@@ -8,7 +8,7 @@
 出力: work/ctlvfx/facts.json と stdout の Markdown 表。
 usage: closure_facts.py
 """
-import os, sys, json, collections, struct
+import os, sys, json, collections, struct, multiprocessing
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 P = os.path.join(HERE, '..')
@@ -113,21 +113,28 @@ def engine_facts(block):
             'pdata_funcs': nf, 'pdata_bytes': nb, 'exports': exp[:20], 'n_exports': len(exp), 'imports': imp}
 
 
+def one(t):
+    name, blk, _tier, eng = t
+    c, rs = closure_info(blk)
+    f = {'block': blk, 'closure_funcs': c['unique_funcs'], 'closure_bytes': c['unique_bytes'],
+         'frontier_funcs': c['framework_frontier_funcs'], 'frontier_bytes': c['framework_frontier_bytes'],
+         'vcall': c['indirect_vcall'], 'ptr_or_vt0': c['indirect_ptr_or_vt0'], 'iat_calls': c['iat_calls'],
+         'entries': c['entries']}
+    f['host'] = host_facts(blk, rs)
+    f['kernel'] = kernel_facts(blk, rs)
+    if eng:
+        f['engine'] = dict(engine_facts(eng), block=eng)
+    return name, f
+
+
 def main():
     os.makedirs(OUTD, exist_ok=True)
     out = {}
-    for name, blk, _tier, eng in TARGETS:
-        c, rs = closure_info(blk)
-        f = {'block': blk, 'closure_funcs': c['unique_funcs'], 'closure_bytes': c['unique_bytes'],
-             'frontier_funcs': c['framework_frontier_funcs'], 'frontier_bytes': c['framework_frontier_bytes'],
-             'vcall': c['indirect_vcall'], 'ptr_or_vt0': c['indirect_ptr_or_vt0'], 'iat_calls': c['iat_calls'],
-             'entries': c['entries']}
-        f['host'] = host_facts(blk, rs)
-        f['kernel'] = kernel_facts(blk, rs)
-        if eng:
-            f['engine'] = dict(engine_facts(eng), block=eng)
-        out[name] = f
-        print('done', name, file=sys.stderr)
+    jobs = int(os.environ.get('FACTS_JOBS', '4'))   # plugin 間は独立。 imap は順序保存なので facts.json は並列数によらず同一
+    with multiprocessing.Pool(jobs) as pool:
+        for name, f in pool.imap(one, TARGETS):
+            out[name] = f
+            print('done', name, file=sys.stderr, flush=True)
     json.dump(out, open(os.path.join(OUTD, 'facts.json'), 'w'), indent=1, ensure_ascii=False)
     print(json.dumps(out, indent=1, ensure_ascii=False))
 

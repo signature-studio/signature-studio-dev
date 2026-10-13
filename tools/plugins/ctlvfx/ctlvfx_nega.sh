@@ -4,6 +4,7 @@
 #   NC-E : ctlvfx_e2e.sh --judge-only に不合格 CSV → exit 非 0 かつ `[ctlvfx_e2e] OK` を出さないこと (対照: 合格 CSV は exit 0 + OK)
 #   NC-M : matrix_check.py に壊した facts / PLUGIN_MATRIX → exit 1
 #   NC-I : ids_crosscheck.py に taint 側 ID +1 / plugin 欠落の facts → exit 1
+#   NC-D : closure_defs.py に define 脱落 / 閉包外混入 / final.ll 無しの batch → exit 1
 #   NC-L1/L2: lift 本体 (最小の閉包 Fruity dB meter 19096): final.ll を壊すと emcc -c が FAIL / ranges を 1 つ落とすとその関数が消える
 # exit 0 = 全 NC が期待どおり (識別できた)。 1 つでも期待を外せば exit 1。
 set -uo pipefail
@@ -11,8 +12,9 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
 cd "$HERE/.."
 N=work/ctlvfx/nega; rm -rf "$N"; mkdir -p "$N/tmp"
-S=work/ctlvfx/status.csv; F=work/ctlvfx/facts.json
+S0=work/ctlvfx/status.csv; F=work/ctlvfx/facts.json; S=$N/base.csv
 M="python3 ctlvfx/nega_mut.py"
+$M csv-pass $S0 $S   # 基準: 実測の行を合格値にそろえたもの (実測に不合格があっても NC の対照にできる)
 NG=0
 # expect <名前> <期待 rc: 0 | nz | 数値> <実 rc>
 expect() {
@@ -23,8 +25,9 @@ expect() {
 }
 J() { python3 ctlvfx/judge.py "$1" > "$N/judge.out" 2>&1; echo $?; }
 
-# --- judge.py ---
-expect "J0  対照 (実測 status.csv)" 0 "$(J $S)"
+# --- judge.py ---  (基準 $S = 実測 status.csv の全行を合格値にそろえたもの。 実測そのものの判定は J00 に情報として出す)
+expect "J0  対照 (全行を合格値にそろえた基準)" 0 "$(J $S)"
+echo "J00 実測 status.csv の judge: rc=$(J $S0) ($(tail -n 1 $N/judge.out))"
 B=19096   # Fruity dB meter (最小の閉包)
 $M csv-set $S $N/a.csv $B emcc_c_rc 1;            expect "J1  emcc_c_rc=1" nz "$(J $N/a.csv)"; grep -q "emcc_c_rc=1" $N/judge.out || { echo "J1 の説明に emcc_c_rc=1 が無い"; NG=$((NG + 1)); }
 $M csv-set $S $N/a.csv $B lift_rc 1;              expect "J2  lift_rc=1" nz "$(J $N/a.csv)"
@@ -62,6 +65,15 @@ ic() { python3 ctlvfx/ids_crosscheck.py "$@" > $N/ic.out 2>&1; echo $?; }
 expect "I0  対照 (実測 facts)" 0 "$(ic $F)"
 $M facts-bump-id $F $N/f.json > $N/ic_who.txt;               expect "I1  taint 側 ID 件数 +1 ($(cat $N/ic_who.txt))" nz "$(ic $N/f.json)"
 $M facts-drop $F $N/f.json "Wave Candy";                     expect "I2  facts から 1 本欠落" nz "$(ic $N/f.json)"
+
+# --- closure_defs.py ---
+cdef() { python3 ctlvfx/closure_defs.py "$@" > $N/cd.out 2>&1; echo $?; }
+expect "D0  対照 (実測 work/batch)" 0 "$(cdef work/batch)"
+mkdir -p $N/batch; for d in work/batch/[0-9]*; do ln -s "$PWD/$d" $N/batch/$(basename $d); done
+rm $N/batch/$B; mkdir $N/batch/$B
+$M ll-rename work/batch/$B/p.final.ll $N/batch/$B/p.final.ll;  expect "D1  define を 1 つ別名に (脱落)" nz "$(cdef $N/batch)"; grep -q "Fruity dB meter.*NG" $N/cd.out || { echo "D1: dB meter の NG 行が無い"; NG=$((NG + 1)); }
+$M ll-outside work/batch/$B/p.final.ll $N/batch/$B/p.final.ll; expect "D2  閉包外の define を混入" nz "$(cdef $N/batch)"
+rm $N/batch/$B/p.final.ll;                                     expect "D3  final.ll 無し" nz "$(cdef $N/batch)"
 
 # --- lift 本体 (dB meter 19096) ---
 OUT=work/batch/$B

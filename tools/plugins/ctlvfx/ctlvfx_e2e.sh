@@ -2,9 +2,9 @@
 # PLG-F8 (#205) 28 本 (controller / VFX / gui-only / visual 他) の「lift 前提」実測を 1 コマンドで再現する。
 #   bash tools/plugins/ctlvfx/ctlvfx_e2e.sh [--skip-lift]            全工程
 #   bash tools/plugins/ctlvfx/ctlvfx_e2e.sh --judge-only <status.csv>  判定 (judge.py) だけ。 ネガティブコントロール用
-# 手順: 前提 inventory (work/ 無ければ生成) → 28 閉包 → batch_lift (RetDec+pass 鎖 → emcc -c) → [gate] judge.py → closure_facts.py
+# 手順: 前提 inventory (work/ 無ければ生成) → 28 閉包 → batch_lift (RetDec+pass 鎖 → emcc -c) → [gate] judge.py + closure_defs.py → closure_facts.py
 #        → [gate] matrix_check.py → [gate] ids_crosscheck.py → engine 2 本の lift (参考; gate に含めない)
-# exit: gate (judge / matrix_check / ids_crosscheck) が 1 つでも不合格なら非 0。 `[ctlvfx_e2e] OK` は全 gate 合格時のみ出る。
+# exit: gate (judge / closure_defs / matrix_check / ids_crosscheck) が 1 つでも不合格なら非 0。 `[ctlvfx_e2e] OK` は全 gate 合格時のみ出る。
 #       gate は全部走らせてから結果をまとめて返す (不合格でも他の実測値は残す)。
 # 出力: work/ctlvfx/{status.csv,facts.json,engines.csv} (work/ は gitignore)
 # 前提素材: fl-win64 / toolchain-retdec (/opt/retdec) / toolchain-emsdk (/opt/emsdk)  (docs/WORKFLOW.md §11)
@@ -52,6 +52,7 @@ fi
 
 FAILED=()
 python3 ctlvfx/judge.py work/ctlvfx/status.csv || FAILED+=(judge)
+python3 ctlvfx/closure_defs.py work/batch || FAILED+=(closure_defs)
 
 python3 ctlvfx/closure_facts.py > work/ctlvfx/facts.stdout.json 2> work/ctlvfx/facts.err
 python3 ctlvfx/matrix_check.py || FAILED+=(matrix_check)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """ctlvfx_nega.sh 用: 実測の status.csv / facts.json / PLUGIN_MATRIX.json を 1 箇所だけ壊したコピーを作る。
+  csv-pass   IN OUT                     全行を合格値にそろえる (対照用の基準。 実測が不合格を含んでいても NC の基準にできる)
   csv-set    IN OUT BLOCK FIELD VALUE   status.csv の BLOCK 行の FIELD を VALUE にする
   csv-drop   IN OUT BLOCK               BLOCK 行を消す
   csv-append IN OUT 'a,b,...'           行を追記する
@@ -9,15 +10,22 @@
   facts-bump-id IN OUT                  最初に即値 ID を持つ plugin の host.ids の最初の即値 ID の件数を +1 (stdout: その plugin 名)
   facts-drop IN OUT NAME                facts から NAME を消す
   matrix-tier IN OUT NAME               PLUGIN_MATRIX.json の NAME の tier を別の値にする
+  ll-rename  IN OUT                     final.ll の最初の `define @function_<VA>` を別名にする (関数の脱落を模す)
+  ll-outside IN OUT                     final.ll に閉包外の `define @function_deadbeef` を足す (混入を模す)
 """
-import csv, json, sys
+import csv, json, re, sys
 
 op, src, dst = sys.argv[1:4]
 a = sys.argv[4:]
 if op.startswith('csv-'):
     rows = list(csv.reader(open(src)))
     hdr = rows[0]
-    if op == 'csv-set':
+    if op == 'csv-pass':
+        for r in rows[1:]:
+            for k in ('lift_rc', 'emcc_c_rc', 'f80_funcs', 'declares_unimpl'):
+                r[hdr.index(k)] = '0'
+            r[hdr.index('defines')] = str(max(int(r[hdr.index('defines')]), int(r[hdr.index('closure_funcs')])))
+    elif op == 'csv-set':
         for r in rows[1:]:
             if r[0] == a[0]:
                 r[hdr.index(a[1])] = a[2]
@@ -32,6 +40,13 @@ if op.startswith('csv-'):
         bad = list(rows[i]); bad[hdr.index('emcc_c_rc')] = '1'
         rows.insert(i, bad)
     csv.writer(open(dst, 'w')).writerows(rows)
+elif op.startswith('ll-'):
+    t = open(src).read()
+    if op == 'll-rename':
+        t = re.sub(r'^(define [^@]*@)function_([0-9a-f]+)\b', r'\1renamed_\2', t, count=1, flags=re.M)
+    else:
+        t += '\ndefine void @function_deadbeef() {\n  ret void\n}\n'
+    open(dst, 'w').write(t)
 else:
     d = json.load(open(src))
     if op == 'facts-bump':

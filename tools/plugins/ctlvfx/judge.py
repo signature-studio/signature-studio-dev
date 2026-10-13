@@ -2,7 +2,8 @@
 """lift 準備度の合否判定 (gate)。 batch_lift.sh の status.csv を読み、targets.py の 28 本すべてが合格のときだけ exit 0。
   usage: judge.py <status.csv>
 合格条件 (行ごと。 同一 block が複数行なら最後の行): 28 本すべての行が存在し、名前が targets.py と一致し、
-  closure_funcs > 0 / lift_rc == 0 / emcc_c_rc == 0 / f80_funcs == 0 / declares_unimpl == 0 / defines == closure_funcs。
+  closure_funcs > 0 / lift_rc == 0 / emcc_c_rc == 0 / f80_funcs == 0 / declares_unimpl == 0 / defines >= closure_funcs。
+  (defines > closure_funcs は正常: RetDec が 1 range を複数 define に切る。 個々の関数の脱落は closure_defs.py が見る)
   (-1 は「final.ll や simd.log が生成されなかった」の印なので、f80 / declares_unimpl の == 0 条件で不合格になる)
 不合格条件の追加: header 不一致 / targets に無い block の行 / 数値でない欄。
 exit: 0 = 全合格 / 1 = 1 件以上の不合格 / 2 = 入力が読めない。 不合格でも表示だけで終わらせない。
@@ -53,8 +54,8 @@ def judge(rows):
         for k in ('lift_rc', 'emcc_c_rc', 'f80_funcs', 'declares_unimpl'):
             if v[k] != 0:
                 why.append('%s=%d' % (k, v[k]))
-        if v['defines'] != v['closure_funcs']:
-            why.append('defines=%d != closure_funcs=%d' % (v['defines'], v['closure_funcs']))
+        if v['defines'] < v['closure_funcs']:
+            why.append('defines=%d < closure_funcs=%d' % (v['defines'], v['closure_funcs']))
         if why:
             fails.append('%s (%d): %s' % (name, b, ', '.join(why)))
         else:
