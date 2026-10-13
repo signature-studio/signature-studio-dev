@@ -3,6 +3,19 @@ import fs from 'fs';
 Error.stackTraceLimit = 40;
 const M11 = new URL('../', import.meta.url).pathname.replace(/\/$/, '');
 const m2 = await import(M11 + '/work/m11_boot.cjs');
+// frames は wasm 関数 index のままだとビルド間で名前がずれるため, 実行した wasm の export 名で解決して JSON に残す (#483)
+const wasmBin = fs.readFileSync(M11 + '/work/m11_boot.cjs.wasm');
+const fnNames = new Map();
+{
+  let pos = 8;
+  const leb = () => { let r = 0, s = 0, x; do { x = wasmBin[pos++]; r |= (x & 0x7f) << s; s += 7; } while (x & 0x80); return r >>> 0; };
+  while (pos < wasmBin.length) {
+    const id = wasmBin[pos++]; const sz = leb(); const end = pos + sz;
+    if (id === 7) { const n = leb(); for (let k = 0; k < n; k++) { const l = leb(); const nm = wasmBin.toString('utf8', pos, pos + l); pos += l; const kind = wasmBin[pos++]; const idx = leb(); if (kind === 0 && !fnNames.has(idx)) fnNames.set(idx, nm); } }
+    pos = end;
+  }
+}
+const resolve = (f) => { const m = /wasm-function\[(\d+)\]/.exec(f); return m && fnNames.has(+m[1]) ? fnNames.get(+m[1]) : f; };
 const errs = [];
 const mod = await m2.default({ printErr: (s) => { errs.push(String(s)); if (process.env.SV_TRACE_AT) fs.writeSync(2, s + '\n'); } });
 mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
@@ -27,12 +40,12 @@ for (let i = 0; i < 942; i++) {
     const r = mod._m11_call_unit(i);
     rec.kind = r === 1 ? 'ok' : r === 0 ? 'noproc' : 'miss';
   } catch (e) {
-    if (e && e.m11_dllmain_done !== undefined) { rec.kind = 'halt0'; rec.frames = ((e.stack) || '').split('\n').filter(l => /wasm-function/.test(l)).slice(0, 30).map(l => l.trim()); }
+    if (e && e.m11_dllmain_done !== undefined) { rec.kind = 'halt0'; rec.frames = ((e.stack) || '').split('\n').filter(l => /wasm-function/.test(l)).slice(0, 30).map(l => resolve(l.trim())); }
     else {
       const msg = ((e && e.message) || String(e)).split('\n')[0];
       rec.kind = /out of bounds/.test(msg) && !/table/.test(msg) ? 'oob' : /abort/i.test(msg) ? 'abort' : 'other';
       rec.msg = msg;
-      rec.frames = ((e && e.stack) || '').split('\n').filter(l => /wasm-function|at /.test(l)).slice(1, 30).map(l => l.trim().replace(/^at /, '').split(' ')[0]);
+      rec.frames = ((e && e.stack) || '').split('\n').filter(l => /wasm-function|at /.test(l)).slice(1, 30).map(l => resolve(l.trim().replace(/^at /, '').split(' ')[0]));
     }
     mod.__emscripten_stack_restore(sp0);
   }

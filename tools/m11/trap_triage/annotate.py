@@ -68,7 +68,7 @@ ec = collections.defaultdict(list)
 for r in per:
     if r['kind'] == 'halt0':
         fr = [nm(f) for f in r.get('frames', [])]
-        i = fr.index('function_409730') if 'function_409730' in fr else fr.index('function_412a60')
+        i = next((fr.index(x) for x in ('function_409730', 'function_412a60', 'function_4096d0') if x in fr), 0)
         ch = []
         for f in fr[i + 1:]:
             if f.startswith('m11_'): break
