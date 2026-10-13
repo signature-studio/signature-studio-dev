@@ -59,6 +59,51 @@ def load_pyc(path, name="__main__"):
     return mod
 
 
+_PYSCRIPTS = {}  # name -> module (読み込み済み .pyscript)
+_FLAPI_GLOBALS = ("channels", "mixer", "patterns", "playlist", "transport", "general", "ui", "device", "arrangement",
+                  "plugins", "screen", "launchMapPages")
+
+
+def load_pyscript(path, name=None):
+    """.pyscript を専用 module namespace で実行する。FL のピアノロールスクリプトは通常の Python ソース。
+    トップレベルで実行される (createDialog/apply を持たない旧形式はこの時点で処理が走る)。
+    戻り値: 公開エントリの有無 {"name", "createDialog", "apply"}。"""
+    import flpianoroll
+    name = name or "pyscript_" + str(len(_PYSCRIPTS))
+    src = open(path, "rb").read().decode("utf-8-sig")
+    mod = types.ModuleType(name)
+    mod.__file__ = path
+    # Remote Scripts (filleach 等) は import 無しで `channels.xxx` を参照する → インストール済みの flapi module を
+    # グローバルに見せる (ASSUMPTION: FL 実機が同じ名前を注入していると推定。同梱 5 本の参照名から逆算)
+    for fm in _FLAPI_GLOBALS:
+        if fm in sys.modules:
+            mod.__dict__[fm] = sys.modules[fm]
+    sys.modules[name] = mod
+    _PYSCRIPTS[name] = mod
+    exec(compile(src, path, "exec"), mod.__dict__)
+    return {"name": name, "createDialog": callable(getattr(mod, "createDialog", None)),
+            "apply": callable(getattr(mod, "apply", None))}
+
+
+def run_pyscript(name, score=None, values=None):
+    """1 回分の実行: score(dict) を注入 → createDialog() → フォーム値(dict)を注入 → apply(form) → 結果 dict。
+    call_json("fl_rt:run_pyscript", {"name":..,"score":..,"values":..}) の共通口からも呼べる (例外は call_json が {"err"} 化)。
+    values は {"コントロール名": 値}。無指定のコントロールは createDialog の既定値のまま。"""
+    import flpianoroll
+    mod = _PYSCRIPTS[name]
+    flpianoroll.reset(score)
+    form = None
+    dialog = None
+    if callable(getattr(mod, "createDialog", None)):
+        form = mod.createDialog()
+        form.set_values(values or {})
+        dialog = form.describe()
+    if callable(getattr(mod, "apply", None)):
+        mod.apply(form)
+    return {"dialog": dialog, "score": flpianoroll.score.dump(),
+            "utils": list(flpianoroll.Utils.messages), "warnings": list(flpianoroll.warnings)}
+
+
 class flmidimsg:
     """FL の flmidimsg 相当 (フィールド一覧は FLEngine rodata: handled timestamp status data1 data2 port ...)。"""
 

@@ -34,6 +34,8 @@ export function createMockEngine() {
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
+    "channels.selectedChannel": (canBeNone = false, offset = 0) => st.selectedChannel + offset,
+    "channels.fillEachNSteps": (i, stride, offset, vel) => { ch(i); for (let p = offset; p < 64; p += stride) ch(i).steps[p] = 1; },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = n; },
     "channels.isChannelSelected": (i) => ch(i).sel,

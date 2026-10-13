@@ -7,9 +7,10 @@ WORK="$HERE/work"; SRC="$WORK/Python-3.12.1"; B="$WORK/build-wasm"; D="$HERE/dis
 # shellcheck disable=SC1091
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 
-python3 "$HERE/analysis/flapi_table.py" >/dev/null   # flapi_table.json / flapi_ids.json を再生成
+# flapi_table.json / flapi_ids.json を再生成 (公開 stubs が work/ にある時のみ。無ければコミット済みの表を使う)
+if [ -f "$WORK/fl-stubs/data/fl_stubs.json" ]; then python3 "$HERE/analysis/flapi_table.py" >/dev/null; fi
 rm -rf "$ST"; mkdir -p "$ST/fl/Lib" "$ST/usr/local/lib/python3.12/lib-dynload" "$D"
-cp "$HERE/src/fl_rt.py" "$HERE/src/fl_api.py" "$HERE/analysis/flapi/flapi_table.json" "$ST/fl/Lib/"
+cp "$HERE/src/fl_rt.py" "$HERE/src/fl_api.py" "$HERE/src/flpianoroll.py" "$HERE/analysis/flapi/flapi_table.json" "$ST/fl/Lib/"
 cp "$B/usr/local/lib/python312.zip" "$ST/usr/local/lib/"
 touch "$ST/usr/local/lib/python3.12/lib-dynload/.empty"
 

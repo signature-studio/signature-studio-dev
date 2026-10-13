@@ -7,6 +7,8 @@ cd "$HERE"
 command -v node >/dev/null || export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 FL_MAC="/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
 FL_WIN="/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin"
+# shellcheck disable=SC1091
+source "$HERE/../shared/env.sh"   # FL_WIN64_DIR 等 (環境変数があればそれを優先)
 step() { printf '\n== %s\n' "$*"; }
 PY312="$HERE/work/build-native/install/bin/python3.12"
 
@@ -27,5 +29,6 @@ step "7. builtin 一覧 / FL 同梱 Python 差分"; node tests/dump_builtins.mjs
 step "8. PoC: MCPTools.pyc on wasm Python + flapi mock (Worker/SAB RPC)"; node tests/poc_mcp.mjs | grep -E '"(tools|init_ms|host_calls|roundtrip_us_per_flapi_call)"|POC'
 step "9. 48 tools 全実行"; node tests/all_tools.mjs
 python3 analysis/mcp_classify.py
+step "9b. .pyscript ローダ + flpianoroll 回帰 (同梱 Piano roll 5 / Remote 5 / Audio 12 調査)"; node tests/pyscript_e2e.mjs | grep -E '^\{"total"'
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
 step "ALL OK"

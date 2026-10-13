@@ -36,7 +36,7 @@ host→Python 入口 (flpy.c export): `flpy_init(syspath)` `flpy_run(src,file)` 
 |---|---|
 | MCP `tools/list` `tools/call` | `host/mcp_rpc.mjs` (JSON-RPC 2.0, 応答は FLEngine の固定テンプレート形) → `py.call("__main__:<tool>")`。MCPTools.pyc は FL と同じく **`__main__` として実行** (`get_mcp_tools_json` が `sys.modules['__main__']` を走査するため) ✔ |
 | MIDI scripting | Web MIDI → engine → `fl_rt:dispatch_midi`: FL と同順 (OnMidiIn → OnMidiMsg → 未 handled なら OnNoteOn 等)。`flmidimsg` 23 フィールド ✔。他 callback は表 (27 個、`pycb*`) 通り同じ `call_json` で ✔設計 |
-| Piano roll scripting | `.pyscript` の `createDialog()` / `apply(form)` + `flpianoroll` module (Note/Marker/score/Utils/ScriptDialog 64 メンバ)。**未実装** (チケット T5) |
+| Piano roll scripting | `.pyscript` の `createDialog()` / `apply(form)` + `flpianoroll` module (Note/Marker/score/Utils/ScriptDialog)。**実装済 ✔** (`src/flpianoroll.py` + `fl_rt.load_pyscript` / `run_pyscript`、#79。詳細は REPORT §10) |
 | stdout/stderr | FL は `fl.FLTextOutput` で Script output へ。本 PoC は Worker→main の `stdout/stderr` メッセージ ✔ |
 
 ## 4. スレッド/リアルタイム
