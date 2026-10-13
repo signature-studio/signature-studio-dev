@@ -412,8 +412,21 @@ GUI_EXPORT const char *gui_stage_dir_win(void) { return GUI_STAGE_WIN_DIR; }
 
 /* ---- ShellExecute → window.open ---- */
 static int url_ok(const char *u) { return u && (!strncasecmp(u, "http://", 7) || !strncasecmp(u, "https://", 8) || !strncasecmp(u, "mailto:", 7)); }
+/* FL の Help (#554): OpenHelpTarget(0x10bdbe0) はローカルの Help パスを ShellExecuteW(NULL, NULL, path, NULL, NULL, SW_SHOW) で直接開く。
+ * <FL>\Help\... と <FL>\System\Internet\error-offline.html だけを host の flHelp へ渡す (".." 等の検査は host の classifyTarget)。 */
+#define GUI_FL_ROOT "C:\\Program Files\\Image-Line\\FL Studio 2026\\"
+static int help_path_ok(const char *f) {
+  if (!f || strncasecmp(f, GUI_FL_ROOT, sizeof GUI_FL_ROOT - 1)) return 0;
+  f += sizeof GUI_FL_ROOT - 1;
+  return !strncasecmp(f, "Help\\", 5) || !strcasecmp(f, "System\\Internet\\error-offline.html");
+}
 static int gui_shell_execute(const char *verb, const char *file, const char *params) {
   if (verb && *verb && strcasecmp(verb, "open")) return 0;
+  if (help_path_ok(file)) {
+    size_t n = strlen(file);
+    if (n >= 1900) return 0;
+    return gui_hostcall(GUI_HC_OPEN_HELP, 0, file, (uint32_t)n + 1, NULL, 0, NULL, 10000) == 1;
+  }
   const char *u = url_ok(file) ? file : url_ok(params) ? params : NULL;   /* 旧式 ShellExecute("iexplore", url) 形も拾う */
   if (!u) return 0;
   size_t n = strlen(u);

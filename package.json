@@ -17,7 +17,9 @@
     "release-guard:test": "node --test tools/legal/release-guard/guard.test.mjs",
     "notices": "node tools/legal/notices/cli.mjs generate",
     "notices:check": "node tools/legal/notices/cli.mjs check",
-    "notices:test": "node --test tools/legal/notices/notices.test.mjs"
+    "notices:test": "node --test tools/legal/notices/notices.test.mjs",
+    "terms-watch": "node tools/legal/terms-watch/cli.mjs",
+    "terms-watch:test": "node --test tools/legal/terms-watch/terms-watch.test.mjs"
   },
   "keywords": [],
   "author": "",

@@ -1,9 +1,8 @@
 # tools/shimx REPORT — Win32/CRT shim 拡張 (担当 Q)
 
 > 正本: `tools/shimx/REPORT.md`。
-> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
-> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
-> 付録: SHX-T8 (#175) は `REPORT_SHX-T8.md` (§15 から分割移動)。
+> **行数**: 250 行以内 (`docs/DOC_MAP.md` §1)。超過分は Git 履歴に残る形で付録へ分割移動 (**内容は削除しない**)。
+> 付録: SHX-T8 (#175) は `REPORT_SHX-T8.md` (§15)、R1〜R8・cbtrans (§9・§10) は `REPORT_R1-R8.md`、CAB-214 (§11・§12) は `REPORT_CAB-214.md` (いずれも分割移動)。
 
 - 日付: 2026-10-10 (初版) / **2026-10-10 更新: CAB-211 — M11 リンク フィードバック R1〜R8 対応 (§9)** / **2026-10-10 更新: CAB-214 — vreg reg.c 本体取込 + username 統一 (§11)** / **2026-10-10 更新: CAB-214 follow-up — 後始末 3 件 (vreg 薄ラッパ化 / pathreg 予備 profile 退役 / winstubs wrap 5 API 退役, §12)** / 検証環境: emcc 6.0.12, node v24.19.0 (emsdk 同梱), llvm-nm
 - 書込範囲: `tools/shimx/` のみ。`tools/shim` `tools/m2` `tools/m6` `tools/m8` `tools/m11` `tools/plugins` `tools/startup` `tools/targets` は読取のみ (改変 0 行)。
@@ -127,214 +126,20 @@ bash tools/hostbridge/cb/cb_e2e.sh                 # R2/R3 実体接続の往復
 
 - 独立再計算 (pefile で `[WIN64]` の `extracted/block00031_PE.bin` を直接解析; 呼出サイトは E8/E9 rel32 を独自走査) で主要数値は一致。差異は M11 外部参照 553→557 (ir_undef の declare 正規表現が struct 戻り値 `__asm_cpuid*` 4 件を取りこぼし。lift 由来のみ・shimx/GUI 件数に影響なし) の 1 件のみで修正済み。
 
-## 9. M11 リンク フィードバック対応 — R1〜R8 (CAB-211)
+## 9. M11 リンク フィードバック対応 — R1〜R8 (CAB-211) / 10. R2/R3 実体接続 — cbtrans (CAB-177)
 
-出典: `tools/m11/shimx_link/REPORT.md` §6 (CAB-166, commit 8170eee)。テスト: `test/test_link.c` (`bash tools/shimx/test.sh` の MT/ST で実行)。既存検収 (M4 53/53, MT/ST, 署名突合 0, OTT t1 SHA 一致 `b5a91b9b…`) は **全て維持**。
+本文・測定値は付録 **`tools/shimx/REPORT_R1-R8.md`** (§9.1〜9.4・§10) に分割移動した (行数上限対応、内容は無変更)。以降の § 参照 (§9.x / §10) は同ファイルを指す。
 
-### 9.1 対応表
+- **結論 (R1〜R8)**: M11 リンク フィードバック 8 項目に対応 (R1 intptr 閾値 / R2 コールバック変換フック / R3 GetProcAddress 表追加 / R4 擬似 LoadLibrary / R5 BSTR 所有表 / R6 ir_undef 構造体展開・重複 declare 正規化 / R7 CS NULL 方針 / R8 検証手順整備)。既存検収は全て維持。
+- **結論 (§10)**: `src/cbtrans.c` で R2/R3 の変換実体を接続し、M11 純リンクの "table index is out of bounds" trap が消滅 (init_count 18, mismatch/undefined/duplicate 0)。
+- 再現: `bash tools/shimx/scripts/rem11_check.sh` (§9.2)・`bash tools/hostbridge/cb/cb_e2e.sh` (§10)。
 
-| # | 要求 (M11 REPORT §6) | 対応 | 実装 |
-|---|---|---|---|
-| R1 | 「ポインタ < 0x10000 は序数/整数」判定の閾値設定 or image 敷設 ≥64KB | **実装** | `shimx_set_intptr_limit(lim)` / `shimx_get_intptr_limit()` (既定 0x10000)。判定箇所は 5 か所 (GetProcAddress 序数 / FindResourceA name,type / AddAtom・FindAtomW の MAKEINTATOM / CharUpper・LowerW 単一文字) を共通ヘルパ `shx_is_iptr()` に統一。**lowbase は LB_BASE=0x10000 敷設で既定値のままで整合** (guest ポインタ全て ≥ lim)。LVA=0 敷設 (M11 旧式) では `shimx_set_intptr_limit(0x4000)` 等に下げる — `kernel32.dll!#39682` (Delphi 文字列 LVA 0x9b02) は lim<0x9b02 で文字列扱いになり、序数 shell32 #16..155 (<0x4000) は引き続き有効。デフォルト不変のため M11 の miss 挙動自体は変わらない (harness 側の設定が必要) |
-| R2 | 関数ポインタ引数の変換フック | **実装** | `shimx_set_callback_translator(fn)` (型: `void* (*fn)(const char* api, void* cb)`)。適用 API: EnumSystemLocalesW / EnumCalendarInfoW / CreateThread / FlsAlloc / CreateTimerQueueTimer / CreateThreadpoolWork / InitOnceExecuteOnce の **計 7 API** (同期 3 = Enum*・InitOnceExecuteOnce + 非同期 4 = CreateThread・FlsAlloc・タイマ・スレッドプール; REPORT 要求を網羅)。翻訳結果 NULL は元値にフォールバック (呼出側の NULL 判定を保護)。未設定時は恒等 → 既存挙動不変。**VA→トランポリン変換の実体は hostbridge (T2/CAB-177)** がこのフックに接続する |
-| R3 | GetProcAddress 組込み表追加 (kernel32 UI言語 3 本, shell32 序数 9 個) | **実装** | kernel32: `GetThreadPreferredUILanguages` / `SetThreadPreferredUILanguages` / `GetThreadUILanguage` を機能実装 (en-US 固定, multi-sz "en-US\0\0", GetProcAddress 名前解決は自動生成 proctable に反映)。shell32 序数は Windows 10/11 の序数表と突合して **同定**: 16=ILFindLastID, 17=ILRemoveLastID, 18=ILClone, 19=ILCloneFirst, 21=ILIsEqual, 25=ILCombine, 152=ILGetSize, 153=ILGetNext, 155=ILFree (既知 190=ILCreateFromPathW も登録)。IL* 8 本を shimx 自前 PIDL 形式で実装し、序数直指定用の新表 `shx_ordtable` (src/module.c, 手書き) から解決。74 (SHCreateStdEnumFmtEtc) は未実装のまま miss |
-| R4 | LoadLibrary 失敗方針 (Msctf.dll/avrt/PowrProf.dll を擬似 DLL 登録するか) | **実装** (選択式) | `shimx_set_pseudo_load(1)`: 未知 DLL 名を擬似モジュール (最小 PE ヘッダ画像, 組込み扱い) として登録し LoadLibrary を成功させる。**既定 0 = 従来どおり失敗** (M11 survey で失敗のまま起動が進む実績があるため既定は不変)。失敗/擬似登録は `SHX_TRACE` に出力 |
-| R5 | SysFreeString が管理外ポインタを受けたときの挙動 | **実装** | SysAlloc* が確保したベースポインタの所有表 (オープンアドレス法ハッシュ, mutex 保護) を導入。`SysFreeString`: 所有済み→従来どおり free / 管理外→**strict=1 で fail-fast (`SysFreeString (管理外ポインタ)`), strict=0 (既定) で無視 + trace**。二重 free も同一経路で無害化。M11 REPORT §3-#1 の lift 誤り (`_WStrClr` がスタック番地を渡して free で abort) は **この変更だけで abort しなくなる** (--fix の `sx_liftfix.c` C 転記は論理修復として並行維持) |
-| R6 | `ir_undef.py --emit-stubs` の構造体 by-value 展開 + `NAME.1` 重複 declare 正規化 | **実装** | (a) `--emit-stubs` が `%name = type {...}` 表から by-value 構造体引数を wasm32 規則で展開 (`WindowFromPoint(%tagPOINT)` → `(int, int)` — M11 REPORT §1 の signature mismatch 1 の再発防止)。(b) 新オプション `--normalize-dup out.ll`: `NAME.<d>` / `NAME_D<d>` (基名が shimx 定義) を基名 declare へ正規化 — 重複 declare 削除 + 呼出siteの引数 0/null 補間 + 戻り値型差の変換命令 (trunc/zext/inttoptr/ptrtoint/fpext/fptrunc)。実測: boot_final2/3 とも 1 名 1 site 正規化され **emcc 通過**。(c) 分類に `shimx_dup` を新設 (§9.3 の再計測参照) |
-| R7 | EnterCriticalSection(NULL) の方針 | **実装** (方針決定 + 選択式) | **既定 = fail-fast のまま** (= Win32 実機のアクセス違反相当。survey unit 115 は旧 M4 shim でも同一 unit で abort する lift 側ポインタ不正であり、黙って成功させると lift 誤りを隠す)。許容モード `shimx_set_cs_null_ok(1)` を追加: Enter/Leave は no-op、TryEnter=FALSE、Initialize 何もしない、SleepConditionVariableCS=FALSE。null_ok モード自体も fail-fast モード (`node x.cjs csnull`) で検査 |
-| R8 | 未検証 133 名の実機検証 | **手順整備** (実検証は unit 完走後) | `scripts/reach_check.py` (M11 `reach.json` の `static_reach_but_never_called` 133 名と実行トレースの差分集計) + `scripts/rem11_check.sh` (§9.2)。現時点の純リンク実行では 133 名の呼出 0 (起動経路は 17 unit まででレジストリ・ファイル系大半に未到達) — REPORT のとおり T9 (CAB-176) の unit 完走後の後続 |
+## 11. vreg reg.c 本体取込 + username 統一 (CAB-214, SHX-T10) / 12. CAB-214 follow-up 後始末 3 件
 
-### 9.2 「CAB-129 修正後、--fix なし純リンクで 17 unit 再測」の再現手順 (1 コマンド)
+本文・測定値は付録 **`tools/shimx/REPORT_CAB-214.md`** (§11.1〜11.7・§12.1〜12.4) に分割移動した (行数上限対応、内容は無変更)。以降の § 参照 (§11.x / §12.x) は同ファイルを指す。
 
-```
-bash tools/shimx/scripts/rem11_check.sh
-```
-
-1. `tools/m11/shimx_link/build.sh --trace --soft` — **IR 無改変・--fix 一切無し** のトレース付き純リンク (signature mismatch 0 / undefined 0 / duplicate 0 を build ログで確認)
-2. `run_trace.mjs` で起動実行 (`SHIMX_TRACE=1`) → `tools/shimx/work/rem11/m11_sx_trace_soft.run.json`
-3. 判定基準 (M11 REPORT §0/§3-#2 の実測と対応):
-   - **真の 17 unit 完走** = `init_count >= 18` (unit #18 に進入) かつ `longjmp_hit == 0` (unit #18 OOB で停止するのが期待値)
-   - **偽の DllMain 完走** (CAB-129 未修正の現状) = `init_count == 17` かつ `longjmp_hit == 1` かつ `boot_rc == 1` — shadow stack 破壊による Halt0
-   - **2026-10-10 実測 (CAB-129 未修正)**: `init_count=17, longjmp_hit=1, boot_rc=1, threw=null` = 偽の完走 (既知到達点どおり。shimx 呼出 17 種 / 27 回)。CAB-129 修正後に同コマンドを再実行し判定行が「真の 17 unit 完走」に変わることを確認する
-4. 同スクリプトが `reach_check.py` で R8 進捗 (133 名のうち本実行で呼ばれた名) を `tools/shimx/work/rem11/reach_progress.md` に出力
-
-前提: `bash tools/m11/m11_e2e.sh` 済みの M11 成果物 (`tools/m11/work/boot_final3.ll` 等)。`tools/m11/shimx_link/` の tracked ファイルは読取のみ (成果物は同 dir の work/ = gitignore)。
-
-### 9.3 ir_undef.py 変更の M11 外部参照数への影響 (再計測)
-
-| IR | 旧分類 (変更前実測) | 新分類 (本変更後) | 差分 |
-|---|---|---|---|
-| boot_final2.ll (557) | shimx 183 / lifter 203 / win_other 171 / unknown 0 | shimx **182** / **shimx_dup 1** (`SHGetFolderPathW.1`) / lifter 203 / win_other 171 / unknown 0 | shimx 183→182+dup1 (合計不変)。`NAME.1` が署名不一致の恐れがある別シンボルとして明示化され、`--emit-stubs` がスタブを吐く/`--normalize-dup` で正規化できるように |
-| boot_final3.ll (570) | shimx 184 / lifter 214 / win_other 171 / unknown 1 (`SHGetFolderPathW_D1`) | shimx **184** / **shimx_dup 1** / lifter 214 / win_other 171 / unknown 0 | unknown 1→0 (同上の rename 後形式も同一扱い)。合計不変 |
-
-外部参照総数 (557/570)・GUI 171・lift 由来は不変。`--emit-stubs` は `win_other + unknown + shimx_dup` を対象に変わったため、旧版で取りこぼしていた重複 declare 分のスタブが生成される (172 本 @boot_final3, 旧 171 本相当 + 1)。
-
-### 9.4 CAB-166 `--fix` の取り込み状況
-
-| --fix 構成要素 | 取り込み | 補足 |
-|---|---|---|
-| `cb_adapt.c` (列挙コールバック変換) | **置換完了 (CAB-177)** | R2 の `shimx_set_callback_translator` が恒常フック口。VA→トランポリン変換の実体は **`src/cbtrans.c` (§10)** として shimx 側に恒久実装し、link 側は `sx_cbboot.c` (constructor で invoke+translator+resolver を登録) だけになった。**tools/m11/shimx_link/cb_adapt.c は削除** (--wrap=Enum* も廃止)。M11 純リンクへの接続実測は §10 |
-| `fix_alloca.py` (alloca 拡幅) | **意図的保留** | lift IR の縮退 alloca 修復で shim の担当外 (CAB-129 の本修正待ち)。`--emit-stubs`/`--normalize-dup` は IR を書くが構造体署名の正規化のみで alloca 構造には触れない |
-| `sx_liftfix.c` (`_WStrClr` C 転記) | **部分取り込み (症状緩和)** | 論理修復 (2 段 deref) は lift 側のまま保留。ただし R5 の所有表により、誤ったポインタを `SysFreeString` に渡しても abort しなくなり、純リンク時の同症状は無害化される (次回 §9.2 の再測で確認) |
-
-## 10. R2/R3 実体接続 — cbtrans (CAB-177 / SHX-T2 hostbridge 接続)
-
-CAB-211 のフック口の**変換実体**を `src/cbtrans.c` として恒久実装し、M11 純リンク (CAB-129 ビルド) と
-検証ハーネスへ接続した。**詳細 (設計/寿命契約/接続手順/実測/未対応・CAB-101 引継ぎ) は
-`tools/hostbridge/cb/REPORT.md`** と `src/cbtrans.c` 冒頭コメント、往復検証は `test/test_cbtrans.c` (MT/ST)
-+ `tools/hostbridge/cb/cb_e2e.sh` (MT 15 / ST 12 checks, exit 0)。
-
-- **R2**: guest VA (≥intptr_limit) → 型付き slot トランポリン (6 形 × 64 slot) → **invoke 契約**
-  `u64 invoke(u64 va, u64 a0..a7)` (= `m11_icall` 或いは `__icall_dispatch` 関数表+BLK 方式) で lift 側関数表へ。
-  未知 va は 0 返し (closure 外でも trap しない)。`cb < intptr_limit` は実 C 関数ポインタの恒等通過 (M4 互換)。
-  **寿命契約**: 翻訳は 7 API の登録時に 1 回 / slot は**プロセス寿命で解放しない** → 非同期系
-  (CreateThread/FlsAlloc/タイマ/スレッドプール) も安全 (同一 VA = 常に同一トランポリン)。
-- **R3**: shell32 IL* 10 本 + kernel32 UI言語 3 本を **lift ABI トークン** (0x7F000000+index) 化する
-  `shimx_lifttab_*`。proc_resolver 接続で GetProcAddress がトークンを返し、lift dispatch 側は
-  `shimx_lifttab_trampoline(token)` (u64×8 → 実 C 署名 thunk) で実体呼出 (M11 = `--wrap=m11_icall`)。
-- **接続手順**: `shimx_cbtrans_set_invoke(<m11_icall 相当>)` → `shimx_cbtrans_install()` →
-  `shimx_set_proc_resolver(shimx_lifttab_proc_resolver)`。実装例 = `tools/m11/shimx_link/sx_cbboot.c`。
-
-**M11 純リンク実測**: init_count=18 / longjmp_hit=0 維持、threw が **"table index is out of bounds" →
-"memory access out of bounds"** (CAB-231 既知 OOB に進行, 後退なし)。icall_ok/miss = 19/**1**。ビルド 5 variant
-とも mismatch/undefined/duplicate **0**。survey 942 unit は **800/41/53 不変**。R3 の 13 名は survey で
-**トークン解決** (GetProcAddress miss 消滅)。
-
-## 11. vreg reg.c 本体取込 + username 統一 (CAB-214, SHX-T10)
-
-**結論**: `tools/startup/vreg/src/reg.c` (828 行, CAB-94/a5b44fe) の拡張全てを `src/reg.c` に取込した
-(686→829 行, 公開シンボル **39→50**, 欠落 0 — 旧 39 シンボルは全て継承)。以後の改良は shimx 側が正本。
-vreg 側との二重管理は解消 (vreg `build.sh symcheck`: shimx 50 シンボルを vreg reg.c が全包含 / **追加 0** =
-両者はシンボル集合として同一)。username も CAB-213 の正規表記 `C:\Users\webstudio` に統一した。
-
-### 11.1 取込差分 (vreg REPORT §2 の 4 項目 + 追加 6 API → 全て実装)
-
-| # | 取込内容 | 実装 | shimx での改善点 |
-|---|---|---|---|
-| 1 | 変更世代 `vreg_generation()` + 通知 `vreg_set_notify(cb)` (set/delete/create で世代+1, **ロック解放後に呼出スレッドで同期通知**) | `reg_unlock()` / `touched()` (全 22 unlock site を経由) | 永続化トリガ (vreg JS の dirty→遅延 flush) が shimx 単体で利用可 |
-| 2 | `RegEnum*` の `ERROR_MORE_DATA` で必要長を返す | `put_name()`: `*cch = n` を設定して返す | Delphi TRegistry 流の 2 段呼出 (長さ問合せ→再取得) が通る |
-| 3 | import 拡張: UTF-8 BOM / `[-HKEY_..]` (サブツリー削除) / `"v"=-` / `@=-` | `shimx_reg_import_text()` | `.reg` 往復が vreg seed (236 エントリ) と同一経路に |
-| 4 | `vreg_export_root(i)` / `vreg_clear_root(i)` / `vreg_clear_all()` | `export_key`/`clear_root_locked` を共用 (`shimx_reg_reset` も `clear_root_locked` に統合) | ルート単位 export/clear が shimx 公開面に |
-| 5 | 追加 6 API: `RegGetValueA` `RegEnumKeyW` `RegDeleteTreeW` `RegSetKeyValueW` `RegDeleteKeyValueW` `RegQueryInfoKeyA` | `src/reg.c` + `shimx.h` 宣言 | **`proctable.c` にも自動登録** (advapi32, 532→538 エントリ) — vreg では未登録だった (vreg REPORT §7「必要になれば proctable 生成の対象に追加」を本取込で解消) |
-| 6 | ヘルパ整理: `free_vals` / `mark_deleted` / `unlink_key` / `type_flags_ok` | vreg 版を verbatim 取用 | 重複コード削減 (`shimx_reg_reset` と `vreg_clear_*` の共通化) |
-
-**exports.txt 差分 (+11)**: `RegDeleteKeyValueW` `RegDeleteTreeW` `RegEnumKeyW` `RegGetValueA` `RegQueryInfoKeyA` `RegSetKeyValueW` `vreg_clear_all` `vreg_clear_root` `vreg_export_root` `vreg_generation` `vreg_set_notify`。
-運用フックは `shimx_*` 53 + `vreg_*` 5 = **58 本** (`gen_inventory.py` と `gen_proctable.py` に `vreg_` 接頭辞分類を追加 — proctable の GetProcAddress 組込み表には載せない。名前は vreg JS 側 `EXPORTED_FUNCTIONS` (`_vreg_generation` 等) との互換のため **`vreg_` 接頭辞を維持**)。
-
-### 11.2 username 統一 (`C:\Users\user` → `C:\Users\webstudio`)
-
-CAB-213 §3 の正規表記へ shimx 内蔵値を統一 (pathreg の alias mount 吸収は不要になる方向。**実効挙動は表記変更のみ**)。
-
-| ファイル | 箇所 | 変更 |
-|---|---|---|
-| `src/env.c` | env 既定表: `USERPROFILE` `HOMEPATH` `APPDATA` `LOCALAPPDATA` `TEMP` `TMP` (6 パス) + `USERNAME` | `...\Users\user...` → `...\Users\webstudio...` / `USERNAME=user` → `webstudio` |
-| `src/file.c` | `GetTempPathW/A` の既定 Temp (2 箇所) | 同上 |
-| `src/shell.c` | `csidl_path()` 13 箇所 + KnownFolder GUID 表 6 箇所 (SHGetFolderPathW/SHGetKnownFolderPath/SHGetSpecialFolderPathW が返すパス) | 同上 (`C:\Users\Public` 系は不変) |
-| `test/test_sys.c` | `PathUnExpandEnvStringsW` 入力 / `GetTempPathW` 期待値 (2 箇所) | 期待値を新正規表記に更新 |
-| `test/test_ole_shell.c` | `SHGetFolderPathW`/`SHGetKnownFolderPath`/`SHGetSpecialFolderLocation` 期待値 (3 箇所) | 同上 |
-
-**触っていないもの**: `tools/shimx/pathreg/` 全体 (V18 検収が読み中のため読取のみ) / `src/reg.c` の seed 内 `RegisteredOwner="user"` (Windows の登録所有者名でユーザ profile 路線でない。vreg seed 236 エントリにも含まれず影響 0)。
-
-### 11.3 vreg 側の薄ラッパ化 / 退役方針 (別作業用 — 本チケットでは vreg 無改変) — **→ 実施済み (§12.1)**
-
-vreg (`tools/startup/vreg/`) は **1 行も変更していない** (vreg.sh 再実行で data/seed.json 等バイト不変を実測済)。
-現状の vreg `build.sh` は shimx `src/*.c` から `reg.c` を除外して自前 `src/reg.c` をリンクしているが、
-取込後は**両者のシンボル集合が完全一致**したため、下記の退役が可能 (vreg 担当 or CAB-11 後続で実施):
-
-1. `vreg/build.sh` の `SRCS` 除外工作 (12 行目の `[ reg.c ] || ...`) を削除 — shimx `reg.c` をそのまま使う
-2. `VSRC` から `src/reg.c` を外す (`probe.c` はテスト/e2e 専用ヘルパとして継続)
-3. `vreg/src/reg.c` を削除 (参照実装が shimx に一本化)。JS 側 (`js/vreg.mjs` 等) は `_vreg_generation` 等
-   の名前が shimx 側でも不変のため **無変更で動作する**
-4. 退役後も `build.sh symcheck` は「自前 vs shimx」の退化検査として残せる (追加 0 を維持)
-
-### 11.4 pathreg 予備 profile (`user2Profile`) の退役手順 (別タスク用) — **→ 実施済み (§12.2)**
-
-username 統一により shimx は `C:\Users\user` を**発行しなくなった**ため、pathreg 既定表の
-`user2Profile = "C:\Users\user"` (pathmap.c 164 行, 予備 mount 4 本) は冗長。退役は pathreg 担当作業:
-
-1. `src/pathmap.c` の `pathreg_paths_init` から `user2Profile` 設定と 197-198 行の条件追加 mount を削除
-2. `test/e2e.mjs` の B グループ等、`C:\Users\user` 表記を使っている fixture があれば `webstudio` 表記へ
-3. **`pathreg_unmap` の同長 tie-break (先勝ち)** は webstudio のみの mount になっても結果不変 (既に正規が先頭)
-4. 削除後の検収: `bash tools/shimx/pathreg/scripts/e2e.sh` (6 groups) + `verify_consistency.py` の
-   username 整合チェック (「+予備 user」の文言も更新)
-
-### 11.5 検証実績 (全て 2026-10-10 実測)
-
-| 検証 | 結果 |
-|---|---|
-| `bash tools/shimx/test.sh` | **exit 0**: MT PASS / ST PASS / fail-fast 8 モード / M4 互換 MT・ST (53/53) / 署名突合 3 IR (m11, m11_3, ott) mismatch **0** / OTT t1 SHA **b5a91b9b2ee8da1e 不変** (512 行) / 未実装 0 (担当範囲 100.0%) |
-| シンボル突合 (llvm-nm) | 旧 shimx reg.c 39 → 新 50 (**+11**, 欠落 0)。`vreg build.sh symcheck` = shimx 50 シンボルを vreg reg.c が全包含 (**追加 0** = 同一集合) |
-| `bash tools/startup/vreg/vreg.sh` | **ALL OK** (6/6 step: seed 再生成バイト不変 / C 単体 / shimx 結合 MT+ST+M4 / symcheck / wasm / node 22/22 / Chrome 実 IndexedDB PASS)。vreg dir の git 差分 **0** |
-| `bash tools/startup/keyfix/keyfix_e2e.sh` | **ALL PASS** (entries=236 / apply=81 / key確定=113 / key=null=3 不変, `verify_consistency.py` 6 項目 PASS — username 整合含む) |
-| `bash tools/shimx/pathreg/scripts/e2e.sh` | **ALL PASS** (C 単体 ST/MT + JS 4/4 + e2e 6 groups。module-b = **shimx reg.c のまま**の構成で新 reg.c を実行して無劣化) |
-| winstubs/gui リンク共存 | `coexist_gui.sh`: 重複シンボル = **既知記録 1 件のみ** (`WTSRegisterSessionNotification`, shimx weak × gui 強定義の既存分)。winstubs 由来の重複 **0**。`verify_sig_ir.sh`: mismatch 0 + 陰性対照 1 検出。winstubs wrap 層経由の shimx 単体テスト ST/MT **ALL PASS** |
-
-### 11.6 winstubs への影響 (後続タスク) — **→ 実施済み (§12.3)**
-
-username 統一により、winstubs (CAB-96) が wrap していた **5 API が shimx 単体で期待値一致**になった
-(`winstubs.sh` step 4 の「差分実装は不要」検査が FAIL 5 件: `SHGetFolderPathW` `SHGetSpecialFolderPathW`
-`SHGetKnownFolderPath` `GetTempPathW` `ExpandEnvironmentStringsW` — shimx 単体ですでに全行 MATCH)。
-これは wrap 層の退役機会であり、winstubs 担当が `wrap_list.txt` / api_matrix の impl 分類を更新すれば解消する
-(winstubs は本チケットでは無改変。`data/diff_table.tsv` は検収スクリプトが毎回再生成する実測表ゆえ触らず)。
-
-### 11.7 CAB-101 (実 FL 結線) への影響
-
-1. **正の影響**: engine が env/SHGetFolderPath で受ける username 表記が seed (vreg 236 エントリ) と
-   完全一致 (`webstudio`) になった → CAB-213 で吸収していた「user 表記と webstudio 表記の併存」が解消され、
-   `SHIMX_TRACE` のパス観測が seed 期待値と直接突合できる。pathreg の alias mount 経由の解釈が不要に。
-2. **レジストリ**: `Reg*` は shimx 正本 1 本に。CAB-101 の open ログ観測では vreg と shimx の差違を気にする
-   必要がなくなり、`vreg_generation()`/`vreg_set_notify()` で Reg 呼出トレース拡張が shimx 直結で可能
-   (vreg REPORT §10 の提案がそのまま shimx で実施可)。
-3. **追加 6 API が GetProcAddress 組込み表に載った** (advapi32 532→538) — lift 側が動的解決しても解決する。
-
-## 12. CAB-214 follow-up: 後始末 3 件 (§11.3 / §11.4 / §11.6) — 全て実施
-
-**結論**: 3 件とも REPORT §11 の手順どおり実施し、回帰は全て exit 0 (§12.4)。shimx 本体 (`src/*.c`) は**コメント 1 箇所以外無変更** (挙動不変)。
-退役の本質は「同名シンボル同時リンク不可」の正式解消 (vreg) と「username 差の吸収層」の撤去 (pathreg alias mount / winstubs wrap) で、いずれも §11.2 の統一で不要になったもの。
-
-### 12.1 vreg 薄ラッパ化 (§11.3 の 4 手順)
-
-| 手順 | 実施 |
-|---|---|
-| 1. `SRCS` 除外工作の削除 | `vreg/build.sh`: `SRCS=("$SHIMX"/src/*.c)` (reg.c 含む) |
-| 2. `VSRC` から reg.c を外す | `VSRC=("$HERE/src/probe.c")` (probe.c はテスト/e2e 専用ヘルパとして継続) |
-| 3. `vreg/src/reg.c` 削除 | `git rm` (828 行)。JS (`js/*.mjs`) は**無変更**で動作 (`vreg_generation` 等の名前不変)。`src/vreg.h` は probe 宣言のみに縮小 (運用フック/追加 6 API の宣言は shimx.h に既存) |
-| 4. `symcheck` の継続 | 手順どおり「自前 vs shimx」比較は自前が無くなるため成立しない → **判断**: 「vreg が要求する公開面 (shimx.h 宣言の `Reg[A-Z]*` 全て + module の EXPORTED `vreg_*`/`shimx_reg_*`) を shimx reg.c が定義している」検査に差し替え (実測: 要求 38 シンボル / reg.c 公開 50 / 不足 0) |
-
-**手順書に無かった波及 (判断)**: `pathreg/scripts/build.sh module-a` が `vreg/src/reg.c` をリンクしていたため同時に修正 — shimx 全 src + `vreg/src/probe.c` + pathreg に変更
-(module-a = `vreg_*` フック export + probe 同梱の本番構成 / module-b = フック非 export の代替構成、として両方存続。regbridge の自動判別 (`_vreg_export_root` の有無) は不変)。
-
-### 12.2 pathreg 予備 profile `user2Profile` 退役 (§11.4 の 4 手順)
-
-| 手順 | 実施 |
-|---|---|
-| 1. `pathmap.c` | `pathreg_paths_init` の `user2Profile` 設定 + `pathreg_set_paths` の条件追加 mount を削除。構造体 `PathRegPaths.user2Profile` (pathreg.h) と JS ミラー (`js/pathmap.mjs` DEFAULT_PATHS + 2 profile ループ) も削除。既定表 **14→8 本** (install 1 + webstudio×6 + `C:` 1) |
-| 2. fixture の webstudio 化 | `test_pathreg.c` / `pathmap.test.mjs` / `e2e.mjs` の `C:\Users\user` → `webstudio`。**追加 (判断)**: 表件数 8 の厳密化 (旧 `>= 9`)、退役 alias `C:\Users\user\...` が残余 `C:` 規則 (`/c/Users/user/...`) に落ちる陰性確認を C / JS / e2e クロスチェック (fixture 15→16) に追加 |
-| 3. `pathreg_unmap` tie-break | コード無変更 (webstudio のみになり結果不変。e2e C グループの逆写像一致で確認) |
-| 4. 検収 + `verify_consistency.py` | `keyfix/verify_consistency.py`: 「+予備 user」文言と `user2Profile = "...user"` 必須判定を撤去し、「webstudio のみ + `user2Profile` 不在 (C / JS 各 1 項目)」に更新 (6→7 項目)。keyfix は shimx 取込完了を待って予備退役する計画 (keyfix REPORT §4-4) だったため整合 |
-
-### 12.3 winstubs wrap 5 API 退役 (§11.6)
-
-| API | 実施 |
-|---|---|
-| `SHGetFolderPathW` `SHGetSpecialFolderPathW` `SHGetKnownFolderPath` `GetTempPathW` | `wrap_list.txt` から削除 (16→12 本)。`ws_sys.c` の `fix_user`/`is_default_user_prefix`/`__wrap_*` 4 本と `ws_internal.h` の `__real_*` 4 宣言を削除。`api_matrix.tsv` impl `wrap`→`shimx`。CREATE フラグ (`CSIDL_FLAG_CREATE`/`KF_FLAG_CREATE`/Temp 作成) は shimx 側 (`shell.c` `mk_win_dir` / `file.c` `mkdirs`) が webstudio を作るため wrap 不要 (boot e2e G07 `created=1 writable=1` 維持) |
-| `ExpandEnvironmentStringsW` | wrap でなく `shimx+seed` 分類だった (§11.6 の 5 件目)。impl→`shimx` (既定環境表が webstudio で一致)。`winstubs_init` の env 上書きは `GetEnvironmentVariableW` (`LANG=en`) のため残置 |
-
-**判断**: `WsConfig.user` は存続 (ABI 維持)。ただし既定以外にすると env (`USERNAME`/`USERPROFILE` 等) のみ追従し、`SHGetFolderPathW`/`GetTempPathW` は shimx 固定の webstudio になる (従来は wrap の `fix_user` が追従)。
-使用箇所は現状ゼロ (テスト・下流とも既定値のみ) のため許容し、`ws_core.c` にコメントで明記。
-再計測 (`winstubs.sh` step 4): impl 内訳 `shimx` 23→**28** / `shimx+seed` 2→**1** / `wrap` 14→**10**、baseline 差分 MATCH 60→**72** / DIFF 40→**28** / MISSING 31 (不変)。「差分実装は不要」検査 FAIL 5→**0**、checks=1133 ALL PASS。
-
-### 12.4 回帰 (全て 2026-10-10 実測、exit 0)
-
-| 検証 | 結果 |
-|---|---|
-| `bash tools/shimx/test.sh` | **exit 0**: MT/ST PASS / fail-fast 8 / M4 53/53 / 署名突合 3 IR mismatch **0** / OTT t1 SHA **b5a91b9b2ee8da1e 不変** / 未実装 0 (担当 100.0%) |
-| `bash tools/startup/vreg/vreg.sh` | **ALL OK** (6/6 step: seed 再生成バイト不変 / C 単体 / shimx 結合 ST+MT+M4 / symcheck / wasm / node 22/22 / Chrome 実 IndexedDB) |
-| `bash tools/startup/keyfix/keyfix_e2e.sh` | **ALL OK** (entries=236 / apply=81 / key確定=113 / key=null=3 不変、`verify_consistency.py` **7 項目** ALL PASS) |
-| `bash tools/shimx/pathreg/scripts/e2e.sh` | **ALL PASS** (C 単体 ST/MT + JS 4/4 + e2e 6 groups, fixture 16) |
-| `bash tools/startup/winstubs/winstubs.sh` | **exit 0** (8/8 step: 131/131 行一致 ST/MT / リンク 67/67 / boot 21/21 / IR 署名 mismatch 0 + 陰性対照 1 / shimx 回帰 ST/MT PASS / **gui 共存**: 重複は既知記録 `WTSRegisterSessionNotification` 1 件のみ・winstubs 由来 0・GetProcAddress 不整合 0・gui 強定義 6/8) |
-| `bash tools/startup/pump/pump.sh` (波及確認; winstubs src を別 work で再ビルド) | **exit 0** (全 PASS) |
-
+- **結論 (§11)**: vreg `reg.c` の拡張を `src/reg.c` に取込 (公開シンボル 39→50, 欠落 0)。username を `C:\Users\webstudio` に統一。
+- **結論 (§12)**: vreg 薄ラッパ化・pathreg 予備 profile `user2Profile` 退役・winstubs wrap 5 API 退役を全て実施。回帰は全て exit 0。
 
 ## 13. WinInet 常時オフライン化 (#111, ST-T4)
 

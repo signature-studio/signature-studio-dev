@@ -75,7 +75,7 @@
 - **外部扱い**: 対象が「ある基準ディレクトリ文字列」で始まらないとき (オンライン URL など。判定は `0x4150d0` の戻り値 == 1 の読み)、`ShellExecuteW(NULL, NULL, url, NULL, NULL, 5)` を直接呼ぶ。機械語 `33 c9 33 d2 49 89 c0 4d 33 c9 48 c7 44 24 20 00… c7 44 24 28 05 00 00 00 e8 <rel32>` を照合 (call 先 = `shell32!ShellExecuteW` thunk)。
   **動詞 (`lpOperation`) は NULL** で、`stub_plan.md` §5-B の "open" と同じに扱う必要がある (`classifyShellExecute` は NULL/""/"open" を open とする)。
 - **内部扱い (読み)**: 基準ディレクトリで始まるローカルパス (= 基本インストールの `Help\…`) は、`[[g_core]+0x4c]` の interface の vtbl+0xa0 または +0xa8 へ渡る
-  (設定+0x3c0 と修飾キー状態 — 0x818890 は `GetKeyState` の 0x10/0x11/0x12 を集約 — の組合せで選ぶと読める)。**この interface の実体 (組込みブラウザ = WebView2 ページか) は静的には確定できず未解決** (§5 U1)。
+  (設定+0x3c0 と修飾キー状態 — 0x818890 は `GetKeyState` の 0x10/0x11/0x12 を集約 — の組合せで選ぶと読める)。**(訂正: §7.1 で実体 = `TServerComms`、ローカル Help はここを通らず `ShellExecuteW` へ直行と確定)**。
   WebView2 は `LoadLibraryW("WebView2Loader.dll")`=NULL (GATES G13) で作られないため、**エンジン内部経路のままでは Help が何も出ない可能性が高い** (推定)。
 
 ### 2.4 `error-offline.html`
@@ -180,3 +180,50 @@ bash tools/startup/helpviewer/e2e.sh     # FL_WIN64_DIR (fl-win64 展開先) が
   `find tools/startup/helpviewer src -type f -size +20M -not -path '*/work/*'` は 0 件 (最大の追加物 `help_files.json` は 9382 B)。
 - 別アルゴリズムでの検算: §2 の「読み」(意味づけ) は capstone による逆アセンブルで行い、機械照合 (`verify_engine.py`) は逆アセンブラを使わないバイト走査 + `.pdata` + IAT で行う (独立した 2 手法)。
 - 検証範囲: 上記のとおり FL 26.1.7.5653 win64 の `Help/**` 55 件と `FLEngine_x64.dll` の宣言済み 54 事項。範囲外: lift 済みエンジンの実行 (U1)、全文オフラインマニュアル (U3)、Chrome 以外 (U4)。
+
+## 7. エンジン結線 (#554 ST-T17、検証起点 `e3b9202`)
+
+既知類型 (`docs/DEFECTS.md`) との関係: **該当なし** (静的解析 + ホスト橋渡しの追加。lift/IR pass は触らない)。PR は `Refs #554` (受入条件 3 の e2e は未達、下表)。
+
+### 7.1 `[[g_core]+0x4c]` interface の実体 (受入条件 1)
+
+静的解析 (capstone + pefile、`FLEngine_x64.dll` 26.1.7.5653)。以下は逆アセンブルの**読み**で、`verify_engine.py` の機械照合には未追加 (§7.3 U7):
+
+| 事実 | 根拠 (VA) |
+|---|---|
+| `[g_core]+0x4c` への書込は 0x9770a0 のみ (`mov [rcx+0x4c], rdx`。rcx = g_core、rdx = 新規インスタンス)。呼出元は 0x11b2ac0 の 1 箇所 (0x11b2f2d)、引数は 0x11b2d05 で生成した `0xbf8f08` クラスのインスタンス | 0x9770a0 / 0x11b2d0a・0x11b2f2d |
+| そのクラスの Delphi VMT の className = **`TServerComms`** (VMT 0xbf8f08、`-0x88` = ShortString 0xbf9141) | 0xbf8f08 |
+| vtbl+0x100 (0xc02a50): 先頭が **`https://support.image-line.com/redirect/`** の文字列を `PosEx` し、無ければ付加して返す = redirect の基底 URL 取得 | 0xc02a50 |
+| vtbl+0xa0 (0xc02620) / +0xa8 (0xc02840): `https://support.image-line.com/redirect/` + 名前を 0xbfa8a0 で組み、+0xa0 は 0x8ea880、+0xa8 は URL 返却 | 0xc02620 / 0xc02840 / 0xbfa8a0 (`lang=` / `?` を付加) |
+| 0x8ea880 → 0x8ea830: `ShellExecuteW(hwnd, NULL, url, NULL, NULL, nShow)` を呼び戻り値 > 32 を返す | 0x8ea830 |
+
+結論: **実体は WebView2 ではなく `TServerComms` (support.image-line.com の redirect URL を組み、ShellExecuteW か内部ブラウザ kind 0x19 に渡す通信クラス)**。
+`OpenHelpTarget` の分岐 (0x10bdc8e `cmp eax, 1`) は「対象文字列が redirect 基底 URL で始まるか」であり、§2.3 の「基準ディレクトリ」の読みは**誤り (訂正)**:
+`Help\...` のローカルパスは redirect 基底で始まらず、0x10bdd85 の `ShellExecuteW(NULL, NULL, path, NULL, NULL, SW_SHOW)` に直行する。`TServerComms` 側へ行くのは redirect URL (外部) のみで、D3 により対象外。
+
+### 7.2 結線 (受入条件 2)
+
+WebView2 の挙動確認は**不要** (ローカル Help は WebView2 経路を通らない)。`ShellExecuteW` → shimx の shell hook (`gui_shimx_attach()` が登録する `gui_shell_execute`、#172) の経路に、Help を足した。
+
+- `tools/gui/src/gui_core_ext.inc`: `<FL>\Help\…` と `<FL>\System\Internet\error-offline.html` (大文字小文字不問、動詞 NULL/"open") だけを `GUI_HC_OPEN_HELP` (= 4) で host へ渡す。それ以外のローカルパス・`print`/`runas` は従来どおり拒否、http(s)/mailto は `GUI_HC_OPEN_URL` のまま。
+- `src/runtime/gui_hostcall.ts`: `HC_OP.openHelp` と `HostCallEnv.openHelp?(path)` (= `window.flHelp.shellExecute(null, path)` を呼ぶ口)。viewer 未接続は 0 + log、例外は `HC_ERR`。
+- 外部リンク (U6): 既定は通知のみ (D3)。`window.open` は **許さない** 方針とした (`onExternal` 既定 no-op のまま。変更なし)。
+
+### 7.3 検証 (受入条件 3 のうち実行できた範囲)
+
+| 検査 | 結果 | ネガコン |
+|---|---|---|
+| `bash tools/gui/test/selftest.sh` (native gcc + ASan/UBSan。新セクション `ShellExecuteW(Help)`: 受理 4 パス・verb open・大文字小文字・host 拒否・拒否 8 パス・print/runas・https 回帰・host 未接続) | exit 0、**426 passed / 0 failed** (所要 6.9 秒、load average 0.19 開始) | `help_path_ok` を `return 1` に壊すと **4 FAIL** (exit 1) |
+| `node --test help_viewer.test.mjs hostcall_help.test.mjs` | 14 pass / 0 fail (新規 3 本: openHelp の true/false/未接続/例外、openUrl 回帰) | — |
+
+コミット済み HEAD `11e79a8` をクリーン detached worktree に展開して再検証 (n=3、並列 1): `selftest.sh` は **run1 = exit 1 (ASan heap-use-after-free)** / run2 = exit 0・426 passed・7.0 秒 / run3 = exit 0・426 passed・6.9 秒 (load average 1 分値 0.25–0.49)、`node --test` 14 pass / 0 fail。
+run1 の失敗は `gui_headless.c:33 blit_surf` が `surf_free` 済みの面を読む**既存の flake** (`tools/gui/shimx_coexist/REPORT.md` §4.2 / §6 に base でも発生と記録済み)。本変更と無関係であることの確認: base `e3b9202` を同じ手順で 12 回実行して 1 回同じ ASan エラー (11 回 exit 0)。新セクションの 426 件中の FAIL はどの実行にも 0 件。
+§6 の `e2e.sh` 全体 (Chrome/typecheck) の再実行は**未実施** (job の 60 分上限のため)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| U7: §7.1 の `TServerComms` 経路を `engine_claims.json` / `verify_engine.py` に追加していない (読みのまま) | 機械照合なし | #554 にコメント (後続) |
+| U8: **lift 済みエンジンの F1 / Help メニュー / `WhatsNew` → viewer の実行 e2e は未達** (boot が `CreateFruityInstance` 未到達で実行不可、#227 closed でも実行未確認)。本 PR は C 側 hook 受理と host 橋渡しの単体検証まで | 受入条件 3 未達 → `Refs #554` | #554 は open のまま。#105 (ST-T5) の open() trace 待ち |
+| U9: `HostCallBridge.start()` + `openHelp` → `flHelp.shellExecute` を呼ぶ起動 glue (src 側) 未結線 (coexist REPORT §6 と同じ未結線) | 実アプリで viewer が開かない | #177 [SHX-T9] |
+| U11: `selftest.sh` の既存 flake (`blit_surf` use-after-free、base 12 回中 1 回) | CI で偶発 FAIL | 既存記録 (#172 shimx_coexist REPORT §6)。本件では起票せず #172 に追記済みの範囲 |
+| U10: emcc (`toolchain-emsdk`) 未取得のため `tools/gui/shimx_coexist/coexist.sh` (wasm リンク) を再実行していない | wasm 共存リンクへの影響未確認 | 再実行は `oc_artifacts: fl-win64 toolchain-emsdk work-m11` を付けて #554 |
