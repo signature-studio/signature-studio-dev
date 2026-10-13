@@ -234,4 +234,4 @@ python3 tools/icall/diff/fn3_diff.py 1801a9be0 --n 600 --dump    # native / rout
 ## 11. ICALL-6: CRT 経路の残 (#361)
 
 FMA3 経路 `1801a9be0` を 42/600 → **600/600** (N3: RetDec の `vmovapd xmm→stack` store 落ち、N4: closure 内 direct call の memory-ABI が戻り xmm1 を通さない)、`_handle_errorf` (1801c8cb8) を closure に入れ override 4/4、`1801a9a6c` の rax は呼出し元が読まないため gate は xmm0 のみ。FMA3 経路は gate に昇格。
-結果表・ネガコン・rax 根拠・検証 (HEAD・所要・load)・未解決表の全文は `REPORT_APPENDIX.md` §11。再現: `bash tools/icall/icall_e2e.sh`。
+結果表・ネガコン・rax 根拠 (`1801a9be0` の rax 不一致 558/600 も含む)・検証 (HEAD `b23593c`・所要・load)・未解決表の全文は `REPORT_APPENDIX.md` §11。再現: `bash tools/icall/icall_e2e.sh`。

@@ -55,6 +55,7 @@
 native の rax は **全入力で `0x7fffffffffffff00`** (測定 8 入力: 4.0, 2.0, 0.25, 100.0, 0.0, 1.5, 12345.678, 0.001)。`1801a9b02 movabs rax, 0x7fffffffffffffff` ... `setb al` の残りで、sqrt の戻り値ではない scratch。
 `diff/rax_callers.py 1801a9a6c` (capstone, 各 call 元の直後 8 命令で rax/eax/ax/al の最初のアクセスを判定) の実測: 直接 call 元 46 件 (`call`; tail jmp は 0) のうち、rax を先に**書く** 39 件・8 命令内で触れない 7 件・**読む 0 件** (exit 0)。よって rax は戻り値として使われず、gate は xmm0 のみ判定でよい。
 原因: route / x64c は BLK の rax、native は sqrt 本体末尾の scratch (上記) を返すため一致しない。**不要の根拠として記載・gate に rax 判定は追加しない。** (限界: 先読み 8 命令の静的判定。7 件の「触れない」は 8 命令より先の読みを見ていない。)
+`1801a9be0` (FMA3 経路) の rax も native と一致しない (gate 出力: `--fma 1` rax 558/600・`--neg --fma 1` 552/600、xmm0 は共に 600/600)。`rax_callers.py 1801a9be0` の実測: 直接 call 元 1 件 (`180126706`) で、直後 8 命令内に rax アクセス無し (READ 0)。rax を返り値として使う呼出し元は無いため gate は xmm0 のみで足りる (限界は上記と同じ先読み 8 命令)。
 (同じ道具で `1801c8c98` (`_handle_errorf` ラッパ) の呼出し元 5 件を見ると `1801bdcba` が直後に eax を読む。読む対象が errorf の戻りかは未確認で、override は xmm0 のみを定義 → 未解決表に記載。)
 
 ### 11.4 `_handle_errorf` (1801c8cb8)
@@ -68,12 +69,13 @@ bash tools/icall/diff/crt_fn_gate.sh          # gate のみ
 python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 ```
 
-検証 (コミット済み HEAD `d383226`, runner 4 core, load average は開始→終了):
+検証 (コミット済み HEAD `b23593c` = main 取り込み merge + REPORT 分割。コード差分は `d383226` の実装 + main 取り込みのみ。runner 4 core, load average は開始→終了):
 | コマンド | 結果 | 所要 | load |
 |---|---|--:|---|
-| `OTT_SKIP_INFO=1 bash tools/ott/ott_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state_diff 0 | 25.0 s | 0.25→ |
-| `bash tools/icall/icall_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state_diff 0, 監査 落ち 70→0, tail-jmp 11→0, crt_fn_gate PASS (SSE2 6 + FMA3 5 + 負入力 2 + override 4/4) | 99.2 s | →1.23 |
-| `python3 tools/icall/tests/test_icall.py` | PASS (0 failed; fix_vstore 2 件を含む) | — | — |
+| `OTT_SKIP_INFO=1 bash tools/ott/ott_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state_diff 0 | 25.9 s | 0.63→0.76 |
+| `bash tools/icall/icall_e2e.sh` | PASS: 89 scenario / 50,236 cell 全一致, max_ulp 0, state_diff 0, 監査 落ち 70→0, tail-jmp 11→0, crt_fn_gate PASS (SSE2 6 + FMA3 5 + 負入力 2 + override 4/4) | 95.4 s | 0.70→1.04 |
+| `python3 tools/icall/tests/test_icall.py` | PASS (0 failed; fix_vstore 2 件を含む) | 2.5 s | — |
+(初回実装時 HEAD `d383226`: ott_e2e 25.0 s / icall_e2e 99.2 s / test_icall PASS。)
 (修復前ベースライン同環境: ott_e2e 25.1 s PASS / icall_e2e 88.9 s PASS。ただし配布スナップショットの route wasm は N1/N2 未適用の古い build で gate FAIL だったため、`ott_route.sh` の再ビルドが必要 (icall_e2e.sh が行う)。)
 
 | 未解決 | 影響 | 起票先 |
