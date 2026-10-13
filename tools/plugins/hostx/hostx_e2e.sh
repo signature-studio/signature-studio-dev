@@ -4,9 +4,9 @@
 # 許可する未実装 helper は rep_stosb_memset のみ (memset へ写像可; plugins/REPORT.md §4.3 / #538)
 # 手順: 前提 inventory (work/ 無ければ生成) → static_facts.py (18 モジュールの PE 外形/API/文字列) →
 #       Delphi 殻 9 本の閉包 → batch_lift (RetDec+pass 鎖 → emcc -c) → 判定 (judge.py: 合格必須 7 本 / expect_state.py: 既知不合格 2 本の状態固定) →
-#       closure_facts.py (host ID / クラス名 / 双子・engine 重なり) → matrix_check.py → ReWired f80 局所検証 → FL Mobile engine の窓 lift (参考)
+#       icall_audit.py (間接 call 脱落) → closure_facts.py (host ID / クラス名 / 双子・engine 重なり) → matrix_check.py → ReWired f80 局所検証 → FL Mobile engine の窓 lift (参考)
 # exit 0 = 合格必須 7 本が合格し、既知不合格 2 本が期待どおりの状態で、後続も完走
-# 出力: work/hostx/{static.json,status_must.csv,status_known.csv,facts.json,engines.csv} (work/ は gitignore)
+# 出力: work/hostx/{icall_audit.md,static.json,status_must.csv,status_known.csv,facts.json,engines.csv} (work/ は gitignore)
 # 前提素材: fl-win64 / toolchain-retdec (/opt/retdec) / toolchain-emsdk (/opt/emsdk)  (docs/WORKFLOW.md §11)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -36,6 +36,10 @@ fi
 rc=0; python3 hostx/judge.py work/batch/status.csv "${MUST[@]}" --allow-unimpl rep_stosb_memset -o work/hostx/status_must.csv || rc=$?
 [ "$rc" = 0 ] || { echo "[hostx_e2e] FAIL: 合格必須 7 本の判定が不合格 (judge.py rc=$rc)" >&2; exit "$rc"; }
 python3 hostx/expect_state.py work/batch/status.csv "${KNOWN[@]}" -o work/hostx/status_known.csv
+
+# 間接 call 監査 (icall §4 D1): 合格 7 本 + ReWired の閉包について、機械語の非 IAT 間接 call 数 vs lift 後 IR の間接 call 数 (judge は emcc -c 通過しか見ない)
+python3 hostx/icall_audit.py "${MUST[@]}" 24161 | tee work/hostx/icall_audit.md
+python3 hostx/xcheck_icall.py "${MUST[@]}" 24161 | tee work/hostx/icall_xcheck.txt
 
 python3 hostx/closure_facts.py > work/hostx/facts.stdout.json 2> work/hostx/facts.err
 python3 hostx/matrix_check.py
