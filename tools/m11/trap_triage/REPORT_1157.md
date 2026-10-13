@@ -1,0 +1,50 @@
+# REPORT_1157 — ClassCreate ON の unit 85/719 退行の二分探索: 前提の実測 (#1157, 親 #595)
+
+結論: 基点 `5ff73ff` の ON で unit 85 / 719 は**退行しなかった**。issue 本文の前提 (「#446 基点で 85/719 が ok 退行していた」) は実測と合わない。**PM 判断 (b) を採用**: 二分探索は実行しない (前提が崩れ、判定基準が無いため探索の価値が無い)。85/719 は対象から外す。現 main `711b58ca` の ON の ok 退行は unit 190 の 1 件のみで (追跡 #1274)、#595 の受入条件 1 はこれで閉じる。基点 `5ff73ff` の ON 退行 15 42 45 138 415 は現 main では退行していない。
+
+測定 commit: 現 main `711b58ca` (`origin/main`、本 branch の基点) と基点 `5ff73ff`。本 PR はコードを変えない (本ファイルの追加のみ)。
+
+## 1. 測定 (単発・並列数 1・逐次実行)
+
+手順: `bash tools/m11/m11_gen_ir2.sh` → `bash tools/m11/m11_build.sh` (`M11_OV_CLASSCREATE=0/1`) → `node tools/m11/trap_triage/survey_units.mjs out.json` → `python3 tools/m11/trap_triage/survey_diff.py a.json b.json`。素材: fl-win64 / toolchain-retdec / toolchain-emsdk / work-m11。
+
+| 構成 | コード | ok | oob | halt0 | miss | noproc | other/abort | ok 退行 |
+|---|---|--:|--:|--:|--:|--:|--:|---|
+| 既定 OFF | `5ff73ff` | 818 | 21 | 56 | 46 | 1 | — | — |
+| ON | `5ff73ff` | 813 | 23 | 55 | 50 | 1 | — | 5: 15 42 45 138 415 |
+| 既定 OFF | `711b58ca` | 870 | 16 | 7 | 47 | 1 | other 1 | — |
+| ON | `711b58ca` | 869 | 15 | 7 | 47 | 1 | other 1, abort 2 | 1: 190 |
+
+基点 `5ff73ff` の OFF / ON は REPORT_595 §1 旧ベース表 (OFF 818/21/56/46/1、ON 813/23/55/50/1、退行 15 42 45 138 415) と完全に一致した。現 main の値は REPORT_595 §5 (OFF 869/16/8/47/1/1) と ok/halt0 が 1 ずつ異なる。IR 再生成の差 (sha は `ir_conditions.json` の `ir_sha256` で確認) の可能性があるが、本 run では切り分けていない。
+
+### 1.1 unit 85 / 719 / 114 の kind (unit 単位)
+
+| 構成 | 85 | 719 | 114 |
+|---|---|---|---|
+| 基点 `5ff73ff` OFF | ok | halt0 | halt0 |
+| 基点 `5ff73ff` ON | ok | halt0 | halt0 |
+| 現 main `711b58ca` OFF | ok | ok | halt0 |
+| 現 main `711b58ca` ON | ok | ok | halt0 |
+
+- 基点で 85 は OFF/ON とも ok、719 は OFF/ON とも halt0。ON で ok→非 ok になる変化は無い。
+- 現 main で 719 は OFF/ON とも ok。REPORT_595 §3 は「OFF halt0」と書いていたが、本 run の OFF は ok。ここも IR 再生成の差と思われるが切り分けていない。
+- unit 114 は基点・現 main とも OFF/ON で halt0 (ハングではない)。
+
+## 2. 前提が崩れた経緯 (判断材料)
+
+- issue #1157 は「#446 基点 (`5ff73ff` 系) で unit 85/719 の ok 退行があった」を前提とする。REPORT_419 §遷移 は「ok→oob 2 (85 719)」と記録しており、この記録が前提の出所と思われる。ただし REPORT_419 の時点は `8cbda0/8cbce0` を ON にした別構成の値。
+- `5ff73ff` の ON では 85/719 の kind が変わらない。`5ff73ff` の ON は REPORT_595 §1 の旧ベースと同じ構成で、退行 5 件は 15 42 45 138 415。
+- REPORT_595 §3 も「85/719 は #446 の古い tree (#474/#503 前) での値」と記録している。二分探索の始点 (`5ff73ff`) が前提の退行を再現しないため、どの commit で「解消」したかを判定する基準が無い。
+
+## 3. 再現の注意 (本 run で判明した環境上の点)
+
+- 基点 `5ff73ff` の `m11_gen_ir2.sh` は PE を固定パス (`[WIN64]` 配下の `extracted/block00031_PE.bin` を repo 外の作業先で指していた旧版の絶対パス) で解決していた。CI の runner ではそのパスが存在せず ldfix が skip され、`ir_conditions.json` が `ldfix=applied` と書かれたまま未適用の IR になる (`WARNING: ldfix skip` が出る)。本 run では `5ff73ff` の IR 生成で実際にこの状態になり、PE パスを差し替えた一時コピー (commit していない) で再生成した。`ir_sha256` は `16d1bae6…` で ldfix 適用済みの値。
+- **main (`711b58ca` 以降) では解決済み**: `m11_gen_ir2.sh` は `PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"` で `M11_PE` / `FL_WIN64_DIR` を見る。したがって「`5ff73ff` で ldfix が skip された」のは当該 commit の固定パスが原因であり、main の IR 生成では起きない。PE 解決の修正は本 PR の対象外。
+- `[EMSDK]` (`emsdk`) と `[RETDEC]` は展開先の symlink で用意した。emsdk は `emsdk_env.sh` 経由だと `emcc` が PATH に乗らず、`upstream/emscripten` と `upstream/bin` と `node/24.19.0_64bit/bin` を直接 PATH に通して解決した。
+
+## 4. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 二分探索の前提 (85/719 の ok 退行) が基点で再現しない | PM 判断 (b) 採用により解決。二分探索は実行せず、#1157 は前提崩れで閉じる | PM 判断 (#1157 にコメント) |
+| 現 main の 719 OFF が REPORT_595 §3 (halt0) と食い違う (本 run は ok) | IR 再生成の差の切り分け未了 | #595 (Refs) |
