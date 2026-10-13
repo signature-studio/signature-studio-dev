@@ -11,7 +11,7 @@
 #   5. M4 互換: tools/shim/test/test_main.c (無改変) を shimx 実装に対して MT/ST で実行 → ALL PASS
 #   6. カバレッジ: inventory/BACKLOG 再生成。担当範囲の未実装 0 / M4 53 API 継承 53 を検査
 #   6b. lift IR (M11 init closure / OTT) の declare を sig_normalize.py で shimx 署名へ正規化 → wasm 署名一致 (signature mismatch 0)
-#       + test/sig/sig_test.sh (合成 fixture: 検出・正規化・adapter 実行・未対応型の fail・sigs.json 乖離検出)
+#       + test/sig/sig_test.sh (合成 fixture: 検出・正規化・adapter 実行・未対応型の fail・sigs.json 乖離検出・符号不明の拡張は unresolved/sext 明示で -1 保存)
 #   6c. R6 検査: ir_undef.py の構造体展開 + 重複 declare 正規化 (--normalize-dup 産物が emcc 通過) を M11 IR で実測
 #   7. OTT undefined 47 種 → shimx リンクで Win/CRT API 24 種が全て解決 (tools/m8 成果物があれば)
 #

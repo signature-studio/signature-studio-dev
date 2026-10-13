@@ -7,6 +7,7 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 IR="$1"; TAG="${2:-ir}"
+set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1; set -u
 mkdir -p "$HERE/work/sig"
 NORM="$HERE/work/sig/$TAG.norm.ll"
 python3 "$HERE/scripts/gen_sigs.py" --check

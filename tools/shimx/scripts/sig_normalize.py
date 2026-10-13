@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """lift IR の外部 declare を shimx の定義署名 (data/sigs.json) へ正規化する IR pass (SHX-T7, #173)。
 
-  sig_normalize.py <in.ll> <out.ll> [--sigs data/sigs.json] [--report out.json] [--strict]
+  sig_normalize.py <in.ll> <out.ll> [--sigs data/sigs.json] [--ext-policy data/sig_ext.json] [--report out.json] [--strict]
 
 背景: RetDec は HANDLE/enum/REFCLSID を i64、別 API では ptr/i32 と declare が揺れる。shimx の定義と wasm 署名が
 食い違うと wasm-ld は "function signature mismatch" を警告し、実行時に trap する (acmMetrics ほか 5 件, REPORT §4)。
@@ -11,7 +11,10 @@
     - declare @N を shimx 署名の declare に置換 (NAME.1 / NAME_D1 形式の重複 declare は削除し基名 declare を補う)
     - IR 内の @N の全参照 (call / 関数ポインタ) を adapter `@__shx_sig_N` へ向ける
     - adapter は IR 側署名で定義し、引数を shimx 署名へ変換して基名を呼び、戻り値を IR 側署名へ戻す
-  変換: 整数 ↔ 整数 (trunc/zext), 整数 ↔ ptr (inttoptr/ptrtoint), float ↔ double。余る引数は捨て、足りない引数は 0。
+  変換: 整数の縮小 (trunc), i1 → 広い整数 (zext), 整数 ↔ ptr (inttoptr/ptrtoint), float ↔ double。
+        余る引数は捨て、足りない引数は 0。
+  整数 (i8 以上) → 広い整数 は LLVM 型に符号が無く zext/sext の正解が決まらないため既定で unresolved (-1 が 4294967295 に化ける)。
+        拡張方針は API 単位で --ext-policy (data/sig_ext.json: {"NAME": {"p0": "zext", "ret": "sext"}}) に明示したものだけ許可する。
   未対応 (float ↔ 整数, 構造体/vector, 可変長) は書換えず report の unresolved に出す。--strict なら exit 1。
 """
 import argparse, json, os, re, sys
@@ -29,16 +32,28 @@ DECL = re.compile(r'^declare\s+(?P<pre>[^@\n]*?)@(?P<name>[\w.$-]+)\((?P<args>.*
 DUP = [re.compile(r'^([A-Za-z_]\w*)\.(\d+)$'), re.compile(r'^([A-Za-z_]\w*)_D(\d+)$')]
 
 
+class Unresolved(Exception):
+    pass
+
+
 def zero(t):
     return ZERO.get(t, '0')
 
 
-def convert(src_t, dst_t, val, tmp):
-    """(命令列, 結果値) を返す。変換不能なら None。tmp は一意名生成関数"""
+def convert(src_t, dst_t, val, tmp, ext=None, slot='?'):
+    """(命令列, 結果値) を返す。変換不能なら None、符号方針が要る拡張で未指定なら Unresolved。
+    tmp は一意名生成関数、ext は当該スロットの拡張方針 ('zext' / 'sext' / None)"""
     if src_t == dst_t:
         return [], val
     if src_t in INT_BITS and dst_t in INT_BITS:
-        op = 'trunc' if INT_BITS[src_t] > INT_BITS[dst_t] else 'zext'
+        if INT_BITS[src_t] > INT_BITS[dst_t]:
+            op = 'trunc'
+        elif src_t == 'i1':
+            op = 'zext'
+        elif ext in ('zext', 'sext'):
+            op = ext
+        else:
+            raise Unresolved('%s: %s -> %s の拡張は符号が不明 (sig_ext.json に zext/sext を明示)' % (slot, src_t, dst_t))
         r = tmp()
         return ['  %s = %s %s %s to %s' % (r, op, src_t, val, dst_t)], r
     if src_t in INT_BITS and dst_t == 'ptr':
@@ -65,8 +80,9 @@ def parse_decl(m):
     return {'ret': toks[-1], 'params': params}
 
 
-def make_adapter(name, target, d, s):
-    """IR 側署名 d の adapter 定義文字列。変換不能なら None"""
+def make_adapter(name, target, d, s, pol=None):
+    """IR 側署名 d の adapter 定義文字列。変換不能なら None、符号方針が無い拡張は Unresolved"""
+    pol = pol or {}
     cnt = [0]
 
     def tmp():
@@ -75,7 +91,7 @@ def make_adapter(name, target, d, s):
     body, call_args = [], []
     for i, st in enumerate(s['params']):
         if i < len(d['params']):
-            c = convert(d['params'][i], st, '%%a%d' % i, tmp)
+            c = convert(d['params'][i], st, '%%a%d' % i, tmp, pol.get('p%d' % i), 'param %d' % i)
             if c is None:
                 return None
             body += c[0]
@@ -92,7 +108,7 @@ def make_adapter(name, target, d, s):
     else:
         r = tmp()
         out.append('  %s = %s' % (r, call))
-        c = convert(s['ret'], d['ret'], r, tmp)
+        c = convert(s['ret'], d['ret'], r, tmp, pol.get('ret'), 'ret')
         if c is None:
             return None
         out += c[0]
@@ -116,7 +132,8 @@ def unsupported(sig):
     return any(t == '...' or t.startswith(('%', '<', '{', '[')) or t == 'i128' for t in sig['params'] + [sig['ret']])
 
 
-def normalize(src, sigs):
+def normalize(src, sigs, ext=None):
+    ext = ext or {}
     defined = set(re.findall(r'^define\s+[^@\n]*@([\w.$-]+)\(', src, re.M))
     decls = {}
     for m in DECL.finditer(src):
@@ -143,7 +160,11 @@ def normalize(src, sigs):
         if unsupported(d) or unsupported(s):
             report['unresolved'].append({'name': name, 'ir': d, 'shimx': s, 'why': 'unsupported type'})
             continue
-        ad = make_adapter(name, target, d, s)
+        try:
+            ad = make_adapter(name, target, d, s, ext.get(target))
+        except Unresolved as e:
+            report['unresolved'].append({'name': name, 'ir': d, 'shimx': s, 'why': str(e)})
+            continue
         if ad is None:
             report['unresolved'].append({'name': name, 'ir': d, 'shimx': s, 'why': 'no conversion'})
             continue
@@ -162,7 +183,9 @@ def normalize(src, sigs):
     for a, b, rep in sorted(edits, reverse=True):
         src = src[:a] + rep + src[b:]
     alt = '|'.join(re.escape(n) for n in sorted(renames, key=len, reverse=True))
-    src = re.sub(r'@(' + alt + r')(?![\w.$-])', lambda mt: '@' + renames[mt.group(1)], src)
+    # 文字列定数 c"..." と ; コメントの中は置換しない (配列長が変わり emcc が落ちる)
+    rx = re.compile(r'(?<![\w.$-])c"[^"]*"|;[^\n]*|@(' + alt + r')(?![\w.$-])')
+    src = rx.sub(lambda mt: mt.group(0) if mt.group(1) is None else '@' + renames[mt.group(1)], src)
     src = src.rstrip('\n') + '\n' + ''.join('\n' + v for v in add_decls.values()) + '\n\n' + '\n\n'.join(adapters) + '\n'
     return src, report
 
@@ -172,12 +195,14 @@ def main():
     ap.add_argument('ir')
     ap.add_argument('out')
     ap.add_argument('--sigs', default=os.path.join(ROOT, 'data', 'sigs.json'))
+    ap.add_argument('--ext-policy', default=os.path.join(ROOT, 'data', 'sig_ext.json'))
     ap.add_argument('--report')
     ap.add_argument('--strict', action='store_true')
     a = ap.parse_args()
     sigs = json.load(open(a.sigs))
     src = open(a.ir, errors='replace').read()
-    out, rep = normalize(src, sigs)
+    ext = json.load(open(a.ext_policy)) if os.path.exists(a.ext_policy) else {}
+    out, rep = normalize(src, sigs, ext)
     open(a.out, 'w').write(out)
     if a.report:
         json.dump(rep, open(a.report, 'w'), indent=1)
