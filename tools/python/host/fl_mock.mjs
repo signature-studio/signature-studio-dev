@@ -94,6 +94,8 @@ export function createMockEngine() {
     "plugins.getParamValueString": (p) => `${(st.params[p].v * 100).toFixed(1)} %`,
     "plugins.setParamValue": (v, p) => { st.params[p].v = v; },
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
+    // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
+    "general.getVersion": () => st.scriptingVersion ?? 1,
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },

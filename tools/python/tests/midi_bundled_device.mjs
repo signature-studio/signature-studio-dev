@@ -4,12 +4,16 @@
 //   exit 0 = PASS / 2 = FAIL / 3 = **NOT VERIFIED (入力が無い。受入条件は未検証)** / --neg で壊した入力を検出できたとき 1
 //   入力が無いときに exit 0 にしない (= 「検証していないのに緑」を作らない)。
 //   --neg: midi.py を供給しない → 同梱 script の `import midi` が失敗し、「script を読込める」の判定が FAIL することを確認する。
+//   --neg-mutate: 実 script のポート定数 (10 << 24) を (11 << 24) に書換える → 転送 message の判定だけが FAIL することを確認する (検出できたとき exit 1)。
+//   実ファイルの挙動 (FL 26.1.7.5653 / win64 block24618 を読んで確定): OnMidiIn は `event.status == midi.MIDI_CONTROLCHANGE` (0xB0 の完全一致 = ch0 の CC のみ) のとき
+//     device.forwardMIDICC(status + (data1<<8) + (data2<<16) + (10<<24), 2) を呼び handled=True。それ以外は handled=False で OnMidiMsg へ進む (OnMidiMsg も handled=False)。
 import fs from "node:fs";
 import { FlPython } from "../host/flpython.mjs";
 import { createMockEngine } from "../host/fl_mock.mjs";
 import { MidiScriptHost } from "../host/midi_host.mjs";
 
 const neg = process.argv.includes("--neg");
+const negMutate = process.argv.includes("--neg-mutate");
 const root = new URL("../", import.meta.url);
 const W = (n) => new URL(`work/${n}`, root);
 const devName = "device_Forward CCs to current plugin Port 10.py";
@@ -32,9 +36,14 @@ const host = new MidiScriptHost(py);
 const checks = {};
 const check = (n, c, x) => { checks[n] = !!c; if (!c) console.error(`FAIL ${n}`, x === undefined ? "" : JSON.stringify(x)); };
 
+let devSrc = fs.readFileSync(W(devName), "utf8");
+if (negMutate) {
+  if (!devSrc.includes("(10 << 24)")) { console.error("--neg-mutate: 書換え対象 (10 << 24) が実 script に無い (FL 版が違う?)"); process.exit(3); }
+  devSrc = devSrc.replace("(10 << 24)", "(11 << 24)");
+}
 let info = null;
 try {
-  info = await host.loadDeviceScript({ name: "bundled", source: fs.readFileSync(W(devName), "utf8"), port: 10 });
+  info = await host.loadDeviceScript({ name: "bundled", source: devSrc, port: 10 });
 } catch (e) {
   console.error(String(e.message).split("\n").slice(0, 6).join("\n"));
 }
@@ -52,18 +61,23 @@ if (info) {
     trace[label] = { called: r.results[0].called, errors: r.results[0].errors, handled: r.results[0].msg.handled, api: calls };
     return trace[label];
   };
-  for (const [label, bytes] of [["cc1_ch0", [0xb0, 1, 64]], ["cc74_ch5", [0xb5, 74, 99]], ["note_on", [0x90, 60, 100]], ["note_off", [0x80, 60, 0]], ["pitch_bend", [0xe0, 0, 64]], ["program_change", [0xc0, 5]], ["sysex", [0xf0, 0x7d, 1, 0xf7]]]) await run(label, bytes);
+  for (const [label, bytes] of [["cc1_ch0", [0xb0, 1, 64]], ["cc74_ch5", [0xb5, 74, 99]], ["cc7_ch0", [0xb0, 7, 100]], ["note_on", [0x90, 60, 100]], ["note_off", [0x80, 60, 0]], ["pitch_bend", [0xe0, 0, 64]], ["program_change", [0xc0, 5]], ["sysex", [0xf0, 0x7d, 1, 0xf7]]]) await run(label, bytes);
   check("全イベント種別 (CC/Note/PB/PC/sysex) の配送で script の例外 0", Object.values(trace).every((t) => t.errors.length === 0), trace);
   const impl = new Set(engine.implemented());
   const unimpl = [...new Set(engine.record.map((r) => r[0]))].filter((n) => !impl.has(n));
   check("script が呼んだ flapi は全て mock が実装済み (未実装 API は None を返す=無言の差異になるため検出)", unimpl.length === 0, unimpl);
   const fwd = engine.state.midiOut.filter((m) => m.api === "forwardMIDICC");
-  // 仮説 (スクリプト名からの推定。実ファイル未確認の期間は FAIL したら trace を見て仮説側を直す): CC は forwardMIDICC へ、Note は転送しない
-  check("[仮説] CC 2 件が device.forwardMIDICC に渡り、Note/PB/PC/sysex では呼ばれない", fwd.length === 2 && trace.note_on.api.every((a) => !/forwardMIDICC/.test(a)), { fwd, trace });
+  const msgOf = (st, d1, d2) => st + (d1 << 8) + (d2 << 16) + (10 << 24);
+  check("実 script: ch0 の CC 2 件 (CC1/CC7) だけが device.forwardMIDICC(status+(d1<<8)+(d2<<16)+(10<<24), 2) に渡る (入力 port ではなく定数 10)",
+    JSON.stringify(fwd) === JSON.stringify([{ api: "forwardMIDICC", message: msgOf(0xb0, 1, 64), mode: 2 }, { api: "forwardMIDICC", message: msgOf(0xb0, 7, 100), mode: 2 }]), fwd);
+  check("転送した CC は OnMidiIn で handled=True になり OnMidiMsg へ進まない", ["cc1_ch0", "cc7_ch0"].every((k) => trace[k].handled === true && trace[k].called.join() === "OnMidiIn"), trace);
+  check("ch5 の CC (0xB5) は status 完全一致 (== MIDI_CONTROLCHANGE) に合わないため転送されない (実 script の挙動。公開 stubs 文書の例 status=191 (0xBF) は ch を含む形)", trace.cc74_ch5.api.length === 0 && trace.cc74_ch5.handled === false, trace.cc74_ch5);
+  check("Note/PB/PC/sysex は転送せず handled=False で OnMidiIn → OnMidiMsg まで進む", ["note_on", "note_off", "pitch_bend", "program_change", "sysex"].every((k) => trace[k].api.length === 0 && trace[k].handled === false && trace[k].called.join() === "OnMidiIn,OnMidiMsg"), trace);
   console.log("trace", JSON.stringify(trace));
 }
 await py.terminate();
 const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
-const ok = neg ? failed.length > 0 && failed[0] === KEY : failed.length === 0;
-console.log((ok ? (neg ? "MIDI BUNDLED NEG-CONTROL DETECTED " : "MIDI BUNDLED OK ") : "MIDI BUNDLED FAIL ") + JSON.stringify({ ok, neg, checks: Object.keys(checks).length, failed }));
-process.exit(ok ? (neg ? 1 : 0) : 2);
+const MUT = "実 script: ch0 の CC 2 件";
+const ok = neg ? failed.length > 0 && failed[0] === KEY : negMutate ? failed.length === 1 && failed[0].startsWith(MUT) : failed.length === 0;
+console.log((ok ? (neg || negMutate ? "MIDI BUNDLED NEG-CONTROL DETECTED " : "MIDI BUNDLED OK ") : "MIDI BUNDLED FAIL ") + JSON.stringify({ ok, neg, negMutate, checks: Object.keys(checks).length, failed }));
+process.exit(ok ? (neg || negMutate ? 1 : 0) : 2);

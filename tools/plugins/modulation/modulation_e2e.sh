@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# PLG-F5 (#202) modulation 8 本の「lift 前提」実測を 1 コマンドで再現する。
+#   bash tools/plugins/modulation/modulation_e2e.sh [--skip-lift | --judge-only]
+# 手順: 前提 inventory (work/ 無ければ生成) → 8 閉包 → batch_lift (RetDec+pass 鎖 → emcc -c) → judge.py (gate)
+#       → closure_facts.py → matrix_check.py → ids_crosscheck.py → icall_check.py --gate → reach_check.py (測定) → engine 4 本 (参考・判定外)
+# exit 0 は「殻 8 本の judge / matrix_check / ids_crosscheck / icall_check --gate が全て合格し、engine 4 本の測定行が揃った」ことだけを意味する。
+#   判定に含めないもの (最終行に件数を出す): engine の `emcc -c` 結果、
+#     reach_check.py の「閉包の取りこぼし (leak)」(frontier の薄いラッパー越しの DLL 固有関数。 追跡 issue は REPORT §7 の起票依頼)。
+#   どれかの判定が不合格なら非 0 で終わり、最終の OK 行は出ない。
+#   --skip-lift  : lift を再実行せず、既存の work/batch/status.csv の最終行で判定する (closure_facts 以降は実行する)
+#   --judge-only : --skip-lift の判定だけ実行して終了 (STATUS_CSV=<path> で入力を差し替え可。 ネガティブコントロール用)
+# 出力: work/modulation/{status8.csv,facts.json,engines.csv} (work/ は gitignore)
+# 前提素材: fl-win64 / toolchain-retdec ([RETDEC]) / toolchain-emsdk ([EMSDK])  (docs/WORKFLOW.md §11、 パスは docs/REFERENCES.md)
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+source "$HERE/env.sh"
+cd "$HERE/.."
+MODE="${1:-}"
+case "$MODE" in ""|--skip-lift|--judge-only) ;; *) echo "usage: $0 [--skip-lift|--judge-only]" >&2; exit 2;; esac
+# Frequency Shifter / Fruity Chorus / Fruity Flanger / Fruity Flangus / Fruity Phaser / Hyper Chorus / Vintage Chorus / Vintage Phaser
+BLOCKS=(18978 18989 19007 19009 19066 19144 19265 19267)
+BLOCKS_CSV="$(IFS=,; echo "${BLOCKS[*]}")"
+ENGINES=(18977 19143 19266 19268)   # 上の殻と同順: Frequency Shifter / Hyper Chorus / Vintage Chorus / Vintage Phaser
+STATUS="${STATUS_CSV:-work/batch/status.csv}"
+S8=work/modulation/status8.csv; [ "$MODE" = "--judge-only" ] && S8=work/modulation/status8.judge.csv
+mkdir -p work/modulation
+
+if [ "$MODE" != "--judge-only" ]; then
+  if [ ! -d work/winfuncs ] || [ ! -f work/win_abi.json ]; then
+    python3 inventory/win_scan.py
+    python3 inventory/blockmap_from_matrix.py
+    python3 inventory/win_funcs.py
+    python3 inventory/win_unique.py > /dev/null
+    python3 inventory/win_abi.py > /dev/null
+  fi
+  [ -f work/kernel_table.json ] || python3 inventory/kernel_table.py > /dev/null
+  python3 lift/plugin_closure.py "${BLOCKS[@]}"
+fi
+
+if [ -z "$MODE" ]; then
+  # 前回の出力が残っていると RetDec 失敗が見えなくなる (lift_ranges.sh は drc.ll の存在だけを見る) ので block ごとに消す
+  for b in "${BLOCKS[@]}"; do rm -rf "work/batch/$b"; done
+  n0=1; [ -f work/batch/status.csv ] && n0=$(wc -l < work/batch/status.csv)
+  bash lift/batch_lift.sh "${BLOCKS[@]}"
+  # この実行で追記された行だけを判定対象にする (stale な行で合格させない)
+  { head -n 1 work/batch/status.csv; tail -n +$((n0 + 1)) work/batch/status.csv; } > "$S8"
+else
+  echo "[modulation_e2e] $MODE: lift は再実行せず $STATUS の block ごとの最終行で判定する"
+  cp "$STATUS" "$S8"
+fi
+
+python3 modulation/judge.py "$S8" --blocks "$BLOCKS_CSV" --batch-dir work/batch \
+  || { echo "[modulation_e2e] FAIL: judge (殻 8 本のうち不合格あり)" >&2; exit 1; }
+if [ "$MODE" = "--judge-only" ]; then echo "[modulation_e2e] judge-only: PASS"; exit 0; fi
+
+python3 modulation/closure_facts.py > work/modulation/facts.stdout.json 2> work/modulation/facts.err
+python3 modulation/matrix_check.py || { echo "[modulation_e2e] FAIL: matrix_check" >&2; exit 1; }
+python3 modulation/ids_crosscheck.py || { echo "[modulation_e2e] FAIL: ids_crosscheck" >&2; exit 1; }
+# 間接 call 脱落の判定 (IR 側 = 元の間接 call + 復元済み dispatch が静的 site 数に満たなければ FAIL。 audit と別算法の線形 sweep の不一致も FAIL)。
+# batch_lift.sh は #514 (237010e) 以降の既定 PLUG_ICALL=1 で復元するため、 8 本とも脱落 0 が期待値 (PLUG_ICALL=0 の従来鎖は 8/8 本が脱落: REPORT §3.2)
+python3 modulation/icall_check.py --gate | tee work/modulation/icall.txt || { echo "[modulation_e2e] FAIL: icall_check (IR の間接 call が静的 site に満たない、 または検算不一致)" >&2; exit 1; }
+ICALL_DROP=$(sed -n 's/.*満たない殻 = \([0-9]*\)\/.*/\1/p' work/modulation/icall.txt | tail -n 1)
+[ -n "$ICALL_DROP" ] || { echo "[modulation_e2e] FAIL: icall_check の結果行が読めない" >&2; exit 1; }
+# 閉包の取りこぼし監査 (leak = frontier の薄いラッパー越しの DLL 固有関数が閉包から漏れる件。 leak 自体は判定外。 辺抽出の検算が食い違えば測定不正として FAIL)
+python3 modulation/reach_check.py | tee work/modulation/reach.txt || { echo "[modulation_e2e] FAIL: reach_check (測定の検算不一致)" >&2; exit 1; }
+REACH_LEAK=$(sed -n 's/.*leak.*のある殻 = \([0-9]*\)\/.*/\1/p' work/modulation/reach.txt | tail -n 1)
+[ -n "$REACH_LEAK" ] || { echo "[modulation_e2e] FAIL: reach_check の結果行が読めない" >&2; exit 1; }
+
+# C++ engine 4 本 (判定には含めない: 到達性の実測のみ。 ただし測定行が揃わなければ FAIL)
+if [ "$MODE" != "--skip-lift" ]; then
+  echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > work/modulation/engines.csv
+  for eb in "${ENGINES[@]}"; do bash modulation/engine_lift.sh "$eb" 1500 | tail -n 1 >> work/modulation/engines.csv; done
+  cat work/modulation/engines.csv work/modulation/engine*/first_errors.txt
+fi
+awk -F, -v n="${#ENGINES[@]}" 'NR > 1 { rows++; if (NF != 15) bad++ } END { exit !(rows == n && !bad) }' work/modulation/engines.csv \
+  || { echo "[modulation_e2e] FAIL: engines.csv の測定行が ${#ENGINES[@]} 本分揃っていない" >&2; exit 1; }
+ENG_OK=$(awk -F, 'NR > 1 && $7 == 0 { n++ } END { print n + 0 }' work/modulation/engines.csv)
+echo "[modulation_e2e] shells: judge/matrix_check/ids_crosscheck 合格 (8/8 本)、 IR の間接 call 脱落あり $ICALL_DROP/8 本 (icall_check --gate 合格)。 判定外の測定: 閉包の取りこぼし (leak) あり $REACH_LEAK/8 本、 engines の emcc -c rc=0 は $ENG_OK/${#ENGINES[@]} 本"
+echo "[modulation_e2e] OK: work/modulation/{status8.csv,facts.json,engines.csv} elapsed=${SECONDS}s loadavg=$(cut -d' ' -f1-3 /proc/loadavg)"
