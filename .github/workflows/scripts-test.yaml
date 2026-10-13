@@ -25,3 +25,5 @@ jobs:
         run: bash .github/scripts/tests/test-pr-loop.sh
       - name: test-watchdog.sh
         run: bash .github/scripts/tests/test-watchdog.sh
+      - name: test-dispatch-context.sh
+        run: bash .github/scripts/tests/test-dispatch-context.sh

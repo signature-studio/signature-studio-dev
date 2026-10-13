@@ -27,6 +27,11 @@ const ntrials = u32(); u32();
 const sigs = JSON.parse(fs.readFileSync(sigPath, 'utf8'));
 const Mod = require(path.resolve(modPath));
 const M = await Mod();
+const f32 = new Float32Array(1), u32a = new Uint32Array(f32.buffer);
+const f64 = new Float64Array(1), u64a = new BigUint64Array(f64.buffer);
+const bitsToF32 = (b) => { u32a[0] = Number(BigInt(b) & 0xffffffffn); return f32[0]; };
+const bitsToF64 = (b) => { u64a[0] = BigInt(b); return f64[0]; };
+const f32bits = (x) => { f32[0] = x; return u32a[0]; };
 const H8 = () => M.HEAPU8;
 const KH_SIZE = 65536n;   /* stubs.c の kh_stack[65536] と同値 */
 const KH_BASE = zeroStack && M._kh_stack_ptr ? BigInt(M._kh_stack_ptr()) : 0n;

@@ -5,7 +5,7 @@ import os as _os, sys as _sys
 _sys.path.append(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', '..', '..', '..', 'shared'))
 from paths import REPO_ROOT
 import sys, struct, pefile, capstone
-P = _os.path.join(REPO_ROOT, 'tools/targets/kilohearts/work/winpkg/HeartCore.core_64')
+P = _os.environ.get('KH_CORE') or _os.path.join(REPO_ROOT, 'tools/targets/kilohearts/work/winpkg/HeartCore.core_64')
 pe = pefile.PE(P, fast_load=True)
 data = open(P, 'rb').read()
 BASE = pe.OPTIONAL_HEADER.ImageBase

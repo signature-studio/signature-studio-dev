@@ -24,7 +24,8 @@ enum { FLA_ST_CLOSED = 0, FLA_ST_OPENED = 1, FLA_ST_RUNNING = 2 };
 /* ctl.wl_state (worklet 側状態) */
 enum { FLA_WL_IDLE = 0, FLA_WL_BUFFERING = 1, FLA_WL_PLAYING = 2 };
 /* ctl.dev_events */
-enum { FLA_EV_SUSPENDED = 1u << 0, FLA_EV_CLOSED = 1u << 1, FLA_EV_RATE_CHANGED = 1u << 2, FLA_EV_RESUMED = 1u << 3 };
+enum { FLA_EV_SUSPENDED = 1u << 0, FLA_EV_CLOSED = 1u << 1, FLA_EV_RATE_CHANGED = 1u << 2, FLA_EV_RESUMED = 1u << 3,
+       FLA_EV_INPUT_CHANGED = 1u << 4 /* 入力デバイスの喪失/切替 (ASIO kAsioResetRequest の元) */ };
 /* ctl.flags */
 enum { FLA_F_DECLICK = 1u << 0, FLA_F_INPUT = 1u << 1 };
 
@@ -39,8 +40,10 @@ enum {
     FLA_CMD_RESUME = 3,     /* AudioContext.resume() (suspend 復帰) */
     FLA_CMD_SET_SR = 4,     /* a0=new sample_rate: AudioContext 再生成 */
     FLA_CMD_MIDI_LIST = 5,  /* 設計のみ (docs) — 未実装 */
-    FLA_CMD_INPUT_OPEN = 6, /* 設計のみ (getUserMedia) — PoC は MediaStream を test ページが直接接続 */
-    FLA_CMD_ATTACH = 7      /* ring 確保後: AudioWorkletNode 生成 (processorOptions に最新 SAB/ctl/layout) + connect + resume */
+    FLA_CMD_INPUT_OPEN = 6, /* 未使用 (予約): 入力は ATTACH 時に FlAudioShimOptions.input (FlAudioInput) が接続する。実装すると fail-fast -2 */
+    FLA_CMD_ATTACH = 7,     /* ring 確保後: AudioWorkletNode 生成 (processorOptions に最新 SAB/ctl/layout) + connect + resume */
+    FLA_CMD_CONTROL_PANEL = 8 /* ASIO::controlPanel: main が FlAudioShimOptions.controlPanel (入力デバイス選択 UI 等) を開く。
+                             * ack_status 0=UI を開いた, FLA_E_NO_PANEL=UI 未登録 */
 };
 
 /* 64 バイト境界で 6 ライン。オフセットは固定 (offsetof で JS 側と照合)。 */
@@ -133,6 +136,7 @@ int  fla_cmd(uint32_t op, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, ui
  *   -1 = RPC 失敗/タイムアウト, FLA_E_BURST_TOO_LARGE = OPEN 較正 burst が大きすぎ ring に収まらない
  *   ((depth+2)*B > FLA_MAX_RING。depth は burst から自動算出し固定上限なし。AudioContext は閉じて CLOSED に戻す) */
 #define FLA_E_BURST_TOO_LARGE (-100)
+#define FLA_E_NO_PANEL (-3)   /* CONTROL_PANEL の ack_status: main に UI が登録されていない */
 int  fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frames, uint32_t depth, uint32_t flags);
 void fla_close(void);
 /* テスト専用: OPEN 較正 burst の下限を強制 (0 = 無効)。ring 超過エラー経路を決定的に再現する */

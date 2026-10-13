@@ -6,7 +6,7 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 IR="$1"; TAG="${2:-ir}"
-set +u; . /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; set -u
+set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1; set -u
 mkdir -p "$HERE/work/sig"
 LOG="$HERE/work/sig/$TAG.log"
 emcc "$IR" "$HERE"/src/*.c -o "$HERE/work/sig/$TAG.js" -w -Wno-error=int-conversion -O0 -sALLOW_MEMORY_GROWTH=1 \
