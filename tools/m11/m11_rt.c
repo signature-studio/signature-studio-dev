@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+#include <emscripten/stack.h>
 
 #define PAGE daunting_nop = 0  /* (未使用のプレース保留は書かない) */
 
@@ -49,6 +50,9 @@ static int g_vfree_noop = 0;
 static unsigned long long g_va_used = 0;       /* 累計確保バイト (従来値と同義) */
 static unsigned long long g_va_live = 0;       /* 現在確保中バイト */
 static unsigned long long g_va_peak = 0;       /* g_va_live の最大 */
+extern const int m11_trace_isolate;   /* trace が shadow stack を汚さないよう SP 直下を退避/復元する (m11_ov.c M11_TRACE, #495) */
+extern void m11_stk_save(unsigned sp);
+extern void m11_stk_restore(unsigned sp);
 static unsigned long long g_va_calls = 0;
 static unsigned long long g_va_oom = 0;        /* calloc 失敗 (NULL を返した) 回数 */
 static unsigned long long g_va_freed_cnt = 0;  /* MEM_RELEASE で実解放した回数 */
@@ -67,7 +71,12 @@ EM_JS(void, m11_va_big_stack, (unsigned size), {
 EMSCRIPTEN_KEEPALIVE
 void *VirtualAlloc(void* addr, unsigned size, unsigned type, unsigned protect) {
     if (g_va_calls < 8) fprintf(stderr, "[m11][VA] #%llu addr=%p size=%u (0x%x) type=0x%x prot=0x%x\n", g_va_calls, addr, size, size, type, protect);
-    if (m11_trace_flag && g_va_calls < 3) EM_ASM({ console.error('[m11][VA-stack]\n' + new Error().stack.split('\n').slice(2, 12).join('\n')); });
+    if (m11_trace_flag && g_va_calls < 3) {
+        unsigned sp_ = (unsigned)emscripten_stack_get_current();
+        if (m11_trace_isolate) m11_stk_save(sp_);
+        EM_ASM({ console.error('[m11][VA-stack]\n' + new Error().stack.split('\n').slice(2, 12).join('\n')); });
+        if (m11_trace_isolate) m11_stk_restore(sp_);
+    }
     if (g_va_stack_at && g_va_calls == g_va_stack_at) m11_va_big_stack(size);
     g_va_calls++;
     if (addr) return addr;

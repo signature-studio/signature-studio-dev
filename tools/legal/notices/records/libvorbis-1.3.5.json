@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "id": "libvorbis-1.3.5",
+  "name": "libvorbis",
+  "version": "1.3.5",
+  "provenance": "build-script",
+  "upstream": {
+    "url": "https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.5.tar.gz",
+    "archive": "libvorbis-1.3.5.tar.gz",
+    "sha256": "6efbcecdd3e5dfbf090341b485da9d176eb250d893e3eb378c428a2db38301ce"
+  },
+  "license": {
+    "spdx": "BSD-3-Clause",
+    "files": [
+      {
+        "path": "COPYING",
+        "sha256": "5c0905d21494102e4d579a3c42216f8de1c2ac738443db4f189f93a01ca31a93",
+        "text": "Copyright (c) 2002-2015 Xiph.org Foundation\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted provided that the following conditions\nare met:\n\n- Redistributions of source code must retain the above copyright\nnotice, this list of conditions and the following disclaimer.\n\n- Redistributions in binary form must reproduce the above copyright\nnotice, this list of conditions and the following disclaimer in the\ndocumentation and/or other materials provided with the distribution.\n\n- Neither the name of the Xiph.org Foundation nor the names of its\ncontributors may be used to endorse or promote products derived from\nthis software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS\n``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT\nLIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR\nA PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION\nOR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,\nSPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT\nLIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,\nDATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY\nTHEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT\n(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\nOF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
+      }
+    ]
+  },
+  "build": {
+    "script": "tools/shared/oss/ogg/build.sh",
+    "toolchain": "emcc 6.0.12",
+    "targets": [
+      "wasm32",
+      "wasm64"
+    ],
+    "args": [
+      {
+        "step": "compile",
+        "args": "emcc -O2 -ffp-contract=off -w -I<build>/inc -I<libvorbis>/include -I<libvorbis>/lib <sources: analysis.c bitrate.c block.c codebook.c envelope.c floor0.c floor1.c info.c lookup.c lpc.c lsp.c mapping0.c mdct.c psy.c registry.c res0.c sharedbook.c smallft.c synthesis.c vorbisenc.c window.c> (autotools 不使用。config_types.h のみ native ./configure 生成)"
+      }
+    ],
+    "patches": []
+  }
+}
