@@ -1,6 +1,6 @@
 # tools/perf REPORT_P8 — plugin 別 module/instance/memory vs 動的リンク (MAIN/SIDE_MODULE) (PERF-P8 / #166)
 
-> **正本**: 本ファイル (`tools/perf/REPORT.md` §12 の付録。REPORT.md が 250 行上限のため分割)。全表は `p8/results/TABLES.md` (自動生成)、生データ `p8/results/*.jsonl`。
+> **正本**: 本ファイル (`tools/perf/REPORT.md` §5 項目 7 の付録。REPORT.md が 250 行上限のため分割)。全表は `p8/results/TABLES.md` (自動生成)、生データ `p8/results/*.jsonl`。
 
 既知類型との関係: 該当なし (計測。lift・既存 wasm は未変更)。検証起点 commit: `8bf9b10` (クリーン detached worktree `p8/work/wt_verify` で `p8.sh` の build・node・Chrome 全段を実行、570 行 = `results/p8.jsonl`)。
 後続 commit で `tables.mjs` (複数実行系対応)・`chrome_p8.mjs` (`P8_JSFLAGS`/`P8_OUT`/`--cfgs`) を直し、診断 2 本 (`p8_diag.jsonl`, `p8_limit.jsonl`) を追加した (ベンチ本体 `lib.mjs`/`bench.mjs` は 8bf9b10 から数値に影響する変更なし)。

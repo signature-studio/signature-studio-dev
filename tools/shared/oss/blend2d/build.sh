@@ -54,4 +54,17 @@ a=load(sys.argv[1]); b=load(sys.argv[2])
 diff=[abs(x-y) for x,y in zip(a,b) if x!=y]
 print(f"[b2d] JIT vs no-JIT (native): differing bytes={len(diff)}/{len(a)} max_abs={max(diff) if diff else 0}")
 PY
+
+# LGL-3 (#86): 再ビルド記録 (Blend2D / AsmJit。配布想定は wasm32 no-JIT ビルド)
+if [ "$rc" = 0 ]; then
+  REC="$HERE/../../../legal/notices/record.mjs"
+  node "$REC" --id blend2d-${REV:0:12} --name Blend2D --version "pre-v0.20 ($REV)" --license-spdx Zlib \
+    --url https://github.com/blend2d/blend2d --commit "$REV" --git-dir "$SRC" --src-dir "$SRC" --license-file LICENSE.md \
+    --script "$HERE/build.sh" --toolchain emcc --target wasm32 \
+    --step "cmake=emcmake cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DBLEND2D_STATIC=ON -DASMJIT_DIR=<asmjit-src> -DBLEND2D_NO_INSTALL=ON -DBLEND2D_NO_JIT=ON -DBLEND2D_NO_TLS=ON -DBLEND2D_NO_FUTEX=ON"
+  node "$REC" --id asmjit-029075b84bf0 --name AsmJit --version "_abi_1_13 (029075b84bf0)" --license-spdx Zlib \
+    --url https://github.com/asmjit/asmjit --commit 029075b84bf0161a761beb63e6eda519a29020db --git-dir "$ASM" --src-dir "$ASM" --license-file LICENSE.md \
+    --script "$HERE/build.sh" --toolchain emcc --target wasm32 \
+    --step "cmake=Blend2D の cmake から ASMJIT_DIR 経由で取り込む (BLEND2D_NO_JIT=ON の wasm では JIT 部は使われない)"
+fi
 exit $rc

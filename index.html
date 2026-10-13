@@ -31,6 +31,15 @@
         font-size: 12px;
         opacity: 0.8;
       }
+      #notices {
+        position: fixed;
+        right: 12px;
+        bottom: 8px;
+        z-index: 10;
+        font-size: 11px;
+        color: #eee;
+        opacity: 0.6;
+      }
       #screen {
         display: block;
         width: 100vw;
@@ -46,6 +55,7 @@
     </div>
     <!-- FL の GUI 描画用フレームバッファ転送先 (全画面 Canvas) -->
     <canvas id="screen"></canvas>
+    <a id="notices" href="/THIRD_PARTY_NOTICES.html" target="_blank" rel="license noopener">Third-party notices</a>
     <script type="module" src="/src/index.ts"></script>
   </body>
 </html>
