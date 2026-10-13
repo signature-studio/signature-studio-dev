@@ -1,0 +1,287 @@
+{
+ "closure": {
+  "filter": {
+   "avx": 423,
+   "bytes": 47313,
+   "class_bytes": {
+    "avx": 8017,
+    "closed": 37409,
+    "iat": 1887
+   },
+   "class_funcs": {
+    "avx": 15,
+    "closed": 84,
+    "iat": 10
+   },
+   "funcs": 109,
+   "gap_funcs": 37,
+   "iat_calls": 20,
+   "indirect_calls": 0,
+   "insn": 10154,
+   "packed": 2116,
+   "scalar_fp": 3410,
+   "x87": 0
+  },
+  "voice": {
+   "avx": 974,
+   "bytes": 411135,
+   "class_bytes": {
+    "avx": 19342,
+    "closed": 300571,
+    "iat": 27699,
+    "icall": 60964,
+    "oss": 2559
+   },
+   "class_funcs": {
+    "avx": 24,
+    "closed": 830,
+    "iat": 92,
+    "icall": 62,
+    "oss": 6
+   },
+   "funcs": 1014,
+   "gap_funcs": 191,
+   "iat_calls": 189,
+   "indirect_calls": 199,
+   "insn": 100074,
+   "packed": 6432,
+   "scalar_fp": 4222,
+   "x87": 0
+  },
+  "wt_osc": {
+   "avx": 1146,
+   "bytes": 520838,
+   "class_bytes": {
+    "avx": 22472,
+    "closed": 415647,
+    "iat": 27042,
+    "icall": 46256,
+    "oss": 9421
+   },
+   "class_funcs": {
+    "avx": 30,
+    "closed": 989,
+    "iat": 91,
+    "icall": 60,
+    "oss": 13
+   },
+   "funcs": 1183,
+   "gap_funcs": 176,
+   "iat_calls": 190,
+   "indirect_calls": 183,
+   "insn": 131687,
+   "packed": 8370,
+   "scalar_fp": 4226,
+   "x87": 0
+  }
+ },
+ "closure_union": {
+  "avx": 1431,
+  "bytes": 719562,
+  "class_bytes": {
+   "avx": 25472,
+   "closed": 572726,
+   "iat": 28825,
+   "icall": 83118,
+   "oss": 9421
+  },
+  "class_funcs": {
+   "avx": 40,
+   "closed": 1216,
+   "iat": 96,
+   "icall": 86,
+   "oss": 13
+  },
+  "funcs": 1451,
+  "gap_funcs": 253,
+  "iat_calls": 196,
+  "indirect_calls": 277,
+  "insn": 174531,
+  "packed": 13420,
+  "scalar_fp": 10142,
+  "x87": 0
+ },
+ "image": "Serum2_win64.vst3",
+ "image_base": "0x180000000",
+ "root_funcs": {
+  "filter": [
+   "0x1800120a0",
+   "0x18008b2a0",
+   "0x1802f5c10",
+   "0x1802f5c40",
+   "0x1802f5c60",
+   "0x1802f6000",
+   "0x1802f7340",
+   "0x1802f7370",
+   "0x1802f74f0",
+   "0x1802f7510",
+   "0x1802fcc90"
+  ],
+  "voice": [
+   "0x18007e700",
+   "0x18007e830",
+   "0x18007ea80",
+   "0x180080fc0",
+   "0x1800812d0",
+   "0x1800818c0",
+   "0x180082700",
+   "0x180082850",
+   "0x180082c90",
+   "0x180083330",
+   "0x180083530",
+   "0x1800838a0",
+   "0x180083a90",
+   "0x180083c30",
+   "0x180084990",
+   "0x180084a50",
+   "0x180084bd0",
+   "0x180084df0",
+   "0x180084e00",
+   "0x180085e00",
+   "0x180086170",
+   "0x1803c71f0",
+   "0x1803c79e0",
+   "0x1803caa70"
+  ],
+  "wt_osc": [
+   "0x180070640",
+   "0x1800879e0",
+   "0x180087a60",
+   "0x180087ad0",
+   "0x180087b10",
+   "0x180279430",
+   "0x18027a220",
+   "0x18027b940",
+   "0x18027bb80",
+   "0x180297d80",
+   "0x180297db0",
+   "0x1803c87d0",
+   "0x1803cb770",
+   "0x1803ce5a0",
+   "0x1803d0850",
+   "0x1803d08a0",
+   "0x1803d08d0",
+   "0x1803d08f0",
+   "0x1803d0970",
+   "0x1803d0980",
+   "0x1803d17f0"
+  ]
+ },
+ "roots": {
+  "filter": {
+   "avx": 0,
+   "bytes": 27282,
+   "class_bytes": {
+    "closed": 27282
+   },
+   "class_funcs": {
+    "closed": 11
+   },
+   "funcs": 11,
+   "gap_funcs": 5,
+   "iat_calls": 0,
+   "indirect_calls": 0,
+   "insn": 5746,
+   "packed": 1761,
+   "scalar_fp": 2542,
+   "x87": 0
+  },
+  "voice": {
+   "avx": 0,
+   "bytes": 31886,
+   "class_bytes": {
+    "closed": 15915,
+    "icall": 15971
+   },
+   "class_funcs": {
+    "closed": 17,
+    "icall": 7
+   },
+   "funcs": 24,
+   "gap_funcs": 2,
+   "iat_calls": 0,
+   "indirect_calls": 24,
+   "insn": 6291,
+   "packed": 665,
+   "scalar_fp": 688,
+   "x87": 0
+  },
+  "wt_osc": {
+   "avx": 0,
+   "bytes": 10812,
+   "class_bytes": {
+    "closed": 8305,
+    "icall": 2507
+   },
+   "class_funcs": {
+    "closed": 17,
+    "icall": 4
+   },
+   "funcs": 21,
+   "gap_funcs": 9,
+   "iat_calls": 0,
+   "indirect_calls": 5,
+   "insn": 2425,
+   "packed": 376,
+   "scalar_fp": 200,
+   "x87": 0
+  }
+ },
+ "voice_core_bytes_inside": 31113,
+ "voice_core_funcs_inside": 20,
+ "voice_core_funcs_overlapping": 20,
+ "voice_core_range": [
+  "0x18007e700",
+  "0x1800861f3"
+ ],
+ "vtables": [
+  {
+   "cls": "WTOsc",
+   "group": "wt_osc",
+   "methods_pdata_only": 2,
+   "slots_text": 10,
+   "this_off": 0,
+   "vtable_va": "0x180a6c5e8"
+  },
+  {
+   "cls": "WTOscState",
+   "group": "wt_osc",
+   "methods_pdata_only": 0,
+   "slots_text": 11,
+   "this_off": 0,
+   "vtable_va": "0x180a4ced8"
+  },
+  {
+   "cls": "XferFilterSVF",
+   "group": "filter",
+   "methods_pdata_only": 1,
+   "slots_text": 6,
+   "this_off": 0,
+   "vtable_va": "0x180a54688"
+  },
+  {
+   "cls": "XferFilterLadder",
+   "group": "filter",
+   "methods_pdata_only": 1,
+   "slots_text": 6,
+   "this_off": 0,
+   "vtable_va": "0x180a54548"
+  },
+  {
+   "cls": "Voice",
+   "group": "voice",
+   "methods_pdata_only": 0,
+   "slots_text": 3,
+   "this_off": 0,
+   "vtable_va": "0x180a6bed8"
+  },
+  {
+   "cls": "Voice",
+   "group": "voice",
+   "methods_pdata_only": 0,
+   "slots_text": 1,
+   "this_off": 48,
+   "vtable_va": "0x180a6bef8"
+  }
+ ]
+}

@@ -6,6 +6,7 @@ cfg (JSON) の主なキー:
   retdec: {"ranges": "0x..-0x..,...", "timeout": 900}
   passes: {"p1": true, "f7": true, "f2": true, "gdata": "external"|"all"|null, "shift": {"base":..,"newbase":..}|null}
   exports: [ "function_180afe090", ... ]
+  extra_funcs: [["0x1802f7370", "0x1802f74ec"], ...]  (.pdata 外の leaf 関数を合成エントリ登録。p1/f2 が機械語を参照するため)
   emcc: {"opt": "-O1" (profile dev のみ), "extra": [..], "variant_extra": {"<変種名>": [..]} (署名ガード変種ごとの追加フラグ), "sources": [..] (追加 C)}
   spec / wasm_func / signature: {"n": 署名用シナリオ数, "expect": 期待署名} (標準ビルド `build` の署名ガード用)
 """
@@ -269,6 +270,8 @@ def lift_repair(cfg_path, workdir=None, detect_only=False):
     os.makedirs(workdir, exist_ok=True)
     log, stats = [], {}
     img = Image(rpath(cfg["image"]))
+    for b, e in cfg.get("extra_funcs", []):
+        img.add_func(int(str(b), 0), int(str(e), 0))
     ic = cfg.get("passes", {}).get("icall")
     if ic:   # lift 前に PE を書換え (間接 call/jmp 復元 + ABI 仮想化 + D7 回避)。img (修復 pass が参照する正本) は元 PE のまま
         rimg, rranges, icmap = ICALL.prelift(cfg, rpath(cfg["image"]), rpath(ic["funcs"]), workdir, log)

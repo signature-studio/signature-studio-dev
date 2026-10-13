@@ -123,6 +123,27 @@ def find_undef_for(mod, fn, ix, readers):
     return best[1], best[2], best[3]
 
 
+SEXT_ARG_RE = re.compile(r"^\s*(%[\w$.\-]+) = sext i64 %arg\d+ to i128\s*$")
+
+
+def find_sext_arg_for(mod, fn, readers):
+    """SR-4 (#75): RetDec が xmm 引数 (例: `movss [rcx+0xc], xmm1`) を undef ではなく `sext i64 %argN to i128`
+    (= 整数引数 reg の値) に束ねる形 (DEFECTS.md D5)。その sext 値の使用が全て xmm reader の機械語アドレス上なら
+    xmm 値の定義とみなす: (bi, li, name)。使用が 1 件も無い/reader 外に使われる sext は対象外。"""
+    rs = set(readers)
+    for bi, b in enumerate(fn.blocks):
+        for li, ln in enumerate(b.lines):
+            m = SEXT_ARG_RE.match(IR.strip_tokens(ln))
+            if not m:
+                continue
+            name = m.group(1)
+            pat = re.compile(r"(?<![\w$.%\-])" + re.escape(name) + r"(?![\w$.\-])")
+            uses = [mod.addr_of(l2) for b2 in fn.blocks for l2 in b2.lines if l2 is not ln and pat.search(IR.strip_tokens(l2))]
+            if uses and all(a in rs for a in uses):
+                return bi, li, name
+    return None
+
+
 # ---------------------------------------------------------------------------------
 # xmm 戻り値の搬送 (LIFTLIB #241) — OTT [F1] accessor 型
 # ---------------------------------------------------------------------------------
@@ -252,6 +273,11 @@ def run(mod, img, log=None, stats=None, repair=True, only=None, phase="both", ix
             for k in ks:
                 kind, readers = i["params"][k]
                 hit = find_undef_for(mod, fn, ix, readers)
+                if hit is None:
+                    hit = find_sext_arg_for(mod, fn, readers)
+                    if hit is not None:
+                        stats["sext_arg_rebound"] = stats.get("sext_arg_rebound", 0) + 1
+                        log.append("F2 %s: xmm%d は `sext i64 %%argN` に束ねられていた (D5 型) → %%xmm%d_bits に差替" % (nm, k, k))
                 if hit is None:
                     log.append("F2 %s: xmm%d の undef 値が見つからない (引数のみ追加)" % (nm, k))
                     stats["undef_missing"] = stats.get("undef_missing", 0) + 1
