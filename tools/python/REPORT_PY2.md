@@ -10,7 +10,7 @@
 
 | 項目 | 実測 (HEAD は末尾の検証欄、GitHub Actions runner 4 core、node 22.23.3、emsdk 6.0.12) |
 |---|---|
-| wasm サイズ | `flpy_static.wasm` 5,955,243B。`flpy.wasm` 5,921,095B との差 +34,148B (provider 単体は `flprov.wasm` 43,225B) |
+| wasm サイズ | `flpy_static.wasm` 5,955,357B。`flpy.wasm` 5,921,211B との差 +34,146B (どちらもクリーン HEAD 5a0b3c3 での再ビルド値。同一ソースでも作業ツリーの再ビルドとはパス文字列分で数百 B 変わる) (provider 単体は `flprov.wasm` 43,225B) |
 | JS import 排除 | `WebAssembly.Module.imports` に `flhost|fl_api|flprov|flHostCall` 一致 **0 件**。同じ検査を `flpy.wasm` に掛けると `env.flhost_call` が 1 件出る (検査が空振りしていないことのポジコン)。`fl_api_call` は export に有り |
 | 48 tool 実行 | `tests/static_check.mjs`: **48/48 ok**、soft_error 0・raised 0、callback 往復 true、host_calls 37,424 (tool 別合計 37,423 + callback 1) |
 | 結果の同一性 | tool 別 (status・結果文字列・api_calls・host_calls) の差: **SAB+provider 版 (`FL_ENGINE=wasm all_tools`) と 0/48、モック版 (追跡中 `tool_coverage.json`) と 0/48**。class A 38 を含む 48 全件 |
@@ -18,16 +18,16 @@
 
 ### 往復コスト (`tests/static_bench.mjs`、1 trial = 20,000 回、5 trial の min / median / max、µs/呼出し)
 
-| 経路 | 試行 1 (load 0.89) | 試行 2 (load 0.90) |
-|---|---|---|
-| 静的: C から `fl_api_call` のみ (Python 無し) | 0.013 / 0.013 / 0.015 | 0.012 / 0.013 / 0.018 |
-| 静的: Python `_flhost.call(fn,())` 直 (戻り int、lambda 込み) | 0.216 / 0.220 / 0.614 | 0.214 / 0.216 / 0.607 |
-| 静的: Python `channels.channelCount()` (fl_api ラッパ経由 = MCPTools が通る経路) | 0.333 / 0.337 / 0.522 | 0.339 / 0.342 / 0.547 |
-| 静的: 戻り str (`mixer.getTrackName`、malloc/free + decode) | 0.285 / 0.299 / 0.428 | 0.286 / 0.296 / 0.418 |
-| 参考: 空の Python 関数呼出し (計測ループの下限) | 0.074 / 0.075 / 0.168 | 0.077 / 0.077 / 0.178 |
-| Worker + SAB (同一 provider、`channels.channelCount()`) | 24.321 / 26.575 / 27.165 | 22.827 / 25.049 / 26.224 |
+| 経路 | 試行 1 (load 0.89) | 試行 2 (load 0.90) | クリーン HEAD 5a0b3c3 (load 0.78) |
+|---|---|---|---|
+| 静的: C から `fl_api_call` のみ (Python 無し) | 0.013 / 0.013 / 0.015 | 0.012 / 0.013 / 0.018 | 0.012 / 0.013 / 0.018 |
+| 静的: Python `_flhost.call(fn,())` 直 (戻り int、lambda 込み) | 0.216 / 0.220 / 0.614 | 0.214 / 0.216 / 0.607 | 0.215 / 0.218 / 0.291 |
+| 静的: Python `channels.channelCount()` (fl_api ラッパ経由 = MCPTools が通る経路) | 0.333 / 0.337 / 0.522 | 0.339 / 0.342 / 0.547 | 0.332 / 0.339 / 0.367 |
+| 静的: 戻り str (`mixer.getTrackName`、malloc/free + decode) | 0.285 / 0.299 / 0.428 | 0.286 / 0.296 / 0.418 | 0.294 / 0.303 / 0.323 |
+| 参考: 空の Python 関数呼出し (計測ループの下限) | 0.074 / 0.075 / 0.168 | 0.077 / 0.077 / 0.178 | 0.075 / 0.076 / 0.122 |
+| Worker + SAB (同一 provider、`channels.channelCount()`) | 24.321 / 26.575 / 27.165 | 22.827 / 25.049 / 26.224 | 24.058 / 25.675 / 26.961 |
 
-結論: 「<1µs」目標は **Python 呼出し込みで 0.34µs (median) で達成**。SAB 版との比は 73.2〜78.9 倍 (試行ごとの median 同士: 25.049/0.342、26.575/0.337)。§5 の過去値 (bimodal 15〜130µs) と違い、本 runner の SAB 版は 22.8〜27.2µs の単峰で、15µs 側・100µs 側は再現しなかった (環境差。比較は同一 run 内の値だけを使う)。内訳 (上表の median の差からの推定) は Python のラッパ (`fl_api._make.f` の `bind` + try) が約 0.12µs、`_flhost.call` の引数組立+C 呼出しが約 0.14µs、`fl_api_call` 自体が約 0.013µs。
+結論: 「<1µs」目標は **Python 呼出し込みで 0.34µs (median) で達成**。SAB 版との比は 73.2〜78.9 倍 (試行ごとの median 同士: 25.049/0.342、26.575/0.337、HEAD 25.675/0.339)。§5 の過去値 (bimodal 15〜130µs) と違い、本 runner の SAB 版は 22.8〜27.2µs の単峰で、15µs 側・100µs 側は再現しなかった (環境差。比較は同一 run 内の値だけを使う)。内訳 (上表の median の差からの推定) は Python のラッパ (`fl_api._make.f` の `bind` + try) が約 0.12µs、`_flhost.call` の引数組立+C 呼出しが約 0.14µs、`fl_api_call` 自体が約 0.013µs。
 
 ### Py_* 動的束縛の対応表 (#115 の範囲を本 issue で処理: PM 判断)
 
@@ -60,10 +60,11 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 - **Python を実行してよいのは UI スレッドと MIDI スレッドだけ。audio スレッド (AudioWorklet) からは呼ばない**。FL の API 自身が audio 側で `Operation unsafe at current time` (code 3) を返す設計と一致。AudioWorklet 内では `Atomics.wait` が TypeError で使えない (runtime REPORT)。
 - 同一 wasm 内なので `_flhost.call` は呼出し元スレッドの上で同期に完結し、callback (`ilmcp.showHighlight` の `whenDone` など) も同じスレッドで戻る。FL 本来の「同一プロセス・同一スレッド」と同じ。
 - GIL: FL は `PyGILState_*` を使わず `PyEval_SaveThread/RestoreThread` + `PyThreadState_New/Swap` を束縛する (上表)。静的版では `SaveThread → RestoreThread` の往復後も tool が動くことを確認済み。**pthread (複数スレッドから同時に Python) 版のビルド・実行は未検証**。単一スレッド wasm 版 (本 PR) は MIDI と UI を 1 つのスレッドで直列に処理する前提で、MIDI スレッドを別スレッドにする場合は pthread ビルド + `PyThreadState_New` 方式が要る (#76 PY-6)。
-- メモリモデル (#25): **wasm32 に決定済み** (`tools/runtime/REPORT.md`、Memory64 は退避路)。本 PR は wasm32 でリンクしており、wasm32 の範囲では依存を満たす。Python の追加は +34,148B と小さく、Memory64 へ移る場合も同じ手順で再リンクできる想定 (**Memory64 でのリンクは未検証**)。
+- メモリモデル (#25): **wasm32 に決定済み** (`tools/runtime/REPORT.md`、Memory64 は退避路)。本 PR は wasm32 でリンクしており、wasm32 の範囲では依存を満たす。provider の追加は +34,146B と小さく、Memory64 へ移る場合も同じ手順で再リンクできる想定 (**Memory64 でのリンクは未検証**)。
 
 ### 検証範囲 / 範囲外
 
+- **HEAD 再現 (5a0b3c3、クリーン worktree にコミット済み内容を展開し、`build_flpy.sh` → `provider/build.sh` → `build_flpy_static.sh` を再実行)**: `pybind_extract --check` OK、SAB+provider `all_tools` 48/48・37,424、`static_check` 3 回とも STATIC CHECK OK (差 0/48 ×2)、0.29 / 0.30 / 0.28 秒 (load 1.10)。
 - 範囲: node (メインスレッド) での静的版 48 tool と対応表。入力 (MCPTools.pyc 100,674B / midi.py / utils.py / `block00031_PE.bin`) は `fl-win64` 素材から配置。CPython wasm は本 run でクリーンビルド 3m21.904s (4 core)、`build_flpy_static.sh` 5.0 秒。
 - 範囲外: **実 FLEngine wasm へのリンクは未実施** (実 FLEngine は MS5 部分起動止まりで `fl_api_call` を持たない)。本節の「FLEngine 側」は `provider/fl_engine.c` の最小エンジン状態。headless Chrome・Worker 内での静的版・`run_all.sh` 全体は未実施。サブインタプリタ・複数スレッド・Memory64 は未検証。
 
