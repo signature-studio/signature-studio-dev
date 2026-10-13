@@ -204,7 +204,7 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 
 ### 6c-3. 現 HEAD `e9007eca` の再測 (main `1adff847` を merge commit で取込済み。e2e の `m6/ottlib.py` 複製を追加)
 
-素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` → `tools/m11/work/`、`toolchain-retdec` → `/opt/retdec` (`RETDEC`)、`toolchain-emsdk` → `/opt/emsdk` (`EMSDK_ENV`)、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、pefile 2024.8.26 / capstone 5.0.7 (`python3 -m pip install --user`)、`pnpm install --frozen-lockfile` (ルート)、`tools/e2e` は `npm install --no-save` (agent-browser 0.39.0。repo に lockfile が無いため `--no-save` で入れた)。
+素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11` → `tools/m11/work/`、`toolchain-retdec` → [RETDEC] (`RETDEC`)、`toolchain-emsdk` → [EMSDK] (`EMSDK_ENV`)、`apt-mingw` (`x86_64-w64-mingw32-gcc`)、pefile 2024.8.26 / capstone 5.0.7 (`python3 -m pip install --user`)、`pnpm install --frozen-lockfile` (ルート)、`tools/e2e` は `npm install --no-save` (agent-browser 0.39.0。repo に lockfile が無いため `--no-save` で入れた)。
 
 手順は WORKFLOW どおり `m11_wndseed.sh` (boot6 lift + 最終 IR) → `flengine/e2e.sh` → `gui/e2e.sh`。
 
