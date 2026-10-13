@@ -174,7 +174,7 @@ node 版は分離リファクタ後も 43/43 PASS (リファクタ前 #79 の ch
 | 既存 | シナリオ内 NEG-a/b/c (Euclidean 改変・getNote clone・typo 値 KeyError) | Chrome でも 3/3 検出 (43 check に含む) |
 
 検証範囲: 同梱 Piano roll 5 本 + Remote 5 本の flapi 列 + Audio 12 本の調査を、モック engine で Chrome headless 1 環境・agent-browser 経由で実行。範囲外: 実機 FL との一致、Firefox/Safari、headful Chrome、実 FLEngine(wasm) 結合 (本検証は mock engine)、`run_all.sh` 全体の再実行 (step 9d のみ実行)。
-注意: `build_flpy.sh` は mac dylib / win PE の無い runner で追跡中の `analysis/flapi/{FLAPI.md,flapi_table.json}` を書き換える (既知、#79 REPORT 7b-2 記載)。本 PR には含めていない。
+注意: `build_flpy.sh` は mac dylib / win PE の無い runner で追跡中の `analysis/flapi/{FLAPI.md,flapi_table.json}` を書き換える (既知)。本 PR には含めていない。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
