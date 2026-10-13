@@ -92,7 +92,7 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 - **FL 側 Python C API 呼出し面は未抽出**: dlsym 先の関数名が平文で無い。サブインタプリタ運用 (`PyInterpreterConfig` 型の存在から示唆のみ) の実態は不明。wasm で `Py_NewInterpreterFromConfig` が動くかも未検証。
 - `mixer.getCurrentTempo(1)`/`setCurrentTempo(bpm,1)` の第 2 引数の意味 (MCPTools は素の BPM 扱い、公式 docs は ×1000) は**実機で未確認**。モックは MCPTools 側に合わせた。
 - FLEngine 側 flapi 実装は**モック(27 API を実装、他は None)**。実エンジンとの意味差 (引数省略時の既定値、-1 の意味) は実機/lift 後に検証が必要。
-- 引数名 (kwargs) は stubs 由来の署名がある関数のみ。新規 43 関数と ilmcp は位置引数のみ (rodata の書式文字列 `i if sdd…` は順序対応が曖昧で未採用)。
+- **kwargs 署名の静的復元 (PY-9 b, #81) 済み**: rodata の並び順ではなく、FLEngine (win PE) の `.data` 内メソッド表 (name/fn/flags/doc, 32B 刻み) と各ラッパー冒頭の `lea [rip+x]` から `PyArg_ParseTupleAndKeywords` の書式と kwlist を復元 (`analysis/flapi_kwargs.py` → `analysis/flapi/flapi_kwargs.json`、`flapi_table.json` の各関数に `kwsig` を追記)。結果は §10。
 - 旧 stubs (LGPL) は**参照入力のみ**でリポジトリ非同梱 (`fetch_inputs.sh` が clone)。FL 由来 pyc/py も非同梱 — 利用者の FL から実行時供給。EULA 判断は行わない (事実整理のみ)。
 - 呼出しコストは node/Chrome headless の mock 実測。実 FLEngine(wasm) 結合時に再計測要。
 - **MCPTools 内のテンポ規約が不整合に見える**: `get_session_context` は `mixer.getCurrentTempo()` (引数なし) を `/1000` して BPM 化、`get_tempo` は `getCurrentTempo(1)` を素の BPM として表示、`set_tempo` は `setCurrentTempo(bpm, 1)`。モックは後者に合わせたため `get_session_context` が `tempo_bpm: 0.13` を返す (`mcp_classification.json` 側の解析メモ)。どちらが実 FL の挙動かは未確認。
@@ -116,4 +116,30 @@ FLEngine rodata の `name\0doc\0…<module>` 並びから機械抽出 (`flapi_ex
 | T6 | MIDI scripting ホスト: device script(.py) ローダ、27 callback 配送、Web MIDI 入力→`dispatch_midi`。サブインタプリタ可否の wasm 検証 | M |
 | T7 | Edison `enveditor` / `flcpt` / `flrack` module と Chord progression ツール (pyc 39 + pyscript 2) の動作検証 | M |
 | T8 | 性能: 構造値の binary ABI、バッチ API、MIDI 1 イベント当り呼出し数の計測 | S |
-| T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば) と kwargs 署名の rodata 書式文字列からの自動復元 | S |
+| T9 | 実機 FL でのモック意味差検証 (ユーザ環境があれば。**kwargs 復元は #81 で完了**、残りは実機確認のみ) | S |
+
+## 10. kwargs シグネチャの静的復元 (PY-9 b, #81)
+
+方式・入力: §7 の kwargs 項目参照。再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi_kwargs.py` (要 capstone, pefile) の後 `python3 tests/kwsig_check.py` (wasm 不要)。
+
+| 項目 | 実測 |
+|---|---|
+| メソッド表から 435 関数全件に対応付け | 435/435 (13 module) |
+| 書式文字列を復元 (flags=1/3/4 + 引数あり) | 309 関数 (flags=1: 200 / flags=3: 103 / flags=4: 6。flags 全体は 1=205, 3=105, 4=125) |
+| **kwlist (引数名) を復元** (flags=3 = VARARGS\|KEYWORDS) | **103 関数**。全件で `len(kwlist) == 書式の最大引数数` |
+| flags=3 だが書式/kwlist 未復元 | 2 (`device.flrMidiNote`, `device.flrMidiCC`: lea の並びが他と異なる) |
+| flags=1 (VARARGS のみ、実 FL は kwargs を受けない可能性) | 205 (うち書式あり 200)。**位置引数のみ**。ただし MCPTools が `channels.channelCount(globalCount=)` を kw 呼出しするため kwargs 拒否にはしていない |
+| 新規 43 関数のうち | 書式あり 32 / kwlist あり 9 (`fillEachNSteps` `rerollLoopStarter*` `setPluginMixLevel` `setPluginMuteState` `setLoopStarterRootNote` `releaseCC` `selectionSet` 等)。残りは flags=1 (位置引数のみ)/4 (引数なし) |
+| メソッド表に載らない表 (flpianoroll/flcpt/ScriptDialog 等のクラスメソッド) | 8 表 (本 table の module 外のため対象外) |
+
+stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署名がある関数): 名前一致 66 / **不一致 28** (バイナリ側を正とする)。例: `channels.getChannelName` は stubs の `index` でなくバイナリの kwlist 先頭が `value`、`channels.getChannelVolume` は `mode` でなく `useDb`、`channels.setChannelPitch` は `mode` でなく `pitchUnit`、`mixer.getTrackVolume` は `mode` でなく `flag`、`plugins.setParamValue` は `value` でなく `paramValue`、`transport.globalTransport` は `command` でなく `index`、`device.forwardMIDICC` は `mode` でなく `forwardTo`、`mixer.automateEvent` は `speed` でなく `smoothSpeed`。書式の引数数 (必須/最大) は stubs 署名と 230 件一致 / 49 件不一致 (stubs の引数が欠けている・書式の `|` 位置が異なる等)。
+
+- `fl_api.py`: kwlist があれば stubs 名より優先して kwargs を束縛。省略可能引数の既定値が C 側で静的に不明なとき、それを飛ばして後続だけ指定する呼出しは `TypeError` (推測値で埋めない)。stubs の既定値がある引数は従来どおり stubs 値を使う。
+- **MCPTools.pyc の実 kwargs 呼出し** (`KW_NAMES` を逆アセンブルして flapi 呼出しに対応付け): kwlist のある関数への呼出しは全て kwlist 名と一致 (`plugins.*` の `slotIndex/useGlobalIndex/pickupMode`、`channels.getChannelName/setChannelName/setTargetFxTrack/showEditor` の `useGlobalIndex/value`)。`print(..., file=/indent=)` 等は flapi 呼出しではない。
+- 検証: `tests/kwsig_check.py` PASS (0.03 秒: 435 関数に kwsig・kwlist 103・bind の 6 区分)。MCPTools の実 kwargs 呼出し 11 パターンを新 bind に通して全て通る。**wasm 上の `tests/all_tools.mjs` (48/48) は未再実行** (§11 参照。FL 同梱 `midi.py`/`utils.py` は mac 側のみで fl-win64 素材に無く、入力が揃わないため)。
+
+## 11. 未解決 (#81)
+
+- (a) 実機 FL での `mixer.getCurrentTempo(1)` 等の意味差確認は実機が必要で未着手 (#81 のブロッカーのまま)。
+- `device.flrMidiNote` / `flrMidiCC` の書式・kwlist 未復元 (2 件)。
+- wasm 回帰 (`bash tools/python/run_all.sh`, 48/48) は本 run で未実行 (入力の mac 由来 `midi.py`/`utils.py`・`[MAC]` 素材が無い)。`fl_api.py` の変更は kwargs 経路のみで位置引数呼出しは従来と同一。

@@ -28,7 +28,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getDisplayZone": {
     "doc": "Get display zone number",
@@ -39,7 +45,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getLiveBlockColor": {
     "doc": "Get live block color",
@@ -61,7 +71,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getLiveBlockStatus": {
     "doc": "Get live block status",
@@ -88,7 +104,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|i",
+     "kwlist": [
+      "index",
+      "blockNum",
+      "mode"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "getLiveLoopMode": {
     "doc": "Get live loop mode",
@@ -105,7 +132,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getLivePosSnap": {
     "doc": "Get live pos snap",
@@ -122,7 +155,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getLiveStatus": {
     "doc": "Get live status",
@@ -144,7 +183,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "mode"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getLiveTrigSnap": {
     "doc": "Get live trig snap",
@@ -161,7 +210,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getLiveTriggerMode": {
     "doc": "Get live trigger mode",
@@ -178,7 +233,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getPerformanceModeState": {
     "doc": "Get performance mode state",
@@ -189,7 +250,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getSongStartTickPos": {
     "doc": "Get song start tick position",
@@ -200,7 +265,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getTrackActivityLevel": {
     "doc": "Get track activity level",
@@ -217,7 +286,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackActivityLevelVis": {
     "doc": "Get track visual activity level",
@@ -234,7 +309,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackColor": {
     "doc": "Get track color",
@@ -251,7 +332,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackName": {
     "doc": "Get track name",
@@ -270,7 +357,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_playlist_track_names"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getVisTimeBar": {
     "doc": "Get time bar",
@@ -281,7 +374,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getVisTimeStep": {
     "doc": "Get time step",
@@ -292,7 +389,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getVisTimeTick": {
     "doc": "Get time tick",
@@ -303,7 +404,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "incLiveLoopMode": {
     "doc": "Increase live loop mode",
@@ -325,7 +430,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "incLivePosSnap": {
     "doc": "Increase live pos snap",
@@ -347,7 +458,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "incLiveTrigMode": {
     "doc": "Increase live trig mode",
@@ -369,7 +486,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "incLiveTrigSnap": {
     "doc": "Increase live trig snap",
@@ -391,7 +514,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "isTrackMuteLock": {
     "doc": "Get track mute lock state",
@@ -408,7 +537,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackMuted": {
     "doc": "Get track mute state",
@@ -425,7 +560,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackSelected": {
     "doc": "Get track selected state",
@@ -442,7 +583,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackSolo": {
     "doc": "Get track solo state",
@@ -459,7 +606,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "liveBlockNumToTime": {
     "doc": "Live block number to time",
@@ -476,7 +629,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "liveDisplayZone": {
     "doc": "Live display zone",
@@ -513,7 +672,20 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iiii|i",
+     "kwlist": [
+      "left",
+      "top",
+      "right",
+      "bottom",
+      "duration"
+     ],
+     "required": 4,
+     "max": 5
+    }
    },
    "liveTimeToBlockNum": {
     "doc": "Live time to block number",
@@ -530,7 +702,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "lockDisplayZone": {
     "doc": "Lock display zone",
@@ -552,7 +730,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "muteTrack": {
     "doc": "Toggle track mute state",
@@ -574,7 +758,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "inGroup"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "muteTrackLock": {
     "doc": "Toggle track mute lock state",
@@ -591,7 +786,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "refreshLiveClips": {
     "doc": "Refresh live clips",
@@ -602,7 +803,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "scrollTo": {
     "doc": "Scroll to",
@@ -634,7 +839,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "selectAll": {
     "doc": "Select all tracks",
@@ -645,7 +856,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "selectTool": {
     "doc": "Select playlist tool",
@@ -653,7 +870,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "selectTrack": {
     "doc": "Set track selected state",
@@ -670,7 +893,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "setTrackColor": {
     "doc": "Set track color",
@@ -694,7 +923,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "set_playlist_tracks_colour"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "setTrackName": {
     "doc": "Set track name",
@@ -718,7 +953,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "rename_playlist_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "is",
+     "required": 2,
+     "max": 2
+    }
    },
    "soloTrack": {
     "doc": "Toggle track solo state",
@@ -745,7 +986,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "inGroup"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "trackCount": {
     "doc": "Get track count",
@@ -758,7 +1010,11 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_playlist_track_names"
-    ]
+    ],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "triggerLiveClip": {
     "doc": "Trigger live clips",
@@ -790,7 +1046,19 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|id",
+     "kwlist": [
+      "index",
+      "blockNum",
+      "flags",
+      "velocity"
+     ],
+     "required": 2,
+     "max": 4
+    }
    }
   },
   "channels": {
@@ -829,7 +1097,13 @@
      "set_step_sequencer_pattern",
      "set_step_sequencer_step",
      "solo_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "channelNumber": {
     "doc": "Get channel number",
@@ -851,7 +1125,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "|ii",
+     "kwlist": [
+      "canBeNone",
+      "offset"
+     ],
+     "required": 0,
+     "max": 2
+    }
    },
    "closeGraphEditor": {
     "doc": "Close graph editor",
@@ -862,7 +1146,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "deselectAll": {
     "doc": "Deselect all channels",
@@ -875,7 +1165,11 @@
     "arm64_same": true,
     "mcp_tools": [
      "open_piano_roll_for_channel"
-    ]
+    ],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "fillEachNSteps": {
     "doc": "Fill every N steps",
@@ -883,7 +1177,20 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|iii",
+     "kwlist": [
+      "index",
+      "interval",
+      "offset",
+      "velocity",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 5
+    }
    },
    "focusEditor": {
     "doc": "focus channel editor",
@@ -905,7 +1212,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getActivityLevel": {
     "doc": "Get channel activity level",
@@ -927,7 +1244,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getChannelColor": {
     "doc": "Get channel color",
@@ -949,7 +1276,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getChannelIndex": {
     "doc": "Get channel index",
@@ -966,7 +1303,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getChannelMidiInPort": {
     "doc": "Get channel midi in port",
@@ -988,7 +1331,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getChannelName": {
     "doc": "Get channel name",
@@ -1030,7 +1383,17 @@
      "set_step_sequencer_pattern",
      "set_step_sequencer_step",
      "solo_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getChannelPan": {
     "doc": "Get channel pan",
@@ -1054,7 +1417,17 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_session_context"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getChannelPitch": {
     "doc": "Get channel pitch",
@@ -1081,7 +1454,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "mode",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "getChannelType": {
     "doc": "get channel type",
@@ -1103,7 +1487,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getChannelVolume": {
     "doc": "Get channel volume",
@@ -1134,7 +1528,18 @@
      "get_channel_volumes",
      "get_session_context",
      "set_channels_volume_db"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "useDb",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "getCurrentStepParam": {
     "doc": "Get current step param",
@@ -1166,7 +1571,19 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iii|i",
+     "kwlist": [
+      "index",
+      "step",
+      "param",
+      "useGlobalIndex"
+     ],
+     "required": 3,
+     "max": 4
+    }
    },
    "getGridBit": {
     "doc": "Get channel grid bit",
@@ -1193,7 +1610,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "position",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "getGridBitWithLoop": {
     "doc": "Get grid bit with loop",
@@ -1220,7 +1648,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|i",
+     "kwlist": [
+      "index",
+      "position",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "getRecEventId": {
     "doc": "Get channel rec event id",
@@ -1242,7 +1681,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getStepParam": {
     "doc": "Get step param",
@@ -1284,7 +1733,20 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iiii|i",
+     "kwlist": [
+      "step",
+      "param",
+      "offset",
+      "startPos",
+      "padsStride"
+     ],
+     "required": 4,
+     "max": 5
+    }
    },
    "getSwing": {
     "doc": "Get swing ",
@@ -1292,7 +1754,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getTargetFxTrack": {
     "doc": "Get channel target FX track",
@@ -1316,7 +1782,17 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_session_context"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "incEventValue": {
     "doc": "increase event value",
@@ -1343,7 +1819,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Ii|d",
+     "required": 2,
+     "max": 3
+    }
    },
    "isChannelMuted": {
     "doc": "Get channel mute state",
@@ -1365,7 +1847,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "isChannelSelected": {
     "doc": "Get channel selected state",
@@ -1405,7 +1897,17 @@
      "set_step_sequencer_pattern",
      "set_step_sequencer_step",
      "solo_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "isChannelSolo": {
     "doc": "Get channel solo state",
@@ -1427,7 +1929,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "isGraphEditorVisible": {
     "doc": "Returns true if graph editor is visible",
@@ -1438,7 +1950,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isGridBitAssigned": {
     "doc": "Is grid bit assigned",
@@ -1460,7 +1976,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "isHighLighted": {
     "doc": "Is higlight rectangle defined",
@@ -1471,7 +1997,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "midiNoteOn": {
     "doc": "Set midi note on for channel",
@@ -1503,7 +2033,19 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iii|i",
+     "kwlist": [
+      "indexGlobal",
+      "note",
+      "velocity",
+      "channel"
+     ],
+     "required": 3,
+     "max": 4
+    }
    },
    "muteChannel": {
     "doc": "Toggle channel mute state",
@@ -1532,7 +2074,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "mute_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "processRECEvent": {
     "doc": "Process rec event",
@@ -1543,7 +2096,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Iii",
+     "required": 3,
+     "max": 3
+    }
    },
    "quickQuantize": {
     "doc": "Perform quick quantize",
@@ -1572,7 +2131,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "quantize_channel"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "startOnly",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "rerollLoopStarterLoop": {
     "doc": "Reroll LoopStarter audio loop (use index -1 for all loops)",
@@ -1580,7 +2150,17 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "rerollLoopStarterSample": {
     "doc": "Reroll LoopStarter kit sample (use index -1 for all step channels)",
@@ -1588,7 +2168,17 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "rerollLoopStarterSteps": {
     "doc": "Reroll LoopStarter steps (use index -1 for all step channels)",
@@ -1596,7 +2186,17 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "selectAll": {
     "doc": "Select all channels",
@@ -1607,7 +2207,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectChannel": {
     "doc": "Set channel selected state",
@@ -1637,7 +2241,18 @@
     "mcp_tools": [
      "open_piano_roll_for_channel",
      "select_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "selectOneChannel": {
     "doc": "Select channel exclusively",
@@ -1659,7 +2274,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "selectedChannel": {
     "doc": "Get selected channel number",
@@ -1686,7 +2311,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "|iii",
+     "kwlist": [
+      "canBeNone",
+      "offset",
+      "indexGlobal"
+     ],
+     "required": 0,
+     "max": 3
+    }
    },
    "setChannelColor": {
     "doc": "Set channel color",
@@ -1715,7 +2351,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "set_channels_colour"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|i",
+     "kwlist": [
+      "index",
+      "color",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "setChannelName": {
     "doc": "Set channel name",
@@ -1744,7 +2391,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "rename_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "is|i",
+     "kwlist": [
+      "index",
+      "name",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "setChannelPan": {
     "doc": "Set channel pan",
@@ -1778,7 +2436,19 @@
     "arm64_same": true,
     "mcp_tools": [
      "set_channels_pan"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "if|ii",
+     "kwlist": [
+      "index",
+      "pan",
+      "pickupMode",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 4
+    }
    },
    "setChannelPitch": {
     "doc": "Set channel pitch",
@@ -1815,7 +2485,20 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "if|iii",
+     "kwlist": [
+      "index",
+      "value",
+      "pitchUnit",
+      "pickupMode",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 5
+    }
    },
    "setChannelVolume": {
     "doc": "Set channel volume",
@@ -1850,7 +2533,19 @@
     "mcp_tools": [
      "set_channels_volume",
      "set_channels_volume_db"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "if|ii",
+     "kwlist": [
+      "index",
+      "volume",
+      "pickupMode",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 4
+    }
    },
    "setGridBit": {
     "doc": "Set channel grid bit",
@@ -1885,7 +2580,19 @@
     "mcp_tools": [
      "set_step_sequencer_pattern",
      "set_step_sequencer_step"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iii|i",
+     "kwlist": [
+      "index",
+      "position",
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 3,
+     "max": 4
+    }
    },
    "setStepParameterByIndex": {
     "doc": "Set step parameter by index",
@@ -1927,7 +2634,21 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iiiii|i",
+     "kwlist": [
+      "index",
+      "patNum",
+      "step",
+      "param",
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 5,
+     "max": 6
+    }
    },
    "setSwing": {
     "doc": "Set swing",
@@ -1935,7 +2656,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "f",
+     "required": 1,
+     "max": 1
+    }
    },
    "setTargetFxTrack": {
     "doc": "Set channel target FX track",
@@ -1964,7 +2691,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "route_channels_to_mixer"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|i",
+     "kwlist": [
+      "index",
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "showCSForm": {
     "doc": "Show cs form",
@@ -1991,7 +2729,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "state",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "showEditor": {
     "doc": "focus channel editor",
@@ -2020,7 +2769,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "set_plugin_parameter_value"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "showGraphEditor": {
     "doc": "Show graph editor",
@@ -2057,7 +2817,20 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iiii|i",
+     "kwlist": [
+      "temporary",
+      "param",
+      "step",
+      "index",
+      "useGlobalIndex"
+     ],
+     "required": 4,
+     "max": 5
+    }
    },
    "soloChannel": {
     "doc": "Toggle channel solo state",
@@ -2081,7 +2854,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "solo_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "updateGraphEditor": {
     "doc": "Update graph editor",
@@ -2092,7 +2876,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    }
   },
   "mixer": {
@@ -2105,7 +2893,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "armTrack": {
     "doc": "Toggle track armed state",
@@ -2122,7 +2914,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "value"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "automateEvent": {
     "doc": "Automate event",
@@ -2164,7 +2966,21 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "Iii|iid",
+     "kwlist": [
+      "index",
+      "value",
+      "flags",
+      "smoothSpeed",
+      "isIncrement",
+      "res"
+     ],
+     "required": 3,
+     "max": 6
+    }
    },
    "deselectAll": {
     "doc": "Deselect all tracks",
@@ -2175,7 +2991,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "enableTrack": {
     "doc": "Toggle track enabled state",
@@ -2192,7 +3012,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "value"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "enableTrackSlots": {
     "doc": "Toggle track slots enabled state",
@@ -2214,7 +3044,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "value"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "focusEditor": {
     "doc": "focus mixer editor",
@@ -2238,7 +3078,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "set_plugin_parameter_value"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getActiveEffectIndex": {
     "doc": "get Active Effect Index",
@@ -2249,7 +3095,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getAutoSmoothEventValue": {
     "doc": "Get event ID value string",
@@ -2271,7 +3121,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "I|i",
+     "kwlist": [
+      "index",
+      "locked"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getCurrentTempo": {
     "doc": "Get current tempo",
@@ -2291,7 +3151,13 @@
     "mcp_tools": [
      "get_session_context",
      "get_tempo"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "getEqBandCount": {
     "doc": "Get eq band count",
@@ -2302,7 +3168,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getEqBandwidth": {
     "doc": "Get eq bandwidth",
@@ -2324,7 +3194,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getEqFrequency": {
     "doc": "Get eq frequency",
@@ -2351,7 +3227,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|i",
+     "kwlist": [
+      "index",
+      "band",
+      "mode"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "getEqGain": {
     "doc": "Get eq gain",
@@ -2378,7 +3265,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|i",
+     "kwlist": [
+      "index",
+      "band",
+      "mode"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "getEventIDName": {
     "doc": "Get event ID name",
@@ -2400,7 +3298,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "I|i",
+     "kwlist": [
+      "index",
+      "shortName"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getEventIDValueString": {
     "doc": "Get event ID value string",
@@ -2422,7 +3330,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getEventValue": {
     "doc": "Get event value from midi",
@@ -2449,7 +3363,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "I|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "smoothTarget"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "getLastPeakVol": {
     "doc": "Get last peak vol",
@@ -2466,7 +3391,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getPluginMixLevel": {
     "doc": "Get track plugin mix level",
@@ -2474,7 +3405,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getPluginMuteState": {
     "doc": "Get track plugin mute state",
@@ -2482,7 +3419,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getRecPPS": {
     "doc": "Get Rec pps",
@@ -2493,7 +3436,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": null
+    }
    },
    "getRouteSendActive": {
     "doc": "Get route send state",
@@ -2520,7 +3467,13 @@
      "get_session_context",
      "reset_mixer_routing",
      "reset_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getRouteToLevel": {
     "doc": "Get route to lebel",
@@ -2545,7 +3498,13 @@
     "mcp_tools": [
      "get_mixer_routing",
      "get_session_context"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getSlotColor": {
     "doc": "Get slot color",
@@ -2567,7 +3526,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getSongStepPos": {
     "doc": "Get song step position",
@@ -2578,7 +3543,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": null
+    }
    },
    "getSongTickPos": {
     "doc": "Get sing tick pos",
@@ -2595,7 +3564,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "getTrackColor": {
     "doc": "Get track color",
@@ -2612,7 +3587,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackCount": {
     "doc": "Get track count",
@@ -2620,7 +3601,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getTrackDockSide": {
     "doc": "Get track dock",
@@ -2637,7 +3622,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackInfo": {
     "doc": "Get tracks info",
@@ -2654,7 +3645,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackName": {
     "doc": "Get track name",
@@ -2691,7 +3688,17 @@
      "set_mixer_tracks_volume_percent",
      "set_plugin_parameter_value",
      "solo_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "maxLen"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getTrackPan": {
     "doc": "Get track pan",
@@ -2710,7 +3717,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_session_context"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackPeaks": {
     "doc": "Get track peaks",
@@ -2732,7 +3745,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getTrackPluginId": {
     "doc": "Get track plugin ID",
@@ -2754,7 +3773,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getTrackRecordingFileName": {
     "doc": "Get track recording file name",
@@ -2771,7 +3796,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackStereoSep": {
     "doc": "Get track stereo separation",
@@ -2788,7 +3819,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getTrackVolume": {
     "doc": "Get track volume",
@@ -2815,7 +3852,17 @@
      "get_session_context",
      "set_channels_volume_db",
      "set_mixer_tracks_volume_db"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "flag"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "isTrackArmed": {
     "doc": "Get track armed state",
@@ -2832,7 +3879,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackAutomationEnabled": {
     "doc": "Get track autotimation state",
@@ -2854,7 +3907,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "isTrackEnabled": {
     "doc": "Get track enabled state",
@@ -2871,7 +3930,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackMuteLock": {
     "doc": "Get track mute lock state",
@@ -2888,7 +3953,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackMuted": {
     "doc": "Get track mute state",
@@ -2905,7 +3976,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackPluginValid": {
     "doc": "Get track plugin valid state",
@@ -2927,7 +4004,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "isTrackRevPolarity": {
     "doc": "Get track reversed polarity state",
@@ -2944,7 +4027,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackSelected": {
     "doc": "Get track selected state",
@@ -2979,7 +4068,13 @@
      "set_mixer_tracks_volume_percent",
      "set_plugin_parameter_value",
      "solo_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackSlotsEnabled": {
     "doc": "Get track slots enabled state",
@@ -2996,7 +4091,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackSolo": {
     "doc": "Get track solo state",
@@ -3013,7 +4114,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isTrackSwapChannels": {
     "doc": "Get track swap channels state",
@@ -3030,7 +4137,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "linkChannelToTrack": {
     "doc": "Link channel to track",
@@ -3057,7 +4170,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|i",
+     "kwlist": [
+      "channel",
+      "track",
+      "select"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "linkTrackToChannel": {
     "doc": "Link track to channel",
@@ -3074,7 +4198,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "muteTrack": {
     "doc": "Toggle track mute state",
@@ -3098,7 +4228,17 @@
     "arm64_same": true,
     "mcp_tools": [
      "mute_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "value"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "remoteFindEventValue": {
     "doc": "Remote find event value",
@@ -3109,7 +4249,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "I|i",
+     "kwlist": [
+      "index",
+      "flags"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "revTrackPolarity": {
     "doc": "Toggle track reverssed polarity state",
@@ -3131,7 +4281,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "value"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "selectAll": {
     "doc": "Select all tracks",
@@ -3142,7 +4302,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectTrack": {
     "doc": "Set track selected state",
@@ -3159,7 +4323,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "value"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "setActiveTrack": {
     "doc": "Set active track",
@@ -3176,7 +4350,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setCurrentTempo": {
     "doc": "Set current tempo",
@@ -3186,7 +4366,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "set_tempo"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "f|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "setEqBandwidth": {
     "doc": "Set eq bandwidth",
@@ -3213,7 +4399,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iif",
+     "required": 3,
+     "max": 3
+    }
    },
    "setEqFrequency": {
     "doc": "Set eq frequency",
@@ -3240,7 +4432,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iif",
+     "required": 3,
+     "max": 3
+    }
    },
    "setEqGain": {
     "doc": "Set eq gain",
@@ -3267,7 +4465,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iif",
+     "required": 3,
+     "max": 3
+    }
    },
    "setPluginMixLevel": {
     "doc": "Set track plugin mix level",
@@ -3275,7 +4479,19 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iif|i",
+     "kwlist": [
+      "index",
+      "plugIndex",
+      "value",
+      "pickupMode"
+     ],
+     "required": 3,
+     "max": 4
+    }
    },
    "setPluginMuteState": {
     "doc": "Set track plugin mute state",
@@ -3283,7 +4499,18 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "iii",
+     "kwlist": [
+      "index",
+      "plugIndex",
+      "value"
+     ],
+     "required": 3,
+     "max": 3
+    }
    },
    "setRouteTo": {
     "doc": "Set route to",
@@ -3319,7 +4546,13 @@
      "reset_mixer_routing",
      "reset_mixer_tracks",
      "set_mixer_routing"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iii|i",
+     "required": 3,
+     "max": 4
+    }
    },
    "setRouteToLevel": {
     "doc": "Set route to lebel",
@@ -3350,7 +4583,13 @@
      "reset_mixer_routing",
      "reset_mixer_tracks",
      "set_mixer_routing"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iif",
+     "required": 3,
+     "max": 3
+    }
    },
    "setSlotColor": {
     "doc": "Set slot color",
@@ -3377,7 +4616,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iii",
+     "required": 3,
+     "max": 3
+    }
    },
    "setTrackColor": {
     "doc": "Set track color",
@@ -3402,7 +4647,13 @@
     "mcp_tools": [
      "reset_mixer_tracks",
      "set_mixer_tracks_colour"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "setTrackName": {
     "doc": "Set track name",
@@ -3427,7 +4678,13 @@
     "mcp_tools": [
      "rename_mixer_tracks",
      "reset_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "is",
+     "required": 2,
+     "max": 2
+    }
    },
    "setTrackNumber": {
     "doc": "Set track number",
@@ -3449,7 +4706,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "flags"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "setTrackPan": {
     "doc": "Set track pan",
@@ -3479,7 +4746,18 @@
     "mcp_tools": [
      "reset_mixer_tracks",
      "set_mixer_tracks_pan"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "if|i",
+     "kwlist": [
+      "index",
+      "pan",
+      "pickupMode"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "setTrackStereoSep": {
     "doc": "Set track setereo separation",
@@ -3506,7 +4784,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "if|i",
+     "kwlist": [
+      "index",
+      "slot",
+      "pickupMode"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "setTrackVolume": {
     "doc": "Ser track volume",
@@ -3537,7 +4826,18 @@
      "reset_mixer_tracks",
      "set_mixer_tracks_volume_db",
      "set_mixer_tracks_volume_percent"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "if|i",
+     "kwlist": [
+      "index",
+      "volume",
+      "pickupMode"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "soloTrack": {
     "doc": "Toggle track solo state",
@@ -3566,7 +4866,18 @@
     "arm64_same": true,
     "mcp_tools": [
      "solo_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "mode"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "swapTrackChannels": {
     "doc": "Toggle track swap channels state",
@@ -3588,7 +4899,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "value"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "trackCount": {
     "doc": "Get tracks count",
@@ -3619,7 +4940,11 @@
      "set_mixer_tracks_volume_percent",
      "set_plugin_parameter_value",
      "solo_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "trackNumber": {
     "doc": "Get track number",
@@ -3630,7 +4955,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    }
   },
   "patterns": {
@@ -3659,7 +4988,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "storeUndo",
+      "updateUi"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "clearPattern": {
     "doc": "Clear pattern",
@@ -3667,7 +5007,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "clonePattern": {
     "doc": "Clone pattern",
@@ -3684,7 +5030,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|ii",
+     "required": 0,
+     "max": 2
+    }
    },
    "deselectAll": {
     "doc": "Deselect all patterns",
@@ -3695,7 +5047,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "duplicatePatternData": {
     "doc": "Duplicate pattern data",
@@ -3703,7 +5059,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "ensureValidNoteRecord": {
     "doc": "Ensure Valid Note Record",
@@ -3714,7 +5076,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "index",
+      "playNow"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "findFirstNextEmptyPat": {
     "doc": "Find first next empty pattern",
@@ -3741,7 +5113,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "flags",
+      "x",
+      "y"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "getActivePatternGroup": {
     "doc": "Get active pattern group",
@@ -3752,7 +5135,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getBlockSetStatus": {
     "doc": "Get block set status",
@@ -3784,7 +5171,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "getChannelLoopStyle": {
     "doc": "Get channel loop style",
@@ -3795,7 +5188,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getPatternColor": {
     "doc": "Get pattern color",
@@ -3812,7 +5211,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getPatternGroupCount": {
     "doc": "Get pattern group count",
@@ -3823,7 +5228,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getPatternGroupName": {
     "doc": "Get pattern group name",
@@ -3834,7 +5243,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getPatternLength": {
     "doc": "Get pattern length",
@@ -3851,7 +5266,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getPatternName": {
     "doc": "Get pattern name",
@@ -3868,7 +5289,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getPatternsInGroup": {
     "doc": "Get patterns in group",
@@ -3879,7 +5306,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "incrementPatternLength": {
     "doc": "Increment pattern length",
@@ -3887,7 +5320,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "isPatternDefault": {
     "doc": "Get pattern default state",
@@ -3904,7 +5343,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isPatternSelected": {
     "doc": "Get pattern selected state",
@@ -3921,7 +5366,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "jumpToPattern": {
     "doc": "Jump to pattern",
@@ -3938,7 +5389,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "movePattern": {
     "doc": "Move pattern",
@@ -3946,7 +5403,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "patternCount": {
     "doc": "Get patterns count",
@@ -3957,7 +5420,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "patternMax": {
     "doc": "Get max pattern id",
@@ -3968,7 +5435,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "patternNumber": {
     "doc": "Get current pattern number",
@@ -3979,7 +5450,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectAll": {
     "doc": "Select all patterns",
@@ -3990,7 +5465,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectPattern": {
     "doc": "Select pattern",
@@ -4017,7 +5496,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "preview"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "setChannelLoop": {
     "doc": "Set channel loop",
@@ -4028,7 +5518,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "setLoopStarterRootNote": {
     "doc": "Set the root note of Loopstarter, when its enabled",
@@ -4036,7 +5532,16 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i",
+     "kwlist": [
+      "rootNoteNum"
+     ],
+     "required": 1,
+     "max": 1
+    }
    },
    "setPatternColor": {
     "doc": "Set pattern color",
@@ -4058,7 +5563,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "setPatternLength": {
     "doc": "Set pattern length",
@@ -4066,7 +5577,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "setPatternName": {
     "doc": "Set pattern name",
@@ -4088,7 +5605,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "is",
+     "required": 2,
+     "max": 2
+    }
    }
   },
   "transport": {
@@ -4112,7 +5635,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "continuousMovePos": {
     "doc": "Continuous move pos",
@@ -4134,7 +5663,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "fastForward": {
     "doc": "Fast forward song pos",
@@ -4156,7 +5691,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "getHWBeatLEDState": {
     "doc": "get HWBeatLEDState",
@@ -4167,7 +5708,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getLoopMode": {
     "doc": "Get loop mode",
@@ -4178,7 +5723,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getSongLength": {
     "doc": "Get song length",
@@ -4195,7 +5744,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getSongPos": {
     "doc": "Get song position",
@@ -4212,7 +5767,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "getSongPosHint": {
     "doc": "Get song position hint",
@@ -4223,7 +5784,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "globalTransport": {
     "doc": "Global transport",
@@ -4255,7 +5820,19 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|ii",
+     "kwlist": [
+      "index",
+      "value",
+      "pmeFlags",
+      "flags"
+     ],
+     "required": 2,
+     "max": 4
+    }
    },
    "isPlaying": {
     "doc": "Returns if the program is playing or stopped",
@@ -4266,7 +5843,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isRecording": {
     "doc": "Get recording state",
@@ -4277,7 +5858,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "markerJumpJog": {
     "doc": "Jog marker jump",
@@ -4299,7 +5884,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "value",
+      "flags"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "markerSelJog": {
     "doc": "Jog marker selection",
@@ -4321,7 +5916,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "value",
+      "flags"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "record": {
     "doc": "Start recording",
@@ -4332,7 +5937,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "rewind": {
     "doc": "Rewind song",
@@ -4354,7 +5963,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "startStop",
+      "flags"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "setLoopMode": {
     "doc": "Set loop mode",
@@ -4365,7 +5984,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "setPlaybackSpeed": {
     "doc": "Set playback speed",
@@ -4382,7 +6005,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "d",
+     "required": 1,
+     "max": 1
+    }
    },
    "setSongPos": {
     "doc": "Set song position",
@@ -4404,7 +6033,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "d|i",
+     "kwlist": [
+      "position",
+      "mode"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "start": {
     "doc": "Start playback",
@@ -4417,7 +6056,11 @@
     "arm64_same": true,
     "mcp_tools": [
      "play"
-    ]
+    ],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "stop": {
     "doc": "Stop playback",
@@ -4430,7 +6073,11 @@
     "arm64_same": true,
     "mcp_tools": [
      "stop"
-    ]
+    ],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    }
   },
   "general": {
@@ -4443,7 +6090,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "dumpScoreLog": {
     "doc": "Dump score log",
@@ -4465,7 +6116,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "time",
+      "silent"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "getChangedFlag": {
     "doc": "Get changed flag ",
@@ -4476,7 +6137,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getPrecount": {
     "doc": "Get precounr",
@@ -4487,7 +6152,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getProjectAuthor": {
     "doc": "Get project author",
@@ -4495,7 +6164,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getProjectGenre": {
     "doc": "Get project genre",
@@ -4503,7 +6176,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getProjectTitle": {
     "doc": "Get project title",
@@ -4511,7 +6188,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getRecPPB": {
     "doc": "Get rec ppb",
@@ -4522,7 +6203,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getRecPPQ": {
     "doc": "Get rec ppq",
@@ -4533,7 +6218,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getUndoHistoryCount": {
     "doc": "Get undo history count",
@@ -4544,7 +6233,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getUndoHistoryLast": {
     "doc": "Get undo history last",
@@ -4555,7 +6248,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getUndoHistoryPos": {
     "doc": "Get undo history position",
@@ -4566,7 +6263,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getUndoLevelHint": {
     "doc": "Get undo level",
@@ -4577,7 +6278,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getUseMetronome": {
     "doc": "Get use metronome",
@@ -4588,7 +6293,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getVersion": {
     "doc": "Get Midi scripting version",
@@ -4599,7 +6308,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "processRECEvent": {
     "doc": "Process rec event",
@@ -4626,7 +6339,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Iii",
+     "required": 3,
+     "max": 3
+    }
    },
    "restoreUndo": {
     "doc": "Restore undo",
@@ -4637,7 +6356,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "restoreUndoLevel": {
     "doc": "Restore undo by level",
@@ -4654,7 +6377,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "safeToEdit": {
     "doc": "Safe to edit stuff",
@@ -4665,7 +6394,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "saveUndo": {
     "doc": "Save undo",
@@ -4692,7 +6425,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "si|i",
+     "kwlist": [
+      "undoName",
+      "flags",
+      "updateHistory"
+     ],
+     "required": 2,
+     "max": 3
+    }
    },
    "setDenominator": {
     "doc": "Set denominator",
@@ -4700,7 +6444,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setNumerator": {
     "doc": "Set numerator",
@@ -4708,7 +6458,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setRecPPQ": {
     "doc": "Set rec ppq",
@@ -4716,7 +6472,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setUndoHistoryCount": {
     "doc": "Set undo history count",
@@ -4733,7 +6495,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setUndoHistoryLast": {
     "doc": "Set undo history last",
@@ -4744,7 +6512,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setUndoHistoryPos": {
     "doc": "Set undo history position",
@@ -4761,7 +6535,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "undo": {
     "doc": "Undo/redo last, or move down in undo history",
@@ -4772,7 +6552,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "undoDown": {
     "doc": "Move down in undo history ",
@@ -4783,7 +6567,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "undoUp": {
     "doc": "Move up in undo history ",
@@ -4794,7 +6582,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "undoUpDown": {
     "doc": "Move up and down in undo history",
@@ -4811,7 +6603,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    }
   },
   "ui": {
@@ -4824,7 +6622,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "closeAllMenu": {
     "doc": "Close all menu",
@@ -4835,7 +6637,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "copy": {
     "doc": "",
@@ -4846,7 +6652,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "crDisplayRect": {
     "doc": "Display selection rectangle in channel rack",
@@ -4888,7 +6698,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiiii|i",
+     "required": 5,
+     "max": 6
+    }
    },
    "cut": {
     "doc": "",
@@ -4899,7 +6715,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "delete": {
     "doc": "",
@@ -4910,7 +6730,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "down": {
     "doc": "",
@@ -4927,7 +6751,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "enter": {
     "doc": "",
@@ -4938,7 +6768,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "escape": {
     "doc": "",
@@ -4949,7 +6783,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getFocused": {
     "doc": "Get form focus state",
@@ -4966,7 +6804,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getFocusedFormCaption": {
     "doc": "Get focused form caption",
@@ -4977,7 +6821,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getFocusedFormID": {
     "doc": "Get focused form ID",
@@ -4988,7 +6836,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getFocusedNodeCaption": {
     "doc": "Get focused node caption",
@@ -4999,7 +6851,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getFocusedNodeFileType": {
     "doc": "Get focused node file type",
@@ -5010,7 +6866,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getFocusedPluginName": {
     "doc": "Get focused plugin name",
@@ -5021,7 +6881,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getHintMsg": {
     "doc": "Get FL Studio hint",
@@ -5032,7 +6896,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getHintValue": {
     "doc": "Get hint value",
@@ -5054,7 +6922,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getProgTitle": {
     "doc": "Get FL Studio title",
@@ -5065,7 +6939,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": "F",
+     "required": 1,
+     "max": 1
+    }
    },
    "getSnapMode": {
     "doc": "",
@@ -5076,7 +6956,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getStepEditMode": {
     "doc": "Get step edit mode",
@@ -5087,7 +6971,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getTimeDispMin": {
     "doc": "Is time time display set to minutes",
@@ -5098,7 +6986,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getVersion": {
     "doc": "Get FL Studio version as string",
@@ -5115,7 +7007,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "getVisible": {
     "doc": "Get form visible state",
@@ -5134,7 +7032,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "open_piano_roll_for_channel"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "hideWindow": {
     "doc": "Hide window",
@@ -5154,7 +7058,13 @@
     "mcp_tools": [
      "open_piano_roll_for_channel",
      "show_or_hide_window"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "horZoom": {
     "doc": "",
@@ -5171,7 +7081,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "insert": {
     "doc": "",
@@ -5182,7 +7098,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isBrowserAutoHide": {
     "doc": "Get browser auto hide state",
@@ -5193,7 +7113,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isClosing": {
     "doc": "Get closing state",
@@ -5204,7 +7128,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isInPopupMenu": {
     "doc": "Is in popup menu",
@@ -5215,7 +7143,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isLoopRecEnabled": {
     "doc": "Is loop recording enabled",
@@ -5226,7 +7158,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isMetronomeEnabled": {
     "doc": "Is metronome enabled",
@@ -5237,7 +7173,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isPrecountEnabled": {
     "doc": "Is precount enabled",
@@ -5248,7 +7188,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isStartOnInputEnabled": {
     "doc": "Is start on input enabled",
@@ -5259,7 +7203,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "jog": {
     "doc": "",
@@ -5276,7 +7224,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "jog2": {
     "doc": "",
@@ -5293,7 +7247,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "launchAudioEditor": {
     "doc": "Launch audio editor",
@@ -5330,7 +7290,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "isiss",
+     "required": 5,
+     "max": 5
+    }
    },
    "left": {
     "doc": "",
@@ -5347,7 +7313,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "miDisplayDockRect": {
     "doc": "Display selection rectangle in mixer dock",
@@ -5379,7 +7351,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "miDisplayRect": {
     "doc": "Display selection rectangle in mixer",
@@ -5411,7 +7389,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iii|i",
+     "required": 3,
+     "max": 4
+    }
    },
    "moveJog": {
     "doc": "",
@@ -5428,7 +7412,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "navigateBrowser": {
     "doc": "Navigate browser",
@@ -5450,7 +7440,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "navigateBrowserMenu": {
     "doc": "Navigate browser menu",
@@ -5472,7 +7468,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "navigateBrowserTabs": {
     "doc": "Navigate browser tabs",
@@ -5489,7 +7491,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "next": {
     "doc": "",
@@ -5500,7 +7508,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "nextWindow": {
     "doc": "Next window",
@@ -5511,7 +7523,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "no": {
     "doc": "",
@@ -5522,7 +7538,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "openEventEditor": {
     "doc": "Open event editor",
@@ -5549,7 +7569,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Ii|i",
+     "required": 2,
+     "max": 3
+    }
    },
    "paste": {
     "doc": "",
@@ -5560,7 +7586,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "previewBrowserMenuItem": {
     "doc": "Preview browser menu item",
@@ -5571,7 +7601,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "previous": {
     "doc": "",
@@ -5582,7 +7616,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "right": {
     "doc": "",
@@ -5599,7 +7637,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "scrollWindow": {
     "doc": "Scroll window",
@@ -5626,7 +7670,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii|i",
+     "required": 2,
+     "max": 3
+    }
    },
    "selectBrowserMenuItem": {
     "doc": "Select browser menu item",
@@ -5637,7 +7687,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectWindow": {
     "doc": "Select window",
@@ -5654,7 +7708,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setBrowserAutoHide": {
     "doc": "Set browser auto hide state",
@@ -5671,7 +7731,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setFocused": {
     "doc": "Set form focus state",
@@ -5688,7 +7754,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setHintMsg": {
     "doc": "Set FL Studio hint",
@@ -5705,7 +7777,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "s",
+     "required": 1,
+     "max": 1
+    }
    },
    "setSnapMode": {
     "doc": "",
@@ -5722,7 +7800,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setStepEditMode": {
     "doc": "Set step edit mode",
@@ -5739,7 +7823,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setTimeDispMin": {
     "doc": "Is time time display set to minutes",
@@ -5750,7 +7840,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "showNotification": {
     "doc": "Show FL Studio notification",
@@ -5767,7 +7863,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "showPicker": {
     "doc": "Show picker panel",
@@ -5775,7 +7877,13 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "showWindow": {
     "doc": "Show window",
@@ -5796,7 +7904,13 @@
      "open_piano_roll_for_channel",
      "run_piano_roll_script",
      "show_or_hide_window"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "snapMode": {
     "doc": "",
@@ -5813,7 +7927,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "snapOnOff": {
     "doc": "",
@@ -5824,7 +7944,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "strip": {
     "doc": "",
@@ -5841,7 +7965,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "stripHold": {
     "doc": "",
@@ -5858,7 +7988,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "stripJog": {
     "doc": "",
@@ -5875,7 +8011,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "toggleBrowserNode": {
     "doc": "Toggle browser node",
@@ -5892,7 +8034,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "up": {
     "doc": "",
@@ -5909,7 +8057,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|i",
+     "required": 0,
+     "max": 1
+    }
    },
    "verZoom": {
     "doc": "",
@@ -5926,7 +8080,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "yes": {
     "doc": "",
@@ -5937,7 +8097,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    }
   },
   "device": {
@@ -5961,7 +8125,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "createRefreshThread": {
     "doc": "Create refresh thread",
@@ -5972,7 +8142,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "destroyRefreshThread": {
     "doc": "Destroy refresh thread",
@@ -5983,7 +8157,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "directFeedback": {
     "doc": "Send out generic midi message",
@@ -5994,7 +8172,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "O",
+     "required": 1,
+     "max": 1
+    }
    },
    "dispatch": {
     "doc": "Dispatch midi message",
@@ -6021,7 +8205,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii|y*",
+     "required": 2,
+     "max": 3
+    }
    },
    "dispatchGetReceiverPortNumber": {
     "doc": "Get receiver port number",
@@ -6038,7 +8228,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "dispatchReceiverCount": {
     "doc": "Get dispatch midi message receiver count",
@@ -6049,7 +8245,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "findEventID": {
     "doc": "Find event id",
@@ -6071,7 +8271,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "flrMidiCC": {
     "doc": "send a midi cc value via FL Studio Remote scripting",
@@ -6079,7 +8285,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": null
+    }
    },
    "flrMidiNote": {
     "doc": "send a midi note via FL Studio Remote scripting",
@@ -6087,7 +8297,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": null
+    }
    },
    "forwardMIDICC": {
     "doc": "Send  generic midi message to active plugin",
@@ -6109,7 +8323,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "L|i",
+     "kwlist": [
+      "message",
+      "forwardTo"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "fullRefresh": {
     "doc": "Perform full refresh",
@@ -6120,7 +8344,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getDeviceID": {
     "doc": "Get device hardware id",
@@ -6131,7 +8359,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": "$",
+     "required": 1,
+     "max": 1
+    }
    },
    "getIdleElapsed": {
     "doc": "Get idle elapsed",
@@ -6142,7 +8376,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getLinkedChannel": {
     "doc": "Get channel value of linked control back or -1 if not linked",
@@ -6159,7 +8397,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "I",
+     "required": 1,
+     "max": 1
+    }
    },
    "getLinkedInfo": {
     "doc": "Get linked control info back or -1 if not linked",
@@ -6176,7 +8420,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "I",
+     "required": 1,
+     "max": 1
+    }
    },
    "getLinkedParamName": {
     "doc": "Get string value of linked control back or error if not linked",
@@ -6193,7 +8443,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "I",
+     "required": 1,
+     "max": 1
+    }
    },
    "getLinkedValue": {
     "doc": "Get normalized value of linked control back or -1 if not linked",
@@ -6210,7 +8466,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "I",
+     "required": 1,
+     "max": 1
+    }
    },
    "getLinkedValueString": {
     "doc": "Get string value of linked control back or error if not linked",
@@ -6227,7 +8489,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "I",
+     "required": 1,
+     "max": 1
+    }
    },
    "getMasterSync": {
     "doc": "Get device master sync",
@@ -6238,7 +8506,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getName": {
     "doc": "Get device name",
@@ -6249,7 +8521,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "getPortNumber": {
     "doc": "Is device assigned",
@@ -6260,7 +8536,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "hardwareRefreshMixerTrack": {
     "doc": "Hardware refresh mixer track",
@@ -6277,7 +8557,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isAssigned": {
     "doc": "Is device assigned",
@@ -6288,7 +8574,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isDoubleClick": {
     "doc": "Double-clicking handling for MIDI",
@@ -6305,7 +8595,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "isMidiOutAssigned": {
     "doc": "Is device midi out assigned",
@@ -6316,7 +8612,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "linkToLastTweaked": {
     "doc": "Link controller control to last tweked parameter",
@@ -6348,7 +8648,19 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|iI",
+     "kwlist": [
+      "controlIndex",
+      "channel",
+      "globalLink",
+      "eventID"
+     ],
+     "required": 2,
+     "max": 4
+    }
    },
    "midiOutMsg": {
     "doc": "Send out midi message",
@@ -6380,7 +8692,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i|iiii",
+     "required": 1,
+     "max": 5
+    }
    },
    "midiOutNewMsg": {
     "doc": "Send out new midi message",
@@ -6402,7 +8720,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "midiOutSysex": {
     "doc": "Send midi out sysex",
@@ -6419,7 +8743,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "y*",
+     "required": 1,
+     "max": 1
+    }
    },
    "processMIDICC": {
     "doc": "Send out generic midi message",
@@ -6436,7 +8766,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "O",
+     "required": 1,
+     "max": 1
+    }
    },
    "releaseCC": {
     "doc": "allow a midi cc to be controlled by automation again",
@@ -6444,7 +8780,17 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii",
+     "kwlist": [
+      "channel",
+      "cc"
+     ],
+     "required": 2,
+     "max": 2
+    }
    },
    "repeatMidiEvent": {
     "doc": "Repeat midi event",
@@ -6471,7 +8817,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "O|ii",
+     "kwlist": [
+      "eventData",
+      "delay",
+      "rate"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "sendMsgGeneric": {
     "doc": "Send out generic midi message",
@@ -6482,7 +8839,19 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "Lss|i",
+     "kwlist": [
+      "id",
+      "message",
+      "lastMessage",
+      "offset"
+     ],
+     "required": 3,
+     "max": 4
+    }
    },
    "setHasMeters": {
     "doc": "Set has meters",
@@ -6493,7 +8862,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "setMasterSync": {
     "doc": "Set device master sync",
@@ -6510,7 +8883,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "stopRepeatMidiEvent": {
     "doc": "stop repeat midi event",
@@ -6521,7 +8900,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    }
   },
   "arrangement": {
@@ -6545,7 +8928,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "is",
+     "required": 2,
+     "max": 2
+    }
    },
    "currentTime": {
     "doc": "Current time",
@@ -6562,7 +8951,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "currentTimeHint": {
     "doc": "Current time hint",
@@ -6594,7 +8989,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii|ii",
+     "required": 2,
+     "max": 4
+    }
    },
    "getMarkerName": {
     "doc": "Get marker name",
@@ -6611,7 +9012,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "jumpToMarker": {
     "doc": "Jump to arrangement marker",
@@ -6633,7 +9040,17 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|i",
+     "kwlist": [
+      "delta",
+      "select"
+     ],
+     "required": 1,
+     "max": 2
+    }
    },
    "liveSelection": {
     "doc": "Live selection",
@@ -6655,7 +9072,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "liveSelectionStart": {
     "doc": "Live selection start",
@@ -6666,7 +9089,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": null
+    }
    },
    "selectionClear": {
     "doc": "Clear selection",
@@ -6674,7 +9101,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectionEnd": {
     "doc": "Selection end",
@@ -6685,7 +9116,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectionIsActive": {
     "doc": "Selection active",
@@ -6693,7 +9128,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "selectionSet": {
     "doc": "Set selection start",
@@ -6701,7 +9140,20 @@
     "new_vs_stubs": true,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|iii",
+     "kwlist": [
+      "selStart",
+      "selStart",
+      "selectNotes",
+      "updateSongLoop",
+      "scroll"
+     ],
+     "required": 2,
+     "max": 5
+    }
    },
    "selectionStart": {
     "doc": "Selection start",
@@ -6712,7 +9164,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    }
   },
   "launchMapPages": {
@@ -6725,7 +9181,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "createOverlayMap": {
     "doc": "Create overlay map",
@@ -6757,7 +9217,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "getMapCount": {
     "doc": "Get launchmap items length",
@@ -6774,7 +9240,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getMapItemAftertouch": {
     "doc": "Get launchmap item aftertouch",
@@ -6796,7 +9268,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getMapItemChannel": {
     "doc": "Get launchmap item destination channel",
@@ -6818,7 +9296,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "getMapItemColor": {
     "doc": "Get launchmap item color",
@@ -6840,7 +9324,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "init": {
     "doc": "Init launchmap pages",
@@ -6867,7 +9357,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "sii",
+     "required": 3,
+     "max": 3
+    }
    },
    "length": {
     "doc": "Get launchmap pages length",
@@ -6878,7 +9374,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "processMapItem": {
     "doc": "Process map item",
@@ -6910,7 +9410,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Oiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "releaseMapItem": {
     "doc": "Release map item",
@@ -6932,7 +9438,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Oi",
+     "required": 2,
+     "max": 2
+    }
    },
    "setMapItemTarget": {
     "doc": "Set map item destination target",
@@ -6959,7 +9471,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iii",
+     "required": 3,
+     "max": 3
+    }
    },
    "updateMap": {
     "doc": "Update launchmap page",
@@ -6976,7 +9494,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    }
   },
   "screen": {
@@ -6989,7 +9513,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiii|i",
+     "required": 4,
+     "max": 5
+    }
    },
    "addTextLine": {
     "doc": "Add text line",
@@ -7000,7 +9530,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "siiii",
+     "required": 5,
+     "max": 5
+    }
    },
    "animateText": {
     "doc": "Animate text",
@@ -7011,7 +9547,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "blank": {
     "doc": "Blank",
@@ -7022,7 +9564,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ii",
+     "required": 2,
+     "max": 2
+    }
    },
    "deInit": {
     "doc": "Destroy screen object",
@@ -7033,7 +9581,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "displayBar": {
     "doc": "Display bar",
@@ -7070,7 +9622,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iisdi",
+     "required": 5,
+     "max": 5
+    }
    },
    "displayText": {
     "doc": "Display text",
@@ -7112,7 +9670,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiisi|i",
+     "required": 5,
+     "max": 6
+    }
    },
    "displayTimedText": {
     "doc": "Display timed text",
@@ -7134,7 +9698,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "s|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "drawRect": {
     "doc": "Draw rectangle",
@@ -7145,7 +9715,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiiii",
+     "required": 5,
+     "max": 5
+    }
    },
    "drawText": {
     "doc": "Draw text",
@@ -7156,7 +9732,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "isiiii",
+     "required": 6,
+     "max": 6
+    }
    },
    "eraseRect": {
     "doc": "Erase rectangle",
@@ -7167,7 +9749,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "fillRect": {
     "doc": "Fill rectangle",
@@ -7178,7 +9766,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiiii",
+     "required": 5,
+     "max": 5
+    }
    },
    "findTextLine": {
     "doc": "Find text line",
@@ -7189,7 +9783,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "getScreenActiveCounter": {
     "doc": "Get screen active counter",
@@ -7200,7 +9800,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "hideMenu": {
     "doc": "Hide menu",
@@ -7211,7 +9815,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": "iiii",
+     "required": 4,
+     "max": 4
+    }
    },
    "init": {
     "doc": "Init screen object",
@@ -7222,7 +9832,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "iiiiii",
+     "required": 6,
+     "max": 6
+    }
    },
    "isBlanked": {
     "doc": "Is blanked",
@@ -7233,7 +9849,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "isUnBlank": {
     "doc": "Is Unblank",
@@ -7244,7 +9864,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "keepDisplayActive": {
     "doc": "Keep display active",
@@ -7255,7 +9879,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "menuItemClick": {
     "doc": "Menu item click",
@@ -7266,7 +9894,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "menuNext": {
     "doc": "Select next menu",
@@ -7277,7 +9909,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "menuPrev": {
     "doc": "Select previous menu",
@@ -7288,7 +9924,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "menuShowing": {
     "doc": "Return true when menu is showing",
@@ -7299,7 +9939,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "removeTextLine": {
     "doc": "Remove text line",
@@ -7310,7 +9954,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i|i",
+     "required": 1,
+     "max": 2
+    }
    },
    "setScreenActiveCounter": {
     "doc": "Set screen active counter",
@@ -7321,7 +9971,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "setup": {
     "doc": "Setup screen properties",
@@ -7332,7 +9988,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "Liiiii",
+     "required": 6,
+     "max": 6
+    }
    },
    "unBlank": {
     "doc": "Unblank",
@@ -7343,7 +10005,13 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "update": {
     "doc": "Update screen",
@@ -7354,7 +10022,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": null
+    }
    }
   },
   "plugins": {
@@ -7388,7 +10060,20 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|iiii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "flag",
+      "paramIndex",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 5
+    }
    },
    "getName": {
     "doc": "Get plugin name",
@@ -7425,7 +10110,20 @@
     "new_vs_stubs": false,
     "win_pair_verified": false,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|iiii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "flag",
+      "paramIndex",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 5
+    }
    },
    "getPadInfo": {
     "doc": "Get plugin pad info",
@@ -7462,7 +10160,20 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|iiii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "paramOption",
+      "paramIndex",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 5
+    }
    },
    "getParamCount": {
     "doc": "Get plugin parameter count",
@@ -7493,7 +10204,18 @@
      "get_plugin_parameter_list",
      "get_plugin_parameter_value",
      "set_plugin_parameter_value"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "getParamName": {
     "doc": "Get plugin parameter name",
@@ -7529,7 +10251,19 @@
      "get_plugin_parameter_list",
      "get_plugin_parameter_value",
      "set_plugin_parameter_value"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|ii",
+     "kwlist": [
+      "paramIndex",
+      "index",
+      "slotIndex",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 4
+    }
    },
    "getParamValue": {
     "doc": "Get plugin parameter value",
@@ -7563,7 +10297,19 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_plugin_parameter_value"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|ii",
+     "kwlist": [
+      "paramIndex",
+      "index",
+      "slotIndex",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 4
+    }
    },
    "getParamValueString": {
     "doc": "Get plugin parameter value string",
@@ -7602,7 +10348,19 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_plugin_parameter_value"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "ii|ii",
+     "kwlist": [
+      "paramIndex",
+      "index",
+      "slotIndex",
+      "useGlobalIndex"
+     ],
+     "required": 2,
+     "max": 4
+    }
    },
    "getPluginName": {
     "doc": "Get plugin name",
@@ -7654,7 +10412,19 @@
      "set_step_sequencer_pattern",
      "set_step_sequencer_step",
      "solo_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|iii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "userName",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 4
+    }
    },
    "getPresetCount": {
     "doc": "Get preset count",
@@ -7681,7 +10451,11 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 1,
+     "fmt": null
+    }
    },
    "isValid": {
     "doc": "Get plugin validity",
@@ -7727,7 +10501,18 @@
      "set_step_sequencer_pattern",
      "set_step_sequencer_step",
      "solo_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "nextPreset": {
     "doc": "Select next plugin preset",
@@ -7754,7 +10539,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "prevPreset": {
     "doc": "Select previous plugin preset",
@@ -7781,7 +10577,18 @@
     "new_vs_stubs": false,
     "win_pair_verified": true,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "i|ii",
+     "kwlist": [
+      "index",
+      "slotIndex",
+      "useGlobalIndex"
+     ],
+     "required": 1,
+     "max": 3
+    }
    },
    "setParamValue": {
     "doc": "Set plugin parameter value",
@@ -7825,7 +10632,21 @@
     "arm64_same": true,
     "mcp_tools": [
      "set_plugin_parameter_value"
-    ]
+    ],
+    "kwsig": {
+     "flags": 3,
+     "fmt": "fii|iii",
+     "kwlist": [
+      "paramValue",
+      "paramIndex",
+      "index",
+      "slotIndex",
+      "pickupMode",
+      "useGlobalIndex"
+     ],
+     "required": 3,
+     "max": 6
+    }
    }
   },
   "ilmcp": {
@@ -7837,7 +10658,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "show_highlight"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "sss|Op",
+     "required": 3,
+     "max": 5
+    }
    },
    "forwardTutorialEvent": {
     "doc": "",
@@ -7845,7 +10672,11 @@
     "new_vs_stubs": true,
     "win_pair_verified": null,
     "arm64_same": true,
-    "mcp_tools": []
+    "mcp_tools": [],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "storePRScript": {
     "doc": "",
@@ -7855,7 +10686,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "save_piano_roll_script"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "ss",
+     "required": 2,
+     "max": 2
+    }
    },
    "runPRScript": {
     "doc": "",
@@ -7865,7 +10702,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "run_piano_roll_script"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "s",
+     "required": 1,
+     "max": 1
+    }
    },
    "addChannel": {
     "doc": "",
@@ -7875,7 +10718,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "add_channel"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "|s",
+     "required": 0,
+     "max": 1
+    }
    },
    "removeChannel": {
     "doc": "",
@@ -7885,7 +10734,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "remove_channels"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "i",
+     "required": 1,
+     "max": 1
+    }
    },
    "getBrowserNames": {
     "doc": "",
@@ -7895,7 +10750,13 @@
     "arm64_same": true,
     "mcp_tools": [
      "get_browser_names"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "sp",
+     "required": 2,
+     "max": 2
+    }
    },
    "getHighlightNames": {
     "doc": "",
@@ -7906,7 +10767,11 @@
     "mcp_tools": [
      "get_highlight_names",
      "show_highlight"
-    ]
+    ],
+    "kwsig": {
+     "flags": 4,
+     "fmt": null
+    }
    },
    "addEffect": {
     "doc": "",
@@ -7918,7 +10783,13 @@
      "add_effect",
      "remove_effect",
      "reset_mixer_tracks"
-    ]
+    ],
+    "kwsig": {
+     "flags": 1,
+     "fmt": "sii",
+     "required": 3,
+     "max": 3
+    }
    }
   }
  },

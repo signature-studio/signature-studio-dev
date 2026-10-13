@@ -18,10 +18,18 @@ _ERR = {1: ValueError, 2: RuntimeError, 3: RuntimeError, 4: IndexError, 5: TypeE
 IDS = []
 
 
-def _make(mod, name, fid, sig):
+def _make(mod, name, fid, sig, kwsig=None):
     params = sig["params"] if sig else None
     names = [p["name"] for p in params] if params else None
     defaults = {p["name"]: p["default"] for p in params if p["default"] is not None} if params else {}
+    # kwsig = FLEngine バイナリ由来 (PyArg_ParseTupleAndKeywords の書式 + kwlist)。kwlist があれば stubs 名より優先。
+    # kwlist 無し (flags=1/4) は stubs 署名のまま (flags=1 の channelCount を MCPTools が globalCount= で呼ぶため、
+    # kwargs 拒否にはしない。実 FL の挙動は未確認)。
+    required = None
+    if kwsig:
+        if kwsig.get("kwlist") is not None:
+            names = list(kwsig["kwlist"])
+        required = kwsig.get("required")
 
     def bind(args, kw):
         if not kw:
@@ -29,11 +37,16 @@ def _make(mod, name, fid, sig):
         if names is None:
             raise TypeError(f"{mod}.{name}() takes no keyword arguments (signature unknown)")
         out = list(args)
-        for n in names[len(args):]:
+        gap = None  # 省略された任意引数 (既定値が C 側にあり不明) の位置
+        for i, n in enumerate(names[len(args):], start=len(args)):
             if n in kw:
+                if gap is not None:
+                    raise TypeError(f"{mod}.{name}() cannot skip optional argument '{names[gap]}' (default unknown)")
                 out.append(kw.pop(n))
             elif n in defaults:
                 out.append(eval(defaults[n], {}))  # stubs 由来の単純リテラル (True/False/0/-1/None)
+            elif required is not None and i >= required:
+                gap = i if gap is None else gap
             else:
                 raise TypeError(f"{mod}.{name}() missing argument '{n}'")
         if kw:
@@ -62,7 +75,7 @@ def install(table_path="/fl/Lib/flapi_table.json"):
         for name in funcs:
             fid = len(IDS)
             IDS.append(f"{mod}.{name}")
-            setattr(m, name, _make(mod, name, fid, funcs[name].get("sig")))
+            setattr(m, name, _make(mod, name, fid, funcs[name].get("sig"), funcs[name].get("kwsig")))
             n += 1
         sys.modules[mod] = m
     return n
