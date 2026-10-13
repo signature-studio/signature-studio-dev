@@ -250,11 +250,31 @@
       ]
     },
     {
-      "id": "help-html",
+      "id": "help-entry",
       "globs": [
         "Help/index_offline.html",
         "Help/WhatsNew.htm",
-        "Help/flstudio.css",
+        "Help/flstudio.css"
+      ],
+      "phase": "on-demand",
+      "tier": "T1",
+      "fetch": "whole",
+      "vfs": "/fl/Help/* (RO)",
+      "readers": [
+        {
+          "va": "0x10be5c0",
+          "role": "ヘルプ URL 生成 (index_offline.html + /html/%s)。呼出元 0x10be820, 0x10be840"
+        },
+        {
+          "va": "0xf1d660",
+          "role": "WhatsNew.htm の場所解決 (index_offline.html の隣)"
+        }
+      ],
+      "note": "ヘルプの入口。どのヘルプ経路でも最初に URL 組立で参照される"
+    },
+    {
+      "id": "help-html",
+      "globs": [
         "Help/html/**",
         "Help/fonts/*"
       ],
@@ -264,20 +284,12 @@
       "vfs": "/fl/Help/** (RO)",
       "readers": [
         {
-          "va": "0x10be5c0",
-          "role": "ヘルプ URL 生成 (index_offline.html + /html/%s)。呼出元 0x10be820, 0x10be840"
-        },
-        {
           "va": "0x10be8c0",
           "role": "/html/FD/web/documents/%s.html (呼出元 0x10d0ff0)"
         },
         {
           "va": "0x10bea60",
           "role": "/html/plugins/%s.htm (呼出元 0x10be860, 0x13303e0)"
-        },
-        {
-          "va": "0xf1d660",
-          "role": "WhatsNew.htm の場所解決 (index_offline.html の隣)"
         }
       ],
       "note": "WebView2 (ST #118 help-viewer) が file:// 相当で読む前提。FL 本体は HTML を解釈せず URL を組み立てて外部ビューアに渡す"

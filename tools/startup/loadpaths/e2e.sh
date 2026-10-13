@@ -22,7 +22,7 @@ import json, sys
 r = json.load(open(sys.argv[1]))
 assert r['fail'] == [] and r['map_mismatch'] == 0 and r['map_checked'] == r['grouped_files']
 by = {g['id']: g for g in r['groups']}
-assert by['lang-moe']['files'] == 7 and by['help-scr']['files'] == 2 and len(r['groups']) == 14, 'group 件数'
+assert by['lang-moe']['files'] == 7 and by['help-scr']['files'] == 2 and len(r['groups']) == 15, 'group 件数'
 print(f"  groups {len(r['groups'])} / grouped_files {r['grouped_files']} / map_mismatch {r['map_mismatch']} / shadowed {r['shadowed']}")
 wp = json.load(open(sys.argv[2]))
 idx = lambda p: next(k for k, v in wp.items() if k.isdigit() and p in v)
