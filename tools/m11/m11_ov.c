@@ -79,6 +79,8 @@ EMSCRIPTEN_KEEPALIVE int m11_disp_count(void) { return (int)m11_disp_n; }
 extern unsigned long long function_40f960(unsigned long long);
 extern unsigned long long function_41c160(unsigned long long);
 extern unsigned long long function_5c0e70(unsigned long long);
+/* 481790 (逆アセンブル #704): rcx = ptr, dl = flag(1 byte) → rax = ptr 幅の戻り値 (u64 で切り捨てなし) */
+extern unsigned long long function_481790(void* rcx, unsigned long long dl);
 static u64 tr_40f960(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_40f960(a0); }
 static u64 tr_41c160(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_41c160(a0); }
 static u64 tr_5c0e70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_5c0e70(a0); }
