@@ -59,6 +59,9 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 
 - 変更 (測定 commit `0cf238bb`): `native/native_ctrl.c` と `native/ctrl_harness.mjs` に同一の 1 ノードを追加 (`C+0x21b8` の head に接続、key u16=1、value=Z、blk=RB0)。
   key=1 は静的読み §1 の `[C+0x328]` 比較の後の探索 key (`keycnt`、`0x180ca1499` の `edx`) に合わせた。key=0 では found=0 のまま (実測)。
+- 修正 (commit `ad1f4768`): 1 ノード追加を `FA_NODE1=1` の裏に置いた (既定 OFF)。既定 OFF では旧 baseline (found=0・ERR=0) を維持し、ゲート (a) は既存の期待値のまま。found=1 は `FA_NODE1=1` 専用の別行として下記に残す。
+- 実測 (HEAD `ad1f4768`, `bash run_fa9.sh`, 既定 OFF): `(a) base: scenarios=8 ERR=0 ca1480=72 path=['map'] eq=['1'] found=['0'] da6c00=0` / `(b) alt: ERR=8/8 ca1480=8 path=['static']` / `(b-wasm) alt: wasm ERR=8/8` / `(c) pert: 状態ダンプ差分トークン=395 / L/R 同一 40 呼出 / 差分 0 呼出` / **GATE: PASS** / `run_ctrl 2 5` **BIT-EXACT 15/15** (wall 3 s)。
+- 実測 (HEAD `ad1f4768`, `FA_NODE1=1` で手動 probe, 専用行・ゲート外): native `scen 8 ERR 8 ca1480 8 found=['1'] eq=['1'] path=['map']` / wasm (`FA_NODE1=1 ctrl_harness.mjs`) ERR 8/8。既知の失敗 (setter `0x180c9d74c` の `addr=0x50` SIGSEGV、#1182 の範囲)。
 - 実測 (`bash run_fa9.sh`, `0cf238bb`, clean build, load 0.18→0.55, wall 35.98 s):
   - (a) base: scenarios=8, ERR=8/8, ca1480=72, path=map, **found=1 (72/72)**, da6c00=0 (旧 baseline は found=0)。
   - 失敗原因: found=1 の後、setter (`0x180c9d74c`) が `addr=0x50` で SIGSEGV (`out[0]+0x10` の vtable が未構築)。受入 2 後半 (0x180da6c00 到達) は範囲外 (#1182)。
