@@ -1,13 +1,23 @@
 // シナリオ行列ランナー: 1 つの headless Chrome で全シナリオを順に実行し、結果 JSON と判定を出力する。
 // 使い方: node harness/run.mjs [--quick] [--only name,name] [--out results/results.json]
+//        node harness/run.mjs --soak30   # 30 分ソークのみ (AU-10)
 import { withChrome } from "./chrome.mjs";
-import path from "node:path"; import fs from "node:fs"; import { fileURLToPath } from "node:url";
+import path from "node:path"; import fs from "node:fs"; import os from "node:os"; import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const quick = args.includes("--quick");
 const only = args.includes("--only") ? args[args.indexOf("--only") + 1].split(",") : null;
-const outFile = args.includes("--out") ? args[args.indexOf("--out") + 1] : path.join(here, "../results/results.json");
 const S = (full, q) => (quick ? q : full);
+// AU-10 (#191): 長時間ソーク。既定の全シナリオ実行には含めない (--soak30 / --soak <秒> 指定時のみ、そのシナリオだけを実行する)。
+//   --soak30        : 1800 秒 (30 分) ランプ・ソーク (B=256, 48kHz, 全フレーム bit-exact 照合)
+//   --soak <秒>     : 秒数指定 (短縮確認・ネガコン用)
+//   --inject-hiccup : ネガティブコントロール。60ms の強制ブロックを混入し、gate が FAIL (exit 1) することを確認する用
+const soakSecs = args.includes("--soak30") ? 1800 : args.includes("--soak") ? +args[args.indexOf("--soak") + 1] : 0;
+if (args.includes("--soak") && !(soakSecs > 0)) { console.error("--soak には 1 以上の秒数が必要です"); process.exit(2); }
+const injectHiccup = args.includes("--inject-hiccup");
+// 既定の results/results.json (全シナリオの記録) を soak 単独実行で上書きしない: soak は results/soak_<秒>[_negctl].json
+const outFile = args.includes("--out") ? args[args.indexOf("--out") + 1]
+  : path.join(here, "../results", soakSecs > 0 ? `soak_${soakSecs}${injectHiccup ? "_negctl" : ""}.json` : "results.json");
 
 // expect: 判定関数 (r) => [ok:boolean, msg]
 const underrunFree = (r) => [r.stats.underruns === 0 && r.stats.silence_frames === 0, `underruns=${r.stats.underruns} silence=${r.stats.silence_frames}`];
@@ -60,7 +70,18 @@ scenarios.push({ name: "asio_apicheck", q: "api=apicheck&secs=1",
     canSampleRate_44100: 0, getSamplePosition_stopped: -996, outputReady: -1000, future: -998, getChannelInfo_ch7: -998, setClockSource_1: -998, getClockSources: 0, clock_n: 1, start_nobuf: -997, getSampleRate: 0, rate: 48000 };
     const bad = Object.keys(want).filter((k) => c[k] !== want[k]); return [bad.length === 0, bad.length ? "mismatch: " + bad.map((k) => `${k}=${c[k]}(want ${want[k]})`).join(", ") : `ASIO エラーコード 16 項目一致`]; } });
 
+if (soakSecs > 0) {
+  scenarios.length = 0;
+  const covered = (r) => { const want = Math.floor(soakSecs * (r.ctx?.sampleRate ?? 48000) * 0.99); const c = r.verify?.ramp?.frames_checked ?? 0; return [c >= want, `実フレーム ${c}f ≥ 公称 ${soakSecs}s の 99% (${want}f)`]; };
+  const wall = (r) => [(r.secs_wall ?? 0) >= soakSecs, `secs_wall=${r.secs_wall} ≥ ${soakSecs}`];
+  const noWorkletErr = (r) => [(r.workletErrors ?? []).length === 0 && !r.aborted && r.exit === 1, `workletErrors=${(r.workletErrors ?? []).length} aborted=${!!r.aborted} exit=${r.exit}(1=完了, 2=エラー)`];
+  // 合格条件 (全て AND): underrun 0 / silence 0 / ランプ全フレーム bit-exact / 実フレーム ≥ 公称 99% / 実時間 ≥ 公称 / worklet エラー 0
+  scenarios.push({ name: `asio_ramp_b256_soak${soakSecs}${injectHiccup ? "_negctl" : ""}`,
+    q: `api=asio&mode=ramp&buf=256&depth=2&secs=${soakSecs}${injectHiccup ? "&hiccup_ms=60&hiccup_every=200" : ""}`,
+    expect: all(underrunFree, rampExact, covered, wall, noWorkletErr) });
+}
 const sel = scenarios.filter((s) => !only || only.includes(s.name));
+const loadStart = os.loadavg(), tStart = Date.now();
 const results = [];
 let failed = 0;
 await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + sel[0].q, log: () => {} }, async (cdp) => {
@@ -93,6 +114,8 @@ if (only && fs.existsSync(outFile)) {   // 部分再実行: 既存結果へ名�
   merged = [...old.filter((x) => !names.has(x.name)), ...results];
 }
 for (const x of results) x.ran_at = new Date().toISOString();
-fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, chrome: "headless google-chrome 154", note: "ran_at は部分再実行時のシナリオ単位時刻", results: merged }, null, 1));
+const hostInfo = { load_start: loadStart, load_end: os.loadavg(), wall_s: (Date.now() - tStart) / 1000, nproc: os.cpus().length };
+console.log(`host: load avg start=${loadStart.map((v) => v.toFixed(2))} end=${hostInfo.load_end.map((v) => v.toFixed(2))} wall=${hostInfo.wall_s.toFixed(1)}s nproc=${hostInfo.nproc}`);
+fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, chrome: "headless google-chrome 154", note: "ran_at は部分再実行時のシナリオ単位時刻", host: hostInfo, results: merged }, null, 1));
 console.log(`\n${results.length - failed}/${results.length} PASS -> ${outFile}${only ? " (部分実行: 既存結果へマージ)" : ""}`);
 process.exit(failed ? 1 : 0);
