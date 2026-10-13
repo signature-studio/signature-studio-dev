@@ -205,4 +205,4 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 | wasm 経路で host が free 済み旧画素を stale に読む可能性 | 画面の一瞬のずれ (crash なし) | #489 にコメント (別チケット候補; 本修正で保留 free の仕組みは入ったので、wasm でも旧画素は `head` 通過まで有効と推論 (未実測)) |
 
 ## 13. GUI-8 (#184): e2e の agent-browser 載せ替え・長時間ストレス・Firefox 取込み
-全文と実測: `REPORT_GUI8.md`。結論: e2e は `tools/e2e` ドライバ (agent-browser / puppeteer-core) 経由で `bash tools/gui/e2e.sh` ALL PASS (golden 差 0)、50,000 フレームのストレスで drop 0・メモリ増加なし・surface gen 不変、ネガコン 3 本は不合格を検出。Firefox は #127 の結果を `PROTOCOL.md §12` に取込み (Safari・Firefox 実描画は未測定)。
+全文と実測 (検証起点 HEAD `761a045`): `REPORT_GUI8.md`。結論: e2e は `tools/e2e` ドライバ (agent-browser / puppeteer-core) 経由で `bash tools/gui/e2e.sh` ALL PASS (golden 差 0、259 s)、50,000 フレームのストレスで drop 0・メモリ増加なし・surface gen 不変、ネガコン 3 本は不合格を検出。Firefox は #127 の結果を `PROTOCOL.md §12` に取込み (Safari・Firefox 実描画は未測定)。
