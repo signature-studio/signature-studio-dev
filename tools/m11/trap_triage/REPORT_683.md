@@ -1,8 +1,9 @@
 # #683: function_414ad0 の `[arg1]` deref 復元 — 4 unit (149/158/280/659) と #307 の 68 関数への波及
 
-**判定: 受入条件 1 は未達** (4 unit はいずれも ok にならない)。受入条件 2 は部分 (68 関数で「最初の trap が 414ad0 の OOB」は消えるが、verdict は全件 mismatch のまま)。受入条件 3 (ok→非 ok の退行 0) は **survey 942 unit と 68 関数では達成、closure 7421 関数では未達** (match→非 match 7 件、§5)。**Closes しない (Refs #683)**。
+**判定: 受入条件 1 は未達** (4 unit はいずれも ok にならない)。受入条件 2 は部分 (68 関数で「最初の trap が 414ad0 の OOB」は消えるが、verdict は全件 mismatch のまま)。受入条件 3 (ok→非 ok の退行 0) は survey 942 unit と 68 関数では達成、closure 7421 関数では未達 (match→非 match 7 件、§5)。**Closes しない (Refs #683)**。
+**既定は OFF** (`M11_OV_414AD0=0`)。既定 OFF では main と同じ LStrSetLength 版が build され、main の build の挙動は変わらない。
 既知類型との関係 (`docs/DEFECTS.md`): **D4** (disp=0 の 1 段 deref 脱落) の再発。新規類型なし。
-検証起点 = `8d883c3` (main)。実装 commit = `309fb3c` (`m11_ov.c` / `m11_build.sh`)、検証スクリプト・IR 版・本 REPORT = `0113c86` (以後の追記は別 commit)。
+検証起点 = `8d883c3` (main)。実装 commit = `309fb3c` (`m11_ov.c` / `m11_build.sh`)、検証スクリプト・IR 版 = `0113c86`、本 REPORT の再測定 = `956d2ed` の後続 commit (本文の HEAD 欄を参照)。
 
 ## 1. 機械語と lift 後 IR の突合 (function_414ad0, VA 0x414ad0..0x414ba9)
 
@@ -12,47 +13,51 @@
 
 ## 2. 転記 (C 版) と IR 版
 
-- **C 版**: `tools/m11/m11_ov.c` の `function_414ad0` (逆アセンブル 414ad0..414ba9 の分岐を 1 対 1 で写す)。helper 412c20 / 414850 / 409c80 / 412d60 / 409470 は既存本体を直接呼ぶ。
-  gate: `-DM11_OV_414AD0` (既定 **1**)。`M11_OV_414AD0=0 bash m11_build.sh` で IR 版に戻る (ネガコン)。`m11_build.sh` は `work/ov_414ad0.stamp` で ov.o だけ切り替える。
+- **C 版**: `tools/m11/m11_ov.c` の `function_414ad0`。gate は `-DM11_OV_414AD0` (既定 **0**)。
+  - `M11_OV_414AD0=1`: UStrSetLength 版 (`#if` 側。機械語 414ad0..414ba9 の分岐を写した転記。deref 復元あり)。
+  - `M11_OV_414AD0=0` (既定): LStrSetLength 版 (`#else` 側。main の #134 版と同じ本体)。
+  - **注意**: 両版とも C で `function_414ad0` を定義するため、gate の切替は「C 転記 (UStr 版) ↔ main と同じ C 版 (LStr 版)」の切替であり、「転記あり ↔ IR 版」の切替ではない。IR 版 (`ir414_fix.py`) は liftdiff の A/B (§4・§5) でのみ使う。
+  - `m11_build.sh` は `work/ov_414ad0.stamp` で `ov.o` だけ切り替える (`emcc -c` に `-DM11_OV_414AD0` を渡す。`ov.o` の内容が gate で変わることを確認済み)。
 - **IR 版** (`trap_triage/ir414_fix.py`): C 版と同じ分岐・同じ deref 復元を LLVM IR で書いたもの。liftdiff は C 上書きを取り込まないため、68 関数の batch はこちらを使う。`--none` は無変更の複写 (A 側・ネガコン)。
-- 既存の上書きと同じく `function_414ad0` は強シンボルで IR の weak 定義を置き換える。build: `cc m11_ov.c` 成功、`wasm-ld signature mismatch: 0, undefined symbol: 0`。
 
-## 3. m11 survey (942 unit): 転記 OFF (= 検証起点と同じ) / ON
+## 3. m11 survey (942 unit): gate OFF (既定) / ON
 
-`bash trap_triage/neg_683.sh` (ON/OFF を順に build + `survey_units.mjs` + `survey_diff.py`)。コミット済み HEAD (`0113c86`) で実行。n=1 (ただし §8 の再実行で同一結果を 2 回確認: 初回 = `309fb3c` 直後、再実行 = `0113c86`)。
-所要 (実測、`/proc/loadavg` 1 分値): 転記前の基準 build 12.3 s / survey 10.5 s (load 0.35、単独実行)。再実行 ON build 23.5 s / survey 12.6 s (load 8.4、closure batch と並行)、OFF build 5.9 s / survey 32.8 s (load 9.8、並行)。並行実行のため所要は参考値。
+`bash trap_triage/neg_683.sh` (ON/OFF を順に build + `survey_units.mjs` + `survey_diff.py`)。素材 `work-m11` は #516/#680 以前の生成物で `ir_conditions.json` が無く、そのままでは build が fail-closed で止まる。そこで `m11_gen_ir2.sh` で同じ `boot*.lift.ll` から IR を作り直した (ldfix=applied、20 s)。以下はその再生成 IR の実測。
 
-| 構成 | ok | oob | halt0 | miss | noproc | 計 |
-|---|--:|--:|--:|--:|--:|--:|
-| OFF (転記なし) | 818 | 21 | 56 | 46 | 1 | 942 |
-| ON (転記あり、既定) | 827 | 11 | 57 | 46 | 1 | 942 |
+- 実行: `956d2ed` の worktree (`/home/runner/work/ws-713`) で 2 回実行 (測定 1・2)。各回で ON build → survey → OFF build → survey の順。
+- 所要 (実測、`/proc/loadavg` 1 分値 = 測定時): 測定 2 = 全体 70 s (ON build 24.0 s / survey 17.1 s (load 0.75) / OFF build 18.3 s / survey 17.1 s (load 0.94))。
 
-- **OFF = 検証起点と同じ** (REPORT_596 §1 の `ok 818 / halt0 56 / miss 46 / oob 21 / noproc 1` と一致)。
-- 遷移 (OFF → ON, unit 単位): ok→ok 818 / **ok→非 ok 0** / halt0→ok 3 (307, 311, 917) / oob→ok 6 (58-63) / oob→halt0 4 (56, 158, 280, 659) / oob→oob 11 / halt0→halt0 53。
-- **対象 4 unit**: 149 は OFF=oob → ON=oob (最上位 frame が `414bb0 ← 652500 ← 653660` から `414c70 ← 653660 ← 6539e0` に変わる)。158/280/659 は OFF=oob → ON=**halt0** (`412770 ← 4128b0__lifted ← 4128b0`)。
-  **4 unit とも ok にならない → 受入条件 1 は未達。**
-- 副作用 (4 対象 unit 以外の変化): 58-63 (417b70 / 8cbb00 系の既知 oob 群) が ok になり、56 は oob→halt0。307/311/917 が halt0→ok。原因は未調査 (414ad0 を経由する unit 群と推定)。m11 survey の ok 増 (+9) はこの副作用を含む。
+| 構成 | ok | oob | halt0 | miss | noproc | trap | 計 |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| OFF (既定, gate=0) 測定 1 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
+| OFF (既定, gate=0) 測定 2 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
+| ON (gate=1) 測定 1 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
+| ON (gate=1) 測定 2 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
 
-ネガコン: OFF build は転記なしの基準と一致 (818/21、4 unit の frame も基準と同じ)。ON↔OFF の 1 箇所切替だけで 4 unit の結果が変わることを確認 (4 unit: OFF oob → ON oob/halt0)。
+- **決定的**: 同じ構成の 2 回の測定は一致 (差 0)。OFF と ON も一致 (差 0)。
+- **遷移 (OFF → ON)**: 942 unit 全件で kind 不変 (ok→ok 828 / oob→oob 11 / halt0→halt0 55 / miss→miss 47 / noproc→noproc 1)。frames の深さの変化も 0。icall sites / targets の [ok, miss] 差も 0。
+- **PR 旧記述 (ON で ok 818→827、ok +9、副作用 58-63・307/311/917・56) は再生成 IR の実測で再現しない**。58-63 / 307 / 311 / 917 は OFF の段階で既に ok、56 は OFF・ON とも oob。
+- **対象 4 unit**: 149 は OFF = ON = oob (最上位 frame `653660 ← 6539e0 ← 664190`)。158/280/659 は OFF = ON = halt0 (`412770 ← 4128b0__lifted ← 4128b0`)。**4 unit とも ok にならない → 受入条件 1 は未達。**
+- **旧 818/21 の出所**: REPORT.md §8.2 の (a)「スナップショット (旧生成物)」。(c)「再生成 IR」を採用基準とする (REPORT.md §8.2 (e))。本 REPORT は (c) を基準とする。
+
+ネガコン: 上記 gate OFF/ON の切替で結果は変わらない。したがって本 gate は survey 上では効果を持たない (C 版 UStr 版と LStr 版が survey で同一の結果)。
 
 ## 4. liftdiff: #307 の 68 関数への波及 (A/B、同一ハーネス)
 
 - **定義** (`tests/oob_414ad0.py` と同じ): batch の関数のうち「最初の `wasm_trap` case の wasm_detail が `memory access out of bounds @ ld_wasm.wasm.function_414ad0` で始まる」関数。基準 jsonl `tools/liftdiff/work/m11/batch_closure.jsonl` (7421 行) で **68**。
-- **A** = IR 無変更の複写 (`m11_414base`)、**B** = `ir414_fix.py` で修復した IR (`m11_414fix`)。68 関数を `--set file:` で指定、`--shards 4 --state auto` (boot_state は両者とも基準 `work/m11/boot_state.json` の複写)。batch 所要 A 9 s / B 10 s (load average は未記録)。
+- **A** = IR 無変更の複写 (`m11_414base`)、**B** = `ir414_fix.py` で修復した IR (`m11_414fix`)。68 関数を `--set file:` で指定、`--shards 4 --state auto`。
+- **実行手順**: `liftdiff68_683.sh` を end-to-end で実行 (rc=0、41 s、`956d2ed` + 本 commit の cp 修正)。途中で `cp` の同一ファイル問題 (修正済み) と numpy 不足 (`liftdiff.py` の依存) に当たったため、venv に numpy / capstone / pefile を入れて実行。
 
 | 指標 (68 関数) | A (IR 無変更) | B (414ad0 修復) |
 |---|--:|--:|
-| 最初の wasm_trap が 414ad0 の OOB | **59** | **0** |
+| 最初の wasm_trap が 414ad0 の OOB | **67** | **0** |
 | verdict = match | 0 | 0 |
 | verdict = mismatch | 68 | 68 |
-| wasm_trap case 総数 | 228 | 147 |
-| wasm_trap が 0 件の関数 | 1 | 38 |
 
-- 遷移: 414ad0 OOB 59 → other 59 (verdict は全件 mismatch → mismatch)。**match → 非 match の退行は 0** (A で match は 0 件のため自明)。
-- B の最初の trap の内訳: `4133f0` の OOB (経路 `4133f0 < 414c70`) **18**、`412e40` の OOB (経路 `412e40 < 653660`) 6、`4128b0__lifted` の unreachable 2、`__asm_rep_movsq_memcpy` 1、`4144a0` 1、`8e6e30` 1、残り 38 件は trap なし。
-- **414ad0 の修復で消えた OOB は、別の関数の OOB (`414c70` 経由の `4133f0` 等) に置き換わった**。その原因 (deref 脱落の有無) は未確認。68 関数はいずれも verdict が mismatch のまま。
-- 注意 (ハーネスの再現性): A (4 shard・68 関数) と既存 closure jsonl (14 shard・7421 関数) は 68 件中 **50 件しか完全一致しない**。OOB414 は 59 (A) と 68 (closure) で、差の 9 関数は最初の trap 関数が変わる (例 0x65c540: closure = 414ad0, A = 408040)。shard・実行順 (memory 状態の持ち越し) による差と推定 (**未確認**)。このため A/B の比較は同一ハーネス内 (4 shard) に限って読む。
-- closure 全体 (7421 関数) を修復 IR で流した結果は §5 に追記 (同じ shard 数 14 で基準 jsonl と比較)。
+- 遷移 (cmp68_683.py): oob414→other・verdict mismatch→mismatch が 67、other→other・verdict mismatch→mismatch が 1。**match → 非 match の退行は 0** (A で match は 0 件のため自明)。
+- B (68 関数) の最初の trap の内訳 (`/tmp/ld68.log` の関数別表の集計、計 68): `4133f0` の OOB 13 件 (経路 `4133f0 < 414c70`)、`412e40` の OOB 9 件 (経路 `412e40 < 652750`)、`4128b0__lifted` の unreachable 3 件、その他の OOB 2 件 (`8e6e30`・`__asm_rep_movsq_memcpy` 各 1)、trap なし 41 件。
+- **414ad0 の修復で消えた OOB は、別の関数の OOB (`412e40` 経由、`4133f0 < 414c70` 等) に置き換わった**。その原因 (deref 脱落の有無) は未確認。68 関数はいずれも verdict が mismatch のまま。
+- **A (今回 67) と既存 closure jsonl の 68 の差**: 1 関数 (最初の trap の関数が変わる)。shard・実行順 (memory 状態の持ち越し) による差と推定 (**未確認**)。このため A/B の比較は同一ハーネス内に限って読む。
 
 ## 5. closure 全体 (7421 関数) の A/B (14 shard、同一ハーネス)
 
@@ -68,39 +73,38 @@ A = IR 無変更 (`m11_414base`、`batch_414base_closure.jsonl`)、B = 修復 IR
 - 遷移 (A → B): match→match 3118 / **match→mismatch 7** / mismatch→match 9 / mismatch→mismatch 2063 / unexec→unexec 2161 / OOB414→other 63。
 - **match → 非 match の 7 件**: 0x5af280 (ret_only)、0x50d920 (ret_only)、0x44b090 (callee_divergence、heap 書込み差)、0x79d920 (spill_slot_deref + callee_divergence)、0x663d80 (memory_semantics)、0x699ca0 (simd_helper + wasm_trap)、0x4447d0 (wasm_trap)。いずれも 414ad0 を直接呼ぶ関数ではない。heap 配置の変化など間接経路と推定 (**未確認**)。
 - **受入条件 3 (退行 0) は closure 全体では未達** (7 件)。68 関数の subset では 0。
-- 注意: 基準として既存の `batch_closure.jsonl` (別の実行時) を使うと match→非 match が 106 件と出るが、同一 harness の A (上表) では 7 件。差 99 件は harness 状態 (§4 の 9/68 不一致と同根と推定) であり、退行の数え方は同一 harness の A を基準にする。
+- 注意: 既存の `batch_closure.jsonl` (別の実行時) を基準にすると match→非 match が 106 件と出る。同一 harness の A (上表) では 7 件。差 99 件は harness 状態 (§4 と同根と推定) であり、退行の数え方は同一 harness の A を基準にする。
+- **本 REPORT の再測定の範囲外**: §5 の closure は本 run で再実行していない (14 shard で約 13 分超のため、本 run の上限に収まらない)。§5 は `683-m11-414ad0-restore` 時点 (`0113c86`) の測定値。
 
-## 5.1 対象 unit / 68 関数の再現 (実行済み)
+## 5.1 kind 以外の差分 unit
 
-- m11 survey: `neg_683.sh` を `0113c86` の HEAD で実行し、表 §3 と同じ結果 (ON 827/11、OFF 818/21、4 unit の状態一致)。
-- liftdiff 68 関数: `liftdiff68_683.sh` は**end-to-end では未実行** (同じ手順を手動で実施: IR 生成 → boot_state 複写 → batch A/B → `cmp68_683.py`)。スクリプトの配線 (target 名・出力名) は実行結果と一致させて作成。
+survey 942 unit の kind は ON/OFF で全件一致 (§3)。`survey_diff.py` の「kind 以外も含めた差分」も 0 件。
 
 ## 6. 再現手順 (1 コマンド)
 
 ```sh
-# m11 survey (ON/OFF、work-m11 展開済み、emsdk は m11_build.sh が source)
+# m11 survey (ON/OFF。work-m11 展開済み、IR は m11_gen_ir2.sh で再生成、emsdk は m11_build.sh が source)
 bash tools/m11/trap_triage/neg_683.sh
-# liftdiff 68 関数 A/B (work-m11 + work-liftdiff 展開済み、PY は capstone 入り python)
+# liftdiff 68 関数 A/B (work-m11 + work-liftdiff 展開済み、PY は capstone + pefile + numpy 入り python)
 FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 ```
-ネガコン: `neg_683.sh` の OFF (`M11_OV_414AD0=0`)、`liftdiff68_683.sh` の A (`--none`)。
+ネガコン: `liftdiff68_683.sh` の A (`--none`、IR 無変更)。survey の 0/1 比較は gate の両版比較であり、IR 版の無変更比較ではない (§2)。
 
 ## 7. 検証範囲 / 範囲外
 
-- 範囲内: m11 survey 942 unit (ON/OFF 各 1 回)、liftdiff 68 関数 (A/B 各 1 回)、closure 7421 関数 (修復 IR 1 回・§5)。
-- 範囲外: n≥3 の再現 (未実施)、`m11_e2e.sh` 全体 (stage4 / bit-exact) への影響 (未実施)、C 版と IR 版の相互検算 (別々に書いたが、突合は未実施)、副作用 10 unit (56, 58-63, 307, 311, 917) の原因 (未調査)。
-- 既存 REPORT の数値 (`818 / 21` 等) は、既定 ON で **main の build の数値が変わる**ため古くなる。他 REPORT の書換えは行わない (PM 判断)。
+- 範囲内: m11 survey 942 unit (ON/OFF 各 2 回)、liftdiff 68 関数 (A/B 各 1 回、end-to-end 実行)。
+- 範囲外: closure 7421 関数の再測定 (§5 は旧測定値)、`m11_e2e.sh` 全体 (stage4 / bit-exact) への影響 (未実施)、C 版と IR 版の相互検算 (未実施)、副作用の原因 (旧 PR 記述の再現が無いため対象外)。
+- 既存 REPORT の数値 (`818 / 21` 等) は旧生成物 (a) の値で、本 gate の有無とは無関係。他 REPORT の書換えは行わない。
 
 ## 8. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 149 の新しい最上位 `414c70` (文字列連結系, 機械語 414cbf `mov rcx,[rcx]` の 1 段 deref。IR は `icmp eq i64 %arg1, %arg2` (24 行目) で値比較。**同型と推定・IR の 0 件突合は未実施**) | 4 対象 unit のうち 149 が oob のまま | #307 にコメント (同型 deref の次候補)。新規子は PM 採番 |
+| 149 の最上位 frame (`653660 ← 6539e0 ← 664190`) の原因 | 4 対象 unit のうち 149 が oob のまま | #307 の次候補 (起票は PM) |
 | 158/280/659 の halt0 (`412770 ← 4128b0__lifted`) の原因 | 4 unit が ok にならない | #683 の継続 (本 PR は Refs) |
-| liftdiff 68 の次の trap 4133f0 (18) / 412e40 (6) | 68 関数が verdict match に届かない | #307 |
-| A (4 shard) と closure jsonl (14 shard) の 9/68 不一致 (harness の shard・状態依存の疑い) | liftdiff batch の再現性 | #307 (harness 件) |
-| closure の match→非 match 7 件 (0x5af280 / 0x50d920 / 0x44b090 / 0x79d920 / 0x663d80 / 0x699ca0 / 0x4447d0) の原因 (414ad0 を直接呼ばない) | 受入条件 3 (退行 0) が closure 全体で未達 | #307 |
-| 副作用 10 unit (oob→ok 58-63, halt0→ok 307/311/917, oob→halt0 56) の原因 | ok 増分の解釈 | #596 |
-| `652500` が 4 unit で rcx=0 で呼ばれる観測 (REPORT_596 §4) | 414ad0 を直しても残る可能性 | #596 |
+| liftdiff 68 の次の trap (`412e40` 経由の OOB 等) | 68 関数が verdict match に届かない | #307 |
+| closure の match→非 match 7 件 (0x5af280 / 0x50d920 / 0x44b090 / 0x79d920 / 0x663d80 / 0x699ca0 / 0x4447d0) の原因 | 受入条件 3 (退行 0) が closure 全体で未達 | #307 |
+| liftdiff batch の再現性 (A 67 と closure 68 の差) | A/B の読み方 | #307 (harness 件) |
 | C 版 (m11_ov.c) と IR 版 (ir414_fix.py) の相互検算 | 転記の正しさ (独立検算) | PM 判断 (検収 subagent) |
-| 既定 ON による main の survey 数値の変化 (REPORT_596 / REPORT.md の 818/21 等) | 既存数値の更新 | PM 判断 (既定 OFF に戻すか) |
+| gate ON が survey で効果を持たない理由 (C 版の 2 版が同じ結果) | 本 gate の存在意義 | PM 判断 |
+| `work-m11` が #516/#680 以前の生成物で `ir_conditions.json` 無し (そのままでは build 不可) | 素材の更新 | PM 判断 (素材の再生成) |

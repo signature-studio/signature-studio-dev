@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# #683: function_414ad0 の C 転記 (m11_ov.c, M11_OV_414AD0) の survey 実測と、ネガコン (M11_OV_414AD0=0 = 転記を外す)。
+# #683: function_414ad0 の C 版 (m11_ov.c, M11_OV_414AD0) の survey 実測。0 = main と同じ LStrSetLength 版 (既定) / 1 = UStrSetLength 版 (転記)。
 # 使い方: bash tools/m11/trap_triage/neg_683.sh   (前提: tools/m11/work/ 展開済み = work-m11。emsdk は m11_build.sh が source する)
 # 出力: work/trap_triage/{on,off}.json と survey_diff の表。判定 (受入条件) は REPORT_683.md に書く。
 set -euo pipefail

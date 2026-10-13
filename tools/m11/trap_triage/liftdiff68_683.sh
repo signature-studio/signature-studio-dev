@@ -28,7 +28,8 @@ PYEOF
 "$PY" "$HERE/ir414_fix.py" tools/m11/work/boot_final3.ll "$LD/work/m11_414fix/boot_final3_414fix.ll"
 for name in m11_414base m11_414fix; do
   cp "$LD/work/m11/boot_state.json" "$LD/work/$name/boot_state.json"
-  cp "$LD/work/m11_414fix/fn68.txt" "$LD/work/$name/fn68.txt"
+  src="$LD/work/m11_414fix/fn68.txt"; dst="$LD/work/$name/fn68.txt"
+  [ "$src" = "$dst" ] || cp "$src" "$dst"
 done
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 for name in m11_414base m11_414fix; do
