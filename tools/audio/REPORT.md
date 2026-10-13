@@ -230,5 +230,6 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 - **dev 失敗の再現**: 本 head `755ecb23` で e2e.sh を無負荷 6 回 (`run1`〜`run5` + `c1`) + CPU 負荷 (`timeout` 付きの busy loop 6 本) 下 3 回の計 9 回実行 → **全 PASS (13/13, 7.6〜9.3 s)、underrun 0・zero_runs 0・first_err_frame=-1**。レビュアー再現条件 (素材・負荷) とは未一致のため未再現。追跡 **#863** (AU-15)。
 
 検証 (commit 755ecb23・e2e.sh 1 run ずつの実測): 無負荷 `c1` 13/13 PASS, 7.6 s, exit 0 / 無負荷 5 run 全 PASS, 7.7〜7.8 s / 負荷下 3 run 全 PASS, 9.2〜9.3 s。
+最終 HEAD `e983c1b6` (main 取り込み後・`pnpm install --frozen-lockfile` 後): `bash tools/audio/integration/e2e.sh` **13/13 PASS, exit 0, 7.8 s**。`tsc` OK・`vite build` OK。dev:tone `max_err=1.49e-8`・underrun 0・zero_runs 0・preview 同値。
 
 残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
