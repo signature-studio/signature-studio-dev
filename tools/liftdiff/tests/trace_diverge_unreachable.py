@@ -61,6 +61,19 @@ def mach(va):
     return direct, mem_ind, reg_ind
 
 
+def tail_jmps(va):
+    """関数 va を ret/int3 まで読み、無条件 jmp の飛び先が [va, 終端] の外にあるもの (tail jump 候補) を返す。"""
+    ins = []
+    for i in md.disasm(pe.read(va - pe.base, 0x600), va):
+        ins.append(i)
+        if i.id in (X.X86_INS_RET, X.X86_INS_INT3):
+            break
+    end = ins[-1].address
+    return [i.operands[0].imm for i in ins
+            if i.id == X.X86_INS_JMP and i.operands[0].type == X.X86_OP_IMM
+            and not (va <= i.operands[0].imm <= end)]
+
+
 def is_cand(d, mi, ic):
     return mi > 0 and ic is not None and ic <= len(d)
 
@@ -125,7 +138,7 @@ def main():
     w('')
     n_div = sum(div.values())
     w('対象 = 最初の wasm_trap case が unreachable の関数 **%d** (batch jsonl %d 行)。うち trace_head 内で食い違いを観測した **%d**、'
-      'trace_head が native/wasm で完全一致し食い違い未観測 **%d** (分岐点集計から除外、§3)。' % (len(un), len(rows), n_div, len(un) - n_div))
+      'trace_head が native/wasm で完全一致し食い違い未観測 **%d** (分岐点集計から除外、§4)。' % (len(un), len(rows), n_div, len(un) - n_div))
     w('trace_head (関数入口 VA 列、最大 12 件) を native/wasm で先頭から比較し、最初に食い違う直前の関数 L を求める。')
     w('')
     w('## 1. 最後の共通 entry L ごとの件数')
@@ -150,15 +163,8 @@ def main():
     w('候補条件 = メモリ間接 call を持ち、かつ IR の call 数 ≤ 機械語の直接 call 先 (distinct) 数。該当 L の件数: **%d / %d** (分母 = 食い違い観測 %d)。' % (drop_total, n_div, n_div))
     w('call site / block は対応づけていない (直接 call の脱落や重複 call の集約でも成立しうる) ため **D15 型の確定ではなく候補**。')
     w('')
-    w('## 2. 分岐 (L, native 次, wasm 次) 上位')
-    w('')
-    w('| L | native 次 | wasm 次 | 件数 | 例 |')
-    w('|---|---|---|---:|---|')
     f = lambda v: '-' if v is None else '0x%x' % v
-    for (L, nn, ww), n in div.most_common(12):
-        w('| %s | %s | %s | %d | %s |' % (f(L), f(nn), f(ww), n, ex[(L, nn, ww)]))
-    w('')
-    w('## 1b. 分岐の型 (LD-17 / #864)')
+    w('## 2. 分岐の型 (LD-17 / #864)')
     w('')
     w('§1 の D15 型候補を先に除き、残りを排他的に分類する (上から順に判定)。L の直接 call 先 = 機械語の直接 call 先集合 d。')
     w('')
@@ -166,7 +172,7 @@ def main():
     w('|---|---:|---|')
     kinds = collections.OrderedDict([
         ('A', 'D15 型候補 (§1)'),
-        ('B', 'L が leaf (call 無し)。L の戻り後の共通呼出元で分岐'),
+        ('B', 'L が leaf (ret まで call 無し・tail jump 無し)。食い違いは L の戻り後の呼出元で起きる (推定。根拠: 下記 tail jump 検出)'),
         ('C', 'L の直接 call 先で分岐 (native/wasm の次 entry のどちらかが d に含まれる)'),
         ('D', 'L の直接 call 先に含まれない分岐 (未特定)'),
         ('E', 'trace_head 先頭から不一致 (L 無し)'),
@@ -180,7 +186,7 @@ def main():
             ic = ir_calls(irs, L)
             if is_cand(d, mi, ic):
                 k = 'A'
-            elif not d and not mi and not ri:
+            elif not d and not mi and not ri and not tail_jmps(L):
                 k = 'B'
             elif nn in d or ww in d:
                 k = 'C'
@@ -192,10 +198,21 @@ def main():
         top = ', '.join('%s (%d)' % (f(L), m) for L, m in by_kind[k].most_common(3))
         w('| %s: %s | %d | %s |' % (k, label, tot, top))
     w('')
+    tj = sorted({L for (L, _, _) in div if L is not None and not any(mach(L)) and tail_jmps(L)})
+    w('型 B の根拠: 型 B の L 以外に、call 無し leaf のうち tail jump 先を持つ L は %s (これらは型 D に入る)。' % (
+        ', '.join(f(L) for L in tj) if tj else 'なし'))
+    w('')
     w('内訳の合計 = 食い違い観測 %d。型 A 以外 (B+C+D) = 未特定の残り **%d**。' % (
         n_div, n_div - sum(by_kind['A'].values())))
     w('')
-    w('## 3. trace_head が完全一致で食い違い未観測の関数 (分岐点集計から除外)')
+    w('## 3. 分岐 (L, native 次, wasm 次) 上位')
+    w('')
+    w('| L | native 次 | wasm 次 | 件数 | 例 |')
+    w('|---|---|---|---:|---|')
+    for (L, nn, ww), n in div.most_common(12):
+        w('| %s | %s | %s | %d | %s |' % (f(L), f(nn), f(ww), n, ex[(L, nn, ww)]))
+    w('')
+    w('## 4. trace_head が完全一致で食い違い未観測の関数 (分岐点集計から除外)')
     w('')
     w('| native trace_len | wasm trace_len | 件数 | 備考 |')
     w('|---:|---:|---:|---|')
@@ -203,7 +220,7 @@ def main():
         note = 'trace_head 上限 12 で打切り (以降の食い違いは不明)' if (nl or 0) > 12 or (wl or 0) > 12 else 'trace 全体が一致 (trap までの関数入口列が同一)'
         w('| %s | %s | %d | %s |' % (nl, wl, n, note))
     w('')
-    w('## 4. ネガティブコントロール (候補判定の検査)')
+    w('## 5. ネガティブコントロール (候補判定の検査)')
     w('')
     w('候補 L の IR に call を 1 行足すと、判定が外れることを確認する (IR 本文を文字列で書き換えて同じ関数で再判定)。')
     w('')

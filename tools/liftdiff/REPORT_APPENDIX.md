@@ -117,8 +117,8 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   410320 については IR が `ret %arg1` のみで call 0 件、機械語は間接 call 1 件 (上記) であり、候補としては強い。残り 126 件は別の分岐 (0x417b70 32 / 0x40a3d0 24 / 0x418be0 20 ほか)。**未特定**。
 - ExitProcess へ至る連鎖 (例 0x6ae290: wasm のみ `409470 → 409730 → 4096d0 → 4096b0 → 412a40 → 4128b0`) は「alloc 失敗を示す Delphi の runerror 経路」と読めるが、
   410320 の call 脱落からその経路に入るまでの因果は trace_head (最大 12 件) に収まらず**直接確認していない** (推定)。
-- **分岐の型 (LD-17 / #864)**: 残りを排他的に型 B (L が leaf) / C (L の直接 call 先で分岐) / D (直接 call 先に無い) に分類した。件数は `results/m11_unreachable_diverge.md` §1b が正本。
-  型 B は関数入口の leaf で食い違うため、L の内部ではなく呼出元の戻り後で起きる。個別原因は未特定 → 子 issue #1034 (型 B)・#1035 (型 C・D)。
+- **分岐の型 (LD-17 / #864)**: 残りを排他的に型 B (L が ret まで call 無し・tail jump 無し) / C (L の直接 call 先で分岐) / D (直接 call 先に無い) に分類した。件数は `results/m11_unreachable_diverge.md` §2 が正本。
+  型 B は「L の内部では食い違わず、L の戻り後の呼出元で次 entry が現れる」と読める (推定)。根拠は B に入る L の機械語を ret まで読んで jmp 先 (tail jump) が無いことを確認した点のみ (`tail_jmps`)。戻り後の実際の呼出元は未確認。個別原因は未特定 → 子 issue #1034 (型 B)・#1035 (型 C・D)。
 - **OOB function_414ad0 系 (68 件)**: 機械語は入口 rcx (var 文字列のアドレス) の 1 段 deref `mov r,[rbx]` が 4 箇所 (0x414af3/0x414b49/0x414b64/0x414b78)。
   lift 後 IR には `%arg1` を ptr とする load が 0 件で、`%arg1` を値のまま `icmp`/`add` に使っている (ldfix F3a/F3b 型の値↔アドレス取り違え)。
   68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
@@ -156,7 +156,7 @@ pip install numpy capstone pefile
 python3 tools/liftdiff/tests/trace_diverge_unreachable.py > tools/liftdiff/results/m11_unreachable_diverge.md
 python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414ad0.md
 ```
-LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §1b (同じスクリプトの出力)。PE 展開は `block00031_PE.bin` 1 ファイルで足りる (実測 22227016 bytes)。
+LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じスクリプトの出力)。PE 展開は `block00031_PE.bin` 1 ファイルで足りる (実測 22227016 bytes)。スクリプトの入力は `work-liftdiff` (batch_closure.jsonl) と `work-m11` (boot_final3.ll) を要するため、これら素材が無い環境では再生成できない。
 単体実行 (手動実測) は `[WIN64]` の PE を指す `pe` に書き換えた `targets/m11.json` の複製で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v` (`targets/m11.json` 自体の固定パスは #294)。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
