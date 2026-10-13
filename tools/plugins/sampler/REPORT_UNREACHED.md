@@ -99,7 +99,7 @@
 
 ### 2d-7. ネガティブコントロール (`unr_nega.sh`)
 
-NC の一覧と各々の実測は **改訂後 (HEAD `3011219d` 系) の結果を §2f の検証表** に、改訂前 (b36fef5 系) の全表は `REPORT_UNREACHED_APPENDIX.md` §A に分割移動した。 NC2 は §2f (U6)、NC2a/NC2b は `REPORT_UNREACHED_APPENDIX.md` §B。
+NC の一覧と各々の実測は **改訂後 (HEAD `de1ea039` 系) の結果を §2f の検証表** に (測定 commit は同表の注を参照)、改訂前 (b36fef5 系) の全表は `REPORT_UNREACHED_APPENDIX.md` §A に分割移動した。 NC2 は §2f (U6)、NC2a/NC2b は `REPORT_UNREACHED_APPENDIX.md` §B。
 
 ## 2e. #707: export 名による命名と改名 (AC2 の解消)
 
@@ -177,13 +177,17 @@ NC の一覧と各々の実測は **改訂後 (HEAD `3011219d` 系) の結果を
 
 **U6 (合成入力、`synth_check`)**: 関数 E (`mov eax, imm32 = R の VA`)・R (`mov ecx, imm32 = T の VA`)・T (`ret`) の 3 関数。 total2 = {E}。 即値参照 1 件だけで R が根になり、R の即値辺で T に届く。 期待: 根 = {R}、total3 = {E, R, T}、漏れ 0。 即値辺を閉包から外すと total3 = {E, R} で漏れ 1 となり FAIL する。
 
-**検証 (HEAD、`TMPDIR=$RUNNER_TEMP`、worktree `879-sampler-imm-negctl`)**
+**検証 (`TMPDIR=$RUNNER_TEMP`。 測定 commit は表の「commit」列)**
 
-| 項目 | 結果 |
-|---|---|
-| `unr_e2e.sh` (前提生成込み) | elapsed 712 s、**rc 0**、`[unr_e2e] OK`。 `judge.py shells` PASS 7/7、`indirect_defs` PASS 7/7 (欠落 0) |
-| `closure_unreached.py` | 24.4 s、**PASS 6 checks** (U1–U5 × 7 本 + U6 合成入力)。 total3 は §2d-3 と同値 |
-| `unr_nega.sh` | elapsed 128 s、**rc 0**、`[unr_nega] OK`。 NC0〜NC8 全て期待どおり (NC2 = U6 FAIL rc 1) |
+| 項目 | commit | 結果 |
+|---|---|---|
+| `unr_e2e.sh` (前提生成込み) | `4acb0840` | elapsed 712 s、**rc 0**、`[unr_e2e] OK`。 `judge.py shells` PASS 7/7、`indirect_defs` PASS 7/7 (欠落 0) |
+| `closure_unreached.py` | `4acb0840` | 24.4 s、**PASS 6 checks** (U1–U5 × 7 本 + U6 合成入力)。 total3 は §2d-3 と同値 |
+| `unr_nega.sh` (NC0〜NC8、NC2a/NC2b を除く) | `4acb0840` | elapsed 128 s、**rc 0**、`[unr_nega] OK`。 期待どおり (NC2 = U6 FAIL rc 1) |
+| `nc2_imm_synth.py` (NC2a / NC2b) | `de1ea039` | NC2a rc 0、NC2b rc 1 (期待どおり)。 NC2a/NC2b の行は `07894a58` 由来 (§B) |
+| `closure_unreached.synth_check()` (U6) | `de1ea039` | True |
+
+注: `closure_unreached.py`・`unr_e2e.sh`・`unr_lift.sh`・`judge.py` は `4acb0840` と `de1ea039` で同一 (diff 0 行)。 `unr_nega.sh` のみ head で +4 行 (NC2a/NC2b)。 `de1ea039` での `unr_e2e.sh` / `unr_nega.sh` 全体は再実行していない (前提の lift 出力の生成が 1 run の上限に収まらない)。
 
 **検証範囲 / 範囲外**: 範囲内は「即値辺の件数 (7 本別の実測)」と「即値辺の識別力 (合成入力の U6 と NC2)」。 範囲外: 実データに即値参照が現れた場合の閉包の正しさ (現データには無い)、wasm リンク、実行時の到達性、差分試験。 通過 ≠ 正しさ。
 
