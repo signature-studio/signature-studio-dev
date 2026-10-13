@@ -1,13 +1,17 @@
 // results/p8.jsonl → results/TABLES.md (自動生成)。使い方: node tables.mjs [--tag <label>]
 import fs from 'node:fs'; import path from 'node:path'; import zlib from 'node:zlib'; import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url)); const RES = path.join(HERE, 'results'); const W = path.join(HERE, 'work');
-const rows = fs.readFileSync(path.join(RES, 'p8.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+const ALL = fs.readFileSync(path.join(RES, 'p8.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 const med = (a) => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
+let rows = ALL;
 const grp = (mode) => { const m = new Map(); for (const r of rows.filter((x) => x.mode === mode)) { const k = `${r.cfg}|${r.N}`; (m.get(k) ?? m.set(k, []).get(k)).push(r); } return m; };
 const rng = (v, key, d = 2) => { const a = v.filter((x) => x[key] != null).map((x) => x[key]); if (!a.length) return '-'; const lo = Math.min(...a), hi = Math.max(...a); return `${med(a).toFixed(d)} (${lo.toFixed(d)}–${hi.toFixed(d)})`; };
 const MB = (b) => (b / 1048576).toFixed(1);
 let o = ['<!-- 自動生成: node tools/perf/p8/tables.mjs (入力 results/p8.jsonl)。人手編集禁止 -->', '', '# P8 TABLES', ''];
-const env = rows[0] ? `${rows[0].runtime}, ${rows[0].cpus} cores, loadavg(測定開始時) ${rows.map((r) => r.loadavg[0]).sort((a, b) => a - b)[0]}〜${rows.map((r) => r.loadavg[0]).sort((a, b) => b - a)[0]}` : ''; o.push(env, '');
+const envLine = () => rows[0] ? `${rows[0].runtime}, ${rows[0].cpus} cores, loadavg(各 run 開始時の 1 分値) ${Math.min(...rows.filter((r) => r.loadavg?.length).map((r) => r.loadavg[0]))}〜${Math.max(...rows.filter((r) => r.loadavg?.length).map((r) => r.loadavg[0]))}` : '';
+for (const rt of [...new Set(ALL.map((r) => r.runtime))]) {
+  rows = ALL.filter((r) => r.runtime === rt);
+  o.push(`# 実行系: ${rt}`, '', envLine(), '');
 { // steady
   const m = grp('steady'); const cfgs = [...new Set([...m.keys()].map((k) => k.split('|')[0]))]; const Ns = [...new Set([...m.keys()].map((k) => +k.split('|')[1]))].sort((a, b) => a - b);
   for (const kind of ['', '_light']) {
@@ -35,6 +39,18 @@ const env = rows[0] ? `${rows[0].runtime}, ${rows[0].cpus} cores, loadavg(測定
   const m = grp('memory'); o.push('## メモリ (N 個 load + 1 ブロック後; 独立プロセス 1 回)', '', '| 構成 | N | WebAssembly.Memory 本数 | 予約 memory 合計 MiB | RSS 増分 MiB | プロセス HWM MiB |', '|---|--:|--:|--:|--:|--:|');
   for (const [k, v] of m) { const r = v[0]; o.push(r.error ? `| ${r.cfg} | ${r.N} | ERR: ${String(r.error).replace(/\|/g, '/').slice(0, 120)} | | | |` : `| ${r.cfg} | ${r.N} | ${r.memories} | ${MB(r.wasm_memory_bytes)} | ${MB(r.rss_delta_bytes)} | ${MB(r.hwm_bytes)} |`); }
   o.push('');
+}
+{ // derived
+  const st = grp('steady'), su = grp('startup'), me = grp('memory'); const g = (m, c, n, key) => { const v = m.get(`${c}|${n}`); if (!v) return null; const a = v.filter((x) => x[key] != null).map((x) => x[key]); return a.length ? med(a) : null; };
+  o.push('### 派生値 (上の表の中央値から算出。式は各行に明記)', '', '| 項目 | 値 |', '|---|--:|');
+  for (const N of [16, 64]) {
+    const sep = g(st, 'sep_based_light', N, 'us_per_block'), nc = g(st, 'sep_based_nocopy_light', N, 'us_per_block'), dh = g(st, 'dyn_hid_light', N, 'us_per_block');
+    if (sep != null && nc != null && dh != null) o.push(`| 境界コスト/plugin/ブロック N=${N} (軽量カーネル): plugin 間コピー 1 KiB = (sep_based−sep_based_nocopy)/N | ${((sep - nc) / N * 1000).toFixed(0)} ns |`, `| 同: JS→wasm 呼出 1 回 = (sep_based_nocopy−dyn_hid)/N | ${((nc - dh) / N * 1000).toFixed(0)} ns |`);
+  }
+  for (const c of ['sep_based', 'sep_based_shared', 'dyn_hid', 'dyn_def']) { const a = g(su, c, 1, 'load_ms'), b = g(su, c, 64, 'load_ms'); if (a != null && b != null) o.push(`| 起動/plugin ms (load(N=64)−load(N=1))/63: ${c} | ${((b - a) / 63).toFixed(2)} |`); }
+  for (const c of ['sep_based', 'sep_based_shared', 'sep_abs_lo', 'sep_abs_hi', 'dyn_hid']) { const a = g(me, c, 1, 'rss_delta_bytes'), b = g(me, c, 128, 'rss_delta_bytes'); if (a != null && b != null) o.push(`| RSS/plugin MiB (RSS増分(N=128)−RSS増分(N=1))/127: ${c} | ${((b - a) / 127 / 1048576).toFixed(2)} |`); }
+  o.push('');
+}
 }
 { // sizes
   o.push('## wasm サイズ (B)', '', '| ファイル | raw | gzip-9 | brotli-11 |', '|---|--:|--:|--:|');

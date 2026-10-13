@@ -7,15 +7,16 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)); const W = path.join(H
 process.env.PERF_TMP ||= path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'perf'); fs.mkdirSync(process.env.PERF_TMP, { recursive: true });
 const argv = process.argv.slice(2); const arg = (k, d) => { const i = argv.indexOf(k); return i < 0 ? d : argv[i + 1]; };
 const mode = argv[0]; const NS = arg('--n', '1,4,16').split(',').map(Number); const REPS = +arg('--reps', 5); const SFX = arg('--sfx', ''); const RUNS = +arg('--runs', 1); const TARGET_MS = +arg('--target-ms', 150);
+const JSFLAGS = process.env.P8_JSFLAGS || ''; const OUT = process.env.P8_OUT || path.join(RES, 'p8.jsonl'); const CFGS = arg('--cfgs', '') ? arg('--cfgs', '').split(',') : null;
 const srv = await startServer({ '/w': W, '/l': HERE });
 const base = srv.url;
-const emit = (o) => { fs.appendFileSync(path.join(RES, 'p8.jsonl'), JSON.stringify(o) + '\n'); console.log(JSON.stringify(o)); };
-async function withChrome(fn) { const b = await launchChrome({}); try { const p = await b.newPage(`${base}/l/web/page.html`); return await fn(b, p); } finally { await b.close(); } }
+const emit = (o) => { if (JSFLAGS) o.jsflags = JSFLAGS; fs.appendFileSync(OUT, JSON.stringify(o) + '\n'); console.log(JSON.stringify(o)); };
+async function withChrome(fn) { const b = await launchChrome({ jsFlags: JSFLAGS }); try { const p = await b.newPage(`${base}/l/web/page.html`); return await fn(b, p); } finally { await b.close(); } }
 const procRss = async (b) => { const ps = b.procs().filter((x) => x.type === 'renderer'); return { rss: Math.max(...ps.map((x) => (x.rssMB ?? 0) * 1048576)), hwm: Math.max(...ps.map((x) => (x.hwmMB ?? 0) * 1048576)) }; };
 const run = (p, b, cfg, N, extra = {}) => p.eval(`runIt(${JSON.stringify({ mode, cfg, N, sfx: SFX, reps: REPS, targetMs: TARGET_MS, info: { runtime: 'chrome ' + b.version.product, cpus: os.cpus().length }, loadavg: os.loadavg().map((x) => +x.toFixed(2)), ...extra })})`, { timeout: 300000 });
 if (mode === 'steady') {
   for (let r = 0; r < RUNS; r++) await withChrome(async (b, p) => {
-    for (const N of NS) for (const cfg of CONFIG_GRID.steady) { if (cfg.startsWith('static') && ![1, 4, 16].includes(N)) continue; try { emit(await run(p, b, cfg, N)); } catch (e) { emit({ mode, cfg: cfg + SFX, N, error: String(e).slice(0, 300) }); } }
+    for (const N of NS) for (const cfg of CFGS ?? CONFIG_GRID.steady) { if (cfg.startsWith('static') && ![1, 4, 16].includes(N)) continue; try { emit(await run(p, b, cfg, N)); } catch (e) { emit({ mode, cfg: cfg + SFX, N, error: String(e).slice(0, 300) }); } }
   });
 } else {
   for (const N of NS) for (const cfg of CONFIG_GRID[mode]) {
