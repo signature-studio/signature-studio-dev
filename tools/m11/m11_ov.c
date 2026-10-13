@@ -902,6 +902,9 @@ static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
 #ifndef M11_OV_413060
 #define M11_OV_413060 0
 #endif
+#ifndef M11_NEG_413060
+#define M11_NEG_413060 0
+#endif
 #if M11_OV_413060
 /* function_413060  VA 0x413060  (System._UStrFromPWCharLen 系: dest: PPointer, src: PWideChar, len: Integer) (#595)
  * 逆アセンブル: `old := [rbx]` を stack に退避 → len>0 なら [rbx] := 412c20(len), src があれば 409c80(src, new, len*2) / len<=0 なら [rbx] := 0 → 最後に 412d60(&old) で旧文字列を解放。
@@ -910,6 +913,7 @@ static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
  * 戻り値: 元実装は 412d60 の戻り値 = stack 上の old のアドレス (関数終了後は無効) を返す。C でそれを返すと無効な番地になるため dest を返す。
  * 呼出し側が戻り値を読むかは未検証 (REPORT_595 §2.2)。 */
 void m11_probe(int i);
+void m11_dest_obs(unsigned long long dest);
 unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
     m11_probe(8);
     u64 old = Q(dest);
@@ -922,6 +926,7 @@ unsigned long long function_413060(unsigned long long dest, void* src, unsigned 
         Q(dest) = 0;
     }
     function_412d60((u64)(uintptr_t)&old, 0);
+    m11_dest_obs(dest);
     return dest;
 }
 #endif /* M11_OV_413060 */

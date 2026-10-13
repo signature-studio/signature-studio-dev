@@ -240,3 +240,22 @@ EMSCRIPTEN_KEEPALIVE int m11_stub_count(int i) { return (i >= 0 && i < g_stub_n)
 static unsigned long long g_probe[PROBE_MAX];
 void m11_probe(int i) { if (i >= 0 && i < PROBE_MAX) g_probe[i]++; }
 EMSCRIPTEN_KEEPALIVE double m11_probe_count(int i) { return (i >= 0 && i < PROBE_MAX) ? (double)g_probe[i] : -1.0; }
+/* #944: function_413060 呼出し後の dest (文字列ポインタ) の値を畳んだ指紋 (OFF/ON/ネガコンの比較用)。
+ * M11_NEG_413060=1 のときだけ dest に +0x40 を書く既知変更 (b) を入れる (OFF/ON 両方に効く; 既定 0 は読み取りのみ) */
+static unsigned long long g_dest_h = 1469598103934665603ULL, g_dest_n;
+#ifndef M11_DEST_READ
+#define M11_DEST_READ 1
+#endif
+void m11_dest_obs(unsigned long long dest) {
+#if M11_NEG_413060
+    *(volatile unsigned long long*)(uintptr_t)dest += 0x40;
+#endif
+#if !M11_DEST_READ
+    return;
+#endif
+    unsigned long long v = *(volatile unsigned long long*)(uintptr_t)dest;
+    g_dest_h = (g_dest_h ^ v) * 1099511628211ULL; g_dest_n++;
+}
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return (double)g_dest_n; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return (double)(unsigned)(g_dest_h >> 32); }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hlo(void) { return (double)(unsigned)(g_dest_h & 0xffffffffu); }

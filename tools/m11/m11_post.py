@@ -241,7 +241,10 @@ def weaken(m):
         if rt == 'void':
             w += ['  call void @%s__lifted(%s)' % (nm, clist), '  ret void']
         else:
-            w += ['  %%r = call %s @%s__lifted(%s)' % (rt, nm, clist), '  ret %s %%r' % rt]
+            w += ['  %%r = call %s @%s__lifted(%s)' % (rt, nm, clist)]
+            if va == 0x413060:  # #944: 呼出し後の dest を観測 (OFF/ON 共通のフック。ネガコン変更もここで行う)
+                w += ['  call void @m11_dest_obs(i64 %p0)']
+            w += ['  ret %s %%r' % rt]
         w.append('}')
         probe_wrappers.append('\n'.join(w))
         return 'define %s @%s__lifted(%s)%s' % (ret, nm, args, m.group('rest'))
@@ -333,7 +336,7 @@ for (nm, ret, args) in fns:
     hdr.append('extern %s %s(%s);' % (rt, nm, ats))
 open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
 ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
-tail = ['', 'declare void @m11_probe(i32)'] + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+tail = ['', 'declare void @m11_probe(i32)', 'declare void @m11_dest_obs(i64)'] + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
 tail.extend(tr)
 tail.append('@m11_disp_n = constant i32 %d' % len(tab))
 tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))

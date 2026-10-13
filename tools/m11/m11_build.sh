@@ -18,8 +18,10 @@ M11_OV_CLASSCREATE="${M11_OV_CLASSCREATE:-0}"   # #419: 1 = m11_ov.c の実験 o
 M11_OV_414AD0="${M11_OV_414AD0:-0}"   # #683: 1 = m11_ov.c の UStrSetLength 版 function_414ad0 (arg1 deref 復元) に切替; 0 = main の LStrSetLength 版 (#134) を使う (既定; closure 退行 7 件が未解決のため)
 M11_FIX_652500="${M11_FIX_652500:-0}"   # #748: 1 = m11_ov.c の function_652500 (*arg1 の 1 段 deref 復元) を有効化; 0 = lift 版 (既定)
 M11_OV_413060="${M11_OV_413060:-0}"   # #944: 1 = m11_ov.c の function_413060 (dest の旧値 deref 復元, D4) を有効化; 0 = lift 版 (既定)。413060 だけを切り替える独立 gate
+M11_NEG_413060="${M11_NEG_413060:-0}"   # #944 ネガコン: 1 = dest に p+0x40 を書く既知変更 (b)。感度確認用。既定 0
+M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_FIX_535BF2=$M11_FIX_535BF2"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -121,6 +123,9 @@ cc() { # cc <src> <obj> [extra deps...]
 }
 # 別 TU (tools/shim, m11_rt/ov/win) が定義する Win32 API は winstubs から除外 (duplicate symbol 回避)
 for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.o; done
+S_NEG="$M11_NEG_413060-$M11_DEST_READ"
+if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
+echo "$S_NEG" > work/neg_413060.stamp
 cc m11_rt.c work/obj/rt.o
 cc m11_win.c work/obj/win.o
 llvm-nm --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
@@ -142,8 +147,9 @@ echo "$M11_OV_414AD0" > work/ov_414ad0.stamp
 if [ "$(cat work/ov_652500.stamp 2>/dev/null || echo none)" != "$M11_FIX_652500" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_FIX_652500" > work/ov_652500.stamp
 # M11_OV_413060 が変わったら ov.o だけ無効化 (#944)
-if [ "$(cat work/ov_413060.stamp 2>/dev/null || echo none)" != "$M11_OV_413060" ]; then rm -f work/obj/ov.o; fi
-echo "$M11_OV_413060" > work/ov_413060.stamp
+S413="$M11_OV_413060-$M11_NEG_413060"
+if [ "$(cat work/ov_413060.stamp 2>/dev/null || echo none)" != "$S413" ]; then rm -f work/obj/ov.o; fi
+echo "$S413" > work/ov_413060.stamp
 # M11_FIX_535BF2 が変わったら ov.o だけ無効化 (#714)
 if [ "$(cat work/ov_535bf2.stamp 2>/dev/null || echo none)" != "$M11_FIX_535BF2" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
@@ -152,7 +158,7 @@ cc work/m11_data.c work/obj/data.o
 
 INITMEM="$((0x12000000))"
 MAXMEM="$((0x72000000))"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_VirtualAlloc,_VirtualFree,_m11_va_used,_m11_va_calls,_m11_va_live,_m11_va_peak,_m11_va_oom,_m11_va_freed,_m11_va_freed_bytes,_m11_va_free_unknown,_m11_va_free_skipped,_m11_va_decommit,_m11_va_big,_m11_set_vfree_noop,_m11_set_va_bigtrace,_m11_set_va_stack_at,_m11_set_va_unit_budget,_m11_va_unit_begin,_m11_va_denied,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_VirtualAlloc,_VirtualFree,_m11_va_used,_m11_va_calls,_m11_va_live,_m11_va_peak,_m11_va_oom,_m11_va_freed,_m11_va_freed_bytes,_m11_va_free_unknown,_m11_va_free_skipped,_m11_va_decommit,_m11_va_big,_m11_set_vfree_noop,_m11_set_va_bigtrace,_m11_set_va_stack_at,_m11_set_va_unit_budget,_m11_va_unit_begin,_m11_va_denied,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
 emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=m11create \
