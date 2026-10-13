@@ -65,6 +65,12 @@ PM (main)                      subagent (実装)                  subagent (検�
 | 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
 | PM (main) | 起票・milestone 確定 | merge・方針変更・是正 | — |
 
+- **子 issue の起票**: PM のほか、実装 subagent も、**1 run に収まらない作業の残り**と**未解決の起票先**として子 issue を起票してよい
+  (2026-10-14 PM 判断。PM の処理待ちで止まるのを避けるため。#833)。条件: ① 題名は `[AREA-n]` 形式。n は
+  `gh api -X GET search/issues -f q='repo:<R> is:issue in:title "[AREA-"'` で既存の最大の n を調べて +1 し、
+  起票の直前にもう一度、同じ題名が無いことを確認する (番号の重複を作らない)。② 本文に `親: #N`・受入条件・
+  必要な `oc_artifacts:` 行を書く。③ milestone・優先度・Project の Status は PM が確定する (subagent は触らない)。
+  ④ 起票した番号を、最終回答と issue コメントに書く。
 - **チケット状態の唯一の正は Project V2 の Status フィールド + issue の open/closed**
   (技術進捗の正本は `docs/STATUS.md`)。不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
 - **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
