@@ -344,6 +344,22 @@ int main(void) {
 
   run_fd_bounds();
 
+  SECTION("GUI-12: surface create/resize/destroy vs render thread blit (ASan UAF regression)");
+  { int ok = 1;
+    for (int it = 0; it < 150; it++) {
+      int64_t sw = CreateWindowExA(0, (int64_t)(uintptr_t)"T1", 0, WS_POPUP | WS_VISIBLE, 0, 0, 600, 400, 0, 0, 0x400000, 0);
+      if (!sw) { ok = 0; break; }
+      MoveWindow(sw, 0, 0, 300 + (it % 5) * 60, 200 + (it % 3) * 50, 1);
+      MoveWindow(sw, 0, 0, 600, 400, 1);
+      GdiFlush();
+      DestroyWindow(sw);
+    }
+    flush_wait();
+    CHK(ok, "stress windows created");
+    /* host が全レコードを消費した後は保留 free (旧画素/snapshot) が全て回収されていること */
+    CHK(gui_surf_retired_count() == 0, "retired surface buffers reaped after host drain (%u left)", gui_surf_retired_count());
+  }
+
   SECTION("quit / destroy messages");
   g_nlog = 0;
   DestroyWindow(h);

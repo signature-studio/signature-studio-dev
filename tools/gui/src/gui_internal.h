@@ -63,6 +63,7 @@ static inline WRECT r_isect(WRECT a, WRECT b) {
 typedef struct { uint8_t *px; int stride, w, h; uint32_t gen; } SurfView;
 int  surf_view(int id, SurfView *v);
 void surf_dirty(int id, WRECT r);
+uint32_t gui_surf_retired_count(void);   /* GUI-12: host 消費待ちで保留中の旧 surface バッファ数 (テスト用) */
 void surf_wseq_begin(int id);            /* window surface へ画素を書く前に呼ぶ (seqlock; 偶数→奇数) */
 void surf_flush(void);                    /* 溜まった dirty を PRESENT + FRAME_END として push */
 void gui_pump_idle_flush(void);
