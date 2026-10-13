@@ -207,7 +207,7 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 |---|---|---|
 | **案 S (Static Assets) で br-11 を使う経路が未確定**: `_headers` の `Content-Encoding: br` は二重エンコード (`deploy/EDGE-SIM.md` #9)、エッジ自動圧縮は zstd/br の level 不明。実エッジでの wire サイズ・`Content-Encoding` の実測が無い | 本 issue の「CDN 配信設定」が未達 | #170 に残置 (Closes しない)。実エッジ計測は Access 資格情報が必要 |
 | R2 (`legacy-r2/20-upload.mjs --precompress br`) への実 PUT・ブラウザ透過復号は未実証 (S3 キー無し) | R2 へ戻す場合のみ | `deploy/REPORT.md` §7 の既存起票 (#8) |
-| 大物 (>24MiB) は br でなく事前非圧縮 part で配信 (結線済み・決定は DECISIONS D9、合成 32.6MiB 実測は `REPORT_P13.md`)。実 FLEngine 規模の実測は未了 | >24MiB 実 FLEngine wasm の配信実測 | #1150 `[PERF-P16]` |
+| 大物 (>24MiB) は br でなく事前非圧縮 part で配信 (`fetchCompile` 関数レベルまで結線・runtime manifest 経路は未接続・決定は DECISIONS D9、合成 32.6MiB 実測は `REPORT_P13.md`)。実 FLEngine 規模の実測は未了 | 本番 runtime からは未到達 (manifest 経路)。>24MiB 実 FLEngine wasm の配信実測も未了 | manifest 経路 #1166 `[PERF-P18]`・実測 #1150 `[PERF-P16]` |
 | 実 FLEngine 規模 (K=10〜100) での streaming 隠蔽効果は合成 17MB のみ。他ブラウザ/実回線は未測 | — | PERF-P9 (§7) |
 
 ## 11. AudioWorklet 向け wasm ローダ (PERF-P3 / #162)

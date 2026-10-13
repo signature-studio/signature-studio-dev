@@ -2,7 +2,7 @@
 
 方式決定は `docs/DECISIONS.md` D9 (事前非圧縮 part + `chunked.mjs`)。本書は実測のみ。
 検証起点: worktree `ws-952` (branch `952-chunked-fetch`、origin/main `70385178` 起点)。
-測定は HEAD `865a5e79` 上で再実行 (実行: 2026-10-14)。本書の数値は `tools/perf/results/chunked.json` と一致する。
+測定は HEAD `30888aed` 上で再実行 (実行: 2026-10-14)。本書の数値は `tools/perf/results/chunked.json` と一致する。
 
 ## 1. 実施内容
 
@@ -32,11 +32,22 @@
 - 注意: 帯域制限は**接続ごと**に掛かる。part は並列 6 本で取るため、100 Mbps/接続 の実効は最大約 300 Mbps 相当。「100 Mbps 回線」の値ではない。
 - 無制限では streaming が bytes より約 17 ms 速い (中央値)。100 Mbps では差は約 24 ms。どちらも誤差に近い。
 
+**注記 (同 HEAD での再実行, 2026-10-14)**: `node tools/perf/delivery/chunked_bench.mjs --mib 32 --reps 3 --mbps 0,100 --out tools/perf/work/chunked_rerun.json` を HEAD `30888aed` で追加実行した (12/12 PASS, `f0()==42`, loadavg 0.49〜1.41)。値は以下のとおり。`chunked.json` (§3 表) とは一致せず、run 間のばらつきが大きい。
+
+| 帯域 | 方式 | 中央値 | min–max |
+|---|---|--:|--:|
+| 無制限 (loopback) | streaming | 190.1 | 187.8–305 |
+| 無制限 (loopback) | bytes | 204.5 | 203.4–209.5 |
+| 100 Mbps/接続 | streaming | 1471.4 | 1454.2–1484.6 |
+| 100 Mbps/接続 | bytes | 1487.9 | 1487.5–1489.5 |
+
+- 再実行間で無制限の中央値が 190〜235 ms まで動く。n=3 では streaming/bytes の差を結論づけられない。確定値には反復数の増加が必要 (未起票・必要なら #1150 に統合)。
+
 ## 4. 検証
 
 - `pnpm typecheck` PASS (exit 0)。
-- `bun tools/perf/delivery/fetch_compile_chunked_check.ts tools/perf/work/chunked/site big.561695cb78ed.wasm`: streaming 165.8 ms / bytes 156.3 ms、`f0=42`、progress 6 回、PASS (HEAD `865a5e79`)。
-- `pnpm typecheck`: exit 0 (HEAD `865a5e79`、本再検証で再実行)。
+- `bun tools/perf/delivery/fetch_compile_chunked_check.ts tools/perf/work/chunked/site big.561695cb78ed.wasm`: streaming 165.8 ms / bytes 156.3 ms、`f0=42`、progress 6 回、PASS (HEAD `30888aed`)。
+- `pnpm typecheck`: exit 0 (HEAD `30888aed`)。
 - `node --test deploy/client/chunked.test.mjs`: **既存 8 件 FAIL** (fixture 側の `05-stage.mjs` が `release-guard` の deny-list 不在で fail-closed)。本変更とは無関係。`tools/legal/release-guard/work/denylist` が worktree に無いため。対処は release-guard:build (解析 dir が要る)。
 - 上記 release-guard 環境要件は §6 (#1151) に起票。
 
