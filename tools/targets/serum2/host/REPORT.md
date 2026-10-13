@@ -141,6 +141,9 @@
 
 - **ネガコン (11 行。各行は「誤った期待」を与えて FAIL することを確認し、FAIL したとき PASS と表示する)**: 例 E1 リテラル末尾を 1 文字変えると 0 hit / `get_cbor_string` の期待を 0x18025b510 にすると不一致 / 0x1801bf5f0 を cbor 扱いにすると不一致 / `_Isnil` を +0x1a とすると不一致。
 - **ゲート自体のネガコン (バイナリ側を壊したコピー, `sr1d_verify.py` を直接実行)**: (i) `get_cbor_string` のリテラルを 1 byte 改変 → `FAIL E1 get_cbor_string`, **exit 1**。(ii) 0x1801bfb00 内 `mov edx,1` の即値を 3 に改変 → `FAIL E3 …` と `FAIL NEGCTL E3 …`, **exit 1**。
+- (iii) `write_cbor` 内 `mov dl,0xf6` の即値を 0xc0 に改変 → `FAIL W3 …` と `FAIL NEGCTL W3 …`, **exit 1**。
+- **検証記録**: 検証起点 commit `559d477` をクリーン worktree (`git worktree add --detach … HEAD`) に展開し、DLL 抽出 (plugins-serum2 の installer から 7z) + `sr3_index.py` + `sr1d_run.sh` を一括実行 = **11.19 s** (4 core, 並列 1 本 (index 生成のみ `mp.Pool(4)`), 開始時 load average 0.11 → 終了時 0.91)、exit 0、`out/sr1d_{locate.tsv,closure.txt,verify.txt}` の 3 ファイルは commit 済みと `cmp` 一致。index 済みの再実行は 0.8 s。`find tools/targets/serum2 -type f -size +20M -not -path '*/work/*'` = 0 件。
+- 検証範囲外: 別アルゴリズムでの検算 (レビュワー実施想定。本節の E1–E4 は文字列・ジャンプ表・命令順の 3 系統で独立)、wine/実 DLL での動的確認、libc++ との DOM レイアウト差の実測。
 - 作業中、`0xA0-0xBF, 0xD9-0xDB` の文を CBOR の array/object 長と仮置きしていたが、upstream ソース (binary_reader.hpp 1653 行) では `get_msgpack_string` のエラー文だった。upstream の関数名と突合して訂正済み (`sr1d_cbor_locate.py` / `sr1d_verify.py` に反映)。
 
 **直接 call closure (`out/sr1d_closure.txt`, `sr1d_closure.py`。間接呼出は見えないので下限)**
