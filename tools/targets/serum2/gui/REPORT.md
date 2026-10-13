@@ -118,3 +118,39 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 - 抽出 → 復号 → uidesc 解析を 1 コマンド系列で 1 回実行 (§1)。出力は §2-1 / §3 の数値と一致。
 - ネガティブコントロール: テンプレート参照カウントは own def を差し引いて 0 (= 自己参照を数えていない)。定義件数 3 は `SpliceExpired`/`SpliceMaxLimit`/`SpliceRTO` の 3 名を列挙して確認。
 - 範囲外: 実 VSTGUI 実行、wasm/canvas 上の表示、Machine ID、mac 版。
+
+## 8. VSTGUI upstream 版の同定 (2026-10-13 run, §5-3 の未了分)
+
+入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` から展開した `Serum2.vst3` (sha256 `501e7bb3dd9cafe4…`, 19,236,864 B)。gitignore 対象の `work/` に置いた。
+
+| 観測 | 結果 | 判定 |
+|---|---|---|
+| VSTGUI ソースパス文字列 (`vstgui\lib\cframe.cpp` 等) | 存在。`uidescription/detail/uijsonpersistence.cpp` を含む | VSTGUI 由来の確認 (高) |
+| `VSTGUI` / `vstgui` 文字列 | 計 2,358 件 (大半はパス・ログ用) | 版番号を含まない |
+| `3.7.12` | `VST 3.7.12` (フォント表示付近の文字列, offset 16595120) | **VST3 SDK の版**。VSTGUI の版ではない |
+| `3.19.3` / `9.1.5` / `2.0.20` / `2.0.24` | 版番号として単独出現 | VSTGUI と結び付く根拠は無い (未特定) |
+| `kVstVersion*` / `VSTGUI_VERSION` 系 | 0 件 | 版定数は無い |
+
+結論: **Xfer 版の VSTGUI の版は、バイナリの文字列からは同定できなかった。** 版確定には (1) upstream の各版 (4.x 系) の uidescription ソース (`uijsonpersistence.cpp` の有無と JSON 形式の差) と本バイナリの UIDescription JSON 読込関数を突き合わせる (2) 版ごとの `UIViewCreator` 名集合と §5-1 の 103 種 / RTTI 39 件を照合する、のいずれかが要る。どちらも本 run では未実施。
+
+§5-3 の (a)/(b) 工数実測は本節の版同定を前提とするため、未実施のまま残す。
+
+### 検証
+
+- 本 run の再測定: **未実施**。`$RUNNER_TEMP/plugins-serum2/` が存在せず (`ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)、上表の数値は前 run の実測値。本節の sha256 (`501e7bb3dd9cafe4…`) も前 run の記録で、本 run では照合していない。
+- 前 run で使った grep の正確な式はログに残っていない。以下は再測定用に定義したもので、**表の数値との一致は未確認**。
+- 抽出 (`tools/targets/serum2/` を cwd とする):
+  ```sh
+  7z x -y -owork/exe_extract "$RUNNER_TEMP/plugins-serum2/Install_Xfer_Serum2_2.1.5.exe"
+  cp -f 'work/exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' work/Serum2_win64.vst3
+  sha256sum work/Serum2_win64.vst3   # 完全な値を REPORT に追記する (前 run は先頭 16 桁のみ記録)
+  stat -c %s work/Serum2_win64.vst3  # 19236864 の一致を確認
+  ```
+- 文字列走査 (grep 既定は大小区別あり。`VSTGUI` と `vstgui` は別々に数える):
+  ```sh
+  grep -aoE 'VSTGUI' work/Serum2_win64.vst3 | wc -l          # 大文字
+  grep -aoE 'vstgui' work/Serum2_win64.vst3 | wc -l          # 小文字
+  grep -aob 'VST 3\.7\.12' work/Serum2_win64.vst3            # offset (前 run の 16595120 と照合が必要)
+  grep -aoE 'kVstVersion|VSTGUI_VERSION' work/Serum2_win64.vst3 | wc -l   # 版定数 (表の 0 件)
+  ```
+- 所要と load: **未計測** (PR 本文と揃える)。
