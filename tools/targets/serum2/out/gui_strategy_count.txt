@@ -1,0 +1,19 @@
+templates: 123 bitmaps: 344
+view class refs: 817 distinct: 103
+  in RTTI (name match): 103 of 103
+  C-prefixed (VSTGUI 標準名とみなす・ヒューリスティック): 16 distinct / 260 refs
+  その他 (Xfer 独自とみなす・ヒューリスティック): 87 distinct / 557 refs
+sub-controller refs: 159 distinct: 61
+  in RTTI (name match): 58 of 61
+  not in RTTI: ['OscController2', 'RoutingSlotController2', 'RoutingSlotController6']
+top 10 view classes:
+   165 CViewContainer
+    80 HoverView
+    59 XferAdvancedOptionMenu
+    44 VectorKnob
+    43 BitmapTextParamDisp
+    43 XferOnOffButton
+    26 CTextLabel
+    21 GridSwitch
+    21 XferVuMeter
+    19 XferUIViewSwitchContainer
