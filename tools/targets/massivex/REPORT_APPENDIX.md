@@ -42,10 +42,12 @@
 
 - 手順: `.text` の rel32 候補を capstone で命令境界まで確定し (`scripts/mx_xref_fn.py`)、文字列を含む NUL 区切り範囲 `[lo,hi)` で照合。
 - **N6 の読み手 (確定)**: 関数 **0x180f95e20** (pdata `[0x180f95e20,0x180f960bf)`)。`r8d` (2〜5) で分岐する文字列生成関数で、N6 の 68 B 文字列 (`Your hardware has changed. / Please open Native Access to re-activate.` を含む範囲 `[0x184ffcf6c,0x184ffcfb0)`) を `movups` で 16B 単位に組み立てる (0x180f95f03 / 0x180f95f0d / 0x180f95f18 / 0x180f95f23)。
-  - 同関数の他の分岐 (0x180f95e86 等) も別の文言を組み立てる。N6 の 6 件の範囲のうち 4 件はこの関数から読まれる。残り 2 件 (0x184ffd03f 系 0x184ffd0d6 系) は未確認。
+  - 参照の内訳 (作成者の実測・未再検証): この範囲を読む命令は 0x180f95f03 / 0x180f95f0d / 0x180f95f18 / 0x180f95f23 の movups 4 箇所。関数内の他の分岐 (0x180f95e86 等) が読む範囲は未確認。
+  - N6 の 6 範囲 (`[lo,hi)` は `mx_xref_fn.py` の `cstr` で確定する): 0x184ffcf87 / 0x184ffcfe8 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131 の各参照元は**本 run で未確認** (素材が無く `mx_xref_fn.py` を実行できなかった)。「6 件のうち 4 件」は根拠を再現できないため撤回する。
   - **呼び出し元は未確定**: E8 直接呼び出し 0 件・絶対 8B 0 件。RVA32 は `.pdata` (0x185fc0ff8) と `.xdata` (0x18630d324) の 2 件のみ (pdata の begin 登録 / unwind 情報のため、呼び出しではない)。間接呼び出し (vtable・関数ポインタ) 経由と推定 [推]。
 - **N5 の読み手 (未特定)**: `MXDemoPopup.qml` 0x18415f411 は範囲内の参照 0 件。`demoExpired` 0x184879407 は rel32 候補 `0x1834606c4` (関数 `[0x183460653,0x18346088c)`)、`subscriptionExpired` 0x18487941a は候補 `0x182d0841f` (関数 `[0x182d083c8,0x182d084fc)`) があるが、capstone で RIP 相対オペランドとしては確定できなかった (候補 disp が命令内でない可能性)。`demoExpiredChanged` 0x1848792b9 は候補 0 件。
-- 検証 (HEAD `a89d4ea3` + 本 PR の調査スクリプトのみ。`mx_lic_stub.py` は未変更): license e2e `-O0` 11/11 PASS (5 s) / `-O1` 11/11 PASS (78 s・lift キャッシュ無し) / `-O2` 11/11 PASS (6 s)。
+- 検証 HEAD: `a89d4ea3`。`git diff a89d4ea3 b5969e5a` は本 PR の 2 ファイル (本節・`mx_xref_fn.py`) のみで、e2e 対象コード (`mx_lic_stub.py` 等) は同一。
+- 上記の e2e 数値 (`-O0` 11/11 PASS 5 s / `-O1` 11/11 PASS 78 s・lift キャッシュ無し / `-O2` 11/11 PASS 6 s) は作成者の実測 (`b5969e5a` 時点の記録)。素材 `plugins-massivex` が無い後続 run では再測定していない。
 
 ### 12.3 未達と起票先
 

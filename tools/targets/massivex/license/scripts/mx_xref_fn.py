@@ -38,7 +38,9 @@ def cstr(va):
 md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 md.detail = True
 
-STR = {"N6": 0x184ffcf87, "N5-MXDemoPopup": 0x18415f411, "N5-demoExpired": 0x184879407,
+STR = {"N6-1": 0x184ffcf87, "N6-2": 0x184ffcfe8, "N6-3": 0x184ffd03f, "N6-4": 0x184ffd092,
+       "N6-5": 0x184ffd0d6, "N6-6": 0x184ffd131,
+       "N5-MXDemoPopup": 0x18415f411, "N5-demoExpired": 0x184879407,
        "N5-demoExpiredChanged": 0x1848792b9, "N5-subscriptionExpired": 0x18487941a}
 RANGES = {k: cstr(v) for k, v in STR.items()}
 
