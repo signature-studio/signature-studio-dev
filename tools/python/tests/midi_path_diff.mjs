@@ -47,6 +47,11 @@ const cases = [
   ["channels.fillEachNSteps", ["a", 4]],
   ["channels.fillEachNSteps", [0.5, 4]],
   ["channels.fillEachNSteps", [999, 4]],
+  ["channels.fillEachNSteps", [0, 1, -100000000]],
+  ["channels.fillEachNSteps", [0, 1, -9e18]],
+  ["channels.fillEachNSteps", [1, 2, -9e18]],
+  ["channels.fillEachNSteps", [2, 3, -7]],
+  ["channels.fillEachNSteps", [0, 1e18, 1]],
   ["ilmcp.forwardTutorialEvent", ["a", 1]],
   ["ilmcp.forwardTutorialEvent", []],
 ];
@@ -65,7 +70,7 @@ for (const [name, args] of cases) {
   const ga = grid(wasm, true), gb = grid(mock, false);
   const same = JSON.stringify(a) === JSON.stringify(b) || (a.err && b.err && a.code === b.code);
   if (!same || ga !== gb) { diffs++; console.log("DIFF", name, JSON.stringify(args), "wasm", JSON.stringify(a), "mock", JSON.stringify(b), ga === gb ? "" : "grid"); }
-  lit = (ga.match(/1/g) || []).length;
+  lit = Math.max(lit, (ga.match(/1/g) || []).length);
 }
 console.log(JSON.stringify({ cases: cases.length, diffs, lit_steps: lit, PASS: diffs === 0 }));
 assert.equal(diffs, 0);

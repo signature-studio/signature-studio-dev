@@ -60,7 +60,9 @@ export function createMockEngine() {
       const stride = argI(a, 1, 1), offset = argI(a, 2, 0);
       argI(a, 3, 0); argI(a, 4, 0);
       if (stride < 1) throw RANGE();
-      for (let p = offset; p < 64; p += stride) if (p >= 0) ch(ci).steps[p] = 1;
+      let p = offset;
+      if (p < 0) { p = offset % stride; if (p < 0) p += stride; }
+      for (; p < 64; p += stride) ch(ci).steps[p] = 1;
     },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = n; },
