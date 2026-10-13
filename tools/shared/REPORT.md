@@ -1,8 +1,7 @@
 # tools/shared REPORT — FL Shared ライブラリ群の分類・IPP 実測・OSS wasm 再ビルド PoC・プロプラ lift PoC・OSS 実クロスビルド (CAB-146/147/148/150)
 
 > 正本: `tools/shared/REPORT.md`。
-> **行数目安**: 本ファイルは 250 行を超過 (`docs/DOC_MAP.md` §1 の上限ルール参照)。
-> 超過分は Git 履歴に残る形での分割移動を推奨 (**内容は削除しない**)。
+> 付録: 分割移動した節 (§3.1 の #145 版判定の詳細 = 付録 §A・§10 ビルド詳細 = 付録 §10・§12 検収記録 = 付録 §12) は `tools/shared/REPORT_APPENDIX.md`。内容は削除せず移動。
 
 日付: 2026-10-10 (検収・訂正 2026-10-10: §8) / 2026-10-11 (OSS 実クロスビルド追加: §9〜§12) / 担当: F shared-libs
 再現: `bash tools/shared/run_all.sh` (~6 分, 素材は `docs/REFERENCES.md` `[MAC]` / `[WIN64]` / `[ANALYSIS-PLUGINS]` を読むのみ) / OSS 実ビルドは `bash tools/shared/oss/flac/build.sh` 等
@@ -72,16 +71,14 @@
 ### 3.1 FreeType 2.7 — `bash oss/freetype/build.sh` (~50s)
 - native gcc / wasm32 / wasm64 を同一ハーネス (`test_ft.c`: Init/New_Face/Set_Pixel_Sizes/Load_Glyph/Render/Outline CBox, OpenSans, 3 サイズ×6 字×hint on/off) で比較。**3 者 40 行完全一致 (TOTAL 1c0c857a3891256f)**。libfreetype.a wasm32 715KB, 試験 wasm 489KB。
 - **LP64 依存 (要注意)**: 素の wasm32 は 30/40 行がずれる (検収で `oss/freetype/unpatched_check.sh` を追加し 30/40 を再現確認; 「1LSB」の程度は未検証)。原因 2 点: ① `ftoption.h` が `#undef FT_CONFIG_OPTION_FORCE_INT64` (clang は `__STDC__` 定義のため FT_LONG64 が立たず**別 rasterizer 実装** `gray_render_scanline` を使う)、② `FT_UDIV` が `long` 幅依存。対策 = (wasm32) FORCE_INT64 有効化 + `ftgrays_lp64.patch` (2 行)、または **wasm64 (-sMEMORY64=1) は無改変で bit 一致**。
-- export 被覆: mac 190/190、win freetype.dll 254/271 (win は別 version: `FT_Alloc` 等 17 本が 2.7 に無い → T-SH-01 で win version 特定)。
+- export 被覆: mac 190/190、win freetype.dll 254/271 (win は FreeType 2.4.10 で、`FT_Alloc` 等 17 本が 2.7 に無い。版判定は §3.1)。
 - **本採用 (#145, docs/DECISIONS.md D8)**: wasm32 + FORCE_INT64 + `ftgrays_lp64.patch`。wasm64 は退避路。
 - **再現 (#145, 検証起点 48a4b30, emcc 6.0.12, GitHub runner 4 vCPU, フォントは DejaVuSans = OpenSans 非取得のため上記 TOTAL とは別値)**:
   `bash oss/freetype/build.sh` **36.7 s** (load average 終了時 2.99): `PASS wasm32` / `PASS wasm64` とも native と 40/40 行一致 (TOTAL 82b7580a3d8e846b)。
   `unpatched_check.sh`: 素の wasm32 は **26/40 行**ずれ (OpenSans の 30/40 とはフォント依存で差)。分解 (差分行数/40): patch のみ (FORCE_INT64 無し) 26、FORCE_INT64 のみ (patch 無し) 6、両方 0 → **2 つとも必須**。
   build.sh の wasm64 実行を修正: システム node v22 は wasm64 の table64 を compile できず CompileError → `EMSDK_NODE` (v24) を使う。旧 `||` フォールバックは失敗を隠すため廃止。
-- **win freetype.dll の version 帯** (`bash oss/freetype/win_version_probe.sh`; 判定 = 17 名が upstream tag の `src/ include/` に語として存在するか): **2.4.12 以前 17/17、2.5.0 以降 3/17 以下** → win の FreeType は **2.4.x 以前の旧版** (2.5.0 で内部 API 名が消えた)。厳密な patch 版は未特定 (実バイナリの version 文字列/`FT_Library_Version` を未確認: fl-win64 素材が必要)。
-- **#145 追記 (fl-win64 実測)**: `extracted/block24358_PE.bin` (i386, export 270) と `block24359_PE.bin` (x64, export 271) の 2 つが `freetype.dll`。両方とも前回の欠け 17 本を含み、差は `FT_MulFix` 1 本のみ。export 宣言の突き合わせ (`name(` の grep) は **2.4.10 / 2.4.11 / 2.4.12 で 271/271**、2.4.9 は `FT_Outline_EmboldenXY` 欠け (270/271)、2.5.0 は 14 本欠け。x64 DLL の PE timestamp は 2012-09-20 (2.4.10 = 2012-06-15 と 2.4.11 = 2012-12-20 の間)。**結論: win freetype.dll は FreeType 2.4.10〜2.4.12 のいずれか** (厳密な 1 版は未確定; `FT_Library_Version` の出力先は構造体で、版定数は PE 内に直接の文字列が無い)。
-- **#145 追記 (版定数の機械語確認)**: x64 `block24359_PE.bin` の `FT_New_Library` (VA 0x180018150) は library 構造体へ `movl $0x2,0x8(%rbx)` / `$0x4,0xc` / `$0xa,0x10` を書く (`llvm-objdump -d`)。これは upstream `FT_New_Library` の `FREETYPE_MAJOR/MINOR/PATCH` 代入に対応し、**x64 DLL の版は 2.4.10 と読める**。i386 `block24358_PE.bin` は minor=4 / patch=10 の即値まで確認 (major の即値は未確認)。上流ソース照合は未実施 (gitlab が Anubis で取得不可・ローカルに 2.4.x ソース無し)。
-- **#145 追記 (上流 3 タグ照合で版を確定)**: `git clone --branch VER-2-4-{10,11,12}` (gitlab.freedesktop.org, 2026-10-14 取得) で `FT_New_Library` (`src/base/ftobjs.c`) を確認。3 版とも `library->version_major/minor/patch = FREETYPE_MAJOR/MINOR/PATCH` を代入し、`FT_LibraryRec_` の先頭は `memory` (x64 で 8B) の直後に `version_major/minor/patch` が続く (オフセット 0x8/0xc/0x10)。`freetype.h` の版マクロは 2.4.10 = 2/4/10, 2.4.11 = 2/4/11, 2.4.12 = 2/4/12。x64 `block24359_PE.bin` 内の `mov dword [reg+disp], imm` は `[+0x8]=2`・`[+0xc]=4`・`[+0x10]=10` の並びを 1 組だけ持つ (バイト列照合)。**結論: win freetype.dll (x64) は FreeType 2.4.10 と確定** (2.4.11 / 2.4.12 は patch 即値が 11 / 12 となり不一致)。export 集合は 3 版とも同一 (271/271) のため FT_* shim 対象 API の確定に影響しない。
+- **win freetype.dll の version 帯** (`bash oss/freetype/win_version_probe.sh`; 判定 = 17 名が upstream tag の `src/ include/` に語として存在するか): **2.4.12 以前 17/17、2.5.0 以降 3/17 以下** → win の FreeType は 2.4.x 以前の旧版 (2.5.0 で内部 API 名が消えた)。
+- **win freetype.dll = FreeType 2.4.10 (確定, #145)**: x64 `block24359_PE.bin` の `FT_New_Library` が書く版定数 (major 2 / minor 4 / patch 10) を上流 `VER-2-4-{10,11,12}` の `src/base/ftobjs.c` と照合して確定 (2.4.11 / 2.4.12 は patch 即値が 11 / 12 で不一致)。i386 `block24358_PE.bin` は minor 4 / patch 10 の即値のみ確認、major 即値は未確認。export 集合は 2.4.10〜2.4.12 で 271/271 同一のため FT_* shim 対象は変わらない。根拠の実測は `tools/shared/REPORT_APPENDIX.md` §A。
 
 ### 3.2 libogg 1.3.2 + libvorbis 1.3.5 — `bash oss/ogg/build.sh` (~15s)
 - 23 ソースを直接 emcc (autotools は cross 判定で Ogg check が落ちる)。合成 PCM 2s→Vorbis VBR(0.4) エンコード→Ogg→復号。**ogg 30,695B hash 一致 (wasm32/64)**、復号 88,200 frame の PCM hash 一致。wasm 504KB (wasm32)。
@@ -131,7 +128,7 @@
 |---|---|---|
 | T-SH-07 | **ipp_shim** → **CAB-37 に統合** (tools/ipp の 239 関数・420 名 export・fail-fast・SIMD128・MS x64 ABI thunk)。初版の「P0 win 6 / P1 12 / P2 159」は下限値ベースで破棄 | **最高** |
 | T-SH-02 | Blend2D 本採用: `-msimd128` 性能検証、**Agg2D glue (~140 symbol, `AggCreateInstance`) の lift or C++ 再実装**、FL 描画経路での画素比較 | **高** |
-| T-SH-01 | ~~FreeType 2.7 本採用~~ (#145: wasm32+patch, D8)、win freetype.dll version 厳密特定 (2.4.12 以前の帯までは特定済)、FT_* 呼出面の shim | 高 |
+| T-SH-01 | ~~FreeType 2.7 本採用~~ (#145: wasm32+patch, D8)、win freetype.dll = **2.4.10 確定 (#145, §3.1)**。FT_* 呼出面の shim は未達 (#1144) | 高 |
 | T-SH-03 | Xiph スタック: libFLAC 1.3.1/1.5.0 再ビルド、liboggio `Oggio*` 9 export の再実装、静的 IPP 部置換 | 中 |
 | T-SH-03b | LAME 3.99.5 / WavPack 4.80 再ビルド | 低 |
 | T-SH-04 | FFmpeg n4.4.x (LGPL) wasm + libILVideo glue | 低 |
@@ -145,7 +142,7 @@
 | T-SH-10/11 | élastique / REX (第三者バイナリ): EULA 確認後に lift | ユーザ判断待ち |
 
 ## 6. 制約・未解決・ユーザ依頼
-- **未実施**: libFLAC/LAME/WavPack/FFmpeg の実ビルド (方針のみ; CPython は tools/python で実施済)、ILSvg の cppfw version 特定、Blend2D の wasm SIMD 試験、Agg2D glue、win 側 Blend2D/FreeType の version 厳密特定。
+- **未実施**: libFLAC/LAME/WavPack/FFmpeg の実ビルド (方針のみ; CPython は tools/python で実施済)、ILSvg の cppfw version 特定、Blend2D の wasm SIMD 試験、Agg2D glue、win 側 Blend2D の version 厳密特定 (win freetype.dll の版は 2.4.10 確定 #145)。
 - Blend2D version は「pre-v0.20 の 2024-12 時点」で近似 (FL が使う正確な commit は不明; symbol 集合比較で絞込み可)。
 - IPP の使用数は静的参照数で実行時カバレッジではない。本 tool 初版の win 12 / mac 159 は VAR 直接参照のみの下限値 (二段間接の数え落とし)。確定値 239 は tools/ipp。
 - **ユーザ依頼**: ① élastique / REX / IPP(再配布条件) / GPC(非商用条項) / NI 派生コードの EULA・ライセンス判断 (事実のみ記載)。② 素材追加は不要。
@@ -180,39 +177,7 @@
 
 ## 10. 各ライブラリのビルド詳細
 
-### 10.1 libFLAC 1.5.0 / 1.3.1 (`bash oss/flac/build.sh` + `bash oss/flac/negctl.sh <ver>`)
-- upstream: `downloads.xiph.org/releases/flac/flac-{1.3.1,1.5.0}.tar.xz`。autotools cross 判定を避け 23 ソースを直接 `emcc`/`gcc` へ。config.h は native configure 生成物を `-DHAVE_CONFIG_H` で共有、wasm は更に `HAVE_CPUID_H`/`HAVE_SYS_AUXV_H`/`FLAC__HAS_X86INTRIN` を落とした版を使う (素のままでは emcc sysroot に無いヘッダを include して失敗)。
-- `FLAC__stream_encoder_init_FILE`/`init_FILE` (FILE* 直結) を使うと seek/tell は libFLAC 内部 `file_*_callback_` で解決され native/wasm 一致。自前 callback だと `CLIENT_ERROR` (24bit の sample 桁あふれ、callback 間の状態不整合) が出た。
-- 実測: 1.5.0 = FLAC 60,171B hash **e22fc4abefae830e** / 1.3.1 = 60,171B hash **645fb4f042eb9ede** (3 arch byte-identical)。復号 hash は両版とも **d3d89c007626c2b1** = 入力 PCM hash (可逆)、`PCM identical 22050/22050`。wasm: 1.5.0 = 169,807/173,204B、1.3.1 = 156,216/158,503B。
-- ネガコン: 音声フレーム 1B 反転 → 復号 hash `faef95f116a11dc7` (1.5.0) / `4479db75ffe71dc7` (1.3.1) が baseline `d3d89c007626c2b1` と不一致 & rc=1。magic `fLaC` 破壊 → rc=1。
-
-### 10.2 LAME 3.99.5 (`bash oss/lame/build.sh` + `bash oss/lame/negctl.sh`)
-upstream: sourceforge ミラー (savannah の `/releases/lame/` は 404)。native は `vector/xmm_quantize_sub.c` 込み、wasm は `HAVE_XMMINTRIN_H`/`MIN_ARCH_SSE` を落として `init_xrpow_core_c` のみ。実測: MP3 16,181B hash **18dd8a4a4c91ee23** (3 arch byte-identical)。wasm 189,172/192,446B。ネガコン: 別 seed PCM → `1132a9cde5cb3e85` ≠ baseline、同一 PCM の再エンコードは同 hash (determinism)。
-
-### 10.3 WavPack 4.80.0 / 4.60.1 (`bash oss/wavpack/build.sh` + `bash oss/wavpack/negctl.sh`)
-upstream: github tag archive (release asset 無し)。24/11 ソースを直接 `emcc`/`gcc`。`WavpackOpenFileOutput` はメモリコールバックなので FILE* 非依存、読み側のみ NODERAWFS。実測: .wv 115,378B sha256[:16] **25d66af8deedf311** (native==wasm32==wasm64、両 version 同ハッシュ)、復号 PCM hash **7819af6dd0d37cf0** = 入力 (可逆)、`WM identical 48000/48000`。wasm 142,907/145,216B (4.80.0)・149,387/151,027B (4.60.1)。ネガコン: 入力 1 sample+1 → `f6185d5d11783983`、.wv 1B 破損 → `WM identical 24000/48000`。
-
-### 10.4 FFmpeg n4.4.2 (`bash oss/ffmpeg/build.sh` + `bash oss/ffmpeg/negctl.sh`)
-upstream: `ffmpeg-4.4.2.tar.bz2` (win 実測 version)。configure: `--disable-everything` + decoder {flac,mp3,vorbis,pcm_s16le,wmav2,aac}・demuxer {wav,flac,ogg,mp3,matroska,aiff}・parser {flac,mpegaudio,vorbis,aac}・protocol file、`--disable-x86asm --disable-inline-asm --disable-bzlib --disable-zlib --disable-lzma --disable-iconv` (nasm 非搭載 & sysroot 不在)。**License: LGPL version 2.1 or later** (`config.h` の `CONFIG_VERSION3 0`)。wasm64 は `-sMEMORY64=1` が configure の try-compile を壊すため `ffbuild/config.mak` の CFLAGS に直接注入してから make。
-実測 (native == wasm32 == wasm64): gen.wav|pcm_s16le 22050 samples hash **9249b2e1bb6ce0b2** / ok.flac|flac 22050 hash **693fe9f21e378245** / enc_native.ogg|vorbis 176640 hash **b51917f65bbce87d** / out.mp3|mp3 39168 hash **1d45943fec1748ca**。wasm 846,430/873,768B、avcodec.a 7.86MB (native) / 5.32MB (wasm32)。注記: planar float (fltp/s16p) の hash は `data[0]` ではなく `extended_data` 全 plane から取る必要がある (初版は `data[0]` のみで native でも実行ごとに hash が変わった = 未初期化読)。ネガコン: FLAC 1B 反転 → `abd5786130dfee29` ≠ baseline `693fe9f21e378245`、WAV の PCM 1 sample+1 → `30e5eb7d33facb1f` ≠ baseline `9249b2e1bb6ce0b2`。
-
-### 10.5 FFmpeg のリンク方針 (CAB-148 の決定事項)
-lift 済み FL コードと同一 wasm に FFmpeg を **静的リンクしない** (LGPL version3 論点最小化)。win バイナリは `--enable-version3` 付きで混ぜると version3 論点が複雑化する。FL が読むのは wav/flac/mp3/ogg なので最小デコーダで足りる。構成: FFmpeg は **独立 wasm モジュール / Worker** (本 build.sh の通り)。FL 側 `libILVideo` glue (26 export) は非互換の代替を持ち ABI 非互換のまま疎結合。本 build は `CONFIG_VERSION3=0` (LGPL-2.1+) なので静的リンクしても version3 の条項は持ち込まない。
-
-### 10.6 ILSvg (CAB-150) — version 特定 (実測: `data/ilsvg_version.json`, 再計算: `scripts/ilsvg_version_recount.py`)
-ILSvg は **version 文字列が無い** (旧 "AGG 2.4 系は推定" を訂正)。`ILSvg_x64.x86_64.dylib` の (a) Xcode object ファイル名 95 個 (`/Volumes/imageline/flextra/sdks/ILSvg/…`) と (b) def symbol 2,780 個 (`llvm-nm --defined-only` + `llvm-cxxfilt`) を upstream repo の tag と突合:
-
-| 構成要素 | version 決定 | 決定的根拠 |
-|---|---|---|
-| **svgdom** | **0.3.59〜0.4.9** | `style_stack_cache`・`finder_by_{class,id,tag}` symbol = commit ddb828e (2021-04-03) 以降。`.cpp` 集合 26 本が 0.3.59〜0.4.9 の全 tag と一致 |
-| **svgren** | **0.5.9〜0.6.3** [検収で下限を修正] | `canvas.cpp` あり = 0.4.75〜0.6.19、`gradient_setter` symbol = **0.5.9 以上** (初出 0.5.9/2021-04-03; old「0.6.0 以上」は下限の取り違え)、`path_type`/`spread_templ` なし = 0.6.4 未満 |
-| **agg** | **未確定 (2.7.4〜2.8.42 のいずれか)** | `agg_*.o` 25 本のファイル集合は 2.7.4〜2.8.42 の全 tag に含まれる。svgren 0.6.3 の AGG API を写した probe も 2.7.0〜2.8.42 でコンパイル成功 (API 形状では絞れない)。svgren は agg を pin しない (`agg/[>=0.0.0]` / `io.github.cppfw:agg:+`)。**old「AGG 2.4 推定」「cppfw/agg 2.8.x」ともに決定的根拠無し (検収で弱めた)** |
-| **pixman** | vendored (version 未特定) | `pixman-*.o/.c` 25 本・230 symbol が静的リンク |
-| **cssom** | **0.2.x** | `cssom::parser/selector/sheet/style/…` 6 class 一致 |
-| **papki** | **1.0.101 以前 = 2021-06-09 未満** (tag なし) [検収で修正] | シンボルは `papki::dir(std::string const&)`。papki が引数を `std::string` → `std::string_view` に変えたのは commit 7255fb8 (release 1.0.102, 2021-06-09) なのでそれ以前。**old「72b5b58 (2024-02-25) 以降」は誤り** (72b5b58 が追加したのは `as_dir()`)。→ papki は svgdom/svgren と矛盾しない |
-| **IL 独自グルー** | 15 本 (非 OSS) | PascalCase `.o` (Element, Filter, Gradients, Length, Parser, Referencing, Renderer, Shapes, Source, Structurals, Styleable, Surface, Transformable, Visitor, File) |
-
-実ビルド: cppfw/agg 2.8.9 の svgren 使用サブセット 25 cpp は emcc でコンパイル成功 (native .so 173,224B) — ただし agg version 特定の根拠にはならない (上記)。**連結ビルドはブロック**: svgdom/svgren は `papki/file.hpp`・`r4/vector.hpp` 等が header パス未解決 (upstream 単体では不可) → 子チケット。推定: papki の日付 (2024-02-25 以降) が他要素 (2021-2023) と矛盾 → FL 26 向けに後年リビルドの可能性。
+> 全文は `tools/shared/REPORT_APPENDIX.md` §10 に分割移動 (250 行上限)。
 
 ## 11. 検証の範囲・環境前提・未解決 (規則 38〜42)
 
@@ -244,62 +209,4 @@ libFLAC ~90 s / LAME ~40 s / WavPack ~60 s / FFmpeg ~10 分 (native 180 s + wasm
 
 ## 12. 検収記録 (2026-10-11, 検収 subagent / tools/shared / CAB-146,147,148,150,18)
 
-### 12.0 run_all.sh e2e (\`bash tools/shared/run_all.sh\`) も clean HEAD から再現
-**rc=0 / 実測 178 s** (load average 開始 1.29 → 終了 4.56, nproc=16, 直列実行)。分類 22 項目・FreeType 40 行一致 + export 被覆 190/190 (win 254/271・欠 17 は FT_Alloc 系)・ogg 30,695B hash cac14495a26b1641 3 arch identical・Blend2D \`PASS: native(no-JIT) == wasm(no-JIT) pixel-exact\` (差 0/230,400B)・libkio difftable 228/760 → 621/760。※ REPORT §0・§11.3 の「~6 分」「~90 s / ~40 s / ~60 s / ~10 分」は単発の負荷依存値で、本検収の実測 178 s (一括)・FLAC 29 s・LAME 36 s・WavPack 36 s・FFmpeg 119 s とは異なる (負荷とキャッシュ状態依存)。
-**\`status.sh\` は tools/shared に存在しない** (run_all.sh のみ)。
-
-### 12.1 e2e 再現結果 (native == wasm32 == wasm64 の byte-identical を実測で確認)
-
-| lib | 検証ハーネス | 実測 (clean HEAD から再現) | 判定 |
-|---|---|---|---|
-| libFLAC 1.5.0 | `oss/flac/build.sh` | FLAC **60,171B** hash **e22fc4abefae830e** / 復号 hash **d3d89c007626c2b1** = 入力 PCM / `PCM identical 22050/22050`。wasm 169,807 / 173,204B、実測 29 s | PASS |
-| libFLAC 1.3.1 | 同 | FLAC **60,171B** hash **645fb4f042eb9ede** / 復号 hash **d3d89c007626c2b1**。wasm 156,216 / 158,503B | PASS |
-| LAME 3.99.5 | `oss/lame/build.sh` | MP3 **16,181B** hash **18dd8a4a4c91ee23**、3 arch identical。wasm 189,172 / 192,446B、実測 36 s | PASS |
-| WavPack 4.80.0/4.60.1 | `oss/wavpack/build.sh` | .wv **115,378B** sha256[:16] **25d66af8deedf311**、復号 hash **7819af6dd0d37cf0** = 入力、`WM identical 48000/48000`。wasm 142,907 / 145,216B と 149,387 / 151,027B、実測 36 s | PASS |
-| FFmpeg n4.4.2 | `oss/ffmpeg/build.sh` | 4 codec 復号 PCM hash が **3 arch 完全一致**: pcm_s16le 22050 → **9249b2e1bb6ce0b2** / flac 22050 → **693fe9f21e378245** / vorbis 176640 → **b51917f65bbce87d** / mp3 39168 → **1d45943fec1748ca**。実測 119 s | PASS (要修正、下記) |
-| libogg/vorbis | `oss/ogg/build.sh` | ogg 30,695B hash cac14495a26b1641、3 arch identical・decode hash 一致 | PASS |
-
-**FFmpeg e2e の欠陥を 1 件修正**: コミット 3fdb1bb の `oss/ffmpeg/build.sh` は `FF_CFG . emconfigure` とだけ呼んでおり (a) `./configure` が抜けて `emconfigure --prefix=...` になり即 FileNotFoundError、かつ (b) ffmpeg の configure は `CC` 環境変数を無視して `cc_default="gcc"` を使うため `emconfigure` だけでは `CC=gcc` のまま = wasm ではなく native オブジェクトができて emcc リンクが落ちる。したがって **コミット時点のスクリプトは wasm32/wasm64 を一度もビルドできておらず、§10.4 の wasm 846,430B / 873,768B は手動手順 (`docs/REFERENCES.md` `[STRATEGY]` 同梱の `ffmake.log` の `emmake make` と `--cc=emcc` 明示) の産物で、1 コマンド e2e では再現できない**。検収で `FF_CFG . emconfigure ./configure --cc=emcc --cxx=em++ --ar=emar --ranlib=emranlib --nm=llvm-nm --strip=llvm-strip` に修正し、3 arch の復号 hash 一致を再現。なお wasm バイナリサイズは **845,872B / 873,256B** (旧記載 846,430 / 873,768 とは 558B / 512B 差。toolchain と configure 差分によるもので、合否基準の decode hash は完全一致)。
-ライセンス実測: configure 出力 `License: LGPL version 2.1 or later`、`ffbuild/config.h` は `CONFIG_GPL 0` / `CONFIG_NONFREE 0` / `CONFIG_VERSION3 0`。
-
-### 12.2 独立再計算 (別アルゴリズム) — `python3 scripts/indep_audio_verify.py <files>`
-
-FVN hash 比較のみの harness に対し、以下を自前実装して検算 (数え方の定義はスクリプト冒頭 docstring):
-- **入力 PCM を自前生成** (resonator 漸化式 + xorshift64、libm 非依存・test_flac.c と同一式) し、3 バイト little-endian パック後の **MD5** を計算 → FLAC ファイルの STREAMINFO に記録された MD5 と **完全一致** (`88ce5836cc009f35cb1ec8794c1c7355`)。= エンコード→復号の可逆性を harness とは別の暗号学的検算で確認。
-- **自前 CRC-8 (poly 0x07) / CRC-16 (poly 0x8005)** を実装し FLAC の 3 frame を検算 → **全 frame で CRC-8 / CRC-16 一致**、frame offset 86 / 22406 / 44717、最終 frame の終端 = ファイルサイズ 60,171B、channel assignment は 3 frame すべて MID_SIDE。
-- **自前 RIFF/WAV パーサ**で `gen.wav` の data payload を読み FNV-1a を計算 → **9249b2e1bb6ce0b2** = FFmpeg の pcm_s16le 復号 hash と一致。
-- **自前 WavPack `WavpackHeader` パーサ** → 2 block (offset 0 / 57880) がファイル 115,378B を隙間なく覆う、version 0x407、3 bytes/sample、sample rate index 9 = 44100 Hz。
-- **自前 MPEG frame header パーサ** → 16 frame・128 kbps stereo、payload 16,077B (残差 104B は LAME info header)。
-
-### 12.3 ネガティブコントロール (規則 41)
-- harness 側: FLAC 音声 frame 1B 反転 → 復号 hash `b50bcf…`/`4479db…` ≠ baseline・rc=1、magic 破壊 → rc=1。LAME 別 seed → hash 変化 + determinism 確認。WavPack 入力 1 sample シフト / .wv 1B 破損を検出。FFmpeg FLAC 1B 反転・WAV 1 sample+1 を検出。→ すべて clean HEAD から再現。
-- **検収側の独立ネガコン**: `indep_audio_verify.py` に bad- ファイルを与えると自前 CRC-16 で破損を検出 (`crc16_all=False` を観測)。正常ファイルでは全 CRC が一致するので検査は実効性を持つ。
-
-### 12.4 ILSvg version 特定の裏付け (CAB-150) — 独立確認した結果と訂正
-| 項目 | 実装側記載 | 検収の独立確認 | 判定 |
-|---|---|---|---|
-| svgren 下限 | `gradient_setter` = 0.6.0 以上 | `gradient_setter` の初出は **0.5.9 (2021-04-03)**。0.5.9〜0.5.26 も canvas.cpp あり・path_type なしなので範囲は **0.5.9〜0.6.3** | **誤記 (修正済)** |
-| agg version | cppfw/agg 2.8.x | agg_*.o 25 本のファイル集合は **2.7.4〜2.8.42 の全 tag** に含まれる。svgren 0.6.3 の AGG API を写した probe も **2.7.0〜2.8.42 でコンパイル成功**。svgren は agg を pin しない | **根拠不足 → 「未確定 (2.7.4〜2.8.42)」に弱めた** |
-| papki | 2024-02-25 以降 | 根拠 commit 72b5b58 は `as_dir()` 追加であり `dir()` は以前から存在。シンボル `papki::dir(std::string const&)` は引数が `std::string_view` に変わる **7255fb8 (1.0.102, 2021-06-09) より前** = 1.0.101 以前 | **誤記 (修正済) → 日付矛盾は解消** |
-| cssom 0.2.x | 6 class 一致 | cssom tags 0.2.0〜0.2.24 で class 集合は安定しており class 集合だけでは絞れない。`cssom::read(...)` は 0.2.x 系の形状 | 範囲内 (単一点特定は不可) |
-| svgdom | 0.3.59〜0.4.9 | `.cpp` 集合・`style_stack_cache`・`finder_by_*` symbol で再現を確認。0.4.x 間で差なし | 範囲内 (単一点特定は不可) |
-| pixman | version 未特定 | pixman-*.o 25 本・`/Volumes/imageline/.../pixman/pixman/` に vendored。version 文字列なし | 未特定のまま |
-| win/mac 実バイナリ照合 | (対象) | **win 側に ILSvg バイナリは存在しない** (mac `Shared/ILSvg_x64.dylib` のみ。win の PE 25166 個からも ILSvg は検出されず)。ILSvg の version 特定は mac slice (sha256 f9c13d8c…, work/slices/ILSvg_x64.x86_64.dylib) のみで実施 | 範囲外 (win バイナリ無し) |
-
-### 12.5 未解決・起票先 (規則 42)
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| FFmpeg `oss/ffmpeg/build.sh` が wasm ビルド不能 (`emconfigure` のみ) | 1 コマンド e2e が再現できなかった | **本コミットで修正** (下記 fix)。CAB-148 に検収コメント |
-| agg version が未確定 (2.7.4〜2.8.42) | ILSvg 再ビルド時の agg 選定が決まらない | CAB-150 コメント (子チケット化を提案) |
-| pixman version 未特定 | 同上 | CAB-150 コメント |
-| svgdom/svgren 連結ビルドがブロック (papki/r4/utki/cssom/mikroxml の header パス) | ILSvg wasm 再ビルド未完 | 新規子チケット (親 CAB-18 / project signature-studio / milestone 統合)。CAB-150 にもコメント |
-| liboggio `Oggio*` 9 export 再実装・静的 IPP 部置換 | FL の ogg 読み書き経路が未置換 | CAB-146 コメント (既存) |
-| win/mac 実バイナリとのビット一致 | 差し替え時の互換性 | 各 CAB に「同一ソースの別環境一致のみ」と明記済 (運用) |
-| REPORT.md が 200 行超 (本節追加で 233 行) | 規則「REPORT.md ≤ 200 行」未達 | 本コミットで圧縮を試みたが積層で超過。メインに整理依頼 |
-
-### 12.6 ファイル (本節の検出物)
-`oss/ffmpeg/build.sh` (emconfigure 引数修正) / `scripts/indep_audio_verify.py` (独立再計算・別アルゴリズム) / `data/ilsvg_version.json` (svgren 下限・agg・papki の訂正) / `work/` は gitignore。
-
-### 12.7 検収時の運用変更 (記録)
-検収中に運用ルールが改訂された。**ルールの正本は `docs/WORKFLOW.md`** (repo 内に import 済み。旧 preflight 読了証跡は `docs/DECISIONS.md` D6 で廃止)。当時の主な変更は ① `git reset`/`stash`/`checkout --` の全面禁止と「reset せず fix コミットを積む」、② **Linear free issue limit 到達** (子チケット作成を試み \`invalid_request: You've exceeded the free issue limit\` で失敗し起票案コメントに変更した)、③ **Linear 廃止・GitHub Issues + worktree/PR フローへの移行** (旧 Linear は 2026-10-12 以降読み取り専用、対応表は \`docs/REFERENCES.md\` \`[CAB_TO_GH]\`)。Linear 側の検収コメント・状態変更は変更前に実施済み。GitHub 側への反映は main 判断。
+> 全文は `tools/shared/REPORT_APPENDIX.md` §12 に分割移動 (250 行上限)。
