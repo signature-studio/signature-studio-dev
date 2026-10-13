@@ -1,7 +1,6 @@
 # REPORT_912 — ClassCreate ON の ok 退行 4 件 (101 190 291 296) の oob 経路の切り分け (#912, 親 #704)
 
-結論: 4 件の oob は、`410360` (ClassCreate ON 時の AfterConstruction 呼出し stub) が **不正な `inst` を受けて `Q(inst)` の読みで trap** することから始まる。
-`inst` が不正になる上流の経路は未特定。受入条件 1 は未達。転記ミスではなく、上流での値の破損 (または上流 lift の欠陥) を疑うが、未検証。
+結論 (run 2): unit 101 / 291 / 296 の oob の上流は `function_4fb090` の `4fa070` 呼出し第 2 引数 `dl`。RetDec IR が `dl` (機械語は `mov dl,1`) をスタック番地の下位 byte にしており、`dl=0` で `410320` を飛ばしたクラス自身が `410360` に渡って oob になる (§6)。修復 pass `fix912/m11_fix912.py` (既定 ON) で 3 件は ok に戻る。残る ok 退行は unit 190 (`function_412e40`、子 issue)。受入条件 3 は未達のため `Refs #912`。
 
 ## 1. 基準 (本 run で再生成・再測定)
 
@@ -45,7 +44,31 @@
 | 190 の `412e40` 経由の trap (410360 を経由しない) | 同上の 4 件の一部。別経路の可能性 | #912 (本 issue) |
 | `Q(inst)` が指す値の中身 (ON で `0xf2b18` の内容) を未測定 | 値の破損元の切り分け | #912 (本 issue) |
 
-## 6. 次の一手 (提案・未検証)
+## 6. 原因 (run 2 で特定。101 / 291 / 296)
 
-- `function_4fa070` の 2 回目の呼出しの入力 (rcx, dl, r8) を、呼出し元 (4fb090 / 4fb8a0 の `call 0x4fa070` 位置) で記録する。
-- VA-big 直後に `[rbp+0x70]` (4fa070 の frame) が書き換わるかを、frame 先頭の値の before/after で見る (stack 破壊の有無)。
+- 上流は `function_4fb090` (呼出し元 `4fb8a0` ほか)。機械語 `4fb12f: mov dl,1` → `4fb134: call 4fa070` で、第 1 引数 `rcx` は `mov rcx,[rip-0x86df]` (VA 0x4f2a50 の値 = VMT 0x4f2b18、PE 上で有効)。
+- RetDec の IR は `dl` を定数 1 ではなく、スタック番地 `%stack_var_-255` の下位 byte (`%37`) として渡していた (`%39 = call @function_4fa070(994072, i64 %37, ...)`)。
+- `dl = 0` の経路では `4fa070` が `410320` (ClassCreate) を飛ばし、VMT 自身を `410360` に渡す。`410360` は `[vmt-0x50]` を読むため、VMT 位置によって oob / 誤 call になる。ON では `0x41037d` の新規 hit はこの経路。
+- 種別: D4 (deref・引数の取り違え) と同系の lift 欠陥。`docs/DEFECTS.md` への追加は本 run では未実施 (類型名の確定は PM 判断)。
+- 修復: `tools/m11/fix912/m11_fix912.py` (IR pass・冪等・双方向。`m11_build.sh` に組み込み、既定 `M11_FIX_912=1`、`0` でネガコン)。
+
+## 7. 測定 (HEAD = a5e9c1ed 相当、`m11_gen_ir2.sh` 再生成・同一 IR)
+
+| 構成 | ok | oob | halt0 | miss | noproc | other | abort |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| OFF (修正 0 / 前) | 869 | 16 | 8 | 47 | 1 | 1 | 0 |
+| OFF (修正 1) | 869 | 16 | 8 | 47 | 1 | 1 | 0 |
+| ON (修正 0 / 前) | 867 | 18 | 8 | 47 | 1 | 1 | 0 |
+| ON (修正 1 / 既定) | 868 | 15 | 8 | 47 | 1 | 1 | 2 |
+
+- OFF 修正 0 vs 1: kind 差 0 (`survey_diff.py`)。frames の差も 0。
+- ON 既定 (修正 1) vs OFF: ok 退行 unit = **190 のみ**。101 / 291 / 296 は ok に戻った。
+- 304 / 555: ON で oob → abort (`function_535c2e` が IR 未定義で fail-fast)。OFF でも oob の unit。ok 退行ではない。
+
+## 8. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| ON の ok 退行 190 (`function_412e40` で trap。`410360` を経由しない。呼出し元が多数) | 受入条件 (ON で ok 退行 0) が未達 | #1274 `[M11-N77]` (親 #912) |
+| 304 / 555 の ON abort (`function_535c2e` が IR 未定義 closure 外) | ON の abort 2 件 (OFF では oob のまま) | #1275 `[M11-N78]` (親 #912) |
+| 修正 (`m11_fix912.py`) の DEFECTS 類型登録 | 文書のみ | #912 (本 issue) |
