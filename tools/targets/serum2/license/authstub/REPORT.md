@@ -166,6 +166,18 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 - 後続 commit で `replace_at` の未使用引数 `tag` を削除した (挙動不変・呼出 1 箇所のみ更新)。素材 `plugins-serum2` が無く e2e の再実行は未実施 (`python3 -m py_compile` のみ確認)。
 - 未達 (#1007 [SR-11] で追跡): 値 (slot オフセット・global 名・LF4 の定数) は依然 literal。RetDec 出力から規則を導出する部分は未実装。
 
+## 13. LF 束縛の値を RetDec 出力から導く (SR-11, Refs #1007)
+
+- 変更: LF5/LF6/LF7 の slot オフセットを `fp_bind.bind_load_slot_at` で IR 行 (`%stack_var_<slot>`) から読む。
+  書き手の literal `'-72'`/`'-80'`/`'-152'` を撤去。global 名 (`__authstub_doc_root` 等) は harness 側の役割名で RetDec 出力に無いため残す。
+- LF4 の定数は元から IR の `ucomisd.1` 引数由来。`verify_lf4_const.py` で PE 上の定数 (0x180a21b60) と IR の値 (bits 4622382073171892366 = 11.00001) の一致を確認。
+- 機械語 VA の site 数: LF5 2 / LF6 2 / LF7 1 (計 5 件)。LF4 の定数 1 件。全て site 数 1 件ずつ確認済み。
+- 機械語の slot 参照は IR の slot 名と一致しない (例: 機械語 `[rbp-0x10]` ↔ IR `stack_var_-72`)。そのため slot は機械語の rbp 値からは導かず、IR 行を正とした。
+- 出力不変: `patched_base_lf.ll` `c62d9316…8793` / `raw_base_lf.ll` `79ab30ca…0d20` (変更前後で一致)。
+- e2e (worktree `ws-1007`・HEAD 変更後): 5 s (lift は既存 `work/lift` を再利用)・23/23 PASS。変更前の cold 実測は 36 s・23/23 PASS。
+- ネガティブコントロール: `bind_load_slot_at` に誤 VA (`0x1800c2c95`・`0x18004fbca`) を渡すと `candidate = 0 (expect 1)` で FAIL。
+- 未達 (子 issue で追跡): global 名の導出 (RetDec 出力の役割からの自動対応) と、LF4 定数を IR から機械的に抽出する規則化は未実装。
+
 ## 13. L1 の再現条件 (実測・追跡 #823)
 
 - 測定 commit: origin/main 36edc993。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
