@@ -13,8 +13,9 @@
   "trap": 23,
   "clobber": 0,
   "kinds": {
-   "memory access out of bounds": 15,
+   "unreachable": 1,
    "gui_failfast": 1,
+   "memory access out of bounds": 14,
    "halt0->longjmp": 7
   },
   "failfast_units": {

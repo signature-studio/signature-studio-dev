@@ -1,7 +1,7 @@
 {
  "mode": "boot",
  "dllmain_done": false,
- "boot_threw": "memory access out of bounds",
+ "boot_threw": "unreachable",
  "boot_failfast": null,
  "units_total": 942,
  "units_run": 52,
