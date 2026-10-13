@@ -144,3 +144,12 @@ python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
 
 - N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
 - 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡 issue は未起票のため PM に起票を依頼する。
+
+## 12. L1 の再現条件 (実測・追跡 #823)
+
+- 測定 commit: origin/main 36edc993 (ws-250b)。素材: plugins-serum2 → `Install_Xfer_Serum2_2.1.5.exe` の `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B, sha256 `501e7bb3…5283`)。
+- baseline `bash e2e.sh` (lift キャッシュ利用): 5.7 s, load 0.92 → 0.35, **23/23 PASS**。cold 再生成は未実施。
+- 機械語 (0x1800c2d59–d76): `[rsi+0x90]` が非 0 なら `or dword [rax+8], 0x800010` (deferred 経路)、0 なら `je 0x1800c2ef4` で直接経路 `mov rcx,[rsi+0x10]; mov rax,[rcx]; mov edx,0x800010; call [rax+0x30]` へ分岐する。
+- raw IR では `dec_label_pc_1800c2d5f` の `br i1 (icmp eq %109, 0)` の 0 側が機械語の `je 0x1800c2ef4` ではなく `dec_label_pc_1800c2f08` に付け替えられており、`0x1800c2ef4` 相当のブロックは関数内のどの分岐からも到達しない (`insn.addr` 0 件)。
+- 結論: 脱落は「`0x1800c2ef4` へ向かう辺が lift 時に `0x1800c2f08` へ付け替わる」形で起きている。raw IR の `0x800010` 即値は `or i32 …, 8388624` (L9878, `0x1800c2d6f` 側の deferred 経路) の 1 箇所のみ。
+- 残: 失われた辺を復元する pass の実装と検証は未着手 (#823)。N2b (`0x1800c2d59` → f08 の強制) は deferred 経路除去であり、直接経路の復元とは別問題。
