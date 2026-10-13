@@ -30,3 +30,10 @@
 - 最終判定 (HEAD `9d604905`): 一致 **16** / 不一致 **7** / 実行不能 0 (修正前 15 / 8 / 0)。
 - 件数の定義 (本付録・PR 本文で共通): 分母は leaf_diff の対象 23 関数。**残 mismatch 7 = 修正後の不一致全体** (内訳: 修正前からの未解決 6 関数 + 回帰 1 関数 0x5de250)。「残 6」は回帰を除いた数。
 - 未実施: 30 関数 (317 箇所) 全体への影響表、`nc_leaf.py` ネガコン、修正前からの未解決 6 関数の切り分け (上の件数定義の「残 6」)。
+
+## 10.3 (#871 fix モード) 0x5de250 回帰の静的確認と未実施項目
+
+- 素材: `fl-win64` のみ実在 (`$HOME/artifacts`)。`toolchain-retdec`・`toolchain-emsdk` は無く、`/opt` に `retdec`・`emsdk` も無い。RetDec の既定配布 URL (`retdec-v5.0-ubuntu-64b.tar.xz`) は 404。よって `f2_step1.sh` (IR 再生成)・`leaf_diff.sh`・`nc_leaf.py` は本 run では未実施。
+- block19006 (`extracted/block19006_PE.bin`): ImageBase `0x400000`、SizeOfImage `0x3b2000`。IR の絶対 VA `0x30D0F4` は ImageBase より下 (image 外) だが、RVA `0x30D0F4` は `.data` (VA 0x2e0000、サイズ 0x3ca00) の内側。RVA `0x30D0F4` の先頭 16 byte は `01120805126800000d79100000000803`。
+- 機序は未確定のまま。native 側の `/proc/<pid>/maps` 実測は未実施。この静的事実だけでは「回帰を期待される差分として許容する」根拠にならない。
+- 未実施 (次の run で `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` を指定して実施): f2_step1 → leaf_diff (修正前後) → nc_leaf.py ネガティブコントロール → 影響表 (30 関数 / 317 箇所)。
