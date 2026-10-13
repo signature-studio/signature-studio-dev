@@ -7,7 +7,7 @@ byte[0x14f84a8] (登録フラグ) と gradeChar を観測する (lift を介さ�
   - IAT は全スロットを 16B 刻みの `ret` スタブへ向け、スタブ実行時に Python 側 API 実装を呼ぶ
   - レジストリは Python の辞書 (HKCU/HKLM)。ライセンスの生成・偽造はしない (観測のみ)
 """
-import os, struct, sys
+import os, struct, sys, zlib
 import pefile
 from unicorn import (Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_READ_UNMAPPED, UC_HOOK_MEM_WRITE_UNMAPPED,
                      UC_HOOK_MEM_FETCH_UNMAPPED, UcError)
@@ -342,7 +342,7 @@ class Emu:
         return 1
 
     def api_LoadLibraryW(self, c, d, r8, r9):
-        return 0x7d000000 + (hash(self.rd_w(c).lower()) & 0xfff) * 0x10000
+        return 0x7d000000 + (zlib.crc32(self.rd_w(c).lower().encode()) & 0xfff) * 0x10000
 
     def api_GetProcAddress(self, c, d, r8, r9):
         nm = self.rd_a(d) if d > 0xffff else ''
