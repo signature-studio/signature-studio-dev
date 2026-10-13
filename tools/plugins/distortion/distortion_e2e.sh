@@ -66,7 +66,7 @@ python3 distortion/matrix_check.py
 python3 distortion/ids_crosscheck.py
 
 if [ "${1:-}" != "--skip-lift" ]; then
-  echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/engines.csv"
+  echo "block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,f80_funcs_pre,emcc_c_rc_pre_f80,lift_s,missing_define,missing_bytes,missing_ref,extra_inside,function_defines" > "$OUT/engines.csv"
   for eb in "${ENGINES[@]}"; do bash distortion/engine_lift.sh "$eb" 1800 | tail -n 1 >> "$OUT/engines.csv"; done
   cat "$OUT/engines.csv" "$OUT"/engine*/first_errors.txt
   python3 distortion/judge.py "$OUT/engines.csv" --engines --blocks "$ENGINES_CSV"

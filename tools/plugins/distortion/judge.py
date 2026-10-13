@@ -10,8 +10,9 @@
         defines == function_defines == closure_funcs + extra_inside (RetDec が range 内部に切り出した関数の分だけ増える)
       を要求する。 要求外の block の行があっても不合格。
   judge.py ENGINES.csv --engines --blocks B1,B2,...
-      engine_lift.sh の 1 行サマリ形式。 測定が成立したか (行 1 本 / 整数 / lift_rc=0 / defines>=1 / pdata_funcs>=1 / 参考列に -1 (集計不能) が無い) だけを判定し、
-      emcc_c / f80 / 未実装 helper / 欠落 define は合否に使わず値を表示する (到達性の実測であって合格条件ではない)。
+      engine_lift.sh の 1 行サマリ形式。 行 1 本 / 整数 / lift_rc=0 / defines>=1 / pdata_funcs>=1 / 集計不能 (-1) 無し、に加え
+      emcc_c_rc=0 / missing_define=0 / f80_funcs=0 (f80 lowering 後) を合格条件とする (PLG-F6-2 #545)。
+      未実装 helper の数 / lowering 前の f80・emcc は合否に使わず表示する。
 
 exit: 0 = 全 block 合格, 1 = 不合格あり, 2 = 入力不正 (引数 / ファイル / ヘッダ)。
 """
@@ -21,7 +22,7 @@ SHELL_COLS = ['block', 'name', 'closure_funcs', 'closure_bytes', 'lift_rc', 'def
               'f80_funcs', 'emcc_c_rc', 'seconds']
 AUDIT_COLS = ['block', 'missing_define', 'missing_bytes', 'missing_ref', 'extra_inside', 'function_defines']
 ENGINE_COLS = ['block', 'pdata_funcs', 'lift_rc', 'defines', 'f80_funcs', 'unimpl_helpers', 'emcc_c_rc',
-               'fixcmp_patched', 'emcc_c_rc_after_fixcmp', 'lift_s', 'missing_define', 'missing_bytes',
+               'f80_funcs_pre', 'emcc_c_rc_pre_f80', 'lift_s', 'missing_define', 'missing_bytes',
                'missing_ref', 'extra_inside', 'function_defines']
 
 
@@ -138,11 +139,17 @@ def judge_engine(rows, blocks):
         neg = [k for k in ('f80_funcs', 'unimpl_helpers', 'emcc_c_rc', 'missing_define') if v[k] < 0]
         if neg:
             why.append('集計不能 (-1) の列 %s' % neg)
+        # PLG-F6-2 (#545) の受入条件: final.ll が emcc -c を通る / .pdata の全 range に define がある / f80 が残らない
+        for k in ('emcc_c_rc', 'missing_define', 'f80_funcs'):
+            if v[k] > 0:
+                why.append('%s=%d' % (k, v[k]))
+        if v['defines'] != v['function_defines'] + 1 and v['defines'] != v['function_defines']:
+            why.append('defines=%d function_defines=%d (差は entry_point の 0 か 1 のみ許容)' % (v['defines'], v['function_defines']))
         if why:
             fails += 1
-        print('%s  engine %d pdata=%d lift_rc=%d defines=%d | 参考(合否外): f80=%d unimpl=%d emcc_c=%d missing_define=%d%s' % (
-            'FAIL' if why else 'PASS', b, v['pdata_funcs'], v['lift_rc'], v['defines'], v['f80_funcs'],
-            v['unimpl_helpers'], v['emcc_c_rc'], v['missing_define'], ('  <- ' + '; '.join(why)) if why else ''))
+        print('%s  engine %d pdata=%d lift_rc=%d defines=%d emcc_c=%d missing_define=%d f80=%d | 参考(合否外): unimpl=%d f80_pre=%d emcc_c_pre_f80=%d%s' % (
+            'FAIL' if why else 'PASS', b, v['pdata_funcs'], v['lift_rc'], v['defines'], v['emcc_c_rc'], v['missing_define'],
+            v['f80_funcs'], v['unimpl_helpers'], v['f80_funcs_pre'], v['emcc_c_rc_pre_f80'], ('  <- ' + '; '.join(why)) if why else ''))
     return fails
 
 

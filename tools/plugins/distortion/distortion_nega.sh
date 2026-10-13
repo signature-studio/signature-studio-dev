@@ -121,11 +121,25 @@ w('e_lift_rc1', lambda b: b[0].__setitem__(hdr.index('lift_rc'), '1'))
 w('e_defines0', lambda b: b[-1].__setitem__(hdr.index('defines'), '0'))
 w('e_unknown', lambda b: b[0].__setitem__(hdr.index('missing_define'), '-1'))
 w('e_deleted', lambda b: b.pop(0))
+w('e_emcc1', lambda b: b[0].__setitem__(hdr.index('emcc_c_rc'), '1'))
+w('e_miss1', lambda b: b[-1].__setitem__(hdr.index('missing_define'), '1'))
+w('e_f80', lambda b: b[0].__setitem__(hdr.index('f80_funcs'), '1'))
 PY
 rc=$(je e_ctrl "$N/e_ctrl.csv"); echo "NC-JE 対照 (実測 engines.csv): exit=$rc (期待 0)"; [ "$rc" = 0 ] && chk 'NC-JE 対照' ok || chk 'NC-JE 対照' ng
-for nm in e_lift_rc1 e_defines0 e_unknown e_deleted; do
+for nm in e_lift_rc1 e_defines0 e_unknown e_deleted e_emcc1 e_miss1 e_f80; do
   rc=$(je "$nm" "$N/$nm.csv"); echo "NC-JE $nm: exit=$rc (期待 非0)"; [ "$rc" != 0 ] && chk "NC-JE $nm" ok || chk "NC-JE $nm" ng
 done
+# emcc_c_rc / missing_define / f80_funcs の不合格は、その列名の理由で落ちること
+for pr in e_emcc1:emcc_c_rc=1 e_miss1:missing_define=1 e_f80:f80_funcs=1; do
+  nm=${pr%%:*}; pat=${pr#*:}
+  if grep -q "$pat" "$N/$nm.out"; then echo "NC-JE $nm 理由 [$pat]: 一致"; chk "NC-JE $nm 理由" ok; else echo "NC-JE $nm 理由 [$pat]: 不一致"; chk "NC-JE $nm 理由" ng; fi
+done
+
+# ---- NC-C: C++ 閉包 (closure_cpp.py) — seed を断つと非 0 -------------------------------------
+python3 distortion/closure_cpp.py 19101 > "$N/cc_ctrl.out" 2>&1; rc0=$?
+CLOSURE_CPP_SEED_DEPTH=0 python3 distortion/closure_cpp.py 19101 > "$N/cc_bad.out" 2>&1; rc1=$?
+echo "NC-C: closure_cpp 19101 対照 exit=$rc0 (期待 0) / seed 探索深さ 0 exit=$rc1 (期待 非0, 理由 seed_vtables=0)"
+[ "$rc0" = 0 ] && [ "$rc1" != 0 ] && grep -q 'seed_vtables=0' "$N/cc_bad.out" && chk 'NC-C' ok || chk 'NC-C' ng
 
 # ---- NC-N: 未実装 helper の名前 (件数だけの judge を補う) ---------------------------------
 mkdir -p "$N/ub/19024" "$N/ub/19004" "$N/ub_bad/19024" "$N/ub_bad2/19004" "$N/ub_bad3/19024"

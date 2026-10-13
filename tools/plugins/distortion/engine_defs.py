@@ -15,6 +15,9 @@ else:
 rg = [tuple(int(x, 16) for x in r.split('-')) for r in open(rpath).read().strip().split(',')]
 ll = open(lpath).read()
 defs = {int(x, 16) for x in re.findall(r'^define [^@]*@function_([0-9a-f]+)\b', ll, re.M)}
+# RetDec は PE のエントリ関数を `@entry_point` と名付ける (function_<VA> ではない)。 先頭ラベル `dec_label_pc_<VA>:` の VA で数える
+# (MSVC の _DllMainCRTStartup 相当 61 B。 PLG-F6-2 #545 で、missing_define=1 の正体が名前だけの違いだったと判明)
+defs |= {int(x, 16) for x in re.findall(r'^define [^@]*@entry_point\([^\n]*\n(?:dec_label_pc_)([0-9a-f]+):', ll, re.M)}
 refs = {int(x, 16) for x in re.findall(r'@function_([0-9a-f]+)\b', ll)}
 starts = {a for a, _ in rg}
 miss = [(a, e) for a, e in rg if a not in defs]
