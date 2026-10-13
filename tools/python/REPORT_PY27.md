@@ -36,7 +36,7 @@ provider 全体: 435 関数 / 実装 70 / 未実装 365 (変化なし。`provide
 ## 検証
 
 測定 commit: `832f985d` (main 取り込み後の HEAD)。`832f985d` から HEAD まで `tools/python` のコード差分は 0 (下記)。
-runner 4 core / node 22.23.3 / emsdk 6.0.12 (`$RUNNER_TEMP/emsdk`、`/opt/emsdk` へ symlink) / `FL_WIN64_DIR` は fl-win64 の展開先。
+runner 4 core / node 22.23.3 / emsdk 6.0.12 ([EMSDK] へ symlink) / `FL_WIN64_DIR` は fl-win64 の展開先。
 `tools/python/work/` は `fetch_inputs.sh` で fl-win64 から作成 (gitignore)。負荷: 測定中 load average 0.8〜3.5 (4 core)。
 
 | コマンド | 結果 | wall |
@@ -52,10 +52,10 @@ runner 4 core / node 22.23.3 / emsdk 6.0.12 (`$RUNNER_TEMP/emsdk`、`/opt/emsdk`
 
 注: 4 本の node テストは `dist/` 生成後に実行 (並列実行すると `dist/flprov.js` 未生成で失敗する)。
 
-コード差分 (測定 commit から HEAD まで、`tools/python` 全体):
+コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
 ```
-$ git diff 832f985d HEAD -- tools/python
-(空。REPORT 更新 commit のみの差分は REPORT_PY27.md 自身であり、コードは変わらない)
+$ git diff 832f985d HEAD -- tools/python ':!*.md'
+(空。tools/python の .md 以外は変更なし)
 ```
 
 ## 未解決
