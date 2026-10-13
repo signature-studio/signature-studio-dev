@@ -264,3 +264,13 @@ iargs 未対応の 3 site (§17.2 の残 unbound: `1801a3117`・`1801c162b`・`1
 | harness の引数位置 | `spec.py` L182-184 が引数の宣言順を `A <slot>` で出力 (`this`=slot 0, `idx`=slot 1)。`native_runner.c` L128 (`c.gpr[sl]`) と `wasm_runner.mjs` L71 がその slot の位置で渡す。`ms_call.S` L18-19 が gpr[0]→rcx、gpr[1]→rdx に載せる。IR が BLK から読むなら、この値は届かない (前行の未確認事項に依存) |
 
 修正と検証 (ネガコン含む) は 1 run では終えられないため、**#883 (HB-H21) に残す**。
+
+### 17.10 #898 (HB-H22) 3 site の bind (HEAD 7f526bab 起点)
+
+| site | 原因 | 対応 |
+|---|---|---|
+| `1801a3117` | rdx = `movzx edx, dl` (呼出元の入口 dl の 0 拡張) | **解決**。`_resolve` に movzx 合成を追加 (`trunc` → `zext`)。IR: `%ia_1801a3117_1z = zext i32 (trunc %arg2 to i8) to i64` → `call @function_1801a30b0(%arg1, %ia_1801a3117_1z, %arg3)` |
+| `1801c162b` / `1801c1752` | r8 = `mov r8d,[rbp+0x5f]`。`[rbp+0x5f]` は呼出元の入口 rsp+0x28 (**5 番目の引数 = スタック渡し**)。`iargs.py` 冒頭の「スタック渡し (5 引数目〜) は扱わない」の範囲外 | **未解決**。0 を渡す。0 が無害かは未確認 (callee `1801c4d00`/`1801c5038` は r8 を `test r8b` 等で読む)。子 issue **[HB-H25]** に分離 |
+
+実測 (`iargs.run`, OTT `ott.drc.ll`): `site_unbound` 3 → **2**。T16 ok (`site_unbound=2`・再走査 0/0/0・冪等)。
+`leafspec targets/ott_iargs.json --n 200`: **match=200 mismatch=0 (rate 1.000 → PASS)**, 実測 23.3 秒。

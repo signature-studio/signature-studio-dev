@@ -20,7 +20,7 @@ MS x64 ABI の整数引数は rcx/rdx/r8/r9。RetDec は
 import re
 
 from .. import ir as IR
-from ..mc import MFunc, GPR_ARGS
+from ..mc import MFunc, GPR_ARGS, _canon_reg
 from ..regbind import Binder, FuncIndex
 
 FN_RE = re.compile(r"function_([0-9a-f]+)$")
@@ -202,6 +202,19 @@ def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0):
     if it.mnem == "mov" and it.mem and it.mem["rip"] is not None and it.mem["read"] and w in (32, 64):
         ins.append("  %s = load %s, ptr inttoptr (i64 %d to ptr)%s" % (nm + "m", ty, it.mem["rip"], tag))
         return (nm + "m", ty)
+    if it.mnem == "movzx" and it.ops[1].type == 1 and w in (32, 64):
+        src = _canon_reg(it._ci, it.ops[1].reg)
+        sw = it.ops[1].size * 8
+        base = _resolve(binder, mf, mod, src, d, tag, nm + "v", ins, depth + 1)
+        if base is None:
+            return None
+        if re.match(r"^-?\d+$", str(base[0])):
+            return (str(int(base[0]) & ((1 << sw) - 1)), ty)
+        if base[1] not in W:
+            return None
+        src_ty = "i%d" % sw
+        t = _conv(base[0], base[1], src_ty, tag, nm + "mt", ins)
+        return (_conv(t, src_ty, ty, tag, nm + "mz", ins), ty)
     if it.mnem == "lea" and it.mem and not it.mem["index"] and it.mem["base"] not in (None, "rip", "rsp"):
         base = _resolve(binder, mf, mod, it.mem["base"], d, tag, nm + "b", ins, depth + 1)
         if base is None:

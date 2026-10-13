@@ -474,6 +474,11 @@ def t16():
     assert not post["define_short"] and not post["sites_short"] and not post["sites_entry"], post
     ctor = [l for l in mod.func("function_18011d400").blocks[0].lines if "@function_180127550(" in l]
     assert len(ctor) == 1 and "(i64 %arg1, i64 %arg2, i64 1, i64 20)" in ctor[0], ctor
+    # movzx edx,dl 合成 (site 1801a3117): rdx を入口 dl の 0 拡張として bind する (unbound にならない)
+    assert not any("1801a3117" in l and "unbound" in l for l in lg), [l for l in lg if "1801a3117" in l]
+    assert any("function_1801a30b0@1801a3117" in l and "%ia_1801a3117_1z" in l for l in lg), lg
+    # 残る unbound は rbp 相対のスタック渡し引数 (5 引数目) の 2 site のみ (§17.2 / 未解決の子 issue)
+    assert st.get("site_unbound") == 2 and all(("1801c162b" in l or "1801c1752" in l) for l in lg if "unbound" in l), lg
     # 復元済みの site の rcx (入口素通し) を undef に戻すと detect-only が検出する (逆方向の被覆)
     fn = mod.func("function_18011d400")
     li = next(i for i, l in enumerate(fn.blocks[0].lines) if "@function_180127550(" in l)
