@@ -8,16 +8,18 @@ import json, os, re, struct, sys
 import pefile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import REPO_ROOT, PLUGINS_DIR  # noqa: E402
 OUT = os.path.join(HERE, '..', 'data', 'imports.json')
-FLE = '/home/ubuntu/work/webstudio/tools/startup/work/FLEngine_x64.dll'
-FLE_ALT = '/home/ubuntu/work/webstudio/tools/m2/work/block00031_PE.bin'
+FLE = f'{REPO_ROOT}/tools/startup/work/FLEngine_x64.dll'
+FLE_ALT = f'{REPO_ROOT}/tools/m2/work/block00031_PE.bin'
 PLUGINS = {
-    'OTT_vst2_win64.dll': '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll',
-    'OTT_vst3_win64.dll': '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst3_win64.dll',
-    'Serum2_win64.vst3': '/home/ubuntu/work/webstudio/tools/targets/serum2/work/Serum2_win64.vst3',
-    'FreshAir.dll': '/home/ubuntu/work/webstudio/tools/targets/freshair/work/win/Fresh Air/'
+    'OTT_vst2_win64.dll': f'{PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll',
+    'OTT_vst3_win64.dll': f'{PLUGINS_DIR}/ott/binaries/OTT_vst3_win64.dll',
+    'Serum2_win64.vst3': f'{REPO_ROOT}/tools/targets/serum2/work/Serum2_win64.vst3',
+    'FreshAir.dll': f'{REPO_ROOT}/tools/targets/freshair/work/win/Fresh Air/'
                     'C__Program Files_Steinberg_VSTPlugins_Slate Digital/Fresh Air.dll',
-    'FL64.exe': '/home/ubuntu/work/webstudio/tools/startup/work/FL64.exe',
+    'FL64.exe': f'{REPO_ROOT}/tools/startup/work/FL64.exe',
 }
 
 
