@@ -865,7 +865,21 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 
 ### 指示 123（2026-10-13、レビュー差し戻し後の自発修正・Opened PR は 2 状態のみ）
 
+> - implementとreviewerは自動的に呼び出しされるようになったのですか？報告してください。
+> - コンテキスト全域を圧縮してください。
 > また、レビュワーエージェントが突き返したとき、実装エージェントはPMの力を借りずに自発的に動作するべきです。現状そうなっていますか？全てのOpened PRは「レビュー中」「レビューを受けて修正中」の2種類の状態のみ許容され、「修正もレビューもされていない状態」は1秒も存在しないようにしてください。
+
+### 指示 124（2026-10-13、全 Opened PR に担当 run があるかの確認）
+
+> 質問: 全てのOpened PRは、Reviewerもしくは修正Implementが稼働中、もしくは待機中ですか？漏れはありませんか？
+
+### 指示 125（2026-10-13、Actions の同時実行数と Team プラン）
+
+> > 待機中の run の滞留: 待機は約 30 本あり、実行枠は 20 です。担当ありの中には、まだ実行されていない run が含まれます。
+>
+> 今Freeだけど、今月だけTeamプランに上げた方が良い？同時実行数が20から60に増える
+> 別に4ドルくらい今すぐ払えるし、私はそれに4ドル以上の価値を感じているので
+> https://docs.github.com/en/actions/reference/limits#job-concurrency-limits-for-github-hosted-runners
 
 ---
 
@@ -896,6 +910,8 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 指示 121: ショートレトロ、既存 PR の解決を最優先、新規タスクの着手禁止 (In review が 0 件になるまで解除されない) | **新規着手の禁止**: 新しい issue への `/oc` 投入・新規子チケットの実装 run を止める。起票は『未解決の追跡』のために行ってよいが、実装 run は投入しない。進行中の run (着手済み issue の続き・PR への修正依頼) は新規ではないので継続する。**解除条件**: Project V2 の Status が In review の件数 0 件 (実質は open PR の解消を含めて 0 に近づける)。**運用**: `sweep_prs.sh` の巡回を既存 PR の解決に集中させる (競合解消・修正・review 再起動・approve 済みの merge 判断)。レトロは `docs/pm/RETRO_2026-10-13.md` に記録し、問題点と対策を列挙する | `docs/pm/RETRO_2026-10-13.md`・`/home/ubuntu/work/analysis/watch_runs.sh.notes` |
 | 指示 122: 1 タスク = 1 チケット = 1 PR。In review が 11 件なら Opened (not draft) PR も 11 件のはず、現状は大きな不整合 | 実測 (2026-10-13 09:20Z): open PR 77 件は 77 の別チケットに 1 対 1 で、PR の重複は無い。不整合の原因は **Project V2 の Status が PR の実態に追従していない**こと (In review 11 件はすべて open PR 無しの残骸、open ready PR 65 件のチケットの In review は 0 件)。Status を PR の実態に合わせた (Done 187・Ready 63・Backlog 131・In review 76 = open ready PR 76)。stacked PR と draft の滞留は禁止する (PR #721 の prompts) | `docs/pm/RETRO_2026-10-13.md` §1・§2 #8・#11 |
 | 指示 123: レビュワーが突き返したとき、実装 agent は PM の力を借りず自発的に動作する。全ての Opened PR は『レビュー中』『レビューを受けて修正中』の 2 種類のみで、どちらでもない状態は 1 秒も存在しない | **現状は実現できていない**: 実測 (09:20Z) で open PR 77 件のうち 56 件 (73%) がどちらでもない状態だった。原因は、差し戻しで実装 run を起動する仕組みが workflow に無かったこと、競合 PR・draft・stacked・Copilot 待ち・merge 順待ちが『どちらでもない』を作ること。対策: PR #721 (差し戻しで fix モードの実装 run を自動起動、往復の上限と `oc:stuck`)・PR-B の watchdog (5 分おきに IDLE を検出して動かす)。**実 Actions 上の動作は merge 後でないと検証できない** (未検証) | `docs/pm/RETRO_2026-10-13.md` §2 #5・#6・§4、PR #721、issue #719 |
+| 指示 124: 全ての Opened PR に、Reviewer または修正 Implement が稼働中・待機中か。漏れはないか | **実測で答える**。`watchdog.sh` を `DRY=1` で本物のリポジトリに当て、open PR を『担当 run あり / 担当なし』に数える。漏れは理由別に分け、その場で依頼を投入して再測定する。主観では答えない | `docs/WORKFLOW.md` §11 (watchdog)・PR #724 |
+| 指示 125: Actions の同時実行数 (Free 20) を、今月だけ Team (60) に上げた方が良いか | 課金は依頼者の判断領域であり、PM は操作しない。実測 (所有者は組織・Free・席 1・public リポジトリ・同時実行が 20 で飽和) と公式の制限値を根拠に推奨と注意点を提示する。費用の本体は GitHub の席代ではなく LLM の推論費用と、API の率制限 | 本ファイル・`docs/WORKFLOW.md` §11 |
 
 ---
 
