@@ -163,22 +163,27 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 ## 11. MX-2 検証の再確認 (#266 / MX2-1 mock 欠陥) — 2026-10-13 実測
 
-### 11.1 検証状況 (HEAD 03d66e83・現 head で実測済み)
+### 11.1 検証状況 (HEAD aa8002f5・現 head で実測済み)
 
-- 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (`/opt/retdec` `/opt/emsdk` は runner 既存)。
-  `work/extracted/VST3/Massive X.vst3` は `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` で生成 (PE32+ DLL 確認済み)。
-- 実行: 各コマンドは foreground で完結。実測値は下表。
+- 素材: `plugins-massivex` / `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から展開。
+  RetDec / emsdk は runner 既存の `[RETDEC]` / `[EMSDK]` (`RETDEC` / `EMSDK` 環境変数で指定)。
+  `plugins-massivex` の tarball は Inno installer 2 本のみのため、
+  `scripts/parse_setup_headers.py <exe> work` → `scripts/extract_massivex.py <exe> work key` で
+  `work/extracted/VST3/Massive X.vst3` を生成した (PE32+ DLL として認識。`pefile` / `capstone` / `numpy` は pip 導入)。
+  - 注意: 展開時の md5 照合は 125 件中 0 件一致 (`md5-ok 0/125`)。展開物の先頭 2 バイトも `MZ` ではなく
+    `MZx` (`mx_pefix.py` の修復対象外)。この展開物と e2e の結果の関係は未調査 (起票先: #266)。
+- 実行: 全コマンド foreground。所要は実測秒。
 
-| 項目 (HEAD 03d66e83) | 結果 | 所要 |
+| 項目 (HEAD aa8002f5) | 結果 | 所要 |
 |---|---|---|
-| license e2e 既定 (-O1 + zero-init) | exit 0 / 11/11 PASS | 79 s (lift 無しの初回) |
-| license e2e `MX_OPT=-O0` | exit 0 / 11/11 PASS | 4 s |
-| license e2e `MX_OPT=-O2` | exit 0 / 11/11 PASS | 6 s |
+| license e2e 既定 (-O1 + zero-init) | exit 0 / 11/11 PASS | 62 s (lift キャッシュ無し) |
+| license e2e `MX_OPT=-O0` | 初回 exit 1 (step [1] `mx_pefix.py` で `patch site 0x18115dec2` の assert。原因未確定) → 同 HEAD で再実行 exit 0 / 11/11 PASS | 初回 3 s / 再実行 5 s |
+| license e2e `MX_OPT=-O2` | exit 0 / 11/11 PASS | 5 s |
 | NC `MX_ZEROINIT=0 MX_OPT=-O1` | exit 1 / 6/11 PASS (T7-T11 TRAP: memory access out of bounds) — 欠陥が再現 | 4 s |
-| dsp/e2e.sh | exit 0 / insns 258,087 / unsup_sites 48,612 / e8e9_targets 594,978 | 45 s |
-| dsp/negctl.sh NC1 / NC2 / NC3 | 3 件 FAIL (期待どおり): 3,118 / 4,575 / 31 insn | — |
+| dsp/e2e.sh | exit 0 / insns 258,087 / unsup_sites 48,612 / e8e9_targets 594,978 | 36 s |
+| dsp/negctl.sh NC1 / NC2 / NC3 | 3 件 FAIL (期待どおり): 3,118 / 4,575 / 31 insn | 10 s |
 
-- dsp の 258,087 insn / 48,612 site は `dsp/REPORT.md` と一致。§2/§3 の値と同一。
+- dsp の値は `dsp/REPORT.md` と一致 (§2/§3 と同一値)。
 
 ### 11.2 未解決 (起票先付き)
 
