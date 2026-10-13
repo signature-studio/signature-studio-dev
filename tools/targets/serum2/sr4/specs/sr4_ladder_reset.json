@@ -1,0 +1,83 @@
+{
+ "name": "sr4_ladder_reset",
+ "func": "0x1802f5c40",
+ "wasm_func": "function_1802f5c40",
+ "scenarios": 50,
+ "steps": 1,
+ "seed": 75004,
+ "args": [
+  {
+   "ptr": "this"
+  }
+ ],
+ "buffers": {
+  "this": {
+   "size": 256,
+   "fields": [
+    {
+     "off": "0x20",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x24",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x28",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x2c",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x30",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x34",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x38",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0x3c",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    },
+    {
+     "off": "0xe8",
+     "type": "u32",
+     "gen": {
+      "bits32": 1
+     }
+    }
+   ]
+  }
+ }
+}

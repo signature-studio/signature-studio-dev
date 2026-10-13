@@ -157,7 +157,7 @@
 
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
-| `tools/runtime/REPORT.md` | ~90 | ブラウザ実行基盤 |
+| `tools/runtime/REPORT.md` | ~155 | ブラウザ実行基盤 |
 | `tools/runtime/rt10/REPORT.md` | ~190 | 実 FLEngine x64c lift (126MB wasm) の Chrome 起動時間・帯域・tier-up・boot ループ soak (RT-10 #128) |
 | `tools/hostbridge/REPORT.md` | ~95 | Fruity Wrapper の VST2 ロード経路解析 + wasm 同梱プラグイン表 |
 | `tools/hostbridge/cb/REPORT.md` | ~145 | shimx R2 コールバック変換の実体接続 |
@@ -176,7 +176,8 @@
 | `tools/assets/REPORT.md` | ~125 | 314MB 級 wasm asset の chunk ローダ + 二段キャッシュ |
 | `tools/assets/wvfs/REPORT.md` | ~145 | 書込可能 OPFS VFS |
 | `tools/assets/deploy-manifest/REPORT.md` | ~60 | 配備 manifest 生産側 (05-stage 契約) |
-| `tools/python/REPORT.md` | ~240 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元) は要約のみで全文は `REPORT_APPENDIX.md` に分割 |
+| `tools/python/REPORT.md` | ~242 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§PY-12 (#587) は要約のみで全文は `REPORT_PY12.md`、§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元) は要約のみで全文は `REPORT_APPENDIX.md` に分割 |
+| `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_APPENDIX.md` | ~50 | python REPORT §PY-13 (build_flpy.sh の env 化 #588) と §12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
 | `tools/plugins/REPORT.md` | ~115 | Fruity プラグイン 141 種 wasm 化マップ (カウントの正本) |
@@ -204,6 +205,7 @@
 | `tools/targets/serum2/host/REPORT.md` | ~110 | Serum 2 最小 VST3 host |
 | `tools/targets/serum2/license/REPORT.md` | ~160 | Serum2 認可機構の呼出点マップ |
 | `tools/targets/serum2/license/authstub/REPORT.md` | ~125 | authorization stub 設計・実装 |
+| `tools/targets/serum2/sr4/REPORT.md` | ~110 | SR-4 (#75) DSP 段階 lift 第 1 段: vtable root 56 関数の対象表 + pilot lift 9 本 (実機 vs wasm 差分) + strict gate + ネガコン |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
