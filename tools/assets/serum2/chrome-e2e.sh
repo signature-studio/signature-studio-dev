@@ -3,7 +3,8 @@
 #   先に serum2/e2e.sh の prep (inventory + pack) を済ませた $SERUM2_WORK/{inv,pkg} を使う。
 #   SERUM2_WORK=<dir> bash tools/assets/serum2/chrome-e2e.sh
 # pass : browser-test (cold / warm / xhr-cold, Chrome 実機) が exit 0 かつ ALL PASS
-# neg  : 全 sha を反転した inventory を与えると browser-test は exit 1 かつ FAILED > 0 でなければならない
+# neg  : 全 sha を 0 に置換した inventory を与えると browser-test は exit 1 で、sha256 不一致の FAIL 行が run 数 (3) だけ出なければならない
+#        (run がエラー終了した場合の failed++ は sha 起因ではないので数えない)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BASE="${SERUM2_WORK:-$(pwd)/serum2/work/run}"
@@ -31,7 +32,8 @@ const L=fs.readFileSync('$INV','utf8').trim().split('\n').map(l=>{const e=JSON.p
 fs.writeFileSync('$NEG',L.join('\n')+'\n');"
 t=$(date +%s); rc=$(run "$NEG" "$OUT/neg.json"); dt=$(( $(date +%s) - t ))
 got=$(failed "$OUT/neg.json")
-okn=$([[ $rc == 1 && $got =~ ^[0-9]+$ && $got -gt 0 ]] && echo 1 || echo 0)
-echo "[neg-sha] exit=$rc failed=$got ${dt}s => $([[ $okn == 1 ]] && echo OK || echo NG)"
+shaf=$(grep -c '^  FAIL sha256 match' "$OUT/neg.json.log" || true)
+okn=$([[ $rc == 1 && $got == 3 && $shaf == 3 ]] && echo 1 || echo 0)
+echo "[neg-sha] exit=$rc failed=$got sha_fail=$shaf ${dt}s => $([[ $okn == 1 ]] && echo OK || echo NG)"
 
 [[ $okp == 1 && $okn == 1 ]] && echo "SERUM2 CHROME E2E OK" || { echo "SERUM2 CHROME E2E NG"; tail -15 "$OUT/pass.json.log"; exit 1; }

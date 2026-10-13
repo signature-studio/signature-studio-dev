@@ -75,17 +75,6 @@ pass 3 回とも `failures=0`、FLAC 4,747/4,747 PCM 一致、MD5 有り 4,747�
 - 回帰: `node tools/assets/test/slotcache-tail-test.ts` (修正版: 5 件中 5 件復元 exit 0) / `--neg` (旧 scan 相当の切り詰め: 4/5 で exit 1)。
 - 影響範囲: 既存 asset e2e (`tools/assets/e2e.sh`) は本 PR で再実行していない (§5)。
 
-## 6. 実 Chrome e2e (`bash tools/assets/serum2/chrome-e2e.sh`)
-
-Chrome 154.0.8037.97 headless (実ディスクプロファイル) / 同一 inventory・pack (`pack/pack.ts`, quality 9, 7,357 files) / `browser-test.ts --sample 150` (sha256 照合 151 files・29.2 MB)。
-
-| 項目 | 実測 |
-|---|---|
-| pass (cold / warm / xhr-cold) | exit 0, failed=0, 5 s (load 0.61 0.48 0.23) |
-| neg (全 sha を 0 に置換) | exit 1, failed=3, 6 s |
-| 各 run の sha256 照合 | 151/151 一致 (cold / warm / xhr-cold すべて) |
-| server chunk request (cold / warm / xhr-cold) | 133 / 0 / 133 |
-
 ## 5. 検証範囲 / 範囲外 (未解決は起票先付き)
 
 検証範囲: node 上のローカル HTTP サーバ (`tools/assets/test/server.ts`) への配信、SAB loader + node fs SlotCache、wasm (node 内 `WebAssembly`) での FLAC 復号、原本 (7z 展開物) との全件照合。
@@ -101,3 +90,16 @@ Chrome 154.0.8037.97 headless (実ディスクプロファイル) / 同一 inven
 | 既存 `tools/assets/e2e.sh` は作者環境の固定絶対パス (repo 外) 前提で runner では実行不可。SlotCache 修正の既存 e2e への影響は未確認 | 既存テストが回帰していない確認が無い (cache.ts の変更は scan の slot 数のみ) | 新規子チケット案 [E2E-n] 「tools/assets/e2e.sh の runner 対応」 |
 
 素材: R2 `plugins-serum2` (2,633,162,886 B) の `Install_Xfer_Serum2_2.1.5.exe` を使用 (FL/プラグイン由来のバイトは commit していない。`tools/assets/serum2/work/` と `$RUNNER_TEMP` のみ)。
+
+## 6. 実 Chrome e2e (`bash tools/assets/serum2/chrome-e2e.sh`)
+
+Chrome 154.0.8037.97 headless (実ディスクプロファイル) / 同一 inventory・pack (`pack/pack.ts`, quality 9, 7,357 files) / `browser-test.ts --sample 150` (sha256 照合 151 files・29.2 MB)。
+
+| 項目 | 実測 |
+|---|---|
+| pass (cold / warm / xhr-cold) | exit 0, failed=0, 5 s (load 0.61 0.48 0.23) |
+| neg (全 sha を 0 に置換) | exit 1, failed=3, 6 s |
+| 各 run の sha256 照合 | 151/151 一致 (cold / warm / xhr-cold すべて) |
+| server chunk request (cold / warm / xhr-cold) | 133 / 0 / 133 |
+
+注: 上表は判定を sha 起因に絞る前のスクリプトでの実測。修正後の `chrome-e2e.sh` (neg は `failed=3` かつ sha256 FAIL 行 3 件) は素材 `plugins-serum2` と prep が runner に無く未実行 (PR 本文の `oc_artifacts: plugins-serum2` で再実行予定)。
