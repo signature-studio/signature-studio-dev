@@ -215,4 +215,16 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
+- **実装が始まったチケットは merge まで止めない (依頼者指示 119・120)**: open PR は常に次のいずれかの状態で、
+  各状態に「次の一手」が決まっている。止まっている PR を残さない。
+  | 状態 | 判定 | 次の一手 |
+  |---|---|---|
+  | CONFLICT | main と競合 (`mergeable=CONFLICTING`)。**競合 PR は review run が起動しない** | main を merge して競合を解消する run |
+  | FIX | oc-reviewer の最新 review が現在の head に CHANGES_REQUESTED | 指摘 (reviewer・Copilot・inline) の修正 run。妥当でない指摘は実測を添えて理由を PR に残す |
+  | NOREVIEW | ready で現在の head に review が無い | review 再起動 (run が既にあれば待つ) |
+  | DRAFT | draft で review が無い | ready にして review 再起動 |
+  | COPILOT | reviewer が COMMENTED (Copilot の review 待ち) | 30 分経ったら close→reopen |
+  | APPROVED | approve 済みで未 merge | merge。PR 本文にマージ順があれば先行 PR の後。base が別 PR のブランチなら先行 merge 後に付け替え |
+  `sweep_prs.sh` が 15 分間隔で全 open PR を判定し、止まっているものを自動で次の run に載せる。
+  着手報告だけで終わった run は `find_silent_runs.sh` で検出して再投入する。
 

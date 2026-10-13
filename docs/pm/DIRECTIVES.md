@@ -842,6 +842,15 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 
 ※ 逐語の原本は同上。要旨: OC_MODEL_ID variable を `console-cloudflare-ai-gateway-custom/claude-sonnet-5-5#xhigh` (サブスクリプション、枠が尽きると停止) から `console-openrouter/anthropic/claude-sonnet-5.5#xhigh` (OpenRouter BYOK → Bedrock、基本停止しない) に更新した。依頼者が利用状況を見て調整する。PM は基本操作せず、トラブル時は `gh variable get -R signature-studio/signature-studio-dev OC_MODEL_ID` で状況を確認する。
 
+### 指示 119（2026-10-13、古い PR がマージされない理由の質問と恒久指示）
+
+> 質問: 古いPRはなぜマージされていないのですか？特に、#329,#371など10以上のPRが3時間以上前にOpenedされ、一部のPRは6時間以上経過しています。
+> 恒久指示: 基本的に、実装が始まったチケットはマージまでノンストップで動き続けている必要があります。
+
+### 指示 120（2026-10-13、作業の中断の禁止）
+
+> 指示に従わずに作業を中断することを禁止します。
+
 ---
 
 ## 2. PM による解釈・運用への反映
@@ -866,6 +875,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 指示 113〜115: 承認・PM への全権委任・コマンド実行制限の撤廃 | プロジェクトの所有者は PM。ユーザーは進捗を後から確認するのみで、チケット・タスク全般を PM の判断で進める。VM と GitHub/Cloudflare の運用責任も PM。**ただし無断の Cloudflare リソース/トークン作成の禁止 (指示 4・9) と破壊的 git 操作の禁止は撤廃されていない** (権限の拡大は責任の拡大であり、事前連絡なしの本番リソース変更の許可ではない)。確認できる情報は自分で取りに行く (step summary を含む) | 本ファイル・`docs/WORKFLOW.md` §11 |
 | 指示 117: jsonl をそのまま出す / text のみ出す提案 | text ブロックの全出力と作業の流れ (tool 名・状態・所要・入力の先頭・cost) は採用。**生 JSONL は採用しない**: repo が public でログも公開、tool の入出力に認証情報・FL 由来物が入り得て、secret マスクは登録値との完全一致でしか効かない (PR #477 の Copilot High・reviewer 指摘)。指示 90 (jsonl を読まず opencode api) とも整合 | `.github/actions/opencode/action.yml`・`docs/WORKFLOW.md` §11・#476 |
 | 指示 118: OC_MODEL_ID の変更 | モデル枠の管理は依頼者。PM は variable を変更しない。失敗が続く時は variable と失敗ログ (`rate_limit_error` 等) を確認して依頼者に共有 | `restart_failed.sh` (失敗 run の再投入) |
+| 指示 119・120: 古い PR がマージされない理由の質問、実装が始まったチケットは merge までノンストップ、作業の中断禁止 | 原因 (2026-10-13 実測、open PR 41 本の分類): 競合 (CONFLICT) は review run が立たないのに review を再起動し続けた約 20 本、reviewer の request-changes 後に修正依頼を出していなかった約 12 本、Copilot review 待ちで保留された 1 本。PR 単位の「次の一手」を PM が手で追えなくなったこと。**運用**: PR ごとに状態 (CONFLICT / FIX / NOREVIEW / DRAFT / COPILOT / APPROVED) を機械的に判定し、止まっている PR を必ず次の run に載せる。`sweep_prs.sh` を常駐させ (15 分間隔)、競合は main を merge する run、request-changes は修正 run、review 未投稿・draft は review 再起動、Copilot 待ちは reopen を自動で依頼する。approve 済み未 merge の PR は PM が merge 順を判断して merge する。着手報告だけで終わった run は `find_silent_runs.sh` で検出して再投入する。6 時間を超えた PR は確認の最初に見る | `/home/ubuntu/work/analysis/sweep_prs.sh`・`watch_runs.sh.notes`・`docs/WORKFLOW.md` §11 |
 | 指示 112: 全作業は GitHub Actions へ移行済みで、ローカルでの作業は基本的に行われない | 作業の実行主体は Actions 上の OpenCode (issue に `/oc oc_actions_allow_write` をコメントして起動)。ローカル subagent を「稼働本数 15」の数え方の前提にしない。PM のローカル作業は「Actions 起動・監視・検収・統合」に限る | `.github/workflows/opencode.yaml` (implement / review job)・`.github/README.md`・`docs/WORKFLOW.md` (Actions 運用の追記が必要) |
 
 ---
