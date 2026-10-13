@@ -118,7 +118,7 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 
 ### 6.2 既存エミュレータの限界 (変更なし)
 
-- 測定 commit: 0eb3c961。`git diff 481eb2d7 HEAD -- tools/plugins/framework/hostshim` は追加 2 ファイル (`REPORT_DISPATCHER.md` +30・`hs_callee_disasm.py` +34 新規)。`git diff 0eb3c961 HEAD -- tools/plugins/framework/hostshim` は `hs_callee_disasm.py` +3 (範囲外 VA の WARN 出力のみ・逆アセンブル結果は不変) と本行の追記のみ。測定対象の `hs_disp_emu.py`・`hostshim.c` は 0 行。
+- 測定 commit: 0eb3c961。`git diff 481eb2d7 HEAD -- tools/plugins/framework/hostshim` は追加 2 ファイル (`REPORT_DISPATCHER.md` +31・`hs_callee_disasm.py` +37 新規)。`git diff 0eb3c961 HEAD -- tools/plugins/framework/hostshim` は `hs_callee_disasm.py` +3 (範囲外 VA の WARN 出力のみ・逆アセンブル結果は不変) と本行の追記のみ。測定対象の `hs_disp_emu.py`・`hostshim.c` は 0 行。
 - 今回の run で `hs_disp_emu.py` を全 256 ID で再実行: exit 0 / 256 件 `stop=ended` / distinct (rax, path) = 109 /
   unmapped 61 ID・5,340 件 (§3.3 と一致)。wall・load は未計測 (本 run では集計のみ)。
 - 未収載 ID 25/54/64/88/96/101/128 の個別 (rax, leaf) は未取得。callee 戻り値 0 代替のため、
