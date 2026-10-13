@@ -52,6 +52,7 @@ class _Lazy:
 
 def _stub_defaults(params):
     # stubs の既定値は単純リテラル (True/False/0/-1/None) を採用し、許可表の `midi.*` は遅延評価 (_Lazy)。
+    # 四則演算だけの式 (`1 / 24`) は _default_value で評価する (旧 eval と同じ値)。
     # それ以外の記号は既定値不明 (省略時は C 側に任せ、後続を指定する呼出しは TypeError)。
     out = {}
     for p in params or []:
@@ -62,6 +63,11 @@ def _stub_defaults(params):
         except (ValueError, SyntaxError):
             if p["default"] in _DEFAULT_NAMES:
                 out[p["name"]] = _Lazy(p["default"])
+            else:
+                try:
+                    out[p["name"]] = _default_value(p["default"])
+                except ValueError:
+                    pass
     return out
 
 
