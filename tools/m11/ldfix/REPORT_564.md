@@ -55,8 +55,8 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 `f4_judge.py` 6 gate (F1 修復対象 / F2 IR 形 / D1 到達 / D2 load だけでは未到達 / P1 起動・survey 不変 / A1 監査分類) 全 PASS。
 ネガコン 4/4 が「期待した FAIL 行」付きで FAIL: N1 pre を post として判定 (D1) / N2 noand を post として判定 (D1) / N3 到達増分 ≥5 を要求 (D1) / N4 survey 1 unit を ok→trap に改竄 (P1)。
 
-**現 head `545883bb` の実測** (`EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64] の fl-win64 展開先> bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.66 / 終了 1.22): **382 s, rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25**。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。監査 sites 2,846 / FRAME_IN_ESCAPED 56 (`results/audit_undefload_564.json`)。
-履歴 (1 行): PR 初回 `7be6bab` 175 s の 816/1/46/79 は main 取り込み前の値。main 取り込み後の survey 変化 (869/1/47/25) の原因は未分離 (§5)。
+**現 head `7d44c033` (main `6aa4b397` 取り込み後) の実測** (`EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64] の fl-win64 展開先> bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 1.01 / 終了 1.08): **326 s, rc 0**。6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。pre / noand / post とも units_run 52 / init_count 54 / icall_miss 5、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25**。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。監査 sites 2,846 / FRAME_IN_ESCAPED 56 (`results/audit_undefload_564.json`)。
+履歴: `545883bb` (main `33fd25a2` 取り込み後) で 382 s, rc 0、値は同じ 869/1/47/25。PR 初回 `7be6bab` 175 s の 816/1/46/79 は main 取り込み前の値。
 
 ## 5. 未解決 / 限界
 

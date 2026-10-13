@@ -139,6 +139,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 2 | 0 | 146 s | 1.03 1.02 0.79 → 1.02 1.03 0.84 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
 | 3 | 0 | 143 s | 1.02 1.03 0.84 → 1.26 1.11 0.90 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
 | HEAD 545883bb (main 33fd25a2 取り込み後・1 回) | 0 | 206 s | 1.03 0.96 0.55 → 1.08 1.02 0.66 (done 行) | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| HEAD 7d44c033 (main 6aa4b397 取り込み後・1 回) | 0 | 172 s (done 行) | 0.99 1.07 0.67 → 1.02 1.05 0.74 | 12/12 PASS | 500 passed / 0 failed (件数増加の原因は未確認) | 5/5 期待どおり FAIL |
 
 - 3 回の一致: B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 undefined/sigmismatch/duplicate `0/0/0`、A1 `177 = 177 (impl 159 / stub 18)`、S1 `871/1/47/23/0 (base 871/1/47/23/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` ×3、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
 - 所要は 137–146 s (e2e.sh の done 行。wall は run1 137 s・run2 146 s・run3 143 s)。runner 4 vCPU。
@@ -171,4 +172,4 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | PM 起票依頼 (新規子チケット) |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない) | runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `gen_ir2` を使わず素材 IR で行う | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件。PM 起票依頼) |
-| 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
+| 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。HEAD 7d44c033 の 1 回 (500/0) でも再現せず。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
