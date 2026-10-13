@@ -4,8 +4,9 @@
 
 ## 結論
 
-- 前回比の差分は 2 組: 基準 `59eea5c` = 38/108/66 から、`origin/main` c4e93550 = 35/112/65 (38→35)。このうち `ldlib/cases.py` だけで 38→40 が再現する (main 全体では 40 でなく 35)。基準 38 は n=3 の生ログ commit 済み (下記)。
-- 前回比の基準 (PM 判断 #1069, 2026-10-14): **『同一 HEAD で n=3 回採点した値 (集計 min–max)』**。過去の報告値は基準にしない。比較は基準側 (main の HEAD) と変更側を同じ run で n=3 採点し、生の `OTT_SUMMARY` 行を `results/` に commit して参照する。
+- 前回比の基準は、同一 HEAD で n=3 採点した値 (min–max)。過去の報告値 (38/108/66・33/110/69) は基準にしない。`59eea5c` の 38/108/66 は旧基準・報告値で、比較の参照点にとどめる (生ログ commit 済み・下記)。
+- 参考: 旧基準 `59eea5c` (38/108/66) から、`origin/main` c4e93550 = 35/112/65 (38→35)。このうち `ldlib/cases.py` だけで 38→40 が再現する (main 全体では 40 でなく 35)。
+- 基準の決定 (PM 判断 #1069, 2026-10-14): 『同一 HEAD で n=3 回採点した値 (集計 min–max)』。
 - 訂正 (LD-31): 旧版 LD-16 付録の基準値 (訂正前の報告値) と、それに基づく切り分け (ld_native.c 計時の寄与・関数単位の表) は再現せず無効。本書から削除した (旧版は git 履歴に残る)。
 - 生ログ: 本節末尾の「生ログの根拠」を参照。
 
@@ -20,7 +21,7 @@
 
 測定方法 (全行共通): wasm は素材 `work-liftdiff` 同梱の凍結 snapshot (`work/ott_old/ld_wasm.wasm`) を使い、`ld_native` は各 commit の `rt/` から再ビルド。`batch --set closure` (212 関数) → `check_ott.py`。wasm 側は 3 commit で同一のため、差はすべて liftdiff 側 (`ldlib/`・`rt/`) の違いに由来する。wasm を各 commit で再 build した測定ではない (emsdk の runner 未導入)。
 
-- 前回比の基準は 59eea5c 38/108/66 (PM 判断 #1069 の規則に従えば、比較は同一 run で測った基準側 n=3 と変更側 n=3 の組)。
+- 前回比は、同一 run で測った基準側 n=3 と変更側 n=3 の組で行う (PM 判断 #1069)。旧基準 59eea5c (38/108/66) は参照点のみ。
 - 検証の途中で、`work/` の展開直後の `liftdiff.py build` が `sigs.json` (212→178 関数) を書き換えた事故があった。素材 tar から `sigs.json`・`batch.jsonl` を戻し直した後の測定のみ採用する。
 
 ## 2. ファイル単位の差し替え (未実施)
@@ -50,7 +51,7 @@
   python3 tests/ott_delta.py <旧 batch.jsonl> <新 batch.jsonl>   # 関数単位の差分
   ```
 - 旧 commit の再現: `git worktree add --detach <dir> 59eea5c`、`tools/{ott,m6,m11,liftdiff}/work/` を素材から入れる。
-- 前回比の基準: PM 判断 (#1069) のとおり、同一 HEAD で n=3 採点した値。過去の報告値は使わない。
+- 前回比の運用 (PM 判断 #1069): 基準側 (main の HEAD) と変更側を同じ run で n=3 採点し、生の `OTT_SUMMARY` 行を `results/` に commit して REPORT から参照する。生ログの無い数値は「報告値」と明記する。
 
 ## 6. 検証の範囲・未解決
 
