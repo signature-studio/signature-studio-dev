@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ILSvg の svgdom/svgren 連結ビルドの版の組を probe する (#877)。
 #   usage: bash tools/shared/oss/ilsvg/probe_svgdom.sh
-# 生成物は tools/shared/work/ilsvg_probe/ (gitignore)。結果の解釈は NOTES.md。
+# 生成物は tools/shared/work/ilsvg_probe/ (gitignore)。結果の解釈は tools/shared/oss/ilsvg/REPORT.md。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; ROOT="$HERE/../.."
 W="$ROOT/work/ilsvg_probe"; mkdir -p "$W/ob"; cd "$W"

@@ -1,5 +1,7 @@
 # ILSvg 版の組 probe (#877 / 親 #151)
 
+結論 1 行: svgdom 0.4.7 は emcc で 26/26 cpp が通る。svgren 0.6.3 / 0.5.9 は svgdom 0.4.7 と enum 名が合わず版の組は未確定 (詳細は下表・§結論)。
+
 再現: `bash tools/shared/oss/ilsvg/probe_svgdom.sh` (生成物は `tools/shared/work/ilsvg_probe/`、gitignore)。
 clean HEAD での実測: 1 run あたり 33.8 s (real)、load average 0.38 (開始時)。
 
@@ -31,5 +33,5 @@ clean HEAD での実測: 1 run あたり 33.8 s (real)、load average 0.38 (開�
 
 | 未解決 | 起票先 |
 |---|---|
-| svgdom と svgren の enum 名が合う版の組の確定、連結 wasm ビルド、3 関数 wrapper、mac dylib との照合基準 | 子 issue (親 #877) |
-| papki 1.0.101 の `make_unique` 置換が FL バイナリの papki と一致するか (推定) | 子 issue (同上) |
+| svgdom と svgren の enum 名が合う版の組の確定、連結 wasm ビルド、3 関数 wrapper、mac dylib との照合基準 | #927 `[T-SH-21]` (親 #877) |
+| papki 1.0.101 の `make_unique` 置換が FL バイナリの papki と一致するか (推定) | #927 (同上) |
