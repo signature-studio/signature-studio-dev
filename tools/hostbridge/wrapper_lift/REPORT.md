@@ -139,3 +139,27 @@
 - liftlib (RetDec C → 修復 → emcc) の Wrapper 適用: RetDec 出力は `.ll` ではなく C であり、liftlib の `lift` 入口 (`targets/*.json`・`.ll` 前提) に直接載らない。修復 (`int64_t*` と整数の混在、`__asm_movsd` 等の未宣言 helper) が未実施。
 - block23676 の x64c 実 lift と、両 block の wasm link 完了 (受入条件 1・2 の残り)。
 - 採用方式の判定 (受入条件 4): build 可否が揃うまで決められない。**採用方式は未決定**。
+
+## 7. #1128 の実測 (検証 HEAD: 7ceb66ce)
+
+環境: `[EMSDK]` (`toolchain-emsdk`) の emcc、`[RETDEC]` (`toolchain-retdec`) v5.0、load average (1 分値) 0.6–2.4。
+
+| 項目 | block19091 | block23676 |
+|---|---|---|
+| RetDec 分割 lift 成功 (§5 の再現) | 19,723 / 19,816 (99.53%)・188 s | 19,733 / 19,826 (99.53%)・194 s |
+| RetDec 出力 C の emcc `-c` 通過 (修復なし, 関数単位) | 17,155 / 19,816 (86.57%) | 17,161 / 19,826 (86.55%) |
+| 同 (`-Wno-implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types`) | 19,650 / 19,816 (99.16%)・ファイル単位で 40 中 16 が exit 0 | 未測定 |
+| x64c 生成 (`ULLULL` 吸収後) | 19,816 関数・`ULLULL` 0 行・60 s | 19,826 関数・`ULLULL` 0 行・60 s |
+| x64c `emcc -c` (`-I tools/ott/rt`) | exit 0・34.5 s・error 0 | exit 0・34.4 s・error 0 |
+| x64c wasm link (`-Wl,--export-all -Wl,--allow-undefined`) | exit 0・0.66 s・43,828,879 B | exit 0・0.47 s・43,833,146 B |
+
+- 再計算コマンド: `python3 tools/hostbridge/wrapper_lift/emcc_per_function.py <retdec_batch_dir> --targets <block.bin> --out <json>` (関数単位、pdata 集合で数える)。
+  x64c: `FL_WIN64_DIR=<fl-win64>/extracted python3 tools/hostbridge/wrapper_lift/x64c_wrapper.py <block.bin> <out>` の後に `emcc -c -I tools/ott/rt`。
+- `ULLULL` の吸収: `x64c_wrapper.py` が生成後に `ULLULL` → `ULL` を置換する (`tools/ott/lift/x64c.py` は変更していない。本体の修正は別 PR)。
+- 修復なし RetDec 出力の誤り内訳 (block19091、全 40 ファイル、error 行 11,432。上位 12 種の集計): undeclared function 8,062 (`__asm_*`・`__readgsqword` 等)、incompatible pointer types 1,245、int 変換系 (incompatible pointer to integer conversion) は上位 6 種の計 1,968、goto/label 関連 94 (`statement not in loop or switch` 78 + `undeclared label` 16)。
+- **注意 1**: `-Wl,--export-all` なしの link は wasm が 2.9 KB で、未 export 関数が DCE されたと推定 (未確認)。build の証拠にならないため、表の値は export-all 版のみ。
+- **注意 2**: `--allow-undefined` のため、link が通っても未解決シンボルの有無は未検証。
+- **注意 3**: 93 件の `no_definition` (§5) の原因は未特定のまま。
+
+**採用方式 (暫定、受入条件 4)**: **x64c (Wrapper 経由) を採用候補とする**。両 block が生成・`emcc -c`・wasm link を通る。RetDec 分割 lift は batch 40 ファイル中 24 件が、警告を抑止しても `emcc -c` で落ち、修復 (undeclared helper・goto/label) が必要なため build 可否が出ない。
+ただし x64c の実行結果 (bit 一致) と CreatePlugInstance 到達 (#829) は未検証。よって「採用」は build 経路の判定であり、実行検証は残る。
