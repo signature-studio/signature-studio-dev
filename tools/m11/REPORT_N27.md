@@ -167,7 +167,7 @@ NC1 (capstone 未導入) は `bash tools/m11/m11_gen_ir2.sh` が exit 1 にな�
 
 ### 11-b. #729: 別 runner VM での n=2 (`b4dac086` = origin/main 起点の worktree)
 - 環境: 前節 (§11) と別の runner VM (hostname `runnervmmprz5`・machine-id 先頭 `566c0bdf`)。素材 `fl-win64` (PE 1 member, sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。
-- 前提の追加: `work-m11` に `lift_pe.sha256` が無く、`m11_e2e.sh` は全再生成に入る。`m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を要求するため、Ghidra 12.1.4 を GitHub Release (`ghidra_12.1.4_PUBLIC_20260921.zip`) から取得して JDK 21 (`/usr/lib/jvm/temurin-21-jdk-amd64`・`MAXMEM=12G`) で `DumpFunctions.java` を実行した (rc 0 / 609 秒 / 59010 行)。
+- 前提の追加: `work-m11` に `lift_pe.sha256` が無く、`m11_e2e.sh` は全再生成に入る。`m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を要求するため、Ghidra 12.1.4 を GitHub Release (`ghidra_12.1.4_PUBLIC_20260921.zip`) から取得して JDK 21 (Temurin)・`MAXMEM=12G`) で `DumpFunctions.java` を実行した (rc 0 / 609 秒 / 59010 行)。
 - IR 生成: `m11_gen_ir2.sh` rc 0 / 44 秒 / ldfix applied。
 
 | 測定 | rc | 所要秒 | load (開始→終了) | ok | oob | halt0 | trap | miss | clobber | oom | ir_sha256 |
