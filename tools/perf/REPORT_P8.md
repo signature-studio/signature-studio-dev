@@ -185,5 +185,5 @@ Chrome 154.0.8037.97 headless, Dedicated Worker, `AMD EPYC 9V45 96-Core Processo
 
 ### 8.3 結論の更新 (実 OTT の範囲)
 - plugin 別 instance の**定常**は実 OTT でも node / Chrome Worker で ほぼ平坦 (node +2.8%、Chrome +9%・run 間ばらつき内; §7, §8.1)。
-- **Memory 本数上限 124〜125 は実 OTT でも同一** (§8.2)。
+- **Memory 本数上限 124〜125 は実 OTT でも同一** (§8.2)。方式の決定 (採る方式 = 同一 Memory への処理オブジェクト畳み込み、Chrome で M=130 駆動・署名一致) は [REPORT_P15](REPORT_P15.md) と DECISIONS D10 が正本。
 - 実 OTT での **PIC 税 (SIDE_MODULE)** と **静的同居** は、絶対 VA 固定の lift では組めないため未測。前提の guest VA 相対化は子 issue #989 (`[LIFTLIB-12]`)、Memory 本数上限への設計は #990 (`[PERF-P15]`) で扱う。
