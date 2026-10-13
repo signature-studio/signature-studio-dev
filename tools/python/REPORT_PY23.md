@@ -68,10 +68,11 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実 FL (Edison) の `EditorSample` 各メンバの戻り値・境界挙動 (`NormalizeFromTo`・`PasteFromTo` の mode 挙動・`Length` setter 等) | mock 値のため実機と異なる可能性 | #81 (PY-9) |
-| `br` `dest` `lim` `rm` `pulse` `saw` は実行完了のみ (数値 oracle 未実装) | 数値の正しさは未検証 | 子 issue (下記 §6) |
-| ソース先頭 1 バイト反転のネガティブコントロール | 受入条件の文言 (pyc) と不一致 | 子 issue (下記 §6) |
+| `br` `dest` `lim` `rm` `pulse` `saw` は実行完了のみ (数値 oracle 未実装) | 数値の正しさは未検証 | #1310 (PY-28) |
+| ソース先頭 1 バイト反転のネガティブコントロール | 受入条件の文言 (pyc) と不一致 | #1310 (PY-28) |
+| Chrome (headless) 上の Audio 実行 (本検証は node のみ) | ブラウザ実行経路は未検証 #1323 (PY-29) |
 
 ## 6. 残り (子 issue)
 
-受入条件のうち「6 本の数値 oracle」と「先頭 1 バイト反転のネガコン」は本 run では未達。子 issue として起票する (番号は PR 本文・issue コメントに記載)。
-| Chrome (headless) 上の Audio 実行 | node のみ | REPORT_CHROME (未実施) |
+受入条件のうち「6 本の数値 oracle」と「先頭 1 バイト反転のネガコン」は本 run では未達。
+子 issue **#1310 [PY-28]** に起票済み (OPEN)。上の未解決表の 2 行目・3 行目がこれに対応する。
