@@ -64,18 +64,19 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 
 ## 3. 実測
 
-### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, head `f630762` で 1 回 (r6))
+### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, 検証 HEAD `58084158` で 1 回 (r7))
 
 比較元は **同一の m11_ov.c** (main 取り込み後, #700 の 8c7710 転記を含む) に固定し、guard のみ変える 3 構成。構成: off = guard 無効 (基準) / fix = guard 有効 (既定) / ng = 偽ガード (`icmp eq i32 %9, 123456789`)。
 
 | 構成 | ok | trap (oom 除く) | oom | miss | noproc | 計 | unit 56 |
 |---|---|---|---|---|---|---|---|
-| off | 865 | 27 | 2 | 47 | 1 | 942 | trap |
-| fix | **866** | 26 | 2 | 47 | 1 | 942 | **ok** |
-| ng | 865 | 27 | 2 | 47 | 1 | 942 | trap |
+| off | 866 | 27 | 2 | 46 | 1 | 942 | trap |
+| fix | **867** | 26 | 2 | 46 | 1 | 942 | **ok** |
+| ng | 866 | 27 | 2 | 46 | 1 | 942 | trap |
 
-- 判定 G1〜G3 は PASS、rc=0。差分は `off→fix` が unit 56 の trap→ok の 1 件のみ、`off→ng` は 0 件。
-- 所要: 3 構成の build + survey 合計 99 秒 (r6、`time` の real 1m38.851s)。qstore 有効 (`capstone` 5.0.7 / `pefile` 2024.8.26 導入後。skip 警告なし)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、node v22.23.3。
+- 判定 G1〜G3 は PASS、rc=0 (`85 秒` real, 3 構成の build + survey 合計)。差分は `off→fix` が unit 56 の trap→ok の 1 件のみ、`off→ng` は 0 件。
+- 参考 (r6, `f630762`): off 865 / fix 866 / ng 865。r6 と r7 の差 (1 unit) は同一 guard 条件でも動く揺らぎ (§6)。
+- qstore 有効 (`capstone` 5.0.7 / `pefile` 2024.8.26 導入後)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、node v22.23.3。
 - 直前 (`22a0f22`, r5) は off 863 / fix 864 / ng 863 だった。同じ guard 条件の 2 回で ok が 2 unit 動いた (865/866 と 863/864)。このずれの原因は未切り分け (§6)。
 - **旧版からの変更点**: 前版の G1 (cur vs base) は、`origin/main` の取り込みで `m11_ov.c` が変わったため比較が成立しなくなった。比較元を同一 m11_ov.c に固定し直した。前版の base/cur/fix/ng の数値 (864/865 等) はこの版と比較できないため、採用しない。
 - 失敗した試行 (記録): r1 = `FL_WIN64_DIR` 未設定で PE を読めず qstore が skip された (unit 56 は trap のまま)。r4 = qstore は有効だが `capstone`/`pefile` 未導入の環境で、fix は unit 56 ok だが G1 / G3 は旧 base との比較で FAIL。r4 のスクリプトは比較元を変えたため廃止。
@@ -99,14 +100,15 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - **走査の範囲**: 全 IR 関数 (= 全 unit の閉包を含む上位集合)。unit への帰属は行っていない。
 - **限界 (重要)**: strict の 405 件は**未検証の候補**。規則は heuristic で、偽陽性の率は未測定。405 件のうち miscompile である件数は本件では言えない。`dropped_target_not_label` の 7058 は内訳 (関数外への tail jump か否か) 未調査。
 
-### 3-3. e2e (`bash tools/m11/m11_e2e.sh`) — 現 head `f630762` では**未完走** (`lift boot5 (RetDec)` で fail-closed)
+### 3-3. e2e (`bash tools/m11/m11_e2e.sh`) — 検証 HEAD `58084158` (n=1)
 
-- 現 head での試行 (1 回, rc=1, 20.5 秒 real): `gen_ir2 (M11_LB_BASE=0): ok` の後、`lift boot5 (RetDec)` で停止。`tools/m11/m11_extra_ranges5.txt` が有るが `work/boot5.lift.ll` が素材に無く、RetDec (`[RETDEC]`) も runner に無い (`toolchain-retdec` は依頼で未指定)。
-- 停止の理由は本 PR の変更ではない。`work-m11` の `work/` には `boot5.lift.ll` が含まれない。e2e の完走には `toolchain-retdec` (または `work-m11` の再生成版) が要る。
-- 直前 (`22a0f22`, 1 回, r2, 61.7 秒, rc 0) の値は参考。ガード code は現 head と同一だが、現 head で再実行できていないため判定の根拠にはしない: `reached_stage 4`、survey `ok 866 / trap 28 (うち oom 2) / clobber 0 / miss 47`、`wasm_bytes 6028429`。
-- §3-1 の r6 (現 head) の fix (866) とは一致するが、off の 863 (r5) と r6 の 865 はずれている。survey の揺らぎ (§6)。
-- 「退行 0」の判定は survey ラベル比較のみ (§3-1 の限界)。e2e は現 head で未確認。
-- 到達 stage は変わらない (4/6)。unit 56 の後段の停止点 (`function_47ad70` の OOB) は本件の範囲外。
+- 検証 HEAD: `58084158` の IR パイプライン・build 手順 (`ebec083` から変更は REPORT のみ)。作業コピーは `$RUNNER_TEMP/run` (`work-m11` 展開 + `fl-win64` 展開、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)。repo の `tools/m11/work/` は使用していない。
+- 実測 (1 回, rc 0, **40 秒 real**, 4 vCPU): `reached_stage 4`、`ir_conditions`: `ldfix=applied`・`qstore=applied`・`ir_sha256=8d966a8d…`、survey `ok 867 / trap 28 (うち oom 2) / clobber 0 / miss 46`、`wasm_bytes 6042615`。停止理由は `function_47ad70` の OOB (本件の範囲外、§6)。
+- 前段の失敗 (記録): 初回の e2e は rc 1 (74 秒) で `emcc: undefined exported symbol: "_m11_set_va_bigtrace"` の build 失敗。原因は作業コピーに `work/obj/*.o` を cp した際の古い object の再利用 (mtime 由来)。`work/obj/*.o` と生成 C を消して再実行し解消。repo 側のソース・build 手順の問題ではない。
+- 直前 (`22a0f22`, 1 回, r2, 61.7 秒, rc 0) の値は参考: `wasm_bytes 6028429`、survey `ok 866 / trap 28`。
+- `lift boot5 (RetDec)` の停止は、`toolchain-retdec` を `/opt/retdec` (既存) で使うため今回は発生しなかった。RetDec は runner に既にある (`/opt/retdec/bin/retdec-decompiler`)。
+- **survey の揺らぎ**: 同一 head で (`negctl` 同一 build の別 run) ok が 866/867 と動く。§6 の揺らぎ項目を参照。
+- 「退行 0」は survey ラベル比較のみ。出力の同一性は未比較 (§3-1 の限界)。
 - 所要の数え方: `date +%s.%N` の差 (`m11_e2e.sh` の開始から終了まで)。4 vCPU。
 - 検証範囲: e2e の survey は `unit 56 = ok` を含めて 942 unit 全件。e2e 末尾の `m11_icall_audit.py` の出力 (`脱落率 100.0%`) は本件と無関係の既存監査で、本件では判定していない。
 
@@ -144,7 +146,7 @@ bash m11_e2e.sh                                        # §3-3
 
 **先頭の結論 (head `ebec083` 時点)**: 以下 2 件は approve 判断に影響する未解決であり、本 PR では解消していない。
 (i) ガード辺の rdx.1 (`zext(arg2)`) は仮定のまま。0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路 (`8c608d` → `410360` → `[rbx-0x50]`) の第 2 引数として参照されうる。値は callee 依存 (§1)。
-(ii) `8c60df` の戻り値不一致 (ガード辺の rax=0 がこの経路で戻り値に届く) は、ガード有無の比較を未測定。`M11_GUARD699=off` と既定の戻り値比較は未実施。
+(ii) `8c60df` の戻り値不一致 (ガード辺の rax=0 がこの経路で戻り値に届く) は、ガード有無の戻り値比較を未測定。survey は unit の戻り値を出力しないため、現行の計測では比較できない。`M11_GUARD699=off` と既定の戻り値比較は未実施。
 「unit 56 ok」は件数 0 経路が正しいことの証拠ではない (§3-1 の限界)。
 
 | 未解決 | 影響 | 起票先 |
