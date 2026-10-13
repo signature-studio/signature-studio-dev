@@ -23,6 +23,7 @@ fail() { echo "[ldfix_e2e] FAILED: $*"; exit 1; }
 [ -f tools/m11/work/boot_final3.ll ] || fail "tools/m11/work/boot_final3.ll 無し (bash tools/m11/m11_e2e.sh を先に)"
 [ -f "$PE" ] || fail "PE 無し"
 
+mkdir -p "$HERE/work/stage4"
 step "1/5 修復 pass 適用: boot_final3.ll -> work/ldfix_fixed.ll"
 python3 "$HERE/ldfix.py" tools/m11/work/boot_final3.ll "$HERE/work/ldfix_fixed.ll" \
   --pe "$PE" --report "$HERE/work/ldfix_report.json" || fail "ldfix.py"
