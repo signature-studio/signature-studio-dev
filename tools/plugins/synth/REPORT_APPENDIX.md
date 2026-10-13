@@ -28,9 +28,7 @@
 - `known.json`: 通過 4 本の `emcc_c_rc` を除去。残りの fails (`declares_unimpl` / `i256_trap` / `missing_define` と不通過 5 本の `emcc_c_rc`) は未解決。
 - judge (C++ 9 本の行のみ、`mk_status.py` 相当の列で作成): KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0 / exit 0。`synth_e2e.sh` 全体 (shell 12 本) は未実行。
 
-## C. E3 修復 (#1485; `function_180049450` の i32 仮引数)
-
-修復 pass: `tools/plugins/lift/passes/fix_i32_ptr_arg.py` [P-T2] (opt-in: `PLUG_I32PTR_FUNCS=function_180049450`)。
+## D. E3 修復 (#1485; `function_180049450` の i32 仮引数)
 
 修復 pass: `tools/plugins/lift/passes/fix_i32_ptr_arg.py` [P-T2] (opt-in: `PLUG_I32PTR_FUNCS=function_180049450`)。
 pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh` が `set -e` で止まる): 実引数が定数・`trunc` 定義以外 / 本体で `inttoptr`・`icmp` 以外に使われる / 呼出が解釈できない形。
@@ -59,6 +57,9 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 | 既定 (opt-in 無効、05a73875) | 0 | `21202,1579,0,1393,0,3,3,1,0,1,42,211,25828,67,23,1391,0` | 1 | 同上 (baseline と同一) |
 | `PLUG_I32PTR_FUNCS=function_180049450` (05a73875) | 1 | `21202,1579,1,-1,-1,-1,-1,-1,0,-1,42,-1,-1,-1,-1,-1,0` (pass 停止のため emcc 列は未生成) | — | `[P-T2] FAIL: 呼出の実引数 %arg1 が trunc 定義でも定数でもない (line 134718)` |
 
+- 測定の鮮度 (fc53b943 → 05a73875): `git diff fc53b943 05a73875 -- tools/plugins/lift tools/plugins/synth` の変更は `lift_ranges.sh` の 2 行 (コメント 1 行と RetDec 呼出行) と REPORT のみ。
+  RetDec 呼出行は `--select-decode-only ${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection} --timeout ...` になった。変数が未設定なら `${…:+…}` は空に展開され、RetDec に渡る argv は変わらない (実測: 未設定時は `--select-decode-only --timeout 5` の 3 語で、旧行と同一)。
+  よって既定経路・opt-in 経路の測定は流用できる (fc53b943 と 05a73875 の summary の差は既定経路の `lift_s` 列のみ 45 → 42。`emcc_c_rc`・欠落数・最初のエラーは同一)。ただし `PLUG_NO_STATIC_DETECT=0` も「設定済み」扱いで `--disable-static-code-detection` が付く (空文字のときだけ付かない)。
 - opt-in 経路は、仕様どおり `function_180056120(i32 %arg1, …)` の呼出で止まる。出力 `.i3.ll` は作られず、`.final.ll` も無い。
   外側の `i32` 署名を i64 化すると範囲が広がるため、本 pass では扱わない (下記 未解決)。
 - そのため「opt-in の `.ll` が `llvm-as`/clang で構文検証を通る」という受入条件は、実データでは**達成していない**。
