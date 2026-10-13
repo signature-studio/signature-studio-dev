@@ -268,7 +268,6 @@ class Region:
         self.leaders = set(mf.cfg().keys())
         self.vocab = {}            # 語彙ごとの使用数 (stats 記録用)
         self.rsp_allocas = {}      # rsp disp → alloca 名 (head block に後で挿入)
-        self.rsp_gpr_written = set()   # LIFTLIB-5: GPR spill で store 済みの slot
         self.rsp_alloca_lines = []
         # LIFTLIB-2: 領域内合流 (DAG) の reg2mem 合成
         self.join_allocas = {}     # (join_va, reg) -> alloca 名
@@ -664,7 +663,7 @@ class Region:
         """`xor r,r ; ... ; setcc r8` (RetDec は結果を i1 で持つ) の r 全体値 = zext i1 → i64 (LIFTLIB-5)。
 
         GPR bind は i1 を弾くため多定義 bind が復元不能になっていた (tan @1801a9cd9 の r10 =
-        入口 sign)。直前 8 命令以内に同 reg のゼロ化 (xor r,r) がある時だけ上位 56bit = 0 と言える。"""
+        入口 sign)。d と同一 block の直前 8 命令以内に同 reg の 32bit 以上のゼロ化 (xor r,r) がある時だけ上位 56bit = 0 と言える。"""
         if not leaf_ext("SETCC_I1"):
             return None
         it = self.mf.insns.get(d)
@@ -672,12 +671,16 @@ class Region:
             return None
         if _canon_reg(it._ci, it.ops[0].reg) != reg:
             return None
-        k = self.mf.order.index(d)
+        # d と同一の機械語 block 内に限る: block 境界を跨ぐと別 pred の xor を「ゼロ化済み」と誤認し,
+        # setcc を通らない経路の上位 56bit が 0 と保証できない (silent miscompile)
+        vas = self.mf.cfg()[self.mf.block_of(d)]["vas"]
+        k = vas.index(d)
         zeroed = False
-        for pv in reversed(self.mf.order[max(0, k - 8):k]):
+        for pv in reversed(vas[max(0, k - 8):k]):
             p = self.mf.insns[pv]
             if p.mnem == "xor" and len(p.ops) == 2 and p.ops[0].type == 1 and p.ops[1].type == 1 \
-                    and p.ops[0].reg == p.ops[1].reg and _canon_reg(p._ci, p.ops[0].reg) == reg:
+                    and p.ops[0].reg == p.ops[1].reg and _canon_reg(p._ci, p.ops[0].reg) == reg \
+                    and p._ci.operands[0].size >= 4:       # 8/16bit xor は上位 bit を消さない
                 zeroed = True
                 break
             if reg in p.writes:
@@ -921,11 +924,11 @@ class Region:
                 self.rsp_alloca_lines.append("  %s = alloca i64" % ap)
             x = self._gpr_val(st, _canon_reg(it._ci, it.ops[1].reg), va, out)
             out.append("  store i64 %s, ptr %s, align 4%s" % (x, ap, tag))
-            self.rsp_gpr_written.add(off)
+            st.setdefault("__gw", set()).add(off)
             self.used("rsp_gpr_store")
             return True
-        if ap is None or off not in self.rsp_gpr_written:
-            raise Unsupported("rsp gpr reload @%x: slot %#x 未 store" % (va, off))
+        if ap is None or off not in st.get("__gw", ()):
+            raise Unsupported("rsp gpr reload @%x: slot %#x が領域内の全経路で store 済みでない" % (va, off))
         dst = _canon_reg(it._ci, it.ops[0].reg)
         n = self.nm(va, "gl")
         out.append("  %s = load i64, ptr %s, align 4%s" % (n, ap, tag))
@@ -1741,7 +1744,7 @@ class Region:
         for va in self.topo:
             self.cur_va = va          # LIFTLIB-4: merge_in が合成する値の def block 基準
             if va == D:
-                st = {k: (set(v) if k == "__w" else (dict(v) if k == "rsp" else v)) for k, v in st0.items()}
+                st = {k: (set(v) if k in ("__w", "__gw") else (dict(v) if k == "rsp" else v)) for k, v in st0.items()}
                 pre = []
             else:
                 st, pre = self.merge_in(va)
@@ -1763,9 +1766,11 @@ class Region:
         cfg = self.mf.cfg()
         preds = [p for p in cfg[va]["pred"] if p in self.internal]
         pst = [self.out_states[p] for p in preds]
-        st = {"__w": set(), "fl": None, "rsp": {}}
+        st = {"__w": set(), "fl": None, "rsp": {}, "__gw": set()}
         if pst:
             st["__w"] = set().union(*[s["__w"] for s in pst])
+            # GPR spill slot は全 pred 経路で store 済みの slot だけ reload 可 (片経路だけの store は未初期化 alloca を読む)
+            st["__gw"] = set.intersection(*[set(s.get("__gw", ())) for s in pst])
             fls = [s.get("fl") for s in pst]
             st["fl"] = fls[0] if all(f == fls[0] for f in fls) else None
             rsps = [s.get("rsp", {}) for s in pst]

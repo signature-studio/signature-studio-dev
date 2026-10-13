@@ -143,6 +143,14 @@ def _ret_thread(mod, fn, mf, binder, log, stats):
             return True
         return d[0] in dom[bi]
 
+    def fresh(va, base):
+        cand, k = "%%lf_%x_%s" % (va, base), 0
+        while cand in used:                # 同一 ret VA を p1 が複製した block で衝突しうる
+            k += 1
+            cand = "%%lf_%x_%s%d" % (va, base, k)
+        used.add(cand)
+        return cand
+
     rets = [(bi, li) for bi, b in enumerate(fn.blocks)
             for li, ln in enumerate(b.lines) if re.match(r"^\s*ret i64 ", IR.strip_tokens(ln))]
     for bi, li in reversed(rets):          # 後方から (挿入で位置がずれないように)
@@ -161,8 +169,8 @@ def _ret_thread(mod, fn, mf, binder, log, stats):
                 bi, li = _relocate(fn, bi, ln)
                 b = fn.blocks[bi]
                 t = mod.tag(va)
-                nn = fresh("ph")
-                t64 = fresh("t")
+                nn = fresh(va, "ph")
+                t64 = fresh(va, "t")
                 b.lines[li] = "  ret i64 %s%s" % (t64, t)
                 b.lines.insert(li, "  %s = trunc i128 %s to i64%s" % (t64, nn, t))
                 b.lines.insert(li, "  %s = load i128, ptr %s%s" % (nn, ph, t))
@@ -192,30 +200,22 @@ def _ret_thread(mod, fn, mf, binder, log, stats):
             if self_used is not None and self_used[0] == bi:
                 pass                              # 同一 block 内定義 (正しい)
 
-        def fresh(base):
-            cand, k = "%%lf_%x_%s" % (va, base), 0
-            while cand in used:            # 同一 ret VA を p1 が複製した block で衝突しうる
-                k += 1
-                cand = "%%lf_%x_%s%d" % (va, base, k)
-            used.add(cand)
-            return cand
-
         if isinstance(v[0], str) and v[0].startswith("@@load:"):
             a = v[0][7:]
             t = mod.tag(va)
-            nn = fresh("ld")
+            nn = fresh(va, "ld")
             b.lines.insert(li, "  %s = load i128, ptr %s%s" % (nn, a, t))
             v = (nn, "i128")
             li += 1
         elif v[1] != "i128":
             # i64/i32 (xmm0 戻り callee の call 戻り / rax.0.reload 等) = xmm0 bits の下位 64bit
             t = mod.tag(va)
-            nn = fresh("ld")
+            nn = fresh(va, "ld")
             b.lines.insert(li, "  %s = zext %s %s to i128%s" % (nn, v[1], v[0], t))
             v = (nn, "i128")
             li += 1
         tag = mod.tag(va)
-        t64 = fresh("t")
+        t64 = fresh(va, "t")
         b.lines[li] = "  ret i64 %s%s" % (t64, tag)
         b.lines.insert(li, "  %s = trunc i128 %s to i64%s" % (t64, v[0], tag))
         n += 1
@@ -312,7 +312,7 @@ def _rx_one(mod, fn, binder, mf, ln, C, reader, stale, phis, fb_done, stats):
             ri = rb.lines.index(ln2)
             ldn = "%%rx_%x_pl" % reader
             k2 = 0
-            while any(ldn in x for x in rb.lines):
+            while any(ldn in x for b_ in fn.blocks for x in b_.lines):
                 k2 += 1
                 ldn = "%%rx_%x_pl%d" % (reader, k2)
             tagr = mod.tag(reader)

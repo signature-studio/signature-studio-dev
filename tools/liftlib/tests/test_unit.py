@@ -522,7 +522,95 @@ def t17():
           % (st["xret_callees_pending"], st["xret_rets_pending"], st["xret_threaded"], st["xret_rets_after"], ev["detected"], ev["injected"]))
 
 
+def t18():
+    """[LIFTLIB-5 / #342] leafabi: `_ret_thread` の名前割当 `fresh` はループ前に束縛される。
+
+    ret が全て reg2mem phi 分岐に入る構成 (最初に処理する ret が phi) で UnboundLocalError にならず,
+    同一 ret VA の複製 ret にも衝突しない名前が付く。`_rx_one` の phi load 名は block を跨いで衝突しない。
+    """
+    from types import SimpleNamespace as NS
+    from liftlib import mc
+    from liftlib.passes import leafabi
+
+    class _Mod:
+        def addr_of(self, ln):
+            return 0x1000
+        def tag(self, va):
+            return ""
+
+    class _Ix:
+        defs = {}
+        def dominators(self):
+            return {0: {0}, 1: {0, 1}}
+
+    class _Binder:
+        ix = _Ix()
+        def bind(self, reg, va):
+            return None
+
+    prev, prev_phi = mc.LEAF_EXT, leafabi._call_phi
+    mc.LEAF_EXT = True
+    leafabi._call_phi = lambda mod, fn, binder, va, used: "%phia"
+    try:
+        fn = NS(name="function_1000", blocks=[NS(lines=["  %a = add i64 0, 0", "  ret i64 %a"]),
+                                              NS(lines=["  ret i64 0"])])
+        st = {}
+        leafabi._ret_thread(_Mod(), fn, None, _Binder(), [], st)
+    finally:
+        mc.LEAF_EXT, leafabi._call_phi = prev, prev_phi
+    assert st["ret_phi"] == 2 and st.get("ret_unbound", 0) == 0, st
+    names = [l.split(" = ")[0].strip() for b in fn.blocks for l in b.lines if " = " in l]
+    assert len(names) == len(set(names)), names
+    for b in fn.blocks:
+        assert b.lines[-1].startswith("  ret i64 %lf_1000_t"), b.lines
+        assert any("load i128, ptr %phia" in l for l in b.lines), b.lines
+    print("T18 ok (leafabi _ret_thread: phi 分岐が先頭 ret でも fresh 束縛済み, 複製 ret の名前は %d 個すべて一意)" % len(names))
+
+
+def t19():
+    """[LIFTLIB-5 / #342] p1 `_setcc_value`: `xor r,r` のゼロ化は setcc と同一の機械語 block 内, かつ 32bit 以上に限る。
+
+    (A) 同一 block の xor r10d,r10d → 復元する (tan @1801a9cd9 の形)
+    (B) xor が別 block (jz で setcc 側へ迂回できる) → 復元しない (別 pred の xor を信用すると上位 56bit が不定)
+    (C) xor r10b,r10b (8bit) → 復元しない (上位 bit を消さない)
+    GPR spill slot: reload は領域内の全 pred 経路で store 済みの slot に限る (st["__gw"] の交わり)。
+    """
+    from types import SimpleNamespace as NS
+    from liftlib import mc
+    from liftlib.passes import p1
+
+    class _Img:
+        def __init__(self, code):
+            self.code = code
+        def read(self, va, n):
+            return self.code[va - 0x1000:va - 0x1000 + n]
+
+    cmp_set_ret = bytes.fromhex("39d1" "410f95c2" "c3")                  # cmp ecx,edx ; setne r10b ; ret
+    cases = {
+        "A_same_block": (bytes.fromhex("4531d2") + cmp_set_ret, True),   # xor r10d,r10d
+        "B_other_block": (bytes.fromhex("85c0" "7403" "4531d2") + cmp_set_ret, False),   # test; jz +3; xor r10d,r10d | setcc
+        "C_xor8": (bytes.fromhex("4530d2") + cmp_set_ret, False),        # xor r10b,r10b
+    }
+    prev = mc.LEAF_EXT
+    mc.LEAF_EXT = True
+    try:
+        got = {}
+        for name, (code, want) in cases.items():
+            mf = MFunc(_Img(code), 0x1000, 0x1000 + len(code))
+            d = next(v for v in mf.order if mf.insns[v].mnem.startswith("set"))
+            stub = NS(mf=mf, mod=NS(tag=lambda va: ""), b=NS(_is_region_dst=lambda n: False),
+                      ix=NS(instrs_at=lambda a: [(0, 0, "  %c = icmp ne i32 %a, %b")]),
+                      _value_ok=lambda n, u: True, nm=lambda va, t: "%sz", used=lambda k: None)
+            out = []
+            v = p1.Region._setcc_value(stub, "r10", d, d, out)
+            got[name] = v is not None
+            assert (v is not None) == want, (name, v, out)
+    finally:
+        mc.LEAF_EXT = prev
+    print("T19 ok (p1 _setcc_value: " + ", ".join("%s=%s" % (k, "復元" if v else "拒否") for k, v in got.items()) + ")")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19):
         f()
     print("ALL UNIT TESTS PASS")
