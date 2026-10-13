@@ -257,7 +257,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 2. Access の許可リストは **本人 (ライセンス保有者) のみ**。複数人に開く場合は各人の個別保有を前提に文書化。
 3. **利用者の登録キー/アカウント情報はサーバに送らず保存しない** (ローカルのみ)。ライセンス stub 方針は 2026-10-10 ユーザ指示により「登録済みとして振る舞う (無条件アクティベーション)」に確定 (§6.0)。ライセンス状態データはローカルでの配置・合成とし、サーバには保存しない。
 4. OSS は upstream から再ビルド、**FL 由来コードと別モジュール (差し替え可能)**、`--enable-gpl` 等を禁止、NOTICE を自動生成。
-5. 各社規約の最新版を取得・差分監視 (FL は 30 日で規約改定が発効)。
+5. 各社規約の最新版を取得・差分監視 (FL は 30 日で規約改定が発効)。→ 実装: `pnpm terms-watch` (LGL-5 #88、`tools/legal/terms-watch/REPORT.md`)。台帳は `docs/LEGAL_TERMS_LEDGER.md`。
 
 ---
 
@@ -299,7 +299,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - **LGL-2**: `release guard` — 公開前に dist/R2 同期対象を走査し、FL/プラグイン由来バイト列・資産ハッシュ (`[ANALYSIS-DIR]`/* から生成した deny-list) を検出したら失敗させる。
 - **LGL-3**: `THIRD_PARTY_NOTICES` 自動生成 (FreeType 謝辞、BSD/MIT 表示、PSF、Apache NOTICE) + upstream バージョン/configure 記録。
 - **LGL-4**: FFmpeg/LAME 等の LGPL 部品を side module (差し替え可能) として upstream から再ビルドする設計 + `--enable-gpl`/`--enable-version3` 検出 CI。
-- **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。
+- **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。 → 実装済み (Xfer を除く。`tools/legal/terms-watch/REPORT.md`)。
 - **LGL-6**: 一次文書の補完取得 (NI Massive X インストーラ同梱版 EULA ※Web 版は確認済み、Slate Fresh Air 個別条項、Xfer 公式規約、Image-Line の公開 ToU/FAQ)。
 
 ---

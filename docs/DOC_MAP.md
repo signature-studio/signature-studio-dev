@@ -43,6 +43,7 @@
 | `tools/shim/inventory.md`・`tools/shimx/inventory.md`・`tools/audio/INVENTORY.md` | 各照合 |
 | `tools/shared/data/ipp_inventory.md` | IPP 実測 |
 | `tools/plugins/PLUGIN_MATRIX.md` | plugin-matrix driver |
+| `docs/LEGAL_TERMS_LEDGER.md` | `pnpm terms-watch` (正本は同 `.json`) |
 | `tools/python/analysis/{flapi/FLAPI,mcp/MCP_TOOLS}.md` | 抽出 driver (repo 内 `tools/python/analysis/`) |
 
 ## 3. REPORT.md 索引
@@ -60,6 +61,7 @@
 | `tools/e2e/REPORT.md` | ~120 | ブラウザ E2E ハーネスと配信構成の実測 |
 | `tools/hosting/REPORT.md` | ~135 | 既定ホスト名だけで COOP/COEP を成立させる配信構成 (案 S の根拠) |
 | `tools/legal/release-guard/REPORT.md` | ~75 | release guard (LGL-2): 公開前に dist を走査し FL/プラグイン由来バイト列を検出して失敗させる deny-list ゲート |
+| `tools/legal/terms-watch/REPORT.md` | ~95 | terms-watch (LGL-5): 各社 EULA/ToU の取得・正規化ハッシュ比較・台帳更新・差分時非ゼロ終了 |
 | `tools/perf/REPORT.md` | ~150 | wasm 実時間性能・compile 時間・巨大 wasm 実験 |
 | `tools/perf/PERF.md` | ~150 | 性能の設計メモ (bit-exact 版の実測は `tools/perf/REPORT.md` §2.1・完走路の正本は `tools/ott/REPORT.md`) |
 
@@ -192,6 +194,7 @@
 | `docs/pm/README.md` | `docs/pm/` の索引 (2 ファイルの役割のみ) | DIRECTIVES の内容の繰り返し・分析内容 |
 | `docs/pm/PREDECESSOR_ANALYSIS.md` | 解任された前任 PM セッションの分析 (混乱の原因・証拠・再発防止ルールへの反映) | 指示の逐語原文 (`DIRECTIVES.md` が正本)・状態や未解決事項 (`STATUS.md`・`HANDOFF` が正本)・repo 外絶対パス |
 | `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
+| `docs/LEGAL_TERMS_LEDGER.{json,md}` | 各社規約の取得台帳 (取得日・版表記・正規化テキストの SHA-256)。`.json` が正本、`.md` は自動生成 | 規約本文・手編集 (`pnpm terms-watch` が更新) |
 | `docs/DOC_MAP.md` | 本書。REPORT.md 索引・行数上限ルール・自動生成一覧・本章 | 技術内容・測定値 |
 | `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D16 (横断正本) | 個別ケースの詳細 (report 側) |
 | `docs/HANDOFF/<日付>.md` | 引継ぎ要約 (方針・ブロッカー・次の一手)。最新のみ保持 | 状態の正本 (STATUS.md へ)・数値の羅列 |
