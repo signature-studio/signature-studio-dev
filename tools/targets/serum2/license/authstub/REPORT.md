@@ -122,3 +122,19 @@ python3 tools/targets/serum2/license/authstub/mpatch.py \
 python3 tools/targets/serum2/license/authstub/authstub_irpass.py \
   work/lift/authstub.drc.ll work/patched.ll --check                       # IR pass 単体
 ```
+
+## 11. LF2〜LF7 束縛の fp_bind 共通プリミティブ化 (PR #778, Refs #250)
+
+- 対象: `tools/liftlib/liftlib/passes/fp_bind.py` (新規。`fn_span` / `replace_lines` / `bind_slot_loads` / `insert_after`、件数 expect で一致を検査) と `authstub_irpass.py` の `apply_liftfix` (fp_bind 経由に変更。束縛内容は不変)。
+- 測定 commit: a1318f94。素材: `plugins-serum2` を 7z 展開 → `Serum2.vst3` 19,236,864 B, sha256 `501e7bb3…5283`。toolchain-retdec・toolchain-emsdk 使用。
+- **出所の注意**: 下表は PR #778 本文に記載されていた実測の転記。本 fix 追記時の run では `plugins-serum2` 素材が無く、e2e は再実行していない。再実測は `oc_artifacts` 付きの次回 run で行い、結果は本節に追記する。
+
+| 項目 | 変更前 (main 97f28539 相当の authstub 版) | リファクタ後 (a1318f94) |
+|---|---|---|
+| `e2e.sh` 所要 | 30.3 s (lift 新規生成) | 4.0 s (lift キャッシュ利用) |
+| load (PR 本文の表記) | 1.08 → 1.19 | 0.10 → 0.18 |
+| wasm ハーネス | 23/23 PASS | 23/23 PASS |
+| 束縛出力 | `work/base/patched_base_lf.ll` sha256 `c62d9316…8793` / `raw_base_lf.ll` sha256 `79ab30ca…0d20` | `--liftfix` 出力が上記 2 ファイルと `cmp` 一致 |
+
+- N4 (process / funclet 無変更) assert OK。変更関数は 18004fad0 / 1800c2b50 / 1800c6090 の 3 件。
+- 本束縛の共通化で達成したのは「既存 e2e の再現」と「束縛プリミティブの共通化」まで。L1 の復元 pass と LF 規則の一般化 (RetDec 出力からの規則導出) は未達。追跡 issue は未起票のため PM に起票を依頼する。
