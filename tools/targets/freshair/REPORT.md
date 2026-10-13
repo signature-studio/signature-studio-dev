@@ -168,7 +168,8 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 
 - **1 回の lift で両対象に効く範囲 = 共通基盤のみ** (SC DSP closure の 31.8% / 21,740 B)。snapin ごとの process は SlateCore と HeartCore で別ビルドの機械語で、既存 KH lift (`tools/targets/kilohearts/snapins/`) の IR/wasm を SlateCore に流用することはできない (Gain は SC 側も別途 lift 済み = §5)。
 - ID の一致 (§1) は **製品 ID・クラス名・17/20 slot の vtable 形が同系統** であることまで。実装同一性は本節で「機械語レベルでは同一でない」と確定。
-- **未検証**: ① 機械語が違っても **意味が同一か** (state 配置を揃えた差分実行 = 同じ入力で SC/KH の native 出力が bit 一致するか) は未実施。Gain は ramp + 2 乗平均メータの同型 (§5 / kilohearts REPORT §6) で、意味同一の蓋然性は高いが測っていない。② `.rdata` 不一致 20 本の分類は 11-3 (一部は未確定)。③ 直接 call のみ追跡 (間接 call は辿らない = closure は下限)。
+- **Gain の差分実行 (①)**: 同一入力 200 case で L/R/state が bit 一致 **126/200** (不一致は全て ramp 継続経路 `first=0`、差は 1 ulp 級)。bit 一致しないことを確定したが、原因 (丸め順か入力差か) は未特定。詳細は付録 §A3。
+- **未検証**: ① 残り (Gain 以外の snapin と、ramp 式の丸め順の切り分け)。② `.rdata` 不一致 20 本の分類は 11-3 (一部は未確定)。③ 直接 call のみ追跡 (間接 call は辿らない = closure は下限)。
 
 ### 11-3. `.rdata` 不一致 20 関数の分類 (`ks_rdata_class.py`)
 

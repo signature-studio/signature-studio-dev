@@ -37,8 +37,8 @@ def main():
             if a[fld] != b[fld]:
                 mism[fld].append(k)
                 bad = True
-        # 通知: SC は長さ+生バイト、KH は件数+値。件数だけ比較する
-        na = len(a["notify"]) and int(a["notify"][0]) or 0
+        # 通知件数: SC は end-begin のバイト数 (要素 4 B)、KH は要素数。件数に揃えて比べる
+        na = int(a["notify"][0]) // 4 if a["notify"] else 0
         nb = int(b["notify"][0]) if b["notify"] else 0
         if na != nb:
             notify_bad.append(k)

@@ -5,8 +5,8 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; FA="$HERE"
 REPO="$(cd -- "$HERE/../../.." && pwd)"
-SC="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
-KH="$REPO/tools/targets/kilohearts/work/winpkg/HeartCore.core_64"
+SC="${SC_CORE:-$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64}"
+KH="${KH_CORE:-$REPO/tools/targets/kilohearts/work/winpkg/HeartCore.core_64}"
 N="${1:-200}"; SEED="${2:-7}"
 W="$FA/work/semantic_gain"; mkdir -p "$W"; cd "$W"
 cc -O1 -o ks_semantic_gain "$HERE/ks_semantic_gain.c" -lm
