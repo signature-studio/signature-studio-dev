@@ -135,3 +135,30 @@ bash tools/gui/test/selftest.sh              # native 回帰
 bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 ```
 前提: emsdk (`toolchain-emsdk`)、node 22 以上、`x86_64-w64-mingw32-gcc` (`gen_api.py` が arity 表に使う)、`wasm-objdump` (wabt; `sigprobe.sh` の `unresolved-imports` 判定。無いと 0 を空振りで出す)。Ubuntu runner では `apt-get install gcc-mingw-w64-x86-64 wabt`。`e2e.sh` は repo 直下の `node_modules` (tsc) も要る。M11 IR は `work-m11`。
+
+## 8. 実ブラウザ確認 (SHX-T19 / #1159, 親 #956)
+
+`bash tools/gui/shimx_coexist/browser_e2e.sh` (前提: 先に `coexist.sh` で `work/` の obj を作る)。同じ obj を `ENVIRONMENT=web,worker` でリンクし、`src/runtime/gui_hostcall.ts` を bun で browser 向けに bundle、headless Chrome で走らせる。
+
+- **確認方式**: user activation が要る host 呼出 (`window.open` / picker) の直前に、ページの `#gate` ボタンを CDP `Input.dispatchMouseEvent` の実マウスで押させる (10 回 = window.open 4 + open 5 + save 1)。`navigator.userActivation.isActive` を各呼出で記録し、全件 true を検査。
+- **picker**: headless で native ダイアログは操作できないため、`showOpenFilePicker` / `showSaveFilePicker` だけ差し替え。`browserEnv()` の本体経路 (types 変換・Abort→null・File 読込・createWritable) は通る。
+- **window.open**: 実 API を呼ぶが遷移先は `about:blank` (外部通信なし)。URL に `blocked` を含む場合のみ null を返してポップアップブロックを模擬。
+- 変更: `HostCallEnv.openWindow` を `boolean | Promise<boolean>` にし、`openUrl` を async 化 (ブラウザ側の戻り値を await する)。node 側の挙動は不変。
+
+### 実測 (commit `40ea2953`、runner、Chrome 154.0.8037.97)
+
+| 項目 | 結果 |
+|---|---|
+| `coexist.sh` (node + mock) | rc=0 / 10.28 s / C 58 PASS・host 13 PASS・NC1 dup 7・NC2 fail 14 / ALL PASS |
+| `browser_e2e.sh` (web build + CDP) | rc=0 / 107.87 s / web link rc=0 / **BROWSER RESULT pass=13 fail=0** |
+| wasm 側 C テスト (web build) | RESULT pass=58 fail=0 |
+| window.open 実行時の user activation | 4 件すべて active |
+| picker 実行時の user activation | open 5 件・save 1 件すべて active |
+
+判定項目: window.open の URL 一致 (C 側で拒否した 4 件は host に来ない)、picker types・multi フラグ、buffer 反映 (kick.wav / a.wav / b.wav / c.mid の内容)、save の実 handle 反映 (`flushSaves` = 1)、host log の想定外エラー無し、ページの未捕捉例外無し。
+
+### 未解決
+
+- 実 FL guest との結合は未実施 (§6 の既存項目)。
+- browser_e2e.mjs には negative control を入れていない (node 版の NC1/NC2 相当は未実装)。
+- 実 FL の `ShellExecute` / `GetOpenFileName` 呼出の順序・タイミングは未検証 (§6 の SHX-T9 / SHX-T12 側)。
