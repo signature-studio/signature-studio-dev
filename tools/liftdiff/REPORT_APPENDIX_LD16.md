@@ -83,7 +83,7 @@ OTT 旧 chain (`build ott_old` + `batch --set closure --shards 4` + `tests/check
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| issue 本文の 38/108/66 の由来 (PR #802 の run 時点の素材・環境) は未特定。今回の素材では再現しない | 前回比の基準値が 2 系統ある | 本 issue #825 にコメント済み。PM 判断 |
-| 関数単位の tag 変化の機序 (vm0/u16 pattern がなぜ unexec の native fault を解消するか) は未確認 | pattern 追加の効果の説明が推定止まり | 起票先未定 (次の LD 子 issue 候補) |
-| m11 sample:800 の 1 件揺れの関数特定 | 非決定性の出所が未特定 | 同上 |
+| issue 本文の 38/108/66 の由来 (PR #802 の run 時点の素材・環境) は未特定。今回の素材では再現しない | 前回比の基準値が 2 系統ある | #1069 ([LD-31]) |
+| 関数単位の tag 変化の機序 (vm0/u16 pattern がなぜ unexec の native fault を解消するか) は未確認 | pattern 追加の効果の説明が推定止まり | #1070 ([LD-32]) |
+| m11 sample:800 の 1 件揺れの関数特定 | 非決定性の出所が未特定 | #1070 ([LD-32]) |
 | 素材の展開・python 依存 (`numpy capstone pefile`) は run ごとに必要 | 素の runner で e2e が exit 2 | 既に REPORT_APPENDIX §10 の未解決 (agent-setup) |
