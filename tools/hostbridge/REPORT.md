@@ -110,6 +110,21 @@
 | H8 (P2) | ブラウザ実機 | 同期 `WebAssembly.Instance`、worker/AudioWorklet 配置、SAB RPC (§2.7) |
 | (DSP) | OTT 自然経路 `[0x248]=1` の junk | M11 の「per-sample 破れ」課題に、natural flow が `[0x248]=1` である事実を追記 |
 
+## 5'. Win32 shim 表 (#784 / H4 分割 b)
+
+- **実装**: `poc/hb_bridge.mjs` に `SafeLoadLibrary(path, mode)` (SetErrorMode → LoadLibraryW → 旧モード復元, fw:0x449770 と同形)、`SetErrorMode`、`timeGetTime` (起動からの経過 ms, DWORD 折返し)、`CreateProcessW` (呼ばれたら原因付き throw = fail-fast)、`ModuleTable.register` での bridge 種別の native 強制 (`bridge`→0, 要求値は `bridgeRequested` に保持)。`GetProcAddress`/`FreeLibrary`/`LoadLibraryW` は既存実装を流用。
+- **試験**: `poc/test_shim.mjs` (OTT 非依存)。`hostbridge.sh` の [3c] で実行。
+- **前提**: `poc/test_marshal.mjs` は `tools/hostbridge/work/host_vst2.wasm` を読むため、`hostbridge.sh` [2] (build) 実行後にのみ動く (clean checkout では ENOENT)。PR 記載の「checks 13 / broken 0」は build 後の結果。
+- **数え方の定義**: `checks` = 実装側の試験 S1〜S8 に含まれる check 行 (`OK`/`FAIL` の行、`S[0-9]+[a-z]? ` 形式) の件数。`ネガコン` = 実装を外した mutant 6 種 (SafeLoadLibrary のモード非復元 / GetProcAddress の大小無視 / FreeLibrary の refcount 無視 / timeGetTime 定数 / CreateProcessW 黙って成功 / bridged 強制の素通し) のうち、対応 check が 1 件以上 FAIL した数。期待値は 6/6。
+- **再計算**: `bash tools/hostbridge/poc/recount_shim.sh` (`test_shim.mjs` を実行し OK/FAIL 件数と negative controls caught を出力)。
+- **実測** (`recount_shim.sh`, HEAD = 784 ブランチ): real checks OK=18 FAIL=0; negative controls caught=6/6; `[shim] ALL PASS`。
+- **OTT e2e (受入 1) 実測** (HEAD b7d7c018, 素材 `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec analysis-ott-binaries work-m6-ott` を取得して展開。`ANALYSIS_DIR=$HOME/analysis`):
+  - `bash tools/hostbridge/hostbridge.sh` (foreground): exit=0, 所要 4 秒 (build 済み `HB_SKIP_BUILD=1` での再実行。初回は [2] build を含めて実行)。[1] E1〜E20 OK / [3b] `checks 13 / broken 0` / [3c] `[shim] ALL PASS`・ネガコン 6/6 / [4] `[run_poc] checks 28 / broken 0` → `[hostbridge] ALL PASS`。
+  - 比較対象 `d78208de^` (shim 追加前, 同じ素材・同じ build 手順で `[2]`→`[4]`): exit=0, `[run_poc] checks 28 / broken 0`。
+  - 前後比較: `run_poc.mjs` の出力を時間・RSS・ビルド時刻・アドレス以外で diff → 差分なし (`bridge stats`・`T5c`〜`T8b` の結果行・`checks 28` が一致)。OTT 経路は shim 追加で不変。
+  - 前提の補足: `analysis/check_pe_stub.py` は `pefile` を要する。runner に未導入だと [3a] で `ModuleNotFoundError` により停止する (`pip install --user pefile` で解消)。`hostbridge.sh` 自体は依存を入れない。
+- **注意**: bridged 強制は `ModuleTable.register` 経由の全 descriptor に効くが、現行 descriptor に `bridge` 欄は無く実効値は常に 0。Wrapper 側 `this+0x761` の本物の制御 (Wrapper を lift した後) は H4 本体の範囲。
+
 ## 6'. 規約遵守メモ
 
 - 書込は `tools/hostbridge/` のみ。`tools/m2,m6..m10` は読取 (Ghidra project は `work/` へコピー、`ott_m10.ll` も `work/` へコピー)。README/docs/・ルート package.json 無改変。

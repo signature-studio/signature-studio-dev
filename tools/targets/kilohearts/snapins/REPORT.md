@@ -114,6 +114,32 @@ delay closure 142 関数の近似命令は rcpps 4 箇所のみ (すべて 0x180
 
 ~~**rcpps の完全エミュレート**~~ → **§13 で達成** (実機表 3 × 4,096 で 3 本が bit-exact 化、gate 未使用のまま解消)。~~**rdataest の精度向上 + D16 検出器化**~~ → **§13-2 で達成**。**CAB-60 の中位〜難 snap-in**: (c) 残り 27 関数 (5,721B) と Ladder / Slice EQ / Filter Table (AVX・FMA 427) は report §4 の難度表に従い未実施 (§13-4 起票先 = 親 CAB-53)。
 
+## 12. KH-16 (#779): VEX-256 / FMA 語彙の実測 (語彙追加の前段)
+
+語彙は推定で足さず、難 4 本の snap-in 固有 closure (`closures_sets.pkl` の unique) を capstone で全命令走査して決める。再現: `python3 snapins/scripts/vex256_census.py --json work/vex256_census.json` (前提 = `closures.py` と `callgraph.py` の出力)。
+
+- **数え方**: unique closure の各関数の全命令を走査し、(a) オペランドに `ymm` を含む命令、または (b) mnemonic が `vf` で始まる命令を 1 件と数える。同一 VA は 1 回。**測定範囲の限界**: (a) は ymm オペランド形、(b) は `vf*` のみ。xmm 形の `vblend*` / `vperm*` は**未計測** (census の filter 外)。
+- **実測 (2026-10-13, HeartCore.core_64 / callgraph 120,856 関数)**: ymm 命令は Convolver 40・Filter Table 40 (Ladder・Slice EQ は 0)。
+- **再計測の状態**: 本 run では `work/closures_sets.pkl` / `work/callgraph.pkl` が runner に無く census を再実行していない。下表は上記実測の値。再計測 (census の生出力の貼付) は次 run で行う (起票先 = #779)。
+
+| mnemonic | Convolver | Filter Table | Ladder | Slice EQ | 合計 |
+|---|--:|--:|--:|--:|--:|
+| `vmovaps` ymm (`ymmword`) | 20 | 20 | – | – | 40 |
+| `vmulps` ymm | 8 | 8 | – | – | 16 |
+| `vaddps` ymm | 6 | 6 | – | – | 12 |
+| `vsubps` ymm | 6 | 6 | – | – | 12 |
+| `vfmadd213sd` (xmm) | – | – | 7 | 3 | 10 |
+| `vfmadd213ss` (xmm) | – | 3 | – | 3 | 6 |
+| `vfmsub213ss` (xmm) | – | 2 | – | 2 | 4 |
+| `vfmadd231sd` (xmm) | – | – | 2 | – | 2 |
+| `vfmadd231ss` (xmm) | – | 1 | – | 1 | 2 |
+| `vfnmadd231sd` (xmm) | – | – | 1 | 1 | 2 |
+| `vfmadd132sd` (xmm) | – | – | 1 | – | 1 |
+
+- **xmm FMA 計 27 件** (Ladder 11 / Filter Table 6 / Slice EQ 10 = 上表の `vf*` 行の合計)。
+- **未解決 (本 PR では未実施)**: ymm 命令の lift (RetDec が ymm を `i256` の `__asm_v*` として出すか、gen_simd の declare 駆動で扱えるか) は未確認。`gen_simd.py` の VEX 別名表は xmm 形のみで、ymm 形の意味 (`vaddps` 等の 8 lane・upper lane 規則) は未実装。`vfmadd*` の scalar 形は既存 `gen_simd.py` で対応済み。xmm 形の `vblend*` / `vperm*` の有無は未計測 (起票先 = #779、census の filter を広げて次 run で測る)。
+- **受入条件の残り**: 語彙追加・既存 14 snap-in のハッシュ不変・語彙ごとの bit-exact テストとネガコン・run_all.sh 再実行は未実施。
+
 ## 13. KH-6 第 2 弾 (CAB-258 続, 2026-10-11) — rcpps/rsqrtps 実機近似表で Resonator/Stereo/Delay が bit-exact 化
 
 起点 `8efb7a0`。既知類型 (DEFECTS.md): **D16 該当** (§13-2)、D2/D3/D7/D8/D9/D11/D14 非該当。前提: rcpps/rsqrtps の結果は CPU 内蔵近似表で仕様 (SDM) は相対誤差 ≤1.5·2⁻¹² しか保束せず、旧 wasm 実装 (IEEE の 1/x) との差が CAB-224 以来の許容誤差 gate の原因だった。
