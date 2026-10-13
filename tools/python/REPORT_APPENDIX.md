@@ -107,6 +107,16 @@
 
 マージ後 HEAD (`cf0547f` = origin/main `e64ef6f` 取り込み後、`build_flpy.sh` 再リンク済み) でも step 9d を n=3 再実行: 3/3 とも node 43/43・Chrome 43/43・compare 不一致 0 (load average 1.04 / 1.44 / 1.44)。
 
+再検証 (#619 レビュー対応): origin/main `f9adacd` 取り込み後の HEAD `3522e52` (コード差分なし = 競合解消 + REPORT 分割) をクリーンな worktree でビルドし直して実行 (Actions runner 4 core、node v22.23.3、Chrome 154.0.0.0 headless、agent-browser 0.39.0)。`build_cpython_wasm.sh` 202 s、`build_flpy.sh` 6 s。step 9d の 3 コマンドを n=3 直列:
+
+| 回 | load average (1 分, 開始時) | node | Chrome (スクリプト内) | compare | 3 コマンド合計 wall |
+|---|---|---|---|---|---|
+| 1 | 2.79 | 43/43 PASS, exit 0 | 43/43 PASS, 0.9 s, exit 0 | outputs 19 件中不一致 0, exit 0 | 15.7 s (初回: agent-browser 初回起動を含む) |
+| 2 | 2.78 | 同上 | 同上 | 同上 | 2.7 s |
+| 3 | 2.80 | 同上 | 同上 | 同上 | 2.7 s |
+
+`pyscript_compare.py --neg` は `outputs 不一致 1/19` + `Euclidean 再計算不一致` を検出して exit 1。検証コミットは `3522e52` のみ (上の c61317a / cf0547f は各時点の記録)。
+
 (別途の先行 3 回: Chrome スクリプト内 1.1〜1.2 s / wall 1.9〜2.1 s。node のスクリプト内秒は整数丸め (`toFixed(1)` の 0.9〜1.0)。)
 node 版は分離リファクタ後も 43/43 PASS (リファクタ前 #79 の check 数と同数)。
 
