@@ -6,7 +6,8 @@
 import { createRpcBuffer, RpcServer } from "./rpc.mjs";
 
 export class FlPython {
-  static async create({ flpyUrl, engine, ids, files = {}, syspath = "", workerUrl, onStdout, onStderr }) {
+  // worker: 呼出し側 (バンドラ) が用意した Worker を渡す場合。未指定なら workerUrl (既定 ./py_worker.mjs) から生成する
+  static async create({ flpyUrl, engine, ids, files = {}, syspath = "", workerUrl, worker, onStdout, onStderr }) {
     const self = new FlPython();
     self.onStdout = onStdout || ((t) => console.log("[py]", t));
     self.onStderr = onStderr || ((t) => console.error("[py!]", t));
@@ -18,8 +19,8 @@ export class FlPython {
       return engine.call(ids[fn], args);
     });
     workerUrl = workerUrl || new URL("./py_worker.mjs", import.meta.url);
-    if (typeof Worker !== "undefined") {
-      self.w = new Worker(workerUrl, { type: "module" });
+    if (worker || typeof Worker !== "undefined") {
+      self.w = worker || new Worker(workerUrl, { type: "module" });
       self.w.onmessage = (e) => self.#onMsg(e.data);
     } else {
       const { Worker: NW } = await import("node:worker_threads");

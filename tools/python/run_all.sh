@@ -28,4 +28,5 @@ step "8. PoC: MCPTools.pyc on wasm Python + flapi mock (Worker/SAB RPC)"; node t
 step "9. 48 tools 全実行"; node tests/all_tools.mjs
 python3 analysis/mcp_classify.py
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
+step "11. MCP JSON-RPC を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-4 #77)"; (cd "$HERE/../.." && node tools/python/tests/mcp_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "ALL OK"

@@ -1,0 +1,38 @@
+## sqlite 3.19.3 amalgamation vs sqlite window
+sqlite: upstream literals(len>=10, no escapes/%)=1864  window funcs=940
+literals present in .rdata and referenced from code: 143; distinct referencing funcs: 189; inside window: 183 (96.8%)
+window funcs referencing >=1 upstream literal: 183/940 (19.5%)
+outside-window referencing funcs: 6 (9310 B)
+  OUT 0x1800e61f0 3820B  'parameters'
+  OUT 0x1801bee30 904B  '0123456789abcdef'
+  OUT 0x18040a2a0 1816B  'parameters'
+  OUT 0x1804bf130 2273B  'parameters'
+  OUT 0x180a00638 74B  'AreFileApisANSI'
+  OUT 0x180a00eac 423B  'AreFileApisANSI'
+negative control (same-size index window shifted; upstream-literal-referencing funcs inside):
+  shift -3x -> 0 funcs
+  shift -2x -> 0 funcs
+  shift -1x -> 0 funcs
+  shift +1x -> 0 funcs
+  shift +2x -> 0 funcs
+  shift +3x -> 0 funcs
+
+## negative control: sqlite literals vs zstd window (expect 0 in window)
+literals present in .rdata and referenced from code: 143; distinct referencing funcs: 189; inside window: 0 (0.0%)
+window funcs referencing >=1 upstream literal: 0/209 (0.0%)
+
+## muparser v2.3.2 vs muparser window
+muparser: upstream literals(len>=4, no escapes/%)=84  window funcs=204
+literals present in .rdata and referenced from code: 26; distinct referencing funcs: 8; inside window: 2 (25.0%)
+window funcs referencing >=1 upstream literal: 2/204 (1.0%)
+outside-window referencing funcs: 6 (1343 B)
+  OUT 0x1809e3240 275B  'acos'
+  OUT 0x1809eb7b0 293B  'log2'
+  OUT 0x1809ef030 306B  'sinh'
+  OUT 0x1809ef7b0 184B  'sqrt'
+  OUT 0x180a0a3e0 253B  'acos'
+  OUT 0x180a0f3f0 32B  'log10'
+negative control (same-size index window shifted; upstream-literal-referencing funcs inside):
+  shift -3x -> 0 funcs
+  shift -2x -> 0 funcs
+  shift -1x -> 0 funcs

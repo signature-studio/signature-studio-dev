@@ -15,10 +15,12 @@ import sys, os, json, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'lift'))
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
 import x64c  # noqa: E402
+from paths import PLUGINS_DIR  # noqa: E402
 
 IMG = 0x180000000
-DLL = '/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll'
+DLL = os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 CLOSURE = 3
 FPCTRL_FN = '1801bc890'   # CAB-138 §8: FP 制御切替 (vldmxcsr/vstmxcsr/rcr を含む大きい関数)
 

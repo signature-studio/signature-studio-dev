@@ -41,7 +41,8 @@
 | canvas-render | 全画面 canvas の putImageData 結果を getImageData で読み戻し (lit ピクセル > 0, 色数 ≥ 2) + スクリーンショット |
 | audioworklet | クリック → `samplePos` が 128f 単位で増加 (SAB 経由の worklet clock) |
 | console-clean | uncaught エラー 0、想定外 console error/warning 0 (意図的 fail-fast ログと favicon 404 のみ許容) |
-| fl-boot | FL 統合後の契約チェック (下記)。既定 SKIP、`E2E_REQUIRE_FL=1` で必須化 |
+| webstudio-contract | `window.__webstudio` の形状検査 (state ∈ booting/running/error、frames は非負 number、running なら frames>0、error 文字列は state=error 時のみ)。FL 未統合のハーネスは `booting`/`frames:0` で PASS |
+| fl-boot | FL 統合後の契約チェック (下記)。既定 SKIP、`E2E_REQUIRE_FL=1` で必須化。`state==='running' && frames>0` (180s) + canvas 画素検査 (lit>0, colors≥2) |
 
 ターゲット: `preview` (vite preview) / `dev` (vite dev) / `edge-sim` (**deploy の配信ポリシーをローカル再現**: R2 同様 `/` の暗黙 index なし +
 Rules の rewrite/ヘッダ/br) / `url` (`run.sh --url https://…`、Access 時は `E2E_ACCESS_CLIENT_ID/SECRET`)。
@@ -90,9 +91,53 @@ dev は `__e2e__/add.wasm` fixture が配信されないため wasm-load 内の 
 - キャッシュ (正本 `deploy/config/edge-policy.json`): immutable 1 年 / document (`/`・`/index.html`・`release.json`・`wasm/manifest.json`) は no-cache /
   他は Static Assets 既定。旧 R2 構成での CF キャッシュ可能上限 512MB 等の制約は `legacy-r2/` 側の記録。
 
-## FL 起動契約 (提案: runtime-arch へ)
-FL 統合後に `fl-boot` を有効化するため、ページは `window.__webstudio = { state: 'booting'|'running'|'error', frames: <number>, error?: string }` を公開する。
-`state==='running'` かつ `frames>0` (GUI フレーム転送済み) を `E2E_REQUIRE_FL=1` で必須化。タイムアウト 180s。
+## CI 化 (#66, `tools/e2e/ci/e2e.yaml.proposed` → `.github/workflows/e2e.yaml`)
+
+**配置の制約**: Actions の GitHub App には `workflows` 権限が無く、`.github/workflows/` への push は拒否された
+(`refusing to allow a GitHub App to create or update workflow ... without workflows permission`、実測 1 回)。
+そのため workflow 本体は `tools/e2e/ci/e2e.yaml.proposed` に置いた。有効化は `git mv tools/e2e/ci/e2e.yaml.proposed .github/workflows/e2e.yaml` を
+`workflows` 権限のあるユーザ/PM が行う (actionlint 1.7.7 で配置後の内容を検査済み = エラー 0)。
+
+既知類型との関係: 該当なし (lift/IR 系ではない)。検証起点: `origin/main` 2847625。
+
+- `local` ジョブ: PR / main push (src・vite 設定・tools/e2e・deploy/config 等の path のみ) / 手動で
+  `run.sh --driver both --targets preview,edge-sim`。結果 JSON・スクリーンショット・ログを artifact (14 日)、表を job summary に出す
+  (`tools/e2e/suite/summary.mjs`)。
+- `remote` ジョブ: 週次 (月曜 03:17 UTC) / 手動 (`remote=true`) で `run.sh --url "$E2E_URL" --driver both`。
+  `E2E_URL` (repo variable) 未設定なら skip。service token は secrets `E2E_ACCESS_CLIENT_ID/SECRET`。
+  運用・ローテーションは `deploy/README.md` §CI / E2E の秘密情報。
+- 実測 (Actions runner 上、Chrome 154.0.8037.97、load average 0.43 → 0.66):
+  `run.sh --driver both --targets preview,edge-sim` = **PASS 30 / FAIL 0 / SKIP 6**、所要 10.7–12.8s (build 込み、n=2: 作業ツリー 1 回 + コミット済み HEAD 0f60391 のクリーン worktree 1 回、load average 0.05–0.66)。
+  `run.sh --url <ローカル edge-sim> --driver both` = **PASS 16 / FAIL 0 / SKIP 2**、所要 3.9s (1 回)。
+- ネガティブコントロール: edge-policy の COEP キーを除いたコピーを `EDGE_POLICY_FILE` で与えると
+  edge-sim × 2 driver で **FAIL 8** (4 check × 2)・exit 1 (CI ジョブが赤になる条件)。
+  workflow の step と同じ `bash -eo pipefail -c 'bash tools/e2e/run.sh ... 2>&1 | tee <log>'` で再現 (コミット済み HEAD 6456cbc、Node v22.23.3、
+  `--driver both --targets preview,edge-sim`、`E2E_SKIP_BUILD=1`): 所要 6.0s、load average 1.43 → 2.27、`PASS=22 FAIL=8 SKIP=6`、**パイプライン exit 1** (n=1)。
+  同条件の正常系は `PASS=30 FAIL=0 SKIP=6`・exit 0・18.6s (build 込み、n=1)。
+  `shell: bash` 明示の根拠: `bash -e -c 'false 2>&1 | tee /dev/null'` は exit 0、`bash -eo pipefail -c` は exit 1。同じ COEP 除去 run (edge-sim のみ) を
+  `-e` のみ (pipefail 無し) で流すと exit 0 (= step が緑のまま FAIL を握り潰す) ことも確認。`shell:` 無指定の `run` は
+  `bash -e {0}` で実行されるため、両 E2E step に `shell: bash` (= `bash --noprofile --norc -eo pipefail {0}`) を明示した。
+- 範囲外: GitHub Actions 上での workflow 実行結果 (workflow は `.proposed` のため PR の check では実行されない。`.github/workflows/e2e.yaml` へ配置後に確認)、実 URL への `--url` (Access 保護下の実 token での実行は未実施 =
+  `E2E_URL` と secrets の登録はユーザ操作)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| workflow の `.github/workflows/e2e.yaml` への配置 (workflows 権限が必要) | 配置まで CI は動かない | #66 へコメント (PM/ユーザ作業) |
+| repo variable `E2E_URL` と secrets `E2E_ACCESS_CLIENT_ID/SECRET` の登録 | 週次 remote ジョブは登録まで skip | 本 issue (#66) へコメント (ユーザ/PM 作業。token secret は `deploy/work/secrets/` にしか無い) |
+| 実 URL に対する週次ジョブの初回実績 | remote の PASS 未確認 | #66 (登録後に `gh workflow run e2e.yaml -f remote=true`) |
+
+## FL 起動契約 (#65)
+ページは `window.__webstudio = { state: 'booting'|'running'|'error', frames: <number>, error?: string }` を公開する。
+実装は `src/runtime/webstudio_state.ts` (`src/index.ts` が `installWebstudioContract()` を読込時に呼ぶ)。
+- 遷移: `booting` → `running` (GUI フレーム 1 枚以上) / `error` (window `error`・`unhandledrejection`・`fail()`)。`error` は終端で最初のエラーを保持、`frames` は単調増加。
+- frames の供給: `GuiHost.attach({ onFrame })` の累計フレーム数を `controller.setFrames()` に渡す (`src/runtime/gui.ts`)。
+  **実 FL の GuiHost 接続は未実装** (FL 本体がページに統合されていないため。ハーネスのテストフレームは計上しない)。
+- e2e: `webstudio-contract` は常時 (形状)、`fl-boot` は `E2E_REQUIRE_FL=1` で `state==='running' && frames>0` を 180s 待ち、canvas の画素を検査 (#32 の受入に接続)。
+  FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り)。
+- 実測 (HEAD 8bf83d9、Chrome 154、node v22.23.3): `--driver both --targets preview,edge-sim,dev` = **PASS 50 / FAIL 0 / SKIP 10** (28.1s、`webstudio-contract` 6/6 PASS = `{"state":"booting","frames":0}`、fl-boot 6 SKIP + edge-policy 4 SKIP)。
+  `E2E_REQUIRE_FL=1 --targets preview` (agent-browser) = PASS 8 / **FAIL 1 (fl-boot: 180146ms 待って `{"state":"booting","frames":0}`)** / SKIP 1、合計 3m2.9s。
+- 単体テスト: `node --test tools/e2e/webstudio_state.test.mjs` (遷移 6 ケース)。
+- 未実施: `agent-browser diff screenshot` による FL 画面のスクリーンショット差分 (基準画像となる FL 起動画面が無いため。#32 後)。
 
 ## ユーザ依頼事項
 1. **公開ホスト名** (例: `studio.<既存ゾーン>`)。案 S の既定は workers.dev (`deploy/README.md` §移行で自前ドメインへ)。
@@ -102,8 +147,8 @@ FL 統合後に `fl-boot` を有効化するため、ページは `window.__webs
 
 ## 下流チケット案
 GitHub issue 起票済 (検収時): T1→実デプロイ (**CAB-35 として完了**・`deploy/REPORT.md`)、
-T2→tools/assets manifest、T3→事前圧縮 + 大容量、T4→`window.__webstudio` 契約実装、
-T5→CI 化 (`feat/add-opencode`)、T6→配信後の自動注入対策、H-1→既定ホスト名構成への適応 (**CAB-61 として完了**)。
+T2→tools/assets manifest、T3→事前圧縮 + 大容量、T4→`window.__webstudio` 契約実装 (#65、契約本体は実装済・実 FL 接続は #32 側)、
+T5→CI 化 (#66、`.github/workflows/e2e.yaml`)、T6→配信後の自動注入対策、H-1→既定ホスト名構成への適応 (**CAB-61 として完了**)。
 旧 `CAB-xxx` と GitHub issue `#N` の対応は `docs/REFERENCES.md` `[CAB_TO_GH]`。
 
 ## 再現
