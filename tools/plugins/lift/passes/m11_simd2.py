@@ -114,6 +114,12 @@ FOP = {'add': 'x + y', 'sub': 'x - y', 'mul': 'x * y', 'div': 'x / y', 'min': '(
 
 def gen_body(base, R, A):
     n = len(A)
+    if base.startswith('v') and not base[1:].startswith(('ucomis', 'comis')):
+        # VEX 3 オペランド形は同名 SSE 形へ委譲する (dst 上位は src1 由来で、SSE 形の a 由来と一致する)。
+        # comis/ucomis は flag 未モデルのため委譲せず未実装 stub のまま残す (黙って no-op にしない)
+        sse = gen_body(base[1:], R, A)
+        if sse is not None:
+            return sse
     if base in ('pause', 'sfence', 'emms', 'vzeroupper', 'lfence', 'mfence', 'fnclex', 'fnclex0'):
         return ['return 0;']
     if base in ('ldmxcsr', 'stmxcsr'):
@@ -143,6 +149,16 @@ def gen_body(base, R, A):
                 'else { for (u64 i = 0; i < c; i++) { u32 t = ((const volatile u32*)s)[i]; ((volatile u32*)d)[i] = t; } }']
     if base == 'rep_movsq_memcpy':
         return ['memmove(a, b, (size_t)c * 8u); /* rep movsq: c = qword 数 */']
+    if base == 'int3' and n == 0:
+        return ['abort(); /* int3: 到達すれば意図しない trap */ return 0;']
+    if base == 'int' and n == 1:
+        return ['(void)a; abort(); /* int n: 到達すれば意図しない trap */']
+    if base == 'rep_movsb_memcpy' and R == 'void' and n == 3:
+        return ['u8* d = (u8*)a; const u8* s = (const u8*)b;',
+                'if (d <= s || d >= s + (size_t)c) { memmove(d, s, (size_t)c); }',
+                'else { for (u64 i = 0; i < c; i++) d[i] = s[i]; }']
+    if base == 'rep_stosw_memset' and n == 3 and A == ['ptr', 'i16', 'i64']:
+        return ['u16* p = (u16*)a; for (u64 i = 0; i < c; i++) p[i] = (u16)b; /* rep stosw: c = word 数 */']
     if base == 'rep_stosq_memset':
         return ['u64* p = (u64*)a; for (u64 i = 0; i < c; i++) p[i] = b; /* rep stosq */']
     if base == 'rep_stosb_memset' and n == 3 and A == ['ptr', 'i8', 'i64']:
@@ -192,6 +208,12 @@ def gen_body(base, R, A):
         return ['{ %s xs[%d], ys[%d], rs[%d]; memcpy(xs, &a, 16); memcpy(ys, &b, 16);' % (T, k, k, k),
                 '  for (int i = 0; i < %d; i++) { %s x = xs[i], y = ys[i]; rs[i] = %s; }' % (k, T, FOP[op]),
                 '  u128 o; memcpy(&o, rs, 16); return o; }']
+    if base == 'cvtsi2ss' and n == 2 and A[1] == 'i32' and R == 'i128':
+        return ['return lane0f_set(a, (float)(i32)b);']
+    if base == 'cvtss2sd' and n == 2 and R == 'i128':
+        return ['return _overwrite_lo64(a, das((double)lane0_f(b)));']
+    if base == 'cvtsd2ss' and n == 2 and R == 'i128':
+        return ['return lane0f_set(a, (float)lane0_d(b));']
     if base == 'cvtsi2sd' and n == 1:
         return ['return set_u64_lo(das((double)%s));' % ('(i64)a' if A[0] == 'i64' else '(i32)a')]
     if base == 'cvtsi2ss' and n == 1:
@@ -219,6 +241,13 @@ def gen_body(base, R, A):
         return ['{ double xs[2]; float rs[4] = {0, 0, 0, 0}; memcpy(xs, &a, 16); rs[0] = (float)xs[0]; rs[1] = (float)xs[1]; u128 o; memcpy(&o, rs, 16); return o; }']
     if base == 'cvtdq2pd':
         return ['{ i32 xs[4]; double rs[2]; memcpy(xs, &a, 16); rs[0] = xs[0]; rs[1] = xs[1]; u128 o; memcpy(&o, rs, 16); return o; }']
+    if base in ('cvtpd2dq', 'cvttpd2dq') and n == 1 and A[0] == 'i128' and R == 'i128':
+        f = 'trunc' if base.startswith('cvtt') else 'nearbyint'
+        return ['{ double xs[2]; i32 rs[4] = {0, 0, 0, 0}; memcpy(xs, &a, 16);',
+                '  for (int i = 0; i < 2; i++) { double v = %s(xs[i]); rs[i] = (v > -2147483649.0 && v < 2147483648.0) ? (i32)v : (i32)0x80000000; }' % f,
+                '  u128 o; memcpy(&o, rs, 16); return o; }']
+    if base == 'pmovsxdq' and n == 1 and A[0] == 'i128':
+        return ['{ i32 xs[4]; i64 rs[2]; memcpy(xs, &a, 16); rs[0] = xs[0]; rs[1] = xs[1]; u128 o; memcpy(&o, rs, 16); return o; }']
     width = 16 if A and A[0] == 'i128' else 8
     if base in LANE and n == 2 and A[0] == A[1]:
         bits, expr = LANE[base]
