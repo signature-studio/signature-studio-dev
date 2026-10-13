@@ -480,6 +480,29 @@ unsigned long long function_410320(unsigned long long self, unsigned int alloc) 
     return ICALL_AT(0x41032e, Q(self - 0x30), self, 0, 0, 0, 0, 0, 0, 0);
 }
 
+/* function_47b260  VA 0x47b260  (TList 系 Add: rcx = リスト (rbx), rdx = 追加する値の番地 (rsi); 戻り = 旧 Count)
+ * 逆アセンブル: rdi = [rbx+8] (Count); rax = [rbx] (FItems); cap = [rax-8] (rax≠0); Count = cap なら 47a3e0(rbx, Count+1);
+ *   [rax+rdi*8] = [rsi]; [rbx+8] += 1; [rbx+0x20] ≠ 0 なら call [rbx+0x20](rcx=[rbx+0x18], rdx=rsi, r8b=1).
+ * RetDec は `mov rax,[rbx]` と `mov rcx,[rsi]` の disp=0 deref を 2 点とも落とし, 項目番地を rbx+8*Count (= FItems 欄そのもの)
+ * にして値として rsi (番地) を書いた (DEFECTS D4, #682). 4f9f10 (25 call site の Add 呼出し) から FItems に stack 番地が入る.
+ * notify (`call [rbx+0x20]`, D15) は省略 (呼出し先 0x535cf0/0x536570 が closure 外 → miss 化するため。REPORT_682 §7). */
+#ifndef M11_FIX_682
+#define M11_FIX_682 1
+#endif
+#if M11_FIX_682
+u64 function_47b260(u64 self, void* src, u64 unused) {
+    u64 s = (u64)(uintptr_t)src;
+    u64 cnt = Q(self + 8);
+    u64 items = Q(self);
+    u64 cap = items ? Q(items - 8) : 0;
+    if (cnt == cap) function_47a3e0(self, cnt + 1);
+    items = Q(self);
+    Q(items + cnt * 8) = Q(s);
+    Q(self + 8) = cnt + 1;
+    return cnt;
+}
+#endif
+
 /* function_5c0270  VA 0x5c0270  (参照カウント付きキャッシュ node の Release: self = キャッシュ, node = function_5c00e0 の戻り)
  * 逆アセンブル転記 (5c0270..5c0392). node = {+0 next, +8 refcount(dword), +0xc 第 1 qword キー, +0x14 hash(word), +0x18 tid(dword), +0x1c payload}.
  * RetDec は 3 点を落とした (#474):
