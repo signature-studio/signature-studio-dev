@@ -147,6 +147,6 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
   - 元に戻した HEAD (`6a906bce` の `mlift_ops.py`) で `lift2_e2e.sh` を再実行: `RESULT: lift2_e2e ALL PASS`, exit 0, real 64 s, load 0.27→0.93, nproc 4。comp 400/400・filter 400/400・ctx-fuzz 4 系統 mismatch 0・ctrl 15/15・ablation 5 種すべて検出。
   - main 取り込み後 HEAD `2e4960f8` で再実行: `RESULT: lift2_e2e ALL PASS`, exit 0, real 62 s, load 0.28→0.93, nproc 4。内訳は上と同値 (comp 400/400・filter 400/400・ctx-fuzz mismatch 0・ctrl 15/15・ablation 5 種)。
   - 本結論は「追加 lowering が e2e で実行されない」を示す。lowering 自体の正しさは e2e では検証されていない (実行されないため)。受入条件 2 の残りは #692 に残す。
-  - 実行環境: `work-liftlib-targets` / `plugins-freshair` / `fl-win64` を `$ARTIFACTS_DIR` から展開して実施 (epf 8 本は `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/work/win` に展開)。emsdk 6.0.12 は `$RUNNER_TEMP/emsdk` に導入し `/opt/emsdk` へ symlink。
+  - 実行環境: `work-liftlib-targets` / `plugins-freshair` / `fl-win64` を `$ARTIFACTS_DIR` から展開して実施 (epf 8 本は `plugins-freshair` の `Fresh Air.Win.zip` を `tools/targets/freshair/work/win` に展開)。emsdk 6.0.12 は `[EMSDK]` の手順で `$RUNNER_TEMP` に導入し、`env.sh` の前提に合わせて配置。
 - 未了 (#692 に残す): `pmovmskb` と ymm 形式の `vpcmpeqw` (関数 `f_1810577ac` / `f_18107d41c`)、rep 経路の e2e 到達 (受入条件 1・ネガコン)、回帰セットの seed 非依存化 (受入条件 3)。
   ctrl closure には `rep stosb` 84・`rep movsb` 39・`rep stosw` 6・`rep stosq` 1 が lift 済みで存在する (`work/ctrl/ctrl_rep.json` の mnemonics 実測)。
