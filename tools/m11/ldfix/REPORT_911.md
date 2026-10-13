@@ -4,7 +4,7 @@
 
 **判定: 部分達成 (受入条件 1 の機構の手がかり、2 の突合まで)**。検出信号・修復・wasm 実測・DEFECTS 追記は未達。残りは子 issue `[LD-33]` (#1091) に起票済み (§5)。
 
-検証起点: PR の base = merge-base `f04e0f05` (PR 作成時の main)。run 時点の `origin/main` は `5182c3c2`。
+検証起点: PR の base (baseRefOid) = `6ae75e48`。HEAD は main `5182c3c2` を merge 済み (`f04e0f05` は HEAD の祖先だが PR の base ではない)。
 素材: `fl-win64` の `block00031_PE.bin` と `work-m11` (`tools/m11/work/` の `boot0.lift.ll` / `boot_final.ll`)。いずれも `tar --zstd -xf` で展開し (§6)、本 run で機械語と IR の両方を確認した。
 
 ## 1. 受入条件 1: 41a670 の機構 (手がかり。RetDec 側は未確定)
