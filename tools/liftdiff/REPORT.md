@@ -248,3 +248,4 @@ Actions run `38430714782` (head `9cadda79`) で `liftdiff_e2e.sh` (--m11-only �
 
 ## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成)
 `vm0` (this/VMT 疑似オブジェクト) と `u16` (UTF-16 文字列 blob) を追加。sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。未達 (受入条件) は #235 に残す。全文・実測・未達の内訳: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12。
+fault 由来 this 疑似 pattern `fvm` (LD-23 / #975): 実装・集計は済み、遷移は 0 件 (sample:800 で 360/230/210 不変)。VMT slot 未解決が原因で未達。全文は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12.1。
