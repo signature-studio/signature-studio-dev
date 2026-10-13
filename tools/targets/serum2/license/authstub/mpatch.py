@@ -16,8 +16,8 @@ import pefile
 PATCHES = [
     ("N1",    0x18004fbdd, bytes.fromhex("0f8439020000"), bytes.fromhex("e93a02000090"),
      "DSP setState: demoVersion 検出 je → jmp (復元続行) [IR: br_force !37]"),
-    ("N2a-1", 0x1800c2cfd, bytes.fromhex("01"),           bytes.fromhex("00"),
-     "Controller setState: xor al,1 → xor al,0 (demo bit store 値を 0 に) [IR: store_const !2624]"),
+    ("N2a-1", 0x1800c2cfc, bytes.fromhex("3401"),         bytes.fromhex("b000"),
+     "Controller setState: xor al,1 → mov al,0 (demo bit store 値を定数 0 に) [IR: store_const !2624]"),
     ("N2a-2", 0x1800c2d48, bytes.fromhex("01"),           bytes.fromhex("00"),
      "Controller setState: mov byte [obj+0x22792],1 → ,0 [IR: store_const !2630]"),
     ("N2b-1", 0x1800c2d04, bytes.fromhex("7559"),         bytes.fromhex("9090"),
