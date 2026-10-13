@@ -56,7 +56,7 @@ FL 由来物は `work/` (gitignore) に置き、commit しない。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `flcpt` / `flrack` の関数・メソッド実装 (型・戻り値の実測根拠が必要) | Chord progression の関数の戻り値は未検証 | 子 issue (本 run で起票・番号は issue コメント参照) |
+| `flcpt` / `flrack` の関数・メソッド実装 (型・戻り値の実測根拠が必要) | Chord progression の関数の戻り値は未検証 | #1327 (`[PY-30]`) |
 | `enveditor` と Audio scripts 12 本 | 本 issue の対象外 | 既存 #1054 (`[PY-23]`)・#1312 (`[PY-23]` partial)・#1310 (`[PY-28]`) が担当 (新規起票しない) |
 | 実 FL の戻り値照合 | mock 値と実値の一致は未確認 | #81 (PY-9) |
 
