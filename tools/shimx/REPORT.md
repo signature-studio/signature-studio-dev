@@ -382,6 +382,7 @@ frame が 1 つも無い場合・捕捉 scope が無い場合・`RtlUnwindEx` �
 | `bash tools/shimx/test.sh --quick` (変更前) | exit 0, 22 s, load 0.45 (1 分値) |
 | 同 (変更後) | exit 0, 22 s, load 0.42。MT 6 グループ (新規 `seh`: catch-all / 入れ子 pad 順序 + frame 引数 + UNWINDING / typed / RtlUnwindEx+RtlUnwind(NULL) / leave 冪等) / ST PASS / M4 互換 PASS / 公開関数 674→680 |
 | fail-fast | 既存 `raise` `rtlunwind` に加え `sehnomatch` (frame あり捕捉 scope なし) `sehbadtarget` (targetFrame 不一致) を追加、いずれも exit=1 + 名前出力 |
+| クリーン HEAD 再現 (4a61103 を detached worktree に展開) | exit 0, 21 s, load 0.76 (1 分値), `seh OK` 出力 1 件 |
 | ネガティブコントロール | unwind 相の `pad()` 呼出を無効化 → `test_seh.c:73: g_pad_n == 2` で FAIL (MT テスト失敗, exit 1)。復元後 PASS |
 
 `--quick` は `verify_ott` を省略 (m11/m8 の work 素材なし、署名突合 6b も素材なしで SKIP)。`inventory.md` / `BACKLOG.md` / `data/*` / `exports.txt` は m11 closure 無しで再生成すると壊れるため**コミットしていない** (§13 と同方針)。`gen_inventory.py` は `RtlUnwind*` を fail-fast 扱いから外したので、次回素材付き run の再生成で BACKLOG の該当行 (P1 `RtlUnwindEx` / `RtlUnwind`) が更新される。
