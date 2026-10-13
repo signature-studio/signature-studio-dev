@@ -30,7 +30,7 @@ watch_runs.sh の完了通知ごとに、結果処理と合わせて実行する
   `python3 $PM_DIR/pm_needs.py` で、最新の差し戻しが PM 判断を求めていて PM の応答が無い PR を洗い出す (REST のみ。所要は REPORT §8)。heartbeat のたびに実行して、未回答を 0 にする。
 - 積み PR の merge 順はブランチの積み方で決まる (判断前に `git log origin/main..<branch>` / 差分に含まれる他 PR の commit を確認する)。
   例: #551(merged) → #624 → #676 → #708 → #720。誤って逆順を指示したら、すぐ PR と issue に訂正コメントを出す。
-- 実装 agent は issue を起票できない規約 (WORKFLOW §2)。reviewer が『起票先番号』を要求したら PM が起票して番号を PR に伝える。起票前に `gh api "search/issues?q=repo:R+%22CI-13%22+in:title"` で番号の重複を必ず確認 (CI-13 が #725 と重複しかけた)。
+- WORKFLOW §3 (#835) に従い実装 agent が起票してよい。milestone・優先度・Status は PM が確定する。reviewer が『起票先番号』を要求したら、起票前に `gh api "search/issues?q=repo:R+%22CI-13%22+in:title"` で番号の重複を必ず確認 (CI-13 が #725 と重複しかけた)。
 - fix run が exit code 143 (SIGTERM) で cancelled になる場合は、エージェントの `kill 0` / `pkill` が step の bash を落としている疑い (#744, PR #745 で setsid 対応)。annotation に shutdown signal が無いことを確認する。
 - 競合 PR の fix は repository_dispatch (watchdog) で実機動作を確認済み (#576, #689。計測値は REPORT §8)。schedule(*/5) は発火が無く、repository_dispatch (oc-watchdog) で起こす経路を使う。
 
