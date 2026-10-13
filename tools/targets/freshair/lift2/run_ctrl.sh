@@ -12,8 +12,9 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; FA="$(dirname "$HERE")"
 CORE="$FA/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
 W="$HERE/work/ctrl"; cd "$W"; source "$HERE/env.sh"
 NS="${1:-2}"; NR="${2:-5}"; SEED="${3:-0xFA2C0001}"
-EXPECT=$((NS + NR + 8))
 python3 "$HERE/gen_ctrl_scen.py" ctrl_scen.txt "$NS" "$NR" "$SEED" | tail -1
+EXPECT=$(wc -l < ctrl_scen.txt)
+[ "$EXPECT" -eq $((NS + NR + 8)) ] || { echo "ERROR: factory .epf 8 本が無い (work/win/Fresh Air/.../FACTORY Presets/Factory Bank/*.epf を展開する。REPORT §11)。生成シナリオ $EXPECT 本"; exit 2; }
 tot=0; bad=0
 for F in 0 1; do
   FA_DBG=1 FA_HEAP_ZERO=1 ./native_ctrl "$CORE" ctrl_scen.txt $F > ctrl_n$F.txt 2> ctrl_n$F.err
