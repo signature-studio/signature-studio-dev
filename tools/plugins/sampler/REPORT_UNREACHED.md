@@ -2,6 +2,8 @@
 
 `REPORT.md` の行数上限 (250 行、`docs/DOC_MAP.md` §1) のため分割。 節番号は REPORT.md に合わせる。 前提の定義・語彙は `REPORT_LEA.md` §2c (total2)。
 
+本 PR (#720) は **#667** (`closure_unreached.py`・`unr_e2e.sh`・本 REPORT §2d) と **#707** (export 名の改名・`export_rename.py`・`unr_lift.sh`・`unr_nega.sh`・§2e) の両方を含む。 #708 (#667 の PR) は base ブランチ `627-sampler-lea-closure` が #676 の merge で削除され自動 close されたため、scope を本 PR に再定義した (PM 判断 (b))。
+
 ## 2d. total2 外の非共通関数の分類と total3 閉包
 
 **結論 (先出し)**
@@ -140,13 +142,13 @@
 | total3 (7 本) | FL Keys 108 / Granulizer 180 / Slicer 214 / Slicer 2 240 / FPC 432 / Slicex 809 / Soundfont 2,248 (いずれも §2d-3 と同値。 U1–U5 PASS) |
 | `find tools/plugins/sampler -size +20M` | 0 件 |
 
-**再検証 (HEAD `1a27d100`、fix モード。 コード差分なし・REPORT のみの commit の上で実測)**
+**再検証 (HEAD `83450b3f`、`TMPDIR=$RUNNER_TEMP`、PR head の検証起点。 コード差分は `1a27d100` 以後なし)**
 
 | 項目 | 結果 |
 |---|---|
-| `unr_e2e.sh` (前提生成込み、`TMPDIR=$RUNNER_TEMP`) | elapsed 511 s (wall)、**rc 0**、`[unr_e2e] OK`。 load 0.79 → 2.34 (4 core) |
-| `judge.py shells` / `indirect_defs` | PASS 7/7 / PASS 7/7 (欠落 0) |
-| `unr_nega.sh` | elapsed 106 s、**rc 1**。 NC0・NC1・NC3〜NC8 は期待どおり。 NC2 のみ不一致 (期待 1・実測 0。 即値辺 0 件で非識別。 #667 に残す) |
+| `unr_e2e.sh` (前提生成込み) | elapsed 520 s (wall)、**rc 0**、`[unr_e2e] OK`。 load 1.20 → 2.38 (4 core) |
+| `judge.py shells` / `indirect_defs` | PASS 7/7 / PASS 7/7 (欠落 0。 FL Keys 108 / FPC 432 / Granulizer 180 / Slicer 214 / Slicer 2 240 / Slicex 809 / Soundfont 2,248) |
+| `unr_nega.sh` | elapsed 104 s、**rc 1**。 NC0・NC1・NC3〜NC8 は期待どおり。 NC2 のみ不一致 (期待 1・実測 0。 即値辺 0 件で非識別。 #667 に残す) |
 
 **検証 (コミット `273cc10`、改名失敗の rc 反映 + NC8 追加後。 レビュー指摘への対応)**
 
