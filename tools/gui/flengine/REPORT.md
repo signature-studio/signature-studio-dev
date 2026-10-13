@@ -388,7 +388,7 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 | `gui/e2e.sh` (HEAD `a88aabfa`、`pnpm install --frozen-lockfile` 後) | **0** | 139 s (load 2.60→1.60) | ALL PASS (selftest 506/0、stress negctl 2/2 exit 1、text/pe_image/present/input ALL PASS) |
 | `m11/ldfix/f4_e2e.sh` (HEAD `a88aabfa`) | **0** | 249 s (load 1.04→1.27) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待行付き FAIL。RegisterClassW pre 2 / noand 2 / post 3。survey `870/1/47/24` |
 
-**切り分けの結論 (PM 指示 1)**: S1 FAIL は main でも同じ値で再現する。したがって **この PR の変更が原因ではない**。S1 の判定は緩和していない (FAIL のまま)。原因特定は子 issue **#1442** (`[GUI-21]`、親 #564) に起票。#1275 ([M11-N78]) とは対象 unit が一致するが、同系統かは未確認。
+**切り分けの結論 (PM 指示 1)**: S1 FAIL は main でも同じ値で再現する。したがって **この PR の変更が原因ではない**。S1 の判定は緩和していない (FAIL のまま)。原因特定は子 issue **#1442** (`[GUI-21]`、親 #564) に起票。#1275 ([M11-N78]) とは対象 unit が一致するが、同系統かは未確認。main でも同値 (S1 FAIL) であることは、この PR の原因ではないことの根拠。S1 の gate PASS の根拠ではない。追跡 #1442。
 
 注記: main の build 段の重複は scratch の削除で回避しただけで、main 側の修正は行っていない。起票先は本 PR の範囲外 (`#1096` の作者 / m11 系の PM 判断)。
 
