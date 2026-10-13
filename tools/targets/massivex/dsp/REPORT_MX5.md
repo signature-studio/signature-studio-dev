@@ -59,16 +59,17 @@ len ヒストグラム (256 B 刻み): 0〜255 B が 143,802 件、4 KiB 以上�
 
 - **測定 commit (コードを変えた最後の commit)**: `93eab8d7` (`fix(massivex): resolve UNWIND_INFO RVA only when unique section hit (#1122)`)。以後の commit は REPORT のみ。
 - **素材**: `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` を再抽出。md5 `622993e7…` / 95,356,824 B (一致)。
-- **実行時間 (`bash dsp/e2e.sh`・測定 commit `93eab8d7`・n=3・全回 rc 0)**:
+- **実行時間 (`bash dsp/e2e.sh`・検証 HEAD `eed8e5ff`・n=3・全回 rc 0)**: 本節の実行時間はこの 1 表だけを根拠とする。
 
   | run | elapsed | load 開始 | load 終了 |
   |---|--:|---|---|
-  | 1 | 30 s | 0.33 0.31 0.14 | 0.60 0.37 0.17 |
-  | 2 | 30 s | 0.55 0.37 0.17 | 0.73 0.43 0.20 |
-  | 3 | 30 s | 0.73 0.43 0.20 | 0.84 0.49 0.22 |
+  | 1 | 43 s | 0.84 0.47 0.24 | 0.93 0.54 0.28 |
+  | 2 | 42 s | 0.72 0.52 0.27 | 0.86 0.58 0.30 |
+  | 3 | 42 s | 0.73 0.56 0.30 | 1.07 0.70 0.36 |
 
-  min–max: **30–30 s** (n=3)。load は連続実行で上がっている (run 間の負荷累積)。所要時間は参考値。
-  - 以前の記録 (PR 本文 34 s・旧 REPORT 31 s・`0bcdcd15` での 33–34 s) は旧版の step 5 で測ったもので、現 commit の値とは比較しない。
+  min–max: **42–43 s** (n=3)。負荷は 1 分平均で 0.7〜1.1 (runner 上の他プロセスの影響を受ける)。所要時間は参考値。
+  - 測定 commit `93eab8d7` (e2e 経路は HEAD と同一・差分 0 行) で同じ `e2e.sh` を n=3 実行した記録は 30 s × 3 (load 開始 0.33→0.73 の順)。負荷条件が違うため現 HEAD の所要時間とは比較せず、根拠にもしない。
+  - PR 本文の 34 s・旧 REPORT の 31 s・`0bcdcd15` での 33–34 s は旧版の計測で、現 commit の値とは比較しない。
 - **step 5/5 の出力 (run 1)**: chained 70,489 / 解決 1 件 167,541・CHAININFO 62,516 / 親 valid 内 62,498 (完全一致 62,498) / 過大評価 116,460 件・2,618,866 B / 過小評価 12。
 - **negctl (`bash dsp/negctl.sh`・同 commit)**: NC1 unsup 67 / NC2 unsup 746 / NC3 unsup 0 → 3 件とも FAIL<期待>。
 - **鮮度 (WORKFLOW §6)**: `git diff 93eab8d7 HEAD -- tools/targets/massivex/dsp/e2e.sh tools/targets/massivex/dsp/negctl.sh tools/targets/massivex/dsp/scripts/mx_pdata_quant.py tools/flelift/x64c.py tools/shared/env.sh` は **0 行**。測定値は測定 commit のまま有効。
