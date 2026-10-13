@@ -1,0 +1,67 @@
+# #1046: unit 492 の OOB (`4133f0` 参照カウント解放経路) の原因特定 (途中経過)
+
+親: #862 (受入 3・4 の持ち越し先)。検証起点: `origin/main` = `9aad4595`。本 PR は `tools/m11/` のコードを変更しない (REPORT のみ)。
+
+**結論 (途中): 受入 1・2 は未達。入力値の実測は未完。最有力は D11 (10 進 `inttoptr` の絶対 VA 残り) だが未確定。**
+
+## 1. 素材と再現
+
+- 素材: `fl-win64` (`$RUNNER_TEMP/extracted/`)、`toolchain-retdec`・`toolchain-emsdk` (`/opt/emsdk` 6.0.12、`/opt/retdec` v5.0)、`work-m11`・`work-liftdiff` (`tools/m11/work/`・`tools/liftdiff/work/` へ展開)。
+- `FL_WIN64_DIR` は PE の親 dir の 1 段上 (`$RUNNER_TEMP`) を指定する (`extracted/block00031_PE.bin` を `$FL_WIN64_DIR/extracted/` で解決するため)。
+- IR: `bash tools/m11/m11_gen_ir2.sh` rc 0 (実測 44.0 s、`ldfix=applied`、`boot_final.ll` 490,693 行、`ir_sha256` `2c68ceae…`)。
+- build: `bash tools/m11/m11_build.sh` rc 0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
+- survey: `node tools/m11/trap_triage/survey_units.mjs` 3 回 (13.27 s・全て rc 0)。per-unit JSON は `cmp` で完全一致。
+
+## 2. survey の実測 (HEAD `9aad4595`、3 回反復)
+
+| 回 | ok | oob | halt0 | miss | other | noproc |
+|---|--:|--:|--:|--:|--:|--:|
+| 1 | 870 | 16 | 7 | 47 | 1 | 1 |
+| 2 | 870 | 16 | 7 | 47 | 1 | 1 |
+| 3 | 870 | 16 | 7 | 47 | 1 | 1 |
+
+- unit 492: 3 回とも `oob` (`memory access out of bounds`)。`410630` を含む frame は 0 件。
+- halt0 は 114 / 245 / 279 / 314 / 509 / 647 / 895 の 7 件。REPORT_862 §9 の 8 件から unit 368 が抜けている。これは #1043 (`pass_m2q_fn980ed0` による修復、ok 869→870) の既知の変化で、本件の変化ではない。
+- oob は 16 件 (144, 149, 275, 280, 304, 477, 484, 492, 513, 520, 555, 659, 745, 830, 880, 923)。
+
+## 3. unit 492 の経路 (全 unit 実行での最上位 frame)
+
+- frames: `function_4133f0 ← function_4473f0 ← function_446400 ← function_446ad0 ← function_ad5700`
+- 最上位 frame の wasm offset: `wasm-function[14873]` (= `function_4133f0`) の `0x352bb9` (`top_off` は `oob_top.mjs` による全 unit 実行の値)。
+- 命令 (`oob_insn.py m11_boot.cjs.wasm 14873 0x352bb9`): `i32.load offset=0` の直前が `i64.load offset=32` → `i64.const 8` → `i64.add` → `i32.wrap_i64`。つまり `4133f0` の `cmp dword ptr [r13 - 8], 0` に対応する `*(arg - 8)` の読みで OOB。
+- 注意: `SV_ONLY=492` の単独実行では最上位 frame が `function_407a50` になり、全 unit 実行と異なる。unit 492 の挙動は先行 unit の状態に依存する。単独実行の frame は採用しない。
+
+## 4. 機械語と IR の対応 (実測)
+
+- `4133f0` (size 135): `rdx` (引数 `r13`) が NULL でなければ `[r13-8]` (refcnt) を読む。解放経路は `lock xadd [rax+8]` → `call 409440`。
+- `4473f0` (size 249): `[rbp+0x40]`・`[rbp+0x48]` のスロットを `447df0` で埋めてから `4133f0` を呼ぶ。`447df0` は `cmp qword [rbx],0` が 0 のときだけ `[arg5 + arg4*8]` を読んで `41c820` へ渡す。戻り値は常に `rbx` のアドレス。
+- IR (`boot_final.ll` `@function_4473f0`): `447df0` の第 5 引数が `inttoptr i64 16433440` (`0xfac120`)・`16433496` (`0xfac158`) の定数。機械語の `lea rax,[rip+disp]` (`0x447467`・`0x44749e` の直前) はこの表を指すはず。
+
+## 5. 未解決 (本 run で切り分けられなかった点)
+
+1. **入力値 (`4133f0` の `rdx`) の実測は未完**。`447df0` が読む表の要素が何か (rdata の表か、機械語の誤読か) を確定していない。
+2. IR 定数 `16433440` (`0xfac120`) と `16433496` (`0xfac158`) は、RVA (= LVA、`M11_LB_BASE=0`) として PE を読むと **6 要素のポインタ配列** になる (`0x4260f0, 0x426100, …` / `0x426160, 0x426170, …`、16B 間隔の rdata 表として妥当)。`0xfac120` を VA として (ImageBase を引いて) 読むのは誤り。よって IR 定数は RVA として正しく、D11 (絶対 VA の残り) の疑いは **否定**。
+3. DEFECTS 類型への対応: 未確定。表の内容 (`0x4260f0…` 系のポインタ) が何の vtable / 文字列表か、要素 `[arg4*8]` のどれが `41c820` に渡って `4133f0` の OOB 入力になるかは未実測。`lea` の実効位置の照合も未完。
+
+## 6. 受入条件の判定
+
+| # | 条件 | 判定 |
+|---|---|---|
+| 1 | `4133f0` の OOB の入力値 (ポインタ・長さ) を実測で特定 | **未達**。命令 (`*(arg-8)`) と入力の供給元 (`447df0` の表読み) までは特定。値は未実測 |
+| 2 | `4473f0` の配列長計算 (`0x92492493`) の戻り値が原因か実測 | **未達**。`4473f0` の IR と機械語の対応まで確認。戻り値の実測なし |
+| 3 | DEFECTS 類型への対応づけ | **未達**。D11 が最有力候補 (未確定) |
+| 4 | unit 492 の kind 実測と per-unit JSON で回帰が無いこと | **達成 (測定のみ)**。3 回とも `oob`、per-unit JSON `cmp` 一致。コード変更なし (回帰 0) |
+
+## 7. 再現
+
+```sh
+export FL_WIN64_DIR=$RUNNER_TEMP   # extracted/block00031_PE.bin の親の 1 段上
+bash tools/m11/m11_gen_ir2.sh
+bash tools/m11/m11_build.sh
+node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/run1.json
+node tools/m11/trap_triage/oob_top.mjs tools/m11/work/trap_triage/topall.json   # 最上位 frame と top_off
+python3 tools/m11/trap_triage/oob_insn.py tools/m11/work/m11_boot.cjs.wasm 14873 0x352bb9 40
+LD_M11_PE=$RUNNER_TEMP/extracted/block00031_PE.bin python3 tools/m11/trap_triage/disasm_fn.py 4133f0 4473f0 447df0
+```
+
+注: `disasm_fn.py` は `LD_M11_PE` で PE を指定する (既定の `/home/ubuntu/...` を読むため)。
