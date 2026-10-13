@@ -571,6 +571,42 @@ unsigned long long function_409470(void* pv, unsigned long long newsize) {
     return rsi;
 }
 
+#ifndef M11_OV_414AD0
+#define M11_OV_414AD0 1
+#endif
+#if M11_OV_414AD0
+/* function_414ad0  VA 0x414ad0  (System._UStrSetLength(var s: UnicodeString; newLen: Integer)) (#683)
+ * RetDec は var 引数 s の 1 段 deref `mov rax,[rbx]` (rbx = rcx = &s) を 4 箇所 (414af3/414b49/414b64/414b78) とも落とし,
+ * &s (arg1) を文字列本体として扱った. 結果 `[arg2-4]` を読んで OOB (unit 149/158/280/659; #307 §9 と同一欠陥).
+ * 逆アセンブル (414ad0..414ba9) から転記. 文字列ヘッダ: data-8=refcnt, data-4=length, data-16=確保ブロック先頭.
+ * 414850(p) は p!=0 なら p をそのまま返す. 戻り値は機械語の rax. */
+u64 function_414ad0(u64 arg1, u64 arg2) {
+    u32 esi = (u32)arg2;
+    if ((int)esi <= 0) return function_412d60(arg1, arg2);
+    u64 p = Q(arg1);
+    if (p && D(p - 8) == 1) {
+        if (D(p - 4) == esi) return p;
+        u64 slot = p - 0x10;
+        long long r13 = (long long)(int)esi;
+        function_409470((void*)(uintptr_t)&slot, (u64)(r13 * 2 + 18));
+        D(slot + 0xc) = esi;
+        Q(arg1) = slot + 0x10;
+        u64 r = function_414850(Q(arg1));
+        *(volatile unsigned short*)(uintptr_t)(r + (u64)(r13 * 2)) = 0;
+        return r;
+    }
+    u64 rdi = function_412c20(esi);
+    if (p == 0) { Q(arg1) = rdi; return 0; }
+    u32 r13 = D(p - 4);
+    if ((int)r13 > (int)esi) r13 = esi;
+    u64 src = function_414850(p);
+    function_409c80(src, rdi, (u64)(long long)(int)(r13 * 2u));
+    u64 ret = function_412d60(arg1, rdi);
+    Q(arg1) = rdi;
+    return ret;
+}
+#endif /* M11_OV_414AD0 */
+
 /* function_417b70  VA 0x417b70  (System.DynArraySetLength(var a: Pointer; ti: PDynArrayTypeInfo; dimCnt: NativeInt; lengths: PNativeInt))
  * RetDec は `mov rax,[rbp+0xb0]; mov rax,[rax]` (= *a) と `mov rax,[rbp+0xc8]; mov rax,[rax]` (= *lengths) の
  * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
