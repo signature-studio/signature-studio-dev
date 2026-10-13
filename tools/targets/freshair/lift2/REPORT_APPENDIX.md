@@ -152,27 +152,30 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 
 ### 7.0 前回記録の訂正
 
-- 旧 §2.3 / §2.6 の「trap 版 15/15 PASS」は、**同一 HEAD で再現しない**。今回の実測 (§7.1) は FAIL で、旧 PASS 記録は撤回する。
-  旧記録の対象 (movs/stosw の trap の位置・実行 commit) は記録上特定できないため、以後の数値はすべて本節の実測を採る。
-- 旧 §7.1 の「trap 版 exit 1」は本節の実測と一致した (再現)。旧 §7.0 の HEAD 3 種 (`84e43186` / `32f3561b` / `5aec7dda`) は本節の `3214a40e` に統一する。
+- 旧 §2.3 / §2.6 の「trap 版 15/15 PASS」は**未検証として削除**する。その記録は HEAD (`32f3561b` / `5aec7dda` / `84e43186` の 3 種が混在) と trap の挿入位置を特定できず、同一 HEAD での再実行 (§7.1) とも一致しない。
+- 同一 HEAD `3214a40e` での再実行 (§7.1) は FAIL (exit 1) で、旧「trap 版 exit 1」の記録 (旧 §7.1) と一致した。以後の数値は本節の実測のみを採る。
+- 旧 §7.3 の全体実行値 (real 48.302 s) は旧 run の値。本節の数値は §7.3 の 1 箇所に集約する (他節は参照のみ)。
 
 ### 7.1 rep 経路ネガコン (HEAD `3214a40e`, 実測)
 
 - 対象: `h_rep_str` 先頭に `llvm.trap` + `unreachable` を入れた一時版 (`mlift/mlift_ops.py`)。`ctrl_rep.json` に `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` が入っており、ctrl 閉包はこれを実行する。
-- trap 版: `build_ctrl.sh` → `mlift: lifted 1157 funcs, failed 1` (`vpcmpeqw ymm` のみ、既知) / `ctrl build ok`。
-  `run_ctrl.sh 2 5` → **exit 1** (`RESULT: MISMATCH in ctrl scenarios`)。`fma=0` / `fma=1` ともに native 15 行 / wasm 0 行、`ERR native/wasm 1/0 (同一 scenario: NO)`、wasm 側 stderr に `RuntimeError: unreachable`。
-- 元に戻した版: `mlift_ops.py` を `git checkout` で HEAD に戻し、`cmp` で HEAD (`3214a40e`) と一致を確認。`lift2_e2e.sh` 全体を実行 (下記 §7.3) し、`ctrl BIT-EXACT 15/15` (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)。
-- 判定: rep 経路の誤りは ctrl e2e で検出される (受入 4 達成)。comp / filter の trap 版は未実施 (§5 の未解決)。
+- 検証 HEAD `3214a40e` (`mlift/mlift_ops.py` の blob `f8f57a70`。PR 最新 `b6f3896a` とこのファイルは同一)。
+- trap 版 (`h_rep_str` の `bits = ...` 行の直前に `fl.e('call void @llvm.trap()'); fl.e('unreachable'); return True`):
+  - `build_ctrl.sh` → exit 0, `mlift: lifted 1157 funcs / 483427 B / 103228 insns, failed(funcs with unsupported) 1` (`f_1810577ac: vpcmpeqw ymm1` のみ、既知) / `ctrl build ok`。
+  - `run_ctrl.sh 2 5` → **exit 1** (`RESULT: MISMATCH in ctrl scenarios`)。`fma=0` / `fma=1` ともに `scenarios 15, lines native/wasm 15/0, ERR native/wasm 1/0 (同一 scenario: NO)`。wasm 側 stderr に `RuntimeError: unreachable`。`ctrl_w0.txt` は 0 行、`ctrl_n0.txt` は 15 行。
+- 元に戻した版: `git checkout -- tools/targets/freshair/lift2/mlift/mlift_ops.py` → `git show 3214a40e:…/mlift_ops.py | cmp - …` で **一致 (CMP OK)**。
+- 判定: rep 経路 (`stos*`/`movs*` 共通の `h_rep_str`) の誤りは ctrl e2e で検出される。受入 4 達成。comp / filter の trap 版は未実施 (§5 の未解決)。
 
 ### 7.2 再現コマンド
 
-1. `h_rep_str` の `bits = ...` 行の直前に `fl.e('call void @llvm.trap()'); fl.e('unreachable'); return True` を入れる。
-2. `bash build_ctrl.sh` → `bash run_ctrl.sh 2 5` (foreground, `TMPDIR=$RUNNER_TEMP`)。FAIL を期待する。
-3. `git checkout -- mlift/mlift_ops.py` で戻し、`cmp` で HEAD と一致を確認する。
+1. HEAD `3214a40e` で `mlift/mlift_ops.py` の `h_rep_str` の `bits = ...` 行の直前に `fl.e('call void @llvm.trap()'); fl.e('unreachable'); return True` を入れる。
+2. `bash build_ctrl.sh` → `bash run_ctrl.sh 2 5` (foreground, `TMPDIR=$RUNNER_TEMP`)。exit 1 / `同一 scenario: NO` / `RuntimeError: unreachable` を期待する。
+3. `git checkout -- tools/targets/freshair/lift2/mlift/mlift_ops.py` で戻し、`git show 3214a40e:…/mlift_ops.py | cmp - …` で一致を確認する。
+
+素材: `work-liftlib-targets` を展開し、`plugins-freshair` は `FA_DL` の `fetch.sh` で epf 8 本を補完 (`work/win` に 8 本を確認)。emsdk / retdec は `/opt` 既存。
 
 ### 7.3 lift2_e2e.sh 全体 (元に戻した HEAD `3214a40e`, 実測)
 
-- 実測: `RESULT: lift2_e2e ALL PASS`, exit 0, real **48.302 s**, load 0.15→0.63 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。
-- comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter 400/400 BIT-EXACT・fuzz 4 系統 mismatch 0・ABI violations 0・ctrl BIT-EXACT 15/15 (S2001 の ERR は両側同一)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。
-- 素材: `work-liftlib-targets` を展開し、`plugins-freshair` は `fetch.sh` (`FA_DL`) で factory `.epf` 8 本を補完 (#693 の手動手順)。emsdk / retdec は `/opt` 既存。
+- 実測: `RESULT: lift2_e2e ALL PASS`, exit 0, real **60.300 s**, load 0.53→0.89 (nproc 4, TMPDIR=`$RUNNER_TEMP`)。
+- comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter BIT-EXACT・fuzz 4 系統 mismatch 0 (各 1200, ERR 0/0)・ABI violations 0・ctrl BIT-EXACT 15/15 (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。
 - 必要な素材: `oc_artifacts: fl-win64 work-liftlib-targets plugins-freshair toolchain-emsdk toolchain-retdec`。
