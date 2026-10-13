@@ -117,7 +117,8 @@ export function createMockEngine() {
       record.push([name, args]);
       const f = impl[name];
       if (!f) return null; // 未実装 API は None を返す (PoC)
-      return f(...args);
+      // 引数の None は省略 (undefined) と同じ扱い。provider (fl_dispatch.c: tag 'N' = 既定値) と揃える
+      return f(...args.map((a) => (a === null ? undefined : a)));
     },
     implemented: () => Object.keys(impl),
   };
