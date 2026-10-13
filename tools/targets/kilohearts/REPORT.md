@@ -230,3 +230,22 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 残件 (emcc): (a) テーブル `UNK_182280000`・`UNK_182280020` が未定義 (`pe_bytes` は 1 グローバル 16 byte しか読まない)、(b) 未関数化 callee `func_0x000180fd648c`・`func_0x000180fd6498`・`func_0x000180fd662c`・`func_0x000180fbdfcc`・`func_0x000180fbdef4`・`FUN_180fe5f40`・`FUN_180fd3144`、(c) `rcpps` の 2 引数形 (`rcpps(in_XMM2, auVar26)`)、(d) 引数なし呼出の `param_1` 不足 2 件。
 - Resonator のビルドは**依然失敗**。突合・ablation・ネガコンは未実施。
 - 回帰確認 (新 shim・同一 HEAD): Gain 1000/1000 (wasm 15,161 B)・Haas 1000/1000 (16,878 B)・Gate 1000/1000 (17,367 B)。wasm サイズは §10-3 の値と一致。Ghidra decompile は 10 関数すべて OK。突合の実測秒は未計測 (emcc 0.2〜0.3 s)。
+
+#### 10-7e. #1215 (KH-23) run: UNK 表の byte 領域化と callee 追加 (部分)
+- 素材: `plugins-kilohearts` (Installer zip) → payload.dat → windows.zip/1ccb1df8c8f10745 → HeartCore.core_64 (手展開)。Ghidra 12.1.4 = `Ghidra_12.1.4_build` の zip, sha256 `ddac49f9…d2db` 一致、JDK 21 (`/usr/lib/jvm/temurin-21-jdk-amd64`)。emsdk 6.0.12。
+- 変更 (`ghidra_route/ghidra_to_c.py` のみ): (1) `&UNK_<va>` を参照する範囲 (`0x182280000`〜) を `gt_<base>` の byte 配列として PE `.rdata` から読み、参照を `((unsigned char*)gt_<base> + off)` に書換える。従来の 16 byte 単位の `_UNK_` 定義では表が uint 1 個として展開され、`UNK_182280000` が未定義だった。(2) `resonator.also` に 4 件を追加 (`0x180fd6498` `0x180fd662c` `0x180fe5f40` `0x180fd3144`)。計 16 件。
+- Ghidra decompile (Resonator + also 16 件 = 17 関数): 17 件すべて OK (summary.tsv, import 込み 31.7 s wall, n=1)。
+- emcc (resonator, 修復なし, `-ferror-limit=0`): **依然失敗**。`UNK_182280000`・`UNK_182280020` は消えた。残件は下表 (件数は 1 run の実測)。
+
+| 残件 | 件数 | 起票先 |
+|---|---|---|
+| 未宣言関数の呼出 (`rcpps` 2 引数形 1 件・`GetLastError`/`SetLastError` 2 件・未関数化 callee `FUN_180fd4f30` `FUN_180fd51cc` `FUN_180fd2d38`・`func_0x…81e4/81ec/648c/6498/662c/bdfcc/bdef4`) | 17 | #1405 |
+| `MXCSR` 参照 | 8 | #1405 |
+| 引数なし呼出の `param_1` 不足 | 2 | #1405 |
+| `V128` への int 代入 (`rcpps` の戻り値) | 1 | #1405 |
+
+- emcc の `resonator.c` error 行は計 28 件 (`-ferror-limit=0`・実測)。上表は同じログの分類 (17 + 8 + 2 + 1 = 28)。
+
+- 回帰確認 (同一 HEAD・同一 shim): Gain 1000/1000 (wasm 15,161 B, emcc 0.75 s)・Haas 1000/1000 (16,878 B, 0.65 s)・Gate 1000/1000 (17,367 B, 0.66 s)。`compare.mjs` の結果は `bit-exact` 3 件とも全件一致。Gain/Haas/Gate の decompile は `--fix bitcast,intload,stackpair,assoc,concat` で C 化し直した (別 decompile 集合 `out_reg`)。
+- Resonator の突合・ablation・ネガコンは未実施 (emcc 未通過のため)。
+- 起票: 残件 → #1405 [KH-25]。Stereo / Delay → #1216 [KH-24]。
