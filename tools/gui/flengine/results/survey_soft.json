@@ -16,9 +16,7 @@
    "memory access out of bounds": 15,
    "halt0->longjmp": 8
   },
-  "failfast_units": {
-   "SystemParametersInfoW": 3
-  }
+  "failfast_units": {}
  },
  "reach": [
   {
@@ -170,131 +168,96 @@
   },
   {
    "order": 22,
-   "name": "CreateWindowExW",
+   "name": "RegisterClassW",
    "calls": 2,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 23,
-   "name": "SetWindowLongPtrW",
+   "name": "CreateWindowExW",
    "calls": 2,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 24,
+   "name": "SetWindowLongPtrW",
+   "calls": 2,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 25,
    "name": "MessageBoxW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 25,
+   "order": 26,
    "name": "RegisterClipboardFormatW",
    "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 26,
+   "order": 27,
    "name": "CharLowerBuffW",
    "calls": 10,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 27,
+   "order": 28,
    "name": "GetClipboardFormatNameW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 28,
+   "order": 29,
    "name": "EnumDisplaySettingsW",
    "calls": 1,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 14,
-   "name": "EnumDisplayMonitors",
-   "calls": 2,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 29,
+   "order": 30,
    "name": "GetClipCursor",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
-   "order": 30,
+   "order": 31,
    "name": "GetMonitorInfoW",
    "calls": 15,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 31,
+   "order": 32,
    "name": "EnumFontFamiliesExW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "2"
   },
   {
-   "order": 32,
+   "order": 33,
    "name": "MessageBoxA",
    "calls": 3,
    "kind": "IMPL",
    "prio": "2"
-  },
-  {
-   "order": 24,
-   "name": "MessageBoxA",
-   "calls": 3,
-   "kind": "IMPL",
-   "prio": "2"
-  },
-  {
-   "order": 25,
-   "name": "GetClassInfoW",
-   "calls": 1,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 26,
-   "name": "RegisterClassW",
-   "calls": 1,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 27,
-   "name": "CreateWindowExW",
-   "calls": 1,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 28,
-   "name": "SetWindowLongPtrW",
-   "calls": 1,
-   "kind": "IMPL",
-   "prio": "0"
   }
  ],
- "reach_summary": "reached=32 impl=31 stub=1",
+ "reach_summary": "reached=33 impl=32 stub=1",
  "failfast_apis": {},
  "softstub_apis": {
   "LoadImageW": 21
  },
  "failfast_count": 0,
- "gui_icall_calls": 2,
+ "gui_icall_calls": 7,
  "gui_ring_discarded": 0,
  "icall_miss": 50,
  "m11_stub_total": 151,

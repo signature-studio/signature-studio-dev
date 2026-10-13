@@ -192,25 +192,32 @@
   },
   {
    "order": 25,
-   "name": "CreateWindowExW",
+   "name": "RegisterClassW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 26,
+   "name": "CreateWindowExW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 27,
    "name": "SetWindowLongPtrW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   }
  ],
- "reach_summary": "reached=26 impl=25 stub=1",
+ "reach_summary": "reached=27 impl=26 stub=1",
  "failfast_apis": {
   "LoadImageW": 1
  },
  "softstub_apis": {},
- "failfast_count": 3,
+ "failfast_count": 1,
  "gui_icall_calls": 1,
  "gui_ring_discarded": 0,
  "icall_miss": 49,
