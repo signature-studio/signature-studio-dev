@@ -720,6 +720,29 @@ unsigned long long function_414ad0(unsigned long long s, unsigned long long newl
 }
 #endif /* M11_OV_414AD0 */
 
+#ifndef M11_FIX_652500
+#define M11_FIX_652500 0
+#endif
+#if M11_FIX_652500
+/* function_652500  VA 0x652500  (rcx = arg1 = &s; 文字列ポインタ *arg1 を読んで 414ec0/414e70/414bb0 に渡す; #748)
+ * 逆アセンブル (64bit, block00031_PE.bin 0x652500..0x65257c) から転記. 定数 0x6525a4 (rip 相対) = R(0x2525a4).
+ * 機械語: if (*arg1 == 0) goto ret; p = *arg1; len = p ? [p-4] : 0; 414ec0(&slot, p, len, 1);
+ *         if (414e70(slot, C) != 0) 414bb0(arg1, C); ret: 412d60(&slot, unused).
+ * RetDec IR は *arg1 の 1 段 deref を落とし ([arg1-4] を読み, &slot を p として渡した). 欠陥類型は D4 と同一. */
+u64 function_652500(void* arg1_p) {
+    u64 arg1 = (u64)(uintptr_t)arg1_p;
+    u64 slot = 0;
+    u64 c = R(0x2525a4);
+    if (Q(arg1) != 0) {
+        u64 p = Q(arg1);
+        u32 len = D(p - 4);
+        function_414ec0((void*)(uintptr_t)&slot, p, len, 1);
+        if ((u32)function_414e70(slot, c) != 0) function_414bb0(arg1, c);
+    }
+    return function_412d60((u64)(uintptr_t)&slot, 0);
+}
+#endif /* M11_FIX_652500 */
+
 /* function_43a3f0  VA 0x43a3f0  (System: 整数 → 10 進文字列の書込み; 符号 '-' 任意)
  * 逆アセンブル (0x43a3f0..0x43a4ea) から転記. rcx = &s (var string), edx = 絶対値 (u32), r8b = 負符号フラグ.
  * 414ad0 で桁数+符号ぶん確保した後, `mov r8,[rbx]` (= *s) の 1 段 deref を RetDec IR が落とし, r8 = &s として '-' と桁を書いた (DEFECTS.md D4 型).
