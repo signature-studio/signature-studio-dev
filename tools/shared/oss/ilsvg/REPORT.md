@@ -64,6 +64,8 @@ native 比較は `-lz` を追加。
 
 mac dylib (`Shared/ILSvg_x64.dylib`) は素材に無いため、受入条件 4 の「mac dylib との出力比較」は未実施。native との一致で代替。
 
+HEAD `e0c3c59b` からの再現 (clean 再ビルド、load average 0.22 開始時): `build_pair.sh` real 1 m 36 s。wasm 388770 B (sha256 先頭 16 桁 `0fa5c92d8eb8ba42`)。描画 dims 64 64 / nonzero_px 3136、画素列 16384 B が `cmp` 一致。
+
 ## 未解決 (起票先)
 
 | 未解決 | 起票先 |
