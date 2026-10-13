@@ -25,7 +25,7 @@ def gen_case(fn, group):
     def seti(o, v): struct.pack_into("<i", st, o, v)
     def fl(): return F32(rng.uniform(-1, 1)) if not big else rng.choice([0.0, 1.0, -1.0, 1e-38, 1e-42, 3e4, -3e4, rng.uniform(-8, 8), rng.uniform(-1, 1)])
     for o in range(0x6C, 0xB8, 4): setf(o, fl())
-    setf(0x78, rng.choice([0.0, 0.0, -0.0, 0.5, fl()]))   # ucomiss 分岐: x==0 (±0) と x!=0 の両経路
+    setf(0x78, rng.choice([0.0, 0.0, -0.0, 0.5, float('nan'), fl()]))   # ucomiss 分岐: x==0 (±0) / x!=0 / NaN (jp 経路) を踏む
     for i in range(13): seti(0x164 + 4 * i, lens[i]); seti(0x12C + 4 * i, rng.randrange(0, lens[i]))
     seti(0x198, len_ring); seti(0x160, rng.randrange(0, len_ring))
     for o in range(0x19C, 0x214, 4): seti(o, rng.randrange(0, minlen))
@@ -36,7 +36,7 @@ def gen_case(fn, group):
     amp = 1.0 if not big else rng.choice([1.0, 100.0, 1e-20])
     inp = [F32(rng.uniform(-amp, amp)) for _ in range(n)]
     return dict(fn=fn, n=n, aux=aux, st=bytes(st), lens=lens + [len_ring], cap=cap, bufs=bufs, inp=inp, group=group,
-                zero78=struct.unpack_from("<f", st, 0x78)[0] == 0.0)
+                zero78=struct.unpack_from("<f", st, 0x78)[0] == 0.0, nan78=math.isnan(struct.unpack_from("<f", st, 0x78)[0]))
 
 def pack(c):
     b = struct.pack("<IIII", c["fn"], c["n"], c["aux"], S) + struct.pack("<14I", *(c["lens"] + [0] * (NL - len(c["lens"]))))[:NL * 4]
@@ -50,10 +50,10 @@ open(f"{W}/cases.bin", "wb").write(struct.pack("<I", len(cases)) + b"".join(pack
 # カバレッジ (gate の一部): 全てを踏まなければテスト自体が無効
 cov = {"fruity": sum(c["fn"] == 0 for c in cases), "uf": sum(c["fn"] == 1 for c in cases),
        "uf_aux": sum(c["fn"] == 1 and c["aux"] for c in cases), "uf_noaux": sum(c["fn"] == 1 and not c["aux"] for c in cases),
-       "x78_zero": sum(c["zero78"] for c in cases), "x78_nonzero": sum(not c["zero78"] for c in cases),
+       "x78_zero": sum(c["zero78"] for c in cases), "x78_nonzero": sum(not c["zero78"] for c in cases), "x78_nan": sum(c["nan78"] for c in cases),
        "n0": sum(c["n"] == 0 for c in cases), "n>=129": sum(c["n"] >= 129 for c in cases)}
 print("coverage:", cov)
-need = ["uf_aux", "uf_noaux", "x78_zero", "x78_nonzero", "n0", "n>=129"]
+need = ["uf_aux", "uf_noaux", "x78_zero", "x78_nonzero", "x78_nan", "n0", "n>=129"]
 if any(cov[k] == 0 for k in need): print("FAIL: coverage hole", [k for k in need if cov[k] == 0]); sys.exit(1)
 
 ranges = json.load(open(f"{W}/loc/ranges.json"))
