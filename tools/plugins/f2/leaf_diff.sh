@@ -3,7 +3,7 @@
 #   bash tools/plugins/f2/leaf_diff.sh
 # 前提: `bash tools/plugins/f2/f2_step1.sh` を実行済み (work/batch/<block>/p.final.ll・p_simd.c・work/f2/<block>.icall.json)。
 #       emsdk (/opt/emsdk)、python に numpy capstone pefile (`source f2/env.sh` が pefile+capstone。numpy は uv pip install numpy)
-# 出力: work/f2/leaf.json, work/f2/leaf/<block>.jsonl (liftdiff 共有フォーマット = tools/liftdiff/docs/FORMAT.md §3),
+# 出力: work/f2/leaf.json, work/f2/leaf/<block>.jsonl (主採点)、work/f2/leaf_custom/<block>.jsonl (補助採点) = liftdiff 共有フォーマット (tools/liftdiff/docs/FORMAT.md §3),
 #       work/f2/leaf_report.md (stdout にも出す)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -27,5 +27,7 @@ for vf in "$ROOT"/work/f2/targets/*.vas; do
   python3 liftdiff.py batch "$ROOT/work/f2/targets/eqf$b.json" --set "file:$vf" --shards "$SHARDS" \
     --out "$ROOT/work/f2/leaf/$b.jsonl" | tail -12
 done
-python3 "$HERE/leaf_report.py" --md "$ROOT/work/f2/leaf_report.md"
+python3 "$HERE/leaf_custom.py"
+python3 "$HERE/leaf_report.py" --md "$ROOT/work/f2/leaf_report.md" --json "$ROOT/work/f2/leaf_report.json"
+python3 "$HERE/xcheck_leaf.py"
 echo "LEAF_DIFF elapsed $(( $(date +%s) - t0 )) s (load average $(cut -d' ' -f1 /proc/loadavg))"

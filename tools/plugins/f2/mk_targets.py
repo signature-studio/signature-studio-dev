@@ -9,7 +9,7 @@
                               .reloc を除く全 section を RVA に敷き、DIR64 reloc が指す image 内ポインタは VA→RVA (-ImageBase) 補正
   targets/<block>.vas         関数 VA 一覧 (liftdiff batch --set file:)
 """
-import json, os, struct, sys
+import json, os, re, struct, sys
 import pefile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +54,42 @@ def build_image(path):
     return bytes(img), {'base': base, 'size': size, 'top': top, 'reloc_dir64': len(relocs), 'fixed': fixed}
 
 
+def ret_kind(pe, base, va, size):
+    """i128 を返す IR 関数の実戻り型: 機械語で ret 前に最後に xmm0 へ書く命令から float/double を決める (決まらなければ None)"""
+    from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+    from capstone.x86 import X86_OP_REG, X86_REG_XMM0
+    md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True
+    kind = None
+    for i in md.disasm(pe.get_data(va - base, size), va):
+        o = i.operands
+        if o and o[0].type == X86_OP_REG and o[0].reg == X86_REG_XMM0 and not i.mnemonic.startswith('ucomis') and not i.mnemonic.startswith('comis'):
+            m = i.mnemonic
+            kind = 'float' if (m.endswith('ss') or m == 'cvtsd2ss') and m != 'cvtss2sd' else 'double' if (m.endswith('sd') or m == 'cvtss2sd') else None
+    return kind
+
+
+def wrap_i128(src, dst, fns):
+    """fns: {va: 'float'|'double'}。 `define i128 @function_<va>(P)` を `@function_<va>.i128` に改名 (呼出し側も) し、
+    同名で float/double を返す ABI アダプタ (trunc + bitcast のみ) を追加する。 liftdiff の JS ランナは i128 戻りの wasm export を呼べないため。
+    戻り: 実際に包んだ {va: kind}"""
+    txt = open(src, errors='replace').read()
+    done, extra = {}, []
+    for va, kind in fns.items():
+        name = 'function_%x' % va
+        m = re.search(r'^define i128 @%s\((.*?)\)(.*)\{$' % name, txt, re.M)
+        if not m:
+            continue
+        params = m.group(1)
+        args = params   # 仮引数は `ty %name` 形式なのでそのまま実引数に使える
+        txt = re.sub(r'@%s\b(?=\()' % name, '@%s.i128' % name, txt)
+        ity, fty = ('i32', 'float') if kind == 'float' else ('i64', 'double')
+        extra.append('define %s @%s(%s) {\nentry:\n  %%r = call i128 @%s.i128(%s)\n  %%t = trunc i128 %%r to %s\n  %%f = bitcast %s %%t to %s\n  ret %s %%f\n}\n' % (
+            fty, name, params, name, args, ity, ity, fty, fty))
+        done[va] = kind
+    open(dst, 'w').write(txt + '\n' + '\n'.join(extra))
+    return done
+
+
 def main():
     a = sys.argv[1:]
     tag = 'eqf'
@@ -76,16 +112,29 @@ def main():
         ip = os.path.join(W, 'f2', 'image', '%d.bin' % b)
         open(ip, 'wb').write(img)
         bd = os.path.join(W, 'batch', str(b))
+        pe = pefile.PE(pe_path, fast_load=True)
+        i128 = {}
+        for r in [r for r in rows if r['block'] == b]:
+            va = int(r['va'], 16)
+            if re.search(r'^define i128 @function_%x\(' % va, open(os.path.join(bd, ir_name), errors='replace').read(), re.M):
+                k = ret_kind(pe, pe.OPTIONAL_HEADER.ImageBase, va, r['bytes'])
+                if k:
+                    i128[va] = k
+        ir_path = os.path.join(bd, ir_name)
+        if i128:
+            os.makedirs(os.path.join(W, 'f2', 'wrap'), exist_ok=True)
+            ir_path = os.path.join(W, 'f2', 'wrap', '%d.ll' % b)
+            print('block %d: i128 戻りを ABI アダプタで包む: %s' % (b, {hex(k): v for k, v in wrap_i128(os.path.join(bd, ir_name), ir_path, i128).items()}))
         t = {
             'name': '%s%d' % (tag, b),
             'desc': 'PLG-F2-3 (#515) eq-filter block %d: RetDec + pass 鎖 (batch_lift.sh) の p.final.ll を関数単位で native 機械語と差分' % b,
             'pe': '${FL_WIN64_DIR}/extracted/block%05d_PE.bin' % b,
-            'ir': rel(os.path.join(bd, ir_name)),
+            'ir': rel(ir_path),
             'image': rel(ip),
             'wasm_origin': '0x0',
             'fn_prefix': 'function_',
             'initial_memory': 671088640,   # ld_wasm.c の g_inbuf 192MB + g_heap 96MB + image が収まる最小級 (m11.json と同値)
-            'simd': {'gen': 'cat %s' % rel(os.path.join(bd, 'p_simd.c')), 'ir': rel(os.path.join(bd, ir_name)),
+            'simd': {'gen': 'cat %s' % rel(os.path.join(bd, 'p_simd.c')), 'ir': rel(ir_path),
                      'include': ['tools/plugins/lift/passes']},
         }
         json.dump(t, open(os.path.join(W, 'f2', 'targets', '%s%d.json' % (tag, b)), 'w'), indent=1)

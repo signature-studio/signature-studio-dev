@@ -72,4 +72,13 @@ print('leaf.json      : %d 関数' % len(want))
 print('集合一致: %s  (差分 got-want=%s want-got=%s)' % ('EQ' if got == want else 'DIFF', sorted(got - want), sorted(want - got)))
 print('強い leaf (機械語に call 命令が 1 つも無い & IR leaf): %d 関数' % strong_all)
 print('IR leaf なのに機械語に直接 call / import call がある (IR から call が脱落): %d 関数 %s' % (len(ir_only_dropped), ir_only_dropped))
+# 位置非依存ハッシュ (inventory/win_funcs.py の funcs[*][2]) で同一コードをまとめる: 23 関数が何種類の機械語か
+import collections
+grp = collections.defaultdict(list)
+for b, va in sorted(want):
+    base = pefile.PE(os.path.join(FL_WIN64_DIR, 'extracted', 'block%05d_PE.bin' % b), fast_load=True).OPTIONAL_HEADER.ImageBase
+    h = {f[0]: f[2] for f in json.load(open(os.path.join(W, 'winfuncs', 'block%05d.json' % b)))['funcs']}[va - base]
+    grp[h].append('%d:%s' % (b, hex(va)))
+print('位置非依存ハッシュで同一コードをまとめると %d 種類 (23 関数のうち複数 block に重複: %s)' % (
+    len(grp), '; '.join(' = '.join(v) for v in grp.values() if len(v) > 1)))
 sys.exit(0 if got == want else 1)
