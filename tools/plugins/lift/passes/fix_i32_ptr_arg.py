@@ -81,10 +81,10 @@ def _trunc_src(lines, j, v, fstart):
     return None
 
 
-def _icmp_const(v, ctx):
-    c = int(v)
+def _icmp_ok(m, ctx):
+    c = int(m.group(2))
     if not 0 <= c <= I32_MAX:
-        raise PassError('icmp の定数 %s は i32/i64 で値が一致しない (%s)' % (v, ctx.strip()))
+        raise PassError('icmp の定数 %d は範囲外 (%s)' % (c, ctx.strip()))
     return ''
 
 
@@ -120,7 +120,7 @@ def process(text, fn):
         for b in body:
             s = re.sub(r'inttoptr i64 ' + re.escape(nm) + r' to ptr', '', b)
             s = re.sub(r'icmp (eq|ne) i32 ' + re.escape(nm) + r', (-?\d+)(?![\w.])',
-                       lambda m: _icmp_const(m.group(2), b), s)
+                       lambda m: _icmp_ok(m, b), s)
             if re.search(re.escape(nm) + r'(?![\w.$])', s):
                 raise PassError('本体で %s が inttoptr / icmp 以外に使われる (%s)' % (nm, b.strip()))
 

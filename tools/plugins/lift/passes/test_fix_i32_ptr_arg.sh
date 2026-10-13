@@ -8,7 +8,7 @@ W="${TMPDIR:-/tmp}/t_i32ptr.$$"
 mkdir -p "$W"
 trap 'rm -rf "$W"' EXIT
 
-LLVM_AS="${LLVM_AS:-$(command -v llvm-as || ls /usr/lib/llvm-*/bin/llvm-as | sort -V | tail -1)}"
+CLANG="${CLANG:-clang}"
 
 callee='define i64 @function_180049450(i64 %arg1, i32 %arg2) {
 entry:
@@ -70,7 +70,7 @@ EOF
 check_ok() {
   local in="$1" name="$2"
   python3 "$PASS" "$in" "$W/$name.out.ll" --func function_180049450 2>"$W/$name.err"
-  "$LLVM_AS" "$W/$name.out.ll" -o /dev/null
+  "$CLANG" -x ir -fsyntax-only "$W/$name.out.ll"
   echo "PASS $name: $(cat "$W/$name.err")"
 }
 
@@ -91,4 +91,21 @@ check_ok "$W/const.ll" const
 check_ok "$W/trunc.ll" trunc
 check_fail "$W/argpass.ll" argpass
 check_fail "$W/body_i32.ll" body_i32
+
+# 5. 本体が i32 仮引数を変数と比較する (icmp の被演算子が定数でない) (失敗させる)
+cat > "$W/icmp_var.ll" <<EOF
+define i64 @function_180049450(i64 %arg1, i32 %arg2) {
+entry:
+  %p = inttoptr i64 %arg2 to ptr
+  %c = icmp eq i32 %arg2, %arg1
+  %v = load i64, ptr %p
+  ret i64 %v
+}
+
+define i64 @caller(i64 %a) {
+  %r = call i64 @function_180049450(i64 %a, i32 0)
+  ret i64 %r
+}
+EOF
+check_fail "$W/icmp_var.ll" icmp_var
 echo "ALL PASS"
