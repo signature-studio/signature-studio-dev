@@ -129,6 +129,15 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 
 - e2e (`S2HOST_WATCH` 未設定, 実行 commit **`c9fbfc54`** = `git rev-parse` `c9fbfc5473f98cc8902f6ee8daffca3e5446eb1f`、`vst3host.cpp` は `35737960` と同一): **50/50 OK, 67.93 s** (`bash tools/targets/serum2/host/e2e.sh`、exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.09 → 0.14。(同コードの `35737960` 時点の run は 71.40 s。)
 
+## 4-2. 値 2 の由来 (実行時 IID 読出し, HEAD `af2e50ea` + vst3host.cpp の IID 出力)
+
+- 実測 (`S2HOST_WATCH=1`, 既定 host, 4 blocks, `watch_256b.console`): `hit#1 RIP=…1338 value=2` の直後に QI の IID 2 件を実メモリから読んだ。
+  - RVA `0x11be750` = `A3B8C6C5-C095-4688-B091-6F0BB697AA44` = **IVst3ToAUWrapper** (VST3 SDK `pluginterfaces/vst/ivsthostapplication.h:103`)
+  - RVA `0x11be8e8` = `6D319DC6-60C5-6242-B32C-951B93BEF4C6` = **IVst3ToAAXWrapper** (同 :122)
+- 同 console の `[P->H] HostApp::queryInterface unknown iid=…` (25 行目・35 行目) で、両 IID が host の `HostApp` に対して `kNoInterface` を返されていることを確認。
+- よって `0x180037600` は「IVst3ToAU / IVst3ToAAX の両方が失敗 → 2」を返す。値 2 は **host が AU/AAX ラッパ用 IID を持たないことに起因する** (host 側の応答)。
+- 含意: `+0x10c` を 1 にするには、host が当該 IID に応答する必要がある可能性 (未検証)。書込元 `0xb1332` (関数 `0xacf70`) の呼出元は未確定のまま。
+
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
