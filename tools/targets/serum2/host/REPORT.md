@@ -74,7 +74,7 @@
 - **payload の正体 = CBOR (RFC 8949)**。zstd 展開後の先頭 `0xb8 0xa4` は msgpack 風ではなく CBOR の map(1B 長=164) / `0xb8 0x3b` = 59 entries、続く `0x64 'Arp0'` は text(4)、`0xa2` = map(2)、`0xa0` = 空 map。key は text・辞書順昇順。processor 164 key / controller 59 key。
   - float は float32 (`0xfa`) 無損失なら `0xfa`、でなければ `0xfb` (nlohmann::json::to_cbor の挙動と一致。DLL に nlohmann json v3.12 の型名あり)。
   - 最上位に meta JSON と同名キー (component/product/productVersion/tags/version…) が重複。**setState が見る DOM = この CBOR 側**。
-  - コンテナ: `u32 展開後長 + u32 版本(=2) + zstd`。0x1801bf1c0 は版本 2 → 0x1801bf480 (0x176e0 B ctx + BMI2 cpuid 検査 = zstd 展開と推定, med) → 0x1801bfb00、版本 0/1 → 0x180571dc0 → 0x1801bf5f0。**どちらが CBOR parser かは未特定** (writer 0x1801be2e0 は `"XferJson"` + 版本 2 + `hash` を組む箇所までを確認、lift は未実施)。
+  - コンテナ: `u32 展開後長 + u32 版本(=2) + zstd`。0x1801bf1c0 は版本 2 → 0x1801bf480 (zstd 展開) → 0x1801bfb00、版本 0/1 → 0x180571dc0 → 0x1801bf5f0。**どちらが CBOR かは #340 で確定 (§5-1): 0x1801bfb00 = CBOR (版本 2)、0x1801bf5f0 = UBJSON (版本 0/1)**。writer 0x1801be2e0 は `"XferJson"` + 版本 2 + `hash` を組み、CBOR 直列化は 0x1801bea90 → 0x180256250。
 - **`payload_codec.py`** (decode/encode/split_state/join_state): seed の既定 state で **processor 5,364 B / controller 1,878 B とも encode(decode(x)) がバイト一致**。zstd 再圧縮は processor 1,053 B 一致 / controller は 651 B vs 元 647 B (zstd 内部差。展開後は一致)。
 - **demo 注入 A/B** (`make_cases.py` v3 に `lic_sent` / `demo_payload` 追加、sentinel = processor `mpePitchBendRange` 24 (既定 48) / controller `presetName` "SENTINEL"):
 
@@ -93,7 +93,7 @@
   |---|---|---|
   | 1. dialog queue probe (+0x139bc8 の xor) は run ごとに値が揺れ (heap 未初期化領域を含む、unpatched+lic_sent と unpatched+demo_payload で setState 前後とも同値) | dialog 発火の判定に使えない。demo 分岐は sentinel 非適用でのみ観測 | #256 (SR-1c) — +0x10c 解明後に観測点を再設計 |
   | 2. controller 側: payload に `kAudioUnitParameterFlag_IsHighResolution=false` を入れても demo bit (this+0x22792) = 0、0x800010 未受信、保存 state にマーカ無し。ゲート +0x10c == 2 のまま (§3-3 と同じ) | controller 側の demo 分岐・0x800010 経路は実 DLL で未観測 | #256 (SR-1c) |
-  | 3. writer/reader の lift・型タグ体系の IR 化は未実施 (CBOR と判明したため独自 binary の型表は不要。nlohmann 相当は OSS 境界として扱える可能性) | SR-3 の lift 範囲 (CBOR parser/serializer を対象に含めるか) が未確定 | #340 (SR-1d: lift 要否判断) / 関連 #71 |
+  | 3. ~~writer/reader の lift 範囲未確定~~ → **#340 で判断済み (§5-1)**: nlohmann CBOR 実装は置換除外せず lift 対象に含める | — | 解決 (#340)。IR 化・実行は SR-3/SR-4 側 |
   | 4. ~~#238 契約突合 (payload 側 productVersion 下げ A/B 未実施)~~ — **§3-6 で実施 (#341)** | — | §3-6 |
 
 - e2e: `bash tools/targets/serum2/host/e2e.sh` = **23/23 OK, 39.7 s** (ベースライン 14/14 は 43.0 s)。本ファイル内の e2e 結果・所要はここだけに記載。
@@ -157,11 +157,63 @@
 
 ## 5. 引継ぎ (CAB-74 / SR-3 系)
 
-1. ~~payload の解読~~ — **完了 (#255, §3-5): CBOR と判明**。残: writer/reader の lift 要否判断 (#340)。payload 側 productVersion 下げ A/B は **完了 (#341, §3-6)**。
+1. ~~payload の解読~~ — **完了 (#255, §3-5): CBOR と判明**。~~writer/reader の lift 要否判断~~ — **完了 (#340, §5-1)**。payload 側 productVersion 下げ A/B は **完了 (#341, §3-6)**。
 2. **controller +0x10c の setter 特定** — 0x800010 観測の前提。候補: IConnectionPoint notify ("SerumDSPSharedData") 処理部 / editor open 完走 / FX-class 区別。gdb watchpoint (wine) か lift で特定。
 3. ~~demoVersion 注入後の A/B E2E~~ — **processor 側は完了 (#255, §3-5)**。controller demo bit / 0x800010 は SR-1c。
 4. **WINEDEBUG=+relay による呼出 API 一覧化** — CAB-68 受け入れ #3 の API レベル証跡 (wine 固有の代役を除くリスト化)。
 5. mac 版 (universal2) 未実施 — Win を正とする方針どおり。
+
+### 5-1. [SR-1d #340] payload writer/reader の同定と lift 要否判断 (静的・実測)
+
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (lift 前の静的同定。lift は未実施)。入力 `Serum2_win64.vst3` sha256 `501e7bb3…5283`。再現: `PY=<python+pefile,capstone,numpy> bash tools/targets/serum2/scripts/sr1d_run.sh` (出力 `out/sr1d_{locate.tsv,closure.txt,verify.txt}`、判定は 1 件でも FAIL なら exit 1)。
+
+**結論 (先出し)**
+1. **CBOR parser = 0x1801bfb00** (→ `sax_parse` 0x180256dc0 に format=1 を渡す → `parse_cbor_internal` 0x1802571e0)。**0x1801bf5f0 は UBJSON** (format=3 → `parse_ubjson_internal` 0x18025e340)。版本 2 = zstd + CBOR (0x1801bf480 → 0x1801bfb00)、版本 0/1 = 0x180571dc0 + UBJSON (0x1801bf5f0)。
+2. **CBOR serializer = 0x1801be2e0 (writer) → 0x1801bea90 → `write_cbor` 0x180256250**。
+3. **判断: OSS 境界として lift 除外 (wasm 版 nlohmann への置換) は不可。lift 対象に含める**。理由は下記 (a)(b)(c)。追加 lift 量は SR-3 cut 表未登録の 246 関数 / 55,103 B (`.pdata` 33,791 関数 / 10,130,044 B の 0.54%) で小さい。
+   - (a) **DOM を Xfer 側コードが inline で読み書きする**: `write_cbor` は basic_json の型 byte を +0、値 ptr を +8 で読み (L1)、配列長を `(end-begin)>>4` (16 B 要素, L2)、map を MSVC `std::map` ノードの `_Isnil` (+0x19, L3) で走査する。つまり DOM の線形メモリ上のレイアウトは **この DLL の MSVC STL 特化そのもの**で、lift 後コードが生成・消費する。別ツールチェーン (emscripten) でビルドした nlohmann に差し替えると型表現が一致しない (libc++ のノード/文字列レイアウトとの差は**推定**。本チケットでは未測定)。
+   - (b) **差し替え可能な安定境界 I/F が無い**: export は `InitDll`/`ExitDll`/`GetPluginFactory` の 3 つだけ (§2) で、nlohmann は全て非 export のテンプレート特化。Xfer 側 wrapper (0x1801bfb00 / 0x1801bea90) が DOM 型 (上記レイアウト) を値で受け渡す。
+   - (c) **除外しても得が小さい**: 下表のとおり closure の大半は zstd/zlib (SR-3 cut 済み) か Xfer 自身のコード。
+4. **SR-3 署名 DB (#71) との突合**: `out/sr3_anchors.txt` の `json_abi_v3_12_0` 文字列 45 hit (nlohmann v3.12 の ABI namespace)。一方 SR-3 cut 表 (`nlohmann_json` 36 関数) に入っているのは本件の binary_reader/writer 領域 248 関数中 **2 関数のみ** (0x180256d60 vtable 51 B / 0x180258890 anchor 1,172 B)。CBOR reader/writer 本体は SR-3 の seed (例外文言 `type must be` 等) では捕捉されていなかった。
+
+**同定の根拠 (`sr1d_verify.py`: 32 check + 11 ネガコン = 43 行 PASS / FAIL 0, 所要 0.8 s)**
+
+| 証拠 | 内容 (upstream = nlohmann/json v3.12.0 `binary_reader.hpp` / `binary_writer.hpp`) | check |
+|---|---|---|
+| E1 エラー文リテラル → 参照関数 | `…0x60-0x7B…0x7F` → 0x18025bbd0 (`get_cbor_string`) / `…0x40-0x5B…0x5F` → 0x18025b510 (`get_cbor_binary`) / `…0xA0-0xBF, 0xD9-0xDB` → 0x18025d200 (**upstream では `get_msgpack_string`**。CBOR ではない) / UBJSON size/type 3 文 → 0x180261c90・0x18025fbb0・0x180263d10 / `BJData…ND-array` → 0x180261410 / `Unsupported BSON record type 0x` → 0x1802598d0。各リテラルの参照元は 1 関数のみ | E1 ×9 |
+| E2 `sax_parse` 0x180256dc0 のジャンプ表 (0x180a4b26c, 5 エントリ, `dec edx` 後 index) | format 1 → 0x1802571e0 (cbor), 2 → 0x1802580d0 (msgpack), 3 → 0x18025e340 (ubjson), 4 → 0x180257130 (bson), 5 → 0x18025e340 (bjdata, ubjson と共有)。`input_format_t {json,cbor,msgpack,ubjson,bson,bjdata}` の並びと一致 | E2 ×8 |
+| E3 reader の呼出元 | 0x1801bfb00 は `mov edx,1` で、0x1801bf5f0 は `mov edx,3` で 0x180256dc0 を呼ぶ | E3 ×3 |
+| E4 0x1801bf1c0 の版本分岐 (命令順) | `cmp eax,2; je` 先の最初の call = 0x1801bf480 → 結果を `cmp rax,-0x78` (ZSTD_isError 相当) → 0x1801bfb00。0x180571dc0 → 0x1801bf5f0 の順 | E4 ×4 |
+| W writer 側 | 0x1801be2e0 → 0x1801bea90 → 0x180256250。`write_cbor` は 0xF6 (null)・`0xF4\|b` (bool)・0xF9/0xFC (half)、0x180256c70 に 0xFA/0xFB (float32/64 prefix, msgpack の 0xCA/0xCB と同居) | W1–W5 |
+| L DOM レイアウト | 上記 (a) | L1–L3 |
+
+- **ネガコン (11 行。各行は「誤った期待」を与えて FAIL することを確認し、FAIL したとき PASS と表示する)**: 例 E1 リテラル末尾を 1 文字変えると 0 hit / `get_cbor_string` の期待を 0x18025b510 にすると不一致 / 0x1801bf5f0 を cbor 扱いにすると不一致 / `_Isnil` を +0x1a とすると不一致。
+- **ゲート自体のネガコン (バイナリ側を壊したコピー, `sr1d_verify.py` を直接実行)**: (i) `get_cbor_string` のリテラルを 1 byte 改変 → `FAIL E1 get_cbor_string`, **exit 1**。(ii) 0x1801bfb00 内 `mov edx,1` の即値を 3 に改変 → `FAIL E3 …` と `FAIL NEGCTL E3 …`, **exit 1**。
+- (iii) `write_cbor` 内 `mov dl,0xf6` の即値を 0xc0 に改変 → `FAIL W3 …` と `FAIL NEGCTL W3 …`, **exit 1**。
+- **検証記録**: 検証起点 commit `559d477` をクリーン worktree (`git worktree add --detach … HEAD`) に展開し、DLL 抽出 (plugins-serum2 の installer から 7z) + `sr3_index.py` + `sr1d_run.sh` を一括実行 = **11.19 s** (4 core, 並列 1 本 (index 生成のみ `mp.Pool(4)`), 開始時 load average 0.11 → 終了時 0.91)、exit 0、`out/sr1d_{locate.tsv,closure.txt,verify.txt}` の 3 ファイルは commit 済みと `cmp` 一致。index 済みの再実行は 0.8 s。`find tools/targets/serum2 -type f -size +20M -not -path '*/work/*'` = 0 件。
+- 検証範囲外: 別アルゴリズムでの検算 (レビュワー実施想定。本節の E1–E4 は文字列・ジャンプ表・命令順の 3 系統で独立)、wine/実 DLL での動的確認、libc++ との DOM レイアウト差の実測。
+- 作業中、`0xA0-0xBF, 0xD9-0xDB` の文を CBOR の array/object 長と仮置きしていたが、upstream ソース (binary_reader.hpp 1653 行) では `get_msgpack_string` のエラー文だった。upstream の関数名と突合して訂正済み (`sr1d_cbor_locate.py` / `sr1d_verify.py` に反映)。
+
+**直接 call closure (`out/sr1d_closure.txt`, `sr1d_closure.py`。間接呼出は見えないので下限)**
+
+領域 REGION = 0x180256000–0x180264000 (`.pdata` 内 248 関数 / 56,326 B)。範囲は参照元関数の最小/最大 (0x180256250–0x180263d10) と隣接関数境界から置いた**推定**で、実際の instantiation の全体ではない。
+
+| root | closure 関数 / B | うち REGION | うち SR-3 cut (zstd/zlib 等) | 残り (Xfer 自身) |
+|---|---:|---:|---:|---:|
+| writer 0x1801be2e0 | 205 / 142,544 | 6 / 2,645 | 62 / 91,146 | 137 / 48,753 |
+| reader 0x1801bf1c0 | 273 / 228,802 | 50 / 43,874 | 36 / 121,849 | 187 / 63,079 |
+| from_cbor 0x1801bfb00 | 230 / 104,329 | 50 / 43,874 | 0 | 180 / 60,455 |
+| from_ubjson 0x1801bf5f0 | 230 / 104,327 | 50 / 43,874 | 0 | 180 / 60,453 |
+
+- REGION 248 関数のうち 3 入口 (0x180256250 / 0x180256dc0 / 0x180263a20) から REGION 内を直接 call で辿れるのは 56 関数 / 46,519 B、**192 関数 / 9,807 B は直接 call 未到達** (vtable・間接呼出経由と推定)。SR-3 cut 済みは 2 関数 / 1,223 B。lift に追加される量 = 248 − 2 = 246 関数 / 55,103 B。
+- XferJson コンテナ自身 (0x1801be2e0 1,539 B・0x1801bea90 162 B・0x1801bf1c0 576 B・0x1801bf5f0 1,137 B・0x1801bfb00 1,139 B, 合計 4,553 B) はいずれも cut 表に無く lift 対象。
+- 範囲外: 版本 0/1 (UBJSON) 経路を lift から外せるか (旧 preset 読込専用か) は未測定。meta JSON 側 (テキスト JSON lexer 0x180248400 等) の扱い、writer の `hash` 算出の同定、動的トレースでの確認は未実施。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| SR-3 cut 表の nlohmann 36 関数 (REGION 内 0x180256d60 / 0x180258890 を含む) が「lift 除外」になっているが、本節 (a)(b) のとおり DOM 型 ABI に依存するため置換は不可 | cut 表のまま wasm 版 nlohmann に差し替えると DOM レイアウト不一致の恐れ | #71 (コメントで通知。cut 表の nlohmann 区分を「同定のみ・lift 継続」へ変更するかは SR-3 側で判断) |
+| REGION (0x180256000–0x180264000) は推定範囲。直接 call 未到達 192 関数 / 9,807 B の帰属が未確定 | lift 範囲の過不足 | #71 (SR-4 #75 着手時の動的トレースで確定) |
+| 版本 0/1 (UBJSON) 経路の lift 要否 (旧版 preset 読込) | lift 量の削減余地 (0x1801bf5f0 1,137 B と ubjson 専用 helper, 未測定) | #71 |
 
 ## 6. 再現
 
@@ -175,6 +227,7 @@ WINEPREFIX=host/work/wineprefix wine64 host/work/build/vst3host.exe \
   'Z:\...\Serum2_win64.authstub.vst3' 'Z:\...\cases\licensed' 'Z:\...\out_x' 64 'Z:\...\exe_extract'
 ```
 - 強制ゲート実験 (#341): `S2HOST_FORCE_GATE=1 wine64 ... vst3host.exe ...` (e2e.sh が自動で実施)。python は `pefile` (mpatch.py) が必要 (`zstandard` は任意。無ければ zstd CLI)。
+- SR-1d (#340) 静的同定: `PY=<python+pefile,capstone,numpy> bash tools/targets/serum2/scripts/sr1d_run.sh` (§5-1)。
 - 前提: `wine64`, `g++-mingw-w64-x86-64`, `xvfb`(任意), CAB-71/237 資産 (`license/authstub/mpatch.py`, `synth_state.py`), 実 DLL `work/Serum2_win64.vst3`。
 - 成果物: `work/out_*/{log.txt, summary.json, saved_*_state.bin, audio_f32_interleaved.raw}` (gitignore)。
 

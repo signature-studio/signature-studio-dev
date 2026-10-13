@@ -34,8 +34,8 @@ echo "  NC (文字列 1 + 呼出辺 1 + 機械語 1 を壊す): ${NC} 件検出 
 [ "$NC" = 3 ]
 
 echo "[2/5] node --test"
-node --test "$HERE/test/help_viewer.test.mjs" 2>&1 | grep -E '^# (tests|pass|fail)'
-node --test "$HERE/test/help_viewer.test.mjs" > /dev/null
+node --test "$HERE/test/help_viewer.test.mjs" "$HERE/test/hostcall_help.test.mjs" 2>&1 | grep -E '^# (tests|pass|fail)'
+node --test "$HERE/test/help_viewer.test.mjs" "$HERE/test/hostcall_help.test.mjs" > /dev/null
 
 echo "[3/5] inspect_help.mjs"
 node "$HERE/inspect_help.mjs" --json "$WORK/inspect.json"

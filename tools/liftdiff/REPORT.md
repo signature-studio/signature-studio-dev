@@ -235,3 +235,8 @@ m11 sample:800 (12 shard) **93〜95 s**、flelift closure (14 shard) **585 s** (
 unreachable 220 関数のうち食い違い観測 212 件で、82 件は最後の共通 entry が `function_410320` (VMT 間接 call が IR に無い。**D15 型候補**、同型候補は合計 86/212、残り 126 件は未特定)。
 OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は全て 414ad0 に到達済み。修正の効果は手元観測のみで第三者再現不可、受入条件の根拠外)。
 全文・再現手順・未解決表は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9、数値・表は `results/m11_unreachable_diverge.md` (`tests/trace_diverge_unreachable.py`)・`results/m11_oob_414ad0.md` (`tests/oob_414ad0.py`)。
+
+## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406、要約)
+
+Actions で [2/4] を 3 回実測: 3 回とも `check_ott.py` exit 0・212 関数 = 一致 38 / 不一致 108 / 実行不能 66 (D1 4 / D2 6 / D3 14 / D4_D5 18 / D6 26)。`pe` は `ANALYSIS_DIR` 経由で解決。
+ネガコン `tests/nc_check_ott.sh` 5/5 PASS。**`liftdiff_e2e.sh` 全体 exit 0 は `fl-win64`・`work-m11` 未取得のため未確認** (#406 受入条件 1 未達)。全文・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
