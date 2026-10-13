@@ -63,12 +63,6 @@ grep -E "PASS|FAIL|done" "$W/res/pe_image_parity.txt"; [ $pr = 0 ] || rc=1
 bash "$GF_GUI/test/pe_image_e2e.sh" > "$W/res/pe_image_e2e.txt" 2>&1; pr=$?
 grep -E "PASS|FAIL|done" "$W/res/pe_image_e2e.txt"; [ $pr = 0 ] || rc=1
 
-S "4b/6 __pe_image の data 実体化 (GUI-12 #566): 共通規則 vs m11_data_gen.py (実 FLEngine PE, LB=0/0x10000) + ネガコン"
-python3 "$HERE/pe_image_parity.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" > "$W/res/pe_image_parity.txt" 2>&1; pr=$?
-grep -E "PASS|FAIL|done" "$W/res/pe_image_parity.txt"; [ $pr = 0 ] || rc=1
-bash "$GF_GUI/test/pe_image_e2e.sh" > "$W/res/pe_image_e2e.txt" 2>&1; pr=$?
-grep -E "PASS|FAIL|done" "$W/res/pe_image_e2e.txt"; [ $pr = 0 ] || rc=1
-
 S "5/6 ネガティブコントロール (全て FAIL / 非 0 になることを要求)"
 nc() { # nc <label> <regex that the failing output must match> <cmd...> : 非 0 かつ regex に一致 (judge のクラッシュ等を FAIL 確認と誤認しない)
   local label="$1" pat="$2"; shift 2
