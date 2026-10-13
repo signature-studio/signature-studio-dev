@@ -171,11 +171,11 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | `asio_sine_b256_96k` の `fla_open: effective depth > 16` abort (今回 10/10 再現) | 親 e2e が 22 シナリオ系で 21/22 | **CAB-210** (AU-11・起票済み)。本チケット起因でないことを §4-1 で実測 |
 | asioMessage selector 6 の内部コマンド 0x17 の正体 | soak 中の `cmd17=0` 実測。解釈は推定のまま | **CAB-97** にコメント済 |
 | shimx 側 `CoCreateInstance` の REGDB_E_CLASSNOTREG スタブからのフォワード 1 行 | 実 FLEngine 結線前に必要 | **CAB-33** に引継ぎ (§9) |
-| 短シナリオ `com_ramp_b256_d2` の underrun (§11 実行 A: 3 回中 1 回) | 短シナリオの負荷依存。120s soak は 3 回とも 0 | **#98** にコメント (残件として記録)。新規子 issue の要否は PM 判断 |
+| 短シナリオ `com_ramp_b256_d2` の underrun (§11 実行 A: 3 回中 1 回) | 短シナリオの負荷依存。120s soak は 3 回とも 0 | **#98** にコメント済 (2026-10-13 15:29 UTC・経過と実行 A〜E の値を記録)。ゲート扱いは §11 の決定 (ゲートに残す) |
 
 ## 11. 修正 PR #771 (#98 差し戻し対応) の実測
 
-- 検証 HEAD: `fef39e5` (作業 commit: 親 e2e から本 e2e を呼ぶ 1 行 + 本節)。
+- 検証 HEAD: 実行ごとに下表の HEAD を記載 (A〜B は `fef39e5`、D は `b341b6e5`、E は `59c952e1`)。
 - 環境: runner 16 コア・load 1分 0.04〜0.66。emsdk は `emsdk install latest` (`$RUNNER_TEMP/emsdk-src`) を使用。`tools/audio/asio/work/` は gitignore。
 
 | 実行 | コマンド | 結果 | 所要 | load 1分 (開始→終了) |
@@ -188,7 +188,8 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 
 - 指摘 1 への対応: `tools/audio/e2e.sh` の末尾で `bash tools/audio/asio/e2e.sh` を呼ぶ (`--quick` は引き継ぐ)。
 - **未解決 (再現性)**: 実行 A の短シナリオ underrun は B・C で再現せず、1/3 回の発生。120s soak は 3 回とも underrun 0。
-  負荷依存と推定するが、A の時点の load は測定していない (計測開始前)。新規子 issue を PM に依頼する。
+  負荷依存と推定 (表の A 行の load 0.49 が開始時の実測値)。
+- **親 e2e ゲートの扱い (決定)**: `com_ramp_b256_d2` の underrun は**ゲートに残す** (exit 1 のまま)。判定基準 underrun 0 を緩めず、揺らぎは #98 で追跡する。merge 判定で 1/3 回の再実行が必要になる場合がある。
 
 ## 9. 検収記録 (2026-10-11・CAB-97 検収 agent・規則 36〜41)
 
