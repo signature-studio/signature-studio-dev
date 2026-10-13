@@ -1,0 +1,26 @@
+{
+ "name": "ott_getparam_idx",
+ "abi": "ms_pos",
+ "func": "0x18011e5a0",
+ "wasm_func": "function_18011e5a0",
+ "scenarios": 200,
+ "steps": 1,
+ "seed": 415001,
+ "ret_from_xmm0": true,
+ "ret_bits": 32,
+ "expect_match_min": 1.0,
+ "vars": [
+  {"name": "idx", "gen": {"int": [0, 19]}}
+ ],
+ "args": [{"ptr": "this"}, {"int": "idx"}],
+ "buffers": {
+  "this": {"size": 1024, "fields": [
+    {"off": "0x2d8", "type": "f32", "gen": {"unif": [-1000.0, 1000.0]}},
+    {"off": "0x2dc", "type": "f32", "gen": {"unif": [-1000.0, 1000.0]}},
+    {"off": "0x2e4", "type": "f32", "gen": {"unif": [-1000.0, 1000.0]}},
+    {"off": "0x2e8", "type": "f32", "gen": {"unif": [-1000.0, 1000.0]}},
+    {"off": "0x248", "type": "u8", "gen": {"int": [0, 255]}},
+    {"off": "0x20c", "type": "f32", "gen": {"unif": [-1000.0, 1000.0]}}
+  ]}
+ }
+}

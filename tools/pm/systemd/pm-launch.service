@@ -1,0 +1,10 @@
+[Unit]
+Description=PM launch: start unblocked issues via /oc comments while the phase allows it (directives 130-132)
+
+[Service]
+Type=oneshot
+Environment=TARGET=50 BATCH=25
+ExecStart=/usr/bin/env python3 /PATH/TO/REPO/tools/pm/launch_issues.py launch
+StandardOutput=append:/PATH/TO/REPO/tools/pm/pm_launch.log
+StandardError=append:/PATH/TO/REPO/tools/pm/pm_launch.log
+TimeoutStartSec=900

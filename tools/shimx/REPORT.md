@@ -237,3 +237,7 @@ fail-fast 9 種 + ExitProcess(7) = 全 PASS、exit 0 ×3。`test.sh` は実行�
 - `tools/startup/winstubs/winstubs.sh` (8/8 完了): rc=0 (実測 10 秒)。`--wrap` 下の shimx 回帰で ST/MT とも ALL PASS
 
 `quick_test.sh` は `test.sh --quick` でも ST/MT の absent-path OK を確認。
+
+### 18. SHX-T12 (#789): 構造化 file trace
+
+file API の JSON Lines トレース (`SHIMX_TRACE_FILE` / `shimx_set_trace_file`) の実測・数え方・制約は分割先 `REPORT_SHX-T12.md` を正本とする。既存 `SHIMX_TRACE=1` の出力は変更なし。

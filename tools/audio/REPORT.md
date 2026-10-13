@@ -100,32 +100,7 @@
 
 ## 10. AU-11 (#211) 96kHz/B=256 の burst 4096 abort の解消
 
-既知類型との関係: 該当なし (lift 欠陥ではなくランタイム shim の容量判定)。方針は両案の併用: **(b) depth 固定上限 16 を撤廃** (制約は ring 容量 `(depth+2)×B ≤ FLA_MAX_RING=32768` のみ。+2B は動的 T 拡張 `Tmax=ring−2B` の余地) し、**(a) それでも収まらない burst は abort でなく `fla_open` が `FLA_E_BURST_TOO_LARGE` を返し `flasio_create_buffers` が `ASE_NoMemory(-994)` を返す** (AudioContext は CLOSE して CLOSED に戻すので再 CreateBuffers 可)。FL 側は CreateBuffers エラー ("Couldn't create the streaming ASIO buffer." が出る経路) になる。`fla_open` の fail-fast は引数不正・二重 open など呼び側バグに限定。
-
-| 条件 (96kHz) | 挙動 |
-|---|---|
-| B=256, burst 3072 | depth=16, T=4096f (従来どおり) |
-| B=256, burst 4096 | depth=21, T=5376f (56.0ms) で成功 (旧: abort)。ring=32768 に収まる |
-| B=512, burst 4096 | depth=11 (計算値) で成功 |
-| `(depth+2)×B > 32768` | `ASE_NoMemory`、abort なし。計算上の限界 burst は B=128/256/512 で 25856/25600/24960f (`need=(b+b/4+2B-1)/B` を b=128 刻みで走査) |
-
-e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` / `asio_sine_b256_96k_burst4096` / `asio_createbuffers_burst_overflow` (B=256, burst 40000 → depth 197, (197+2)×256=50944 > 32768)。後 2 本は burst をテスト専用フック `fla_test_set_burst_floor()` (`burst_floor=` クエリ) で強制し、環境依存の揺れを決定的に再現する。
-
-実測 (コミット `14fa86a` でビルド (main へリベース後は同内容の `57c9143`。実装 5 ファイルの diff が 0 行であることを確認済み), headless Chrome / emcc 6.0.12, GitHub runner, 並列 1):
-
-| 検証 | 結果 |
-|---|---|
-| フル e2e 1 回 (`node harness/run.mjs`) | **25/25 PASS**, exit 0, 所要 440.51 s (開始時 load average 0.22 / 終了時 0.03)。soak120: underrun 0・5,763,328f 一致 |
-| 96k 3 シナリオ × 6 周 (`--quick`, load average 0.00 開始) | **18/18 PASS** (b256_96k / b512_96k / b256_96k_burst4096 各 6/6)。burst4096 は毎回 T=5376, underrun 0, 正弦最大誤差 1.49e-8 (7 周目以降は打切りのため集計外) |
-| burst 溢れ | `first=-994, retry=0, dispose=0, aborted=false` |
-
-検証範囲 / 範囲外: 本 runner の fake シンクでは自然な OPEN 較正 burst は 1024 で、**検収環境で見えた burst 4096 は自然には再現していない**。burst 4096 の経路は強制フックでの検証。実機 burst 分布は未計測。**ネガティブコントロール (旧コードで burst4096 が abort することの再実行) は未実施**。旧挙動の根拠は検収記録 §9 と旧コードの `depth > 16` 判定 (`git show 14fa86a^:tools/audio/src/flaudio.c`) のみ。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| ~~T 縮小が未実装 (burst 4096 で T=56ms 固定)~~ → AU-6 (#190) で実装済み、§17 | 96k/B=256 の遅延が burst 最大値に引きずられる | #190 (AU-6) にコメント |
-| 実機 burst 分布が未計測 | 自然な burst 4096 の発生頻度・遅延影響が不明 | #187 (AU-2) にコメント |
-| 旧コードでの abort 再現 (ネガティブコントロール) 未実施 | 修正前後の差を本 runner で実測していない | 本 PR 本文に明記 |
+要約: burst 4096 (96k/B=256) で旧 `depth>16` abort を解消 (depth 上限撤廃 + 容量超過は `ASE_NoMemory` で返す)。25 シナリオ実測 PASS・未解決 3 件は全文 `REPORT_AU11.md` (分割移動先)。
 
 ## 11. AU-7 (#193) ASIO プロファイル確定・systemTime 規約・outputLatency 吸収
 
@@ -210,9 +185,11 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `index.ts.diff` の `src/index.ts` への適用 (#25 管轄) | 適用までアプリ本体は旧ハーネスのまま = #185 完了条件は未達 | #185 コメントで PM/#25 担当に合意依頼 |
+| `index.ts.diff` の `src/index.ts` への適用 (#25 管轄) | (§17 で適用済み。`e2e.sh` は適用済み HEAD を検証する) | 解消済み (§17) |
 | 適用後に `audio.ts` / `dummy-worklet.js` を削除 (`deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が dummy-worklet.js を参照) | 二重実装が残る | 適用 PR で併せて対応 (#185) |
-| 本番配信での `/wasm/audio/*` (R2) と `/worklets/fl-audio-worklet.js` の COOP/COEP/CORP policy | `vite preview` では検証済み、Cloudflare/R2 配信は未検証 | #62 系 (H) へ コメント |
+| 本番配信での `/wasm/audio/*` (R2) と `/worklets/fl-audio-worklet.js` の COOP/COEP/CORP policy | `vite preview` では検証済み、Cloudflare/R2 配信は未検証 | #8 (H-2: R2 静的配信 + COOP/COEP) へ コメント |
+| dev 経路の断続的 tone/underrun FAIL (レビュアー再現 6 回中 2 回、本 head では 9 回全 PASS で未再現) | 再現時の原因 (producer 遅延 / consumer 枯渇) 未切り分け | #863 (AU-15) |
+| 旧ハーネス残骸 `public/worklets/dummy-worklet.js` の削除 (参照 2 箇所) | 未参照の残骸 | #839 (E2E-5) |
 | `stage_wasm.mjs` / ルート `package.json` script への `stage_app.sh` 組込 | 現状は手動実行 | 適用 PR (#25 管轄) |
 | `tools/e2e` スイートのパッチ適用後再実行 | 既存 `audioworklet` チェックとの互換は推定 (status 文言 `worklet 実行中`・samplePos 128f 単位は維持) | 適用 PR で実行 |
 
@@ -237,3 +214,23 @@ DirectSound shim を実装 (secondary = 循環バイト列, pump が T まで充
 ## 17. AU-6 (#190) 遅延ポリシー: T の減衰 (全文: `REPORT_AU6.md`)
 
 underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`kAsioLatenciesChanged` は既定 OFF のまま。減衰テストと検証結果の正本は `REPORT_AU6.md` §2。**未解決**: 閾値 3 秒の実機調整 (#187)、安全/低遅延モード UI (#34 以降)、selector 6 の利用可否 (0x17 未確定)。
+
+## 18. AU-9 (#185) 組込適用 (`src/index.ts` 反映・旧ハーネス削除)
+
+§12 の提案パッチを `src/index.ts` に適用し、旧 `src/runtime/audio.ts` を削除した (#25 close 済みのため管轄の前提が解消)。`e2e.sh` は `index.ts` が未適用のときだけパッチを当てる (適用済み HEAD を検証可能にするため)。`e2e.sh` の `git archive` 範囲は HEAD 全体へ広げた (`vite.config.ts` が `tools/legal/notices`・`tools/ipp` の LICENSE を読むため部分展開では build が落ちた)。
+
+検証: 素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (7.5 s) し `FL_WIN64_DIR` に指定。HEAD `321c94fa` (適用済み・audio.ts 削除後) で `bash tools/audio/integration/e2e.sh`: **13/13 PASS, exit 0, 67 s** (e2e.sh 全体)。同条件の直前 run (`3c52be7a`) は 13/13 PASS, 63 s / 60.7 s、その前の run は 13/13 PASS, 70 s。tsc --noEmit OK。
+
+旧パッチ適用経路 (`e5f043c3`・index.ts 未コミット状態) の 3 回目 run では dev 側 `dev:tone` / `dev:underruns` が 1 回だけ FAIL (underruns=1, zero_runs=1)。以降の 3 run (`2d68a5bd`〜`321c94fa`) は dev/preview とも全 PASS。
+
+**レビュー差し戻し対応 (fix, 2026-10-13)**: head `0e0e8634` のレビュー再実行で dev 失敗 2 回 (6 回中)・preview 後のハング (exit 124, 25 分) が報告された。対応:
+
+- **ハング**: 原因候補は preview 終了時の `srv.httpServer.close(callback)` が Chrome の keep-alive 接続で完了を待ち続けること。`closeServer()` で `closeAllConnections()` を呼び、10 s の上限を付けた (dev は `srv.close()` のまま)。修正後の 1 run の実測では preview 後の後始末は即時完了。ハングの再現は本 head では未確認 (原因は未確定。対策は上限付きの防御)。
+- **位置情報**: `verifyToneCapture` に `first_err_frame` / `first_zero_run_frame` / `underrun_cap` / `first_underrun_frame` / `last_underrun_frame` を追加 (worklet が capture ヘッダへ記録する値)。
+- **dev 失敗の再現**: 本 head `755ecb23` で e2e.sh を無負荷 6 回 (`run1`〜`run5` + `c1`) + CPU 負荷 (`timeout` 付きの busy loop 6 本) 下 3 回の計 9 回実行 → **全 PASS (13/13, 7.6〜9.3 s)、underrun 0・zero_runs 0・first_err_frame=-1**。レビュアー再現条件 (素材・負荷) とは未一致のため未再現。追跡 **#863** (AU-15)。
+
+検証 (commit 755ecb23・e2e.sh 1 run ずつの実測): 無負荷 `c1` 13/13 PASS, 7.6 s, exit 0 / 無負荷 5 run 全 PASS, 7.7〜7.8 s / 負荷下 3 run 全 PASS, 9.2〜9.3 s。
+最終 HEAD `e983c1b6` (main 取り込み後・`pnpm install --frozen-lockfile` 後): `bash tools/audio/integration/e2e.sh` **13/13 PASS, exit 0, 7.8 s**。`tsc` OK・`vite build` OK。dev:tone `max_err=1.49e-8`・underrun 0・zero_runs 0・preview 同値。
+最終 HEAD `948e6fb3` (REPORT §10 の件数修正のみ・コード差分なし、`FL_WIN64_DIR` 展開 `fl-win64`): `bash tools/audio/integration/e2e.sh` を 3 回実行 → **13/13 PASS・exit 0 が 3 回** (7.9 s / 7.8 s / 7.7 s、wall 12.0 s / 10.6 s / 10.4 s、load 0.48 / 0.47 / 0.81)。FAIL 0 件。
+
+残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
