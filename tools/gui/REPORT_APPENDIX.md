@@ -91,7 +91,7 @@ bash tools/gui/e2e.sh                              # 全体 (PE lift を含む);
 
 - **結論**: 現 HEAD `b44ddcd` で rc=0・ALL PASS (1 回)。1/6 selftest は 428 passed / 0 failed、ASan UAF は 0 件。
 - **ただし解消ではない**: 1/6 に到達した有効 7 回中 2 回 (T1・R2) が ASan UAF で rc=1 になった。既存の race (#489 `[GUI-12]`)。現 HEAD の 1 回は発火していない。「ALL PASS」を受入とみなすかは PM 判断。
-- 現 HEAD の素材: `toolchain-emsdk` を `/opt/emsdk`、`toolchain-retdec` を `/opt/retdec` に展開。mingw は apt `gcc-mingw-w64-x86-64`。`emsdk_env.sh` は `emcc` を PATH に出さなかったため `PATH=/opt/emsdk/upstream/emscripten:/opt/emsdk/upstream/bin:/opt/emsdk/node/24.19.0_64bit/bin` を直接指定した。`fl-win64.tar.zst` は本 run の `$ARTIFACTS_DIR` に無く未展開 (e2e の step 3 は `test/gui_app.c` を使い fl-win64 を要さないため影響なし)。
+- 現 HEAD の素材: `toolchain-emsdk` を `[EMSDK]`、`toolchain-retdec` を `[RETDEC]` に展開。mingw は apt `gcc-mingw-w64-x86-64`。`emsdk_env.sh` は `emcc` を PATH に出さなかったため、`[EMSDK]` の `upstream/emscripten`・`upstream/bin`・`node/24.19.0_64bit/bin` を PATH に直接指定した。`fl-win64.tar.zst` は本 run の `$ARTIFACTS_DIR` に無く未展開 (e2e の step 3 は `test/gui_app.c` を使い fl-win64 を要さないため影響なし)。
 - 層ごとの結果 (run3 `ea7a538`):
 
 | 層 | 結果 (`ea7a538`) |
