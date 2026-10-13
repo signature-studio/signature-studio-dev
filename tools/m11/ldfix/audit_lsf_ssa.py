@@ -31,6 +31,8 @@ class Ldu(tuple):
     """('ldu', w) と == / hash が同値 (join の挙動を audit_lsf.py と一致させる) で、由来 prov / base 名だけ付随する値"""
     prov = ''
     base = ''
+    depth = 1
+    src = None
 
 
 NO_ALLOCA_PROP = False   # --no-alloca-prop: reg2mem alloca 経由の由来伝播を切る (ablation)
@@ -45,6 +47,19 @@ I2P_DEF = re.compile(r'^inttoptr (?:i\d+) (%?[\w.$-]+) to ptr')
 ADD_DEF = re.compile(r'^add (?:nuw |nsw )*i\d+ (%?[\w.$-]+), (-?\d+|%[\w.$-]+)')
 GEP_DEF = re.compile(r'^getelementptr (?:inbounds )?i8, ptr (%?[\w.$-]+), i\d+ (-?\d+)')
 STORE_LINE = re.compile(r'^\s*store (i\d+|ptr) (%?[\w.$-]+), ptr ((?:inttoptr \([^)]*\)|%[\w.$-]+|@[\w.$-]+))')
+
+
+def depth_of(sv):
+    """機械語側の値の deref 段数: arg / 不明 = 0、argN の 1 段 deref = 1、global セル・[reg+disp] から読んだポインタ = 1、Ldu = その段数"""
+    if sv is None:
+        return 0
+    if sv[0] == 'ld':
+        return 1
+    if sv[0] == 'ldu':
+        return getattr(sv, 'depth', 1)
+    if sv[0] == 'src' and sv[1] in ('rip-mem', 'mem+disp'):
+        return 1
+    return 0
 
 
 def describe(sv, mb):
@@ -86,6 +101,8 @@ def transfer(cs, i, state, homes, ev):
                 else:
                     newv = Ldu(('ldu', o1.size * 8))
                     newv.prov, newv.base = describe(sv, mb), mb
+                    newv.depth = 1 + depth_of(sv)
+                    newv.src = sv[2] if sv and sv[0] == 'src' else None
             else:
                 kind = 'rip-mem' if rip else ('frame' if mb in ('rbp', 'rsp') else 'mem+disp')
                 newv = ('src', kind, i.address)
@@ -103,11 +120,11 @@ def transfer(cs, i, state, homes, ev):
                 sv = None
             if sv and sv[0] == 'ld' and sv[2] == w:
                 ev.append(('lsf', i.address, sv[1], w, '%s %s' % (mn, i.op_str)))
-                SITES[i.address] = dict(kind='lsf', w=w, prov='arg%d' % sv[1], base='arg', disp=o0.mem.disp,
+                SITES[i.address] = dict(kind='lsf', depth=1, cell_src=None, w=w, prov='arg%d' % sv[1], base='arg', disp=o0.mem.disp,
                                         idx=o0.mem.index != 0 or (bool(o0.mem.base) and cs.reg_name(o0.mem.base) == 'rip'), frame=frame, text='%s %s' % (mn, i.op_str))
             elif sv and sv[0] == 'ldu' and sv[1] == w:
                 ev.append(('unk', i.address, 0, w, ''))
-                SITES[i.address] = dict(kind='unk', w=w, prov=sv.prov, base=sv.base, disp=o0.mem.disp,
+                SITES[i.address] = dict(kind='unk', depth=sv.depth, cell_src=sv.src, w=w, prov=sv.prov, base=sv.base, disp=o0.mem.disp,
                                         idx=o0.mem.index != 0 or (bool(o0.mem.base) and cs.reg_name(o0.mem.base) == 'rip'), frame=frame, text='%s %s' % (mn, i.op_str))
             elif sv and sv[0] == 'arg' and not frame:
                 ev.append(('ptr', i.address, sv[1], w, ''))
@@ -184,6 +201,38 @@ def load_derived(defs, allocas, stores):
     return ld
 
 
+def make_depth(defs, allocas, stores):
+    """SSA 名 -> IR 側の deref 段数 (値を作る load の入れ子の深さ。定数アドレスからの load = 1、argN / call 戻り / 定数 = 0)。
+    reg2mem alloca は store された値の最大を取る。循環は 0 で打ち切る (過小評価 = SHALLOW 側に倒れる)。"""
+    ast = collections.defaultdict(list)
+    for (_w, v, p) in stores:
+        if p in allocas:
+            ast[p].append(v)
+    memo = {}
+
+    def d(v, stack=()):
+        if not v.startswith('%') or v in stack:
+            return 0
+        if v in memo:
+            return memo[v]
+        rhs = defs.get(v)
+        if rhs is None or rhs.startswith('call') or rhs.startswith('alloca'):
+            r = 0
+        else:
+            m = LOAD_DEF.match(rhs)
+            if m:
+                p = m.group(2).strip()
+                if p in allocas:
+                    r = max([d(x, stack + (v,)) for x in ast[p]] or [0])
+                else:
+                    r = 1 + (d(p, stack + (v,)) if p.startswith('%') else 0)
+            else:
+                r = max([d(o, stack + (v,)) for o in re.findall(r'%[\w.$-]+', rhs)] or [0])
+        memo[v] = r
+        return r
+    return d
+
+
 def ptr_disp(defs, p):
     """store 宛先ポインタ %p -> disp (inttoptr(add %x, C) / gep i8 の C。それ以外は 0)"""
     for _ in range(4):
@@ -209,10 +258,46 @@ def ptr_disp(defs, p):
     return 0
 
 
+IR_CONST_LOAD = re.compile(r'load (i\d+|ptr), ptr inttoptr \(i64 (\d+) to ptr\)')
+
+
+def cell_check(mach, body, site, alg3):
+    """rip 相対セル経由 (機械語: `mov rA,[rip+X]; mov rD,[rA]`) の site を、image の実データで判定する。
+    X のセル内容 V (image は reloc 済みの LVA 座標) を読み、IR の定数アドレス load を調べる:
+      V を読む load がある            -> FOLDED_OK  (RetDec がセル内容を静的に解決して 1 段化。正しい)
+      セル自身 K = X - base を読む load があり、かつ (幅が 64 でない = qword のセルを dword 以下で読んでいる、または alg3 が SHALLOW)。幅 64 の load は、対応する store の値が SHALLOW と確定した時だけ (store が IR に見つからない NOCAND では判定しない)
+                                       -> CELL_COLLAPSED (2 段 deref が 1 段に潰れ、変数 V でなくセルを読む = 脱落)
+      それ以外                         -> CELL_DEEP (IR に 2 段の連鎖がある、または定数 load が見当たらない)"""
+    a = site.get('cell_src')
+    if not a or site['prov'] != 'rip-mem':
+        return None
+    got = list(mach.cs.disasm(mach.read(a - mach.base, 16), a, 1))
+    if not got:
+        return None
+    i = got[0]
+    mem = [o for o in i.operands if o.type == capstone.CS_OP_MEM]
+    if not mem or mach.cs.reg_name(mem[0].mem.base) != 'rip':
+        return None
+    x = i.address + i.size + mem[0].mem.disp
+    k = x - mach.base
+    raw = mach.read(x - mach.base, 8)
+    v = int.from_bytes(raw, 'little') if len(raw) == 8 else None
+    loads = [(A.width_of(t), int(c)) for t, c in IR_CONST_LOAD.findall(body)]
+    w = site['w']
+    if v is not None and any(c == v for _t, c in loads):
+        r = 'FOLDED_OK'
+    elif any(c == k and (t != 64 or alg3 == 'SHALLOW') for t, c in loads):
+        r = 'CELL_COLLAPSED'
+    else:
+        r = 'CELL_DEEP'
+    return dict(verdict=r, cell='%x' % x, k='%x' % k, content='%x' % v if v is not None else None)
+
+
 def judge(body, sites):
     """sites: [dict] -> (alg1 per width, alg2 per site, ir_ldst Counter)"""
     defs, allocas, stores = parse_ir(body)
     ld = load_derived(defs, allocas, stores)
+    dep = make_depth(defs, allocas, stores)
     ldst = collections.Counter()
     cands = []
     for (w, v, p) in stores:
@@ -221,7 +306,7 @@ def judge(body, sites):
         isld = v in ld
         if isld:
             ldst[w] += 1
-        cands.append((w, ptr_disp(defs, p), isld))
+        cands.append((w, ptr_disp(defs, p), isld, dep(v)))
     return ldst, cands
 
 
@@ -267,16 +352,18 @@ def main():
         for s in sites:
             if s['frame']:
                 rec['sites'].append(dict(addr='%x' % s['addr'], kind=s['kind'], w=s['w'], prov=s['prov'], base=s['base'], disp=s['disp'],
-                                         idx=s['idx'], frame=True, text=s['text'], alg2='FRAME', cand=0, cand_ld=0))
+                                         idx=s['idx'], frame=True, text=s['text'], alg2='FRAME', alg3='FRAME', depth=s['depth'], cell=cell_check(mach, body, s, 'FRAME'), cand=0, cand_ld=0))
                 continue
             same = [c for c in cands if c[0] == s['w'] and (s['idx'] or c[1] == s['disp'])]
             nl = sum(1 for c in same if c[2])
             v2 = 'OK' if nl else ('SUSPECT' if same else 'NOCAND')
+            v3 = ('OK' if any(c[3] >= s['depth'] for c in same) else 'SHALLOW') if same else 'NOCAND'
             rec['sites'].append(dict(addr='%x' % s['addr'], kind=s['kind'], w=s['w'], prov=s['prov'], base=s['base'], disp=s['disp'],
-                                     idx=s['idx'], frame=False, text=s['text'], alg2=v2, cand=len(same), cand_ld=nl))
+                                     idx=s['idx'], frame=False, text=s['text'], alg2=v2, alg3=v3, depth=s['depth'], ir_depth=max([c[3] for c in same] or [-1]), cell=cell_check(mach, body, s, v3), cand=len(same), cand_ld=nl))
         fns['%x' % va] = rec
     cnt = collections.Counter()
-    a1, a2 = set(), set()
+    a1, a2, a3 = set(), set(), set()
+    cnt3 = collections.Counter()
     for v, r in fns.items():
         if any(x['deficit'] > 0 for x in r['alg1']):
             a1.add(v)
@@ -284,13 +371,19 @@ def main():
             cnt['%s/%s/%s' % (st['kind'], 'frame' if st['frame'] else 'store', st['alg2'])] += 1
             if st['alg2'] in ('SUSPECT', 'NOCAND'):
                 a2.add(v)
+            if st['alg3'] in ('SHALLOW', 'NOCAND'):
+                a3.add(v)
+                cnt3['%s/%s' % (st['kind'], st['alg3'])] += 1
     tot['alg1_flagged_fns'] = len(a1)
     tot['alg2_flagged_fns'] = len(a2)
+    tot['alg3_flagged_fns'] = len(a3)
     tot['alg1_or_alg2_fns'] = len(a1 | a2)
+    tot['alg_any_fns'] = len(a1 | a2 | a3)
     out = dict(summary=dict(tot), by_site=dict(cnt), alg1_fns=sorted(a1, key=lambda x: int(x, 16)),
-               alg2_fns=sorted(a2, key=lambda x: int(x, 16)), functions=fns)
+               alg2_fns=sorted(a2, key=lambda x: int(x, 16)), alg3_fns=sorted(a3, key=lambda x: int(x, 16)), by_site_alg3=dict(cnt3), functions=fns)
     print(json.dumps(dict(tot), ensure_ascii=False))
     print(json.dumps(dict(sorted(cnt.items())), ensure_ascii=False))
+    print(json.dumps(dict(sorted(cnt3.items())), ensure_ascii=False))
     if a.json:
         json.dump(out, open(a.json, 'w'), indent=1, ensure_ascii=False)
 
