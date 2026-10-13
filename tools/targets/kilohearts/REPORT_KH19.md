@@ -123,6 +123,16 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 受入 2 (対照 Gain の closure が手検証の 160 関数と差分 0): **未達**。narrow は 1,994 関数 (差分 1,834)。
 - 受入 3 (before/after 表と未解決 call の内訳を REPORT に書く): **部分達成**。本節の表は Gain のみ。§2 の表は #782 の wide 規則による値で、3 種の narrow 表は無い。
 
+## 6. #848 (KH-19b) 受入 2 の検証と判定 (検証 HEAD `8504517d`, 4 vCPU)
+
+- 注記: 本節の計測値は素材 `plugins-kilohearts` を展開した旧 run の出力を転記したもの。PR 本文は計測コードを HEAD `8504517d` 相当としているが、旧 run の HEAD は再確認できない。JSON は保存していない。本 HEAD での再計測は素材不足 (`fl-win64` のみ取得) で未実施。
+- 再現手順: 素材 `plugins-kilohearts` を展開 → `extract_installer.sh` → `rtti_walk.py` → `callgraph.py` → `vtable_closure.py` / `vtable_probe_this.py` / `vtable_gap_probe.py`。§5 と同じ値 (before 160 / nogui 555 / all 1,995 / narrow 1,994) を旧 run で得た。
+- `scripts/vtable_gap_probe.py` (gain, 旧 run の出力): before 160 関数の中の vtable call 112 部位。候補 (全 class の同 slot) 781 件のうち before 外は 458 件。
+- 呼び出し直前に `rcx` (this) へ書く命令 (同一関数内・直前のみ): `mov reg, reg` 102 / 書き手なし 6 / その他 4。レジスタ由来は同関数内では追えず、this 型は呼び出し鎖の伝播が要る (§5 と同じ結論)。
+- 未計測・取り下げ: 外れる候補の class 別内訳 (GUI 系/その他) は出力していないため記載しない。「112 部位すべてに before 外の候補がある」は `sites_with_outside_cand` を JSON に記録していないため取り下げる。
+- 家族規則 (`*MasterDsp` / `*Dsp` / `*DspModel` の vtable slot のみを候補にする) の closure 関数数 (`before_funcs`) は未記録。160 関数との集合比較は未実施。手検証の 160 関数一覧はリポジトリに無いため、差分 0 は主張しない。
+- **受入 2 の判定: 未達のまま**。家族規則を採用するかは、手検証の一覧を得てから判断する。
+
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
 未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は部分達成・open のまま)。rip_data は #849、lift 失敗点は #850 (§4)。

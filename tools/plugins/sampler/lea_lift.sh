@@ -29,15 +29,12 @@ print(v['total2_funcs'], v['total2_bytes'])")"
   t1=$(date +%s)
   DEF=$(grep -c '^define' "$OUT/p.final.ll" 2>/dev/null || echo 0)
   UNI=$(grep -o 'unimplemented [0-9]*' "$OUT/p.simd.log" 2>/dev/null | awk '{print $2}' | head -1)
-  F80=$(python3 - "$OUT/p.final.ll" <<'PY'
-import re, sys
+  F80=$(python3 -c 'import sys; sys.path.insert(0, "sampler")
 try:
-    s = open(sys.argv[1]).read()
+    import f80_split
+    print(sum(1 for v in f80_split.body_f80(sys.argv[1]).values() if v))
 except Exception:
-    print(-1); sys.exit()
-print(sum(1 for f in re.split(r'\n(?=define )', s) if f.startswith('define') and 'x86_fp80' in f))
-PY
-)
+    print(-1)' "$OUT/p.final.ll")
   erc=-1
   if [ -f "$OUT/p.final.ll" ]; then
     ( source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; TMPDIR="$OUT/tmp" emcc -c "$OUT/p.final.ll" -o "$OUT/p.o" -w -O0 -msimd128 > "$OUT/emcc.log" 2>&1 ); erc=$?
@@ -48,12 +45,12 @@ PY
   if [ "$F80" -gt 0 ] 2>/dev/null; then
     LOW=1
     python3 p0c/f80_lower.py "$OUT/p.final.ll" "$OUT/p.lower.ll" --report "$OUT/lower.json" > "$OUT/lower.log" 2>&1 || true
-    if [ -f "$OUT/p.lower.ll" ]; then F80=$(python3 - "$OUT/p.lower.ll" <<'PY'
-import re, sys
-s = open(sys.argv[1]).read()
-print(sum(1 for f in re.split(r'\n(?=define )', s) if f.startswith('define') and 'x86_fp80' in f))
-PY
-); else F80=-1; fi
+    if [ -f "$OUT/p.lower.ll" ]; then F80=$(python3 -c 'import sys; sys.path.insert(0, "sampler")
+try:
+    import f80_split
+    print(sum(1 for v in f80_split.body_f80(sys.argv[1]).values() if v))
+except Exception:
+    print(-1)' "$OUT/p.lower.ll"); else F80=-1; fi
     erc=-1
     if [ -f "$OUT/p.lower.ll" ]; then
       ( source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; TMPDIR="$OUT/tmp" emcc -c "$OUT/p.lower.ll" -o "$OUT/p.lower.o" -w -O0 -msimd128 > "$OUT/emcc_lower.log" 2>&1 ); erc=$?
