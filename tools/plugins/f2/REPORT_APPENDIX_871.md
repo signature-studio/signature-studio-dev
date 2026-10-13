@@ -72,3 +72,30 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - 指摘 3 (影響表): 範囲を leaf 23 関数に限定して検証した。残り 7 関数 (非 leaf、30 − 23) の liftdiff は未実施。影響の有無は未確認。
 - 受入条件「回帰: 一致 15 以上」は件数ではなく「既存 match の維持」で判定する。現時点では 0x5de250 の match 維持に失敗しているため、未達。
 - 起票先: 回帰の解消・ld_native 実測・残 7 関数の liftdiff は #923 (子)。修正前からの未解決 mismatch 6 関数は #871 / #613。
+
+## 10.6 (#871 fix モード 4) 最終 head での再測定 (素材付き run)
+
+- 検証 HEAD: `71d6fd68` (コード差分は `9d604905` 以降なし。`git diff 9d604905 HEAD -- tools/plugins/f2/mk_targets.py tools/liftdiff tools/plugins/f2/leaf_diff.sh` が空)。
+- 素材: `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を `$ARTIFACTS_DIR` から展開 (fl-win64 13.8 s、PE 実在を確認)。emcc は `tools/m1/flags.sh` の pin `6.0.12` を確認。
+- `f2_step1.sh`: rc 0、558 s。間接 call 監査の IR leaf 55 / うち機械語でも間接 call 無し 23 (leaf_diff の対象 23 関数と一致)。
+- `leaf_diff.sh` (HEAD `71d6fd68`): rc 0、148 s、load 1.36。**最終判定 一致 16 / 不一致 7 / 実行不能 0** (10.2・10.4 の前 run 測定値と一致)。集合一致 EQ。IR から call 脱落 0。
+- 最終判定 (23 関数、HEAD `71d6fd68`):
+
+| VA | block | 最終判定 | 備考 |
+|---|---|---|---|
+| 0x6f1650 | 19059 | match | 修正の本命 |
+| 0x6c8fc0 | 18975 | match | 副次的に解消 |
+| 0x5de250 | 19006 | **mismatch** (memory_semantics) | **回帰** (§10.3 の機序は未確定) |
+| 0x6bfec0 | 18975 | mismatch | 修正前から未解決 |
+| 0x6c9b60 | 18975 | mismatch | 修正前から未解決 |
+| 0x6b0ef0 | 18982 | mismatch | 修正前から未解決 |
+| 0x6c8c90 | 19005 | mismatch | 修正前から未解決 |
+| 0x6cc2e0 | 19006 | mismatch | 修正前から未解決 |
+| 0x6ca5c0 | 19013 | mismatch | 修正前から未解決 |
+| 上記以外 14 関数 (match) | - | match | 0x6cd8a0・0x662fc0・0x73e640・0x73fa20・0x73fa70・0x5de300・0x6e9440・0x6ec2a0・0x6ec2f0・0x6f1c40・0x6f1c60・0x6f2320・0x6f2370・0x6f23b0 |
+
+- 最終判定の内訳: match 16 (上の 2 関数 + 14 関数) / mismatch 7 (上の表の 7 関数のうち 0x5de250 以外の 6 関数と回帰 0x5de250)。
+- 件数の定義は §10.2 のとおり (残 mismatch 7 = 回帰 1 + 未解決 6)。
+- 件数 (一致 16 / 不一致 7 / 実行不能 0) と回帰 0x5de250・改善 0x6f1650・0x6c8fc0 の判定は §10.4 の前 run 測定と一致。
+- 本 run の `nc_leaf.py` は再実行していない (§10.4 の HEAD `747c5fe0` 測定を残す。コード差分なし)。修正前 `78aa75ad` との関数単位の突き合わせ (遷移 14/6/1/2) は今回は再計算していない (ログ未保存のため)。
+- 範囲は leaf 23 関数のみ (§10.5)。残り 7 関数は未確認。
