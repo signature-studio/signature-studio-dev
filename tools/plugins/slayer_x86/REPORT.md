@@ -28,7 +28,7 @@
 | C4 | 殻が `32bit\ilbridge.exe`・`64bit\ilbridge.exe`・`-wrapper`・`-address`・`-processid` の文字列を持つ | 5 文字列とも各 1 件 (存在のみの検査) | `.rdata` の Delphi UnicodeString |
 | C5 | `ilbridge.exe` の実体 (x86 EXE と x64 EXE) が FL に同梱され、共有メモリ/プロセス API を使う | block **24765** (x86 EXE, 4,124,744 B)・block **24766** (x64 EXE, 6,200,392 B)。 両方 `TBridgeCommandLineParams`・`OpenFileMappingW`・`MapViewOfFile`・`CreateFileMappingW`・`LoadLibraryW`・`GetProcAddress`・`OpenProcess` を持つ | `TBridgeCommandLineParams` を持つ PE は全 block 中この 2 本のみ (`grep -l -a`) |
 | C6 | engine の `main` が VST2 の `main(audioMasterCallback)` で、`audioMaster(0, 1 /* audioMasterVersion */, 0,0,0,0)` を呼び、AEffect に magic `'VstP'` (0x56737450) を書く | `main`=0x10007ca0、`push 0 ×4; push 1; push 0; call esi` を確認。 `'VstP'` の即値は `.text` 内 1 箇所 (0x1000113d) | 命令列。 `0x10001000` 以降の `[eax+0x40]->vtable` 転送 stub が `AEffect.dispatcher/process/setParameter/getParameter` (offset 0x24/0x28/0x2c/0x30) |
-| C7 | engine は SIMD 命令 0・x87 あり | 線形掃引 25,349 命令 (`.text` 73,002 B。 `.text` 内データが命令に化けるため近似): SIMD 0、x87 4,203 (mnemonic が `f` で始まるもの。 `fldcw`/`fnstcw`/`fstcw` 50 を**含む**)、間接 call 302 | capstone (CS_MODE_32) |
+| C7 | engine は SIMD 命令 0・x87 あり | 線形掃引 25,349 命令 (`.text` 73,002 B。 `.text` 内データが命令に化けるため近似): SIMD 0、x87 4,203 (mnemonic が `f` で始まるもの。 内訳: `fldcw` 32 + `fnstcw` 18 = 制御語 50、`fnstenv` 2 + `fldenv` 2、`fnsave` 2 + `frstor` 2 を**含む**)、間接 call 302 | capstone (CS_MODE_32) |
 
 解釈:
 
