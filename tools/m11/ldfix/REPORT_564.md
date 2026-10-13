@@ -49,8 +49,8 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 | F4 修復関数 | 0 | 10 | 10 |
 | `RegisterClassW` 到達 (probe 通算) | 2 | 2 | **3** |
 | `function_52a7f0` の戻り | 0x0 (CreateWindowExW NULL) | 0x0 | **0x110000f** |
-| 通常起動 units_run / init_count | 22 / 23 | 同 | 同 |
-| survey ok / noproc / miss / trap | 816 / 1 / 46 / 79 | 同 | 同 |
+| 通常起動 units_run / init_count | 52 / 54 | 同 | 同 |
+| survey ok / noproc / miss / trap | 869 / 1 / 47 / 25 | 同 | 同 |
 
 `f4_judge.py` 6 gate (F1 修復対象 / F2 IR 形 / D1 到達 / D2 load だけでは未到達 / P1 起動・survey 不変 / A1 監査分類) 全 PASS。
 ネガコン 4/4 が「期待した FAIL 行」付きで FAIL: N1 pre を post として判定 (D1) / N2 noand を post として判定 (D1) / N3 到達増分 ≥5 を要求 (D1) / N4 survey 1 unit を ok→trap に改竄 (P1)。
