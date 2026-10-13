@@ -15,7 +15,7 @@
 
 > **注**: PR の現 head の測定は **§12 (測定 commit `05e467f1`) が正**。下記の §1〜§11 と §12-旧 は旧 commit・旧 IR の記録として残す。
 
-- 検証起点 (測定の基準 main): `origin/main` = `412e302d`。PR ブランチの merge-base もこの commit (`git merge-base` で確認)。REPORT 旧版の「99b87bc2」は誤記で、`99b87bc2` は `412e302d` の祖先。
+- 現 head (`05e467f1` 以降) の測定基準 main = `c0b2c183` (`origin/main` の当時の値で、PR ブランチの merge-base でもある)。`412e302d` は旧記録の基準 (`412e302d` は `c0b2c183` の祖先だが merge-base ではない)。REPORT 旧版の「99b87bc2」は誤記で、`99b87bc2` は `412e302d` の祖先。
 - 旧記録の測定 commit (当時コードを変えた最後): `a5e9c1ed`。`2e6fba53` は `m11_build.sh` の既定値 (`M11_FIX_912:-0`→`:-1`) とコメントだけを変え、`fix912/` は変えていない (`git diff a5e9c1ed 2e6fba53 -- tools/m11/fix912` は 0 行)。
 - 旧記録の差分: `a5e9c1ed` → `2e6fba53` 以降で `m11_passes.py` の `pass_m2q_fn980ed0` (#1043 の function_980ed0 VA→LVA remap。IR を変える) と `m11_build.sh` の既定値変更が入った。`a5e9c1ed` の IR は M2q を含まないため、§2・§7-旧 の数値は**現 head の IR の測定ではない**。
 - 現 head の測定対象: `05e467f1` (main `c0b2c183` を取り込んだ merge。`ca3001ce` から `tools/m11` にも main 由来の差分が入ったため、`ca3001ce` ではなくこの merge を測定 commit とした)。以後 `tools/m11` のコード差分は 0 (§12)。
