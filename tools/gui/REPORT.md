@@ -212,9 +212,12 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
 - **golden 画素一致 (差 0)**: `bash tools/gui/test/nc_golden.sh` (`e2e.sh` 1d/6 に組込み)。popup + TOPMOST tooltip + 枠/caption 付きウィンドウ + 無効 2 矩形だけの再描画の 200×140 シーンを独立 Python オラクル `golden/gen_golden_nc.py` (shim と共有するものなし) と比較: **28,000 px 差 0**。同じバイナリが 26 assertion (client/window rect・HT* 判定・`WindowFromPoint` の HTTRANSPARENT 素通し・`WM_NCLBUTTONDOWN(HTCAPTION)` 配送・`GetUpdateRgn` = COMPLEXREGION・DPI 96↔192 の切替と `AdjustWindowRectEx`・z 順 3 本) も実行: **26 passed / 0 failed**。
 - **ネガコン (3 本; どれかが通ると exit 1)**: 期待値を 1 画素改変 → 拒否 / `NC_FAULT=1` (tooltip を TOPMOST にしない) → **840 px 不一致で拒否** / `NC_FAULT=2` (2 矩形でなく外接矩形を無効化) → **4,270 px 不一致で拒否**。
 
-### 検証 (現 HEAD `7105a2d`、この run の実測)
+### 検証 (現 HEAD `67d5cb7`、この run の実測; 以下の `7105a2d` 以前の行は過去 HEAD の記録)
 | 項目 | 結果 |
 |---|---|
+| `bash tools/gui/e2e.sh` (HEAD `67d5cb7`、origin/main `8d64067` の merge commit、`$RUNNER_TEMP` で実行) | **ALL PASS、rc 0、142 s** (開始 load 0.72 → 終了 load 3.22)。内訳: selftest 428/0・bpp 16,000 px 差 0 (negctl 2/2)・text golden ALL PASS (negctl 4/4)・**nc golden 28,000 px 差 0 (asserts 26/0)**・native lift 0/64,000 px・SIMD 15,679 mismatch 0 (故意欠陥 4 種 FAIL 確認)・Chrome readback / screenshot 0 px (6 / 6b / 6c / 6d PASS)・sigprobe mismatch 0 (negctl 177)・present 7 pass / 0 fail |
+| nc golden 単体 (`67d5cb7`) | `bash tools/gui/test/nc_golden.sh`: rc 0、asserts 26/0、28,000 px 差 0。ネガコン 3 本 (1 px 改変 / `NC_FAULT=1` 840 px / `NC_FAULT=2` 4,270 px) すべて拒否 |
+| 注記 | レビュー側で出た `node_modules` 不在による tsc (step 5) ENOENT は、`pnpm install --frozen-lockfile` で解消する環境依存でありコード起因ではない。本 run では e2e 開始前 (12:24:25) に `node_modules` が存在していたため、本 run の実測は `pnpm install` 直後の状態に該当する (作成経路は未確認) |
 | `bash tools/gui/e2e.sh` (HEAD `7105a2d`) | **ALL PASS、rc 0、110 s** (終了時 load 1.60)。内訳: selftest 426/0・bpp 16,000 px 差 0・text golden ALL PASS・**nc golden 28,000 px 差 0 (asserts 26/0)**・native lift 0/64,000 px・SIMD 15,679 mismatch 0・Chrome readback / screenshot 0 px・sigprobe mismatch 0 (negctl 177)・present ALL PASS |
 | nc golden ネガコン (`7105a2d`) | 1 px 改変 → 拒否 / `NC_FAULT=1` → MISMATCH 840 px / `NC_FAULT=2` → MISMATCH 4,270 px。判定は「PPM 出力 + MISMATCH 行」に厳格化 (欠落・クラッシュは不合格) |
 | z 順 assert の感度 | 修正前の `gui_core.c` (`51e6170`) に対し新 assert 2 件が FAIL (`non-topmost after TOPMOST stays below it` / `HWND_BOTTOM clears TOPMOST`)、修正後は PASS |
