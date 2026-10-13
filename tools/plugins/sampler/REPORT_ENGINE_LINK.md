@@ -110,14 +110,25 @@
 
 - 結論: 前 run の値では `--backend-no-opts` で RSS が 8.15 GiB から下がり、C 出力まで完走した (上表)。 共有 `lift_ranges.sh` は変更せず、既定経路は `lift_from_ll.sh` のまま (判断: 変更しない)。
 - 理由: `lift_from_ll.sh` は C 出力を使わず `.ll` の後段だけ使う。 `.ll` 出力までの秒数は本書で未記録のため、既定経路との時間比較は行わない。
-- 本 HEAD (main dc7c11df・fl-win64 展開 `$RUNNER_TEMP/fl-win64`、23664 の ranges 5,160 関数) での測定。 **n=1 の単発測定**。 環境は 4 vCPU・RAM 15 GiB (`nproc`・`free -g`)。 run id・load average・並列数は未記録 (実装 run `38459725194` のログと #540 のコメントに該当出力が無いことを確認済み)。 min–max レンジは未取得:
+- 本 HEAD (main dc7c11df・fl-win64 展開 `$RUNNER_TEMP/fl-win64`、23664 の ranges 5,160 関数) での測定。 **n=1 の単発測定**。 環境は 4 vCPU・RAM 15 GiB (`nproc`・`free -g`)。 run id・load average・並列数は未記録 (実装 run `38459725194` のログと #540 のコメントに該当出力が無いことを確認済み)。 min–max レンジは未取得。 したがって下表の秒数・RSS は **出所不明の参考値** として扱い、判断の根拠は exit 137・C 出力未完・完走の有無という観測事実に限る:
 
 | 方式 | 結果 (n=1 実測) |
 |---|---|
 | `--no-memory-limit` (既定 `--backend-*` のまま) | exit 137、`--timeout 1100` で打ち切り (経過 18:20.34)、Maximum RSS 11.19 GB。 "out of memory" 0 件。 "emission of the target code [c]" に 922.76 s で入り、C 出力の途中で打ち切り。 C 出力は未完 |
 | `--backend-no-opts` | exit 0、8:18.90 (498.90 s)、Maximum RSS 3.52 GB。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走 |
 
-- 結論 (受入条件 3・n=1 の範囲): 上表の n=1 測定では `--no-memory-limit` は C 出力を完了できず、RSS も抑えられなかった。 `--backend-no-opts` は完走したが所要は上表のとおり。 共有 `lift_ranges.sh` には入れない (判断: 変更しない)。 RetDec の既定経路は本 HEAD でも `lift_from_ll.sh` を使う。
+- 結論 (受入条件 3・n=1 の範囲): 上表の n=1 測定では `--no-memory-limit` は C 出力を完了できなかった。 `--backend-no-opts` は完走した。 共有 `lift_ranges.sh` には入れない (判断: 変更しない)。 RetDec の既定経路は本 HEAD でも `lift_from_ll.sh` を使う。 n≥3 の min–max は未取得のため、受入条件 3 は「判断まで完了 (測定は n=1、再測定は未実施)」。
+- 鮮度 (WORKFLOW §6): 測定 commit は dc7c11df。 測定以降の sampler コード差分は 0 行。 出力:
+
+  ```
+  $ git diff dc7c11df 23396e1a -- tools/plugins/sampler ':!*.md'
+  (出力 0 行)
+  $ git diff --stat dc7c11df 23396e1a -- tools/plugins/sampler
+   tools/plugins/sampler/REPORT_ENGINE_LINK.md | 14 +++++++++++---
+   1 file changed, 11 insertions(+), 3 deletions(-)
+  ```
+
+  差分は本 REPORT (md) のみ。 本 REPORT の更新 commit も md のみのため、dc7c11df の測定結果は現 HEAD でも同じ sampler コードに対するものとして扱う。 再測定は要求しない。
 
 ### 5. VEX helper の CPUID 分岐 (前 run の引用、main f0d65f32。本 HEAD では未再測定)
 
