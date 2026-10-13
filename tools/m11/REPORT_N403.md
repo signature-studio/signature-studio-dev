@@ -107,7 +107,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 ## 5. unit 別の LB 依存差 (作成者の前回 run の記録・受入 2 の切り分け・原因は未特定)
 
 測定主体: 下の数値は作成者の前回 run の**記録の引用**である。本 PR の作業 runner では再測定していない (work-m11・toolchain が無い)。
-測定 HEAD は記録間で食い違う: PR 本文は d2a9102d の worktree、§2・§4 は 64d09590 と記載。どちらで測ったかは未確定。「2 回一致」は引用元の記録での主張で、本 runner では確認していない。
+測定 HEAD は記録間で食い違う: §2・§4 は 64d09590、前回 commit d2a9102d の記録もある。どちらで測ったかは未確定。「2 回一致」は引用元の記録での主張で、本 runner では確認していない。
 - 素材の前提 (引用元の記録): fl-win64 を展開。work-m11 / work-liftdiff は `tools/m11/work/` に展開。toolchain-emsdk / retdec は `[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md`) の環境。
   work-m11 は #728 以前のスナップショットで `work/lift_pe.sha256` が無く、`m11_e2e.sh` が全再生成に入って Ghidra の `functions_dll.csv` を要求して止まる。
 - **指紋検査の迂回 (前回 run の操作。REPORT の出所として明記)**: `work/lift_pe.sha256` に PE の sha256 を手で書き、lift 成果物を再利用した (全再生成はしていない)。
