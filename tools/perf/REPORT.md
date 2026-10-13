@@ -247,4 +247,4 @@ e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動
 ## 12. plugin 別 module vs 動的リンク (PERF-P8 / #166)
 
 詳細・全表は `tools/perf/REPORT_P8.md` (付録; 行数上限のため分割)。1 コマンド: `bash tools/perf/p8/p8.sh`。
-結論: 現行 lift (VA 固定) の plugin は plugin 別 module/instance/Memory (定常 CPU 差なし。Chrome 154 は Memory 124〜125 本が上限)。動的リンクは `-fvisibility=hidden` 必須 (既定 visibility は Chrome で ×1.24〜1.25)。合成カーネルでの測定で実 OTT は未再測。
+結論: 現行 lift (VA 固定) の plugin は plugin 別 module/instance/Memory。動的リンクは `-fvisibility=hidden` 必須 (既定 visibility の PIC 税の大きさはホスト依存)。数値・Memory 本数上限・別ホスト再測は `REPORT_P8.md` §0/§2.5 を参照。合成カーネルでの測定で実 OTT は未再測。

@@ -14,7 +14,7 @@ const env = {
   rss: () => process.memoryUsage().rss,
   hwm: () => +/VmHWM:\s+(\d+)/.exec(fs.readFileSync('/proc/self/status', 'utf8'))[1] * 1024,
   loadavg: () => os.loadavg().map((x) => +x.toFixed(2)),
-  info: { runtime: 'node ' + process.version, cpus: os.cpus().length },
+  info: { runtime: 'node ' + process.version, cpus: os.cpus().length, cpu: os.cpus()[0]?.model ?? 'unknown' },
 };
 const emit = (o) => { fs.mkdirSync(RES, { recursive: true }); fs.appendFileSync(path.join(RES, 'p8.jsonl'), JSON.stringify(o) + '\n'); console.log(JSON.stringify(o)); };
 function child(mode, cfg, N) {

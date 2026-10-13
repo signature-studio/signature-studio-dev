@@ -4,7 +4,7 @@
 
 # 実行系: node v22.23.3
 
-node v22.23.3, 4 cores, loadavg(各 run 開始時の 1 分値) 1.02〜2.26
+node v22.23.3, 4 cores, CPU 型番: 不明 (この jsonl を採取した run が `cpu` を記録していない), loadavg(各 run 開始時の 1 分値) 1.02〜2.26
 
 ## 定常 µs / 128f ブロック (標準カーネル NST=32; 各セル = 独立プロセス間の p50 の中央値 (min–max)、比 = 同 N の static_based 比。static が無い N=64 は sep_based 比 = 自己比 ×1.000)
 
@@ -134,7 +134,7 @@ node v22.23.3, 4 cores, loadavg(各 run 開始時の 1 分値) 1.02〜2.26
 
 # 実行系: chrome Chrome/154.0.8037.97
 
-chrome Chrome/154.0.8037.97, 4 cores, loadavg(各 run 開始時の 1 分値) 1.01〜8.53
+chrome Chrome/154.0.8037.97, 4 cores, CPU 型番: 不明 (この jsonl を採取した run が `cpu` を記録していない), loadavg(各 run 開始時の 1 分値) 1.01〜8.53
 
 ## 定常 µs / 128f ブロック (標準カーネル NST=32; 各セル = 独立プロセス間の p50 の中央値 (min–max)、比 = 同 N の static_based 比。static が無い N=64 は sep_based 比 = 自己比 ×1.000)
 

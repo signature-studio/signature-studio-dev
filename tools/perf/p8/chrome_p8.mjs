@@ -14,7 +14,7 @@ const emit = (o) => { if (JSFLAGS) o.jsflags = JSFLAGS; fs.appendFileSync(OUT, J
 let PRODUCT = '';
 async function withChrome(fn) { const b = await launchChrome({ jsFlags: JSFLAGS }); PRODUCT = 'chrome ' + b.version.product; try { const p = await b.newPage(`${base}/l/web/page.html`); return await fn(b, p); } finally { await b.close(); } }
 const procRss = async (b) => { const ps = b.procs().filter((x) => x.type === 'renderer'); return { rss: Math.max(...ps.map((x) => (x.rssMB ?? 0) * 1048576)), hwm: Math.max(...ps.map((x) => (x.hwmMB ?? 0) * 1048576)) }; };
-const run = (p, b, cfg, N, extra = {}) => p.eval(`runIt(${JSON.stringify({ mode, cfg, N, sfx: SFX, reps: REPS, targetMs: TARGET_MS, info: { runtime: 'chrome ' + b.version.product, cpus: os.cpus().length }, loadavg: os.loadavg().map((x) => +x.toFixed(2)), ...extra })})`, { timeout: 300000 });
+const run = (p, b, cfg, N, extra = {}) => p.eval(`runIt(${JSON.stringify({ mode, cfg, N, sfx: SFX, reps: REPS, targetMs: TARGET_MS, info: { runtime: 'chrome ' + b.version.product, cpus: os.cpus().length, cpu: os.cpus()[0]?.model ?? 'unknown' }, loadavg: os.loadavg().map((x) => +x.toFixed(2)), ...extra })})`, { timeout: 300000 });
 if (mode === 'steady') {
   for (let r = 0; r < RUNS; r++) await withChrome(async (b, p) => {
     for (const N of NS) for (const cfg of CFGS ?? CONFIG_GRID.steady) { if (cfg.startsWith('static') && ![1, 4, 16].includes(N)) continue; try { emit(await run(p, b, cfg, N)); } catch (e) { emit({ mode, cfg: cfg + SFX, N, runtime: PRODUCT, error: String(e).slice(0, 300) }); } }

@@ -10,7 +10,8 @@ const grp = (mode) => { const m = new Map(); for (const r of rows.filter((x) => 
 const rng = (v, key, d = 2) => { const a = v.filter((x) => x[key] != null).map((x) => x[key]); if (!a.length) return '-'; const lo = Math.min(...a), hi = Math.max(...a); return `${med(a).toFixed(d)} (${lo.toFixed(d)}–${hi.toFixed(d)})`; };
 const MB = (b) => (b / 1048576).toFixed(1);
 let o = ['<!-- 自動生成: node tools/perf/p8/tables.mjs (入力 results/p8.jsonl)。人手編集禁止 -->', '', '# P8 TABLES', ''];
-const envLine = () => rows[0] ? `${rows[0].runtime}, ${rows[0].cpus} cores, loadavg(各 run 開始時の 1 分値) ${Math.min(...rows.filter((r) => r.loadavg?.length).map((r) => r.loadavg[0]))}〜${Math.max(...rows.filter((r) => r.loadavg?.length).map((r) => r.loadavg[0]))}` : '';
+const cpuLine = () => { const c = [...new Set(rows.map((r) => r.cpu).filter(Boolean))]; return c.length ? c.join(' / ') + (rows.some((r) => !r.cpu && !r.error) ? ' (cpu 未記録の行あり)' : '') : '不明 (この jsonl を採取した run が `cpu` を記録していない)'; };
+const envLine = () => rows[0] ? `${rows[0].runtime}, ${rows[0].cpus} cores, CPU 型番: ${cpuLine()}, loadavg(各 run 開始時の 1 分値) ${Math.min(...rows.filter((r) => r.loadavg?.length).map((r) => r.loadavg[0]))}〜${Math.max(...rows.filter((r) => r.loadavg?.length).map((r) => r.loadavg[0]))}` : '';
 for (const rt of [...new Set(ALL.map((r) => r.runtime))]) {
   rows = ALL.filter((r) => r.runtime === rt);
   o.push(`# 実行系: ${rt}`, '', envLine(), '');
