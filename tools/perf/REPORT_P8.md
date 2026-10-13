@@ -130,24 +130,24 @@ node tools/perf/p8/check.mjs --negative   # ネガティブコントロール (�
 ## 7. 実 OTT (bit-exact x64c lift) での再測 (PERF-P8 未達項目の解消)
 
 既知類型との関係: 該当なし (計測のみ。lift・既存 wasm は未変更)。検証 HEAD: `72e1ae3e` (`bash tools/perf/p8/real/p8_real.sh`, `NS="1 2 4 8 16"`)。素材 `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.cjs` = 既存 `tools/ott` の x64c lift 産物, 26 KB glue + 793 KB wasm, 署名 `6b1696f0`)。
-生データ: `tools/perf/p8/results/real_ott.jsonl` (N=1,2,4,8,16 の各別プロセス)。node v22.23.3, 4 コア runner, loadavg 0.2〜0.6 (計測時)。CPU 型番は未記録 (本 run は `os.cpus()` の型番を取っていない)。
+生データ: `tools/perf/p8/results/real_ott.jsonl` (N=1,2,4,8,16 の各別プロセス, 計 5 行)。本節の全数値はこのファイルの各行から引く (実行は commit 72e1ae3e; 以降 `tools/perf/` は未変更)。node v22.23.3, 4 コア runner, loadavg 0.2〜0.6 (計測時)。CPU 型番は未記録 (本 run は `os.cpus()` の型番を取っていない)。
 
 **方式**: 1 プロセスで `ottl.cjs` の `createModule` を N 回呼び、各 instance が独立の Memory を持つ状態で同一 OTT の `process` (128f = 1 block) を instance 順に round-robin 駆動。定常 = 1000 block × 7 rep の p50、instance 当たり µs/block。署名は `ott_x64c_bench.mjs` と同一手順 (全 instance で一致を確認)。
 
 | N (instance) | load ms | setup ms | RSS 増分 MiB | µs/block (p50 [min–max]) | RTF@44.1k / instance | 署名 |
 |---|---|---|---|---|---|---|
-| 1 | 23.6 | 21.0 | 20.6 | 110.39 [110.03–113.59] | 0.03803 | 6b1696f0 ×1 |
-| 2 | 28.8 | 27.1 | 28.2 | 111.29 [110.75–113.07] | 0.03834 | 6b1696f0 ×2 |
-| 4 | 40.4 | 42.1 | 41.7 | 112.62 [112.05–115.79] | 0.03880 | 6b1696f0 ×4 |
-| 8 | 56.6 | 56.7 | 65.2 | 113.92 [113.26–115.63] | 0.03925 | 6b1696f0 ×8 |
-| 16 | 88.4 | 118.4 | 114.6 | 113.14 [112.35–114.34] | 0.03898 | 6b1696f0 ×16 |
+| 1 | 22.41 | 20.18 | 20.7 | 110.43 [109.82–113.14] | 0.03805 | 6b1696f0 ×1 |
+| 2 | 30.62 | 22.94 | 28.7 | 112.49 [110.96–118.54] | 0.03876 | 6b1696f0 ×2 |
+| 4 | 41.03 | 35.68 | 42.5 | 112.92 [111.77–114.46] | 0.03891 | 6b1696f0 ×4 |
+| 8 | 59.51 | 59.55 | 66.6 | 113.32 [112.74–115.38] | 0.03904 | 6b1696f0 ×8 |
+| 16 | 93.59 | 107.89 | 115.4 | 113.57 [113.34–113.79] | 0.03913 | 6b1696f0 ×16 |
 
-コミット済み HEAD での再実行 (`72e1ae3e`): N=1 110.43 / N=16 113.57 µs/block、署名は全 N で `6b1696f0` (表と同じ傾向)。
+表の値はすべて `real_ott.jsonl` の各行 (`load_ms` / `setup_ms` / `rss_load_mib` / `us_per_block_p50`・`_min`・`_max` / `rtf44_per_instance` / `sig_n`) から引いた。RSS 増分 = `rss_load_mib`。合計 RSS は同行の `rss_after_mib` (N=16 で 287.6 MiB)。
 
 **読み取り**:
-- 実 OTT でも **定常コストは instance 数に依らず平坦** (N=1→16 で +2.5%、先の合成カーネルの「plugin 別 Memory は静的リンクと同等」と整合)。各 instance は 1 block あたり約 110〜114 µs で、44.1 kHz では RTF 約 0.038〜0.039 (1 instance の計算量の 3.8〜3.9%)。
-- **1 instance の追加コスト** (N=16 の平均): load 約 5.5 ms (88.4/16) + setup 約 7.4 ms (118.4/16) + RSS 約 7.2 MiB (114.6/16)。N=16 で合計 RSS 288 MiB。
+- 実 OTT でも **定常コストは instance 数にほぼ依らず平坦** (N=1→16 で 110.43 → 113.57 µs、+2.8% = 113.57/110.43)。先の合成カーネルの「plugin 別 Memory は静的リンクと同等」と整合。各 instance は 1 block あたり約 110〜114 µs で、44.1 kHz では RTF 約 0.038〜0.039 (1 instance の計算量の 3.8〜3.9%)。
+- **1 instance の追加コスト** (N=16 の平均): load 約 5.8 ms (93.59/16 = 5.85) + setup 約 6.7 ms (107.89/16) + RSS 約 7.2 MiB (115.4/16)。N=16 で合計 RSS 約 288 MiB (287.6)。
 - 合成カーネルと違い、実 OTT は **絶対 VA (0x30000000 台) 固定** のため、動的リンク / 静的同居の比較は本 lift のままでは組めない (guest VA の相対化 pass が前提; 下記未解決)。したがって実 OTT で測れたのは「plugin 別 instance」の構成のみ。
 - 合成カーネルの PIC 税 (SIDE_MODULE) は実 OTT では測れていない (未達のまま)。
 
-**範囲外 (未測)**: Chrome Worker / AudioWorklet での実 OTT 複数 instance (本 run は node のみ)。Chrome の Memory 本数上限 (124〜125) は合成カーネルで確認済みで、実 OTT の initial 864 MiB でも同じ上限が当たる見込みだが、実 OTT では未確認。
+**範囲外 (未測)**: Chrome Worker / AudioWorklet での実 OTT 複数 instance (本 run は node のみ)。Chrome の Memory 本数上限 (124〜125) は合成カーネルで確認済み (§2.4 `p8_limit.jsonl`)。実 OTT の initial 864 MiB でも同じ上限が当たる見込みだが、実 OTT では未確認。
