@@ -145,10 +145,32 @@
 
 | 未解決 | 起票先 |
 |---|---|
-| 殻の selector 9 件の `r8`/`r9` 引数の完全な意味・戻り値の型 (engine 側 case ごとの読解) | 本 #540 (継続) |
+| 殻の selector 9 件の `r8`/`r9` 引数の完全な意味・戻り値の型 (§8 で 7 件の意味を確定。sel 2・4 の内側 id の値と、sel 10 の `r8` 入力バッファの書込み元は未確定) | 本 #540 (継続) |
 | `--no-memory-limit` の n=1 測定の扱い (§5 参照) | 本 #540 (継続、受入条件 3 は判断まで完了) |
 | VEX helper の SSE 固定の動的確認 (直接 call 鎖では guard 無し。間接 call は未追跡) | #527 にコメント予定 (既存・重複起票せず) |
 | 受入条件 1・2 の再測定 (`sampler_engines.sh`) | 本 HEAD の検証 run は runner に [RETDEC] が無く未再現。 RetDec 環境のある run で再測定 (#540 継続) |
+
+## 8. selector ごとの引数の意味 (受入条件 4 の続き)
+
+測定: `disasm_range.py` (capstone) で engine 23664 の `DispatchToEngine` 0x180147bc0〜、殻 23663 の呼出し wrapper を逆アセンブル。 jump table は `.text` 上の rip 相対 int32 表を直接読んで解いた (case VA は §3 と一致)。
+
+関数の共通形: `rcx` = engine (殻の `[obj+0x1b8]`)、`rdx` = selector、`r8`/`r9` = 第 3・第 4 引数、`[rsp+0x20]` = 第 5 引数 (殻は `&local` の out ポインタ、または 0)、`xmm3`/`[rsp+0x28]` = 第 6 引数 (float)。 engine 側は `r12` = `r9`、`rdi` = `r8`、`rsi` = 第 5 引数 (`[rbp+0x60]`)。
+
+| sel | engine case の動作 (逆アセンブル) | 殻の呼出し (引数) | 確定した意味 |
+|--:|---|---|---|
+| 2 | `[rcx+0x1b0]` の関数を呼んだ後、`r9` (= `r12`) を第 2 段 switch (0..14) の添字に使う | wrapper 0x846a80 が `r9` = 自身の第 2 引数 (`rdx`) を渡す | 二段ディスパッチ。 内側 id は `r9` |
+| 3 | 第 2 段 switch: `r9-0x3e8` (0..8)、float を engine obj のフィールドへ格納 (`[rbp+0x68]` = xmm3 を書く) | wrapper 0x846b10 が `r9` = 第 2 引数、`xmm3` = 値 | float setter と読める (第 2 段の各 case が obj のフィールドへ `movss` する形。 xmm3 の `[rbp+0x68]` への退避は未確認)。 id = `r9-1000` |
+| 4 | sel 2 と同型の第 2 段 switch (表 0x14838c) | wrapper 0x846ac0 が `r9` = 第 2 引数 | 二段ディスパッチ (sel 2 と同じ) |
+| 5 | 第 2 段 switch: `r9-0x3e8` (0..8)、obj のフィールドを読み `[rsi]` (= 第 5 引数) へ格納 | wrapper 0x846b50 が `r9` = 第 2 引数、第 5 引数 = `&local` | float getter。 出力は第 5 引数の out ポインタ |
+| 10 (0xa) | `[rcx]` vtable `+0xd0` を呼び、`r8` を C 文字列として `strlen` し、`std::string` を組む | 0x8439a0 が `r8` = `&[rbp+0x4f]` | `r8` は入力の C 文字列。 ただし 0x8439a0 の範囲内には `[rbp+0x4f]` への書込みが無く、書込み元は未確定 |
+| 11 (0xb) | `*r8 = 0x80` を書き、`rbx+0x3468` を返す | 0x8471f0 が `r8` = `&[rbp+0x58]` (out)、戻り値 `rax` を使う | バッファ容量 (0x80) を `*r8` に返し、バッファ先頭を戻り値で返す。 殻は長さを `[rbp+0x58]-1` を `0x7f` で頭打ちにして使う |
+| 12 (0xc) | `r8` (= `edi`) を index、`r9 != 0` を bool として、`xmm3` を値に第 2 関数 0x18014fdf0 へ渡す | 0x847510 が `r8` = `sext(edx)` (index)、`r9` = `sext(r8d)` (flag)、`xmm3` = 値、かつ `edx > -1` のときのみ呼ぶ | 範囲付き index 設定。 `r9` は 0/非 0 の flag |
+| 13 (0xd) | `[rbx+0x30]` の std::string の `c_str` 相当 (SSO 判定 `>= 0x10` 込み) を返す | 0x8473c8 が戻り値 `rax` を使う (`r8`・`r9` = 0 で未使用) | 文字列の `c_str()` 取得 |
+| 14 (0xe) | `[rcx]` vtable `+0xd0`、`r8` を C 文字列として `strlen` して `std::string` を組む | 0x8474ad が `r8` = `&[rbp+0x57]` (直前に 0x55d0a0 で 0x200 バイトを埋めた入力) | `r8` は入力の C 文字列 (sel 10 と同じ形) |
+
+- 結論 (本 HEAD、逆アセンブルの範囲): 9 件の selector のうち 7 件 (3・5・11・12・13・14、および 2・4 の二段ディスパッチの形) は引数の意味を確定した。 sel 10 は `r8` が入力文字列であることまでを確定し、書込み元は未確定。
+- 未確定 (本 HEAD): (a) sel 2・4 の wrapper 呼出し元 (`[obj+0x1c0]` を経由しない間接経由の呼出し元) の inner id の値。 `E8 rel32` と絶対ポインタの走査 (wrapper 8 関数) は 0 件で終わった。 走査方法の正しさは未検証のため、呼出し元は本 HEAD では確定しない。 (b) sel 10 の `[rbp+0x4f]` の書込み元。 (c) 戻り値の型の完全な一覧 (sel 2・4 の戻り値は未確認)。
+- 受入条件 4 の残り: (a)〜(c) を次の run で確定する。
 
 ## 7. 検証 (測定 HEAD 5880a9f6、af86748b と sampler コード同一)
 

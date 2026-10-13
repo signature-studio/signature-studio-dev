@@ -20,7 +20,7 @@
 | D | 0 | 14 | 15 / 5 | `0x128c320--0x128dc44` (正) | `0x128c280--0x128c281` (1 B) |
 
 - 集計は `grep -c NonRecursiveCFGBuilder <run>.log` と、`grep NonRecursiveCFGBuilder <run>.log | grep -c function_128c320` (関連数)。
-- 全体 5 → 15 (D は C に本体を足した場合)。A/B にも出る 10 件 (`rax_1_reload` 5 件・`# empty statement` 3 件・`var*` 2 件) は隣接関数の decode 範囲由来。`function_128c320()` を指す警告は C / D の 5 件のみ。
+- 全体 5 → 15 (D は C に本体を足した場合)。A/B にも出る 10 件 (`rax_1_reload` 5 件・`# empty statement` 3 件・`var*` 2 件) は、※ #1286 節で訂正: 隣接関数由来ではなく本体 `0x128c320` 由来 (A/B は本体を含むため出る)。`function_128c320()` を指す警告は C / D の 5 件のみ。
 - 前回 (`adc7f577`) の警告 5 件・5→15 は本 HEAD の A〜D 実測と一致する。前回の「279 s」は実測ではないため採らない。
 - rt_flengine chunk0〜3 は **本 HEAD では未検証** (前回 `adc7f577` の実測のみ・範囲テキスト未コミット)。`before.ranges.N` は `tools/m11/work` (`fle_F.txt`) 由来で、`work-m11` 素材が本 run の `oc_artifacts` に無く、リポジトリ単独では再生成できないため。
 
@@ -49,7 +49,7 @@
 | C | 0 | 8 | 5 | 5 | `0x128c320--0x128c321` (1 B) |
 | D | 0 | 11 | 15 | 5 | `0x128c320--0x128dc44` (正) |
 
-- 警告の内訳 (`grep NonRecursiveCFGBuilder <run>.log`): A/B は `# empty statement` 3・`rax_1_reload = rax_1_reg2mem` 5・`var514`/`var512` 系 2 (隣接関数由来、本体無しでも出る)。C は `function_128c320(var3)` へのエッジ 5 件のみ。D は C の 5 件 (`function_128c320()`) に A/B 相当の 10 件が加わる。
+- 警告の内訳 (`grep NonRecursiveCFGBuilder <run>.log`): A/B は `# empty statement` 3・`rax_1_reload = rax_1_reg2mem` 5・`var514`/`var512` 系 2 (※ #1286 節で訂正: 隣接関数由来ではなく本体 `0x128c320` 由来。A/B は本体を含む)。C は `function_128c320(var3)` へのエッジ 5 件のみ。D は C の 5 件 (`function_128c320()`) に A/B 相当の 10 件が加わる。
 - **1 バイト化は範囲分割で確定** (再掲): A/B で正、C で 1 B。`0x128c2f0` は B で `function_128c2f0 at 0x128c2f0--0x128c313` として選択時のみ出る (A では `data inside code section at 0x128c2e1--0x128c2f0` と `0x128c313--0x128c320` の data)。
 - `function_128c320` を呼ぶ 0x128f9e0 の C 出力 (`D.drc.c` line 2948) には `function_128c320();` が残る。それでも D の警告は `there is no node for an edge to function_128c320()`。捨てられる段階は未特定 (D.log の phase 単位では切り分け未了)。
 - `audit_icall.py` 突合 (`--funcs` で 5 関数 / 3 関数に限定): C は 388 site 中 dropped 387、D は 388 中 dropped 386 (`other_insn` 2)。A/B/D の隣接 3 関数 (`0x128c280`・`0x128c2f0`・`0x128c320`) は 14 site で dropped 13 (`other_insn` 1、3 run で同数)。**隣接関数の lift 欠落は before/after とも 13/14 で同じ** — 本体の有無で隣接関数の欠落は変わらない。
@@ -62,4 +62,40 @@
 - `rax_1_reload` 等 10 件の出所 (IR 命令単位の追跡)。
 - `function_128c320` への edge が D で捨てられる段階の特定。
 - rt_flengine chunk0〜3 の再現 — `RANGES_DIR` (`tools/m11/work` 由来、`work-m11` 未取得) が無く未検証。
+
+## #1286 (ICALL-23): 追加 10 件の警告は本体 `0x128c320` 由来 (隣接関数由来ではない)
+
+素材: `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0)。測定 commit = `c4fba12a` (origin/main 時点)。
+`tools/icall` は本節で変更していないため、コード差分は本文書の追記のみ。
+差分証跡 (HEAD = 本節の commit、測定 commit `c4fba12a` との差分):
+
+```
+git diff c4fba12a HEAD -- tools/icall                                  # 30 行 (本文書の追記のみ)
+git diff c4fba12a HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_851.md'   # 0 行
+```
+再現は `tools/icall/fn_boundary_repro.sh` と同じ `--select-ranges` + `--select-decode-only --timeout 100`。
+集計は `grep -c NonRecursiveCFGBuilder <log>`・`grep -c 'function_128c320()' <log>`。runner 上 foreground、`load 0.34–0.78`。
+
+| 範囲 (`--select-ranges`) | rc | sec (n=3 の順) | 警告 | 内訳 |
+|---|--:|---|--:|---|
+| E: `0x128c320-0x128dc44` (本体のみ) | 0 | 13, 13, 13 | 10 | `# empty statement` 3・`rax_1_reload = rax_1_reg2mem` 5・`var515`/`var514`/`var512` 系 2 |
+| F: `0x128c280-0x128c2e1` (隣接 1) | 0 | 10, 10, 10 | 0 | — |
+| G: `0x128c2f0-0x128c313` (隣接 2) | 0 | 8, 8, 9 | 0 | — |
+| A (再現スクリプト): F + E | 0 | 14 (1 回) | 10 | E と同一 |
+
+- 既存記述の訂正: 本文の「A/B にも出る 10 件は隣接関数の decode 範囲由来」は**誤り**。隣接関数を単独で
+  decode すると 0 件で、本体 `0x128c320` を入れた時点で 10 件出る (E・A・B)。`0x128c280` の追加は件数を変えない (E と H で 10 件)。
+- 出現 phase (E.log の行順): 「removing code that is not reachable in a CFG」と「optimizations」の 2 段階。
+  `# empty statement` 3 件・`rax_1_reload` 5 件・`var515` 2 件 (log 上の変数名は run ごとに 514/515 と揺れる)。
+- 生成物 (`E.drc.ll`) には `rax_1_reload` の名前は残らない (RetDec 内部の reg2mem 名で、出力 IR では `%rax.0.reload` 等に変わる)。
+  よって警告文字列から IR 命令を直接引くことはできない。出所の命令特定には RetDec の中間 phase ダンプが要る (未実施)。
+- 既知類型: `docs/DEFECTS.md` に該当する類型は無い (警告は CFG edge の破棄で、命令の誤復号を示す直接の証拠は未確認)。行案は未確定。
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 警告 10 件を生む IR 命令 (`rax_1_reload` 等) の特定 (phase 単位のダンプ必要)。DEFECTS 行案も未確定 | 本体 `0x128c320` の一部 edge が破棄されている可能性 | 子 issue ICALL-30 (本 run で起票) |
+| `function_128c320()` edge が D で捨てられる段階の特定 | 呼出元 `0x128f9e0` からの call edge 欠落 | 子 issue ICALL-30 (同上) |
+| 366 site 落ちとの因果 | 1 バイト化とは別の lift 欠落 | 子 issue ICALL-30 (同上) |
 
