@@ -1,0 +1,5089 @@
+{
+ "summary": {
+  "image": "block00031_PE.bin",
+  "image_size": 22227016,
+  "functions_scanned": 57816,
+  "instructions_scanned": 2580490,
+  "direct_refs_to_flag": [],
+  "slot_loads": 44,
+  "reads": 38,
+  "writes": 6,
+  "other": 0,
+  "read_funcs": [
+   12723664,
+   12781536,
+   12785808,
+   12789808,
+   12793488,
+   12794896,
+   15527024,
+   15528512,
+   15540160,
+   15708368,
+   15829856,
+   15848464,
+   15856112,
+   16799776,
+   17595600,
+   17634112,
+   17652096,
+   17652720,
+   17652832,
+   17652976,
+   18307216,
+   18438928,
+   18494240,
+   18557632,
+   18603680,
+   18604192,
+   18623872,
+   18639072,
+   18956640,
+   19193088,
+   20018080,
+   20296608,
+   20331248,
+   20404624
+  ],
+  "write_funcs": [
+   17595600
+  ],
+  "flag_initial_byte": "00",
+  "slot_value": "0x14f84a8",
+  "grade_slot_loads": 196,
+  "grade_reads": 189,
+  "grade_writes": 7
+ },
+ "sites": [
+  {
+   "func": 12723664,
+   "load": 12723766,
+   "seq": [
+    "c2263d movzx rax, byte ptr [rax]",
+    "c22641 test al, 4",
+    "c22643 je 0xc226d0",
+    "c22649 lea rcx, [rbp + 0x68]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Upgrade Fire to Producer Edition",
+    "31041",
+    "Upgrade Fire to Signature Bundle",
+    "31042",
+    "Upgrade Fruity Fire to All Plugins Edition",
+    "31046"
+   ],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Upgrade Fire to Producer Edition",
+    "31041",
+    "Upgrade Fire to Signature Bundle",
+    "31042",
+    "Upgrade Fruity Fire to All Plugins Edition",
+    "31046"
+   ]
+  },
+  {
+   "func": 12781536,
+   "load": 12782796,
+   "seq": [
+    "c30cd3 movzx rax, byte ptr [rax]",
+    "c30cd7 test al, 4",
+    "c30cd9 je 0xc30d8e",
+    "c30cdf lea rcx, [rbp + 0x98]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Save anyway",
+    "More information"
+   ],
+   "bit_clear_path": [
+    "More information"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "     Buy plugins",
+    "Save anyway",
+    "More information"
+   ]
+  },
+  {
+   "func": 12785808,
+   "load": 12787219,
+   "seq": [
+    "c31e1a movzx rax, byte ptr [rax]",
+    "c31e1e test al, 4",
+    "c31e20 je 0xc31f65",
+    "c31e26 lea rcx, [rbp + 0xa0]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "More information"
+   ],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Warning|The plugin is a limited |trial| version and will not load these settings until you",
+    "More information"
+   ]
+  },
+  {
+   "func": 12789808,
+   "load": 12789954,
+   "seq": [
+    "c328c9 movzx rax, byte ptr [rax]",
+    "c328cd test al, 4",
+    "c328cf je 0xc328e5",
+    "c328d1 movzx rcx, byte ptr [rbp + 0x37]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Upgrade"
+   ]
+  },
+  {
+   "func": 12793488,
+   "load": 12793570,
+   "seq": [
+    "c336e9 movzx rax, byte ptr [rax]",
+    "c336ed test al, 4",
+    "c336ef je 0xc337bc",
+    "c336f5 lea rcx, [rbp + 0x60]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Warning|%s is in |trial| mode.",
+    "FL Studio",
+    "You can save this project but you must connect your Fire controller to open the project ag",
+    "More information"
+   ],
+   "bit_clear_path": [
+    "Buy FL Studio",
+    "Fire_Instructions"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Warning|%s is in |trial| mode.",
+    "FL Studio",
+    "You can save this project but you must connect your Fire controller to open the project ag",
+    "More information"
+   ]
+  },
+  {
+   "func": 12793488,
+   "load": 12793844,
+   "seq": [
+    "c337fb movzx rax, byte ptr [rax]",
+    "c337ff test al, 4",
+    "c33801 je 0xc33826",
+    "c33803 mov rax, qword ptr [rip + 0x9b0f86]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Fire_Instructions"
+   ],
+   "bit_clear_path": [
+    "RegOfTrial"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Buy FL Studio",
+    "Fire_Instructions",
+    "RegOfTrial"
+   ]
+  },
+  {
+   "func": 12794896,
+   "load": 12794989,
+   "seq": [
+    "c33c74 movzx rax, byte ptr [rax]",
+    "c33c78 test al, 4",
+    "c33c7a je 0xc33d64",
+    "c33c80 lea rcx, [rbp + 0x70]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Note|This project was saved while %s was in |trial|.",
+    "FL Studio",
+    "Please attach Fire controller and restart %s to open the project",
+    "FL Studio",
+    "More information"
+   ],
+   "bit_clear_path": [
+    "Buy FL Studio",
+    "Fire_Instructions"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Note|This project was saved while %s was in |trial|.",
+    "FL Studio",
+    "Please attach Fire controller and restart %s to open the project",
+    "More information"
+   ]
+  },
+  {
+   "func": 12794896,
+   "load": 12795292,
+   "seq": [
+    "c33da3 movzx rax, byte ptr [rax]",
+    "c33da7 test al, 4",
+    "c33da9 je 0xc33dce",
+    "c33dab mov rax, qword ptr [rip + 0x9b09de]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Fire_Instructions"
+   ],
+   "bit_clear_path": [
+    "RegOfTrial"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Buy FL Studio",
+    "Fire_Instructions",
+    "RegOfTrial"
+   ]
+  },
+  {
+   "func": 15527024,
+   "load": 15527146,
+   "seq": [
+    "ececf1 movzx rax, byte ptr [rax]",
+    "ececf5 test al, 4",
+    "ececf7 jne 0xeced49",
+    "ececf9 lea rcx, [rbp + 0x40]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [],
+   "bit_clear_path": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode."
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode."
+   ]
+  },
+  {
+   "func": 15528512,
+   "load": 15529347,
+   "seq": [
+    "ecf58a movzx rax, byte ptr [rax]",
+    "ecf58e test al, 4",
+    "ecf590 jne 0xecf5f2",
+    "ecf592 mov rax, qword ptr [rbp + 0x30]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [],
+   "bit_clear_path": [
+    "(disabled in Trial mode)"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "(disabled in Trial mode)"
+   ]
+  },
+  {
+   "func": 15540160,
+   "load": 15540242,
+   "seq": [
+    "ed2019 movzx rax, byte ptr [rax]",
+    "ed201d test al, 4",
+    "ed201f je 0xed2111",
+    "ed2025 mov rax, qword ptr [rbp + 0x38]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    ".zip"
+   ],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    ".zip"
+   ]
+  },
+  {
+   "func": 15708368,
+   "load": 15708680,
+   "seq": [
+    "efb20f movzx rax, byte ptr [rax]",
+    "efb213 test al, 1",
+    "efb215 jne 0xefb22d",
+    "efb217 mov rax, qword ptr [rip + 0x6e9572]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": [
+    "Your license has expired and ",
+    "vompdlfe"
+   ]
+  },
+  {
+   "func": 15829856,
+   "load": 15830238,
+   "seq": [
+    "f18ce5 movzx rax, byte ptr [rax]",
+    "f18ce9 test al, 4",
+    "f18ceb jne 0xf18cf1",
+    "f18ced xor eax, eax"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": []
+  },
+  {
+   "func": 15848464,
+   "load": 15848482,
+   "seq": [
+    "f1d429 movzx rax, byte ptr [rax]",
+    "f1d42d test al, 1",
+    "f1d42f je 0xf1d44f",
+    "f1d431 mov rax, qword ptr [rip + 0x6c7358]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": []
+  },
+  {
+   "func": 15856112,
+   "load": 15856193,
+   "seq": [
+    "f1f248 movzx rax, byte ptr [rax]",
+    "f1f24c test al, 4",
+    "f1f24e jne 0xf1f2a5",
+    "f1f250 lea rcx, [rbp + 0x60]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [
+    "Choose to back the project up to FL Cloud this time only or every time it's saved locally.",
+    "Back up once",
+    "Back up every save",
+    "Cancel"
+   ],
+   "bit_clear_path": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode."
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode.",
+    "Choose to back the project up to FL Cloud this time only or every time it's saved locally.",
+    "Back up once",
+    "Back up every save"
+   ]
+  },
+  {
+   "func": 16799776,
+   "load": 16800011,
+   "seq": [
+    "1005912 movzx rax, byte ptr [rax]",
+    "1005916 and al, byte ptr [rip + 0x424]",
+    "100591c cmp al, byte ptr [rip + 0x41f]",
+    "1005922 je 0x1005939"
+   ],
+   "rw": "read",
+   "op": "movzx ... and al, byte ptr [rip + 0x424]",
+   "mask": null,
+   "strings_near": [
+    "Fruity Fire",
+    "Fruity",
+    "Edition limitation|%s Edition allows a maximum of |%d Audio Clip Channels|."
+   ]
+  },
+  {
+   "func": 17595600,
+   "load": 17598317,
+   "seq": [
+    "10c8774 movzx rcx, byte ptr [rip + 0x815c]",
+    "10c877c mov byte ptr [rax], cl",
+    "10c877e mov rcx, qword ptr [rip - 0xb1ae05]",
+    "10c8785 mov dl, 1"
+   ],
+   "rw": "write",
+   "op": "store",
+   "mask": null,
+   "strings_near": []
+  },
+  {
+   "func": 17595600,
+   "load": 17611540,
+   "seq": [
+    "10cbb1b and byte ptr [rax], 0xfd",
+    "10cbb1e mov rax, qword ptr [rip + 0x514b73]",
+    "10cbb25 and byte ptr [rax], 0xfb",
+    "10cbb28 cmp byte ptr [rbp + 0x48d7], 2"
+   ],
+   "rw": "write",
+   "op": "and 0xfd",
+   "mask": 253,
+   "strings_near": []
+  },
+  {
+   "func": 17595600,
+   "load": 17611550,
+   "seq": [
+    "10cbb25 and byte ptr [rax], 0xfb",
+    "10cbb28 cmp byte ptr [rbp + 0x48d7], 2",
+    "10cbb2f je 0x10cbb3a",
+    "10cbb31 cmp dword ptr [rbp + 0x48d8], 0"
+   ],
+   "rw": "write",
+   "op": "and 0xfb",
+   "mask": 251,
+   "strings_near": []
+  },
+  {
+   "func": 17595600,
+   "load": 17617080,
+   "seq": [
+    "10cd0bf or byte ptr [rax], 2",
+    "10cd0c2 mov rax, qword ptr [rip + 0x5176c7]",
+    "10cd0c9 mov rax, qword ptr [rax]",
+    "10cd0cc mov rax, qword ptr [rax + 0xd0]"
+   ],
+   "rw": "write",
+   "op": "or 0x02",
+   "mask": 2,
+   "strings_near": []
+  },
+  {
+   "func": 17595600,
+   "load": 17617150,
+   "seq": [
+    "10cd105 or byte ptr [rax], 4",
+    "10cd108 add dword ptr [rbp + 0x48dc], 1",
+    "10cd10f add qword ptr [rbp + 0x3d8], 4",
+    "10cd117 add qword ptr [rbp + 0x3e0], 4"
+   ],
+   "rw": "write",
+   "op": "or 0x04",
+   "mask": 4,
+   "strings_near": []
+  },
+  {
+   "func": 17595600,
+   "load": 17626342,
+   "seq": [
+    "10cf4ed or byte ptr [rax], 1",
+    "10cf4f0 mov rax, qword ptr [rip + 0x5111a1]",
+    "10cf4f7 movzx rax, byte ptr [rax]",
+    "10cf4fb test al, 1"
+   ],
+   "rw": "write",
+   "op": "or 0x01",
+   "mask": 1,
+   "strings_near": []
+  },
+  {
+   "func": 17595600,
+   "load": 17626352,
+   "seq": [
+    "10cf4f7 movzx rax, byte ptr [rax]",
+    "10cf4fb test al, 1",
+    "10cf4fd je 0x10cf531",
+    "10cf4ff mov rcx, qword ptr [rip - 0x7ffe3e]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Upgrade registration"
+   ],
+   "bit_clear_path": [
+    "Upgrade registration"
+   ],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": [
+    "Please remember to register",
+    "Upgrade registration",
+    "Registration details"
+   ]
+  },
+  {
+   "func": 17634112,
+   "load": 17634509,
+   "seq": [
+    "10d14d4 movzx rax, byte ptr [rax]",
+    "10d14d8 test al, 2",
+    "10d14da je 0x10d157d",
+    "10d14e0 mov ecx, 0xc8"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [
+    "Your license has expired"
+   ],
+   "rw": "read",
+   "op": "test mask 0x02",
+   "mask": 2,
+   "strings_near": [
+    "Your license has expired"
+   ]
+  },
+  {
+   "func": 17652096,
+   "load": 17652283,
+   "seq": [
+    "10d5a42 movzx rax, byte ptr [rax]",
+    "10d5a46 test al, 1",
+    "10d5a48 je 0x10d5a5c",
+    "10d5a4a lea rcx, [rbp + 0x48]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "BoxEdition.txt"
+   ],
+   "bit_clear_path": [
+    "NotReggedTxt.txt"
+   ],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": [
+    "BoxEdition.txt",
+    "NotReggedTxt.txt",
+    "DemoTxt.txt",
+    "System\\Texts\\"
+   ]
+  },
+  {
+   "func": 17652720,
+   "load": 17652729,
+   "seq": [
+    "10d5c00 movzx rax, byte ptr [rax]",
+    "10d5c04 test al, 1",
+    "10d5c06 je 0x10d5c26",
+    "10d5c08 mov rax, qword ptr [rip + 0x50eb81]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": []
+  },
+  {
+   "func": 17652832,
+   "load": 17652867,
+   "seq": [
+    "10d5c8a movzx rax, byte ptr [rax]",
+    "10d5c8e test al, 1",
+    "10d5c90 setne dl",
+    "10d5c93 call 0x60a270"
+   ],
+   "jcc": null,
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": []
+  },
+  {
+   "func": 17652976,
+   "load": 17652984,
+   "seq": [
+    "10d5cff movzx rax, byte ptr [rax]",
+    "10d5d03 test al, 1",
+    "10d5d05 je 0x10d5d20",
+    "10d5d07 lea rcx, [rip + 0x26]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "BoxRegReminder"
+   ],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": [
+    "BoxRegReminder"
+   ]
+  },
+  {
+   "func": 18307216,
+   "load": 18325578,
+   "seq": [
+    "117a051 movzx rax, byte ptr [rax]",
+    "117a055 test al, 4",
+    "117a057 jne 0x117a1fa",
+    "117a05d mov rcx, qword ptr [rip - 0x7b081c]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [
+    "The plugin versions of %s have been installed.",
+    "FL Studio",
+    "Installation successful|%s",
+    "Important note: not every plugin host supports what's required for the %s plugins to work ",
+    "FL Studio"
+   ],
+   "bit_clear_path": [
+    " VSTi installation",
+    "please select the folder where your other VST plugins are",
+    "FL Studio",
+    " - ",
+    "System\\Plugin\\"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    " VSTi installation",
+    "please select the folder where your other VST plugins are",
+    "FL Studio",
+    " - "
+   ]
+  },
+  {
+   "func": 18438928,
+   "load": 18439023,
+   "seq": [
+    "1195b76 movzx rax, byte ptr [rax]",
+    "1195b7a test al, 2",
+    "1195b7c je 0x1195b9b",
+    "1195b7e mov rcx, qword ptr [rip + 0x44a8b3]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Fire ",
+    " [build ",
+    " / plugin"
+   ],
+   "bit_clear_path": [
+    " [build ",
+    " / plugin"
+   ],
+   "rw": "read",
+   "op": "test mask 0x02",
+   "mask": 2,
+   "strings_near": [
+    "Fire ",
+    " [build "
+   ]
+  },
+  {
+   "func": 18494240,
+   "load": 18494251,
+   "seq": [
+    "11a3332 movzx rax, byte ptr [rax]",
+    "11a3336 test al, 1",
+    "11a3338 jne 0x11a335a",
+    "11a333a mov rax, qword ptr [rip + 0x43d357]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [
+    "General",
+    "Last BRR date",
+    "General",
+    "Last BRR date"
+   ],
+   "bit_clear_path": [
+    "General",
+    "Last BRR date",
+    "General",
+    "Last BRR date"
+   ],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": [
+    "General",
+    "Last BRR date"
+   ]
+  },
+  {
+   "func": 18494240,
+   "load": 18494266,
+   "seq": [
+    "11a3341 movzx rax, byte ptr [rax]",
+    "11a3345 test al, 2",
+    "11a3347 jne 0x11a335a",
+    "11a3349 mov rax, qword ptr [rip + 0x441058]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [
+    "General",
+    "Last BRR date",
+    "General",
+    "Last BRR date"
+   ],
+   "bit_clear_path": [
+    "General",
+    "Last BRR date",
+    "General",
+    "Last BRR date"
+   ],
+   "rw": "read",
+   "op": "test mask 0x02",
+   "mask": 2,
+   "strings_near": [
+    "General",
+    "Last BRR date"
+   ]
+  },
+  {
+   "func": 18557632,
+   "load": 18558731,
+   "seq": [
+    "11b2f12 movzx rcx, byte ptr [rcx]",
+    "11b2f16 test cl, 1",
+    "11b2f19 setne cl",
+    "11b2f1c mov byte ptr [rax + 0x4d], cl"
+   ],
+   "jcc": null,
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": []
+  },
+  {
+   "func": 18603680,
+   "load": 18603859,
+   "seq": [
+    "11bdf5a movzx rax, byte ptr [rax]",
+    "11bdf5e test al, 4",
+    "11bdf60 je 0x11bdf66",
+    "11bdf62 xor eax, eax"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "General",
+    "Last SUR"
+   ]
+  },
+  {
+   "func": 18604192,
+   "load": 18605496,
+   "seq": [
+    "11be5bf movzx rax, byte ptr [rax]",
+    "11be5c3 test al, 1",
+    "11be5c5 je 0x11be5dc",
+    "11be5c7 lea rcx, [rbp + 0xb8]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Please remember to register"
+   ],
+   "bit_clear_path": [
+    "FL Studio 2026 ",
+    "Registered to: ",
+    "UVSH"
+   ],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": [
+    "Please remember to register",
+    "FL Studio 2026 ",
+    "Registered to: "
+   ]
+  },
+  {
+   "func": 18623872,
+   "load": 18629099,
+   "seq": [
+    "11c41f2 movzx rax, byte ptr [rax]",
+    "11c41f6 test al, 2",
+    "11c41f8 je 0x11c4261",
+    "11c41fa lea rcx, [rbp + 0x70]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Upgrade to Producer edition for more features...",
+    "Upgrade reminder"
+   ],
+   "bit_clear_path": [
+    "Update your expired license",
+    "..."
+   ],
+   "rw": "read",
+   "op": "test mask 0x02",
+   "mask": 2,
+   "strings_near": [
+    "Upgrade reminder",
+    "Upgrade to Producer edition for more features...",
+    "Update your expired license",
+    "..."
+   ]
+  },
+  {
+   "func": 18639072,
+   "load": 18640142,
+   "seq": [
+    "11c6d15 movzx rax, byte ptr [rax]",
+    "11c6d19 test al, 4",
+    "11c6d1b je 0x11c6d30",
+    "11c6d1d mov ecx, 0x3a"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": []
+  },
+  {
+   "func": 18956640,
+   "load": 18956691,
+   "seq": [
+    "121419a movzx rax, byte ptr [rax]",
+    "121419e test al, 4",
+    "12141a0 je 0x12141b3",
+    "12141a2 mov cl, 0x15"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": []
+  },
+  {
+   "func": 18956640,
+   "load": 18956771,
+   "seq": [
+    "12141ea movzx rax, byte ptr [rax]",
+    "12141ee test al, 1",
+    "12141f0 je 0x121421f",
+    "12141f2 cmp byte ptr [rip + 0x4a87f4], 0"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": []
+  },
+  {
+   "func": 19193088,
+   "load": 19193130,
+   "seq": [
+    "124dd31 movzx rax, byte ptr [rax]",
+    "124dd35 test al, 1",
+    "124dd37 je 0x124dd5f",
+    "124dd39 lea rcx, [rbp + 0x38]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Create account"
+   ],
+   "bit_clear_path": [
+    "My account"
+   ],
+   "rw": "read",
+   "op": "test mask 0x01",
+   "mask": 1,
+   "strings_near": [
+    "Create account",
+    "My account"
+   ]
+  },
+  {
+   "func": 20018080,
+   "load": 20065341,
+   "seq": [
+    "1322c44 movzx rax, byte ptr [rax]",
+    "1322c48 test al, 4",
+    "1322c4a je 0x13281af",
+    "1322c50 mov dword ptr [rbp + 0xaf0], 0x425cac07"
+   ],
+   "jcc": "je",
+   "bit_set_path": [],
+   "bit_clear_path": [],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": []
+  },
+  {
+   "func": 20296608,
+   "load": 20300376,
+   "seq": [
+    "135c25f movzx rax, byte ptr [rax]",
+    "135c263 test al, 4",
+    "135c265 jne 0x135c2c7",
+    "135c267 mov rax, qword ptr [rbp + 0x30]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [],
+   "bit_clear_path": [
+    "(disabled in Trial mode)"
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "(disabled in Trial mode)"
+   ]
+  },
+  {
+   "func": 20331248,
+   "load": 20331420,
+   "seq": [
+    "1363ba3 movzx rax, byte ptr [rax]",
+    "1363ba7 test al, 4",
+    "1363ba9 jne 0x1363c00",
+    "1363bab lea rcx, [rbp + 0x70]"
+   ],
+   "jcc": "jne",
+   "bit_set_path": [
+    "untitled.flp",
+    "Warning",
+    "The project needs to be saved before it can be backed up to FL Cloud.",
+    "Save now",
+    "Don't save"
+   ],
+   "bit_clear_path": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode."
+   ],
+   "rw": "read",
+   "op": "test mask 0x04",
+   "mask": 4,
+   "strings_near": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode.",
+    "untitled.flp",
+    "The project needs to be saved before it can be backed up to FL Cloud."
+   ]
+  },
+  {
+   "func": 20404624,
+   "load": 20407230,
+   "seq": [
+    "13763c5 movzx rax, byte ptr [rax]",
+    "13763c9 test al, 2",
+    "13763cb je 0x13763fb",
+    "13763cd lea rcx, [rip + 0x3a4]"
+   ],
+   "jcc": "je",
+   "bit_set_path": [
+    "Fire edition",
+    "BasicInitialization failed."
+   ],
+   "bit_clear_path": [
+    "BasicInitialization failed."
+   ],
+   "rw": "read",
+   "op": "test mask 0x02",
+   "mask": 2,
+   "strings_near": [
+    "Fire edition",
+    "BasicInitialization failed."
+   ]
+  }
+ ],
+ "grade_sites": [
+  {
+   "func": 12781536,
+   "load": 12782774,
+   "seq": [
+    "c30cbd mov rax, qword ptr [rax]",
+    "c30cc0 mov rax, qword ptr [rax + 0xd0]",
+    "c30cc7 cmp byte ptr [rax], 0x40",
+    "c30cca ja 0xc30cdf",
+    "c30ccc mov rax, qword ptr [rip + 0x9af9c5]",
+    "c30cd3 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Save anyway",
+    "More information"
+   ],
+   "path_cond_false": [
+    "Save anyway",
+    "More information"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 12785808,
+   "load": 12787197,
+   "seq": [
+    "c31e04 mov rax, qword ptr [rax]",
+    "c31e07 mov rax, qword ptr [rax + 0xd0]",
+    "c31e0e cmp byte ptr [rax], 0x40",
+    "c31e11 ja 0xc31e26",
+    "c31e13 mov rax, qword ptr [rip + 0x9ae87e]",
+    "c31e1a movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "More information"
+   ],
+   "path_cond_false": [
+    "More information"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 12790576,
+   "load": 12790845,
+   "seq": [
+    "c32c44 mov rax, qword ptr [rax]",
+    "c32c47 mov rax, qword ptr [rax + 0xd0]",
+    "c32c4e movzx r8, byte ptr [rax]",
+    "c32c52 mov rax, qword ptr [rip + 0x9afa4f]",
+    "c32c59 mov r9, qword ptr [rax]",
+    "c32c5c mov rax, qword ptr [rbp + 0x68]"
+   ],
+   "rw": "read",
+   "op": "movzx r8, byte ptr [rax]"
+  },
+  {
+   "func": 12796000,
+   "load": 12796285,
+   "seq": [
+    "c34184 mov rax, qword ptr [rax]",
+    "c34187 mov rax, qword ptr [rax + 0xd0]",
+    "c3418e cmp byte ptr [rax], 0x40",
+    "c34191 jne 0xc341a4",
+    "c34193 movzx rcx, word ptr [rip + 0x147]",
+    "c3419b xor edx, edx"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 12945840,
+   "load": 12947852,
+   "seq": [
+    "c59193 mov rax, qword ptr [rax]",
+    "c59196 mov rax, qword ptr [rax + 0xd0]",
+    "c5919d cmp byte ptr [rax], 0x40",
+    "c591a0 jne 0xc59201",
+    "c591a2 lea rax, [rip + 0x8aba53]",
+    "c591a9 movsxd rcx, dword ptr [rip + 0x8abc24]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 12945840,
+   "load": 12947987,
+   "seq": [
+    "c5921a mov rdx, qword ptr [rdx]",
+    "c5921d mov rdx, qword ptr [rdx + 0xd0]",
+    "c59224 movzx rdx, byte ptr [rdx]",
+    "c59228 bt qword ptr [rax + rcx*8], rdx",
+    "c5922d setb al",
+    "c59230 mov byte ptr [rip + 0x8abba2], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 12945840,
+   "load": 12948022,
+   "seq": [
+    "c5923d mov rax, qword ptr [rax]",
+    "c59240 mov rax, qword ptr [rax + 0xd0]",
+    "c59247 cmp byte ptr [rax], 0x40",
+    "c5924a jne 0xc5925e",
+    "c5924c cmp byte ptr [rip + 0x8abb85], 0",
+    "c59253 je 0xc5925e"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 12945840,
+   "load": 12953537,
+   "seq": [
+    "c5a7c8 mov rax, qword ptr [rax]",
+    "c5a7cb mov rax, qword ptr [rax + 0xd0]",
+    "c5a7d2 cmp byte ptr [rax], 0x3f",
+    "c5a7d5 je 0xc5a7db",
+    "c5a7d7 xor eax, eax",
+    "c5a7d9 jmp 0xc5a7dd"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 14461616,
+   "load": 14463309,
+   "seq": [
+    "dcb154 mov rax, qword ptr [rax]",
+    "dcb157 mov rax, qword ptr [rax + 0xd0]",
+    "dcb15e cmp byte ptr [rax], 0x40",
+    "dcb161 ja 0xdcb181",
+    "dcb163 mov rax, qword ptr [rbx + 0x9c8]",
+    "dcb16a mov byte ptr [rax + 0x63b], 1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15060256,
+   "load": 15070562,
+   "seq": [
+    "e5f569 mov rax, qword ptr [rax]",
+    "e5f56c mov rax, qword ptr [rax + 0xd0]",
+    "e5f573 cmp byte ptr [rax], 0x40",
+    "e5f576 jne 0xe5f5d7",
+    "e5f578 lea rax, [rip + 0x6ce641]",
+    "e5f57f movsxd rcx, dword ptr [rip + 0x6ce812]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15060256,
+   "load": 15070697,
+   "seq": [
+    "e5f5f0 mov rdx, qword ptr [rdx]",
+    "e5f5f3 mov rdx, qword ptr [rdx + 0xd0]",
+    "e5f5fa movzx rdx, byte ptr [rdx]",
+    "e5f5fe bt qword ptr [rax + rcx*8], rdx",
+    "e5f603 setb al",
+    "e5f606 mov byte ptr [rip + 0x6ce790], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15060256,
+   "load": 15070732,
+   "seq": [
+    "e5f613 mov rax, qword ptr [rax]",
+    "e5f616 mov rax, qword ptr [rax + 0xd0]",
+    "e5f61d cmp byte ptr [rax], 0x40",
+    "e5f620 jne 0xe5f634",
+    "e5f622 cmp byte ptr [rip + 0x6ce773], 0",
+    "e5f629 je 0xe5f634"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15060256,
+   "load": 15076247,
+   "seq": [
+    "e60b9e mov rax, qword ptr [rax]",
+    "e60ba1 mov rax, qword ptr [rax + 0xd0]",
+    "e60ba8 cmp byte ptr [rax], 0x3f",
+    "e60bab je 0xe60bb1",
+    "e60bad xor eax, eax",
+    "e60baf jmp 0xe60bb3"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15153488,
+   "load": 15156273,
+   "seq": [
+    "e74438 mov rax, qword ptr [rax]",
+    "e7443b mov rax, qword ptr [rax + 0xd0]",
+    "e74442 cmp byte ptr [rax], 0x40",
+    "e74445 jne 0xe744a6",
+    "e74447 lea rax, [rip + 0x6ba7b2]",
+    "e7444e movsxd rcx, dword ptr [rip + 0x6ba983]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15153488,
+   "load": 15156408,
+   "seq": [
+    "e744bf mov rdx, qword ptr [rdx]",
+    "e744c2 mov rdx, qword ptr [rdx + 0xd0]",
+    "e744c9 movzx rdx, byte ptr [rdx]",
+    "e744cd bt qword ptr [rax + rcx*8], rdx",
+    "e744d2 setb al",
+    "e744d5 mov byte ptr [rip + 0x6ba901], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15153488,
+   "load": 15156443,
+   "seq": [
+    "e744e2 mov rax, qword ptr [rax]",
+    "e744e5 mov rax, qword ptr [rax + 0xd0]",
+    "e744ec cmp byte ptr [rax], 0x40",
+    "e744ef jne 0xe74503",
+    "e744f1 cmp byte ptr [rip + 0x6ba8e4], 0",
+    "e744f8 je 0xe74503"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15153488,
+   "load": 15161958,
+   "seq": [
+    "e75a6d mov rax, qword ptr [rax]",
+    "e75a70 mov rax, qword ptr [rax + 0xd0]",
+    "e75a77 cmp byte ptr [rax], 0x3f",
+    "e75a7a je 0xe75a80",
+    "e75a7c xor eax, eax",
+    "e75a7e jmp 0xe75a82"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15238928,
+   "load": 15240774,
+   "seq": [
+    "e88e4d mov rax, qword ptr [rax]",
+    "e88e50 mov rax, qword ptr [rax + 0xd0]",
+    "e88e57 cmp byte ptr [rax], 0x40",
+    "e88e5a jne 0xe88ebb",
+    "e88e5c lea rax, [rip + 0x6a5f7d]",
+    "e88e63 movsxd rcx, dword ptr [rip + 0x6a614e]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15238928,
+   "load": 15240909,
+   "seq": [
+    "e88ed4 mov rdx, qword ptr [rdx]",
+    "e88ed7 mov rdx, qword ptr [rdx + 0xd0]",
+    "e88ede movzx rdx, byte ptr [rdx]",
+    "e88ee2 bt qword ptr [rax + rcx*8], rdx",
+    "e88ee7 setb al",
+    "e88eea mov byte ptr [rip + 0x6a60cc], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15238928,
+   "load": 15240944,
+   "seq": [
+    "e88ef7 mov rax, qword ptr [rax]",
+    "e88efa mov rax, qword ptr [rax + 0xd0]",
+    "e88f01 cmp byte ptr [rax], 0x40",
+    "e88f04 jne 0xe88f18",
+    "e88f06 cmp byte ptr [rip + 0x6a60af], 0",
+    "e88f0d je 0xe88f18"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15238928,
+   "load": 15246459,
+   "seq": [
+    "e8a482 mov rax, qword ptr [rax]",
+    "e8a485 mov rax, qword ptr [rax + 0xd0]",
+    "e8a48c cmp byte ptr [rax], 0x3f",
+    "e8a48f je 0xe8a495",
+    "e8a491 xor eax, eax",
+    "e8a493 jmp 0xe8a497"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15299280,
+   "load": 15300963,
+   "seq": [
+    "e9796a mov rax, qword ptr [rax]",
+    "e9796d mov rax, qword ptr [rax + 0xd0]",
+    "e97974 cmp byte ptr [rax], 0x40",
+    "e97977 jne 0xe979d8",
+    "e97979 lea rax, [rip + 0x698abc]",
+    "e97980 movsxd rcx, dword ptr [rip + 0x698c8d]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15299280,
+   "load": 15301098,
+   "seq": [
+    "e979f1 mov rdx, qword ptr [rdx]",
+    "e979f4 mov rdx, qword ptr [rdx + 0xd0]",
+    "e979fb movzx rdx, byte ptr [rdx]",
+    "e979ff bt qword ptr [rax + rcx*8], rdx",
+    "e97a04 setb al",
+    "e97a07 mov byte ptr [rip + 0x698c0b], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15299280,
+   "load": 15301133,
+   "seq": [
+    "e97a14 mov rax, qword ptr [rax]",
+    "e97a17 mov rax, qword ptr [rax + 0xd0]",
+    "e97a1e cmp byte ptr [rax], 0x40",
+    "e97a21 jne 0xe97a35",
+    "e97a23 cmp byte ptr [rip + 0x698bee], 0",
+    "e97a2a je 0xe97a35"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15299280,
+   "load": 15306648,
+   "seq": [
+    "e98f9f mov rax, qword ptr [rax]",
+    "e98fa2 mov rax, qword ptr [rax + 0xd0]",
+    "e98fa9 cmp byte ptr [rax], 0x3f",
+    "e98fac je 0xe98fb2",
+    "e98fae xor eax, eax",
+    "e98fb0 jmp 0xe98fb4"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15419040,
+   "load": 15420671,
+   "seq": [
+    "eb4d06 mov rax, qword ptr [rax]",
+    "eb4d09 mov rax, qword ptr [rax + 0xd0]",
+    "eb4d10 cmp byte ptr [rax], 0x40",
+    "eb4d13 jne 0xeb4d74",
+    "eb4d15 lea rax, [rip + 0x67caf4]",
+    "eb4d1c movsxd rcx, dword ptr [rip + 0x67ccc5]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15419040,
+   "load": 15420806,
+   "seq": [
+    "eb4d8d mov rdx, qword ptr [rdx]",
+    "eb4d90 mov rdx, qword ptr [rdx + 0xd0]",
+    "eb4d97 movzx rdx, byte ptr [rdx]",
+    "eb4d9b bt qword ptr [rax + rcx*8], rdx",
+    "eb4da0 setb al",
+    "eb4da3 mov byte ptr [rip + 0x67cc43], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15419040,
+   "load": 15420841,
+   "seq": [
+    "eb4db0 mov rax, qword ptr [rax]",
+    "eb4db3 mov rax, qword ptr [rax + 0xd0]",
+    "eb4dba cmp byte ptr [rax], 0x40",
+    "eb4dbd jne 0xeb4dd1",
+    "eb4dbf cmp byte ptr [rip + 0x67cc26], 0",
+    "eb4dc6 je 0xeb4dd1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15419040,
+   "load": 15426356,
+   "seq": [
+    "eb633b mov rax, qword ptr [rax]",
+    "eb633e mov rax, qword ptr [rax + 0xd0]",
+    "eb6345 cmp byte ptr [rax], 0x3f",
+    "eb6348 je 0xeb634e",
+    "eb634a xor eax, eax",
+    "eb634c jmp 0xeb6350"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15527024,
+   "load": 15527124,
+   "seq": [
+    "ececdb mov rax, qword ptr [rax]",
+    "ececde mov rax, qword ptr [rax + 0xd0]",
+    "ecece5 cmp byte ptr [rax], 0x40",
+    "ecece8 ja 0xeced49",
+    "ececea mov rax, qword ptr [rip + 0x7119a7]",
+    "ececf1 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode."
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15528512,
+   "load": 15529325,
+   "seq": [
+    "ecf574 mov rax, qword ptr [rax]",
+    "ecf577 mov rax, qword ptr [rax + 0xd0]",
+    "ecf57e cmp byte ptr [rax], 0x40",
+    "ecf581 ja 0xecf5f2",
+    "ecf583 mov rax, qword ptr [rip + 0x71110e]",
+    "ecf58a movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "(disabled in Trial mode)"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15540160,
+   "load": 15540220,
+   "seq": [
+    "ed2003 mov rax, qword ptr [rax]",
+    "ed2006 mov rax, qword ptr [rax + 0xd0]",
+    "ed200d cmp byte ptr [rax], 0x40",
+    "ed2010 ja 0xed2025",
+    "ed2012 mov rax, qword ptr [rip + 0x70e67f]",
+    "ed2019 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    ".zip"
+   ],
+   "path_cond_false": [
+    ".zip"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15708368,
+   "load": 15708695,
+   "seq": [
+    "efb21e mov rax, qword ptr [rax]",
+    "efb221 mov rax, qword ptr [rax + 0xd0]",
+    "efb228 cmp byte ptr [rax], 0x40",
+    "efb22b jne 0xefb24e",
+    "efb22d mov rax, qword ptr [rbp + 0x38]",
+    "efb231 lea rcx, [rax + 0x10]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "vompdlfe",
+    "vompdlfe",
+    "PP¢£¤¢P¤jP"
+   ],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15744176,
+   "load": 15744552,
+   "seq": [
+    "f03e2f mov rax, qword ptr [rax]",
+    "f03e32 mov rax, qword ptr [rax + 0xd0]",
+    "f03e39 cmp byte ptr [rax], 0x40",
+    "f03e3c ja 0xf03e7b",
+    "f03e3e mov rax, qword ptr [rbp + 0x4330]",
+    "f03e45 mov byte ptr [rax + 0x8c8], 1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Continue"
+   ],
+   "path_cond_false": [
+    "Don't unlock"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15829856,
+   "load": 15830216,
+   "seq": [
+    "f18ccf mov rax, qword ptr [rax]",
+    "f18cd2 mov rax, qword ptr [rax + 0xd0]",
+    "f18cd9 cmp byte ptr [rax], 0x40",
+    "f18cdc ja 0xf18cf1",
+    "f18cde mov rax, qword ptr [rip + 0x6c79b3]",
+    "f18ce5 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15856112,
+   "load": 15856171,
+   "seq": [
+    "f1f232 mov rax, qword ptr [rax]",
+    "f1f235 mov rax, qword ptr [rax + 0xd0]",
+    "f1f23c cmp byte ptr [rax], 0x40",
+    "f1f23f ja 0xf1f2a5",
+    "f1f241 mov rax, qword ptr [rip + 0x6c1450]",
+    "f1f248 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Choose to back the project up to FL Cloud this time only or every time it's saved locally.",
+    "Back up once",
+    "Back up every save",
+    "Cancel"
+   ],
+   "path_cond_false": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode."
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15871776,
+   "load": 15875616,
+   "seq": [
+    "f23e27 mov rax, qword ptr [rax]",
+    "f23e2a mov rax, qword ptr [rax + 0xd0]",
+    "f23e31 cmp byte ptr [rax], 0x40",
+    "f23e34 jne 0xf23e95",
+    "f23e36 lea rax, [rip + 0x614a6b]",
+    "f23e3d movsxd rcx, dword ptr [rip + 0x614c3c]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15871776,
+   "load": 15875751,
+   "seq": [
+    "f23eae mov rdx, qword ptr [rdx]",
+    "f23eb1 mov rdx, qword ptr [rdx + 0xd0]",
+    "f23eb8 movzx rdx, byte ptr [rdx]",
+    "f23ebc bt qword ptr [rax + rcx*8], rdx",
+    "f23ec1 setb al",
+    "f23ec4 mov byte ptr [rip + 0x614bba], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15871776,
+   "load": 15875786,
+   "seq": [
+    "f23ed1 mov rax, qword ptr [rax]",
+    "f23ed4 mov rax, qword ptr [rax + 0xd0]",
+    "f23edb cmp byte ptr [rax], 0x40",
+    "f23ede jne 0xf23ef2",
+    "f23ee0 cmp byte ptr [rip + 0x614b9d], 0",
+    "f23ee7 je 0xf23ef2"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15871776,
+   "load": 15881301,
+   "seq": [
+    "f2545c mov rax, qword ptr [rax]",
+    "f2545f mov rax, qword ptr [rax + 0xd0]",
+    "f25466 cmp byte ptr [rax], 0x3f",
+    "f25469 je 0xf2546f",
+    "f2546b xor eax, eax",
+    "f2546d jmp 0xf25471"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15871776,
+   "load": 15892257,
+   "seq": [
+    "f27f28 mov rax, qword ptr [rax]",
+    "f27f2b mov rax, qword ptr [rax + 0xd0]",
+    "f27f32 cmp byte ptr [rax], 0x40",
+    "f27f35 jne 0xf27f96",
+    "f27f37 lea rax, [rip + 0x61096a]",
+    "f27f3e movsxd rcx, dword ptr [rip + 0x610b3b]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15871776,
+   "load": 15892392,
+   "seq": [
+    "f27faf mov rdx, qword ptr [rdx]",
+    "f27fb2 mov rdx, qword ptr [rdx + 0xd0]",
+    "f27fb9 movzx rdx, byte ptr [rdx]",
+    "f27fbd bt qword ptr [rax + rcx*8], rdx",
+    "f27fc2 setb al",
+    "f27fc5 mov byte ptr [rip + 0x610ab9], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15871776,
+   "load": 15892427,
+   "seq": [
+    "f27fd2 mov rax, qword ptr [rax]",
+    "f27fd5 mov rax, qword ptr [rax + 0xd0]",
+    "f27fdc cmp byte ptr [rax], 0x40",
+    "f27fdf jne 0xf27ff3",
+    "f27fe1 cmp byte ptr [rip + 0x610a9c], 0",
+    "f27fe8 je 0xf27ff3"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15871776,
+   "load": 15897972,
+   "seq": [
+    "f2957b mov rax, qword ptr [rax]",
+    "f2957e mov rax, qword ptr [rax + 0xd0]",
+    "f29585 cmp byte ptr [rax], 0x3f",
+    "f29588 je 0xf2958e",
+    "f2958a xor eax, eax",
+    "f2958c jmp 0xf29590"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15915952,
+   "load": 15917716,
+   "seq": [
+    "f2e29b mov rax, qword ptr [rax]",
+    "f2e29e mov rax, qword ptr [rax + 0xd0]",
+    "f2e2a5 cmp byte ptr [rax], 0x40",
+    "f2e2a8 jne 0xf2e309",
+    "f2e2aa lea rax, [rip + 0x60a7be]",
+    "f2e2b1 movsxd rcx, dword ptr [rip + 0x60a990]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15915952,
+   "load": 15917851,
+   "seq": [
+    "f2e322 mov rdx, qword ptr [rdx]",
+    "f2e325 mov rdx, qword ptr [rdx + 0xd0]",
+    "f2e32c movzx rdx, byte ptr [rdx]",
+    "f2e330 bt qword ptr [rax + rcx*8], rdx",
+    "f2e335 setb al",
+    "f2e338 mov byte ptr [rip + 0x60a90e], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 15915952,
+   "load": 15917886,
+   "seq": [
+    "f2e345 mov rax, qword ptr [rax]",
+    "f2e348 mov rax, qword ptr [rax + 0xd0]",
+    "f2e34f cmp byte ptr [rax], 0x40",
+    "f2e352 jne 0xf2e366",
+    "f2e354 cmp byte ptr [rip + 0x60a8f1], 0",
+    "f2e35b je 0xf2e366"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15915952,
+   "load": 15923401,
+   "seq": [
+    "f2f8d0 mov rax, qword ptr [rax]",
+    "f2f8d3 mov rax, qword ptr [rax + 0xd0]",
+    "f2f8da cmp byte ptr [rax], 0x3f",
+    "f2f8dd je 0xf2f8e3",
+    "f2f8df xor eax, eax",
+    "f2f8e1 jmp 0xf2f8e5"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 15976560,
+   "load": 15978138,
+   "seq": [
+    "f3cea1 mov rax, qword ptr [rax]",
+    "f3cea4 mov rax, qword ptr [rax + 0xd0]",
+    "f3ceab cmp byte ptr [rax], 0x40",
+    "f3ceae ja 0xf3ceb4",
+    "f3ceb0 xor eax, eax",
+    "f3ceb2 jmp 0xf3ceb6"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15992896,
+   "load": 16000294,
+   "seq": [
+    "f4252d mov rax, qword ptr [rax]",
+    "f42530 mov rax, qword ptr [rax + 0xd0]",
+    "f42537 cmp byte ptr [rax], 0x40",
+    "f4253a ja 0xf42548",
+    "f4253c movzx rax, byte ptr [rbp + 0x4698]",
+    "f42544 test al, 4"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 15992896,
+   "load": 16000569,
+   "seq": [
+    "f42640 mov rax, qword ptr [rax]",
+    "f42643 mov rax, qword ptr [rax + 0xd0]",
+    "f4264a cmp byte ptr [rax], 0x40",
+    "f4264d ja 0xf42660",
+    "f4264f movzx rax, byte ptr [rbp + 0x4698]",
+    "f42657 test al, 2"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "FL Studio",
+    "%s %s.%d"
+   ],
+   "path_cond_false": [
+    "FL Studio",
+    "%s %s.%d"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 16016416,
+   "load": 16016460,
+   "seq": [
+    "f46453 mov rax, qword ptr [rax]",
+    "f46456 mov rax, qword ptr [rax + 0xd0]",
+    "f4645d cmp byte ptr [rax], 0x40",
+    "f46460 ja 0xf46473",
+    "f46462 mov rax, qword ptr [rcx + 0xb40]",
+    "f46469 mov dword ptr [rax + 0x4448], 1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 16016528,
+   "load": 16037841,
+   "seq": [
+    "f4b7d8 mov rax, qword ptr [rax]",
+    "f4b7db mov rax, qword ptr [rax + 0xd0]",
+    "f4b7e2 cmp byte ptr [rax], 0x40",
+    "f4b7e5 jne 0xf4b840",
+    "f4b7e7 mov rax, qword ptr [rbp + 0xb40]",
+    "f4b7ee mov eax, dword ptr [rax + 0x4488]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 16267840,
+   "load": 16270905,
+   "seq": [
+    "f84640 mov rax, qword ptr [rax]",
+    "f84643 mov rax, qword ptr [rax + 0xd0]",
+    "f8464a cmp byte ptr [rax], 0x40",
+    "f8464d jne 0xf846ae",
+    "f8464f lea rax, [rip + 0x5b894a]",
+    "f84656 movsxd rcx, dword ptr [rip + 0x5b8b1b]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 16267840,
+   "load": 16271040,
+   "seq": [
+    "f846c7 mov rdx, qword ptr [rdx]",
+    "f846ca mov rdx, qword ptr [rdx + 0xd0]",
+    "f846d1 movzx rdx, byte ptr [rdx]",
+    "f846d5 bt qword ptr [rax + rcx*8], rdx",
+    "f846da setb al",
+    "f846dd mov byte ptr [rip + 0x5b8a99], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 16267840,
+   "load": 16271075,
+   "seq": [
+    "f846ea mov rax, qword ptr [rax]",
+    "f846ed mov rax, qword ptr [rax + 0xd0]",
+    "f846f4 cmp byte ptr [rax], 0x40",
+    "f846f7 jne 0xf8470b",
+    "f846f9 cmp byte ptr [rip + 0x5b8a7c], 0",
+    "f84700 je 0xf8470b"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 16267840,
+   "load": 16276590,
+   "seq": [
+    "f85c75 mov rax, qword ptr [rax]",
+    "f85c78 mov rax, qword ptr [rax + 0xd0]",
+    "f85c7f cmp byte ptr [rax], 0x3f",
+    "f85c82 je 0xf85c88",
+    "f85c84 xor eax, eax",
+    "f85c86 jmp 0xf85c8a"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 16801696,
+   "load": 16801742,
+   "seq": [
+    "1005fd5 mov rax, qword ptr [rax]",
+    "1005fd8 mov rax, qword ptr [rax + 0xd0]",
+    "1005fdf cmp byte ptr [rax], 0x42",
+    "1005fe2 je 0x100600d",
+    "1005fe4 mov rax, qword ptr [rip + 0x5de7a5]",
+    "1005feb mov rax, qword ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x42",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 66,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 16801696,
+   "load": 16801764,
+   "seq": [
+    "1005feb mov rax, qword ptr [rax]",
+    "1005fee mov rax, qword ptr [rax + 0xd0]",
+    "1005ff5 cmp byte ptr [rax], 0x40",
+    "1005ff8 jne 0x100606c",
+    "1005ffa mov rax, qword ptr [rip + 0x5de78f]",
+    "1006001 mov rax, qword ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 16801920,
+   "load": 16802002,
+   "seq": [
+    "10060d9 mov rax, qword ptr [rax]",
+    "10060dc mov rax, qword ptr [rax + 0xd0]",
+    "10060e3 cmp byte ptr [rax], 0x42",
+    "10060e6 jne 0x1006222",
+    "10060ec call 0x10d35e0",
+    "10060f1 test al, al"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x42",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 66,
+   "taken_if_negated": true,
+   "path_cond_true": [
+    "Edition limitation|This project contains more than |%d Audio Clip Channels|.",
+    "You can remove Audio Clip Channels or upgrade if you want to modify the number of specific",
+    "Remove clips",
+    "Save",
+    "Upgrade"
+   ],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 17461872,
+   "load": 17461885,
+   "seq": [
+    "10a7284 mov rcx, qword ptr [rcx]",
+    "10a7287 mov rcx, qword ptr [rcx + 0xd0]",
+    "10a728e cmp byte ptr [rcx], 0x40",
+    "10a7291 ja 0x10a72bc",
+    "10a7293 mov rax, qword ptr [rbx + 0x88]",
+    "10a729a movsxd rsi, esi"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "free"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17469808,
+   "load": 17469970,
+   "seq": [
+    "10a9219 mov rax, qword ptr [rax]",
+    "10a921c mov rax, qword ptr [rax + 0xd0]",
+    "10a9223 cmp byte ptr [rax], 0x40",
+    "10a9226 ja 0x10a923c",
+    "10a9228 mov rcx, qword ptr [rbp + 0x30]",
+    "10a922c lea rdx, [rip + 0x159]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "welcome_window_trial"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17469808,
+   "load": 17470076,
+   "seq": [
+    "10a9283 mov rax, qword ptr [rax]",
+    "10a9286 mov rax, qword ptr [rax + 0xd0]",
+    "10a928d cmp byte ptr [rax], 0x40",
+    "10a9290 setbe al",
+    "10a9293 mov byte ptr [rbp + 0x2f], al",
+    "10a9296 movzx rax, byte ptr [rbp + 0x2f]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: setbe)"
+  },
+  {
+   "func": 17469808,
+   "load": 17470133,
+   "seq": [
+    "10a92bc mov rax, qword ptr [rax]",
+    "10a92bf mov rax, qword ptr [rax + 0xd0]",
+    "10a92c6 cmp byte ptr [rax], 0x40",
+    "10a92c9 seta al",
+    "10a92cc mov byte ptr [rbp + 0x2f], al",
+    "10a92cf movzx rax, byte ptr [rbp + 0x2f]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 17476320,
+   "load": 17477426,
+   "seq": [
+    "10aaf39 mov rax, qword ptr [rax]",
+    "10aaf3c mov rax, qword ptr [rax + 0xd0]",
+    "10aaf43 cmp byte ptr [rax], 0x40",
+    "10aaf46 ja 0x10aafc3",
+    "10aaf48 mov rax, qword ptr [r13 + 0x18]",
+    "10aaf4c mov rax, qword ptr [rax + 0x88]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "free",
+    "customers",
+    "Free",
+    "FREE",
+    "FREE"
+   ],
+   "path_cond_false": [
+    "customers",
+    "Free for customers",
+    "FREE FOR CUSTOMERS",
+    "CUSTOMERS"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17524384,
+   "load": 17524392,
+   "seq": [
+    "10b66af mov rax, qword ptr [rax]",
+    "10b66b2 mov rax, qword ptr [rax + 0xd0]",
+    "10b66b9 cmp byte ptr [rax], 0x40",
+    "10b66bc jbe 0x10b66f9",
+    "10b66be cmp qword ptr [rbx + 0x28], 0",
+    "10b66c3 jne 0x10b66f9"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jbe",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17524480,
+   "load": 17524500,
+   "seq": [
+    "10b671b mov rax, qword ptr [rax]",
+    "10b671e mov rax, qword ptr [rax + 0xd0]",
+    "10b6725 cmp byte ptr [rax], 0x40",
+    "10b6728 jbe 0x10b676e",
+    "10b672a cmp qword ptr [rbx + 0x38], 0",
+    "10b672f jne 0x10b676e"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jbe",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17528688,
+   "load": 17528959,
+   "seq": [
+    "10b7886 mov rax, qword ptr [rax]",
+    "10b7889 mov rax, qword ptr [rax + 0xd0]",
+    "10b7890 cmp byte ptr [rax], 0x40",
+    "10b7893 ja 0x10b798d",
+    "10b7899 lea rcx, [rbp + 0xa8]",
+    "10b78a0 lea rdx, [rip + 0x40d]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "Sign in to import your FL Studio Web projects",
+    "Sign in",
+    "Sign in to your Image-Line account to import your FL Studio Web projects"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17528688,
+   "load": 17529503,
+   "seq": [
+    "10b7aa6 mov rax, qword ptr [rax]",
+    "10b7aa9 mov rax, qword ptr [rax + 0xd0]",
+    "10b7ab0 cmp byte ptr [rax], 0x40",
+    "10b7ab3 ja 0x10b7b9e",
+    "10b7ab9 lea rcx, [rbp + 0x80]",
+    "10b7ac0 lea rdx, [rip + 0x3fd]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Loading your Project backups ...",
+    "Loading your Project backups"
+   ],
+   "path_cond_false": [
+    "Sign in to load your Project backups",
+    "Sign in",
+    "Sign in to your Image-Line account to load your project backups"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17533664,
+   "load": 17533860,
+   "seq": [
+    "10b8bab mov rax, qword ptr [rax]",
+    "10b8bae mov rax, qword ptr [rax + 0xd0]",
+    "10b8bb5 cmp byte ptr [rax], 0x40",
+    "10b8bb8 seta dl",
+    "10b8bbb call 0x840520",
+    "10b8bc0 mov rcx, qword ptr [rbp + 0x28]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 17593648,
+   "load": 17593667,
+   "seq": [
+    "10c754a mov rax, qword ptr [rax]",
+    "10c754d mov rax, qword ptr [rax + 0xd0]",
+    "10c7554 cmp byte ptr [rax], 0x40",
+    "10c7557 seta bl",
+    "10c755a test bl, bl",
+    "10c755c je 0x10c7636"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 17595600,
+   "load": 17605980,
+   "seq": [
+    "10ca563 mov rax, qword ptr [rax]",
+    "10ca566 mov rax, qword ptr [rax + 0xd0]",
+    "10ca56d mov byte ptr [rax], 0x40",
+    "10ca570 mov dword ptr [rbp + 0x48d8], 0",
+    "10ca57a mov dword ptr [rbp + 0x48dc], 0x41",
+    "10ca584 lea rax, [rip + 0x4ed975]"
+   ],
+   "rw": "write",
+   "op": "store"
+  },
+  {
+   "func": 17595600,
+   "load": 17611513,
+   "seq": [
+    "10cbb00 mov rax, qword ptr [rax]",
+    "10cbb03 mov rax, qword ptr [rax + 0xd0]",
+    "10cbb0a movzx rcx, byte ptr [rbp + 0x48dc]",
+    "10cbb12 mov byte ptr [rax], cl",
+    "10cbb14 mov rax, qword ptr [rip + 0x514b7d]",
+    "10cbb1b and byte ptr [rax], 0xfd"
+   ],
+   "rw": "write",
+   "op": "store"
+  },
+  {
+   "func": 17595600,
+   "load": 17617090,
+   "seq": [
+    "10cd0c9 mov rax, qword ptr [rax]",
+    "10cd0cc mov rax, qword ptr [rax + 0xd0]",
+    "10cd0d3 movzx rcx, byte ptr [rbp + 0x48dc]",
+    "10cd0db mov byte ptr [rax], cl",
+    "10cd0dd cmp byte ptr [rbp + 0x48d7], 2",
+    "10cd0e4 je 0x10cd0ef"
+   ],
+   "rw": "write",
+   "op": "store"
+  },
+  {
+   "func": 17595600,
+   "load": 17626293,
+   "seq": [
+    "10cf4bc mov rax, qword ptr [rax]",
+    "10cf4bf mov rax, qword ptr [rax + 0xd0]",
+    "10cf4c6 mov byte ptr [rax], 0x3f",
+    "10cf4c9 lea rcx, [rip + 0x1748]",
+    "10cf4d0 mov rdx, qword ptr [rbp + 0x48c8]",
+    "10cf4d7 mov r8d, 1"
+   ],
+   "rw": "write",
+   "op": "store"
+  },
+  {
+   "func": 17595600,
+   "load": 17626417,
+   "seq": [
+    "10cf538 mov rax, qword ptr [rax]",
+    "10cf53b mov rax, qword ptr [rax + 0xd0]",
+    "10cf542 cmp byte ptr [rax], 0x40",
+    "10cf545 jbe 0x10cf5c1",
+    "10cf547 mov rax, qword ptr [rip + 0x515242]",
+    "10cf54e mov rax, qword ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jbe",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [
+    "Upgrade registration"
+   ],
+   "path_cond_false": [
+    "Buy / register"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17595600,
+   "load": 17626439,
+   "seq": [
+    "10cf54e mov rax, qword ptr [rax]",
+    "10cf551 mov rax, qword ptr [rax + 0xd0]",
+    "10cf558 cmp byte ptr [rax], 0x44",
+    "10cf55b jae 0x10cf58f",
+    "10cf55d lea rcx, [rbp + 0x50]",
+    "10cf561 lea rdx, [rip + 0x16f4]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x44",
+   "jcc": "jae",
+   "cmp_op": ">=",
+   "cmp_imm": 68,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Registration details"
+   ],
+   "path_cond_false": [
+    "Upgrade registration"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 17595600,
+   "load": 17626640,
+   "seq": [
+    "10cf617 mov rax, qword ptr [rax]",
+    "10cf61a mov rax, qword ptr [rax + 0xd0]",
+    "10cf621 mov byte ptr [rax], 0x40",
+    "10cf624 lea rcx, [rbp + 0x38]",
+    "10cf628 lea rdx, [rip + 0x16c9]",
+    "10cf62f call 0x8da350"
+   ],
+   "rw": "write",
+   "op": "store"
+  },
+  {
+   "func": 17635456,
+   "load": 17635570,
+   "seq": [
+    "10d18f9 mov rax, qword ptr [rax]",
+    "10d18fc mov rax, qword ptr [rax + 0xd0]",
+    "10d1903 movzx rax, byte ptr [rax]",
+    "10d1907 cmp al, 0x41",
+    "10d1909 jb 0x10d1936",
+    "10d190b cmp al, 0x43"
+   ],
+   "rw": "read",
+   "op": "movzx; cmp imm 0x41",
+   "jcc": "jb",
+   "cmp_op": ">=",
+   "cmp_imm": 65,
+   "taken_if_negated": true,
+   "path_cond_true": [
+    "/newreleases/?username=%s&productcodes=%s&productversions=%s"
+   ],
+   "path_cond_false": [
+    "/newreleases/?username=%s&productcodes=%s&productversions=%s"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 17644080,
+   "load": 17644146,
+   "seq": [
+    "10d3a79 mov rcx, qword ptr [rcx]",
+    "10d3a7c mov rcx, qword ptr [rcx + 0xd0]",
+    "10d3a83 mov byte ptr [rcx], 0x3f",
+    "10d3a86 add rsp, 0x28",
+    "10d3a8a ret "
+   ],
+   "rw": "write",
+   "op": "store"
+  },
+  {
+   "func": 17649872,
+   "load": 17650428,
+   "seq": [
+    "10d5303 mov rax, qword ptr [rax]",
+    "10d5306 mov rax, qword ptr [rax + 0xd0]",
+    "10d530d movzx rcx, byte ptr [rax]",
+    "10d5311 add ecx, 0xa",
+    "10d5314 cmp ecx, 0x4a",
+    "10d5317 jne 0x10d52f9"
+   ],
+   "rw": "read",
+   "op": "movzx rcx, byte ptr [rax]"
+  },
+  {
+   "func": 17775920,
+   "load": 17777742,
+   "seq": [
+    "10f4455 mov rax, qword ptr [rax]",
+    "10f4458 mov rax, qword ptr [rax + 0xd0]",
+    "10f445f cmp byte ptr [rax], 0x40",
+    "10f4462 jne 0x10f44c3",
+    "10f4464 lea rax, [rip + 0x4c69cd]",
+    "10f446b movsxd rcx, dword ptr [rip + 0x4c6b9e]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 17775920,
+   "load": 17777877,
+   "seq": [
+    "10f44dc mov rdx, qword ptr [rdx]",
+    "10f44df mov rdx, qword ptr [rdx + 0xd0]",
+    "10f44e6 movzx rdx, byte ptr [rdx]",
+    "10f44ea bt qword ptr [rax + rcx*8], rdx",
+    "10f44ef setb al",
+    "10f44f2 mov byte ptr [rip + 0x4c6b1c], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 17775920,
+   "load": 17777912,
+   "seq": [
+    "10f44ff mov rax, qword ptr [rax]",
+    "10f4502 mov rax, qword ptr [rax + 0xd0]",
+    "10f4509 cmp byte ptr [rax], 0x40",
+    "10f450c jne 0x10f4520",
+    "10f450e cmp byte ptr [rip + 0x4c6aff], 0",
+    "10f4515 je 0x10f4520"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 17775920,
+   "load": 17783427,
+   "seq": [
+    "10f5a8a mov rax, qword ptr [rax]",
+    "10f5a8d mov rax, qword ptr [rax + 0xd0]",
+    "10f5a94 cmp byte ptr [rax], 0x3f",
+    "10f5a97 je 0x10f5a9d",
+    "10f5a99 xor eax, eax",
+    "10f5a9b jmp 0x10f5a9f"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 17849920,
+   "load": 17849980,
+   "seq": [
+    "1105e83 mov rax, qword ptr [rax]",
+    "1105e86 mov rax, qword ptr [rax + 0xd0]",
+    "1105e8d cmp byte ptr [rax], 0x40",
+    "1105e90 ja 0x1105ef1",
+    "1105e92 lea rcx, [rbp + 0x60]",
+    "1105e96 lea rdx, [rip + 0x443]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Failed to open an empty project"
+   ],
+   "path_cond_false": [
+    "Undo tests are disabled in Trial mode"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18107584,
+   "load": 18107622,
+   "seq": [
+    "1144ced mov rax, qword ptr [rax]",
+    "1144cf0 mov rax, qword ptr [rax + 0xd0]",
+    "1144cf7 cmp byte ptr [rax], 0x40",
+    "1144cfa ja 0x1144d2e",
+    "1144cfc mov rax, qword ptr [rbx + 0x7e0]",
+    "1144d03 mov rcx, rax"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18108272,
+   "load": 18109436,
+   "seq": [
+    "1145403 mov rax, qword ptr [rax]",
+    "1145406 mov rax, qword ptr [rax + 0xd0]",
+    "114540d cmp byte ptr [rax], 0x40",
+    "1145410 ja 0x1145694",
+    "1145416 mov rax, qword ptr [rbp + 0x30]",
+    "114541a mov rcx, qword ptr [rax + 0x860]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18111088,
+   "load": 18111154,
+   "seq": [
+    "1145ab9 mov rax, qword ptr [rax]",
+    "1145abc mov rax, qword ptr [rax + 0xd0]",
+    "1145ac3 cmp byte ptr [rax], 0x40",
+    "1145ac6 ja 0x1145ae9",
+    "1145ac8 mov rax, qword ptr [rbx + 0x828]",
+    "1145acf mov rcx, rax"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18111584,
+   "load": 18111641,
+   "seq": [
+    "1145ca0 mov rax, qword ptr [rax]",
+    "1145ca3 mov rax, qword ptr [rax + 0xd0]",
+    "1145caa cmp byte ptr [rax], 0x40",
+    "1145cad ja 0x1145cce",
+    "1145caf mov rcx, qword ptr [rip + 0x49baea]",
+    "1145cb6 lea rdx, [rbp + 0x38]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Welcome to ",
+    "FL Studio"
+   ],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18112912,
+   "load": 18113117,
+   "seq": [
+    "1146264 mov rax, qword ptr [rax]",
+    "1146267 mov rax, qword ptr [rax + 0xd0]",
+    "114626e cmp byte ptr [rax], 0x40",
+    "1146271 ja 0x11462ee",
+    "1146273 lea rcx, [rbp + 0xa8]",
+    "114627a lea rdx, [rip + 0x44b]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Continue"
+   ],
+   "path_cond_false": [
+    " in %s trial",
+    "Continue"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18112912,
+   "load": 18113857,
+   "seq": [
+    "1146548 mov rax, qword ptr [rax]",
+    "114654b mov rax, qword ptr [rax + 0xd0]",
+    "1146552 cmp byte ptr [rax], 0x40",
+    "1146555 ja 0x114656c",
+    "1146557 lea rcx, [rbp + 0xd0]",
+    "114655e lea rdx, [rip + 0x1f7]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Start %0:s%1:s"
+   ],
+   "path_cond_false": [
+    " trial"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18114640,
+   "load": 18114662,
+   "seq": [
+    "114686d mov rax, qword ptr [rax]",
+    "1146870 mov rax, qword ptr [rax + 0xd0]",
+    "1146877 cmp byte ptr [rax], 0x40",
+    "114687a ja 0x114688e",
+    "114687c lea rcx, [rbp + 0x38]",
+    "1146880 lea rdx, [rip + 0x20d]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    " trial"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18123008,
+   "load": 18123157,
+   "seq": [
+    "114899c mov rcx, qword ptr [rcx]",
+    "114899f mov rcx, qword ptr [rcx + 0xd0]",
+    "11489a6 cmp byte ptr [rcx], 0x40",
+    "11489a9 seta cl",
+    "11489ac mov byte ptr [rax + 0x6ca], cl",
+    "11489b2 mov rax, qword ptr [rbp + 0x50]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 18154272,
+   "load": 18154438,
+   "seq": [
+    "11503cd mov rax, qword ptr [rax]",
+    "11503d0 mov rax, qword ptr [rax + 0xd0]",
+    "11503d7 cmp byte ptr [rax], 0x40",
+    "11503da ja 0x11503fe",
+    "11503dc lea rcx, [rbp + 0x30]",
+    "11503e0 lea rdx, [rip + 0x7c1]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "News",
+    "P_Large"
+   ],
+   "path_cond_false": [
+    "Online"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18157280,
+   "load": 18157592,
+   "seq": [
+    "115101f mov rax, qword ptr [rax]",
+    "1151022 mov rax, qword ptr [rax + 0xd0]",
+    "1151029 cmp byte ptr [rax], 0x40",
+    "115102c ja 0x115103a",
+    "115102e mov dword ptr [rbp + 0xdc], 0",
+    "1151038 jmp 0x1151066"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18157280,
+   "load": 18157720,
+   "seq": [
+    "115109f mov rax, qword ptr [rax]",
+    "11510a2 mov rax, qword ptr [rax + 0xd0]",
+    "11510a9 cmp byte ptr [rax], 0x40",
+    "11510ac jbe 0x115114d",
+    "11510b2 mov rax, qword ptr [rbp + 0xb8]",
+    "11510b9 movss xmm0, dword ptr [rax + 0xc]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jbe",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18157280,
+   "load": 18158075,
+   "seq": [
+    "1151202 mov rax, qword ptr [rax]",
+    "1151205 mov rax, qword ptr [rax + 0xd0]",
+    "115120c cmp byte ptr [rax], 0x40",
+    "115120f ja 0x1151225",
+    "1151211 mov rax, qword ptr [rbp + 0x168]",
+    "1151218 mov rax, qword ptr [rax + 0x18]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18157280,
+   "load": 18158293,
+   "seq": [
+    "11512dc mov rax, qword ptr [rax]",
+    "11512df mov rax, qword ptr [rax + 0xd0]",
+    "11512e6 cmp byte ptr [rax], 0x40",
+    "11512e9 ja 0x11516ca",
+    "11512ef lea rcx, [rbp + 0xf0]",
+    "11512f6 call 0x4204d0"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18157280,
+   "load": 18160140,
+   "seq": [
+    "1151a13 mov rax, qword ptr [rax]",
+    "1151a16 mov rax, qword ptr [rax + 0xd0]",
+    "1151a1d cmp byte ptr [rax], 0x40",
+    "1151a20 ja 0x1151abc",
+    "1151a26 lea rcx, [rbp + 0xf0]",
+    "1151a2d call 0x4204d0"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18157280,
+   "load": 18160730,
+   "seq": [
+    "1151c61 mov rax, qword ptr [rax]",
+    "1151c64 mov rax, qword ptr [rax + 0xd0]",
+    "1151c6b cmp byte ptr [rax], 0x40",
+    "1151c6e ja 0x1151c84",
+    "1151c70 mov rax, qword ptr [rbp + 0x168]",
+    "1151c77 mov rax, qword ptr [rax + 0x18]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18162192,
+   "load": 18162289,
+   "seq": [
+    "1152278 mov rcx, qword ptr [rcx]",
+    "115227b mov rcx, qword ptr [rcx + 0xd0]",
+    "1152282 cmp byte ptr [rcx], 0x40",
+    "1152285 ja 0x115229c",
+    "1152287 cvtsi2sd xmm0, dword ptr [rbx + 0x98]",
+    "115228f mulsd xmm0, qword ptr [rip + 0x49]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18162656,
+   "load": 18162671,
+   "seq": [
+    "11523f6 mov rax, qword ptr [rax]",
+    "11523f9 mov rax, qword ptr [rax + 0xd0]",
+    "1152400 cmp byte ptr [rax], 0x40",
+    "1152403 ja 0x1152417",
+    "1152405 mov rdi, rdx",
+    "1152408 lea rsi, [rip + 0x11]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18162752,
+   "load": 18162882,
+   "seq": [
+    "11524c9 mov r10, qword ptr [r10]",
+    "11524cc mov r10, qword ptr [r10 + 0xd0]",
+    "11524d3 cmp byte ptr [r10], 0x40",
+    "11524d7 seta r10b",
+    "11524db movzx r10, r10b",
+    "11524df mov dword ptr [rsp + 0x28], r10d"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 18163360,
+   "load": 18163379,
+   "seq": [
+    "11526ba mov rax, qword ptr [rax]",
+    "11526bd mov rax, qword ptr [rax + 0xd0]",
+    "11526c4 cmp byte ptr [rax], 0x40",
+    "11526c7 ja 0x1152803",
+    "11526cd mov rax, qword ptr [rsp + 0x38]",
+    "11526d2 mov ebx, dword ptr [rax + 0x9c]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18164480,
+   "load": 18164562,
+   "seq": [
+    "1152b59 mov r10, qword ptr [r10]",
+    "1152b5c mov r10, qword ptr [r10 + 0xd0]",
+    "1152b63 cmp byte ptr [r10], 0x40",
+    "1152b67 seta r10b",
+    "1152b6b movzx r10, r10b",
+    "1152b6f mov dword ptr [rsp + 0x28], r10d"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 18307216,
+   "load": 18308999,
+   "seq": [
+    "1175f8e mov rax, qword ptr [rax]",
+    "1175f91 mov rax, qword ptr [rax + 0xd0]",
+    "1175f98 cmp byte ptr [rax], 0x40",
+    "1175f9b jne 0x1175ffc",
+    "1175f9d lea rax, [rip + 0x44c751]",
+    "1175fa4 movsxd rcx, dword ptr [rip + 0x44c925]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18307216,
+   "load": 18309134,
+   "seq": [
+    "1176015 mov rdx, qword ptr [rdx]",
+    "1176018 mov rdx, qword ptr [rdx + 0xd0]",
+    "117601f movzx rdx, byte ptr [rdx]",
+    "1176023 bt qword ptr [rax + rcx*8], rdx",
+    "1176028 setb al",
+    "117602b mov byte ptr [rip + 0x44c8a3], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18307216,
+   "load": 18309169,
+   "seq": [
+    "1176038 mov rax, qword ptr [rax]",
+    "117603b mov rax, qword ptr [rax + 0xd0]",
+    "1176042 cmp byte ptr [rax], 0x40",
+    "1176045 jne 0x1176059",
+    "1176047 cmp byte ptr [rip + 0x44c886], 0",
+    "117604e je 0x1176059"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18307216,
+   "load": 18314684,
+   "seq": [
+    "11775c3 mov rax, qword ptr [rax]",
+    "11775c6 mov rax, qword ptr [rax + 0xd0]",
+    "11775cd cmp byte ptr [rax], 0x3f",
+    "11775d0 je 0x11775d6",
+    "11775d2 xor eax, eax",
+    "11775d4 jmp 0x11775d8"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18307216,
+   "load": 18325552,
+   "seq": [
+    "117a037 mov rax, qword ptr [rax]",
+    "117a03a mov rax, qword ptr [rax + 0xd0]",
+    "117a041 cmp byte ptr [rax], 0x40",
+    "117a044 ja 0x117a1fa",
+    "117a04a mov rax, qword ptr [rip + 0x466647]",
+    "117a051 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "The plugin versions of %s have been installed.",
+    "FL Studio",
+    "Installation successful|%s",
+    "Important note: not every plugin host supports what's required for the %s plugins to work ",
+    "FL Studio"
+   ],
+   "path_cond_false": [
+    " VSTi installation",
+    "please select the folder where your other VST plugins are",
+    "FL Studio",
+    " - "
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18393104,
+   "load": 18395177,
+   "seq": [
+    "118b030 mov rax, qword ptr [rax]",
+    "118b033 mov rax, qword ptr [rax + 0xd0]",
+    "118b03a cmp byte ptr [rax], 0x40",
+    "118b03d jne 0x118b09e",
+    "118b03f lea rax, [rip + 0x43891e]",
+    "118b046 movsxd rcx, dword ptr [rip + 0x438aef]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18393104,
+   "load": 18395312,
+   "seq": [
+    "118b0b7 mov rdx, qword ptr [rdx]",
+    "118b0ba mov rdx, qword ptr [rdx + 0xd0]",
+    "118b0c1 movzx rdx, byte ptr [rdx]",
+    "118b0c5 bt qword ptr [rax + rcx*8], rdx",
+    "118b0ca setb al",
+    "118b0cd mov byte ptr [rip + 0x438a6d], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18393104,
+   "load": 18395347,
+   "seq": [
+    "118b0da mov rax, qword ptr [rax]",
+    "118b0dd mov rax, qword ptr [rax + 0xd0]",
+    "118b0e4 cmp byte ptr [rax], 0x40",
+    "118b0e7 jne 0x118b0fb",
+    "118b0e9 cmp byte ptr [rip + 0x438a50], 0",
+    "118b0f0 je 0x118b0fb"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18393104,
+   "load": 18400892,
+   "seq": [
+    "118c683 mov rax, qword ptr [rax]",
+    "118c686 mov rax, qword ptr [rax + 0xd0]",
+    "118c68d cmp byte ptr [rax], 0x3f",
+    "118c690 je 0x118c696",
+    "118c692 xor eax, eax",
+    "118c694 jmp 0x118c698"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18438928,
+   "load": 18438967,
+   "seq": [
+    "1195b3e mov rdx, qword ptr [rdx]",
+    "1195b41 mov rdx, qword ptr [rdx + 0xd0]",
+    "1195b48 movzx rdx, byte ptr [rdx]",
+    "1195b4c mov rdx, qword ptr [rax + rdx*8 - 0x1f8]",
+    "1195b54 call 0x4133f0",
+    "1195b59 mov rax, qword ptr [rip + 0x44ec30]"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18438928,
+   "load": 18439001,
+   "seq": [
+    "1195b60 mov rax, qword ptr [rax]",
+    "1195b63 mov rax, qword ptr [rax + 0xd0]",
+    "1195b6a cmp byte ptr [rax], 0x40",
+    "1195b6d jbe 0x1195b9b",
+    "1195b6f mov rax, qword ptr [rip + 0x44ab22]",
+    "1195b76 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jbe",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [
+    "Fire ",
+    " [build "
+   ],
+   "path_cond_false": [
+    " [build ",
+    " / plugin"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18443264,
+   "load": 18453945,
+   "seq": [
+    "11995c0 mov rax, qword ptr [rax]",
+    "11995c3 mov rax, qword ptr [rax + 0xd0]",
+    "11995ca cmp byte ptr [rax], 0x40",
+    "11995cd jne 0x119962e",
+    "11995cf lea rax, [rip + 0x42afaa]",
+    "11995d6 movsxd rcx, dword ptr [rip + 0x42b17b]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18443264,
+   "load": 18454080,
+   "seq": [
+    "1199647 mov rdx, qword ptr [rdx]",
+    "119964a mov rdx, qword ptr [rdx + 0xd0]",
+    "1199651 movzx rdx, byte ptr [rdx]",
+    "1199655 bt qword ptr [rax + rcx*8], rdx",
+    "119965a setb al",
+    "119965d mov byte ptr [rip + 0x42b0f9], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18443264,
+   "load": 18454115,
+   "seq": [
+    "119966a mov rax, qword ptr [rax]",
+    "119966d mov rax, qword ptr [rax + 0xd0]",
+    "1199674 cmp byte ptr [rax], 0x40",
+    "1199677 jne 0x119968b",
+    "1199679 cmp byte ptr [rip + 0x42b0dc], 0",
+    "1199680 je 0x119968b"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18443264,
+   "load": 18459630,
+   "seq": [
+    "119abf5 mov rax, qword ptr [rax]",
+    "119abf8 mov rax, qword ptr [rax + 0xd0]",
+    "119abff cmp byte ptr [rax], 0x3f",
+    "119ac02 je 0x119ac08",
+    "119ac04 xor eax, eax",
+    "119ac06 jmp 0x119ac0a"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18503616,
+   "load": 18514922,
+   "seq": [
+    "11a83f1 mov rax, qword ptr [rax]",
+    "11a83f4 mov rax, qword ptr [rax + 0xd0]",
+    "11a83fb cmp byte ptr [rax], 0x40",
+    "11a83fe jne 0x11a845f",
+    "11a8400 lea rax, [rip + 0x41c340]",
+    "11a8407 movsxd rcx, dword ptr [rip + 0x41c512]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18503616,
+   "load": 18515057,
+   "seq": [
+    "11a8478 mov rdx, qword ptr [rdx]",
+    "11a847b mov rdx, qword ptr [rdx + 0xd0]",
+    "11a8482 movzx rdx, byte ptr [rdx]",
+    "11a8486 bt qword ptr [rax + rcx*8], rdx",
+    "11a848b setb al",
+    "11a848e mov byte ptr [rip + 0x41c490], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18503616,
+   "load": 18515092,
+   "seq": [
+    "11a849b mov rax, qword ptr [rax]",
+    "11a849e mov rax, qword ptr [rax + 0xd0]",
+    "11a84a5 cmp byte ptr [rax], 0x40",
+    "11a84a8 jne 0x11a84bc",
+    "11a84aa cmp byte ptr [rip + 0x41c473], 0",
+    "11a84b1 je 0x11a84bc"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18503616,
+   "load": 18520607,
+   "seq": [
+    "11a9a26 mov rax, qword ptr [rax]",
+    "11a9a29 mov rax, qword ptr [rax + 0xd0]",
+    "11a9a30 cmp byte ptr [rax], 0x3f",
+    "11a9a33 je 0x11a9a39",
+    "11a9a35 xor eax, eax",
+    "11a9a37 jmp 0x11a9a3b"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18555984,
+   "load": 18556180,
+   "seq": [
+    "11b251b mov r8, qword ptr [r8]",
+    "11b251e mov r8, qword ptr [r8 + 0xd0]",
+    "11b2525 movzx r8, byte ptr [r8]",
+    "11b2529 mov r8, qword ptr [rax + r8*8 - 0x1f8]",
+    "11b2531 call 0x414c70",
+    "11b2536 lea rcx, [rip + 0x50a40b]"
+   ],
+   "rw": "read",
+   "op": "movzx r8, byte ptr [r8]"
+  },
+  {
+   "func": 18603680,
+   "load": 18603837,
+   "seq": [
+    "11bdf44 mov rax, qword ptr [rax]",
+    "11bdf47 mov rax, qword ptr [rax + 0xd0]",
+    "11bdf4e cmp byte ptr [rax], 0x40",
+    "11bdf51 ja 0x11bdf62",
+    "11bdf53 mov rax, qword ptr [rip + 0x42273e]",
+    "11bdf5a movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18611216,
+   "load": 18611621,
+   "seq": [
+    "11bfdac mov rax, qword ptr [rax]",
+    "11bfdaf mov rax, qword ptr [rax + 0xd0]",
+    "11bfdb6 movzx rdx, byte ptr [rax]",
+    "11bfdba call 0x43a7e0",
+    "11bfdbf lea rcx, [rbp + 0xa0]",
+    "11bfdc6 lea rdx, [rip + 0x2183]"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rax]"
+  },
+  {
+   "func": 18641328,
+   "load": 18641546,
+   "seq": [
+    "11c7291 mov rax, qword ptr [rax]",
+    "11c7294 mov rax, qword ptr [rax + 0xd0]",
+    "11c729b cmp byte ptr [rax], 0x40",
+    "11c729e jbe 0x11c72b0",
+    "11c72a0 mov rax, qword ptr [rbp + 0x150]",
+    "11c72a7 cmp byte ptr [rax + 0x34e0], 0"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jbe",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18641328,
+   "load": 18643787,
+   "seq": [
+    "11c7b52 mov rax, qword ptr [rax]",
+    "11c7b55 mov rax, qword ptr [rax + 0xd0]",
+    "11c7b5c cmp byte ptr [rax], 0x40",
+    "11c7b5f ja 0x11c7bd2",
+    "11c7b61 mov rcx, qword ptr [rip - 0xb76a78]",
+    "11c7b68 mov dl, 1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "Software\\Image-Line\\FL Studio 26",
+    "General",
+    "Last start",
+    "General",
+    "Ticks"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18657280,
+   "load": 18665665,
+   "seq": [
+    "11cd0c8 mov rax, qword ptr [rax]",
+    "11cd0cb mov rax, qword ptr [rax + 0xd0]",
+    "11cd0d2 mov byte ptr [rax], 0x3f",
+    "11cd0d5 jmp 0x11cd141",
+    "11cd0d7 movsd xmm0, qword ptr [rbp + 0xad8]",
+    "11cd0df ucomisd xmm0, qword ptr [rip + 0x341]"
+   ],
+   "rw": "write",
+   "op": "store"
+  },
+  {
+   "func": 18714416,
+   "load": 18714535,
+   "seq": [
+    "11d8fae mov rax, qword ptr [rax]",
+    "11d8fb1 mov rax, qword ptr [rax + 0xd0]",
+    "11d8fb8 cmp byte ptr [rax], 0x40",
+    "11d8fbb ja 0x11d8ffd",
+    "11d8fbd lea rcx, [rbp + 0x48]",
+    "11d8fc1 lea rdx, [rip + 0x100]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "(Trial)"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 18726352,
+   "load": 18726463,
+   "seq": [
+    "11dbe46 mov rax, qword ptr [rax]",
+    "11dbe49 mov rax, qword ptr [rax + 0xd0]",
+    "11dbe50 cmp byte ptr [rax], 0x40",
+    "11dbe53 je 0x11dbe62",
+    "11dbe55 call 0xc307e0",
+    "11dbe5a test al, al"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18726352,
+   "load": 18726516,
+   "seq": [
+    "11dbe7b mov rax, qword ptr [rax]",
+    "11dbe7e mov rax, qword ptr [rax + 0xd0]",
+    "11dbe85 cmp byte ptr [rax], 0x42",
+    "11dbe88 jne 0x11dbeac",
+    "11dbe8a call 0x1006080",
+    "11dbe8f sub al, 1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x42",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 66,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18733056,
+   "load": 18736874,
+   "seq": [
+    "11de6f1 mov rax, qword ptr [rax]",
+    "11de6f4 mov rax, qword ptr [rax + 0xd0]",
+    "11de6fb cmp byte ptr [rax], 0x40",
+    "11de6fe jne 0x11de75f",
+    "11de700 lea rax, [rip + 0x3e85b5]",
+    "11de707 movsxd rcx, dword ptr [rip + 0x3e8786]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18733056,
+   "load": 18737009,
+   "seq": [
+    "11de778 mov rdx, qword ptr [rdx]",
+    "11de77b mov rdx, qword ptr [rdx + 0xd0]",
+    "11de782 movzx rdx, byte ptr [rdx]",
+    "11de786 bt qword ptr [rax + rcx*8], rdx",
+    "11de78b setb al",
+    "11de78e mov byte ptr [rip + 0x3e8704], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18733056,
+   "load": 18737044,
+   "seq": [
+    "11de79b mov rax, qword ptr [rax]",
+    "11de79e mov rax, qword ptr [rax + 0xd0]",
+    "11de7a5 cmp byte ptr [rax], 0x40",
+    "11de7a8 jne 0x11de7bc",
+    "11de7aa cmp byte ptr [rip + 0x3e86e7], 0",
+    "11de7b1 je 0x11de7bc"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18733056,
+   "load": 18742559,
+   "seq": [
+    "11dfd26 mov rax, qword ptr [rax]",
+    "11dfd29 mov rax, qword ptr [rax + 0xd0]",
+    "11dfd30 cmp byte ptr [rax], 0x3f",
+    "11dfd33 je 0x11dfd39",
+    "11dfd35 xor eax, eax",
+    "11dfd37 jmp 0x11dfd3b"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18802288,
+   "load": 18802529,
+   "seq": [
+    "11ee768 mov rax, qword ptr [rax]",
+    "11ee76b mov rax, qword ptr [rax + 0xd0]",
+    "11ee772 cmp byte ptr [rax], 0x40",
+    "11ee775 jne 0x11ee77a",
+    "11ee777 mov byte ptr [rax], 0x43",
+    "11ee77a nop "
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18878720,
+   "load": 18880344,
+   "seq": [
+    "120175f mov rax, qword ptr [rax]",
+    "1201762 mov rax, qword ptr [rax + 0xd0]",
+    "1201769 cmp byte ptr [rax], 0x40",
+    "120176c jne 0x12017cd",
+    "120176e lea rax, [rip + 0x3c6f63]",
+    "1201775 movsxd rcx, dword ptr [rip + 0x3c7134]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18878720,
+   "load": 18880479,
+   "seq": [
+    "12017e6 mov rdx, qword ptr [rdx]",
+    "12017e9 mov rdx, qword ptr [rdx + 0xd0]",
+    "12017f0 movzx rdx, byte ptr [rdx]",
+    "12017f4 bt qword ptr [rax + rcx*8], rdx",
+    "12017f9 setb al",
+    "12017fc mov byte ptr [rip + 0x3c70b2], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18878720,
+   "load": 18880514,
+   "seq": [
+    "1201809 mov rax, qword ptr [rax]",
+    "120180c mov rax, qword ptr [rax + 0xd0]",
+    "1201813 cmp byte ptr [rax], 0x40",
+    "1201816 jne 0x120182a",
+    "1201818 cmp byte ptr [rip + 0x3c7095], 0",
+    "120181f je 0x120182a"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18878720,
+   "load": 18886029,
+   "seq": [
+    "1202d94 mov rax, qword ptr [rax]",
+    "1202d97 mov rax, qword ptr [rax + 0xd0]",
+    "1202d9e cmp byte ptr [rax], 0x3f",
+    "1202da1 je 0x1202da7",
+    "1202da3 xor eax, eax",
+    "1202da5 jmp 0x1202da9"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18905792,
+   "load": 18911230,
+   "seq": [
+    "1209005 mov rax, qword ptr [rax]",
+    "1209008 mov rax, qword ptr [rax + 0xd0]",
+    "120900f cmp byte ptr [rax], 0x40",
+    "1209012 seta dl",
+    "1209015 call 0x840520",
+    "120901a mov rax, qword ptr [rbp + 0x28]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 18905792,
+   "load": 18911300,
+   "seq": [
+    "120904b mov rax, qword ptr [rax]",
+    "120904e mov rax, qword ptr [rax + 0xd0]",
+    "1209055 cmp byte ptr [rax], 0x40",
+    "1209058 seta dl",
+    "120905b call 0x840520",
+    "1209060 mov rax, qword ptr [rbp + 0x28]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 18905792,
+   "load": 18911370,
+   "seq": [
+    "1209091 mov rax, qword ptr [rax]",
+    "1209094 mov rax, qword ptr [rax + 0xd0]",
+    "120909b cmp byte ptr [rax], 0x40",
+    "120909e seta dl",
+    "12090a1 call 0x840520",
+    "12090a6 mov rax, qword ptr [rip + 0x3db4ab]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 18928448,
+   "load": 18930158,
+   "seq": [
+    "120d9f5 mov rax, qword ptr [rax]",
+    "120d9f8 mov rax, qword ptr [rax + 0xd0]",
+    "120d9ff cmp byte ptr [rax], 0x40",
+    "120da02 jne 0x120da63",
+    "120da04 lea rax, [rip + 0x3bc3a1]",
+    "120da0b movsxd rcx, dword ptr [rip + 0x3bc572]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18928448,
+   "load": 18930293,
+   "seq": [
+    "120da7c mov rdx, qword ptr [rdx]",
+    "120da7f mov rdx, qword ptr [rdx + 0xd0]",
+    "120da86 movzx rdx, byte ptr [rdx]",
+    "120da8a bt qword ptr [rax + rcx*8], rdx",
+    "120da8f setb al",
+    "120da92 mov byte ptr [rip + 0x3bc4f0], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18928448,
+   "load": 18930328,
+   "seq": [
+    "120da9f mov rax, qword ptr [rax]",
+    "120daa2 mov rax, qword ptr [rax + 0xd0]",
+    "120daa9 cmp byte ptr [rax], 0x40",
+    "120daac jne 0x120dac0",
+    "120daae cmp byte ptr [rip + 0x3bc4d3], 0",
+    "120dab5 je 0x120dac0"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18928448,
+   "load": 18935843,
+   "seq": [
+    "120f02a mov rax, qword ptr [rax]",
+    "120f02d mov rax, qword ptr [rax + 0xd0]",
+    "120f034 cmp byte ptr [rax], 0x3f",
+    "120f037 je 0x120f03d",
+    "120f039 xor eax, eax",
+    "120f03b jmp 0x120f03f"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18959280,
+   "load": 18961088,
+   "seq": [
+    "12152c7 mov rax, qword ptr [rax]",
+    "12152ca mov rax, qword ptr [rax + 0xd0]",
+    "12152d1 cmp byte ptr [rax], 0x40",
+    "12152d4 jne 0x1215335",
+    "12152d6 lea rax, [rip + 0x3b52bb]",
+    "12152dd movsxd rcx, dword ptr [rip + 0x3b548c]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18959280,
+   "load": 18961223,
+   "seq": [
+    "121534e mov rdx, qword ptr [rdx]",
+    "1215351 mov rdx, qword ptr [rdx + 0xd0]",
+    "1215358 movzx rdx, byte ptr [rdx]",
+    "121535c bt qword ptr [rax + rcx*8], rdx",
+    "1215361 setb al",
+    "1215364 mov byte ptr [rip + 0x3b540a], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 18959280,
+   "load": 18961258,
+   "seq": [
+    "1215371 mov rax, qword ptr [rax]",
+    "1215374 mov rax, qword ptr [rax + 0xd0]",
+    "121537b cmp byte ptr [rax], 0x40",
+    "121537e jne 0x1215392",
+    "1215380 cmp byte ptr [rip + 0x3b53ed], 0",
+    "1215387 je 0x1215392"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18959280,
+   "load": 18966773,
+   "seq": [
+    "12168fc mov rax, qword ptr [rax]",
+    "12168ff mov rax, qword ptr [rax + 0xd0]",
+    "1216906 cmp byte ptr [rax], 0x3f",
+    "1216909 je 0x121690f",
+    "121690b xor eax, eax",
+    "121690d jmp 0x1216911"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 18984384,
+   "load": 18984417,
+   "seq": [
+    "121ade8 mov rax, qword ptr [rax]",
+    "121adeb mov rax, qword ptr [rax + 0xd0]",
+    "121adf2 cmp byte ptr [rax], 0x40",
+    "121adf5 jne 0x121ae03",
+    "121adf7 mov rax, qword ptr [rip + 0x3c66aa]",
+    "121adfe cmp dword ptr [rax], 7"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19003248,
+   "load": 19003259,
+   "seq": [
+    "121f782 mov rax, qword ptr [rax]",
+    "121f785 mov rax, qword ptr [rax + 0xd0]",
+    "121f78c cmp byte ptr [rax], 0x40",
+    "121f78f seta dl",
+    "121f792 call 0x840520",
+    "121f797 add rsp, 0x28"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40 (jcc: seta)"
+  },
+  {
+   "func": 19019904,
+   "load": 19021535,
+   "seq": [
+    "1223ee6 mov rax, qword ptr [rax]",
+    "1223ee9 mov rax, qword ptr [rax + 0xd0]",
+    "1223ef0 cmp byte ptr [rax], 0x40",
+    "1223ef3 jne 0x1223f54",
+    "1223ef5 lea rax, [rip + 0x3a705c]",
+    "1223efc movsxd rcx, dword ptr [rip + 0x3a722d]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19019904,
+   "load": 19021670,
+   "seq": [
+    "1223f6d mov rdx, qword ptr [rdx]",
+    "1223f70 mov rdx, qword ptr [rdx + 0xd0]",
+    "1223f77 movzx rdx, byte ptr [rdx]",
+    "1223f7b bt qword ptr [rax + rcx*8], rdx",
+    "1223f80 setb al",
+    "1223f83 mov byte ptr [rip + 0x3a71ab], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 19019904,
+   "load": 19021705,
+   "seq": [
+    "1223f90 mov rax, qword ptr [rax]",
+    "1223f93 mov rax, qword ptr [rax + 0xd0]",
+    "1223f9a cmp byte ptr [rax], 0x40",
+    "1223f9d jne 0x1223fb1",
+    "1223f9f cmp byte ptr [rip + 0x3a718e], 0",
+    "1223fa6 je 0x1223fb1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19019904,
+   "load": 19027220,
+   "seq": [
+    "122551b mov rax, qword ptr [rax]",
+    "122551e mov rax, qword ptr [rax + 0xd0]",
+    "1225525 cmp byte ptr [rax], 0x3f",
+    "1225528 je 0x122552e",
+    "122552a xor eax, eax",
+    "122552c jmp 0x1225530"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19091872,
+   "load": 19094079,
+   "seq": [
+    "1235a46 mov rax, qword ptr [rax]",
+    "1235a49 mov rax, qword ptr [rax + 0xd0]",
+    "1235a50 cmp byte ptr [rax], 0x40",
+    "1235a53 ja 0x1235a59",
+    "1235a55 xor eax, eax",
+    "1235a57 jmp 0x1235a5b"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 19127232,
+   "load": 19129465,
+   "seq": [
+    "123e480 mov rax, qword ptr [rax]",
+    "123e483 mov rax, qword ptr [rax + 0xd0]",
+    "123e48a cmp byte ptr [rax], 0x40",
+    "123e48d jne 0x123e4ee",
+    "123e48f lea rax, [rip + 0x38e746]",
+    "123e496 movsxd rcx, dword ptr [rip + 0x38e917]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19127232,
+   "load": 19129600,
+   "seq": [
+    "123e507 mov rdx, qword ptr [rdx]",
+    "123e50a mov rdx, qword ptr [rdx + 0xd0]",
+    "123e511 movzx rdx, byte ptr [rdx]",
+    "123e515 bt qword ptr [rax + rcx*8], rdx",
+    "123e51a setb al",
+    "123e51d mov byte ptr [rip + 0x38e895], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 19127232,
+   "load": 19129635,
+   "seq": [
+    "123e52a mov rax, qword ptr [rax]",
+    "123e52d mov rax, qword ptr [rax + 0xd0]",
+    "123e534 cmp byte ptr [rax], 0x40",
+    "123e537 jne 0x123e54b",
+    "123e539 cmp byte ptr [rip + 0x38e878], 0",
+    "123e540 je 0x123e54b"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19127232,
+   "load": 19135150,
+   "seq": [
+    "123fab5 mov rax, qword ptr [rax]",
+    "123fab8 mov rax, qword ptr [rax + 0xd0]",
+    "123fabf cmp byte ptr [rax], 0x3f",
+    "123fac2 je 0x123fac8",
+    "123fac4 xor eax, eax",
+    "123fac6 jmp 0x123faca"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19221776,
+   "load": 19223468,
+   "seq": [
+    "12553b3 mov rax, qword ptr [rax]",
+    "12553b6 mov rax, qword ptr [rax + 0xd0]",
+    "12553bd cmp byte ptr [rax], 0x40",
+    "12553c0 jne 0x1255421",
+    "12553c2 lea rax, [rip + 0x37918f]",
+    "12553c9 movsxd rcx, dword ptr [rip + 0x379360]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19221776,
+   "load": 19223603,
+   "seq": [
+    "125543a mov rdx, qword ptr [rdx]",
+    "125543d mov rdx, qword ptr [rdx + 0xd0]",
+    "1255444 movzx rdx, byte ptr [rdx]",
+    "1255448 bt qword ptr [rax + rcx*8], rdx",
+    "125544d setb al",
+    "1255450 mov byte ptr [rip + 0x3792de], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 19221776,
+   "load": 19223638,
+   "seq": [
+    "125545d mov rax, qword ptr [rax]",
+    "1255460 mov rax, qword ptr [rax + 0xd0]",
+    "1255467 cmp byte ptr [rax], 0x40",
+    "125546a jne 0x125547e",
+    "125546c cmp byte ptr [rip + 0x3792c1], 0",
+    "1255473 je 0x125547e"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19221776,
+   "load": 19229153,
+   "seq": [
+    "12569e8 mov rax, qword ptr [rax]",
+    "12569eb mov rax, qword ptr [rax + 0xd0]",
+    "12569f2 cmp byte ptr [rax], 0x3f",
+    "12569f5 je 0x12569fb",
+    "12569f7 xor eax, eax",
+    "12569f9 jmp 0x12569fd"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19261952,
+   "load": 19273747,
+   "seq": [
+    "126181a mov rax, qword ptr [rax]",
+    "126181d mov rax, qword ptr [rax + 0xd0]",
+    "1261824 cmp byte ptr [rax], 0x43",
+    "1261827 jb 0x1261832",
+    "1261829 mov byte ptr [rbp + 0x35f], 2",
+    "1261830 jmp 0x1261858"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x43",
+   "jcc": "jb",
+   "cmp_op": ">=",
+   "cmp_imm": 67,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19261952,
+   "load": 19273778,
+   "seq": [
+    "1261839 mov rax, qword ptr [rax]",
+    "126183c mov rax, qword ptr [rax + 0xd0]",
+    "1261843 cmp byte ptr [rax], 0x42",
+    "1261846 jb 0x1261851",
+    "1261848 mov byte ptr [rbp + 0x35f], 1",
+    "126184f jmp 0x1261858"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x42",
+   "jcc": "jb",
+   "cmp_op": ">=",
+   "cmp_imm": 66,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19327488,
+   "load": 19329211,
+   "seq": [
+    "126f0c2 mov rax, qword ptr [rax]",
+    "126f0c5 mov rax, qword ptr [rax + 0xd0]",
+    "126f0cc cmp byte ptr [rax], 0x40",
+    "126f0cf jne 0x126f130",
+    "126f0d1 lea rax, [rip + 0x360c60]",
+    "126f0d8 movsxd rcx, dword ptr [rip + 0x360e31]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19327488,
+   "load": 19329346,
+   "seq": [
+    "126f149 mov rdx, qword ptr [rdx]",
+    "126f14c mov rdx, qword ptr [rdx + 0xd0]",
+    "126f153 movzx rdx, byte ptr [rdx]",
+    "126f157 bt qword ptr [rax + rcx*8], rdx",
+    "126f15c setb al",
+    "126f15f mov byte ptr [rip + 0x360daf], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 19327488,
+   "load": 19329381,
+   "seq": [
+    "126f16c mov rax, qword ptr [rax]",
+    "126f16f mov rax, qword ptr [rax + 0xd0]",
+    "126f176 cmp byte ptr [rax], 0x40",
+    "126f179 jne 0x126f18d",
+    "126f17b cmp byte ptr [rip + 0x360d92], 0",
+    "126f182 je 0x126f18d"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19327488,
+   "load": 19334896,
+   "seq": [
+    "12706f7 mov rax, qword ptr [rax]",
+    "12706fa mov rax, qword ptr [rax + 0xd0]",
+    "1270701 cmp byte ptr [rax], 0x3f",
+    "1270704 je 0x127070a",
+    "1270706 xor eax, eax",
+    "1270708 jmp 0x127070c"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19462624,
+   "load": 19465627,
+   "seq": [
+    "12905a2 mov rax, qword ptr [rax]",
+    "12905a5 mov rax, qword ptr [rax + 0xd0]",
+    "12905ac cmp byte ptr [rax], 0x40",
+    "12905af jne 0x1290610",
+    "12905b1 lea rax, [rip + 0x340d58]",
+    "12905b8 movsxd rcx, dword ptr [rip + 0x340f29]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19462624,
+   "load": 19465762,
+   "seq": [
+    "1290629 mov rdx, qword ptr [rdx]",
+    "129062c mov rdx, qword ptr [rdx + 0xd0]",
+    "1290633 movzx rdx, byte ptr [rdx]",
+    "1290637 bt qword ptr [rax + rcx*8], rdx",
+    "129063c setb al",
+    "129063f mov byte ptr [rip + 0x340ea7], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 19462624,
+   "load": 19465797,
+   "seq": [
+    "129064c mov rax, qword ptr [rax]",
+    "129064f mov rax, qword ptr [rax + 0xd0]",
+    "1290656 cmp byte ptr [rax], 0x40",
+    "1290659 jne 0x129066d",
+    "129065b cmp byte ptr [rip + 0x340e8a], 0",
+    "1290662 je 0x129066d"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19462624,
+   "load": 19471312,
+   "seq": [
+    "1291bd7 mov rax, qword ptr [rax]",
+    "1291bda mov rax, qword ptr [rax + 0xd0]",
+    "1291be1 cmp byte ptr [rax], 0x3f",
+    "1291be4 je 0x1291bea",
+    "1291be6 xor eax, eax",
+    "1291be8 jmp 0x1291bec"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19493456,
+   "load": 19495123,
+   "seq": [
+    "12978da mov rax, qword ptr [rax]",
+    "12978dd mov rax, qword ptr [rax + 0xd0]",
+    "12978e4 cmp byte ptr [rax], 0x40",
+    "12978e7 jne 0x1297948",
+    "12978e9 lea rax, [rip + 0x339c30]",
+    "12978f0 movsxd rcx, dword ptr [rip + 0x339e01]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19493456,
+   "load": 19495258,
+   "seq": [
+    "1297961 mov rdx, qword ptr [rdx]",
+    "1297964 mov rdx, qword ptr [rdx + 0xd0]",
+    "129796b movzx rdx, byte ptr [rdx]",
+    "129796f bt qword ptr [rax + rcx*8], rdx",
+    "1297974 setb al",
+    "1297977 mov byte ptr [rip + 0x339d7f], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 19493456,
+   "load": 19495293,
+   "seq": [
+    "1297984 mov rax, qword ptr [rax]",
+    "1297987 mov rax, qword ptr [rax + 0xd0]",
+    "129798e cmp byte ptr [rax], 0x40",
+    "1297991 jne 0x12979a5",
+    "1297993 cmp byte ptr [rip + 0x339d62], 0",
+    "129799a je 0x12979a5"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19493456,
+   "load": 19500808,
+   "seq": [
+    "1298f0f mov rax, qword ptr [rax]",
+    "1298f12 mov rax, qword ptr [rax + 0xd0]",
+    "1298f19 cmp byte ptr [rax], 0x3f",
+    "1298f1c je 0x1298f22",
+    "1298f1e xor eax, eax",
+    "1298f20 jmp 0x1298f24"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19871920,
+   "load": 19874309,
+   "seq": [
+    "12f420c mov rax, qword ptr [rax]",
+    "12f420f mov rax, qword ptr [rax + 0xd0]",
+    "12f4216 cmp byte ptr [rax], 0x40",
+    "12f4219 jne 0x12f427a",
+    "12f421b lea rax, [rip + 0x2e28c6]",
+    "12f4222 movsxd rcx, dword ptr [rip + 0x2e2a97]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19871920,
+   "load": 19874444,
+   "seq": [
+    "12f4293 mov rdx, qword ptr [rdx]",
+    "12f4296 mov rdx, qword ptr [rdx + 0xd0]",
+    "12f429d movzx rdx, byte ptr [rdx]",
+    "12f42a1 bt qword ptr [rax + rcx*8], rdx",
+    "12f42a6 setb al",
+    "12f42a9 mov byte ptr [rip + 0x2e2a15], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 19871920,
+   "load": 19874479,
+   "seq": [
+    "12f42b6 mov rax, qword ptr [rax]",
+    "12f42b9 mov rax, qword ptr [rax + 0xd0]",
+    "12f42c0 cmp byte ptr [rax], 0x40",
+    "12f42c3 jne 0x12f42d7",
+    "12f42c5 cmp byte ptr [rip + 0x2e29f8], 0",
+    "12f42cc je 0x12f42d7"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 19871920,
+   "load": 19880024,
+   "seq": [
+    "12f585f mov rax, qword ptr [rax]",
+    "12f5862 mov rax, qword ptr [rax + 0xd0]",
+    "12f5869 cmp byte ptr [rax], 0x3f",
+    "12f586c je 0x12f5872",
+    "12f586e xor eax, eax",
+    "12f5870 jmp 0x12f5874"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 20018080,
+   "load": 20039005,
+   "seq": [
+    "131c564 mov rax, qword ptr [rax]",
+    "131c567 mov rax, qword ptr [rax + 0xd0]",
+    "131c56e cmp byte ptr [rax], 0x40",
+    "131c571 jne 0x131c5d2",
+    "131c573 lea rax, [rip + 0x2bc8ca]",
+    "131c57a movsxd rcx, dword ptr [rip + 0x2bca9b]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 20018080,
+   "load": 20039140,
+   "seq": [
+    "131c5eb mov rdx, qword ptr [rdx]",
+    "131c5ee mov rdx, qword ptr [rdx + 0xd0]",
+    "131c5f5 movzx rdx, byte ptr [rdx]",
+    "131c5f9 bt qword ptr [rax + rcx*8], rdx",
+    "131c5fe setb al",
+    "131c601 mov byte ptr [rip + 0x2bca19], al"
+   ],
+   "rw": "read",
+   "op": "movzx rdx, byte ptr [rdx]"
+  },
+  {
+   "func": 20018080,
+   "load": 20039175,
+   "seq": [
+    "131c60e mov rax, qword ptr [rax]",
+    "131c611 mov rax, qword ptr [rax + 0xd0]",
+    "131c618 cmp byte ptr [rax], 0x40",
+    "131c61b jne 0x131c62f",
+    "131c61d cmp byte ptr [rip + 0x2bc9fc], 0",
+    "131c624 je 0x131c62f"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "jne",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": true,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 20018080,
+   "load": 20044720,
+   "seq": [
+    "131dbb7 mov rax, qword ptr [rax]",
+    "131dbba mov rax, qword ptr [rax + 0xd0]",
+    "131dbc1 cmp byte ptr [rax], 0x3f",
+    "131dbc4 je 0x131dbca",
+    "131dbc6 xor eax, eax",
+    "131dbc8 jmp 0x131dbcc"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x3f",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 63,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_false"
+  },
+  {
+   "func": 20018080,
+   "load": 20065319,
+   "seq": [
+    "1322c2e mov rax, qword ptr [rax]",
+    "1322c31 mov rax, qword ptr [rax + 0xd0]",
+    "1322c38 cmp byte ptr [rax], 0x40",
+    "1322c3b ja 0x1322c50",
+    "1322c3d mov rax, qword ptr [rip + 0x2bda54]",
+    "1322c44 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 20275936,
+   "load": 20276610,
+   "seq": [
+    "1356589 mov rax, qword ptr [rax]",
+    "135658c mov rax, qword ptr [rax + 0xd0]",
+    "1356593 cmp byte ptr [rax], 0x40",
+    "1356596 ja 0x1356601",
+    "1356598 lea rcx, [rbp + 0x80]",
+    "135659f lea rdx, [rip + 0x616]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "Open unlock window",
+    "Click \"Open unlock window\" after updating %s or buying new products.",
+    "FL Studio"
+   ],
+   "path_cond_false": [
+    "Unlock",
+    "FL Studio"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 20296608,
+   "load": 20300354,
+   "seq": [
+    "135c249 mov rax, qword ptr [rax]",
+    "135c24c mov rax, qword ptr [rax + 0xd0]",
+    "135c253 cmp byte ptr [rax], 0x40",
+    "135c256 ja 0x135c2c7",
+    "135c258 mov rax, qword ptr [rip + 0x284439]",
+    "135c25f movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [
+    "(disabled in Trial mode)"
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 20331248,
+   "load": 20331398,
+   "seq": [
+    "1363b8d mov rax, qword ptr [rax]",
+    "1363b90 mov rax, qword ptr [rax + 0xd0]",
+    "1363b97 cmp byte ptr [rax], 0x40",
+    "1363b9a ja 0x1363c00",
+    "1363b9c mov rax, qword ptr [rip + 0x27caf5]",
+    "1363ba3 movzx rax, byte ptr [rax]"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "ja",
+   "cmp_op": ">",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [
+    "untitled.flp",
+    "Warning",
+    "The project needs to be saved before it can be backed up to FL Cloud.",
+    "Save now",
+    "Don't save"
+   ],
+   "path_cond_false": [
+    "Warning",
+    "Project backups to FL Cloud are not available in Trial mode."
+   ],
+   "at_0x40": "cond_false",
+   "at_0x41": "cond_true"
+  },
+  {
+   "func": 20395936,
+   "load": 20395940,
+   "seq": [
+    "13737ab mov rax, qword ptr [rax]",
+    "13737ae mov rax, qword ptr [rax + 0xd0]",
+    "13737b5 cmp byte ptr [rax], 0x40",
+    "13737b8 je 0x13737c6",
+    "13737ba mov rax, qword ptr [rip + 0x2705bf]",
+    "13737c1 cmp byte ptr [rax], 1"
+   ],
+   "rw": "read",
+   "op": "cmp imm 0x40",
+   "jcc": "je",
+   "cmp_op": "==",
+   "cmp_imm": 64,
+   "taken_if_negated": false,
+   "path_cond_true": [],
+   "path_cond_false": [],
+   "at_0x40": "cond_true",
+   "at_0x41": "cond_false"
+  }
+ ]
+}
