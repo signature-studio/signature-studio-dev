@@ -44,13 +44,13 @@ REPORT 本体 §4 から分割移動した経緯と実行条件 (内容は削除
 
 ## G. 殻と engine の結合方式 (受入 5、静的解析)
 
-- 対象: 殻 (Delphi) 18978 / 19144 / 19265 / 19267 と engine 18977 / 19143 / 19266 (19268 は engine 側未解析)。`fl-win64` の block PE を展開し pefile と文字列走査で確認 (定数・ファイル名の実測。`work/` 無し)。
+- 対象: 殻 (Delphi) 18978 / 19144 / 19265 / 19267 と engine 18977 / 19143 / 19266 / 19268。`fl-win64` の block PE を展開し pefile と文字列走査で確認 (定数・ファイル名の実測。`work/` 無し)。
 - 殻の import: 4 本とも `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` を持つ (KERNEL32)。
 - 殻の文字列 (UTF-16 / ASCII): engine 名は殻に入っている。
   - Frequency Shifter: 殻 18978 に `Engine_x64.dll` と `dispatch` (0x2dda74 / 0x2dda92)。engine 18977 の export は `dispatch` のみ。
   - Hyper Chorus: 殻 19144 に `engine_x64.dll` と `DispatchToEngine` (0x2e9704 / 0x2e9722)。engine 19143 の export は `DispatchToEngine` のみ。
-  - Vintage Chorus: 殻 19265 に `engine_x64.dll` と VST 系の名前 `VSTPluginMain` ほか大文字小文字違い 9 種 (0x2d9db0〜0x2daaa0)。engine 19266 の export は `VSTPluginMain` / `main`。
-  - Vintage Phaser: 殻 19267 に `engine_x64.dll` と VST 系名 (0x2db640〜0x2dc330)。engine 19268 は未解析 (19266 と同じ VST2 export と推定)。
-- 結論 (推定): 殻が `LoadLibraryExW(engine_x64.dll)` → `GetProcAddress(<export>)` で engine を動的ロードし、Frequency Shifter / Hyper Chorus は `dispatch` / `DispatchToEngine` を、Vintage 系は `VSTPluginMain` (大文字小文字違いの名前で検索) を引く。殻の `dynload 2` (§3) と一致する。
+  - Vintage Chorus: 殻 19265 に `engine_x64.dll` と VST 系の名前 `VSTPluginMain` ほか大文字小文字違い 8 種 (計 9 種、0x2d9db0〜0x2daaa0。`vstpluginmain` は 2 箇所)。engine 19266 の export は `VSTPluginMain` / `main`。
+  - Vintage Phaser: 殻 19267 に `engine_x64.dll` と VST 系名 (0x2db640〜0x2dc330)。engine 19268 の export は `VSTPluginMain` / `main` (19266 と同じ VST2 export 構成)、import は `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` (KERNEL32)。
+- 結論 (推定): 殻が `LoadLibraryExW(engine_x64.dll)` → `GetProcAddress(<export>)` で engine を動的ロードし、Frequency Shifter / Hyper Chorus は `dispatch` / `DispatchToEngine` を、Vintage 系は `VSTPluginMain` (大文字小文字違いの名前で検索) を引く。殻の `dynload 2` (§1) と一致する。
 - 未解析: 殻内の `GetProcAddress` 呼出箇所と引数の実値 (文字列アドレスを参照する命令の特定)、engine の `DllMain` の扱い。bit-exact 検証や wasm 側のリンク方式は範囲外 (#202 / #197)。
 - 再現: `pefile` で殻・engine の export / KERNEL32 import を列挙し、UTF-16 / ASCII 文字列を走査 (本節の値の出典)。
