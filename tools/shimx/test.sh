@@ -70,6 +70,8 @@ expect_fail() {  # $1=mode $2=stderr に含むべき文字列
 expect_fail unimpl "DestroyWindow_NonImplemented_Example"
 expect_fail raise "RaiseException (code=0xE06D7363"
 expect_fail rtlunwind "RtlUnwind"
+expect_fail sehnomatch "RaiseException (code=0xE0000003"
+expect_fail sehbadtarget "RtlUnwindEx"
 expect_fail strict "GetProcAddress(kernel32.dll!NoSuchKernelApi)"
 expect_fail bstrfree "SysFreeString (管理外ポインタ)"
 expect_fail csnull "EnterCriticalSection (NULL/misaligned)"
