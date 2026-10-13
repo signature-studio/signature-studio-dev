@@ -1,8 +1,8 @@
 # tools/plugins/synth/REPORT_APPENDIX.md — #534: C++ x64 DLL 9 本の `emcc -c` 実測 (HEAD 3418333a)
 
-- 本書は REPORT.md (250 行上限) の付録。 結論は REPORT §5 の表を見る。 本書は HEAD 3418333a での再測定の記録。
+- 本書は REPORT.md (250 行上限) の付録。 結論は REPORT.md §0-4 と §5 を見る。 本書は HEAD 3418333a での再測定の記録。
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 HLL_CAP=100000 bash tools/plugins/synth/cpp_lift.sh <block>` (出力は `tools/plugins/work/synth/cpp<block>/`)
-- 素材: `fl-win64` (`tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 7 秒)。 `toolchain-emsdk` / `toolchain-retdec` は `/opt/emsdk` / `/opt/retdec` に実在
+- 素材: `fl-win64` (`tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 7 秒)。 `toolchain-emsdk` ([EMSDK]) / `toolchain-retdec` ([RETDEC]) を使用 (`docs/REFERENCES.md`・`docs/WORKFLOW.md` §11)。 本 fix run (2026-10-13, runner) では両ツールの展開先が runner に無いことを確認したため、表 A は再実行していない (未検証)
 - 環境: Actions runner (4 core)。 `PLUG_AVX256=0` (既定)、`PLUG_F80_LOWER` 未指定 (既定 0)
 
 ## A. 実測 (8 本: 並列 4、`xargs -P 4`、総経過 4 分 27 秒)
