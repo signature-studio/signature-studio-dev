@@ -1,5 +1,9 @@
 """L1 census: 0x1800c2ef4–f05 の直接 vtable 通知 `call [rax+0x30]` (edx=0x800010) が raw IR に残るかを数える。
 
+機械語側: 直接 `call [reg+0x30]` の site 数 / site 範囲の `edx=0x800010` 即値ロード数 / site への入口 edge (j*) 数。
+raw IR 側: `insn.addr` が site 範囲の命令数 / そのうち直接 call / site 範囲内の 0x800010 (8388624) 即値 /
+ファイル全体の 0x800010 即値 / site ブロックへの br・switch edge 数 / insn.addr の被覆 / site ブロックの有無。
+
 使い方: python3 l1_census.py <PE> <raw.ll>
 """
 import re
@@ -32,8 +36,23 @@ for l in ll:
 covered = [a for a in set(meta.values()) if in_site(a)]
 has_block = any(l.startswith('dec_label_pc_%x:' % SITE) for l in ll)
 
+ir_site = []
+for l in ll:
+    m = re.search(r'!insn\.addr (!\d+)', l)
+    if m and m.group(1) in meta and in_site(meta[m.group(1)]):
+        ir_site.append(l.strip())
+ir_calls = [l for l in ir_site if re.search(r'\bcall\b', l)]
+ir_edx = [l for l in ir_site if re.search(r'\b8388624\b', l)]
+ir_whole_edx = [l for l in ll if re.search(r'\b8388624\b', l)]
+ir_edges = [l for l in ll if ('label %%dec_label_pc_%x' % SITE) in l]
+
 print('machine: direct call [reg+0x30] sites   =', len(sites))
 print('machine: edx=0x800010 loads             =', len(edx_const))
 print('machine: edges into site block          =', len(into))
 print('IR: insn.addr entries covering site     =', len(covered))
 print('IR: block dec_label_pc_%x present      =' % SITE, has_block)
+print('IR: insns with insn.addr in site range  =', len(ir_site))
+print('IR: direct call in site range           =', len(ir_calls))
+print('IR: edx=0x800010 immediates in site     =', len(ir_edx))
+print('IR: 0x800010 immediates (whole file)    =', len(ir_whole_edx))
+print('IR: edges (br/switch) into site block   =', len(ir_edges))
