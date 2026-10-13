@@ -29,21 +29,22 @@
 | trap 内 oom | 1 | 1 |
 | wasm_bytes | 6,042,784 | 6,043,167 |
 
-**REPORT_APPENDIX の「stage / survey 集計は一致 (ok 812 / trap 83)」は本 HEAD (`64d09590`) では再現しない。**
-LB=0 でも ok 870 / trap 25 で、旧記録 (812 / 83) と別の値になっている。旧記録の HEAD と現 HEAD の差は未切り分け。
+**REPORT_APPENDIX の「stage / survey 集計は一致 (ok 812 / trap 83)」は、前回記録 (`64d09590`) の引用では一致しない。** 引用元の記録の LB=0 は ok 870 / trap 25 で、旧記録 (812 / 83) と別の値になっている。旧記録の HEAD と引用元の HEAD の差は未切り分け。
 
 ### unit 別の結果差 (survey, LB=0 vs LB=0x10000)
 
-全 942 unit のうち結果が食い違うのは 4 件。REPORT の「差 0」は成り立たない。
+以下の表の数値・観測列は §2 冒頭と同じく**前回記録の引用**で、本 PR の作業 runner では再測定していない。
 
-| unit (VA: LB=0 / LB=0x10000) | LB=0 | LB=0x10000 | 観測 |
+引用元の記録では、全 942 unit のうち結果が食い違うのは 4 件。REPORT の「差 0」は引用元の記録の範囲では成り立たない。
+
+| unit (VA: LB=0 / LB=0x10000) | LB=0 | LB=0x10000 | 観測 (引用) |
 |---|---|---|---|
 | 40 (`0x105bd0` / `0x115bd0`) | ok | trap (Halt0 → longjmp) | `m11_throw_dllmain_done` 経由。unit 内の Halt 呼出し |
 | 153 (`0x265b90` / `0x275b90`) | ok | trap (OOB) | |
 | 158 (`0x26d1a0` / `0x27d1a0`) | ok | trap (OOB) | GetMem 139 → 2 |
-| 745 (`0xabb3b0` / `0xacb3b0`) | trap (OOB, GetMem 34) | ok (GetMem 36) | REPORT の「SelectObject 3 回追加」は本実行の出力で確認できず |
+| 745 (`0xabb3b0` / `0xacb3b0`) | trap (OOB, GetMem 34) | ok (GetMem 36) | 引用元の記録では「SelectObject 3 回追加」は確認できない |
 
-- unit 873: 両 LB とも ok・VA 要求 0・GetMem 1 で、REPORT の「LB=0 は 1914MB 要求で OOM」は再現しなかった。
+- unit 873: 前回記録の引用では両 LB とも ok・VA 要求 0・GetMem 1 で、REPORT の「LB=0 は 1914MB 要求で OOM」とは食い違う (引用同士の比較。本 runner では未確認)。
 - 各 unit の VA 表示は LVA 基準 (LB ぶんずれる) のため、表の左右の VA 文字列は 0x10000 ずれている。
 
 ### 再現コマンド (リポジトリ root で実行。`FL_WIN64_DIR` は `tools/shared/env.sh` 経由)
@@ -68,14 +69,16 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
   この件数は本 runner では再計算していない (`work/boot_final.ll` が無い)。
   `m2_inttoptr_remap = 0`・`m2b_remap = 0` (`ir_report.json`) と合わせ、残件の解消先は未特定 (§未解決 参照)。
 - IR 指紋 (`ir_sha256`) は記録ごとに次の値があり、同一ファイル内でも一致していない (記録の出所別に整理):
-  | 記録 | LB=0 | LB=0x10000 | 出所 |
-  |---|---|---|---|
-  | 旧 main 版 (REPORT_N715 系) | `9a9e223e…` | `451ecd03…` | HEAD `64d09590` 以前の記録 (引用) |
-  | 本 PR §3 | `3a9ceb17…` | `5dfb1473…` | 作成者の手元記録 (引用。本 runner で未再現) |
-  | 本 PR §5 | `1fc847d4…` | `b529a344…` | 作成者の手元記録 (引用。本 runner で未再現) |
-  §3 と §5 は同一 run の記録ではない可能性があり、どちらが測定時の IR かは未確定。本 PR の作業 runner では IR を再生成していない。
-  `REPORT_N27.md` では同一手順の 2 run で `ir_sha256` が異なった記録があり (RetDec・gen_ir2 の出力の非決定性の可能性)、指紋の差はこれと区別できていない。
-  したがって「IR は変更していない」とは言えない。どの IR (指紋) を使った測定かは未確定。
+
+| 記録 | LB=0 | LB=0x10000 | 出所 |
+|---|---|---|---|
+| 旧 main 版 (REPORT_N715 系) | `9a9e223e…` | `451ecd03…` | HEAD `64d09590` 以前の記録 (引用) |
+| 本 PR §3 | `3a9ceb17…` | `5dfb1473…` | 作成者の手元記録 (引用。本 runner で未再現) |
+| 本 PR §5 | `1fc847d4…` | `b529a344…` | 作成者の手元記録 (引用。本 runner で未再現) |
+
+§3 と §5 は同一 run の記録ではない可能性があり、どちらが測定時の IR かは未確定。本 PR の作業 runner では IR を再生成していない。
+`REPORT_N27.md` では同一手順の 2 run で `ir_sha256` が異なった記録があり (RetDec・gen_ir2 の出力の非決定性の可能性)、指紋の差はこれと区別できていない。
+したがって「IR は変更していない」とは言えない。どの IR (指紋) を使った測定かは未確定。
 - 実行後の guest ポインタ assert (実行結果の VA 範囲検査) は未実装。子 issue #1004 (M11-N57) の範囲。
 - `lb_check.py` と IR 指紋 (`ir_sha256`) は LB 別に `m11_cond.py --bind` で記録される。現在の指紋の正本は work-m11 の `ir_conditions.json` (本 runner に無い)。
 
@@ -98,7 +101,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | unit 40 / 153 / 158 / 745 の LB 依存差の原因 (特に unit 40 の Halt 経路と通常起動の Halt0 早期終了) | LB=0x10000 の通常起動が 37 unit で止まる。受入 2 未達 | 本 issue (#403) で継続 |
-| REPORT_APPENDIX の旧 HEAD 集計 (812/83) と現 HEAD (870/25) の差 | 既存の数値の根拠が現 HEAD で再現しない | PM が起票 (#222 系) |
+| REPORT_APPENDIX の旧集計 (812/83) と前回記録の引用 (870/25) の差 | 既存の数値の根拠が引用元の記録で再現しない (本 runner では未測定) | PM が起票 (#222 系) |
 | 実行後の guest ポインタ assert (未実装) | 受入 3 の後半 | 子 issue #1004 (M11-N57) |
 | 未 remap の image VA 即値 4,368 件 (件数の解消先) | 受入 3 の件数は計測済み。解消を担当する issue は未特定 (#417 は halt0 21 unit の別件、#1004 は実行後 assert で範囲外) | PM 起票を要求 (担当 issue 未確定) |
 | IR 指紋の不一致 (§3 の `3a9ceb17…`/`5dfb1473…`、§5 の `1fc847d4…`/`b529a344…`、旧 main 版の `9a9e223e…`/`451ecd03…` の 3 組) | どの IR で測定したかが未確定。§2 の表 (LB=0 870/25) と §5 の LB=0 の値は同じ ok/trap だが指紋は別 | PM 確認 (work-m11 の `ir_conditions.json` で照合) |
@@ -112,6 +115,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
   work-m11 は #728 以前のスナップショットで `work/lift_pe.sha256` が無く、`m11_e2e.sh` が全再生成に入って Ghidra の `functions_dll.csv` を要求して止まる。
 - **指紋検査の迂回 (前回 run の操作。REPORT の出所として明記)**: `work/lift_pe.sha256` に PE の sha256 を手で書き、lift 成果物を再利用した (全再生成はしていない)。
   これは `docs/WORKFLOW.md` §11 が定める「PE が変われば作り直す」指紋検査を手で迂回した操作である。
+  AGENTS.md §4-4 (`tools/**/work/` への作業禁止) に該当する操作でもあり、本来は行うべきでなかった。
   **その結果が全再生成と同一である保証はない。** §5 の数値は、この迂回が生成結果を変えていないという前提に依存する。
 - 引用の記録 (上の前提の下での値。§2 の表・§4 とは別の run 記録だが、ok/trap の値は §2 と同じ):
   - `M11_LB_BASE=0`: units_run 53 / survey ok 870 / trap 25 / miss 46 / ir_sha256 `1fc847d4…`
