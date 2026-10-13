@@ -247,3 +247,4 @@ factory .epf 8 本 (+0x10 = Mid Air, +0x14 = High Air の f32, Trim=0) で nativ
 - ID (0x157/0x158/0x15a) が Filter snapin の**どの内部パラメタ**に当たるか (名前・値域) は未解決: harness の controller map (`C+0x318`, `0x180ca7db0` の木) は空で、実 setter は param を解決せず no-op。実 map を構築して Filter の係数が変わることの確認は未実施。
 - 宛先が子リスト index 0 の Filter 固定である点は静的 (get の r8=0) + 実測で確定。他 7 子へマクロは直接届かない (子自身の param は preset DUMP 由来の値で、本関数は触らない)。
 - .epf の他フィールド (+0x4cc/+0x4d4 の 1、Mixbus 系の +0x4d8 f32 -0.93/-1.41 等) の意味は未解析 (macro 以外は現行 slot[12] 駆動に影響しない)。
+- FA-10 (#666, 2026-10-13): 工程 6 (ctrl) FAILED の原因は epf 素材の展開漏れ (epf を展開すると同一コードで ctrl 15/15 PASS, A/B 実測)。rep movs/stosw を実装したが既存 e2e は未実行 (未解決)。詳細・未解決は `REPORT_APPENDIX.md`。
