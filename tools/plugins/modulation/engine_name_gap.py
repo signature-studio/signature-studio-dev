@@ -14,8 +14,18 @@ ll = open(os.path.join(d, 'e.final.ll')).read()
 dnames = set(re.findall(r'^define [^@]*@([A-Za-z_][A-Za-z0-9_.]*)\b', ll, re.M))
 src = open(os.path.join(d, 'e.drc.c')).read()
 name_at = {}
-for m in re.finditer(r'// Address range: 0x([0-9a-f]+) - 0x[0-9a-f]+\n(?:[^\n]*\n)*?\s*(?:int|void|uint|int64_t|int32_t|char|float|double|bool|unsigned|__int\w*)[^\n(]*?\b([A-Za-z_][A-Za-z0-9_]*)\s*\(', src):
-    name_at[int(m.group(1), 16)] = m.group(2)
+lines = src.split('\n')
+n_ann = 0
+for i, ln in enumerate(lines):
+    m = re.match(r'// Address range: 0x([0-9a-f]+) - 0x[0-9a-f]+', ln)
+    if not m:
+        continue
+    n_ann += 1
+    h = re.match(r'[^\n(]*?\b([A-Za-z_]\w*)\s*\(', lines[i + 1] if i + 1 < len(lines) else '')
+    if h:
+        name_at[int(m.group(1), 16)] = h.group(1)
+if len(name_at) != n_ann:
+    sys.exit('annotation/name mismatch: annotations=%d names=%d' % (n_ann, len(name_at)))
 va_defs = {int(x, 16) for x in re.findall(r'^define [^@]*@function_([0-9a-f]+)\b', ll, re.M)}
 miss_va = [(a, e) for a, e in rg if a not in va_defs]
 named = [(a, e) for a, e in miss_va if name_at.get(a) in dnames]
