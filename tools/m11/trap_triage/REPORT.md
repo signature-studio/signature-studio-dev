@@ -3,7 +3,7 @@
 **判定: 部分達成 (trap 83 → 66、目標 < 20 は未達)**。halt0 48 unit の発生源を wasm スタックで全数特定し、
 最大の原因 `function_417b70` (System.DynArraySetLength) の 1 段 deref 脱落を C 転記 (`m11_ov.c`) で修正した。
 
-## 1. 実測 (HEAD `1eccbfa`、`bash tools/m11/m11_e2e.sh`、16.1 s、load average 0.45)
+## 1. 実測 (HEAD `36494d0`、`bash tools/m11/m11_e2e.sh`、16.2 s、load average 0.38)
 
 | 項目 | 修正前 | 修正後 |
 |---|--:|--:|
@@ -12,6 +12,8 @@
 | └ oob / halt0 / abort | 34 / 48 / 1 | 44 / 21 / 1 |
 | reached_stage / units_run (通常起動) | 4/6 / 17 | 4/6 / 17 (不変) |
 | wasm-ld signature mismatch / undefined | 0 / 0 | 0 / 0 |
+
+`node tools/m11/trap_triage/survey_units.mjs <out.json>` (同 HEAD、0.51 s): `SURVEY_UNITS {"ok":829,"oob":44,"halt0":21,"miss":46,"abort":1,"noproc":1}`。
 
 unit 遷移 (per-unit JSON 比較): halt0→ok 16 / **halt0→oob 11** / oob→ok 1。halt0→oob の 11 件は、
 修正で Halt0 を抜けて先へ進み、次の欠陥 (下記 §3-2) に当たったもの。trap 総数の減少は 17 (= 83−66)。
@@ -48,12 +50,14 @@ CAB-129 REPORT §5 の「GetLocaleInfoW / LoadStringW 相関」は不採用 (hal
 # 前提: bash tools/m11/m11_e2e.sh 済み (work/m11_boot.cjs, work/m11_image.bin)
 node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/after.json    # 942 unit の per-unit JSON (kind / frames / stub / va_mb)
 python3 tools/m11/trap_triage/annotate.py tools/m11/work/trap_triage/after.json [unit...]   # export 名で注釈・halt0 の Error() 呼出元集計
-python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の capstone 逆アセンブル (LD_M11_PE で PE 指定)
+python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の capstone 逆アセンブル
 ```
 
 環境変数: `SV_ONLY=884` (unit 限定)・`SV_TRACE_AT=884` (その unit だけ trace)・`SV_PROG=1` (進捗を stderr)。
-`capstone` / `pefile` (pip) が要る。この runner では `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin`
-と `/home/ubuntu/work/webstudio` を symlink / 展開して実行した (PR #301 の方法)。
+`capstone` / `pefile` (pip) が要る。`disasm_fn.py` は `tools/shared/paths.py` の `FL_WIN64_DIR`
+(`docs/REFERENCES.md` `[WIN64]`、Actions での展開は `docs/WORKFLOW.md` §11) 配下の `extracted/block00031_PE.bin` を読む
+(`LD_M11_PE` で PE を直接指定も可)。`m11_e2e.sh` など既存スクリプトは作業 VM の固定パスを前提にするため、
+この runner では `[WIN64]` と repo の checkout をそのパスへ symlink して実行した (PR #301 の方法)。
 
 ## 5. 未解決 (下流)
 

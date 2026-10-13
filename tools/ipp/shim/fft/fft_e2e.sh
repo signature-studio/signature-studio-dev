@@ -9,7 +9,8 @@
 # usage: bash tools/ipp/shim/fft/fft_e2e.sh
 set -euo pipefail
 cd "$(dirname "$0")"; FFT=$PWD; SHIM="$(dirname "$FFT")"; IPP="$(dirname "$SHIM")"; W="$IPP/work/shim"; mkdir -p "$W" /tmp/opencode
-DLL=/home/ubuntu/work/analysis/win64/extracted/block24356_PE.bin
+source "$IPP/../shared/env.sh"
+DLL="$FL_WIN64_DIR/extracted/block24356_PE.bin"
 export PATH=/opt/emsdk/node/24.19.0_64bit/bin:$PATH
 step() { echo; echo "## $*"; }
 CF="-std=gnu11 -O2 -ffp-contract=off -fno-fast-math -Wall -Wno-unused-function -Wno-maybe-uninitialized -Wno-misleading-indentation"

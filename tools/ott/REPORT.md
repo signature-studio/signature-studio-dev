@@ -182,3 +182,37 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 **検収 (別セッション, 2026-10-11): `ACCEPTANCE_CAB238_CAB135.md`** — 判定 = **受入 (PASS)**
 (CAB-238 4 項目 + CAB-135 全条件を Clean HEAD snapshot で独立再現・独立再計算・ネガティブコントロール 3 件)。
 ただし既定ビルドの**無限ルーブ 2 combo (params=0.9 / [0x248]=1) は未修**で、実運用 blocker として LIFTLIB-2 引継。
+
+## 10. #450 — 固定パス (/home/ubuntu) の環境変数化 (親 #294 / 報告 #440)
+
+既知類型との関係 (DEFECTS.md): 該当なし (パス参照の置換のみ・lift 出力は不変)。
+
+- 対象 8 ファイルのうち、`tools/liftlib/tests/test_unit.py` / `tools/liftlib/xmm0_ret_census.py` は #427 (2db928d) で
+  `liftlib.env.OTT_DLL` (= `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll`) 参照済みで本件の変更なし。
+  残り 6 ファイルを `tools/shared/{env.sh,paths.py}` 経由に置換:
+  `ott/avx/build_avx.sh`・`ott/crtinit/lift_crt.sh` (DLL → `$PLUGINS_DIR`、emsdk → `${EMSDK_DIR:-/opt/emsdk}`)、
+  `ott/accept/acc_crt_table.py`・`ott/avx/unsup_scan.py`・`m9/m9_tablebind.py` (DLL → `PLUGINS_DIR`)、
+  `shimx/scripts/import_scan.py` (プラグイン → `PLUGINS_DIR`、`/home/ubuntu/work/webstudio/...` → `REPO_ROOT`)。
+- 既定値の不変: 環境変数未設定時の `PLUGINS_DIR` = `/home/ubuntu/work/analysis/plugins` (paths.py 既定のまま)。
+  `import_scan.py` の webstudio 側は `REPO_ROOT` (git toplevel) になる — 作業用 VM の webstudio checkout と同一 repo を指す前提。
+- 検証 (Actions runner, 2 vCPU load average 0.27–1.06): 置換前 = origin/main (11f0561) の対象 6 ファイルの固定パスだけを
+  `$HOME/analysis` / worktree 絶対パスに sed 置換した基準 worktree、置換後 = 本 branch。同一入力 (`ANALYSIS_DIR=$HOME/analysis`) で比較。
+
+| 対象 | 比較方法 | 結果 |
+|---|---|---|
+| `acc_crt_table.py` | stdout の sha256 | 一致 (104b771c…, rc 0) |
+| `m9_tablebind.py` | stdout + 生成 `m9_tables.c` の cmp | 一致 (62cee537…, 4096 B, rc 0) |
+| `unsup_scan.py` | 出力 JSON の cmp (1.65 s / 1.54 s) | 一致 (c839ab44…, sites 0) |
+| `import_scan.py` | 変数 (FLE/PLUGINS) の解決値を ROOT 相対で比較 + 実行 | 解決値一致。実行は FLEngine 素材 (tools/startup/work, tools/m2/work) が runner に無く旧新とも同一の FileNotFoundError → **範囲外** |
+| `build_avx.sh` / `lift_crt.sh` | gcc/emcc/python3 を記録 shim に差し替え、呼出引数列を比較 | 一致 (4 行 / 6 行。`--pe` は OTT DLL を指す)。実 emcc ビルドは未実行 → **範囲外** |
+
+- ネガティブコントロール: `PLUGINS_DIR=/nonexistent` で `m9_tablebind.py` / `acc_crt_table.py` / `unsup_scan.py` が
+  `/nonexistent/ott/binaries/OTT_vst2_win64.dll` の FileNotFoundError で失敗する (3/3) = 変数が実際に効いている。
+- 参考 (変更なしの確認): `xmm0_ret_census.py` = 分母 169・検出 103・別算法 103・一致 YES (6.3 s)。
+  `liftlib/tests/test_unit.py` は FreshAir SlateCore 素材 (work-liftlib-targets) が無く T1 で FileNotFoundError → 範囲外 (本件は当該行を変更していない)。
+- 再現: `ANALYSIS_DIR=<analysis> python3 tools/m9/m9_tablebind.py out.c` 等を origin/main と本 branch で実行して cmp。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `test_unit.py` の `T = ../..` 相対 (FA_PE 等) は `REPO_ROOT` 化していない | 固定パスではなく挙動不変のため据え置き | #294 にコメント |
+| `import_scan.py` / `build_avx.sh` / `lift_crt.sh` の実素材での通し実行 | 本 run は素材 (FLEngine, emcc ビルド) 未実行 | #294 にコメント |

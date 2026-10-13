@@ -63,7 +63,7 @@
 |---|---|
 | Move_8u/32f, Zero_8u/32f, Copy_32f, Set_32f/32s, Add_32f_I, Mul_32f(_I), AddC_32f(_I), MulC_32f(_I), SubCRev_32f(_I), Sqr_32f(_I), Threshold_GT/LT_32f_I, Convert_32f32s_Sfs | **21 関数 bit-exact** (戻りステータス含む。通常入力と特殊値のみ入力の両方, `C6/C7`)。ただし **両方 NaN の要素は仮数ペイロードの差を「一致」とみなす** (`nan_payload_diff` 別計上: 通常入力 AddC/MulC で各 42〜43 要素、特殊値入力 Add_I 826・Mul_I 817・AddC_I 201・MulC_I 189・AddC 206・MulC 214 要素 / 約 2.67M 中)。NaN 以外は全 bit 一致。NULL×len エラー格子 222 点も全一致 (`C8`) |
 | `Sqrt_32f_A11` / `Exp_32f_A11` | 実 IPP は **A11 = 12〜14.5 bit 精度** (相対誤差 最大 4.4e-5〜2.6e-4 = 11.9〜14.5 bit)、自前は 24 bit。IPP 自身が **AVX-512 vs AVX2 で Sqrt 最大 4098 ulp / Exp 最大 1802 ulp 異なる** → bit 一致は定義不能。状態コード (overflow=12, underflow=17, 負引数=19) は一致 (Exp は overflow/underflow 境界の 71 ケースで不一致) |
-| `VectorSlope_32f` | 実 IPP は **ブロック累積** (誤差が真値比で 100〜130 eps24 まで漂う; ISA 経路間の出力は同一) で bit 再現は未解決。自前は 1.8 eps24 (厳密に近い) |
+| `VectorSlope_32f` | **(IPP-9 #276 で出力先が揃った場合、IPP-11 #473 で要素境界に揃った任意の出力先について bit 再現済み。`shim/REPORT_IPP9.md`・`shim/REPORT_IPP11.md`)** 以下は当時の記録: 実 IPP は **ブロック累積** (誤差が真値比で 100〜130 eps24 まで漂う; ISA 経路間の出力は同一) で bit 再現は未解決。自前は 1.8 eps24 (厳密に近い) |
 
 実 IPP の発見済み癖 (bit-exact に必要で実装済): `MulC_32f(_I)` は val==±0 で **+0 全埋め** (x=inf/NaN/負でも)、`AddC_32f` は val==0 で copy (-0 が残る)、`AddC_32f_I` は val==0 で no-op、`Convert_32f32s_Sfs` の NaN は符号で飽和方向 (+NaN→INT_MAX, -NaN→INT_MIN)、len<1→-6/NULL→-8 (ippvm 系 Sqrt/Exp のみ len 検査が先)。
 

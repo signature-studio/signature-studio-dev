@@ -103,7 +103,7 @@
 
 ## 7. 未解決 / ブロッカー / ユーザ依頼
 
-- 未解決: ① ~~低信頼 47 ID~~ → L-6 で解消 (§10; med 25 件の役割確定は §10.4), ② native plugin state (event 213) は blob のまま (plugin 毎デコーダ未実装), ③ ~~版境界 stride~~ → §10 で規則を engine から確定 (build 4702–4719 の実標本のみ無し), ④ ORACLE の STFT 判定 (D クラス) 未実装 / C・D 閾値は暫定。
+- 未解決: ① ~~低信頼 47 ID~~ → L-6 で解消 (§10; med 25 件の役割確定は §10.4), ② native plugin state (event 213) は blob のまま (plugin 毎デコーダ未実装), ③ ~~版境界 stride~~ → §10 で規則を engine から確定 (build 4702–4719 の実標本のみ無し), ④ ~~ORACLE の STFT 判定 (D クラス) 未実装~~ → L-5 で実装 (§11) / C・D 閾値は暫定。
 - ブロッカー: なし (ネイティブ FL 不在は設計で回避)。
 - **ユーザ依頼**: (1) 可能ならネイティブ FL 26.1.7 で **Render tests 82 本 + Demo 3 本を 48kHz/32bit float/dither off で WAV 書出し** (ORACLE.md §7) — T5 の golden。(2) Serum 2 / OTT / Fresh Air / Kilohearts を実際に使った `.flp` (第三者 VST の 213 解析と tools/plugins の実使用検証用)。
 - 法務は事実整理のみ: Demo/Template/preset は Image-Line 同梱素材。リポジトリには複製せず派生メタデータのみコミット。PyFLP は GPL-3.0 で **参照のみ** (コード非流用; `id_sets.ts` は ID 番号のみ, 名前とレイアウトは本実装で独立に記述)。
@@ -116,7 +116,7 @@
 | L-2 | headless offline render 入口 + 決定論ランナー (T2): Render tests 82 本 × 3 回 SHA 一致 | ORACLE §2 |
 | L-3 | 上位 plugin の state (213) デコーダ + 単体 DSP 3 者比較 (T3): Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 から | クラス A/B 判定表 |
 | L-4 | ネイティブ golden 取込 (T5) と C/D 閾値再校正 | §7 依頼 (1) |
-| L-5 | STFT/LUFS 判定 (`src/wav.ts` D クラス) と最初の差分位置レポート | ORACLE §4.4 |
+| L-5 | STFT/LUFS 判定 (`src/wav.ts` D クラス) と最初の差分位置レポート | ORACLE §4.4 (**済 §11, #108**) |
 | L-6 | エンジン読込 switch (`0xa9e7a0` 以降の FlpLoad) 逆アセンブルで低信頼 47 ID を確定 | `unknown_events.json` の undocumented → 0 (**済 §10, #109**) |
 | L-7 | VST2/VST3/CLAP ラッパ (213) の実データ検証 | §7 依頼 (2) |
 | L-8 | `flp_e2e.sh` を `agent-browser` E2E に接続 (ブラウザで parse/dump) | M12 — **実装済 (#112, §9)** |
@@ -194,3 +194,19 @@
 | playlist build 4702–4719 の実標本なし | 規則は engine から確定だが標本で未確認 | #109 コメント |
 | FL 26.1.7 以外の版の読込 switch は未確認 (版依存分岐はハンドラ内の定数比較で存在: 例 104 の `build<3006005`) | 古い版の変換の記述は本 DLL の読み出しのみ | 範囲外 |
 | `cli/corpus.ts` の full 再スキャンは未実施 (mac .app 不在) | manifest.json 等は不変 | #109 コメント |
+
+## 11. L-5: D クラス STFT/LUFS/true-peak 判定と最初の差分位置 (#108)
+
+仕様 = ORACLE.md §4.4 / §4.3。実装 = `src/stft.ts` (FFT・STFT 比較・LUFS-I・true-peak)、`src/wav.ts` (`judgeWav` / `judgeSpectral` / `firstDiff` / `firstViolation`)、`cli/wavcmp.ts` (JSON に `spectral`・`firstDiff` を追加)。`judge(m,'D-spectral')` は `SpectralMetrics` 無しだと fail-closed (従来は時間領域のみで PASS していた)。
+
+**11.1 検証 (HEAD `fb04035` / 実測)**。素材不要 (合成 WAV のみ)。Node v22.23.3。
+- `tsc -p tsconfig.json`: クリーン。`node --test test/oracle.test.ts`: 13/13 PASS (旧 5 + 新 8; n=3: 0.99 / 1.02 / 1.01 s、load average 0.17)。`node --test test/*.test.ts`: tests 32 / pass 29 / fail 0 (残 3 は素材 (mac .app) 不在による skip)。
+- 単体テストが固定する値: LUFS-I = 997 Hz −23 dBFS ステレオで −23.0 ±0.05 LUFS (EBU R128 基準)、モノは 3.0103 LU 低い、−70 LUFS 絶対ゲートで無音区間を除外、fs/4 の 45° 位相正弦 (サンプルピーク −3.01 dB) の true-peak ≈ 0 dBTP (±0.05)、FFT = 直接 DFT (<1e-9)、STFT 先頭差分フレーム = 最初に差分へ触れる窓、−80 dBFS の副信号はフロア (−60 dB) 以下で無視、+0.5 dB ゲイン誤差は STFT/LUFS/TP 全て FAIL、位相のみ違う同一スペクトルは STFT PASS。
+- CLI (`cli/wavcmp.ts`, 48 kHz ステレオ 3 s の 1 kHz 正弦, `D-spectral`): 同一 → exit 0 (STFT 0/3864 bin 超過)、+0.003 dB ゲイン → exit 0 (rmsDiff/ref −69.2 dB)、ch1 の 2.000 s から 3000 f にバースト → exit 1、`firstDiff` = `{channel:1, frame:91, startSample:93184, timeSec:1.9413, bin:79, freqHz:925.8, diffDb:0.826}` (TP 差 0.828 dB)。
+
+**11.2 範囲外 / 未解決**
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| true-peak の補間 FIR は BS.1770 Annex 2 の係数表ではなく Kaiser sinc 近似 (fs/4 付近までの正弦で ≤0.001 dB) | ±0.1 dB 判定には十分。規格準拠の係数表が必要なら差替 | #108 コメント |
+| 実機 golden が無いため STFT フロア −60 dB・0.1 dB 等の閾値は暫定のまま | 実 render での偽陽性/偽陰性率は未測定 | L-4 (T5, §8) |
+| 乱数変調 plugin 等 (非相関ノイズ) は STFT 振幅が bin 単位で揺れるため本判定では FAIL する (テストで固定) | 該当 plugin の D 判定には統計的スペクトル (帯域平均) 版が別途必要 | #108 コメント (PM 判断で子チケット化) |

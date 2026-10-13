@@ -18,7 +18,8 @@ import time
 from . import env
 from . import ir as IR
 from .pe import Image
-from .passes import base as B, p1, f7, f2, remap
+from .passes import base as B, p1, f7, f2, iargs, remap
+from .passes import icall as ICALL
 from .simd import gen as SG
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -27,8 +28,10 @@ SIMD_DIR = os.path.join(HERE, "simd")
 
 
 def rpath(p):
+    """repo 相対 / 絶対パス。`${PLUGINS_DIR}` 等 (env.PATH_VARS のキー) は環境変数優先で展開する"""
     if p is None:
         return None
+    p = re.sub(r"\$\{(\w+)\}", lambda m: env.PATH_VARS[m.group(1)], p)
     return p if os.path.isabs(p) else os.path.join(ROOT, p)
 
 
@@ -78,6 +81,12 @@ def repair_ll(cfg, raw_path, img, log, detect_only=False):
     # define に足し, callsite 相で生存側 call を固定した後に p1 が領域を lift する。
     # p1 の領域は _lift_call で f2 済みの declare 引数 (%xmmK_bits) を正しく渡し,
     # f2 の bind は領域コピーが存在しない素な IR に対して行われる (支配違反の混入を避ける)。
+    # HB-H3: 整数引数 (rdx/r8/r9) 脱落の復元は f2 より前 (f2 は仮引数末尾に %xmmK_bits を足す)。既定 off。
+    if passes.get("iargs"):
+        st, lg = {}, []
+        iargs.run(mod, img, lg, st, repair=rep)
+        stats["iargs"] = st
+        log.extend("iargs: " + x for x in lg)
     if passes.get("f2", True):
         st, lg = {}, []
         f2.run(mod, img, lg, st, repair=rep, only=passes.get("f2_only"), phase="callee")
@@ -191,7 +200,15 @@ def run_all(cfg_path, workdir=None, detect_only=False):
     os.makedirs(workdir, exist_ok=True)
     log, stats = [], {}
     img = Image(rpath(cfg["image"]))
-    raw = retdec_lift(cfg, workdir, log)
+    ic = cfg.get("passes", {}).get("icall")
+    if ic:   # lift 前に PE を書換え (間接 call/jmp 復元 + ABI 仮想化 + D7 回避)。img (修復 pass が参照する正本) は元 PE のまま
+        rimg, rranges, icmap = ICALL.prelift(cfg, rpath(cfg["image"]), rpath(ic["funcs"]), workdir, log)
+        cfg = dict(cfg, image=rimg, retdec=dict(cfg.get("retdec", {}), ranges=rranges))
+        raw = retdec_lift(cfg, workdir, log)
+        raw = ICALL.restore(raw, icmap, workdir, log)
+        cfg["raw_ll"] = raw
+    else:
+        raw = retdec_lift(cfg, workdir, log)
     mod, st = repair_ll(cfg, raw, img, log, detect_only=detect_only)
     stats.update(st)
     cjs = None
