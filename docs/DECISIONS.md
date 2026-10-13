@@ -75,3 +75,14 @@
   根拠の実測値は `tools/targets/freshair/REPORT.md` §1・§2・§6 B6・§7 FA-6。
 - **影響**: lift 作業 (`tools/targets/freshair/lift2` 等) は GUI/エディタ層を対象にしない。UI 素材の抽出・配置の
   具体実装は HUD 側 (#10) の範囲。法的な可否の結論は含まない (Slate/Audiotonix ToS の論点は `docs/LEGAL.md` §4.3)。
+
+## D8 — FreeType 2.7 は wasm32 (FORCE_INT64 + ftgrays_lp64.patch) を本採用、wasm64 は退避路
+
+- **状態**: 採用 (2026-10-13, issue #145 [T-SH-01])
+- **決定**: FL 同梱 FreeType 2.7 の wasm 再ビルドは **wasm32 + `FT_CONFIG_OPTION_FORCE_INT64` + `oss/freetype/ftgrays_lp64.patch` (2 行)** を既定とする。
+  wasm64 (無改変) は退避路として `oss/freetype/build.sh` で常時 native との一致を確認する。素の wasm32 (patch 無し) は使わない。
+- **理由**: メモリモデルが wasm32 + LVA 既定 (`tools/runtime/DESIGN.md` D1) で、wasm64 は Memory 個数上限が半分になる。
+  wasm32 + patch は native と bit 一致する。FreeType 側に 4GiB 超の要求は無い。
+  実測は `tools/shared/REPORT.md` §3.1。
+- **影響**: 退避トリガは RT D1 と同じ (wasm64 へ切替える時は FreeType も無改変の wasm64 ビルドを使う)。
+  win freetype.dll は別 version のため、この決定は mac 2.7 の再ビルドにのみ適用する (version は未特定)。
