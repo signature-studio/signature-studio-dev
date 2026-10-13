@@ -6,7 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-const M11 = path.resolve(HERE, '../../m11');
+const M11 = process.env.GF_M11 || path.resolve(HERE, '../../m11');
 const args = process.argv.slice(2);
 const survey = args.includes('--survey');
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
@@ -31,11 +31,10 @@ try { mod._m11_boot_enter(0n, 1n); } catch (e) {
   else bootThrew = msg1(e);
 }
 
-const res = { ok: 0, noproc: 0, miss: 0, trap: 0 };
+const res = { ok: 0, noproc: 0, miss: 0, trap: 0, clobber: 0 };
 const kinds = {}, ffUnits = {}, perUnit = [];
-if (survey) {
+if (survey) {   // m11_survey.mjs と同じ隔離プロトコル: unit ごとに VA 予算を開始し, InitTable が壊れたら実行前の image を戻して clobber に数える
   const sp0 = mod._emscripten_stack_get_current();
-  // unit 隔離: m11_survey.mjs と同じく unit ごとに VA 上限を張り直し、unit が書いた image を実行前の状態へ戻す
   const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(941)];
   const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(941) === unitVa0[1];
   const snap = new Uint8Array(img.length);
@@ -43,26 +42,27 @@ if (survey) {
     errs.push('GF-UNIT-BEGIN ' + i);
     snap.set(mod.HEAPU8.subarray(0, img.length));
     mod._m11_va_unit_begin();
-    try {
-      const r = mod._m11_call_unit(i);
+    let r, err = null;
+    try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
+    if (!tableIntact()) { mod.HEAPU8.set(snap, 0); res.clobber++; perUnit.push([i, 'clobber']); if (err) mod.__emscripten_stack_restore(sp0); continue; }
+    if (!err) {
       if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
       perUnit.push([i, r === 1 ? 'ok' : r === 0 ? 'noproc' : r === 2 ? 'miss' : 'ret' + r]);
-    } catch (e) {
-      res.trap++;
-      let k;
-      if (isDone(e)) k = 'halt0->longjmp';
-      else if (e && e.gui_failfast) { k = 'gui_failfast'; ffUnits[e.gui_failfast] = (ffUnits[e.gui_failfast] || 0) + 1; }
-      else k = msg1(e);
-      kinds[k] = (kinds[k] || 0) + 1;
-      perUnit.push([i, 'trap', k]);
-      mod.__emscripten_stack_restore(sp0);
+      continue;
     }
-    if (!tableIntact()) { mod.HEAPU8.set(snap, 0); res.clobber++; }
+    res.trap++;
+    let k;
+    if (isDone(err)) k = 'halt0->longjmp';
+    else if (err.gui_failfast) { k = 'gui_failfast'; ffUnits[err.gui_failfast] = (ffUnits[err.gui_failfast] || 0) + 1; }
+    else k = msg1(err);
+    kinds[k] = (kinds[k] || 0) + 1;
+    perUnit.push([i, 'trap', k]);
+    mod.__emscripten_stack_restore(sp0);
   }
   if (process.env.GF_SURVEY_UNITS) fs.writeFileSync(process.env.GF_SURVEY_UNITS, JSON.stringify(perUnit));
 }
 
-mod._gui_reach_dump();
+if (mod._gui_reach_dump) mod._gui_reach_dump();   // --base (shim 無し比較元) には無い
 const reach = [];
 for (const l of errs) {
   const m = /GUI-REACH (\d+) (\w+) (\d+) (IMPL|STUB) P(\S+)$/.exec(l);

@@ -40,7 +40,7 @@ MAX_ACTIONS="${OC_MAX_ACTIONS:-12}"
 WD_MAX="${OC_WATCHDOG_MAX:-6}"
 # 同じ head に対する競合解消の dispatch の上限 (超えたら oc:stuck)
 DISPATCH_MAX="${OC_DISPATCH_MAX:-3}"
-ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff|m6-ott|liftlib-targets|liftlib|icall)|analysis-ott-binaries|apt-mingw)$'
+ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff|m6-ott|liftlib-targets|liftlib|icall)|analysis-(ott-binaries|mac-shared)|apt-mingw)$'
 RUNS_TOKEN="${RUNS_TOKEN:-${GH_TOKEN:-}}"
 now="$(date -u +%s)"
 age_min() { echo $(((now - $(date -u -d "$1" +%s)) / 60)); }

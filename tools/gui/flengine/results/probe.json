@@ -1,5 +1,5 @@
 {
- "boot_dllmain_done": true,
+ "boot_dllmain_done": false,
  "hinstance": 0,
  "classes": [
   {
@@ -27,38 +27,34 @@
  "windows": [
   {
    "name": "TLightweightLayeredControl",
-   "hwnd": "0x110000e",
-   "hwnd_below_2_31": true,
+   "hwnd": "0x0",
+   "hwnd_below_2_31": null,
    "err": null,
-   "wndproc_icall_calls": 4,
-   "m11_icall_ok_delta": 1,
-   "wndproc": "0x31dd10",
+   "wndproc_icall_calls": 2,
    "thunk_calls": 0,
-   "m11_icall_miss_delta": 3
+   "m11_icall_miss_delta": 2
   },
   {
    "name": "TApplication",
-   "hwnd": "0x110000f",
+   "hwnd": "0x210000e",
    "hwnd_below_2_31": true,
    "err": null,
-   "wndproc_icall_calls": 4,
-   "m11_icall_ok_delta": 0,
-   "wndproc": "0x24920",
-   "thunk_calls": 4,
+   "wndproc_icall_calls": 5,
+   "thunk_calls": 5,
    "m11_icall_miss_delta": 0
   }
  ],
  "abi": {
-  "gui_shared_ptr": 271672128,
+  "gui_shared_ptr": 271662208,
   "gui_shared_ptr_ge_0x10000": true,
-  "screen_dc": "0x1200010",
+  "screen_dc": "0x120000f",
   "screen_dc_in_31bit": true
  },
  "reach": [
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 4,
+   "calls": 3,
    "kind": "IMPL",
    "prio": "1"
   },
@@ -78,14 +74,14 @@
   },
   {
    "order": 4,
-   "name": "SetWindowLongPtrW",
-   "calls": 2,
+   "name": "GetClassInfoW",
+   "calls": 1,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 5,
-   "name": "GetClassInfoW",
+   "name": "SetWindowLongPtrW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "0"
@@ -105,8 +101,5 @@
    "prio": "0"
   }
  ],
- "icall_miss": 3,
- "icall_miss_targets": [
-  "0x6c6f"
- ]
+ "icall_miss": 7
 }

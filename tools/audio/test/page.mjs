@@ -209,7 +209,7 @@ function verify(capSpec, cfg, result) {
   } else if (cfg.mode === "ramp") {
     let ok = 0, firstBad = -1, bad = 0;
     for (let p = 0; p < covered; p++) {
-      const e0 = p + 1;
+      const e0 = (p & 0xFFFFFF) + 1; // fla_test.c のランプは 24bit (f32 の厳密整数域) で巻き戻る: 2^24 f = 349.5 s @48k。30 分ソークは巻き戻しを跨ぐ
       if (ch0[p] === e0 && ch1[p] === -e0) ok++;
       else { bad++; if (firstBad < 0) firstBad = p; }
     }
@@ -217,7 +217,7 @@ function verify(capSpec, cfg, result) {
     // underrun 後の連続性: out[p] == ramp[p - S] (S = underrun で挿入された無音フレーム数) が末尾領域で成立するか
     const S = result.stats.silence_frames, lo = Math.max(0, covered - 20000), hi = Math.max(lo, covered - 3000);
     let tail_ok = 0, tail_n = 0;
-    for (let p = lo; p < hi; p++) { tail_n++; if (ch0[p] === p + 1 - S && ch1[p] === -(p + 1 - S)) tail_ok++; }
+    for (let p = lo; p < hi; p++) { tail_n++; const e = ((p - S) & 0xFFFFFF) + 1; if (ch0[p] === e && ch1[p] === -e) tail_ok++; }
     v.ramp.tail_shift_exact = { silence_S: S, checked: tail_n, exact: tail_ok };
   } else if (cfg.mode === "sine") {
     let maxErr = 0, peak = 0, ss = 0, bad = 0;

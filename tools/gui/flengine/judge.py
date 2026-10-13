@@ -38,16 +38,16 @@ gate('A1 adapters', ad and ad.group(1) == ad.group(2) and ad.group(5) == '0' and
 bu = a.expect_units if a.expect_units is not None else base_boot['units_run']
 gate('B1 boot parity', boot['units_run'] == bu and boot['dllmain_done'] == base_boot['dllmain_done'] and boot['init_count'] == base_boot['init_count']
      and boot['probes'].get('GetMem') == base_boot['probes'].get('GetMem') and boot['probes'].get('FreeMem') == base_boot['probes'].get('FreeMem')
-     and boot['icall_miss'] == base_boot['icall_miss'] and boot['boot_failfast'] is None and boot['boot_threw'] is None,
-     'units_run %s (base %s) / dllmain_done %s / GetMem %s FreeMem %s / icall_miss %s' % (boot['units_run'], bu, boot['dllmain_done'], boot['probes'].get('GetMem'), boot['probes'].get('FreeMem'), boot['icall_miss']))
+     and boot['icall_miss'] == base_boot['icall_miss'] and boot['boot_failfast'] is None and boot['boot_threw'] == base_boot.get('threw'),
+     'units_run %s (base %s) / dllmain_done %s / GetMem %s FreeMem %s / icall_miss %s / threw %s (base %s)' % (boot['units_run'], bu, boot['dllmain_done'], boot['probes'].get('GetMem'), boot['probes'].get('FreeMem'), boot['icall_miss'], boot['boot_threw'], base_boot.get('threw')))
 first = boot['reach'][0] if boot['reach'] else None
 gate('R1 first GUI API reaches shim (boot)', first and first['kind'] == 'IMPL' and first['calls'] > 0,
      'first=%s calls=%s kind=%s; reached=%d' % (first and first['name'], first and first['calls'], first and first['kind'], len(boot['reach'])))
 names_soft = {r['name'] for r in svs['reach']}
 gate('R2 survey reach floor', expected <= names_soft, 'reached %d (expected floor %d); missing=%s' % (len(names_soft), len(expected), sorted(expected - names_soft)))
 sv, bs = svs['survey'], base_sv
-gate('S1 survey parity (soft)', all(sv[k] == bs[k] for k in ('ok', 'noproc', 'miss', 'trap')),
-     'ok/noproc/miss/trap = %s/%s/%s/%s (base %s/%s/%s/%s)' % (sv['ok'], sv['noproc'], sv['miss'], sv['trap'], bs['ok'], bs['noproc'], bs['miss'], bs['trap']))
+gate('S1 survey parity (soft)', all(sv.get(k, 0) == bs.get(k, 0) for k in ('ok', 'noproc', 'miss', 'trap', 'clobber')),
+     'ok/noproc/miss/trap/clobber = %s/%s/%s/%s/%s (base %s/%s/%s/%s/%s)' % (sv['ok'], sv['noproc'], sv['miss'], sv['trap'], sv.get('clobber', 0), bs['ok'], bs['noproc'], bs['miss'], bs['trap'], bs.get('clobber', 0)))
 ffu = set(svf['survey']['failfast_units'])
 stub_soft = set(svs['softstub_apis'])
 gate('S2 fail-fast APIs are STUB in soft reach', ffu <= stub_soft and not (svf['survey']['kinds'].get('gui_failfast', 0) and not ffu),

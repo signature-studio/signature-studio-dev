@@ -10,9 +10,9 @@
 | 項目 | 結果 |
 |---|---|
 | 完了条件 2: 47 vs 46 の差 1 製品 | **「差 1 製品」は製品ではない**。47 ctor 呼出元の RTTI を全数解決: **製品 EditorModel 45 + `HostProxyEditorModel` (0x180007a40) + `SnapinGroupEditorModel` (0x180267c50) = 47**。product_index.json の 46 = 45 snapin/plugin + `core` (HeartCore 自体、EditorModel なし)。45 製品の id と ctor は最近傍ヒューリスティクスで 1:1 (§2)。KH9 §5-5 の「group/host 系の製品追加」推定は **「host proxy と snapin group の 2 つの非製品 EditorModel」** に確定 (47 − 46 = 非製品 2 − core 1) |
-| 完了条件 1: ブラウザ分類の lift IR | `0x180ef7fc0` (2,549 B) を含む module F (6 関数) が **emcc を通過** (wasm 47,604 B・undefined import 0・[icall] 3 サイト復元)。入口を node 実行すると最初の未 lift callee `0x180112a30` の fail-fast まで実行される (分類処理そのものには未到達。残りの STL/map/shared_ptr 群は未 lift) |
-| ゲート結果 (stub 定数 9 入力) | lift した実 IR の thunk A/C を status 0..40 で実行しゲート真理値表を再構成: **status 9 → flag 無関係に「一覧に載る・unlocked」**。unlocked 集合 = {5,7,8,9,26}。status 25 は flag=0 で非表示 / flag=1 で locked 表示 (§3) |
-| カテゴリ (Essential/Premium/Hosts/Groups) — **式の再実装による期待値確認 (lift IR では未検証)** | id 列 `egskocskpsdktafkqepkswsktfsk` は **PE から機械読出し**し、7 dword = {ksge,ksco,kdsp,kfat,kpeq,ksws,ksft} を確定 (リスト L と呼ぶ。「無償系」の意味は未確認)。product_index の 45 製品中 **Premium 7 / Essential 38**。`grup` → Groups、entry+0x22 が真なら Hosts (§4)。**注: 分類式は機械語読解の node 再実装で lift IR では未検証。カテゴリ名と製品の無償/有償の対応も未確認** (§4 注・§6.2) |
+| 完了条件 1: ブラウザ分類の lift IR | `0x180ef7fc0` (2,549 B) を含む module F (6 関数) が **emcc を通過** (wasm 54,394 B・undefined import 0・[icall] 3 サイト復元)。入口を node 実行すると最初の未 lift callee `0x180112a30` の fail-fast で停止する (= 入口の実行は未 lift callee の手前まで。分類処理本体には到達していない。残りの STL/map/shared_ptr 群は未 lift) |
+| 分類結果 (stub 定数 9 入力) | lift した実 IR の thunk A/C を status 0..40 で実行しゲート真理値表を再構成: **status 9 → flag 無関係に「一覧に載る・unlocked」**。unlocked 集合 = {5,7,8,9,26}。status 25 は flag=0 で非表示 / flag=1 で locked 表示 (§3) |
+| カテゴリ (Essential/Premium/Hosts/Groups) | id 列 `egskocskpsdktafkqepkswsktfsk` を **PE から機械読出し**し、7 dword = {ksge,ksco,kdsp,kfat,kpeq,ksws,ksft} を得た (KH9 の「推定」の id 列部分を確定)。product_index の 45 製品中、このリストに属する 7 件を リスト L (カテゴリ番号 1) と呼ぶ。残り 38 件はカテゴリ番号 0。**カテゴリ名 (Premium/Essential) と リスト L の意味 (無償/有償) の対応は未確認** (§4 注・§6.2)。分類式は機械語読解の node 再実装で、lift IR の結果ではない |
 | 0x180d5f190 | **`UISnapinLaneModel` (RTTI) の vtable slot 23** (vtable 0x181a37e78 + 0xb8)。`kmic`(Snap Heap)/`kmup`(Multipass)/`grup` の id だけを対象に thunk A∧¬thunk C をゲートして lane 一覧を作る関数 (§5) |
 | 0x180d52990 | 3 呼出元 (0x18055c060 / 0x1805c6a50 = Phase Plant / 0x1807e3420) はいずれも EditorModel 派生 ctor ではない。closure は §5 の範囲で確認 (関数本体の lift は未実施) |
 
@@ -36,7 +36,7 @@
 - `product_index.json` 46 = `plugins` 配列 46 要素 = 45 製品 + `core` (HeartCore, formats=['heartcore']・dependencies 無し)。`core` は EditorModel を持たない
 - **47 = 45 + 2、46 = 45 + 1 (core)**。差 1 は「製品 1 つ」ではなく、非製品 EditorModel 2 (host proxy / snapin group) と core 1 の差
 
-## 3. ブラウザ分類ゲート (完了条件 1 のうち lift IR で検証した部分)
+## 3. ブラウザ分類ゲート (完了条件 1・ゲート thunk の IR 実行 / 分類式は node 再実装で期待値を確認)
 
 関数 0x180ef7fc0 のエントリ採否 (機械語 0x180ef8710〜0x180ef87c8):
 `status = getStatus(...)` → `A(status)` (0x1800b4ac0・許可集合) が偽なら不採用候補、真なら `r13 = !C(status)` (0x1800b4ae0 = status==25)。`r13 != 0` で unlocked 登録、`r13 == 0` のときグローバル flag `[0x182358298]` が非 0 なら locked 登録・0 なら非表示。なお id==`grup` のエントリは別経路 (0x180ef862a): `r13 = [mgr+0xed9]` (byte) を使い、この表の対象外 (§6.2)。
@@ -50,15 +50,15 @@
 
 → **getStatus ≡ 9 (stub) では flag 無関係に全エントリが listed/unlocked**。stub が「許可側に固定」されていることの UI 分類レベルの裏取り。
 
-## 4. カテゴリ分類 (式の再実装による期待値の確認・lift IR では未検証)
+## 4. カテゴリ分類
 
 名前表 (逆アセンブルから UTF-16 文字列を読出し): 0 `Essential Effects` (0x1823a34e0) / 1 `Premium Effects` (0x1823a3504) / 2 `Effects Hosts` (0x1823a3524) / 3 `Groups` (0x181e79826)。
 
-分類式 (0x180ef82aa〜0x180ef830b の機械語読解): `id=='grup' → 3 / entry+0x22 が真 → 2 / id ∈ リスト L (7 id) → 1 / それ以外 → 0`。リスト L = `egskocskpsdktafkqepkswsktfsk` (0x180ef825b 付近の 2 つの 16 B 定数 = 28 B 重畳)。PE から読出して dword 列に分解すると {ksge, ksco, kdsp, kfat, kpeq, ksws, ksft} と一致 (BE 並べ)。
+分類式 (0x180ef82aa〜0x180ef830b の機械語読解): `id=='grup' → 3 / entry+0x22 が真 → 2 / id ∈ 無償系 7 id リスト → 1 / それ以外 → 0`。リスト = `egskocskpsdktafkqepkswsktfsk` (0x180ef825b 付近の 2 つの 16 B 定数 = 28 B 重畳)。PE から読出して dword 列に分解すると {ksge, ksco, kdsp, kfat, kpeq, ksws, ksft} と一致 (BE 並べ)。
 
 `kh249_check.mjs` の独立再計算: product_index 45 製品 (core 除外) に適用 → **category 1 = {kdsp,kfat,kpeq,ksco,ksft,ksge,ksws} の 7、category 0 = 38**。
 
-注: カテゴリ番号 1 (表示名 `Premium Effects`) はリスト L に一致する id の側で、カテゴリ番号 0 (表示名 `Essential Effects`) は残り。表示名と無償/有償の対応は未確認 (表示名の意味は未検証。KH9 の「無償系」は id 列の由来からの推定のまま)。
+注: カテゴリ番号 1 (表示名 `Premium Effects`) はリスト L の製品、番号 0 (表示名 `Essential Effects`) はそれ以外。リスト L が無償か有償かは未確認で、KH9 の「無償系」呼称は id 列の由来からの推定のまま (表示名との対応は未検証)。
 
 ## 5. 0x180d5f190 周辺の closure
 
@@ -79,28 +79,27 @@
 | 2 | `compare.mjs` の `bitsToF32` 未定義 (本チケットで発見した既存欠陥) | matrix/clipper の比較が実行されず `trials_ok=null` のまま `run_all.sh` が exit=0 (偽陽性)。→ §8 |
 
 ### 6.2 範囲外 (規則 40)
-- ブラウザ関数本体は **入口〜最初の未 lift callee まで**。std::map/string/vector/shared_ptr 等 41 個の callee (kh_lower の `unlifted callees` 41 件) は未 lift で、リスト構築・描画へ進む経路の bit 一致は未検証。
-- 数え方の違い (実測 `work/licF`): kh_lower の `unlifted callees` 41 件 → fail-fast stub (`stubs.c`) は **33 件**。差 8 件 = `0x180021490` `0x1800219b0` `0x180021d40` `0x18006c040` `0x1800b4b10` `0x180107430` `0x18010b6c0` `0x18024b2e0` は **すべて getStatus `kh_180054bd0` の本体からの呼出し**で、`lic_stub` が本体を `ret 9` に置換するため stub 後の `final.ll` に残らない (`shims.json` は空。shim 由来ではない)。本体 lift 後の closure は 41 件、stub 後の残存は 33 件。
-- 分類式・ゲート式は機械語読解の node 再実装 (lift IR のブラウザ本体をカテゴリまで流した結果ではない)。thunk A/C・getStatus は実 IR 実行。分類式は「lift IR では未検証」。`kh249_check.mjs` [3a] で式定数を命令バイトと照合し、[3b] で式を 5 通り壊して結果が変わることを確認するが、これは式の再実装が PE の読解と整合する・検査が自明でないことの確認までで、lift IR の分類結果の検証ではない。lift IR で検証するには未 lift callee (41 件) の shim が要る。
+- ブラウザ関数本体は **入口〜最初の未 lift callee まで**。std::map/string/vector/shared_ptr 等の callee は未 lift で、リスト構築・描画へ進む経路の bit 一致は未検証。
+- 未 lift callee の数え方 (実測・`work/licF/stat.json` の `unlifted callees`、HEAD `b0db3a1` で `lic_build.py --module F`): kh_lower の `unlifted callees` は **40 件**。内訳は shim 4 (`new`/`delete`/`memcpy`/`getManager`) + 残り 36。`gen_stubs_sigs.py` の `stubs 33` (fail-fast 定義) は final.ll に `declare` が残った数で、残り 7 件は fail-fast 定義に現れない。`n1s.ll` には 48 件すべての declare が残るが、`final.ll` は 40 件に減る (`lic_build.py` の重複 declare 除去は、本体 `call` が 1 箇所だけの declare を消す)。`180107430` は shim 側 (`shims` で C 実装に置換)。`180021490`・`1800219b0`・`180021d40`・`18006c040`・`18010b6c0`・`18024b2e0` の 6 件は、`stub_only` の `getStatus` (0x180054bd0) の本体を `lic_stub.py` が stub に置換した後、その本体 (`n1.ll` 1292〜2133 行) にあった `call` だけが残る declare として除去される。ここの機構は実測の観察で、`lic_build.py` の該当箇所 (107〜114 行) の挙動から導いた説明であり、6 件の個別の経路は未追跡。本 REPORT の 41 件・40 件は kh_lower の出力 (shim 追加前後) を指し、stub 33 件とは数え方が異なる。
+- 分類式・ゲート式は機械語読解の node 再実装 (lift IR のブラウザ本体をカテゴリまで流した結果ではない)。thunk A/C・getStatus は実 IR 実行。分類式は「lift IR では未検証」。`kh249_check.mjs` [3a] で式定数を命令バイトと照合し、[3b] で式を 5 通り壊して結果が変わることを確認するが、これは式の再実装が PE の読解と整合する・検査が自明でないことの確認までで、lift IR の分類結果の検証ではない。lift IR で検証するには未 lift callee (40 件。shim 追加前は 41 件) の shim が要る。
 - `grup` エントリのゲート (`[mgr+0xed9]`) は未検証 (§3 の表は非 grup のみ)。
 - 製品 id ↔ ctor の 1:1 対応は「id を持つ関数の最近傍」ヒューリスティクス (§2)。RTTI クラス名の 47/47 同定とは独立で、製品名の対応は一部 (`Matrix`=kscm 等) クラス名からの読み替え。
 - native oracle (ctx-fuzz) との bit 突合は未実施。
 
-### 6.3 実測 (コミット済み HEAD `d238c27` で `bash run_all.sh` を単発実行。以降の差分は本節の docs のみ)
-
-**直近の実測 (本 HEAD 上の修正後 run・cold キャッシュ)**: `bash run_all.sh` exit 0 / **4 分 53 秒** (`KH_EM_CACHE` 空の新規 dir、xref 有り、nproc=4)。kh249_check ok=17 ng=0、snapin 12 系 200/200 (call 全一致)、module E 200/200・1000/1000、em_check ok=52 ng=0、emfire 0/200 (既知・exit 非影響)。
+### 6.3 実測 (コミット済み HEAD `fac2c73` で `bash run_all.sh` を単発実行 (2 回目・キャッシュ有り)。以降の差分は本節の docs のみ)
 | 項目 | 結果 |
 |---|---|
-| 所要時間 | **49 s** (同 run の直前に実行した初回 (キャッシュ無し・HEAD `9b6e379` + 未コミット差分) は **5 分 06 s** (07:10:12〜07:15:19、xref 全走査含む)。本実測は xref・RetDec stage-0 キャッシュ有り。nproc=4) |
-| load average (1/5/15 分) | 開始 0.12 / 0.60 / 0.43 → 終了 0.69 / 0.68 / 0.47 |
-| exit | **0** |
+| 所要時間 | **54.2 s** (`real 0m54.178s`、2 回目の実行。素材 `KH_SRC` 指定・emsdk cache は空の新規ディレクトリから作成済み・xref は初回のみ 44.6 s を別計測)。nproc=4 |
+| load average (1/5/15 分) | 開始 0.48 / 0.70 / 0.44 → 終了 1.13 / 0.90 / 0.57 (計測中の他プロセスなし) |
+| exit | **0** (1 回目は `KH_SRC` 未指定で [4b] の素材チェックにより exit 1。素材指定の 2 回目で exit 0) |
 | lic_check (module A/B) | ok=70 |
 | snapin 6 種 base/lic | **200/200 × 12 系** bit-exact (matrix 1149 / gain 999 / haas 1100 / clipper 1100 / gate 999 / quickeq 999 call。全 call 一致) |
 | em / empoll (module E) | 200/200 (700/700 call) / 1000/1000 (10,000/10,000 call) bit-exact |
 | em_check | ok=52 ng=0 |
 | emfire (情報提供・既知未解決) | 0/200 (ctor/register 400/600 call 一致、fire 0/200)。KH11_REPORT §2 と同じ。run_all.sh の exit には影響しない |
-| module F (本チケット) | 6 関数 lift・wasm 47,604 B・undefined import 0・`kh249_check` ok=17 ng=0 |
+| module F (本チケット) | 6 関数 lift・wasm **54,394 B** (sha256 `7ba79e65…8c7707`)・undefined import 0・`kh249_check` ok=17 ng=0 |
 | ctor 同定 | callers=47 rtti_resolved=47 |
+| xref 全走査 (初回のみ) | `xrefscan.py` 44.6 s (`work/xref_kh11.json` が無いときのみ実行) |
 
 初回実行 (HEAD `da081d5`) は `run_all.sh` が exit=0 だったが matrix/clipper が `null/null` だった (§8)。上表は修正後 HEAD の再実行値。
 
@@ -108,6 +107,7 @@
 - `[EMSDK]/upstream/emscripten/cache` が読取専用で `emcc` が filelock の PermissionError (`js_output.lock`) で失敗 → `KH_EM_CACHE=<書込可 dir>` を指定 (`lic_build.py`)。`emsdk_env.sh` が `EM_CACHE` を unset するため source 後に再設定している。
 - Python は `uv venv work/venv` に `pefile capstone numpy` を入れて PATH 先頭に置く (system python は PEP 668 で pip 不可)。
 - `plugins-kilohearts` は Windows zip だけ展開 (`work/win` → `work/blobs/windows.zip/*` → `work/winpkg`)。macOS dmg / llvm-lipo は本チケットでは不要。
+- **`work/winpkg/product_index.json` の入力元**: 素材 `plugins-kilohearts` の `Kilohearts Offline Installer.zip` → `payload.dat` 内 `index.json` の `releases[0].plugins` (87 件) のうち、formats が `bank` のみでない 46 件 (45 製品 + `core`)。生成は `python3 scripts/kh249_product_index.py` (`run_all.sh` [4b] から実行)。`extract_installer.sh` は `index.json` を `work/blobs/` に置くが `product_index.json` は作らないため、生成は本スクリプトが担う。素材または `KH_SRC` が無い場合・件数が 46 でない場合は exit 1 で止まり、`kh249_check.mjs` / `kh249_id_scan.py` も欠落時に明示メッセージで落ちる。
 
 ## 8. 既存欠陥の発見と修正 (スコープ内)
 - `harness/compare.mjs` (license 側コピー) に `bitsToF32/bitsToF64/f32bits` の定義が無く、float/double 引数を持つ関数 (matrix 0x1804f4180 / clipper) の比較が ReferenceError で落ちた。compare.json が生成されず `lic_build.py` は `trials_ok=None` を出すのみで、`run_all.sh` はそれを失敗扱いにしなかった (= **「200/200」未達のまま exit=0**)。`snapins/harness/compare.mjs` の同定義を移植して修正し、`run_all.sh [5]` で `trials_ok !== trials` を FAIL 化 (exit 1) した。この repo HEAD の license/harness 単体では matrix/clipper の比較は再現していなかった (KH-9 / KH-11 REPORT の記載値と食い違う経緯は未調査)。修正後の再実行で 12 系すべて 200/200 を確認 (§6.3)。
@@ -116,8 +116,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ブラウザ本体の STL/shared_ptr 群 (41 callee) 未 lift、native oracle 突合なし | リスト構築〜描画の bit 一致未証明 | #249 (本 issue) 継続 / 親 #15 |
-| lift IR のブラウザ分類器 (0x180ef7fc0 のカテゴリ割当) の実行検証 | 分類は式の再実装 (§4) の確認のみ。shim/lift 無しでは lift IR の分類結果は出ない | #656 [KH-13] (親 #249 / #15) |
+| ブラウザ本体の STL/shared_ptr 群 (未 lift callee 40 件。shim 追加前は 41 件) 未 lift、native oracle 突合なし | リスト構築〜描画の bit 一致未証明 | #249 (本 issue) 継続 / 親 #15・追跡 #656 [KH-13] |
 | entry+0x22 の意味 (Hosts 判定) 未同定 | `Effects Hosts` が実際にどのエントリかは不明 | #249 継続 |
 | カテゴリ名と無償/有償の対応未確認 | 「無償系」解釈は推定 | #249 継続 |
 | 0x180d52990 の本体 lift 未実施 | Phase Plant 等 3 呼出元の closure は呼出元同定まで | #249 継続 |

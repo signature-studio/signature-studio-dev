@@ -14,7 +14,9 @@ source "$ROOT/../shared/env.sh"
 python3 -c 'import numpy' 2>/dev/null || { [ -n "${VIRTUAL_ENV:-}" ] || VIRTUAL_ENV="${PYTHON_VENV:-${RUNNER_TEMP:-/tmp}/f2venv}"; export VIRTUAL_ENV; uv pip install -q numpy; }
 BLOCKS="18953 18975 18979 18982 18984 19005 19006 19013 19058 19059 19145"
 SHARDS="${SHARDS:-4}"
-mkdir -p "$LD/work/tmp" "$ROOT/work/f2/leaf"
+mkdir -p "$LD/work/tmp" "$ROOT/work/f2/leaf" "$ROOT/work/f2/leaf_custom" "$ROOT/work/f2/targets"
+# 前回実行の生成物 (選定集合が変わると古い block の target / 結果が残り、再実行や集計に混ざる) を消してから再生成する
+rm -f "$ROOT"/work/f2/targets/*.vas "$ROOT"/work/f2/targets/eqf*.json "$ROOT"/work/f2/leaf/*.jsonl "$ROOT"/work/f2/leaf_custom/*.jsonl
 t0=$(date +%s)
 python3 "$HERE/leaf_list.py" --expect 23 $BLOCKS
 python3 "$HERE/mk_targets.py"

@@ -8,7 +8,10 @@ from pe_dis import pe, data, BASE, rd
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 arg = lambda k, d=None: sys.argv[sys.argv.index(k) + 1] if k in sys.argv else d
 ctors = json.load(open(arg('--ctors', os.path.join(HERE, 'work', 'ctor_ids.json'))))
-plugins = json.load(open(os.path.join(HERE, '..', 'work', 'winpkg', 'product_index.json')))['plugins']
+pi = os.path.join(HERE, '..', 'work', 'winpkg', 'product_index.json')
+if not os.path.isfile(pi):
+    sys.exit('FAIL: %s が無い。python3 scripts/kh249_product_index.py で生成 (入力: plugins-kilohearts)' % pi)
+plugins = json.load(open(pi))['plugins']
 ids = {struct.unpack('>I', p['id'].encode())[0]: p['id'] for p in plugins}
 pd = [s for s in pe.sections if s.Name.rstrip(b'\0') == b'.pdata'][0]
 b = data[pd.PointerToRawData:pd.PointerToRawData + pd.Misc_VirtualSize]

@@ -84,12 +84,10 @@ class Pe:
         lo, hi = self.base, self.img_hi
         for i in ins_list:
             mn, op = i.mnemonic, i.op_str
-            if mn == 'call' or (mn.startswith('j') and re.fullmatch(r'0x[0-9a-f]+', op)):
-                tgt = int(op, 16) if re.fullmatch(r'0x[0-9a-f]+', op) else None
-                if mn == 'call':
-                    op = 'F' if tgt is not None else op
-                else:
-                    op = 'J'
+            if mn == 'call' and re.fullmatch(r'0x[0-9a-f]+', op):
+                op = 'F'
+            elif mn.startswith('j') and re.fullmatch(r'0x[0-9a-f]+', op):
+                op = 'J'
             op = RIP.sub('[rip+G]', op)
 
             def absaddr(mm):
@@ -138,16 +136,13 @@ def main(kh_path, sc_path, out):
                 if max(a[0], b[0]) > 2.5 * min(a[0], b[0]):
                     continue
                 if a[2][0] == b[2][0]:
-                    rm, rr, re_ = 1.0, 1.0, 1.0
+                    rm = 1.0
                 else:
-                    sm = difflib.SequenceMatcher(None, a[2][2], b[2][2], autojunk=False)
-                    rm = sm.ratio()
-                    rr = 1.0 if a[2][1] == b[2][1] else None
-                    re_ = None
-                pairs.append((rm, i, j, rr, re_))
+                    rm = difflib.SequenceMatcher(None, a[2][2], b[2][2], autojunk=False).ratio()
+                pairs.append((rm, i, j))
         pairs.sort(reverse=True)
         used_k, used_s, best = set(), set(), []
-        for rm, i, j, rr, re_ in pairs:
+        for rm, i, j in pairs:
             if i in used_k or j in used_s:
                 continue
             used_k.add(i); used_s.add(j)
