@@ -83,6 +83,13 @@ def main():
              os.path.join(d3, 'k80.argfix.ll'), ucs, '--func', 'function_5e0d80',
              '--report', os.path.join(d3, 'k80.ucomi_sign.json')])
         os.replace(ucs, os.path.join(d3, 'k80.argfix.ll'))
+    # #982: fistp qword の上位 dword store 欠落 (0x5de3e0) を関数指定で復元 (K80_NO_FISTP_HI=1 で外す)
+    if os.environ.get('K80_NO_FISTP_HI') != '1':
+        fhi = os.path.join(d3, 'k80.argfix.fhi.ll')
+        run(['python3', os.path.join(HERE, '..', 'lift', 'passes', 'fix_fistp_hi_store.py'),
+             os.path.join(d3, 'k80.argfix.ll'), fhi, '--func', 'function_5de3e0',
+             '--report', os.path.join(d3, 'k80.fistp_hi.json')])
+        os.replace(fhi, os.path.join(d3, 'k80.argfix.ll'))
     rep = json.load(open(os.path.join(d3, 'k80.argfix.json')))
     print('   argfix: movd=%d helper_xmm=%d struct_copy=%d orphan(gpr/float)=%d/%d' % (
         rep['movd_fixed'], rep['helper_xmm_fixed'], rep['struct_copy_fixed'],

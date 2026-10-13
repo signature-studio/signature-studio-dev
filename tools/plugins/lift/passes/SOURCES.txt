@@ -24,6 +24,7 @@ m11_passes.py: IMG_HI を環境変数 PLUG_IMG_HI で上書き可能に (他は�
 fix_regparam_alloca.py  [P-R1]  引数レジスタ名 alloca (store 無し) → inttoptr(argN)
 fix_asm_stores.py       [P-S1c/S1d] 64bit 部分 store / i64 経由 sext の 128bit store の復元
 fix_orcond_xnor.py      [P-C1]  RetDec の `or.cond = icmp eq i1` (XNOR 誤畳み込み) → and (opt-in, 関数指定)
+fix_fistp_hi_store.py   [P-S2]  fistp qword の上位 dword store 欠落を復元 (opt-in, 関数指定; #982)
 fix_dup_decls.py        [P-D1]  同一 declare 重複除去
 fix_ptr_params.py       [P-T1]  定義済み関数の `ptr %argN` 仮引数を i64 に統一 (call site は ptrtoint, 本体の ptr 文脈は inttoptr)
 fix_icmp_ptr.py         [P-E1]  `icmp P ptr %a, %b` の i64 被演算子 → inttoptr (PLG-F6-2 #545。 旧 distortion/engine_fixcmp.py)

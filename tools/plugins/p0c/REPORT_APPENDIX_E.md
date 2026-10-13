@@ -92,7 +92,7 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x5de3e0 の `[rdx]` store 欠落 (lift) | buf_diff 2000 | #331 |
+| ~~0x5de3e0 の `[rdx]` store 欠落 (lift)~~ | 解決 (#982, §14.6) | — |
 | 0x5dee90 / 0x5df040 / 0x5e02b0 の残差 | buf_diff 約 2.57M | #331 |
 | 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | #331 |
 
@@ -116,6 +116,25 @@ INTERSECT `run=66`)。MEMW の差は CSV の buf_diff でのみ検出できる�
 前提: `k80.lift.ll` は `bash tools/plugins/lift/lift_ranges.sh <PE> work/k80_ranges.txt tools/plugins/p0c/work k80 2400`
 で再生成。`llvm-as` / `clang` は PATH に必要 (runner では `/usr/lib/llvm-18/bin`)。
 `/opt/retdec` と `/home/ubuntu/work/{analysis,webstudio}` は runner 上の symlink で代替 (§12.4)。
+
+### 14.6 0x5de3e0 の上位 dword store 復元 (#982、親 #331)
+
+機械語 `fistp qword [rbp+8]` の後に `mov [rdx], eax` (上位 dword) と `mov [r8], eax` (下位 dword) の 2 store がある。
+RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使用だった (lift 欠落、§14.4 の未解決)。
+
+- 修復: `tools/plugins/lift/passes/fix_fistp_hi_store.py` [P-S2] (opt-in、関数指定)。下位 dword store の直後に
+  `lshr 32` → `trunc` → 未使用 `inttoptr` への store を挿入する。対象形が 1 関数に 1 つだけ成立するときのみ書き換え、曖昧なら何もしない。
+  `p0c4_abi_e2e.py` は `K80_NO_FISTP_HI=1` で外せる。`lift_ranges.sh` は `PLUG_FISTP_HI_FUNCS` で指定する。
+- 実測 (`p0c4_abi_e2e.py 2000`、負論対照 `K80_NO_FISTP_HI=1` と同一 HEAD で比較):
+
+| 条件 (検証 HEAD = 本 PR のコミット、同一 HEAD で実行) | rc | 所要 | load (開始時) | 0x5de3e0 buf_diff | ok かつ buf_diff=0 |
+|---|---:|---:|---:|---:|---:|
+| 修復なし (`K80_NO_FISTP_HI=1`) | 0 | 27.1 s | 0.14 | 2000 | 45 |
+| 修復あり | 0 | 27.2 s | 0.14 (同) | **0** | **46** |
+
+- 差分は 0x5de3e0 の 1 行のみ (他 79 kernel の `run / ok / sig11 / buf_diff` は不変)。`run=67 ok=67 sig11=0`。
+- `lift_ranges.sh` の opt-in 経路: `PLUG_FISTP_HI_FUNCS=function_5de3e0` で `on.final.ll` に `fhi_s` が 2 箇所、未指定で 0 箇所。
+- 未検証: 残る 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 (#331) と、`p0c3_e2e.sh` の回帰判定 (0x5de3e0 除外の既存処理) の見直し。
 
 ## 15. 環境パス置換 (#346, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
 
