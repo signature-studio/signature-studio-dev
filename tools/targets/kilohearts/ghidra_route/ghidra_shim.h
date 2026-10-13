@@ -18,9 +18,12 @@ typedef unsigned int uint;
 typedef unsigned char byte;
 typedef unsigned short ushort;
 
+typedef struct { uint8_t v[12]; } B12;
 typedef union {
     uint8_t b[16];
     struct { float _0_4_, _4_4_, _8_4_, _12_4_; };
+    struct { uint64_t _0_8_, _8_8_; };
+    struct { uint32_t _p4; B12 _4_12_; };
 } V128;
 
 static inline void v128_store_shl32(void* dst, V128 v) {

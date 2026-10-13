@@ -222,3 +222,11 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 起票先: Resonator の emcc 残件 → #1215 [KH-23] / Stereo・Delay の実ビルド・突合 → #1216 [KH-24]。
 - 残る未解決 (emcc 出力): (a) V128 lane `_8_8_`/`_4_12_`/`_0_8_`、(b) `rcpps` 未実装 (`gen_simd.py` の `kh_rcp_exact` 系を移植すれば入る見込み。未検証)、(c) 引数なし呼出の `param_1` 不足、(d) 推移的な未関数化 callee `0x180fd6498`・`0x180fd662c`・`0x180fe5f40`・`0x180fd3144`、(e) `UNK_182280000` 未定義。
 - 突合・ablation・ネガコンは本 run でも未実施。Stereo / Delay は未着手。
+
+#### 10-7d. #1215 (KH-23) 1 単位: V128 の 128bit レーン型を shim で解消
+- 環境: Ghidra 12.1.4 = GitHub release `Ghidra_12.1.4_build` の zip (sha256 `ddac49f9…d2db` 一致)、JDK 21。素材は `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64。emsdk は `[EMSDK]` (6.0.12)。
+- 変更: `ghidra_shim.h` の `V128` に `_0_8_`・`_8_8_` (uint64) と `_4_12_` (12 byte) のレーンを追加 (commit は本 PR)。
+- emcc (resonator, 修復なし, `-ferror-limit=0`, 同一条件): 旧 shim 22 行 (`_8_8_`/`_4_12_`/`_0_8_` 由来 8 件) → 新 shim 18 行 (そのレーン由来 0 件)。
+- 残件 (emcc): (a) テーブル `UNK_182280000`・`UNK_182280020` が未定義 (`pe_bytes` は 1 グローバル 16 byte しか読まない)、(b) 未関数化 callee `func_0x000180fd648c`・`func_0x000180fd6498`・`func_0x000180fd662c`・`func_0x000180fbdfcc`・`func_0x000180fbdef4`・`FUN_180fe5f40`・`FUN_180fd3144`、(c) `rcpps` の 2 引数形 (`rcpps(in_XMM2, auVar26)`)、(d) 引数なし呼出の `param_1` 不足 2 件。
+- Resonator のビルドは**依然失敗**。突合・ablation・ネガコンは未実施。
+- 回帰確認 (新 shim・同一 HEAD): Gain 1000/1000 (wasm 15,161 B)・Haas 1000/1000 (16,878 B)・Gate 1000/1000 (17,367 B)。wasm サイズは §10-3 の値と一致。Ghidra decompile は 10 関数すべて OK。突合の実測秒は未計測 (emcc 0.2〜0.3 s)。
