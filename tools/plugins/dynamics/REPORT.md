@@ -203,7 +203,9 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 |---|---|---|
 | 差分試験 bit-exact (出口条件 3)。 Eff_Render 単位の native / wasm harness が無く、P0a/P0b 未完 | #200 を閉じられない | #195 / #196 の完了後に #200 を再開 (Closes はその時)。 harness は新規子チケットを PM に起票依頼: 「[PLG-F3a] Eff_Render 単位の native(ms_abi VA 敷設) ⟷ wasm 差分 harness」 |
 | Render test .flp の E2E (出口条件 4) | 同上 | FLEngine 統合待ち。 親 #14 / #200 |
-| engine 2 本の `emcc -c` 未通過 (型エラー 3 類型の連鎖、VEX helper 未実装、`.pdata` 210 件 define 無し) | T2 の 2 本 (Multiband / Transient) | 新規子チケットを PM に起票依頼: 「[PLG-F3b] C++ engine DLL の lift 鎖: IR 型整合 pass + VEX helper + define 脱落の原因調査」 |
+| engine 2 本の未実装 helper 宣言 (Transient 12 / Multiband 6、FMA・movntps・vmovsd store・ucomis flag) | T2 の 2 本 (Multiband / Transient) | #1408 ([PLG-F3-8]) |
+| `.pdata` 範囲の define 脱落 (Multiband 210 件 / Transient 2 件)。 原因未特定 | T2 の 2 本 | #1412 ([PLG-F3-9]) |
+| `emcc -c` (`e.final.ll` と生成 helper C の両方) は 2 本とも rc 0 で達成済み (型エラー 3 類型は `engine_fixcmp.py` と `PLG_F80_LOWER` で解消) | — | 解消済み (#1163) |
 | Transient engine の f80 1 関数 | engine の wasm 化 | #197 (`f80_lower.py` の適用) にコメント |
 | 0x5dee90 の P0c 汎用 harness 残差 (2,565,360) | Maximus / Soundgoodizer の kernel 保証 | #331 (既存) にこの依存を追記 |
 | host slot 0x80 / 0x120 と動的 ID 4 site の意味 | Emphasis / Limiter / Compressor ほか | #196 作業 5 (0x13173a0 全 case 解析) に追記 |
