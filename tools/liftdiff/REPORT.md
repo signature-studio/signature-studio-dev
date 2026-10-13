@@ -1,12 +1,10 @@
 # liftdiff — flelift (x64c) 全数採点 (CAB-232) + native 全起動の参照化 (CAB-233)
 
 > 正本: `tools/liftdiff/REPORT.md`。書式仕様は `docs/FORMAT.md`。
-> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文・§8 wasm_trap トリアージ・§9 wasm_trap 個別原因)。
+> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文・§8 wasm_trap トリアージ・§9 wasm_trap 個別原因・§12 被覆拡大 2 パターンの全文)。
 
 検証起点 commit: 01d5cb5 (CAB-233)。A/B は fba272c (CAB-232) 側。検収は b8e762d (HEAD) から実施。
-既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call
-`call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。
-icall REPORT §4 体系 (D1=間接 call / D9=disp_size) とは別物。
+既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call `call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。icall REPORT §4 体系 (D1=間接 call / D9=disp_size) とは別物。
 
 **判定: CAB-232 達成 / CAB-233 達成 (残 3 unit は下流)**。CAB-232 では FLEngine closure **7,421 関数の全数採点**
 (9 pattern × native/wasm) で **一致 4,143 / 不一致 633 / 実行不能 2,645** を実測し、m11 RetDec route との突合で
@@ -241,33 +239,12 @@ OOB `function_414ad0` 系 68 件は `[rbx]` 1 段 deref の IR 脱落 (68 件は
 Actions で [2/4] を 3 回実測: 3 回とも `check_ott.py` exit 0・212 関数 = 一致 38 / 不一致 108 / 実行不能 66 (D1 4 / D2 6 / D3 14 / D4_D5 18 / D6 26)。`pe` は `ANALYSIS_DIR` 経由で解決。
 ネガコン `tests/nc_check_ott.sh` 5/5 PASS。**`liftdiff_e2e.sh` 全体 exit 0 は `fl-win64`・`work-m11` 未取得のため未確認** (#406 受入条件 1 未達)。全文・未解決表: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §10。
 
-## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成)
-
-`cases.PATTERNS` に 2 pattern を追加 (`ldlib/cases.py`・`ldlib/session.py`)。どちらも既存 9 pattern の case 生成には影響しない。
-
-- `vm0`: this 疑似オブジェクト。arena+0x1000 に VMT (arena+0x2000) への fixup ptr を置き、0 埋めの VMT を指す。
-- `u16`: UTF-16 文字列 blob。arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, len) + UTF-16LE 本文を置き、本文先頭を引数で渡す。
-
-実測 (m11, sample:800, `--shards 12 --state auto`、base = origin/main 97f28539 / 新 = 本ブランチ):
-
-| 項目 | base (9 pattern) | 新 (11 pattern) |
-|---|---|---|
-| 一致 / 不一致 / 実行不能 | 358 / 212 / 230 | 361 / 229 / 210 |
-| 所要 (batch) | 1m39s (load 0.76) | 1m49s (load 0.31→1.35) |
-
-関数単位の遷移: unexec→match 7 / unexec→mismatch 13 / match→mismatch 4 / match→match 354 / mismatch→mismatch 212 / unexec→unexec 210。
-match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pattern (vm0/u16) の case だけが diff/wasm_trap で、既存 9 pattern は変わらない (深部経路の露出)。
-`liftdiff_e2e.sh --m11-only` は exit 0 (単体テスト・unit #18 の 3 検査 PASS・closure 361/229/210)。
-
-**未達 (受入条件)**: 実行不能 2,261 (closure) の内訳の大半 (native fault / null deref) は今回の 2 pattern では解消しない。
-UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試していない。this/VMT は VMT の slot を埋めないため、仮想 call 先で native が落ちる。
-「native 失敗 RVA からの引数補正」「署名未対応 (vector/struct) の扱い」「状態前提 (InitTable/TLS) の case 生成」は未着手。
-flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
-起票先: 本 issue #235 (部分達成のため Refs)。
-
 ## 11. 比較系の偽陽性 2 類型の修正 (LD-11 / #548、要約)
 
 既知類型との関係: 該当なし (DEFECTS.md の lift 欠陥ではなく比較器側の偽陽性。f2 REPORT §7 起点)。
 - 修正: `cmp_mem` の byte 単位比較 (`eq_block_bytewise`) と wasm timeout の別 outcome `wasm_timeout_native_long` (verdict は unexec)。target 値は `compare.wasm_timing_params` が正の値のみ受理。単体テスト 23 件 (ネガコン込み) は e2e [0/4] で全 PASS。
 - 実測 (HEAD f694ef0・`--m11-only` 3 回 全 exit 0): sample:800 = 一致 358/357/357 · 不一致 212/213/213 · 実行不能 230。origin/main は 353/217/230。安定 +4 (0x1062200・0x1266e70・0x441500・0x9cecc0) と run 依存 1 件 (0x959a40)。`wasm_timeout_native_long` は 0 件。
 - **未検証**: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれず f2 系素材が必要)。全文・3 run 表・未解決: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §11。
+
+## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成)
+`vm0` (this/VMT 疑似オブジェクト) と `u16` (UTF-16 文字列 blob) を追加。sample:800 で 一致 358→361 / 不一致 212→229 / 実行不能 230→210 (base 97f28539 比)。未達 (受入条件) は #235 に残す。全文・実測・未達の内訳: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §12。

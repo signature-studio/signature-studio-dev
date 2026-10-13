@@ -214,3 +214,27 @@ PR head は 358 / 212 / 230 ×2 と 357 / 213 / 230 ×1 (本 run の 3 回と一
 |---|---|---|
 | 受入条件 1: 0x6cd8a0 の 9 パターン実 PE 実測 (sample:800 に含まれない・f2 系素材が必要) | #548 を Closes できない | f2 系素材の許可名追加 = #293 (PM 判断) |
 | 非決定性: main 同士の case outcome の揺らぎ・0x959a40 の ret/trace 差分の run 依存 | 「+5」ではなく「安定 +4 + 揺らぎ 1 件」として扱う必要 | PM 判断: #548 へのコメントか新規 issue (未起票) |
+
+## 12. 被覆拡大 2 パターン (LD-4 / #235、部分達成) — 全文
+
+`cases.PATTERNS` に 2 pattern を追加 (`ldlib/cases.py`・`ldlib/session.py`)。どちらも既存 9 pattern の case 生成には影響しない。
+
+- `vm0`: this 疑似オブジェクト。arena+0x1000 に VMT (arena+0x2000) への fixup ptr を置き、0 埋めの VMT を指す。
+- `u16`: UTF-16 文字列 blob。arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, len) を置き、本文 UTF-16LE は +8 (arena+0x1008) に置く。引数はヘッダ先頭 (arena+0x1000) を渡す (`PATTERNS` の `('u16', {0}, 'u16', 0, 'small')`・加算 0)。
+
+実測 (m11, sample:800, `--shards 12 --state auto`、base = origin/main 97f28539 / 新 = 本ブランチ):
+
+| 項目 | base (9 pattern) | 新 (11 pattern) |
+|---|---|---|
+| 一致 / 不一致 / 実行不能 | 358 / 212 / 230 | 361 / 229 / 210 |
+| 所要 (batch) | 1m39s (load 0.76) | 1m49s (load 0.31→1.35) |
+
+関数単位の遷移: unexec→match 7 / unexec→mismatch 13 / match→mismatch 4 / match→match 354 / mismatch→mismatch 212 / unexec→unexec 210。
+match→mismatch の 4 件 (0x8445b0・0x6681f0・0xfe8e80・0x528680) は新 pattern (vm0/u16) の case だけが diff/wasm_trap で、既存 9 pattern は変わらない (深部経路の露出)。
+`liftdiff_e2e.sh --m11-only` は exit 0 (単体テスト・unit #18 の 3 検査 PASS・closure 361/229/210)。
+
+**未達 (受入条件)**: 実行不能 2,261 (closure) の内訳の大半 (native fault / null deref) は今回の 2 pattern では解消しない。
+UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試していない。this/VMT は VMT の slot を埋めないため、仮想 call 先で native が落ちる。
+「native 失敗 RVA からの引数補正」「署名未対応 (vector/struct) の扱い」「状態前提 (InitTable/TLS) の case 生成」は未着手。
+flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
+起票先: 本 issue #235 (部分達成のため Refs)。

@@ -37,7 +37,7 @@ def make_blob_vm(size=BLOB_SIZE):
 
 
 def make_blob_u16(size=BLOB_SIZE):
-    """UTF-16 文字列: arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, length) + UTF-16LE 本文 (本文先頭 = arena+0x1008)。"""
+    """UTF-16 文字列: arena+0x1000 に Delphi UnicodeString ヘッダ (refcnt=1, length)、本文 UTF-16LE は +8 (arena+0x1008) に置く。引数はヘッダ先頭 (arena+0x1000) を渡す。"""
     import struct
     buf = bytearray(size)
     text = 'FL Studio 26.1.7 ABC'.encode('utf-16-le')
