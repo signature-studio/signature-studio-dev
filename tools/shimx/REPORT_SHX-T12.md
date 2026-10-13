@@ -62,9 +62,9 @@
 | fail_err | {2: 3, 18: 1} (ERROR_FILE_NOT_FOUND ×3 / ERROR_NO_MORE_FILES ×1) |
 | distinct_posix_opened | 2 |
 
-`ftrace_test.sh` の結果: rc=0 / 3.97 s / load 0.18 0.25 0.22 / PASS 4 段 (✓ 4 件 + 完了行)。
+`ftrace_test.sh` の結果 (HEAD = 修正 commit、検証直前の `/proc/loadavg` 開始値 0.84 0.69 0.36): rc=0 / 5.72 s / PASS 6 段 (✓ 完了 5 件 + 完了行)。
 
-`bash test.sh` (既存の全体テスト): rc=0 / 37 s。
+`bash tools/shimx/test.sh` (既存の全体テスト): rc=0 / 94 s / 7/7 完了 (開始 load 0.04 0.24 0.18、終了 1.78 0.80 0.38)。実行後に追跡対象の生成物 (`BACKLOG.md` / `exports.txt` / `inventory.md` / `data/coverage.json` / `data/inventory.csv`) は HEAD に戻した。
 
 ## 6. ネガティブコントロール
 
@@ -77,7 +77,9 @@
 - **既定 (MEMFS) ビルドでは guest の `getenv` から host の環境変数が見えない**。`SHIMX_TRACE_FILE` は NODERAWFS ビルドでのみ効く (実測: `env=(null)` / `env=/tmp/x`)。既存の `SHIMX_TRACE` も同じ制約で、`tools/m11/shimx_link/run_trace.mjs` は `_shimx_set_trace(1)` の export で回避している。
   - 本件では `run_trace.mjs` を変更していない。m11 の本番 wasm に `shimx_set_trace_file` を export するには wasm の再ビルドが必要で、m8/m11 素材の再生成を伴うため本 run では検証できない。**未起票: m11 harness (`run_trace.mjs`) に `shimx_set_trace_file` の export を足す作業。PM に起票を依頼する**。
 - 対象 API は受入条件どおり 6 種 + FindFirstFileExW。`CreateFileA` は `ftr_create` 内で `MultiByteToWideChar` による元文字列の復元を行う (トレース有効時のみ)。
-- 本 run では m11 本番 (`run_trace.mjs`) の実 boot で JSON を収集していない (素材の再生成が必要)。受入条件の「実 boot の open() trace」の実測は、上記の未起票分で行う。
+- 本 run では m11 本番 (`run_trace.mjs`) の実 boot で JSON を収集していない (素材の再生成が必要)。受入条件の「実 boot の open() trace」の実測は、上記の未起票分で行う。**未達 (#789 は未完了のまま)**。
+- `CreateFileA` の `guest` は CP_ACP → UTF-16 → UTF-8 の変換を経由する。ASCII では元の文字列と一致する。非 ASCII (CP_ACP の多バイト文字) では UTF-8 化の結果が元のバイト列と一致しない場合がある (変換の往復で失われる)。`CreateFileW` は UTF-16 をそのまま UTF-8 化するため、この差は `CreateFileA` のみ。
+- `ftrace_test.sh` の trace 出力先は MEMFS の仮想パス (`/ftr.jsonl`)。env 段の確認用 `CreateFileW` は host の FS に書かない (読取専用の失敗 open)。
 
 ## 8. 再現
 

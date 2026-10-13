@@ -6,7 +6,7 @@
  */
 #include "../test_common.h"
 
-static const char* TRACE_PATH = "/tmp/ftr.jsonl";
+static const char* TRACE_PATH = "/ftr.jsonl";   /* MEMFS 上の仮想パス (host の FS には書かない) */
 
 static void mkfile(const char* posix, const char* body) {
     FILE* f = fopen(posix, "w");
@@ -56,10 +56,8 @@ int main(int argc, char** argv) {
     const char* mode = argc > 1 ? argv[1] : "traced";
     if (!strcmp(mode, "env")) {                       /* NODERAWFS ビルド専用: 環境変数だけで有効化されることを確認 */
         shimx_init();
-        HANDLE h = CreateFileW(W("/tmp/ftr_env_probe.txt"), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-        CHECK(h != INVALID_HANDLE_VALUE);
-        CloseHandle(h);
-        unlink("/tmp/ftr_env_probe.txt");
+        HANDLE h = CreateFileW(W("C:\\ftr_env_probe.txt"), GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+        CHECK(h == INVALID_HANDLE_VALUE);
         printf("env ok\n");
         return 0;
     }

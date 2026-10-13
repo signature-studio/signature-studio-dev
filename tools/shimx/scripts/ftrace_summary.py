@@ -4,7 +4,7 @@
   python3 scripts/ftrace_summary.py <trace.jsonl> [--json out.json]
 
 集計の定義 (REPORT の数え方と一致させること):
-  events       : 行数 (空行は除く)。JSON として読めない行があれば異常終了 (exit 2)
+  events       : 行数 (空行は除く)。JSON として読めない行・必須キー (api/ok/err) が無い行があれば異常終了 (exit 2)
   by_api       : api 名ごとの件数
   ok / fail    : "ok" が true / false のイベント数
   write        : "write" が true のイベント数 (書込系 open)
@@ -25,9 +25,13 @@ def summarize(lines):
         if not line:
             continue
         try:
-            events.append(json.loads(line))
+            ev = json.loads(line)
         except json.JSONDecodeError as e:
             raise ValueError(f"line {i}: invalid JSON: {e}") from e
+        missing = [k for k in ("api", "ok", "err") if not isinstance(ev, dict) or k not in ev]
+        if missing:
+            raise ValueError(f"line {i}: missing key(s): {', '.join(missing)}")
+        events.append(ev)
     by_api = Counter(e["api"] for e in events)
     ok = sum(1 for e in events if e["ok"])
     fail = len(events) - ok

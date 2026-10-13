@@ -10,19 +10,19 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD="$HERE/build"
-mkdir -p "$BUILD" "$HERE/work"
+mkdir -p "$BUILD"
 source "$HERE/flags.sh"
 set +u; . /opt/emsdk/emsdk_env.sh >/dev/null 2>&1 || true; set -u
 
 info() { echo "[ftrace] $*"; }
 die()  { echo "[ftrace] FAIL: $*" >&2; exit 1; }
 
-info "1/7 ST ビルド"
+info "1/6 ST ビルド"
 emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_ST[@]}" -I"$HERE/src" "$HERE"/src/*.c "$HERE/test/ftrace/ftrace_main.c" \
     -o "$BUILD/ftrace_st.js" || die "emcc ビルド失敗"
 mv "$BUILD/ftrace_st.js" "$BUILD/ftrace_st.cjs"
 
-info "2/7 実行 + 集計 (期待値照合)"
+info "2/6 実行 + 集計 (期待値照合)"
 rc=0
 node "$BUILD/ftrace_st.cjs" traced > "$BUILD/ftrace.out" 2> "$BUILD/ftrace.err" || rc=$?
 [ "$rc" -eq 0 ] || { tail -5 "$BUILD/ftrace.err" >&2; die "traced 実行失敗 (exit=$rc)"; }
@@ -47,13 +47,13 @@ print("expect ok:", s["events"], "events")
 PYEOF
 info "    $(cat "$BUILD/ftrace_summary.txt" | tr -d '\n' | head -c 300)"
 
-info "3/7 ネガコン (SHIMX_TRACE_FILE 無し → 出力が空)"
+info "3/6 ネガコン (SHIMX_TRACE_FILE 無し → 出力が空)"
 node "$BUILD/ftrace_st.cjs" untraced > "$BUILD/ftrace_neg.out" 2>/dev/null
 if grep -q -- "--TRACE-BEGIN--" "$BUILD/ftrace_neg.out"; then die "ネガコン: トレース未指定なのに出力された"; fi
 grep -q "^ops ok$" "$BUILD/ftrace_neg.out" || die "ネガコン: ops が実行されていない"
 info "    ✓ トレース無効時は JSON 行なし"
 
-info "4/7 既存 stderr トレース (shimx_set_trace(1)) が残り、JSON 行は混ざらない"
+info "4/6 既存 stderr トレース (shimx_set_trace(1)) が残り、JSON 行は混ざらない"
 node "$BUILD/ftrace_st.cjs" stderr > /dev/null 2> "$BUILD/ftrace_stderr.err" || die "stderr モード実行失敗"
 grep -q "CreateFile open(" "$BUILD/ftrace_stderr.err" || die "既存 SHX_TRACE の stderr 出力が消えた"
 if grep -q '^{"seq"' "$BUILD/ftrace_stderr.err"; then die "stderr に JSON 行が混入した"; fi
@@ -63,12 +63,12 @@ info "5/6 環境変数 SHIMX_TRACE_FILE の経路 (NODERAWFS ビルド: guest ge
 emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_ST[@]}" -sNODERAWFS=1 -I"$HERE/src" "$HERE"/src/*.c "$HERE/test/ftrace/ftrace_main.c" \
     -o "$BUILD/ftrace_raw.js" || die "NODERAWFS ビルド失敗"
 mv "$BUILD/ftrace_raw.js" "$BUILD/ftrace_raw.cjs"
-ENVF=/tmp/ftr_env_trace.jsonl; rm -f "$ENVF"
-SHIMX_TRACE_FILE="$ENVF" node "$BUILD/ftrace_raw.cjs" env > "$BUILD/env_on.out" 2>&1 || die "env 実行失敗 (有効)"
+ENVF="$BUILD/ftr_env_trace.jsonl"; rm -f "$ENVF"
+(cd "$BUILD" && SHIMX_TRACE_FILE="$ENVF" node ftrace_raw.cjs env > env_on.out 2>&1) || die "env 実行失敗 (有効)"
 [ -s "$ENVF" ] || die "SHIMX_TRACE_FILE 指定時にトレースファイルが生成されない"
 grep -q '"api":"CreateFileW"' "$ENVF" || die "env 経路: CreateFileW の行が無い"
 rm -f "$ENVF"
-node "$BUILD/ftrace_raw.cjs" env > "$BUILD/env_off.out" 2>&1 || die "env 実行失敗 (無効)"
+(cd "$BUILD" && node ftrace_raw.cjs env > env_off.out 2>&1) || die "env 実行失敗 (無効)"
 [ ! -e "$ENVF" ] || die "ネガコン: 環境変数無しでトレースファイルが生成された"
 info "    ✓ env 指定あり → JSON 行 1 件以上 / 指定なし → ファイル無し"
 
@@ -78,5 +78,10 @@ printf '{"api":"ReadFile","ok":true}\n\n{bad json\n' > "$BUILD/bad.jsonl"
 python3 "$HERE/scripts/ftrace_summary.py" "$BUILD/bad.jsonl" > /dev/null 2>&1; brc=$?
 set -e
 [ "$brc" -eq 2 ] || die "不正 JSON で exit=$brc (期待 2)"
-info "    ✓ 不正 JSON → exit 2"
+printf '{"api":"ReadFile"}\n' > "$BUILD/nokey.jsonl"
+set +e
+python3 "$HERE/scripts/ftrace_summary.py" "$BUILD/nokey.jsonl" > /dev/null 2>&1; krc=$?
+set -e
+[ "$krc" -eq 2 ] || die "必須キー欠落で exit=$krc (期待 2)"
+info "    ✓ 不正 JSON → exit 2 / 必須キー欠落 → exit 2"
 info "完了: SHX-T12 ftrace 全 PASS"
