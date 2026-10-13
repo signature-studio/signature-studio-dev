@@ -7,6 +7,6 @@ get() { # file url sha256
   [ -f "$1" ] || curl -fsSL --retry 3 -o "$1" "$2"
   echo "$3  $1" | sha256sum -c - >/dev/null || { echo "sha256 mismatch: $1" >&2; rm -f "$1"; exit 1; }
 }
-get OpenSans-Regular.ttf https://github.com/googlefonts/opensans/raw/main/fonts/ttf/OpenSans-Regular.ttf c53aceea2dcf5b4098099c0c4d0a061d17e178a049317b42a422b1a9f7f8eb59
-get Barlow-Regular.ttf https://github.com/google/fonts/raw/main/ofl/barlow/Barlow-Regular.ttf 95aa02c7c43096e0dd44d787ba6216864a67157e402adab59b35572e0c1577ea
+# 台帳 test/fonts.tsv (file<TAB>url<TAB>sha256<TAB>face 名)。ブラウザ e2e (e2e/text_e2e.mjs) も同じ台帳の sha256 で検証する (GUI-13 #615)
+while IFS=$'\t' read -r f u h _; do [ -n "$f" ] && get "$f" "$u" "$h"; done < "$D/../test/fonts.tsv"
 echo "[fetch_fonts] ok: $D"

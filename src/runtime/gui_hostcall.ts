@@ -14,7 +14,7 @@ export const HC = {
 export const HC_MAGIC = 0x43484749;
 export const HC_IN = 2048;
 export const HC_OUT = 4096;
-export const HC_OP = { openUrl: 1, openFile: 2, saveFile: 3, openHelp: 4 } as const;
+export const HC_OP = { openUrl: 1, openFile: 2, saveFile: 3, openHelp: 4, fetchFont: 5 } as const;
 /** host 側エラーの result 値 (wasm 側の -1/-2/-3 と衝突しない) */
 export const HC_ERR = -16;
 
@@ -30,6 +30,8 @@ export interface HostCallEnv {
   openWindow(url: string): boolean;
   /** FL の Help パス (ShellExecuteW の lpFile) を viewer で開く。window.flHelp.shellExecute(null, path) 相当。表示できれば true (#554) */
   openHelp?(path: string): Promise<boolean>;
+  /** face 名のフォントを取得・sha256 検証して wasm heap へ置き、その ptr/size を返す (GUI-13 #615; gui_fonts.ts の createFontLoader)。無し・検証失敗は null */
+  loadFont?(name: string): Promise<{ ptr: number; size: number } | null>;
   /** showOpenFilePicker 相当。キャンセルは null */
   pickOpen(o: PickOptions): Promise<PickedFile[] | null>;
   /** showSaveFilePicker 相当。キャンセルは null */
@@ -110,6 +112,11 @@ export class HostCallBridge {
     try {
       if (op === HC_OP.openUrl) result = this.openUrl(fields[0] ?? "") ? 1 : 0;
       else if (op === HC_OP.openHelp) result = (await this.openHelp(fields[0] ?? "")) ? 1 : 0;
+      else if (op === HC_OP.fetchFont) {
+        const f = this.env.loadFont ? await this.env.loadFont(fields[0] ?? "") : null;
+        if (!this.env.loadFont) this.log.push("fetchFont: no loader");
+        if (f) { const o = new Uint8Array(8); const dv = new DataView(o.buffer); dv.setUint32(0, f.ptr >>> 0, true); dv.setUint32(4, f.size >>> 0, true); out = o; result = 1; } else result = 0;
+      }
       else if (op === HC_OP.openFile || op === HC_OP.saveFile) {
         const r = await this.dialog(op === HC_OP.saveFile, flags, fields);
         result = r.result; out = r.out;

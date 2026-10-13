@@ -100,7 +100,8 @@ def fold_const_ops(text):
                     n += 1
                     done = True
             if not done:
-                pos = idx + 1  # 外側が畳めなくても入れ子の内側を走査する (zext (.. zext (i32 0 to i64) ..) の取りこぼし)
+                # [P-F1] 畳めない外側の内側にある式も走査する (旧: pos = j + 1 で内側を読み飛ばした)
+                pos = idx + 1
     for w in ("zext", "trunc", "sext"):
         pos = 0
         while True:
@@ -136,7 +137,7 @@ def fold_const_ops(text):
                 pos = max(idx - 80, 0)
                 n += 1
                 continue
-            pos = idx + 1
+            pos = idx + 1   # [P-F1] 同上 (内側の `zext (i32 0 to i64)` を畳む)
     return text, n
 
 
@@ -610,12 +611,9 @@ def lift_residual_constexpr(blocks):
             # 反復ごとにも suffix を変える (前回反復で挿入済みの %ce* との衝突防止)
             for ln in lines:
                 newln, ins, cnt = _lift_one_line(ln, cnt, f"{nonce}{it}_{name}")
-                if not ins and newln != ln:
-                    # `bitcast (ptr X to ptr)` の no-op 除去は命令を挿入せず行だけ書き換える。
-                    # これを捨てると固定点反復が止まり、外側の icmp/zext 定数式が残る (GMS 23677 で観測)
-                    out.append(newln)
-                    changed = True
-                elif ins:
+                # [P-F2] `bitcast (ptr X to ptr)` の除去は ins が空で行だけ変わる。 旧実装はこれを「変更なし」として
+                # 書換え後の行を捨て、最内の constexpr がずっと bitcast のまま外側の icmp/zext が命令化されなかった
+                if ins or newln != ln:
                     out.extend(ins)
                     out.append(newln.rstrip() if newln.strip() != newln else newln)
                     nlines += 1

@@ -89,6 +89,7 @@
 - version 特定: mac バイナリの C ABI が **camelCase `blArrayInit`**、asmjit 名前空間 `_abi_1_13` (asmjit 2024-01→2025-03)。upstream は 2025-09 (v0.20.0) で snake_case 化 → master(v0.21.3) は不一致。**blend2d fc827d5 (2024-12-13, 自己申告 v0.11.5) + asmjit 029075b** を採用。
 - 3 構成 (native JIT / native no-JIT / wasm32 no-JIT) で 320×240 シーン (rounded rect 線形グラデ・半透明円・放射グラデ楕円・stroke bezier・OpenSans テキスト 2 サイズ) を描画: **hash e467bd5b7dbcd277 全一致、画素差 0/230,400B (PPM payload 全域; 3 枚 sha256 同一)** (JIT と no-JIT も一致)。libblend2d.a: JIT 4.0MB / no-JIT 2.6MB / wasm 2.8MB。
 - **性能**: ms/frame (300 回平均): 初回 native JIT 0.054 / no-JIT 0.159 / wasm32 0.214 (node24)。**検収再計測 (node 26.10, 3 回)**: JIT 0.053–0.058 / no-JIT 0.121–0.137 / wasm 0.225–0.272 → wasm は JIT 比 **約 4–5x**、native no-JIT は 2.2–2.5x (測定は VM 共有で ±15% ぶれる)。`-msimd128` 試験と glue (Agg2D ~140 symbol) は T-SH-02。
+- **`-msimd128` 試験 (T-SH-02)**: wasm32 no-JIT の base / `-msimd128` は native no-JIT と画素一致 (PASS)。速度はレンジが重なり有意差なし。`-msse2` 併用は Blend2D simd 層がビルド失敗。実測・ネガティブコントロール・未解決 (起票先付き) は `tools/shared/oss/blend2d/REPORT_SIMD.md`。
 
 ## 4. プロプラ lib 評価と lift PoC
 
