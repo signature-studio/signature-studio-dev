@@ -40,7 +40,7 @@
 
 ## 4. 未達・残り
 
-- 受入条件 1 (`m11_e2e.sh --full` が work-m11 展開直後に build を通る): **この runner では未検証**。`--full` は Ghidra の
+- 受入条件 1 (`m11_e2e.sh --full` が work-m11 展開直後に build を通る): **この runner では未検証** (未解決は #1396 [M11-N89])。`--full` は Ghidra の
   `functions_dll.csv` (`tools/m2/work/ghidra_dll/`) が前提で、素材 (fl-win64 / toolchain-* / work-m11 / work-liftdiff) に含まれず、
   `/opt/ghidra` も無い。build 段の修正は上記 §1 の通り実測済み。`--full` の通し確認は Ghidra 素材 (または `functions_dll.csv` を含む素材) を用意して行う必要がある。
 - 受入条件 2 (再現手順の REPORT 実測): 本ファイル §1 に記録 (rc・所要)。
