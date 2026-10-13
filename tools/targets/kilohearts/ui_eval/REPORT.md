@@ -107,7 +107,7 @@ HUD 側の転送コスト・present 方式は `tools/gui/REPORT.md` §9 が正�
 - llvm-objdump は PATH に無い状態 (`command -v` 不在) で `/usr/lib/llvm-18/bin` (16/17/18 のうち最新) に解決され、ステップ 4 (xcheck_xref) まで通過。`8cef593` の同じ素のコマンドはステップ 3 の後で「llvm-objdump が無い」により exit 1 になっていた (レビュー 5501841861 の再現結果。`a0b5377` で修正)。
 - 判定が不合格のとき exit 0 にならないこと: G1〜G4 が残る間は exit 2。ネガコン失敗・前提違反・素材なし・llvm-objdump なしは exit 1。`a0b5377` での実測: llvm-objdump の探索 glob を外した一時コピー → **exit 1** (ステップ 1 の前で停止、「llvm-objdump が無い」); 素材なし (`KH_UI_WORK` を空ディレクトリ、`ARTIFACTS_DIR` を不在パス) → **exit 1** (「素材なし/検証失敗」); 1 byte 改変した core (`KH_CORE`、sha256 不一致) → **exit 1**。exit 0 に到達できること = §2.4 の修正案作業コピーで `shim_probe` が exit 0 (3 回とも。対照の判定が逆転して双方向に判別)。
 - ネガコン一覧 (全て期待どおり): ui_imports 9 (GPU import 注入 → 2 件検出 / ASCII・UTF-16 の DLL 名注入 → 各 1 件 / SkSL backend 名で偽陽性 0 / DirectWrite 文字列なし → 0 / IMPL から `SetDIBitsToDevice` 除外 → gap 1 / IMPL 空 → gap 102 = import 数 / shimx exports 空 → MISSING 302 = import 数 / `DWriteCreateFactory` を含む模擬 repo → 検出), ui_present 4 (ySrc 改変の lambda を 1 式に整理した後も 4/4 ok), ui_closure 2 (C3・C5n), xcheck_xref 1, shim_probe 1 (+対照 2 系統。修正案の作業コピーでは対照の判定が逆転 = 双方向の判別を確認)。
-- 範囲確認 (`a0b5377`): `git status --porcelain=v1 -- tools/targets/kilohearts/ui_eval` で取りこぼし 0、tracked の `find … -size +20M` 0 件。PR の差分 (`git diff 17b7774 HEAD --stat`) は `ui_eval/`・`tools/targets/kilohearts/REPORT.md`・`docs/DOC_MAP.md` のみ (`tools/gui`・`STATUS.md`・`DEFECTS.md` は未変更)。
+- 範囲確認 (`a0b5377`): `git status --porcelain=v1 -- tools/targets/kilohearts/ui_eval` で取りこぼし 0、tracked の `find … -size +20M` 0 件。PR の差分 (`git diff 17b7777 HEAD --stat`) は `ui_eval/`・`tools/targets/kilohearts/REPORT.md`・`docs/DOC_MAP.md` のみ (`tools/gui`・`STATUS.md`・`DEFECTS.md` は未変更)。
 
 ## 5. 範囲 / 範囲外
 - 範囲: Win64 `HeartCore.core_64` の静的解析 (import・xref・RTTI・直接辺の閉包・逆アセンブル)、tools/gui の native headless ビルドへの投入。
@@ -126,7 +126,11 @@ HUD 側の転送コスト・present 方式は `tools/gui/REPORT.md` §9 が正�
 | M2 | `UIWindow` 抽象 42 slot の契約が未解析、閉包の間接 call 未追跡 | B 方式の工数が見積れない | **新規** `[KH-14]` (B 方式を採る場合のみ) |
 | M3 | 実 Windows でのオラクル確認なし | G1 の根拠が Wine ソース + HeartCore の意図のみ | ユーザ依頼 (任意): 実 Windows で同形の 7 ケースを実行する小プログラム (`shim_probe.c` の呼び出し部) |
 
-DEFECTS.md 行案 (shim 側, 層 `ours`; ID は main `6f4f3b0` の最後の D17 の次の **D18**。起票時に最新 main で再確認): | D18 | ours (shim) | 新規 | `SetDIBitsToDevice` (top-down DIB, 部分矩形) で別の行が描かれる。全面更新では顕在化しない | `StretchDIBits` と `dib_to_dc` を共有し top-down の ySrc を上原点とみなす・`StartScan`/`cLines` 無視 (Windows/Wine は下原点: `src_top = startscan + lines − (ySrc + cy)`) | `shim_probe.sh`: 5/7 ケース、矩形内 100% の画素が別行 | biHeight<0 かつ ySrc≠0 または cLines≠cy の転送を、独立オラクルで部分矩形ごとに比較 | `dib_to_dc` の呼び出し前に Wine 式で src 行へ変換 (`g1_shim_fix.patch`; 作業コピーで 0/7) |
+DEFECTS.md 行案 (shim 側, 層 `ours`; ID は main `6f4f3b0` の最後の D17 の次の **D18**。起票時に最新 main で再確認):
+
+| ID | 層 | 新旧 | 症状 (silent) | 根本原因 | 観測 (証拠) | 検出信号 (機械的) | 修復 |
+|---|---|---|---|---|---|---|---|
+| D18 | ours (shim) | 新規 | `SetDIBitsToDevice` (top-down DIB, 部分矩形) で別の行が描かれる。全面更新では顕在化しない | `StretchDIBits` と `dib_to_dc` を共有し top-down の ySrc を上原点とみなす・`StartScan`/`cLines` 無視 (Windows/Wine は下原点: `src_top = startscan + lines − (ySrc + cy)`) | `shim_probe.sh`: 5/7 ケース、矩形内 100% の画素が別行 | biHeight<0 かつ ySrc≠0 または cLines≠cy の転送を、独立オラクルで部分矩形ごとに比較 | `dib_to_dc` の呼び出し前に Wine 式で src 行へ変換 (`g1_shim_fix.patch`; 作業コピーで 0/7) |
 
 ## 7. 次タスク提案
 1. `[GUI-13]` G1 修正 (小): `g1_shim_fix.patch` を `gui_gdi.c` に適用 + selftest 追加 → `shim_probe.sh` が exit 0 になる。
