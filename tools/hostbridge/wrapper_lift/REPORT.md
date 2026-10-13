@@ -38,7 +38,7 @@
   先頭の `No matching plugins found for 'FishPE 1.1x'` は format 判定の警告。
 - 解釈: **この 1 関数範囲でも RetDec は IR を出力できなかった**。全体 (19,816 関数) の成否・件数は未測定。
   `--select-ranges` の指定方法自体の誤りの可能性を否定していない (未切り分け)。
-- 未解決: RetDec の全体 lift 成否と、失敗型の分類 → 子 issue A (下記 §4)。
+- 未解決: RetDec の全体 lift 成否と、失敗型の分類 → #828 (§4)。
 
 ## 3. 未実測 (本 run の範囲外)
 
@@ -53,6 +53,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| RetDec の Wrapper 全体 lift の成否・失敗型分類 (本 REPORT §2 の単発失敗の切り分け含む) | lift 方式の比較表の 1 列が埋まらない | 子 issue (下記) |
-| liftlib / x64c の Wrapper 適用と比較表の完成 | 受入条件 1 未達 | 子 issue (下記) |
-| CreatePlugInstance 到達 (受入条件 2) | 受入条件 2 未達 | #94 の後続 / 子 issue (下記) |
+| RetDec の Wrapper 全体 lift の成否・失敗型分類 (本 REPORT §2 の単発失敗の切り分け含む) | lift 方式の比較表の 1 列が埋まらない | #828 |
+| liftlib / x64c の Wrapper 適用と比較表の完成 | 受入条件 1 未達 | #828 |
+| CreatePlugInstance 到達 (受入条件 2) | 受入条件 2 未達 | #829 |
