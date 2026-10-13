@@ -60,12 +60,41 @@
 - #782 受入 2 (lift / build の最初の失敗点): **未達**。正確な closure が無いため lift 対象を確定できない。
 - #782 受入 3 (数え方と再計算スクリプトを REPORT に書く): **達成** (§1・§2、スクリプトは `scripts/vtable_closure.py`)。
 
-## 4. 未解決
+## 4. rip_data (IAT 以外の関数ポインタ変数) の読み出し解決 (#849)
+
+- 数え方: 「rip_data call 件数」= closure 内の `call [rip+..]` (IAT 以外) の件数 (§2 の rip_data 列と同じ)。「slot 種別」= その参照先 slot (VA) を 1 本ずつ分類した数。
+- 規則 (`scripts/vtable_closure.py`): 参照先 slot S について
+  - `runtime_store` (.text に `mov [rip+S], x` があり実行時に書き換わる) / `addr_taken` (`lea` で S の番地を取る) → 未確定
+  - `null_unused` (初期値 0) / `nonfunc_init` (初期値が関数先頭でない) → 未確定
+  - `trampoline` (初期値の関数先頭が `jmp reg` または IAT 外の `jmp [rip+..]`) → 呼び先が静的に決まらない thunk。未確定
+  - `static_fn` (初期値の関数が上記以外) → 確定し候補に加える (after_rip)
+- 再計測 (HEAD `d7cf3c77` + 本 PR, 4 vCPU, 各 1 回, 各 run 11〜13 s):
+
+| ns | モード | rip_data call 件数 | 参照先 slot | slot 種別 | 確定 slot | after (旧) 関数 | after_rip 関数 |
+|---|---|--:|--:|---|--:|--:|--:|
+| Snap Heap (micropass) | nogui | 20 | 2 | trampoline 2 | 0 | 1,531 / 722,713 B | 1,531 / 722,713 B |
+| Snap Heap (micropass) | all | 54 | 2 | trampoline 2 | 0 | 3,094 / 1,388,293 B | 3,094 / 1,388,293 B |
+| Multipass (multipass) | nogui | 20 | 2 | trampoline 2 | 0 | 1,802 / 817,610 B | 1,802 / 817,610 B |
+| Multipass (multipass) | all | 54 | 2 | trampoline 2 | 0 | 3,328 / 1,476,922 B | 3,328 / 1,476,922 B |
+| Phase Plant (phaseplant) | nogui | 56 | 2 | trampoline 2 | 0 | 3,767 / 1,791,711 B | 3,767 / 1,791,711 B |
+| Phase Plant (phaseplant) | all | 56 | 2 | trampoline 2 | 0 | 5,582 / 2,768,378 B | 5,582 / 2,768,378 B |
+| 対照 Gain (gain) | nogui | 8 | 2 | trampoline 2 | 0 | 555 / 178,451 B | 555 / 178,451 B |
+| 対照 Gain (gain) | all | 54 | 2 | trampoline 2 | 0 | 1,995 / 731,396 B | 1,995 / 731,396 B |
+
+- 全 8 条件で、rip_data の参照先 slot は同じ 2 本 (`0x1813a1d38` / `0x1813a1d40`, `.rdata`)。どちらも初期値は thunk:
+  - `0x1813a1d38` → `jmp rax` (レジスタ間接。呼び先は実行時に決まる)
+  - `0x1813a1d40` → `jmp [rip+0x1dee2]` → `0x1813a1d38` (上と同じ slot を経由)
+- **結論: rip_data の読み出し解決で確定できた候補は 0 件。** after と after_rip は全条件で一致し、rip_data の件数は closure を広げない。
+- 過程の誤り (記録): 初版は初期値の先 (thunk) を関数とみなして `static_fn` 判定し、after_rip を +2 関数と出した。thunk の先頭命令を見て `trampoline` 判定を足したところ、確定 0 件になった。この 2 本を関数として扱うのは誤り。
+- 残りの未解決 (本 PR 後): rip_data call 件数 8〜56 件/ns は、すべて上記 2 本の thunk 経由。呼び先を決めるには `jmp rax` の `rax` の値 (呼び出し側で `lea`/`mov` により入る関数) を追う必要がある。これは「reg に入る値の追跡」で、#848 (KH-19b、間接 call の型追跡) の対象。本 issue では扱わない。
+- 対象外 (明記): res 外 (sweep されなかった関数) が S へ書き込む可能性は未確認。store 走査は `callgraph.pkl` の res 内関数だけ。
+
+## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 型を追う (this の型追跡) による正確な closure。現在は slot 番号一致の過大評価 | after 表が真値でない | #848 |
-| `rip_data` (IAT 以外の関数ポインタ変数) の読み出し解決 | 未解決 call (rip_data 8〜56 件/ns, nogui) が closure の外に残る | #849 |
+| `rip_data` の読み出し解決 (#849 で試行): 参照先 2 本はすべて thunk (`jmp rax` / `jmp [rip]`)。確定 0 件 | rip_data 8〜56 件/ns が closure の外に残る。呼び先は reg 値の追跡が要る | #848 |
 | 確定 closure の lift / build 最初の失敗点 | 受入 2 未達 | #850 |
 | 人手の検収 (lift 結果の bit-exact 化は本 issue の範囲外) | — | — |
 

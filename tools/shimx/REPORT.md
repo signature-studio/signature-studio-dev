@@ -241,3 +241,10 @@ fail-fast 9 種 + ExitProcess(7) = 全 PASS、exit 0 ×3。`test.sh` は実行�
 ### 18. SHX-T12 (#789): 構造化 file trace
 
 file API の JSON Lines トレース (`SHIMX_TRACE_FILE` / `shimx_set_trace_file`) の実測・数え方・制約は分割先 `REPORT_SHX-T12.md` を正本とする。既存 `SHIMX_TRACE=1` の出力は変更なし。
+
+## 19. SHX-T6 (#179): winmm midi* の変換層 + backend 表
+
+- 結論: weak な `midi*` 20 関数を win64 MIDIHDR (112B) ⇄ native (48B) の変換層に置き換え、関数表 `shimx_midi_vtbl` へ委譲する。表は `shimx_set_midi_backend` で登録する。**未登録時は従来どおり 0 台**。
+- **未配線 (次 PR)**: audio 側の登録口 `flmidi_shimx_install()` は本番の起動経路から呼ばれていない。実行時の強定義は未達。#37 (AU-14) で配線と結線確認を行う。
+- 詳細・構成・ABI 変換表・生成物の扱い・検証 (`verify_ott` SKIP を含む): `REPORT_SHX-T6.md` (§19.0〜19.8)。
+
