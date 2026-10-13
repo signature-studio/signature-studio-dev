@@ -14,10 +14,12 @@
 #   DRAFT             draft -> ready (ready_for_review で review が起動する)
 #   FIX_IDLE          現在の head に CHANGES_REQUESTED があるのに fix run が無い -> CHANGES_REQUESTED を再提出して fix 経路へ
 #   APPROVED          approve 済みで未 merge -> merge。失敗したら理由付きの CHANGES_REQUESTED
-#   NOREVIEW          現在の head に verdict が無い (copilot-pending の COMMENT が OC_COPILOT_PENDING_MINUTES を
-#                     超えたものを含む) -> close -> reopen で review を再起動
+#   NOREVIEW          現在の head に verdict (APPROVED / CHANGES_REQUESTED) が無い。COMMENT だけの review も含む
+#                     (Copilot 待ちの保留は廃止した) -> close -> reopen で review を再起動
 # 同じ head に対する復旧が尽きた PR (watchdog の差し戻し OC_WATCHDOG_MAX 回、または review の自動再実行 3 回) は
-# oc:stuck ラベルを付けて止める。
+# oc:stuck ラベルを付けて止める。fix-progress.sh が差し戻し 10 件で付けるラベルも同じで、ラベル付きの PR は
+# 人 (PM) の判断待ちとして一切触らない (ラベルを外すと再開する)。
+# merge は --match-head-commit で、点検した head 以外 (その後に push された未レビューの commit) を巻き込まない。
 # 1 回の点検で行う操作は OC_MAX_ACTIONS 件まで (古い更新の PR から)。残りは次回に回す。
 #
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
@@ -28,7 +30,6 @@ set -uo pipefail
 R="$OC_REPO"
 DRY="${DRY:-0}"
 SETTLE_MIN="${OC_SETTLE_MINUTES:-4}"
-PENDING_MIN="${OC_COPILOT_PENDING_MINUTES:-20}"
 MAX_ACTIONS="${OC_MAX_ACTIONS:-12}"
 WD_MAX="${OC_WATCHDOG_MAX:-6}"
 RUNS_TOKEN="${RUNS_TOKEN:-${GH_TOKEN:-}}"
@@ -70,13 +71,18 @@ for i in $(seq 0 $((total - 1))); do
   title="$(jq -r .title <<< "$pr")"
   head="$(jq -r .head.sha <<< "$pr")"
   draft="$(jq -r .draft <<< "$pr")"
-  created="$(jq -r .created_at <<< "$pr")"
   upd_age="$(age_min "$(jq -r .updated_at <<< "$pr")")"
 
   if jq -e --argjson n "$n" --arg t "$title" \
     'any(.[]; ((.prs | index($n)) != null) or ((.event == "issue_comment" or .event == "workflow_dispatch") and .title == $t))' \
     <<< "$active" > /dev/null; then
     covered_n=$((covered_n + 1))
+    continue
+  fi
+
+  if jq -e '[.labels[].name] | index("oc:stuck") != null' <<< "$pr" > /dev/null; then
+    echo "#$n STUCK_LABELLED: oc:stuck is set, waiting for a human decision"
+    tally[STUCK_LABELLED]=$((${tally[STUCK_LABELLED]:-0} + 1))
     continue
   fi
 
@@ -104,14 +110,6 @@ for i in $(seq 0 $((total - 1))); do
     case "$st" in
       CHANGES_REQUESTED) reason=FIX_IDLE ;;
       APPROVED) reason=APPROVED ;;
-      COMMENTED)
-        if jq -e '.body | contains("copilot-pending")' <<< "$rv" > /dev/null \
-          && [ "$(age_min "$created")" -lt "$PENDING_MIN" ]; then
-          reason=COPILOT_WAIT
-        else
-          reason=NOREVIEW
-        fi
-        ;;
       *) reason=NOREVIEW ;;
     esac
   fi
@@ -130,8 +128,8 @@ for i in $(seq 0 $((total - 1))); do
     fi
     continue
   fi
-  if [ "$reason" = COPILOT_WAIT ] || [ "$upd_age" -lt "$SETTLE_MIN" ]; then
-    echo "  skip: waiting (Copilot review pending, or a recent update is still propagating)"
+  if [ "$upd_age" -lt "$SETTLE_MIN" ]; then
+    echo "  skip: a recent update is still propagating"
     continue
   fi
   if [ "$acted" -ge "$MAX_ACTIONS" ]; then
@@ -156,7 +154,7 @@ for i in $(seq 0 $((total - 1))); do
     APPROVED)
       if [ "$DRY" = 1 ]; then
         echo "  DRY: merge #$n"
-      elif gh pr merge "$n" --repo "$R" --merge --delete-branch > /dev/null 2> "${RUNNER_TEMP:-/tmp}/merge-err.txt"; then
+      elif gh pr merge "$n" --repo "$R" --merge --delete-branch --match-head-commit "$head" > /dev/null 2> "${RUNNER_TEMP:-/tmp}/merge-err.txt"; then
         echo "  DO : merged #$n"
       else
         err="$(head -c 300 "${RUNNER_TEMP:-/tmp}/merge-err.txt")"
