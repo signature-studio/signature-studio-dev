@@ -140,6 +140,14 @@
 | total3 (7 本) | FL Keys 108 / Granulizer 180 / Slicer 214 / Slicer 2 240 / FPC 432 / Slicex 809 / Soundfont 2,248 (いずれも §2d-3 と同値。 U1–U5 PASS) |
 | `find tools/plugins/sampler -size +20M` | 0 件 |
 
+**再検証 (HEAD `1a27d100`、fix モード。 コード差分なし・REPORT のみの commit の上で実測)**
+
+| 項目 | 結果 |
+|---|---|
+| `unr_e2e.sh` (前提生成込み、`TMPDIR=$RUNNER_TEMP`) | elapsed 511 s (wall)、**rc 0**、`[unr_e2e] OK`。 load 0.79 → 2.34 (4 core) |
+| `judge.py shells` / `indirect_defs` | PASS 7/7 / PASS 7/7 (欠落 0) |
+| `unr_nega.sh` | elapsed 106 s、**rc 1**。 NC0・NC1・NC3〜NC8 は期待どおり。 NC2 のみ不一致 (期待 1・実測 0。 即値辺 0 件で非識別。 #667 に残す) |
+
 **検証 (コミット `273cc10`、改名失敗の rc 反映 + NC8 追加後。 レビュー指摘への対応)**
 
 | 項目 | 結果 |
