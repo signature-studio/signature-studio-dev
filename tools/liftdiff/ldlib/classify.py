@@ -158,6 +158,8 @@ def unexec_reason(rec):
     st = [c['outcome'] for c in cs]
     if any(s == 'hang' for s in st):
         return 'hang'
+    if any(s == 'wasm_timeout_native_long' for s in st):
+        return 'wasm_timeout_native_long'
     nat = [c.get('native_status') for c in cs]
     # 全 case で native が落ちた → 原因分類 (fault addr から)
     faults = [c.get('fault') for c in cs if c.get('fault')]
