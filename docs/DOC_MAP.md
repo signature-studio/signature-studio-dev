@@ -178,6 +178,7 @@
 | `tools/plugins/f2/REPORT.md` | ~200 | PLG-F2 eq-filter 11 本: 固有閉包 lift の再現と間接 call 脱落の監査 (#199)、icall 復元の batch_lift 接続と回帰ゲート (#514) |
 | `tools/plugins/framework/REPORT.md` | ~520 | TFruityHost shim 実装と検収 |
 | `tools/plugins/p0c/REPORT.md` | ~665 | kernel 表妥当性検証 + f80 assessment |
+| `tools/plugins/slayer_x86/REPORT.md` | ~132 | FL Slayer x86 engine (Slayer_Engine.dll) の結合方式 (ilbridge.exe 経由) と lift 方針 (#536) |
 | `tools/shared/REPORT.md` | ~295 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 
