@@ -551,8 +551,7 @@ static TouchIn g_tin[MAXTOUCH]; static int g_ntin; static GestInfo g_gi;
 static int touch_registered(U64 h) { for (int i = 0; i < g_ntouch_wnd; i++) if (g_touch_wnd[i] == h) return 1; return 0; }
 API RegisterTouchWindow(I64 h, I64 flags) {
   (void)flags; if (!wnd_from_h((U64)h)) { gui_set_last_error(1400); return 0; }
-  if (!touch_registered((U64)h) && g_ntouch_wnd < 32) { g_touch_wnd[g_ntouch_wnd++] = (U64)h; out_cmd(GUI_CMD_TOUCH_WINDOWS, 0, (uint32_t)g_ntouch_wnd, 0, 0, 0, 0); }
-  return 1;
+  if (!touch_registered((U64)h) && g_ntouch_wnd < 32) g_touch_wnd[g_ntouch_wnd++] = (U64)h; return 1;
 }
 API SetGestureConfig(I64 h, I64 res, I64 c, I64 pcfg, I64 cb) {   /* GESTURECONFIG {dwID, dwWant, dwBlock} 12B */
   (void)res; if (!wnd_from_h((U64)h) || cb != 12) { gui_set_last_error(87); return 0; }

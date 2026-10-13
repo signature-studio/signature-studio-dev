@@ -145,7 +145,7 @@ try {
   // ---- 6) 入力リング drop 0 ----
   const st = await page.evaluate("(() => { const v = window.__g6.host.view; return { pushed: v.u32[33 - 1], dropped: v.u32[33], consumed: v.u32[34] }; })()", { awaitPromise: false });
   const ta = await page.evaluate("window.__g6.host.canvas.style.touchAction", { awaitPromise: false });
-  ck("touch-action: RegisterTouchWindow 済みのときだけ canvas が none (TOUCH_WINDOWS 経由)", ta === "none", `touchAction=${JSON.stringify(ta)}`);
+  ck("touch-action: GUI canvas は常に none (PM 承認 2026-10-13)", ta === "none", `touchAction=${JSON.stringify(ta)}`);
   ck("input ring: drop 0, all pushed consumed", st.dropped === 0 && st.pushed === st.consumed, `in_pushed=${st.pushed} in_dropped=${st.dropped} in_consumed=${st.consumed}`);
   ck("no page errors", (await page.evaluate("window.__g6.errors.length", { awaitPromise: false })) === 0 && page.exceptions.length === 0, page.exceptions.join("|"));
 } catch (e) {

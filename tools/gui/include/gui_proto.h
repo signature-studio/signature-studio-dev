@@ -56,8 +56,7 @@ enum {
   GUI_CMD_EXIT         = 9, /* w1 = exit code */
   GUI_CMD_POINTER_LOCK = 10, /* w2 = 1 要求 / 0 解除。host は requestPointerLock / exitPointerLock (成立は GUI_IN_POINTER_LOCK で返す) */
   GUI_CMD_IME_POS      = 11, /* w1 = surf, w2 = x, w3 = y (surface client 座標; ImmSetCompositionWindow/CandidateWindow)。host は IME ポップアップ位置の textarea を移動 */
-  GUI_CMD_CLIP_RECT    = 12, /* w2..w5 = l,t,r,b (ClipCursor; 全 0 = 解除)。host はロック中の仮想カーソルをこの矩形へ clamp */
-  GUI_CMD_TOUCH_WINDOWS = 13  /* w2 = RegisterTouchWindow 済み窓の数 (変化時のみ送る)。0 = タッチ非対応 (host は canvas の touch-action を auto に戻す) */
+  GUI_CMD_CLIP_RECT    = 12  /* w2..w5 = l,t,r,b (ClipCursor; 全 0 = 解除)。host はロック中の仮想カーソルをこの矩形へ clamp */
 };
 
 /* ---- surface 表エントリ (128 B) -------------------------------------------- */

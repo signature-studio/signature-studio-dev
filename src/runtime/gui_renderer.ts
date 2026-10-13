@@ -31,7 +31,6 @@ export type GuiRenderMsg =
   | { type: "ptrlock"; on: boolean }
   | { type: "imepos"; surf: number; x: number; y: number }
   | { type: "cliprect"; l: number; t: number; r: number; b: number }
-  | { type: "touchwin"; n: number }
   | { type: "exit"; code: number };
 
 export type GuiPresentOptions = {
@@ -499,7 +498,6 @@ export class GuiRenderer {
         case CMD.POINTER_LOCK: this.post({ type: "ptrlock", on: r[2] === 1 }); break;
         case CMD.IME_POS: this.post({ type: "imepos", surf: r[1], x: r[2] | 0, y: r[3] | 0 }); break;
         case CMD.CLIP_RECT: this.post({ type: "cliprect", l: r[2] | 0, t: r[3] | 0, r: r[4] | 0, b: r[5] | 0 }); break;
-        case CMD.TOUCH_WINDOWS: this.post({ type: "touchwin", n: r[2] | 0 }); break;
         case CMD.LOG: {
           const n = r[1] & 0xff;
           const bytes = new Uint8Array(v.buffer, v.base + o * 4 + 8, n).slice();
