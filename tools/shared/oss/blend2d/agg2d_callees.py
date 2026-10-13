@@ -92,6 +92,10 @@ def main():
     text_lo = base + text.VirtualAddress
     text_hi = text_lo + text.Misc_VirtualSize
     iat = import_map(pe)
+    lc = getattr(pe, "DIRECTORY_ENTRY_LOAD_CONFIG", None)
+    if lc is not None:
+        iat[lc.struct.GuardCFDispatchFunctionPointer] = "CFG!GuardCFDispatch"
+        iat[lc.struct.GuardCFCheckFunctionPointer] = "CFG!GuardCFCheck"
 
     entries = load_entries(data, base, text_lo, text_hi)
     roots = sorted(set(entries))
