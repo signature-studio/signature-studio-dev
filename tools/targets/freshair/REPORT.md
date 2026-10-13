@@ -162,7 +162,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 | 上記 63 関数のうち KH 側 VA が `snapins.json` の lift VA に出現 | 49 本 (VA の 9 桁 hex 文字列一致の粗い判定。複数 KH 関数が同一ハッシュになる SC 関数が 7 本ある) |
 | 上記 63 関数の `.rdata` 定数 (rip 参照先先頭 16 B) | 参照なし 35 / 一致 8 / **不一致 20**。コードが一致しても参照先定数が違う関数がある (内訳は下の 11-3) |
 
-実測: `ks_identity.sh` 全体 55.5 s (n=1・nproc=4・load average 0.59 → 0.84)、個別は identity 5.0 s / census 31.8 s / closure_share 18.2 s。コミット済み HEAD (`1465257`) で再実行し 3 本の JSON が直前の実行と byte 一致 (決定的)。
+実測: 検証起点 HEAD `47c07803` (`git worktree` clean 展開、`work-liftlib-targets` 展開後) で `ks_identity.sh` を 2 回実行: 42.2 s / 40.8 s (EXIT=0、nproc=4、load 1 分値 0.63 → 1.29 / 1.10 → 1.29)。2 回の `ident.json` / `census.json` / `share.json` / `rdata_class.json` は byte 一致 (決定的)。`ks_rdata_class.py` 0.22 s (EXIT=0、value 17 / ptr 3)。
 
 ### 11-2. 結論と制約
 
