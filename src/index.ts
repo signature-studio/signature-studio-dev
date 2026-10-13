@@ -6,6 +6,7 @@ import { mountRuntimePanel } from "./runtime/boot_ui";
 import { mountGuiRenderSelfTest, mountGuiSelfTest } from "./runtime/gui_boot";
 import { installWebstudioContract } from "./runtime/webstudio_state";
 import { installFlMcp, mountMcpPanel } from "./runtime/mcp_panel";
+import { installFlMidi, mountMidiPanel } from "./runtime/midi_script";
 
 // FL 起動契約 (tools/e2e/REPORT.md §FL 起動契約)。実 FL 統合後は GuiHost の onFrame で setFrames を呼ぶ。
 // このハーネスのテストフレーム (下の blitFrame) は FL の GUI フレームではないので計上しない。
@@ -139,5 +140,12 @@ if (runtimeParams.get("gui") === "selftest") {
 // ---------------------------------------------------------------------------
 installFlMcp();
 if (runtimeParams.has("mcp")) mountMcpPanel();
+
+// ---------------------------------------------------------------------------
+// MIDI scripting ホスト (PY-6 #76) — devtools: window.flMidi / UI: /?midi=1
+// device script (.py) は利用者の FL から実行時供給 (非同梱)
+// ---------------------------------------------------------------------------
+installFlMidi();
+if (runtimeParams.has("midi")) mountMidiPanel();
 
 export {};
