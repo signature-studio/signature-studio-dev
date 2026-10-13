@@ -3,7 +3,7 @@
 #   bash tools/plugins/modulation/engine_lift.sh <block> [timeout_sec]      例: 18977 (Frequency Shifter engine)
 # 出力: work/modulation/engine<block>/ と 1 行サマリ (block,pdata_funcs,lift_rc,defines,f80_funcs,unimpl_helpers,emcc_c_rc,fixcmp_patched,emcc_c_rc_after_fixcmp,lift_s,
 #   missing_define,missing_bytes,missing_ref,extra_inside,function_defines  ← engine_defs.py,
-#   emcc_c_rc_after_f80_lower  ← f80 段 (erc2 != 0 かつ f80 関数あり のときだけ実行。それ以外は erc2 と同値))
+#   erc3 (= emcc_c_rc_after_f80_lower)  ← f80 段 (p0c/f80_lower.py) 後の emcc -c rc。erc2 = 0 または f80 関数 0 のときは erc3 = erc2)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/env.sh"
