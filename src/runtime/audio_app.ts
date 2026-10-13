@@ -115,6 +115,14 @@ export interface ToneCheck {
   peak: number;
   rms: number;
   zero_runs_ge16: number;
+  /** 最初に理論値から 1e-5 を超えた出力フレーム (無ければ -1) */
+  first_err_frame: number;
+  /** 最初に 16 フレーム連続無音になった開始フレーム (無ければ -1) */
+  first_zero_run_frame: number;
+  /** worklet が capture ヘッダへ記録した underrun 件数・最初/最後の underrun の出力 quantum 位置 (frame = quantum*128) */
+  underrun_count: number;
+  first_underrun_frame: number;
+  last_underrun_frame: number;
 }
 
 /** capture ダンプを 440Hz(L)/660Hz(R) 振幅 0.5 の理論値と照合する (tools/audio/test/page.mjs verify と同じ式) */
@@ -123,14 +131,21 @@ export function verifyToneCapture(cap: FlCaptureSpec, sr: number): ToneCheck {
   const covered = Atomics.load(hdr, 0);
   const out = new Float32Array(cap.sab, 64, cap.frames * cap.outCh);
   const ch0 = out.subarray(0, cap.frames), ch1 = out.subarray(cap.frames, 2 * cap.frames);
-  let maxErr = 0, peak = 0, ss = 0, runs = 0, run = 0;
+  let maxErr = 0, peak = 0, ss = 0, runs = 0, run = 0, firstErr = -1, firstRun = -1;
   for (let p = 0; p < covered; p++) {
     const e0 = 0.5 * Math.sin((2 * Math.PI * 440 * p) / sr);
     const e1 = 0.5 * Math.sin((2 * Math.PI * 660 * p) / sr);
-    maxErr = Math.max(maxErr, Math.abs(ch0[p] - e0), Math.abs(ch1[p] - e1));
+    const err = Math.max(Math.abs(ch0[p] - e0), Math.abs(ch1[p] - e1));
+    if (err > 1e-5 && firstErr < 0) firstErr = p;
+    maxErr = Math.max(maxErr, err);
     peak = Math.max(peak, Math.abs(ch0[p]));
     ss += ch0[p] * ch0[p];
-    if (ch0[p] === 0) { run++; if (run === 16) runs++; } else run = 0;
+    if (ch0[p] === 0) { run++; if (run === 16) { runs++; if (firstRun < 0) firstRun = p - 15; } } else run = 0;
   }
-  return { covered_frames: covered, max_abs_err: maxErr, peak, rms: covered ? Math.sqrt(ss / covered) : 0, zero_runs_ge16: runs };
+  const uc = Atomics.load(hdr, 6);
+  return {
+    covered_frames: covered, max_abs_err: maxErr, peak, rms: covered ? Math.sqrt(ss / covered) : 0, zero_runs_ge16: runs,
+    first_err_frame: firstErr, first_zero_run_frame: firstRun,
+    underrun_count: uc, first_underrun_frame: uc ? Atomics.load(hdr, 4) * 128 : -1, last_underrun_frame: uc ? Atomics.load(hdr, 5) * 128 : -1,
+  };
 }
