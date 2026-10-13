@@ -2,6 +2,8 @@
 
 結論 (部分達成): unit 190 の ON の oob は、**現 main では `function_412e40` ではなく `function_407a50` で起きる**。REPORT_912 §3 の記録 (`412e40`) は、現 main では再現しない。trap の経路 (`6cf480 → 6cf2a0 → 6ced90 → 409410 → 407a50`) は実測できた。原因の特定・既存類型への分類・ON の ok 退行 0 は未達 (下記 §4 の起票先)。
 
+既知類型との関係: 該当なし (未切り分け。原因特定は #1274 次 run で `407a50` の lift 内容を確認して判定)。
+
 ## 1. 測定条件
 
 - 測定 commit: `851c342e` (origin/main、`Merge pull request #1466 from signature-studio/1275-m11-n78`)。本 PR は REPORT のみ変更で、`tools/m11` のコードは変えていない。
@@ -54,3 +56,5 @@ kind が変わった unit (OFF → ON):
 ## 5. 差分 (測定 commit から本 PR の HEAD まで)
 
 測定 commit `851c342e` から本 PR の HEAD までの `tools/m11` のコード差分は 0 (REPORT_1274.md の追加のみ)。`git diff 851c342e HEAD -- tools/m11 ':(exclude)*.md'` は 0 行。
+- `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。
+- `find tools/m11/trap_triage -type f -size +20M`: 0 件 (20MiB 超の blob なし)。
