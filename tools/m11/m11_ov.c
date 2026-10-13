@@ -961,7 +961,7 @@ unsigned long long function_467c40(void) {
     u64 slot = Q(R(0x11e3af0));
     if (Q(slot) != 0) {
         function_412e00(&s78);
-        u64 r = m11_icall(Q(Q(R(0x11e3af0))), 0, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
+        u64 r = ICALL_AT(0x467cc9, Q(Q(R(0x11e3af0))), 0, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
         function_45a640((u32)r, 0xb, 8);
         function_4149b0((void*)(uintptr_t)R(0x11f1118), s78);
         function_4149b0(&a[7], s78);                   /* rbp+0x60 */
@@ -971,7 +971,7 @@ unsigned long long function_467c40(void) {
         function_4398f0(&a[6], a[5]);                  /* rbp+0x58 */
         function_4133f0(R(0x11f1128), a[6]);
         function_412e00(&s78);
-        r = m11_icall(Q(Q(R(0x11e3af0))), 0xffffffffull, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
+        r = ICALL_AT(0x467d5d, Q(Q(R(0x11e3af0))), 0xffffffffull, 0x400, 0, (u64)(uintptr_t)&s78, 0, 0, 0, 0);
         function_45a640((u32)r, 0xb, 8);
         function_4149b0((void*)(uintptr_t)R(0x11f1130), s78);
         function_4149b0(&a[3], s78);                   /* rbp+0x40 */

@@ -14,7 +14,7 @@ void* GetProcessHeap(void) { return &g_dummy_heap; }
 unsigned GetVersion(void) { return 0x4a63000au; /* Win10 19043: major 10 minor 0 build 19043 */ }
 unsigned GetACP(void) { return 1252; }
 int SetThreadLocale(unsigned lcid) { (void)lcid; return 1; }
-void SysFreeString(void* p) { (void)p; }   /* 自前確保でない BSTR (静的/他経路) が来るため free しない (PoC: リーク許容; free 化で unit 13 abort を実測) */
+void SysFreeString(void* p) { (void)p; }   /* 自前確保でない BSTR (静的/他経路) が来るため free しない (PoC: リーク許容) */
 /* BSTR: [u32 バイト長][UTF-16 文字列][NUL]. SysAllocStringLen(NULL, n) は未初期化 n 文字 (+NUL). 失敗時 NULL */
 void* SysAllocStringLen(const unsigned short* src, unsigned len) {
     unsigned char* b = (unsigned char*)malloc(4 + (size_t)len * 2 + 2);
@@ -28,6 +28,10 @@ void* SysAllocStringLen(const unsigned short* src, unsigned len) {
 int SysReAllocStringLen(void** pbstr, const unsigned short* src, unsigned len) {
     void* nb = SysAllocStringLen(src, len);
     if (!nb) return 0;
+    if (!src && *pbstr) {
+        unsigned old = *(unsigned*)((unsigned char*)*pbstr - 4) / 2;
+        memcpy(nb, *pbstr, (size_t)(old < len ? old : len) * 2);
+    }
     if (*pbstr) SysFreeString(*pbstr);
     *pbstr = nb;
     return 1;

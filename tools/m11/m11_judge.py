@@ -10,7 +10,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 W = os.environ.get('M11_JUDGE_WORK') or os.path.join(HERE, 'work')
 REQUIRE = None
 if '--require-stage' in sys.argv:
-    REQUIRE = int(sys.argv[sys.argv.index('--require-stage') + 1])
+    try:
+        REQUIRE = int(sys.argv[sys.argv.index('--require-stage') + 1])
+    except (IndexError, ValueError):
+        REQUIRE = None
+    if REQUIRE not in range(1, 7):
+        sys.stderr.write('usage: m11_judge.py [--require-stage N]  (N は 1〜6 の整数)\n')
+        sys.exit(2)
 
 
 def read(p):
