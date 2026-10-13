@@ -15,9 +15,12 @@ from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 WORK = os.path.join(ROOT, 'work')
-WIN_EXTRACTED = '/home/ubuntu/work/analysis/win64/extracted'
-WIN_MANIFEST = '/home/ubuntu/work/analysis/win64/block_manifest.json'
-WIN_PE_META = '/home/ubuntu/work/analysis/win64/pe_metadata.json'
+# block_manifest.json / pe_metadata.json が無い環境は inventory/mk_inputs.py で再構成し WIN_INPUTS_DIR に置く
+_WIN64 = os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64'
+_INPUTS = os.environ.get('WIN_INPUTS_DIR') or _WIN64
+WIN_EXTRACTED = os.path.join(_WIN64, 'extracted')
+WIN_MANIFEST = os.path.join(_INPUTS, 'block_manifest.json')
+WIN_PE_META = os.path.join(_INPUTS, 'pe_metadata.json')
 MAC_APP = '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents'
 
 # ---- 分類 ---------------------------------------------------------------
