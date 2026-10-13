@@ -56,7 +56,7 @@ python3 g1/judge_nc.py work/g1/status12.csv "${BLOCKS[@]}" | tee "$N/nc3.txt"; n
 verdict "NC3 judge.py" "$nc3" "$(grep '^変異' "$N/nc3.txt")"
 
 # --- NC4 e2e の終了コード
-cp work/batch/status.csv "$N/status_ctl.csv"
+cp work/batch/status.csv "$N/status_ctl.csv"; sha_before=$(sha256sum work/g1/status12.csv | cut -d' ' -f1)
 python3 - work/batch/status.csv "$N/status_bad.csv" <<'PY'
 import csv, sys
 rows = list(csv.reader(open(sys.argv[1])))
@@ -65,8 +65,9 @@ csv.writer(open(sys.argv[2], 'w')).writerows(rows)
 PY
 rc_ctl=$(G1_STATUS_CSV="$N/status_ctl.csv" rc_of bash g1/g1_e2e.sh --skip-lift --judge-only); grep -c 'judge-only: gate 1 のみ通過' "$N/last.out" > "$N/ctl_pass_lines"
 rc_bad=$(G1_STATUS_CSV="$N/status_bad.csv" rc_of bash g1/g1_e2e.sh --skip-lift --judge-only); pass_bad=$(grep -c 'judge-only: gate 1 のみ通過\|\[g1_e2e\] OK' "$N/last.out" || true)
-verdict "NC4 e2e exit code" $([ "$rc_ctl" = 0 ] && [ "$(cat "$N/ctl_pass_lines")" = 1 ] && [ "$rc_bad" != 0 ] && [ "$pass_bad" = 0 ]; echo $?) \
-  "対照 rc=$rc_ctl (通過行 $(cat "$N/ctl_pass_lines")) / emcc_c_rc=1 注入 rc=$rc_bad (通過行 $pass_bad)"
+sha_after=$(sha256sum work/g1/status12.csv | cut -d' ' -f1)
+verdict "NC4 e2e exit code" $([ "$rc_ctl" = 0 ] && [ "$(cat "$N/ctl_pass_lines")" = 1 ] && [ "$rc_bad" != 0 ] && [ "$pass_bad" = 0 ] && [ "$sha_before" = "$sha_after" ]; echo $?) \
+  "対照 rc=$rc_ctl (通過行 $(cat "$N/ctl_pass_lines")) / emcc_c_rc=1 注入 rc=$rc_bad (通過行 $pass_bad) / status12.csv は不合格 run の前後で $([ "$sha_before" = "$sha_after" ] && echo 不変 || echo 変化)"
 
 # --- NC5 matrix_check / NC6 ids_crosscheck (facts を壊す)
 python3 - work/g1/facts.json "$N" <<'PY'

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """g1_e2e.sh の判定 gate (PLG-G1 / #206)。 batch_lift.sh の status.csv を、要求した block 集合に対して検査する。
 
-  python3 judge.py <status.csv> <block> [<block> ...] [--out FILE]
+  python3 judge.py <status.csv> <block> [<block> ...] [--out FILE]     (--out は全 block 合格のときだけ書く)
 
 block ごとの合格条件 (すべて満たす):
   行がちょうど 1 つ / 列が整数 / closure_funcs > 0 / lift_rc == 0 / emcc_c_rc == 0 / f80_funcs == 0 /
@@ -81,7 +81,7 @@ def main(argv):
         print('FAIL: status.csv を読めない: %s' % e, file=sys.stderr)
         return 1
     fails, ok_rows = judge(rows, want)
-    if out:
+    if out and not fails:          # 不合格のときは成果物を書かない (前回の合格済み出力を壊さない)
         with open(out, 'w', newline='') as f:
             w = csv.DictWriter(f, COLS)
             w.writeheader()
