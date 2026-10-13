@@ -55,5 +55,27 @@ for fn in sorted(set(re.findall(r"(?m)^define [^\n]*@(__Z\w+)\(", s))):
                 return f"{p} = inttoptr i64 %arg{i} to ptr\n  {v} = load {ty}, ptr {p}, align {BITS[ty]}\n"
             new = re.sub(pat, rep, new)
     if new != body: s = s.replace(body, new); n += 1
+# [B] float 引数落ち: 元の機械語は xmm 引数を直接読むが RetDec IR は未初期化 alloca から読んでいる。
+#     逆アセンブル確認済みの対応 (xmm0=arg1, xmm1=arg2, xmm2=arg3) で alloca load を float 引数の lane0 bit 列に置換する。
+# [D] ucomiss flags 落ち: `ucomiss xmm1,xmm0; ja` は xmm1 > xmm0 (順序付き・非 NaN) の分岐。flags の load を fcmp ogt に接続する。
+def xmm_of(v, arg): return f"%fbits{v} = bitcast float %arg{arg} to i32\n  %{v} = zext i32 %fbits{v} to i128"
+FLOAT_XMM = {
+  "__Z7Fix_RCSf": {"%1 = load i128, ptr %0": xmm_of("1", 1)},
+  "__Z14LimitFloat_RCSfff": {
+    "%2 = load i128, ptr %0": xmm_of("2", 3),
+    "%3 = load i128, ptr %0": xmm_of("3", 2),
+    "%4 = load i128, ptr %0": xmm_of("4", 1),
+    "%5 = load i1, ptr %1": "%5 = fcmp ule float %arg2, %arg1",
+    "%6 = load i1, ptr %1": "%6 = fcmp ule float %arg2, %arg1",
+  },
+}
+for fn, rules in FLOAT_XMM.items():
+    m = re.search(r"(?ms)^define [^\n]*@" + re.escape(fn) + r"\(.*?^}\n", s)
+    if not m: continue
+    body = m.group(0); new = body
+    for old, rep in rules.items():
+        new = new.replace(old, rep)
+    new = re.sub(r"(?m)^  uselistorder .*\n", "", new)
+    if new != body: s = s.replace(body, new); n += 1
 open(sys.argv[2], "w").write(s)
 print(f"[kio_fix] widened {n} functions")
