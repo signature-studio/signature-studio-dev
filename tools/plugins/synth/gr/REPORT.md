@@ -14,7 +14,7 @@
 3. **native 側も「this = 0 埋め」では基準にならない。 実測: 12 本中 11 本が Gen_Render 内で SIGSEGV、 FL Slayer 1 本は正常 return したが dst に 1 word も書かない** (§3)。
    つまり判定は現状 12/12 本が `INVALID-REF` で exit 1。 native を基準にするには、ctor を通した実 instance (または host オブジェクトのモック) が要る。 これは #196 作業 5 (P0b) と同じ前提。
 4. **受入条件のうち未着手**: 「固定 MIDI/パラメータ列」 (TriggerVoice / ProcessParam を呼ぶ列)。 this が成立しないため、列を native へ流しても意味のある出力にならない。 case 列は length / 出力 padding のみ (§2)。
-5. **ネガティブコントロール**: 判定器の 13 ケース (control 1 + 改変 12) すべて期待通り (§4)。 ただし**合成データによる判定器の検査**で、実プラグインの出力による NC ではない。
+5. **ネガティブコントロール**: 判定器の 18 ケース (control 1 + 改変 17) すべて期待通り (§4)。 ただし**合成データによる判定器の検査**で、実プラグインの出力による NC ではない。
 
 ## 1. 構成
 
@@ -33,7 +33,7 @@
 - `cases.bin`: u32 ncases + 各 case `{u32 length; u32 padD; u32 reset}`。 `length` = Gen_Render の `Length` (frame 数)、`padD` = dst の 4 B 単位ずらし、`reset` = case 前に this を 0 埋めし直すか。
   固定 6 case: `(64,0,1) (64,0,0) (17,3,0) (1,0,0) (512,1,0) (64,0,1)` (`gr_lib.make_cases`)。
 - `results.bin`: 各 case `{u32 status; u32 sig; u64 fault_rip; u64 fault_addr; u64 ret; u32 nd; u32 dst[nd]}`、`nd = 2*length + 16`。 dst の初期値は `0xA5A5A5A5` で、書かれなかった word を見分ける。
-- 許容条件: 既定は **bit-exact (許容 0)**。 `--ulp N` は float32 の順序整数距離 ≤ N を許容し、PASS-TOL に分類する。 bit-exact にならない shell の許容値は、**比較が成立した後に**ここへ記録する (現状 0 件)。
+- 許容条件: 既定は **bit-exact (許容 0)**。 `--ulp N` (N ≥ 1) は float32 の順序整数距離 ≤ N を許容し、PASS-TOL に分類する。 順序整数は符号をまたいで連続 (`gr_lib._ord`) で、**+0 と -0 は距離 0 (`--ulp` 指定時は同値扱い、既定の bit-exact では bit が違うので DIFF)**。 NaN は常に不一致。 bit-exact にならない shell の許容値は、**比較が成立した後に**ここへ記録する (現状 0 件)。
 
 ## 3. native 実行の実測 (this = 0 埋め、case 6 件)
 
@@ -60,7 +60,7 @@
 - FL Slayer は `[this+0x148]` (engine オブジェクト) が 0 のとき何もせず return する分岐があり、this=0 埋めではその経路を通る。 正常 return でも**何も出力しない**ため基準にならない (judge は空出力を `INVALID-REF` にする)。
 - IAT は未解決 (0) のまま。 Win32 呼出を含む経路は、実 DLL なしの native では到達できない。
 
-## 4. ネガティブコントロール (`gr_nega.py`、合成データ、3 回実行して 0.50〜0.51 s)
+## 4. ネガティブコントロール (`gr_nega.py`、合成データ、実測時間は §5)
 
 合成 native (決定的な疑似乱数の finite float) を 12 本分作り、wasm = native のコピーに 1 箇所だけ改変を入れて `gr_judge.py` を実行。 期待 rc と出力文字列の**両方**を検査する (rc だけ見ると別の理由で落ちても緑になる: `synth/REPORT.md` §6 の教訓)。
 
@@ -71,12 +71,15 @@
 | 差 1 ulp、許容 0 | rc 1、`DIFF=1` | OK |
 | 差 1 ulp、`--ulp 2` | rc 0、`PASS-TOL=1` | OK |
 | 差 8 ulp、`--ulp 2` | rc 1、`DIFF=1` | OK |
+| 符号違い +最小非正規数 / -最小非正規数 (距離 2)、`--ulp 2` / `--ulp 1` | rc 0 `PASS-TOL=1` / rc 1 `DIFF=1` | 2 件 OK |
+| 符号違い +0 / -0、許容なし / `--ulp 1` | rc 1 `DIFF=1` / rc 0 `PASS-TOL=1` | 2 件 OK |
+| 符号違い +1e-9 / -1e-9 (距離 1628627134)、`--ulp 100` | rc 1、`DIFF=1` | OK |
 | wasm が中断 / 結果ファイルなし / 出力長 1 word 短い | rc 1、`WASM-ABORT=1` / `MISSING-WASM=1` / `SHAPE=1` | 3 件 OK |
 | 戻り値 (rax) だけ違う | rc 1、`DIFF=1` | OK |
 | wasm が NaN (`--ulp 100000000` でも) | rc 1、`DIFF=1` | OK |
 | native が中断 / dst 無書込 / 結果ファイルなし | rc 1、`INVALID-REF=1` | 3 件 OK |
 
-13 ケース中 NG 0。 **実 DLL に対する NC (native の実行器を壊す等) は未実施** — 実行器が基準を作れていない (§3) ため、壊す対象となる合格状態が無い。
+18 ケース中 NG 0。 符号をまたぐ 5 ケースは review (#612) で指摘された `_ord` の不連続 (旧実装は +0/-0 を距離 2147483648、+1e-9/-1e-9 を 3776110782 と返した) の修正に伴う追加で、旧 `gr_lib.py` に対しては 18 ケース中 NG 2 (+denorm/-denorm `--ulp 2` と +0/-0 `--ulp 1`) になり、検出できることを確認済み。 **実 DLL に対する NC (native の実行器を壊す等) は未実施** — 実行器が基準を作れていない (§3) ため、壊す対象となる合格状態が無い。
 
 ## 5. 検証
 

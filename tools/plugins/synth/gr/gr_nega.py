@@ -115,6 +115,32 @@ def m_ulp8(i, b, nd, wd, w):
     return flip(w, bit=8) if i == 3 else w
 
 
+def set_pair(nat_w, wsm_w, b, nd, shell, i=3):
+    """shell i の case 1 / word 5 を native = nat_w、wasm = wsm_w にする (符号をまたぐ組の合成用)"""
+    if shell != i:
+        return None
+    nat = synth_native(shell)
+    nat[1]['dst'][5] = nat_w
+    L.write_results(os.path.join(nd, b + '.bin'), nat)
+    w = copy.deepcopy(nat)
+    w[1]['dst'][5] = wsm_w
+    return w
+
+
+def m_sign_denorm(i, b, nd, wd, w):  # +最小非正規数 vs -最小非正規数 (距離 2)
+    return set_pair(0x00000001, 0x80000001, b, nd, i) or w
+
+
+def m_sign_zero(i, b, nd, wd, w):  # +0 vs -0 (距離 0)
+    return set_pair(0x00000000, 0x80000000, b, nd, i) or w
+
+
+def m_sign_tiny(i, b, nd, wd, w):  # +1e-9 vs -1e-9 (距離 2*0x2f...)
+    import struct
+    p = struct.unpack('<I', struct.pack('<f', 1e-9))[0]
+    return set_pair(p, p | 0x80000000, b, nd, i) or w
+
+
 CASES = [
     # (名前, mutate, 追加引数, 期待 rc, 出力に含むべき文字列, 含んではいけない文字列)
     ('control (wasm = native)', None, (), 0, 'OK 12/12', 'FAIL'),
@@ -122,6 +148,11 @@ CASES = [
     ('差 1 ulp、許容なし (strict)', m_ulp1, (), 1, 'DIFF=1', 'OK 12/12'),
     ('差 1 ulp、--ulp 2 (許容内 = 合格、PASS-TOL に分類)', m_ulp1, ('--ulp', '2'), 0, 'PASS-TOL=1', 'FAIL'),
     ('差 8 ulp、--ulp 2 (許容外)', m_ulp8, ('--ulp', '2'), 1, 'DIFF=1', 'OK 12/12'),
+    ('符号違い +denorm/-denorm (距離 2)、--ulp 2 (許容内 = PASS-TOL)', m_sign_denorm, ('--ulp', '2'), 0, 'PASS-TOL=1', 'FAIL'),
+    ('符号違い +denorm/-denorm (距離 2)、--ulp 1 (許容外)', m_sign_denorm, ('--ulp', '1'), 1, 'DIFF=1', 'OK 12/12'),
+    ('符号違い +0/-0、許容なし (bit 違いは DIFF)', m_sign_zero, (), 1, 'DIFF=1', 'OK 12/12'),
+    ('符号違い +0/-0、--ulp 1 (同値扱い = PASS-TOL)', m_sign_zero, ('--ulp', '1'), 0, 'PASS-TOL=1', 'FAIL'),
+    ('符号違い +1e-9/-1e-9 (距離 1628627134)、--ulp 100 (許容外)', m_sign_tiny, ('--ulp', '100'), 1, 'DIFF=1', 'OK 12/12'),
     ('wasm が中断', m_abort, (), 1, 'WASM-ABORT=1', 'OK 12/12'),
     ('wasm 結果ファイルなし', m_missing, (), 1, 'MISSING-WASM=1', 'OK 12/12'),
     ('wasm の出力長が 1 word 短い', m_shape, (), 1, 'SHAPE=1', 'OK 12/12'),

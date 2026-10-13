@@ -46,8 +46,9 @@ def write_results(path, recs):
 
 
 def _ord(w):
-    """float32 ビット列を単調な整数順序に (ulp 距離用)。 NaN は呼出側で除外"""
-    return (0x80000000 - w) if w & 0x80000000 else (w + 0x80000000)
+    """float32 ビット列を符号をまたいで連続・単調な整数順序に (ulp 距離用)。 +0 と -0 は同値 (0x80000000)。 NaN は呼出側で除外"""
+    m = w & 0x7fffffff
+    return (0x80000000 - m) if w & 0x80000000 else (0x80000000 + m)
 
 
 def _isnan(w):
@@ -95,7 +96,7 @@ def compare(nat, wsm, ulp=0):
             if x == y:
                 continue
             d = ulp_dist(x, y)
-            if d is not None and d <= ulp:
+            if ulp and d is not None and d <= ulp:  # ulp=0 は bit-exact (±0 の bit 差も DIFF)
                 within += 1
                 maxulp = max(maxulp, d)
                 continue
