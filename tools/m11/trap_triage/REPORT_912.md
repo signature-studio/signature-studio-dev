@@ -1,14 +1,14 @@
 # REPORT_912 — ClassCreate ON の ok 退行 4 件 (101 190 291 296) の oob 経路の切り分け (#912, 親 #704)
 
-結論: unit 101 / 291 / 296 の oob は、`function_4fb090` の `4fa070` 呼出し第 2 引数 `dl` の IR 取り違え (機械語 `mov dl,1` を、IR がスタック番地の下位 byte にしていた) を直すと ok に戻る (実測。§6・§7)。修復 pass `fix912/m11_fix912.py` は既定 ON (`M11_FIX_912=1`)。機構 (`dl=0` → `410320` 欠落 → `410360` の oob) は仮説で、直接観測していない。既定 ON の ok は 868 で OFF の 869 より 1 件少ない (unit 190 が ok→oob)。190 は未解決 (#1274)。受入条件 3 は未達のため `Refs #912`。
+結論: unit 101 / 291 / 296 の oob は、`function_4fb090` の `4fa070` 呼出し第 2 引数 `dl` の IR 取り違え (機械語 `mov dl,1` を、IR がスタック番地の下位 byte にしていた) を直すと ok に戻る (実測。§6・§7)。修復 pass `fix912/m11_fix912.py` は既定 OFF (`M11_FIX_912=1` で有効化)。既定を OFF にした理由: 現 head (M2q 込み IR) では ON/OFF の survey 差が 0 (942 unit 全一致、§10)。101 / 291 / 296 の oob 解消は**旧 IR (測定 commit `a5e9c1ed`、M2q 無し) での実測**であり、現 head では効果を確認できない。機構 (`dl=0` → `410320` 欠落 → `410360` の oob) は仮説で、直接観測していない。190 は旧 IR でのみ ON で ok→oob (未解決 #1274。現 head では ok)。受入条件 3 は現 head で ON/OFF の差 0 で成立するが、fix912 の効果によるものではない (M2q で同じ現象が消えている可能性。未確認)。PR は `Refs #912` の部分達成。
 
 ## 1. 基準
 
 - 検証起点 (測定の基準 main): `origin/main` = `412e302d`。PR ブランチの merge-base もこの commit (`git merge-base` で確認)。REPORT 旧版の「99b87bc2」は誤記で、`99b87bc2` は `412e302d` の祖先。
 - 測定 commit (コードを変えた最後): `a5e9c1ed`。`2e6fba53` は `m11_build.sh` の既定値 (`M11_FIX_912:-0`→`:-1`) とコメントだけを変え、`fix912/` は変えていない (`git diff a5e9c1ed 2e6fba53 -- tools/m11/fix912` は 0 行)。
 - **現 HEAD は測定 commit と同一ではない** (WORKFLOW §6 の差分 0 の条件を満たさない)。`git diff a5e9c1ed HEAD -- tools/m11/m11_passes.py tools/m11/m11_build.sh` は 2 files, 17 insertions(+), 2 deletions(-) で、内訳は (a) `m11_passes.py` の `pass_m2q_fn980ed0` (#1043 の function_980ed0 VA→LVA remap。`m11_gen_ir2.sh` が実行する pass で、IR を変える)、(b) `m11_build.sh` の `M11_FIX_912` 既定値変更。`a5e9c1ed` の IR は M2q を含まないため、§2・§7 の数値は**現 HEAD の IR の測定ではない**。
-- 以下の §2・§7 の IR は `a5e9c1ed` 時点 (M2q 無し) のもの。現 HEAD (M2q 込み) の IR での表・既定 (環境変数なし) の実測は未実施 (理由と手順は §9)。
-- 素材: `fl-win64` と `toolchain-retdec` は取得済み ([RETDEC] の `bin/` が存在)。ただし IR 再生成の入力 `functions_dll.csv` (Ghidra 出力) と `toolchain-emsdk` が揃わず、再測定は未実施。§2〜§7 の数値は `a5e9c1ed` 時点の実測。
+- 以下の §2 の IR は `a5e9c1ed` 時点 (M2q 無し) のもの。現 HEAD (M2q 込み) の実測は §10 が正 (既定 ON/OFF とも ok 870・全 942 unit 一致)。
+- 既定値の変更 (`M11_FIX_912` 既定 1→0、本節の commit) の確認 (`cmp` の結果) は §10 に追記する。
 - `m11_gen_ir2.sh`: 37.9 s (rc=0)。ldfix=applied (F1=902、errors=0)。
 - `m11_build.sh` ON: 22.9 s (rc=0、signature mismatch 0・undefined symbol 0)。OFF: rc=0。
 - `survey_units.mjs`: ON 9.3 s (rc=0)、OFF (rc=0)。load average 0.24–0.49。
@@ -72,17 +72,12 @@
 
 **修復**: `tools/m11/fix912/m11_fix912.py` (IR pass・冪等・双方向。`m11_build.sh` に組み込み、既定 `M11_FIX_912=1`、`0` でネガコン)。SSA 名 (`%37`/`%39`/`%38`) と定数 `994072` を直書きしており、IR 再生成で変わると count != 1 で fail-loud になる (非必須・後続)。`--mode off` は修正済み IR に対しては未検証 (現 IR に対しては実質 no-op)。
 
-## 7. 測定 (現 head・測定 commit `c05c11e4`・§10 が正)
+## 7. 測定
 
-| 構成 | ok | oob | halt0 | miss | noproc | other | abort |
-|---|--:|--:|--:|--:|--:|--:|--:|
-| 既定 ON | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
-| OFF (`M11_FIX_912=0`) | 870 | 16 | 7 | 47 | 1 | 1 | 0 |
+- 現 head の測定は §10 が正 (ON/OFF ともに ok 870、全 942 unit 一致。fix912 の効果は現 head では無い)。
+- 以下の §7-旧 は `a5e9c1ed` 時点・M2q 無し IR の実測。旧 IR での効果 (101 / 291 / 296 の回復) の根拠として残す。現 head には当てはまらない。
 
-- **既定 ON と OFF の差し引き: ok 0・unit 単位で全 942 件一致。** 現 head では fix912 の効果は survey に現れない。
-- 以下の旧 §7 の表 (`a5e9c1ed` 時点・M2q 無し IR) は参考として残す。現 head の結論には使わない。
-
-### 7-旧. 前 run の測定 (測定 commit `a5e9c1ed`、M2q 無し IR。現 head で再現せず)
+### 7-旧. 測定 commit `a5e9c1ed`、M2q 無し IR (旧 IR での実測。現 head で再現せず)
 
 | 構成 | ok | oob | halt0 | miss | noproc | other | abort |
 |---|--:|--:|--:|--:|--:|--:|--:|
@@ -108,13 +103,10 @@
 
 ## 9. 既定値変更 (`2e6fba53`) の鮮度と、本 run の再測定
 
-- `a5e9c1ed..2e6fba53` の差分は `tools/m11/m11_build.sh` の既定値 (`M11_FIX_912:-0`→`:-1`) とコメントのみ。`tools/m11/fix912/` と IR 生成手順は 0 行 (`git diff a5e9c1ed 2e6fba53 -- tools/m11/fix912` = 0 行)。したがって §7 の数値 (修正 1 = ON) は既定値変更の前後で同じ修正・同じ IR に対するもの。
-- ただし §7 の ON 行が `M11_FIX_912=1` を明示して走らせたか、既定 (環境変数なし) で走らせたかを示すログは残っていない。
-- 本 run (fix 対応) の確認: `ls $ARTIFACTS_DIR` は `fl-win64.tar.zst` と `toolchain-retdec.tar.zst` (`[RETDEC]` の `bin/` が存在)。ただし次の 2 点が揃わず、IR 再生成と build を完走できなかった。
-  - `m11_bounds.py` の入力 `tools/m2/work/ghidra_dll/functions_dll.csv` (Ghidra 12.1.4 出力) が無い。`fl-win64` の一覧 (25168 entry) に Ghidra 出力は無く、[GHIDRA] も無い。
-  - `m11_build.sh` は [EMSDK] の `emsdk_env.sh` を要求するが、`toolchain-emsdk` は未指定で [EMSDK] が無い。
-- (注: 以下は前 run の記録。現 HEAD の再測定と `functions_dll.csv` の作成は §10 で実施済み。)
-- よって現 HEAD での既定値の再測定は未実施。不足の内訳 (この run の確認):
+- 既定値の現 HEAD 再測定・`functions_dll.csv` の作成・手順は **§10 が正** (旧記述は削除。経緯は Git 履歴)。
+- 既定値は現在 OFF (`M11_FIX_912` 既定 0)。§10 の表は既定値変更前 (既定 ON 時) の build で測ったもの。既定 OFF の build は下記 §11 で測る。
+- (以下は旧記述。現在は §10 の実測で置き換え済み。)
+- 旧記述の要点 (前 run の確認):
   - `functions_dll.csv` は素材ではなく、Ghidra 12.1.4 headless (`tools/m2/README.md`・`DumpFunctions.java`) で作る中間物。[GHIDRA] (`docs/REFERENCES.md`) は無く、JDK 21 (temurin) は runner 同梱のものを使う。GitHub への到達は確認済み (200)。
   - `toolchain-emsdk` は未取得 ([EMSDK] 無し)。PR 本文の `oc_artifacts:` 行に追加する。
   - `work/boot*.lift.ll` は RetDec の全 lift (`m11_lift_all.sh`) が無いと生成されない。`docs/WORKFLOW.md` §11 の実測は `--full` が 633 秒 (head `2e128c5c`) で、素材と Ghidra 出力が揃っている前提。
