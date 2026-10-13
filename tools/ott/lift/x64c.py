@@ -18,6 +18,9 @@ from capstone.x86 import *
 IMG = 0x180000000
 SHIFT = 0x150000000        # 0x180000000 → 0x30000000
 IMG_SIZE = 0x308000
+IA32 = False               # --arch ia32 (PE machine 0x14c): PEInfo が設定する。既定 x64 は出力不変
+PTR = 8                    # ポインタ/戻り先幅 (ia32 = 4)
+MACHINE_ARCH = {0x8664: 'x64', 0x14c: 'ia32'}
 VEXCOV = os.environ.get('OTT_VEXCOV') == '1'   # CAB-135 probe: VEX 命令の実行 address 記録 (ott_vexhit)
 # fake TEB/TLS (CAB-135): image 末尾の未使用領域 (.reloc 終端 0x180307794 以降)。
 # PE image は MAP_ANONYMOUS(wasm も 0 初期化) なので両側とも 0 が読める = 「TLS 未割当」。
@@ -66,18 +69,43 @@ class Unsup(Exception):
     pass
 
 
+def iat_slot(ins, op):
+    """間接 call/jmp のメモリ operand が指す IAT スロット VA (なければ None)。
+    x64 は RIP 相対、ia32 は絶対 disp32 (ImageBase 基準 VA)。"""
+    if op.type != X86_OP_MEM:
+        return None
+    if op.mem.base == X86_REG_RIP:
+        return ins.address + ins.size + op.mem.disp
+    if IA32 and op.mem.base == 0 and op.mem.index == 0 and op.mem.segment == 0:
+        return op.mem.disp & 0xffffffff
+    return None
+
+
 class PEInfo:
-    def __init__(self, path):
+    def __init__(self, path, arch=None):
+        global IA32, PTR, IMG, SHIFT, IMG_SIZE
         self.data = open(path, 'rb').read()
         pe = pefile.PE(data=self.data)
+        mach = pe.FILE_HEADER.Machine
+        want = MACHINE_ARCH.get(mach)
+        if want is None:
+            raise SystemExit('[x64c] fail-fast: PE machine 0x%x は未対応' % mach)
+        if arch not in (None, 'auto') and arch != want:
+            raise SystemExit('[x64c] fail-fast: --arch %s だが PE machine 0x%x (%s) (D18)' % (arch, mach, want))
+        IA32 = want == 'ia32'
+        PTR = 4 if IA32 else 8
+        if IA32:   # ia32: 絶対アドレス・ImageBase 基準。shift なし (恒等)
+            IMG = pe.OPTIONAL_HEADER.ImageBase
+            SHIFT = 0
+            IMG_SIZE = pe.OPTIONAL_HEADER.SizeOfImage
         self.img = pe.get_memory_mapped_image()
         self.iat = {}                    # slot VA → name
         for ent in pe.DIRECTORY_ENTRY_IMPORT:
             for imp in ent.imports:
                 nm = imp.name.decode() if imp.name else 'ord%d' % imp.ordinal
                 self.iat[imp.address] = nm
-        sec = [s for s in pe.sections if s.Name.startswith(b'.pdata')][0]
-        raw = sec.get_data()
+        secs = [s for s in pe.sections if s.Name.startswith(b'.pdata')]
+        raw = secs[0].get_data() if secs else b''
         self.pdata = []
         for i in range(0, len(raw) // 12 * 12, 12):
             b, e, u = struct.unpack_from('<III', raw, i)
@@ -173,9 +201,13 @@ class FnLift:
         ent = []
         if n is None or n < 0 or n > 512:
             n = 64
+        if IA32:   # ia32 の jump table は絶対 VA (4 B)。tbl は ImageBase 基準の VA
+            tbl = tbl - IMG
         for k in range(n + 1):
-            off = struct.unpack_from('<i', self.pe.img, tbl + 4 * k)[0]
-            t = IMG + off
+            if IA32:
+                t = struct.unpack_from('<I', self.pe.img, tbl + 4 * k)[0]
+            else:
+                t = IMG + struct.unpack_from('<i', self.pe.img, tbl + 4 * k)[0]
             if not (self.entry - 0x4000 <= t < self.entry + 0x20000):
                 break
             ent.append(t)
@@ -286,6 +318,8 @@ class FnLift:
 
     def call_stmt(self, ins, tgt):
         ret = sh(ins.address + ins.size)
+        if IA32:
+            return 'R[RSP] -= 4; ST32(R[RSP], %s); ' % hx(ret) + tgt
         return 'R[RSP] -= 8; ST64(R[RSP], %s); ' % hx(ret) + tgt
 
     def emit_call_direct(self, ins, t):
@@ -406,9 +440,15 @@ class FnLift:
         self.L(self.wr(ins, ops[0], self.ea(ins, ops[1]), ops[0].size))
 
     def i_push(self, ins, ops):
+        if IA32:   # ia32: push r32/imm32/m32 (4 B)。ops[0] は 32bit 値として扱う
+            self.L('{ uint32_t v_ = %s; R[RSP] -= 4; ST32(R[RSP], v_); }' % self.rd(ins, ops[0], 4))
+            return
         self.L('{ uint64_t v_ = %s; R[RSP] -= 8; ST64(R[RSP], v_); }' % self.rd(ins, ops[0], 8))
 
     def i_pop(self, ins, ops):
+        if IA32:
+            self.L('{ uint32_t v_ = LD32(R[RSP]); R[RSP] += 4; %s }' % self.wr(ins, ops[0], 'v_', 4))
+            return
         self.L('{ uint64_t v_ = LD64(R[RSP]); R[RSP] += 8; %s }' % self.wr(ins, ops[0], 'v_', 8))
 
     def i_xchg(self, ins, ops):
@@ -603,26 +643,27 @@ class FnLift:
             return self.L('goto %s;' % self.label(t))
         if ins.address in self.jtabs:
             sw = ' '.join('case %s: goto %s;' % (hx(sh(t)), self.label(t)) for t in sorted(set(self.jtabs[ins.address])))
-            return self.L('switch (%s) { %s default: ott_badjump(%s, %s); }' % (self.rd(ins, op, 8), sw, hx(ins.address), self.rd(ins, op, 8)))
-        if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
-            slot = ins.address + ins.size + op.mem.disp
-            if slot in self.pe.iat:
-                return self.L('imp_%s(); return;' % self.pe.iat[slot])
+            return self.L('switch (%s) { %s default: ott_badjump(%s, %s); }' % (self.rd(ins, op, PTR), sw, hx(ins.address), self.rd(ins, op, PTR)))
+        slot = iat_slot(ins, op)
+        if slot is not None and slot in self.pe.iat:
+            return self.L('imp_%s(); return;' % self.pe.iat[slot])
         # 間接 tail jmp (CFG dispatch 等): target を値として dispatch
-        return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, 8))
+        return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, PTR))
 
     def i_call(self, ins, ops):
         op = ops[0]
         if op.type == X86_OP_IMM:
             return self.L(self.emit_call_direct(ins, op.imm))
-        if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
-            slot = ins.address + ins.size + op.mem.disp
-            if slot in self.pe.iat:
-                return self.L(self.call_stmt(ins, 'imp_%s();' % self.pe.iat[slot]))
-        self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, 8) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
+        slot = iat_slot(ins, op)
+        if slot is not None and slot in self.pe.iat:
+            return self.L(self.call_stmt(ins, 'imp_%s();' % self.pe.iat[slot]))
+        self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, PTR) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
 
     def i_ret(self, ins, ops):
-        self.L('R[RSP] += 8; return;')
+        if IA32 and ops:   # ia32 の ret imm16 (stdcall): 戻り先 + 引数分を捨てる。x64 の出力は不変
+            self.L('R[RSP] += %d; return;' % (PTR + ops[0].imm))
+            return
+        self.L('R[RSP] += %d; return;' % PTR)
 
     # ---- rep string ----
     def rep(self, ins):
@@ -963,7 +1004,10 @@ class FnLift:
     def i_stmxcsr(self, ins, ops): self.L('ST32(%s, ott_mxcsr);' % self.ea(ins, ops[0]))
     i_vldmxcsr = i_ldmxcsr
     i_vstmxcsr = i_stmxcsr
-    def i_leave(self, ins, ops): self.L('R[RSP] = R[RBP]; R[RBP] = LD64(R[RSP]); R[RSP] += 8;')
+    def i_leave(self, ins, ops):
+        if IA32:
+            return self.L('R[RSP] = R[RBP]; R[RBP] = LD32(R[RSP]); R[RSP] += 4;')
+        self.L('R[RSP] = R[RBP]; R[RBP] = LD64(R[RSP]); R[RSP] += 8;')
     def i_cld(self, ins, ops): pass
     def i_cpuid(self, ins, ops): self.L('ott_unsup(%s, "cpuid");' % hx(ins.address))
 
@@ -1466,20 +1510,21 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--closure', type=int, default=0, help='未 lift の直接 call 先を再帰的に追加 (深さ)')
     ap.add_argument('--override', action='append', default=[], help='VA=CNAME: その関数 body を C 実装 (rt/ott_ovr.c) に置換')
+    ap.add_argument('--arch', default='auto', choices=['auto', 'x64', 'ia32'], help='既定 auto = PE machine から決める。不一致は fail-fast (D18)')
     a = ap.parse_args()
     overrides = {int(x.split('=')[0], 16): x.split('=')[1] for x in a.override}
-    pe = PEInfo(a.pe)
+    pe = PEInfo(a.pe, a.arch)
     cfg = json.load(open(a.entries))
     entries = set(IMG + r for r in cfg.get('calltgt', [])) | set(cfg.get('roots', []))
-    md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True
+    md = Cs(CS_ARCH_X86, CS_MODE_32 if IA32 else CS_MODE_64); md.detail = True
     thunks = {}
 
     def thunk_name(va):
         code = pe.bytes_at(va, 8)
         for i in md.disasm(code, va, 1):
-            if i.mnemonic == 'jmp' and i.operands[0].type == X86_OP_MEM and i.operands[0].mem.base == X86_REG_RIP:
-                slot = va + i.size + i.operands[0].mem.disp
-                return pe.iat.get(slot)
+            if i.mnemonic == 'jmp' and i.operands[0].type == X86_OP_MEM:
+                slot = iat_slot(i, i.operands[0])
+                return pe.iat.get(slot) if slot is not None else None
         return None
 
     for e in list(entries):
@@ -1526,9 +1571,9 @@ def main():
     used_imps = set(thunks.values())
     for f in final.values():
         for ins in f.insns.values():
-            if strip_prefix(ins.mnemonic) in ('call', 'jmp') and ins.operands[0].type == X86_OP_MEM and ins.operands[0].mem.base == X86_REG_RIP:
-                s = ins.address + ins.size + ins.operands[0].mem.disp
-                if s in pe.iat:
+            if strip_prefix(ins.mnemonic) in ('call', 'jmp'):
+                s = iat_slot(ins, ins.operands[0])
+                if s is not None and s in pe.iat:
                     used_imps.add(pe.iat[s])
     used_imps = sorted(used_imps)
     with open(os.path.join(out, 'ott_lifted.c'), 'w') as fh:

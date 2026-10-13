@@ -192,7 +192,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   work-liftlib-targets / work-liftlib / work-icall / work-fw-stage1 / analysis-ott-binaries / analysis-mac-shared / apt-mingw。それ以外は
   run が失敗する)。`oc_artifacts: none` は「追加素材なし」の明示で、単独なら空扱い (既定の fl-win64 になる)。他の名前との混在は失敗する。
   全素材は約 17.7 GiB (2026-10-13 実測) のため必要分だけ指定する。
-  - `toolchain-retdec` → [RETDEC]、`toolchain-emsdk` → [EMSDK] に展開される (環境変数の対応は `docs/REFERENCES.md` §4)。
+  - `toolchain-retdec` → [RETDEC]、`toolchain-emsdk` → [EMSDK] に展開される (環境変数の対応は `docs/REFERENCES.md` §4)。`m11_lift.sh` は PATH に無ければ `$RETDEC_ROOT/bin` → 既定 `/opt/retdec/bin` の順で解決するため、PATH 設定は不要 (#928)。
   - `work-m6-ott` → `tools/m6/work/` + `tools/ott/work/` + `tools/m8/work/` + `tools/m9/work/` + `tools/m10/work/`
     (`tar --zstd -tf` で実測)、`work-liftlib` → `tools/liftlib/work/`、
     `work-icall` → `tools/icall/work/`、`work-liftlib-targets` → `tools/targets/{freshair,kilohearts}/work/`
