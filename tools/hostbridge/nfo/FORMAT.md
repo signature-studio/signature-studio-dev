@@ -120,7 +120,7 @@ FL 自身の書込 (`fle:0xaac300` → `0xaac1e0` → `0xab8ae0` → `0xa9eff0`)
  203 TEXT UTF-16LE <表示名>\0           (内部名と異なる時のみ = 常に出力)
  213 DATA wrapper chunk
 ```
-wrapper chunk (`0xa9eff0`, `tools/flp` の `parseWrapperData` で再パース可): `u32 8` に続き `{u32 id, u64 size, payload}`:
+wrapper chunk (`0xa9eff0`, `tools/flp` の `parseWrapperData` で再パース可): `u32 8` (**format version**: Wrapper が受理するのは 5–12、Wrapper 自身の writer は 12、FL 11.5.5 の DB writer は 8。kind ではない — H10 `tools/hostbridge/h10/REPORT.md` §2) に続き `{u32 id, u64 size, payload}`:
 
 | id | size | 内容 | 出現条件 |
 |---|---|---|---|
@@ -134,7 +134,7 @@ wrapper chunk (`0xa9eff0`, `tools/flp` の `parseWrapperData` で再パース可
 | 56 | n | vendor | 非空の時 |
 | 53 | n | プラグイン state (`effGetChunk`) | 持つ時のみ。DB 生成では出さない |
 
-文字列は ANSI コードページ (ASCII なら UTF-8 と同一) で NUL なし。レコード意味 (2 の各 flag の意味、212 の u32@8) は構造は確定、**意味付けは推定**。実プロジェクトに入るレコード (1, 30, 31, 32 等) は Wrapper 側が `.fst` 読込後に自分で足す (FL 書込の DB `.fst` には無い)。
+文字列は ANSI コードページ (version ≤ 8; version ≥ 9 は UTF-8。ASCII なら同一) で NUL なし。レコード意味 (2 の各 flag の意味、212 の u32@8) は構造は確定、**意味付けは推定**。実プロジェクトに入るレコード (1, 30, 31, 32, 53, 57 等) は Wrapper 側が自分の保存時に足す (FL 書込の DB `.fst` には無い)。**Wrapper の reader (`fw:0x875af0`) は 1, 2, 30, 31, 32, 50–58 の 14 id だけを読み、未知 id は読まずに skip、欠落は既定値**(1 = MIDI port −1/−1、30 = 未使用、31/32 = 0 件で plugin 既定 routing、50 = **0 (VST2 fx)**、57 = 1、53 無し = 既定 state)。**id 57 は VST2 hint ではなく `effGetVstVersion` (opcode 58) の戻り値** で、bitness 不一致時のみ使われる。hint (`TVSTPlugin` 第 6 引数) の供給元は存在しない (呼出元 1 件・定数 0)。212 の `u16@16`: **0x10 = generator** (`fle:0xf54900` が 0x31/0x32 の種別判定に使用)、**0x80 は DB 生成経路では立たない** (`fle:0xaac300` 第 4 引数 = 0)。根拠・検証は `tools/hostbridge/h10/REPORT.md`。
 
 ## 9. 未確認 [未]
 

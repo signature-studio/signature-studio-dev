@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+import { thirdPartyNotices } from "./tools/legal/notices/vite-plugin.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -122,7 +123,7 @@ function pyAssets(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets()],
+  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets(), thirdPartyNotices()],
   server: {
     // tools/ 配下は巨大な work/ を多数抱える (inotify watch 枯渇 ENOSPC の原因)。HMR 対象外にする
     watch: { ignored: ["**/tools/**", "**/deploy/**", "**/dist/**", "**/node_modules/**"] },

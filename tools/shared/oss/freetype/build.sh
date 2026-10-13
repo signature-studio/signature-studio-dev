@@ -55,4 +55,15 @@ for v in wasm32 wasm64; do
     echo "[ft] PASS $v: native == wasm ($(wc -l < "$B/out_$v.txt") lines, $(tail -1 "$B/out_$v.txt"))"
   else diff "$B/out_native.txt" "$B/out_$v.txt" | head -6; echo "[ft] FAIL $v"; rc=1; fi
 done
+
+# LGL-3 (#86): 再ビルド記録 (upstream 版・ソース sha256・configure 引数・パッチ) を NOTICES 用に書く
+if [ "$rc" = 0 ]; then
+  node "$ROOT/../legal/notices/record.mjs" --id freetype-2.7 --name FreeType --version 2.7 --license-spdx FTL \
+    --url https://download.savannah.gnu.org/releases/freetype/freetype-2.7.tar.gz --archive "$ROOT/work/src/freetype-2.7.tar.gz" \
+    --src-dir "$SRC" --license-file docs/FTL.TXT --license-file docs/LICENSE.TXT \
+    --script "$HERE/build.sh" --toolchain emcc --target wasm32 --target wasm64 \
+    --step "configure=./configure $CFG --build=x86_64-pc-linux-gnu --host=i686-pc-linux-gnu (emconfigure, CFLAGS=-O2; wasm64 は CFLAGS=-O2 -sMEMORY64=1)" \
+    --step "config-edit=wasm32 のみ include/freetype/config/ftoption.h の FT_CONFIG_OPTION_FORCE_INT64 を #define" \
+    --patch "tools/shared/oss/freetype/ftgrays_lp64.patch:ftgrays.c の FT_UDIV を long long 化 (wasm32 のみ)"
+fi
 exit $rc
