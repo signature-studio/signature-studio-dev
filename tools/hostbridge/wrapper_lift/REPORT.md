@@ -93,7 +93,7 @@
 | 所要 (RetDec, 全呼び出し秒 `retdec_seconds_all`, block19091 / block23676) | 267.37 / 265.41 (前回 run) | 11.22 s (block19091, 19,816 関数, 単一プロセス) | 未測定 |
 
 - 計測環境: RetDec v5.0 (`[RETDEC]`、公式 Linux release を RUNNER_TEMP に展開)、capstone 5.0.7 / pefile 2024.8.26。直列 1 プロセス。load average (1 分値) は計測中 0.23–0.33。
-- 所要の注意: 本 HEAD の runner には `[RETDEC]` が無く (`/opt` 配下に無い)、RetDec の所要は本 HEAD で再計測していない。表の 267.37 / 265.41 s は本節の定義による旧計測値。同じ項目の別値 (305.01 s / 305.04 s) が以前の記載にあり、どちらが正かは RetDec を入れた環境での再計測で確定させる (未解決、#828)。
+- 所要の注意: 本 HEAD の runner には `[RETDEC]` の実体が無く、RetDec の所要は本 HEAD で再計測していない。表の 267.37 / 265.41 s は本節の定義による旧計測値。同じ項目の別値 (305.01 s / 305.04 s) が以前の記載にあり、どちらが正かは RetDec を入れた環境での再計測で確定させる (未解決、#828)。
 - 所要の定義: `retdec_seconds_all` = 分割前の親 batch・分割後の子 batch・単独失敗を含む、全 `retdec-decompiler` 呼び出しの wall 時間の和 (呼び出し 40 回、全て exit 0)。`retdec_seconds_ok_calls` (rc == 0 の呼び出しだけの和) は同値 (267.37 / 265.41) で、今回は失敗呼び出しが無いため差は出ない。
 - 定義: RetDec 成功 = 出力 C に `function_<開始 VA>` の定義本体が現れる関数。`exit 0` だが定義が無い関数は失敗 (reason `no_definition`)。RetDec の出力 C はコンパイル可否を保証しない (emcc 通過は別欄)。
 - 失敗 93 件の内訳 (block19091 / block23676 とも同じ): (a) RetDec が非 0 終了 = 0 件 (全 40 呼び出しが exit 0 で、分割による単独 range の非 0 終了は起きなかった)。(b) exit 0 だが定義なし = 93 件。(a) に該当する代表的なエラー行は無い。(b) の 93 件は線形 decode の不能範囲 (§1: 0x40ce20 / 0x425720 / 0x56f5c0 / 0x572b00 の各範囲) と重ならず (0 件)、原因は未特定。失敗 93 件の全アドレスは `retdec_block*.json` の `failed_funcs` (gitignore)。
@@ -115,7 +115,7 @@
 
 ## 6. 比較表 (#917 受入条件 1〜3。検証 HEAD: 本 PR、2026-10-13 run)
 
-数値の正本は §1・§5。ここは到達状況のみ。計測環境: `/opt` 配下の emcc・RetDec は本 HEAD の runner に無く、emcc 相当の検査は clang `-fsyntax-only` で代用した (下記)。
+数値の正本は §1・§5。ここは到達状況のみ。計測環境: `[EMSDK]`・`[RETDEC]` の実体は本 HEAD の runner に無く、emcc 相当の検査は clang `-fsyntax-only` で代用した (下記)。
 
 | 項目 | RetDec 分割 lift | x64c (`x64c_wrapper.py`) | liftlib (RetDec→修復→emcc) |
 |---|---|---|---|
