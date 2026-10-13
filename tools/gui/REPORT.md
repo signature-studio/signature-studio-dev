@@ -134,6 +134,7 @@ python3 tools/gui/analysis/gui_imports.py && python3 tools/gui/gen_api.py   # im
 | nc golden ネガコン (`7105a2d`) | 1 px 改変 → 拒否 / `NC_FAULT=1` → MISMATCH 840 px / `NC_FAULT=2` → MISMATCH 4,270 px。判定は「PPM 出力 + MISMATCH 行」に厳格化 (欠落・クラッシュは不合格) |
 | z 順 assert の感度 | 修正前の `gui_core.c` (`51e6170`) に対し新 assert 2 件が FAIL (`non-topmost after TOPMOST stays below it` / `HWND_BOTTOM clears TOPMOST`)、修正後は PASS |
 | 試行 | 1 回目は 5/6 で worktree に `node_modules` が無く `tsc` が ENOENT で停止 (コード起因ではない)。`pnpm install --frozen-lockfile` 後の 2 回目で ALL PASS |
+| 最終 HEAD `87c20fc` (docs のみ追加) | 試行 1: **rc 1** で 2b/6 `reach_test` の `selftest_wrapped` が停止。同バイナリ 20 回で **16 ok / 4 fail** (4 件とも `gui_headless.c:33 blit_surf` の ASan heap-use-after-free = #489)。試行 2: **ALL PASS、rc 0、101 s** (load 1.98)。全 step PASS の内訳は `7105a2d` と同一 |
 | 参考: `51e6170` の e2e | PR コメント記載 (3 試行中 2 回失敗、1/6 と 2b/6 の ASan UAF = #489 系、3 試行目 ALL PASS 97 s)。修正前の HEAD 実測として参照のみ |
 
 ### 検証 (`e822e53`、runner 4 CPU、RetDec・emsdk・mingw あり)
