@@ -237,4 +237,4 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 - **結論**: 同一 PE・同一 ranges の RetDec raw `*.drc.ll` は実行ごとに変わり得る (ASLR 有効の実行群で distinct 1〜6 種)。差分は `uselistorder` 指示の行 (行の有無と並び)。`.drc.c` は 8/8 同一。既存の A7 段 (`run_base` / `ir5_patch`) がこの行を除去するため、liftlib base 段は 6/6、m6 chain は 3/3 が同一 (OTT 入力)。
 - **対策**: raw は sha256 比較しない・A7 後の成果物で判定する。回帰 gate `lift_determinism_e2e.sh` は PASS し、1 行追加の検出と A7 外し (FAIL・rc=1) を確認。`setarch -R` は決定性の手段として採らない (ASLR 無効でも raw が一致しない事例があり、契機は未分離)。
 - **未解決**: k80 (block18983_PE.bin) の alloca 並び差は OTT で再現せず、A7 後に残るかは未検証 (fl-win64 が必要) → `[LIFTLIB-10]` #695 に起票。PR は `Refs #668`。
-- 詳細・全実測・受入条件の達成状況は [`REPORT_APPENDIX_D.md`](REPORT_APPENDIX_D.md) (§22.1〜§22.11)。再現: `bash tools/liftlib/lift_determinism_e2e.sh` (N=2、総 20 秒) / `bash tools/liftlib/lift_determinism_probe.sh 4` (約 35 秒)。
+- 詳細・全実測・受入条件の達成状況は [`REPORT_APPENDIX_D.md`](REPORT_APPENDIX_D.md) (§22.1〜§22.12)。再現: `bash tools/liftlib/lift_determinism_e2e.sh` (N=2、HEAD `116cbb3` で総 17 秒) / `bash tools/liftlib/lift_determinism_probe.sh 4` (同 33 秒)。レビュー指摘 (PR #696) の対応は §22.12。

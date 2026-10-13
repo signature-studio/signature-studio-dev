@@ -48,9 +48,11 @@ distinct (値の種類数): ASLR 有効 raw = **4/4**、uselistorder 除去後 =
 | gate N=4 (`5dc0117`) | §22.7 | 4 | 2 (`5bac875d2e33` ×3・`a782ad770357` ×1) |
 | probe (`ae16a2f`、レビュー再実行) | PR review | 4 | 2 (`5bac875d2e33` ×3・`6d79bb6f829a` ×1) |
 | gate N=2 (`ae16a2f`、レビュー再実行) | PR review | 2 | 1 (r1 = r2 = `5bac875d2e33`) |
-| 修正後 HEAD の probe | §22.12 | | |
+| gate N=2 (`116cbb3`、修正後) | §22.12 | 2 | 2 |
+| gate N=4 (`116cbb3`、修正後) | §22.12 | 4 | 3 |
+| probe (`116cbb3`、修正後) ASLR 有効 | §22.12 | 4 | 4 |
 
-→ 同じ条件でも一致する回と一致しない回がある。n=2〜6 で distinct は 1〜6 (min–max)。
+→ 同じ条件でも一致する回と一致しない回がある。ASLR 有効の実行群では n=2〜6 で distinct は 1〜6 (min–max)。ASLR 無効 (`setarch -R`) の probe は 2 回 (`5dc0117` と `116cbb3`、計 8 本) とも 4/4 が `279d6ee60f7d` で同一。ただし 2 回とも同じ出力パス (`tools/liftlib/work/probe/off/r1/tmp` 等) を使っており、§22.4 のとおり条件で値が変わり得るため、決定性の根拠にはしない。
 
 ## 22.4 実測 2: ASLR 無効でも raw が一致しない事例 (契機は未分離)
 
@@ -128,3 +130,32 @@ PR は `Refs #668` (Closes は使わない)。k80 の実測が残るため。
 
 - `tools/liftlib/liftlib_e2e.sh` (FreshAir・KH の素材を要する) は今回の `oc_artifacts` に無いため未実行。本 gate は OTT のみを使う。
 - block18983_PE.bin / k80 は未使用 (fl-win64 不在)。k80 の数値は p0c REPORT §15.4 の既存記録のみ。
+
+## 22.12 レビュー指摘への対応と修正後の再検証
+
+PR #696 の oc-reviewer review (`ae16a2f`、CHANGES_REQUESTED) への対応。修正 commit `116cbb3` (`tools/liftlib/` のみ)。検証は `116cbb3` の HEAD で実施。
+
+| 指摘 | 対応 |
+|---|---|
+| 1 repo 外絶対パス (§22.1 の RetDec・runner 行) | RetDec の実体は `[RETDEC]` (`docs/REFERENCES.md`) 参照に統一し、runner の作業 dir の記述は削除 |
+| 2 §22.4 の機構 (TMPDIR 長で値が変わる) | 断定を撤回し、契機は未分離と明記。レビュー再実行 (TMPDIR 長のみ変更、1c5f5c6a47bb 同一) を §22.4 に併記 |
+| 3 「毎回変わる」の過大 | 「実行ごとに変わり得る」に変更し、実行群ごとの分布表を §22.3 に追加 |
+| 4 `lift_determinism_check.py` の docstring | 「必ず exit 1」を訂正 (raw が偶然一致すれば exit 0) |
+| 5 `DET_RUNS=1` で比較 0 組のまま PASS | N<2 は rc=2 (`lift_determinism_e2e.sh` と `lift_determinism_check.py` の両方) |
+| 6 「use-list 順」の不正確さ | 「`uselistorder` 指示の行 (行の有無と並び)」に統一 (§22.1・§22.5) |
+| Copilot | `copilot-pull-request-reviewer` の review と inline コメントは 0 件 (2026-10-13 取得時点) |
+
+検証 (HEAD `116cbb3`、runner nproc=4):
+
+| 検証 | 結果 | 所要 | load (開始 → 終了) |
+|---|---|---|---|
+| `lift_determinism_e2e.sh` (N=2、既定) | PASS、negctrl detected、rc=0。raw `5bac875d2e33` / `35847e5a3fc2`、base 2/2 `c8fb37be3a24` | 総 17 s (RetDec 9 s) | 0.10 → 0.45 |
+| `DET_RUNS=4 lift_determinism_e2e.sh` | PASS、negctrl detected、rc=0。raw 3 種 (`5bac875d2e33` ×2・`279d6ee60f7d`・`ef2320ee025b`)、base 4/4 `c8fb37be3a24` | 総 35 s (RetDec 20 s) | 0.50 → 2.31 |
+| ネガコン 2: `DET_NEGCTRL_NO_BASE=1` (A7 を外す) | `determinism FAIL`、rc=1 (期待どおり) | RetDec 19 s | 0.50 → 2.69 |
+| 前提・ガード: `DET_RUNS=1` / `DET_RUNS=abc` | rc=2 (RetDec 未起動) | — | — |
+| `lift_determinism_check.py /nonexistent 1` | rc=2 | — | — |
+| `lift_determinism_probe.sh 4` (ASLR 有効 / 無効 各 4) | raw: 有効 4 種 / 無効 1 種 (`279d6ee60f7d` 4/4)。除去後 raw・`.drc.c` は 8 本とも各 1 種 | 総 33 s | 2.13 → 2.08 |
+
+静的確認: `bash -n` と `python3 -m py_compile` が通過。`find tools/liftlib docs -size +20M` は 0 件。`git diff --check` は clean。変更は `tools/liftlib/` と `docs/DOC_MAP.md` (付録 D の行数欄) のみ。
+
+未解決は §22.10 のとおり (変更なし)。k80 の実測は `[LIFTLIB-10]` #695 で行う。
