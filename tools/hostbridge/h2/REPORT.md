@@ -164,8 +164,6 @@ node tools/hostbridge/lowbase/multi/multi_load.mjs --ott $PWD/tools/hostbridge/h
 - 事前準備 (gitignore 済み `work/`): `tools/m8/work`・`tools/m9/work` を mkdir しないと `m10_build.sh` が FileNotFound で落ちる。
   python 依存 `pefile capstone numpy` は runner に無く pip install が必要。
 
-| 未達 | 理由 | 起票先 |
-|---|---|---|
 **#92 再々実行 (fl-win64 付き, 検証 HEAD 6e5c8dac)**: 未達だった `h2_e2e.sh` [4/4] と Balance 同時ロードを解消。
 
 - 素材: `oc_artifacts: fl-win64 plugins-ott toolchain-retdec toolchain-emsdk work-m6-ott work-liftlib analysis-ott-binaries`。
