@@ -16,7 +16,7 @@ if [ -f "$OUT/$NAME.drc.ll" ]; then
   sed '/^\/opt\/retdec\/bin\/retdec-decompiler/,+1d' "$LR" > "$T"
   want=2
 else
-  sed '/^--select-ranges/ s#2>&1$#2>\&1 \&\nRDPID=$!\ntimeout "$TMO" tail -n +1 -F "$OUT/$NAME.retdec.log" 2>/dev/null | grep -m1 -q "LLVM IR -> HLL" || true\nkill -9 "$RDPID" 2>/dev/null || true\nwait "$RDPID" 2>/dev/null || true#' "$LR" > "$T"
+  sed '/^[[:space:]]*--select-ranges/ s#2>&1$#2>\&1 \&\nRDPID=$!\ntimeout "$TMO" tail -n +1 -F "$OUT/$NAME.retdec.log" 2>/dev/null | grep -m1 -q "LLVM IR -> HLL" || true\nkill -9 "$RDPID" 2>/dev/null || true\nwait "$RDPID" 2>/dev/null || true#' "$LR" > "$T"
   want=-4
 fi
 [ "$(( $(wc -l < "$LR") - $(wc -l < "$T") ))" = "$want" ] || { echo "[lift_from_ll] lift_ranges.sh の RetDec 呼出を特定できない" >&2; exit 1; }

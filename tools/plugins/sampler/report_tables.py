@@ -12,6 +12,10 @@ F = json.load(open(os.path.join(W, 'facts.json')))
 S = {int(r['block']): r for r in csv.DictReader(open(os.path.join(W, 'status.csv')))}
 M = {p['name']: p for p in json.load(open(os.path.join(HERE, '..', 'PLUGIN_MATRIX.json')))['plugins']}
 n = lambda x: format(x, ',')
+SECS = {}
+for r in csv.DictReader(open(os.path.join(HERE, '..', 'work', 'batch', 'status.csv'))):
+    SECS.setdefault(int(r['block']), []).append(int(r['seconds']))
+rng = lambda b: ('%d–%d' % (min(SECS[b]), max(SECS[b])) if min(SECS[b]) != max(SECS[b]) else str(SECS[b][0])) + ' (n=%d)' % len(SECS[b])
 SEC = sys.argv[1] if len(sys.argv) > 1 else ''
 import io, contextlib
 _buf = io.StringIO()
@@ -28,7 +32,7 @@ for name, blk, _ in targets.SHELLS:
     print('| %s | %d | %s | %s / %s | %s / %s | %d | %d | %d | %s | %s | %s%s | %s | %s |' % (
         name, blk, M[name]['tier'], n(f['closure_funcs']), n(f['closure_bytes']), n(f['frontier_funcs']), n(f['frontier_bytes']),
         f['vcall'], f['ptr_or_vt0'], f['iat_calls'], s['defines'], s['f80_funcs'], s['declares_unimpl'],
-        ' (%s)' % s['unimpl_names'] if s['unimpl_names'] else '', s['emcc_c_rc'], s['seconds']))
+        ' (%s)' % s['unimpl_names'] if s['unimpl_names'] else '', s['emcc_c_rc'], rng(blk)))
 print('| 計 | | | **%s / %s** | | | | | %s | | | | |' % (n(tot[0]), n(tot[1]), n(tot[2])))
 
 print('@@S3')
