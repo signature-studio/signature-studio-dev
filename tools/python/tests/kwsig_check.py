@@ -87,18 +87,21 @@ assert last() == (1,), last()
 mx.getTrackName(7)
 assert last() == (7,), last()
 
-# (7) stubs に既定値がある引数: バイナリ側で名前が変わっていても同位置の stubs 既定値を引き継ぐ
-ch.getChannelVolume(1, useGlobalIndex=True)  # stubs の mode=False が kwlist の useDb に引き継がれる
-assert last() == (1, False, True), last()
-ch.getChannelVolume(index=3)
-assert last() == (3, False, False), last()
-mx.getTrackVolume(index=2)  # stubs mode=0 -> kwlist flag
-assert last() == (2, 0), last()
+# (7) 既定値は stubs の同名引数のものだけ。名前が違う同位置 (stubs mode → kwlist useDb/flag) の既定値は引き継がない
+expect(TypeError, ch.getChannelVolume, 1, useGlobalIndex=True)  # useDb は既定値不明 (途中の省略) → 拒否
+ch.getChannelVolume(index=3)  # 末尾の useDb・useGlobalIndex は省略 → C 側の既定値
+assert last() == (3,), last()
+ch.getChannelVolume(1, True, useGlobalIndex=True)
+assert last() == (1, True, True), last()
+mx.getTrackVolume(index=2)  # stubs mode=0 は kwlist flag へ引き継がない → 省略
+assert last() == (2,), last()
 mx.getTrackVolume(2, flag=1)
 assert last() == (2, 1), last()
 gen.saveUndo("u", 1)  # 位置のみ
-gen.saveUndo("u", 1, updateHistory=False)  # stubs update=True -> kwlist updateHistory
+gen.saveUndo("u", 1, updateHistory=False)  # stubs update=True (別名) は引き継がない。明示指定は通る
 assert last() == ("u", 1, False), last()
+gen.saveUndo("u", 1)
+assert last() == ("u", 1), last()
 expect(TypeError, ch.getChannelVolume, 1, mode=1)  # バイナリに無い名前 (stubs の旧名) は拒否
 expect(TypeError, mx.getTrackVolume, 1, mode=1)
 # 位置がずれた引数 (stubs に無い引数がバイナリで挿入されている) は、別の引数の既定値を流用せず拒否
@@ -117,11 +120,13 @@ expect(TypeError, dv.linkToLastTweaked, 1, 2, eventId=3)
 
 # (8) PR 前の bind (stubs 署名のみ。fl_api._make の旧実装と同一ロジック) との新旧比較。
 #     stubs 署名と kwlist の両方がある 94 関数の全てで、位置引数 k 個 + kw 1 個 (kwlist の名前) の呼出しを比べる。
-#     旧が通った呼出しは新も同じ結果でなければならない。例外はバイナリと食い違う次の関数だけ (期待を固定):
-#       channels.getStepParam    : stubs は 6 引数、バイナリは 5 引数 (新は 6 つ目を渡さない)
-#       channels.soloChannel     : バイナリは (index, value, useGlobalIndex)。旧は useGlobalIndex を value の位置に束縛していた
-#       plugins.getColor         : バイナリは useGlobalIndex の前に paramIndex がある (同上)
-#       plugins.getParamValueString : バイナリは pickupMode が無く、4 番目が useGlobalIndex
+#     差は次の 3 種だけ (PY-15 #653 で既定値の引き継ぎを同名のみに変えた結果。期待を固定):
+#       a. 名前だけ違う同位置の既定値を引き継がない → 末尾は省略 (C 側の既定値)、途中は TypeError
+#          (channels.getChannelVolume/soloChannel/setChannelPitch, mixer.getTrackVolume/getEventIDName/automateEvent,
+#           general.saveUndo, device.forwardMIDICC)
+#       b. 旧が位置をずらして誤束縛していた (新は束縛しない・TypeError):
+#          plugins.getColor (useGlobalIndex を paramIndex の位置へ) / plugins.getParamValueString (5 引数目を渡す)
+#       c. バイナリは 5 引数なので旧の 6 つ目 (useGlobalIndex の stubs 既定値) を渡さない: channels.getStepParam
 def legacy_bind(sig, args, kw):
     names = [p["name"] for p in sig["params"]]
     defaults = {p["name"]: p["default"] for p in sig["params"] if p["default"] is not None}
@@ -168,9 +173,10 @@ for m, fs in t["modules"].items():
                 else:
                     known.add(f"{m}.{n}")
 print(f"legacy bind が通った kw 呼出し {n_cmp} 件のうち新も同結果 {n_same}、差 {sorted(known)}")
-assert known == {"channels.getStepParam", "channels.soloChannel", "plugins.getColor", "plugins.getParamValueString"}, known
-# 差 8 件 = 上の 4 関数。うち 3 件 (soloChannel(index=)・getColor(flag=) ×2) は旧が gap 後の既定値で位置ずれさせていたもの (新は省略)
-assert n_cmp - n_same == 8, (n_cmp, n_same)
+assert known == {"channels.getChannelVolume", "channels.getStepParam", "channels.setChannelPitch", "channels.soloChannel",
+                 "device.forwardMIDICC", "general.saveUndo", "mixer.automateEvent", "mixer.getEventIDName",
+                 "mixer.getTrackVolume", "plugins.getColor", "plugins.getParamValueString"}, known
+assert (n_cmp, n_same) == (224, 208), (n_cmp, n_same)
 
 # (9) kwlist の重複名 (arrangement.selectionSet は ['selStart','selStart','selectNotes',...]; バイナリ由来)
 #     最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)
