@@ -154,18 +154,18 @@ PR #638 (規則反映) は merge 済み。検証は PR HEAD `1885bc03` の workt
 | `pack` (small) | OK | 2.941 秒 / load 0.47→0.52 | `node pack/pack.ts --only '^(Data/System/[^/]*$\|Artwork/\|System/Config/\|Data/Templates/Minimal/)' --out work/pkg-small` / 15:42:05 |
 | `node-test` | ALL PASS | 1.327 秒 / load 0.44→0.80 | `node test/node-test.ts --pkg work/pkg-small --out work/results-node.json` / 15:42:23 |
 | `browser-test` (Chrome) | ALL PASS | 4.119 秒 / load 0.70→0.70 | `node test/browser-test.ts --pkg work/pkg-small --out work/results-chrome.json` / 15:42:38 |
-| `emscripten-test` | **未実行** | `[EMSDK]` 未配置 | (`oc_artifacts: toolchain-emsdk` が必要) |
+| `emscripten-test` | 実行済み (ALL PASS)。§13 | (§13 参照) | `node test/emscripten-test.ts` / §13 |
 | `asset-e2e` | **未実行** | k100 (314 MB wasm 素材) が未配置 | (許可素材に無い) |
 
 - 旧版 (origin/main 64d09590 / run 2) の値「展開 5.5 秒」は今回 8.5 秒と再現せず、本表の値で置き換えた。
 - `node_modules` 無しの clean worktree では `e2e.sh` の tsc 段が落ちる (`node_modules` はルートの `pnpm i` が必要)。これは本 PR 由来ではなく、#637 の解消条件は「ルートの `node_modules` がある」こと。
 - `node-test` は初回、`pack` と並列に起動したため manifest 未生成で失敗した (`latest.json` 不在)。直列で再実行して PASS。
 
-未解決: emscripten-test (要 `[EMSDK]` = `toolchain-emsdk`) と asset-e2e (要 k100 の素材化、PM 判断) → #592。
+未解決: asset-e2e (要 k100 の素材化、PM 判断) → #592。emscripten-test は §13 で解消 (`[EMSDK]` は runner 既存の emcc 6.0.12 を使用)。
 
 ## 13. emscripten-test の実行 (#592 受入条件 2 / 検証 HEAD 986e7415 / 2026-10-13 UTC)
 
-§12 の「emscripten-test 未実行」を解消する。`[EMSDK]` は runner 既存の `/opt/emsdk` (emcc 6.0.12・`docs/REFERENCES.md` §4 の既定位置) を使った。`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` は展開していない (`emscripten-test.ts` が `/opt/emsdk/emsdk_env.sh` を直接 source するため)。
+§12 の「emscripten-test 未実行」を解消する。`[EMSDK]` は runner 既存の emcc 6.0.12 (`docs/REFERENCES.md` §4 の既定位置) を使った。`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` は展開していない (`emscripten-test.ts` が `[EMSDK]` の `emsdk_env.sh` を直接 source するため)。
 素材は `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` とした。`TMPDIR=$RUNNER_TEMP`。`pnpm install --frozen-lockfile` は 0.35 秒で完了。
 
 `bash tools/assets/e2e.sh` (既定サブセット) を 3 回。各回 asset-e2e の 1 段で停止するため rc=1 (既知: k100 不在)。
@@ -178,5 +178,5 @@ PR #638 (規則反映) は merge 済み。検証は PR HEAD `1885bc03` の workt
 
 - 並列 1 (`e2e.sh` は直列)。ログは `tools/assets/work/e2e-n{1,2,3}.log` (gitignore)。
 - 初回 run (`e2e-run4.log`) でも同じ順序で emscripten-test ALL PASS (`fread/fseek/ftell` で 8.86 MB ファイルの fnv 一致・`write denied`)。
-- 前段 (復元 → 差分検査 6 点 → ネガコン → 生成物一致) は各回 exit 0 相当で通過。`tsc` も exit 0 (`node_modules` あり)。
+- 前段の段ごとの exit code (ec06535e・素材 fl-win64 を `$RUNNER_TEMP/fl-win64` に展開して単独実行): mk_manifest 0 / mk_inputs 0 / recover_paths 0 / inventory 0 / strings_scan 0 / classify 0 / 差分検査 0 / ネガコン 1 (期待どおり FAIL を検出。`e2e.sh` は「ネガコンが通ったら FAIL」と判定) / 生成物差分 0。`tsc` も exit 0 (`node_modules` あり)。
 - asset-e2e は未達のまま。k100 (314 MB) の素材化は PM 判断 (§5・§12 参照)。`oc_artifacts` の許可名に k100 を含む素材は無い。
