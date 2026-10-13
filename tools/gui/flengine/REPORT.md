@@ -190,7 +190,6 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | `SystemParametersInfoW` の未対応 action (例: `0x101a` SPI_GETICONTITLELOGFONT 相当) は FALSE 返却。LOGFONTW の値は未実装 (§5-5) | 当該 action を呼ぶ経路で FL の見た目が既定値と異なり得る | PM 起票依頼 (LOGFONTW の FL 実機値の確認と実装。shim の SPI 対応範囲) |
 | `LoadStringW` の資源 ID 供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | survey の順序依存 (非 pthread と pthread で 10 unit が trap↔ok で動く、§5-6) | survey の unit 別結果が build 条件と前 unit の状態に依存する。S1 の比較は同一 build (`--base`) に限る | PM 起票依頼 (m11 survey 隔離の状態汚染。m11 側の件) |
-| 受入「`__pe_image` を m11_data_gen 方式の data 実体化へ統合」(スコープ 3) | 未着手 (本 PR は m11 の image 敷設をそのまま利用) | PM 起票依頼 (新規子チケット) |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
 | `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない) | runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `gen_ir2` を使わず素材 IR で行う | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件。PM 起票依頼) |
 | 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
