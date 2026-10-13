@@ -74,8 +74,9 @@ HeartCore の呼び方を tools/gui の native headless host (gcc + ASan/UBSan) 
 - ローダの動作 (逆アセンブル): `LoadLibraryExW` で `DWriteCore.dll` を試し、失敗すると `dwrite.dll` を試す。`GetProcAddress` で `DWriteCoreCreateFactory` → 失敗時 `DWriteCreateFactory` を取得。両方失敗すると NULL を返し、呼び出し元は結果 0 を格納する (`movq $0,(%rsi)`)。取得した工場は静的キャッシュ `0x184168338` に保持する。
 - 使用インタフェース: 工場の vtable 経由 (`callq *0x68/0x28/0x20/0x18(%rax)` 等)。COM の `IDWriteFactory` で、フォント列挙・テキストレイアウトを含むため、最小の代替は大きい。
 - 方針: FreeType 経由では受けない (COM の DWrite 面全体を置き換える必要があり、文字の描画は `ui_eval` の範囲外)。shimx は未対応 API を `shim_unimplemented` で名前を出して abort する方針 (`shimx.h` §先頭) に合わせ、`GetProcAddress` の段で `DWriteCreateFactory` / `DWriteCoreCreateFactory` を fail-fast させる (`tools/shimx/src/module.c`)。
-- 検証: `tools/shimx/test.sh` の fail-fast 段に `dwrite` ケースを追加 (`exit=1` + 名前を stderr に出力) → PASS。shimx 全体 (MT/ST・M4 互換・fail-fast) も PASS。
-- **未検証**: 実 Windows での DWrite の実呼び出し (動的ロードが実際に走るか・どの DLL が見つかるか)。静的解析の結論であり、実行確認は範囲外 (§5)。ローダの呼び出し元 2 件の役割 (テキスト描画か) は未確認。
+- 検証 (実測, コード commit `c80a1951`。test.sh は `tools/shimx/src`・`test` のみ読み REPORT は読まないため、後続の文書のみ commit 後も同一結果を別 run で確認): `bash tools/shimx/test.sh` = exit 0。開始 epoch `1791908643` → 終了 `1791908691` (所要 48 秒)。load (終了時 uptime) 0.61。MT PASS (7 グループ)・ST PASS・M4 互換 PASS・カバレッジ 687 公開関数 PASS。`dwrite` ケースは `exit=1`、stderr 行 `[shim] FAIL-FAST: unimplemented Win32 API: DWriteCreateFactory (DirectWrite 未対応: Kilohearts Skia の動的ロード。KH-20 方針 = 明示 fail-fast)` を確認 (`expect_fail dwrite` ✓)。
+- 環境: emcc 6.0.12 は [EMSDK] を runner 上に新規展開して使用 (run 環境のみ)。test.sh の生成物 (`BACKLOG.md`・`inventory.*`・`exports.txt`・`coverage.json`) は素材不足 (plugins 未展開) で劣化して再生成されるため、コミットしない。
+- **未検証**: 実 Windows での DWrite の実呼び出し (動的ロードが実際に走るか・どの DLL が見つかるか)。静的解析の結論であり、実行確認は範囲外 (§5)。ローダの呼び出し元 2 件の役割 (テキスト描画か) は未確認。旧挙動 (NULL → 結果 0 格納 → 呼び出し元続行) からの変化により、**abort が A/B の通常起動で発火し得るか**も未確認 (ローダ呼び出し元 2 件の到達条件を実機で確認するまで、決定の影響範囲は不明)。
 
 ### 2.5 UI 層の規模と OS 境界 (`ui_closure.py`, rtti_walk+callgraph 再利用)
 方法: roots = 42 効果の名前空間ごとに「Dsp/MasterDsp/DspModel **以外**」クラス (Editor/EditorModel/Controller/UI*/Field) の vtable slot。**直接 call/jmp 辺のみ追跡 = 下限** (間接 call は辿らない)。
