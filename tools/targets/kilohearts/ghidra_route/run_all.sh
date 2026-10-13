@@ -11,7 +11,7 @@ GHIDRA_HOME=${GHIDRA_HOME:-/opt/ghidra/ghidra_12.1.4_PUBLIC}
 CORE="$KH/work/winpkg/HeartCore.core_64"
 [ -f "$CORE" ] || { echo "HeartCore.core_64 が無い: bash $KH/scripts/extract_installer.sh" >&2; exit 2; }
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
-T() { local t0; t0=$(date +%s.%N); "$@"; printf '   [wall %.1f s | load %s]\n' "$(echo "$(date +%s.%N) - $t0" | bc)" "$(cut -d' ' -f1-3 /proc/loadavg)"; }
+T() { local t0; t0=$(date +%s.%N); "$@"; printf '   [wall %.1f s | load %s]\n' "$(echo "$(date +%s.%N) - $t0" | bc)" "$(cut -d' ' -f1-3 /proc/loadavg)" >&2; }
 
 echo "== [1] native 参照 + 共通 ctx-fuzz ベクタ (snapins/harness, $TR trial / seed $SEED)"
 mkdir -p "$KH/snapins/work"
