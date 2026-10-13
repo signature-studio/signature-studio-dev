@@ -246,5 +246,5 @@ wasm 行カーネル (node, 各 n=5 の min–max ms/frame; scalar = `-msimd128`
   | 未解決 | 影響 | 起票先 |
   |---|---|---|
   | (1) `loadFont` の取得元を #22 (VFS) の遅延取得 (Range/OPFS/R2) へ結線 | 本番ブラウザへの配信は未接続 (e2e は同一オリジン `/fonts/*`) | #660 (GUI-14) |
-  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 既存 e2e の維持は 8×8 回帰 (上記) までの確認。c4b293d では RetDec 不在で未達: `e2e.sh` 全体は step 2 rc=1、`SKIP_NATIVE=1` は step 3 rc=127 (付録 §12 追補) | #615 に `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec apt-mingw` での再実行を依頼 (PR 本文の行は更新済み) |
+  | (2) `bash tools/gui/e2e.sh` 全体 (PE lift 層込み) の ALL PASS 確認 | 7ead604 のレビュー実測 (RetDec あり) で 2 回中 1 回 ALL PASS、もう 1 回は `selftest_wrapped` の既知 flake (ASan blit_surf UAF、単独 30 回で 9/30 失敗) で rc=1 (付録 §12 追補) | flake は `gui_headless.c` の起票を PM 依頼 (未起票)。ALL PASS の追加確認は PM 判断 |
   | (3) 実 FL の face/サイズ確定・alias 実値 | alias は e2e 用 (Segoe UI/Tahoma → Open Sans) のみ | #174 (GUI-3) / #186 の未解決 (2) |

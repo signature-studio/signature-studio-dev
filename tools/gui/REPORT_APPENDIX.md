@@ -18,11 +18,13 @@
 
 ## 12 追補. c4b293d 再確認 (PR #661 レビュー対応: e2e.sh の FT ビルド保証を step 4 の前へ移動した後)
 
-環境: 4 vCPU・RAM 15 GiB、emcc 6.0.12、Chrome headless。`$ARTIFACTS_DIR` は `fl-win64.tar.zst` と `toolchain-emsdk.tar.zst` のみ (`toolchain-retdec` 無し、`/opt/retdec` 不在、`apt-mingw` は `x86_64-w64-mingw32-gcc` を確認)。各実測の load は開始時の `uptime` (1 分値)。
+環境: 4 vCPU・RAM 15 GiB、RetDec v5.0 ([RETDEC])、emcc 6.0.12、Chrome headless、clean worktree。以下の数値は PR #661 レビュー (oc-reviewer, HEAD `7ead604`) の実測で、rc・所要・開始時 load (1 分値)・回数を記す。
 
 - **負の対照 (旧順序の再現)**: libfreetype wasm32 が無い状態で `lift/gui_wasm.sh` を呼ぶと `run tools/shared/oss/freetype/build.sh first` で **rc=2** (1.1 s)。旧順序の e2e.sh step 4 は同じ経路で落ちる。
 - **新順序の FT ガード** (`test/fetch_fonts.sh` → `FONT=… shared/oss/freetype/build.sh`): **rc=0**、実時間 1 m 31 s。native / wasm32 / wasm64 の自己テストは PASS (TOTAL a4eff06d516ef88f)、フォント 2 本取得・sha256 OK。続けて `lift/ft_wasm_lib.sh` **rc=0** (5.9 s、`build/ft_mt` へ -pthread 再ビルド)。`gui_wasm.sh` は FT 段を通過し、`/nonexistent/lifted.c` の emcc 入力エラー (rc=1) で止まる。失敗位置が FT 検査から lifted.c 入力へ移ったことを確認 (lifted.c の生成は RetDec が必要で本 run では未実施)。
 - **`text_wasm_e2e.sh` (RetDec 不要)**: **3/3 rc=0 PASS**。実時間 18.27 s (初回) / 8.59 s / 8.63 s (FT ビルド 1 m 31 s は含まない)、開始時 load 1.84 / 1.76 / 3.01。読み戻し 0 px・スクリーンショット 0 px (38400 px 中、前景 3826 px)、metrics 30 行差 0、8×8 回帰 0 px (前景 2179 px)、ネガコン N1〜N5 全て拒否。
-- **`SKIP_NATIVE=1 bash tools/gui/e2e.sh`**: **rc=127 で step 3** (`gui_lift.sh` の `/opt/retdec/bin/retdec-decompiler` 呼出し)、実時間 9.62 s、開始時 load 2.82。`app.exe` (mingw) は生成されるが `retdec.c` は出ない。FT 段に到達しないため、本 run では SKIP_NATIVE 経路の通過を確認できない。
-- **`bash tools/gui/e2e.sh` (通常経路)**: step 0・1 (selftest **426 passed, 0 failed**)・1b (bpp ALL PASS)・1c0 (text-golden ALL PASS、ネガコン 4/4、ft-wasm PASS TOTAL edd537e3b390f846) は PASS。**rc=1 で step 2** (`test/native_e2e.sh` → `gui_lift.sh` の RetDec 呼出しで rc=127)、実時間 34.18 s、開始時 load 2.15。step 1c 以降は未到達。**ALL PASS は未確認。**
-- **未解決 (起票依頼)**: `toolchain-retdec` を含む素材での `bash tools/gui/e2e.sh` (通常経路) と `SKIP_NATIVE=1` の再実行。起票先 #615。
+- **旧 `e2e.sh` (f3ba8e1) の `SKIP_NATIVE=1`・libfreetype 未ビルド (ネガコン)**: **rc=2 で step 4** (`run tools/shared/oss/freetype/build.sh first`)、11.2 s。
+- **現 HEAD `SKIP_NATIVE=1 bash tools/gui/e2e.sh`・libfreetype 未ビルド**: **rc=0 ALL PASS**、2 m 24 s、開始時 load 1.28。step 33 のガードで FT native/wasm32/wasm64 を構築し、wasm32・wasm64 とも `[ft] PASS`。
+- **現 HEAD `bash tools/gui/e2e.sh` (通常経路) 2 回**: 1 回目 **rc=0 ALL PASS**、3 m 21 s、開始時 load 0.60。2 回目 **rc=1、step 2b の末尾で停止**、2 m 15 s、開始時 load 0.59。2 回目の出力は grep で除外され、原因行は未取得。受入条件 1 は 2 回中 1 回 ALL PASS。
+- **既知 flake (本 PR の変更とは独立)**: `tools/gui/test/reach_test.sh` 末尾の `selftest_wrapped` (ASan) が約 30% の確率で `gui_headless.c:33 blit_surf` の heap-use-after-free (`recompose_all` ← `on_cmd`、thread T1) で落ちる。同バイナリを単独 30 回回した結果は PR HEAD `7ead604` が **9/30 失敗**、origin/main `0fa8283` が **8/30 失敗** (同じ ASan エラー)。PR は `gui_headless.c`・`selftest.c`・`reach_test.sh` に触れていない。
+- **未解決 (起票依頼)**: `gui_headless.c` の blit_surf race の issue 起票 (PM 依頼・未起票)。`toolchain-retdec` を含む素材での通常経路 ALL PASS の追加確認の要否は PM 判断。
