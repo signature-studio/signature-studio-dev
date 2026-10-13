@@ -174,6 +174,13 @@ LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じス
 - `results/m11_unreachable_cd.md` は現コードの出力と一致 (入力 work-m11 / work-liftdiff で再生成して確認。コード HEAD 516a2b07 で exit 0・16.56 s・diff 0 行)。
 - P2 の全 20 件で `L ∈ direct_calls(F)` が成立 (同一 PE・同一入力で 20/20 を確認)。
 - 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
+- **0x417b70 (LD-28 受入条件 1・静的確認のみ、動的未確認)**: 食い違い 32 件の次 entry は native 側 0x409470 (18)・0x409410 (11)・0x418190 (3)、wasm 側 0x409730 (17)・0x409410 (15)。
+  L の機械語は `417c56: idiv qword ptr [rbp+0x60]` (符号付き除算) だが、IR は `%29 = udiv i64 %28, %arg4` (符号なし)。
+  その直後の `icmp eq %29, %27` が偽のとき `call 0x409730; unreachable` へ進む。stride×count が負で count > 0 なら、符号付き除算は stride を返すが符号なし除算は一致しない。
+  手計算の数値例 (積の符号のみ): −16×2 (count 2)、−32×4、−8×3 で udiv は stride を返さず、idiv は返す。
+  仮説: 32 件の一部は、この udiv が trap 経路 (0x409730) を誤って取ることで生じる。**未確認**: 32 件の stride 符号・経路の実測、および sdiv への修正後に食い違いが消えるかの再実行。
+  `417c7a`〜`417c81` の `dword [rax+4]==1` 判定と 0x409410/0x409470 の分岐も未確認。
+  子 issue: #1238 (LD-41) に追記 (動的確認の受入条件を持つ)。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
 
