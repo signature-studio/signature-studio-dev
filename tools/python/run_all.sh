@@ -33,4 +33,12 @@ python3 analysis/mcp_classify.py
 step "9c. .pyscript ローダ + flpianoroll 回帰 (同梱 Piano roll 5 / Remote 5 / Audio 12 調査)"; node tests/pyscript_e2e.mjs | grep -E '^\{"total"'
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
 step "11. MCP JSON-RPC を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-4 #77)"; (cd "$HERE/../.." && node tools/python/tests/mcp_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
+step "12. MIDI scripting ホスト (PY-6 #76): device script ローダ・27 callback・Web MIDI 結線 (合成 fixture) + 同梱 device script"
+node tests/midi_script.mjs | cut -c1-300
+node tests/midi_script.mjs --neg | cut -c1-120 || [ $? -eq 1 ]   # ネガコン: 検出できたとき exit 1
+node tests/midi_bundled_device.mjs                              # 入力が無ければ exit 3 (NOT VERIFIED) で run_all を止める
+step "13. サブインタプリタ検証 (flpy.wasm: Py_NewInterpreterFromConfig)"
+node tests/subinterp_probe.mjs | cut -c1-300
+node tests/subinterp_probe.mjs --neg | cut -c1-120 || [ $? -eq 1 ]
+step "14. MIDI scripting を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-6 #76)"; (cd "$HERE/../.." && node tools/python/tests/midi_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "ALL OK"

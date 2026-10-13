@@ -163,3 +163,37 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 | R3 の GetProcAddress | §4.3 の miss 12 名 (UI言語 3 + shell32 序数 9) | **13 名トークン解決** (`lifttab: … -> token 0x7f0000xx`), miss 消滅 |
 | survey (trace_soft_fix) | ok 800 / oob 41 / halt0 53 | **同値 (不変)** |
 | ビルド 5 variant | mismatch/undefined/duplicate 0 | **0 (不変)** |
+
+## 10. winstubs 結線 (#223 / ST-T3b) — `build.sh --ws`
+
+2026-10-13 / 再現: `bash tools/m11/shimx_link/build.sh --soft --fix --ws && node tools/m11/shimx_link/ws_e2e.mjs tools/m11/work/shimx_link/m11_sx_plain_soft_fix_ws.cjs` (exit 0 = 全 PASS)。
+`tools/startup/winstubs` `tools/shimx` は読取のみ (差分 0 行)。`tools/m11` の変更は `m11_simd2.py` (オプション追加のみ。既定出力は変更前と byte 一致) と本ディレクトリ。
+
+| 要素 | 実装 |
+|---|---|
+| `--wrap` | `winstubs/wrap_list.txt` の現行 **12 本**を `-Wl,--wrap=<api>` で付与 (issue 本文の 16 本は CAB-214 follow-up で退役済み。受入は 12 本で解釈) |
+| winstubs ソース | `winstubs/src/*.c` を `obj_ws/` にビルドしてリンク。weak 定義は `gen_link.py` の m11 nm に加えるため **GUI/audio スタブから自動除外** (gui スタブ 170→156 本 / lift_c 211→225) |
+| `winstubs_init(0)` | `sx_winstubs.c` の `constructor(102)` (sx_cbboot の既定優先度より先)。`m11_boot_enter` より前に 1 回 = THostInstance 構築前の要件を満たす |
+| cpuid 橋 | `m11_simd2.py --cpuid=winstubs` が `__asm_cpuid*` の実体を `winstubs_cpuid` 呼出へ置換 (`work/m11_simd_ws.c`)。既定 (`m11_build.sh`) は旧 CPUID_BODY のまま |
+| 観測口 | `sx_ws_probe_{cpuid,g03,g12}` / `sx_ws_stat` / `sx_ws_loadlib_miss` を export (同一 wasm 内から `__wrap_*` 経由で呼ぶ) |
+
+### 10.1 実測 (コミット 6dd00c2 でクリーンビルドから再現)
+
+| 項目 | 実測 |
+|---|---|
+| リンク (`--soft --fix --ws`) | **signature mismatch 0 / undefined symbol 0 / duplicate 0**。所要 5.4 秒 (obj キャッシュ無し)。wasm 6,250,610 B (ws 無し 6,239,337 B) |
+| `ws_e2e.mjs` | **PASS 19 / FAIL 0** (所要 0.76 秒)。うち **9 件は `[probe由来]`** (G03 ×4 / G12 ×3 / `WRAP.symbols_in_wasm` / `LOG.loadlib_miss_available`: `sx_ws_probe_*` か wasm バイト列検査で得た証拠で、lift の自然経路ではない)。残り 10 件 (BOOT ×2 + G05 ×7 + `WRAP.count`) のうち、boot 中に lift が自然に踏んだと言えるのは `BOOT.*` ×2 (到達点) と `G05.boot_cpuid_from_lift` (`winstubs_cpuid` 8 回) (他の G05 6 件も `sx_ws_probe_cpuid` 経由の値検査)。`BOOT.init_count_ge_18` / `BOOT.units_run_ge_17` は下限のみ (#236 / #307 で先へ進んでも落ちない) |
+| G05 (lift `__asm_cpuid` 経由) | leaf1.EDX=`0x078bfbff` / cmov=1 / leaf1.ECX=0 / leaf7 AVX2=0。**boot 中に lift から `winstubs_cpuid` が 8 回呼ばれた** (自然経路) |
+| G03 (`--wrap` 経由 probe) | engine ×2 + host exe とも signer_match=1。`WinVerifyTrust` 計数 6 (VERIFY+CLOSE ×3) |
+| G12 (probe) | CreateProcessW 試行 1 / 成功 **0**、`WebView2Loader.dll` は NULL・GetLastError=126、loadlib_blocked=1 |
+| `winstubs_loadlib_miss` | `["WebView2Loader.dll"]` を取得 (probe 由来) |
+| `--wrap` シンボル | wrap_list 12/12 の `__wrap_*` が wasm 内に存在 |
+| 回帰 `bash tools/startup/winstubs/winstubs.sh` | **exit 0 / ALL PASS (checks=1133) / boot 21/21 / リンク 67/67 (ST/MT) / shimx 回帰 ST・MT ALL PASS**。所要 10.1 秒。coexist_gui は gui 側ビルド物が無く SKIP |
+| 既存 closure (`--soft --fix`, ws 無し) | 到達点は不変: init_count 18 / units_run 17/942 / threw=memory access out of bounds (CAB-231 停止点) |
+
+### 10.2 未達・制限
+
+- **boot は従来どおり unit #18 の OOB (CAB-231/#236) で止まる**。G03 署名・G12 CreateProcessW/WebView2Loader は FL が自然に呼ぶ前に停止するため、これらは同一 wasm 内の probe で `__wrap_*` 経由の挙動を測った (boot 中に自然経路で呼ばれた winstubs は cpuid の 8 回のみ。他の統計は boot 時点で 0)。
+  「lift 実機で `winstubs_loadlib_miss` を取得し retval_table を実測校正」は、unit 18 の先へ進むまで**実施不可** (probe の 1 件は校正根拠にならない)。
+- #103 引継ぎ 3 点のうち未着手: (1) `m11_genstubs.py` の除外リストへの pump API 追加は、`shimx_link` 系が genstubs の `m11_winstubs.c` を使わず pump TU も未リンクのため**現構成では不要** (pump を closure に入れる #102 で必要)。(2) `pump_ring_addr()` → `new PumpRing(...)` 結線も #102。(3) 時計較正は ctrl 単体を使わない — 本結線は時計に触れない。
+- `--trace` と `--ws` の併用は未検証 (trace_wrap の改名 IR は ws の定義済み名と未突合)。リンクのみ確認 (`--trace --soft --fix --ws`: mismatch 0 / undefined 0 / duplicate 0)、実行は未確認。trace の obj / `BOOT` パスは `$WSUF` 付きで WS 有無のキャッシュを分離済み (`boot_trace_fix.o` 4,282,726 B と `boot_trace_fix_ws.o` 4,282,642 B は別内容)。
