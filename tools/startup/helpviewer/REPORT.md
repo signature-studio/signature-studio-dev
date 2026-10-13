@@ -1,6 +1,6 @@
 # REPORT — ST-T8 (#118): help-viewer — FL の Help を sandbox iframe に表示、error-offline.html 差替
 
-検証起点: 親 `main` = `72cc968`、検証対象コミット = §6 に記載。素材 = `fl-win64` (FL Studio 26.1.7.5653、`FLEngine_x64.dll`)。
+検証起点: 親 `main` = `72cc968`、検証対象コミット = `9e04154` (§6)。素材 = `fl-win64` (FL Studio 26.1.7.5653、`FLEngine_x64.dll`)。
 既知類型 (`docs/DEFECTS.md`) との関係: **該当なし** (lift/IR pass を扱わない。FLEngine の静的解析と、ブラウザ側 TS の実装・検証)。
 受入条件は issue 本文に無いため、本 REPORT §0 で定義した。**全項目の達成ではない** (エンジン結線は未達、§5)。PR は `Refs #118`。
 
@@ -147,7 +147,7 @@ HelpFiles = 利用者の FL の Help フォルダ (webkitdirectory/ドロップ)
 
 ## 6. 検証
 
-検証対象コミット: §下記の実測欄を参照 (コミット済み HEAD をクリーン worktree に展開して実行)。
+検証はコミット済み HEAD をクリーン worktree に展開して実行した (下の実測欄)。
 
 ```sh
 bash tools/startup/helpviewer/e2e.sh     # FL_WIN64_DIR (fl-win64 展開先) が必要。Chrome (CHROME_BIN) と pnpm install 済みの node_modules が前提
@@ -167,4 +167,16 @@ bash tools/startup/helpviewer/e2e.sh     # FL_WIN64_DIR (fl-win64 展開先) が
 
 実測 (コミット済み HEAD、n=3 のクリーン worktree 展開):
 
-__MEASURED__
+検証対象コミット = `9e04154` (feat)。`git worktree add --detach <dir> 9e04154` で展開し `pnpm install --frozen-lockfile` 後に `e2e.sh` を 3 回 (並列 1、同一 Actions runner、Chrome/154.0.8037.97、node v22.23.3):
+
+| run | 所要 (e2e.sh 全体) | load average 開始→終了 (1 分値) | ブラウザ e2e: `index_offline.html` 表示 / `WhatsNew.htm` 表示 | 結果 |
+|---:|---:|---|---|---|
+| 1 | 23.9 秒 | 0.08 → 0.47 | 42 ms / 335 ms | exit 0・PASS |
+| 2 | 23.4 秒 | 0.47 → 0.62 | 50 ms / 352 ms | exit 0・PASS |
+| 3 | 23.9 秒 | 0.62 → 0.67 | 46 ms / 332 ms | exit 0・PASS |
+
+- 範囲: 所要 23.4–23.9 秒、表示時間は `shellExecute` 呼出から iframe 内 `document.title` が期待値になるまでの壁時計 (CDP ポーリング 50 ms 間隔の分解能を含む)。
+- `git diff 72cc968 9e04154 --stat`: 15 ファイル +1960 行。範囲は `src/runtime/help_{viewer,panel}.ts`・`src/index.ts`・`tools/startup/helpviewer/`・`docs/{DOC_MAP,STATUS}.md` のみ。
+  `find tools/startup/helpviewer src -type f -size +20M -not -path '*/work/*'` は 0 件 (最大の追加物 `help_files.json` は 9382 B)。
+- 別アルゴリズムでの検算: §2 の「読み」(意味づけ) は capstone による逆アセンブルで行い、機械照合 (`verify_engine.py`) は逆アセンブラを使わないバイト走査 + `.pdata` + IAT で行う (独立した 2 手法)。
+- 検証範囲: 上記のとおり FL 26.1.7.5653 win64 の `Help/**` 55 件と `FLEngine_x64.dll` の宣言済み 54 事項。範囲外: lift 済みエンジンの実行 (U1)、全文オフラインマニュアル (U3)、Chrome 以外 (U4)。
