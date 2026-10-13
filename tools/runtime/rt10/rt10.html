@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>RT-10</title>
+<script>
+// measure.mjs が window.rt10Run(cfg) を呼ぶ。結果は Promise で返る。
+window.rt10Run = (cfg) => new Promise((res) => {
+  const w = new Worker('/h/rt10_worker.mjs', { type: 'module' });
+  w.onmessage = (e) => { res(e.data); w.terminate(); };
+  w.onerror = (e) => res({ ok: false, error: 'worker error ' + (e.message || e.filename || '') });
+  w.postMessage(cfg);
+});
+window.rt10Isolated = self.crossOriginIsolated;
+</script>
