@@ -233,6 +233,7 @@ Morphine は後段のみの秒 (下記)。
 | `synth_e2e.sh` 全工程 (`JOBS=4`、スクリプト a824a1d) | exit 1、958 秒。 judge: PASS 12 / KNOWN 9 / NEW-FAIL 0。 strict: PASS 12 / NEW-FAIL 9。 **`matrix_check` が 90/91 で rc 1**: PLUGIN_MATRIX の Harmless `batch.unimpl_helpers` 5 と実測 0 の食い違い。 → `PLUGIN_MATRIX.json` を 5 → 0 に更新 (f251ca6)。 gate は意図通り不一致で落ちた |
 | **コミット済み HEAD aef6120 の `synth_e2e.sh --skip-lift`** | **exit 0、194 秒** (開始時 load average 0.57、終了時 0.99、並列 1)。 matrix_check 91/91、ids_crosscheck 12/12、judge: PASS 12 / KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0。 `[synth_e2e] OK` |
 | HEAD aef6120 の `synth_nega.sh` | exit 0、11 秒。 NC1〜NC5 すべて期待通り (§6) |
+| main (#538 ほか) をマージした 146f168 + helper_diff の stosb 変異を #538 の実装に合わせた 4f9fb12 | `synth_e2e.sh --skip-lift` exit 0 / 191 秒 (開始時 load average 0.43、終了時 1.00)、judge PASS 12 / KNOWN 9 / NEW-FAIL 0、matrix_check 91/91。 `synth_nega.sh` exit 0。 `helper_diff.sh` exit 0 (12,040,001 checks / 0 mismatch、NC 8/8)。 マージ直後は stosb の変異が当たらず helper_diff が FAIL した (「変異が当たらなければ FAIL」の設計どおり) |
 | `known.json` | 3 本の `#535` 行を削除。 baseline に載ったまま解消した行は FIXED で落ちるため、削除が必須 |
 | shell 3 本の lift 秒 (逐次) | 34 / 18 / 41 (旧 §2: 20 / 9 / 19)。 `fix_avx256` 自体は 1 秒未満で、増加の原因は未調査 (同一 HEAD での反復無し。 全工程の run は 4 並列で RetDec と同時に走る別条件) |
 
