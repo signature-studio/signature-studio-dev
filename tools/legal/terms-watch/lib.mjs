@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { NsisError, nsisLicenseCandidates } from "./nsis.mjs";
 
 export class SourceError extends Error {
   constructor(message, kind = "error") {
@@ -242,8 +243,67 @@ export function locateFlFile(flDir, match) {
   return { name, data };
 }
 
+function walkFiles(root, nameRe, maxDepth, out = [], depth = 0) {
+  for (const e of readdirSync(root, { withFileTypes: true })) {
+    const p = path.join(root, e.name);
+    if (e.isDirectory()) { if (depth < maxDepth && e.name !== "node_modules") walkFiles(p, nameRe, maxDepth, out, depth + 1); }
+    else if (e.isFile() && nameRe.test(e.name)) out.push(p);
+  }
+  return out;
+}
+
+// NSIS インストーラのヘッダ内ライセンスページから、内容署名 (containsRegex) に一致する規約本文を探す。
+// file = 明示指定のインストーラ、dir = 再帰探索する素材 dir (PLUGINS_DIR)。内容違いが複数あれば失敗 (正規化後で比較)
+export function locateNsisLicense({ file, dir }, match = {}) {
+  const bodyRes = (match.containsRegex ?? []).map((r) => new RegExp(r, "i"));
+  let files;
+  if (file) {
+    if (!existsSync(file)) throw new SourceError(`インストーラが無い: ${file}`);
+    files = [file];
+  } else {
+    if (!dir || !existsSync(dir)) throw new SourceError(`プラグイン素材 dir が無い: ${dir ?? "(未設定)"} (plugins-ott 等の素材と PLUGINS_DIR が要る)`, "skip");
+    files = walkFiles(dir, new RegExp(match.name ?? "\\.exe$", "i"), match.maxDepth ?? 6).filter((f) => statSync(f).size >= 4096);
+  }
+  const hits = new Map();
+  const unreadable = new Map();
+  let readable = 0;
+  for (const f of files) {
+    let cands;
+    try { cands = nsisLicenseCandidates(f); } catch (e) {
+      if (!(e instanceof NsisError)) throw e;
+      if (file) throw new SourceError(`${path.basename(f)}: ${e.message}`);
+      unreadable.set(path.basename(f), e.message);
+      continue;
+    }
+    readable++;
+    for (const c of cands) {
+      const text = c.fmt === "rtf" ? rtfToText(c.body) : c.body;
+      const flat = normalizeText(text); // 行折返し・空白差で署名が外れないよう、空白圧縮後に照合する
+      if (bodyRes.every((r) => r.test(flat))) hits.set(f, text);
+    }
+  }
+  if (!hits.size) {
+    const why = [...unreadable].filter(([, m]) => !/firstheader が見つからない/.test(m)).slice(0, 3).map(([n, m]) => `${n}: ${m}`);
+    throw new SourceError(`規約を含む NSIS インストーラが無い (走査 ${files.length} 件、NSIS として読めたもの ${readable} 件、署名 ${match.containsRegex ?? []})${why.length ? ` 読めなかった理由: ${why.join(" / ")}` : ""}`);
+  }
+  const distinct = new Set([...hits.values()].map((t) => sha256(normalizeText(t))));
+  if (distinct.size > 1) throw new SourceError(`規約が内容違いで ${distinct.size} 種ある: ${[...hits.keys()].map((f) => path.basename(f)).join(", ")}`);
+  const [name, text] = hits.entries().next().value;
+  return { name: path.basename(name), text, files: hits.size };
+}
+
 // 1 件の source を取得してテキスト化する。戻り値: { raw: 生テキスト, origin }
 export async function acquire(src, ctx) {
+  if (src.kind === "nsis-license") {
+    const plain = src.textEnv ? process.env[src.textEnv] : undefined;
+    if (plain) {
+      if (!existsSync(plain)) throw new SourceError(`ファイルが無い: ${plain}`);
+      const data = readFileSync(plain);
+      return { raw: decodeBody(data), origin: `file:${path.basename(plain)}`, bytes: data.length };
+    }
+    const hit = locateNsisLicense({ file: src.pathEnv ? process.env[src.pathEnv] : undefined, dir: ctx.pluginsDir }, src.match);
+    return { raw: hit.text, origin: `nsis:${hit.name}`, bytes: hit.text.length };
+  }
   if (src.kind === "fl-extracted") {
     const { name, data } = locateFlFile(ctx.flDir, src.match);
     const raw = src.format === "rtf" ? rtfToText(data.toString("latin1")) : htmlToText(decodeBody(data));
@@ -297,7 +357,7 @@ export function renderLedgerMd(ledger, sources) {
     L.push(`| \`${s.id}\` | ${s.vendor} / ${s.title} | ${d.current.version ?? "文書内に版表記なし"} | \`${d.current.sha256}\` | ${d.current.chars} | ${d.firstSeen} | ${d.lastChecked} | ${d.pendingReview ? "**要レビュー**" : "—"} | ${d.history.length} |`);
   }
   L.push("", "## 出典", "");
-  for (const s of sources) L.push(`- \`${s.id}\`: ${s.kind === "url" ? s.url : s.kind === "fl-extracted" ? "FL インストーラ抽出物 (fl-win64) 内の同梱文書" : (s.note ?? "ローカルファイル")}`);
+  for (const s of sources) L.push(`- \`${s.id}\`: ${s.kind === "url" ? s.url : s.kind === "fl-extracted" ? "FL インストーラ抽出物 (fl-win64) 内の同梱文書" : s.kind === "nsis-license" ? "NSIS インストーラ (PLUGINS_DIR 内) のヘッダ内ライセンスページ" : (s.note ?? "ローカルファイル")}`);
   const hist = sources.filter((s) => ledger.docs[s.id]?.history.length);
   if (hist.length) {
     L.push("", "## 変更履歴", "");

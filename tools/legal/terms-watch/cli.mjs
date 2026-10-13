@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // 各社規約の差分監視 CLI (LGL-5, #88)
-//   node tools/legal/terms-watch/cli.mjs [check] [--only id,id] [--fl-dir dir] [--allow-skip|--strict] [--no-write] [--json out.json]
+//   node tools/legal/terms-watch/cli.mjs [check] [--only id,id] [--fl-dir dir] [--plugins-dir dir] [--allow-skip|--strict] [--no-write] [--json out.json]
 //                                         [--sources f] [--ledger f] [--md f] [--snapshots dir]
 //   node tools/legal/terms-watch/cli.mjs ack <id...|all> [--ledger f] [--md f]   # 差分をレビュー済みにする
 // 終了コード: 0 全件一致 / 1 差分あり or 未レビュー変更が残存 / 2 引数不正 / 3 検証不能 (取得失敗・素材なし)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
-import { FL_WIN64_DIR, REPO_ROOT } from "../../shared/paths.mjs";
+import { FL_WIN64_DIR, PLUGINS_DIR, REPO_ROOT } from "../../shared/paths.mjs";
 import { ackDocs, exitCodeFor, loadLedger, renderLedgerMd, runCheck, serializeLedger } from "./lib.mjs";
 
 const here = import.meta.dirname;
@@ -17,7 +17,7 @@ const rest = first && !first.startsWith("--") ? restAll : process.argv.slice(2);
 const opt = (name) => { const i = rest.indexOf(`--${name}`); return i >= 0 ? rest[i + 1] : undefined; };
 const flag = (name) => rest.includes(`--${name}`);
 const usage = () => {
-  console.error("usage: cli.mjs [check] [--only id,id] [--fl-dir dir] [--allow-skip|--strict] [--no-write] [--json out] [--sources f] [--ledger f] [--md f] [--snapshots dir]\n       cli.mjs ack <id...|all> [--ledger f] [--md f]");
+  console.error("usage: cli.mjs [check] [--only id,id] [--fl-dir dir] [--plugins-dir dir] [--allow-skip|--strict] [--no-write] [--json out] [--sources f] [--ledger f] [--md f] [--snapshots dir]\n       cli.mjs ack <id...|all> [--ledger f] [--md f]");
   process.exit(2);
 };
 
@@ -50,7 +50,7 @@ if (cmd === "ack") {
   const only = opt("only")?.split(",").filter(Boolean) ?? null;
   if (only) for (const id of only) if (!sources.some((s) => s.id === id)) { console.error(`terms-watch: 未知の id ${id}`); process.exit(2); }
   const t0 = Date.now();
-  const results = await runCheck({ sources, ledger, ctx: { flDir: opt("fl-dir") ?? FL_WIN64_DIR }, now, snapshotDir: snapDir, only });
+  const results = await runCheck({ sources, ledger, ctx: { flDir: opt("fl-dir") ?? FL_WIN64_DIR, pluginsDir: opt("plugins-dir") ?? PLUGINS_DIR }, now, snapshotDir: snapDir, only });
   const code = exitCodeFor(results, { allowSkip: flag("allow-skip"), strict: flag("strict") });
   const old = new Map(results.filter((r) => r.status === "CHANGED").map((r) => [r.id, r.previous.sha256]));
   if (!flag("no-write")) save();

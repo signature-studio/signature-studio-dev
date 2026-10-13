@@ -19,7 +19,7 @@
 - `fl-eula-html`: FL インストーラ抽出物 (fl-win64) 内の同梱文書
 - `fl-tou-rtf`: FL インストーラ抽出物 (fl-win64) 内の同梱文書
 - `fl-tou-web`: https://www.image-line.com/image-line-software-eula
-- `xfer-eula`: 公開 Web 版が見つからない (xferrecords.com は /privacy_policy のみ)。インストーラ同梱の License.txt (Serum 2 mac pkg の Resources/License.txt 等) のパスを TERMS_WATCH_XFER_EULA に指定する
+- `xfer-eula`: NSIS インストーラ (PLUGINS_DIR 内) のヘッダ内ライセンスページ
 - `kilohearts-eula`: https://kilohearts.com/resources/media_static/documents/eula.pdf
 - `slate-audiotonix-terms`: https://slatedigital.com/terms-of-service/
 - `ni-eula`: https://www.native-instruments.com/pages/end-user-license-agreement

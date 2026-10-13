@@ -6,7 +6,9 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { ackDocs, exitCodeFor, extractSection, htmlToText, loadLedger, locateFlFile, normalizeText, renderLedgerMd, rtfToText, runCheck, SourceError } from "./lib.mjs";
+import { deflateRawSync } from "node:zlib";
+import { ackDocs, exitCodeFor, extractSection, htmlToText, loadLedger, locateFlFile, locateNsisLicense, normalizeText, renderLedgerMd, rtfToText, runCheck, SourceError } from "./lib.mjs";
+import { NsisError, nsisLicenseCandidates, readNsisHeader } from "./nsis.mjs";
 
 const CLI = path.join(import.meta.dirname, "cli.mjs");
 const tmp = mkdtempSync(path.join(process.env.RUNNER_TEMP ?? os.tmpdir(), "tw-test-"));
@@ -147,4 +149,88 @@ test("CLI 終了コード: 0 → 0 → 1 → 1 → ack → 0、素材なし 3 (-
   assert.equal(cli("bogus").status, 2);
   assert.equal(cli("ack").status, 2);
   assert.equal(loadLedger(ledger).docs.doc.pendingReview, false);
+});
+
+// 合成 NSIS インストーラ (stub 4096 B + firstheader + raw deflate ヘッダ)。実 makensis での検証は nsis_e2e.sh
+function fakeNsis(strings, { align = 4096, deflate = true } = {}) {
+  const str = Buffer.from(strings.map((x) => x + "\0").join(""), "utf16le");
+  const top = 4 + 64;
+  const hdr = Buffer.alloc(top + str.length);
+  const blk = (i, off, num) => { hdr.writeInt32LE(off, 4 + i * 8); hdr.writeInt32LE(num, 8 + i * 8); };
+  [0, 1, 2].forEach((i) => blk(i, top, 0));
+  blk(3, top, strings.length);
+  blk(4, top + str.length, 0);
+  [5, 6, 7].forEach((i) => blk(i, hdr.length, 0));
+  str.copy(hdr, top);
+  const body = deflate ? deflateRawSync(hdr) : Buffer.from("not deflate: \xff\xfe\xfd".repeat(20), "latin1");
+  const fh = Buffer.alloc(32);
+  fh.writeUInt32LE(0xdeadbeef, 4);
+  fh.write("NullsoftInst", 8, "latin1");
+  fh.writeInt32LE(hdr.length, 20);
+  fh.writeInt32LE(body.length + 4, 24);
+  fh.writeUInt32LE((body.length | 0x80000000) >>> 0, 28);
+  return Buffer.concat([Buffer.alloc(align, 0x90), fh, body, Buffer.alloc(64, 0xcc)]);
+}
+const LIC = "The Licensee is prohibited from reverse engineering the Software. ".repeat(20);
+const RTF = String.raw`{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard ${LIC.replaceAll(".", ".\\par")}}`;
+
+test("nsis: ライセンス文の抽出 (形式フラグ \\x11=text / \\x12=RTF、短い文字列・フラグ無しは除外)・不正ヘッダは NsisError", () => {
+  const d = path.join(tmp, "nsis1");
+  mkdirSync(d, { recursive: true });
+  writeFileSync(path.join(d, "a.exe"), fakeNsis(["Setup", "\x01\u8000", "\x11" + LIC, "\x12" + RTF, LIC, "short"]));
+  const c = nsisLicenseCandidates(path.join(d, "a.exe"));
+  assert.deepEqual(c.map((x) => x.fmt), ["text", "rtf"]);
+  assert.equal(c[0].body, LIC);
+  writeFileSync(path.join(d, "noalign.exe"), fakeNsis(["\x11" + LIC], { align: 1000 }));
+  assert.throws(() => readNsisHeader(path.join(d, "noalign.exe")), (e) => e instanceof NsisError && /firstheader/.test(e.message));
+  writeFileSync(path.join(d, "lzma.exe"), fakeNsis(["x"], { deflate: false }));
+  assert.throws(() => readNsisHeader(path.join(d, "lzma.exe")), (e) => e instanceof NsisError && /deflate/.test(e.message));
+  writeFileSync(path.join(d, "plain.exe"), Buffer.alloc(5000, 0x41));
+  assert.throws(() => readNsisHeader(path.join(d, "plain.exe")), NsisError);
+});
+
+test("locateNsisLicense: dir 探索・RTF と text の同一本文は同一視・内容違い/無し/dir 無しの扱い", () => {
+  const m = { containsRegex: ["Licensee", "reverse engineering"] };
+  const d = path.join(tmp, "nsis2");
+  mkdirSync(path.join(d, "sub/deep"), { recursive: true });
+  writeFileSync(path.join(d, "junk.exe"), Buffer.alloc(6000, 0x41));
+  writeFileSync(path.join(d, "sub/deep/a.exe"), fakeNsis(["\x11" + LIC]));
+  writeFileSync(path.join(d, "sub/b.exe"), fakeNsis(["\x12" + RTF]));
+  assert.equal(normalizeText(locateNsisLicense({ dir: d }, m).text), normalizeText(LIC));
+  const wrapped = LIC.replaceAll(" reverse engineering", "\r\n  reverse\n engineering");
+  writeFileSync(path.join(d, "sub/c.exe"), fakeNsis(["\x11" + wrapped]));
+  assert.equal(locateNsisLicense({ dir: d }, m).files, 3, "折返し・空白差があっても署名に一致し、同一内容として扱う");
+  writeFileSync(path.join(d, "sub/d.exe"), fakeNsis(["\x11" + LIC.replace("prohibited", "permitted")]));
+  assert.throws(() => locateNsisLicense({ dir: d }, m), /内容違いで 2 種/);
+  assert.throws(() => locateNsisLicense({ dir: d }, { containsRegex: ["NO SUCH WORD"] }), (e) => e instanceof SourceError && e.kind === "error" && /NSIS として読めたもの 4 件/.test(e.message));
+  assert.throws(() => locateNsisLicense({ dir: path.join(tmp, "none") }, m), (e) => e instanceof SourceError && e.kind === "skip");
+  assert.throws(() => locateNsisLicense({ file: path.join(tmp, "none.exe") }, m), (e) => e instanceof SourceError && e.kind === "error");
+  assert.throws(() => locateNsisLicense({ file: path.join(d, "junk.exe") }, m), /firstheader/);
+});
+
+test("runCheck(nsis-license): NEW → UNCHANGED → CHANGED、textEnv の平文は同一本文なら同一ハッシュ", async () => {
+  const d = path.join(tmp, "nsis3");
+  mkdirSync(d, { recursive: true });
+  const exe = path.join(d, "Setup.exe");
+  const src = { id: "x", vendor: "V", title: "T", kind: "nsis-license", optional: true, textEnv: "TW_TEST_TEXT", match: { containsRegex: ["Licensee"] }, mustContain: ["reverse engineering"], minChars: 500 };
+  const ledger = { schema: 1, docs: {} };
+  const ctx = { pluginsDir: d };
+  writeFileSync(exe, fakeNsis(["\x11" + LIC]));
+  const r1 = (await runCheck({ sources: [src], ledger, ctx, now: "2026-10-13T00:00:00Z" }))[0];
+  assert.equal(r1.status, "NEW");
+  assert.match(r1.origin, /^nsis:Setup\.exe$/);
+  assert.equal((await runCheck({ sources: [src], ledger, ctx }))[0].status, "UNCHANGED");
+  writeFileSync(exe, fakeNsis(["\x11" + LIC.replace("prohibited", "permitted")]));
+  assert.equal((await runCheck({ sources: [src], ledger, ctx }))[0].status, "CHANGED");
+  writeFileSync(exe, fakeNsis(["\x11" + LIC]));
+  const txt = path.join(d, "License.txt");
+  writeFileSync(txt, LIC.replaceAll(" ", "\r\n"));
+  process.env.TW_TEST_TEXT = txt;
+  try {
+    const r = (await runCheck({ sources: [src], ledger: { schema: 1, docs: {} }, ctx: { pluginsDir: path.join(tmp, "none") } }))[0];
+    assert.equal(r.status, "NEW");
+    assert.equal(r.sha256, r1.sha256, "平文直指定でも NSIS 経由と同一ハッシュ");
+  } finally {
+    delete process.env.TW_TEST_TEXT;
+  }
 });
