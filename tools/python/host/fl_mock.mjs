@@ -35,6 +35,9 @@ export function createMockEngine() {
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
+    "channels.selectedChannel": (canBeNone = false, offset = 0) => st.selectedChannel + offset,
+    // 5 番目引数 useGlobalIndex は未モデル化 (index 0 のみを使う検査では差が出ない)
+    "channels.fillEachNSteps": (i, stride, offset, vel) => { ch(i); for (let p = offset; p < 64; p += stride) ch(i).steps[p] = 1; },
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = n; },
     "channels.isChannelSelected": (i) => ch(i).sel,
