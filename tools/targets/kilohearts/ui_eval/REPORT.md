@@ -1,7 +1,7 @@
 # REPORT — KH-7 (#59): Kilohearts UI (Skia CPU ラスタ) の M7 フレーム転送 HUD への接続可否評価
 
 - 評価日: 2026-10-13 / 担当 dir: `tools/targets/kilohearts/ui_eval/` / 親: #15 (PLG-E) / 関連: #10 (GUI-10 HUD)・#248 (KH-10 EditorModel lift)
-- 検証起点 commit: `9ba0d38` (スクリプト一式)。数値は全てこの commit のクリーン worktree (`git worktree add --detach`) での実測。以降の commit は REPORT・docs と `run_all.sh` の表示文言のみ変更 (挙動不変)。
+- 検証起点 commit: `8cef593` (スクリプト一式)。数値は全てこの commit のクリーン worktree (`git worktree add --detach`) での実測。以降の commit は REPORT のみ変更。
 - 素材: Kilohearts Offline Installer 132102 → `HeartCore.core_64` (Win64 PE, 76,642,304 B, sha256 `d55ce8b4…8751441e` を `extract_core.sh` が検証)
 - 既知類型との関係: `docs/DEFECTS.md` D1〜D16 **該当なし** (lift 欠陥ではない)。ただし M7 GUI shim 側の API 意味論の不一致を 1 件発見 (§2.4、行案は §6)。
 
@@ -14,7 +14,7 @@
 | 1 | 画面転送の形 | **GDI のみ**。`SetDIBitsToDevice` の静的 call site は **1 箇所** (`UIWindowWin32` の WndProc `0x18024f500`, 4,635 B)。32bpp・BI_RGB・top-down (biHeight=−H)・`BeginPaint` の rcPaint 1 矩形/回。M7 HUD の SAB フレーム転送と形が合う |
 | 2 | GPU 系 API | **0 件** (static import 404 件 / 17 DLL に OpenGL・D3D・DXGI・Vulkan・EGL・D2D・DComp なし。DLL 名/API 名文字列もイメージ全域で 0 件) |
 | 3 | shim 被覆 (tools/gui) | gdi32 **9/9 IMPL**、user32 **76/93 IMPL** (未実装 17 = fail-fast stub 9 + 名前自体なし 8) → **G2** |
-| 4 | shim の意味論 | **G1: `SetDIBitsToDevice` が HeartCore の呼び方 (top-down + 部分矩形) で誤った行を描く**。プローブ 7 ケース中 **5 ケース不一致** (全面更新と上下対称矩形だけ一致)。bottom-up 対照は 7/7 一致 |
+| 4 | shim の意味論 | **G1: `SetDIBitsToDevice` が HeartCore の呼び方 (top-down + 部分矩形) で誤った行を描く**。プローブ 7 ケース中 **5 ケース不一致** (全面更新と上下対称矩形だけ一致)。bottom-up 対照は 7/7 一致。修正案 (`g1_shim_fix.patch`, 実質 1 式) を当てた作業コピーでは 7/7 一致 |
 | 5 | フォント | **G3: Skia が DirectWrite を動的ロード** (`DWriteCreateFactory`)。repo に DirectWrite 代替なし (shim・FreeType 経路とも) |
 | 6 | UI 層の規模 | 42 効果の UI 閉包 (直接辺のみ = 下限) **2,405,825 B = .text の 11.69%**、同手法の DSP 閉包の **6.44 倍**。うち Skia 由来 1,420,448 B。効果ごとの固有分は小さい (Gain: 25 関数 / 3,387 B)。重いのは共有 UI+Skia 基盤 (717,474 B) |
 | 7 | OS 境界 | UI の OS 依存は **`UIWindowWin32`** (抽象 `UIWindow` の Win32 実装; `UIWindow` vtable 42 slot / `UIWindowWin32` vtable 43 slot・重複を除く 42 関数 15,777 B) に集約。ここを差し替えれば (推定: 呼び出し元が層内かどうかによる) 未実装 17 名のうち 11 名は不要になる (残る 6 名はダイアログ/LoadStringA 等で境界外) |
@@ -27,7 +27,7 @@
 bash tools/targets/kilohearts/ui_eval/run_all.sh     # 素材: oc_artifacts: plugins-kilohearts。KH_CORE=<HeartCore.core_64> 指定で展開を省略
 ```
 終了コード: **0 = 全検査 PASS (接続準備 OK) / 1 = 評価の前提違反・ネガコン失敗・素材なし・検算不能 / 2 = 前提は成立・接続準備に未達 (gap) が残る**。
-ステップ: `ui_imports.py` (§2.1〜2.2・2.6) → `ui_present.py` (§2.3) → `ui_closure.py` (§2.5) → `xcheck_xref.py` (別算法) → `shim_probe.sh` (§2.4)。
+ステップ: `ui_imports.py` (§2.1〜2.2・2.6) → `ui_present.py` (§2.3) → `ui_closure.py` (§2.5) → `xcheck_xref.py` (別算法) → `shim_probe.sh` (§2.4) → `shim_probe_fixed.sh` (G1 修正案 `g1_shim_fix.patch` の事前検証; 期待 exit 0, 0 以外は評価無効 = exit 1)。
 前提: gcc・llvm-objdump・uv (python に pefile/capstone/numpy が無ければ `uv run --with` で自動)。**mingw が無い runner でも動く** (shim 本体 4 ファイルを直接ビルドし `gen_api.py` を使わない)。
 
 ## 2. 測定結果
@@ -65,6 +65,7 @@ HeartCore の呼び方を tools/gui の native headless host (gcc + ASan/UBSan) 
 - 矩形外の破壊は全ケース 0 px。**不一致は「矩形内の全画素が別の行の内容」**。全面更新と `top+bottom=H` の対称矩形では ySrc=top と偶然一致するため、**全面描画だけの試験では顕在化しない**。
 - 仕様の根拠: MS Learn は `ySrc` を「image の **lower-left corner** の y」と定義 (https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-setdibitstodevice, 2026-10-13 取得; top-down DIB での扱いは Remarks が曖昧)。HeartCore (実 Windows で動く製品) が `ySrc=H−bottom` を渡す事実と、Wine の式 (下記) が同じ解釈を与える。
 - 原因: `SetDIBitsToDevice` (`gui_gdi.c`) が `StretchDIBits` と同じ `dib_to_dc` を共有し、**top-down DIB の ySrc を上原点とみなす** (`sy_top = ys`) うえ、`StartScan`/`cLines` を無視する。Wine の `nulldrv_SetDIBitsToDevice` (https://github.com/wine-mirror/wine/blob/master/dlls/win32u/dib.c, 2026-10-13 取得) は `src.y = startscan + lines − (ySrc + cy)` (下原点)。HeartCore の引数では全ケースで `= top` になる (プローブが各ケースで確認: 7/7 一致)。**オラクルは Wine ソースと HeartCore の意図であり、実 Windows での実行確認ではない** (§5)。
+- **修正案の事前検証** (`shim_probe_fixed.sh`; tools/gui 本体は無変更): `g1_shim_fix.patch` を作業コピーに当てると HeartCore 形 **0/7 不一致 (exit 0)**、bottom-up 対照 0/7、`ySrc=top` の呼び方は逆に **5/7 不一致** (プローブが両方向で判別できる)。修正は `ys_eff = start + lines − (ys + h)` (top-down のみ) の 1 式。`StartScan`/`cLines` を使うバンド転送 (`lines<高さ`) と bottom-up の一般化は未検証。
 - オラクル感度 (ネガコン): 期待値を 1 画素だけ壊す → 不一致 **1 件**を検出 (期待 1)。ハーネス異常 0。
 - `StretchDIBits` も同じ `dib_to_dc` を使う。Wine は top-down SRCCOPY で非原点/拡縮なら下原点に変換するため、同型の不一致の疑いがある (**未検証**; FL の `StretchDIBits` は 4 call site)。
 
@@ -101,10 +102,10 @@ HeartCore の呼び方を tools/gui の native headless host (gcc + ASan/UBSan) 
 
 HUD 側の転送コスト・present 方式は `tools/gui/REPORT.md` §9 が正本 (CPU putImageData / WebGL2 の frame time 表)。HeartCore の窓サイズ・実フレームレートは**未計測**。
 
-## 4. 検証 (コミット済み `9ba0d38` のクリーン worktree)
-- `bash tools/targets/kilohearts/ui_eval/run_all.sh` を **3 回**: 全体 **35 s / 35 s / 65 s** (65 s は初回で `plugins-kilohearts.tar.zst` からの展開 + sha256 検証を含む)。nproc=4、load average(1 分) 開始→終了 = 0.27→1.27 / 1.27→1.73 / 1.73→1.72。3 回とも exit 2 (VERDICT: NOT READY)、出力は所要秒の行以外同一 (`diff` 差分 0)。
-- 判定が不合格のとき exit 0 にならないこと: G1〜G4 が残る間は exit 2。ネガコン失敗・前提違反・素材なし・llvm-objdump なしは exit 1。
-- ネガコン一覧 (全て期待どおり): ui_imports 9 (GPU import 注入 → 2 件検出 / ASCII・UTF-16 の DLL 名注入 → 各 1 件 / SkSL backend 名で偽陽性 0 / DirectWrite 文字列なし → 0 / IMPL から `SetDIBitsToDevice` 除外 → gap 1 / IMPL 空 → gap 102 = import 数 / shimx exports 空 → MISSING 302 = import 数 / `DWriteCreateFactory` を含む模擬 repo → 検出), ui_present 4, ui_closure 2 (C3・C5n), xcheck_xref 1, shim_probe 1 (+対照 2 系統)。
+## 4. 検証 (コミット済み `8cef593` のクリーン worktree)
+- `bash tools/targets/kilohearts/ui_eval/run_all.sh` を **3 回**: 全体 **38 s / 38 s / 78 s** (78 s は初回で `plugins-kilohearts.tar.zst` からの展開 + sha256 検証を含む。各回 rtti_walk+callgraph も実行)。nproc=4、load average(1 分) 開始→終了 = 0.35→1.29 / 0.96→0.98 / 0.98→1.33。3 回とも exit 2 (VERDICT: NOT READY)、出力は所要秒の行以外同一 (`diff` 差分 0)。
+- 判定が不合格のとき exit 0 にならないこと: G1〜G4 が残る間は exit 2。ネガコン失敗・前提違反・素材なし・llvm-objdump なしは exit 1。実測: 素材なし (`ARTIFACTS_DIR` 不在) → **exit 1**、1 byte 改変した core (sha256 不一致) → **exit 1**。exit 0 に到達できること = §2.4 の修正案作業コピーで `shim_probe` が exit 0。
+- ネガコン一覧 (全て期待どおり): ui_imports 9 (GPU import 注入 → 2 件検出 / ASCII・UTF-16 の DLL 名注入 → 各 1 件 / SkSL backend 名で偽陽性 0 / DirectWrite 文字列なし → 0 / IMPL から `SetDIBitsToDevice` 除外 → gap 1 / IMPL 空 → gap 102 = import 数 / shimx exports 空 → MISSING 302 = import 数 / `DWriteCreateFactory` を含む模擬 repo → 検出), ui_present 4, ui_closure 2 (C3・C5n), xcheck_xref 1, shim_probe 1 (+対照 2 系統。修正案の作業コピーでは対照の判定が逆転 = 双方向の判別を確認)。
 - 範囲確認: `git status --porcelain=v1 -- tools/targets/kilohearts/ui_eval` で取りこぼし 0、`find … -size +20M` 0 件、`git diff origin/main HEAD --stat` は `ui_eval/`・docs 3 ファイルのみ。
 
 ## 5. 範囲 / 範囲外
@@ -116,7 +117,7 @@ HUD 側の転送コスト・present 方式は `tools/gui/REPORT.md` §9 が正�
 
 | # | 未解決 | 影響 | 起票先 |
 |---|---|---|---|
-| G1 | shim `SetDIBitsToDevice` (+疑い `StretchDIBits`) が top-down DIB の ySrc を上原点扱い・`StartScan`/`cLines` 無視 | HeartCore の部分更新で別の行が表示される。FL の `SetDIBitsToDevice` 2 call site も同じ関数を通る | **新規** `[GUI-13]` (親 #10): shim 修正 + `selftest` に top-down 部分矩形ケース追加。受入 = `shim_probe.sh` 7/7 PASS (exit 0) |
+| G1 | shim `SetDIBitsToDevice` (+疑い `StretchDIBits`) が top-down DIB の ySrc を上原点扱い・`StartScan`/`cLines` 無視 | HeartCore の部分更新で別の行が表示される。FL の `SetDIBitsToDevice` 2 call site も同じ関数を通る | **新規** `[GUI-13]` (親 #10): `ui_eval/g1_shim_fix.patch` を起点に shim 修正 + `selftest` に top-down 部分矩形ケース追加 (+`StretchDIBits` の確認)。受入 = `shim_probe.sh` 7/7 PASS (exit 0) |
 | G2 | user32 未実装 17 名 | A 方式でウィンドウ生成・メニュー・layered 窓・モーダルダイアログが fail-fast | メニュー 8 → #176 (GUI-2) にコメント、`UpdateLayeredWindow`・`MonitorFromPoint`・`BringWindowToTop`・ダイアログ 4 → #183 (GUI-7) にコメント、`TrackMouseEvent` → #182 (GUI-6)、`LoadStringA` → #174 (GUI-3) |
 | G3 | Skia の DirectWrite 経路 (動的ロード) の代替なし | A・B 方式でテキストが描けない/起動時に失敗し得る | **新規** `[KH-13]` (親 #15): DWrite を FreeType/shim どちらで受けるか決定 + 関連 #186 (GUI-9) にコメント |
 | G4 | shimx に `SHBrowseForFolderW`・shell32 序数 74 なし | フォルダ選択ダイアログのみ | #172 (SHX-T5) にコメント |
@@ -124,10 +125,10 @@ HUD 側の転送コスト・present 方式は `tools/gui/REPORT.md` §9 が正�
 | M2 | `UIWindow` 抽象 42 slot の契約が未解析、閉包の間接 call 未追跡 | B 方式の工数が見積れない | **新規** `[KH-14]` (B 方式を採る場合のみ) |
 | M3 | 実 Windows でのオラクル確認なし | G1 の根拠が Wine ソース + HeartCore の意図のみ | ユーザ依頼 (任意): 実 Windows で同形の 7 ケースを実行する小プログラム (`shim_probe.c` の呼び出し部) |
 
-DEFECTS.md 行案 (shim 側, 層 `ours`): | D17 | ours (shim) | 新規 | `SetDIBitsToDevice` (top-down DIB, 部分矩形) で別の行が描かれる。全面更新では顕在化しない | `StretchDIBits` と `dib_to_dc` を共有し top-down の ySrc を上原点とみなす・`StartScan`/`cLines` 無視 (Windows/Wine は下原点: `src_top = startscan + lines − (ySrc + cy)`) | `shim_probe.sh`: 5/7 ケース、矩形内 100% の画素が別行 | biHeight<0 かつ ySrc≠0 または cLines≠cy の転送を、独立オラクルで部分矩形ごとに比較 | `dib_to_dc` の呼び出し前に Wine 式で src 行へ変換 |
+DEFECTS.md 行案 (shim 側, 層 `ours`): | D17 | ours (shim) | 新規 | `SetDIBitsToDevice` (top-down DIB, 部分矩形) で別の行が描かれる。全面更新では顕在化しない | `StretchDIBits` と `dib_to_dc` を共有し top-down の ySrc を上原点とみなす・`StartScan`/`cLines` 無視 (Windows/Wine は下原点: `src_top = startscan + lines − (ySrc + cy)`) | `shim_probe.sh`: 5/7 ケース、矩形内 100% の画素が別行 | biHeight<0 かつ ySrc≠0 または cLines≠cy の転送を、独立オラクルで部分矩形ごとに比較 | `dib_to_dc` の呼び出し前に Wine 式で src 行へ変換 (`g1_shim_fix.patch`; 作業コピーで 0/7) |
 
 ## 7. 次タスク提案
-1. `[GUI-13]` G1 修正 (小): `gui_gdi.c` の変換 + selftest 追加 → `shim_probe.sh` が exit 0 になる。
+1. `[GUI-13]` G1 修正 (小): `g1_shim_fix.patch` を `gui_gdi.c` に適用 + selftest 追加 → `shim_probe.sh` が exit 0 になる。
 2. `[KH-13]` DirectWrite 代替方針 (小〜中): 実際に `DWriteCreateFactory` が呼ばれる経路の特定 (動的トレース) と FreeType 差し替えの可否。
 3. M1 の決定後に、C 方式なら Kilohearts UI の HUD 実装チケット (効果ごとの UI 仕様は共有基盤 + 効果固有 25〜38 関数程度と小さい: Gain 25・Delay 38・Reverb 17・Compressor 32 関数, §2.5)、B 方式なら `[KH-14]`。
 4. `tools/gui` の `e2e.sh`/`selftest.sh` は mingw 必須 (`gen_api.py`) で mingw の無い runner では走らない。CI で回すなら mingw 追加が必要 → #184 (GUI-8) にコメント。
