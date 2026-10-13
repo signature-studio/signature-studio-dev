@@ -58,6 +58,25 @@ IR 表 (`tools/m11/work/` = `work-m11` の既存ファイル。本 run で検証
 | 666a60 のループ内 store の機械語突合・REPORT_509 解釈の再検証 | 本 run では store の存在のみ確認 | 子 issue #911 |
 | `ir_sha256` の照合 (`ir_conditions.json` の生成) | `work-m11` に `ir_conditions.json` が無い。`tools/m11/m11_gen_ir2.sh` での生成は本 run の範囲外 | 子 issue #911 |
 
+## 2b. 検出信号の試作 (run 4・`audit_lsf_disp.py`、既存判定は無変更)
+
+機械語 load に変位 (disp) を持たせ、IR の `store` 値の `load (argN + c)` の c と照合する。`audit_lsf.py` は変更していない (既存の SUSPECT_VAS / SUSPECT_USE_VAS は不変)。
+
+実測 (`work-m11`、全 7421 関数、`python3 tools/m11/ldfix/audit_lsf_disp.py boot_final.ll m11_image.bin 'boot*.drc.config.json'`、12.2 s):
+
+| 項目 | 値 |
+|---|---|
+| 機械語の LSF 列挙があった関数 | 135 |
+| SUSPECT (SIGNAL 成立) 関数 | 4: `41a670` / `6677a0` / `d237e0` / `de1da0` |
+
+- `41a670`: 機械語の (arg1, 64bit) disp = {0}、IR の c = {8}、miss = {8}。目的の型。
+- `6677a0` (arg2, 64): 機械語 disp = {72,80,88,96}、IR c = {36,72,80,88,96}、miss = {36}。IR の `arg2+36` は `store i64` 3 本のうち 1 本。機械語側の列挙漏れの可能性が高いが、未突合。
+- `d237e0` (arg2, 64): miss = {36}。IR `arg2+36` は `load i64` の結果を `store` しない (`store i32 %2`)。ほぼ誤検出。未突合。
+- `de1da0` (arg1, 64): miss = {244}。未突合。
+
+判定: **検出信号としては採用しない** (誤検出・列挙漏れ 3 件の突合が未了)。`41a670` は 1 件で拾える。
+次に必要なのは、3 件の機械語 (disp 列挙の漏れ・store 先ごとの値) の逆アセンブル突合。これは #1091 (LD-33) の範囲に含める。
+
 ## 3. 再現
 
 機械語 (本 run で実行済み。`fl-win64` の `block00031_PE.bin` が必要。依存は `pip install capstone pefile`):
