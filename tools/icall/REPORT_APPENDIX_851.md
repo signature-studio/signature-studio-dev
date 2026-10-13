@@ -56,10 +56,57 @@
 - 追加の 10 件 (`rax_1_reload` 等) は A/B にも出るので 1 バイト化の原因ではない。出所 (どの IR 命令が起点か) は未特定。
 - 既知類型: `docs/DEFECTS.md` に 1 バイト stub (decode 範囲由来) の類型は無い。命令の誤復号ではないため、行案は未確定のまま。
 
+## #1285 (ICALL-22): edge 捨て段の特定と 183 site 突合 (HEAD `604e900f`)
+
+素材: `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0 `53e55b4b`)。foreground で実行。`load 0.53` (開始時)。
+
+### (1) 再現 (A〜D、`fn_boundary_repro.sh`)
+
+前節 #851 の表と一致 (再現済み)。
+
+| run | rc | sec | 警告 全体 | `function_128c320` 関連 | ラベル |
+|---|--:|--:|--:|--:|---|
+| A | 0 | 12 | 10 | 0 | `0x128c320--0x128dc44` (正) |
+| B | 0 | 12 | 10 | 0 | `0x128c320--0x128dc44` (正) |
+| C | 0 | 10 | 5 | 5 | `0x128c320--0x128c321` (1 B) |
+| D | 0 | 14 | 15 | 5 | `0x128c320--0x128dc44` (正) |
+
+全体 49.3 s (`real`)。
+
+### (2) edge が捨てられる段: `removing code that is not reachable in a CFG`
+
+D の `D.log` で `function_128c320()` を指す警告 5 件はすべて、この段 (`Running phase: removing code that is not reachable in a CFG`) の中で出る (`D.log` 行 59〜62 ほか。後続段の再出力を含む)。
+
+- `--print-after-all` (`D.pa.log`、682 段) で `function_128c320` の定義と呼出しを段ごとに数えた。LLVM 段の全段で `@function_128c320(` 定義は残り、呼出し `call i64 @function_128c320(), !insn.addr !1080` (`0x128f9e0` 内、`0x1290312` の site) も残る。
+- つまり、LLVM 段では消えていない。BIR 変換段 (`converting function function_128c320`、`D.log` 行 56) では関数ノードは作られている。
+- 捨てられるのは LLVM→BIR 後の `NonRecursiveCFGBuilder` (CFG 構築) 段で、「ノードが無い」と判定される。その内部 (BIR のどのノードが対応を失うか) は `--print-after-all` が BIR を dump しないため未特定。
+- 結論: 段は **「BIR 変換 → CFG 構築 (`removing code that is not reachable`)」** まで絞れた。段内部の原因は未特定。
+
+### (3) 183 site 単位の突合 (`audit_icall.py` 直接監査、before 側 IR)
+
+`--funcs` で C (`0xc589b0`・`0x128f9e0`) / D (+`0x128c320`) を監査。`sites_{C,D}.json` を site ごとに突合。
+
+| 関数 | C 全 site | C dropped | D 全 site | D dropped |
+|---|--:|--:|--:|--:|
+| `0xc589b0` | 183 | **183** | 183 | **183** |
+| `0x128f9e0` | 191 | **190** | 191 | **190** |
+| `0x128c320` | 0 | 0 | 14 | 13 |
+
+- C→D で既存 site の状態変化は **0 件** (`status change C->D: []`)。`0x128c320` 本体を足しても `0xc589b0` / `0x128f9e0` の site 落ちは変わらない。
+- したがって「183 site 落ち」と「`0x128c320` 本体の有無」は独立。`function_128c320` の edge 捨ては 183 site 落ちの原因ではない。
+- 注: 本節の数値は `audit_icall.py` の before 側 IR 直接監査で、REPORT (`roundtrip.sh` 経由・書換え後の 366 落ち) とは対象が違う。REPORT の 183 と本節の 183 (`0xc589b0`) は一致するが、`0x128f9e0` は 190 (REPORT 183) で一致しない。両者は別条件のため直接比べない。
+- 既存記載との不一致: 前節 (#851) の「C は 388 site 中 dropped 387」は、今回の C (`0xc589b0`+`0x128f9e0`、計 374 site) の再測定 (dropped 373) と一致しない。C に `0x128c320` 本体は含まれないため、前節の 388 (= D の site 数) は C の値として誤記だった可能性が高い。原因は未確定で、旧 run の入力を再現できないため判定できない。D の 388 / 386 は一致。
+
+### (4) 結論と既知類型
+
+- 既知類型か: `docs/DEFECTS.md` D1a〜D20 のどれとも一致しない (D15 は「call 命令の IR ブロックが空」だが、本件は IR に `call i64 @function_128c320()` が残る)。1 バイト stub の decode 範囲由来 (前節) と、BIR での node 欠落 (本節) の 2 つが絡む。
+- **行案は未確定**。仮置きの類型名: `RNC-edge-drop` (RetDec `NonRecursiveCFGBuilder` が、decode 範囲で 1 バイト化した関数への edge を捨てる)。`docs/DEFECTS.md` への追記は、BIR 段内部の原因が確定してから行う。
+- 366 落ちとの因果: 本体の有無は落ちに影響しない (上記 (3))。ただし、366 の内訳 (`0x128f9e0` 183 相当) との 1 対 1 対応は、`roundtrip.sh` 経由の条件で未確認。
+
 ### 未達 (子 issue へ分割)
 
-- 366 site 落ちとの因果 (`0xc589b0` / `0x128f9e0` の 183 site 単位での突合) — 本 run では `0x128c320` 周辺 3 関数の監査のみ。
+- `NonRecursiveCFGBuilder` が BIR の `function_128c320` ノードを失う原因 (BIR 段内部、RetDec ソース追跡が要る)。
 - `rax_1_reload` 等 10 件の出所 (IR 命令単位の追跡)。
-- `function_128c320` への edge が D で捨てられる段階の特定。
+- `roundtrip.sh` 条件 (書換え後) での 183 site 単位の突合 (REPORT の 366 内訳との対応)。
 - rt_flengine chunk0〜3 の再現 — `RANGES_DIR` (`tools/m11/work` 由来、`work-m11` 未取得) が無く未検証。
 
