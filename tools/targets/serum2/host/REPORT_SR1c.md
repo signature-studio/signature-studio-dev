@@ -57,7 +57,7 @@
 - 測定 commit: **`3ca29c66974d87dcf9c90ffb8f73b8480951b3f4`** (`fix(serum2-host): link host statically so the wine seed run works`)。
 - 結果: `bash tools/targets/serum2/host/e2e.sh` → **50/50 OK, 67.31 s** (exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.14 → 0.37。
 - 同一ソースの直前 run: `37adcb93` (`build.sh` 修正前、default の win32 版でビルド) → 50/50 OK, 70.73 s。
-- 鮮度 (WORKFLOW §6): 測定 commit `3ca29c66` は `tools/targets/serum2/host` のコード commit の最終。測定時点の `git diff 3ca29c66 HEAD -- tools/targets/serum2/host` は **0 バイト** (`git diff 3ca29c66 HEAD -- tools/targets/serum2/host | wc -c` = 0)。以後の commit は `REPORT_SR1c.md` (文書) のみで、コードの差分は 0 のまま。
+- 鮮度 (WORKFLOW §6): 測定 commit `3ca29c66` は `tools/targets/serum2/host` のコード commit の最終。`git diff 3ca29c66 HEAD -- tools/targets/serum2/host ':!tools/targets/serum2/host/REPORT_SR1c.md'` は **0 バイト** (コード・スクリプト・TSV の差分 0)。`REPORT_SR1c.md` 自体の差分は文書のみ (`git diff --stat 3ca29c66 HEAD -- tools/targets/serum2/host` は本 REPORT の変更だけを示す)。
 
 ### 1-0-b. seed run の rc=53 (環境側の原因)
 
