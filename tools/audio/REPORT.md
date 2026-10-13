@@ -242,4 +242,4 @@ DirectSound shim を実装 (secondary = 循環バイト列, pump が T まで充
 
 旧パッチ適用経路 (`e5f043c3`・index.ts 未コミット状態) の 3 回目 run では dev 側 `dev:tone` / `dev:underruns` が 1 回だけ FAIL (underruns=1, zero_runs=1)。以降の 3 run (`2d68a5bd`〜`321c94fa`) は dev/preview とも全 PASS。再現性は未確定のため、dev 側の underrun は要監視。
 
-残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず (管轄: #62 系 / tools/e2e)。`tools/e2e` スイートの再実行は未実施。
+残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
