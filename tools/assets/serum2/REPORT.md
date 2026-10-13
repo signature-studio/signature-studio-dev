@@ -105,3 +105,21 @@ HEAD `62ba0b54` (判定を sha 起因に絞った後) で `SERUM2_WORK=<prep> ba
 | server chunk request (cold / warm / xhr-cold) | 133 / 0 / 133 (pass・neg とも) |
 
 修正前スクリプト (`1f8f477`) の実測 (pass 5 s / neg 6 s) は本表で置き換え。実行は 1 回のみ (n=1)。
+
+## 7. 実 Chrome 全件試験 (SR-10 / #845、`SERUM2_SAMPLE=99999`)
+
+`SERUM2_WORK=<prep> SERUM2_SAMPLE=99999 bash tools/assets/serum2/chrome-e2e.sh`。Chrome 実機 headless、prep は §6 と同じ (inventory 7,357 files / 1,392,825,417 B 期待値一致、pack 10.8 s)。
+
+| 項目 | cold | warm | xhr-cold |
+|---|---|---|---|
+| sha256 一致 (全件) | 7,357/7,357 (mismatch 0) | 7,357/7,357 (mismatch 0) | 7,357/7,357 (mismatch 0) |
+| 全件読み所要 (`content.ms`) | 15,350 ms | 13,838 ms | 15,102 ms |
+| OPFS slot 数 (使用 / 上限) | 1,020 (上限) | 1,020 (cold 終了時から scan で復元) | 1,020 (上限) |
+| OPFS 使用 bytes (slot × slotBytes、slotBytes = 4,096 + 1,048,576 = 1,052,672) | 1,073,725,440 B (1,020 slot) | 同左 | 同左 |
+| evictions | 2,056 | 3,071 | 2,056 |
+| server chunk request | 3,071 | 573 | 3,074 |
+| server 転送 bytes | 1,335,389,999 | 551,245,721 | 1,338,289,512 |
+
+- 判定: pass (`failed=0`, exit 0) / neg-sha (全 sha を 0 に置換, `failed=3`, `sha_fail=3`, exit 1)。`chrome-e2e.sh` 実行 wall 1 分 53 秒 (pass 57 s / neg 56 s、load 2.20 1.44 0.73)。
+- **全件は OPFS 上限 (1,020 slot) を超える**ため warm でも chunk 再取得 (573 request) が起きる。sample 151 件 (§6) では warm chunk request 0 を期待できたが、全件では期待しない。`browser-test.ts` は全件のとき warm の chunk 上限判定を行わず、件数を info 行に出すよう変更 (`NFILES < inv.length` のときのみ assert)。
+- 変更前の初回実行では、この上限判定 (`<= 2`) のみが落ち、pass は `failed=1`、neg は `failed=4` になった。sha 照合は全件で一致していた (判定を変えただけで sha の失敗はこの run の数値に含まれない)。
