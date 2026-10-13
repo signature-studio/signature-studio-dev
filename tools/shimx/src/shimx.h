@@ -1115,6 +1115,7 @@ typedef unsigned long long (*shimx_lift_thunk_fn)(unsigned long long a0, unsigne
                                                   unsigned long long a6, unsigned long long a7);
 void shimx_init(void);                                      /* 省略可 (遅延初期化) */
 void shimx_set_trace(int on);                               /* stderr にトレース出力 (環境変数 SHIMX_TRACE=1 でも可) */
+int  shimx_set_trace_file(const char* path);                /* file API の JSON Lines トレース先 (NULL で停止)。環境変数 SHIMX_TRACE_FILE=<path> でも可 */
 void shimx_set_strict(int on);                              /* 1: 未知 GetProcAddress 名を fail-fast */
 void shimx_set_intptr_limit(uint32_t lim);                  /* R1: 値 < lim を序数/整数 (MAKEINTRESOURCE 等) とみなす閾値。既定 0x10000 */
 uint32_t shimx_get_intptr_limit(void);

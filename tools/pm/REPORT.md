@@ -90,3 +90,10 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 - OTT: `tools/ott/REPORT.md` の scenario matrix 89 本 / 50,236 cell の native 一致。
 - Serum 2 host: `tools/targets/serum2/host/REPORT.md` の e2e 23/23 OK。
+
+## 8. 運用の計測値 (watch_runs.notes.md から移送・取得時刻は PM 記録)
+
+- `pm_needs.py` の 1 回の実行: 約 1〜2 分 (REST のみ・PM 記録)。
+- 競合 PR の fix を repository_dispatch (watchdog) で起動し、検出から push まで: 約 2.5 分 (#576, #689・PM 記録)。
+- schedule(*/5) の発火: #724 の merge から 80 分時点で 0 件、2 時間時点で 0 件 (PM 記録)。
+- `m11_gen_ir2.sh` の所要: 約 26 秒 (PM 記録)。

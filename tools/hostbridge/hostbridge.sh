@@ -17,5 +17,6 @@ if [ "${HB_SKIP_BUILD:-0}" != "1" ]; then
 fi
 echo "== [3a] PE スタブ (仮想 FS 用) 生成 + Wrapper 事前検査相当"; node poc/pe_stub.mjs work/OTT_x64.stub.dll VSTPluginMain main && python3 analysis/check_pe_stub.py work/OTT_x64.stub.dll
 echo "== [3b] marshal 単体試験"; node poc/test_marshal.mjs
+echo "== [3c] Win32 shim 単体試験 + ネガコン (#784)"; node poc/test_shim.mjs
 echo "== [4] PoC 検収";        node poc/run_poc.mjs
 echo "[hostbridge] ALL PASS"

@@ -14,6 +14,10 @@
 #define FLASIO_NUM_IN  2
 #define FLASIO_NUM_OUT 2
 
+#ifndef FLASIO_SHRINK_STABLE_MS
+#define FLASIO_SHRINK_STABLE_MS 3000   /* underrun 無しがこの時間続いたら T を B 刻みで 1 段減衰 (閾値は AU-2 実機データで調整) */
+#endif
+
 static struct {
     int inited, created, running;
     ASIOCallbacks cb;
@@ -26,6 +30,7 @@ static struct {
     volatile int stop;
     uint32_t ready;
     uint32_t reset_requests, latency_changes, T, timeinfo_cb;
+    uint32_t grows, shrinks, T_max, T0;
     int use_timeinfo, notify_lat;
 } A = { .sr = 48000.0, .depth = 2, .hint = 0 };
 
@@ -210,18 +215,24 @@ static void *thread_fn(void *arg) {
     __atomic_store_n(&A.ready, 1, __ATOMIC_SEQ_CST);
     wake32(&A.ready);
     /* 目標充填 T の動的調整: (1) worklet が観測した最長バースト + 25% + B を下限に (2) underrun 毎に +B (上限 ring-2B)。
-     * 下げる方向は無し (セッション内)。変更時はホストへ kAsioLatenciesChanged。 */
+     * (3) underrun が FLASIO_SHRINK_STABLE_MS 続いたら +B を 1 段ずつ戻す (下限 (1) は下げない = 拡張とのヒステリシス)。
+     * 変更時はホストへ kAsioLatenciesChanged (既定 OFF = A.notify_lat)。 */
     uint32_t T = A.depth * A.B, T0 = T, esc = 0, last_u = 0;
     const uint32_t Tmax = c->ring_frames - 2 * A.B;
+    double quiet_t0 = emscripten_get_now();
     while (!A.stop) {
         uint32_t burst = LD(c->burst_obs);
         uint32_t need = (burst + burst / 4 + A.B + A.B - 1) / A.B * A.B;
         uint32_t u = LD(c->underruns);
-        if (u != last_u) { esc += A.B; last_u = u; }
+        double now = emscripten_get_now();
+        if (u != last_u) { esc += A.B; last_u = u; quiet_t0 = now; }
+        else if (esc > 0 && now - quiet_t0 >= FLASIO_SHRINK_STABLE_MS) { esc -= A.B; quiet_t0 = now; }
         uint32_t Tn = (need > T0 ? need : T0) + esc;
         if (Tn > Tmax) Tn = Tmax;
-        if (Tn > T) {
+        if (Tn != T) {
+            if (Tn < T) A.shrinks++; else A.grows++;
             T = Tn; A.depth = T / A.B; A.T = T;
+            if (T > A.T_max) A.T_max = T;
             c->depth = T / A.B; A.latency_changes++;
             if (A.notify_lat && A.cb.asioMessage) A.cb.asioMessage(kAsioLatenciesChanged, 0, NULL, NULL);
         }
@@ -249,6 +260,7 @@ ASIOError flasio_start(void) {
     fla_halt();
     fla_reset_indexes();
     A.stop = 0; A.ready = 0;
+    A.grows = 0; A.shrinks = 0; A.T0 = A.T_max = A.depth * A.B;
     if (pthread_create(&A.th, NULL, thread_fn, NULL) != 0) return ASE_HWMalfunction;
     while (!__atomic_load_n(&A.ready, __ATOMIC_SEQ_CST))
         __builtin_wasm_memory_atomic_wait32((int *)&A.ready, 0, 50 * 1000000LL);
@@ -313,6 +325,7 @@ void flasio_get_stats(flasio_stats_t *s) {
     s->buffer_frames = A.B; s->depth = A.depth; s->ring_frames = c->ring_frames; s->quanta = LD(c->quanta);
     s->reset_requests = A.reset_requests;
     s->timeinfo_cb = A.timeinfo_cb; s->latency_changes = A.latency_changes; s->T = A.depth * A.B; s->burst_obs = LD(c->burst_obs);
+    s->grows = A.grows; s->shrinks = A.shrinks; s->T_max = A.T_max; s->T0 = A.T0;
     for (int k = 0; k < 6; k++) s->wake_hist[k] = c->wake_hist[k];
 }
 

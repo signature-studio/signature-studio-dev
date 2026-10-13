@@ -302,3 +302,7 @@ drop500 の 62 s 台は既存 REPORT_MIDI §13-3 で未特定と記録済みの�
 | 実 FL (`fl-win64`) での winmm MIDI 結線 (`midiInOpen` の呼出元 → 本実装) の実機確認 | 結線は ABI 変換まで。FL 実 e2e 未実施 | #37 (AU-14) にコメント |
 | `shimx` と audio MIDI を同一 wasm に結合した統合 e2e | 本 run は shimx 単体 (模擬 backend) と audio 単体 (flm_midi 直) を分けて検証 | #37 (AU-14) |
 | 実 Web MIDI・実デバイス | モック検証のみ (REPORT_MIDI §13-3) | #187 (AU-2) |
+
+### 19. SHX-T12 (#789): 構造化 file trace
+
+file API の JSON Lines トレース (`SHIMX_TRACE_FILE` / `shimx_set_trace_file`) の実測・数え方・制約は分割先 `REPORT_SHX-T12.md` を正本とする。既存 `SHIMX_TRACE=1` の出力は変更なし。

@@ -382,6 +382,8 @@ jobs:
         shell: bash
         env:
           OC_PERMISSION: write
+          # PR の現在の本文を API で取り直すため (push の直後に本文へ追記された oc_artifacts を拾う。#820)
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: bash .github/scripts/prepare-event-context.sh
 
       - uses: actions/create-github-app-token@v3

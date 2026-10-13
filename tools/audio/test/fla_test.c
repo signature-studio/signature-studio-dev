@@ -16,7 +16,7 @@
 
 static struct {
     int asio; int apikind; int mode; /* 0 sine 1 ramp 2 loop */
-    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, timeinfo, sr_after, burst_floor, panel;
+    uint32_t buf, depth, sr, stress, work_us, hiccup_ms, hiccup_every, hiccup_stop_ms, timeinfo, sr_after, burst_floor, panel;
     uint32_t ds_f32, ds_notify, ds_size;
     double secs;
 } P = { .asio = 1, .mode = 0, .buf = 256, .depth = 2, .sr = 48000, .secs = 10, .ds_size = 16384 };
@@ -30,6 +30,7 @@ static float *g_obuf[2][2], *g_ibuf[2][2];
 static uint64_t g_n;           /* producer 側の生成フレーム数 (prefill 含む) */
 static volatile int g_stress_stop;
 static uint32_t g_cbs_since;
+static double g_hiccup_t0;     /* run_asio 開始時刻。hiccup_stop_ms 経過後は hiccup を止める (減衰の検証用) */
 
 static void spin_us(double us) {
     double t0 = emscripten_get_now();
@@ -55,7 +56,7 @@ static void gen_block(float *o0, float *o1, const float *i0, const float *i1, ui
 
 static void load_sim(void) {
     if (P.work_us) spin_us(P.work_us);
-    if (P.hiccup_every && ++g_cbs_since >= P.hiccup_every) { g_cbs_since = 0; spin_us(P.hiccup_ms * 1000.0); }
+    if (P.hiccup_every && ++g_cbs_since >= P.hiccup_every && (!P.hiccup_stop_ms || emscripten_get_now() - g_hiccup_t0 < P.hiccup_stop_ms)) { g_cbs_since = 0; spin_us(P.hiccup_ms * 1000.0); }
 }
 
 static void bufferSwitch(ASIOLong idx, ASIOBool direct) {
@@ -155,6 +156,7 @@ static int run_asio(char *j, size_t jn) {
     for (uint32_t k = 0; k < P.stress; k++) { pthread_t t; pthread_create(&t, NULL, stress_fn, NULL); pthread_detach(t); }
     if (flasio_start() != ASE_OK) { snprintf(j, jn, "{\"error\":\"start\"}"); return 1; }
     double t0 = emscripten_get_now();
+    g_hiccup_t0 = t0;
     pos_sample_t smp[256]; int ns = 0;
     int mono = 1; double lastpos = -1;
     while (emscripten_get_now() - t0 < P.secs * 1000.0) {
@@ -183,7 +185,7 @@ static int run_asio(char *j, size_t jn) {
         "\"reported\":{\"nin\":%d,\"nout\":%d,\"min\":%d,\"max\":%d,\"pref\":%d,\"gran\":%d,\"lat_in\":%d,\"lat_out\":%d,\"lat_out0\":%d,\"olat_us0\":%u,\"ch_type\":%d},"
         "\"stats\":{\"cb_count\":%u,\"cb_late\":%u,\"cb_max_us\":%u,\"cb_avg_us\":%u,\"underruns\":%u,\"silence_frames\":%u,"
         "\"in_overruns\":%u,\"in_underflows\":%u,\"min_fill\":%u,\"avg_fill\":%u,\"wake_count\":%u,\"wait_timeouts\":%u,"
-        "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u,\"st_n\":%u,\"st_invalid\":%u,\"st_nonmono\":%u,\"st_dmin\":%d,\"st_dmax\":%d},"
+        "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u,\"grows\":%u,\"shrinks\":%u,\"T_max\":%u,\"T0\":%u},\"timeinfo\":{\"calls\":%u,\"bad\":%u,\"st_n\":%u,\"st_invalid\":%u,\"st_nonmono\":%u,\"st_dmin\":%d,\"st_dmax\":%d},"
         "\"clock\":{\"samples\":%d,\"fit_ok\":%d,\"rate_hz\":%.3f,\"audible_minus_now_ms\":%.3f,\"monotonic\":%d},"
         "\"produced_frames\":%llu,\"resets_seen\":%u,\"rate_changes\":%u,\"panel_code\":%d}",
         name, P.buf, st.depth, P.sr, P.mode, elapsed / 1000.0,
@@ -191,7 +193,7 @@ static int run_asio(char *j, size_t jn) {
         st.cb_count, st.cb_late, st.cb_max_us, st.cb_avg_us, st.underruns, st.silence_frames,
         st.in_overruns, st.in_underflows, st.min_fill, st.avg_fill, st.wake_count, st.wait_timeouts,
         st.ring_frames, st.quanta, st.reset_requests,
-        st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, g_ti_n, g_ti_bad,
+        st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5], st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb, st.grows, st.shrinks, st.T_max, st.T0, g_ti_n, g_ti_bad,
         g_st_n, g_st_invalid, g_st_nonmono, g_st_n ? g_st_dmin : 0, g_st_n ? g_st_dmax : 0,
         ns, fit == 0, rate, offs, mono, (unsigned long long)g_n, g_resets, g_rate_changes, g_panel_code);
     return 0;
@@ -560,6 +562,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(a, "timeinfo")) P.timeinfo = (uint32_t)atoi(v);
         else if (!strcmp(a, "sr_after")) P.sr_after = (uint32_t)atoi(v);
         else if (!strcmp(a, "hiccup_every")) P.hiccup_every = (uint32_t)atoi(v);
+        else if (!strcmp(a, "hiccup_stop_ms")) P.hiccup_stop_ms = (uint32_t)atoi(v);
     }
     int rc;
     if (P.apikind == 2) { ASIOLong a, b; flasio_get_channels(&a, &b); rc = 0; }                 /* init 前の呼出 → fail-fast abort */

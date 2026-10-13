@@ -227,6 +227,9 @@ T1〜T9 の表は 250 行上限のため [REPORT_APPENDIX.md](REPORT_APPENDIX.md
 
 **結論**: 受入条件 3 件とも達成 (`_flhost` を module state 化し `Py_mod_multiple_interpreters` 宣言、isolated で import 可・破棄後も main 無傷、採用判断材料あり)。**採用判断: 採用しない** (隔離の代償が module namespace 分離の数百倍)。
 
+## PY-7 (#78): Chord progression 41 本の import / 実行 (mock 条件つき)
+結論: 41/41 import・実行 (wasm, mock 値あり・根拠なし)。ネガコン 7 FAIL exit 1。全文・mock 表: [REPORT_PY7.md](REPORT_PY7.md)。
+
 ## PY-13 (#588): `build_flpy.sh` の flapi_table 再生成を環境変数化
 入力 (win PE / stubs / mac dylib / 出力先 / emsdk) を環境変数化し、欠落時は exit 2 (旧: 空入力で緑)。検証 `tests/flapi_table_check.sh` (3 回とも exit 0・2.20 秒・正常系 3/3 一致・ネガコン 6 本 exit 2)。全文・未解決 (#630 PY-15 ほか): [REPORT_APPENDIX.md](REPORT_APPENDIX.md)
 

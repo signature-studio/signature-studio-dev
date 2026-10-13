@@ -250,10 +250,9 @@ def main():
         by.get("unpatched+g1+lic_sent") and by["unpatched+g1+lic_sent"]["saved_marker"] is False)
     chk("patched+g1+lic_sent: 保存 controller state にマーカ無し (bit 1 でも N3 が書込を抑止)",
         by.get("patched+g1+lic_sent") and by["patched+g1+lic_sent"]["saved_marker"] is False)
-    # 既知の不一致 (pin): mpatch N2a-1 `xor al,1→0` は demo bit = IR pass の「常時 0」ではなく「lookup 値そのまま」
-    # (marker キー不在 = 既定 true → bit 1)。0x800010 は N2b-2 で抑止され、getState の marker 書込は N3 で抑止される。
-    chk("[KNOWN-DIVERGENCE] patched+g1+lic_sent: demo bit == 1 (IR pass は 0 の設計。#623)",
-        bit_n("patched+g1+lic_sent") == 1 and not has800010("patched+g1+lic_sent"))
+    # #623: mpatch N2a-1 は `mov al,0` (定数 0 store)。IR pass の「常時 0」と一致する。
+    chk("patched+g1+lic_sent: demo bit == 0・0x800010 無し (N2a-1 定数 0 store; IR pass と一致)",
+        bit_n("patched+g1+lic_sent") == 0 and not has800010("patched+g1+lic_sent"))
     # 5. 0x800010 は本 host セッションでは未発火 (restartComponent(0x10) は観測) — 記録
     r = by.get("patched+licensed")
     if r:
