@@ -24,7 +24,7 @@
 
 - `emcc -c` 通過: **4/9** (23914 / 23944 / 24159 / 24298)。不通過 5 本: BooBass_Eng (E3 1 件)、f80 libcall 4 本 (23916 / 24163 / 24167 / 24216)。
 - E1 (`fix_icmp_ptr.py`): `fixcmp_patched` は 9 本とも 0 (`engine_fixcmp.py` の適用なし)。共有鎖で解消済みのため、修復前後の rc は不変。
-- Morphine (23944): `hll_killed_s` 354 — RetDec の HLL 段を kill して `.ll` から再開した経路。通常経路 (HLL 段を含む) の最後までの実測は無い。
+- Morphine (23944): `hll_killed_s` 354 — RetDec の HLL 段を kill して `.ll` から再開した経路 (§A の実測)。通常経路 (HLL 段を含む) の実測は §D。
 - `known.json`: 通過 4 本の `emcc_c_rc` を除去。残りの fails (`declares_unimpl` / `i256_trap` / `missing_define` と不通過 5 本の `emcc_c_rc`) は未解決。
 - judge (C++ 9 本の行のみ、`mk_status.py` 相当の列で作成): KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0 / exit 0。`synth_e2e.sh` 全体 (shell 12 本) は未実行。
 
@@ -80,7 +80,7 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 | f80 (x86_fp80) の libcall (`fp_extend` / `fp_round`) | 不通過 4 本 (23916 / 24163 / 24167 / 24216) | #534 (本 issue)。f80→f64 は精度が変わるため既定外。扱いは判断が要る |
 | E3 (i32 仮引数の i64 使用) BooBass_Eng `function_180049450` | 不通過 1 本 | #1301 (PLG-G2-13) |
 | define 欠落 (BooBass_Eng 211 件) | 1 本 (他 8 本は 1〜2 件) | #1301 (PLG-G2-13) |
-| Morphine (23944) の HLL 段を含む通常経路の実測 | 未実測 (再開経路のみ) | #1301 (PLG-G2-13) |
+| Morphine (23944) の HLL 段を含む通常経路の実測 | §D で解消 (kill 無しで最後まで実測。`emcc_c_rc` 0) | #1487 (解消済み) |
 | VEX helper 未実装 (未実装 helper 件数 83〜121) と `PLUG_AVX256` 有効時の再測定 | lift 結果の完全性 | #534 (本 issue) |
 | E2 (SSA 値入り定数式) / E4 (`fix_asm_stores` の def 欠落) | 今回の最初のエラーには出ず未再現。 網羅の確認は未実施 | #534 (本 issue) |
 
@@ -130,3 +130,31 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 | 静的検出の既定化 (`PLUG_NO_STATIC_DETECT` を既定 1 にする) と他 batch への影響確認 | 209 件 (BooBass_Eng) | 子 issue (本 run で起票) |
 | 関数名で出る 2 件 (`CreatePlugInstance` / `entry_point`) の `function_<VA>` への正規化 | 2 件 | 子 issue (本 run で起票) |
 | 回復 209 関数の後段 (emcc 型エラー) の確認。 E3 が先に止めるため未確認 | 209 件 | #1301 (PLG-G2-13) |
+
+## D. Morphine (23944) 通常経路の実測 (f3ffd7ba、#1487)
+
+- 測定 commit: **f3ffd7ba**。 その後の `tools/plugins` 差分 (`git diff f3ffd7ba HEAD -- tools/plugins ':!tools/plugins/synth/REPORT_APPENDIX.md'`) は **5 files, +78 / -2** (main 取り込み #1486 由来と #1222 由来):
+  - `lift/lift_ranges.sh` (+1 行 env 分岐): `PLUG_NO_STATIC_DETECT` 未設定時は RetDec 引数が従来と同一 (`${PLUG_NO_STATIC_DETECT:+...}` が空展開)。測定は既定の環境変数で実行したため経路は不変。
+  - `framework/hostshim/hs_disp_emu.py` (+6 / -1): `HS_DISP_RET_ARG=1` のときだけ挙動が変わる。測定では未設定。
+  - `synth/missing_define_classify.py` (新規 30 行) / `reverb_delay/REPORT_APPENDIX.md` (+10) / `framework/hostshim/REPORT_DISPATCHER.md` (+29): 測定経路から呼ばれない (lift 本体ではない)。
+  - 上記により f3ffd7ba 以降のコード経路は変わっていない。測定値はそのまま f3ffd7ba の値として成立する。
+- 測定コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP HLL_CAP=100000000 bash tools/plugins/synth/cpp_lift.sh 23944 2400`。
+  `HLL_CAP` を 1e8 秒にして HLL 段の kill 判定が発火しないようにした (= kill 無しの通常経路)。`timeout 2280` で包んで実行。
+- 所要時間: 壁時計 14 分 27 秒 (23:03:30 開始 → 23:17:57 終了、`date` 実測)。lift 秒 **854** (summary.csv)。
+- RetDec の段別内訳 (IR 出力 / HLL 段 / finalization の秒数) は **未確認**。測定時の `e.retdec.log` は残っておらず (作業ツリー・`$RUNNER_TEMP`・`$ARTIFACTS_DIR` のいずれにも無い)、段別の秒数は記載しない。
+- load: 実行終了時 `1.07 1.02 0.74`、測定後 `0.71 0.93 0.72`。
+- 結果 (summary.csv): `23944,3050,0,3321,0,52,24,0,0,0,854,1,61,0,271,3320,0`
+
+| 項目 | 通常経路 (f3ffd7ba) | §A 再開経路 (604e900f) |
+|---|--:|--:|
+| lift_rc | 0 | 0 |
+| defines | 3,321 | 3,321 |
+| 未実装 helper | 52 | 121 |
+| i256 trap | 24 | 24 |
+| f80 関数 | 0 | 0 |
+| `emcc_c_rc` | **0** | 0 |
+| lift 秒 | 854 | 407 |
+| `hll_killed_s` | **0** | 354 |
+
+- `emcc -c` は通過 (`emcc.log` 0 バイト、`first_errors.txt` 空)。未実装 helper は §A と不一致 (52 vs 121)。差の原因は `m11_simd2.py` の変更 (711d9ece・f2bbad10、#1163。VEX 3 オペランド形の SSE 委譲、cvt/rep 系の対応追加) で、§A (604e900f) の時点より未実装が減ったことによる。コードの差分からの説明であり、旧 commit での再測定はしていない。それ以外の列 (defines / i256 trap / f80 / emcc_c_rc / lift 秒を除く) は §A の再開経路と一致した。`.ll` 本体の差分比較はしていない。
+- 出力: `tools/plugins/work/synth/cpp23944/` (gitignore)。
