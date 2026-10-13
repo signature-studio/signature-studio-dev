@@ -74,7 +74,7 @@
 | `--soak 10` 3 回目 | PASS: underruns 0, ramp 0 / 480,512 f, T=1536, cb_max 80 µs | 63 s / 0.08 → 0.25 |
 | `--soak 10` 4 回目 | PASS: underruns 0, ramp 0 / 481,024 f, T=1536, cb_max 80 µs | 64 s / 0.02 → 0.20 |
 | `--soak 10` 5 回目 | PASS: underruns 0, ramp 0 / 480,512 f, T=1536, cb_max 324 µs | 63 s / 0.01 → 0.16 |
-| **`--soak30` (1800 s, 無負荷)** | **PASS (exit=1 完了)**: underruns 0, silence 0, ramp **0 / 86,4xx f** (全フレーム一致), cb 337,539 回 late 0, **cb_max 184 µs**, T=1536, dev_fill min/avg/max 1024/1299/1536, **clock_jumps 4 / clock_jump_frames 0**, secs_wall 1800.03 | 1802 s / 0.05 → 0.15 |
+| **`--soak30` (1800 s, 無負荷)** | **PASS (exit=1 完了)**: underruns 0, silence 0, ramp **0 / 86,408,192 f** (全フレーム一致), cb 337,539 回 late 0, **cb_max 184 µs**, T=1536, dev_fill min/avg/max 1024/1299/1536, **clock_jumps 4 / clock_jump_frames 0**, secs_wall 1800.03 | 1802 s / 0.05 → 0.15 |
 
 結論:
 - head `57519ca` で 4 回中 1 回出た `--soak 10` の FAIL は、head `d7d91d2` の 5 回では**再現しなかった** (6aa4b39 の 1 回も PASS)。通算で FAIL は 1/10 回。原因は**未特定**。FAIL 時の T・dev_fill のログは今回の試行では採れていない。
