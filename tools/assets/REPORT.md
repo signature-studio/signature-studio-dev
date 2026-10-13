@@ -6,7 +6,7 @@
 ## 1. 結論
 
 - **前担当残骸 (tools/assets/, コミット 0 件) は全面採用**。VFS 本体 (manifest v1 / pack / LazyVfs / SlotCache(OPFS) / SabLoader / Emscripten FS) は修正 1 行も不要で node/Chrome 実測 ALL PASS。壊れていたのは**テストハーネス側 3 点**のみで修正した (§3)。
-- チケット要件の未実装部分「**manifest→chunk 取得→連結→compileStreaming→キャッシュ (IDB/OPFS)**」を `vfs/asset.ts` + `vfs/idb.ts` として新規実装し、**314,206,140 byte の wasm (tools/perf/work/huge/k100.wasm, exports 8271) で 4 シナリオ e2e 全 PASS** (§5)。
+- チケット要件の未実装部分「**manifest→chunk 取得→連結→compileStreaming→キャッシュ (IDB/OPFS)**」を `vfs/asset.ts` + `vfs/idb.ts` として新規実装し、**314,206,140 byte の wasm (素材 k100, exports 8271) で 4 シナリオ e2e 全 PASS** (§5)。
 - キャッシュは **L1=IndexedDB (bytes のみ保存, Module は保存しない) / L2=OPFS SyncAccessHandle** の二段。破損検出は **chunk 単位 sha256 (内容アドレス id) を毎読み照合**し、破損 chunk だけ他 tier / network から再取得して部分修復する (§4)。
 - **deploy/client/chunked.mjs との統合判断: ストリーミング契約は同一形に寄せ、実装は統合せず E 側に置く** (理由と統合経路は §6)。
 
@@ -119,21 +119,6 @@ pathreg 既定マウント表の `/c/home`・`/c/tmp` 写像先を実装)。本 
 - **ネガティブコントロール (規則 41)**: 検証 copy の `vfs/asset.ts` から OPFS 読み出しの per-chunk sha128 照合だけを削除すると (検証後に HEAD 内容へ復旧済み)、corrupt-opfs が `CompileError: length overflow` で FAIL (2 シナリオ FAIL)。照合が破損検出の実体であることを確認。追加の検算: 1 バイト破損は sha128 不一致で検出 / 照合を外すと全体 sha256 が不一致のまま通過 / chunk 0 と 1 を入替えると `WebAssembly.compile` が magic word エラーで失敗 (§5 の表と同一条件で `node test/verify-asset-indep.ts` 出力)。
 - **修正した誤記** (この commit): §2 の 227 ファイル→399 ファイル・234 slot→231–232 slot、§4 の pass2 923–1229ms→0.867–1.198s、§5 の 4 シナリオ compile を n=12 の min–max に更新 (当初の n=3 の範囲は狭く、`e2e.sh --full` 内実行の 6.518s を含んでいなかった)、pass2 255–350 MB/s→262–358 MB/s、**imports 3→21**。
 
-## 12. 既存 e2e の維持 (#592 受入条件 2 / 検証起点 origin/main 64d09590 / run 2)
-
-PR #638 (規則反映) は merge 済み。この検証は origin/main の clean worktree で実行した (`e2e.sh` の全段は未実行)。
-
-| 段 | 結果 | 実測 |
-|---|---|---|
-| fl-win64 展開 (`tar --zstd -xf`) | OK | 5.5 秒 / extracted 25,166 件 |
-| 復元 → inventory → strings_scan → classify → 差分検査 → ネガコン → 生成物一致 | PASS (exit 0) | 12 秒 / load 0.44→0.56 |
-| `tsc -p tsconfig.json --noEmit` | exit 0 | #637 の解消を確認 (main 時点の exit 1 は解消) |
-| `pack` (small) | OK | 3.2 秒 |
-| `node-test` | ALL PASS | 2 秒 |
-| `browser-test` (Chrome) | ALL PASS | 4 秒 |
-| `emscripten-test` | **未実行** | `/opt/emsdk` が無い (`oc_artifacts: toolchain-emsdk` が必要) |
-| `asset-e2e` | **未実行** | `tools/perf/work/huge/k100.wasm` が無い (許可素材に無い) |
-
 ## 11. ST-T14 の tier 差分 6 点を bootset 規則に反映 (#592 / 親 #39 / 検証起点 8f55002)
 
 既知類型との関係: 該当なし (lift/逆アセ系ではない)。`tools/startup/loadpaths/REPORT.md` §4 の表を `bootset/classify_bootset.py` の `RULES` に反映し、`bootset.json` / `BOOTSET.md` を**再生成**した (人手編集なし)。tier は引き続き**推定** (実トレースは #105)。
@@ -152,22 +137,28 @@ PR #638 (規則反映) は merge 済み。この検証は origin/main の clean 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `e2e.sh` の `emscripten-test.ts` を未実行 (`toolchain-emsdk` 未取得) | 受入条件 2 (既存 e2e 維持) の一部が未検証 | #592 (`oc_artifacts: fl-win64 toolchain-emsdk` で再実行) |
-| `e2e.sh` の `asset-e2e.ts` を未実行 (`tools/perf/work/huge/k100.wasm` が許可素材に無い) | 同上 (tier 規則は触らないため影響は小さい。推定) | #592 (素材の置き場の確認は PM) |
+| `e2e.sh` の `asset-e2e.ts` を未実行 (素材 k100 が許可素材に無い) | 同上 (tier 規則は触らないため影響は小さい。推定) | #592 (素材の置き場の確認は PM) |
 | `tsc -p tsconfig.json --noEmit` が main 時点で exit 1 (`../../shared/paths.mjs` の型宣言なし・esbuild の解決不可) | `e2e.sh` が tsc で止まる (本 PR 由来ではない。origin/main の clean worktree で同じ 4 件を確認) | #637 [CI-12] |
 
-## 12. 既存 e2e の維持 (#592 受入条件 2 / 検証起点 origin/main 64d09590 / run 2)
+## 12. 既存 e2e の維持 (#592 受入条件 2 / 検証 HEAD 1885bc03 / 2026-10-13 UTC)
 
-PR #638 (規則反映) は merge 済み。この検証は origin/main の clean worktree で実行した (`e2e.sh` の全段は未実行)。
+PR #638 (規則反映) は merge 済み。検証は PR HEAD `1885bc03` の worktree (`ws-822`) で行った。
+素材は `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst`) を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` とした。
+実行シェルは `TMPDIR=$RUNNER_TEMP`。`load` は `/proc/loadavg` の 1 分値 (開始→終了)。
 
-| 段 | 結果 | 実測 |
-|---|---|---|
-| fl-win64 展開 (`tar --zstd -xf`) | OK | 5.5 秒 / extracted 25,166 件 |
-| 復元 → inventory → strings_scan → classify → 差分検査 → ネガコン → 生成物一致 | PASS (exit 0) | 12 秒 / load 0.44→0.56 |
-| `tsc -p tsconfig.json --noEmit` | exit 0 | #637 の解消を確認 (main 時点の exit 1 は解消) |
-| `pack` (small) | OK | 3.2 秒 |
-| `node-test` | ALL PASS | 2 秒 |
-| `browser-test` (Chrome) | ALL PASS | 4 秒 |
-| `emscripten-test` | **未実行** | `/opt/emsdk` が無い (`oc_artifacts: toolchain-emsdk` が必要) |
-| `asset-e2e` | **未実行** | `tools/perf/work/huge/k100.wasm` が無い (許可素材に無い) |
+| 段 | 結果 | 実測 | コマンド・日時 (UTC) |
+|---|---|---|---|
+| fl-win64 展開 | OK | 8.518 秒 / 25,166 件 / load 0.29→0.78 | `tar --zstd -xf fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64` / 15:40:35 |
+| 復元 → inventory → strings_scan → classify → 差分検査 → ネガコン → 生成物一致 | PASS (exit 0 まで。`e2e.sh` 35 行目の tsc で停止) | 11 秒 / load 0.81→0.92 | `bash tools/assets/e2e.sh` / 15:40:57 |
+| `tsc -p tsconfig.json --noEmit` | exit 0 (`node_modules` の リンク時のみ) | 166 ms / load 0.52→0.52。`node_modules` 無しでは exit 1 (TS2688 `node` 型定義なし) | `../../node_modules/.bin/tsc -p tsconfig.json --noEmit` / 15:41:49 |
+| `pack` (small) | OK | 2.941 秒 / load 0.47→0.52 | `node pack/pack.ts --only '^(Data/System/[^/]*$\|Artwork/\|System/Config/\|Data/Templates/Minimal/)' --out work/pkg-small` / 15:42:05 |
+| `node-test` | ALL PASS | 1.327 秒 / load 0.44→0.80 | `node test/node-test.ts --pkg work/pkg-small --out work/results-node.json` / 15:42:23 |
+| `browser-test` (Chrome) | ALL PASS | 4.119 秒 / load 0.70→0.70 | `node test/browser-test.ts --pkg work/pkg-small --out work/results-chrome.json` / 15:42:38 |
+| `emscripten-test` | **未実行** | `[EMSDK]` 未配置 | (`oc_artifacts: toolchain-emsdk` が必要) |
+| `asset-e2e` | **未実行** | k100 (314 MB wasm 素材) が未配置 | (許可素材に無い) |
 
-未解決: emscripten-test (要 `toolchain-emsdk`) と asset-e2e (要 k100.wasm の素材化、PM 判断) → #592。
+- 旧版 (origin/main 64d09590 / run 2) の値「展開 5.5 秒」は今回 8.5 秒と再現せず、本表の値で置き換えた。
+- `node_modules` 無しの clean worktree では `e2e.sh` の tsc 段が落ちる (`node_modules` はルートの `pnpm i` が必要)。これは本 PR 由来ではなく、#637 の解消条件は「ルートの `node_modules` がある」こと。
+- `node-test` は初回、`pack` と並列に起動したため manifest 未生成で失敗した (`latest.json` 不在)。直列で再実行して PASS。
+
+未解決: emscripten-test (要 `[EMSDK]` = `toolchain-emsdk`) と asset-e2e (要 k100 の素材化、PM 判断) → #592。
