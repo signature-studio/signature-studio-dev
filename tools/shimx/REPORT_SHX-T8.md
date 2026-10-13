@@ -73,9 +73,9 @@ exports.txt の再生成差分: 並べ替えに加えて **9 本が追加** (削
 | 項目 | 実測 |
 |---|---|
 | コマンド | `bash tools/shimx/test.sh` (`--quick` なし, 素材 `work-m11` / `work-m6-ott` 展開済み, `plugins-*` は未使用) |
-| 検証 HEAD | `ef7b40ee` (生成器修正 `270a32d7` / 生成物修正 `14e4eb35` / REPORT 修正 `7d2e1e3f` / 検証 HEAD 記録 `ef7b40ee`)。実行前に `work-m11` / `work-m6-ott` を展開 (`tools/m11/work/` `tools/m6/work/` `tools/m8/work/` `tools/m9/work/` `tools/m10/work/` `tools/ott/work/`) |
-| 結果 | **exit 0**, real **1m29.2s** (user 1m14.7s / sys 16.4s), load average 0.18 (実行直前)。SKIP なし、FAIL 0 |
-| 再生成後の差分 | `git status` 空 (再生成物は commit 済みの内容と一致)。素材が無い状態で走らせると `m11_closure` / `ott_api_resolved` が空・0 に化けるため、素材の展開は必須 |
+| 検証 HEAD | `5bfaec5c` (生成器修正 `38c1167a` の後、`inventory.md` の再生成 `5bfaec5c`)。実行前に `work-m11` / `work-m6-ott` を展開 (`tools/m11/work/` `tools/m6/work/` `tools/m8/work/` `tools/m9/work/` `tools/m10/work/` `tools/ott/work/`) |
+| 結果 | **exit 0**, real **53.06s** (`time` 実測, load は実行直前 `uptime` 未取得のため記録なし)。SKIP なし、FAIL 0 |
+| 再生成後の差分 | `inventory.md` の 88 行目のみ (「プラグイン専用で未提供 …: 」→「… なし」)。他の生成物は commit 済みの内容と一致。素材が無い状態で走らせると `m11_closure` / `ott_api_resolved` が空・0 に化けるため、素材の展開は必須 |
 | MT / ST / M4 | MT PASS (7 グループ) / ST PASS / M4 テスト MT・ST PASS |
 | 署名 | verify_sig m11 / m11_3 / ott: signature mismatch = 0。sig_test (a)〜(h) ALL PASS |
 | R6 | 構造体展開スタブ + 重複 declare 正規化 OK |
