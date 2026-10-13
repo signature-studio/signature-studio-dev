@@ -1,8 +1,8 @@
 # tools/python REPORT 付録: PY-12 (#587) `_flhost` per-module state 化
 
-`REPORT.md` の行数上限 (250 行) のため §12 を分離 (内容は REPORT.md §12 として書いたもの)。
+`REPORT.md` の行数上限 (250 行) のため PY-12 節を分離 (内容は REPORT.md の PY-12 節として書いたもの)。
 
-## 12. `_flhost` の per-module state 化 (PY-12, #587)
+## PY-12 (#587): `_flhost` の per-module state 化
 
 既知類型との関係: 該当なし (lift / 逆アセではない。`docs/DEFECTS.md` 対象外)。検証起点 commit `8f55002` (着手時の main)。
 
