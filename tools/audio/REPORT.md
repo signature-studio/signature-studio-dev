@@ -245,3 +245,13 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 - 旧 HEAD `bb912951` (`d53f449c` からは REPORT のみの差分でコード同一。main 取り込み前): 初回 1 run exit 1・11/13 PASS (8.6 s)。FAIL は dev:tone (`max_err=6.85e-1` `zero_runs=1` `first_err_frame=56576` `first_zero_run_frame=56607`) と dev:underruns (`underruns=1` `first_underrun_frame=56576`)。直後の 10 回は 10/10 exit 0・13/13 PASS。
 - 旧 HEAD `d53f449c` の記録 (失敗ログ未取得) は旧記録として残す。旧記述「21 run 全 PASS」は本実測と合わず撤回。
 - 再現条件 (負荷・タイミング) は未特定。FAIL は旧 HEAD の 11 run 中 1 件のみで、切り分けは `first_underrun_frame=56576` (producer 遅延か consumer rebuffer か) を起点に行う。追跡 **#863** (AU-15)。
+
+## 20. AU-15 (#863) 現 HEAD での再試行 (失敗 0 件)
+
+測定 HEAD は `origin/main` `2f235a0a` (worktree `ws-863`・コード差分なし)。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64/extracted`、`toolchain-emsdk` を `EMSDK_ENV` に指定。`bash tools/audio/integration/e2e.sh` を foreground で実行。
+
+- 無負荷 9 run (load 1.64〜2.34): **9/9 exit 0・13/13 PASS** (11〜12 s)。
+- CPU 負荷 (busy loop 6 本) 下 6 run (load 3.74〜9.52): **6/6 exit 0・13/13 PASS** (21〜23 s)。
+- 計 15 run 全 PASS。dev:tone `max_err=1.49e-8` zero_runs 0・dev:underruns underruns 0・`first_err_frame=-1` (全 15 run のログで同値。rms の丸め差 1 件のみ)。
+- 失敗が再現しなかったため、producer (wasm 出力遅延) と consumer (worklet rebuffer) の切り分けは未実施。旧 HEAD `bb912951` の失敗ログ (§19) が唯一の失敗例。
+- 追跡 **#863** (AU-15) のまま。次回失敗時は §19 の位置情報 (`first_err_frame` 等) を取得して切り分ける。
