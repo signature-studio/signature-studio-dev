@@ -13,3 +13,19 @@
 | 残 5 関数 (no_placeholder 3 / slot_occupied 2) の原因切り分け | 受入条件 1・2 | #871 ([PLG-F2-6]) |
 
 親: #613 (PLG-F2-5)。未解決の追跡先は上表のとおり #871 のみ。
+
+## 10.2 (#871 修正) mk_targets の恒等写像化: 部分達成 (回帰 1 件)
+
+- 変更: `mk_targets.py` を `wasm_origin = ImageBase` (恒等写像) にし、DIR64 reloc の VA→RVA 補正を外した。IR の絶対 VA 定数をそのまま image 内に指せるようにする。
+- 測定 HEAD: 修正前は `78aa75ad` (origin/main) で再現 (一致 15 / 不一致 8 / 実行不能 0、leaf_diff 130 秒)。修正後の測定は本節の commit で `leaf_diff.sh` を実行 (下記)。
+- 修正前後の差 (23 関数、最終判定):
+
+| VA | block | 修正前 | 修正後 | 備考 |
+|---|---|---|---|---|
+| 0x6f1650 | 19059 | mismatch (ret_only) | **match** 11/11/11 | 受入の本命が解消 |
+| 0x6c8fc0 | 18975 | mismatch (xmm_arg_drop) | **match** | 副次的に解消 |
+| 0x5de250 | 19006 | **match** 8/8/11 | **mismatch** (memory_semantics) | **回帰** |
+
+- 回帰の機序 (確定していない・暫定): 0x5de250 は IR で `load i32 @ inttoptr (3198772 = 0x30D0F4)` を読み、その値で分岐する。0x30D0F4 は ImageBase (0x400000) より下で image 外。修正前は wasm 側がこの値を別の内容として読んでいた。修正後は wasm 側の比較が native と一致しなくなり、`arena+0x1000` への store の有無が分かれる。
+- 最終判定: 一致 **16** / 不一致 **7** / 実行不能 0 (修正前 15 / 8 / 0)。回帰 1 件を含む。
+- 未実施: 30 関数 (317 箇所) 全体への影響表、`nc_leaf.py` ネガコン、残 5 関数の切り分け。
