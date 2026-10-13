@@ -243,21 +243,4 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | 負荷を掛けた状態 (並行 e2e) での再現試験が未実施 | 原因の切り分けができない | #998 |
 | 実行 A は HEAD `fef39e5` (別コミット)。同一 HEAD での再現ではない | 同一 HEAD の再現条件が未確定 | #998 |
 
-### 12-2. 負荷下の再現試験 (2026-10-14・worktree HEAD `80c32a06`・検証コード差分 0)
-
-負荷: `yes > /dev/null` を 4 本 (4 コア runner)。実行前 load 0.28 → 実行中 load 6.0〜9.6。e2e は foreground。
-
-| 実行 | 種別 | exit | 所要 | load (実行後) | underruns (b256_d2 / b1024_d2 / sine / soak) | 備考 |
-|---|---|---|---|---|---|---|
-| L1 | 完全 (`e2e.sh`) | **1** | 221 s | 6.00 | **1** (silence 512) / 0 / 0 / 0 | `com_ramp_b256_d2` FAIL。ramp 194432/240512 |
-| L2 | `--quick` | 0 | 86 s | — | 0 / 0 / 0 (soak なし) | 3/3 PASS |
-| L3 | 完全 | 0 | 224 s | 9.60 | 0 / 0 / 0 / 0 | 4/4 PASS |
-
-- 負荷下では `com_ramp_b256_d2` が完全実行 2 回中 1 回 (L1) で underrun 1 を出した。原因は未特定。L1 の silence は 512 で、§11 実行 A (silence 1280) より小さい。
-- 通算母集団は §12 の定義に L1〜L3 を加えて **13 回・underrun 2 回** (`b256_d2` のみ)。
-- 同一 HEAD・同一負荷での再現は確定的ではない (完全実行 2 回中 1 回)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 実行 A・L1 の underrun の原因 (負荷・ring 深さ・worklet スケジューリング) が未特定。負荷下でも完全実行 2 回中 1 回でしか出ない | ゲート (underrun 0) が揺らぐ。merge 判定で再実行が必要になり得る | #998 |
-| 負荷下の再現頻度の確定 (N 回の連続試行) と、underrun 時の ring 深さ・worklet 側のログ採取が未実施 | 原因の切り分けができない | #998 |
+負荷下の再現試験 (L1〜L3) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下で完全実行 2 回中 1 回 underrun (`com_ramp_b256_d2`)。
