@@ -88,11 +88,15 @@ def selftest():
     c = ('// Address range: 0x1000 - 0x1010\nint function_1000(void)\n{\n}\n'
          '// Address range: 0x2000 - 0x2010\nint function_2000(void)\n{\n}\n')
     ranges = '0x1000-0x1010,0x2000-0x2010'
+    ll_one_entry = 'define i32 @entry_point() {\n  ret i32 0\n}\n'
+    c_same_name = ('// Address range: 0x1000 - 0x1010\nint entry_point(void)\n{\n}\n'
+                   '// Address range: 0x2000 - 0x2010\nint entry_point(void)\n{\n}\n')
     cases = [
         ('good', base, ll, c, 0, 'PASS'),
         ('NC lift_rc=1', base.replace(',418,0,', ',418,1,'), ll, c, 1, 'lift_rc=1'),
         ('NC erc3=1', base[:-1] + '1', ll, c, 1, 'emcc_c_rc(erc3)=1'),
         ('NC 欠落 range', base, ll.replace('function_2000', 'other_2000'), c, 1, 'define 無し'),
+        ('NC 同名 2 range', base, ll_one_entry, c_same_name, 1, 'define 無し range 2 件'),
         ('NC 列数不足', base[:base.rfind(',')], ll, c, 2, '列数'),
         ('NC 非整数', base.replace(',418,', ',x,', 1), ll, c, 2, '整数'),
     ]
