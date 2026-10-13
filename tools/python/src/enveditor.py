@@ -246,7 +246,11 @@ class Sample:
 
     def LoadFromClipboard(self):
         # MOCK: 実 FL のクリップボードは無い。ホストが set_clipboard で注入する。未注入なら空 (Length 0)。
-        self._chans = [[] for _ in range(DEFAULT_NUM_CHANS)]
+        if _CLIPBOARD is None:
+            self._chans = [[] for _ in range(DEFAULT_NUM_CHANS)]
+        else:
+            self._chans = [list(map(float, ch)) for ch in _CLIPBOARD.get("ch", [[]])]
+            self.SampleRate = int(_CLIPBOARD.get("rate", DEFAULT_SAMPLE_RATE))
         self._regions = []
 
     def LoadFromFile(self, Filename):
@@ -300,6 +304,14 @@ Utils = TUtils()
 __all__ = ["Sample", "Region", "Editor", "EditorSample", "Utils", "ScriptDialog",
            "PASTE_INSERT", "PASTE_REPLACE", "PASTE_MIX", "NF_NumChannels", "NF_Format", "NF_Samplerate", "NF_All",
            "nfAll", "CM_MergeLR", "CM_Left", "CM_Right", "reset", "install"]
+
+
+_CLIPBOARD = None  # ホストが注入する {"ch", "rate"} (reset と同形式)。None なら LoadFromClipboard は空
+
+
+def set_clipboard(sample):
+    global _CLIPBOARD
+    _CLIPBOARD = sample
 
 
 def reset(sample=None, selection=None):
