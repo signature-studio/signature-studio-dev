@@ -11,6 +11,16 @@ ROOT_REPO="$(cd "$HERE/../.." && pwd)"
 set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
 command -v node >/dev/null || { echo "node not found (emsdk env)" >&2; exit 2; }
 command -v google-chrome >/dev/null || [ -n "${CHROME:-}" ] || { echo "google-chrome not found" >&2; exit 2; }
+E2E_TOOLS="${E2E_TOOLS_DIR:-$HERE/../e2e}"
+case "${E2E_DRIVER:-agent-browser}" in
+  agent-browser) E2E_DEP="$E2E_TOOLS/node_modules/.bin/agent-browser" ;;
+  puppeteer) E2E_DEP="$E2E_TOOLS/node_modules/puppeteer-core/package.json" ;;
+  *) echo "[gui-e2e] E2E_DRIVER=${E2E_DRIVER} は未対応 (agent-browser|puppeteer)" >&2; exit 2 ;;
+esac
+if [ ! -e "$E2E_DEP" ] && [ "${E2E_NO_AUTOINSTALL:-0}" != "1" ]; then
+  (cd "$E2E_TOOLS" && npm ci --no-audit --no-fund --ignore-scripts) >&2 || true
+fi
+[ -e "$E2E_DEP" ] || { echo "[gui-e2e] 前提不足: $E2E_DEP が無い (step 6 のドライバが ENOENT で落ちる)。対処: (cd tools/e2e && npm ci --no-audit --no-fund --ignore-scripts) を実行する" >&2; exit 2; }
 echo "[gui-e2e] 0/6 import 解析 + API 面生成"
 [ -f "$HERE/analysis/imports_all.json" ] || python3 "$HERE/analysis/gui_imports.py" >/dev/null
 python3 "$HERE/gen_api.py"
@@ -27,6 +37,7 @@ if [ "${SKIP_NATIVE:-0}" != "1" ]; then
   echo "[gui-e2e] 1d/6 GUI-7 popup/tooltip surface・NC 領域・無効領域複数矩形・DPI (独立 Python オラクル golden/gen_golden_nc.py と画素完全一致 + ネガコン 3 本)"; bash "$HERE/test/nc_golden.sh" | tail -6
   echo "[gui-e2e] 1e/6 GUI-7 テスト PE (popup + tooltip + WM_NCPAINT, lift 経由) の golden (独立 Python オラクル golden/gen_golden_ncpe.py と画素完全一致 + ネガコン 2 本: 1 画素改変 / tooltip の TOPMOST 欠陥 PE)"; bash "$HERE/test/nc_pe_golden.sh" | tail -6
   echo "[gui-e2e] 2/6 native lift 実行 (PE->RetDec->gcc, headless host, golden)"; bash "$HERE/test/native_e2e.sh" 2>&1 | grep -E "native_run|\[post\]"
+  echo "[gui-e2e] 2a/6 __pe_image の data 実体化 (.reloc DIR64 補正; GUI-12 #566; ネガコン付き。FAIL なら非 0 で停止)"; bash "$HERE/test/pe_image_e2e.sh" 2>&1 | grep -E "PASS|FAIL|done"
   echo "[gui-e2e] 2b/6 結合準備 native (到達 API ログ / wasm32 署名 adapter / ハンドル 31bit / 改名 selftest; CAB-156)"; bash "$HERE/test/reach_test.sh" 2>&1 | grep -E "passed|FAIL"
 fi
 echo "[gui-e2e] 1c/6 GUI-5 wasm SIMD128 行カーネル (scalar と画素完全一致 + 故意欠陥 4 種を検出 + v128 命令の有無; bench 省略)"

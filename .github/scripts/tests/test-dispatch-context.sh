@@ -64,6 +64,18 @@ ctx '{"pr":5,"reason":"conflict"}'
 [ "$CTX_RC" = 0 ] && out_has 'artifacts=' && out_has 'should_run=true'
 expect "no artifacts -> empty (workflow falls back to the default)" $?
 
+# 6b. oc_artifacts: none は単独なら「素材なし」(空。旧スクリプトは unknown artifact で落ちていた: PR #924 / #937)
+ctx '{"pr":5,"reason":"conflict","artifacts":"none"}'
+[ "$CTX_RC" = 0 ] && out_has 'artifacts=' && out_has 'should_run=true'
+expect "artifacts=none alone -> empty, run proceeds" $?
+
+# 6c. none と他の名前の混在は拒否 (どちらの順でも)
+for bad in 'none fl-win64' 'fl-win64 none' 'none none'; do
+  ctx "{\"pr\":5,\"reason\":\"conflict\",\"artifacts\":\"$bad\"}"
+  [ "$CTX_RC" != 0 ] && grep -q '"none" must be the only name' "$TMP/log"
+  expect "artifacts=\"$bad\" is rejected" $?
+done
+
 # 7. 他のイベントの挙動は変わらない: issue_comment の /oc 判定
 rm -rf "$TMP/rt"; mkdir -p "$TMP/rt"
 printf '{"comment":{"body":"/oc oc_actions_allow_write\\nhello"},"issue":{"number":9}}' > "$TMP/ev.json"

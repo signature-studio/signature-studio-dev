@@ -9,32 +9,13 @@ tools/m1 の「main 抽出」より踏み込んだ最小後処理 (lifter 産コ
   4. 関数 VA -> 関数ポインタ表 (GuiFnMap) を生成 (WNDCLASS.lpfnWndProc 等は VA 値で lifted コードが保持)
   5. WndProc 系の 4 引数署名を強制。候補は既定で自動検出 (integ/lift_fnmap.py: RegisterClass*/SetWindowLong* を呼ぶ関数の本体で
      VA 定数として取得されている関数)。`--wndproc NAME` は追加指定、`--no-auto-wndproc` で検出を無効化
-usage: gui_lift_post.py <retdec.c> <pe> <out.c> [--wndproc NAME ...] [--no-auto-wndproc]
+usage: gui_lift_post.py <retdec.c> <pe> <out.c> [--wndproc NAME ...] [--no-auto-wndproc] [--no-pe-reloc (検査用)]
 """
 import os, re, struct, sys, argparse
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "integ"))
 import lift_fnmap
-
-
-def read_pe_image(path):
-    d = open(path, "rb").read()
-    pe = struct.unpack_from("<I", d, 0x3C)[0]
-    nsec = struct.unpack_from("<H", d, pe + 6)[0]
-    optsz = struct.unpack_from("<H", d, pe + 20)[0]
-    opt = pe + 24
-    base = struct.unpack_from("<Q", d, opt + 24)[0]
-    size_of_image = struct.unpack_from("<I", d, opt + 56)[0]
-    img = bytearray(size_of_image)
-    so = opt + optsz
-    for i in range(nsec):
-        e = so + i * 40
-        name = d[e:e + 8].split(b"\0")[0].decode("latin1")
-        vsz, va, rsz, rptr = struct.unpack_from("<IIII", d, e + 8)
-        if name == ".text":
-            continue  # コードは lift 済み。イメージには入れない
-        n = min(vsz, rsz) if rsz else 0
-        img[va:va + n] = d[rptr:rptr + n]
-    return base, bytes(img)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pe_image
 
 
 CTYPE = {"int8_t": "int8_t", "uint8_t": "uint8_t", "int16_t": "int16_t", "uint16_t": "uint16_t",
@@ -48,9 +29,12 @@ def main():
     ap.add_argument("--wndproc", action="append", default=[])
     ap.add_argument("--no-auto-wndproc", action="store_true")
     ap.add_argument("--entry-rename", default="lifted_entry")
+    ap.add_argument("--no-pe-reloc", action="store_true", help="DIR64 補正を出さない (ネガティブコントロール用)")
     a = ap.parse_args()
     txt = open(a.src, encoding="utf-8").read()
-    base, img = read_pe_image(a.pe)
+    pe = pe_image.PE(a.pe)
+    base = pe.base
+    img, relocs, rstat = pe_image.runtime_image(pe, relocate=not a.no_pe_reloc)
 
     gi = txt.index("// --------------------- Global Variables ---------------------")
     fi = txt.index("// ------------------------ Functions -------------------------")
@@ -61,15 +45,16 @@ def main():
 
     # --- globals
     macros = []; gnames = []
-    for m in re.finditer(r"^([^\n;=]+?)\s+(g\d+)(?:\s*=\s*[^;]*)?;(?:\s*//\s*(0x[0-9a-fA-F]+))?\s*$", gtxt, re.M):
-        ty, name, addr = m.group(1).strip(), m.group(2), m.group(3)
+    for m in re.finditer(r"^([^\n;=\[]+?)\s+(g\d+)(\[\d+\])?(?:\s*=\s*[^;]*)?;(?:\s*//\s*(0x[0-9a-fA-F]+))?\s*$", gtxt, re.M):
+        ty, name, arr, addr = m.group(1).strip(), m.group(2), m.group(3), m.group(4)
         gnames.append(name)
         ct = "int64_t" if ("*" in ty or ty.startswith("struct")) else CTYPE.get(ty, "int64_t")
+        cty = "%s (*)%s" % (ct, arr) if arr else "%s *" % ct   # 配列は `&gN` / `gN[i]` が素の C と同じに働く配列 lvalue にする
         if addr is None:
-            macros.append("static %s %s;" % (ct, name))
+            macros.append("static %s %s%s;" % (ct, name, arr or ""))
         else:
             off = int(addr, 16) - base
-            macros.append("#define %s (*(%s *)(__pe_image + 0x%x))" % (name, ct, off))
+            macros.append("#define %s (*(%s)(__pe_image + 0x%x))" % (name, cty, off))
 
     # --- functions
     parts = re.split(r"(?m)^// Address range: (0x[0-9a-f]+) - (0x[0-9a-f]+)\n", ftxt)
@@ -133,11 +118,21 @@ def main():
         chunk = img[i:i + 32]
         rows.append("  " + ",".join("0x%02x" % b for b in chunk) + ",")
     hdr += rows + ['};', '']
+    # イメージ内ポインタ (DIR64) のスロット offset 表。起動時に delta = &__pe_image[0] - base を足す (.text 宛 = 関数 VA は fnmap の鍵なので触らない)
+    hdr += ['static const uint32_t __pe_image_relocs[] = {' + ",".join("0x%x" % o for o in relocs or [0]) + '};',
+            'static const int __pe_image_relocs_n = %d;' % len(relocs),
+            'static void __pe_image_fixup(void) {',
+            '  static int done;',
+            '  if (done) return;',
+            '  done = 1;',
+            '  uint64_t delta = (uint64_t)(uintptr_t)__pe_image - __pe_image_base;',
+            '  for (int i = 0; i < __pe_image_relocs_n; i++) { uint64_t *p = (uint64_t *)(__pe_image + __pe_image_relocs[i]); *p += delta; }',
+            '}', '']
     body = "\n".join(hdr + macros + [''] + protos + [''] + out_funcs)
     body += "\n" + lift_fnmap.emit_fnmap(fnmap)
-    body += "int64_t gui_lift_entry(void) { return %s(); }\n" % a.entry_rename
+    body += "int64_t gui_lift_entry(void) { __pe_image_fixup(); return %s(); }\n" % a.entry_rename
     open(a.out, "w", encoding="utf-8").write(body)
-    print("[post] globals=%d functions kept=%d (thunks dropped=%d) image=%dB base=0x%x" % (len(macros), len(funcs), (len(parts) - 1) // 3 - len(funcs), len(img), base))
+    print("[post] globals=%d functions kept=%d (thunks dropped=%d) image=%dB base=0x%x dir64=%d rebased=%d text_kept=%d" % (len(macros), len(funcs), (len(parts) - 1) // 3 - len(funcs), len(img), base, rstat["dir64"], len(relocs), rstat["text_kept"]))
 
 
 if __name__ == "__main__":

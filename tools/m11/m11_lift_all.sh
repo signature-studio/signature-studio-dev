@@ -20,8 +20,9 @@ for i in $(seq 0 $((CH - 1))); do
   echo "[chunk $i] start $(date +%T)"
   bash m11_lift.sh work/chunk_$i.txt boot$i 1800 > work/boot_lift_i$i.out 2>&1
   rc=$?
-  touch "work/boot$i.lift.DONE"
   echo "[chunk $i] rc=$rc end $(date +%T)"
+  [ $rc = 0 ] || { echo "[boot lift all] FAIL chunk $i (fail-closed; work/boot_lift_i$i.out 末尾)" >&2; tail -5 "work/boot_lift_i$i.out" >&2; exit 1; }
+  touch "work/boot$i.lift.DONE"
 done
 touch work/boot_all.DONE
 echo "[boot lift all] done $(date +%T)"
