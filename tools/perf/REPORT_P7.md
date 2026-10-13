@@ -61,10 +61,12 @@ runner (Linux) では Safari を起動できないため、macOS 実機で以下
 
 1. macOS の端末で repo を checkout し、リポジトリ直下で次を実行する (Node 必要。サーバは 127.0.0.1 のみで待つ)。
    ```sh
-   node --input-type=module -e "import fs from 'node:fs'; import {startServer} from './tools/perf/p7/server.mjs'; const s = await startServer(); console.log(s.url + '/p7.html?cfg=safari&rounds=3'); setInterval(() => fs.writeFileSync('work/p7_safari.json', JSON.stringify(s.results, null, 1)), 3000);"
+   mkdir -p work && node --input-type=module -e "import fs from 'node:fs'; import {startServer} from './tools/perf/p7/server.mjs'; const s = await startServer(); console.log(s.url + '/p7.html?cfg=safari&rounds=3'); setInterval(() => fs.writeFileSync('work/p7_safari.json', JSON.stringify(s.results, null, 1)), 3000);"
    ```
+   `work/` は `.gitignore` 対象 (`**/work/`) で checkout に含まれないため、`mkdir -p work` を先に実行する。
    表示された URL (`http://127.0.0.1:<port>/p7.html?cfg=safari&rounds=3`) を **Safari で開く**。
 2. ページは round 0 の全実験を行った後、同一 URL を 2 回再ロードする (wasm code cache の観測)。`work/p7_safari.json` の `done` キーが出るまで待つ (目安は端末依存。`done` が出なければ失敗)。
+   書き出しは 3 秒おきの interval なので、`done` が出ても直後のファイルには含まれないことがある。**`done` が出てから 3 秒以上待ってから** `work/p7_safari.json` を確認し、`done` キーが含まれることを確かめる。
 3. `work/p7_safari.json` を `tools/perf/p7/results/` に移し、上限・lazy compile・Memory 本数の数値を §0 と同じ表形式で本ファイルに追記する。
 4. 検証: Safari 上で `done` が届かない場合は、Safari の開発メニュー → コンソールのエラーを記録する。
 
