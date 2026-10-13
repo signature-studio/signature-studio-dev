@@ -9,9 +9,10 @@
 
 - 機械語の `[rbx]` (rbx = 入口 rcx = `var s` のアドレス) の 1 段 deref は **4 箇所** (414af3 / 414b49 / 414b64 / 414b78)。
 - 作業 IR (`work-m11` の `boot_final3.ll`) では `%arg1` を ptr とする load が **0 件**。`%arg1` を値のまま `icmp eq i64 %arg1, 0` / `add i64 %arg1, -N` に使い、`%arg2-4` を ptr として読む (414b6c の `load i32, ptr (%37-4)` がトラップ位置 0xbc575 = unit 149/158/280/659 の入口)。
+- 機械語との同一入力突合 (C 版・IR 版・LStr 版): §9 を参照。
 - IR はさらに機械語と違う点がある: 414b49 の `call 0x414850` の引数が `[rbx]` の新しい値ではなく **スタック slot のアドレス**、414b01 の早期 return の戻り値が機械語の rax (= `[rbx]` の値) ではなく arg1。転記では機械語どおりに写した。
 
-## 2. 転記 (C 版) と IR 版
+## 2. 転記 (C 版) と IR 版 (機械語との突合は §9)
 
 - **C 版**: `tools/m11/m11_ov.c` の `function_414ad0`。gate は `-DM11_OV_414AD0` (既定 **0**)。`origin/main` に対して追加 36 行・削除 0 行 (`git diff origin/main HEAD -- tools/m11/m11_ov.c`)。
   - `M11_OV_414AD0=1`: UStrSetLength 版 (`#if` 側。機械語 414ad0..414ba9 の分岐を写した転記。deref 復元あり)。
@@ -117,8 +118,25 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 
 - 範囲内 (merged HEAD `a1ebdd31`): m11 survey 942 unit (ON/OFF 各 n=3)、liftdiff 68 関数 (A/B 各 n=3、end-to-end 実行)。gate=0 と main のオブジェクト同一性 (§2)。
 - **n の限界**: 上記は n=3 で全件一致 (min = max)。ただし同一素材・同一マシン上の反復であり、別マシン・別負荷での再現は未確認。独立測定 (`d8075de`) では §3 の差が出ており、その原因は未確認。
-- 範囲外: closure 7421 関数の再測定 (§5 は旧測定値)、`m11_e2e.sh` 全体 (stage4 / bit-exact) への影響 (未実施)、C 版と IR 版の相互検算 (未実施)、副作用の原因 (旧 PR 記述の再現が無いため対象外)。
+- 範囲外: closure 7421 関数の再測定 (§5 は旧測定値)、`m11_e2e.sh` 全体 (stage4 / bit-exact) への影響 (未実施)、C 版と IR 版の相互検算は §9 で実施 (機械語との突合)、副作用の原因 (旧 PR 記述の再現が無いため対象外)。
 - 既存 REPORT の数値 (`818 / 21` 等) は旧生成物 (a) の値で、本 gate の有無とは無関係。他 REPORT の書換えは行わない。
+
+## 9. C 版・IR 版の機械語突合 (#764)
+
+- **対象**: function_414ad0 (VA 0x414ad0..0x414ba9, 218 byte)。oracle = PE の実バイト列を unicorn (2.1.4) で実行 (`xcheck414.py`)。callee (412d60 / 409470 / 414850 / 412c20 / 409c80 / 40f560) は Python スタブで置換し、C 側 (`xcheck414_harness.c`) と同じ仕様。
+- **入力**: 5000 case (seed 0x764)。var 引数 s の内容 (ヘッダ refcnt・length・ポインタ値を乱数化)、n ∈ {-2..100}。fault (oob 相当) 1131 / 非 fault 3869。
+- **実行**: `FL_WIN64_DIR=… tools/m11/trap_triage/xcheck414.py 5000` (実測 46.5 s、load 0.65 / 0.29 / 0.15 の 1 分値)。rc=0。
+- **結果 (機械語との差 = fault・ret・arena の fnv1a64・bump 全一致で判定)**:
+
+| 版 | 差 / 5000 |
+|---|--:|
+| C 版 (`m11_ov.c` の `#if M11_OV_414AD0`、UStr 版) | **0** |
+| IR 版 (`ir414_fix.py`) | **0** |
+| LStr 版 (`#else`、既定 OFF・main と同じ本体、負の対照) | 2900 |
+
+- **読み**: C 版と IR 版は、この突合の範囲 (分岐・deref・戻り値・arena 副作用) で機械語と一致する。LStr 版は機械語と異なるので、既定 OFF の版は本件の転記とは別物であり、試験は差を検出できている。
+- **限界**: callee は stub。stub の値 (412c20 が読む flags 語 G_WORD=2、409470 の確保規則) は実 PE の値を検証していない。機械語側の実 callee を使う突合ではない。`mc` と `C`/`IR` が同じ stub を使うため、stub 自体の誤りは検出できない。
+- 成果物 (`tools/m11/work/xcheck414/`) は gitignore 対象。生成は `FL_WIN64_DIR` と `pyvenv (capstone/pefile/numpy/unicorn)` が要る。
 
 ## 8. 未解決
 
@@ -131,6 +149,6 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 | closure の match→非 match 7 件 (0x5af280 / 0x50d920 / 0x44b090 / 0x79d920 / 0x663d80 / 0x699ca0 / 0x4447d0) の原因・merged HEAD での再測 | 受入条件 3 (退行 0) が closure 全体で未達 | #307 |
 | 独立測定 (`d8075de`) の OFF 13/10 と本測定の差 | survey 数値の再現性 | #680 (IR 生成条件で OFF が 818/21 ↔ 828/13 と変わる件。既存) |
 | liftdiff batch の再現性 (A 67 と closure 68 の差) | A/B の読み方 | #307 (harness 件) |
-| C 版 (m11_ov.c) と IR 版 (ir414_fix.py) の相互検算 | 転記の正しさ (独立検算) | #764 (M11-N39。本 PR で起票) |
+| (解消) C 版 (m11_ov.c) と IR 版 (ir414_fix.py) の相互検算 | — | #764 で実施。§9 (5000 case で C 版・IR 版とも機械語と差 0) |
 | gate ON が survey で効果を持たない理由 (C 版の 2 版が同じ結果) | 本 gate の存在意義 | #683 の継続 |
 | `work-m11` が #516/#680 以前の生成物で `ir_conditions.json` 無し (そのままでは build 不可) | 素材の更新 | #729 (survey 測定基準の残課題。work-m11 の R2 再投入を含む) |

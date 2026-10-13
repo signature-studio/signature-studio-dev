@@ -4640,7 +4640,7 @@
 },
 "midiOutShortMsg": {
 "params": [
-"i64",
+"i32",
 "i32"
 ],
 "ret": "i32"
@@ -4929,6 +4929,12 @@
 "shimx_set_locale": {
 "params": [
 "i32"
+],
+"ret": "void"
+},
+"shimx_set_midi_backend": {
+"params": [
+"ptr"
 ],
 "ret": "void"
 },
