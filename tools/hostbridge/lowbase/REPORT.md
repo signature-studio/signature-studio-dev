@@ -102,7 +102,7 @@
 1. RetDec chain の surrogate 依存 (`plugin_ott_entry.c`) は H2 の対象 (本チケット範囲外)。lowbase は `-DLB_ARENA_ADDR` で追従可。x64c 版は hostbridge 用の VSTPluginMain 入口が未作成 (H2 で作る時に `ott_run` を `hb_icall` へ接続すればよい)。
 2. 同居方式 (§0 最終項) は CPU 状態 `R/X` を共有する逐次実行 (単スレッド) 前提。複数 AudioWorklet/Worker で同一 Memory を並行実行するには shared memory + 状態分離が要る (未着手)。
 3. Chrome の RSS は他 chrome プロセス混在で信頼できず非掲載。Memory 個数上限 (計 123) は CAB-124 の領分で本チケットでは緩和できない (同居方式が回避経路)。
-4. m11 (FLEngine) への適用は未実施: LVA=RVA で <0x10000 の reloc 先が 55,929 件ある (§2)。audit_va.py の IAT 判定は FLEngine で 738 slot が image 範囲値を持つと出たが、m11 の import 解決との関係は未確認。
+4. m11 (FLEngine) への適用は未実施: LVA=RVA で <0x10000 の reloc 先が 55,929 件ある (§2)。audit_va.py の IAT 判定は FLEngine で 738 slot が image 範囲値を持つと出たが、原因は hint/name RVA の誤判定と確定 (IAT に VA は無い。`../../m11/REPORT_N403.md` §1)。
 5. `lb_reloc.py` は「0x30000000 系に shift 済みの成果」を後段で動かす近道。liftlib 統合時は最初から `newbase` 引数で作る方が堅い (integration.md)。
 
 ## 6. ユーザ依頼事項
