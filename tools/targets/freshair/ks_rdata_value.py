@@ -2,6 +2,7 @@
 """ks_rdata_class.py の value 分類 (#52 残件) を語単位で切り分ける。
 
 .rdata 参照 (32 B) を 8 B 語ごとに対で比べ、差の出た語を次の 3 つに分ける:
+  RVA 候補  : 上位 32 bit が 0 の RVA、または ImageBase <= v < ImageBase + SizeOfImage の 8 B 絶対アドレス (後者は abs_ 接頭辞)
   layout    : RVA 候補どうしで、同じセクション内のオフセットが一致する (配置差だけで説明できる)
   target_eq : RVA 候補どうしで、オフセットは違うが参照先の 16 B が一致する (配置差の候補)
   rva_off_found  : 参照先の 16 B が違い、SC の 16 B が KH の .rdata 内に (任意バイト位置で) 存在する
@@ -9,8 +10,8 @@
   dbl       : それ以外の倍精度候補 (定数値の差の候補)
   int       : それ以外の整数候補
   text      : 印字可能 ASCII を含む語 (文字列断片)
-判定: 関数ごとに、差分語が layout / target_eq のみなら layout_only、それ以外を含めば value_differs。
-注: rva_off_absent は、RVA 候補の指す 16 B 自体が相手側に無いことを示す。指す先の内部がさらにポインタを含む場合は未追跡。
+判定: 関数ごとに、差分語が layout / target_eq (abs_ 付きを含む) のみなら layout_only、それ以外を含めば value_differs。
+注: rva_off_absent は、RVA 候補の指す 16 B 自体が相手側の .rdata に無いことを示す。指す先の内部がさらにポインタを含む場合は未追跡 (下限)。
 usage: ks_rdata_value.py <HeartCore.core_64> <SlateCore.core_64> <ks_rdata_class.json> <ks_closure_share.json> <out.json>
 """
 import sys, os, json, struct, collections, math
@@ -20,11 +21,17 @@ from ks_closure_share import rip_data
 
 
 def sec_of(pe, v):
-    if v >> 32:
+    """語 v を (セクション名, セクション内オフセット, RVA, 絶対アドレスか) に解決する。RVA でも絶対 VA でもなければ None。"""
+    hi = pe.base + pe.pe.OPTIONAL_HEADER.SizeOfImage
+    if pe.base <= v < hi:
+        rva, absp = v - pe.base, True
+    elif v >> 32:
         return None
+    else:
+        rva, absp = v, False
     for name, s in pe.secs.items():
-        if s.VirtualAddress <= v < s.VirtualAddress + s.Misc_VirtualSize:
-            return name, v - s.VirtualAddress
+        if s.VirtualAddress <= rva < s.VirtualAddress + s.Misc_VirtualSize:
+            return name, rva - s.VirtualAddress, rva, absp
     return None
 
 
@@ -40,12 +47,13 @@ def pair_kind(x, y, sc, kh, kraw):
         return 'text'
     sx, sy = sec_of(sc, x), sec_of(kh, y)
     if sx and sy:
+        pre = 'abs_' if (sx[3] or sy[3]) else ''
         if sx[0] == sy[0] and sx[1] == sy[1]:
-            return 'layout'
-        blk = sc.rva_bytes(x, 16)
-        if blk == kh.rva_bytes(y, 16):
-            return 'target_eq'
-        return 'rva_off_found' if blk in kraw else 'rva_off_absent'
+            return pre + 'layout'
+        blk = sc.rva_bytes(sx[2], 16)
+        if blk == kh.rva_bytes(sy[2], 16):
+            return pre + 'target_eq'
+        return pre + ('rva_off_found' if blk in kraw else 'rva_off_absent')
     dx, dy = struct.unpack('<d', struct.pack('<Q', x))[0], struct.unpack('<d', struct.pack('<Q', y))[0]
     if math.isfinite(dx) and math.isfinite(dy) and dx != 0 and dy != 0 and abs(dx) > 1e-300 and abs(dy) > 1e-300:
         return 'dbl'
@@ -73,7 +81,7 @@ def main(kp, sp, cls_json, share_json, out):
                 k = pair_kind(p, q, sc, kh, kraw)
                 if k != 'same':
                     kinds[k] += 1
-        fn_verdict = 'layout_only' if kinds and set(kinds) <= {'layout', 'target_eq'} else 'value_differs'
+        fn_verdict = 'layout_only' if kinds and set(kinds) <= {'layout', 'target_eq', 'abs_layout', 'abs_target_eq'} else 'value_differs'
         res[s] = dict(kh_va=info['kh_va'], verdict=fn_verdict, kinds=dict(kinds))
         tot.update(kinds)
         tot['fn_' + fn_verdict] += 1
