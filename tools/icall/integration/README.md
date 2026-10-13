@@ -1,18 +1,13 @@
 # tools/icall → tools/liftlib 統合手順 (CAB-89)
 
-liftlib (CAB-49/54/55, 別 subagent が編集中) は **直接編集しない**。ここには「適用すれば入る」patch と API/回帰試験の定義を置く。
+**状態 (#229): `liftlib` への統合は完了済み** (`liftlib/passes/icall.py` + `pipeline.py`)。以降の liftlib 側変更は `tools/liftlib` を直接編集する。
+`liftlib_icall.patch` / `liftlib_passes_icall.py` は**再適用不可の履歴スナップショット** (patch は stub 長 `stub+78` 固定の旧版で、現行の `stub_len` (map.json 由来) と合わない)。適用コマンドは載せない。cfg 例は `tools/liftlib/targets/ott_route.json`。
 
-## 1. 適用
-
-```sh
-cd <repo root>
-patch -p1 --dry-run < tools/icall/integration/liftlib_icall.patch   # 先に dry-run (liftlib の現行版に対して適用可を確認済み: icall.py 新規 + pipeline.py 2 hunk)
-patch -p1 < tools/icall/integration/liftlib_icall.patch
-```
-- 新規 `liftlib/passes/icall.py` (= `integration/liftlib_passes_icall.py`): `prelift()` / `restore()` の 2 関数 (tools/icall の CLI を subprocess 呼出し)。
+## 1. 統合の構成
+- `liftlib/passes/icall.py`: `prelift()` / `restore()` の 2 関数 (tools/icall の CLI を subprocess 呼出し)。**`passes.icall.funcs` は functions ファイルのパス必須** (inline range 文字列は不可。`closure.py` で作る)。
 - `liftlib/pipeline.py`: `cfg.passes.icall` があれば ① lift 前に PE を書換え ② RetDec の ranges と image を書換え版に差し替え ③ raw ll を復元してから既存の
-  `repair_ll` (P1/F7/F2) へ渡す。`img` (修復 pass が機械語を参照する正本) は元 PE のまま。
-- cfg 例 (`targets/ott_route.json`): `{"name":"ott_route","image":"…/OTT_vst2_win64.dll","passes":{"icall":{"funcs":"tools/icall/work/route/F.txt"},"p1":false,"f7":false,"f2":false,"gdata":null}, …}`
+  `repair_ll` (P1/F7/F2) へ渡す。`img` (修復 pass が機械語を参照する正本) は元 PE のまま。`image` / `funcs` は repo 相対・絶対・`${PLUGINS_DIR}` 等 (tools/shared の変数) が使える。
+- cfg 例 (`targets/ott_route.json`): `{"name":"ott_route","image":"${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll","passes":{"icall":{"funcs":"tools/icall/work/route/F.txt"},"p1":false,"f7":false,"f2":false,"gdata":null}, …}`
   icall の書換えは P1 (comis flag) / F7 (load 脱落 = D7) / F2 (xmm 引数脱落) の対象を**生成前に**除去するので、icall 有効時は p1/f7/f2 を off にできる (残すと二重修復なので off 推奨)。
 - emcc の sources に `tools/icall/rt/icall_rt.c` と `rt/icall_simd_extra.c` を追加し、`ir_flatten.py --table` の出力 (`icall_tbl_*`, `icall_cfg_va`) をリンクする。
 
@@ -41,7 +36,9 @@ closure 外 (CRT 等) の direct call は従来どおり RetDec の推定 signat
 | liftlib 側 | `bash tools/liftlib/liftlib_e2e.sh` に `python3 -m liftlib ott --icall` 相当 (ott_route.sh を呼ぶ) を追加 | 上と同一基準 |
 
 ## 4. 既知の制約 (統合時の注意)
-- closure 内の **stack 渡し引数 (5 個目以降)** は未対応 (BLK は rcx/rdx/r8/r9/xmm0-3 のみ)。FLEngine の `_InitLib` (8 引数) 等は個別 BLK 拡張が必要 → 子チケット。
+- **stack 渡し引数 (5 個目以降)**: #229 で対応。BLK `+0x48` = `ICALL_BLK+0x100` (STKBUF) のアドレス、STKBUF[k] = 呼出し点の `[rsp+0x20+8k]` (最大 12 語)。
+  「rsp+0x20 のアドレス」を渡す方式は RetDec が rsp を stack_var 別 alloca に分割するため不採用 → 呼出し直前に実際に store されたスロットだけを値コピー (`stk_slots_stored`)。実測と経緯は [`../REPORT.md` §9](../REPORT.md)。
+  検出は site 直前 48 命令内 (直前の call/ret/jmp まで) の `[rsp+0x20+8k]` **書込み** (cmp/test 等の読み取りは除外)。**限界**: 他の基本ブロックで store された引数・`rep movs` 等の一括 store・13 語以上は検出外。tail `jmp` 経由は引数が呼出し元スロットのまま (コピーしない)。
 - jump table: `jmp reg` 形のみ cmp/je 列へ展開。`jmp [idx*8+tbl]` (メモリ直接) 形は表パッチのみ (RetDec 任せ)。Delphi の in-code 表 (`lea B,[rip+x]; jmp [B+i*8+d]`) は解決器が対応するが cmp/je 展開は未実装。
 - CFG unreachable code (Delphi unwind landing pad = try/finally の dtor 呼出し, FLEngine で 879 site) は RetDec が decode しない → 別 pass (unwind info → 到達エッジ追加) が必要。
 - FPU(x87)/MMX/AVX/`lock` 命令は RetDec の translator 依存 (本 pass の対象外)。`rep movs/stos` は RetDec 任せ。

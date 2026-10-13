@@ -65,9 +65,9 @@
 ## 6. 限界と未実装 (正直ベース)
 
 - **fake シンクの数値**: 音声 HW が無いため `outputLatency` 35ms/`baseLatency` 10.7ms は fake 値。実デバイス (Windows WASAPI/mac CoreAudio, Firefox, Safari) での burst・遅延・underrun は**未計測**。往復の総遅延 (入力ブラウザバッファ含む) も未計測。
-- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、~~DirectSound shim~~ (AU-4 で実装, §11)、WebMIDI shim、getUserMedia のデバイス選択 UI、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
+- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、~~DirectSound shim~~ (AU-4 で実装, §12)、WebMIDI shim、getUserMedia のデバイス選択 UI、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
 - B=128 は ILWASAPI2ASIO の min 256 より小さい (shim 既定プロファイル min=128/gran=128 の結果であり FL 実運用値ではない)。`-DFLASIO_PROFILE_ILWASAPI=1` での e2e は未実施。
-- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、FL が granularity=128/min=128 を受理するか (ILWASAPI 値は `-DFLASIO_PROFILE_ILWASAPI=1` に用意)、~~DS バッファの 16/32bit~~ (§11 で静的確定)、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
+- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、FL が granularity=128/min=128 を受理するか (ILWASAPI 値は `-DFLASIO_PROFILE_ILWASAPI=1` に用意)、~~DS バッファの 16/32bit~~ (§12 で静的確定)、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
 - `ctx.outputLatency` は起動直後 0 → 約 250ms 後に更新される。`getLatencies` は呼出時の値で、FL が起動直後に読むと小さく見える。
 
 ## 7. ユーザ依頼事項
@@ -77,7 +77,7 @@
 1. **[audio-com-adapter]** IASIO COM アダプタ生成 (win64 ABI ⇄ `flasio_*`)、`ASIOCallbacks` 4 関数 (0xc57420/0xc576b0/0xc576c0/0xc56ae0) の受け渡し、`DllGetClassObject`/`CoCreateInstance` と `SOFTWARE\ASIO` レジストリ配線 (registry shim 担当と連携)。依存: リフタの呼出規約 (M11)。
 2. **[audio-realdevice]** 実機 Chrome/Firefox/Safari での burst・outputLatency・underrun 行列、ループバックケーブルによる総往復遅延、T 下限の再評価。
 3. **[audio-midi]** WebMIDI shim (SAB MIDI ring, `midiIn/Out` 20 関数, CALLBACK_FUNCTION スレッド, SysEx バッファ, 再スキャン) と Worker 直受信の実機検証。
-4. ~~**[audio-directsound]**~~ 実装済み (AU-4 #189, §11)。
+4. ~~**[audio-directsound]**~~ 実装済み (AU-4 #189, §12)。
 5. **[audio-input-ui]** getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
 6. **[audio-latency-policy]** T の縮小 (安定時に B 刻みで減衰)、安全モード/低遅延モードの UI、FL の selector 6 (0x17) 挙動確認後に `kAsioLatenciesChanged` を使うか決定。
 7. **[audio-fl-profile]** FLEngine 起動後に granularity=128 / ILWASAPI プロファイルのどちらが必要か実機検証、`pbtrackingmode` 各モードでのカーソル追従確認。
@@ -127,7 +127,46 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | 実機 burst 分布が未計測 | 自然な burst 4096 の発生頻度・遅延影響が不明 | #187 (AU-2) にコメント |
 | 旧コードでの abort 再現 (ネガティブコントロール) 未実施 | 修正前後の差を本 runner で実測していない | 本 PR 本文に明記 |
 
-## 11. AU-4 (#189) DirectSound shim (`src/flds.{h,c}`) と FL の DS バッファ形式の静的確認
+## 11. AU-9 (#185) src/index.ts 組込パッチ設計 (`tools/audio/integration/`)
+
+既知類型との関係: 該当なし (lift 欠陥ではなくアプリ組込)。検証起点 commit: `d9cdc00` (ブランチ `185-audio-ui-integration`, base `86df5e6`)。
+
+**方針 (決定案 — D(runtime-arch, #25) の合意待ち)**: `audio.ts` + `dummy-worklet.js` の独自 SAB レイアウト (RUN_FLAG/SAMPLE_POS) は廃止し、`FlAudioShim` に置換する。ring レイアウトは `flaudio.h` が単一の真実で、`attach()` が起動時に 59 項目を照合する (不一致は throw)。
+
+| ファイル | 内容 | 管轄 |
+|---|---|---|
+| `src/runtime/audio_app.ts` (新規・適用済み) | `startFlAudio()`: テスト音 wasm ロード → `FlAudioShim.attach`。`verifyToneCapture()`: ダンプを 440/660Hz 理論値と照合 | audio (新規ファイルのみ) |
+| `tools/audio/integration/index.ts.diff` | `src/index.ts` 差分: `createAudioHarness` → `startFlAudio` (クリック内で実行)。`?audio_capture=1` で `window.__audio` 公開 | **#25 管轄のため未適用 (提案)** |
+| `tools/audio/integration/stage_app.sh` | `fla_test` を build し `${RUNTIME_WASM_DIR}/audio/` へハッシュ名 + `manifest.json` で stage | audio |
+| `tools/audio/integration/e2e.{sh,mjs}` | HEAD を一時ディレクトリへ `git archive` → パッチ適用 → typecheck → `vite build` → headless Chrome (dev / preview) | audio |
+
+- **worklet 配置**: `public/worklets/fl-audio-worklet.js` は vite がそのまま `dist/worklets/` へ出力 (build 後の `ls dist/worklets` で確認)。URL は `document.baseURI` 基準。`vite.config.ts` の変更は不要 (`/wasm/audio/*` は既存 `wasmAssets` プラグインが配信し COOP/COEP/CORP を付与)。
+- **glue (.mjs)**: emcc glue は pthread Worker スクリプトも兼ねるので、wasm 名のみハッシュ名へ置換 (`stage_wasm.mjs` と同流儀。glue 内の `fla_test.` 参照が残れば stage 失敗)。
+- **producer**: 現状は `fla_test` (ASIO 風, 正弦)。FL 本体接続時は `loadToneWasm` を差し替える (接点は `FlAudioWasmApi` の 5 関数)。
+
+### 検証 (`bash tools/audio/integration/e2e.sh`, headless Chrome / emcc 6.0.12, GitHub runner, fake 出力シンク)
+
+| 回 | 結果 | 所要 (e2e.sh 全体 / e2e.mjs) | 開始時 load average |
+|---|---|---|---|
+| 1 | 13/13 PASS, exit 0 | 65.4 s / 63.2 s | 0.11 |
+| 2 | 13/13 PASS, exit 0 | 63.2 s / 61.1 s | 0.29 |
+| 3 | 13/13 PASS, exit 0 | 62.7 s / 60.5 s | 0.16 |
+
+13 項目 = dev・preview(本番ビルド) 各 6 (isolated / samplePos / tone / underruns / neg1 / console-clean) + neg2。代表値 (回 3): samplePos 1920→11008 (44,549 frames/s, 128f 単位)、ダンプ 149,504 f で最大誤差 1.49e-8・RMS 0.3536 (理論 0.3536)・無音ラン 0・underrun 0。パッチ適用後の `tsc --noEmit`・`vite build` も成功。素のブランチの `pnpm typecheck` も成功 (`audio_app.ts` 追加後)。
+
+**ネガティブコントロール**: (N1) 照合の sampleRate を ×1.01 にずらすと max_err=1.00 で FAIL 判定 (dev/preview とも)。(N2) テスト音 wasm 未配置だと状態表示が「オーディオ開始に失敗: … manifest 取得失敗」になりボタンが再有効化。実際に初回実行で `audio_app.ts` の SAB 型キャスト誤り (TS2352) を typecheck が検出し修正済み。
+
+検証範囲 / 範囲外: fake シンクでの正弦ビット近似のみ。**実機の可聴再生・実デバイス遅延は未計測**。`tools/e2e` (`audioworklet` チェック等) をパッチ適用後に流してはいない。Firefox/Safari 未検証。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `index.ts.diff` の `src/index.ts` への適用 (#25 管轄) | 適用までアプリ本体は旧ハーネスのまま = #185 完了条件は未達 | #185 コメントで PM/#25 担当に合意依頼 |
+| 適用後に `audio.ts` / `dummy-worklet.js` を削除 (`deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が dummy-worklet.js を参照) | 二重実装が残る | 適用 PR で併せて対応 (#185) |
+| 本番配信での `/wasm/audio/*` (R2) と `/worklets/fl-audio-worklet.js` の COOP/COEP/CORP policy | `vite preview` では検証済み、Cloudflare/R2 配信は未検証 | #62 系 (H) へ コメント |
+| `stage_wasm.mjs` / ルート `package.json` script への `stage_app.sh` 組込 | 現状は手動実行 | 適用 PR (#25 管轄) |
+| `tools/e2e` スイートのパッチ適用後再実行 | 既存 `audioworklet` チェックとの互換は推定 (status 文言 `worklet 実行中`・samplePos 128f 単位は維持) | 適用 PR で実行 |
+
+## 12. AU-4 (#189) DirectSound shim (`src/flds.{h,c}`) と FL の DS バッファ形式の静的確認
 
 既知類型との関係: 該当なし (ランタイム shim 新規実装。lift 欠陥ではない)。検証起点 commit `4483b84` (実装 + e2e)。設計は `docs/PROTOCOL.md` §8。
 
@@ -152,4 +191,3 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | INVENTORY.md §2 の DS 集計の訂正反映 (生成物扱いのため未編集) | 旧集計 (SetVolume 等) が残る | #11 にコメント (PM が生成元整備) |
 | 実 FL からの DS 呼出 e2e | COM アダプタ未実装 | #98 (AU-1) |
 | 実機での DS cursor 精度・write-ahead | fake シンクのみ | #187 (AU-2) |
-

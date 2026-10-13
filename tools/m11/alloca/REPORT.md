@@ -34,8 +34,9 @@ trap 計 (oob+halt0+abort, shimx --fix survey) は 95 → **95**。目標 trap<2
 ## 2. pass (`m11_alloca.py`) の仕様と検出実測
 
 `boot_final.ll` (closure 全定義 7,422 = `function_*` 7,421 + `entry_point` / うち alloca 保持 6,087 関数) を走査し、
-**alloca 実体積 < 使用箇所の要求サイズ** の場合だけ `alloca T` → `alloca [K x i64]` に書換える (ptr 値・他の IR は不変, idempotent —
-再実行は byte-identical, `llvm-as` 通過確認済)。
+**alloca 実体積 < 使用箇所から求めた要求サイズ** の場合だけ `alloca T` → `alloca [K x i64]` に書換える (ptr 値・他の IR は不変, idempotent —
+再実行は byte-identical, `llvm-as` 通過確認済)。R1〜R7 は使用箇所が**具体的なサイズを供給する**規則、R8 (#132) は供給されない
+サイズを**推定する**規則 (性質が違うので下記の注を読むこと)。
 
 | 規則 | 証拠 | 検出サイト | 拡幅 |
 |---|---|---|---|
@@ -46,7 +47,16 @@ trap 計 (oob+halt0+abort, shimx --fix survey) は 95 → **95**。目標 trap<2
 | R5 | Win32 出力パラメータ表 (GetVersionExW 284B 等, shimx_link/fix_alloca.py と同表) | 24 | 18 |
 | R6 | Win32 (buf,count) 表 — count 定数なら buf ≥ count×要素幅 (GetLocaleInfoW cch×2 等) | 12 | 11 |
 | R7 | 直接 store の型幅 > alloca 実体積 (i128 store 等) | 39,017 走査 | 9 |
-| **計** | | | **63 alloca / 56 関数, 追加 stack +269,874 B (最大 1 件 188,408 B @408b60)** |
+| **計 (R1〜R7, CAB-129 時点)** | | | **63 alloca / 56 関数, 追加 stack +269,874 B (最大 1 件 188,408 B @408b60)** |
+| R8 (#132, **推定**) | `%stack_var_-N` が call / ptrtoint の引数に渡る (escape) → 「次の stack_var までの間隔」(最小の N は N 全体) | 4,077 サイト | 下記 |
+
+**R8 はヒューリスティクス** (R1〜R7 と前提が違う): 使用箇所はサイズを一切供給せず、証拠は「アドレスが escape した」ことだけ。callee の
+参照幅は静的に分からないため、フレーム上の隣接領域までを要求サイズと推定して拡幅する。RetDec の `stack_var_-N` 命名に依存し、他の名前の
+alloca には効かない。実際には使われない stack を足す過大拡幅がありうる (別 alloca とは重ならないので安全側)。導入理由は unit #18 OOB の
+真因 (`44bae0` の `stack_var_-88` が callee `44ba50` に渡り `[rcx+0x2c..0x3e]` を書いて 44bb70 の record を壊す; tools/m11/REPORT.md §10)。
+R1〜R7 だけの CAB-129 版では検出できなかった (サイズを供給する証拠が呼出し側に無い)。
+実測 (gen_ir2 で再生成した素の IR に R1〜R8 を適用, 本 REPORT 更新時 = commit `b760fa2`): 拡幅 **2,408 alloca / 1,347 関数, 追加 stack +1,153,849 B (最大 1 件 188,408 B)**。
+最大の要求を出した規則別 (`widened_by_rule`): R8 2,392 / R3 7 / R5 4 / R6 4 / R2 1 (R8 が R1〜R7 より大きい要求を出した alloca は R8 に数える)。
 
 - **R1 の 4 サイトがチケットの対象そのもの**: `44bb70` / `59b100` / `95b400` / `ade4d0` が全て
   `alloca i64` + `rep stosq ×49` (=392B) で、ネイティブ逆アセンブル (`sub rsp,0x1b8` + `lea rdi,[rbp+0x28]`,
@@ -128,7 +138,7 @@ python3 tools/m11/alloca/m11_alloca.py IN.ll OUT.ll --report r.json   # pass 単
 
 | ファイル | 役割 |
 |---|---|
-| `m11_alloca.py` | 縮退検出+拡幅 pass (R1〜R7, idempotent, GEP/ptrtoint 警告付き) |
+| `m11_alloca.py` | 縮退検出+拡幅 pass (R1〜R7 = サイズ供給型, R8 = escape 推定型, idempotent, GEP 警告付き) |
 | `e2e.sh` | 1 コマンド検収 (pass 適用 → mainline → shimx 純リンク → 集計) |
 | `ab_baseline.sh` | 修正前 IR での shimx 純リンク A/B 再現 |
 | `summarize.py` | baseline 比較表 (`results/summary.json`) |

@@ -10,6 +10,7 @@
 
 import { fetchCompile, describeModule } from "./loader_boot";
 import { describeMemory } from "./mem";
+import { guiSelfTest } from "./gui_selftest";
 import { DRIVERS } from "./worker_drivers";
 import { MessagePump, PumpRing, WM, canBlock, newPumpMsg } from "./worker_pump";
 import type { BootTimings, FromWorker, PumpSelfTestResult, ToWorker } from "./worker_protocol";
@@ -104,6 +105,12 @@ self.onmessage = (ev: MessageEvent<ToWorker>) => {
     boot(msg).catch((e: unknown) => post({ t: "error", message: String((e as Error)?.message ?? e), stack: (e as Error)?.stack }));
   } else if (msg.t === "ping") {
     post({ t: "pong", n: msg.n, tWorker: performance.now() });
+  } else if (msg.t === "gui-selftest") {
+    try {
+      guiSelfTest(msg, post);
+    } catch (e) {
+      post({ t: "error", message: String((e as Error)?.message ?? e), stack: (e as Error)?.stack });
+    }
   } else if (msg.t === "pump-selftest") {
     try {
       pumpSelfTest(msg);

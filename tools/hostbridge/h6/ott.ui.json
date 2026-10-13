@@ -1,0 +1,143 @@
+{
+  "schema": "hb-ui-g1/1",
+  "plugin": {
+    "uniqueID": "XfTT",
+    "name": "OTT"
+  },
+  "window": {
+    "width": 620,
+    "height": 880
+  },
+  "assets": {
+    "bg": {
+      "rsrc": "PNG/128",
+      "w": 620,
+      "h": 880,
+      "sha256": "e2f7db98ea9ff20bf9614d393734590ccfcd91a6963b5d232c1f863bda3ae261"
+    },
+    "knobTick": {
+      "rsrc": "PNG/129",
+      "w": 80,
+      "h": 9680,
+      "frames": 121,
+      "frameH": 80,
+      "sha256": "2227656363c3562e94b02f542f1cf1b6f81378c673ac371d70926dfc84ac6122"
+    },
+    "knobBody": {
+      "rsrc": "PNG/130",
+      "w": 80,
+      "h": 102,
+      "sha256": "40457375c3c2534d142ca360052d9c3ccee5eac1fa6734e070f1e71149231bc0"
+    },
+    "knobRing": {
+      "rsrc": "PNG/131",
+      "w": 80,
+      "h": 80,
+      "sha256": "a825c45116fd81231cc976bcf181dc19ff49cae3593cd880d66d974adbaa30e2"
+    }
+  },
+  "layers": [
+    {
+      "kind": "image",
+      "asset": "bg",
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "controls": [
+    {
+      "id": "depth",
+      "kind": "knob",
+      "param": "Depth",
+      "cx": 100,
+      "cy": 205,
+      "readout": {
+        "cx": 100,
+        "cy": 313
+      }
+    },
+    {
+      "id": "time",
+      "kind": "knob",
+      "param": "Time",
+      "cx": 240,
+      "cy": 205,
+      "readout": {
+        "cx": 240,
+        "cy": 313
+      }
+    },
+    {
+      "id": "ingain",
+      "kind": "knob",
+      "param": "In Gain",
+      "cx": 380,
+      "cy": 205,
+      "readout": {
+        "cx": 380,
+        "cy": 313
+      }
+    },
+    {
+      "id": "outgain",
+      "kind": "knob",
+      "param": "Out Gain",
+      "cx": 520,
+      "cy": 205,
+      "readout": {
+        "cx": 520,
+        "cy": 313
+      }
+    },
+    {
+      "id": "upward",
+      "kind": "knob",
+      "param": "Upwd Strgth",
+      "cx": 220,
+      "cy": 733,
+      "readout": {
+        "cx": 220,
+        "cy": 833
+      }
+    },
+    {
+      "id": "downward",
+      "kind": "knob",
+      "param": "Dnwd Strgth",
+      "cx": 380,
+      "cy": 733,
+      "readout": {
+        "cx": 380,
+        "cy": 833
+      }
+    },
+    {
+      "id": "gainH",
+      "kind": "hslider",
+      "param": "Gain H",
+      "x0": 40,
+      "x1": 550,
+      "y": 421
+    },
+    {
+      "id": "gainM",
+      "kind": "hslider",
+      "param": "Gain M",
+      "x0": 40,
+      "x1": 550,
+      "y": 517
+    },
+    {
+      "id": "gainL",
+      "kind": "hslider",
+      "param": "Gain L",
+      "x0": 40,
+      "x1": 550,
+      "y": 613
+    }
+  ],
+  "interaction": {
+    "knobPixelsPerRange": 200,
+    "knobFineFactor": 0.1
+  }
+}

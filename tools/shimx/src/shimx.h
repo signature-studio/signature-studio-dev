@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <setjmp.h>
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten.h>
@@ -1137,7 +1138,34 @@ void shimx_set_locale(LCID lcid);
 void shimx_set_exe_path(const char* winPathUtf8);
 void shimx_set_command_line(const char* utf8);
 void shimx_set_exit_hook(void (*fn)(UINT code));
-void shimx_set_raise_hook(int (*fn)(EXCEPTION_RECORD64* rec));   /* 戻り 1=処理済 */
+void shimx_set_raise_hook(int (*fn)(EXCEPTION_RECORD64* rec));   /* 戻り 1=処理済 (VEH より前に呼ばれる外部上書き口) */
+
+/* ---- SEH 実巻き戻し (#171): lift した try 関数が frame を登録する setjmp 系ランタイム ----
+ * scope table は Delphi x64 の UNWIND_INFO inline 形式 (tools/icall/landing/REPORT.md §2):
+ *   uint32 count; count × { begin, end, kind, target }  (RVA)
+ *   kind==2 : catch-all。pc が [begin,end) なら捕捉 → 巻き戻し後 frame->jb へ longjmp (resume_ip = target)
+ *   kind>2  : typed except。kind は descriptor list の RVA。shimx_seh_set_typed_matcher で照合
+ *   kind 0/1: handler 領域。巻き戻し時に pc が範囲内なら target (pad) を pad(&{rec,ctx}, frame) で呼ぶ
+ * 使い方 (lift 側):  ShxSehFrame f = {0}; f.frame = ..; f.scopes = ..;
+ *   shimx_seh_enter(&f); if (setjmp(f.jb)) { f.resume_ip へ分岐 } ... f.pc = <RVA>; call ...; shimx_seh_leave(&f);
+ * frame が 1 つも登録されていない場合の RaiseException/RtlUnwind(Ex) は従来どおり fail-fast。 */
+typedef struct ShxSehScope { uint32_t begin, end, kind, target; } ShxSehScope;
+typedef struct ShxSehFrame {
+    struct ShxSehFrame* prev;      /* ランタイム管理 (スレッド毎の frame 鎖) */
+    uint64_t frame;                /* establisher frame 識別子 (pad の第 2 引数 / RtlUnwindEx の targetFrame と照合) */
+    const uint32_t* scopes;        /* count + ShxSehScope[count] (NULL = scope 無し) */
+    volatile uint32_t pc;          /* 現在の ControlPc (RVA)。lift 側が try 内の call 前に更新 */
+    uint64_t resume_ip;            /* longjmp で戻る時の再開先 (catch-all=scope target RVA / RtlUnwind(Ex)=targetIp) */
+    uint64_t resume_ret;           /* RtlUnwind(Ex) の retval */
+    jmp_buf jb;
+} ShxSehFrame;
+typedef uint64_t (*shimx_seh_pad_fn)(uint64_t excptrs, uint64_t frame);
+void shimx_seh_enter(ShxSehFrame* f);
+void shimx_seh_leave(ShxSehFrame* f);                                  /* f と f より内側を鎖から外す */
+void shimx_seh_set_pad_resolver(shimx_seh_pad_fn (*fn)(uint32_t rva)); /* scope target RVA → pad 関数 */
+void shimx_seh_set_typed_matcher(int (*fn)(const EXCEPTION_RECORD64* rec, uint32_t descRva, uint32_t* handlerRva));
+const EXCEPTION_RECORD64* shimx_seh_current_exception(void);           /* 直近に捕捉/巻き戻し中の例外 (スレッド毎) */
+unsigned shimx_seh_depth(void);                                        /* 登録中 frame 数 (スレッド毎) */
 HMODULE shimx_module_register(const char* name, HMODULE base, const char* winPath);
 int  shimx_proc_register(HMODULE m, const char* name, DWORD ordinal, void* fn);
 void shimx_set_proc_resolver(void* (*fn)(HMODULE m, const char* name, DWORD ordinal));
