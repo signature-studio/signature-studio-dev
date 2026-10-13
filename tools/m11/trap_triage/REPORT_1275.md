@@ -6,9 +6,9 @@
 
 ## 0. 基準
 
-- 測定 commit: `604e900f` (origin/main 取込時点。コード変更なし)。本 PR は `40c35ed5` (再現スクリプト `n78_measure.sh` のみ追加)。現 HEAD は `a57e158b` (その後は REPORT・DOC_MAP のみ変更。コード差分は §8)。
+- 測定 commit: `604e900f` (origin/main 取込時点。コード変更なし)。本 PR は `40c35ed5` (再現スクリプト `n78_measure.sh` のみ追加)。main 取込 (`3cffa548`) 後の HEAD で再測定した (§8 のコード差分を含む状態)。
 - 素材: fl-win64 (`$RUNNER_TEMP/fl-win64`)・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff (`$HOME/artifacts` から展開。実在確認済み)。`m11_gen_ir2.sh` で IR を作り直した (`ldfix=applied`)。
-- 再現: `FL_WIN64_DIR=... RETDEC_ROOT=... EMSDK=... bash tools/m11/trap_triage/n78_measure.sh` (全工程 rc=0。測定 commit `604e900f` で 2 分 20 秒、load 0.13〜0.6。HEAD `a57e158b` で再実行し 2 分 25 秒、開始時 load average 1.38・終了時 1.08。両方とも §4 と同じ数値)。
+- 再現: `FL_WIN64_DIR=... RETDEC_ROOT=... EMSDK=... bash tools/m11/trap_triage/n78_measure.sh` (全工程 rc=0。測定 commit `604e900f` で 2 分 20 秒、load 0.13〜0.6。HEAD `a57e158b` で 2 分 25 秒・終了時 load 1.08。main 取込後の HEAD `3cffa548` で 2 分 22 秒・終了時 load 0.95。3 回とも §4 と同じ数値)。
 
 ## 1. 受入条件の判定
 
@@ -64,7 +64,7 @@
 
 `trap` の OFF → ON の +1 は unit 190 (ok→oob) による。304/555 の oob→abort は trap 数を変えない (2 件とも trap のまま)。
 
-`survey_diff.py` の全出力 (HEAD `a57e158b`、上記の数値と同じ実行):
+`survey_diff.py` の全出力 (HEAD `3cffa548` の通し実行。`a57e158b` 時点の出力とも一致):
 
 ```
 $ python3 trap_triage/survey_diff.py work/n78/units_off.json work/n78/units_on.json 304 555 101 190 291 296 923
@@ -144,12 +144,19 @@ kind 以外も含めた差分 unit (frames は深さのみ比較): 10 [114, 190,
 
 ## 8. 差分 (差分 0 の証跡)
 
-測定 commit `604e900f` (origin/main) から現 HEAD `a57e158b` までの差分 (md を除く):
+測定の基準は `604e900f` (手動測定)。その後 PR に入った差分と main 取込による差分 (md を除く) は次の通り。
 
 ```
-$ git diff 604e900f a57e158b -- tools/m11 ':!*.md'
- tools/m11/trap_triage/n78_measure.sh | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+$ git diff 604e900f 3cffa548 -- tools/m11 ':!*.md'
+ tools/m11/fix912/m11_fix912.py       | 45 +++++++++++++++++++++++++++++++++++
+ tools/m11/m11_build.sh               |  4 ++++
+ tools/m11/m11_ov.c                   |  2 +-
+ tools/m11/trap_triage/n78_measure.sh | 19 +++++++++++++++
+ 4 files changed, 69 insertions(+), 1 deletion(-)
 ```
 
-コード差分は再現スクリプト `n78_measure.sh` の追加のみ。`m11_*.sh`・`m11_ov.c`・`survey_units.mjs`・`survey_diff.py` は未変更。測定はスクリプトの追加前の `604e900f` で手動実行した。スクリプトは HEAD `a57e158b` で通しで再実行し (rc=0、§0)、§4 の数字と一致することを確認した。`40c35ed5` 以降の docs のみの commit (`211ced3d`・`a57e158b`) は測定対象外。
+- `n78_measure.sh` は本 PR で追加 (測定ではなく再現スクリプト)。
+- `m11_build.sh` の `fix912` 行は既定 `M11_FIX_912=0` (OFF) のため、既定の build 出力は変えない。
+- `m11_ov.c` の変更は `g_trace` 時の trace 行 (`old=` の追加) のみ。
+- 上の差分があるため、`3cffa548` で `n78_measure.sh` を通しで再実行した (rc=0、§0)。§4 の数字は `604e900f` の手動測定と完全に一致した。
+- `40c35ed5` 以降の docs のみの commit (`211ced3d`・`a57e158b`・`56e2c0c2`) は測定対象外。
