@@ -22,6 +22,8 @@ cd "$W"
 mkdir -p tmp
 export TMPDIR="$W/tmp"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+# runner は emsdk に llvm-as が無く Ubuntu の llvm-as-18 だけ入っている (IR 検証 llvm-as 用)
+command -v llvm-as >/dev/null 2>&1 || llvm-as() { llvm-as-18 "$@"; }
 
 # ---- emcc 入力 (相対参照) と hs_e2e.sh の前提ファイルを W に揃える ----
 # S1 (CAB-269): fw_rt.h/fw_rt.c は cp していたが fw_boot.c は漏れていた
@@ -157,7 +159,7 @@ class DynTag(dict):
         if m: return 'g%s' % m.group(1)
         return d or '?'
 G.TAG = DynTag({'i128':'x','i64':'q','i32':'d','i16':'w','i8':'b','i256':'y','void':'v','ptr':'p','float':'f','double':'F'})
-G.CT.update({'p':'void*','f':'float','F':'double'})
+G.CT.update({'p':'void*','f':'float','F':'double','g224':'u64'})
 sys.argv = ['gen', 'fw_flat4.ll', '-o', 'fw_simd.c', '--canon', 'fw_flat4_canon.ll']
 G.main(sys.argv[1:])
 PY
