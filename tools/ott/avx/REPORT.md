@@ -194,7 +194,7 @@ python3 tools/ott/avx/unsup_scan.py tools/ott/work/avx/entries.json \
 ### 10.1 変更
 
 - `/home/ubuntu` 参照の置換そのものは #450 (`a4f8a08`) で main に入っている (`build_avx.sh` の `DLL`、`unsup_scan.py` の `paths.PLUGINS_DIR` 経由を含む)。
-- 本 PR の差分は `build_avx.sh` の 1 行移動だけ: `source "$OTT/../shared/env.sh"` を `OUT=` の後から `OTT=` の直後へ動かした (競合解消 `6c6645d` で `source` 行を 1 本にまとめた位置)。`env.sh` は `OTT`・`AVX`・`OUT` を設定も参照もしないため挙動は不変。`git diff --stat origin/main...HEAD` = `build_avx.sh` 1 行 + `REPORT.md` 31 行追加。
+- 本 PR の差分は `build_avx.sh` の 1 行移動だけ: `source "$OTT/../shared/env.sh"` を `OUT=` の後から `OTT=` の直後へ動かした (競合解消 `6c6645d` で `source` 行を 1 本にまとめた位置)。`env.sh` は `OTT`・`AVX`・`OUT` を設定も参照もしないため挙動は不変。`git diff --stat origin/main...HEAD` = `build_avx.sh` 1 行変更 (1 insertion / 1 deletion) + `REPORT.md` 51 行追加。
 - `unsup_scan.py` は本 PR で変更しない。
 - `*.log` 5 本の `/home/ubuntu/work/webstudio/...` は過去実行の出力記録で、受入条件の対象拡張子外のため変更しない。
 
@@ -212,14 +212,14 @@ python3 tools/ott/avx/unsup_scan.py tools/ott/work/avx/entries.json \
 | `ee8f70c` (旧 REPORT の検証起点・置換前) | 2 |
 | `a4f8a08^` (#450 の親・置換前) | 2 |
 | `origin/main` (#450 込み) | 0 |
-| `HEAD` (`6c6645d`) | 0 |
+| `HEAD` (`e78fc76`、コードは `6c6645d` と同一) | 0 |
 
 - 受入条件 2 (既定値同一性): `env -u ANALYSIS_DIR -u PLUGINS_DIR` で bash (`source tools/shared/env.sh`) と python (`paths.PLUGINS_DIR`) が組む DLL パスは、どちらも置換前の固定文字列 (`/home/ubuntu/work/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`) と文字列一致 (`[ "$a" = ... ]` で判定)。
 - ネガティブコントロール: `PLUGINS_DIR=/nonexistent` で両方が `/nonexistent/ott/binaries/OTT_vst2_win64.dll` を返す (変数が効いている)。
 - 構文: `bash -n build_avx.sh`・`python3 -m py_compile unsup_scan.py` とも OK。
 - 測定条件: n=1・直列、load average 0.59 (測定時の 1 分値)。
 
-### 10.3 e2e 実測 (素材付き・HEAD `6c6645d`)
+### 10.3 e2e 実測 (素材付き・コード HEAD `6c6645d`、以降の `e78fc76` は REPORT のみの差分)
 
 - 実行: `tools/ott` を cwd として `bash avx/avx_e2e.sh` (スクリプト内 heredoc が `work/avx/` を cwd 相対で開くため)。素材は `analysis-ott-binaries` (`ANALYSIS_DIR` 展開先)・`fl-win64` (`FL_WIN64_DIR` 展開先)・`work-m6-ott` (`tools/ott/work/`)・`toolchain-emsdk` (`/opt/emsdk`、emcc 6.0.12)・`plugins-ott`。展開先は `docs/WORKFLOW.md` §11。
 - 所要: real 6m3.455s (user 59.8s / sys 5m8.3s)。load average (1 分値) 開始 0.63 → 終了 1.08。n=1・直列。
@@ -235,5 +235,4 @@ python3 tools/ott/avx/unsup_scan.py tools/ott/work/avx/entries.json \
 
 - 置換行の経路: `build_avx.sh` の `DLL` は `x64c.py --pe` と `data_gen.py` の入力になるため、gate [1] は置換後の `PLUGINS_DIR` 経由の DLL パスで走っている。
 - gate 単位の結果は、同 head の oc-reviewer 独立再実行と一致 (所要は別 run のため異なる)。
-- 範囲外: `ott_e2e.sh` / `entry_e2e.sh` / `crt_e2e.sh` の単体実行 (`avx_e2e.sh` の [6/6] は手動・回帰扱い)。
-- 前版の未解決「`avx_e2e.sh` 未実行」は本実測で解消したため削除。
+- 範囲外: `ott_e2e.sh` / `entry_e2e.sh` / `crt_e2e.sh` の単体実行 (`avx_e2e.sh` の [6/6] は手動・回帰扱い)。起票先: 本 PR #394 のレビューで PM 判断に上げる (未起票)。
