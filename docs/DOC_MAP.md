@@ -91,7 +91,7 @@
 | `tools/liftdiff/REPORT.md` | ~250 | flelift (x64c) 全数採点 + native 全起動の参照化 (§5/§6.1/§6.2 は `REPORT_APPENDIX.md` に分割)。§12 (被覆拡大 vm0/u16) は要約のみで全文は `REPORT_APPENDIX.md` §12 |
 | `tools/liftdiff/REPORT_APPENDIX.md` | ~240 | liftdiff REPORT の分割移動節の全文: §5/§5.1/§5.2 (回帰 A/B・Ablation)・§6.1/§6.2 (検収・再現性)・§8/§9 (wasm_trap)・§10 (OTT 旧 chain)・§11 (比較系偽陽性)・§12 (被覆拡大 vm0/u16)。250 行上限のため無変更で分割移動 |
 | `tools/icall/REPORT.md` | ~237 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361) は要約のみで全文は `REPORT_APPENDIX.md` に分割 |
-| `tools/icall/REPORT_APPENDIX.md` | ~88 | icall REPORT §10.1 (#530 OTT 回帰再実行) と §11 (ICALL-6 #361: FMA3 CRT 経路 600/600・`_handle_errorf` override・rax scratch 根拠) の全文 (250 行上限のため無変更で分割移動) |
+| `tools/icall/REPORT_APPENDIX.md` | ~171 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361: FMA3 CRT 経路 600/600・`_handle_errorf` override・rax scratch 根拠)・§12 (#229 FLEngine 範囲分割 + #851 `0x128c320` 境界誤認 = §12.1)・§12 (ICALL-16 #1023 stack 引数の動的検証) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/icall/disp_size/REPORT.md` | ~160 | capstone `disp_size` 誤り (D9) の水平展開監査 |
 | `tools/icall/landing/REPORT.md` | ~165 | Delphi unwind landing pad の抽出と lift |
 

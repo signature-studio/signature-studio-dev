@@ -107,11 +107,20 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 - 範囲分割で落ちは減らない (CHUNKS=2 で 366 のまま)。仮説 A (RetDec の打ち切り回避) は**棄却**。
 - 補足 (DEFECTS 候補): RetDec は `0x128c320` 直前の関数を `data inside code section 0x128c281--0x128c320` と誤認し、`0x128c320` を 1 バイト関数にする。`NonRecursiveCFGBuilder` が `function_128c320` への edge を毎回捨てる警告 (5 件) が出る。本件の 366 落ちとの因果は未検証。
 
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 366 site 落ちの真因 (decode 後・最適化中に stub 呼出しが減る段の特定と、関数単位の before/after 突合) | 2 関数の wasm 化不可 | #229 (続き) |
+| `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
+| jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |
+
 ### 12.1 #851: `0x128c320` の関数境界誤認 (1 バイト関数化) の原因
 
 結論: **誤認の原因は範囲分割 (decode 単位)**。バイナリの境界は正しい。`0x128c320` の本体が同じ decode モジュールに無いと、RetDec は 1 バイトの stub として作る。`.pdata` (unwind 表) と一致する。
 
-素材 `fl-win64` (`block00031_PE.bin`)、検証起点 HEAD = #851 ブランチ (main `7c9ea884` 基点)、再現 `FL_WIN64_DIR=<展開先> bash tools/icall/fn_boundary_repro.sh <outdir>` (load 1.01・所要 279 s)。
+素材 `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec`。検証起点 commit = `adc7f577` (#851 ブランチ HEAD、main `7c9ea884` 基点)。
+再現: `oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に置いた run で `FL_WIN64_DIR=<展開先> bash tools/icall/fn_boundary_repro.sh <outdir>`。スクリプトは範囲を直書きし `work/` に依存しない (chunk 行は `RANGES_DIR` 指定時のみ)。
+各 run の集計: `<outdir>/<name>.log` に対し `grep -c NonRecursiveCFGBuilder` (警告数)、`<outdir>/<name>.drc.dsm` に対し `grep -h "^; function: function_128c320 at"` (ラベル)、所要はスクリプトが `sec=` で出す。
+**本表の数値 (警告 5 件・5→15・追加 10 件・279 s・rc=0) は前回 run (HEAD `adc7f577`) の実測で、decode log は未コミット。本 run では RetDec と素材 `toolchain-retdec` が無く再実行していない (未検証)。** 再実行で上記の集計と突合するまで、数値は「前回実測・log 未保存」として扱う。
 
 | decode 範囲 | `function_128c320` のラベル | 備考 |
 |---|---|---|
@@ -135,12 +144,6 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 - 隣接関数の lift 欠落の before / after 監査 (`audit_icall.py` の数字) は**未実施**。上の表はラベル (境界) の before / after のみ。
 - 追加の警告 10 件 (`rax_1_reload` 等) の出所は未確認。
 - 366 落ちとの因果は未検証 (本体を足しても警告 5 件が残る)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 366 site 落ちの真因 (decode 後・最適化中に stub 呼出しが減る段の特定と、関数単位の before/after 突合) | 2 関数の wasm 化不可 | #229 (続き) |
-| `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
-| jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |
 
 ## 12. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
