@@ -1,4 +1,4 @@
-// kh249_check.mjs — KH-11 (#249) ブラウザ分類 0x180ef7fc0 の lift 後検証 (module F)
+// kh249_check.mjs — KH-11 (#249) ブラウザ分類 0x180ef7fc0 の検証 (module F)。[1][2] は lift 済み IR の実行、[3] は式の再実装による期待値の確認 (lift IR の分類結果ではない)
 //   node kh249_check.mjs [workDir]   (workDir 既定: work/licF)
 // [1] lift 済み実 IR の分類 thunk A (0x1800b4ac0) / C (0x1800b4ae0) を status 0..40 で実行し、ブラウザの
 //     エントリ採否ゲート (0x180ef8732〜0x180ef87c8) の真理値表を再構成 (getStatus は stub 9 を実行)

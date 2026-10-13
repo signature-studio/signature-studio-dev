@@ -10,9 +10,9 @@
 | 項目 | 結果 |
 |---|---|
 | 完了条件 2: 47 vs 46 の差 1 製品 | **「差 1 製品」は製品ではない**。47 ctor 呼出元の RTTI を全数解決: **製品 EditorModel 45 + `HostProxyEditorModel` (0x180007a40) + `SnapinGroupEditorModel` (0x180267c50) = 47**。product_index.json の 46 = 45 snapin/plugin + `core` (HeartCore 自体、EditorModel なし)。45 製品の id と ctor は最近傍ヒューリスティクスで 1:1 (§2)。KH9 §5-5 の「group/host 系の製品追加」推定は **「host proxy と snapin group の 2 つの非製品 EditorModel」** に確定 (47 − 46 = 非製品 2 − core 1) |
-| 完了条件 1: ブラウザ分類の lift IR | `0x180ef7fc0` (2,549 B) を含む module F (6 関数) が **emcc を通過** (wasm 47,604 B・undefined import 0・[icall] 3 サイト復元)。入口を node 実行すると最初の未 lift callee `0x180112a30` の fail-fast に到達 (= IR は入口から実行可能。残りの STL/map/shared_ptr 群は未 lift) |
-| 分類結果 (stub 定数 9 入力) | lift した実 IR の thunk A/C を status 0..40 で実行しゲート真理値表を再構成: **status 9 → flag 無関係に「一覧に載る・unlocked」**。unlocked 集合 = {5,7,8,9,26}。status 25 は flag=0 で非表示 / flag=1 で locked 表示 (§3) |
-| カテゴリ (Essential/Premium/Hosts/Groups) | 無償系 id 列 `egskocskpsdktafkqepkswsktfsk` は **PE から機械読出し**し、7 dword = {ksge,ksco,kdsp,kfat,kpeq,ksws,ksft} (「推定」だった KH9 の解読を**確定**)。product_index の 45 製品中 **Premium 7 / Essential 38**。`grup` → Groups、entry+0x22 が真なら Hosts (§4)。**注: 分類式は機械語読解の node 再実装で lift IR では未検証。カテゴリ名と製品の無償/有償の対応も未確認** (§4 注・§6.2) |
+| 完了条件 1: ブラウザ分類の lift IR | `0x180ef7fc0` (2,549 B) を含む module F (6 関数) が **emcc を通過** (wasm 47,604 B・undefined import 0・[icall] 3 サイト復元)。入口を node 実行すると最初の未 lift callee `0x180112a30` の fail-fast まで実行される (分類処理そのものには未到達。残りの STL/map/shared_ptr 群は未 lift) |
+| ゲート結果 (stub 定数 9 入力) | lift した実 IR の thunk A/C を status 0..40 で実行しゲート真理値表を再構成: **status 9 → flag 無関係に「一覧に載る・unlocked」**。unlocked 集合 = {5,7,8,9,26}。status 25 は flag=0 で非表示 / flag=1 で locked 表示 (§3) |
+| カテゴリ (Essential/Premium/Hosts/Groups) — **式の再実装による期待値確認 (lift IR では未検証)** | id 列 `egskocskpsdktafkqepkswsktfsk` は **PE から機械読出し**し、7 dword = {ksge,ksco,kdsp,kfat,kpeq,ksws,ksft} を確定 (リスト L と呼ぶ。「無償系」の意味は未確認)。product_index の 45 製品中 **Premium 7 / Essential 38**。`grup` → Groups、entry+0x22 が真なら Hosts (§4)。**注: 分類式は機械語読解の node 再実装で lift IR では未検証。カテゴリ名と製品の無償/有償の対応も未確認** (§4 注・§6.2) |
 | 0x180d5f190 | **`UISnapinLaneModel` (RTTI) の vtable slot 23** (vtable 0x181a37e78 + 0xb8)。`kmic`(Snap Heap)/`kmup`(Multipass)/`grup` の id だけを対象に thunk A∧¬thunk C をゲートして lane 一覧を作る関数 (§5) |
 | 0x180d52990 | 3 呼出元 (0x18055c060 / 0x1805c6a50 = Phase Plant / 0x1807e3420) はいずれも EditorModel 派生 ctor ではない。closure は §5 の範囲で確認 (関数本体の lift は未実施) |
 
@@ -36,7 +36,7 @@
 - `product_index.json` 46 = `plugins` 配列 46 要素 = 45 製品 + `core` (HeartCore, formats=['heartcore']・dependencies 無し)。`core` は EditorModel を持たない
 - **47 = 45 + 2、46 = 45 + 1 (core)**。差 1 は「製品 1 つ」ではなく、非製品 EditorModel 2 (host proxy / snapin group) と core 1 の差
 
-## 3. ブラウザ分類ゲート (完了条件 1・実行検証)
+## 3. ブラウザ分類ゲート (完了条件 1 のうち lift IR で検証した部分)
 
 関数 0x180ef7fc0 のエントリ採否 (機械語 0x180ef8710〜0x180ef87c8):
 `status = getStatus(...)` → `A(status)` (0x1800b4ac0・許可集合) が偽なら不採用候補、真なら `r13 = !C(status)` (0x1800b4ae0 = status==25)。`r13 != 0` で unlocked 登録、`r13 == 0` のときグローバル flag `[0x182358298]` が非 0 なら locked 登録・0 なら非表示。なお id==`grup` のエントリは別経路 (0x180ef862a): `r13 = [mgr+0xed9]` (byte) を使い、この表の対象外 (§6.2)。
@@ -50,15 +50,15 @@
 
 → **getStatus ≡ 9 (stub) では flag 無関係に全エントリが listed/unlocked**。stub が「許可側に固定」されていることの UI 分類レベルの裏取り。
 
-## 4. カテゴリ分類
+## 4. カテゴリ分類 (式の再実装による期待値の確認・lift IR では未検証)
 
 名前表 (逆アセンブルから UTF-16 文字列を読出し): 0 `Essential Effects` (0x1823a34e0) / 1 `Premium Effects` (0x1823a3504) / 2 `Effects Hosts` (0x1823a3524) / 3 `Groups` (0x181e79826)。
 
-分類式 (0x180ef82aa〜0x180ef830b の機械語読解): `id=='grup' → 3 / entry+0x22 が真 → 2 / id ∈ 無償系 7 id リスト → 1 / それ以外 → 0`。リスト = `egskocskpsdktafkqepkswsktfsk` (0x180ef825b 付近の 2 つの 16 B 定数 = 28 B 重畳)。PE から読出して dword 列に分解すると {ksge, ksco, kdsp, kfat, kpeq, ksws, ksft} と一致 (BE 並べ)。
+分類式 (0x180ef82aa〜0x180ef830b の機械語読解): `id=='grup' → 3 / entry+0x22 が真 → 2 / id ∈ リスト L (7 id) → 1 / それ以外 → 0`。リスト L = `egskocskpsdktafkqepkswsktfsk` (0x180ef825b 付近の 2 つの 16 B 定数 = 28 B 重畳)。PE から読出して dword 列に分解すると {ksge, ksco, kdsp, kfat, kpeq, ksws, ksft} と一致 (BE 並べ)。
 
 `kh249_check.mjs` の独立再計算: product_index 45 製品 (core 除外) に適用 → **category 1 = {kdsp,kfat,kpeq,ksco,ksft,ksge,ksws} の 7、category 0 = 38**。
 
-注: 「Essential/Premium」という名前はカテゴリ番号 1 の側が **無償系リスト** であり、命名と製品の無償/有償の対応は未確認 (表示名の意味は未検証。KH9 の「無償系」は id 列の由来からの推定のまま)。
+注: カテゴリ番号 1 (表示名 `Premium Effects`) はリスト L に一致する id の側で、カテゴリ番号 0 (表示名 `Essential Effects`) は残り。表示名と無償/有償の対応は未確認 (表示名の意味は未検証。KH9 の「無償系」は id 列の由来からの推定のまま)。
 
 ## 5. 0x180d5f190 周辺の closure
 
@@ -80,12 +80,15 @@
 
 ### 6.2 範囲外 (規則 40)
 - ブラウザ関数本体は **入口〜最初の未 lift callee まで**。std::map/string/vector/shared_ptr 等 41 個の callee (kh_lower の `unlifted callees` 41 件) は未 lift で、リスト構築・描画へ進む経路の bit 一致は未検証。
+- 数え方の違い (実測 `work/licF`): kh_lower の `unlifted callees` 41 件 → fail-fast stub (`stubs.c`) は **33 件**。差 8 件 = `0x180021490` `0x1800219b0` `0x180021d40` `0x18006c040` `0x1800b4b10` `0x180107430` `0x18010b6c0` `0x18024b2e0` は **すべて getStatus `kh_180054bd0` の本体からの呼出し**で、`lic_stub` が本体を `ret 9` に置換するため stub 後の `final.ll` に残らない (`shims.json` は空。shim 由来ではない)。本体 lift 後の closure は 41 件、stub 後の残存は 33 件。
 - 分類式・ゲート式は機械語読解の node 再実装 (lift IR のブラウザ本体をカテゴリまで流した結果ではない)。thunk A/C・getStatus は実 IR 実行。分類式は「lift IR では未検証」。`kh249_check.mjs` [3a] で式定数を命令バイトと照合し、[3b] で式を 5 通り壊して結果が変わることを確認するが、これは式の再実装が PE の読解と整合する・検査が自明でないことの確認までで、lift IR の分類結果の検証ではない。lift IR で検証するには未 lift callee (41 件) の shim が要る。
 - `grup` エントリのゲート (`[mgr+0xed9]`) は未検証 (§3 の表は非 grup のみ)。
 - 製品 id ↔ ctor の 1:1 対応は「id を持つ関数の最近傍」ヒューリスティクス (§2)。RTTI クラス名の 47/47 同定とは独立で、製品名の対応は一部 (`Matrix`=kscm 等) クラス名からの読み替え。
 - native oracle (ctx-fuzz) との bit 突合は未実施。
 
 ### 6.3 実測 (コミット済み HEAD `d238c27` で `bash run_all.sh` を単発実行。以降の差分は本節の docs のみ)
+
+**直近の実測 (本 HEAD 上の修正後 run・cold キャッシュ)**: `bash run_all.sh` exit 0 / **4 分 53 秒** (`KH_EM_CACHE` 空の新規 dir、xref 有り、nproc=4)。kh249_check ok=17 ng=0、snapin 12 系 200/200 (call 全一致)、module E 200/200・1000/1000、em_check ok=52 ng=0、emfire 0/200 (既知・exit 非影響)。
 | 項目 | 結果 |
 |---|---|
 | 所要時間 | **49 s** (同 run の直前に実行した初回 (キャッシュ無し・HEAD `9b6e379` + 未コミット差分) は **5 分 06 s** (07:10:12〜07:15:19、xref 全走査含む)。本実測は xref・RetDec stage-0 キャッシュ有り。nproc=4) |
@@ -114,6 +117,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | ブラウザ本体の STL/shared_ptr 群 (41 callee) 未 lift、native oracle 突合なし | リスト構築〜描画の bit 一致未証明 | #249 (本 issue) 継続 / 親 #15 |
+| lift IR のブラウザ分類器 (0x180ef7fc0 のカテゴリ割当) の実行検証 | 分類は式の再実装 (§4) の確認のみ。shim/lift 無しでは lift IR の分類結果は出ない | #249 継続 (PM 起票依頼) |
 | entry+0x22 の意味 (Hosts 判定) 未同定 | `Effects Hosts` が実際にどのエントリかは不明 | #249 継続 |
 | カテゴリ名と無償/有償の対応未確認 | 「無償系」解釈は推定 | #249 継続 |
 | 0x180d52990 の本体 lift 未実施 | Phase Plant 等 3 呼出元の closure は呼出元同定まで | #249 継続 |

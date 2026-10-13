@@ -29,7 +29,7 @@ CFG = json.load(open(os.path.join(ROOT, 'lic_config.json')))
 
 def sh(cmd, log=None, check=True):
     t = time.time()
-    cache = os.environ.get('KH_EM_CACHE')   # /opt/emsdk の cache が読取専用な環境 (Actions runner) 用。emsdk_env.sh が EM_CACHE を消すため source 後に再設定
+    cache = os.environ.get('KH_EM_CACHE')   # [EMSDK] の cache が読取専用な環境 (Actions runner) 用。emsdk_env.sh が EM_CACHE を消すため source 後に再設定
     cmd = 'source %s >/dev/null 2>&1; ' % EMSDK + ('export EM_CACHE=%s; ' % cache if cache else '') + cmd
     r = subprocess.run(cmd, shell=True, capture_output=True, text=True, executable='/bin/bash')
     if log:
