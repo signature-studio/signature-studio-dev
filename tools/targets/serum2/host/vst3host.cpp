@@ -997,6 +997,15 @@ int main(int argc, char** argv) {
         *(int*)(cb1 + 0xdc), cb1[0x22792]);
     }
 
+    // #341: 実験オプション。0x1800c2cd7 の `cmp [this+0xdc],1; jne` ゲート (headless では 2 のまま, REPORT §3-3) を
+    // 環境変数 S2HOST_FORCE_GATE=<n> で強制し、ゲート内の productVersion 比較 (0x1800c2d39) に到達させる。
+    {
+      const char* fg = getenv("S2HOST_FORCE_GATE");
+      int forced = fg ? atoi(fg) : -1;
+      if (fg) *(int*)(cb + 0xdc) = forced;
+      SI("force_gate_requested", forced);
+      SI("gate_0xdc_before_ctrl_setstate", *(int*)(cb + 0xdc));
+    }
     tresult r3 = ctrl->setState(sCtrl);  // IEditController slot6 → 0xc2b50
     L("[restore] controller->setState(slot6) = %s", tresName(r3));
     SI("restore_ctrl_setstate", (long long)r3);

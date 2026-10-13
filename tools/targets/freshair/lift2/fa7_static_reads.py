@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """fa7_static_reads.py <core> <filter_rep.json> — Filter process closure (lift 済み 114 関数) が参照する [reg+disp] の disp のうち
-M (Filter model) の param 領域 [0x19b8, 0xa400) に入るものを列挙し、ID descriptor 表 (ids.txt) の各 ID の desc 範囲 [desc_off, desc_off+0x148) と突合する。
+M (Filter model) の param 領域 [0x19b8, 0xa400) に入るものを列挙し、ID descriptor 表 (ids.txt) の各 ID の desc 範囲 [desc_off, desc_off+0x48) と突合する。
 出力: 各 disp が属する ID (desc 範囲) の一覧と、ID 0x156..0x15b (343/344/346 含む) が読まれるか。"""
 import sys, re, json, collections
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64

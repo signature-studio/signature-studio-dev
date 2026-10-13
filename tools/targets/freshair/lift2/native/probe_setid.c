@@ -1,6 +1,11 @@
 /* probe_setid.c — FA-7: 実 ctor (0x180b4c040) で構築した Filter モデル M に対し、実機 setter 0x1803debc0(M,id,value) を呼び
  *   (a) M (0xa400B) のどのバイトが変わるか (b) Filter process (0x180b6f050) の出力が変わるか を実測する。
- *   ./probe_setid <core> <id_hex>... ; 値は f32 0.5 / 0.25 / 0.9 の 3 水準。stdout: 1 行/ID。
+ *   ./probe_setid <core> <id_hex>... [Pxxxx=f32] [Sid=f32]
+ *     <id_hex>  : 3 水準 (f32 0.5 / 0.25 / 0.9) で setter を呼ぶ。
+ *     Pxxxx=f32 : M+0xxxx へ直書き (陽性対照 POKE。setter 経由なし)。
+ *     Sid=f32   : setter 1 水準の陽性対照 (PC 行。値は DSP 側の単位で与える)。
+ *   測定単位は「ctor を毎回新規実行した独立モデル」。モデルは自己参照ポインタを持つため memcpy 複製は使わない
+ *   (複製に setter を掛けると元モデル側が書き換わる。alias_check 行で実測)。
  *   (b) は sr=48000, 型 enum M+0x9dc4 = type (環境変数 FA_TYPE, 既定 ctor 値) で 64 sample の疑似ノイズを処理し L/R の FNV-1a を比較。 */
 #include "pe_map.h"
 #include "native_shim.h"
@@ -9,28 +14,50 @@ typedef long long (__attribute__((ms_abi)) *ctor_t)(void*, void*);
 typedef void (__attribute__((ms_abi)) *set_t)(void*, int, unsigned);
 typedef void (__attribute__((ms_abi)) *proc_t)(void*, void*);
 #define MS 0xa400
-static unsigned char *M0;
+#define NOFF 32
+typedef struct { uint64_t h; int serr, perr, nd, offs[NOFF]; } res_t;
 static uint64_t fnv(const void* p, size_t n);
 static uint64_t run_proc(unsigned char* M, unsigned type, int* err);
-/* 測定は fork 子で隔離 (process が image 内グローバルを書き換えるため親状態を汚さない)。id<0 は setter 無し。 */
 static int g_poff = -1; static unsigned g_pval;
-static uint64_t measure(int id, unsigned val, unsigned type, int* serr, int* perr, int* diffB, int* offs) {
-    uint64_t* sh = mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+/* ctor を新規実行して独立モデルを返す */
+static unsigned char* fresh_model(void) {
+    unsigned char* M = gr_alloc(MS); static unsigned long long dummy[4];
+    g_in_guard = 1; int s = sigsetjmp(g_jb, 1);
+    if (s == 0) ((ctor_t)0x180b4c040ULL)(M, dummy);
+    g_in_guard = 0; if (s) { fprintf(stderr, "ctor ERR\n"); _exit(3); }
+    return M;
+}
+static void do_setter(unsigned char* T, int id, unsigned val, int* serr) {
+    g_in_guard = 1; int s = sigsetjmp(g_jb, 1);
+    if (s == 0) ((set_t)0x1803debc0ULL)(T, id, val);
+    g_in_guard = 0; *serr = s;
+}
+/* 測定は fork 子で隔離 (process が image 内グローバルを書き換えるため親状態を汚さない)。id<0 は setter 無し。 */
+static res_t measure(int id, unsigned val, unsigned type) {
+    res_t* sh = mmap(0, sizeof(res_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     pid_t pid = fork();
     if (pid == 0) {
-        /* FA-8 修正: setter 0x1803debc0 は [M+8] の descriptor ポインタ表を引くが、表の中身は ctor を走らせた M0 内への絶対ポインタ。
-         * 旧実装 (FA-7) は M0 を T に複製して process を走らせたため、setter の書込みは M0 側に入り T の出力は構造的に変わらなかった
-         * (ID 2 (周波数) でも outChanged=0 = 空洞な測定)。ここでは fork 子の M0 そのものに setter を適用し、その M0 で process を走らせる。 */
-        unsigned char* T = M0; unsigned char* SNAP = gr_alloc(0xa400); memcpy(SNAP, M0, 0xa400); int s2 = 0; if (g_poff >= 0) memcpy(T + g_poff, &g_pval, 4);
-        if (id >= 0) { g_in_guard = 1; s2 = sigsetjmp(g_jb, 1); if (s2 == 0) ((void (__attribute__((ms_abi))*)(void*, int, unsigned))0x1803debc0ULL)(T, id, val); g_in_guard = 0; }
-        int nd = 0; for (int i = 0; i < 0xa400; i++) if (T[i] != SNAP[i]) { if (nd < 8) ((int*)(sh + 4))[nd] = i; nd++; }
-        int e; uint64_t h = run_proc(T, type, &e);
-        sh[0] = h; ((int*)sh)[2] = s2; ((int*)sh)[3] = e; ((int*)sh)[4 + 16] = nd; _exit(0);
+        unsigned char* T = fresh_model(); unsigned char* S0 = gr_alloc(MS); memcpy(S0, T, MS); res_t r; memset(&r, 0, sizeof r);
+        if (g_poff >= 0) memcpy(T + g_poff, &g_pval, 4);
+        if (id >= 0) do_setter(T, id, val, &r.serr);
+        for (int i = 0; i < MS; i++) if (T[i] != S0[i]) { if (r.nd < NOFF) r.offs[r.nd] = i; r.nd++; }
+        r.h = run_proc(T, type, &r.perr);
+        *sh = r; _exit(0);
     }
-    int st; waitpid(pid, &st, 0);
-    uint64_t h = sh[0]; *serr = ((int*)sh)[2]; *perr = ((int*)sh)[3]; *diffB = ((int*)sh)[4 + 16];
-    for (int i = 0; i < 8; i++) offs[i] = ((int*)(sh + 4))[i];
-    munmap(sh, 4096); return h;
+    int st; waitpid(pid, &st, 0); res_t r = *sh; munmap(sh, sizeof(res_t)); return r;
+}
+/* 検査: memcpy で複製したモデル C に setter を掛けると、元モデル B が変わる (自己参照ポインタの aliasing)。戻り値 = B の変化バイト数 */
+static int alias_check(float f) {
+    res_t* sh = mmap(0, sizeof(res_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    pid_t pid = fork();
+    if (pid == 0) {
+        unsigned bits; memcpy(&bits, &f, 4);
+        unsigned char* B = fresh_model(); unsigned char* C = gr_alloc(MS); unsigned char* B0 = gr_alloc(MS);
+        memcpy(C, B, MS); memcpy(B0, B, MS); int se; do_setter(C, 2, bits, &se);
+        int n = 0; for (int i = 0; i < MS; i++) if (B[i] != B0[i]) n++;
+        sh->nd = n; _exit(0);
+    }
+    int st; waitpid(pid, &st, 0); int n = sh->nd; munmap(sh, sizeof(res_t)); return n;
 }
 static uint64_t fnv(const void* p, size_t n) { uint64_t h = 1469598103934665603ULL; const uint8_t* b = p; for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= 1099511628211ULL; } return h; }
 static uint64_t run_proc(unsigned char* M, unsigned type, int* err) {
@@ -55,27 +82,26 @@ int main(int argc, char** argv) {
       if (p[0] == 0x65 && p[1] == 0x4c && p[2] == 0x8b && p[3] == 0x1c) { static const unsigned char G[9] = {0x4d,0x31,0xdb,0x90,0x90,0x90,0x90,0x90,0x90}; memcpy(p, G, 9); }
       unsigned char* q = im + (0x18100c738ULL - 0x180000000ULL); if (q[0] == 0x73) q[0] = 0xEB; }
     g_heap_zero = 1; patch_iat("iat_slots.txt"); patch_pokes("pokes.txt");
-    static unsigned long long dummy[4];
-    M0 = gr_alloc(MS);
-    g_in_guard = 1; int s = sigsetjmp(g_jb, 1);
-    if (s == 0) ((ctor_t)0x180b4c040ULL)(M0, dummy);
-    g_in_guard = 0; if (s) { fprintf(stderr, "ctor ERR\n"); return 3; }
+    fresh_model();
     unsigned type = getenv("FA_TYPE") ? (unsigned)atoi(getenv("FA_TYPE")) : 0xffffffffu;
     unsigned lv[3]; float fl[3] = {0.5f, 0.25f, 0.9f}; memcpy(lv, fl, 12);
-    int se, pe, nd, of[8]; uint64_t base_h = measure(-1, 0, type, &se, &pe, &nd, of);
-    uint64_t base_h2 = measure(-1, 0, type, &se, &pe, &nd, of);
+    res_t b1 = measure(-1, 0, type), b2 = measure(-1, 0, type);
     printf("# type=%s base_out_hash=%016llx base_rerun_hash=%016llx deterministic=%d perr=%d\n", type == 0xffffffffu ? "ctor-default" : getenv("FA_TYPE"),
-           (unsigned long long)base_h, (unsigned long long)base_h2, base_h == base_h2, pe);
+           (unsigned long long)b1.h, (unsigned long long)b2.h, b1.h == b2.h, b1.perr);
+    printf("# alias_check: memcpy 複製モデルへの setter(ID 0x2, 1000) で元モデルが変わったバイト数 = %d (0 でなければ memcpy 複製は測定に使えない)\n", alias_check(1000.0f));
     for (int a = 2; a < argc; a++) {
-        if (argv[a][0] == 'P') {   /* 陽性対照: M+off へ f32 を直書き (setter 経由なし) */
+        if (argv[a][0] == 'P') {   /* 陽性対照 POKE: M+off へ f32 を直書き (setter 経由なし) */
             char* eq = strchr(argv[a], '='); g_poff = (int)strtol(argv[a] + 1, 0, 16); float f = strtof(eq + 1, 0); memcpy(&g_pval, &f, 4);
-            uint64_t h = measure(-1, 0, type, &se, &pe, &nd, of); printf("POKE M+0x%x=%g: diffB=%d outChanged=%d perr=%d\n", g_poff, f, nd, h != base_h, pe); g_poff = -1; continue; }
+            res_t r = measure(-1, 0, type); printf("POKE M+0x%x=%g: diffB=%d outChanged=%d perr=%d\n", g_poff, f, r.nd, r.h != b1.h, r.perr); g_poff = -1; continue; }
+        if (argv[a][0] == 'S') {   /* 陽性対照 setter: 1 水準 (DSP 側の単位の値を与える) */
+            char* eq = strchr(argv[a], '='); int id = (int)strtol(argv[a] + 1, 0, 16); float f = strtof(eq + 1, 0); unsigned bits; memcpy(&bits, &f, 4);
+            res_t r = measure(id, bits, type); printf("PC ID 0x%x v=%g: setErr=%d diffB=%d outChanged=%d perr=%d\n", id, f, r.serr, r.nd, r.h != b1.h, r.perr); continue; }
         int id = (int)strtol(argv[a], 0, 16); printf("ID 0x%x:", id);
         for (int k = 0; k < 3; k++) {
-            uint64_t h = measure(id, lv[k], type, &se, &pe, &nd, of);
-            printf(" [v=%.2f setErr=%d diffB=%d", fl[k], se, nd);
-            if (nd) { printf(" off="); for (int i = 0; i < nd && i < 8; i++) printf("%x,", of[i]); }
-            printf(" outChanged=%d perr=%d]", h != base_h, pe);
+            res_t r = measure(id, lv[k], type);
+            printf(" [v=%.2f setErr=%d diffB=%d", fl[k], r.serr, r.nd);
+            if (r.nd) { printf(" off="); for (int i = 0; i < r.nd && i < NOFF; i++) printf("%x,", r.offs[i]); }
+            printf(" outChanged=%d perr=%d]", r.h != b1.h, r.perr);
         }
         printf("\n");
     }
