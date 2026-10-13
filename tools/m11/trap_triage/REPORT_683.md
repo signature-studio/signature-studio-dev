@@ -24,8 +24,8 @@
 
 `bash trap_triage/neg_683.sh` (ON/OFF を順に build + `survey_units.mjs` + `survey_diff.py`)。素材 `work-m11` は #516/#680 以前の生成物で `ir_conditions.json` が無く、そのままでは build が fail-closed で止まる。そこで `m11_gen_ir2.sh` で同じ `boot*.lift.ll` から IR を作り直した (ldfix=applied、20 s)。以下はその再生成 IR の実測。
 
-- 実行: HEAD `44bf3e9` の worktree (`/home/runner/work/ws-713`) で、`m11_gen_ir2.sh` による IR 再生成 (21.2 s、`ldfix=applied`、`ir_sha256` 7497b4d8…) の後に 3 回実行 (測定 1・2・3)。各回で ON build → survey → OFF build → survey の順 (`neg_683.sh`)。C 側 (`m11_ov.c`) と build スクリプトは `956d2ed` から変更していない。
-- 所要 (実測、`neg_683.sh` 全体): 測定 1 = 81.96 s (ON build 24.9 s / survey 17.2 s (load 0.93) / OFF build 18.8 s / survey 20.9 s (load 1.10))、測定 2 = 71.84 s、測定 3 = 71.36 s (ON build 19.0 s / survey 17.1 s (load 1.38) / OFF build 18.8 s / survey 16.4 s (load 1.21))。
+- 実行: HEAD `50fed21d` の worktree で、`m11_gen_ir2.sh` による IR 再生成 (20.7 s、`ldfix=applied`、`ir_sha256` 7497b4d8…) の後に `neg_683.sh` を 3 回実行 (測定 1・2・3)。各回で ON build → survey → OFF build → survey の順。`50fed21d` と `44bf3e9` の差分は本 REPORT のみ (コード・スクリプト同一)。C 側 (`m11_ov.c`) と build スクリプトは `956d2ed` から変更していない。
+- 所要 (実測、`neg_683.sh` の各段階。load は各段階終了時の 1 分値): 測定 1 = 全体 76.8 s (ON build 24.5 s / survey 17.2 s (load 1.03) / OFF build 18.4 s / survey 16.5 s (load 1.02))、測定 2 = ON build 18.6 s / survey 16.9 s (load 1.08) / OFF build 18.6 s / survey 16.8 s (load 1.11)、測定 3 = ON build 18.4 s / survey 17.2 s (load 1.06) / OFF build 18.6 s / survey 17.2 s (load 1.03)。
 
 | 構成 | ok | oob | halt0 | miss | noproc | trap | 計 |
 |---|--:|--:|--:|--:|--:|--:|--:|
@@ -33,7 +33,26 @@
 | ON (gate=1) n=3 | 828 | 11 | 55 | 47 | 1 | 66 | 942 |
 
 - **決定的**: 測定 1〜3 は全件一致 (min = max = n=3)。OFF と ON も一致 (差 0)。
-- **kind 以外の差分 (`survey_diff.py` の全出力、測定 1〜3 とも同一)**: `kind 以外も含めた差分 unit (frames は深さのみ比較): 0 []`。`icall sites / targets の [ok, miss] 差: 0 件`。ok 退行 0。旧 `956d2ed` の確認で出ていた unit 235・888 の差分は、今回の HEAD・IR 再生成後の測定では出ない (0 件)。
+- **`survey_diff.py` の全出力** (`bash trap_triage/neg_683.sh` の出力そのもの。測定 1〜3 とも 1 行ずつ完全に同一。`off` / `on` の 2 行は同スクリプト末尾の unit 149/158/280/659 表示):
+
+```
+A: {'halt0': 55, 'miss': 47, 'noproc': 1, 'ok': 828, 'oob': 11}  trap=66
+B: {'halt0': 55, 'miss': 47, 'noproc': 1, 'ok': 828, 'oob': 11}  trap=66
+遷移 (A -> B):
+  halt0   -> halt0   55
+  miss    -> miss    47
+  noproc  -> noproc  1
+  ok      -> ok      828
+  oob     -> oob     11
+ok 退行 unit: 0 []
+kind 以外も含めた差分 unit (frames は深さのみ比較): 0 []
+icall sites の総数 [ok, miss] 差 (A -> B): 0 件 
+icall targets の総数 [ok, miss] 差 (A -> B): 0 件 
+off  units 149/158/280/659: [(149, 'oob'), (158, 'halt0'), (280, 'halt0'), (659, 'halt0')]
+on   units 149/158/280/659: [(149, 'oob'), (158, 'halt0'), (280, 'halt0'), (659, 'halt0')]
+```
+
+  kind 以外の差分は 3 回とも 0 件。ok 退行 0。
 - **遷移 (OFF → ON)**: 942 unit 全件で kind 不変 (ok→ok 828 / oob→oob 11 / halt0→halt0 55 / miss→miss 47 / noproc→noproc 1)。frames の深さの変化も 0。icall sites / targets の [ok, miss] 差も 0。
 - **PR 旧記述 (ON で ok 818→827、ok +9、副作用 58-63・307/311/917・56) は再生成 IR の実測で再現しない**。58-63 / 307 / 311 / 917 は OFF の段階で既に ok、56 は OFF・ON とも oob。
 - **対象 4 unit**: 149 は OFF = ON = oob (最上位 frame `653660 ← 6539e0 ← 664190`)。前版の「ON で最上位が `414c70` に変わる」は、再生成 IR の (c) 測定 (ON/OFF とも) では再現しなかった。`414c70` は stack の最上位に現れない。158/280/659 は OFF = ON = halt0 (`412770 ← 4128b0__lifted ← 4128b0`)。**4 unit とも ok にならない → 受入条件 1 は未達。**
@@ -78,7 +97,7 @@ A = IR 無変更 (`m11_414base`、`batch_414base_closure.jsonl`)、B = 修復 IR
 
 ## 5.1 kind 以外の差分 unit
 
-survey 942 unit の kind は ON/OFF で全件一致 (§3)。`survey_diff.py` の「kind 以外も含めた差分」も 0 件 (測定 1〜3 とも `kind 以外も含めた差分 unit (frames は深さのみ比較): 0 []`)。`956d2ed` の確認で出ていた unit 235・888 の差分は、HEAD `44bf3e9` と IR 再生成 (`ldfix=applied`) の後の測定では再現しない。
+survey 942 unit の kind は ON/OFF で全件一致 (§3)。`survey_diff.py` の「kind 以外も含めた差分」も 0 件 (HEAD `50fed21d`、測定 1〜3 とも `kind 以外も含めた差分 unit (frames は深さのみ比較): 0 []`。全出力は §3)。`956d2ed` の確認で出ていた unit 235・888 の差分は、今回の測定では再現しない。その原因は未確認 (`956d2ed` 時点の IR 生成条件を本 run では再現していない)。
 
 ## 6. 再現手順 (1 コマンド)
 
@@ -92,7 +111,7 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
 
 ## 7. 検証範囲 / 範囲外
 
-- 範囲内: m11 survey 942 unit (ON/OFF 各 n=3、HEAD `44bf3e9`)、liftdiff 68 関数 (A/B 各 n=3、end-to-end 実行、HEAD `44bf3e9`)。
+- 範囲内: m11 survey 942 unit (ON/OFF 各 n=3、HEAD `50fed21d`)、liftdiff 68 関数 (A/B 各 n=3、end-to-end 実行、HEAD `44bf3e9`。コードは `50fed21d` と同一で、以後の REPORT のみの commit では再実行していない)。
 - **n の限界**: 上記は n=3 で全件一致 (min = max)。ただし同一素材・同一マシン上の反復であり、別マシン・別負荷での再現は未確認。
 - 範囲外: closure 7421 関数の再測定 (§5 は旧測定値)、`m11_e2e.sh` 全体 (stage4 / bit-exact) への影響 (未実施)、C 版と IR 版の相互検算 (未実施)、副作用の原因 (旧 PR 記述の再現が無いため対象外)。
 - 既存 REPORT の数値 (`818 / 21` 等) は旧生成物 (a) の値で、本 gate の有無とは無関係。他 REPORT の書換えは行わない。
