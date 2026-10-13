@@ -25,7 +25,7 @@ def main():
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     for i in md.disasm(data[off0:off1], base + start_rva):
         s = f"{i.address - base:x}: {i.mnemonic} {i.op_str}"
-        if i.mnemonic in ("cmp", "ja", "jbe", "jmp", "lea") or "[" in i.op_str and "rip" in i.op_str:
+        if i.mnemonic in ("cmp", "ja", "jbe", "jmp", "lea") or ("[" in i.op_str and "rip" in i.op_str):
             print(s)
     return 0
 

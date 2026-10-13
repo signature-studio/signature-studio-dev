@@ -4,6 +4,7 @@
 入力: work/Serum2_win64.vst3 (REPORT §9-1 で展開)。
 出力: 各ヒットの関数開始 RVA (直前の int3/nop 境界から推定)、関数内の cursor ID 即値の一覧。
 """
+import re
 import sys
 import struct
 
@@ -40,12 +41,11 @@ def main():
                 break
         ids = []
         for i in md.disasm(data[start:end], va0 + start):
-            if i.mnemonic in ("mov", "lea", "cmp") and "0x7f" in i.op_str:
-                for tok in i.op_str.replace(",", " ").split():
-                    if tok.startswith("0x7f"):
-                        v = int(tok, 16)
-                        if 0x7F00 <= v <= 0x7FFF:
-                            ids.append((hex(i.address), v))
+            if i.mnemonic in ("mov", "lea", "cmp"):
+                for m in re.finditer(r"(?<![0-9a-fx])0x([0-9a-f]+)", i.op_str):
+                    v = int(m.group(1), 16)
+                    if 0x7F00 <= v <= 0x7FFF:
+                        ids.append((hex(i.address), v))
         print(f"hit RVA 0x{va0 + off:x}: func 0x{va0 + start:x}..0x{va0 + end:x} "
               f"({end - start} B), cursor-ID imm {len(ids)} 件")
         for addr, v in ids:
