@@ -2,7 +2,7 @@
 
 親: #1076 / #860 / #417。対象は `M11_M2P=1` (`pass_m2p_dec_inttoptr`) が remap する命令形の 10 進 `inttoptr`。
 再現スクリプト: [m11_inttoptr_class.py](m11_inttoptr_class.py) (1 コマンド・実測 0.95 s)。
-実行: `FL_WIN64_DIR=<展開先> python3 tools/m11/m11_inttoptr_class.py work/boot_allfx.ll --list-other`
+実行: `FL_WIN64_DIR=<展開先> python3 tools/m11/m11_inttoptr_class.py tools/m11/work/boot_allfx.ll --list-other`
 
 ## 1. 結論
 
@@ -21,7 +21,7 @@
 
 ## 2. 基準 IR と分母
 
-- 基準: `work/boot_allfx.ll` (work-m11 スナップショット、`m11_passes.py` の M2p 直前の IR)。
+- 基準: `tools/m11/work/boot_allfx.ll` (work-m11 スナップショット、`m11_passes.py` の M2p 直前の IR)。
   命令形 10 進 `%x = inttoptr i64 N to ptr` は **4449 件** (`grep -cE` の実測と一致)。
 - 範囲 `[0x400000, 0x1abf400)` (`m11_passes.py` の `IMG_LO`/`IMG_HI`) 内は **4364 件** = #1076 の分母。
 - PE: `block00031_PE.bin` (ImageBase `0x400000`)。section 境界 (実測): `.text` `0x401000–0x13a44b0` (実行可)・
@@ -44,7 +44,7 @@
 
 - **call 引数 (12 件)**: `CreateThread` の起動関数 (`0x412ae0`, line 125305)・`EnumDisplayMonitors` の
   コールバック (`0x85df70`, line 333404/334381)・`EnumCalendarInfoW` のコールバック (`0x4476d0`/`0x4477a0`, line 157888 系)
-  等、コールバックとして渡される PE `.text` 内 VA。残りの call 引数 (`function_414da0` の引数 line 60141 等) は
+  等、コールバックとして渡される PE `.text` 内 VA。残りの call 引数 (`function_11ff410` 内の line 60141 `%ce5n11_function_11ff410` 等。`function_414da0` へ渡す引数) は
   用途を個別には確認していない。いずれも整数データではなく code 範囲のアドレスであるため、LVA 化の対象と判定する。
 - **store 値 (7 件)**: `.data` の `0x15e4568`/`0x15e1b40`/`0x15e0590`/`0x15e4f60` (line 245611–262915) と
   `.text` の `0x788141`–`0x788143` (line 302838–302874)。`function_680790` / `function_6a40b0` / `function_787f20` では

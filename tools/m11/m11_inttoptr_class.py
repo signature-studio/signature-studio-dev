@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # [M11-N82] 10 進 inttoptr 命令 (`%x = inttoptr i64 N to ptr`) の VA→LVA 仕分け (#1318).
-# 入力: 基準 IR (既定 work/boot_allfx.ll = M11_M2P=1 が remap する直前の IR) と PE (FL_WIN64_DIR/extracted/block00031_PE.bin)。
+# 入力: 基準 IR (既定 tools/m11/work/boot_allfx.ll = M11_M2P=1 が remap する直前の IR) と PE (FL_WIN64_DIR/extracted/block00031_PE.bin)。
 # 対象: 10 進の命令形 `%x = inttoptr i64 N to ptr` 全件 (M2p と同じ正規表現)。
 # 分類は全使用箇所で判定する (1 箇所でも非アドレス用途があれば「要確認」):
 #   - 範囲外 (N が [0x400000, 0x1abf400) に無い): VA のまま (整数定数・ビット列・小さな数値。remap 対象外)
@@ -17,7 +17,7 @@ DEF = re.compile(r'^\s*(%[\w.$-]+)\s*=\s*inttoptr i64 (\d+) to ptr')
 TOK = re.compile(r'%[\w.$-]+')
 
 ap = argparse.ArgumentParser()
-ap.add_argument('ir', nargs='?', default='work/boot_allfx.ll')
+ap.add_argument('ir', nargs='?', default='tools/m11/work/boot_allfx.ll')
 ap.add_argument('--pe', default=os.path.join(os.environ.get('FL_WIN64_DIR', ''), 'extracted', 'block00031_PE.bin'))
 ap.add_argument('--list-other', action='store_true', help='範囲内で「要確認」の全件を行付きで出す')
 a = ap.parse_args()
