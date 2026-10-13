@@ -13,6 +13,8 @@
 /* shimx の midi_dispatch (VA→invoke / p1 の native→guest 戻し) を audio の発火口に接続する。形は flm_cb_invoke_fn と同一 */
 static void set_cb_invoke(shx_midi_cb_fn fn) { flmidi_set_invoke((flm_cb_invoke_fn)fn); }
 
+/* 表の関数ポインタ型 (shx_midi_hdr_fn 等) と flm_* の実型は引数の並びが同じ (wasm32 では uintptr_t = 4B)。
+ * C 規格上は関数ポインタの cast 自体が未定義動作だが、wasm の呼出規約では引数幅・順序が一致するため動作する。 */
 static const shimx_midi_vtbl g_vtbl = {
     .inGetNumDevs = flm_midiInGetNumDevs,
     .outGetNumDevs = flm_midiOutGetNumDevs,

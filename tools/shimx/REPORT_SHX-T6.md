@@ -63,6 +63,8 @@ mirror は guest ヘッダと 1:1 (guest アドレスで引く)。Prepare で確
 
 `sig_test.sh` (a) の陰性対照は `midiOutShortMsg` の drift を数えていた。#179 で shimx 側を HANDLE (i32) に統一したため drift が消え、mismatch は 5 → 4。gate は drift の残る `acmMetrics` へ移した (ケース (h) も同様)。
 
+`midiOutShortMsg` の第 1 引数は `HANDLE` (i32) に統一した (旧 `uint64_t` 側と RetDec の i64 declare の不一致を解消)。wasm32 では HANDLE が 4B のため、i64 で受ける呼出元は shimx 内に無い (`grep -rn midiOutShortMsg tools/shimx/src` は定義 `midi_conv.c` と宣言 `shimx_stubs.h` のみ)。
+
 ### 19.7 検証 (HEAD は下記 commit で実行)
 
 | 検証 | コマンド | 結果 | 所要 / 備考 |
