@@ -10,12 +10,16 @@ CallNextHookEx
 CallWindowProcA
 CallWindowProcW
 CharLowerBuffW
+CharLowerW
+CharNextExA
 CharNextW
+CharToOemBuffW
 CharUpperBuffW
 CharUpperW
 ClientToScreen
 CloseClipboard
 CombineRgn
+CommDlgExtendedError
 CopyRect
 CreateBitmap
 CreateCaret
@@ -129,6 +133,7 @@ GetModuleHandleW
 GetMonitorInfoW
 GetObjectA
 GetObjectW
+GetOpenFileNameW
 GetParent
 GetPhysicalCursorPos
 GetPixel
@@ -136,6 +141,7 @@ GetPropW
 GetRandomRgn
 GetRegionData
 GetRgnBox
+GetSaveFileNameW
 GetStockObject
 GetStretchBltMode
 GetSysColor
@@ -311,5 +317,7 @@ UnregisterClassW
 UpdateWindow
 ValidateRect
 ValidateRgn
+WTSRegisterSessionNotification
+WTSUnRegisterSessionNotification
 WaitMessage
 WindowFromPoint

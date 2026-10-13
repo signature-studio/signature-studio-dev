@@ -146,7 +146,7 @@ host は **レコード書込の前に** 共有 pointer 状態 (cursor/buttons/m
 
 ## 9. 制限・既知の逸脱 (fail-fast ではなく近似で通すもの)
 `SetWindowRgn`/`NotifyWinEvent`/`LockWindowUpdate`/`ShowOwnedPopups`/`AttachThreadInput`/`IsDialogMessage`/`SetThreadDpiAwarenessContext` は no-op、`SelectPalette`/`RealizePalette` は常に真色扱い (≤8bpp DIB の色は DIB 自身の色テーブル)、
-`SetCursorPos` は共有 cursor 値のみ更新 (Pointer Lock 連携は未実装)、`GetDeviceCaps(RASTERCAPS)` は RC_PALETTE なし、`MsgWaitForMultipleObjects` は `nCount==0` のみ、`GetDC(NULL)`(スクリーン DC) は fail-fast。
+`SetCursorPos` は共有 cursor 値のみ更新 (Pointer Lock 連携は未実装)、`GetDeviceCaps(RASTERCAPS)` は RC_PALETTE なし、`MsgWaitForMultipleObjects[Ex]` は shimx リンク時のみ kernel handle 待ちに対応 (未リンクなら `nCount==0` のみ; #172)、`GetDC(NULL)`(スクリーン DC) は fail-fast。
 フック (`SetWindowsHookEx` 系) は §11 の範囲で配送 (CAB-159)。ImageList_*/FlatSB_*/uxtheme BufferedPaint/IME/印刷/メタファイル/wgl は stub (IMPORTS.md)。
 
 ## 10. FL lift 接続メモ (RetDec 実測知見, PE 実験 3 本から)
