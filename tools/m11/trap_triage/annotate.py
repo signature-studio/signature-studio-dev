@@ -25,8 +25,8 @@ per = json.load(open(sys.argv[1]))
 def nm(f):
     m = re.search(r'wasm-function\[(\d+)\]', f)
     return names.get(int(m.group(1)), '?') if m else f
-def err_idx(fr):  # Error() 本体 frame (409730 優先, 無ければ 412a60) の位置. 無い halt0 は -1
-    for e in ('function_409730', 'function_412a60'):
+def err_idx(fr):  # Error() 本体 frame (409730 優先, 無ければ 412a60 → 4096d0) の位置. 無い halt0 は -1
+    for e in ('function_409730', 'function_412a60', 'function_4096d0'):
         if e in fr: return fr.index(e)
     return -1
 tops = collections.defaultdict(list)

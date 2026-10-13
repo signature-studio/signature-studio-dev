@@ -28,6 +28,7 @@
 | `[LINEAR-AUDIT]` | `../analysis/LINEAR_AUDIT_LOG.md` | 旧 Linear 運用の定期監査ログ (歴史資料) |
 | `[PREFLIGHT]` | `../analysis/preflight.sh` | 環境検査・`--env` / `--lock` ヘルパ (歴史的。repo 内手順は `docs/WORKFLOW.md`) |
 | `[MODEL-POLICY]` | `../analysis/MODEL_POLICY.md` | モデル指定・ゾンビ監視の方針 (PM 管理) |
+| `[PM-SCRIPTS]` | `../analysis/sweep_prs.sh` ほか | PM が VM 上で常駐・実行する PR/run 運用スクリプト (repo 外・repo に未取込)。`sweep_prs.sh` (open PR の状態判定と次の run の自動依頼、`docs/WORKFLOW.md` §11)・`find_silent_runs.sh` (着手報告だけで終わった run の検出)・`restart_failed.sh` (失敗 run の再投入)・`watch_runs.sh` (+ `watch_runs.sh.notes`)。所在が記録されているのは `sweep_prs.sh` のみ。他は `[ANALYSIS-DIR]` 配下かどうか未確認 (#582 のコメントで PM に確認依頼済み。#582 は確認が済むまで open) |
 
 `../analysis/` は **作業用 VM 上のリポジトリ外ディレクトリ**。リポジトリには含めない (`.gitignore` 対象外・クローン先に無い)。
 CI や他人の環境では存在しないため、再現手順は本ファイルの所在情報を前提としない。
@@ -66,6 +67,7 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 | `[V-PFFFT-UP]` | `tools/ipp/shim/fft/work/pffft_up/` | 同上 `[V-PFFFT]` の比較用 upstream 複製 | — | なし | BSD 系 | 差分確認用 |
 | `[V-MASSIVEX]` | `tools/targets/massivex/work/{innoextract,issrc}/` | Inno Setup 抽出ツール類 | — | なし | 各種 | gitignore 対象 |
 | `[V-ICALL]` | `tools/icall/disp_size/work/capnext/` | capstone next | — | なし | BSD | gitignore 対象 |
+| `[V-CP932-BESTFIT]` | `tools/shimx/src/cp932_tab.c` (生成物 192 KB) | https://unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WindowsBestFit/bestfit932.txt (Microsoft / Unicode Consortium) | 取得時点 (入力は `tools/shimx/work/` に取得、非 commit) | `tools/shimx/scripts/gen_cp932.py` による C 配列への機械変換のみ (手編集禁止) | Unicode Terms of Use | `tools/shimx/REPORT_SHX-T8.md` §15.3 |
 | `[V-FLP]` | `tools/flp/work/venv/...` | Python venv (`nothing` 等) | — | なし | — | gitignore 対象 |
 
 **vendored の共通ルール**:
