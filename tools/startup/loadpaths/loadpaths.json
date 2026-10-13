@@ -1,0 +1,682 @@
+{
+  "build": "FLEngine_x64.dll 26.1.7.5653。va は ImageBase 0x400000 込みの絶対 VA (tools/startup/STARTUP.md と同じ Ghidra 表記)",
+  "tiers": "T0=起動に必須 / T0p=起動時に列挙・読取するが欠落しても継続 (推定) / T1=初回使用時 / T2=明示操作時 (tools/assets/MANIFEST.md の groups と同義)",
+  "phase": {
+    "boot": "Init core paths 以降〜最初のアイドルまでの経路にコード上の呼出点がある",
+    "boot-conditional": "起動経路上にあるが、レジストリ/設定値が既定のままだとファイルを開かない",
+    "on-demand": "ユーザ操作 (ダイアログ/メニュー/ドラッグ等) の経路にだけ呼出点がある",
+    "unresolved": "呼出点を特定できていない (名前の一致または種別からの推定のみ)"
+  },
+  "groups": [
+    {
+      "id": "lang-moe",
+      "globs": [
+        "System/Languages/*.moe"
+      ],
+      "phase": "boot-conditional",
+      "tier": "T2",
+      "fetch": "whole",
+      "vfs": "/fl/System/Languages/<lang>.moe (RO)。ユーザ側 /c/home/**/Languages/<lang>.moe が先に探される",
+      "readers": [
+        {
+          "va": "0x1375990",
+          "role": "エンジン Init (Init core paths → BasicInitialization) 内から 0x13754b0 (言語初期化) を呼ぶ"
+        },
+        {
+          "va": "0x9deaa0",
+          "role": "言語初期化。言語コードは 0x9dece0 = レジストリ Software\\Image-Line\\Shared\\Language\\Program Language (既定 'en')"
+        },
+        {
+          "va": "0x9de620",
+          "role": "言語コード → 候補名 (xx_YY → xx) を作り 0x9de400 で探索"
+        },
+        {
+          "va": "0x9de400",
+          "role": "<name>.moe を host の検索パス服務 (id 0x40f = Languages 区分) で解決"
+        },
+        {
+          "va": "0x8e1500",
+          "role": "TMoFile 相当。拡張子 .moe なら 0x8e13f0 (復号) → メモリストリームを丸ごと保持、その他は FileStream/MapView"
+        },
+        {
+          "va": "0x8e13f0",
+          "role": "FileStream 全体を 0x8d85d0 (RSA e=3 + 16 byte 鍵 XOR ストリーム) で復号。moe.py が再現"
+        }
+      ],
+      "note": "既定 (レジストリ空) は 'en' で .moe を開かない。非 en を選ぶと選択言語 1 ファイルだけを全量読み込む"
+    },
+    {
+      "id": "lang-svg",
+      "globs": [
+        "System/Languages/*.svg"
+      ],
+      "phase": "unresolved",
+      "tier": "T1",
+      "fetch": "whole",
+      "vfs": "/fl/System/Languages/<lang>.svg (RO)",
+      "readers": [],
+      "note": "言語選択 UI の国旗アイコンと推定 (参照元は特定できていない。.svg の汎用ローダは 0xdceea0)"
+    },
+    {
+      "id": "skin-splash",
+      "globs": [
+        "Artwork/Skins/Default/Title.png"
+      ],
+      "phase": "boot",
+      "tier": "T0",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Skins/Default/Title.png (RO)",
+      "readers": [
+        {
+          "va": "0x136cba0",
+          "role": "スプラッシュ画像ローダ (レジストリ General\\SplashImage 未設定時の既定名 Title.png)。呼出元 0x13734d0"
+        }
+      ]
+    },
+    {
+      "id": "skin-startsound",
+      "globs": [
+        "Artwork/Skins/Default/StartSnd.wv"
+      ],
+      "phase": "boot-conditional",
+      "tier": "T0p",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Skins/Default/StartSnd.wv (RO)",
+      "readers": [
+        {
+          "va": "0x11bfb10",
+          "role": "起動音ローダ"
+        },
+        {
+          "va": "0x1368840",
+          "role": "起動音ローダ (ProcessFirstTimeStuff 0x11ef180 の 'Play startup sound' 経路。flags&8==0 のとき)"
+        }
+      ]
+    },
+    {
+      "id": "skin-ondemand",
+      "globs": [
+        "Artwork/Skins/Default/BigFruit.png",
+        "Artwork/Skins/Default/ClipHanger.png",
+        "Artwork/Skins/Default/PickerChan.png",
+        "Artwork/Skins/Default/ScopeGradient.bmp",
+        "Artwork/Skins/Default/RenderSnd.wv"
+      ],
+      "phase": "on-demand",
+      "tier": "T1",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Skins/Default/* (RO)",
+      "readers": [
+        {
+          "va": "0x1369240",
+          "role": "About ダイアログ (BigFruit.png + System\\Texts\\About\\AboutTxt.txt)"
+        },
+        {
+          "va": "0x107f990",
+          "role": "クリップのドラッグ表示 (ClipHanger.png)"
+        },
+        {
+          "va": "0xec6760",
+          "role": "チャンネルピッカー (PickerChan.png, Cuprum.ttf)"
+        },
+        {
+          "va": "0xf633b0",
+          "role": "プラグインフォーム (ScopeGradient.bmp)"
+        },
+        {
+          "va": "0xf69c90",
+          "role": "ScopeGradient.bmp"
+        },
+        {
+          "va": "0xc4eac0",
+          "role": "RenderSnd.wv (レンダ完了音)"
+        },
+        {
+          "va": "0x1188470",
+          "role": "RenderSnd.wv (quick render)"
+        }
+      ]
+    },
+    {
+      "id": "theme-default",
+      "globs": [
+        "Artwork/Themes/thmDefault.png",
+        "Artwork/Themes/tweak_default.png"
+      ],
+      "phase": "boot",
+      "tier": "T0",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Themes/* (RO)",
+      "readers": [
+        {
+          "va": "0x11317b0",
+          "role": "テーマ適用 ((Default) → thmDefault.png / tweak_default.png / __current.flstheme)。呼出元 0x1127e60, 0x1129630, 0x1132040, 0x11323c0"
+        }
+      ]
+    },
+    {
+      "id": "theme-others",
+      "globs": [
+        "Artwork/Themes/*.flstheme",
+        "Artwork/Themes/thm*.jpg",
+        "Artwork/Themes/*/**"
+      ],
+      "phase": "on-demand",
+      "tier": "T2",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Themes/** (RO)",
+      "readers": [
+        {
+          "va": "0x9db5b0",
+          "role": "検索パス区分 0x413 'Themes' に Themes\\ (user) と Artwork\\Themes\\ (factory) を登録。テーマ選択 UI が列挙して使う"
+        }
+      ],
+      "note": "テーマ選択 UI の列挙経路は未追跡 (登録のみ確認)"
+    },
+    {
+      "id": "wallpaper-default",
+      "globs": [
+        "Artwork/Wallpapers/Default.txt"
+      ],
+      "phase": "boot",
+      "tier": "T0",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Wallpapers/Default.txt (RO)",
+      "readers": [
+        {
+          "va": "0x11c58d0",
+          "role": "壁紙設定 (Background / Caption / Grid 等のキー) 読込。呼出元はフォーム生成 0x111c010, 0x111da90, 0x112e240, 0x11326a0, 0x1196c00, 0x11f79a0, 0x11f8470"
+        }
+      ],
+      "note": "Default.txt が参照する画像名は txt の中身次第 (本 ticket では画像側の必須性は未確認)"
+    },
+    {
+      "id": "wallpaper-images",
+      "globs": [
+        "Artwork/Wallpapers/*"
+      ],
+      "phase": "on-demand",
+      "tier": "T2",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Wallpapers/* (RO)",
+      "readers": [
+        {
+          "va": "0x11f7b40",
+          "role": "Browser.html を含む壁紙選択 (呼出元 0xf1be90)"
+        }
+      ]
+    },
+    {
+      "id": "fonts",
+      "globs": [
+        "Artwork/Fonts/**",
+        "Shared/Artwork/Fonts/*"
+      ],
+      "phase": "boot",
+      "tier": "T0p",
+      "fetch": "whole",
+      "vfs": "/fl/Artwork/Fonts/**, /fl/Shared/Artwork/Fonts/* (RO)",
+      "readers": [
+        {
+          "va": "0x668d30",
+          "role": "フォント表初期化 (OpenSans-Regular/CondLight, ILGlyphsEx.ilfont, segoeui/tahoma/consola/lucon の Windows 標準フォント名も参照)。呼出元 0x66d050"
+        },
+        {
+          "va": "0x668b50",
+          "role": "Artwork\\Fonts 配下の .ilfont 読込 (ILGlyphsEx.ilfont)"
+        }
+      ],
+      "note": "segoeui/tahoma/consola/lucon は Windows 側のシステムフォント。VFS には無いので代替フォント (OpenSans 等) への解決が shim 側で必要"
+    },
+    {
+      "id": "help-scr",
+      "globs": [
+        "Help/HelpPlugins.scr",
+        "Help/HelpAliases.scr"
+      ],
+      "phase": "boot",
+      "tier": "T0p",
+      "fetch": "whole",
+      "vfs": "/fl/Help/*.scr (RO)",
+      "readers": [
+        {
+          "va": "0x10be350",
+          "role": "FLStudio%sHelp 環境変数を設定し、検索パスから HelpPlugins.scr / HelpAliases.scr を読む"
+        },
+        {
+          "va": "0x1196c00",
+          "role": "ログ '  Initialize the help file' の段。呼出元 0x11a57c0 = LoadSettings"
+        }
+      ]
+    },
+    {
+      "id": "help-html",
+      "globs": [
+        "Help/index_offline.html",
+        "Help/WhatsNew.htm",
+        "Help/flstudio.css",
+        "Help/html/**",
+        "Help/fonts/*"
+      ],
+      "phase": "on-demand",
+      "tier": "T2",
+      "fetch": "whole",
+      "vfs": "/fl/Help/** (RO)",
+      "readers": [
+        {
+          "va": "0x10be5c0",
+          "role": "ヘルプ URL 生成 (index_offline.html + /html/%s)。呼出元 0x10be820, 0x10be840"
+        },
+        {
+          "va": "0x10be8c0",
+          "role": "/html/FD/web/documents/%s.html (呼出元 0x10d0ff0)"
+        },
+        {
+          "va": "0x10bea60",
+          "role": "/html/plugins/%s.htm (呼出元 0x10be860, 0x13303e0)"
+        },
+        {
+          "va": "0xf1d660",
+          "role": "WhatsNew.htm の場所解決 (index_offline.html の隣)"
+        }
+      ],
+      "note": "WebView2 (ST #118 help-viewer) が file:// 相当で読む前提。FL 本体は HTML を解釈せず URL を組み立てて外部ビューアに渡す"
+    },
+    {
+      "id": "texts-dialog",
+      "globs": [
+        "System/Texts/*.txt",
+        "System/Texts/About/*",
+        "System/Texts/Licenses/*"
+      ],
+      "phase": "on-demand",
+      "tier": "T1",
+      "fetch": "whole",
+      "vfs": "/fl/System/Texts/** (RO)",
+      "readers": [
+        {
+          "va": "0x10d5980",
+          "role": "BoxEdition.txt / NotReggedTxt.txt / DemoTxt.txt (エディション案内)"
+        },
+        {
+          "va": "0x11cb000",
+          "role": "NewVersion.txt (更新確認。外部通信が無効なら到達しない)"
+        },
+        {
+          "va": "0x1366ae0",
+          "role": "SincIP_Realtime.txt"
+        },
+        {
+          "va": "0x1369240",
+          "role": "About/AboutTxt.txt"
+        }
+      ]
+    },
+    {
+      "id": "empty-project",
+      "globs": [
+        "Data/System/Empty.flp"
+      ],
+      "phase": "boot",
+      "tier": "T0",
+      "fetch": "whole",
+      "vfs": "/fl/Data/System/Empty.flp (RO)",
+      "readers": [
+        {
+          "va": "0x11db420",
+          "role": "既定の空プロジェクト読込。無いと 'Could not find default empty project.' のエラー。呼出元 0xe1d090 (MIDI import), 0xed5c40"
+        }
+      ]
+    }
+  ],
+  "claims": [
+    {
+      "va": "0x9de400",
+      "refs": [
+        ".moe",
+        ".mo"
+      ]
+    },
+    {
+      "va": "0x9de620",
+      "refs": [
+        "LC_MESSAGES",
+        "Default"
+      ]
+    },
+    {
+      "va": "0x8daeb0",
+      "refs": [
+        "LC_MESSAGES",
+        ".moe",
+        ".mo",
+        "CHARSET=UTF-8"
+      ]
+    },
+    {
+      "va": "0x8e1500",
+      "refs": [
+        ".moe",
+        "Cannot open file ",
+        "This file is not a valid GNU gettext mo file: "
+      ]
+    },
+    {
+      "va": "0x9dece0",
+      "refs": [
+        "en",
+        "Software\\Image-Line\\Shared\\Language",
+        "Program Language"
+      ]
+    },
+    {
+      "va": "0x9deaa0",
+      "refs": [
+        "zh",
+        "Default"
+      ]
+    },
+    {
+      "va": "0x9db5b0",
+      "refs": [
+        "Languages\\",
+        "System\\Languages\\",
+        "Skins",
+        "Artwork\\Skins\\",
+        "Themes",
+        "Artwork\\Themes\\"
+      ]
+    },
+    {
+      "va": "0x136cba0",
+      "refs": [
+        "SplashImage",
+        "Title.png"
+      ]
+    },
+    {
+      "va": "0x11bfb10",
+      "refs": [
+        "StartSnd.wv"
+      ]
+    },
+    {
+      "va": "0x1368840",
+      "refs": [
+        "StartSnd.wv"
+      ]
+    },
+    {
+      "va": "0x1369240",
+      "refs": [
+        "BigFruit.png",
+        "System\\Texts\\",
+        "AboutTxt.txt"
+      ]
+    },
+    {
+      "va": "0x107f990",
+      "refs": [
+        "ClipHanger.png"
+      ]
+    },
+    {
+      "va": "0xec6760",
+      "refs": [
+        "PickerChan.png",
+        "Cuprum.ttf"
+      ]
+    },
+    {
+      "va": "0xf633b0",
+      "refs": [
+        "ScopeGradient.bmp"
+      ]
+    },
+    {
+      "va": "0xf69c90",
+      "refs": [
+        "ScopeGradient.bmp"
+      ]
+    },
+    {
+      "va": "0xc4eac0",
+      "refs": [
+        "RenderSnd.wv"
+      ]
+    },
+    {
+      "va": "0xd1d230",
+      "refs": [
+        "RenderSnd.wv"
+      ]
+    },
+    {
+      "va": "0x1188470",
+      "refs": [
+        "RenderSnd.wv"
+      ]
+    },
+    {
+      "va": "0x11317b0",
+      "refs": [
+        "thmDefault.png",
+        "tweak_default.png",
+        "__current.flstheme"
+      ]
+    },
+    {
+      "va": "0x11c58d0",
+      "refs": [
+        "Wallpapers",
+        "Default.txt"
+      ]
+    },
+    {
+      "va": "0x11f7b40",
+      "refs": [
+        "Browser.html",
+        "Wallpapers"
+      ]
+    },
+    {
+      "va": "0x668d30",
+      "refs": [
+        "OpenSans-Regular",
+        "ILGlyphsEx.ilfont",
+        "segoeui.ttf"
+      ]
+    },
+    {
+      "va": "0x668b50",
+      "refs": [
+        "Artwork\\Fonts",
+        "ILGlyphsEx.ilfont"
+      ]
+    },
+    {
+      "va": "0x10be350",
+      "refs": [
+        "FLStudio%sHelp",
+        "HelpPlugins.scr",
+        "HelpAliases.scr"
+      ]
+    },
+    {
+      "va": "0x1196c00",
+      "refs": [
+        "  Initialize the help file"
+      ]
+    },
+    {
+      "va": "0x10be5c0",
+      "refs": [
+        "index_offline.html",
+        "/html/%s"
+      ]
+    },
+    {
+      "va": "0x10be8c0",
+      "refs": [
+        "/html/FD/web/documents/%s.html"
+      ]
+    },
+    {
+      "va": "0x10bea60",
+      "refs": [
+        "/html/plugins/%s.htm"
+      ]
+    },
+    {
+      "va": "0xf1d660",
+      "refs": [
+        "WhatsNew.htm"
+      ]
+    },
+    {
+      "va": "0x10d5980",
+      "refs": [
+        "BoxEdition.txt",
+        "NotReggedTxt.txt",
+        "DemoTxt.txt"
+      ]
+    },
+    {
+      "va": "0x11cb000",
+      "refs": [
+        "NewVersion.txt"
+      ]
+    },
+    {
+      "va": "0x1366ae0",
+      "refs": [
+        "SincIP_Realtime.txt"
+      ]
+    },
+    {
+      "va": "0x11db420",
+      "refs": [
+        "Data\\System\\Empty.flp"
+      ]
+    },
+    {
+      "va": "0x1375990",
+      "refs": [
+        "HostVersion=%d Flags=%.8x",
+        "Init core paths",
+        "BasicInitialization failed."
+      ]
+    },
+    {
+      "va": "0x11ef180",
+      "refs": [
+        "ProcessFirstTimeStuff",
+        "Play startup sound"
+      ]
+    },
+    {
+      "va": "0xdceea0",
+      "refs": [
+        ".svg"
+      ]
+    }
+  ],
+  "calls": [
+    [
+      "0x1375990",
+      "0x13754b0"
+    ],
+    [
+      "0x13754b0",
+      "0x9deaa0"
+    ],
+    [
+      "0x9deaa0",
+      "0x9dece0"
+    ],
+    [
+      "0x9deaa0",
+      "0x9de620"
+    ],
+    [
+      "0x9de620",
+      "0x9de400"
+    ],
+    [
+      "0x9deaa0",
+      "0x9de810"
+    ],
+    [
+      "0x8daeb0",
+      "0x8e0110"
+    ],
+    [
+      "0x8e0110",
+      "0x8e1500"
+    ],
+    [
+      "0x8e1500",
+      "0x8e13f0"
+    ],
+    [
+      "0x8e13f0",
+      "0x8d85d0"
+    ],
+    [
+      "0x8d85d0",
+      "0x8d5670"
+    ],
+    [
+      "0x8d85d0",
+      "0x8d8510"
+    ],
+    [
+      "0x8e13f0",
+      "0x8e1000"
+    ],
+    [
+      "0x11a57c0",
+      "0x1196c00"
+    ],
+    [
+      "0x1196c00",
+      "0x10be350"
+    ],
+    [
+      "0x1196c00",
+      "0x11c58d0"
+    ],
+    [
+      "0x13734d0",
+      "0x136cba0"
+    ],
+    [
+      "0x1127e60",
+      "0x11317b0"
+    ],
+    [
+      "0xe1d090",
+      "0x11db420"
+    ],
+    [
+      "0x66d050",
+      "0x668d30"
+    ],
+    [
+      "0x10be820",
+      "0x10be5c0"
+    ],
+    [
+      "0x10d0ff0",
+      "0x10be8c0"
+    ],
+    [
+      "0x13303e0",
+      "0x10bea60"
+    ],
+    [
+      "0xf1be90",
+      "0x11f7b40"
+    ]
+  ]
+}
