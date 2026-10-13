@@ -1,0 +1,3116 @@
+{
+ "date": "2026-10-13T05:21:59.853Z",
+ "reps": 3,
+ "secs": 6,
+ "elapsed_s": 230.94,
+ "loadavg_start": 0.04,
+ "loadavg_end": 0.16,
+ "chrome": "headless google-chrome",
+ "gates": [
+  {
+   "name": "wl_ramp_b128",
+   "ok": true,
+   "msg": "ramp 290688/290688 bit-exact, jumps=0, renders=2272, gap_max=15ms"
+  },
+  {
+   "name": "wl_ramp_b256",
+   "ok": true,
+   "msg": "ramp 290560/290560 bit-exact, jumps=0, renders=1136, gap_max=12ms"
+  },
+  {
+   "name": "wl_ramp_b512",
+   "ok": true,
+   "msg": "ramp 289920/289920 bit-exact, jumps=0, renders=567, gap_max=12ms"
+  },
+  {
+   "name": "wl_loop_b128#0",
+   "ok": true,
+   "msg": "lag=128f (2.67ms) corr=1.0000 (want lag=128f)"
+  },
+  {
+   "name": "ring_loop_b128#0",
+   "ok": true,
+   "msg": "lag=1408f (29.33ms) T=1408f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b128#1",
+   "ok": true,
+   "msg": "lag=128f (2.67ms) corr=1.0000 (want lag=128f)"
+  },
+  {
+   "name": "ring_loop_b128#1",
+   "ok": true,
+   "msg": "lag=1408f (29.33ms) T=1408f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b128#2",
+   "ok": true,
+   "msg": "lag=128f (2.67ms) corr=1.0000 (want lag=128f)"
+  },
+  {
+   "name": "ring_loop_b128#2",
+   "ok": true,
+   "msg": "lag=1408f (29.33ms) T=1408f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b256#0",
+   "ok": true,
+   "msg": "lag=256f (5.33ms) corr=1.0000 (want lag=256f)"
+  },
+  {
+   "name": "ring_loop_b256#0",
+   "ok": true,
+   "msg": "lag=1536f (32.00ms) T=1536f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b256#1",
+   "ok": true,
+   "msg": "lag=256f (5.33ms) corr=1.0000 (want lag=256f)"
+  },
+  {
+   "name": "ring_loop_b256#1",
+   "ok": true,
+   "msg": "lag=1536f (32.00ms) T=1536f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b256#2",
+   "ok": true,
+   "msg": "lag=256f (5.33ms) corr=1.0000 (want lag=256f)"
+  },
+  {
+   "name": "ring_loop_b256#2",
+   "ok": true,
+   "msg": "lag=1536f (32.00ms) T=1536f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b512#0",
+   "ok": true,
+   "msg": "lag=512f (10.67ms) corr=1.0000 (want lag=512f)"
+  },
+  {
+   "name": "ring_loop_b512#0",
+   "ok": true,
+   "msg": "lag=2048f (42.67ms) T=2048f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b512#1",
+   "ok": true,
+   "msg": "lag=512f (10.67ms) corr=1.0000 (want lag=512f)"
+  },
+  {
+   "name": "ring_loop_b512#1",
+   "ok": true,
+   "msg": "lag=2048f (42.67ms) T=2048f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "wl_loop_b512#2",
+   "ok": true,
+   "msg": "lag=512f (10.67ms) corr=1.0000 (want lag=512f)"
+  },
+  {
+   "name": "ring_loop_b512#2",
+   "ok": true,
+   "msg": "lag=2048f (42.67ms) T=2048f burst_obs=512 corr=1.0000 underruns=0 in_overruns=0"
+  },
+  {
+   "name": "compare_b128",
+   "ok": true,
+   "msg": "worklet 直走行 lag max=128f < ring lag min=1408f  (中央値 2.67ms vs 29.33ms, 差 26.67ms)"
+  },
+  {
+   "name": "compare_b256",
+   "ok": true,
+   "msg": "worklet 直走行 lag max=256f < ring lag min=1536f  (中央値 5.33ms vs 32.00ms, 差 26.67ms)"
+  },
+  {
+   "name": "compare_b512",
+   "ok": true,
+   "msg": "worklet 直走行 lag max=512f < ring lag min=2048f  (中央値 10.67ms vs 42.67ms, 差 32.00ms)"
+  },
+  {
+   "name": "load_0.75_wl",
+   "ok": true,
+   "msg": "work=4000us/予算5333us: ramp 不一致 0, jumps=0, rt_ratio=1.001, 較正 5714.3 iter/us"
+  },
+  {
+   "name": "load_0.75_ring",
+   "ok": true,
+   "msg": "work=4000us: underruns=0 T=1536f cb_max=4024us"
+  },
+  {
+   "name": "overload_1.5_wl_detects",
+   "ok": true,
+   "msg": "work=8000us>予算: 健全性 gate が FAIL を検出 (ramp 不一致 0, jumps=0, rt_ratio=0.6351)",
+   "negctl": true
+  },
+  {
+   "name": "overload_1.5_ring_detects",
+   "ok": true,
+   "msg": "work=8000us>予算: underruns=443 (>0 を期待)",
+   "negctl": true
+  },
+  {
+   "name": "wl_probe_atomic_wait32_traps",
+   "ok": true,
+   "msg": "到達マーカ=100 (100=到達後に戻らず) quanta=10 (10 で停止 = process() が死んだ) 3s 後"
+  },
+  {
+   "name": "neg_loop_gate_no_input",
+   "ok": true,
+   "msg": "入力を接続しない loop: corr=0 input_rms=0 → lag gate が FAIL",
+   "negctl": true
+  },
+  {
+   "name": "neg_wl_gate_on_ring_result",
+   "ok": true,
+   "msg": "ring の lag=1536f を wl 用 gate (lag==256) に通す → FAIL",
+   "negctl": true
+  },
+  {
+   "name": "neg_ramp_gate_one_mismatch",
+   "ok": true,
+   "msg": "ramp を 1 件壊した結果は wlRampOk が FAIL",
+   "negctl": true
+  }
+ ],
+ "failed": 0,
+ "raw": [
+  {
+   "name": "wl_ramp_b128",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 1,
+    "buf": 128,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290816,
+    "quanta": 2272,
+    "renders": 2272,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1653,
+     16,
+     599,
+     3,
+     0,
+     0
+    ],
+    "gap_max_ms": 15,
+    "iters_per_us": 0,
+    "wall_ms": 6016.6,
+    "rt_ratio": 0.9995,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "ramp",
+     "buf": 128,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290816,
+     "sr": 48000,
+     "ramp": {
+      "frames_checked": 290688,
+      "bit_exact": 290688,
+      "mismatches": 0,
+      "first_mismatch_frame": -1,
+      "head_nonzero": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_ramp_b256",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 1,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290816,
+    "quanta": 2272,
+    "renders": 1136,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1653,
+     14,
+     604,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 12,
+    "iters_per_us": 0,
+    "wall_ms": 6013.3,
+    "rt_ratio": 1,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "ramp",
+     "buf": 256,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290816,
+     "sr": 48000,
+     "ramp": {
+      "frames_checked": 290560,
+      "bit_exact": 290560,
+      "mismatches": 0,
+      "first_mismatch_frame": -1,
+      "head_nonzero": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_ramp_b512",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 1,
+    "buf": 512,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290432,
+    "quanta": 2269,
+    "renders": 567,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1646,
+     19,
+     603,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 12,
+    "iters_per_us": 0,
+    "wall_ms": 6003,
+    "rt_ratio": 1,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "ramp",
+     "buf": 512,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290432,
+     "sr": 48000,
+     "ramp": {
+      "frames_checked": 289920,
+      "bit_exact": 289920,
+      "mismatches": 0,
+      "first_mismatch_frame": -1,
+      "head_nonzero": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b128_0",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 128,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290304,
+    "quanta": 2268,
+    "renders": 2268,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1646,
+     18,
+     603,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 11,
+    "iters_per_us": 0,
+    "wall_ms": 6006.3,
+    "rt_ratio": 0.9994,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 128,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290304,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 128,
+      "lag_ms": 2.6666666666666665,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b128_0",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 128,
+    "depth": 11,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 737,
+     "lat_out": 3457,
+     "lat_out0": 3457,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 2251,
+     "cb_late": 0,
+     "cb_max_us": 50,
+     "cb_avg_us": 1,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "avg_fill": 1211,
+     "wake_count": 1027,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      1003,
+      24,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 1408,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 48000.011,
+     "audible_minus_now_ms": 33.916,
+     "monotonic": 1
+    },
+    "produced_frames": 289664,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 289664,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 2252,
+     "cb_late": 0,
+     "cb_max_us": 50,
+     "wake_count": 1029,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 128,
+     "depth": 11,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 128,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 0.9999986579039735
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1622,
+      "1-5": 36,
+      "6-12": 598,
+      "13-20": 1,
+      "21-40": 0,
+      ">40": 0,
+      "max": 15
+     },
+     "spans": [
+      [
+       1408,
+       287104,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1024,
+      "max": 1408,
+      "avg": 1317.4425645592164,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 1408,
+      "lag_ms": 29.333333333333332,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b128_1",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 128,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290816,
+    "quanta": 2272,
+    "renders": 2272,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1650,
+     17,
+     603,
+     1,
+     0,
+     0
+    ],
+    "gap_max_ms": 13,
+    "iters_per_us": 0,
+    "wall_ms": 6015.3,
+    "rt_ratio": 0.9997,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 128,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290816,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 128,
+      "lag_ms": 2.6666666666666665,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b128_1",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 128,
+    "depth": 11,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 737,
+     "lat_out": 3457,
+     "lat_out0": 3457,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 2251,
+     "cb_late": 0,
+     "cb_max_us": 44,
+     "cb_avg_us": 1,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "avg_fill": 1219,
+     "wake_count": 1086,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      1061,
+      25,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 1408,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 48000.104,
+     "audible_minus_now_ms": 33.49,
+     "monotonic": 1
+    },
+    "produced_frames": 289664,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 289664,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 2252,
+     "cb_late": 0,
+     "cb_max_us": 44,
+     "wake_count": 1088,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 128,
+     "depth": 11,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 128,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 1.0000004299069063
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1618,
+      "1-5": 39,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       1408,
+       287104,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1024,
+      "max": 1408,
+      "avg": 1327.3588601959038,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 1408,
+      "lag_ms": 29.333333333333332,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b128_2",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 128,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290816,
+    "quanta": 2272,
+    "renders": 2272,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1655,
+     12,
+     603,
+     1,
+     0,
+     0
+    ],
+    "gap_max_ms": 13,
+    "iters_per_us": 0,
+    "wall_ms": 6018.9,
+    "rt_ratio": 0.9991,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 128,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290816,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 128,
+      "lag_ms": 2.6666666666666665,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b128_2",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 128,
+    "depth": 11,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 737,
+     "lat_out": 3457,
+     "lat_out0": 3457,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 2251,
+     "cb_late": 0,
+     "cb_max_us": 10,
+     "cb_avg_us": 1,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "avg_fill": 1223,
+     "wake_count": 1112,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      1082,
+      30,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 1408,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 48000.046,
+     "audible_minus_now_ms": 33.498,
+     "monotonic": 1
+    },
+    "produced_frames": 289664,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 289664,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 2252,
+     "cb_late": 0,
+     "cb_max_us": 10,
+     "wake_count": 1114,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 128,
+     "depth": 11,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 128,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 0.999997722755034
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1618,
+      "1-5": 39,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       1408,
+       287104,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1024,
+      "max": 1408,
+      "avg": 1332.5449688334818,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 1408,
+      "lag_ms": 29.333333333333332,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b256_0",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290304,
+    "quanta": 2268,
+    "renders": 1134,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1644,
+     20,
+     602,
+     1,
+     0,
+     0
+    ],
+    "gap_max_ms": 14,
+    "iters_per_us": 0,
+    "wall_ms": 6006.9,
+    "rt_ratio": 0.9993,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 256,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290304,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 256,
+      "lag_ms": 5.333333333333333,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b256_0",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 256,
+    "depth": 6,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.002,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 865,
+     "lat_out": 3585,
+     "lat_out0": 3585,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 1125,
+     "cb_late": 0,
+     "cb_max_us": 24,
+     "cb_avg_us": 2,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "avg_fill": 1194,
+     "wake_count": 849,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      826,
+      23,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 1536,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 47999.997,
+     "audible_minus_now_ms": 33.32,
+     "monotonic": 1
+    },
+    "produced_frames": 289792,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 289792,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 1126,
+     "cb_late": 0,
+     "cb_max_us": 24,
+     "wake_count": 851,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 256,
+     "depth": 6,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 256,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 1.000000135695724
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1626,
+      "1-5": 31,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       1536,
+       286976,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1024,
+      "max": 1536,
+      "avg": 1361.7809439002672,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 1536,
+      "lag_ms": 32,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b256_1",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 291328,
+    "quanta": 2276,
+    "renders": 1138,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1657,
+     13,
+     605,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 11,
+    "iters_per_us": 0,
+    "wall_ms": 6021,
+    "rt_ratio": 1.0005,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 256,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 291328,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 256,
+      "lag_ms": 5.333333333333333,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b256_1",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 256,
+    "depth": 6,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 865,
+     "lat_out": 3585,
+     "lat_out0": 3585,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 1125,
+     "cb_late": 0,
+     "cb_max_us": 44,
+     "cb_avg_us": 2,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "avg_fill": 1160,
+     "wake_count": 717,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      700,
+      17,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 1536,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 47999.763,
+     "audible_minus_now_ms": 33.708,
+     "monotonic": 1
+    },
+    "produced_frames": 289792,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 289792,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 1126,
+     "cb_late": 0,
+     "cb_max_us": 44,
+     "wake_count": 719,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 256,
+     "depth": 6,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 256,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 0.9999970334253043
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1636,
+      "1-5": 21,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       1536,
+       286976,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1024,
+      "max": 1536,
+      "avg": 1332.7159394479074,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 1536,
+      "lag_ms": 32,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b256_2",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290816,
+    "quanta": 2272,
+    "renders": 1136,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1653,
+     14,
+     604,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 11,
+    "iters_per_us": 0,
+    "wall_ms": 6010.2,
+    "rt_ratio": 1.0005,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 256,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290816,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 256,
+      "lag_ms": 5.333333333333333,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b256_2",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 256,
+    "depth": 6,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 865,
+     "lat_out": 3585,
+     "lat_out0": 3585,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 1125,
+     "cb_late": 0,
+     "cb_max_us": 40,
+     "cb_avg_us": 2,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "avg_fill": 1181,
+     "wake_count": 795,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      776,
+      19,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 1536,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 48000.015,
+     "audible_minus_now_ms": 33.898,
+     "monotonic": 1
+    },
+    "produced_frames": 289792,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 289792,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 1126,
+     "cb_late": 0,
+     "cb_max_us": 40,
+     "wake_count": 797,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 256,
+     "depth": 6,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 256,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 0.9999988540012166
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1628,
+      "1-5": 29,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       1536,
+       286976,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1024,
+      "max": 1536,
+      "avg": 1349.3570792520036,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 1536,
+      "lag_ms": 32,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b512_0",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 512,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 291328,
+    "quanta": 2276,
+    "renders": 569,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1658,
+     12,
+     605,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 11,
+    "iters_per_us": 0,
+    "wall_ms": 6020.4,
+    "rt_ratio": 1.0006,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 512,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 291328,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 512,
+      "lag_ms": 10.666666666666666,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b512_0",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 512,
+    "depth": 4,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 1121,
+     "lat_out": 4097,
+     "lat_out0": 4097,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 562,
+     "cb_late": 0,
+     "cb_max_us": 15,
+     "cb_avg_us": 3,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 1152,
+     "avg_fill": 1425,
+     "wake_count": 562,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      540,
+      22,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 2048,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 47999.928,
+     "audible_minus_now_ms": 33.45,
+     "monotonic": 1
+    },
+    "produced_frames": 290304,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 290304,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 563,
+     "cb_late": 0,
+     "cb_max_us": 15,
+     "wake_count": 564,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 1152,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 512,
+     "depth": 4,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 512,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 1.0000003405834432
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1627,
+      "1-5": 30,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       2048,
+       286464,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1280,
+      "max": 2048,
+      "avg": 1719.3374888691005,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 2048,
+      "lag_ms": 42.666666666666664,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b512_1",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 512,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 291328,
+    "quanta": 2276,
+    "renders": 569,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1650,
+     20,
+     605,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 11,
+    "iters_per_us": 0,
+    "wall_ms": 6024.1,
+    "rt_ratio": 1,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 512,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 291328,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 512,
+      "lag_ms": 10.666666666666666,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b512_1",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 512,
+    "depth": 4,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 1121,
+     "lat_out": 4097,
+     "lat_out0": 4097,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 562,
+     "cb_late": 0,
+     "cb_max_us": 50,
+     "cb_avg_us": 3,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 1152,
+     "avg_fill": 1416,
+     "wake_count": 562,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      547,
+      15,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 2048,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 47999.666,
+     "audible_minus_now_ms": 33.419,
+     "monotonic": 1
+    },
+    "produced_frames": 290304,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 290304,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 563,
+     "cb_late": 0,
+     "cb_max_us": 50,
+     "wake_count": 564,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 1152,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 512,
+     "depth": 4,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 512,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 0.9999951744026425
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1635,
+      "1-5": 22,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       2048,
+       286464,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1280,
+      "max": 2048,
+      "avg": 1713.86642920748,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 2048,
+      "lag_ms": 42.666666666666664,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_loop_b512_2",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 512,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 291328,
+    "quanta": 2276,
+    "renders": 569,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1650,
+     20,
+     605,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 11,
+    "iters_per_us": 0,
+    "wall_ms": 6021.6,
+    "rt_ratio": 1.0004,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 512,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 291328,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 512,
+      "lag_ms": 10.666666666666666,
+      "input_rms": 0.2886665785592893
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_loop_b512_2",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 512,
+    "depth": 4,
+    "sr": 48000,
+    "mode": 2,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 1121,
+     "lat_out": 4097,
+     "lat_out0": 4097,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 562,
+     "cb_late": 0,
+     "cb_max_us": 10,
+     "cb_avg_us": 4,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 1152,
+     "avg_fill": 1425,
+     "wake_count": 562,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2251,
+     "reset_requests": 0,
+     "wake_hist": [
+      534,
+      28,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 2048,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 48000.079,
+     "audible_minus_now_ms": 33.378,
+     "monotonic": 1
+    },
+    "produced_frames": 290304,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2258,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288512,
+     "out_write": 290304,
+     "in_write": 288512,
+     "in_read": 288256,
+     "gen": 1,
+     "cb_count": 563,
+     "cb_late": 0,
+     "cb_max_us": 10,
+     "wake_count": 564,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 1152,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 512,
+     "depth": 4,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "loop",
+     "buf": 512,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 0,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "noise",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 1.0000019678535041
+    },
+    "verify": {
+     "covered_frames": 288512,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2254,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1627,
+      "1-5": 30,
+      "6-12": 600,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 10
+     },
+     "spans": [
+      [
+       2048,
+       286464,
+       -0.4795973300933838
+      ]
+     ],
+     "device_fill": {
+      "min": 1280,
+      "max": 2048,
+      "avg": 1721.6170970614426,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 1,
+      "lag_frames": 2048,
+      "lag_ms": 42.666666666666664,
+      "input_rms": 0.28866657855928923
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_load_0.75",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 1,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 4000,
+    "secs": 6,
+    "covered_frames": 291328,
+    "quanta": 2276,
+    "renders": 1137,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     834,
+     1068,
+     373,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 7,
+    "iters_per_us": 5714.3,
+    "wall_ms": 6025.9,
+    "rt_ratio": 1.001,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "ramp",
+     "buf": 256,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 4000,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 291328,
+     "sr": 48000,
+     "ramp": {
+      "frames_checked": 291072,
+      "bit_exact": 291072,
+      "mismatches": 0,
+      "first_mismatch_frame": -1,
+      "head_nonzero": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_load_0.75",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 256,
+    "depth": 6,
+    "sr": 48000,
+    "mode": 1,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 865,
+     "lat_out": 3585,
+     "lat_out0": 3585,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 1124,
+     "cb_late": 0,
+     "cb_max_us": 4024,
+     "cb_avg_us": 4001,
+     "underruns": 0,
+     "silence_frames": 0,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "avg_fill": 1175,
+     "wake_count": 599,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2258,
+     "reset_requests": 0,
+     "wake_hist": [
+      586,
+      13,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 0,
+     "T": 1536,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 47999.911,
+     "audible_minus_now_ms": 33.517,
+     "monotonic": 1
+    },
+    "produced_frames": 289536,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 0,
+     "silence_frames": 0,
+     "quanta": 2262,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 288128,
+     "out_write": 289536,
+     "in_write": 0,
+     "in_read": 0,
+     "gen": 1,
+     "cb_count": 1125,
+     "cb_late": 0,
+     "cb_max_us": 4024,
+     "wake_count": 599,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 896,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 256,
+     "depth": 6,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "ramp",
+     "buf": 256,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 4000,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "none",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 0.9999984420489805
+    },
+    "verify": {
+     "covered_frames": 288128,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 2251,
+     "first_underrun_q": 0,
+     "last_underrun_q": 0,
+     "underrun_events": 0,
+     "audio_thread_gap_ms_hist": {
+      "0": 1638,
+      "1-5": 22,
+      "6-12": 601,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 11
+     },
+     "spans": [
+      [
+       0,
+       288128,
+       1
+      ]
+     ],
+     "device_fill": {
+      "min": 1024,
+      "max": 1536,
+      "avg": 1292.7258136424432,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "ramp": {
+      "frames_checked": 288128,
+      "bit_exact": 288128,
+      "mismatches": 0,
+      "first_mismatch_frame": -1,
+      "tail_shift_exact": {
+       "silence_S": 0,
+       "checked": 17000,
+       "exact": 17000
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_load_1.5",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 1,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 8000,
+    "secs": 6,
+    "covered_frames": 184320,
+    "quanta": 1440,
+    "renders": 719,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     701,
+     19,
+     719,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 10,
+    "iters_per_us": 6666.7,
+    "wall_ms": 6020.9,
+    "rt_ratio": 0.6351,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "ramp",
+     "buf": 256,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 8000,
+     "probe": 0,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 184320,
+     "sr": 48000,
+     "ramp": {
+      "frames_checked": 184064,
+      "bit_exact": 184064,
+      "mismatches": 0,
+      "first_mismatch_frame": -1,
+      "head_nonzero": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "ring_load_1.5",
+   "r": {
+    "api": "asio",
+    "driver": "FL Studio ASIO",
+    "buf": 256,
+    "depth": 62,
+    "sr": 48000,
+    "mode": 1,
+    "secs_wall": 6.003,
+    "reported": {
+     "nin": 2,
+     "nout": 2,
+     "min": 256,
+     "max": 4096,
+     "pref": 512,
+     "gran": 0,
+     "lat_in": 865,
+     "lat_out": 17921,
+     "lat_out0": 3585,
+     "olat_us0": 30000,
+     "ch_type": 19
+    },
+    "stats": {
+     "cb_count": 748,
+     "cb_late": 0,
+     "cb_max_us": 8010,
+     "cb_avg_us": 8000,
+     "underruns": 443,
+     "silence_frames": 94976,
+     "in_overruns": 0,
+     "in_underflows": 0,
+     "min_fill": 256,
+     "avg_fill": 320,
+     "wake_count": 2,
+     "wait_timeouts": 0,
+     "ring_frames": 16384,
+     "quanta": 2269,
+     "reset_requests": 0,
+     "wake_hist": [
+      2,
+      0,
+      0,
+      0,
+      0,
+      0
+     ],
+     "latency_changes": 56,
+     "T": 15872,
+     "burst_obs": 512,
+     "timeinfo_cb": 0
+    },
+    "timeinfo": {
+     "calls": 0,
+     "bad": 0,
+     "st_n": 0,
+     "st_invalid": 0,
+     "st_nonmono": 0,
+     "st_dmin": 0,
+     "st_dmax": 0
+    },
+    "clock": {
+     "samples": 24,
+     "fit_ok": 1,
+     "rate_hz": 48000.031,
+     "audible_minus_now_ms": 33.058,
+     "monotonic": 1
+    },
+    "produced_frames": 193280,
+    "resets_seen": 0,
+    "rate_changes": 0,
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03
+    },
+    "snapshot": {
+     "underruns": 443,
+     "silence_frames": 94976,
+     "quanta": 2273,
+     "in_overruns": 0,
+     "wl_state": 0,
+     "out_read": 193024,
+     "out_write": 193280,
+     "in_write": 0,
+     "in_read": 0,
+     "gen": 1,
+     "cb_count": 749,
+     "cb_late": 0,
+     "cb_max_us": 8010,
+     "wake_count": 2,
+     "wait_timeouts": 0,
+     "in_underflows": 0,
+     "min_fill": 256,
+     "clock_jumps": 0,
+     "clock_jump_frames": 0,
+     "ring_frames": 16384,
+     "buffer_frames": 256,
+     "depth": 62,
+     "sample_rate": 48000,
+     "out_latency_us": 30000,
+     "base_latency_us": 10021
+    },
+    "workletErrors": [],
+    "cfg": {
+     "api": "asio",
+     "mode": "ramp",
+     "buf": 256,
+     "depth": 2,
+     "secs": 6,
+     "sr": 48000,
+     "stress": 0,
+     "work_us": 8000,
+     "hiccup_ms": 0,
+     "hiccup_every": 0,
+     "timeinfo": 0,
+     "sr_after": 0,
+     "burst_floor": 0,
+     "input": "none",
+     "jank": false,
+     "suspend": false,
+     "olat_zero_ms": 0
+    },
+    "ref_slope": {
+     "n": 25,
+     "ctx_per_wall": 1.000000287402274
+    },
+    "verify": {
+     "covered_frames": 288000,
+     "sr": 48000,
+     "gen_inits": 1,
+     "playing_quanta": 1508,
+     "first_underrun_q": 28,
+     "last_underrun_q": 2249,
+     "underrun_events": 443,
+     "audio_thread_gap_ms_hist": {
+      "0": 1652,
+      "1-5": 16,
+      "6-12": 604,
+      "13-20": 0,
+      "21-40": 0,
+      ">40": 0,
+      "max": 12
+     },
+     "spans": [
+      [
+       0,
+       3615,
+       1
+      ],
+      [
+       3840,
+       287,
+       112.03125
+      ],
+      [
+       4224,
+       799,
+       120.03125
+      ],
+      [
+       5248,
+       287,
+       144.03125
+      ],
+      [
+       5760,
+       287,
+       152.03125
+      ],
+      [
+       6144,
+       799,
+       160.03125
+      ],
+      [
+       7168,
+       287,
+       184.03125
+      ],
+      [
+       7680,
+       287,
+       192.03125
+      ],
+      [
+       8064,
+       799,
+       200.03125
+      ],
+      [
+       9088,
+       287,
+       224.03125
+      ],
+      [
+       9600,
+       287,
+       232.03125
+      ],
+      [
+       9984,
+       799,
+       240.03125
+      ]
+     ],
+     "device_fill": {
+      "min": 0,
+      "max": 1024,
+      "avg": 170.47636039250668,
+      "unit": "frames (リング充填, worklet 消費直前)"
+     },
+     "ramp": {
+      "frames_checked": 288000,
+      "bit_exact": 3584,
+      "mismatches": 284416,
+      "first_mismatch_frame": 3584,
+      "tail_shift_exact": {
+       "silence_S": 94976,
+       "checked": 17000,
+       "exact": 0
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "wl_probe_wait32",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 0,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 3,
+    "covered_frames": 1280,
+    "quanta": 10,
+    "renders": 5,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     7,
+     0,
+     3,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 10,
+    "iters_per_us": 0,
+    "wall_ms": 3005.5,
+    "rt_ratio": 0,
+    "probe": {
+     "atomic_wait32": 100
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "sine",
+     "buf": 256,
+     "secs": 3,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 2,
+     "neg": 0
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 1280,
+     "sr": 48000,
+     "sine": {
+      "frames_checked": 1024,
+      "max_abs_err": 1.4869736886247154e-8,
+      "zero_runs_ge16": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "neg_wl_loop_no_input",
+   "r": {
+    "api": "worklet_direct",
+    "mode": 2,
+    "buf": 256,
+    "sr": 48000,
+    "work_us": 0,
+    "secs": 6,
+    "covered_frames": 290816,
+    "quanta": 2272,
+    "renders": 1136,
+    "clock_jumps": 0,
+    "clock_jump_frames": 0,
+    "gap_hist": [
+     1654,
+     13,
+     604,
+     0,
+     0,
+     0
+    ],
+    "gap_max_ms": 11,
+    "iters_per_us": 0,
+    "wall_ms": 6021.6,
+    "rt_ratio": 0.9986,
+    "probe": {
+     "atomic_wait32": -99
+    },
+    "exit": 1,
+    "ctx": {
+     "sampleRate": 48000,
+     "baseLatency": 0.010020833333333333,
+     "outputLatency": 0.03,
+     "state": "running"
+    },
+    "cfg": {
+     "mode": "loop",
+     "buf": 256,
+     "secs": 6,
+     "sr": 48000,
+     "work_us": 0,
+     "probe": 0,
+     "neg": 1
+    },
+    "stderr": [],
+    "verify": {
+     "covered_frames": 290816,
+     "sr": 48000,
+     "loop": {
+      "window": 48000,
+      "base": 24000,
+      "best_norm_corr": 0,
+      "lag_frames": 0,
+      "lag_ms": 0,
+      "input_rms": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "summary",
+   "r": {
+    "128": {
+     "wl_lag_frames": [
+      128,
+      128,
+      128
+     ],
+     "ring_lag_frames": [
+      1408,
+      1408,
+      1408
+     ],
+     "ring_T_frames": [
+      1408,
+      1408,
+      1408
+     ],
+     "wl_median_ms": 2.6666666666666665,
+     "ring_median_ms": 29.333333333333332,
+     "saved_median_ms": 26.666666666666668
+    },
+    "256": {
+     "wl_lag_frames": [
+      256,
+      256,
+      256
+     ],
+     "ring_lag_frames": [
+      1536,
+      1536,
+      1536
+     ],
+     "ring_T_frames": [
+      1536,
+      1536,
+      1536
+     ],
+     "wl_median_ms": 5.333333333333333,
+     "ring_median_ms": 32,
+     "saved_median_ms": 26.666666666666668
+    },
+    "512": {
+     "wl_lag_frames": [
+      512,
+      512,
+      512
+     ],
+     "ring_lag_frames": [
+      2048,
+      2048,
+      2048
+     ],
+     "ring_T_frames": [
+      2048,
+      2048,
+      2048
+     ],
+     "wl_median_ms": 10.666666666666666,
+     "ring_median_ms": 42.666666666666664,
+     "saved_median_ms": 32
+    }
+   }
+  }
+ ]
+}

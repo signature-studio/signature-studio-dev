@@ -1,0 +1,269 @@
+{
+ "pe": "/home/runner/work/_temp/fl-win64/extracted/block00031_PE.bin",
+ "negctl": false,
+ "functions": 57816,
+ "imports": 795,
+ "summary": {
+  "thread_create": {
+   "imported_apis": 3,
+   "call_sites": 17,
+   "distinct_functions": 17
+  },
+  "blocking_wait": {
+   "imported_apis": 9,
+   "call_sites": 760,
+   "distinct_functions": 594
+  },
+  "nonblocking_sync": {
+   "imported_apis": 6,
+   "call_sites": 971,
+   "distinct_functions": 759
+  },
+  "atomic": {
+   "imported_apis": 0,
+   "call_sites": 0,
+   "distinct_functions": 0
+  },
+  "thread_attr": {
+   "imported_apis": 11,
+   "call_sites": 75,
+   "distinct_functions": 65
+  }
+ },
+ "rows": [
+  {
+   "class": "blocking_wait",
+   "api": "EnterCriticalSection",
+   "dll": "kernel32.dll",
+   "call_sites": 699,
+   "distinct_functions": 550
+  },
+  {
+   "class": "blocking_wait",
+   "api": "Sleep",
+   "dll": "kernel32.dll",
+   "call_sites": 33,
+   "distinct_functions": 25
+  },
+  {
+   "class": "blocking_wait",
+   "api": "WaitForSingleObject",
+   "dll": "kernel32.dll",
+   "call_sites": 16,
+   "distinct_functions": 16
+  },
+  {
+   "class": "blocking_wait",
+   "api": "MsgWaitForMultipleObjects",
+   "dll": "user32.dll",
+   "call_sites": 3,
+   "distinct_functions": 3
+  },
+  {
+   "class": "blocking_wait",
+   "api": "SwitchToThread",
+   "dll": "kernel32.dll",
+   "call_sites": 3,
+   "distinct_functions": 3
+  },
+  {
+   "class": "blocking_wait",
+   "api": "WaitForMultipleObjectsEx",
+   "dll": "kernel32.dll",
+   "call_sites": 3,
+   "distinct_functions": 3
+  },
+  {
+   "class": "blocking_wait",
+   "api": "MsgWaitForMultipleObjectsEx",
+   "dll": "user32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "blocking_wait",
+   "api": "SignalObjectAndWait",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "blocking_wait",
+   "api": "WaitForMultipleObjects",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "nonblocking_sync",
+   "api": "LeaveCriticalSection",
+   "dll": "kernel32.dll",
+   "call_sites": 799,
+   "distinct_functions": 635
+  },
+  {
+   "class": "nonblocking_sync",
+   "api": "DeleteCriticalSection",
+   "dll": "kernel32.dll",
+   "call_sites": 65,
+   "distinct_functions": 48
+  },
+  {
+   "class": "nonblocking_sync",
+   "api": "InitializeCriticalSection",
+   "dll": "kernel32.dll",
+   "call_sites": 65,
+   "distinct_functions": 48
+  },
+  {
+   "class": "nonblocking_sync",
+   "api": "CreateEventW",
+   "dll": "kernel32.dll",
+   "call_sites": 17,
+   "distinct_functions": 14
+  },
+  {
+   "class": "nonblocking_sync",
+   "api": "SetEvent",
+   "dll": "kernel32.dll",
+   "call_sites": 17,
+   "distinct_functions": 17
+  },
+  {
+   "class": "nonblocking_sync",
+   "api": "ResetEvent",
+   "dll": "kernel32.dll",
+   "call_sites": 8,
+   "distinct_functions": 7
+  },
+  {
+   "class": "thread_attr",
+   "api": "GetCurrentThreadId",
+   "dll": "kernel32.dll",
+   "call_sites": 51,
+   "distinct_functions": 47
+  },
+  {
+   "class": "thread_attr",
+   "api": "SetProcessAffinityMask",
+   "dll": "kernel32.dll",
+   "call_sites": 9,
+   "distinct_functions": 6
+  },
+  {
+   "class": "thread_attr",
+   "api": "TlsGetValue",
+   "dll": "kernel32.dll",
+   "call_sites": 4,
+   "distinct_functions": 3
+  },
+  {
+   "class": "thread_attr",
+   "api": "GetThreadPriority",
+   "dll": "kernel32.dll",
+   "call_sites": 2,
+   "distinct_functions": 2
+  },
+  {
+   "class": "thread_attr",
+   "api": "ResumeThread",
+   "dll": "kernel32.dll",
+   "call_sites": 2,
+   "distinct_functions": 2
+  },
+  {
+   "class": "thread_attr",
+   "api": "TlsSetValue",
+   "dll": "kernel32.dll",
+   "call_sites": 2,
+   "distinct_functions": 2
+  },
+  {
+   "class": "thread_attr",
+   "api": "ExitThread",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "thread_attr",
+   "api": "SetThreadPriority",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "thread_attr",
+   "api": "SuspendThread",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "thread_attr",
+   "api": "TlsAlloc",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "thread_attr",
+   "api": "TlsFree",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  },
+  {
+   "class": "thread_create",
+   "api": "SetTimer",
+   "dll": "user32.dll",
+   "call_sites": 13,
+   "distinct_functions": 13
+  },
+  {
+   "class": "thread_create",
+   "api": "CreateThread",
+   "dll": "kernel32.dll",
+   "call_sites": 3,
+   "distinct_functions": 3
+  },
+  {
+   "class": "thread_create",
+   "api": "CreateTimerQueueTimer",
+   "dll": "kernel32.dll",
+   "call_sites": 1,
+   "distinct_functions": 1
+  }
+ ],
+ "gate": [
+  {
+   "class": "thread_create",
+   "api": "CreateThread",
+   "min_call_sites": 1,
+   "got": 3,
+   "ok": true
+  },
+  {
+   "class": "blocking_wait",
+   "api": "WaitForSingleObject",
+   "min_call_sites": 1,
+   "got": 16,
+   "ok": true
+  },
+  {
+   "class": "nonblocking_sync",
+   "api": "SetEvent",
+   "min_call_sites": 1,
+   "got": 17,
+   "ok": true
+  },
+  {
+   "class": "blocking_wait",
+   "api": "Sleep",
+   "min_call_sites": 1,
+   "got": 33,
+   "ok": true
+  }
+ ],
+ "ok": true
+}
