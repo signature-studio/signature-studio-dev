@@ -7,7 +7,7 @@
 #   NC-I : ids_crosscheck.py に、独立走査の件数より多い ID 件数 (+1) を持つ facts を与える → exit 1 (対照 0)
 #   NC-M : matrix_check.py に closure_funcs +1 の facts / emcc_c_rc を変えた status を与える → exit 1 (対照 0)
 #   NC-W : e2e 本体 (--skip-lift) に判定が落ちる lift 結果を与える → 非 0 かつ OK 行なし
-#   NC-N : unimpl_names.py に許容外 / 件数不一致 / log 無しの simd.log を与える → exit 1 (対照 0)
+#   NC-N : unimpl_names.py に未実装名 (旧許容の rep_stosb_memset を含む) / 件数不一致 / log 無しの simd.log を与える → exit 1 (対照 0)
 #   NC-D : engine_defs.py に実在しない range を 1 本足した ranges を与える → missing_define が 1 増える
 # 事前: distortion_e2e.sh を実行済み。 exit 0 = 全 NC が期待通り
 set -uo pipefail
@@ -69,7 +69,7 @@ emcc_c1 19004 emcc_c_rc 1 emcc_c_rc=1
 lift_rc1 19078 lift_rc 1 lift_rc=1
 f80_3 18987 f80_funcs 3 f80_funcs=3
 unimpl5 19082 declares_unimpl 5 declares_unimpl=5
-unimpl_over_allow 19024 declares_unimpl 2 declares_unimpl=2
+unimpl_was_allowed 19024 declares_unimpl 1 declares_unimpl=1
 unimpl_unknown 18914 declares_unimpl -1 declares_unimpl=-1
 defines0 19089 defines 0 defines=0
 defines_ne_closure 18972 defines 9999 defines=9999
@@ -130,17 +130,18 @@ done
 # ---- NC-N: 未実装 helper の名前 (件数だけの judge を補う) ---------------------------------
 mkdir -p "$N/ub/19024" "$N/ub/19004" "$N/ub_bad/19024" "$N/ub_bad2/19004" "$N/ub_bad3/19024"
 cp work/batch/19024/p.simd.log "$N/ub/19024/"; cp work/batch/19004/p.simd.log "$N/ub/19004/"
-sed 's/__asm_rep_stosb_memset/__asm_rep_stosw_memset/' work/batch/19024/p.simd.log > "$N/ub_bad/19024/p.simd.log"
-{ cat work/batch/19004/p.simd.log; echo '   unimplemented: void __asm_fake_helper(ptr)'; } > "$N/ub_bad2/19004/p.simd.log"
-grep -v '^   unimplemented' work/batch/19024/p.simd.log > "$N/ub_bad3/19024/p.simd.log"
-AL='--allow 19024=__asm_rep_stosb_memset'
+bump() { sed -E 's/(unimplemented )[0-9]+/\11/' "$1"; }   # 集計行の未実装件数を 1 にする
+{ bump work/batch/19024/p.simd.log; echo '   unimplemented: void __asm_rep_stosb_memset(ptr, i8, i64)'; } > "$N/ub_bad/19024/p.simd.log"
+{ bump work/batch/19004/p.simd.log; echo '   unimplemented: void __asm_fake_helper(ptr)'; } > "$N/ub_bad2/19004/p.simd.log"
+bump work/batch/19024/p.simd.log > "$N/ub_bad3/19024/p.simd.log"
+AL=''
 python3 distortion/unimpl_names.py "$N/ub" --blocks 19024,19004 $AL > "$N/un0.out" 2>&1; rc=$?
 echo "NC-N 対照 (実測 p.simd.log): exit=$rc  $(tail -n 1 "$N/un0.out")  (期待 0)"
 [ "$rc" = 0 ] && chk 'NC-N 対照' ok || chk 'NC-N 対照' ng
 python3 distortion/unimpl_names.py "$N/ub_bad" --blocks 19024 $AL > "$N/un1.out" 2>&1; rc=$?
-echo "NC-N 別名の helper (stosb -> stosw): exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 別名' ok || chk 'NC-N 別名' ng
+echo "NC-N 旧許容 helper (rep_stosb_memset) が再び未実装: exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 別名' ok || chk 'NC-N 別名' ng
 python3 distortion/unimpl_names.py "$N/ub_bad2" --blocks 19004 $AL > "$N/un2.out" 2>&1; rc=$?
-echo "NC-N 未実装 0 の block に名前を追記: exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 追記' ok || chk 'NC-N 追記' ng
+echo "NC-N 未実装 0 の block に未知の名前 (件数も 1 に揃える): exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 追記' ok || chk 'NC-N 追記' ng
 python3 distortion/unimpl_names.py "$N/ub_bad3" --blocks 19024 $AL > "$N/un3.out" 2>&1; rc=$?
 echo "NC-N 件数 1 だが名前の行が無い: exit=$rc  (期待 1)"; [ "$rc" = 1 ] && chk 'NC-N 件数不一致' ok || chk 'NC-N 件数不一致' ng
 python3 distortion/unimpl_names.py "$N/ub" --blocks 19024,18914 $AL > "$N/un4.out" 2>&1; rc=$?

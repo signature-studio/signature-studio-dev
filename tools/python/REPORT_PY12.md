@@ -8,7 +8,7 @@
 
 **結論**: 受入条件 3 件とも達成。`src/flpy.c` の `_flhost` を static 変数 (`json_loads`/`HostError`/`g_cbs`/`g_cb_counter`) から **module state 構造体** (`m_size` + traverse/clear/free) に変更し、`Py_mod_multiple_interpreters = Py_MOD_PER_INTERPRETER_GIL_SUPPORTED` を宣言。`g_last_error` はホスト向け診断バッファ (インタプリタ非依存) で static のまま。**採用判断: 現時点では採用しない** (device script は module namespace 分離のまま。下表)。
 
-| 受入条件 | 結果 | 検証 (`tools/python/` から。`build_cpython_wasm.sh` → `FLPY_SKIP_TABLE=1 bash build_flpy.sh` 後) |
+| 受入条件 | 結果 | 検証 (`tools/python/` から。`build_cpython_wasm.sh` → `FLPY_SKIP_TABLE=1 bash build_flpy.sh` 後 (表の再生成を省き追跡済み `flapi_table.json` を使う)) |
 |---|---|---|
 | per-module state + 宣言 | 達成 | isolated の拒否 builtin は 5/66 → 4/66 (`_flhost` が消え `_elementtree _lsprof faulthandler pyexpat` のみ) |
 | isolated で import でき、破棄後も main が壊れない | 達成 | `node tests/subinterp_probe.mjs`: 19 check PASS (exit 0)。3 構成 (isolated+OWN_GIL / SHARED_GIL / legacy) 全てで、sub 内の `_flhost.call` (J 戻り値) / callable 登録 / `HostError(3,"boom")` が動き、sub の `_cbs` は `{1}` から採番 (main と独立)。破棄後の main の `call` / `HostError` / `_cbs` は無傷 (main 側 `{1}`→自身の登録で `{1,2}`)。legacy で sub が 5 個登録しても main の `_cbs` は 3 のまま |
@@ -32,6 +32,8 @@ PY-6 §11 の 26.74〜28.21 ms (別 run・同一コード系列) より本 run �
 
 実測: `subinterp_probe.mjs` wall 26.711 秒 (1 回目の誤 FAIL を直した後の 1 run)、`tests/subinterp_negcontrol_old.sh` wall 28.279 秒 (リンク 6 秒+probe)。CPython クリーンビルド (tgz 取得+native+wasm+記録) は `build_cpython_wasm.sh` が 06:29〜06:33 (uptime 時刻の区間。秒単位の計測はしていない)。`flpy.wasm` 5,924,633B (修正前 `8f55002` 5,923,834B、差 +799B)。
 
+再検証 (main の #588 を merge した後・Actions runner 4 core): `build_cpython_wasm.sh` wall 3 分 33.8 秒 (load average 0.48 開始)、`FLPY_SKIP_TABLE=1 bash build_flpy.sh` 5.3 秒、`subinterp_probe.mjs` 19 check PASS・wall 23.02 / 22.93 秒 (n=2、exit 0)、`subinterp_negcontrol_old.sh` exit 0 (修正前 flpy.c で probe exit 2・FAIL 8 件、wall 23.61 秒)、`subinterp_probe.mjs --neg` exit 1、`smoke_direct.mjs` exit 0、`midi_script.mjs` 23 check PASS・`--neg` exit 1。`FLPY_SKIP_TABLE` 無しの `build_flpy.sh` は win PE 無しで exit 2 (#588 の仕様どおり)。
+
 ネガティブコントロール (どちらも「検出できた」のとき緑):
 - `node tests/subinterp_probe.mjs --neg` → exit 1 (拒否 builtin の期待に `pyexpat` を欠く → その 1 check だけが FAIL)。
 - **`bash tests/subinterp_negcontrol_old.sh`** → exit 0: 修正前 `flpy.c` (`8f55002`) を `FLPY_C`/`FLPY_OUT` で別 dir にビルドし同じ probe を実行 → **exit 2・FAIL 8 件** (isolated は `_flhost` import 不可、SHARED_GIL/legacy は callback 表が main と共有 (`{1}` にならず)、破棄後の main が壊れる、メモリ check)。修正前でも probe が緑なら exit 1 で落ちる。
@@ -43,4 +45,4 @@ PY-6 §11 の 26.74〜28.21 ms (別 run・同一コード系列) より本 run �
 |---|---|---|
 | 201〜250 個目付近からの線形メモリ増加の原因 (リーク / 断片化 / 成長のみ) が未切り分け | サブインタプリタを大量に作る運用では上限が要る (現行は不採用なので影響なし) | 採用検討時に新規 `[PY-n]` (PM 起票)。#587 にコメント |
 | 実 FL がサブインタプリタを使うかは未確認 | 採用判断は性能のみに基づく | #76 (実機バイナリ解析の再実行時) |
-| `build_flpy.sh` の `flapi_table.py` 再生成が win PE 無しで表を劣化させる (本 run で `FLPY_SKIP_TABLE=1` を追加して回避) | `run_all.sh` は従来どおり再生成 | §11 の同名行 (別 issue 提案済み) |
+| (解消) `build_flpy.sh` の `flapi_table.py` 再生成が win PE 無しで表を劣化させる | #588 (PY-13) で入力欠落は exit 2。`FLPY_SKIP_TABLE=1` は「再生成せず追跡済みの表をそのまま使う」明示オプションとして残した (negcontrol が win PE 無しの runner で link だけ行うため) | `REPORT_PY13.md` |

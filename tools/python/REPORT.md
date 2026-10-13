@@ -117,7 +117,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 エラー code の割当 (`provider/fl_api.h`): FLEngine PE の文言 9 種 (Invalid value / Unspecified error / Operation unsafe at current time / Range error / Index out of range / Wrong number of function parameters or wrong parameter type / Linked device not assigned / Device not assigned / Plugin not valid) を 1〜8 に割当 (`Range error` と `Index out of range` は 4 に束ねた)。provider が実際に返すのは 2 / 4 / 5 のみで、1 (Invalid value)・3 (unsafe)・6〜8 は定義だけ (実エンジンの発生条件が未解明)。**数値は Python 側 `fl_api._ERR` の写像と整合させた暫定値で、実エンジンの数値は未確認**。
 
 再現: `bash provider/build.sh && node tests/provider_check.mjs && FL_ENGINE=wasm node tests/all_tools.mjs` (前提: `build_flpy.sh` 済み。runner では `EMSDK_ENV=<emsdk>/emsdk_env.sh`、`FL_WIN64_DIR`)。
-入力の用意 (mac pkg 無しの Actions): `oc_artifacts: fl-win64 toolchain-emsdk` + `FL_WIN64_DIR=<fl-win64 展開先> bash fetch_inputs.sh` (パスは `tools/shared/env.sh` 経由。`$FL_MAC_DIR` に mac pkg が無ければ win64 の `block25159_DATA.bin` = MCPTools.pyc、`block24429_DATA.bin` = midi.py (770 行)、`block24430_DATA.bin` = utils.py (213 行) を `work/` に置く)。続けて `build_cpython_wasm.sh` → `build_flpy.sh` (注: `build_flpy.sh` は先頭で `analysis/flapi_table.py` を再実行し、mac dylib / win PE が無い環境では追跡中の `flapi_table.json` / `FLAPI.md` を書き換える。commit しないこと)。
+入力の用意 (mac pkg 無しの Actions): `oc_artifacts: fl-win64 toolchain-emsdk` + `FL_WIN64_DIR=<fl-win64 展開先> bash fetch_inputs.sh` (パスは `tools/shared/env.sh` 経由。`$FL_MAC_DIR` に mac pkg が無ければ win64 の `block25159_DATA.bin` = MCPTools.pyc、`block24429_DATA.bin` = midi.py (770 行)、`block24430_DATA.bin` = utils.py (213 行) を `work/` に置く)。続けて `build_cpython_wasm.sh` → `build_flpy.sh` (`build_flpy.sh` は先頭で `analysis/flapi_table.py` を再実行する。入力は環境変数 `FL_WIN64_DIR`/`FL_WIN_PE`・`FL_STUBS_DIR`・`FL_ENGINE_DYLIB`・`FLAPI_OUT_DIR`・`EMSDK_DIR` で指定でき、win PE / stubs 欠落・PE 照合 0 件は exit 2 + 理由表示で止まる。詳細は §PY-13)。
 
 ### 7b-2. レビュー指摘 (d2706e1) の修正: `ilmcp.getBrowserNames` の固定バッファ
 
@@ -176,7 +176,7 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | flapi の提供側がモック (`fl_mock.mjs`) のまま。実 FLEngine wasm の `fl_api_call` に差替え未了 | tool の結果はモック値で、実 FL と同一動作の保証なし | #74 (PY-1, PR #459) 以降 / 親 #35 |
 | ilmcp B 群 8 tools は最小の偽実装 | UI から呼べるが FL 本来の挙動ではない | 親 #35 の T3 (ilmcp 実装) |
 | `/?mcp=1` のパネルは最小 UI (整形・履歴・複数行 arguments 編集なし)。`pnpm build` 成果物 (`dist/`) は `/py/` を持たないため dev / preview 専用 | 本番配信での公開は未対応 | 親 #35 に提案 (配信設計は #62 H 系と調整) |
-| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する。runner には win PE が無く `win_pair_verified` が false になる | 本 PR では当該 2 ファイルをコミットしていない | #74 の PR (provider) と同じ `/home/ubuntu` 固定パス問題。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
+| (解消) `build_flpy.sh` の `flapi_table.json` 再生成が win PE / stubs 無しで黙って劣化する | #588 (PY-13) で env 化・入力欠落は exit 2 | §PY-13。`fetch_inputs.sh` / `run_all.sh` の `/home/ubuntu` 固定パスは別途 (下の未解決表) |
 
 ## 11. MIDI scripting ホスト (PY-6, #76)
 
@@ -223,9 +223,13 @@ mock との差で見つかったもの: mock は引数の個数/型を検査し�
 | 文書 (公開 stubs) 由来の仕様 (handled 伝播・midiId/midiChan=0・timestamp=0) は 26.1.7 実機で未確認 | 実 script が midiChan 等に依存すると差が出る | 上記 #76 再実行時に同梱 script で確認 / 実機があれば #35 |
 | `_flhost` の per-module state 化 + `Py_mod_multiple_interpreters` 宣言 | 解消 | #587 (PY-12) で実装 → §12 |
 | mock の `device.*` は forwardMIDICC / midiOutMsg の記録と 3 関数のみ。実エンジン未接続 | 同梱 script が他の device API を使うと None が返る (`midi_bundled_device.mjs` は未実装 API 呼出しを FAIL にする) | #74 (PY-1) 以降 / 親 #35 |
-| `build_flpy.sh` が `flapi_table.json` / `FLAPI.md` を再生成する (`work/fl-stubs` の clone も要る)。runner には win PE が無い | 本 PR では当該 2 ファイルをコミットしていない | PY-4 §10 と同じ。`fetch_inputs.sh` / `run_all.sh` の env 化を別 issue で提案 |
+| (解消) `build_flpy.sh` の `flapi_table.json` 再生成 | #588 (PY-13) で env 化 | §PY-13 (`REPORT_PY13.md`) |
 | PY-4 の `poc_mcp.mjs` / `all_tools.mjs` / `mcp_ui_check.mjs` は MCPTools.pyc が無く再実行不可 (本 run で `dispatch_midi` の PoC 区間のみ `midi_script.mjs` に複製して同結果を確認) | `fl_rt.py` / `fl_mock.mjs` の変更の回帰を全体では未確認 | #76 再実行時に `run_all.sh` 相当を実行 |
 
 ## 12. `_flhost` の per-module state 化 (PY-12, #587) — 実測・全文は `REPORT_PY12.md`
 
 **結論**: 受入条件 3 件とも達成 (`_flhost` を module state 化し `Py_mod_multiple_interpreters` 宣言、isolated で import 可・破棄後も main 無傷、採用判断材料あり)。**採用判断: 採用しない** (隔離の代償が module namespace 分離の数百倍)。
+
+## PY-13 (#588): `build_flpy.sh` の flapi_table 再生成を環境変数化 — 全文・実測は `REPORT_PY13.md`
+
+`flapi_table.py` の入力 (win PE / stubs / mac dylib / 出力先 / emsdk) を env 化し、欠落時は exit 2。`FLPY_TABLE_ONLY=1` で表だけ再生成。検証は `tests/flapi_table_check.sh`。
