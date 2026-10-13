@@ -3,7 +3,7 @@
 
 内容が違う .rdata 参照 (32 B 先頭) を 8 B 語ごとに次のどれかへ分ける:
   text  : 印字可能 ASCII (0 終端を含む) の断片を含む参照
-  rva32 : 上位 32 bit が 0 で、下位 32 bit が image 内 RVA として妥当な語 (4 B 形の参照先の疑い)
+  rva32 : 上位 32 bit が 0 で、下位 32 bit が いずれかのセクションの [VirtualAddress, +VirtualSize) 内の語 (RVA 候補。先頭セクション (0x1000〜) 未満の定数は除外される)
   abs   : image 範囲の 8 B 絶対アドレス (ks_rdata_class.py の ptr 判定に入る)
   dbl   : それ以外 (倍精度・整数定数など)
 usage: ks_rdata_detail.py <HeartCore.core_64> <SlateCore.core_64> <ks_rdata_class.json> <ks_closure_share.json>
@@ -25,7 +25,7 @@ def words(blob, pe):
             continue
         if pe.base <= v < pe.img_hi:
             cnt['abs'] += 1
-        elif v >> 32 == 0 and v < pe.img_hi - pe.base:
+        elif v >> 32 == 0 and any(s.VirtualAddress <= v < s.VirtualAddress + s.Misc_VirtualSize for s in pe.secs.values()):
             cnt['rva32'] += 1
         else:
             cnt['dbl'] += 1
@@ -36,7 +36,6 @@ def main(kp, sp, cls_json, share_json):
     kh, sc = Pe(kp), Pe(sp)
     rc = json.load(open(cls_json))
     tot = collections.Counter()
-    per = {}
     for s, info in rc.items():
         if info['cls'] != 'value':
             continue
@@ -52,7 +51,7 @@ def main(kp, sp, cls_json, share_json):
                 tot[tag + '.ref'] += 1
                 for k, n in words(blob, pe).items():
                     tot[tag + '.' + k] += n
-        per[s] = info['cls']
+        tot['pairs'] += sum(1 for x, y in zip(a, b) if x != y)
     out = dict(sorted(tot.items()))
     print(json.dumps(out, sort_keys=True))
 
