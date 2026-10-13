@@ -31,17 +31,17 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
 |---|--:|--:|--:|--:|--:|--:|--:|
 | FL Keys | 22386 | 84 / 32,913 | 88 | 0 | 0 | 0 | 4 |
 | FPC | 23617 | 341 / 131,429 | 343 | 0 | 0 | 0 | 11–12 |
-| Fruity Granulizer | 23658 | 165 / 45,587 | 165 | 0 | **3 → 0** | **1 → 0** | 5 |
-| Fruity Slicer | 23662 | 195 / 57,453 | 197 | 0 | **3 → 0** | **1 → 0** | 6 |
-| Fruity Slicer 2 (殻) | 23663 | 198 / 69,184 | 198 | 0 | **3 → 0** | **1 → 0** | 8 |
+| Fruity Granulizer | 23658 | 165 / 45,587 | 165 | 0 | **2 → 0** | **1 → 0** | 5 |
+| Fruity Slicer | 23662 | 195 / 57,453 | 197 | 0 | **2 → 0** | **1 → 0** | 6 |
+| Fruity Slicer 2 (殻) | 23663 | 198 / 69,184 | 198 | 0 | **2 → 0** | **1 → 0** | 8 |
 | Slicex | 24172 | 709 / 262,399 | 713 | 0 | 0 | 0 | 24 |
 | Soundfont Player | 24175 | 2,124 / 791,544 | 2,138 | 0 | 0 | 0 | 64–65 |
 
 - **7/7 通過** (lift_rc 0 / lowering 後の `emcc -c` rc 0 / lowering 後の f80 0)。 range 欠落監査 (`indirect_defs.py --lift-dir lealift --ranges-dir lea`): 全 7 本で ranges の全関数 (計 3,816) が final.ll に define あり (欠落 0)。
-- **L-3 f80 (新規の観測)**: lea 由来の関数が x87 を含む。 Granulizer の `function_7442c0` / `function_7443e0`、Slicer の `function_7534f0` / `function_753610`、Slicer 2 の `function_851760` / `function_851880` は lea root (total に無い)、各 block の `function_7594e0` / `function_770e00` / `function_8527b0` は計数の誤りにより f80 扱いされたが、関数本体・機械語とも x87 なし (下記)。 **実 f80 は lea root の 2 本 / block だけ**。 #537 の final.ll には f80 を含む関数が無かった (f80 0)。
+- **L-3 f80 (新規の観測)**: lea 由来の関数が x87 を含む。 Granulizer の `function_7442c0` / `function_7443e0`、Slicer の `function_7534f0` / `function_753610`、Slicer 2 の `function_851760` / `function_851880` は lea root (total に無い)、**実 f80 は lea root の 2 本 / block だけ** (CSV の `f80_raw` = 2)。 旧計数 (`\n(?=define )` 分割) の +1 (`function_7594e0` / `function_770e00` / `function_8527b0`) は関数本体・機械語とも x87 なしで、#1033 で `f80_split.py` の関数本体計数に差し替えて解消。 #537 の final.ll には f80 を含む関数が無かった (f80 0)。
   lowering 前の `emcc -c` は `no libcall available for fmul with type f80` / `do not know how to soften fp_extend` で rc 1 になる。 そこで `lea_lift.sh` は f80 を検出した block に限り **`p0c/f80_lower.py` (x86_fp80→f64、#197 の成果物) を明示の段として通し**、judge には lowering 後の値を渡す (raw 値は CSV の `f80_raw` / `emcc_c_rc_raw` / `lowered` 列に残す)。
   **f80→f64 は拡張精度の丸めが変わり bit-exact を保証しない** (#197)。 通過 ≠ 正しさ。 3 block とも lowering の適用は機械的に通ったが、差分試験は範囲外。 **該当 3 block の PASS は lowering 後の値による** (judge.py の出力「lowering 後の値で判定した block」に列挙。 raw は `f80_raw` / `emcc_c_rc_raw`)。
-   **機序 (前回 HEAD 7c7d2d7c の記録。 上の「残り 1 本が f80」は計数の誤りだった)**: 3 block の `function_7594e0` / `function_770e00` / `function_8527b0` は `p.final.ll` で **最後の define** に当たり、後ろの module 直下の `declare __frontend_reg_{load,store}.fpr(..., x86_fp80)` を `lea_lift.sh` の `\n(?=define )` 分割が関数に含めてしまう。 関数本体の f80 は 0。 **実際に f80 を含むのは lea root の 2 本 / block** (Granulizer `function_7442c0` / `function_7443e0`、Slicer `function_7534f0` / `function_753610`、Slicer 2 `function_851760` / `function_851880`)。 この計数の修正は追跡 #1033。
+   **機序 (前回 HEAD 7c7d2d7c の記録。 上の「残り 1 本が f80」は計数の誤りだった)**: 3 block の `function_7594e0` / `function_770e00` / `function_8527b0` は `p.final.ll` で **最後の define** に当たり、後ろの module 直下の `declare __frontend_reg_{load,store}.fpr(..., x86_fp80)` を `lea_lift.sh` の `\n(?=define )` 分割が関数に含めてしまう。 関数本体の f80 は 0。 **実際に f80 を含むのは lea root の 2 本 / block** (Granulizer `function_7442c0` / `function_7443e0`、Slicer `function_7534f0` / `function_753610`、Slicer 2 `function_851760` / `function_851880`)。 この計数は #1033 で `lea_lift.sh` を `sampler/f80_split.py` の `body_f80()` (関数本体だけを数える) に差し替えて解消。
     **x87 突合 (関数単位)**: `sampler/f80_split.py` の `x87_of()` は `va` から `.pdata` の関数終端 (無ければ `ret`) までを逆アセンブルし、range 外に出たら打ち切る。 返り値は `None` = range 外で未検査 (x87 の有無は不明)、`[]` = 検査済みで x87 なし。 PE は `fl-win64` tar 内 `extracted/block23658_PE.bin` / `block23662_PE.bin` / `block23663_PE.bin` を `tools/plugins/work/x87/` に展開して使う (gitignore)。 p.final.ll と lift 中間成果は本 run に無いため、突合は PE と pdata だけで行う。
     再現: `python3 sampler/x87_check.py work/x87/block23658_PE.bin 7442c0 7443e0 7594e0` (他 block も同様)。 `f80_split.py` の実行例 (`mini.ll` は手書きの合成入力で、`function_7442c0` は x86_fp80 を含み `function_7594e0` は含まない。 実 p.final.ll ではない。 ranges は pdata から組んだ `7442c0-74436f,7594e0-7595c1`): `python3 sampler/f80_split.py work/x87/block23658_PE.bin work/x87/ranges.txt work/x87/mini.ll` → `defines=2 body_f80_funcs=1 {'function_7442c0': 1}`、`function_7442c0: machine x87 mnemonics=['faddp', 'fcompp', 'fld', 'fmul', 'fnclex', 'fst', 'fstp', 'fsubp', 'fxch']`。 `x87_check.py` の実行出力 (HEAD: 本 commit):
     ```
@@ -72,7 +72,7 @@ lea root を足して `call/jmp rel32` で広げ、新たに入った関数の l
     **再現できなかった点**: 段ごとの f80 数値 (7442c0 / 7443e0 の `p.drc.ll` 36 / 100 → `p.lower.ll` 0、total 158 / 190 / 193) は、lift 中間成果 (`work/sampler/lea/*`・`p.final.ll`) と RetDec が本 run の runner に無いため再実行できず、前回記録値のまま (未再測定)。
    **段ごと**: Granulizer では 7442c0 / 7443e0 の x86_fp80 が RetDec の `p.drc.ll` で既に 36 / 100 あり、以後の pass 鎖で 35 / 100 のまま、`f80_lower.py` (`p.lower.ll`) で 0。 **差の起点は RetDec decode 段**で、我々の pass ではない。
    **#537 との差**: #537 の閉包 (`total`) は lea root の 2 本を含まない。 `total` の f80 関数数は前回記録値 (HEAD 7c7d2d7c) で 0 (Granulizer 158 define / Slicer 190 / Slicer 2 193)。 x87 関数が閉包に入っていないことの反映で、lift の誤りではない。 同一関数 `function_7594e0` の本体は total と total2 で同一 (diff は declare 行のみ)。 本 HEAD では再測定していない (上の「再現できなかった点」を参照)。
-   **CSV の注意**: `lea_lift.sh` の `f80_funcs` / `f80_raw` 列は上記の計数で 1 block あたり +1 (実数 2 → CSV 3)。 判定 (judge) は lowering 後の値 0 で通るため結論には影響しない。 計数の修正は未対応 (結論に影響なし。 `lea_lift.sh` の計数を `f80_split.py` の関数本体計数に差し替えるのは後続の小修正)。
+   **CSV の注意 (#1033 で修正済み)**: `lea_lift.sh` の `f80_funcs` / `f80_raw` 列は `f80_split.py` の `body_f80()` (関数本体計数) で数える。 3 block とも `f80_raw` = 2 (lea root の実数と一致)、`f80_funcs` (lowering 後) = 0。 旧計数の +1 (実数 2 → CSV 3) は解消。 判定 (judge) は lowering 後の値 0 で通るため結論には影響しない。
 - 未実装 helper は main 上で 0 (`rep_stosb_memset` は #629 で実装済み、§6b)。 旧基点 (042f869) では Granulizer・Slicer 各 1 だった (#538 は解消済み)。
 
 ### 検査 (`closure_lea.py`、不合格で exit 1)
@@ -157,4 +157,4 @@ NC1–NC7・NC11–NC13 は sed 置換が当たったことを確認してから
 | Soundfont Player の taint 版 host call 0 site (total2 でも) | host 呼出面の過小計上 | #196 にコメント (taint 精密化) |
 | 0x5dee90 の依存が FPC・Slicer 2 にも広がる | P0c の未解決 kernel #331 の影響範囲 | #197 / #331 にコメント |
 | PLUGIN_MATRIX / 見積 (57.5 人日) への反映 | total2 は #537 の total に +193 関数 / +46,327 B。 見積前提は変わらず | PM 判断 (書き換えていない) |
-| `function_7594e0` / `function_770e00` / `function_8527b0` の f80 計数 (CSV `f80_funcs` の +1) | lea_lift.sh の計数 (`\n(?=define )` 分割) の誤り。 関数本体・機械語とも f80 0。 実 f80 は lea root 2 本 / block | `lea_lift.sh` 側の計数を `f80_split.py` の関数本体計数に差し替える修正は未対応 (結論に影響なし) | 新規 #1033 [PLG-G3-10] (起票済み) |
+| `function_7594e0` / `function_770e00` / `function_8527b0` の f80 計数 (CSV `f80_funcs` の +1) | lea_lift.sh の計数 (`\n(?=define )` 分割) の誤り。 関数本体・機械語とも f80 0。 実 f80 は lea root 2 本 / block | #1033 で解消 (`f80_split.py` の関数本体計数に差し替え、f80_raw = 2 × 3 block) | #1033 [PLG-G3-10] (解消) |
