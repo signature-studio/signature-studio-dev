@@ -588,6 +588,13 @@
 ],
 "ret": "i32"
 },
+"CryptReleaseContext": {
+"params": [
+"i32",
+"i32"
+],
+"ret": "i32"
+},
 "DecodePointer": {
 "params": [
 "ptr"
@@ -2731,6 +2738,15 @@
 ],
 "ret": "i32"
 },
+"QISearch": {
+"params": [
+"ptr",
+"ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
 "QueryDepthSList": {
 "params": [
 "ptr"
@@ -3267,6 +3283,21 @@
 "params": [
 "ptr",
 "ptr",
+"ptr",
+"ptr"
+],
+"ret": "i32"
+},
+"SHCreateMemStream": {
+"params": [
+"ptr",
+"i32"
+],
+"ret": "ptr"
+},
+"SHCreateStdEnumFmtEtc": {
+"params": [
+"i32",
 "ptr",
 "ptr"
 ],
@@ -4671,6 +4702,12 @@
 "params": [],
 "ret": "i32"
 },
+"shimx_drag_accepts": {
+"params": [
+"i32"
+],
+"ret": "i32"
+},
 "shimx_get_callback_translator": {
 "params": [],
 "ret": "ptr"
@@ -4691,6 +4728,16 @@
 "ptr"
 ],
 "ret": "void"
+},
+"shimx_hdrop_create": {
+"params": [
+"ptr",
+"i32",
+"i32",
+"i32",
+"i32"
+],
+"ret": "i32"
 },
 "shimx_init": {
 "params": [],
@@ -4882,6 +4929,12 @@
 "shimx_set_locale": {
 "params": [
 "i32"
+],
+"ret": "void"
+},
+"shimx_set_notify_hook": {
+"params": [
+"ptr"
 ],
 "ret": "void"
 },
