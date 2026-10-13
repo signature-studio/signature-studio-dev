@@ -395,3 +395,21 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 **ret 値の IR 併記 (PM 指示・受入条件 3)**: `function_52a7f0` の ret は IR ごとに異なる値。どの IR の値か:
 - `f4_e2e.sh` の post IR (`m11_gen_ir2.sh` → `m11_build.sh`、wndseed 無し): **`0x110000f`**
 - `flengine/e2e.sh` の最終 IR (wndseed 込み。`m11_wndseed.sh` を実行): **`0x1100010`** (§6d-2)
+
+## 6f. origin/main の S1 実測 (PR #577 の PM 指示 1。main commit `b4a8422c`)
+
+PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 PR が原因」。判定式・baseline 値は変えていない。
+
+| 項目 | 値 |
+|---|---|
+| 測定対象 | `origin/main` = `b4a8422c` (Merge #1443)。検証用 worktree (detached・本 PR の branch ではない)。素材 `work-m11` / `work-liftdiff` / `fl-win64` は同じ展開物 |
+| 手順 | `EMSDK_ENV=/opt/emsdk/emsdk_env.sh RETDEC=/opt/retdec/bin/retdec-decompiler FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 ANALYSIS_DIR=… bash tools/gui/flengine/e2e.sh` (foreground・1 回) |
+| rc / 所要 / load | **1** / 445 s / 0.62→1.65 (nproc 4) |
+| S1 survey parity (soft) | **FAIL `870/1/47/24/0` (base `872/1/47/22/0`)** |
+| 判定 | 12/14 (S1 FAIL、**R2 FAIL**)。他 L1×2・A1・B1・R1・S2・P1〜P5・W1 は PASS |
+
+**main 側の build 段の回避 (本実測だけの前提。main に修正は入れていない)**: main `b4a8422c` は `wasm-ld: duplicate symbol: GetMonitorInfoW / EnumDisplayMonitors` で build 段で止まる (`tools/m11/m11_win.c` (#1096) と `tools/gui/build/gui_adapt_w32.c` (`gen_api.py` 生成) の重複)。scratch の `tools/gui/flengine/build.sh` のリンク行に `-Wl,--allow-multiple-definition` を足して通した (`obj/*.o` を先に並べるので `m11_win.c` 側の定義が使われる)。この変更は commit していない。
+
+**R2 の FAIL は回避の副作用の可能性が高い (未確定)**: 回避後の main では `EnumDisplayMonitors` / `GetMonitorInfoW` が reach に出ず (`missing=['EnumDisplayMonitors', 'GetMonitorInfoW']`、reached 30 ≥ floor 19 だが欠落 2 件で FAIL)。直前の main 測定 (§6e、ソース側で重複を削除した版) では R2 PASS の 13/14 だった。回避方法で R2 が変わるため、本節の R2 は main の欠陥の根拠にしない。S1 の値は両方法で `870/1/47/24/0` と一致する。
+
+**結論**: S1 の `870/1/47/24/0` (base `872/1/47/22/0`) は `origin/main` (`b4a8422c`) でも同一。**PR #577 の変更が原因ではない**。S1 は FAIL のまま (判定を緩和していない)。原因の追跡は子 issue **#1442** (`[GUI-21]`、親 #564)。#1275 (`[M11-N78]`) とは対象 unit が一致するが、同一原因か・同系統かは未確認 (機械語・IR の突合は未実施)。
