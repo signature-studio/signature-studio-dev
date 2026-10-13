@@ -103,7 +103,6 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 export PERF_TMP=$RUNNER_TEMP/perf
 node tools/perf/p15/probe_limit.mjs --k 1,2,4 --max 160 --runs 2   # §1
 node tools/perf/p15/probe_iso.mjs --k1 1 --k2 1 --max 160 --runs 2  # §1 (別 renderer)
-node tools/perf/p15/shared_obj.mjs tools/ott/work/lift/ottl.cjs 130 50  # §2
 node tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3  # §3
 ```
 
@@ -114,11 +113,10 @@ node tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3  
 - 測定 commit: `2b2faf52` (origin/main の worktree `ws-990`)。`tools/perf/p15` の差分は `862ef65b` 以降 `page.html` の未使用リスナー削除のみ (測定経路外・§0)。
 - 環境: Chrome 154.0.8037.97 (headless), CPU `AMD EPYC 9V45 96-Core Processor` (4 vCPU。§0 の 7763 とは別機), node v22.23.3。
 - 生データ: `tools/perf/p15/results/rerun_20261014_*.jsonl` (`probe_limit` 6 行・`probe_iso` 2 行・`chrome_shared` 9 行。いずれも本再測定の行のみで、`2b2faf52` の既存 `results/*.jsonl` と完全一致する行は除外)。
-- `shared_obj` (M=130) の生データは**未保存**: 標準出力のみで、jsonl への保存をしなかった。素材 `work-m6-ott` が本 run に無く再実行もできないため、下表の `shared_obj` 行は再現可能な生データを伴わない参考値として扱う。
+- `shared_obj.mjs` (M=130 の `sig_unique` / setup 時間) は本節の根拠から外す。同じ実行の生データ (標準出力) が残っておらず、jsonl にも保存できなかったため。N=130 の署名一致は下表の `chrome_shared` M=130 の 3 行 (`sig_ok=true`、sig_n=130) で示す。
 
 | 項目 | 前回 (`862ef65b`, EPYC 7763) | 再測定 (`2b2faf52`, EPYC 9V45) |
 |---|---|---|
-| shared_obj M=130 `sig_unique` / `sig_n` | `6b1696f0` / 130 | `6b1696f0` / 130 (`sig_ok=true`, setup 470.77 ms) |
 | probe_limit K=1 (Worker 1 個) | 125 | 125 / 125 (2 回) |
 | probe_limit K=2 合計 | 124 / 188 | 125 / 124 |
 | probe_limit K=4 合計 | 243 / 253 | 182 / 216 |
