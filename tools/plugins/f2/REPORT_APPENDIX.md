@@ -162,7 +162,7 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 
 ## 9. PLG-F2-4 (#547): xmm 引数復元 pass の接続 (**未達: 不一致 8 のまま・中間報告**)
 
-- 検証起点 commit: **1191aef** (`547-plg-f2-4-xmm-argpass`、#553 の branch `515-plg-f2-3-leaf-diff` 758a06b 基点)。`git status --porcelain=v1` は 0 行 (コミット済み HEAD で実測)。数値は下記 9.4 の 3 コマンドをこの HEAD で実行して取得 (初版は 875ab8e で、レビュー指摘の修正 (9.5) 後に再測した)。
+- 検証起点 commit: **2f77ace** (`547-plg-f2-4-xmm-argpass`、main `8b98f64` を取り込んだ後の HEAD に REPORT 分割修正を積んだもの)。数値は下記 9.4 の手順をこの HEAD で実行して取得。旧検証起点 1191aef の値は 9.4 の注記に残す。
 - 既知類型との関係: **(DEFECTS.md) D5** (xmm 引数脱落)。D4 系 `spill_slot_deref` 4 / D1a `fp_flag_unreflected` 4 は本件では未着手。
 - 範囲: pass の実装と鎖への opt-in 接続、eq-filter 6 block での lift/`emcc -c`/`leaf_diff.sh` 実測。既定鎖への ON 化・ablation 完走は範囲外 (下記)。
 
@@ -173,7 +173,7 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 4. 受入条件 2 (回帰) は、一致 15 が一致のままであることだけ確認 (上記 3 の同判定)。**ablation (pass を外すと 8 関数が戻る) は無意味**: pass 有無で不一致が同数のため、ネガコンとして成立していない。
 5. 受入条件 3 (#232 / #233 の適用可否判定) は未実施。
 
-### 9.2 実測 (`PLUG_XMMARG=1`、block ごとの `p.xa.json`、HEAD 1191aef)
+### 9.2 実測 (`PLUG_XMMARG=1`、block ごとの `p.xa.json`、HEAD 2f77ace。復元・skip 件数は 1191aef と同一を再確認)
 | block | 復元した関数 | skip した関数 (内訳) | call site に 0 を渡した数 | `emcc -c` rc |
 |--:|--:|--:|--:|--:|
 | 18975 | 3 | 12 (`slot_occupied` 6 / `no_placeholder` 5 / `partial_slots` 1) | 4 | 0 |
@@ -200,23 +200,31 @@ python3 tools/plugins/f2/nc_leaf.py      # ネガティブコントロール (ki
 | spill_slot_deref 4 / fp_flag_unreflected 4 の #232 / #233 適用可否 | 受入条件 3 | #613 |
 | PLUG_XMMARG 既定 ON 化と、全 block での `emcc -c`・matrix 突合の回帰 (6 block のみ実測) | 既定化の可否 | #613 |
 
-### 9.4 再現と実測 (HEAD 1191aef、4 core Actions runner)
+### 9.4 再現と実測 (HEAD `2f77ace`、4 core runner、逐次・同一 run)
 ```sh
 source tools/shared/env.sh && source tools/plugins/f2/env.sh
-time bash tools/plugins/f2/f2_step1.sh                                                              # 前提 (PLUG_ICALL=0 の既定鎖)
-cd tools/plugins && time PLUG_XMMARG=1 PLUG_ICALL=0 bash lift/batch_lift.sh 18975 18982 19005 19006 19013 19059; cd ../..
-time bash tools/plugins/f2/leaf_diff.sh                                                             # 最終判定の再計算
-bash tools/plugins/f2/nc_leaf.py の 3 kind 並列 (--kinds K --run-only) → python3 tools/plugins/f2/nc_leaf.py --reuse
+time bash tools/plugins/f2/f2_step1.sh                                                              # 前提 (PLUG_ICALL=0 の既定鎖。work/ 生成を含む)
+cd tools/plugins && PLUG_XMMARG=0 PLUG_ICALL=0 time bash lift/batch_lift.sh 18975 18982 19005 19006 19013 19059; cd ../..   # 接続前
+cd tools/plugins && PLUG_XMMARG=1 PLUG_ICALL=0 time bash lift/batch_lift.sh 18975 18982 19005 19006 19013 19059; cd ../..   # 接続後
+time bash tools/plugins/f2/leaf_diff.sh                                                             # 最終判定 (n=3 で繰り返した)
+time python3 tools/plugins/f2/nc_leaf.py                                                            # ネガコン (3 kind 直列)
 ```
-| コマンド | `time` の real | 開始時 load average (1 分) | 結果 |
-|---|--:|--:|---|
-| `f2_step1.sh` (`work/` 生成済み。`win_funcs.py` 初回は別途 **517 秒**、終了時 load 16) | 0m51.042s | 8.78 | exit 0、matrix DIFF count = 0 |
-| `PLUG_XMMARG=1 PLUG_ICALL=0 batch_lift.sh` (6 block) | 0m21.675s | 4.49 | 6/6 lift_rc=0・`emcc -c` rc=0 |
-| `leaf_diff.sh` | 2m22.983s (スクリプト内の `LEAF_DIFF elapsed` = 143 s) | 3.30 (終了時 0.97) | exit 0。一致 15 / 不一致 8 / 実行不能 0。別算法 `xcheck_leaf.py` 集合一致 EQ |
-| `nc_leaf.py` (3 kind 並列 → `--reuse` 集計) | 87 s (並列部) | 0.88 | rc=0。`store_drop` 6/6・`load_drop` 11/11・`offset_shift` 13/13 検出、未検出 0・unexec 0 |
 
-- 初版の「133 秒、load 0.29」は §8.7 の cold 実行 (133 s) と秒数が偶然一致していたが、初版時に `time` 出力を残していなかった。上表は今回の再測で、`time` の出力そのもの。
+| コマンド | `time` の real | 開始時 load (1 分) → 終了時 | 結果 (rc) |
+|---|--:|---|---|
+| `f2_step1.sh` (`work/` 無しから。`win_funcs.py` 込み) | 5m00.874s | 0.24 → 8.14 | rc=0、matrix `DIFF count = 0`、dispatch 550 |
+| `PLUG_XMMARG=0 batch_lift.sh` (6 block) | 0m14.227s | 8.14 → 6.56 | 6/6 `lift_rc=0`・`emcc_c_rc=0` |
+| `PLUG_XMMARG=1 batch_lift.sh` (6 block) | 0m15.294s | 6.03 → (未採取) | 6/6 `lift_rc=0`・`emcc_c_rc=0` |
+| `leaf_diff.sh` 1 回目 | 2m12.108s (`LEAF_DIFF elapsed` 132 s) | 4.12 → 0.97 | rc=0 |
+| `leaf_diff.sh` 2 回目 | 2m04.158s (`LEAF_DIFF elapsed` 124 s) | 0.82 → 0.37 | rc=0 |
+| `leaf_diff.sh` 3 回目 | 2m03.543s (`LEAF_DIFF elapsed` 123 s) | 0.34 → 0.31 | rc=0 |
+| `nc_leaf.py` | 3m13.452s | 0.29 → 0.55 | rc=0。store_drop 6/6・load_drop 11/11・offset_shift 13/13、未検出 0・unexec 0 |
+
+- `leaf_diff.sh` 3 回の判定は全て同一: **最終判定 一致 15 / 不一致 8 / 実行不能 0**、主採点 一致 12 / 不一致 6 / 実行不能 5、case 207 (native 完走 93 = equal 58 / diff 33 / wasm_trap 0、比較不能 114)、補助 66 (equal 60 / diff 6)、別算法 `xcheck_leaf.py` 集合一致 EQ。`leaf_report.md` の md5 先頭 12 桁は `493f2e32c8b0` (3 回目)。
+- 最終 mismatch のタグ (該当数): `xmm_arg_drop` 7・`fp_flag_unreflected` 4・`arg_drop` 4・`spill_slot_deref` 4・`ret_only` 1。`ret_only` 1 は 0x6f1650 (分類器変更で `xmm_arg_drop` 扱いから移動)。
+- **1191aef の旧値との差**: 旧版の主採点 (一致 9 / 不一致 9 / 実行不能 5、case 207 の native 完走 93 = equal 56 / diff 35 / wasm_trap 2) は今回の値 (一致 12 / 不一致 6 / 実行不能 5、equal 58 / diff 33 / wasm_trap 0) と異なる。最終判定 15/8/0 は不変。差は `fix_avx256`・`m11_simd2` を含む main 取り込み (`8b98f64`) 由来と推定 (未切り分け)。
 - ネガコン `nc_leaf.py` は、変異が 1 つでも match のまま / unexec なら exit 1 (9.5 の C2)。上記は全検出で rc=0。
+- **分類器変更 (C1) の既存 results への影響**: `ldlib/classify.py` の `xmm_arg_drop` 判定の変更は liftdiff 全体のタグに効く。`tools/liftdiff/results/flelift_closure_summary.txt` (`xmm_arg_drop` 主因 6・該当 12)、`m11_closure_summary.txt` (主因 70・該当 121)、`tools/flelift/boot/results/mixed_summary.md` (`xmm_arg_drop: 12`) は**旧分類のまま・再分類は未実施**。本 PR は既存 results を書き換えていない。
 
 ### 9.5 レビュー指摘への対応 (oc-reviewer / Copilot)
 | ID | 指摘 | 対応 |
