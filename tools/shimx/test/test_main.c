@@ -37,6 +37,10 @@ int main(int argc, char** argv) {
         EnterCriticalSection(NULL);
         return 0;
     }
+    if (!strcmp(mode, "dwrite")) {                                         /* KH-20: DirectWrite は未対応 = 名前を出して fail-fast */
+        GetProcAddress(GetModuleHandleW(W("dwrite.dll")), "DWriteCreateFactory");
+        return 0;
+    }
     if (!strcmp(mode, "exit")) { shimx_set_exit_hook(exit_hook); ExitProcess(7); return 0; }
     if (!strcmp(mode, "deadlock")) {
         HANDLE e = CreateEventW(NULL, TRUE, FALSE, NULL);

@@ -69,6 +69,14 @@ HeartCore の呼び方を tools/gui の native headless host (gcc + ASan/UBSan) 
 - オラクル感度 (ネガコン): 期待値を 1 画素だけ壊す → 不一致 **1 件**を検出 (期待 1)。ハーネス異常 0。
 - `StretchDIBits` も同じ `dib_to_dc` を使う。Wine は top-down SRCCOPY で非原点/拡縮なら下原点に変換するため、同型の不一致の疑いがある (**未検証**; FL の `StretchDIBits` は 4 call site)。
 
+### 2.7 DirectWrite の呼び出し経路と方針 (KH-20 / #838)
+- 呼び出し元: ローダ関数 RVA `0x9382f0` (VA `0x1809382f0`) のみが `DWriteCreateFactory` / `DWriteCoreCreateFactory` の文字列を参照する (LEA 2 件)。ローダの呼び出し元は 2 件 (`0x8b6f7b` / `0x9371c1`)。文字列走査の結果と一致。
+- ローダの動作 (逆アセンブル): `LoadLibraryExW` で `DWriteCore.dll` を試し、失敗すると `dwrite.dll` を試す。`GetProcAddress` で `DWriteCoreCreateFactory` → 失敗時 `DWriteCreateFactory` を取得。両方失敗すると NULL を返し、呼び出し元は結果 0 を格納する (`movq $0,(%rsi)`)。取得した工場は静的キャッシュ `0x184168338` に保持する。
+- 使用インタフェース: 工場の vtable 経由 (`callq *0x68/0x28/0x20/0x18(%rax)` 等)。COM の `IDWriteFactory` で、フォント列挙・テキストレイアウトを含むため、最小の代替は大きい。
+- 方針: FreeType 経由では受けない (COM の DWrite 面全体を置き換える必要があり、文字の描画は `ui_eval` の範囲外)。shimx は未対応 API を `shim_unimplemented` で名前を出して abort する方針 (`shimx.h` §先頭) に合わせ、`GetProcAddress` の段で `DWriteCreateFactory` / `DWriteCoreCreateFactory` を fail-fast させる (`tools/shimx/src/module.c`)。
+- 検証: `tools/shimx/test.sh` の fail-fast 段に `dwrite` ケースを追加 (`exit=1` + 名前を stderr に出力) → PASS。shimx 全体 (MT/ST・M4 互換・fail-fast) も PASS。
+- **未検証**: 実 Windows での DWrite の実呼び出し (動的ロードが実際に走るか・どの DLL が見つかるか)。静的解析の結論であり、実行確認は範囲外 (§5)。ローダの呼び出し元 2 件の役割 (テキスト描画か) は未確認。
+
 ### 2.5 UI 層の規模と OS 境界 (`ui_closure.py`, rtti_walk+callgraph 再利用)
 方法: roots = 42 効果の名前空間ごとに「Dsp/MasterDsp/DspModel **以外**」クラス (Editor/EditorModel/Controller/UI*/Field) の vtable slot。**直接 call/jmp 辺のみ追跡 = 下限** (間接 call は辿らない)。
 
@@ -120,7 +128,7 @@ HUD 側の転送コスト・present 方式は `tools/gui/REPORT.md` §9 が正�
 |---|---|---|---|
 | G1 | shim `SetDIBitsToDevice` (+疑い `StretchDIBits`) が top-down DIB の ySrc を上原点扱い・`StartScan`/`cLines` 無視 | HeartCore の部分更新で別の行が表示される。FL の `SetDIBitsToDevice` 2 call site も同じ関数を通る | **新規** `[GUI-13]` (親 #10): `ui_eval/g1_shim_fix.patch` を起点に shim 修正 + `selftest` に top-down 部分矩形ケース追加 (+`StretchDIBits` の確認)。受入 = `shim_probe.sh` 7/7 PASS (exit 0) |
 | G2 | user32 未実装 17 名 | A 方式でウィンドウ生成・メニュー・layered 窓・モーダルダイアログが fail-fast | メニュー 8 → #176 (GUI-2) にコメント、`UpdateLayeredWindow`・`MonitorFromPoint`・`BringWindowToTop`・ダイアログ 4 → #183 (GUI-7) にコメント、`TrackMouseEvent` → #182 (GUI-6)、`LoadStringA` → #174 (GUI-3) |
-| G3 | Skia の DirectWrite 経路 (動的ロード) の代替なし | A・B 方式でテキストが描けない/起動時に失敗し得る | **新規** `[KH-13]` (親 #15): DWrite を FreeType/shim どちらで受けるか決定 + 関連 #186 (GUI-9) にコメント |
+| G3 | Skia の DirectWrite 経路 (動的ロード) の代替なし | A・B 方式でテキストが描けない/起動時に失敗し得る | **方針決定 (KH-20 / #838)**: 呼び出し元を特定 (§2.7)。代替は作らず **shimx で未対応名を明示 fail-fast** (`DWriteCreateFactory` の GetProcAddress で abort)。FreeType 経由は不採用 (理由 §2.7)。関連 #186 (GUI-9) にコメント |
 | G4 | shimx に `SHBrowseForFolderW`・shell32 序数 74 なし | フォルダ選択ダイアログのみ | #172 (SHX-T5) にコメント |
 | M1 | 接続方式 (§3 A/B/C) の決定 | 以降の KH-UI 作業の有無が変わる | 親 #15 へ提案: `docs/DECISIONS.md` に D7 の Kilohearts 拡張 ADR を PM が起案 |
 | M2 | `UIWindow` 抽象 42 slot の契約が未解析、閉包の間接 call 未追跡 | B 方式の工数が見積れない | **新規** `[KH-14]` (B 方式を採る場合のみ) |
@@ -134,6 +142,6 @@ DEFECTS.md 行案 (shim 側, 層 `ours`; ID は main `6f4f3b0` の最後の D17 
 
 ## 7. 次タスク提案
 1. `[GUI-13]` G1 修正 (小): `g1_shim_fix.patch` を `gui_gdi.c` に適用 + selftest 追加 → `shim_probe.sh` が exit 0 になる。
-2. `[KH-13]` DirectWrite 代替方針 (小〜中): 実際に `DWriteCreateFactory` が呼ばれる経路の特定 (動的トレース) と FreeType 差し替えの可否。
+2. ~~`[KH-13]` DirectWrite 代替方針~~ → #838 (KH-20) で対応済み (§2.7: 静的解析で経路を特定し fail-fast 方針)。残る実機確認 (動的トレース) は M3 と同様に起票依頼。
 3. M1 の決定後に、C 方式なら Kilohearts UI の HUD 実装チケット (効果ごとの UI 仕様は共有基盤 + 効果固有 25〜38 関数程度と小さい: Gain 25・Delay 38・Reverb 17・Compressor 32 関数, §2.5)、B 方式なら `[KH-14]`。
 4. `tools/gui` の `e2e.sh`/`selftest.sh` は mingw 必須 (`gen_api.py`) で mingw の無い runner では走らない。CI で回すなら mingw 追加が必要 → #184 (GUI-8) にコメント。
