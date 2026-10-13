@@ -291,7 +291,8 @@ if ordn:
     if unknown:
         A('序数 import (名前解決不能。実体 API の特定が要る): ' + ', '.join(unknown))
 A('')
-A('プラグイン専用で未提供 (BSD ソケット名は Emscripten libc が解決; 下記は Serum2 のみ): ' + ', '.join(sorted({n for p in plug_rows for n in p[4]})) )
+_plug_missing = ', '.join(sorted({n for p in plug_rows for n in p[4]})) or 'なし'
+A('プラグイン専用で未提供 (BSD ソケット名は Emscripten libc が解決; 下記は Serum2 のみ): ' + _plug_missing)
 A('')
 A('## 表D: 対象外 (他担当 DLL)')
 A('')
