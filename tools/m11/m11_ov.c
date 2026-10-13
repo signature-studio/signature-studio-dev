@@ -101,13 +101,49 @@ static m11_tr_t disp_find(u32 va) {
     return 0;
 }
 
+/* ---- 間接 call の入口計測 (常設, #494) ----
+ * m11_icall の全呼出しを site (元バイナリの `call` 命令 VA) 別と target (解決先 VA) 別に ok / miss で数える.
+ * site は C 転記側が ICALL_AT(va, m11_icall の引数...) で渡す (m11_icall の署名・呼出し経路は不変: shimx_link が --wrap=m11_icall する).
+ * ICALL_AT を使わない呼出し (外部 TU) は site = M11_SITE_EXT, survey ドライバは M11_SITE_NONE (数えない).
+ * 読出しは m11_icall_cnt_* (survey_units.mjs が unit 前後の差分を JSON の icall 欄に出す). */
+#define M11_SITE_NONE 0xffffffffu
+#define M11_SITE_EXT 1u
+typedef struct { u32 key, ok, miss; } icall_cnt_t;
+typedef struct { icall_cnt_t* e; short* h; u32 cap, n; } icall_tab_t;
+#define ICALL_SITE_CAP 256
+#define ICALL_TGT_CAP 2048
+static icall_cnt_t g_isite_e[ICALL_SITE_CAP], g_itgt_e[ICALL_TGT_CAP];
+static short g_isite_h[ICALL_SITE_CAP * 2], g_itgt_h[ICALL_TGT_CAP * 2];
+static icall_tab_t g_isite = { g_isite_e, g_isite_h, ICALL_SITE_CAP, 0 }, g_itgt = { g_itgt_e, g_itgt_h, ICALL_TGT_CAP, 0 };
+static u32 g_icall_drop = 0, g_icall_site = 0;
+#define ICALL_AT(site, ...) (g_icall_site = (u32)(site), m11_icall(__VA_ARGS__))
+static void icall_bump(icall_tab_t* t, u32 key, int miss) {
+    u32 m = t->cap * 2, h = (key * 2654435761u) % m;
+    for (short s; (s = t->h[h]) != 0; h = (h + 1) % m)
+        if (t->e[s - 1].key == key) { if (miss) t->e[s - 1].miss++; else t->e[s - 1].ok++; return; }
+    if (t->n >= t->cap) { g_icall_drop++; return; }
+    icall_cnt_t* c = &t->e[t->n];
+    c->key = key; c->ok = !miss; c->miss = !!miss;
+    t->h[h] = (short)++t->n;
+}
+static icall_tab_t* icall_tab(int t) { return t ? &g_itgt : &g_isite; }
+EMSCRIPTEN_KEEPALIVE int m11_icall_cnt_n(int t) { return (int)icall_tab(t)->n; }
+EMSCRIPTEN_KEEPALIVE unsigned m11_icall_cnt_key(int t, int i) { return icall_tab(t)->e[i].key; }
+EMSCRIPTEN_KEEPALIVE unsigned m11_icall_cnt_ok(int t, int i) { return icall_tab(t)->e[i].ok; }
+EMSCRIPTEN_KEEPALIVE unsigned m11_icall_cnt_miss(int t, int i) { return icall_tab(t)->e[i].miss; }
+EMSCRIPTEN_KEEPALIVE int m11_icall_cnt_drop(void) { return (int)g_icall_drop; }
+
 /* 間接 call: target は .data ポインタ表由来 (LVA; reloc 補正済) か lea [rip] 由来の VA. */
 u64 m11_icall(u64 target, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
-    m11_tr_t f = disp_find((u32)(target + (0x400000ull - M11_LB_BASE)));
+    u32 site = g_icall_site ? g_icall_site : M11_SITE_EXT;
+    g_icall_site = 0;
+    u32 tkey = (u32)(target + (0x400000ull - M11_LB_BASE));
+    m11_tr_t f = disp_find(tkey);
     if (!f) {
         f = disp_find((u32)target);
-        if (f) g_icall_viaVA++;
+        if (f) { g_icall_viaVA++; tkey = (u32)target; }
     }
+    if (site != M11_SITE_NONE) { icall_bump(&g_isite, site, !f); icall_bump(&g_itgt, tkey, !f); }
     if (!f) {
         g_icall_miss++;
         int seen = 0;
@@ -143,7 +179,7 @@ EMSCRIPTEN_KEEPALIVE int m11_call_unit(int i) {
     if (!proc) return 0;
     u32 m0 = (u32)g_icall_miss;
     D(R(0x11eac98)) = (u32)(i + 1);
-    m11_icall(proc, 0, 0, 0, 0, 0, 0, 0, 0);
+    ICALL_AT(M11_SITE_NONE, proc, 0, 0, 0, 0, 0, 0, 0, 0);
     return (u32)g_icall_miss != m0 ? 2 : 1;
 }
 EMSCRIPTEN_KEEPALIVE unsigned m11_unit_va(int i) {
@@ -168,7 +204,7 @@ u64 function_4120c0(void) {
         if (!proc) continue;
         u32 miss0 = (u32)g_icall_miss;
         if (g_trace) M11_TRACE("[m11][unit %d/%d] init=0x%llx\n", i, count, proc);
-        m11_icall(proc, 0, 0, 0, 0, 0, 0, 0, 0);
+        ICALL_AT(0x412126, proc, 0, 0, 0, 0, 0, 0, 0, 0);
         if ((u32)g_icall_miss != miss0) g_units_skipped++;
         else g_units_run++;
     }
@@ -195,9 +231,9 @@ u64 m11_InitLib(u64 ctx, u64 a1, u64 a2, u64 tbl, u64 dllproc, u64 hinst, u64 re
     Q(r13 + 8) = 1;
     B(r13 + 0x30) = (u8)(reason + 1);
     Q(r13 + 0x28) = Q(tbl);
-    if (reason == 1 || reason == 2) m11_icall(Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
-    if (dllproc) m11_icall(dllproc, reason, reserved, 0, 0, 0, 0, 0, 0);
-    if (reason == 3) m11_icall(Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
+    if (reason == 1 || reason == 2) ICALL_AT(0x41223e, Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
+    if (dllproc) ICALL_AT(0x412258, dllproc, reason, reserved, 0, 0, 0, 0, 0, 0);
+    if (reason == 3) ICALL_AT(0x41226d, Q(tbl + (u64)reason * 8), reason, 0, 0, 0, 0, 0, 0, 0);
     if (Q(R(0x11e6078)) == 0) {
         B(R(0x11e6084)) = 1;
         D(R(0xfa5054)) = (u32)function_40a3b0();
@@ -270,6 +306,49 @@ unsigned long long function_4133f0(unsigned long long dest, unsigned long long s
         }
     }
     return 0;
+}
+
+/* function_412d60  VA 0x412d60  (System._UStrClr(dest: PPointer))
+ * RetDec は `mov rax,[rbx]` (旧値の読出し) を落とし, dest のアドレス自体を文字列ポインタとして refcnt を触った (4133f0 と同型).
+ *   old=*dest; old!=nil → *dest=0; refcnt(old-8)>0 → --refcnt==0 なら 0x409440(old-0x10) (FreeMem). 戻り値 = dest */
+unsigned long long function_412d60(unsigned long long dest, unsigned long long unused) {
+    (void)unused;
+    u64 old = Q(dest);
+    if (old) {
+        u64 hdr = old - 0x10;
+        Q(dest) = 0;
+        int rc = (int)D(hdr + 8);
+        if (rc > 0) {
+            D(hdr + 8) = (u32)(rc - 1);
+            if (rc - 1 == 0) function_409440(hdr);
+        }
+    }
+    return dest;
+}
+
+/* function_418190  VA 0x418190  (System._LStrArrayClr/_DynArrayClear 系: dest=PPointer, rdx=type info)
+ * 同上: `mov rsi,[rbx]` の旧値読出しが落ちている. refcnt は old-0xc (int32), length は old-8.
+ *   old=*dest; old!=nil → *dest=0; refcnt(old-0xc)>0 → --refcnt==0 なら
+ *   elem=Q(ti+6+B(ti+1)) があり len=Q(old-8)!=0 なら 0x416230(old, Q(elem), len) (要素 finalize) → 0x409440(old-0x10). 戻り値 = dest */
+unsigned long long function_418190(unsigned long long dest, unsigned long long ti, unsigned long long unused) {
+    (void)unused;
+    u64 old = Q(dest);
+    if (old) {
+        Q(dest) = 0;
+        int rc = (int)D(old - 0xc);
+        if (rc > 0) {
+            D(old - 0xc) = (u32)(rc - 1);
+            if (rc - 1 == 0) {
+                u64 elem = Q(ti + 6 + (u64)B(ti + 1));
+                if (elem) {
+                    u64 len = Q(old - 8);
+                    if (len) function_416230(old, Q(elem), (unsigned int)len);
+                }
+                function_409440(old - 0x10);
+            }
+        }
+    }
+    return dest;
 }
 
 /* function_412770  VA 0x412770  (System: InitContext 復元 + longjmp(setjmp 点=entry_point 内) )
@@ -379,7 +458,7 @@ u64 function_41c160(u64 self) {
  * alloc < 0 (継承 ctor 経由) は従来どおり self をそのまま返す. */
 unsigned long long function_410320(unsigned long long self, unsigned int alloc) {
     if ((signed char)(alloc & 0xff) < 0) return self;
-    return m11_icall(Q(self - 0x30), self, 0, 0, 0, 0, 0, 0, 0);
+    return ICALL_AT(0x41032e, Q(self - 0x30), self, 0, 0, 0, 0, 0, 0, 0);
 }
 
 /* function_5c0270  VA 0x5c0270  (参照カウント付きキャッシュ node の Release: self = キャッシュ, node = function_5c00e0 の戻り)
@@ -407,7 +486,7 @@ u64 function_5c0270(u64 self, u64 node) {
     if (zero) {
         u64 key = Q(node + 0xc);
         if (key) function_424090((void*)(uintptr_t)key);
-        m11_icall(Q(Q(self)), self, node, 0, 0, 0, 0, 0, 0);
+        ICALL_AT(0x5c037e, Q(Q(self)), self, node, 0, 0, 0, 0, 0, 0);
         function_409440(node);
     }
     return 0;
@@ -425,7 +504,7 @@ u64 function_5c03d0(u64 self, u64 obj, u64 key) {
     u64 old = Q(obj + 0x18);
     u64 node = function_5c00e0(self, key);
     Q(obj + 0x18) = node;
-    if (node != old) m11_icall(Q(Q(obj) + 0x18), obj, 0, 0, 0, 0, 0, 0, 0);
+    if (node != old) ICALL_AT(0x5c0437, Q(Q(obj) + 0x18), obj, 0, 0, 0, 0, 0, 0, 0);
     function_5c0270(self, old);
     function_423980((void*)(uintptr_t)(self + 0x10));
     return 0;
@@ -435,7 +514,7 @@ u64 function_5c03d0(u64 self, u64 obj, u64 key) {
  * 逆アセンブル転記 (5c0810..5c082e): `cmp [rbx+8],0; je; mov rcx,[rbx+0x10]; mov rdx,rbx; call [rbx+8]`. boot closure 外 (IR に関数が無い). */
 u64 function_5c0810(u64 self) {
     u64 code = Q(self + 8);
-    if (code) m11_icall(code, Q(self + 0x10), self, 0, 0, 0, 0, 0, 0);
+    if (code) ICALL_AT(0x5c0826, code, Q(self + 0x10), self, 0, 0, 0, 0, 0, 0);
     return 0;
 }
 
@@ -445,7 +524,7 @@ u64 function_5c0810(u64 self) {
 u64 function_5c0e70(u64 self) {
     function_5c0810(self);
     u64 owner = Q(self + 0x30);
-    if (owner) m11_icall(Q(Q(owner) + 0x18), owner, 0, 0, 0, 0, 0, 0, 0);
+    if (owner) ICALL_AT(0x5c0e91, Q(Q(owner) + 0x18), owner, 0, 0, 0, 0, 0, 0, 0);
     return 0;
 }
 
@@ -538,5 +617,99 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
         for (u64 i = 0; (long long)i < (long long)len; i++) function_417b70(data + i * 8, elt, dc, lv);
     }
     Q(a) = data;
+    return 0;
+}
+
+/* function_410b10  VA 0x410b10  (System.TMonitor の GetMonitor 相当: obj の monitor スロット = obj + InstanceSize - 8 を返し, 無ければ 410650 で作って cmpxchg で差す)
+ * RetDec は `mov rax,[rcx]` (obj → VMT) を落とし, `[obj-0x80]` (InstanceSize = [VMT-0x80]) を読んだ (D4: disp=0 の deref 脱落).
+ * _ClassCreate が TClass 自身を「オブジェクト」として返していた間は [obj-0x80] が偶然 InstanceSize になっていたが, 40fb40 以降の実オブジェクトでは
+ * ヒープ上の任意値になり, 不正アドレスに TMonitor の LockCount/Recursion/Owner を書いて FastMM のプールヘッダを壊した (unit #18 OOB の再発).
+ *   rsi = obj + sext([[obj]-0x80]) - 8; cur = *rsi; (cur & ~1) があればそれを返す.
+ *   無ければ new = 410650() (TMonitor 作成); lock cmpxchg(*rsi, cur → new | (cur & 1)); 再読込して (*rsi & ~1) == 0 なら再試行;
+ *   勝った値が new と異なれば new を 407e20 (FreeMem) で解放. 戻り = *rsi & ~1. */
+extern unsigned long long function_410650(void);
+extern unsigned long long function_407e20(unsigned long long);
+unsigned long long function_410b10(unsigned long long obj) {
+    u64 slot = obj + (u64)(long long)(int)D(Q(obj) - 0x80) - 8;
+    u64 cur = Q(slot);
+    u64 mon = cur & ~1ull;
+    if (mon) return mon;
+    u64 nw = function_410650();
+    for (;;) {
+        if (Q(slot) == cur) Q(slot) = nw | (cur & 1);
+        cur = Q(slot);
+        mon = cur & ~1ull;
+        if (mon) break;
+    }
+    if (mon != nw) function_407e20(nw);
+    return mon;
+}
+
+/* function_40a3b0 (System.Math.GetMXCSR: stmxcsr [rsp]; pop rax; ret): RetDec は pop rax を落とし常に 0 を返す
+ * (__asm_stmxcsr(0); ret 0)。MXCSR マスクビット (0x1f80) が 0 = 全 FP 例外アンマスク扱いとなり,
+ * 40a1c0 (FP 例外送出) → 409730 Error → Halt0 に至る (#417)。wasm に MXCSR は無いので既定値 0x1f80 を返す。 */
+unsigned long long function_40a3b0(void) {
+    return 0x1f80;
+}
+
+/* function_4159e0  VA 0x4159e0  (System.InitializeArray(p, ti, count))  /  function_416db0 (System.CopyArray(dest, src, ti, count))
+ * RetDec は型情報の種別バイト `mov rax,ti; movzx rcx,byte [rax]` の load を落とし kind=0 固定 → default 分岐の Error(reInvalidPtr)
+ * → Halt0 (#417: survey halt0 の 6 unit 直接原因)。逆アセンブル (4159e0..415b05 / 416db0..416f70) から転記。
+ * kind: 10/11/15/17/18 = 単純管理型 (8B), 12 = 24B, 13 = 静的配列 (再帰), 14/22 = record */
+#define TI_REC(ti) ((ti) + B((ti) + 1))
+unsigned long long function_4159e0(unsigned long long p, unsigned long long ti, unsigned int count32) {
+    u64 count = count32;
+    if (!count) return 0;
+    u32 kind = B(ti);
+    switch (kind) {
+    case 10: case 11: case 15: case 17: case 18:
+        if (count == 1) Q(p) = 0; else function_40d210((void*)(uintptr_t)p, count << 3, 0, 0);
+        return 0;
+    case 12:
+        if (count == 1) { Q(p) = 0; Q(p + 8) = 0; Q(p + 16) = 0; }
+        else function_40d210((void*)(uintptr_t)p, count * 24, 0, 0);
+        return 0;
+    case 13: {
+        u64 r = TI_REC(ti);
+        return function_4159e0(p, Q(Q(r + 0xa)), (unsigned)((u64)D(r + 6) * count));
+    }
+    case 14: {
+        u64 r = TI_REC(ti), sz = D(r + 2);
+        do { function_415610(p, ti); p += sz; } while (--count);
+        return 0;
+    }
+    case 22: {
+        u64 dummy[16];
+        return function_4158e0(dummy, p, ti, count);
+    }
+    default:
+        function_409730(2);
+        return 0;
+    }
+}
+
+unsigned long long function_416db0(unsigned long long dest, unsigned long long src, unsigned long long ti, unsigned int count32) {
+    u64 count = count32;
+    if (!count) return 0;
+    u32 kind = B(ti);
+    u64 r = (kind == 13 || kind == 14 || kind == 22) ? TI_REC(ti) : 0;
+    do {
+        u64 step = 8;
+        switch (kind) {
+        case 10: function_413540(dest, Q(src)); break;
+        case 11: function_4134e0(dest, Q(src)); break;
+        case 12: /* 416720: Q(RVA 0xfa5028) が 0 なら Error(0x10), 非 0 なら間接 call (RetDec は落とす, D15 型) */
+            if (Q(R(0xfa5028)) == 0) function_409730(0x10);
+            else m11_icall(Q(R(0xfa5028)), dest, src, 0, 0, 0, 0, 0, 0);
+            step = 0x18; break;
+        case 13: function_416db0(dest, src, Q(Q(r + 0xa)), D(r + 6)); step = D(r + 2); break;
+        case 14: case 22: function_416750(dest, src, ti); step = D(r + 2); break;
+        case 15: function_41a7b0(dest, Q(src)); break;
+        case 17: function_418210(dest, Q(src), ti); break;
+        case 18: function_4133f0(dest, Q(src)); break;
+        default: function_409730(2); return 0;
+        }
+        dest += step; src += step;
+    } while (--count);
     return 0;
 }

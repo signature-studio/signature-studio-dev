@@ -29,6 +29,19 @@ HEAD (b8e762d) でも FAIL (native 67 / wasm 46)。原因は tools/m11/work/boot
 **本チケット (liftdiff) とは無関係**で fix 対象外。
 `liftdiff_e2e.sh` は check 3 で exit 1 になるため、検収时は [4/4] を別途手動実行した (§6 参照)。
 
+### 5.1.1 check 3 の判定条件更新と Actions 上の再現 (#122)
+
+`check 3` の閾値 `wasm_trace <= 6` は boot_final3.ll 再生成前 (wasm 4〜6) の値で、現 IR (native 67 / wasm 46) では FAIL し
+`liftdiff_e2e.sh` が exit 1 になっていた。欠陥 (callee 0x41c820 arg1 が wasm で 0 = `callsite_arg_drop`、heap への 7 件の
+resourcestring 書込み欠落 = mem diff) は同じ形で残っているため、判定を `native_trace > wasm_trace` ∧ `callsite_arg_drop` ∧ `mem diff > 0` に変更した。
+あわせて `liftdiff_e2e.sh` に `--m11-only` (OTT 旧 chain の ott.ll が無い環境用)・入力/依存 (numpy capstone pefile) の事前検査を追加した。
+
+Actions runner (4 core, 実測 2026-10-12): 素材 `oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
+`bash tools/liftdiff/liftdiff_e2e.sh --m11-only` が **exit 0 / 128 s** (load average 開始 0.91 → 終了 4.72、batch は 12 shard で 81 s)。
+unit#18 check 1-3 PASS、m11 sample:800 = **一致 353 / 不一致 217 / 実行不能 230** (§5 の CAB-233 値と同一)。
+(別に 4 shard で走らせた batch は 346/224/230 = shard 数・負荷によるぶれ、§6.2。)
+OTT 旧 chain (D1〜D6) は `tools/ott/work/ott.ll` (`work-m6-ott`) と OTT_vst2_win64.dll (`analysis-ott-binaries`) が必要で、この run では**未実施**。
+
 ## 5.2 Ablation (規則 41)
 
 主要な効果に対して、その修正だけを外した対照を 3 つ実施した (いずれも `work/abl/` にビルド、
@@ -66,3 +79,26 @@ timeout (native 248 / wasm 346) が負荷で変動**することで、同一 boo
 **結論: 全数採点の絶対値 (2,498 / 941 / 4,182 / 741) は 1 run の snapshot で数十オーダー変動する。**
 下流の判断は (a) `compare_bootstate.py` の遷移 (旧→新) の方向性、(b) `cascade_410360.py` の
 case 単位分類 (完全再現) を基準にすること。「実行不能 2,498」は target 値に使えない。
+
+## 8. m11 wasm_trap 578 関数のトリアージ (LD-5 / #236)
+
+集計 = `python3 tools/liftdiff/tests/triage_wasm_trap.py > tools/liftdiff/results/m11_wasm_trap_triage.md` (cwd 非依存。表・内訳はそちらが正本)。
+入力は既存 closure の batch jsonl (`work/m11/batch_closure.jsonl`、再走なし)。Refs #236 / 個別原因は #307 (LD-7) へ。
+
+再現済み (スクリプトが `results/` に出力。TSV を 1 行壊すと 578 → 577 になることを確認):
+
+- **unreachable 218 は全件 `function_4128b0__lifted` で trap**。frame 名に signature / thunk を含むものは 0。
+  wasm 側 import 呼出列には全件 `ExitProcess` があり、native 側は 0 件。
+- 連鎖は `__lifted < function_4128b0 < function_412a40 < {function_4096b0 (144) | function_412a60 (74)}`。
+  frame [3] = **`function_412a40` の呼出元** (旧版は `function_412a60` の呼出元と誤表記していた)。
+- OOB 222 は最上位 frame が 71 種に分散 (`function_414ad0` 68 件が最多)。hang 39・badjson 25・indirect_sig 3・arith/stack/other 計 4。個別原因は未確定 (#307)。
+- TSV 578 のうち 67 件は今の jsonl に wasm_trap case が無い (jsonl 側のみ 71 件)。TSV と jsonl は別 run のため (§6.2)。
+
+現スナップショット (`work/m11/` の wasm / IR / build.json) での観測 (`results/` §6 に出力。**jsonl を作った build と同一かは未確認**。
+スナップショットの mtime は jsonl より新しい):
+
+- wasm バイナリ中に `signature_mismatch` / `sig_mismatch` / `thunk` は 0 件、`build.json` の wasm-ld `signature mismatch` 警告も 0 件。
+  M11 §2.4 の thunk は sigfix 済みと整合するが、jsonl 取得時点の build での確認ではない。
+- IR の `function_4128b0__lifted` では `ExitProcess` 呼出 (`dec_label_pc_4129f7`) の直後が `unreachable` (1 箇所)。
+  stub `ExitProcess` が戻る wasm でここに落ちる、という推論は**未検証** (stub の挙動を変えた再走はしていない)。
+- 分岐点 (native では `ExitProcess` に入らず wasm だけが入る理由) は上流にあり**未特定** → #307。

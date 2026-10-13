@@ -3,6 +3,7 @@
 #   usage: negctl_482.sh [構成名 ...]   (省略時は全構成)  各構成の結果を work/negctl_482/<名>.{json,out,err} + 1 行サマリで出す
 #   構成: full(現行) no5c03d0(5c03d0 の転記を外す = IR の weak 版 = #481 HEAD と同じ) no5c0e70(通知先 5c0e70/5c0810 の転記を外す = 通知は icall miss)
 #         probe(full + 5c03d0 の呼出し/通知先解決と 5c0e70 の入口を stderr に記録) probe_no5c03d0(no5c03d0 + 5c0e70 の入口だけ記録)
+#   json 行 (#494) は同じ survey の JSON の icall 欄 (site/target 別 hit) だけで検収した結果 (PASS/FAIL = 構成ごとの期待 ok/miss との一致).
 #   icall 列は最小集合 {1,17,45,95,114} を trace (SV_TRACE_AT=114) 付きで別に実行して数える: 5c0e70 宛の m11_icall が解決できた回数 / miss した回数.
 #   終了時に work/obj/ov.o を現行 m11_ov.c から再生成する.
 set -uo pipefail
@@ -45,5 +46,12 @@ for c in "${CFGS[@]}"; do
   if [ $rc = 124 ]; then r="HANG (timeout ${HANG_S}s)"; else r=$(grep -a SURVEY_UNITS "$OUT/$c.out" | head -1); fi
   p3=$(grep -ac '^\[probe5c03d0\]' "$OUT/$c.err"); p3r=$(grep -ac '^\[probe5c03d0\].* changed=1 .* resolved=1' "$OUT/$c.err"); pe=$(grep -ac '^\[probe5c0e70\]' "$OUT/$c.err"); ih=$(grep -ac '^\[m11\]\[icall\] 0x1c0e70' "$OUT/$c.trace.err"); im=$(grep -ac '^\[m11\]\[icall-miss\] target=0x1c0e70' "$OUT/$c.trace.err")
   printf '%-14s rc=%-3s %.1fs  %s  5c03d0(calls=%s changed&resolved=%s) 5c0e70 enter=%s icall(0x5c0e70) ok=%s miss=%s\n' "$c" "$rc" "$(echo "$e - $s" | bc)" "$r" "$p3" "$p3r" "$pe" "$ih" "$im"
+  # #494: survey JSON の icall 欄だけで同じ事実を検収する (site 0x5c0437 = 5c03d0 の call [rbx+0x18], target 0x5c0e70 = 通知先). 期待は構成ごとの [ok/miss]
+  case "$c" in
+    full|probe) ex="site:0x5c0437=4/0 target:0x5c0e70=4/0" ;;
+    no5c03d0|probe_no5c03d0) ex="site:0x5c0437=0/0 target:0x5c0e70=0/0" ;;
+    no5c0e70) ex="site:0x5c0437=0/4 target:0x5c0e70=0/4" ;;
+  esac
+  [ $rc = 124 ] || python3 trap_triage/icall_hits.py "$OUT/$c.json" --expect $ex | grep -aE '^(PASS|FAIL)' | sed 's/^/    json: /'
 done
 rm -f work/ov_ablate.c; touch m11_ov.c; bash m11_build.sh > /dev/null 2>&1; echo "ov.o を現行 m11_ov.c から再生成した"

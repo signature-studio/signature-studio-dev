@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# AU-9 e2e: コミット済み HEAD の src/ ・public/ を一時ディレクトリへ展開 → index.ts.diff を適用 → typecheck → vite build →
+# headless Chrome で「クリック → FlAudioShim 経由のテスト音 (440/660Hz 正弦) 再生」を検証する (dev / preview(本番ビルド) 両方)。
+#   bash tools/audio/integration/e2e.sh        終了コード 0 = 全 PASS
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
+ROOT="$(cd -- "$HERE/../../.." && pwd)"
+# shellcheck source=/dev/null
+. "$ROOT/tools/shared/env.sh"
+TMP="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/au9_verify"
+rm -rf "$TMP"; mkdir -p "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+
+# 1) 検証対象 = コミット済み HEAD (未コミット WIP に依存しない)
+git -C "$ROOT" archive HEAD src public index.html vite.config.ts tsconfig.json package.json | tar -x -C "$TMP"
+ln -s "$ROOT/node_modules" "$TMP/node_modules"
+( cd "$TMP" && patch -p1 --no-backup-if-mismatch < "$ROOT/tools/audio/integration/index.ts.diff" )
+
+# 2) テスト音 wasm を stage (RUNTIME_WASM_DIR は vite.config.ts の /wasm/* 配信元)
+export RUNTIME_WASM_DIR="$TMP/wasm"
+bash "$HERE/stage_app.sh"
+
+# 3) typecheck + build (パッチ適用後)
+( cd "$TMP" && "$ROOT/node_modules/.bin/tsc" --noEmit && echo "[au9] typecheck OK (patched)" )
+( cd "$TMP" && "$ROOT/node_modules/.bin/vite" build --logLevel warn && echo "[au9] vite build OK" && ls dist/worklets )
+
+AU9_ROOT="$TMP" node "$HERE/e2e.mjs" "$@"

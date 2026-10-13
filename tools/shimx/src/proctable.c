@@ -526,7 +526,11 @@ const ShxProcEnt shx_proctable[] = {
     { "wininet.dll", "HttpOpenRequestW", (void*)HttpOpenRequestW },
     { "wininet.dll", "HttpQueryInfoA", (void*)HttpQueryInfoA },
     { "wininet.dll", "HttpQueryInfoW", (void*)HttpQueryInfoW },
+    { "wininet.dll", "HttpSendRequestA", (void*)HttpSendRequestA },
     { "wininet.dll", "HttpSendRequestExW", (void*)HttpSendRequestExW },
+    { "wininet.dll", "HttpSendRequestW", (void*)HttpSendRequestW },
+    { "wininet.dll", "InternetCheckConnectionA", (void*)InternetCheckConnectionA },
+    { "wininet.dll", "InternetCheckConnectionW", (void*)InternetCheckConnectionW },
     { "wininet.dll", "InternetCloseHandle", (void*)InternetCloseHandle },
     { "wininet.dll", "InternetConnectW", (void*)InternetConnectW },
     { "wininet.dll", "InternetGetConnectedState", (void*)InternetGetConnectedState },
@@ -542,4 +546,4 @@ const ShxProcEnt shx_proctable[] = {
     { "winmm.dll", "timeGetTime", (void*)timeGetTime },
     { "wintrust.dll", "WinVerifyTrust", (void*)WinVerifyTrust },
 };
-const int shx_proctable_n = 538;
+const int shx_proctable_n = 542;
