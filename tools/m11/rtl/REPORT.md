@@ -218,7 +218,7 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 
 ### 9-2. 退行 5 件の単独再採点 (batch 外・n=3)
 
-`liftdiff.py batch targets/flelift.json --set file:<5 VA> --shards 5 --nobuild --state auto` を 3 回実行した (既存の `work/flelift` の wasm・obj を使用、batch 全数の再実行は無し、1 回あたり 9 秒)。
+`liftdiff.py batch targets/flelift.json --set file:<5 VA> --shards 5 --nobuild --state auto` を PR 作成時のローカル環境で 3 回実行した記録 (batch 全数の再実行は無し)。**生ログは repo に未保存**で、本 fix run では `tools/flelift/work`・`tools/liftdiff/work` と使用 wasm・obj が存在せず再実行できなかった。以下の表は当時の記録であり、この run では再検証していない。
 
 | va | batch (9-1 の jsonl) | 単独 r1 | 単独 r2 | 単独 r3 |
 |---|---|---|---|---|
@@ -228,8 +228,10 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 | `0x44a590` | mismatch | mismatch | mismatch | mismatch |
 | `0x4511d0` | mismatch | **match** | **match** | **match** |
 
-* 結論: 退行 5 件のうち 4 件は単独でも mismatch で安定し、退行の実在は裏づいた。`0x4511d0` は単独では 3 回とも match で、batch の mismatch と食い違う。§7-2 の「セッション間で verdict が動く」現象の一例と見られる (未特定)。
+* 結論 (当時の記録): 退行 5 件のうち 4 件は単独でも mismatch だった。`0x4511d0` は単独で 3 回とも match で、batch の mismatch と食い違う。原因は未確定で、次の 2 つが残る: (a) batch 文脈への依存 (b) セッション差 (§7-2 の「verdict はセッション間で動く」)。両者は同一セッションの batch と単独の並列比較でしか分離できず、未実施。
+* 未確認: 単独 run が使った wasm・obj と batch jsonl (`work-liftdiff`) が同一バイナリかは sha256 で照合していない (元ファイルが無い)。差がバイナリ差なら batch 文脈差ではない。
+* 「退行の実在」は 4 件の単独 mismatch が当時の記録で再現したという範囲に限る。n=3 の生ログは未保存。
 * 含意: 一致→不一致 7 件の「退行」のうち少なくとも 1 件は、batch 文脈依存の可能性がある。退行の判定には単独 n>=3 の確認を前提にすること。
 * `0x4511d0` 単独 (1 関数のみ) は `--shards 1` でも `--shards 5` でも match。shard 配置の差では説明できない。
 * 未検証: `0x4511d0` が単独で match になる理由 (同居関数・state の影響)。`0x40faa0` の間接 call 解決の確認は未実施。
-* 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` を設定。`tools/flelift/work/lift` は無いが、既存の `work/flelift` (ld_wasm.wasm・obj) で動いた。
+* 素材 (本 fix run の確認): `$HOME/artifacts/fl-win64.tar.zst` は存在するが、`tar --zstd -xf` は exit 1 で完走せず (25,168 entry 中 25,166 を展開)、`tools/flelift/work/lift`・`tools/liftdiff/work`・`/opt/emsdk` も無いため、単独 run の再現は不可。
