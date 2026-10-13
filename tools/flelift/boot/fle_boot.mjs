@@ -23,6 +23,8 @@ let m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;
 
 if (TRACE) { try { m._shimx_set_trace(1); } catch { /* nosx では未 export */ } }
+// FLE-6 ネガコン: FLE_IPP=0 で dsp_ippv2 の LoadLibrary/GetProcAddress 修正を外す (修正前の挙動)
+if (process.env.FLE_IPP === '0') m._fle_boot_set_ipp(0);
 
 const MM = 0x13a5c90, PKG = 0x13768b0;
 function rd64(a) { return '0x' + U8.slice(a, a + 8).reduce((s, b, i) => s + BigInt(b) * (1n << BigInt(8 * i)), 0n).toString(16); }
