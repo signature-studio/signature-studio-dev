@@ -26,10 +26,11 @@ BLK の算出式・32bit 切り詰め・`ICALL_BLK` 不一致・パイプライ�
 
 ## 実測 (再現・IR 確認)
 
-素材 (`work-liftlib` / `work-icall` / `work-m6-ott` / `analysis-ott-binaries` / `toolchain-*`) を展開して再実行した。`gen_ott_getparam_F.sh` → `0x18011e5a0-0x18011e76c`。
-`leafspec targets/ott_getparam.json --n 200` は **rc=1, 9.1 s, match=0 / mismatch=200 / wasm_trap=200** で §17.9 と一致。
+本 PR (fix run) では再実行していない。`$ARTIFACTS_DIR` に実在するのは `fl-win64.tar.zst` のみで、`analysis-ott-binaries`・`work-*`・`toolchain-*` は展開されていない。
+下表の leafspec 数値 (`rc=1`・`match=0 / mismatch=200 / wasm_trap=200`) は §17.9 の記録 (HEAD `83cd9eb4`) の引用であり、本ファイルで独立に再測定したものではない。
+§17.9 の実行 run ID は本ファイル作成時点で特定できていない (`83cd9eb4` に紐づく Actions run のログに該当の leafspec 行を確認できなかった)。
 
-IR 再生成 (`work/ott_getparam/ott_getparam_fixed.ll`・`ott_getparam.drc.restored.ll`):
+IR の観測 (下表) は `work/ott_getparam/ott_getparam_fixed.ll`・`ott_getparam.drc.restored.ll` を参照しているが、`work/` は gitignore 対象で本 PR からは再生成できず、生成コマンドも未記録。以下の件数は**未検証**として扱い、再現手順が確定するまで根拠にしない:
 
 | 項目 | 観測 |
 |---|---|
@@ -59,7 +60,7 @@ wasm32 (`p:32:32`) では BLK+0x08 = `0x84308008` / BLK+0x80 = `0x84308080` に�
 
 ## 次の作業
 
-修正・ネガコン・regress 登録は子 issue で行う (本 issue #883 は受入条件 4 件のうち未達 0 件 → 検証未了のため open のまま)。
+修正・ネガコン・regress 登録は子 issue で行う (本 issue #883 は受入条件 4 件のうち達成 0 件 (4 件とも未達) → 検証未了のため open のまま)。
 
 ## 再現
 
