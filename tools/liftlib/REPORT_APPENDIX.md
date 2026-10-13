@@ -228,3 +228,18 @@ liftdiff の 4 スナップショット (`ir_instr.ll`) の declare で C 生成
 - 再開に必要な `oc_artifacts`: `fl-win64 toolchain-retdec toolchain-emsdk work-liftlib work-m6-ott plugins-ott analysis-ott-binaries` (§17 冒頭の素材と同じ)。
 - 再開手順: ①`liftlib/passes/` に `jmp r8` jump table を `icall_rewrite.py` D10 (`tools/icall/REPORT.md` §4) と同じ target 列挙展開で復元する pass を追加 → ②`leafabi` (`ret_xmm0`) と組合せ → ③`leafspec` で `function_18011e5a0` を idx 0..19 × 200 で native 突合 (現状 0/200, §17.3) → ④ネガコン (pass OFF で FAIL) を数値で記録。
 - 優先度は PM 判断 (#415 コメント: M-Boot blocker #132/#253 解消後に再評価)。
+
+### 17.9 #415 fix 実測 (差し戻し対応・HEAD 83cd9eb4, Actions run)
+
+素材 (展開実測): `work-liftlib` → `tools/liftlib/work/`、`work-m6-ott` → `tools/m6/work/` + `tools/ott/work/`、`analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll 3,146,752 B)、`toolchain-retdec` → `/opt/retdec`、`toolchain-emsdk` → `/opt/emsdk`。`plugins-ott` は `analysis-ott-binaries` 内の DLL で代替可 (展開先は同じ)。
+
+| 項目 | 結果 |
+|---|---|
+| F.txt 生成 (必須 4) | `bash tools/liftlib/gen_ott_getparam_F.sh` → `0x18011e5a0-0x18011e76c` (1 関数, closure 0.44 s)。依存 capstone/pefile は venv 導入 |
+| `leafspec targets/ott_getparam.json --n 200` (ベースライン) | **rc=1, 4 s**, match=0 / mismatch=200 / wasm_trap=200 / native_crash=0。PR 本文の実測と一致 |
+| wasm trap の内容 | `memory access out of bounds` (`LL_VERBOSE=1` の wasm_runner)。IR 側は `inttoptr (i64 6512738312)` = `0x184308008` (= BLK `0x184308000` + 8 = `rcx`) を直接 load |
+| ネガコン A (`jtchain` OFF) | rc=1, 2 s, match=0 / wasm_trap=200 |
+| ネガコン B (`leafabi` OFF) | rc=1, 3 s, match=0 / wasm_trap=200 |
+
+ネガコン A/B はベースラインと同じく FAIL で、pass の寄与は切り分けられていない (ベースラインが既に FAIL のため)。`this` (rcx) が仮引数化されず BLK 絶対 VA を直接読む点が原因の本体で、icall pass の BLK 配線 (`tools/icall/icall_rewrite.py` の `BLK_RCX` 参照) を直す必要がある。本 run では修正を入れていない。
+load average: 実行中 0.01〜0.33 (1 分平均)。
