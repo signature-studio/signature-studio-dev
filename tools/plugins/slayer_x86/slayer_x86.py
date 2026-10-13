@@ -271,6 +271,13 @@ def probe_retdec(eng_path, work):
     first = (em.stderr.strip().splitlines() or [''])[0]
     print('[probe] retdec rc=%d defines=%d defines_with_x86_fp80=%d emcc_rc=%d first_error=%s' % (
         log.returncode, len(defs), len(f80), em.returncode, first))
+    # 1 件目の誤り (関数局所名 %wide-string の定数化) だけを機械的に除いて再度 emcc。 2 件目以降の阻害要因の有無を見る
+    s2 = re.sub(r'(?m)^(@\S+ = [a-z ]*constant \[\d+ x i16\]) %wide-string', r'\1 zeroinitializer', ll)
+    open(os.path.join(work, 'se2.ll'), 'w').write(s2)
+    em2 = subprocess.run(['bash', '-c', 'source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; emcc -c %s -o %s -w -O0' % (
+        os.path.join(work, 'se2.ll'), os.path.join(work, 'se2.o'))], capture_output=True, text=True)
+    print('[probe] after stubbing wide-string: emcc_rc=%d first_error=%s' % (
+        em2.returncode, (em2.stderr.strip().splitlines() or [''])[0].replace(work, '<work>')))
 
 
 def main():
