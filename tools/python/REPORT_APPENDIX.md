@@ -82,7 +82,7 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | `build_flpy.sh` 再リンク | 6.4 秒 (1 回) |
 | 回帰 (既存 PoC) | `smoke_direct` OK / `poc_mcp` POC OK / `all_tools` 48/48 ok・37,424 呼出し (§5 と同値) |
 
-ネガティブコントロール (数値): (a) Euclidean の `int(i*slope)` を `int(i*slope+0.5)` に改変 → oracle 不一致を検出 (改変版のノート集合が oracle と異なる)。(b) `Score.getNote` を clone 返却に差替え → Humanize の offset が反映されず検出。(c) 存在しないコントロール名 → `KeyError` で検出。3/3 が期待通り FAIL 側に倒れた。
+ネガティブコントロール (数値、テストが `INFO` 行で常時出力): (a) Euclidean の `int(i*slope)` を `int(i*slope+0.5)` に改変 → 改変版 **41 ノート** / oracle **39 ノート** で集合不一致を検出。(b) `Score.getNote` を clone 返却に差替え → Humanize (Start Time Offset 0.5・Ref 1/64 = 6 ticks・Seed 2) の time 値列が元値 **[200,248,296,344]** のまま。同パラメータの正常系の期待値は **[203,251,299,347]** (12 ノート正常系の先頭 4 値を実測)。(c) 存在しないコントロール名 → `KeyError` で検出。3/3 とも期待どおり検出側に倒れた。
 
 ### Remote Scripts 5 本 / Audio scripts 12 本 の調査結果
 
@@ -121,3 +121,16 @@ stubs (LGPL 参照) 署名との照合 (kwlist のある 103 のうち stubs 署
 | 比較 (同手順で再実行、一時展開) | 旧 head `57326b1`: host_calls 37,424 / `origin/main` `b6311f3`: 37,425 (`get_plugin_parameter_value` に `plugins.getParamValueString` 呼出しが 1 件増)。merge 後 HEAD は main と同値。差は main 側に既存。保存スナップショット `analysis/mcp/tool_coverage.json` (37,424) は現行コードより古い (自動生成物のため本 PR では更新しない) |
 | 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)、`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`) の位置に展開。mac dylib なし (flapi_table は既存表 27 件を引継ぎ) |
 | 範囲 | node + mock engine。Chrome 上の pyscript 実行は未検証 (従来どおり) |
+
+### 14-c. 差し戻し対応後の再検証 (検証 HEAD `cd9e81e`、node v22.23.3、4 core)
+
+検証 HEAD は差し戻し対応の code/test commit `cd9e81e`。以降の commit は docs のみ (実行結果に影響しない)。ビルドは merge `36af1c4` の worktree で実施 (`cd9e81e` までに `src/` は未変更)。
+
+| 項目 | 結果 |
+|---|---|
+| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`、`extracted/` 25,166 件)。`toolchain-emsdk` は [EMSDK] の位置 (存在確認済み) |
+| `fetch_inputs.sh` → `build_cpython_wasm.sh` → `build_flpy.sh` | 全て exit 0。直列 real 3m28.731s (wasm 初回ビルド込み。`build_flpy.sh` 単体は 14-b の 5.680s) |
+| `tests/pyscript_e2e.mjs` (n=3) | 43/43 PASS・exit 0 ×3。wall 0.89 / 0.80 / 0.80 秒。uptime 1 分値 1.11 → 1.26 |
+| 回帰 | `smoke_direct` exit 0 / `poc_mcp` POC OK / `all_tools` 48/48 ok・host_calls 37,425 / `midi_script` 23 checks OK・`--neg` exit 1 |
+| NC 実測 | (a) 改変版 41 ノート vs oracle 39 ノート / (b) time 値列 [200,248,296,344] vs 期待 [203,251,299,347] (詳細は §14 の NC 段落) |
+| 副作用 | `all_tools` は tracked の `analysis/mcp/tool_coverage.json` を書き換える (実測 37,425 vs 保存値 37,424)。検証後に元の内容へ戻し、commit には含めない |
