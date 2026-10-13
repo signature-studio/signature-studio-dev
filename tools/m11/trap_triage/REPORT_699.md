@@ -6,7 +6,7 @@
 既知類型との関係 (DEFECTS.md): **D1b と同型の症状・検出信号** (機械語の jcc に対応する IR `br` が無く、飛び先が無条件実行になる)。ただし **根本原因は未切り分け** (D1b は stage-0 のフラグが定数に畳まれる機構。本件は生 lift の段階で既に jcc が無く、同じ機構かは未確認。§2, §6)。新規番号は付けず、行案 (§5) は PM 判断。番号は (DEFECTS.md) 体系。
 
 検証起点: `8d883c3` (main)。作業 branch は `d9bcc52` (親 PR #700 の head) から切った。修正 commit `9dd4d55`。
-**検証 HEAD: `bcc605d2` (本版 = `f3d5341` に `origin/main` を merge した commit)**。negctl (§3-1) は本 HEAD で rc 0・3 構成 PASS。e2e (§3-3) は本 HEAD で rc 0 だが、停止理由が `main` 取り込み前と変わった (本版で未切り分け、§3-3 参照)。
+**最終の実測 HEAD: `a2190b26`** (§3-6, n=3)。`negctl_699.sh` は 3 回とも rc=1 (G2 FAIL: unit 56 が全構成で trap のまま。受入条件 2 は未達)。`m11_e2e.sh` は 3 回とも rc 0 で、停止理由は `function_8c5eb0` の fail-fast trap (`units_run=53/942`)。
 rdx.1 の値と `8c60df` の戻り値不一致は **未解決のまま** (§1, §6)。approve 判断に影響する。本版でもこれらの解消は行っておらず、PM 判断を要求する。
 
 ## 1. 修復の内容
@@ -49,7 +49,7 @@ dec_label_pc_8c5ef5_g699_e:
 - **ガード辺の値**: ガードで飛ばすと、元 IR で `%rax.0.reg2mem`・`%rdx.1.reg2mem` を store するのは `dec_label_pc_8c6034`・`dec_label_pc_8c603f` だけで、飛び先 `dec_label_pc_8c6066` が両方を load する (phi は無い)。このままでは 0 件経路で未定義値になるため、専用ブロックで明示 store する。
   - **rax.0 := 0 (機械語で確定)**: `8c5f06: xor eax,eax` の後、`8c5f18: jg` まで rax は書かれない (`8c5f08`〜`8c5f15` は rcx・ebx・[rbp+0x4c]・flags のみ)。0 件経路は rax=0 のまま `8c6066` に入る。
     - **訂正 (f3e9950 で確認)**: 前版の「`8c60df` で上書きされるため結果に効く経路は無い」は誤り。IR の `dec_label_pc_8c60df` は `ret rax.2` で、rax.2 は `8c6084` で rax.1 (= ガード辺の 0) を受ける。一方、機械語 `8c60df: mov rax,[rbp+0x80]` は [rbp+0x80] を返す。よって 0 件 ∧ arg2 下位 byte == 0 (`8c608b je 8c60df`) の経路では、IR は 0 を返し、機械語は entry の rcx (= [rbp+0x80], `8c5ebd` で保存、`8c5eee` は arg2 下位 byte ≠ 0 の枝でのみ書く) を返す。**ガード辺の rax.0 := 0 は戻り値に届き、この経路で機械語と食い違う。** この食い違いは `8c60df` の戻り値不一致 (§6) の一部で、件数 > 0 の経路も同じ構造だが、ガード無しでの再現は未実測 (前版の「ガード無しでも再現」は機械語の比較のみに基づく)。ガード辺の rax 値は未確定。
-  - **rdx.1 (旧版の zext(arg2) 仮定は撤回、(b') で置換)**: 0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路は trap に落とす。それ以外では rdx.1 は読まれない (§1 冒頭)。以下は旧版の調査記録: 機械語では `8c5efd: call 8c67a0` の後の rdx は callee 依存。`8c67a0` は中で `8c7c80` を呼び (`mov rdx, rbx` 後), `8c5eda` の `410320` は `call qword ptr [rax-0x30]` (vtable 間接 call、target は IR から決まらない) を呼ぶ。rdx の出力は IR から確定できない。`8c5ee1: movzx rdx, byte [rbp+0x88]` を経由する値として、既存 IR の `8c6071` (`8ca670` 後の rdx を引数 rdx と同じとする) と同じ pass-through 規約に合わせた。**410320 と 8c67a0 が rdx を変えないことは確認していない**。
+  - **rdx.1 (b' 版の扱い)**: 0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路は trap に落とす。それ以外の 0 件経路 (専用ブロック `_e`) は `rdx.1 := 0` を store する。これは `8c6066` が rdx.1 を rdx.2 に移し、rdx.2 を読むのは `8c608d` (arg3==0 ∧ arg2 下位≠0) だけという IR の CFG から確認した (`boot_final.ll` の `function_8c5eb0` を読み取り)。`8c608d` 以外の経路では rdx.2 は読まれないため、`_e` の値は結果に影響しない。`zext(arg2)` の仮定は (b') で撤回し、コードには残っていない。以下は確認の記録 (旧版の仮定を検討した時点のもの): 機械語では `8c5efd: call 8c67a0` の後の rdx は callee 依存。`8c67a0` は中で `8c7c80` を呼び (`mov rdx, rbx` 後), `8c5eda` の `410320` は `call qword ptr [rax-0x30]` (vtable 間接 call、target は IR から決まらない) を呼ぶ。rdx の出力は IR から確定できない。
   - **機械語での確認 (head b47f7f7, capstone 5.0.7, `block00031_PE.bin` を VA 直接逆アセンブル)**:
     - `8c5efd: call 8c67a0` → `8c67a0` は `call 8c5c90` の後 `call 8c7c80` して `ret` のみ (rdx を書かない)。8c5f02 時点の rdx は `8c7c80` の ret 時の rdx と同じ。
     - `8c7c80` の ret 時の rdx は末尾の経路で決まり、`8c7710` の戻り・`40f9e0` の戻り・vtable 間接 call (`call qword ptr [rbx]`) の戻りのいずれかになる。callee 依存で、逆アセンブルだけでは確定しない。
@@ -143,10 +143,14 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - 測定できない理由: survey / negctl は unit の戻り値を出力しない。戻り値の比較には、0 件 ∧ arg2 下位 byte == 0 の呼出しを持つ unit を特定し、呼出し元の戻り値を比較する追加計測が要る。本版では実施していない。
 - 本版の結論: 「0 件経路の戻り値は機械語と一致しない可能性がある (IR 構造から)。測定は未実施。」 approve 判断に影響する。起票先は #718 (`[M11-N35]`、コメント 6146067294 で追記済み)。
 
-### 3-6. (b') 版の実測 (head = 本 commit, n=3)
+### 3-6. (b') 版の実測 (測定 HEAD `a2190b26`, n=3)
 
+- 測定 HEAD: `a2190b26` (`m11_guard699.py` の docstring を b' 版の実装に合わせた commit。コードは `78fa706` と同一)。素材は runner の `$RUNNER_TEMP` に展開 (`fl-win64`・`work-m11`)。IR は `m11_e2e.sh` が `ir_conditions.json` を作り直した (`ir_sha256=63863d66…`)。
 - 変更: rdx 経路を trap に落とした (`_t`)。negctl・e2e を n=3 で実行。
-- **negctl_699.sh (n=3)**: 3 回とも rc=1、build+survey 95・96・95 秒。counts は 3 構成とも `ok 869 / trap 24 / oom 1 / miss 47 / noproc 1`、unit 56 は全構成で `trap`。G1 PASS / **G2 FAIL** / G3 PASS。`diff off->fix: n=0`, `diff off->ng: n=0`。
+- **negctl_699.sh (n=3, HEAD `a2190b26`)**: 3 回とも rc=1、build+survey 95・95・94 秒。3 構成 (off/fix/ng) とも `ok 870 / trap 24 / oom 1 / miss 46 / noproc 1`、unit 56 は全構成で `trap`。G1 PASS / **G2 FAIL** / G3 PASS。`diff off->fix: n=0`, `diff off->ng: n=0`。G2 が FAIL する理由は次項。
+- **G2 FAIL の扱い**: 期待値 (unit 56 のみ trap→ok) は、ok 化する版 (旧 rdx 仮定) を前提にしている。(b') は unit 56 を fail-fast で trap のまま残すため、この期待値は (b') では成立しない。受入条件 2 の改訂は PM 判断 (スクリプトの期待値は変更していない)。
+- **e2e (`m11_e2e.sh`, n=3, HEAD `a2190b26`)**: 3 回とも rc=0。所要 123.2・41.2・37.6 秒 (r1 は IR 再生成を含む)。停止理由は 3 回とも `trap "unreachable" @ function_8c5eb0 <- function_56fde0 <- m11_tr_function_56fde0 <- m11_icall <- function_4120c0`。**full InitUnits run は `units_run=53/942`** (停止時点)。停止後に検証されなかった unit は `942 - 53 = 889` (fail-fast の後続)。survey (InitUnits 抑止, 942 unit 個別隔離) は `ok 870 / trap 25 (うち oom 1) / miss 46 / noproc 1 / clobber 0` (3 回とも同一)。
+- 注: 上記の `units_run=53` は full run の停止時点。survey の `ok 870` は各 unit を独立に実行した結果で、fail-fast の影響を受けない。
 - **G2 FAIL の扱い**: 期待値 (unit 56 のみ trap→ok) は、ok 化する版 (旧 rdx 仮定) を前提にしている。(b') は unit 56 を fail-fast で trap のまま残すため、この期待値は (b') では成立しない。判定基準の改訂は PM 判断 (スクリプトは変更していない)。
 - **unit 56 の trap 種別 (実測の食い違い)**: 全 trap unit の stack 取得 (`M11_SURVEY_STACK=<trap 全件>`) では unit 56 = `RuntimeError: unreachable` (`8c5eb0` の `_t`)。unit 56 単独の stack 取得 (`M11_SURVEY_STACK=56`) では `RuntimeError: memory access out of bounds`。同じ build で観測が異なる。原因は未切り分け。
 - **fail-fast 到達 unit 数 (限定)**: 全 trap 24 件の stack 取得では `unreachable` は unit 56 の 1 件のみ。ただし unit 56 の単独取得では OOB と出るため、到達 unit 数を 1 と断定しない。他 unit が `_t` に到達する可能性は未除外。
