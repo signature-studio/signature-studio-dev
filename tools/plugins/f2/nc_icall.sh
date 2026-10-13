@@ -32,5 +32,20 @@ s = re.sub(r'(call void @__icall_dispatch\(i64 )\d+(\))', r'\g<1>0\2', s, count=
 open(sys.argv[2], 'w').write(s)
 PY
 echo "[NC3] dispatch の site VA を 0 にした IR:"; G "$N/zero1.ll" nc3_zero1 | tail -2; rc3=${PIPESTATUS[0]}
-echo "== 判定: 正常 rc=$rc_ok (期待 0) / NC1 rc=$rc1 / NC2 rc=$rc2 / NC3 rc=$rc3 (期待 いずれも 1)"
-[ "$rc_ok" = 0 ] && [ "$rc1" = 1 ] && [ "$rc2" = 1 ] && [ "$rc3" = 1 ] && echo "ALL DETECTED" || { echo "NOT DETECTED あり"; exit 1; }
+# NC4: waiver の悪用 — NC2 で落とした site に waiver を付けても、raw IR にその VA の命令が残っているので waiver 無効 (F4) で FAIL
+python3 - "$N/drop1.ll" "$N/waiver_bad.json" <<'PY'
+import json, re, sys
+# NC2 で消した dispatch の site VA = 正常 IR にあって drop1.ll に無い値
+ok = set(re.findall(r'__icall_dispatch\(i64 (\d+)\)', open('work/batch/18984/p.final.ll').read()))
+dr = re.findall(r'__icall_dispatch\(i64 (\d+)\)', open(sys.argv[1]).read())
+gone = [v for v in ok if dr.count(v) < re.findall(r'__icall_dispatch\(i64 (\d+)\)', open('work/batch/18984/p.final.ll').read()).count(v)]
+assert len(gone) == 1, gone
+json.dump([{'block': 'nc', 'site': hex(int(gone[0])), 'reason': 'NC4 偽の waiver'}], open(sys.argv[2], 'w'))
+print('偽 waiver: site', hex(int(gone[0])))
+PY
+echo "[NC4] 偽 waiver (落とした site に waiver を付ける):"; python3 f2/icall_gate.py --pe "$PE" --ranges "$RG" --ir "$N/drop1.ll" --raw-ir "work/batch/$B/p.drc.restored.ll" --label nc --waivers "$N/waiver_bad.json" | tail -2; rc4=${PIPESTATUS[0]}
+# NC5: 正当な waiver (18979) を外す → missing=1 で FAIL
+echo '[]' > "$N/no_waiver.json"
+echo "[NC5] waiver を外した 18979:"; python3 f2/icall_gate.py --waivers "$N/no_waiver.json" 18979 | tail -2; rc5=${PIPESTATUS[0]}
+echo "== 判定: 正常 rc=$rc_ok (期待 0) / NC1 rc=$rc1 / NC2 rc=$rc2 / NC3 rc=$rc3 / NC4 rc=$rc4 / NC5 rc=$rc5 (期待 いずれも 1)"
+[ "$rc_ok" = 0 ] && [ "$rc1" = 1 ] && [ "$rc2" = 1 ] && [ "$rc3" = 1 ] && [ "$rc4" = 1 ] && [ "$rc5" = 1 ] && echo "ALL DETECTED" || { echo "NOT DETECTED あり"; exit 1; }
