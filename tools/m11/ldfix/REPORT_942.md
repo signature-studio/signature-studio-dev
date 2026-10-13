@@ -235,3 +235,6 @@ base の trap は survey で 26 件。以下は unit VA 単位で、取得でき
   - `m11_build.sh` は `boot_final3.ll` が `boot_final.ll` より古いときなどにだけ作り直すため、IR を入れ替えたら `rm -f` で消してから build する。
   - 本 fix run ではこの手順を実行していない (素材が無い。§8-5 の冒頭参照)。
 - 最後に残した `tools/m11/work/` は ldfix 無し (`M11_LDFIX=0`) の状態。本 fix run では work/ が無いため、この状態も確認していない。
+- 差分 0 の証跡 (fix run・HEAD 時点の実測。測定 commit `604e900f` → 本 HEAD):
+  - `git diff 604e900f HEAD -- tools/ ':!*.md'` の出力: 0 行 (コード差分 0)。
+  - `git diff 604e900f HEAD --stat -- tools/` の出力: `tools/m11/ldfix/REPORT_942.md | 104 +++` (REPORT のみ)。
