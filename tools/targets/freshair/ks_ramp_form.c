@@ -15,8 +15,6 @@ int main(void) {
     for (int trial = 0; trial < 1000000; trial++) {
         int n = 1 + (int)(R32() % 128);
         volatile float a = RF(0, 3), b = RF(0, 3), coef = 1.0f / (float)n;
-        float cur_kh = a, cur_sc_dummy = 0;
-        (void)cur_sc_dummy;
         for (int k = 1; k <= n; k++) {
             volatile float t = (float)k * coef;
             volatile float kh = a + (b - a) * t;

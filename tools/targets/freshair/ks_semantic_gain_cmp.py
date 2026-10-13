@@ -14,12 +14,13 @@ def parse(path):
             p = line.split()
             if not p or not p[0].startswith("C"):
                 continue
+            # 形式 (固定 11 トークン): C<i> n= mode= first= dl= dr= <notify count> <notify hex> <L hex|-> <R hex|-> <state hex>
+            assert len(p) == 11, f"token count {len(p)}: {line[:120]}"
             idx = int(p[0][1:])
             kv = dict(x.split("=") for x in p[1:6])
             n = int(kv["n"])
-            # 形式: C<i> n= mode= first= dl= dr= <notify...> <L hex> <R hex> <state hex>
-            L, R, S = p[-3], p[-2], p[-1]
-            notify = p[6:-3]
+            L, R, S = p[8], p[9], p[10]
+            notify = p[6:8]
             rows[idx] = {"n": n, "kv": kv, "L": L, "R": R, "S": S, "notify": notify}
     return rows
 

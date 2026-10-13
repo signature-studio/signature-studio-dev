@@ -120,10 +120,12 @@ static void run(int sc, uint64_t va, Case* c, int perturb) {
         ((fn_t)va)(self, ctx, aud);
         int np = (int)(*(int**)(V + 0x68) - vec);
         printf("%d ", np);
+        if (np == 0) printf("-");
         for (int i = 0; i < np; i++) printf("%08x", (uint32_t)(vec[i] - id));
     }
     printf(" ");
-    hexdump(L, c->n * 4); printf(" "); hexdump(R, c->n * 4); printf(" ");
+    if (c->n) { hexdump(L, c->n * 4); printf(" "); hexdump(R, c->n * 4); } else printf("- -");
+    printf(" ");
     hexdump(self + so + 0x64, 0x38); printf("\n");
 }
 
