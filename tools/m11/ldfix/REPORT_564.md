@@ -61,10 +61,11 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 **main 取り込み後の再実測** (merge commit `8637316`、Refs #577。`bash tools/m11/ldfix/f4_e2e.sh`、4 vCPU、開始 load 0.86 / 終了 1.00): **294 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。RegisterClassW 2→3、ret 0x0→0x110000f は上の表と同じ。
 survey は **ok 864 / noproc 1 / miss 46 / trap 31** (pre・post 同一、units_run 22 / init_count 23 / icall_miss 0) で、上の表 (816/1/46/79) と一致しない。差 48 件のうち 36 件は main 取り込みで入った `m11_survey.mjs` の unit 別 VirtualAlloc 上限 (#513、既定 256 MB) の効果: 上限 0 (旧挙動) で再実行すると 828/1/46/67。残る 12 件 (828 vs 816) は未分離 (main 側 `m11_build.sh` 等の寄与の可能性)。`results/f4_564_{pre,noand,post}.json` は 8637316 の実行出力で上書きした。上の表の値は PR 時点 (7be6bab) の実測として残す。
 
-**head `62659d4` の再実測** (`bash tools/m11/ldfix/f4_e2e.sh`、`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`、4 vCPU、開始 load 0.85 / 終了 1.02): **300 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。
-pre / noand / post は **units_run 52 / init_count 54 / icall_miss 5** (main 取り込みで unit 数が 22→52 に増えた)、survey ok / noproc / miss / trap = **865 / 1 / 47 / 29** (3 構成とも同一)。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。
-`results/f4_564_{pre,noand,post}.json` は本回の出力で上書きした。`ok 864 / miss 46 / trap 31` (8637316 時点) とは別の値になった。差の原因は未分離 (`gen_ir2` / `m11_build.sh` の入力差を未確認)。
+**main 取り込み後の再実測** (`bash tools/m11/ldfix/f4_e2e.sh`、`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`、4 vCPU、merge commit 後の head): **371 s, rc 0**、6 gate 全 PASS、ネガコン 4/4 が期待行付きで FAIL。
+pre / noand / post は **units_run 52 / init_count 54 / icall_miss 5** (main 取り込みで unit 数が 22→52 に増えた)、survey ok / noproc / miss / trap = **869 / 1 / 47 / 25** (3 構成とも同一)。RegisterClassW 2 → 2 → 3、`function_52a7f0` ret 0x0 → 0x0 → 0x110000f。
+`results/f4_564_{pre,noand,post}.json` は本回の出力で上書きした。`ok 864 / miss 46 / trap 31` (8637316 時点) とは別の値。main の F3c 等の取り込み後の変化と見られるが、原因は未分離。
 監査 (`audit_undefload.py`): sites 2,846 / FRAME_IN_ESCAPED 56 (本回も同一)。
+(参考) 取り込み直後の一時的な実測として `62659d4` 時点の 865/1/47/29 がある (merge 解消前の ldfix.py 使用、rc 0)。
 
 ## 5. 未解決 / 限界
 

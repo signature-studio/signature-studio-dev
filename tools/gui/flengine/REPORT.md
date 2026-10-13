@@ -1,7 +1,7 @@
 # REPORT — GUI-3 (#174): 実 FLEngine の lift に GUI shim を結合する
 
 **判定: 部分達成 (受入条件 1 は未達、条件 2 は達成。PR は `Refs #174`)**。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
-**自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **19 種**が shim に到達 (実装済み 18 / fail-fast stub 1 = `EnumFontFamiliesExW`)。
+**自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **28 種**が shim に到達 (実装 27 / STUB 1 = `LoadImageW`。head `62659d4` 取り込み後の実測。取込前は 19 種)。
 一方 **`RegisterClass*` / `CreateWindowEx*` は自然起動でも survey でも未到達** (通常起動は unit #23 で Halt0、#134 / #490 の先)。実 WNDCLASS を JS から指向呼出した場合は
 `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 
@@ -15,11 +15,11 @@
 |---|---|---|
 | リンク | wasm-ld signature mismatch **0** / undefined **0** / duplicate **0** (ff・soft 両ビルド) | `build.sh` のリンクログを grep。wasm 6,167,297 B |
 | GUI declare ↔ adapter | IR の GUI declare **177** = adapter **177** (実装 158 / stub 19)、突合不一致 c=0 d=0 | `integ/gen_adapt.py --ir boot_final.ll` |
-| 起動の回帰 | shim 有り/無し (同一 IR) で **units_run 52 / init_count 54 / icall_miss 5 / GetMem 560 / FreeMem 20 が一致**。両者とも `memory access out of bounds` で停止 (dllmain_done false) | baseline = `m11_run.mjs` (GUI 3 本は m11_win.c の暫定 stub)。head `62659d4` の値 (main 取り込み後。取込前は 22 / 23 / 0) |
-| survey の回帰 | soft ビルド (stub は 0 返却) の survey が baseline と **ok 828 / noproc 1 / miss 47 / trap 66 が一致** | 942 unit 隔離 (`m11_survey.mjs` 同手順、VA 上限 0 = `M11_VA_UNIT_BUDGET_MB=0`。既定 256 の m11 survey は run.mjs と食い違うため baseline 側を 0 に揃えた)。取込前は 828 / 46 / 67 |
+| 起動の回帰 | shim 有り/無し (同一 IR) で **units_run 52 / init_count 54 / icall_miss 5 / GetMem 560 / FreeMem 20 が一致**。両者とも `memory access out of bounds` で停止 (dllmain_done false) | baseline = `m11_run.mjs` (GUI 3 本は m11_win.c の暫定 stub)。main 取り込み後 (取込前は 22 / 23 / 0) |
+| survey の回帰 | soft ビルド (stub は 0 返却) の survey が baseline と **ok 869 / noproc 1 / miss 47 / trap 25 が一致** | 942 unit 隔離 (`m11_survey.mjs` 同手順、VA 上限 0 = `M11_VA_UNIT_BUDGET_MB=0`。既定 256 の m11 survey は run.mjs と食い違うため baseline 側を 0 に揃えた)。取込前は 828 / 46 / 67 |
 | 最初の GUI 呼出 (自然起動) | **`LoadStringW` ×4 → shim (IMPL, P1)**。DllMain attach の 22 unit 内 (`shimx_link/REPORT.md` §4.1 は unit #16 付近) | `GUI-REACH` 行 (`boot.json`) |
-| survey で shim に到達した API | **19 種** (IMPL 19 / STUB 0)。§3 | `survey_soft.json` の reach |
-| fail-fast ビルドの survey | ok 828 / trap 67 (soft と同一)。fail-fast は 0 件 (到達した API は全て実装済み) | `survey_ff.json` |
+| survey で shim に到達した API | **28 種** (IMPL 27 / STUB 1 = `LoadImageW`)。§3 | `survey_soft.json` の reach |
+| fail-fast ビルドの survey | ok 869 / trap 25 (soft と同一)。fail-fast 3 件 (`LoadImageW` 1 unit / `SystemParametersInfoW` 2 unit。action 単位の未実装) | `survey_ff.json` |
 | `RegisterClass*` / `CreateWindowEx*` の自然到達 | **0** (起動・survey とも) | judge の INFO 行 |
 | 指向呼出 (§4) | `RegisterClassW` ×2 成功 (atom 0xC001 / 0xC002)、`TApplication` 窓 hwnd `0x210000e` (< 2^31)、WNDPROC 4 引数が `m11_icall` 経由 | `probe.json` |
 
@@ -106,7 +106,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 |---|---|
 | L1×2 / A1 | link の sigmismatch / undefined / duplicate が 0 (ff・soft) / adapter 数 = declare 数 かつ c=d=0 |
 | B1 / S1 | 起動・survey が baseline と一致 (§1) |
-| R1 / R2 / S2 | 最初の GUI API が IMPL で shim に到達 / survey の到達集合が committed floor (19) を包含 / fail-fast した API は soft で STUB |
+| R1 / R2 / S2 | 最初の GUI API が IMPL で shim に到達 / survey の到達集合が committed floor (19) を包含 / soft は ff 以上に fail-fast を生まない (soft の fail-fast API ⊆ ff の fail-fast API、かつ ff の STUB 化は soft で STUB) |
 | P1〜P4 | 指向呼出で RegisterClassW×2・CreateWindowExW 到達 / `gui_shared_ptr` ≥ 0x10000 かつ 31bit ハンドル / WNDPROC が hook 経由 / TApplication の窓が生成される |
 
 ネガティブコントロール (全て「期待した FAIL 行が出る」まで検査。judge のクラッシュを FAIL 確認と誤認しない):
@@ -123,7 +123,9 @@ main 取込前 (コード commit `d4665eb` 時点, 当時の値 816/1/46/79), `e
 **修正後 head の実測** (`e2e.sh` 1 回, 4 vCPU): **118 秒, rc 0** (load 1.17 → 0.85 → 0.49)。judge **12/12 PASS** (S1: soft 828/1/46/67 = baseline 828/1/46/67)、ネガコン 5/5 期待どおり FAIL、native selftest **431 passed / 0 failed**。修正前は S1 が soft 828/1/46/67 vs baseline 864/1/46/31 で FAIL だった (baseline 側が既定 VA 上限 256 を掛け、run.mjs は掛けないため)。修正 = baseline を `M11_VA_UNIT_BUDGET_MB=0` で取る (`e2e.sh`)。
 **head `62659d4` (main 取り込み後) の実測**: 修正前の `e2e.sh` は **rc 1** (judge 11/12)。B1 が FAIL: shim 有り boot の `boot_threw` が `memory access out of bounds` で、baseline (shim 無し・同一 IR) も `threw` に同じ例外で止まる (units_run 52 / init 54 / icall_miss 5 は一致)。judge の B1 は「`boot_threw` が None」を要求していたため、baseline と同じ停止位置でも FAIL していた。判定を `boot_threw == base_boot['threw']` (baseline と同じ停止理由) に直した。停止理由 OOB は m11 REPORT §1 の既知の通常起動の停止と同じ (unit #18、`44bb70` の alloca 潰れ)。
 修正後の `e2e.sh` (1 回, 4 vCPU, 開始 load 1.00): **146 秒, rc 0**。judge **12/12 PASS**、ネガコン 5/5 期待どおり FAIL、native selftest **433 passed / 0 failed**。`gui/e2e.sh` の step 5 は `tsc` 導入後に通過 (worktree で `pnpm install --frozen-lockfile`)。
-main 取り込み後で、units_run は 22 → **52**、init_count 23 → **54**、survey soft = baseline = **828 / 1 / 47 / 66** (取込前は 828 / 1 / 46 / 67。miss/trap が 1 件ずつ移動。原因は未分離)。
+main 取り込み後で、units_run は 22 → **52**、init_count 23 → **54**、survey soft = baseline = **869 / 1 / 47 / 25** (取込前は 828 / 1 / 46 / 67)。
+**merge commit (main 取り込み, head = 上記 merge 後) の実測**: `e2e.sh` 1 回, 4 vCPU, 開始 load 1.79 / 終了 1.79: **136 秒, rc 0**、judge **12/12 PASS**、ネガコン 5/5 期待どおり FAIL、native selftest 433 passed / 0 failed。
+この回で S2 の旧判定 (「ff の fail-fast API は全部 soft で STUB」) が FAIL した。`SystemParametersInfoW` は ff でも soft でも fail-fast (action 単位の未実装) で、STUB 化しないのが正しい。判定を「soft は ff 以上に fail-fast を生まない」に直した。判定の強さは、soft に ff に無い `NoSuchApi` を足した結果で S2 FAIL (rc 1) を確認して担保した。
 個別の単発計測 (開発中, load 0.3〜0.9): `m11_gen_ir2.sh` 20.5 秒 / `m11_build.sh` 12.3 秒 / baseline 起動 0.386 秒 / baseline survey 16.9 秒 / 結合 build 10.6〜17.0 秒 / 結合起動 0.371 秒 / 結合 survey 18.2〜24.1 秒 (ff・soft・EnumFontFamiliesExW 前後で差)。`gen_ir2` は e2e の前提側 (本スクリプトは IR を再生成しない)。
 `results/*.json` と `IMPORTS.md` は本修正で e2e が再生成し、コミットに含めた (baseline_survey.json は上限 0 の値に更新。IMPORTS.md は main 版から `gen_api.py` の出力へ)。
 受入条件 2 (`bash tools/gui/e2e.sh` ALL PASS 維持): 修正後 head で全体を実行 (`FL_WIN64_DIR` 指定) → **rc 1**。step 1 の native selftest (ASan) が `gui_headless.c:33` で heap-use-after-free により abort (headless の render thread が、main thread が `surf_free` した surface を読む競合)。`gui_headless.c` は main と同一で、本 PR では未変更。selftest 単独の再実行 3 回中 1 回が同じ abort。

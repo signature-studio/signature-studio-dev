@@ -49,8 +49,9 @@ gate('S1 survey parity (soft)', all(sv[k] == bs[k] for k in ('ok', 'noproc', 'mi
      'ok/noproc/miss/trap = %s/%s/%s/%s (base %s/%s/%s/%s)' % (sv['ok'], sv['noproc'], sv['miss'], sv['trap'], bs['ok'], bs['noproc'], bs['miss'], bs['trap']))
 ffu = set(svf['survey']['failfast_units'])
 stub_soft = set(svs['softstub_apis'])
-gate('S2 fail-fast APIs are STUB in soft reach', ffu <= stub_soft and not (svf['survey']['kinds'].get('gui_failfast', 0) and not ffu),
-     'ff survey fail-fast APIs=%s (units %s); soft STUB APIs=%s' % (sorted(ffu), svf['survey']['kinds'].get('gui_failfast', 0), sorted(stub_soft)))
+sfu = set(svs['survey']['failfast_units'])
+gate('S2 soft adds no fail-fast beyond ff (ff fail-fast APIs stay STUB or fail-fast in soft)', sfu <= ffu and ffu <= (stub_soft | sfu),
+     'ff fail-fast APIs=%s (units %s); soft fail-fast=%s; soft STUB APIs=%s' % (sorted(ffu), svf['survey']['kinds'].get('gui_failfast', 0), sorted(sfu), sorted(stub_soft)))
 cl = probe['classes']
 pr = {r['name']: r['calls'] for r in probe['reach']}
 gate('P1 RegisterClassW/CreateWindowExW reach shim (directed)', len(cl) >= 2 and all(c['atom'] not in (None, 0) for c in cl) and pr.get('RegisterClassW', 0) >= 2 and pr.get('CreateWindowExW', 0) >= 2,

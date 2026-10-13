@@ -1827,6 +1827,7 @@ def main():
     ap.add_argument('--passes', help='カンマ区切りで pass を限定 (f1,f1v,f2,f3a,f3b,f3c,f4)。既に ldfix 済みの IR へ F3c だけを重ねる用 (#509)')
     ap.add_argument('--f4-no-consumer', action='store_true', help='F4 の consumer 復元 (and i1) だけ外す (ネガコン, #564)')
     ap.add_argument('--no-f4', action='store_true', help='F4 (#564) を無効化 (ネガコン / 旧出力との差分確認)')
+    a = ap.parse_args()
     passes = set(a.passes.split(',')) if a.passes else None
     only = set(int(x, 16) for x in a.only.split(',')) if a.only else None
     NO_CONSUMER[0] = a.f4_no_consumer

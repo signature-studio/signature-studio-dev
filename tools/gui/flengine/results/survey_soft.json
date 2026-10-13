@@ -7,42 +7,45 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 828,
+  "ok": 869,
   "noproc": 1,
   "miss": 47,
-  "trap": 66,
+  "trap": 25,
   "kinds": {
-   "memory access out of bounds": 11,
-   "halt0->longjmp": 55
+   "memory access out of bounds": 15,
+   "gui_failfast": 3,
+   "halt0->longjmp": 7
   },
-  "failfast_units": {}
+  "failfast_units": {
+   "SystemParametersInfoW": 3
+  }
  },
  "reach": [
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 48069057,
+   "calls": 15,
    "kind": "IMPL",
    "prio": "1"
   },
   {
    "order": 2,
    "name": "GetDC",
-   "calls": 3,
+   "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 3,
    "name": "GetDeviceCaps",
-   "calls": 2,
+   "calls": 3,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 4,
    "name": "ReleaseDC",
-   "calls": 3,
+   "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
@@ -69,116 +72,195 @@
   },
   {
    "order": 8,
-   "name": "MessageBoxA",
-   "calls": 55,
+   "name": "RegisterWindowMessageW",
+   "calls": 11,
    "kind": "IMPL",
-   "prio": "2"
+   "prio": "0"
   },
   {
    "order": 9,
-   "name": "RegisterWindowMessageW",
-   "calls": 10,
+   "name": "GetSystemMetrics",
+   "calls": 8,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 10,
-   "name": "GetSystemMetrics",
-   "calls": 6,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 11,
    "name": "FindWindowW",
    "calls": 2,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 12,
-   "name": "RegisterClipboardFormatW",
-   "calls": 4,
-   "kind": "IMPL",
-   "prio": "0"
-  },
-  {
-   "order": 13,
-   "name": "CharLowerBuffW",
-   "calls": 8,
+   "order": 11,
+   "name": "LoadCursorW",
+   "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
-   "order": 14,
-   "name": "EnumDisplaySettingsW",
+   "order": 12,
+   "name": "LoadImageW",
+   "calls": 21,
+   "kind": "STUB",
+   "prio": "2"
+  },
+  {
+   "order": 13,
+   "name": "GetKeyboardLayout",
    "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 14,
+   "name": "EnumDisplayMonitors",
+   "calls": 2,
    "kind": "IMPL",
    "prio": "1"
   },
   {
    "order": 15,
-   "name": "GetClipCursor",
-   "calls": 1,
+   "name": "SystemParametersInfoW",
+   "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 16,
-   "name": "EnumDisplayMonitors",
+   "name": "MessageBoxW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "1"
   },
   {
    "order": 17,
-   "name": "SystemParametersInfoW",
-   "calls": 1,
+   "name": "RegisterClipboardFormatW",
+   "calls": 4,
    "kind": "IMPL",
    "prio": "0"
   },
   {
    "order": 18,
-   "name": "GetMonitorInfoW",
-   "calls": 53,
+   "name": "CharLowerBuffW",
+   "calls": 10,
    "kind": "IMPL",
    "prio": "1"
   },
   {
    "order": 19,
+   "name": "GetClipboardFormatNameW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 20,
+   "name": "EnumDisplaySettingsW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 21,
+   "name": "GetClipCursor",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 22,
+   "name": "GetMonitorInfoW",
+   "calls": 15,
+   "kind": "IMPL",
+   "prio": "1"
+  },
+  {
+   "order": 23,
    "name": "EnumFontFamiliesExW",
    "calls": 1,
    "kind": "IMPL",
    "prio": "2"
+  },
+  {
+   "order": 24,
+   "name": "MessageBoxA",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "2"
+  },
+  {
+   "order": 25,
+   "name": "GetClassInfoW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 26,
+   "name": "RegisterClassW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 27,
+   "name": "CreateWindowExW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
+  },
+  {
+   "order": 28,
+   "name": "SetWindowLongPtrW",
+   "calls": 1,
+   "kind": "IMPL",
+   "prio": "0"
   }
  ],
- "reach_summary": "reached=19 impl=19 stub=0",
- "failfast_apis": {},
- "softstub_apis": {},
- "failfast_count": 0,
- "gui_icall_calls": 1,
+ "reach_summary": "reached=28 impl=27 stub=1",
+ "failfast_apis": {
+  "SystemParametersInfoW": 3
+ },
+ "softstub_apis": {
+  "LoadImageW": 21
+ },
+ "failfast_count": 3,
+ "gui_icall_calls": 2,
  "gui_ring_discarded": 0,
- "icall_miss": 49,
- "m11_stub_total": 70,
+ "icall_miss": 50,
+ "m11_stub_total": 150,
  "m11_stubs": [
-  "GetLocaleInfoW:59",
-  "EnumCalendarInfoW:2",
+  "GetLocaleInfoW:64",
+  "EnumCalendarInfoW:4",
   "GetTimeZoneInformation:1",
   "MulDiv:1",
   "GlobalAddAtomW:3",
-  "GetFileAttributesW:1",
+  "GetCurrentThread:1",
+  "GetFileAttributesW:23",
+  "SetDllDirectoryW:3",
+  "SHGetFolderPathW_D1:1",
+  "SetThreadErrorMode:32",
   "acmMetrics:1",
   "SHGetMalloc:1",
-  "GetCurrentThread:1"
+  "GetSystemDefaultLocaleName:1",
+  "OutputDebugStringW:1",
+  "GetTempPathW:1",
+  "VariantClear:3",
+  "FreeLibrary:2",
+  "GetComputerNameExW:2",
+  "RegOpenKeyExA:2",
+  "RegCloseKey:2",
+  "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 24035505,
-  "FreeMem": 32,
-  "FastMM_GetMem(407a50)": 24035553,
-  "FastMM_FreeMem(407e20)": 33,
+  "GetMem": 1988,
+  "FreeMem": 158,
+  "FastMM_GetMem(407a50)": 2073,
+  "FastMM_FreeMem(407e20)": 162,
   "InitUnits": 0,
-  "Halt0": 56
+  "Halt0": 8
  },
- "va_calls": 1247,
- "va_bytes": 1552941056
+ "va_calls": 35,
+ "va_bytes": 1369767936
 }
