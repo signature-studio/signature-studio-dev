@@ -96,6 +96,19 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 - e2e 50/50 は `REPORT.md` §3-6 と一致 (本付録のベースライン、§1-1)。ゲート `+0xdc` = 2 のまま、0x800010 は既定 host で未受信。
 - 強制ゲート (`S2HOST_FORCE_GATE=1`) での 0x800010 観測は既存結果 (§3-6) を引用。本付録での追加実測は無し。
 
+## 4-1. 実行時 writer の観測 (DR0 watch, #256 次回 run の前段)
+
+- 追加: `vst3host.cpp` に `S2HOST_WATCH=1` の opt-in 計測 (既定は無変更)。controller 生成直後に `ctrl iface+0xdc` (= controller base+0x10c) へ x86 デバッグレジスタ DR0 の 4 byte 書込 watch を張り、VEH で書込 RIP と値を記録する。wine 9.0 上で機能することを確認。
+- 実測 (`S2HOST_WATCH=1`, 既定 host, 4 blocks): `+0xdc` への書込は **1 回のみ** (hit#1, value=2)。その後の `[gate]` は 2 のまま (61 観測)。watch は createInstance 直後に張り、hit は `[gate]` ログより前 (initialize / setComponentHandler / createView を含む区間) で発生。どの呼出の内側かは未分離。
+- 書込命令: DLL 内 RVA **`0xb1332` `mov [rcx+0xfc], eax`** (trap 後の RIP は `0xb1338`)。書込値 `eax` は `0x180037600` の戻り値。関数は `0xacf70`〜`0xb142a`。
+- 値 2 の意味 (逆アセンブル): `0x180037600` は `queryInterface` を 2 回試し、A 成功なら 1、A 失敗かつ B 成功なら 0、両方失敗なら **2** を返す。実測の 2 は「両 QI 失敗」。
+- QI の IID (rdata の `0x11be750` / `0x11be8e8`) は未復号 (rdata 読出の範囲判定が未完)。どの interface を探しているかは未確定。
+- 書込元 `0xacf70` の address は rdata `0xa2bf00` の qword に現れる (vtable 内の位置・所属 class は未確認。IEditController の `0xa2bf58` とは別位置)。直接 call の呼出元は無し。
+- 結論: +0x10c は **controller 生成〜editor 準備の区間で、QI 結果から値 2 が格納される経路**を通る (1 回のみ観測)。REPORT §3-3 の「copy ctor 0x18000d1b0 が候補」との関係は未検証。0x800010 の観測 (= 1 への遷移) は、この QI 結果が変わる条件の解明が前提。
+- 未検証: IID の内容 / 所属 class / `0xacf70` の呼出元 / 0x800010 の既定 host 受信。
+
+- e2e (`S2HOST_WATCH` 未設定, HEAD 本 PR): **50/50 OK, 75.27 s**, exit 0, NC1/NC2 期待どおり (exit=1, NG=1)、load 0.10 → 0.18。
+
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
