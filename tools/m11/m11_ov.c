@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <emscripten.h>
+#include <emscripten/stack.h>
 
 typedef unsigned long long u64;
 typedef unsigned int u32;
@@ -33,6 +34,32 @@ typedef struct { u32 va; void* fn; } m11_disp_ent;
 extern const m11_disp_ent m11_disp_tab[];
 extern const u32 m11_disp_n;
 typedef u64 (*m11_tr_t)(u64, u64, u64, u64, u64, u64, u64, u64);
+
+/* trace 出力 (fprintf) は wasm shadow stack の SP より下を汚す. その残骸は後続 unit の frame で「未初期化 alloca の読み」として読まれ,
+ * survey の結果が trace の有無で変わる (#495: unit 134 の function_413870 は rcx/rdx/r8 を未初期化 alloca から読む).
+ * 出力の前後で SP 直下 M11_TRACE_SPAN バイトを JS 側 (shadow stack を使わない) で退避/復元し, trace を透過にする.
+ * M11_TRACE_ISOLATE=0 で従来 (素の fprintf) に戻る (ネガコン用: trap_triage/negctl_495.sh). */
+#ifndef M11_TRACE_ISOLATE
+#define M11_TRACE_ISOLATE 1
+#endif
+#define M11_TRACE_SPAN 8192   /* 下の EM_JS の 8192 と同じ値 */
+const int m11_trace_isolate = M11_TRACE_ISOLATE;
+EM_JS(void, m11_stk_save, (unsigned sp), {
+    Module.m11_stk_saved = HEAPU8.slice(Math.max(0, sp - 8192), sp);
+});
+EM_JS(void, m11_stk_restore, (unsigned sp), {
+    const s = Module.m11_stk_saved, base = sp - s.length;
+    if (Module.m11_trace_probe) {   /* 汚れた最深バイトの SP からの距離 (最大値) を記録: M11_TRACE_SPAN が足りているかの実測 */
+        let d = 0; for (let i = 0; i < s.length; i++) if (HEAPU8[base + i] !== s[i]) { d = s.length - i; break; }
+        if (d > (Module.m11_maxdirty | 0)) Module.m11_maxdirty = d;
+    }
+    HEAPU8.set(s, base);
+});
+#if M11_TRACE_ISOLATE
+#define M11_TRACE(...) do { unsigned sp_ = (unsigned)emscripten_stack_get_current(); m11_stk_save(sp_); fprintf(stderr, __VA_ARGS__); m11_stk_restore(sp_); } while (0)
+#else
+#define M11_TRACE(...) fprintf(stderr, __VA_ARGS__)
+#endif
 
 static int g_trace = 0;
 static u64 g_icall_ok = 0, g_icall_miss = 0, g_icall_viaVA = 0;
@@ -56,6 +83,20 @@ static u64 tr_40f960(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
 static u64 tr_41c160(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_41c160(a0); }
 static u64 tr_5c0e70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_5c0e70(a0); }
 static u64 tr_ret0(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return 0; }
+/* closure 外の既定 IEqualityComparer<pointer-size ordinal> のメソッド (#483): 479b00 Equals = `cmp rdx,r8; sete al`,
+ * 479b10 GetHashCode = FNV-1a(&Value, 8, 0x811c9dc5) (475ba0 も closure 外のため直接展開) */
+static u64 tr_479b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return a1 == a2; }
+static u64 ov_getter_478420(u64 info);
+static u64 ov_getter_478540(u64 info);
+static u64 ov_getter_478c70(u64 info, u64 size);
+static u64 tr_478420(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return ov_getter_478420(a0); }
+static u64 tr_478540(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return ov_getter_478540(a0); }
+static u64 tr_478c70(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return ov_getter_478c70(a0, a1); }
+static u64 tr_479b10(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
+    u32 h = 0x811c9dc5u;
+    for (int i = 0; i < 8; i++) h = (h ^ (u32)((a1 >> (8 * i)) & 0xff)) * 0x1000193u;
+    return h;
+}
 
 static m11_tr_t disp_find(u32 va) {
     int lo = 0, hi = (int)m11_disp_n - 1;
@@ -70,6 +111,11 @@ static m11_tr_t disp_find(u32 va) {
     case 0x41c160: return tr_41c160;
     case 0x5c0e70: return tr_5c0e70;   /* 5c03d0 の node 差替え通知の実体 (#482) */
     case 0x5c04a0: return tr_ret0;   /* `ret` 1 命令 (キャッシュ node 解放フックの既定実体) */
+    case 0x478420: return tr_478420;
+    case 0x478540: return tr_478540;
+    case 0x478c70: return tr_478c70;
+    case 0x479b00: return tr_479b00;
+    case 0x479b10: return tr_479b10;
     }
     return 0;
 }
@@ -122,11 +168,11 @@ u64 m11_icall(u64 target, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6
         int seen = 0;
         for (u32 i = 0; i < g_nmiss_uniq; i++) if (g_miss[i] == (u32)target) { seen = 1; break; }
         if (!seen && g_nmiss_uniq < MISS_MAX) g_miss[g_nmiss_uniq++] = (u32)target;
-        if (g_trace) fprintf(stderr, "[m11][icall-miss] target=0x%llx (closure 外; skip, ret 0)\n", target);
+        if (g_trace) M11_TRACE("[m11][icall-miss] target=0x%llx (closure 外; skip, ret 0)\n", target);
         return 0;
     }
     g_icall_ok++;
-    if (g_trace) fprintf(stderr, "[m11][icall] 0x%llx\n", target);
+    if (g_trace) M11_TRACE("[m11][icall] 0x%llx\n", target);
     return f(a0, a1, a2, a3, a4, a5, a6, a7);
 }
 
@@ -164,7 +210,7 @@ EMSCRIPTEN_KEEPALIVE unsigned m11_unit_va(int i) {
 u64 function_4120c0(void) {
     u64 tbl = Q(R(0x11eac90));
     if (g_survey) { g_units_total = tbl ? D(tbl) : 0; return 0; }
-    if (g_trace) fprintf(stderr, "[m11][InitUnits] InitTable=0x%llx\n", tbl);
+    if (g_trace) M11_TRACE("[m11][InitUnits] InitTable=0x%llx\n", tbl);
     if (!tbl) return 0;
     int count = (int)D(tbl);
     u64 units = Q(tbl + 8);
@@ -176,7 +222,7 @@ u64 function_4120c0(void) {
         D(R(0x11eac98)) = (u32)i;
         if (!proc) continue;
         u32 miss0 = (u32)g_icall_miss;
-        if (g_trace) fprintf(stderr, "[m11][unit %d/%d] init=0x%llx\n", i, count, proc);
+        if (g_trace) M11_TRACE("[m11][unit %d/%d] init=0x%llx\n", i, count, proc);
         ICALL_AT(0x412126, proc, 0, 0, 0, 0, 0, 0, 0, 0);
         if ((u32)g_icall_miss != miss0) g_units_skipped++;
         else g_units_run++;
@@ -188,7 +234,7 @@ u64 function_4120c0(void) {
  *   args: rcx=Context rdx=a1 r8=a2 r9=InitTable(hook 表: [reason] を call) [stk5]=DllProc [stk6]=hInst [stk7]=Reason [stk8]=Reserved */
 u64 m11_InitLib(u64 ctx, u64 a1, u64 a2, u64 tbl, u64 dllproc, u64 hinst, u64 reason64, u64 reserved) {
     u32 reason = (u32)reason64;
-    if (g_trace) fprintf(stderr, "[m11][InitLib] ctx=0x%llx a1=0x%llx a2=0x%llx tbl=0x%llx dllproc=0x%llx hinst=0x%llx reason=%u reserved=0x%llx\n", ctx, a1, a2, tbl, dllproc, hinst, reason, reserved);
+    if (g_trace) M11_TRACE("[m11][InitLib] ctx=0x%llx a1=0x%llx a2=0x%llx tbl=0x%llx dllproc=0x%llx hinst=0x%llx reason=%u reserved=0x%llx\n", ctx, a1, a2, tbl, dllproc, hinst, reason, reserved);
     u64 r13 = R(reason < 2 ? 0x11eac80 : 0x11eada8);
     u64 tmp[30];
     memcpy(tmp, (void*)(uintptr_t)(ctx + 0x38), 240);
@@ -258,7 +304,7 @@ unsigned long long function_412510(void* tbl) {
  *   old=*dest; *dest=src; old!=nil && refcnt(old-8)>0 → --refcnt==0 なら 0x409440(old-0x10) (FreeMem) */
 unsigned long long function_4133f0(unsigned long long dest, unsigned long long src) {
     u64 s = src;
-    if (g_trace) fprintf(stderr, "[m11][UStrAsg] dest=0x%llx src=0x%llx\n", dest, src);
+    if (g_trace) M11_TRACE("[m11][UStrAsg] dest=0x%llx src=0x%llx\n", dest, src);
     if (s) {
         if ((int)D(s - 8) < 0) {
             u32 len = D(s - 4);
@@ -333,7 +379,7 @@ static int g_longjmp_hit = 0;
 EMSCRIPTEN_KEEPALIVE int m11_longjmp_hit(void) { return g_longjmp_hit; }
 unsigned long long function_412770(void* ctx) {
     g_longjmp_hit++;
-    if (g_trace) fprintf(stderr, "[m11][longjmp] Halt0 -> RestoreContext(ctx=%p): DllMain attach 完走として JS 例外で巻き戻す\n", ctx);
+    if (g_trace) M11_TRACE("[m11][longjmp] Halt0 -> RestoreContext(ctx=%p): DllMain attach 完走として JS 例外で巻き戻す\n", ctx);
     m11_throw_dllmain_done(1);
     return 0;
 }
@@ -590,6 +636,135 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
         for (u64 i = 0; (long long)i < (long long)len; i++) function_417b70(data + i * 8, elt, dc, lv);
     }
     Q(a) = data;
+    return 0;
+}
+
+/* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
+ * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
+ *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)
+ *           → FComparer が実体でなく getter 関数 478b10 自身 (0x78b10) になる
+ *   8cbda0  GetHashCode: `call [vt+0x20]` 脱落 (D15) + 引数 rdx (key) が唯一の使用者を失って IR 署名から消える → hash = [FComparer]+1 の定数
+ *   8cbce0  Find:        `call [vt+0x18]` (Equals) 脱落 (D15) → `test al,al` が [FComparer] の下位 byte を読み 常に真 → 2 個目のキーが必ず「重複」
+ * → 8cc190 が EListError を生成して 411e80 (RaiseExcept) を呼び Halt0 (survey halt0 11 unit, REPORT_483).
+ * 逆アセンブル (479b40..479bd6 / 8cbda0..8cbdc2 / 8cbce0..8cbd90 / 8cc190..8cc214 / 8cbde0..8cbe3a) から転記.
+ * 8cbda0 は引数 key を取れないので helper (ov_dict_hash) に置き, IR 署名を変えずに済むよう呼出元の 8cc190 / 8cbde0 も転記する. */
+
+/* function_479b40  VA 0x479b40  (_LookupVtableInfo(intf: u8; info: PTypeInfo; size: Integer): Pointer)
+ *   表 @LVA 0xfb2c28: [intf * 0x170 + info.Kind * 16] = { u8 flags; u64 data @+8 }
+ *   flags&2: data := data(info, size) (getter) / flags&1: data := MakeInstance(data, info, size) (4781a0).
+ *   info = nil: intf 0 → 478a90(nil,size) / 1 → 478b10(nil,size) / 他 → Error(reInvalidPtr). */
+u64 function_479b40(u64 intf, void* infop, u64 size) {
+    u64 info = (u64)(uintptr_t)infop;
+    if (info) {
+        u64 e = R(0xfb2c28) + (intf & 0xff) * 0x170 + (u64)B(info) * 16;
+        u64 data = Q(e + 8);
+        if (B(e) & 2) data = m11_icall(data, info, size, 0, 0, 0, 0, 0, 0);
+        if (B(e) & 1) data = function_4781a0(data, info, size);
+        return data;
+    }
+    if ((intf & 0xff) == 0) return function_478a90(0, size);
+    if ((intf & 0xff) == 1) return function_478b10(0, size);
+    function_409730(4);
+    return 0;
+}
+
+/* function_8cbda0 の転記 (key を引数に取る): GetHashCode(FComparer, key) を m11_icall で呼び (vt+0x20), (h & 0x7fffffff) + 1 を再マスク */
+static u32 ov_dict_hash(u64 self, u64 key) {
+    u64 cmp = Q(self + 0x18);
+    u32 h = (u32)m11_icall(Q(Q(cmp) + 0x20), cmp, key, 0, 0, 0, 0, 0, 0);
+    return ((h & 0x7fffffffu) + 1u) & 0x7fffffffu;
+}
+
+/* function_8cbce0  VA 0x8cbce0  (TDictionary.GetBucketIndex(key, hash): 戻り >= 0 = 発見 index, < 0 = ~(挿入位置), 空表は 0x8000000000000000)
+ *   バケット = 24B { u32 hash (0xffffffff = 空); u64 key @+8; u64 value @+0x10 }, 線形探査, 配列長は [arr-8]. Equals は [FComparer.vt + 0x18]. */
+u64 function_8cbce0(u64 self, u64 key, u64 hash) {
+    u32 h = (u32)hash;
+    u64 arr = Q(self + 8);
+    long long n = arr ? (long long)Q(arr - 8) : 0;
+    if (n == 0) return 0x8000000000000000ull;
+    long long i = (long long)(int)h & (n - 1);
+    u64 p = arr + (u64)i * 24;
+    for (;;) {
+        u32 eh = D(p);
+        if (eh == 0xffffffffu) return ~(u64)i;
+        if (eh == h) {
+            u64 cmp = Q(self + 0x18);
+            if ((u8)m11_icall(Q(Q(cmp) + 0x18), cmp, Q(p + 8), key, 0, 0, 0, 0, 0)) return (u64)i;
+        }
+        i++; p += 24;
+        if (i >= n) { i = 0; p = Q(self + 8); }
+    }
+}
+
+/* function_8cc190  VA 0x8cc190  (TDictionary.Add(key, value)): 満杯なら Grow(8cbcb0) → hash → Find → 発見なら EListError を生成して RaiseExcept (411e80) /
+ * 未発見なら 8cbe40 (AddItem(self, hash, ~idx, key, value)). EListError クラス = [LVA 0x2f078], メッセージ resourcestring = [LVA 0x11e00e0]. */
+u64 function_8cc190(u64 self, u64 key, u64 val) {
+    if ((long long)Q(self + 0x10) >= (long long)Q(self + 0x20)) function_8cbcb0(self);
+    u32 h = ov_dict_hash(self, key);
+    long long idx = (long long)function_8cbce0(self, key, h);
+    if (idx >= 0) function_411e80(function_448ee0(Q(R(0x2f078)), 1, Q(R(0x11e00e0))));
+    return function_8cbe40(self, h, ~(u64)idx, key, val);
+}
+
+/* function_8cbde0  VA 0x8cbde0  (TDictionary.GetItem(key): value; 未発見は EListError [msg = LVA 0x11e0080]) */
+u64 function_8cbde0(u64 self, u64 key) {
+    u32 h = ov_dict_hash(self, key);
+    long long idx = (long long)function_8cbce0(self, key, h);
+    if (idx < 0) {
+        function_411e80(function_448ee0(Q(R(0x2f078)), 1, Q(R(0x11e0080))));
+        return 0;
+    }
+    return Q(Q(self + 8) + (u64)idx * 24 + 0x10);
+}
+
+/* function_478420  VA 0x478420  (IEqualityComparer getter: tkInteger / tkEnumeration; OrdType (byte [info+1+nameLen+1]) で static 実体を選ぶ)
+ *   OrdType 0,1 (byte) → LVA 0xfb21e0 / 2,3 (word) → 0xfb21e8 / 4,5 (long) → 0xfb21f0 / 他 → Error(reInvalidPtr) */
+static u64 ov_getter_478420(u64 info) {
+    u8 ot = B(info + B(info + 1) + 2);
+    if (ot < 2) return R(0xfb21e0);
+    ot -= 2;
+    if (ot < 2) return R(0xfb21e8);
+    ot -= 2;
+    if (ot < 2) return R(0xfb21f0);
+    function_409730(4);
+    return 0;
+}
+
+/* function_478540  VA 0x478540  (IComparer getter: tkInt64; MaxInt64Value > MinInt64Value (符号付き比較) なら符号付き用 / 他は符号なし用の static 実体) */
+static u64 ov_getter_478540(u64 info) {
+    u64 n = B(info + 1);
+    return (long long)Q(info + n + 0xa) > (long long)Q(info + n + 2) ? R(0xfb2218) : R(0xfb2240);
+}
+
+/* function_471310  VA 0x471310  (record 型の比較方式分類: 0 = 非 record / 1 = 4B 以下で最初の RecOp が奇数 / 2 = 4B 以下で単純 / 3 = 4B 超か複数 RecOp).
+ *   Kind は tkRecord (14) / tkMRecord (22) だけ対象 (word 表 @LVA 0x71400 = 0x4040 の bit (Kind-8)). RecSize (dword) > 4 → 3, tkRecord → 2,
+ *   tkMRecord は ManagedFld (16B x Count) を飛ばした先の RecOps を最大 4 個見る. */
+static u8 ov_rec_kind(u64 info) {
+    if (!info) return 0;
+    u8 k = (u8)(B(info) - 8);
+    if (k > 0xf || !((1u << k) & 0x4040u)) return 0;
+    u64 n = info + 1;
+    if ((int)D(n + B(n) + 1) > 4) return 3;
+    if (B(info) == 0xe) return 2;
+    u64 a = n + B(n) + 5;
+    u32 cnt = D(a);
+    a += 4 + (u64)(long long)((int)(cnt << 4));
+    u8 c = B(a);
+    a += 1;
+    if (c != 0 && (Q(a) & 1)) return 1;
+    if (c > 1 && Q(a + 8) != 0) return 3;
+    if (c > 2 && Q(a + 0x10) != 0) return 3;
+    if (c > 3 && Q(a + 0x18) != 0) return 3;
+    return 2;
+}
+
+/* function_478c70  VA 0x478c70  (IComparer getter: tkRecord / tkMRecord; ov_rec_kind で static vtable を選び 4781a0 でインスタンス化) */
+static u64 ov_getter_478c70(u64 info, u64 size) {
+    switch (ov_rec_kind(info)) {
+    case 1: return function_4781a0(R(0xfb2670), info, size);
+    case 2: return function_478a90(info, size);
+    case 3: return function_4781a0(R(0xfb2488), info, size);
+    }
     return 0;
 }
 
