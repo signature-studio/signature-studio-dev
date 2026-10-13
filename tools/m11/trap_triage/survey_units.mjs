@@ -71,7 +71,7 @@ for (let i = 0; i < 942; i++) {
       const msg = ((e && e.message) || String(e)).split('\n')[0];
       rec.kind = /out of bounds/.test(msg) && !/table/.test(msg) ? 'oob' : /abort/i.test(msg) ? 'abort' : 'other';
       rec.msg = msg;
-      rec.frames = ((e && e.stack) || '').split('\n').filter(l => /^\s*at /.test(l)).slice(0, 30).map(l => resolve(l.trim().replace(/^at /, '').split(' ')[0]));   // #684: 旧 slice(1) は先頭行 (trap 直後の wasm frame) を落としていた
+      rec.frames = ((e && e.stack) || '').split('\n').filter(l => /^\s*at /.test(l)).slice(0, 30).map(l => resolve(l.trim().replace(/^at /, '').split(' ')[0]));   // #663: 旧 slice(1) は先頭行 (trap 直後の wasm frame) を落としていた
     }
     mod.__emscripten_stack_restore(sp0);
   }
