@@ -162,3 +162,21 @@ PR #638 (規則反映) は merge 済み。検証は PR HEAD `1885bc03` の workt
 - `node-test` は初回、`pack` と並列に起動したため manifest 未生成で失敗した (`latest.json` 不在)。直列で再実行して PASS。
 
 未解決: emscripten-test (要 `[EMSDK]` = `toolchain-emsdk`) と asset-e2e (要 k100 の素材化、PM 判断) → #592。
+
+## 13. emscripten-test の実行 (#592 受入条件 2 / 検証 HEAD 986e7415 / 2026-10-13 UTC)
+
+§12 の「emscripten-test 未実行」を解消する。`[EMSDK]` は runner 既存の `/opt/emsdk` (emcc 6.0.12・`docs/REFERENCES.md` §4 の既定位置) を使った。`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` は展開していない (`emscripten-test.ts` が `/opt/emsdk/emsdk_env.sh` を直接 source するため)。
+素材は `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` とした。`TMPDIR=$RUNNER_TEMP`。`pnpm install --frozen-lockfile` は 0.35 秒で完了。
+
+`bash tools/assets/e2e.sh` (既定サブセット) を 3 回。各回 asset-e2e の 1 段で停止するため rc=1 (既知: k100 不在)。
+
+| run | 所要 | load (1 分値) 開始→終了 | node-test | emscripten-test | browser-test | asset-e2e |
+|---|---|---|---|---|---|---|
+| 1 | 12.384 秒 | 0.91→1.16 | ALL PASS | ALL PASS | ALL PASS | 未達 (`source wasm not found: tools/perf/work/huge/k100.wasm`) |
+| 2 | 11.203 秒 | 1.16→1.21 | ALL PASS | ALL PASS | ALL PASS | 未達 (同) |
+| 3 | 11.256 秒 | 1.21→1.16 | ALL PASS | ALL PASS | ALL PASS | 未達 (同) |
+
+- 並列 1 (`e2e.sh` は直列)。ログは `tools/assets/work/e2e-n{1,2,3}.log` (gitignore)。
+- 初回 run (`e2e-run4.log`) でも同じ順序で emscripten-test ALL PASS (`fread/fseek/ftell` で 8.86 MB ファイルの fnv 一致・`write denied`)。
+- 前段 (復元 → 差分検査 6 点 → ネガコン → 生成物一致) は各回 exit 0 相当で通過。`tsc` も exit 0 (`node_modules` あり)。
+- asset-e2e は未達のまま。k100 (314 MB) の素材化は PM 判断 (§5・§12 参照)。`oc_artifacts` の許可名に k100 を含む素材は無い。
