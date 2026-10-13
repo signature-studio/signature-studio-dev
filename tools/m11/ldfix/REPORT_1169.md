@@ -17,28 +17,33 @@
 | alg3 flagged 関数 | 77 | 58 |
 
 - `fixed_fns=24 fixed_cells=29` (`fix_d17.py`)。emcc 構文検証 `-O0 -g1 -c`: rc=0。
-- e2e の所要時間: 約 32 秒 (`real 0m31.8s`、load 0.36 開始時)。
+- e2e の所要時間: `real 0m31.8s` (開始時 load 0.36)。元の測定 run の値。再現に必要な素材 (`work-m11`・`toolchain-emsdk`) は本 fix run では無く、再測定していない。
 - 修復前後の数値は `REPORT_968.md` §2 の値と一致する (store 宛 86 → 53、spill 宛 37 → 37)。
 - `fix_d17.py` は store 宛 (`frame=False`) だけを対象とするため、spill 宛 37 site は修復前後で変化しない。これは想定どおり。
 
 ## 2. spill 宛の内訳 (既存判定の集計)
 
-`results/drops_510.tsv` の `dest=frame` 37 行 (REPORT_510 §4.3 と同じ集合):
+`results/drops_510.tsv` の `dest=frame` は 37 行 (22 関数): `source=candidate` 31 行 (判定なし、本 run では未集計) と `source=manual` 6 行。
 
-- `source=manual` 6 行: TRUE_DROP 6 (4 関数: cf3790・f40840・ff8b60・100b890)。
-- `source=candidate` 31 行: 未確認 (18 関数相当の oracle 候補)。
+`results/manual_verdicts_510.jsonl` で spill 宛の判定が付いているのは 18 行 (4 関数)。このうち TSV の `dest=frame` と突き合わせられるのは次の 6 行だけで、6 行とも TRUE_DROP。
 
-`results/manual_verdicts_510.jsonl` の spill 宛判定 (関数別):
+| 関数 | TSV `dest=frame` (manual) の site | 判定 |
+|---|---|---|
+| cf3790 | cf387f・cf38be・cf390f | TRUE_DROP 3 |
+| f40840 | f43266 | TRUE_DROP 1 |
+| ff8b60 | ff8c63 | TRUE_DROP 1 |
+| 100b890 | 100b8d0 | TRUE_DROP 1 |
 
-| 関数 | 判定 (site) |
+残りの 12 行は TSV に無く、spill 宛 37 site の集合には入らない (由来は REPORT_510 §4.3 の目視判定)。
+
+| 関数 | TSV に無い site と判定 |
 |---|---|
-| cf3790 | TRUE_DROP 3 (cf387f・cf38be・cf390f)、OK_LOAD 2 (cf395f・cf3af5)、NO_CONSUMER 1 (cf398c) |
-| f40840 | TRUE_DROP 1 (f43266)、OK_LOAD 5 (f4286f・f431c1・f43545・f442cd・f4434c)、NO_CONSUMER 2 (f44154・f4435b) |
-| ff8b60 | TRUE_DROP 1 (ff8c63)、OK_LOAD 1 (ff8c15)、NO_CONSUMER 1 (ff8b77 dead spill) |
-| 100b890 | TRUE_DROP 1 (100b8d0) |
+| cf3790 | cf395f OK_LOAD・cf3af5 OK_LOAD・cf398c NO_CONSUMER |
+| f40840 | f4286f・f431c1・f43545・f442cd・f4434c OK_LOAD、f44154・f4435b NO_CONSUMER |
+| ff8b60 | ff8c15 OK_LOAD、ff8b77 NO_CONSUMER (dead spill) |
 
-- 目視 27 site の消費者判定: TRUE_DROP 6、OK_LOAD 16、NO_CONSUMER 5 (REPORT_510 §4.3 と一致)。
-- 上記の表は `manual_verdicts_510.jsonl` の上記 4 関数の spill 宛 18 行 (`evidence` 欄) をそのまま分類したもので、再判定はしていない。REPORT_510 §4.3 の「目視 27 site」は、この 18 行に加えて他関数の行を含む数である (本 run では他関数の行は未集計)。
+- 上の 12 行の内訳: OK_LOAD 8、NO_CONSUMER 4。
+- REPORT_510 §4.3 の「目視 27 site の消費者判定: TRUE_DROP 6、OK_LOAD 16、NO_CONSUMER 5」は、この 18 行より広い集合の引用である。本 run では再集計していない。
 
 ## 3. 未了と既存の子 issue
 
