@@ -85,7 +85,7 @@ FLEngine 静的/delay import には担当範囲内の未実装 API は **あり�
 序数 import のうち同定済み (実行時は GetProcAddress が返す): shell32!ord74=SHCreateStdEnumFmtEtc (同定済み・実装済み, GetProcAddress 序数表で解決), shell32!ord190=ILCreateFromPathW (同定済み・実装済み, GetProcAddress 序数表で解決), shell32!ord155=ILFree (同定済み・実装済み, GetProcAddress 序数表で解決), shlwapi!ord219=QISearch (同定済み・実装済み, GetProcAddress 序数表で解決), shlwapi!ord12=SHCreateMemStream (同定済み・実装済み, GetProcAddress 序数表で解決)
 序数 import (名前解決不能。実体 API の特定が要る): d2d1!ord1
 
-プラグイン専用で未提供 (BSD ソケット名は Emscripten libc が解決; 下記は Serum2 のみ): 
+プラグイン専用で未提供 (BSD ソケット名は Emscripten libc が解決; 下記は Serum2 のみ): なし
 
 ## 表D: 対象外 (他担当 DLL)
 
