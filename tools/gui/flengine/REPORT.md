@@ -240,5 +240,6 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 |---|---|---|
 | RetDec C 経路で実 FLEngine 規模の PE を通した実測なし (§8-4) | `gN` 分割の実機挙動が未検証 | 範囲外 (FLEngine は m11 IR 経路) |
 | §1〜§5 の数値・記述 (秒数・survey・`52e6bd57` 時点) は参考。現 HEAD の値は §6 の表を正とする | 本 PR の後続 commit で本文を書き直すのは別作業 (文書の整理) | 本 PR 内で行う (未実施なら PR 本文で明示) |
+| `tools/gui/e2e.sh` step 6 (headless Chrome) の前提 (`tools/e2e` の `npm ci` 後に `agent-browser` が存在すること) を e2e.sh が検査しない。前提不足のときは ENOENT で落ちる | 前提を満たせば step 6 は PASS (§6)。前提検査が無いため、初回 run は原因が分かりにくい | #826 (GUI-18、#184 の子) |
 
 範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
