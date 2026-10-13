@@ -1,0 +1,1012 @@
+{
+ "summary": {
+  "function_va": "0xc395a0",
+  "scan_end_va": "0xc3a118",
+  "names": 110,
+  "unique": 110,
+  "in_lib": 109,
+  "funcs": 93,
+  "data": 16,
+  "absent_allowed": [
+   "_PyInterpreterState_GetRefTotal"
+  ],
+  "missing": [],
+  "with_slot": 110,
+  "resolvers": [
+   "0x4235f0"
+  ]
+ },
+ "bindings": [
+  {
+   "name": "Py_NewInterpreterFromConfig",
+   "lea_va": "0xc395e9",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8250",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_InitializeEx",
+   "lea_va": "0xc39603",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8260",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyThreadState_Get",
+   "lea_va": "0xc3961d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8268",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyThreadState_Swap",
+   "lea_va": "0xc39637",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8270",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyRun_SimpleString",
+   "lea_va": "0xc39651",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8278",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModuleDef_Init",
+   "lea_va": "0xc3966b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8280",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyImport_AppendInittab",
+   "lea_va": "0xc39685",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8288",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_AddObject",
+   "lea_va": "0xc3969f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8290",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyLong_FromLong",
+   "lea_va": "0xc396b9",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8298",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_EndInterpreter",
+   "lea_va": "0xc396d3",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8258",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_FromDefAndSpec2",
+   "lea_va": "0xc396ed",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82a0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_ExecDef",
+   "lea_va": "0xc39707",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82a8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_BuildValue",
+   "lea_va": "0xc39721",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82b0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "_PyNamespace_New",
+   "lea_va": "0xc3973b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82b8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyUnicode_FromString",
+   "lea_va": "0xc39755",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82c0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyImport_AddModule",
+   "lea_va": "0xc3976f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82c8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "_PyImport_SetModuleString",
+   "lea_va": "0xc39789",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82d0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyType_FromModuleAndSpec",
+   "lea_va": "0xc397a3",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82d8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "_Py_NoneStruct",
+   "lea_va": "0xc397bd",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82e0",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyModule_AddType",
+   "lea_va": "0xc397d7",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82e8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyArg_ParseTuple",
+   "lea_va": "0xc397f1",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82f0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyArg_ParseTupleAndKeywords",
+   "lea_va": "0xc3980b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b82f8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_GetState",
+   "lea_va": "0xc39825",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8300",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_FinalizeEx",
+   "lea_va": "0xc3983f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8308",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_IsInitialized",
+   "lea_va": "0xc39859",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8310",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyErr_GetRaisedException",
+   "lea_va": "0xc39873",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8318",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyArg_UnpackTuple",
+   "lea_va": "0xc3988d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8320",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_Str",
+   "lea_va": "0xc398a7",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8328",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyUnicode_AsUTF8",
+   "lea_va": "0xc398c1",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8330",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_GetDict",
+   "lea_va": "0xc398db",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8338",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyRun_StringFlags",
+   "lea_va": "0xc398f5",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8340",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyException_GetTraceback",
+   "lea_va": "0xc3990f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8348",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyList_Append",
+   "lea_va": "0xc39929",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8358",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_CallObject",
+   "lea_va": "0xc39943",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8360",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_Call",
+   "lea_va": "0xc3995d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8368",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PySys_AddAuditHook",
+   "lea_va": "0xc39977",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8370",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyTuple_GetItem",
+   "lea_va": "0xc39991",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8378",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_AddObjectRef",
+   "lea_va": "0xc399ab",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8380",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyEval_RestoreThread",
+   "lea_va": "0xc399c5",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8388",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_AddIntConstant",
+   "lea_va": "0xc399df",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8390",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyLong_FromLongLong",
+   "lea_va": "0xc399f9",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83a0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyLong_AsLongLong",
+   "lea_va": "0xc39a13",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83a8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyFloat_FromDouble",
+   "lea_va": "0xc39a2d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83b0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyFloat_AsDouble",
+   "lea_va": "0xc39a47",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83b8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyLong_AsLong",
+   "lea_va": "0xc39a61",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83c0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyType_GetModuleByDef",
+   "lea_va": "0xc39a7b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83c8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PySys_GetObject",
+   "lea_va": "0xc39a95",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8350",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyList_New",
+   "lea_va": "0xc39aaf",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83d0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyList_AsTuple",
+   "lea_va": "0xc39ac9",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83d8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_GetAttrString",
+   "lea_va": "0xc39ae3",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83e0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyDict_GetItemString",
+   "lea_va": "0xc39afd",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83e8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyImport_GetModuleDict",
+   "lea_va": "0xc39b17",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83f0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyExc_IndexError",
+   "lea_va": "0xc39b31",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b83f8",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyExc_NameError",
+   "lea_va": "0xc39b4b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8400",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyErr_SetString",
+   "lea_va": "0xc39b65",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8408",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyUnicode_Type",
+   "lea_va": "0xc39b7f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8410",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyObject_GetIter",
+   "lea_va": "0xc39b99",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8420",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_SelfIter",
+   "lea_va": "0xc39bb3",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8428",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyIter_Next",
+   "lea_va": "0xc39bcd",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8430",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_HasAttrString",
+   "lea_va": "0xc39be7",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8438",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyList_Size",
+   "lea_va": "0xc39c01",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8440",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyErr_Clear",
+   "lea_va": "0xc39c1b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8448",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyErr_PrintEx",
+   "lea_va": "0xc39c35",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8450",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyCallable_Check",
+   "lea_va": "0xc39c4f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8458",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyBytes_FromStringAndSize",
+   "lea_va": "0xc39c69",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8460",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyExc_Exception",
+   "lea_va": "0xc39c83",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8468",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyErr_Occurred",
+   "lea_va": "0xc39c9d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8470",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyLong_Type",
+   "lea_va": "0xc39cb7",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8478",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyExc_TypeError",
+   "lea_va": "0xc39cd1",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8480",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyExc_RuntimeError",
+   "lea_va": "0xc39ceb",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8488",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyExc_SystemExit",
+   "lea_va": "0xc39d05",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8490",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyLong_FromSize_t",
+   "lea_va": "0xc39d1f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84a0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyFloat_Type",
+   "lea_va": "0xc39d39",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84a8",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyBool_Type",
+   "lea_va": "0xc39d53",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84b0",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyEval_SaveThread",
+   "lea_va": "0xc39d6d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84b8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyModule_AddStringConstant",
+   "lea_va": "0xc39d87",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8398",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_DontWriteBytecodeFlag",
+   "lea_va": "0xc39da1",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84c0",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyThreadState_New",
+   "lea_va": "0xc39dbb",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84c8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyThreadState_Clear",
+   "lea_va": "0xc39dd5",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84d0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyThreadState_DeleteCurrent",
+   "lea_va": "0xc39def",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84d8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "_PyInterpreterState_GetRefTotal",
+   "lea_va": "0xc39e09",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84e0",
+   "kind": null,
+   "lib": false,
+   "lib_type": null,
+   "absent_reason": "CPython 3.12 \u306e Objects/object.c \u3067 #ifdef Py_REF_DEBUG \u5185\u306e\u307f\u5b9a\u7fa9 (release build \u306b\u7121\u3044)"
+  },
+  {
+   "name": "Py_IncRef",
+   "lea_va": "0xc39e23",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84e8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_DecRef",
+   "lea_va": "0xc39e3d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84f0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PySys_SetObject",
+   "lea_va": "0xc39e57",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b84f8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyNumber_Check",
+   "lea_va": "0xc39e71",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8500",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyInterpreterState_Main",
+   "lea_va": "0xc39e8b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8508",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyInterpreterState_ThreadHead",
+   "lea_va": "0xc39ea5",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8510",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_IsTrue",
+   "lea_va": "0xc39ebf",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8518",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyBuffer_Release",
+   "lea_va": "0xc39ed9",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8520",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyConfig_InitIsolatedConfig",
+   "lea_va": "0xc39ef3",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b85a0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyConfig_Clear",
+   "lea_va": "0xc39f0d",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b85a8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_InitializeFromConfig",
+   "lea_va": "0xc39f27",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b85b0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "Py_DecodeLocale",
+   "lea_va": "0xc39f41",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b85b8",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyMem_RawFree",
+   "lea_va": "0xc39f5b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b85c0",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyWideStringList_Append",
+   "lea_va": "0xc39f75",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8528",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyLong_FromVoidPtr",
+   "lea_va": "0xc39f8f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8530",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyLong_AsVoidPtr",
+   "lea_va": "0xc39fa9",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8538",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyList_Type",
+   "lea_va": "0xc39fc3",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8418",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyList_SetItem",
+   "lea_va": "0xc39fdd",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8540",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyObject_IsInstance",
+   "lea_va": "0xc39ff7",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8548",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "_Py_TrueStruct",
+   "lea_va": "0xc3a011",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8550",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "_Py_FalseStruct",
+   "lea_va": "0xc3a02b",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8558",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyInterpreterState_GetDict",
+   "lea_va": "0xc3a045",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8560",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyInterpreterState_Get",
+   "lea_va": "0xc3a05f",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8568",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyDict_SetItemString",
+   "lea_va": "0xc3a079",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8570",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyErr_WarnEx",
+   "lea_va": "0xc3a093",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8578",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyExc_UserWarning",
+   "lea_va": "0xc3a0ad",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8498",
+   "kind": "data",
+   "lib": true,
+   "lib_type": "D"
+  },
+  {
+   "name": "PyErr_SetRaisedException",
+   "lea_va": "0xc3a0c7",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8580",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyBool_FromLong",
+   "lea_va": "0xc3a0e1",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8588",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  },
+  {
+   "name": "PyDict_New",
+   "lea_va": "0xc3a0fb",
+   "resolver_va": "0x4235f0",
+   "slot_va": "0x16b8590",
+   "kind": "func",
+   "lib": true,
+   "lib_type": "T"
+  }
+ ]
+}

@@ -27,6 +27,10 @@ step "7. builtin 一覧 / FL 同梱 Python 差分"; node tests/dump_builtins.mjs
 step "8. PoC: MCPTools.pyc on wasm Python + flapi mock (Worker/SAB RPC)"; node tests/poc_mcp.mjs | grep -E '"(tools|init_ms|host_calls|roundtrip_us_per_flapi_call)"|POC'
 step "9. 48 tools 全実行"; node tests/all_tools.mjs
 step "9b. C provider (fl_api_call) 版 flprov.wasm + 48 tools"; bash provider/build.sh | tail -2; node tests/provider_check.mjs; FL_ENGINE=wasm node tests/all_tools.mjs
+step "9c. PY-2 (#83): Py_* 動的束縛の対応表 + CPython/provider 同一 wasm 静的リンク + 48 tools"
+source ../shared/env.sh
+python3 analysis/pybind_extract.py --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" --lib work/build-wasm/libpython3.12.a --out analysis/pybind --expect 110 --check
+bash build_flpy_static.sh | tail -1; node tests/static_check.mjs
 python3 analysis/mcp_classify.py
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
 step "11. MCP JSON-RPC を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-4 #77)"; (cd "$HERE/../.." && node tools/python/tests/mcp_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
