@@ -122,15 +122,9 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
   残り 27 件は trace_head (最大 12 件) に位置が保持されていないだけで、**非到達・別原因とは言えない** (原因は 41 件と同じか否か未確認)。
 
-### 27 件の到達確認 (LD-18 / #865、実測)
+### 27 件の到達確認・OOB 他の集計 (LD-18 / #865)
 
-`tests/rerun_414ad0_27.sh` で 27 件を `trace_head=200` (`-v`) で単体再走 → `tests/oob_414ad0_27.py` → `results/m11_oob_414ad0_27.md`。
-**25 / 27 件が wasm trace に 0x414ad0 を含み、最上位 frame も全 25 件が function_414ad0** (= 到達)。
-残り 2 件: 0x6525b0 は最上位 frame が function_4133f0 (414ad0 無し)、0x66ea90 は再走で trap せず both_fault。
-
-OOB 他の最上位 frame 集計 (LD-18、`tests/oob_top_frames.py` → `results/m11_oob_top_frames.md`): 上位 5 種は function_414ad0 68・__asm_rep_movsq_memcpy 13・function_412e40 12・function_4133f0 11・function_1062930 11。
-IR 分類は候補のみ (`inttoptr %arg` 経由の deref の有無)。機械語との突合・単体再走はしていないため**原因は未確定**。
-(本節の集計は batch jsonl 全体の OOB 239 件が対象。§8 の TSV 222 件とは別集計。)
+実測・集計表・件数 (239 / 222) の定義は `REPORT_APPENDIX_865.md` (250 行上限のため分割移動)。
 
 ### 手動実測 (単体 run、スクリプト非対応・第三者再現不可)
 

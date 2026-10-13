@@ -49,7 +49,6 @@ def ir_funcs(path):
 def classify(body):
     if body is None:
         return 'IR なし'
-    ptr = re.search(r'(load|store) [^\n]*ptr %arg1\b|(load|store) [^\n]*ptr %\w+', body)
     arg_ptr = re.search(r'inttoptr i64 %arg\d', body)
     if arg_ptr:
         return 'ptr_arg (inttoptr %arg 経由の deref あり)'
