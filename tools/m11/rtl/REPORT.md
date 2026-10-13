@@ -216,21 +216,6 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 * 2 件 (`0x412020` / `0x455650`) は unexec のため、batch の差分からは原因を取れない。
 * 次の一手 (本 run では未実施): 退行 5 件を単独で再採点し、trace 差分の入口 (`0x40faa0`) の間接 call 解決を確認する。修復は tools/flelift の変更が要るため #410 に継続。
 
-### 9-2. 退行 5 件の単独再採点 (batch 外・n=3) — 当時の記録 (出典・証跡なし)
+### 9-2. 退行 5 件の単独再採点 — 未実施
 
-`liftdiff.py batch targets/flelift.json --set file:<5 VA> --shards 5 --nobuild --state auto` を PR 作成時のローカル環境で 3 回実行したとされる記録 (batch 全数の再実行は無し)。**実測ではなく、出典・生ログ・per-VA の判定根拠はいずれも repo に無い。** 本 fix run では `tools/flelift/work`・`tools/liftdiff/work` と使用 wasm・obj が存在せず、再現も行っていない。以下の表は退行判定の根拠として使わないこと。実測が必要なら #410 で素材と work/ が揃う環境から再採点する。
-
-| va | batch (9-1 の jsonl) | 単独 r1 | 単独 r2 | 単独 r3 |
-|---|---|---|---|---|
-| `0x4090e0` | mismatch | mismatch | mismatch | mismatch |
-| `0x41cd70` | mismatch | mismatch | mismatch | mismatch |
-| `0x42d830` | mismatch | mismatch | mismatch | mismatch |
-| `0x44a590` | mismatch | mismatch | mismatch | mismatch |
-| `0x4511d0` | mismatch | **match** | **match** | **match** |
-
-* 結論 (当時の記録・未検証): 退行 5 件のうち 4 件は単独でも mismatch だったとされる。`0x4511d0` は単独で 3 回とも match で、batch の mismatch と食い違う。原因は未確定で、次の 2 つが残る: (a) batch 文脈への依存 (b) セッション差 (§7-2 の「verdict はセッション間で動く」)。両者は同一セッションの batch と単独の並列比較でしか分離できず、未実施。
-* 未確認: 単独 run が使った wasm・obj と batch jsonl (`work-liftdiff`) が同一バイナリかは sha256 で照合していない (元ファイルが無い)。差がバイナリ差なら batch 文脈差ではない。
-* 「退行の実在」について、本節から言えるのは「当時の記録上、4 件の単独 mismatch が報告されている」ことまで。出典・生ログが無いため、退行の根拠にはしない。
-* 含意: 一致→不一致 7 件の「退行」のうち少なくとも 1 件は、batch 文脈依存の可能性がある。退行の判定には単独 n>=3 の確認を前提にすること。
-* 未検証: `0x4511d0` が単独で match になる理由 (同居関数・state・shard 配置の影響を含む)。本節の記録では shard 配置を変えた比較は無く、`0x40faa0` の間接 call 解決の確認も未実施。
-* 素材 (本 fix run の確認): 素材 `fl-win64` (`docs/WORKFLOW.md` §11。`[WIN64]` の `FL_WIN64_DIR` に相当) は `$ARTIFACTS_DIR/fl-win64.tar.zst` として存在するが、`tar --zstd -xf` は exit 1 で完走せず (25,168 entry 中 25,166 を展開)。`tools/flelift/work/lift`・`tools/liftdiff/work`・ローカルツール `[EMSDK]` も無いため、単独 run の再現は不可。
+退行 5 件 (§9-1) は単独 (batch 外) での再採点を行っておらず、実測値は存在しない。本節は単独での判定を記録しない。再採点は #410 で、素材 `fl-win64` (`docs/WORKFLOW.md` §11) と `tools/flelift/work`・`tools/liftdiff/work` が揃う環境で行う。
