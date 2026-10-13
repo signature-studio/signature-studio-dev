@@ -29,7 +29,7 @@ IR に使用ゼロの無名 alloca (B1 の痕跡) が有る / ブロック内 xo
 frame read が恰好 1 本で、prologue を追った `rsp/rbp` モデル (`frame_model`) で escape 済み stack_var の gap 内に解決 / 同番地への機械語 store 無し /
 使用が最初の使用と同一 IR ブロックで、その前に stack_var を渡す call がある。
 さらに consumer: `cmp [frame],K; je T` の形で IR が `icmp eq i1 (v==K), X` に畳まれていれば `and i1 (v==K), X` に戻す (`f4_consumer_and`: 52a7f0 と 71dd80)。
-load だけ直しても到達しない (§4 D2)。`m11_gen_ir2.sh` が `--pe` を `FL_WIN64_DIR` から引くよう変更 (従来は `[WIN64]` の固定パス (`/home/ubuntu/...`) で、runner では ldfix が黙ってスキップされた)。`LDFIX_ARGS` で F4 を外せる (ネガコン用)。
+load だけ直しても到達しない (§4 D2)。`m11_gen_ir2.sh` が `--pe` を `FL_WIN64_DIR` から引くよう変更 (従来は `[WIN64]` の固定パスで、runner では ldfix が黙ってスキップされた)。`LDFIX_ARGS` で F4 を外せる (ネガコン用)。
 
 ## 3. 全数走査 (`audit_undefload.py`, 別算法)
 
