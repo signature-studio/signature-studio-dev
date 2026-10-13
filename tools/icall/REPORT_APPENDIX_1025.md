@@ -6,9 +6,11 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 **未達 (部分達成)**。icall 経路の復元後 IR から wasm ビルドまで成立したが、wasm 実行は未達 (前回 run で 61/61 シナリオが trap)。native 差分は未取得。
 
-## 実測 (HEAD `0b761625`・`ws-1025` detached worktree・2026-10-13 20:10 UTC)
+## 実測 (HEAD `44d70d74`・`ws-1025` worktree・2026-10-13 20:43 UTC)
 
-素材: `work-icall` を `tools/icall/work/` に展開 (`tar --zstd -xf`・22.9 s)。`plugins-kilohearts` / `toolchain-*` は `$ARTIFACTS_DIR` に実在を確認 (`ls -la`) のみで、本 build 経路では展開していない (emsdk は `/opt/emsdk`)。
+測定 run: PR #1247 の fix モード (レビュー指摘への対応)。HEAD `44d70d74` を `ws-1025` worktree で checkout して実行。
+
+素材: `work-icall` を `tools/icall/work/` に展開 (`tar --zstd -xf`)。`plugins-kilohearts` / `toolchain-*` は `$ARTIFACTS_DIR` に実在を確認したが、本 build 経路では展開していない (emsdk は `/opt/emsdk` を使用)。
 
 | 項目 | 結果 | 実測 |
 |---|---|---|
@@ -16,16 +18,13 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 | ir_flatten | 成功 | global defs removed 485, refs 300, i64 consts shifted 202, dispatch 表 164 entries (non-i64 ret wrapped 7) |
 | m11_simd2 + vex_gen + simd_merge | 成功 | vex_generated 61 (unresolved 3: `__asm_vandnpd`・`__asm_vmovsd__27`・`__asm_vpcmpeqq`) / merge: extra_names 66, stubs_replaced_by_extra 63, fail_fast_installed 1, remaining_unimpl_stubs 13 |
 | map.json | `blk` = `0x18a25c000`、`cfg_thunks` = `[]` | `python3` で読んだ値。`ncfg` 0 のため `ir_flatten.py --cfg ""` は正しい |
-| emcc (-O0, メモリ 0x3c000000, BLK は map.json の `blk`) | 成功 | `kh_route.cjs` 107,844 B / `kh_route.wasm` 628,625 B (同一 HEAD の 2 回目 build で sha256 一致) |
-| 再現 | 1 本 (実行 rc 0) | `bash tools/icall/kh_route_build.sh` → rc 0、`time` 実測 real 6.317 s (script 全体) |
+| emcc (-O0, メモリ 0x3c000000, BLK は map.json の `blk`) | 成功 | `kh_route.cjs` 107,844 B / `kh_route.wasm` 生成 (rc 0) |
+| 再現 | 1 本 (rc 0) | `bash tools/icall/kh_route_build.sh` → rc 0。同一 worktree で 2 回 build し、`kh_route.cjs` / `kh_route.wasm` の sha256 が一致 |
 
-**wasm サイズはチェックアウトのパスに依存する**: `-g` のデバッグ情報に絶対パスが埋まる (`.../signature-studio-dev/<worktree>/...`)。
-同じ HEAD を `ws-1025` (628,625 B) と別名の worktree (628,689 B) で build して確認した。レビュー run の 628,501 B は別パスで build された値と考えられ、本 run では再現していない。
+**wasm のバイト数・sha256 はチェックアウトのパスに依存する**: `-g` のデバッグ情報に絶対パスが埋まるため、worktree が違うと値が変わる。受入値として使うのは「同一 worktree 内で 2 回 build して sha256 が一致すること」のみ。バイト数と build 時間は受入値にしない。
 
 fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は出典不明のハードコードだったため削除)、`ir_flatten.py --cfg` に `map.json` の `cfg_thunks` を渡す (OTT `ott_route.sh` と同じ生成式)。
 `cfg_thunks` が空であることは上表の `map.json` の値で確認済み。
-
-
 
 ## 未解決
 
