@@ -1,6 +1,6 @@
 # tools/plugins/sampler/REPORT.md — PLG-G3 (#208) sampler 8 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/sampler/` のみ / 検証起点 commit: **53c2eb6** (スクリプト。 以降は REPORT.md のみ)
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/sampler/` のみ / 検証起点 commit: **4c3ae00** (以降 209dc3c5 → cc35d4ef は docs のみ。 検証経路は無変更)
 - 再現: `bash tools/plugins/sampler/sampler_e2e.sh` (Delphi 殻 7 本: lift + 判定 + 突合) / `bash tools/plugins/sampler/sampler_engines.sh` (engine 2 本) /
   `bash tools/plugins/sampler/sampler_nega.sh` (ネガティブコントロール)。 対象の定義は `targets.py` だけ
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 環境は `sampler/env.sh`
