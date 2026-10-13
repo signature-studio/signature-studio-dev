@@ -1,0 +1,91 @@
+{
+ "files": 9128,
+ "stats": {
+  "Fruity Delay 3": {
+   "events": 119,
+   "supported": 119,
+   "legacy": 0,
+   "ok": 119,
+   "roundTrip": 119,
+   "lengthMatch": 119,
+   "lengthChecked": 119,
+   "versions": {
+    "1": 119
+   },
+   "bad": []
+  },
+  "Fruity Reeverb 2": {
+   "events": 328,
+   "supported": 321,
+   "legacy": 7,
+   "ok": 321,
+   "roundTrip": 328,
+   "lengthMatch": 321,
+   "lengthChecked": 321,
+   "versions": {
+    "19": 1,
+    "33": 2,
+    "75": 1,
+    "100": 2,
+    "400": 1,
+    "10000": 63,
+    "10001": 258
+   },
+   "bad": []
+  },
+  "Fruity Limiter": {
+   "events": 351,
+   "supported": 338,
+   "legacy": 13,
+   "ok": 338,
+   "roundTrip": 351,
+   "lengthMatch": 338,
+   "lengthChecked": 338,
+   "versions": {
+    "5": 13,
+    "6": 157,
+    "7": 181
+   },
+   "bad": []
+  },
+  "Fruity Parametric EQ 2": {
+   "events": 1127,
+   "supported": 1104,
+   "legacy": 23,
+   "ok": 1104,
+   "roundTrip": 1127,
+   "lengthMatch": 1104,
+   "lengthChecked": 1104,
+   "versions": {
+    "2": 23,
+    "3": 328,
+    "6": 205,
+    "7": 100,
+    "8": 471
+   },
+   "bad": []
+  },
+  "Maximus": {
+   "events": 165,
+   "supported": 129,
+   "legacy": 36,
+   "ok": 129,
+   "roundTrip": 165,
+   "lengthMatch": 0,
+   "lengthChecked": 0,
+   "versions": {
+    "2": 11,
+    "3": 7,
+    "4": 15,
+    "5": 1,
+    "6": 2,
+    "7": 11,
+    "10": 58,
+    "11": 1,
+    "14": 10,
+    "15": 49
+   },
+   "bad": []
+  }
+ }
+}

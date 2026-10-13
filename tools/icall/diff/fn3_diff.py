@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(T, 'ott', 'native'))
 ROUTE = os.path.join(T, 'icall', 'work', 'route', 'ott_route.cjs')
 X64C = os.path.join(T, 'ott', 'work', 'lift', 'ottl.cjs')
 FMA_FLAG = 0x18026c50c
+NEG = '--neg' in sys.argv    # 入力の符号を半数反転 (tan の符号復元 = vmovapd [rsp+0x40] の再読込経路を踏む)
 KERNEL = '--kernel' in sys.argv  # 入力 = xmm0..3 + r8 (1801aa1a0 の呼出し規約: x, corr, ?, n, parity)
 
 
@@ -28,6 +29,8 @@ def gen_inputs(n, seed, wide):
             x = random.uniform(-4, 4) if k < .4 else random.uniform(0, 60000) if k < .8 else random.uniform(-1e-3, 1e-3)
         else:
             x = random.choice([random.uniform(0.01, 4), random.uniform(0.0001, 100), random.uniform(1, 30000)])
+        if NEG and random.random() < .5:
+            x = -x
         if KERNEL:
             n = random.choice([0.0, 1.0, 2.0, 3.0])
             out.append((f(random.uniform(-0.8, 0.8)), f(random.uniform(-1e-16, 1e-16)), f(random.uniform(-1e-16, 1e-16)), f(n), random.getrandbits(1)))

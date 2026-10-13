@@ -25,7 +25,7 @@
    shim 本体 (`gui_core/gdi/stubs`) は `gui_rename.h` で `gui_impl_<Name>` に改名され、公開名は `gui_adapt_w32.o` が **IR の署名で**定義する。
    kernel32 級 5 名 (ExitProcess/GetModuleHandle[AW]/OutputDebugString[AW]) は `-DGUI_NO_K32` で除外済み (shimx が提供)。
 2. **m11_winstubs から GUI 名を除外**: `llvm-nm --defined-only <m11>/work/obj_gui/*.o` の定義名を m11 の `work/defined_c.txt` に追記してから `m11_genstubs.py` を回す (`M11_EXCLUDE`)。`build_objs.sh` が `exports.txt` に出力。
-   (shimx の weak 9 本の重複解消は CAB-171 の担当。本 shim 側に要求は無い。重複したら `gui_adapt_w32.o` の名前と shimx の名前が衝突する — その場合は REPORT に記す)
+   (shimx の user32 weak 9 本 + wtsapi32 2 本との共存は #172 で確定: gui の強定義が勝ち、重複 0。検査は `bash tools/gui/shimx_coexist/coexist.sh`、境界表は `tools/gui/shimx_coexist/REPORT.md` §2)
 3. **emcc リンクに `work/obj_gui/*.o` を追加**し、export に `_gui_shared_ptr,_gui_shared_size`(+ `_gui_reach_dump,_gui_reach_json,_gui_reach_distinct`) を足す。`-sGLOBAL_BASE` は ≥ 0x10000 (m11 の 0x10000000 で可)。
 4. **icall hook を起動前に 1 回設定**:
    ```c
@@ -37,6 +37,8 @@
    ```
    `m11_icall` は VA→trampoline (8×u64 統一署名) で、WNDPROC の引数個数が 4 でなくても `call_indirect` 署名不一致を起こさない。miss 時は 0 を返し `m11_icall_miss` を加算するだけなので、
    結合側で WNDPROC 呼出前後の miss 増分を見て fail-fast するとよい。`WNDCLASS.lpfnWndProc` の定数アドレス: `python3 tools/gui/integ/lift_fnmap.py --ir <m11>/work/boot_final.ll` が現 IR の `RegisterClassW` 呼出点 (例 `function_52a7f0` → WNDCLASS 0xfbe810) を列挙する。
+   **shimx 結線 (#172)**: shimx をリンクした場合は起動時に 1 回 `gui_shimx_attach()` を呼ぶ (bit0 = kernel object 状態変化→doorbell で `MsgWaitForMultipleObjects[Ex]` の handle 待ちを起こす、bit1 = `ShellExecute` hook→`window.open`)。
+   ブラウザ側は `HostCallBridge` (`src/runtime/gui_hostcall.ts`) を `gui_hostcall_ptr()` に対して `start()` する (ShellExecute / GetOpen・SaveFileName。host 未起動なら dialog は FALSE を返す)。ドロップは `installDropTarget()` が FS へ書き出し `gui_drop_files()` で `WM_DROPFILES` を配送する。
    **リソース供給 hook** (`LoadStringW`/`LoadBitmapW` 用; CAB-159): shimx 側のリソース供給 (`shimx_set_resource_provider` / FindResource 系) を同様に 1 回接続する。
    ```c
    static int gui_res(unsigned long long hinst, unsigned type, unsigned id, const void **data, unsigned *size);   /* RT_STRING=6 は (id>>4)+1 のブロック, RT_BITMAP=2 は DIB */
