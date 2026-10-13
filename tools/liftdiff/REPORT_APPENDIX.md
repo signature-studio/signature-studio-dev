@@ -171,7 +171,8 @@ LD-17 (#864) の型分類は `results/m11_unreachable_diverge.md` §2 (同じス
 - 結論: 型 C・D の食い違いは原因候補 (P1・P2・P3) に分類した。P2 は L が F の直接 call 先であることを条件に含む。内訳は results 参照。
 - P2 の代表例 0x418be0 (呼出元 0x41c820) は P2 候補に分類した。IR 側 (`call 0x407030` の欠落) は再確認していない。call site と IR block の対応づけは未実施。
 - P2 の全 20 件で F→L の直接 call 辺 (`L ∈ direct_calls(F)`) が成立することを PE 実測で確認した。
-- `results/m11_unreachable_cd.md` は F→L 条件を入れた後の出力と一致することを HEAD で確認済み (生成元を再実行して diff 0 行)。
+- `results/m11_unreachable_cd.md` は現コードの出力と一致 (入力 work-m11 / work-liftdiff で再生成して確認。コード HEAD 516a2b07 で exit 0・16.56 s・diff 0 行)。
+- P2 の全 20 件で `L ∈ direct_calls(F)` が成立 (同一 PE・同一入力で 20/20 を確認)。
 - 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
 
 ## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
