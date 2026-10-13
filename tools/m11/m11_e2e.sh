@@ -13,6 +13,11 @@
 # 前提: /opt/emsdk, /opt/retdec, node(v26: ~/.local/share/pnpm/bin), analysis/win64/extracted/block00031_PE.bin
 set -u
 cd "$(dirname "$0")"
+# #715 fail-closed: 期待値ファイルが無いと回帰ゲートが黙って無効になるため、無ければ前提確認より前に非 0 で止める
+[ -f e2e_expect.env ] || { echo "[m11_e2e] e2e_expect.env 無し: 回帰ゲートの期待値が読めない (fail-closed)"; echo "M11_SUMMARY {\"reached_stage\":0,\"stop_reason\":\"e2e_expect.env missing (fail-closed)\"}"; exit 1; }
+source e2e_expect.env     # M11_EXPECT_STAGE / M11_EXPECT_SURVEY_OK (環境変数が優先)
+case "$M11_EXPECT_STAGE" in ''|*[!0-9]*) echo "[m11_e2e] M11_EXPECT_STAGE が整数でない: '$M11_EXPECT_STAGE' (fail-closed)"; exit 1 ;; esac
+case "$M11_EXPECT_SURVEY_OK" in ''|*[!0-9]*) echo "[m11_e2e] M11_EXPECT_SURVEY_OK が整数でない: '$M11_EXPECT_SURVEY_OK' (fail-closed)"; exit 1 ;; esac
 source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 FULL=0; TRACE=0
@@ -90,7 +95,6 @@ step "実行 B: unit survey (942 unit を try/catch 隔離)"
 timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1 || true
 
 # #715: 回帰ゲート。期待値 (e2e_expect.env・環境変数で上書き可) を下回れば judge が非 0 を返し、e2e も非 0 で終わる
-[ -f e2e_expect.env ] && source e2e_expect.env
-python3 m11_judge.py --require-stage "${M11_EXPECT_STAGE:-1}" --min-survey-ok "${M11_EXPECT_SURVEY_OK:-0}"; rc=$?
+python3 m11_judge.py --require-stage "$M11_EXPECT_STAGE" --min-survey-ok "$M11_EXPECT_SURVEY_OK"; rc=$?
 python3 m11_icall_audit.py 2>/dev/null | tail -1 || true
 exit $rc
