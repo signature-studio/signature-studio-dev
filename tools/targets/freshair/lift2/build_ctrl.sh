@@ -114,5 +114,6 @@ emcc -w -O1 -ffp-contract=off -frounding-math -fno-fast-math ctrl_full.ll "$HERE
   -sERROR_ON_UNDEFINED_SYMBOLS=1 -sMODULARIZE=1 -sENVIRONMENT=node -sALLOW_MEMORY_GROWTH=1 \
   -sEXPORTED_FUNCTIONS="${EXPORTS},_fa_va2ptr,_malloc,_free,_fa_heap_zero" -sEXPORTED_RUNTIME_METHODS=HEAPU8,stackSave,stackRestore --no-entry -o ctrl_full.js
 cp ctrl_full.js ctrl_full.cjs
-clang -O1 -ffp-contract=off -frounding-math -w -o native_ctrl "$HERE/native/native_ctrl.c"
+clang -O1 -ffp-contract=off -frounding-math -w -o native_ctrl "$HERE/native/native_ctrl.c" || { echo "ERROR: native_ctrl の clang が失敗 (build_ctrl.sh)" >&2; exit 1; }
+[ -x native_ctrl ] && [ -f ctrl_full.cjs ] || { echo "ERROR: ctrl build の成果物 (native_ctrl / ctrl_full.cjs) が無い" >&2; exit 1; }
 echo "ctrl build ok"

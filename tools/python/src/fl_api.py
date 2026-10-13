@@ -5,7 +5,9 @@
 実装本体 (FLEngine 側) は JS ホストが fn_id → 実関数に対応付ける。Python 側に FL ロジックは無い。
 """
 import ast
+import importlib
 import json
+import operator
 import sys
 import types
 
@@ -16,12 +18,41 @@ import _flhost
 _ERR = {1: ValueError, 2: RuntimeError, 3: RuntimeError, 4: IndexError, 5: TypeError, 6: RuntimeError,
         7: RuntimeError, 8: RuntimeError}
 
+# stubs 既定値の許可表。midi.* の値は利用者の midi モジュールから実行時に取る (値を repo に複製しない)。
+_DEFAULT_NAMES = frozenset({"midi.PIM_None", "midi.GT_All", "midi.LB_Status_Default", "midi.EKRes", "midi.MaxInt",
+                            "midi.ST_Int", "midi.PME_System", "midi.REC_None", "midi.GC_BackgroundColor",
+                            "midi.FPN_Param"})
+_DEFAULT_UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+_DEFAULT_BINARY = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
+
+
+def _default_value(expr):
+    # literal_eval は 1 / 24 (BinOp) を扱えないため、四則演算だけ operator で計算する
+    def ev(n):
+        if isinstance(n, ast.Constant) and (n.value is None or isinstance(n.value, (bool, int, float))):
+            return n.value
+        if isinstance(n, ast.UnaryOp) and type(n.op) in _DEFAULT_UNARY:
+            return _DEFAULT_UNARY[type(n.op)](ev(n.operand))
+        if isinstance(n, ast.BinOp) and type(n.op) in _DEFAULT_BINARY:
+            return _DEFAULT_BINARY[type(n.op)](ev(n.left), ev(n.right))
+        if isinstance(n, ast.Attribute) and isinstance(n.value, ast.Name):
+            if f"{n.value.id}.{n.attr}" in _DEFAULT_NAMES:
+                return getattr(importlib.import_module(n.value.id), n.attr)
+        raise ValueError(f"unsupported stub default: {expr!r}")
+    return ev(ast.parse(expr, mode="eval").body)
+
 IDS = []
 
 
+class _Lazy:
+    # midi.* など利用者の module から実行時に解決する既定値 (bind 時に _default_value で評価する)
+    def __init__(self, expr):
+        self.expr = expr
+
+
 def _stub_defaults(params):
-    # stubs の既定値は単純リテラル (True/False/0/-1/None) だけ採用する。`midi.PIM_None` 等の記号は数値が
-    # 静的に分からないので既定値不明 (省略時は C 側に任せ、後続を指定する呼出しは TypeError)。
+    # stubs の既定値は単純リテラル (True/False/0/-1/None) を採用し、許可表の `midi.*` は遅延評価 (_Lazy)。
+    # それ以外の記号は既定値不明 (省略時は C 側に任せ、後続を指定する呼出しは TypeError)。
     out = {}
     for p in params or []:
         if p["default"] is None or p["name"] in out:
@@ -29,7 +60,8 @@ def _stub_defaults(params):
         try:
             out[p["name"]] = ast.literal_eval(p["default"])
         except (ValueError, SyntaxError):
-            pass
+            if p["default"] in _DEFAULT_NAMES:
+                out[p["name"]] = _Lazy(p["default"])
     return out
 
 
@@ -64,6 +96,15 @@ def _make(mod, name, fid, sig, kwsig=None):
             raise TypeError(f"{mod}.{name}() unexpected keyword arguments {extra}")
         out = list(args)
         gap = None  # 省略された任意引数 (既定値が C 側にあり不明) の位置
+        known = {}
+        for k, v in defaults.items():
+            if isinstance(v, _Lazy):
+                try:
+                    known[k] = _default_value(v.expr)
+                except ImportError:
+                    continue  # midi が無い環境では既定値不明として扱う
+            else:
+                known[k] = v
         for i, n in enumerate(names[len(args):], start=len(args)):
             if kwnames[i] is not None and n in kw:
                 if gap is not None:
@@ -71,8 +112,8 @@ def _make(mod, name, fid, sig, kwsig=None):
                 out.append(kw.pop(n))
             elif gap is not None:
                 continue  # gap 以降の未指定引数は省略 (既定値を足すと位置がずれる)
-            elif n in defaults:
-                out.append(defaults[n])
+            elif n in known:
+                out.append(known[n])
             elif required is not None and i >= required:
                 gap = i if gap is None else gap
             else:

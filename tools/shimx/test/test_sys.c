@@ -80,6 +80,24 @@ static void test_strings(void) {
     CHECK(PathUnExpandEnvStringsW(W("D:\\none"), w, 64) == FALSE);
 }
 
+/* #658: UI 言語。kernel32 export (proctable 経由) が en-US 1 件を返す。flags = MUI_LANGUAGE_NAME(8) / 0 */
+static void test_ui_language(void) {
+    typedef BOOL (*gupl_fn)(DWORD, ULONG*, LPWSTR, ULONG*);
+    CHECK(GetProcAddress(GetModuleHandleW(W("kernel32.dll")), "GetUserPreferredUILanguages") == (void*)GetUserPreferredUILanguages);
+    gupl_fn fn = (gupl_fn)GetProcAddress(GetModuleHandleW(W("kernel32.dll")), "GetUserPreferredUILanguages");
+    const DWORD flags[2] = { 8u, 0u };
+    for (int i = 0; i < 2; i++) {
+        ULONG num = 0, cch = 0;
+        CHECK(fn(flags[i], &num, NULL, &cch) && num == 1 && cch == 7);                  /* 問合せ: "en-US" + 2 NUL */
+        WCHAR buf[16]; memset(buf, 0xAA, sizeof buf);
+        cch = 16;
+        CHECK(fn(flags[i], &num, buf, &cch) && num == 1 && cch == 7);
+        CHECK(buf[0] == 'e' && buf[1] == 'n' && buf[2] == '-' && buf[3] == 'U' && buf[4] == 'S' && buf[5] == 0 && buf[6] == 0 && buf[7] == 0xAAAA);
+        cch = 6;
+        CHECK(!fn(flags[i], &num, buf, &cch) && GetLastError() == ERROR_INSUFFICIENT_BUFFER && cch == 7);
+    }
+}
+
 /* ---------------------------------------------------------------
  * レジストリ
  * --------------------------------------------------------------- */
@@ -577,6 +595,7 @@ static void test_process_module(void) {
 
 void run_sys_tests(void) {
     test_strings();
+    test_ui_language();
     test_registry();
     test_files();
     test_time();
