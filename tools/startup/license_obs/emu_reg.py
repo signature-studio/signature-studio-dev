@@ -6,6 +6,7 @@ byte[0x14f84a8] (登録フラグ) と gradeChar を観測する (lift を介さ�
   - メモリマネージャ (MM_TABLE 0x13a5c90 の 4 関数) だけ Python の bump allocator に差し替える
   - IAT は全スロットを 16B 刻みの `ret` スタブへ向け、スタブ実行時に Python 側 API 実装を呼ぶ
   - レジストリは Python の辞書 (HKCU/HKLM)。ライセンスの生成・偽造はしない (観測のみ)
+  - ILRegKey 非空の経路 (復号 VM 0x8d0380 系) は unit 初期化節 UNIT_INITS (VM ハンドラ表を作る 11 関数) を先に実行して通す (init_units)
 """
 import os, struct, sys, zlib
 import pefile
@@ -26,6 +27,15 @@ TLS_INDEX_VAR = 0x13a9388
 # 実機では翻訳オブジェクト (起動時に生成) を引く文字列取得 `_(lit)`: (rcx=&out UnicodeString, rdx=リテラル) → out := lit
 OVERRIDE_VAS = (0x8da350,)
 ENTRY, SENTINEL_OFF = 0x10c7cd0, 0xfff0
+# VM ハンドラ登録 `0x8c5cc0(classRef, id)` (singleton 0x8c5c90 の byte 添字表 [obj+8+idx*8] へ登録) の呼び出し元関数 11 個 = unit 初期化節。
+# いずれも `sub [cnt],1; cmp [cnt],-1; jne skip` の 1 回限りガード付きで、unit 表 0x1376c30.. の init 側エントリと一致する。
+# 独立導出 (生バイト走査) との一致は verify.py V6a が検査する。
+UNIT_INITS = (0x558e20, 0x5658e0, 0x56fde0, 0x577290, 0x577fd0, 0x579610, 0x57fd50, 0x580970, 0x582230, 0x8b2080, 0x8cb690)
+REGISTER_HANDLER = 0x8c5cc0
+# 観測点 (実行到達の記録のみ。実行は改変しない)
+PROBES = {'vm_decode': 0x8d0380, 'head_ready': 0x10cad6e, 'tier_machine_check': 0x10cb728, 'tier_record_search': 0x10cb741,
+          'tier_apply': 0x10cbaf0, 'tier_skip': 0x10cb991}
+HEAD_SLOT_OFF = 0x4be0   # 0x10cad6e 時点で [rbp+0x4be0] = 復号結果の head (0x8e6770 の先頭グループ。最初の ':' より前。':' が無ければ復号結果全体)
 
 
 def u16z(s):
@@ -96,6 +106,10 @@ class Emu:
             uc.hook_add(UC_HOOK_CODE, self._ovr, begin=va, end=va)
         uc.hook_add(UC_HOOK_MEM_READ_UNMAPPED | UC_HOOK_MEM_WRITE_UNMAPPED | UC_HOOK_MEM_FETCH_UNMAPPED, self._unm)
         self.unmapped = None
+        self.probe_hits = {k: 0 for k in PROBES}
+        self.head_samples = []
+        for k, va in PROBES.items():
+            uc.hook_add(UC_HOOK_CODE, self._probe, begin=va, end=va, user_data=k)
 
     # ---- メモリ ----
     def alloc(self, n, zero=True):
@@ -178,6 +192,24 @@ class Emu:
             ret = struct.unpack('<Q', self.rd(rsp, 8))[0]
             uc.reg_write(UC_X86_REG_RSP, rsp + 8)
             uc.reg_write(UC_X86_REG_RIP, ret)
+
+    def _probe(self, uc, addr, size, key):
+        self.probe_hits[key] += 1
+        if key == 'head_ready':
+            p = struct.unpack('<Q', self.rd(self.r(UC_X86_REG_RBP) + HEAD_SLOT_OFF, 8))[0]
+            self.head_samples.append(self.rd_w_raw(p))
+
+    def rd_w_raw(self, p, maxn=4096):
+        """UnicodeString/NUL 終端 UTF-16 を生バイトで返す (復号結果は非文字列のことがあるため decode しない)。"""
+        if not p:
+            return b''
+        b = bytearray()
+        for _ in range(maxn):
+            c = bytes(self.uc.mem_read(p + len(b), 2))
+            if c == b'\0\0':
+                break
+            b += c
+        return bytes(b)
 
     # ---- API ----
     def hkey_path(self, h):
@@ -449,6 +481,10 @@ class Emu:
     def api_GetCurrentProcessId(self, *a):
         return 1234
 
+    def api_InitializeCriticalSection(self, *a):
+        return 0
+    api_EnterCriticalSection = api_LeaveCriticalSection = api_DeleteCriticalSection = api_InitializeCriticalSection
+
     # ---- 実行 ----
     def run(self, entry=ENTRY, cl=0, max_insn=50_000_000):
         uc = self.uc
@@ -473,6 +509,13 @@ class Emu:
 
     def rd(self, va, n):
         return bytes(self.uc.mem_read(va, n))
+
+    def init_units(self):
+        """VM ハンドラ表を作る unit 初期化節 (UNIT_INITS) を順に実行する。実機械語のまま (差し替えなし)。全て ok でなければ例外。"""
+        for va in UNIT_INITS:
+            st = self.run(entry=va)
+            if st != 'ok':
+                raise RuntimeError(f'unit init {va:#x}: {st}')
 
     def setup_teb(self):
         teb = self.alloc(0x1000)
@@ -508,6 +551,7 @@ if __name__ == '__main__':
     standard_seed(reg)
     e = Emu(reg, trace=True)
     e.setup_globals()
+    e.init_units()
     print(e.run())
     print('unknown apis', getattr(e, 'unknown', None))
     print('flag', e.rd(FLAG, 1).hex(), 'grade', e.rd(e.grade_ptr, 1).hex())

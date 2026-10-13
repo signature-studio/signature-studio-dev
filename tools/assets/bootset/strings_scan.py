@@ -5,7 +5,7 @@
 """
 import re, sys, json, os, struct
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE); WORK = os.path.join(ROOT, 'work')
-WIN = '/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin'
+WIN = os.path.join(os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted/block00031_PE.bin')
 MAC = '/home/ubuntu/work/webstudio/tools/m2/work/FLEngine_x86_64.dylib'
 
 def ascii_strings(b, minlen=4):

@@ -1,7 +1,7 @@
 # 付録: liftdiff 回帰 A/B・Ablation・検収・再現性 (CAB-232/233) — tools/liftdiff/
 
 > **正本**: `tools/liftdiff/REPORT.md` (結論・§1〜§4・§6 成果物・§7 未解決)。本書は 250 行上限 (`docs/DOC_MAP.md` §1) のため
-> 本体から**そのまま分割移動**した §5 / §5.1 / §5.2 / §6.1 / §6.2 の全文 (節番号は本体の参照と一致)。
+> 本体から**そのまま分割移動**した §5 / §5.1 / §5.2 / §6.1 / §6.2 / §8 / §9 の全文 (節番号は本体の参照と一致)。
 
 ## 5. 回帰 — fresh HEAD との A/B (本チケットで実測)
 
@@ -102,3 +102,78 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
 - IR の `function_4128b0__lifted` では `ExitProcess` 呼出 (`dec_label_pc_4129f7`) の直後が `unreachable` (1 箇所)。
   stub `ExitProcess` が戻る wasm でここに落ちる、という推論は**未検証** (stub の挙動を変えた再走はしていない)。
 - 分岐点 (native では `ExitProcess` に入らず wasm だけが入る理由) は上流にあり**未特定** → #307。
+
+## 9. wasm_trap の個別原因 (LD-7 / #307、#305 上に積んだ分)
+
+集計 = `tests/trace_diverge_unreachable.py` → `results/m11_unreachable_diverge.md`、`tests/oob_414ad0.py` → `results/m11_oob_414ad0.md` (数値・表はそちらが正本)。
+入力は §8 と同じ既存 batch jsonl (再走なし) と PE (`LD_M11_PE` または `--pe`)。
+
+- **unreachable (最初の trap が unreachable の 220 関数)**: うち trace_head 内で native/wasm の食い違いを観測した 212 件を対象に、
+  最初に食い違う直前の関数 L を数える。trace_head が両側で完全一致し食い違い未観測の 8 件 (trace_head は最大 12 件で打切り) は分岐点集計から除外した。
+  `function_410320` が最多 (82 件)。機械語は `test dl,dl; jl; call qword ptr [rax-0x30]` (VMT 間接 call) だが、lift 後 IR は `ret %arg1` のみで call が無い。
+  native は 410320 の次に 0x409410 へ進み (例 0x6ae290)、wasm は 0x40f9e0 へ進む。
+  同型の **D15 型候補** (メモリ間接 call を持ち、IR の call 数 ≤ 機械語の直接 call 先 distinct 数) は 0x40f9e0・0x1253610・0x678480 を含め合計 86/212。
+  この判定は call site / block を対応づけておらず (直接 call の脱落でも成立しうる)、D15 の**確定ではない**。
+  410320 については IR が `ret %arg1` のみで call 0 件、機械語は間接 call 1 件 (上記) であり、候補としては強い。残り 126 件は別の分岐 (0x417b70 32 / 0x40a3d0 24 / 0x418be0 20 ほか)。**未特定**。
+- ExitProcess へ至る連鎖 (例 0x6ae290: wasm のみ `409470 → 409730 → 4096d0 → 4096b0 → 412a40 → 4128b0`) は「alloc 失敗を示す Delphi の runerror 経路」と読めるが、
+  410320 の call 脱落からその経路に入るまでの因果は trace_head (最大 12 件) に収まらず**直接確認していない** (推定)。
+- **OOB function_414ad0 系 (68 件)**: 機械語は入口 rcx (var 文字列のアドレス) の 1 段 deref `mov r,[rbx]` が 4 箇所 (0x414af3/0x414b49/0x414b64/0x414b78)。
+  lift 後 IR には `%arg1` を ptr とする load が 0 件で、`%arg1` を値のまま `icmp`/`add` に使っている (ldfix F3a/F3b 型の値↔アドレス取り違え)。
+  68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
+  残り 27 件は trace_head (最大 12 件) に位置が保持されていないだけで、**非到達・別原因とは言えない** (原因は 41 件と同じか否か未確認)。
+
+### 手動実測 (単体 run、スクリプト非対応・第三者再現不可)
+
+次は `tools/liftdiff/work/` 配下の未 commit 成果物に基づく手元観測で、**受入条件 2 の根拠には含めない** (AGENTS §4-4: `work/` は commit 対象外)。
+再現用のパッチ・再生成スクリプトは commit していない (起票先は下表)。
+- 単体 `run --fn 0x414ad0 --pattern q0`: callee 0x414850 の arg0 が native=0x22479388 / wasm=0x5 (※ 本 run では再実行していない)。
+- 4 箇所に `load` を足した IR (`work/ld7/`) で再ビルドした単体実行: callee_divergence タグが消え memory_semantics になり、
+  z / s / p0 は wasm=trap/ok → wasm=ok (native_fault) になった。p1 / p01 / pall / pall2 / qall は native・wasm とも fault のまま。
+
+### 検証範囲 / 範囲外
+- 範囲内: 2 スクリプトの出力 (`results/*.md`) の再計算、ネガティブコントロール (`m11_unreachable_diverge.md` §4: 候補 4 関数の IR に call を足すと全て非候補に変わる)。
+- 範囲外: 上記 手動実測、`liftdiff_e2e.sh`・batch 再走、`mach()` の線形走査 (最初の `ret`/`int3` まで) による早期 return 関数の間接 call 数え落とし。
+
+### 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unreachable の 410320 以外 126 件の分岐 | 原因未特定 | #307 に残す + 子 issue 起票を PM に依頼 (PR コメント) |
+| OOB 414ad0 の 41 件以外の 27 件と、414ad0 系でも他パターンで fault が残る件 | 原因未確認 | 同上 |
+| OOB 他 70 種の最上位 frame | 未調査 | 同上 |
+| `load` 追加 IR の再現手段 (patch / 再生成スクリプト) | 手動実測が検証不能 | 同上 |
+| D15 候補の call site 対応づけ (機械語 call ↔ IR block) | 候補止まり | 同上 |
+| `targets/m11.json` の `pe` が環境固有の絶対パス固定 (`[WIN64]` 相当) | `--pe` / `LD_M11_PE` が必須 | #294 |
+
+### 再現手順
+素材は `work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)・`fl-win64` (`[WIN64]`、`docs/WORKFLOW.md` §11 の展開手順)。
+```
+mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
+export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"
+export LD_M11_PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
+pip install numpy capstone pefile
+python3 tools/liftdiff/tests/trace_diverge_unreachable.py > tools/liftdiff/results/m11_unreachable_diverge.md
+python3 tools/liftdiff/tests/oob_414ad0.py > tools/liftdiff/results/m11_oob_414ad0.md
+```
+単体実行 (手動実測) は `[WIN64]` の PE を指す `pe` に書き換えた `targets/m11.json` の複製で `python3 liftdiff.py run <target.json> --fn 0x414ad0 --state auto --nobuild -v` (`targets/m11.json` 自体の固定パスは #294)。
+
+## 10. OTT 旧 chain (D1〜D6) の Actions 再現 (LD-8 / #406)
+
+既知類型との関係 (DEFECTS.md): 新規類型なし (D1〜D6 は OTT 旧 chain の既存分類 = `check_ott.py`)。検証起点 commit: `59eea5c` (main `bb76f7c` 上)。
+素材: `plugins-ott analysis-ott-binaries toolchain-retdec toolchain-emsdk work-liftdiff work-m6-ott` (`fl-win64`・`work-m11` は**未取得**)。
+
+- **PE パス解決**: `targets/ott_old.json` の `pe` = `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll`。`PLUGINS_DIR` 未設定・`ANALYSIS_DIR=/home/runner/analysis` で
+  `ldlib/build_wasm.py` と同じ展開式 (`tools/shared/paths.py` 既定 `$ANALYSIS_DIR/plugins`) が `/home/runner/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (3,146,752 B, 実在) に解決。
+- **D1〜D6 検出** (`ld_native` + `build ott_old` + `batch --set closure --shards 4` + `tests/check_ott.py`、クリーン worktree で 3 回): 3 回とも exit 0・出力同一。
+  212 関数 = 一致 38 / 不一致 108 / 実行不能 66。D1 icall_drop 4 / D2 short_global 6 / D3 callsite_arg_drop+arg_drop 14 / D4_D5 C 定義 port 18 / D6 body 層 26 (分母 = 212 関数、タグは複数重複あり)。
+  ctor `18011d400` = mismatch (icall_drop, callsite_arg_drop, callee_divergence, import_call_seq, zero_init_drop, fp_flag_unreflected)。
+  §5 の旧実測 (38/108/66) と完全一致。ott_old build は wasm 931,471 B (sig_mismatch 0, undefined 0)。
+- **所要 (実測、4 vCPU runner)**: build+batch+check 20.2 / 22.7 / 21.8 s (load 0.67 / 1.16 / 1.24)。単独 build 6.4 s・batch 15.0 s・nc 0.37 s。
+- **ネガコン** (`tests/nc_check_ott.sh`、新規・`liftdiff_e2e.sh` [2/4] から呼ぶ): batch 複製から D1 / D2 / D3 / D6 のタグを 1 系統ずつ除去 → `check_ott.py` は 4/4 とも exit 1、無加工は exit 0 (計 5/5 PASS)。
+  1 つでも期待外なら nc は exit 1 で e2e が落ちる。
+- **検証範囲**: [2/4] OTT 旧 chain のみ。範囲外: [3/4] unit#18・[4/4] m11 closure と `liftdiff_e2e.sh` の全体 exit 0 は
+  `fl-win64`・`work-m11` 未取得のため未実施 (`tools/m11/work/` 無し → 設計どおり exit 2)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `liftdiff_e2e.sh` (--m11-only なし) 全体 exit 0 未確認 | Issue #406 受入条件 1 が未達 | #406 に残す。`oc_artifacts: fl-win64 toolchain-emsdk work-m11 work-liftdiff work-m6-ott analysis-ott-binaries` で再起動 |
+| runner に numpy/capstone/pefile が無く e2e 前に `python3 -m pip install` が必要 | 素の Actions で e2e が exit 2 | 別 issue 化を PM に提案 (agent-setup への追加) |

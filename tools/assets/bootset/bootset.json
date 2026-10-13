@@ -1,20 +1,20 @@
 {
  "tiers": {
   "T0": {
-   "files": 142,
-   "bytes": 2212908
+   "files": 137,
+   "bytes": 1869977
   },
   "T0p": {
-   "files": 258,
-   "bytes": 5595646
+   "files": 253,
+   "bytes": 5676790
   },
   "T1": {
-   "files": 1700,
-   "bytes": 76414481
+   "files": 1704,
+   "bytes": 70394241
   },
   "T2": {
-   "files": 24990,
-   "bytes": 1001026635
+   "files": 24996,
+   "bytes": 1007308662
   },
   "X-lift": {
    "files": 196,
@@ -31,22 +31,102 @@
  },
  "rules": [
   {
-   "tier": "T0",
-   "glob": "Artwork/Skins/Default/*",
-   "why": "既定スキン (起動画面/UI 素材, 起動音)",
-   "files": 7,
-   "bytes": 518483,
+   "tier": "T0p",
+   "glob": "Artwork/Skins/Default/StartSnd.wv",
+   "why": "起動音 (flags&8 の条件付き; ST-T14 §4 #4)",
+   "files": 1,
+   "bytes": 72076,
    "evidence": {
-    "Artwork\\Skins\\": true,
-    "Title.png": true,
-    "BigFruit.png": true,
-    "ClipHanger.png": true,
-    "PickerChan.png": true,
-    "ScopeGradient.bmp": true,
     "StartSnd.wv": true
    },
-   "evidence_found": 7,
-   "evidence_total": 7
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "Artwork/Skins/Default/BigFruit.png",
+   "why": "操作時のみ (ST-T14 §4 #5)",
+   "files": 1,
+   "bytes": 166508,
+   "evidence": {
+    "BigFruit.png": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "Artwork/Skins/Default/ClipHanger.png",
+   "why": "操作時のみ (ST-T14 §4 #5)",
+   "files": 1,
+   "bytes": 12315,
+   "evidence": {
+    "ClipHanger.png": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "Artwork/Skins/Default/PickerChan.png",
+   "why": "操作時のみ (ST-T14 §4 #5)",
+   "files": 1,
+   "bytes": 23681,
+   "evidence": {
+    "PickerChan.png": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "Artwork/Skins/Default/ScopeGradient.bmp",
+   "why": "操作時のみ (ST-T14 §4 #5)",
+   "files": 1,
+   "bytes": 1592,
+   "evidence": {
+    "ScopeGradient.bmp": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T1",
+   "glob": "Artwork/Skins/Default/RenderSnd.wv",
+   "why": "操作時のみ (ST-T14 §4 #5)",
+   "files": 1,
+   "bytes": 66856,
+   "evidence": {
+    "RenderSnd.wv": true
+   },
+   "evidence_found": 1,
+   "evidence_total": 1
+  },
+  {
+   "tier": "T0",
+   "glob": "Artwork/Skins/Default/*",
+   "why": "既定スキン (起動画面/UI 素材)",
+   "files": 1,
+   "bytes": 175455,
+   "evidence": {
+    "Artwork\\Skins\\": true,
+    "Title.png": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
+   "tier": "T0",
+   "glob": "Artwork/Wallpapers/Default.txt",
+   "why": "起動中のフォーム生成で読む既定壁紙定義 (ST-T14 §4 #2)",
+   "files": 1,
+   "bytes": 97,
+   "evidence": {
+    "Default.txt": true,
+    "Wallpapers": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
   },
   {
    "tier": "T0",
@@ -295,11 +375,11 @@
    "evidence_total": 2
   },
   {
-   "tier": "T0p",
-   "glob": "System/Texts/*.txt",
-   "why": "エディション/案内文",
-   "files": 8,
-   "bytes": 1881,
+   "tier": "T1",
+   "glob": "System/Texts/*",
+   "why": "エディション/案内文・About/ライセンス文 (ダイアログ経路のみ; 直下 .txt は ST-T14 §4 #6 で T0p→T1)",
+   "files": 24,
+   "bytes": 110241,
    "evidence": {
     "System\\Texts\\": true,
     "BoxEdition.txt": true,
@@ -308,18 +388,6 @@
    },
    "evidence_found": 4,
    "evidence_total": 4
-  },
-  {
-   "tier": "T1",
-   "glob": "System/Texts/*",
-   "why": "About/ライセンス文",
-   "files": 16,
-   "bytes": 108360,
-   "evidence": {
-    "System\\Texts\\": true
-   },
-   "evidence_found": 1,
-   "evidence_total": 1
   },
   {
    "tier": "T0p",
@@ -335,11 +403,24 @@
    "evidence_total": 2
   },
   {
+   "tier": "T2",
+   "glob": "System/Languages/*.moe",
+   "why": "言語 .moe (既定 en では開かない; ST-T14 §4 #3)",
+   "files": 7,
+   "bytes": 6282124,
+   "evidence": {
+    "System\\Languages\\": true,
+    ".moe": true
+   },
+   "evidence_found": 2,
+   "evidence_total": 2
+  },
+  {
    "tier": "T1",
    "glob": "System/Languages/*",
-   "why": "言語ファイル (英語は内蔵; 選択言語のみ 1 ファイル)",
-   "files": 15,
-   "bytes": 6286149,
+   "why": "言語補助 (.svg 等)",
+   "files": 8,
+   "bytes": 4025,
    "evidence": {
     "System\\Languages\\": true,
     "Languages\\": true
@@ -551,9 +632,9 @@
    "evidence_total": 1
   },
   {
-   "tier": "T1",
+   "tier": "T0p",
    "glob": "Help/*.scr",
-   "why": "ヘルプ別名表",
+   "why": "ヘルプ別名表 (LoadSettings の Initialize the help file で起動時に読む; ST-T14 §4 #1)",
    "files": 2,
    "bytes": 10949,
    "evidence": {
