@@ -224,3 +224,16 @@ OTT_ULP_TOL=2 bash tools/ott/ott_e2e.sh  # 許容 ulp 指定
 - 生成 C (`--closure 0`) を `cc -c -O1 -I tools/ott/rt ott_lifted.c` → rc=0。`emcc` は runner に無く `emcc -c` は未実行。
 - `--arch x64` + ia32 PE → `fail-fast` (exit 1)。
 - 未解決 (ia32 の関数境界・x87・jump table 実データ) は #1098 / #1099 / #1117。
+
+## 14. #1200 — 画像 base の相対化 (OTT_RELOC=1, 親 #989 / 子 #1201)
+
+- 結論: **既定 base (0x30000000) での同一性のみ確認**。相対化の実証 (別 base・複数インスタンス N=16) は未実施 → #1200 に残す。
+- 実装: `lift/x64c.py` の `OTT_RELOC=1` で画像 VA 定数を `(ott_gbase + RVA)` で出力。`OTT_RELOC=1` と `OTT_VEXCOV=1` は fail-fast (VEXCOV の shifted VA 定数は相対化未対応)。
+  `rt/ott_glue.c` に `ott_gbase` (既定 0x30000000) と `ott_set_gbase`。`crtinit/ott_crt.c` は cookie・api-set 表・encoded slot・`__FlsIndex`・trampoline 番地を RVA + `ott_gbase` で持つ。
+- 既定 lift (`OTT_RELOC` 未設定): 生成 `ott_lifted.c` / `ott_data.c` が main 版と byte 一致 (`cmp`)。
+- 測定 (HEAD 80cd4a2a, 素材 `analysis-ott-binaries` + `toolchain-emsdk`): 既定 lift real 6.8 s、`functions 75, insns 5790, unsup {}`。
+  相対化 lift も `functions 75, insns 5790, unsup {}`、`ott_lifted.c` の `ott_gbase` 参照 776 箇所。
+  署名 (node 22.23.3, SIG_ONLY): 既定 `6b1696f0` / 相対化 `6b1696f0` (N=1, gbase 既定値)。
+- 後続 commit で追加した修正 (指摘対応): VEXCOV+RELOC の fail-fast、`ott_crt.c` の絶対番地を gbase 相対化、`ott_cpu.c` の unlifted 診断を `va - ott_gbase` に変更。
+  これらは本 commit 時点で compile (gcc -c) のみ確認。e2e の再実行は素材未展開のため未実施。
+- 未達: N=16 / 別 base での `ott_set_gbase` 経路 → #1200 に残す。相対化の CPU コスト・SIDE_MODULE PIC 税 → #1201。

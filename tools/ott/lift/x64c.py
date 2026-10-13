@@ -57,6 +57,8 @@ CCMAP = {'e': 'E', 'z': 'E', 'ne': 'NE', 'nz': 'NE', 'b': 'B', 'c': 'B', 'nae': 
 
 
 RELOC = os.environ.get('OTT_RELOC') == '1'   # 相対化モード: 画像 VA 定数を (ott_gbase + RVA) で書く (既定 off = 出力不変)
+if RELOC and VEXCOV:   # OTT_VEXCOV_HIT の引数は既定 base の shifted VA 固定 (相対化未対応)
+    raise SystemExit('[x64c] fail-fast: OTT_RELOC=1 と OTT_VEXCOV=1 は同時に使えない')
 
 
 def sh(c):
