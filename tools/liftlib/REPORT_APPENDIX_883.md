@@ -19,15 +19,18 @@ REPORT_APPENDIX.md が 250 行上限を超えているため、#883 の実測は
 測定値 (F.txt `0x18011e5a0-0x18011e76c`・leafspec の match / mismatch / wasm_trap・gate FAIL) は [`REPORT_APPENDIX.md` §17.9](REPORT_APPENDIX.md) を正本とする。
 本 fix run では素材 `analysis-ott-binaries` が展開されておらず再実測していない (素材の取得は `docs/WORKFLOW.md` §11)。
 
-## 確定事項 (本 PR で新たに確定した差分)
+## 確定事項
 
-§17.9・§17.10 に無い点のみ記す。BLK の算出式・32bit 切り詰め・`ICALL_BLK` 不一致・パイプライン順序は §17.10 を参照。
-出典は前 run の IR 実測 (`tools/liftlib/work/ott_getparam/ott_getparam_fixed.ll`・gitignore・本 run では不在)。
-
-1. entry 先頭で BLK+0x10 (`idx`/rdx 相当) も直接 load する (§17.10 では未確認)。`%arg1` (this) と `%arg2` (idx) は本体で読まれない。
-2. 戻り値の store 先も BLK 絶対アドレス: BLK+0x80 (rax)・BLK+0x88 (xmm0)。
+BLK の算出式・32bit 切り詰め・`ICALL_BLK` 不一致・パイプライン順序は §17.10 を参照 (本ファイルでは再掲しない)。
+本 PR で新たに確定できた差分はない。
 
 ## 未確定 (次の作業)
+
+前 run の IR 観測 (`tools/liftlib/work/ott_getparam/ott_getparam_fixed.ll`・gitignore・本 run では不在) に基づく以下は、再検証できていないため未確認扱いとする (§17.10 と同じ扱い)。
+
+- entry 先頭で BLK+0x10 (`idx`/rdx 相当) も直接 load するか。`%arg1` (this) と `%arg2` (idx) が本体で読まれないか。(§17.10 で未確認)
+- 戻り値の store 先が BLK 絶対アドレス (BLK+0x80 = rax・BLK+0x88 = xmm0) か。
+- 次 run で IR を再生成して上記を確認する (`gen_ott_getparam_F.sh` の出力を残す)。
 
 - **修正方式の選択**: (a) entry の BLK 読みを `%arg` 読みに差し替える (`this`/`idx` を仮引数から取る)、(b) harness が BLK へ this/idx を書いてから呼ぶ、(c) BLK の配置自体を wasm 内の範囲に収める (`blk_va` 指定は rewriter の RIP 相対 int32 制約で不可 = §17.10 の試行)。
 - (a) と (b) のどちらが正しいかは、呼出し規約の正本 (`spec.py` / `native_runner.c` の引数 slot) と BLK の書込み主体を突合して決める。今回はその突合まで到達していない。
