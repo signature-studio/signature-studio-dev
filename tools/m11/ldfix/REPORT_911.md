@@ -32,7 +32,7 @@
 
 仮説 (未検証): RetDec の lift で、同一ベースレジスタ (`arg1`) からの load を値番号付けする際に **displacement を鍵から落としている** (base だけで同一視)。REPORT_735 §1.1 の「offset が +8 にずれる」はこの見え方である。RetDec ソースでの該当箇所 (load forwarding / 値番号付け) は未調査。
 
-既知類型との関係: D4 (deref 脱落) とは別 (load は残り offset が違う)。D17 (幅縮小) とも別。新類型候補だが、機構確定まで DEFECTS.md には入れない。
+既知類型との関係: D20 (既登録・機構未確定) と同型。D4 (deref 脱落) とは別 (load は残り offset が違う)。D17 (幅縮小) とも別。DEFECTS.md 側の追記は #1091 (受入 5) に残す。
 
 ## 2. 受入条件 2: 666a60 のループ内 store の機械語突合
 
