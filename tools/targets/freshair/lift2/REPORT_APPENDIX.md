@@ -118,3 +118,13 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 | CI の素材配線: plugins-freshair の Win zip → `work/win` の epf 展開が無い (fetch.sh は既存ディレクトリでスキップ) | ctrl 工程は epf 欠落で exit 2 (手動展開が必要) | #693 (FA-12) |
 | 2/5 回帰セットが epf 有無で乱数列が変わる seed 依存 | 別 seed では native OOB の可能性 (既知限界の再発) | #692 に併記 |
 | capstone 4 系の版差 (FA-2c 当時の capstone 版は不明) | 73 s 当時との差の原因は未切り分け | 本 Issue #666 に留保 |
+
+## 6. FA-11 (#692) 途中経過: SSE 整数 pcmpeqw / pshuflw の lowering (部分達成)
+
+- 検証起点: HEAD `c8ce2a4d` で `lift2_e2e.sh` → `RESULT: lift2_e2e ALL PASS` (exit 0, real 78 s, load 0.11→0.77, nproc 4)。
+- 追加: `mlift/mlift_ops.py` に `pshuflw` と `pcmpeq{b,w,d}` (legacy 2 オペランド) の lowering を追加。
+- ctrl build (`build_ctrl.sh`): `failed(funcs with unsupported)` は 2 → 2 (変化なし)。ただし失敗の内訳は
+  `pcmpeqw` 行が消え、残りは `f_18107d41c: pmovmskb eax, xmm1` と `f_1810577ac: vpcmpeqw ymm1,ymm1,[r9]` (ymm 非対応) と `pmovmskb eax, xmm0` の 3 件。
+- 同 HEAD (変更後) の `lift2_e2e.sh`: `RESULT: lift2_e2e ALL PASS` (exit 0, real 78 s, load 0.11→1.33)。内訳は comp 400/400・filter 400/400・ctrl 15/15・ablation 5 種すべて検出 (変更前と同値)。
+- 未了 (#692 に残す): `pmovmskb` と ymm 形式の `vpcmpeqw` (関数 `f_1810577ac` / `f_18107d41c`)、rep 経路の e2e 到達 (受入条件 1・ネガコン)、回帰セットの seed 非依存化 (受入条件 3)。
+  ctrl closure には `rep stosb` 84・`rep movsb` 39・`rep stosw` 6・`rep stosq` 1 が lift 済みで存在する (`work/ctrl/ctrl_rep.json` の mnemonics 実測)。

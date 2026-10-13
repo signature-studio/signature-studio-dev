@@ -711,6 +711,19 @@ def emit_sse(fl, i, m, O):
         idx = ', '.join('i32 %d' % ((imm >> (2 * k)) & 3) for k in range(4))
         r = fl.t(); fl.e('%s = shufflevector <4 x i32> %s, <4 x i32> undef, <4 x i32> <%s>' % (r, src, idx))
         fl.x_set(d, r); return False
+    if b == 'pshuflw':
+        d = xidx(fl, O[0]); src = fl.v_to(vec_src(fl, O[1]), '<8 x i16>'); imm = O[2].imm & 0xff
+        idx = ', '.join('i32 %d' % (((imm >> (2 * k)) & 3) if k < 4 else k) for k in range(8))
+        r = fl.t(); fl.e('%s = shufflevector <8 x i16> %s, <8 x i16> undef, <8 x i32> <%s>' % (r, src, idx))
+        fl.x_set(d, fl.v_from(r, '<8 x i16>')); return False
+    mc = re.match(r'pcmpeq([bwd])$', b)
+    if mc:
+        w = mc.group(1); ty, n = {'b': ('<16 x i8>', 16), 'w': ('<8 x i16>', 8), 'd': ('<4 x i32>', 4)}[w]
+        d, s1, s2 = x3(fl, i)
+        A = fl.v_to(s1, ty); B = fl.v_to(vec_src(fl, s2), ty)
+        c = fl.t(); fl.e('%s = icmp eq %s %s, %s' % (c, ty, A, B))
+        s = fl.t(); fl.e('%s = sext <%d x i1> %s to %s' % (s, n, c, ty))
+        fl.x_set(d, fl.v_from(s, ty)); return False
     if b in ('punpckldq', 'unpcklps'):
         d, s1, s2 = x3(fl, i)
         r = fl.t(); fl.e('%s = shufflevector <4 x i32> %s, <4 x i32> %s, <4 x i32> <i32 0, i32 4, i32 1, i32 5>' % (r, s1, vec_src(fl, s2)))
