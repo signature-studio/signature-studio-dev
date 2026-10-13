@@ -5,7 +5,9 @@
   1. 初期集合 before = roots (<ns>::*Dsp / *MasterDsp / *DspModel の vtable slot) からの直接 call/jmp 閉包。
   2. 集合内の各関数を逆アセンブルし間接 call を分類する:
        vtable : call [reg+disp] / call [reg] → 候補 = 同 ns の全 class の vtable の slot (disp/8 番目)
-       その他 : call reg / call [rip+..] (IAT 以外) / call [idx*s+..] 等 → 解決せず未解決として計上
+       iat    : call [rip+..] で参照先が import address table (IAT) の slot → 外部 DLL 関数、解決不要 (別計上)
+       rip_data: call [rip+..] で参照先が IAT 以外 (関数ポインタ変数等) → 解決せず未解決として計上
+       その他 : call reg / call [idx*s+..] 等 → 解決せず未解決として計上
   3. 候補を閉包に加え、増分が無くなるまで繰り返す。after = 不動点。
   ※ 候補は同 ns の vtable に限る (他 ns・boost/Skia の仮想関数は対象外 = 過小評価の余地あり、REPORT に明記)。
 usage: vtable_closure.py <HeartCore.core_64> <work/callgraph.pkl> <work/rtti_vtables.json> <ns> <all|nogui> <out.json>
@@ -44,13 +46,36 @@ def vtable_slots(vt, ns, mode):
     return slots
 
 
-def classify_call(ops):
+RIP_REF = re.compile(r'\[rip ([+-]) (0x[0-9a-f]+|[0-9]+)\]')
+
+
+def iat_slots(pe, base):
+    """import address table の各 slot の VA (IMAGE_IMPORT_DESCRIPTOR.FirstThunk から import 数ぶん)。"""
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_ENTRY_IMPORT']])
+    slots = set()
+    for entry in getattr(pe, 'DIRECTORY_ENTRY_IMPORT', []):
+        first = base + entry.struct.FirstThunk
+        for k in range(len(entry.imports)):
+            slots.add(first + 8 * k)
+    return slots
+
+
+def rip_target(insn):
+    m = RIP_REF.search(insn.op_str)
+    if not m:
+        return None
+    d = int(m.group(2), 16) if m.group(2).startswith('0x') else int(m.group(2))
+    return insn.address + insn.size + (-d if m.group(1) == '-' else d)
+
+
+def classify_call(insn, iat):
+    ops = insn.op_str
     if ops.startswith('0x'):
         return ('direct', None)
     if re.fullmatch(r'r[a-z0-9]+', ops):
         return ('reg', None)
     if 'rip' in ops:
-        return ('rip_data', None)
+        return ('iat', None) if rip_target(insn) in iat else ('rip_data', None)
     m = re.fullmatch(r'qword ptr \[(r[a-z0-9]+)(?: \+ (0x[0-9a-f]+|[0-9]+))?\]', ops)
     if m:
         d = m.group(2)
@@ -68,6 +93,7 @@ def main(corep, cgp, vtp, ns, mode, outp):
     res = pickle.load(open(cgp, 'rb'))['res']
     vt = json.load(open(vtp))
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    iat = iat_slots(pe, base)
 
     roots = set()
     for cls, lst in vt.items():
@@ -97,7 +123,7 @@ def main(corep, cgp, vtp, ns, mode, outp):
         if f not in sites:
             size = res[f]['size']
             off = f - t.VirtualAddress
-            sites[f] = [classify_call(i.op_str) for i in md.disasm(data[off:off + size], base + f) if i.mnemonic == 'call']
+            sites[f] = [classify_call(i, iat) for i in md.disasm(data[off:off + size], base + f) if i.mnemonic == 'call']
         return sites[f]
 
     before = direct_closure(roots)
@@ -120,10 +146,13 @@ def main(corep, cgp, vtp, ns, mode, outp):
 
     unresolved = collections.Counter()
     vt_sites = 0
+    iat_sites = 0
     for f in cur:
         for kind, _ in sites_of(f):
             if kind == 'vtable':
                 vt_sites += 1
+            elif kind == 'iat':
+                iat_sites += 1
             elif kind != 'direct':
                 unresolved[kind] += 1
 
@@ -134,7 +163,7 @@ def main(corep, cgp, vtp, ns, mode, outp):
         ns=ns, mode=mode, roots=len(roots), candidate_slots=sum(len(v) for v in slots.values()),
         before_funcs=len(before), before_bytes=bytes_of(before),
         after_funcs=len(cur), after_bytes=bytes_of(cur),
-        vtable_sites=vt_sites, unresolved=dict(unresolved),
+        vtable_sites=vt_sites, iat_sites=iat_sites, unresolved=dict(unresolved),
     )
     json.dump(result, open(outp, 'w'), indent=1)
     print(json.dumps(result))
