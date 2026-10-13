@@ -15,7 +15,9 @@ import json, sys
 T, W = sys.argv[1:3]
 m = json.load(open(T + '/ott/work/lift/lift_meta.json'))
 r = open(T + '/m6/work/ott_ranges.txt').read().strip()
-open(W + '/roots.txt', 'w').write(r + ',' + ','.join('0x' + f for f in m['functions']))
+import os
+extra = [x for x in os.environ.get('ICALL_EXTRA_ROOTS', '1801c8cb8').split(',') if x]   # 実行されないが override 対象の CRT 関数 (_handle_errorf)
+open(W + '/roots.txt', 'w').write(r + ',' + ','.join('0x' + f for f in m['functions'] + extra))
 PY
 python3 "$HERE/closure.py" --pe "$OTT_DLL" --roots "$W/roots.txt" --out "$W/F.txt"
 # 2. PE 書換え (間接 call/jmp → memory-ABI + stub, [reg] deref 補償, closure 内 ABI 仮想化)
@@ -32,13 +34,16 @@ PY
 python3 "$HERE/ir_icall_restore.py" --ir "$W/oi.drc.ll" --map "$W/map.json" --out "$W/oi.restored0.ll" --report "$W/restore.json"
 if [ "${ICALL_FIX_MASK:-1}" = "1" ]; then python3 "$HERE/ir_fix_mask.py" "$W/oi.restored0.ll" "$W/oi.restored.ll" | tee "$W/fix_mask.json"
 else cp "$W/oi.restored0.ll" "$W/oi.restored.ll"; echo '{"hi32_mask_fixed": "skipped (negative control)"}' | tee "$W/fix_mask.json"; fi
+# RetDec が xmm→stack の vmovapd store を void helper に落とした箇所を store に戻す (N3, ICALL_FIX_VSTORE=0 でネガコン)
+if [ "${ICALL_FIX_VSTORE:-1}" = "1" ]; then python3 "$HERE/ir_fix_vstore.py" "$W/oi.restored.ll" "$W/oi.restored1.ll" | tee "$W/fix_vstore.json"; mv "$W/oi.restored1.ll" "$W/oi.restored.ll"
+else echo '{"vstore_fixed": "skipped (negative control)"}' | tee "$W/fix_vstore.json"; fi
 # 5. 既存 pass (normalize / ir5_patch) → flatten (global→絶対 addr + shift + dispatch 表)
 python3 "$T/m2/ir_normalize.py" "$W/oi.restored.ll" "$W/oi.norm0.ll" >/dev/null
 python3 "$T/m5/ir5_patch.py" "$W/oi.norm0.ll" "$W/oi.lift.ll" --report "$W/ir5.json" >/dev/null 2>&1
 cp "$W/oi.lift.ll" "$W/oi.p1.ll"   # comis は icall_rewrite の stub+sahf 経路で処理 (m6 ir6_pass P1 不要)
 python3 "$HERE/ir_flatten.py" "$W/oi.p1.ll" "$W/oi.flat0.ll" --table "$W/oi.table.c" --cfg "$(python3 -c "import json;print(','.join('%x' % v for v in json.load(open('$W/map.json'))['cfg_thunks']))")"
 # CRT エラー報告経路 3 関数を C override (rt/icall_ovr.c) に置換 (R の ott_ovr.c 移植)
-python3 "$HERE/ir_override.py" "$W/oi.flat0.ll" "$W/oi.flat.ll" "${ICALL_OVR:-1801c8c00,1801a9a6c,1801a9b38}" | tee "$W/override.json"
+python3 "$HERE/ir_override.py" "$W/oi.flat0.ll" "$W/oi.flat.ll" "${ICALL_OVR:-1801c8c00,1801c8cb8,1801a9a6c,1801a9b38}" | tee "$W/override.json"
 python3 "$T/m11/m11_simd2.py" "$W/oi.flat.ll" 2> "$W/simd.log" | sed 's#"../msimd11_core.h"#"'"$T"'/m11/msimd11_core.h"#' > "$W/oi.simd0.c"
 # 補完 helper: SSE2 5 種 (固定 C) + AVX/FMA3 VEX.128 (vex_gen.py が IR の署名から生成)。残る未実装 stub は silent (0 を返す) でなく fail-fast にする
 python3 "$HERE/vex_gen.py" "$W/oi.flat.ll" "$W/oi.vex.c" | tee "$W/vex_gen.json"

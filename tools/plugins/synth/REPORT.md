@@ -17,7 +17,7 @@
    known.json 付きの通常実行は exit 0。 baseline にない不合格が出るか、baseline にある不合格が解消すると exit 1 (§6 の NC)。
 3. **手順 1 (固有閉包の lift) は shell 12 本すべてで通った。** RetDec+pass 鎖が完走 (lift_rc 0)、`emcc -c` 通過、`x86_fp80` 関数 0、`.pdata` 範囲の define 欠落 0。
    合計 **1,200 関数 / 729,929 B**。 ただし**厳格基準 (未実装 helper 0 かつ i256 trap 0) を満たすのは 9 本**。 Harmless (helper 5 + i256 trap 6)・Kepler Exo (helper 1)・
-   Wave Traveller (helper 1) は未実装 helper を宣言する (§2、#535)。 #207 本文の Harmless の記載 (5 件・i256 trap 6 箇所) を再現した。
+   Wave Traveller (helper 1) は未実装 helper を宣言した (#207 本文の Harmless の記載 5 件・i256 trap 6 箇所を再現)。 **#535 (§10) で 3 本とも 0 にした: 厳格基準を満たすのは shell 12 本全部**。
    PLUGIN_MATRIX.json の記録とは 91/91 項目一致 (shell 11 本の閉包 6 項目 + batch 4 項目 ×4 本、C++ DLL 9 本の `.pdata` 関数数)。 BooBass の殻は PLUGIN_MATRIX に lift 欄が無く今回初測定。
 4. **C++ x64 DLL 9 本は RetDec まで通るが 9 本とも `emcc -c` は未通過** (§5、#534)。 全 `.pdata` 関数を lift すると define 欠落が 1〜211、未実装 helper が 18〜144 (うち VEX が 10〜94)。
    Morphine は RetDec の C 生成 (HLL) 段が終わらず、IR 出力から後段を再開した (§5)。 T2/T3 の見積にはこの未知工数が残る。
@@ -49,21 +49,21 @@
 | Autogun | 21151 | T1 | 186 / 87,806 | 163 / 23,993 | 170 | 105 | 3 | 190 | 0 | 0 | 0 | 0 | 14 |
 | BooBass | 21204 | T2 | 15 / 4,863 | 41 / 7,372 | 23 | 2 | 0 | 15 | 0 | 0 | 0 | 0 | 2 |
 | FL Slayer | 22433 | T1 | 21 / 4,812 | 28 / 3,193 | 33 | 2 | 0 | 21 | 0 | 0 | 0 | 0 | 3 |
-| Harmless | 23738 | T1 | 141 / 99,087 | 148 / 29,266 | 121 | 147 | 10 | 141 | **5** | **6** | 0 | 0 | 20 |
+| Harmless | 23738 | T1 | 141 / 99,087 | 148 / 29,266 | 121 | 147 | 10 | 141 | 0 | 0 | 0 | 0 | 34 |
 | Kepler | 23913 | T3 | 34 / 17,897 | 64 / 11,342 | 37 | 1 | 0 | 34 | 0 | 0 | 0 | 0 | 3 |
-| Kepler Exo | 23915 | T3 | 81 / 61,178 | 114 / 23,274 | 84 | 4 | 0 | 81 | **1** | 0 | 0 | 0 | 9 |
+| Kepler Exo | 23915 | T3 | 81 / 61,178 | 114 / 23,274 | 84 | 4 | 0 | 81 | 0 | 0 | 0 | 0 | 18 |
 | Ogun | 24146 | T1 | 200 / 104,955 | 199 / 36,548 | 181 | 113 | 3 | 202 | 0 | 0 | 0 | 0 | 17 |
 | PoiZone | 24158 | T2 | 37 / 43,590 | 69 / 22,022 | 51 | 2 | 0 | 37 | 0 | 0 | 0 | 0 | 25 |
 | Sakura | 24162 | T2 | 25 / 57,607 | 68 / 18,185 | 139 | 2 | 0 | 25 | 0 | 0 | 0 | 0 | 20 |
 | Sawer | 24165 | T2 | 32 / 55,355 | 76 / 18,972 | 93 | 2 | 0 | 32 | 0 | 0 | 0 | 0 | 12 |
 | Transistor Bass | 24297 | T3 | 34 / 34,004 | 102 / 23,054 | 50 | 5 | 0 | 34 | 0 | 0 | 0 | 0 | 5 |
-| Wave Traveller | 24315 | T2 | 394 / 158,775 | 129 / 15,299 | 199 | 139 | 3 | 396 | **1** | 0 | 0 | 0 | 19 |
-| 計 | | | **1,200 / 729,929** | | | | | 1,208 | 7 | 6 | 0 | 0 | 149 |
+| Wave Traveller | 24315 | T2 | 394 / 158,775 | 129 / 15,299 | 199 | 139 | 3 | 396 | 0 | 0 | 0 | 0 | 41 |
+| 計 | | | **1,200 / 729,929** | | | | | 1,208 | 0 | 0 | 0 | 0 | 93 |
 
 - 最右から 2 列目は `emcc -c -O0 -msimd128` の終了コード (0 = 通過)。 **通過 ≠ 正しさ**: 正しさは差分試験でしか示せない (batch_plan §4)。
 - define が閉包関数数より多いのは Autogun (+4)・Ogun (+2)・Wave Traveller (+2) で、RetDec が range 内部に別 define を切り出したため。 閉包の開始 VA に対応する define が無い range は 12 本とも 0 (`missing_define`)。
 - 未実装 helper の中身 (`work/synth/unimpl_names.txt`): Harmless = `prefetcht0` / `vaddps` (AVX) / `vmovaps` (AVX) / `cmpnltps` / `movmskps`、Kepler Exo = `rep_movsd_memcpy`、Wave Traveller = `rep_stosb_memset`。
-  Harmless の i256 trap 6 箇所は CPUID 分岐で SSE 路に固定する必要がある (#207 本文の記載。固定の可否は未検証)。 いずれも #535。
+  Harmless の i256 trap 6 箇所は #207 本文では「CPUID 分岐で SSE 路に固定」と想定されていたが、機械語を見ると分岐で守られていない (§10)。 表の 3 行は #535 後の値 (旧値は §10 の表)。
 - 直接 Win32 API (`PLUGIN_MATRIX.json` の `win_direct_api`) はプラグイン単位の集計で、殻と engine の内訳が無いため本書では扱わない。
 - FL Slayer の殻は 21 関数 / 4,812 B と最小。 engine (x86) 側にある DSP は本書で未追跡 (#536)。
 
@@ -178,7 +178,7 @@ Morphine は後段のみの秒 (下記)。
 | 差分試験 bit-exact (出口条件 3)。 Gen_Render 単位の native / wasm harness が無く、P0a/P0b/P0c 未完 | #207 を閉じられない | #533 (新規)。 前提 #195 / #196 / #197 |
 | Render test .flp の E2E (出口条件 4)。 対象 RT 列 Y は Autogun / BooBass / Harmless / Ogun / PoiZone / Sakura / Sawer / Wave Traveller | 同上 | FLEngine 統合待ち。 親 #14 / #207 |
 | C++ DLL 9 本の `emcc -c` 未通過 (E1〜E4、VEX helper、define 欠落、UI/GL を含む engine) | T2/T3 の 7 本 + Morphine / Toxic | #534 (新規) |
-| 未実装 helper 7 件と Harmless の i256 trap 6 箇所 | shell 3 本 | #535 (新規) |
+| (解消) 未実装 helper 7 件と Harmless の i256 trap 6 箇所 | shell 3 本 | #535 で解消 (§10)。 C++ DLL 9 本の helper は #534 |
 | FL Slayer の x86 engine | FL Slayer の DSP | #536 (新規) |
 | Morphine を通常経路 (HLL 段まで) で最後まで回した実測が無い | Morphine の lift 秒 | #534 |
 | host slot (0x28 / 0x30 / 0x128 / 0xf8 ほか) と動的 ID 2 site の意味 | Autogun / Harmless / Ogun / Wave Traveller | #196 作業 5 |
@@ -204,6 +204,46 @@ Morphine は後段のみの秒 (下記)。
 | `synth_e2e.sh` | 対象導出 → shell 12 閉包 batch_lift → C++ DLL 9 本 cpp_lift → `mk_status.py` → `closure_facts.py` → `matrix_check.py` / `ids_crosscheck.py` / `judge.py`。 `--skip-lift` / `--judge-only <csv>` |
 | `judge.py` `known.json` | 判定 (PASS / KNOWN / NEW-FAIL / FIXED / MISSING)。 不合格で exit 1。 `known.json` = 既知不合格の baseline (起票先 `ref` 必須) |
 | `synth_nega.sh` `nega_judge.py` | ネガティブコントロール (emcc / ranges / define 監査 / judge 16 ケース / matrix_check / ids_crosscheck) |
+| `helper_diff/` (`helper_diff.sh` `helper_diff.c` `synth.ll`) | #535: helper の native 差分試験 + ネガコン 8 件 (§10)。 `bash tools/plugins/synth/helper_diff/helper_diff.sh` |
 | `targets.py` `mk_status.py` `cpp_lift.sh` `simd_stats.py` `f80_count.py` | 対象導出 / 判定用 CSV 統合 / C++ DLL の lift / 補助 |
 | `closure_facts.py` `matrix_check.py` `ids_crosscheck.py` | 閉包・host ID・kernel・外形 → `work/synth/facts.json` / PLUGIN_MATRIX 突合 / Dispatcher ID の別算法検算 |
 | `engine_ranges.py` `engine_defs.py` `engine_fixcmp.py` `mk_blockmap.py` `env.sh` | #506 から複製した補助 (`engine_defs.py` は引数を一般化) |
+
+## 10. #535: 未実装 helper 7 件と i256 trap の解消
+
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (silent miscompile ではなく、helper 未実装を loud に宣言していた欠落の補完。 差分試験で命令単位の bit 一致を確認した)。 検証起点 commit: aef6120 (下表の `--skip-lift` / `synth_nega.sh` / `helper_diff.sh` は aef6120 で再実行して同じ結果。 f251ca6 以降の変更は helper_diff の 128bit vaddps 検査の追加のみ)。
+
+| 旧 (§2 の記録) | 原因 | 対処 |
+|---|---|---|
+| Harmless `prefetcht0` / `cmpnltps` / `movmskps` | `m11_simd2.py` に実装が無い | `m11_simd2.py` に実装: `prefetcht*` (no-op) / `cmp{eq,lt,le,unord,neq,nlt,nle,ord}{ps,pd}` / `movmsk{ps,pd}` |
+| Harmless `vaddps__8` / `vmovaps__9` (128bit VEX) と ymm の i256 trap 6 箇所 (`vmovaps` / `vsubps` / `vmulps` / `vaddps` / `vextractf128` / `vmovaps__10`) | `function_745c00` (VA 0x745c00) が **ymm を無条件に使う** AVX 関数。 呼出元は 0x7467f8 の 1 箇所で、`[rip+..]` の機能 bit 0x40000 が立っている時だけ到達する。 この bit は 0x5a39a4 で CPUID (`ecx & 0x18000000`) と `xgetbv` (0x5a37b3、`eax & 6`) の両方を通った時に立つ | **CPUID 固定ではなく IR へ lower** (新 pass `lift/passes/fix_avx256.py`、`lift_ranges.sh` の `m11_passes` 直後): ymm の `v{add,sub,mul,div,min,max}ps`・`vmov*`・`vextractf128`・VEX store 形を `<8 x float>` 演算 / `store` へ。 C の i256 ABI (wasm の sret / 引数分割) に依存しない。 128bit の VEX `v{add,..}ps` / `vmov*` は `m11_simd2.py` の SSE 実装に合流 |
+| Kepler Exo `rep_movsd_memcpy` | 実装無し | `m11_simd2.py`: dst が src の直後で重なる場合も前方コピー意味を保持 |
+| Wave Traveller `rep_stosb_memset` | 実装無し | `m11_simd2.py` の `memset(a, b & 0xff, c)` (al のみ有効)。 これは本 PR と並行して #538 (main) が同内容で実装済みで、マージ (146f168) で 1 箇所になった。 本 PR の `helper_diff` はこれも native `rep stosb` と比較する |
+
+- #207 本文は「CPUID 分岐で SSE 路に固定」を想定していたが、0x745c00 自体は分岐を持たない (呼出元の機能 bit が分岐)。 CPUID 側の返値表 (`m11_simd2.py` の `CPUID_BODY` は SSE2 まで、`xgetbv` は 0) は維持したので、wasm では通常 0x745c00 に到達しない。 lower 済みなので到達しても trap しない。
+- `synth/cpp_lift.sh` は `PLUG_AVX256=0` (既定) で C++ DLL 9 本の結果列を #535 の pass で変えない (#534 の領分)。 実測: 9 本は KNOWN のまま (judge: NEW-FAIL 0 / FIXED 0)。
+
+実測 (4 core / 15 GiB の Actions runner):
+
+| 項目 | 実測 |
+|---|---|
+| `[simd2]` 行 (Harmless / Kepler Exo / Wave Traveller) | declares 62 / 36 / 44: implemented 62 / 36 / 44、**unimplemented 0 / 0 / 0、i256 trap 0 / 0 / 0**。 `fix_avx256` (Harmless): ymm 演算 lower 32 件 / VEX store 復元 8 件 / 不要 declare 除去 7 件。 3 本とも `emcc -c` rc 0 |
+| `bash synth/helper_diff/helper_diff.sh` (native 実命令との差分。 `-mavx2`、N=200000、HEAD aef6120) | **checks=12,040,001 mismatches=0**、exit 0、7 秒。 検査: cmpnltps / movmskps (NaN・±0・inf 混在) / prefetcht0 / rep movsd (重なり・長さ 0 含む) / rep stosb (al の上位ビットを無視) / ymm の 6 演算 / 128bit `vaddps__8` / vmovaps / vextractf128 0,1 / VEX store (256・128bit) |
+| 差分試験のネガティブコントロール (実装を 1 箇所壊す) | **8/8 が rc 1 で mismatch > 0**: cmpnltps (`!(x<y)` → `x>=y`) 308,280 / movmskps (sign bit の位置) 395,374 / stosb (長さ −1) 19,822 / movsd (重なりでも memmove) 11,059 / 128bit vaddps (`x+y` → `x-y`) 306,390 / min (`olt` → `ogt`) 1,019,814 / vextractf128 1 (上位 → 下位) 199,997 / VEX 128bit store (`store i256 0`) 200,000。 sed が当たらなかった変異は FAIL にする |
+| `synth_e2e.sh` 全工程 (`JOBS=4`、スクリプト a824a1d) | exit 1、958 秒。 judge: PASS 12 / KNOWN 9 / NEW-FAIL 0。 strict: PASS 12 / NEW-FAIL 9。 **`matrix_check` が 90/91 で rc 1**: PLUGIN_MATRIX の Harmless `batch.unimpl_helpers` 5 と実測 0 の食い違い。 → `PLUGIN_MATRIX.json` を 5 → 0 に更新 (f251ca6)。 gate は意図通り不一致で落ちた |
+| **コミット済み HEAD aef6120 の `synth_e2e.sh --skip-lift`** | **exit 0、194 秒** (開始時 load average 0.57、終了時 0.99、並列 1)。 matrix_check 91/91、ids_crosscheck 12/12、judge: PASS 12 / KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0。 `[synth_e2e] OK` |
+| HEAD aef6120 の `synth_nega.sh` | exit 0、11 秒。 NC1〜NC5 すべて期待通り (§6) |
+| main (#538 ほか) をマージした 146f168 + helper_diff の stosb 変異を #538 の実装に合わせた 4f9fb12 | `synth_e2e.sh --skip-lift` exit 0 / 191 秒 (開始時 load average 0.43、終了時 1.00)、judge PASS 12 / KNOWN 9 / NEW-FAIL 0、matrix_check 91/91。 `synth_nega.sh` exit 0。 `helper_diff.sh` exit 0 (12,040,001 checks / 0 mismatch、NC 8/8)。 マージ直後は stosb の変異が当たらず helper_diff が FAIL した (「変異が当たらなければ FAIL」の設計どおり) |
+| `known.json` | 3 本の `#535` 行を削除。 baseline に載ったまま解消した行は FIXED で落ちるため、削除が必須 |
+| shell 3 本の lift 秒 (逐次) | 34 / 18 / 41 (旧 §2: 20 / 9 / 19)。 `fix_avx256` 自体は 1 秒未満で、増加の原因は未調査 (同一 HEAD での反復無し。 全工程の run は 4 並列で RetDec と同時に走る別条件) |
+
+検証範囲: 3 本の lift 出力に未実装 helper / i256 trap が無いこと、各 helper の命令単位の bit 一致 (native 実命令との比較)。
+範囲外: Gen_Render の中でこれら helper の結果が正しく使われること。 `rep movsd` / `rep stosb` の DF=1 (後方) 方向 (呼出元は DF の追跡をしていない)。 `cmp*pd` / `movmskpd` / `prefetcht1,2,nta,w` は実装したが 3 本は使わず、差分試験の対象外 (`cmp*ps` / `movmskps` と同じ生成器)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x745c00 (AVX 路) の Gen_Render 単位の実走差分 | lower した ymm 経路の正しさは命令単位までしか示していない | #533 |
+| `rep movsd/stosb` の DF=1 | 3 本では未使用 | #197 (SIMD kernel 差分試験と共通の基盤) |
+| `cmp*pd` / `movmskpd` の差分試験 | 3 本では未使用 | #197 |
+| shell 3 本の lift 秒の増加 (旧 20/9/19 → 34/18/41) の原因 | 所要の見積のみ | #207 |
+| C++ DLL 9 本の helper (18〜144 件、VEX を含む) | #534 の領分。 `fix_avx256` は `PLUG_AVX256=1` で適用できるが、未検証 | #534 |
