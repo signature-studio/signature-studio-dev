@@ -29,6 +29,15 @@ HEAD `028ec002` の `bash tools/m11/m11_e2e.sh` (期待値ファイル・環境�
 
 `e2e_expect.env` は検証後に元どおり復元した。
 
+現ヘッド `dfeb2d26` (`028ec002` からの差分は REPORT_N715.md と DOC_MAP.md のみ) で同じ 2 条件を再実行した:
+
+| 条件 (HEAD `dfeb2d26`) | 出力 | rc |
+|---|---|---|
+| `e2e_expect.env` 無し | `e2e_expect.env 無し: 回帰ゲートの期待値が読めない (fail-closed)` | 1 |
+| `M11_EXPECT_SURVEY_OK=abc` | `M11_EXPECT_SURVEY_OK が整数でない: 'abc' (fail-closed)` | 1 |
+
+`e2e_expect.env` は再実行後に復元し、`git status` で差分が無いことを確認した。
+
 ## 4. e2e 再現の試行 (本 run)
 - 1 回目 `bash m11_e2e.sh` (`work/` 無し) → `m11_scan` は成功 (57,816 fn, 10.5 MB の index を生成)。
 - 続く `m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を要求して失敗 → fail-closed で rc=1 (32.8 s)。
@@ -47,7 +56,7 @@ PR 作成者の run (HEAD `b5a4c90d`・`/opt/retdec/bin` を PATH・load 0.5〜0
 | 判定単体 (既存 work/) | stage≥5 | `REQUIRE_STAGE_FAILED` | - | 1 |
 
 注: 既存 `work-m11` の出力 (ok 812) とは `gen_ir2` 再生成で値が異なる (ok 870)。下限 800 は両方を通す。
-PE パスは `m11_bounds.py`・`m11_data_gen.py` 等に `/home/ubuntu/work/analysis/win64` の既定値フォールバックがある (`FL_WIN64_DIR` 未設定時に使われる)。
+PE パスの既定値フォールバック (`FL_WIN64_DIR` 未設定時に使われる) は次のとおり: `m11_bounds.py:14`・`m11_data_gen.py:15`・`m11_icall_audit.py:14`・`m11_scan.py:11`・`m11_tail.py:12`・`m11_image_gen.py:16`・`m11_reloc_gate.sh:9`、および `tools/shared/env.sh` 経由 (`m11_e2e.sh`・`m11_build.sh`・`qstore/qstore_e2e.sh`)。直書きの実行パスではなく既定値のみ。
 
 ## 6. 次の一手
 - `oc_artifacts: fl-win64 work-m11` で再起動し、`m11_e2e.sh` を (`--full` 無し) 再実行して本節の表を実測値で置き換える。HEAD と rc を必ず併記する。
