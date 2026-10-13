@@ -16,6 +16,7 @@ command -v x86_64-w64-mingw32-gcc >/dev/null || { S "前提欠如: x86_64-w64-mi
 
 S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の相対参照を保つ)"
 rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$TREE/"
+mkdir -p "$TREE/m6" && cp -a "$GF_GUI/../m6/ottlib.py" "$TREE/m6/"   # m11_wndclass_scan.py は ../m6/ottlib.py を import する
 export GF_M11="$TREE/m11"; M="$GF_M11"
 ( cd "$M" && bash m11_gen_ir2.sh > "$W/res/m11_gen_ir2.log" 2>&1 ) || { S "m11_gen_ir2.sh 失敗 (複製側で IR 再生成。#680 の ldfix=applied 記録が必要)"; tail -5 "$W/res/m11_gen_ir2.log"; exit 2; }   # main #680: m11_build.sh は ir_conditions.json の ldfix=applied を要求する。素材の旧 IR は使えない
 (cd "$SRC/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/material  /') > "$R/ir_sha256.txt"   # 素材そのままの IR (provenance)
