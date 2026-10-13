@@ -138,7 +138,8 @@ static void run_gui6(void) {
   { int d = 0, u = 0, mv = 0; for (int i = 0; i < g_g6_n; i++) { d += g_g6_log[i] == WM_LBUTTONDOWN; u += g_g6_log[i] == WM_LBUTTONUP; mv += g_g6_log[i] == WM_MOUSEMOVE; }
     CHK(d == 1 && u == 1 && mv >= 1, "unregistered window: touch promoted to LBUTTONDOWN/MOUSEMOVE/LBUTTONUP (d=%d mv=%d u=%d)", d, mv, u); }
   CHK(RegisterTouchWindow(h, 0) == 1 && RegisterTouchWindow(0xDEAD, 0) == 0, "RegisterTouchWindow valid / invalid hwnd");
-  { uint32_t gc[3] = { 0, 1u << 3, 0 }; CHK(SetGestureConfig(h, 0, 1, PTR(gc), 12) == 1 && SetGestureConfig(h, 0, 1, PTR(gc), 8) == 0, "SetGestureConfig (ZOOM only; cbSize 12 ok / 8 rejected)"); }
+  { uint32_t gc[3] = { 3, 1, 0 }; CHK(SetGestureConfig(h, 0, 1, PTR(gc), 12) == 1 && SetGestureConfig(h, 0, 1, PTR(gc), 8) == 0, "SetGestureConfig (GID_ZOOM=3 GC_ZOOM=1; cbSize 12 ok / 8 rejected)"); }
+  { uint32_t ga[3] = { 0, 1, 0 }; CHK(SetGestureConfig(h, 0, 1, PTR(ga), 12) == 1, "SetGestureConfig dwID=0 GC_ALLGESTURES (all gestures enabled)"); }
   g_g6_n = 0; g_g6_gn = 0;
   gui_hl_input(GUI_IN_TOUCH, 0, 70, 80, 7u | (0u << 8) | (1u << 12), 0);
   gui_hl_input(GUI_IN_TOUCH, 0, 120, 80, 8u | (0u << 8), 0);
@@ -170,7 +171,7 @@ static void run_gui6(void) {
     CHK(S->out_pushed > before, "CLIP_RECT commands emitted");
     ShowCursor(0);   /* 非表示 (カウンタ -1) */
     uint32_t p0 = S->out_pushed;
-    SetCapture(h);   /* 非表示 + capture → POINTER_LOCK 要求 (w2=1) を 1 回 push */
+    SetCapture(h);   /* 非表示 + capture → POINTER_LOCK 要求を 1 回 push */
     uint32_t p1 = S->out_pushed;
     gui_hl_input(GUI_IN_POINTER_LOCK, 0, 0, 0, 1, 0);
     { uint32_t t0 = gui_now_ms(); while (gui_now_ms() - t0 < 200) { g6_drain(h); gui_futex_wait(&S->doorbell, S->doorbell, 5); } }
@@ -178,7 +179,7 @@ static void run_gui6(void) {
     uint32_t p2 = S->out_pushed;
     while (ShowCursor(1) < 0) {}   /* 表示に戻す: 既に解除済みなので push なし */
     uint32_t p3 = S->out_pushed;
-    CHK(p1 - p0 == 1 && p2 - p1 == 1 && p3 == p2, "Pointer Lock request: SetCapture with hidden cursor pushes one POINTER_LOCK (w2=1), ReleaseCapture pushes one (w2=0), ShowCursor(TRUE) none (push %u/%u/%u)", p1 - p0, p2 - p1, p3 - p2);
+    CHK(p1 - p0 == 1 && p2 - p1 == 1 && p3 == p2, "Pointer Lock request: SetCapture with hidden cursor pushes one POINTER_LOCK, ReleaseCapture pushes one, ShowCursor(TRUE) none (push %u/%u/%u)", p1 - p0, p2 - p1, p3 - p2);
   }
   DestroyWindow(h);
 }

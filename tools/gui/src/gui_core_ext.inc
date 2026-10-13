@@ -556,7 +556,7 @@ API RegisterTouchWindow(I64 h, I64 flags) {
 API SetGestureConfig(I64 h, I64 res, I64 c, I64 pcfg, I64 cb) {   /* GESTURECONFIG {dwID, dwWant, dwBlock} 12B */
   (void)res; if (!wnd_from_h((U64)h) || cb != 12) { gui_set_last_error(87); return 0; }
   const uint32_t *g = (const uint32_t *)P_(pcfg); uint32_t want = 0;
-  for (int i = 0; i < (int)c; i++) { if (g[i * 3] == 0) want = g[i * 3 + 1] & ~g[i * 3 + 2]; else if (g[i * 3] < 32) { if (g[i * 3 + 1]) want |= 1u << g[i * 3]; } }
+  for (int i = 0; i < (int)c; i++) { if (g[i * 3] == 0) { if (g[i * 3 + 1] & 1u) want = 0xFFFFFFFFu; } else if (g[i * 3] < 32) { if (g[i * 3 + 1] & 1u) want |= 1u << g[i * 3]; } }
   int k = -1; for (int i = 0; i < g_ngest; i++) if (g_gest_wnd[i] == (U64)h) k = i;
   if (k < 0 && g_ngest < 32) { k = g_ngest++; g_gest_wnd[k] = (U64)h; }
   if (k >= 0) g_gest_want[k] = want; return 1;

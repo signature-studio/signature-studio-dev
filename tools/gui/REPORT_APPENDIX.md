@@ -3,13 +3,13 @@
 > **正本**: `tools/gui/REPORT.md`。本書は同 REPORT §12 の全文の付録 (行数上限 250 行のための分割移動。内容は削除していない)。
 
 ## 12. GUI-6 (#182): 入力品質 (キー配列 / IME / タッチ・ジェスチャ / Pointer Lock・ClipCursor)
-既知類型との関係: lift 欠陥ではなく shim/host の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。検証起点: 実装コミットは本 PR の最終 HEAD (下記の数値はコミット済み tree で実測)。
+既知類型との関係: lift 欠陥ではなく shim/host の意味論 (`docs/DEFECTS.md` D1a〜D16 に該当なし)。検証起点: 実装コミットは `8dd9457`、本 run の差分 (B2・推奨修正) は後続コミット (下記の数値はコミット済み tree で実測)。
 
 ### 結論
 - **FL 非依存で CDP 再現できる範囲を実装し e2e 済み。受入条件は未達 → PR は `Refs #182`** (理由は「範囲外・未達」: `bash tools/gui/e2e.sh` 全体の ALL PASS は RetDec 不在で PE lift 層が走らず未確認、WM_POINTER*、実機確認)。
 - **キー配列**: 入力 `GUI_IN_KEY_*` の flags に host が set 1 スキャンコード/extended を載せ (`SCAN_BY_CODE`)、shim が現配列で scancode→VK を引く (`kbd_layout_vk`)。`GUI_IN_LAYOUT` で US(0x0409)/DE(0x0407)/FR(0x040C) を切替え、`MapVirtualKeyW` (VK↔VSC/VSC→VK/VK→CHAR)・`ToUnicode`/`ToAscii` (Shift/Caps/AltGr=Ctrl+Alt)・`GetKeyboardLayout`/`GetKeyboardLayoutNameW`/`LoadKeyboardLayoutW` (未対応 KLID は 0 で失敗)/`ActivateKeyboardLayout` が配列に従う。host は Keyboard API の `getLayoutMap` から自動推定 (`layoutFromMap`)。
 - **IME**: 隠し textarea の composition イベント → `GUI_IN_IME` (4 UTF-16/レコードで連結) → `WM_IME_STARTCOMPOSITION`/`WM_IME_COMPOSITION` (GCS_COMPSTR|GCS_CURSORPOS / GCS_RESULTSTR)/`WM_IME_ENDCOMPOSITION`。imm32 は `ImmGetContext`/`ReleaseContext`/`GetCompositionStringW`/`SetCompositionWindow`/`SetCandidateWindow` (位置を host へ `GUI_CMD_IME_POS`)/`Get/SetOpenStatus`/`Get/SetConversionStatus`/`NotifyIME`/`IsIME`/`AssociateContextEx` を実装 (計 12 名)。このうち FL の import 表 (IMPORTS.md) で STUB→IMPL になったのは 7 名 (`ImmAssociateContextEx`・`ImmGetContext`・`ImmGetConversionStatus`・`ImmReleaseContext`・`ImmSetConversionStatus`・`ImmSetOpenStatus`・`ImmIsIME`)。残り 5 名 (`ImmGetCompositionStringW`・`ImmSetCompositionWindow`・`ImmSetCandidateWindow`・`ImmNotifyIME`・`ImmGetOpenStatus`) は FL の import 表に無く、IMPORTS.md 上は変化しない。composition 中の入力から WM_CHAR は合成しない。
-- **タッチ**: `PointerEvent(pointerType=touch)` → `GUI_IN_TOUCH`。`RegisterTouchWindow` 済み窓へ `WM_TOUCH` (`GetTouchInputInfo` = Win64 TOUCHINPUT 48B)、未登録窓は primary 接触をマウスへ昇格。`SetGestureConfig` で許可した GID_ZOOM (2 本指距離) を `WM_GESTURE` (`GetGestureInfo` = Win64 GESTUREINFO 56B) で配送。GID_PAN (1 本指移動) も実装しているが、**selftest / e2e に検査が無く未検証**。
+- **タッチ**: `PointerEvent(pointerType=touch)` → `GUI_IN_TOUCH`。`RegisterTouchWindow` 済み窓へ `WM_TOUCH` (`GetTouchInputInfo` = Win64 TOUCHINPUT 48B)、未登録窓は primary 接触をマウスへ昇格。`SetGestureConfig` (MS 仕様の符号化: `{dwID=GID, dwWant=GC_*, dwBlock}`。`{0, GC_ALLGESTURES, 0}` = 全ジェスチャ有効、`{GID_ZOOM=3, GC_ZOOM=1, 0}` = ZOOM のみ) で許可した GID_ZOOM (2 本指距離) を `WM_GESTURE` (`GetGestureInfo` = Win64 GESTUREINFO 56B) で配送。GID_PAN (1 本指移動) も実装しているが、**selftest / e2e に検査が無く未検証**。
 - **Pointer Lock / ClipCursor**: 「カーソル非表示 (`ShowCursor(FALSE)`) かつ capture 中またはボタン押下中」に `GUI_CMD_POINTER_LOCK` で host へ `requestPointerLock` を要求 (要求の発行は selftest で push 数 1/1/0 を検査)。ロック中 host は `movementX/Y` を `cursor_x/y` へ積算 (ClipCursor 矩形へ clamp)。`SetCursorPos` は ClipCursor 矩形へ clamp、`GetClipCursor` は矩形を返す。
 - **ブラウザ既定動作の変更**: `src/runtime/gui.ts` は GUI canvas に `touch-action: none` を設定する。タッチによるブラウザ既定のパン/ズームを GUI canvas 上で無効化する (挙動変更。範囲外表を参照)。
 - プロトコル追加は enum 値のみ (`GuiShared` のオフセットは不変・`_Static_assert` 更新なし)。`gui_proto.h` ↔ `gui_proto.ts` を同時更新。
@@ -27,15 +27,15 @@
 ### ネガコン実測 (`bash tools/gui/input/negctl.sh`, 検証起点 `8dd9457`)
 | 変異 (ソース 1 箇所を壊す) | 検出した層 | 結果 (passed / failed、または FAIL 件数) |
 |---|---|---|
-| nc1 物理キー → 現配列 VK 変換 (`kbd_layout_vk`) を無効化 | selftest | 491 passed / **1 failed** → 検出 |
-| nc2 DE の Z/Y の配置を入替 | selftest | 487 passed / **5 failed** → 検出 |
-| nc3 AltGr (Ctrl+Alt) の文字表を無視 | selftest | 489 passed / **3 failed** → 検出 |
-| nc4 WM_IME_COMPOSITION の結果送信フラグを GCS_COMPSTR に変更 | selftest | 489 passed / **3 failed** → 検出 |
-| nc5 ZOOM の接触数補正 (離す接触を数えない) を削除 | selftest | 491 passed / **1 failed** → 検出 |
-| nc6 ClipCursor の clamp を無効化 | selftest | 491 passed / **1 failed** → 検出 |
-| nc7 MAPVK_VK_TO_CHAR の英字大文字化を削除 (本 PR の B4 修正の逆) | selftest | 489 passed / **3 failed** → 検出 |
-| nc8 POINTER_LOCK 要求の push を削除 (本 PR の B5 検査の対象) | selftest | 491 passed / **1 failed** → 検出 |
-| host-1 KEY の scancode を flags から落とす (gui.ts) | Chrome e2e | exit 1 / **7 FAIL** → 検出 |
+| nc1 物理キー → 現配列 VK 変換 (`kbd_layout_vk`) を無効化 | selftest | 492 passed / **1 failed** → 検出 |
+| nc2 DE の Z/Y の配置を入替 | selftest | 488 passed / **5 failed** → 検出 |
+| nc3 AltGr (Ctrl+Alt) の文字表を無視 | selftest | 490 passed / **3 failed** → 検出 |
+| nc4 WM_IME_COMPOSITION の結果送信フラグを GCS_COMPSTR に変更 | selftest | 490 passed / **3 failed** → 検出 |
+| nc5 ZOOM の接触数補正 (離す接触を数えない) を削除 | selftest | 492 passed / **1 failed** → 検出 |
+| nc6 ClipCursor の clamp を無効化 | selftest | 492 passed / **1 failed** → 検出 |
+| nc7 MAPVK_VK_TO_CHAR の英字大文字化を削除 (本 PR の B4 修正の逆) | selftest | 490 passed / **3 failed** → 検出 |
+| nc8 POINTER_LOCK 要求の push を削除 (本 PR の B5 検査の対象) | selftest | 492 passed / **1 failed** → 検出 |
+| host-1 KEY の scancode を flags から落とす (gui.ts) | Chrome e2e | exit 1 / **6 FAIL** → 検出 |
 | host-2 IME update の送信を落とす (gui.ts) | Chrome e2e | exit 1 / **1 FAIL** → 検出 |
 | host-3 touch 分岐を無効化 (touch→mouse 昇格が効かない) (gui.ts) | Chrome e2e | exit 1 / **6 FAIL** → 検出 |
 | host-4 Pointer Lock 要求の発行を落とす (gui.ts) | Chrome e2e | exit 1 / **1 FAIL** → 検出 |

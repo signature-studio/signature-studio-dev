@@ -40,7 +40,7 @@ int64_t gui_lift_entry(void) {
   RegisterClassA((int64_t)(intptr_t)&wc);
   int64_t h = CreateWindowExA(0, (int64_t)(intptr_t)"G6APP", (int64_t)(intptr_t)"g6", 0x10000000 | (int)0x80000000, 0, 0, 320, 200, 0, 0, 0x400000, 0);
   RegisterTouchWindow(h, 0);
-  uint32_t gc[3] = { 0, 1u << 3, 0 }; SetGestureConfig(h, 0, 1, (int64_t)(intptr_t)gc, 12);
+  uint32_t gc[3] = { 3, 1, 0 }; SetGestureConfig(h, 0, 1, (int64_t)(intptr_t)gc, 12);
   L("G6 READY layout=%llx", (long long)GetKeyboardLayout(0));
   WMSG m;
   while (GetMessageA((int64_t)(intptr_t)&m, 0, 0, 0)) { TranslateMessage((int64_t)(intptr_t)&m); DispatchMessageA((int64_t)(intptr_t)&m); }
