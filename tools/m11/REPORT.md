@@ -2,11 +2,11 @@
 
 **判定: 部分達成** (到達 stage 4/6)。`entry_point`(DllMain attach) → `_StartLib` → `_InitLib` → `InitUnits` が
 wasm 上で動作し、**FastMM4 が実際に GetMem → VirtualAlloc でプールを確保するところまで**は実測で到達。
-ただし 942 unit の初期化は通常起動で **22 本完走後、unit #23 (VA 0x467f00) が Delphi 例外 → Halt0 (§10, #132 で #18 の OOB を解消)**、stage 5 (survey trap 無し完走) は未達。
-(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §10、survey の最新値 (OOM/clobber 分離後) は §12、#516 qstore 後の最新値は §13。)
+ただし 942 unit の初期化は通常起動で **unit 57 (VA 0x16fde0) の後に Halt0 → longjmp で停止** (完了 56 unit = units_run 53 + units_skipped 3。§14, #134)。stage 5 (survey trap 無し完走) と stage 6 (DllMain 正常 return) は未達。
+(下の §1 表と §2〜§8 は #132 以前 = unit #18 OOB 時点の実測。最新値は §14、survey の OOM/clobber 分離後の値は §12、#516 qstore 後は §13。§10 は #132 時点 (`b760fa2`) の記録。)
 
-再現: `bash tools/m11/m11_e2e.sh` (work/ があれば増分 build: 実測 29.3〜29.6 秒 (§10, 4 vCPU, n=3) / `--full` で RetDec lift から全再生成: 旧記載「約 10 分」で本 PR では未再測定)。常に exit 0。
-gen_ir2 の ldfix は capstone+pefile が無いと黙ってスキップされる (§10 未解決の末尾)。PE は `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin` 固定 (runner では symlink)。
+再現: `bash tools/m11/m11_e2e.sh` (work/ があれば増分 build。実測値は §14)。`--full` は RetDec lift から全再生成 (旧記載「約 10 分」は本 PR で未再測定)。常に exit 0。
+gen_ir2 の ldfix は capstone+pefile が無いと黙ってスキップされる (§10 未解決の末尾)。PE は `M11_PE` / `FL_WIN64_DIR` で指定する (`docs/REFERENCES.md` `[WIN64]` の `extracted/block00031_PE.bin`。`m11_e2e.sh` の既定値だけが repo 外の固定パス)。
 
 ## 1. 結論と実測 (m11_e2e.sh 出力)
 
@@ -133,24 +133,7 @@ RTL の範囲確定と RetDec/x64c 別の liftdiff 採点 (#129): `tools/m11/rtl
 **起点 commit `b760fa2`** (本 PR の最終コード = origin/main `c1e4105` + 本 PR; 以降の commit は docs のみ)。`bash tools/m11/m11_e2e.sh` (work-m11 / work-liftdiff 展開済み, PE は fl-win64 の
 `block00031_PE.bin`, capstone+pefile 入り venv で gen_ir2 の ldfix が有効, 4 vCPU runner)。load average = `/proc/loadavg` の 1 分値 (開始→終了; 開始値は直前の作業を含む)。
 
-| commit | 内容 | units_run | 停止理由 (通常起動) | survey ok/trap/miss/noproc | trap 内訳 | GetMem/FreeMem | 所要 / load |
-|---|---|---|---|---|---|---|---|
-| `2c23bef` | 本 PR 初版 (旧 main 0a9e9d3 上) | 22/942 | DllMain attach 完走 (longjmp 経路) | 817/78/46/1 | halt0 39 + OOB 39 | 28/20 | 100 s / 1.06→1.26 (並行 2 本) |
-| `0f22d9c` | main (#414/#447/#481 後) | 17/942 | OOB | 839/56/46/1 | halt0 32 + OOB 24 | 16/1 | 46 s / 1.06→1.65 (並行 2 本) |
-| `6ad441d` | 0f22d9c + R8 + 3 override (410b10 無し) | 17/942 | OOB | 841/54/46/1 | halt0 32 + OOB 22 | 8/1 | 45.7 s / 0.26→0.72 |
-| `a71a404` | 6ad441d + 410b10 転記 | 22/942 | DllMain attach 完走 | 809/86/46/1 | halt0 72 + OOB 14 | 33/20 | 50.6 s / 0.12→0.66 |
-| `c1e4105` | main (#491/#496/#500 後 = 現 origin/main) | 17/942 | OOB | 849/43/49/1 | halt0 17 + OOB 26 | 16/1 | 43 s / 0.51→1.97 (手動 gen_ir2 と並行) |
-| **`b760fa2`** | **最終 HEAD** (c1e4105 + 本 PR) | **22/942** | **DllMain attach 完走 (longjmp 経路)** | **816/79/46/1** | halt0 65 + OOB 14 | 33/20 | 50.5 s (gen_ir2+ldfix+alloca+build 込み) / 1.36→1.77; 以降 29.3 / 29.4 / 29.6 s / 1.77→1.54, 1.54→1.32, 1.32→1.20 |
-| (NC) `b760fa2` − 410b10 | ネガティブコントロール | 17/942 | OOB | 850/45/46/1 | halt0 20 + OOB 25 | 8/1 | 49 s / 1.18→1.28 |
-
-reached_stage は全行 4/6 (stage 5 未達)。最終 HEAD は 5 回測定 (gen_ir2 から 2 回 + 増分 3 回) すべて units_run 22 / survey 816/79/46/1 / halt0 65 + OOB 14 で一致 (変動なし)。
-
-- 解消したのは **unit #18 の OOB** であり、unit #23 (0x467f00) の **Delphi 例外 (45a2a0, 0xEEDFADE) → Halt0 は未解消** (旧版の表の「例外なし」は誤り)。停止理由「DllMain attach 完走」は Halt0 → longjmp 経路の判定。
-- PR 本文の「コードは 499bdfa と同一」は誤りだった。数値の測定コードは上表の commit ごとに別物 (`2c23bef` = 499bdfa と REPORT のみ差。最終は main merge + `410b10` 転記を含む)。
-- 最終 HEAD の survey ok (816) は main (849) より少ない。survey は 942 unit を 1 プロセスで通算実行し `VirtualFree` が no-op (leak) のため、VirtualAlloc 累計が上限 (1,490〜1,502 MB) に達すると
-  `[m11][VA] OOM` (calloc 失敗 → NULL) になる。この OOM の回数は NC 3 回 (VirtualAlloc 1,101 回) に対し最終 HEAD 55 回 (1,199 回)。`6ad441d` → `a71a404` の unit 別比較 (`M11_SURVEY_UNITS`) は
-  ok→trap 33 本 / trap→ok 1 本で、ok→trap の 4 本 (unit 235/265/276/313) のスタックは 409410/409470 (GetMem/ReallocMem) → 409730 (Error) → 412a40 → 4128b0 (Halt0) = GetMem 失敗 → Error → Halt0 と整合。
-  unit #18 が完走して消費が増えたためと**推定**するが、OOM を除いた意味の退行の有無は**未切り分け** (起票: #132)。
+commit 別の測定表 (`2c23bef`〜`b760fa2`・NC) と注記は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §10a に分割移動 (250 行上限, 内容は無変更)。
 
 **真因・修正 4 点・NC・次 blocker (unit #23)・外した内容 (#490 で追跡) の全文は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §10b に分割移動 (250 行上限, 内容は無変更)。** 要点: 44bb70 の record 破壊 (44bae0 の `alloca i64` が callee へ escape) を R8 で拡幅、`412d60`/`418190`/`410b10` を C 転記して通常起動 17 → 22 unit。次 blocker は unit #23 (0x467f00) の Delphi 例外 → Halt0 (#490)。
 
@@ -227,3 +210,34 @@ reached_stage は全行 4/6 (stage 5 未達)。最終 HEAD は 5 回測定 (gen_
 ## 13. #516 [M11-N18]: 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS.md D17, idx 87/898)
 
 機械語 `mov qword [rbp+X], imm` (8B) が IR で `store ptr null` / `store i32 imm` (wasm32 で 4B) に縮み、上位 4B 未初期化のまま C 転記 `Q(dest)` が読んで OOB (idx 87 = `418190`, idx 898 = `412d60`, idx 58–63 = `417b70` の `Q(a)`、後者は `function_8cbb00` の 2 site)。`qstore/m11_qstore.py` が 279 site / 158 関数を `store i64` に戻す (`M11_QSTORE=0` で無効)。**#513 取り込み後の HEAD `8e5f760` の実測 (n=3 一致)**: survey NC 856/38/46/1 (clobber 1) → 修復 864/31/46/1 (clobber 0)、ラベル差 9 unit (58–63・87・898 が trap→ok、144 が clobber→trap)。58–63 は `8cbb00` の 2 site だけを除外すると trap に戻り (858/37/46/1) qstore の効果と確定、144 は別 site (未切り分け)。数値・site 一覧・再現・未解決は [qstore/REPORT.md](qstore/REPORT.md)。
+
+## 14. #134 [M11-N5]: unit 23 の IntToStr 表構築 OOB を解消 (通常起動 22→53 unit), judge を Halt0 早期終了と分離
+
+既知類型: DEFECTS.md D4 (1 段 deref 脱落) 2 件 = 414ad0 `_LStrSetLength` (`[rbx]`) / 43a3f0 IntToStr 書込み (`mov r8,[rbx]`)。D15 の 467c40 間接 call は 4c3baa4 で復元 (#490)。
+**起点** `13e8962` (= origin/main `8d883c3` + 本 PR)。4 vCPU, PE=`FL_WIN64_DIR` の block00031_PE.bin, work-m11 展開, capstone+pefile venv, node v22.23.3。
+
+| 構成 | units_run | 停止 | survey ok/trap(oom)/miss/noproc | 所要 s / load |
+|---|---|---|---|---|
+| main + PE パス修正のみ (n=1) | 22 | unit 23 例外→Halt0 | 864/31(1)/46/1 | 45.2 / 0.33→0.76 |
+| + 4c3baa4 + BSTR 割当 (n=1) | 22 | OOB 414ad0←43a3f0←467c40 | 864/31(1)/46/1 | 26.7 |
+| `6654322` (+414ad0・43a3f0 転記, n=3) | **53** | unit 57 (0x16fde0) 後に Halt0 | **866/29(2)/46/1** | 26.3–26.9 / 0.39→0.98 |
+| `6654322` 再測 (n=1, gen_ir2・boot5 lift 込み) | 53 | 同 | 866/29(2)/46/1 | 84.7 / 0.35→0.97 |
+| `de50ffa` (指摘対応 3 点, n=1, 増分 build) | 53 | 同 | 866/29(2)/46/1 (不変) | 32.5 / 0.16→0.69 |
+| NC: `6654322` から 2 転記を IR 版へ | 22 | OOB (boot threw) | 未測 | — |
+
+**数え方** (`m11_ov.c` `function_4120c0`): `units_run` は Init が例外も間接 call miss も無く完了した unit 数。miss が 1 回でも出た unit は `units_skipped` に入り `units_run` には入らない (その unit の init は呼ばれている)。Halt0 までに実行を終えた unit は `units_run + units_skipped` = 53 + 3 = **56**、停止したのは 1-based で 57 番目 (VA 0x16fde0)。
+
+**units_skipped = 3 の内訳**: `icall_miss_targets` は `0xfa9390` の 1 種 (`icall_miss=3`)。unit 30・39・40 の Init 値が 0xfa9390 で、呼出し site は `InitUnits` の `ICALL_AT(0x412126)`。0xfa9390 は PE `.text` (RVA 0xba9390) の関数先頭ではなく、直前の `jg rel32` の直後にある中間アドレス (先頭 bytes `00 44 2b f0`)。closure 外のため miss → ret 0 で skip される。関数名は未特定。PE の .data/.rdata に同じ 8B 値のポインタは無く (LE 検索 0 件)、この値の出所は未確認 (未解決)。
+
+**stage 6 の `skip 0`**: judge は `units_skipped` が非 0 なら 6 にしない (`m11_judge.py` の stage 6 条件)。Halt0 が無くても本 HEAD は skip 3 のため未達。
+
+機構: 43a3f0 は `call 414ad0` の後 `mov r8,[rbx]` で `*s` を読むが, IR は deref を落として `r8=&s` とし, 桁を変数自身 (a[0]) に書いた。次反復で文字列本体を文字列ポインタとして読み, `Move` が長さ -2012213261 で OOB。414ad0 も rcx=&s の `[rbx]` 脱落。機械語を 1 命令ずつ突合し C 転記 (桁ペア表 PE 0x13aaa68 の 100 entry は "00".."99" と一致)。BSTR は faee5b6 の m11_win.c 部分のみ採用 (m11_ov.c 部分は main の 417b70/409470 と重複のため不採用)。
+指摘対応 (`de50ffa`): 467c40 の translated call 2 箇所 (0x467cc9 / 0x467d5d) は `ICALL_AT` で元 call-site VA を渡す (#494 telemetry の site 計上; 数値は不変)。`SysReAllocStringLen` は NULL src 時に旧 prefix を min(旧長, 新長) 文字保持する (shimx `ole.c` と同じ; この経路の到達は本 e2e で未計測)。`SysFreeString` コメントの未記録の測定値は削除。
+
+judge: stage 6 は Halt0/longjmp 無し・全 942 unit 実行・skip 0・DllMain rc=1 の時のみ。`--require-stage N` で未達を exit 1 (既定は報告のみ exit 0)。N は 1〜6 の整数のみ受け付け、0・7・x・欠落は usage (exit 2)。ネガコン実測 (`de50ffa`): `--require-stage 6` → `reached 4/6`, exit 1 / `--require-stage 4` → exit 0 / 不正値 4 種 → exit 2。合成入力 (`M11_JUDGE_WORK`) 942 完走 → 6/6 exit 0 / Halt0 経由で 942/942 → 5/6 exit 1 (`6654322` で実測)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 57 (0x16fde0) の 0xf960 (GetMem+40fb40) ↔ 0x79b10 反復後の Halt0 (未読) | 53/942 (完了 56) で停止, stage 5/6 未達 | 起票依頼 (PM 判断: 子 issue 新設 or #134 コメント)。#490 は本 PR が範囲 (unit 23 の間接 call 復元・boot5・BSTR) を取り込み済みのため積み増し先として不適 |
+| unit 30/39/40 の Init 値 0xfa9390 (.text の関数途中・closure 外・skip 3)。skip は ret 0 のため当該 3 unit の init は未実行 | stage 6 の `skip 0` 未達。出所未確認 | 上と同じ (起票依頼 PM 判断) |
+| D4 同型 (`mov r64,[reg]` の 1 段 deref 脱落) の他サイトの全数 | 他 unit の silent 誤動作の恐れ | DEFECTS.md 行案 (PM 判断) |

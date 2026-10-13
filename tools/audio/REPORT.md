@@ -65,9 +65,9 @@
 ## 6. 限界と未実装 (正直ベース)
 
 - **fake シンクの数値**: 音声 HW が無いため `outputLatency` 35ms/`baseLatency` 10.7ms は fake 値。実デバイス (Windows WASAPI/mac CoreAudio, Firefox, Safari) での burst・遅延・underrun は**未計測**。往復の総遅延 (入力ブラウザバッファ含む) も未計測。
-- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、WebMIDI shim、getUserMedia のデバイス選択の**製品 UI** (部品は §13 で実装、画面は AU-9 #184)、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
+- **未実装**: COM vtable アダプタ (win64 ABI/8 バイトポインタの ASIOCallbacks・ASIOBufferInfo・ASIOTime への変換; リフタ呼出規約待ち)、レジストリ `SOFTWARE\ASIO\FL Studio ASIO` と `CoCreateInstance` 配線 (別 shim 行)、DirectSound shim、~~WebMIDI shim~~ (AU-3 で実装, §13。FL 結線は未)、getUserMedia のデバイス選択の**製品 UI** (部品は §14 で実装、画面は AU-9 #184)、WASAPI capture/exclusive/loopback、T の縮小 (拡張のみ)、macOS 固有 (AudioUnit 面) の薄いアダプタ。
 - B=128 は ILWASAPI2ASIO の min 256 より小さい (shim 単体の性能であり FL 実運用値ではない)。→ AU-7 で既定 profile を ILWASAPI 値に確定し、FL が min/max/granularity を読まないことを静的に確認 (§11)。
-- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、~~FL が granularity=128/min=128 を受理するか~~ (解決: FL は読まない, §11)、DS バッファの 16/32bit、Web MIDI の Worker 内実装状況 (W3C 仕様上は `Exposed=(Window,Worker)`, 実装未確認)。
+- 未確認 (推定): `asioMessage` selector 6 → コマンド 0x17 が再起動かどうか、~~FL が granularity=128/min=128 を受理するか~~ (解決: FL は読まない, §11)、DS バッファの 16/32bit、Web MIDI の Firefox/Safari の挙動 (Chrome 154 の DedicatedWorker に Web MIDI が無いことは実測済み, `tools/audio/REPORT_MIDI.md` §13-2)。
 - `ctx.outputLatency` は起動直後 0 → 約 250ms 後に更新される。`getLatencies` は呼出時の値で、FL が起動直後に読むと小さく見える。→ AU-7 で ATTACH 側の待ちを実装 (§11-3)。
 
 ## 7. ユーザ依頼事項
@@ -78,7 +78,7 @@
 2. **[audio-realdevice]** 実機 Chrome/Firefox/Safari での burst・outputLatency・underrun 行列、ループバックケーブルによる総往復遅延、T 下限の再評価。
 3. **[audio-midi]** WebMIDI shim (SAB MIDI ring, `midiIn/Out` 20 関数, CALLBACK_FUNCTION スレッド, SysEx バッファ, 再スキャン) と Worker 直受信の実機検証。
 4. **[audio-directsound]** DirectSound shim (ring を循環バッファ化, Lock/Unlock/GetCurrentPosition/Notify)。FL の DS バッファ形式 (16/float) の確認を含む。
-5. **[audio-input-ui]** (#192, 部品は §13 で実装済み。FL 本体側の再初期化確認と入力遅延実測は未達) getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
+5. **[audio-input-ui]** (#192, 部品は §14 で実装済み。FL 本体側の再初期化確認と入力遅延実測は未達) getUserMedia デバイス選択 + `controlPanel` UI + `kAsioResetRequest` 連携、入力遅延実測。
 6. **[audio-latency-policy]** T の縮小 (安定時に B 刻みで減衰)、安全モード/低遅延モードの UI、FL の selector 6 (0x17) 挙動確認後に `kAsioLatenciesChanged` を使うか決定。
 7. **[audio-fl-profile]** (AU-7 #193) 静的に確定できた部分は §11。実 FLEngine 起動後の profile / `pbtrackingmode` 各モード (Driver/Hybrid/Mixer) でのカーソル追従確認は #34 待ち。
 8. **[audio-worklet-wasm]** (任意) FL ミキサを Wasm Audio Worklet 内で直接走らせる案との遅延比較 (ブロッキング不可のため FL スレッド構造の再設計が前提)。
@@ -216,7 +216,11 @@ e2e 追加 3 本 (`harness/run.mjs`, 計 25 シナリオ): `asio_sine_b512_96k` 
 | `stage_wasm.mjs` / ルート `package.json` script への `stage_app.sh` 組込 | 現状は手動実行 | 適用 PR (#25 管轄) |
 | `tools/e2e` スイートのパッチ適用後再実行 | 既存 `audioworklet` チェックとの互換は推定 (status 文言 `worklet 実行中`・samplePos 128f 単位は維持) | 適用 PR で実行 |
 
-## 13. AU-5 (#192) 入力デバイス選択・controlPanel・入力喪失リセット (main thread 部品)
+## 13. AU-3 (#188) Web MIDI shim (全文: `REPORT_MIDI.md`)
+
+winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/runtime/midi-shim.ts` に実装。結論: **Chrome 154 の Worker には Web MIDI が無い (実測) ため main thread 中継が必須**。検証の数値・内訳は `REPORT_MIDI.md` §13-1、未解決は §13-3 を参照。モック `MIDIAccess` での検証のみで、実デバイス (AU-2 #187)・FL 結線/shimx 強定義置換 (#179, #37) は未達。
+
+## 14. AU-5 (#192) 入力デバイス選択・controlPanel・入力喪失リセット (main thread 部品)
 
 既知類型との関係: 該当なし (lift 欠陥ではなくランタイム shim)。
 
