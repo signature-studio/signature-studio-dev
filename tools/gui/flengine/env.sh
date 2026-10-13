@@ -5,4 +5,4 @@ GF_GUI="$(cd "$GF_HERE/.." && pwd)"
 GF_M11="$(cd "$GF_GUI/../m11" && pwd)"
 GF_W="${GF_W:-$GF_GUI/work/flengine}"
 export PATH="${GF_EXTRA_PATH:+$GF_EXTRA_PATH:}$PATH"
-set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u
+set +u; [ -n "${EMSDK_ENV:-}" ] && { . "$EMSDK_ENV" >/dev/null 2>&1 || true; }; set -u   # [EMSDK] の env.sh を EMSDK_ENV で指定 (未指定なら PATH の emcc を使う)

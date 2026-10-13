@@ -2,7 +2,7 @@
 # M11-N20 (#565): WNDCLASS 静的実体の WNDPROC を closure に加える (自動生成)。
 #   PE の WNDCLASS 走査 (m11_wndclass_scan.py) → closure 外 WNDPROC + call/jmp 閉包の ranges → RetDec lift (boot5) → gen_ir2 → 検査
 #   bash tools/m11/m11_wndseed.sh        (所要: lift 約 2 分 + gen_ir2 約 30 秒。boot0..4 が work/ にあること)
-# 前提: capstone / pefile (python3)、/opt/retdec、PE (FL_WIN64_DIR/extracted/block00031_PE.bin。既定値は tools/shared/env.sh)
+# 前提: capstone / pefile (python3)、retdec-decompiler (PATH 上。RETDEC で上書き可)、PE (FL_WIN64_DIR/extracted/block00031_PE.bin)
 set -euo pipefail
 cd "$(dirname "$0")"
 source ../shared/env.sh

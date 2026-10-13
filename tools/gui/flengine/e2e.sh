@@ -28,7 +28,7 @@ S "2/6 run: 通常起動 / survey(ff) / survey(soft) / 指向 probe / 通常起�
 cd "$HERE"
 node run.mjs                                                  --out "$W/res/boot_ff.json"     > /dev/null
 node run.mjs --survey                                         --out "$W/res/survey_ff.json"   > /dev/null
-node run.mjs --survey --wasm "$W/m11_gui_soft.cjs"            --out "$W/res/survey_soft.json" > /dev/null
+GF_SURVEY_UNITS="$W/res/survey_soft_units.json" node run.mjs --survey --wasm "$W/m11_gui_soft.cjs" --out "$W/res/survey_soft.json" > /dev/null
 node probe.mjs                                                --out "$W/res/probe.json"       > /dev/null
 node run.mjs --wasm "$W/m11_gui_plain.cjs"                    --out "$W/res/boot_plain.json"  > /dev/null
 for f in boot_ff survey_ff survey_soft probe boot_plain baseline_boot baseline_survey; do [ -s "$W/res/$f.json" ] || { S "結果 JSON が空: $f"; exit 1; }; done

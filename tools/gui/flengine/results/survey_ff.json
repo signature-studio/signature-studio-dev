@@ -12,8 +12,8 @@
   "miss": 46,
   "trap": 67,
   "kinds": {
-   "halt0->longjmp": 54,
-   "memory access out of bounds": 13
+   "halt0->longjmp": 53,
+   "memory access out of bounds": 14
   },
   "failfast_units": {}
  },
@@ -21,7 +21,7 @@
   {
    "order": 1,
    "name": "LoadStringW",
-   "calls": 48069975,
+   "calls": 48069976,
    "kind": "IMPL",
    "prio": "1"
   },
@@ -177,7 +177,7 @@
   "FastMM_GetMem(407a50)": 24035618,
   "FastMM_FreeMem(407e20)": 24,
   "InitUnits": 0,
-  "Halt0": 55
+  "Halt0": 54
  },
  "va_calls": 1244,
  "va_bytes": 1552941056

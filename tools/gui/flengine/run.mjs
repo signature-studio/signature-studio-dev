@@ -31,13 +31,15 @@ try { mod._m11_boot_enter(0n, 1n); } catch (e) {
 }
 
 const res = { ok: 0, noproc: 0, miss: 0, trap: 0 };
-const kinds = {}, ffUnits = {};
+const kinds = {}, ffUnits = {}, perUnit = [];
 if (survey) {
   const sp0 = mod._emscripten_stack_get_current();
   for (let i = 0; i < 942; i++) {
+    errs.push('GF-UNIT-BEGIN ' + i);
     try {
       const r = mod._m11_call_unit(i);
       if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
+      perUnit.push([i, r === 1 ? 'ok' : r === 0 ? 'noproc' : r === 2 ? 'miss' : 'ret' + r]);
     } catch (e) {
       res.trap++;
       let k;
@@ -45,9 +47,11 @@ if (survey) {
       else if (e && e.gui_failfast) { k = 'gui_failfast'; ffUnits[e.gui_failfast] = (ffUnits[e.gui_failfast] || 0) + 1; }
       else k = msg1(e);
       kinds[k] = (kinds[k] || 0) + 1;
+      perUnit.push([i, 'trap', k]);
       mod.__emscripten_stack_restore(sp0);
     }
   }
+  if (process.env.GF_SURVEY_UNITS) fs.writeFileSync(process.env.GF_SURVEY_UNITS, JSON.stringify(perUnit));
 }
 
 mod._gui_reach_dump();
