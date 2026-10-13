@@ -143,7 +143,7 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 ## 13. #1026 (ICALL-18): Fresh Air SlateCore の復元後残落ち 6 件の分類
 
 既知類型との関係: 該当なし (新規類型は未確定。残 6 件は RetDec の vtable 呼出し落ちで、icall §4 D1 の残存形)。
-検証起点 HEAD: `origin/main` (`23f2570f`)。素材 `plugins-freshair` (`Fresh Air.Win.zip` → `SlateCore.core_64`, 36,285,952 B)、`work-icall` の `rt_freshair-core/` を読取専用で使用。
+数値の出所: 既存 `work-icall` 監査 JSON (`rt_freshair-core/`) の再集計。その監査を生成した HEAD はリポジトリに記録が無いため、本節では特定しない。本 run では `work-icall` が無く再実行していない (未検証)。素材 `plugins-freshair` (`Fresh Air.Win.zip` → `SlateCore.core_64`, 36,285,952 B) からの機械語確認は、本 run では再実行していない (初回 PR の記載のみ)。
 
 ### 13.1 残 6 件 (復元後 IR に call が無い非 IAT 間接 call)
 
