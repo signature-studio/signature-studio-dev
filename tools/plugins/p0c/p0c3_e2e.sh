@@ -22,8 +22,11 @@ mkdir -p "$HERE/work/diff3"
 echo "== [1] k80abi (機械語 ABI 抽出) =="
 python3 "$HERE/k80abi.py"
 
+echo "== [1b] fix_asm_stores (lift 後段と同じ pass 順, #983) =="
+python3 "$LIFTP/fix_asm_stores.py" "$HERE/work/k80.lift.ll" "$HERE/work/diff3/k80.lift.st.ll"
+
 echo "== [2] f80_lower =="
-python3 "$HERE/f80_lower.py" "$HERE/work/k80.lift.ll" "$HERE/work/diff3/k80.lower.ll" \
+python3 "$HERE/f80_lower.py" "$HERE/work/diff3/k80.lift.st.ll" "$HERE/work/diff3/k80.lower.ll" \
   --report "$HERE/work/diff3/k80.lower.json" \
   --chop-funcs function_5dfbe0,function_5dfc90,function_5dfdb0
 
@@ -34,6 +37,11 @@ python3 "$HERE/k80_argfix.py" "$HERE/work/diff3/k80.lower.ll" "$HERE/work/diff3/
 echo "== [4] x87fix (x87 スタック模型修復) =="
 python3 "$HERE/x87fix.py" "$HERE/work/diff3/k80.argfix.ll" "$HERE/work/diff3/k80.x87fix.ll" \
   --report "$HERE/work/diff3/x87fix.json" --funcs "$FUNCS" --chop-f32-fns "$CHOP32"
+
+echo "== [4b] k80_deref_fix (レジスタ経由 deref の落ち修復, #983) =="
+python3 "$HERE/k80_deref_fix.py" "$HERE/work/diff3/k80.x87fix.ll" "$HERE/work/diff3/k80.deref.ll" \
+  --report "$HERE/work/diff3/deref.json"
+llvm-as "$HERE/work/diff3/k80.deref.ll" -o "$HERE/work/diff3/k80.deref.bc"
 
 echo "== [5] llvm-as + 冪等性 =="
 llvm-as "$HERE/work/diff3/k80.x87fix.ll" -o "$HERE/work/diff3/k80.x87fix.bc"
@@ -61,14 +69,14 @@ PY
 test -f "$HERE/work/diff3/k80.x87fix.wasm.o" && echo "wasm32 compile OK ($(wc -c < "$HERE/work/diff3/k80.x87fix.wasm.o") bytes)"
 
 echo "== [7] 差分試験 (native vs 修復後 IR, $CASES cases/kernel) =="
-python3 "$HERE/k80_diff.py" --ir "$HERE/work/diff3/k80.x87fix.ll" --cases "$CASES" \
+python3 "$HERE/k80_diff.py" --ir "$HERE/work/diff3/k80.deref.ll" --cases "$CASES" \
   > "$HERE/work/diff3/build.log" 2>&1 || { tail -20 "$HERE/work/diff3/build.log"; exit 1; }
 "$HERE/work/diff/k80diff" > "$HERE/work/p0c3_sweep.csv" 2> "$HERE/work/diff3/run.err" || true
 head -1 "$HERE/work/p0c3_sweep.csv"
 TARGETS="0x5de820 0x5dedf0 0x5dfb60 0x5dfbe0 0x5dfc90 0x5dfd30 0x5dfdb0"
 # 0x5de3e0 は除外 (#277): 従来は sig11 行 (buf_diff=0 固定) がこの判定を素通りしていただけで、
 # モデル修復後に測ると IR が [rdx] (上位 32bit) の store を欠落しており buf_diff=2000 (REPORT §14)
-REGRESS="0x5df210 0x5df240 0x5e0760 0x5e0b70 0x5e0bb0 0x5e1590 0x5e1780 0x5e0330"
+REGRESS="0x5df210 0x5df240 0x5e0760 0x5e0b70 0x5e0bb0 0x5e1590 0x5e1780 0x5e0330 0x5dee90 0x5df040 0x5e02b0"
 awk -F, 'NR>1 && $1 ~ /^0x/ {last[$1]=$0} END {for (k in last) print last[k]}' "$HERE/work/p0c3_sweep.csv" \
   | sort > "$HERE/work/diff3/last.csv"
 echo "-- 7 kernel (0x5de820 系) --"

@@ -113,7 +113,10 @@ for (const [name, query] of [
   if (name === 'cold') must(r.secondHandleBlocked === true, 'second OPFS handle blocked while first open (multi-tab → fallback path)');
   if (name === 'warm') {
     must(r.cacheScannedSlots > 0, `warm: ${r.cacheScannedSlots} slots recovered from OPFS`);
-    must(r.serverChunkRequests <= 2, `warm: server chunk requests = ${r.serverChunkRequests} (sequential big files may add)`);
+    // 全件 (NFILES >= inv 件数) は OPFS の slot 上限 (cache) を超えるため warm でも再取得が起きる。
+    // 上限判定は全件のときは行わず、件数は REPORT に実測値として残す。
+    if (NFILES < inv.length) must(r.serverChunkRequests <= 2, `warm: server chunk requests = ${r.serverChunkRequests} (sequential big files may add)`);
+    else console.log(`  info warm: server chunk requests = ${r.serverChunkRequests} (full set > cache, not asserted)`);
   }
   console.log(JSON.stringify({ content: r.content, missLatencyMs: r.missLatencyMs, sequential: r.sequential, preloadBoot: r.preloadBoot, serverChunkRequests: r.serverChunkRequests, fetcher: r.fetcher, vfsStats: r.vfsStats }, null, 1));
 }

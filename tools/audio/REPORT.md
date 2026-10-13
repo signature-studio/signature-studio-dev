@@ -235,6 +235,8 @@ underrun が 3 秒続くと +B を 1 段ずつ戻す (下限は下げない)。`
 
 残り: `public/worklets/dummy-worklet.js` は `deploy/probe/policy-check.mjs`・`tools/e2e/suite/checks.mjs` が参照するため今回は削除せず、追跡 **#839** (E2E-5)。`tools/e2e` スイートの再実行は未実施 (#839 で実施)。
 
+**状態注記 (#839 で更新)**: 上の「削除せず」は当時の記述。#839 で参照を `fl-audio-worklet.js` へ差し替え `dummy-worklet.js` を削除済み。`tools/e2e` の `audioworklet`・`console-clean` は `run.sh` が `stage_app.sh` でテスト音 wasm を配置するようになったため PASS (実測は `tools/e2e/REPORT.md` の「839 E2E-5」節)。
+
 ## 19. AU-15 (#863) dev 断続 FAIL の再現 (失敗 1 件を取得)
 
 検証 HEAD `d53f449c` (PR 差分は本ファイルのみ)。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (3.3 GiB)・`FL_WIN64_DIR` 指定。`toolchain-emsdk` は未取得のため、pin 版 emsdk 6.0.12 を `$RUNNER_TEMP/emsdk` へ install し `EMSDK_ENV` で指定。`bash tools/audio/integration/e2e.sh` (foreground)。
