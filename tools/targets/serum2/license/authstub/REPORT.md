@@ -206,11 +206,12 @@ IR 側の「直接 call」「`edx=0x800010`」「入口 edge」の件数は**ス
 
 ### 実測の記録 (e2e・census)
 
-- 実行: 2026-10-13 (UTC 17:40)・HEAD `4df84cd4`・load average 0.42 (1 分平均、run 開始時)。
+- 実行: 2026-10-13 (UTC 17:45)・HEAD `c7fd0739` (main 取り込み後)・load average 0.06 (1 分平均、run 開始時)。
   PE は `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` から `7z x` で `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` を取り出した (19,236,864 B・sha256 `501e7bb3…5283`)。
-- `bash tools/targets/serum2/license/authstub/e2e.sh`: exit 0・**23/23 PASS**・real 34.9 s (lift は本実行で新規生成。`authstub.drc.ll` 710,975 B)。
+- `bash tools/targets/serum2/license/authstub/e2e.sh` (`work/` を削除してから cold 実行): exit 0・**23/23 PASS**・real 34.8 s (lift は本実行で新規生成。`authstub.drc.ll` 710,975 B)。
 - `python3 tools/targets/serum2/license/authstub/l1_census.py <PE> work/lift/authstub.drc.ll`: exit 0・real 0.16 s。
   `sites=1` / `edx_const=1` / `into=1` / `covered=0` / `has_block=False`。
+- 同一 HEAD `4df84cd4` (main 取り込み前) でも 2026-10-13 17:40 に e2e 23/23 PASS・34.9 s、census は同じ 5 指標を確認。
 - 前 run (HEAD `3afb7674`) の申告値 (3.2 s・23/23) は一次ログ無しのため本節には含めない。本節が一次の実測。
 
 - 事実の範囲: 上記は raw lift 1 本での実測。復元 pass は未実装 (受入条件 2・3 は未達、子 issue に分割)。
