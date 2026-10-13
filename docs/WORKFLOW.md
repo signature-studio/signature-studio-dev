@@ -197,6 +197,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (head `4e084e1` で実行し `m11_bounds` が `tools/m2/work/ghidra_dll/functions_dll.csv` の欠落で fail-closed。この CSV は素材に無い Ghidra の中間物。`tools/m11/REPORT_N27.md` §10-3・#728)。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
+    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup は現状これらを入れないので、Actions 上で使うには事前に pip で入れるか、agent-setup への追加を別 PR で扱う。
     `ir_conditions.json` は生成時の PE の絶対パスを記録し、`m11_build.sh` は現在の PE と一致しないと build を拒否するため、別の環境で作った json を素材に同梱しても使えない。
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
