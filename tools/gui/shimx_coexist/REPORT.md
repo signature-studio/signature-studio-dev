@@ -147,9 +147,9 @@ bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 |---|---|
 | `bash tools/gui/test/selftest.sh` (HEAD `bb57ca34`) | **506 passed / 0 failed**、rc 0、所要 **14.464 s** (新規: hook / テンプレートの fail-fast 2 件 = `expect_failfast` で子プロセス abort を検査) |
 | `bash tools/gui/shimx_coexist/coexist.sh` (HEAD `bb57ca34`) | **ALL PASS**、所要 **14.660 s**。link duplicate 0 / warning 0 / undefined 0、C 側 **58 PASS / 0 FAIL**、host 側 **13 PASS / 0 FAIL**、NC1 duplicate 7・NC2 C 側 14 FAIL (§4.1 と同値) |
-| `bash tools/gui/e2e.sh` (変更前の作業ツリー、同一コード経路) | **ALL PASS**、所要 **4 分 53.758 s** (load average 1 分値 0.57 開始時)。stress 固定メモリ 50000 frames EXACT MATCH 0 px 差・memory.grow 経路 EXACT MATCH・ネガコン 2 件 exit 1 |
+| `bash tools/gui/e2e.sh` (main 作業ツリーで実行。変更は未 commit の同一 diff を当てた状態。HEAD `bb57ca34` 上では未実行) | **ALL PASS**、所要 **4 分 53.758 s** (load average 1 分値 0.57 開始時)。stress 固定メモリ 50000 frames EXACT MATCH 0 px 差・memory.grow 経路 EXACT MATCH・ネガコン 2 件 exit 1 |
 
-注: e2e は変更の前に作業ツリー上で実行した (変更は gui の OFN 入口のみで、描画経路を通らない)。HEAD 上での e2e 再実行はしていない。
+注: e2e は HEAD `bb57ca34` ではなく、同一 diff を当てた main 作業ツリーで実行した。変更は gui の OFN 入口のみで描画経路を通らないが、コミット済み HEAD での再実行は未実施。
 
 ### 8.1 受入条件の達成状況 (#957)
 
