@@ -1,0 +1,27 @@
+name: Scripts test
+
+# .github/scripts の分岐 (fix モードの往復上限・verdict 検証・watchdog の判定など) を fake gh で検証する。
+# 失敗すると PR の自動遷移 (差し戻し -> 修正 -> レビュー) が黙って止まるため、変更のたびに走らせる。
+on:
+  pull_request:
+    paths:
+      - '.github/scripts/**'
+      - '.github/actions/**'
+      - '.github/workflows/opencode.yaml'
+      - '.github/workflows/scripts-test.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-pr-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: test-pr-loop.sh
+        run: bash .github/scripts/tests/test-pr-loop.sh
+      - name: test-watchdog.sh
+        run: bash .github/scripts/tests/test-watchdog.sh
