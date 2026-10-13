@@ -59,6 +59,8 @@ need(mv['outcome'] == 'diff' and 'spill_slot_deref' in mv['tags'], 'Delphi Move(
 rs = d['4123c0(resourcestring init loop)']
 need(rs['outcome'] == 'diff' and rs['native_trace'] > rs['wasm_trace'] and 'callsite_arg_drop' in rs['tags'] and rs['diffs'].get('mem', {}).get('count', 0) > 0, '4123c0: resourcestring 初期化が wasm で脱落 (native entry %s > wasm %s, callsite_arg_drop, mem diff %s)' % (rs['native_trace'], rs['wasm_trace'], rs['diffs'].get('mem', {}).get('count')))
 PY
+echo "== [3b/4] InitUnits の空振り一致検出 (LD-25 / #977: InitTable 充足の boot 状態で空振りが出ないこと)"
+python3 tests/check_initunits.py --json work/m11/initunits.json
 echo "== [4/4] M11 closure 差分バッチ ($SET)"
 python3 liftdiff.py batch targets/m11.json --set "$SET" --shards 12 --nobuild --state auto --out work/m11/batch_${SET//[:]/_}.jsonl | tail -30
 echo "LIFTDIFF_E2E PASS"

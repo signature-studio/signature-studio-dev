@@ -94,11 +94,13 @@ def cmd_bootstate(a):
     from ldlib import boot
     sess = Session(a.target, shards=1, build=not a.nobuild)
     r, res = boot.build_state(sess, a.upto, mode=a.mode)
-    out = os.path.join(sess.t['work'], 'boot_state.json')
+    out = os.path.join(sess.t['work'], 'boot_state.json' if a.mode == 'units' else 'boot_state_%s.json' % a.mode)
     json.dump(res, open(out, 'w'))
     st = res['state']
     print('[boot] units_run=%s/%s first_fail=%s mode=%s img_runs=%d heap_used=%s hw=%s -> %s' % (
         res['units_run'], res['units_total'], res['first_fail'], res.get('mode'), len(st['img']), st['heap_used'], st['hw'], out))
+    pc = boot.precondition(st)
+    print('[boot] precondition InitTable=%#x InitCount=%d TLS_set=%d ok=%s' % (pc['table_ptr'], pc['init_count'], pc['tls_set'], pc['ok']))
     if r:
         r.close()
 
