@@ -118,6 +118,7 @@
 | `tools/m11/qstore/REPORT.md` | ~90 | 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS D17) の検出・修復・idx 87/898/58–63 の帰属・#513 取り込み後の実測 (#516) |
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 現 HEAD の実測 ON/OFF・対照差 0・ok 退行 5) |
 | `tools/m11/trap_triage/REPORT_419.md` | ~58 | #419 の合流前 (fa918df 基準) の OOB 修正試行・旧 ON 構成 (410360 + 8cbda0/8cbce0) の測定 (REPORT §8 から無変更で分割移動) |
+| `tools/m11/trap_triage/REPORT_679.md` | ~110 | icall site 0x41037d の hit 23,053,861 の内訳 (unit 101 = #513 の暴走 loop に 99.999% が集中)・既定 ON の 0x41032e 併記・再現手順と検査スクリプト `icall_41037d_679.py` (#679) |
 | `tools/m11/trap_triage/REPORT_418.md` | ~70 | 409470 転記ハングの原因特定 (#418) |
 | `tools/m11/trap_triage/REPORT_474.md` | ~100 | 410320 補完後の unit 114 ハング = 5c0270 の unlink deref 脱落 (#474)・409470/410320 再採用 |
 | `tools/m11/trap_triage/REPORT_482.md` | ~100 | `5c03d0` の node 差替え通知 `call [rbx+0x18]` の D15 脱落を復元 (#482)・survey 不変の実測 |
