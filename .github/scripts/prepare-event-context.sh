@@ -109,7 +109,7 @@ printf 'should_run=%s\n' "$should_run" >> "${GITHUB_OUTPUT:-/dev/null}"
 # R2 から取得する。本文は untrusted なので allowlist に一致する語だけを通す。
 # 指定が無ければ空 (workflow 側で既定の fl-win64 になる)。
 # 注意: 全素材で約 17.7 GiB (2026-10-13 実測)。runner の空きに収まるよう必要なものだけ指定すること。
-ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff|m6-ott|liftlib-targets|liftlib|icall)|analysis-ott-binaries|apt-mingw)$'
+ARTIFACT_RE='^(fl-win64|plugins-(ott|freshair|serum2|massivex|kilohearts)|toolchain-(retdec|emsdk)|work-(m11|liftdiff|m6-ott|liftlib-targets|liftlib|icall|fw-stage1)|analysis-ott-binaries|apt-mingw)$'
 artifacts=""
 # pull_request_review (reviewer の差し戻し) の本文は reviewer の指摘であり、素材の指定は PR 本文にある。
 ARTIFACTS_SRC="$COMMENT_FILE"
@@ -123,7 +123,7 @@ artifacts_line="$(grep -m1 -E '^[[:space:]]*oc_artifacts:' "$ARTIFACTS_SRC" || t
 if [ -n "$artifacts_line" ]; then
   for name in $(printf '%s' "${artifacts_line#*oc_artifacts:}" | tr -cd 'a-z0-9 -'); do
     if ! printf '%s' "$name" | grep -qE "$ARTIFACT_RE"; then
-      printf '::error::oc_artifacts: unknown artifact "%s" (allowed: fl-win64, plugins-{ott,freshair,serum2,massivex,kilohearts}, toolchain-{retdec,emsdk}, work-{m11,liftdiff,m6-ott,liftlib-targets,liftlib,icall}, analysis-ott-binaries, apt-mingw)\n' "$name"
+      printf '::error::oc_artifacts: unknown artifact "%s" (allowed: fl-win64, plugins-{ott,freshair,serum2,massivex,kilohearts}, toolchain-{retdec,emsdk}, work-{m11,liftdiff,m6-ott,liftlib-targets,liftlib,icall,fw-stage1}, analysis-ott-binaries, apt-mingw)\n' "$name"
       exit 1
     fi
     artifacts="${artifacts:+$artifacts }$name"
