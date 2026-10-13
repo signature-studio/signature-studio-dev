@@ -118,12 +118,12 @@
 | `--backend-no-opts` | exit 0、8:18.90 (498.90 s)、Maximum RSS 3.52 GB。 `.ll` 75 MB・`.c` 39.6 MB 出力まで完走 |
 
 - 結論 (受入条件 3・n=1 の範囲): 上表の n=1 測定では `--no-memory-limit` は C 出力を完了できなかった。 `--backend-no-opts` は完走した。 共有 `lift_ranges.sh` には入れない (判断: 変更しない)。 RetDec の既定経路は本 HEAD でも `lift_from_ll.sh` を使う。 n≥3 の min–max は未取得のため、受入条件 3 は「判断まで完了 (測定は n=1、再測定は未実施)」。
-- 鮮度 (WORKFLOW §6): 測定 commit は dc7c11df。 検証 HEAD 2bc5ce41 までの sampler コード差分は 0 行。 出力:
+- 鮮度 (WORKFLOW §6): 測定 commit は dc7c11df。 検証 HEAD 77b85cec までの sampler コード差分は 0 行。 出力:
 
   ```
-  $ git diff dc7c11df 2bc5ce41 -- tools/plugins/sampler ':!*.md'
-  (出力なし、exit 0)
-  $ git diff --stat dc7c11df 2bc5ce41 -- tools/plugins/sampler
+  $ git diff dc7c11df 77b85cec -- tools/plugins/sampler ':!*.md' | wc -l
+  0
+  $ git diff --stat dc7c11df 77b85cec -- tools/plugins/sampler
    tools/plugins/sampler/REPORT_ENGINE_LINK.md | 25 ++++++++++++++++++++++---
    1 file changed, 22 insertions(+), 3 deletions(-)
   ```
