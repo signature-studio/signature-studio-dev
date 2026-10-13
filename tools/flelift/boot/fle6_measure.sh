@@ -36,7 +36,9 @@ python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W" > /dev/null
 elapsed "gen-A" "$T"
 
 T=$(date +%s); stage "lift"
-python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure "${FLE_LIFT_CLOSURE:-2}" \
+# lift は RSS 上限 (FLE_RSS_CAP_MB, 既定 13800MB) を rss_cap.py で監視する。超過時は子 PID だけ kill され rc=143 で止まる。
+python3 "$HERE/rss_cap.py" --cap-mb "${FLE_RSS_CAP_MB:-13800}" --log "$W/rss_lift.log" -- \
+  python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure "${FLE_LIFT_CLOSURE:-2}" \
   --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
   --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
   --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits | tail -3

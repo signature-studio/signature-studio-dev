@@ -224,28 +224,18 @@ GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` �
 
 | 項目 | 状態 |
 |---|---|
-| shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未実測 (理由: lift が RAM 上限で打ち切り)**。素材は現在 `$ARTIFACTS_DIR` に fl-win64 / toolchain-emsdk / toolchain-retdec / work-m11 / work-liftdiff が揃っており (`oc_artifacts:` と一致)、lift 段まで到達した。lift が 13.8GB を超えて kill (§10.x 実測 3) のため clang・boot に進めず。起票依頼 ③・FLE-7 (#918) |
-| units_run の前進・次の停止点 | **未実施**。前 run の値 (209 据え置き) は #672 08:07 コメントに残る |
-| survey 再実測 (0x6a7b70 root の非破裂確認) | **未実施**。起票依頼 ② |
-| 呼出 IPP 名の全一覧 | **未実施**。起票依頼 ① |
+| lift/boot の到達 (分割 lift で boot まで到達) | **未達 (#918)**。lift が cap 13800MB 超で kill (§10.x 実測 3・4)。boot 未到達 |
+| shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未取得 (#918)**。boot 未到達のため `FLEBOOT_IPP_CHECK` は出ていない |
+| units_run の前進・次の停止点 | **未取得 (#918)**。前 run の値 (209) は #672 08:07 コメントに残るが、本 PR では比較していない |
+| `ipp.called` 全件・`stopped_at` | **未取得 (#918)** |
+| survey 再実測 (0x6a7b70 root の非破裂確認) | **未取得 (#918)**。0x6a7b70 の恒久 root 化は採用しない (PM 判断 4/14 のまま) |
+| 既定経路 (`FLE_IPP` 未指定) の非変化 | **未測定**。「209 据え置き」とは書かない |
 
 起票依頼: ① IPP fail-soft の呼出名一覧と silent miscompile 検査 ② survey 再実測と 0x6a7b70 root 化の可否判断 (PM 判断) ③ `bash tools/flelift/boot/fle6_measure.sh` を emsdk 込みの runner で再採取 (素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`)。
 `boot_e2e.sh` / `build.sh` / `iterate_roots.sh` の `[EMSDK]` 直書きは既存の書式で、本 PR の範囲外 (起票依頼 ④)。
 
 ### 10.x 実測の試行
 
-- 結論 (fix run 2026-10-13): 受入条件は未了。詳細と経緯は `REPORT_APPENDIX.md` §C。
-- **実測 (fix run 2026-10-13 16:14–16:23 UTC, head 55acfb6d・素材 fl-win64 / toolchain-emsdk / toolchain-retdec / work-m11 / work-liftdiff 展開済み)**:
-  - 全量 lift (`--closure 2`): `ulimit -v 12GB` で `MemoryError` (16:14:13 開始、約 2 分)。仮想メモリ上限では RSS の値は取れない。
-  - closure 1 (`FLE_LIFT_CLOSURE=1`): `ulimit -v` では capstone の確保で `MemoryError`。RSS 監視 (12288MB 超で子 PID を kill) に切り替え、16:21:35 開始 → 16:23 頃に **ピーク RSS 12563MB で kill (rc=143)**。
-  - 結論: closure 1 でも 12GB 以内に収まらない。clang・boot・ネガコン・survey は未到達。units_run・ipp.called は未測定。
-  - 下界の位置づけ: 「lift が 12GB を超える」ことだけが確定。どの root で止まったかは未特定。`[sys]` mem の値 (MemAvailable) は run ログ `rss.log` にあるが、REPORT には要点のみ転記。
-  - 実測 3 (fix run 2026-10-13 16:33–16:38 UTC, head 8cfd4a8c・`fle6_measure.sh` 本体・素材 fl-win64 / toolchain-emsdk / toolchain-retdec を展開済み・`FL_WIN64_DIR` = `$RUNNER_TEMP/ss-art`・capstone 5.0.7 / pefile を `$RUNNER_TEMP/venv-flelift` に導入):
-    - 監視: python3 ラッパー (1 秒ごとに `/proc/<pid>/status` の VmRSS を読み、cap 13824MB 超で **その PID だけ** kill)。runner は MemTotal 15988MB / swap 3071MB。
-    - gen-A: 7 s 完了 (load 0.38 0.44 0.22)。
-    - closure 2 (`FLE_LIFT_CLOSURE=2`, 0x6a7b70 を `FLE_EXTRA_ROOTS` で一時追加): 16:33:53 開始 → **ピーク RSS 13883MB で kill (rc=143)**、約 2 分。
-    - closure 1 (`FLE_LIFT_CLOSURE=1`, 同上): 16:36:13 開始 → **ピーク RSS 13949MB で kill (rc=143)**、約 2 分。
-    - 結論: closure 1・2 とも lift は 13.8GB を超える。cap を実 RAM 近くまで上げても完走しない。どの root / 関数で RSS が膨らむかは未特定 (ログに関数名を出していない)。
-    - 未到達: clang・boot・ネガコン (`FLE_IPP=0`)・shim 有 (`FLE_IPP=1`) の `units_run` / `stopped_at` / `FLEBOOT_IPP_CHECK` / `ipp.called` 全件・0x6a7b70 root 化後の前進・survey 非破裂。**いずれも未測定**。前 run の 209 据え置き値とも比較できていない。
-    - 残件は FLE-7 (#918) の分割 lift で扱う。
-  - 既定経路: shim は既定で無効 (`55acfb6d`)。`FLE_IPP=1` のときだけ有効。boot 未到達のため、既定経路の数値 (209 据え置き等) が変わるかは未測定。
+- 結論 (fix run 2026-10-13): **この PR では lift が runner の上限内で完走しない** (cap 13800MB で実測 4 が kill)。clang・boot・ネガコン・`FLEBOOT_IPP_CHECK` は未到達で、分割 lift は #918 (FLE-7)。実測 1〜4 の詳細と経緯は `REPORT_APPENDIX.md` §C。
+- **実測 4 (PM 指示の 1 回採取, 16:43 UTC 開始, head は本 commit)**: `rss_cap.py --cap-mb 13800` で `x64c.py --closure 1` (`FLE_EXTRA_ROOTS=0x6a7b70`)。**126 s・ピーク RSS 13832MB で kill (rc=143)**。closure 2 は再採取せず、実測 3 の時間切れを残す。
+- 既定経路: shim は既定で無効 (`55acfb6d`)。`FLE_IPP=1` のときだけ有効。boot 未到達のため、既定経路の数値 (209 据え置き等) が変わるかは未測定。

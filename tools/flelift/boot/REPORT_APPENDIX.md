@@ -190,3 +190,11 @@ FLE-5 は `boot/dbg_lift.py` (任意 guest VA を lift 生成 C の行に埋め�
 - `fle6_measure.sh` (foreground, `timeout 1500`, rc=124): gen-A 7 s 完了。`lift` (x64c, closure 2) は 25 分経っても完了せず打ち切り。`work/boot` 配下の生成物は無し。
 - 未取得: shim 有/無の `units_run`・`stopped_at`・`ipp.called` 全件・`FLEBOOT_IPP_CHECK`・0x6a7b70 root 化後の前進・survey 非破裂。**取れなかった理由: lift 段の時間切れ (25 分で打ち切り)**。
 - 判定: 受入条件は未了のまま。Closes は付けず `Refs #672`。次の run で lift 単体の所要時間を先に採ってから boot に進む。
+- 実測 1〜3 (REPORT §10.x から移動, 2026-10-13, head 55acfb6d → 8cfd4a8c・947cbb58):
+  - 実測 1 (16:14–16:23 UTC, head 55acfb6d): 全量 lift (`--closure 2`) は `ulimit -v 12GB` で `MemoryError` (約 2 分)。仮想メモリ上限では RSS は取れない。closure 1 は capstone の確保で `MemoryError` → RSS 監視 (12288MB) に切替え、16:21:35 開始 → **ピーク RSS 12563MB で kill (rc=143)**。`[sys]` の MemAvailable は run ログ `rss.log` にある。
+  - 実測 2 (16:33–16:38 UTC, head 8cfd4a8c, `fle6_measure.sh` 本体): 監視は python3 ラッパー (1 秒ごとに VmRSS を読み、cap 13824MB 超で **その PID だけ** kill)。runner は MemTotal 15988MB / swap 3071MB。gen-A 7 s 完了。closure 2 (`FLE_EXTRA_ROOTS=0x6a7b70`): 16:33:53 開始 → **ピーク RSS 13883MB で kill (rc=143)**、約 2 分。closure 1 (同上): 16:36:13 開始 → **ピーク RSS 13949MB で kill (rc=143)**、約 2 分。
+  - 未特定: どの root / 関数で RSS が膨らむかは (ログに関数名を出していないため) 未特定。
+- 素材の現状 (fix run 2026-10-13 16:40–16:45 UTC): 「素材不足」ではない。`$ARTIFACTS_DIR` に 5 種 (fl-win64 / toolchain-emsdk / toolchain-retdec / work-m11 / work-liftdiff) が実在し、`fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` → `tools/m11/work`、`work-liftdiff` → `tools/liftdiff/work` に展開済み。`/opt/emsdk`・`/opt/retdec` は runner に既存。capstone 5.0.7 / pefile は `$RUNNER_TEMP/venv-flelift` に導入。失敗理由は素材ではなく lift の RSS。
+- 実測 4 (PM 指示の 1 回採取, 16:43 UTC 開始): `gen_boot.py` → `rss_cap.py --cap-mb 13800` で `x64c.py --closure 1` (`FLE_EXTRA_ROOTS=0x6a7b70`)。MemAvailable 起動時 14799600kB (≈14.4GB)。**126 s、ピーク RSS 13832MB、cap 超過で kill (rc=143)**。closure 2 は再採取しない (実測 3 の 25 分打ち切りをそのまま時間切れとして残す)。
+- 結論: この PR では lift が runner の上限内で完走しない。clang・boot・ネガコン・`FLEBOOT_IPP_CHECK` は未到達。分割 lift で完走させる作業は #918 (FLE-7) に分離。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 SS_EMSDK_ENV=/opt/emsdk/emsdk_env.sh FLE_RSS_CAP_MB=13800 bash tools/flelift/boot/fle6_measure.sh` (lift 段は `boot/rss_cap.py` 経由。cap 超過で rc=143 → スクリプトは停止)。
