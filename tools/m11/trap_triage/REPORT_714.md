@@ -53,3 +53,21 @@ mkdir -p work/probe714
 M11_SURVEY_UNITS=work/probe714/units_714.json node m11_survey.mjs
 python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,923,291,296   # rc=1 (2/5)
 ```
+
+## 6. OOB 命令の特定 (2026-10-13, 追補 run、n=1)
+
+再現 (HEAD 1d7b619e): gen_ir2 36 秒 rc=0 / build 23.6 秒 rc=0 / survey 11.7 秒 rc=0 (ok 869 / trap 25、§3 と一致) / check_682 2/5 (304=trap 555=trap 923=trap)。
+
+`M11_SURVEY_STACK=304,923,555` の wasm スタックを `trap_triage/oob_insn.py` で逆引きした結果:
+
+| unit | 先頭フレーム (wasm fn / offset) | OOB 命令 | 読んでいる式 |
+|---|---|---|---|
+| 304 | `function_535bf2` (3370 / 0x1a3318) | `i32.load offset=0` | `tbl + cnt*24` の dword (sentinel `-1` 比較)。`tbl` = `*(*(obj+8)+8)`、`cnt` = `[obj+0x10]` を +1 した値 |
+| 555 | `function_535bf2` (3370 / 0x1a3318) | 同上 | 同上 (304 と同一命令・同一 offset) |
+| 923 | `function_410b10` (14898 / 0x354e6f) | `i32.load offset=0` | `*(*(obj+0x20)... ) - 0x80` 系の読み (`[obj-0x80..]` 系、REPORT §4 と一致) |
+
+- 304・555 は同じ OOB 命令 (`535bf2` のテーブル走査) を通る。`535bf2` は `cnt` を加算してから sentinel を探す走査で、sentinel が見つからないか `tbl` が壊れていると線形メモリ外へ出る。
+- 原本では走査の前に `0x535c11` の境界チェック (`jl 0x535bf2`) がある。転記 `M11_FIX_535BF2` の C 版でこの境界条件がどう扱われているかは未確認。
+- 次の一手 (未着手): OOB 直前に `tbl` と `cnt` の値 (`obj` の 0x08 / 0x10) を JS 側で読み、(a) `tbl` が指す表の sentinel の有無、(b) `obj` の初期化元 (この走査を持つ構造体を作る関数) を特定する。923 は `410b10` の `obj-0x80` の `obj` 生成元を追う。
+
+本追補の run は上記の逆引きまでで止める (真因は未特定)。
