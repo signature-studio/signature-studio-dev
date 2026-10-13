@@ -1,7 +1,8 @@
 # #684 単発 OOB 4 unit (95 / 275 / 477 / 895) の個別原因
 
 親: #596 (PR #675)。対象: `tools/m11/trap_triage/REPORT.md` §8.2 の OOB 13 件のうち単発の 4 unit。
-検証起点: `791cce5` (本 PR の最終コード HEAD。以降 `718849f` まで docs のみ)。素材: work-m11 (`tools/m11/work` の複製) + fl-win64 (`$RUNNER_TEMP/fl-win64`)。
+検証起点: `791cce5` (本 PR の最終コード HEAD。以降 `e920ac3` まで docs のみ)。素材: work-m11 (`tools/m11/work` の複製) + fl-win64 (`$RUNNER_TEMP/fl-win64`)。
+**注意**: §1〜§4 の数値は `e920ac3` 時点の build。merge `0618c61` (main 取込み) 後の build では OOB 内訳が変わった (§8 の `0618c61` 節)。§1〜§4 はその build で再分析していない (§5 に起票)。
 
 既知類型との関係 (`docs/DEFECTS.md`): **477 は D11 の変種と判定** (10 進 `inttoptr` 形の VA 未変換)。95 / 275 / 895 は未判定。
 `tools/icall/REPORT.md` §4 の D 体系とは対応させていない。
@@ -24,7 +25,9 @@
 - 修正: `filter(/^\s*at /).slice(0, 30)` (集計は不変: ok 828 / halt0 54 / miss 46 / oob 13 / noproc 1)。
 - ネガコン (旧版の出力 `head684_before_fix.json` と新版の比較): **OOB 13 件すべて旧 `frames[0]` == 新 `frames[1]`**。
 
-| unit | VA | 旧 (§8.2) 最上位 | 新 最上位 (trap 直上) | 生 stack の先頭 (wasm index, offset) |
+列 `LVA` は `survey_units.mjs` の `va` 欄 (= `_m11_unit_va`) の値。関数名 `function_XXXXXX` の XXXXXX = LVA + 0x400000 (例: 477 は LVA `0x6bfd60` → `function_abfd60`)。
+
+| unit | LVA | 旧 (§8.2) 最上位 | 新 最上位 (trap 直上) | 生 stack の先頭 (wasm index, offset) |
 |--:|---|---|---|---|
 | 95 | 0x1d2680 | `536da0` | **`47ad70`** | [3067] 0x18f8df |
 | 149 | 0x264260 | `414bb0` | **`414ad0`** | [733] 0xbc57d |
@@ -46,7 +49,7 @@
 
 - **95** `function_47ad70` @ `0x18f8df` = `i64.load offset=0`。直前は `local.get 5; i64.const 3; i64.shl; local.get 0; i64.add; i32.wrap_i64` (`oob_insn.py` の実出力)。`i32.wrap_i64` は `i64.add` の後・`i64.load offset=0` の前にある。
   ループ内で `*(arg1 + (v << 3))` を読む (`arg1` は IR の `%arg1` = wasm local 0。v = record の `+8` の値)。caller: `536da0` ← `4fe150` ← `5d2680` (unit 本体)。
-  unit 内で GDI 系 stub (GetDC / GetDeviceCaps / CreatePalette / GetStockObject / LoadIconW / MulDiv) が呼ばれる (呼出し回数のみ確認、順序は未確認)。
+  unit 内で GDI 系 stub (GetDC / GetDeviceCaps / CreatePalette / GetStockObject / LoadIconW / MulDiv) が呼ばれる (unit 全体の呼出し回数のみ確認、順序は未確認)。
 - **275** `function_864fe0` @ `0x935bf` = `i64.load offset=0` (`this+8` = `GetMonitorInfoW` の hMonitor)。`this` (arg1) が不正。
   caller: `80e040` のループ (項目を `function_8657b0` で取得し 864fe0 へ) ← `80e140` ← `80e170` (unit 本体)。
   unit 内で `GetMonitorInfoW` が 20 回、`EnumDisplayMonitors` が 1 回呼ばれる。両 stub は常に 0 を返し、コールバックを呼ばない (`tools/m11/work/m11_winstubs.c`)。
@@ -82,7 +85,7 @@ IR (`work/boot_final3.ll`): `function_abfd60` 内の `%ce0n11_function_abfd60 = 
 - 275: this 不正の出所は未特定。`80e040` の項目取得 (`function_8657b0`) が返す値を実測していない。
   stub (GetMonitorInfoW / EnumDisplayMonitors が 0 を返す) が項目の作り方に影響する**推定** (未検証)。
   次の一手: 80e040 直前の項目列の実測、または monitor enumeration の stub を仮に実装して差を測る (ネガコン付き)。
-- 95: `47ad70` の index `v` の出所 (record `+8`) と `arg1` の由来は未確認。caller の GDI stub 系との関係は**推定**。
+- 95: `47ad70` の index `v` の出所 (record `+8`) と `arg1` の由来は未確認。unit 95 の GDI 系 stub (GetDC 2 / GetDeviceCaps 2 / ReleaseDC 2 / CreatePalette 1 / GetStockObject 3 / LoadIconW 1 / MulDiv 1) は unit 全体の呼出し回数で、順序は未確認。caller の GDI stub 系との関係は**推定**。
 - 895: リスト先頭 (`40ffe0` の引数) の出所は未確認。`p-144` が指す構造体の定義は未特定。
 
 ## 5. 未解決 (起票先)
@@ -93,7 +96,8 @@ IR (`work/boot_final3.ll`): `function_abfd60` 内の `%ce0n11_function_abfd60 = 
 | 275: this 不正の出所 (monitor 列挙の stub 仮説) | 単発 OOB 1 件 | 新規子チケット案 (親 #596 配下、M11) |
 | 95: index と record の出所 | 単発 OOB 1 件 | 同上 (親 #596 にコメント) |
 | 895: リスト先頭の出所 | 単発 OOB 1 件 | 同上 (親 #596 にコメント) |
-| `survey_units.mjs` の旧 frame を前提にした #419 §8.2 / §8.3 の記述 | §8.3 (`414ad0` と #307 の関係) の結論が逆転 | 本 PR で訂正注記 (`REPORT.md` §8.2 直下)。#307 との関係は再検証が必要 (未実施) |
+| `survey_units.mjs` の旧 frame を前提にした #419 §8.2 / §8.3 の記述 | §8.3 (`414ad0` と #307 の関係) の結論が逆転 | 本 PR で訂正注記 (`REPORT.md` §8.1 と §8.2 の直下)。#307 との関係は再検証が必要 (未実施) |
+| merge `0618c61` 後の build で e2e (866/29/2) と survey (829/55/11) が PR 本文・§8 の旧値と変わった。新規 OOB 56 (`8c6530`) と halt0 移動 (158/280/659) の原因 | 本 PR の 4 unit 解析 (§1〜§3) の前提が merge build で未確認 | PM 判断: 本 PR で再解析するか、子チケットに分けるか (main 側の変更の特定を含む) |
 | work-m11 snapshot の `m11_boot.cjs` は `_m11_icall_cnt_n` を含まず (件数 0)、snapshot 単独の `survey_units.mjs` は `mod._m11_icall_cnt_n is not a function` で失敗する。e2e で再生成した build (件数 2) では動く | survey の再現手順の前提 (§7) | PM 判断 (#494 へのコメント or 新規子チケット) |
 
 ## 6. DEFECTS.md 行案 (PM 判断。本 PR では未編集)
@@ -120,11 +124,21 @@ node trap_triage/oob684_probe.mjs 477 0 watch                             # addr
 `work-m11` 素材には `work/trap_triage/` が含まれず (`tar --zstd -tf` の grep で 0 件)、`survey_units.mjs` も出力先を作らないため、survey の前に `mkdir -p` が要る。
 survey は e2e で再生成した `work/m11_boot.cjs(.wasm)` に対して実行する。snapshot 単独では不可 (§5)。
 
-## 8. 検証結果 (実測。HEAD ごとに記載、最新は下記の `718849f` 節)
+## 8. 検証結果 (実測。HEAD ごとに記載、最新は下記の `0618c61` 節)
 
-### 最新 (HEAD `17ac1fe`、コード HEAD `791cce5` と同一の code。以降は docs のみ)
+### 最新 (merge HEAD `0618c61`、main 取込み後。n=3)
 
-- e2e `m11_e2e.sh` (foreground、rc=0、35.7 s、load 0.52→0.76): reached_stage 4/6、units 22/942、ok 864 / trap 31 (oom 1) / miss 46 / noproc 1 / clobber 0。
+- e2e `m11_e2e.sh` (foreground、rc=0、n=3): 101.6 / 39.8 / 39.8 s (1 回目は merge 後の初回。build 再生成の有無は未確認)、load 1.06 / 1.03 / 1.01。reached_stage 4/6、units 22 ではなく `units_run_full` 53/942、**survey_ok 866 / trap 29 (oom 2) / miss 46 / noproc 1 / clobber 0**。3 回とも同一。
+  - PR 本文 (`e920ac3` 時点) の 864 / 31 (oom 1) とは**一致しない**。差の原因は未特定 (main 取込み由来と推定、未検証)。
+- survey `SV_RAW=1 survey_units.mjs` (n=3、逐次): 17.3 / 16.9 / 17.5 s、load 0.89–0.94。3 回とも **ok 829 / halt0 55 / miss 46 / oob 11 / noproc 1**。3 回の JSON は byte 一致。
+  - `e920ac3` 時点 (ok 828 / halt0 54 / oob 13) とは一致しない。
+- OOB 11 件 (LVA: 最上位 frame / 生 stack 先頭): 56 `function_8c6530` (新規 OOB) / 95 `47ad70` / 149 `412e40` (旧 `414ad0` から変化) / 275 `864fe0` / 291・296・304・555・923 `4f9f40` / 477 `903d20` / 895 `40ff70`。
+  - 158 / 280 / 659 は `halt0` に移った (最上位 `412770`、JSON で確認)。`e920ac3` 時点で OOB だった 149 は `412e40` が最上位。新規 OOB の 56 は `8c6530` (LVA `0x16fde0`)。
+  - **§1〜§3 の wasm offset・命令解析・477 の 1 箇所 LVA 実験は merge build では未再取得**。REPORT の表は `e920ac3` build のまま。
+
+### e920ac3 時点の実測 (HEAD `17ac1fe`、コード HEAD `791cce5` と同一の code。以降は docs のみ)
+
+- e2e `m11_e2e.sh` (foreground、rc=0、n=1、35.7 s、load 0.52→0.76): reached_stage 4/6、units 22/942、ok 864 / trap 31 (oom 1) / miss 46 / noproc 1 / clobber 0。
 - survey `SV_RAW=1 survey_units.mjs` (rc=0): 単独実行 17.5 s (load 1.02 → 1.02。計 3 回のうち並列の 2 回は 17.4 / 17.6 s で、時間は干渉を含む)。3 回とも ok 828 / halt0 54 / miss 46 / oob 13 / noproc 1。単独実行の JSON は `718849f` 時の JSON と byte 一致 (`cmp`)。
 - 手順は §7 どおり (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`work-m11` を展開した clean な worktree `ws-703`)。
 - OOB 13 件の frame (解決名) と raw 先頭: §1 の表と 13/13 一致。halt0 54 件はすべて frames を持つ (集計は JSON の kind で確認)。
