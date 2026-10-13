@@ -73,8 +73,6 @@
 - `results/ott_ld31_n3_cases59_n{1,2,3}.log`: 59eea5c + main の `cases.py` の n=3
 - `results/liftdiff_e2e_head986e7415_n{1,2,3}.log`: 986e7415 の n=3 (LD-16 時の既存ログ)
 
-`results/ott_ld31_repro_summary.txt` は手作業の抜粋で、本節の根拠には使わない (旧報告値の出典であり、無効)。
-
 ## 7. LD-32 (#1070): 8 関数の機序 (パターン単位の観測) と m11 sample:800 の n=3
 
 測定: `c4e93550` (main 取り込み時点の HEAD)・Actions runner (4 vCPU・load 1 分平均 1.5〜6.9)。`bash tools/liftdiff/liftdiff_e2e.sh` は exit 0・`LIFTDIFF_E2E PASS`・所要 約 3 分 (本 run 1 回目)。素材の根拠: 測定 run のログ `results/liftdiff_e2e_ld32_head_c4e93550_n1.log` の 118〜123 行に `[4/4] M11 closure 差分バッチ (sample:800)` の実行と 800 件の集計 (360/230/210) が出ており、m11 chain はこの run で実行された。**素材の一覧はこの測定 run では記録していない**。後続の fix run (`ed2b5cd2`〜) の `$ARTIFACTS_DIR` には `fl-win64` のみあり、`work-m11` `work-liftdiff` `work-m6-ott` `analysis-ott-binaries` は無い (PR 本文の「素材」行と一致)。OTT 集計 35 / 112 / 65 は §1 の `986e7415` と一致 (D1〜D6 = 4/6/14/20/26)。ログは `results/liftdiff_e2e_ld32_head_c4e93550_n1.log` (commit 済み)。
