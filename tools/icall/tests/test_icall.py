@@ -96,6 +96,27 @@ _rc, _o = _run('simd_merge.py', _gen, _out, _ex)
 _t = open(_out).read()
 check('simd_merge: extra 定義済みの stub を除き、残る stub は abort する', '__asm_foo(u128 a) { m11' not in _t and 'abort()' in _t and '__asm_bar' in _t, _o)
 
+# ---- ICALL-6 (#361): ir_fix_vstore (RetDec が xmm→stack store を void helper にして落とす)
+_vl = os.path.join(_td, 'v.ll')
+open(_vl, 'w').write("""define i64 @function_1801a9be0() {
+  %0 = alloca i128
+  %xmm1.0.reg2mem = alloca i128
+  %5 = load i128, i128* %0
+  %6 = load i128, i128* %0
+  call void @__asm_vmovapd.22(i128 %5, i128 %10), !insn.addr !7138
+  %274 = call i128 @__asm_vmovapd(i128 %5), !insn.addr !7222
+  call void @__asm_movups(i128 %6, i128 %10)
+  call void @__asm_vmovdqa(i256 %221, i256 %207)
+  ret i64 0
+}
+""")
+_rc, _o = _run('ir_fix_vstore.py', _vl, _vl + '.o')
+_t = open(_vl + '.o').read()
+_j = json.loads(_o)
+check('fix_vstore: alloca 由来の宛先 2 件 (vmovapd / movups) を store 化し、読出し 1 件を reload に置換', _j['vstore_fixed'] == 2 and _j['vstore_reloads'] == 1 and 'store i128 %10, i128* %vst.0' in _t
+      and '%vld.0 = load i128, i128* %vst.0' in _t and '@__asm_vmovapd(i128 %vld.0)' in _t and 'call void @__asm_vmovapd.22' not in _t, _o)
+check('fix_vstore: 256bit (i256) は触らず unresolved に数える', _j['vstore_unresolved'] == 1 and '@__asm_vmovdqa(i256' in _t, _o)
+
 # ---- pe: OTT closure に対する固定値
 if os.path.exists(OTT):
     img = A.Image(OTT)
