@@ -162,7 +162,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 ## 5b. 間接呼出到達先を加えた推移閉包 (#537 の closure_indirect 定義を流用)
 
-- 再現: `bash tools/plugins/dynamics/indirect_e2e.sh` (前提の inventory・閉包が無ければ dynamics_e2e.sh --skip-lift で生成)。 定義・検査 C1〜C4 は `dynamics/closure_indirect.py` (`sampler/closure_indirect.py` の `Pe` / `bfs` を import、sampler 側は無変更)
+- 再現: `bash tools/plugins/dynamics/indirect_e2e.sh` (前提の inventory が無ければ win_scan〜win_abi を直接生成。 dynamics_e2e.sh は batch_lift の status.csv を要するので前提生成には使わない)。 定義・検査 C1〜C4 は `dynamics/closure_indirect.py` (`sampler/closure_indirect.py` の `Pe` / `bfs` を import、sampler 側は無変更)
 - 定義: total = 直接 call/jmp 閉包 (base) ∪ 非共通 ∧ 閉包外 ∧ データ参照あり関数 (root) からの BFS。 検査 C2 は sampler の `unreached.json` が無いため、同定義を本 dir 内で再計算して照合
 - 検査: C1 base 再現 / C2 root 再計算一致 / C3 total ⊆ 非共通 / C4 capstone ⊆ byte 走査 → **PASS 4 checks × 7 plugins**
 - 増分 (実測・ `work/dynamics/indirect.json`):
@@ -179,7 +179,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 | 計 | 312 / 154,522 | **820 / 289,420** | |
 
 - lift (増分閉包を `lift_ranges.sh` = batch_lift と同一鎖で実行): **7/7 lift_rc=0 / declares_unimpl=0 / f80=0 / emcc_c_rc=0** (judge.py 7/7 合格)。 増分閉包の関数数は base の約 1.8〜3.3 倍 (Emphasis 109/60、Compressor 60/31、Soundgoodizer 212/65)
-- 実測時間 (`indirect_e2e.sh`、コミット前の作業ツリー): **73 s / rc=0**。 `closure_indirect.py` 2.7 s、lift 7 本の合計 71 s (Limiter 7 / Compressor 5 / Maximus 23 / Soundgoodizer 18 / Emphasis 9 / Multiband 4 / Transient 5 s)
+- 実測時間 (`indirect_e2e.sh`、commit 18a1c169、前提 work/ 生成済みで再実行): **101 s / rc=0** (`uptime` 1 分値: 開始 3.07 / 終了 1.38)。 lift 7 本の内訳は batch 時間 (Limiter 9 / Compressor 7 / Maximus 31 / Soundgoodizer 25 / Emphasis 11 / Multiband 6 / Transient 7 s、計 96 s)
 - 判定の負例: 増分 status から 1 行を落とすと judge.py が exit 1 (行欠落の検出)
 - **範囲外 (主張しない)**: 増分閉包の lift が通ったのは emcc の wasm バックエンドを通ったことだけ。 差分試験 (native ⟷ wasm の bit 比較) と wasm リンク・実行は未実施。 増分閉包の内容が正しい機能か (間接呼出の到達先が実際に呼ばれるか) は未検証
 - 注意: 増分後も "非共通 ∧ total 外" の関数は Maximus 307 / 232,504 B、Soundgoodizer 249 / 205,150 B と残る (sampler の #537 と同じく、閉包の取りこぼしは解消していない)。 残差の内訳 (lea 残 関数は Maximus 2 / Soundgoodizer 1 のみ) は本節の対象外
