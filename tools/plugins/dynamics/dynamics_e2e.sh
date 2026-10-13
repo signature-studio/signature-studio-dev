@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # PLG-F3 (#200) dynamics 7 本の「lift 前提」実測を 1 コマンドで再現する。
 #   bash tools/plugins/dynamics/dynamics_e2e.sh [--skip-lift]
-# 手順: 前提 inventory (work/ 無ければ生成) → 7 閉包 → batch_lift (RetDec+pass 鎖 → emcc -c) → 判定 → closure_facts.py → engine 2 本の lift (参考)
+# 手順: 前提 inventory (work/ 無ければ生成) → 7 閉包 → batch_lift (RetDec+pass 鎖 → emcc -c) → 判定 (judge.py) → closure_facts.py → matrix_check.py → engine 2 本の lift (参考)
+# exit 0 = 判定が 7 本とも合格し、後続も完走 (不合格なら judge.py の rc で即終了し、最終の OK 行は出ない)
 # 出力: work/dynamics/{status7.csv,facts.json,engines.csv} (work/ は gitignore)
 # 前提素材: fl-win64 / toolchain-retdec (/opt/retdec) / toolchain-emsdk (/opt/emsdk)  (docs/WORKFLOW.md §11)
 set -euo pipefail
@@ -25,19 +26,9 @@ if [ "${1:-}" != "--skip-lift" ]; then
   bash lift/batch_lift.sh "${BLOCKS[@]}"
 fi
 
-python3 - "${BLOCKS[@]}" <<'PY'
-import csv, sys
-want = set(sys.argv[1:])
-rows = [r for r in csv.reader(open('work/batch/status.csv'))]
-last = {r[0]: r for r in rows[1:] if r[0] in want}   # 再実行時は最後の行を採用
-hdr, body = rows[0], list(last.values())
-csv.writer(open('work/dynamics/status7.csv', 'w')).writerows([hdr] + body)
-bad = [r for r in body if r[4] != '0' or r[8] != '0' or r[7] != '0']
-print('status7: %d rows; lift_rc!=0 / f80!=0 / emcc_c!=0: %d' % (len(body), len(bad)))
-for r in bad:
-    print('  ', r)
-sys.exit(0 if len(body) == len(want) else 1)
-PY
+# 判定: 7 本とも lift_rc / declares_unimpl / f80_funcs / emcc_c_rc が全 0 (不合格・行欠落 = exit 1。 dynamics/judge.py)
+rc=0; python3 dynamics/judge.py work/batch/status.csv "${BLOCKS[@]}" -o work/dynamics/status7.csv || rc=$?
+[ "$rc" = 0 ] || { echo "[dynamics_e2e] FAIL: 判定が不合格 (judge.py rc=$rc)" >&2; exit "$rc"; }
 
 python3 dynamics/closure_facts.py > work/dynamics/facts.stdout.json 2> work/dynamics/facts.err
 python3 dynamics/matrix_check.py
