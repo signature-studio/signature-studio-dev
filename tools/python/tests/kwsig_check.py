@@ -213,6 +213,9 @@ assert last() == (1, FAKE["GT_All"]), last()
 tr.globalTransport(index=1, value=2)
 assert last() == (1, 2), last()
 assert fl_api._default_value("midi.PME_System") == FAKE["PME_System"]  # 代わりに midi.PME_System の評価を直接検証
+# (b'') kwlist なし・stubs 既定値が式 (1 / 24) の incEventValue: 省略時も旧 eval と同じ 1/24 が入る (PY-17 #711)
+ch.incEventValue(1, step=5)
+assert last() == (1, 5, 1 / 24), last()
 mx.getEventValue(index=1)  # value (midi.MaxInt)。smoothTarget (stubs 既定 1) も同時に入る
 assert last() == (1, FAKE["MaxInt"], 1), last()
 # (b') midi. 以外の既定値は従来の eval と同じ値・同じ型 (既存挙動を変えない)
