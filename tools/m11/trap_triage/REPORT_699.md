@@ -6,8 +6,8 @@
 既知類型との関係 (DEFECTS.md): **D1b と同型の症状・検出信号** (機械語の jcc に対応する IR `br` が無く、飛び先が無条件実行になる)。ただし **根本原因は未切り分け** (D1b は stage-0 のフラグが定数に畳まれる機構。本件は生 lift の段階で既に jcc が無く、同じ機構かは未確認。§2, §6)。新規番号は付けず、行案 (§5) は PM 判断。番号は (DEFECTS.md) 体系。
 
 検証起点: `8d883c3` (main)。作業 branch は `d9bcc52` (親 PR #700 の head) から切った。修正 commit `9dd4d55`。
-**検証 HEAD: `11091dc` (本版)**。negctl (§3-1) と e2e (§3-3) は本 HEAD で 1 回ずつ実測し、完走した (capstone/pefile を PATH に置いた環境)。
-rdx.1 の値と `8c60df` の戻り値不一致は **未解決のまま** (§1, §6)。approve 判断に影響する。
+**検証 HEAD: `bcc605d2` (本版 = `f3d5341` に `origin/main` を merge した commit)**。negctl (§3-1) は本 HEAD で rc 0・3 構成 PASS。e2e (§3-3) は本 HEAD で rc 0 だが、停止理由が `main` 取り込み前と変わった (本版で未切り分け、§3-3 参照)。
+rdx.1 の値と `8c60df` の戻り値不一致は **未解決のまま** (§1, §6)。approve 判断に影響する。本版でもこれらの解消は行っておらず、PM 判断を要求する。
 
 ## 1. 修復の内容
 
@@ -68,19 +68,23 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 
 ## 3. 実測
 
-### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, 検証 HEAD `11091dc` で 1 回 (r2))
+### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`)
 
 比較元は **同一の m11_ov.c** (main 取り込み後, #700 の 8c7710 転記を含む) に固定し、guard のみ変える 3 構成。構成: off = guard 無効 (基準) / fix = guard 有効 (既定) / ng = 偽ガード (`icmp eq i32 %9, 123456789`)。
 
+検証 HEAD `bcc605d2` (1 回, r7):
+
 | 構成 | ok | trap (oom 除く) | oom | miss | noproc | 計 | unit 56 |
 |---|---|---|---|---|---|---|---|
-| off | 866 | 27 | 2 | 46 | 1 | 942 | trap |
-| fix | **867** | 26 | 2 | 46 | 1 | 942 | **ok** |
-| ng | 866 | 27 | 2 | 46 | 1 | 942 | trap |
+| off | 870 | 24 | 1 | 46 | 1 | 942 | trap |
+| fix | **871** | 23 | 1 | 46 | 1 | 942 | **ok** |
+| ng | 870 | 24 | 1 | 46 | 1 | 942 | trap |
 
-- 判定 G1〜G3 は PASS、rc=0 (**97.9 秒** real, 3 構成の build + survey 合計, 4 vCPU)。差分は `off→fix` が unit 56 の trap→ok の 1 件のみ、`off→ng` は 0 件。
-- 実行環境: `$RUNNER_TEMP/run` (`tools/` のコピー + `work-m11` 展開)、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、capstone 5.0.7 / pefile を PATH の venv から使用。`tools/m11/work/` は使っていない。
-- 参考 (r6, `f630762`): off 865 / fix 866 / ng 865。r6 と r2 (本版) の差は同一 guard 条件での揺らぎ (§6)。
+- 判定 G1〜G3 は PASS、rc=0 (**115 秒** real, 3 構成の build + survey 合計)。差分は `off→fix` が unit 56 の trap→ok の 1 件のみ、`off→ng` は 0 件。
+- 検証 HEAD `f3d5341` (main 取り込み前, 1 回, r6'): off 866 / fix 867 / ng 866 (unit 56: trap / ok / trap)。rc=0 (**102 秒**)。
+- 実行環境: `$RUNNER_TEMP/run*` (`tools/` のコピー + `work-m11` 展開)、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、capstone 5.0.7 / pefile を venv から使用。`tools/m11/work/` は使っていない。
+- 注: スナップショット (`work-m11`) に `ir_conditions.json` が無かったため、最初の `m11_e2e.sh` (`f3d5341`) が `gen_ir2` で IR を作り直した。この IR 作り直しを経て negctl が通った。
+- 同じ head での数値差 (r6 の 865 系 / 866 系, r7 の 870 系) は main 取り込みの影響 (`tools/m11` 34 ファイルの変化) を含み、guard 単独の揺らぎとは切り分けていない (§6)。
 - **survey は戻り値を出力しない** (`M11_SURVEY` の項目は ok/trap/miss/oom の件数のみ)。0 件 ∧ arg2 下位 byte == 0 経路の戻り値比較は、この negctl では測れない (§3-5)。
 - qstore 有効 (`capstone` 5.0.7 / `pefile` 2024.8.26 導入後)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、node v22.23.3。
 - 参考 (r5, `22a0f22`): off 863 / fix 864 / ng 863。同じ guard 条件の 2 回で ok が動く (r5 と r6 の揺らぎ)。原因は未切り分け (§6)。
@@ -106,12 +110,15 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - **走査の範囲**: 全 IR 関数 (= 全 unit の閉包を含む上位集合)。unit への帰属は行っていない。
 - **限界 (重要)**: strict の 405 件は**未検証の候補**。規則は heuristic で、偽陽性の率は未測定。405 件のうち miscompile である件数は本件では言えない。`dropped_target_not_label` の 7058 は内訳 (関数外への tail jump か否か) 未調査。
 
-### 3-3. e2e (`bash tools/m11/m11_e2e.sh`) — 検証 HEAD `11091dc` (n=1)
+### 3-3. e2e (`bash tools/m11/m11_e2e.sh`)
 
-- 検証 HEAD: `11091dc`。作業コピーは `$RUNNER_TEMP/run` (`tools/` のコピー + `work-m11` 展開、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、PATH に capstone/pefile の venv)。repo の `tools/m11/work/` は使用していない。
-- 実測 (1 回, **rc 0, 101.1 秒 real**, 4 vCPU): `reached_stage 4`、`ir_conditions`: `ldfix=applied`・`qstore=applied`・`ir_sha256=8d966a8d…`、survey `ok 867 / trap 28 (うち oom 2) / clobber 0 / miss 46`、`wasm_bytes 6042615`。停止理由は `function_47ad70` の OOB (本件の範囲外、§6)。
-- 初回の試行 (記録): `capstone/pefile 無し` で `reached_stage 0` の rc 1 (0.05 秒)。PATH に venv を加えて解消。e2e が前提の python モジュールを見つけられないことによるもので、ロジックの問題ではない。
-- 同一 survey 値 (ok 867 / trap 28) は本版の 1 回のみ。他 HEAD の e2e 実測は本版の数値と混ぜない。
+- 作業コピーは `$RUNNER_TEMP/run*` (`tools/` のコピー + `work-m11` 展開、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、PATH に capstone/pefile の venv)。repo の `tools/m11/work/` は使用していない。
+- **検証 HEAD `bcc605d2` (1 回, r2'): rc 0, 53 秒 real**。`reached_stage 4`、`ir_conditions`: `ldfix=applied`・`qstore=applied`・`ir_sha256=8d966a8d…`。停止理由は `Halt0 経由の早期終了 (units_run=110/942)`。survey `ok 871 / trap 23 (うち oom 1) / clobber 0 / miss 46`。
+- 同じ head を `M11_GUARD699=off` で 1 回 (r2'-off): rc 0, 51 秒。停止理由は `function_8c6530 <- function_8c5eb0 <- function_56fde0` の OOB。survey `ok 870 / trap 25 (うち oom 1)`。
+- **検証 HEAD `f3d5341` (main 取り込み前, 1 回, r1'): rc 0, 103 秒**。停止理由は `function_47ad70` の OOB。survey `ok 867 / trap 28 (うち oom 2) / miss 46`、`wasm_bytes 6042615`。
+- 未切り分け: `f3d5341` → `bcc605d2` で停止理由が「OOB」から「Halt0 早期終了」に変わった。guard の効果か main 取り込みの効果か、本版では切り分けていない。`bcc605d2` で guard を外すと `function_8c6530 <- function_8c5eb0` の OOB が出る (§3-3 の off 実行)。
+- 初回の試行 (記録): `capstone/pefile 無し` で `reached_stage 0` の rc 1 (0.05 秒)。PATH に venv を加えて解消。
+- 同一 head での survey の揺らぎは §6 の揺らぎ項目と同じ扱い。他 HEAD の e2e 実測は本版の数値と混ぜない。
 - `lift boot5 (RetDec)` の停止は、runner に既存の RetDec (`[RETDEC]`) を使うため今回は発生しなかった。
 - **survey の揺らぎ**: 同一 head で (`negctl` 同一 build の別 run) ok が 866/867 と動く。§6 の揺らぎ項目を参照。
 - 「退行 0」は survey ラベル比較のみ。出力の同一性は未比較 (§3-1 の限界)。
@@ -169,7 +176,7 @@ bash m11_e2e.sh                                        # §3-3
 | strict 候補 405 件の真偽 (偽陽性率を含む) | 他 unit の miscompile の有無。survey の trap 29 本との関係も未確認 | #718 (`[M11-N35]`) |
 | `dropped_target_not_label` 7058 の内訳 | 走査の見落とし/偽陽性の見積もり | #718 (`[M11-N35]`) |
 | `m11_e2e.sh` の PE 固定パス (`[WIN64]`) と node v26 前提 | runner では `FL_WIN64_DIR` と node v22 で動かしている | #680 |
-| 同一 guard 条件での survey の揺らぎ (r5: fix 864 / r6: fix 866、off 863 / 865) | 1 unit 単位で ok 数が動く。guard の効果判定の信頼区間が定まらない | 起票依頼 (PM 採番。#680 が近いが別件の可能性) |
+| 同一 guard 条件での survey の揺らぎ (f3d5341: off 866 / fix 867、bcc605d2: off 870 / fix 871) | 1 unit 単位で ok 数が動く。main 取り込みの影響と guard 単独の揺らぎは未切り分け | #718 (`[M11-N35]`) へ追記 |
 | e2e の完走の前提 (本版では完走: rc 0, 101 秒。前段の失敗は PATH 上の capstone/pefile 不在) | runner の e2e 実行には capstone/pefile が PATH に必要。runner 既存の `[RETDEC]` で代替 | なし (手順として §4 に記載) |
 | `docs/DEFECTS.md` の行案 (D1b との関係の判定を含む) | PM 判断 | PM (§5) |
 | ガード辺の rdx.1 の値 (0 件 ∧ arg3==0 ∧ arg2 下位≠0 の `8c608d` 経路) | 仮定 (zext(arg2)) を置いた。410320 の vtable target と 8c7c80 の rdx 出力を確認するまで正しさは未証明 | #718 (`[M11-N35]`) へ追記 |
