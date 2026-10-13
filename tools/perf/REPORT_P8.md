@@ -158,7 +158,7 @@ node tools/perf/p8/check.mjs --negative   # ネガティブコントロール (�
 ブラウザ版は glue (`ottl.cjs`) が node 専用 (`node:fs`) のため使わず、wasm の import (`env` 2 + `wasi_snapshot_preview1` 3) を直接満たして `WebAssembly.instantiate` → `__wasm_call_ctors` → `ott_data_install` の順で初期化する (`tools/perf/p8/real/web/real_worker.mjs`)。処理手順・署名は node の `bench_real.mjs` と同一。
 Chrome 154.0.8037.97 headless, Dedicated Worker, `AMD EPYC 9V45 96-Core Processor` (4 vCPU, `os.cpus()` 記録), loadavg 0.4〜1.4。条件×反復ごとに Chrome を新規起動。生データ: `tools/perf/p8/results/chrome_real.jsonl` (9 行) / `chrome_real_limit.jsonl` (3 行)。
 
-### 8.1 定常・起動 (N = plugin 別 instance 数, 3 回の Chrome 起動の中央値 [min–max])
+### 8.1 定常・起動 (N = plugin 別 instance 数, 3 回の Chrome 起動 = 回ごとに値を併記。中央値は本文に明記)
 
 | N | 回 | µs/block p50 | RTF@44.1k / instance | load ms | setup ms | renderer RSS 増分 MiB | 署名 |
 |---|---|---|---|---|---|---|---|
