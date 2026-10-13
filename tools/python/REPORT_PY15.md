@@ -132,6 +132,33 @@ cases 6122
 | `tool_coverage.json` の tracked 版が main の既存コードの出力と不一致 (37,424 vs 37,425) | 生成物の更新漏れ。本 PR の変更とは無関係 (旧 main でも同じ出力) | #712 (PY-18) |
 | `browser_check` / `mcp_ui_check` / `midi_ui_check` 未実行 | UI 側の影響は未検証 | #712 (PY-18) |
 
+### 16-a. 検証 HEAD `d84e73b6` の再実行 (main 取り込み後の競合解消で入った `kwsig_check.py` 回帰の修正)
+
+- 回帰の原因: stubs の `transport.globalTransport` は `pmeflags` (小文字)、kwlist は `pmeFlags`。規則「既定値は同名のみ」により `globalTransport(index=1, value=2)` の既定値 `midi.PME_System` は引き継がれず、旧 `(1, 2, PME_System, GT_All)` → 新 `(1, 2)` (挙動変更 1 件)。大文字小文字は同名とみなさない (規則 (a) と同じ扱い)。
+- 修正: `tests/kwsig_check.py` の期待を `(1, 2)` に直し、`midi.PME_System` の評価は `fl_api._default_value("midi.PME_System")` で直接検証する。
+- 挙動変更 (旧 main `c5df4657` → 新): `transport.globalTransport(index=1, value=2)` の `pmeFlags` 省略。旧の期待値 (`kwsig_check.py:206-207` の `c5df4657` 版) は `(1, 2, PME_System, GT_All)` で、旧は `midi.PME_System` を入れていた。新は C 側既定値に任せる。上の 6122 基準の内訳 (値変更 6・拒否 19) への該当の有無は未確認 (`kwsig_behavior_diff` の再実行が必要)。
+
+| 検査 (HEAD `d84e73b6`) | 結果 | rc |
+|---|---|---|
+| `tests/kwsig_check.py` | OK (224 件中同結果 208、差 16・11 関数) | 0 |
+| `tests/kwsig_bind_check.py` | PASS (103 関数・6122 ケース、misbind 0・mismatch 0) | 0 |
+| `tests/mcp_kwcalls_extract.py` (python3.12・`block25159_DATA.bin`) → `tests/mcp_kwcalls_bind.py src` | 20 箇所・14 パターン → 14/14 PASS | 0 |
+| 同 `--neg` | distinct 15: pass 14, fail 1 → FAIL | 1 |
+
+wasm 系 (素材 `fl-win64` を `$RUNNER_TEMP/fl` に展開、`FL_WIN64_DIR` 設定、直列・前景、4 vCPU):
+
+| 手順 | 結果 | rc | 所要 |
+|---|---|---|---|
+| `fetch_inputs.sh` → `build_cpython_wasm.sh` | `python.wasm` 生成 | 0 | 4 分 09.8 秒 |
+| `build_flpy.sh` | `flpy.wasm` 生成 | 0 | 7.2 秒 |
+| `provider/build.sh` | `flprov.wasm` 生成 | 0 | 1.2 秒 |
+| `tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425・callback_roundtrip true | 0 | 2.09 秒 |
+| `FL_ENGINE=wasm tests/all_tools.mjs` | 48/48 ok・host_calls 37,425 | 0 | 2.13 秒 |
+| `tests/provider_check.mjs` | PASS (functions 435・implemented 60・mcp_static 60) | 0 | 0.34 秒 |
+
+- 旧 main の `globalTransport` 実測の再取得は本 run では完了せず (測定スクリプトの import 経路の誤り)。旧 `(1, 2, PME_System, GT_All)` は `kwsig_check.py` の旧期待値 (本 PR 前の `d84e73b6` の親) で確認済み。
+- `tests/kwsig_bind_check.py` と `tests/kwsig_check.py` の 6122 / 224 件基準は本修正で変わらない。
+
 ### 16-b. 本 PR head の wasm 回帰 (検証 HEAD `a92cd53`、node v22.23.3、4 vCPU)
 
 §14 の wasm 数値 (`bdd2f7c`) は src が main 取り込みで変わったため、本 head で再計測した。`src/` は `53a013d` 以降不変で、`a70b4c8`→`a92cd53` は docs のみ。
