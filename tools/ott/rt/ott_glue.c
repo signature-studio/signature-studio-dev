@@ -2,6 +2,8 @@
 #include "ott_cpu.h"
 static uint8_t guest_stack[1 << 20] __attribute__((aligned(16)));
 #define STACK_TOP ((uint64_t)(uintptr_t)guest_stack + sizeof(guest_stack) - 0x100)
+uint64_t ott_gbase = 0x30000000ull;   /* 相対化モード: guest image の wasm 上の base (JS から ott_set_gbase で変更) */
+void ott_set_gbase(uint64_t b) { ott_gbase = b; }
 uint64_t ott_run(uint32_t va, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3,
                  uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3) {
     R[RSP] = STACK_TOP;
