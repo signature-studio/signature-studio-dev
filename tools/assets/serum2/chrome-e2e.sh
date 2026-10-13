@@ -15,7 +15,7 @@ OUT="$BASE/chrome"; mkdir -p "$OUT"
 
 run() { # inv out -> exit code
   local rc=0
-  timeout 900 node test/browser-test.ts --pkg "$PKG" --inv "$1" --sample 150 --out "$2" >"$2.log" 2>&1 || rc=$?
+  timeout 3600 node test/browser-test.ts --pkg "$PKG" --inv "$1" --sample "${SERUM2_SAMPLE:-150}" --out "$2" >"$2.log" 2>&1 || rc=$?
   echo "$rc"
 }
 failed() { node -e "console.log(JSON.parse(require('fs').readFileSync('$1','utf8')).failed)" 2>/dev/null || echo NA; }
