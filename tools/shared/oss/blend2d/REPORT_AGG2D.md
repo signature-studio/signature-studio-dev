@@ -49,7 +49,7 @@
 > 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_vtable.py`
 > (依存: `pefile`・`capstone`)。出力は `tools/shared/work/agg2d_vtable.json` (gitignore)。
 
-- `AggCreateInstance` (`0x1800`59a60) は `0x1170` B を確保し、`0x1800568a0` のコンストラクタに tail-jump する。
+- `AggCreateInstance` (`0x180059a60`) は `0x1170` B を確保し、`0x1800568a0` のコンストラクタに tail-jump する。
 - コンストラクタは `lea rax,[rip+0x185607]` で vtable (VA `0x1801DBEC0`) を先頭に書く。
 - vtable は `.text` 内を指す qword が **130 slot** 連続し、終端値 `0x504d42` (コード外) で止まる。
 
