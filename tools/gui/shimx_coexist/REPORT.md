@@ -1,6 +1,7 @@
 # REPORT — shimx × gui 共存と Web 実装接続 (#172 [SHX-T5])
 
 検証起点: コミット済み HEAD `96f95dc` (base `64e617f`)。クリーンな detached worktree で `coexist.sh` を実行して取得 (§4)。
+レビュー差し戻し対応 (§3.4 複数選択の境界修正) の再検証起点: コミット済み HEAD `eb09329` (§4.2・§4.3)。
 既知類型との関係: `docs/DEFECTS.md` 該当なし (lift の silent miscompile ではなくリンク境界の問題)。ただし §2 の「gui の fail-fast stub が shimx の機能実装を黙って上書きする」は境界リスクとして記録する。
 
 ## 1. 結論 (先出し)
@@ -48,6 +49,8 @@ GuiShared のレイアウトを変えないので GUI-4 (#180, PR #491) と衝�
 ### 3.4 GetOpenFileNameW / GetSaveFileNameW → File System Access
 Win64 `OPENFILENAMEW` (NT4 版 136 B / 2000 版 152 B) を解釈し、title / 初期ディレクトリ / defExt / フィルタ (`WAV (*.wav)\0*.wav\0…` → `types`) / `OFN_ALLOWMULTISELECT` を host へ渡す。
 選択ファイルは host が Emscripten FS の**ステージング** `C:\Users\webstudio\Documents\WebImport` (= POSIX `/c/Users/webstudio/Documents/WebImport`、`shimx_path_to_posix` で算出) へ書き出し、FL へは Win パスで返す (単一=フルパス、複数=`dir\0name\0…\0\0`、`nFileOffset`/`nFileExtension`/`lpstrFileTitle` 設定、バッファ不足は先頭 WORD に必要数 + `FNERR_BUFFERTOOSMALL`)。
+複数選択の組立 (`file_dialog()`): 作業バッファ `w[]` は `GUI_HC_OUT + 700` 要素 (dir ≤ 600 + host 応答 < `GUI_HC_OUT` B。UTF-16 の単位数は UTF-8 のバイト数を超えない)。`fd_put()` は `u8_to_u16x` の打ち切り報告を見て、収まらなければ**切り詰めた断片を返さず** FALSE + `CDERR_INITIALIZATION` (`GetLastError`=111) にする。
+名前は最大 64 件 (`FD_NAMES_MAX`): 65 件目以降を黙って捨てず、同じく FALSE + `CDERR_INITIALIZATION` を返す (撤廃は §6)。
 save は FL が書き終えた POSIX ファイルを `HostCallBridge.flushSaves()` が選択済み handle へ反映する (反映契機の自動結線は未実装 → §6)。
 
 ### 3.5 Drag&Drop
@@ -80,9 +83,32 @@ host (`deliverDrop` / `installDropTarget`) が DataTransfer のファイルを�
 | NC1: shimx から `SHIMX_WEAK` を外したコピーをリンク | duplicate symbol を検出して失敗 | rc=1、duplicate symbol **7** (= gui 公開名 ∩ shimx weak の 7 本と一致) |
 | NC2: host (`HostCallBridge`) を起動しない | ShellExecute / ダイアログ検査が落ちる | C 側 **14** 項目 FAIL、exit 1 |
 
-## 5. 変更ファイル
+### 4.2 レビュー差し戻し対応後の再検証 (HEAD `eb09329`、クリーン detached worktree、並列 1)
 
-`tools/gui/src/{gui_core.c, gui_core_ext.inc, gui_platform.c}`・`tools/gui/include/gui_hostcall.h`・`src/runtime/gui_hostcall.ts`・`tools/shimx/src/{shell.c, handles.c, shimx.h}`・`tools/gui/gen_api.py` (生成物ヘッダを出力に含める。手編集されていた `IMPORTS.md` 先頭と一致させ、再生成で差分が出ない)・`tools/gui/{IMPORTS.md, exports.txt}` (再生成: 実装済み 270→277。`IMPORTS.md` は fail-fast stub 159→152 で、差分 7 は §2 で IMPL 化した 7 名と一致)・`tools/gui/shimx_coexist/`。
+| 検査 | 結果 |
+|---|---|
+| `coexist.sh` 3 回 | 全て ALL PASS。所要 **9.387 / 8.572 / 8.787 s** (開始時 load average 1 分値 0.51 / 0.50 / 0.54)。リンク duplicate symbol 0 / warning 0 / undefined symbol 0、C 側 **58 PASS / 0 FAIL**、host 側 **13 PASS / 0 FAIL**、NC1 duplicate symbol 7・NC2 C 側 14 FAIL (§4.1 と同値) |
+| `bash tools/gui/test/selftest.sh` (native ASan/UBSan) | **342 passed / 0 failed** (= 314 + 新規境界テスト 28)。所要 6.000 s (コンパイル込み) |
+| `bash tools/gui/e2e.sh` | **ALL PASS**、所要 41.864 s (終了時 load average 1 分値 1.18)。golden EXACT MATCH 0 px 差 (固定メモリ / MEMORY_GROWTH / reach の 3 構成)、sigprobe `mismatch=0 unresolved-imports=0`、陰性対照 177 |
+
+境界テスト (`tools/gui/test/selftest_fd.inc`、`selftest.c` から include): host 役スレッドが `gui_hostcall_native()` 経由で N 件 × nlen 文字の名前列を返し、`GetOpenFileNameW` (`OFN_EXPLORER|OFN_ALLOWMULTISELECT`) の `lpstrFile` を `nMaxFile` 要素ちょうどの heap にして ASan で境界外 R/W を、`w[]` を UBSan で添字境界を検出する。
+- 成功系 12 組 (件数 × 名前長 × narrow/wide): N = 3 / 50 / 52 / 56 / 58 / 60 / 63 / 64 (18 文字) と (64 × 60 文字)・(40 × 100 文字)・(60 / 64 × U+3042 を 15 個含む名前)。うち総文字数が 1020 を超える組は 10 (**1028–4080**、旧実装の `1020 - wl` 上限を超える領域)。各組で ① `nMaxFile` = 必要数ちょうどで TRUE かつ全 N 名が完全一致 (dir・各名・終端・`nFileOffset`) ② `nMaxFile` = 必要数 − 1 で FALSE・`FNERR_BUFFERTOOSMALL`・先頭 WORD = 必要数、を検査 (12 × 2 = 24 項目)。
+- 失敗系 4 組: 65 / 70 (18 文字)・65 / 200 (5 文字) 件 → FALSE・`CDERR_INITIALIZATION`・`lpstrFile` 不変 (4 項目)。
+
+数え方: 「総文字数」= `dir\0` + Σ(名前長 + 1) + 終端 `\0` の UTF-16 単位数 (= `nMaxFile` に要る要素数、テスト内 `fd_need()`)。
+
+`selftest` には本 PR と無関係の**既存の flake**がある: headless host の描画スレッド `gui_headless.c:33 blit_surf` が `surf_free` 済みの面を読む ASan heap-use-after-free (発生した実行は `P1/*` セクションまたは `SendMessage / cross-thread` で止まり、追加した境界テストより前)。base `8953540` と HEAD `eb09329` を交互に各 100 回実行して **10 / 9 回**発生 (同率)。発生しなかった実行は常に 342 / 0 で、本 PR のコードパスは含まれない。§6 に起票依頼。
+
+### 4.3 境界テストのネガティブコントロール
+
+| 壊し方 | 期待 | 実測 |
+|---|---|---|
+| NC-A: 旧実装 (`8953540` の `src/`) に新テストを当てる (`selftest.sh` 既定構成) | 旧実装で FAIL | n = 52 / 56 で 4 項目 FAIL (TRUE を返すが名前数・内容が不一致 = 断片名)、n = 58 で UBSan abort `gui_core_ext.inc:481:83: index 1024 out of bounds for type 'uint16_t [1024]'` (exit ≠ 0) |
+| NC-B: NC-A に `-fsanitize-recover=address,undefined` + `ASAN_OPTIONS=halt_on_error=0` を足して最後まで流す | 該当項目が全て FAIL | **318 passed / 24 failed** (成功系 10 組 × 2 + 65 件以上 4)。ASan stack-buffer-overflow 2 件 (L481 の WRITE of size 2、`memcpy(file, w, wl*2)` の READ of size 2050)、UBSan 2 件 |
+| NC-C: 修正後の実装から 65 件目以降の失敗判定 1 行を削除 | 失敗系 4 組が FAIL | **338 passed / 4 failed** |
+| NC-D: 修正後の実装で `FD_W_CAP` を 1024 に戻す (`fd_put` の打ち切り判定は残す) | 断片を TRUE で返さず FALSE にする | **322 passed / 20 failed**。失敗は全て FALSE + `CDERR_INITIALIZATION` (`ret=0 cderr=2`)。`file_dialog` 由来の ASan / UBSan 報告 0 |
+
+`tools/gui/src/{gui_core.c, gui_core_ext.inc, gui_platform.c}`・`tools/gui/test/{selftest.c, selftest_fd.inc}`・`tools/gui/include/gui_hostcall.h`・`src/runtime/gui_hostcall.ts`・`tools/shimx/src/{shell.c, handles.c, shimx.h}`・`tools/gui/gen_api.py` (生成物ヘッダを出力に含める。手編集されていた `IMPORTS.md` 先頭と一致させ、再生成で差分が出ない)・`tools/gui/{IMPORTS.md, exports.txt}` (再生成: 実装済み 270→277、fail-fast stub 159→152。STUB→IMPL の 7 名 = `CharLowerW` / `CharNextExA` / `CharToOemBuffW` / `GetOpenFileNameW` / `GetSaveFileNameW` / `WTSRegisterSessionNotification` / `WTSUnRegisterSessionNotification`)・`tools/gui/shimx_coexist/`。
 shimx の生成物 (`BACKLOG.md` / `inventory.md` / `data/*` / `exports.txt`) は再生成しなかった: `test.sh --quick` は OTT 素材が無いと OTT 列と `ott_api_resolved` を落とす (実測: 24→0)。新設の 3 公開関数 (`shimx_set_notify_hook` / `shimx_drag_accepts` / `shimx_hdrop_create`) は次回のフル `test.sh` 再生成で反映される。
 
 ## 6. 未解決・範囲外
@@ -97,13 +123,15 @@ shimx の生成物 (`BACKLOG.md` / `inventory.md` / `data/*` / `exports.txt`) �
 | `gui_shimx_attach()` と `HostCallBridge.start()` を呼ぶ起動 glue が未結線 (`tools/m11/shimx_link` / 起動 glue 側) | 実 FL 結線ビルドで MsgWait の handle 待ちが 5 ms poll 縮退、ダイアログが host 未接続で FALSE | #177 [SHX-T9] (実機検証) にコメント |
 | 実 FL guest との結合は未実施。MsgWait の `HANDLE` 配列の要素幅は、shimx が `HANDLE = size_t` (wasm32 で 4 B)、lift 側が 8 B 要素で組む可能性があり**整合は未検証** | handle 配列の読み違い (未確認) | #177 [SHX-T9] にコメント (実 guest でのみ検証可能) |
 | OFN の `lpfnHook` / `OFN_ENABLETEMPLATE` / フォルダ選択 (`SHBrowseForFolder` / `IFileDialog`) は未対応 | 該当 FL 機能 (使用有無は未調査) | [SHX-T12] に含める (使用有無を先に `SHIMX_TRACE` で確認) |
+| 複数選択は最大 64 件 (`FD_NAMES_MAX`): 65 件以上は FALSE + `CDERR_INITIALIZATION`。名前の列を `names[]` 配列に載せず 2 パスで走査すれば撤廃できる (host 応答は 4,094 B 以内なので 1 文字名で最大 2,047 件) | FL で 65 件超を一括選択する操作 (有無は未調査) | 新規子チケット (PM 起票依頼; FL の実操作で要否を判断) |
+| `selftest.sh` の既存 flake: `gui_headless.c:33 blit_surf` が解放済み面を読む ASan heap-use-after-free (base・HEAD とも 100 回中 10 / 9 回、§4.2) | `selftest.sh` と、それを `pipefail` 下で呼ぶ `e2e.sh` step 1 が同率で落ちる (本 PR の変更とは無関係) | 新規子チケット [GUI-*] (PM 起票依頼。headless host の render thread と `surf_free` の同期) |
 | shimx の生成物 (BACKLOG / inventory / data / exports) が未再生成 (§5) | 新設 3 関数が一覧に無い | 次回のフル `bash tools/shimx/test.sh` (OTT 素材付き) |
 
 ## 7. 再現
 
 ```
-bash tools/gui/shimx_coexist/coexist.sh      # 約 12 秒。env: M11_IR=<boot_final3.ll> (無ければ integ/fixtures の GUI declare 抜粋)
+bash tools/gui/shimx_coexist/coexist.sh      # 実測 8.6–12.1 s (§4・§4.2)。env: M11_IR=<boot_final3.ll> (無ければ integ/fixtures の GUI declare 抜粋)
 bash tools/gui/test/selftest.sh              # native 回帰
 bash tools/gui/e2e.sh                        # gui 単体 wasm 回帰
 ```
-前提: emsdk (`toolchain-emsdk`)、node 22 以上、`x86_64-w64-mingw32-gcc` (`gen_api.py` が arity 表に使う)。M11 IR は `work-m11`。
+前提: emsdk (`toolchain-emsdk`)、node 22 以上、`x86_64-w64-mingw32-gcc` (`gen_api.py` が arity 表に使う)、`wasm-objdump` (wabt; `sigprobe.sh` の `unresolved-imports` 判定。無いと 0 を空振りで出す)。Ubuntu runner では `apt-get install gcc-mingw-w64-x86-64 wabt`。`e2e.sh` は repo 直下の `node_modules` (tsc) も要る。M11 IR は `work-m11`。
