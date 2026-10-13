@@ -62,7 +62,7 @@
 | 候補 | 判定 | 理由 |
 |---|---|---|
 | **A. 32bit 鎖の整備 (x64c 系の ia32 front-end で engine のみ lift)** | **採用** | engine は小さい (`.text` 73,002 B、export `main` 1 つ、KERNEL32 のみ、SIMD 0)。 x87 は 4,203 / 25,349 命令 (16.6%、線形掃引の近似) あり、SIMD は 0。 x87 の f80→f64 lowering は `tools/plugins/p0c/REPORT.md` §3.4 で kernel 分類ごとに判定済み: f32 系 21 本と int32 系 8 本は実測 0 差分、f64 出力系 4 本は ±1 ulp が 0.018%、**int64 系 2 本は f64 経由で 64% 不一致** (i64 保持の lowering pass が必要と結論)。 engine の x87 は同じ分類で扱える見込み (**推定**。 engine 単体での実測は #674。 int64 系相当の命令が engine にあるかは未確認) |
-| B. 別実装 | 不採用 | FL Slayer は reFX 由来の音源 (engine の VERSIONINFO に `CompanyName = reFX`・`LegalCopyright = Copyright (C) 2002/2003 reFX`。 殻 block 22433 の VERSIONINFO `Comments` に「Slayer engine copyright (c) 2003 reFX」) で、音の同一性を示す仕様が無い。 差分試験の参照 (native 実行) を作れる A のほうが出口条件 (#207) に合う |
+| B. 別実装 | 不採用 | FL Slayer は reFX 由来の音源 (engine の VERSIONINFO に `CompanyName = reFX`・`LegalCopyright = Copyright (C) 2002/2003 reFX`、UTF-16) で、音の同一性を示す仕様が無い。 差分試験の参照 (native 実行) を作れる A のほうが出口条件 (#207) に合う |
 | C. 提供しない | 不採用 | 受入条件の「決定がなければ FL Slayer は #207 の出口条件を満たせない」の裏返しで、提供しないと #207 の対象 14 本が 13 本になる。 A で最小コスト (engine 73 KB) で収まる見込みがあるため、先に A を試す (A が不成立の場合に C へ降りる判断を #674 の末尾に残す) |
 
 A の中での方式選択:
