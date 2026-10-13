@@ -30,12 +30,12 @@
 - 初回 `fw_269_verify.sh` は三段で落ちた (いずれも既存コードの不備。修正して後段へ進んだ):
   1. snapshot が `tools/shared/env.sh` を含まず `fw_stage2.sh` が 0 s で exit 1 → `git archive` に `tools/shared` を追加。
   2. `liftlib/simd/gen.py` の `_params` が `CT[t]` で落ちる (`KeyError: 'g224'`)。`fw_stage2.sh` の DynTag が `iN` を `gN` に変換し `CT` に無いキーを渡す (b8e6855f #241 で `_stub` が `_params` 経由になった回帰)。→ `CT.get(t, "u128")` の寛容化。
-  3. `pefile` / `capstone` 未導入 (WORKFLOW §11 の注記どおり) → `pip install --user`。`llvm-as` が emsdk 同梱に無く `/usr/lib/llvm-18/bin` を PATH に追加 (IR 検証用。emcc は emsdk の clang 24 のまま)。
-- **実測 (commit d0e15d52 → 382c345a を含む HEAD、空の W から stage-2 全再構築)**:
-  - `fw_269_verify.sh`: rc=0, `fw_stage2.sh` 428 s (load 2.78 2.22 1.35 → 継続), smoke ×3 PASS (dispatch=38 units_done=0 va=1 heap=1 ff=0)、smoke 同値 差分行=0/0、wasm 15,062,176 B (HEAD 参照 15,061,227 B に対し +949 B。`--size` 未指定のため照合は警告止まり)。
-  - `hs_e2e.sh`: rc=0, 137 s。Phase B は `Phase B 例外: memory access out of bounds` を出すが、判定 (hs.mjs §判定) は `plug===0` 時の ID prefix 照合のみで、GOLDEN 6 ID すべて一致 → `E2E PASS`。`plug != 0` の完全生成は REPORT §7.1 の次段扱い (既存仕様)。
-  - Phase B 例外の切り分け (レビュー指摘): origin/main の `gen.py` では `fw_stage2.sh` が `KeyError: 'g224'` で停止し `fw_image.bin` を生成できない。したがって origin/main では Phase B に到達せず、同素材の baseline は取得不可。本 PR の `_params` 修正 (`CT.get(t, "u128")`) が Phase B の例外を導入したかは未切り分け。修正後 HEAD の Phase B 挙動は本 run では未再実行 (素材 `work-fw-stage1` 未展開)。追跡 issue は未起票 (起票先: PM 判断)。
-  - `_stub` (指摘 1 対応): `d0e15d52` の `_stub` 書き換えを元に戻した。未知タグ `?` を含む形と既知型形を含む 8 形で 56aa8795 と出力一致 (diff 0)。`['g224']` / `['x','g224']` の `_params` 経路は `u128` にフォールバックして正常生成 (旧版は KeyError)。
+  3. `pefile` / `capstone` 未導入 (WORKFLOW §11 の注記どおり) → system python3 では `pip install --user` 後も import できなかったため `tools/plugins/framework/work/venv` に導入して PATH 先頭に置いた。`llvm-as` が emsdk 同梱に無く `/usr/lib/llvm-18/bin` を PATH に追加 (IR 検証用。emcc は emsdk の clang 24 のまま)。
+- **実測 (検証 HEAD = e1791ef7。3bdb1d74 に origin/main 570bcb73 を merge した commit。空の W から stage-2 全再構築、素材 fl-win64 + toolchain-emsdk + work-fw-stage1、2026-10-13 runner)**:
+  - `fw_269_verify.sh`: rc=0, `fw_stage2.sh` 255 s (load 0.36 0.26 0.10 → 2.56 1.52 0.65), smoke ×3 PASS (83/82/83 ms, dispatch=38 units_done=0 va=1 heap=1 ff=0)、smoke 同値 差分行=0/0、wasm 15,062,169 B (`--size` 未指定のため照合は警告止まり)。
+  - `hs_e2e.sh --fresh`: rc=0, 85 s (load 0.20 0.91 0.60 → 0.84 0.95 0.64), `E2E PASS`。Phase B は `Phase B 例外: memory access out of bounds` を出し、emcc 側の実行ログにも `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` が出る。判定 (hs.mjs §判定) は `plug===0` 時の ID prefix 照合のみで、GOLDEN 6 ID すべて一致 → `E2E PASS`。`plug != 0` の完全生成は REPORT §7.1 の次段扱い。
+  - Phase B 例外の切り分け (レビュー指摘 2): origin/main の `gen.py` では `fw_stage2.sh` が `KeyError: 'g224'` で停止し `fw_image.bin` を生成できない。したがって origin/main では Phase B に到達せず、同素材の baseline は取得不可。本 PR の `_params` 修正 (`CT.get(t, "u128")`) で到達可能になった経路が例外の原因である可能性を否定できない。**既存仕様とは断定しない**。切り分けと判定は #884 (`[P0c-11]`) で行う。
+  - `_stub` (指摘 1 対応): `d0e15d52` の `_stub` 書き換えを元に戻した。未知タグ `?` を含む形と既知型形を含む 8 形で 56aa8795 と出力一致 (diff 0)。`['g224']` / `['x','g224']` の `_params` 経路は `u128` にフォールバックして正常生成 (旧版は KeyError)。`gen.py` の PR 差分は `_params` の 1 行のみ。
 - 副作用の確認: `liftlib/simd/gen.py` の既知型 (x/d/q/b/y 等) の `_stub` 出力は origin/main と一致 (5 形で diff 0)。`tests/test_unit.py` は `m6/work` 等の素材が無く実行不可 (既存の前提)。
 - **未達 (受入 3 の FW_EXT_FUNCS 指定経路)**: 本 run は既定経路 (FW_EXT_FUNCS 未指定) のみ検証。ext 指定時の e2e は未実施。
 
@@ -43,4 +43,5 @@
 |---|---|---|
 | FW_EXT_FUNCS 指定 (ext 対象関数あり) 時の fw_269_verify.sh / hs_e2e.sh 再検証 | #311 受入条件 3 の残り | #197 (選定後に再 run) |
 | FW_EXT_FUNCS 対象 x87 関数の一覧と選定根拠 | 未決 | #197 |
+| Phase B `memory access out of bounds` の原因切り分け (origin/main に baseline 無し) | `_params` の CT.get 経路で到達可能になった可能性。既存仕様か回帰かは未確定 | #884 |
 | `tests/test_unit.py` の素材依存 (`m6/work/ott.drc.ll` 等) | 単体テストが素材無しで実行不可 | 別途 (未起票・次 PM 判断) |
