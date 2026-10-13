@@ -205,4 +205,4 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 関数集合 (`snapins.json` の `lift` 値 + `extra` の和): Resonator 7 / Stereo 8 / Delay 141 (= lift 値の一意アドレス数 `len(set(lift.values()))`。Delay は 142 キーのうち `proc` と `f_1802ed7f0` が同一アドレス `1802ed7f0` で重複 1)。`DecompEach.java` で 156 関数を decompile し **156 件 OK** (summary.tsv の status 集計 = OK 156・失敗 0)。3 snap-in 合計の decompile は headless import 込みで 31.3 s (n=1)。
 - Resonator の C 化 (`ghidra_to_c.py resonator`、修復なし) は **ビルド未成功 (emcc 失敗)**。エラー 21 件以上・先頭 10 件の種類: 128bit レーン参照 `_8_8_`/`_4_12_`/`_0_8_` が V128 に無い 3 種、`rcpps` 未実装、`FUN_180fcf904` の引数不一致、`func_0x000180fbdef4` 未定義 stub 等。このため突合・ablation・ネガコンは未実施。
 - 未実施 (理由: 128bit レーン・rcpps/rsqrtps 近似表 (`snapins/scripts/approx_tables.b64`) の C 移植・プロトタイプ整合・stub 追加が未完)。
-- `run_all.sh` (Gain/Haas/Gate) は本 HEAD (3f1a4127) では再実行していない。値は §10-3 (c4841f4, n=3) を引用。
+- `run_all.sh` (Gain/Haas/Gate) は本 PR では再実行していない。値は §10-3 (c4841f4, n=3) を引用。
