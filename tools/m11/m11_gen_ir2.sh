@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
 # M11 IR 生成 (再現用): boot0..4.lift.ll → merge → numfix → asmfix → passes → genstubs → dotfix → fnclex0 rename
 #   boot4 = tail-call/間接 call 表 seed の追加分 (m11_tail.py 出力)
-#   boot5 = WNDCLASS 静的実体の WNDPROC (+閉包) の追加分 (m11_wndclass_scan.py --ranges-out → m11_lift.sh ... boot5; #565)
+#   boot6 = WNDCLASS 静的実体の WNDPROC (+閉包) の追加分 (m11_wndclass_scan.py --ranges-out → m11_lift.sh ... boot6; #565)
+#           boot5 は #132 の間接 call fallback (m11_extra_ranges5.txt) が使うため、名前を分けている
 set -euo pipefail
 cd "$(dirname "$0")"
-source ../shared/env.sh
+source ../shared/env.sh   # FL_WIN64_DIR (既定は従来どおり /home/ubuntu/work/analysis/win64)
+PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
+python3 m11_cond.py --reset ldfix=pending qstore=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
 CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
 [ -f work/boot4.lift.ll ] && CH="$CH work/boot4.lift.ll"
-[ -f work/boot5.lift.ll ] && CH="$CH work/boot5.lift.ll"   # boot5 = WNDCLASS 静的実体の WNDPROC 閉包 (m11_wndclass_scan.py, #565)
+# boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt; #132 unit #23)
+[ -f work/boot5.lift.ll ] && CH="$CH work/boot5.lift.ll"
+[ -f work/boot6.lift.ll ] && CH="$CH work/boot6.lift.ll"   # boot6 = WNDCLASS 静的実体の WNDPROC 閉包 (m11_wndclass_scan.py, #565)
 python3 m11_merge.py $CH -o work/boot_all.ll
 python3 - <<'PYnum'
 import re
@@ -34,11 +39,19 @@ PY2
 # ldfix (CAB-231/CAB-131): load 取り違え (値↔アドレス / 1 段 deref 脱落) 修復 pass を常設適用する。
 #   capstone による実機械語 (.pdata 区間) との突合付き。詳細は ldfix/REPORT.md / ldfix/REPORT_CAB131.md。
 #   適用位置は m11_post (weak 化/sigfix) 前 = ここ (ldfix REPORT §6-2 の推奨)。
-PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
-if [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
+#   skip は失敗扱い (#680 fail-closed): 警告のみで IR を作ると測定基準が環境で変わるため。
+#   M11_LDFIX=0 は ldfix 適用前の IR を明示的に取る検証用 (ldfix/audit_lsf_e2e.sh)。ir_conditions.json に ldfix=disabled を残し、build は拒否する。
+if [ "${M11_LDFIX:-1}" = 0 ]; then
+  python3 m11_cond.py ldfix=disabled
+  echo "[gen_ir2] M11_LDFIX=0: ldfix を適用しない (ir_conditions.json ldfix=disabled; この IR は build できない)" >&2
+elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json
   mv work/boot_final.ldfix.ll work/boot_final.ll
+  python3 m11_cond.py ldfix=applied
 else
-  echo "[gen_ir2] WARNING: ldfix skip (PE または capstone/pefile 無し)" >&2
+  python3 m11_cond.py ldfix=skipped
+  echo "[gen_ir2] ERROR: ldfix skip (PE 無し: $PE / capstone・pefile 無し) — fail-closed で失敗" >&2
+  exit 1
 fi
+python3 m11_cond.py --bind work/boot_final.ll   # IR の指紋を記録 (m11_build.sh はこれと一致する IR だけを build する)
 echo "[gen_ir2] OK: work/boot_final.ll ($(wc -l < work/boot_final.ll) 行)"

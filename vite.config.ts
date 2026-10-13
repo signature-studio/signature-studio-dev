@@ -91,7 +91,7 @@ function wasmAssets(): Plugin {
  */
 function pyAssets(): Plugin {
   const dir = path.join(here, "tools/python");
-  const allowed = /^(host\/[\w.-]+\.mjs|dist\/flpy\.(js|wasm|data)|analysis\/flapi\/flapi_ids\.json)$/;
+  const allowed = /^(host\/[\w.-]+\.mjs|dist\/flpy\.(js|wasm|data)|analysis\/flapi\/flapi_ids\.json|analysis\/ilmcp\/(plugin_catalog|highlight_names)\.json)$/;
   const types: Record<string, string> = { ".mjs": "text/javascript", ".js": "text/javascript", ".wasm": "application/wasm", ".data": "application/octet-stream", ".json": "application/json" };
   const mw = (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
     const url = new URL(req.url ?? "/", "http://x");

@@ -4,9 +4,9 @@
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
-source "$HERE/../shared/env.sh"
+source ../shared/env.sh   # FL_WIN64_DIR (#680: PE は env 経由)
 mkdir -p work
-BIN="$FL_WIN64_DIR/extracted/block00031_PE.bin"
+BIN="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
 export TMPDIR="$HERE/work/tmp"
 mkdir -p work/tmp
 
@@ -16,7 +16,7 @@ NAME="$2"
 TMO="${3:-2400}"
 NFN="$(echo "$RANGES" | tr ',' '\n' | wc -l)"
 echo "[lift] $NAME: ranges=$NFN timeout=$TMO"
-"${RETDEC:-retdec-decompiler}" "$BIN" -o "work/$NAME.drc.c" \
+/opt/retdec/bin/retdec-decompiler "$BIN" -o "work/$NAME.drc.c" \
   --select-ranges "$RANGES" --select-decode-only --timeout "$TMO" \
   > "work/$NAME.retdec.log" 2>&1
 touch "work/$NAME.retdec.DONE"

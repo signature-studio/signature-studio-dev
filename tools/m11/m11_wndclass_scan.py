@@ -3,7 +3,7 @@
 lift closure (IR の `define @function_<VA>`) の内外を判定する。closure 外の WNDPROC (+ その call/jmp 閉包) を seed として出力する。
 
   python3 m11_wndclass_scan.py --pe <PE> [--ir work/boot_final.ll] [--json-out results/wndclass_scan.json]
-                               [--ranges-out work/boot_ranges_wnd.txt]   # 新規 closure 関数の RetDec --select-ranges (boot5 の lift 入力)
+                               [--ranges-out work/boot_ranges_wnd.txt]   # 新規 closure 関数の RetDec --select-ranges (boot6 の lift 入力)
                                [--check]   # 判定: 最終 IR に定義の無い fn WNDPROC があれば exit 1 (検出件数が --min-instances 未満でも exit 1)
 
 検出規則 (x64 WNDCLASS。EX 形は +0=cbSize(80)・style が +4、非 EX は +0=style・+4=0 の 8 バイト整列相当):
@@ -21,9 +21,9 @@ sys.path.insert(0, os.path.join(HERE, '..', 'm6'))
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--pe', required=True)
-ap.add_argument('--ir', default=os.path.join(HERE, 'work', 'boot_final.ll'), help='最終 IR (boot5 取込後の closure 判定 = --check 用)')
+ap.add_argument('--ir', default=os.path.join(HERE, 'work', 'boot_final.ll'), help='最終 IR (boot6 取込後の closure 判定 = --check 用)')
 ap.add_argument('--base-lift', nargs='*', default=[os.path.join(HERE, 'work', 'boot%d.lift.ll' % i) for i in range(5)],
-                help='WNDCLASS seed 導入前の lift (boot0..4)。ranges / seed の算出は常にこれを基準にする (boot5 取込後に再実行しても冪等)')
+                help='WNDCLASS seed 導入前の lift (boot0..4)。ranges / seed の算出は常にこれを基準にする (boot6 取込後に再実行しても冪等)')
 ap.add_argument('--json-out')
 ap.add_argument('--ranges-out')
 ap.add_argument('--check', action='store_true')
@@ -173,7 +173,7 @@ def defs(paths):
             out |= set(int(x, 16) for x in DEF.findall(open(pth).read()))
     return out
 defined = defs(a.base_lift)       # seed 導入前の closure (boot0..4)
-final_defined = defs([a.ir])      # 最終 IR (boot5 取込後)
+final_defined = defs([a.ir])      # 最終 IR (boot6 取込後)
 if not defined:
     sys.exit('base lift (boot0..4) の define が 0 件: %s' % a.base_lift)
 for r in rows:
