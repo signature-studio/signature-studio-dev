@@ -138,12 +138,12 @@ HelpFiles = 利用者の FL の Help フォルダ (webkitdirectory/ドロップ)
 
 | # | 未解決 | 影響 | 起票先 |
 |---|---|---|---|
-| U1 | **エンジン側の結線**: ローカル Help は `OpenHelpTarget` の内部 interface (vtbl+0xa0/+0xa8) に渡り、`ShellExecuteW` を経由しない。実体 (WebView2 ページか) の確定と、`flHelp.shellExecute` / `flHelp.open` を呼ぶ結線が未実施。boot が `CreateFruityInstance` 未到達で実行トレース不可 | A5 未達。エンジンの Help 操作から viewer が開くことは未確認 | 新規子チケット (親 #118、依存 #227 / #105) |
-| U2 | `ShellExecuteW` の shell hook への接続: `flHelp.shellExecute(verb, file)` は戻り値 33 を返す入口として用意したが、shimx の hook (`shimx_set_shell_execute_hook`) と未接続 | 同上 | #172 (SHX-T5, PR #505) と U1 の子チケットで調整 |
-| U3 | 全文オフラインマニュアル (FL の別インストーラ `offline_help_installer`) の Help フォルダでの表示は**未検証** (素材なし: `docs/REFERENCES.md` に該当項目なし)。左メニューは script 依存のため除去され、本文のみの表示になる (推定) | 全文マニュアルを使う場合の体験 | U1 の子チケットに含める。素材は利用者持ち込み (ユーザ依頼事項は無し) |
+| U1 | **エンジン側の結線**: ローカル Help は `OpenHelpTarget` の内部 interface (vtbl+0xa0/+0xa8) に渡り、`ShellExecuteW` を経由しない。実体 (WebView2 ページか) の確定と、`flHelp.shellExecute` / `flHelp.open` を呼ぶ結線が未実施。boot が `CreateFruityInstance` 未到達で実行トレース不可 | A5 未達。エンジンの Help 操作から viewer が開くことは未確認 | #554 ([ST-T17], 親 #118、依存 #227 / #105) |
+| U2 | `ShellExecuteW` の shell hook への接続: `flHelp.shellExecute(verb, file)` は戻り値 33 を返す入口として用意したが、shimx の hook (`shimx_set_shell_execute_hook`) と未接続 | 同上 | #172 (SHX-T5, PR #505) と #554 で調整 |
+| U3 | 全文オフラインマニュアル (FL の別インストーラ `offline_help_installer`) の Help フォルダでの表示は**未検証** (素材なし: `docs/REFERENCES.md` に該当項目なし)。左メニューは script 依存のため除去され、本文のみの表示になる (推定) | 全文マニュアルを使う場合の体験 | #554 に含める。素材は利用者持ち込み (ユーザ依頼事項は無し) |
 | U4 | 検証ブラウザは Chrome/154.0.8037.97 のみ。Firefox/Safari の `srcdoc` + meta CSP + sandbox の挙動は未検証 | 他ブラウザでの隔離・表示 | `docs/STATUS.md` の e2e マトリクス拡張時に追加 (起票なし) |
 | U5 | 本番配信での Help の供給元: `useHttp("/fl/Help/")` は用意したが、`tools/assets` の manifest が `Help/` を配信対象にするかは未確認。tier の推奨は #522 (PR) の §4 表 (help-entry T1, help-html T2) | 配信構成 | #105 (ST-T5)・`tools/assets` (PM 判断) |
-| U6 | 外部リンクの扱い: 既定は通知のみ (`onExternal` 既定 no-op)。`stub_plan.md` §5-B の「ユーザ操作中のみ `window.open`」を実装する場合は `onExternal` に結線 | 外部ページへの導線 | U1 の子チケットで方針確認 (D3 により既定 OFF) |
+| U6 | 外部リンクの扱い: 既定は通知のみ (`onExternal` 既定 no-op)。`stub_plan.md` §5-B の「ユーザ操作中のみ `window.open`」を実装する場合は `onExternal` に結線 | 外部ページへの導線 | #554 で方針確認 (D3 により既定 OFF) |
 
 ## 6. 検証
 
