@@ -246,4 +246,4 @@ e2e: `node tools/perf/loader/loader_e2e.mjs [--reps 5] [--quick]` (Chrome 起動
 
 ## 12. bit-exact OTT の RTF 再測 — Chrome Worker / 実 AudioWorklet / 低負荷 / native 比 (PERF-P9 / #168)
 
-全文・表・未解決は `REPORT_APPENDIX.md` §12 (検証起点 `1f98990`、再現 `bash tools/perf/x64c_suite.sh`)。結論: **node = Chrome Worker = 実 AudioWorklet (±4%)**、AudioWorklet で 128f 時間超過 0 / 15,000 block、LTO 1.2×、native 実機械語比 3.6〜4.4×。**M11 級 closure での LTO 効果は未測** (`fl-win64` + FLEngine x64c lift が必要 → 新規 `[PERF-P11]` 起票依頼)。
+全文・表・未解決は `REPORT_APPENDIX.md` §12 (検証起点 `1f98990`、再現 `bash tools/perf/x64c_suite.sh`)。結論: **node = Chrome Worker = 実 AudioWorklet (±4%)**、AudioWorklet で 128f 時間超過 0 / 15,000 block、LTO 1.2×、native 実機械語比 3.6〜4.4×。**M11 級 closure での LTO 効果は未測** (`fl-win64` + FLEngine x64c lift が必要 → 新規 `[PERF-P12]` 起票依頼)。

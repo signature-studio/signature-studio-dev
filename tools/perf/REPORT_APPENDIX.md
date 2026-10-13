@@ -76,7 +76,7 @@ BUSY=4 (4 本の busy loop を並走; loadavg(1 分) node 3.20〜4.04・Worker 4
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| **M11 級 closure での LTO 効果が未測** (bit-exact な M11 級 = `tools/flelift` の FLEngine x64c lift。`fl-win64` 素材と長時間 lift/link が必要で本 run の素材 (toolchain-emsdk / analysis-ott-binaries / plugins-ott) と 60 分では不足) | #168 の 4 点中 1 点が未達 (Closes しない) | 新規 `[PERF-P11]` の起票依頼 (#168 コメントに本文案、必要素材 `oc_artifacts: fl-win64 toolchain-emsdk`) |
+| **M11 級 closure での LTO 効果が未測** (bit-exact な M11 級 = `tools/flelift` の FLEngine x64c lift。`fl-win64` 素材と長時間 lift/link が必要で本 run の素材 (toolchain-emsdk / analysis-ott-binaries / plugins-ott) と 60 分では不足) | #168 の 4 点中 1 点が未達 (Closes しない) | 新規 `[PERF-P12]` の起票依頼 (#168 コメントに本文案、必要素材 `oc_artifacts: fl-win64 toolchain-emsdk`) |
 | 実オーディオデバイス (headful) での underrun、他ブラウザ/モバイル CPU (3〜10× 低速想定) | 実時間余裕は null sink の値 (RTF 0.02 級) | PERF-P7 (#165) にコメント |
 | 1 instance = 864 MiB の linear memory | 多 instance・多プラグインの実用上限をメモリが決める | §7 P4 (低位再配置) |
 | Chrome Worker の o1 が node の 1.6× 遅い原因 | production(O2+) では影響小 | #168 に残置 (必要なら PM が新規) |
