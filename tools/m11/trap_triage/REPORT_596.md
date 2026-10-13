@@ -1,14 +1,17 @@
 # #596: OOB 他分類の最上位 frame・原因と #307 (LD-7) の OOB との突合
 
-**判定: 受入条件 1 は部分達成 (全 21 unit を最上位 frame で分類、原因特定は一部のみ)、受入条件 2 は達成 (同じ定義で数値突合)。Closes しない (Refs #596)。**
-検証起点 = `0865903` (main)。変更はすべて `tools/m11/trap_triage/` の診断ツール追加で、`m11_ov.c`・IR・survey の判定は不変。
+**判定: 受入条件 1 は部分達成 (全 21 unit を最上位 frame で分類、原因特定は一部のみ)、受入条件 2 は達成 (jsonl 基準で同じ定義の数値突合。TSV 基準 222 との重なりも併記)。Closes しない (Refs #596)。**
+測定基準 = `work-m11` スナップショット (IR 生成条件は未固定、#680)。tools は `d22892e` から変更なし (`probe_entry.sh` の不具合修正と `oob_cross307.py` の TSV 基準追記を除く、§7)。
+変更はすべて `tools/m11/trap_triage/` の診断ツール追加で、`m11_ov.c`・IR・survey の判定は不変。
 既知類型との関係 (`docs/DEFECTS.md`): 4f9f40 系は **該当なし** (レジストリ TList の items が壊れる = 書込み側の別症状。D4/D15 かは未確認)。`414ad0` 系 4 unit は #307 §9 の「入口 rcx の `[rbx]` 1 段 deref 脱落」と**同じ欠陥** (§4 で IR を突合)。
 
-## 1. 前提の訂正: OOB は 44 ではなく 21
+## 1. 前提の訂正: OOB は 44 ではなく 21 (snapshot 基準)
 
-#419 / PR #446 の「OOB 44」は #414 HEAD `fa918df` 時点の値。現 main (`0865903`) を work-m11 から build し直した survey は
-`ok 818 / halt0 56 / miss 46 / oob 21 / noproc 1` (942 unit。`m11_build.sh` 13.2 s → `survey_units.mjs` 16.2 s、load average 1.0〜1.2、1 並列)。
-#446 で挙がった 410730 ×6 / 904190 ×4 / 47d460 ×4 / 409470 ×4 は、現 main では **oob ではない** (410730 と 47d460 は 0 unit、904190 は 1 unit、409470 は 0 unit)。
+#419 / PR #446 の「OOB 44」は #414 HEAD `fa918df` 時点の値。`work-m11` スナップショットから build し直した survey は
+`ok 818 / halt0 56 / miss 46 / oob 21 / noproc 1` (942 unit。`m11_build.sh` 13.2 s → `survey_units.mjs` 16.2 s、1 並列)。
+#446 で挙がった 410730 ×6 / 904190 ×4 / 47d460 ×4 / 409470 ×4 は、この snapshot 基準では **oob ではない** (410730 と 47d460 は 0 unit、904190 は 1 unit、409470 は 0 unit)。
+
+**現 main (`8d883c3`) との関係 (未解決・#680)**: #680 の記録では、work-m11 スナップショットの IR は現 main の生成手順と一致せず、IR の生成条件で `ok 818 / oob 21` ↔ `ok 828 / oob 13` が変わる。#596 の PM 追記は現 main の分母を 13 件としている。本 REPORT の 21 は snapshot 基準の値で、現 main の値ではない。差の扱いは #680 で固定する。現 main の再測は本 run では行っていない。
 
 ## 2. 最上位 frame の再集計 (`oob_top.mjs`)
 
@@ -19,7 +22,7 @@
 |---|---|--:|---|---|
 | `417b70` ← `417fc0` ← `8cbb00` ← `8cbcb0` | 56 58 59 60 61 62 63 | 7 | 0x354227 | 既知 (REPORT_483 §4b: `8cbb00` SetCapacity が IR のまま。`exp8cbb00` で ok、採用は PM 判断)。旧表の「`417fc0` ×7」は 1 段上 |
 | `4f9f40` ← `4f9ff0` ← `4faae0`/`4fad10` ← `4fb910`/`4fb8a0` | 291 296 304 555 923 | 5 | 0x193d4f / 0x193cc3 | **§3 で一部特定**: レジストリ (`[0x11f26a0]`) の TList の items 配列が破損 |
-| `414ad0` ← `414bb0` ← `652500` ← `653660` | 149 158 280 659 | 4 | 0xbc575 | **§4**: `414ad0` 自身の `[arg1]` deref 脱落 (#307 と同一欠陥)。加えて `652500` が rcx=0 で呼ばれる別の観測 |
+| `414ad0` ← `414bb0` ← `652500` ← `653660` | 149 158 280 659 | 4 | 0xbc575 | **§4**: `414ad0` 自身の `[arg1]` deref 脱落 (#307 と同一欠陥)。加えて `652500` の入口 arg1 は非ゼロ (§4 の表) |
 | `418190` ← `59f9a0` | 87 | 1 | 0x353397 | 既知 (REPORT_483 §4b: #411 の `418190` 転記との組合せ) |
 | `47ad70` ← `536da0` ← `4fe150` ← `5d2680` | 95 | 1 | 0x18f8d3 | 未特定 (§5) |
 | `864fe0` ← `80e040` ← `80e140` | 275 | 1 | 0x935b7 | 未特定。`80e040` が rcx=0 で入る (§5) |
@@ -32,8 +35,11 @@
 
 機構 (機械語と実測):
 - `4faae0` / `4f9f40` は `[[g+8]+0x10]` (Count) と `[[g+8]+8]` (items 配列) を読む TList 走査。`g = [0x11f26a0]` (LVA、グローバルのレジストリオブジェクト)。
-- IR の入口 probe (`probe_entry.sh`, 引数 + `[a1+8]`) で、trap 直前の `4faae0` の `[[a1+8]+8]` = `0x10a9f8e8`、`[[a1+8]+0x10]` = `0x10a9f941`。**どちらも wasm の shadow stack (0x10a9f8xx) のアドレス** (本来は heap 上の items 配列ポインタと Count)。
-- 変化点の計測 (全 261 関数中 257 関数の入口で `[[g+8]+8]` を読み、値が変わった所を出力。`PROBE_WATCH=11f26a0:8:8 probe_entry.sh w2 …`): `[[g+8]+8]` は unit 45 で `0x10a9f948` (shadow stack) に変わり (直前の入口 fn = `410360` = AfterConstruction stub、直後 = `536c20`)、unit 144 で消える。
+- probe 入口値 (`probe_entry.sh p2 4f9f40,4faae0,414ad0,652500,653660`, 全 unit の `[pe]` 行 118 件): unit 291/296/304/555/923 の `4faae0` は a1 = `0x10bcc0c0`、`[[a1+8]+8]` = `0x10a9f8e8`、`[[a1+8]+0x10]` = `0x10a9f941`。**どちらも wasm の shadow stack (0x10a9f8xx) のアドレス** (本来は heap 上の items 配列ポインタと Count)。`a1 = 0x10bcc0c0` は非 probe の SV_WATCH で読んだ `g` (下記) と一致する。
+- **値は build (probe の有無) とサンプリング点に依存する** (実測):
+  - 非 probe build・unit 境界 (`SV_WATCH=11f26a0:8:8 node trap_triage/oob_top.mjs`): `g = [0x11f26a0]` は unit 46 から `0x10bcc0c0`、`[[g+8]+8]` は `0x10a9f888` で、unit 46・142〜159・290〜305・550〜556・922〜924 の全件で一定。
+  - probe build・全関数入口 (`PROBE_WATCH=11f26a0:8:8 probe_entry.sh …`): `[[g+8]+8]` が `dead → 0x10a9f948` に変わるのは unit 45 内 (直前の入口 fn = `410360` = AfterConstruction stub、直後 = `536c20`)。非 probe と比べて `0xC0` ずれる。
+  - **「unit 144 で `[[g+8]+8]` が消える」は非 probe build では再現しなかった** (142〜159 で `0x10a9f888` のまま)。この主張は削除した。
 - `536c20` = TList 系のコンストラクタ (`call 0x410320` ClassCreate → `40f9e0` TObject.Create → `5373f0` で `[self+8]` に items を設定、`410360` で AfterConstruction)。`410360` (AfterConstruction) の IR は `ret arg1` だけの関数で VMT 間接 call が脱落している (#419 / PR #446 REPORT §8.2 の観測。本 run では未再確認)。直前の入口が `410360` であることと、この脱落が items 破損の原因かどうかは別 (**推定**、未検証)。
 - 判定の実測: 単体 `SV_ONLY=291,296,304,555,923` は 5 unit とも **halt0 (oob ではない)**。unit 45 を前置すると 45 だけ oob に変わり、5 unit は halt0 のまま (n=1)。つまり oob になる条件は「前の unit 群が積んだ状態」。**書き込み元の関数までは特定できていない** (probe は入口単位で、関数内の書込み命令は見ていない)。
 
@@ -42,21 +48,35 @@
 ## 4. 414ad0 系 (4 unit) と #307 の OOB との突合
 
 survey の 4 unit (149 158 280 659) は同じ連鎖 `414ad0 ← 414bb0 ← 652500 ← 653660 ← 6539e0`。trap 位置 wasm offset 0xbc575 は IR `dec_label_pc_414b6c` の `load i32, ptr (%37 - 4)` (`%37 = arg2 & 0xffffffff`)。
-機械語 (`414b64: mov rax,[rbx]` → `414b6c: mov r13d,[rax-4]`) は `[arg1]` を 1 段 deref して**文字列本体**の長さを読むが、IR は deref を落とし **長さ引数 (`arg2`)** を本体ポインタとして `[arg2-4]` を読む。probe の入口値は `414ad0(a1=0x10a9f8e8, a2=2)` で、`[2-4]` = 負アドレスの読出し → OOB。
-= **#307 §9 (`414ad0` の `[rbx]` deref 脱落、IR の `%arg1` を ptr とする load 0 件) と同一の欠陥**。#307 の 68 関数と m11 の 4 unit は同じ `414ad0` を別経路から踏んでいる。
-別の観測: `652500` が全 4 unit で rcx=0 (arg1..4 = 0 0 0 0) で呼ばれる (`653660` の引数は `264208` 等の正常値)。`652500` の IR が呼出側から引数を受けていない疑いだが、`653660` の機械語と IR の call は未突合 (**推定**)。`414ad0` の deref 脱落を直せばこの 4 unit の OOB が消えるかは未検証 (`414ad0` の転記は未実施)。
+機械語 (`414b64: mov rax,[rbx]` → `414b6c: mov r13d,[rax-4]`) は `[arg1]` を 1 段 deref して**文字列本体**の長さを読む。本 run で fl-win64 の PE (`block00031_PE.bin`、ImageBase `0x400000`) を `objdump -d` して、この 2 命令を確認した。IR は deref を落とし **長さ引数 (`arg2`)** を本体ポインタとして `[arg2-4]` を読む。probe の入口値 (`[pe]` 行) は unit 別に次のとおり (a2 は 4 unit とも `2`):
+
+| unit | `414ad0(a1, a2, a3, a4)` 入口 | `[a1]` 入口 | `652500(a1, a2, a3, a4)` 入口 |
+|---|---|---|---|
+| 149 | `0x10a9f918, 2, 0, 0` | 0 | `0x10a9f918, 0, 0, 0` |
+| 158 | `0x10a9f918, 2, 0, 0` | 0 | `0x10a9f918, 0, 0, 0` |
+| 280 | `0x10a9f8d8, 2, 0, 0` | 0 | `0x10a9f8d8, 0, 0, 0` |
+| 659 | `0x10a9f8f8, 2, 0, 0` | 0 | `0x10a9f8f8, 0, 0, 0` |
+
+`[2-4]` = 負アドレスの読出し → OOB。
+= **#307 §9 (`414ad0` の `[rbx]` deref 脱落、IR の `%arg1` を ptr とする load は offset 0 の `[arg1]` に限って 0 件。`arg1-8` / `arg1-4` の load は IR にある) と同一の欠陥**。#307 の 68 関数と m11 の 4 unit は同じ `414ad0` を別経路から踏んでいる。
+入口の `[a1] = 0` について: 機械語では `414b64` の `[rbx]` が 0 なら `je 0x414b9c` で `[rax-4]` を読まずに抜けるはず。IR はこの分岐を持たず `414b6c` を通る。ただし `414b64` 時点の `[rbx]` は実測していない (入口値のみ、**推定**)。
+別の観測: `652500` の入口 arg1 は unit 別の非ゼロ値 (上表)、arg2〜4 は 0 (`653660` の arg2 は `264208` 等)。`652500` の IR が呼出側から引数を正しく受けていない疑いだが、`653660` の機械語と IR の call は未突合 (**推定**)。`414ad0` の deref 脱落を直せばこの 4 unit の OOB が消えるかは未検証 (`414ad0` の転記は未実施)。
 
 #307 (LD-7) との突合 (比較軸を揃えた数値、`oob_cross307.py`):
 
-| 軸 | #307 liftdiff | 本件 m11 survey |
-|---|---|---|
-| 対象 | 関数単位。batch 7421 行のうち「最初の `wasm_trap` case が OOB」の関数 **239** (#307 の 222 とは数が違う。差の原因は未調査: 同じ `oob_414ad0.py` の定義で現 jsonl を数えると `414ad0` は 68 で一致し、全体は 239) | unit 単位 (InitUnits の 942 unit)。`kind=oob` **21** |
-| 最上位 frame の種類 | 84 | 8 |
-| `414ad0` | 68 関数 | 4 unit |
-| `40ff70` | 2 関数 | 1 unit (895) |
-| 他の 6 種 (`417b70` `4f9f40` `418190` `47ad70` `864fe0` `903d20`) | **0 関数** | 15 unit |
+**「同じ定義」は jsonl 基準で同じ定義という意味** (`oob_414ad0.py` と同じ: 関数ごとの「最初の `wasm_trap` case」が `memory access out of bounds` のもの)。
+#307 本文と `tools/liftdiff/REPORT_APPENDIX.md` §8 の「OOB 222・71 種」は別の集計 `results/m11_wasm_trap_triage.md` (verdicts TSV の tags に `wasm_trap` があり、最初の wasm_trap case の kind が oob) で、batch jsonl 基準の 239 とは **別 run の結果** (REPORT_APPENDIX §8 と `results/m11_wasm_trap_triage.md` §5: wasm_trap 関数は TSV 578 / jsonl 582 で、共通 511・TSV のみ 67・jsonl のみ 71)。
+TSV 基準では `414ad0` 68・`40ff70` 2 (下表の括弧内) で、jsonl 基準と同じ件数。TSV 222 は jsonl 239 の部分集合 (TSV のみ 0 / jsonl のみ 17)、jsonl のみの 17 関数はいずれも TSV の tags に `wasm_trap` が無い (`oob_cross307.py` の出力)。
 
-- survey の最上位 frame 8 種のうち liftdiff にも現れるのは **2 種 (`414ad0` `40ff70`) のみ**。#446 §6.3 の「同一欠陥の別症状の可能性が高い」は **`414ad0` について成立** (同じ関数・同じ deref 脱落で OOB。IR 突合は上記)。残りの 15 unit は #307 の OOB と**重ならない**。
+| 軸 | #307 liftdiff (jsonl 基準 / TSV 基準) | 本件 m11 survey |
+|---|---|---|
+| 対象 | 関数単位。jsonl 基準 **239** / TSV 基準 **222** (`results/m11_wasm_trap_triage.md`) | unit 単位 (InitUnits の 942 unit)。`kind=oob` **21** |
+| 最上位 frame の種類 | jsonl 84 / TSV 71 | 8 |
+| `414ad0` | 68 関数 / 68 関数 | 4 unit |
+| `40ff70` | 2 関数 / 2 関数 | 1 unit (895) |
+| 他の 6 種 (`417b70` `4f9f40` `418190` `47ad70` `864fe0` `903d20`) | **0 関数** / 0 関数 | 15 unit |
+
+- survey の最上位 frame 8 種のうち liftdiff にも現れるのは **2 種 (`414ad0` `40ff70`) のみ** (両基準で同じ)。#446 §6.3 の「同一欠陥の別症状の可能性が高い」は **`414ad0` について成立** (同じ関数・同じ deref 脱落で OOB。IR 突合は上記)。残りの 15 unit は #307 の OOB と**重ならない**。
 - liftdiff は関数を単体 (state auto / 合成入力) で動かすため、survey の「前の unit が積んだ状態」依存の OOB (4f9f40 系) は出ない。逆に liftdiff の 68 件の `414ad0` は合成引数 (`q0` `p1` 等) 由来で、survey では 4 unit しか到達しない。
 - 検算 (別アルゴリズム): `--verify` は jsonl を JSON パースせず raw 文字列走査で「最初の `wasm_trap` の後 400 字以内に OOB 文字列」を数え、239 関数・`414ad0` 68 で正規表現版と一致。
 
@@ -74,7 +94,9 @@ node trap_triage/oob_top.mjs work/trap_triage/top.json                          
 python3 trap_triage/oob_cross307.py work/trap_triage/top.json --verify              # #307 との突合表 + 別算法検算 (不一致は exit 1)
 bash trap_triage/probe_entry.sh p1 4f9f40,4faae0,414ad0,652500 [unit,...]           # IR 入口に引数 dump を入れた build で survey (終了時に元の boot.o を再生成)
 PROBE_WATCH=11f26a0:8:8 bash trap_triage/probe_entry.sh w2 <fn,fn,...>              # 指定 chain の値が変わった入口を出す
+SV_WATCH=11f26a0:8:8 node trap_triage/oob_top.mjs work/trap_triage/watch.json 2> watch.err  # 非 probe build で unit 境界の [[g+8]+8] を出す (`[watch]` 行)
 ```
+`probe_entry.sh` は probe 版 build の後に元の boot.o を再生成する (trap restore)。`work-m11` 展開直後は `m11_post.py` の mtime が新しく、`m11_build.sh` が probe 版 boot.o を非 probe 版で上書きして `[pe]` が 0 件になる。本 run で `probe_entry.sh` に `touch work/boot_final3.ll` を入れて回避し、修正前 (`p1`: `[pe]` 0 件) と修正後 (`p2`: 118 件) を比べた。
 
 ## 7. ネガコン (実測)
 
@@ -83,15 +105,19 @@ PROBE_WATCH=11f26a0:8:8 bash trap_triage/probe_entry.sh w2 <fn,fn,...>          
 - probe build の透過性: probe 無し (復元後) の survey JSON が `base.json` と **byte 一致** (`cmp`)。復元は `probe_entry.sh` の `trap restore EXIT`。
 - **限界**: batch の 1 行 (414ad0 の 1 関数) の OOB 文字列を壊した変異では、正規表現版 (238) と raw 走査版 (238 / 414ad0 67) が**両方とも**変化し `--verify` は一致のまま。= `--verify` は「2 つの数え方が同じ入力で一致するか」を見るもので、入力の改変そのものの検出力は無い (改変の検出は上の survey 側ネガコンが担う)。
 - 所要 (実測): `probe_entry.sh` 1 回 20.5 s (11 関数)〜41.2 s (36 関数。build + survey + 元 boot.o の再生成を含む `time`)。load average 0.4〜1.2、1 並列。
-- 未実施: `m11_e2e.sh` 全体 (PE = fl-win64 の展開が必要。本 run は work-m11 のスナップショットで build+survey のみ)、`oob_top.mjs` の n≥3 再現 (HEAD で 1 回再実行: 942 unit の kind 一致・oob 21 unit の frames 名一致。JSON の byte 一致はしない = 末尾 frame の `oob_top.mjs:<行>:19` (ハーネス自身の行番号) が SV_WATCH 追加で動いたため。frame 名・kind は同一)。
+- 本 run の追加確認: fl-win64 の PE (`block00031_PE.bin`) は §4 の機械語 (`414b64` / `414b6c`) の `objdump` 確認にだけ使った。`TSV 基準` の 222 / 68 / 2 は `oob_cross307.py` の出力 (本 run、`--verify` 通過)。
+- 未実施: `m11_e2e.sh` 全体 (本 run は work-m11 のスナップショットで build+survey のみ)、現 main `8d883c3` での再測 (#680)、`oob_top.mjs` の n≥3 再現 (HEAD で 1 回再実行: 942 unit の kind 一致・oob 21 unit の frames 名一致。JSON の byte 一致はしない = 末尾 frame の `oob_top.mjs:<行>:19` (ハーネス自身の行番号) が SV_WATCH 追加で動いたため。frame 名・kind は同一)。
 
 ## 8. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `414ad0` の C 転記 (または ldfix の `[arg1]` deref 復元) で 4 unit (149 158 280 659) が ok になるか | oob 4 unit。#307 の 68 関数も同じ関数 | 新規子チケット [M11-N27] (#307 と共通) |
-| 4f9f40 系 5 unit: `[g+8]` の items が shadow stack を指す経路 (unit 45 の `536c20` 以降) の書込み命令 | oob 5 unit | 新規子チケット [M11-N26] (IR の store に probe。`PROBE_WATCH` の拡張) |
-| `653660` → `652500` が rcx=0 で呼ばれる理由 (機械語と IR の call の突合) | 414ad0 を直した後に残る可能性 | 上の [M11-N27] に併記 |
-| 95 / 275 / 477 / 895 の個別原因 (各 1 unit) | oob 4 unit | #596 にコメント (本 REPORT §5) |
+| `414ad0` の C 転記 (または ldfix の `[arg1]` deref 復元) で 4 unit (149 158 280 659) が ok になるか。`652500` の入口 arg1 が非ゼロ・arg2〜4 が 0 となる理由 (`653660` の call 引数の突合) を含む | oob 4 unit。#307 の 68 関数も同じ関数 | **#683** (#307 と共通) |
+| 4f9f40 系 5 unit: `[g+8]` の items が shadow stack を指す経路 (unit 45 の `536c20` 以降) の書込み命令。値は build 依存 (§3) | oob 5 unit | **#682** (IR の store に probe。`PROBE_WATCH` の拡張) |
+| 95 / 275 / 477 / 895 の個別原因 (各 1 unit) | oob 4 unit | **#684** (本 REPORT §5) |
+| `oob_top.mjs` は `survey_units.mjs` の複製 (frames 処理・SV_WATCH など)。乖離リスクがあるので 1 本に統合する | 2 系統の harness | **#683** で統合 (非ブロッキング) |
+| 現 main `8d883c3` と本 REPORT の測定基準の差 (分母 13 と 21) | §1 | #680 (測定基準の固定化) |
 | `8cbb00` (7 unit) の採用可否 | oob 7 unit | REPORT_483 §6 の既存起票先 |
 | `survey_units.mjs` の `.slice(1)` を直す (oob の frames 基準が 1 段変わる) | `annotate.py` / `survey_diff.py` の基準変更 | PM 判断 (#495 の既起票) |
+
+旧 ID との対応 (PR 本文・初版 REPORT にあった仮 ID): [M11-N26] → #682 / [M11-N27] → #683 (#680 の [M11-N27] と衝突していたため、番号で参照する)。
