@@ -120,8 +120,10 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 | N5 | `GetDC(NULL)` を元の fail-fast に戻した shim で native selftest | `FAIL-FAST: unimplemented Win32 API: GetDC`, exit 134 |
 
 実測 (コード commit `d4665eb` + glue のコメントのみ変更, `e2e.sh` 全体を 3 回直列, 4 vCPU): **126 / 125 / 124 秒** (開始時 load average 0.56→1.22→1.24, 終了時 1.22 / 1.24 / 1.03)、毎回 judge **12/12 PASS**・ネガコン 5/5 期待どおり FAIL・native selftest 324 passed / 0 failed・`results/*.json` は 3 回とも同一。
-内訳 (1 回分の代表値): baseline m11 build + 起動 + survey 約 20 秒 / 結合 build 3 種 (ff・soft・plain) / 通常起動 0.4 秒 / survey 1 本 18〜24 秒 ×2 / probe 1 秒未満。`gen_ir2` (ldfix 有効) 20.5 秒 は e2e の前提側 (本スクリプトは IR を再生成しない)。
+個別の単発計測 (開発中, load 0.3〜0.9): `m11_gen_ir2.sh` 20.5 秒 / `m11_build.sh` 12.3 秒 / baseline 起動 0.386 秒 / baseline survey 16.9 秒 / 結合 build 10.6〜17.0 秒 / 結合起動 0.371 秒 / 結合 survey 18.2〜24.1 秒 (ff・soft・EnumFontFamiliesExW 前後で差)。`gen_ir2` は e2e の前提側 (本スクリプトは IR を再生成しない)。
 `git status --porcelain=v1 -- tools/gui` は commit 後クリーン (results と IMPORTS.md は再生成しても差分 0)。
+受入条件 2 (`bash tools/gui/e2e.sh` ALL PASS 維持): 本 PR の shim 変更 (`GetDC(NULL)`) 後に実行し **rc 0 / ALL PASS (64 秒, load average 0.75→1.03, 1 回)**。native selftest 324 passed / 0 failed、native lift と Chrome の画素が golden と **EXACT MATCH (0 / 64000 px)**、
+reach_test 11 / adapt_test 28 passed、sigprobe は adapter 有り mismatch 0 / 無し (陰性対照) 177、present e2e 7 pass / 0 fail。`wasm-objdump: command not found` が出るが既存 (sigprobe の補助表示のみ)。
 
 ## 7. 未解決
 
