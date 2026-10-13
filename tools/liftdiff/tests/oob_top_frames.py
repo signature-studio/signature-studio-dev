@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""LD-18 (#865): m11 wasm_trap OOB 222 件の最上位 trap frame を集計し、上位 5 種の原因候補を IR から分類する。
+"""LD-18 (#865): m11 wasm_trap OOB 239 件 (batch jsonl 全行の最初の wasm_trap case の detail が OOB) の最上位 trap frame を集計し、上位 5 種の原因候補を IR から分類する。
+TSV 側の 222 件 (tests/triage_wasm_trap.py) は別集計で、本スクリプトの対象ではない。
 
 分類 (IR 側の構造のみ・機械語との突合なし。候補であり原因の確定ではない):
   ptr_arg  : 関数本体で %arg を値のまま inttoptr せず使う load/store がある (ldfix F3 型の疑い)

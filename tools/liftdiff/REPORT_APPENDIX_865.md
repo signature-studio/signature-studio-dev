@@ -1,7 +1,7 @@
 # 付録: liftdiff LD-18 (#865) — trace_head 外 27 件の到達確認・OOB 他の最上位 frame 集計
 
-> **正本**: `tools/liftdiff/REPORT.md` (結論・§7 未解決)。詳細は `tools/liftdiff/REPORT_APPENDIX.md` §9 から分割移動した本書。
-> 250 行上限 (`docs/DOC_MAP.md` §1) のため、LD-18 節を `REPORT_APPENDIX.md` から分割移動した。
+> **正本**: `tools/liftdiff/REPORT.md` (結論・§7 未解決)。本書は LD-18 (#865) の新規節。
+> `REPORT_APPENDIX.md` は 250 行上限 (`docs/DOC_MAP.md` §1) のため増やさず、本書に別置きした (参照 1 文のみ `REPORT_APPENDIX.md` §9)。
 
 ### 27 件の到達確認 (LD-18 / #865、実測)
 
