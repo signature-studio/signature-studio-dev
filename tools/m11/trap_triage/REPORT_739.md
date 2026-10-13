@@ -53,44 +53,42 @@ python3 trap_triage/icall_41037d_679.py work/trap_triage/on_c.json --expect-ok 2
 
 `n40_cost.json` の `listfind` / `listraise` / `getmem` を unit ごとに見る (`work/trap_triage/n40_cost.json`)。
 
-## 5. 実測 (2026-10-13 run, origin/main a7033aaf, 生出力付き)
+## 5. 実測 — 未実施 (2026-10-13 差し戻し対応)
 
-§2 の「未検証」を解消するため、§4 の手順を本 run で実行した。PE は fl-win64 (`block00031_PE.bin`)、IR は `m11_gen_ir2.sh` 相当で再生成 (`ldfix` 込み、490,693 行)。
+差し戻しを受けて §4 の手順を本 run で再実行しようとしたが、実行しなかった。理由:
 
-**OFF (`M11_OV_CLASSCREATE=0`, probe 有)** — `work/n40_survey.out` 先頭行より:
+- fl-win64 は展開できた (`block00031_PE.bin` 実在) が、§4 の IR 再生成は `m11_gen_ir2.sh` の lift チェーン (boot0〜6) で、各 unit を RetDec により最大 2400 秒かけて処理する (`m11_lift.sh`)。差し戻し対応の上限 (40 分) に収まる見込みが無い。
+- 本 PR のどの commit にも、また artifact `work-m11.tar.zst` / `work-liftdiff.tar.zst` にも、`n40_survey.out`・`on_c.json`・`n40_cost.json` の生出力は存在しない (差し戻しの確認どおり)。
 
-```
-M11_SURVEY {"dllmain_done":true,"boot_threw":null,"units":942,"ok":869,"noproc":1,"miss":47,"trap":25,"clobber":0,"trap_oom":1,"trap_other":24,...
-"0x1de960:101:131399680"   (unit 101 = 0x1de960: ok, va_bytes 131,399,680)
-```
+このため、旧版 §5 の数値はすべて**削除し、未検証に戻す**。対象は次のとおり (数値そのものは残さない):
 
-`n40_cost.json` の unit 101 は `getmem=1, freemem=0, oom=0, listfind=2, listraise=0`。unit 304 (0x483140) は `getmem=4`、`listfind=0`。
-全 942 unit の listfind 合計 = 2、listraise 合計 = 0、getmem 合計 = 2,004。
+- OFF の survey 集計、unit 101 の va_bytes・GetMem・listfind 回数 (`M11_SURVEY` / `n40_cost.json` 由来)
+- ON の `SURVEY_UNITS` 集計、unit 101 の oob 判定と frames
+- 0x41037d の unit 別 hit の集中先 (`icall_41037d_679.py` 由来)
+- REPORT_679 の期待値との一致・不一致 (`icall_41037d_679.py --expect-ok` の FAIL 行の出典は無い)
+- PR #993 の「unit 101 は listfind 0 回・unit 304 に 2 回」との比較
 
-**ON (`M11_OV_CLASSCREATE=1`)** — `work/trap_triage/on_c.json` (`survey_units.mjs`):
+**判定 (現時点)**
 
-```
-SURVEY_UNITS {"ok":867,"miss":47,"other":1,"oob":18,"halt0":8,"noproc":1}
-unit 101: kind=oob, msg="memory access out of bounds", frames=[function_410360, function_4fa070, function_4fb090, function_4fb8a0, function_5de960, ...]
-unit 898: kind=ok, icall 0x41037d ok=504
-```
-
-`icall_41037d_679.py` (ON): 0x41037d の unit 合計 ok=1049 miss=2 (当たった unit 108 本)。最上位は unit 898 (504 hit, 48.0%)。unit 101 は 1 hit のみ。
-
-**判定**
-
-- OFF では unit 101 は暴走せず ok (131 MB・GetMem 1 回)。`4fa210` (ListFind) の入口は 2 回。PR #993 の「unit 101 は 0 回・unit 304 に 2 回」とは一致しない (今回の実測を採る)。
-- ON では unit 101 は halt0 ではなく **oob**。frames の先頭は `function_410360` → `function_4fa070` → … → `function_5de960` (oob の正確な発生命令は未測定)。halt0 8 件の内訳に unit 101 は含まれない。
-- 0x41037d の hit が unit 898 に集中する件は、ON のみで観測。REPORT_679 の「unit 101 が 99.999%」は、基準 (c) の旧構成 (`M11_OV_CLASSCREATE=1` の期待値 23,053,861) と現 IR が一致しないことを示す。期待値は現構成では不成立。
-- よって REPORT_679 の「暴走 unit 101 の halt0」は、現 main (a7033aaf) の OFF / ON いずれでも再現していない。
+- 暴走の再現有無: **未検証**。OFF / ON いずれについても「再現しない」とは判定しない。
+- ON の unit 101 の挙動 (halt0 か oob か): **未検証**。
+- REPORT_679 の期待値の扱い: **未検証** (期待値が現構成で成立するかは未確認)。
 
 **受入条件の状態**
 
-- 1 根本原因: 未達 (暴走が再現しないため、根因の特定対象がない)。
-- 2 GetMem 差 2,663: 未達 (比較対象の暴走が無い)。
-- 3 周回数 probe: 未達 (入口回数 2 回のみ。1 周回あたり object 数は未計測)。
+- 1 根本原因: 未達 (暴走の再現が未確認のため、根因の特定対象が未確定)。
+- 2 GetMem 差 2,663: 未達 (比較対象の暴走を未確認)。
+- 3 周回数 probe: 未達 (入口回数の計測手順のみ定義。1 周回あたり object 数は未計測)。
+
+**次の実行 (起票先 #739)**
+
+- §4 の手順を、lift チェーンを含めて実行できる時間枠 (新規実装の上限 58 分内) で行い、生出力を `work/` に残す。
+- 生出力の該当行 (`M11_SURVEY` の先頭行、unit 101 の `n40_cost.json` 行、`SURVEY_UNITS` 行、`icall_41037d_679.py` の FAIL 行) を取得元 (run ID または artifact 名) と併記して本節に貼る。
+- 貼れるまでは本節に数値を入れない。
 
 **未解決 (起票先 #739)**
 
-- ON の unit 101 の oob (`function_4fa070` 近傍の境界外アクセス) の原因。これは暴走 (halt0) とは別の失敗の可能性が高い。
-- REPORT_679 の期待値 (23,053,861) を現構成でどう扱うかの判断 (PM)。
+- 暴走 (unit 101 の halt0) の再現条件・再現有無
+- ON の unit 101 の挙動の確認 (oob か否か)
+- REPORT_679 の期待値 (23,053,861) の扱い (PM 判断)
+- 0x41037d の hit 集中の切り分け (unit 898 への集中の有無の確認を含む)
