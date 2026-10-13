@@ -5,7 +5,7 @@
 #   NC3: judge.py — 実測 status を --allow-unimpl 付きで通す (期待 rc 0) / 許可名を変える (期待 rc 1: Wrapper の未実装 helper を許可外にする) /
 #        許可名ありでも emcc_c_rc=1 の合成行 (期待 rc 1) / 行を落とす (期待 rc 1)
 #   NC4: expect_state.py — 実測 (期待 rc 0) / ReWired の行を合格値 (f80=0, emcc_c_rc=0) にした合成 CSV (期待 rc 1 = 方針表の更新が必要)
-#   NC6: icall_audit.py — MIDI Out の final.ll に間接 call (inttoptr → call ptr) を 1 本注入 → audit_icall の IR 間接 call 0 → 1 / grep 側も 0 → 1
+#   NC6: icall_audit.py — MIDI Out の final.ll の先頭関数に間接 call (inttoptr → call ptr) を 1 本注入 → audit_icall の IR 間接 call 0 → 1 / grep 側も 0 → 1
 #   NC5: matrix_check.py — facts.json の 1 項目 (Patcher(E) closure_bytes) を書き換えた合成 facts (期待 rc 1)
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -91,7 +91,9 @@ echo "NC5: matrix_check rc: 実測=$m_ok (期待0) / closure_bytes を +1 した
 python3 - "$OUT/p.final.ll" "$N/inj/batch/$B/p.final.ll" <<'PY'
 import os, sys
 s = open(sys.argv[1]).read()
-s += '\ndefine void @nc_inject_indirect(i64 %a) {\n  %f = inttoptr i64 %a to ptr\n  call void %f()\n  ret void\n}\n'
+i = s.index('\ndefine ')
+k = s.index('\n  ret ', i)
+s = s[:k] + '\n  %nc_f = inttoptr i64 0 to ptr\n  call void %nc_f()' + s[k:]
 os.makedirs(os.path.dirname(sys.argv[2]), exist_ok=True)
 open(sys.argv[2], 'w').write(s)
 PY
