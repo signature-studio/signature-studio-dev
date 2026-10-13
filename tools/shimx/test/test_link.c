@@ -108,6 +108,17 @@ static void test_r3_proctable(void) {
     cch = sizeof buf / 2;
     CHECK(GetThreadPreferredUILanguages(0, &num, buf, &cch) && wstr_eq(buf, "en-US"));
 
+    /* ST-T19 (#591): shimx_set_locale に追従 (FL 0x9df190 は flags=8 で呼び、zh のときだけ Program language を自動書込みする) */
+    shimx_set_locale(0x0804);
+    cch = sizeof buf / 2;
+    CHECK(GetUserPreferredUILanguages(8, &num, buf, &cch) && num == 1 && cch == 7 && wstr_eq(buf, "zh-CN"));
+    shimx_set_locale(0x1234);                                             /* 表に無い LCID でも落ちず en-US */
+    cch = sizeof buf / 2;
+    CHECK(GetUserPreferredUILanguages(8, &num, buf, &cch) && wstr_eq(buf, "en-US"));
+    shimx_set_locale(0x0409);                                             /* 復元 */
+    cch = sizeof buf / 2;
+    CHECK(GetUserPreferredUILanguages(8, &num, buf, &cch) && wstr_eq(buf, "en-US"));
+
     /* shell32 序数表 (Windows 10/11 のエクスポート序数): R3 の 9 本 + 既知 190 */
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)16) == (void*)ILFindLastID);
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)17) == (void*)ILRemoveLastID);
@@ -119,8 +130,13 @@ static void test_r3_proctable(void) {
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)153) == (void*)ILGetNext);
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)155) == (void*)ILFree);
     CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)190) == (void*)ILCreateFromPathW);
-    CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)74) == NULL);             /* SHCreateStdEnumFmtEtc は未実装のまま */
+    CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)74) == (void*)SHCreateStdEnumFmtEtc);   /* SHX-T8 */
+    CHECK(GetProcAddress(sh, (LPCSTR)(uintptr_t)75) == NULL);             /* 未割当序数は miss */
     CHECK(GetLastError() == ERROR_PROC_NOT_FOUND);
+    HMODULE shl = GetModuleHandleW(W("shlwapi.dll"));
+    CHECK(GetProcAddress(shl, (LPCSTR)(uintptr_t)12) == (void*)SHCreateMemStream);
+    CHECK(GetProcAddress(shl, (LPCSTR)(uintptr_t)219) == (void*)QISearch);
+    CHECK(GetProcAddress(shl, (LPCSTR)(uintptr_t)16) == NULL);            /* shell32 #16 とは別名前空間 */
 
     /* IL* 実働 (shimx 自前 PIDL 形式) */
     LPVOID pidl = ILCreateFromPathW(W("C:\\Program Files\\FL"));

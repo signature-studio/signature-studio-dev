@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+import { thirdPartyNotices } from "./tools/legal/notices/vite-plugin.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -90,7 +91,7 @@ function wasmAssets(): Plugin {
  */
 function pyAssets(): Plugin {
   const dir = path.join(here, "tools/python");
-  const allowed = /^(host\/[\w.-]+\.mjs|dist\/flpy\.(js|wasm|data)|analysis\/flapi\/flapi_ids\.json)$/;
+  const allowed = /^(host\/[\w.-]+\.mjs|dist\/flpy\.(js|wasm|data)|analysis\/flapi\/flapi_ids\.json|analysis\/ilmcp\/(plugin_catalog|highlight_names)\.json)$/;
   const types: Record<string, string> = { ".mjs": "text/javascript", ".js": "text/javascript", ".wasm": "application/wasm", ".data": "application/octet-stream", ".json": "application/json" };
   const mw = (req: IncomingMessage, res: ServerResponse, next: () => void): void => {
     const url = new URL(req.url ?? "/", "http://x");
@@ -122,7 +123,7 @@ function pyAssets(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets()],
+  plugins: [crossOriginIsolation(), wasmAssets(), pyAssets(), thirdPartyNotices()],
   server: {
     // tools/ 配下は巨大な work/ を多数抱える (inotify watch 枯渇 ENOSPC の原因)。HMR 対象外にする
     watch: { ignored: ["**/tools/**", "**/deploy/**", "**/dist/**", "**/node_modules/**"] },

@@ -47,7 +47,7 @@
 | windowscodecs.dll | 1 | 2 |  |
 | comdlg32.dll | 2 | 2 | ● |
 
-GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **270** / fail-fast stub **159** / arity 不明で未生成 **0**。
+GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, uxtheme.dll, imm32.dll, msimg32.dll, dwmapi.dll, winspool.drv, oleacc.dll, wtsapi32.dll, shcore.dll) の import 合計 **429 名**: 実装済み **280** / fail-fast stub **149** / arity 不明で未生成 **0**。
 
 ## 2. 優先度定義
 
@@ -339,8 +339,8 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | ImageList_GetDragImage | comctl32 | imagelist | 4 | STUB |
 | ImageList_GetImageCount | comctl32 | imagelist | 4 | STUB |
 | CreateHalftonePalette | gdi32 | palette | 4 | STUB |
-| GetDIBColorTable | gdi32 | palette | 4 | STUB |
-| SetDIBColorTable | gdi32 | palette | 4 | STUB |
+| GetDIBColorTable | gdi32 | palette | 4 | IMPL |
+| SetDIBColorTable | gdi32 | palette | 4 | IMPL |
 | ImmAssociateContextEx | imm32 | IME | 4 | STUB |
 | DestroyMenu | user32 | menu | 4 | STUB |
 | EnableMenuItem | user32 | menu | 4 | STUB |
@@ -370,7 +370,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | CreatePatternBrush | gdi32 | dc-state | 2 | STUB |
 | CreatePenIndirect | gdi32 | dc-state | 2 | STUB |
 | CreatePolygonRgn | gdi32 | clip/region | 2 | STUB |
-| EnumFontFamiliesExW | gdi32 | text/font | 2 | STUB |
+| EnumFontFamiliesExW | gdi32 | text/font | 2 | IMPL |
 | EnumFontsW | gdi32 | text/font | 2 | STUB |
 | FrameRgn | gdi32 | clip/region | 2 | STUB |
 | GetCurrentObject | gdi32 | dc-state | 2 | IMPL |
@@ -381,9 +381,9 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | TextOutW | gdi32 | text/font | 2 | IMPL |
 | GetDpiForMonitor | shcore | system | 2 | STUB |
 | GetProcessDpiAwareness | shcore | system | 2 | STUB |
-| CharLowerW | user32 | util | 2 | STUB |
-| CharNextExA | user32 | util | 2 | STUB |
-| CharToOemBuffW | user32 | util | 2 | STUB |
+| CharLowerW | user32 | util | 2 | IMPL |
+| CharNextExA | user32 | util | 2 | IMPL |
+| CharToOemBuffW | user32 | util | 2 | IMPL |
 | CopyImage | user32 | cursor/icon | 2 | STUB |
 | CountClipboardFormats | user32 | clipboard | 2 | STUB |
 | CreateCaret | user32 | cursor/icon | 2 | IMPL |
@@ -495,10 +495,10 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | BufferedPaintUnInit | uxtheme | aux | 2 | STUB |
 | GetDefaultPrinterW | winspool.drv | printing | 2 | STUB |
 | OpenPrinterW | winspool.drv | printing | 2 | STUB |
-| WTSRegisterSessionNotification | wtsapi32 | shell-integration | 2 | STUB |
-| WTSUnRegisterSessionNotification | wtsapi32 | shell-integration | 2 | STUB |
-| GetOpenFileNameW | comdlg32 | dialog | 1 | STUB |
-| GetSaveFileNameW | comdlg32 | dialog | 1 | STUB |
+| WTSRegisterSessionNotification | wtsapi32 | shell-integration | 2 | IMPL |
+| WTSUnRegisterSessionNotification | wtsapi32 | shell-integration | 2 | IMPL |
+| GetOpenFileNameW | comdlg32 | dialog | 1 | IMPL |
+| GetSaveFileNameW | comdlg32 | dialog | 1 | IMPL |
 | DefMDIChildProcW | user32 | aux | 1 | IMPL |
 | EnableScrollBar | user32 | scrollbar | 1 | STUB |
 | GetScrollRange | user32 | scrollbar | 1 | STUB |

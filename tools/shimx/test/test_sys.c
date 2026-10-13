@@ -20,10 +20,13 @@ static void test_strings(void) {
     const WCHAR jp[] = { 0x3042, 'x', 0 };
     CHECK(WideCharToMultiByte(1252, 0, jp, -1, a, 64, NULL, &used) == 3 && a[0] == '?' && a[1] == 'x' && used);
     CHECK(WideCharToMultiByte(CP_ACP, 0, W("\xE2\x82\xAC"), 1, a, 64, NULL, &used) == 1 && (unsigned char)a[0] == 0x80);
-    CHECK(MultiByteToWideChar(932, 0, "a", -1, w, 64) == 0 && GetLastError() == ERROR_INVALID_PARAMETER);   /* DBCS 非対応 */
-    CHECK(GetACP() == 1252 && GetOEMCP() == 437 && IsValidCodePage(65001) && !IsValidCodePage(932));
+    CHECK(MultiByteToWideChar(932, 0, "a", -1, w, 64) == 2 && w[0] == 'a' && w[1] == 0);                     /* SHX-T8: CP932 対応 */
+    CHECK(MultiByteToWideChar(936, 0, "a", -1, w, 64) == 0 && GetLastError() == ERROR_INVALID_PARAMETER);   /* 936 等は非対応のまま */
+    CHECK(GetACP() == 1252 && GetOEMCP() == 437 && IsValidCodePage(65001) && IsValidCodePage(932) && !IsValidCodePage(936));
     CPINFO ci; CHECK(GetCPInfo(CP_UTF8, &ci) && ci.MaxCharSize == 4);
     CHECK(IsDBCSLeadByteEx(1252, 0x81) == FALSE);
+    CHECK(IsDBCSLeadByteEx(932, 0x81) && IsDBCSLeadByteEx(932, 0x9F) && !IsDBCSLeadByteEx(932, 0xA0) && IsDBCSLeadByteEx(932, 0xE0) &&
+          IsDBCSLeadByteEx(932, 0xFC) && !IsDBCSLeadByteEx(932, 0xFD) && !IsDBCSLeadByteEx(932, 'a'));
 
     CHECK(lstrlenW(W("hello")) == 5 && lstrlenW(NULL) == 0);
     CHECK(lstrcmpiW(W("Hello"), W("hELLO")) == 0 && lstrcmpW(W("a"), W("b")) < 0 && lstrcmpW(W("b"), W("a")) > 0);
@@ -75,6 +78,24 @@ static void test_strings(void) {
     CHECK(FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, ERROR_ACCESS_DENIED, 0, ab, 128, NULL) > 0 && !strncmp(ab, "Access is denied.", 17));
     CHECK(PathUnExpandEnvStringsW(W("C:\\Users\\webstudio\\AppData\\Roaming\\x.dat"), w, 64) && wstr_eq(w, "%APPDATA%\\x.dat"));
     CHECK(PathUnExpandEnvStringsW(W("D:\\none"), w, 64) == FALSE);
+}
+
+/* #658: UI 言語。kernel32 export (proctable 経由) が en-US 1 件を返す。flags = MUI_LANGUAGE_NAME(8) / 0 */
+static void test_ui_language(void) {
+    typedef BOOL (*gupl_fn)(DWORD, ULONG*, LPWSTR, ULONG*);
+    CHECK(GetProcAddress(GetModuleHandleW(W("kernel32.dll")), "GetUserPreferredUILanguages") == (void*)GetUserPreferredUILanguages);
+    gupl_fn fn = (gupl_fn)GetProcAddress(GetModuleHandleW(W("kernel32.dll")), "GetUserPreferredUILanguages");
+    const DWORD flags[2] = { 8u, 0u };
+    for (int i = 0; i < 2; i++) {
+        ULONG num = 0, cch = 0;
+        CHECK(fn(flags[i], &num, NULL, &cch) && num == 1 && cch == 7);                  /* 問合せ: "en-US" + 2 NUL */
+        WCHAR buf[16]; memset(buf, 0xAA, sizeof buf);
+        cch = 16;
+        CHECK(fn(flags[i], &num, buf, &cch) && num == 1 && cch == 7);
+        CHECK(buf[0] == 'e' && buf[1] == 'n' && buf[2] == '-' && buf[3] == 'U' && buf[4] == 'S' && buf[5] == 0 && buf[6] == 0 && buf[7] == 0xAAAA);
+        cch = 6;
+        CHECK(!fn(flags[i], &num, buf, &cch) && GetLastError() == ERROR_INSUFFICIENT_BUFFER && cch == 7);
+    }
 }
 
 /* ---------------------------------------------------------------
@@ -574,6 +595,7 @@ static void test_process_module(void) {
 
 void run_sys_tests(void) {
     test_strings();
+    test_ui_language();
     test_registry();
     test_files();
     test_time();

@@ -24,6 +24,8 @@ for a in "$@"; do
   esac
 done
 python3 -c 'import numpy, capstone, pefile' 2>/dev/null || { echo "missing python deps: numpy capstone pefile" >&2; exit 2; }
+echo "== [0/4] 比較系の単体テスト (LD-11 / #548: cmp_mem byte 単位・wasm timeout の別 outcome。ネガコン込み。失敗で set -e により中断)"
+python3 tests/test_compare_ld11.py
 need() { [ -e "$1" ] || { echo "missing input: $1 ($2)" >&2; exit 2; }; }
 need ../m11/work/boot_final3.ll "oc_artifacts: work-m11"
 need ../m11/work/m11_image.bin "oc_artifacts: work-m11"
@@ -36,6 +38,7 @@ python3 liftdiff.py build targets/ott_old.json >/dev/null
 echo "== [2/4] OTT 旧 chain: 欠陥 D1〜D6 の検出"
 python3 liftdiff.py batch targets/ott_old.json --set closure --shards 4 --nobuild --out work/ott_old/batch.jsonl | tail -22
 python3 tests/check_ott.py | tee work/ott_old/check.txt
+bash tests/nc_check_ott.sh   # ネガコン: D1/D2/D3/D6 のタグを 1 系統ずつ除くと check_ott.py が exit 1 になること
 else
 echo "== [2/4] OTT 旧 chain: skipped (--m11-only)"
 fi

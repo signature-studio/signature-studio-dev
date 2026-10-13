@@ -4,13 +4,15 @@
 # 検証内容:
 #   1. 全ソースのビルド (MT) → 生成物更新 (proctable.c / shimx_stubs.h / exports.txt)
 #   2. MT(pthread) ビルドで全グループ PASS (core: ハンドル/待機/スレッド/ロック/TLS/FLS/タイマ, sys: 文字列/レジストリ/
-#      ファイル/時刻/heap/モジュール/環境/SEH, ole/shell: BSTR/VARIANT/SAFEARRAY/IStream/shell32/version)
+#      ファイル/時刻/heap/モジュール/環境/SEH/UI言語, ole/shell: BSTR/VARIANT/SAFEARRAY/IStream/shell32/version,
+#      absent: pathreg 写像経由の不在パス属性/検索エラーコード (#658))
 #   3. ST(単一スレッド) ビルドで同テストが PASS (スレッド系は skip)
 #   4. fail-fast: 未対応 API / 未処理 RaiseException / RtlUnwind / strict GetProcAddress / ST の INFINITE 待ち → 非 0 終了 + 名前出力。
 #      ExitProcess(7) → 終了コード 7。strict SysFreeString(管理外 BSTR) / EnterCriticalSection(NULL) も fail-fast
 #   5. M4 互換: tools/shim/test/test_main.c (無改変) を shimx 実装に対して MT/ST で実行 → ALL PASS
 #   6. カバレッジ: inventory/BACKLOG 再生成。担当範囲の未実装 0 / M4 53 API 継承 53 を検査
-#   6b. lift IR (M11 init closure / OTT) の declare 署名と shimx 定義の wasm 署名が一致 (signature mismatch 0)
+#   6b. lift IR (M11 init closure / OTT) の declare を sig_normalize.py で shimx 署名へ正規化 → wasm 署名一致 (signature mismatch 0)
+#       + test/sig/sig_test.sh (合成 fixture: 検出・正規化・adapter 実行・未対応型の fail・sigs.json 乖離検出・符号不明の拡張は unresolved/sext 明示で -1 保存)
 #   6c. R6 検査: ir_undef.py の構造体展開 + 重複 declare 正規化 (--normalize-dup 産物が emcc 通過) を M11 IR で実測
 #   7. OTT undefined 47 種 → shimx リンクで Win/CRT API 24 種が全て解決 (tools/m8 成果物があれば)
 #
@@ -32,6 +34,7 @@ command -v node >/dev/null || die "node が見つかりません"
 command -v llvm-nm >/dev/null || die "llvm-nm が見つかりません"
 mkdir -p "$BUILD" "$HERE/work"
 source "$HERE/flags.sh"
+PR_INC=(-I"$HERE/src" -I"$HERE/pathreg/include")   # test_absent.c / pathmap.c (VFS 写像 pathreg) 用
 { echo "emcc : $(emcc --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"; echo "node : $(node --version)"; echo "date : $(date -Is)"; } > "$BUILD/versions.txt"
 
 info "1/7 オブジェクトビルド + 生成物更新 (proctable / stub prototypes / exports.txt)"
@@ -46,14 +49,14 @@ N_EXPORT="$(grep -vc '^#' "$HERE/exports.txt")"
 info "    公開関数 $N_EXPORT 本 (うち shimx_* 運用フック $(grep -c '^shimx_' "$HERE/exports.txt"))"
 
 info "2/7 MT (pthread) ビルド + node 実行"
-emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_MT[@]}" "$HERE"/src/*.c "$HERE"/test/*.c -o "$BUILD/shimx_test_mt.js" || die "emcc MT ビルド失敗"
+emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_MT[@]}" "${PR_INC[@]}" "$HERE"/src/*.c "$HERE"/test/*.c "$HERE"/pathreg/src/pathmap.c -o "$BUILD/shimx_test_mt.js" || die "emcc MT ビルド失敗"
 mv "$BUILD/shimx_test_mt.js" "$BUILD/shimx_test_mt.cjs"
 node "$BUILD/shimx_test_mt.cjs" > "$BUILD/mt.out" 2> "$BUILD/mt.err" || { tail -5 "$BUILD/mt.err" >&2; die "MT テスト失敗 (build/mt.err)"; }
 grep -q "ALL PASS (build=mt(pthreads))" "$BUILD/mt.out" || die "MT: ALL PASS が出力されていない"
 info "    MT PASS ($(grep -c 'OK' "$BUILD/mt.err") グループ)"
 
 info "3/7 ST (シングルスレッド) ビルド + node 実行"
-emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_ST[@]}" "$HERE"/src/*.c "$HERE"/test/*.c -o "$BUILD/shimx_test_st.js" || die "emcc ST ビルド失敗"
+emcc "${SHIMX_CLANG_FLAGS[@]}" "${SHIMX_EMCC_ST[@]}" "${PR_INC[@]}" "$HERE"/src/*.c "$HERE"/test/*.c "$HERE"/pathreg/src/pathmap.c -o "$BUILD/shimx_test_st.js" || die "emcc ST ビルド失敗"
 mv "$BUILD/shimx_test_st.js" "$BUILD/shimx_test_st.cjs"
 node "$BUILD/shimx_test_st.cjs" > "$BUILD/st.out" 2> "$BUILD/st.err" || { tail -5 "$BUILD/st.err" >&2; die "ST テスト失敗 (build/st.err)"; }
 grep -q "ALL PASS (build=st)" "$BUILD/st.out" || die "ST: ALL PASS が出力されていない"
@@ -104,8 +107,10 @@ if [ -f "$HERE/../m8/work/ott_m8.ll" ]; then
 fi
 for pair in "m11:$HERE/../m11/work/boot_final2.ll" "m11_3:$HERE/../m11/work/boot_final3.ll" "ott:$HERE/../m8/work/ott_m8.ll"; do
     tag="${pair%%:*}"; ir="${pair#*:}"
-    if [ -f "$ir" ]; then bash "$HERE/scripts/verify_sig.sh" "$ir" "$tag" | sed 's/^/    /' || die "署名不一致 ($tag): lift IR の declare と shimx 定義が wasm 署名で食い違う"; fi
+    if [ -f "$ir" ]; then bash "$HERE/scripts/sig_gate.sh" "$ir" "$tag" | sed 's/^/    /' || die "署名不一致 ($tag): sig_normalize.py 後も lift IR の declare と shimx 定義が wasm 署名で食い違う (または未解決型)"; fi
 done
+# SHX-T7 (#173): 合成 fixture による署名正規化の回帰 (陰性対照・adapter 実行・sigs.json 乖離検出を含む)
+bash "$HERE/test/sig/sig_test.sh" | sed 's/^/    /' || die "署名正規化テスト (test/sig/sig_test.sh) 失敗"
 # R6: 構造体展開スタブ + 重複 declare 正規化 (M11 IR があれば実測)
 if [ -f "$HERE/../m11/work/boot_final3.ll" ]; then
     python3 "$HERE/scripts/ir_undef.py" "$HERE/../m11/work/boot_final3.ll" --nm "$HERE/work/nm_MT.txt" \

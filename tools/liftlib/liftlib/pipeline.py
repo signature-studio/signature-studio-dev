@@ -6,17 +6,21 @@ cfg (JSON) の主なキー:
   retdec: {"ranges": "0x..-0x..,...", "timeout": 900}
   passes: {"p1": true, "f7": true, "f2": true, "gdata": "external"|"all"|null, "shift": {"base":..,"newbase":..}|null}
   exports: [ "function_180afe090", ... ]
-  emcc: {"opt": "-O1", "extra": [..], "sources": [..] (追加 C)}
+  extra_funcs: [["0x1802f7370", "0x1802f74ec"], ...]  (.pdata 外の leaf 関数を合成エントリ登録。p1/f2 が機械語を参照するため)
+  emcc: {"opt": "-O1" (profile dev のみ), "extra": [..], "variant_extra": {"<変種名>": [..]} (署名ガード変種ごとの追加フラグ), "sources": [..] (追加 C)}
+  spec / wasm_func / signature: {"n": 署名用シナリオ数, "expect": 期待署名} (標準ビルド `build` の署名ガード用)
 """
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 
 from . import env
 from . import ir as IR
+from . import stdbuild as SB
 from .pe import Image
 from .passes import base as B, p1, f7, f2, iargs, remap
 from .passes import icall as ICALL
@@ -159,8 +163,8 @@ def emit_stubs(mod, defined_extra=(), externals=False):
     return "\n".join(lines) + "\n", n
 
 
-def build(cfg, mod, workdir, log, stats):
-    """修復済み Module → helper 生成 → emcc → <name>.cjs"""
+def prepare(cfg, mod, workdir, stats):
+    """修復済み Module → 正規名 IR + SIMD helper C + stub C を書く (変種に依らず 1 回)。返値 (ll_path, h_path, s_path)"""
     name = cfg["name"]
     text = mod.dump()
     text, mp = SG.canonicalize(text)
@@ -177,29 +181,97 @@ def build(cfg, mod, workdir, log, stats):
     s_path = os.path.join(workdir, name + "_stubs.c")
     open(s_path, "w").write(stub_c)
     stats["stubs"] = nstub
+    return ll_path, h_path, s_path
+
+
+def emit(cfg, paths, workdir, profile="dev", tag=None):
+    """prepare の出力 → emcc → <name>[.<tag>].cjs。profile は data/std_build.json (標準 = std)。
+    dev (既定・後方互換) だけ cfg の emcc.opt を尊重する (旧 -O1)。それ以外は profile が最適化水準を決める。"""
+    ll_path, h_path, s_path = paths
+    name = cfg["name"]
     em = cfg.get("emcc", {})
     exports = ["_malloc", "_free"] + ["_" + e for e in cfg.get("exports", [])]
-    out_js = os.path.join(workdir, name + ".js")
-    cmd = ["emcc", "-w", em.get("opt", "-O1"), "-ffp-contract=off", "-frounding-math", "-fno-fast-math",
-           "-I", SIMD_DIR, ll_path, h_path, s_path] + [rpath(x) for x in em.get("sources", [])] + em.get("extra", []) + [
-        "-sERROR_ON_UNDEFINED_SYMBOLS=1", "-sMODULARIZE=1", "-sENVIRONMENT=node", "-sALLOW_MEMORY_GROWTH=1",
-        "-sEXPORTED_FUNCTIONS=" + ",".join(exports), "-sEXPORTED_RUNTIME_METHODS=HEAPU8", "--no-entry",
-        "-Wl,--no-gc-sections", "-o", out_js]
+    out_js = os.path.join(workdir, name + (("." + tag) if tag else "") + ".js")
+    fl = SB.flags(profile, rounding_math=True)
+    if profile == "dev" and em.get("opt"):
+        fl = [em["opt"] if f == "-O1" else f for f in fl]
+    cmd = (["emcc", "-w"] + fl + ["-I", SIMD_DIR, ll_path, h_path, s_path] + [rpath(x) for x in em.get("sources", [])] + em.get("extra", [])
+           + (em.get("variant_extra", {}).get(tag, []) if tag else [])
+           + ["-sERROR_ON_UNDEFINED_SYMBOLS=1", "-sMODULARIZE=1", "-sENVIRONMENT=node", "-sALLOW_MEMORY_GROWTH=1",
+              "-sEXPORTED_FUNCTIONS=" + ",".join(exports), "-sEXPORTED_RUNTIME_METHODS=HEAPU8", "--no-entry", "-o", out_js])
+    bad = SB.violations(profile, cmd)
+    if bad:
+        raise SB.StdBuildError("profile %s に禁止フラグ: %s" % (profile, " ".join(bad)))
     r = env.run(cmd, capture_output=True, text=True)
     if r.returncode:
-        raise RuntimeError("emcc failed:\n" + r.stderr[-3000:])
-    cjs = os.path.join(workdir, name + ".cjs")
+        raise RuntimeError("emcc failed (%s):\n%s" % (profile, r.stderr[-3000:]))
+    cjs = out_js[:-3] + ".cjs"
     os.replace(out_js, cjs)
-    return cjs, ll_path
+    return cjs
 
 
-def run_all(cfg_path, workdir=None, detect_only=False):
+def build(cfg, mod, workdir, log, stats, profile="dev"):
+    """修復済み Module → helper 生成 → emcc → <name>.cjs (単一 profile。署名ガード無し = 旧 lift 経路)"""
+    paths = prepare(cfg, mod, workdir, stats)
+    return emit(cfg, paths, workdir, profile), paths[0]
+
+
+def build_variants(cfg, mod, workdir, log, stats, profile="std", variants=None, n=None, expect=None, timeout=300):
+    """標準ビルド入口: 1 回の修復結果から profile + 署名ガード変種を全部ビルドし、wasm_runner 署名が全一致のときだけ
+    <name>.cjs (= profile 版) を確定する。不一致 / 期待署名違いは SignatureMismatch (成果物 <name>.cjs は作らない)。
+    変種名は `<tag>` (= profile 名) か `<tag>=<profile>` (variant_extra[tag] で追加フラグを足す変種)。
+    署名 = 同一シナリオ (cfg.spec; 実機 oracle 不要) を各変種の wasm に流した出力の正規化ハッシュ (stdbuild.canon_digest)。"""
+    from .harness import diff as D, spec as SP
+    spec = json.load(open(os.path.join(HERE, "..", cfg["spec"])))
+    paths = prepare(cfg, mod, workdir, stats)
+    names = list(dict.fromkeys(list(variants if variants is not None else SB.load()["guard_variants"]) + [profile]))
+    scen = os.path.join(workdir, "sigguard_scen.txt")
+    open(scen, "w").write(SP.build(spec, n=n))
+    sigp = os.path.join(workdir, "sigguard_sig.json")
+    json.dump(D.wasm_sig(paths[0], cfg["wasm_func"]), open(sigp, "w"))
+    final = os.path.join(workdir, cfg["name"] + ".cjs")
+    if os.path.exists(final):
+        os.remove(final)
+    res = {}
+    for v in names:
+        t0 = time.time()
+        cjs = emit(cfg, paths, workdir, v.partition("=")[2] or v, tag=v.partition("=")[0])
+        t_build = time.time() - t0
+        outp = os.path.join(workdir, "sigguard_out_%s.txt" % v)
+        t0 = time.time()
+        if D.run_wasm(cjs, cfg["wasm_func"], sigp, scen, outp, timeout) is None:
+            sig = "TIMEOUT"
+        else:
+            try:
+                sig = SB.canon_digest(open(outp).read(), spec)
+            except SB.StdBuildError as e:
+                sig = "NO-RESULT"
+                log.append("stdbuild: %s %s" % (v, e))
+        res[v] = dict(cjs=cjs, wasm_bytes=os.path.getsize(cjs[:-4] + ".wasm"), build_s=round(t_build, 2), run_s=round(time.time() - t0, 2),
+                      sig=sig)
+        log.append("stdbuild: %s %dB build %.1fs sig %s" % (v, res[v]["wasm_bytes"], t_build, res[v]["sig"]))
+    rep = dict(variants=res, profile=profile)
+    try:
+        rep["guard"] = SB.guard({k: v["sig"] for k, v in res.items()}, expect)
+    except SB.SignatureMismatch:
+        json.dump(rep, open(os.path.join(workdir, cfg["name"] + ".sig.json"), "w"), indent=1, default=str)
+        raise
+    shutil.copyfile(res[profile]["cjs"], final)
+    shutil.copyfile(res[profile]["cjs"][:-4] + ".wasm", final[:-4] + ".wasm")
+    json.dump(rep, open(os.path.join(workdir, cfg["name"] + ".sig.json"), "w"), indent=1, default=str)
+    return final, rep
+
+
+def lift_repair(cfg_path, workdir=None, detect_only=False):
+    """設定 JSON → RetDec → 修復 pass。返値 (cfg, workdir, mod, stats, log)。ビルドはしない"""
     cfg = load_cfg(cfg_path)
     workdir = workdir or os.path.join(HERE, "..", "work", cfg["name"])
     workdir = os.path.abspath(workdir)
     os.makedirs(workdir, exist_ok=True)
     log, stats = [], {}
     img = Image(rpath(cfg["image"]))
+    for b, e in cfg.get("extra_funcs", []):
+        img.add_func(int(str(b), 0), int(str(e), 0))
     ic = cfg.get("passes", {}).get("icall")
     if ic:   # lift 前に PE を書換え (間接 call/jmp 復元 + ABI 仮想化 + D7 回避)。img (修復 pass が参照する正本) は元 PE のまま
         rimg, rranges, icmap = ICALL.prelift(cfg, rpath(cfg["image"]), rpath(ic["funcs"]), workdir, log)
@@ -211,8 +283,30 @@ def run_all(cfg_path, workdir=None, detect_only=False):
         raw = retdec_lift(cfg, workdir, log)
     mod, st = repair_ll(cfg, raw, img, log, detect_only=detect_only)
     stats.update(st)
+    return cfg, workdir, mod, stats, log
+
+
+def _dump_report(workdir, stats, log):
+    json.dump(dict(stats=stats, log=log), open(os.path.join(workdir, "pipeline_report.json"), "w"), indent=1, ensure_ascii=False, default=str)
+
+
+def run_all(cfg_path, workdir=None, detect_only=False):
+    cfg, workdir, mod, stats, log = lift_repair(cfg_path, workdir, detect_only)
     cjs = None
     if not detect_only:
         cjs, ll_path = build(cfg, mod, workdir, log, stats)
-    json.dump(dict(stats=stats, log=log), open(os.path.join(workdir, "pipeline_report.json"), "w"), indent=1, ensure_ascii=False, default=str)
+    _dump_report(workdir, stats, log)
     return cfg, workdir, cjs, stats, log
+
+
+def run_build(cfg_path, workdir=None, profile="std", variants=None, n=None, expect=None, timeout=300):
+    """標準ビルド入口 (`python3 -m liftlib build`)。lift → 修復 → profile ビルド + 署名ガード。
+    返値 (cfg, workdir, cjs, stats, log, rep)。署名不一致は SignatureMismatch (rep は <name>.sig.json に残る)。"""
+    cfg, workdir, mod, stats, log = lift_repair(cfg_path, workdir)
+    sg = cfg.get("signature", {})
+    try:
+        cjs, rep = build_variants(cfg, mod, workdir, log, stats, profile=profile, variants=variants,
+                                  n=n or sg.get("n"), expect=expect or sg.get("expect"), timeout=timeout)
+    finally:
+        _dump_report(workdir, stats, log)
+    return cfg, workdir, cjs, stats, log, rep
