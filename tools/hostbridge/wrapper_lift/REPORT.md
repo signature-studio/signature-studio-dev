@@ -71,6 +71,39 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| RetDec の Wrapper 全体 lift の成否・失敗型分類 (本 REPORT §2 の単発失敗の切り分け含む) | lift 方式の比較表の 1 列が埋まらない | #828 |
+| RetDec 既定モードの reg 243 失敗の原因 (分割 lift は §5 で測定済み) | 既定モードは使えない | #828 |
 | liftlib / x64c の Wrapper 適用と比較表の完成 | 受入条件 1 未達 | #828 |
 | CreatePlugInstance 到達 (受入条件 2) | 受入条件 2 未達 | #829 |
+| liftlib (RetDec → 修復 → emcc) の Wrapper 適用・wasm build 可否と採用方式の決定 | 比較表の build 列と採用方式が埋まらない | #917 (子) |
+| RetDec 既定モード (`--select-decode-only` なし) が reg 243 で落ちる原因 | 既定モードで Wrapper を lift できない理由が未特定 | #828 |
+
+## 5. 方式比較の実測 (#828、検証 HEAD: 本 PR)
+
+計測: `FL_WIN64_DIR=<fl-win64>/extracted python3 tools/hostbridge/wrapper_lift/retdec_batch.py block19091_PE.bin block23676_PE.bin` (RetDec v5.0、batch 500、直列)。x64c は `tools/icall/x64c_census.py` (関数集合は §1 と同じ chain 併合)。
+
+| 項目 | RetDec (分割 lift) | x64c (静的カバレッジ) | liftlib (RetDec→修復→emcc) |
+|---|---|---|---|
+| block19091: 関数数 | 19,816 | 19,816 | 未測定 |
+| block19091: lift 成功 (関数単位) | 19,723 (99.53%) | — | 未測定 |
+| block23676: 関数数 / lift 成功 | 19,826 / 19,733 (99.53%) | — | 未測定 |
+| 未対応命令数 (block19091 / block23676) | — | 3,697 / 3,697 (0.56% / 0.56%) | 未測定 |
+| build 可否 (wasm) | 未実施 | 未実施 | 未実施 |
+| 所要 (RetDec, 合計秒) | block19091 294.54 / block23676 288.11 | 11.22 s (block19091, 19,816 関数, 単一プロセス) | 未測定 |
+
+- 計測環境: 直列 1 プロセス。load average (1 分値) は計測中 0.06–0.65。RetDec の所要は batch 内の `retdec-decompiler` 実行時間の和。
+- 定義: RetDec 成功 = 出力 C に `function_<開始 VA>` の定義本体が現れる関数。`exit 0` だが定義が無い関数は失敗 (reason `no_definition`)。
+- 再現性: block19091 を 2 回 (16:07 と 16:13) 実行し、件数 (19,723 / 93 失敗) が一致。
+- 失敗 93 件 (両 block 同数) は `retdec_block*.json` の `failed_funcs` に全件を記録 (gitignore)。
+
+**RetDec の既定モードの失敗 (§2 の追試)**: 1 関数範囲だけでなく block19091・block23676 の全体でも、既定モードは decode 段で
+`[capstone2llvmir]: Missing type for register number: 243` により exit 1 で落ちる (約 8 s)。対照の小さい PE (block00004 / block00006) は exit 0。
+`--select-decode-only` を付けると範囲指定の lift が通る。reg 243 の由来は未特定 (capstone 5.0.7 では `X86_REG_BND1` に当たるが、
+両 block の `.text` を線形 decode しても BND レジスタは現れない。RetDec 同梱の capstone の番号体系の差の可能性が残る)。
+
+**x64c の未対応**: 未対応 mnemonic 66 種。上位は `movsq` 1,587 / `stosq` 435 / x87 (`fld`・`fmul`・`fadd`・`fxch`・`fstp` 等) / `rep movsq` 68 / `lock xadd`・`lock cmpxchg`。
+Delphi RTL の文字列コピー (rep/movs) と x87 演算が主因。これは静的カバレッジで、x64c の実 lift 成否ではない。
+
+**未解決 (受入条件の残り)**
+- liftlib (RetDec 出力 → 修復 → emcc) を Wrapper に適用した成否と、wasm build 可否。RetDec の batch 出力 C を結合して emcc する経路は未着手。
+- 採用方式の判定。RetDec は分割 lift で 99.53% が通るが、出力の build と実行 (bit 一致) が未確認のため、単独で採用とは言えない。x64c は命令カバレッジ 99.44% だが実 lift 未実施。
+- 上記は子 issue #917 ([HB-H23]) として起票する (§4 の 2 行)。
