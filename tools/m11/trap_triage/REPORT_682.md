@@ -146,3 +146,12 @@ bash trap_triage/store_watch_682.sh w2                                   # 全 s
 - 検証起点: `8d883c3` (main)。修復 commit はこの branch の次の commit (本 PR)。
 - 変更ファイル: `tools/m11/m11_ov.c` (47b260 転記を追加。他は不変)、`tools/m11/trap_triage/{REPORT_682.md, watch_store_682.{py,c}, store_watch_682.sh, chain_682.sh, negctl_682.sh, check_682.py}`。
 - work/ 配下の成果 (`work/probe682/`、sites.json 5.6 MB 等) は git 管理外 (`tools/m11/.gitignore: work/`)。
+
+## 11. `m11_e2e.sh` 全体の実行 (HEAD `c922c19`)
+
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP` の下で、`m11_e2e.sh` の `PE=` 行だけを `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` に差し替え、`sed ... | bash -s` で実行 (リポジトリのファイルは変更していない)。
+- 結果: rc=0 / 所要 35.5 秒 / load 0.33→0.63 / 4 vCPU / n=1。
+- `M11_SUMMARY`: reached_stage 4 (DllMain attach 完走・longjmp 経路、stage 5 未達) / units_run_full 22 / survey ok 868・trap 27 (oom 0)・clobber 0・miss 46 / getmem 33・freemem 20 / VA 1.3 MB / wasm 6,027,631 B。
+- survey の ok・trap・clobber・miss は §4.1 の修復行と一致。stage と units_run は §10 の最終 HEAD と一致。
+- 注意: `m11_e2e.sh` は未達・前提欠如でも `exit 0` を返す (スクリプト冒頭の注記どおり)。rc=0 は合否の根拠にしない。合否は `check_682.py` (不合格で rc=1) で判定する。
+- 未解決: `m11_e2e.sh` の PE 固定パス (`/home/ubuntu/...`) と exit 0 固定は、本 PR の範囲外として残す (起票先は §7 の表に追記)。
