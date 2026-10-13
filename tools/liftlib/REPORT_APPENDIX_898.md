@@ -5,25 +5,33 @@ REPORT_APPENDIX.md が 250 行上限を超えているため、#898 の節はこ
 
 ## 状態
 
-部分達成。`site_unbound` は 3 → 2 (受入条件 #1 の `site_unbound` 0 は未達)。
-残り 2 site (`1801c162b`・`1801c1752`) はスタック渡し引数の bind であり、[HB-H25] #1124 で扱う。
-0 を渡した場合の機能上の影響は未確認。
+`site_unbound` は 3 → 0 (main 取り込み後の HEAD で実測)。
+- `1801a3117` (rdx = `movzx edx, dl`): 本 PR の movzx 合成で bind。
+- `1801c162b` / `1801c1752` (r8 = 5 番目の引数, 入口 rsp+0x28): main の [HB-H25] #1158 で bind 済み。
 
-### 3 site の bind (検証コード HEAD 220c4703)
+高バイト (`movzx edx, dh` 等) は合成せず unbound にする (本 PR の review 指摘で追加。`_HIGH8`・T16b)。
+
+### 3 site の bind
 
 | site | 原因 | 対応 |
 |---|---|---|
-| `1801a3117` | rdx = `movzx edx, dl` (呼出元の入口 dl の 0 拡張) | **解決**。`_resolve` の movzx 分岐 (`sw` = 元レジスタ幅で切る → 呼出側の型へ `zext`)。emit 行は `iargs.py` の `nm_` 規則 (`%ia_<C>_<k>`) から導いた次の 3 行 (実行ログからの貼付ではない。入口値の token は未確認): `%ia_1801a3117_1mt = trunc <入口 rdx の型> <入口値> to i8` → `%ia_1801a3117_1mz = zext i8 %ia_1801a3117_1mt to i32` → `%ia_1801a3117_1z = zext i32 %ia_1801a3117_1mz to i64`。call の引数は `i64 %ia_1801a3117_1z` |
-| `1801c162b` / `1801c1752` | r8 = `mov r8d,[rbp+0x5f]`。`[rbp+0x5f]` は呼出元の入口 rsp+0x28 (**5 番目の引数 = スタック渡し**)。`iargs.py` 冒頭の「スタック渡し (5 引数目〜) は扱わない」の範囲外 | **未解決**。0 を渡す (T16 で `site_unbound=2` を固定)。0 が無害かは未確認 (callee `1801c4d00`/`1801c5038` は r8 を `test r8b` 等で読む)。子 issue **[HB-H25] #1124** で扱う |
+| `1801a3117` | rdx = `movzx edx, dl` (呼出元の入口 dl の 0 拡張) | **解決**。`_resolve` の movzx 分岐 (`sw` = 元レジスタ幅で切る → 呼出側の型へ `zext`)。元レジスタが `ah`/`bh`/`ch`/`dh` の場合は合成せず `None` (unbound)。 |
+| `1801c162b` / `1801c1752` | r8 = `mov r8d,[rbp+0x5f]`。入口 rsp+0x28 (5 番目の引数 = スタック渡し) | **main で解決** ([HB-H25] #1158)。本 PR では変更なし。 |
 
-### 実測 (検証コード HEAD 220c4703・main 取り込み前)
+### 実測 (HEAD `5efcb24b`・素材: fl-win64 / work-m6-ott / analysis-ott-binaries / work-liftlib)
 
-- `iargs.run` (OTT `ott.drc.ll`): `site_unbound` 3 → 2。
-- `leafspec targets/ott_iargs.json --n 200`: match=200 mismatch=0 wasm_trap=0 (rate 1.000 → PASS)。所要 22.8 秒 (rc=0)。
-- 測定の出所: PR 作成時の単一測定。実行 ID・出力全文は保存していない。同じ HEAD の再測定値は別に存在しない。
-- 現 HEAD (2b456966) との関係: `iargs.py` は 220c4703 から不変 (`git diff` で確認)。一方、main 取り込み (c3ce2796) で `passes/base.py` の `canon_alloca_order` と `tests/test_unit.py` の T23 が加わっており、上記の測定はそれらを含まない。現 HEAD での T16 / leafspec は未実測。
+- `tests/test_unit.py` T16 (単独実行, `python3 -c` で `t16()`): PASS。`define_fixed=15 sites_fixed=24 site_unbound=0`、再走査 0/0/0、冪等。所要 254.6 秒 (`real 4m14.7s`, rc=0)。
+- T16b (高バイト被覆, 新規): PASS。`movzx edx, dh` → None / `movzx edx, dl` → i32 の zext 合成。修正を外すと FAIL することを確認。
+- T23: PASS (単独実行 0.0 秒)。
+- `leafspec targets/ott_iargs.json --n 200`: **未実行**。`emcc` / `/opt/emsdk` が無く、`oc_artifacts` に `toolchain-emsdk` が無いため。
 
-### 再実行できなかった検証 (レビュー指摘 5)
+### leafspec の実測 (未取得)
 
-- 本 fix run (HEAD 2b456966) では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` のみがあり、OTT 素材 (`tools/m6/work/ott.drc.ll`・`OTT_vst2_win64.dll`) が無い。T16 と leafspec は再実行できず、本節の数値は再検証していない。
-- 再実行に必要な素材: `fl-win64 work-m6-ott analysis-ott-binaries work-liftlib` (`docs/WORKFLOW.md` §11)。素材が揃った run の Actions run ID と出力全文を、ここに追記すること。
+- 旧測定 (HEAD 220c4703・main 取り込み前): match=200 mismatch=0 wasm_trap=0 (rate 1.000 → PASS)。所要 22.8 秒 (rc=0)。出所は PR 作成時の単一測定で、実行 ID・出力全文は保存していない。
+- 現 HEAD での実測: 以下の run で取得し、ここに追記する (未了)。
+  - Actions run ID: 未取得
+  - 出力全文 (match / mismatch / wasm_trap / rc): 未取得
+
+### 再実行に必要な素材
+
+`fl-win64 work-m6-ott analysis-ott-binaries work-liftlib toolchain-emsdk` (`docs/WORKFLOW.md` §11)。
