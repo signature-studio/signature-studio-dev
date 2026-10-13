@@ -53,7 +53,7 @@ python3 tools/m11/trap_triage/annotate.py tools/m11/work/trap_triage/after.json 
 python3 tools/m11/trap_triage/disasm_fn.py 417b70 ...   # PE (.pdata 区間) の capstone 逆アセンブル (LD_M11_PE で PE 指定)
 ```
 
-環境変数: `SV_ONLY=884` (unit 限定)・`SV_TRACE_AT=884` (その unit だけ trace)・`SV_PROG=1` (進捗を stderr)。
+環境変数: `SV_ONLY=884` (unit 限定)・`SV_TRACE_AT=884` (その unit 以降を trace。#495 で結果を変えないよう透過化済み `REPORT_495.md`)・`SV_PROG=1` (進捗を stderr)・`SV_STK_FILL=ff` (各 unit 直前に SP 下を埋める)。
 `capstone` / `pefile` (pip) が要る。この runner では `/home/ubuntu/work/analysis/win64/extracted/block00031_PE.bin`
 と `/home/ubuntu/work/webstudio` を symlink / 展開して実行した (PR #301 の方法)。
 
