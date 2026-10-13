@@ -97,6 +97,7 @@
 - **再計算**: `bash tools/hostbridge/poc/recount_shim.sh` (`test_shim.mjs` を実行し OK/FAIL 件数と negative controls caught を出力)。
 - **実測** (`recount_shim.sh`, HEAD = 784 ブランチ): real checks OK=18 FAIL=0; negative controls caught=6/6; `[shim] ALL PASS`。
 - **未検証**: OTT 経路 (`run_poc.mjs`) は `tools/m10/work/ott_m10.ll` が必要で、その生成 (`m6_lift.sh`) は OTT 実機バイナリ (`[ANALYSIS-PLUGINS]` 配下の `ott/binaries/OTT_vst2_win64.dll`) と `work/ott_ranges.txt` を要する。本 run では `analysis-ott-binaries` / `work-m6-ott` の素材が取得されておらず (`$ARTIFACTS_DIR` は `fl-win64` のみ)、`run_poc.mjs` は実行できない。issue 受入 1 (既存 OTT 経路の不変確認) は未達のまま。PM へ: 素材 `oc_artifacts: fl-win64 toolchain-emsdk toolchain-retdec analysis-ott-binaries work-m6-ott` での再起動を要請。
+  - 再確認 (HEAD 93ef594c, fix run): `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ。`bash tools/hostbridge/hostbridge.sh` → [1] E1〜E20 OK → [2] build で `tools/m10/work/ott_m10.ll` 無しにより exit=1 で停止。[3a]〜[4] (`run_poc.mjs`) 未実行。shim 追加前後の `run_poc.mjs` 比較は未取得。
 - **注意**: bridged 強制は `ModuleTable.register` 経由の全 descriptor に効くが、現行 descriptor に `bridge` 欄は無く実効値は常に 0。Wrapper 側 `this+0x761` の本物の制御 (Wrapper を lift した後) は H4 本体の範囲。
 
 ## 6'. 規約遵守メモ
