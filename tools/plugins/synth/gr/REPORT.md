@@ -82,9 +82,10 @@
 
 | 項目 | 実測 |
 |---|---|
-| `gr_nega.py` | 3 回すべて exit 0、0.50〜0.51 s (load average 0.02) |
-| `gr_e2e.sh` (wasm 結果なし) | 3 回すべて **exit 1**、約 0.46 s (最初の 1 回の実測値 0.463 s)。 出力: `INVALID-REF=12` |
-| 検証起点 | 下の「コミット済み HEAD の再現」を参照 |
+| 検証起点 | **コミット済み HEAD 73c540e** をクリーン worktree (`git worktree add --detach`) に展開して実行 (4 core / 開始時 load average 0.07) |
+| `gr_nega.py` | 3 回すべて exit 0、0.50 s (13 ケース中 NG 0) |
+| `gr_e2e.sh` (wasm 結果なし) | 3 回すべて **exit 1**、0.43〜0.44 s。 出力: `INVALID-REF=12` (12 本中 11 本が native SIGSEGV、1 本が dst 無書込) |
+| 作業ツリー (未コミット作業中) での同じ実行 | `gr_nega.py` 0.50〜0.51 s ×3 / `gr_e2e.sh` 0.463 s (1 回目) と同じ結果 |
 
 検証範囲: 12 shell の Gen_Render VA / instance size の導出、native 実行器の挙動 (落ちる事実を結果に残すこと)、判定器の識別力。
 範囲外: wasm 実行、ctor を通した this での native 実行、MIDI / パラメータ列、engine DLL、Render test .flp。 範囲外の項目について本書は何も主張しない。
