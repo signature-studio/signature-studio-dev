@@ -43,7 +43,7 @@
 | `tools/audio/test/*`, `harness/*` | テスト wasm (正弦/ランプ/ループバック), CDP 駆動 headless Chrome ランナー (COOP/COEP 付き静的サーバ込み) |
 | `tools/audio/{inventory.sh,e2e.sh,build.sh,flags.sh}`, `*.py` | 実測スクリプト群 (capstone/pefile/llvm-nm), emcc フラグは `tools/m1,shim/flags.sh` 流儀 |
 
-## 5. 検証結果 (`results/results.json` = 原実行 22/22 PASS。検収の独立再実行は §9)
+## 5. 検証結果 (下表は原実行 (検収時) の値。`results/results.json` は merged HEAD `a6212bc` の 33/33 run。差分は §13。検収の独立再実行は §9)
 
 | シナリオ | 結果 |
 |---|---|
@@ -230,7 +230,16 @@ winmm `midiIn`/`midiOut` 20 関数の Web MIDI 実体を `src/flmidi*.c` / `src/
 | `FlAudioShimOptions.input` | in_ch>0 の ATTACH 毎に接続 (失敗しても出力は継続)。`lost` → `dev_events` に `FLA_EV_INPUT_CHANGED` (=16) → producer が `kAsioResetRequest` を発行 (`ctx.suspend` と同経路) |
 | `FLA_CMD_CONTROL_PANEL` (=8) / `FlAudioShimOptions.controlPanel` | `flasio_control_panel()` が main の UI 代替を呼ぶ。UI 未登録なら `ASE_NotPresent` (FL 側は "Could not open ASIO control panel" 経路) |
 
-検証 (コミット `1809e67`、`inventory.sh` 以外の e2e.sh 手順 = tsc → build.sh → `node harness/run.mjs` フル、headless Chrome 154 の fake device/UI、load average 0.04 開始、所要 485 s): **30/30 PASS** (新規 5 本 + 既存 25 本, `results/results.json`)。`inventory.sh` は固定ホームパス参照のため本 run では未実行。
+検証 (`inventory.sh` 以外の e2e.sh 手順 = tsc → build.sh → `node harness/run.mjs` フル、headless Chrome 154 の fake device/UI、`inventory.sh` は固定ホームパス参照のため未実行):
+
+| 回 | コミット | 結果 | 所要 | 開始時 load |
+|---|---|---|---|---|
+| 1 (pre-merge) | `1809e67` | 30/30 PASS (新規 5 + 既存 25) | 485 s | 0.04 |
+| 2 (merged, 修正前) | `b66c676` | 32/33 PASS。`asio_ramp_b128_d2` のみ FAIL (underrun 1, silence 640) | 518 s | 0.45 |
+| 2' (2 の単独再実行) | `b66c676` | `--only asio_ramp_b128_d2` 1/1 PASS (underrun 0, mismatch 0/961024) | 73 s | 0.13 |
+| 3 (最終) | `a6212bc` | **33/33 PASS** (main 側 3 件を含む全 33 件), exit 0 | 498 s | 0.20 |
+
+回 2 の FAIL は B=128 のランプ試験の揺れ (入力を使わないシナリオ・同一コードで回 2' は PASS)。再現性の確認は回 3 の PASS と回 2' による。`results/results.json` は回 3 の生成物。
 
 | 新規シナリオ | 結果 |
 |---|---|
