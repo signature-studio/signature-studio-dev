@@ -60,7 +60,8 @@ struct Wnd {
   U64 wndproc, userdata, id, hinst;
   int wide, destroying;
   char title[128];
-  int has_inv; WRECT inv; int erase;
+  int has_inv; WRECT inv; RL invl; int erase;   /* invl = 無効領域 (client 座標の非重複矩形リスト), inv = その外接矩形 */
+  int nl, nt, nr, nb; int nc_dirty;              /* 非クライアント領域の幅 (window rect と client rect の差) */
   int surf;                 /* top-level のみ */
   uint64_t tid; uint8_t *extra; int cbextra;
   int in_paint;
@@ -75,8 +76,8 @@ static uint64_t g_gui_tid;
 static uint32_t g_msg_time; static WPOINT g_msg_pt;
 
 /* ================= surface / present ================= */
-static WRECT g_dirty[GUI_MAX_SURF]; static uint8_t g_hasdirty[GUI_MAX_SURF]; static volatile int g_any_dirty; static uint32_t g_last_flush;
-static uint32_t g_ztop;
+static RL g_dirty[GUI_MAX_SURF]; static uint8_t g_hasdirty[GUI_MAX_SURF];   /* dirty は非重複矩形リスト (8 超は外接矩形へ縮退) */ static volatile int g_any_dirty; static uint32_t g_last_flush;
+static uint32_t g_ztop, g_ztop_tm = 0x40000000u;   /* TOPMOST は常に非 TOPMOST より前面 (z >= 0x40000000) */
 static uint8_t *g_surf_ptr[GUI_MAX_SURF];   /* native(64bit) 用の実ポインタ。wasm32 では s->pixels と同値 */
 
 /* host (headless render thread) 向けの不変スナップショット (px,w,h)。shim は surface の生成/再確保ごとに新しい SurfSnap を atomic に公開し、
@@ -158,14 +159,10 @@ void surf_dirty(int id, WRECT r) {
   r = r_isect(r, (WRECT){ 0, 0, (int32_t)s->w, (int32_t)s->h });
   if (!r_empty(r)) {
     g_any_dirty = 1;
-    if (!g_hasdirty[id]) { g_dirty[id] = r; g_hasdirty[id] = 1; }
-    else {
-      WRECT *d = &g_dirty[id];
-      if (r.left < d->left) d->left = r.left;
-      if (r.top < d->top) d->top = r.top;
-      if (r.right > d->right) d->right = r.right;
-      if (r.bottom > d->bottom) d->bottom = r.bottom;
-    }
+    RL t = {0}; rl_add(&t, r);
+    if (!g_hasdirty[id]) { rl_clear(&g_dirty[id]); g_hasdirty[id] = 1; }
+    rl_union(&g_dirty[id], &t); rl_free(&t);
+    if (g_dirty[id].n > 8) { WRECT b; rl_bbox(&g_dirty[id], &b); rl_clear(&g_dirty[id]); rl_add(&g_dirty[id], b); }
   }
   gui_unlock();
 }
@@ -181,9 +178,11 @@ void surf_flush(void) {
     if (!g_hasdirty[i]) continue;
     g_hasdirty[i] = 0;
     if (!sh->surf[i].state) continue;
-    WRECT r = g_dirty[i];
-    out_cmd(GUI_CMD_PRESENT, (uint32_t)i, (uint32_t)r.left, (uint32_t)r.top, (uint32_t)r.right, (uint32_t)r.bottom, seq);
-    any = 1;
+    for (int k = 0; k < g_dirty[i].n; k++) {
+      WRECT r = g_dirty[i].r[k];
+      out_cmd(GUI_CMD_PRESENT, (uint32_t)i, (uint32_t)r.left, (uint32_t)r.top, (uint32_t)r.right, (uint32_t)r.bottom, seq);
+      any = 1;
+    }
   }
   if (any) {
     out_cmd(GUI_CMD_FRAME_END, seq, 0, 0, 0, 0, 0);
@@ -225,7 +224,7 @@ static void surf_free(int id) {
     __atomic_store_n(&s->state, 0, __ATOMIC_SEQ_CST);
     SurfSnap *osn = __atomic_exchange_n(&g_surf_snap[id], NULL, __ATOMIC_ACQ_REL);
     retire_locked(g_surf_ptr[id], osn);   /* host が SURF_DESTROY (と先行レコード) を消費するまで free しない */
-    g_surf_ptr[id] = NULL; s->pixels = 0; g_hasdirty[id] = 0;
+    g_surf_ptr[id] = NULL; s->pixels = 0; g_hasdirty[id] = 0; rl_free(&g_dirty[id]);
   }
   gui_unlock();
 }
@@ -301,29 +300,31 @@ static int is_visible(Wnd *w) {
   for (; w && w != g_desktop; w = w->parent) if (!(w->style & WS_VISIBLE)) return 0;
   return 1;
 }
-int wnd_target(Wnd *w, int *surf, int *ox, int *oy) {
+static int ww(Wnd *w) { return w->nl + w->w + w->nr; }
+static int wh(Wnd *w) { return w->nt + w->hgt + w->nb; }
+int wnd_target(Wnd *w, int *surf, int *ox, int *oy) {   /* top-level surface と w の client 原点 (surface 座標) */
   int x = 0, y = 0;
-  while (w && w->parent != g_desktop) { x += w->x; y += w->y; w = w->parent; }
+  while (w && w->parent != g_desktop) { x += w->x + w->nl; y += w->y + w->nt; w = w->parent; }
   if (!w) return 0;
-  *surf = w->surf; *ox = x; *oy = y;
+  *surf = w->surf; *ox = x + w->nl; *oy = y + w->nt;
   return 1;
 }
 void wnd_client_size(Wnd *w, int *cw, int *ch) { *cw = w->w; *ch = w->hgt; }
 static void to_screen_origin(Wnd *w, int *sx, int *sy) {
   int x = 0, y = 0;
-  while (w && w != g_desktop) { x += w->x; y += w->y; w = w->parent; }
+  while (w && w != g_desktop) { x += w->x + w->nl; y += w->y + w->nt; w = w->parent; }
   *sx = x; *sy = y;
 }
-void wnd_clip(Wnd *w, RL *out) {
+static void wnd_clip_impl(Wnd *w, RL *out, int win) {   /* win=1: window DC (NC を含む window rect) */
   rl_clear(out);
   if (!is_visible(w)) return;
   int surf, ox, oy;
   if (!wnd_target(w, &surf, &ox, &oy)) return;
-  WRECT r = { ox, oy, ox + w->w, oy + w->hgt };
+  WRECT r = win ? (WRECT){ ox - w->nl, oy - w->nt, ox - w->nl + ww(w), oy - w->nt + wh(w) } : (WRECT){ ox, oy, ox + w->w, oy + w->hgt };
   /* 祖先 client に収める */
   int ax = ox, ay = oy;
   for (Wnd *a = w; a->parent != g_desktop; a = a->parent) {
-    ax -= a->x; ay -= a->y;  /* a->parent の client 原点 (surface 座標) */
+    ax -= a->x + a->nl; ay -= a->y + a->nt;  /* a->parent の client 原点 (surface 座標) */
     Wnd *p = a->parent;
     if (p->parent == g_desktop || 1) {
       WRECT pc = { ax, ay, ax + p->w, ay + p->hgt };
@@ -332,13 +333,68 @@ void wnd_clip(Wnd *w, RL *out) {
   }
   rl_add(out, r);
   if ((w->style & WS_CLIPSIBLINGS) && w->parent != g_desktop) {
-    int px = ox - w->x, py = oy - w->y;
+    int px = ox - w->x - w->nl, py = oy - w->y - w->nt;
     for (Wnd *s = w->next; s; s = s->next)
-      if (s->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ px + s->x, py + s->y, px + s->x + s->w, py + s->y + s->hgt });
+      if (s->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ px + s->x, py + s->y, px + s->x + ww(s), py + s->y + wh(s) });
   }
   if (w->style & WS_CLIPCHILDREN)
     for (Wnd *c = w->first; c; c = c->next)
-      if (c->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ ox + c->x, oy + c->y, ox + c->x + c->w, oy + c->y + c->hgt });
+      if (c->style & WS_VISIBLE) rl_subtract_rect(out, (WRECT){ ox + c->x, oy + c->y, ox + c->x + ww(c), oy + c->y + wh(c) });
+}
+void wnd_clip(Wnd *w, RL *out) { wnd_clip_impl(w, out, 0); }
+void wnd_clip_window(Wnd *w, RL *out) { wnd_clip_impl(w, out, 1); }
+void wnd_window_origin(Wnd *w, int *ox, int *oy) { int s; wnd_target(w, &s, ox, oy); *ox -= w->nl; *oy -= w->nt; }
+
+/* ================= z-order / 非クライアント領域 ================= */
+enum { WS_BORDER_ = 0x00800000, WS_DLGFRAME_ = 0x00400000, WS_THICKFRAME_ = 0x00040000, WS_EX_TOPMOST_ = 8, WS_EX_TRANSPARENT_ = 0x20,
+       WS_EX_CLIENTEDGE_ = 0x200, WS_EX_NOACTIVATE_ = 0x08000000, HT_NOWHERE = 0, HT_CLIENT = 1, HT_CAPTION = 2, HT_BORDER = 18, HT_TRANSPARENT = -1 };
+static uint32_t next_z(Wnd *w) { return (w->exstyle & WS_EX_TOPMOST_) ? ++g_ztop_tm : ++g_ztop; }
+static void link_top(Wnd *w) {   /* desktop の子リスト (= z 順) の最前面へ。ただし非 TOPMOST は TOPMOST の下 */
+  unlink_child(w);
+  Wnd *p = g_desktop; w->parent = p;
+  Wnd *at = p->last;
+  if (!(w->exstyle & WS_EX_TOPMOST_)) while (at && (at->exstyle & WS_EX_TOPMOST_)) at = at->prev;
+  w->prev = at; w->next = at ? at->next : p->first;
+  if (at) at->next = w; else p->first = w;
+  if (w->next) w->next->prev = w; else p->last = w;
+}
+/* DPI 方針 (PROTOCOL.md §12): canvas 内部解像度 = 物理 px。DPI 非対応 (既定) の context には 96 を見せ画素は 1:1、
+ * 対応 (SYSTEM/PER_MONITOR 系) の context には dpr*96 を見せ、shim が決める寸法 (NC 幅・システムメトリクス) をその DPI に比例させる。
+ * context はプロセス共通の 1 値 (SetThreadDpiAwarenessContext も同じ変数を書く。スレッド別には保持しない)。 */
+static I64 g_dpi_ctx = -1;   /* DPI_AWARENESS_CONTEXT_UNAWARE */
+int gui_dpi(void) { if (g_dpi_ctx == -1 || g_dpi_ctx == -5) return 96; uint32_t d = gui_sh()->dpr_x100; return (int)((96u * (d ? d : 100) + 50) / 100); }
+static int dscale(int v) { return (v * gui_dpi() + 48) / 96; }
+static I64 send_message(U64 h, uint32_t msg, U64 wp, I64 lp);
+/* 非クライアント幅 (決定的な shim 規約: 実 Windows の DWM 枠とは一致しない。PROTOCOL.md §12) */
+static void nc_metrics(uint32_t style, uint32_t ex, int *l, int *t, int *r, int *b) {
+  int bw = 0;
+  if (style & WS_THICKFRAME_) bw = dscale(5);                                   /* SM_CXFRAME 4 + SM_CXBORDER 1 */
+  else if (style & WS_DLGFRAME_) bw = dscale(3);                                /* SM_CXDLGFRAME */
+  else if (style & WS_BORDER_) bw = dscale(1);
+  if (ex & WS_EX_CLIENTEDGE_) bw += dscale(2);
+  int cap = ((style & WS_CAPTION) == WS_CAPTION) ? dscale(23) : 0;
+  *l = *r = *b = bw; *t = bw + cap;
+}
+static WRECT *g_nc_cur;   /* 送信中の NCCALCSIZE_PARAMS.rgrc: lift 済み WndProc は lParam を int32 に切り詰める (REPORT §4-6) ため native (64bit) では下位 32bit 一致で復元 */
+/* ウィンドウ矩形 (親 client 座標) を与え WM_NCCALCSIZE で client 寸法と NC 幅を確定 */
+static void calc_nc(Wnd *w, int ww_, int wh_) {
+  struct { WRECT r[3]; U64 pwp; } p;
+  struct { U64 hwnd, after; int32_t x, y, cx, cy; uint32_t flags, _p; } wp = { w->h, 0, w->x, w->y, ww_, wh_, 0, 0 };
+  WRECT win = { w->x, w->y, w->x + ww_, w->y + wh_ };
+  p.r[0] = p.r[1] = p.r[2] = win; p.pwp = H_(&wp);
+  WRECT *saved = g_nc_cur; g_nc_cur = p.r;
+  send_message(w->h, WM_NCCALCSIZE, 1, H_(&p));
+  g_nc_cur = saved;
+  WRECT c = p.r[0];
+  if (c.left < win.left) c.left = win.left;
+  if (c.top < win.top) c.top = win.top;
+  if (c.right > win.right) c.right = win.right;
+  if (c.bottom > win.bottom) c.bottom = win.bottom;
+  if (c.right < c.left) c.right = c.left;
+  if (c.bottom < c.top) c.bottom = c.top;
+  w->nl = c.left - win.left; w->nt = c.top - win.top; w->nr = win.right - c.right; w->nb = win.bottom - c.bottom;
+  w->w = c.right - c.left; w->hgt = c.bottom - c.top;
+  w->nc_dirty = (w->nl | w->nt | w->nr | w->nb) != 0;
 }
 
 /* ================= 呼出し ================= */
@@ -497,29 +553,30 @@ static API create_window_impl(uint32_t exstyle, I64 cls, I64 name, uint32_t styl
   if (y == (int32_t)0x80000000) y = 0;
   if (cx == (int32_t)0x80000000) cx = 640;
   if (cy == (int32_t)0x80000000) cy = 480;
-  w->x = x; w->y = y; w->w = cx < 0 ? 0 : cx; w->hgt = cy < 0 ? 0 : cy;
+  w->x = x; w->y = y; w->w = cx < 0 ? 0 : cx; w->hgt = cy < 0 ? 0 : cy;   /* NC 確定 (WM_NCCALCSIZE) まで window rect = client */
   w->id = (style & WS_CHILD) ? (U64)menu : 0;
   w->cbextra = k->cbwnd; if (w->cbextra > 0) w->extra = (uint8_t *)calloc(1, (size_t)w->cbextra);
   w->h = h_alloc(HT_WND, w);
-  link_child(par ? par : g_desktop, w);
-  if (!par) w->surf = surf_alloc(x, y, w->w, w->hgt, w->title);
+  if (par) link_child(par, w); else link_top(w);
+  if (!par) { w->surf = surf_alloc(x, y, w->w, w->hgt, w->title); if (exstyle & WS_EX_TOPMOST_) gui_sh()->surf[w->surf].z = ++g_ztop_tm; }
   /* CREATESTRUCT (Win64 layout, 88B) */
   struct { U64 lpCreateParams, hInstance, hMenu, hwndParent; int32_t cy, cx, y, x; uint32_t style, _p; U64 lpszName, lpszClass;
            uint32_t dwExStyle, _p2; } cs = { (U64)param, (U64)hinst, (U64)menu, (U64)parent, cy, cx, y, x, style, 0,
                                            (U64)name, (U64)cls, exstyle, 0 };
   I64 r = send_message(w->h, WM_NCCREATE, 0, H_(&cs));
-  if (!r) { Wnd *dead = w; send_message(dead->h, WM_NCDESTROY, 0, 0); unlink_child(dead); if (dead->surf >= 0) surf_free(dead->surf); h_free(dead->h); free(dead->extra); free(dead); return 0; }
+  if (!r) { Wnd *dead = w; send_message(dead->h, WM_NCDESTROY, 0, 0); unlink_child(dead); if (dead->surf >= 0) surf_free(dead->surf); h_free(dead->h); rl_free(&dead->invl); free(dead->extra); free(dead); return 0; }
+  calc_nc(w, w->w, w->hgt);
   r = send_message(w->h, WM_CREATE, 0, H_(&cs));
   if ((int32_t)r == -1) {
     send_message(w->h, WM_DESTROY, 0, 0); send_message(w->h, WM_NCDESTROY, 0, 0);
-    unlink_child(w); if (w->surf >= 0) surf_free(w->surf); h_free(w->h); free(w->extra); free(w);
+    unlink_child(w); if (w->surf >= 0) surf_free(w->surf); h_free(w->h); rl_free(&w->invl); free(w->extra); free(w);
     return 0;
   }
   if (style & WS_VISIBLE) {
     w->style |= WS_VISIBLE;
     send_message(w->h, WM_SHOWWINDOW, 1, 0);
     post_size_move(w);
-    if (!par) { GuiShared *sh = gui_sh(); sh->surf[w->surf].visible = 1; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); activate(w); }
+    if (!par) { GuiShared *sh = gui_sh(); sh->surf[w->surf].visible = 1; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); if (!(exstyle & WS_EX_NOACTIVATE_)) activate(w); }
     invalidate(w, NULL, 1, 1);
   } else post_size_move(w);
   return (I64)w->h;
@@ -545,7 +602,7 @@ static void destroy_tree(Wnd *w) {
   if (w->surf >= 0) surf_free(w->surf);
   h_free(w->h);
   while (w->props) { struct Prop *p = w->props; w->props = p->next; free(p); }
-  free(w->extra); free(w);
+  rl_free(&w->invl); free(w->extra); free(w);
 }
 API DestroyWindow(I64 h) {
   Wnd *w = wnd_from_h((U64)h);
@@ -599,8 +656,8 @@ API GetClientRect(I64 h, I64 rc) {
 }
 API GetWindowRect(I64 h, I64 rc) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
-  int sx, sy; to_screen_origin(w, &sx, &sy);
-  WRECT *r = (WRECT *)P_(rc); r->left = sx; r->top = sy; r->right = sx + w->w; r->bottom = sy + w->hgt; return 1;
+  int sx, sy; to_screen_origin(w, &sx, &sy); sx -= w->nl; sy -= w->nt;
+  WRECT *r = (WRECT *)P_(rc); r->left = sx; r->top = sy; r->right = sx + ww(w); r->bottom = sy + wh(w); return 1;
 }
 API ClientToScreen(I64 h, I64 pt) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
@@ -622,7 +679,7 @@ API MapWindowPoints(I64 hf, I64 ht, I64 pts, I64 n) {
   return ((I64)(uint16_t)(fy - ty) << 16) | (uint16_t)(fx - tx);
 }
 
-static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int sized) {
+static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int sized) {   /* cw, ch = window rect の寸法 */
   w->x = x; w->y = y;
   if (is_toplevel(w) && w->surf >= 0) {
     GuiSurface *s = &gui_sh()->surf[w->surf];
@@ -630,9 +687,9 @@ static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int 
     if (sized) surf_resize(w->surf, cw, ch);
     out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0);
   }
-  w->w = cw; w->hgt = ch;
+  if (sized) calc_nc(w, cw, ch); else { w->w = cw - w->nl - w->nr; w->hgt = ch - w->nt - w->nb; }
   if (sized) {
-    send_message(w->h, WM_SIZE, 0, ((I64)(ch & 0xFFFF) << 16) | (cw & 0xFFFF));
+    send_message(w->h, WM_SIZE, 0, ((I64)(w->hgt & 0xFFFF) << 16) | (w->w & 0xFFFF));
     invalidate(w, NULL, 1, 1);
   }
   if (moved) send_message(w->h, WM_MOVE, 0, ((I64)(y & 0xFFFF) << 16) | (x & 0xFFFF));
@@ -641,32 +698,43 @@ static void apply_geometry(Wnd *w, int x, int y, int cw, int ch, int moved, int 
 API MoveWindow(I64 h, I64 x, I64 y, I64 cw, I64 ch, I64 repaint) {
   (void)repaint;
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
-  apply_geometry(w, (int)x, (int)y, (int)cw, (int)ch, w->x != (int)x || w->y != (int)y, w->w != (int)cw || w->hgt != (int)ch);
+  apply_geometry(w, (int)x, (int)y, (int)cw, (int)ch, w->x != (int)x || w->y != (int)y, ww(w) != (int)cw || wh(w) != (int)ch);
   return 1;
 }
 static void show_internal(Wnd *w, int show);
+static int g_noact;   /* SW_SHOWNA / SWP_NOACTIVATE 中は show で activate しない */
 API SetWindowPos(I64 h, I64 after, I64 x, I64 y, I64 cx, I64 cy, I64 flags) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   int nx = (flags & SWP_NOMOVE) ? w->x : (int)x, ny = (flags & SWP_NOMOVE) ? w->y : (int)y;
-  int nw = (flags & SWP_NOSIZE) ? w->w : (int)cx, nh = (flags & SWP_NOSIZE) ? w->hgt : (int)cy;
+  int nw = (flags & SWP_NOSIZE) ? ww(w) : (int)cx, nh = (flags & SWP_NOSIZE) ? wh(w) : (int)cy;
   if (!(flags & SWP_NOZORDER) && w->parent) {
     Wnd *p = w->parent;
     if (after == HWND_BOTTOM_ || after == HWND_TOP_ || after == -1 || after == -2) {
+      if (after == -1 && is_toplevel(w)) w->exstyle |= WS_EX_TOPMOST_;   /* HWND_TOPMOST / HWND_NOTOPMOST */
+      if ((after == -2 || after == HWND_BOTTOM_) && is_toplevel(w)) w->exstyle &= ~(uint32_t)WS_EX_TOPMOST_;   /* NOTOPMOST / BOTTOM は topmost を外す (MSDN) */
       unlink_child(w);
       if (after == HWND_BOTTOM_) { w->parent = p; w->next = p->first; w->prev = NULL; if (p->first) p->first->prev = w; else p->last = w; p->first = w; }
+      else if (is_toplevel(w)) link_top(w);
       else link_child(p, w);
-      if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = (after == HWND_BOTTOM_) ? 0 : ++g_ztop; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = (after == HWND_BOTTOM_) ? 0 : next_z(w); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
     } else if (wnd_from_h((U64)after)) {
       Wnd *a = wnd_from_h((U64)after);
-      unlink_child(w);
-      w->parent = p; w->prev = a; w->next = a->next;
-      if (a->next) a->next->prev = w; else p->last = w;
-      a->next = w;
-      if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = gui_sh()->surf[a->surf].z; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      if (is_toplevel(w) && ((w->exstyle ^ a->exstyle) & WS_EX_TOPMOST_)) {   /* TOPMOST 群と非 TOPMOST 群は跨がない: 各群の先頭 (link_top) へ */
+        link_top(w);
+        if (w->surf >= 0) { gui_sh()->surf[w->surf].z = next_z(w); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      } else {
+        unlink_child(w);
+        w->parent = p; w->prev = a; w->next = a->next;
+        if (a->next) a->next->prev = w; else p->last = w;
+        a->next = w;
+        if (is_toplevel(w) && w->surf >= 0) { gui_sh()->surf[w->surf].z = gui_sh()->surf[a->surf].z; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0); }
+      }
     }
   }
-  apply_geometry(w, nx, ny, nw, nh, w->x != nx || w->y != ny, w->w != nw || w->hgt != nh);
+  apply_geometry(w, nx, ny, nw, nh, w->x != nx || w->y != ny, ww(w) != nw || wh(w) != nh);
+  g_noact = (flags & SWP_NOACTIVATE) != 0;
   if (flags & SWP_SHOWWINDOW) show_internal(w, 1);
+  g_noact = 0;
   if (flags & SWP_HIDEWINDOW) show_internal(w, 0);
   return 1;
 }
@@ -679,7 +747,7 @@ static void show_internal(Wnd *w, int show) {
   if (is_toplevel(w) && w->surf >= 0) {
     gui_sh()->surf[w->surf].visible = show ? 1 : 0;
     out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)w->surf, 0, 0, 0, 0, 0);
-    if (show) activate(w);
+    if (show) { if (!(w->exstyle & WS_EX_NOACTIVATE_) && !g_noact) activate(w); }
     else if (g_active == w) { g_active = NULL; for (Wnd *t = g_desktop->last; t; t = t->prev) if ((t->style & WS_VISIBLE) && t != w) { activate(t); break; } }
   }
   if (show) invalidate(w, NULL, 1, 1);
@@ -688,7 +756,9 @@ static void show_internal(Wnd *w, int show) {
 API ShowWindow(I64 h, I64 cmd) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   int was = !!(w->style & WS_VISIBLE);
+  g_noact = (cmd == SW_SHOWNA || cmd == 4 /* SW_SHOWNOACTIVATE */);
   show_internal(w, cmd != SW_HIDE);
+  g_noact = 0;
   return was;
 }
 
@@ -750,20 +820,21 @@ API GetWindowThreadProcessId(I64 h, I64 pid) {
   if (pid) *(uint32_t *)P_(pid) = 1;
   return (I64)(w->tid & 0x7fffffff);
 }
-API AdjustWindowRectEx(I64 rc, I64 style, I64 menu, I64 ex) { (void)rc; (void)style; (void)menu; (void)ex; return 1; }
+API AdjustWindowRectEx(I64 rc, I64 style, I64 menu, I64 ex) {
+  (void)menu; WRECT *r = (WRECT *)P_(rc); int l, t, rr, b; nc_metrics((uint32_t)style, (uint32_t)ex, &l, &t, &rr, &b);
+  r->left -= l; r->top -= t; r->right += rr; r->bottom += b; return 1;
+}
+API AdjustWindowRect(I64 rc, I64 style, I64 menu) { return AdjustWindowRectEx(rc, style, menu, 0); }
 
 /* ================= 無効領域 / WM_PAINT ================= */
 static void invalidate(Wnd *w, const WRECT *r, int erase, int children) {
   WRECT full = { 0, 0, w->w, w->hgt };
   WRECT x = r ? r_isect(*r, full) : full;
   if (!r_empty(x)) {
-    if (!w->has_inv) { w->inv = x; w->has_inv = 1; }
-    else {
-      if (x.left < w->inv.left) w->inv.left = x.left;
-      if (x.top < w->inv.top) w->inv.top = x.top;
-      if (x.right > w->inv.right) w->inv.right = x.right;
-      if (x.bottom > w->inv.bottom) w->inv.bottom = x.bottom;
-    }
+    if (!w->has_inv) rl_clear(&w->invl);
+    RL t = {0}; rl_add(&t, x); rl_union(&w->invl, &t); rl_free(&t);   /* 複数矩形の無効領域 (非重複) */
+    if (w->invl.n > 16) { WRECT b; rl_bbox(&w->invl, &b); rl_clear(&w->invl); rl_add(&w->invl, b); }
+    rl_bbox(&w->invl, &w->inv); w->has_inv = 1;
     if (erase) w->erase = 1;
   }
   if (children) for (Wnd *c = w->first; c; c = c->next) invalidate(c, NULL, erase, 1);
@@ -780,7 +851,10 @@ API ValidateRect(I64 h, I64 rc) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 1;
   if (!rc) { w->has_inv = 0; w->erase = 0; return 1; }
   const WRECT *r = (const WRECT *)P_(rc);
-  if (w->has_inv && r->left <= w->inv.left && r->top <= w->inv.top && r->right >= w->inv.right && r->bottom >= w->inv.bottom) { w->has_inv = 0; w->erase = 0; }
+  if (w->has_inv) {
+    rl_subtract_rect(&w->invl, *r);
+    if (rl_empty(&w->invl)) { w->has_inv = 0; w->erase = 0; } else rl_bbox(&w->invl, &w->inv);
+  }
   return 1;
 }
 API GetUpdateRect(I64 h, I64 rc, I64 erase) {
@@ -802,7 +876,10 @@ static void erase_background(Wnd *w, U64 hdc) {
   I64 handled = send_message(w->h, WM_ERASEBKGND, hdc, 0);
   (void)handled;
 }
-static void do_paint_msg(Wnd *w) { send_message(w->h, WM_PAINT, 0, 0); }
+static void nc_paint_if_needed(Wnd *w) {   /* 枠の再描画は WM_PAINT の前に WM_NCPAINT (wParam=1: 全域) */
+  if (w->nc_dirty && is_visible(w)) { w->nc_dirty = 0; send_message(w->h, WM_NCPAINT, 1, 0); surf_flush(); }
+}
+static void do_paint_msg(Wnd *w) { nc_paint_if_needed(w); send_message(w->h, WM_PAINT, 0, 0); }
 API UpdateWindow(I64 h) {
   Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   if (w->has_inv && is_visible(w)) do_paint_msg(w);
@@ -815,7 +892,11 @@ API BeginPaint(I64 h, I64 ps) {
   WRECT rc = w->has_inv ? w->inv : (WRECT){ 0, 0, w->w, w->hgt };
   RL clip = {0}; wnd_clip(w, &clip);
   int surf, ox, oy; wnd_target(w, &surf, &ox, &oy);
-  rl_intersect_rect(&clip, (WRECT){ ox + rc.left, oy + rc.top, ox + rc.right, oy + rc.bottom });
+  if (w->has_inv) {   /* 無効領域 (複数矩形) だけを描画可能にする */
+    RL inv = {0}; rl_copy(&inv, &w->invl);
+    for (int i = 0; i < inv.n; i++) { inv.r[i].left += ox; inv.r[i].right += ox; inv.r[i].top += oy; inv.r[i].bottom += oy; }
+    rl_intersect(&clip, &inv); rl_free(&inv);
+  } else rl_intersect_rect(&clip, (WRECT){ ox + rc.left, oy + rc.top, ox + rc.right, oy + rc.bottom });
   U64 dc = gdi_get_dc_for_wnd(w, 0, &clip);
   rl_free(&clip);
   p->hdc = dc; p->rcPaint = rc;
@@ -844,7 +925,14 @@ API GetDC(I64 h) {
   return (I64)dc;
 }
 API GetDCEx(I64 h, I64 rgn, I64 flags) { (void)rgn; (void)flags; return GetDC(h); }
-API GetWindowDC(I64 h) { return GetDC(h); }
+API GetWindowDC(I64 h) {   /* 原点 = window rect 左上・可視領域は NC を含む */
+  gui_sh(); ensure_desktop();
+  Wnd *w = h ? wnd_from_h((U64)h) : g_desktop; if (!w) return 0;
+  if (w == g_desktop) gui_failfast("GetWindowDC", "screen DC (GetWindowDC(NULL)) not implemented");
+  RL clip = {0}; wnd_clip_window(w, &clip);
+  U64 dc = gdi_get_dc_for_wnd(w, 1, &clip); rl_free(&clip);
+  return (I64)dc;
+}
 API ReleaseDC(I64 h, I64 dc) { (void)h; gdi_release_dc((U64)dc); surf_flush(); return 1; }
 
 /* ================= フォーカス / キャプチャ / アクティブ ================= */
@@ -853,8 +941,8 @@ static void activate(Wnd *top) {
   Wnd *old = g_active; g_active = top;
   if (old) send_message(old->h, WM_ACTIVATE, 0, (I64)top->h);
   if (is_toplevel(top) && top->surf >= 0) {
-    if (top->parent->last != top) { unlink_child(top); link_child(g_desktop, top); }
-    gui_sh()->surf[top->surf].z = ++g_ztop; out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)top->surf, 0, 0, 0, 0, 0);
+    link_top(top);
+    gui_sh()->surf[top->surf].z = next_z(top); out_cmd(GUI_CMD_SURF_CHANGE, (uint32_t)top->surf, 0, 0, 0, 0, 0);
   }
   send_message(top->h, WM_ACTIVATE, 1, 0);
   if (!g_focus || toplevel_of(g_focus) != top) set_focus_internal(top);
@@ -929,21 +1017,28 @@ static int wnd_in_filter(U64 hwnd, U64 filt) {
   for (; w; w = w->parent) if (w == f) return 1;
   return 0;
 }
+static int g_hit_code = HT_CLIENT;   /* 直近 hit_test の WM_NCHITTEST 結果 */
 static Wnd *hit_test(int x, int y, int *lx, int *ly) {
   ensure_desktop();
+  g_hit_code = HT_CLIENT;
   for (Wnd *t = g_desktop->last; t; t = t->prev) {
     if (!(t->style & WS_VISIBLE)) continue;
-    /* surface z-order : 同 z は後勝ち; ここでは sibling 順 = z 順 */
-    if (x < t->x || y < t->y || x >= t->x + t->w || y >= t->y + t->hgt) continue;
-    Wnd *cur = t; int cx = x - t->x, cy = y - t->y;
+    /* surface z-order : 同 z は後勝ち; ここでは sibling 順 = z 順 (TOPMOST は link_top で常に末尾側) */
+    if (x < t->x || y < t->y || x >= t->x + ww(t) || y >= t->y + wh(t)) continue;
+    int cx = x - t->x - t->nl, cy = y - t->y - t->nt;
+    int inclient = cx >= 0 && cy >= 0 && cx < t->w && cy < t->hgt;
+    I64 code = send_message(t->h, WM_NCHITTEST, 0, ((I64)(uint16_t)(int16_t)y << 16) | (uint16_t)(int16_t)x);
+    if ((int32_t)code == HT_TRANSPARENT) continue;   /* ツールチップ等: 下の窓へ素通し */
+    if (!inclient || (int32_t)code != HT_CLIENT) { g_hit_code = (int32_t)code == HT_CLIENT ? HT_BORDER : (int32_t)code; *lx = cx; *ly = cy; return t; }
+    Wnd *cur = t;
     for (;;) {
       Wnd *hit = NULL;
       for (Wnd *c = cur->last; c; c = c->prev) {
         if (!(c->style & WS_VISIBLE)) continue;
-        if (cx >= c->x && cy >= c->y && cx < c->x + c->w && cy < c->y + c->hgt) { hit = c; break; }
+        if (cx >= c->x && cy >= c->y && cx < c->x + ww(c) && cy < c->y + wh(c)) { hit = c; break; }
       }
       if (!hit) break;
-      cur = hit; cx -= hit->x; cy -= hit->y;
+      cur = hit; cx -= hit->x + hit->nl; cy -= hit->y + hit->nt;
     }
     *lx = cx; *ly = cy;
     return cur;
@@ -992,6 +1087,12 @@ static void translate_input(const uint32_t *r) {
       if (w) client_of_screen(w, x, y, &lx, &ly);
       else w = hit_test(x, y, &lx, &ly);
       if (!w) return;
+      if (!g_capture && g_hit_code != HT_CLIENT && type != GUI_IN_WHEEL) {   /* 非クライアント: WM_NCMOUSEMOVE / WM_NCLBUTTONDOWN|UP (wParam = HT*, lParam = screen) */
+        uint32_t nm = type == GUI_IN_MOUSE_MOVE ? 0xA0u : (a == 0 ? 0xA1u : a == 1 ? 0xA7u : 0xA4u) + (type == GUI_IN_MOUSE_UP ? 1 : 0);
+        if (type == GUI_IN_MOUSE_DOWN) { Wnd *tp = toplevel_of(w); if (tp != g_active && !(tp->exstyle & WS_EX_NOACTIVATE_)) activate(tp); }
+        QMsg m = { w->h, nm, (U64)(int64_t)g_hit_code, mk_lparam(x, y), t, { x, y }, NULL };
+        q_push(m); return;
+      }
       if (type == GUI_IN_MOUSE_MOVE) {
         if (!g_capture) send_message(w->h, WM_SETCURSOR, w->h, (I64)(1 | (WM_MOUSEMOVE << 16)));
         if (mouse_hook_discard(w, WM_MOUSEMOVE, x, y)) return;
@@ -1008,7 +1109,7 @@ static void translate_input(const uint32_t *r) {
         uint32_t base = btn == 0 ? WM_LBUTTONDOWN : btn == 1 ? WM_MBUTTONDOWN : WM_RBUTTONDOWN;
         uint32_t msg = base + (type == GUI_IN_MOUSE_UP ? 1 : 0);
         if (type == GUI_IN_MOUSE_DOWN) {
-          if (!g_capture) { Wnd *tp = toplevel_of(w); if (tp != g_active) activate(tp); }
+          if (!g_capture) { Wnd *tp = toplevel_of(w); if (tp != g_active && !(tp->exstyle & WS_EX_NOACTIVATE_)) activate(tp); }
           int dbl = w->cls && (w->cls->style & CS_DBLCLKS) && g_last_click_btn == btn && (t - g_last_click_t) <= 500 &&
                     abs(x - g_last_click_x) <= 4 && abs(y - g_last_click_y) <= 4;
           if (dbl) { msg = base + 2; g_last_click_btn = -1; }
@@ -1223,6 +1324,7 @@ static API dispatch_impl(I64 lpmsg) {
   Wnd *w = wnd_from_h(m->hwnd);
   if (!w) return 0;
   if (m->message == WM_PAINT && !w->has_inv) return 0;
+  if (m->message == WM_PAINT) nc_paint_if_needed(w);
   I64 r = call_proc(w, m->message, m->wParam, m->lParam);
   if (m->message == WM_PAINT) surf_flush();
   return r;
@@ -1275,13 +1377,34 @@ static API defproc_impl(I64 h, I64 msg, I64 wp, I64 lp, int wide) {
       gdi_fill_rect_dc(dc, r, col);
       return 1;
     }
-    case WM_NCHITTEST: return 1;  /* HTCLIENT */
+    case WM_NCCALCSIZE: {   /* wParam=1: NCCALCSIZE_PARAMS (rgrc[0] = 新 window rect -> client rect)、0: RECT */
+      WRECT *r = (g_nc_cur && (uint32_t)lp == (uint32_t)(uintptr_t)g_nc_cur) ? g_nc_cur : (WRECT *)P_(lp); int l, t, rr, b; nc_metrics(w->style, w->exstyle, &l, &t, &rr, &b);
+      r->left += l; r->top += t; r->right -= rr; r->bottom -= b; return 0;
+    }
+    case WM_NCPAINT: {   /* window DC に枠 (4 辺) とキャプション帯を描く。client は塗らない */
+      extern API GetWindowDC(I64); extern API ReleaseDC(I64, I64);
+      I64 dc = GetWindowDC(h); if (!dc) return 0;
+      int W_ = ww(w), HH = wh(w), bw = w->nl, cap = w->nt - bw; if (cap < 0) cap = 0;
+      if (bw) {
+        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, 0, W_, bw }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ 0, HH - w->nb, W_, HH }, 0x646464);
+        gdi_fill_rect_dc((U64)dc, (WRECT){ 0, bw, w->nl, HH - w->nb }, 0x646464); gdi_fill_rect_dc((U64)dc, (WRECT){ W_ - w->nr, bw, W_, HH - w->nb }, 0x646464);
+      }
+      if (cap) gdi_fill_rect_dc((U64)dc, (WRECT){ w->nl, bw, W_ - w->nr, bw + cap }, 0xD1B499);
+      ReleaseDC(h, dc); return 0;
+    }
+    case WM_NCHITTEST: {   /* lParam = screen 座標 */
+      int px = (int16_t)(lp & 0xFFFF), py = (int16_t)((lp >> 16) & 0xFFFF), sx, sy; to_screen_origin(w, &sx, &sy);
+      int cx = px - sx, cy = py - sy;
+      if (cx >= 0 && cy >= 0 && cx < w->w && cy < w->hgt) return HT_CLIENT;
+      if (cx < -w->nl || cy < -w->nt || cx >= w->w + w->nr || cy >= w->hgt + w->nb) return HT_NOWHERE;
+      int bw = w->nl; return (w->nt > bw && cy < 0 && cy >= -(w->nt - bw)) ? HT_CAPTION : HT_BORDER;
+    }
     case WM_SETCURSOR: {
       extern API SetCursor(I64);
       if (w->cls && w->cls->hcursor) SetCursor((I64)w->cls->hcursor);
       return 1;
     }
-    case WM_MOUSEACTIVATE: return 1;
+    case WM_MOUSEACTIVATE: return (w->exstyle & WS_EX_NOACTIVATE_) ? 3 /* MA_NOACTIVATE */ : 1;
     case WM_SHOWWINDOW: case WM_SIZE: case WM_MOVE: case WM_ACTIVATE: case WM_SETFOCUS: case WM_KILLFOCUS:
     case WM_DESTROY: case WM_NCDESTROY: case WM_CREATE: return 0;
     case WM_GETTEXTLENGTH: return (I64)strlen(w->title);
@@ -1351,13 +1474,13 @@ API GetSystemMetrics(I64 i) {
     case SM_CXSCREEN: case SM_CXVIRTUALSCREEN: case SM_CXFULLSCREEN: case SM_CXMAXIMIZED: return sh->screen_w;
     case SM_CYSCREEN: case SM_CYVIRTUALSCREEN: case SM_CYFULLSCREEN: case SM_CYMAXIMIZED: return sh->screen_h;
     case SM_XVIRTUALSCREEN: case SM_YVIRTUALSCREEN: return 0;
-    case SM_CXVSCROLL: case SM_CYHSCROLL: return 17;
-    case SM_CYCAPTION: return 23;
-    case SM_CXBORDER: case SM_CYBORDER: return 1;
+    case SM_CXVSCROLL: case SM_CYHSCROLL: return dscale(17);
+    case SM_CYCAPTION: return dscale(23);
+    case SM_CXBORDER: case SM_CYBORDER: return dscale(1);
     case SM_CXDOUBLECLK: case SM_CYDOUBLECLK: return 4;
     case SM_CXICON: case SM_CYICON: return 32;
     case SM_CXSMICON: case SM_CYSMICON: return 16;
-    case SM_CXFRAME: case SM_CYFRAME: return 4;
+    case SM_CXFRAME: case SM_CYFRAME: return dscale(4);
     case SM_CXDRAG: case SM_CYDRAG: return 4;
     case SM_CMONITORS: return 1;
     case SM_MOUSEPRESENT: return 1;
@@ -1426,7 +1549,14 @@ API SendInput(I64 n, I64 pin, I64 cb) {
 API MessageBoxA(I64 h, I64 t, I64 c, I64 f) { (void)h; (void)f; gui_logf("MessageBox[%s]: %s", c ? (const char *)P_(c) : "", t ? (const char *)P_(t) : ""); return 1; }
 API MessageBoxW(I64 h, I64 t, I64 c, I64 f) { char a[200], b[100]; u16_to_u8((const uint16_t *)P_(t), a, sizeof a); u16_to_u8((const uint16_t *)P_(c), b, sizeof b); return MessageBoxA(h, H_(a), H_(b), f); }
 API NotifyWinEvent(I64 a, I64 b, I64 c, I64 d) { (void)a; (void)b; (void)c; (void)d; return 0; }
-API SetThreadDpiAwarenessContext(I64 c) { return c; }
+API SetThreadDpiAwarenessContext(I64 c) {   /* 戻り値 = 旧 context。不正値は 0 */
+  if (!((c >= -5 && c <= -1))) { gui_set_last_error(87); return 0; }
+  I64 old = g_dpi_ctx; g_dpi_ctx = c; return old;
+}
+API GetThreadDpiAwarenessContext(void) { return g_dpi_ctx; }
+API GetDpiForSystem(void) { gui_sh(); return (g_dpi_ctx == -1 || g_dpi_ctx == -5) ? 96 : (I64)((96u * (gui_sh()->dpr_x100 ? gui_sh()->dpr_x100 : 100) + 50) / 100); }
+API GetDpiForWindow(I64 h) { if (!wnd_from_h((U64)h)) return 0; return gui_dpi(); }
+API IsProcessDPIAware(void) { return g_dpi_ctx != -1 && g_dpi_ctx != -5; }
 API IsIconic(I64 h) { (void)h; return 0; }
 API IsZoomed(I64 h) { (void)h; return 0; }
 
@@ -1526,7 +1656,8 @@ API GetUpdateRgn(I64 h, I64 rgn, I64 erase) {
   extern API SetRectRgn(I64, I64, I64, I64, I64);
   (void)erase; Wnd *w = wnd_from_h((U64)h); if (!w) return 0;
   if (!w->has_inv) { SetRectRgn(rgn, 0, 0, 0, 0); return 1; }
-  SetRectRgn(rgn, w->inv.left, w->inv.top, w->inv.right, w->inv.bottom); return 2;
+  extern void gdi_rgn_set_rl(U64, const RL *);
+  gdi_rgn_set_rl((U64)rgn, &w->invl); return w->invl.n > 1 ? 3 : 2;
 }
 API ValidateRgn(I64 h, I64 rgn) { (void)rgn; return ValidateRect(h, 0); }
 API BeginDeferWindowPos(I64 n) { (void)n; return 0x7DEF0000; }

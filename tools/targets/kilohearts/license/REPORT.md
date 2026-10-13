@@ -124,3 +124,7 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 回帰: run_all.sh **exit=0** (33 s)・lic_check **70/70**・em_check **ok=52 ng=0**・snapin 6 種 base/lic 200/200。
 - 未解決 (起票先付き): emfire (manager slot 起火 0x18010b180) の post-state bit 不一致 (vector-compact の ctrl vtable delete thunk 0x180003360 = 尾 `jmp rax` 未 lift) → 親 CAB-13 に次タスク提案。0x1800f6540 lift・listener [sub+0x1170] 通知検証も未実施 → 親 CAB-13。
 - 独立再計算: `python3 scripts/kh11_audit.py` (lift 44 関数 / icall raw 97 サイト (空ブロック 77) / slot map 4,934 スロット完全一致)。
+
+## 11. #249 追記 (ブラウザ分類 lift・ctor 47 vs 46 同定、詳細は `KH249_REPORT.md`)
+
+- 47 ctor = 製品 45 + `HostProxyEditorModel` + `SnapinGroupEditorModel`、product_index 46 = 製品 45 + `core` (KH9 §5-5 の推定を確定)。ブラウザ 0x180ef7fc0 は module F で emcc 通過・status 9 で全エントリ listed/unlocked を実 IR の thunk 実行で確認。
