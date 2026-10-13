@@ -36,7 +36,7 @@
   {
    "name": "get_browser_names",
    "status": "ok",
-   "result": "[object Object]",
+   "result": "Effects/,Generators/,Installed/",
    "api_calls": [
     "ilmcp.getBrowserNames/2"
    ],
@@ -54,7 +54,7 @@
   {
    "name": "get_highlight_names",
    "status": "ok",
-   "result": "Toolbar: Show Piano roll,Toolbar: Show playlist,Toolbar: Show Mixer,Toolbar: Show Channel Rack",
+   "result": "Toolbar: Show Piano Roll,Toolbar: Show Playlist,Toolbar: Show Mixer,Toolbar: Show Channel Rack,Toolbar: Tempo Selector,Add channel,Add steps,Start playback,Enab",
    "api_calls": [
     "ilmcp.getHighlightNames/0"
    ],

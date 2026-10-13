@@ -26,6 +26,7 @@ step "6. smoke (print(1+1) + stdlib)"; node tests/smoke_direct.mjs
 step "7. builtin 一覧 / FL 同梱 Python 差分"; node tests/dump_builtins.mjs; python3 analysis/py_inventory.py > analysis/python_inventory.json
 step "8. PoC: MCPTools.pyc on wasm Python + flapi mock (Worker/SAB RPC)"; node tests/poc_mcp.mjs | grep -E '"(tools|init_ms|host_calls|roundtrip_us_per_flapi_call)"|POC'
 step "9. 48 tools 全実行"; node tests/all_tools.mjs
+step "9b. ilmcp 9 関数 e2e (状態検査 + ネガティブ)"; node tests/ilmcp_e2e.mjs
 python3 analysis/mcp_classify.py
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
 step "ALL OK"

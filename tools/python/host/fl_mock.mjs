@@ -1,6 +1,7 @@
 // FLEngine 模擬ホスト (PoC)。実装版では FLEngine wasm の export に置換される同一インタフェース:
 //   engine.call("mixer.getTrackName", [index, ...]) -> any
 // 返す number は整数なら int、実数なら float になる。整数値の float は F(x) で明示。
+import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
 
 class FlError extends Error {
@@ -88,14 +89,12 @@ export function createMockEngine() {
     "plugins.getParamValue": (p) => F(st.params[p].v),
     "plugins.getParamValueString": (p) => `${(st.params[p].v * 100).toFixed(1)} %`,
     "plugins.setParamValue": (v, p) => { st.params[p].v = v; },
-    "ilmcp.getBrowserNames": (name, rec) => ({ name, items: ["Fruity Slicer", "3x Osc", "Sampler"].map((n) => `${name || ""}/${n}`) }),
-    "ilmcp.getHighlightNames": () => ["Toolbar: Show Piano roll", "Toolbar: Show playlist", "Toolbar: Show Mixer", "Toolbar: Show Channel Rack"],
-    "ilmcp.showHighlight": (item, name, caption, cb) => { st.highlight = { item, name, caption, cb }; return true; },
-    "ilmcp.addChannel": (plugin) => { st.channels.push({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0) }); return st.channels.length - 1; },
-    "ilmcp.removeChannel": (i) => { st.channels.splice(i, 1); },
-    "ilmcp.addEffect": (plugin, track, slot) => { tr(track).slots[slot] = plugin; return true; },
-    "ilmcp.storePRScript": (name, src) => { st.prScripts[name] = src; return true; },
-    "ilmcp.runPRScript": (src) => { st.log.push(["runPRScript", src.length]); return true; },
+    ...createIlmcp(st, {
+      RANGE,
+      INVALID: (m) => new FlError(m, 1),
+      makeChannel: (plugin) => ({ name: plugin, plugin, vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: false, fx: 0, steps: new Array(64).fill(0) }),
+      nMixer: st.mixer.length,
+    }),
   };
 
   const record = [];
