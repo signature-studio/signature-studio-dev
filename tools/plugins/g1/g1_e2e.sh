@@ -52,6 +52,6 @@ if [ "$SKIP_ENG" = 0 ]; then
   python3 g1/engine_check.py work/g1/engines.csv "${CPP[@]}"
   cat work/g1/engines.csv
 fi
-echo "== 未解決の観測 (gate ではない。 件数のみ; 起票先は REPORT §6)"
+echo "== 未解決の観測 (gate ではない。 件数のみ; 起票先は REPORT §10)"
 python3 g1/findings.py
 echo "[g1_e2e] OK: gate 1 / 1b / 2 / 3 / 4 と C++ DLL の形式検査が合格 (出力 work/g1/)"
