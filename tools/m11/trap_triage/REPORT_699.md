@@ -6,7 +6,8 @@
 既知類型との関係 (DEFECTS.md): **D1b と同型の症状・検出信号** (機械語の jcc に対応する IR `br` が無く、飛び先が無条件実行になる)。ただし **根本原因は未切り分け** (D1b は stage-0 のフラグが定数に畳まれる機構。本件は生 lift の段階で既に jcc が無く、同じ機構かは未確認。§2, §6)。新規番号は付けず、行案 (§5) は PM 判断。番号は (DEFECTS.md) 体系。
 
 検証起点: `8d883c3` (main)。作業 branch は `d9bcc52` (親 PR #700 の head) から切った。修正 commit `9dd4d55`。
-e2e は現 head では完走できていない (§3-3)。negctl は現 head で実測 (§3-1)。
+**検証 HEAD: `11091dc` (本版)**。negctl (§3-1) と e2e (§3-3) は本 HEAD で 1 回ずつ実測し、完走した (capstone/pefile を PATH に置いた環境)。
+rdx.1 の値と `8c60df` の戻り値不一致は **未解決のまま** (§1, §6)。approve 判断に影響する。
 
 ## 1. 修復の内容
 
@@ -52,6 +53,9 @@ dec_label_pc_8c5ef5_g699:
       - `8c608d: call 410360`: `410360` (`410360`〜`410380`) は rdx を変えず、`call qword ptr [rbx-0x50]` (rbx = `*rcx`) へ渡す。**rdx は vtable 先の第 2 引数として参照される。** vtable 先の実体は未特定。
       - IR 対応: `dec_label_pc_8c6066` は `%rdx.2 = %rdx.1` を経て、`dec_label_pc_8c608d` の `call function_410360(…, %rdx.2)` へ渡す (`fn8c5eb0` 抜粋)。
       - **結論 (再確認): 参照の有無 = 有り (`8c608d` → `410360` → `[rbx-0x50]` の第 2 引数)。値の由来 = callee 依存 ((a) `8c7710` の戻り、(b)(c) vtable 先の戻り)。`zext(arg2)` の正しさは未証明のまま。** 未確認: `8c7710` の rdx 出力、`[rbx-0x50]` と `[rbx]` の vtable 先の実体と rdx の扱い。
+    - **head 11091dc での再確認 (capstone 5.0.7, `block00031_PE.bin`, VA 直接)**: `8c5eda`〜`8c5f18` と `8c6057`〜`8c60ec` を逆アセンブルし、上記の経路を確認した。`8c608d: mov rcx,[rbp+0x80]; call 410360` で rdx は設定されない。`8c60df: mov rax,[rbp+0x80]` (`8c608b je` の 0 件 ∧ arg2 下位 byte == 0 の枝)。IR の `dec_label_pc_8c6084`〜`8c608d` とは対応する。
+    - 今回の確認で rdx の値は決まらなかった。`8c7710` / vtable 先の逆アセンブルは未実施 (VA の特定と rdx の出力規約の確定に時間が要るため本版では行わない)。
+    - **要求 (b) への対応**: 本版は仮定 `zext(arg2)` を IR に残したまま。PM 判断: 仮定を外す (0 件経路の rdx を guard で store しない) と、0 件経路の `8c6066` が未定義値を読むため、外す案は採らない。残す場合の影響は「0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路の戻り値が、仮定と異なる rdx の影響を受けうる」。この経路の実測 (戻り値の比較) は未実施 (§6)。
   - **残る未証明の経路**: 0 件 ∧ arg3 (r8) == 0 ∧ arg2 下位 byte ≠ 0 のとき `8c608d: call 410360` の第 2 引数 (rdx) が、この仮定値と一致するか。同経路は `8c608d` まで到達する (arg2 下位 byte = 0 では到達しない)。上記の確認で、この rdx は callee 依存と分かった。未確定のまま残す (§6)。
   - 上記の未証明により、**「unit 56 ok」は件数 0 経路が正しいことの証拠ではない**。unit 56 は survey のラベル (ok/trap) が変わったことを示すだけで、出力の同一性は比較していない。
 - pass は冪等で、`--mode off` が逆変換する (`on → off` で元の IR にバイト一致, `on → on` で無変更を確認)。
@@ -64,7 +68,7 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 
 ## 3. 実測
 
-### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, 検証 HEAD `58084158` で 1 回 (r7))
+### 3-1. negctl (`bash tools/m11/trap_triage/negctl_699.sh`, 検証 HEAD `11091dc` で 1 回 (r2))
 
 比較元は **同一の m11_ov.c** (main 取り込み後, #700 の 8c7710 転記を含む) に固定し、guard のみ変える 3 構成。構成: off = guard 無効 (基準) / fix = guard 有効 (既定) / ng = 偽ガード (`icmp eq i32 %9, 123456789`)。
 
@@ -74,10 +78,12 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 | fix | **867** | 26 | 2 | 46 | 1 | 942 | **ok** |
 | ng | 866 | 27 | 2 | 46 | 1 | 942 | trap |
 
-- 判定 G1〜G3 は PASS、rc=0 (`85 秒` real, 3 構成の build + survey 合計)。差分は `off→fix` が unit 56 の trap→ok の 1 件のみ、`off→ng` は 0 件。
-- 参考 (r6, `f630762`): off 865 / fix 866 / ng 865。r6 と r7 の差 (1 unit) は同一 guard 条件でも動く揺らぎ (§6)。
+- 判定 G1〜G3 は PASS、rc=0 (**97.9 秒** real, 3 構成の build + survey 合計, 4 vCPU)。差分は `off→fix` が unit 56 の trap→ok の 1 件のみ、`off→ng` は 0 件。
+- 実行環境: `$RUNNER_TEMP/run` (`tools/` のコピー + `work-m11` 展開)、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、capstone 5.0.7 / pefile を PATH の venv から使用。`tools/m11/work/` は使っていない。
+- 参考 (r6, `f630762`): off 865 / fix 866 / ng 865。r6 と r2 (本版) の差は同一 guard 条件での揺らぎ (§6)。
+- **survey は戻り値を出力しない** (`M11_SURVEY` の項目は ok/trap/miss/oom の件数のみ)。0 件 ∧ arg2 下位 byte == 0 経路の戻り値比較は、この negctl では測れない (§3-5)。
 - qstore 有効 (`capstone` 5.0.7 / `pefile` 2024.8.26 導入後)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、node v22.23.3。
-- 直前 (`22a0f22`, r5) は off 863 / fix 864 / ng 863 だった。同じ guard 条件の 2 回で ok が 2 unit 動いた (865/866 と 863/864)。このずれの原因は未切り分け (§6)。
+- 参考 (r5, `22a0f22`): off 863 / fix 864 / ng 863。同じ guard 条件の 2 回で ok が動く (r5 と r6 の揺らぎ)。原因は未切り分け (§6)。
 - **旧版からの変更点**: 前版の G1 (cur vs base) は、`origin/main` の取り込みで `m11_ov.c` が変わったため比較が成立しなくなった。比較元を同一 m11_ov.c に固定し直した。前版の base/cur/fix/ng の数値 (864/865 等) はこの版と比較できないため、採用しない。
 - 失敗した試行 (記録): r1 = `FL_WIN64_DIR` 未設定で PE を読めず qstore が skip された (unit 56 は trap のまま)。r4 = qstore は有効だが `capstone`/`pefile` 未導入の環境で、fix は unit 56 ok だが G1 / G3 は旧 base との比較で FAIL。r4 のスクリプトは比較元を変えたため廃止。
 - 限界: 1 回の実測のみ。再現性 (n≥3) は未測定。survey の揺らぎ (#662 reviewer 観測の base 856/38, 859/36) は本環境では再現していない。node は v22.23.3 (e2e 想定の v26 ではない)。
@@ -100,24 +106,32 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - **走査の範囲**: 全 IR 関数 (= 全 unit の閉包を含む上位集合)。unit への帰属は行っていない。
 - **限界 (重要)**: strict の 405 件は**未検証の候補**。規則は heuristic で、偽陽性の率は未測定。405 件のうち miscompile である件数は本件では言えない。`dropped_target_not_label` の 7058 は内訳 (関数外への tail jump か否か) 未調査。
 
-### 3-3. e2e (`bash tools/m11/m11_e2e.sh`) — 検証 HEAD `58084158` (n=1)
+### 3-3. e2e (`bash tools/m11/m11_e2e.sh`) — 検証 HEAD `11091dc` (n=1)
 
-- 検証 HEAD: `58084158` の IR パイプライン・build 手順 (`ebec083` から変更は REPORT のみ)。作業コピーは `$RUNNER_TEMP/run` (`work-m11` 展開 + `fl-win64` 展開、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)。repo の `tools/m11/work/` は使用していない。
-- 実測 (1 回, rc 0, **40 秒 real**, 4 vCPU): `reached_stage 4`、`ir_conditions`: `ldfix=applied`・`qstore=applied`・`ir_sha256=8d966a8d…`、survey `ok 867 / trap 28 (うち oom 2) / clobber 0 / miss 46`、`wasm_bytes 6042615`。停止理由は `function_47ad70` の OOB (本件の範囲外、§6)。
-- 前段の失敗 (記録): 初回の e2e は rc 1 (74 秒) で `emcc: undefined exported symbol: "_m11_set_va_bigtrace"` の build 失敗。原因は作業コピーに `work/obj/*.o` を cp した際の古い object の再利用 (mtime 由来)。`work/obj/*.o` と生成 C を消して再実行し解消。repo 側のソース・build 手順の問題ではない。
-- 直前 (`22a0f22`, 1 回, r2, 61.7 秒, rc 0) の値は参考: `wasm_bytes 6028429`、survey `ok 866 / trap 28`。
-- `lift boot5 (RetDec)` の停止は、`toolchain-retdec` を `/opt/retdec` (既存) で使うため今回は発生しなかった。RetDec は runner に既にある (`/opt/retdec/bin/retdec-decompiler`)。
+- 検証 HEAD: `11091dc`。作業コピーは `$RUNNER_TEMP/run` (`tools/` のコピー + `work-m11` 展開、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、PATH に capstone/pefile の venv)。repo の `tools/m11/work/` は使用していない。
+- 実測 (1 回, **rc 0, 101.1 秒 real**, 4 vCPU): `reached_stage 4`、`ir_conditions`: `ldfix=applied`・`qstore=applied`・`ir_sha256=8d966a8d…`、survey `ok 867 / trap 28 (うち oom 2) / clobber 0 / miss 46`、`wasm_bytes 6042615`。停止理由は `function_47ad70` の OOB (本件の範囲外、§6)。
+- 初回の試行 (記録): `capstone/pefile 無し` で `reached_stage 0` の rc 1 (0.05 秒)。PATH に venv を加えて解消。e2e が前提の python モジュールを見つけられないことによるもので、ロジックの問題ではない。
+- 同一 survey 値 (ok 867 / trap 28) は本版の 1 回のみ。他 HEAD の e2e 実測は本版の数値と混ぜない。
+- `lift boot5 (RetDec)` の停止は、runner に既存の RetDec (`[RETDEC]`) を使うため今回は発生しなかった。
 - **survey の揺らぎ**: 同一 head で (`negctl` 同一 build の別 run) ok が 866/867 と動く。§6 の揺らぎ項目を参照。
 - 「退行 0」は survey ラベル比較のみ。出力の同一性は未比較 (§3-1 の限界)。
 - 所要の数え方: `date +%s.%N` の差 (`m11_e2e.sh` の開始から終了まで)。4 vCPU。
 - 検証範囲: e2e の survey は `unit 56 = ok` を含めて 942 unit 全件。e2e 末尾の `m11_icall_audit.py` の出力 (`脱落率 100.0%`) は本件と無関係の既存監査で、本件では判定していない。
+
+### 3-5. 0 件 ∧ arg2 下位 byte == 0 経路の戻り値 (未測定)
+
+- 機械語 (§1 の逆アセンブル): `8c608b je 8c60df` → `8c60df: mov rax,[rbp+0x80]` → `ret`。IR は `dec_label_pc_8c60df` が `ret rax.2` で、rax.2 は `8c6084` で rax.1 を受ける。
+- 0 件経路 (ガード辺) では rax.1 = rax.0 = 0 (ガード辺の store)。よって IR は 0 を返し、機械語は [rbp+0x80] を返す。**IR と機械語で戻り値が食い違う経路がある。**
+- この食い違いは guard の無い IR にも存在する (IR の `ret rax.2` の構造は guard 前から同じ。guard は 0 件経路を `8c6066` に直接飛ばすため、この経路に入る件数が変わるだけ)。ただし **実測はしていない**。
+- 測定できない理由: survey / negctl は unit の戻り値を出力しない。戻り値の比較には、0 件 ∧ arg2 下位 byte == 0 の呼出しを持つ unit を特定し、呼出し元の戻り値を比較する追加計測が要る。本版では実施していない。
+- 本版の結論: 「0 件経路の戻り値は機械語と一致しない可能性がある (IR 構造から)。測定は未実施。」 approve 判断に影響する。起票先は #718 (`[M11-N35]`、コメント 6146067294 で追記済み)。
 
 ## 3-4. 判定の表 (受入条件との対応)
 
 | 受入条件 (#699) | 結果 | 根拠 |
 |---|---|---|
 | 8c5eb0 の件数 0 ガードを復元 (IR pass) | 達成 | §1, `m11_guard699.py`, `m11_build.sh` 組込み |
-| unit 56 が ok。off 比の退行 0 (survey ラベルのみ。56 のみ trap→ok) | 達成 (ラベル比較のみ。出力の同一性は未比較) | §3-1 G1・G2・G3 (r6 で 1 回。n≥3 は未測定) |
+| unit 56 が ok。off 比の退行 0 (survey ラベルのみ。56 のみ trap→ok) | 達成 (ラベル比較のみ。出力の同一性は未比較) | §3-1 G1・G2・G3 (head 11091dc で 1 回。n≥3 は未測定) |
 | ネガコン (ガード条件を壊すと 56 が trap に戻る) を数値で残す | 達成 | §3-1 G3 (ng: 865/27, unit 56 trap, off 比 0) |
 | 同型の脱落を全 unit 走査し件数を測る | 達成 (件数のみ。真偽は未検証) | §3-2 (strict 406 / 405) |
 | RetDec がなぜ分岐を落としたかの機構を記録 | **未達** (生 lift 段で既に欠落まで。CFG 復元か翻訳かは未切り分け) | §2, §6 → #718 |
@@ -144,9 +158,9 @@ bash m11_e2e.sh                                        # §3-3
 
 ## 6. 未解決
 
-**先頭の結論 (head `ebec083` 時点)**: 以下 2 件は approve 判断に影響する未解決であり、本 PR では解消していない。
-(i) ガード辺の rdx.1 (`zext(arg2)`) は仮定のまま。0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路 (`8c608d` → `410360` → `[rbx-0x50]`) の第 2 引数として参照されうる。値は callee 依存 (§1)。
-(ii) `8c60df` の戻り値不一致 (ガード辺の rax=0 がこの経路で戻り値に届く) は、ガード有無の戻り値比較を未測定。survey は unit の戻り値を出力しないため、現行の計測では比較できない。`M11_GUARD699=off` と既定の戻り値比較は未実施。
+**先頭の結論 (head `11091dc` 時点)**: 以下 2 件は approve 判断に影響する未解決であり、本 PR では解消していない。PM 判断 (仮定を残すか、guard の対象を絞るか) を要する。
+(i) ガード辺の rdx.1 (`zext(arg2)`) は仮定のまま。0 件 ∧ arg3==0 ∧ arg2 下位 byte≠0 の経路 (`8c608d` → `410360` → `[rbx-0x50]`) の第 2 引数として参照されうる。値は callee 依存で、`8c7710` / vtable 先の rdx 出力は未確定 (§1)。
+(ii) `8c60df` の戻り値不一致 (0 件 ∧ arg2 下位 byte==0 の経路で、IR は 0 を、機械語は [rbp+0x80] を返す) は **未測定** (§3-5)。survey は戻り値を出力しないため現行の計測では比較できない。IR 構造 (`ret rax.2`) から guard 前の IR にも存在すると読めるが、実測はしていない。
 「unit 56 ok」は件数 0 経路が正しいことの証拠ではない (§3-1 の限界)。
 
 | 未解決 | 影響 | 起票先 |
@@ -156,10 +170,10 @@ bash m11_e2e.sh                                        # §3-3
 | `dropped_target_not_label` 7058 の内訳 | 走査の見落とし/偽陽性の見積もり | #718 (`[M11-N35]`) |
 | `m11_e2e.sh` の PE 固定パス (`[WIN64]`) と node v26 前提 | runner では `FL_WIN64_DIR` と node v22 で動かしている | #680 |
 | 同一 guard 条件での survey の揺らぎ (r5: fix 864 / r6: fix 866、off 863 / 865) | 1 unit 単位で ok 数が動く。guard の効果判定の信頼区間が定まらない | 起票依頼 (PM 採番。#680 が近いが別件の可能性) |
-| e2e (`m11_e2e.sh`) の現 head での完走 | RetDec (`[RETDEC]`) が runner に無く `boot5.lift.ll` を作れない。素材 `toolchain-retdec` の指定が要る | 起票依頼 (PM 採番。依頼側で `oc_artifacts` に `toolchain-retdec` を足す) |
+| e2e の完走の前提 (本版では完走: rc 0, 101 秒。前段の失敗は PATH 上の capstone/pefile 不在) | runner の e2e 実行には capstone/pefile が PATH に必要。runner 既存の `[RETDEC]` で代替 | なし (手順として §4 に記載) |
 | `docs/DEFECTS.md` の行案 (D1b との関係の判定を含む) | PM 判断 | PM (§5) |
 | ガード辺の rdx.1 の値 (0 件 ∧ arg3==0 ∧ arg2 下位≠0 の `8c608d` 経路) | 仮定 (zext(arg2)) を置いた。410320 の vtable target と 8c7c80 の rdx 出力を確認するまで正しさは未証明 | #718 (`[M11-N35]`) へ追記 |
-| `8c60df` の戻り値不一致 (別件・ガード無しでも再現。ガード辺の rax 値もこの経路で戻り値に届く) | 機械語 `8c60df: mov rax,[rbp+0x80]` は [rbp+0x80] (entry の rcx、または `8c6099` で 410360 結果を格納した値) を返す。IR `dec_label_pc_8c60df` は `ret rax.2`。arg2 下位 byte == 0 (`8c608b`) の経路で、IR は rax.1 (件数 > 0 なら 8ca670 結果、0 件ならガード辺の 0) を返し、機械語は arg1 を返す。戻り値は呼出側で使われる (例: `56fde0`)。今回の 2 呼出しは arg2 下位 byte = 1 のため `8c60df` 経路に入らない。他の呼出しで同経路に入るかは未確認 | #718 (`[M11-N35]`) へ追記依頼 (issue 番号確定) |
+| `8c60df` の戻り値不一致 (ガード辺の rax=0 がこの経路で戻り値に届く。guard 前の IR にも構造上存在するが未測定) | 機械語 `8c60df: mov rax,[rbp+0x80]` は [rbp+0x80] を返す。IR `dec_label_pc_8c60df` は `ret rax.2`。arg2 下位 byte == 0 (`8c608b`) の経路で、IR は rax.1 を返し、機械語は arg1 を返す (§3-5)。戻り値は呼出側で使われる (例: `56fde0`)。今回の 2 呼出しは arg2 下位 byte = 1 のため `8c60df` 経路に入らない | #718 (`[M11-N35]`) へ追記済み (コメント 6146067294) |
 | `count = INT_MIN` の不一致 (§1) | 件数の不正値。到達可否は未確認 | #718 (`[M11-N35]`) |
 
 ## 7. 次タスク提案
