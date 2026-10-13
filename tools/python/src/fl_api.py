@@ -44,10 +44,31 @@ def _default_value(expr):
 IDS = []
 
 
+class _Lazy:
+    # midi.* など利用者の module から実行時に解決する既定値 (bind 時に _default_value で評価する)
+    def __init__(self, expr):
+        self.expr = expr
+
+
+def _stub_defaults(params):
+    # stubs の既定値は単純リテラル (True/False/0/-1/None) を採用し、許可表の `midi.*` は遅延評価 (_Lazy)。
+    # それ以外の記号は既定値不明 (省略時は C 側に任せ、後続を指定する呼出しは TypeError)。
+    out = {}
+    for p in params or []:
+        if p["default"] is None or p["name"] in out:
+            continue
+        try:
+            out[p["name"]] = ast.literal_eval(p["default"])
+        except (ValueError, SyntaxError):
+            if p["default"] in _DEFAULT_NAMES:
+                out[p["name"]] = _Lazy(p["default"])
+    return out
+
+
 def _make(mod, name, fid, sig, kwsig=None):
     params = sig["params"] if sig else None
     names = [p["name"] for p in params] if params else None
-    defaults = {p["name"]: p["default"] for p in params if p["default"] is not None} if params else {}
+    defaults = _stub_defaults(params)
     # kwsig = FLEngine バイナリ由来 (PyArg_ParseTupleAndKeywords の書式 + kwlist)。kwlist があれば stubs 名より優先。
     # kwlist 無し (flags=1/4) は stubs 署名のまま (flags=1 の channelCount を MCPTools が globalCount= で呼ぶため、
     # kwargs 拒否にはしない。実 FL の挙動は未確認)。
@@ -56,19 +77,9 @@ def _make(mod, name, fid, sig, kwsig=None):
     if kwsig:
         if kwsig.get("kwlist") is not None:
             names = list(kwsig["kwlist"])
-            sn = [p["name"] for p in params] if params else []
-            # stubs の既定値の引き継ぎ: 同名ならその引数の値、改名 (同位置で名前だけ違う) なら同位置の値。
-            # stubs 側の名前が kwlist の別位置に現れる (位置がずれた) 場合は別の引数の値なので引き継がない。
-            defaults = {}
-            for i, n in enumerate(names):
-                if n in sn:
-                    d = params[sn.index(n)]["default"]
-                elif i < len(sn) and sn[i] not in names:
-                    d = params[i]["default"]
-                else:
-                    d = None
-                if d is not None:
-                    defaults[n] = d
+            # 既定値は stubs の同名引数のものだけ引き継ぐ。名前だけ違う同位置の引数 (mode→useDb 等) の既定値は
+            # 別の引数の値なので入れない (PY-15 #653: 誤束縛 0 の条件)。
+            defaults = {n: defaults[n] for n in names if n in defaults}
             # kwlist 内の重複名 (バイナリ由来。arrangement.selectionSet の 2 つ目) は、最初の出現だけを kw で束縛し、
             # 2 つ目以降は位置専用として扱う (実 CPython は重複の 2 つ目を kw で束縛する場合があるが、誤記を kw で踏まない側に倒す)。
             kwnames = [n if n not in names[:i] else None for i, n in enumerate(names)]
@@ -85,6 +96,15 @@ def _make(mod, name, fid, sig, kwsig=None):
             raise TypeError(f"{mod}.{name}() unexpected keyword arguments {extra}")
         out = list(args)
         gap = None  # 省略された任意引数 (既定値が C 側にあり不明) の位置
+        known = {}
+        for k, v in defaults.items():
+            if isinstance(v, _Lazy):
+                try:
+                    known[k] = _default_value(v.expr)
+                except ImportError:
+                    continue  # midi が無い環境では既定値不明として扱う
+            else:
+                known[k] = v
         for i, n in enumerate(names[len(args):], start=len(args)):
             if kwnames[i] is not None and n in kw:
                 if gap is not None:
@@ -92,8 +112,8 @@ def _make(mod, name, fid, sig, kwsig=None):
                 out.append(kw.pop(n))
             elif gap is not None:
                 continue  # gap 以降の未指定引数は省略 (既定値を足すと位置がずれる)
-            elif n in defaults:
-                out.append(_default_value(defaults[n]))  # stubs 由来の既定値 (許可した式だけ)
+            elif n in known:
+                out.append(known[n])
             elif required is not None and i >= required:
                 gap = i if gap is None else gap
             else:

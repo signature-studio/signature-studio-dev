@@ -16,42 +16,49 @@ const outFile = opt('--out', null);
 const errs = [];
 const m2 = await import(wasmCjs);
 const mod = await (m2.default ? m2.default({ printErr: (s) => { errs.push(String(s)); } }) : m2());
-mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
+const img = fs.readFileSync(M11 + '/work/m11_image.bin');
+mod.HEAPU8.set(img, 0);
 const num = (f) => { try { return Number(f()); } catch (_) { return null; } };
 const isDone = (e) => e && e.m11_dllmain_done !== undefined;
 const msg1 = (e) => ((e && e.message) || String(e)).split('\n')[0];
 
 let bootThrew = null, bootFailfast = null, dllmainDone = false;
 const sp_boot = mod._emscripten_stack_get_current();
-if (survey) { mod._m11_set_survey(1); mod._m11_set_va_unit_budget(256); }   // m11_survey.mjs と同じ unit 別 VA 予算 (#513)
+if (survey) { mod._m11_set_survey(1); mod._m11_set_va_unit_budget(Number(process.env.M11_VA_UNIT_BUDGET_MB ?? '256')); }
 try { mod._m11_boot_enter(0n, 1n); } catch (e) {
   if (isDone(e)) { dllmainDone = true; if (survey) mod.__emscripten_stack_restore(sp_boot); }
   else if (e && e.gui_failfast) bootFailfast = e.gui_failfast;
   else bootThrew = msg1(e);
 }
 
-const res = { ok: 0, noproc: 0, miss: 0, trap: 0 };
+const res = { ok: 0, noproc: 0, miss: 0, trap: 0, clobber: 0 };
 const kinds = {}, ffUnits = {};
-if (survey) {
+if (survey) {   // m11_survey.mjs と同じ隔離プロトコル: unit ごとに VA 予算を開始し, InitTable が壊れたら実行前の image を戻して clobber に数える
   const sp0 = mod._emscripten_stack_get_current();
+  const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(941)];
+  const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(941) === unitVa0[1];
+  const snap = new Uint8Array(img.length);
   for (let i = 0; i < 942; i++) {
+    snap.set(mod.HEAPU8.subarray(0, img.length));
     mod._m11_va_unit_begin();
-    try {
-      const r = mod._m11_call_unit(i);
+    let r, err = null;
+    try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
+    if (!tableIntact()) { mod.HEAPU8.set(snap, 0); res.clobber++; if (err) mod.__emscripten_stack_restore(sp0); continue; }
+    if (!err) {
       if (r === 1) res.ok++; else if (r === 0) res.noproc++; else if (r === 2) res.miss++;
-    } catch (e) {
-      res.trap++;
-      let k;
-      if (isDone(e)) k = 'halt0->longjmp';
-      else if (e && e.gui_failfast) { k = 'gui_failfast'; ffUnits[e.gui_failfast] = (ffUnits[e.gui_failfast] || 0) + 1; }
-      else k = msg1(e);
-      kinds[k] = (kinds[k] || 0) + 1;
-      mod.__emscripten_stack_restore(sp0);
+      continue;
     }
+    res.trap++;
+    let k;
+    if (isDone(err)) k = 'halt0->longjmp';
+    else if (err.gui_failfast) { k = 'gui_failfast'; ffUnits[err.gui_failfast] = (ffUnits[err.gui_failfast] || 0) + 1; }
+    else k = msg1(err);
+    kinds[k] = (kinds[k] || 0) + 1;
+    mod.__emscripten_stack_restore(sp0);
   }
 }
 
-mod._gui_reach_dump();
+if (mod._gui_reach_dump) mod._gui_reach_dump();   // --base (shim 無し比較元) には無い
 const reach = [];
 for (const l of errs) {
   const m = /GUI-REACH (\d+) (\w+) (\d+) (IMPL|STUB) P(\S+)$/.exec(l);

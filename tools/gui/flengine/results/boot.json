@@ -31,11 +31,11 @@
  "probes": {
   "GetMem": 560,
   "FreeMem": 20,
-  "FastMM_GetMem(407a50)": 568,
+  "FastMM_GetMem(407a50)": 570,
   "FastMM_FreeMem(407e20)": 20,
   "InitUnits": 0,
   "Halt0": 0
  },
- "va_calls": 17,
- "va_bytes": 12845056
+ "va_calls": 19,
+ "va_bytes": 275644416
 }

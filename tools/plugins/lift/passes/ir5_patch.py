@@ -126,9 +126,13 @@ def fold_const_ops(text):
             inner = text[open_idx + 1:j]
             m = re.fullmatch(r"([iif]\d+)\s+(-?\d+)\s+to\s+([iif]\d+)", inner.strip())
             if m:
+                sw = int(m.group(1)[1:])
                 k = int(m.group(2))
                 tid = int(m.group(3)[1:])
-                v = k & ((1 << tid) - 1)
+                u = k & ((1 << sw) - 1)
+                if w == "sext" and (u >> (sw - 1)) & 1:
+                    u -= 1 << sw
+                v = u & ((1 << tid) - 1)
                 text = text[:idx] + str(v) + text[j + 1:]
                 pos = max(idx - 80, 0)
                 n += 1
@@ -488,10 +492,13 @@ def _lift_one_line(line, cnt, suffix=""):
 
     nv = f"%ce{cnt}{suffix}"
     if op in _CAST_OP:
-        m = re.fullmatch(r"(?:ptr|[iif]\d+)\s+([%@][\w.\-]+|[iifp]\d+[^\s]?\s?[^\s]+|[^\s]+)\s+to\s+([ip][\w\d]*)",
+        m = re.fullmatch(r"(ptr|[iif]\d+)\s+([%@][\w.\-]+|[iifp]\d+[^\s]?\s?[^\s]+|[^\s]+)\s+to\s+(double|float|[ip][\w\d]*)",
                          inner.strip())
         if m:
-            val, toty = m.group(1), m.group(2)
+            fromty, val, toty = m.group(1), m.group(2), m.group(3)
+            if op == "bitcast" and toty in ("double", "float") and val.startswith("%"):
+                # bitcast (i64 %local to double): 値だけにすると型が落ちて parse error になる (GMS 以外の engine 23664 で観測)
+                return line[:start] + nv + line[end:], [f"  {nv} = bitcast {fromty} {val} to {toty}"], cnt + 1
             if op == "bitcast":
                 # bitcast (ptr X to ptr) は no-op で除去。iN→ptr は inttoptr 命令化。
                 if toty == "ptr":

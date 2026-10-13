@@ -1,6 +1,6 @@
 # tools/plugins/sampler/REPORT.md — PLG-G3 (#208) sampler 8 本: lift 前提の実測
 
-- 日付: 2026-10-13 / 担当 dir: `tools/plugins/sampler/` のみ / 検証起点 commit: **53c2eb6** (スクリプト。 以降は REPORT.md のみ)
+- 日付: 2026-10-13 / 担当 dir: `tools/plugins/sampler/` のみ / 検証起点 commit: **4c3ae00** (以降 209dc3c5 → cc35d4ef は docs のみ。 検証経路は無変更)
 - 再現: `bash tools/plugins/sampler/sampler_e2e.sh` (Delphi 殻 7 本: lift + 判定 + 突合) / `bash tools/plugins/sampler/sampler_engines.sh` (engine 2 本) /
   `bash tools/plugins/sampler/sampler_nega.sh` (ネガティブコントロール)。 対象の定義は `targets.py` だけ
 - 素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` (`docs/WORKFLOW.md` §11)。 環境は `sampler/env.sh`
@@ -76,6 +76,12 @@ framework 共通ハッシュ (13 DLL 以上) でない `.pdata` 関数 (`lift/pl
 - 検証 (HEAD 0f50a1b): `indirect_e2e.sh` 3 回 exit 0 (141 / 139 / 138 s)・`indirect_nega.sh` NC0–NC7 全て期待通り (19 s)。 再現: `bash tools/plugins/sampler/indirect_e2e.sh` / `bash tools/plugins/sampler/indirect_nega.sh`。
 - PLUGIN_MATRIX / 見積 (57.5 人日) は書き換えていない (影響の記録は付録。 PM 判断)。
 
+## 2c. lea 経路を root に足した閉包 (#627) — 全文は `REPORT_LEA.md`
+
+- **結論**: `lea [rip+X]` 参照の固定点を足した閉包は **7 本計 3,816 関数 / 1,390,509 B** (#537 の total 比 +193 関数 / +46,327 B)。 1 巡目の lea root は 153 関数 / 38,656 B (issue 値と一致)。 lift は 7/7 通過 (range 欠落 0)。
+  lea 由来の x87 関数で Granulizer / Slicer / Slicer 2 の raw `emcc -c` が rc 1 になるため、`p0c/f80_lower.py` を明示の段として通す (bit-exact 未検証)。 total2 外の非共通は 2,653 関数 / 1,200,793 B 残り、閉包はなお下限 (#667)。
+- host 呼出面・kernel 依存を total2 で再計測 (§3b: host site 152 → 184 → 193、新規 kernel 呼出 3 site)。 C4 の補強 (反例注入 7/7 で検出、命令境界外 E8/E9 6,226 機会のうち閉包を偽に広げる先 0 件)。 検証 HEAD・実測秒・ネガコンは REPORT_LEA.md §6b。
+
 ## 3. host 呼出面 (閉包内の Dispatcher ID / host vtable slot)
 
 `inventory/host_calls.py` の taint 追跡 (`Host=[this+0xbc]` → `vt=[Host]` → `call [vt+disp]`、ID = 直前の `r8` 即値) を閉包 ranges 内の関数に限定して集計 (`closure_facts.py`)。 slot0 = Dispatcher。
@@ -135,21 +141,39 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 参照されている (link 時に未解決になる) 件数は 2 本とも 0。
   逆に range 内部に別 define が増えた件数は 23664 で 833、23677 で 170 (RetDec の関数境界統合・分割)。 f80 関数は 2 / 1 本 (#197 の `f80_lower.py` の適用対象)。
   未実装 `__asm_*` helper は 188 / 128 件 (#629 取り込み後の再測定。 旧版 215 / 151)。 CPUID 分岐で SSE 路に固定できるかは未確認。
+- **根本原因と修正 (共有鎖 `tools/plugins/lift/passes/`)**。 修正前 HEAD 190f1d8 の再現: 23664 は `use of undefined value '%15'`、23677 は E1 → (`engine_fixcmp.py` 後) `zext 0 to i64`。 `emcc -c` は最初の型エラーで止まるため、1 件直すと次が出る (出た順)。
+  | # | 症状 (最小再現で確認) | 根本原因 | 修正 | 効いた block | main の P-F1 / P-F2 との関係 |
+  |---|---|---|---|---|---|
+  | 1 | 23664 `%15` dangling use (`function_18014f8a0`) | `fix_asm_stores.py` P-S1d が `call __asm_movdqu` + `sext` の定義行を空行化するが、`store i64 %15, ptr %r9.1.reg2mem` 等 store 以外の使用を数えない | 他の使用が残る定義は消さない (使用数を数える) | 23664 | 無関係 (main の `fix_asm_stores.py` に使用数の数えは無い。 PR のみ) |
+  | 2 | 23677 `zext 0 to i64` | `ir5_patch.py` A8 `fold_const_ops` が外側 (`trunc (add (zext (xor ..)))`) を畳めない時に `pos = j + 1` で次へ進み、内側の `zext (i32 0 to i64)` を走査しない。 A4 が xor を `0` にした後に残る。 `_src_pref` の型欠けではなく**畳み込み漏れ**で、A9L が型無しで命令化した | 外側が畳めなくても `pos = idx + 1` で内側へ入る (2 箇所) | 23677 | **同じ箇所の別修正ではなく統合済み**。 main (#545 `efcb0e3c`) が `[P-F1]` として同じ `pos = idx + 1` を入れており、PR はそれを取り込んだ。 PR が新たに足したのは行 7 の型幅マスクのみ |
+  | 3 | 23677 `zext constexprs are no longer supported` (`rep_stosq_memset` 第 3 引数) | A9L 固定点反復 `lift_residual_constexpr` が、命令を挿入しない行書換 (`bitcast (ptr X to ptr)` の no-op 除去) を捨てて `changed` を立てず、外側の `icmp`/`zext` 定数式が残る | 行だけ書き換わった場合も採用して反復を続ける | 23677 | **同じ箇所の別修正ではなく統合済み**。 main が `[P-F2]` として同じ判定 (`if ins or newln != ln`) を入れており、PR はそれを取り込んだ |
+  | 4 | 23664 `invalid use of function-local name` (`glOrtho` の `double bitcast (i64 ptrtoint (ptr @0 to i64) to double)`) | A9L が `bitcast (i64 %v to double)` の型を落として `double bitcast (i64 %ce.. to double)` を残す | `bitcast iN %v to double/float` は型付き命令として挿入 | 23664 | **main と別修正**。 `[P-F2]` は no-op 除去の判定だけで、`double/float` の型保持は main に無い。 PR 追加分 (`_lift_one_line` の 1 hunk) |
+  | 5 | 23677 E1 `icmp eq ptr %45, %arg1` | `fix_ptr_params.py` は `ptr %argN` を探すが `icmp P ptr %a, %argN` は型が先頭オペランドにしか付かず一致しない。 #523 E1 と同型 | `icmp` の `%argN` オペランドを `inttoptr` 経由にする | 23677 (23664 の `%arg3` も) | **別修正** (E1 の 2 pass、下記)。 main の `fix_icmp_ptr.py` (#545) とは対象が違う |
+  | 6 | 23677 `do not know how to soften fp_extend` (x86_fp80) | wasm バックエンドが f80 を扱えない (23677 は f80 関数 `function_18012d290` 1 本。 #197 の対象) | 既存 `p0c/f80_lower.py` (x86_fp80 → f64) を `engine_lift.sh` が fixcmp 後に適用して再度 `emcc -c` (f80 tokens 11 → 0) | 23677 | 無関係 (`p0c/f80_lower.py` の既存 pass を当てただけ) |
+  | 7 | (#643 review 指摘 1) `zext (i8 -1 to i64)` が 2^64-1 になり、`sext` が元の符号ビットを見ない。 入れ子の cast を走査するようになって露出 | `fold_const_ops` の cast 畳みが宛先幅のマスクだけを使う | 元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる。 回帰テスト `passes/test_fold_const_ops.py` (旧版で 3 件 FAIL、修正後 4 件 PASS) | 実 block への効きは未計測 (後段の T0/T1 は rc のみ) | 行 2 の統合 (P-F1) で露出した誤りで、PR で追加 |
+  - `engine_fixcmp.py` は 5 により不要になった (修復 operand 数 23664: 7 → 0、23677: 11 → 0。 スクリプトは診断用に残す)。
+  - 退行確認 (共有鎖を変えたため): Delphi 殻 7 閉包は `sampler_e2e.sh` が exit 0・7/7 `emcc_c=0` (§6)。 T0 バッチは §6。 修正前 pass での 23677 `.lift.ll` は `zext 0 to i64` 2 件・A9L 残存 53 件、修正後は 0 件。
+  - 同型の `v = k & ((1 << tid) - 1)` (元幅を使わない cast 畳み) は PR 外の `tools/m3/ir_patch.py`・`tools/m5/ir5_patch.py`・`tools/targets/kilohearts/snapins/lift/ir5_patch.py`・`tools/targets/kilohearts/poc_gain/ref/ir5_patch.py`・`tools/targets/freshair/ref/ir5_patch.py`・`tools/liftlib/liftlib/passes/base.py` にもある (行 7 と同型)。 本 PR では触らず、§7 に起票行は未作成 (PM 判断)。
 - `emcc -c` は clang が最初の型エラーで止まるため 1 件ずつ露見する (到達性の下限)。
-  - 23664: `use of undefined value '%15'` (`function_18014f8a0`: `store i64 %15, ptr %r9.1.reg2mem` の `%15` が未定義。 #523 の E4 (dangling use) 相当)。 `engine_fixcmp.py` は 7 operand を直すが同じエラーで止まる。
-  - 23677: `icmp eq ptr %45, %arg1` (`%arg1` は i64 仮引数。 E1) → `engine_fixcmp.py` が 11 operand を直した後は `%ce1n11_function_1800e04b0 = zext 0 to i64` の "expected type"
-    (定数式抽出後に型が欠けた `zext`。 新規類型。 §8 の E6 候補)。
-- **RetDec の C バックエンドが支配的**: `lift_ranges.sh` 直行 (`sampler_e2e.sh` 初版、engine 2 本を並列) では、`LLVM IR -> HLL` 段の開始 (= `.ll` 出力後) は RetDec 開始後 23664 で 114.24 s・23677 で 69.49 s (スクリプト一本版の run では 93.05 s / 46.51 s) だったが、その後の C 出力段が終わらなかった。
-  23664 は 614.57 s 時点 (`variable renaming`) で RSS 8.15 GiB、"out of memory; trying to recover" を 3 回出した (RetDec の既定メモリ上限は搭載 RAM の半分 = 約 8 GiB、`--no-memory-limit` で解除可)。 23677 は 758.98 s 時点 (`emission of the target code [c]`) で RSS 6.85 GiB。
-  同時使用は 14.4 GiB / 15.6 GiB (空き 1.6 GiB) まで逼迫したため、私が 621 s / 838 s で RetDec を停止した (この初版 e2e は engine 判定で exit 1。 未完の run を成功と報告しない)。
-  C は使わないので、`lift_from_ll.sh` で `.ll` 出力後に RetDec を止めて後段 pass 鎖だけ走らせる方式に変えた (`lift_ranges.sh` 本体から後段を切り出す。 共有鎖は変更していない)。 `.ll` の出力から `emcc -c` までの結果は、停止して再開した版とスクリプト一本の版で同一だった
-  (23664: define 5,993 / 欠落 3 / 未実装 215 / f80 2、23677: define 2,525 / 欠落 1 / 未実装 151 / f80 1。 `.ll` は 23664 で 333 B 異なるが各列は一致)。
-- 判定 (`judge.py engines`) は「計測が成立したか」(lift_rc 0・define>0・pdata>0・行が揃う) だけで、`emcc -c` の成否は不合格にしない。 `emcc -c` 未通過は到達性の実測値として §7 の起票対象。
-- 以上は到達性の実測で、engine の正しさは何も示していない。 殻 (Slicer 2) との結合方式 (`DispatchToEngine`・LoadLibrary 経路) は未解析。
+  - 23664 は `engine_fixcmp.py` 後も行 1 で止まる。 23677 は行 5 (E1) の後に行 2 が残る。
+- **RetDec の C バックエンドが支配的** (経緯の全文は `REPORT_APPENDIX.md` §D): C 出力段が終わらず RetDec を止めた。 `lift_from_ll.sh` で `.ll` 出力後に止めて後段 pass 鎖だけ走らせる方式に変えた (共有鎖は変更していない)。
+- 判定 (`judge.py engines`) = lift_rc 0 / defines>0 / pdata>0 / 行が揃う / 最終 IR の `emcc -c` rc 0 (`emcc_c_rc_after_f80`) / `missing_ref` 0。 不合格は exit 1。 以上は到達性の実測で、engine の正しさは示していない。 殻 (Slicer 2) との結合方式 (`DispatchToEngine`・LoadLibrary 経路) は未解析。
+
+- E1 (`icmp P ptr %a, %argN` の i64 被演算子) は 2 pass で直す: `fix_ptr_params.py` (ptr 仮引数を i64 化し、その使用箇所に inttoptr・PR 追加) と main の `fix_icmp_ptr.py` (i64 被演算子に inttoptr・#545)。 合成 `.ll` で役割分担を確認: 片方だけでは残りが落ち、両方を順に通すと二重の inttoptr は出ない。 統合は別 issue。
+- `fold_const_ops` (`ir5_patch.py`) は cast の元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる (5bc59f1)。 回帰テスト `passes/test_fold_const_ops.py` 4 件。 旧版では 3 件 FAIL (255 / 65535 / 2^64-1)。
 
 ## 6. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner)
 
-検証起点 commit は **5abf4d5** (#629 取り込み後の再検証。 以下は全てコミット済み HEAD で実行した。 旧 run の記録は履歴として残す)。
+検証起点 commit は **4c3ae00** (origin/main 1358c61 = #551 merge 済み を取り込んだ merge commit)。 4c3ae00 → 209dc3c5 で検証経路 (`tools/plugins/lift/`・`sampler_e2e.sh`・`sampler_engines.sh`・`engine_lift.sh`・`judge.py`・`targets.py`・`report_tables.py`) は無変更。 追加は #537 の `indirect_*` 群のみで、e2e・engines の経路からは呼ばれない。 4 core / 15 GiB の Actions runner、逐次、`TMPDIR=$RUNNER_TEMP`。
+
+| 項目 | 実測 (4c3ae00) |
+|---|---|
+| `sampler_e2e.sh` (inventory 込み、`work/` 無し) | exit 0、**886 s**。 judge shells **PASS 7/7** (`declares_unimpl` 全 0、許容 0 件)、matrix **54/54**、ids_crosscheck 7/7 |
+| `sampler_engines.sh` | exit 0、**318 s**。 `judge engines` **PASS 2/2**。 23664: lift 295 s・define 5,993・最終 `emcc -c` 0・`missing_ref` 0 / 23677: lift 141 s・define 2,524・0・0 |
+| `passes/test_fold_const_ops.py` / `test_ir5_constexpr.py` | OK / OK |
+| `sampler_nega.sh` / T0 / T1 | **未測定** (本 run の時間上限)。 旧値は `REPORT_APPENDIX.md` §C (7ffab50 基準) |
+
+以下は旧検証 (5abf4d5 以前) の記録。
 
 | 項目 | 実測 |
 |---|---|
@@ -175,7 +199,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 - `declares_unimpl` も判定に含める。 許容は `targets.py` の `ALLOW_UNIMPL` と名前の許可リストで、本 PR では両方空 (#629 で `rep_stosb_memset` が消えたため)。 未実装 helper が 1 件でもあれば不合格。 -1 (計測不能)・非整数・行欠落・header のみ・空は全て不合格。
 - lift 実行時は、その run が `work/batch/status.csv` に追記した行だけを判定する (過去 run の合格行で通さない)。
 - 突合 (`matrix_check.py` / `ids_crosscheck.py` / `unreached_unique.py`) は期待件数と照合した件数が一致しなければ不合格 (facts が空・欠落でも vacuous に通さない)。 `unreached_unique.py` は正の対照が落ちると exit 1。
-- engine の判定は「計測が成立したか」(lift_rc 0・define>0・pdata>0・行が揃う) に限り、`emcc -c` の成否は不合格にしない (到達性の実測値であり §7 で起票)。 この区別をスクリプト冒頭と REPORT に明記した。
+- engine の判定 = lift_rc 0 / defines>0 / pdata>0 / 行が揃う / 最終 IR の `emcc -c` rc 0 (`emcc_c_rc_after_f80`) / `missing_ref` 0。 不合格は exit 1 (NC8 で 1 列ずつ壊して確認)。
 
 ### ネガティブコントロール (`sampler_nega.sh`、exit 0、10.49 s、HEAD 53c2eb6)
 
@@ -201,8 +225,11 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 |---|---|---|
 | 差分試験 bit-exact (出口条件)。 Eff_Render 単位の native / wasm harness が無く、P0a/b/c が OPEN | #208 を閉じられない | #195 / #196 / #197 の完了後に #208 を再開 (Closes はその時)。 harness は #506 の REPORT §6 が提案した「[PLG-F3a]」と共用 (PM 判断) |
 | Render test .flp の E2E (FL Keys / FPC / Granulizer / Slicer / Slicex / GMS の RT 列 Y) | 同上 | FLEngine 統合待ち。 親 #14 / #208 |
-| 閉包外の固有関数 (§2): 推移閉包を含む lift と見積の再計算 | 見積 57.5 人日の前提・wasm リンク | 新規 #537 [PLG-G3-3] (起票済み)。 dynamics #200 / PR #506 にも同じ制約があるため #200 にコメント |
-| `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | #538 [PLG-G3-4] → #629 で解消済み (本 PR の許容を除去し gate で検出) |
+| 閉包外の固有関数 (§2): 推移閉包を含む lift と見積の再計算 | 見積 57.5 人日の前提・wasm リンク | **#537 (PR #624 で main に merge 済み) で推移閉包の算出と lift (7/7) は完了 (§2b)**。 見積の書き換えは PM 判断。 dynamics #200 / PR #506 にも同じ制約があるため #200 にコメント |
+| 推移閉包でもなお total 外の非共通関数 2,846 関数 / 1,247,120 B (うち `lea [rip+X]` 参照 153 関数 / 38,656 B) の到達性 | 閉包は下限のまま | lea 経路は **#627 で root に足した (§2c)**。 total2 外の 2,653 関数 / 1,200,793 B は #667 [PLG-G3-6] |
+| 推移閉包 (total) の host 呼出面・kernel 依存 (`closure_facts.py` は base のまま) | §3・§4 が base 限定 | **#627 で total2 版を再計測し #196 / #197 / #331 にコメント済み (REPORT_LEA.md §3b)** |
+| `closure_indirect.py` の dynamics (#200 / PR #506) 等への適用 (受入条件 4) | 他ファミリの閉包も過小の可能性 | #200 にコメント (未検証)。 `plugin_closure.py` の仕様変更は不要だったため退行確認の対象なし |
+| `rep_stosb_memset` 未実装 stub (Granulizer / Slicer 各 1 call site) | silent な memset 欠落 | #538 [PLG-G3-4] → #629 で解消済み (main 上で `declares_unimpl` 0 × 7 block の実測)。 本 PR で許容を撤去 |
 | C++ engine / 単体 DLL 2 本の `emcc -c` 未通過 (E1・dangling use・`zext 0 to i64`)、未実装 helper 188 / 128、f80 2 / 1、RetDec C バックエンドの規模耐性 | Slicer 2 (T3) の engine、GMS (T3) | 新規 #540 [PLG-G3-2] (起票済み) (同型: #523 [PLG-F4-2]・#527 [PLG-F5-2]) |
 | engine 内の f80 関数 (Slicer 2 engine 2 / GMS 1) | engine の wasm 化 | #197 (`f80_lower.py` の適用) にコメント |
 | host の Dispatcher ID 88 (FPC)・101 (Granulizer) が `hs_ids.json` 未収載、独立走査のみの ID 1 / 63 / 64、slot 0x28 / 0x30 / 0x68 / 0x78 / 0xb8 / 0xf0 / 0xf8 / 0x128 の意味 | P0b の応答表の網羅性 | #196 作業 5 (0x13173a0 全 case 解析) にコメント |
@@ -211,6 +238,8 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | Slicex が使う 0x5dee90 / 0x5df040 | P0c の未解決 kernel | #331 にコメント |
 | Slicer 2 殻と engine の結合方式 (LoadLibrary 経路・`DispatchToEngine`) が未解析 | engine を殻に結線できない | 新規 #540 [PLG-G3-2] (起票済み) の受入条件 4 |
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | 本 PR で DOC_MAP §3 に `REPORT.md`・`REPORT_INDIRECT.md` の 2 行を追記して解消 (REPORT 側の PM 追記は不要) |
+| `ALLOW_UNIMPL` (`rep_stosb_memset` 用の許容) の撤去 | 撤去後も既存 CSV に対する judge は PASS 7/7 (`--skip-lift`)。 stub が戻れば FAIL する | 本 PR で撤去 (main 8d883c3 以降の実測で 7 block とも `declares_unimpl` 0) |
+| lowering (f80→f64) の bit-exact 差分 (3 block) | 通過 ≠ 正しさ。 差分試験の対象外 | #197 にコメント済み (REPORT_LEA.md §7b) |
 
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
 
@@ -229,4 +258,5 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | `sampler_nega.sh` | ネガティブコントロール NC1–NC7 (§6) |
 | `closure_facts.py` `matrix_check.py` `ids_crosscheck.py` `unreached_unique.py` `report_tables.py` | 閉包 / host / kernel / engine 外形 → `facts.json` / `PLUGIN_MATRIX.json` 突合 / Dispatcher ID の別算法検算 / 閉包外の固有関数 / 表の機械生成 |
 | `closure_indirect.py` `indirect_lift.sh` `indirect_defs.py` `indirect_e2e.sh` `indirect_nega.sh` `REPORT_INDIRECT.md` | #537: 推移閉包の算出 (4 検査) → lift → 判定 (`judge.py shells` + range 欠落監査) → ネガコン NC0–NC7。 不合格で exit 1 |
+| `closure_lea.py` `lea_lift.sh` `lea_e2e.sh` `facts_total.py` `lea_nega.sh` `REPORT_LEA.md` | #627: lea 参照の固定点閉包 (7 検査) → lift (f80 検出 block は `f80_lower.py`) → 判定 (`judge.py shells` + range 欠落監査) → total2 の host/kernel 再計測 (4 検査) → ネガコン NC0–NC13。 不合格で exit 1 |
 | `targets.py` `env.sh` `mk_blockmap.py` | 対象の唯一の定義 / 環境 / `block_manifest.json` 不要の inventory 前提 |

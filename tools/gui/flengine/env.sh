@@ -2,7 +2,8 @@
 # FL_WIN64_DIR: fl-win64 展開先 (tools/shared/env.sh と同名)。capstone/pefile/mingw は PATH 上にあること。
 GF_HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 GF_GUI="$(cd "$GF_HERE/.." && pwd)"
-GF_M11="${GF_M11:-$(cd "$GF_GUI/../m11" && pwd)}"   # e2e.sh は tools/m11 の複製 (検証スナップショット) を指定する
+GF_M11="${GF_M11:-$(cd "$GF_GUI/../m11" && pwd)}"   # 読取専用の素材元。e2e.sh は複製先 ($GF_W/tree/m11) を入れる
 GF_W="${GF_W:-$GF_GUI/work/flengine}"
-export PATH="${GF_EXTRA_PATH:+$GF_EXTRA_PATH:}$PATH"
+export GF_M11 PATH="${GF_EXTRA_PATH:+$GF_EXTRA_PATH:}$PATH"
+# EMSDK_ENV の既定値は [EMSDK] (docs/REFERENCES.md) の既定配置。別の場所なら環境変数で上書きする。
 set +u; . "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1 || true; set -u

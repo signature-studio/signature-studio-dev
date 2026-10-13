@@ -3,13 +3,14 @@
 #   bash tools/gui/flengine/e2e.sh
 # 終了コード: 0 = 全 gate PASS かつ全ネガティブコントロールが期待どおり FAIL / 1 = gate FAIL またはネガコンが FAIL しなかった / 2 = 前提欠如。
 # 前提: tools/m11/work/ (work-m11 素材 + gen_ir2 済み IR)・emsdk・node・python3 (+ x86_64-w64-mingw32-gcc: tools/gui/gen_api.py の arity 表)。
-#   FL_WIN64_DIR は gen_ir2 の ldfix にだけ必要 (本スクリプトは IR を再生成しない)。PATH は env.sh の GF_EXTRA_PATH で足せる。
+#   FL_WIN64_DIR は gen_ir2 の ldfix と m11_build.sh の qstore 段 (PE 突合) に必要。PATH は env.sh の GF_EXTRA_PATH で足せる。
+#   tools/m11 は読取専用: m11_build.sh は work/ を in-place 更新するため、素材を $GF_W/tree へ複製し複製側で m11_gen_ir2.sh → baseline / build を回す。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; source "$HERE/env.sh"
-W="$GF_W"; M="$GF_M11"; R="$HERE/results"; mkdir -p "$W/res" "$R"
+W="$GF_W"; SRC="$GF_M11"; TREE="$W/tree"; R="$HERE/results"; mkdir -p "$W/res" "$R"
 S() { echo "[gf_e2e] $*"; }
 t0=$(date +%s); S "start load=$(cut -d' ' -f1-3 /proc/loadavg) nproc=$(nproc)"
-for f in boot_final.ll boot_final3.ll m11_image.bin; do [ -f "$M/work/$f" ] || { S "前提欠如: tools/m11/work/$f (work-m11 素材 + m11_gen_ir2.sh)"; exit 2; }; done
+for f in boot_final.ll boot_final3.ll m11_image.bin; do [ -f "$SRC/work/$f" ] || { S "前提欠如: tools/m11/work/$f (work-m11 素材 + m11_gen_ir2.sh)"; exit 2; }; done
 [ -f "${FL_WIN64_DIR:-/nonexistent}/extracted/block00031_PE.bin" ] || { S "前提欠如: FL_WIN64_DIR/extracted/block00031_PE.bin (import thunk 表)"; exit 2; }
 command -v x86_64-w64-mingw32-gcc >/dev/null || { S "前提欠如: x86_64-w64-mingw32-gcc (gen_api.py の arity 表)"; exit 2; }
 # tools/m11 は読取のみ (AGENTS §4-4): m11_build.sh は work/ を書き換えるため、work 込みで複製した検証スナップショットで以降を回す
@@ -17,10 +18,20 @@ SNAP="$W/snap"; rm -rf "$SNAP"; mkdir -p "$SNAP"
 cp -a "$GF_M11" "$SNAP/m11" && cp -a "$GF_M11/../shared" "$SNAP/shared" && cp -a "$GF_M11/../shim" "$SNAP/shim" || { S "検証スナップショットの複製に失敗"; exit 2; }
 export GF_M11="$SNAP/m11"; M="$GF_M11"; S "検証スナップショット: $M (元の tools/m11 は読取のみ)"
 
-S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs"
+S "0/6 複製: tools/m11 + tools/shim + tools/shared → $TREE (m11_build.sh の相対参照を保つ)"
+rm -rf "$TREE"; mkdir -p "$TREE"; cp -a "$SRC" "$GF_GUI/../shim" "$GF_GUI/../shared" "$TREE/"
+export GF_M11="$TREE/m11"; M="$GF_M11"
+( cd "$M" && bash m11_gen_ir2.sh > "$W/res/m11_gen_ir2.log" 2>&1 ) || { S "m11_gen_ir2.sh 失敗 (複製側で IR 再生成。#680 の ldfix=applied 記録が必要)"; tail -5 "$W/res/m11_gen_ir2.log"; exit 2; }   # main #680: m11_build.sh は ir_conditions.json の ldfix=applied を要求する。素材の旧 IR は使えない
+(cd "$SRC/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/material  /') > "$R/ir_sha256.txt"   # 素材そのままの IR (provenance)
+S "0/6 baseline (GUI shim 無し, 同一 IR): m11_build.sh → m11_run.mjs / m11_survey.mjs (複製側)"
 ( cd "$M" && bash m11_build.sh > "$W/res/m11_build.log" 2>&1 ) || { S "m11_build.sh 失敗"; tail -5 "$W/res/m11_build.log"; exit 2; }
-( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" && node m11_survey.mjs 2>/dev/null | sed -n 's/^M11_SURVEY //p' > "$W/res/baseline_survey.json" )
-[ -s "$W/res/baseline_boot.json" ] && [ -s "$W/res/baseline_survey.json" ] || { S "baseline 取得失敗"; exit 2; }
+(cd "$M/work" && sha256sum boot_final.ll boot_final3.ll | sed 's/^/after_m11_build  /') >> "$R/ir_sha256.txt"   # m11_build.sh (qstore/alloca/post) 後の IR
+( cd "$M" && node m11_run.mjs 2>/dev/null | sed -n 's/^M11_RESULT //p' > "$W/res/baseline_boot.json" )
+[ -s "$W/res/baseline_boot.json" ] || { S "baseline 取得失敗"; exit 2; }
+bash "$HERE/build.sh" --base > "$W/res/build_base.log" 2>&1 || { S "build base 失敗"; tail -5 "$W/res/build_base.log"; exit 2; }   # 比較元は GUI と同じ -pthread build (shim 無し)。非 pthread の m11_boot.cjs と比べると 8 unit ぶん順序・ビルド条件差が出る (REPORT §5-6)
+( cd "$HERE" && node run.mjs --survey --wasm "$W/m11_base.cjs" --out "$W/res/baseline_base_survey.json" > /dev/null )
+python3 -c "import json,sys; d=json.load(open(sys.argv[1]))['survey']; json.dump(d, open(sys.argv[2],'w'))" "$W/res/baseline_base_survey.json" "$W/res/baseline_survey.json" 2>/dev/null
+[ -s "$W/res/baseline_survey.json" ] || { S "baseline survey 取得失敗"; exit 2; }
 
 S "1/6 build: ff (fail-fast 例外) / soft (STUB は 0 返却) / plain (到達ログ無し = ネガコン用)"
 bash "$HERE/build.sh"          > "$W/res/build_ff.log"    2>&1 || { S "build ff 失敗"; tail -5 "$W/res/build_ff.log"; exit 1; }
@@ -45,6 +56,12 @@ python3 "$GF_GUI/gen_api.py" > /dev/null    # IMPORTS.md の「実到達」列�
 
 S "4/6 native selftest (tools/gui/test/selftest.sh)"
 bash "$GF_GUI/test/selftest.sh" 2>&1 | tail -1 | tee "$W/res/selftest.txt"; grep -q ", 0 failed" "$W/res/selftest.txt" || rc=1
+
+S "4b/6 __pe_image の data 実体化 (GUI-12 #566): 共通規則 vs m11_data_gen.py (実 FLEngine PE, LB=0/0x10000) + ネガコン"
+python3 "$HERE/pe_image_parity.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" > "$W/res/pe_image_parity.txt" 2>&1; pr=$?
+grep -E "PASS|FAIL|done" "$W/res/pe_image_parity.txt"; [ $pr = 0 ] || rc=1
+bash "$GF_GUI/test/pe_image_e2e.sh" > "$W/res/pe_image_e2e.txt" 2>&1; pr=$?
+grep -E "PASS|FAIL|done" "$W/res/pe_image_e2e.txt"; [ $pr = 0 ] || rc=1
 
 S "4b/6 __pe_image の data 実体化 (GUI-12 #566): 共通規則 vs m11_data_gen.py (実 FLEngine PE, LB=0/0x10000) + ネガコン"
 python3 "$HERE/pe_image_parity.py" --pe "$FL_WIN64_DIR/extracted/block00031_PE.bin" > "$W/res/pe_image_parity.txt" 2>&1; pr=$?

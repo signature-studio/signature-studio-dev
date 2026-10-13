@@ -131,7 +131,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | §13 | LIFTLIB-3 (CAB-264): 汎用 xmm0-ret bind + tan 入口誤解析修正 | leafabi/regbind/mc/f2 に xmm0-ret bind を実装し残留 dropped と tan を改善。census junkHi は不変 (記録のみ) | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §13 |
 | §14 | LIFTLIB-4 (CAB-272): leaf region の phi 合成 | OTT 既定 p1 の残留 UNSUPPORTED をさらに削減, tan 改善。回帰 ALL PASS | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §14 |
 | §15 | LIFTLIB-1 (#224): 旧 dir 参照専用化の検収 | 対応表を `README.md` に追記, 旧 dir REPORT に参照専用注記。`liftlib_e2e.sh` 通常・`--fresh` とも ALL PASS | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §15 |
-| §16 | 環境パス置換 (#386): `tools/liftlib/liftlib` の `/home/ubuntu` を `tools/shared` へ | DLL パスを `tools/shared/paths.py` 経由に置換 (既定値同一)。`tools/liftlib/` 直下 5 ファイルの残りは §16.3 の未解決表 | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §16 |
+| §16 | 環境パス置換 (#386): `tools/liftlib/liftlib` の `<HOME>/work` 固定を `tools/shared` へ | DLL パスを `tools/shared/paths.py` 経由に置換 (既定値同一)。`tools/liftlib/` 直下 5 ファイルの残りは §16.3 の未解決表 | [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) §16 |
 
 ## 17. HB-H3 (#93): 整数引数脱落 (D3) の機械検出・復元 pass `iargs` — 付録へ移動
 
@@ -194,7 +194,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `work-liftlib` / `work-m6-ott` 素材の絶対 symlink (作業 VM の旧 checkout 内ファイルを指す) が runner で dangling。lowbase_e2e [2] が素材展開直後は FAIL | Actions 上で lowbase_e2e を再実行する度に手動張り直しが要る | #448 `[CI-8]` (OPEN) が追跡 (素材の相対 symlink 化 or `recipes/ott.py` の `os.path.lexists` 判定) |
-| (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも `/home/ubuntu` の出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
+| (初版の記述: `tools/ott/avx/build_avx.sh`・`tools/ott/crtinit/lift_crt.sh`・`tools/ott/accept/acc_crt_table.py`・`tools/ott/avx/unsup_scan.py`・`tools/m9/m9_tablebind.py`・`tools/shimx/scripts/import_scan.py`・`tools/liftlib/tests/test_unit.py`・`tools/liftlib/xmm0_ret_census.py` にも同一の固定パスが残る。同種の移植性欠陥 (本 issue の範囲外)。新規子チケット案 (CI-4 系列)) | **解消済み**: a4f8a08 (#450 / PR #460) と 2db928d (#427 / PR #438) で main に merge 済み。この HEAD で 8 ファイルとも旧ユーザ名付き絶対パスの出現数 0 を実測。#450 `[CI-4-ott-liftlib]` は CLOSED | 起票不要 |
 | `OTT_DLL` が [3] (`build_x64c.sh`) と `--full` に伝わらない。[3] は `libottnative.so` (既定 DLL 由来) と比較するため、別 DLL を指定しても [3] だけ既定 DLL を検証する | 別 DLL を `OTT_DLL` で指定した検証が [1][2] と [3] で別対象になる | 未起票 (新規子チケット案、CI-4 系列・親 #294。PM に起票依頼) |
 | `capstone` / `pefile` の依存がどこにも宣言されていない。素材展開だけでは [1] の最初の python 呼び出しで落ちる | Actions 上で e2e を再実行する度に手動インストールが要る | 未起票 (新規子チケット案、CI 系列。PM に起票依頼) |
 
@@ -238,3 +238,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 - **対策**: raw は sha256 比較しない・A7 後の成果物で判定する。回帰 gate `lift_determinism_e2e.sh` は PASS し、1 行追加の検出と A7 外し (FAIL・rc=1) を確認。`setarch -R` は決定性の手段として採らない (ASLR 無効でも raw が一致しない事例があり、契機は未分離)。
 - **未解決**: k80 (block18983_PE.bin) の alloca 並び差は OTT で再現せず、A7 後に残るかは未検証 (fl-win64 が必要) → `[LIFTLIB-10]` #695 に起票。PR は `Refs #668`。
 - 詳細・全実測・受入条件の達成状況は [`REPORT_APPENDIX_D.md`](REPORT_APPENDIX_D.md) (§22.1〜§22.12)。再現: `bash tools/liftlib/lift_determinism_e2e.sh` (N=2、HEAD `116cbb3` で総 17 秒) / `bash tools/liftlib/lift_determinism_probe.sh 4` (同 33 秒)。レビュー指摘 (PR #696) の対応は §22.12。
+
+## 23. LIFTLIB-5 (#342) — tan / tanf bit-exact・SVF 20/40 (未達)
+
+- **結論**: tan 40/40・tanf 40/40 で gate 化。SVF 20/40 (未達・gate 無し)、cvt 26/40。本文は [`REPORT_APPENDIX_E.md`](REPORT_APPENDIX_E.md) (§23.1〜§23.7・DEFECTS 行案)。
