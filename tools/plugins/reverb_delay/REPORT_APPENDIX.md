@@ -41,10 +41,11 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 3. IPPCODE の扱い: 未決 (#38 [IPP-10] と PM 判断)。
 4. LoadLibrary 結合解析: 未実施。
 
-## 14. #523 E7 の切り分け (2026-10-13 · 測定起点 main dc7c11df · コード変更なし)
+## 14. #523 E7 の切り分け (2026-10-13 · コード変更なし · 未再現)
 
-- **再測定** (engine 19165, IPPCODE 除外 + AVX 系 78 除外, 同一条件): lift rc 0 / define 2,608 / f80 6 / unimpl 241 / `emcc -c` rc 139 (segfault) / `emcc -c` (fixcmp) rc 139。 lift 時間 615 秒 (`summary.csv` の `lift_s`。 wall は未計測)。 §13 と同値。
-- **E7 の IR 上の位置**: `e.final.ll` の `function_1800ceec0` (行 273038〜) で `bitcast x86_fp80 %12 to i80` → `trunc i80 to i64` → `inttoptr` の列が 2 箇所 (行 273381・273392 付近、 ブロック `dec_label_pc_1800ceffe` 内)、 `sext i32 to i80` → `bitcast i80 to x86_fp80` が 2 箇所 (行 273480・273633 付近)。 (f80 lowering 前の `e.final.ll` の行番号。 別経路の同型 4 箇所は行 348058 以降)。 `%12` は `load x86_fp80, x86_fp80* %11` で、 `%11 = bitcast ptr %rcx to x86_fp80*`。 つまり **整数のポインタ値を格納したメモリを x87 (f80) として読んでいる**。
-- **推定原因**: RetDec のメモリ型推定が、 整数スロットを f80 として扱ったことによる lift 側の型誤り。 `p0c/f80_lower.py` は型名を `double` に置換するだけなので、 この bit 列の意味 (80 bit の下位 64 bit をアドレスとして使う) は保存されず、 `bitcast double to i80` が残る。 「`bitcast` の lowering 漏れ」より上流の型誤りが本体と見てよい。
-- **対処方針 (未実施)**: (a) lift 側 (RetDec 出力後の型修復 pass) で `%11` の load を `i64` に差し替える engine-local 修復を入れる。 (b) `f80_lower.py` で i80 ビット列を扱う規則を足す (共有鎖・T0/T1 退行確認が必要)。 (a) を先に試す。 本 run では実装していない。
-- **残りの類型**: 同じ IR に `error: do not know how to soften fp_extend` と `no libcall available for fp_round with type f80` が出る (`f80_lower` 無し時)。 E7 を消しても f80 libcall が残るため、 19165 が `emcc -c` rc 0 になるには E7 修正に加えて f80 の扱いを決める必要がある。
+- **結論**: 19165 の segfault は E7 (f80 ビット列の型誤り) と推定。 測定値は §13 が正本。 本節の内容は未再現の転記で、再測定はしていない (`work/reverb_delay/` と `summary.csv` は本 runner に無く、`e.final.ll` の sha256 も確認できない)。 lift 秒の値は §12・§13 で食い違っており、本節では引用しない。
+- **E7 の IR 位置 (未再現・転記)**: `e.final.ll` の `function_1800ceec0` 内、ブロック `dec_label_pc_1800ceffe` で `bitcast x86_fp80 %12 to i80` → `trunc i80 to i64` → `inttoptr` の列 (行 273381・273392 付近)、`sext i32 to i80` → `bitcast i80 to x86_fp80` の列 (行 273480・273633 付近)。 行番号は f80 lowering 前の `e.final.ll` 基準。 別経路の同型は行 348058 以降。
+- **E7 の IR 抜粋 (未確認)**: `%12` は `load x86_fp80, x86_fp80* %11` で、`%11 = bitcast ptr %rcx to x86_fp80*` と記録されている。 IR 抜粋は添えられていないため、以下は**推定**。
+- **推定原因 (推定)**: RetDec のメモリ型推定が、整数スロットを f80 として扱った lift 側の型誤りではないか。 `p0c/f80_lower.py` は型名を `double` に置換するだけなので、`bitcast double to i80` が残る。 「`bitcast` の lowering 漏れ」より上流の型誤りが本体と推定される。
+- **対処方針 (未実施)**: (a) lift 側の型修復 pass で `%11` の load を `i64` に差し替える。 (b) `f80_lower.py` で i80 ビット列を扱う規則を足す (共有鎖・T0/T1 退行確認が必要)。 (a) を先に試す。
+- **残りの類型 (転記・未再現)**: 同じ IR で `do not know how to soften fp_extend` と `no libcall available for fp_round with type f80` が出る (`f80_lower` 無し時と記録)。 E7 を消しても f80 libcall が残るため、19165 が `emcc -c` rc 0 になるには E7 修正に加えて f80 の扱いを決める必要がある。
