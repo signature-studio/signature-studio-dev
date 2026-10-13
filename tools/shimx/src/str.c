@@ -1,7 +1,8 @@
 /* 文字列 / コードページ / 簡易ロケール。
  * ACP 既定は 1252 (shimx_set_acp で変更可: 65001=UTF-8 を推奨する場合あり)。
- * 対応コードページ: 1252 / 28591(Latin-1) / 437・850(近似=Latin-1) / 20127(ASCII) / 65001(UTF-8)。
- * 他 (932 等 DBCS) は ERROR_INVALID_PARAMETER を返す (inventory の制限参照)。
+ * 対応コードページ: 1252 / 28591(Latin-1) / 437・850(近似=Latin-1) / 20127(ASCII) / 65001(UTF-8) /
+ *                   932 (Shift-JIS: DBCS。表は scripts/gen_cp932.py が生成する src/cp932_tab.c)。
+ * 他 (936/949/950 等) は ERROR_INVALID_PARAMETER を返す (inventory の制限参照)。
  */
 #include "shimx_internal.h"
 #include <wctype.h>
@@ -119,6 +120,83 @@ static UINT resolve_cp(UINT cp) {
     if (cp == CP_MACCP) return 10000;
     return cp;
 }
+/* ---------------------------------------------------------------
+ * CP932 (Windows-31J)。表 = Microsoft WindowsBestFit/bestfit932.txt
+ *   MB→WC: 単一バイト 256 + DBCS (リード 0x81-0x9F/0xE0-0xFC × トレイル 0x40-0xFC, 0x7F 除く)
+ *   WC→MB: WCTABLE 全件 (厳密 + best-fit)。WC_NO_BEST_FIT_CHARS 指定時は往復一致するものだけ
+ * 無効並び (リード単独 / 無効トレイル / 未割当) は U+30FB (CPINFO の UnicodeDefaultChar) か、
+ * MB_ERR_INVALID_CHARS 時は ERROR_NO_UNICODE_TRANSLATION。無効トレイルの 1 バイトは再解釈する。
+ * --------------------------------------------------------------- */
+extern const uint16_t shx_cp932_sb[256];
+extern const uint16_t shx_cp932_db[60 * 189];
+extern const uint32_t shx_cp932_wc[];
+extern const unsigned shx_cp932_wc_n;
+#define CP932_DEFAULT_WC 0x30FBu
+static int cp932_is_lead(unsigned b) { return (b >= 0x81 && b <= 0x9F) || (b >= 0xE0 && b <= 0xFC); }
+static int cp932_is_trail(unsigned b) { return b >= 0x40 && b <= 0xFC && b != 0x7F; }
+static uint32_t cp932_db_at(unsigned lead, unsigned trail) {
+    unsigned row = lead <= 0x9F ? lead - 0x81 : lead - 0xE0 + 31;
+    return shx_cp932_db[row * 189 + (trail - 0x40)];
+}
+static uint32_t cp932_decode_code(unsigned code) {     /* code: 1 バイト値 or (lead<<8|trail)。無効は 0xFFFF */
+    if (code <= 0xFF) { uint32_t v = shx_cp932_sb[code]; return v; }
+    unsigned ld = code >> 8, tr = code & 0xFF;
+    if (!cp932_is_lead(ld) || !cp932_is_trail(tr)) return 0xFFFF;
+    uint32_t v = cp932_db_at(ld, tr);
+    return v ? v : 0xFFFF;
+}
+static int cp932_encode_wc(uint32_t wc, int strict, unsigned* code) {   /* 1: 変換可 */
+    unsigned lo = 0, hi = shx_cp932_wc_n;
+    while (lo < hi) {
+        unsigned mid = (lo + hi) / 2;
+        uint32_t e = shx_cp932_wc[mid], w = e >> 16;
+        if (w == wc) {
+            unsigned c = e & 0xFFFF;
+            if (strict && cp932_decode_code(c) != wc) return 0;
+            *code = c; return 1;
+        }
+        if (w < wc) lo = mid + 1; else hi = mid;
+    }
+    return 0;
+}
+static int mb2wc_932(DWORD flags, const unsigned char* s, int len, WCHAR* wc, int cchWc) {
+    int n = 0, strict = (flags & MB_ERR_INVALID_CHARS) != 0;
+    for (int i = 0; i < len;) {
+        unsigned b = s[i]; uint32_t c; int adv = 1;
+        if (cp932_is_lead(b)) {
+            unsigned t = (i + 1 < len) ? s[i + 1] : 0;
+            uint32_t v = 0;
+            int trail_ok = (i + 1 < len) && cp932_is_trail(t);
+            if (trail_ok) { v = cp932_db_at(b, t); adv = 2; }
+            if (!v) {
+                if (strict) { SetLastError(ERROR_NO_UNICODE_TRANSLATION); return 0; }
+                c = CP932_DEFAULT_WC;
+            } else c = v;
+        } else c = shx_cp932_sb[b];
+        if (cchWc) {
+            if (n >= cchWc) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
+            wc[n] = (WCHAR)c;
+        }
+        n++; i += adv;
+    }
+    return n;
+}
+static int wc2mb_932(DWORD flags, const WCHAR* wc, int len, char* mb, int cbMb, LPCSTR defChar, BOOL* usedDef) {
+    int n = 0, strict = (flags & WC_NO_BEST_FIT_CHARS) != 0;
+    unsigned dc = defChar ? (unsigned char)defChar[0] : 0x3F;
+    for (int i = 0; i < len; i++) {
+        unsigned code; int ok = cp932_encode_wc(wc[i], strict, &code);
+        if (!ok) { code = dc; if (usedDef) *usedDef = TRUE; }
+        int nb = code > 0xFF ? 2 : 1;
+        if (cbMb) {
+            if (n + nb > cbMb) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
+            if (nb == 2) { mb[n] = (char)(code >> 8); mb[n + 1] = (char)(code & 0xFF); } else mb[n] = (char)code;
+        }
+        n += nb;
+    }
+    return n;
+}
+
 /* 1: 単一バイト対応, 0: 非対応 */
 static int cp_sbcs_kind(UINT cp) {
     switch (cp) {
@@ -158,6 +236,7 @@ int MultiByteToWideChar(UINT cp, DWORD flags, LPCSTR mb, int cbMb, LPWSTR wc, in
         if (n == -2) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
         return n;
     }
+    if (cp == 932) return mb2wc_932(flags, s, len, cchWc ? wc : NULL, cchWc);
     int kind = cp_sbcs_kind(cp);
     if (!kind) { SetLastError(ERROR_INVALID_PARAMETER); return 0; }
     if (cchWc == 0) return len;
@@ -202,6 +281,7 @@ int WideCharToMultiByte(UINT cp, DWORD flags, LPCWSTR wc, int cchWc, LPSTR mb, i
         free(tmp);
         return r;
     }
+    if (cp == 932) return wc2mb_932(flags, wc, len, mb, cbMb, defChar, usedDef);
     int kind = cp_sbcs_kind(cp);
     if (!kind) { SetLastError(ERROR_INVALID_PARAMETER); return 0; }
     if (cbMb == 0) return len;
@@ -369,7 +449,12 @@ SHIMX_WEAK LPWSTR CharNextW(LPCWSTR s) {
     if (s[0] >= 0xD800 && s[0] <= 0xDBFF && s[1] >= 0xDC00 && s[1] <= 0xDFFF) return (LPWSTR)s + 2;
     return (LPWSTR)s + 1;
 }
-SHIMX_WEAK LPSTR CharNextExA(WORD cp, LPCSTR s, DWORD flags) { (void)cp; (void)flags; return (LPSTR)(*s ? s + 1 : s); }
+SHIMX_WEAK LPSTR CharNextExA(WORD cp, LPCSTR s, DWORD flags) {
+    (void)flags;
+    if (!*s) return (LPSTR)s;
+    if (IsDBCSLeadByteEx(cp, (BYTE)*s) && s[1]) return (LPSTR)(s + 2);
+    return (LPSTR)(s + 1);
+}
 SHIMX_WEAK BOOL CharToOemBuffW(LPCWSTR src, LPSTR dst, DWORD n) {
     for (DWORD i = 0; i < n; i++) { int b = wc_to_sb(2, src[i]); dst[i] = (char)(b < 0 ? '?' : b); }
     return TRUE;
@@ -380,14 +465,15 @@ SHIMX_WEAK BOOL CharToOemBuffW(LPCWSTR src, LPSTR dst, DWORD n) {
  * --------------------------------------------------------------- */
 UINT GetACP(void) { return g_acp; }
 UINT GetOEMCP(void) { return 437; }
-BOOL IsValidCodePage(UINT cp) { cp = resolve_cp(cp); return cp == CP_UTF8 || cp_sbcs_kind(cp) != 0; }
+BOOL IsValidCodePage(UINT cp) { cp = resolve_cp(cp); return cp == CP_UTF8 || cp == 932 || cp_sbcs_kind(cp) != 0; }
 BOOL GetCPInfo(UINT cp, LPCPINFO info) {
     if (!info) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
     UINT r = resolve_cp(cp);
-    if (r != CP_UTF8 && !cp_sbcs_kind(r)) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
+    if (r != CP_UTF8 && r != 932 && !cp_sbcs_kind(r)) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
     memset(info, 0, sizeof(*info));
-    info->MaxCharSize = (r == CP_UTF8) ? 4 : 1;
+    info->MaxCharSize = (r == CP_UTF8) ? 4 : (r == 932) ? 2 : 1;
     info->DefaultChar[0] = '?';
+    if (r == 932) { info->LeadByte[0] = 0x81; info->LeadByte[1] = 0x9F; info->LeadByte[2] = 0xE0; info->LeadByte[3] = 0xFC; }
     return TRUE;
 }
 BOOL GetCPInfoExW(UINT cp, DWORD flags, LPCPINFOEXW info) {
@@ -398,13 +484,14 @@ BOOL GetCPInfoExW(UINT cp, DWORD flags, LPCPINFOEXW info) {
     memset(info, 0, sizeof(*info));
     info->MaxCharSize = ci.MaxCharSize;
     info->DefaultChar[0] = '?';
-    info->UnicodeDefaultChar = '?';
+    memcpy(info->LeadByte, ci.LeadByte, sizeof ci.LeadByte);
+    info->UnicodeDefaultChar = resolve_cp(cp) == 932 ? CP932_DEFAULT_WC : '?';
     info->CodePage = resolve_cp(cp);
-    char nm[32]; snprintf(nm, sizeof nm, "%u (ANSI)", info->CodePage);
+    char nm[48]; if (info->CodePage == 932) snprintf(nm, sizeof nm, "932 (ANSI/OEM - Japanese Shift-JIS)"); else snprintf(nm, sizeof nm, "%u (ANSI)", info->CodePage);
     for (int i = 0; nm[i]; i++) info->CodePageName[i] = (WCHAR)nm[i];
     return TRUE;
 }
-BOOL IsDBCSLeadByteEx(UINT cp, BYTE c) { (void)cp; (void)c; return FALSE; }
+BOOL IsDBCSLeadByteEx(UINT cp, BYTE c) { return resolve_cp(cp) == 932 && cp932_is_lead(c); }
 int NormalizeString(int form, LPCWSTR src, int cch, LPWSTR dst, int cchDst) {
     (void)form;
     if (!src) { SetLastError(ERROR_INVALID_PARAMETER); return 0; }

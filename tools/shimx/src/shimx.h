@@ -1006,6 +1006,10 @@ LPVOID  ILCombine(const void* a, const void* b);
 UINT    ILGetSize(const void* pidl);
 LPVOID  ILGetNext(const void* pidl);
 HRESULT SHGetMalloc(LPVOID* out);
+/* 序数 import でしか参照されない 3 API (SHX-T8 / src/shord.c): shell32 #74 / shlwapi #12 / #219 */
+HRESULT SHCreateStdEnumFmtEtc(UINT cfmt, const void* afmt, LPVOID* out);
+LPVOID  SHCreateMemStream(const BYTE* data, UINT len);
+HRESULT QISearch(void* that, const void* tab, const GUID* riid, LPVOID* out);
 HRESULT SHGetDesktopFolder(LPVOID* out);
 HRESULT SHCreateItemFromParsingName(LPCWSTR p, LPVOID bc, const GUID* iid, LPVOID* out);
 HRESULT SHOpenFolderAndSelectItems(LPVOID pidl, UINT n, LPVOID* children, DWORD flags);
@@ -1063,6 +1067,7 @@ BOOL    CryptCreateHash(HANDLE prov, DWORD alg, HANDLE key, DWORD flags, LPHANDL
 BOOL    CryptHashData(HANDLE h, const BYTE* d, DWORD n, DWORD flags);
 BOOL    CryptGetHashParam(HANDLE h, DWORD p, BYTE* d, LPDWORD n, DWORD flags);
 BOOL    CryptDestroyHash(HANDLE h);
+BOOL    CryptReleaseContext(HANDLE prov, DWORD flags);
 
 /* winmm (MIDI は「デバイス 0 台」スタブ。Web MIDI 連携は下流) */
 UINT    timeBeginPeriod(UINT ms);

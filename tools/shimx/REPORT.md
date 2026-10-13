@@ -17,7 +17,7 @@
 | 担当範囲 (738 − 他担当 379 = 359) に対するカバレッジ | **100.0%** (未実装 **0**、序数 import 0)。内訳 = 実装 358 + libc 解決 `memset` 1。対象外 379 = user32/gdi32/comctl32/opengl32 (tools/gui) 377 + dsound (tools/audio) 2。実装 358 のうち 9 本は user32 の weak 実装 (Char*W/MsgWaitForMultipleObjects*; gui 側が強定義で上書き可)。**100% は「シンボル提供」の意味**で、うち 115 本はスタブ (常時エラー/0 台/fail-fast の `RtlUnwind*` 等)。機能実装は 243 本 |
 | 呼出サイト加重 (静的 7,309 サイト) | shimx 4,050 サイト (55.4%) / 他担当 (GUI) 3,252 サイト (44.5%) / libc 7 |
 | delay-load 57 | 実装 23 / 他担当 34 / 未実装 0 |
-| プラグイン import (GUI/audio 除く) | OTT vst2 146/147, vst3 150/151 (残 = shell32 序数 74), FreshAir 98/98, FL64.exe 111/111, Serum2 234/238 (残 = 序数 4) |
+| プラグイン import (GUI/audio 除く) | OTT vst2 **147/147**, vst3 **151/151**, FreshAir 98/98, FL64.exe 111/111, Serum2 **238/238** (SHX-T8 #175 で達成 → §14。分母 = `data/coverage.json` の `in_scope`) |
 | **OTT undefined 47 種 (M8)** | shimx リンクで **47 → 23**。Win/CRT API **24 種は全て解決** (CloseHandle/CreateFileW/TlsGet・SetValue/WriteFile/GetProcAddress/LoadLibraryExW/`__readgsqword`/Rtl*/UnhandledExceptionFilter ほか)。残 23 は `function_18*` = lift 欠落で shim の対象外。t1 出力 SHA は baseline と bit 一致 (`b5a91b9b…`, 512 行)。signature mismatch 0 |
 | M11 init closure (`boot_final2.ll`) 外部参照 557 | shimx 提供 **182** + shimx 重複 declare (`SHGetFolderPathW.1` = R6 の shimx_dup 分類) **1** / GUI・audio 担当 171 (user32 114 / gdi32 53 / shcore 2 / uxtheme 1 / dsound 1) / lift 由来 203。**非 GUI の Win/CRT は 100% 提供**、IR declare と wasm 署名の不一致 0 (後述 §4 の 5 件を修正済み) |
 | **R2/R3 実体接続 (§10, CAB-177)** | `shimx_set_callback_translator` の**変換実体** `src/cbtrans.c` (VA→slot トランポリン→lift 側関数表) + R3 `shimx_lifttab_*` (IL* 10 本 + kernel32 UI言語 3 本を lift ABI トークン化)。M11 純リンクに接続済み: unit 18 の `EnumCalendarInfoW(0x4476d0)` が trampoline 経由で実呼出され **"table index is out of bounds" trap が消滅** (init_count 18・mismatch/undefined 0・survey 800/41/53 不変)。検証: `test/test_cbtrans.c` (MT/ST) + `tools/hostbridge/cb/cb_e2e.sh` (MT 15/ST 12 checks) |
@@ -83,10 +83,10 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 - **関数ポインタ/COM**: IStream/IMalloc の vtable は Win64 の 8B スロットだが中身は wasm 関数テーブル index。lifted コードからの間接呼出し (署名 i64↔i32) は hostbridge の呼出規約ブリッジが必要。`GetProcAddress` の戻りも同様。
 - **SEH**: RtlUnwind/RaiseException(非継続) は fail-fast。Delphi `raise`/try-finally の実行時巻き戻しは lift 側 (M2: UHANDLER 8,021) の課題。
 - **ブロッキング待ち**: 実装は futex。ブラウザのメインスレッドでは Atomics.wait 不可 → エンジンは Worker で動かす前提 (M4 同様)。ST ビルドの INFINITE 待ちは fail-fast。
-- **コードページ**: 既定 ACP=1252。932 等 DBCS は ERROR_INVALID_PARAMETER (日本語 ACP が要るなら表実装が必要)。ロケールデータは en-US 固定。
+- **コードページ**: 既定 ACP=1252。**932 (Shift-JIS) は SHX-T8 (#175) で対応 (§14)**。936/949/950 等の他 DBCS は ERROR_INVALID_PARAMETER。ロケールデータは en-US 固定。
 - **FileMapping**: マッピング毎の共有バッファ (書戻しは Unmap/Flush/Close)。別プロセスとの共有や巨大ファイルの遅延マップは不可。VirtualAlloc 予約は malloc (上限 512MB/回)。
 - **GlobalUnlock** は M4 互換 (ロック済みなら TRUE)。HeapDestroy は配下ブロックを回収しない。SuspendThread は実停止しない。
-- 序数 import (shell32 74, shlwapi 12/219, d2d1 1): 名前未特定で未実装。shell32 155=ILFree / 190=ILCreateFromPathW は R3 で同定済み (§9.1, GetProcAddress 序数表で解決)。Serum2 の advapi32 Crypt* は常に失敗 (FL 本体は使わない)。
+- 序数 import: shell32 74 / 155 / 190・shlwapi 12 / 219 は同定・実装済み (R3 §9.1 + SHX-T8 §14)。**d2d1 ord1 のみ未同定** (d2d1 は tools/gui 担当帯で本チケット範囲外 → §14.5)。advapi32 Crypt* は MD5/SHA-1/SHA-256 を実装 (§14)。
 - **コールバック (R2)**: 翻訳フックは登録時に 1 回走り、戻り値 (実 call 可能な関数ポインタ) を保存して以後使う。**変換実体は `src/cbtrans.c` (§10, CAB-177)**: guest VA (≥intptr_limit) を slot トランポリン (寿命 = プロセス, 解放しない) に変換し lift 側関数表 (invoke 契約) へ落とす。未設定時は恒等なので挙動は不変。実 C 関数ポインタ (<intptr_limit) は恒等通過 (M4 互換テストを壊さない)。
 - **BSTR (R5)**: 管理外ポインタの free は無視されるため、lift 側が FastMM 等の別確保元 BSTR を SysFreeString した場合はリークになる (abort しない優先)。所有表はピーク同時 BSTR 数 × 8B。
 - **intptr 閾値 (R1)**: プロセス共通の 1 変数。image を <0x10000 に敷設する lift 系と MAKEINTRESOURCE 系の両立は敷設側 (lowbase LB_BASE≥0x10000) か閾値設定のいずれかで解決する。
@@ -103,7 +103,7 @@ Init・DeleteCriticalSection 65 / GetLastError 61 / GetCurrentThreadId 51 / Vari
 | T5 | GUI 側連携 | ShellExecute→`window.open`、GetOpen/SaveFileName→File System Access、Drag&Drop (`shimx_get_drop_target`)、user32 の Char*/MsgWait* は weak なので gui 側の強定義で置換可 | gui |
 | T6 | MIDI/タイマ | winmm `midi*` (weak, 0 台) を Web MIDI で強定義、`timeBeginPeriod` と AudioWorklet クロックの整合 | audio |
 | T7 | 署名正規化 | RetDec の i64/ptr 揺れを吸収する IR パス (declare を shimx 署名へ正規化) または CI で `verify_sig.sh` を常時実行 | lift |
-| T8 | 序数 import と追加 API | shell32 74/155/190・shlwapi 12/219 の同定、Crypt ハッシュ (Serum2)、CP932 テーブル (日本語 ACP) | plugins / shim |
+| T8 | 序数 import と追加 API | shell32 74/155/190・shlwapi 12/219 の同定、Crypt ハッシュ (Serum2)、CP932 テーブル (日本語 ACP) | plugins / shim — **実施済み (#175, §14)** |
 | T9 | 実機検証 | FL 起動 closure (DllMain→初期化) を shimx で通し、`SHIMX_TRACE=1` で GetProcAddress miss/LoadLibrary 失敗/CreateProcess 拒否を収集 → バックログ更新 | M11 |
 
 ## 7. 再現
@@ -345,3 +345,58 @@ username 統一により、winstubs (CAB-96) が wrap していた **5 API が s
 
 - `verify_ott` と M11 closure の突合は `work-m11` / `work-m6-ott` 素材が無く SKIP。このため `test.sh` が再生成した inventory.md / BACKLOG.md / coverage.json / inventory.csv は m11 closure が空になるので**コミットしていない** (次回素材付き run で再生成)。`exports.txt` と `proctable.c` は差分 5 行のみ反映。
 - `shimx_wininet_call_count` 以外の公開面変更は `shimx.h` の 4 宣言のみ。
+
+## 14. SHX-T8 (#175): 序数 import の同定・Crypt ハッシュ・CP932
+
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (lift/IR 変更なし。shimx 実装のみ)。検証起点 commit: `80c7471` (main)。
+
+**結論**: OTT vst2/vst3 = 147/147・151/151、Serum2 = 238/238 (import カバレッジ, `data/coverage.json` の `covered`/`in_scope`)。
+CP932 は MB→WC 全 DBCS 9,604 セルと WC→MB 往復が一致。Crypt は MD5/SHA-1/SHA-256 を実装し公開ベクトルと一致。
+
+### 14.1 序数 → 名前 (根拠: Wine `shell32.spec` / `shlwapi.spec` = Windows の序数表。呼出箇所の引数での裏取りは §14.5)
+
+| import | 同定 | 実装 | 備考 |
+|---|---|---|---|
+| shell32 #74 (OTT) | `SHCreateStdEnumFmtEtc(UINT, const FORMATETC*, IEnumFORMATETC**)` | `src/shord.c` | 深いコピーの IEnumFORMATETC (Next/Skip/Reset/Clone) |
+| shlwapi #12 (Serum2) | `SHCreateMemStream(const BYTE*, UINT)` | `src/shord.c` | データをコピーした IStream (ole.c の HGLOBAL ストリームを再利用) |
+| shlwapi #219 (Serum2) | `QISearch(void*, const QITAB*, REFIID, void**)` | `src/shord.c` | QITAB = {piid, offset} 16B (Win64)。一致オブジェクトを AddRef |
+| shell32 #155 / #190 (Serum2) | `ILFree` / `ILCreateFromPathW` | R3 で実装済み | 本チケットで集計側 (`ORD_KNOWN`) に反映しカバー扱い (`K` 状態) |
+
+登録先: `module.c` `shx_ordtable` (shlwapi を追加) / `cbtrans.c` `g_lifttab` (13 → 16 本。dll 名前空間を shell32/kernel32/shlwapi の 3 値化。shlwapi #16 が shell32 #16 のトークンを返さないことをテスト)。
+
+### 14.2 Crypt (`src/crypt.c`)
+
+`CryptAcquireContextA` / `CryptReleaseContext` / `CryptCreateHash` / `CryptHashData` / `CryptGetHashParam` (HP_ALGID/HP_HASHSIZE/HP_HASHVAL) / `CryptDestroyHash`。
+CALG_MD5 / CALG_SHA1 / CALG_SHA_256。鍵付き (`key != 0`)・他アルゴリズムは NTE_BAD_KEY / NTE_BAD_ALGID。ハンドルは 256 スロット + 世代 (解放済みの再利用を NTE_BAD_HASH で検出)。
+サイズ問合せ (`pbData == NULL`) は確定しない。確定後の追記は NTE_BAD_HASH_STATE。旧スタブ (reg.c, 常時失敗) は削除。
+
+### 14.3 CP932 (`src/cp932_tab.c` 自動生成 + `str.c`)
+
+表の出典 = Microsoft `WindowsBestFit/bestfit932.txt` (Unicode Consortium 配布)。`scripts/gen_cp932.py` が生成 (生成物 192 KB を commit, 入力は `work/` に取得)。
+MultiByteToWideChar / WideCharToMultiByte / GetCPInfo(Ex) / IsValidCodePage / IsDBCSLeadByteEx / CharNextExA が 932 (および `shimx_set_acp(932)` 後の CP_ACP) で動作。
+無効列 (孤立リード・無効トレイル・未割当) は U+30FB (CPINFO の UnicodeDefaultChar) か `MB_ERR_INVALID_CHARS` で ERROR_NO_UNICODE_TRANSLATION、無効トレイルは 1 バイトとして再解釈。
+`WC_NO_BEST_FIT_CHARS` は往復一致する文字のみ変換。
+
+### 14.4 検証 (2026-10-13 実測, GitHub Actions runner, emcc 6.0.12 / node 22.23.3)
+
+| 検証 | 結果 |
+|---|---|
+| `bash tools/shimx/test.sh` | (§14.7 にコミット済み HEAD での実測を記載) |
+| CP932 全 DBCS セル | **9,604 セル**: MB→WC 不一致 **0**、WC→MB→WC 往復不一致 **0** (`test_shord.inc`)。オラクル = Python 標準 codec `cp932` (表の出典と独立実装)。生成表 `src/cp932_tab.c` も同 codec と 11,340 セル全件突合し差 **0** |
+| Crypt | RFC 1321 / FIPS 180-4 の公開ベクトル 7 件 + 百万 `a` ×3 アルゴ + 境界長 (55/56/63/64/65 B) ×3 アルゴ全一致。1 バイトずつ流した場合も同値。期待値は Python `hashlib` で再検算 (手書き値との差 0) |
+| 序数 | `GetProcAddress` 序数 (shell32 74 / shlwapi 12・219)・lift トークン往復・IEnumFORMATETC / IStream / QISearch の実呼出を `test_link.c` / `test_cbtrans.c` / `test_shord.inc` で確認 |
+| ネガティブコントロール (n=11, 全て意図どおり FAIL = exit 1) | SHA-256 定数 1 語 / MD5 回転量 1 つ / SHA-1 K 定数 / CP932 表 1 セル / best-fit 判定除去 / リード範囲 -1 / ord74 登録削除 / ord219→218 / QISearch の AddRef 除去 / Clone の位置引継ぎ除去 / HASHVAL 再確定 |
+| import カバレッジ (`data/coverage.json`) | OTT vst2 147/147, vst3 151/151, Serum2 238/238, FreshAir 98/98, FL64.exe 111/111 |
+
+範囲外: 実 PE (OTT/Serum2) を実際にリンク・実行しての import 解決は未実施 (`plugins-*` 素材なしで、coverage は `data/imports.json` の既存スナップショット (import_scan.py 出力) と `shimx` 定義の突合)。
+`verify_ott` / M11 closure 突合は `work-m11` / `work-m6-ott` が無く SKIP (§13 と同じ)。このため `test.sh` が再生成した `BACKLOG.md` / `inventory.md` / `data/inventory.csv` は M11・OTT 列が空になり劣化するので **main 版のまま (未更新)** にした。`data/coverage.json` は生成器 (`gen_inventory.py`) の出力のうち `plugins` / `shimx_*` / `ordinal` のみ反映し、`m11_closure` / `ott_api_resolved` は main 版を保持。
+結果として `inventory.md` / `BACKLOG.md` は「ord74 等が未解決」と古いままで `coverage.json` と食い違う → 14.5 の未解決に計上 (素材 `work-m11 work-m6-ott` 付きで `bash tools/shimx/test.sh` を再実行すれば生成器が全て更新する。生成器側は本 PR で修正済み)。
+
+### 14.5 序数の裏取りの限界と未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 序数 → 名前は Wine の `.spec` (Windows の序数表と同一規約) で同定したが、**呼出箇所の引数での裏取り (OTT/Serum2 の call site 逆アセ) は未実施**。素材 `plugins-ott` / `plugins-serum2` が本 run に無い | 序数表が実 Windows 10/11 と食い違う場合、誤実装が silent に通る | #175 にコメント (再起動時 `oc_artifacts: fl-win64 plugins-ott plugins-serum2`)。新規子チケット案: `[SHX-T8b] 序数 import 5 件の call site 引数裏取り` |
+| d2d1 ord1 は同定対象外 (d2d1 = tools/gui 担当帯。分母 238 にも含まれない)。Wine `d2d1.spec` は序数を明示せず名前のみ列挙するため、序数 1 の根拠が取れていない | Serum2 GUI 経路のみ | tools/gui 担当 (issue #175 にコメントで引継ぎ) |
+| shlwapi #219 を `QISearch` とした点は Wine の `-import` 属性 (`QISearch(ptr ptr ptr ptr)`) に依拠 | 同上 | 上と同じ |
+
