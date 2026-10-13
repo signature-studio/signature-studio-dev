@@ -283,6 +283,7 @@ void shx_ensure_init(void) {
         t_in_init = 1;
         const char* t = getenv("SHIMX_TRACE");
         g_shx_trace = (t && *t && *t != '0');
+        shx_ftrace_open_env();
         shx_init_env();
         shx_init_std_handles();
         shx_init_reg();

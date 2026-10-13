@@ -236,6 +236,34 @@ void shx_file_destroy(ShxObj* o) {
 }
 
 /* ---------------------------------------------------------------
+ * 構造化 trace (SHX-T12, #789)。引数の変換は SHX_FTRACE_ON() のときだけ行う
+ * --------------------------------------------------------------- */
+static void ftr_create(const char* api, LPCWSTR gw, const char* posix, DWORD access, DWORD disp, DWORD flags, HANDLE h) {
+    if (!SHX_FTRACE_ON()) return;
+    ShxFtrEv ev; memset(&ev, 0, sizeof ev);
+    ev.api = api; ev.guestw = gw; ev.posix = posix;
+    ev.has_open = 1; ev.access = access; ev.disp = disp; ev.flags = flags;
+    ev.write = (access & (GENERIC_WRITE | GENERIC_ALL)) != 0 || disp == CREATE_NEW || disp == CREATE_ALWAYS
+             || disp == OPEN_ALWAYS || disp == TRUNCATE_EXISTING;
+    ev.ok = (h != INVALID_HANDLE_VALUE); ev.err = ev.ok ? 0 : GetLastError();
+    shx_ftrace_emit(&ev);
+}
+static void ftr_attr(LPCWSTR gw, const char* posix, int ok, DWORD attr) {
+    if (!SHX_FTRACE_ON()) return;
+    ShxFtrEv ev; memset(&ev, 0, sizeof ev);
+    ev.api = "GetFileAttributesW"; ev.guestw = gw; ev.posix = posix;
+    ev.has_attr = ok; ev.attr = attr; ev.ok = ok; ev.err = ok ? 0 : GetLastError();
+    shx_ftrace_emit(&ev);
+}
+static void ftr_find(const char* api, LPCWSTR gw, const char* posix, int ok, LPCWSTR name) {
+    if (!SHX_FTRACE_ON()) return;
+    ShxFtrEv ev; memset(&ev, 0, sizeof ev);
+    ev.api = api; ev.guestw = gw; ev.posix = posix; ev.namew = ok ? name : NULL;
+    ev.ok = ok; ev.err = ok ? 0 : GetLastError();
+    shx_ftrace_emit(&ev);
+}
+
+/* ---------------------------------------------------------------
  * CreateFile
  * --------------------------------------------------------------- */
 static HANDLE create_file_posix(const char* path, DWORD access, DWORD disp, DWORD flagsAttr) {
@@ -295,17 +323,33 @@ HANDLE CreateFileW(LPCWSTR fileName, DWORD access, DWORD share, LPSECURITY_ATTRI
     (void)share; (void)sa; (void)tmpl;
     shx_ensure_init();
     char path[2048];
+    HANDLE h;
     if (fileName && fileName[0] == 'N' && fileName[1] == 'U' && fileName[2] == 'L' && !fileName[3]) strcpy(path, "/dev/null");
-    else if (shx_wpath_to_posix(fileName, path, sizeof path) < 0) return INVALID_HANDLE_VALUE;
-    return create_file_posix(path, access, disp, flagsAttr);
+    else if (shx_wpath_to_posix(fileName, path, sizeof path) < 0) {
+        h = INVALID_HANDLE_VALUE;
+        ftr_create("CreateFileW", fileName, NULL, access, disp, flagsAttr, h);
+        return h;
+    }
+    h = create_file_posix(path, access, disp, flagsAttr);
+    ftr_create("CreateFileW", fileName, path, access, disp, flagsAttr, h);
+    return h;
 }
 HANDLE CreateFileA(LPCSTR fileName, DWORD access, DWORD share, LPSECURITY_ATTRIBUTES sa,
                    DWORD disp, DWORD flagsAttr, HANDLE tmpl) {
     (void)share; (void)sa; (void)tmpl;
     shx_ensure_init();
     char path[2048];
-    if (shx_apath_to_posix(fileName, path, sizeof path) < 0) return INVALID_HANDLE_VALUE;
-    return create_file_posix(path, access, disp, flagsAttr);
+    HANDLE h;
+    WCHAR gw[1100]; gw[0] = 0;
+    if (SHX_FTRACE_ON() && fileName) MultiByteToWideChar(CP_ACP, 0, fileName, -1, gw, 1100);
+    if (shx_apath_to_posix(fileName, path, sizeof path) < 0) {
+        h = INVALID_HANDLE_VALUE;
+        ftr_create("CreateFileA", gw, NULL, access, disp, flagsAttr, h);
+        return h;
+    }
+    h = create_file_posix(path, access, disp, flagsAttr);
+    ftr_create("CreateFileA", gw, path, access, disp, flagsAttr, h);
+    return h;
 }
 
 /* ---------------------------------------------------------------
@@ -325,6 +369,12 @@ BOOL ReadFile(HANDLE h, LPVOID buf, DWORD n, LPDWORD out, LPOVERLAPPED ov) {
     if (!o) return FALSE;
     ssize_t r = read(o->fd, buf, n);
     int e = errno;
+    if (SHX_FTRACE_ON() && (!o->ftr_read || r < 0)) {
+        o->ftr_read = 1;
+        ShxFtrEv ev; memset(&ev, 0, sizeof ev);
+        ev.api = "ReadFile"; ev.posix = o->path; ev.ok = (r >= 0); ev.err = r < 0 ? errno_to_win(e, 0) : 0;
+        shx_ftrace_emit(&ev);
+    }
     shx_unref(o);
     if (r < 0) { SetLastError(errno_to_win(e, 0)); return FALSE; }
     if (out) *out = (DWORD)r;
@@ -575,17 +625,20 @@ BOOL RemoveDirectoryW(LPCWSTR p) {
 }
 
 DWORD GetFileAttributesW(LPCWSTR p) {
-    char px[2048]; if (shx_wpath_to_posix(p, px, sizeof px) < 0) return INVALID_FILE_ATTRIBUTES;
+    char px[2048]; if (shx_wpath_to_posix(p, px, sizeof px) < 0) { ftr_attr(p, NULL, 0, 0); return INVALID_FILE_ATTRIBUTES; }
     struct stat st;
     if (stat(px, &st) != 0) {
         char par[2048]; snprintf(par, sizeof par, "%s", px);
         char* sl = strrchr(par, '/'); int pm = 0;
         if (sl && sl != par) { *sl = 0; struct stat ps; pm = (stat(par, &ps) != 0); }
         SetLastError(errno_to_win(errno, pm));
+        ftr_attr(p, px, 0, 0);
         return INVALID_FILE_ATTRIBUTES;
     }
     SetLastError(ERROR_SUCCESS);
-    return attrs_of(&st);
+    DWORD attr = attrs_of(&st);
+    ftr_attr(p, px, 1, attr);
+    return attr;
 }
 DWORD GetFileAttributesA(LPCSTR p) {
     WCHAR w[1100];
@@ -828,10 +881,9 @@ static BOOL find_fill(ShxObj* o, WIN32_FIND_DATAW* fd) {
     return TRUE;
 }
 
-HANDLE FindFirstFileExW(LPCWSTR pat, int infoLevel, LPVOID fd, int searchOp, LPVOID filter, DWORD flags) {
-    (void)infoLevel; (void)searchOp; (void)filter; (void)flags;
+static HANDLE find_first_impl(LPCWSTR pat, LPVOID fd, char* px, size_t pxSize) {
     shx_ensure_init();
-    char in[2048], px[2048];
+    char in[2048];
     if (!pat || !*pat || shimx_utf16_to_utf8(pat, -1, in, sizeof in) < 0) { SetLastError(ERROR_INVALID_PARAMETER); return INVALID_HANDLE_VALUE; }
     /* ディレクトリ部とパターン部を分離 (Win 区切りで) */
     size_t l = strlen(in);
@@ -842,8 +894,8 @@ HANDLE FindFirstFileExW(LPCWSTR pat, int infoLevel, LPVOID fd, int searchOp, LPV
     if (dl) { memcpy(dirpart, in, dl); dirpart[dl] = 0; if (dl > 1 && !(dl == 3 && dirpart[1] == ':')) dirpart[dl - 1] = 0; } else strcpy(dirpart, ".");
     snprintf(patpart, sizeof patpart, "%s", base);
     if (!*patpart) { SetLastError(ERROR_FILE_NOT_FOUND); return INVALID_HANDLE_VALUE; }
-    if (shimx_path_to_posix(dirpart, px, sizeof px) < 0) { SetLastError(ERROR_PATH_NOT_FOUND); return INVALID_HANDLE_VALUE; }
-    ci_fix(px, sizeof px);
+    if (shimx_path_to_posix(dirpart, px, pxSize) < 0) { SetLastError(ERROR_PATH_NOT_FOUND); return INVALID_HANDLE_VALUE; }
+    ci_fix(px, pxSize);
     DIR* d = opendir(px);
     if (!d) { SetLastError(errno == ENOENT || errno == ENOTDIR ? ERROR_PATH_NOT_FOUND : errno_to_win(errno, 0)); return INVALID_HANDLE_VALUE; }
     char** list = NULL; int cnt = 0, cap = 0;
@@ -870,11 +922,24 @@ HANDLE FindFirstFileExW(LPCWSTR pat, int infoLevel, LPVOID fd, int searchOp, LPV
     SetLastError(ERROR_SUCCESS);
     return h;
 }
-HANDLE FindFirstFileW(LPCWSTR pat, WIN32_FIND_DATAW* fd) { return FindFirstFileExW(pat, 0, fd, 0, NULL, 0); }
+HANDLE FindFirstFileExW(LPCWSTR pat, int infoLevel, LPVOID fd, int searchOp, LPVOID filter, DWORD flags) {
+    (void)infoLevel; (void)searchOp; (void)filter; (void)flags;
+    char px[2048] = "";
+    HANDLE h = find_first_impl(pat, fd, px, sizeof px);
+    ftr_find("FindFirstFileExW", pat, px[0] ? px : NULL, h != INVALID_HANDLE_VALUE, fd ? ((WIN32_FIND_DATAW*)fd)->cFileName : NULL);
+    return h;
+}
+HANDLE FindFirstFileW(LPCWSTR pat, WIN32_FIND_DATAW* fd) {
+    char px[2048] = "";
+    HANDLE h = find_first_impl(pat, fd, px, sizeof px);
+    ftr_find("FindFirstFileW", pat, px[0] ? px : NULL, h != INVALID_HANDLE_VALUE, fd ? fd->cFileName : NULL);
+    return h;
+}
 BOOL FindNextFileW(HANDLE h, WIN32_FIND_DATAW* fd) {
     ShxObj* o = shx_ref(h, OBJ_FIND);
-    if (!o) { SetLastError(ERROR_INVALID_HANDLE); return FALSE; }
+    if (!o) { SetLastError(ERROR_INVALID_HANDLE); ftr_find("FindNextFileW", NULL, NULL, 0, NULL); return FALSE; }
     BOOL r = find_fill(o, fd);
+    ftr_find("FindNextFileW", NULL, o->path, r, fd->cFileName);
     shx_unref(o);
     return r;
 }

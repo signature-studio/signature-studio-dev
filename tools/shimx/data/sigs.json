@@ -4986,6 +4986,12 @@
 ],
 "ret": "void"
 },
+"shimx_set_trace_file": {
+"params": [
+"ptr"
+],
+"ret": "i32"
+},
 "shimx_set_trust_ok": {
 "params": [
 "i32"
@@ -5083,6 +5089,16 @@
 "params": [
 "ptr"
 ],
+"ret": "void"
+},
+"shx_ftrace_emit": {
+"params": [
+"ptr"
+],
+"ret": "void"
+},
+"shx_ftrace_open_env": {
+"params": [],
 "ret": "void"
 },
 "shx_futex_wait": {
