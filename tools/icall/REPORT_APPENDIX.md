@@ -112,3 +112,22 @@ python3 tools/icall/diff/rax_callers.py 1801a9a6c 1801c8cb8 1801c8c98
 | 366 site 落ちの真因 (decode 後・最適化中に stub 呼出しが減る段の特定と、関数単位の before/after 突合) | 2 関数の wasm 化不可 | #229 (続き) |
 | `0x128c320` の関数境界誤認 (1 バイト関数化) と NonRecursiveCFGBuilder 警告 | 隣接関数の lift 欠落の疑い | 子 issue (下記) |
 | jump table cmp/je 展開 / Balance・KH・FA wasm 差分 / stack 引数動的検証 / plugin closure バッチ | 本 run 範囲外 | 子 issue (下記) |
+
+## 12. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
+
+結論: **OTT では stack 引数の値一致を動的に検証できない** (stack 引数あり site が実行経路に無い)。達成は未了で、残りは #854 / #229 が追跡する。
+
+| 項目 | 結果 | 実測 |
+|---|---|---|
+| 素材 | fl-win64・toolchain-retdec・toolchain-emsdk・plugins-ott・analysis-ott-binaries・work-m6-ott・work-liftlib・work-icall を展開 | 展開 10.5 s (fl-win64) |
+| ベースライン `icall_e2e.sh` (HEAD `b850207d`) | **PASS** | 98.3 s (load 0.84 開始)、unit 0 failed / OTT F 落ち 70→0 / tail-jmp 11→0 / matrix 89 scenario・50,236 cell 全 bit 一致 (max_ulp 0, state_diff 0) / crt_fn_gate PASS |
+| `ICALL_CHECK_STK` 付き route build | OK | 34.8 s |
+| `stk_check.mjs` (OTT ctor→setParam→resume→process) | `dispatch=1337 ptr_bad=0 nonzero_stkbuf=0` rc=0 | 1,337 dispatch の全てで STKBUF 12 語が全 0 (stack 引数の store が実行されない) |
+
+- stack 引数あり site は OTT F の 96 site 中 2 件 (`0x1801a1ce6`・`0x1801aa528`)。いずれも `stk_check` の実行経路で dispatch されない (§9 の `executed 0` と整合)。
+- 値一致の検証には「5 引数以上の間接 call 先が実行される PE」が必要。OTT では成立しない。必要な入力は IPP 結合 or FLEngine (`0xc589b0`・`0x128f9e0` 周辺) で、どちらも素材と runner 上の実行経路が未整備。
+- ネガティブコントロール (STKBUF を 1 語ずらす) は、対象 site が実行されない現状では FAIL を出せない。gate は作っていない (偽の PASS を残さないため)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| stack 引数 5 個以上の間接 call の値一致の動的検証 (実行される PE が必要) | 受入条件 (1)(2)(3) 未達 | #854 (ICALL-13) / #229 (icall 親) |
