@@ -1,6 +1,6 @@
 name: Scripts test
 
-# .github/scripts の分岐 (fix モードの往復上限・verdict 検証など) を fake gh で検証する。
+# .github/scripts の分岐 (fix モードの往復上限・verdict 検証・watchdog の判定など) を fake gh で検証する。
 # 失敗すると PR の自動遷移 (差し戻し -> 修正 -> レビュー) が黙って止まるため、変更のたびに走らせる。
 on:
   pull_request:
@@ -23,3 +23,5 @@ jobs:
           persist-credentials: false
       - name: test-pr-loop.sh
         run: bash .github/scripts/tests/test-pr-loop.sh
+      - name: test-watchdog.sh
+        run: bash .github/scripts/tests/test-watchdog.sh
