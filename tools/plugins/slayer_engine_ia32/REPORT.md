@@ -151,3 +151,41 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 | `xcheck_objdump.py` | objdump 2.42 による別デコーダの検算 (§3) |
 | `REPORT.md` | 本ファイル |
 | `work/` | gitignore 対象 (`tools/plugins/.gitignore`)。 逆アセンブル全文 (`block22434.ia32.disasm.txt`) と `nega/*.dll` |
+
+## 9. AEffect marshal 表 (#674 受入 3) の実測
+
+仕様は `MARSHAL.md` (本書は測定値の正本)。 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 $PY tools/plugins/slayer_engine_ia32/marshal.py` (gate) と `… marshal.py --nega` (ネガコン)。 `$PY` は §8 と同じ capstone 5.0.7 の venv。
+
+### 9.1 engine の AEffect 構築 store 列 (ctor RVA 0x10E0〜0x1196、静的実測)
+
+| 欄 (AE+off) | store 値 | 出所 |
+|---|---|---|
+| magic (0x00) | 0x56737450 | 即値 |
+| dispatcher / process / setParameter / getParameter (0x04 / 0x08 / 0x0c / 0x10) | 0x10001000 / 0x100010a0 / 0x10001080 / 0x10001060 | 即値 (ポインタ) |
+| **numPrograms (0x14)** | **`ebp`** (0x1139 `mov [edx+0x34],ebp`、`ebp` = `[esp+0x10]`) | 引数由来 (即値でない) |
+| **numParams (0x18)** | **`eax`** (0x111e `mov [edx+0x38],eax`、`eax` = `[esp+0x1c]`) | 引数由来 (即値でない) |
+| numInputs / numOutputs / flags (0x1c / 0x20 / 0x24) | 1 / 2 / 0 | 即値 |
+| object (0x40) | `edx` (= this) | レジスタ (AEffect 自身ではない) |
+| ioRatio (0x3c) / uniqueID (0x48) / version (0x4c) | 0x3f800000 / 0x4e6f4566 / 1 | 即値 |
+| processReplacing (0x50) | 0x100010c0 | 即値 (ポインタ) |
+
+- `rep stosd` の 0 埋めは `ecx = 0x24` dword = **0x90 B** (= sizeof)。 未 store の processDoubleReplacing (0x54) は 0 埋め由来。
+- gate の `want` に numPrograms `ebp`・numParams `eax` を追加した (以前は未検査で `<- ebp`・`<- eax` のまま PASS していた)。
+
+### 9.2 gate とネガコン (marshal.py)
+
+| 項目 | 実測 |
+|---|---|
+| gate (`marshal.py`) | `[marshal] OK`・exit 0。 wall 0.065 s (single run) |
+| nega (`marshal.py --nega`) | `nega: 0/3 miss`・exit 0。 wall 0.056 s |
+| 負荷 | 実行前 load 1 分 0.23・cpu 4 |
+
+| NC | 壊した入力・期待 | 実測 FAIL |
+|---|---|---|
+| N1 | magic 即値を 1 bit 壊した複製 (値突合のみ、sha 検査は外す) | `engine magic = 1450406993, want 1450406992` (HIT) |
+| N2 | x32 sizeof 期待を 0xA0 に誤る | `x32 sizeof 0x90 != 0xa0` (HIT) |
+| N3 | 期待 magic を 1 ずらす | `engine magic @0x0 = 1450406992, want 1450406993` (HIT) |
+
+### 9.3 未解決 (起票先: #674)
+
+§6 の未解決と同じ (VstEvents / ERect の engine 側読取、殻側の実物構造体、engine の store 値の実行確認)。

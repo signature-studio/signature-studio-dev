@@ -174,7 +174,9 @@ def check(path, x32_size=0x90, magic_expect=MAGIC, ptr32=4, pin_sha=True):
     # 値の突合 (engine の実値)
     want = {'magic': ('imm', magic_expect), 'numOutputs': ('imm', 2), 'version': ('imm', 1),
             'ioRatio': ('imm', 0x3F800000), 'uniqueID': ('imm', 0x4E6F4566), 'numInputs': ('imm', 1),
-            'object': ('reg', 'edx'), 'flags': ('imm', 0)}
+            'object': ('reg', 'edx'), 'flags': ('imm', 0),
+            # 引数由来 (呼出し元が決める・即値でない)
+            'numPrograms': ('reg', 'ebp'), 'numParams': ('reg', 'eax')}
     for name, exp in want.items():
         off = L32[name][0]
         got = st.get(off)
