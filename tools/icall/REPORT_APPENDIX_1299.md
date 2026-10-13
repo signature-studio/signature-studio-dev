@@ -11,7 +11,7 @@
 
 ## 2. 実測
 
-測定 commit: 本 PR の HEAD (初版 `fa_nat.py` 追加)。素材: `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し `tools/targets/freshair/fetch.sh` で `work/win/Fresh Air/...SlateCore.core_64` を取得 (factory .epf 8 本・mac 0 件)。
+測定 commit: `36ba67a6` (`tools/icall/diff/fa_nat.py` を追加した commit。以降は付録のみ)。素材: `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し `tools/targets/freshair/fetch.sh` で `work/win/Fresh Air/...SlateCore.core_64` を取得 (factory .epf 8 本・mac 0 件)。
 
 | 試行 | 入力 | 結果 |
 |---|---|---|
@@ -22,6 +22,7 @@
 
 ## 3. 未解決 (子 issue)
 
-- wasm route (SlateCore closure の RetDec → icall 復元 → emcc) と native との xmm0 bit 比較。`fa_ranges.txt` は本 run で `clo_freshair_all.json` 相当を取得済み (3,143 字・130 関数)。
+- wasm route (SlateCore closure の RetDec → icall 復元 → emcc) と native との xmm0 bit 比較。closure 範囲は既存の `tools/icall/work/fa_ranges.txt` (3,143 字) を使う想定 (本 run で再生成していない)。子 issue: #1451 (ICALL-28)。
 - CRT 初期化 (SlateCore の `.data` / グローバル初期値の install) を native 側で再現しないと、グローバルを参照する関数は実行できない。OTT の `ott_native.c` は DllMain を走らせない方針。Fresh Air 側でも同じ前提が成立するかは未確認。
 - 検証方法: `python3 tools/icall/diff/fa_nat.py <VA> --n N` (native のみ)。wasm との比較は未実装。
+- 起票: #1451 (ICALL-28、親 #1299)。受入条件 2・3 と CRT 初期化の再現を含む。
