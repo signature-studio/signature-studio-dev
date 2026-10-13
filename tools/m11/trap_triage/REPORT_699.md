@@ -158,6 +158,8 @@ RetDec の CFG 復元 (jcc の終端化) と命令翻訳 (フラグ) のどち�
 - 実行環境の補足: runner に `[RETDEC]` が無いため、`toolchain-retdec` を `$RUNNER_TEMP` に展開して代替 (`m11_lift.sh` は `[RETDEC]` の固定パス参照のまま。#680 の範囲)。`tools/m2/ir_normalize.py`・`tools/m6/ottlib.py` を作業コピーに追加した (欠落時は `m11_e2e.sh` が fail-closed)。
 - **最終 HEAD `93382f48` での再実測 (n=3)**: negctl_699.sh は rc=1 (G2 FAIL, 上記と同じ)、95 秒。G1・G3 PASS、`diff off->fix: n=0`、`diff off->ng: n=0`。e2e (`m11_e2e.sh`) は 3 回とも rc=0、所要 88.2・86.1・86.3 秒。停止理由は 3 回とも `trap "unreachable" @ function_8c5eb0`、`survey_ok 869 / survey_trap 25 (うち oom 1)`。
 - 限界: survey の ok/trap ラベル比較のみ。出力の同一性は未比較。
+- **未解決 (数値の食い違い, 本版では解消せず)**: 上の `93382f48` の e2e 所要時間は、同じ節の 2 行で一致しない (157 行目 `88.2・85.1・85.0` / 159 行目 `88.2・86.1・86.3`)。ログは保持していないため、どちらが正しいかを判定できない。本版はどちらも採用しない。
+- **現 head の再測定は未実施**: 本版 (`98d61013`, コードは `a2190b26` と同一) の negctl / e2e は、`$ARTIFACTS_DIR` に `work-m11` と `toolchain-retdec` が無かったため実行できなかった (`fl-win64` のみ)。PM 判断 (6147966392) の「最終 HEAD で n=3 を取り直す」は未達。実測値の再取得は素材が揃ってから行う。
 
 ## 3-4. 判定の表 (受入条件との対応)
 
