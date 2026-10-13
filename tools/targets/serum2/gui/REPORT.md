@@ -118,3 +118,19 @@ python3 gui/decode_splice_url.py work/Serum2_win64.vst3                  # 0x180
 - 抽出 → 復号 → uidesc 解析を 1 コマンド系列で 1 回実行 (§1)。出力は §2-1 / §3 の数値と一致。
 - ネガティブコントロール: テンプレート参照カウントは own def を差し引いて 0 (= 自己参照を数えていない)。定義件数 3 は `SpliceExpired`/`SpliceMaxLimit`/`SpliceRTO` の 3 名を列挙して確認。
 - 範囲外: 実 VSTGUI 実行、wasm/canvas 上の表示、Machine ID、mac 版。
+
+## 8. VSTGUI upstream 版の同定 (2026-10-13 run, §5-3 の未了分)
+
+入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` から展開した `Serum2.vst3` (sha256 `501e7bb3dd9cafe4…`, 19,236,864 B)。gitignore 対象の `work/` に置いた。
+
+| 観測 | 結果 | 判定 |
+|---|---|---|
+| VSTGUI ソースパス文字列 (`vstgui\lib\cframe.cpp` 等) | 存在。`uidescription/detail/uijsonpersistence.cpp` を含む | VSTGUI 由来の確認 (高) |
+| `VSTGUI` / `vstgui` 文字列 | 計 2,358 件 (大半はパス・ログ用) | 版番号を含まない |
+| `3.7.12` | `VST 3.7.12` (フォント表示付近の文字列, offset 16595120) | **VST3 SDK の版**。VSTGUI の版ではない |
+| `3.19.3` / `9.1.5` / `2.0.20` / `2.0.24` | 版番号として単独出現 | VSTGUI と結び付く根拠は無い (未特定) |
+| `kVstVersion*` / `VSTGUI_VERSION` 系 | 0 件 | 版定数は無い |
+
+結論: **Xfer 版の VSTGUI の版は、バイナリの文字列からは同定できなかった。** 版確定には (1) upstream の各版 (4.x 系) の uidescription ソース (`uijsonpersistence.cpp` の有無と JSON 形式の差) と本バイナリの UIDescription JSON 読込関数を突き合わせる (2) 版ごとの `UIViewCreator` 名集合と §5-1 の 103 種 / RTTI 39 件を照合する、のいずれかが要る。どちらも本 run では未実施。
+
+§5-3 の (a)/(b) 工数実測は本節の版同定を前提とするため、未実施のまま残す。
