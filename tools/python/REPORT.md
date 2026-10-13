@@ -243,4 +243,4 @@ FLEngine の PyMethodDef 表から 435/435 関数を対応付け、書式 303 �
 
 ## 14. Piano roll scripting (`flpianoroll` + `.pyscript` ローダ) — #79 (PY-5)
 
-結論: 同梱 Piano roll scripts 5/5 を wasm 上で回帰テスト化 (`tests/pyscript_e2e.mjs`)。Remote Scripts 5/5・Audio scripts 0/12 (`enveditor` 依存)。全文・実測・未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。
+結論: 同梱 Piano roll scripts 5/5 を wasm 上で回帰テスト化 (`tests/pyscript_e2e.mjs`)。Remote Scripts 5/5・Audio scripts 0/12 (`enveditor` 依存)。flpianoroll は 64 メンバ中 62 実装 (`ScriptDialog.DialogParams` 未実装・`Score.loadScoreFromFile` は stub)。全文・実測・未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §14。
