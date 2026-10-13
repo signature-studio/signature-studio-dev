@@ -61,3 +61,20 @@ node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/base130.j
 ```
 
 注: `work-m11` の `obj/rt.o`・`obj/win.o` は snapshot 由来の古い obj で、`m11_rt.c` の新関数 (`m11_set_va_bigtrace`) が欠けて emcc が fail-closed で落ちた。削除して再ビルドすると通る。
+
+## 5. 追補 (2026-10-13, 再着手 run): M11_FIX_535BF2=1 の実測 (負の結果)
+
+基準 HEAD `36edc993` (main) を再ビルドして baseline を再現し、`m11_ov.c` の `M11_FIX_535BF2` 既定を 1 にした build と比較した (コードは commit せず、測定後に 0 へ戻した)。
+
+| 項目 | baseline (既定 0) | M11_FIX_535BF2=1 |
+|---|--:|--:|
+| e2e wall | 125.8 s (初回 emcc 込み) | 38.6 s (増分) |
+| survey ok / trap / miss | 870 / 25 / 46 | 870 / 25 / 46 |
+| trap kinds | OOB 17 / halt0 8 (oom 1 併発) | OOB 17 / halt0 8 (同左) |
+| top frame `function_535bf2` | x2 | 0 (代わりに `function_410010` x2 が出現) |
+
+- `535bf2` の closure 外呼出し (`function_535c2e`) は、転記で消えても trap 数は変わらない。unit 304・555 の OOB は `535bf2` の境界条件では解けず、呼出元の `tbl`/`cnt` の値 (`obj` の生成元) が原因と判断する。`#714` の次の一手に従う。
+- `function_903e00` 系 (unit 477 484 513 520) は `#684` (`903d20` ← `904190`) で追跡済み。本 run では未着手。
+- 完了条件 (trap < 20) は引き続き未達 (25)。残 trap は既存の子 issue に割り当て済み: 304・555・923 → #714 / 477・484・513・520 → #684 / halt0 245・279・647 → #860 / 509・492 → #862・#861 系 / 149 → #748 / 95・275・895 → #684・#881・#882 / 56 → #856。
+
+再現: `export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH="$RUNNER_TEMP/pyenv130/bin:$PATH"; bash tools/m11/m11_e2e.sh`
