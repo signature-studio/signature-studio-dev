@@ -184,7 +184,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 ### 10.1 rep 経路ネガコン (HEAD `3214a40e`, 実測)
 
 - 対象: `h_rep_str` 先頭に `llvm.trap` + `unreachable` を入れた一時版 (`mlift/mlift_ops.py`)。`ctrl_rep.json` に `rep movsb` / `rep stosb` / `rep stosw` / `rep stosq` が入っており、ctrl 閉包はこれを実行する。
-- 検証 HEAD `3214a40e` (`mlift/mlift_ops.py` の blob `f8f57a70`。PR 最新 `b6f3896a` とこのファイルは同一)。
+- 検証 HEAD `3214a40e` (`mlift/mlift_ops.py` の blob `f8f57a70`。現 PR head `7ec97437` でも同一ファイル)。
 - trap 版 (`h_rep_str` の `bits = ...` 行の直前に `fl.e('call void @llvm.trap()'); fl.e('unreachable'); return True`):
   - `build_ctrl.sh` → exit 0, `mlift: lifted 1157 funcs / 483427 B / 103228 insns, failed(funcs with unsupported) 1` (`f_1810577ac: vpcmpeqw ymm1` のみ、既知) / `ctrl build ok`。
   - `run_ctrl.sh 2 5` → **exit 1** (`RESULT: MISMATCH in ctrl scenarios`)。`fma=0` / `fma=1` ともに `scenarios 15, lines native/wasm 15/0, ERR native/wasm 1/0 (同一 scenario: NO)`。wasm 側 stderr に `RuntimeError: unreachable`。`ctrl_w0.txt` は 0 行、`ctrl_n0.txt` は 15 行。
@@ -197,7 +197,7 @@ bash tools/targets/freshair/lift2/lift2_e2e.sh                                  
 2. `bash build_ctrl.sh` → `bash run_ctrl.sh 2 5` (foreground, `TMPDIR=$RUNNER_TEMP`)。exit 1 / `同一 scenario: NO` / `RuntimeError: unreachable` を期待する。
 3. `git checkout -- tools/targets/freshair/lift2/mlift/mlift_ops.py` で戻し、`git show 3214a40e:…/mlift_ops.py | cmp - …` で一致を確認する。
 
-素材: `work-liftlib-targets` を展開し、`plugins-freshair` は `FA_DL` の `fetch.sh` で epf 8 本を補完 (`work/win` に 8 本を確認)。emsdk / retdec は `/opt` 既存。
+素材: `work-liftlib-targets` を展開し、`plugins-freshair` は `FA_DL` の `fetch.sh` で epf 8 本を補完 (`work/win` に 8 本を確認)。emsdk は `[EMSDK]`、retdec は `[RETDEC]` (`docs/REFERENCES.md`) を使用。
 
 ### 10.3 lift2_e2e.sh 全体 (元に戻した HEAD `3214a40e`, 実測)
 
