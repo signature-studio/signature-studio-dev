@@ -13,6 +13,7 @@ static const LocName k_locs[] = {
     { 0x0407, "de-DE", "de", "DE", "German (Germany)", "Deutsch (Deutschland)" },
     { 0x040C, "fr-FR", "fr", "FR", "French (France)", "fran\xC3\xA7" "ais (France)" },
     { 0x0C0A, "es-ES", "es", "ES", "Spanish (Spain)", "espa\xC3\xB1ol (Espa\xC3\xB1" "a)" },
+    { 0x0804, "zh-CN", "zh", "CN", "Chinese (Simplified, PRC)", "\xE4\xB8\xAD\xE6\x96\x87(\xE4\xB8\xAD\xE5\x8D\x8E\xE4\xBA\xBA\xE6\xB0\x91\xE5\x85\xB1\xE5\x92\x8C\xE5\x9B\xBD)" },
 };
 static LCID g_user_lcid = 0x0409;
 void shimx_set_locale(LCID l) { g_user_lcid = l; }
@@ -21,6 +22,11 @@ static const LocName* loc_find(LCID id) {
     if (id == LOCALE_USER_DEFAULT || id == LOCALE_SYSTEM_DEFAULT || id == LOCALE_NEUTRAL || id == 0x0400) id = g_user_lcid;
     for (size_t i = 0; i < sizeof k_locs / sizeof k_locs[0]; i++) if (k_locs[i].id == id) return &k_locs[i];
     return NULL;
+}
+/* 既定ロケール。shimx_set_locale で表に無い LCID を指定された場合も NULL を返さず en-US にする */
+static const LocName* loc_cur(void) {
+    const LocName* l = loc_find(0x0400);
+    return l ? l : &k_locs[0];
 }
 
 LCID GetUserDefaultLCID(void) { return g_user_lcid; }
@@ -41,7 +47,7 @@ LCID LocaleNameToLCID(LPCWSTR name, DWORD flags) {
     return 0;
 }
 int GetSystemDefaultLocaleName(LPWSTR out, int cch) {
-    const LocName* l = loc_find(0x0400);
+    const LocName* l = loc_cur();
     int n = (int)strlen(l->name) + 1;
     if (cch < n) { SetLastError(ERROR_INSUFFICIENT_BUFFER); return 0; }
     for (int i = 0; i < n; i++) out[i] = (WCHAR)l->name[i];
@@ -49,7 +55,7 @@ int GetSystemDefaultLocaleName(LPWSTR out, int cch) {
 }
 BOOL GetUserPreferredUILanguages(DWORD flags, ULONG* num, LPWSTR buf, ULONG* cch) {
     (void)flags;
-    const LocName* l = loc_find(0x0400);
+    const LocName* l = loc_cur();
     ULONG n = (ULONG)strlen(l->name) + 2;       /* multi-sz: "en-US\0\0" */
     if (num) *num = 1;
     if (!cch) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }

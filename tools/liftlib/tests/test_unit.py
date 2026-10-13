@@ -562,6 +562,62 @@ def t18():
 
 
 def t19():
+    """SR-4 (#75): S1c movl/h(ps|pd) の store 復元 + Image.add_func (.pdata 外 leaf の合成エントリ)。"""
+    blk = {"function_x": "\n".join([
+        "  %a = load i64, ptr %p, align 8, !insn.addr !1",
+        "  call void @__asm_movlps(i64 %a, i128 %v), !insn.addr !2",
+        "  %b = load i64, ptr %q, align 8, !insn.addr !3",
+        "  call void @__asm_movhpd(i64 %b, i128 %w), !insn.addr !4",
+        "  %c = add i64 %b, 1",
+        "  call void @__asm_movlps(i64 %c, i128 %v), !insn.addr !5"])}
+    out, n = base.lower_asm_lane_store(dict(blk))
+    t = out["function_x"]
+    assert n == 2, n
+    assert "store i64 %s1c_0_lo, ptr %p" in t and "%s1c_0_lo = trunc i128 %v to i64" in t, t
+    assert "%s1c_1_sh = lshr i128 %w, 64" in t and "store i64 %s1c_1_lo, ptr %q" in t, t
+    assert "call void @__asm_movlps(i64 %c, i128 %v)" in t     # load 由来でない旧値は触らない (simd 生成側が unsupported 報告)
+    same, n0 = base.lower_asm_lane_store({"f": "  %x = add i64 1, 2"})
+    assert n0 == 0 and same == {"f": "  %x = add i64 1, 2"}
+    img = Image(os.path.join(T, "targets/serum2/work/Serum2_win64.vst3")) if os.path.exists(os.path.join(T, "targets/serum2/work/Serum2_win64.vst3")) else None
+    if img is None:
+        print("T19 ok (S1c 合成 IR; add_func は Serum2 PE 無しで skip)")
+        return
+    assert img.func_at(0x1802f7370) is None
+    img.add_func(0x1802f7370, 0x1802f74ec)
+    assert img.func_at(0x1802f7380) == (0x1802f7370, 0x1802f74ec)
+    try:
+        img.add_func(0x1802f7510, 0x1802f7520)     # .pdata 関数 (0x1802f7510-0x1802fcc82) と重なる
+        raise SystemExit("T19 FAIL: overlap not rejected")
+    except ValueError:
+        pass
+    print("T19 ok (S1c movlps/movhpd store 復元 2 件 + 非 load 旧値は不変 + Image.add_func 登録/重複拒否)")
+
+
+def t20():
+    """SR-4 (#75): F2 の D5 型 (xmm 引数が `sext i64 %argN` に束ねられた形) 検出。"""
+    from liftlib.passes import f2
+    ll = "\n".join([
+        "define i64 @function_18008b2a0(i64 %arg1) local_unnamed_addr {",
+        "dec_label_pc_18008b2a0:",
+        "  %2 = sext i64 %arg1 to i128, !insn.addr !0",
+        "  %3 = call i64 @__asm_movss__qx(i128 %2), !insn.addr !0",
+        "  %4 = sext i64 %arg1 to i128, !insn.addr !1",
+        "  %5 = call i64 @__asm_movss__qx(i128 %4), !insn.addr !2",
+        "  ret i64 0, !insn.addr !2",
+        "}",
+        "declare i64 @__asm_movss__qx(i128) local_unnamed_addr",
+        "!0 = !{i64 6443020960}", "!1 = !{i64 6443020965}", "!2 = !{i64 6443020970}", ""])
+    mod = IR.Module.parse(ll)
+    fn = mod.funcs()[0]
+    hit = f2.find_sext_arg_for(mod, fn, [6443020960])
+    assert hit is not None and hit[2] == "%2", hit                 # reader アドレス上でのみ使われる sext
+    assert f2.find_sext_arg_for(mod, fn, [6443020999]) is None     # reader 外 -> 対象外
+    assert f2.find_sext_arg_for(mod, fn, [6443020960, 6443020970]) is not None
+    print("T20 ok (F2 D5 型: reader 上の sext i64 %arg を xmm 値定義として検出 / reader 外は不検出)")
+
+
+
+def t21():
     """[LIFTLIB-5 / #342] leafabi: `_ret_thread` の名前割当 `fresh` はループ前に束縛される。
 
     ret が全て reg2mem phi 分岐に入る構成 (最初に処理する ret が phi) で UnboundLocalError にならず,
@@ -603,10 +659,10 @@ def t19():
     for b in fn.blocks:
         assert b.lines[-1].startswith("  ret i64 %lf_1000_t"), b.lines
         assert any("load i128, ptr %phia" in l for l in b.lines), b.lines
-    print("T19 ok (leafabi _ret_thread: phi 分岐が先頭 ret でも fresh 束縛済み, 複製 ret の名前は %d 個すべて一意)" % len(names))
+    print("T21 ok (leafabi _ret_thread: phi 分岐が先頭 ret でも fresh 束縛済み, 複製 ret の名前は %d 個すべて一意)" % len(names))
 
 
-def t20():
+def t22():
     """[LIFTLIB-5 / #342] p1 `_setcc_value`: `xor r,r` のゼロ化は setcc と同一の機械語 block 内, かつ 32bit 以上に限る。
 
     (A) 同一 block の xor r10d,r10d → 復元する (tan @1801a9cd9 の形)
@@ -646,10 +702,10 @@ def t20():
             assert (v is not None) == want, (name, v, out)
     finally:
         mc.LEAF_EXT = prev
-    print("T20 ok (p1 _setcc_value: " + ", ".join("%s=%s" % (k, "復元" if v else "拒否") for k, v in got.items()) + ")")
+    print("T22 ok (p1 _setcc_value: " + ", ".join("%s=%s" % (k, "復元" if v else "拒否") for k, v in got.items()) + ")")
 
 
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t17, t18, t19, t20, t21, t22):
         f()
     print("ALL UNIT TESTS PASS")
