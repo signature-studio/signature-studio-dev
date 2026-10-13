@@ -52,3 +52,43 @@ python3 trap_triage/icall_41037d_679.py work/trap_triage/on_c.json --expect-ok 2
 ```
 
 `n40_cost.json` の `listfind` / `listraise` / `getmem` を unit ごとに見る (`work/trap_triage/n40_cost.json`)。
+
+## 5. 実測 — 未実施 (2026-10-13 差し戻し対応)
+
+差し戻しを受けて §4 の手順を本 run で再実行しようとしたが、実行しなかった。理由:
+
+- fl-win64 は展開できた (`block00031_PE.bin` 実在) が、§4 の IR 再生成は `m11_gen_ir2.sh` の lift チェーン (boot0〜6) で、各 unit を RetDec により最大 2400 秒かけて処理する (`m11_lift.sh`)。差し戻し対応の上限 (40 分) に収まる見込みが無い。
+- 本 PR のどの commit にも、また artifact `work-m11.tar.zst` / `work-liftdiff.tar.zst` にも、`n40_survey.out`・`on_c.json`・`n40_cost.json` の生出力は存在しない (差し戻しの確認どおり)。
+
+このため、旧版 §5 の数値はすべて**削除し、未検証に戻す**。対象は次のとおり (数値そのものは残さない):
+
+- OFF の survey 集計、unit 101 の va_bytes・GetMem・listfind 回数 (`M11_SURVEY` / `n40_cost.json` 由来)
+- ON の `SURVEY_UNITS` 集計、unit 101 の oob 判定と frames
+- 0x41037d の unit 別 hit の集中先 (`icall_41037d_679.py` 由来)
+- REPORT_679 の期待値との一致・不一致 (`icall_41037d_679.py --expect-ok` の FAIL 行の出典は無い)
+- PR #993 の「unit 101 は listfind 0 回・unit 304 に 2 回」との比較
+
+**判定 (現時点)**
+
+- 暴走の再現有無: **未検証**。OFF / ON いずれについても「再現しない」とは判定しない。
+- ON の unit 101 の挙動 (halt0 か oob か): **未検証**。
+- REPORT_679 の期待値の扱い: **未検証** (期待値が現構成で成立するかは未確認)。
+
+**受入条件の状態**
+
+- 1 根本原因: 未達 (暴走の再現が未確認のため、根因の特定対象が未確定)。
+- 2 GetMem 差 2,663: 未達 (比較対象の暴走を未確認)。
+- 3 周回数 probe: 未達 (入口回数の計測手順のみ定義。1 周回あたり object 数は未計測)。
+
+**次の実行 (起票先 #739)**
+
+- §4 の手順を、lift チェーンを含めて実行できる時間枠 (新規実装の上限 58 分内) で行い、生出力を `work/` に残す。
+- 生出力の該当行 (`M11_SURVEY` の先頭行、unit 101 の `n40_cost.json` 行、`SURVEY_UNITS` 行、`icall_41037d_679.py` の FAIL 行) を取得元 (run ID または artifact 名) と併記して本節に貼る。
+- 貼れるまでは本節に数値を入れない。
+
+**未解決 (起票先 #739)**
+
+- 暴走 (unit 101 の halt0) の再現条件・再現有無
+- ON の unit 101 の挙動の確認 (oob か否か)
+- REPORT_679 の期待値 (23,053,861) の扱い (PM 判断)
+- 0x41037d の hit 集中の切り分け (unit 898 への集中の有無の確認を含む)
