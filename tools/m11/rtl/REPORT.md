@@ -216,6 +216,28 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 * 2 件 (`0x412020` / `0x455650`) は unexec のため、batch の差分からは原因を取れない。
 * 次の一手 (本 run では未実施): 退行 5 件を単独で再採点し、trace 差分の入口 (`0x40faa0`) の間接 call 解決を確認する。修復は tools/flelift の変更が要るため #410 に継続。
 
-### 9-2. 退行 5 件の単独再採点 — 未実施
+### 9-2. 退行 7 件の再採点 (生ログ付き・実測)
 
-退行 5 件 (§9-1) は単独 (batch 外) での再採点を行っておらず、実測値は存在しない。本節は単独での判定を記録しない。再採点は #410 で、素材 `fl-win64` (`docs/WORKFLOW.md` §11) と `tools/flelift/work`・`tools/liftdiff/work` が揃う環境で行う。
+§9-1 の 5 件 (+ unexec の 2 件) を、生ログを残す形で再採点した。前 run までの「単独 n=3」表 (出典・生ログ無し) は取り下げ済みで、本節はそれを置き換える。
+
+* 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (rc 0)。`work-liftdiff` を `tools/liftdiff/work/` に展開 (gitignore 対象・commit しない)。
+* 単独 n=3: `liftdiff.py batch targets/flelift.json --set file:<5 VA> --shards 5 --nobuild --state auto` を 3 回。所要 7 / 7 / 8 秒。生 jsonl は `tools/liftdiff/work/rerun5/r{1,2,3}.jsonl`。
+* 同一環境の RTL 帯 batch: `--set file:<RTL 帯 1,172 VA> --shards 4 --nobuild --state auto` を 1 回。所要 86 秒 (load 3.40 / 1.65 / 0.70)。生 jsonl は `tools/liftdiff/work/rerun5/band_b1.jsonl`。
+* 入力 jsonl (commit 済み batch): sha256 `d9995bfa…6e0e6b` (7,421 行の元 batch と同じ)。flelift `ld_wasm.cjs` sha256 `9f826a35…850f44`。
+* 集計: `tools/m11/rtl/rerun_regression7.py` → `results/x64c_regression7_rerun.tsv`。
+
+| va | batch jsonl (9-1) | 単独 r1 | 単独 r2 | 単独 r3 | 帯 batch b1 |
+|---|---|---|---|---|---|
+| `0x4090e0` | mismatch | mismatch | mismatch | mismatch | mismatch |
+| `0x41cd70` | mismatch | mismatch | mismatch | mismatch | mismatch |
+| `0x42d830` | mismatch | mismatch | mismatch | mismatch | mismatch |
+| `0x44a590` | mismatch | mismatch | mismatch | mismatch | mismatch |
+| `0x4511d0` | mismatch | **match** | **match** | **match** | **match** |
+| `0x412020` | unexec | - | - | - | mismatch |
+| `0x455650` | unexec | - | - | - | match |
+
+* 結論 (実測): 4 件 (`0x4090e0` / `0x41cd70` / `0x42d830` / `0x44a590`) は単独 3 回・帯 batch 1 回すべて mismatch。退行の実在は再現した。
+* `0x4511d0` は、単独 3 回と同一環境の帯 batch 1 回がすべて match で、コミット済み batch jsonl の mismatch と食い違う。5 件だけの単独実行 (`--shards 5`) でも、帯 batch (1,172 件) でも match なので、batch 文脈依存とは言えない。コミット済み jsonl 側の値が実行ごとの揺れで出ていた可能性が高い (§7-2)。ただし jsonl の生成時の環境は確認できていないため、確定はしない。
+* `0x412020` / `0x455650` は、コミット済み jsonl では unexec だったが、今回の帯 batch では mismatch / match になった。単独では未実行。unexec の判定も §7-2 の揺れに含まれる。
+* 含意: 一致→不一致 7 件のうち確実な退行は 4 件 (`0x4090e0` / `0x41cd70` / `0x42d830` / `0x44a590`)。`0x4511d0` は退行かどうか未確定 (再現性が無い)。`0x412020` / `0x455650` は一致→不一致の判定自体が揺れている。
+* 未実施: `0x40faa0` 入口の間接 call 解決の確認 (修復側の作業で、#410 に継続)。
