@@ -41,6 +41,27 @@ REPORT_595 の表 (817 / 47 / 21 / 56) とは IR が違うため、数値は直�
 - OFF では `0x41037d` は 0 hit。REPORT_679 (`0x41037d` の暴走) と同じ site だが、unit 101 以外の 190/291/296 も含むため、REPORT_679 の数値とは別の経路と見る。
 - 原因は未特定。受入条件 2 の残件として子 issue に起票する。
 
+## 4-2. 現 HEAD での再測定 (#704 再 run)
+
+測定 commit: `18e9910b` (origin/main、`tools/m11` のコードは本 run で変えていない)。
+
+- `m11_gen_ir2.sh`: 43.4 s (rc=0)。`ldfix=applied` (F1=902、errors=0)。
+- `m11_build.sh` OFF: 13.0 s (rc=0、`[fix912] mode=off replaced=0`)。ON (`M11_OV_CLASSCREATE=1`): 11.9 s (rc=0)。
+- `survey_units.mjs`: OFF rc=0 (13.0 s)、ON rc=0。load average 0.99 → 0.76 (単発、並列数 1)。
+
+| 構成 | ok | oob | halt0 | miss | noproc | other | abort | ok 退行 |
+|---|--:|--:|--:|--:|--:|--:|--:|---|
+| OFF (既定) | 870 | 16 | 7 | 47 | 1 | 1 | 0 | — |
+| ON (`M11_OV_CLASSCREATE=1`) | 869 | 15 | 7 | 47 | 1 | 1 | 2 | 1: 190 |
+
+- `survey_diff.py` (OFF→ON): ok→oob 1 (190)、oob→abort 2 (304 555)、ok→ok 869。101 / 291 / 296 は ON でも ok。415 は ON/OFF とも ok。
+- unit 190 (ON): `function_412e40` で `memory access out of bounds`。frames は `function_412e40 ← 653660 ← 6539e0 ← 664190 ← 6cf2a0 ← 6cf480`。icall sites `0x41037d` [1, 0] (OFF は 0 hit)。
+- 旧 IR の観測 (§4: 101 190 291 296 の 4 件) との差: 現 HEAD では 101 / 291 / 296 は退行しない。残るのは 190 の 1 件のみ。追跡は #1274 (`[M11-N77]`、親 #912)。
+
+### 差分 (測定 commit `18e9910b` から HEAD まで)
+
+`git diff 18e9910b HEAD -- tools/m11` の出力は 0 行 (本 run のコード変更なし。REPORT_704.md のみ追記)。
+
 ## 5. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |

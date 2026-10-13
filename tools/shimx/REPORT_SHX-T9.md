@@ -8,7 +8,7 @@
 
 - DllMain closure は**未完** (Todo 維持)。逐次起動 (`trace_soft_fix`) は unit #18 の `_UStrAsg` OOB (#232) で止まり、unit 完走 (stage 5/6) は未達。
 - SHIMX_TRACE の収集は `results/survey.md` の集計から行った。GetProcAddress miss 65 件 / LoadLibrary 失敗 3 種 / CreateProcess 拒否 0 件。
-- survey の unit 160 以降を「harness の range 連鎖 (783 件)」とした前版の記述は、commit 済み results から裏付けられないため取り下げる (§3)。
+- survey の unit 160 以降の range 連鎖 (783 件) は、`survey_trace.mjs` が InitTable 破壊 (unit 159 の OOB で `*(0x11eac90)` が 0 になる) を見ずに続行したことが原因と実測で確定し、harness を修正した (§3・#773)。
 
 ## 2. 実測 (出典: commit 済み results)
 
@@ -55,15 +55,41 @@
 ### 2.4 fail-fast 到達
 
 - **逐次起動 `trace_soft_fix` (soft モード, 17 unit + #18) では shimx 起因の fail-fast は 0**。停止要因は `_UStrAsg` OOB (lift 側の #232)。
-- **逐次起動 plain (既定 fail-fast) では shimx 起因の fail-fast で停止する**: `m11_sx_plain_failfast` / `m11_sx_trace_failfast_fix` とも `[shim] FAIL-FAST: unimplemented Win32 API: LoadStringW` (top frame `shim_unimplemented`) で Aborted。init_count 16 / units_run 15 で止まる。survey の LoadStringW 初出も unit 16。LoadStringW は GUI 系 API のスタブだが、shimx 側の fail-fast であることに変わりはない (unit 115 と同じ扱い)。
-- **survey の unit 115**: `[shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (NULL/misaligned)` (`results/survey.md` §fail-fast、`results/stub_usage.md`)。shimx `locks.c` の `cs_of()` が出す fail-fast であり、shimx 起因として数える。R7 (`tools/shimx/REPORT_R1-R8.md`) の既定方針 (NULL は fail-fast のまま) に従う。lift 側ポインタ不正が原因かは未確認。起票先: R7 の既存項目 (新規起票なし)。
+- **逐次起動 plain (既定 fail-fast) では shimx 起因の fail-fast で停止する**: `m11_sx_plain_failfast` / `m11_sx_trace_failfast_fix` とも `[shim] FAIL-FAST: unimplemented Win32 API: LoadStringW` (top frame `shim_unimplemented`) で Aborted。init_count 16 / units_run 15 で止まる。survey の LoadStringW 初出も unit 16。LoadStringW は GUI 系 API のスタブだが、shimx 側の fail-fast であることに変わりはない。
+- **survey の unit 115**: shimx 版では fail-fast せず halt0 (§3.1)。baseline の abort (`EnterCriticalSection`、shim 側の未登録 CS) は shim 側の差であり、shimx 起因の fail-fast には数えない。R7 (`tools/shimx/REPORT_R1-R8.md`) の既定方針 (NULL は fail-fast のまま) は、本 survey の他の NULL 到達事例にのみ適用する。
 - **plain 逐次起動の LoadStringW fail-fast**: 上記 (§2 の表) の通り shimx 起因として数える。起票先: tools/gui (GUI stub の実装側)。
 
-## 3. survey の unit 160 以降 (前版の記述を取り下げ)
+## 3. survey の unit 160 以降 (#773 で切り分け済み)
 
-- 前版の「unit 160 以降 783 件が `_m11_call_unit` の戻り -1 (range)」は、commit 済み results から裏付けられなかった。`results/survey.md` に range 行は無く、`results/stderr_trace_soft_fix.txt` (12 行) にも `SXL_SURVEY` 行は無い。根拠 (実行ログ) を示せない推定値のため、本付録の数値からは除く。
-- 942 unit の集計 (§2) は合計 942 で一致する。unit 別の range 判定は results には残っていない。
-- 原因の切り分け (`survey_trace.mjs` の trap 後復帰、`m11_call_unit` の戻り値判定) は #773 (SHX-T9b) で扱う。#773 の前提 (range 連鎖の存在) は再測で確認されるまで未確認扱い。
+実測 (`tools/m11/shimx_link/e2e.sh` の foreground 再実行, 素材 work-m11 / work-liftdiff, origin/main a5adb2fc):
+
+- 修正前 (`survey_trace.mjs`): `SXL_SURVEY` の kinds は ok 137 / oob 6 / closure_outside 14 / halt0 2 / **range 783** / reboots 0。trace 無しの `m11_sx_plain_soft` でも同じ 783 件 (trace 機能とは無関係)。
+- 原因: unit 159 (1 始まり, VA 0x26d1a0) の OOB 後、`*(0x11eac90)` (InitTable ポインタ) が `0xf768b0` から 0 に変わる。`m11_call_unit` は `tbl==0` で -1 を返すため、160 以降の全 unit が `lva=0x0` の range になる。
+- 修正 (`survey_trace.mjs`): baseline (`m11_survey.mjs`) と同じく InitTable (先頭・末尾の proc VA) の破壊を検出し、その unit を `clobber` と記録して boot をやり直す。image の書き戻し方式は採らない (書き戻すと closure_outside が 796 件に増えた。shimx の import 状態が壊れるため)。
+- 修正後: `SXL_SURVEY` kinds は ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1。range は 0。
+- baseline (`m11_boot`) は ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1 (reboots 1)。ログ: `tools/m11/alloca/results/run/m11_boot_surveytrace.out` (`SXL_SURVEY` 行、追跡済み)。
+- 裏付け (`tools/shimx/evidence_773/`、全出力は `survey_full_*.txt`、image sha256 は `image_sha256.txt`): `[EMSDK]` 6.0.12 で `build.sh` を clean rebuild (obj / gen / *.cjs 削除後) した image (`m11_sx_trace_soft_fix.cjs`, sha256 `b674477d…`) に対する foreground 実測。修正前 harness (a5adb2fc) は range 783 (ok 137 / oob 6 / closure_outside 14 / halt0 2)、修正後 harness (本 PR) は ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 / range 0。baseline (`m11_boot.cjs`) は ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1 / reboots 1。修正後・baseline は PR の値と一致。
+- 素材 `work-m11` 同梱の `m11_sx_trace_soft_fix.cjs` (sha256 `f100dd66…`, 2026-10-10 build, `.cjs.wasm` 同梱) は別 image。修正後 harness で測ると ok 800 / oob 41 / halt0 53 / closure_outside 46 / abort 1 / noproc 1 / reboots 1 / clobber 0 / range 0 (`survey_full_material_work-m11_f100dd66.txt`)。この image では range 783 も clobber も出ない。よって本節の数値は上の clean rebuild image に対するものに限る。
+- 差分の説明 (未完): baseline は unit 115 で `EnterCriticalSection` の fail-fast (abort) に当たって reboot するが、shimx 版では同 unit が halt0 になり fail-fast に当たらない。以後の unit は状態がずれ、oob と halt0/ok が unit 単位で入れ替わる (unit 単位の差分は 81 件)。oob 増 (50→95) の内訳を unit 単位で説明するところまでは未達。起票先: 子 issue #1255 (`[SHX-T9c]`)。
+
+### 3.1 #1255 の切り分け (実測)
+
+測定 commit: `604e900f` (origin/main)。shimx 版は `tools/m11/shimx_link/build.sh --trace --soft --fix` で clean rebuild (17 秒・`[sxlink] OK`、sha256 `c6461194…`)。baseline は素材 `work-m11` の `m11_boot.cjs` (sha256 `e826e6c0…`)。survey は `SHIMX_TRACE=1 node survey_trace.mjs` (foreground 5 分 13 秒)。load 0.38–0.47 (4 CPU)。
+
+- shimx 版: ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 (`evidence_773` の集計と一致)。
+- baseline: ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1 / reboots 1。
+- 差分 81 unit の kind 遷移: ok→oob 31 / halt0→oob 26 / halt0→ok 10 / oob→ok 10 / halt0→closure_outside 1 / abort→halt0 1 / oob→halt0 1 / oob→clobber 1。差分は全 100 unit 区間にわたる (最多 0 区間 13)。
+- 最初の差分は **unit 23** (LVA 0x67f00、baseline halt0 → shimx closure_outside)。unit 115 より前。
+
+**unit 115 の差 (受入条件 1)**: 同じ前処理 (unit 1〜114 を順に実行) で、baseline は `m11_boot.cjs` 単独でも `EnterCriticalSection (未初期化/未登録)` で abort する (`tools/shim/src/sync.c`: CS を表に登録した後の mutex 写影で、表に無い CS を fail-fast)。shimx 版は同じ unit で `EnterCriticalSection` 18 回・`LeaveCriticalSection` 18 回が対で通り、halt0 (正常停止) になる (`tools/shimx/src/locks.c` は ゼロ初期化の CS を未ロック扱いし、NULL/非整列のみ fail-fast)。差は「未登録 CS を abort するか、未ロックとして扱うか」の実装差が差の直接の機構と推定する。shimx 版の halt0 は、この実装差により fail-fast に当たらず到達したものと読む。CS ポインタの具体値 (両者の一致) は未比較のため、両者が同一の CS を見ているかは未確認。
+
+**oob 増 (受入条件 2)**: oob 増 57 件 (ok→oob 31 / halt0→oob 26) と減 12 件 (oob→ok 10 / oob→halt0 1 / oob→clobber 1)。増分の内訳の unit 単位説明は未完 (起票先: 子 issue #1465 `[SHX-T9d]`)。`evidence_1255/unit_diff_out.txt` が unit 別の遷移一覧。
+
+再現: `python3 tools/shimx/evidence_1255/unit_diff.py <baseline.survey.json> <shimx.survey.json>` (per-unit JSON は `evidence_1255/` に保存)。
+
+### 3.2 検証の commit と差分 (WORKFLOW §6)
+
+- 測定 commit: `604e900f` (origin/main)。本 PR の変更は `tools/shimx/REPORT_SHX-T9.md` と `tools/shimx/evidence_1255/` のみで、測定対象のコード (`tools/m11/shimx_link/`・`tools/shimx/src`) には差分が無い。
 
 ## 4. 残一覧 (BACKLOG 反映用の要約)
 
@@ -74,11 +100,13 @@
 | GetProcAddress GUI 系 miss | 44 | tools/gui |
 | GetProcAddress 序数 miss (kernel32 `#39682`) | 1 | R1 (intptr 閾値 / 敷設) |
 | LoadLibrary 失敗 (Msctf / avrt / PowrProf) | 3 | R4 (`tools/shimx/REPORT_R1-R8.md`) |
-| survey unit 115 の shimx fail-fast (EnterCriticalSection NULL) | 1 | R7 (`tools/shimx/REPORT_R1-R8.md`・既存) |
 | plain 逐次起動の shimx fail-fast (LoadStringW, GUI stub) | 1 | tools/gui |
-| survey unit 160 以降 (range 連鎖の有無) | 未確認 | #773 |
+| survey unit 160 以降の range 連鎖 | 解消 (harness 修正) | #773 |
+| survey の unit 単位差分: unit 115 の fail-fast 差 | 差の機構を推定 (§3.1)。CS ポインタ一致は未比較 | #1255 (`[SHX-T9c]`) |
+| survey の unit 単位差分: unit 23 の分岐・oob 増 57 件の内訳 | 未説明 | #1465 (`[SHX-T9d]`) |
 
 ## 5. 再現性
 
-- 本 PR の修正は素材 (`work-m11` / `work-liftdiff`) が無い環境で行ったため、`e2e.sh` の再実行は**行っていない**。数値はすべて commit 済み results からの引用。
-- 再測の前提: `oc_artifacts: fl-win64 work-m11 work-liftdiff` を依頼に付け、`bash tools/m11/m11_e2e.sh` (lift 成果物) を先に通すこと。
+- 測定 commit: `c17ac666` (`build.sh` の PATH 修正 05b2c71b を含む)。測定後のコード差分 (`git diff c17ac666 HEAD -- tools/m11/shimx_link/survey_trace.mjs tools/m11/shimx_link/build.sh tools/shimx/src`) は出力 0 行。素材は `oc_artifacts: fl-win64 work-m11 work-liftdiff` で展開 (`tools/m11/work/`・`tools/liftdiff/work/`)。IR 再生成 (`m11_gen_ir2.sh`) は行わず、素材の `boot_final3.ll` / `m11_image.bin` を使用。image は `e2e.sh` で clean rebuild (obj / gen を削除してから実行)。
+- image の build には `[EMSDK]` (6.0.12) が必要。`emsdk_env.sh` は PATH の `upstream/bin` を外すため、`build.sh` の `llvm-nm` が見つからず 5 本とも失敗する (失敗しても `e2e.sh` は exit 0 を返す)。`build.sh` で `upstream/bin` を PATH に戻して解消 (symlink 不要。HEAD の build.sh で確認済み)。build ログの `[sxlink] OK` で成功を確認すること。
+- `e2e.sh` を再実行すると `tools/m11/shimx_link/results/` の自動生成物が書き換わる (commit 済みと生成元が異なる)。本 PR では results を HEAD に戻し、裏付けは `evidence_773/` に置いた。

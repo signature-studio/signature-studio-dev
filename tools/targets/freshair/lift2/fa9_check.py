@@ -31,7 +31,7 @@ def lr_tail(seg):
     t = seg.split(' ')
     return t[-2:]
 
-def check(base_out, base_err, alt_out, alt_err, pert_base_out, pert_out):
+def check(base_out, base_err, alt_out, alt_err, pert_base_out, pert_out, wasm_alt_out=None):
     fails = []
     bo = open(base_out).read().split('\n')[:8]
     ca, da = calls_of(base_err)
@@ -52,6 +52,12 @@ def check(base_out, base_err, alt_out, alt_err, pert_base_out, pert_out):
     print('(b) alt   : ERR=%d/8 ca1480=%d path=%s (静的分岐強制ネガコン)' % (aerr, len(aca), apaths))
     if aerr != 8 or apaths != ['static']:
         fails.append('(b) 静的分岐ネガコンが ERR/static にならない')
+    if wasm_alt_out is not None:
+        wo = open(wasm_alt_out).read().split('\n')[:8]
+        werr = sum(1 for ln in wo if '|ERR' in ln)
+        print('(b-wasm) alt: wasm ERR=%d/8 (静的分岐強制ネガコン, wasm 側)' % werr)
+        if werr != 8:
+            fails.append('(b-wasm) wasm 側の静的分岐ネガコンが ERR にならない')
     pb = open(pert_base_out).read().split('\n')[:8]
     pp = open(pert_out).read().split('\n')[:8]
     dtok = same_lr = diff_lr = 0
@@ -70,5 +76,5 @@ if __name__ == '__main__':
     if sys.argv[1] == 'mkpert':
         mkpert(sys.argv[2], sys.argv[3]); sys.exit(0)
     if sys.argv[1] == 'check':
-        sys.exit(check(*sys.argv[2:8]))
+        sys.exit(check(*sys.argv[2:9]))
     sys.exit(2)

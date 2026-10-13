@@ -92,7 +92,7 @@ function verify(capSpec, cfg, result) {
   if (cfg.mode === "ramp") {
     let ok = 0, firstBad = -1, bad = 0;
     for (let p = 0; p < covered; p++) {
-      const e0 = p + 1;
+      const e0 = (p & 0xFFFFFF) + 1;
       if (ch0[p] === e0 && ch1[p] === -e0) ok++;
       else { bad++; if (firstBad < 0) firstBad = p; }
     }

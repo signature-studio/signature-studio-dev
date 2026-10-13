@@ -118,12 +118,12 @@ shimx の生成物 (`BACKLOG.md` / `inventory.md` / `data/*` / `exports.txt`) �
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実ブラウザ (Chrome) での `showOpenFilePicker` / `showSaveFilePicker` / `window.open` e2e が未実施。これらは transient user activation (約 5 秒) を要し、FL の操作が入力イベントから遅れると picker が SecurityError → FALSE (`CDERR_INITIALIZATION`) になり得る | 受入条件「Web 実装経由で動く」の実機確認 | 新規子チケット [GUI-9] (`tools/gui/e2e` の CDP ドライバでユーザ操作付き e2e) — 親 #13 / M-Integration |
-| `RegisterDragDrop` 経路: `gui_set_drop_target_invoker` の口のみ。guest の `IDropTarget` vtable 呼出 (m11_icall / `shimx_cbtrans_set_invoke` 経由) と CF_HDROP を返す `IDataObject` が未実装 | FL が OLE D&D のみ使う場合ファイルドロップ不可 | #1178 [SHX-T21] |
+| `RegisterDragDrop` 経路: guest の `IDropTarget` 呼出し橋と CF_HDROP の `IDataObject` は #1388 [SHX-T23] で実装 (node + mock まで。実 FL guest は未検証、詳細 `REPORT_SHX-T23.md`) | FL が OLE D&D のみ使う場合の実機可否は未確認 | #1178 [SHX-T21] / #177 [SHX-T9] |
 | save の反映契機: `flushSaves()` は手動呼出。FL の `CloseHandle` 等への自動結線が無い | 保存したファイルが実ファイルへ出ない | 新規子チケット [SHX-T13] (pathreg の flush 契機 #169 と整合) |
 | `gui_shimx_attach()` と `HostCallBridge.start()` を呼ぶ起動 glue が未結線 (`tools/m11/shimx_link` / 起動 glue 側) | 実 FL 結線ビルドで MsgWait の handle 待ちが 5 ms poll 縮退、ダイアログが host 未接続で FALSE | #177 [SHX-T9] (実機検証) にコメント |
 | 実 FL guest との結合は未実施。MsgWait の `HANDLE` 配列の要素幅は、shimx が `HANDLE = size_t` (wasm32 で 4 B)、lift 側が 8 B 要素で組む可能性があり**整合は未検証** | handle 配列の読み違い (未確認) | #177 [SHX-T9] にコメント (実 guest でのみ検証可能) |
 | OFN の `lpfnHook` / `lpTemplateName` (`OFN_ENABLEHOOK` / `OFN_ENABLETEMPLATE` / `OFN_ENABLETEMPLATEHANDLE`) は **fail-fast で明示** (`file_dialog()` 入口。`selftest_fd.inc` で検査、§8) | hook 付き呼出しは abort する (黙って無視しない) | 対応は必要時に別 issue |
-| フォルダ選択 (`SHBrowseForFolder` / `IFileDialog`) は shimx・gui とも実体無し (IMPORTS.md で未登録) | 該当 FL 機能 (呼出の有無は未確認) | #1179 [SHX-T22] |
+| フォルダ選択 (`SHBrowseForFolder` / `IFileDialog`) は shimx・gui とも実体無し (IMPORTS.md で未登録)。FL 本体は `SHBrowseForFolderA` を静的 import (呼出の有無は未確認) | 該当 FL 機能 (呼出の有無は未確認) | #1179 [SHX-T22] (調査: `REPORT_APPENDIX.md`) |
 | 複数選択は最大 64 件 (`FD_NAMES_MAX`): 65 件以上は FALSE + `CDERR_INITIALIZATION`。名前の列を `names[]` 配列に載せず 2 パスで走査すれば撤廃できる (host 応答は 4,094 B 以内なので 1 文字名で最大 2,047 件) | FL で 65 件超を一括選択する操作 (有無は未調査) | 新規子チケット (PM 起票依頼; FL の実操作で要否を判断) |
 | `selftest.sh` の既存 flake: `gui_headless.c:33 blit_surf` が解放済み面を読む ASan heap-use-after-free (base・HEAD とも 100 回中 10 / 9 回、§4.2) | `selftest.sh` と、それを `pipefail` 下で呼ぶ `e2e.sh` step 1 が同率で落ちる (本 PR の変更とは無関係) | 新規子チケット [GUI-*] (PM 起票依頼。headless host の render thread と `surf_free` の同期) |
 | shimx の生成物 (BACKLOG / inventory / data / exports) が未再生成 (§5) | 新設 3 関数が一覧に無い | 次回のフル `bash tools/shimx/test.sh` (OTT 素材付き) |

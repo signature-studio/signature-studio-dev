@@ -14,6 +14,8 @@
 
 ## 0. ベースラインと計測 gate
 
+**#1149 追記 (測定 commit `2f83abc0`・HEAD = `a3641979` 以降を含む main)**: 既定 build の基準は **870/24** (旧 869/25 は `a3641979` 以前の値)。`repro_705.sh` の基準を 870/24 に更新して PASS (§6)。
+
 計測用の probe (`function_413060` の index 8) と dest 観測 hook は、`M11_INSTR_413060=1` のときだけ post と C に入る (既定 0)。
 
 | build | 測定 commit | ok | noproc | miss | trap | clobber | 備考 |
@@ -160,3 +162,30 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 
 - 素材: `fl-win64` (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)・`work-m11` (`tools/m11/work/`)・`toolchain-emsdk` ([EMSDK]、`docs/REFERENCES.md`)。
 - `work-m11` は `ir_conditions.json` を含まないため、`m11_gen_ir2.sh` を実行して生成 (36 秒・ldfix F1=902 F3c=36 errors=0・`ir_sha256=f5b27a23…`)。
+
+## 6. #1149 追記: dest 観測の OFF/ON 数値差分とネガコン (受入条件 1〜4)
+
+測定 commit: **`2f83abc0`** (`repro_705.sh` の既定基準を 870/24 に更新。コードを変えた最後の commit)。
+`git diff 2f83abc0 HEAD -- tools/m11` は空 (本節の文書追記のみ後続 commit)。
+コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=$HOME/.local/agent-py/bin:$PATH bash tools/m11/trap_triage/repro_705.sh` (直列・単発・全体 182 秒・判定 `PASS`)。
+素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` で `ir_conditions.json` を再生成 F1=902 F3c=36 errors=0)・`toolchain-emsdk`。
+
+| 構成 | ok | noproc | miss | trap | clobber | 413060 unit | 呼出し | dest 指紋 (`dest_obs_hash`) | elapsed | load (開始) |
+|---|--:|--:|--:|--:|--:|--:|--:|---|--:|--:|
+| 既定 (計測なし) | 870 | 1 | 47 | 24 | 0 | — | — | — | 16.293 s | 0.78 |
+| OFF (`M11_OV_413060=0`) | 870 | 1 | 47 | 24 | 0 | 35 | 227 | `acb2345ddb678281` | 16.247 s | 0.89 |
+| ON (`M11_OV_413060=1`) | 870 | 1 | 47 | 24 | 0 | 35 | 227 | `ac2d2efb758d4bb1` | 16.199 s | 1.07 |
+| OFF 再実行 (決定性) | 870 | 1 | 47 | 24 | 0 | 35 | 227 | `acb2345ddb678281` | 16.122 s | 1.04 |
+| ネガコン (b) (`M11_NEG_413060=1`) | 867 | 1 | 47 | 27 | 0 | 35 | 180 | `18e582921189ec13` | 15.425 s | 1.02 |
+
+- **受入条件 1 (観測手段・決定性)**: dest 書込み後の `*dest` を `m11_dest_obs` で畳んだ指紋を OFF/ON/ネガコンで出力。OFF を 2 回測って指紋 `acb2345ddb678281` が一致 (決定的)。
+- **受入条件 2 (ネガコン感度)**: 既知変更 (b) `Q(dest)=p+0x40` は OFF と指紋が異なる (`18e582921189ec13` ≠ `acb2345ddb678281`)。呼出し数も 227 → 180、ok/trap も 870/24 → 867/27 に変わる。感度あり。
+- **受入条件 3 (OFF/ON 差分の数値化)**: 指紋は OFF `acb2345ddb678281` ≠ ON `ac2d2efb758d4bb1`。survey の unit ラベル差分は 0 unit (942 unit 全て一致)、計数 (ok/noproc/miss/trap/clobber/呼出し 227) も一致。
+  - §2 の「差 0」結論は次のように更新する: **survey 判定 (trap の有無) では OFF/ON に差は出ない。dest の値では差が出る** (指紋差 1 件)。ただし指紋は heap 上の値を含むため、この差が意味的差 (ON の dest 値が実際に変わる) かビルド差 (割付順) かは未切り分け (§4 (a) を継続)。
+  - ネガコンは指紋差に加えて呼出し数差 (227→180) を作るが、ON は呼出し数差を作らない。ON と OFF の差は計数では出ず、指紋のみに出る。
+- **受入条件 4 (再現手段)**: `tools/m11/trap_triage/repro_705.sh` (基準 870/24 に更新) で PASS。
+
+### §6.1 既定 build の基準更新
+
+`a3641979` 以降の main (`tools/m11` 変更を含む) で既定 build は 870/24 (`repro_705.sh` の旧基準 869/25 は不一致)。
+§0 の表と `repro_705.sh` の基準を HEAD の実測値に合わせた。869/25 は `53aa0a6a` 時点の値として残す。

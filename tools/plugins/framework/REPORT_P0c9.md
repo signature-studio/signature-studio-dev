@@ -91,8 +91,16 @@
   - 受入条件 2 (書換え 0 件の関数は FAIL): `skip:no-rewrite` になり `fw_f80.py` の `status != 'ext'` 判定で FAIL。
   - `fw_269_verify.sh` の ALL PASS と `rewritten` 件数は、この fix run では再実行していない。
 
+### 再測定 (#1253 受入条件 3・P0c-16 run。HEAD `a67af27b` = 測定 commit、クリーン HEAD 展開)
+
+- `7d8b7d51..a67af27b` のコード差分: `tools/plugins/p0c/f80_lower.py`・`fw_f80.py`・`fw_stage2.sh`・`fw_269_verify.sh` は 0 (`git diff --stat` は REPORT 追記と hostshim 他 PR 由来のみ)。
+- ext 指定 (`FW_EXT_FUNCS=function_5dfd30,function_5dfdb0,function_5de820,function_5dedf0 bash fw_269_verify.sh <共有 work/fw>`): ALL PASS。fw_stage2 exit=0・448 s・load avg 0.76 → 2.31。smoke ×3 dispatch=38 units_done=0 va=1 heap=1 ff=0 (3 回同値)。wasm **15,075,739 B** (作成者 run の値と一致)。
+- 既定 (FW_EXT_FUNCS 未指定): ALL PASS。fw_stage2 exit=0・430 s・load avg 2.12 → 2.19。smoke 同値。wasm **15,062,173 B**。
+- `cmp` (ext と既定): DIFF (byte 94 から)。受入条件 3 を満たす。
+- 素材: `fl-win64` `toolchain-emsdk` `work-fw-stage1` を使用 (`toolchain-retdec` は未使用)。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 受入条件 4: `hs_e2e.sh` の ext 版 E2E | 既定と ext 版の E2E 同等性が未確認 | #1283 (P0c-16, 親 #1253) |
 | 受入条件 5: `skip:no-ext-values` 3 件の原因確定 | ext 化されない関数の原因が未特定 | #1283 |
-| 素材依存の `rewritten` 件数・`fw_269_verify.sh` の再実行 | 本節の再測定が未実施 | #1283 |
+| `rewritten` 件数の再集計 (`fw_f80.ll.ext.json`) | 作成者 run の値のみ。本 run では未取得 | #1283 |

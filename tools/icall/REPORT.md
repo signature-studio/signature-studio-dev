@@ -4,8 +4,7 @@
 
 - **判定: 達成**。RetDec route に「間接 call 復元 pass」を入れるだけで **OTT は native 実機械語と全 bit 一致**した (x64c.py 不使用)。
   `bash tools/icall/icall_e2e.sh` (約 85 秒) = **PASS**: scenario matrix **89/89 本・全 cell が native と bit 一致 (max_ulp 0), 最終 heap/obj state 差 0 qword**
-  (cell 総数・内訳の正本は `tools/ott/REPORT.md` §2)
-  (t1 標準 512 cell: zero 5 / normal 507 / **junkHi 0 / junkTiny 0**, |max| 0.2516 = native と同値)。旧 RetDec chain は同 matrix で 4,791 cell (9.5%) のみ一致。
+  (cell 総数・内訳の正本は `tools/ott/REPORT.md` §2) (t1 標準 512 cell: zero 5 / normal 507 / **junkHi 0 / junkTiny 0**, |max| 0.2516 = native と同値)。旧 RetDec chain は同 matrix で 4,791 cell (9.5%) のみ一致。
 - 手法は「**RetDec の入力 PE を decode 専用に書換える (binary pre-rewrite)**」: 間接 call/jmp を memory-ABI (固定 BLK への引数 store → 共有 stub call → 戻り load) に展開 →
   RetDec が引数の SSA 配線を普通の store として保持 → 後段で stub call を `__icall_dispatch(site_va)` に置換 (VA→関数表 = call_indirect 相当)。
   IR 後付け挿入は RetDec が register→IR 値の対応を捨てるため不採用 (§3)。
@@ -242,9 +241,10 @@ FMA3 経路 `1801a9be0` を 42/600 → **600/600** (N3: RetDec の `vmovapd xmm�
 
 ## 13. #1026 (ICALL-18): Fresh Air 残落ち 6 件
 
-Fresh Air SlateCore の復元後の残落ち 6 件 (全て vtable 直接 call `call [rax+disp]`、2 関数) を分類。結論・実測表・未解決の全文は `REPORT_APPENDIX_1067.md` §13 (250 行上限のため分割移動)。wasm 実行と native 差分は未実施 (子 #1299)。
-段別の切り分け (RetDec 段で欠落したとする説明) は推定のみで未検証。根拠・再現手段の現状は `REPORT_APPENDIX_1067.md` §13.3 (#1067)。
+Fresh Air SlateCore の復元後の残落ち 6 件 (全て vtable 直接 call `call [rax+disp]`、2 関数) を分類。結論・実測表・未解決の全文は `REPORT_APPENDIX_1067.md` §13 (250 行上限のため分割移動)。RetDec 段の切り分け (#1298) は `REPORT_APPENDIX_1298.md`。wasm 実行と native 差分は未実施 (子 #1299)。段別の切り分け (RetDec 段で欠落したとする説明) は推定のみで未検証。根拠・再現手段の現状は `REPORT_APPENDIX_1067.md` §13.3 (#1067)。
 
 ## 14. #852 (ICALL-11): FLEngine jump table の取りこぼし修正
 
-FLEngine の Delphi 表 (`sub rdx,8` 形) で 1 件しか解決していなかった欠陥を修正 (9 件に)。cmp/je 展開の効果は未実測 → REPORT_APPENDIX.md §16・#1206。
+FLEngine の Delphi 表 (`sub rdx,8` 形) で 1 件しか解決していなかった欠陥を修正 (9 件に)。cmp/je 展開の効果は未実測 → REPORT_APPENDIX.md §16・§17 (#1206 の実測。§17 全文は `REPORT_APPENDIX_1206.md`)。
+
+## 15. #1025 (ICALL-17): Kilohearts Gain icall 経路 wasm 化は build まで (部分達成・実行/native 差分は未達)。`bash tools/icall/kh_route_build.sh`。全文 `REPORT_APPENDIX_1025.md`

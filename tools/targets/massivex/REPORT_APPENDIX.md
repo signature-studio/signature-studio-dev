@@ -81,7 +81,7 @@
 | N5 demo UI 抑制 (QML 側の demoExpired / subscriptionExpired / MXDemoPopup 表示経路の特定と差し替え)。N5 の 4 範囲は RIP 相対の参照元 0 件 | 受入条件 1 未達 | #1017 [MX-4] (OPEN) |
 | N6 Native Access 誘導文言 6 種の抑制 (N6-1 の読み手 0x180f95e20 の呼び出し元の特定。N6-2〜6 の読み手関数 0x181142370 / 0x181144570 / 0x181142640 / 0x1811453f0 の役割と呼び出し元の特定 → 差し替え点の決定) | 受入条件 2 未達 | #1017 [MX-4] (OPEN) |
 | `acpt_verify_mx2.py` の N5/N6 検査は文字列実在のみ | 「抑制済み」の機械検証が無い | #1017 [MX-4] (OPEN) |
-| e2e の再測定 (`toolchain-retdec` 素材が必要) | 本節の e2e 数値は作成者の記録のまま | #1280 (素材付き再測定・`[MX-7]`) |
+| e2e の再測定 (`toolchain-retdec` 素材が必要) | 素材付きの再測定は §12.6 で実施済み (`-O0`/`-O1`/`-O2` とも 11/11 PASS) | #1280 (`[MX-7]`・受入条件 達成) |
 
 ### 12.4 #1017 の再確認 (main 側の素材付き実測。本 PR の HEAD `b83223e6` でも同一スクリプトで再実行済み)
 
@@ -111,3 +111,40 @@
   - RVA32 (LE 4B) 一致: 2 件 (raw `0x54a23f8` / `0x57e9d24`)。pefile で所属を確認すると `.pdata` (RVA `0x5fc0ff8`) と `.xdata` (RVA `0x630d324`) で、いずれも unwind/範囲表の内部。コード側の呼び出し元ではないと判定 [推]。
 - 判定: N6 読み手の呼び出し元は直接参照では見つからない。間接呼び出し (関数ポインタ表・vtable 経由) か、テーブル基準の相対参照の可能性が残る。N5 の読み手は本節でも未特定。
 - 結論: 差し替え点は依然として未特定。`mx_lic_stub.py` の N5/N6 ルールは追加しない (根拠なしに br_force/store を入れると silent miscompile になるため)。#1017 で間接参照の総当たりを行う。
+
+### 12.6 license e2e の素材付き再測定 (`[MX-7]`・#1280・2026-10-13)
+
+- 測定 commit = `604e900f` (origin/main。測定時点で `tools/targets/massivex/` のコードは無変更)。
+- 素材: `plugins-massivex` と `toolchain-retdec` / `toolchain-emsdk` を `$ARTIFACTS_DIR` から `tar --zstd -xf` で展開。`Massive X.vst3` は `parse_setup_headers.py` → `extract_massivex.py <exe> work key` で生成し、md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B) が §11.1 と一致。RetDec は `$RUNNER_TEMP/rd/retdec`、emsdk は `$RUNNER_TEMP/em/emsdk` を `RETDEC` / `EMSDK` で指定。
+- 実行: `license/work` を削除してから `MX_OPT=<level> bash e2e.sh` (lift キャッシュ無し = 冷間)。各レベルとも exit 0。
+
+| MX_OPT | 所要 (wall) | load (開始→終了) | harness | 結果 |
+|---|--:|---|--:|---|
+| `-O0` | 55.7 s | 0.90 → 1.13 | 11/11 | PASS (exit 0) |
+| `-O1` (既定) | 52.4 s | 0.88 → 1.19 | 11/11 | PASS (exit 0) |
+| `-O2` | 47.6 s | 1.01 → 1.00 | 11/11 | PASS (exit 0) |
+
+- 全レベルで T1〜T11 が PASS。`-O1`/`-O2` の T7〜T11 が TRAP しなかったことは確認したが、MX2-1 zero-init pass の寄与は未測定 (`MX_ZEROINIT=0` の対照実験は本節では実施していない)。
+- コード差分: 測定 commit `604e900f` から HEAD までの `tools/targets/massivex/` のうち `.md` 以外は 0 行 (`git diff 604e900f HEAD -- tools/targets/massivex ':!*.md'` が空)。
+- 生ログ: `$RUNNER_TEMP/e2e_O{0,1,2}.log` (`work/` 外・commit しない)。
+
+### 12.7 N6 読み手の直接呼び出し元 (#1017・実 PE 実測 2026-10-13)
+
+- 測定 commit = `1260d27e` (最後にコードを変えた commit。linear の欠落区間の出力を追加)。実 PE・selftest とも同一 commit で実行。
+- 素材: `plugins-massivex` (`$ARTIFACTS_DIR`) を `$RUNNER_TEMP/mx` に展開 → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` (`tools/targets/massivex` 直下、展開先 `work/`)。`work/extracted/VST3/Massive X.vst3` = 95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca` (§11.1 と一致)。
+- 走査スクリプトの読む先: `work/extracted/VST3/Massive X.vst3` (`tools/targets/massivex` 起点)。
+
+| 手順 | コマンド (`tools/targets/massivex` 直下) | 所要 (wall) | 結果 |
+|---|---|--:|---|
+| 陽性対照 (probe) | `python3 license/scripts/mx_callers_probe.py --selftest` | 1.1 s (probe 実走査と合計) | 期待 1/2/0/0/0 → 検出 1/2/0/0/0 PASS (rc 0) |
+| 直接走査 (probe) | `python3 license/scripts/mx_callers_probe.py` | 同上 | 5 読み手への E8/E9 = **0 件** (rc 0) |
+| 陽性対照 (linear) | `python3 license/scripts/mx_callers_linear.py --selftest` | 0.1 s | 期待 1/2/1/0/0 → 検出 1/2/1/0/0 PASS・不正バイト 3 B を挟んでも後続 call を検出 (rc 0) |
+| 線形検算 (linear) | `python3 license/scripts/mx_callers_linear.py` | 36.5 s | `.text` 60,224,000 B 中 **デコード 60,189,833 B (99.94%)**・未デコード 34,167 B (17,579 区間)。5 読み手への call/jmp = **0 件** (rc 0) |
+
+- 欠落区間: 未デコードは 1 B ずつ再同期した区間。全区間の VA 開始・バイト数を `work/mx_linear_gaps.txt` に出力 (`work/` は gitignore・commit しない)。区間バイト数の合計 34,167 B は上の未デコード量と一致。カバー率は 100% ではないが、この欠落区間の中身 (データか未対応命令か) は未分類。読み手への直接 call/jmp の 0 件は、バイト走査 (probe) が欠落区間を含む全 `.text` を走査して同じく 0 件である点で裏付ける。
+- 負荷: 測定時 `uptime` load average 0.31 (開始) → 0.65 (linear 完走時・HEAD 88fcedc1 再測定)。4 vCPU。並列 1 プロセス。
+- 件数の一致: 読み手 5 関数は probe / linear とも 0 件で一致。0 件の根拠となる陽性対照は selftest (合成 .text) で示した。実 PE 上の陽性対照 (読み手以外の頻出関数の件数比較) は本 HEAD では再測定していない。
+- 判定 (実 PE・現 HEAD): **直接 call/jmp (E8/E9) で N6 読み手 5 関数を呼ぶ箇所は .text 内に 0 件** (バイト走査・線形逆アセンブルの 2 方式で一致)。間接呼び出し (vtable / 関数ポインタ表) と、テーブル基準の参照は本節では判定していない。N5 の読み手は未特定。
+- 残件: 間接呼び出し元の特定 (vtable / 関数ポインタ表の `.rdata` 走査) → #1439 [MX-9]。N5 の読み手の特定 → #1439 [MX-9]。
+- e2e (`license/e2e.sh`) は本節では未実行。e2e の実測は §12.6 (#1280) が正本。
+- コード差分: 測定 commit `1260d27e` から HEAD までの `tools/targets/massivex/license` と非 md の差分は 0 行 (`git diff 1260d27e HEAD -- tools/targets/massivex ':!*.md'` が空)。

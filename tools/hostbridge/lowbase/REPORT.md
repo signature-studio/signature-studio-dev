@@ -10,6 +10,7 @@
   `[0x248]=0` 条件は M10 の 864 MiB module (再配置前) と **512/512 bit 一致** (T4c)。自然経路 (`[0x248]=1`) は 500 blk × 256 cell = 128,000 cell 中 **2 cell のみ差分 (|v|≤7.3e-34 の junk-tiny)**。
   image/arena だけ低位化し heap/stack 位置を旧のままにすると **0/128,000 差分** (§4.3) = 差分は VA 再配置ではなく RetDec chain の junk (未初期化読み) が stack/heap 絶対位置に依存するため。x64c 版は address 非依存で bit-exact。
 - **複数同時ロード**: 同一 hostbridge ホスト + HostBridge 1 つに **OTT×4 (各専用 memory) + Balance kernel (別 DLL・別 lift 系統)** を同居。linear memory 合計 **3,456 MiB → 96 MiB (+4 MiB)**、プロセス VmData(commit) 増分 **3,465 MB → 105 MB**。出力: 4 module の 500 blk × 128f sha256 が全一致、Balance は native 機械語と 768/768 cell 一致。
+- **SAB ring → AudioWorklet と Worker の `Atomics.wait` RPC による `VSTPluginMain` 往復も Chrome で通過** (#1174, §10)。消費量・総和・先頭出力ビットが node 参照と一致。
 - **headless Chrome (154) の dedicated Worker** でも同一 module がロードでき、OTT 出力 sha256 が node と一致。追加 100 instance を 684 ms で生成 (計 105 Memory)。上限 probe: 追加 118 個 (計 123 Memory) で `Out of memory: Cannot allocate Wasm memory` = CAB-124 の約 124 個上限と同じ (initial/max に依存しない仮想予約制約)。
 - **同居方式も実証**: 同一 DLL を base A=`0x10000` / B=`0x400000` + 接頭辞 `a_`/`b_` で **1 wasm・1 linear memory (24 MiB)** に載せ交互駆動し 512/512×2 一致 (Memory 個数上限を回避する経路)。
 
@@ -139,3 +140,23 @@ python3 tools/hostbridge/lowbase/audit_va.py <dll> 0x10000
 - 検証 e2e: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS**、所要 **98 秒** (Chrome 込み・全ビルド込み、worktree `ws-974`, Chrome 154)。※ PR 作成 run (38452251025) の記録。当該 run のログは保存されていないため未再現。素材付き再実行 (`oc_artifacts: fl-win64 plugins-ott analysis-ott-binaries work-m6-ott work-liftlib`) で ALL PASS 行と C1〜C5 値 (`run_chrome.mjs` の出力 JSON) を確認するまで、受入 1・2・5 は「実測記録あり・再現未了」とし、#974 はクローズしない。
 - 修正: §3 の wasm 名前空間検査が `wasm-objdump` (runner に無い) に依存して 0 件と誤判定していた。node の `WebAssembly.Module.exports` で数えるよう変更 (`ott_function_*` 211 件 / 無接頭 `function_*` 0 件)。
 - 残り (子 issue): 受入 3・4 は AudioWorklet 側の SAB ring 消費と `Atomics.wait` RPC の新規実装が要る。RT-4 (#123) の「AudioWorklet は ring 消費専用 (`Atomics.wait` 不可)」制約を前提に設計する。
+  → 実装済み (#1174)。§10 参照。
+
+## 10. HB-H27 (#1174): SAB ring → AudioWorklet と Atomics.wait RPC の往復 (2026-10-14 実測)
+
+- 測定 commit: `bc871968` (HEAD)。`git diff bc871968 HEAD -- tools/hostbridge/lowbase` は空 (測定後のコード差分 0)。
+- 検証: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS**、所要 **103.0 秒** (全ビルド込み・Chrome 154 込み)。load average 0.04 (開始時)。素材: `fl-win64`・`plugins-ott`・`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib`・`toolchain-*` を展開して実行。`ott_hb.cjs` と `k.final.ll` は `hostbridge.sh` と `t0_e2e.sh` で当 run に再生成 (357/357 PASS・seed 3 種)。
+
+| # | 受入条件 (#1174) | 実測 (`work/ring/ring_result.json`) | 判定 |
+|---|---|---|---|
+| 1 | OTT の出力を SAB ring 経由で AudioWorklet に流し、消費量と総和が node と一致 | 消費 **126,976 float** (= 期待 126,976, 500 blk − NRPC 4 blk × 2ch × 128f)、総和 uint32 checksum **1952270321** = node 参照 | 達成 |
+| 2 | Worker を SAB + `Atomics.wait` RPC で呼び出し、`VSTPluginMain` 経由の処理が往復 | LOAD/CONFIG/BLOCK×4/SHUTDOWN の 7 往復。RPC 区間 **25.8 ms**。先頭 4 ブロック L[0] ビット `[0, 1705319804, 3920893779, 4162865819]` = node 参照 | 達成 |
+
+- 方式:
+  - Worker (`ring_rpc_worker.mjs`) が OTT lowbase module を保持し、`Atomics.wait(REQ)` で page からの要求を待つ。処理は `host_load_plugin` → guest `VSTPluginMain` (hb_bridge.mjs:67) → `host_process`。
+  - 残りの 496 ブロックは Worker が SAB ring (Float32, L,R interleave, capacity 4096) へ書く。AudioWorklet (`ring_worklet.js`) は `Atomics.load` で消費し `Atomics.store` で消費量を返す。`Atomics.wait` は AudioWorklet では使わない (RT-4 #123)。
+  - 比較は float 総和ではなく **uint32 bit 和** (`accum`)。OTT 出力は 1e27 級まで育つため float 総和が溢れて判定不能になるので使わない。
+- 限界 (未検証の範囲):
+  - ring は実時間ではなく**全量を先に流す**形で検証した。128 frame の quantum を実時間で回す (AudioContext の時計と同期する) 検証は含まない。
+  - 同じ Memory を複数 AudioWorklet/Worker が並行に叩く構成は未検証 (§5-2 の通り)。
+  - AudioWorklet 側の `process` は headless Chrome の offline 描画ではなく live `AudioContext` で回した。描画のタイミング依存の揺れは観測していない。
