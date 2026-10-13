@@ -25,12 +25,12 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 ## 鮮度 (測定 commit から現 HEAD まで)
 
-検証 HEAD `ae54f97f` (本節を書いた時点) まで、測定 commit `44d70d74` からのコード差分は 0 行。`44d70d74..ae54f97f` の変更は本付録 (`REPORT_APPENDIX_1025.md`) のみ。
+検証 HEAD `c666521f` (本節を書いた時点) まで、測定 commit `44d70d74` からのコード差分は 0 行。`44d70d74..c666521f` の変更は本付録 (`REPORT_APPENDIX_1025.md`) のみ。
 
 ```
-$ git diff 44d70d74 ae54f97f -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m*
+$ git diff 44d70d74 c666521f -- tools/icall/kh_route_build.sh tools/icall/ir_*.py tools/icall/rt tools/m*
 (出力 0 行・exit 0)
-$ git diff --stat 44d70d74 ae54f97f
+$ git diff --stat 44d70d74 c666521f
  tools/icall/REPORT_APPENDIX_1025.md | 14 ++++++++++++++
  1 file changed, 14 insertions(+)
 ```
