@@ -35,6 +35,7 @@ BLK_XMMRET1 = 0x98       # closure 内 direct call の戻り xmm1 (hi/lo 2 値�
 ABI_XMM1 = os.environ.get('ICALL_ABI_XMM1', '1') == '1'
 BLK_STK = 0x48           # 第 5 引数以降 (stack) 配列の先頭アドレス (定数 = blk+BLK_STKBUF; icall_rt.c の __icall_dispatch が設定)
 BLK_STKBUF = 0x100       # stack 引数の連続コピー領域: 呼出し点で [rsp+0x20+8k] (jmp 末尾呼出しは +0x28+8k) を k=0..NSTK-1 だけ明示 load/store
+BLK_RESERVE = 0x280      # BLK 域 [blk, blk+0x280) は再配置範囲 (関数・stub) と重ならない。0 埋めし、コードバイトを残さない (#2565)
 NSTK = 12                # 16 引数まで (IPP ippiResize*_8u 13 引数 = 9 語)
 STK_COPY_ONE = 8 + 7     # mov r11,[rsp+disp32] (8B) ; mov [rip+d],r11 (7B)
 STK_WINDOW = 48          # nstk 推定: site 直前の同一基本ブロック風の命令列 (直前の call/ret/jmp まで, 最大この命令数) を遡る
@@ -474,6 +475,11 @@ COMIS_STUB_LEN = 7 * 4 + 1
 STUB_LEN = 7 * (11 + NSTK) + 1
 
 
+def blk_overlap(blk, ranges):
+    """(lo, hi, name) の再配置範囲のうち BLK 域 [blk, blk+BLK_RESERVE) と交わるものを返す (#2565)"""
+    return [r for r in ranges if r[0] < blk + BLK_RESERVE and r[1] > blk]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--pe', required=True)
@@ -651,6 +657,9 @@ def main():
     # ---- layout
     image_size = img.pe.OPTIONAL_HEADER.SizeOfImage
     sect_va = img.base + ((image_size + 0xfff) & ~0xfff)
+    # BLK の VA は消費側 (fw_rt.c・fw_boot.c・hostshim・fw_run.mjs・fw_stage2.sh の --blk) が直書きするため据え置く。
+    # 再配置の方を place() で BLK 域の外へ送る (#2565)
+    blk = a.blk_va if a.blk_va else (img.base + image_size + 0x4000000 if img.base > 0x100000000 else img.base + image_size + 0x100000)
     cur = sect_va
     new_start = {}
 
@@ -659,18 +668,29 @@ def main():
         # [a,b)+[b,c) を 1 関数に併合して後続関数の define が落ちる (#514: eq-filter 4 block で 5 関数) ので 1 paragraph 空ける
         a = (c + 15) & ~15
         return a + 16 if a == c else a
+
+    def place(c, n):
+        # [c, c+n) が BLK 域と重なるなら、BLK 域の直後 (16 byte 整列) へ送る (#2565)
+        p = (c + 15) & ~15
+        if p < blk + BLK_RESERVE and p + n > blk:
+            p = (blk + BLK_RESERVE + 15) & ~15
+        return p
     for k, (f, (fs, fe, items)) in enumerate(funcs.items()):
-        cur = next_slot(cur) if k else sect_va
+        cur = place(next_slot(cur) if k else sect_va, sum(it.newlen for it in items))
         new_start[f] = cur
         for it in items:
             it.newva = cur; cur += it.newlen
     cur = next_slot(cur)
-    stub_va = cur
-    cur += STUB_LEN
-    cstub_va = next_slot(cur)
+    stub_va = place(cur, STUB_LEN)
+    cur = stub_va + STUB_LEN
+    cstub_va = place(next_slot(cur), COMIS_STUB_LEN)
     cur = cstub_va + COMIS_STUB_LEN
     sect_end = cur
-    blk = a.blk_va if a.blk_va else (img.base + image_size + 0x4000000 if img.base > 0x100000000 else img.base + image_size + 0x100000)
+    reloc = [(new_start[f], new_start[f] + sum(it.newlen for it in funcs[f][2]), 'func %x' % f) for f in funcs]
+    reloc += [(stub_va, stub_va + STUB_LEN, 'stub'), (cstub_va, cstub_va + COMIS_STUB_LEN, 'comis_stub')]
+    ovl = blk_overlap(blk, reloc)
+    if ovl:
+        sys.exit('BLK 域 %#x..%#x が再配置範囲と重なる (fail-closed・#2565): %s' % (blk, blk + BLK_RESERVE, ovl[:5]))
     # old->new map per function (instruction starts)
     omap = {}
     lomap = {}
@@ -685,6 +705,9 @@ def main():
 
     # ---- emit
     buf = bytearray(sect_end - sect_va)
+    bo = blk - sect_va
+    if 0 <= bo and bo + BLK_RESERVE <= len(buf):
+        buf[bo:bo + BLK_RESERVE] = bytes(BLK_RESERVE)                                         # BLK 域は 0 埋め (#2565)
     insn_map = []   # (newva, newlen, origva)
     jt_patches = []  # (table_va, scale, relb, [(index, newtarget)])
     errs = collections.Counter()
@@ -832,6 +855,8 @@ def main():
                         errs['in-code table entry on insn'] += 1
                 else:
                     pe_patches.append((ea, newb))
+    if 0 <= bo and bo + BLK_RESERVE <= len(buf):
+        assert not any(buf[bo:bo + BLK_RESERVE]), 'BLK 域にコードバイトが残る (#2565)'
     # ---- PE 出力: section 追加
     pe = img.pe
     hdr_end = pe.DOS_HEADER.e_lfanew + 4 + 20 + pe.FILE_HEADER.SizeOfOptionalHeader
@@ -860,7 +885,7 @@ def main():
     new_size = ((sect_va - img.base + len(buf)) + pe.OPTIONAL_HEADER.SectionAlignment - 1) // pe.OPTIONAL_HEADER.SectionAlignment * pe.OPTIONAL_HEADER.SectionAlignment
     struct.pack_into('<I', data, soi, new_size)
     open(a.out, 'wb').write(data)
-    m = {'pe': a.pe, 'image_base': img.base, 'section_va': sect_va, 'section_size': len(buf), 'blk': blk, 'blk_stk': BLK_STK, 'blk_stkbuf': BLK_STKBUF, 'nstk_max': NSTK, 'nstk_hist': dict(nstk_hist), 'stub': stub_va, 'stub_len': STUB_LEN, 'comis_stub': cstub_va, 'comis_stub_len': COMIS_STUB_LEN, 'ncomis': ncomis,
+    m = {'pe': a.pe, 'image_base': img.base, 'section_va': sect_va, 'section_size': len(buf), 'blk': blk, 'blk_reserve': BLK_RESERVE, 'blk_stk': BLK_STK, 'blk_stkbuf': BLK_STKBUF, 'nstk_max': NSTK, 'nstk_hist': dict(nstk_hist), 'stub': stub_va, 'stub_len': STUB_LEN, 'comis_stub': cstub_va, 'comis_stub_len': COMIS_STUB_LEN, 'ncomis': ncomis,
          'nsites': nsites, 'nfrag_inlined': nfrag, 'njt': njt, 'ncfg': ncfg, 'cfg_thunks': sorted(cfg_thunks), 'nderef': nderef, 'abi': dict(nabi), 'nfuncs': len(funcs), 'errors': dict(errs),
          'func_map': {hex(f): hex(new_start[f]) for f in funcs},
          'func_range_new': {hex(f): [hex(new_start[f]), hex(new_start[f] + sum(it.newlen for it in funcs[f][2]))] for f in funcs},

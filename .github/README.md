@@ -43,7 +43,7 @@ github.event.comment.user.type == 'Bot' && github.event.comment.user.login == va
 | `scripts/assemble-prompt.sh` | イベント文脈を実装エージェント用プロンプトに流し込む |
 | `scripts/assemble-reviewer-prompt.sh` | 同じ方式でレビュワー用プロンプトを組み立てる |
 | `scripts/record-run-outcome.sh` / `review-recover.sh` | implement が PR を出さずに終わった issue への `oc:no-pr` ラベルと `<!-- oc-run-outcome: ... -->` マーカー、review の runner 打ち切りの即時再起動 (上限は review-retry 3 回。#1950)。詳細は `docs/WORKFLOW.md` §11 |
-| `scripts/fix-progress.sh` / `verify-review-verdict.sh` / `reopen-pr.sh` | 差し戻し後の fix の進捗判定・往復の上限、verdict の検証、close -> reopen による review の再起動 (open の PR のみ・reopen は 3 回まで再試行。merge 済み・close 済みは何もしない) |
+| `scripts/fix-progress.sh` / `verify-review-verdict.sh` / `reopen-pr.sh` | 差し戻し後の fix の進捗判定・往復の上限、verdict の検証、close -> reopen による review の再起動 (reopen は 3 回まで再試行。merge 済み・close 済みの PR は何もせず成功) |
 | `prompts/implementer.md` | 実装エージェントの行動規範 (スコープ・commit 規約・実測必須・マージ方法・規約への導線) |
 | `prompts/reviewer.md` | レビュワーエージェントの役割 (approve/request-changes・マージ) |
 
