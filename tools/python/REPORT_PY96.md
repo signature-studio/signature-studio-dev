@@ -35,7 +35,7 @@
 
 測定 commit: `73cdd073` (コードを変えた最後の commit。`origin/main` (`eeca4ded`) の取り込み merge。PR #2991 の競合解消)。衝突は 5 ファイル。`docs/DOC_MAP.md` (1 箇所: 両側の行を残した)、`tools/python/host/fl_mock.mjs` (2 箇所: 状態の初期化・impl 表の末尾。両側を残した)、`tools/python/provider/fl_engine.c` (3 箇所: 状態変数・reset・ハンドラ。両側を残した)、`tools/python/tests/provider_check.mjs` (1 箇所: 集合の宣言と件数 assert。両側の集合を 1 つの `if` に併せ、期待値を 実装 113 / 未実装 322 にした)、`tools/python/tests/arrangement_diff.mjs` (両側が同名で新規作成していた。main の PY-152 版をそのまま残し、本 PR のテストは `tests/arrangement_selection_diff.mjs` に分けた)。
 
-環境: runner 4 core (load 1 分平均 0.76 (測定開始時))。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`、7.3 秒)、`FL_WIN64_DIR` を設定して `bash fetch_inputs.sh` (rc 0)。emsdk は `/opt/emsdk` (`EMSDK_ENV=/opt/emsdk/emsdk_env.sh`、`emcc` の実在を確認)。
+環境: runner 4 core (load 1 分平均 0.76 (測定開始時))。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`、7.3 秒)、`FL_WIN64_DIR` を設定して `bash fetch_inputs.sh` (rc 0)。emsdk は `[EMSDK]` (`docs/REFERENCES.md` §4。`EMSDK_ENV=<[EMSDK]>/emsdk_env.sh` で `emcc` の実在を確認)。
 
 前提の生成物 (`73cdd073` の作業ツリーで生成。gitignore 対象): `bash build_cpython_wasm.sh` (rc 0・wall 194 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0・wall 5 秒)・`bash provider/build.sh` (rc 0・wall 1.25 秒)。`gen_provider.py --check-handlers` は 435 関数・ハンドラ 113。
 
