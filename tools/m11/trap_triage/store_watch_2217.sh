@@ -4,8 +4,8 @@
 #   unit 106 で止まっていた #2099/#2165 と違い, 監視 (m11_watch_on) を unit 114 の窓内だけで ON にし, 計装 build の
 #   m11_sw 呼出し自体は unit 0..113 でも実行される. 窓の端は probe と同じ icall 行 (M11_TRACE) を printErr で拾って切る.
 #   usage: store_watch_2217.sh <tag> [w114|diag]
-#     w114 (既定): stderr に `unit i` 行だけを出す。
-#     diag: 各 unit の結果と ms (`unit i <結果> ms=...`) も出す。
+#     w114 (既定): stderr に `unit i` 行に加え `[win] ON/OFF` 行と `unit 114 ...` 行を出す。
+#     diag: 上記に加え、各 unit の結果と ms (`unit i <結果> ms=...`) も出す。
 #   出力: work/probe2217/<tag>.err (`[aw]` 行), work/probe2217/sites.json
 #   終了時に work/obj を消して m11_build.sh で clean な wasm に復元する (trap で必ず復元).
 set -uo pipefail
