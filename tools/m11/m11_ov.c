@@ -779,7 +779,13 @@ unsigned long long function_43a3f0(unsigned long long s, unsigned long long valu
  * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
  * → GetMem に巨大サイズが渡り 0 を返して Error(reOutOfMemory) → Halt0 (survey halt0 の 17 unit 直接原因, #130).
  * 逆アセンブル (417b70..417fa2) から転記. 動的配列ヘッダ: hdr = data-16, [hdr+4]=refcnt, [hdr+8]=length. */
+#if M11_ENTRY_PROBE
+extern volatile int m11_fe_417b70;
+#endif
 unsigned long long function_417b70(unsigned long long a, unsigned long long ti, unsigned long long dimcnt, unsigned long long lengths) {
+#if M11_ENTRY_PROBE
+    m11_fe_417b70 = 1;
+#endif
     u64 p = Q(a);
     u64 len = Q(lengths);
     if ((long long)len <= 0) {
