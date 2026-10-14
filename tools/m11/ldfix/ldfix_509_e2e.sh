@@ -25,6 +25,7 @@ if [ -z "${PY:-}" ]; then
 fi
 CFG="$W/boot*.drc.config.json"; IMG="$W/m11_image.bin"
 PE_QS="${PE:-${FL_WIN64_DIR:?FL_WIN64_DIR (fl-win64 の展開先) を指定してください}/extracted/block00031_PE.bin}"
+: "${EMSDK_ENV:?EMSDK_ENV (<[EMSDK]> の emsdk_env.sh) を指定してください}"   # reach_509.sh が要る (未指定だと 6/7 の reach だけ失敗して rc 0 になっていた)
 step() { echo "[ldfix_509_e2e] $*"; }
 FNS="5c0270,41a670,66e080,7e5240,806740,c62780,417b70,409c80,666a60,1062c50,1063090,12cb4f0,12f9730,4087a0,40ffe0,447ee0,44f110,44f1d0,44f2c0,44f740,6074b0,7763d0,8239d0,86a7c0,8c7710,f3dd20"
 
@@ -123,7 +124,7 @@ a = [norm(x) for x in json.load(open(sys.argv[1]))]; b = [norm(x) for x in json.
 d = [x['unit'] for x, y in zip(a, b) if x != y]
 print('[survey] 正規化後 (wasm hash / offset を除く) に unit 記録 (kind・msg・frame・stub 呼出・va_mb) が異なる unit: %d %s' % (len(d), d[:20]))
 PYEOF
-M11_WORK="$B/tools/m11/work" bash "$HERE/reach_509.sh" "$FNS" "$OUT/reach.json"
+M11_WORK="$B/tools/m11/work" bash "$HERE/reach_509.sh" "$FNS" "$OUT/reach.json" || FAIL=1
 
 step "7/7 動的確認 (修復前 wasm / 修復後 wasm を直接呼ぶ)"
 if [ "$FAIL" = 0 ]; then
