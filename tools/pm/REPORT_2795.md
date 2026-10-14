@@ -84,6 +84,7 @@
 - deploy していない。deploy 後の停止の観測 (`launch_halted` の出方・30 分後の digest の送信・降格中の保留と解除後の送信) は未測定。deploy は PM が行う。
 - 通知の頻度 (Review-Only・rate-guard が 30 分続いた回数) は本番で未測定。deploy 後に `counters.pmDispatched` と `pm_dispatch_1h` で確認する。
 - digest の PM run は `/status` を読めない (oc-pm の workflow に `PM_WORKER_URL` が無い)。起票先は子 #2848 (CI-135)。未解決の表は PR 本文が正本。
+  - ※ #2539 で変更: digest の PM run は、率制限の項目だけ `tools/pm/worker_url` の `/status` を `curl` で読む (`.github/prompts/pm.md` の digest 節)。読めないのは `launch_halted` (停止の理由) のほう。起票先 (#2848) は変えない。
 
 ## 6. 再現手順
 

@@ -62,6 +62,31 @@ boot.va_calls = Number(m._fle_va_calls()); boot.va_bytes = Number(m._fle_va_byte
 boot.getproc = Number(m._fle_n_getproc()); boot.exit = Number(m._fle_n_exit());
 boot.cb_calls = Number(m._fle_n_cb()); boot.soft_calls = Number(m._fle_n_soft()); boot.soft_uniq = Number(m._fle_n_soft_uniq());
 boot.mm_after = mmTable();
+// PY-123 (#3028): boot 停止時点の undo 管理オブジェクトと安全判定の実行時値 (guest VA = wasm アドレス)
+const UNDO_MGR_SLOT = 0x15e1c78, UNDO_RET_SINGLETON = 0x16b82e0, UNDO_SAFE_GLOBAL = 0x15e4790;
+const undoProbe = (() => {
+    const dv = new DataView(m.HEAPU8.buffer);
+    const inb = (a) => a >= 0n && a + 8n <= BigInt(U8.length);
+    const u64 = (a) => (inb(a) ? dv.getBigUint64(Number(a), true) : null);
+    const u32 = (a) => (inb(a) ? dv.getUint32(Number(a), true) : null);
+    const hx = (v) => (v === null ? null : '0x' + v.toString(16));
+    const mgr = u64(BigInt(UNDO_MGR_SLOT));
+    const safeGlobal = u64(BigInt(UNDO_SAFE_GLOBAL));
+    const safeObj = safeGlobal === null ? null : u64(safeGlobal + 8n);
+    const mgrOk = mgr !== null && mgr !== 0n;
+    const safeOk = safeObj !== null && safeObj !== 0n;
+    return {
+        slot_0x15e1c78: hx(mgr),
+        pos_0x20: mgrOk ? u32(mgr + 0x20n) : null,
+        count_0x24: mgrOk ? u32(mgr + 0x24n) : null,
+        ret_singleton_0x16b82e0: hx(u64(BigInt(UNDO_RET_SINGLETON))),
+        slot_0x15e4790: hx(safeGlobal),
+        safe_obj: hx(safeObj),
+        safe_obj_0x98: safeOk ? hx(u64(safeObj + 0x98n)) : null,
+        safe_obj_0x88: safeOk ? hx(u64(safeObj + 0x88n)) : null,
+    };
+})();
+boot.undo_probe = undoProbe;
 // FLE-6: dsp_ippv2 GetProcAddress 結果 (0x15F34A0 = ippsZero_8u の登録値) と IPP 呼出の証跡
 boot.ipp_ptr_15F34A0 = rd64(0x15F34A0);
 boot.ipp_ptr_15F40E8 = rd64(0x15F40E8);
@@ -152,6 +177,7 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
     ipp_total: boot.ipp_total, ipp_called: boot.ipp_called,
 }));
+console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
 // FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない
 const ippPtrOk = IPP_ON ? !/^0x0+$/.test(boot.ipp_ptr_15F34A0) : /^0x0+$/.test(boot.ipp_ptr_15F34A0);
 console.log('FLEBOOT_IPP_CHECK ' + JSON.stringify({ ipp_on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ok: ippPtrOk }));
