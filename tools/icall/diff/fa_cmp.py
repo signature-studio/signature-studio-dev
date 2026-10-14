@@ -45,6 +45,12 @@ def blk_xmm0_out():
     return blk - 0x180000000 + 0x30000000 + 0x88
 
 
+# ICALL-81 (#2695): 要素の state 0 は 0x180da41a0 (64 B 節点の lock-free キュー読み出し) を呼ぶ。
+# 先頭節点 (node[0] = (B+0xbf)&~63) の next が nil (0x4001) でないと空判定に進まず spin する (件数 1 で hang)。
+# 空キュー (node[0].next = nil・head/tail = 0) にすると 0 を返して要素を飛ばす。
+NIL_NODE = 0x4001
+
+
 def init_native(va):
     gpr = [N.alloc(0x400) for _ in range(4)]
     if va == LOOP_VA:
@@ -52,6 +58,7 @@ def init_native(va):
         N.wr(gpr[0] + 0x10, struct.pack('<Q', A))
         N.wr(gpr[0] + 0xb8, struct.pack('<Q', B))
         N.wr(A + 0x199c, struct.pack('<I', LOOP_CNT))
+        N.wr((B + 0xbf) & ~63, struct.pack('<I', NIL_NODE))
     return tuple(gpr)
 
 
@@ -67,9 +74,10 @@ MK_JS = (
     "    const d = new DataView(mod.HEAPU8.buffer);\n"
     "    d.setBigUint64(S + 0x10, BigInt(A), true); d.setBigUint64(S + 0xb8, BigInt(B), true);\n"
     "    d.setUint32(A + 0x199c, LOOP_CNT, true);\n"
+    "    d.setUint32((B + 0xbf) & ~63, %d, true);\n"
     "  }\n"
     "  return g;\n"
-    "}\n" % (LOOP_VA, LOOP_STRIDE, LOOP_CNT)
+    "}\n" % (LOOP_VA, LOOP_STRIDE, LOOP_CNT, NIL_NODE)
 )
 
 

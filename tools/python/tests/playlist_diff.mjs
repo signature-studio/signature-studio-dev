@@ -70,7 +70,7 @@ const seq = [
   ["playlist.isTrackMuteLock", []],
   ["playlist.getTrackActivityLevelVis", [1, 0]],
   ["playlist.getLiveTrigSnap", ["1"]],
-  // getTrackColor は格納色の R/B を入替え、alpha (0xff000000) を立てる。setTrackColor は素の値を格納する (REPORT_PY62 §未解決)
+  // setTrackColor は R/B を入替えて 0xffffff で切って格納する (PY-113・REPORT_PY113 §2)。getTrackColor は格納値の R/B を入替え alpha を立てる
   ["playlist.setTrackColor", [3, 0x123456]],
   ["playlist.getTrackColor", [3]],
   ["playlist.setTrackColor", [3, 0xFF0000FF]],
@@ -86,4 +86,11 @@ for (const [name, args] of seq) {
 }
 
 assert.deepEqual(diffs, [], `playlist 確定 8 関数の差分 ${diffs.length} 件`);
+// 往復 get(set(v)) = 0xff000000 | v (v が 0xRRGGBB の範囲)。setter の格納式 (PY-113) の確定値を C と mock の両方で固定する
+for (const eng of [mock, wasm]) {
+  eng.call("playlist.setTrackColor", [3, 0x123456]);
+  assert.equal(eng.call("playlist.getTrackColor", [3]), 0xff123456);
+  eng.call("playlist.setTrackColor", [3, 0xff0000ff]);
+  assert.equal(eng.call("playlist.getTrackColor", [3]), 0xff0000ff);
+}
 console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));
