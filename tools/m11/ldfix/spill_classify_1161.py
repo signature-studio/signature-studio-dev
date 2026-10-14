@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """spill_classify_1161.py — #1161 (LD-35) spill 宛 178 site の分類表と脱落関数の和集合。
 
-入力: audit_lsf_ssa.py --json の出力 (ssa.json) / 目視判定 manual_verdicts_510.jsonl / 候補判定 candidate_verdicts_1161.jsonl・candidate_verdicts_2245.jsonl・candidate_verdicts_2838.jsonl
+入力: audit_lsf_ssa.py --json の出力 (ssa.json) / 目視判定 manual_verdicts_510.jsonl / 候補判定 candidate_verdicts_1161.jsonl・candidate_verdicts_2245.jsonl・candidate_verdicts_2838.jsonl・candidate_verdicts_2922.jsonl
 出力: 第 2 引数の TSV (既定 results/spill178_1161.tsv・site ごとに 1 行) と標準出力の集計
 
 status:
@@ -32,6 +32,7 @@ man = load('results/manual_verdicts_510.jsonl')
 cand = load('results/candidate_verdicts_1161.jsonl')
 cand.update(load('results/candidate_verdicts_2245.jsonl'))
 cand.update(load('results/candidate_verdicts_2838.jsonl'))
+cand.update(load('results/candidate_verdicts_2922.jsonl'))
 TSV = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, 'results/spill178_1161.tsv')
 
 rows = []
