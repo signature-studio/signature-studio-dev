@@ -57,36 +57,39 @@
 - `provider/fl_engine.c`: 同じ。`NARGS(0,0)` / `NARGS(1,2)` と `A_INT`。
 - 効果 (0x12df090・0x124c020) は API から観測できないため状態を持たない。P と gate は真の定数とし、-2 の経路は到達させない (仮置き)。
 - `tests/general_diff.mjs`: 呼出し 3 件と引数違い・型違い 4 件を追加 (計 16 件。既存 9 件)。
-- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349 (PY-125 の PR 作成時の base 上)。main 取り込み後は main 側の `pe100` (2 関数)・`pe119` (6 関数) を含むため、期待値は 実装 92→94、未実装 343→341 (main `875eba29` まで取り込んだ後も同じ)。
+- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349 (PY-125 の PR 作成時の base 上)。main 取り込み後は main 側の `pe100` (2 関数)・`pe119` (6 関数) を含むため、期待値は 実装 92→94、未実装 343→341 (main `875eba29` まで)。main `8fd940bb` の取り込み後は main 側の `pe121` (5 関数) を含むため、97→99、未実装 338→336 (merge commit `6a9fe2df`)。
 
 ## 検証
 
-測定 commit: `e3154671` (コードを変えた最後の commit。main (`875eba29`) を取り込んだ merge `a64ae310` の後に、`host/fl_mock.mjs`・`provider/fl_engine.c` の 2 行コメントに「成功経路」の条件を足した)。以後の commit は REPORT_PY125.md のみ。main 取り込みは競合なし (auto merge)。
-環境: runner 4 core。測定中の load average は 2.6〜2.9 (`uptime` 21:51:51〜21:52:04。直前の CPython ビルドの直後)。素材: `fl-win64` ([WIN64]) を展開し、`extracted/block00031_PE.bin`・`block25159/24429/24430/24618_DATA.bin` を使う (`FL_WIN64_DIR` = [WIN64] の展開先)。emsdk は [EMSDK] の 6.0.12。この run は launch 時に `toolchain-emsdk` が展開されていなかったため、上流から導入した (`git clone` emsdk → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12`、約 2 分)。PR 本文に `oc_artifacts: fl-win64 toolchain-emsdk` を書いた。
+測定 commit: `6a9fe2df` (コードを変えた最後の commit。main `8fd940bb` を取り込んだ merge)。main は `875eba29` の取り込み後にも進んだため、再 merge した。競合は `host/fl_mock.mjs` と `tests/provider_check.mjs` の 2 件で、両側の追加 (PY-121 の screen 5 関数と PY-125 の 2 関数) を残した。以後の commit は REPORT_PY125.md のみ。
+環境: runner 4 core。測定中の load average は 0.11〜0.18 (`uptime` 21:55:18〜21:55:46。直前のビルドの後)。素材: `fl-win64` ([WIN64]) を展開し、`extracted/block00031_PE.bin`・`block25159/24429/24430/24618_DATA.bin` を使う (`FL_WIN64_DIR` = [WIN64] の展開先)。emsdk は [EMSDK] の 6.0.12。この run は launch 時に `toolchain-emsdk` が展開されていなかったため、上流から導入した (`git clone` emsdk → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12`、約 2 分)。PR 本文に `oc_artifacts: fl-win64 toolchain-emsdk` を書いた。
 
-前提の生成物 (gitignore。`e3154671` の tree で本 run にビルド): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 50.6 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.7 秒)・`bash provider/build.sh` (rc 0、1.0 秒。`gen_provider.py --check-handlers` でハンドラ 94)。
+前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 50.6 秒。`e3154671` の tree で作成。以後 `tools/python/src`・`analysis`・CPython ビルドスクリプトは変わっていない (`git diff --stat e3154671 6a9fe2df -- tools/python/src tools/python/analysis tools/python/build_*.sh` は空))・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒。`6a9fe2df` で再ビルド)・`bash provider/build.sh` (rc 0、0.7 秒。`gen_provider.py --check-handlers` でハンドラ 99)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.258 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 94 / 未実装 341 / MCP 静的 60) (rc 0) | 0.289 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.272 秒 |
-| `node tests/all_tools.mjs` (既定 JS mock) | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.353 秒 |
-| `node tests/mixer_diff.mjs` (main 側の追加分。既定色 0xff636c71 を mock と wasm で検査) | calls 59、diffs 0、PASS (rc 0) | 0.040 秒 |
+| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.037 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 99 / 未実装 336 / MCP 静的 60) (rc 0) | 0.278 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.269 秒 |
+| `node tests/all_tools.mjs` (既定 JS mock) | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.286 秒 |
+| `node tests/mixer_diff.mjs` (main 側の追加分。既定色 0xff636c71 を mock と wasm で検査) | calls 59、diffs 0、PASS (rc 0) | 0.039 秒 |
+| `node tests/screen_diff.mjs` (main 側 #2985 の追加分) | calls 32、diffs 0、PASS (rc 0) | 0.044 秒 |
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `clearLog` の戻り値を `undefined` から `0` にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1。元に戻すと calls 16・diffs 0・PASS (rc 0)。
 
-コード差分 (測定 commit `e8604912` から `e3154671` まで。`tools/python` の .md 以外。main 側 `875eba29` の PY-118 既定色の変更と、本 PR のコメント修正):
+コード差分 (前回の測定 commit `e8604912` から `6a9fe2df` まで。`tools/python` の .md 以外。main 側の PY-118 既定色・PY-121 screen 状態・両者の merge 解消と、本 PR のコメント修正):
 
 ```
-$ git diff --stat e8604912 e3154671 -- tools/python ':!*.md'
- tools/python/host/fl_mock.mjs     | 6 +++---
- tools/python/provider/fl_engine.c | 5 +++--
- tools/python/tests/mixer_diff.mjs | 6 ++++++
- 3 files changed, 12 insertions(+), 5 deletions(-)
+$ git diff --stat e8604912 6a9fe2df -- tools/python ':!*.md'
+ tools/python/host/fl_mock.mjs         | 13 +++++--
+ tools/python/provider/fl_engine.c     | 14 ++++++--
+ tools/python/tests/mixer_diff.mjs     |  6 ++++
+ tools/python/tests/provider_check.mjs |  8 +++--
+ tools/python/tests/screen_diff.mjs    | 67 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 100 insertions(+), 8 deletions(-)
 ```
 
-測定 commit から本 REPORT の commit までの差分 (`git diff e3154671 HEAD -- tools/python ':!*.md'`) は空 (本 commit は REPORT_PY125.md だけを変える)。
+測定 commit から本 REPORT の commit までの差分 (`git diff 6a9fe2df HEAD -- tools/python ':!*.md'`) は空 (本 commit は REPORT_PY125.md だけを変える)。
 
 ## 未解決
 
