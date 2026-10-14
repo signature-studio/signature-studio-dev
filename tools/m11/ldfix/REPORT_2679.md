@@ -64,8 +64,8 @@
 
 ### 3-5 issue 本文との差異
 
-- 入口として挙がった `tools/m11/ldfix/ld104_reach.py`・`results/ld104_reach.tsv`・`results/ld104_checks.txt` は repo に存在しない (`git ls-files` で 0 件)。
-  本 run は `results/ld104_sites.tsv`・`results/ld92_machine_evidence.tsv` と機械語・IR の直接突合を使った。
+- 入口として挙がった `tools/m11/ldfix/ld104_reach.py`・`results/ld104_reach.tsv`・`results/ld104_checks.txt` は、取り込み前の base (`5d88dda2`) には無かった。main 取り込み後 (`08138a06`) は存在する (`ee237f22`・#2659 で取り込み)。
+  本 PR は使わず、`results/ld104_sites.tsv`・`results/ld92_machine_evidence.tsv` と機械語・IR の直接突合を使った。
 
 ## 4. 12 site の判定表
 
