@@ -1,6 +1,6 @@
 # REPORT — HB-H15 Fruity Wrapper の lift 方式判定 (分割 a: 計測の土台)
 
-> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md`。詳細は §9 / 付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md`。
+> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md`。§9 (#1521) の全文は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md`。
 
 - 親: #94 (HB-H4) / 本 issue: #783 / 担当 dir: `tools/hostbridge/wrapper_lift/`
 - 検証起点: `origin/main` @ 7c5f7a8f (作業ブランチ `783-wrapper-lift-method`)
@@ -227,4 +227,5 @@
 
 ## 9. #1521: int/pointer・frontend helper の修復と emcc 通過数 (測定 commit: bb076c69)
 
-結論: 修復で error 行は block19091 11,432 → 1,377、block23676 11,475 → 1,383。exit 0 は各 40 件中 1 件で受入条件 3 は未達 (子 issue #1679 / #1680)。詳細と内訳は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md`。
+- 結論: int/pointer 混在 (`-Wint-conversion`) は修復済み (block19091_0.c で 46 → 0、全 40 ファイルで修復後 0)。emcc exit 0 は 40 ファイル中 1 件のみで受入条件 3 は未達 (残りは goto/break 94 件と引数型不一致 1,245 件)。未達は子 issue #1679 (HB-H35)・#1680 (HB-H36) に分割。
+- 測定表・残り error の内訳 (合計 1,377)・受入条件の判定・再測定手順・未検証項目は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md` (§9 全文の分割移動) を参照。
