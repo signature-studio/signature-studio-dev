@@ -1,24 +1,20 @@
 # REPORT #2837 — spill 宛 未判定 関数 10c7cd0 (12 site) の消費者分類 (LD-134)
 
-親: #2245 (LD-93)。兄弟: #2838 (LD-135・CLOSED。残りの未判定・判定不能 site は開いた issue に移管・§6)。本 issue の受入条件 1・2 (12 site 全件の分類・根拠の配置) は達成。受入条件 3 (`audit_lsf_ssa_e2e.sh` 7/7) は測定 commit `412cd2ec` で実測済み (rc=0・7/7・cmp 一致。§1)。
+親: #2245 (LD-93)。兄弟: #2838 (LD-135・CLOSED)・#2921 (LD-138・CLOSED。ddf630 の 4 site は main 側で TRUE_DROP 確定)。残りの未判定・判定不能 site は開いた issue に移管 (§6)。本 issue の受入条件 1・2 (12 site 全件の分類・根拠の配置) は達成。受入条件 3 (`audit_lsf_ssa_e2e.sh` 7/7) は測定 commit `9b7ddcc7` で実測済み (rc=0・7/7・cmp 一致。§1)。
 
 ## 1. 測定
 
-- 測定 commit: `412cd2ec5228673802b0c2b5565ce517b87390cb` (完全 SHA・e2e を実行した HEAD)。その後に積む commit は docs のみ (REPORT・DOC_MAP)。`git diff 412cd2ec HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` の出力は 0 行 (`docs/WORKFLOW.md` §6)
+- 測定 commit: `9b7ddcc75c8e7dea72650757f9708293d9e279ee` (完全 SHA・e2e を実行した HEAD。main (`798bbb67`) の取り込み merge)。その後に積む commit は docs のみ (REPORT・DOC_MAP・PR 本文)。`git diff 9b7ddcc7 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` の出力は 0 行 (`docs/WORKFLOW.md` §6)
 - 素材: `work-m11` / `work-liftdiff` を `tar --zstd -xf` で `tools/m11/work/`・`tools/liftdiff/work/` (gitignore) に展開。PR 本文の `oc_artifacts: fl-win64 work-m11 work-liftdiff` で取得
-- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground・`TMPDIR=$RUNNER_TEMP`・`timeout 900`)
-- **測定 commit `412cd2ec` の結果**: rc=0・real 1m34.2s・load average (1 分値) 1.12 → 1.08。1〜7/7 完走 (`[audit_lsf_ssa_e2e] n/7` の 7 段すべて出力)。`drops_510.tsv` は results/ と cmp 一致、`spill178_1161.tsv` は results/ と cmp 一致
-- step 7 の集計 (412cd2ec): 確定 132 (NO_CONSUMER 19・OK_LOAD 61・TRUE_DROP 52) / 判定不能 30 / 未判定 16 (11 関数)。脱落関数の和集合 75 (§5)
+- 実行: `TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground・`timeout 900`)
+- **測定 commit `9b7ddcc7` の結果**: rc=0・real 1m27.5s・load average (1 分値) 0.13 → 0.87。1〜7/7 完走 (`[audit_lsf_ssa_e2e] n/7` の 7 段すべて出力)。`drops_510.tsv` は results/ と cmp 一致、`spill178_1161.tsv` は results/ と cmp 一致
+- step 7 の集計 (9b7ddcc7): 確定 136 (NO_CONSUMER 19・OK_LOAD 61・TRUE_DROP 56) / 判定不能 30 / 未判定 12 (10 関数)。脱落関数の和集合 76 (§5)
+- 前測定 commit `412cd2ec` (main 取り込み前の HEAD): rc=0・real 1m34.2s・load average 1.12 → 1.08・1〜7/7 完走・cmp 一致。step 7: 確定 132 / 判定不能 30 / 未判定 16 / 和集合 75。`412cd2ec` → `9b7ddcc7` で main の #2921 (3ec6620c・ddf630 の 4 site が 未判定 → TRUE_DROP) が入り、未判定 16 → 12・確定 132 → 136。
 - 先行測定 commit `a31084db` (分類 `results/candidate_verdicts_2837.jsonl`・`spill_classify_1161.py` の読込追加・再生成した `results/spill178_1161.tsv` を入れた最後の commit。基点は `origin/main` の `b2b052ce`。作業 worktree `ws-2837` (branch `2837-spill-10c7cd0-consumer`)):
   - 結果: rc=0・real 2m36.5s・load average 0.68 → 0.99・1〜7/7 完走。7/7 で `spill178_1161.tsv` と `drops_510.tsv` が results/ と一致 (cmp OK)
   - 変更前 (`b2b052ce`) の同スクリプト: rc=0・real 2m35.3s。確定 117 / 判定不能 30 / 未判定 31
   - 変更後 (`a31084db`・main 取り込み前): 確定 129 (+12) / 判定不能 30 / 未判定 19 (−12)
-- `a31084db` → `412cd2ec` の差分 (`git diff a31084db 412cd2ec -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results`): 5 ファイル・168 挿入・11 削除。内容は main 取り込み (`b20470b0`) 由来と、競合解消の 1 行。この差分も 412cd2ec の e2e で測定済み:
-  - `ldfix.py`: #2745 の F3d pass (型タグ読みの load 復元)。既定は無効で `--passes f3d` のときだけ働く。既定の出力は変わらない
-  - `f3d_negctl_2745.sh`: 新規 (F3d のネガティブコントロール・#2745)
-  - `results/candidate_verdicts_2838.jsonl`: 新規 3 行 (466af0 の 3 site = TRUE_DROP・#2838)
-  - `results/spill178_1161.tsv`: 466af0 の 3 site が 未判定 → TRUE_DROP 確定
-  - `spill_classify_1161.py`: `candidate_verdicts_2838.jsonl` を読む 1 行を追加 (競合は両方残して解消)
+- `412cd2ec` → `9b7ddcc7` は main の取り込み (merge)。競合は `spill_classify_1161.py` の 1 箇所 (§8)。TSV の差分は main 側 #2921 の 4 行 (ddf630)。
 
 ## 2. 判定結果 (10c7cd0 の 12 site)
 
@@ -44,18 +40,18 @@
 
 ## 5. 脱落関数の集合
 
-- 現 head (`412cd2ec`) の e2e step 5・6 の出力 (`spill_classify_1161.py` の [5]・[6]):
-  - [5] `drops_510.tsv`: store 宛 51 関数・frame 宛 22 関数・和集合 69 (a31084db から不変)
-  - [6] spill 宛の確定 TRUE_DROP 関数 24 のうち drops_510 に無いもの 6 = 4120c0・41a5d0・466af0・6bb3f0・6c3700・10c7cd0
-- 和集合 = 69 + 6 = **75** (main 74 + 10c7cd0)。増分は 10c7cd0 のみ。466af0 (#2838) は main 側で入った。
-- a31084db 時点の値は 74 (= 69 + 5。466af0 が無く 10c7cd0 が入った形)。
-- 残りの未判定 16 site・判定不能 30 site の決着で変わりうる → §6
+- 測定 commit `9b7ddcc7` の e2e step 5・6 の出力 (`spill_classify_1161.py` の [5]・[6]):
+  - [5] `drops_510.tsv`: store 宛 51 関数・frame 宛 22 関数・和集合 69
+  - [6] spill 宛の確定 TRUE_DROP 関数 25 のうち drops_510 に無いもの 7 = 4120c0・41a5d0・466af0・6bb3f0・6c3700・ddf630・10c7cd0
+- 和集合 = 69 + 7 = **76**。内訳の増分は 10c7cd0 (本 PR)・466af0 (#2838)・ddf630 (#2921)。main 側 (#2921 取り込み後) の和集合は 75。
+- 参考: `412cd2ec` (#2921 取り込み前) は 75 (= 69 + 6)。`a31084db` 時点は 74 (= 69 + 5)。
+- 残りの未判定 12 site・判定不能 30 site の決着で変わりうる → §6
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 未判定 16 site (11 関数) | 脱落関数の和集合 75 が未確定 | 開いた issue: #2921 (ddf630 の 4 site)・#2922 (12cb680 の 2 site)・#2923 (1046a30 の 1 site)・#2583 (LD-118・照合待ち 9 site: 6c3700・6c3d20・6c5930・775340・815050・1042d20・f3e050・12f9730) |
+| 未判定 12 site (10 関数) | 脱落関数の和集合 76 が未確定 | 開いた issue: #2922 (12cb680 の 2 site)・#2923 (1046a30 の 1 site)・#2583 (LD-118・照合待ち 9 site: 1043e2d・12f9752・6c3c78・6c44bd・6c6125・77545c・77593b・815220・f3e0c2) |
 | 判定不能 30 site | 同上 | 開いた issue: #2688 (LD-123・9 site)・#2253 (LD-95・7 site)・#2705 (LD-125・128f9e0 の 12 site)・#2922 (12cb8e1)・#2923 (1047556。再判定は子 #2958) |
 | `cell_check` が K-8 の読みを見ない (8 site のオラクルが CELL_DEEP と出る) | オラクル列の表示が不正確。判定は IR 構造で行ったので結論には影響しない | PM agent の判断待ち: cell_check が K-8 の読みを数えない点を改修するか・既定案: 改修せず注記のまま (判定と数値に影響なし) |
 
@@ -67,10 +63,10 @@ tar --zstd -xf $ARTIFACTS_DIR/work-liftdiff.tar.zst
 bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh
 ```
 
-## 8. main 取り込み後 (競合解消 merge `b20470b0`)
+## 8. main 取り込み (merge `9b7ddcc7`・競合解消)
 
-- 競合は `spill_classify_1161.py` の読込行だけ。main 側 (#2838) は `candidate_verdicts_2838.jsonl` の `cand.update` を、本 PR は `candidate_verdicts_2837.jsonl` の `cand.update` を追加していた。両方を残し、docstring の入力列挙も両方書いた。`spill178_1161.tsv` は自動 merge で衝突せず、判定 JSONL との照合で全行一致 (手動 510・候補 2837・2838 の全 key が TSV の判定と一致)。
-- `92702b10` の時点では e2e を再実行できなかった。本 run の素材が `fl-win64` のみで `work-m11`・`work-liftdiff` が無く、IR の入力 (`boot_final3.ll`) が無いと step 2 以降が走らないため。その時の step 7 だけの代替確認 (TSV の行から組んだ ssa.json を `spill_classify_1161.py` に入力・rc 0・cmp 一致) は読込と集計の検査であり、e2e の代わりではない。
-- `412cd2ec` で素材を取得して e2e を実行し、§1 のとおり 7/7 完走・cmp 一致。
-- 解消後の件数 (step 7 の [2]・[5]・[6]): 確定 132 / 判定不能 30 / 未判定 16。脱落関数の和集合 = 69 + 6 = **75** (main 74 + 10c7cd0)。未判定 16 site は 11 関数 (和集合外 10)。
-- §1 の「変更後 129 / 19 / 74」は a31084db 時点の値として読む。§5・§6 は 412cd2ec の値。
+- main (`798bbb67`) の #2921 (`3ec6620c`) は `spill_classify_1161.py` の docstring と読込行を書き換え、本 PR の `candidate_verdicts_2837.jsonl` の読込行を消していた (main 側に 2837 の参照は 0 件)。消したまま解消すると 10c7cd0 の 12 site が未判定に戻るため、2837 を残した。
+- 解消後の読込は 1161・2245・2837・2838・2921 の 5 本。docstring の入力列挙も同じ 5 本。TSV は自動 merge (main 側 #2921 の ddf630 の 4 行と衝突しない)。
+- 解消後の TSV は `audit_lsf_ssa_e2e.sh` の step 7 が `results/spill178_1161.tsv` と cmp 一致 (§1 の 9b7ddcc7 測定)。
+- 解消後の件数: 確定 136 / 判定不能 30 / 未判定 12。和集合 76。§1・§5・§6 は 9b7ddcc7 の値。
+- 92702b10 の時点では e2e を再実行できなかった (素材なし) が、412cd2ec で素材を取得して 7/7 を実測。以降は 9b7ddcc7 で実測。
