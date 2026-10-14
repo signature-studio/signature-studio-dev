@@ -1,0 +1,108 @@
+[
+ {
+  "mode": "ctrl",
+  "by_verdict": {
+   "UNDETERMINED": 44,
+   "DROP": 3,
+   "LIVE-IN": 1
+  },
+  "site_by_verdict": {
+   "UNDETERMINED": 46,
+   "DROP": 3,
+   "LIVE-IN": 1,
+   "NOSLOT": 1
+  },
+  "fn_verdict": {
+   "10628a0": "DROP",
+   "13105d0": "DROP",
+   "c38bd0": "DROP",
+   "412160": "LIVE-IN"
+  },
+  "fn_sites": {
+   "10628a0": [
+    [
+     "10628c0",
+     "DROP",
+     "ALL_PATHS_STORE"
+    ]
+   ],
+   "412160": [
+    [
+     "41217d",
+     "LIVE-IN",
+     "NO_DEF_ON_ANY_PATH"
+    ]
+   ]
+  }
+ },
+ {
+  "mode": "drop10628bc",
+  "by_verdict": {
+   "UNDETERMINED": 45,
+   "DROP": 2,
+   "LIVE-IN": 1
+  },
+  "site_by_verdict": {
+   "UNDETERMINED": 47,
+   "DROP": 2,
+   "LIVE-IN": 1,
+   "NOSLOT": 1
+  },
+  "fn_verdict": {
+   "10628a0": "UNDETERMINED",
+   "13105d0": "DROP",
+   "c38bd0": "DROP",
+   "412160": "LIVE-IN"
+  },
+  "fn_sites": {
+   "10628a0": [
+    [
+     "10628c0",
+     "UNDETERMINED",
+     "ONLY_ENTRY_AFTER_CALL"
+    ]
+   ],
+   "412160": [
+    [
+     "41217d",
+     "LIVE-IN",
+     "NO_DEF_ON_ANY_PATH"
+    ]
+   ]
+  }
+ },
+ {
+  "mode": "fake412160",
+  "by_verdict": {
+   "UNDETERMINED": 44,
+   "DROP": 4
+  },
+  "site_by_verdict": {
+   "UNDETERMINED": 46,
+   "DROP": 4,
+   "NOSLOT": 1
+  },
+  "fn_verdict": {
+   "10628a0": "DROP",
+   "13105d0": "DROP",
+   "c38bd0": "DROP",
+   "412160": "DROP"
+  },
+  "fn_sites": {
+   "10628a0": [
+    [
+     "10628c0",
+     "DROP",
+     "ALL_PATHS_STORE"
+    ]
+   ],
+   "412160": [
+    [
+     "41217d",
+     "DROP",
+     "ALL_PATHS_STORE"
+    ]
+   ]
+  }
+ }
+]
