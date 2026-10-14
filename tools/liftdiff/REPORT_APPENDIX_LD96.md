@@ -123,8 +123,7 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 ### 8.7 再現と差分
 
 ```sh
-export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"          # fl-win64 の extracted/block00031_PE.bin を含む展開先
-export ARTIFACTS_DIR="${ARTIFACTS_DIR:-$HOME/artifacts}"
+export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"          # fl-win64 の extracted/block00031_PE.bin を含む展開先 ($ARTIFACTS_DIR は素材の置き場)
 cd <repo root>
 tar --zstd -xf "$ARTIFACTS_DIR/work-liftdiff.tar.zst" tools/liftdiff/work/m11/simd.c   # 素材版 simd.c に戻す
 tar --zstd -xf "$ARTIFACTS_DIR/work-m11.tar.zst"      # tools/m11/work (boot_final3.ll・m11_image.bin)
