@@ -63,9 +63,11 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `69c774…` IR の build・survey (受入 3) | 6 件の fix の survey 退行が未判定 | #1154 (REPORT_N86 §8 と同じ) |
-| partial_write 35・stack_partial 9・arith 11 (計 55 件) の値を、上位ビット・旧値の SSA 接続で定める | 0 詰め引数の意味が未保証 | 子 issue (下記) |
+| partial_write 35・stack_partial 9・arith 11 (計 55 件) の値を、上位ビット・旧値の SSA 接続で定める | 0 詰め引数の意味が未保証 | #1660 ([M11-N112]・親 #1524) |
 
-## 7. 再現
+## 7. 再現・測定 commit
 
-- `python3 m11_setother_imm_class.py work/sigfix_stats/fixes.json work/sigfix_stats/final3_base.ll --pe <block00031_PE.bin>` (exit 0)
-- `python3 m11_setother_ledger_verify.py work/sigfix_stats/fixes.json --pe <PE>` (exit 0 = 410 一致)
+- 測定 commit: `55b65295` (コード変更の最後の commit)。コードは `tools/m11/m11_argrecover.py`・`tools/m11/m11_post.py`・`tools/m11/m11_setother_imm_class.py`。
+- 測定 commit から HEAD までのコード差分: 本 REPORT を含む commit 以降のコード差分は無い (`git diff 55b65295 HEAD -- tools/m11 ':(exclude)*.md'` の出力は 0 行)。
+- `55b65295` を `git worktree add --detach` で展開して §1 の 4 コマンドを実行し、§4・§2 の値を再現した (`ecab191b…`・`match 410`・分類 6/35/9/11・`sigfix_const_recovered 24`)。検証 worktree は削除済み。
+- 検算の独立性は限定的: `m11_setother_imm_class.py` は `m11_argrecover.py` の窓 (`REGS`・`rw`・`memops_of`) を流用する。REPORT_N86 §3 の「命令列の取得と窓は台帳と共通」と同じ制約で、窓の誤りは検出できない。
