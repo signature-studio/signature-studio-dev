@@ -95,4 +95,15 @@ describe("PmDO (実 Durable Object ランタイム)", () => {
     expect(Date.parse(JSON.parse(text).last_webhook_at)).toBeGreaterThan(0);
     for (const needle of ["BEGIN RSA PRIVATE KEY", "MIIEdummyKEYmaterial", "ghp_DUMMY", "whsec_dummy", SECRET, STORE_KEY]) expect(text).not.toContain(needle);
   });
+  it("/status の build: デプロイ時の BUILD_COMMIT を DO の env から読む。渡さなければ null (wrangler.toml の [vars] には無い)", async () => {
+    const hash = "3d011ecd0d1f6b5f3f1b1b5a0a7c8c2e4f9a1b2c";
+    await runInDurableObject(pmStub(), async (_i, state: any) => {
+      const withBuild = new PmDO(state, { ...env, BUILD_COMMIT: hash } as any) as any;
+      const s = await (await withBuild.app.handle(new Request("https://pm.test/status"))).json();
+      expect(s.build).toBe(hash);
+      const plain = new PmDO(state, env as any) as any;
+      const p = await (await plain.app.handle(new Request("https://pm.test/status"))).json();
+      expect(p.build).toBeNull();
+    });
+  });
 });
