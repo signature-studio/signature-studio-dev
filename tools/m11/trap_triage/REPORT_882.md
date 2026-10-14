@@ -249,3 +249,43 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 | `m11_e2e.sh --full` 由来 IR での再測定 (本 §12 の値の再現) | 数値の出所 | #882 の次 run (`oc_artifacts:` に `work-m11` を含める場合は素材名を明記) |
 | probe ON で分類が変わる (ok +2 / oob -2) | 計測 hook が survey を動かす | #684 (PM 判断) |
 | `functions_dll.csv` 素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM 判断 |
+
+## 13. 8 回目の run: `40ffe0` の入口 probe (`M11_INSTR_40FFE0`) と caller 側の値
+
+測定 commit: `origin/main` `f5d2aa3b` 起点の `882-m11-p144-caller` (コード変更は本節の probe のみ)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下、`m11_gen_ir2.sh` rc=0 (54.1 s)。
+
+### 13.1 実装
+
+- `m11_post.py`: `M11_INSTR_40FFE0=1` のときだけ `function_40ffe0` の wrapper 先頭に `m11_ffe0_obs(arg1)` を入れる (PROBES の末尾追加。既存 index 不変)。
+- `m11_ov.c`: `m11_ffe0_obs` を定義。`a` (arg1)、`v = [a]` (40ff70 へ渡る値)、`p-144 = [v-0x90]` を `[m11][ffe0]` として stderr に出す。線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。
+- `m11_build.sh`: `M11_INSTR_40FFE0` を CF に渡し、stamp を `40ff70:40ffe0` の組で管理する。既定 0 は従来どおり。
+
+### 13.2 測定 (`SV_RAW=1 node trap_triage/survey_units.mjs`、全て rc=0)
+
+| build | survey 集計 | 観測行 |
+|---|---|---|
+| probe ON (`M11_INSTR_40FFE0=1 M11_INSTR_40FF70=1`) | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` (13.7 s) | `[m11][ffe0] #1 arg1=0x0 v=[arg1]=0xc343f0 p-144=0x9078558948704d89` |
+| probe OFF (既定) | `ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1` | 0 件 |
+
+- 観測の 1 件目 (unit 895 の `err` 内) では `40ffe0` の `arg1` が **0 (null)**。`v = [0] = 0xc343f0` が `40ff70` の `arg1` になり、§12 の `[m11][p144] arg1=0xc343f0` と一致する。
+- 前版の probe は `a >= 8` の条件で `[0]` を読まず、`v=0` と誤記録していた。修正後 (address 0 を読む) で値が出た。
+- probe ON の survey 集計 (`872/14`) は §11.2・§12 と同じ。
+
+### 13.3 caller 側
+
+- `40ffe0` の唯一の観測 caller は `function_60a270` (`REPORT_596`・`REPORT_663` と一致)。`60a270` は `40ffe0` へ `%8` を渡す。`%8` の出所 (`[rcx]` の deref 元) は本節では未追跡。
+
+### 13.4 受入条件
+
+1. unit 95 `47ad70` の index / arg1: 未達 (現行 main で OOB 不発。観測対象が無い)。
+2. unit 895 `40ff70` の `p-144`: **部分達成**。`40ffe0` の `arg1=0` (null) で、`[0]=0xc343f0` が `40ff70` に渡ることを実測。null 由来の `arg1` が 895 の halt0 経路に入る点までは確定。`60a270` の `%8` 出所は未特定。
+3. DEFECTS 行案: 未達 (新規類型未確定。D4 変種との対応は未検証)。
+
+### 13.5 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `60a270` が `40ffe0` に渡す `%8` (= `arg1` の値) の出所 | 受入条件 2 | #882 の次 run (`60a270` の入口 probe) または #684 |
+| 895 の halt0 が null `arg1` の経路に由来するか (`412770` の null memcpy との関係) | 受入条件 2 | #1080 (親 #684) |
+| probe ON の集計 (872/14) と OFF (870/16) の差 | 計測 hook が分類を変える | #684 (PM 判断) |
+| `functions_dll.csv` 素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM 判断 |
