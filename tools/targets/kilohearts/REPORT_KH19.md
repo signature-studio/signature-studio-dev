@@ -133,6 +133,15 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 家族規則 (`*MasterDsp` / `*Dsp` / `*DspModel` の vtable slot のみを候補にする) の closure 関数数 (`before_funcs`) は未記録。160 関数との集合比較は未実施。手検証の 160 関数一覧はリポジトリに無いため、差分 0 は主張しない。
 - **受入 2 の判定: 未達のまま**。家族規則を採用するかは、手検証の一覧を得てから判断する。
 
+## 7. #1619 (KH-19e) 対照 Gain の before 160 一覧と差分 (検証 HEAD `3a76c8cb`, 4 vCPU)
+
+- 素材 `plugins-kilohearts` を `$RUNNER_TEMP` に展開し、`KH_SRC` 指定で `extract_installer.sh` を実行 (Windows 側のみ成功。mac 側 `llvm-lipo` は本件で不使用)。
+- 実測: `rtti_walk.py` 6,307 クラス (1.8 s) → `callgraph.py` 120,856 関数・4 round (7.8 s) → `vtable_closure.py gain all` before 160 / after 1,995、`gain nogui` before 160 / after 555。REPORT §2・§5 と一致。
+- 一覧: `gain_before_160.tsv` (正本・生成: `scripts/gain_before_list.py`)。各行は root からの親 (parent_rva) と call 位置 (call_site_rva)。`verified` 列は全行 `auto` (機械生成)。
+- 差分: 一覧は `vtable_closure` と同じ `direct_closure(roots)` から作るため、「before 160 の再現が一覧と一致する」ことは自明にしか確認できず、手検証の代替にはならない。
+- **受入 1 (各関数を手で確認) は未達**。受入 2 (手検証 160 との差分 0) は未達。`verified` 列を `manual` に変える行は、本 run では 0 件。
+- 人手検証の範囲と差分の判定は別 issue に切り出す (下記 未解決)。
+
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
 未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は部分達成・open のまま)。rip_data は #849、lift 失敗点は #850 (§4)。
