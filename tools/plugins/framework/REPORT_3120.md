@@ -1,6 +1,6 @@
 # #3120 REPORT — stage-2 smoke の InitUnits 中の `Runtime error 203 at 0x1` は未解決 (発生経路を静的に絞った。BLK 修正との因果は未切り分け) [PLG-P0b-29]
 
-- 担当 issue: #3120 `[PLG-P0b-29]` (親 #2566)。前回の作業は PR #3123 (枝 `2566-plg-p0b-21-relift`・open)。本 PR はその修正 commit `66a3dbe1` (`fw_entry_fix.py` の新形 fallback) を main から取り込む。
+- 担当 issue: #3120 `[PLG-P0b-29]` (親 #2566)。前回の作業は PR #3123 (枝 `2566-plg-p0b-21-relift`・2026-10-14 22:34:15Z に merge 済み・merge commit `31334810`)。その修正 commit `66a3dbe1` (`fw_entry_fix.py` の新形 fallback) は、この merge で `origin/main` に入っている。本 PR の測定 commit `77205e76` は同じ内容の再 cherry-pick で、`origin/main` に対する `fw_entry_fix.py` の差分は 0。本 PR の実質の追加は REPORT と DOC_MAP の登録のみ。
 - 既知類型との関係: `docs/DEFECTS.md` に該当 ID なし。`REPORT_2510.md` §6 の D24 候補 (BLK slot の constant 化) とは別の失敗 (エラーの種類・番地が変わった)。
 
 ## 0. 結論 (1 行)
@@ -9,8 +9,8 @@ stage-1 を BLK 修正後の `icall_rewrite` で再生成し stage-2 を再現�
 
 ## 1. 検証起点と測定 commit
 
-- 測定 commit: **`77205e76`** (`origin/main` `c98d2c99` に `66a3dbe1` を cherry-pick した commit。worktree `../ws-3120`・branch `3120-plg-p0b-29-stage2-smoke`)。
-- 素材: `work-fw-stage1` と `work-liftlib` を展開 (gitignore)。`fl-win64` は member 2 本 (`extracted/block18983_PE.bin`・`extracted/block00031_PE.bin`) のみ展開。`[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md` §4) は runner 既存。
+- 測定 commit: **`77205e76`** (測定時の `origin/main` である `c98d2c99` に `66a3dbe1` を cherry-pick した commit。worktree `../ws-3120`・branch `3120-plg-p0b-29-stage2-smoke`)。
+- 素材: `work-fw-stage1` と `work-liftlib` を展開 (gitignore)。`fl-win64` は member 2 本 (`extracted/block18983_PE.bin`・`extracted/block00031_PE.bin`) のみ展開。`[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md` §1「ローカルツール」) は runner 既存。
 - 補助物: `tools/plugins/work/fw_hash_counts.json` は `{}` で代用 (`REPORT_2566.md` §1 と同じ。framework 統計の出力のみに影響)。
 - 修正前素材の比較: `work-fw-stage1` を `$RUNNER_TEMP/pre_root` に展開し、`FW_W` で stage-2 を独立に再実行 (`#2584` より前に生成された stage-1 成果物)。
 - 実行環境: runner 4 vCPU・RAM 15 GiB。
@@ -75,8 +75,10 @@ stage-1 を BLK 修正後の `icall_rewrite` で再生成し stage-2 を再現�
 
 ## 7. 再現手順
 
+基点は測定時の main `c98d2c99`。現 `origin/main` は `66a3dbe1` を含むため、そこからの cherry-pick は空になって失敗する。
+
 ```sh
-git worktree add ../ws-3120 -b 3120-plg-p0b-29-stage2-smoke origin/main
+git worktree add ../ws-3120 -b 3120-plg-p0b-29-stage2-smoke c98d2c99
 cd ../ws-3120 && git cherry-pick 66a3dbe1
 tar --zstd -xf $ARTIFACTS_DIR/work-fw-stage1.tar.zst && tar --zstd -xf $ARTIFACTS_DIR/work-liftlib.tar.zst
 D=$RUNNER_TEMP/fl-win64; mkdir -p $D && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $D extracted/block18983_PE.bin extracted/block00031_PE.bin
@@ -89,10 +91,17 @@ grep -n 'MessageBoxA' tools/plugins/work/fw/smoke.log                           
 # 修正前素材の比較 (§3): FW_W=$RUNNER_TEMP/pre_root/tools/plugins/work/fw bash tools/plugins/framework/fw_stage2.sh --fresh
 ```
 
-## 8. コード差分 (測定 commit 以降)
+## 8. コード差分と確認 (測定 commit 以降)
 
 測定 commit `77205e76` 以降のコード変更は無し (本 PR の追記は REPORT と DOC_MAP のみ)。
 
 ```sh
 git diff 77205e76 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'   # 空 = 実行コード差分 0
 ```
+
+検証 HEAD `1dd07ee6` での実行結果 (WORKFLOW §6):
+
+- 上の diff: 空 (出力 0 行)。実行コード差分 0。
+- `git status --porcelain`: 本 PR の範囲外の未コミット変更 2 件 (`package.json`・`pnpm-lock.yaml`。runner の checkout に残っていたもの) のみ。本 PR の commit には含めていない。
+- 20MiB 超の blob: 0 件 (`c98d2c99..HEAD` の全 object で最大 145,533 B)。
+- e2e の再実行: 未実施。`$ARTIFACTS_DIR` に `fl-win64.tar.zst` しか無く、`work-fw-stage1`・`work-liftlib`・`toolchain-retdec`・`toolchain-emsdk` が無いため。§2・§3 の実測は測定 commit `77205e76` での別 run の記録で、この HEAD では再現していない。
