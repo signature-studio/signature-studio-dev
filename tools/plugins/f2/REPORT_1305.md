@@ -85,3 +85,21 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 測定 commit: 892a5c7d (f2 の `.py` 3 本の追加 commit)。
 - 再実行 (HEAD、`FL_WIN64_DIR` は block19148/19245 のみ展開): `raise_reach_frontier.py 19148` = visited 31・indirect 23・unresolved 1・raise_api 1 (1.6 秒)、19245 も同値。`raise_root_reach.py` は 2 root ずつ `reaches_raise: true`。`indirect_resolve.py` は raise_via_slot 3 / slot_no_store 5 / object_or_register_based 15 (両 block)。
 - `git diff 892a5c7d 6cfbac24 -- tools/plugins/f2/ --stat` の出力: `tools/plugins/f2/REPORT_1305.md | 30 +++++++++++++++++++++--------` / `1 file changed, 22 insertions(+), 8 deletions(-)`。`.py` は不変のため、数値は再測定不要。
+
+## 7. PLG-F3-10 (#1499): 残り間接 call の解決の追加 (測定 commit 8a06cad5)
+
+- 追加した解決段: (1) レジスタの直前代入が `mov reg,[rip+slot]` のとき、その slot を (A) と同じ格納元解析に通す。(2) `no store found` の slot は、その番地が `.data`/`.rdata` の qword として現れる箇所 (`data_ptr_to_slot`) を記録する。
+- 測定 (8a06cad5、`FL_WIN64_DIR` は block19148/19245 のみ展開、Python 3.14・pefile・capstone):
+
+| 分類 | 19148 (前) | 19148 (後) | 19245 (後) |
+|---|--:|--:|--:|
+| raise_via_slot | 3 | 3 | 3 |
+| resolved_runtime_store | 0 | 1 | 1 |
+| slot_no_store | 5 | 5 | 5 |
+| object_or_register_based | 15 | 14 | 14 |
+
+- 解決が増えた 1 件: `0x411a80` の `call rbx` (0x411af9)。`rbx` は `mov rbx,[rip+0x8bf0a0]` (19245 は `0x8aa0a0`) で、この slot の PE 内の格納は `imm 0` の 1 件のみ。よって呼出し先は PE 内の格納からは決まらず、実行時の書込みに依存する。例外 API ではないことは確認できたが、呼出し先の特定はできていない。
+- 未解決 (残り 19 件): `slot_no_store` 5 件 (`0x8c3ca8`・`0x8bf068`・`0x8bf048`・`0x8bf3d8`・`0x8bf040`) は全て `.bss` にあり、PE 内の rip 相対参照は 0 件。`data_ptr_to_slot` は `0x8bf040` (`0x8bd2f0` の qword) の 1 件のみで、これは 2 段以上の間接経由なので本ツールの範囲外。`object_or_register_based` 14 件は `[rbx-0x20]`・`[rbx+8]`・`[rbp+0x38]`・`[rax-0x30]`・`jmp [rcx]` 等で、オブジェクトの vtable 参照のため、呼出し先はオブジェクトの型 (実行時値) に依存する。
+- 受入条件の判定: 1 (間接 call の解決) **部分達成** (3 件は前回どおり RaiseException、1 件は格納 0 のみ確認、残り 19 件は未解決)。2 (`slot_no_store` の格納元まで辿る) **未達** (`.bss` 5 件は PE 内に格納が無く、「解決不能」の理由は上記)。3 (19245 も同じ判定) **達成** (同一構成)。4 (reason 反映・#529 へ報告) **未達**: 解決の範囲が 3 件 + 1 件の確認で、waiver の reason を書き換える根拠が不足するため、判断材料を本節に残し、waiver は変更しない。
+- 再現 (8a06cad5): `python3 tools/plugins/f2/indirect_resolve.py 19148` / `19245` の `classification`、および `python3 tools/plugins/f2/raise_reach_frontier.py 19148` / `19245` (= visited 31・indirect 23・unresolved 1・raise_api 1)。
+- 次の段 (未解決の起票先: #1499 の残件として本 issue で追跡): 実行時に slot へ書く経路 (`0x8bd2f0` の参照元の関数表、`0x8bf0a0` の書込み元) を 2 段以上追う解析。これは静的 1 段の範囲を超えるため、別の解析 (動的トレース) が要る。
