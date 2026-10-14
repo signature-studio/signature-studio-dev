@@ -5,6 +5,7 @@ import type { Config } from "./config.ts";
 import { Gh, GhError } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
 import type { Store } from "./kvstore.ts";
+import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import {
   applyEvent,
   EMPTY_STATE,
@@ -34,6 +35,12 @@ export interface Plan {
   target: number;
   room: number;
   picks: Planned[];
+  // Review-Only (指示 130)。true の間は picks を空にする。
+  phase: PhaseState;
+  open_prs_excl_stuck: number;
+  stuck_prs: number;
+  // launch を止める理由 (stuck-ceiling)。止めないなら undefined。
+  stop?: string;
 }
 
 interface Meta {
@@ -350,7 +357,14 @@ export class Engine {
     const relMap = new Map(rows.relaunch);
     const picks: Planned[] = [];
     const issueOf = new Map(snap.issues.map((i) => [i.number, i] as const));
-    for (const n of sel.picks) {
+    // Review-Only と stuck の上限は、どちらも新規着手 (picks) を空にする。数え方は VM 版 (launch_issues.py) と同じ。
+    const pr = countOpenPrs(Object.values(this.s.prs).map((p) => ({ state: p.state, labels: p.labels ?? [] })));
+    const prev = this.phase();
+    const phase: PhaseState = { review_only: nextReviewOnly(prev.review_only, pr.openExclStuck), open_prs: pr.openExclStuck };
+    phase.since = phase.review_only !== prev.review_only || !prev.since ? iso(nowMs) : prev.since;
+    const stop = pr.stuck > this.d.cfg.stuckHigh ? "stuck-ceiling" : undefined;
+    const gated = phase.review_only || !!stop;
+    for (const n of gated ? [] : sel.picks) {
       const i = issueOf.get(n);
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
@@ -359,13 +373,28 @@ export class Engine {
       const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
       picks.push({ n, art, relaunch: relMap.has(n) });
     }
-    const plan: Plan = { at: iso(nowMs), active, target: this.d.cfg.target, room: sel.room, picks };
+    const plan: Plan = {
+      at: iso(nowMs),
+      active,
+      target: this.d.cfg.target,
+      room: sel.room,
+      picks,
+      phase,
+      open_prs_excl_stuck: pr.openExclStuck,
+      stuck_prs: pr.stuck,
+      stop,
+    };
     return { rows, plan, picks };
   }
 
   // ---------------------------------------------------------------- 実行
   private fresh(): boolean {
     return !!this.meta.fullSyncAt && !!this.meta.reconcileAt && this.d.now() - this.meta.reconcileAt < STALE_AFTER_MS;
+  }
+
+  // Review-Only の状態は DO に保存する (未保存なら review_only: true)。
+  private phase(): PhaseState {
+    return this.d.store.get<PhaseState>("meta", "phase") ?? { review_only: true };
   }
 
   async launch(gh: Gh | null): Promise<Plan> {
@@ -377,6 +406,7 @@ export class Engine {
       this.saveMeta();
       return plan;
     }
+    this.d.store.put("meta", "phase", plan.phase);
     const live = this.d.cfg.live && gh;
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     for (const p of picks) {
@@ -505,6 +535,10 @@ export class Engine {
       room: plan.room,
       open_issues: open,
       open_prs: Object.values(this.s.prs).filter((p) => p.state === "open").length,
+      phase: plan.phase.review_only ? "review-only" : "launch",
+      open_prs_excl_stuck: plan.open_prs_excl_stuck,
+      stuck_prs: plan.stuck_prs,
+      launch_stop: plan.stop ?? null,
       blocked: c("blocked"),
       started: c("started"),
       ready: c("ready"),
