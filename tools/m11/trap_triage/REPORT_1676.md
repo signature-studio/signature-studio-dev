@@ -57,3 +57,24 @@
 - probe `probe1507_listB.mjs` n=2: 両回で list B `base(+8)=0`、unit 114 halt0、275 の callback が `mem[8]` を `0x10bd5280` に書換え (REPORT_881 §10 と一致)。
 - probe `probe1676_listB_writes.mjs` n=1: list B は unit 114 で base=0 のまま生成。
 - 注意: 本 run の確定は n=1 (監視 probe)。n≥2 は未実施。
+
+## 6. #1931 の追補 (n=2 再現・thunk の逆アセンブル)
+
+- 測定 commit: 検証起点 `8f4c6379` (main)。素材: `fl-win64` (sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`。
+- `work-m11` には `lift_pe.sha256` が無く、`m11_e2e.sh` の全再生成は `m11_bounds.py` が `m2/work/ghidra_dll/functions_dll.csv` を要求して落ちた (素材に無い Ghidra 中間物)。
+  PE 指紋 `b2c64da4…` が一致したため `work/lift_pe.sha256` を手で記録し、非 `--full` 経路で再ビルドした。
+- e2e `m11_e2e.sh` (foreground、rc=0、166 s、load 0.5): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§10 と一致)。
+- probe `probe1676_listB_writes.mjs` n=2: 両回とも unit 114 で `L=0x10bd4c20`・`base=0`・`cnt=1` の生成、unit 275 で trap。n=1 の結論が n=2 でも再現。
+- thunk の逆アセンブル (`trap_triage/dis1676_thunks.py`):
+  - `410320`: `rax=rcx`。`dl<0` 以外のとき `call qword ptr [rax-0x30]` (引数 `rcx=rax`)。
+  - `410360`: `rbx=[rax]`、`call qword ptr [rbx-0x50]`。
+  - `40f9e0`: `dl≠0` のとき `410320` → `410360` の順に呼ぶ。`dl=0x81` の分岐には `call qword ptr [rbx-0x20]` がある。
+  - 補足: IR の `function_410320` / `410360` は `ret arg1` のみで、上記 2 つの間接 call は IR から脱落している。
+- 未確定: 間接 call の**実 target** (vtable の中身) と、list B の base を入れる関数。object→vtable の対応は未特定。
+  線形逆アセンブルの call 元走査が 0 件だったため、呼出し元の追跡は未完。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `[rax-0x30]`・`[rbx-0x50]` の実 target と base 設定関数の確定 | list B の base=0 の原因特定 | 既存 #1783 [LD-63] (410320 スロットの書き込み元の実行時 watch) |
+| DEFECTS 行 (D15 同類型か) | 分類 | 上記確定後 (#1931 の残件) |
+| `SV_RAW=1 survey_units.mjs` の n≥2 は未実施 (本 run は e2e 内の survey n=1) | survey 側の再現性が未確認 | 既存 #1783 の再測定に含める |
