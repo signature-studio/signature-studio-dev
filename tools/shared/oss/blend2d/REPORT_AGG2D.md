@@ -131,3 +131,49 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 - `Blend2D`・`blend2d` の文字列は DATA を含む複数ファイルに現れる。`block25162_PE.bin` の一致は素材ファイル名 (`Baggy` 等) による偶然の一致で、Blend2D 本体ではない。
 
 **未判明**: FL 本体が `block24339` の `AggCreateInstance` をどこから呼ぶか (呼び出し元の特定)。名前 import が無いため、`GetProcAddress` の引数の文字列を追うか、呼び出し側の関数ポインタ参照を探す必要がある。受入条件 (b) の画素比較の起点はこの未判明の箇所に依存する。
+
+## 9. x64c による lift 可否の実測 (閉包の深さ別)
+
+> 測定 commit: `6b11bfd9` (`agg2d_lift_probe.py` を追加)。本節を含む commit までのコード差分は `git diff 6b11bfd9 HEAD -- tools/shared/oss/blend2d` で 0 行 (本節は REPORT のみ)。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_lift_probe.py` (依存: `pefile`・`capstone`、約 6 s)。出力は `tools/shared/work/agg2d_lift_probe.json` (gitignore)。
+> lifter は `tools/flelift/x64c.py` (FLEngine 向け fork)。`--img 0x180000000 --img-size 0x300000` (block24339 の ImageBase / SizeOfImage)、roots は §5 の unique 79 VA。
+
+| 閉包の深さ (`--closure`) | 関数 | 命令 | 未対応 site | 未対応 mnemonic 種 | 未 lift の直接 call (件) | 使用 import |
+|---|---|---|---|---|---|---|
+| 0 | 79 | 4,265 | 0 | 0 | 107 | 0 |
+| 1 | 110 | 9,007 | 92 | 12 | 36 | 2 |
+| 3 | 168 | 22,681 | 220 | 23 | 26 | 7 |
+| 50 | **221** | 27,684 | **363** | **33** | **0** | 27 |
+
+**判明**:
+- 直接 call の閉包は depth 50 で使い切れる (未 lift の直接 call 0)。vtable 79 関数から到達する内部関数は x64c の閉包で **221** (§6 の `agg2d_callees.py` は 217。差 4 の原因は未確認)。
+- depth 50 の未対応 site 363 件 (33 mnemonic) の上位: `vfmadd213sd` 53・`vmulsd` 50・`vmovsd` 47・`vaddsd` 40・`vsubsd` 37・`vmovq` 28 (残りは VEX スカラー FMA・整数 SSE/AVX・非テンポラル store `movntps`/`vmovntdq` 23 等)。x64c はこれらを未対応として記録し、C への変換を持たない。
+- 未対応 site は `ott_unsup` (実行時 abort) として出力される。到達するかは未検証 (実行トレースが要る)。
+
+## 10. CFG 間接 call の lowering (x64c の不具合候補)
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| x64c の扱い | `call [slot]` / `jmp [slot]` (RIP 相対、IAT 以外) を `ott_dispatch(LD64(slot))` に落とす | `tools/flelift/x64c.py` `i_call` / `i_jmp` (宛先を rax 経由で取らない) |
+| 閉包 (depth 50) 内の dispatch 箇所 | **6** (slot `0x1801b7308` = GuardCFDispatch) | `agg2d_lift_probe.py` の `indirect_dispatch` |
+| slot の値 | `0x1801b5b90`、bytes `ffe0` (`jmp rax`) | 同上 (PE の `.rdata` から読んだ値) |
+| dispatch 表に値があるか | **無い** (`case 0x1801b5b90ULL` が生成 C に無い) | 同上 |
+| 到達時の挙動 | `ott_dispatch` の default → `ott_unlifted` (`tools/flelift/rt/fle_cpu.c`)。hook 無しは abort、hook 有りは戻り値 0 扱いで続行 (silent) | `fle_cpu.c` |
+| 既知の対応 | `tools/icall/REPORT.md` の D13 (MSVC CFG thunk): `rax-in` を保持し、thunk 経由で実 target に解決する処理が既にある。**x64c 経路には未移植** | `tools/icall/REPORT.md` |
+
+**判明**: x64c の CFG 間接 call は、宛先を rax で渡す thunk (`jmp rax`) の値を dispatch し、実 target を見ていない。閉包内の 6 箇所が該当する。
+**未検証**: 到達頻度 (dynamic trace が要る)。42 箇所 (§6) の全体での扱い。
+
+## 11. (a) の判断材料と未解決
+
+- 指示 54 (`docs/pm/DIRECTIVES.md`、2026-10-10): 「upstream からビルドできるものはビルドし、難しいものは lift」。Blend2D 本体は upstream build 済み (`tools/shared/REPORT.md` §3.3)。
+- 閉包 221 関数のうち、Blend2D 本体の内部関数と Agg2D glue の帰属は**未判定** (§9 の閉包は両者を含む)。帰属が決まれば、「glue のみ C++ 再実装 + 本体は upstream build」が取れるかが判断できる。
+- x64c を使う lift 経路は、閉包 221 関数に対して未対応 33 種と CFG rax-in 欠落がある。lift を採るならこの 2 点の解消が前提。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| (a) 221 関数の Blend2D 内部 / Agg2D glue の帰属 (upstream blend2d fc827d5 との照合) | lift か C++ 再実装かの判断の中心 | #146 (次の測定候補) |
+| (a) 方針 (lift / C++ 再実装) の決定。指示 54 を当てはめるかの確認 | 実装に入れない | #146 (PM/ユーザ判断) |
+| x64c の CFG rax-in 対応 (§10)・未対応 33 種 (§9) | lift 採用時の必須項目。silent 経路の恐れ | #146 (方針決定後に子 issue 化) |
+| (b) FL 実描画経路の画素比較 harness | 受入条件 (b) 未達 | #146 |
+| (c) symbol 集合比較の手段 | 受入条件 (c) 未達 | #146 |
