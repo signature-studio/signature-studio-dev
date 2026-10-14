@@ -13,7 +13,7 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 | 5 | `docs/WORKFLOW.md` | subagent 運用・PR・レビュー・検収の**詳細** |
 | 6 | `docs/REFERENCES.md` | 外部ソース・素材・ツール・vendored 台帳 |
 | 7 | `docs/DOC_MAP.md` | REPORT.md 索引・行数上限ルール・ドキュメント責務の正本 |
-| 8 | `docs/DEFECTS.md` | lift の silent miscompile 類型 (D1a〜D22) |
+| 8 | `docs/DEFECTS.md` | lift の silent miscompile 類型 (D1a〜D23) |
 | 9 | `docs/LEGAL.md` | ライセンス/規約上の運用制約 |
 | 10 | `docs/HANDOFF/<日付>.md` | 最新の引継ぎ |
 | 11 | `docs/pm/DIRECTIVES.md` | ユーザ指示の逐語原文 (依頼の正本) |
