@@ -13,7 +13,7 @@
 
 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11` (`tools/m11/work/`)・`toolchain-emsdk`・`toolchain-retdec`。`m11_gen_ir2.sh` で `ir_conditions.json` を生成 (ldfix F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 F4=10 errors=0)。生成した IR の `ir_sha256` は `08c7b646…` で、REPORT_1352 の `2c68ceae…` とは一致しない (IR 指紋は生成ごとに変わるという REPORT_1352 §4 の既知事項と整合。ldfix の件数は一致)。
 
-**`repro_1352.sh` の実測は `7fc1088f` での 1 回 (1 分 54 秒・load 0.63〜0.97) のみ**。現 HEAD `22d4a2eb` では測っていない (`22d4a2eb` の `repro_1352.sh` PASS という記録は取り消し)。`22d4a2eb` と `7fc1088f` の差は `tools/m11` では空 (`git diff 7fc1088f 22d4a2eb -- tools/m11` は 0 行 = 差分は docs のみ) だが、再現の正本はあくまで実測値である。
+**`repro_1352.sh` の実測は `7fc1088f` での 1 回 (1 分 54 秒・load 0.63〜0.97) のみ**。現 HEAD では測っていない (`22d4a2eb` の `repro_1352.sh` PASS という記録は取り消し)。`47e4a846` → `22d4a2eb` の差分は `docs/` と REPORT_1542.md のみ (`git diff 47e4a846 22d4a2eb -- tools/m11` は REPORT_1542.md の 51 行追加)。`7fc1088f` → `22d4a2eb` の `tools/m11` 差分は別の commit 由来 (`47e4a846` より前に入っている) で、`repro_1352.sh` の実測は `7fc1088f` 時点のコードに対するものである。
 
 **未実施 (本 run の素材不足)**: 下表の C・D の所要時間、A〜D の n≥3、`repro_1352.sh` の `22d4a2eb` での再測定。この run には `work-m11`・`toolchain-*` が無く、`m11_build.sh` は実行できなかった。
 
