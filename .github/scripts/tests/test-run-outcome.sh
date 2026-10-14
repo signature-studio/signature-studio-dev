@@ -1,6 +1,6 @@
 #!/bin/bash
 # test-run-outcome.sh — record-run-outcome.sh (implement 終了時の不変条件) と review-recover.sh (review の打ち切りの即時再起動) を
-# fake gh で検証する (#1950)。実行: bash .github/scripts/tests/test-run-outcome.sh
+# fake gh で検証する (#1950、run 中に merge まで済んだ PR は #2590)。実行: bash .github/scripts/tests/test-run-outcome.sh
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -48,13 +48,21 @@ not_logged() { ! grep -q -- "$1" "$LOG"; }
 fx() { printf '%s' "$2" > "$FIX/${1//\//_}"; }
 
 # ------------------------------------------------------------------ record-run-outcome.sh
-reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; unset FAKE_FAIL; }
+RUN0=2026-10-14T10:00:00Z # run を起動したコメントの時刻 (run の開始)
+# recent <json> [page]: run 開始以降の PR の一覧 (pulls?state=all&sort=updated)。既定は空
+recent() { fx "repos/o/r/pulls?state=all&sort=updated&direction=desc&per_page=30&page=${2:-1}" "$1"; }
+# rpr <head> <body> <created> <merged|空> <updated>: 一覧の 1 件
+rpr() { jq -cn --arg h "$1" --arg b "$2" --arg c "$3" --arg m "$4" --arg u "$5" '{head: {ref: $h}, body: $b, created_at: $c, merged_at: (if $m == "" then null else $m end), updated_at: $u}'; }
+# filler <updated> [n]: この issue と関係の無い PR を n 件 (既定 30)
+filler() { jq -cn --arg u "$1" --argjson n "${2:-30}" '[range($n) | {head: {ref: "other"}, body: "", created_at: "2026-10-14T09:00:00Z", merged_at: null, updated_at: $u}]'; }
+reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; unset FAKE_FAIL; recent '[]'; }
 # issue <state> <labels json> [blocked_by]
 issue() { fx repos/o/r/issues/42 "{\"state\":\"$1\",\"labels\":$2,\"issue_dependencies_summary\":{\"blocked_by\":${3:-0}}}"; }
 prs() { fx 'repos/o/r/pulls?state=open&per_page=100' "$1"; }
 # agent の最終回答 (opencode の JSONL。最後の text が回答)
 answer() { printf '{"type":"text","part":{"text":"途中経過"}}\n{"type":"step_finish","part":{}}\n' > "$TMP/oc.jsonl"; jq -cn --arg t "$1" '{type:"text",part:{text:$t}}' >> "$TMP/oc.jsonl"; }
-ev_issue() { printf '{"issue":{"number":42},"comment":{"body":"x"}}' > "$TMP/ev.json"; }
+ev_issue() { printf '{"issue":{"number":42},"comment":{"body":"x","created_at":"%s"}}' "$RUN0" > "$TMP/ev.json"; }
+ev_issue_nots() { printf '{"issue":{"number":42},"comment":{"body":"x"}}' > "$TMP/ev.json"; }
 ev_pr() { printf '{"issue":{"number":42,"pull_request":{"url":"u"}},"comment":{"body":"x"}}' > "$TMP/ev.json"; }
 outcome() { # outcome [env...]: 結果は $TMP/out と $RC
   GITHUB_EVENT_NAME="${EVENT:-issue_comment}" GITHUB_EVENT_PATH="$TMP/ev.json" OC_ISSUE_NUMBER="${NUM-42}" OC_OUTPUT_FILE="$TMP/oc.jsonl" OC_JOB_STATUS=success \
@@ -100,6 +108,10 @@ reset; ev_issue; issue open '[]'; prs '[{"head":{"ref":"42-fix-x"},"body":""}]';
 outcome
 { [ $RC = 0 ] && not_logged 'api -X POST'; }
 expect "open PR with branch 42-... -> nothing recorded (started)" $?
+reset; ev_issue; issue open '[]'; prs '[{"head":{"ref":"42-fix-x"},"body":""}]'; answer '完了'
+outcome
+not_logged 'state=all'
+expect "open PR found -> the recent PR list is not read" $?
 
 # 4b. 本文の Closes #42 / Refs #42 でも着手済み。#421 は別の issue
 reset; ev_issue; issue open '[]'; prs '[{"head":{"ref":"x"},"body":"説明\nRefs #42\n"}]'; answer '完了'
@@ -110,6 +122,80 @@ reset; ev_issue; issue open '[]'; prs '[{"head":{"ref":"421-y"},"body":"Closes #
 outcome
 { [ $RC = 0 ] && reason_is unknown; }
 expect "PR for #421 does not cover #42 (no prefix match)" $?
+
+# 4c. run の最中に open から merge まで済んだ PR (open->merge 12 秒。#2303 型)。run の最後には open の PR が無い -> 着手済み (#2590)
+reset; ev_issue; issue open '[]'; prs '[]'; answer '着手しました'
+recent "[$(rpr 42-x 'Refs #42' 2026-10-14T10:00:30Z 2026-10-14T10:00:42Z 2026-10-14T10:00:50Z)]"
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'created or merged since the run started' "$TMP/out"; }
+expect "PR opened and merged within the run (12 s) -> nothing recorded (started)" $?
+reset; ev_issue; issue open '[{"name":"oc:no-pr"}]'; prs '[]'
+recent "[$(rpr 42-x 'Refs #42' 2026-10-14T10:00:30Z 2026-10-14T10:00:42Z 2026-10-14T10:00:50Z)]"
+outcome
+{ [ $RC = 0 ] && logged 'api -X DELETE repos/o/r/issues/42/labels/oc%3Ano-pr' && not_logged 'api -X POST'; }
+expect "PR merged within the run + stale oc:no-pr -> the label is removed" $?
+# 本文だけで指す PR (ブランチ名は別) も、ブランチ名だけで指す PR (本文は空) も数える
+reset; ev_issue; issue open '[]'; prs '[]'
+recent "[$(rpr feature-y 'Closes #42' 2026-10-14T10:00:30Z 2026-10-14T10:00:40Z 2026-10-14T10:00:50Z)]"
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST'; }
+expect "merged PR whose body says Closes #42 -> started" $?
+reset; ev_issue; issue open '[]'; prs '[]'
+recent "[$(rpr 42-z '' 2026-10-14T10:00:30Z 2026-10-14T10:00:40Z 2026-10-14T10:00:50Z)]"
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST'; }
+expect "merged PR on branch 42-... with an empty body -> started" $?
+# run の最中に作成され、merge せず閉じた PR も『PR を出した』
+reset; ev_issue; issue open '[]'; prs '[]'
+recent "[$(rpr 42-w 'Refs #42' 2026-10-14T10:00:20Z '' 2026-10-14T10:01:00Z)]"
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST'; }
+expect "PR created in the run and closed unmerged -> started (a PR was produced)" $?
+# 先行する run の PR が、この run の最中に merge された
+reset; ev_issue; issue open '[]'; prs '[]'
+recent "[$(rpr 42-v 'Refs #42' 2026-10-14T09:50:00Z 2026-10-14T10:03:00Z 2026-10-14T10:03:00Z)]"
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST'; }
+expect "PR created before the run but merged during it -> started" $?
+
+# 4d. 数えない PR: 別 issue の PR、run の開始より前に作成・merge 済みの PR
+reset; ev_issue; issue open '[]'; prs '[]'; answer '着手報告のみ'
+recent "[$(rpr 421-y 'Closes #421' 2026-10-14T10:00:30Z 2026-10-14T10:00:42Z 2026-10-14T10:00:50Z), $(rpr 43-q 'Refs #43' 2026-10-14T10:00:31Z 2026-10-14T10:00:41Z 2026-10-14T10:00:49Z), $(rpr 99-z 'Refs #99' 2026-10-14T08:00:00Z 2026-10-14T08:00:05Z 2026-10-14T09:00:00Z)]"
+outcome
+{ [ $RC = 0 ] && reason_is unknown && logged 'labels\[\]=oc:no-pr'; }
+expect "merged PRs of other issues (#421 by prefix, #43) do not count -> recorded" $?
+reset; ev_issue; issue open '[]'; prs '[]'; answer '着手報告のみ'
+recent "[$(rpr 42-old 'Refs #42' 2026-10-14T08:00:00Z 2026-10-14T08:00:10Z 2026-10-14T09:00:00Z)]"
+outcome
+{ [ $RC = 0 ] && reason_is unknown && logged 'labels\[\]=oc:no-pr' && not_logged 'page=2'; }
+expect "PR merged before the run started does not count -> recorded (and no older page is read)" $?
+
+# 4e. 頁送り: 30 件の頁が全て run 開始以降の更新で、対象は 2 頁目 -> 数える。3 頁読んでも run の開始に届かなければ PR 無しとして扱う
+reset; ev_issue; issue open '[]'; prs '[]'
+recent "$(filler 2026-10-14T10:30:00Z)" 1
+recent "[$(rpr 42-p 'Refs #42' 2026-10-14T10:00:30Z 2026-10-14T10:00:42Z 2026-10-14T10:00:50Z)]" 2
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && logged 'page=2'; }
+expect "the matching PR is on page 2 (page 1 is all newer unrelated PRs) -> started" $?
+reset; ev_issue; issue open '[]'; prs '[]'; answer '着手報告のみ'
+recent "$(filler 2026-10-14T10:30:00Z)" 1
+recent "$(filler 2026-10-14T10:30:00Z)" 2
+recent "$(filler 2026-10-14T10:30:00Z)" 3
+outcome
+{ [ $RC = 0 ] && reason_is unknown && not_logged 'page=4' && grep -q '3 pages of recent PRs' "$TMP/out"; }
+expect "3 pages never reach the run start -> at most 3 pages are read, treated as no PR" $?
+
+# 4f. run の開始: 起動コメントの時刻が無ければ run の run_started_at。どちらも分からなければ書かない
+reset; ev_issue_nots; issue open '[]'; prs '[]'; fx repos/o/r/actions/runs/555 '{"run_started_at":"2026-10-14T10:00:05Z"}'
+recent "[$(rpr 42-x 'Refs #42' 2026-10-14T10:00:30Z 2026-10-14T10:00:42Z 2026-10-14T10:00:50Z)]"
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST'; }
+expect "no comment time in the event -> run_started_at is used" $?
+reset; ev_issue_nots; issue open '[]'; prs '[]'; answer '着手報告のみ'
+recent "[$(rpr 42-x 'Refs #42' 2026-10-14T10:00:30Z 2026-10-14T10:00:42Z 2026-10-14T10:00:50Z)]"
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'could not tell when the run started' "$TMP/out"; }
+expect "run start unknown (no comment time, run lookup fails) -> no write, exit 0" $?
 
 # 5. 明示的な終了状態 (oc:stuck / needs-user-input / blocked ラベル、open な依存) -> 何もしない
 for lab in oc:stuck needs-user-input blocked; do
@@ -174,6 +260,10 @@ reset; ev_issue; issue open '[]'; prs '[]'
 FAKE_FAIL='pulls?state=open' outcome
 { [ $RC = 0 ] && not_logged 'api -X POST'; }
 expect "open PR list fails -> no write (cannot tell started from floating), exit 0" $?
+reset; ev_issue; issue open '[]'; prs '[]'
+FAKE_FAIL='pulls?state=all' outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST'; }
+expect "recent PR list fails -> no write (cannot tell started from floating), exit 0" $?
 
 # 11. DRY=1 は書かない
 reset; ev_issue; issue open '[]'; prs '[]'; answer '停止します'

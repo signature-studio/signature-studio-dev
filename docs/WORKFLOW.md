@@ -367,7 +367,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   PR を出さずに終わっていた (着手報告のみ・停止報告・1 run に収まらない・素材不足)。
 
   - **implement の終了時** (`record-run-outcome.sh`、`opencode.yaml` の最終 step。`always()` で、agent の失敗・cancel の後も走る。job は失敗させない):
-    issue の `/oc` run が、open PR も、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
+    issue の `/oc` run が、PR (open のもの、または run の開始以降に作成・merge されたもの。open から merge まで数秒で済む PR を含む) も、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
     issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> run=<run id> -->` を残す。
     PM Worker はコメント本文を解析せず、**ラベルとマーカー**で扱う。`oc:no-pr` は、次の run が PR を出す (または issue が close・明示的な状態になる) と、この script が外す。
     `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ。優先順 artifact > blocked > split > stop):

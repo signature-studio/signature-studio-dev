@@ -7,7 +7,8 @@
 # run の最後 (workflow の if: always() の step) で、issue が次のどれかかを判定する:
 #   closed                              : 何もしない (oc:no-pr を外す)
 #   明示的な終了状態                     : oc:stuck / needs-user-input / blocked (ラベル、または依存 issue が open) -> 何もしない (oc:no-pr を外す)
-#   着手済み                            : この issue を指す open PR がある (ブランチ名 <N>-... か本文の Closes/Refs/Fixes #N) -> 何もしない (oc:no-pr を外す)
+#   着手済み                            : この issue を指す PR がある (ブランチ名 <N>-... か本文の Closes/Refs/Fixes/Resolves #N) -> 何もしない (oc:no-pr を外す)
+#                                         open の PR、または run の開始以降に作成・merge された PR (open から merge まで数秒で済む PR は、run の最後には open でない: #2590)
 #   上のどれでもない (PR も push も無い)   : ラベル oc:no-pr と構造化コメントを残す
 #       <!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> run=<run id> -->
 # PM Worker はコメント本文を解析せず、ラベルとマーカーで判断する。oc:no-pr は次の run が PR を出したときこの script が外す。
@@ -93,15 +94,44 @@ if jq -e '([.labels[].name] | any(. == "oc:stuck" or . == "needs-user-input" or 
   exit 0
 fi
 
+# この issue を指す PR (ブランチ名が <N>- で始まる、または本文が Closes/Refs/Fixes/Resolves #N)
+MINE='(((.head.ref // "") | test("^" + $n + "-")) or ((.body // "") | test("(Closes|Refs|Fixes|Resolves) #" + $n + "([^0-9]|$)"; "i")))'
+
 if ! prs_raw="$(gh api --paginate "repos/$R/pulls?state=open&per_page=100")"; then
   echo "::warning::could not list open PRs: the run outcome is not recorded"
   exit 0
 fi
-if jq -s -e --argjson n "$N" '[.[][] | select(((.head.ref // "") | test("^" + ($n | tostring) + "-")) or ((.body // "") | test("(Closes|Refs|Fixes|Resolves) #" + ($n | tostring) + "([^0-9]|$)"; "i")))] | length > 0' <<< "$prs_raw" > /dev/null; then
+if jq -s -e --arg n "$N" "[.[][] | select($MINE)] | length > 0" <<< "$prs_raw" > /dev/null; then
   echo "issue #$N has an open PR: started"
   remove_label
   exit 0
 fi
+
+# run の最中に open から merge まで済んだ PR は、ここでは open でない。run の開始以降に作成または merge された PR も着手済みとする。
+# run の開始は、この run を起動したコメントの時刻 (無ければ run の run_started_at)。search API は 30 回/分の制限があるので使わない。
+since="$(jq -r '.comment.created_at // empty' "$EV" 2> /dev/null)"
+[ -n "$since" ] || since="$(gh api "repos/$R/actions/runs/${GITHUB_RUN_ID:-0}" --jq '.run_started_at // empty' 2> /dev/null)"
+if [ -z "$since" ]; then
+  echo "::warning::could not tell when the run started: the run outcome is not recorded"
+  exit 0
+fi
+# 更新順の新しい 30 件ずつ、run の開始より前の更新に届くまで (最大 3 頁)。作成または merge が run の開始以降のものだけ数える
+SINCE='((.created_at // "") >= $since or (.merged_at // "") >= $since)'
+page=1
+while [ "$page" -le 3 ]; do
+  if ! recent="$(gh api "repos/$R/pulls?state=all&sort=updated&direction=desc&per_page=30&page=$page")"; then
+    echo "::warning::could not list recent PRs: the run outcome is not recorded"
+    exit 0
+  fi
+  if jq -s -e --arg n "$N" --arg since "$since" "[.[][] | select($MINE and $SINCE)] | length > 0" <<< "$recent" > /dev/null; then
+    echo "issue #$N has a PR created or merged since the run started ($since): started"
+    remove_label
+    exit 0
+  fi
+  jq -e --arg since "$since" '(.[-1].updated_at // "") < $since' <<< "$recent" > /dev/null && break
+  page=$((page + 1))
+done
+[ "$page" -le 3 ] || echo "::notice::3 pages of recent PRs did not reach the run start ($since): treated as no PR"
 
 # --- ここから: PR も push も無く、明示的な終了状態でもない -> oc:no-pr と構造化コメント ---
 f="${OC_OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/oc-output.jsonl}"
