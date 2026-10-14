@@ -5,7 +5,7 @@
 #   - 第 3・第 4 引数を与えると、<file> だけを <parent-commit> の版に差し替える (ablation)
 #   - IR を m11_gen_ir2.sh で作り直し、ON (M11_OV_CLASSCREATE=1) で build し、unit survey を取る
 #   - 出力: unit 101 の kind・0x41037d / 0x41032e の hit・halt0 の unit 数
-#   前提: $HOME/artifacts/work-m11.tar.zst と fl-win64.tar.zst が実在 (WORKFLOW §11)。fl-win64 は下の FL_WIN64_DIR に展開済みであること。
+#   前提: ${ARTIFACTS_DIR:?}/work-m11.tar.zst と fl-win64.tar.zst が実在 (WORKFLOW §11)。fl-win64 は下の FL_WIN64_DIR に展開済みであること。
 set -uo pipefail
 C="${1:?commit を指定}"; F="${2:-}"; P="${3:-}"
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -15,7 +15,7 @@ D="$ROOT/$C${F:+_abl}"
 rm -rf "$D"; mkdir -p "$D"
 git -C "$REPO" archive "$C" tools/m11 tools/shared | tar -x -C "$D" || { echo ARCHIVE_FAIL; exit 1; }
 if [ -n "$F" ]; then git -C "$REPO" show "$P:$F" > "$D/$F" || { echo SHOW_FAIL; exit 1; }; fi
-tar --zstd -xf "$HOME/artifacts/work-m11.tar.zst" -C "$D" || { echo WORK_FAIL; exit 1; }
+tar --zstd -xf "${ARTIFACTS_DIR:?}/work-m11.tar.zst" -C "$D" || { echo WORK_FAIL; exit 1; }
 cd "$D/tools/m11" || exit 1
 export FL_WIN64_DIR="${FL_WIN64_DIR:-$RUNNER_TEMP/fl-win64}"
 export M11_PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
