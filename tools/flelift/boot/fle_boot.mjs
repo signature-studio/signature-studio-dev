@@ -23,9 +23,11 @@ let m = await (mod.default ? mod.default() : mod());
 const U8 = m.HEAPU8;
 
 if (TRACE) { try { m._shimx_set_trace(1); } catch { /* nosx では未 export */ } }
-// FLE-6: dsp_ippv2 shim は既定で無効。FLE_IPP=1 のときだけ有効 (ネガコン FLE_IPP=0 / 未指定 = 修正前の挙動)
-const IPP_ON = process.env.FLE_IPP === '1';
-m._fle_boot_set_ipp(IPP_ON ? 1 : 0);
+// FLE-6: dsp_ippv2 shim は既定で無効。FLE_IPP=1 のときだけ有効 (ネガコン FLE_IPP=0 / 未指定 = 修正前の挙動)。
+// FLE_IPP=2 (#2702): shim 有 + ippsZero_8u 以外の IPP 呼出で停止 (停止名と呼出元を summary に出す)。
+const IPP_MODE = { '1': 1, '2': 2 }[process.env.FLE_IPP] || 0;
+const IPP_ON = IPP_MODE !== 0;
+m._fle_boot_set_ipp(IPP_MODE);
 
 const MM = 0x13a5c90, PKG = 0x13768b0;
 function rd64(a) { return '0x' + U8.slice(a, a + 8).reduce((s, b, i) => s + BigInt(b) * (1n << BigInt(8 * i)), 0n).toString(16); }
@@ -94,7 +96,22 @@ boot.ipp_total = Number(m._fle_ipp_total());
 boot.ipp_called = [];
 for (let i = 0; i < Number(m._fle_ipp_names()); i++) {
     const c = Number(m._fle_ipp_count(i));
-    if (c) boot.ipp_called.push([m.UTF8ToString(m._fle_ipp_name(i)), c]);
+    if (c) boot.ipp_called.push([m.UTF8ToString(m._fle_ipp_name(i)), c, '0x' + Number(m._fle_ipp_site(i)).toString(16)]);
+}
+// ippsZero_8u の唯一の呼出し点は 0x67264b (`call qword ptr [rax]`・FF 10)。target は直前の 0x672644 `mov rax,[0x15e0a48]` で読む (PE の逆アセンブル実測)。0x67264d は戻り番地 (ipp.called の ret)。読出し経路の値を残す
+const objPtr = Number(BigInt(rd64(0x15e0a48)));
+boot.ipp_call_slot = { slot_15e0a48: rd64(0x15e0a48), obj_first_qword: objPtr ? rd64(objPtr) : null };
+const stopNm = m.UTF8ToString(m._fle_ipp_stop_name());
+boot.ipp_stop = stopNm ? { name: stopNm, site: '0x' + Number(m._fle_ipp_stop_site()).toString(16) } : null;
+// IPP トークン (0x7F100000+i) が guest メモリのどこに書かれたか (0x15F34A0 が 0 のときの所在確認。image 域のみ走査)
+boot.ipp_token_at = [];
+for (let i = 0; i < Number(m._fle_ipp_names()); i++) {
+    if (!Number(m._fle_ipp_count(i))) continue;
+    const tok = 0x7F100000 + i, hits = [];
+    for (let a = 0x400000 >>> 2; a < 0x2000000 >>> 2 && hits.length < 4; a++) {
+        if (m.HEAPU32[a] === tok) hits.push('0x' + (a * 4).toString(16));
+    }
+    boot.ipp_token_at.push([m.UTF8ToString(m._fle_ipp_name(i)), hits]);
 }
 // unit 番号 = units_run は「dispatch した unit 数」(開始で計数、完了でない)。
 // raise 等で中断した場合、実行中 (未完走) なのは units_run 番目 (1-based) の unit。
@@ -154,7 +171,7 @@ const summary = {
     boot,
     survey,
     soft_top: softs.slice(0, 40),
-    ipp: { on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ptr_15F40E8: boot.ipp_ptr_15F40E8, total: boot.ipp_total, called: boot.ipp_called },
+    ipp: { mode: IPP_MODE, on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ptr_15F40E8: boot.ipp_ptr_15F40E8, total: boot.ipp_total, called: boot.ipp_called, stop: boot.ipp_stop, token_at: boot.ipp_token_at, call_slot: boot.ipp_call_slot },
     notes: {
         entry: '0x1376820', longjmp_target: '0x1376840', init_table: '0x13768b0',
         baseline_retdec: {
@@ -174,11 +191,12 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     longjmp: boot.longjmp, getmem: boot.getmem, freemem: boot.freemem,
     va_calls: boot.va_calls, va_bytes: boot.va_bytes, exit: boot.exit,
     survey: survey && survey.byCls ? survey.byCls : (survey && survey.prologue_threw || null),
-    ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
-    ipp_total: boot.ipp_total, ipp_called: boot.ipp_called,
+    ipp_mode: IPP_MODE, ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
+    ipp_total: boot.ipp_total, ipp_called: boot.ipp_called, ipp_stop: boot.ipp_stop,
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
-// FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない
+// FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない。
+// mode 2 (#2702) は停止を測る測定モードなので判定しない (ok の値は出すが終了コードは変えない)。
 const ippPtrOk = IPP_ON ? !/^0x0+$/.test(boot.ipp_ptr_15F34A0) : /^0x0+$/.test(boot.ipp_ptr_15F34A0);
-console.log('FLEBOOT_IPP_CHECK ' + JSON.stringify({ ipp_on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ok: ippPtrOk }));
-if (!ippPtrOk) process.exitCode = 3;
+console.log('FLEBOOT_IPP_CHECK ' + JSON.stringify({ mode: IPP_MODE, ptr_15F34A0: boot.ipp_ptr_15F34A0, ok: ippPtrOk }));
+if (!ippPtrOk && IPP_MODE !== 2) process.exitCode = 3;

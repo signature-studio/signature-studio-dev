@@ -102,6 +102,9 @@ if ! cmp -s work/boot_final.ll work/boot_final.alloca.tmp.ll; then mv work/boot_
 #   M11_GUARD699=off で脱落状態に戻す (ネガコン)。M11_GUARD699_COND で条件を差し替え (ネガコン: 常に不成立)。
 python3 guard699/m11_guard699.py work/boot_final.ll work/boot_final.guard699.tmp.ll --mode "${M11_GUARD699:-on}" --cond "${M11_GUARD699_COND:-icmp sle i32 %9, 0}" --report work/guard699_report.json
 if ! cmp -s work/boot_final.ll work/boot_final.guard699.tmp.ll; then mv work/boot_final.guard699.tmp.ll work/boot_final.ll; else rm -f work/boot_final.guard699.tmp.ll; fi
+# #2773: 4fa210 (件数 0 の線形探索) の入口ガードを IR に復元 (D19 同型・冪等)。M11_GUARD4FA210=off で脱落状態に戻す (ネガコン)。
+python3 guard4fa210/m11_guard4fa210.py work/boot_final.ll work/boot_final.guard4fa210.tmp.ll --mode "${M11_GUARD4FA210:-on}" --report work/guard4fa210_report.json
+if ! cmp -s work/boot_final.ll work/boot_final.guard4fa210.tmp.ll; then mv work/boot_final.guard4fa210.tmp.ll work/boot_final.ll; else rm -f work/boot_final.guard4fa210.tmp.ll; fi
 # #912: 4fb090 の 4fa070 呼出し第 2 引数 dl を機械語 (mov dl,1) どおりに戻す (冪等)。既定 0 (OFF)。M11_FIX_912=1 で有効化。
 #   現 head (M2q 込み IR) では ON/OFF の survey 差 0 (REPORT_912 §10)。旧 IR (a5e9c1ed) では 101/291/296 の oob を解消した (REPORT_912 §7-旧)。
 python3 fix912/m11_fix912.py work/boot_final.ll work/boot_final.fix912.tmp.ll --mode "$([ "${M11_FIX_912:-0}" = 1 ] && echo on || echo off)" --report work/fix912_report.json
