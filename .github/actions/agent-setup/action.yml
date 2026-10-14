@@ -244,7 +244,7 @@ runs:
       run: |
         set -euo pipefail
         venv="$HOME/.local/agent-py"
-        shim="$HOME/.local/agent-py-shim"
+        shim="${venv}-shim"
         uv venv --clear --python 3.14 "$venv"
         uv pip install --python "$venv/bin/python" --require-hashes --only-binary :all: -r "${{ github.action_path }}/requirements-py.txt"
         "$venv/bin/python" -c "import pefile, capstone, numpy; print('pefile', pefile.__version__, 'capstone', capstone.__version__, 'numpy', numpy.__version__)"
