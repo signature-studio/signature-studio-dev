@@ -208,3 +208,8 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 - 欠落 define は **211 → 209** (B 25,828 → 25,411)。 defines 1391 → 1393 (+2)。 参照欠落 `missing_ref` 67 は不変 (改名は `@<名前>` の参照も書き換えるが、欠落参照の集計は変わらなかった)。
 - 受入条件 `missing_define` = 0 は **未達**。 残り 209 件は §C-1 (a) の RetDec 静的検出 (`statically linked function`) で、 `PLUG_NO_STATIC_DETECT=1` (#1486 の opt-in) の既定化が要る。 起票先: #1536。
 - `emcc -c` は既定・opt-in とも rc 1 (E3 が先に止める)。 両者の `first_errors.txt` は同一。
+
+
+## F. #1536 (PLUG_NO_STATIC_DETECT の既定化) の節
+
+§F は 250 行上限のため [REPORT_APPENDIX_F.md](REPORT_APPENDIX_F.md) に分割移動した。
