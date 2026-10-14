@@ -5,10 +5,10 @@
 
 ## 測定
 
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`block00031_PE.bin` のみ。実測 2.3 秒)。
-- 逆アセンブル: `analysis/flapi/pe_disasm.py`。参照列挙: `analysis/flapi/pe_xref.py 141d6b8,141d6c0` (hits 9・stores 3・48.3 秒)、`pe_xref.py 125b1c0,125b0f8` (hits 2・stores 0・48.3 秒。hits は全て `0x125b0f8` の load)。
-- 書込み候補の列挙: `analysis/flapi/pe_slot_writers.py 15e4790 8` (命令 5,022,467・スロット読出し 2422・`[reg+8]` 書込み 3347・候補 20・49.4 秒)。
-- 測定 commit: `9e3f9edc` (`pe_slot_writers.py` の走査修正。コードを変えた最後の commit)。走査修正は境界をまたぐ命令の読み飛ばしを直すもので、修正前 (`b5adbf47`) と数値は同一 (命令 5,022,467・候補 20)。上の 3 測定は HEAD `f295c8bc` で再現した値。以後の commit は REPORT と DOC_MAP のみ。差分 0 の証跡は PR 本文に添付 (`git diff 9e3f9edc HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests`)。
+- 素材: `$HOME/artifacts/fl-win64.tar.zst` (`$ARTIFACTS_DIR` は未設定) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (`block00031_PE.bin` のみ。実測 2.8 秒)。
+- 逆アセンブル: `analysis/flapi/pe_disasm.py 11d1430 14` (0.08 秒)。参照列挙: `analysis/flapi/pe_xref.py 141d6b8,141d6c0` (命令 5,022,467・hits 9・stores 3・62.7 秒)、`pe_xref.py 125b1c0,125b0f8` (命令 5,022,467・hits 2・stores 0・63.6 秒。hits は全て `0x125b0f8` の load)。
+- 書込み候補の列挙: `analysis/flapi/pe_slot_writers.py 15e4790 8` (命令 5,022,467・スロット読出し 2422・`[reg+8]` 書込み 3347・候補 20・63.7 秒)。
+- 測定 commit: `cd5f0609` (`origin/main` を取り込んだ merge commit。コードを変えた最後の commit)。前回の測定 commit `9e3f9edc` からの差分は main 側の変更 (`tools/python/analysis/flapi/pe_callgraph.py` 等 14 ファイル) で、上の 4 測定に使うスクリプト (`pe_disasm.py`・`pe_xref.py`・`pe_slot_writers.py`) は両 commit で同一。`cd5f0609` で 4 測定を再実行し、前回と同じ値を得た。走査修正 (`9e3f9edc`。境界をまたぐ命令の読み飛ばしを直す。修正前 `b5adbf47` と数値は同一) の経緯は変えない。以後の commit は本付録のみ。差分 0 の証跡: `git diff cd5f0609 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
 - 検証範囲: PE の逆アセンブルと参照列挙のみ。wasm・mock・C provider の実行は未実行 (コード差分 0)。
 
 ## 1. `0x11d1430` の参照鎖 (確定)
