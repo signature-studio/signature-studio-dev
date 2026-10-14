@@ -27,6 +27,7 @@ const seq = [
   ["channels.getChannelName", [3]],
   ["channels.setChannelName", [1, "Clap"]],
   ["channels.getChannelName", [1]],
+  ["channels.soloChannel", [0, true, false]],
   ["channels.isChannelSelected", [0]],
   ["channels.selectChannel", [1, true]],
   ["channels.isChannelSelected", [1]],

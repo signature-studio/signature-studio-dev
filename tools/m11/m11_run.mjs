@@ -62,3 +62,7 @@ console.log('M11_RESULT ' + JSON.stringify({
   threw,
   ptrcheck: ptrCheckRes,
 }));
+if (!ptrCheckRes.gate.pass) {   // #2778: ptrcheck ゲート不合格 (M11_PTRCHECK_MAX_NEW). JSON は出した後に非 0
+  console.error('FAIL: ptrcheck image_va_words_new=' + ptrCheckRes.image_va_words_new + ' > max=' + ptrCheckRes.gate.max + ' (' + ptrCheckRes.gate.env + ')');
+  process.exitCode = 1;
+}

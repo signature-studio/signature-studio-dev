@@ -9,11 +9,15 @@ class FlError extends Error {
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
+// mixer の色の R/B 入替え (REPORT_PY115.md §2)。MIX_DEFAULT_COLOR は未確定の既定値 (C の MIX_DEFAULT_COLOR と同じ仮置き)
+const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
+const MIX_DEFAULT_COLOR = 0x5a6b7c;
 
 export function createMockEngine() {
   const st = {
     tempo: 130,
     playing: false,
+    changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -22,7 +26,7 @@ export function createMockEngine() {
     ],
     mixer: Array.from({ length: 127 }, (_, i) => ({
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
-      color: 0x5A6B7C, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
+      color: 0, colorSet: false, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
@@ -144,7 +148,8 @@ export function createMockEngine() {
     "mixer.setTrackVolume": (i, v) => { tr(i).vol = v; },
     "mixer.getTrackPan": (i) => F(tr(i).pan),
     "mixer.setTrackPan": (i, v) => { tr(i).pan = v; },
-    "mixer.setTrackColor": (i, c) => { tr(i).color = c; },
+    "mixer.setTrackColor": (i, c) => { const t = tr(i); t.color = (swapRb(c) | 0xff000000) >>> 0; t.colorSet = true; },
+    "mixer.getTrackColor": (i) => { const t = tr(i); return (swapRb(t.colorSet ? t.color : swapRb(MIX_DEFAULT_COLOR)) | 0xff000000) >>> 0; },
     "mixer.isTrackSelected": (i) => tr(i).sel,
     "mixer.muteTrack": (i, v) => { tr(i).mute = tog(tr(i).mute, v); },
     "mixer.soloTrack": (i) => { tr(i).solo = !tr(i).solo; },
@@ -163,7 +168,7 @@ export function createMockEngine() {
     "playlist.trackCount": () => st.playlist.length,
     "playlist.getTrackName": (i) => { i = ix(i); return st.playlist[i - 1]?.name ?? ""; }, // 範囲外は空文字 (C と同じ)
     "playlist.setTrackName": (i, n) => { pl(i).name = str(n); },
-    "playlist.setTrackColor": (i, c) => { pl(i).color = c; },
+    "playlist.setTrackColor": (i, c) => { pl(i).color = (((c & 0xff) << 16) | (c & 0xff00) | ((c >>> 16) & 0xff)) & 0xffffff; }, // FL の格納式 (C と同じ)
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
@@ -177,6 +182,11 @@ export function createMockEngine() {
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
     // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
     "general.getVersion": (...a) => { arity(a, 0, 0); return st.scriptingVersion ?? 1; },
+    // PY-87 (#2738): 状態 1 つを返すだけの 4 関数。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "general.getChangedFlag": (...a) => { arity(a, 0, 0); return st.changedFlag; },
+    "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
+    "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
+    "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
