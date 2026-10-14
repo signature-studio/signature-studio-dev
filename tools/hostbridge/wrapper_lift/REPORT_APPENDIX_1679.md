@@ -2,7 +2,8 @@
 
 > **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §12。本付録は計測の全文。
 
-測定 commit: `10d45b08` (`retdec_gotofix.py` / `goto_jump_check.py` を追加した commit。以降、本 PR でこの範囲のコードは変えていない)。
+測定 commit: `10d45b08` (`retdec_gotofix.py` / `goto_jump_check.py` を追加した commit。本 PR でこの commit 以降に変えたのは main 取り込みによる `retdec_batch.py` (+16 / -2、#1819 の `lift_set` 再試行) のみ)。
+**本付録の値は `10d45b08` 時点の値で、現 HEAD (`retdec_batch.py` が変わった状態) では未測定。** 現 HEAD での再測定は `toolchain-retdec` / `toolchain-emsdk` の素材が必要で、未実施。
 環境: `[RETDEC]` v5.0 (`toolchain-retdec`)・`[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP` に展開)。load average (1 分値) 0.07–0.74。
 
 ## 1. 原因の切り分け (受入条件 1)
@@ -47,7 +48,7 @@ RetDec の出力 C に現れる goto 相当は 2 種類ある。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `statement not in loop` 27 件 (飛び先の注釈無し)・`use of undeclared label` 16 件 | exit 0 が 40 件中 2 件のみ | 子 issue (本 PR で起票、番号は PR 本文・issue コメントに記載) |
+| `statement not in loop` 27 件 (飛び先の注釈無し)・`use of undeclared label` 16 件 | exit 0 が 40 件中 2 件のみ | #1954 (HB-H41) |
 | 引数型不一致 1,245 件 | exit 0 が 40 件中 2 件のみ (主因) | #1680 (HB-H36) |
-| 飛び先の jump が機械語に無い `break` 113 件 | 飛び先の正しさ未検証 | 子 issue の範囲 |
-| 修復後の wasm 実行 (bit 一致) | 制御構造の正しさ未検証 | 未起票 (実行検証は #829 系) |
+| 飛び先の jump が機械語に無い `break` 113 件 | 飛び先の正しさ未検証 | #1954 (HB-H41) の範囲 |
+| 修復後の wasm 実行 (bit 一致) | 制御構造の正しさ未検証 | 本 issue の範囲外。実行検証は #829 (HB-H20) 系で扱う |

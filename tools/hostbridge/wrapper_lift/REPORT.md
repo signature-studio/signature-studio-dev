@@ -232,7 +232,7 @@
 
 ## 10. #1522: `no_definition` 残り 4 件の原因 (測定 commit: 05db246f)
 
-- 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。→ #1819 で原因特定・修正済み (§11)。
+- 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。→ #1819 で原因特定・修正済み (§11・全文は `REPORT_APPENDIX_1819.md`)。
 - 判定の取りこぼし (3 件): 旧 `DEF_RE` は `function_<VA>` 名だけを定義とみなした。RetDec は関数名を別名で出すことがあり、`0x41c480` は `__dbk_fcall_wrapper`、`0x86ab10` / `0x86a970` は `CreatePlugInstance`、`0x87cdf0` / `0x87cfc0` は `entry_point`。単独 range の RetDec 出力 (exit 0) で定義を確認。判定に `// Address range: 0x<VA> - ...` 直後の関数定義を追加して修正。
 - batch 固有の脱落 (1 件): `0x570b30` は batch (500 関数) 内の出力に定義もヘッダも無い。単独 range・2 件ペアでは `function_570b30` として出る。batch の RetDec 出力が範囲を落とす現象で、原因は未特定。
 - 再計測 (retdec_batch.py、判定修正後): block19091 は 19,816 中 19,815 ok・1 件 `no_definition` (0x570b30)、block23676 は 19,826 中 19,825 ok・1 件 (0x570b30)。RetDec 呼び出し 40 回、全 exit 0。所要 273.95 s / 274.23 s。load average 0.01–0.28。
@@ -242,39 +242,9 @@
 
 ## 11. #1819: batch で `0x570b30` が脱落する原因と修正 (測定 commit: 4568c3f3)
 
-- 結論: 原因は RetDec 側の範囲の取り扱い。直前の範囲の終端が対象の開始 VA と**ちょうど隣接**するとき、batch 出力は対象を 1 バイト手前の VA (`0x570b2f`) で `function_570b2f` と出す。定義ヘッダは `0x570b2f` 名になり、`0x570b30` の判定では `no_definition` になる。batch 内の他関数の影響ではない (隣接の有無だけで決まる)。修正は `retdec_batch.py` で定義が出なかった範囲だけを再試行する。block19091 / block23676 とも `no_definition` 0 件。
-- 原因の切り分け (block19091、RetDec v5.0、`--select-decode-only`、いずれも exit 0):
-
-| 入力範囲の組 | `0x570b30` の定義 |
-|---|---|
-| 単独 `0x570b30-0x570bad` | ok |
-| 500 関数 batch 全体 (対象は 83 番目) | 脱落 (`0x570b2f` 名で出力) |
-| batch の先頭 〜 対象 (prefix, 84 件) | 脱落 |
-| 対象 〜 末尾 (suffix, 417 件) | ok |
-| `0x56f5c0-0x570b30` + 対象 | 脱落 |
-| `0x56f5c0-0x570aa1` + 対象 (直前範囲を短縮) | ok |
-| `0x56f5c0-0x570b2f` + 対象 (直前範囲を 1 バイト短縮) | ok |
-| `0x56f180-0x56f5b7` + 対象 など、隣接しない 2 件組 | ok |
-
-- 修正 (`4568c3f3`): `lift_set` で exit 0 のとき定義が出なかった範囲を集め、全件欠落でなければ欠落範囲だけを再帰で再試行する。欠落が全件 (または単独範囲) のときだけ `no_definition` とする。分割は従来通り。再試行は範囲が必ず減るので停止する。
-- 再測定 (commit `4568c3f3`、`retdec_batch.py` を両 block に 1 回ずつ実行):
-
-| 項目 | block19091 | block23676 |
-|---|---|---|
-| 関数数 | 19,816 | 19,826 |
-| lift_ok | 19,816 | 19,826 |
-| lift_fail (`no_definition` 含む) | 0 | 0 |
-| RetDec 呼び出し回数 | 41 | 41 |
-| RetDec 所要 (seconds_all) | 287.67 s | 289.77 s |
-| wall | 287.98 s | 290.08 s |
-| load average (開始→終了) | 0.24→1.00 | 1.00→1.00 |
-
-- 環境: `[RETDEC]` v5.0 (`toolchain-retdec`)、`fl-win64` 26.1.7.5653 の展開先。素材は `tar --zstd -xf` で展開済みを確認。
-- 未実施: ネガティブコントロール (`--nc`) は本 issue の受入条件外のため未実施。
+- 結論: 脱落は RetDec の隣接範囲の取り扱いが原因。`retdec_batch.py` で定義が出なかった範囲だけを再試行して修正。切り分けと測定は `REPORT_APPENDIX_1819.md`。
 
 ## 12. #1679: loop 外 break・undeclared label の制御構造復元 (測定 commit: 10d45b08)
 
-- 結論: loop 外の `break -> 0x<VA>` (78 件 / block19091) は、RetDec の注釈 `// 0x<VA>` が同じ関数内にある 51 件だけ、その飛び先への `goto lab_0x<VA>` に直した (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
-- emcc exit 0 (40 ファイル中): 修復のみ 1 → 修復 + goto 化 2 (block19091 / block23676 とも)。error 行は 1,377 → 1,326 (block19091)。
-- 残り 43 件 (`statement not in loop` 27・`use of undeclared label` 16) は子 issue `[HB-H41]` に分割。引数型不一致 1,245 件は #1680 (HB-H36)。
-- 測定の全文・機械語照合 (1,314 / 1,427 件が jump で一致)・方式の根拠は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1679.md`。
+- 結論: loop 外の `break -> 0x<VA>` は、飛び先の注釈 `// 0x<VA>` が同じ関数内にあるものだけ `goto lab_0x<VA>` に直す (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
+- 測定値 (emcc exit 0 件数・error 行数)・方式の根拠・未検証項目は付録 `REPORT_APPENDIX_1679.md` にのみ置く。残りは子 issue #1954 (HB-H41) と #1680 (HB-H36)。
