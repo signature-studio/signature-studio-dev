@@ -149,7 +149,9 @@
 - **一貫性 (#3154)**: hit の前後 WINDOW=4 個 (範囲内) の entry のうち、d≠0 で対象と同じセクションを指す割合が 1/2 以上なら OK。d=0 は base 自身を指すため除外し、hit 自体が d=0 なら NG。
 - **対照 (#3154)**: `.rdata` 内のランダム VA 40 件 (seed 3154) を同じ走査・同じ一貫性判定に通す。再現: `python3 license/scripts/mx_table_refs.py --control` (既定の素材パスは `tools/targets/massivex` から実行)。
 - 自己検査: `--selftest` PASS (rc 0)。4 ケース = 一貫 OK 1 件 (既知の表 entry) と一貫 NG 3 件 (周辺が別セクション・周辺が 0 埋め・hit が d=0 の自己参照)。判定 (一貫性) を常に真にする / hit の d=0 ガードを外す / 周辺の 0 除外を外す、の 3 種の mutant で FAIL を確認。
-- 測定 commit `8b2eb41e` (`git diff 8b2eb41e HEAD -- tools/targets/massivex/license/scripts` の出力は空)。素材 `plugins-massivex` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致)。
+- 測定 commit `8b2eb41e` (素材 `plugins-massivex` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致))。
+- 修正 commit `bf1ad2de` (#3173 round 1): `scan_tables` の `targets`・`sections` を省略可能にし、`mx_dll_table_refs.py` の呼出しを更新。`git diff --stat 8b2eb41e bf1ad2de -- tools/targets/massivex/license/scripts` は 2 files, 17 insertions(+), 3 deletions(-)。コードが変わったため、下表の数値は `8b2eb41e` 時点の値で `bf1ad2de` での再測定は未了 (本 run に素材 `plugins-massivex` が無い)。
+- `bf1ad2de` の検証: `--selftest` PASS (rc 0)、既定経路の検査を外す mutant (`targets = {}`) で FAIL。`mx_dll_table_refs.py` は合成 PE (表 1 件・N6-1 を指す) で `main` と同じ hit 1 件 (rc 0)、修正前 `190c2e20` は `TypeError` で再現。実素材の DLL で hit 4 件を再現する検証は未実施。
 
 | 測定 (`8b2eb41e`・同一 VM 4 vCPU) | 所要 (wall) | 結果 |
 |---|--:|---|
@@ -174,7 +176,7 @@
 | うち control 18 (0x184183474。表の base 自身の 0 埋め領域で d=0 が全件 hit) | 64 | 0 |
 | control 18 を除く (39 対象) | 6 (平均 0.154) | 5 (平均 0.128) |
 
-`--control` の出力 (hit が 1 件以上の対象のみ抜粋。0 件の 34 対象は省略。全行は同コマンドで再現):
+`--control` の出力 (hit が 1 件以上の対象のみ抜粋 (5 対象: 01・12・18・21・26)。0 件の 35 対象は省略。全行は同コマンドで再現):
 
 ```
 対照: .rdata 0x183971000..0x18515e89c 内のランダム VA 40 件 (seed 3154)
