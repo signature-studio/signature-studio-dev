@@ -9,7 +9,7 @@
 #   ① `git archive HEAD -- tools/plugins/framework` を work/verify_269/snap に展開 (未コミット WIP を含まない)
 #   ② 独立 W (work/verify_269/fw) に SRC の stage-1 成果物をハードリンク (共有 work/fw は書換えない)
 #   ③ FW_W=その W で snapshot の fw_stage2.sh を実行 (steps 1-18 全部 = stage-2 を最初から再構築)
-#   ④ smoke ×3 + fw_smoke_check.py で同値検証 (dispatch=38 units_done=0 va=1 heap=1 ff=0)
+#   ④ smoke ×3 + fw_smoke_check.py で同値検証 (runerr=0 ff=0 init_reach=288・#2425 で基準を再定義)
 # 出力: work/verify_269/run.log / smoke{1,2,3}.log
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
