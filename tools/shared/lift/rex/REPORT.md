@@ -14,7 +14,7 @@ REX DLL の export 14 本の閉包を `rex_closure.py` で実測 (0.6 秒・再�
 ## 1. 対象
 - `REX Shared Library.dll` = fl-win64 の `extracted/block24351_PE.bin` (PE32+ x64, 321,848 B, ImageBase 0x180000000, `.text` RVA 0x1000・サイズ 0x320de)。`tools/shared/scripts/classify.py` の 24351 に対応。
 - export 14 本: Open / Close / REXCreate / REXDelete / REXGetCreatorInfo / REXGetInfo / REXGetInfoFromBuffer / REXGetSliceInfo / REXRenderPreviewBatch / REXRenderSlice / REXSetOutputSampleRate / REXSetPreviewTempo / REXStartPreview / REXStopPreview。
-- 直接 import: KERNEL32 (約 60 名) と WINMM `timeGetTime`。閉包に現れる import は KERNEL32 の 35 名のみ (`timeGetTime` は閉包に現れない)。C++ ランタイムの DLL 名 import は無い (静的リンク)。
+- 直接 import (`pefile` で実測): KERNEL32 (77 名。名前付き、序数のみは 0) と WINMM `timeGetTime` (1 名)。閉包に現れる import は KERNEL32 の 35 名のみ (`timeGetTime` は閉包に現れない)。C++ ランタイムの DLL 名 import は無い (静的リンク)。
 - 参照元の候補: fl-win64 内で文字列 `REXCreate` を含むバイナリは **33 件** (`tar --zstd -xf … --to-command` で走査、ディスク展開なし)。`block24341` (DirectWaveCtEngine.dll) を含む。**文字列の存在だけで、各バイナリがどの export を呼ぶかは未確認** (子 issue で確定する)。
 
 ## 2. 方法 (`rex_closure.py`)
@@ -54,17 +54,17 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/lift/rex/rex_closure.py [
 - 単発実行の所要 0.61 秒 (`time` の real)。同じ入力で 2 回実行し、JSON が `cmp` で一致 (決定的)。
 
 ## 4. 読み (実測から言えること・推定)
-- **最小単位の候補**: `REXGetCreatorInfo` (22 関数・924 命令・間接 0) と `REXGetInfo` (39・1,238・間接 1) は閉包が小さく、間接もほぼ無い。lift の最初の対象として妥当 [推定: x64c で閉包が取れるかは未検証]。
+- **最小単位の候補**: `REXGetCreatorInfo` (22 関数・924 命令・間接 0) と `REXGetInfo` (39・1,238・間接 1) は閉包が小さく、間接もほぼ無い。ただし両者は近似比率が高く (`REXGetCreatorInfo` 12/22 = 55%、`REXGetInfo` 27/39 = 69%)、閉包の関数の半分以上が `.pdata` 無しの近似に依る。「小さい」は近似込みの値で、確定した大きさではない。lift の最初の対象として妥当 [推定: x64c で閉包が取れるかは未検証。近似関数の範囲が確定するまで、閉包の大きさは上限寄りの値として扱う]。
 - **中核**: `REXCreate` (514) と `REXGetInfoFromBuffer` (242)・`REXRenderSlice` (168) は間接 call を 15〜74 件含む。間接の先は測定に含まれない (下限) ため、lift の完全性は未確認。
 - **CRT 相当の閉包**: `Close` / `REXCreate` 等の閉包は FLS・heap・critical section・SEH (`RtlUnwindEx` 等) の import を含む。これは C++ 例外・TLS の初期化経路で、wasm 側の代替が要る (子 issue で扱う)。
-- **近似の影響**: `approx` は閉包の 15〜40% 程度 (`.pdata` 無しの leaf 関数)。関数数・命令数の上限は近似で膨らみうる。正確な値は lift 後の関数単位突合で確定する。
+- **近似の影響**: `approx` (`.pdata` 無しの関数) は閉包の 33〜69% を占める (§3 表の「うち近似」÷「閉包の関数数」。最小が `REXGetInfoFromBuffer` 80/242 = 33%、最大が `REXGetInfo` 27/39 = 69%)。関数数の少ない export ほど比率が高く、39 関数以下の 7 本は 46〜69%、51 関数以上の 7 本は 33〜42%。関数数・命令数の上限は近似で膨らみうる。正確な値は lift 後の関数単位突合で確定する。
 
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 最小閉包 (`REXGetCreatorInfo` / `REXGetInfo`) の x64c lift と native 直実行の差分テスト (ネガコン込み) | lift 方式と差分ゲートが未検証 | #2733 (T-SH-44) |
-| 中核閉包 (`REXCreate` / `REXGetInfoFromBuffer` / `REXRenderSlice`) の lift。間接 call 74 件の解決を含む | REX 読込の実機能が未実装 | #2733 (T-SH-44) |
+| 中核閉包 (`REXCreate` / `REXGetInfoFromBuffer` / `REXRenderSlice`) の lift。間接 call 74 件の解決を含む | REX 読込の実機能が未実装 | #2734 (T-SH-45) |
 | owner-only tier の side module 化・ビルドフラグ・release guard の deny-list 追加 (D20・D11) | 公開 tier への混入防止が未実装 | PM (D11 により手元で実施。本 PR の範囲外) |
 | 33 バイナリの `REXCreate` 文字列の参照関係 (各 importer が呼ぶ export) | REX 読込の実利用経路が未確定 | #2734 (T-SH-45) の受入条件 |
 
