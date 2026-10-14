@@ -4,7 +4,7 @@
 
 既知類型との関係 (DEFECTS.md): 該当 — D9 (`jmp reg` 型の間接分岐) と類似の表 dispatch (本件は `jmp [r10+rax*8]` の 8 バイト絶対ポインタ表で、D9 の `lea` + 4 バイト表の `mov` とは同型ではない)。D15 (`call [mem]` の欠落) が `jmp [mem]` にも及ぶかは lift 段で確認する。D11・D14 (表の絶対 VA・可変索引の窓) も lift 段の確認対象。線形走査の IPPCODE 内データ誤デコード (外向き 32 件) は既存 ID に該当なし。
 
-日付: 2026-10-14 / 担当: #152 fix run 3 (review 5521472320 の差し戻し対応) / 測定 commit: facts `7cf85980` (`scripts/elastique_facts.py`、以後変更なし)・dispatch `dcd3e7df` (`scripts/elastique_dispatch.py`、以後変更なし)
+日付: 2026-10-14 / 担当: #152 fix run 4 (review round 4 の差し戻し対応) / 測定 commit: facts `7cf85980` (`scripts/elastique_facts.py`、以後変更なし)・dispatch `dcd3e7df` (`scripts/elastique_dispatch.py`、以後変更なし)
 再現: `python3 tools/shared/elastique/scripts/elastique_facts.py` と `python3 tools/shared/elastique/scripts/elastique_dispatch.py` (入力 `tools/shared/work/win/elastique_x64.dll`。素材は `docs/REFERENCES.md` `[WIN64]` の `extracted/block24357_PE.bin` を `fl-win64` から `tar --zstd -xf` で展開して改名)。依存は capstone のみ。出力は `tools/shared/work/elastique/` (gitignore)。`dispatch.json` の `summary.D_qword_refs` に §2.4 の 8 バイト走査の結果。
 
 ## 0. 結論 (先出し)
@@ -68,7 +68,7 @@
   - **索引の値域 = {0,…,5}** (6 種の CPU クラス。6 は未対応で null)。ただし、これは `0x1800015a0` の直接 store に限る。callee 経由の書込みは下記の未解決 (§6)。
   - callee の検査 (逆アセンブル): `0x1800015c8` の `call 0x180001120` は rdx = out のまま呼ばれる。`0x180001120` は `[r13]` (= rcx = `[rsp+0x20]` の一時領域) と RIP 相対にしか store しない。しかし `call 0x1802f8030` (IPPCODE・`0x180001150`) の時点でも rdx = out のまま。`0x18000168c` の `call 0x180001580` は RIP 相対の store しか持たず、out には書けない。**`0x1802f8030` が `[rdx]` へ書くかは未検査**。
 - **0x1800010a0** (`.text`・pdata 先頭・0x80 B): 索引を書く関数。`0x1800010b4` の分岐 (判定 `0x180001000` の戻り値) の両側が `0x1800010ca` に合流し、`0x1800015a0` を呼んだ後、`0x1800010e6` で `[索引] = edx` を書き、`0x1800010ec` で IPPCODE の `0x1802f83b8` を直接 call して戻る (`0x180001105`)。thunk → `0x1803e71b0` → `0x1800010a0` → `0x1802f83b8` の経路は、全 thunk に共通。
-- **枠 (record)**: 1 つの IPP 関数ごとに 8 qword。`枠 = B − 8` (B は表の先頭) に thunk 頭 (再配置される絶対ポインタ)、`B+0〜+5` = CPU クラス 0〜5 の実装、`B+6` = 0、`B+7` = 次の枠の thunk 頭 (例 `0x180001830`)。32 本は `0x1804afc60 + 0x40 × k` に連続。最後の 1 本 (`0x1801bad00`・枠 `0x1804b08c0`) は `B+6` が非 0 (`0x1801bb1c0`) で、32 本の配置と合わない別群 (索引値域 0〜5 では `B+6` は到達しない)。
+- **枠 (dispatch 枠・record)**: 1 つにつき 8 qword (IPP 関数との対応は未同定。同定は #2667)。`枠 = B − 8` (B は表の先頭) に thunk 頭 (再配置される絶対ポインタ)、`B+0〜+5` = CPU クラス 0〜5 の実装、`B+6` = 0、`B+7` = 次の枠の thunk 頭 (例 `0x180001830`)。32 本は `0x1804afc60 + 0x40 × k` に連続。最後の 1 本 (`0x1801bad00`・枠 `0x1804b08c0`) は `B+6` が非 0 (`0x1801bb1c0`) で、32 本の配置と合わない別群 (索引値域 0〜5 では `B+6` は到達しない)。
 - 表の参照: `lea r10,[rip+表]` が 33 箇所 (`.text`)。
 
 ### 2.2 先頭 2 本の全エントリ (例示)
@@ -120,7 +120,7 @@ thunk `0x180001830` (枠 `0x1804afca0`・表 `0x1804afca8`):
 ## 4. D20 の停止条件 (「置換できない場合は理由を報告して停止」) の評価
 
 - 現時点: 置換不能の根拠は見つからない (IPP 相当の実装の所在は、IPPCODE 内と `.text` 内の未同定の飛び先 186 個の両方に見える)。
-- 未確定: (a) IPPCODE 直接の 197 入口と dispatch 表の 1 段目の飛び先 186 個 (2 段目の飛び先 251 個は 1 段目と重複しないもの) のうち、`tools/ipp` (239 API) に対応が無いものの数。(b) thunk 頭 33 本の到達元。いずれも T-SH-40 (#2613) で確定し、対応の無いものが残れば、その入口ごとに理由を報告して停止する (D20)。
+- 未確定: (a) IPPCODE 直接の 197 入口と dispatch 表の 1 段目の飛び先 186 個 (2 段目の飛び先 251 個は 1 段目と重複しないもの) のうち、`tools/ipp` (239 API) に対応が無いものの数。(b) thunk 頭 33 本の到達元。(a) は T-SH-43 (#2667)、(b) は T-SH-42 (#2643) で確定し、対応の無いものが残れば、その入口ごとに理由を報告して停止する (D20)。
 
 ## 5. 所有者限定 tier と side module (D20 の適用・子 T-SH-41 (#2614) の前提)
 
@@ -137,7 +137,7 @@ thunk `0x180001830` (枠 `0x1804afca0`・表 `0x1804afca8`):
 | thunk 頭 33 本の到達元 (実行時に計算されるアドレスの経路・枠の参照元) | 入口集合が静的に閉じない | 子 T-SH-42 (#2643・実行時到達の動的確認。既存の受入条件) |
 | `.text` 本体の RetDec lift (4,556 関数)・KERNEL32 77 件の host 置換・side module の構成・除外フラグ | élastique の機能が wasm に無い | 子 T-SH-41 (#2614) |
 | release guard deny-list への élastique 追加 | 公開 tier への混入を機械検査できない | PM (D11・手元作業) |
-| mac 版 (dylib。実体名・Accelerate 依存の扱いは未確認) | 本 REPORT は win 版のみ。mac 版は実測していない | PM agent の判断待ち: mac 版 (dylib・実体名は未確認) を追跡するか・既定案: 追跡せず win 版のみ。本 PR は `Closes #152` のため merge で #152 は閉じる。追跡の要否は merge 前に PM が決める (D20 の lift 対象は win 版) |
+| mac 版 (dylib。実体名・Accelerate 依存の扱いは未確認) | 本 REPORT は win 版のみ。mac 版は実測していない | 依頼者の判断待ち (#152 の needs-user-input): mac 版 (dylib) を追跡するか・既定案: 追跡せず win 版のみ。本 PR は `Closes #152` のため merge で #152 は閉じる |
 
 ## 7. 検証
 
@@ -151,4 +151,5 @@ thunk `0x180001830` (枠 `0x1804afca0`・表 `0x1804afca8`):
 - 陽性対照 (検出器が陽性を出せることの確認): `.reloc` DIR64 の `.text` 指し 3,086 件。IPPCODE 指しの 0 件は、この検出器が陽性を出せる前提での 0 件である。
 - 陰性対照 (1 件を壊して FAIL することの確認・dcd3e7df で実施): リポジトリ外 `$RUNNER_TEMP/ex/neg/` に DLL のコピーを作り、thunk 0 (`0x180001800`) の `jmp *(%r10,%rax,8)` (`41 ff 24 c2`・ファイル offset `0xc1e`) を `jmp %rax` + `nop nop` (`ff e0 90 90`) に置き換えた。`elastique_dispatch.py` にこのコピーを渡すと **rc=1・`AssertionError: 0x180001810`** (thunk 形の assert で停止)、標準出力 0 バイト (出力を書く前に停止)。参考 (前版 `a27c04e5` で確認): 同じ箇所を 4 バイト NOP にした場合は `IndexError` で rc=1 (assert ではなく例外で落ちる。FAIL の結果は同じ)。
 - thunk パターン照合 (`call` → `movsxd` → `lea` → `jmp [r10+rax*8]`) は、本物の DLL の 33 箇所すべてで assert を通過した (rc=0)。
+- 自己検査フラグ `summary.A_dispatch.record_layout_null_slot6_all_zero` は `false` になる。33 本の表の `B+6` (表の先頭 + 48) が全て 0 かを見るフラグで、最後の 1 本 (`0x1801bad00`) の `B+6` が `0x1801bb1c0` (非 0) のため (§2.1)。期待どおりの値で、欠陥ではない。
 - 範囲外: 2 段目以降の関数の意味 (IPP の API 名)・thunk 頭の実行時到達・mac 版・`0x1802f8030` が `[rdx]` へ書くか (callee 経由の索引値域) は未検証。
