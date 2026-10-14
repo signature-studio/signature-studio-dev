@@ -113,7 +113,7 @@ run_sha() { local p="$1" sha="$2" nums="" ; shift 2; for n in "$@"; do nums="$nu
 pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s","repo":{"full_name":"%s"}},"draft":%s,"updated_at":"%s","labels":%s,"body":%s}' "$1" "$1" "$2" "${7:-o/r}" "$3" "$4" "${5:-[]}" "$(jq -Rn --arg b "${6:-}" '$b')"; }
 # detail <n> <mergeable> <reviews json> <comments json>
 detail() {
-  fx "repos/o/r/pulls/$1" "{\"mergeable\":$2}"
+  fx "repos/o/r/pulls/$1" "{\"state\":\"open\",\"mergeable\":$2}"
   fx "repos/o/r/pulls/$1/reviews" "${3:-[]}"
   fx "repos/o/r/issues/$1/comments" "${4:-[]}"
 }

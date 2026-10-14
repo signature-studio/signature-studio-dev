@@ -3,6 +3,8 @@
 # 使う場所: verify-review-verdict.sh (verdict 無し) / fix モードの answered (push せず根拠だけをコメント)。
 # reopen が失敗すると PR は closed のまま残り、open PR の監視から外れる。そのため reopen は 3 回まで
 # 再試行し、なお失敗したら PR に oc:stuck ラベルとコメントを残して非 0 で終わる。
+# PR が merge 済み・close 済みなら何もせず 0 で終わる (再 review の対象が無い / 人が閉じた PR は reopen しない)。
+# PR の状態が読めないとき、または open のまま close に失敗したときは失敗する。
 #
 # 入力 (env): GH_TOKEN, OC_REPO, OC_PR_NUMBER
 # 任意 (env): OC_STUCK_LABEL (既定 oc:stuck)・OC_REOPEN_WAIT (秒、既定 3。テストで 0 にする)
@@ -12,7 +14,34 @@ set -uo pipefail
 STUCK_LABEL="${OC_STUCK_LABEL:-oc:stuck}"
 WAIT="${OC_REOPEN_WAIT:-3}"
 
+pr_state() { # PR の状態を open / merged / closed で出す。読めなければ非 0
+  local json
+  json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")" || return 1
+  jq -r 'if .state == "open" then "open" elif .state == "closed" then (if .merged == true then "merged" else "closed" end) else empty end' <<< "$json"
+}
+
+state="$(pr_state)" || state=""
+case "$state" in
+  open) ;;
+  merged | closed)
+    echo "::notice::PR #$OC_PR_NUMBER is already $state; not reopening it"
+    exit 0
+    ;;
+  *)
+    echo "::error::could not read the state of PR #$OC_PR_NUMBER"
+    exit 1
+    ;;
+esac
+
 if ! gh pr close "$OC_PR_NUMBER" --repo "$OC_REPO"; then
+  # close が失敗する間に merge / close されていたら、再 review の対象が無いので 0 で終わる (競合)
+  state="$(pr_state)" || state=""
+  case "$state" in
+    merged | closed)
+      echo "::notice::PR #$OC_PR_NUMBER became $state while closing; not reopening it"
+      exit 0
+      ;;
+  esac
   echo "::error::could not close PR #$OC_PR_NUMBER"
   exit 1
 fi
