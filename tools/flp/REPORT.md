@@ -215,7 +215,7 @@
 
 - 詳細・実測・未解決 (起票先付き) は **`REPORT_APPENDIX.md` §12**。Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 の state(213) デコーダ (`src/plugstate.ts`) を実装し、コーパス 2,090 件の往復が byte-exact。**受入条件 (クラス A/B 判定表) は未達** (X/L/W 3 者比較は未実施。静的走査による推定のみ)。
 
-- #113 S1 (wine64 での FL 26.1.7 起動) は **未達**。WinVerifyTrust (G03) で停止し FLEngine_x64.dll に未到達。詳細・trace 根拠は **`REPORT_APPENDIX.md` §14**。測定 commit `155382c8`、`git diff 155382c8 HEAD -- tools/flp/s1_wine_probe.sh tools/startup tools/assets` = 空 (差分 0)。
+- #113 は **部分達成**。S1 (wine64 での FL 26.1.7 起動) は達成 (G03 を oracle ローカルコピーで回避、FLEngine_x64.dll ロード・GUI 継続)。S2 は `/R` で WAV が出る・決定性 3 回一致まで確認したが、出力は 48 kHz / **16-bit** で目標の 32-bit float ではない。詳細・測定 commit `d3d0e4f9`・未解決は **`REPORT_APPENDIX.md` §15** (S1 の前回測定は §14)。
 
 ## 13. Wrapper chunk (event 213) の実データ検証 (#110 / L-7)
 

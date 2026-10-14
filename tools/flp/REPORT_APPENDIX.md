@@ -65,3 +65,33 @@
 - 注: 再測定 (`-all`) の起動ログは 4 行 (`rundll32.exe` 0xc0000135 と `X connection ... broken`) で、rc 124 は出ていない。rc 124 と WinVerifyTrust/MSGBOX は trace 付きの再実行 (上記) でのみ確認した。
 - 検証起点: 測定 commit `155382c8` (コード差分の最終 commit)。`git diff 155382c8 HEAD -- tools/flp/s1_wine_probe.sh tools/startup tools/assets` = 空 (差分 0)。`git diff b9de32d0 HEAD -- tools/flp tools/startup tools/assets` は `s1_wine_probe.sh` の 1 行 (`WORK`) と本 REPORT の差分のみ。
 - 未解決: G03 回避手段 (oracle 用ローカルパッチ or wine DLL override) / S2・S3 全部 → #113 に残す (Refs #113)。
+
+## 15. #113 S1 達成 / S2 部分 (wine64 + `/R` 書き出し・決定性)
+
+測定 commit: **`d3d0e4f9`** (`tools/flp/s1_g03_patch.py` と `tools/flp/s2_render_probe.sh` を含む最後のコード commit)。実行環境: Ubuntu 24.04、wine64 9.0 (`/usr/lib/wine/wine64`)、xvfb 21.1.12、`nproc`=4。素材 `fl-win64` (`$RUNNER_TEMP/fl-win64/extracted`、block 分割から §14 の手順でインストール木を復元)。
+
+**S1 (達成)**: 前回 (§14) は `WinVerifyTrust` (G03) の失敗で MSGBOX により停止した。`tools/flp/s1_g03_patch.py` が、検査失敗の条件分岐 3 箇所を無条件 `jmp` に書き換える (期待バイトを照合してから書換え、oracle 用ローカルコピーのみ・commit しない・配布しない)。
+- FL64.exe VA `0x140006eaf` (`je`→`jmp`、G03 ホスト検査の失敗 → -2 分岐)
+- FLEngine_x64.dll VA `0x1375ee9` (`jne`→`jmp`、エンジン自身の検査、フラグ 0x3d1)
+- FLEngine_x64.dll VA `0x137633e` (`jne`→`jmp`、ホスト EXE の検査、フラグ 0x23f)
+
+結果 (`xvfb-run -a wine64 FL64.exe`、120 s、`WINEDEBUG=+loaddll,+msgbox,+wintrust`): rc 124 (終了せず GUI 継続)。`FLEngine_x64.dll` が `native` でロードされ、MSGBOX は 0 件。G01 (Mfplat) 通過。その後 `Shared\*.dll` (Blend2D・freetype・ILTools 等) のロード、`WTSRegisterSessionNotification`・`DwmFlush`・WebView 周辺 (wininet cookie) の呼出しまで到達。G03 は**検証を通すのではなく検証結果を無視する**パッチなので、CN="Image Line NV" の一致は確認していない (GATES G03 の「通す」方針の oracle 版)。
+
+**S2 (部分)**: `tools/flp/s2_render_probe.sh Autogun.flp 3` (`Data/System/Render tests/Autogun.flp`、render 2.0 s の 1 本) を commit 済み HEAD で 3 回実行した。
+| run | rc | 所要 | 形式 | data バイト | data SHA-256 |
+|--:|--:|--:|---|--:|---|
+| 1 | 0 | 16 s | PCM (fmt 1), 2 ch, 48000 Hz, **16 bit** | 385,000 | `fe7a0614…e561a` |
+| 2 | 0 | 16 s | 同上 | 385,000 | 同上 |
+| 3 | 0 | 16 s | 同上 | 385,000 | 同上 |
+
+- 3 回の data SHA-256 は全て一致 (T2 の決定性は、16-bit 出力では成立)。
+- 出力 sample rate は、wine レジストリ `HKCU\Software\Image-Line\FL Studio 26\Devices\Audio output` の `Sample rate` (既定 44100) を 48000 に書き換えると 48000 Hz になる (確認済み)。
+- 未達: 目標の **32-bit float** が出ない。`/R` の trace (`WINEDEBUG=+reg`) では、書き出し設定の鍵 `General\WAVRenderForm` は開かれるが、その中の値 (`WAV bit depth`・`Export WAV`・`Dither`) は読まれていない。値を変えても形式は変わらなかった (`WAV bit depth`=2・3、`Export WAV`=2 で 16-bit のまま)。`/E`・`/O` を付けても WAV は出るが 16-bit、`/F` を付けると WAV は出ない。ビット深度を決める経路は未特定。
+- 再現の注意: `wine64 reg add` の直後に FL64.exe を起動すると rc 231 で即終了する。`wineserver -k` で止めると正常に戻る (`s2_render_probe.sh` に反映済み)。
+
+**未解決** (`| 未解決 | 影響 | 起票先 |`)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 書き出しのビット深度を 32-bit float にする経路 (`/R` が読む設定) の特定 | S2 の受入「48 kHz / 32-bit float / dither off」が未達 | #113 (Refs) |
+| Render tests 82 本 + Demo 3 本の全数書き出しと、sha256・メトリクス JSON の commit (S3) | 未着手 | #113 (Refs) |
+| 書き出し WAV の内容 (音色・レベル) の妥当性は未確認。T5 の C/D 閾値の校正には使えない | #106 の閾値確定が未着手 | #106 |
