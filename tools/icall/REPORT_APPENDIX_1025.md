@@ -53,12 +53,23 @@ fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は�
 
 測定 commit: `a1830d497085222a26e0ae50e95c218d7c82b2cf` (`tools/icall/kh_route_build.sh` と `tools/icall/kh_route_run.sh` を変えた最後の commit。実行段の数値はこの commit の worktree で測定)。
 
-`a1830d49` から現 HEAD までの `tools/icall` 差分 (コード差分は次の 1 行の削除のみ。`s.replace(x, x)` は置換前後が同じで no-op のため、実測値は不変):
+`a1830d49..HEAD` の `tools/icall` のコード差分は 1 行の削除のみ (`s.replace(x, x)` は置換前後が同じ no-op のため、実行結果は不変)。付録自身の文言修正は除く (`git diff a1830d49 HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_1025.md'` の出力):
 
 ```
-$ git diff a1830d49 HEAD -- tools/icall
-(実行結果を下記に貼付)
+diff --git a/tools/icall/kh_route_run.sh b/tools/icall/kh_route_run.sh
+index ab3ba4c0..4a9d4642 100644
+--- a/tools/icall/kh_route_run.sh
++++ b/tools/icall/kh_route_run.sh
+@@ -19,7 +19,6 @@ b = "ret = M['_' + fname](...call);"
+ assert s.count(a) == 1 and s.count(b) == 1, "wasm_runner.mjs の形が変わった"
+ s = s.replace(a, "if (!M['_ott_run']) {")
+ s = s.replace(b, "ret = M['_ott_run'](%d, ...call, ...Array(8 - call.length).fill(0n));" % va)
+-s = s.replace("const sig = JSON.parse", "const sig = JSON.parse")
+ open(dst, 'w').write(s)
+ EOF
+ cp "$NAT/scen.txt" "$W/scen.txt"
 ```
+
 再現: `bash tools/icall/kh_route_build.sh && bash tools/icall/kh_route_run.sh` (素材 `fl-win64 plugins-kilohearts toolchain-retdec toolchain-emsdk work-icall work-liftlib`)。
 
 | 項目 | 実測 |
