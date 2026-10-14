@@ -4,7 +4,7 @@
 
 ## 解析 (PY-72 #2542)
 
-- 対象: `channels.setChannelPitch` (flapi `(int, float, int=0, int=PIM_None, bool=False)`)。前提の `[PY-72]` 子 issue は親 #2499 の「7 回目 run」節を参照するが、その節は `1bb996f0` の REPORT_PY39.md に無い。本ファイルを PY-72 の記録とする。REPORT_PY39.md の「7 回目 run」は別件 (#1527 の selectAll 節) のため、見出しの重複を避けてこのファイルへ分けた。
+- 対象: `channels.setChannelPitch` (flapi `(int, float, int=0, int=PIM_None, bool=False)`)。本ファイルが PY-72 の記録の正本 (子 #2562・#2576 の記録もここに節を立てる)。
 - 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` と `analysis/flapi/pe_rip_consts.py <VA> <命令数>` (本 run で追加。どちらも `<命令数>` 命令で打ち切る)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (`-C` は `-xf` の直後に置く。`--wildcards` の後ろに置くと GNU tar 1.35 でカレントに展開される。正しい順では `<展開先>/extracted/block00031_PE.bin` に出る)。実測 1.7 秒 (`00a01625`)・2.9 秒 (`3787c3d0`)。
 - 既知類型との関係: 該当なし (lift 作業ではない)。
 - 測定 commit: `3787c3d0` (`origin/main` (`ea407723`) を取り込んだ merge commit。コードを変えた最後の commit)。測定対象の `analysis/flapi/pe_disasm.py`・`pe_rip_consts.py` は `00a01625` から変更なし (`git diff 00a01625 3787c3d0 -- tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_rip_consts.py` は 0 行)。差分 0 の証跡: `git diff 3787c3d0 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続の commit は本ファイルのみ)。
@@ -19,7 +19,7 @@
 
 | 項目 | PE 実測 |
 |---|---|
-| 書式 | `if\|iii` (`0xd5aaaa`〜`0xd5aadf` の出力先 `[rbp+0xa8]`=index・`[rbp+0xac]`=value(float)・`[rbp+0xa4]`=pitchUnit・`[rbp+0xa0]`=pickupMode・`[rbp+0x9c]`=useGlobalIndex) |
+| 書式 | `if\|iii` (参照: `0xd5aa8e` `lea r8, [rip+0x10f]` → 文字列 `0xd5aba4`。`0xd5aaaa`〜`0xd5aadf` の出力先 `[rbp+0xa8]`=index・`[rbp+0xac]`=value(float)・`[rbp+0xa4]`=pitchUnit・`[rbp+0xa0]`=pickupMode・`[rbp+0x9c]`=useGlobalIndex) |
 | 既定値 | 省略時は pitchUnit=0・pickupMode=0・useGlobalIndex=0 (`0xd5aa68`〜`0xd5aa7c` で 0 を書く)。flapi の既定 `PIM_None` が 0 かは未確認 |
 | 委譲 | `0xd5e620(self)` の戻り値 `rax` が指す値を `rbx` に読む (`0xd5aa65` `mov rbx, [rax]`)。`0xd843d0(rbx, &out, r8=0xd5a720, r9=0, index, &value, pitchUnit, pickupMode, useGlobalIndex, 0, 1)` を呼ぶ (`0xd5aaf3` で `r8 = 0xd5a720` = callback を確認) |
 | 戻り値 | `out` の下位 32bit を `0xd82c20` に渡し、その戻り値を返す (`0xd5ab4c`〜`0xd5ab5a`) |
