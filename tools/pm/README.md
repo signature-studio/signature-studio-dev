@@ -164,7 +164,7 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
 | `phase.json` | Worker の DO `meta/phase` (`phase.ts`。open PR (stuck を除く) が 80 を超えたら Review-Only、10 未満で解除、間は直前の値) | 破棄。切替時に VM の値 (`review_only=false`) を一度だけ保存済み (REPORT §12-5) | 保存が無い状態 (新しいデプロイ先・DO の再作成) は Review-Only で始まり、open PR が 10 以上の間は新規着手しない (安全側の停滞) |
 | `issues_state.json` | Worker の DO (`issues`・`pmArt`・`botLast`)。snapshot は持たない | 破棄 | PM の `oc_artifacts:` 行は、同期窓 (24 時間) より古いコメントからは新たに読まれない。DO に取り込み済みの古い行が残るかは未確認。必要な issue は PM が行を書き直す (#2343) |
 | `*.log`・`*.log.err`・`*.log.tmp` | - | 退役時に破棄 | 判断の根拠は issue コメントと `REPORT.md` に残る |
-| `stop_deps_candidates.json`・`wave2_cat.json` | - | 実行時の状態。`tools/pm/.gitignore` の 2 行にだけ残り、リポジトリに書き手も読み手も無い | 破棄 | なし (Worker は参照しない) |
+| `stop_deps_candidates.json`・`wave2_cat.json` | - | 破棄 | 実行時の状態。`tools/pm/.gitignore` の 2 行にだけ残り、リポジトリに書き手も読み手も無い。Worker は参照しないので影響なし |
 
 ## 運用の約束
 
