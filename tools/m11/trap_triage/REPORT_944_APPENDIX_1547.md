@@ -4,8 +4,8 @@
 
 ## 9. #1547 追記: unit 158 の観測副作用の切り分け (受入条件 2・3。受入条件 1 は #1864 へ移管)
 
-測定 commit: **`49f5dd63`** (`m11_rt.c` に `M11_DEST_GUARD` (既定 0) を追加し、`m11_build.sh` の `CF` に 1 語足した)。後続の `1f6c107b` は `m11_build.sh` の `rt.o` 作り直し stamp (`S_NEG`) に `M11_DEST_GUARD` を足しただけで、測定値の計算には影響しない。
-検証 HEAD (実測の対象): **`9fc311b2`** (main 取り込み merge)。以後 PR head まで `tools/m11` のコード差分は 0 (文書のみ)。最終 HEAD は PR 本文の「検証 HEAD」を参照。§9.1 の表は測定 commit `1f6c107b` 時点の実測。`git diff 1f6c107b 589f742b -- tools/m11` の差分は main 由来 (`m11_build.sh` の `M11_TRACE_ISOLATE`・`M11_KEEP_BOOT_O`、`probe_entry.sh`) で、既定値 (`M11_TRACE_ISOLATE=1` は C 側の `#define` 既定と同じ・`M11_KEEP_BOOT_O=0` は従来どおり `boot.o` を作る) では生成物が変わらない。
+測定 commit (コードを変えた最後の commit): **`aa56c459`** (main 取り込み merge。`m11_build.sh` の競合解消を含む)。§9 の本文の数値は `9fc311b2` (main 取り込み merge) での実測 (`M11_DEST_GUARD` を入れた `49f5dd63`・`1f6c107b` の時点で取得)。`aa56c459` では既定 build の survey のみ再測定した (件数は同じ 870/24/0)。
+検証 HEAD: **`aa56c459`** (解消後の merge)。既定 build の survey を解消後 HEAD で再実行し、`870/24/0` と一致した (PR 本文)。§9.1 の表は測定 commit `1f6c107b` 時点の実測。`git diff 1f6c107b 589f742b -- tools/m11` の差分は main 由来 (`m11_build.sh` の `M11_TRACE_ISOLATE`・`M11_KEEP_BOOT_O`、`probe_entry.sh`) で、既定値 (`M11_TRACE_ISOLATE=1` は C 側の `#define` 既定と同じ・`M11_KEEP_BOOT_O=0` は従来どおり `boot.o` を作る) では生成物が変わらない。
 
 `9fc311b2` での再検証 (直列・単発・foreground・各 timeout 付き・素材 fl-win64 / work-m11 / toolchain-emsdk・`m11_gen_ir2.sh` で `ir_conditions.json` 再生成 F1=902 F3c=36 errors=0)。`589f742b` も同じコードのため、この値は `589f742b` の値でもある:
 - `repro_1389.sh`: **PASS** (全体 1 分 50.1 秒)。OFF 16.207 s (load 0.84) / OFF 再実行 16.136 s (load 0.97) / ON 16.289 s (load 0.98)。OFF/OFF 再実行 227 件一致、ON は 0x26d1a0 j=12 の 1 件差。
