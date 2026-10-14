@@ -372,6 +372,8 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 
 詳細と実測値は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §6i (測定 commit `719f1c43`・鮮度の範囲を含む)。
 
+WIN-4 (#2715・部分達成): `CreateFruityInstance` の閉包 (2,071 関数) を boot7 として取り込み、呼出しまで到達した (`EnterCriticalSection` で fail-fast)。測定 commit `5f9d7cbd`・判定と未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §7 を正とする。
+
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
