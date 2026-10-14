@@ -4,6 +4,7 @@
 //   (b) 追跡中のモック版 (analysis/mcp/tool_coverage.json) の双方と突き合わせる。1 件でも差があれば exit 1。
 //   node tests/static_check.mjs                       前提: build_flpy_static.sh と `FL_ENGINE=wasm node tests/all_tools.mjs` 済み
 //   STATIC_WASM=flpy_static_neg  別ビルド (ネガコン) を使う。
+//   比較ゲートは result の先頭 160 字だけを見る。全文の 3 経路比較は tests/fulltext_parity.mjs (FULLTEXT_OUT=<path> で全文を書く)。
 import fs from "node:fs";
 import assert from "node:assert/strict";
 import { A } from "./tool_args.mjs";
@@ -45,6 +46,7 @@ if (!exportsFl.includes("fl_api_call")) fail("fl_api_call が wasm に存在し�
 run(`import fl_rt; fl_rt.install_flapi(); fl_rt.load_pyc("/fl/Tools/MCPTools.pyc", "__main__")`);
 const tools = JSON.parse(call("__main__:get_mcp_tools_json", {}).ok);
 const cov = [];
+const full = [];
 let total = 0;
 M._flpy_trace_reset(1); // 以後の全呼出しを通し番号で記録 (tool 別は開始 index との差。tool 外の呼出し = callback 往復も総数に入る)
 for (const t of tools) {
@@ -60,6 +62,7 @@ for (const t of tools) {
   for (let i = from; i < to; i++) calls.push(`${ids[M.HEAPU8[fnp + 2 * i] | (M.HEAPU8[fnp + 2 * i + 1] << 8)]}/${M.HEAPU8[ap + i]}`);
   total += n;
   const text = r.err ? r.err : String(r.ok);
+  full.push({ name: t.name, text });
   cov.push({
     name: t.name,
     status: r.err ? "raised" : /^(error|failed)/i.test(text) || /error/i.test(text.slice(0, 40)) ? "soft-error" : "ok",
@@ -97,6 +100,7 @@ const summary = { total: cov.length, ok: by("ok"), soft_error: by("soft-error"),
 console.log(J(summary));
 fs.mkdirSync(new URL("work/", root), { recursive: true });
 fs.writeFileSync(new URL(`work/tool_coverage.${name}.json`, root), J({ summary, tools: cov }, null, 1));
+if (process.env.FULLTEXT_OUT) fs.writeFileSync(process.env.FULLTEXT_OUT, J({ engine: "static", tools: full }, null, 1));
 
 // 比較: tool 別に完全一致 (差 0/48 を assert)。比較元が無い/短いこと自体を失敗にする
 const refs = [
