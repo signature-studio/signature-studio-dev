@@ -1,9 +1,11 @@
 # REPORT #2405 — RetDec 2019-03 版の share 入手経路と、41a6a0 での gv 分岐の発火確認 (LD-113)
 
+既知類型との関係: 該当 ID は D20 (41a670 系の wrong-value reuse、既登録・機構未確定) の関連調査。新規類型なし。本 REPORT は gv 分岐の発火確認で、D20 の機構は確定していない (§6)。
+
 親: #2314 (LD-106) / #2038 (LD-75)。付録 `REPORT_911_APPENDIX_1967.md` §6g・§6i の続き。#2405 は結果を同付録 §6i に追記するよう求めており、§6i 末尾に結論と測定 commit・主な実測値だけを追記した。表・コマンド・各範囲の結果は本 REPORT に置く。
 
 **結論**
-1. 2019-03-03 の share (`retdec-support_2019-03-03.tar.xz`) の入手経路は**無いと確定した (入手不可)**。GitHub の release asset が消えており、複製も見つからない (§1)。
+1. 2019-03-03 の share (`retdec-support_2019-03-03.tar.xz`) は、確認範囲 (§1 の経路) で見つからず、**入手不可として扱う**。GitHub の release asset は 404 で、確認範囲では複製も見つからない (§1)。
 2. 代用 share ([RETDEC] v5.0 の share を 2019 版のレイアウトに合わせたもの。§2) で **2019 版 `retdec-decompiler.py` を起動でき**、`checkForGlobalInInstruction` の gv 分岐 (2019 版 L163〜168) が **41a6a0 で 1 回発火する**ことを実測した (§4)。41a6d3・666b10・666b20 も各 1 回、対照 41a6b3 は 0。件数・root・`ops` が v5.0 (付録 §6g・§6h) と一致した。
 3. 発火後の IR も v5.0 と同じ形になる: Constants optimization で 41a6a0 の `load *rax` が `load @rcx` に変わる (§5)。違いは、2019 版では不要になった `inttoptr` が残ること。
 4. 限界: share は 2019-03-03 の実物ではない。一時ログ付きビルド。各範囲 n=1 (2 つのビルドで同じ結果)。
@@ -26,11 +28,11 @@
 
 `retdec2019_gv_2405.sh install` が作る。
 - [RETDEC] (v5.0) の `share/retdec/support` をコピーし、`version.txt` を `2019-03-03` にする。`install-share.py` は `version.txt` が一致すれば download と sha256 検証を省くため `make install` が通り、ラッパー `retdec-decompiler.py` が使える (#2314 の付録 §6i は「`make install` が 404 で失敗し、ラッパーは使えない」としていた)。
-- 2019 版 `retdec-config.py` (L19・L21) のレイアウトに合わせ、`x86/ords`・`arm/ords` を v5.0 の `ordinals/{x86,arm}` への symlink にする。
+- 2019 版 `scripts/retdec-config.py` (6edcaaea で `ARM_ORDS_DIR` が L23、`X86_ORDS_DIR` が L25) のレイアウトに合わせ、`x86/ords`・`arm/ords` を v5.0 の `ordinals/{x86,arm}` への symlink にする。
 - 2019-03-03 の実物との差は確認できない (実物が無い)。確認できたのは次の 2 点。
   - `generic/types/*.json` 5 本は、v5.0 の share と 2019-03-08 の archive でバイト一致する (`cmp`)。
   - 変種 B: types と static-code を 2019-03-08 の archive (sha256 検証済み) の物に差し替えた share でも、41a6a0・41a6d3・666b10 の発火と対照 41a6b3 の 0 は変わらない (§4)。この archive は ordinals・signsrch・tools の YARA を持たない (レイアウトが `301f4e64` 以降) ため、それらは v5.0 の物のままである。
-- 2019 版の fileinfo は `signsrch/signsrch.yara` を探すが、v5.0 の share は `.yarac` のみで無い。fileinfo は無言で続行し rc=0 だった (暗号定数の検出は行われない。decode 範囲の結果には使われない)。
+- 2019 版の fileinfo は `signsrch/signsrch.yara` を探すが、v5.0 の share は `.yarac` のみで無い。fileinfo は無言で続行し rc=0 だった。暗号定数の検出が行われないかは未確認。「decode 範囲の結果に使われない」は未検証の推定である (§6 (d))。
 
 ## 3. ビルド
 
@@ -78,7 +80,7 @@ gv 分岐が発火した単独範囲の root (`TAG_PRE_GV` の行。v5.0 の付�
 | 0x666b10-0x666b13 | `%2 = load i64, i64* %1` | `@r8` | 0 |
 | 0x666b20-0x666b23 | `%2 = load i8, i8* %1` | `@rcx` | 0 |
 
-- 全体範囲の発火の root も v5.0 の付録 §6h と一致する: 41a670-41a6f4 は gv 分岐が 2 回 (いずれも `@rcx`)、666a60-666b20 は 4 回 (`@r9`・`@rcx`・`@rcx`・`@rcx`)。
+- 全体範囲 (41a670-41a6f4・666a60-666b20) の発火の件数は上の表のとおり。root は本測定の出力に含まれず、ログを保存していないため**未確認** (付録 §6h の root との照合もしていない)。
 - 41a693-41a69a は `TAG_SITE1_MAXROOT` (v5.0 の L150 に相当) で、gv 分岐ではない。
 - 変種 B (§2、`retdec2019_gv_2405.sh variantb`): 41a6a0・41a6d3・666b10 は gv 分岐が各 1、対照 41a6b3 は 0 (どちらのビルドでも)。real 4.15〜5.61 s。
 - load average (1 分値、`ranges` の前後): 1 回目のビルド 1.24 → 1.12、2 回目 1.22 → 1.11。
@@ -98,7 +100,11 @@ v5.0 (REPORT_911 §6c・§6e) との比較: 値の変化 (`load *rax` → `load 
 
 - **41a6a0 で gv 分岐 (2019 版 L163〜168) は発火する**。1 回、`%2 = load i64, i64* %1`、root = 裸の GV `@rax`、`ops=0`。41a6d3・666b10 も同じ分岐で、v5.0 と件数・root・`ops` まで一致する。
 - 2019 版と v5.0 の `checkForGlobalInInstruction` の差は 3 点 (`6edcaaea` と `53e55b4b` を diff): (1) root の構築が `SymbolicTree root(RDA, val)` か `SymbolicTree::PrecomputedRda(RDA, val)` か、(2) 第 1 分岐に `getActiveBits() <= 64` の条件、(3) 第 1 分岐と gv 分岐に `_toRemove.insert(val)`。gv 分岐の条件式 `isa<LoadInst>(inst) && gv && root.ops.size() <= 1` は同じ。この 3 点は、少なくとも**発火の有無・件数・root、deref が `load @rcx` に変わる結果には効いていない**。
-- 未確認: (a) 代用 share と実物 2019-03-03 の差 (types・static-code では効かないことだけ確認)。(b) 一時ログなしの 2019 版との差 (ログのみのパッチで、挙動を変えない前提)。(c) 残る `inttoptr` が最終 C 出力に効くか (`--stop-after bin2llvmir` までで止めた)。
+- 未確認 (各件の起票先は PR 本文の未解決表に残す。WORKFLOW §3):
+  - (a) 代用 share と実物 2019-03-03 の差 (types・static-code では効かないことだけ確認)。
+  - (b) 一時ログなしの 2019 版との差 (ログのみのパッチで、挙動を変えない前提)。
+  - (c) 残る `inttoptr` が最終 C 出力に効くか (`--stop-after bin2llvmir` までで止めた)。
+  - (d) fileinfo の yara 欠落が decode 範囲の結果に使われないこと (推定。未検証)。
 - #2314 の付録 §6i の阻害要因のうち「ラッパーは install 段が落ちるため使えない」「CLI が違う」は、`version.txt` を合わせた代用 share でラッパー経由なら解消する (§2)。`retdec-bin2llvmir` を直接呼ぶ必要はなかった (ラッパーは `--select-ranges`・`--select-decode-only`・`--stop-after` を持つ)。
 
 ## 7. 測定の記録

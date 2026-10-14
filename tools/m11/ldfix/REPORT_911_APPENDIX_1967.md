@@ -135,7 +135,4 @@ time make -j4                                                                   
 
 ### 追記 (#2405 / LD-113): 2019 版での gv 分岐の発火確認 (表・コマンド・全範囲の結果は `REPORT_2405.md`)
 
-測定 commit: `c810b847` (`retdec2019_gv_2405.sh`・`retdec_constants_trace_2405.patch`)。阻害要因 1 (share 404) は、GitHub の release asset・tag・Wayback・fork のどこにも 2019-03-03 の物が無く、**入手経路なしと確定**した。代わりに [RETDEC] (v5.0) の share に `version.txt=2019-03-03` と旧レイアウトの symlink を合わせた代用 share を置くと `make install` が通り、阻害要因 3 (CLI の差・ラッパー不可) もラッパー `retdec-decompiler.py` 経由で解消した。
-- 一時ログ付きの 2019 版ビルド (`make -j4`、n=1 ずつ): real 679.1 s (11 分 19 秒)・675.5 s、rc=0。
-- **41a6a0 で gv 分岐 (2019 版 L163〜168) は 1 回発火する** (root = 裸の GV `@rax`・`ops=0`)。41a6d3・666b10・666b20 も各 1、対照 41a6b3 は 0。件数・root は v5.0 の §6g・§6h と一致。範囲ごとの real は 4.1〜5.8 s (n=1)。
-- Constants optimization で 41a6a0 が `load *rax` → `load @rcx` になる (2019 版は段 15、v5.0 は段 16)。2019 版は不要な `inttoptr` が残る点だけが違う。
+測定 commit: `c810b847`。結論 (代用 share 条件): 2019 版の gv 分岐 (L163〜168) は 41a6a0 で発火する。実測値・所要時間・範囲別の結果は [REPORT_2405.md](REPORT_2405.md) (§3・§4・§5)。
