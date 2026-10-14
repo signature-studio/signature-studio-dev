@@ -67,13 +67,15 @@ const EXISTING_KEYS = [
 const ADDED_KEYS = [
   "last_webhook_at", "last_dispatch_at", "last_digest_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
   "no_pr_needs_pm",
-  "target_eff", "cap_est", "peak_running", "queued", "oldest_queued_age_min",
+  "target_eff", "cap_est", "peak_running", "queued", "oldest_queued_age_min", "build",
   "last_redeliver_scan", "hook_failed_last_scan",
   // 同時実行の計数 (opencode.yaml の全 run を TARGET に数える)
   "active_all", "active_impl", "active_other", "active_by_event",
   // 自律運転の指標 (#2335)
   "stuck", "stuck_age_max_min", "needs_pm", "needs_user", "no_pr_by_reason", "refs_only_merge_rate_24h", "open_issues_delta_24h", "pm_dispatch_1h",
-  "launch_unobserved",
+  "mode_close", "auto_close_detected", "launch_unobserved",
+  // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
+  "hold",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];
@@ -89,7 +91,9 @@ test("/status (d): 既存のキーは全て残り、追加するキーだけが�
   assert.equal(detail.phase, "launch");
   assert.equal(detail.launch_stop, null);
   assert.equal(detail.fresh, false);
-  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, redelivered: 0, wouldRedeliver: 0 });
+  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0 });
+  assert.equal(detail.mode_close, "dry-run");
+  assert.equal(detail.auto_close_detected, 0);
   assert.equal(detail.last_error, null);
   assert.deepEqual(detail.log, []);
   assert.deepEqual(detail.would_launch_now, []);
@@ -109,6 +113,27 @@ test("/status: 観測の初期値は null / 0 (残量を 0 と誤読しない)",
   assert.equal(s.rest_remaining, null);
   assert.equal(s.rest_used, null);
   assert.equal(s.rest_reset_at, null);
+});
+
+// ---------------------------------------------------------------------------------------------------------------- build (#2416)
+test("build: デプロイ時の BUILD_COMMIT をそのまま返す。渡していなければ null (他のキーは変えない)", async () => {
+  const hash = "3d011ecd0d1f6b5f3f1b1b5a0a7c8c2e4f9a1b2c";
+  const set = await configuredApp({ env: { BUILD_COMMIT: hash } });
+  const s = (await (await get(set)).json()) as any;
+  assert.equal(s.build, hash);
+  assert.equal(s.mode, "dry-run");
+  assert.equal(s.phase, "launch");
+  const unset = await configuredApp();
+  assert.equal(((await (await get(unset)).json()) as any).build, null);
+});
+
+test("build: commit hash の形 (小文字 hex の 7〜40 字) でない値は null。token らしい値も出さない", async () => {
+  for (const v of ["", "main", "0123AB7", "0123ab", "ghp_0123456789abcdef0123456789abcdef", "0123abcd\nx", "a".repeat(41)]) {
+    const ctx = await configuredApp({ env: { BUILD_COMMIT: v } });
+    const body = await (await get(ctx)).text();
+    assert.equal((JSON.parse(body) as any).build, null, JSON.stringify(v));
+    assert.ok(!body.includes("ghp_"), "token らしい値は応答に出ない");
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------------------- 受入 1

@@ -142,6 +142,7 @@ aws s3 cp s3://signature-studio-artifacts/artifacts/<prefix>.tar.zst "$HOME/arti
 identity になり **自分自身の PR を approve できない** (comment + 直接 merge に
 フォールバック)。設定していても installation が `contents:write` /
 `pull-requests:write` を grant していない場合は同じフォールバックになる。
+このフォールバックの直接 merge は、下の main の Ruleset で失敗する見込み (未検証)。
 
 `workflow_dispatch` の入力は `prompt` と opencode の pin 3 つ。dispatch は write
 権限を持つ人手による起動なので、常に書き込み可として扱う。
@@ -158,6 +159,17 @@ allow_rebase_merge: false
 
 `gh pr merge --squash` は必ず失敗する。プロンプトも `gh pr merge --auto --merge` /
 `gh pr merge --merge --delete-branch` を使う。
+
+## main の Ruleset (承認必須)
+
+main への merge には承認 (APPROVED) 1 件以上が要る (Ruleset `main-require-review`、id `25094342`、2026-10-14 16:03Z 作成)。
+仕様・緊急 merge・無効化の手順は `docs/WORKFLOW.md` §2 の「merge の担い手と main の Ruleset」節が正本。
+
+- **reviewer token の取得失敗時 (未検証)**: `OC_REVIEW_APP_PRIVATE_KEY` が未設定、または installation の権限が足りないと、
+  reviewer は実装 App と同じ identity になり approve できない。承認が無いので直接 merge も失敗し、PR は承認されないまま止まる見込み。
+  この挙動は実 run で確かめていない。
+- **`gh pr merge --auto` の挙動 (未検証)**: Auto Merge を有効化した PR が、承認の後に自動で merge されるかは確かめていない。
+  承認が無い間は merge されず残る見込み。
 
 ## 規約
 

@@ -167,6 +167,7 @@ const negatives: Array<[string, string, Opts]> = [
   ["needs-user-input", "user", { labels: ["needs-user-input"] }],
   ["pm-apply", "user", { labels: ["pm-apply"] }],
   ["oc:stuck", "user", { labels: ["oc:stuck"] }],
+  ["oc:hold (#2651)", "hold", { labels: ["oc:hold"] }],
   ["open PR 21-x (started)", "started", { pre: async (ctx) => assert.equal((await send(ctx.app, "pull_request", { ...prEv(91), pull_request: { ...prEv(91).pull_request, head: { ref: "21-x" } } })).status, 202) }],
   [
     "依存: #22 (open) (blocked)",
@@ -176,7 +177,7 @@ const negatives: Array<[string, string, Opts]> = [
       pre: async (ctx) => assert.equal((await send(ctx.app, "issues", issuePayload(22))).status, 202),
     },
   ],
-  ["oc:no-pr + 上限 (np=3・cooldown 後)", "stopped", { labels: ["oc:no-pr"], hours: 4, prep: (ctx) => ctx.store.put("relaunch", "np:21", { count: 3 }) }],
+  ["oc:no-pr + 上限 (np=3・cooldown 後)", "stopped", { labels: ["oc:no-pr"], hours: 7, prep: (ctx) => ctx.store.put("relaunch", "np:21", { count: 3 }) }],
   [
     "launch 未観測 (failed)",
     "stopped",
@@ -199,7 +200,7 @@ test("統合 (oc:no-pr の cooldown 中): 投稿せず、処理済みにもし�
   await tickNow(ctx);
   assert.equal(postsTo(ctx, 21).length, 0);
   assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "待ちは拒否として数えない");
-  ctx.clock.t += 2 * H; // 報告 (10:00) から 4 時間。既定の cooldown (3 時間) を過ぎる
+  ctx.clock.t += 5 * H; // 報告 (10:00) から 7 時間。既定の cooldown (6 時間) を過ぎる
   await tickNow(ctx);
   assert.equal(postsTo(ctx, 21).length, 1);
   assert.equal(focusPosts(ctx).length, 1, "意図の本文 (focus 行) で投稿された");

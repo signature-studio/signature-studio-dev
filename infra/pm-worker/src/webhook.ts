@@ -2,7 +2,7 @@
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
 import { needsPmDecision } from "./needs.ts";
-import { refsOnlyNumbers } from "./refs.ts";
+import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
 
 export const DEFAULT_REVIEWER_LOGIN = "oc-reviewer-for-signature-studio[bot]";
 export const NEEDS_USER_LABEL = "needs-user-input";
@@ -45,6 +45,11 @@ export interface PrState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // 保存前の全文 (body は切るか closed で空にするため) から取った参照。古い保存値には無い (規則 A は無いものを参照しない)。
+  // closes: Closes / Fixes / Resolves / Refs で参照する issue 番号 (規則 A の merged PR)。
+  closes?: number[];
+  // mentions: 題名と本文に現れる #番号。open PR が親 issue を参照しているかの判定 (規則 A の除外) に使う。
+  mentions?: number[];
   // merge の時刻と、本文が Refs #N のみ (Closes/Fixes なし) か。merge 済みの PR だけが持つ (本文そのものは持たない)。
   mergedAt?: string;
   refsOnly?: boolean;
@@ -345,7 +350,6 @@ function applyDependencies(s: PmState, p: Json): PmState {
   const adding = p.action === "blocked_by_added" || p.action === "blocking_added";
   const has = cur.includes(blocker);
   if (adding === has) return s;
-  const known = k in s.blockedBy || !adding;
   const nextList = adding ? [...cur, blocker].sort((a: number, b: number) => a - b) : cur.filter((x) => x !== blocker);
   const summary = p.blocked_issue?.issue_dependencies_summary?.total_blocked_by;
   const blockedBy = { ...s.blockedBy, [k]: nextList };
@@ -369,6 +373,7 @@ function applyPr(s: PmState, p: Json): PmState {
   if (!pr) return s;
   const k = String(pr.number);
   if (!newer(s.prs[k], pr.updated_at)) return s;
+  const full = typeof pr.body === "string" ? pr.body : "";
   const merged = !!pr.merged_at;
   const next: PrState = {
     number: pr.number,
@@ -377,12 +382,14 @@ function applyPr(s: PmState, p: Json): PmState {
     draft: !!pr.draft,
     ref: pr.head?.ref ?? "",
     title: pr.title ?? "",
-    body: pr.state === "closed" ? "" : (pr.body ?? "").slice(0, 3000),
+    body: pr.state === "closed" ? "" : full.slice(0, 3000),
     labels: Array.isArray(pr.labels) ? pr.labels.map((l: any) => String(l?.name ?? "")) : [],
     updatedAt: pr.updated_at,
     author: pr.user?.login ?? s.prs[k]?.author,
     authorType: pr.user?.type ?? s.prs[k]?.authorType,
     assoc: pr.author_association ?? s.prs[k]?.assoc,
+    closes: closeRefs(full),
+    mentions: mentionRefs(`${pr.title ?? ""}\n${full}`),
     // 切り詰める前の完全な本文から真偽だけを取る (本文は保存しない)。
     ...(merged ? { mergedAt: String(pr.merged_at), refsOnly: refsOnlyBody(pr.body ?? "") } : {}),
     // 本文は closed で捨てるので、merge 時点の本文から Refs の番号だけを残す (REST の一覧・webhook のどちらでも同じ)。

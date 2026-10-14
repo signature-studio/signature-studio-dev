@@ -3,7 +3,8 @@
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
 import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
 import type { LaunchState } from "./launchobs.ts";
-import { DIGEST_ROLLING_RE } from "./pm.ts";
+import { parentOf } from "./refs.ts";
+import { DIGEST_ROLLING_RE, OC_HOLD_LABEL } from "./pm.ts";
 
 export interface SnapIssue {
   number: number;
@@ -62,6 +63,8 @@ export interface Rows {
   blocked: Array<[number, number[]]>;
   started: Array<[number, string[]]>;
   user: Array<[number, string]>;
+  // oc:hold の issue (#2651)。Worker の自動着手を見送る。launch_issues.py に無い区分 (Worker 版の拡張)。
+  hold: Array<[number, string]>;
   stopped: Array<[number, string]>;
   recent: Array<[number, string]>;
   relaunch: Array<[number, string]>;
@@ -97,12 +100,8 @@ function graph(d: Snapshot, input: ClassifyInput) {
 
   const children = new Map<number, number[]>();
   for (const [n, i] of iss) {
-    const m = /^親\s*[:：]\s*(.+)$/m.exec(i.body);
-    if (!m) continue;
-    const first = /#(\d+)/.exec(m[1]);
-    if (!first) continue;
-    const pn = Number(first[1]);
-    if (nums.has(pn) && pn !== n) {
+    const pn = parentOf(i.body);
+    if (pn !== null && nums.has(pn) && pn !== n) {
       const c = children.get(pn) ?? [];
       c.push(n);
       children.set(pn, c);
@@ -207,7 +206,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
   const { iss, blockers, children } = graph(d, input);
   const st = startedMap(d, iss);
   const ageH = (ts: string) => (input.nowMs - Date.parse(ts)) / 3_600_000;
-  const rows: Rows = { blocked: [], started: [], user: [], stopped: [], recent: [], relaunch: [], ready: [] };
+  const rows: Rows = { blocked: [], started: [], user: [], hold: [], stopped: [], recent: [], relaunch: [], ready: [] };
 
   const blocksCount = new Map<number, number>();
   for (const bs of blockers.values()) for (const b of bs) blocksCount.set(b, (blocksCount.get(b) ?? 0) + 1);
@@ -225,6 +224,8 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     const bl = d.bot_last[k];
     if (i.labels.includes("needs-user-input")) {
       rows.user.push([n, ""]);
+    } else if (i.labels.includes(OC_HOLD_LABEL)) {
+      rows.hold.push([n, ""]);
     } else if (bs && bs.size > 0) {
       rows.blocked.push([n, [...bs].sort((a, b) => a - b)]);
     } else if (st.has(n)) {

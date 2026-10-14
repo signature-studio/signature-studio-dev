@@ -57,6 +57,7 @@ node tests/pyscript_browser.mjs --dump work/pyscript_chrome.json | grep -E '^\{"
 python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json
 python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json --neg >/dev/null && { echo "NEG が不一致を検出しなかった"; exit 1; } || true   # ネガコン: exit 1 で検出できたとき正常
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
+step "10b. headless Chrome: Worker 内の静的版 (flpy_static) 48 tool を SAB 版 (flpy + provider) と比較 (PY-81 #2634)"; node tests/static_browser_check.mjs
 step "11. MCP JSON-RPC を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-4 #77)"; (cd "$HERE/../.." && node tools/python/tests/mcp_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "12. MIDI scripting ホスト (PY-6 #76): device script ローダ・27 callback・Web MIDI 結線 (合成 fixture) + 同梱 device script"
 node tests/midi_script.mjs | cut -c1-300

@@ -89,6 +89,12 @@ FL_H(channels, setChannelName) { CH(0); const char *s = A_STR(1); set_name(k->na
 FL_H(channels, isChannelSelected) { CH(0); return fl_ret_b(c, k->sel); }
 FL_H(channels, selectChannel) { CH(0); int64_t v = A_INT(1, -1); k->sel = TOG(k->sel, v); return fl_ret_none(c); }
 FL_H(channels, deselectAll) { for (int i = 0; i < nch; i++) ch[i].sel = 0; return fl_ret_none(c); }
+/* PE 0xd5afc0 → 0xd5af30 → 0x11e84a0: 範囲外は -4 (Index out of range)、他 channel の選択を解除して対象だけ選ぶ。未モデル: useGlobalIndex・前提ゲート 0xd5af58・選択 gating 0xffac20 (REPORT_PY69) */
+FL_H(channels, selectOneChannel) {
+    CH(0); (void)A_INT(1, 0);
+    for (int i = 0; i < nch; i++) ch[i].sel = (i == _i);
+    return fl_ret_none(c);
+}
 FL_H(channels, muteChannel) { CH(0); int64_t v = A_INT(1, -1); k->mute = TOG(k->mute, v); return fl_ret_none(c); }
 FL_H(channels, soloChannel) { CH(0); k->solo = !k->solo; return fl_ret_none(c); }
 FL_H(channels, getChannelVolume) { CH(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(k->vol, 0.78125) : k->vol); }

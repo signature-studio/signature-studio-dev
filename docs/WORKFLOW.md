@@ -53,10 +53,39 @@ PM (main)                      subagent (実装)                  subagent (検�
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
-- **merge は PM のみ**。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
+- **merge の担い手**: 通常は reviewer App が approve 後の同じ run で merge し、PM は緊急時だけ merge する (下の「merge の担い手と main の Ruleset」節)。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
 - **競合時**: `git rebase origin/main` で解消してから `push --force-with-lease` (自分 branch のみ)。
 - **既定ブランチは `main`** (`origin/HEAD → origin/main`)。旧 `origin/master` は `main` の祖先で
   12+ commits 遅れの凍結枝。master を base にした PR・master への pull/push は行わない。
+
+### merge の担い手と main の Ruleset (`main-require-review`)
+
+- **Ruleset**: GitHub Ruleset `main-require-review` (id `25094342`。対象は既定ブランチ `~DEFAULT_BRANCH`、enforcement `active`、
+  2026-10-14 16:03Z 作成)。main への merge は **APPROVED の承認が 1 件以上**ある PR だけが通る (`required_approving_review_count=1`)。
+  merge 方式は merge commit のみ (`allowed_merge_methods=[merge]`)。CODEOWNERS・最後の push 後の承認・thread 解決は要求しない。
+- **効果**: 承認の無い PR の merge は 405 で失敗する。reviewer App (`oc-reviewer-for-signature-studio`) の APPROVED は承認として数えられる
+  (PM の canary 記録。再測定していない。所見と取得方法は `tools/pm/REPORT_2648.md`)。実装 App 単独の承認では merge できない見込み (未検証)。
+- **通常経路**: reviewer App が approve し、同じ run で `gh pr merge --merge --match-head-commit <レビューした head>` を行う
+  (`.github/prompts/reviewer.md` の手順 4)。実装 agent が `gh pr merge --auto --merge` で Auto Merge を有効化しても、承認が要るため
+  承認の後に merge される見込み。**Auto Merge の挙動は未検証。**
+- **PM の緊急 merge (Admin bypass)**: 次の手順。bypass の設定の有無は実測 (`tools/pm/REPORT_2648.md`) を参照し、
+  緊急 merge の前に手順 2 の `gh api ... --jq .bypass_actors` で確かめる (設定は変わりうるため、本書には値を書かない)。
+  1. まず reviewer App に承認させ、承認の後に merge する (通常経路)。
+  2. bypass が要るときは、PM が Ruleset に Admin (`RepositoryRole`、`pull_request` モード) の bypass を設定する。設定の有無は
+     `gh api repos/signature-studio/signature-studio-dev/rulesets/25094342 --jq .bypass_actors` で確かめる。
+  3. 緊急 merge の理由と PR 番号を issue に残す。bypass の設定から merge までの一連は**未検証**。
+- **無効化・ロールバック**: `enforcement` を `disabled` にする。部分 JSON ではなく、取得した全体 JSON の `enforcement` だけを書き換えて PUT する
+  (PUT は未実行・未検証。作業ファイルは gitignore 対象の `work/` に置く):
+
+  ```
+  gh api repos/signature-studio/signature-studio-dev/rulesets/25094342 > work/ruleset.json
+  jq '.enforcement = "disabled" | del(.id, .node_id, .source, .source_type, .created_at, .updated_at, .current_user_can_bypass, ._links)' work/ruleset.json > work/ruleset-off.json
+  gh api -X PUT repos/signature-studio/signature-studio-dev/rulesets/25094342 --input work/ruleset-off.json
+  ```
+
+  戻すときは `enforcement` を `active` にして同じ PUT を行う。無効化・bypass の設定変更は PM が issue に記録する。
+- **未解決 (未検証)**: reviewer token が取れない場合の挙動は `.github/README.md` の「main の Ruleset」節。本節の merge 担い手は
+  AGENTS.md §1 の「merge は PM が行う」と食い違うが、AGENTS.md は規約の要約なので、この変更では直さない (PM 判断)。
 
 ## 3. ステータスと責任区分
 
@@ -64,7 +93,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 |---|---|---|---|
 | 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更 |
 | 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge・方針変更・是正 | — |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | 緊急時の merge (通常は reviewer App。下の節)・方針変更・是正 | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
