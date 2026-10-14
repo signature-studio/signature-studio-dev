@@ -16,7 +16,9 @@
 - 比較基準: HEAD (`cdc67bb8` 時点の `audit_undefload_dest.py`) を同じ入力で実行
 - 実行: `python3 audit_undefload_dest.py PE OUT 5入力`。HEAD は 70 秒、測定 commit は 70 秒 (load average 約 1.0, 4 vCPU, rc 0)。
 
-## 実測 (sites 2,729 同一)
+## 実測 (sites 2,729 同一) — d7998dca のコードの値
+
+**注: 本表は測定 commit `d7998dca` のコードの値。検証 HEAD のコードでは未再測定 (入力 `work-m11` が本 run に無いため)。**
 
 | 分類 | HEAD | 測定 commit | 差 |
 |---|---|---|---|
@@ -59,15 +61,17 @@ python3 audit_undefload_dest.py <fl-win64 extracted/block00031_PE.bin> out.json 
 
 結果 JSON: `results/audit_undefload_dest_2202_head.json` (HEAD)・`results/audit_undefload_dest_2202.json` (測定 commit)。
 
-## 測定 commit から PR head までの差分 (`git diff --stat d7998dca 255d5a53 -- tools/m11/ldfix` の実出力)
+## 測定 commit から検証 HEAD までの差分 (コード)
+
+測定 commit `d7998dca` → 検証 HEAD (`git diff --stat d7998dca HEAD -- tools/m11/ldfix/audit_undefload_dest.py` の実出力):
 
 ```
- tools/m11/ldfix/REPORT_2202.md                              |  73 ++++++++
- tools/m11/ldfix/results/audit_undefload_dest_2202.json      | 190 +++++++++++++++++++++
- tools/m11/ldfix/results/audit_undefload_dest_2202_head.json | 190 +++++++++++++++++++++
+ tools/m11/ldfix/audit_undefload_dest.py | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 ```
 
-`d7998dca` → `255d5a53` では `audit_undefload_dest.py` の差分は 0 行で、表の数値はこの範囲のコードで測った値。
+この範囲のコードは測定 commit と異なる。したがって表の件数 (d7998dca の値) は**現コードの値ではない**。
+(`tools/m11/ldfix` 全体の stat は main 取り込みで他 PR のファイルが混ざるため、コード範囲は上記に限定。)
 
 ## review 対応 (fix モード)
 
@@ -76,10 +80,27 @@ PR head `255d5a53` の review (request-changes) への対応。**この節以降
 
 | # | 指摘 | 対応 | 検証 |
 |---|---|---|---|
-| 1 | DEST_RIPREAD の詳細が JSON に無い | `main()` に `dest_riprip` (fn・file・detail) を追加。**JSON は未再生成** (入力 IR 無し、下記未解決) | `trace_dest` 単体で 69c381 → 69c378 `mov eax,[rip+0xf58576]` を再確認 (PE: `fl-win64` の `block00031_PE.bin`) |
-| 2 | `is_reg_rmw` が第 2 オペランドを追跡しない | RMW writer を飛ばす際、その第 2 オペランドの reg (`cl` は `rcx` に正規化) を `want` に加える | 合成機械語: `add eax,ecx` / `shl eax,cl` の源を RIP 読み `mov` まで辿れることを確認 |
-| 3 | `reads_dest` が `bt*`・`shld/shrd`・`xadd`・`cmpxchg` を落とす | 上記 mnemonic を `reads_dest` に追加 | 合成機械語: `bt eax,ecx` / `xadd eax,ecx` を consumer とした時、eax の元 `mov` を辿れることを確認 (修正前は REGLIVE) |
+| 1 | DEST_RIPREAD の詳細が JSON に無い | `main()` に `dest_riprip` (fn・file・detail) を追加。**JSON は未再生成** (入力 IR 無し、下記未解決) | `verify_dest_2202.py` [1]: PE 69c381 `not eax` ← 69c378 `mov eax,[rip+0xf58576]` (rip_rva=0x15f48f4) |
+| 2 | `is_reg_rmw` が第 2 オペランドを追跡しない | RMW writer を飛ばす際、その第 2 オペランドの reg (`cl` は `rcx` に正規化) を `want` に加える | `verify_dest_2202.py` [2a] `add eax,ecx` の ecx は reg 定義 `mov ecx,edx` → mem=False (REGLIVE)、[2b] `shl eax,cl` の cl は `mov ecx,[rip+0x1fa]` → mem=True |
+| 3 | `reads_dest` が `bt*`・`shld/shrd`・`xadd`・`cmpxchg` を落とす | 上記 mnemonic を `reads_dest` に追加 | `verify_dest_2202.py` [3a] `bt eax,ecx`・[3b] `xadd eax,ecx`・[3c] `cmpxchg ecx,edx` の consumer が、dest の元 `mov [rip+..]` に到達 (mem=True) |
 | 4 | REPORT の stat が実物と不一致 | 上の実出力で置換 (64 → 73 / 190 / 190) | `git diff --stat` の実出力 |
+
+### 検証スクリプト
+
+`tools/m11/ldfix/verify_dest_2202.py` (commit `07cb1f47`)。入力: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst extracted/block00031_PE.bin`)。合成機械語は同ファイル内に記載。
+
+```
+python3 tools/m11/ldfix/verify_dest_2202.py extracted/block00031_PE.bin
+[1] PE 69c381 eax <- 69c378 mov eax, dword ptr [rip + 0xf58576] : rip_rva=0x15f48f4  OK
+[2a add eax,ecx (ecx=reg def)] consumer cmp eax, 0 -> writer mov ecx, edx  mem=False  OK
+[2b shl eax,cl (cl=rip read)] consumer cmp eax, 0 -> writer mov ecx, dword ptr [rip + 0x1fa]  mem=True  OK
+[3a bt eax,ecx] consumer bt eax, ecx -> writer mov eax, dword ptr [rip + 0xfa]  mem=True  OK
+[3b xadd eax,ecx] consumer xadd eax, ecx -> writer mov eax, dword ptr [rip + 0xfa]  mem=True  OK
+[3c cmpxchg ecx,edx] consumer cmpxchg ecx, edx -> writer mov ecx, dword ptr [rip + 0xfa]  mem=True  OK
+ALL OK
+```
+
+注: 本検証は `trace_dest` の writer 特定を確認するもので、件数 (5 入力) の変化は含まない (下記未測定)。
 
 ### 既存 18 件 (DEST_FRAME_IN_ESCAPED 15 / PTR_ESCAPED 3) の再判定
 
