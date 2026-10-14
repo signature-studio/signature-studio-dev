@@ -153,7 +153,9 @@ def fix_414390(lines):
         ('%%ce8n11_function_414390 = ptrtoint ptr %s to i64' % r8,
          '%ce8n11_function_414390 = load i64, ptr inttoptr (i64 9048088 to ptr), align 8'),
         ('store i16 0, ptr %s, align 8' % rcx,
-         'store i16 0, ptr inttoptr (i64 9048072 to ptr), align 8'),
+         '%hs414390_dst = load i64, ptr inttoptr (i64 9048072 to ptr), align 8\n'
+         '  %hs414390_dstp = inttoptr i64 %hs414390_dst to ptr\n'
+         '  store i16 0, ptr %hs414390_dstp, align 8'),
     ]
     for old, new in rules:
         cnt = 0
