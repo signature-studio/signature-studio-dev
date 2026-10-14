@@ -191,7 +191,7 @@ git diff bae12679 HEAD -- tools/m11 tools/shared ':(exclude)tools/m11/trap_triag
 
 詳細・測定表・原典突合・未解決の全文は `REPORT_APPENDIX_2773.md` (正本)。
 
-- **終了条件**: `4fa210` (件数の線形探索) の原典 `4fa23f` の件数 0 ガードが lift IR で脱落 (D19)。件数 0 で本体が 1 回走り、範囲外の `47a250` を呼ぶ。減算が `0xFFFFFFFF` へ回り約 2^32 周回に入る。
+- **終了条件**: `4fa210` (件数の線形探索) の原典 `4fa23f` の件数 0 ガードが lift IR で脱落 (D19)。件数 0 で本体が 1 回走り、範囲外の `47a250` を呼ぶ。減算が `0xFFFFFFFF` へ回り約 2^32 周回に入る (IR と原典からの推定。周回数は未計測。詳細は付録 §10-1)。
 - **例外 object 未解放**: `47a250` は原典では raise で戻らないが、lift では戻って続行する。周回ごとに object が作られ、どれも解放されない (FreeMem 0)。
-- **修復** `guard4fa210/m11_guard4fa210.py` (入口に件数 0 → `ret 0`): 修復を入れると、修復なしで halt0 だった構成 (A) の unit 101 は halt0 → oob (2 hit)、halt0 unit は 55 → 6。既定 (ON・OFF) は修復前後で全 unit の kind が変わらない (0 unit)。
+- **修復** `guard4fa210/m11_guard4fa210.py` (入口に件数 0 → `ret 0`)。修復の効果 (halt0 の減少・既定構成の kind 不変) は付録 §10-2 の表が正本。
 - **§9 の仮説**: wasm の index ずれは否定 (E1 で分岐しない import を足しても halt0 のまま)。詳細は付録 §10-6。
