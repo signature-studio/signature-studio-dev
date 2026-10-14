@@ -77,6 +77,7 @@ export function createMockEngine() {
     "channels.selectOneChannel": (...a) => {
       arity(a, 1, 2);
       const k = ch(a[0]);
+      argI(a, 1, 0);
       st.channels.forEach((c) => (c.sel = c === k));
     },
     "channels.muteChannel": (i, v) => { ch(i).mute = tog(ch(i).mute, v); },
