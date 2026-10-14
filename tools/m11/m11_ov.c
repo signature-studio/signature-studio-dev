@@ -989,6 +989,19 @@ void m11_ffe0_obs(unsigned long long a) {
 }
 #endif
 
+/* #2373 計測専用 (M11_INSTR_60A270=1 のときだけ有効): function_60a270 の入口で this (arg1) と arg2 を stderr に出す。
+ * 60a270 は 40ffe0 の唯一の観測 caller (#882 §13.3)。this が 0 かどうかを見る。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_60A270
+#define M11_INSTR_60A270 0
+#endif
+#if M11_INSTR_60A270
+static int g_60a270_n;
+void m11_60a270_obs(unsigned long long a, unsigned int b) {
+    if (g_60a270_n++ < 16)
+        fprintf(stderr, "[m11][60a270] #%d this=0x%llx arg2=0x%x\n", g_60a270_n, a, b);
+}
+#endif
+
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
  * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
  *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)
