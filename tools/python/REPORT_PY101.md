@@ -25,6 +25,17 @@
 | PE 書込み元の列挙 | `python3 analysis/flapi/pe_grid_writers.py` | +0x7ac 書込み 21 件 (うち qword 1 件) | 30.3 秒 |
 
 - ネガティブコントロール: mock の `channels.isGridBitAssigned` を `return false` に変えると `channels_diff` は `channels/playlist 差分 2 件` で FAIL (rc 1)。`return true` に戻して PASS を確認した。
+- 統合後の再測定: main (`f82768d9`) を取り込んだ merge commit `44defabf` で再測定した (競合は `tests/provider_check.mjs` の集合定義と件数だけ)。`git diff 44defabf HEAD -- tools/python/{host,provider,tests}` は 0 行 (本行の commit は範囲外)。素材 `fl-win64`・`toolchain-emsdk` は `$ARTIFACTS_DIR` で実在を確認した。
+
+| 検査 (44defabf) | コマンド | 結果 | 所要 |
+|---|---|---|---|
+| provider ビルド | `bash tools/python/provider/build.sh` | rc 0・ハンドラ 86・`gen/` 再生成の差分 0 | 1.48 秒 |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 132・diffs 0・PASS | 0.12 秒 |
+| general 差分 | `node tests/general_diff.mjs` | calls 9・diffs 0・PASS | — |
+| device 差分 | `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS | — |
+| 実装数 (flpy 非依存の節) | `node tests/provider_check.mjs` の第 1・2・2b・6 節 | functions 435・implemented 86・unimplemented 349・mcp_static 60・PASS | — |
+| 第 3 節・全 tool | `tests/provider_check.mjs` 第 3 節・`FL_ENGINE=wasm node tests/all_tools.mjs` | 未実行 (`dist/flpy.js` と `work/midi.py` が runner に無い) | — |
+
 - KPI: 起動・GUI に関わらない PR のため対象外。
 
 ## PE 解析 (FL_WIN64_DIR の `extracted/block00031_PE.bin`)
