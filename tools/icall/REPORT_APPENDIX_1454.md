@@ -69,7 +69,7 @@ va=0x180da72fc fn=0x180da6e60 call qword ptr [rax + 0x30]  ir=dropped
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" tools/icall/work/rt_freshair-core   # 素材名は docs/WORKFLOW.md §11
 python3 tools/icall/diff/fa_residual.py tools/icall/work/rt_freshair-core
 unzip -o "<plugins-freshair の Fresh Air.Win.zip>" '*SlateCore.core_64'   # 展開先は作業用の一時ディレクトリ
-retdec-decompiler <PE> -o x.c --select-ranges 0x180c97aa0-0x180c97ee0 --select-decode-only --backend-no-opts --output-llvmir x.ll
+[RETDEC] (`docs/REFERENCES.md`) の `retdec-decompiler` <PE> -o x.c --select-ranges 0x180c97aa0-0x180c97ee0 --select-decode-only --backend-no-opts --output-llvmir x.ll
 ```
 
 一時展開先と `work/` 配下の dump は gitignore 対象で、commit していない。
