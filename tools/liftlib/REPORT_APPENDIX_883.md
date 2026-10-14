@@ -125,3 +125,22 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 
 - (a) `shift_va` で加算定数 `6442450944` (0x180000000 の加算) を image base 移動の対象に含める (`remap.py` 側の拡張)。その上で shift 後の wasm 線形メモリ上限 (`newbase` の選択と INITIAL_MEMORY) を確認する。
 - (b) は #1270 (this/idx 受渡し) で扱う。
+
+## #1583 (HB-H33) run: blk_global 単独の実測 (測定 commit 5f0a8ce9, origin/main 起点 worktree)
+
+素材: `fl-win64` 以外の要求素材を展開 (`analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/`、`work-liftlib`・`work-icall`・`work-m6-ott` → 各 `tools/*/work/`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
+
+| 設定 (leafspec `--n 200`) | rc | 時間 | match / mismatch / wasm_trap |
+|---|---|---|---|
+| ベース (`blk_global: false`, shift なし) | 1 | 6.1 s | 0 / 200 / 200 |
+| `blk_global: true` のみ | 1 | 未計測 | 0 / 200 / 200 |
+
+`blk_global: true` の効果: `work/ott_getparam/ott_getparam_fixed.ll` の BLK 参照は `@__icall_blk` の GEP 136 件へ置換され、`inttoptr (i64 BLK+off)` の残りは 0 件。それでも全シナリオが wasm trap する。
+
+残りの trap 原因 (`ott_getparam_fixed.ll` の静的数え上げ):
+
+- 画像 VA 範囲 (`0x180000000`〜) の `i64` 即値が 193 件 (distinct 65)。`shift_va` の対象は `i64 <即値>` のみ。
+- 加算形 `add nuw nsw i64 %x, 6442450944` (= 0x180000000) が 2 件 (例: `%18 = add nuw nsw i64 %17, 6442450944`)。`shift_va` は対象外のため平行移動されず、この形の後の `inttoptr` が画像 VA を指す。
+- よって BLK の張り替え (受入条件 1) 単独では wasm trap は消えず、画像 VA 側の shift が要る。
+
+修正方針 (未実装・子 issue へ): `remap.shift_va` に加算定数 (`add ... , <image VA>`) を含める拡張、または leaf 側に `passes.shift` を入れて `newbase` を wasm 線形メモリ内へ移す。いずれも ott 既存 recipe (`recipes/ott.py` の `shift_va`) の出力に影響しうるため、ott_route / ott_iargs の前後一致を確認してから入れる。
