@@ -19,6 +19,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hs_resp_src as S
 import hs_disp_emu as E
 
+INIT = 0x131873f  # 共通初期化 mov qword [rbp+0x11a0],0 (全 ID が実行する)
+END = 0x1328a4a  # 共通終端 (応答 0 の ID が末尾に到達する VA)
+
 
 def static_stores(read_va):
     code = read_va(E.FN_LO, E.FN_HI - E.FN_LO)
@@ -37,6 +40,12 @@ def executed(run):
     return res
 
 
+def no_case_store(run, static):
+    """共通初期化 (INIT) の格納だけを実行し、共通終端 (END) に到達した ID の集合 (応答 0 の 202 件に相当)。"""
+    return set(int(k) for k, v in run.items()
+               if v['path'] and v['path'][-1] == END and set(a for a in v['path'] if a in static) == {INIT})
+
+
 def main():
     runs = [json.load(open(p)) for p in sys.argv[1:]]
     if not runs:
@@ -49,6 +58,8 @@ def main():
     print('static stores in [0x%x,0x%x) = %d' % (E.FN_LO, E.FN_HI, len(static)))
     print('base executed (union over IDs) = %d / unexecuted = %d' % (len(cov0), len(static - cov0)))
     print('unexecuted: %s' % ' '.join('0x%x' % a for a in sorted(static - cov0)))
+    s0 = no_case_store(runs[0], static)
+    print('no-case-store IDs (init only, end 0x%x) = %d' % (END, len(s0)))
     for p, run in zip(sys.argv[2:], runs[1:]):
         ex = executed(run)
         now = set(a for a in ex if a in static)
@@ -58,6 +69,9 @@ def main():
         for a in sorted(cov0 - now):
             print('  lost 0x%x' % a)
         print('  executed = %d / new = %d / lost = %d' % (len(now), len(now - cov0), len(cov0 - now)))
+        s = no_case_store(run, static)
+        print('  no-case-store IDs = %d / leave = %s / enter = %s' % (
+            len(s), ','.join('0x%02x' % i for i in sorted(s0 - s)) or '-', ','.join('0x%02x' % i for i in sorted(s - s0)) or '-'))
 
 
 if __name__ == '__main__':
