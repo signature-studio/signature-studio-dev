@@ -8,7 +8,7 @@
 - 受入 1 (応答表の統一): 前 run の PR #3049 (merge 済み。shim の commit `7278e857`) で wasm の HeapFree を native 参照 (`tools/liftdiff/rt/ld_core.h:430`) と同じ応答 (TRUE) に揃えた。決定は `tools/shim/REPORT.md` §6。
 - 受入 2 (再測定): 1c5e84・1c621c・1c682c・1c69cc の vm0/u16 (計 8 case) の wasm block 入口列は、**native と全件一致** (共通接頭辞 = wasm 入口数 = native 入口数)。LD-84 で 8 case すべてにあった分岐 (`1c0b71` の HeapFree 戻り値による) は消えた。分岐点の原因を示す必要は無い。
 - 受入 3 (測定 commit と差分): 測定 commit `0dc0aa4b` (計測コードの最後の変更)。`git diff 0dc0aa4b HEAD -- <範囲>` は 0 行 (§5)。
-- 残った差は block 列の外にある (§4): 8 case の `outcome` は依然 `diff`。原因は (a) import 呼出し記録の差 (計装上の差、8 case)、(b) `sext i1` による rax の差 (6 case。試験で消えることを確認)、(c) 1c621c の rax の差 (2 case。未特定)。
+- 残った差は block 列の外にある (§4): 8 case の `outcome` は依然 `diff`。原因は (a) import 呼出し記録の差 (計装上の差、8 case)、(b) `sext i1` による rax の差の疑い (6 case。IR の機構は確認。rax の差との因果は未検証で推定)、(c) 1c621c の rax の差 (2 case。未特定)。
 
 ## 1. 測定条件
 
@@ -70,14 +70,15 @@ native 入口数は LD-84 と同じ (変わらない)。wasm 入口数と共通�
 
 **(b) rax の差: 1c5e84 (vm0/u16)・1c682c (vm0/u16)・1c69cc (vm0/u16) の 6 case**: native `rax=1`、wasm `rax=0xffffffffffffffff`。
 - IR の機構 (`tools/ott/work/ott.ll`、`function_1801c0b6c` の block `1c0b71`): `%4 = call i1 @HeapFree(...)` → `%5 = sext i1 %4 to i64` → `store i64 %5, ptr %rax.0.reg2mem` → `ret i64`。TRUE を `sext` すると -1 になる。
-- native では BOOL の戻り値 (eax=1) が 0 拡張されて rax=1 になる。
-- **試験 (work/ のみ・非コミット)**: `ott.ll` の HeapFree 直後の 1 行だけを `zext i1 %4 to i64` に置換し、既定 build (計装なし) で 4 関数 × vm0/u16 を再測定 (`work/ld84/exp_zext.json`・`exp_zext_all.json`)。6 case の rax の差は消えた。残るのは (a) と、1c621c の (c) だけである。よって (b) の原因は `sext` と推定し、試験で確認した。恒久修正ではない。
+- native の観測は rax=1。BOOL の戻り値 (eax=1) が 0 拡張されたためかは未確認 (推定)。
+- rax の値の出典 (未コミット): `tools/liftdiff/work/ld84/blk_all.json` (計装版 run の出力。`results/` には無い)。要素のうち `function.va` が該当 VA (例 `0x1801c5e84`) のものの `cases[]` で、`pattern` が vm0 か u16 の case。`cases[].raw.native.rax` が native、`cases[].raw.wasm.rax` が wasm。`raw` は `outcome` が `diff`・`wasm_trap` の case にだけ入る。
+- **試験は未実施 (推定)**: `sext` を `zext` に置き換えた場合の rax は測っていない。`tools/ott/work/` は書き換えない (AGENTS.md 禁止事項 4)。(b) の原因が `sext` であるかは推定にとどまる。検証は子 #3180 (LD-147) の受入で、`work/` の外の複製により行う。
 - 影響範囲: `ott.ll` の `call i1 @` は 18 件 (WriteFile 6 件、WriteConsoleW 2 件、IsProcessorFeaturePresent 2 件 ほか)。BOOL 戻り値の型幅の扱いは HeapFree 固有ではない。sext の実影響は未検証。
 - 新類型の行案 (`docs/DEFECTS.md` は PM 判断で編集するため、ここに残す):
 
-| D25 | fe (機構は IR で確認。型決定の段は推定) | **新規** (LD-133 / #2821 で発見) | Win32 BOOL の import 戻り値を `i1` で受け、`sext i1→i64` で rax に入れる。TRUE が `0xffffffffffffffff` になる (native は eax=1 で rax=1) | BOOL の戻り値幅の決め方 (`i1` 宣言 + `sext`)。`ott.ll` の `function_1801c0b6c` `1c0b71` で確認 | 同一 IR の該当 1 行を `zext` にすると 6 case の rax 差が消える (work のみの試験) | BOOL 戻り値を 32bit 幅で zext して受ける修復 (PM 判断で起票) |
+| D25 | fe (機構は IR で確認。型決定の段は推定) | **新規** (LD-133 / #2821 で発見) | Win32 BOOL の import 戻り値を `i1` で受け、`sext i1→i64` で rax に入れる。TRUE が `0xffffffffffffffff` になる疑い (native は eax=1 で rax=1) | BOOL の戻り値幅の決め方 (`i1` 宣言 + `sext`)。`ott.ll` の `function_1801c0b6c` `1c0b71` で機構を確認 | **未試験** (推定)。rax 差との因果は未検証 | 子 #3180 (LD-147・親 #2821)。DEFECTS.md への登録の要否は PM agent の判断待ち・既定案: #3180 の検証結果が出るまで登録しない |
 
-**(c) 1c621c (vm0/u16) の rax の差**: native `0x1720f22a0` (heap ポインタ)、wasm `0x1801c5e84` (1c5e84 の VA と同じ値)。`zext` の試験でも変わらない。原因は未特定 (推定もしない)。
+**(c) 1c621c (vm0/u16) の rax の差**: native `0x1720f22a0` (heap ポインタ)、wasm `0x1801c5e84` (1c5e84 の VA と同じ値)。出典は上の (b) の行と同じ。原因は未特定 (推定もしない)。原因の特定は子を作らず、#2801 (LD-131) へのコメントで追跡する。
 
 ## 5. 測定 commit と差分
 
@@ -95,8 +96,8 @@ native 入口数は LD-84 と同じ (変わらない)。wasm 入口数と共通�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| BOOL 戻り値の `i1` + `sext` (D25 行案 §4 (b)) | 6 case の rax 差 (TRUE が -1)。`ott.ll` の `call i1` 18 件に同じ型決定。実影響は未検証 | PM 判断 (DEFECTS.md への登録と子 issue。新類型) |
-| 1c621c の rax 差 (§4 (c)) | 2 case。原因未特定 | PM 判断 (#2193 (LD-84) への追跡の提案) |
-| import 呼出し記録の差 (§4 (a)) | 8 case の outcome を `diff` にする計装上の差 | PM 判断 (計装の改修。#2192 (LD-83) の残りと同じ系) |
-| 実機 Windows の HeapFree 戻り値 (割当て外 p) | 応答表の根拠が未検証 | #2821 の受入外 (PM 判断) |
-| GlobalFree・LocalFree の範囲外の応答 | HeapFree 以外。`tools/shim/REPORT.md` 側 | PM 判断 |
+| BOOL 戻り値の `i1` + `sext` (D25 行案 §4 (b)) | 6 case の rax 差の疑い (TRUE が -1)。`ott.ll` の `call i1` 18 件に同じ型決定。因果は未検証 | 子 #3180 (LD-147・親 #2821)。DEFECTS.md への D25 登録の要否は PM agent の判断待ち・既定案: #3180 の検証結果が出るまで登録しない |
+| 1c621c の rax 差 (§4 (c)) | 2 case。原因未特定 | #2801 (LD-131) へのコメントで追跡 (命令単位の wasm trace で rax の源を示す) |
+| import 呼出し記録の差 (§4 (a)) | 8 case の outcome を `diff` にする計装上の差 | PM agent の判断待ち: 計装の改修を子 issue にするか・既定案: 子は起票せず #2801 (LD-131) へのコメントで追跡 |
+| 実機 Windows の HeapFree 戻り値 (割当て外 p) | 応答表の根拠が未検証 | PM agent の判断待ち: 実機検証の起票先・既定案: 本 run では実機検証しない。`tools/shim/REPORT.md` §6 の未検証注記を正本とする |
+| GlobalFree・LocalFree の範囲外の応答 (native stub は 0、shim は `h`) | HeapFree 以外。native と shim が一致しない | #2841 (LD-136) へのコメントで追跡 (shim の範囲外応答の残り。`tools/shim/REPORT.md` §6 の注記を参照) |
