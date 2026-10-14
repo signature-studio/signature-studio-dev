@@ -1,6 +1,6 @@
 # 付録: icall #2508 (ICALL-78) — frame slot 復元の残件 (0x180da6e60 の候補分類・0x181057b38 の xmm0 不一致の切り分け)
 
-> 親: #2427 (ICALL-77, PR #2514 merge 済み・`FA_FRAME_SLOT=1` の pass)。受入 3 (`SlateCore.core_64` 205 B の sha256 照合) は素材 `plugins-freshair` が無いため本 run では未実施 (§6)。
+> 親: #2427 (ICALL-77, PR #2514 merge 済み・`FA_FRAME_SLOT=1` の pass)。受入 3 (`SlateCore.core_64` 205 B の sha256 照合) は素材 `plugins-freshair` が無いため本 run では未実施 (§6)。受入 4 (16B 結合 merge 規則の他関数での検証) も本 run では未実施 (§6)。
 > 測定 commit: `05194cdc` (`origin/main` (`9b352bd7`) 取り込みの merge。コードを変えた最後の commit)。`fa_cmp.py` の harness 修正は `0d29b5f4`。
 
 ## 1. 結論
@@ -8,7 +8,7 @@
 - **0x181057b38 の 8/8 不一致は harness 由来**。関数と callee の機械語は xmm0 を一度も書かず、native は入力 xmm0 をそのまま返す (素通し)。wasm 側は戻り値の出力スロット BLK+0x88 を `ott_run` が初期化しないため、0 を返していた。`tools/icall/diff/fa_cmp.py` で入力値を BLK+0x88 に置いてから呼ぶよう修正し、0x181057b38 は **8/8 一致** (修正前 0/8)。
 - 同じ修正で、素通しの関数 8 件が「不一致」から「一致」に変わった (§3.4)。fixed route の `fa_sweep` (131 関数・HEAD で再実行) は **値の不一致 11 → 3、bit 一致 46 → 54** (旧 harness → 新 harness)。PR 初版の bit 一致 55 は HEAD の再実行で再現せず、差は `0x1803dee20` の 1 件 (§3.5)。
 - **0x180da6e60 の候補 10 件は部分分類**。route が使う IR (`after.0.restored.ll`) に store が無いのは 8 件。うち 2 件はこの関数内に読みが無く (無害とは断定しない)、6 件は仮想 call に渡す構造体の内部または cookie 検査の入力で、読み先・値の出所が静的に確定せず「誤り疑い」のまま。残り 2 件は route IR に store があり、before IR との比較による誤検出 (§4)。
-- 残件 (受入 1 の残り・受入 3) は未達。PR は `Refs #2508` とし、残件を #2508 に残す (§6)。
+- 残件 (受入 1 の残り・受入 3・受入 4) は未達。PR は `Refs #2508` とし、残件を #2508 に残す (§6)。
 
 ## 2. 測定条件
 
@@ -70,7 +70,7 @@ base route (新 harness): **53 / 66 / 9 / 3**。base → fixed で判定が変�
 
 測定 commit `0d29b5f4` の PR 初版では fixed の bit 一致が 55 で、`0x1803dee20` が一致側に入っていた。HEAD `50112f92` で同じ手順 (`fa_sweep.sh 8 60`) を 2 回、`fa_cmp.py 1803dee20 --n 8` を 3 回実行したが、いずれも `0x1803dee20` は一致せず (native `0000000000000000`、wasm `c000c5300342457c` ほか)、sweep は 54 / 66 / 8 / 3 だった。レビュー環境の再実行も同じ値だった。ASLR を無効にした場合 (`setarch -R`) と `FA_ENC_INIT=1` の場合も結果は変わらなかった。
 
-PR 初版でこの 1 件が一致した理由は特定できていない。1 関数分の揺れとして #2302 に追記する (§6)。
+PR 初版でこの 1 件が一致した理由は特定できていない。1 関数分の揺れとして #2302 に追記した ([コメント](https://github.com/signature-studio/signature-studio-dev/issues/2302#issuecomment-6172956250))。
 
 ## 4. 0x180da6e60 の候補 10 件の分類 (受入 1)
 
@@ -136,7 +136,8 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 | `0x1803dee20` の native 0 / wasm 入力 (ctor。戻り値は rax、xmm0 は callee の残留値。旧 harness でも不一致) | 値の不一致 1 件。seed 修正とは無関係。深い連鎖 (`0x18100be74` → `0x1810553d0` 付近) は未追跡 | #2508 |
 | `0x18105d9fc` の xmm0 がヒープポインタ (native と wasm でアドレスが違う) | 比較オラクルの問題。関数の値の正しさは未判定 | #2508 |
 | 候補検出の基準を route IR (after) にする | 誤検出 2/10 (本件) | #2508 |
-| `fa_sweep` の揺れ: PR 初版の fixed 55/66/8/2 が HEAD の再実行 (2 回) で 54/66/8/3 に変わった (差は `0x1803dee20` の 1 件・§3.5)。旧 46/66/9/9 とも違う | 原因未特定。1 関数分の揺れとして追記 | #2302 (既存・追記) |
+| `fa_sweep` の揺れ: PR 初版の fixed 55/66/8/2 が HEAD の再実行 (2 回) で 54/66/8/3 に変わった (差は `0x1803dee20` の 1 件・§3.5)。旧 46/66/9/9 とも違う | 原因未特定。1 関数分の揺れとして追記済み | #2302 (追記済み: [コメント](https://github.com/signature-studio/signature-studio-dev/issues/2302#issuecomment-6172956250)) |
+| merge 規則の一般化 (`REPORT_APPENDIX_2427.md` §5 の限界。`0x180da6e60` を含む他関数での検証)。`frame_slot_restore.py` の 16B 結合 merge 規則の適用条件は他関数では未確定で、本 run では検証していない (受入 4) | 適用条件が未確定のまま。2310・2427 の付録がこれを #2508 の残件として参照 | #2508 |
 | `docs/DEFECTS.md` への新類型 (passthrough の出力スロット未初期化) の追記 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
 
 ## 7. 測定 commit からの差分
