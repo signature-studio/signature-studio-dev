@@ -42,7 +42,7 @@ function restWorld() {
       const u = new URL(c.url);
       const p = u.pathname;
       if (p.endsWith("/actions/runs")) return j({ workflow_runs: w.runs.filter((r) => r.status === u.searchParams.get("status")) }, 200, hdr());
-      if (p.endsWith("/issues/comments")) return j(w.comments, 200, hdr());
+      if (p.endsWith("/issues/comments")) return j([...w.comments].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)), 200, hdr());
       if (p.endsWith("/issues")) return j(u.searchParams.get("state") === "open" ? w.issues.filter((i) => i.state === "open") : w.issues, 200, hdr());
       if (p.endsWith("/pulls")) return j(w.prs, 200, hdr());
       if (/\/dependencies\/blocked_by$/.test(p)) return j([], 200, hdr());
@@ -62,6 +62,7 @@ const EXISTING_KEYS = [
   "mode", "mode_launch", "mode_dispatch", "active_runs", "target", "room", "open_issues", "open_prs", "phase", "open_prs_excl_stuck", "stuck_prs", "launch_stop",
   "blocked", "started", "ready", "relaunch", "user", "stopped", "recent", "would_launch_now", "last_full_sync", "last_reconcile",
   "last_watchdog", "last_tick", "fresh", "counters", "last_error", "log", "configured", "installed", "pm_bot_login",
+  "sync_truncated", "last_full_sync_rest_calls", "last_full_sync_comment_rest_calls", "comment_window_h", "comment_max_pages",
 ];
 const ADDED_KEYS = [
   "last_webhook_at", "last_dispatch_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at",
@@ -196,7 +197,7 @@ test("reconcile_diff: REST を適用して DO の内容が変わった件数 (�
   assert.deepEqual(await diff(), { last: 0, total: 2 }, "一致していれば 0。累計は減らない");
   // issue 1 のタイトル変更と、新しい bot の報告を取りこぼした
   w.w.issues = [restIssue(1, { title: "[CI-1] renamed", at: "2026-10-14T11:50:00Z" }), restIssue(2, { at: "2026-10-14T11:41:00Z" })];
-  w.w.comments.push({ issue_url: "https://api.github.com/repos/x/y/issues/2", user: { login: BOT }, body: "報告 2", created_at: "2026-10-14T11:55:00Z" });
+  w.w.comments.push({ issue_url: "https://api.github.com/repos/x/y/issues/2", user: { login: BOT }, body: "報告 2", created_at: "2026-10-14T12:15:00Z" });
   clock.t += 6 * 60_000;
   await ctx.app.engine.reconcile(gh);
   assert.deepEqual(await diff(), { last: 2, total: 4 });
