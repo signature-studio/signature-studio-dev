@@ -46,6 +46,7 @@ for va in vas:
             break
         hits.append(j)
         start = j + 1
+    print(f"  abs64 total={len(hits)} (先頭 20 件のみ表示)")
     print(f"  abs64 occurrences in file: {[hex(h) for h in hits[:20]] or 'none'}")
     for h in hits[:20]:
         sec = next((s for s in pe.sections if s.PointerToRawData <= h < s.PointerToRawData + s.SizeOfRawData), None)
