@@ -55,7 +55,7 @@ def main():
                 if ins.mnemonic == "mov" and len(ops) == 2 and ops[0].type == capstone.x86.X86_OP_MEM \
                         and ops[0].mem.disp == disp and ops[0].mem.base not in (0, capstone.x86.X86_REG_RIP):
                     stores.append((ins.address, ins.op_str))
-            off = end + 1 if end > off else off + 1
+            off = end if end > off else off + 1
     loads.sort()
     addrs = [a for a, _ in loads]
     n_hit = 0
