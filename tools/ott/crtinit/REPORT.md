@@ -194,8 +194,8 @@ bash tools/ott/entry/entry_e2e.sh --quick          # entry 85 (旧 build, 無改
 - **修正**: `ott_crt.c` と `crt_native.c` の `APISET_N` を 34 に (片側だけだと両側の初期状態が食い違う)。`acc_crt_table.py` の N も 34 にそろえた (`74d4ddaa`)。
 - **init の確認 (実測)**: 修正後 build で init 直後の表 34 entry が全て enc(NULL)=cookie (`00002b992ddfa232`) = 95/95 run。修正前は init が 32 entry しか書かないため、32・33 は静的値 0 のままだったと推論する (静的推論。修正前 build での読み戻しは未実施)。
 - **index 32・33 の観測 (読み戻し)**: `apiset_readback.py` が scenario を 1 本ずつ別プロセスで実行し、実行後に表 0..33 を読む。crt 新 9 本 + `entrylift/scen.json` 86 entry (一意 85 + 重複 `op12` 1) = **95 run・全 run 成功**。変化した index は **{5, 6} のみ** (各 7 run)。§2.1 の FlsGetValue / FlsSetValue wrapper と、dispatcher 静的解析の call site id 5・6 に対応する。**32・33 は 95/95 で変わらなかった**。陽性対照として 5・6 の変化は検出されている。
-- **手法 (受入の代替, m1)**: issue の受入 (coverage か陰性対照) ではなく読み戻しを採った。coverage は解決コード 0x1801c38c8 が全 index で共有されるため、index 32・33 と 5・6 を区別できない。
-- **限界 (m2)**: 読み戻しで言えるのは「その scenario の中で解決時の書き戻しが無かった」まで。解決が NULL を返すと encode(0)=cookie で値が変わらず、この方法では区別できない。本 REPORT の「未解決」は、この意味で使う。
+- **手法 (issue 受入の代替)**: issue の受入 (coverage か陰性対照) ではなく読み戻しを採った。coverage は解決コード 0x1801c38c8 が全 index で共有されるため、index 32・33 と 5・6 を区別できない。
+- **限界**: 読み戻しで言えるのは「その scenario の中で解決時の書き戻しが無かった」まで。解決が NULL を返すと encode(0)=cookie で値が変わらず、この方法では区別できない。本 REPORT の「未解決」は、この意味で使う。
 - **既知類型**: 該当なし (冒頭の 1 行)。
 
 | 未解決 | 影響 | 起票先 |
@@ -220,4 +220,4 @@ bash tools/ott/entry/entry_e2e.sh --quick          # entry 85 (旧 build, 無改
 - 所要時間は両者の測定条件 (native 再ビルドの有無) を記録していないため、直接比較しない。
 
 - **測定後のコード差分** (0 行が正): `git diff 2629fa88 HEAD -- tools/ott/crtinit/*.c tools/ott/crtinit/crt_*.py tools/ott/crtinit/*.sh tools/ott/crtinit/*.mjs` = 0 行 (crt_e2e の対象。`apiset_readback.py` は crt_e2e の対象外)。`git diff a64803bb HEAD -- tools/ott/crtinit/apiset_readback.py` = 0 行 (以降の変更は REPORT.md のみ)。`git diff 74d4ddaa HEAD -- tools/ott/accept` = 0 行。
-- 前 round の全工程 run の FAIL (94 件) は古い `libottnative.so` 起因。§9 の `build.sh` で解消し、今回の測定は build.sh の後に行った。
+- 初回の `crt_e2e.sh` 全工程 run の FAIL (94 件) は古い `libottnative.so` 起因。§9 の `build.sh` で解消し、今回の測定は build.sh の後に行った。
