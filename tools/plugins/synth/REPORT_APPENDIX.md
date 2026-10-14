@@ -158,3 +158,40 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 - `emcc -c` は通過 (`emcc.log` 0 バイト、`first_errors.txt` 空)。未実装 helper は §A と不一致 (52 vs 121)。差の原因は `m11_simd2.py` の変更 (711d9ece・f2bbad10、#1163。VEX 3 オペランド形の SSE 委譲、cvt/rep 系の対応追加) で、§A (604e900f) の時点より未実装が減ったことによる。コードの差分からの説明であり、旧 commit での再測定はしていない。それ以外の列 (defines / i256 trap / f80 / emcc_c_rc / lift 秒を除く) は §A の再開経路と一致した。`.ll` 本体の差分比較はしていない。
 - 出力: `tools/plugins/work/synth/cpp23944/` (gitignore)。
+
+## E. #1536: PLUG_NO_STATIC_DETECT の既定化 (1)
+
+- 既定化: `lift/lift_ranges.sh` で `PLUG_NO_STATIC_DETECT` の既定を 1 にした (未設定 = `--disable-static-code-detection` あり)。`PLUG_NO_STATIC_DETECT=0` で従来 (静的検出あり) に戻る。 測定 commit: **0d51d876** (コードを変えた最後の commit)。
+- 素材: `fl-win64` / `plugins-ott` を `$HOME/artifacts` から `$RUNNER_TEMP` に展開して使用 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)。
+- 測定 HEAD の差分: `git diff 0d51d876 HEAD -- tools/plugins/lift tools/plugins/synth` (本節の追記以外は 0 行)。
+
+### E-1. BooBass_Eng (21202) の受入
+
+`bash tools/plugins/synth/cpp_lift.sh 21202 1500` (既定, 0d51d876)、所要 49.0 s (real)、load `0.73 0.95 0.86` → `0.86 0.96 0.87`:
+
+`summary.csv` = `21202,1579,0,1602,0,12,3,1,0,1,48,2,417,0,23,1600,0`
+
+`missing_define` = **2** (欠落 417 B / 参照欠落 0)。 `missing_define_classify.py` の内訳は `symbol_named` 2 件 (`CreatePlugInstance` / `entry_point`)、`static_linked` 0 件。 受入 (`missing_define` <= 2) を満たす。 `emcc_c_rc` は 1 (E3 `'%arg2' defined with type 'i32' but expected 'i64'`、既存と同一)。
+
+### E-2. 他の C++ DLL への影響 (同一 HEAD、既定 vs `PLUG_NO_STATIC_DETECT=0`)
+
+`cpp_lift.sh <block> 240` を 7 本ずつ、既定 (1) と従来 (0) の両方で流した。`summary.csv` の列を比較 (`lift_s` 列を除く):
+
+| block | 既定 (1) | 従来 (0) | 差 |
+|--:|---|---|---|
+| 23914 | `…,34,3,0,0,0,133,2,111,0,503,3695,0` | `…,34,3,0,0,0,132,2,111,0,503,3695,0` | `lift_s` のみ (133 / 132) |
+| 23916 | `…,35,3,1,0,1,135,2,111,0,501,3692,0` | `…,35,3,1,0,1,132,2,111,0,501,3692,0` | `lift_s` のみ |
+| 24159 | `…,36,3,0,0,0,45,1,61,0,152,1789,0` | 同一 | 差なし |
+| 24163 | `…,21,3,1,0,1,51,1,61,0,63,1706,0` | 同一 | 差なし |
+| 24167 | `…,22,3,1,0,1,51,1,61,0,157,1832,0` | `…,22,3,1,0,1,48,1,61,0,157,1832,0` | `lift_s` のみ |
+| 24216 | `…,30,3,1,0,1,75,1,61,0,86,1926,0` | 同一 | 差なし |
+| 24298 | `…,21,3,0,0,0,123,2,111,0,484,3739,0` | `…,21,3,0,0,0,127,2,111,0,484,3739,0` | `lift_s` のみ |
+
+- 7 本とも `defines`・欠落 define・欠落 bytes・参照欠落・`emcc_c_rc`・`emcc_c_rc_after_fixcmp`・未実装 helper・i256 trap・f80 が既定と従来で一致。 `lift_s` は 45〜135 s の範囲で揺れた。
+- 差は `lift_s` の 4 本 (23914・23916・24167・24298) のみ。 `.ll` 本体のバイト比較はしていない。 summary の列一致は「欠落・emcc 結果が変わらない」ことの確認であり、出力の完全同一を示すものではない。
+- 測定した既定版 7 本は、コミット `0d51d876` の直前の作業ツリー (lift コードは同一内容) で流した。 0d51d876 の HEAD で 7 本を再測定はしていない。
+
+### E-3. 未解決
+
+- `batch_lift.sh` 系 (PLUG_ICALL=1 の batch / engine_lift など `lift_ranges.sh` を呼ぶ全 lift) の出力比較は未実施。 既定化で RetDec 引数が変わるため、 batch 系の summary は再測定が必要。 起票先: #1698 (PLG-G2-21)。
+- `CreatePlugInstance` / `entry_point` (symbol_named 2 件) の `function_<VA>` への正規化: 起票先 #1537 (PLG-G2-19)。
