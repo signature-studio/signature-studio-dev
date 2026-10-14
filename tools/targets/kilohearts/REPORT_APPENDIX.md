@@ -213,11 +213,11 @@
 - 生成 C: `ghidra_to_c.py gain/haas/gate` (fix なし) の出力を修復前 (`work/gr/base/<n>/`) と `diff` → **0 行** (sigs.json・globals.json も一致)。修復はすべて stereo 限定の規則か、stereo にしか現れない形 (`in_XMM`・`maxps`・`ZEXT416`・`ABS`・`sbyte`) なので、gain/haas/gate には影響しない。
 - 注意: `build_cmp.sh` は `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。mkdir -p で解消)。
 
-**未解決 (子 issue 候補。親 #3071 の子として PM が起票)**
-1. **[KH-39a] V128 二項演算 6 件 + SUB168 2 件 (計 8 件)**: `auVar * auVar + auVar` (行 725・726・733・839・840・846) と `SUB168(x, 8)` (725・839: 128bit の上位 8 バイト抽出)。乗算・加算の lane 型 (mulps/mulpd 等) を機械語で確定してから shim 化する。
-2. **[KH-39b] 未関数化 callee `FUN_180fd8aac` 2 件**: `also` へ足すと閉包が広がる (§10-7j・§10-7l の前例 13→26)。追加前に件数を測る。
-3. **[KH-39c] callee の多値戻り (xmm0 / xmm1) の未モデル (最重要・emcc で見えない silent 誤り)**: `FUN_180fdc470`・`FUN_180fdfdb0`・`FUN_180fdc660` 系は rax に四分象限のみ C 化され、reduce 後の値 (xmm0、dfdb0 は xmm1 も) は C 本体に出ない。呼出元の `extraout_XMM0_Qa*` の読み 6 箇所が未代入 (未初期化)。stereo の数値は native vec (`snapins/work/stereo/vec_1000_7.bin`) との突合でのみ判定可能で、本 run では未実施 (emcc 未通過)。
-4. **[KH-39d] 引数 2 個目 (xmm1) の 2 件 (規則 9・10) は 0.0 仮置き**: 呼出元で未設定の入力のため、実値の特定 (FUN_18080d4d0 の呼出元の解析) が要る。
-5. **[KH-39e] stereo の bit 型修復 (fix 未適用)**: `bitcast`・`intload`・`assoc` などの `--fix` 群を stereo に適用していない (例: 行 223 の `(float)((uint)(fVar13-fVar18) & _DAT_1813d6fc0)`)。突合で検出する。
+**未解決 (子 issue。親 #3071。本 run で起票: KH-45・KH-46)**
+1. **[KH-45] V128 二項演算 6 件 + SUB168 2 件 + 未関数化 FUN_180fd8aac 2 件 (計 10 件・emcc 残件の全部)**: `auVar * auVar + auVar` (行 725・726・733・839・840・846) と `SUB168(x, 8)` (725・839: 128bit の上位 8 バイト抽出)。乗算・加算の lane 型 (mulps/mulpd 等) を機械語で確定してから shim 化する。
+   未関数化 callee `FUN_180fd8aac` 2 件 (内訳の 2 件目)**: `also` へ足すと閉包が広がる (§10-7j・§10-7l の前例 13→26)。追加前に件数を測る。
+2. **[KH-46] callee の多値戻り (xmm0 / xmm1) の未モデル (最重要・emcc で見えない silent 誤り)**: `FUN_180fdc470`・`FUN_180fdfdb0`・`FUN_180fdc660` 系は rax に四分象限のみ C 化され、reduce 後の値 (xmm0、dfdb0 は xmm1 も) は C 本体に出ない。呼出元の `extraout_XMM0_Qa*` の読み 6 箇所が未代入 (未初期化)。stereo の数値は native vec (`snapins/work/stereo/vec_1000_7.bin`) との突合でのみ判定可能で、本 run では未実施 (emcc 未通過)。
+3. **[KH-46] 引数 2 個目 (xmm1) の 2 件 (規則 9・10) は 0.0 仮置き**: 呼出元で未設定の入力のため、実値の特定 (FUN_18080d4d0 の呼出元の解析) が要る。
+4. **[KH-46] stereo の bit 型修復 (fix 未適用)**: `bitcast`・`intload`・`assoc` などの `--fix` 群を stereo に適用していない (例: 行 223 の `(float)((uint)(fVar13-fVar18) & _DAT_1813d6fc0)`)。突合で検出する。
 - 未実施: Stereo の native 突合・ablation・ネガコン (emcc 未通過のため)。
 - 注: REPORT.md 本体への導線 1 行は、commit 範囲 (ghidra_route + REPORT_APPENDIX) の指示どおり未追加。§10-7p は本ファイルに存在しないため、本節は末尾 (§10-7n の後) に置いた。
