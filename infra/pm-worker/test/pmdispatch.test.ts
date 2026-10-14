@@ -428,12 +428,12 @@ test("ネガコン (g): pm-apply / needs-user-input が付いた oc:no-pr の is
   await markFresh(ctx);
   assert.deepEqual(targets(ctx), ["no_pr#93"], "対照: ラベルの無い 93 だけが対象");
   const { picks, rows } = ctx.app.engine.plan();
-  assert.deepEqual(picks.map((p) => p.n), [93], "対照: 93 だけが再投入される");
+  assert.deepEqual(picks.map((p) => p.n), [], "split は再投入せず PM agent に回す (reason ごとの再着手は engine.test.ts)");
   assert.ok(rows.user.some(([n]) => n === 91) && rows.user.some(([n]) => n === 92));
   await ctx.app.engine.launch(await (ctx.app.engine as any).d.gh());
   await ctx.app.engine.pmDispatch(await (ctx.app.engine as any).d.gh());
   const oc = ctx.m.calls.filter((c) => c.method === "POST" && /\/issues\/\d+\/comments$/.test(c.url));
-  assert.deepEqual(oc.map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["93"]);
+  assert.deepEqual(oc.map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), []);
   assert.deepEqual(pmCalls(ctx.m.calls).map((c) => c.body.client_payload), [{ kind: "no_pr", ref: 93 }]);
 });
 
