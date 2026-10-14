@@ -134,3 +134,20 @@ DEFECTS.md 行案 (編集は PM 判断):
 
 - **tanf wide** (`unif[-1e12,1e12]`、spec の `mix` は既定どおり、`work/1687/` の gitignore 領域): **match 15 / mismatch 25 / native_crash 0 / wasm_trap 0** (gate FAIL、目標 40/40)。§23.9 の 33/40 (8e077944) とは値が違う。原因は未切り分け (spec の seed/生成の差の候補)。
 - 既定経路 (tan / tanf / exp の既定 spec) は本ベースラインで不変。修正の対象は整数 flag 経路のみ。
+
+### 23.13 LIFTLIB-19 (#1709) — 再現と原因の切り分け (コード未変更)
+- **測定 commit**: `09723d9e` (origin/main 時点)。`git diff 09723d9e HEAD -- tools/liftlib` は本 PR の REPORT 追記のみ。
+- **素材**: `work-m6-ott` / `work-liftlib` / `analysis-ott-binaries` / `toolchain-*` を展開。`tools/*/work` は gitignore のため、検証 worktree には本体からコピーして使用 (本体の work は未変更)。
+- **再現 (leafspec `--n 40`、約 13 s)**:
+  - tanf wide (`mix` 第 1 枝のみ `unif[-1e12,1e12]`): **match 15 / mismatch 25 / native_crash 0 / wasm_trap 0** → §23.12 と一致 (ベースライン再現)。
+  - 既定 spec `ott_leaf_tanf`: **match 40 / mismatch 0** (不変)。
+  - 注: `gen` 全体を `unif[-1e12,1e12]` に置換すると 0/40 になる。mix の |x| 小域 (既定 spec の 40% 近傍) が落ち、比較対象が無くなるため。第 1 枝だけを広げること。
+- **不一致の形**: wasm の戻りは全件 `0x48133140` / `0xc8133140` (±150725.0) に張り付く。
+- **原因の切り分け (RetDec raw `.ll` の段階)**: `tools/m6/work/ott.drc.ll` の `function_1801ba860` (raw line 123/132/138/141 ほか) では、Payne-Hanek の 4 分岐が既に `br i1 true` / `false` / `false` / `undef` に畳まれている。raw IR に `shr`・`bsr`・`adc`・`mul` の `__asm_` 呼び出しは 1 件も残っておらず (`and` / `icmp` / `udiv` に展開済み)、整数 flag の材料が p1 の入力に無い。
+- **p1 の現状**: `cmp reg,imm/reg` は `("int", ...)` flag として扱えるが、`shr reg,cl`・`bsr`・`adc` の flag 生成は無い (`liftlib/passes/p1.py` line 1455-1466 は値のみ)。
+- **結論**: 修正は「p1 に flag 生成を足す」だけでは完結しない。RetDec raw から失われた整数 flag を機械語 (`0x1801baa3a`〜`0x1801bab26`) から復元する入口が要る。受入条件 (40/40・SVF・e2e) は未達。
+- **起票先**: 下記 §23.14。
+
+### 23.14 残作業 (起票先)
+- 整数 flag の復元 (機械語 `0x1801baa3a`〜`0x1801bab26` の `shr cl` / `bsr` / `adc` / `cmp rcx,0` の CF/ZF/SF を p1 に追加し、RetDec raw で畳まれた 4 分岐を `icmp` で再結線する) → #1948 (LIFTLIB-20・親 #1709)。
+- 受入条件 (tanf wide 40/40・SVF `--n 40` 再測定・`liftlib_e2e.sh` ALL PASS) → #1948 で扱う。
