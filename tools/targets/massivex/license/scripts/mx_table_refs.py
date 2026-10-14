@@ -8,8 +8,9 @@
      base 候補 = .text の命令が RIP 相対 mem の実効先・即値として指す VA のうち、
      .rdata / .data に入るもの (表を指すコードの参照点)。
      各 base から先頭 N 個の 4B 符号付き値 d を読み、base + d が対象 VA に一致すれば hit。
-  一貫性: hit の前後 WINDOW 個 (範囲内) の entry のうち、対象と同じセクションを指すものが 1/2 以上なら OK。
+  一貫性: hit の前後 WINDOW 個 (範囲内) の entry のうち、d != 0 で対象と同じセクションを指すものが 1/2 以上なら OK。
      表として隣接 entry が同じ領域を指すかを見る (周辺が別セクション・セクション外に散るなら誤検出の疑い)。
+     d == 0 (base 自身) は所属を示さないので除外し、周辺がすべて 0 埋めなら NG。
   対照 (--control): 対象 15 VA の代わりに、.rdata 内のランダム VA CONTROL_N 件 (seed CONTROL_SEED) を同じ走査で照合する。
     偶然一致の水準 (1 対象あたり平均 hit) を測る。
 
@@ -67,10 +68,13 @@ def section_of(va, sections):
 
 
 def consistent(row, base, ci, t, sections):
-    """row の ci 番目 (hit) の前後 WINDOW 個 (範囲内) のうち、t と同じセクションを指す割合が 1/2 以上か。"""
+    """row の ci 番目 (hit) の前後 WINDOW 個 (範囲内) のうち、d != 0 の entry が t と同じセクションを指す割合が 1/2 以上か。
+    d == 0 は base 自身を指す (表の 0 埋め・自己参照) ため所属を判定できず除外する。hit 自体が d == 0 なら NG。"""
+    if int(row[ci]) == 0:
+        return False
     ts = section_of(t, sections)
-    near = [j for j in range(max(0, ci - WINDOW), min(len(row), ci + WINDOW + 1)) if j != ci]
-    same = sum(section_of(base + int(row[j]), sections) == ts for j in near)
+    near = [int(row[j]) for j in range(max(0, ci - WINDOW), min(len(row), ci + WINDOW + 1)) if j != ci and row[j] != 0]
+    same = sum(section_of(base + d, sections) == ts for d in near)
     return bool(near) and 2 * same >= len(near)
 
 
@@ -104,22 +108,28 @@ def selftest():
     t_syn = rd_va + 0x800
     good = rd_va + 16
     bad = rd_va + 0x80
+    zero = rd_va + 0x100
     table = bytearray(b"\x00" * rd_size)
     for j in range(8):
         table[16 + 4 * j:20 + 4 * j] = (rd_va + 0x900 + 0x10 * j - good).to_bytes(4, "little", signed=True)
         table[0x80 + 4 * j:0x84 + 4 * j] = (0x40000000 + 0x10 * j).to_bytes(4, "little", signed=True)
     table[16 + 12:32] = (t_syn - good).to_bytes(4, "little", signed=True)
     table[0x80 + 12:0x90] = (t_syn - bad).to_bytes(4, "little", signed=True)
+    table[0x100 + 12:0x110] = (t_syn - zero).to_bytes(4, "little", signed=True)
+    selfb = rd_va + 0x200
+    for j in range(8):
+        table[0x200 + 4 * j:0x204 + 4 * j] = (rd_va + 0x900 + 0x10 * j - selfb).to_bytes(4, "little", signed=True)
+    table[0x200 + 12:0x210] = b"\x00\x00\x00\x00"
     code = bytearray(b"\x90" * 0x10)
-    for dst in (good, bad):
+    for dst in (good, bad, zero, selfb):
         at = len(code)
         code += b"\x48\x8d\x05" + (dst - (text_va + at + 7)).to_bytes(4, "little", signed=True)  # lea rax,[rip+dst]
         code += b"\x90" * 0x10
     bases = collect_bases(bytes(code), text_va, rd_va, rd_va + rd_size)
-    hits, n = scan_tables(bases, rd_va, bytes(table), 8, {t_syn: "synthetic"}, sections)
+    hits, n = scan_tables(bases, rd_va, bytes(table), 8, {t_syn: "synthetic", selfb: "self"}, sections)
     got = {(h[1], h[2]): h[5] for h in hits}
-    ok = got == {(good, 3): True, (bad, 3): False}
-    print(f"selftest bases={n} hits={[(hex(h[1]), h[2], h[5]) for h in hits]} (期待 2 件: base={hex(good)} i=3 一貫 OK / base={hex(bad)} i=3 一貫 NG)")
+    ok = got == {(good, 3): True, (bad, 3): False, (zero, 3): False, (selfb, 3): False}
+    print(f"selftest bases={n} hits={[(hex(h[1]), h[2], h[5]) for h in hits]} (期待 4 件: base={hex(good)} i=3 一貫 OK / base={hex(bad)} i=3 一貫 NG / base={hex(zero)} i=3 (周辺 0 埋め) 一貫 NG / base={hex(selfb)} i=3 (d=0 の自己参照) 一貫 NG)")
     print("selftest:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
