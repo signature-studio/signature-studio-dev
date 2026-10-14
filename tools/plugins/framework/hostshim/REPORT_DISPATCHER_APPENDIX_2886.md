@@ -98,7 +98,7 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 - Phase A (`hs_e2e.sh` の framework smoke): `[fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0` → **PASS** (`2dca40dd` 時点の前回測定。本節 §6 では未再実行)。`hs_e2e.sh` の Phase A は `$WFW/fw_route.cjs` (CAB-194 artifact) をそのまま使い、`hostshim.c` をコンパイルしない (`hs_e2e.sh` 17 行目)。よって hostshim.c の変更は Phase A の経路に入らない。
 - stage-2 (`fw_stage2.sh`・stage-1 再利用・n=1): 5 分 30.2 秒。`SMOKE PASS (Halt0/RestoreContext 到達): dispatch=38 units_done=0 va=1 heap=1 ff=0` は PASS (測定 commit は付録に未記録のため、鮮度は保証しない)。
   `fw_smoke_check` は **FAIL** (`runerr=1`・`init_reach=16` MISMATCH)。これは `REPORT_2425.md` §4・`REPORT_2510.md` §1 に記録済みの既存状態 (#2510 の idx 16 RunError)。
-  `fw_stage2.sh` は hostshim を含まないため、本変更は stage-2 の判定に影響しない。今回は未再実行 (素材 `work-fw-stage1` と `/opt/emsdk` が本 run に無い)。
+  `fw_stage2.sh` は hostshim を含まないため、本変更は stage-2 の判定に影響しない。今回は未再実行 (素材 `work-fw-stage1` と emsdk [EMSDK] が本 run に無い)。
 - Phase B (`hs_e2e.sh`): `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7 pluglog=0 slotsCalled=0x0` → **FAIL** (前回測定の時点は `2d523491`・`2dca40dd`。既存 #1229・#2911 の範囲)。今回は未再実行。
   Phase B の hs_route ビルドは `fw_hostfix.py` と `fw_rt.c` を使う。この 2 つは `2dca40dd` と `470a8f15` の間で main 取り込みにより変わっている (2 ファイル 43 行追加・6 行削除)。よって §6 の基準では Phase B の再測定が要る。素材 `work-fw-stage1`・`toolchain-emsdk` が本 run に無いため、PR 本文の `oc_artifacts` で依頼した。
 - 時間: `hs_e2e.sh` 初回 (IR 生成込み) 1 分 58.8 秒 (n=1)。変更後の再実行 12.8 秒 (emcc 増分)。開始 load は未計測。
