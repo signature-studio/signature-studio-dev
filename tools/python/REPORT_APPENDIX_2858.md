@@ -6,15 +6,15 @@
 
 ## 1. 結論
 
-- **受入 1 (達成)**: `flpy_static64` (`-sMEMORY64=1`) は headless Chrome 155 で読めた。
+- **受入 1 (縮小後の範囲で達成。12 check 版は #2919)**: `flpy_static64` (`-sMEMORY64=1`) は headless Chrome 155 で読めた。
   validate true、`_flpy_init` 0、`print(1 + 1)` が `2`、`_flpy_subinterp_run` は 1 回と 160 回の全てで ok。
   判定は **PROBE OK (PASS)**。同じ probe の wasm32 版 `flpy_static` も PASS。
   node v22.23.3 では `flpy_static64.wasm` の `WebAssembly.validate` が false (table64 非対応) のため、
   MEMORY64 版の検査は headless Chrome でのみ行える。
-- **受入 2 (未達・一部のみ切り分け)**: 160 回の subinterp 作成/破棄の前後で heap は増えなかった。
+- **受入 2 (未達・子 #2918 へ分割)**: 160 回の subinterp 作成/破棄の前後で heap は増えなかった。
   MEMORY64=1 は 33,554,432 B → 33,554,432 B、wasm32 も同じ。
   issue にある MEMORY64=2 の増加 (33,554,432 → 48,365,568 B) は、MEMORY64=2 版を作っていないため再現も比較もしていない。
-  増加の原因は未切り分け (子 issue 候補は §8)。
+  増加の原因は未切り分け (子 issue は §8)。
 - **検証**: 測定 commit `38344a16` の HEAD でビルドを作り直し、probe を再実行した。wasm の sha256 は再生成の前後で同一で、
   結果は PASS のまま。`git diff 38344a16 HEAD -- tools/python` の出力は 0 行 (差分 0。本 REPORT を追加する前の HEAD で確認)。
 
@@ -124,17 +124,16 @@ node tools/python/tests/static64_browser_probe.mjs flpy_static
 
 | 条件 | 判定 | 根拠 |
 |---|---|---|
-| 1. MEMORY64=1 を table64 対応エンジン (headless Chrome) で読み、probe 結果 (PASS/FAIL・所要・load) を記録 | **達成** | §6-1 (PASS、load 190/203 ms、driver wall 4.1〜4.3 s) |
-| 2. MEMORY64=2 の heap 増加 (160 回後) の原因を切り分ける | **未達 (一部)** | MEMORY64=1 と wasm32 では増加が出ない (§6-1)。MEMORY64=2 版は本 run で作っていない (範囲外) → §8-1 |
+| 1 (縮小後). MEMORY64=1 を table64 対応エンジン (headless Chrome) で読み、smoke probe の結果 (PASS/FAIL・所要・load) を記録 | **達成** | §6-1 (PASS、load 190/203 ms、driver wall 4.1〜4.3 s)。元の 12 check 版は未実施 → #2919 |
+| 2. MEMORY64=2 の heap 増加 (160 回後) の原因を切り分ける | **未達 → #2918** | MEMORY64=1 と wasm32 では増加が出ない (§6-1)。MEMORY64=2 版は本 run で作っていない (範囲外) |
 
-## 8. 未達・子 issue 候補
+## 8. 未達・子 issue
 
-1. **`[PY-98-2] MEMORY64=2 の subinterp 160 回後の heap 増加 (33,554,432 → 48,365,568 B) の再現と原因切り分け`**
+1. **#2918 `[PY-108]` MEMORY64=2 の subinterp 160 回後の heap 増加 (33,554,432 → 48,365,568 B) の再現と原因切り分け**
    受入: `build_flpy_static.sh` の MEMORY64 分岐を 2 にも対応させ、`static64_browser_probe.mjs` で before/after を記録する。増加を再現したら、増えた分の出所 (subinterp の確保・解放、allocator の挙動) を切り分ける。MEMORY64=1 との差も記録する。
-2. **`[PY-98-3] flpy_static64 の 48 tool 比較 (Worker 版)`**
-   受入: `static_browser_check.mjs` と同等に、Worker 内の flpy_static64 と SAB 版 (flpy + flprov) の 48 tool を比べ、差 0/48 かつ host_calls が一致する。Worker 内でも §5-2 の BigInt 分岐が要る。
-3. **`[PY-98-4] wasm64 の LGL 記録と emcc 警告の解消`**
-   受入: `tools/legal/notices/record.mjs --target wasm64` で記録を作る (本 run では wasm64 の記録を作っていない)。`-sMEMORY64=1` の deprecation 警告 (emcc 6.0.12) を標準の `-m64` / `--target=wasm64` へ移す。
+2. **#2919 `[PY-109]` 12 check の subinterp probe を静的版 (headless Chrome) で実行する**
+   受入: `tests/subinterp_probe.mjs` と同じ 12 check を `flpy_static64` と `flpy_static` に対して実行し、PASS/FAIL・load・所要を記録する。
+3. **起票せず (PM 判断)**: `flpy_static64` の 48 tool 比較 (Worker 版) と、wasm64 の LGL 記録 (`tools/legal/notices/record.mjs --target wasm64`) と、`-sMEMORY64=1` の deprecation 警告 (emcc 6.0.12) の解消。受入条件の外にあるため、子 issue は作らない (子の上限を 2 件に留めた)。
 
 ## 9. 本 run で行っていないこと
 
