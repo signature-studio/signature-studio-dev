@@ -2,11 +2,12 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `6444b186` (main)。本 PR は REPORT・結果 JSON・DOC_MAP の索引追加のみ。
-  `git diff 6444b186 HEAD -- tools/m11` は 0 行 (監査スクリプト・ldmach/ldframe 無変更)。
+- 測定 commit: `6444b186` (main)。本 PR は REPORT・結果 JSON のみで、監査コードは無変更。
+  `git diff 6444b186 HEAD -- tools/m11/ldfix/*.py tools/m11/*.py tools/m11/*.sh` は 0 行 (監査スクリプト・ldmach/ldframe 無変更)。
+  PR 自身の REPORT・結果 JSON (計 2046 行) はコード範囲から外して数えた。
 - 入力: `tools/m11/work/boot{0,1,2,3,4}.norm0.ll` (5 入力)。`boot5.norm0.ll` は `work/` に無く、
   全体 (`find /`) 検索も時間切れで所在不明のため**除外**した。
-- PE: 素材 `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf` で `/home/runner/work/_temp/fl` に展開)。
+- PE: 素材 `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf` で `FL_WIN64_DIR` に展開。`docs/REFERENCES.md` の `[WIN64]`)。
 - 実行: `audit_undefload.py` 69.7 秒 (rc 0)、`audit_undefload_dest.py` 70.1 秒 (rc 0)。load average 0.97 (4 vCPU)。
 - 結果 JSON: `results/audit_undefload_2141_old.json` / `results/audit_undefload_dest_2141.json` /
   `results/audit_undefload_union_2141.json`。
@@ -59,7 +60,7 @@ sites の差 (2,854 → 2,846、2,737 → 2,729) は、`boot5` 入力の欠落�
 |---|---|---|
 | FRAME_IN_ESCAPED 和集合 65 関数の真偽判定・修復要否 (旧 48 関数の判定を含む) | 本件型の脱落が残る可能性 | #2144 [LD-80] |
 | F4 偽陰性の検出 (132e8e0 / 44d1c0 / 69c360 / 977e40) とネガコン | 偽陰性の残存を確定できない | #2143 [LD-79] |
-| `boot5.norm0.ll` の所在確認と再実行 (本 REPORT は 5 入力) | 件数の sites が 8 少ない (関数集合は不変) | 本 PR 内で記録のみ (追加の子 issue は起票しない) |
+| `boot5.norm0.ll` の所在確認と再実行 (本 REPORT は 5 入力)・再生成 IR での再確認 | 件数の sites が 8 少ない (関数集合は不変)。再生成 IR での確認は未実施 | #2144 [LD-80] に追記 (新規起票は PM に依頼) |
 
 ## 6. 参照
 
