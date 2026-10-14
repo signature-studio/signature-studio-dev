@@ -21,6 +21,8 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    arrTime: 0,
+    numerator: 4, denominator: 4, undoHistoryPos: 0, undoHistoryCount: 0, undoHistoryLast: 0,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     channels: [
@@ -34,6 +36,7 @@ export function createMockEngine() {
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
+    displayTime: 0,
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
     midiOut: [],
@@ -55,6 +58,7 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -174,6 +178,13 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-121 (#2982): PE で確定した引数書式 (PyArg fmt) と時間引数の頭打ち (0x7d0)。表示そのものは未モデルで、最後の時間引数だけ st.displayTime に残す
+    "ui.crDisplayRect": (...a) => disp(a, 5, 6, 4),
+    "ui.miDisplayRect": (...a) => disp(a, 3, 4, 2),
+    "ui.miDisplayDockRect": (...a) => disp(a, 4, 4, 3),
+    "ui.showNotification": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
+    "ui.closeAllMenu": (...a) => { arity(a, 0, 0); },
+    "ui.closeActivePopupMenu": (...a) => { arity(a, 0, 0); },
     // PY-119 (#2980): PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119)。値は未実測の仮置き (provider/fl_engine.c と同じ)
     "ui.getFocused": (...a) => { arity(a, 1, 1); ix(a[0]); return false; },
     "ui.getFocusedFormID": (...a) => { arity(a, 0, 0); return 0; },
@@ -196,6 +207,22 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i')。個数は fl_table (必須 2) に合わせた暫定で、jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。
+    // 選択・マーカーの 5 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
+    "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
+    "arrangement.selectionClear": (...a) => { arity(a, 0, 0); },
+    "arrangement.selectionSet": (...a) => { arity(a, 2, 5); for (let i = 0; i < 5; i++) argI(a, i, 0); },
+    "arrangement.liveSelection": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
+    "arrangement.addAutoTimeMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); str(a[1]); },
+    "arrangement.jumpToMarker": (...a) => { arity(a, 2, 2); argI(a, 0, 0); argI(a, 1, 0); },
+    // PY-119 (#2977): PE の setRecPPQ 0xd69350・setNumerator 0xd694e0・setDenominator 0xd69670 の範囲判定 (範囲外は status -3 Range error)。ゲート (safeToEdit 相当) は未確定のため真と仮定 (REPORT_PY119_2977)
+    "general.setRecPPQ": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 24 || v > 960) throw RANGE("Range error"); st.recPPQ = v; },
+    "general.setNumerator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 1 || v > 16) throw RANGE("Range error"); st.numerator = v; },
+    "general.setDenominator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 2 || v > 16) throw RANGE("Range error"); st.denominator = v; },
+    // undo 3 件は PE 0xd69af0 (共有コールバック) が範囲検査なしに値を書く (kind 0=Pos・1=Count・2=Last)。ゲートは上と同じく仮に真
+    "general.setUndoHistoryPos": (...a) => { arity(a, 1, 1); st.undoHistoryPos = ix(a[0]); },
+    "general.setUndoHistoryCount": (...a) => { arity(a, 1, 1); st.undoHistoryCount = ix(a[0]); },
+    "general.setUndoHistoryLast": (...a) => { arity(a, 1, 1); st.undoHistoryLast = ix(a[0]); },
     // PY-121 (#2985): screen 状態の 5 関数 (PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
     "screen.isBlanked": (...a) => { arity(a, 0, 0); return st.screenBlanked; },
     "screen.isUnBlank": (...a) => { arity(a, 0, 0); return st.screenUnBlank; },
