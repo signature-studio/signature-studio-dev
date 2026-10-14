@@ -1,5 +1,5 @@
-// mixer 系 18 関数の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、
-// 各呼出しの戻り値・エラー code が一致することを確認する。mock に定義が無い mixer 関数 (57 件) は対象外。
+// mixer 系 19 関数の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と C provider (provider/fl_engine.c) に流し、
+// 各呼出しの戻り値・エラー code が一致することを確認する。mock に定義が無い mixer 関数 (56 件) は対象外。
 //   node tests/mixer_diff.mjs     (前提: provider/build.sh 済み)
 import fs from "node:fs";
 import assert from "node:assert/strict";
@@ -37,6 +37,12 @@ const seq = [
   ["mixer.setTrackPan", [1, -0.25]],
   ["mixer.getTrackPan", [1]],
   ["mixer.setTrackColor", [1, 0x123456]],
+  ["mixer.getTrackColor", [1]],
+  ["mixer.getTrackColor", [0]],
+  ["mixer.setTrackColor", [2, 0xABCDEF]],
+  ["mixer.getTrackColor", [2]],
+  ["mixer.setTrackColor", [2, 0xFF0000FF]],
+  ["mixer.getTrackColor", [2]],
   ["mixer.isTrackSelected", [0]],
   ["mixer.isTrackSelected", [2]],
   ["mixer.muteTrack", [1]],
@@ -68,6 +74,8 @@ const seq = [
   ["mixer.getCurrentTempo", [1]],
   // 範囲外 index は両者とも code 4 (RANGE)
   ["mixer.getTrackName", [127]],
+  ["mixer.getTrackColor", [127]],
+  ["mixer.getTrackColor", [-1]],
   ["mixer.getTrackVolume", [-1, 0]],
   ["mixer.setTrackPan", [200, 0]],
 ];
@@ -80,4 +88,7 @@ for (const [name, args] of seq) {
 }
 
 assert.deepEqual(diffs, [], `mixer 差分 ${diffs.length} 件`);
+// 往復: setTrackColor(1, 0x123456) → getTrackColor(1) = 0xff123456 (playlist 側と同じ期待値)
+assert.equal(run(mock, "mixer.getTrackColor", [1]).ok, 0xff123456);
+assert.equal(run(wasm, "mixer.getTrackColor", [1]).ok, 0xff123456);
 console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));
