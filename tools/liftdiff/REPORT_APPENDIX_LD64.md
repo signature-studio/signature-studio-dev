@@ -5,9 +5,10 @@
 ## 結論
 
 - 受入条件は**部分達成**。wasm 側の trace は **IR basic block 入口単位**で入れた (命令単位ではない)。
-- 6 関数 × vm0/u16 で block trace を取得し、`1c0b6f` (je) と `1c0b82` (HeapFree) の位置を IR block に対応付けた (§3)。
+- 6 関数 × vm0/u16 で block trace を取得した。ただし、`1c0b6f` (je) と `1c0b82` (HeapFree) の IR block への対応付け (§3) は、入力 (`blk_all.json`・IR `ott.ll`・`block_coverage.py` の出力) を本 PR に commit していないため、**本 PR の資料では再現できない (未検証)**。
+- native 側の事実 (`1c0b6f` が je、`1c0b82` が HeapFree の call で、この順に並ぶこと) は `results/ld57/insn_1801c5e84_u16.txt` で確認できる。block 対応はこれとは別の主張である。
 - **計装版は vm0 の wasm 戻り値を変える** (§4)。`blk=0` で計装を入れても戻り値が変わるため、計装 (`call @ld_blk`) 自体が wasm の挙動を変えている。よって計装版の block trace は、現時点では結果の根拠にできない。
-- 既定 build (`ott_old`) は HEAD で再 build しても、変更前 (baseline) と全 case の outcome・diff が一致する (§5)。既定の判定には影響しない。
+- 既定 build (`ott_old`) は HEAD で再 build した 12 case (6 関数 × vm0/u16) では、変更前 baseline と outcome・diff が一致した (§5)。ただし baseline 比較の出力も本 PR に commit していない。既定 build 全体への無影響は主張しない (§5)。
 - 命令単位 (per-instruction) の wasm trace は、IR に元の VA が無いため本 PR の範囲外 (§6)。
 
 ## 1. 測定条件
@@ -17,7 +18,7 @@
 - 素材: `work-liftdiff`・`work-m6-ott`・`analysis-ott-binaries` (`$HOME/analysis/plugins/ott/binaries/`)・`toolchain-emsdk` (`/opt/emsdk`)。`fl-win64` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` に展開して指定。
 - 実行コマンド (6 関数 × pattern):
   `python3 liftdiff.py run targets/ott_old_blk.json --fn 0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc --pattern vm0,u16 --nobuild --notrace --verbose --json work/ld64/blk_all.json`
-- 所要 (実測・各 1 回): 6 関数 × 2 pattern の run は `ott_old` 5.553 s・`ott_old_blk` 5.551 s (`--nobuild --notrace`)。`ott_old_blk` の wasm link は 0.6 s (`build_wasm.py --force` のログ `link 0.6s`)。
+- 所要 (**n=1 の参考値。結論には使わない**): 6 関数 × 2 pattern の run は `ott_old` 5.553 s・`ott_old_blk` 5.551 s (`--nobuild --notrace`)。`ott_old_blk` の wasm link は 0.6 s (`build_wasm.py --force` のログ `link 0.6s`)。n=1 のため min–max レンジは出せない (`docs/WORKFLOW.md` §5)。
 
 ## 2. 実装
 
@@ -36,7 +37,7 @@
 
 ## 3. block trace の結果 (native との対応)
 
-`blk_all.json` の block 入口列 (`verdict` は計装版の判定。§4 の注意つき)。
+`blk_all.json` の block 入口列 (`verdict` は計装版の判定。§4 の注意つき)。**この表の数値と、下の block 対応は、本 PR に入力も出力も commit していないため未検証**。再現するには `blk_all.json` (6 関数 × vm0/u16 の raw)、IR `ott.ll` (`tools/ott/work/` 配下。`work-m6-ott` 素材で展開)、`block_coverage.py` の出力を揃える必要がある (子 #1906・#1907 で扱う)。
 
 | 関数 | pattern | outcome | block 入口数 | 異なり数 | 末尾 block |
 |---|---|---|---|---|---|
@@ -51,12 +52,13 @@
 | 1801c69cc | vm0 | diff | 304 | 23 | 1c6a01 |
 | 1801c69cc | u16 | wasm_trap | 10 | 10 | 1c0b71 |
 
-- native `1c0b6f` (je) は IR block `1c0b6c` の末尾 (`icmp eq %arg1, 0` の `br`) にあたる。wasm の `1c5e84` u16 trace は `1c0b6c` → `1c0b71` に入り、`1c0b71` の `HeapFree` 呼出し (`@HeapFree`) で `block_ok` の範囲外 load により trap する。LD-57 の「u16 は HeapFree 経路」と一致する。
-- native `1c0b82` (HeapFree の call) は IR block `1c0b71` の中にある。wasm では `1c0b71` の入口で `HeapFree` に入る。
+- (未検証) native `1c0b6f` (je) が IR block `1c0b6c` の末尾 (`icmp eq %arg1, 0` の `br`) にあたる、という主張は、上記の入力を揃えて確認するまで採らない。
+- (未検証) wasm の `1c5e84` u16 trace が `1c0b6c` → `1c0b71` に入り、`HeapFree` 経路で trap する、という主張も同様に未確認。LD-57 の「u16 は HeapFree 経路」とは、本 PR では照合していない。
+- native `1c0b82` (HeapFree の call) が IR block `1c0b71` の中にある、という主張も未確認 (上と同じ入力が要る)。
 - vm0 の `1c0b6c` → `1c0ba8` (早期 return) は、wasm の block 列にも現れる (`1c5e84` vm0 の列に `1c0b6c`, `1c0ba8` が繰り返し出る)。ただし vm0 の計装版の戻り値は §4 のとおり変わっている。
 - **`1801c621c` の vm0 は 287 block、`1801c69cc` の vm0 は 304 block**。残り 4 関数の分岐点 (受入条件 3) は、block 列の比較までは示せたが、native 側 (`insn_*.txt`) の対応付けは未了。
 
-`results/ld64/block_coverage.py` は native の rva が IR block label と一致する割合を数える (LD-57 の `insn_*.txt` に対する出力は本 PR の `results/ld64/` 参照)。一致率は 9.5〜25.5% で、**命令単位の対応付けには使えない** (block 入口にしか当たらないため)。
+`tools/liftdiff/results/ld64/block_coverage.py` は native の rva が IR block label と一致する割合を数える (入力: IR `ott.ll` と `results/ld57/insn_*.txt`)。本 PR では、この出力 (一致率) を commit していない。以前の記述の 9.5〜25.5% は、再現可能な出力として本 PR に残っていない。**命令単位の対応付けには使えない** (block 入口にしか当たらないため)。
 
 ## 4. 計装が wasm の結果を変える (未解決・本 PR の最重要)
 
@@ -78,9 +80,9 @@
 ## 5. 既定経路への影響 (ネガティブコントロール相当)
 
 - `ott_old` を HEAD (`ab190bbd`) で `build_wasm.py --force` して再 build し、6 関数 × vm0/u16 を run した。
-- 変更前 baseline (`work/ld64/rep_ott_old_1.json`) と **12 case の outcome・diffs が一致** (`HEAD ott_old cases == baseline: True`)。
+- 変更前 baseline (`work/ld64/rep_ott_old_1.json`) と **この 12 case では outcome・diffs が一致** (`HEAD ott_old cases == baseline: True`)。baseline の比較出力は本 PR に commit していない (再現には `work/ld64/rep_ott_old_1.json` が要る)。
 - verdict は `match, match, mismatch, mismatch, mismatch, mismatch` (変更前と同一)。
-- 計装 (`ld_blk` 呼出し) を `ott_old` に入れないため、既定の判定への影響は無い。
+- `rt/ld_core.h` は既定 build も含む共有ヘッダで、static 変数と関数を追加している。static 配置の変化で wasm 戻り値が変わりうる (§4) ため、**既定 build 全体への無影響は言い切れない**。主張は「この 12 case では baseline と一致」に限る。
 
 ## 6. 測定 commit と差分
 
