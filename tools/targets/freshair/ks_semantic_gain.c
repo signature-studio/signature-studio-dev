@@ -44,6 +44,7 @@ static uint8_t* map_pe(const char* path) {
 
 static uint32_t rng;
 static int probe_cur;
+static int indump;
 static uint32_t fbits(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }
 static uint32_t R32(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
 static float bitsf(uint32_t b) { float f; memcpy(&f, &b, 4); return f; }
@@ -105,6 +106,15 @@ static void run(int sc, uint64_t va, Case* c, int perturb, int dump, int idx) {
     *(float*)(self + so + 0x84) = c->c1; *(float*)(self + so + 0x88) = c->m1;
     *(float*)(self + so + 0x94) = c->c2; *(float*)(self + so + 0x98) = c->m2;
     if (dump) fprintf(stderr, "M%d %.9g %.9g %.9g %.9g\n", idx, *(float*)(self + so + 0x88), *(float*)(self + so + 0x84), *(float*)(self + so + 0x98), *(float*)(self + so + 0x94));
+    if (indump) {
+        fprintf(stderr, "X%d ", idx);
+        for (int i = 0; i < 0x38; i++) fprintf(stderr, "%02x", self[so + 0x64 + i]);
+        fprintf(stderr, " ");
+        for (int i = 0; i < c->n * 4; i++) fprintf(stderr, "%02x", ((const uint8_t*)c->L)[i]);
+        fprintf(stderr, " ");
+        for (int i = 0; i < c->n * 4; i++) fprintf(stderr, "%02x", ((const uint8_t*)c->R)[i]);
+        fprintf(stderr, "\n");
+    }
     if (sc) {
         uint8_t* P = calloc(1, 0xa000); uint8_t* Q = calloc(1, 0x80);
         *(void**)(self + 0x90) = P; *(void**)(P + 0x9f30) = Q;
@@ -153,6 +163,7 @@ int main(int argc, char** argv) {
     int perturb = getenv("PERTURB") && getenv("PERTURB")[0] == '1';
     int dump = getenv("METER_DUMP") && getenv("METER_DUMP")[0] == '1';
     probe_cur = getenv("CUR_PROBE") && getenv("CUR_PROBE")[0] == '1';
+    indump = getenv("IN_DUMP") && getenv("IN_DUMP")[0] == '1';
     map_pe(argv[2]);
     for (int i = 0; i < nc; i++) {
         Case c; memset(&c, 0, sizeof c);

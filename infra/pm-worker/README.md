@@ -22,7 +22,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 1. blocked_by の一覧が不明な issue は着手しない。
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
-3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 6 時間。`NO_PR_COOLDOWN_H`) の間は着手しない。cooldown の後は次のとおり。
+3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 6 時間。`NO_PR_COOLDOWN_H`) の間は着手しない。`prio:critical` の issue は cooldown を半分 (3 時間) にする (`noPrCooldownMs`。意図の投稿の判定 `intentGate` も同じ)。cooldown の後は次のとおり。
    - `unknown`: 1 回だけ再着手する。
    - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) が停止報告 (`STOP_RE`) で、その報告に前回の `oc_artifacts` に無い allowlist 内の素材があるときだけ 1 回再着手する (増えなければ再投入しない)。
    - `stop`・`split`: 再投入せず、PM agent (`oc-pm`・下の oc-pm 節) に回す。
@@ -33,6 +33,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
    `/status` の `no_pr_needs_pm` は、最後の run-outcome が `artifact` で stopped に残った `oc:no-pr` の件数 (PM の判断待ち)。
 4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
 5. relaunch (`oc:no-pr` の再投入・素材の追加) も 1 tick の枠 `min(room, BATCH, relaunch + ready)` に入り、残りの枠を ready が使う (`src/launch.ts` の `planLaunch`)。relaunch は room や BATCH を超えても全件出す。枠を `ready` の件数だけで頭打ちにする VM の `launch_issues.py` の式とは、relaunch がある tick で最大 relaunch の件数だけ差が出る (VM の式は変えていない)。relaunch は classify が issue ごとに 2 回までに絞る。
+7. **優先の区分 (`prio:critical` / `prio:low`)**: ready の並びは、区分 (critical → 区分なし (normal) → low) が先。同じ区分の中は従来の並び (被ブロック数の多い順 → 『任意』でない順 → 番号順)。`prio:critical` が付いた ready が枠より多いときは、critical を先に選ぶ。critical が無ければ、他の ready を従来どおり枠の残りに入れる (枠を遊ばせない)。relaunch は従来どおり枠の先頭に全件入り、残りの枠を ready が使う (critical は ready の中で先頭)。ラベルは作成しない (`prio:*` が無ければ従来と同じ並び)。
 6. **room の基準は opencode.yaml の全 run の総数**: `room = max(0, target_eff - active_all)` (`target_eff` は上の『同時実行の上限の推定』で決まり、推定が無ければ `TARGET`)。`active_all` は `workflow_run.path` が `opencode.yaml` の未完了の run (in_progress・queued・pending・waiting・requested) を **event を問わず** 全て数える (`src/active.ts`)。VM 版の `active_runs` は実装・fix の run (`issue_comment` `workflow_dispatch` `pull_request_review` と題名が `oc-fix` の `repository_dispatch`) だけを数え、review (`pull_request`)・oc-pm・watchdog を数えなかった。同時実行の上限 (Team プランで 60) はこれらを含む opencode.yaml の全 run が共有するので、旧い数え方では `room` が過大になり、上限を超えて queued が出た (実測は #2625)。別 workflow (`scripts-test.yaml` `terms-watch.yaml`) の run は別枠で数えない。`path` を持たない run (この版より前の保存値) は opencode.yaml として数える (過大に数える側)。reconcile (5 分ごと) が REST の `path` で埋める。TARGET の既定は **58** (上限 60 から 2 を残す)。推定の観測 (`running` / `queued`) は従来どおり workflow を問わない (同時実行の上限は repo の全 workflow の job が共有するため)。
 7. ラベル `oc:hold` の open な issue (Worker の自動着手を見送る印。#2651) は `hold` 行に置き、着手 (picks) も再投入の意図 (`oc-pm-intent`) も投稿しない。判定は `needs-user-input` の次で、`blocked`・`started` より前 (付いていれば、ほかの行を見ない)。詳細は下の『oc:hold ラベル』の節。
 
@@ -70,7 +71,7 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 | kind | 検出 (すべて open の対象。起票者は後述の絞り込みを通ったものだけ) |
 |---|---|
 | `stuck` | `oc:stuck` の PR で、最新の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) に `<!-- oc-pm-intent: stuck pr=N ... -->` がある (`pr=` が当該 PR の番号) |
-| `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`) |
+| `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`)。または実装 run の打ち切りが連続して自動の再着手を止めた issue (『実装 run の打ち切りの連続』。`oc:no-pr` の標識は付かない) |
 | `needs_decision` | reviewer の最新の verdict が CHANGES_REQUESTED で、本文が `NEEDS_KEY` (`src/needs.ts`。`tools/pm/pm_needs.py` の `KEY` と同じ正規表現・同じ行分割) に一致し、その後に PM 応答が無い |
 | `user_answered` | `needs-user-input` の issue に、ラベルが付いた後に非 bot のユーザーのコメントが付いた (コメント者が `MEMBER` / `OWNER` / `COLLABORATOR` のものだけ。第三者のコメントでは起こさない #2461) |
 | `refs_orphan` | `Refs #N` のみ (閉じキーワード `Closes` / `Fixes` / `Resolves` の系が無い) で merge された PR の N が open で、本文に `親: #N` を持つ open の子が無い。`ref` は親 N (`src/refs.ts`。merge 時点の本文から番号だけを `prs[PR].refsOnlyNums` に残す) |
@@ -84,6 +85,19 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 - ラベル `pm-apply` / `needs-user-input` の issue (着手しても PR を出さない/出せない) は、`no_pr` の検出から除く。`plan()` は、この 2 ラベルの issue を ready・再投入の対象であっても着手せず `user` 行に置く (`oc:no-pr` の有無に依らない)。`user_answered` は `needs-user-input` が対象。`tools/pm/launch_issues.py` との差は PR 本文の未解決表に書く。
 - 検出するのは上の 5 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
 - `digest` (#2349・CI-70) は状態ではなく時刻で送る: `ref` は 0 だけ。初回の tick は起点を置くだけで、以後 24 時間に 1 回 (`meta/digestAt`)。送信に失敗した試行も 1 回と数え、毎分叩き直さない。dry-run は `would_dispatch_pm` に `digest#0` を記録するだけ。PM agent 側の集計は `.github/prompts/pm.md` の digest 節。
+
+## 実装 run の打ち切りの連続 (killed)
+
+実装 run (`issue_comment`) が **PR も出さずに** cancelled / failure / timed_out で終わると、`oc:no-pr` の標識が付かない (runner の shutdown では `record-run-outcome.sh` の `always()` step が走らない)。標識が無いと、Worker は『着手済みで run が終わった』issue として cooldown (3 時間) ごとに同じ指示で再着手し続ける。重い issue ではこれが同じ失敗の繰り返しになる。そこで **`workflow_run.completed` の conclusion だけで** (標識に依らず) 数える (`src/webhook.ts` の `applyKill`)。
+
+- **数える**: conclusion が `cancelled` / `failure` / `timed_out` で、題名が **一意な open issue** に当たる `issue_comment` の run。PR 上のコメントの run (題名が PR) や、同じ題名の open issue が複数あるときは数えない。
+- **数えない**: (a) open PR がある (ブランチ名 `N-...` か本文の `Closes` / `Refs` / `Fixes` / `Resolves #N`。着手済み)、または run の開始以降に merge された PR がある (run 中に open から merge まで済んだ PR は open の一覧に出ない。closed の PR は本文を持たないので、ブランチ名 `N-...` だけで当てる。`record-run-outcome.sh` と同じ考え方)、(b) `oc:stuck` `needs-user-input` `blocked` `pm-apply` のラベルか blocked_by がある (明示的な終了状態)、(c) **後続の run がある** (同じ題名の `issue_comment` の run で id が大きく、`skipped` で終わったものを除く。concurrency で置換された待機中の run の cancelled)。
+- **連続**: 成功した run は連続を断つ。`skipped` の run は断たない (agent 自身のコメントでも `issue_comment` の run が起き、`skipped` で終わる)。同じ run の再配送と順不同の配送は、最後に数えた run の id (`sig[N].killRun`) より大きい run だけを数えて重ねない。`killRun` は連続の解除では消さず、閉じた issue でも残す (run が prune された後の再配送も数えない)。
+- **止める**: 連続 **2 回** (`KILLED_STOP_AT`) で、`plan()` は ready・relaunch・recent から `stopped` (`killed x2`) に移す。`oc:no-pr` の cooldown・再投入の枠 (`np`) には載せない。`oc-pm` の **`no_pr`** (既存の kind。新しい kind は作らない) で PM agent の判断に回す。ラベル・コメントは書かない。
+- **解除 (連続を 0 に戻す)**: その issue の open PR が出た / issue が close された / 成功した run / kill より後の PM の応答 (PM のログインの通常コメント、PM のマーカー `oc-pm-decision:` `oc-pm-intent: relaunch` 付きの bot コメント) か人 (MEMBER / OWNER / COLLABORATOR) のコメント。**`/oc` の投稿は解除にしない** (Worker 自身の再投稿が連続を解かないように)。人の `/oc` では自動の再着手は止めたままで、`oc-pm` の `no_pr` だけを送らない (PM が応答済み)。その run がまた打ち切られれば再び送る。
+- **`/status`**: `killed_stopped` (止めている open issue の件数)、`killed_issues` (その番号。最大 100 件)。`pm_detected.no_pr` にも入る。
+- **限界**: (1) `completed` の配送を取りこぼすと数えない (reconcile が『一覧に無い』ことから付ける `conclusion=unknown` は数えない。失敗した配送の回収 #2339 が補う)。(2) 『push はしたが PR は出していない』run も PR 無しとして数える (`record-run-outcome.sh` と同じ定義)。(3) この版より前の打ち切りは数えない (連続は配送を受けた時点から)。(4) `prepare-event-context.sh` の `no_pr` は `oc-run-outcome` コメントを PM agent に渡すが、打ち切りの issue には無いので、PM agent には issue 本文とラベルだけが渡る。
+- 実測と受入条件は #2626。
 
 ## 自動 close: 規則 A (#2336)
 
@@ -138,6 +152,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `needs_user` | open な issue と PR のうち `needs-user-input` の付いた数 (合計) |
 | `no_pr_needs_pm` | 最後の run-outcome が `artifact` で stopped に残った open な `oc:no-pr` の件数 (新しい素材が無い・停止報告でない・再投入済み・上限に達したものを含む。PM の判断待ち)。`split`・`stop`・`blocked`・`unknown` は数えない |
 | `no_pr_by_reason` | `{split, artifact, unknown, blocked, stop}`: open な `oc:no-pr` の issue を、最新の outcome の理由別に数えた値。outcome の無いものは数えない |
+| `ready_by_prio` | `{critical, normal, low}`: 着手待ち (`ready`) の件数を優先の区分別に数えた値。`prio:critical`・`prio:low` のラベルで決まり、無ければ normal。合計は `ready` と一致する |
 | `refs_only_merge_rate_24h` | `{merged, refs_only, rate}`: 直近 24 時間に merge された PR の件数 (`merged`) と、そのうち本文が `Refs #N` のみ (`Closes` / `Fixes` / `Resolves` が 1 つでもあれば数えない) の件数 (`refs_only`) と率。0 件なら `rate` は `null`。merge 済み PR の『Refs のみ』は merge 時点の本文から取った真偽値だけを持つ (本文は保存しない)。導入前に merge された PR は、次の全体同期 (6 時間以内) で埋まる |
 | `open_issues_delta_24h` | 現在の open issue 数から、24 時間前以前で最も新しい 1 時間ごとの点 (`meta/openHist`、最大 48 点) の数を引いた差。点が無い (履歴が 24 時間分に満たない) ときは `null`。同期が古い間と一覧を打ち切った間は点を残さない |
 | `pm_dispatch_1h` | 直近 1 時間の `oc-pm` の送信数 (dry-run の would を含む。`pmHistory` と同じ live / dry-run の別) |
@@ -322,7 +337,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `TARGET` | 同時に走らせる **opencode.yaml の run の総数** の上限 (room = target_eff − active_all。`active_all` は実装・review・fix・oc-pm・watchdog の全て。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"58"` (上限 60 から 2 を残す。以前の暫定 `"50"` と、80 に戻す案 #2458 は置き換えた) |
 | `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
 | `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
-| `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"6"` (コードの既定も 6。#2650 で 24 から短縮) |
+| `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間。`prio:critical` の issue は半分 (#2683) | `"6"` (コードの既定も 6。#2650 で 24 から短縮) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
 切替は `[vars]` を書き換えて**再デプロイ**する (`cd infra/pm-worker && npx wrangler deploy`。`STORE_KEY` の secret は変わらない)。リポジトリと稼働中の値を一致させるため、書き換えは PR で merge してから、その main でデプロイする。

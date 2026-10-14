@@ -78,8 +78,9 @@ fence="$(awk -v n="$longest_fence" 'BEGIN { s = ""; while (length(s) < n) s = s 
     printf 'gh はレビュワー App identity で認証済み。approve / merge を実行できる。\n'
   else
     printf 'NOTE: reviewer App identity unavailable; gh is authenticated as the implementer App.\n'
-    printf 'You cannot approve your own PR. Post the review as a comment and merge directly\n'
-    printf 'if the project allows. If reviewer-token was expected, check that\n'
+    printf 'You cannot approve your own PR, and you must not approve or merge it (#2600).\n'
+    printf 'Post the review as a comment explaining that the reviewer token is unavailable, then stop.\n'
+    printf 'If reviewer-token was expected, check that\n'
     printf 'OC_REVIEW_APP_PRIVATE_KEY is set and that the App installation grants\n'
     printf 'contents:write and pull-requests:write.\n'
   fi

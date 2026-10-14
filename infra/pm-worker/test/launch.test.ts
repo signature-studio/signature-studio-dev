@@ -4,7 +4,9 @@ import {
   ALLOW_ARTS,
   buildLaunchBody,
   inferArtifacts,
+  noPrCooldownMs,
   planLaunch,
+  prioOf,
   sortReady,
   validateArtLine,
 } from "../src/launch.ts";
@@ -53,6 +55,67 @@ test("並び順: 被ブロック数の多い順、次に『任意』でない順
     { n: 7, title: "[A-4] w", blocksCount: 2 },
   ]);
   assert.deepEqual(sorted.map((r) => r.n), [7, 3, 9, 5]);
+});
+
+test("区分: prio:critical > prio:low、どちらも無ければ normal。両方付いたら critical", () => {
+  assert.equal(prioOf(["prio:critical"]), "critical");
+  assert.equal(prioOf(["prio:low"]), "low");
+  assert.equal(prioOf(["oc:no-pr"]), "normal");
+  assert.equal(prioOf([]), "normal");
+  assert.equal(prioOf(["prio:low", "prio:critical"]), "critical");
+});
+
+test("並び順 (区分): critical を先頭、low を末尾にし、同じ区分の中は被ブロック数・『任意』・番号の順", () => {
+  const sorted = sortReady([
+    { n: 1, title: "[A-1] low", blocksCount: 9, labels: ["prio:low"] },
+    { n: 2, title: "[A-2] 任意 normal", blocksCount: 0, labels: [] },
+    { n: 3, title: "[A-3] normal", blocksCount: 0 },
+    { n: 4, title: "[A-4] critical", blocksCount: 0, labels: ["prio:critical"] },
+    { n: 5, title: "[A-5] critical blocked", blocksCount: 3, labels: ["prio:critical"] },
+    { n: 6, title: "[A-6] normal blocked", blocksCount: 2 },
+    { n: 7, title: "[A-7] 任意 blocked", blocksCount: 2, labels: ["oc:no-pr"] },
+    { n: 8, title: "[A-8] low 任意", blocksCount: 5, labels: ["prio:low"] },
+  ]);
+  assert.deepEqual(sorted.map((r) => r.n), [5, 4, 6, 7, 3, 2, 1, 8]);
+});
+
+test("選定 (区分): room が限られても、prio:critical の ready を先に入れ、low は後に回す", () => {
+  const ready = [
+    { n: 100, title: "t", blocksCount: 0 },
+    { n: 101, title: "t", blocksCount: 0 },
+    { n: 102, title: "t", blocksCount: 0, labels: ["prio:critical"] },
+    { n: 103, title: "t", blocksCount: 0, labels: ["prio:low"] },
+  ];
+  const p = planLaunch({ ready, relaunch: [], active: 47, target: 50, batch: 25 });
+  assert.equal(p.room, 3);
+  assert.deepEqual(p.picks, [102, 100, 101]);
+});
+
+test("選定 (区分): critical が無ければ他を遊ばせない (low も枠に余裕があれば出す)", () => {
+  const ready = [
+    { n: 100, title: "t", blocksCount: 0 },
+    { n: 101, title: "t", blocksCount: 0, labels: ["prio:low"] },
+    { n: 102, title: "t", blocksCount: 0 },
+  ];
+  const p = planLaunch({ ready, relaunch: [], active: 0, target: 50, batch: 25 });
+  assert.deepEqual(p.picks, [100, 102, 101]);
+});
+
+test("選定 (区分): relaunch は従来どおり枠の先頭に全件入り、残りの枠を critical の ready が使う", () => {
+  const ready = [
+    { n: 100, title: "t", blocksCount: 0 },
+    { n: 101, title: "t", blocksCount: 0, labels: ["prio:critical"] },
+  ];
+  const p = planLaunch({ ready, relaunch: [7, 8], active: 47, target: 50, batch: 25 });
+  assert.equal(p.room, 3);
+  assert.deepEqual(p.picks, [7, 8, 101]);
+});
+
+test("cooldown (区分): prio:critical の oc:no-pr は半分 (3 時間)、他は設定どおり (6 時間)", () => {
+  assert.equal(noPrCooldownMs([], 6), 6 * 3_600_000);
+  assert.equal(noPrCooldownMs(["oc:no-pr"], 6), 6 * 3_600_000);
+  assert.equal(noPrCooldownMs(["oc:no-pr", "prio:critical"], 6), 3 * 3_600_000);
+  assert.equal(noPrCooldownMs(["prio:low"], 6), 6 * 3_600_000);
 });
 
 test("選定: room = TARGET - active, n = min(room, BATCH, ready)", () => {
