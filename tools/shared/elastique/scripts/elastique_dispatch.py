@@ -245,6 +245,7 @@ def main():
     # ---- D. 8 バイト整列位置の値としての参照 (全節) -------------------------
     qword_head = collections.Counter()
     qword_slot = collections.Counter()
+    qword_ipp = collections.Counter()
     for s in sections:
         for off in range(0, s["vsize"] - 7, 8):
             v = struct.unpack_from("<Q", image, s["va"] + off)[0]
@@ -252,6 +253,8 @@ def main():
                 qword_head[s["name"]] += 1
             if v in slot_map:
                 qword_slot[s["name"]] += 1
+            if inside(v, ipp):
+                qword_ipp[s["name"]] += 1
 
     tgt_summary = collections.Counter()
     for T, ti in tinfo.items():
@@ -286,7 +289,8 @@ def main():
         },
         "C_reloc": {"dir64_total": total, "dir64_target_section": dict(dir64),
                     "dir64_at_slots": slot_dir64, "dir64_value_is_thunk_head": head_dir64},
-        "D_qword_refs": {"thunk頭の値 (節別)": dict(qword_head), "枠アドレスの値 (節別)": dict(qword_slot)},
+        "D_qword_refs": {"thunk頭の値 (節別)": dict(qword_head), "枠アドレスの値 (節別)": dict(qword_slot),
+                         "IPPCODEを指す値 (節別)": dict(qword_ipp)},
     }
     out = {"file": os.path.basename(dll), "summary": summary, "linear_out_list": lin_out,
            "records": {k: [hex(x) if x else "0" for x in v] for k, v in recs.items()},
