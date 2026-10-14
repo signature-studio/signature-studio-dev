@@ -28,18 +28,29 @@ if [ ! -x "$WORK/build-native/python" ]; then
 fi
 
 # --- 2) wasm32-emscripten ---
+# CPY_MEMORY64=1: wasm64 (-sMEMORY64=1) の libpython を work/build-wasm64 に作る (PY-98 #2858)。
+# configure は wasm32 と同一 (configure 段に -sMEMORY64=1 を入れると try-compile が壊れるため)。make の段で OPT に足す。
+CPY_MEMORY64="${CPY_MEMORY64:-0}"
+if [ "$CPY_MEMORY64" = 1 ]; then BD="$WORK/build-wasm64"; else BD="$WORK/build-wasm"; fi
 # shellcheck disable=SC1091
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 BP="$WORK/build-native/python"
-mkdir -p "$WORK/build-wasm"
-cd "$WORK/build-wasm"
+mkdir -p "$BD"
+cd "$BD"
+SITE="$SRC/Tools/wasm/config.site-wasm32-emscripten"
+if [ "$CPY_MEMORY64" = 1 ]; then
+  # wasm64 (LP64 相当) の sizeof を cache 値で与える。pyconfig.h の SIZEOF_LONG 等が 4 のままだと pyport.h の LONG_BIT 検査で落ちる
+  SITE="$BD/config.site-wasm64"
+  cp "$SRC/Tools/wasm/config.site-wasm32-emscripten" "$SITE"
+  printf 'ac_cv_sizeof_long=8\nac_cv_sizeof_void_p=8\nac_cv_sizeof_size_t=8\nac_cv_sizeof_uintptr_t=8\nac_cv_sizeof_pthread_t=8\n' >> "$SITE"
+fi
 if [ ! -f Makefile ]; then
   # 不要/ビルド不能モジュールを configure 段階で無効化 (sqlite3: port 依存を避ける, xxlimited: 動的リンク用 -fPIC 要求, CJK codec: 約 1MB)
   env py_cv_module__sqlite3=n/a py_cv_module_xxlimited=n/a py_cv_module_xxlimited_35=n/a \
       py_cv_module__codecs_cn=n/a py_cv_module__codecs_hk=n/a py_cv_module__codecs_iso2022=n/a \
       py_cv_module__codecs_jp=n/a py_cv_module__codecs_kr=n/a py_cv_module__codecs_tw=n/a \
       py_cv_module__multibytecodec=n/a \
-    CONFIG_SITE="$SRC/Tools/wasm/config.site-wasm32-emscripten" \
+    CONFIG_SITE="$SITE" \
     emconfigure "$SRC/configure" -C \
       --host=wasm32-unknown-emscripten \
       --build="$("$SRC/config.guess")" \
@@ -48,15 +59,23 @@ if [ ! -f Makefile ]; then
       OPT="-DNDEBUG -fwrapv -O3" \
       --with-build-python="$BP" >configure.log 2>&1
 fi
+if [ "$CPY_MEMORY64" = 1 ]; then
+  # wasm64 は静的リンク用の libpython3.12.a と build_flpy_static.sh が使う補助ライブラリだけ作る (stock python.js は作らない)
+  emmake make -j"$(nproc)" libpython3.12.a Modules/_decimal/libmpdec/libmpdec.a Modules/_hacl/libHacl_Hash_SHA2.a Modules/expat/libexpat.a OPT="-DNDEBUG -fwrapv -O3 -sMEMORY64=1" >make.log 2>&1
+  ls -la libpython3.12.a Modules/_decimal/libmpdec/libmpdec.a Modules/_hacl/libHacl_Hash_SHA2.a Modules/expat/libexpat.a
+else
 # stock python.js (node/browser 用 CLI) まで通す。共有 ext module (xxlimited 等) は静的化されるので不要。
 emmake make -j"$(nproc)" python.js >make.log 2>&1
 ls -la libpython3.12.a python.js python.wasm python.data
+fi
 
 # LGL-3 (#86): 再ビルド記録 (upstream 版・ソース sha256・configure 引数)。build_flpy.sh は CPython ソースにパッチを当てない
-node "$HERE/../legal/notices/record.mjs" --id "cpython-$PYVER" --name CPython --version "$PYVER" --license-spdx PSF-2.0 \
+# CPY_MEMORY64=1 の記録は tools/legal/notices/records を書き換えるので行わない (wasm32 の記録と別管理)
+if [ "$CPY_MEMORY64" != 1 ]; then node "$HERE/../legal/notices/record.mjs" --id "cpython-$PYVER" --name CPython --version "$PYVER" --license-spdx PSF-2.0 \
   --url "https://www.python.org/ftp/python/$PYVER/Python-$PYVER.tgz" --archive "$WORK/Python-$PYVER.tgz" \
   --src-dir "$SRC" --license-file LICENSE \
   --script "$HERE/build_cpython_wasm.sh" --toolchain emcc --target wasm32 \
   --step "configure-native=./configure -C (emsdk を PATH から外した native build python 用)" \
   --step "configure-wasm=env py_cv_module__sqlite3=n/a py_cv_module_xxlimited=n/a py_cv_module_xxlimited_35=n/a py_cv_module__codecs_cn=n/a py_cv_module__codecs_hk=n/a py_cv_module__codecs_iso2022=n/a py_cv_module__codecs_jp=n/a py_cv_module__codecs_kr=n/a py_cv_module__codecs_tw=n/a py_cv_module__multibytecodec=n/a CONFIG_SITE=Tools/wasm/config.site-wasm32-emscripten emconfigure ./configure -C --host=wasm32-unknown-emscripten --build=<config.guess> --with-emscripten-target=browser --disable-ipv6 OPT=\"-DNDEBUG -fwrapv -O3\" --with-build-python=<native python>" \
   --step "make=emmake make python.js"
+fi
