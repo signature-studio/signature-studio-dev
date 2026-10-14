@@ -223,6 +223,18 @@ expect "pm.md: the oc-pm-decision marker format" $?
 pm_has '<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->'
 expect "pm.md: the oc-pm-intent marker format" $?
 
+# 10b. 不在中ダイジェスト (CI-70 #2349): digest 節は 24 時間ごと・件数だけ・1 日 1 件までの緊急コメント。user_answered は回答を反映して確定する。
+pm_has '### `digest`'
+expect "pm.md has the kind section 'digest'" $?
+for s in '24 時間ごと' '直近 24 時間' '本文・題名の個票は読み出さない' '件数と最古' '自律運転ダイジェスト (rolling)' '本文は件数の表だけ' '個票 (issue・PR の題名や本文) は書かない' '1 日 1 件まで' '<!-- oc-pm-digest-alert -->' '<!-- oc-auto-close rule=Rn -->' '<!-- oc-fix-reset'; do
+  pm_has "$s"
+  expect "pm.md digest: has '$s'" $?
+done
+for s in '回答を反映して issue 本文を更新' '`needs-user-input` を外す' '「確定」コメント' '回答が曖昧なとき' '聞き直す'; do
+  pm_has "$s"
+  expect "pm.md user_answered: has '$s'" $?
+done
+
 # 11. repository_dispatch oc-pm (#2327): kind は列挙 9 値、ref は数字 1〜7 桁 (supply/digest/retro は 0 も可)。
 # payload の他のフィールドは指示文にも env にも入らない。対象は API で隔離し、起票者は許可 bot か MEMBER 以上だけ。
 PMBIN="$TMP/pmbin"

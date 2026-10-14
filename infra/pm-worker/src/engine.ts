@@ -7,7 +7,19 @@ import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
-import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
+import {
+  detectPm,
+  DIGEST_EVERY_MS,
+  DIGEST_KIND,
+  DIGEST_REF,
+  pruneHistory,
+  selectDispatch,
+  validPayload,
+  DETECTED_KINDS,
+  HOLD_LABELS,
+  type HistoryEntry,
+  type PmTarget,
+} from "./pm.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
 import {
@@ -61,6 +73,8 @@ interface Meta {
   // 署名を検証できた webhook の最後の受信 / repository_dispatch (oc-watchdog) に成功した最後の時刻
   lastWebhookAt?: number;
   lastDispatchAt?: number;
+  // 直近の digest (oc-pm kind=digest) を試行した時刻。成功・失敗・dry-run の記録を問わず 24 時間に 1 回。
+  digestAt?: number;
   // GitHub REST の x-ratelimit-* (ヘッダのあった値だけ更新する)。reset は epoch 秒。
   rest?: RateInfo;
   // 直近の reconcile で DO と REST が食い違った件数と、その累計
@@ -753,6 +767,42 @@ export class Engine {
     return out;
   }
 
+  // 日次のダイジェスト (oc-pm kind=digest ref=0)。時刻だけで送り、集計は PM agent が pm.md の digest 節で行う。
+  // 初回の tick は起点を置くだけ (初めて動いた直後に起こさない)。以後 24 時間に 1 回。送信に失敗した試行も 1 回と数え、毎分叩き直さない。
+  // 対象を指さないので、同期の新旧は問わない。
+  async digest(gh: Gh | null): Promise<"sent" | "would" | "skipped"> {
+    const now = this.d.now();
+    if (this.meta.digestAt === undefined) {
+      this.meta.digestAt = now;
+      return "skipped";
+    }
+    if (now - this.meta.digestAt < DIGEST_EVERY_MS) return "skipped";
+    this.meta.digestAt = now;
+    this.meta.counters = this.meta.counters ?? this.zero();
+    const hist = [...this.pmHistory(), { kind: DIGEST_KIND, ref: DIGEST_REF, at: now }];
+    if (!this.d.cfg.liveDispatch || !gh) {
+      this.meta.counters.wouldDispatchPm = (this.meta.counters.wouldDispatchPm ?? 0) + 1;
+      this.d.store.put("meta", this.pmHistoryKey(), hist);
+      this.pushLog({ kind: "would-pm-dispatch", n: DIGEST_REF, note: DIGEST_KIND });
+      this.saveMeta();
+      return "would";
+    }
+    let sent = true;
+    try {
+      await gh.dispatchPm(DIGEST_KIND, DIGEST_REF);
+    } catch (e) {
+      sent = false;
+      this.pushLog({ kind: "error", note: e instanceof GhError ? `oc-pm ${DIGEST_KIND}: ${e.message}` : `oc-pm ${DIGEST_KIND}: dispatch failed` });
+    }
+    this.d.store.put("meta", this.pmHistoryKey(), hist);
+    if (sent) {
+      this.meta.counters.pmDispatched = (this.meta.counters.pmDispatched ?? 0) + 1;
+      this.pushLog({ kind: "pm-dispatch", n: DIGEST_REF, note: DIGEST_KIND });
+    }
+    this.saveMeta();
+    return sent ? "sent" : "skipped";
+  }
+
   // 1 回の点検。alarm (毎分・webhook 後 2 秒) と cron (毎分) の両方から呼ばれる。
   async tick(): Promise<{ ready: boolean }> {
     // cron と alarm が重なっても、同時に 2 回は走らせない (二重投稿の防止)。
@@ -785,6 +835,7 @@ export class Engine {
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
+      await this.digest(gh);
       this.meta.lastError = undefined;
     } catch (e) {
       this.setError(now, e instanceof GhError ? e.message : "tick failed");
@@ -852,6 +903,7 @@ export class Engine {
       counters,
       last_webhook_at: this.meta.lastWebhookAt ? iso(this.meta.lastWebhookAt) : null,
       last_dispatch_at: this.meta.lastDispatchAt ? iso(this.meta.lastDispatchAt) : null,
+      last_digest_at: this.meta.digestAt ? iso(this.meta.digestAt) : null,
       running,
       // dry-run のために投稿しなかった GitHub への書き込み (/oc 投稿 + repository_dispatch) の累計。
       dry_run_skipped_posts: counters.wouldLaunch + counters.wouldDispatch,

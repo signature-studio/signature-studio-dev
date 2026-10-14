@@ -65,7 +65,7 @@ const EXISTING_KEYS = [
   "sync_truncated", "last_full_sync_rest_calls", "last_full_sync_comment_rest_calls", "comment_window_h", "comment_max_pages",
 ];
 const ADDED_KEYS = [
-  "last_webhook_at", "last_dispatch_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
+  "last_webhook_at", "last_dispatch_at", "last_digest_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];
