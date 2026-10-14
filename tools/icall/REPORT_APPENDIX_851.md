@@ -154,7 +154,6 @@ git diff c4fba12a HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_851.md'   #
 | `function_128c320()` edge が D で捨てられる段階の特定 | 呼出元 `0x128f9e0` からの call edge 欠落 | 子 issue ICALL-30 (同上) |
 | 366 site 落ちとの因果 | 1 バイト化とは別の lift 欠落 | 子 issue ICALL-30 (同上) |
 
-
 ## #1456 (ICALL-30): 警告 10 件は CFG 構築の edge 破棄 (RetDec 上流 TODO 経路)。phase は確定、IR 命令・183 突合は未了
 
 素材: `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0 `retdec-decompiler`)。
@@ -199,6 +198,6 @@ git diff cb3a89a6 HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_851.md'   #
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 警告 10 件の IR 命令 (`rax_1_reload` 等) の特定 (phase 中間ダンプ) | 本体 `0x128c320` の一部 edge の由来が未確定 | 子 issue (本 run で起票・番号は PR 本文と issue コメント参照) |
-| `roundtrip.sh` 条件での 183 site 突合・edge 破棄と 366 落ちの因果 | 366 落ちの原因の一部が未特定 | 同上 |
-| `DEFECTS.md` 行案 (`RNC-edge-drop`) の確定 | 類型の正本化 | 同上 |
+| 警告 10 件の IR 命令 (`rax_1_reload` 等) の特定 (phase 中間ダンプ) | 本体 `0x128c320` の一部 edge の由来が未確定 | #1592 `[ICALL-33]` |
+| `roundtrip.sh` 条件での 183 site 突合・edge 破棄と 366 落ちの因果 | 366 落ちの原因の一部が未特定 | #1592 `[ICALL-33]` |
+| `DEFECTS.md` 行案 (`RNC-edge-drop`) の確定 | 類型の正本化 | #1592 `[ICALL-33]` |
