@@ -5,7 +5,7 @@
 - 対象: 対照 Gain (`gain`) の before 160 閉包。root 27 件は `gain_before_160.tsv` の root 行 (機械生成・`verified` 列は全行 `auto`)。
 - 素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B)。
   ImageBase `0x180000000`・SizeOfImage `0x625c000`・AMD64。Windows 側だけを手で展開 (`extract_installer.sh` は macOS 側で停止するため)。展開先は repo 外。
-- 測定 commit (lift・build・smoke・cmp の実測): `d8c168c4` (main `f81c46bb` を取り込んだ merge。コードを変えた最後の commit)。main 取り込み前の `f1c40af2` の測定は、main の x64c (VEX/FMA 被覆) を含まないため使わない (§2・§5)。
+- 測定 commit (lift・build・smoke・cmp の実測): `61e5467a` (main `567c7182` を取り込んだ merge。コードを変えた最後の commit)。main 取り込み前の `f1c40af2` の測定は、main の x64c (VEX/FMA 被覆) を含まないため使わない (§2・§5)。
 
 ## 0. 結論
 
@@ -43,30 +43,30 @@ python3 tools/targets/kilohearts/scripts/gain_x64c_closure.py $OUT/winpkg/HeartC
 
 入力の違い: `REPORT_APPENDIX_3065.md` の `scripts/lift_closure_x64c.sh` (main) は `calltgt` に TSV の 160 行の func_rva を与え、`--closure 0` で lift する。本スクリプトは root 27 行だけを roots とし、`--closure 60` で直接 call を辿る。入力が違うので、2 本の関数数は同じ閉包を指さない。
 
-## 2. 実測 (測定 commit `d8c168c4`・4 vCPU・各 1 回 (n=1)・開始時 load average 0.81 0.48 0.21)
+## 2. 実測 (測定 commit `61e5467a`・4 vCPU・各 1 回 (n=1))
 
 | 段 | 結果 | 時間 (n=1 の参考値) |
 |---|---|--:|
-| x64c (roots 27・closure 60・`--img 0x180000000 --shift 0x17E000000`) | functions 148・insns 9,502・unsup 0 (`unsup {}`)・unlifted callees 0・imports used 25 (IAT 404 slot) | 14.1 s |
+| x64c (roots 27・closure 60・`--img 0x180000000 --shift 0x17E000000`) | functions 148・insns 9,502・unsup 0 (`unsup {}`)・unlifted callees 0・imports used 25 (IAT 404 slot) | 13.9 s |
 | fle_data_gen (`shift 0x17E000000`) | sections `.rdata` 21.8 MB・`.data` 1.8 MB・`.reloc` 0.8 MB、windows 8、total 24,441,216 B | — |
 | emcc compile (`fle_lifted.c`) | warnings 0・errors 0 | — |
-| emcc link (`fle_lift.sh` と同じフラグ) | exit 0・`kh.wasm` 25,319,395 B | 34.5 s |
+| emcc link (`fle_lift.sh` と同じフラグ) | exit 0・`kh.wasm` 25,319,395 B | 21.4 s |
 | smoke (node): `_fle_init` / `_fle_data_install` / `_fle_run(Gain process, 引数 0)` | `init ok` / `data_install ok` / `fle_run(gain process, zero args) ok 303369004`。判定 `smoke: ok=3 (3 が成功) EXC=0 (0 が成功)` で通過 | — |
-| スクリプト全体 (`build_closure_x64c.sh`・判定込み) | exit 0 | 70.0 s |
+| スクリプト全体 (`build_closure_x64c.sh`・判定込み) | exit 0 | 55.4 s |
 
 - **負例 (ネガティブコントロール)**: `_fle_data_install` の段を外すと (§1 の `smoke_neg.cjs`)、`init ok` の後に `fle_run(gain process, zero args) EXC RuntimeError: memory access out of bounds`。`ok` 1・`EXC` 1 となり、判定 (`ok` 3・`EXC` 0) は失敗側に入る。
 - 前回測定 (`f1c40af2`・main 取り込み前) との差: functions 148・insns 9,502・imports 25・total 24,441,216 B・cmp は同値。unsup は 0 になった (main の `x64c.py` の VEX/FMA 被覆の取り込みによる)。`kh.wasm` は 25,295,206 B から 25,319,395 B に変わった (差の原因は未切り分け)。
-- 時間は n=1 の参考値。前回の 46.0 s (`f1c40af2`)・70.0 s (`56c6f8cb`) とも変動が大きいので、レンジとしては扱わない。
+- 時間は n=1 の参考値。全体時間は 46.0 s (`f1c40af2`)・70.0 s (`56c6f8cb`・`d8c168c4`)・55.4 s (本測定) で変動が大きいので、レンジとしては扱わない。
 - smoke は**正しさの検証ではない**。入力 spec を与えていないため戻り値の値は意味を持たない。bit 突合は issue の範囲外。
 - unsup: 取り込み前の x64c では VEX/FMA 系の unsup が残っていた (件数と内訳は [`REPORT_APPENDIX_3065.md`](REPORT_APPENDIX_3065.md) §2)。本 HEAD の x64c は `unsup {}` (0 site) を出力する。
 
 ## 3. 閉包の差分 (x64c 148 vs TSV 160)
 
 - 内訳 (件数と番地) は **[`REPORT_APPENDIX_3064.md` §1](REPORT_APPENDIX_3064.md)** が正本 (#3064 KH-37)。本節には再掲しない。
-- 再現: `scripts/gain_x64c_closure.py` (§1 の最後のコマンド)。測定 commit `d8c168c4` で再実行し、APPENDIX §1 と一致することを確認した。
+- 再現: `scripts/gain_x64c_closure.py` (§1 の最後のコマンド)。測定 commit `61e5467a` で再実行し、APPENDIX §1 と一致することを確認した。
 - 旧版の `closure_breakdown.py` は削除した (`f1c40af2`)。IAT thunk 判定が REX.W 付きの `jmp` を取りこぼしていたため。同じ分類を二重実装しない。
 
-## 4. build の失敗点の記録 (同じ入力・手順の 3 試行・測定 commit `d8c168c4` で再実行)
+## 4. build の失敗点の記録 (同じ入力・手順の 3 試行・測定 commit `61e5467a` で再実行)
 
 | 試行 | 構成 | 結果 |
 |---|---|---|
@@ -77,12 +77,12 @@ python3 tools/targets/kilohearts/scripts/gain_x64c_closure.py $OUT/winpkg/HeartC
 - 試行 B の原因箇所: `tools/flelift/fle_data_gen.py` の `for a, n in [(0x42f670, 0x30)]`。本 PR で `IMG <= a < IMG + SizeOfImage` の判定を足した。FLEngine (像内) では従来どおり追加される。
 - 試行 A の補足 (未確認): 直書き窓は VA 版では `IMG + rva` が打ち消し合い `0x42f670` へ書き込む。emcc の静的領域と重なるかは確認していない。
 
-## 5. FLEngine 側の回帰確認 (測定 commit `d8c168c4` で実行)
+## 5. FLEngine 側の回帰確認 (測定 commit `61e5467a` で実行)
 
 - `scripts/fle_data_gen_cmp.sh` (素材: `fl-win64` の `block00031_PE.bin`・meta は空の合成値 `{}`):
   - `cmp old/new: 一致 (14820487 B)` — 旧版 (`196f37ef^` の `fle_data_gen.py`) と測定 commit の版 (本 PR 版) の出力が一致。
   - ネガティブコントロール `neg (shift 0x17E000000): 差分 200 byte` — shift を与えると出力が変わり、cmp が差を検出することを示す。
-- 測定 commit 以降の変更: `git diff --stat d8c168c4 HEAD -- tools/targets/kilohearts/scripts tools/flelift` は空 (0 行)。取り込み前の `f1c40af2` からの差分は、本 PR の `fle_data_gen_cmp.sh`・`build_closure_x64c.sh` (旧 `lift_closure_x64c.sh`・判定の 4 行)・`fle_data_gen.py` (shift と窓の範囲判定) と、main 取り込み分 (`x64c.py`・`rt/fle_cpu.h`・`boot/*`・`tests/*`・`gain_x64c_closure.py`)。
+- 測定 commit 以降の変更: `git diff --stat 61e5467a HEAD -- tools/targets/kilohearts/scripts tools/flelift` は空 (0 行)。取り込み前の `f1c40af2` からの差分は、本 PR の `fle_data_gen_cmp.sh`・`build_closure_x64c.sh` (旧 `lift_closure_x64c.sh`・判定の 4 行)・`fle_data_gen.py` (shift と窓の範囲判定) と、main 取り込み分 (`x64c.py`・`rt/fle_cpu.h`・`boot/*`・`tests/*`・`gain_x64c_closure.py`)。`x64c.py` の `--cfg-rax` は既定 OFF で、本測定は使っていない。
 - 注意: 確認に使った `lift_meta.json` は空の合成値 (jt / textrefs / IAT なし)。FLEngine の全 lift (`fle_lift.sh`) は再実行していない (§6)。
 
 ## 6. 未解決
