@@ -6,7 +6,9 @@
 set -euo pipefail
 MODE="${1:?mode (locale0|none)}"
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; W="$HERE/../work/shimx_link"; T="$W/exp_t27"; O="$W/obj"; mkdir -p "$T"
-set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
+EMENV="$(grep -o '[^ ]*emsdk_env.sh' "$HERE/build.sh" | head -1)"   # build.sh と同じ emsdk (REFERENCES [EMSDK]) を使う
+set +u; source "$EMENV" > /dev/null 2>&1; set -u
+export PATH="$(dirname "$EMENV")/upstream/bin:$PATH"
 WRAPS="-Wl,--wrap=m11_icall"; EXTRA=""
 case "$MODE" in
   locale0)
