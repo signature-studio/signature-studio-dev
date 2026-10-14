@@ -214,28 +214,28 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 §F は 250 行上限のため [REPORT_APPENDIX_F.md](REPORT_APPENDIX_F.md) に分割移動した。
 
-## G. main (ba4babca) での 9 本再測定と known.json 更新 (#534)
+## G. 現 head (f1d1db11 = main 取り込み後) での 9 本再測定と known.json 判定 (#534)
 
-- **状態 (現 head `ba71f8c0` に対して未確認)**: 下表は測定 HEAD `ba4babca` の値で、現 head には対応しない。`git diff ba4babca HEAD -- tools/plugins` は 0 行ではない (`lift/lift_ranges.sh`: `PLUG_NO_STATIC_DETECT` の既定が未設定→1 (RetDec 引数が変わる)、`synth/cpp_lift.sh`: 21202 の `PLUG_I32PTR_FUNCS` に `function_1800599bc` を追加、`synth/known.json`: 本 PR の変更)。現 head での 9 本再測定は、素材 `toolchain-emsdk` / `toolchain-retdec` が無いため未実施。known.json は再測定までの間、main の内容 (`emcc_c_rc` を含む) に戻した。
-- 測定 HEAD: **ba4babca** (origin/main)。 コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/plugins/synth/cpp_lift.sh <block> 2400` を 9 本 `xargs -P 3`。 既定 `HLL_CAP=300`、既定の opt-in (`PLUG_I32PTR_FUNCS` は 21202 のみ既定で ON。ba4babca 時点の既定は 2 関数 `function_180049450 function_180056120`。現 head では `function_1800599bc` を加えた 3 関数)。 素材 `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` を `$HOME/artifacts` から展開して使用。
-- 総経過 **569 s** (9 本、終了コード 0 が 9 本)。 load (測定後) `2.04`。
+- **測定 commit: f1d1db11** (`origin/main` を merge した commit。tools/plugins のコードを変えた最後の commit)。`git diff f1d1db11 HEAD -- tools/plugins ':!*.md'` は **0 行** (測定後のコード差分 0。md の差分のみ)。
+- 旧表 (測定 HEAD ba4babca, 2 関数版) は現 head に対応しないため撤回した。
+- コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/plugins/synth/cpp_lift.sh <block> 2400` を 9 本 `xargs -P 3`。既定 env (21202 は `PLUG_I32PTR_FUNCS` 既定の 3 関数 `function_180049450 function_180056120 function_1800599bc`)。素材 fl-win64 / toolchain-emsdk / toolchain-retdec。
+- 総経過 **8 分 22 秒** (real 502.7 s)、9 本とも終了コード 0。 load 1.83 (開始時) → 1.42 (終了時)。 23944 は HLL 生成が HLL_CAP (300 s) を超えたため RetDec を止めて `.ll` から後段を再開 (`hll_killed_s` 361)。
 
-| block | 名前 | pdata | lift_rc | defines | f80 | unimpl | i256 | emcc_c_rc | missing_define | lift_s |
-|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 21202 | BooBass_Eng | 1,579 | 0 | 1,393 | 0 | 2 | 3 | **0** | 211 | 61 |
-| 23914 | Kepler engine | 3,194 | 0 | 3,697 | 0 | 34 | 3 | **0** | 2 | 219 |
-| 23916 | Kepler Exo engine | 3,193 | 0 | 3,694 | 1 | 35 | 3 | 1 | 2 | 243 |
-| 23944 | Morphine | 3,050 | 0 | 3,321 | 0 | 41 | 24 | **0** | 1 | 471 |
-| 24159 | PoiZone engine | 1,638 | 0 | 1,790 | 0 | 36 | 3 | **0** | 1 | 63 |
-| 24163 | Sakura engine | 1,644 | 0 | 1,707 | 1 | 21 | 3 | 1 | 1 | 79 |
-| 24167 | Sawer engine | 1,676 | 0 | 1,833 | 1 | 22 | 3 | 1 | 1 | 78 |
-| 24216 | Toxic Biohazard | 1,841 | 0 | 1,927 | 1 | 30 | 3 | 1 | 1 | 141 |
-| 24298 | Transistor Bass engine | 3,257 | 0 | 3,741 | 0 | 21 | 3 | **0** | 2 | 189 |
+| block | 名前 | lift_rc | defines | f80 | unimpl | i256 | emcc_c_rc | missing_define | lift_s |
+|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| 21202 | BooBass | 0 | 1,602 | 0 | 12 | 3 | **1** | 2 | 60 |
+| 23914 | Kepler | 0 | 3,697 | 0 | 34 | 3 | **0** | 2 | 144 |
+| 23916 | Kepler Exo | 0 | 3,694 | 1 | 35 | 3 | 1 | 2 | 189 |
+| 23944 | Morphine | 0 | 3,321 | 0 | 41 | 24 | **0** | 1 | 429 |
+| 24159 | PoiZone | 0 | 1,790 | 0 | 36 | 3 | **0** | 1 | 57 |
+| 24163 | Sakura | 0 | 1,707 | 1 | 21 | 3 | 1 | 1 | 73 |
+| 24167 | Sawer | 0 | 1,833 | 1 | 22 | 3 | 1 | 1 | 60 |
+| 24216 | Toxic Biohazard | 0 | 1,927 | 1 | 30 | 3 | 1 | 1 | 103 |
+| 24298 | Transistor Bass | 0 | 3,741 | 0 | 21 | 3 | **0** | 2 | 129 |
 
-- `emcc -c` 通過 **5/9**: 21202 BooBass_Eng (E3 は `PLUG_I32PTR_FUNCS` の既定化で解消)・23914・23944・24159・24298。 不通過 4 本は f80 libcall (`fp_round` / `fp_extend` 系、23916・24163・24167・24216)。
-- 21202 の `missing_define` は 211 のまま (#1301・#1486・#1536 の範囲)。 9 本とも `missing_define` は 0 ではない (1〜211) ため、受入条件は未達。
-
-### known.json の扱い (未決)
-- ba4babca 時点の `judge.py` (judge only, C++ 9 行) では FIXED 1 (21202 の `emcc_c_rc`) だった。FIXED は exit 1 になるため、当時は 21202 の `emcc_c_rc` を外す案を立てた。
-- 現 head での 21202 の `emcc_c_rc` と judge 結果は未測定のため、本 PR では known.json を main の内容に戻し、判定の更新は再測定の後に行う。
-- 以前の CSV 組み立て (`summary.csv` を手作業で列対応させた) は再現できない記述だったため撤回する。判定は `summary.csv` を `mk_status.py` / `judge.py` に通した出力で行う (shell 12 本は未測定のため `synth_e2e.sh` 全体の判定は未実行)。
+- **判定**: 9 行の判定 CSV を `judge.py --want <9 本>` (known.json 既定) に通した結果は KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0 (exit 0)。known.json は main と同一のまま変更なし。 `--strict` は NEW-FAIL 9 (known を無視した全件不合格。想定どおり)。
+- 注: `mk_status.py` は shell 12 本の行 (work/batch) も必須で exit 1 になるため、C++ 9 行だけを `mk_status.py` の cpp 行と同じ列対応で組んだ (組み立てスクリプトは未 commit)。 `mk_status.py` 全体の判定は未実行。
+- **21202 の 2 関数版の確認**: `PLUG_I32PTR_FUNCS="function_180049450 function_180056120"` では `lift_rc` 1 (`[P-T2] FAIL: function_180049450 の仮引数 %arg1 を伝播できない (呼出元 function_1800599bc は --func に未指定)`)。 3 関数指定が必要。
+- **21202 の emcc 失敗**: `e.final.ll:123490:45: error: '%penv' defined with type 'i64' but expected 'ptr'` (FreeEnvironmentStringsW)。 旧表の 21202 emcc 0 は現 head で再現しない。
+- 受入条件 (未達): `emcc -c` 通過 **4/9** (23914・23944・24159・24298)。 不通過 5 本: 21202 (`%penv` i64/ptr)・23916 (`no libcall available for fp_round with type f80`)・24163・24167・24216 (`do not know how to soften fp_extend`)。 `missing_define` 0 は **0/9** (1〜2 件)。
+- 未解決: f80 libcall → #197 / #523。 `missing_define` → #1301 / #1536。 21202 の `%penv` i64/ptr 型不一致 → 起票先未定 (既存 issue の確認は未実施。PM 確認を要する)。 VEX helper → #527 / #779 / #1163。
