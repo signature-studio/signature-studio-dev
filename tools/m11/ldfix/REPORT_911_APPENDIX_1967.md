@@ -24,6 +24,7 @@
 
 ソース: avast/retdec `53e55b4b` (v5.0)。LLVM は CMake が取得する avast/llvm `2a1f3d8a` (sha256 一致)。ビルドは `RelWithDebInfo`・`-j4`・yara 無効 (`RETDEC_COMPILE_YARA=OFF`・`YARA_MAKE_PROGRAM=/usr/bin/make`)・`-include cstdint` (GCC 13 対策)。
 ビルド時間 (実測・n=1): 成功した最終 run (LLVM 含む、`ninja -j4`) real 9 分 10.623 秒。前段で失敗した run は real 10 分 0.841 秒 (yara 段で停止)。load average (`uptime`) は最終 run 中 2.75〜4.81 (4 コア)。
+測定の鮮度: 測定経路は RetDec v5.0 (`53e55b4b`) のソースビルドと `tools/m11/ldfix/uprobe_1967.sh` である。`git diff 10b65967 HEAD -- tools/m11/ldfix/uprobe_1967.sh` は 0 行。`tools/m11/ldfix/` 内で差分が出るのは `audit_undefload_dest.py`・`ld92_machine_evidence.py`・`ld98_dump.py`・`verify_dest_2202.py` の 4 件 (263 行追加。main 取り込み由来)。このうち `.sh` から呼ばれるのは `audit_undefload_dest.py` だけで、呼び出し元は `repro_2143.sh` (#2143 の測定) である。`ld92`・`ld98`・`verify_dest_2202` は #2038 の測定経路に入らない。したがって本測定の鮮度は、RetDec 本体 (repo 外。`53e55b4b` に固定) と `uprobe_1967.sh` (差分 0 行) で判断できる。
 
 行対応の確定: 一時ログ (`TAG_L150`・`TAG_L167`) をビルド用ソースにだけ入れ、成果物には含めない。`convertConstantToType` の呼び出しは v5.0 で 3 箇所: L150 (`max == &root`)・L157 (`userI`)・L167 (`gv` 分岐)。
 
