@@ -33,15 +33,16 @@ const PROBE = `(async () => {
 const pactl = (...a) => { try { return execFileSync("pactl", a, { encoding: "utf8", timeout: 5000 }); } catch (e) { return "ERR " + e.message; } };
 const ciNull = () => pactl("list", "short", "sinks").split("\n").map((l) => l.split("\t")).find((c) => c[1] === "ci_null") ?? null;
 // 再生中に 300 ms ごとに sink-input を採取し、それが ci_null (既定 sink) の index に繋がったかを記録する
+// pactl list short sink-inputs の列 (PulseAudio 16.1 実測): index / sink / client / driver / spec (state 列は無い)
 function watchSinkInputs(sinkIdx) {
   const seen = new Map();
   const iv = setInterval(() => {
     for (const l of pactl("list", "short", "sink-inputs").split("\n").filter(Boolean)) {
       const c = l.split("\t");
-      seen.set(l, { sink: c[1], spec: c[4], state: c[5] });
+      seen.set(l, { sink: c[1], spec: c[4] });
     }
   }, 300);
-  return { stop: () => clearInterval(iv), summary: () => { const rows = [...seen.values()]; return { seen: rows.length > 0, on_ci_null: rows.some((r) => r.sink === sinkIdx), specs: [...new Set(rows.map((r) => r.spec))], states: [...new Set(rows.map((r) => r.state))] }; } };
+  return { stop: () => clearInterval(iv), summary: () => { const rows = [...seen.values()]; return { seen: rows.length > 0, on_ci_null: rows.some((r) => r.sink === sinkIdx), specs: [...new Set(rows.map((r) => r.spec))] }; } };
 }
 const underrunFree = (r) => r.stats.underruns === 0 && r.stats.silence_frames === 0;
 const sineOk = (r) => r.verify?.sine && r.verify.sine.max_abs_err < 1e-5 && r.verify.sine.zero_runs_ge16 === 0;
@@ -50,30 +51,34 @@ const loadStart = os.loadavg(), tStart = Date.now();
 const sinkBefore = ciNull();
 const results = [];
 let failed = 0, probe = null;
+// 初回のシナリオは withFirefox の page で開く (navigate は 1 回だけ。run.mjs の first と同じ扱い)
 await withFirefox({ root: path.join(here, "../build/web"), page: "index.html?" + SCEN[0].q }, async (ff) => {
+  let first = true;
   for (const sc of SCEN) {
     const watch = watchSinkInputs(sinkBefore?.[0]);
     let r = null, err = null;
-    try { await ff.navigate("index.html?" + sc.q); r = await ff.eval("window.__done"); } catch (e) { err = String(e); }
+    try { if (!first) await ff.navigate("index.html?" + sc.q); r = await ff.eval("window.__done"); } catch (e) { err = String(e); }
+    first = false;
     watch.stop();
+    const conn = watch.summary();
     let ok = false, msg = err ?? "";
     if (r) {
       const rateOk = r.ctx?.sampleRate === sc.sr;
-      ok = !r.aborted && underrunFree(r) && !!sineOk(r) && rateOk && (r.workletErrors ?? []).length === 0;
-      msg = `underruns=${r.stats.underruns} silence=${r.stats.silence_frames}f sine maxErr=${r.verify?.sine?.max_abs_err?.toExponential(2)} zeroRuns=${r.verify?.sine?.zero_runs_ge16} ctx.sampleRate=${r.ctx?.sampleRate}(want ${sc.sr})`;
+      ok = !r.aborted && underrunFree(r) && !!sineOk(r) && rateOk && (r.workletErrors ?? []).length === 0 && conn.on_ci_null;
+      msg = `underruns=${r.stats.underruns} silence=${r.stats.silence_frames}f sine maxErr=${r.verify?.sine?.max_abs_err?.toExponential(2)} zeroRuns=${r.verify?.sine?.zero_runs_ge16} ctx.sampleRate=${r.ctx?.sampleRate}(want ${sc.sr}) sink-input on ci_null=${conn.on_ci_null}`;
     }
     if (!ok) failed++;
     const s = r?.stats ?? {};
-    results.push({ name: sc.name, sr: sc.sr, query: sc.q, ok, msg, error: err, pulse_sink_input: watch.summary(),
+    results.push({ name: sc.name, sr: sc.sr, query: sc.q, ok, msg, error: err, pulse_sink_input: conn,
       ctx: r?.ctx ?? null, burst: s.burst_obs ?? null, T: s.T ?? null, clock_hz: r?.clock?.rate_hz ?? null, underruns: s.underruns ?? null,
       silence_frames: s.silence_frames ?? null, cb_count: s.cb_count ?? null, result: r });
     console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(24)} ${msg}${err ? " ERR " + err : ""}`);
-    console.log(`       burst=${s.burst_obs ?? "-"} T=${s.T ?? "-"} clock=${r?.clock?.rate_hz?.toFixed(1) ?? "-"}Hz sink-input on ci_null=${watch.summary().on_ci_null} specs=${JSON.stringify(watch.summary().specs)}`);
+    console.log(`       burst=${s.burst_obs ?? "-"} T=${s.T ?? "-"} clock=${r?.clock?.rate_hz?.toFixed(1) ?? "-"}Hz sink-input on ci_null=${conn.on_ci_null} specs=${JSON.stringify(conn.specs)}`);
   }
   probe = await ff.eval(PROBE);
 });
 const out = { browser: "firefox", rep, secs, extra, date: new Date().toISOString(), load_start: loadStart, load_end: os.loadavg(), nproc: os.cpus().length,
-  wall_s: (Date.now() - tStart) / 1000, pulse: { default_sink: pactl("get-default-sink").trim(), ci_null_before: sinkBefore }, probe, results };
+  wall_s: (Date.now() - tStart) / 1000, pulse: { default_sink: pactl("get-default-sink").trim(), ci_null_before: sinkBefore }, probe, results, failed, rc: failed ? 1 : 0 };
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, JSON.stringify(out, null, 1));
 console.log(`probe: ${JSON.stringify(probe)}`);

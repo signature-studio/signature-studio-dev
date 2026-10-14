@@ -13,12 +13,13 @@ for (const f of files) {
     rows.get(k).runs.push({ ...r, rep: d.rep });
   }
 }
-console.log("| browser | sampleRate | シナリオ | n | PASS | burst (f) | T (f) | clock (Hz) | underruns | sink-input が ci_null に繋がった |");
-console.log("|---|---|---|---|---|---|---|---|---|---|");
+console.log("| browser | sampleRate | シナリオ | n | PASS | underruns | burst (f) | T (f) | clock (Hz) | baseLatency (s) | outputLatency (s) | sink-input が ci_null に接続 | sink-input の規格 |");
+console.log("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
 for (const { browser, sr, name, runs } of rows.values()) {
   const pass = runs.filter((x) => x.ok).length;
   const conn = runs.filter((x) => x.pulse_sink_input?.on_ci_null).length;
-  console.log(`| ${browser} | ${sr} | ${name} | ${runs.length} | ${pass}/${runs.length} | ${range(runs.map((x) => x.burst))} | ${range(runs.map((x) => x.T))} | ${range(runs.map((x) => (x.clock_hz == null ? null : Math.round(x.clock_hz))))} | ${range(runs.map((x) => x.underruns))} | ${conn}/${runs.length} |`);
+  const specs = [...new Set(runs.flatMap((x) => x.pulse_sink_input?.specs ?? []))].join(", ");
+  console.log(`| ${browser} | ${sr} | ${name} | ${runs.length} | ${pass}/${runs.length} | ${range(runs.map((x) => x.underruns))} | ${range(runs.map((x) => x.burst))} | ${range(runs.map((x) => x.T))} | ${range(runs.map((x) => (x.clock_hz == null ? null : Math.round(x.clock_hz))))} | ${range(runs.map((x) => x.ctx?.baseLatency))} | ${range(runs.map((x) => x.ctx?.outputLatency))} | ${conn}/${runs.length} | ${specs} |`);
 }
 for (const f of files) {
   const d = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));

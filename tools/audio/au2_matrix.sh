@@ -2,6 +2,7 @@
 # AU-2 (#187) 行列: Firefox × PulseAudio null-sink × {48k, 96k} を n 回測る (AU-23 #2540)。
 # PulseAudio の既定 sink を ci_null にし、Firefox の出力をその sink へ流す。結果は results/au2/firefox_r<rep>.json、集計は au2_summary.mjs。
 # 使い方: bash tools/audio/au2_matrix.sh [n=3]    終了コード 0 = 全 rep の全条件 PASS
+# PASS = underrun 0・sine 一致・ctx.sampleRate 一致・worklet エラー 0 に加え、sink-input が既定 sink (ci_null) に接続したこと
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 N="${1:-3}"
