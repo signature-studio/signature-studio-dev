@@ -670,11 +670,12 @@ export class Engine {
       } else if (reason === "unknown" && c.unknown === 0) {
         pick = { art: baseArt(n), np: "unknown" };
       } else if (reason === "artifact" && c.artifact === 0) {
-        // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。
-        const stop = isStopReport(snap.bot_report[String(n)]?.head ?? "");
+        // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。報告が無い (古い保存値) は新しい素材なし。
+        const rep = snap.bot_report[String(n)];
+        const stop = isStopReport(rep?.head ?? "");
         const extra = stop ? neededArts(n, input).filter((a) => !prevNames.includes(a)) : [];
         if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
-        else note = stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
+        else note = !rep || stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
       } else {
         note = `oc:no-pr ${reason} 再投入済み`;
       }
