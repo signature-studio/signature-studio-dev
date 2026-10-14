@@ -3,7 +3,7 @@
 ## 14f. L1 復元 pass の前後 census の再計算とネガコン (#1009)
 
 - 再計算: `python3 l1_recompute.py <PE> <raw.ll> <outdir>` (`authstub/`)。raw lift を base 修復した IR (pass 無し = 脱落状態 `raw_base.ll`) と、その上に `liftlib.passes.l1_restore.restore_l1` を適用した IR (pass 有り `raw_l1.ll`) を作り、両方に `l1_census.py` を実行する。数え方の定義は §13b。
-- 照合 (fail-closed・不一致で SystemExit): pass 無しは `dec_label_pc_1800c2ef4` 無し・被覆 0・直接 call 0・入口 edge 0。pass 有りは block 有り・直接 call 1・入口 edge 1 以上。機械語側 3 指標は両者で一致する。両 IR を `llvm-as-18` で検査する。
+- 照合 (fail-closed・不一致で SystemExit): pass 無しは `dec_label_pc_1800c2ef4` 無し・被覆 0・直接 call 0・入口 edge 0。pass 有りは block 有り・直接 call 1・入口 edge 1 以上。機械語側 3 指標 (直接 call sites・edx 即値・入口 edge) は PE だけから計算されるため、両者で同値になるのが構造上当然である。`l1_recompute.py` はこの同値のみを照合し、期待値 (sites=1・edx_const=1・into=1) は照合しない。両 IR を `llvm-as-18` で検査する。
 - ネガコン: (a) pass 無し (`raw_base.ll`) が脱落状態そのもの。pass を外すと復元された辺・block・被覆が消える。(b) 同じ IR に pass を 2 回適用すると `二重適用` で SystemExit (スクリプト内で確認)。
 
 ### 再現
@@ -22,6 +22,7 @@ python3 l1_recompute.py ../../work/Serum2_win64.vst3 work/lift/authstub.drc.ll w
 - e2e cold (`work/` 削除後・`TMPDIR=$RUNNER_TEMP`・開始時 load 0.27): rc 0・real **35.3 s**・**23/23 PASS**。pass は e2e チェーンに入っていないため、不変確認である。
 - `l1_recompute.py` (同 lift): rc 0・real 2.8 s・`l1_recompute OK`。二重適用は `0x1800c2ef4 ブロックが既に存在する (二重適用)` で SystemExit。
 - 出力 IR sha256 先頭 16 桁: `raw_base.ll` `3523d0400d43ec2a`・`raw_l1.ll` `67c9af539303f7f9`。
+- 差分 0 の証跡 (WORKFLOW §6): `git diff 054a94b5 HEAD -- tools/targets/serum2/license/authstub/*.py tools/liftlib tools/targets/serum2/license/authstub/e2e.sh` の出力は 0 行 (HEAD = `5ed692f6` 時点で確認。以降の commit は本文書のみ)。
 
 census (`l1_census.py` の 10 指標を再計算した値):
 
@@ -38,7 +39,7 @@ census (`l1_census.py` の 10 指標を再計算した値):
 | IR: br/switch の入口 edge | 0 | 1 |
 | IR: block `dec_label_pc_1800c2ef4` | 不在 | 存在 |
 
-- 機械語側 3 指標は両列で同値。pass が変えるのは IR 側の行だけである。
+- 機械語側 3 指標は PE 由来のため両列で同値になる (pass は機械語側を変えない。この列の一致は検証の根拠ではない)。pass が変えるのは IR 側の行だけである。
 - 注: 本表の pass 有り列は §14e の `raw_l1` 列 (store 込み) と同じ値である。`raw_base` 列は §13b の脱落状態と同じ値である。
 
 ### 未解決
