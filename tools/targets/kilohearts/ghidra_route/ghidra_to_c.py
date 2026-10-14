@@ -128,6 +128,7 @@ def main():
     # --- 前方宣言 (Ghidra の定義シグネチャから)
     protos = []
     bodies = []
+    abi_hits = {}
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
@@ -151,12 +152,18 @@ def main():
         if 'stackpair' in fixes:
             t = re.sub(r'\blonglong lStack_e8;\n\s*longlong lStack_e0;', 'longlong lStk[2];', t)
             t = t.replace('&lStack_e8', 'lStk').replace('lStack_e8', 'lStk[0]').replace('lStack_e0', 'lStk[1]')
+        from patches import ABI
+        for nm, rx, rp in ABI.get(name, []):
+            t, k = re.subn(rx, rp, t)
+            abi_hits[nm] = abi_hits.get(nm, 0) + k
         m = re.search(r'^([\w \*]+?)\s*\n?\s*FUN_%x\((.*?)\)\s*\n\s*\{' % va, t, re.S | re.M)
         if not m:
             m = re.search(r'^([\w \*]+?)\s+FUN_%x\((.*?)\)\s*\{?' % va, t, re.S | re.M)
         assert m, 'signature not found %x' % va
         protos.append('%s FUN_%x(%s);' % (m.group(1).strip(), va, ' '.join(m.group(2).split())))
         bodies.append(t)
+    for nm, _, _ in ABI.get(name, []):
+        assert abi_hits.get(nm) == 1, 'ABI rule hit %s: %s' % (abi_hits.get(nm), nm)
     for va, s in STUB.items():
         if ('FUN_%x' % va) in alltxt:
             protos.append(s.split('{')[0].strip() + ';')
