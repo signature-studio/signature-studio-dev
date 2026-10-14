@@ -171,10 +171,11 @@ class DecodeSites(unittest.TestCase):
         self.assertFalse(decode_sites.ord_ok(items))
 
     def test_callee_blocks_between_sites_are_positive(self):
-        # 呼び出し元 block (B 1801c0b6c) の C.0 の後に呼び出し先 block (B 1801c0b71・C.0) が挟まり、戻った後に C.1 が続く
-        # (実データと同じ形: B は 33 bit、site は下位 32 bit)
+        # 呼び出し元 block (B 1801c0b6c) の C.0 の後に呼び出し先 block (B 1801c0b71・C.0・J.1) が挟まり、戻った後に C.1 が続く
+        # (実データと同じ形: B は 33 bit、site は下位 32 bit。旧 ord 判定は戻りを扱えず NG になる)
         seq = [0x1801c0b6c, (1 << 62) | (2 << 56) | 0x801c0b6c,
                0x1801c0b71, (1 << 62) | (2 << 56) | 0x801c0b71,
+               (1 << 62) | (1 << 56) | (1 << 40) | (1 << 39) | 0x801c0b71,
                (1 << 62) | (2 << 56) | (1 << 40) | 0x801c0b6c]
         items = [decode_sites.decode(v) for v in decode_sites.vals([hex(v) for v in seq])]
         self.assertTrue(decode_sites.ord_ok(items))
