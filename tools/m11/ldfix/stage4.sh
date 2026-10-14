@@ -14,7 +14,7 @@ mkdir -p "$W/obj" "$W/tmp" "$S4"
 export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 export TMPDIR="$W/tmp"
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0} ${S4_EXTRA_CF:-}"
 
 # 署名 header (m11_post.py と同一規約: IR の define 署名から C prototype を生成)
 python3 - "$IR" "$W/boot_final3_sigs.h" <<'PYEOF'
