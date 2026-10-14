@@ -4,14 +4,14 @@
 
 結論: `M11_XMM_ARGS=1` で、xmm を読む callee 49 件のうち **34 件** を IR 署名へ復元した。残り 15 件は、呼出し側の引数個数が署名と違うため検査で skip する (検査を外すと 49 件すべてが復元され、作業中の版では 9 unit が ok→trap になった: 表 3)。pass 全体の arity 不一致は 46 件で、そのうち 31 件は placeholder が無く、検査が無くても元々対象外。0 詰め 48 引数は 48 件すべて未復元 (実値への置換 0 件、表 4)。survey は既定・opt-in とも基準と unit 別 942 本で差 0。既定は OFF のまま。
 
-測定 commit: `98c2183` (コード変更の最終 commit)。`git diff 98c2183 HEAD -- tools/m11/m11_build.sh tools/plugins/lift/passes/fix_xmm_args.py` は空 (差分 0)。以後の変更は本 REPORT と `tools/m11/m11_xmm_stats.sh` (新規、測定対象の外) のみ。
+測定 commit: 表 1 (survey・build) は `98c2183` (build と arity 検査のコードの最終 commit)。表 2・表 3 (検査なし)・表 4 は `1817d54a` (`tools/m11/m11_xmm_stats.sh` の最終 commit。`fix_xmm_args.py` と `m11_build.sh` は 98c2183 と同一)。98c2183 以後の commit は `5c12d6a8` (本 REPORT と DOC_MAP の行の追加)・`cad8f038` (`m11_xmm_stats.sh` の追加)・`c2e80f07` (本 REPORT の改訂)・`1817d54a` (表 4 の 0 件行の出力)・本 REPORT の最終改訂 (REPORT と DOC_MAP の行のみ)。差分 (検証時の HEAD): `git diff 98c2183 HEAD -- tools/m11/m11_build.sh tools/plugins/lift/passes/fix_xmm_args.py` は空、`git diff 1817d54a HEAD -- tools/m11/m11_build.sh tools/plugins/lift/passes/fix_xmm_args.py tools/m11/m11_xmm_stats.sh` も空 (どちらも差分 0)。
 
 ## 測定条件
 
 - IR: `$ARTIFACTS_DIR/work-m11` の `tools/m11/work/boot_final.ll` (生成 commit 不明)。`m11_cond.py --bind` の指紋 `69c774de…`。ir_conditions は ldfix=applied / ld108=applied を手で記録した。**#1430 の `7e149974` 全再生成 IR とは別物**で、基準 872/23/46/1 とは比較しない。
 - PE: fl-win64 `extracted/block00031_PE.bin` (sha256 `b2c64da4…`、本 REPORT の再実行でも一致を確認)。
 - 表 1 (survey・build): `m11_build.sh` (増分) → `m11_survey.mjs` (`M11_SURVEY_UNITS` で unit 別 JSON)。load 0.80。survey 値は 98c2183 時点の測定値で、本 REPORT の再実行では再測定していない。
-- 表 2・表 4・表 3 の検査なし行: `tools/m11/m11_xmm_stats.sh` を HEAD (`5c12d6a8`、上記の対象コードは 98c2183 と同一) で再実行。load 0.35、72 秒 (1 回)。
+- 表 2・表 4・表 3 の検査なし行: `tools/m11/m11_xmm_stats.sh` を `1817d54a` で再実行 (`git archive` で repo 外の scratch に展開し、`work-m11` の `boot_final.ll` と fl-win64 の PE を置いた)。load 0.43、54 秒 (1 回)。数値は表 2・表 3・表 4 と一致。
 - `m11_e2e.sh` は未実行。boot5 の中間物が snapshot に無く RetDec の再 lift が入るため、1 run に収まらない。増分 build と survey で代替した。
 
 ## 表 1: 基準と復元版 (同一 IR, 98c2183)
@@ -77,12 +77,12 @@ arity 検査の内訳: 検査を外した版 (表 3 の「検査なし」) で p
 
 | 数値 | 再現コマンド |
 |---|---|
-| 表 1 survey・build | `M11_XMM_ARGS=0 bash tools/m11/m11_build.sh` → `M11_SURVEY_UNITS=<既定 JSON> node tools/m11/m11_survey.mjs`。`M11_XMM_ARGS=1` の同じ 2 本を別 JSON に出し、`cmp` で unit 別 JSON を比べる (差 0 が基準)。 |
-| 表 2・表 4・表 3「検査なし」 | `bash tools/m11/m11_xmm_stats.sh` (前提: `work/boot_final.ll` と `PE=$FL_WIN64_DIR/extracted/block00031_PE.bin`。出力 `work/xmm_stats/`。stdout の `[表2]` `[表3]` `[arity]` `[0詰め48]` が上記の数値) |
+| 表 1 survey・build | `cd tools/m11 && M11_XMM_ARGS=0 bash m11_build.sh && M11_SURVEY_UNITS=work/survey_xmm0.json node m11_survey.mjs` と、`M11_XMM_ARGS=1` の同じ 2 本 (出力は `work/survey_xmm1.json`)。`cmp work/survey_xmm0.json work/survey_xmm1.json` の差 0 が基準。emsdk (`/opt/emsdk`) と work-m11 の IR が要る。 |
+| 表 2・表 4・表 3「検査なし」 | `bash tools/m11/m11_xmm_stats.sh` (前提: `work/boot_final.ll` と `PE=$FL_WIN64_DIR/extracted/block00031_PE.bin`。出力 `work/xmm_stats/`。stdout の `[表2]` `[表3]` `[arity]` `[0詰め48]` が上記の数値。表 4 の fixed 0 も行として出る) |
 | 表 2 の 78 / 検査前の作業中の版 | 78 は `work/xmm_stats/xa_report.json` の `callsite_zero_args`。検査前の版は非再現 (表 3 の注) |
 | 40c1d0 の呼出し個数 | `grep -c 'call [^@]*@function_40c1d0(' work/boot_final.ll` (68)、`grep -c 'call i64 @function_40c1d0(i128 ' work/boot_final.ll` (65)、`grep -c 'call i64 @function_40c1d0()' work/boot_final.ll` (3) |
 | PE の同一性 | `tar --zstd -xOf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block00031_PE.bin \| sha256sum` → `b2c64da4…` |
-| 測定 commit からの差分 0 | `git diff 98c2183 HEAD -- tools/m11/m11_build.sh tools/plugins/lift/passes/fix_xmm_args.py` (出力なし) |
+| 測定 commit からの差分 0 | 表 1: `git diff 98c2183 HEAD -- tools/m11/m11_build.sh tools/plugins/lift/passes/fix_xmm_args.py` / 表 2・3・4: `git diff 1817d54a HEAD -- tools/m11/m11_build.sh tools/plugins/lift/passes/fix_xmm_args.py tools/m11/m11_xmm_stats.sh` (どちらも出力なし) |
 
 ## PLUG_XMMARG 経路
 
@@ -99,10 +99,10 @@ arity 検査の内訳: 検査を外した版 (表 3 の「検査なし」) で p
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | arity 不一致で skip した 15 callee の xmm 復元 (placeholder の `i128` 引数を xmm 値へ置換する) | 0 詰め 48 引数のうち 9 引数 (3 callee)。skip 15 callee の xmm 呼出し実値は 0.0 のまま | [M11-N154] #2762 (子) |
-| arity 不一致のうち placeholder の無い 31 callee | 検査が無くても元々対象外 (#2762 の範囲外) | PM agent の判断待ち: 起票先 |
-| slot_occupied の 0 詰め 39 引数 (12 callee) | IR に当該 xmm 位置の整数引数が既にあり、本 pass は復元しない | PM agent の判断待ち: 起票先 |
-| 検査前の退行 4 unit (146・153・184・190) | `function_40c1d0` を外しても退行が残る。原因未特定 | PM agent の判断待ち: 起票先 |
+| arity 不一致のうち placeholder の無い 31 callee | 検査が無くても元々対象外 (#2762 の範囲外) | PM agent の判断待ち: placeholder 無しの 31 callee を追う issue を起票するか・既定案: 起票しない (現状の skip を維持) |
+| slot_occupied の 0 詰め 39 引数 (12 callee) | IR に当該 xmm 位置の整数引数が既にあり、本 pass は復元しない | PM agent の判断待ち: slot_occupied の 0 詰めを扱う issue を起票するか・既定案: 起票しない (現状の 0 詰めを維持) |
+| 検査前の退行 4 unit (146・153・184・190) | `function_40c1d0` を外しても退行が残る。原因未特定 (検査前の作業中の版のみ。本 PR の版は退行 0) | PM agent の判断待ち: 原因未特定の 4 unit を追う issue を起票するか・既定案: 起票しない (#2762 で 15 callee を復元する時に同じ 4 unit を再測定する) |
 | 既定を ON にするか | 既定 OFF のまま。ON の survey は差 0 だが、KPI 向上は未測定 | PM agent の判断待ち: 既定を ON にするか・既定案: OFF (現状どおり) |
-| PLUG_XMMARG=1 経路 (f2 §9.2) の arity 検査後の件数 | §9.2 は検査前の件数。検査後は未測定 | PM agent の判断待ち: 起票先 |
+| PLUG_XMMARG=1 経路 (f2 §9.2) の arity 検査後の件数 | §9.2 は検査前の件数。検査後は未測定 | PM agent の判断待ち: 検査後の件数を測るか・既定案: f2 の次回測定で測る (本 PR では測らない) |
 | 基準 JSON (`7e149974` の全再生成) の unit 別再測定、1,172→1,185 の原因 commit、7 カテゴリ | 本 REPORT は work-m11 IR 上の A/B のみ | #1479 (既存) |
 | `m11_e2e.sh` の実行 / build の n≥3 の min–max | boot5 の再 lift が要る / 単発値のみ | 次 run |
