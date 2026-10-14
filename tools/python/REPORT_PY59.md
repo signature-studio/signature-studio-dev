@@ -55,3 +55,30 @@
 | `0xdd2002`・`0xec7bb8`・`0xec6098` の型名 (クラス名) と vtable | 幅不一致の確定 (受入条件 1・2) | #1974 (PY-59・残り) |
 | `0xec53b0` の `this` が単一グローバルか、複数インスタンスか | 同一構造体かどうかの確定 | #1974 (PY-59・残り) |
 | `REPORT_PY50.md` の未確定表の更新 | 受入条件 2 | #1974 (PY-59・残り) |
+
+## 6. 追加の測定 (2 回目 run)
+
+- 測定 commit: `ec02f804` (新規 `tools/python/analysis/py59_refs.py` を追加した commit)。
+  - 前回の測定 commit `2f115b91` からの差分: `git diff --stat 2f115b91 ec02f804 -- tools/python` は 18 ファイル・916 行追加 (main 取り込み分 py54・py58 等を含む)。
+  - PY-59 の実行コードは変わっていない: `git diff 2f115b91 HEAD -- tools/python/analysis/py59_func.py tools/python/analysis/py59_callers.py` の出力は 0 行。
+  - `py59_refs.py` は `git log --oneline -- tools/python/analysis/py59_refs.py` で `ec02f804` のみ (初登場)。
+- 新規スクリプト `tools/python/analysis/py59_refs.py <PE.bin> <VA>...` は `.pdata` の関数単位で逆アセンブルし、rip 相対で指定 VA を参照する命令を列挙する。実測 33.6 秒 (`.text` 全体)。
+- global slot `0x16baaf0` (`0xebf558` で `0xec53b0` の `this` として読む) を rip 相対で参照する箇所は 13 件 (`0xebf51e`・`0xebf528`・`0xebf53f`・`0xebf54b`・`0xebf558`・`0xebf584`・`0xebf58e`・`0xebf7b2`・`0xebf7bb`・`0xebfb04`・`0xebfb12`・`0xec652e`・`0xec6537`)。
+  - 直接の書込みは `0xebf7bb`・`0xec6537` の `mov qword [slot], 0` の 2 箇所のみ。
+  - `0xebf53f` は `lea rdx, [slot]` で slot の**アドレス**を `0x11c8950` に渡す。slot の実体はこの呼出し先で間接的に書かれうるため、「非 0 を入れる命令は無い」とは言えない。`0x11c8950` の中身は未確認。
+- `0xdd1fde` の `call 0x410320` は vtable 呼出しの thunk: `mov rax, rcx` の後 `dl>=0` のとき `call qword [rax-0x30]` を行い、戻り値を `this` にする。thunk の先頭アドレスから型は導けない。
+- RTTI の型名文字列 (`.?AV...`) は本 binary に見当たらない (`grep -a` で 0 件)。型名は vtable の直接参照を辿る必要がある。
+- 以上により、受入条件 1 (型名・vtable) は未達のまま。残りは「global slot の実体を入れる生成元の特定」と「`[obj+0]` に vtable を書く生成関数の特定」。
+
+## 7. 追加の測定 (3 回目 run)
+
+- 測定 commit: `ab13d73d` (作業 base = origin/main。解析スクリプトは変更していない)。`git diff ec02f804 HEAD -- tools/python/analysis/py59_func.py tools/python/analysis/py59_callers.py tools/python/analysis/py59_refs.py` の出力は 0 行。
+- 素材: `fl-win64.tar.zst` → `tools/python/work/py59/extracted/block00031_PE.bin` (`$ARTIFACTS_DIR` で実在確認後に展開)。
+- `0xe39e2f`・`0xe39e5d`・`0xe39e8b`・`0xe39eb9` の 4 箇所 (`0xdd1fa0` の呼び出し元。`0xe39d50..0xe3a086` の関数内) は、第 1 引数 `rcx` を `[rip+disp]` の slot から読む。読出し先 VA は `0xdd26a0`・`0xbd2e10`・`0xde9450`・`0xdf12c0` (逆アセンブルの rip 計算値)。
+  - この VA はいずれも `.text` (raw `0x9d1aa0`・`0x7d2210`・`0x9e8850`・`0x9f06c0`) で、データ slot ではない。値は code 相当のバイト列で、型を示す vtable として読めない。rip 計算が誤っている可能性を含め未確定。
+- 呼び出し元の引数割当 (`0xe39e0b` 付近): 第 1 引数 `rcx` (`this`) = `[rip+disp]` の値、第 3 引数 `r8` = `[[rip+disp]]` (参照元 slot `0x15e30f8`・`.data`)、第 4 引数 `r9` = 呼び出し元の rcx。`0x15e30f8` は `this` の供給元ではない。
+- 注意: `this` の読出し先 (`0xdd26a0` 等) が `.text` を指す点は、rip 計算か逆アセンブルの同期 (関数途中からの復号) のどちらかの誤りの可能性がある。未確定。
+- `0x16baaf0` (§6 の global slot) は `.bss` (raw 0・zero-init)。ファイル内の初期値は 0 で、非 0 の値は起動後に入る。
+- `0x11c8950` は引数を `0x86a470` へ転送するだけ (`0x86a470..0x86a601`)。`0x11c8950` が slot の実体を入れるとは確認できなかった。
+- `0xec7bb8` の関数 `0xec7840..0xec7d68` は、`+0x7f4` の配列 (`[[rcx+0x7f4]+8][i]`) と `+0x7e4`・`+0x7fc` を読む。`+0x79c` の書込みは `0xec7bb8` 1 箇所 (§1 と一致)。vtable (`[this+0]`) の読出しは関数内に無い。
+- 結論: 3 箇所の型名と vtable は本 run でも未同定。受入条件 1・2 は未達のまま。残りは「`0xdd1fa0` の呼び出し元 4 種の slot を実 VA で正しく読み直す」と「`0xec7840` の `this` を生成する関数の特定」。

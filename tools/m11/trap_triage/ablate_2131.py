@@ -20,18 +20,24 @@ VARIANTS = {
     'no9b4b00': lambda s: replace1(s, '    case 0x9b4b00: return tr_9b4b00;', '    case 0x9b4b00: return 0;'),
     # 両方外す
     'no41c130_9b4b00': lambda s: replace1(replace1(s, '    case 0x41c130: return tr_41c130;', '    case 0x41c130: return 0;'), '    case 0x9b4b00: return tr_9b4b00;', '    case 0x9b4b00: return 0;'),
+    # 4 要素を同時に外す: 41c130・9b4b00 の disp、413060 の gate、410360 の vcall (M11_NOVCALL=1 は env で渡す)
+    'all_off': lambda s: replace1(replace1(replace1(s, '    case 0x41c130: return tr_41c130;', '    case 0x41c130: return 0;'), '    case 0x9b4b00: return tr_9b4b00;', '    case 0x9b4b00: return 0;'), '#if M11_OV_CLASSCREATE || M11_OV_413060\n/* function_413060', '#if M11_OV_413060\n/* function_413060'),
+    # 410360 の C 版の戻り値だけを 0 にする (vcall・disp は ON のまま)
+    'ret0_410360': lambda s: replace1(s, '    m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);\n    return inst;', '    m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);\n    return 0;'),
 }
+ENV_EXTRA = {'all_off': {'M11_NOVCALL': '1'}}
 only = sys.argv[3].split(',') if len(sys.argv) > 3 else list(VARIANTS)
 try:
     for tag in only:
         open(SRC, 'w').write(VARIANTS[tag](src0))
         ov = os.path.join(TOOL, 'work', 'obj', 'ov.o')
         if os.path.exists(ov): os.remove(ov)
-        b = subprocess.run(['bash', 'm11_build.sh'], cwd=TOOL, env=env0, capture_output=True, text=True, timeout=400)
+        envv = dict(env0, **ENV_EXTRA.get(tag, {}))
+        b = subprocess.run(['bash', 'm11_build.sh'], cwd=TOOL, env=envv, capture_output=True, text=True, timeout=400)
         if b.returncode != 0:
             print(tag, 'BUILD FAIL', b.stdout[-200:], b.stderr[-200:], flush=True); continue
         out = os.path.join(OUT, tag + '.json')
-        s = subprocess.run(['node', 'trap_triage/survey_units.mjs', out], cwd=TOOL, env=dict(env0, SV_RAW='1'), capture_output=True, text=True, timeout=400)
+        s = subprocess.run(['node', 'trap_triage/survey_units.mjs', out], cwd=TOOL, env=dict(envv, SV_RAW='1'), capture_output=True, text=True, timeout=400)
         line = [l for l in s.stdout.splitlines() if 'SURVEY_UNITS' in l]
         rows = {r['unit']: r for r in json.load(open(out))}
         print(tag, line[-1] if line else 'NO SUMMARY', 'unit190=' + str(rows[190]['kind']), flush=True)

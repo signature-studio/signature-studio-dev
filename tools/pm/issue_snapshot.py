@@ -5,7 +5,8 @@
 分類のための素材だけを集める。判定は launch_issues.py が行う。
   issues   : open issue (PR を除く) の number/title/labels/body/created/updated/milestone/dependencies summary
   prs      : 全 PR (open+closed+merged) の number/state/merged/head ref/body 先頭/title
-  bot_last : issue ごとの『最後の bot コメント』(時刻と先頭 400 文字)。直近の実行報告の有無を見る
+  bot_last : issue ごとの『最後の bot コメント』(時刻と先頭 400 文字)。直近の実行報告の有無を見る。
+             run-outcome・PM のマーカーを含むコメントは停止報告ではないので入れない (bot_last_of)
   runs     : 実行中・待機中の run (event, title, created)
 """
 import os
@@ -14,6 +15,23 @@ import json, re, subprocess, sys
 R = "signature-studio/signature-studio-dev"
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "issues_state.json")
 BOTS = {"opencode-for-signature-studio[bot]"}
+MARKERS = ("<!-- oc-run-outcome:", "<!-- oc-pm-")
+
+
+def bot_last_of(comments):
+    """コメント列から issue ごとの最後の bot コメントを返す。マーカー付きのコメントは除く。"""
+    bot_last = {}
+    for c in comments:
+        if c["user"]["login"] not in BOTS:
+            continue
+        body = c.get("body") or ""
+        if any(m in body for m in MARKERS):
+            continue
+        n = int(c["issue_url"].rsplit("/", 1)[1])
+        if n not in bot_last or c["created_at"] > bot_last[n]["at"]:
+            am = re.search(r"^\s*`?(oc_artifacts:[^\n`]*)`?\s*$", body, re.M)
+            bot_last[n] = {"at": c["created_at"], "head": body[:400], "art": am.group(1).strip() if am else None}
+    return bot_last
 
 
 def api(path, paginate=True):
@@ -46,15 +64,11 @@ def main():
             "ref": p["head"]["ref"], "title": p["title"], "body": (p.get("body") or "")[:3000]} for p in prs_raw]
     # 直近 2 日のコメントから、issue ごとの最後の bot コメントを取る
     comments = api(f"repos/{R}/issues/comments?since=2026-10-12T00:00:00Z&per_page=100")
-    bot_last = {}
+    bot_last = bot_last_of(comments)
     pm_art = {}  # PM (pycabbage) が過去の /oc コメントに書いた oc_artifacts の最後の行
     for c in comments:
         n = int(c["issue_url"].rsplit("/", 1)[1])
-        if c["user"]["login"] in BOTS:
-            if n not in bot_last or c["created_at"] > bot_last[n]["at"]:
-                am = re.search(r"^\s*`?(oc_artifacts:[^\n`]*)`?\s*$", c.get("body") or "", re.M)
-                bot_last[n] = {"at": c["created_at"], "head": (c.get("body") or "")[:400], "art": am.group(1).strip() if am else None}
-        elif c["user"]["login"] == "pycabbage":
+        if c["user"]["login"] == "pycabbage":
             m = re.search(r"^oc_artifacts:[^\n]*$", c.get("body") or "", re.M)
             if m and (n not in pm_art or c["created_at"] > pm_art[n]["at"]):
                 pm_art[n] = {"at": c["created_at"], "line": m.group(0)}
