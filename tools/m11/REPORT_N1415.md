@@ -67,7 +67,7 @@
 ## 6. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (b) 旧 build (`d6a17b64`) → HEAD で ok 861 → 868 (+7, ldfix 有り基準) の二分探索の残り。§8: 862→866 は `f39a9e3b` (PR #706 merge, #682 の 47b260 転記) 付近、866→868 は単調でなく `3bdae05d` (PR #1316 merge) 付近 | 過去数値の解釈 | #2163 ([M11-N142]) |
+| (b) `d6a17b64` (ok 861) → `4c3f7458` (ok 868) の個別測定 (+7, ldfix 有り基準) の二分探索の残り。§8: 862→866 は `f39a9e3b` (PR #706 merge, #682 の 47b260 転記) 付近、866→868 は単調でなく `3bdae05d` (PR #1316 merge) 付近 | 過去数値の解釈 | #2163 ([M11-N142]) |
 | (d) `m11_e2e.sh` 既定経路の再通し: `functions_dll.csv` (Ghidra 12.1.4 headless・約 10 分) の作成と、e2e 全体の実測 | 受入 (e2e 検証) | #1598 ([M11-N104]) |
 | (解決) ldfix1 と snapshot の `ldfxc` 差 54 件 → `b5eeb322` (#736) で生じると §3-2 で特定 | — | #1739 で完了 |
 | `159d9fc0` (R8) が snapshot IR の alloca 54 件 → 2,408 件を生む件の survey 影響の実測 (ok/trap が変わるか) | R8 の採否 | #132 (R8 の起票元) |
@@ -88,7 +88,50 @@ python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408
 ## 8. #1597 (M11-N103) の二分結果: ok 862→866・866→868 の変化点 (#2163)
 - 測定の条件: 各 commit で `git archive <commit> tools/m11 tools/shim tools/shared tools/m6` を展開し、work-m11 の lift 中間物 (`boot0..6.lift.ll`) と `m11_image.bin` だけ外から置く。`M11_LDFIX=1 bash m11_gen_ir2.sh` → `m11_data_gen.py` → `m11_image_gen.py` → `M11_QSTORE=0 bash m11_build.sh` → `node m11_survey.mjs`。`FL_WIN64_DIR` は fl-win64 の PE 1 member。`m11_data.c` と `m11_image.bin` は commit ごとに作り直す (`m11_e2e.sh` と同じ順)。
 - 環境: 4 vCPU。Node v22.23.3。1 commit の測定は gen 18〜83 秒・build 13〜51 秒・survey 8〜31 秒 (2〜4 並列で実行したため、時間は並列数で変わる)。load average は直列測定時 0.66 (`uptime`)、並列時は未記録。
-- 測定 commit (本 PR の起点): `6444b186` (main)。HEAD までのコード差分: `git diff 6444b186 HEAD -- tools/m11 tools/shim tools/shared` は空。
+- 測定 commit (本 PR の起点): `6444b186` (main)。現 head `75016a1c` は未再測定。`75016a1c` で測定範囲にコード差分があるため、`6444b186` の測定値は現 head の値として扱わない。
+- 鮮度の証跡 (検証起点 `6444b186` → 現 head `75016a1c`): `git diff --stat 6444b186 HEAD -- tools/m11 tools/shim tools/shared tools/m6` の出力は空ではなく、次のとおり。
+  ```
+  $ git diff --stat 6444b186 HEAD -- tools/m11 tools/shim tools/shared tools/m6
+   tools/m11/REPORT_N1415.md                          |   89 +-
+   tools/m11/ldfix/REPORT_2141.md                     |   69 +
+   tools/m11/ldfix/REPORT_2143.md                     |  124 ++
+   tools/m11/ldfix/REPORT_2144.md                     |   72 +
+   tools/m11/ldfix/REPORT_2186.md                     |   88 ++
+   tools/m11/ldfix/audit_frame_store_verdict.py       |   84 +
+   tools/m11/ldfix/audit_lsf_ssa_e2e.sh               |   29 +-
+   tools/m11/ldfix/audit_undefload_dest.py            |   21 +-
+   tools/m11/ldfix/repro_2143.sh                      |   93 ++
+   tools/m11/ldfix/results/audit_undefload_2141_old.json | 1635 ++++++++++++++++++++
+   tools/m11/ldfix/results/audit_undefload_dest_2141.json | 186 +++
+   tools/m11/ldfix/results/audit_undefload_dest_2144.json | 190 +++
+   tools/m11/ldfix/results/audit_undefload_dest_2186.json | 190 +++
+   tools/m11/ldfix/results/audit_undefload_dest_2186_b0to4.json | 190 +++
+   tools/m11/ldfix/results/audit_undefload_dest_2186_wm11.json | 190 +++
+   tools/m11/ldfix/results/audit_undefload_union_2141.json | 157 ++
+   tools/m11/ldfix/results/frame_store_verdict_2144.json | 416 +++++
+   tools/m11/ldfix/results/ldfix_report_2186.json     | 1087 +++++++++++++
+   tools/m11/ldfix/results/spill178_1161.tsv          | 179 +++
+   tools/m11/ldfix/spill_classify_1161.py             |   74 +
+   tools/m11/m11_build.sh                             |   13 +-
+   tools/m11/m11_ov.c                                 |   17 +
+   tools/m11/m11_post.py                              |    7 +-
+   tools/m11/m11_rt.c                                 |   20 +
+   tools/m11/shimx_link/probe_trace_unit.mjs          |   24 +
+   tools/m11/shimx_link/probe_unit23.mjs              |    8 +-
+   tools/m11/trap_triage/REPORT_1463.md               |   11 +
+   tools/m11/trap_triage/REPORT_1676.md               |   15 +
+   tools/m11/trap_triage/REPORT_1952.md               |   75 +
+   tools/m11/trap_triage/REPORT_882.md                |   49 +-
+   tools/m11/trap_triage/REPORT_882_APPENDIX.md       |   89 ++
+   tools/m11/trap_triage/REPORT_APPENDIX_1274.md      |   15 +
+   tools/m11/trap_triage/probe1676_u114.mjs           |    2 +-
+   tools/m11/trap_triage/repro_1952_rt_mech.sh        |   65 +
+   tools/shared/REPORT_APPENDIX.md                    |    1 +
+   35 files changed, 5502 insertions(+), 72 deletions(-)
+  ```
+  - 測定に効くのは `m11_build.sh`・`m11_ov.c`・`m11_rt.c`・`m11_post.py` の差分 (生成 IR と build に入る)。HEAD の ok 値は、これらを含む commit で再測定するまで未確定。
+  - `c613a4ea` (本節の REPORT 追記 commit) は `6444b186` の子孫で、その差分は `tools/m11/REPORT_N1415.md` の +49 行のみ (コードは変えていない)。`75016a1c` は `origin/main` (`f4c37e6a`) の取り込み merge で、`c613a4ea` の子孫。上の差分のコードは main 側の commit 由来。
+  - 測定対象の範囲にある差分 0 の測定済み commit は無い (`3bdae05d` からでも 208 files の差分、`4c3f7458` からでも 117 files)。よって §6 の基準 (差分 0 の commit で測り直す) は満たせない。素材 `work-m11` が runner に無く、この run では再測定もできない。
 
 ### 8-1. 変化点の特定 (survey, n=1 を基本。再現確認は下記)
 | commit | 内容 | ok | trap | miss |
@@ -122,7 +165,7 @@ first-parent で `e07cc83f`〜`3bdae05d` を測った (merge 単位、各 n=1)�
 | `b6e4eb42` | Merge PR #1261 (882-m11-oob-95-895-recheck-8bc34ed9) | 867 | 27 | 47 |
 | `35c3425b` | Merge PR #1326 (1134-ldfix-root-cause) | 867 | 27 | 47 |
 | `3bdae05d` | Merge PR #1316 (1096-m11-enumdisplaymonitors-callback) | **868** | 26 | 47 |
-| `6444b186` (HEAD) | — | **868** | 26 | 47 |
+| `6444b186` (測定 commit。現 head `75016a1c` の値ではない) | — | **868** | 26 | 47 |
 
 - first-parent 上の code 変更 commit の列: `e07cc83f`(866) → `2c77e8b0`(867) → (途中 14 件は未測定。902f1132・b6e4eb42 は 867 と測定済み) → `35c3425b`(867) → `3bdae05d`(868)。`e07cc83f`→`2c77e8b0` の間に code 変更 commit は無いので、**866→867 の変化点は `2c77e8b0` の merge の差分**。`35c3425b`→`3bdae05d` の間は code 変更 commit が `3bdae05d` の 1 件だけなので、**867→868 の変化点は `3bdae05d`**。
 - `8bc34ed9` (866) は `e07cc83f` (866) の祖先で、`b6e4eb42` (867) の枝にも含まれる。merge 単位の表は祖先関係どおりに並べていないため、時系列の単調性は主張しない。`b6e4eb42` (867) の内部で 867 を起こす commit は未分解。
