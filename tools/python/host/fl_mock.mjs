@@ -14,6 +14,7 @@ export function createMockEngine() {
   const st = {
     tempo: 130,
     playing: false,
+    changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -92,6 +93,9 @@ export function createMockEngine() {
     },
     // PY-41 (#1514): stub midi.CT_Sampler = 0 / CT_GenPlug = 2 を plugin 名で決める (C と同一・Hybrid 等は未モデル)
     "channels.getChannelType": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).plugin === "Sampler" ? 0 : 2; },
+    // PY-89 (#2805): C と同一。identity (全 channel が 1 グループ)・既定 -2 (未割当)
+    "channels.getChannelIndex": (...a) => { arity(a, 1, 1); const i = ix(a[0]); ch(i); return i; },
+    "channels.getChannelMidiInPort": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return -2; },
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
     // PE 0xd5afc0 → 0x11e84a0: 対象だけ選択し他は解除 (useGlobalIndex は未モデル・C と同じ)
@@ -158,6 +162,11 @@ export function createMockEngine() {
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
     // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
     "general.getVersion": (...a) => { arity(a, 0, 0); return st.scriptingVersion ?? 1; },
+    // PY-87 (#2738): 状態 1 つを返すだけの 4 関数。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "general.getChangedFlag": (...a) => { arity(a, 0, 0); return st.changedFlag; },
+    "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
+    "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
+    "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },

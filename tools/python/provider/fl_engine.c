@@ -36,6 +36,7 @@ static int sel_chan;
 static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"Resonance", 0.2}, {"Gain", 0.8}};
 static double pvals[3];
 #define NPARAM 3
+static int changed_flag, use_metronome, precount, rec_ppq;
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -62,6 +63,7 @@ void fl_engine_reset(void) {
     win[0] = win[2] = win[4] = 1;
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
+    changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
     dev_port = 0; midi_out_n = 0; sel_chan = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -107,6 +109,9 @@ FL_H(channels, channelNumber) {
 }
 /* 型定数 (stub midi.CT_*): Sampler = 0、生成プラグイン = CT_GenPlug 2。Hybrid 1・Layer 3・AudioClip 4・AutoClip 5 は mock に無いため未モデル */
 FL_H(channels, getChannelType) { CH(0); return fl_ret_i(c, strcmp(k->plugin, "Sampler") == 0 ? 0 : 2); }
+/* PY-89 (#2805): getChannelIndex は全 channel を 1 グループとみなして identity (PE 0xd5bd60 は 0..nch-1 の範囲検査)。getChannelMidiInPort は既定 -2 (未割当・PE 0xfe976e の初期化)。設定経路は公開 API に無いため状態は持たない。useGlobalIndex は未モデル */
+FL_H(channels, getChannelIndex) { CH(0); return fl_ret_i(c, _i); }
+FL_H(channels, getChannelMidiInPort) { CH(0); (void)A_INT(1, 0); return fl_ret_i(c, -2); }
 FL_H(channels, selectChannel) { CH(0); int64_t v = A_INT(1, -1); k->sel = TOG(k->sel, v); return fl_ret_none(c); }
 FL_H(channels, deselectAll) { for (int i = 0; i < nch; i++) ch[i].sel = 0; return fl_ret_none(c); }
 /* PE 0xd5afc0 → 0xd5af30 → 0x11e84a0: 範囲外は -4 (Index out of range)、他 channel の選択を解除して対象だけ選ぶ。未モデル: useGlobalIndex・前提ゲート 0xd5af58・選択 gating 0xffac20 (REPORT_PY69) */
@@ -206,6 +211,11 @@ FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
+/* PY-87 (#2738): PE 0xd69800/0xd69820/0xd69840/0xd69330 は状態 1 つを読んで変換スロット 0x15e4280 に渡すだけ。値は未実測の仮置き (REPORT_PY87) */
+FL_H(general, getChangedFlag) { NARGS(0, 0); return fl_ret_i(c, changed_flag); }
+FL_H(general, getUseMetronome) { NARGS(0, 0); return fl_ret_b(c, use_metronome); }
+FL_H(general, getPrecount) { NARGS(0, 0); return fl_ret_b(c, precount); }
+FL_H(general, getRecPPQ) { NARGS(0, 0); return fl_ret_i(c, rec_ppq); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }

@@ -215,7 +215,7 @@ sig.review?.state === "CHANGES_REQUESTED" && sig.review.needs && !answeredAfter(
   - ラベル `oc:stuck` の open PR → 件数だけ (緊急の天井の判定に使う。番号・題名は書かない)
 - 出力 (rolling issue): 題名 `[CI-n] 自律運転ダイジェスト (rolling)` の open issue を検索し、**本文を更新**する。無ければ 1 件起票する (n は既存の最大 + 1。起票の直前に同じ題名の open issue が 0 件であることを確かめる)。本文は件数の表だけにし、個票 (issue・PR の題名や本文) は書かない。この issue は launch の対象から外れる (Worker の classify と `tools/pm/launch_issues.py` が題名で除く)。PM はこの issue に `/oc` を書かない。
 - コメントは緊急のときだけ、かつ 1 日 1 件まで。投稿先は rolling issue (本文を更新するのと同じ issue)。緊急は次の 1 つだけ: stuck の天井 (oc:stuck の open PR が STUCK_HIGH (既定 40) を超えた。観測元は上の `oc:stuck` の open PR の件数)。Worker の停止の兆候と率制限の alert は、本 run の入力に無いので緊急に数えない (digest の run は Worker が送るため、Worker が止まっている間は起きず、PM からは観測できない)。直近 24 時間に `<!-- oc-pm-digest-alert -->` のコメントが既にあれば書かない。緊急コメントは判断ではないので decision マーカーは付けず、`<!-- oc-pm-digest-alert -->` だけを付ける。
-- 周期: 24 時間ごと (Worker が送る)。digest の作業は判断ではないので decision マーカーは残さない。
+- 周期: 24 時間ごと (Worker が送る)。launch が 30 分止まったときも、Worker は digest を 1 回送る (#2795)。停止の理由は本 run の入力に無いので、通常どおり集計だけを行う。digest の作業は判断ではないので decision マーカーは残さない。
 
 `supply`・`retro` の節は本書に無い。後続 issue ([CI-71] など) が節を足す。
 

@@ -1,6 +1,6 @@
 # PY-73 付録 (#2817 / PY-93): `0x11d1430` のゲート参照鎖・T の書込み元・vptr・vtable 先
 
-親: `tools/python/REPORT_PY73.md` §9 (要点)。本文の行数上限 (250 行) のため分割。
+親: `tools/python/REPORT_PY73.md` §8-4 (要点)。本文の行数上限 (250 行) のため分割。
 前段: `tools/python/REPORT_PY73.md` §2・§8-3。対象: midiNoteOn の状態ゲート述語 `0x11d1430` と本体 `0x10002a0`。
 
 ## 測定

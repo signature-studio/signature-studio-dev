@@ -18,7 +18,7 @@ import sys
 src, dst, p0c = sys.argv[1:4]
 t = open(src).read()
 a = "sys.path.insert(0, os.path.join(HERE, '..', '..', 'p0c'))"
-b = ("                    elif any(c != len(plist) for c in arity.get(fname, ())):\n"
+b = ("                    elif any(c != len(plist) for c in arity.get(fname, ())) and (fname in NO_CONV or not conv_ok(xs, len(plist), argsites.get(fname, []))):\n"
      "                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d)' % (\n"
      "                            ','.join(str(c) for c in sorted(arity[fname])), len(plist))\n")
 assert t.count(a) == 1 and t.count(b) == 1

@@ -38,7 +38,11 @@ static void* alloc_with_header(size_t bytes, int zeroInit) {
 }
 
 static int block_ok(void* user) {
-    if (!user) return 0;
+    /* ヘッダ [user - sizeof(hdr), user) が wasm linear memory の内に収まるかを先に確かめる。
+     * 範囲外の値 (例: u16 の文字列値) を読むと wasm が OOB trap する (LD-132 / #2802) */
+    uint64_t u = (uintptr_t)user;
+    uint64_t mem = (uint64_t)__builtin_wasm_memory_size(0) * 65536u;
+    if (!user || u < sizeof(ShimMemHdr) || u > mem) return 0;
     ShimMemHdr* hdr = (ShimMemHdr*)raw_of(user);
     return hdr->magic == SHIM_HEAP_MAGIC;
 }

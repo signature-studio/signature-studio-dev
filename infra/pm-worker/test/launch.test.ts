@@ -2,7 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ALLOW_ARTS,
+  addArts,
+  bodyArtLine,
   buildLaunchBody,
+  defaultArtLine,
   inferArtifacts,
   lowAllowance,
   noPrCooldownMs,
@@ -220,4 +223,65 @@ test("選定: relaunch は room を使う。room を超える relaunch も全件
 
 test("allowlist は infer が返す全素材名を含む", () => {
   assert.ok(ALLOW_ARTS.includes("work-m6-ott"));
+});
+
+test("本文の素材行 (#2758): 検証済みの 1 行にする。allowlist 外の名前は落とす", () => {
+  assert.equal(bodyArtLine("説明\noc_artifacts: fl-win64 evil-thing work-m11\n"), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(bodyArtLine("説明\noc_artifacts: evil\n"), null);
+});
+
+test("本文の素材行 (#2758): 最後の行を使い、前の行には戻らない", () => {
+  assert.equal(bodyArtLine("oc_artifacts: fl-win64\noc_artifacts: work-m11\n"), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(bodyArtLine("oc_artifacts: fl-win64\noc_artifacts: evil\n"), null);
+});
+
+test("本文の素材行 (#2758): fl-win64 が無ければ先頭に補い、重複は除く (addArts と揃える)", () => {
+  assert.equal(bodyArtLine("oc_artifacts: plugins-ott\n"), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal(bodyArtLine("oc_artifacts: work-m11 work-m11\n"), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(bodyArtLine("oc_artifacts: fl-win64 fl-win64\n"), "oc_artifacts: fl-win64");
+});
+
+test("本文の素材行 (#2758): none は単独の行のときだけ有効。混在は none を落とす", () => {
+  assert.equal(bodyArtLine("oc_artifacts: none\n"), "oc_artifacts: none");
+  assert.equal(bodyArtLine("oc_artifacts: none fl-win64\n"), "oc_artifacts: fl-win64");
+});
+
+test("本文の素材行 (#2758): 先頭 4000 字の外の行は見ない", () => {
+  assert.equal(bodyArtLine("x".repeat(4000) + "\noc_artifacts: fl-win64\n"), null);
+  assert.equal(bodyArtLine("x".repeat(3900) + "\noc_artifacts: fl-win64\n"), "oc_artifacts: fl-win64");
+});
+
+test("本文の素材行 (#2758): バッククォートで囲んだ行と CRLF の本文を読む", () => {
+  assert.equal(bodyArtLine("`oc_artifacts: fl-win64 work-m11`"), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(bodyArtLine("a\r\noc_artifacts: fl-win64\r\n"), "oc_artifacts: fl-win64");
+});
+
+test("本文の素材行 (#2758): 行の途中に出る語や自然文は素材行にしない", () => {
+  assert.equal(bodyArtLine("必要なし (実機採取のため ...)"), null);
+  assert.equal(bodyArtLine("素材は oc_artifacts: fl-win64 を参照"), null);
+  assert.equal(bodyArtLine(""), null);
+});
+
+test("素材行の既定 (#2758): PM の行 → 本文の行 → 推定の順。無効な行は飛ばす", () => {
+  assert.equal(defaultArtLine("oc_artifacts: fl-win64 plugins-ott", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal(defaultArtLine("oc_artifacts: evil", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(defaultArtLine(null, "oc_artifacts: none", "[CI-1] t", []), "oc_artifacts: none");
+  assert.equal(defaultArtLine(undefined, null, "[SR-1] serum", []), inferArtifacts("[SR-1] serum", []));
+});
+
+test("本文の素材行 (#2758): 字数の境界をまたぐ末尾の行は採らない (改行で終わる行だけ見る)", () => {
+  assert.equal(bodyArtLine("x".repeat(3975) + "\noc_artifacts: fl-win64 plugins-ott"), null);
+  assert.equal(bodyArtLine("x".repeat(3900) + "\noc_artifacts: fl-win64 work-m11\n" + "y".repeat(200)), "oc_artifacts: fl-win64 work-m11");
+});
+
+test("素材行へ足す (#2758): none は外し、fl-win64 を先頭に補う。足すものが無ければ null", () => {
+  assert.equal(addArts("oc_artifacts: none", ["plugins-serum2"]), "oc_artifacts: fl-win64 plugins-serum2");
+  assert.equal(addArts("oc_artifacts: plugins-ott", ["plugins-serum2"]), "oc_artifacts: fl-win64 plugins-ott plugins-serum2");
+  assert.equal(addArts("oc_artifacts: fl-win64 work-m11", ["work-m11", "plugins-serum2"]), "oc_artifacts: fl-win64 work-m11 plugins-serum2");
+  assert.equal(addArts("oc_artifacts: none", []), null);
+  assert.equal(addArts("oc_artifacts: fl-win64", ["fl-win64"]), null);
+  assert.equal(addArts("oc_artifacts: fl-win64", ["evil-thing"]), null);
+  assert.equal(addArts("oc_artifacts: none", ["fl-win64"]), "oc_artifacts: fl-win64", "none の後に fl-win64 を足すと 1 件だけ入る (二重にしない)");
+  assert.equal(addArts("oc_artifacts: plugins-ott", ["fl-win64"]), "oc_artifacts: fl-win64 plugins-ott", "fl-win64 が base に無く extra にあっても二重にしない");
+  assert.equal(addArts("oc_artifacts: plugins-ott", ["fl-win64", "plugins-serum2", "fl-win64"]), "oc_artifacts: fl-win64 plugins-ott plugins-serum2");
 });
