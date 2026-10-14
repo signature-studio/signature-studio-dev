@@ -83,7 +83,7 @@ dec_label_pc_8c5ef5_g699:
 
 ## 7. 修復案の試験 (未コミット・work 内のみ)
 
-- 試験 A: `boot_final3.ll` の `_t` だけを次に置換した (元の IR は `/home/runner/work/_temp/2579_boot_final3.orig.ll` に退避し、試験後に `cmp` で一致を確認して戻した)。
+- 試験 A: `boot_final3.ll` の `_t` だけを次に置換した (元の IR は `$RUNNER_TEMP` に退避し、試験後に `cmp` で一致を確認して戻した)。
 
 ```
 dec_label_pc_8c5ef5_g699_t:
