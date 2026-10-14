@@ -166,8 +166,13 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | `p0c_e2e.sh` (lift 込み・k80 80 kernel) | 0 | 514 s | 0.70 → 7.86 |
 | `p0c2_e2e.sh` | 0 | 50 s | 7.86 → 3.98 |
 
-k80 lift 単体 (`PLUG_CANON_ALLOCA=1`) の所要時間: **未測定 (条件不明)**。測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が残っておらず、単独の時間値は採用しない。
-- 再測定不可: 修正時点の runner には `toolchain-retdec` ([RETDEC]) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
+k80 lift 単体 (`PLUG_CANON_ALLOCA=1`) の旧所要時間: **未測定 (条件不明)** (測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が無い)。下記の再測定 (HEAD `b38ff403`) の値とは別扱い。
+- **再測定 (HEAD `b38ff403`・測定 commit 以降の差分分)**: `$ARTIFACTS_DIR` に `toolchain-retdec` があり、`/opt/retdec/bin/retdec-decompiler` は展開アーカイブと sha256 一致 (`9d49ffcf...`)。両 opt-in 変数 (`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`) は未設定、`PLUG_CANON_ALLOCA=1` のみで `lift_ranges.sh` を 1 回実行 (ranges 80 件は `kernel_table.py` から生成し直し)。
+  - rc = 0 / 所要 2 s (秒精度) / `/proc/loadavg` 1 分値 0.52 → 0.52 (開始・終了時)
+  - RetDec 実行の確認: `PLUG_REUSE_DRC` 未設定。`k80.retdec.log` に phase 出力 (最終 `cleanup` 1.76 s)。所要 2 s は RetDec を 80 range・`--select-decode-only` で走らせた実時間。
+  - `k80.lift.ll` sha256 = `628fa71edeca59318c75e48287cc09e108b09894240b12b34393d64b80ac3b6f` (**一致**)
+  - 参考: `k80.drc.ll` sha256 = `b760d51a94f6fa7496b211360b1415576bdc8e12f397345b42d32a11d49e9c52` (受入 2' は未達のまま。#1560)
+- 再測定不可 (履歴。HEAD `9d943df3` 時点の記録): 修正時点の runner には `toolchain-retdec` ([RETDEC]) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
 - 再試行 (fix モード, HEAD `9d943df3`): `$ARTIFACTS_DIR` は `fl-win64` のみ。`[RETDEC]` の実体が無いため RetDec 段を実行できず、k80 lift を再実行していない (rc・所要・load・sha256 は未取得)。`oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に追記し、次回の run で再測定する。
 - 一致判定 (受入条件 2・3) は lift の sha256 と `p0c2_sweep.csv` の `cmp` で行い、所要時間には依存しない。
 
@@ -184,4 +189,4 @@ k80 lift 単体 (`PLUG_CANON_ALLOCA=1`) の所要時間: **未測定 (条件不�
 
 既定 (両変数未設定) の経路は、bash で展開を確認し引数・出力とも変わらないと判断した。`p0c_e2e.sh` は両変数を設定しない。`lift_ranges.sh` は `bash -n` を通る。
 
-これは「差分 0」ではない。`WORKFLOW.md` §6 に従えば再測定が必要だが、`toolchain-retdec` が無く実施できなかった。したがって §17 の実測 (lift 514 s / p0c2 50 s) は `d5959204` 時点の値であり、HEAD `e86c5ac8` 以降の再測定は未実施。PM 判断: `oc_artifacts: fl-win64 toolchain-retdec` で再実行するか、既定経路の等価性で受け入れるか。
+これは「差分 0」ではない。`WORKFLOW.md` §6 に従い、差分分 (k80 lift が通る `lift_ranges.sh`) を HEAD `b38ff403` で再測定した (上記「再測定」行。`k80.lift.ll` sha256 一致)。§17 の lift 514 s / p0c2 50 s は `d5959204` 時点の値。p0c2 は `k80.lift.ll` の sha256 一致により同一入力とみなし、再実行していない。
