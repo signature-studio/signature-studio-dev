@@ -1,7 +1,8 @@
 # signature-studio-pm (PM Worker)
 
 PM の launch / watchdog を、VM のポーリング (systemd timer) から **webhook 駆動 + Cron / alarm** の Cloudflare Worker に移す (#1751)。
-この PR の範囲は **dry-run まで** (GitHub へは書き込まない)。投稿の有効化と VM timer の停止は PM の判断 (後述)。
+既定は **dry-run** (GitHub へは書き込まない)。書き込みの有効化と VM timer の停止は PM の判断 (後述)。
+書き込みは経路ごとに独立したスイッチを持つ: launch の `/oc` コメント投稿 = `LIVE_LAUNCH`、`repository_dispatch` (`oc-watchdog`) の送信 = `LIVE_DISPATCH` (#2417)。
 
 ## 構成
 
@@ -9,18 +10,29 @@ PM の launch / watchdog を、VM のポーリング (systemd timer) から **we
 |---|---|
 | `POST /webhook` | GitHub App の webhook。`X-Hub-Signature-256` を HMAC-SHA256 (定数時間) で検証してから状態に反映する。対象: `issues` `issue_comment` `issue_dependencies` `pull_request` `pull_request_review` `workflow_run` |
 | Durable Object `PmDO` (SQLite) | issue / PR / run / 最後の bot 報告 / blocked_by / launch 時刻を保持。App の鍵は AES-GCM で封じて保管 |
-| alarm (webhook の 2 秒後 / 毎分) と Cron Trigger (毎分) | `tick`: 同期 (6 時間ごとに full、5 分ごとに reconcile)・`repository_dispatch` (`oc-watchdog`、5 分周期)・launch |
+| alarm (webhook の 2 秒後 / 毎分) と Cron Trigger (毎分) | `tick`: 同期 (6 時間ごとに full、5 分ごとに reconcile)・`repository_dispatch` (`oc-watchdog`、前回の送信から 5 分未満は送らない。`LIVE_DISPATCH`)・launch (`LIVE_LAUNCH`) |
 | `GET /setup` `GET /setup/callback` | GitHub App `oc-pm-for-signature-studio` の manifest flow (org 所有)。`/setup` は無認証だが、期限内 (1 時間) の state があれば上書きせず同じ state を返す。state は org 所有の App への変換に成功したときだけ消費する |
-| `GET /status` | 集計のみ (実行中 run 数・ready/blocked 数・最終 reconcile 時刻・モード)。`?detail=1` は repo の push 権限を持つ GitHub token (Bearer) が必要 |
+| `GET /status` | 集計のみ (実行中 run 数・ready/blocked 数・最終 reconcile 時刻・モード)。`mode_launch` / `mode_dispatch` が経路ごとのモード (`live` / `dry-run`)。`mode` は両方 `live` のときだけ `live` (片方だけなら `partial`、どちらもなら `dry-run`。`tools/pm/pm_gate.sh` は `mode=live` を『VM の command を止めてよい』と読む)。`?detail=1` は repo の push 権限を持つ GitHub token (Bearer) が必要 |
 
 launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出力 (固定 JSON を Python 版と TS 版の両方で読む突き合わせテスト: `test/classify.test.ts`)。差分は次の 4 点で、いずれも issue 本文を解析しない。
 
 1. blocked_by の一覧が不明な issue は着手しない。
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
 3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。cooldown (既定 3 時間) の間は着手せず、過ぎたら再着手する (3 回まで。超えたら stopped)。`oc:stuck` は人の判断待ち。
-4. 同期が 15 分以上止まっている間は投稿しない。
+4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
 
 `/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。
+
+## 同期の窓と打ち切り
+
+- 全体同期 (6 時間ごと) と reconcile (5 分ごと) は、GitHub の一覧を `per_page=100` のページで読む。`Gh.list` は、上限ページで止めて続きがあるときだけ `truncated=true` を返す
+  (上限ちょうどで読み尽くしたときは、次の 1 ページを読んで空 (または窓の外だけ) なら `false`)。
+- コメントは `sort=created&direction=desc` で**新しい順**に読み、`created_at` が窓より古いコメントに達したら止める。窓は全体同期で `COMMENT_WINDOW_H` 時間 (既定 24。24 未満は 24)、
+  reconcile は `reconcileAt - 2 分`。ページ上限は `COMMENT_MAX_PAGES` (既定 80 = 8,000 件。`wrangler.toml` の値は実測に合わせて引き上げてある)。
+  状態に使うコメント (bot と PM) 以外は本文を持たない。`botLast` / `pmArt` / `launchedAt` は適用の順序に依らず `created_at` (同時刻は comment id) が最新のものになる。
+- PR は全体同期で open を全件・closed を `sort=updated&direction=desc` で窓の中だけ読む (`state=all` の全件は PR の増加で上限を超える)。reconcile も起点より古い更新で止める。
+- 打ち切った一覧は `meta.syncTruncated` (対象名・読んだページ数・時刻。本文・題名は入れない) に残し、1 件でもあれば `fresh=false`。同じ一覧を次に読んで打ち切りが無ければ自動で消える。
+  打ち切ったときは『一覧に無い』ことを根拠にした close / completed 扱い (issue・PR・run) をしない。`/status` は `sync_truncated` と `last_full_sync_rest_calls` (全体同期の REST 回数。うちコメントは `last_full_sync_comment_rest_calls`) を出す。
 
 ## ファイル構成
 
@@ -51,7 +63,7 @@ wrangler login --device --browser=false
 ```
 
 表示された URL (`https://dash.cloudflare.com/oauth2/device`) を手元のブラウザで開き、表示されたコードを入力して **Allow** を押す (コードの有効期限は 5 分。切れたら再実行)。
-ログインする Cloudflare のメンバーには、後述の **Workers の Admin** (Workers product スコープ) が要る。デプロイ後に PM が `wrangler logout` する (OAuth token の失効と保存済み資格情報の削除)。新規 API token は作らない。
+ログインする Cloudflare のメンバーには、後述の **Workers の Admin** (Workers product スコープ) が要る。デプロイ後も `wrangler logout` はしない。保存された OAuth を VM に残し、以後の再デプロイに PM が使う (PM 判断 2026-10-14、#2357。手順は後述の「再デプロイ」)。新規 API token は作らない。
 
 ### 必要な Cloudflare の権限
 
@@ -61,7 +73,7 @@ wrangler login --device --browser=false
 - `Editor` で足りるのは**既存 Worker** の更新: script・settings・schedules (cron)・versions・deployments・`wrangler secret put` まで。作成と削除はできない。2 回目以降の deploy と `STORE_KEY` の更新は `Editor` でよい。
 - Durable Object には別の権限は無い。DO を実装する Worker への Workers ロールで決まる (<https://developers.cloudflare.com/workers/authorization/durable-objects/>)。
 - 旧名との対応: `Workers Scripts: Edit` = `Editor`、旧 `Workers Admin` (改名後 `Workers Platform Admin`) = `Admin` (Developer Platform スコープ)。旧名の対応表は上の Workers ページの『Legacy Workers permissions』、改名は <https://developers.cloudflare.com/changelog/post/2025-06-16-workers-platform-admin-role/>。
-- 補足: `wrangler login` の OAuth は、粒度の細かい権限 (granular authorization) に未対応と公式にある (<https://developers.cloudflare.com/workers/authorization/>)。OAuth で Worker を作れるかどうかは、ログインしたメンバー自身のロール (Workers の Admin か、アカウントの Administrator 等) で決まる。API token は『platform-level の権限を持てない』ので使う場合は Workers product スコープで付ける。この手順は新規 token を作らず OAuth を使う。
+- 補足: `wrangler login` の OAuth は、粒度の細かい権限 (granular authorization) に未対応と公式にある (<https://developers.cloudflare.com/workers/authorization/>)。OAuth で Worker を作れるかどうかは、ログインしたメンバー自身のロール (Workers の Admin か、アカウントの Administrator 等) で決まる。公式には、API token は『platform-level の権限を持てない』とある。この手順は API token を作らず OAuth だけを使う (指示 4・9)。
 - 未確認 (docs に記載なし): `workers.dev` サブドメインの有効化 (`POST .../subdomain`) と、アカウントに workers.dev のサブドメインが未登録のときの登録に必要な権限。
 
 ```
@@ -74,7 +86,7 @@ npm run metadata > metadata.json                # wrangler.toml と同じ bindin
 ```
 
 `wrangler deploy` でも同じ (`wrangler.toml`)。`STORE_KEY` は `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='` で作り、シェルの履歴・ファイル・ログに残さない。
-`LIVE` は `"0"` (dry-run)。
+`LIVE_LAUNCH` / `LIVE_DISPATCH` はどちらも `"0"` (dry-run)。
 
 ## 依頼者の操作 (1 回、ブラウザ)
 
@@ -87,7 +99,112 @@ App の id・private key・webhook secret は Worker が受け取って暗号化
 
 ## 切替 (PM の判断。この PR では行わない)
 
+スイッチは `wrangler.toml` の `[vars]` にある 2 つ。値は秘密ではない (`wrangler secret` は使わない)。`"1"` だけが live で、それ以外 (`"0"`・`""`・`"true"`・未設定) は dry-run。
+
+| 変数 | 経路 | `wrangler.toml` の既定 |
+|---|---|---|
+| `LIVE_LAUNCH` | launch の `/oc` コメント投稿 (`POST /repos/{o}/{r}/issues/{n}/comments`) | `"0"` |
+| `LIVE_DISPATCH` | `repository_dispatch` の `oc-watchdog` の送信 (`POST /repos/{o}/{r}/dispatches`) | `"0"` |
+| `LIVE` (旧) | 上の 2 つのうち、未設定のほうにだけ効く (両方の既定値) | (置かない) |
+
+個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
+切替は `[vars]` を書き換えて**再デプロイ**する (`cd infra/pm-worker && npx wrangler deploy`。`STORE_KEY` の secret は変わらない)。リポジトリと稼働中の値を一致させるため、書き換えは PR で merge してから、その main でデプロイする。
+
+### A. dispatch (watchdog) だけを先に live にする
+
+`oc-watchdog` の送信は Actions の watchdog job を起こすだけで、VM の `pm-launch.timer` と二重着手にならない (watchdog job は同じ concurrency group `opencode-watchdog` で直列。`cancel-in-progress: false`)。launch は dry-run のまま。
+Worker が送る type は `oc-watchdog` だけ (`src/github.ts` の `DISPATCH_TYPES`)。payload は `{"event_type":"oc-watchdog"}` のみで、`client_payload` を持たない。`oc-fix` (PR 番号・理由・素材名の `client_payload` を検証して送る) は Actions の `watchdog.sh` の仕事で、Worker は送らない。
+
+1. 本 PR を merge する。
+2. `wrangler.toml` の `LIVE_DISPATCH` を `"1"` にして (`LIVE_LAUNCH` は `"0"` のまま)、`npx wrangler deploy --dry-run` で bindings を確かめてから再デプロイする。
+   `GET /status` が `mode_dispatch: "live"`・`mode_launch: "dry-run"`・`mode: "partial"` になる。
+3. Worker 由来の `repository_dispatch` の run が届くことを確認する (VM 由来の actor は `pycabbage`、Worker 由来は `oc-pm-for-signature-studio[bot]`):
+   `gh api "repos/signature-studio/signature-studio-dev/actions/runs?event=repository_dispatch&per_page=10" --jq '.workflow_runs[]|"\(.created_at) \(.display_title) \(.triggering_actor.login)"'`
+   併せて `GET /status` の `counters.dispatched` が増え、`last_watchdog` が 5 分ごとに進むこと。ここまでの間は VM の ping も動いている (どちらかが欠けても watchdog は途切れない)。
+4. VM の `pm-watchdog.timer` を止める: `systemctl --user disable --now pm-watchdog.timer`。
+5. 24 時間後にも watchdog の run が途切れないことを確認する (`display_title` が `watchdog` の run の間隔が 10 分以内であること。送信が重なる期間に、待機中の run が後続の run に置き換わって `cancelled` になるのは正常):
+   ```
+   S=$(date -u -d '24 hours ago' +%FT%TZ)
+   gh api --paginate "repos/signature-studio/signature-studio-dev/actions/runs?event=repository_dispatch&per_page=100&created=%3E%3D$S" \
+     --jq '.workflow_runs[]|select(.display_title=="watchdog")|.created_at' | sort | python3 -c 'import sys,datetime as d; t=[d.datetime.fromisoformat(l.strip().replace("Z","+00:00")) for l in sys.stdin if l.strip()]; g=[(b-a).total_seconds() for a,b in zip(t,t[1:])]; print(len(t),"runs, max gap",max(g),"s")'
+   ```
+
+戻す場合: `pm-watchdog.timer` を `enable --now` で再開し、`LIVE_DISPATCH` を `"0"` にして再デプロイする。
+
+### B. launch を live にする
+
 1. dry-run の出力 (`GET /status?detail=1` の `would_launch_now` と `log`) を、VM の `launch_issues.py plan` と数時間比較する。
-2. 一致したら `LIVE=1` にする。同時に Actions 側の `vars.OC_PM_BOT_LOGIN` に `GET /status` の `pm_bot_login` (`oc-pm-for-signature-studio[bot]`) を設定する (別 issue)。
-3. VM の `pm-launch.timer` と `pm-watchdog.timer` を止める。
-4. 戻す場合: `LIVE=0` にして VM の timer を再開する (VM 版は変更していない)。同期が壊れたら `/status` の `fresh` が false になり、Worker は投稿しない。
+2. 一致したら `LIVE_LAUNCH` を `"1"` にして再デプロイする (A の後なら `mode` が `live` になる)。同時に Actions 側の `vars.OC_PM_BOT_LOGIN` に `GET /status` の `pm_bot_login` (`oc-pm-for-signature-studio[bot]`) を設定する (別 issue)。
+3. VM の `pm-launch.timer` を止める (A を済ませていなければ `pm-watchdog.timer` も)。
+4. 戻す場合: `LIVE_LAUNCH` を `"0"` にして再デプロイし、VM の timer を再開する (VM 版は変更していない)。同期が壊れたら `/status` の `fresh` が false になり、Worker は投稿しない。
+
+## 再デプロイ (PM。VM に残した wrangler の OAuth)
+
+Worker のコード (`src/`・`wrangler.toml`) を変更して main に merge したら、PM が VM から再デプロイする。認証は初回デプロイで保存された OAuth を使う (wrangler が refresh token で access token を自動更新する)。
+Workers Builds は接続しない (後述)。デプロイするのは **main に merge 済みの commit だけ**。以下のコマンドは wrangler 4.151.0 で、`--help` とソース、認証なしで実行できるものは実行して確認した。実 Worker への実行は未確認の項目として最後に列挙する。
+
+1. 認証の確認 (token の値は表示しない・書かない)。
+
+   ```
+   cd infra/pm-worker
+   wrangler whoami --json
+   ```
+
+   終了コード 0・`loggedIn` が `true`・`authType` が `OAuth Token` ならよい。`--json` を付けない `wrangler whoami` は、資格情報が無い環境でも終了コード 0 になる (`--json` は 1。認証なしの環境で確認)。判定には `--json` を使う。
+   `authType` が `OAuth Token` でないときは、環境変数の token が OAuth より優先されている。止めて原因を調べる (この VM に token の環境変数を置かない。指示 4・9)。失敗したら後述の「OAuth が失効したとき」。
+   OAuth の保存先 `~/.config/.wrangler/config/default.toml` は平文で token を含む。中身を表示・commit・コメントに貼らない。
+2. 戻し先の記録。デプロイ前に `wrangler deployments status` を実行し、稼働中の version id を控える (ロールバックの戻し先)。あわせて `curl -fsS "$PM_WORKER_URL/status"` の `mode` `mode_launch` `mode_dispatch` `fresh` `last_tick` を控える (`PM_WORKER_URL` は `tools/pm/README.md` の `pm_gate.sh` と同じ)。
+3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]`) が出る。migration の有無はここでは分からない。
+4. デプロイ: `wrangler deploy --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。
+   - **`[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。** `--keep-vars` なしの既定では、dashboard 等で変えた var は消える (`wrangler deploy --help` の説明)。特に `LIVE_LAUNCH` / `LIVE_DISPATCH`: `wrangler.toml` はどちらも `"0"` (dry-run) なので、dashboard 等で `"1"` にしても再デプロイすると `wrangler.toml` の値で置き換わって dry-run に戻る。切替の手順は「切替」節 (A・B) が正本で、値を変えるときも `wrangler.toml` を変えて merge してから deploy する (正本はリポジトリ)。デプロイ前に手順 2 の `mode` `mode_launch` `mode_dispatch` を見て、意図しない `live` → `dry-run` の変化が出ないことを確かめる。
+   - secret (`STORE_KEY`) は deploy で消えない (ソースで `keepSecrets: true`、`--help` に『secrets are never deleted by deployments』)。`STORE_KEY` を作り直さない (App の鍵が復号できなくなる)。
+   - Durable Object のコードを変えるだけなら migration は要らない (公式: <https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/>)。migration は適用済みの tag を飛ばして、新しい tag の分だけが deploy 時に適用される。現在の `wrangler.toml` は `v1` (`new_sqlite_classes = ["PmDO"]`) だけ。`[[migrations]]` を足す変更は、ロールバックできなくなる境界を作る (後述)。単独の PR・単独のデプロイにする。
+5. 反映の確認。
+   - `wrangler deployments status` に、手順 4 の `--tag` と `--message` を持つ version が 100% で出る。出力の項目 (version id・Created・Tag・Message) はソースで確認した。実 Worker での表示は未確認 (末尾のチェックリスト)。
+   - `curl -fsS "$PM_WORKER_URL/status"` が応答し、`fresh` が `true`、`last_tick` が deploy 後の時刻に進む。
+   - **現状の `/status` には、デプロイされた commit を識別する key が無い** (`src/engine.ts` の `status()`、main 0ca7f8c5)。そのため `/status` だけでは『新しい commit が反映された』と断定できない。上の `deployments status` の Tag / Message と、その commit で `/status` に足した・変えた key が応答に出ることを併せて見る。恒久策は [CI-84] #2416 (`/status` に `build` を載せる)。
+
+## ロールバック
+
+1. 戻し先を決める。`wrangler versions list` (直近 10 件) または `wrangler deployments status` で、手順 4 の Tag / Message から選ぶ。
+2. `wrangler rollback <version-id> --message "<理由>"`。`--message` を付けると確認の prompt が省かれる。version id を省くと『最新の 1 つ前に upload された version』に戻る (公式: <https://developers.cloudflare.com/workers/wrangler/commands/workers/#rollback>)。戻すと新しい deployment ができ、全 route で即座に有効になる。
+3. 「再デプロイ」の手順 5 と同じ確認をする。戻した理由と戻し先の version id を、起点の issue に書く。**main に問題の commit が残ったままだと、次の再デプロイで同じ版がまた出る。** revert の PR を出すか、修正を merge してから再デプロイする。
+
+制約 (公式: <https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/>):
+
+- 戻せるのは直近 100 version まで。
+- **Durable Object のクラス lifecycle の変更 (`[[migrations]]` の追加) を跨いでは戻せない。** 現在の稼働中 version と戻し先の間に migration の追加があると、rollback は拒否される。本 Worker は `v1` 1 件だけなので、`v1` を含む version 同士の rollback は、公式の記述では可能と読める (実機では未実行: 後述 [未確認])。
+- rollback で戻るのはコードだけで、binding の先 (DO の SQLite の保存内容) は戻らない。DO に保存する形式を変える変更は、旧コードが新しい形式を読める (後方互換) ようにしてから出す。公式にも『データの構造が変わると、旧 version のコードでエラーが起きうる』とある。
+- OAuth が失効している間は、`wrangler rollback` も実行できない。dashboard の Workers & Pages → 対象 Worker → Deployments → Rollback でも戻せるが、dashboard へのログインは依頼者の操作になる。
+
+## OAuth が失効したとき
+
+**検知。**
+
+- 再デプロイ・ロールバックの直前の `wrangler whoami --json` が、終了コード 1 で失敗する。OAuth の失効を自動で知らせる経路は無い。Worker は OAuth を使わない (デプロイ操作だけが使う) ので、失効しても Worker は止まらず、Worker 側の監視 (`/status`) にも出ない。
+- Worker 自体の停止は別: `/status` の `fresh=false` または応答なしを watchdog が検知して `[CI] PM Worker 停止` の issue を起票する設計 ([CI-49] #2328)。**この文書の作成時点 (main 0ca7f8c5) で #2328 は open で、`.github/scripts/watchdog.sh` に該当の処理は無い** (`PM Worker 停止` の grep が 0 件)。実装されるまでは、停止も自動では検知されない。
+- wrangler の挙動 (4.151.0 のソースで確認): access token は期限が切れたときだけ refresh token で更新される。refresh が拒否されたとき、TTY が無い・CI の環境では『`Not logged in. Your auth token has expired and could not be refreshed, and the environment is non-interactive.`』で失敗する。TTY のある端末では、ブラウザでの再ログインが自動で始まる。Cloudflare に届かないだけのときは別の理由 (`token-refresh-unreachable`) で、保存済みの資格情報は変更されない。
+- 擬似的な再現: 隔離した設定 dir に、期限切れの access token と無効な refresh token を入れて `CI=1 wrangler whoami` (`--json` の有無を問わず) を実行すると、終了コード 1 で上のメッセージが出た。これは実機の失効 (Cloudflare 側で refresh token が失効した場合) の再現ではない。
+- エラー文は、`CLOUDFLARE_API_TOKEN` を設定する方法も案内する。**この手順では従わない** (token を作らない・設定しない。指示 4・9)。
+
+**失効している間の状態。** 稼働中の Worker は、最後にデプロイしたコードのまま動き続ける (webhook・Cron・alarm・DO は Cloudflare 側で動く)。遅れるのは『コード変更の反映』と『ロールバック』だけ。main に merge した修正は、再認証までデプロイされない。
+
+**対処。** 再認証にはブラウザでの承認が要るので、依頼者の操作になる。
+
+1. 依頼者が VM のシェルで `wrangler login --device --browser=false` を実行する。表示された URL を手元のブラウザで開き、コードを入力して **Allow** を押す (コードの有効期限は 5 分。切れたら再実行)。ログインするメンバーのロールは、既存 Worker の更新だけなら `Editor` で足りる (上の「必要な Cloudflare の権限」)。
+2. 実行後に `wrangler whoami --json` が通ることを確認し、保留していた再デプロイをする。
+3. 依頼者が不在のときは待たない。`needs-user-input` の issue に積む (既定案: 『再認証まで反映を遅らせる』。他の作業は止めない。`docs/WORKFLOW.md` §12)。
+
+## Workers Builds を接続しない理由
+
+Workers Builds (Cloudflare 側に repo を接続し、main への merge で自動ビルド・デプロイする機能) は、既定ではビルド用の API token を Cloudflare がアカウントに**自動で発行**する (公式: <https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token>)。依頼者の指示 4・9 (無断で token を作らない・secrets を平文で保存しない) の趣旨に反しうるため、PM 判断 (2026-10-14、#2357 [CI-78]) で接続しないと決めた。代わりに、上の手順で PM が VM の OAuth を使って再デプロイする。引き換えに、merge から反映までは PM の操作を待ち、OAuth が失効している間は反映できない (稼働中の Worker は止まらない)。依頼者が判断を変えたら、#2357 を再開して判断する。
+
+## 確認できていない点 `[未確認]` のチェックリスト
+
+公式 docs・wrangler のソース・認証なしで実行できるコマンドで確認できなかった点。推測では書かない。実 Worker で確かめたら、結果をここに移して `[未確認]` を外す。
+
+- [ ] `[未確認]` refresh token の有効期間と失効の条件。公式 docs に記載を見つけられなかった (確認した範囲: `wrangler login` のページ、`wrangler auth token` の『automatically refreshed if expired』)。wrangler のソースでは、refresh の応答に新しい refresh token があればそれを保存し、無ければ従来のものを使い続ける。ただし有効期間が固定か、使うたびに延びるか、使わない期間が長いと失効するか、パスワード変更・ロール剥奪・ユーザーによる取り消しで失効するか、`--device` で得た token が通常の `wrangler login` と同じ寿命かは不明。確認の方法: 失効が起きたときの日時と、直前の `wrangler` 実行の日時を issue に記録して比べる。
+- [ ] `[未確認]` 稼働中の script の `migration_tag` が `v1` か。wrangler は deploy 時にこの tag を取得して、`wrangler.toml` の最後の tag と同じなら migration を送らない (ソースで確認)。初回デプロイを REST (`scripts/metadata.mjs`) と `wrangler deploy` のどちらでしたかの記録が無く、tag が付いていなければ wrangler は `v1` を再送する。その場合に、既存の DO namespace に対して Cloudflare がどう応答するかは不明。確認の方法: 最初の再デプロイの出力に migration の適用が出ないこと。出たら止めて、依頼者に報告する。
+- [ ] `[未確認]` `wrangler rollback` を本 Worker (migration は `v1` の 1 件のみ) で実行したときの成否。公式の制約は『lifecycle 変更を跨ぐと不可』で、本 Worker の `v1` 同士なら可と読めるが、実機では未実行。確認の方法: `LIVE_LAUNCH` / `LIVE_DISPATCH` を `"1"` にする前に、最初の再デプロイで 2 つ目の version ができた後、`wrangler rollback <旧 version> --message "rollback test"` で戻し、もう一度 deploy する。
+- [ ] `[未確認]` rollback で `[vars]` (特に `LIVE_LAUNCH` / `LIVE_DISPATCH`) と Cron の schedule が戻し先の version の値に戻るか。公式は『binding の先は変わらない』とだけ書き、`[vars]` と schedule の扱いは書いていない。`LIVE_LAUNCH` または `LIVE_DISPATCH` が `"1"` の運用中に rollback すると、戻し先の値が `"0"` ならその経路が dry-run に戻る (投稿・dispatch が止まる) 恐れがある。確認の方法: 上のテストの後に `GET /status` の `mode_launch` / `mode_dispatch` (と `mode`)、dashboard の Triggers の cron が残っていることを見る。
+- [ ] `[未確認]` `wrangler deployments status` と `wrangler versions list` の実際の出力 (Tag / Message の表示を含む)。項目名はソースで確認した。実 Worker での表示は未確認。

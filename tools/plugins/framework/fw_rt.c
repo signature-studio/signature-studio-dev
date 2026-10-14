@@ -59,9 +59,9 @@ void __icall_dispatch(uint64_t site) {
     long long (*f)(void) = lookup((uint32_t)t);
     if (!f || (t >> 32)) {
         /* CAB-195: host shim 連鎖 (CreatePlugInstance → ctor) では, Delphi framework が
-         * FL 本体 (FLEngine) の **export function table** (image 外 VA, 例 0x710030) を
-         * 経由する経路が到達する (0x40d6e0 → 0x710030 = FL 内部 API の函数ポインタ)。
-         * headless では FL 本体がロードされていないので呼出は不能。
+         * Delphi RTL の例外フック (0x710030 = RaiseException thunk 0x404c00, 0x710038 = RtlUnwind
+         * thunk 0x404c10, 0x710040 = 0x43d940: REPORT_2008 §8) が未初期化 (target 0) のまま呼ばれる。
+         * Phase B は DllMain/InitUnits を通らないので呼出は不能。
          * 連鎖検証を止めないため fail-soft (0 を返し記録) にする。
          * fw_ff ではない (exit しない) ので回復可能。 */
         g_dispatch_cnt++;

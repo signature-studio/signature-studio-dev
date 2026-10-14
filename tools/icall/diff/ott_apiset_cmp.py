@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OTT_vst2_win64.dll の security cookie と api-set 表 (32 × u64) を PE 直読みし、decode 結果を出す。
+"""OTT_vst2_win64.dll の security cookie と api-set 表 (34 × u64) を PE 直読みし、decode 結果を出す。
 
 用法: python3 tools/icall/diff/ott_apiset_cmp.py <OTT_vst2_win64.dll>
 出典: tools/icall/REPORT_APPENDIX_2225.md §2.3・§3 (#2225)。
@@ -18,7 +18,7 @@ import pefile
 
 COOKIE_VA = 0x180260CE0
 APISET_VA = 0x18026C9F0
-N_ENTRY = 32
+N_ENTRY = 34  # CRT 初期化関数 0x1801c43a4 の rep stos 個数 (and ecx,0x22)。ott_crt.c の APISET_N は 32 (REPORT_APPENDIX_2225.md §2.5)
 MASK64 = (1 << 64) - 1
 
 

@@ -2,9 +2,10 @@
 """audit_lsf_disp.py — 「load 値の変位 (disp) の取り違え」の検出信号 (#735 LD-13 / #911 / #1091 LD-33)。
 
 41a670 型: 機械語 `mov rax,[rax]` (rax = argN、変位 0) の値を store しているのに、IR はその store 値を
-`load (argN + c)` (c≠0) から取っている。audit_lsf.py は変位を追跡しないため検出できない (REPORT_911 §6b)。
+`load (argN + c)` (c≠0) から取っている。audit_lsf.py の既存判定は変位を追跡しないため検出できない (REPORT_911 §6b)。
 本スクリプトは audit_lsf.py の use_events / descend / 不動点の枠組みを流用し、機械語側の argN 基底 load に
 変位を持たせる (state = ('ld', n, w, disp))。既存の判定 (SUSPECT_VAS / SUSPECT_USE_VAS) と audit_lsf_ssa.py は変えない。
+audit_lsf.py は #2396 (LD-111) から、判定の本体 (disp_suspects) を本ファイルから呼んで SUSPECT_DISP_VAS として並べて出力する (単体実行も可)。
 
   機械語 LSF site: 非 frame 宛の `mov [m],rD` で rD が argN 基底 zero-disp 以外の load (変位 disp_m, 幅 w) の値
                    → (n, w) ごとに disp_m の集合 (機械語が argN+disp_m を読んで書いている)
@@ -13,7 +14,10 @@
   SIGNAL (関数単位): IR の c のうち、機械語の同じ (n, w) の disp_m 集合に無いものが 1 つ以上ある
                      (機械語が argN+c を読んでいないのに IR は argN+c の値を書く)
 
-使い方: python3 audit_lsf_disp.py IR.ll IMAGE.bin 'CONFIG_GLOB' [--json OUT] [--only VA,VA] [--pe PE]
+  文字列転送 (#2396 LD-111): `lea rsi,[argN+k]` → `movsq/movsd [rdi],[rsi]` (rep 無し) を LSF site として列挙する (disp = k, 以降 rsi/rdi は幅ぶん進む)。
+                   これが無いと 6677a0 / d237e0 / de1da0 の `argN+36/244` が機械語側に無く、誤検出になる (REPORT_2396 §2)。--no-strmov で #2316 時点の列挙に戻す。
+
+使い方: python3 audit_lsf_disp.py IR.ll IMAGE.bin 'CONFIG_GLOB' [--json OUT] [--only VA,VA] [--pe PE] [--no-strmov]
 """
 import argparse
 import collections
@@ -29,6 +33,7 @@ from ldmach import norm_reg, Machine  # noqa: E402
 from ldmach_img import ImageMachine  # noqa: E402
 import capstone  # noqa: E402
 
+STRMOV = True  # --no-strmov で False (#2316 時点の列挙)
 ADD_RE = re.compile(r'^\s*(%[\w.$-]+) = add i64 (%arg\d+), (\d+)\s*$', re.M)
 ITP_RE = re.compile(r'^\s*(%[\w.$-]+) = inttoptr i64 (%[\w.$-]+) to ptr\s*$', re.M)
 LDP_RE = re.compile(r'^\s*(%[\w.$-]+) = load i(\d+), ptr (%[\w.$-]+)', re.M)
@@ -60,6 +65,8 @@ def transfer(cs, i, state, homes, ev):
                 sv = state.get(mb)
                 if sv and sv[0] == 'arg':
                     newv = ('ld', sv[1], o1.size * 8, o1.mem.disp)
+                elif STRMOV and sv and sv[0] == 'argoff':
+                    newv = ('ld', sv[1], o1.size * 8, sv[2] + o1.mem.disp)
                 else:
                     newv = ('ldu', o1.size * 8)
         elif o0.type == capstone.CS_OP_MEM and o1.type == capstone.CS_OP_REG:
@@ -74,6 +81,30 @@ def transfer(cs, i, state, homes, ev):
                     state.pop(('m', mb, o0.mem.disp), None)
             if ev is not None and not frame and sv and sv[0] == 'ld' and sv[2] == w:
                 ev.append(('dlsf', i.address, sv[1], w, sv[3]))
+    post = {}
+    if STRMOV and mn == 'lea' and len(ops) == 2 and ops[0].type == capstone.CS_OP_REG and ops[1].type == capstone.CS_OP_MEM:
+        m = ops[1].mem
+        mb = norm_reg(cs, m.base) if m.base else None
+        sv = state.get(mb) if mb and m.index == 0 and cs.reg_name(m.base) != 'rip' else None
+        dest = norm_reg(cs, ops[0].reg)
+        if sv and sv[0] == 'arg':
+            newv = ('argoff', sv[1], m.disp)
+        elif sv and sv[0] == 'argoff':
+            newv = ('argoff', sv[1], sv[2] + m.disp)
+        elif mb in ('rbp', 'rsp') and m.index == 0:
+            newv = ('frm',)
+    if STRMOV and mn.startswith('movs') and len(ops) == 2 and ops[0].type == capstone.CS_OP_MEM and ops[1].type == capstone.CS_OP_MEM \
+            and ops[0].mem.base and ops[1].mem.base and norm_reg(cs, ops[0].mem.base) == 'rdi' and norm_reg(cs, ops[1].mem.base) == 'rsi' \
+            and not any(p in (0xf2, 0xf3) for p in i.prefix):
+        w = ops[1].size * 8
+        ssv, dsv = state.get('rsi'), state.get('rdi')
+        soff = (0 if ssv[0] == 'arg' else ssv[2]) if ssv and ssv[0] in ('arg', 'argoff') else None
+        if ev is not None and soff is not None and not (dsv and dsv[0] == 'frm'):
+            ev.append(('dlsf', i.address, ssv[1], w, soff))
+        if soff is not None:
+            post['rsi'] = ('argoff', ssv[1], soff + w // 8)
+        if dsv and dsv[0] == 'argoff':
+            post['rdi'] = ('argoff', dsv[1], dsv[2] + w // 8)
     if mn == 'call':
         for r in A.VOLATILE:
             state.pop(r, None)
@@ -88,6 +119,7 @@ def transfer(cs, i, state, homes, ev):
                 state.pop(r, None)
     if dest and newv:
         state[dest] = newv
+    state.update(post)
 
 
 def machine_sites(mach, va, labels):
@@ -198,7 +230,32 @@ def ir_off_stores(body):
     return out
 
 
+def disp_suspects(mach, va, body):
+    """関数 va の SIGNAL 判定。(機械語に LSF site があったか, SUSPECT のリスト) を返す。
+    audit_lsf.py の --disp と本スクリプトの main が共有する (判定の定義は 1 箇所)。"""
+    labels = [int(x, 16) for x in re.findall(r'^dec_label_pc_([0-9a-f]+)[:.]', body, re.M)]
+    sites = machine_sites(mach, va, labels)
+    if not sites:
+        return False, []
+    mach_d = collections.defaultdict(set)
+    for (_ad, n, w, d) in sites:
+        mach_d[(n, w)].add(d)
+    ir = collections.defaultdict(set)
+    for (n, w, c) in ir_off_stores(body):
+        ir[(n, w)].add(c)
+    sus = []
+    for key in sorted(ir):
+        if key not in mach_d:
+            continue
+        miss = sorted(c for c in ir[key] if c not in mach_d[key])
+        if miss:
+            sus.append(dict(arg=key[0], width=key[1], machine_disps=sorted(mach_d[key]),
+                            ir_offsets=sorted(ir[key]), miss=miss))
+    return True, sus
+
+
 def main():
+    global STRMOV
     ap = argparse.ArgumentParser()
     ap.add_argument('ir')
     ap.add_argument('image')
@@ -206,7 +263,9 @@ def main():
     ap.add_argument('--json')
     ap.add_argument('--only')
     ap.add_argument('--pe')
+    ap.add_argument('--no-strmov', action='store_true', help='文字列転送 (movs) と lea 経由の変位を列挙しない (#2316 時点の挙動)')
     a = ap.parse_args()
+    STRMOV = not a.no_strmov
     only = set(int(x, 16) for x in a.only.split(',')) if a.only else None
     text = open(a.ir, errors='replace').read()
     mach = Machine(a.pe) if a.pe else ImageMachine(a.image, a.cfg)
@@ -218,25 +277,10 @@ def main():
         if only and va not in only:
             continue
         tot['functions'] += 1
-        labels = [int(x, 16) for x in re.findall(r'^dec_label_pc_([0-9a-f]+)[:.]', body, re.M)]
-        sites = machine_sites(mach, va, labels)
-        if not sites:
+        has_sites, sus = disp_suspects(mach, va, body)
+        if not has_sites:
             continue
         tot['mach_fns'] += 1
-        mach_d = collections.defaultdict(set)
-        for (_ad, n, w, d) in sites:
-            mach_d[(n, w)].add(d)
-        ir = collections.defaultdict(set)
-        for (n, w, c) in ir_off_stores(body):
-            ir[(n, w)].add(c)
-        sus = []
-        for key in sorted(ir):
-            if key not in mach_d:
-                continue
-            miss = sorted(c for c in ir[key] if c not in mach_d[key])
-            if miss:
-                sus.append(dict(arg=key[0], width=key[1], machine_disps=sorted(mach_d[key]),
-                                ir_offsets=sorted(ir[key]), miss=miss))
         if sus:
             out['%x' % va] = sus
             tot['suspect_fns'] += 1

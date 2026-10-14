@@ -72,24 +72,24 @@ cf3790	cf390f	manual	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x128], rax
 cf3790	cf395f	manual	OK_LOAD	確定	CELL_DEEP	mov qword ptr [rbp + 0x120], rax
 cf3790	cf398c	manual	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
 cf3790	cf3af5	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0x118], rax
-cf3790	cf3b03	-		未判定	-	mov qword ptr [rbp + 0x110], rax
-cf3790	cf3b54	-		未判定	-	mov qword ptr [rbp + 0x108], rax
-cf3790	cf3b62	-		未判定	-	mov qword ptr [rbp + 0x100], rax
-cf3790	cf3baf	-		未判定	-	mov qword ptr [rbp + 0xf8], rax
-cf3790	cf3bbd	-		未判定	-	mov qword ptr [rbp + 0xf0], rax
-cf3790	cf3c0e	-		未判定	-	mov qword ptr [rbp + 0xe8], rax
-cf3790	cf3c1c	-		未判定	-	mov qword ptr [rbp + 0xe0], rax
+cf3790	cf3b03	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x110], rax
+cf3790	cf3b54	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x108], rax
+cf3790	cf3b62	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x100], rax
+cf3790	cf3baf	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xf8], rax
+cf3790	cf3bbd	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xf0], rax
+cf3790	cf3c0e	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xe8], rax
+cf3790	cf3c1c	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xe0], rax
 cf3790	cf3c7a	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x140], rax
 cf3790	cf3cbb	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xd8], rax
 cf3790	cf3d20	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xd0], rax
-cf3790	cf3dfa	-		未判定	-	mov qword ptr [rbp + 0xc8], rax
-cf3790	cf3e08	-		未判定	-	mov qword ptr [rbp + 0xc0], rax
-cf3790	cf3e7a	-		未判定	-	mov qword ptr [rbp + 0xb8], rax
-cf3790	cf3e88	-		未判定	-	mov qword ptr [rbp + 0xb0], rax
-cf3790	cf3f47	-		未判定	-	mov qword ptr [rbp + 0xa8], rax
-cf3790	cf3f55	-		未判定	-	mov qword ptr [rbp + 0xa0], rax
-cf3790	cf3fd3	-		未判定	-	mov qword ptr [rbp + 0x98], rax
-cf3790	cf3fe1	-		未判定	-	mov qword ptr [rbp + 0x90], rax
+cf3790	cf3dfa	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xc8], rax
+cf3790	cf3e08	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xc0], rax
+cf3790	cf3e7a	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xb8], rax
+cf3790	cf3e88	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xb0], rax
+cf3790	cf3f47	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa8], rax
+cf3790	cf3f55	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa0], rax
+cf3790	cf3fd3	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x98], rax
+cf3790	cf3fe1	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x90], rax
 dcdde0	dcdeee	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0x58], eax
 ddf630	ddf6b5	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
 ddf630	ddf6c6	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xb8], rax
