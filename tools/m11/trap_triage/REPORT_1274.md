@@ -6,13 +6,13 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `851c342e` (origin/main、`Merge pull request #1466 from signature-studio/1275-m11-n78`)。本 PR は REPORT のみ変更で、`tools/m11` のコードは変えていない。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR` に指定)。`work-m11` を repo ルートに展開。`toolchain-retdec` を `$HOME/retdec`、`toolchain-emsdk` を `$HOME/emsdk` に展開 (`RETDEC_ROOT` / `EMSDK` に指定)。
+- 測定 commit: `851c342e` (origin/main、`Merge pull request #1466 from signature-studio/1275-m11-n78`)。本 PR の `tools/m11` のコード差分 (probe 1 行) は §5b・§6 を参照。
+- 素材: `fl-win64` を展開して `FL_WIN64_DIR` に指定 (展開先は `[WIN64]`)。`work-m11` を repo ルートに展開。`toolchain-retdec` を `RETDEC_ROOT` に指定 (`[RETDEC]`)、`toolchain-emsdk` を `EMSDK` に指定 (`[EMSDK]`)。
 - IR: `m11_gen_ir2.sh` rc=0 (44.9 s、`ldfix=applied`、F1=902、errors=0)。
 - build: `M11_OV_CLASSCREATE=1 m11_build.sh` rc=0 (24.7 s、signature mismatch 0・undefined symbol 0)。OFF (`M11_OV_CLASSCREATE=0`) も rc=0。
 - survey: `SV_RAW=1 node survey_units.mjs` (ON 12.2 s、OFF 12.8 s、いずれも load は低い)。
 
-注: 最初の試行では `FL_WIN64_DIR` を `…/extracted/..` の形で指定したため、IR の PE パスと現 PE が一致せず build が `exit 1` で拒否された (`m11_build.sh` の PE 指紋検査が働いた)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で IR を作り直して解消した。
+注: 最初の試行では `FL_WIN64_DIR` を `…/extracted/..` の形で指定したため、IR の PE パスと現 PE が一致せず build が `exit 1` で拒否された (`m11_build.sh` の PE 指紋検査が働いた)。`FL_WIN64_DIR` を fl-win64 の正しい展開先 (`[WIN64]`) に指定して IR を作り直して解消した。
 
 ## 2. 結果 (ON と OFF の unit 単位比較、942 unit)
 
@@ -55,7 +55,7 @@ kind が変わった unit (OFF → ON):
 
 ## 5. 再測定 (次 run、測定 commit `8483b900` = origin/main `Merge #1631`)
 
-- IR: `m11_gen_ir2.sh` rc=0 (44.5 s、ldfix=applied、F1=902、errors=0)。素材は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`RETDEC_ROOT=$HOME/retdec` で展開。
+- IR: `m11_gen_ir2.sh` rc=0 (44.5 s、ldfix=applied、F1=902、errors=0)。素材は `FL_WIN64_DIR` (`[WIN64]`)、`RETDEC_ROOT` (`[RETDEC]`) で指定。
 - build: `M11_OV_CLASSCREATE=1` rc=0 (25.7 s、signature mismatch 0・undefined 0)、`=0` rc=0。
 - survey: `SV_RAW=1 node trap_triage/survey_units.mjs` (ON 12.5 s、OFF。load 0.6 以下)。
   - ON: `ok 869 / oob 15 / abort 2 / halt0 7 / miss 47 / noproc 1 / other 1`
@@ -69,7 +69,25 @@ kind が変わった unit (OFF → ON):
 
 ## 5b. 407a50 入口の probe 実測 (測定 commit `1e3ee7af` = origin/main)
 
-- 素材: fl-win64 / toolchain-retdec / toolchain-emsdk / work-m11 を展開 (`tools/m11/work/`・`$RUNNER_TEMP/fl-win64`・`$HOME/retdec`・`$HOME/emsdk`)。IR `m11_gen_ir2.sh` rc=0 (45.2 s、ldfix=applied、F1=902、errors=0)。build ON rc=0 (25.0 s)。
+- 素材: fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開 (`tools/m11/work/` 配下)。IR `m11_gen_ir2.sh` rc=0 (45.2 s、ldfix=applied、F1=902、errors=0)。build ON rc=0 (25.0 s)。
+- コード差分: 測定時は `probe_entry.py` の 1 行修正 (`(?:__lifted)?`) を作業ツリーに入れて実行した。測定 commit `1e3ee7af` から本 PR の HEAD までのコード差分はその 1 行のみで、その行は測定で実際に実行されたコード。`git diff 1e3ee7af HEAD -- tools/m11 ':(exclude)*.md'` の出力 (md を除外するのは、この REPORT 自身の更新で出力が変わらないようにするため):
+
+```diff
+diff --git a/tools/m11/trap_triage/probe_entry.py b/tools/m11/trap_triage/probe_entry.py
+index 39480f0a..5a9c1929 100644
+--- a/tools/m11/trap_triage/probe_entry.py
++++ b/tools/m11/trap_triage/probe_entry.py
+@@ -18,7 +18,7 @@ n = 0
+ if fns == ['all']:
+     fns = sorted(set(re.findall(r'^define [^\n@]*@function_([0-9a-f]+)\(', src, re.M)))
+ for f in fns:
+-    pat = re.compile(r'(^define [^\n@]*@function_%s\(([^)]*)\)[^\n]*\{\n[^\n]*:[^\n]*\n)' % f, re.M)
++    pat = re.compile(r'(^define [^\n@]*@function_%s(?:__lifted)?\(([^)]*)\)[^\n]*\{\n[^\n]*:[^\n]*\n)' % f, re.M)
+     m = pat.search(src)
+     if not m: print('no define for', f, file=sys.stderr); continue
+     args = re.findall(r'(i64|ptr|i32) (?:nonnull )?(%arg\d+)', m.group(2))
+```
+
 - probe: `probe_entry.py` の正規表現を `function_<hex>(?:__lifted)?(` に変更 (`407a50` は lift 本体が `function_407a50__lifted`。変更前は `no define` で 0 件)。probe は読み取りのみ。
 - 単独 unit 190 (ON・OFF とも): `407a50` 入口 1 回、`arg1` = `0x404` (= 1028、`6ced90` の定数と一致)。単独実行は前 unit の状態を持たないため ON/OFF で差は出ない。
 - 全 unit (942) の probe 版 survey: ON `ok 866 / oob 20`、OFF `ok 871 / oob 15`。probe 無しの §5 (ON 869/15、OFF 870/16) とは一致しない。**probe 版 build は通常 build と結果が一致しない** (`[pe]` 挿入自体が挙動を変える)。以下の入口列は probe 版の結果。
@@ -81,7 +99,7 @@ kind が変わった unit (OFF → ON):
 | 7 | (trap まで無し) | 0x88 |
 | 8〜17 | (無し) | 0x88, 0x3e, 0x40, 0x32, 0x16, 0x20, 0x28, 0x28, 0x20, 0x18, 0x44 |
 
-- 読み取り: 先頭 6 件は ON と OFF で一致する。ON は 6 件目の後で trap し (§3 の生 frame 先頭が `407a50`)、OFF は同じ `0x88` の入口をさらに続けて 17 件まで進む。**入口の引数は同じで、参照先の状態が ON と OFF で違う**と読める。
+- 読み取り: 先頭 6 件は ON と OFF で一致する。ON は 6 件目の後で trap し (§3 の生 frame 先頭が `407a50`)、OFF は同じ `0x88` の入口をさらに続けて 17 件まで進む。**入口の引数は同じで、参照先の状態が ON と OFF で違うと推定される (未確認)**。入口の引数が同じことまでしか確認していない。
 - 未確定: `[arg-8]` の読み先の値は取れていない (probe の `q()` は image 外候補 (`0x10000` 未満) を読まず `dead` を出す)。ON の差がこの読み先に当たるかは未確定。
 - ON-only override (`m11_ov.c` の `410360`→`9b4b00`) は `[rbx+0x54]`・`[rbx+0x34]`・`9b5450` のフィールド 0 クリアを書く。`407a50` の参照先との重なりは未照合。
 - 次の確認 (#1642): (a) 6 件目 `0x88` の入口で `407a50` 内の load アドレスを採る (`q()` の範囲拡大、または load 直前の値の dump)、(b) `PROBE_WATCH` で ON-only の書込みが (a) の参照先に当たるかを切り分ける。
@@ -89,6 +107,6 @@ kind が変わった unit (OFF → ON):
 
 ## 6. 差分 (測定 commit から本 PR の HEAD まで)
 
-測定 commit `851c342e` から本 PR の HEAD までの `tools/m11` のコード差分は 0 (REPORT_1274.md の追加のみ)。`git diff 851c342e HEAD -- tools/m11 ':(exclude)*.md'` は 0 行。
+測定 commit `1e3ee7af` から本 PR の HEAD までの `tools/m11` のコード差分は `probe_entry.py` の 1 行のみ (`(?:__lifted)?`。§5b の diff 参照)。`git diff 1e3ee7af HEAD -- tools/m11 ':(exclude)*.md'` は上記 1 hunk のみ。
 - `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。
 - `find tools/m11/trap_triage -type f -size +20M`: 0 件 (20MiB 超の blob なし)。
