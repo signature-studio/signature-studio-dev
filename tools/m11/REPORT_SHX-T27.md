@@ -4,21 +4,22 @@
 
 - 測定 commit: `5d167ecd` (origin/main 取り込み後の commit 済み HEAD)。build 前に `git rev-parse HEAD` を確認。
 - 受入条件「`SHIMX_TRACE_FILE` の ftrace 件数 > 0」は **未達** (0 行)。件数 0 のため #1050 は close 不可と判定する。
-- trace 上の停止は `unit 18` の `GetLocaleInfoW` 66 回反復の後で、`memory access out of bounds` (`dllmain_done=false` / `units_run=17`)。前回 (`3cdf8329`) と同一の結果。
+- trace 上の停止は `unit 18` の `GetLocaleInfoW` 66 回反復の後で、`memory access out of bounds` (`dllmain_done=false` / `units_run=17`)。前回の実測 (`3cdf8329`、`tools/m11/REPORT_N1050.md` §7) と同一の結果。
 - 停止の trap 位置は `function_4133f0` (wasm-function[1352])。前回までの「stack 最上段が export 無し」は誤りで、export 名で解決すると `function_4133f0` である。
 - ftrace が 0 バイトのままである事実は確認した (`FS` export 済みの現行 build でも同じ)。停止が unit 18 の `GetLocaleInfoW` 反復の後に起きる事実も確認した。ただし「そのため file API に到達しない」という因果は未検証。
 
-## 2. 実測 (HEAD `5d167ecd`)
+## 2. 実測 (測定 commit `5d167ecd`、検証 HEAD `7738ce46` の clean worktree `work/wt_verify`)
 
 | 段階 | コマンド | 結果 |
 |---|---|---|
-| trace variant build | `bash tools/m11/shimx_link/build.sh --trace --soft` | rc=0 / 9.7 s / `signature mismatch=1 undefined symbol=0 duplicate=0` |
-| 実 boot (ftrace) | `SHIMX_TRACE_FILE=/ftrace.jsonl node tools/m11/shimx_link/run_trace.mjs m11_sx_trace_soft.cjs --out <dir>` | rc=0 / `boot_stage=1` `init_count_var=18` `units_run=17` `icall_ok=24` `icall_miss=1` `dllmain_done=false` `threw="memory access out of bounds"` |
+| trace variant build | `bash tools/m11/shimx_link/build.sh --trace --soft` | rc=0 / 13.9 s / `signature mismatch=1 undefined symbol=0 duplicate=0` |
+| 実 boot (ftrace) | `SHIMX_TRACE_FILE=/ftrace.jsonl node tools/m11/shimx_link/run_trace.mjs $W/m11_sx_trace_soft.cjs --out $W/verify` (`$W` = `tools/m11/work/shimx_link` の絶対パス。`.cjs` は絶対パスで渡す) | rc=0 / 0.42 s / `boot_stage=1` `init_count_var=18` `units_run=17` `icall_ok=24` `icall_miss=1` `dllmain_done=false` `threw="memory access out of bounds"` |
 | trace | 同上 (run.json) | `total_calls=97` `distinct_called=28` `dropped=0` |
 | ftrace 行数 | `wc -l <tag>.ftrace.jsonl` | **0 行** (0 バイト)。`FS` は export 済み・`ftrace_error` 無し |
 
+- 測定時 load (1 分平均): 0.69 (`uptime`、boot 直前)。
 - 既存 `work-m11` の `.cjs` (旧 build) は `FS` 未 export のため `Aborted('FS' was not exported)` で落ちる。これは `build.sh` の現行版で再 build すると解消する。
-- `9f968b27` (前回の測定 HEAD) と `5d167ecd` の間の差分は `tools/m11/REPORT_APPENDIX_960.md` と `tools/m11/m11_sdiv_variant.py` の追加のみ (`git diff --stat 9f968b27 5d167ecd -- tools/m11 tools/shimx`)。trace build の経路と結果は同一。
+- 参考: 比較用の旧 HEAD `9f968b27` から測定 commit `5d167ecd` までの `tools/m11`・`tools/shimx` の差分は 2 ファイル (`REPORT_APPENDIX_960.md`・`m11_sdiv_variant.py`) の追加のみ (+64 行)。`9f968b27` は測定対象ではない。
 
 ### 2-1. unit 別の trace calls (run.json)
 
@@ -61,8 +62,15 @@
 | `function_4133f0` と D19 (DEFECTS.md) の関係 | D19 の類型判定が未確定 (`REPORT_N1050.md` §7-3 と整合) | #1629 (SHX-T26) |
 | `midiOutShortMsg` の型不一致 `signature mismatch=1` | trace variant の link 整合 | #1628 (SHX-T25) |
 
-## 5. 検証の起点
+## 5. 検証の起点と鮮度
 
-- 測定 commit: `5d167ecd624185d98140f4d7bb641484a8ff3de2` (commit 済み・clean)。
-- 素材: `work-m11` を `tools/m11/work/` に展開 (main の作業ツリーで実施し、本 worktree では symlink で共有・gitignore)。
-- 差分確認: `git diff 9f968b27 5d167ecd -- tools/m11 tools/shimx` は 2 ファイル (`REPORT_APPENDIX_960.md`・`m11_sdiv_variant.py`) の追加のみ。
+- 測定 commit: `5d167ecd624185d98140f4d7bb641484a8ff3de2` (コード差分の最終 commit。commit 済み・clean)。
+- 測定の場所: `git worktree add --detach work/wt_verify 7738ce46` (main の作業ツリーは使わない)。素材 `work-m11.tar.zst` を worktree 直下に `tar --zstd -xf` で展開 (`tools/m11/work/` 233 エントリ・gitignore)。測定後 `git worktree remove --force work/wt_verify` で後始末する。
+- 鮮度 (§6 形式): `git diff 5d167ecd 7738ce46 -- tools/m11 tools/shimx --stat` の出力は次のとおり。
+
+```
+ tools/m11/REPORT_SHX-T27.md | 68 +++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+```
+
+- 上記は本 REPORT 自身の追加 (68 行) のみで、コード差分は 0。
