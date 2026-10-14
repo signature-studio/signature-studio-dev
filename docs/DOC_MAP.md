@@ -122,7 +122,7 @@
 | `tools/icall/REPORT_APPENDIX_2197.md` | ~70 | icall #2197 (ICALL-62): T1 `0x181307100`・T2 `0x1813071a0` の index 域と既知 12 slot の判定 (12 中 7 件が T1/T2 内、5 件は起点未満)。表の終点・OTT 比較は未達 (子 issue へ移管) |
 | `tools/icall/REPORT_APPENDIX_2170.md` | ~84 | icall #2170 (ICALL-61): `slot_trace.sh` の fatal RIP 採取 (`work/slot_trace_fatal.txt`)、fatal RIP の群別集計 (baseline 53 件・stub 47 件)、table 2 本 (`0x181307100`・`0x1813071a0`) の静的参照範囲。受入条件 3 のみ部分達成。表の終点・既知 12 slot 判定・OTT 比較は #2197 (ICALL-62)、fatal RIP 原因は #2198 (ICALL-63) へ移管 |
 | `tools/icall/REPORT_APPENDIX_2198.md` | ~90 | icall #2198 (ICALL-63): fatal RIP の群 (9 種)・rc 内訳と既知 12 の 3/12・4/12 の実測、fatal 経路の ACC 計上漏れの修正 (`c2f52068`・`slot_trace.c`)。`0x..96f` 形 9 件は harness の `missing_import` (`slot_trace+0x296f`)。群 B〜H の引数由来・群 C の因果は #2231 (ICALL-67) へ移管 |
-| `tools/icall/REPORT_APPENDIX_2225.md` | 136 | icall #2225 (ICALL-65): SlateCore 符号化表と OTT api-set 表 `0x18026c9f0` の形式比較 (cookie・decode 式・zero-fill 配置は一致)。entry 数の比較は未達 (SlateCore 側未確定。#2226)。OTT の PE 直読みは `tools/icall/diff/ott_apiset_cmp.py` |
+| `tools/icall/REPORT_APPENDIX_2225.md` | ~245 | icall #2225 (ICALL-65): SlateCore 符号化表と OTT api-set 表 `0x18026c9f0` の形式比較。cookie・decode 式・zero-fill 配置・entry 数 (T1 20・T2 34) が両 PE で一致。OTT の `APISET_N` 32 は 2 entry 不足、既知 12 slot は T1/T2 の外。CRT の初期化ループから終点を静的確定 (`tools/icall/diff/dispatcher_ids.py`)。OTT の PE 直読みは `ott_apiset_cmp.py`。動的な最大 index は #2226 |
 | `tools/icall/REPORT_APPENDIX_2231.md` | ~113 | icall #2231 (ICALL-67): fatal RIP 群 B/C/D/E/G/H の引数由来 (D・G は heap 引数の直接使用、B・E・H は未追跡)、群 C の `SLOT_ENC_INIT` 因果、群 I の整列違反 (thunk 呼出し元の `rsp` 不整列)。`slot_trace.sh` の fatal 抽出に `regs`/`heap_args` を含める修正。測定 commit と差分 0 の証跡を §5 に記載 |
 | `tools/icall/REPORT_APPENDIX_2081.md` | ~78 | icall #2081 (ICALL-57): SlateCore encoded slot の静的解析 (`slatecore_fptr_table.py`)。受入条件 1・3 は未達で #2120 へ。受入条件 2 は部分達成 (12 slot は zero-fill 部の参照として確認) |
 | `tools/icall/REPORT_APPENDIX_2262.md` | ~70 | icall #2262 (ICALL-69): site `0x1810553e6` の target `0xb77e88c8000` の由来 (= `ror(cookie,50)` の下位 44 bit。lifted IR が cookie を `load i32` で読むことが原因)。`fa_sweep.sh 8 60` の再測定 (131 関数 artifact・bit 一致 47)。表への包含判定と cookie 幅の修復は子 issue へ移管 |
@@ -380,6 +380,7 @@
 | `tools/targets/serum2/host/REPORT.md` | ~240 | Serum 2 最小 VST3 host |
 | `tools/targets/serum2/host/REPORT_SR1c.md` | ~222 | SR-1c (#256) 付録: controller ゲート (+0x10c / +0xdc) の静的 writer 走査と API 突合 (import 327 / 呼出 110 / 未呼出 217)。API 名一覧は `host/sr1c_api_surface.tsv` |
 | `tools/targets/serum2/host/REPORT_SR23.md` | ~78 | SR-23 (#1545) 付録: 書込元 `0x1800acf70` の所属 class (`SerumController`・vtable slot 3) と、wrapper IID (`IVst3ToAUWrapper`/`AAX`) に応答する host 根拠 (SDK 参照 host は応答しない) |
+| `tools/targets/serum2/host/REPORT_SR5.md` | ~63 | SR-5 (#73): 参照音源 (wine64 上の実 Serum2 DLL) の WAV 生成と dB 誤差ハーネス。決定性 (file SHA-256 一致)・content dir 条件 (空 dir / installer 全展開) ごとの参照 pin・ネガコン・測定 commit の対応・stub による補助確認 (再測定ではない) |
 | `tools/targets/serum2/license/REPORT.md` | ~160 | Serum2 認可機構の呼出点マップ |
 | `tools/targets/serum2/license/authstub/REPORT.md` | ~232 | authorization stub 設計・実装。§13b・§14 の詳細は付録 `REPORT_APPENDIX.md` §13b・§14b (250 行上限のため分割移動) |
 | `tools/targets/serum2/license/authstub/REPORT_APPENDIX.md` | ~95 | authstub REPORT の分割移動節: §13b (L1 脱落条件の突合・census の数え方) と §14b (L1 復元 pass の census・ネガコン・e2e 実測、LF 束縛の詳細) |

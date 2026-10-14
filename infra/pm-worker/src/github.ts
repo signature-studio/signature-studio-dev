@@ -44,6 +44,9 @@ export async function appJwt(appId: number | string, pem: string, nowSec: number
 
 export { fromB64u };
 
+export const DISPATCH_TYPES = ["oc-watchdog"] as const;
+export type DispatchType = (typeof DISPATCH_TYPES)[number];
+
 export interface GhResponse<T = any> {
   status: number;
   json: T;
@@ -127,7 +130,10 @@ export class Gh {
     return this.req("POST", `/repos/${this.repo}/issues/${n}/comments`, { body });
   }
 
-  dispatch(eventType: string) {
+  // Worker が送る repository_dispatch は oc-watchdog だけ。payload は event_type のみで、client_payload (自由な値) は付けない。
+  // oc-fix は PR 番号・理由・素材名の client_payload が要り、検証と送信は Actions の watchdog.sh が行う。
+  dispatch(eventType: DispatchType) {
+    if (!DISPATCH_TYPES.includes(eventType)) throw new Error("dispatch type not allowed");
     return this.req("POST", `/repos/${this.repo}/dispatches`, { event_type: eventType });
   }
 }
