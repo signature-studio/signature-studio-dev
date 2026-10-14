@@ -40,3 +40,38 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 - int3 の影響: 両 engine の `e.final.ll` の `__asm_int3` は `i64` 戻り値の宣言 (1 件ずつ) のため、旧 void 版の `return 0;` 問題には当たらない。 `void` 版の修正そのものは合成 `.ll` のみで確認 (下記)。
 - int3 修正 (`m11_simd2.py`・本 HEAD): `void` 版は `abort()` のみ、戻り値あり版は `abort(); return 0;` を生成する。 `int3` を含む合成 `.ll` (`declare void @__asm_int3()` と `declare i32 @__asm_int3__1()`) で生成した C を `clang -c -Wall -Werror=return-type` で検査: 修正後 rc 0、修正前 (`f50ca8ad`) は `void function '__asm_int3' should not return a value` で rc 1。 engine 出力での確認は、上の「生成 helper C」の `emcc -c` rc 0 (両 engine、`c0afd85b`) で行った。 合成 `.ll` の検査は `void` 版の分岐を直接見るためのもの。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
+
+## D. #1698: lift_ranges.sh 既定化 (PLUG_NO_STATIC_DETECT=1) の batch 系への影響 (engine_lift 経由)
+
+- 測定 commit: **30a7b5b4** (ws-1698 の起点 = origin/main。本 run はコードを変更していない)。
+  `git diff 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics` の出力は 0 行 (下の検証節を参照)。
+- 環境: fl-win64 (`$RUNNER_TEMP/fl-win64`)・toolchain-retdec (RetDec v5.0)・toolchain-emsdk (emcc 6.0.12)。 `engine_lift.sh <block>` の出力 summary.csv を比較。
+- 実行: `bash dynamics/engine_lift.sh <block> <timeout>` (既定) と `PLUG_NO_STATIC_DETECT=0 bash dynamics/engine_lift.sh <block> <timeout>` (従来)。
+  load は各回の開始時 0.45〜0.91 (1 分平均)。 4 vCPU。
+
+| block | 条件 | lift_rc | defines | unimpl | emcc_c_rc | fixcmp | after_fixcmp | lift_s | missing_define | missing_bytes | missing_ref | function_defines |
+|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| 19048 | 既定 (1) | 0 | 1712 | 5 | 1 | 2 | 0 | 63 | **0** | **0** | **0** | 1710 |
+| 19048 | 既定 (1)・再実行 | 0 | 1712 | 5 | 1 | 2 | 0 | 63 | 0 | 0 | 0 | 1710 |
+| 19048 | 従来 (0) | 0 | 1504 | 1 | 1 | 1 | 0 | 61 | **208** | **22819** | **67** | 1502 |
+| 19252 | 既定 (1) | 0 | 551 | 5 | 0 | 0 | 0 | 16 | 0 | 0 | 0 | 549 |
+| 19252 | 従来 (0) | 0 | 551 | 5 | 0 | 0 | 0 | 16 | 0 | 0 | 0 | 549 |
+
+- 19048 (Multiband Compressor comp_eng): 既定化で `missing_define` 208→0・`missing_bytes` 22819→0・`missing_ref` 67→0、`defines` 1504→1712。 既定の再実行で同一値を再現。 `emcc_c_rc_after_fixcmp` は両条件 0。
+- 19048 の差は、既定で 208 件の「statically linked function」が define されることによる (§A と一致)。 `unimpl` (5 vs 1) と `fixcmp` (2 vs 1) も変わったが、原因は未調査 (下の未解決表)。
+- 19252 (Transient Processor engine): 既定と従来で summary が完全一致。 既定化の影響なし。
+- 判断 (暫定): engine 2 本では既定化を悪化させる欠落は出なかった (19048 は欠落 0、19252 は不変)。 `unimpl` 増加 (19048 の 1→5) の原因が確定するまで、既定化は暫定で維持する。
+- 未実施: `batch_lift.sh` 本体は、素材に無い inventory 成果物 (`work/win_pe_scan.json`・`nsis_blockmap.json`・`winfuncs/`・`block_manifest.json`) を要するため実行できなかった。
+  また `synth/cpp_lift.sh` の 7 本 (従来 (0) の再測定) も本 run では流していない。 `batch_lift.sh` 系の summary 比較は起票先の残件とする。
+
+### D-1. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 19048 の `unimpl` 1→5・`fixcmp` 1→2 の原因 (既定化で増えた define 由来か) | 既定化で未実装 helper が増える。 到達性のみの指標で正しさは未確認 | PM 判断 (切り分けは次の lift 検証 run。本 PR では子 issue を起票しない) |
+| `batch_lift.sh` 本体の既定/従来比較 | `batch_lift.sh` 経由の summary.csv は未測定 (inventory 成果物 `win_pe_scan.json`・`nsis_blockmap.json`・`winfuncs/`・`block_manifest.json` が素材に無い) | PM 判断 (素材の追加要否。許可名に該当する素材が無いため、本 PR では起票しない) |
+
+### D-2. 検証
+
+- 測定 summary (`work/dynamics/engine<B>/summary.csv`) は `work/` (gitignore 対象) にあり commit しない。
+- コード差分 (§D の「出力は 0 行」の根拠・`docs/WORKFLOW.md` §6): `git diff 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics ':!*.md' | wc -l` → **0**。 `:!*.md` を外した形は文書 (`REPORT.md`・`REPORT_APPENDIX.md`) の差分だけが出る (`git diff --stat 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics` の対象は この 2 件のみ)。 測定 commit `30a7b5b4` は HEAD の祖先。
