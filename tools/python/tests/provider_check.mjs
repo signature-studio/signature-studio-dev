@@ -20,18 +20,16 @@ const direct = (name, ...a) => { try { return { ok: engine.call(name, a) }; } ca
 const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHasMeters", "device.forwardMIDICC", "device.midiOutMsg"]);
 // 実装 = mock (host/fl_mock.mjs・host/ilmcp.mjs) が持つ MIDI 経路の 5 関数 (PY-20)
 const mig = new Set(["channels.selectedChannel", "channels.fillEachNSteps", "general.getVersion", "transport.isPlaying", "ilmcp.forwardTutorialEvent"]);
-// PY-39 (#1527): PE 解析 (FLEngine 0xd5b150 → d843d0 → 0xd5b100 → 0x11e8670) で意味論を確定した実装 (selectAll のみ)
-const pe39 = new Set(["channels.selectAll"]);
 let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PY-39 1 (pe39)
-assert.equal(impl, 71); assert.equal(unimpl, 364);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig)
+assert.equal(impl, 70); assert.equal(unimpl, 365);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);

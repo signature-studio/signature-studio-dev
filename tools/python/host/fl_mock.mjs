@@ -72,7 +72,6 @@ export function createMockEngine() {
     "channels.setChannelName": (i, n) => { ch(i).name = str(n); },
     "channels.isChannelSelected": (i) => ch(i).sel,
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
-    "channels.selectAll": () => { st.channels.forEach((c) => (c.sel = true)); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
     "channels.muteChannel": (i, v) => { ch(i).mute = tog(ch(i).mute, v); },
     "channels.soloChannel": (i) => { ch(i).solo = !ch(i).solo; },
