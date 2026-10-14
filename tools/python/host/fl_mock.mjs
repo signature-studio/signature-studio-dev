@@ -12,9 +12,9 @@ class FlError extends Error {
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
-// mixer の色の R/B 入替え (REPORT_PY115.md §2)。MIX_DEFAULT_COLOR は未確定の既定値 (C の MIX_DEFAULT_COLOR と同じ仮置き)
+// mixer の色の R/B 入替え (REPORT_PY115.md §2)。既定色は FL の .bss 0x15f6774 の初期値 (REPORT_PY118)
 const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
-const MIX_DEFAULT_COLOR = 0x5a6b7c;
+const MIX_DEFAULT_COLOR = 0xff636c71;
 
 export function createMockEngine() {
   const st = {
