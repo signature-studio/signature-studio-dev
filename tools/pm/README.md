@@ -51,7 +51,7 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 | `manual_deps.json` | 停止報告に根拠のある依存 (子 → [依存先])。**追跡する設定ファイル** (他の json は状態で、`.gitignore`) |
 | `rest_heal.py` | open PR を CONFLICT / FIX / NOREVIEW / DRAFT / APPROVED / COVERED / STUCK_LABELLED に分類し、足りない次の一手を `/oc` コメントか close→reopen で補う。watchdog (`.github/scripts/watchdog.sh`) の補助 |
 | `sync_status.py` | Project V2 の Status を PR / Issue の実態に同期する (冪等)。Status は参考で、チケット状態の正は issue の open/closed + ラベル + PR (`docs/WORKFLOW.md` §3)。実行しないと Status が陳腐化する。**退役後は同期をやめる (根拠: #2356。下表)** |
-| `pm_needs.py` | 最新の差し戻しが PM 判断を求めていて、PM の応答が無い PR を列挙する。heartbeat のたびに実行して未回答を 0 にする |
+| `pm_needs.py` | 最新の差し戻しが PM 判断を求めていて、PM の応答が無い PR を列挙する。未回答の検出は Worker の `needs.ts` が担い、監査専用の heartbeat からは実行しない (指示 145)。手で確かめるときだけ使う |
 | `idle_report.sh` | watchdog の run 履歴から『idle>0 が 15 分以上続いた回数』を数える (VM の `pm-watchdog.timer` を止めてよいかの soak 判定用)。REST のみ。`idle_report.sh --since <ISO> --until <ISO>`。使い方は下の節。テスト: `bash tools/pm/test_idle_report.sh` |
 | `pr_gaps.py` | open PR を「レビュー中 / 修正中 / 担当なし」に分類する |
 | `dismiss_spam.py` | watchdog が水増しした `(watchdog)` の request-changes を取り下げる (`DRY=1` で確認) |
@@ -146,7 +146,7 @@ systemd timer から 10 分ごとに 1 回ずつ呼ぶ。`/status` (公開・集
 3. `systemd/pm-wake.service` と `systemd/pm-wake.timer` の `/PATH/TO/...` を置換し、`~/.config/systemd/user/` に置く。`systemctl --user daemon-reload` の後に `systemctl --user enable --now pm-wake.timer`。
 4. `pm-heartbeat.service` は、内蔵の 30 分版の文面では無効化したままにする (監査専用の文面・7200 秒での稼働は指示 145。上の注)。
 
-戻し方: `systemctl --user disable --now pm-wake.timer`。heartbeat に戻すなら `systemctl --user enable --now pm-heartbeat.service` (`heartbeat.sh` の既定の文面・間隔は変えていない)。
+戻し方: `systemctl --user disable --now pm-wake.timer`。heartbeat を内蔵の 30 分版に戻すなら、`systemd/pm-heartbeat.service` の `PM_HEARTBEAT_SECONDS=7200` と `PM_HEARTBEAT_MSG_FILE` の 2 行を外してから `systemctl --user enable --now pm-heartbeat.service` (`heartbeat.sh` の既定の文面・間隔は変えていない。VM の drop-in も同じ 2 行を外す)。
 
 ## watchdog の担当なし時間を集計する (`idle_report.sh`)
 
