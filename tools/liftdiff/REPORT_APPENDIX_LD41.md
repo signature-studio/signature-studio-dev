@@ -7,4 +7,9 @@
 - IR: `boot_final3.ll` の `%29 = udiv i64 %28, %arg4` (符号なし・前回 run の記録では 125366 行)、続く `icmp eq`・`br`、偽側の `unreachable` (前回 run の記録では 125368〜125372 行)。
 - 除算の入力: 被除数 = stride (`[rbp+0x48]`) × count (`[rbp+0x60]`)、除数 = count。count は `417bb8`〜`417bbd` で正の値が保証された後の値。
 - 符号付きと符号なしで結果が一致するのは count = 1 のとき。count ≥ 2 かつ積が負なら、符号なし除算は stride を返さない (例: stride −16・count 2)。
-- **未確認** (#1576 の受入条件): trap 経路 (0x409730) へ実際に入る入力の実測 (trace_head は関数入口 VA のみで除算入力を記録していない)、sdiv 修正後に食い違いが消えるかの再実行。
+- **未確認** (#1576 の受入条件): trap 経路 (0x409730) へ実際に入る入力の実測 (trace_head は関数入口 VA のみで除算入力を記録していない)、sdiv 修正後に食い違いが消えるかの再実行。動的確認は子 issue #1767 に切り出した。
+
+#### P3 の残り L の静的確認 (#1576・LD-54)
+- 測定 commit = `d16d7f5d` (main 取り込み後の HEAD・コード差分 0 行)。`block00031_PE.bin` (fl-win64・22227016 bytes) と `tools/m11/work/boot_final3.ll` で確認。
+- 再実行: `LD_M11_PE=<block00031_PE.bin> python3 tools/liftdiff/tests/trace_diverge_cd.py` は 13.3 s で、`results/m11_unreachable_cd.md` と diff 0 行。
+- 0x476c30・0x462ed0 は機械語に `div`/`idiv` が無く、IR にも `udiv`/`sdiv` が無い。sdiv 仮説 (除算の符号) では説明できない。原因は未特定で、件数は `results/m11_unreachable_cd.md` の P3 行を正本とする。
