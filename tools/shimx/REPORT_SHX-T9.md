@@ -144,7 +144,9 @@
   - よって baseline の halt0 は `0x67f00` の先頭直後で起き、shimx 版の `0xf960` 進入 (NewInstance) と分岐する。
 - 既存の「`ret=2` vs `halt0`」の食い違いは、古い `work/shimx_link/obj/` 由来の成果物が原因だった。`build.sh --trace --soft --fix` の clean rebuild (`obj/`・`gen/` を削除) で `ret=2` が再現する。
 - 未確定: `0x67f00` の中で shimx 版だけ `0xf960` に進む条件 (icall の直前の比較値)。`function_467f00` (IR L174409) の分岐は `0x11f1114` の一度きりの初期化フラグのみで、unit 23 の `0x67f00` (LVA) 本体の icall 列は未読。`FormatMessageW` / `LoadStringW` の戻り値が差の候補。起票先: #1985 に残す。
-- 証跡: `tools/shimx/evidence_1985/probe_u23_{shimx,baseline}_slotfix.txt` / `trace_u23_{shimx,baseline}_head.txt`。trace の再現は `tools/m11/shimx_link/probe_trace_unit.mjs`。測定 commit `c718dd00`。
+- 証跡: `tools/shimx/evidence_1985/probe_u23_{shimx,baseline}_slotfix.txt` / `trace_u23_{shimx,baseline}_head.txt`。trace の再現は `tools/m11/shimx_link/probe_trace_unit.mjs`。
+- 測定 commit: `98508612` (trace 取得に使った `probe_trace_unit.mjs` を追加した commit)。slot 訂正の commit は `c718dd00` (`probe_unit23.mjs` の 4 行)。`git show 98508612:tools/m11/shimx_link/probe_trace_unit.mjs` と作業ツリーのファイルは byte 一致。
+- `git diff 98508612 HEAD -- tools/m11/shimx_link tools/shimx/src`: 出力 0 行 (測定後の変更は REPORT と evidence のみ)。
 
 ### 3.4 検証の commit と差分 (WORKFLOW §6)
 
