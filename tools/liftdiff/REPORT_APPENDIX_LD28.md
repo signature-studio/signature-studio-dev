@@ -45,7 +45,7 @@
 - **結論**: 0x418be0 系の原因は未特定。食い違いの次段は 0x410320 (VMT 間接 call の関数・LD-17 の D15 型候補と同じ entry) が最多で、0x410320 以後の分岐が次の調査対象。受入条件 1 の 0x418be0 は、thunk の表現差の切り分けまで完了・原因は未達 → #1035 に残す。
 - **再現手順**: `python3 tools/liftdiff/tests/trace_diverge_418be0.py > tools/liftdiff/results/m11_418be0_thunk.md` (リポジトリルートから実行。既定入力 `tools/liftdiff/work/m11/batch_closure.jsonl`。PE・IR 不要、batch jsonl のみ)。素材は `work-liftdiff` (`tools/liftdiff/work/`)。
 
-#### 現 head での全件再生成と記録の比較 (LD-60 / #1736)
+#### 測定 commit `ad7d455f` での全件再生成と記録の比較 (LD-60 / #1736・現 head ではない)
 - **再生成の基準 = `576c4976`** (測定時の `origin/main`)。ただし再生成の値は `576c4976` のコードの結果とは言えない。fix run で `git diff 576c4976 8a75e60a -- tools/liftdiff` を確認すると 17 ファイル・444 行追加の差分があり、空ではない (同一コードという前版の主張は誤りだった)。
   - 鮮度の正本は上の `200cc2b4` 側 (測定に使う 3 ファイルの差分 0 行) で、`576c4976` 基準の差分は参考値。
   - 比較 (検証 HEAD `c66ddd7b`): `git diff 576c4976 c66ddd7b -- tools/liftdiff` = 20 files・592 insertions・10 deletions (本 REPORT の追記 7 insertions・6 deletions を含む)。`origin/main` と HEAD の `git diff --stat -- tools/liftdiff` は `REPORT_APPENDIX_LD28.md` と `results/m11_418be0_thunk.md` (1 行の再生成差分) の 2 files・20 insertions・6 deletions (merge 後の HEAD で確認)。コードの差分は 0 行。merge 前後で `tools/liftdiff` のコードは変わっていない (`git diff 848d83fd 85e75eec -- tools/liftdiff` = 0 行)。
@@ -157,7 +157,7 @@
   - 記録 jsonl (`work-liftdiff` 同梱): 16 + 4 = 20 件。`#2242` の結果と同じで、スクリプトが P2 を拾えることの対照になる。
 - **結論 (測定 commit `930c6dbc` に限る)**: `930c6dbc` も記録 (2,273 / 2,892 / 2,256) の生成 commit ではない。`0x41c820` mismatch も再現しない。測定 commit の候補 `1c4b7c7e`・`930c6dbc` はいずれも記録を再現しなかった (現 head の結論ではない)。残る `9e9c1315` (#2276) / `38d53ac8` (#2277) は既存の子 issue で扱う。#1035 の受入条件 1 は [~] のまま。
 - **コード差分 (測定 commit → HEAD・候補の判定に影響する範囲)**: `git diff 930c6dbc HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (`--stat`。`930c6dbc` は `origin/main` の祖先)。この範囲の変更が判定に効くかは未測定。本測定は `930c6dbc` の値として読む。
-- **現 head `be556652` の値ではない (§6 の要件は未充足)**: 上記の集計・verdict 一致数・対象 2 関数の判定は、現 head の値として引用しない。理由は 2 つ。
+- **`930c6dbc` の値は現 head の値ではない (§6 の要件は未充足)**: 上記の集計・verdict 一致数・対象 2 関数の判定は、現 head の値として引用しない。現 head `1f82a53b` の値は上の「現 head `1f82a53b` の全件 closure 再測定」節が正。理由は 2 つ。
   1. **再測定できない**: fix run の素材は `fl-win64` のみ (`$HOME/artifacts`)。`work-m11`・`work-liftdiff` が無いため、`m11_gen_ir2.sh`・batch 入力・`ir_conditions.json` を作れない。
   2. **差分に判定経路の変更がある** (差分を読んだ結果。影響の大きさは未測定): `git diff 930c6dbc HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の内訳のうち、batch の判定に入る範囲は次のとおり。
      - `targets/m11.json`: `initial_memory` 469762048 → 671088640 (`ldlib/build_wasm.py` の build 時に読まれる。m11 の wasm メモリ量が変わる)
@@ -168,20 +168,35 @@
      - `liftdiff.py`: `route = 'clift'` の分岐と `irfeats` の取得条件 (m11 は既定の `ir` route のまま)
   3. 上の 2 点から、この差分が m11 closure の verdict を変えないとは言えない。現 head での再測定 (`liftdiff.py build` → `batch --set closure --shards 14 --nobuild`) が要る。素材 `work-m11`・`work-liftdiff` が揃うまで、#1035 の受入条件 1 の根拠は測定 commit `930c6dbc` の値のみ。
   4. **再測定の手順 (素材を揃えた run 用)**: PR 本文の `oc_artifacts: fl-win64 work-m11 work-liftdiff` で素材を取得し、`bash tools/m11/m11_gen_ir2.sh` → `tools/liftdiff/liftdiff.py build m11` → `batch m11 --set closure --shards 14 --nobuild` を現 head で実行する。集計・verdict 一致数・`0x418be0` / `0x41c820` の判定を現 head の値で本節に追記し、測定 commit と `git diff <測定 commit> HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の出力を併記する。
-- 「候補 4 件はいずれも記録を再現しなかった」は、`930c6dbc` と `1c4b7c7e` の測定に限った結論として読む。現 head では未確定。
+- 「候補 `1c4b7c7e`・`930c6dbc` は記録を再現しなかった」は、それぞれの測定 commit に限った結論。現 head `1f82a53b` でも記録は再現しない (上の現 head 節)。
 
-#### 現 head `f84b407e` の全件 closure 再測定 (LD-102 / #2278 の review 対応)
-- **測定 commit = `f84b407e`** (現 head。`git diff 930c6dbc HEAD` のコード差分を含む。この節は `930c6dbc` の値を置き換えない)。素材 `fl-win64` + `work-m11` + `work-liftdiff` を本 run で展開 (`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`)。
+#### 現 head `1f82a53b` の全件 closure 再測定 (LD-102 / #2278 の review 対応・現 head の正)
+- **測定 commit = `1f82a53b`** (現 head。PR ブランチ `2278-ld102-930c6dbc-closure` の HEAD を worktree `ws-2294` で checkout して測定)。素材 `fl-win64` + `work-m11` + `work-liftdiff` を本 run で展開 (`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`。`work-m11`・`work-liftdiff` は repo 相対パスで格納されているため、repo ルートへ `tar --zstd -xf` で展開した)。
+- **emsdk**: `emsdk install 6.0.12` を `$RUNNER_TEMP/emsdk-src` に入れ、`/opt/emsdk` へ symlink した (runner 上の一時環境。repo 外)。
+- **IR**: `bash tools/m11/m11_gen_ir2.sh` rc 0 (`gen_ir2 OK`・`ldfix` errors=0・491,108 行 / 490,733 行)。
+- **build**: `liftdiff.py build tools/liftdiff/targets/m11.json` rc 0・`sig_mismatch 0`・`undefined 1`・wasm 4,456,679 B (`f84b407e` の 4,456,250 B・`930c6dbc` の 4,439,240 B とは異なる。build 入力が変わったため)。
+- **batch**: `liftdiff.py batch tools/liftdiff/targets/m11.json --set closure --shards 14 --nobuild --out tools/liftdiff/work/m11/batch_closure_1f82a53b.jsonl` rc 0・**wall 13 分 27 秒** (`[batch] done 805s`)・開始時 load 1.27 / 終了時 load 8.48 (shards 14)。出力 sha256 `8c70c719…` (7,421 行)。
+- **集計 (現 head `1f82a53b`)**: 一致 **3,238** / 不一致 **1,483** / 実行不能 **2,700** (7,421 関数)。`liftdiff.py summary` と `ld101_aggregate.sh` で一致。記録 2,273 / 2,892 / 2,256 と**不一致**。
+- **記録との verdict 一致**: 7,421 関数中 **5,616** (記録 jsonl `work/m11/batch_closure.jsonl` sha256 `810b4d3a…` との照合)。
+- **対象 2 関数 (現 head)**: `0x418be0` = **match** (outcome `equal`。記録 match と一致)。`0x41c820` = **match** (outcome `equal`・`both_fault`・`native_fault`。記録 mismatch は現 head でも再現しない)。
+- **`trace_diverge_418be0.py` (rc 0)**: `tools/liftdiff/tests/trace_diverge_418be0.py tools/liftdiff/work/m11/batch_closure_1f82a53b.jsonl` で実行。rc 0・除外 0 件・対象 0 件 (thunk 除去後の食い違い 0・trace_head 上限の判定不能 0)。
+- **コード差分 (測定 commit → HEAD)**: `git diff 1f82a53b HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の出力は 0 行 (測定 commit 自身が HEAD。以後の commit は本 REPORT の文書のみ)。
+- **直前の測定 commit `f84b407e` → `1f82a53b` のコード差分**: `git diff f84b407e 1f82a53b -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 3 files (`ldlib/cases.py` 23 行変更 / `rt/fle_ldbridge.c` 4 行変更 / `rt/ld_core.h` 24 行変更) = 43 insertions(+) / 8 deletions(-)。VMT slot 用の仮 proc 域 (`vm` blob) の追加で、`fvm_line` の case と判定経路が変わる。この差分の分だけ `f84b407e` の集計 (3,239 / 1,482 / 2,700) は現 head の値ではない。
+- **`f84b407e` と現 head の集計差**: 一致 3,239 → 3,238 (-1)・不一致 1,482 → 1,483 (+1)・実行不能 2,700 → 2,700。記録との verdict 一致は 5,616 で不変。差の 1 件の関数名と原因は未特定 (本 run では関数単位の比較をしていない)。
+- **結論 (現 head `1f82a53b` に限る)**: 現 head の全件 closure は記録 (2,273 / 2,892 / 2,256) を再現しない。`0x41c820` の記録 mismatch も再現しない。`0x418be0` は match。#1035 の受入条件 1 の「記録 (commit・sha256・件数)」は [~] のまま。記録の生成条件の切り分けは #1035 の範囲。
+
+#### 過去の再測定 `f84b407e` (現 head ではない・参考。`1f82a53b` で置き換え)
+- **測定 commit = `f84b407e`** (当時の現 head。現 head は `1f82a53b`。この節の値は `f84b407e` に限る)。素材 `fl-win64` + `work-m11` + `work-liftdiff` を本 run で展開 (`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`)。
 - **emsdk**: `build` は `/opt/emsdk` を読むため、`emsdk install 6.0.12` (`[EMSDK]` pin) を `$RUNNER_TEMP/emsdk-src` に入れ、`/opt/emsdk` へ symlink した (runner 上の一時環境。repo 外)。
 - **IR**: `bash tools/m11/m11_gen_ir2.sh` rc 0 (`gen_ir2 OK`・`ldfix` errors=0・491,108 行 / 490,733 行)。
 - **build**: `liftdiff.py build tools/liftdiff/targets/m11.json` rc 0・`sig_mismatch 0`・`undefined 1`・wasm 4,456,250 B (`930c6dbc` の 4,439,240 B とは異なる。ビルド入力が変わったため)。
 - **batch**: `batch tools/liftdiff/targets/m11.json --set closure --shards 14 --nobuild` rc 0・**wall 13 分 26 秒**・開始時 load 0.91 / 終了時 load 7.94。出力 `tools/liftdiff/work/m11/batch_closure_f84b407e.jsonl` (sha256 `cefded51…`)。
-- **集計 (現 head)**: 一致 3,239 / 不一致 1,482 / 実行不能 2,700 (7,421 関数)。記録 2,273 / 2,892 / 2,256 と**不一致**。
+- **集計 (`f84b407e` 時点)**: 一致 3,239 / 不一致 1,482 / 実行不能 2,700 (7,421 関数)。記録 2,273 / 2,892 / 2,256 と**不一致**。
 - **記録との verdict 一致**: 7,421 関数中 5,616。`930c6dbc` の 5,704 から変わった。
-- **対象 2 関数 (現 head)**: `0x418be0` = match (記録 match・全 pattern equal。`vm0`・`u16` も equal)。`0x41c820` = match (記録 mismatch。`qall` が `diff` → `both_fault`。記録の mismatch は現 head でも再現しない)。
+- **対象 2 関数 (`f84b407e` 時点)**: `0x418be0` = match (記録 match・全 pattern equal。`vm0`・`u16` も equal)。`0x41c820` = match (記録 mismatch。`qall` が `diff` → `both_fault`。記録の mismatch は `f84b407e` でも再現しない)。
 - **`trace_diverge_418be0.py` (rc 0)**: `tools/liftdiff/tests/trace_diverge_418be0.py tools/liftdiff/work/m11/batch_closure_f84b407e.jsonl` で実行。rc 0・除外 0 件・対象 0 件。
 - **コード差分 (測定 commit → HEAD)**: `git diff f84b407e HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は測定 commit 自身のため 0 行。
-- **結論 (現 head `f84b407e` に限る)**: 現 head の全件 closure は記録 (2,273 / 2,892 / 2,256) を再現しない。`0x41c820` の記録 mismatch も再現しない。#1035 の受入条件 1 の「記録 (commit・sha256・件数)」は [~] のまま。現 head の数値で件数の一致は取れなかった。
+- **結論 (`f84b407e` に限る)**: この測定の全件 closure は記録 (2,273 / 2,892 / 2,256) を再現しない。`0x41c820` の記録 mismatch も再現しない。#1035 の受入条件 1 の「記録 (commit・sha256・件数)」は [~] のまま。
 
 #### 候補 `38d53ac8` の全件 closure rebuild (LD-101 / #2277)
 - **測定 commit = `38d53ac8`** (候補 commit そのものを detached worktree で checkout して測定。`git worktree add --detach ../ws-2277-38d53ac8 38d53ac8`)。素材は `fl-win64` + `work-m11` + `work-liftdiff` (`$ARTIFACTS_DIR` から展開)。
