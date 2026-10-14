@@ -90,3 +90,21 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 | native ERR=8/8: setter `0x180c9d74c` の `addr=0x50` SIGSEGV の原因特定 | 未解決 | #1578 (FA-22) |
 | wasm の found 観測点と ERR 形 (`RuntimeError: unreachable`) | 未解決 | #1578 (FA-22) (観測点は #1182 の範囲) |
 | 0x180da6c00 到達と Filter 出力比較 | 未着手 | #1182 (FA-16) |
+
+## 10. FA-25 (#1791): FA_NODE1=1 の fault 値の採取と out[0] の照合
+
+- 付録 `REPORT_APPENDIX_FA22.md` は本 checkout に無い。FA-22 の記述 (`rip=180c9d74c addr=0x50`) は `FA_ALT9=1` の結果 (§6 (b)) で、`FA_NODE1=1` の結果ではなかった。
+- `FA_NODE1=1` (probe 無し, 実測): `ERR S900 sig=11 rip=180c9d741 addr=0 ... rcx=a5a5a5a5a5a5a5a5 rdx=0`。`0x180c9d741` は `mov rax,[rcx]` (setter の vtable 読み)。`rcx` は `[out0+0x10]` で、ヒープ poison 値 `a5a5...` が入っている。`a5a5...` は非 canonical アドレスなので #GP となり、Linux は `si_addr=0` を返す。`si_addr` と `rcx` の不一致は採取の誤りではない (`on_sig` は `si_addr` と `REG_RCX` を同一 ucontext から読む)。
+- 旧 probe の `found=1` は誤り: `ca1480_probe` は `out+0x10` を見ていた。修正後 (`found = out[0] != 0`) は `found=0` (S900–S907, key={1,0}, 8/8)。
+- `probe_guard` 版 (`[C+0x318]+0xa8` の読みを範囲内に限る) でも `out[0]=0` で、node Z (`out[0]` 候補) とは一致しない。`out[0]=0` と setter の `rcx=[out0+0x10]` の poison は両立しない。probe 自体が呼出順を変えている可能性があり、未解決。
+- `FA9OBJ` 行 (観測専用) は `out[0]` が自前の node Z と一致するときだけ `+0x10` を読む (`bf7b39fc` で修正。想定外の値は deref しない)。既定 probe (`FA_PROBE9=1`) では `out[0]=0` のため出力 0 行、`FA_NODE1=1` の probe でも `out[0]=0` で 0 行 (実測)。
+- 判定基準 (`run_fa9.sh` (a) の期待値 found=0・ERR=0) は変更していない。
+
+測定 (測定 commit `bf7b39fc` = lift2 のコードを変えた最後の commit, `bash tools/targets/freshair/lift2/run_fa9.sh`, load 0.48→0.52, wall 5 s):
+- (a) base: ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0 / (b) alt: ERR=8/8 path=static / (b-wasm) alt: wasm ERR=8/8 / (c) pert: 差分 395 トークン・L/R 同一 40 呼出・差分 0 呼出 / **GATE: PASS**
+- `bash run_ctrl.sh 2 5`: **BIT-EXACT 15/15** (wall 4 s)
+- 測定 commit から HEAD までの lift2 差分: `git diff bf7b39fc HEAD -- tools/targets/freshair/lift2` (下記 HEAD 時点で 0 行)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `FA_NODE1=1` で `out[0]` が 0 (probe 下) と poison (probe 無し) になる不一致 | out[0] と node Z の照合が未了 (受入 2) | #1791 (本 issue に残す) |

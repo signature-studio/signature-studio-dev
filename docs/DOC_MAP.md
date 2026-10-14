@@ -117,6 +117,7 @@
 | `tools/icall/REPORT_APPENDIX_851.md` | ~40 | icall #851 (`0x128c320` の関数境界誤認 = decode 範囲分割) の全文。`REPORT_APPENDIX.md` §15 の別置き (250 行上限のため)。現 HEAD の A〜D 実測と、前回 `adc7f577` の chunk 実測 (未再現) を含む |
 | `tools/icall/REPORT_APPENDIX_1592.md` | ~67 | icall #1592 (ICALL-33): 警告 10 件の出所 (段の帰属は #1456 の BIR 段記述と未突合) と 366 site 落ちの独立性 (A〜D 再現・`roundtrip.sh` 書換え後 C/D 集合とも 366 落ち)。DEFECTS 行案は保留。未了は子 #1776 |
 | `tools/icall/REPORT_APPENDIX_1776.md` | ~66 | icall #1776 (ICALL-39): 警告 10 件の段の帰属 (LLVM→HLL の CFG 構築 2 件・copy-propagation 系の再構築 8 件) と `addEdgeFromVector()` の発生箇所 (upstream v5.0 で確認)。statement 単位の出所と最終出力への影響は未了 (子 #1861 `[ICALL-46]`)。DEFECTS 行案は保留 |
+| `tools/icall/REPORT_APPENDIX_1763.md` | ~59 | icall #1763 (ICALL-38): OTT F の jt 比較列 8 site の jt_present→jt_dropped 遷移の切り分け。rewrite 側の展開は 8 site とも生成済み。after IR で比較列区間の `insn.addr` が 0 件 (RetDec の switch 畳み込みが有力だが未確定)。before 段階で落ちていた 1 件 (0x1801a31fb) は未切り分け。未解決は子 #1839 (ICALL-42) |
 | `tools/icall/REPORT_APPENDIX_1402.md` | ~21 | icall #1402 (ICALL-26) の jmp [mem] 形 jump table の cmp/je 展開 (jtm) の実装と、FLEngine 0x40d210--0x40d31b の before/after 実測 (dropped 0→0・未解決 → #1589)。REPORT_APPENDIX.md は 250 行上限のため増やさず別置き |
 | `tools/icall/disp_size/REPORT.md` | ~160 | capstone `disp_size` 誤り (D9) の水平展開監査 |
 | `tools/icall/landing/REPORT.md` | ~165 | Delphi unwind landing pad の抽出と lift |
@@ -151,6 +152,7 @@
 | `tools/m11/REPORT_N1176.md` | ~45 | #1176 (M11-N71): work-m11 同梱の古い obj/rt.o・win.o が build を落とす件の再現 (rc・所要の実測)・`m11_build.sh` の mtime 判定の穴を source sha256 判定に変えた修正・`--full` の未検証範囲 (Ghidra 素材不足) |
 | `tools/m11/REPORT_N715.md` | ~70 | #715: m11_e2e.sh 回帰ゲートの期待値 fail-closed 化・判定分岐の実測・e2e 再現試行 (`work-m11` 不足で fail-closed 停止)・PR 作成者の報告値 (未再現) の所在 |
 | `tools/m11/REPORT_N27.md` | ~238 | #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化・IR 生成条件と指紋の記録・同一 runner の n=3 再現・NC 試験・`--full` は入力 CSV 欠落で未成功 (§10)・レビュー指摘の扱い・§13 73532f8 (c) 数値の切り分け) (環境間一致は未実測)。§14 (#960 `--full` 2 回実行の段の切り分け) は要約のみで全文は `REPORT_APPENDIX_960.md` |
+| `tools/m11/REPORT_N1598.md` | ~60 | #1598 (M11-N104): `m11_e2e.sh` 既定経路を HEAD `4c3f7458` で rc 0 まで再通し (623 秒・judge PASS)。Ghidra 12.1.4 (sha256 一致・JDK 21) で `functions_dll.csv` 59,010 行を作成。trap (stage 4) は残存 |
 | `tools/m11/REPORT_N1415.md` | 70 | #1415: snapshot IR (`69c774de…`) と再生成 IR の段ごとの sha256 切り分け (merge・asmfix までは一致)。`alloca [N x i64]` 54 件は R8 導入前 pass (`159d9fc0~1`) で再現。ldfix の `ldfxc` 差 54 件と (b)(d) は未解決 (子 issue) |
 | `tools/m11/REPORT_N1165.md` | ~110 | #1165: 旧 IR (818/21/56/77) の再現 (`d6a17b64` 手順で ok 818・oob 21・halt0 56)・ldfix の有無による差 (818 ↔ 828)・ldfix 無し build の opt-in 経路 (`M11_ALLOW_LDFIX_DISABLED=1`)・HEAD の 2×2 測定。lift 段の起点と e2e 全体は未解決 (#1165) |
 | `tools/m11/REPORT_APPENDIX_960.md` | ~22 | m11 REPORT_N27 §14 (#960: `--full` を同一 HEAD・同一 PE で 2 回実行し、IR の差の段を切り分け) の全文。250 行上限のため無変更で分割移動 |
