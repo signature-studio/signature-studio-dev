@@ -45,6 +45,10 @@ import {
 } from "./webhook.ts";
 
 export const FULL_SYNC_EVERY_MS = 6 * 3_600_000;
+// 全体同期が書く派生値の版 (2: issue の起票者 author/assoc と、PR・issue の手がかり sig.outcome など #2333)。
+// 保存値の版が違う (未記録・導入より前に保存された状態) ときは、周期を待たずに全体同期を走らせて補完する。その失敗の再試行は SIGNAL_RETRY_MS ごと。
+export const SIGNAL_VER = 2;
+export const SIGNAL_RETRY_MS = 15 * 60_000;
 // reconcile がこれ以上止まっていたら、状態が古いとみなして launch しない (誤った着手を避ける)。
 export const STALE_AFTER_MS = 15 * 60_000;
 const NO_PR_MAX_RELAUNCH = 3;
@@ -110,6 +114,9 @@ export interface Plan {
 
 interface Meta {
   fullSyncAt?: number;
+  // 保存値の版 (SIGNAL_VER)。全体同期が完了したときに記録する。版の補完を最後に試した時刻 (再試行の間隔に使う)。
+  signalVer?: number;
+  signalTryAt?: number;
   reconcileAt?: number;
   watchdogAt?: number;
   tickAt?: number;
@@ -392,6 +399,7 @@ export class Engine {
     this.meta.fullSyncCalls = gh.calls - calls0;
     // reconcile の起点は同期の開始時刻 (同期中に作られたコメントを次の reconcile が読み直す)。
     this.meta.fullSyncAt = this.d.now();
+    this.meta.signalVer = SIGNAL_VER;
     this.meta.reconcileAt = startedAt;
     this.saveMeta();
   }
@@ -1314,7 +1322,10 @@ export class Engine {
       return { ready: false };
     }
     try {
-      if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS) await this.fullSync(gh);
+      // 保存値の版が古いときは、周期 (6 時間) を待たずに全体同期で補完する。失敗しても SIGNAL_RETRY_MS ごとにしか再試行しない (REST の枠を使い切らないため)。
+      const stale = this.meta.signalVer !== SIGNAL_VER && now - (this.meta.signalTryAt ?? 0) >= SIGNAL_RETRY_MS;
+      if (stale) this.meta.signalTryAt = now;
+      if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS || stale) await this.fullSync(gh);
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
       // 同期が古い・打ち切り中は run 一覧が不完全なので観測しない (launch と同じ条件)。偽の飽和を作らないため。
       if (this.fresh()) this.observe(now);
