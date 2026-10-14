@@ -28,6 +28,8 @@ export interface Env {
   // 全体同期でコメントを読む窓 (時間。24 未満は 24 に切り上げる) と、コメント一覧のページ上限 (1 ページ 100 件)。
   COMMENT_WINDOW_H?: string;
   COMMENT_MAX_PAGES?: string;
+  // oc:stuck の open PR がこれを超えたら launch を止める (既定 40)。
+  STUCK_HIGH?: string;
 }
 
 export interface Config {
@@ -43,6 +45,7 @@ export interface Config {
   noPrCooldownH: number;
   commentWindowH: number;
   commentMaxPages: number;
+  stuckHigh: number;
   manualDeps: Record<string, number[]>;
 }
 
@@ -68,6 +71,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     // classify が見る bot の報告は 24 時間以内。窓がそれより短いと、取りこぼした報告で誤って着手する。
     commentWindowH: Math.max(MIN_COMMENT_WINDOW_H, num(env.COMMENT_WINDOW_H, DEFAULT_COMMENT_WINDOW_H)),
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),
+    stuckHigh: num(env.STUCK_HIGH, 40),
     manualDeps,
   };
 }
