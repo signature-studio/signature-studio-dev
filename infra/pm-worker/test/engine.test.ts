@@ -197,7 +197,7 @@ test("alarm/cron: tick は repository_dispatch (oc-watchdog) を送る。cron �
   assert.ok(d[0].url.endsWith("/repos/signature-studio/signature-studio-dev/dispatches"));
   clock.t += 30_000; // cron が alarm の直後に来た
   await ctx.app.engine.tick();
-  assert.equal(dispatches(ctx.m.calls).length, 1, "周期の半分以内は再送しない");
+  assert.equal(dispatches(ctx.m.calls).length, 1, "前回の送信から周期 (5 分) 未満は再送しない");
   clock.t += 5 * 60_000;
   await ctx.app.engine.tick();
   assert.equal(dispatches(ctx.m.calls).length, 2, "5 分後に再送");

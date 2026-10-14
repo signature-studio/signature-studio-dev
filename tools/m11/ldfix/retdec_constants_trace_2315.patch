@@ -1,0 +1,15 @@
+diff --git a/src/bin2llvmir/optimizations/constants/constants.cpp b/src/bin2llvmir/optimizations/constants/constants.cpp
+index 38ba873d..9267ae04 100644
+--- a/src/bin2llvmir/optimizations/constants/constants.cpp
++++ b/src/bin2llvmir/optimizations/constants/constants.cpp
+@@ -162,8 +162,10 @@ void ConstantsAnalysis::checkForGlobalInInstruction(
+ 	}
+ 
+ 	auto* gv = dyn_cast<GlobalVariable>(root.value);
++	std::cerr << "TAG_PRE165 inst=" << llvmObjToString(inst) << " rootval=" << (root.value ? llvmObjToString(root.value) : std::string("null")) << " ops=" << root.ops.size() << " isLoad=" << isa<LoadInst>(inst) << " gv=" << (gv != nullptr) << " valtype=" << llvmObjToString(val->getType()) << std::endl;
+ 	if (isa<LoadInst>(inst) && gv && root.ops.size() <= 1)
+ 	{
++		std::cerr << "TAG_L167 inst=" << llvmObjToString(inst) << " gv=" << gv->getName().str() << std::endl;
+ 		auto* conv = IrModifier::convertConstantToType(gv, val->getType());
+ 		_toRemove.insert(val);
+ 		inst->replaceUsesOfWith(val, conv);
