@@ -223,6 +223,7 @@
 | `tools/m11/trap_triage/REPORT_861.md` | ~70 | unit 189 (409470 ReallocMem) の IR↔逆アセンブル突合・既存 C 転記 (#474) のネガコン (転記なしで 189 は halt0、ok→非 ok 24 件)・転記あり/なしの回帰 (unit 368 のみ)・未解決の起票先 (#861) |
 | `tools/m11/trap_triage/REPORT_1043.md` | ~60 | unit 368 の 409470 VA-big 確保の原因 (`function_980ed0` の 10 進 `inttoptr` 1 件の VA→LVA remap 漏れ)・`pass_m2q_fn980ed0` による修復・ネガコン/修復の survey (ok 869→870, 変化は 368 の halt0→ok のみ)・残件 (#861 受入 4) |
 | `tools/m11/trap_triage/REPORT_1046.md` | ~67 | #1046 unit 492 OOB 途中経過 (`4133f0` の入力値は未実測・受入 4 のみ達成・受入 1–3 は #1288) |
+| `tools/m11/trap_triage/REPORT_1620.md` | ~122 | #1620: unit 477 の `0x10a9f910` 下位 4B 上書きの書込み元 (IR store 経路ではない見込み・書込み主体は未特定)。埋め値依存の位置 (unit 134)・C 呼出し計装の副作用 (unit 304)・計装 `trap_w1620.py` |
 | `tools/m11/trap_triage/REPORT_596.md` | ~125 | work-m11 snapshot 基準の OOB 21 unit の最上位 frame 分類・4f9f40 系/414ad0 系の観測・#307 の OOB との同軸突合 (#596) |
 | `tools/m11/trap_triage/REPORT_494.md` | ~125 | survey の per-unit JSON に間接 call の site / target 別 hit 数 (`icall` 欄) を常設・#482 の復元を hit 数だけで検収 (#494) |
 | `tools/m11/trap_triage/REPORT_683.md` | ~110 | function_414ad0 (SetLength) の `[arg1]` deref 復元の C 転記 (gate `M11_OV_414AD0`) と IR 版の A/B。結論・測定値は REPORT_683 (#683) |
@@ -341,7 +342,7 @@
 | `tools/python/REPORT_PY40.md` | ~90 | PY-40 (#1529): channels グラフ/CS エディタ系 5 関数 (closeGraphEditor / updateGraphEditor / showGraphEditor / showCSForm / focusEditor) の PE 解析。引数形式・内部経路・callback は確定、範囲外 code と戻り値は未確定 (実装は保留)。親 #1515 |
 | `tools/python/REPORT_PY38.md` | ~80 | PY-38 (#1525): channels の reroll 3 関数 (rerollLoopStarter{Loop,Sample,Steps}) / setSwing / getSwing の PE 上の位置・引数書式・index -1 の扱い・値の変換式 (実装なし)。未確定は helper `0x1046a30` と status 写像。親 #1515 / 分割先 #1554 |
 | `tools/python/REPORT_PY72.md` | ~145 | PY-72 (#2542): channels.setChannelPitch (`0xd5aa30`) の PE 意味論。書式・委譲 `0xd843d0`・callback `0xd5a720` の判定順 (index → NaN 検査 → pitchUnit 0/1/2)・status → 例外文言 (-1/-2/-3/-4)。効果関数・guard・一覧 A/B・N の既定値は未確定 (実装なし)。測定は `analysis/flapi/pe_disasm.py`・`pe_rip_consts.py`。「追加解析 (PY-75 / #2562)」節 (callback `0xd5a720` の guard・値検査・pitchUnit 0/1/2、効果関数 `0x1051d20` の 7 引数。本体の未確定は子 #2576 [PY-77]) を含む。REPORT_PY39.md の 250 行上限のため分離 |
-| `tools/python/REPORT_PY73.md` | ~110 | PY-73 (#2547・途中記録): channels.incEventValue (`Ii|d`) と channels.midiNoteOn (`iii|i`) の PE 書式・戻り経路・例外 code (-2 unsafe / -4 range)・文言の確定。戻り値の型と副作用は未確定 (`analysis/flapi/pe_errmsg_probe.py` で文言を再現) |
+| `tools/python/REPORT_PY73.md` | ~150 | PY-73 (#2547・途中記録): channels.incEventValue (`Ii|d`) の戻り値の型 (flags bit1 で int / float ビット列)・`0x1051330` 本体の範囲外 code (例外経路なし)・本体の副作用 (スタック書込みのみ) を PE で確定 (§7)。呼出し先 `0x1046a30` の副作用・値源 (表・現在値・flags) と channels.midiNoteOn (`iii|i`) の副作用は未確定。文言は `analysis/flapi/pe_errmsg_probe.py` で再現 |
 | `tools/python/REPORT_PY74.md` | ~50 | PY-1 ilmcp 意味論の整合 (#74, PR #763): getBrowserNames 木・getHighlightNames 21 件・addChannel/addEffect/storePRScript 検証の実測表、`tests/ilmcp_diff.mjs` の結果、NC (addEffect 検証を外して 2 件差分)、非 ASCII 空白の未解決。REPORT.md §7b-3 の実測表の全文 |
 | `tools/python/REPORT_PY8.md` | ~45 | PY-8 (#80): MIDI 1 イベント flapi 呼出し数・所要時間と遅いモード切り分け (REPORT.md の分割ではなく新規。250 行上限とは無関係) |
 | `tools/python/REPORT_PY15.md` | ~130 | PY-15 (#653): 省略引数のホスト受け渡し方式・kwlist 103 関数の誤束縛 0 検証・挙動変更の内訳・ネガコン (REPORT.md §16 の全文。250 行上限のため分離) |
@@ -399,6 +400,7 @@
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
 | `tools/shared/elastique/REPORT.md` | ~140 | élastique 2.2.15 (win x64) の静的 IPP 入口 197 件の API 同定 (T-SH-40 / #2613): 線形走査の入口再現・dsp_ippv2 の本体照合 (一意名 8・族候補 26・未同定 163)・tools/ipp の stub 名 28 (stub のみ 18・混在 16 入口。#2613 受入 2)・間接経路の静的確認。対応表は `data/entries.csv` |
 | `tools/shared/REPORT_APPENDIX.md` | ~110 | shared REPORT の分割移動節の全文: §A win freetype.dll の版判定 (#145, 上流 VER-2-4-{10,11,12} 照合の実測)・§10 ライブラリのビルド詳細 (libFLAC/LAME/WavPack/FFmpeg/ILSvg)・§12 検収記録 (2026-10-11)。250 行上限のため無変更で分割移動 |
+| `tools/shared/elastique/REPORT_152.md` | ~155 | élastique 2.2.15 (win `elastique_x64.dll`) の静的 IPP 入口と dispatch 層 (thunk・表の飛び先) の実測と lift 前提 (D20 の side module 方針)。測定値は本 REPORT §0。T-SH-10 (#152)。同定は子 T-SH-43 (#2667)、lift 本体は子 T-SH-41 (#2614) |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 | `tools/shared/oss/ilsvg/REPORT.md` | ~50 | ILSvg の版の組 probe (#877): svgdom 0.4.7 は emcc 26/26 cpp OK、svgren 0.6.3 / 0.5.9 は svgdom 0.4.7 と enum 名不一致で版の組は未確定 (未解決 #927) |
 | `tools/shared/oss/blend2d/REPORT_SIMD.md` | ~60 | Blend2D wasm `-msimd128` 試験 (T-SH-02, #146) の実測詳細・ネガティブコントロール・前版の実測・未解決の起票先 (`tools/shared/REPORT.md` §3.3 から分割移動) |

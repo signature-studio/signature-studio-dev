@@ -28,6 +28,7 @@ import {
 } from "./pm.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
+import type { VmState } from "./vmstate.ts";
 import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type Sample } from "./saturation.ts";
 import {
   applyEvent,
@@ -62,6 +63,8 @@ export const REDELIVER_EVERY_MS = 5 * 60_000;
 export const REDELIVER_MAX_PER_SCAN = 10;
 export const REDELIVER_MAX_PER_GUID = 3;
 const HOUR_MS = 3_600_000;
+// VM の状態を取り込む前の launch 停止 (#2343)。/status.launch_blocked と plan.blocked に出す。
+export const NO_IMPORT = "no-import";
 // open issue 数の履歴は 1 時間ごとに 1 点、最大 48 点 (48 時間分)。open_issues_delta_24h の基準に使う。
 export const OPEN_SAMPLE_MS = 3_600_000;
 export const OPEN_SAMPLE_MAX = 48;
@@ -113,6 +116,8 @@ export interface Plan {
   stuck_prs: number;
   // launch を止める理由 (stuck-ceiling / rate-guard)。止めないなら undefined。
   stop?: string;
+  // 新規・再投入の picks を空にしている理由 (no-import)。止めないなら undefined。
+  blocked?: typeof NO_IMPORT;
 }
 
 interface Meta {
@@ -130,6 +135,8 @@ interface Meta {
   // 直近の reconcile で DO と REST が食い違った件数と、その累計
   reconcileDiff?: { last: number; total: number };
   rateGuardOn?: boolean;
+  // VM の状態 (launched・relaunch・phase・pm_art) を取り込んだ時刻。無いあいだは launch しない (IMPORT_REQUIRED=0 を除く)。
+  importedAt?: string;
   // 同時実行の上限の推定 (saturation.ts)。観測の履歴は meta/obs に別に持つ。
   cap?: Cap;
   installationId?: number | null;
@@ -186,7 +193,8 @@ export interface Log {
     | "observed"
     | "resync"
     | "would-redeliver"
-    | "redeliver";
+    | "redeliver"
+    | "import";
   n?: number;
   art?: string;
   note?: string;
@@ -425,6 +433,48 @@ export class Engine {
       this.busy = false;
     }
     return { status: "ok" };
+  }
+
+  // ---------------------------------------------------------------- VM の状態の取り込み・書き出し (#2343)
+  // apply のときだけ書く (既定は検証のみ。呼び出し側で検証を済ませた値が来る)。同じ issue が両方にあるときは、
+  // 新しい時刻 (launched・pm_art) と多い回数 (relaunch) を残す。phase は取り込んだ値 (VM の現在値) にする。
+  importVm(v: VmState, apply: boolean): void {
+    if (!apply) return;
+    for (const [k, at] of Object.entries(v.launched)) {
+      const cur = this.s.launchedAt[k];
+      if (cur && Date.parse(cur) >= Date.parse(at)) continue;
+      this.d.store.put("launchedAt", k, at);
+      this.s = { ...this.s, launchedAt: { ...this.s.launchedAt, [k]: at } };
+    }
+    for (const [k, r] of Object.entries(v.relaunch)) {
+      const cur = this.d.store.get<{ count: number; art: string | null }>("relaunch", k);
+      if (!cur || cur.count < r.count) this.d.store.put("relaunch", k, { count: r.count, art: r.art });
+    }
+    for (const [k, p] of Object.entries(v.pm_art)) {
+      const cur = this.s.pmArt[k];
+      if (cur && Date.parse(cur.at) >= Date.parse(p.at)) continue;
+      const next = { at: p.at, line: p.line };
+      this.d.store.put("pmArt", k, next);
+      this.s = { ...this.s, pmArt: { ...this.s.pmArt, [k]: next } };
+    }
+    this.d.store.put("meta", "phase", v.phase);
+    this.meta.importedAt = iso(this.d.now());
+    this.saveMeta();
+    this.pushLog({ kind: "import", note: `launched ${Object.keys(v.launched).length} relaunch ${Object.keys(v.relaunch).length} pm_art ${Object.keys(v.pm_art).length}` });
+  }
+
+  // VM の形式 (launched.json・relaunch.json・phase.json と pm_art) で書き出す。relaunch は issue 番号のキーだけ (np:<n> は VM に無いので出さない)。
+  // phase は一度も保存していなければ null (最初の tick の前)。
+  exportVm(): Omit<VmState, "phase"> & { phase: VmState["phase"] | null } {
+    const launched = { ...this.s.launchedAt };
+    const relaunch: VmState["relaunch"] = {};
+    for (const [k, r] of this.d.store.all<{ count: number; art: string | null }>("relaunch")) {
+      if (/^[1-9]\d*$/.test(k)) relaunch[k] = { count: r.count, art: r.art };
+    }
+    const pm_art: VmState["pm_art"] = {};
+    for (const [k, p] of Object.entries(this.s.pmArt)) pm_art[k] = { at: p.at, line: p.line };
+    const phase = this.d.store.get<VmState["phase"]>("meta", "phase") ?? null;
+    return { launched, relaunch, phase, pm_art };
   }
 
   private async syncRuns(gh: Gh): Promise<number> {
@@ -823,7 +873,9 @@ export class Engine {
     phase.since = phase.review_only !== prev.review_only || !prev.since ? iso(nowMs) : prev.since;
     // launch を止める理由。stuck-ceiling (既存) を先に見る。rate-guard は REST の残量が 1,500 未満の間 (reconcile の読み取りは続く)。
     const stop = pr.stuck > this.d.cfg.stuckHigh ? "stuck-ceiling" : restGuardOn(this.meta.rest?.remaining) ? RATE_GUARD : undefined;
-    const gated = phase.review_only || !!stop;
+    // VM の状態を取り込むまでは launch しない (#2343)。取り込んだ launched の時刻は classify が recent に入れる。
+    const blocked = this.d.cfg.importRequired && !this.meta.importedAt ? NO_IMPORT : undefined;
+    const gated = phase.review_only || !!stop || !!blocked;
     for (const n of gated ? [] : sel.picks) {
       const i = issueOf.get(n);
       if (!i) continue;
@@ -848,6 +900,7 @@ export class Engine {
       open_prs_excl_stuck: pr.openExclStuck,
       stuck_prs: pr.stuck,
       stop,
+      blocked,
     };
     return { rows, plan, picks, unknown, children };
   }
@@ -910,8 +963,8 @@ export class Engine {
     const live = this.d.cfg.liveLaunch && gh;
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     // 再投入の意図は picks より先に処理する。picks が先に投稿すると、同じ issue の意図は『投稿の後に出た意図』として focus なしで処理済みになるため。
-    // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard) は picks も空なので、意図も処理しない。
-    const intent = plan.phase.review_only || plan.stop ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children });
+    // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard・取り込み前の no-import) は picks も空なので、意図も処理しない (処理済みにせず次の tick に回す)。
+    const intent = plan.phase.review_only || plan.stop || plan.blocked ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children });
     for (const p of intent.halted ? [] : picks) {
       if (intent.handled.has(p.n)) continue;
       let body: string;
@@ -1462,6 +1515,9 @@ export class Engine {
       open_prs_excl_stuck: plan.open_prs_excl_stuck,
       stuck_prs: plan.stuck_prs,
       launch_stop: plan.stop ?? null,
+      // VM の状態を取り込む前は "no-import" (launch しない)。取り込んだ時刻は imported_at (#2343)。
+      launch_blocked: plan.blocked ?? null,
+      imported_at: this.meta.importedAt ?? null,
       blocked: c("blocked"),
       started: c("started"),
       ready: c("ready"),
