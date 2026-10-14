@@ -65,7 +65,7 @@ work/venv/bin/python gui/xref_rva.py work/Serum2_win64.vst3 fc55b4 1195f14      
 ### 2-3. 未確定 (受入条件 1 の残り)
 
 - テンプレート名は平文に無いため、名前で直接選ぶ関数は探せなかった。実体化は uidesc の子 index など名前以外の経路か、vtable 経由 (スロット 11 の上流) の可能性がある。
-- `SpliceController` のメソッド候補 (`0x180796320` / `0x180796090` / `0x180542a20`) のうち、`0x180796320` は既知 (support 記事 URL を開くボタン処理, `gui/REPORT.md` §2-2)。`0x180796090` (size 587) は本 run でも未解析。
+- `SpliceController` のメソッド候補 (`0x180796320` / `0x180796090` / `0x180542a20`) のうち、`0x180796320` は既知 (support 記事 URL を開くボタン処理, `gui/REPORT.md` §2-2)。`0x180796090` (size 587) は未解析 (前 run から変更なし)。
 
 ## 3. demo bit (+0x22792) の読み出し・書込み (実測)
 
@@ -81,7 +81,7 @@ work/venv/bin/python gui/xref_rva.py work/Serum2_win64.vst3 fc55b4 1195f14      
 | 0x1800c2f08 / 0x1800c2f11 | `cmp [rsi+0x22790], 1` / `or [rsi+0x22b70], 0x10` | 同上 |
 | 0x1800c6874 | `cmp [rsi+0x22792], 1` (読み) | `SerumController::getState` 0x1800c6090 |
 
-- `license/authstub/REPORT.md` の「+0x22792 の writer は setState の 2 store のみ」と**一致** (本 run でも全 .text 走査で再確認)。
+- `license/authstub/REPORT.md` の「+0x22792 の writer は setState の 2 store のみ」と**一致** (前 run で全 .text 走査により確認。本 run では未再確認: 入力 `Serum2_win64.vst3` が無い)。
 - 0x1800aa336 / 0x1800ac7b0 / 0x1800b95ae は authstub REPORT に言及が無い。+0x22790 のみで +0x22792 ではない。demo 判定の別経路かは未確認。
 
 ## 4. demo ダイアログ呼出 0x1800501c0 の到達性 (受入条件 3)
