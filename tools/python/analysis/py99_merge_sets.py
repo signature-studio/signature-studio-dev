@@ -338,7 +338,7 @@ def main(argv):
 
     xs = sorted({x for _, x in keys})
     taken = sum(1 for x in xs if x in shared.addr_taken)
-    overlap = 0
+    frame = []
     nonconst = 0
     for a in order:
         m, o = ins[a]
@@ -349,9 +349,9 @@ def main(argv):
         if mm is None:
             nonconst += 1
             continue
-        off, sz = int(mm.group(2), 16), SIZES[mm.group(1)]
-        if any(off != x and off < x + 4 and x < off + sz for x in xs):
-            overlap += 1
+        frame.append((int(mm.group(2), 16), SIZES[mm.group(1)]))
+    xw = {x: max([sz for off, sz in frame if off == x], default=4) for x in xs}
+    overlap = sum(1 for off, sz in frame if any(off != x and off < x + xw[x] and x < off + sz for x in xs))
     print(f"# 限界情報: 解析した X {len(xs)} 種のうち lea で取られるもの {taken}・"
           f"X と重なる別オフセットの frame store (byte/word/dword/qword 定数) {overlap} 件・"
           f"frame の非定数オフセット store {nonconst} 件")
