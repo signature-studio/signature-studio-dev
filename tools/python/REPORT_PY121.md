@@ -53,7 +53,7 @@
 ## 検証
 
 測定 commit: `535dd91e` (コードを変えた最後の commit。`feat(python): screen state functions ... (#2985)`)。以下の表はこの commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから測定した。
-環境: runner 4 core、測定時の load average 1.23 (`uptime` 21:01:41)。`FL_WIN64_DIR` は `/home/runner/work/_temp/fl-win64` (fl-win64 を全展開)。`toolchain-emsdk` は `/opt/emsdk` (emsdk 6.0.12) を使用 (素材の展開はしていない)。前提生成物: `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 23 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.3 秒)。
+環境: runner 4 core、測定時の load average 1.23 (`uptime` 21:01:41)。`FL_WIN64_DIR` は `[WIN64]` の展開先 (fl-win64 を全展開)。emsdk は `[EMSDK]` (6.0.12、`toolchain-emsdk` の素材は展開していない)。前提生成物: `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 23 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.3 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
