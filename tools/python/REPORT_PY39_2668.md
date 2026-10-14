@@ -28,29 +28,35 @@
   - `*p` の書込み元 4 関数 (5 VA) を所属関数に帰属させた (下表)。selectAll の**直接 call** の前進閉包 (566 関数・深さ 60 まで) からは到達しない。ただし閉包内に**間接 call が 191 箇所**あり、そこを解決していないため「到達しない」とは証明できていない。
   - 段 6 の status → 例外文言の写像 (`0xd82c20`) の対応を確定した (下表)。`c38bc0` の中身と、文言を出す分岐のゲート `[rax+0x88]` は未確定。
   - 通常時の `*p`・`obj+80`・`d84f30`・callback の状態 byte は静的解析では確定しなかった (残ゲート・下の未解決表)。
+- 直接 call 元の数は `callers` mode で数え直した。`0x103b710` は 32 箇所・30 関数 (前版の「8 箇所・12 関数」は誤り)。
 - 既知類型との関係: 該当なし (意味論の読解。lift 出力は実行に使っていない)。
 
 ### 測定
 
-- 測定 commit: `64d751bd` (コード変更の最後の commit。`tools/python/analysis/flapi/pe_callgraph.py` を `9172cfc9` で追加し、`64d751bd` で usage の素材パスを `$ARTIFACTS_DIR` に直した)。`git diff 64d751bd HEAD -- tools/python/provider tools/python/host tools/python/tests` は本 REPORT の commit 時点で 0 行 (本 PR はこれらのコードを変えない)。
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` から `block00031_PE.bin` のみ展開 (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・2.9 秒)。展開先は `tools/python/work/fl` (gitignore)。
+- 測定 commit: `4fe5d043` (コード変更の最後の commit。`pe_callgraph.py` に `callers` mode と `--callee-starts` を足した。`fwd` の既定の結果は `9172cfc9`・`64d751bd` と同じ)。`git diff 4fe5d043 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は本 REPORT の commit 時点で 0 行 (本 PR はこれらのコードを変えない)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` から `block00031_PE.bin` のみ展開 (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・2.8 秒)。展開先はリポジトリ外 (`$RUNNER_TEMP/flpy39`)。`FL_WIN64_DIR=<展開先>` で `extracted/block00031_PE.bin` を読む。
 - 再現 (`FL_WIN64_DIR=<展開先>` で実行):
   - 所属関数: `python3 analysis/flapi/pe_callgraph.py func 0x103b781 0x103b9ec 0x103be3a 0x103c01c`
+  - 直接 call 元: `python3 analysis/flapi/pe_callgraph.py callers 0x103b710,0x103b950,0x103ba10,0x103bd60,0x103bec0 0xd5b150,0xd843d0,0xd5b100,0x11e8670,0xff8a90,0xffac20 60`
   - 前進閉包: `python3 analysis/flapi/pe_callgraph.py fwd 0xd5b150,0xd843d0,0xd5b100,0x11e8670,0xff8a90,0xffac20 0x103b710,0x103b950,0x103ba10,0x103bd60,0x103bec0 60`
+  - 閉包の補正版: 上の `fwd` に `--callee-starts` を付ける
   - 段 6: `python3 analysis/flapi/pe_disasm.py 0xd82c20 70` と、各 `lea rdx, [rip+…]` 先の文字列 (下表)
-- 実測: `fwd` 終了 0・閉包 566 関数・間接 call 命令 191 箇所・標的 hit 0 (`9172cfc9` で 36.0 秒。`64d751bd` での再実行は同じ結果)。測定直後の load average (1 分値) 0.55 (4 core)・並列数 1。
+- 実測 (`4fe5d043`・クリーンな worktree・コミット済み HEAD): `callers` 終了 0・36.5 秒。`fwd` 終了 0・36.8 秒 (閉包 566 関数・間接 call 191 箇所・標的 hit 0)。`fwd --callee-starts` 終了 0・37.4 秒 (閉包 665 関数・間接 call 208 箇所・標的 hit 0)。`func` は下表と一致。load average (1 分値) 0.76 → 1.07 (4 core)・並列数 1 (単一プロセスの線形走査)。
 
 ### `*p` の書込み元の所属関数と直接 call
 
-| 書込み VA | 命令 | 所属関数 (推定) | 直接 call 元 |
+| 書込み VA | 命令 | 所属関数 (推定) | 直接 call 元 (`callers` の実測) |
 |---|---|---|---|
-| 0x103b781 | `mov [rcx], eax` | 0x103b710 | 8 箇所 (12 関数から) |
-| 0x103b9ec / 0x103ba02 | `mov [rax], esi` / `mov [rax], ebx` | 0x103b950 (`*p` の入替え。8 回目 run 節) | 0x103b950 は 0x103ba10 の 2 箇所 (0x103bb1a・0x103bc1b) からのみ呼ばれる |
-| 0x103be3a | `mov [rax], ecx` | 0x103bd60 | 3 箇所 (0x103c000・0x1041a95・0x11d3bde) |
+| 0x103b781 | `mov [rcx], eax` | 0x103b710 | 32 箇所 (30 関数から)。閉包内は 0 |
+| 0x103b9ec / 0x103ba02 | `mov [rax], esi` / `mov [rax], ebx` | 0x103b950 (`*p` の入替え。8 回目 run 節) | 2 箇所 (1 関数 0x103ba10 から: 0x103bb1a・0x103bc1b)。閉包内は 0 |
+| 0x103be3a | `mov [rax], ecx` | 0x103bd60 | 3 箇所 (3 関数から: 0x103c000 (0x103bec0)・0x1041a95 (0x1041990)・0x11d3bde (0x11d3750))。閉包内は 0 |
 | 0x103c01c | `mov [rax], esi` | 0x103bec0 | 直接 call 0 箇所 (関数ポインタ・vtable 経由のみ) |
 
+- 直接 call 元の数え方: `callers <標的 VA csv>` は全 `.text` の E8 rel32 から標的 VA への呼出し箇所を集め、各箇所を所属関数 (`func` と同じ推定) へ帰属させる。関数数は帰属先の異なり数。根 VA を渡すと、各箇所の所属関数が根からの閉包 (`fwd` と同じ深さ 60) に入るかを出す。
+- 前版の `0x103b710` の「8 箇所 (12 関数から)」は誤りで、上の数に直した。`0x103b950`・`0x103bd60`・`0x103bec0` の前版の数は実測と一致していた。
 - 所属関数は CC パディング直後の命令を関数先頭とみなした推定。既知の関数 (`0xd5b150`・`0xd843d0`・`0xd5b100`・`0x11e8670`・`0xff8a90`・`0xffac20`・`0xd84f30`) は一致した。
-- 標的 4 関数 (`0x103b710`・`0x103b950`・`0x103ba10`・`0x103bd60`・`0x103bec0`) はいずれも、selectAll の経路 (`0xd5b150`・`0xd843d0`・`0xd5b100`・`0x11e8670`・`0xff8a90`・`0xffac20`) から直接 call の前進閉包で到達しない。
+- 標的は 5 関数 (書込み元 4 関数 `0x103b710`・`0x103b950`・`0x103bd60`・`0x103bec0` と、`0x103b950` の呼出元 `0x103ba10`)。いずれも、selectAll の経路 (`0xd5b150`・`0xd843d0`・`0xd5b100`・`0x11e8670`・`0xff8a90`・`0xffac20`) から直接 call の前進閉包で到達しない。
+- 閉包の補正版 (`fwd ... --callee-starts`): 直接 call の先も関数先頭に加えると、閉包は 665 関数・間接 call 208 箇所に広がる。標的 5 関数は依然として届かなかった。ただし関数先頭は CC パディングと直接 call 先からの推定にすぎず、閉包の完全性は未証明 (未解決表)。
 
 ### 段 6: status → 例外文言の写像 (`0xd82c20`・PE 実測)
 
@@ -75,21 +81,24 @@
 
 ### 受入条件 (#2668) の状態 (9 回目 run 時点)
 
-- [部分] (1) `*p` の書込み元 4 関数の所属関数と、selectAll 閉包 (直接 call) からの非到達を PE 箇所つきで記録。通常時の `*p`・`obj+80`・`d84f30`・状態 byte は未確定 (残ゲート)
-- [部分] (2) 段 6 の status → 文言の写像は確定 (上表)。`c38bc0` と文言分岐のゲート `[rax+0x88]` は未確定
-- [不実施] (3) 選択値・ゲートが確定しないため、`provider/fl_engine.c`・`host/fl_mock.mjs` は変更しない
-- [不実施] (4) コード変更 0 のため `all_tools` は再実行していない。直近の 48/48 は `12e711cc` (8 回目 run)。main の provider/host/tests は以後 他 PR で変わっている
-- [達成] (5) 理由と残ゲートを本 REPORT に残し、実装は行わない
+- issue #2668 は (5) の範囲に縮めて `Closes` で閉じる。(1)〜(4) は未達のため issue 本文から外し、原文を下に移した。未達の子 issue は起票しない (未解決の追跡だけのため。下の未解決表)。
+- [達成] (5) 理由と残ゲートを本 REPORT に残し、実装は行わない (`provider/fl_engine.c`・`host/fl_mock.mjs` は変更しない)
+- 移した受入条件 (原文のまま):
+  - (1) selectAll の経路 (0xd5b150 → 0xd843d0 → 0xd5b100 → 0x11e8670 → 0xff8a90 → 0xffac20) で、`*p` の通常時の値と、ゲート (`obj+80`・`d84f30`・状態 byte) が成立するかを PE 解析箇所つきで REPORT に残す。 → 部分。書込み元 4 関数の所属関数と、selectAll 閉包 (直接 call) からの非到達を PE 箇所つきで記録。通常時の `*p`・`obj+80`・`d84f30`・状態 byte は未確定
+  - (2) 戻り値・範囲外 code (段 6 の写像 `0xd82c20`・`c38bc0`) を確定する。 → 部分。段 6 の status → 文言の写像は確定 (上表)。`c38bc0` と文言分岐のゲート `[rax+0x88]` は未確定
+  - (3) 確定できたら `provider/fl_engine.c` と `host/fl_mock.mjs` に実装し、`tests/channels_diff.mjs` で mock と C の diffs 0。 → 条件不成立のため対象外 (選択値・ゲートが未確定。実装しない)
+  - (4) `FL_ENGINE=wasm node tests/all_tools.mjs` が 48/48 ok を維持。 → 未実施。本 PR は provider/host/tests を変えない。直近の 48/48 は `12e711cc` (8 回目 run)
 
 ### 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `*p` (`0x154528c`) の通常時の値。書込み元 4 関数 (0x103b710・0x103b950・0x103bd60・0x103bec0) を実行時にどの経路で呼ぶか | 初期値 -1 のままなら `ffac20` は全 channel で 1 (全選択)。値が 0 以上なら `item+0x798 == *p` の channel だけが選ばれる | 本表のみ (子は起票しない。親 #1527 は閉じ済み) |
+| `*p` (`0x154528c`) の通常時の値。書込み元 4 関数 (0x103b710・0x103b950・0x103bd60・0x103bec0) を実行時にどの経路で呼ぶか | 初期値 -1 のままなら `ffac20` は全 channel で 1 (全選択)。値が 0 以上なら `item+0x798 == *p` の channel だけが選ばれる | 同じ選択ゲート `0xffac20` を扱う #2642 [PY-82] (OPEN) へ参照を残す。子は起票しない。親 #1527 は閉じ済み |
 | 書込み元への経路の非到達の証明: 閉包内の間接 call 191 箇所 (vtable・関数ポインタ) | 直接 call の閉包では到達しないが、間接 call の先は未解決のため、非到達は未証明 | 本表のみ |
 | 段 2 の `obj+80` と `d84f30`、段 3 の状態 byte の通常時の値 | 通常時にゲートが通るかが未確認。通らないと selectAll は -2 で何もしない | 本表のみ |
 | `c38bc0` の中身 (status 0 以上の戻り値) と、文言分岐のゲート `[rax+0x88]`・status 0 の `[rax]` | None 扱いと例外文言を出す条件が未確認 | 本表のみ |
-| 関数先頭の推定の限界 (`pe_callgraph.py` は CC パディング後の先頭だけを検出する。`0xd82c20` は `0xd829f0` の内側と誤帰属) | 閉包が過小評価になる可能性。上の「到達しない」は暫定 | 本表のみ |
+| 関数先頭の推定の限界 (`pe_callgraph.py` は CC パディング後の先頭だけを検出する。`0xd82c20` は `0xd829f0` の内側と誤帰属)。`--callee-starts` の補正版 (665 関数) でも標的は届かなかったが、先頭の検出漏れは残る | 閉包が過小評価になる可能性。上の「到達しない」は暫定 | 本表のみ |
+| 移した受入条件 (1)〜(4) の未達分 (原文は上の「受入条件」節) | 通常時の選択値とゲートが未確定のため、`channels.selectAll` の C provider / mock 実装 (`channels_diff` 0 と `all_tools` 48/48 の再確認) は行わない | 本表のみ (issue #2668 は (5) の範囲で閉じた) |
 
 ### 8 回目 run 節の分割移動 (250 行上限のため)
 
