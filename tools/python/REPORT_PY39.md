@@ -110,3 +110,77 @@
 - `0x40fe90` / `0x40feb0`: `0x40feb0` は引数が非 0 かつ `0x40fe90` の検査に通らないとき、code `0xa` で `0x4096d0` を呼ぶ。`0x4096d0` は code の下位 7bit を受けて通知する。**0xa が範囲外 code かは未確定**。
 - 結論: 選択フラグの setter (`0xff8a90`)・全解除 (`0x11e8720`)・検索 (`0x11e8280`) の所在は確定。**selectAll / selectOneChannel がこれらを呼ぶかは未確認**のため、7 関数の戻り値・範囲外 code は引き続き未確定。`fl_engine.c` 実装は行わない。
 - 未読 (次に読む対象): `0x11e8670` の `0xfe8bb0` 以降 (呼び出し後の戻り規約)、`0xff8a90` の `0xfdee80`、`0xffac20`、`0x410010`、`0x4096b0`。selectAll・selectOneChannel 本体 (`0xd5b150` → `0xd843d0` 以降) が `0x11e8720`・`0x11e8280` を呼ぶかの確認。
+
+## 追加解析 (7 回目 run, #2548): setStepParameterByIndex の呼出し経路・status・副作用
+
+- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (各 1 回・終了 0)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (実測 2.9 秒)。
+- 測定 commit: `1bb996f0` (origin/main 取り込み後の HEAD。コード変更なし・本 run は REPORT のみ)。
+- 差分 0 の証跡: `git diff 1bb996f0 HEAD -- tools/python/provider tools/python/host tools/python/tests` (PR 本文に出力を載せる)。
+
+### 呼出し経路 (PE 実測)
+
+| 段 | VA | 読み取った内容 |
+|---|---|---|
+| ハンドラ | 0xd5cec0 | 結果 struct `[rbp+0x80]` を初期化。書式 `iiiii\|i` を解析し 6 値 (index, patNum, step, param, value, useGlobalIndex) を受ける。解析成功時のみ `0xd843d0` を呼ぶ |
+| 委譲 | 0xd843d0 | `[out+0]` を `-2` で初期化。6 値を context `+0x18`〜`+0x40` に格納。callback `0xd5ce00` を r8 で渡す。最後に `[out+0]` へ status (`[ctx+0x60]`) を書く |
+| callback | 0xd5ce00 | status を `-2` にする。`[vtable+0x98]` の述語が偽なら status `-2` のまま戻る。真なら `0x1005730(index, useGlobal>0, &obj)` で範囲チェック。失敗で status `-4`。成功で status `0` にして `0x130f740(obj.[+0x794], patNum, step, param, value)` を呼ぶ |
+| step 換算 | 0x130f740 | `step` に `[G1]` を乗じて `0x130f3d0` へ渡す (`imul`) |
+| 本体 | 0x130f3d0 | `0x130f200` で対象 item 群を list に集める。list[0] の field を読んで `delta = value - field` を求め、全 item の field に加算 (param 別の clamp は下表) |
+| 戻り値変換 | 0xd82c20 | status を Python 側の戻り値・例外に変換 (下表) |
+
+`0x1005730` の範囲チェック: `useGlobal > 0` なら配列 A (件数 `[0x5dcad3]`)、それ以外は配列 B (件数 `[0x5da9a8]`) を使う。index が `[0, 件数-1]` の外なら false。
+
+### status と文字列 (PE 内の文字列を直接読んだ)
+
+| status | 文字列 | 発生箇所 (実測) |
+|---|---|---|
+| 0 | `OK` | callback 成功経路 (0xd5ce00 の `[rbx+0x60]=0`)。`0xd82c20` は code 0 で `0xc38bc0` へ |
+| -1 | `Unspecified error` | 0xd82c20 の分岐 (0xd82d03) |
+| -2 | `Operation unsafe at current time` | callback の述語 `[vtable+0x98]` が偽のときの初期値 (0xd82d18) |
+| -3 | `Range error` | 0xd82d2a。この経路の上流 (どの呼出しが -3 を立てるか) は未読 |
+| -4 | `Index out of range` | `0x1005730` が false (0xd5ce75 の `[rbx+0x60]=-4`) |
+| その他 | `Unknown error` | 0xd82d9a |
+
+戻り値の経路 (推定を含む):
+- status ≥ 0: `0xd82c20` は `0xc38bc0` を返す。`0xc38bc0` は `mov rax,[rip+...]` (global object の読出し) なので、戻り値は None と推定。
+- status < 0: `0xd82c20` は `[global]→+8→vtable+0x88` の述語を見る。偽なら `0xd82dd0` で `0xc38bc0` (None) を返し、例外は立たない。真なら上表の文字列を `0x4135e0` で設定する。例外型は未確認。
+- 未確認: status 0 のとき `0xd82c20` が先に `[0x860485]` の関数を呼ぶ経路 (非 NULL なら 0 を返す)。
+
+### 範囲外・空振り
+
+- index が配列の範囲外: status `-4` (上記)。
+- `0x130f200` の channel ID 探索 (`[elem+0x794] == chanId`) で見つからない・patNum が `[0, 998]` の外・pattern が null: `0x130f3b0` / `0x130f3a7` で空 list を返す。`0x130f3d0` は件数 0 なら書換えをしない。status は 0 のまま (副作用なし)。分岐の読みから導いた結論で、実機での確認は未実施。
+
+### 副作用 (読めた範囲)
+
+item の field と clamp (`0x130f5f8`〜`0x130f68c` で確認):
+
+| param | 差分計算の読出し | 書込み (`+= delta` 後) |
+|---|---|---|
+| 0 | word `+0xc` (符号付き) | 書込み分岐は未読 |
+| 1 | byte `+0x15` | 書込み分岐は未読 |
+| 2 | byte `+0x12` | 書込み分岐は未読 |
+| 3 | byte `+0x10` | byte、clamp `[0, 0xf0]` |
+| 4 | byte `+0x14` | byte、clamp `[0, 0x80]` |
+| 5 | byte `+0x16` | byte、clamp `[0, 0xff]` |
+| 6 | byte `+0x17` | byte、clamp `[0, 0xff]` |
+| 7 | dword `+0x0` | dword `+= delta` (clamp なし)。delta≠0 のとき `0x12df760` を呼ぶ (0x130f6a0) |
+| 8 | 差分なし (`delta = value` の直値) | byte `+0x11 = low8(value)` (`0x130f68c`。param 8 との対応は推定) |
+| その他 | 差分なし (ebx=0) | 書換えなし |
+
+後処理: `[global]≠0` で `0xe39560`、`[global+0xa9]≠0` で `0x1307760` (未読。通知・再描画と推定)。最後に list を `0x418190` で解放。
+
+### 未解決 (次回の着手点)
+
+1. param 0・1・2 の書込み分岐 (`0x130f582`・`0x130f5aa`・`0x130f5d1`) と param 8 の対応を未読。
+2. item 列挙 `0x12df320`・長さ `0x105f2e0`・list 追加 `0x417fc0` の意味。換算用グローバル `G1` (`[rip+0x2d2ead]` の乗算、step 換算) と `G2` (`[rip+0x2d32ce]`、item 位置の `idiv` 換算) の値。
+3. callback 述語 `[vtable+0x98]` (status -2 の条件) と `[vtable+0x88]` (負の status で例外を立てるか) の型。`general.safeToEdit` 相当と推定するが未確認。
+4. `0x4135e0` (メッセージ設定) と `0x414000` の実体。
+5. param 番号の意味 (flapi 署名の docs との照合) は未実施。mock 側に pattern の note モデルが無いため、実装には note 列の表現も要る。
+
+### 受入条件 (#2548) の状態 (7 回目 run 時点)
+
+- [ ] 戻り値・範囲外 code・副作用を PE 解析箇所つきで REPORT に残す — **部分達成** (呼出し経路・status 表・範囲外 `-4`・param 3〜8 の field と clamp は残した。param 0〜2、item 列挙、述語は未確定)。
+- [ ] `provider/fl_engine.c` と `host/fl_mock.mjs` に実装 — **未達** (副作用の未確定部分があるため、推測で実装しない)。
+- [ ] `tests/channels_diff.mjs` に追加・diffs 0 — **未達**。
+- [ ] `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 — **未実行** (コード差分 0)。
