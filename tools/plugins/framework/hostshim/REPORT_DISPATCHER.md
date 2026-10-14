@@ -223,3 +223,12 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 - Phase B の `memory access out of bounds` (`status=0xffffffff plug=0x0 rec=7`) は REPORT_1229 §1 の既知ベースライン (2b2faf52 で同症状) と同一。本 run はコード無変更のため、今回の変更による回帰ではない。起票先は既存の #1229 (`[PLG-P0b-4]`)。
 - 受入 3 の未了: `hostshim.c` の応答表を実測に合わせる作業は未実施 (受入 2 の未収載 ID 応答が未確定のため。#1222 に残す)。
 - 作業ツリー: `ws-1222` (branch `1222-plg-p0b-3-phaseA`)。生成物 (`tools/plugins/work/fw/`・`work/`) は gitignore 対象。
+
+## 10. #2886 (PLG-P0b-25): 格納元の機械語確定
+
+部分達成。詳細と VA は `REPORT_DISPATCHER_APPENDIX.md` (250 行上限のため分割)。測定 commit は `2d523491` (解析) と `2dca40dd` (応答表)。
+
+- 受入 1 (格納元 19 ID): 出所を VA 付きで確定。TLS 要素ポインタ + `0x2a8` 6 ID / call 戻り値 6 ID / callee 出力引数 1 / グローバル・フィールド 5 / ローカル 1。値の実体は未確定。
+- 受入 2 (仮想呼出し出口 27 ID): A (戻り値を格納) 3 / B (戻り値を捨てて `0x13281af` へ) 13 / C (後続未読) 11。B は応答が状態格納 0〜4 で決まる。
+- 受入 3: `hostshim.c` に 0x07・0x1c・0x4e (非 NULL) を追加。Phase A `dispatch=38 ff=0` PASS。Phase B の OOB は変更前後で同一。
+- 未解決: [PLG-P0b-27] (受入 2 の残り)・[PLG-P0b-28] (整数・bool 格納元の実値)。
