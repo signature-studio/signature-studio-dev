@@ -25,7 +25,7 @@
 
 - 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に展開 (12 ファイル)。[EMSDK]・[RETDEC] (`docs/REFERENCES.md` の ID) は runner に存在。fl-win64 は展開していない (`fw_stage2.sh`・`hs_e2e.sh` は `$FL_WIN64_DIR` を読まない)。
 - 実行: 逐次 (並列数 1・nproc 4)。`fw_stage2.sh` は増分 (`--fresh` なし。stage-1 の RetDec は再実行しない)。`hs_e2e.sh` は両回 `--fresh`。
-- 対照 = 注釈 `return 0` 版 (コミット 3b581236 の `fw_hostfix.py`。現 HEAD と同一コード)。stand-in 版 (未採用) = 91308efd の `fw_hostfix.py` (ca85489e の同ファイルと同一)。
+- 対照 = 注釈 `return 0` 版 (コミット 3b581236 の `fw_hostfix.py`。現 HEAD の `fw_hostfix.py` と同一)。stand-in 版 (未採用) = 91308efd の `fw_hostfix.py` (ca85489e の同ファイルと同一)。
 
 | 手順 | 結果 | 所要 (real) | load average (開始 → 終了) |
 |---|---|---|---|
@@ -49,7 +49,7 @@
 
 - 受入 2 は未達。既定の注釈は `return 0` のまま。0 埋めブロックの stand-in は未採用で、正しい戻り値 (TLS ブロックの中身・`+568` の意味) は未確定。OOB は解消していない。
 - 受入 3 は n=1 の実測と対照で部分達成。変動 (n≥3) と §8 との食い違いは未評価。
-- 既定の値は対照 (3b581236・`--fresh`・§10.3) の実測をそのまま引用する。HEAD は対照と同一コードのため、追加の再測定は行わない (WORKFLOW §6)。
+- 既定の値は対照 (3b581236・`--fresh`・§10.3) の実測をそのまま引用する。HEAD の実行コードは測定 commit `058c2049` と同一のため、HEAD の実測は付録 §11.4.1 を引用する (WORKFLOW §6)。対照 3b581236 は stand-in 版との比較にだけ使う。
 - 未解決の一覧は `REPORT_2115.md` §9 に置く (本節では重複させない)。
 
 ## 11. TLS 経路の確定と注入実験 (fix round 5・測定 commit 4c00ec24)
