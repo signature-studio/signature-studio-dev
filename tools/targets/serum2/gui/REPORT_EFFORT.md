@@ -29,7 +29,7 @@ python3 gui/strategy_count.py work/uidesc.json out/rtti_classes.txt > work/gui_s
 python3 gui/effort_measure.py work/uidesc.json work/vstgui4/vstgui > work/effort_measure.txt
 ```
 
-- 入力 sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` は `gui/REPORT.md` §9-1 の値と一致 (本 run で `$ARTIFACTS_DIR/plugins-serum2.tar.zst` から再展開して照合)。
+- 入力 sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` は `gui/REPORT.md` §9-1 の値 (前版 `f0212bab` で照合)。本 HEAD では `plugins-serum2` が未展開のため再照合していない。
 - 依存: `pefile` `capstone` `zstandard` (venv `work/venv`、`uv venv` + `uv pip install`)。
 - upstream: tag `vstgui4_14_3` (commit `b1e82355`) を depth 1 で clone。14.0〜14.3 のどれかは未確定 (`gui/REPORT.md` §11) のため、14.3 の宣言照合は**版の差に対して頑健な範囲のみ**使う (宣言の有無は 14.0〜14.3 で同一と仮定。仮定は未検証)。
 
@@ -104,9 +104,9 @@ python3 gui/effort_measure.py work/uidesc.json work/vstgui4/vstgui > work/effort
 
 ## 5. 検証
 
-- 入力の sha256 は `gui/REPORT.md` §9-1 の値と一致 (上記 §1)。
-- `strategy_count.py` の出力は、コミット済みの `out/gui_strategy_count.txt` と**一致** (`diff` で確認)。
-- `effort_measure.py` の出力 (`work/effort_measure.txt`): 所要 0.93 s real (逐次, load 未計測)。
+- 以下の §2 の値は**前版 `f0212bab` での測定値**。本 HEAD では再実行していない (入力 `work/uidesc.json` は `plugins-serum2` の展開が要る)。
+- 前版では、入力の sha256 は `gui/REPORT.md` §9-1 の値と一致 (§1)。`strategy_count.py` の出力は、コミット済みの `out/gui_strategy_count.txt` と一致 (`diff`)。
+- 前版の `effort_measure.py` の出力 (`work/effort_measure.txt`): 所要 0.93 s real (逐次, load 未計測)。
 - ネガティブコントロール: C 接頭辞 ヒューリスティックが誤る 5 種 (`CBitmapTextEdit` 等) を宣言照合で検出。宣言照合の偽陰性は、前方宣言のみのクラス (`CKickButton` `COnOffButton` 等) で一度生じたため、宣言の正規表現は `class|struct <名>\b` の単語一致に限定して再照合済み (`gui/effort_measure.py` の `upstream_has`)。
 - 範囲外: 実 VSTGUI 実行、wasm/canvas 上の表示、工数 (人日)、mac 版。
 
@@ -138,4 +138,4 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 - 測定 commit: `0444a3f3` (`gui/effort_poc.py` に純粋仮想の計数を追加した commit。コードを変えた最後の commit)。初版 `f0212bab` は include 閉包のみを計数していた。
 - `git diff 0444a3f3 HEAD -- tools/targets/serum2/gui/*.py` の出力: 空 (差分 0)。REPORT 文書のみの後続 commit は測定対象のコードを変えない。
 - §6 の純粋仮想の計数は `0444a3f3` の `effort_poc.py` で測定。同一入力の 2 回実行で出力が一致 (`cmp` で確認)。
-- 既存の `effort_measure.py` / `strategy_count.py` は本 run で再実行し、§2 の値と一致した (`effort_measure.py` は `work/effort_measure.txt` に保存)。
+- `effort_measure.py` / `strategy_count.py` の §2 の値は前版 `f0212bab` での測定値。本 HEAD では再実行していない (入力 `work/uidesc.json` は `plugins-serum2` の展開が要る)。
