@@ -102,10 +102,10 @@ static uint64_t plug_call(uint32_t va, uint64_t a1, uint64_t a2, uint64_t a3, ui
 
 static int in_image(uint64_t va) { return va >= 0x400000u && va < 0xd02000u; }
 
-/* framework 初期化の TLS 部分 (#2571)。_StartLib (0x4189c0) の reason==1 は [0x7162d8]=1 を立てた後,
- * _InitLib が hooks[1] (= 0x418120) を呼んで TlsAlloc → [0x6d6e70] を設定する。Phase B はこの経路を
- * 通らず CreatePlugInstance に入るため, ここで同じ 2 手を先に実行する。_StartLib 全体 (0x4189c0) は
- * InitUnits (0x40da80) を含むため採らない (Phase B の route では未検証)。 */
+/* framework 初期化の TLS 部分 (#2571)。_StartLib (0x4189c0) の reason==1 は [0x716290]・[0x7162d8] を 1 に立て,
+ * fw_call_cur(0x418240) を呼んだ後, _InitLib が hooks[1] (= 0x418120) を呼ぶ (0x418120 は TlsAlloc → [0x6d6e70])。
+ * 本関数は [0x7162d8]=1 と 0x418120 の 2 手だけを行う。Phase B は CreatePlugInstance に直接入るため, ここで先に実行する。
+ * 他の store と 0x418240 は役割未確認のため採らない (REPORT_2571 §4)。_StartLib 全体 (0x4189c0) は InitUnits (0x40da80) を含むため採らない。 */
 #define VA_TLS_INIT    0x418120u
 #define VA_TLS_FLAG    0x7162d8u
 #define VA_TLS_INDEX   0x6d6e70u
