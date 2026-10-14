@@ -21,8 +21,9 @@
 | ネガコン 別ノート (D-spectral) | FAIL |
 | ネガコン 1 サンプル改変 (A-exact) | FAIL |
 | ref メトリクス | peak 0.790915 / rms 0.310052 / 非ゼロ 16,380/16,384 cell |
-| `ref_harness.sh` (HEAD) | NG=0, 13.6 s, load 0.33 (開始時 1 分値) |
-| 既存 `e2e.sh` (HEAD) | 62/62 OK, 67.3 s, load 0.12 (開始時 1 分値), NC1/NC2 とも期待どおり |
+| `ref_harness.sh` (測定 commit `dcafb442`) | NG=0, 13.6 s, load 0.33 (開始時 1 分値) |
+| 既存 `e2e.sh` (測定 commit `dcafb442`) | 62/62 OK, 67.3 s, load 0.12 (開始時 1 分値), NC1/NC2 とも期待どおり |
+| `84e411e7` 上の再測定 (ref_harness / e2e) | 未実施 (素材 `plugins-serum2`・`apt-mingw` が本 run に無い)。§2 参照 |
 
 ## 2. 既存 e2e への影響 (測定 commit 以降のコード差分)
 
@@ -31,7 +32,7 @@
 ```
 git diff dcafb442 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
   ref_harness.sh   : 表示文言 data → file SHA-256 (1 行)
-  ref_manifest.json / ref_manifest.py : runner 表記 /usr/lib/wine/wine64 → apt wine 9.0 (1 行ずつ)
+  ref_manifest.json / ref_manifest.py : runner 表記 (repo 外の wine64 絶対パス) → `wine64 (apt wine 9.0)` (1 行ずつ)
   ref_render.sh    : wine 実行を `|| RC=$?` に変更 (RC=0 を先置き)
 ```
 
