@@ -86,7 +86,7 @@ def main():
                            'detail': {k: v for k, v in c.items() if not k.startswith('_')} if va in aud else None})
             v = liftdiff.make_record(sess, rec, irfeats)
             out.write(json.dumps({'mode': a.mode, 'part': pi, 'va': hex(va), 'name': rec['name'],
-                                  'verdict': v.get('verdict'), 'cases': cs}, default=str) + '\n')
+                                  'verdict': v.get('verdict'), 'control': va == ctrl_va, 'cases': cs}, default=str) + '\n')
         out.flush()
         print('[ld96] part %d done (%d fn) %.0fs' % (pi, len(part), time.time() - t0), flush=True)
     out.close()
