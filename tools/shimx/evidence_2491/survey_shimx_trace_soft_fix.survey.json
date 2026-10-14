@@ -1,0 +1,7352 @@
+{
+ "summary": {
+  "variant": "m11_sx_trace_soft_fix",
+  "units": 942,
+  "kinds": {
+   "ok": 789,
+   "oob": 95,
+   "closure_outside": 47,
+   "halt0": 9,
+   "clobber": 1,
+   "noproc": 1
+  },
+  "reboots": 1,
+  "shimx_trace_msgs": {
+   "[shimx] GetProcAddress miss: kernel32.dll!#39682": {
+    "count": 1,
+    "first_unit": 2
+   },
+   "[shimx] lifttab: GetThreadPreferredUILanguages # orm=0 -> token 0x7f00000a": {
+    "count": 1,
+    "first_unit": 2
+   },
+   "[shimx] lifttab: SetThreadPreferredUILanguages # orm=0 -> token 0x7f00000b": {
+    "count": 1,
+    "first_unit": 2
+   },
+   "[shimx] lifttab: GetThreadUILanguage # orm=0 -> token 0x7f00000c": {
+    "count": 1,
+    "first_unit": 2
+   },
+   "[shimx] GetProcAddress miss: ntdll.dll!": {
+    "count": 1,
+    "first_unit": 18
+   },
+   "[shimx] cbtrans: EnumCalendarInfoW VA 0x4476d0 -> trampoline slot 0 (invoke=0x1)": {
+    "count": 1,
+    "first_unit": 18
+   },
+   "[shimx] cbtrans: EnumCalendarInfoW VA 0x4477a0 -> trampoline slot 1 (invoke=0x1)": {
+    "count": 1,
+    "first_unit": 18
+   },
+   "[shimx] GetProcAddress miss: kernel32.dll!": {
+    "count": 11,
+    "first_unit": 36
+   },
+   "[shimx] LoadLibrary 失敗: Msctf.dll": {
+    "count": 1,
+    "first_unit": 104
+   },
+   "[shimx] GetProcAddress miss: ole32.dll!": {
+    "count": 6,
+    "first_unit": 107
+   },
+   "[shimx] GetProcAddress miss: shell32.dll!": {
+    "count": 1,
+    "first_unit": 137
+   },
+   "[shimx] GetProcAddress miss: dwmapi.dll!": {
+    "count": 23,
+    "first_unit": 146
+   },
+   "[shimx] GetProcAddress miss: user32.dll!": {
+    "count": 8,
+    "first_unit": 146
+   },
+   "[shimx] LoadLibrary 失敗: avrt": {
+    "count": 1,
+    "first_unit": 146
+   },
+   "[shimx] GetProcAddress miss: advapi32.dll!": {
+    "count": 1,
+    "first_unit": 146
+   },
+   "[shimx] LoadLibrary 失敗: PowrProf.dll": {
+    "count": 1,
+    "first_unit": 146
+   },
+   "[shimx] GetProcAddress miss: shcore.dll!": {
+    "count": 1,
+    "first_unit": 146
+   },
+   "[shimx] lifttab: (null) # orm=16 -> token 0x7f000000": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=17 -> token 0x7f000001": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=18 -> token 0x7f000002": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=19 -> token 0x7f000003": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=21 -> token 0x7f000004": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=25 -> token 0x7f000005": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=152 -> token 0x7f000006": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=153 -> token 0x7f000007": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] lifttab: (null) # orm=155 -> token 0x7f000008": {
+    "count": 1,
+    "first_unit": 239
+   },
+   "[shimx] GetProcAddress miss: comctl32.dll!": {
+    "count": 12,
+    "first_unit": 299
+   }
+  },
+  "api_units": {
+   "TlsGetValue": {
+    "units": 13,
+    "calls": 49,
+    "first_unit": 112
+   },
+   "GetModuleHandleW": {
+    "units": 12,
+    "calls": 18,
+    "first_unit": 2
+   },
+   "GetProcAddress": {
+    "units": 12,
+    "calls": 78,
+    "first_unit": 2
+   },
+   "WideCharToMultiByte": {
+    "units": 10,
+    "calls": 64,
+    "first_unit": 18
+   },
+   "InitializeCriticalSection": {
+    "units": 9,
+    "calls": 14,
+    "first_unit": 2
+   },
+   "GetCurrentThreadId": {
+    "units": 7,
+    "calls": 41,
+    "first_unit": 2
+   },
+   "VirtualAlloc": {
+    "units": 7,
+    "calls": 24,
+    "first_unit": 16
+   },
+   "GetVersionExW": {
+    "units": 4,
+    "calls": 4,
+    "first_unit": 17
+   },
+   "GetModuleFileNameW": {
+    "units": 4,
+    "calls": 6,
+    "first_unit": 18
+   },
+   "QueryPerformanceCounter": {
+    "units": 4,
+    "calls": 4,
+    "first_unit": 46
+   },
+   "RegisterWindowMessageW": {
+    "units": 4,
+    "calls": 10,
+    "first_unit": 115
+   },
+   "GetSystemInfo": {
+    "units": 3,
+    "calls": 3,
+    "first_unit": 2
+   },
+   "LoadStringW": {
+    "units": 3,
+    "calls": 5,
+    "first_unit": 16
+   },
+   "LoadLibraryW": {
+    "units": 3,
+    "calls": 7,
+    "first_unit": 104
+   },
+   "RegisterClipboardFormatW": {
+    "units": 3,
+    "calls": 4,
+    "first_unit": 168
+   },
+   "GetACP": {
+    "units": 2,
+    "calls": 2,
+    "first_unit": 2
+   },
+   "GetVersion": {
+    "units": 2,
+    "calls": 3,
+    "first_unit": 2
+   },
+   "GetCPInfo": {
+    "units": 2,
+    "calls": 2,
+    "first_unit": 18
+   },
+   "GetLastError": {
+    "units": 2,
+    "calls": 6,
+    "first_unit": 18
+   },
+   "CreateEventW": {
+    "units": 2,
+    "calls": 3,
+    "first_unit": 42
+   },
+   "QueryPerformanceFrequency": {
+    "units": 2,
+    "calls": 2,
+    "first_unit": 46
+   },
+   "MulDiv": {
+    "units": 2,
+    "calls": 2,
+    "first_unit": 96
+   },
+   "GetDC": {
+    "units": 2,
+    "calls": 3,
+    "first_unit": 96
+   },
+   "GetDeviceCaps": {
+    "units": 2,
+    "calls": 3,
+    "first_unit": 96
+   },
+   "GetStockObject": {
+    "units": 2,
+    "calls": 7,
+    "first_unit": 96
+   },
+   "LoadIconW": {
+    "units": 2,
+    "calls": 2,
+    "first_unit": 96
+   },
+   "ReleaseDC": {
+    "units": 2,
+    "calls": 3,
+    "first_unit": 96
+   },
+   "GlobalAddAtomW": {
+    "units": 2,
+    "calls": 3,
+    "first_unit": 115
+   },
+   "FindWindowW": {
+    "units": 2,
+    "calls": 2,
+    "first_unit": 115
+   },
+   "GetSystemMetrics": {
+    "units": 2,
+    "calls": 6,
+    "first_unit": 115
+   },
+   "GetCommandLineW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 2
+   },
+   "GetStartupInfoW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 2
+   },
+   "SetThreadLocale": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 2
+   },
+   "VerSetConditionMask": {
+    "units": 1,
+    "calls": 3,
+    "first_unit": 2
+   },
+   "VerifyVersionInfoW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 2
+   },
+   "EnumCalendarInfoW": {
+    "units": 1,
+    "calls": 2,
+    "first_unit": 18
+   },
+   "GetLocaleInfoW": {
+    "units": 1,
+    "calls": 48,
+    "first_unit": 18
+   },
+   "GetLogicalProcessorInformation": {
+    "units": 1,
+    "calls": 2,
+    "first_unit": 18
+   },
+   "GetThreadLocale": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 18
+   },
+   "IsValidLocale": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 18
+   },
+   "GetTimeZoneInformation": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 86
+   },
+   "RegOpenKeyExW": {
+    "units": 1,
+    "calls": 3,
+    "first_unit": 96
+   },
+   "CreatePalette": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 96
+   },
+   "SetErrorMode": {
+    "units": 1,
+    "calls": 2,
+    "first_unit": 104
+   },
+   "CharLowerW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "CharNextW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "EnterCriticalSection": {
+    "units": 1,
+    "calls": 18,
+    "first_unit": 115
+   },
+   "GetCurrentProcessId": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "GetCurrentThread": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "LeaveCriticalSection": {
+    "units": 1,
+    "calls": 18,
+    "first_unit": 115
+   },
+   "CreateWindowExW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "DeleteObject": {
+    "units": 1,
+    "calls": 4,
+    "first_unit": 115
+   },
+   "EnumDisplayMonitors": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "GetClassInfoW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "GetKeyboardLayout": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "LoadCursorW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "LoadImageW": {
+    "units": 1,
+    "calls": 21,
+    "first_unit": 115
+   },
+   "SetWindowLongPtrW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 115
+   },
+   "SystemParametersInfoW": {
+    "units": 1,
+    "calls": 2,
+    "first_unit": 115
+   },
+   "MessageBoxA": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 145
+   },
+   "GetFileAttributesW": {
+    "units": 1,
+    "calls": 2,
+    "first_unit": 150
+   },
+   "RegCloseKey": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 154
+   },
+   "RegCreateKeyExW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 154
+   },
+   "RegQueryInfoKeyW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 154
+   },
+   "RegQueryValueExW": {
+    "units": 1,
+    "calls": 848688,
+    "first_unit": 154
+   },
+   "acmMetrics": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 171
+   },
+   "OleInitialize": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 236
+   },
+   "SHGetMalloc": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 236
+   },
+   "EnumDisplaySettingsW": {
+    "units": 1,
+    "calls": 1,
+    "first_unit": 247
+   }
+  },
+  "aborts": []
+ },
+ "per_unit": [
+  {
+   "unit": 1,
+   "lva": "0x1e7e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 2,
+   "lva": "0x1ce10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetACP": 1,
+    "GetCommandLineW": 1,
+    "GetCurrentThreadId": 1,
+    "GetModuleHandleW": 4,
+    "GetProcAddress": 4,
+    "GetStartupInfoW": 1,
+    "GetSystemInfo": 1,
+    "GetVersion": 2,
+    "InitializeCriticalSection": 1,
+    "SetThreadLocale": 1,
+    "VerSetConditionMask": 3,
+    "VerifyVersionInfoW": 1
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: kernel32.dll!#39682",
+    "[shimx] lifttab: GetThreadPreferredUILanguages # orm=0 -> token 0x7f00000a",
+    "[shimx] lifttab: SetThreadPreferredUILanguages # orm=0 -> token 0x7f00000b"
+   ]
+  },
+  {
+   "unit": 3,
+   "lva": "0x20d80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 4,
+   "lva": "0x21910",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 5,
+   "lva": "0x21970",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 6,
+   "lva": "0x25aa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 7,
+   "lva": "0x26280",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 8,
+   "lva": "0x262d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 9,
+   "lva": "0x26300",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 10,
+   "lva": "0x26650",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 11,
+   "lva": "0x26fd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 12,
+   "lva": "0x2d390",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 13,
+   "lva": "0x2d870",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 14,
+   "lva": "0x2daa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 15,
+   "lva": "0x35240",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 16,
+   "lva": "0x4a570",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "VirtualAlloc": 1,
+    "LoadStringW": 2
+   }
+  },
+  {
+   "unit": 17,
+   "lva": "0x54090",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetVersionExW": 1,
+    "LoadStringW": 1
+   }
+  },
+  {
+   "unit": 18,
+   "lva": "0x55790",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "EnumCalendarInfoW": 2,
+    "GetCPInfo": 1,
+    "GetCurrentThreadId": 3,
+    "GetLastError": 1,
+    "GetLocaleInfoW": 48,
+    "GetLogicalProcessorInformation": 2,
+    "GetModuleFileNameW": 1,
+    "GetModuleHandleW": 2,
+    "GetProcAddress": 2,
+    "GetThreadLocale": 1,
+    "InitializeCriticalSection": 1,
+    "IsValidLocale": 1,
+    "WideCharToMultiByte": 1
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: ntdll.dll!",
+    "[shimx] cbtrans: EnumCalendarInfoW VA 0x4476d0 -> trampoline slot 0 (invoke=0x1)",
+    "[shimx] cbtrans: EnumCalendarInfoW VA 0x4477a0 -> trampoline slot 1 (invoke=0x1)"
+   ]
+  },
+  {
+   "unit": 19,
+   "lva": "0x55e90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 20,
+   "lva": "0x566c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 21,
+   "lva": "0x56dc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 22,
+   "lva": "0x58020",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetModuleHandleW": 1
+   }
+  },
+  {
+   "unit": 23,
+   "lva": "0x67f00",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 24,
+   "lva": "0x693f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 25,
+   "lva": "0x71480",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 26,
+   "lva": "0x75be0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 27,
+   "lva": "0x777d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 28,
+   "lva": "0x777f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 29,
+   "lva": "0x77990",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 30,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 31,
+   "lva": "0x79ff0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 32,
+   "lva": "0x7ef10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 33,
+   "lva": "0x7f830",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 34,
+   "lva": "0x7fa70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 35,
+   "lva": "0x7fc60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 36,
+   "lva": "0x82d10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetModuleHandleW": 1,
+    "GetProcAddress": 1,
+    "WideCharToMultiByte": 1
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: kernel32.dll!"
+   ]
+  },
+  {
+   "unit": 37,
+   "lva": "0x96fa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 38,
+   "lva": "0xbdfa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 39,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 40,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 41,
+   "lva": "0x105bd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 42,
+   "lva": "0x125600",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "CreateEventW": 1
+   }
+  },
+  {
+   "unit": 43,
+   "lva": "0x127d20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 44,
+   "lva": "0x12d080",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetACP": 1,
+    "GetCPInfo": 1
+   }
+  },
+  {
+   "unit": 45,
+   "lva": "0x12ef20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 46,
+   "lva": "0x12f1f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "CreateEventW": 2,
+    "QueryPerformanceCounter": 1,
+    "QueryPerformanceFrequency": 1,
+    "VirtualAlloc": 2
+   }
+  },
+  {
+   "unit": 47,
+   "lva": "0x13e570",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 48,
+   "lva": "0x143890",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 49,
+   "lva": "0x144740",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 50,
+   "lva": "0x145970",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 51,
+   "lva": "0x1459a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 52,
+   "lva": "0x145d10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "InitializeCriticalSection": 1,
+    "VirtualAlloc": 16
+   }
+  },
+  {
+   "unit": 53,
+   "lva": "0x1556c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 54,
+   "lva": "0x158e20",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 55,
+   "lva": "0x1658e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 56,
+   "lva": "0x166b30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 57,
+   "lva": "0x16fde0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 58,
+   "lva": "0x171f90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 59,
+   "lva": "0x177290",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 60,
+   "lva": "0x177fd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 61,
+   "lva": "0x179610",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 62,
+   "lva": "0x17fd50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 63,
+   "lva": "0x180970",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 64,
+   "lva": "0x182230",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "InitializeCriticalSection": 1
+   }
+  },
+  {
+   "unit": 65,
+   "lva": "0x182f50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 66,
+   "lva": "0x187920",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 67,
+   "lva": "0x192130",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 68,
+   "lva": "0x1925b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 69,
+   "lva": "0x1925d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 70,
+   "lva": "0x1925f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 71,
+   "lva": "0x192610",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 72,
+   "lva": "0x192990",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 73,
+   "lva": "0x1929b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 74,
+   "lva": "0x192ac0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 75,
+   "lva": "0x192ae0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 76,
+   "lva": "0x192b00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 77,
+   "lva": "0x192b20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 78,
+   "lva": "0x192b40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 79,
+   "lva": "0x192b60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 80,
+   "lva": "0x1934b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 81,
+   "lva": "0x193810",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 82,
+   "lva": "0x193870",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 83,
+   "lva": "0x1939b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 84,
+   "lva": "0x1939d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 85,
+   "lva": "0x194aa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 86,
+   "lva": "0x1998a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetTimeZoneInformation": 1
+   }
+  },
+  {
+   "unit": 87,
+   "lva": "0x19b100",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 88,
+   "lva": "0x19f9a0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "QueryPerformanceCounter": 1
+   }
+  },
+  {
+   "unit": 89,
+   "lva": "0x1a1350",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 90,
+   "lva": "0x1aa3c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 91,
+   "lva": "0x1af280",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 92,
+   "lva": "0x1b3630",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 93,
+   "lva": "0x1b6ef0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 94,
+   "lva": "0x1b7690",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 95,
+   "lva": "0x1bf380",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 96,
+   "lva": "0x1d2680",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetCurrentThreadId": 18,
+    "GetVersionExW": 1,
+    "InitializeCriticalSection": 6,
+    "MulDiv": 1,
+    "RegOpenKeyExW": 3,
+    "VirtualAlloc": 1,
+    "CreatePalette": 1,
+    "GetDC": 2,
+    "GetDeviceCaps": 2,
+    "GetStockObject": 3,
+    "LoadIconW": 1,
+    "ReleaseDC": 2
+   }
+  },
+  {
+   "unit": 97,
+   "lva": "0x1d8920",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 98,
+   "lva": "0x1dbdf0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 99,
+   "lva": "0x1dc9e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "InitializeCriticalSection": 1
+   }
+  },
+  {
+   "unit": 100,
+   "lva": "0x1dca70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 101,
+   "lva": "0x1dcbd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 102,
+   "lva": "0x1de960",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetCurrentThreadId": 12,
+    "VirtualAlloc": 1
+   }
+  },
+  {
+   "unit": 103,
+   "lva": "0x1de9d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 104,
+   "lva": "0x1deae0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "LoadLibraryW": 1,
+    "SetErrorMode": 2
+   },
+   "msgs": [
+    "[shimx] LoadLibrary 失敗: Msctf.dll"
+   ]
+  },
+  {
+   "unit": 105,
+   "lva": "0x1deb60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 106,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 107,
+   "lva": "0x1e0eb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetModuleHandleW": 1,
+    "GetProcAddress": 6,
+    "WideCharToMultiByte": 6
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: ole32.dll!",
+    "[shimx] GetProcAddress miss: ole32.dll!",
+    "[shimx] GetProcAddress miss: ole32.dll!"
+   ]
+  },
+  {
+   "unit": 108,
+   "lva": "0x1e0fe0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 109,
+   "lva": "0x1e10d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 110,
+   "lva": "0x1e1140",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 111,
+   "lva": "0x1f1f30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 112,
+   "lva": "0x1f4120",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 9
+   }
+  },
+  {
+   "unit": 113,
+   "lva": "0x1f41e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 114,
+   "lva": "0x1f4200",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 115,
+   "lva": "0x223840",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "CharLowerW": 1,
+    "CharNextW": 1,
+    "EnterCriticalSection": 18,
+    "GetCurrentProcessId": 1,
+    "GetCurrentThread": 1,
+    "GetCurrentThreadId": 5,
+    "GetModuleFileNameW": 1,
+    "GetVersion": 1,
+    "GetVersionExW": 1,
+    "GlobalAddAtomW": 2,
+    "LeaveCriticalSection": 18,
+    "MulDiv": 1,
+    "TlsGetValue": 21,
+    "VirtualAlloc": 2,
+    "CreateWindowExW": 1,
+    "DeleteObject": 4,
+    "EnumDisplayMonitors": 1,
+    "FindWindowW": 1,
+    "GetClassInfoW": 1,
+    "GetDC": 1,
+    "GetDeviceCaps": 1,
+    "GetKeyboardLayout": 1,
+    "GetStockObject": 4,
+    "GetSystemMetrics": 1,
+    "LoadCursorW": 1,
+    "LoadIconW": 1,
+    "LoadImageW": 21,
+    "RegisterWindowMessageW": 4,
+    "ReleaseDC": 1,
+    "SetWindowLongPtrW": 1,
+    "SystemParametersInfoW": 2
+   }
+  },
+  {
+   "unit": 116,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 117,
+   "lva": "0x230100",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 118,
+   "lva": "0x2324b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 119,
+   "lva": "0x234e60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 120,
+   "lva": "0x2374e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 121,
+   "lva": "0x238910",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 122,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 123,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 124,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 125,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 126,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 127,
+   "lva": "0x239810",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 128,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 129,
+   "lva": "0x239830",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 130,
+   "lva": "0x239850",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 131,
+   "lva": "0x239870",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 132,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 133,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 134,
+   "lva": "0x2398a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 135,
+   "lva": "0x23a5e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 136,
+   "lva": "0x23aae0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "QueryPerformanceCounter": 1,
+    "QueryPerformanceFrequency": 1
+   }
+  },
+  {
+   "unit": 137,
+   "lva": "0x23b230",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetModuleHandleW": 1,
+    "GetProcAddress": 1,
+    "WideCharToMultiByte": 1
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: shell32.dll!"
+   ]
+  },
+  {
+   "unit": 138,
+   "lva": "0x23bef0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetModuleHandleW": 1,
+    "GetProcAddress": 1,
+    "WideCharToMultiByte": 1
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: kernel32.dll!"
+   ]
+  },
+  {
+   "unit": 139,
+   "lva": "0x243270",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 5
+   }
+  },
+  {
+   "unit": 140,
+   "lva": "0x245ce0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 141,
+   "lva": "0x24f690",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 142,
+   "lva": "0x2516c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 143,
+   "lva": "0x2524f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 144,
+   "lva": "0x253c50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 145,
+   "lva": "0x25c540",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 1,
+    "MessageBoxA": 1
+   },
+   "msgs": [
+    "[m11][MessageBoxA] caption='Error' text='Runtime error   0 at 000000001029EAC0' type=0x0 (自動 IDOK)"
+   ]
+  },
+  {
+   "unit": 146,
+   "lva": "0x25c9f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetModuleHandleW": 2,
+    "GetProcAddress": 34,
+    "LoadLibraryW": 5,
+    "WideCharToMultiByte": 34
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: dwmapi.dll!",
+    "[shimx] GetProcAddress miss: dwmapi.dll!",
+    "[shimx] GetProcAddress miss: dwmapi.dll!"
+   ]
+  },
+  {
+   "unit": 147,
+   "lva": "0x262e50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 148,
+   "lva": "0x2634a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 149,
+   "lva": "0x264180",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 150,
+   "lva": "0x264260",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "GetFileAttributesW": 2,
+    "GetLastError": 5,
+    "GetModuleFileNameW": 3
+   }
+  },
+  {
+   "unit": 151,
+   "lva": "0x264290",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 152,
+   "lva": "0x264b40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 153,
+   "lva": "0x264d50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 154,
+   "lva": "0x265b90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "RegCloseKey": 1,
+    "RegCreateKeyExW": 1,
+    "RegQueryInfoKeyW": 1,
+    "RegQueryValueExW": 848688
+   }
+  },
+  {
+   "unit": 155,
+   "lva": "0x265d50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 156,
+   "lva": "0x266900",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 157,
+   "lva": "0x266c70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetSystemInfo": 1
+   }
+  },
+  {
+   "unit": 158,
+   "lva": "0x266e90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 159,
+   "lva": "0x26d1a0",
+   "kind": "clobber",
+   "detail": "InitTable 破壊 (元の kind=oob): memory access out of bounds",
+   "shim_calls": {},
+   "clobbered": true
+  },
+  {
+   "unit": 160,
+   "lva": "0x26dab0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 161,
+   "lva": "0x26e010",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 162,
+   "lva": "0x26e050",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 163,
+   "lva": "0x26e9a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 164,
+   "lva": "0x26eb00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 165,
+   "lva": "0x26ebb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 166,
+   "lva": "0x26ec60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 167,
+   "lva": "0x26ecc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 168,
+   "lva": "0x270040",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "RegisterClipboardFormatW": 2
+   }
+  },
+  {
+   "unit": 169,
+   "lva": "0x2708c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 170,
+   "lva": "0x2709c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 171,
+   "lva": "0x275290",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "acmMetrics": 1,
+    "RegisterClipboardFormatW": 1
+   }
+  },
+  {
+   "unit": 172,
+   "lva": "0x275f00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 173,
+   "lva": "0x2774a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 174,
+   "lva": "0x277ab0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 175,
+   "lva": "0x277ad0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 176,
+   "lva": "0x277af0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 177,
+   "lva": "0x2780e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 178,
+   "lva": "0x278940",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "InitializeCriticalSection": 1
+   }
+  },
+  {
+   "unit": 179,
+   "lva": "0x27fac0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 180,
+   "lva": "0x280240",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 181,
+   "lva": "0x281a00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 182,
+   "lva": "0x283540",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 183,
+   "lva": "0x28d100",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 184,
+   "lva": "0x29caf0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetSystemInfo": 1
+   }
+  },
+  {
+   "unit": 185,
+   "lva": "0x29fcd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 186,
+   "lva": "0x2a6890",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 187,
+   "lva": "0x2a7f50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 188,
+   "lva": "0x2a7fa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 189,
+   "lva": "0x2a8120",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 190,
+   "lva": "0x2b7e40",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 191,
+   "lva": "0x2cf480",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 192,
+   "lva": "0x2cf500",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 193,
+   "lva": "0x2cf520",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 194,
+   "lva": "0x2cf540",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 195,
+   "lva": "0x2cf590",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 196,
+   "lva": "0x2d1020",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 197,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 198,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 199,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 200,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 201,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 202,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 203,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 204,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 205,
+   "lva": "0x2d6110",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 206,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 207,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 208,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 209,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 210,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 211,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 212,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 213,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 214,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 215,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 216,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 217,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 218,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 219,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 220,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 221,
+   "lva": "0x2d7640",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 222,
+   "lva": "0x2d7ab0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 223,
+   "lva": "0x2d8fb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 224,
+   "lva": "0x2db470",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 225,
+   "lva": "0x2e1a70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 226,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 227,
+   "lva": "0x2ea710",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 228,
+   "lva": "0x2eacf0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "RegisterWindowMessageW": 2
+   }
+  },
+  {
+   "unit": 229,
+   "lva": "0x2f2ad0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 230,
+   "lva": "0x2f3280",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 231,
+   "lva": "0x2f38f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 232,
+   "lva": "0x2f3910",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 233,
+   "lva": "0x2f6b90",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 234,
+   "lva": "0x2fd0a0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 235,
+   "lva": "0x302330",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 236,
+   "lva": "0x308260",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "OleInitialize": 1,
+    "SHGetMalloc": 1
+   }
+  },
+  {
+   "unit": 237,
+   "lva": "0x30cfb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "FindWindowW": 1
+   }
+  },
+  {
+   "unit": 238,
+   "lva": "0x30f910",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 239,
+   "lva": "0x3121e0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "GetProcAddress": 9,
+    "LoadLibraryW": 1
+   },
+   "msgs": [
+    "[shimx] lifttab: (null) # orm=16 -> token 0x7f000000",
+    "[shimx] lifttab: (null) # orm=17 -> token 0x7f000001",
+    "[shimx] lifttab: (null) # orm=18 -> token 0x7f000002"
+   ]
+  },
+  {
+   "unit": 240,
+   "lva": "0x31d1a0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 241,
+   "lva": "0x31ee30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 242,
+   "lva": "0x321050",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 243,
+   "lva": "0x322900",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 244,
+   "lva": "0x323360",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 245,
+   "lva": "0x3254d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 246,
+   "lva": "0x333090",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 247,
+   "lva": "0x341880",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "EnumDisplaySettingsW": 1
+   }
+  },
+  {
+   "unit": 248,
+   "lva": "0x341f80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 249,
+   "lva": "0x342060",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 250,
+   "lva": "0x34ab00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 251,
+   "lva": "0x34f870",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 252,
+   "lva": "0x350e40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 253,
+   "lva": "0x35ca70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 254,
+   "lva": "0x365290",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 255,
+   "lva": "0x36c410",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 256,
+   "lva": "0x3701b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 257,
+   "lva": "0x370f70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 258,
+   "lva": "0x3717d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 259,
+   "lva": "0x377f00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 260,
+   "lva": "0x390b50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 261,
+   "lva": "0x3981c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 262,
+   "lva": "0x3a1620",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 263,
+   "lva": "0x3a1640",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 264,
+   "lva": "0x3a1660",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 265,
+   "lva": "0x3a6240",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 266,
+   "lva": "0x3a7360",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "GetVersionExW": 1,
+    "TlsGetValue": 1
+   }
+  },
+  {
+   "unit": 267,
+   "lva": "0x3a7960",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 268,
+   "lva": "0x3a8ad0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 269,
+   "lva": "0x3b6680",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 270,
+   "lva": "0x3b66a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 271,
+   "lva": "0x3b6a40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 272,
+   "lva": "0x3bcf00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 273,
+   "lva": "0x3f5350",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 274,
+   "lva": "0x3fe340",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 275,
+   "lva": "0x3ffbb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 276,
+   "lva": "0x40e170",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "LoadStringW": 2
+   }
+  },
+  {
+   "unit": 277,
+   "lva": "0x40f980",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "GetModuleHandleW": 1,
+    "GetProcAddress": 5,
+    "WideCharToMultiByte": 5,
+    "GetSystemMetrics": 5
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: user32.dll!",
+    "[shimx] GetProcAddress miss: user32.dll!",
+    "[shimx] GetProcAddress miss: user32.dll!"
+   ]
+  },
+  {
+   "unit": 278,
+   "lva": "0x40fa50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 279,
+   "lva": "0x40fac0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 280,
+   "lva": "0x4136d0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 281,
+   "lva": "0x416010",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 282,
+   "lva": "0x417c10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 283,
+   "lva": "0x418130",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 284,
+   "lva": "0x41e040",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "GetCurrentThreadId": 1,
+    "GetModuleHandleW": 2,
+    "GetProcAddress": 2,
+    "WideCharToMultiByte": 2
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: user32.dll!",
+    "[shimx] GetProcAddress miss: kernel32.dll!"
+   ]
+  },
+  {
+   "unit": 285,
+   "lva": "0x41e090",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 286,
+   "lva": "0x41e4f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 287,
+   "lva": "0x427770",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 288,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 289,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 290,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 291,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 292,
+   "lva": "0x432660",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 1
+   }
+  },
+  {
+   "unit": 293,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 294,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 295,
+   "lva": "0x4332c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 296,
+   "lva": "0x438100",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 297,
+   "lva": "0x446130",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 1
+   }
+  },
+  {
+   "unit": 298,
+   "lva": "0x44b6b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 299,
+   "lva": "0x44c270",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "GetModuleHandleW": 1,
+    "GetProcAddress": 12,
+    "WideCharToMultiByte": 12
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: comctl32.dll!",
+    "[shimx] GetProcAddress miss: comctl32.dll!",
+    "[shimx] GetProcAddress miss: comctl32.dll!"
+   ]
+  },
+  {
+   "unit": 300,
+   "lva": "0x45a710",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 301,
+   "lva": "0x45a940",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 302,
+   "lva": "0x464810",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 303,
+   "lva": "0x46d240",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "GetModuleHandleW": 1,
+    "GetProcAddress": 1,
+    "WideCharToMultiByte": 1,
+    "RegisterWindowMessageW": 2
+   },
+   "msgs": [
+    "[shimx] GetProcAddress miss: user32.dll!"
+   ]
+  },
+  {
+   "unit": 304,
+   "lva": "0x46fdb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 305,
+   "lva": "0x483140",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "GetCurrentThreadId": 1,
+    "GlobalAddAtomW": 1,
+    "TlsGetValue": 1,
+    "RegisterWindowMessageW": 2
+   }
+  },
+  {
+   "unit": 306,
+   "lva": "0x48b6a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 307,
+   "lva": "0x4a5c60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 308,
+   "lva": "0x4b2080",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 309,
+   "lva": "0x4b43f0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 310,
+   "lva": "0x4b4610",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 311,
+   "lva": "0x4ba890",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 312,
+   "lva": "0x4cb690",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 313,
+   "lva": "0x4d0760",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 314,
+   "lva": "0x4d8840",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 315,
+   "lva": "0x4e48a0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 316,
+   "lva": "0x4e8db0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 317,
+   "lva": "0x4e94a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 318,
+   "lva": "0x4ea7d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 319,
+   "lva": "0x4ea8f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 320,
+   "lva": "0x4ea910",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 321,
+   "lva": "0x4ea9e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 322,
+   "lva": "0x4ead60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 323,
+   "lva": "0x4eaf00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 324,
+   "lva": "0x4eb410",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 325,
+   "lva": "0x4eb7f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 326,
+   "lva": "0x4ef440",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 327,
+   "lva": "0x4f1b00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 328,
+   "lva": "0x4f7070",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 329,
+   "lva": "0x502960",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 330,
+   "lva": "0x505b70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 331,
+   "lva": "0x50b380",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 332,
+   "lva": "0x50f9f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 333,
+   "lva": "0x5148d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 334,
+   "lva": "0x516d80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 335,
+   "lva": "0x517450",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 336,
+   "lva": "0x51e5e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 337,
+   "lva": "0x520b00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 338,
+   "lva": "0x526110",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 339,
+   "lva": "0x5285a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 340,
+   "lva": "0x528c10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 341,
+   "lva": "0x52dab0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 342,
+   "lva": "0x52eda0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 343,
+   "lva": "0x52fb10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 344,
+   "lva": "0x52fe10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 345,
+   "lva": "0x534490",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 346,
+   "lva": "0x538750",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 347,
+   "lva": "0x5391d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 348,
+   "lva": "0x5395b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 349,
+   "lva": "0x53f400",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 350,
+   "lva": "0x540710",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 351,
+   "lva": "0x540840",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 352,
+   "lva": "0x546e30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 353,
+   "lva": "0x549f90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 354,
+   "lva": "0x54a6c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 355,
+   "lva": "0x54a8f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 356,
+   "lva": "0x54ad30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 357,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 358,
+   "lva": "0x55b400",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 359,
+   "lva": "0x55cce0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 360,
+   "lva": "0x5620e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 361,
+   "lva": "0x562c30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 362,
+   "lva": "0x5678e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 363,
+   "lva": "0x573890",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 364,
+   "lva": "0x5755f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 365,
+   "lva": "0x575880",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 366,
+   "lva": "0x577100",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 367,
+   "lva": "0x578a70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 368,
+   "lva": "0x57e120",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 369,
+   "lva": "0x5810f0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 370,
+   "lva": "0x581550",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 371,
+   "lva": "0x5823d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 372,
+   "lva": "0x5824b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 373,
+   "lva": "0x5824d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 374,
+   "lva": "0x582510",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 375,
+   "lva": "0x582530",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 376,
+   "lva": "0x582550",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 377,
+   "lva": "0x582570",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 378,
+   "lva": "0x582590",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 379,
+   "lva": "0x5825b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 380,
+   "lva": "0x5825d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 381,
+   "lva": "0x5825f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 382,
+   "lva": "0x582ee0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 383,
+   "lva": "0x583a50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 384,
+   "lva": "0x583e10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 385,
+   "lva": "0x588b90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "RegisterClipboardFormatW": 1
+   }
+  },
+  {
+   "unit": 386,
+   "lva": "0x588c00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 387,
+   "lva": "0x588c20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 388,
+   "lva": "0x588c40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 389,
+   "lva": "0x5894f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 390,
+   "lva": "0x589510",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 391,
+   "lva": "0x589890",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 392,
+   "lva": "0x58bc00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 393,
+   "lva": "0x58bc20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 394,
+   "lva": "0x58de10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 395,
+   "lva": "0x58f460",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 396,
+   "lva": "0x590270",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 397,
+   "lva": "0x590bd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 398,
+   "lva": "0x5920a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 399,
+   "lva": "0x5920c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 400,
+   "lva": "0x5928a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 401,
+   "lva": "0x5961e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 402,
+   "lva": "0x5979c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 403,
+   "lva": "0x59aa10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 404,
+   "lva": "0x59b9a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 405,
+   "lva": "0x59ff00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 406,
+   "lva": "0x5a24a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 407,
+   "lva": "0x5a8140",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 408,
+   "lva": "0x5a8db0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 409,
+   "lva": "0x5ac090",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 410,
+   "lva": "0x5ada80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 411,
+   "lva": "0x5afaa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 412,
+   "lva": "0x5b39b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 413,
+   "lva": "0x5b4260",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 414,
+   "lva": "0x5b4280",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 415,
+   "lva": "0x5b42a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 416,
+   "lva": "0x5b6180",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 417,
+   "lva": "0x5bb410",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 418,
+   "lva": "0x5c96a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 419,
+   "lva": "0x5c9be0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 420,
+   "lva": "0x5cdfb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 421,
+   "lva": "0x5ce320",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 422,
+   "lva": "0x5cefd0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 423,
+   "lva": "0x5cf410",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 424,
+   "lva": "0x5d5240",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 425,
+   "lva": "0x5d95f0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 426,
+   "lva": "0x5da590",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 427,
+   "lva": "0x5dac90",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 428,
+   "lva": "0x5db1d0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "GetModuleFileNameW": 1
+   }
+  },
+  {
+   "unit": 429,
+   "lva": "0x5de2b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 430,
+   "lva": "0x5df8a0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 431,
+   "lva": "0x5df940",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 432,
+   "lva": "0x5dfe00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 433,
+   "lva": "0x631210",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 434,
+   "lva": "0x632380",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 435,
+   "lva": "0x63cd70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 436,
+   "lva": "0x646520",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 437,
+   "lva": "0x648460",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 438,
+   "lva": "0x64c610",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 439,
+   "lva": "0x64f8b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 440,
+   "lva": "0x652550",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 441,
+   "lva": "0x655790",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 442,
+   "lva": "0x656d40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 443,
+   "lva": "0x657800",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 444,
+   "lva": "0x659a70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 445,
+   "lva": "0x65bc10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 446,
+   "lva": "0x65c6f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 447,
+   "lva": "0x65d8e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 448,
+   "lva": "0x65dac0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 449,
+   "lva": "0x65fc40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 450,
+   "lva": "0x660780",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 451,
+   "lva": "0x661200",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 452,
+   "lva": "0x6624b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 453,
+   "lva": "0x6644b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 454,
+   "lva": "0x664d90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 455,
+   "lva": "0x665190",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 456,
+   "lva": "0x665a70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 457,
+   "lva": "0x666450",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 458,
+   "lva": "0x6691a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 459,
+   "lva": "0x66b2a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 460,
+   "lva": "0x66bf00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 461,
+   "lva": "0x66d560",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 462,
+   "lva": "0x6924a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 463,
+   "lva": "0x697180",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 464,
+   "lva": "0x698ea0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 465,
+   "lva": "0x699e20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 466,
+   "lva": "0x69d990",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 467,
+   "lva": "0x69ed30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 468,
+   "lva": "0x69ee90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 469,
+   "lva": "0x69fd40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 470,
+   "lva": "0x6a3c70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 471,
+   "lva": "0x6ac590",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 472,
+   "lva": "0x6b2bd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 473,
+   "lva": "0x6bc270",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 474,
+   "lva": "0x6be270",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 475,
+   "lva": "0x6be390",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 476,
+   "lva": "0x6be3b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 477,
+   "lva": "0x6be7c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 478,
+   "lva": "0x6bfd60",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 479,
+   "lva": "0x6bfdb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 480,
+   "lva": "0x6c0d60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 481,
+   "lva": "0x6c2480",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 482,
+   "lva": "0x6c24a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 483,
+   "lva": "0x6c25e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 484,
+   "lva": "0x6cf340",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 485,
+   "lva": "0x6d0680",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 486,
+   "lva": "0x6d0be0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 487,
+   "lva": "0x6d0c70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 488,
+   "lva": "0x6d0ca0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 489,
+   "lva": "0x6d1260",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 490,
+   "lva": "0x6d1800",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 491,
+   "lva": "0x6d1820",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 492,
+   "lva": "0x6d1880",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 493,
+   "lva": "0x6d5700",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 494,
+   "lva": "0x6d9ba0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 495,
+   "lva": "0x6d9f70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 496,
+   "lva": "0x6da180",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 497,
+   "lva": "0x6de4d0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 498,
+   "lva": "0x6def50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 499,
+   "lva": "0x6e30b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 500,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 501,
+   "lva": "0x6e30d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 502,
+   "lva": "0x6e49c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 503,
+   "lva": "0x6ec0a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 504,
+   "lva": "0x6ee5a0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "TlsGetValue": 3
+   }
+  },
+  {
+   "unit": 505,
+   "lva": "0x6ef2b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 506,
+   "lva": "0x6ef370",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 507,
+   "lva": "0x6ef5f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 508,
+   "lva": "0x6f1190",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 509,
+   "lva": "0x722ae0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 510,
+   "lva": "0x739ca0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 511,
+   "lva": "0x7429c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 512,
+   "lva": "0x75a380",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 513,
+   "lva": "0x762200",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 514,
+   "lva": "0x7654c0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 515,
+   "lva": "0x768dd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 516,
+   "lva": "0x769e90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 517,
+   "lva": "0x769f70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 518,
+   "lva": "0x769fa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 519,
+   "lva": "0x770d20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 520,
+   "lva": "0x776a70",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 521,
+   "lva": "0x776bf0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 522,
+   "lva": "0x77f030",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 523,
+   "lva": "0x77f8d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 524,
+   "lva": "0x77ff60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 525,
+   "lva": "0x7902d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 526,
+   "lva": "0x795370",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 527,
+   "lva": "0x795650",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 528,
+   "lva": "0x797070",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 529,
+   "lva": "0x7a1980",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 530,
+   "lva": "0x7a1c90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 531,
+   "lva": "0x7a3220",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 532,
+   "lva": "0x7a4bc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 533,
+   "lva": "0x7a4d40",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 534,
+   "lva": "0x7a6620",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 535,
+   "lva": "0x7a7350",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 536,
+   "lva": "0x7aa8a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 537,
+   "lva": "0x7b0170",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 538,
+   "lva": "0x7b0190",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 539,
+   "lva": "0x7b15c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 540,
+   "lva": "0x7b1a70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 541,
+   "lva": "0x7b1bc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 542,
+   "lva": "0x7ba780",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 543,
+   "lva": "0x7cc620",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 544,
+   "lva": "0x7d0b90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 545,
+   "lva": "0x7d2e00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 546,
+   "lva": "0x7d4fa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 547,
+   "lva": "0x7d68d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 548,
+   "lva": "0x7d6a00",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 549,
+   "lva": "0x7d6d20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 550,
+   "lva": "0x7d92b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 551,
+   "lva": "0x7d97d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 552,
+   "lva": "0x7d9800",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 553,
+   "lva": "0x7d9840",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 554,
+   "lva": "0x7e85a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 555,
+   "lva": "0x7ec750",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 556,
+   "lva": "0x7f2500",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 1
+   }
+  },
+  {
+   "unit": 557,
+   "lva": "0x7f3fd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 558,
+   "lva": "0x7f5440",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 559,
+   "lva": "0x7f74f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 560,
+   "lva": "0x7f7c70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 561,
+   "lva": "0x7f85f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 562,
+   "lva": "0x7f8df0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 563,
+   "lva": "0x7f8e10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 564,
+   "lva": "0x7f8e30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 565,
+   "lva": "0x8041d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 566,
+   "lva": "0x804af0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 567,
+   "lva": "0x805160",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 568,
+   "lva": "0x805480",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 569,
+   "lva": "0x8054a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 570,
+   "lva": "0x8054c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 571,
+   "lva": "0x807260",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 572,
+   "lva": "0x807300",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 573,
+   "lva": "0x807400",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 574,
+   "lva": "0x807620",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 575,
+   "lva": "0x807640",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 576,
+   "lva": "0x8137c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 577,
+   "lva": "0x815080",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 578,
+   "lva": "0x8150a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 579,
+   "lva": "0x817090",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 580,
+   "lva": "0x8175b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 581,
+   "lva": "0x8175d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 582,
+   "lva": "0x8175f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 583,
+   "lva": "0x817610",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 584,
+   "lva": "0x817630",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 585,
+   "lva": "0x81c7f0",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 1
+   }
+  },
+  {
+   "unit": 586,
+   "lva": "0x8217b0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 587,
+   "lva": "0x821810",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 588,
+   "lva": "0x821830",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 589,
+   "lva": "0x821850",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 590,
+   "lva": "0x821a00",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 591,
+   "lva": "0x821b10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 592,
+   "lva": "0x821b30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 593,
+   "lva": "0x821b50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "QueryPerformanceCounter": 1
+   }
+  },
+  {
+   "unit": 594,
+   "lva": "0x821b80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 595,
+   "lva": "0x821de0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 596,
+   "lva": "0x824340",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 597,
+   "lva": "0x82bb00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 598,
+   "lva": "0x82eff0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 599,
+   "lva": "0x830560",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 600,
+   "lva": "0x834300",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 601,
+   "lva": "0x8349a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 602,
+   "lva": "0x835fb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 603,
+   "lva": "0x83d070",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 604,
+   "lva": "0x840c10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 605,
+   "lva": "0x844460",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {
+    "TlsGetValue": 3
+   }
+  },
+  {
+   "unit": 606,
+   "lva": "0x846680",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 607,
+   "lva": "0x849c60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 608,
+   "lva": "0x849fa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 609,
+   "lva": "0x84bd30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 610,
+   "lva": "0x852220",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 611,
+   "lva": "0x852ae0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 612,
+   "lva": "0x854020",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 613,
+   "lva": "0x8545c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 614,
+   "lva": "0x854c70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 615,
+   "lva": "0x85e430",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 616,
+   "lva": "0x8620b0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 617,
+   "lva": "0x863d20",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 618,
+   "lva": "0x864360",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 619,
+   "lva": "0x864c00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 620,
+   "lva": "0x867510",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 621,
+   "lva": "0x8675f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 622,
+   "lva": "0x867f50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 623,
+   "lva": "0x869430",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 624,
+   "lva": "0x869c00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 625,
+   "lva": "0x869da0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 626,
+   "lva": "0x86a5e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 627,
+   "lva": "0x86aee0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 628,
+   "lva": "0x86b0f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 629,
+   "lva": "0x86d600",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 630,
+   "lva": "0x86f5f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 631,
+   "lva": "0x870900",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 632,
+   "lva": "0x871a80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 633,
+   "lva": "0x874860",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 634,
+   "lva": "0x875780",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 635,
+   "lva": "0x876180",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 636,
+   "lva": "0x877130",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 637,
+   "lva": "0x878130",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 638,
+   "lva": "0x87a9d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 639,
+   "lva": "0x87c380",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 640,
+   "lva": "0x87e560",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 641,
+   "lva": "0x87f8b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 642,
+   "lva": "0x883370",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 643,
+   "lva": "0x8833a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 644,
+   "lva": "0x883c20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 645,
+   "lva": "0x885f40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 646,
+   "lva": "0x894550",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 647,
+   "lva": "0x897530",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 648,
+   "lva": "0x897ac0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 649,
+   "lva": "0x899e20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 650,
+   "lva": "0x89c620",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 651,
+   "lva": "0x8a0f30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 652,
+   "lva": "0x8a1270",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 653,
+   "lva": "0x8aa5b0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 654,
+   "lva": "0x8ace50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 655,
+   "lva": "0x8ad6d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 656,
+   "lva": "0x8ad6f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 657,
+   "lva": "0x8af680",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 658,
+   "lva": "0x8b0cc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 659,
+   "lva": "0x8b2da0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 660,
+   "lva": "0x8eaa30",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 661,
+   "lva": "0x8eae70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 662,
+   "lva": "0x8f06e0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 663,
+   "lva": "0x8f3650",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 664,
+   "lva": "0x8f4500",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 665,
+   "lva": "0x8f46d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 666,
+   "lva": "0x9034d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 667,
+   "lva": "0x90eee0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 668,
+   "lva": "0x91fcd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 669,
+   "lva": "0x92c350",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 670,
+   "lva": "0x933480",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 671,
+   "lva": "0x9366b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 672,
+   "lva": "0x939d80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 673,
+   "lva": "0x93d340",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 674,
+   "lva": "0x93ef70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 675,
+   "lva": "0x943fe0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 676,
+   "lva": "0x9477d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 677,
+   "lva": "0x94b630",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 678,
+   "lva": "0x94d450",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 679,
+   "lva": "0x94f420",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 680,
+   "lva": "0x950cf0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 681,
+   "lva": "0x951f00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 682,
+   "lva": "0x953050",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 683,
+   "lva": "0x955b90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 684,
+   "lva": "0x958df0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 685,
+   "lva": "0x95e690",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 686,
+   "lva": "0x964d10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 687,
+   "lva": "0x967700",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 688,
+   "lva": "0x968d80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 689,
+   "lva": "0x96a950",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 690,
+   "lva": "0x96fdc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 691,
+   "lva": "0x9747e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 692,
+   "lva": "0x977e10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 693,
+   "lva": "0x978cf0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 694,
+   "lva": "0x97a750",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 695,
+   "lva": "0x97ed10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 696,
+   "lva": "0x981730",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 697,
+   "lva": "0x987d90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 698,
+   "lva": "0x987ef0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 699,
+   "lva": "0x98be30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 700,
+   "lva": "0x98d2c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 701,
+   "lva": "0x9973d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 702,
+   "lva": "0x99a980",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 703,
+   "lva": "0x99bf10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 704,
+   "lva": "0x99d830",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 705,
+   "lva": "0x99f020",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 706,
+   "lva": "0x99f4c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 707,
+   "lva": "0x9a09f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 708,
+   "lva": "0x9a53b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 709,
+   "lva": "0x9b2bb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 710,
+   "lva": "0x9b75d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 711,
+   "lva": "0x9b90a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 712,
+   "lva": "0x9b9370",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 713,
+   "lva": "0x9c4e60",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 714,
+   "lva": "0x9cfff0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 715,
+   "lva": "0x9d1a60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 716,
+   "lva": "0x9d2690",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 717,
+   "lva": "0x9d3ec0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 718,
+   "lva": "0x9d4200",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 719,
+   "lva": "0x9d4ff0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 720,
+   "lva": "0x9db790",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 721,
+   "lva": "0x9e3b30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 722,
+   "lva": "0x9e48c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 723,
+   "lva": "0x9e7050",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 724,
+   "lva": "0x9e77f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 725,
+   "lva": "0x9e9440",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 726,
+   "lva": "0x9eb260",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 727,
+   "lva": "0x9ec3c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 728,
+   "lva": "0x9edea0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 729,
+   "lva": "0x9eeca0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 730,
+   "lva": "0x9efdb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 731,
+   "lva": "0x9f12b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 732,
+   "lva": "0x9f3ab0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 733,
+   "lva": "0x9f57e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 734,
+   "lva": "0x9f7b20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 735,
+   "lva": "0x9fa390",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 736,
+   "lva": "0x9fac40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 737,
+   "lva": "0x9fb790",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 738,
+   "lva": "0xa0efa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 739,
+   "lva": "0xa1c6d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 740,
+   "lva": "0xa1faa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 741,
+   "lva": "0xa20250",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 742,
+   "lva": "0xa20a50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 743,
+   "lva": "0xa21910",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 744,
+   "lva": "0xa27790",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 745,
+   "lva": "0xa2dd70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 746,
+   "lva": "0xabb3b0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 747,
+   "lva": "0xacbec0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 748,
+   "lva": "0xacf870",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 749,
+   "lva": "0xad0b50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 750,
+   "lva": "0xad6480",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 751,
+   "lva": "0xad6980",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 752,
+   "lva": "0xad8810",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 753,
+   "lva": "0xaf8550",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 754,
+   "lva": "0xafa310",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 755,
+   "lva": "0xafaff0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 756,
+   "lva": "0xafbaa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 757,
+   "lva": "0xb06560",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 758,
+   "lva": "0xb06de0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 759,
+   "lva": "0xb084f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 760,
+   "lva": "0xb0a730",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 761,
+   "lva": "0xb11600",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 762,
+   "lva": "0xb12fa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 763,
+   "lva": "0xb357f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 764,
+   "lva": "0xb36400",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 765,
+   "lva": "0xb3a430",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 766,
+   "lva": "0xb3ad70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 767,
+   "lva": "0xb55b10",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 768,
+   "lva": "0xb55e20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 769,
+   "lva": "0xb72d20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 770,
+   "lva": "0xb7b3e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 771,
+   "lva": "0xb8cba0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 772,
+   "lva": "0xb90440",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 773,
+   "lva": "0xb90610",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 774,
+   "lva": "0xb92640",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 775,
+   "lva": "0xb94f00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 776,
+   "lva": "0xb98570",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 777,
+   "lva": "0xb9b120",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 778,
+   "lva": "0xb9d030",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 779,
+   "lva": "0xba04d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 780,
+   "lva": "0xba2260",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 781,
+   "lva": "0xba34e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 782,
+   "lva": "0xba4f30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 783,
+   "lva": "0xba6ca0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 784,
+   "lva": "0xba71f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 785,
+   "lva": "0xba8c40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 786,
+   "lva": "0xbaa380",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 787,
+   "lva": "0xbac410",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 788,
+   "lva": "0xbacf10",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 789,
+   "lva": "0xbae780",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 790,
+   "lva": "0xbafde0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 791,
+   "lva": "0xbb28e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 792,
+   "lva": "0xbb42b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 793,
+   "lva": "0xbb90e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 794,
+   "lva": "0xbbada0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 795,
+   "lva": "0xbbc170",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 796,
+   "lva": "0xbbda40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 797,
+   "lva": "0xbc0da0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 798,
+   "lva": "0xbc33a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 799,
+   "lva": "0xbd3e60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 800,
+   "lva": "0xbdcb40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 801,
+   "lva": "0xbdfb20",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 802,
+   "lva": "0xbe0a30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 803,
+   "lva": "0xbe1d50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 804,
+   "lva": "0xc080d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 805,
+   "lva": "0xc09120",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 806,
+   "lva": "0xc0c1a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 807,
+   "lva": "0xc2b010",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 808,
+   "lva": "0xc328f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 809,
+   "lva": "0xc46700",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 810,
+   "lva": "0xc469d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 811,
+   "lva": "0xc52540",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 812,
+   "lva": "0xc534d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 813,
+   "lva": "0xc65f00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 814,
+   "lva": "0xc73c50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 815,
+   "lva": "0xc74c50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 816,
+   "lva": "0xc77320",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 817,
+   "lva": "0xc7d550",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 818,
+   "lva": "0xc83780",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 819,
+   "lva": "0xc84fe0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 820,
+   "lva": "0xc85fc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 821,
+   "lva": "0xc88fe0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 822,
+   "lva": "0xc8ae30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 823,
+   "lva": "0xca0180",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 824,
+   "lva": "0xca0730",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 825,
+   "lva": "0xca0f80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 826,
+   "lva": "0xcb9930",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 827,
+   "lva": "0xcbdae0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 828,
+   "lva": "0xcbec50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 829,
+   "lva": "0xcbec70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 830,
+   "lva": "0xcc3210",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 831,
+   "lva": "0xcd50d0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 832,
+   "lva": "0xcd5d80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 833,
+   "lva": "0xcd6600",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 834,
+   "lva": "0xcd79f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 835,
+   "lva": "0xcd8810",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 836,
+   "lva": "0xcd8f30",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 837,
+   "lva": "0xce01f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 838,
+   "lva": "0xce4470",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 839,
+   "lva": "0xce6230",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 840,
+   "lva": "0xce6330",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 841,
+   "lva": "0xced4b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 842,
+   "lva": "0xcfbff0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 843,
+   "lva": "0xcfc010",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 844,
+   "lva": "0xcfc030",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 845,
+   "lva": "0xcfc050",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 846,
+   "lva": "0xcfcfe0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 847,
+   "lva": "0xcfe400",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 848,
+   "lva": "0xcfeec0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 849,
+   "lva": "0xd00ce0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 850,
+   "lva": "0xd013c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 851,
+   "lva": "0xd02fb0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 852,
+   "lva": "0xd04e20",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 853,
+   "lva": "0xd05af0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 854,
+   "lva": "0xd08d90",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 855,
+   "lva": "0xd14140",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 856,
+   "lva": "0xd1aa40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 857,
+   "lva": "0xd25a50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 858,
+   "lva": "0xd33650",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 859,
+   "lva": "0xd33920",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 860,
+   "lva": "0xd37310",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 861,
+   "lva": "0xd39810",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 862,
+   "lva": "0xd3a7d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 863,
+   "lva": "0xd3cfa0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 864,
+   "lva": "0xd52c40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 865,
+   "lva": "0xd562a0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 866,
+   "lva": "0xd573e0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 867,
+   "lva": "0xd578c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 868,
+   "lva": "0xd57bd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 869,
+   "lva": "0xd5a030",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 870,
+   "lva": "0xd5c730",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 871,
+   "lva": "0xd5cef0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 872,
+   "lva": "0xd5f420",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 873,
+   "lva": "0xd65200",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 874,
+   "lva": "0xe51210",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 875,
+   "lva": "0xe51c50",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 876,
+   "lva": "0xe51c70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 877,
+   "lva": "0xe53c20",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 878,
+   "lva": "0xe5aba0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 879,
+   "lva": "0xe5abc0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 880,
+   "lva": "0xe5af80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 881,
+   "lva": "0xe63540",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 882,
+   "lva": "0xe652b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 883,
+   "lva": "0xe66a60",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 884,
+   "lva": "0xe67b40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "InitializeCriticalSection": 1
+   }
+  },
+  {
+   "unit": 885,
+   "lva": "0xe68010",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 886,
+   "lva": "0xe74ed0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 887,
+   "lva": "0xe76750",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 888,
+   "lva": "0xe77cb0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 889,
+   "lva": "0xeaea40",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "VirtualAlloc": 1
+   }
+  },
+  {
+   "unit": 890,
+   "lva": "0xeb0280",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 891,
+   "lva": "0xebf9b0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 892,
+   "lva": "0xec69f0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 893,
+   "lva": "0xec7830",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 894,
+   "lva": "0xeca2f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 895,
+   "lva": "0xecbeb0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 896,
+   "lva": "0xeddfe0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 897,
+   "lva": "0xee0020",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 898,
+   "lva": "0xee1570",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 899,
+   "lva": "0xf06110",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 900,
+   "lva": "0xf10ca0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 901,
+   "lva": "0xf12fd0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 902,
+   "lva": "0xf132b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 903,
+   "lva": "0xf13f60",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 904,
+   "lva": "0xf13f80",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 905,
+   "lva": "0xf2c870",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 906,
+   "lva": "0xf2dea0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 907,
+   "lva": "0xf2e050",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 908,
+   "lva": "0xf314e0",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 909,
+   "lva": "0xf317a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 910,
+   "lva": "0xf317c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 911,
+   "lva": "0xf319d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 912,
+   "lva": "0xf319f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 913,
+   "lva": "0xf31b00",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 914,
+   "lva": "0xfa9390",
+   "kind": "closure_outside",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 915,
+   "lva": "0xf3cbe0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 916,
+   "lva": "0xf42390",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 917,
+   "lva": "0xf4b3d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 918,
+   "lva": "0xf4c760",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 919,
+   "lva": "0xf50a70",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 920,
+   "lva": "0xf6b110",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 921,
+   "lva": "0xf6b330",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 922,
+   "lva": "0xf6b370",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 923,
+   "lva": "0xf6b390",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 924,
+   "lva": "0xf6c660",
+   "kind": "halt0",
+   "detail": null,
+   "shim_calls": {
+    "TlsGetValue": 1
+   }
+  },
+  {
+   "unit": 925,
+   "lva": "0xf6c6a0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 926,
+   "lva": "0xf6c6c0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 927,
+   "lva": "0xf6c6e0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 928,
+   "lva": "0xf6c720",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 929,
+   "lva": "0xf6c740",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 930,
+   "lva": "0xf6d1b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 931,
+   "lva": "0xf6d1d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 932,
+   "lva": "0xf6d1f0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 933,
+   "lva": "0xf6d210",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 934,
+   "lva": "0xf6d670",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 935,
+   "lva": "0xf6d7d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 936,
+   "lva": "0xf74350",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 937,
+   "lva": "0xf75000",
+   "kind": "oob",
+   "detail": "memory access out of bounds",
+   "shim_calls": {}
+  },
+  {
+   "unit": 938,
+   "lva": "0xf75110",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 939,
+   "lva": "0xf75170",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {
+    "InitializeCriticalSection": 1
+   }
+  },
+  {
+   "unit": 940,
+   "lva": "0xf751b0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 941,
+   "lva": "0xf751d0",
+   "kind": "ok",
+   "detail": null,
+   "shim_calls": {}
+  },
+  {
+   "unit": 942,
+   "lva": "0x0",
+   "kind": "noproc",
+   "detail": null,
+   "shim_calls": {}
+  }
+ ]
+}

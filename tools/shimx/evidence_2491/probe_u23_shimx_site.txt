@@ -1,0 +1,23 @@
+PRE|unit 20 slot 0x0 gp GetModuleHandleW=6 GetProcAddress=6
+PRE|unit 21 slot 0x0 gp GetModuleHandleW=6 GetProcAddress=6
+PRE|unit 22 slot 0x457860 gp GetModuleHandleW=7 GetProcAddress=6
+SLOT_BEFORE_UNIT|0x457860
+unit 23 lva 0x67f00
+SLOT_AT_UNIT|0x457860
+ret=2
+MISS_UNIQ 2 MISS_TOTAL 3
+MISS_AT|0 4476d0
+MISS_AT|1 457860
+RET|unit 2 GetModuleHandleW a=0x9ae8 b=0x0 r=0x112ee000 site=function_4099c0@L110523 name="kernel32.dll" 
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x9b02 r=0x0 site=function_4099c0@L110524 name="GetLogicalProcessorInformation"  ord=39682
+RET|unit 2 GetModuleHandleW a=0x18eb4 b=0x0 r=0x112ee000 site=function_418e10@L126428 name="kernel32.dll" 
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x18ece r=0x7f00000a site=function_418e10@L126429 name="GetThreadPreferredUILanguages" 
+RET|unit 2 GetModuleHandleW a=0x18eb4 b=0x0 r=0x112ee000 site=function_418e10@L126432 name="kernel32.dll" 
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x18eec r=0x7f00000b site=function_418e10@L126433 name="SetThreadPreferredUILanguages" 
+RET|unit 2 GetModuleHandleW a=0x18eb4 b=0x0 r=0x112ee000 site=function_418e10@L126436 name="kernel32.dll" 
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x18f0a r=0x7f00000c site=function_418e10@L126437 name="GetThreadUILanguage" 
+RET|unit 18 GetModuleHandleW a=0x4b894 b=0x0 r=0x11441000 site=function_44b7e0@L154039 name="NTDLL.DLL" 
+RET|unit 18 GetProcAddress a=0x11441000 b=0x13fdc r=0x0 site=function_4235f0@L131978  
+RET|unit 18 GetModuleHandleW a=0x105e8 b=0x0 r=0x112ee000 site=function_4104f0@L116255 name="kernel32.dll" 
+RET|unit 18 GetProcAddress a=0x112ee000 b=0x10602 r=0x25a site=function_4104f0@L116256 name="GetLogicalProcessorInformation" 
+RET|unit 22 GetModuleHandleW a=0x57f0c b=0x0 r=0x11443000 site=function_457c70@L160493 name="oleaut32.dll" 

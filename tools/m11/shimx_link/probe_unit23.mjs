@@ -56,7 +56,9 @@ if (typeof mod._sxt_ret_n === 'function') {
     let str = '';
     if (nm === 'GetModuleHandleW' && a > 0 && a < u8.length) { for (let p = a; p + 1 < u8.length && (u8[p] | u8[p + 1] << 8); p += 2) str += String.fromCharCode(u8[p] | u8[p + 1] << 8); }
     if (nm === 'GetProcAddress' && b > 0 && b < u8.length) { for (let p = b; p < u8.length && u8[p]; p++) str += String.fromCharCode(u8[p]); }
-    console.log('RET|unit', mod._sxt_ret_unit(k), nm, 'a=0x' + a.toString(16), 'b=0x' + b.toString(16), 'r=0x' + mod._sxt_ret_r(k).toString(16), str ? 'name=' + JSON.stringify(str) : '');
+    const site = mod.UTF8ToString(mod._sxt_site_name(mod._sxt_ret_site(k)));
+    const ord = nm === 'GetProcAddress' && b > 0 && b < 0x10000 ? ' ord=' + b : '';
+    console.log('RET|unit', mod._sxt_ret_unit(k), nm, 'a=0x' + a.toString(16), 'b=0x' + b.toString(16), 'r=0x' + mod._sxt_ret_r(k).toString(16), 'site=' + site, str ? 'name=' + JSON.stringify(str) : '', ord);
   }
 }
 for (const l of errs.slice(e0)) console.log('ERR|' + l.slice(0, 300));
