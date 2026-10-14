@@ -80,3 +80,13 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
   - native: 8/8 scenario で `found=1` (`FA9CA` 行 8/8)。ERR 8/8 (setter `0x180c9d74c` の `addr=0x50` SIGSEGV、#1182 の範囲)。
   - wasm: found は**未観測** (`ctrl_harness.mjs` に FA9CA 相当の観測点が無い)。ERR 8/8 (`RuntimeError: unreachable` at wasm-function[1102], native とは別の失敗形)。wasm 側で 1 ノードが found=1 になったかは本測定では判定できない。
 - 判定: issue #1535 の受入 1・2 は未達。判定基準 (a) の期待値 (found=0・ERR=0) は変更していない。found=1 の既定化と wasm 側の観測点・ERR 形の解消は #1182 で扱う。
+
+## 9. 未解決表 (PM 改訂 (A) 分割に合わせる)
+
+| 項目 | 状態 | 起票先 |
+|---|---|---|
+| 既定 OFF での 1 ノード成立 (map 非空の既定化) | 未達 | #1182 (FA-16) |
+| `run_fa9.sh` (a) の `found>=1` (期待値は変更しない) | 未達 | #1182 (FA-16) |
+| native ERR=8/8: setter `0x180c9d74c` の `addr=0x50` SIGSEGV の原因特定 | 未解決 | #1578 (FA-22) |
+| wasm の found 観測点と ERR 形 (`RuntimeError: unreachable`) | 未解決 | #1578 (FA-22) (観測点は #1182 の範囲) |
+| 0x180da6c00 到達と Filter 出力比較 | 未着手 | #1182 (FA-16) |
