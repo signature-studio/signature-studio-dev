@@ -57,7 +57,8 @@ def resolve_layout(img, lb_base, init_mib=None, max_mib=64):
 def same(text, ref_path):
     if not os.path.exists(ref_path):
         return None
-    return nb(text) == nb(open(ref_path).read())
+    # p1 の一時名 %pc<行 index> は空行数に依る (#1664 以降の入力では名前だけが変わる)。改名だけを無視する (#2863)
+    return nb(p1_legacy.canon_tags(text)) == nb(p1_legacy.canon_tags(open(ref_path).read()))
 
 
 def sh(cmd, cwd, log, name):
