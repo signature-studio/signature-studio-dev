@@ -43,7 +43,7 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 ### 0xffe370 / 0xffa930 (`0xfe2e98` の表)
 
 - `0xbe2298` (file offset) に `0xffe370`、`0xbe22a0` に `0xffa930` の 8 バイト絶対値。表を指す絶対値・RIP 相対参照は 0 件。
-- `0xffe370` の命令: `mov dword [rcx+0x794], edx`・続けて `[rcx+0x9c]`・`[rcx+0x7ac]` への書込み。`rcx` が受ける対象は引数で、所属クラスは不明。
+- `0xffe370` の命令: `mov dword [rcx+0x794], edx`・続けて `[rcx+0x9c]` への書込み、`[rcx+0x7ac]` の読込み。`rcx` が受ける対象は引数で、所属クラスは不明。
 - 直接 call/jmp 0 件。間接呼出し (vtable 経由) の経路は未特定。
 
 ### 0xec60ae (`[rbp+0x120]` 上)
@@ -133,3 +133,110 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 | P (= `*g`) の型: `0x86a4cf` の `call [A-0x30]` の戻り値型と、A = `*(0x1306300)` の由来 | `0x1306dbf`・`0x130760f` の `+0x794` の対象型が確定しない (受入条件 1 後半) | 子 issue #2501 (`[PY-71]`) |
 | 受入条件 2〜4 (`0xffe370` の所属・`0xec60ae` の型・`0x8ed012` の chan 判定) | 未達のまま | 子 issue #2501 (`[PY-71]`) |
 | g への書込みの網羅 (スタック経由・呼出しをまたぐ経路・base+offset で作った `&g`) | depth 1 の 0 件から「書込み無し」は言えない。書込み元の列挙は未了 | 親 #2159 への提案 (PM 判断) |
+
+## 5. PY-71 (#2501): g の値 P の型・0xffe370 の所属 (追加解析)
+
+§1 の「未完」の `.data` slot `0x15e3d38` は本節 5.1 で解決した (値は `&g`)。
+
+| # | 受入条件 (#2501) | 結果 |
+|---|---|---|
+| 1 | `0x86a4cf` の `call [A-0x30]` の戻り値型と g の値 P の型 | **達成**。P は vptr `0x13063c8`・サイズ `0x840` のクラス (クラス名は無い (stripped)) |
+| 2 | `0xffe370` の所属クラスと呼出し元 | 所属は**達成** (vptr `0xfe2cf8`・サイズ `0x8a8` のクラス、仮想スロット 52)。呼出し元は**未達** |
+| 3 | `0xec60ae` の対象型 (chan 以外なら除外) | **未達** (`[rbp+0x120]` の出所を追えず) |
+| 4 | `0x8ed012` の `[rbp+0x70]` が chan か | **未達** (判定材料を得られず) |
+
+- 測定 commit: `ea3c0c27` (コードを変えた最後の commit)。`8360e1da` (main 取り込みの merge) からの変更は `py67_vtable.py` → `py71_vtable.py` の改名と `py71_callers.py` の docstring 1 行のみ。基点 `origin/main` (`5d33ba04`)。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 バイト)。`tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開。`tools/**/work/` は使わない。
+- 再現 (全コマンド共通。`tools/python` で実行):
+  ```
+  P=$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin
+  T=0xfe2c80,0xfe2c88,0xfe2c90,0xfe2c98,0xfe2ca0,0xfe2ca8,0xfe2cb0,0xfe2cb8,0xfe2cc0,0xfe2cc8,0xfe2cd0,0xfe2cd8,0xfe2ce0,0xfe2ce8,0xfe2cf0,0xfe2cf8,0xfe2d00,0xfe2d08,0xfe2d10,0xfe2d18,0xfe2d20,0xfe2d28,0xfe2d30,0xfe2d38,0xfe2d40,0xfe2d48,0xfe2d50,0xfe2d58,0xfe2d60,0xfe2d68,0xfe2d70,0xfe2d78,0xfe2d80,0xfe2d88,0xfe2d90,0xfe2d98,0xfe2da0,0xfe2da8,0xfe2db0,0xfe2db8,0xfe2dc0,0xfe2dc8,0xfe2dd0,0xfe2dd8,0xfe2de0,0xfe2de8,0xfe2df0,0xfe2df8,0xfe2e00,0xfe2e08,0xfe2e10,0xfe2e18,0xfe2e20,0xfe2e28,0xfe2e30,0xfe2e38,0xfe2e40,0xfe2e48,0xfe2e50,0xfe2e58,0xfe2e60,0xfe2e68,0xfe2e70,0xfe2e78,0xfe2e80,0xfe2e88,0xfe2e90,0xfe2e98,0xfe2ea0
+  ```
+
+### 実測 (コミット済み `ea3c0c27`・件数のみ)
+
+所要時間は受入判定に使わないため記録しない。出力の件数で再現を確かめた。
+
+- `python3 analysis/py71_callers.py "$P" 0x86a470,0x11c8950 8`: 直接 call 25 件 (`0x11c8950` 23 件 + `0x86a470` 2 件)。出力 254 行。
+- `python3 analysis/py71_slot.py "$P" 0x1306300,0x13a5c90,0x15e3d38 16 16`: 出力 178 行。
+- `python3 analysis/py71_callers.py "$P" "$T" 0` (表スキャン・受入 2a/2b の根拠): `[imm]`・`[load]`・`STORE`・`[lea]` 0 件。絶対 8 バイト `0xfe2cf8` の格納 2 件 (VA `0xfe2c30`・`0xfe2ed8`)。
+- `python3 analysis/py71_vtable.py "$P" 0x13063c8 0x714,0x718,0x739,0x794` と `... 0xfe2cf8 ...`: 5.4 の表の値。
+- 差分 0 の証跡は本節末尾。
+
+### 差分 0 の証跡 (§5)
+
+```
+$ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
+(出力 0 行)
+```
+
+### ネガティブコントロール
+
+- RIP 経路 (正の対照): `python3 analysis/py71_callers.py "$P" 0x1306300 0` → `[load]` 1 件 (`0x11be449`・`mov rcx, [rip+0x147eb0]`)。既知の RIP 参照は検出される。表スキャンの RIP 0 件はこの検出器で見た 0 件。
+- 即値経路: `$RUNNER_TEMP/py71_nc/` (`$RUNNER_TEMP` 下・`tools/**/work/` は使わない) に PE の写しを作り、`0x4074ff` の `mov ecx, 0xa` (`b9 0a 00 00 00`) の即値を `0xfe2c88` (表の 1 要素) に書き換える (差分 3 バイト)。以下を `$RUNNER_TEMP/py71_nc/nc_patch.py` として保存する。
+  ```python
+  import struct, sys, pefile, capstone
+  src, dst = sys.argv[1], sys.argv[2]
+  pe = pefile.PE(src, fast_load=True)
+  data = bytearray(open(src, "rb").read())
+  text = next(s for s in pe.sections if s.Name.startswith(b".text"))
+  base = pe.OPTIONAL_HEADER.ImageBase + text.VirtualAddress
+  off0 = text.PointerToRawData
+  md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+  off = 0
+  while off < text.SizeOfRawData:
+      ins = next(md.disasm(bytes(data[off0 + off:off0 + off + 15]), base + off, 1), None)
+      if ins is None:
+          off += 1
+          continue
+      if ins.mnemonic == "mov" and ins.size == 5 and ins.bytes[0] == 0xB9:
+          data[off0 + off + 1:off0 + off + 5] = struct.pack("<I", 0xFE2C88)
+          break
+      off += ins.size
+  open(dst, "wb").write(data)
+  ```
+  `python3 $RUNNER_TEMP/py71_nc/nc_patch.py "$P" "$RUNNER_TEMP/py71_nc/block00031_PE_nc.bin"` の後、`python3 analysis/py71_callers.py "$RUNNER_TEMP/py71_nc/block00031_PE_nc.bin" "$T" 0` を実行すると `[imm]` は 0 件 → 1 件 (`0x4074ff: mov ecx, 0xfe2c88  [imm]`)。元の PE に同じコマンドを実行すると `[imm]` は 0 件のまま。表スキャンの即値 0 件は、この検出器が即値経路で動くことを確かめた上での 0 件。
+
+### 5.1 g ← P の経路 (静的)
+
+1. 書込み: `0x86a4e1` の `mov [rax], rcx` (P を `*r8` へ)。`r8 = &g`。関数 `0x86a470` は `this=rcx`・`A=rdx`・`out=r8`。
+2. 直接 call は 2 件。`0x10dc775` は `out=&[rbp+0x68]` (ローカル。g ではない)。もう 1 件は thunk `0x11c8950` (`0x11c896d`) で、`this=*(0x15e50f8)`・`A=rcx`・`out=rdx` に並べ替える。
+3. thunk `0x11c8950` の呼出しは 23 件。g へ書くのは fn `0x11be0a0` (11 件の内) の `0x11be457`。その直前で `rcx=*(0x1306300)=A`、`rdx=*(0x15e3d38)=&g` (`0x11be450`)。
+4. `A = *(0x1306300) = 0x13063c8` (`.text` の静的値)。`0x1306300` への RIP 相対の書込みは 0 件。
+5. `call [A-0x30]`: `[0x1306398] = 0x40f960` (F)。F は `size = dword[this-0x80] = 0x840` を読み、`0x409410(size)` で確保、`0x40fb40(this, X)` で `*X = this` (vptr = A) を書いて `X` を返す。よって P = X (新規 `0x840` バイトのオブジェクト)。
+6. `0x409410` の確保は `call [0x13a5c90]` の間接呼出しで、`0x13a5c90` は `.data` の静的値 `0x407a50`。`0x407a50` は先頭 `push rbp` で、同関数内 (int3 を挟まない線形逆アセンブル) の `0x407b06`・`0x407b15`・`0x407b28`・`0x407b56` に `f0 0f b0 23` (`lock cmpxchg byte ptr [rbx], ah`) がある。アロケータと見なす根拠はこの 4 件。
+
+### 5.2 P の型 (vptr `0x13063c8`)
+
+- `[A]=0x619200` (先頭スロット) で、vtable は 110 スロット。`0x86a4ef`〜`0x86a4f6` は `mov rax,[P]`・`mov rax,[rax]` (vptr) の後に `call [rax+0x78]` を呼ぶ (vtable スロット 15 = `0x80c850`)。
+- `0x1306dbf` (`mov [rcx+0x794], rax`・`rcx=g`) と `0x130760f` (`mov [rax+0x794], r14`・`rax=g`) はどちらも P の `+0x794` へ書く。`0x794 < 0x840` で、対象型は vptr A のクラス。
+- クラス名は無い (stripped)。chan かどうかは 5.4 の近似でも確定しない。
+
+### 5.3 0xffe370 の所属 (vptr `0xfe2cf8`)
+
+- `V = 0xfe2cf8`: `[V-0x80] = 0x8a8` (サイズ)、`[V-0x30] = 0x40f960` (A と同じ factory F)。`0xfe2c78..0xfe2cf0` (V-0x80..V-0x8) は V の 16 語のメタデータ (A の `A-0x80..A-0x8` と同じ形)。
+- 仮想表 `0xfe2cf8..0xfe2ea0` は 54 スロット。`0xffe370` = スロット 52 (`+0x1a0`)、`0xffa930` = スロット 53。`0xffe370` は `[rcx+0x794]`・`[rcx+0x9c]` を書き、`[rcx+0x7ac]` を読む (V のメソッドとして整合)。
+- 表を指す参照は、RIP 相対・即値の参照 0 件 (`0xfe2c80+8k` の 69 個全て。「ネガティブコントロール」節の検出器で確認)。絶対 8 バイト値 `0xfe2cf8` は 2 件 (`.text` の `0xfe2c30`・`0xfe2ed8` に格納)。同じスキャンで `0xfe2d00`・`0xfe2e00` にも絶対値の格納が 1 件ずつある (VA `0x94ab97`・`0x94aba7`)。隣接値は `0x15ec29800` と交互に並び、V の vtable 列とは別の構造。未調査。
+- 未解決: 呼出し元 (V のインスタンスの `call [reg+0x1a0]`) と、V の vptr を書く箇所。`0xfe2c30`・`0xfe2ed8` の格納元も未追跡。
+
+### 5.4 chan 判定の材料 (近似。vtable 単位・ベース不問の disp 一致)
+
+| クラス (vptr) | サイズ | `+0x714` | `+0x718` | `+0x739` | `+0x794` |
+|---|---|---|---|---|---|
+| P: A `0x13063c8` | `0x840` | 1/110 | 1/110 | 0/110 | 0/110 |
+| V `0xfe2cf8` | `0x8a8` | 0/54 | 0/54 | 0/54 | 12/54 |
+
+(数値はスロット数。`py71_vtable.py`。chan の判定根拠 (`+0x714`・`+0x718`・`+0x739`) は両クラスとも弱く、chan とは確定できない。)
+
+### 5.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `0xec60ae` の `[rbp+0x120]` の出所 (`push rbp` を 0x3000 バイト内に見つけられず) | 受入条件 3 | #2501 (Refs で残す) |
+| `0x8ed012` の `[rbp+0x70]` の出所 (関数先頭は未特定。直前の `push rbp` `0x8ea780` は `sub rsp,0x28` の別関数で、`[rbp+0x70]` の代入元ではない) | 受入条件 4 | #2501 |
+| V (`0xfe2cf8`) のインスタンス生成箇所と、`call [reg+0x1a0]` の呼出し元 | 受入条件 2 (呼出し元) | #2501 |
+| A (`0x13063c8`) のクラス名と chan 判定 | 5.4 の判定根拠 | #2501 |
+
+### 名称
+
+- `py67_vtable.py` は PR 初版の名前 (main に同名は無い)。他の 2 本 (`py71_callers.py`・`py71_slot.py`) と揃えて `py71_vtable.py` に改名した (`ea3c0c27`)。

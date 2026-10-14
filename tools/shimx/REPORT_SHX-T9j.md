@@ -9,7 +9,7 @@
 - 受入 2 (GetLastError を両版で読める export): `_GetLastError` を baseline (`tools/m11/m11_build.sh` の `EXPORTS`) と shimx (`tools/m11/shimx_link/build.sh` の `EXPORTS`) に 1 語ずつ追加 (測定 commit `0bdd046d`)。`-Wl,--export-all` だけでは `Module._GetLastError` にならないため必要だった。C 側の変更は無し。
 - 受入 3 (両版で実測): 現行 `m11_ov.c` から baseline を再生成 (`m11_gen_ir2.sh` → `m11_build.sh`) し、shimx は `--trace --soft --fix` の clean rebuild で unit 23 を 1 回実行した。両版とも `ret=2`・icall-miss `0x457860` (2 件) で経路は一致した。unit 23 終了時の GetLastError は **baseline 0 / shimx 126**。
 - 旧 snapshot 由来の `af6115db` の値 (baseline 1 / shimx 0) とは一致しない。unit 18・unit 22 の振る舞いが IR 再生成の後で変わっており、原因は IR 再生成と推定する (未切り分け・§4)。
-- shimx 版の GetLastError=126 (`ERROR_MOD_NOT_FOUND`) が unit 22 で立つ呼出しは**未特定** (§2.4・§4)。
+- shimx 版の GetLastError=126 (`ERROR_MOD_NOT_FOUND`) が unit 22 で立つ呼出しは、後続の SHX-T9k (#2593) で特定済み: GetProcAddress の 1 回目の呼出し (hModule `0x56670`)。詳細は `tools/shimx/REPORT_SHX-T9k.md` §1 (§2.4 は本 PR 時点の記録として残す)。
 
 ## 2. 測定
 
@@ -72,6 +72,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| unit 22 で shimx 版の GetLastError が 126 になる発生元 (`module.c` の LoadLibrary / GetModuleHandle 系のどれか) | unit 22・23 の GetLastError 比較の解釈 | #2491 (`[SHX-T9i]`) に合流 (未起票) |
+| unit 22 で shimx 版の GetLastError が 126 になる発生元 → **特定済み** (GetProcAddress・`REPORT_SHX-T9k.md` §2.1)。hModule `0x56670` の出所 (`function_457c70` の未初期化 alloca の残存値) は未特定 | unit 22・23 の GetLastError 比較の解釈 | #1607 (`[SHX-T9e]`) |
 | 旧 IR (`af6115db`) と再生成 IR で unit 18・22 の結果が変わった原因 (IR 再生成と推定・未切り分け) | 旧 evidence の値を根拠にできない | #2489 (`[SHX-T9h]`) の残り。PM が close 判断 |
 | shimx 版 unit 18 `halt0` と baseline `ret=1` の差 (再生成 IR 上) | 両版の unit 単位差分 | 未起票 (`#1465` は CLOSED・`#2489` の比較に含める) |

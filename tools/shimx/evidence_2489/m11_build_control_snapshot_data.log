@@ -1,0 +1,10 @@
+[guard699] mode=on before='icmp sle i32 %9, 0' after='icmp sle i32 %9, 0' changed=False
+[fix912] mode=off replaced=0
+[m11build] cc work/m11_winstubs.c
+[m11build] cc work/m11_fnstubs.c
+[m11build] OK: work/m11_boot.cjs(+.wasm)  wasm-ld signature mismatch: 0, undefined symbol: 0
+rc=0
+
+real	0m19.373s
+user	0m17.952s
+sys	0m1.437s

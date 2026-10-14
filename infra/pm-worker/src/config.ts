@@ -2,8 +2,10 @@ import manualDepsJson from "../../../tools/pm/manual_deps.json" with { type: "js
 import { DEFAULT_BATCH } from "./launch.ts";
 import { DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 
-// 既定の TARGET は 80。GitHub の同時 job 上限 (60) を超えた分は queued になり、常時 60 に張り付くための余裕。
-export const DEFAULT_TARGET_WORKER = 80;
+// 既定の TARGET は 58: 同時に走らせる opencode.yaml の run の総数 (実装・review・fix・oc-pm・watchdog の全て。active.ts) の上限。
+// GitHub の同時実行の上限 (60) から 2 を残す (oc-pm・watchdog と、投稿直後でまだ run が現れていない分の余裕)。
+// 実際の目標は、観測から推定した上限を足した target_eff (saturation.ts。TARGET を超えない)。
+export const DEFAULT_TARGET_WORKER = 58;
 export const DEFAULT_QUEUE_MARGIN = 10;
 export const DEFAULT_TARGET_MIN = 30;
 export const DEFAULT_REPO = "signature-studio/signature-studio-dev";
@@ -29,6 +31,8 @@ export interface Env {
   LIVE?: string;
   LIVE_LAUNCH?: string;
   LIVE_DISPATCH?: string;
+  // 規則 A の自動 close (autoclose.ts) を実行するか。"1" のときだけ。LIVE には従わない (close は副作用が大きいので個別に明示する)。
+  LIVE_CLOSE?: string;
   // "1" のときだけ、失敗した webhook 配送を GitHub に再配送する (POST /app/hook/deliveries/{id}/attempts)。LIVE には従わない (単独のスイッチ・#2339)。
   LIVE_REDELIVER?: string;
   // 実装 App (bot) のログイン。bot_last (最後の報告) の判定に使う。
@@ -60,6 +64,8 @@ export interface Config {
   liveLaunch: boolean;
   // repository_dispatch (oc-watchdog と oc-pm) の送信を実行するか。
   liveDispatch: boolean;
+  // 規則 A の自動 close を実行するか (LIVE_CLOSE="1" のときだけ。既定は記録のみ)。
+  liveClose: boolean;
   // 失敗した webhook 配送の再配送を実行するか (既定 false: 一覧を読んで送るはずだった件数だけ記録する)。
   liveRedeliver: boolean;
   botLogin: string;
@@ -98,6 +104,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     batch: num(env.BATCH, DEFAULT_BATCH),
     liveLaunch: liveFlag(env.LIVE_LAUNCH, env.LIVE),
     liveDispatch: liveFlag(env.LIVE_DISPATCH, env.LIVE),
+    liveClose: env.LIVE_CLOSE === "1",
     liveRedeliver: env.LIVE_REDELIVER === "1",
     botLogin: env.BOT_LOGIN ?? "opencode-for-signature-studio[bot]",
     pmLogins: (env.PM_LOGINS ?? "pycabbage").split(",").map((s) => s.trim()).filter(Boolean),

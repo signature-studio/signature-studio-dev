@@ -43,6 +43,8 @@ jobs:
           persist-credentials: false
       # Kilohearts の PDF 抽出が `uv run --with pypdf==5.9.0` を使う
       - uses: astral-sh/setup-uv@v10.3.0
+        with:
+          version: '0.13.1'
       - name: Check terms (Web 4 documents)
         id: check
         shell: bash
