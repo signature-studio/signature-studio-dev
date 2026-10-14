@@ -139,6 +139,20 @@
 - **数え方**: real = 試験 S1〜S9 の check 行 (OK/FAIL) の件数。ネガコン = mutant 7 種のうち、対応 check が 1 件以上 FAIL した数 (期待 7/7)。
 - **再計算**: `node tools/hostbridge/poc/test_shim.mjs` (OTT 非依存) と `node tools/hostbridge/poc/test_marshal.mjs`。
 
+## 5-d. memload real の派生 loader 撤去 (RT-15, #2552)
+
+- **変更**: `tools/runtime/memload/real/real_worker.mjs` の派生 `PoolBridge` (LoadLibraryW の採番だけ単調増加に置換) を削除し、共有 `hb_bridge.mjs` の `HostBridge` を直接使う。共有側は §5-c (#2553) で `allocHandle()` 済みのため挙動は同一。経緯と未実測の理由は `tools/runtime/REPORT_APPENDIX_2552.md`。
+- **実測 (測定 commit `0af3030c`。load average 0.38 → 0.56、4 CPU、並列 1)**:
+  - `bash tools/hostbridge/hostbridge.sh`: rc=0、7.57 s、`[hostbridge] ALL PASS`。OK 92 / FAIL 0。
+  - 内訳: [1] E1〜E20 OK、[2] `build_plugin_ott.sh` OK (`ott_hb.cjs.wasm` 848,251 B) と `build_host.sh` OK (`host_vst2.wasm` 3,734 B)、[3b] `checks 13 / broken 0`、[3c] `[shim] ALL PASS` ・ネガコン 7/7 caught、[4] `[run_poc] checks 28 / broken 0`。
+  - 素材: `work-m6-ott` を `tar --zstd -xf` で展開 (`tools/m6,m8,m9,m10,ott/work/`)。toolchain は既存の [EMSDK]・[RETDEC] (`docs/REFERENCES.md` §4) を使用。
+- **測定後のコード差分**: `git diff 0af3030c HEAD -- tools/hostbridge/poc tools/runtime/memload` の出力は `real_worker.mjs` の未使用 import (`HMODULE_BASE`) 1 行の削除のみ (review 対応)。`tools/hostbridge/poc` は 0 行で、hostbridge.sh は `tools/runtime/memload` を参照しない (grep 0 件)。受入 2 の測定値は `0af3030c` のまま有効。出力:
+  ```diff
+  -import { ModuleTable, HostBridge, EmscriptenGuest, HMODULE_BASE } from "./hb_bridge.mjs";
+  +import { ModuleTable, HostBridge, EmscriptenGuest } from "./hb_bridge.mjs";
+  ```
+- **未実測**: `pnpm runtime:memload:real` (RT-15 受入 1)。lowbase ビルドが OTT DLL (`analysis-ott-binaries`) 無しで停止 (`FileNotFoundError: .../ott/binaries/OTT_vst2_win64.dll`)。
+
 ## 6'. 規約遵守メモ
 
 - 書込は `tools/hostbridge/` のみ。`tools/m2,m6..m10` は読取 (Ghidra project は `work/` へコピー、`ott_m10.ll` も `work/` へコピー)。README/docs/・ルート package.json 無改変。

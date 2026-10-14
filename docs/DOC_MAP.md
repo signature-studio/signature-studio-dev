@@ -334,6 +334,7 @@
 |---|---:|---|
 | `tools/runtime/REPORT.md` | ~155 | ブラウザ実行基盤 |
 | `tools/runtime/REPORT_APPENDIX_127.md` | ~65 | RT-9 (#127) の追補: 音声込み Firefox 測定の手順と実測表、Playwright WebKit 26.0 (Linux) の参考値 (Safari 実機ではない) |
+| `tools/runtime/REPORT_APPENDIX_2552.md` | ~15 | RT-15 (#2552): memload real の派生 loader `PoolBridge` 撤去 (共有 hb_bridge.mjs の HostBridge に接続)。memload real の実測は OTT DLL 素材待ち (REPORT §RT-6 の追補) |
 | `tools/runtime/rt10/REPORT.md` | ~190 | 実 FLEngine x64c lift (126MB wasm) の Chrome 起動時間・帯域・tier-up・boot ループ soak (RT-10 #128) |
 | `tools/hostbridge/REPORT.md` | ~95 | Fruity Wrapper の VST2 ロード経路解析 + wasm 同梱プラグイン表 |
 | `tools/hostbridge/cb/REPORT.md` | ~145 | shimx R2 コールバック変換の実体接続 |
