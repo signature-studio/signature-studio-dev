@@ -126,10 +126,10 @@ slot の対応 (block24339 の種別 × block24356 の種別, 件数):
 
 ## 16. x64c の未対応 6 mnemonic の被覆 (#3138、閉包 50 の unsup 13 site)
 
-> 測定 commit: `fe2dc9ed` (コードを変えた最後の commit: `feat(flelift): cover the 6 unsup mnemonics of the Agg2D closure in x64c`)。`git diff fe2dc9ed HEAD -- tools/flelift tools/shared/oss/blend2d ':(exclude)*.md'` の出力は 0 行 (以後の変更は REPORT の文言のみ)。
+> 測定 commit: `5fc307db` (`origin/main` `6cfa2e8a` を取り込んだ merge commit。コードを変えた最後の commit)。`git diff 5fc307db HEAD -- tools/flelift tools/shared/oss/blend2d ':(exclude)*.md'` の出力は 0 行 (以後の変更は REPORT の文言のみ)。取り込み前の実装 commit は `fe2dc9ed` (`feat(flelift): cover the 6 unsup mnemonics of the Agg2D closure in x64c`)。下の「変更後 = `fe2dc9ed`」の表と差分試験の本文は取り込み前の値で、統合後の値は「統合後の再測定」の節を参照。
 > 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_lift_probe.py [出力 JSON]` (約 4 秒)。差分試験: `python3 tools/flelift/tests/x64c_vex_diff.py` (約 2 秒、GNU as / gcc が必要)。
 
-**閉包別の lift 結果** (変更前 = `8d8d0e6a`、変更後 = `fe2dc9ed`。`agg2d_lift_probe.py` の `depths`)
+**閉包別の lift 結果** (取り込み前の値。変更前 = `8d8d0e6a`、変更後 = `fe2dc9ed`。`agg2d_lift_probe.py` の `depths`)
 
 | 閉包 | funcs | insns | unsup_sites 前 → 後 | unsup_mnemonics 前 → 後 | unlifted_callees 前 → 後 |
 |---|---|---|---|---|---|
@@ -158,7 +158,7 @@ funcs・insns・unlifted は変更前後で同一 (受入条件 (1) 達成)。pr
 
 **C 出力の差分** (閉包 50 の `fle_lifted.c`): 変更前 58,903 行 → 変更後 58,914 行。`diff` の変更は **13 行 (`ott_unsup` の 13 site) を 24 行 (新 handler) に置換する hunk のみ**で、他の行は変化しない。内訳: vsubsd 5 site × 2 行、vdivsd 2 × 2、vxorps 2 × 2、vpsrldq 1 × 2、vcvttpd2dq 1 × 2、cmpneqpd 2 × 1 (計 24 行)。閉包 0・1・3 の C 出力の diff は取っていない (unsup 表は上の通り)。
 
-**FLEngine の lift 出力** (受入条件 (3)): `block00031_PE.bin` を `--closure 0`、entries は `tools/flelift/fle_entries.json`、引数は `fle_lift.sh` と同じ (emcc は省略)。変更前は `origin/main` の `x64c.py` を一時ディレクトリに置いて実行。両方 **7,018 関数 / 340,761 命令 / unsup {} / unlifted 0 / import 354**。`fle_lifted.c` と `lift_meta.json` は `cmp` で**バイト一致** (差分 0)。FLEngine の lift には今回の変更が効く unsup 箇所が無く、出力は変わらない。lift 所要は各 19 秒。
+**FLEngine の lift 出力** (受入条件 (3)、取り込み前の値。統合後は下の再測定): `block00031_PE.bin` を `--closure 0`、entries は `tools/flelift/fle_entries.json`、引数は `fle_lift.sh` と同じ (emcc は省略)。変更前は `origin/main` の `x64c.py` を一時ディレクトリに置いて実行。両方 **7,018 関数 / 340,761 命令 / unsup {} / unlifted 0 / import 354**。`fle_lifted.c` と `lift_meta.json` は `cmp` で**バイト一致** (差分 0)。FLEngine の lift には今回の変更が効く unsup 箇所が無く、出力は変わらない。lift 所要は各 19 秒。
 
 **統合後の再測定** (測定 commit `5fc307db` = `origin/main` `6cfa2e8a` を取り込んだ merge commit)。取り込みで `fe2dc9ed` からの x64c.py・blend2d 側のコード差分が入ったため (`--cfg-rax` 既定 OFF、rcr の docstring)、上の表は取り込み前の値として残し、以下で測り直した。`git diff 5fc307db HEAD -- tools/flelift tools/shared/oss/blend2d ':(exclude)*.md'` = 0 行。
 
