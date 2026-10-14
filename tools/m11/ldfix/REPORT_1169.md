@@ -1,16 +1,17 @@
 # REPORT #1169 — D17 spill 宛 CELL_COLLAPSED 37 site の判定対応と修復 pass の判断 (LD-37)
 
-既知類型との関係: D4 (2 段 deref 脱落) の spill 宛版に近い。ただし本 REPORT は機構を確定しない (`docs/DEFECTS.md` の該当 ID は付けない)。
+既知類型との関係: D4 (`mov r64,[r8]` の disp=0 の 1 段 deref の脱落) と、load の脱落で値が化ける点は近い。ただし同一とは確定しない。本 REPORT は spill 宛の機構を確定せず、`docs/DEFECTS.md` の該当 ID は付けない。
 
 親: #968 (LD-21)。本 issue は規約 (`docs/WORKFLOW.md` §3 の Closes 縮小規定) に従い範囲を縮小した。完了分は判定対応 (受入 1 の 30/37 確定 + 残りの担当付け)・残数の実測 (受入 3)・emcc 構文検証 (受入 4)。修復 pass (受入 2) は子 issue へ移した (§4)。
 
 ## 1. 測定条件
 
 - 測定 commit: `30860c30` (コードを変えた最後の commit。判定対応の e2e 追加)。作業 worktree `ws-1169` (branch `1169-spill-frame-verdict`)
-- 素材: `work-m11` を `tar --zstd -xf` で展開 (gitignore 対象の `tools/m11/work/`)。worktree には無いため `M11_WORK` で main の展開先を読んだ (読込のみ)
-- 実行: `M11_WORK=<main>/tools/m11/work bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、`TMPDIR=$RUNNER_TEMP`)
+- 素材: `work-m11` (`tools/m11/work/` に展開) と `toolchain-emsdk` (`/opt/emsdk` に展開)。どちらも PR 本文の `oc_artifacts:` 行で agent-setup が展開する (`docs/WORKFLOW.md` §11)。実装 run の測定は ws-1169 に素材が無かったため、`M11_WORK` で main の展開先を読んだ (読込のみ)。再現の手順は §5 の 1 通り
+- 素材の性質: `work-m11` は #516 qstore 以前の生成で、現 main の生成手順と一致しない snapshot (`docs/WORKFLOW.md` §11・#680)。以下の「37 のまま」の結論はこの IR に限る。現 main の IR に対する結論ではない
+- 実行: `bash tools/m11/ldfix/fix_d17_e2e.sh` (既定の `M11_WORK` = `tools/m11/work`、`TMPDIR=$RUNNER_TEMP`、foreground)。測定時は `M11_WORK=<main>/tools/m11/work` を指した
 - 結果: rc=0、real 23.3 s、load average (uptime) 0.09 → 0.40。5 ステップすべて完走、emcc rc=0、`spill37_1169.tsv` は results/ と一致
-- 測定後の差分: 測定 commit 以降、`tools/m11/ldfix` のコード・入力は変えていない (§5 の `git diff`)
+- 測定後の差分: 測定 commit 以降の変更は `spill37_1169.py` の step 4 だけ (`with` での読込と引数の整理。出力は不変)。step 1〜3・5 は未変更。HEAD での e2e 再実行は、本 round では素材が無く未実施 (§5)
 
 | 項目 | 修復前 | 修復後 (fix_d17.py) |
 |---|--:|--:|
@@ -46,6 +47,7 @@
 - 観察 (1003c20・TRUE_DROP・site 1003c73 `mov qword ptr [rbp + 0x38], rax`): 機械語 1003c42 `cmp dword ptr [rax + 0x794], 0` と 1003c49 `jge` の比較が、IR の `function_1003c20` (`boot_final3.ll` 845〜912 行、68 行) には無い。1003c73 に対応する store も IR に無い。IR と機械語の対応が取れていない兆候で、spill 宛の欠落を IR 側の 2 段 deref 脱落とは断定できない。
 - 修復方式の決定には、TRUE_DROP 24 site ごとに「IR に対応する命令があり値が 1 段に潰れているか」「lift 段で欠落しているか」を先に判定する必要がある。後者は #2705 (LD-125) と同じ問い。判定が付かないまま pass を入れると、脱落の検出と修復の判定が循環し、silent miscompile の危険がある (#1740 の注意と同じ)。
 - そのため受入 2 は未実施。修復後の残数の再測定 (受入 3 の後半) も修復 pass と同時に行う。
+- 上の 1003c20 の IR 照合 (`function_1003c20` に 1003c42 の比較が無い) は未検証。本 round では `work-m11` が無く IR を開けなかった。素材を使える round で再確認し、結果をこの行に追記する。子 #2794 の根拠になっているため、確認が済むまで根拠の強さは未確定
 
 ## 4. 未解決と起票先
 
@@ -56,11 +58,54 @@
 
 ## 5. 再現
 
+素材は agent-setup が PR 本文の `oc_artifacts: work-m11 toolchain-emsdk` で展開する (`work-m11` → `tools/m11/work/`、`toolchain-emsdk` → `/opt/emsdk`)。再現の手順は次の 1 通り。
+
 ```
-tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst
 bash tools/m11/ldfix/fix_d17_e2e.sh
 ```
 
-判定対応だけなら audit JSON を 1 本渡す: `python3 tools/m11/ldfix/spill37_1169.py OUT.tsv AUDIT.json [AUDIT_AFTER.json]` (素材不要。audit JSON は `fix_d17_e2e.sh` の step 1 の出力)。
+agent-setup の外で再現するときも同じ配置にする (`tar --zstd -xf <work-m11>.tar.zst -C <repo 直下>`、`sudo tar --zstd -xf <toolchain-emsdk>.tar.zst -C /opt`)。
 
-測定後の差分 (測定 commit 以降のコード・入力): `git diff 30860c30 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` の出力は空 (§1 の結論を保つ)。
+step 4 (判定対応) だけを試すなら audit JSON を渡す: `python3 tools/m11/ldfix/spill37_1169.py OUT.tsv AUDIT.json [AUDIT_AFTER.json]`。`results/audit_510_ssa.json` (#510 時点の snapshot。HEAD の audit の代用ではない) を入力にすると、素材なしで `results/spill37_1169.tsv` と `cmp` 一致する (本 round で 1 本・2 本の両方を確認)。
+
+測定 commit `30860c30` から HEAD までのコード差分 (`git diff 30860c30 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results`。最後のコード commit は `8f58dc81`):
+
+```diff
+diff --git a/tools/m11/ldfix/spill37_1169.py b/tools/m11/ldfix/spill37_1169.py
+index 0d92b28d..68a5d8d7 100644
+--- a/tools/m11/ldfix/spill37_1169.py
++++ b/tools/m11/ldfix/spill37_1169.py
+@@ -24,7 +24,8 @@ def rows(path):
+ 
+ 
+ def frame_collapsed(audit_path):
+-    audit = json.load(open(audit_path))
++    with open(audit_path) as f:
++        audit = json.load(f)
+     out = set()
+     for va, v in audit['functions'].items():
+         for s in v['sites']:
+@@ -37,9 +38,10 @@ def frame_collapsed(audit_path):
+ def main():
+     if len(sys.argv) not in (3, 4):
+         sys.exit(__doc__)
+-    out_path, audits = sys.argv[1], sys.argv[2:]
+-    sites = frame_collapsed(audits[0])
+-    for a in audits[1:]:
++    out_path, audit_path = sys.argv[1], sys.argv[2]
++    after_paths = sys.argv[3:]
++    sites = frame_collapsed(audit_path)
++    for a in after_paths:
+         if frame_collapsed(a) != sites:
+             print('FAIL: 修復後の audit の spill 宛 CELL_COLLAPSED 集合が修復前と不一致 (%s)' % a, file=sys.stderr)
+             sys.exit(1)
+@@ -59,7 +61,7 @@ def main():
+     with open(out_path, 'w') as f:
+         f.write('\n'.join(lines) + '\n')
+     print('spill 宛 CELL_COLLAPSED site %d / 関数 %d (audit %d 本で一致)'
+-          % (len(sites), len({k[0] for k in sites}), len(audits)))
++          % (len(sites), len({k[0] for k in sites}), 1 + len(after_paths)))
+     for k, n in sorted(cnt.items(), key=lambda x: -x[1]):
+         print('%s %s: site %d / 関数 %d' % (k[0], k[1], n, len(fns[k])))
+ 
+```
