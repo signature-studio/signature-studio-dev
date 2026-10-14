@@ -8,6 +8,8 @@
 - **cookie と decode 規則は一致**: SlateCore `0x18125eaa8` と OTT `0x180260ce0` の cookie はどちらも静的既定 `0x2b992ddfa232` (rot = cookie & 0x3f = 50)。decode は両者とも `ror(entry ^ cookie, cookie & 0x3f)`。
 - **配置も一致 (静的状態)**: OTT api-set 表 (32 entry = 256 B) も SlateCore の既知 12 slot・T1 `0x181307100`・T2 `0x1813071a0` も、すべて `.data` の **zero-fill 域** にあり、ファイル上の生値は 0。
 - **entry 数は比較できない**: OTT 側は 32 entry と確定。SlateCore 側は T1/T2 の終点が未確定 (#2226)。
+  **仮定 (issue #2225 本文の指定どおり明記)**: SlateCore 側の entry 数は未確定のため、「一致」とも「相違」とも判定しない。
+  entry 数が 32 と一致するかは #2226 の結論待ち。形式 (cookie・decode 式・zero-fill 配置) の一致だけを本 appendix の判定とする。
 - **訂正**: `tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の「api-set 表 0x18026c9f0 のファイル生値は非ゼロ 32/32」は誤り。実測は 0/32 (§2.3)。`tools/ott/crtinit/REPORT.md` §3 の「全 0」が正しい。本 PR では ACCEPTANCE 文書を書き換えず、未解決表に残す。
 
 ## 2. 実測
