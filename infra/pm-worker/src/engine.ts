@@ -48,7 +48,7 @@ const NO_PR_MAX_RELAUNCH = 3;
 // oc-watchdog の最短送信間隔は WATCHDOG_INTERVAL_S (既定 300 秒 = VM の pm_watchdog_ping.sh と同じ 5 分) から、この分だけ短い。
 // tick は毎分 (cron と alarm) で、わずかに早い tick を弾くと次の送信が 1 分遅れ、周期が 6 分になるため。
 export const WATCHDOG_JITTER_MS = 30_000;
-// 降格 (#2340): 同じ issue に、この時間内に 2 回目の /oc が付いたら DO を dry-run に戻す。
+// 降格 (#2340): 同じ issue に、この時間内に Worker (PM App) と個人の /oc の組が付いたら DO を dry-run に戻す。
 export const OC_DOUBLE_MS = 30 * 60_000;
 // shadow (#2340): would_launch と VM の /oc を、この窓 (15 分) で突き合わせる。
 export const SHADOW_WINDOW_MS = 15 * 60_000;
@@ -324,7 +324,8 @@ export class Engine {
 
   // ---------------------------------------------------------------- 降格と shadow (#2340)
   // PM のログイン (個人と PM App) の /oc 投稿を記録する。id で重複を除く (webhook と reconcile の両方から来るため)。
-  // 同じ issue に OC_DOUBLE_MS 以内の 2 件目が付いたら降格する (判定は ocWatchFrom 以降に届いたものだけ)。
+  // 降格の組は、Worker (PM App) と Worker 以外の PM ログイン (個人) の /oc だけ (先後は問わない)。Worker 同士・個人同士の組は数えない。
+  // 組は OC_DOUBLE_MS 以内で同じ issue に付き、判定は ocWatchFrom 以降に届いたものだけ。
   private noteOc(p: any): void {
     const c = p?.comment;
     const n = Number(p?.issue?.number);
@@ -334,10 +335,11 @@ export class Engine {
     if (p?.action !== "created" || !Number.isInteger(n) || !Number.isInteger(id) || !Number.isFinite(at)) return;
     if (!login || typeof c.body !== "string" || !this.pmLogins().includes(login) || !OC_RE.test(c.body)) return;
     if (this.ocPosts.some((x) => x.id === id)) return;
+    const vm = this.d.cfg.pmLogins.includes(login);
     const from = this.meta.ocWatchFrom ?? 0;
-    if (at >= from && this.ocPosts.some((x) => x.at >= from && x.n === n && Math.abs(x.at - at) <= OC_DOUBLE_MS)) this.demote(`double-oc #${n}`);
+    if (at >= from && this.ocPosts.some((x) => x.at >= from && x.n === n && x.vm !== vm && Math.abs(x.at - at) <= OC_DOUBLE_MS)) this.demote(`double-oc #${n}`);
     const now = this.d.now();
-    this.ocPosts = [...this.ocPosts.filter((x) => x.at >= now - OC_KEEP_MS), { n, id, at, vm: this.d.cfg.pmLogins.includes(login) }];
+    this.ocPosts = [...this.ocPosts.filter((x) => x.at >= now - OC_KEEP_MS), { n, id, at, vm }];
     this.d.store.put("meta", "ocPosts", this.ocPosts);
   }
 

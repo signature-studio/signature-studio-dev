@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configuredApp, issuePayload, j, markFresh, send, T0, type Call } from "./helpers.ts";
 
-// 降格 (#2340): 同じ issue に 30 分以内に 2 回目の /oc が付いたら DO を dry-run に戻す。shadow: would_launch と VM (PM の個人アカウント) の /oc を突き合わせる。
+// 降格 (#2340): 同じ issue に 30 分以内に Worker (PM App) と個人の /oc の組が付いたら DO を dry-run に戻す (Worker 同士・個人同士は数えない)。shadow: would_launch と VM (PM の個人アカウント) の /oc を突き合わせる。
 
 const R = "/repos/signature-studio/signature-studio-dev";
 const PM_BOT = "oc-pm-for-signature-studio[bot]";
@@ -43,7 +43,19 @@ test("降格 (正例): 同じ issue に 30 分以内に 2 回目の /oc (VM → 
   assert.equal((await status(ctx)).counters.wouldLaunch, 1);
 });
 
-test("降格 (ネガ): 1 件だけ / 30 分を超えた 2 件 / 判定の窓より前の 2 件 / 同じコメントの再配送 では降格しない", async () => {
+test("降格 (正例・逆順): PM App の /oc の後に個人の /oc が 30 分以内に付くと降格する", async () => {
+  const ctx = await configuredApp({ live: true, handlers: writeHandlers });
+  for (const n of [11, 12]) await send(ctx.app, "issues", issuePayload(n));
+  await send(ctx.app, "issue_comment", ocEv(11, 1, PM_BOT, T0 + 1 * MIN));
+  ctx.clock.t = T0 + 10 * MIN;
+  await send(ctx.app, "issue_comment", ocEv(11, 2, VM, T0 + 10 * MIN));
+  const s = await status(ctx);
+  assert.equal(s.demoted_reason, "double-oc #11");
+  assert.equal(s.mode_launch, "dry-run");
+  assert.equal(s.counters.demoted, 1);
+});
+
+test("降格 (ネガ): 1 件だけ / 30 分を超えた組 / 判定の窓より前の組 / 同じコメントの再配送 / /oc で始まらない投稿 では降格しない", async () => {
   const one = await configuredApp({ live: true, handlers: writeHandlers });
   await send(one.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
   assert.equal((await status(one)).demoted_reason, null);
@@ -54,22 +66,37 @@ test("降格 (ネガ): 1 件だけ / 30 分を超えた 2 件 / 判定の窓よ�
   await send(far.app, "issue_comment", ocEv(11, 2, PM_BOT, T0 + 32 * MIN));
   assert.equal((await status(far)).demoted_reason, null);
 
-  // 窓 (ocWatchFrom = T0) より前の 2 件は、過去の二重投稿として降格しない。
+  // 窓 (ocWatchFrom = T0) より前の組は、過去の二重投稿として降格しない。
   const old = await configuredApp({ live: true, handlers: writeHandlers });
-  await send(old.app, "issue_comment", ocEv(11, 1, VM, T0 - 40 * MIN));
+  await send(old.app, "issue_comment", ocEv(11, 1, PM_BOT, T0 - 40 * MIN));
   await send(old.app, "issue_comment", ocEv(11, 2, VM, T0 - 20 * MIN));
   assert.equal((await status(old)).demoted_reason, null);
 
-  // 同じ id の再配送 (webhook の後に reconcile が読む) は 2 件目に数えない。
+  // 同じ id の再配送は記録を増やさない (個人の投稿 1 件だけなら降格しない)。
   const dup = await configuredApp({ live: true, handlers: writeHandlers });
   await send(dup.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
   await send(dup.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
   assert.equal((await status(dup)).demoted_reason, null);
+  assert.equal((dup.app.engine as any).ocPosts.length, 1);
+
+  // Worker (PM App) 同士の 2 件は、降格の組にしない (停止報告の後の再投入で自己降格しない)。
+  const worker = await configuredApp({ live: true, handlers: writeHandlers });
+  await send(worker.app, "issue_comment", ocEv(11, 1, PM_BOT, T0 + 1 * MIN));
+  await send(worker.app, "issue_comment", ocEv(11, 2, PM_BOT, T0 + 6 * MIN));
+  const ws = await status(worker);
+  assert.equal(ws.demoted_reason, null);
+  assert.equal(ws.mode_launch, "live");
+
+  // 個人アカウント同士の 2 件も、降格の組にしない。
+  const human = await configuredApp({ live: true, handlers: writeHandlers });
+  await send(human.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
+  await send(human.app, "issue_comment", ocEv(11, 2, VM, T0 + 6 * MIN));
+  assert.equal((await status(human)).demoted_reason, null);
 
   // /oc で始まらない PM のコメントは数えない。
   const plain = await configuredApp({ live: true, handlers: writeHandlers });
   await send(plain.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
-  await send(plain.app, "issue_comment", ocEv(11, 2, VM, T0 + 2 * MIN, "状況の共有です"));
+  await send(plain.app, "issue_comment", ocEv(11, 2, PM_BOT, T0 + 2 * MIN, "状況の共有です"));
   assert.equal((await status(plain)).demoted_reason, null);
 });
 
