@@ -321,7 +321,7 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 
 ## 11. #2152 追記: unit 158 の後続経路と ON 版の 2 区間書込み (M11-N141・部分)
 
-測定 commit: **`6444b186`** (origin/main) の上に本 PR の計装変更 (`watch_2118.sh`・`watch_range_2118.c`・`m11_ov.c` の `M11_PRINT_DEST_2118` gate・`m11_build.sh` の stamp と CF)。詳細と実測は [REPORT_APPENDIX_2152.md](REPORT_APPENDIX_2152.md)。
+測定 commit: **`28db3b3a`** (コードを変えた最後の commit。`watch_2118.sh`・`watch_range_2118.c`・`m11_ov.c` の `M11_PRINT_DEST_2118` gate・`m11_build.sh` の stamp と CF)。詳細と実測は [REPORT_APPENDIX_2152.md](REPORT_APPENDIX_2152.md)。
 
 - **unit 158 の IR 名**: `function_66d1a0` (VA `0x26d1a0`・`function_<VA>` は base `0x400000`)。§10 の `function_41ce10` (`0x1ce10`) と同じ規則。
 - **受入 2 (ON の 2 区間書込み)**: 達成。OFF/ON の `[rw]` 書込み集合 (738 件) は完全一致。2 回の ON で決定的。
