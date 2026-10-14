@@ -56,10 +56,13 @@
 ## 追加解析 (2 回目 run): selectAll の委譲チェーン
 
 - 測定: `FL_WIN64_DIR=tools/python/work/fl python3 analysis/flapi/pe_handler_probe.py selectAll` (`work/` は gitignore)。展開は `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'`。
-- channels 側 `selectAll` (fn `0xd5b150`) は `0xd5e620` を経由し、そこで関数ポインタを `call qword ptr [rax]` で呼ぶ薄い委譲 (実処理ではない)。
-- `0xd5e620` は間接呼び出し 1 回 (`call qword ptr [rax]`) だけの薄い委譲。別関数 `0xd5e640` (`0xc38a10` と `0x40feb0` を呼んだ後に `0xd5e620` を呼ぶ) はこの委譲の呼び元で、channel 配列そのものは参照していない。
+- 測定 (probe 出力): `0xd5b150` は先頭で `call 0xd5e620` を呼んだ後、`call 0xd843d0`・`call 0xd82c20`・`call 0x415c30` を続ける。関数全体は薄い委譲ではなく、`0xd5e620` 経由の間接呼び出し (関数ポインタ) の後段に `0xd843d0`・`0xd82c20` の処理がある。
+- 測定 (本体の逆アセンブル、下記の方法): 以下の 4 関数は probe の出力に現れないため、probe と同じ section 対応 (VA→file offset) で `block00031_PE.bin` から capstone により `ret` まで逆アセンブルした (作業用の一時スクリプトでリポジトリ外・未コミット)。
+  - `0xd5e620`: `sub rsp,0x28` / `mov rax,[rip+0x881f8d]` / `call qword ptr [rax]` / `add rsp,0x28` / `ret`。間接呼び出し 1 回のみの薄い委譲。
+  - `0xd5e640`: `0xc38a10` を呼び、`0x40feb0` を呼び、`0xd5e620` を呼んで `[rax]` に格納する。呼び元の 1 つ。channel 配列の参照の有無は未確定。
+  - `0xd82c20`: `index == 0` で関数ポインタ経路 (`call [rax]`) を取り、`index < 0` で `call [rax+0x88]` の後 `-4` 等の switch、`index >= 0` で `call 0xc38bc0` を呼ぶ。
+  - `0xc38bc0`: `mov rax,[rip+0xa7f719]` / `ret` のみ。引数 `index` を使わず、グローバル 1 個を返す。`index → 要素の解決` の候補ではない。
 - `selectAll` 本体 (`0xd56d00`・`0xd5b150`) の後段は `0xd843d0` (引数 6 個 + フラグ 1 個を構造体に格納する投入処理に見える) を呼ぶ。channel 固有の処理かは未確定。
-- `0xd82c20` は引数 `index` を取り、`index == 0` の分岐で別経路、`index < 0` で固定の負値 (-4 等) を switch し、`index >= 0` は `0xc38bc0` を呼ぶ。channel index → 要素の解決の候補だが、`0xc38bc0` と戻り値の型は未読。
 - 結論: selectAll の戻り値・範囲外 code は引き続き未確定。実処理の関数 (channel 要素の選択状態を書き換える箇所) は未特定。
 
 ## 受入条件 (#1527) の状態 (2 回目 run 時点)
