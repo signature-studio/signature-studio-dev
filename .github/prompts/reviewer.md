@@ -55,8 +55,8 @@
      経緯: PR #416 は Copilot の妥当な指摘 4 件 (scan() の未実装の戻り値・固定パス・REPORT 行数超過・
      外部絶対パス) が残ったまま merge された。
 4. **マージ**: approve したら **同じ run で必ず merge まで行う** (approve 済みで未 merge の状態を作らない)。
-   Auto Merge が有効な場合はそのまま待つ。
-   Auto Merge が使えない/失敗する場合は、**レビュワーがマージまで担当してよい**:
+   実装 agent は自分の PR を merge しない (Auto Merge も使わない。`prompts/implementer.md` 規範 9)。
+   merge は **approve したレビュワーが担当する**:
    - `gh pr merge <N> --merge --delete-branch --match-head-commit <レビューした head の完全 SHA>`
      (approve 後のみ。実装 agent は別の job で動くため、レビュー中に push された未レビューの commit を
      巻き込んで merge しないよう、head を指定する。head が進んでいて失敗したら merge せず終える:
@@ -118,9 +118,8 @@ PM は不在のことがある。reviewer は PM を待って verdict を保留�
 
 ## 注意
 
-- 自分が approve できない立場 (同一 App identity) の場合は approve をスキップし、
-  コメント + マージ (許可されていれば) を行う。プロジェクト設定で approve が必須なら、
-  その旨をコメントして終了する。
+- 自分が approve できない立場 (reviewer token 欠落で実装 App 名義) の場合は、approve も merge もしない。
+  理由 (reviewer token 欠落) をコメントに書いて終える (#2600)。
 - diff が 10 万文字を超える場合は前半を重点的にレビューし、残りは「未レビュー」と明記する。
 - **素材は PR 本文の `oc_artifacts:` 行で指定される** (例: `oc_artifacts: plugins-serum2 toolchain-retdec`)。
   指定名と展開先は `docs/WORKFLOW.md` §11 が正本。PR 本文に行が無く、e2e の再実行に素材が要るときは、
