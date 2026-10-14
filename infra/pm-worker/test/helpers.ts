@@ -2,6 +2,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { PmApp } from "../src/app.ts";
 import { loadConfig } from "../src/config.ts";
 import { b64u } from "../src/crypto.ts";
+import { SIGNAL_VER } from "../src/engine.ts";
 import { signBody } from "../src/hmac.ts";
 import { MemoryStore } from "../src/kvstore.ts";
 
@@ -129,6 +130,7 @@ export const commentPayload = (n: number, login: string, body: string, at = "202
 export async function markFresh(ctx: { app: PmApp; store: MemoryStore; clock: { t: number } }) {
   const meta = ctx.store.get<any>("meta", "main") ?? {};
   meta.fullSyncAt = ctx.clock.t;
+  meta.signalVer = SIGNAL_VER;
   meta.reconcileAt = ctx.clock.t;
   ctx.store.put("meta", "main", meta);
   ctx.app.engine.meta = meta;
