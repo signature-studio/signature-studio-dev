@@ -212,7 +212,3 @@
 ## 追加解析 (#2548 の run): setStepParameterByIndex の呼出し経路・status・副作用
 
 本文は `REPORT_PY39_2548.md` に分割移動した (250 行上限のため)。結論: 呼出し経路・status 表・範囲外 `-4`・param 3〜8 の副作用を PE で確定。param 0〜2・item 列挙・述語の型は未確定で、子 issue #2581 (`[PY-78]`) に移した。
-
-## 追加解析 (PY-75 / #2562): setChannelPitch の callback と効果関数の PE 確定
-
-本文は `REPORT_PY39_2562.md` に分離した (250 行上限のため)。結論: callback `0xd5a720` の pitchUnit 0/1/2 の分岐と効果関数 `0x1051d20` の 7 引数を PE で確定。未確定事項は子 #2576 [PY-77] へ移送。
