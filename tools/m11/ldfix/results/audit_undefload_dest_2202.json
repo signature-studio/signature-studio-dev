@@ -1,0 +1,210 @@
+{
+ "sites_total": 2729,
+ "by_class": {
+  "DEST_FRAME_IN_ESCAPED": 15,
+  "REGLIVE": 2501,
+  "NOADDR": 193,
+  "DEST_FRAME_OTHER": 9,
+  "DEST_FRAME_PTR_ESCAPED": 3,
+  "DEST_MEMREAD": 6,
+  "DEST_RIPREAD": 2
+ },
+ "fns_by_class": {
+  "DEST_FRAME_IN_ESCAPED": 15,
+  "REGLIVE": 2437,
+  "NOADDR": 190,
+  "DEST_FRAME_OTHER": 9,
+  "DEST_FRAME_PTR_ESCAPED": 3,
+  "DEST_MEMREAD": 6,
+  "DEST_RIPREAD": 2
+ },
+ "dest_frame_in_escaped": [
+  {
+   "fn": "1312080",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "131211a add ecx, eax <- 1312117 mov ecx, dword ptr [rbp + 0x38]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "407800",
+   "ty": "i64",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "40788d cmp rax, r13 <- 407889 mov rax, qword ptr [rbp + 0x38]",
+    "407892 sub r13, rax <- 407889 mov rax, qword ptr [rbp + 0x38]",
+    "407895 add r14, rax <- 407889 mov rax, qword ptr [rbp + 0x38]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "441730",
+   "ty": "i16",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "441811 and ax, 0xffdf <- 44180c movzx rax, word ptr [rbp + 0x6e]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45ce40",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "45cec0 mov qword ptr [rbp + 0x68], rax <- 45cebc movsxd rax, dword ptr [rbp + 0x54]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "5afe30",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "5afe85 add r8d, 1 <- 5afe81 mov r8d, dword ptr [rbp + 0x74]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "607620",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "60764b sub r8d, edi <- 607647 mov r8d, dword ptr [rbp + 0x2c]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "639c70",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "639cc3 test eax, 0x80000000 <- 639c83 mov eax, dword ptr [rsp + 0x2c]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "652b90",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "652ca1 cmp ax, 9 <- 652c9c movzx rax, word ptr [rbp + 0x62]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6c7ca0",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "6c7db3 sub r9d, ecx <- 6c7dac mov r9d, dword ptr [rbp + 0x88]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "7e46cb and ecx, 1 <- 7e46c8 mov ecx, dword ptr [rbp + 0x68]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "81a710",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "81a80d test eax, 0x10 <- 81a807 mov eax, dword ptr [rbp + 0xc0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "81bfd0",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "81bff7 test eax, 3 <- 81bff3 mov eax, dword ptr [rsp + 0x2c]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "843ad0",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "843b7e test ecx, 0x6000 <- 843b78 mov ecx, dword ptr [rbp + 0xc8]",
+    "843b99 and ecx, 0xffff9fff <- 843b93 mov ecx, dword ptr [rbp + 0xc8]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "865020",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "86503f test eax, 1 <- 86503c mov eax, dword ptr [rbp + 0x4c]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "bf8b40",
+   "ty": "i32",
+   "cls": "DEST_FRAME_IN_ESCAPED",
+   "detail": [
+    "bf8b79 cmp eax, 0x38 <- bf8b73 mov eax, dword ptr [rbp + 0xac]"
+   ],
+   "file": "boot2.norm0.ll"
+  }
+ ],
+ "dest_frame_ptr_escaped": [
+  {
+   "fn": "4425f0",
+   "ty": "i128",
+   "cls": "DEST_FRAME_PTR_ESCAPED",
+   "detail": [
+    "442655 movsd qword ptr [rax], xmm0 <- 442651 mov rax, qword ptr [rbp + 0x60]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "783d00",
+   "ty": "i64",
+   "cls": "DEST_FRAME_PTR_ESCAPED",
+   "detail": [
+    "78417b mov word ptr [rax + 0x2c], 0x3d <- 784174 mov rax, qword ptr [rbp + 0xb0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "e9d8a0",
+   "ty": "i1",
+   "cls": "DEST_FRAME_PTR_ESCAPED",
+   "detail": [
+    "e9d8f3 movsq qword ptr [rdi], qword ptr [rsi] <- e9d8ef mov rsi, qword ptr [rbp + 0x68]"
+   ],
+   "file": "boot3.norm0.ll"
+  }
+ ],
+ "dest_riprip": [
+  {
+   "fn": "11ca250",
+   "ty": "i128",
+   "cls": "DEST_RIPREAD",
+   "detail": [
+    "11ca2d9 movsd qword ptr [rax], xmm0 <- 11ca2d2 mov rax, qword ptr [rip + 0x416a87]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "69c360",
+   "ty": "i32",
+   "cls": "DEST_RIPREAD",
+   "detail": [
+    "69c381 not eax <- 69c378 mov eax, dword ptr [rip + 0xf58576]"
+   ],
+   "file": "boot1.norm0.ll"
+  }
+ ]
+}
