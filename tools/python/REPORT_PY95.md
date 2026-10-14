@@ -41,34 +41,35 @@
 
 - `host/fl_mock.mjs`: state に `uiClosing` ほか 7 項目を追加 (既定 `false` / `0`)、`ui.*` 9 件を定義 (`arity(a, 0, 0)`)。`isMetronomeEnabled` / `isPrecountEnabled` は既存の `useMetronome` / `precount` を読む。
 - `provider/fl_engine.c`: 静的変数 7 件 (`ui_closing`・`ui_time_disp_min`・`ui_start_on_input`・`ui_loop_rec`・`ui_step_edit`・`ui_browser_auto_hide`・`ui_snap_mode`) を `fl_engine_reset` で 0 に初期化。`FL_H(ui, ...)` 9 件を `NARGS(0, 0)` 付きで定義。
-- `tests/provider_check.mjs`: `pe95` の集合を追加。実装 83 → 92、未実装 352 → 343 (total 435 は不変)。
+- `tests/provider_check.mjs`: `pe95` の集合を追加。実装 83 → 92、未実装 352 → 343 (total 435 は不変)。main 取り込み後 (PY-115 の `mixer.getTrackColor` 1 件を加えた) は 実装 93・未実装 342 (§4)。
 - `tests/ui_state_diff.mjs` (新規): 9 件の既定値呼出し (9) と引数過多 (9) の計 18 呼出しを mock と C で照合。
 
 ## 4. 検証
 
-測定 commit: `b0a8a46d` (コードを変えた最後の commit。`origin/main` (`314e2e94`) を取り込んだ merge。衝突は無し。本 PR のコード commit は `07ff6f89`)。測定は同 commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから行った (`git status --porcelain` は空)。
+測定 commit: `ea3a9f64` (コードを変えた最後の commit。`origin/main` (`e87eb52a`) を取り込んだ merge。衝突は `tools/python/tests/provider_check.mjs` の 1 件のみで、PY-95 の集合 `pe95` (9 件) と main 側の PY-115 の集合 `pe115` (`mixer.getTrackColor` 1 件) を両方残し、期待値を 実装 93・未実装 342 に更新した)。本 PR のコード commit は `07ff6f89`、旧測定 commit は `b0a8a46d`。測定は同 commit のクリーンな作業ツリーで、素材展開 → emsdk 6.0.12 → `provider/build.sh` → `build_cpython_wasm.sh` → `build_flpy.sh` の順に再ビルドしてから行った (`git status --porcelain` は空)。
 
-環境: runner 4 core、測定開始時の load average 0.31 (1 分平均)、終了時 0.44。
+環境: runner 4 core、uptime の 1 分平均 (測定開始 21:13:03 時点) 1.43、終了 (21:13:05) 1.43。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` (再ビルド) | rc 0・ハンドラ 92 | — |
-| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (再ビルド) | rc 0 | — |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.36 s |
-| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS (PY-87 の回帰) | 0.05 s |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS (既存) | 0.05 s |
-| `node tests/ui_state_diff.mjs` | calls 18、diffs 0、PASS | 0.05 s |
-| `node tests/channels_diff.mjs` | calls 123、diffs 0、PASS (回帰。main 取り込みで呼出しが 1 件増えた) | 0.06 s |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.32 s |
+| `bash provider/build.sh` (再ビルド、`EMSDK_ENV` で emsdk 6.0.12 の env を指定) | rc 0・ハンドラ 93 | 未計測 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (再ビルド) | rc 0 | 未計測 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 93 / 未実装 342 / MCP 静的 60) | 0.362 s |
+| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS (PY-87 の回帰) | 0.050 s |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS (既存) | 0.051 s |
+| `node tests/ui_state_diff.mjs` | calls 18、diffs 0、PASS | 0.052 s |
+| `node tests/channels_diff.mjs` | calls 123、diffs 0、PASS (回帰) | 0.052 s |
+| `node tests/mixer_diff.mjs` | calls 57、diffs 0、PASS (main 取り込みで追加された PY-115 の回帰) | 0.052 s |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.571 s |
 
-前提の生成物 (測定前に作成・gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 08 秒、`07ff6f89` の測定時)。
+前提の生成物 (測定前に作成・gitignore): 素材 `fl-win64.tar.zst` から DATA block 4 件を `tar --zstd -xf --wildcards` で展開 (rc 0、3 秒)・`fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 27 秒)・`build_flpy.sh` (rc 0)。emsdk は `emsdk install 6.0.12` と `activate 6.0.12` で入れ、`build_flpy.sh` / `build_cpython_wasm.sh` の既定配置 (`[EMSDK]`・`docs/REFERENCES.md`) へ symlink して使った。`gcc -fsyntax-only -Wall -Wextra` で `provider/fl_engine.c` と `gen/fl_table.c` が警告 0 件で通ることも確認した。
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `uiClosing` の既定値を `false` から `true` にすると、`node tests/ui_state_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 状態ゲッター差分 1 件` で rc 1 (FAIL)。元に戻すと calls 18・diffs 0・PASS (rc 0)。
 
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff b0a8a46d HEAD -- tools/python ':!*.md'
+$ git diff ea3a9f64 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
