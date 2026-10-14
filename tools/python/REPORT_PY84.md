@@ -51,7 +51,7 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 | block24775_DATA.bin | 105 | c333d1b3 | `pyscript/stack.pyscript` | 先頭が `"""\r?\nStack / Generator comms script;…"""\r?\nfrom control_rack import \*` | 1 |
 | block24797_DATA.bin | 191356 | 1dd818c3 | `drum_patterns.json` | `{` 始まりの UTF-8 JSON で、dict が `compatible_from` と `genres` を持つ | 1 |
 
-- 各規則がちょうど 1 block に当たったときだけ書く。0 件・2 件以上は stderr に理由を出し exit 3。何も書かない (§6 (b) で確認)。
+- 各規則がちょうど 1 block に当たったときだけ書く。0 件・2 件以上は stderr に理由を出し exit 3。何も書かない (§6.1 の抽出器 NC で確認)。
 - 旧規則 `ScriptDialog\(|def createDialog` は どの block にも当たらず未使用だったため削除した。
 - 既存の text 候補 (`manifest.json` の `text`、18 件) の抽出条件は変えていない。
 
@@ -90,7 +90,15 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 - load average: e2e の 3 回で 1 分平均は 2.10–2.28 (nproc = 4)。
 - e2e の末尾 JSON は 3 回とも `{"total":41,"pass":41,"fail":0,"mock":true,"sec":"0.5"}`。
 - step 15 の 2 行を単独実行 (`PY312` と `FL_WIN64_DIR` は run_all と同じ値。`set -euo pipefail` 下): wall 4.9 秒、rc=0。抽出の出力 `{"pyc": 40, "text_candidates": 18, "skipped": 0, "pyscript": 2, "drum_patterns": 1}`、e2e の出力 `{"total":41,"pass":41,"fail":0,"mock":true,"sec":"0.5"}`。
-- 測定後の差分: `git diff a623fec6 HEAD -- tools/python/analysis tools/python/run_all.sh` は空 (REPORT と DOC_MAP の commit だけが HEAD 側に増える)。
+- 測定後の差分: `git diff a623fec6 HEAD -- tools/python/analysis tools/python/run_all.sh | wc -l` の出力は `0` (差分 0 行)。HEAD 側に増えるのは REPORT と DOC_MAP の commit だけ。
+- 独立再実行 (実装 run とは別の確認。同じ `a623fec6` の worktree、1 分 load 0.21): 抽出器 4.33 秒 rc=0・出力 `{"pyc": 40, "text_candidates": 18, "skipped": 0, "pyscript": 2, "drum_patterns": 1}`、`cmp` で 3 件 SAME、e2e `{"total":41,"pass":41,"fail":0,...}` 0.61 秒 rc=0。
+
+### 6.1 ネガティブコントロール (測定 commit `a623fec6`)
+
+| 対象 | 操作 | 結果 |
+|---|---|---|
+| e2e | `node tests/chord_progression_e2e.mjs --neg` (`Chords/data.pyc` の先頭 1 バイトを反転) | `{"total":41,"pass":34,"fail":7}`、FAIL 7 件、rc=1。内訳: `Chords/data.pyc` 自身 1 件、それを import する `control.pyc`・`control_rack.pyc`・`util.pyc`・`util_rack.pyc` の 4 件、pyscript の `cpt.pyscript`・`stack.pyscript` の 2 件 (いずれも `ImportError: bad magic number in 'Chords.data'`) |
+| 抽出器 | block24797 だけを除いた 20309 件の symlink dir (`$RUNNER_TEMP/nc84/src`) を `FL_WIN64_DIR` に指定して抽出 | stderr `ERROR: drum_patterns: 0 block () が一致 (期待 1)`、rc=3、出力 dir は作られない。pyscript 2 件は一致したまま (規則単位で判定) |
 
 ## 7. 検証範囲
 
