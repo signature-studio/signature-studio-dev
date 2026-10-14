@@ -49,8 +49,45 @@
 | dest 版 (REPORT_1866) | 再生成 IR 6 入力 | 2,737 | DEST_FRAME_IN_ESCAPED 18 (ポインタ分割前) |
 
 - **注意**: sites 2,731 と REPORT_1866 の 2,737 (差 6) は、入力 IR の出所 (`work-m11` の norm0 と REPORT_1866 の再生成 IR) の差による。同一 IR での比較はしていない。
-- SUSPECT の正式な定義 (dest 版) は本 run でも決めていない。上の件数を SUSPECT の再計測値とはみなさない。
+- 上の件数は dest 版の class 件数であり、SUSPECT の再計測値ではない。SUSPECT の再計測は §2.4。
 - 測定 commit `84b8faa7` と HEAD までのコード差分は §4 に記載。
+
+### 2.4 受入条件 3: SUSPECT 件数の再計測 (測定 commit `26f90ada`)
+
+- SUSPECT は `audit_lsf.py` の既存判定を使う (SUSPECT_VAS = store 形 / SUSPECT_USE_VAS = 消費者形 / SUSPECT_MIXED_VAS / SUSPECT_DISP_VAS (#2396))。
+  `audit_undefload_dest.py` には SUSPECT 定義が無いので、dest 版は §2.3 と同じく class 件数として別掲する。
+  この定義の選択は本 run の判断。dest 版に別の SUSPECT 定義が要るなら、PM が別 issue にする。
+- IR: `m11_gen_ir2.sh` で再生成した。`boot0〜4` は work-m11 の既存 lift、`boot5` は `m11_lift.sh m11_extra_ranges5.txt boot5 600` で作り直した (7.98 秒、rc 0)。
+  gen_ir2 は 41 秒、rc 0。ldfix・ld108 を適用。`boot_final.ll` は 492,765 行、sha256 `e4255f53…`。同じ手順の 2 回目の再生成で sha256 が一致した。
+  比較用の ldfix 無し IR は `M11_LDFIX=0 M11_FIX_LD108=0` で生成 (sha256 `2622357b…`)。
+- 監査 `audit_lsf.py`: 1 回 20 秒、rc 0。worktree の HEAD で再実行し、結果 JSON (`results/audit_lsf_2144_post.json`) とバイト一致した。
+
+| 判定 (audit_lsf.py) | ldfix 無し (`results/audit_lsf_2144_pre.json`) | ldfix 適用 (`results/audit_lsf_2144_post.json`) |
+|---|---|---|
+| SUSPECT_VAS (store 形) | 8 関数 (409c80 417b70 41a670 5c0270 66e080 7e5240 806740 c62780) | **0** |
+| SUSPECT_USE_VAS (消費者形) | 52 関数 / 56 引数 | **23 関数 / 24 引数** |
+| SUSPECT_MIXED_VAS | 124 関数 | 119 関数 |
+| SUSPECT_DISP_VAS (#2396) | 1 (41a670) | 0 |
+
+- 48 関数 (§2.1 の一覧) との交差: SUSPECT_VAS・MIXED・DISP は両 IR で 0 件。SUSPECT_USE_VAS は ldfix 無しで 2 件 (6ca580 / 6ca6c0。判定は UNDETERMINED)、ldfix 適用で 0 件。
+- 読み方: SUSPECT は引数 (argN) 経由の load 脱落の形を見る判定で、FRAME_IN_ESCAPED の 48 関数とは交差しない。
+  SUSPECT 件数は本件型 (frame slot の読み脱落) の残存を示さない。48 関数の判定は §2.1・§2.2 の DROP / LIVE-IN で行う。
+- dest 版 (`audit_undefload_dest.py`、boot0〜5 の norm0 6 入力、57 秒、rc 0。`results/audit_undefload_dest_2144_regen.json`):
+
+| class | sites |
+|---|---|
+| REGLIVE | 2,505 |
+| NOADDR | 196 |
+| DEST_FRAME_IN_ESCAPED | 15 |
+| DEST_FRAME_OTHER | 10 |
+| DEST_FRAME_PTR_ESCAPED | 3 |
+| DEST_MEMREAD | 6 |
+| DEST_RIPREAD | 2 |
+| 合計 | 2,737 |
+
+  合計 2,737・DEST_FRAME_IN_ESCAPED 15・DEST_FRAME_PTR_ESCAPED 3 は REPORT_2186 §2.2 (a) と一致する。
+  REGLIVE と DEST_RIPREAD が各 1 ずれる。9d2fe0fb 以降に `audit_undefload_dest.py` が 124 行変わっているので、その差による可能性がある (未切り分け)。
+- IR の sha256 は REPORT_2186 (`b61a91d3…`・492,784 行) と一致しない。9d2fe0fb 以降に `m11_gen_ir2.sh` (13 行) と ldfix が変わっているため。REPORT_2186 の IR は再現していない。
 
 ## 3. 未解決 (起票先)
 
@@ -59,12 +96,15 @@
 | 48 関数のうち 46 関数の判定 (直前ブロックの store を見る拡張が必要) | 脱落か live-in かが未確定 | #2185 [LD-81] |
 | 10628a0 / c38bd0 の IR 側確認 (IR で該当 read が undef か) | DROP 候補の確定 | #2186 [LD-82] |
 | 入力 IR を `m11_gen_ir2.sh` で再生成して sites 2,737 と突き合わせる | 2,731 と 2,737 の差 (6 site) の原因未確認 | #2186 [LD-82] |
-| dest 版の SUSPECT 定義と件数の正式化 | 受入条件 3 の SUSPECT 件数が未定義 | 本 issue #2144 (未達。SUSPECT を定義するには DROP 判定 (#2185) が要る) |
+| dest 版に SUSPECT 定義が無い (本 PR は `audit_lsf.py` の既存 SUSPECT で計測。48 関数とは交差 0 (§2.4)) | 本件型の残存は SUSPECT では見えない | PM が dest 版の SUSPECT 定義を求める場合のみ別 issue (未起票) |
 
 ## 4. コード差分
 
 測定 commit `84b8faa7` から、この REPORT を含む HEAD までの `tools/m11/ldfix` の差分は、
 REPORT・結果 JSON の追加のみで `.py` の差分は 0 行 (`git diff --stat 84b8faa7 HEAD -- tools/m11/ldfix` の出力で確認)。
+
+§2.4 の SUSPECT 再計測の測定 commit は `26f90ada` (main HEAD)。そこから本 PR の HEAD までの `tools/m11/ldfix` の差分は REPORT と結果 JSON の追加のみ。
+`git diff --stat 26f90ada HEAD -- tools/m11/ldfix ':!tools/m11/ldfix/REPORT_2144.md' ':!tools/m11/ldfix/results'` の出力は空 (コード差分 0 行)。
 
 ## 5. 参照
 
