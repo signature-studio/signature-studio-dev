@@ -236,4 +236,17 @@ for bad in ["__import__('os')", "midi.NoSuch", "open", "'x'"]:
 # (e) 静的ガード: 本番コードに eval( の呼出しを残さない
 src = open(os.path.join(ROOT, "src", "fl_api.py"), encoding="utf-8").read()
 assert re.search(r"\beval\s*\(", src) is None, "src/fl_api.py に eval( が残っている"
+# (11) PY-116 (#2952): wrapper が PyArg_Parse* に渡す非 0 の出力ポインタ数 (outs) と、書式が消費する数 (ptrs) の照合。
+#      不一致は screen.addTextLine (siiii) と screen.addMeter (iiii|i) の 2 件だけで、どちらも wrapper が書式より 1 個多く渡す (REPORT_PY116.md §2)。
+kwt = json.load(open(os.path.join(ROOT, "analysis/flapi/flapi_kwargs.json")))
+outs_n, outs_bad = 0, []
+for m, fs in kwt["modules"].items():
+    for n, e in fs.items():
+        if e["fmt"] is None:
+            continue
+        outs_n += 1
+        if e["outs"] != e["ptrs"]:
+            outs_bad.append(f"{m}.{n}:{e['ptrs']}/{e['outs']}")
+print(f"書式とポインタ数の照合 {outs_n} 件・不一致 {sorted(outs_bad)}")
+assert outs_n == 303 and sorted(outs_bad) == ["screen.addMeter:5/6", "screen.addTextLine:5/6"], (outs_n, outs_bad)
 print("kwsig_check: OK")

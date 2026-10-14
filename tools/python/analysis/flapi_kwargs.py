@@ -133,6 +133,46 @@ class Image:
                 names.append(s)
         return fmt, names
 
+    def wrapper_outs(self, fn, flags):
+        """PyArg_Parse* の直前 (前の call より後) に渡される非 0 の出力ポインタ数。書式が消費する数と比べる (PY-116 #2952)。
+        非 kw: r8, r9, [rsp+0x20].. が出力 (rdx=書式)。kw: [rsp+0x20].. が出力 (r8=書式, r9=kwlist)。NULL (0) の引数は数えない。"""
+        if flags & 4:
+            return None
+        o = self.off(fn)
+        seq = []
+        for i in self.md.disasm(self.b[o:o + 0x200], fn):
+            if i.mnemonic in ("ret", "int3"):
+                return None
+            if i.mnemonic == "call":
+                if i.op_str.startswith("qword ptr ["):
+                    break
+                seq = []
+                continue
+            seq.append(i)
+        else:
+            return None
+        kw = flags & 2
+        slots = []
+        for i in seq:
+            m = re.match(r"qword ptr \[rsp \+ (0x[0-9a-f]+)\], r[a-z0-9]+$", i.op_str)
+            if i.mnemonic == "mov" and m:
+                slots.append((int(m.group(1), 16) - 0x20) // 8 + (0 if kw else 2))
+            m = re.match(r"(r8|r9), (.+)$", i.op_str)
+            if m and not kw and i.mnemonic in ("lea", "mov") and not re.match(r"-?(0x[0-9a-f]+|\d+)$", m.group(2)):
+                slots.append(0 if m.group(1) == "r8" else 1)
+        return max(slots) + 1 if slots else 0
+
+
+def fmt_ptrs(fmt):
+    """書式が消費するポインタ数 (単位の文字 1 つ = 1、`#` `!` `&` は各 +1)。`:` `;` 以降は関数名なので数えない。"""
+    n = 0
+    for c in fmt:
+        if c in ":;":
+            break
+        if c.isalpha() or c in "#!&":
+            n += 1
+    return n
+
 
 def fmt_units(fmt):
     """書式から (必須数, 全数)。`|` 以降が省略可。単純な 1 文字 = 1 引数のみ数える (`O!` 等は 1 単位)。"""
@@ -197,9 +237,10 @@ def main():
                 continue
             m = cands[0]
             fmt, kws = img.wrapper_args(fn, fl)
-            ent = {"flags": fl, "fmt": fmt, "kwlist": kws, "fn_va": hex(fn)}
+            ent = {"flags": fl, "fmt": fmt, "kwlist": kws, "fn_va": hex(fn), "outs": img.wrapper_outs(fn, fl)}
             if fmt is not None:
                 ent["required"], ent["max"] = fmt_units(fmt)
+                ent["ptrs"] = fmt_ptrs(fmt)
             out["modules"].setdefault(m, {})[n] = ent
     json.dump(out, open(os.path.join(OUT, "flapi_kwargs.json"), "w"), indent=1, ensure_ascii=False)
     merge_into_table(os.path.join(OUT, "flapi_table.json"), out)
