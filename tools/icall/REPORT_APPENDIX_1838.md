@@ -13,10 +13,11 @@ REPORT §15 から参照。修正の本体は `tools/icall/prep_targets.py` の 
 - 伸ばした範囲に、親の断片以外の関数開始 VA (`img.bounds`) が入る場合は伸ばさない。
 - 境界条件は `tools/icall/tests/test_chain_end.py` (PE 不要・4 件) で固定。
 
-## 3. 実測 (現 HEAD `d64c86c5`・コード差分 0)
+## 3. 実測 (測定 commit `d64c86c5`・以後コード差分 0)
 
-- コードの測定 commit は `77be6b71` (最後にコードを変えた commit)。`git diff 77be6b71 HEAD -- tools/icall/prep_targets.py tools/icall/chain_ranges_diff.py tools/icall/tests` の出力は 0 行 (測定は `d64c86c5` の worktree で実施)。
-- ただし PR 本文の「`git diff 3cdf8cf3 HEAD -- tools/icall` は差分 0」は成り立たない。`3cdf8cf3..HEAD` では `tools/icall` の 13 files が変わっている (`audit_icall.py` 35 行・`rt/icall_rt.c` 1 行・`diff/fa_imports.py` 追加など。`chain_end` 本体の変更は `77be6b71`)。`3cdf8cf3` の旧測定値は使わない。
+- 測定 commit は `d64c86c5` (測定を実行した commit)。コードの証跡: `git diff d64c86c5 HEAD -- tools/icall ':!tools/icall/*.md'` の出力は 0 行 (`d64c86c5..HEAD` で変わるのは付録 `.md` のみ)。`77be6b71` は `chain_end` を最後にコードで変えた commit だが、測定 commit ではない。
+- `audit_icall.py` (`call_lost` の算出に使う) と `rt/icall_rt.c` は `77be6b71..d64c86c5` で変わっているが、測定は `d64c86c5` のコードで行ったので対象に入る。
+- `3cdf8cf3` の旧測定値は使わない。
 
 | 項目 | 結果 (実測) |
 |---|---|
