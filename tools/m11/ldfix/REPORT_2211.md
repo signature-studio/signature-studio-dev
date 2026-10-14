@@ -2,11 +2,11 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `92f55325` (判定器 `audit_frame_store_alias_2211.py`・結果 JSON・negctl 結果を含む commit)。
+- 測定 commit: `32925d7f` (判定器 `audit_frame_store_alias_2211.py`・結果 JSON・negctl 結果を含む commit)。前版 `92f55325` からの変更は §2 の区間条件の 1 行だけで、判定結果は両版で同一 (sites・fn_info が一致)。
 - 入力: `results/audit_undefload_564_full.json`・`results/f4_564_post.json` (#2185 と同じ)。#2185 の結果 JSON は `detail` を持たず入力にできないため、同じ入力を使う。
 - PE: fl-win64 の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`、#2185 と同じ)。
 - 再現確認: 作業の前に #2185 の判定器 `audit_frame_store_verdict.py` を再実行し、`results/frame_store_verdict_2185.json` と一致 (DROP 3・LIVE-IN 1・UNDETERMINED 44)。
-- 判定器 `audit_frame_store_alias_2211.py`: 0.24 秒、rc 0。load average 0.00〜0.10 (4 vCPU)。
+- 判定器 `audit_frame_store_alias_2211.py`: 0.24 秒 (測定 commit で再実行、rc 0)。load average 0.22 (4 vCPU)。
 - #2185 の判定器 `audit_frame_store_verdict.py` は変更しない。
 
 ## 2. 方式 (#2185 からの変更点)
@@ -19,7 +19,7 @@
 | 2 | 読み | frame 基底の重なる読みで打ち切り | 読みは定義にならないので透過 |
 | 3 | 漏出 (glk) | 規則なし | frame 派生値 F (rbp/rsp と lea・mov・算術で得た値) が、メモリへ書かれる / call の引数 (rcx・rdx・r8・r9) に入る / rax で ret する、のいずれかで関数全体を glk とする |
 | 4 | glk 無しの関数 | escaped なら全ポインタ store と call で打ち切り | ポインタ store と call は frame に届かないので透過 |
-| 5 | rsp/rbp の混在 | 全て打ち切り (MIXED_BASE) | 区間 (`mov rbp, rsp` から `lea rsp, [rbp+N]` まで。rsp のみの関数は `sub rsp, N` から `add rsp, N` まで) の内側では rsp と rbp を同じ frame 座標として比べる。区間内で rsp・rbp が書かれず、外から飛び込む分岐が無いときだけ成立 |
+| 5 | rsp/rbp の混在 | 全て打ち切り (MIXED_BASE) | 区間 (`mov rbp, rsp` から `lea rsp, [rbp+N]` まで。rsp のみの関数は `sub rsp, N` から `add rsp, N` まで) の内側では rsp と rbp を同じ frame 座標として比べる。区間内で rsp・rbp が書かれず、push/pop が無く、区間の外から区間内へ飛び込む分岐も、区間より前の分岐も無いときだけ成立 |
 
 打ち切り理由は ALIAS_FRAME_PTR (F 派生ポインタへの store)・LEAK_STORE (glk 関数のポインタ store)・MIXED_BASE・INDEXED・PARTIAL_OR_RMW・CALL (glk 関数の call) に分けて記録する。区間は 48 関数すべてで成立した。glk 関数は 11 関数。
 
@@ -157,8 +157,8 @@ LIVE-IN の全経路は「関数内で定義されない」 (ENTRY)。DROP の�
 
 ### 3.8 差分 (WORKFLOW §6)
 
-- 測定 commit: `92f55325`。判定器・結果 JSON・negctl はこの commit で測定した。
-- この commit から REPORT を含む HEAD までで変わるのは `tools/m11/ldfix/REPORT_2211.md` のみ。`git diff --stat 92f55325 HEAD -- tools/m11/ldfix` の出力は PR 本文の検証結果に載せる。
+- 測定 commit: `32925d7f`。判定器・結果 JSON・negctl はこの commit で測定した。
+- この commit から REPORT を含む HEAD までで `tools/m11/ldfix` に変わるのは `REPORT_2211.md` のみ。`git diff --stat 32925d7f HEAD -- tools/m11/ldfix` の出力は PR 本文の検証結果に載せる。
 - #2185 の判定器 `audit_frame_store_verdict.py` は本 issue で変更していない (差分 0 行)。
 
 ## 4. 未解決 (起票先)
