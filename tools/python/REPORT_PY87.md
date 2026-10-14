@@ -34,23 +34,25 @@
 
 ## 検証
 
-測定 commit: `0a6ac0ef` (コードを変えた最後の commit。`feat(python): general state getters ... (#2738)`)。測定は同 commit の作業ツリーで、`provider/build.sh` を再実行してから行った。
-環境: runner 4 core、測定開始時の load average 1.46 (`uptime`)。`FL_WIN64_DIR` は fl-win64 の展開先 (`tools/python/work/py87`、gitignore)。
+測定 commit: `f2e03058` (コードを変えた最後の commit。main (`b2b052ce`) を取り込んだ merge。衝突は `tools/python/tests/provider_check.mjs` の定数表と件数だけ)。測定は同 commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから行った。
+環境: runner 4 core、測定開始時の load average 1.45 (`uptime`)。`FL_WIN64_DIR` は [WIN64] の展開先 (runner の一時領域)。素材 `toolchain-emsdk` は取得されていなかったため、[EMSDK] を `emsdk install 6.0.12` で取得し、docs の規定位置に symlink した。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | exit 0・ハンドラ 80 | 0.74 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 80 / 未実装 355 / MCP 静的 60) | 0.30 秒 |
+| `bash provider/build.sh` | exit 0・ハンドラ 81 | 0.75 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 81 / 未実装 354 / MCP 静的 60) | 0.30 秒 |
 | `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.04 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.56 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.30 秒 |
 
-前提の生成物 (測定前に作成・gitignore): `bash fetch_inputs.sh` (0.6 秒)・`bash build_cpython_wasm.sh` (3 分 40 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh`。
+件数の変化: main の取り込みで `channels.getChannelType` が公開 stub 確定 (REPORT_PY41_1514) として加わったため、本 PR 単独の測定 (実装 80 / 未実装 355) から実装 81 / 未実装 354 に変わった。上の表は取り込み後の値。
+
+前提の生成物 (測定前に作成・gitignore): `bash fetch_inputs.sh`・`bash build_cpython_wasm.sh` (2 分 12 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh`。
 
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 0a6ac0ef HEAD -- tools/python ':!*.md'
+$ git diff f2e03058 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
