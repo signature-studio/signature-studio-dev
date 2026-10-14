@@ -6,6 +6,7 @@
 # COL (x64 の RTTICompleteObjectLocator, signature=1) は vtable[-1] が指す。
 import json
 import os
+import re
 import struct
 import sys
 
@@ -21,6 +22,23 @@ DLL_BLOCK = "block24339_PE.bin"
 def read_cstr(data, off):
     end = data.index(b"\0", off)
     return data[off:end].decode("ascii", errors="replace")
+
+
+def rip_lea_hits(md, data, text, base, target):
+    # .text 全体のバイト走査で REX.W + lea r64,[rip+disp] を探し、指す先が target のものを返す。
+    # 線形スイープは未知の命令で途切れるため使わない (REPORT_AGG2D §7)。
+    lo = text.VirtualAddress
+    code = bytes(data[lo:lo + text.Misc_VirtualSize])
+    hits = []
+    for m in re.finditer(rb"[\x48-\x4f]\x8d[\x05\x0d\x15\x1d\x25\x2d\x35\x3d]", code):
+        s = m.start()
+        ea = base + lo + s
+        if ea + 7 + struct.unpack_from("<i", code, s + 3)[0] != target:
+            continue
+        ins = next(md.disasm(code[s:s + 15], ea, count=1), None)
+        if ins is not None and ins.mnemonic == "lea":
+            hits.append(hex(ea))
+    return hits
 
 
 def main():
@@ -70,6 +88,7 @@ def main():
     text = [s for s in pe.sections if s.Name.rstrip(b"\0") == b".text"][0]
     text_lo = base + text.VirtualAddress
     text_hi = text_lo + text.Misc_VirtualSize
+    vtable_writers = rip_lea_hits(md, data, text, base, vtable_va)
 
     def vtables_of(type_name):
         name_rva = data.find(b"\0" + type_name.encode() + b"\0")
@@ -99,6 +118,7 @@ def main():
         "type_name": td_name,
         "base_classes": bases,
         "vtables_with_same_col": same_col,
+        "vtable_lea_writers": vtable_writers,
         "vtables_by_class": {
             name: vtables_of(name) for name in [td_name] + bases
         },
