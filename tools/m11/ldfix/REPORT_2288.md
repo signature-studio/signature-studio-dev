@@ -9,6 +9,7 @@
 - 結果: `spill178_1161.tsv` と `drops_510.tsv` は results/ と一致 (cmp OK)。
 - 集計 (step 7/7): spill 宛 unk site 178 / 71 関数。status 未判定 120 / 確定 51 / 判定不能 7。脱落関数の和集合 69 (変更無し)。
 - 素材: `work-m11` は `tools/m11/work/`、`work-liftdiff` は `tools/liftdiff/work/` に展開 (tarball 内が `tools/m11/work/...` の相対パスのため、展開後に 1 段移動した)。
+- 再現用の素材名: `oc_artifacts: fl-win64 work-m11` (`work-liftdiff` は `audit_lsf_ssa_e2e.sh` の 4/7・5/7 で使うため併せて指定する場合は `work-liftdiff` を足す)。
 
 ## 2. 機械語側の確認 (24 site)
 
@@ -23,6 +24,16 @@
 - `boot_final3.ll` 全体でも `18746032` は 8 件で、いずれも別関数 (`cf3790` 側などの inttoptr load)。
 - 一方、既判定の TRUE_DROP 候補 `c5d2df`・`c5d343` が読む定数は `18751296` (LVA `0x11e1f40`) で、`0x11e0ab0` とは別セル。
 - REPORT_2266 の「slot `0x11e0ab0` の 1 段 deref」という記述は、IR 側では確認できない。IR に読みが無いため、「deref が落ちている」か「値が別経路で作られる」かを site ごとに区別できない。
+
+### 3-a. 再現の状況 (未再現・記録の欠落)
+
+- **§2・§3 の数値は本 REPORT 作成後に再実行していない。** 当時の grep コマンド・逆アセンブル出力・生成元スクリプトは記録が残っていない。よって「IR_refs=0」「boot_final3.ll 全体で 8 件」「二段参照 24 site」「計 27 回」は**未再現の主張**として扱う。
+- 当時使った IR の sha256 は未記録。`boot_final3.ll` は実行ごとに sha256 が変わる (`docs/WORKFLOW.md` §11・#680)。再現には当時と同一の IR ファイルが要るため、次の手順では sha256 を必ず記録する。
+- 再現手順 (次 run・未実行。素材 `oc_artifacts: fl-win64 work-m11` が前提):
+  1. `tools/m11/work/boot_final3.ll` の sha256 を記録する (`sha256sum`)。
+  2. IR 側: `grep -c '18746032'` を全体と `function_c589b0` (390809〜391214 行) / `function_128f9e0` (76541〜77198 行) の範囲で数える。範囲の抜き出しは `sed -n 'A,Bp'`。
+  3. 機械語側: fl-win64 の PE を capstone で逆アセンブルし、rip 相対で `0x11e0ab0` を指す命令を走査する。出力と走査スクリプトを `tools/m11/ldfix/results/` に残す (生成元を REPORT に書く)。
+  4. 上記の結果が §2・§3 と違えば、§2・§3 を書き換えて §4 の判定 (0 件) を見直す。
 
 ## 4. 判定の結果
 
