@@ -146,7 +146,7 @@
 
 - `M11_WORK=<主 checkout>/tools/m11/work python3 tools/m11/ldfix/ld104_reach.py`: 測定 commit `ee237f22` で rc=0。出力 `results/ld104_reach.tsv`・`results/ld104_checks.txt` と cmp 一致。
 - 負の対照: v=6 の枝刈りで 4/12 が届き、v=8 で 0/12 になる (分岐の判定 1 件で到達が変わる)。
-- e2e (`audit_lsf_ssa_e2e.sh`): 測定 commit `ee237f22` (HEAD 上で実行) で再実行。`RUNNER_TEMP=/home/runner/work/_temp`・`M11_WORK`・`LD_WORK` は主 checkout に展開済みの `tools/m11/work`・`tools/liftdiff/work` を読み取りだけに使った。rc=0・2m31s・7/7 完了・終了直後の 1 分 load average 0.83。`drops_510.tsv` と `spill178_1161.tsv` は `results/` と cmp 一致 (差分 0)。集計 (7/7): 確定 109 / 判定不能 16 / 未判定 53、脱落関数の和集合 69。
+- e2e (`audit_lsf_ssa_e2e.sh`): 測定 commit `ee237f22` (HEAD 上で実行) で再実行。`RUNNER_TEMP` は作業用の一時ディレクトリ、`M11_WORK`・`LD_WORK` は主 checkout に展開済みの `tools/m11/work`・`tools/liftdiff/work` (読み取りのみ・`<主 checkout>` を指定) を使った。rc=0・2m31s・7/7 完了・終了直後の 1 分 load average 0.83。`drops_510.tsv` と `spill178_1161.tsv` は `results/` と cmp 一致 (差分 0)。集計 (7/7): 確定 109 / 判定不能 16 / 未判定 53、脱落関数の和集合 69。
 - spill178 の c589b0 の 12 行 (未判定 → 確定) は `c7f36256` の e2e で `results/` に反映済み (rc=1 → 新出力で置換 → cmp OK)。`candidate_verdicts_1161.jsonl` は `c7f36256` と HEAD の比較で evidence 文 (12 行) だけが変わり、evidence 以外の差分は 0 (verdict・status は不変)。
 - e2e の 7 step は `ld104_reach.py` を呼ばない。
 
