@@ -120,6 +120,21 @@ _j = json.loads(_o)
 check('fix_vstore: alloca 由来の宛先 2 件 (vmovapd / movups) を store 化し、読出し 1 件を reload に置換', _j['vstore_fixed'] == 2 and _j['vstore_reloads'] == 1 and 'store i128 %10, i128* %vst.0' in _t
       and '%vld.0 = load i128, i128* %vst.0' in _t and '@__asm_vmovapd(i128 %vld.0)' in _t and 'call void @__asm_vmovapd.22' not in _t, _o)
 check('fix_vstore: 256bit (i256) は触らず unresolved に数える', _j['vstore_unresolved'] == 1 and '@__asm_vmovdqa(i256' in _t, _o)
+# ---- #1025: ir_fix_vstore --direct (alloca 以外の宛先ポインタ。既定 off)
+_vd = os.path.join(_td, 'vd.ll')
+open(_vd, 'w').write("""define void @function_x(i64 %0) {
+  %48 = add i64 %0, 104
+  %49 = inttoptr i64 %48 to i128*
+  %50 = load i128, i128* %49, align 8
+  call void @__asm_movups(i128 %50, i128 %47)
+  ret void
+}
+""")
+_rc, _o = _run('ir_fix_vstore.py', _vd, _vd + '.off')
+check('fix_vstore: 既定 (--direct なし) では非 alloca 宛先を触らず unresolved に数える', json.loads(_o)['vstore_unresolved'] == 1 and 'store i128' not in open(_vd + '.off').read(), _o)
+_rc, _o = _run('ir_fix_vstore.py', _vd, _vd + '.on', '--direct')
+_t = open(_vd + '.on').read()
+check('fix_vstore: --direct で非 alloca 宛先の helper 呼出しを store i128 に置換 (使用 2 箇所のみ)', json.loads(_o)['vstore_direct'] == 1 and 'store i128 %47, i128* %49' in _t and '__asm_movups' not in _t, _o)
 
 # ---- pe: OTT closure に対する固定値
 if os.path.exists(OTT):

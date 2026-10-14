@@ -18,7 +18,8 @@ for (let i = 0; i < 942; i++) {
     if (e && e.m11_dllmain_done !== undefined) { out.push({ i, va: mod._m11_unit_va(i), kind: 'halt0', frame: null }); }
     else {
       const m = e && e.stack && /wasm-function\[(\d+)\]/.exec(e.stack);
-      out.push({ i, va: mod._m11_unit_va(i), kind: ((e && e.message) || String(e)).split('\n')[0], frame: m ? +m[1] : null });
+      const chain = e && e.stack ? [...String(e.stack).matchAll(/wasm-function\[(\d+)\]:(0x[0-9a-f]+)/g)].slice(0, 8).map(c => [+c[1], c[2]]) : [];
+      out.push({ i, va: mod._m11_unit_va(i), kind: ((e && e.message) || String(e)).split('\n')[0], frame: m ? +m[1] : null, chain });
     }
     mod.__emscripten_stack_restore(sp0);
   }

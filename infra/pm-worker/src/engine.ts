@@ -6,7 +6,7 @@ import { countOpencodeRuns, type ActiveCount } from "./active.ts";
 import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
+import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
@@ -33,6 +33,7 @@ import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type
 import {
   applyEvent,
   EMPTY_STATE,
+  KILLED_STOP_AT,
   NEEDS_USER_LABEL,
   reviewSignal,
   setSig,
@@ -46,6 +47,10 @@ import {
 } from "./webhook.ts";
 
 export const FULL_SYNC_EVERY_MS = 6 * 3_600_000;
+// 全体同期が書く派生値の版 (2: issue の起票者 author/assoc と、PR・issue の手がかり sig.outcome など #2333)。
+// 保存値の版が違う (未記録・導入より前に保存された状態) ときは、周期を待たずに全体同期を走らせて補完する。その失敗の再試行は SIGNAL_RETRY_MS ごと。
+export const SIGNAL_VER = 2;
+export const SIGNAL_RETRY_MS = 15 * 60_000;
 // reconcile がこれ以上止まっていたら、状態が古いとみなして launch しない (誤った着手を避ける)。
 export const STALE_AFTER_MS = 15 * 60_000;
 const NO_PR_MAX_RELAUNCH = 3;
@@ -121,6 +126,9 @@ export interface Plan {
 
 interface Meta {
   fullSyncAt?: number;
+  // 保存値の版 (SIGNAL_VER)。全体同期が完了したときに記録する。版の補完を最後に試した時刻 (再試行の間隔に使う)。
+  signalVer?: number;
+  signalTryAt?: number;
   reconcileAt?: number;
   watchdogAt?: number;
   tickAt?: number;
@@ -406,6 +414,7 @@ export class Engine {
     this.meta.fullSyncCalls = gh.calls - calls0;
     // reconcile の起点は同期の開始時刻 (同期中に作られたコメントを次の reconcile が読み直す)。
     this.meta.fullSyncAt = this.d.now();
+    this.meta.signalVer = SIGNAL_VER;
     this.meta.reconcileAt = startedAt;
     this.saveMeta();
   }
@@ -508,8 +517,10 @@ export class Engine {
     const R = this.d.cfg.repo;
     let diff = 0;
     // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
+    // 人の /oc は本文で『着手であって応答ではない』と判定する (webhook.ts の answered) ので、/oc で始まる本文だけは残す。
     const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
-    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: mine.has(c.user?.login) ? c.body : "" });
+    const keepBody = (c: any) => mine.has(c.user?.login) || /^\/oc\b/m.test(c.body ?? "");
+    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: keepBody(c) ? c.body : "" });
     const cs = this.note(
       "comments",
       await gh.list<any>(
@@ -632,15 +643,18 @@ export class Engine {
         this.s = { ...this.s, runs: rest };
       }
     }
-    // 閉じた issue / PR の手がかりは使わない
+    // 閉じた issue / PR の手がかりは使わない。数えた run の id (killRun) だけは残す (reopen の後に古い run の配送が届いても数え直さない)。
     for (const k of Object.keys(this.s.sig)) {
       const i = this.s.issues[k];
       const p = this.s.prs[k];
-      if ((i || p) && i?.state !== "open" && p?.state !== "open") {
-        this.d.store.del("sig", k);
-        const { [k]: _, ...rest } = this.s.sig;
-        this.s = { ...this.s, sig: rest };
-      }
+      if (!((i || p) && i?.state !== "open" && p?.state !== "open")) continue;
+      const killRun = this.s.sig[k].killRun;
+      const keep = killRun === undefined ? undefined : { killRun };
+      if (JSON.stringify(keep) === JSON.stringify(this.s.sig[k])) continue;
+      if (keep) this.d.store.put("sig", k, keep);
+      else this.d.store.del("sig", k);
+      const { [k]: _, ...rest } = this.s.sig;
+      this.s = { ...this.s, sig: keep ? { ...rest, [k]: keep } : rest };
     }
   }
 
@@ -706,6 +720,16 @@ export class Engine {
     return this.activeRuns().all;
   }
 
+  // 打ち切りが連続して自動の再着手を止めた open な issue と、その回数 (番号順)。
+  killedIssues(): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const i of Object.values(this.s.issues)) {
+      const c = this.s.sig[String(i.number)]?.kill?.count ?? 0;
+      if (i.state === "open" && c >= KILLED_STOP_AT) out.push([i.number, c]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
+  }
+
   // 全 event の run を状態別に数える (running = in_progress、queued = queued・pending・waiting)。
   // oldestMin は最も古い queued の経過分 (queued に入った時刻の近似として updatedAt を使う)。queued が無ければ null。
   runCounts(now: number): { running: number; queued: number; oldestMin: number | null } {
@@ -742,7 +766,7 @@ export class Engine {
     const labels = new Map(snap.issues.map((i) => [i.number, i.labels] as const));
     const title = new Map(snap.issues.map((i) => [i.number, i.title] as const));
     const nowMs = this.d.now();
-    const cool = this.d.cfg.noPrCooldownH * 3_600_000;
+    const cool = (n: number) => noPrCooldownMs(labels.get(n) ?? [], this.d.cfg.noPrCooldownH);
     const hasLabel = (n: number, l: string) => (labels.get(n) ?? []).includes(l);
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
@@ -774,7 +798,7 @@ export class Engine {
       let note = reason;
       if (reason === "stop" || reason === "split") {
         // PM agent の判断待ち (stopped に残す)。
-      } else if (nowMs - this.lastAct(n) < cool) {
+      } else if (nowMs - this.lastAct(n) < cool(n)) {
         recent = true;
         note = "oc:no-pr cooldown";
       } else if (c.count >= NO_PR_MAX_RELAUNCH) {
@@ -830,10 +854,17 @@ export class Engine {
       rows.user.push([n, hold]);
     }
 
+    // 実装 run が PR も出さずに連続して打ち切られた issue (webhook.ts の applyKill が数える sig.kill) は、自動で再着手しない。oc:no-pr の標識は付かない
+    // (runner の shutdown では record-run-outcome.sh が走らない) ので、cooldown や再投入の枠には載せず stopped に置き、PM agent (oc-pm の no_pr) に回す。
+    for (const [n, c] of this.killedIssues()) {
+      const from = (["ready", "relaunch", "recent"] as const).find((r) => (rows[r] as unknown[]).some((x) => (Array.isArray(x) ? x[0] : x) === n));
+      if (from) moveTo(n, from, () => rows.stopped.push([n, `killed x${c}`]));
+    }
+
     const blocksCount = new Map<number, number>();
     const cls = classify(snap, input);
     for (const [k, v] of Object.entries(cls.blocksCount)) blocksCount.set(Number(k), v);
-    const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0 }));
+    const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0, labels: labels.get(n) ?? [] }));
     const act = this.activeRuns();
     const active = act.all;
     // 推定の上限が無ければ TARGET のまま (変えない)。推定があれば、上限 + 余裕 (下限 TARGET_MIN、上限 TARGET)。
@@ -1110,7 +1141,7 @@ export class Engine {
     if (labels.includes("oc:stuck") || HOLD_LABELS.some((l) => labels.includes(l))) return { kind: "reject", reason: "user" };
     if ((ctx.children[String(n)] ?? []).length) return { kind: "reject", reason: "stopped" };
     if (labels.includes("oc:no-pr")) {
-      if (nowMs - this.lastAct(n) < this.d.cfg.noPrCooldownH * 3_600_000) return { kind: "wait" };
+      if (nowMs - this.lastAct(n) < noPrCooldownMs(labels, this.d.cfg.noPrCooldownH)) return { kind: "wait" };
       if (this.noPrState(n).count >= NO_PR_MAX_RELAUNCH) return { kind: "reject", reason: "stopped" };
     }
     if (at.row === "stopped" && INTENT_HARD_STOP.includes(at.why)) return { kind: "reject", reason: "stopped" };
@@ -1383,7 +1414,10 @@ export class Engine {
       return { ready: false };
     }
     try {
-      if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS) await this.fullSync(gh);
+      // 保存値の版が古いときは、周期 (6 時間) を待たずに全体同期で補完する。失敗しても SIGNAL_RETRY_MS ごとにしか再試行しない (REST の枠を使い切らないため)。
+      const stale = this.meta.signalVer !== SIGNAL_VER && now - (this.meta.signalTryAt ?? 0) >= SIGNAL_RETRY_MS;
+      if (stale) this.meta.signalTryAt = now;
+      if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS || stale) await this.fullSync(gh);
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
       // 同期が古い・打ち切り中は run 一覧が不完全なので観測しない (launch と同じ条件)。偽の飽和を作らないため。
       if (this.fresh()) this.observe(now);
@@ -1450,6 +1484,9 @@ export class Engine {
     const stuckAges = openPrs
       .filter(withLabel(STUCK_LABEL))
       .map((p) => Math.max(0, Math.floor((now - Date.parse(this.s.sig[String(p.number)]?.stop?.at ?? p.updatedAt)) / 60_000)));
+    // 着手待ち (ready) を優先の区分で数える (launch は critical を先頭、low を末尾に並べる)。
+    const readyByPrio = { critical: 0, normal: 0, low: 0 };
+    for (const n of rows.ready) readyByPrio[prioOf(this.s.issues[String(n)]?.labels ?? [])]++;
     const noPrByReason = { split: 0, artifact: 0, unknown: 0, blocked: 0, stop: 0 };
     for (const i of openIssues.filter(withLabel(NO_PR_LABEL))) {
       const r = this.s.sig[String(i.number)]?.outcome?.reason;
@@ -1498,6 +1535,8 @@ export class Engine {
       blocked: c("blocked"),
       started: c("started"),
       ready: c("ready"),
+      // ready の区分別の件数 (prio:critical / prio:low のラベル。無ければ normal)。合計は ready と一致する。
+      ready_by_prio: readyByPrio,
       relaunch: c("relaunch"),
       user: c("user"),
       hold: c("hold"),
@@ -1512,6 +1551,9 @@ export class Engine {
       needs_pm: countLabel(NEEDS_PM_LABEL),
       needs_user: countLabel(NEEDS_USER_LABEL),
       no_pr_by_reason: noPrByReason,
+      // 実装 run が PR も出さずに連続して打ち切られ (cancelled / failure / timed_out)、自動の再着手を止めた open issue の件数と番号 (oc-pm の no_pr で PM agent に回す)。
+      killed_stopped: this.killedIssues().length,
+      killed_issues: this.killedIssues().map(([n]) => n).slice(0, 100),
       refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
       open_issues_delta_24h: base ? open - base.open : null,
       pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,

@@ -92,7 +92,7 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 - full (`chunk0` の該当 1 関数 + `chunk1` の 18 関数): 19/19 `mismatch` (§7 と一致。`chunk0`・`chunk1` 行の `verdict`)。wasm の先頭 case で残存がある関数は **3/19** (11 B。`0x4bf600`・`0xb77200`・`0x7850d0`。`chunk1` 行の `wasm_z_n` 列)。native は 0。
 - **残存を持たない 16/19 関数は、残存 0 のまま mismatch**。高水位外の残存は 19 関数全体の揺れを説明しない。
 - 上の 3 関数が持つ同じ 11 B (`wasm_z_first` 0x353eeb・`wasm_z_last` 0x37fffb) は、chunk1 全体では 14 関数に見える (`chunk1` 行で `wasm_z_n` = 11)。残存が揺れの原因かは未確定 (残存を消して結果が変わるかは未検証)。
-- 19 関数の `mem_blocks` (列の定義は §8.7): 14 件に差分あり (3000 ブロックが 10 件・3002 ブロックが 3 件・1 ブロックが 1 件 = `0x7850d0`)。5 件は `-` (差分なし)。3000 と 3002 は rt の上限 `LD_MAX_BLOCKS` (3000) と一致するため、総数ではなく下限として扱う (§8.7)。
+- 19 関数の `mem_blocks` (列の定義は §8.7): 14 件に差分あり (3000 ブロックが 10 件・3002 ブロックが 3 件・1 ブロックが 1 件 = `0x7850d0`)。5 件は `-` (差分なし)。3000 は rt の上限 `LD_MAX_BLOCKS` (3000) に到達した値、3002 はそれを超えた値 (上限とは一致しない)。上限に到達すると記録は打ち切られ、計数は領域ごとに 1 件ずつ増えるため、3000 以上の値は総数ではなく下限として扱う (§8.7)。
 
 ### 8.4 chunk 0・1 の全関数 (400 関数ずつ)
 
@@ -116,7 +116,7 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 残存を持つ 124/400 関数 (wasm 側だけ) の書き手。残存を持たない 16/19 関数の揺れの原因 | 受入 (a)・(b) | #2258 (残作業) |
-| 0x959a40 の wasm 側の書込みの書き手 (文脈として効いた前の関数・状態) | 受入 (b) | #2258 (残作業) |
+| 0x959a40 の wasm 側の書込みの書き手 (文脈として効いた前の関数・状態) | 受入 (b)。出所は同 runner で先行する 0x50abe0 の case 列 (`REPORT_APPENDIX_LD122.md` §4)。機構は未特定 | #2723 (LD-122 §5 から移管。範囲は PM agent の判断待ち) |
 | 残存 (wasm) の出現元の確定と、wasm ランナ再起動による消去の検証 | 受入 (a) | #2258 (残作業) |
 | `entry_arg` の表示差 (native 絶対 / wasm 相対) が比較の正規化の問題か | 比較結果の妥当性 | #2258 (残作業) |
 | `liftdiff.py build` の simd.c 再生成と素材版の差 | 再現性 | #2258 (残作業・観察) |
@@ -157,7 +157,7 @@ git diff 7d434168 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/
   - `native_audited_cases`・`wasm_audited_cases`: 監査した case 数 (側ごと)。19 関数は全 case、非 19 関数は先頭 case の 1 件、`unexec` は 0。`control` 行は 11 件。
   - `native_z_n`・`native_z_first`・`native_z_last` (wasm 側も同じ): 先頭 case (pattern `z`) で高水位より外に残った非 0 バイト数 (`n`)。`first`・`last` は残存の最初と最後の非 0 バイトのオフセット。`-` は先頭 case が無い (`unexec`)。
   - `native_max_n`・`wasm_max_n`: 監査した全 case の `n` の最大。
-  - `mem_blocks`: 監査 case のうち最初に `diffs.mem.count` を持つ case の値。`count` は `ldlib/compare.py` の `cmp_mem` が返す mem 差分ブロックの数 (`first` は先頭 8 件まで)。rt は 1 case の mem 差分の記録数を `LD_MAX_BLOCKS` (3000・`rt/ld_core.h:532`) で打ち切り、`mem_trunc`=1 を出す (`rt/ld_core.h:539`・`543`・`746`。カウンタは case ごとに 0 に戻る)。TSV に `mem_trunc` 列は無い (raw 非収録) ため、上限と一致する 3000・3002 の 13 件は総数ではなく下限として扱い、打ち切りの有無は未確認。`-` の意味は関数の種類で違う: 19 関数は詳細を取るので `-` = 差分なし。それ以外の関数は詳細を取らないので `-` = 未記録。
+  - `mem_blocks`: 監査 case のうち最初に `diffs.mem.count` を持つ case の値。`count` は `ldlib/compare.py` の `cmp_mem` が返す mem 差分ブロックの数 (`first` は先頭 8 件まで)。rt は 1 case の mem 差分の記録数を `LD_MAX_BLOCKS` (3000・`rt/ld_core.h:532`) で打ち切り、`mem_trunc`=1 を出す (`rt/ld_core.h:539`・`543`・`746`。カウンタは case ごとに 0 に戻る)。TSV に `mem_trunc` 列は無い (raw 非収録) ため、上限に到達した 3000 (10 件) と、上限を超えた 3002 (3 件) は総数ではなく下限として扱い、打ち切りの有無は未確認。3002 は `ld_diff_region` (`rt/ld_core.h:543`) が上限到達後に領域ごとに計数を 1 件増やして return するため、上限を 2 件超えている (LD-121 #2681 で確認)。`-` の意味は関数の種類で違う: 19 関数は詳細を取るので `-` = 差分なし。それ以外の関数は詳細を取らないので `-` = 未記録。
   - `0x7850d0` (chunk1) の `mem_blocks` は 1 (差分 1 ブロック)。この関数は先頭 case で wasm 残存 11 B も持つ。ブロックの位置は raw データ (非収録) にあり、残存との対応は未確認 (§8.6)。
 - 列の定義 (`results/ld96_heap_residue_summary.tsv`・run × side): `functions` = 先頭 case を監査した関数数 (`solo` は対照を除く 18)。`audited_cases` = 監査 case 数。`z_with_residue` = 先頭 case で `n` > 0 の関数数。`z_n_min`・`z_n_max` = その `n` の最小・最大。`z_n_gt_1000` = `n` > 1000 の関数数。`z_n_sum` = `n` の合計。`control` 行は §8.2 の対照。
 

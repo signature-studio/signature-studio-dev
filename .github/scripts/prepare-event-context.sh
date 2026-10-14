@@ -175,6 +175,9 @@ elif [ "$EVENT_NAME" = repository_dispatch ]; then
     conflict)
       comment_body='この PR は main と競合しています。競合 PR は review イベントでワークフローが起動しないため、watchdog がこの依頼を送りました。origin/main を merge して競合を解消し、push してください (競合解消以外の変更はしない。main 側の変更を消さない)。競合した箇所と解消方針を PR にコメントで報告してください。'
       ;;
+    changes-requested)
+      comment_body='現在の head に対する oc-reviewer の差し戻し (CHANGES_REQUESTED) の指摘が、まだ修正されていません。その review と inline コメントを読み、指摘を修正して push してください (指摘への対応以外の変更はしない)。対応した内容と、対応しなかった指摘の理由を PR にコメントで報告してください。'
+      ;;
     *)
       printf '::error::repository_dispatch: unknown reason "%s"\n' "$(printf '%s' "$dispatch_reason" | tr -cd 'a-z0-9-' | head -c 40)"
       dispatch_ok=false
@@ -327,8 +330,15 @@ pr_number="$(jq -r '.issue.number // .pull_request.number // empty' "$GITHUB_EVE
 
 # ------------------------------------------------------- $GITHUB_ENV への書き込み
 # ここから下は「1 行の値」しか書かない。複数行・heredoc・untrusted 本文は書かない。
+dispatch_reason_env=""
+if [ "$EVENT_NAME" = repository_dispatch ] && [ "$dispatch_ok" = true ]; then
+  case "${dispatch_reason:-}" in
+    conflict | changes-requested) dispatch_reason_env="$dispatch_reason" ;;
+  esac
+fi
 {
   printf 'OC_EVENT_NAME=%s\n' "$EVENT_NAME"
+  printf 'OC_DISPATCH_REASON=%s\n' "$dispatch_reason_env"
   printf 'OC_PERMISSION=%s\n' "$permission"
   printf 'OC_COMMENT_FILE=%s\n' "$COMMENT_FILE"
   printf 'OC_PR_TITLE_FILE=%s\n' "$PR_TITLE_FILE"

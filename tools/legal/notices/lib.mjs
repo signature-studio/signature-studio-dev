@@ -103,7 +103,7 @@ export function validateRecord(rec, expectedId, { repoRoot = REPO, forbiddenArgs
 /**
  * font-asset (GUI-9 の OSS 代替フォント。リポジトリには入れず fetch スクリプトが取得する) の検証。問題文字列の配列 (空 = OK)。
  *   - upstream は commit 固定 (url に commit を含む)・版・著作権表示・ライセンス本文 (sha256 一致)・各ファイルの size/sha256 が必須
- *   - 各ファイルの sha256 が取得スクリプト (coveredBy) の検証値と一致すること (registry だけ更新して取得物が変わる事故の検出)
+ *   - 各ファイルの sha256 が取得スクリプト・検証値台帳 (coveredBy の存在するファイル全て) の検証値と一致すること (registry だけ更新して取得物が変わる事故の検出)
  *   - 各ファイルの sha256 が release guard の allow-list にあること (FL 同梱の旧版と窓を共有し、無いと公開物が exit 6 になる: REPORT)
  */
 export function validateFontAsset(c, { repoRoot = REPO } = {}) {
@@ -120,8 +120,8 @@ export function validateFontAsset(c, { repoRoot = REPO } = {}) {
   else if (sha256(lic.text) !== lic.sha256) p.push("fontAsset.licenseFile の sha256 が本文と一致しない");
   if (lic.url && !lic.url.includes(f.commit ?? "\0")) p.push("fontAsset.licenseFile.url が commit 固定でない");
   if (!Array.isArray(f.files) || f.files.length === 0) p.push("fontAsset.files が空");
-  const script = (c.coveredBy ?? []).map((x) => path.join(repoRoot, x)).find((x) => existsSync(x) && statSync(x).isFile());
-  const scriptText = script ? readFileSync(script, "utf8") : null;
+  const scripts = (c.coveredBy ?? []).map((x) => path.join(repoRoot, x)).filter((x) => existsSync(x) && statSync(x).isFile());
+  const scriptText = scripts.length ? scripts.map((x) => readFileSync(x, "utf8")).join("\n") : null;
   if (scriptText === null) p.push("coveredBy に取得スクリプト (ファイル) が無い");
   const allowPath = path.join(repoRoot, "tools/legal/release-guard/allowlist.json");
   const allow = existsSync(allowPath) ? (JSON.parse(readFileSync(allowPath, "utf8")).entries ?? []) : [];
@@ -131,7 +131,9 @@ export function validateFontAsset(c, { repoRoot = REPO } = {}) {
       continue;
     }
     if (!x.url.includes(f.commit ?? "\0")) p.push(`${x.name}: url が commit 固定でない`);
-    if (scriptText !== null && !scriptText.includes(x.sha256)) p.push(`${x.name}: sha256 が取得スクリプトの検証値に無い (registry と取得物が食い違う)`);
+    // 台帳 (fonts.tsv: file<TAB>url<TAB>sha256<TAB>face) の同名行で、名前と sha256 の対応を見る
+    const paired = (scriptText ?? "").split("\n").some((l) => { const c = l.split("\t"); return c[0] === x.name && c.includes(x.sha256); });
+    if (scriptText !== null && !paired) p.push(`${x.name}: sha256 が取得スクリプトの検証値に無い (台帳の同名行と食い違う。registry と取得物が食い違う)`);
     if (!allow.some((e) => e.sha256 === x.sha256 && e.reason)) p.push(`${x.name}: sha256 が release-guard の allowlist.json に無い (FL 同梱フォントと窓を共有するため公開物が guard で exit 6 になる)`);
   }
   return p;

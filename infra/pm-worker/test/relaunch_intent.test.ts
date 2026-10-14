@@ -206,6 +206,20 @@ test("統合 (oc:no-pr の cooldown 中): 投稿せず、処理済みにもし�
   assert.equal(focusPosts(ctx).length, 1, "意図の本文 (focus 行) で投稿された");
 });
 
+test("統合 (prio:critical の cooldown): 報告から 3 時間で critical の意図は投稿し、通常の oc:no-pr は 6 時間まで待つ (ネガコン)", async () => {
+  const crit = await stopped({ LIVE_LAUNCH: "1" }, { labels: ["oc:no-pr", "prio:critical"] });
+  const norm = await stopped({ LIVE_LAUNCH: "1" }, { labels: ["oc:no-pr"] });
+  for (const ctx of [crit, norm]) assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+  for (const ctx of [crit, norm]) {
+    await tickNow(ctx); // 報告 (10:00) から 2 時間
+    assert.equal(postsTo(ctx, 21).length, 0);
+    ctx.clock.t += 1 * H; // 報告から 3 時間
+    await tickNow(ctx);
+  }
+  assert.equal(focusPosts(crit).length, 1, "critical は 3 時間で、意図の本文 (focus 行) を投稿する (picks の素の投稿ではない)");
+  assert.equal(postsTo(norm, 21).length, 0, "通常は 6 時間まで投稿しない");
+});
+
 test("統合 (picks との競合): 同じ tick で ready の issue に意図があれば、意図の投稿が focus 付きで入り、picks は投稿しない", async () => {
   const ctx = await configuredApp({ env: { LIVE_LAUNCH: "1" }, handlers: writeHandlers });
   assert.equal((await send(ctx.app, "issues", issuePayload(22))).status, 202);

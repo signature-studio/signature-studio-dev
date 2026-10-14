@@ -199,3 +199,40 @@ python3 tools/targets/serum2/host/fl_pe_iid_scan.py <dir>/extracted <dir>/extrac
 - 一般 host が wrapper IID に応答するには、`IPlugInterfaceSupport` にその IID を登録する必要がある。登録時は IID の 16 byte 定数を渡すため、定数 (LE / BE) が PE 内に存在することが前提になる。
 - §6-1 の走査で、`fl-win64` の PE 313 件に両 IID の定数は **0 件** (negative control で検索器が LE / BE 両方を検出できることを確認済み)。よって FL 本体に当該 IID を登録する静的な根拠は見つからない。
 - **限界**: 定数を分割・動的生成する実装は静的走査で拾えない。登録呼出箇所そのものは特定していない。実行時の応答は未観測 (上の未解決表の 1 行目。起票先は #255)。
+
+## 8. [#255 run] 4 byte チャンク検査と HEAD 再測定
+
+- 日付: 2026-10-14 / 親: #255 / 作業ブランチ: `255-fl-iid-chunk-scan`
+- 測定 commit (コードを変えた最後の commit): **`3877d1aa`** (`feat(serum2-host): check 4-byte chunks of wrapper IIDs in FL PEs (#255)`)。
+- 素材: `fl-win64` (展開物 25,166 files、§6-1 と同じ)、`plugins-serum2` (`Install_Xfer_Serum2_2.1.5.exe` → `7z x`)、`Serum2_win64.vst3` sha256 `501e7bb3…4e5283` (19,236,864 B、§1-0 と一致)。
+
+### 8-1. 静的走査の強化
+
+- §6-1 は 16 byte 連続列 (LE / BE) のみ検索していた。IID を即値 (`cmp dword`・`mov r32, imm32`) で分割して埋め込む実装に備え、4 byte チャンク (LE) が 4 つとも同一 PE に現れるかを検査する (`host/fl_pe_iid_scan.py` の `dword_hits`)。
+- 実測 (`3877d1aa`、`python3 host/fl_pe_iid_scan.py <extracted> <extracted>/block00005_PE.bin`):
+
+```
+valid PE files: 313
+IVst3ToAUWrapper: LE=0 BE=0 / 4-byte chunk all4=0
+IVst3ToAAXWrapper: LE=0 BE=0 / 4-byte chunk all4=0
+negative control (IID を末尾に追記した PE 複製): LE/BE hits=1 (各 IID)、chunk all4=1 (各 IID)
+```
+
+- 解釈: FL 本体の 313 PE には両 IID の定数が無い (16 byte 列でも 4 byte 分割でも無い)。§6-1 の「一般 host は応答しない」の示唆を補強する。実行時の応答は未観測 (§8-3)。
+
+### 8-2. e2e (HEAD 再測定)
+
+- `bash tools/targets/serum2/host/e2e.sh` (`host/work` を削除してから実行、wine 9.0、逐次、4 core): **62/62 OK, 70.20 s** (real 1m10.196s、exit 0)。NC1/NC2 は期待どおり (exit=1, NG=1)。load (1 分値) 0.29 → 0.29。
+- 同日の直前 HEAD (`8d632b57` = origin/main、本 PR の base) でも 62/62 OK, 83.36 s。`d5702b2d..HEAD` で `vst3host.cpp` 等が変わっていたため、`3877d1aa` で取り直した。
+- 鮮度: `git diff 3877d1aa HEAD -- tools/targets/serum2/host ':!*.md'` は 0 行 (本節を含む次の commit は `*.md` のみ)。`fl_pe_iid_scan.py` は e2e の入力ではない (`grep -rn fl_pe_iid_scan host/e2e.sh host/build.sh host/make_cases.py host/summarize.py` は 0 件)。
+
+### 8-3. 受入 #3 (controller 側) の判定材料
+
+- 既定 host (`kNoInterface`) では gate が 2 のまま (§4-4)。wrapper QI に応答する opt-in (`S2HOST_WRAPPER_QI=1`) では gate=1 となり、0x800010 受信・demo bit=1 になる (§4-4 の表・e2e の wq 行)。
+- 静的証拠 (§6-1・§8-1) は、実 FL 本体が wrapper IID に応答する実装を持つ根拠を示さない。既定 host は無変更のまま。
+- 未解決 (起票先は PR 本文・issue コメント):
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| FL の `IHostApplication::queryInterface` の静的特定 (未知 IID の戻り値が非 NULL かどうか) | 定数を持たない応答経路の否定 | PM 判断 (#255 コメント) |
+| 実 FL (wine + GUI) で Serum2 を読み込ませ、QI 応答を捕捉 | gate=1 の実機条件と `S2HOST_WRAPPER_QI` の既定化判断 | PM 判断 (新規起票の要否) |

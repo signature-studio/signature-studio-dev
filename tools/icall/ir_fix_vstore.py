@@ -13,8 +13,12 @@
        %D の他の使用 (reload)                →  直前に `%vld.K = load i128, i128* %vst.N` を挿入して置換
    %P が alloca でない (グローバル/ポインタ) 場合は意味を決められないので触らず unresolved として数える。
    出力: JSON 1 行 {"vstore_fixed": N, "vstore_reloads": M, "vstore_unresolved": K, "unresolved_detail": [...]}。
-   unresolved が非 0 でも exit 0 (対象 PE に該当があるだけで、修復済みの結果は有効; 件数は REPORT の台帳)。"""
+   unresolved が非 0 でも exit 0 (対象 PE に該当があるだけで、修復済みの結果は有効; 件数は REPORT の台帳)。
+   --direct (opt-in, #1025): 宛先 %D が alloca 以外のポインタ %P の load で、%D の使用が load と helper 呼出しの 2 箇所だけなら、
+   helper 呼出しを `store i128 %S, i128* %P` に置き換える (movups [mem], xmm の宛先が self+N 等の引数由来のとき消えていた store)。
+   既定 off: OTT/FA 経路は従来どおり (未検証の経路を巻き込まない)。"""
 import json, re, sys
+from collections import Counter
 
 NAMES = r'(?:v?mov(?:aps|apd|dqa|dqu|ups|upd))'
 DROP = re.compile(r'^(?P<i>\s*)call void @__asm_(?P<n>' + NAMES + r')(?:[.\w]*)\(i128 (?P<d>%[\w.]+), i128 (?P<s>%[\w.]+|-?\d+)\)(?P<md>, !insn\.addr !\d+)?[ \t]*$')
@@ -36,19 +40,23 @@ def fix_function(lines, st):
         if m:
             loads[m.group('d')] = m.group('p')
     fix = {}   # %D -> new alloca
+    direct = {}   # %D -> 宛先ポインタ (alloca 以外。%D の使用が load と helper 呼出しの 2 箇所だけなら store を直接置く)
+    uses = Counter(t for ln in lines for t in re.findall(r'%[\w.]+', ln))
     for ln in lines:
         m = DROP.match(ln)
         if m:
             d = m.group('d')
             if d in loads and loads[d] in allocas:
                 fix.setdefault(d, '%%vst.%d' % (st['n'] + len(fix)))
+            elif d in loads and uses[d] == 2 and st['direct_on']:
+                direct[d] = loads[d]
             else:
                 st['unres'].append({'dst': d, 'line': ln.strip()[:120]})
             continue
         m = DROP_ANY.match(ln)
         if m:
             st['unres'].append({'dst': None, 'line': ln.strip()[:120]})
-    if not fix:
+    if not fix and not direct:
         return lines
     # phi が %D を使うと挿入位置が決まらない → その %D は触らない
     for d in list(fix):
@@ -56,8 +64,6 @@ def fix_function(lines, st):
         if any(pat.search(ln) for ln in lines):
             st['unres'].append({'dst': d, 'line': 'used by phi'})
             del fix[d]
-    if not fix:
-        return lines
     st['n'] += len(fix)
     out = []
     for k, ln in enumerate(lines):
@@ -65,6 +71,10 @@ def fix_function(lines, st):
         if m and m.group('d') in fix:
             out.append('%sstore i128 %s, i128* %s%s' % (m.group('i'), m.group('s'), fix[m.group('d')], m.group('md') or ''))
             st['fixed'] += 1
+            continue
+        if m and m.group('d') in direct:
+            out.append('%sstore i128 %s, i128* %s%s' % (m.group('i'), m.group('s'), direct[m.group('d')], m.group('md') or ''))
+            st['direct'] += 1
             continue
         m = LOAD.match(ln)
         if m and m.group('d') in fix:
@@ -82,15 +92,15 @@ def fix_function(lines, st):
         if k == last_alloca:
             for a in fix.values():
                 out.append('  %s = alloca i128' % a)
-    if last_alloca < 0:
+    if fix and last_alloca < 0:
         raise SystemExit('ir_fix_vstore: alloca 無し関数に修復対象 (想定外)')
     return out
 
 
 def main():
-    src, dst = sys.argv[1:3]
+    src, dst = [a for a in sys.argv[1:] if not a.startswith('--')][:2]
     lines = open(src, errors='replace').read().split('\n')
-    st = {'n': 0, 'r': 0, 'fixed': 0, 'reloads': 0, 'unres': []}
+    st = {'n': 0, 'r': 0, 'fixed': 0, 'direct': 0, 'direct_on': '--direct' in sys.argv, 'reloads': 0, 'unres': []}
     out, i = [], 0
     while i < len(lines):
         if lines[i].startswith('define '):
@@ -103,7 +113,7 @@ def main():
         out.append(lines[i])
         i += 1
     open(dst, 'w').write('\n'.join(out))
-    print(json.dumps({'vstore_fixed': st['fixed'], 'vstore_reloads': st['reloads'], 'vstore_unresolved': len(st['unres']), 'unresolved_detail': st['unres'][:20]}))
+    print(json.dumps({'vstore_fixed': st['fixed'], 'vstore_direct': st['direct'], 'vstore_reloads': st['reloads'], 'vstore_unresolved': len(st['unres']), 'unresolved_detail': st['unres'][:20]}))
 
 
 if __name__ == '__main__':
