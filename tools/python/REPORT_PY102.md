@@ -196,7 +196,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 - 測定 commit: `ac73210e` (コードを変えた最後の commit)。本節の追記だけを後続の commit で加える。`git diff ac73210e HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` は 0 行。
 - 前回の測定 (`8ceec7c9`) の全文は `REPORT_PY102_APPENDIX_2883.md` へ移した (250 行上限)。
 - 素材・emsdk: 本検証は `fl-win64` を展開しない (provider の build と JS の差分検査は素材を読まない)。emsdk は上流 `emsdk install 6.0.12` を `/opt/emsdk` に導入して `activate` した (`emcc` 6.0.12)。`toolchain-emsdk` 素材は本 run に無い。
-- 未実行 (理由): `build_flpy.sh`・`provider_check.mjs` の §3・`tests/all_tools.mjs` は flpy (CPython wasm と `work/`) を使うため実行していない。`build_flpy.sh` と `host/flpython.mjs` は `fl_engine.c`・`fl_table.c` を参照せず、本 merge で変わったのは provider と mock 側だけ。
+- 未実行 (理由): `build_flpy.sh`・`provider_check.mjs` の §3・`tests/all_tools.mjs` は flpy (CPython wasm と `work/`) を使うため実行していない。`build_flpy.sh` と `host/flpython.mjs` は `fl_engine.c`・`fl_table.c` を参照しない。前回測定 (`8ceec7c9`) からの変更は `git diff --stat 8ceec7c9 ac73210e -- tools/python` の範囲で、main 由来の `pe125` (provider・mock・`general_diff.mjs`) と、build・test から参照されない `analysis/py99_*`・REPORT だけ。flapi 表と生成器 (`analysis/flapi*`) は 0 行差分 (`git diff 8ceec7c9 HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/analysis/flapi/flapi_table.json` は 0 行)。表の再生成 `flapi_table_check.sh`・`static_check.mjs`・`fulltext_parity.mjs` も本 run では未実行。
 - 環境: GitHub Actions runner (4 コア)。検証開始時の `uptime` の load average は `0.13 0.24 0.13` (23:18:51)。
 
 | 検証 | 実行 | 結果 | 所要 |
@@ -213,6 +213,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 | screen 差分 (main 由来) | `node tests/screen_diff.mjs` | calls 32・diffs 0・PASS | 0.058 s |
 | transport / ui 差分 | `node tests/transport_diff.mjs`・`ui_diff.mjs` | calls 7・diffs 0・PASS / calls 17・diffs 0・outOfRangeKnownDiffs 3・PASS | 0.055 s / 0.055 s |
 | ui 状態 / 表示・メニュー (main 由来) | `node tests/ui_state_diff.mjs`・`ui_display_diff.mjs` | calls 12・diffs 0・PASS / ok_calls 12・bad_calls 11・diffs 0・PASS | 0.056 s / 0.057 s |
+| kwsig 照合・束縛・arity probe | `python3 tests/kwsig_check.py`・`python3 tests/kwsig_bind_check.py`・`node tests/sig_arity_probe.mjs` | OK / PASS / kwsig_targets 24・unimplemented 16・fails 0・PASS | - |
 
 - 件数の差: handler 120 (`8ceec7c9`) → 122 は main の PY-125 `pe125` (2 件) の取り込み分。`pe102` (1 件) は前回と今回の両方に含まれる。
 - 未解決 (§5) は不変: 準備判定 (#2959)・追加引数の意味論 (#2950)・kwlist 無しの名前と書式 (#2952)。
