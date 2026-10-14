@@ -125,7 +125,7 @@
 - S2: run C の `Autogun_run_1.wav` の data チャンク先頭から 1000 byte 目の bit 0 を反転すると、data SHA-256 は `47a0586955c84799cf36ca9738e91b91bfa6ceaebc36b30ba2778a98cfb57466` になり、一致値 `fe7a0614…e561a` と一致しない。
 - S1: FL64.exe の検査分岐 (VA `0x140006eaf`、file offset `0x62af`) の期待バイト `74 0b` を `75 0b` に変えた入力では、`s1_g03_patch.py` が `FL64.exe: VA 0x140006eaf expected 740b got 750b` で終了 (rc 1)。変えない入力は rc 0 (`740b -> eb0b`)。
 
-**差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff 8be0756f HEAD -- tools/flp/s1_g03_patch.py tools/flp/s2_render_probe.sh tools/flp/s1_wine_probe.sh tools/startup tools/assets` の出力は空 (0 行)。本節を含む REPORT_APPENDIX.md の commit だけが HEAD の差分。
+**差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff 8be0756f HEAD -- tools/flp/s1_g03_patch.py tools/flp/s2_render_probe.sh tools/flp/s1_wine_probe.sh tools/startup tools/assets` の出力は空 (0 行)。`git diff --stat 8be0756f HEAD` で `tools/flp/REPORT.md` と `tools/flp/REPORT_APPENDIX.md` だけが変わっている (REPORT の文言修正のみ)。
 
 **未解決**
 
