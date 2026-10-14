@@ -80,6 +80,7 @@ export class FlAudioShim {
   controlPanelCalls = 0;
   lastCapture: FlCaptureSpec | null = null;
   workletErrors: string[] = [];
+  clockJumpLog: { q: number; d: number; frame: number; prev: number; ms: number }[] = [];
   commandsHandled = 0;
   private refPts: { x: number; y: number }[] = [];
 
@@ -257,8 +258,9 @@ export class FlAudioShim {
       },
     });
     node.port.onmessage = (e: MessageEvent) => {
-      const d = e.data as { type: string; message?: string };
+      const d = e.data as { type: string; message?: string; q?: number; d?: number; frame?: number; prev?: number; ms?: number };
       if (d.type === "error") { this.workletErrors.push(d.message ?? "?"); this.log(`worklet error: ${d.message}`); }
+      if (d.type === "clock_jump") this.clockJumpLog.push({ q: d.q ?? -1, d: d.d ?? 0, frame: d.frame ?? -1, prev: d.prev ?? -1, ms: d.ms ?? 0 });
     };
     node.connect(ctx.destination);
     this.node = node;

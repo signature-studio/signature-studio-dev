@@ -69,6 +69,7 @@ const ADDED_KEYS = [
   "no_pr_needs_pm",
   "target_eff", "cap_est", "peak_running", "queued", "oldest_queued_age_min", "build",
   "last_redeliver_scan", "hook_failed_last_scan",
+  "demoted_reason", "shadow",
   // 同時実行の計数 (opencode.yaml の全 run を TARGET に数える)
   "active_all", "active_impl", "active_other", "active_by_event",
   // 自律運転の指標 (#2335)
@@ -76,6 +77,8 @@ const ADDED_KEYS = [
   "mode_close", "auto_close_detected", "launch_unobserved",
   // 着手待ちの区分別の件数 (prio:critical / prio:low。#2683)
   "ready_by_prio",
+  // 未完了の run の区分別の件数と、prio:low の上限 (LOW_CAP。#2721)
+  "active_by_prio", "low_cap",
   // 実装 run の打ち切りが連続して自動の再着手を止めた issue
   "killed_stopped", "killed_issues",
   // VM の状態の取り込み (#2343)
@@ -97,7 +100,7 @@ test("/status (d): 既存のキーは全て残り、追加するキーだけが�
   assert.equal(detail.phase, "launch");
   assert.equal(detail.launch_stop, null);
   assert.equal(detail.fresh, false);
-  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0 });
+  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0, demoted: 0, restored: 0 });
   assert.equal(detail.mode_close, "dry-run");
   assert.equal(detail.auto_close_detected, 0);
   assert.equal(detail.last_error, null);

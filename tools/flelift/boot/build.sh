@@ -29,7 +29,8 @@ if [ ! -f "$W/obj/.sx_done" ]; then
 fi
 
 CCF="-O0 -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1"
-CAP_MB="${FLE_CC_RSS_CAP_MB:-11000}"
+SHARDS="${FLE_SHARDS:-1}"
+CAP_MB="${FLE_CC_RSS_CAP_MB:-$([ "$SHARDS" -gt 1 ] && echo 5000 || echo 11000)}"
 cc() { local src="$1" obj="$2"; shift 2
   if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
     local rc=0 log="$W/rss_cc_$(basename "$obj" .o).log"
@@ -46,7 +47,18 @@ CHKF=""; [ "$V" = chk ] && CHKF="-DFLE_CHK"
 NOSX_DEF=$([ "$V" = nosx ] && echo 1 || echo 0)
 EXPORTS="_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_nullpage,_fle_boot_set_blkdiag,_fle_blkdiag_stat,_fle_boot_set_ipp,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count"
 [ "$NOSX_DEF" = 1 ] || EXPORTS="$EXPORTS,_shimx_set_trace,_shimx_init"
-cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted.c"  "$W/obj/${V}_lifted.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+# FLE_SHARDS>1: fle_lifted_s<k>.c を xargs -P3 で並列 clang (各 cap 付き)。既定 1 は単一 fle_lifted.c。
+LIFTED_OBJS="$W/obj/${V}_lifted.o"
+if [ "$SHARDS" -gt 1 ]; then
+  cc_shard() { cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted_s$1.c" "$W/obj/${V}_lifted_s$1.o" $CCF $CHKF -I"$FLE/rt" -I"$HERE"; }
+  export -f cc cc_shard
+  export W V FLE HERE CAP_MB CCF CHKF FLE_LIFT_DIR
+  seq 0 $((SHARDS - 1)) | xargs -P 3 -I{} bash -c 'cc_shard {}'
+  LIFTED_OBJS=""
+  for k in $(seq 0 $((SHARDS - 1))); do LIFTED_OBJS="$LIFTED_OBJS $W/obj/${V}_lifted_s$k.o"; done
+else
+  cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted.c"  "$W/obj/${V}_lifted.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+fi
 cc "${FLE_LIFT_DIR:-$W/lift}/fle_data.c"    "$W/obj/${V}_data.o"    $CCF $CHKF -I"$FLE/rt"
 cc "$FLE/rt/fle_cpu.c"     "$W/obj/${V}_cpu.o"     $CCF $CHKF -I"$FLE/rt" $CPUDEFS
 cc "$FLE/rt/fle_glue.c"    "$W/obj/${V}_glue.o"    $CCF $CHKF -I"$FLE/rt"
@@ -54,7 +66,7 @@ cc "$BRIDGE"               "$W/obj/${V}_bridge.o"  $CCF $CHKF -I"$FLE/rt" -I"$HE
 cc "$W/fle_textwin.c"      "$W/obj/${V}_tw.o"      $CCF $CHKF -I"$FLE/rt" -I"$HERE"
 cc "$HERE/fle_boot.c"      "$W/obj/${V}_boot.o"    $CCF $CHKF -I"$FLE/rt" -I"$HERE" -I"$SX/src" \
    -DFLEBOOT_STRICT=$([ "$V" = strict ] && echo 1 || echo 0) -DFLEBOOT_NOSX=$NOSX_DEF
-OBJS="$W/obj/${V}_lifted.o $W/obj/${V}_data.o $W/obj/${V}_cpu.o $W/obj/${V}_glue.o $W/obj/${V}_bridge.o $W/obj/${V}_tw.o $W/obj/${V}_boot.o"
+OBJS="$LIFTED_OBJS $W/obj/${V}_data.o $W/obj/${V}_cpu.o $W/obj/${V}_glue.o $W/obj/${V}_bridge.o $W/obj/${V}_tw.o $W/obj/${V}_boot.o"
 [ $NOSX = 1 ] || OBJS="$OBJS $W/obj/sx_*.o"
 emcc $OBJS -o "$W/fleboot_$V.cjs.tmp" \
   -O0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \

@@ -15,6 +15,10 @@ const ptrPreSet = ptrPre(mod, img.length);
 mod._m11_set_tolerant(1);
 mod._m11_set_va_unit_budget(Number(process.env.M11_VA_UNIT_BUDGET_MB ?? '256'));
 const snap = new Uint8Array(img.length);
+const heapFrom = process.env.M11_HEAP_FROM;   // #2768: 寛容起動の記録 JSON (M11_TOLERANT_OUT の出力). その skipped unit だけ heap 全体の差分を取る (既定 off)
+const heapSet = heapFrom ? new Set(JSON.parse(fs.readFileSync(heapFrom, 'utf8')).skipped.map((s) => s.i)) : null;
+const heapRec = [];
+let hbuf = null, hLen = 0;
 const units = [];                  // 全 unit: [i, va, kind, va_bytes, getmem, freemem, oom, clobber]
 const skipped = [];                // 失敗 unit (skip): 種類・メッセージ・image 差分の範囲
 const kinds = {};
@@ -31,6 +35,22 @@ const diffRanges = () => {   // 直前 unit の前後で image 範囲 (0..img.le
   }
   return out;
 };
+const G = (n) => { const v = mod[n]; return Number(v !== null && typeof v === 'object' ? v.value : v); };
+const LAY = heapSet ? { gb: G('___global_base'), sl: G('___stack_low'), sh: G('___stack_high'), hb: G('___heap_base') } : null;
+const regionOf = (a) => (a < LAY.gb ? 'gap' : a < LAY.sl ? 'c_static' : a < LAY.sh ? 'stack' : a < LAY.hb ? 'stack_gap' : 'heap');
+const heapDiff = () => {   // #2768: unit 直前の heap 全体 (hbuf) と現在の差分を, image の外で区間にする (16B 以内の隙間は同じ区間). 64KB (wasm の頁) 単位で比べてから byte を見る
+  const cur = mod.HEAPU8, L1 = cur.length, L0 = hLen, out = [], zero = Buffer.alloc(65536);
+  const view = (u8, o, n) => Buffer.from(u8.buffer, u8.byteOffset + o, n);
+  let cs = -1, ce = -1;
+  const add = (i) => { if (cs >= 0 && i - ce <= 16) ce = i + 1; else { if (cs >= 0) out.push([cs, ce, regionOf(cs)]); cs = i; ce = i + 1; } };
+  for (let p = 0; p < L1; p += 65536) {
+    const n = Math.min(65536, L1 - p);
+    if (view(cur, p, n).equals(p < L0 ? view(hbuf, p, n) : view(zero, 0, n))) continue;
+    for (let k = 0; k < n; k++) if (p + k >= img.length && cur[p + k] !== (p < L0 ? hbuf[p + k] : 0)) add(p + k);
+  }
+  if (cs >= 0) out.push([cs, ce, regionOf(cs)]);
+  return out;
+};
 mod.m11_tolerant_run = () => {   // C の function_4120c0 (g_tolerant) から呼ばれる: InitUnits 本体
   hookRan = true;
   const count = Number(mod._m11_tol_count()), base = Number(mod._m11_tol_units());
@@ -41,6 +61,8 @@ mod.m11_tolerant_run = () => {   // C の function_4120c0 (g_tolerant) から呼
     started++;
     const va = mod.HEAPU32[(base + i * 16) >>> 2];   // strict と同じく units は起動時の 1 度だけ読む. proc の下位 32bit = VA
     snap.set(mod.HEAPU8.subarray(0, img.length));
+    const hOn = heapSet !== null && heapSet.has(i);
+    if (hOn) { const L = mod.HEAPU8.length; if (!hbuf || hbuf.length < L) hbuf = new Uint8Array(L); hbuf.set(mod.HEAPU8); hLen = L; }
     mod._m11_va_unit_begin();
     const oom0 = Number(mod._m11_va_oom()), vaUsed0 = Number(mod._m11_va_used());
     const gm0 = Number(mod._m11_probe_count(0)), fm0 = Number(mod._m11_probe_count(1));
@@ -67,6 +89,7 @@ mod.m11_tolerant_run = () => {   // C の function_4120c0 (g_tolerant) から呼
     const vaBytes = Number(mod._m11_va_used()) - vaUsed0, gmD = Number(mod._m11_probe_count(0)) - gm0, fmD = Number(mod._m11_probe_count(1)) - fm0;
     if (SKIP.has(kind)) skipped.push({ i, va: vaHex, kind, raw, msg, frame, clobber: clob, va_bytes: vaBytes, getmem: gmD, freemem: fmD, oom, img_ranges: diffRanges() });
     kinds[kind] = (kinds[kind] || 0) + 1;
+    if (hOn) heapRec.push({ i, va: vaHex, kind, ranges: heapDiff() });
     units.push([i, vaHex, kind, vaBytes, gmD, fmD, oom ? 1 : 0, clob ? 1 : 0]);
   }
 };
@@ -91,3 +114,10 @@ console.log('M11_TOLERANT ' + JSON.stringify({
   icall_miss_uniq: num(() => mod._m11_icall_miss_uniq()), va_unit_budget_mb: Number(process.env.M11_VA_UNIT_BUDGET_MB ?? '256'),
   stub_uniq: num(() => mod._m11_stub_uniq()), stub_total: num(() => mod._m11_stub_total()),
 }));
+if (heapSet) {
+  const p1 = new Map(JSON.parse(fs.readFileSync(heapFrom, 'utf8')).skipped.map((s) => [s.i, s.kind]));
+  const match = heapRec.length === heapSet.size && heapRec.every((r) => p1.get(r.i) === r.kind);
+  const out = { from: heapFrom, img_len: img.length, layout: LAY, match, units: heapRec };
+  if (process.env.M11_HEAP_OUT) fs.writeFileSync(process.env.M11_HEAP_OUT, JSON.stringify(out));
+  console.log('M11_TOLERANT_HEAP ' + JSON.stringify({ n: heapRec.length, match, layout: LAY, img_len: img.length }));
+}
