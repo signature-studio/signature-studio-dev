@@ -120,4 +120,4 @@ cp tools/icall/work/slot_trace_fatal.txt tools/icall/work/fatal_stub.txt
 
   測定対象 (`slot_trace.c`・`slot_trace.sh`・`tools/ott`) は差分 0。差分は main 取り込み由来の `slot_table_reach.py` の新規追加のみ。
 - `slot_table_reach.py` は harness (`slot_trace.sh`・`slot_trace.c`) から呼ばれない (判定手順として `REPORT_APPENDIX_2197.md` から参照されるだけ)。
-- `git diff 2c1c8121 071b1023 -- tools/icall/diff` は `slot_trace.sh` の 1 行 (抽出 grep の修正) のみ。
+- `git diff 2c1c8121 071b1023 -- tools/icall/diff` は `slot_trace.sh` の 1 行 (抽出 grep の修正) と、main 由来の `slot_table_reach.py` の 31 行追加のみ。
