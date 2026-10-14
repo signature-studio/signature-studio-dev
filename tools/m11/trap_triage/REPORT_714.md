@@ -238,3 +238,5 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 | 読取りを実際にコンパイルする計測での 304・555・923 の実値採取 | 受入 1・2 が未達 | #1426 (継続) |
 
 **#1602 r2 追記 (2026-10-14)**: 計測 hook の本体を変えると 304・555 の判定が 872/22 ↔ 870/24 と変わるが、どちらも範囲外の読みは 0 件で、値は採れていない。詳細は [REPORT_APPENDIX_1602.md](REPORT_APPENDIX_1602.md) §14。trap 位置は 304・555 が `function_535bf2`、923 が `function_410b10`。未解決は #1426 (継続)。
+
+**#1602 r4 追記 (2026-10-14)**: 受入 1・2 を達成。V8 inspector (`trap_triage/inspect_trap.mjs`、build 不変) で trap 時点の wasm local を読み、判定は不変 (870/24)。304・555 は `function_535bf2` の `obj = 0` (`tbl`・`cnt` は範囲外の値)、923 は `function_410b10` の `obj = 0x10bd3960` (範囲内) で `*(obj) = 0` のため `*(obj)-0x80 = 0xffffff80` が範囲外。測定表・呼出し鎖は [REPORT_APPENDIX_1602.md](REPORT_APPENDIX_1602.md) §16。未解決は #714 (継続)。

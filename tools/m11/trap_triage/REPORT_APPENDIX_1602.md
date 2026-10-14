@@ -1,4 +1,4 @@
-# #1602 付録: C 版内 stderr 計測 (REPORT_714 §13 の全文)
+# #1602 付録: C 版内 stderr 計測 (REPORT_714 §13 の全文) と r2〜r4 の再試行 (§14〜§16)
 
 自動生成ではない。`REPORT_714.md` §13 の全文を 250 行上限のため分割移動した (2026-10-14, 差し戻し対応 run)。
 本節の測定 commit は `4c3f7458` (origin/main)。
@@ -121,3 +121,71 @@ load average は測定中 0.73 前後。`check_682.py` は HEAD では未実行�
 |---|---|---|
 | 計測版で判定が 870 → 837 に動く機構 (`undefined symbol: 1` と `[1602]` 0 件の原因を含む) | 受入 1・2 が未達 | #1426 (継続) |
 | 候補 (b) trap address の逆算の実現性 (RuntimeError の address の有無) | 受入 1・2 が未達 | #1426 (継続) |
+
+## 16. V8 inspector による trap 時点の local 採取 (#1602 r4, 2026-10-14, n=2)
+
+結論: build を変えずに、node の inspector (`Debugger.setPauseOnExceptions` all) で RuntimeError が投げられた瞬間の wasm local を読めた。判定は不変 (unit 別ラベル JSON が通常 survey とバイト一致)。304・555 は `function_535bf2` の `obj = 0`、923 は `function_410b10` の `*(obj) = 0` (vptr が NULL) が OOB の直接原因。
+
+測定 commit `2ae50140` (コードを変えた最後の commit。`9e5ef3af` は同ファイルのコメントのみ、HEAD は `9e5ef3af`)。作業ベース `14150b46` (origin/main)。素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 0.17。node v22.23.3。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490733 行、F1=902 errors=0) | 42.6 秒 |
+| `m11_build.sh` (既定) | rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`) | 21.5 秒 |
+| `m11_survey.mjs` (既定・inspector なし) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 13.4 秒 |
+| `check_682.py` (既定) | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | - |
+| `m11_survey.mjs` + `inspect_trap.mjs` (1 回目) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 21.8 秒 |
+| 同 (2 回目) | 同上 | 21.8 秒 |
+| `check_682.py` (inspector 版の unit JSON) | 2/5 (同じ) | - |
+
+- 判定不変: inspector 版 2 回の `M11_SURVEY_UNITS` JSON は、inspector なしの JSON と `cmp` でバイト一致 (942 unit 全て同じラベル)。追加の試走 4 回 (測定 commit の前) も同じ。2 回の記録 JSONL も `cmp` で一致。
+- 手段: `trap_triage/inspect_trap.mjs` を `node --wasm-enforce-bounds-checks --import ... tools/m11/m11_survey.mjs` で preload する (build・C 版・wasm は無変更)。`Debugger.paused` で top frame の `local` scope を `Runtime.getProperties` で読み、すぐ resume する。
+- `--wasm-enforce-bounds-checks` が要る。既定 (trap handler による OOB 検出) では OOB 時の frame に local の side table が無く、`local` scope が空で返る (最小の wasm module で、フラグ無し = 空・有り = `$var0`/`$var1` の値、を確認)。フラグは範囲チェックを明示コードにするだけで、OOB の判定は同じ。
+- 事象と unit の対応: 非 halt0 の RuntimeError 17 件が、unit 別ラベルの trap のうち halt0 でない 17 unit と順序で 1 対 1 に対応する。304・555・923 は、事象の (wasm 関数 index, offset) が `M11_SURVEY_STACK` の先頭フレーム (3372:0x1a3376, 3372:0x1a3376, 14900:0x354f51) と一致した。
+
+### 304・555 (`function_535bf2`、wasm 3372、OOB 命令 0x1a3376)
+
+線形メモリは 1655963648 B (0x62b40000)。読み式は `tbl = *(*(obj+8)+8)`、`cnt = *(obj+0x10)` を +1 した値、アドレス = `(tbl + cnt*24) mod 2^32` (REPORT §6)。
+
+| 項目 | 304 | 555 |
+|---|---|---|
+| `obj` (local 0, i64) | 0x0 (NULL) | 0x0 (NULL) |
+| `*(obj+8)` (addr 0x8) | 0x6c006c0064002e | 同左 |
+| `*(obj+8)+8` を i32 に wrap した addr | 0x640036 (線形メモリ内) | 同左 |
+| `tbl` = その位置の i64 | 0xb00474ffd03c8352 (メモリ範囲外の値) | 同左 |
+| `obj+0x10` (addr 0x10) の `cnt` (+1 後) | 0x3400360078005f (範囲外の値) | 0x34003600780060 (同) |
+| OOB アドレス `(tbl + cnt*24) mod 2^32` | 0xdb7c8c3a | 0xdb7c8c52 |
+| 範囲判定 | addr+4 > 0x62b40000 で OOB | 同左 |
+
+- `obj = 0` のため、`obj+8`・`obj+0x10` は guest メモリの先頭 (addr 8, 16) を読む。trap 時点の addr 0〜0x3f は、addr 8 = UTF-16LE の ".dll"、addr 0x10 = "_x64.dll" (304) / "`x64.dll" (555) だった。`cnt` の +1 は addr 0x10 の先頭 wide char を書き換える (0x5f → 0x60 が 304 → 555 の差)。
+- 呼出し鎖 (top から): `function_535bf2` ← `function_535c11` ← `function_4fad10` ← `function_4fb910` ← 304 は `function_883140`、555 は `function_bf2500`。`function_535c11` の local0 は 304 が 280842688、555 が 280847200 で、どちらも非 0。
+- `obj = 0` は IR と整合する: `boot_final.ll` の `function_535c11` は `call i64 @function_535bf2()` を引数なしで呼ぶ (`m11_ov.c` 537 行のコメント・REPORT_1275 の「RetDec が `jl 0x535bf2` を rcx=0 の call にした」と同じ)。本 run は IR 側の再検証はしていない (実測は obj = 0 まで)。
+
+### 923 (`function_410b10`、wasm 14900、OOB 命令 0x354f51)
+
+読み式は `*( *(obj) - 0x80 )` (REPORT §6)。
+
+| 項目 | 値 |
+|---|---|
+| `obj` (local 0, i64。関数入口の引数と同じ。local は書換わらない) | 0x10bd3960 (線形メモリ内) |
+| `*(obj)` (vptr 相当) | 0x0 |
+| `*(obj) - 0x80` の i32 wrap | 0xffffff80 (範囲外 → OOB) |
+| 参考: `obj - 0x80` | 0x10bd38e0 (範囲内)。OOB の原因は `obj-0x80` ではなく `*(obj)-0x80` |
+| `obj` 先頭 64 B | 全て 0 (trap 時点) |
+
+- 呼出し鎖: `function_410b10` ← `function_410730` (local0 = 同じ obj 0x10bd3960) ← `function_4fb910` (local0 = 0xf6b900, local1 = 0x1fa8d8) ← `function_136c660` ← `m11_tr_function_136c660`。
+- 同じ addr 0x10bd3960 は 304・555 の `function_4fad10` の local0 (280836448) でもある。そのときの先頭 8 B は 0x0f3120 (非 0) で、923 の時点では 0。同一 addr の別時点の状態であり、同一オブジェクトかは未確認。
+
+### 判定 (r4)
+
+- 受入 1 (304・555 の `obj`・`*(obj+8)`・`*(obj+8)+8`・`obj+0x10` の実測、`tbl`/`cnt` の範囲判定): **達成** (上表)。
+- 受入 2 (923 の `obj` の実測、範囲外の判定): **達成**。`obj` は範囲内、`*(obj)-0x80` が範囲外。
+- 受入 3 (入口 dump 以外の採取手段で、判定が変わらない): **達成**。手段は issue 本文の候補 (a)・(b) ではなく (c) V8 inspector。unit JSON はバイト一致。
+- 受入 4 (回帰 0、既定 OFF の survey が ok 870 / trap 24 / noproc 1 / miss 47): **達成** (build 側のコード変更は 0 件)。
+
+### 未解決 (r4)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 304・555: `function_535c11` → `function_535bf2` の引数なし call (obj = 0) の修復 (`M11_FIX_535BF2` の C 版は REPORT §3) | OOB の除去 | #714 (継続) |
+| 923: `obj` (0x10bd3960) の vptr が 0 になる由来 (構築が走らないのか、解放・消去後か)。`inspect_trap.mjs` で `function_4fb910` 以降の生成元を追える | OOB の除去 | #714 (継続) |
