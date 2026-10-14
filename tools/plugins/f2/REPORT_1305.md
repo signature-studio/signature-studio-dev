@@ -231,3 +231,12 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
   - `unicorn_trace.py $PE 0x83efb0 -H -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、`UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0x0`、書込み 0 件。
   - `unicorn_trace.py $PE 0x409090 -H -q 0x867100 -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、書込み 28 件 (rip=0x4090a1〜0x4090f9)。
 - 未解決 (#2303 の残件。起票先は本 issue。実経路で `0x847120`・`0x409090` を呼ぶ上位関数を確定する必要あり): (a) `0x847120` の呼出し元 `0x83f637` が `0x83efb0` の経路に乗るか、(b) `0x409090` の呼出し元 `0x41bc60` (表 `0x8526c0`) が実行時に埋まる経路、(c) `[rax-8]` のチャンクヘッダ形式 (受入 3)、(d) `0x411bb8` 記録 (受入 5)。
+
+## 16. PLG-F3-27 続き (#2303): arena の前処理と chunk header 形式 (部分、測定 commit 8eda24a9、block19148)
+
+- 道具 (8eda24a9): `unicorn_trace.py` に `-p hex` (本体の前に同じメモリで実行する関数。arena 初期化 `0x409090` 用) と `-V` (VirtualAlloc が 0x50000000〜 の pool を 64KB 境界で返す) を追加。既定の挙動は不変。
+- 測定 (逐次、load 0.03→0.10、各 wall 1.69〜1.75 秒、RSS 約 227〜237 MB): A `-H` は `UC_ERR_READ_UNMAPPED rip=0x407a5e` (§15 と一致)。B `-H -p 0x409090` は `0x407a20` を通過し、`VirtualAlloc` の戻り 0 で `rip=0x41bfaa` (エラー経路)。C `-H -V -p 0x409090` は初回確保 (`0x407630`→`0x407c21`) まで進み、pool への書込み 44 件の後、`UC_ERR_INSN_INVALID rip=0x50138d06` (pool 内) で停止。
+- 受入 3 (chunk header) **達成** (C の書込み元 rip より): blk=`0x50138cc0`。`[blk-8]`=size+6 (`0x407c25`)、`[blk+0]`=所有 bin `0x867200` (`0x407c31`)、`[blk+0x18]`=空きリスト先頭 0、`[blk+0x20]`=使用数 1 (`0x407c34`・`0x407c38`)。最初の obj (`blk+0x30`) の `[obj-8]`=blk (`0x407c60`)。確保済みの `[obj-8]` は所有 blk。空き obj の `[obj-8]` は次の空き obj へのリンク (読取り側 `0x407a5e` の `and rcx,[rax-8]` からの推定。書込み側は未観測)。
+- 受入 4 (0x411a80 到達) **未達**: 停止点 `0x50138cf0`→`0x50138d06` (pool)。`0x5da06d` (`mov rax,[rax]`) は 1 回実行され、そのときの rcx (this) は 0。停止と this の対応は未確定。`0x407520` が `[blk+0]` を `0x867200`→`0x8c02c0` に書換える (`0x407553`) ことも確認。
+- 受入 5 (0x411bb8 の記録) **未達** (受入 4 が前提)。残件は子 issue に分割 (PR 本文の未解決表)。
+- 再現 (8eda24a9): `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000` (C)。
