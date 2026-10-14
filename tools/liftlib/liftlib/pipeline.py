@@ -90,8 +90,14 @@ def _repair_ll(cfg, raw_path, img, log, detect_only=False):
     t0 = time.time()
     text, brep = B.run_base(open(raw_path).read(), B.make_args())
     stats["base"] = {k: v for k, v in brep.items() if k in ("b1_fixed", "s1_stores", "a9_residual_constexpr", "fixups_add0", "dup_declares_removed")}
-    mod = IR.Module.parse(text)
     passes = cfg.get("passes", {})
+    if (passes.get("icall") or {}).get("blk_global"):
+        import json as _json
+        blk = _json.load(open(os.path.join(os.path.dirname(raw_path), cfg["name"] + ".icall.map.json")))["blk"]
+        text, nblk = ICALL.blk_global_text(text, blk)
+        stats["icall_blk_global"] = nblk
+        log.append("icall.blk_global: %d refs -> @__icall_blk (blk %#x)" % (nblk, blk))
+    mod = IR.Module.parse(text)
     names = set(cfg.get("funcs") or [f.name for f in mod.funcs()])
     rep = not detect_only
     # LIFTLIB-2: f2 を p1 より前に実行する (callee 相で入口 xmm 値 (%xmmK_bits 引数) を

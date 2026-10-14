@@ -45,3 +45,28 @@ def restore(raw_ll, map_path, workdir, log):
     out = os.path.splitext(raw_ll)[0] + ".restored.ll"
     log.append("icall.restore: " + _py("ir_icall_restore.py", "--ir", raw_ll, "--map", map_path, "--out", out).strip())
     return out
+
+
+BLK_GLOBAL = "@__icall_blk"
+BLK_GLOBAL_SIZE = 0x200
+
+
+def blk_global_text(text, blk):
+    """#1269: BLK (icall の固定 block, 既定 VA 0x184308000) への inttoptr 定数を module-local global への GEP に張り替える。
+    wasm32 では BLK VA が線形メモリ外へ切り詰められ load/store が trap するため。配置は wasm 内の global に任せる。
+    対象は blk ..< blk+BLK_GLOBAL_SIZE の inttoptr のみ。返値 (text, 置換数)"""
+    import re
+    n = [0]
+
+    def sub(m):
+        v = int(m.group(1))
+        if blk <= v < blk + BLK_GLOBAL_SIZE:
+            n[0] += 1
+            return "getelementptr inbounds i8, ptr %s, i64 %d" % (BLK_GLOBAL, v - blk)
+        return m.group(0)
+    text = re.sub(r"inttoptr i64 (\d+) to ptr", sub, text)
+    if n[0]:
+        decl = "%s = internal global [%d x i8] zeroinitializer, align 16\n\n" % (BLK_GLOBAL, BLK_GLOBAL_SIZE)
+        m = re.search(r"^(define|declare) ", text, flags=re.M)
+        text = text[:m.start()] + decl + text[m.start():] if m else text + "\n" + decl
+    return text, n[0]
