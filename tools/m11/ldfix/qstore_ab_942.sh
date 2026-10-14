@@ -8,7 +8,6 @@ set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(cd -- "$HERE/../../.." && pwd)"
 cd "$REPO"
-export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 source "$REPO/tools/shared/env.sh"
 PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
 RAW=tools/m11/work/boot_final3.ll

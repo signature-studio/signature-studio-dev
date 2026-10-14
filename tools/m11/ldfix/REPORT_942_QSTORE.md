@@ -14,7 +14,7 @@
 
 - commit `3525c2c4` (`tools/m11/ldfix/qstore_ab_942.sh` 追加。既存の ldfix.py・fix_ld108.py・qstore・stage4.sh・survey_stage4.mjs を呼ぶのみ)。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/qstore_ab_942.sh` → **111.7 秒・rc 0** (load 0.47 / 0.54 / 0.30 → 1.08 / 0.73 / 0.40)。n=1。
-- 素材: fl-win64・work-m11 (snapshot `boot_final3.ll`・`m11_image.bin`)・work-liftdiff。toolchain-emsdk は `/opt/emsdk` を使用。
+- 素材: fl-win64・work-m11 (snapshot `boot_final3.ll`・`m11_image.bin`)・work-liftdiff。toolchain-emsdk は [EMSDK] (`docs/REFERENCES.md` §4) を使用。
 
 | variant | IR の作り方 | stage4 threw (units_run) | survey ok | miss | trap | OOB | halt0 | raw から消えた trap |
 |---|---|---|---|---|---|---|---|---|
