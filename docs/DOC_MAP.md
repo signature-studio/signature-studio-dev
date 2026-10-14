@@ -368,7 +368,8 @@
 | `tools/targets/serum2/gui/REPORT_SR30.md` | ~100 | SR-30 (#2000): REPORT_SR28 の vtable 0x180a86b88 前提の訂正 (RTTI は SerumEditor の sub-object)。Splice 生成の直接呼出元と demo bit 読書 (0x1800c2b50 / 0x1800c6090) を列挙。選択 state 条件と間接経路は未達 (子 #2053〜#2055) |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
-| `tools/targets/massivex/REPORT_APPENDIX.md` | ~47 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017) |
+| `tools/targets/massivex/REPORT_APPENDIX.md` | ~248 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017) |
+| `tools/targets/massivex/REPORT_APPENDIX_2151.md` | ~69 | Massive X §12.12〜§12.14 (#1976・#2108・#2151 MX-31) の分割移動全文。§12.14 の `.pdata` 訂正は未確定 |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
