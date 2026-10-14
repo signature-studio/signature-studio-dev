@@ -321,6 +321,9 @@ int main(int argc, char** argv) {
     } else if (!strncmp(l, "PEEK ", 5)) {   /* PEEK <i:rva|a:off|h:off|hex> <n> */
       char tok[64]; int cnt = 0; if (sscanf(l + 5, "%63s %d", tok, &cnt) == 2) {
         u8* p = (u8*)(uintptr_t)ld_parse_val(tok); ld_ob_reset(); ld_hex(p, cnt); puts(ld_out); fflush(stdout); }
+    } else if (!strncmp(l, "POKE ", 5)) {   /* POKE <i:rva|a:off|h:off> <hex>: 状態中の任意位置へ直接書込み (#2718) */
+      char* sp = strchr(l + 5, ' ');
+      if (sp) { *sp = 0; int n = ld_unhex(sp + 1, (u8*)(uintptr_t)ld_parse_val(l + 5), 1 << 16); printf("{\"poke\":%d}\n", n); fflush(stdout); }
     } else if (!strcmp(l, "STATE")) {
       puts(ld_state_dump()); fflush(stdout);
     } else if (l[0] == 'S' && (!strncmp(l, "SIMG ", 5) || !strncmp(l, "SHEAP ", 6) || !strncmp(l, "SMODEL ", 7) || !strcmp(l, "SSNAP"))) {
