@@ -5,7 +5,8 @@
 
 同梱 pyc は magic 3531 (CPython 3.12 の bytecode) のため、Python 3.12 でしか命令を正しく読めない。
 出力: (1) `flr` を import する元 (2) `flr = ...` の定義 (3) `flr` に続く属性読取の件数
-(4) `flrack` に続く属性読取の件数 (5) `flrack.flr` の属性読取の件数。
+(4) `flrack` に続く属性読取の件数 (5) `flrack.flr` の属性読取の件数
+(6) 全 code object の `LOAD_ATTR flr`・`STORE_ATTR flr` の件数 (属性として flr を読む・書く箇所の総数)。
 """
 import collections
 import dis
@@ -31,6 +32,8 @@ def main():
     flr_def = []
     flr_attr = collections.Counter()
     flrack_attr = collections.Counter()
+    pyc_n = 0
+    attr_flr = collections.Counter()
     for path in sorted(glob.glob(os.path.join(base, "block*_DATA.bin"))):
         with open(path, "rb") as f:
             head = f.read()
@@ -39,11 +42,14 @@ def main():
         code = marshal.loads(head[16:])
         if not isinstance(code, types.CodeType):
             continue
+        pyc_n += 1
         name = os.path.basename(path)
         for c in walk(code):
             ins = list(dis.get_instructions(c))
             for i, x in enumerate(ins):
                 nxt = ins[i + 1] if i + 1 < len(ins) else None
+                if x.opname in ("LOAD_ATTR", "STORE_ATTR") and x.argval == "flr":
+                    attr_flr[x.opname] += 1
                 if x.opname == "IMPORT_FROM" and x.argval == "flr":
                     j = i - 1
                     while j >= 0 and ins[j].opname != "IMPORT_NAME":
@@ -69,6 +75,7 @@ def main():
     for k, n in flrack_attr.most_common():
         print(f"  {k}: {n}")
     print(f"# (5) flrack の属性として flr を読む箇所: {flrack_attr.get('flr', 0)} 件")
+    print(f"# (6) 全 code object (pyc {pyc_n} 件) の属性 flr: LOAD_ATTR {attr_flr['LOAD_ATTR']} 件・STORE_ATTR {attr_flr['STORE_ATTR']} 件")
 
 
 if __name__ == "__main__":
