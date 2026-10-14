@@ -3,7 +3,7 @@
 #
 #   bash tools/liftlib/liftlib_e2e.sh [--quick] [--fresh]
 #
-#   (a) OTT   : liftlib 側だけで m10_e2e 相当を再現。既定は auto f7,p1 (CAB-238: checks 7/0 + census 改善 junkHi ≤104 ゲート,
+#   (a) OTT   : liftlib 側だけで m10_e2e 相当を再現。既定は auto f2,f7,p1 (CAB-238: checks 7/0 + census 改善 junkHi ≤104 ゲート,
 #               出力 SHA は m10 参照と分離 = 修復由来の差分は正当)。旧既定 (修復無し = m10 chain 再現 + SHA 42/42 ゲート) は
 #               `python3 -m liftlib ott --auto none` で実行できる。
 #   (b) FA    : Fresh Air gain::GainDsp::process を RetDec → liftlib 修復 → wasm → 実機機械語と差分 (400 シナリオ bit-exact)

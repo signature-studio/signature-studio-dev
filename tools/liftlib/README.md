@@ -6,7 +6,7 @@ OTT (`tools/m5〜m10`)・Fresh Air (`targets/freshair/{ref,lift}`)・Kilohearts 
 pass と helper を 1 本に統合した (元 dir は無改変)。
 
 ```
-bash tools/liftlib/liftlib_e2e.sh            # 回帰 (OTT = auto f7,p1 既定 (checks 8/0 = param 0.0/0.1/0.9/1.0 sweep 付き) + 旧既定 --auto none + leaf spec。所要は REPORT_APPENDIX_A.md §12 参照): ユニット + FA 400/400 + KH 366/366 + OTT + SIMD 281 form + 注入 94/94 + OTT leaf native spec
+bash tools/liftlib/liftlib_e2e.sh            # 回帰 (OTT = auto f2,f7,p1 既定 (checks 8/0 = param 0.0/0.1/0.9/1.0 sweep 付き) + 旧既定 --auto none + leaf spec。所要は REPORT_APPENDIX_A.md §12 参照): ユニット + FA 400/400 + KH 366/366 + OTT + SIMD 281 form + 注入 94/94 + OTT leaf native spec
 bash tools/liftlib/liftlib_e2e.sh --quick    # 回帰のみ (FA/KH/OTT)
 bash tools/liftlib/liftlib_e2e.sh --fresh    # FA/KH を RetDec の lift から再生成 (全体で約 1 分)
 bash tools/liftlib/stdbuild_e2e.sh           # 標準ビルド設定 + 署名ガード (PERF-P1 / #155): 合成入力で全変種署名一致 + ネガコン (plugin バイナリ・RetDec 不要。数秒)
@@ -23,7 +23,7 @@ bash tools/liftlib/lowbase_e2e.sh            # lowbase 検証 (CAB-220): audit_v
 | `diagnose <cfg>` | pass ごとに無効化して再評価 (どの修復が必須か) + 未修復所見 |
 | `simd gen x.ll -o out.c [--canon y.ll]` | `__asm_*` 宣言から C helper 生成 (正規名化も) |
 | `simd test` / `simd report` | 生成 helper を実機 inline asm と bit 突合 / KH census の被覆 before→after |
-| `ott [--auto none\|f7\|p1\|f7,p1] [--lb-base N]` | OTT を liftlib 側だけで再現 (m10_e2e 相当)。**`--auto` 既定 = `f7,p1` (CAB-238)**: 汎用 F7 (ir9_outcopy 包含) + 語彙拡張 P1 を適用し, checks 7/0 + census 改善 (junkHi ≤104) をゲートにする。出力 SHA は修復由来で m10 参照と分離 (差分理由は REPORT_APPENDIX_A.md §12)。`--auto none` = 旧既定 (修復無し m10 chain 再現, 各段 IR 一致 + SHA 42/42 ゲート)。`--lb-base` で V-shift 先 newbase (=LB_BASE) を指定して低位 base・小 memory で最初から生成 (CAB-220, 例 `0x10000` = initial 24MiB / `0x1230000`。未指定は元 m10 chain と同一の 0x30000000) |
+| `ott [--auto none\|f7\|p1\|f7,p1] [--lb-base N]` | OTT を liftlib 側だけで再現 (m10_e2e 相当)。**`--auto` 既定 = `f2,f7,p1` (CAB-238・LIFTLIB-3)**: 汎用 F7 (ir9_outcopy 包含) + 語彙拡張 P1 を適用し, checks 7/0 + census 改善 (junkHi ≤104) をゲートにする。出力 SHA は修復由来で m10 参照と分離 (差分理由は REPORT_APPENDIX_A.md §12)。`--auto none` = 旧既定 (修復無し m10 chain 再現, 各段 IR 一致 + SHA 42/42 ゲート)。`--lb-base` で V-shift 先 newbase (=LB_BASE) を指定して低位 base・小 memory で最初から生成 (CAB-220, 例 `0x10000` = initial 24MiB / `0x1230000`。未指定は元 m10 chain と同一の 0x30000000) |
 | `leafspec targets/ott_leaf.json` | OTT leaf closure を base→f2→P1→leafabi→emcc で構築し, 実機機械語と乱数 scenario で bit 突合 (CAB-239。xmm0 戻りは IR ret 差替で搬送) |
 | `inject-eval` | パターン注入による検出器の検出力・偽陽性評価 |
 | `specgen <image> <va>` | 機械語から harness spec の雛形を生成 |
