@@ -214,7 +214,7 @@ static void *thread_fn(void *arg) {
     fla_go();
     __atomic_store_n(&A.ready, 1, __ATOMIC_SEQ_CST);
     wake32(&A.ready);
-    /* 目標充填 T の動的調整: (1) worklet が観測した最長バースト + 25% + B を下限に (2) underrun 毎に +B (上限 ring-2B)。
+    /* 目標充填 T の動的調整: (1) worklet が観測した最長バースト × FLA_BURST_PCT% + B を下限に (2) underrun 毎に +B (上限 ring-2B)。
      * (3) underrun が FLASIO_SHRINK_STABLE_MS 続いたら +B を 1 段ずつ戻す (下限 (1) は下げない = 拡張とのヒステリシス)。
      * 変更時はホストへ kAsioLatenciesChanged (既定 OFF = A.notify_lat)。 */
     uint32_t T = A.depth * A.B, T0 = T, esc = 0, last_u = 0;
@@ -222,7 +222,7 @@ static void *thread_fn(void *arg) {
     double quiet_t0 = emscripten_get_now();
     while (!A.stop) {
         uint32_t burst = LD(c->burst_obs);
-        uint32_t need = (burst + burst / 4 + A.B + A.B - 1) / A.B * A.B;
+        uint32_t need = (burst * FLA_BURST_PCT / 100 + A.B + A.B - 1) / A.B * A.B;
         uint32_t u = LD(c->underruns);
         double now = emscripten_get_now();
         if (u != last_u) { esc += A.B; last_u = u; quiet_t0 = now; }
