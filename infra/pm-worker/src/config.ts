@@ -21,6 +21,8 @@ export interface Env {
   WATCHDOG_INTERVAL_S?: string;
   RECONCILE_INTERVAL_S?: string;
   NO_PR_COOLDOWN_H?: string;
+  // oc:stuck の open PR がこれを超えたら launch を止める (既定 40)。
+  STUCK_HIGH?: string;
 }
 
 export interface Config {
@@ -34,6 +36,7 @@ export interface Config {
   watchdogIntervalS: number;
   reconcileIntervalS: number;
   noPrCooldownH: number;
+  stuckHigh: number;
   manualDeps: Record<string, number[]>;
 }
 
@@ -56,6 +59,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     watchdogIntervalS: num(env.WATCHDOG_INTERVAL_S, 300),
     reconcileIntervalS: num(env.RECONCILE_INTERVAL_S, 300),
     noPrCooldownH: num(env.NO_PR_COOLDOWN_H, 3),
+    stuckHigh: num(env.STUCK_HIGH, 40),
     manualDeps,
   };
 }

@@ -30,6 +30,8 @@ export interface PrState {
   ref: string;
   title: string;
   body: string;
+  // ラベル名。oc:stuck の除外に使う (古い保存値には無いので参照側で ?? [] とする)
+  labels: string[];
   updatedAt: string;
 }
 export interface RunState {
@@ -175,6 +177,7 @@ function applyPr(s: PmState, p: Json): PmState {
     ref: pr.head?.ref ?? "",
     title: pr.title ?? "",
     body: pr.state === "closed" ? "" : (pr.body ?? "").slice(0, 3000),
+    labels: Array.isArray(pr.labels) ? pr.labels.map((l: any) => String(l?.name ?? "")) : [],
     updatedAt: pr.updated_at,
   };
   return { ...s, prs: { ...s.prs, [k]: next } };

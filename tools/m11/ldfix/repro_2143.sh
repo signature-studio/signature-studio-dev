@@ -83,11 +83,30 @@ neg() {
   audit f4off "$OUT/2143_f4off.ll"
 }
 
+# #2201 (LD-85): 名前付き stack_var の read を site にする監査 (--named)。F4 有無の差 = F4 修復の検出数。
+named() {
+  [ -f "$OUT/2143_f4on.ll" ] && [ -f "$OUT/2143_f4off.ll" ] || { echo "named: 先に f4 を実行すること" >&2; exit 1; }
+  time python3 "$HERE/audit_undefload_dest.py" --named "$PE" "$OUT/named_f4on.json" "$OUT/2143_f4on.ll"
+  time python3 "$HERE/audit_undefload_dest.py" --named "$PE" "$OUT/named_f4off.json" "$OUT/2143_f4off.ll"
+  python3 - "$OUT" <<'PY'
+import json, sys
+E = sys.argv[1]
+on = json.load(open(E + '/named_f4on.json')); off = json.load(open(E + '/named_f4off.json'))
+key = lambda s: (s['fn'], s['load'], s['sv'], s['off'])
+ko = {key(s) for s in on['sites']}; kf = {key(s) for s in off['sites']}
+print('named on', len(ko), 'off', len(kf), 'diff(on-off)', len(ko - kf), 'diff(off-on)', len(kf - ko))
+for t in ['132e8e0', '44d1c0', '69c360', '977e40', '865020']:
+    print('named', t, 'on', sum(1 for k in ko if k[0] == t), 'off', sum(1 for k in kf if k[0] == t))
+print('named diff functions', sorted({k[0] for k in ko - kf}))
+PY
+}
+
 case "$step" in
   audit) audit norm0 "${NORM_IN[@]}" ;;
   strip) strip ;;
   f4) f4 ;;
   neg) neg ;;
-  all) audit norm0 "${NORM_IN[@]}"; strip; f4; neg ;;
-  *) echo "usage: $0 [all|audit|strip|f4|neg]" >&2; exit 2 ;;
+  named) named ;;
+  all) audit norm0 "${NORM_IN[@]}"; strip; f4; neg; named ;;
+  *) echo "usage: $0 [all|audit|strip|f4|neg|named]" >&2; exit 2 ;;
 esac

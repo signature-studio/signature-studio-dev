@@ -37,16 +37,30 @@ test('playlist stride follows the measured FL version table', () => {
   assert.equal(playlistStride(new Uint8Array(0), v('24.2.99.4701')), 60);
 });
 
-test('VST wrapper chunk list parses (kind 10, name/vendor)', () => {
+test('VST wrapper chunk list parses (version 8, class 10 record, name/vendor)', () => {
   const rec = (id: number, s: string): number[] => {
     const b = [...Buffer.from(s)];
     return [id, 0, 0, 0, b.length, 0, 0, 0, 0, 0, 0, 0, ...b];
   };
-  const d = Uint8Array.from([10, 0, 0, 0, ...rec(50, 'x'), ...rec(54, 'OTT'), ...rec(56, 'Xfer')]);
+  const d = Uint8Array.from([8, 0, 0, 0, 50, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, 0, ...rec(54, 'OTT'), ...rec(56, 'Xfer')]);
   const v = parseWrapperData(d);
+  assert.equal(v?.version, 8);
+  assert.equal(v?.plugclass, 10);
   assert.equal(v?.name, 'OTT');
   assert.equal(v?.vendor, 'Xfer');
+  assert.equal(v?.vstVersion, 1);
   assert.equal(parseWrapperData(Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])), undefined);
+  assert.equal(parseWrapperData(Uint8Array.from([13, 0, 0, 0, ...rec(54, 'OTT')])), undefined);
+});
+
+test('wrapper chunk: record 50 absent keeps class 0; truncated record is rejected', () => {
+  const rec = (id: number, s: string): number[] => {
+    const b = [...Buffer.from(s)];
+    return [id, 0, 0, 0, b.length, 0, 0, 0, 0, 0, 0, 0, ...b];
+  };
+  const v = parseWrapperData(Uint8Array.from([8, 0, 0, 0, ...rec(54, 'OTT')]));
+  assert.equal(v?.plugclass, 0);
+  assert.equal(parseWrapperData(Uint8Array.from([8, 0, 0, 0, 54, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 1])), undefined);
 });
 
 test('typed round trip + summary on a synthetic project', () => {
