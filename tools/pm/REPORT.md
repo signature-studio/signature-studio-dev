@@ -243,3 +243,9 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - ネガコンの確認: 間隔を 0 にした一時複製では c1・c2・f2 が、上限と fresh 判定を壊した複製では d2・d3・g2 が FAIL (いずれも 17 passed, 3 failed)。
 - live (読み取りのみの `GET /status`、15:18Z): `needs_pm`・`stuck`・`stuck_age_max_min` が返らない。`pm_wake.sh` は `result=status-failed reason=parse`・exit 2 で、送信は 0 件。本番 Worker は #2335 の変更を含まない版と見られる `[未確認: デプロイ版]`。再デプロイ後に needs_pm 経路が有効になる。
 - 差分 (測定 commit から HEAD まで・コード範囲): `git diff edb3ab39 HEAD -- tools/pm/pm_wake.sh tools/pm/test_pm_wake.sh tools/pm/systemd` の出力は空 (差分 0)。
+
+## 15. heartbeat の監査文面と空ファイル検査 (#2607・指示 145)
+
+既知類型との関係: 該当なし (PM 運用の記録)。測定 commit `3f624789` (コードを変えた最後の commit)、測定時刻 2026-10-14T16:09Z。
+- 偽の opencode・間隔 1 秒・`timeout 4`: 文面ファイルあり 送信 3 回 (監査文面 3 回・既定 0 回)、未設定 送信 3 回 (既定 3 回)、存在しない・空・空白のみは終了 1・送信 0。初回送信は間隔 2 秒で 2.01 秒後。`bash tools/pm/test_pm_wake.sh` 20 passed。
+- 差分 (測定 commit から HEAD まで・コード範囲): `git diff 3f624789 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は空 (差分 0)。
