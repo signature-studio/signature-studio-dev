@@ -57,20 +57,20 @@
 - `provider/fl_engine.c`: 同じ。`NARGS(0,0)` / `NARGS(1,2)` と `A_INT`。
 - 効果 (0x12df090・0x124c020) は API から観測できないため状態を持たない。P と gate は真の定数とし、-2 の経路は到達させない (仮置き)。
 - `tests/general_diff.mjs`: 呼出し 3 件と引数違い・型違い 4 件を追加 (計 16 件。既存 9 件)。
-- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349 (PY-125 の PR 作成時の base 上)。main 取り込み後 (merge commit `6976c595`) は main の `pe100` (2 関数) を含むため、期待値は 実装 86→88、未実装 349→347。
+- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349 (PY-125 の PR 作成時の base 上)。main 取り込み後は main 側の `pe100` (2 関数)・`pe119` (6 関数) を含むため、期待値は 実装 92→94、未実装 343→341 (merge commit `e8604912`)。
 
 ## 検証
 
-測定 commit: `6976c595` (コードを変えた最後の commit。main を取り込んだ merge。`tests/provider_check.mjs` の期待値を 88 / 347 に直した)。
-環境: runner 4 core、測定開始時の load average 1.97 (`uptime` 21:35:30)。素材: `fl-win64` ([WIN64]) を展開し、`block00031_PE.bin`・`block25159/24429/24430/24618_DATA.bin` を使う。emsdk は [EMSDK] の 6.0.12。
+測定 commit: `e8604912` (コードを変えた最後の commit。main (`718e90fb`) を取り込んだ merge。`tests/provider_check.mjs` の期待値を 94 / 341 に直した)。
+環境: runner 4 core、測定開始時の load average 0.32 (`uptime` 21:37:34)。素材: `fl-win64` ([WIN64]) を展開し、`block00031_PE.bin`・`block25159/24429/24430/24618_DATA.bin` を使う。emsdk は [EMSDK] の 6.0.12。
 
-前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 27 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.1 秒)・`bash provider/build.sh` (rc 0、1.6 秒。`gen_provider.py --check-handlers` でハンドラ 88)。
+前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 27 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.1 秒) は `94b6c6bd` 上で実施。以後 `src/`・`build_flpy.sh`・`analysis/flapi` は変えていない (`git diff 94b6c6bd e8604912` で空)。`bash provider/build.sh` は `e8604912` 上で実施 (rc 0、`gen_provider.py --check-handlers` でハンドラ 94)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.047 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 88 / 未実装 347 / MCP 静的 60) (rc 0) | 0.366 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 2.065 秒 |
+| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.049 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 94 / 未実装 341 / MCP 静的 60) (rc 0) | 0.361 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 2.126 秒 |
 
 既定 (JS mock) の `node tests/all_tools.mjs` も 48/48 ok、host_calls 37,425、callback 往復 true (rc 0)。
 
@@ -79,7 +79,7 @@
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 6976c595 HEAD -- tools/python ':!*.md'
+$ git diff e8604912 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
