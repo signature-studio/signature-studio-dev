@@ -13,7 +13,7 @@
 
 - 測定 commit: `09f6668b` (コードを変えた最後の commit。コメント 2 行の変更のみで、動作の変更は無い)。
 - コード範囲 `tools/python/{host,provider,tests}` の `git diff 09f6668b HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
-- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に全展開 (7.5 秒)。`toolchain-emsdk` は `/opt/emsdk` (`$ARTIFACTS_DIR` で実在を確認)。`fetch_inputs.sh` rc 0。`build_cpython_wasm.sh` rc 0 (2 分 44 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (3.8 秒)。追跡ファイルの変更は 0 件。
+- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に全展開 (7.5 秒)。`toolchain-emsdk` は `[EMSDK]` (`$ARTIFACTS_DIR` で実在を確認)。`fetch_inputs.sh` rc 0。`build_cpython_wasm.sh` rc 0 (2 分 44 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (3.8 秒)。追跡ファイルの変更は 0 件。
 - 環境: runner 4 core、node v22.23.3。load average (測定時) 2.33 / 1.37 / 0.58。
 - 旧測定 (`06df07f5`・main 取り込み前の表) は根拠にしない。Git 履歴に残る (`git show 30b77bc0:tools/python/REPORT_PY101.md`)。main (`f82768d9`) の取り込みは `44defabf` (merge)。競合は `tests/provider_check.mjs` の集合定義と件数だけ。
 
@@ -90,5 +90,5 @@
 - 素材展開: `tar --zstd -xf <fl-win64>.tar.zst -C <展開先>` (`FL_WIN64_DIR=<展開先>`)。PE は `extracted/block00031_PE.bin`。
 - PE 書込み元の列挙: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_grid_writers.py` (約 17 秒)。
 - 逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py d5bc10 60` ほか、`12d3ff0`・`12d3e20`・`d5b360`・`d5b420`・`ff63f0`・`ff5aa0`。
-- flpy の前提: `fetch_inputs.sh` → `build_cpython_wasm.sh` → `FLPY_SKIP_TABLE=1 build_flpy.sh` (`EMSDK_DIR=/opt/emsdk`)。
+- flpy の前提: `fetch_inputs.sh` → `build_cpython_wasm.sh` → `FLPY_SKIP_TABLE=1 build_flpy.sh` (`EMSDK_DIR` は `[EMSDK]`)。
 - 検査: `node tests/channels_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (前提: `provider/build.sh` 済み)。
