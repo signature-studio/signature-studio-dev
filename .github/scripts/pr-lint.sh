@@ -61,8 +61,8 @@ if [ "$sync_only" = 1 ]; then
 elif grep -qE '(^|[^A-Za-z])Closes #[0-9]+' "$BODY"; then
   while IFS=: read -r n _; do
     report "$BODY" "$n" "closes-unmet" "Closes #N なのに未達の受入条件がある (Closes を外すか、未達を子 issue に移して本文から外す)"
-  done < <(grep -nE '^[[:space:]]*[-*] \[ \]|\|[[:space:]]*(\[ \]|未達)[[:space:]]*\|' "$BODY" || true)
-elif grep -qE '(^|[^A-Za-z])Refs #[0-9]+' "$BODY" && ! grep -q '理由' "$BODY"; then
+  done < <(grep -nE '^[[:space:]]*[-*] \[ \]|^[[:space:]]*\|.*(未達|\[ \])' "$BODY" || true)
+elif grep -qE '(^|[^A-Za-z])Refs #[0-9]+' "$BODY" && ! grep -qE '^[[:space:]]*理由(:|：)' "$BODY"; then
   report "$BODY" 1 "refs-reason" "Refs #N のみで merge するなら「理由:」行が必要"
 fi
 

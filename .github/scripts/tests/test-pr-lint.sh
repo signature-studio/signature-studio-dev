@@ -52,6 +52,16 @@ echo "y" >> "$R/src/a.txt"; commit_case v-closes
 lint "$(body 'Closes #2250\n\n| 受入 | 結果 |\n|---|---|\n| 1 | 未達 |\n')"
 { [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "#2250 型: Closes なのに未達 [ ] を検出" || ng "#2250 型: Closes なのに未達 [ ] を検出 (rc=$RC)"
 
+new_case v-closes-cell
+echo "z" >> "$R/src/a.txt"; commit_case v-closes-cell
+lint "$(body 'Closes #2250\n\n| 受入 | 結果 |\n|---|---|\n| 1 | 未達 (子 issue #2331 へ) |\n')"
+{ [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "表セル 未達 (…) を検出" || ng "表セル 未達 (…) を検出 (rc=$RC)"
+
+new_case v-refs-prose
+echo "w" >> "$R/src/a.txt"; commit_case v-refs-prose
+lint "$(body 'Refs #2300\n\n背景として理由を述べる。\n')"
+{ [ "$RC" = 1 ] && has_rule refs-reason; } && ok "Refs #N: 散文の 理由 だけでは合格にしない" || ng "Refs #N: 散文の 理由 だけでは合格にしない (rc=$RC)"
+
 new_case v-report
 echo "line 251" >> "$R/tools/x/REPORT.md"; commit_case v-report
 lint "$(body 'Closes #1\n')"
