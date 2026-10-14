@@ -29,8 +29,16 @@ if [ ! -f "$W/obj/.sx_done" ]; then
 fi
 
 CCF="-O0 -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1"
+CAP_MB="${FLE_CC_RSS_CAP_MB:-11000}"
 cc() { local src="$1" obj="$2"; shift 2
-  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then emcc -c "$src" -o "$obj" "$@"; fi; }
+  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+    local rc=0 log="$W/rss_cc_$(basename "$obj" .o).log"
+    python3 "$HERE/rss_cap.py" --cap-mb "$CAP_MB" --log "$log" -- emcc -c "$src" -o "$obj" "$@" || rc=$?
+    if [ "$rc" = 143 ] && grep -q 'CAP EXCEEDED' "$log"; then
+      echo "[build] clang RSS cap 超過: $src peak=$(grep -o 'peak=[0-9]*' "$log" | tail -1 | cut -d= -f2)MB (cap ${CAP_MB}MB, log $log)"; exit 1
+    fi
+    [ "$rc" = 0 ] || exit "$rc"
+  fi; }
 CPUDEFS="$(cat "$W/fle_link_defs.txt")"
 BRIDGE="$W/fle_imp_bridge.c"; NOSX=0
 [ "$V" = nosx ] && { BRIDGE="$W/nosx/fle_imp_bridge.c"; NOSX=1; }

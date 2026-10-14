@@ -72,9 +72,20 @@ export interface Signal {
   labelAt?: string;
   // reviews を REST で一度取得した
   revChecked?: boolean;
+  // 実装 run (issue_comment) が PR も出さずに打ち切られた (cancelled / failure / timed_out) 連続回数。KILLED_STOP_AT 回で自動の再着手を止める。
+  // at はその run の完了時刻。PR・close・PM/人のコメント・成功した run で消す。
+  kill?: { count: number; at: string };
+  // 最後に数えた run の id。kill とは別に持ち、連続を消しても残す (完了済みの run の配送が再送・順不同で届いても、同じ run を数え直さない)。
+  killRun?: number;
   // 最新の oc-pm-intent: relaunch (issue コメント)。書き手が実装 App かどうか (bot) と、マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
   relaunch?: { at: string; id?: number; bot: boolean; issue: string; arts: string; focus: string | null };
 }
+
+// 打ち切られた run を連続でこの回数数えた issue は、自動で再着手しない (oc:no-pr の reason=killed 相当)。PM agent (oc-pm の no_pr) の判断に回す。
+export const KILLED_STOP_AT = 2;
+const KILL_CONCLUSIONS = ["cancelled", "failure", "timed_out"];
+// record-run-outcome.sh の『明示的な終了状態』(oc:stuck / needs-user-input / blocked) に、Worker の pm-apply (#2423 で user に置く issue) を足したもの。打ち切りを数えない。
+const EXPLICIT_LABELS = ["oc:stuck", "needs-user-input", "blocked", "pm-apply"];
 export interface RunState {
   id: number;
   event: string;
@@ -204,6 +215,7 @@ function applyIssue(s: PmState, p: Json): PmState {
   };
   let out: PmState = { ...s, issues: { ...s.issues, [k]: next } };
   // needs-user-input が付いた時刻。labeled の配送だけが時刻を持つ (REST は engine が events から補う)。外れたら消す。
+  if (closed) out = setSig(out, k, { kill: undefined });
   if (closed || !next.labels.includes(NEEDS_USER_LABEL)) out = setSig(out, k, { labelAt: undefined });
   else if (p.action === "labeled" && p.label?.name === NEEDS_USER_LABEL) out = setSig(out, k, { labelAt: i.updated_at });
   return out;
@@ -320,7 +332,12 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
     patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: impl, ...rel };
   }
   // 人の回答は、非 bot かつ MEMBER / OWNER / COLLABORATOR のコメントだけ (第三者のコメントで PM を起こさない)。
-  if (login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association) && later(cur?.userAt)) patch.userAt = at;
+  const human = !!login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association);
+  if (human && later(cur?.userAt)) patch.userAt = at;
+  // 打ち切りの連続は、その後の PM の応答 (PM のログインか PM のマーカー付き bot コメント) か人の回答で解く。`/oc` の投稿は着手であって応答ではない
+  // (Worker 自身の再投稿が解除にならないように。PM のログインは Worker の PM App を含む)。
+  const answered = !/^\/oc\b/m.test(body) && (pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body)) || human);
+  if (answered && cur?.kill && Date.parse(at) > Date.parse(cur.kill.at)) patch.kill = undefined;
   return setSig(s, k, patch);
 }
 
@@ -431,6 +448,65 @@ function applyRun(s: PmState, p: Json): PmState {
   return { ...s, runs: { ...s.runs, [k]: next } };
 }
 
+// issue n を指す open PR があるか (ブランチ名 <n>-... か本文の Closes / Refs / Fixes / Resolves #n。record-run-outcome.sh と同じ判定・同じ語の集合)。
+const PR_MENTION_RE = /\b(?:closes|refs|fixes|resolves) #(\d+)/gi;
+function prIssues(pr: { ref?: string; body?: string }): number[] {
+  const out = new Set<number>();
+  const m = /^(\d+)-/.exec(pr.ref ?? "");
+  if (m) out.add(Number(m[1]));
+  for (const x of (pr.body ?? "").matchAll(PR_MENTION_RE)) out.add(Number(x[1]));
+  return [...out];
+}
+export function hasOpenPr(s: PmState, n: number): boolean {
+  return Object.values(s.prs).some((p) => p.state === "open" && prIssues(p).includes(n));
+}
+// open な PR に加えて、since 以降に merge された PR も着手の証拠にする (run 中に open から merge まで済んだ PR は open の一覧に出ない。record-run-outcome.sh と同じ)。
+// closed の PR は本文を持たない (applyPr) ので、merge 済みの PR はブランチ名 N-... だけで当てる。
+function hasPrSince(s: PmState, n: number, since: string | undefined): boolean {
+  const t = Date.parse(since ?? "");
+  return Object.values(s.prs).some(
+    (p) => prIssues(p).includes(n) && (p.state === "open" || (p.merged && Number.isFinite(t) && Date.parse(p.mergedAt ?? "") >= t)),
+  );
+}
+
+// PR が出たら、その issue の打ち切りの連続を消す (着手済みになった)。
+function clearKillByPr(s: PmState, pr: Json | undefined): PmState {
+  if (!pr || pr.state !== "open") return s;
+  let out = s;
+  for (const n of prIssues({ ref: pr.head?.ref, body: pr.body })) out = s.sig[String(n)]?.kill ? setSig(out, String(n), { kill: undefined }) : out;
+  return out;
+}
+
+// 完了した実装 run (issue_comment) が PR も出さずに打ち切られた回数を、issue ごとに数える (record-run-outcome.sh の always() step は
+// runner の shutdown で走らないので、oc:no-pr は付かない。conclusion は workflow_run の配送で分かる)。
+//  - 数える: conclusion が cancelled / failure / timed_out。題名が一意な open issue に当たり、PR (open か run の開始以降に merge) も明示的な終了状態も無い。
+//  - 数えない: 後続の run がある (concurrency で置換された待機中の run。コメントで起きて skipped になった run は後続に数えない)。
+//  - 成功した run は連続を断つ。skipped などの run は断たない (agent 自身のコメントでも issue_comment の run が起きる)。
+// 同じ run の再配送と順不同の配送は、最後に数えた run の id (killRun。連続の解除では消さない) より大きい run だけを数えて重ねない。
+function applyKill(prev: PmState, next: PmState, w: Json | undefined): PmState {
+  if (next === prev || !w) return next;
+  const run = next.runs[String(w.id)];
+  if (!run || run.event !== "issue_comment" || run.status !== "completed") return next;
+  // conclusion が分かっている完了済みの run の再配送は数えない (reconcile が『一覧に無い』ことから付ける conclusion=unknown は、本当の完了の配送で上書きする)
+  const was = prev.runs[String(w.id)];
+  if (was?.status === "completed" && was.conclusion !== "unknown") return next;
+  const conclusion = run.conclusion ?? "";
+  if (conclusion !== "success" && !KILL_CONCLUSIONS.includes(conclusion)) return next;
+  const title = run.title.trim();
+  const hits = Object.values(next.issues).filter((i) => i.state === "open" && i.title.trim() === title);
+  if (hits.length !== 1) return next;
+  const issue = hits[0];
+  const k = String(issue.number);
+  const cur = next.sig[k]?.kill;
+  const counted = next.sig[k]?.killRun;
+  if (counted !== undefined && run.id <= counted) return next;
+  if (conclusion === "success") return cur ? setSig(next, k, { kill: undefined }) : next;
+  if (Object.values(next.runs).some((r) => r.id > run.id && r.event === "issue_comment" && r.title.trim() === title && !(r.status === "completed" && r.conclusion === "skipped"))) return next;
+  if (issue.labels.some((l) => EXPLICIT_LABELS.includes(l)) || issue.blockedByCount > 0) return next;
+  if (hasPrSince(next, issue.number, run.createdAt)) return cur ? setSig(next, k, { kill: undefined }) : next;
+  return setSig(next, k, { kill: { count: (cur?.count ?? 0) + 1, at: run.updatedAt }, killRun: run.id });
+}
+
 export function applyEvent(
   s: PmState,
   event: WebhookEvent,
@@ -447,11 +523,11 @@ export function applyEvent(
     case "issue_dependencies":
       return applyDependencies(s, payload);
     case "pull_request":
-      return applyPr(s, payload);
+      return clearKillByPr(applyPr(s, payload), payload.pull_request);
     case "pull_request_review":
-      return applyReview(s, payload, reviewerLogin);
+      return clearKillByPr(applyReview(s, payload, reviewerLogin), payload.pull_request);
     case "workflow_run":
-      return applyRun(s, payload);
+      return applyKill(s, applyRun(s, payload), payload.workflow_run);
   }
 }
 
