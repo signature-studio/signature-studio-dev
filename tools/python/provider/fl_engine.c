@@ -213,9 +213,9 @@ FL_H(playlist, getLiveLoopMode) { PL(0); return fl_ret_i(c, p->loop); }
 FL_H(playlist, getLiveTriggerMode) { PL(0); return fl_ret_i(c, p->trig_mode); }
 FL_H(playlist, getLivePosSnap) { PL(0); return fl_ret_i(c, p->pos_snap); }
 FL_H(playlist, getLiveTrigSnap) { PL(0); return fl_ret_i(c, p->trig_snap); }
-/* 表 (gen/fl_table.c) の引数数は 1 (sig)。binary の value 引数 ('i|i'・REPORT_PY61 §3) は表に無く dispatch が 2 個目を拒否するため、
- * 到達するのは value=-1 (反転) の経路だけ。準備判定 (-2) は未モデル (常に準備済み) */
-FL_H(playlist, muteTrackLock) { PL(0); p->lock = !p->lock; return fl_ret_none(c); }
+/* 表 (gen/fl_table.c・main #2927 で kwsig 'i|i' に合わせ value 引数が入った)。REPORT_PY61 §3 確定: value -1 (省略を含む) は反転、それ以外は下位 1 byte を lock に書く。
+ * 準備判定 (-2) は未モデル (常に準備済み) */
+FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == -1 ? !p->lock : (uint8_t)v; return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }

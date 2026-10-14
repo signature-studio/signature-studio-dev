@@ -35,7 +35,7 @@ const seq = [
   ["playlist.getLivePosSnap", [2]],
   ["playlist.getLiveTrigSnap", [3]],
   ["playlist.getLiveLoopMode", [-1]],
-  // muteTrackLock (表の引数数 1): 1 個呼びは反転。2 個目 (value) は表に無いため両者とも code 5
+  // muteTrackLock (表の引数数 1〜2・main #2927): 1 個呼びと value -1 は反転。value 0/1 は設定 (下位 1 byte)。3 個は code 5 (REPORT_PY61 §3)
   ["playlist.muteTrackLock", [1]],
   ["playlist.isTrackMuteLock", [1]],
   ["playlist.muteTrackLock", [1]],

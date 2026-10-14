@@ -157,8 +157,8 @@ export function createMockEngine() {
     "playlist.getLiveTriggerMode": (...a) => { arity(a, 1, 1); return pl(a[0]).trigMode; },
     "playlist.getLivePosSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).posSnap; },
     "playlist.getLiveTrigSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).trigSnap; },
-    // 表の引数数は 1 (C と同一・value 引数は表に無く 2 個目は code 5)。反転のみ。準備判定 (-2) は未モデル
-    "playlist.muteTrackLock": (...a) => { arity(a, 1, 1); const t = pl(a[0]); t.lock = t.lock ? 0 : 1; },
+    // 表の引数数は 1〜2 (C と同一・main #2927)。value -1 (省略を含む) は反転、それ以外は下位 1 byte を設定 (REPORT_PY61 §3)。準備判定 (-2) は未モデル
+    "playlist.muteTrackLock": (...a) => { arity(a, 1, 2); const t = pl(a[0]); const v = argI(a, 1, -1); t.lock = v === -1 ? (t.lock ? 0 : 1) : v & 0xff; },
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
