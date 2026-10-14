@@ -66,8 +66,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 FL Studio が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` に応答するかの実機観測 (§2-3)。`fl-win64` 本体 (`[0]`) は 7z で開けず未確認 | `S2HOST_WRAPPER_QI` の既定化判断 (現状は既定無変更) | #256 (既存の残件。本 issue の受入は SDK 記述で充足) |
-| 書込関数 `0xacf70` の上位呼出連鎖と、関数 `0x4894c0` の所属 class | writer の完全な特定 | #256 (`REPORT_SR1c.md` §5 の残件: 全スレッド・wine watchpoint) |
+| 実 FL Studio が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` に応答するかの実機観測 (§2-3)。`fl-win64` 本体 (`[0]`) は 7z で開けず未確認 | `S2HOST_WRAPPER_QI` の既定化判断 (現状は既定無変更) | #255 (既存の残件。本 issue の受入は SDK 記述で充足) |
+| 書込関数 `0xacf70` の上位呼出連鎖と、関数 `0x4894c0` の所属 class | writer の完全な特定 | #255 (`REPORT_SR1c.md` §5 の残件: 全スレッド・wine watchpoint。旧 #256 は CLOSED のため受け先を #255 とする) |
 
 ## 5. 再現
 
@@ -127,8 +127,8 @@ negative control (copy of block00005_PE.bin with IIDs appended, one order at a t
 |---|---|---|
 | 312 件 (前回記録) と 313 件 (本 run) の差 1 件の出所 | 静的観測の母集団の記録誤り。IID 0 件の結論には影響しない (313 件でも 0 件) | 本 PR で訂正済み。出所の追跡は不要 |
 | `0x4894c0` の所属 class と `0xacf70` の上位呼出連鎖 | #255 受入 #3 の controller 側判定 | 解決済み (§7-1・§7-2)。起票なし |
-| `IPlugInterfaceSupport` 登録箇所の静的確認 | 一般 host の QI 応答の根拠 | §7-5 で静的確認 (IID 定数 0 件)。登録呼出箇所の直接特定は未実施 | #1759 (実行時観測と併せて) |
-| 実 FL Studio の wrapper IID 実行時応答 | `S2HOST_WRAPPER_QI` 既定化の最終判断 | #256 (既存) |
+| `IPlugInterfaceSupport` 登録箇所の静的確認 | 一般 host の QI 応答の根拠 | §7-5 で静的確認 (IID 定数 0 件)。登録呼出箇所の直接特定は未実施 | #255 (実行時観測と併せて。旧 #1759 は CLOSED) |
+| 実 FL Studio の wrapper IID 実行時応答 | `S2HOST_WRAPPER_QI` 既定化の最終判断 | #255 (既存。旧 #256 は CLOSED) |
 | e2e の再測定 (load average・並列数付き) | 本 run の 62/62 は前回 run (899e4249) の記録のみ | 次回の serum2 作業時 (素材 `plugins-serum2` が必要) |
 
 ### 6-6. 再現
@@ -190,12 +190,12 @@ python3 tools/targets/serum2/host/fl_pe_iid_scan.py <dir>/extracted <dir>/extrac
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 FL Studio (fl-win64) の host が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` に応答するかの実行時観測 | controller gate (+0xdc) が 1 に到達する条件。`S2HOST_WRAPPER_QI` の既定化判断 | #1759 (SR-26、既存の残件) |
+| 実 FL Studio (fl-win64) の host が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` に応答するかの実行時観測 | controller gate (+0xdc) が 1 に到達する条件。`S2HOST_WRAPPER_QI` の既定化判断 | #255 (旧 SR-26 #1759 は CLOSED のため受け先を #255 とする) |
 | 0x4894c0 (MenuData 系の登録補助) の呼出目的・グローバル配列の用途 | 本 issue の範囲外 (writer 連鎖と無関係と確認済み) | 起票せず (必要なら SR-3 の lift 時に扱う) |
-| thunk `0xb4ea0` 経由の連鎖は静的 (tail jump) 確認のみ。実行時の thunk 経由の厳密な確認は unwind の範囲外 | 連鎖の厳密性 (thunk を経由することは `sr1c_callers.py` の静的結果と一致) | #256 (SR-1c) の残件に含める |
+| thunk `0xb4ea0` 経由の連鎖は静的 (tail jump) 確認のみ。実行時の thunk 経由の厳密な確認は unwind の範囲外 | 連鎖の厳密性 (thunk を経由することは `sr1c_callers.py` の静的結果と一致) | #255 (旧 SR-1c #256 は CLOSED のため受け先を #255 とする) |
 
 ### 7-5. IPlugInterfaceSupport 登録箇所の静的確認 (§6-2 の繰り延べの解消)
 
 - 一般 host が wrapper IID に応答するには、`IPlugInterfaceSupport` にその IID を登録する必要がある。登録時は IID の 16 byte 定数を渡すため、定数 (LE / BE) が PE 内に存在することが前提になる。
 - §6-1 の走査で、`fl-win64` の PE 313 件に両 IID の定数は **0 件** (negative control で検索器が LE / BE 両方を検出できることを確認済み)。よって FL 本体に当該 IID を登録する静的な根拠は見つからない。
-- **限界**: 定数を分割・動的生成する実装は静的走査で拾えない。登録呼出箇所そのものは特定していない。実行時の応答は未観測 (上の未解決表の 1 行目。起票先は #1759)。
+- **限界**: 定数を分割・動的生成する実装は静的走査で拾えない。登録呼出箇所そのものは特定していない。実行時の応答は未観測 (上の未解決表の 1 行目。起票先は #255)。
