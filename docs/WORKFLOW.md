@@ -237,7 +237,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   3. **照合**: R2 から同じ object を取り直し、梱包元と sha256 が一致することを確認する。不一致なら 2 からやり直す。
   4. **権限を戻す**: 手順 1 の逆 (Read のみ)。戻したことを確認する方法は `[未確認]`。
   5. **許可名を足す場合**: 同じ PR で `.github/scripts/prepare-event-context.sh` と `.github/scripts/watchdog.sh` の `ARTIFACT_RE` と、本節の許可名一覧を更新する。`pr-lint.sh` は watchdog.sh の値を読むため、`grep -n '^ARTIFACT_RE=' .github/scripts/*.sh` で両者の一致を確認する。
-  - **Actions から投入しない理由**: (1) Actions の R2 認証 (`CF_ACCOUNT_ID`・`CF_R2_ACCESS_KEY_ID`・`CF_R2_SECRET_ACCESS_KEY`) は素材の取得に使う。`tools/pm/README.md` の運用の約束は、投入を「既存 token の一時昇格だけ・終わったら Read のみへ戻す」と定める。Write 可能な token を repo secret に置くと、`/oc` を書ける人の run (実装 agent を含む) がバケットに書ける。(2) 原本の一部は VM のディスクにしか無い (`docs/REFERENCES.md` の原本表)。run からは `~/ダウンロード/` や mac pkg の展開物を再作成できない。
+  - **Actions から投入しない理由**: (1) Actions の R2 認証 (`CF_ACCOUNT_ID`・`CF_R2_ACCESS_KEY_ID`・`CF_R2_SECRET_ACCESS_KEY`) は素材の取得に使う。`tools/pm/README.md` の運用の約束は、投入を「R2 への投入は既存 token の一時昇格だけで行い、終わったら必ず Read のみへ戻す」と定める。Write 可能な token を repo secret に置くと、`/oc` を書ける人の run (実装 agent を含む) がバケットに書ける。(2) 原本の一部は VM のディスクにしか無い (`docs/REFERENCES.md` の原本表)。run からは `~/ダウンロード/` や mac pkg の展開物を再作成できない。
 - **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
   (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
   tools/ のスクリプトは `tools/shared/env.sh` (bash)・`paths.py`・`paths.mjs` 経由でこの変数を読む

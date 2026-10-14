@@ -221,6 +221,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 ### 12-6. 未解決
 
 - VM の `relaunch.json` (67 件。count=1 が 60、2 が 7) は Worker に無い。履歴の無い issue を最大 2 回余分に再投入し得る (#2343)。
+- 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343)。rate-guard が launch を止める場面と、live の oc-pm 送信 (PM agent の起動) は未測定 (fake gh のテストだけ)。
 
 ## 13. R2 素材投入の頻度 (#2434・手順は `docs/WORKFLOW.md` §11)
 
@@ -234,4 +235,3 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - watchdog 側の copy (`.github/scripts/watchdog.sh`。`pr-lint.sh` が読む) は後から追随した: `analysis-mac-shared` は `3b2346a0` (2026-10-13T14:22:02Z)、`work-fw-stage1` は `33a18408` (2026-10-13T15:13:01Z) で入った。`9e52c39d` の時点の watchdog.sh には mac-shared が無い (grep 0 件)。
 - R2 への投入の記録: repo 内にあるのは 2026-10-12 の全素材の再投入 1 回 (依頼者操作。`docs/pm/RETRO_2026-10-13.md`)。PM が VM で記録したとされる昇格ログは 1 件 (2026-10-13T14:16:50Z) だが、本 run では VM のログを確認していない `[未確認]`。
 - 未解決: open の #874 ([CI-18] mac pkg 素材の R2 化) の投入状況は本 run で未確認 (R2 の一覧は認証情報を使わずに取得していない)。起票先: 既存の #874 (新規起票なし)。
-- 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343)。rate-guard が launch を止める場面と、live の oc-pm 送信 (PM agent の起動) は未測定 (fake gh のテストだけ)。
