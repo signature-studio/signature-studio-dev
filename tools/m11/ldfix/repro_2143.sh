@@ -2,7 +2,7 @@
 # REPORT_2143 の数値を再現する手順 (#2143)。素材が必要:
 #   PE       = fl-win64 の extracted/block00031_PE.bin
 #   NORM0    = work-m11 の boot0..4.norm0.ll を置いたディレクトリ (tools/m11/work/ 相当)
-#   BOOT_FINAL = work-m11 の boot_final.ll (ldfix 適用前 IR の入力元。M11_LDFIX=0 で作り直す場合は BOOT_FINAL_PRE を使う)
+#   BOOT_FINAL = M11_LDFIX=0 bash tools/m11/m11_gen_ir2.sh で作った work/boot_final.ll (ldfix 適用前。REPORT_2143 §1・§4 と同じ)
 #   使い方: PE=... NORM0=... BOOT_FINAL=... bash tools/m11/ldfix/repro_2143.sh [all|audit|strip|f4|neg]
 #   f4 は内部で f4on/f4off を作る。neg は f4 の出力 (OUT/2143_f4on.ll・f4off.ll) を前提とするため、単独実行時は先に f4 を走らせる。
 # OUT (既定 ${RUNNER_TEMP:-/tmp}/2143) に生成物を置く。repo 内 work/ には書かない。
