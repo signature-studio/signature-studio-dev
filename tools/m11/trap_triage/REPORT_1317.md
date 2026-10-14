@@ -96,3 +96,25 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 `disasm_fn.py` は `FL_WIN64_DIR` 配下の `extracted/block00031_PE.bin` を使う (fl-win64 は `$HOME/artifacts/fl-win64.tar.zst` を展開)。
 
 `work/` は gitignore 対象で commit しない。
+
+## 6. 追補 (2026-10-14・#1317 3 回目 run)
+
+- 測定 commit: `a5111d06` (コード差分 0。本節の追記のみ)。検証は `a5111d06` 上で ON build (`M11_M2P=1`) を再生成して行った。
+- `m11_gen_ir2.sh` 46 s rc=0 / `m11_build.sh` 25 s rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。ldfix は §1 と同じ `errors=0`。load 0.6〜0.8。
+- 再現 (`survey_units.mjs`, 60 s 上限):
+  - `0..830` + 880: rc=124 (60 s 打ち切り。本 run では 1 回測定)。
+  - `0..829` + 880: rc=0、2 s、`{"ok":765,"oob":13,"miss":46,"other":1,"halt0":4,"abort":2}`。
+- `0x40fb40` (PE, size 191) の逆アセンブル (`disasm_fn.py 40fb40`) の構造:
+  - `0x40fb6c`〜`0x40fbde` は `rcx ← [rcx-0xc0]` の配列走査 (`0x40fb91`〜`0x40fbb8` で `[rax+8+20*i]` の qword を `[rsi+off]` へ書く) と、`rcx ← [[rcx-0x78]]` を `rcx == 0` まで回す連鎖走査 (`0x40fbcf`〜`0x40fbde`) からなる。
+  - 連鎖走査は終了条件が `rcx == 0` のみで、`[rcx-0x78]` の先が循環すると終わらない。この構造は**確認済み**。
+  - 循環が 880 で実際に起きているかは**未検証**。hang は例外を出さないため `SV_RAW` (e.stack) では frame が取れない。次の一手は `SV_WATCH` で `[rcx-0x78]` の連鎖を辿る (`unit 880` の直前に読む) か、連鎖長に上限を入れた計測。
+- icall 値の対応 (§5 の `0xf960` → `0x40f960` 等) は前 run の記述を引き継ぐ。wasm 側の icall 番号から PE VA への対応は未確認。
+
+### 受入の状況 (本 run 末)
+
+| 受入 | 状態 |
+|---|---|
+| 1. 830 が残す状態 | 未達 (未特定) |
+| 2. 停止命令・wasm frame | 部分 (PE `0x40fb40` の構造まで。実際の停止は未確認) |
+| 3. 修正案 | 未達 |
+| 4. 修正後の完走 | 未実施 (停止は再現済み) |
