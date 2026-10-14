@@ -56,3 +56,7 @@ const createModule = require('./lift/kh.cjs');
 })();
 EOF
 (cd "$OUT" && node smoke.cjs) | tee "$OUT/smoke.log"
+N_OK=$(grep -cw 'ok' "$OUT/smoke.log" || true)
+N_EXC=$(grep -cw 'EXC' "$OUT/smoke.log" || true)
+echo "smoke: ok=$N_OK (3 が成功) EXC=$N_EXC (0 が成功)"
+if [ "$N_OK" != 3 ] || [ "$N_EXC" != 0 ]; then echo "smoke: 失敗" >&2; exit 1; fi
