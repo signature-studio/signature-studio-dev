@@ -37,7 +37,7 @@ cd ../work && mkdir -p ghproj
   -import Serum2_win64.vst3 -overwrite -scriptPath ../gui -postScript ghidra_fn_size.java
 ```
 
-- 環境: Ghidra 12.1.4 (`ghidra_12.1.4_PUBLIC_20260921.zip`、GitHub release の `Ghidra_12.1.4_build`)・JDK 21 (temurin-21)。`/opt/ghidra` は runner に無いため、初回使用時に上の zip を `_temp` 配下へ展開した。実測時間: 1 回目 (スクリプト修正前、NPE で終了) の `analyzeHeadless` は 14 分 34 秒 (real)。2 回目 (採用した結果) の時間は未計測。
+- 環境: Ghidra 12.1.4 (`ghidra_12.1.4_PUBLIC_20260921.zip`、GitHub release の `Ghidra_12.1.4_build`)・JDK 21 (temurin-21)。`[GHIDRA]` が runner に無いため、初回使用時に上の zip を `_temp` 配下へ展開した。実測時間: 1 回目 (スクリプト修正前、NPE で終了) の `analyzeHeadless` は 14 分 34 秒 (real)。2 回目 (採用した結果) の時間は未計測。
 - 注意: `analyzeHeadless` の既定 project 名は `ghproj/xo` の前にディレクトリが要る (無いと `Directory not found` で abort)。
 
 ## 2. 対応付けの結果 (Ghidra 出力・再現可能)
@@ -53,7 +53,7 @@ cd ../work && mkdir -p ghproj
 | 0x6227b0 | 0x1806227b0 | `FUN_1806227b0` | 1806227b0..18062283c | 141 | |
 | 0x622840 | 0x180622840 | `FUN_180622840` | 180622840..180622871 | 50 | COL 0xaa9770 (副次 vtable) |
 
-- 合計: **507 B** (8 件、重複 entry 0)。内訳は通常関数 6 件 = 502 B、thunk 2 件 = 10 B。
+- 合計: **507 B** (8 件、重複 entry 0)。内訳は通常関数 6 件 = 497 B (70 + 12 + 181 + 43 + 141 + 50)、thunk 2 件 = 10 B (5 + 5)。
 - thunk 2 件 (`0x4b5670`・`0x4b6690`) は Ghidra が thunk と判定した関数 (本体 5 B)。転送先は `thunk_FUN_180117c10`・`thunk_FUN_180142720` の名前から示されるが、転送先の本体は測っていない。
 - 上限の意味: 本体合計は「vtable から直接指される関数 8 件の本体」であり、`XferOnOffButton` の置換に要る全コードの大きさではない。呼び出し先の閉包は未測定。
 
