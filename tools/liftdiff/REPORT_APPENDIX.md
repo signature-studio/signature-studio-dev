@@ -312,13 +312,22 @@ flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無
 ### 12.1.1 LD-48 (#1398): VMT slot への仮 proc 番地配置 (部分達成)
 
 - 実装 (review 1744 対応後): `rt/ld_core.h` の VMT 用仮 proc は静的 index 域 `LD_VMT_IDX0 (256)..263` (`?vmslot0..7`) に置く。`ld_nfakeproc` は増やさない (GetProcAddress 側の index 0..255 は不変)。`ld_fakeproc_valid` / `ld_fakeproc_name` が域を判定し、`fle_ldbridge.c` の `ott_dispatch` は両域を解決する。`ld_snapshot` 前の `ld_fakeproc_vmt_init` が番地式 `LD_FAKEPROC_BASE+i*SZ` の不一致を abort で検出する。仮 proc 上限超過も abort (旧: 0x50010000 を無言で返し proc 0 と衝突)。`ldlib/cases.py` `make_blob_vm` は VMT slot k に `0x50010000+(256+k)*32` を書く。
-- **未測定 (現 head)**: 修正後の base/新 sample:800 と `tests/fvm_transitions.py` は、fix run で素材 (`work-m11`・`work-liftdiff`・`toolchain-emsdk`) が取得できず未実施。`$ARTIFACTS_DIR` には `fl-win64` のみ・`tools/m11/work`・`tools/liftdiff/work` は無く、手元で再生成もできない。既存 pattern の増減 0 は**未確認**。
-- **測定 commit と差分の証跡**: 修正後コードの測定 commit は未確定 (測定が無い)。`git diff 8ac5b169 HEAD -- tools/liftdiff` は 4 files・28+/20- で差分 0 ではない (`rt/ld_core.h`・`rt/fle_ldbridge.c`・`ldlib/cases.py`・本 REPORT_APPENDIX)。よって `docs/WORKFLOW.md` §6 により現 head での再測定が必要。
-- 検証 (fix run・この run で実施): `gcc -fsyntax-only -Wall -Wno-unused-function rt/ld_native.c` rc 0 / `python3 -m py_compile ldlib/cases.py` OK / `python3 tests/test_compare_ld11.py` 23 tests OK。`main` (59f0a5f9) を merge 済み (競合なし)。
-- 以下の実測値 (sample:800・fvm 件数・既存 pattern の遷移) は **修正前** の commit `8ac5b169` のもの (base = origin/main 025bdd8a)。現コードの値ではない。`liftdiff_e2e.sh --m11-only` は `8ac5b169` で rc 0・`LIFTDIFF_E2E PASS` (3 分 12 秒・4 vCPU・load 0.99→6.18)。
-- sample:800 (同一 worktree で base / 新を連続実測・`--shards 12 --state auto`): base 361 / 229 / 210、新 361 / 232 / 207。
-- fvm の件数: 427 件 = native_fault 182 / both_fault 244 / hang 1。**equal / diff / wasm_trap は 0 件** (受入条件 (2) 未達)。native は `rip=0xb` で segv し、VMT slot の仮 proc まで到達していない (引数値を関数ポインタとして呼ぶ経路)。
-- 既存 pattern の遷移 (base → 新): `vm0` native_fault→diff 3・both_fault→wasm_trap 1・both_fault→hang 1、`p0` hang→native_fault 1、`pall`/`qall` both_fault→hang 各 1。登録 8 件で nfakeproc がずれ、GetProcAddress 応答の index も変わるため、この差は登録の副作用。受入条件 (3) は未達 (理由は上記、登録を VMT 専用の index 域へ分ける案が次の作業)。
+- **根本原因 (修正前 `8ac5b169` の副作用)**: 既存 pattern `vm0` は `make_blob_vm` の blob を使うが、VMT slot に仮 proc 番地を書いたため `vm0` の入力そのものが変わっていた。index 域の分離 (`LD_VMT_IDX0`) だけでは `vm0` の変化は消えなかった。
+- **修正 (commit `7d7259ec`)**: fvm 専用 blob `vmt` (`make_blob_vmt`) を新設し、VMT 仮 proc 番地は `vmt` にだけ置く。既存 `vm` blob (`make_blob_vm`) は元の 0 埋めに戻す。`fvm_line` は `blob=vmt`。`rt/ld_core.h` の index 域分離と abort 化は前 commit のまま。
+- **測定 commit**: `7d7259ec` (`git diff 7d7259ec HEAD -- tools/liftdiff` は差分 0)。base = `origin/main` `025bdd8a`。
+- 検証: `liftdiff_e2e.sh --m11-only` (測定 commit `7d7259ec`) rc 0・`LIFTDIFF_E2E PASS`・約 3 分 (2m57s、4 vCPU、load は未採取)。
+- sample:800 (`--shards 12 --state auto`):
+
+| run | match / mismatch / unexec | 関数単位の遷移 |
+|---|---|---|
+| base `025bdd8a` | 360 / 230 / 210 | - |
+| `7d7259ec` 1 回目 | 360 / 233 / 207 | match→match 360・mismatch→mismatch 230・unexec→mismatch 3・unexec→unexec 207 |
+| `7d7259ec` 2 回目 (同一 commit 再実行) | 360 / 233 / 207 | match→match 360・mismatch→mismatch 230・unexec→mismatch 3・unexec→unexec 207 |
+
+- **既存 pattern の変化 (base vs `7d7259ec`)**: `vm0` は全 run で変化 0 (equal 330 / diff 85 / wasm_trap 41 / native_fault 179 / both_fault 149 / hang 15 を両 run で確認)。
+  verdict は 3 run とも不変 (match 360・mismatch 230・unexec 210)。case 単位では hang 系の揺らぎのみ出た: 1 回目 `z` hang→both_fault 2・`p0` native_fault→hang 1 ほか計 6 件、2 回目 `p0` native_fault→hang 1・`p1` hang→both_fault 1・`z` hang→both_fault 2・`u16` hang→both_fault 1・`pall` both_fault→hang 1 (同一 commit 内でも run ごとに揺れる)。**`vm0` と verdict の増減は 0**。
+  case 単位の hang 揺らぎを 0 にすることは、この PR では達成していない (既存の性質で、本 PR の変更とは切り分けていない)。
+- **fvm の件数 (`7d7259ec` 1 回目)**: 437 件 = native_fault 189 / both_fault 245 / diff 3。**equal / wasm_trap は 0 件**。受入条件 (2) (fvm の equal/diff/wasm_trap 化) は部分達成 (diff 3 件のみ)。diff 3 件 (`0x1024830`・`0x132f6a0`・`0x5c1030`, arg 0) は、関数 verdict が unexec→mismatch に変わった 3 関数と一致する。diff の中身 (`native_extra_call` 等) はこの PR では未切り分け。native は `rip=0xb` で segv し、VMT slot の仮 proc まで到達していない (引数値を関数ポインタとして呼ぶ経路)。
 
 ### LD-24 (#976) 署名未対応 50 関数の内訳 (REPORT §12 から移動)
 
