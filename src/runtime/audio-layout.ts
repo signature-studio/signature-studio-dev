@@ -4,10 +4,10 @@
  * (verifyLayout が wasm の fla_layout_off() と照合し、不一致なら fail-fast) のために持つ。
  */
 export const FLA_ABI = 1;
-export const FLA_CTL_SIZE = 4488;
+export const FLA_CTL_SIZE = 16776;
 export const FLA_QUANTUM = 128;
 /** producer の write 記録リングの件数 (flaudio.h FLA_PW_N) */
-export const FLA_PW_N = 256;
+export const FLA_PW_N = 1024;
 
 export const FLA_LAYOUT = {
   magic: 0, state: 8, sample_rate: 16, out_ch: 20, in_ch: 24, ring_frames: 28, ring_mask: 32,

@@ -14,16 +14,23 @@ const root = process.env.AU9_ROOT;
 if (!root) throw new Error("AU9_ROOT 未設定 (e2e.sh 経由で実行)");
 const results = [];
 const rec = (name, ok, detail) => { results.push({ name, ok, detail }); console.log(`${ok ? "PASS" : "FAIL"} ${name}: ${detail}`); };
-// producer の write 記録 (ctl.pw_trace) の要約。pw_at_underrun は underrun 直前の write と次の write (w/fill/起床µs/完了µs。w = 書き込み開始 frame)
+// producer の write 記録 (ctl.pw_trace) の要約。pw_at_underrun は underrun 直前の write と次の write (w/fill/起床µs/完了µs。w = 書き込み開始 frame)。
+// 直近 FLA_PW_N 件の窓より前の失敗位置は out_of_window、窓内に直前の write が無いものは none、write が 1 件も無いものは no_writes。
+// 差分は u32 の剰余 (>>> 0) で取る (起床・完了の µs は約 71.6 分で折り返すため)。
 const pwInfo = (v) => {
   const pw = v.producer.writes;
-  const lat = pw.map((e) => e.done_us - e.wake_us);
-  const gaps = pw.slice(1).map((e, i) => e.wake_us - pw[i].wake_us);
-  const steps = [...new Set(pw.slice(1).map((e, i) => e.w - pw[i].w))];
+  const n = v.producer.pw_n;
+  if (pw.length === 0) return `pw_n=${n} pw_w_step=none pw_lat_max_us=none pw_gap_max_us=none${v.underrun_count ? " pw_at_underrun=[no_writes]" : ""}`;
+  const lat = pw.map((e) => (e.done_us - e.wake_us) >>> 0);
+  const gaps = pw.slice(1).map((e, i) => (e.wake_us - pw[i].wake_us) >>> 0);
+  const steps = [...new Set(pw.slice(1).map((e, i) => (e.w - pw[i].w) >>> 0))];
   let at = -1;
   pw.forEach((e, i) => { if (v.first_underrun_frame >= 0 && e.w <= v.first_underrun_frame) at = i; });
-  const atStr = pw.slice(Math.max(0, at - 2), at + 2).map((e) => `${e.w}/${e.fill}/${e.wake_us}/${e.done_us}`).join(",");
-  return `pw_n=${v.producer.pw_n} pw_w_step=${steps.length === 1 ? steps[0] : `mixed:${steps.join("|")}`} pw_lat_max_us=${Math.max(...lat)} pw_gap_max_us=${Math.max(...gaps)}${v.underrun_count ? ` pw_at_underrun=[${at < 0 ? "none" : atStr}]` : ""}`;
+  const atStr = at < 0
+    ? (n > pw.length && v.first_underrun_frame < pw[0].w ? "out_of_window" : "none")
+    : pw.slice(Math.max(0, at - 2), at + 2).map((e) => `${e.w}/${e.fill}/${e.wake_us}/${e.done_us}`).join(",");
+  const stepStr = steps.length === 0 ? "none" : steps.length === 1 ? steps[0] : `mixed:${steps.join("|")}`;
+  return `pw_n=${n} pw_w_step=${stepStr} pw_lat_max_us=${Math.max(...lat)} pw_gap_max_us=${gaps.length ? Math.max(...gaps) : "none"}${v.underrun_count ? ` pw_at_underrun=[${atStr}]` : ""}`;
 };
 // keep-alive 接続 (Chrome 側) が残ると httpServer.close の callback が来ず永久に待つため、接続を強制切断してから閉じ、上限を付ける
 const closeServer = async (srv, isDev) => {
