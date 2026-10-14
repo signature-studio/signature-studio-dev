@@ -8,7 +8,7 @@
 ## 1. 環境 (実測)
 
 - `$ARTIFACTS_DIR` に実在: `fl-win64.tar.zst`・`work-m6-ott.tar.zst`。`tools/m10/work/ott_m10.cjs` (+ `.wasm`) と `tools/m6/work/ott.drc.ll` 等は作業ツリーに既にある。
-- **不足 (liftlib 生成 module を作れない)**: `analysis-ott-binaries` (`OTT_vst2_win64.dll`。`ott.run` の `Image(DLL)` で読む。`$ARTIFACTS_DIR` に無い) と `toolchain-emsdk` (`/opt/emsdk` が無く `emcc` が無い)。
+- **不足 (liftlib 生成 module を作れない)**: `analysis-ott-binaries` (`OTT_vst2_win64.dll`。`ott.run` の `Image(DLL)` で読む。`$ARTIFACTS_DIR` に無い) と `toolchain-emsdk` (既定の emsdk 配置 `EMSDK_DIR` が無く `emcc` が無い)。
 - よって `ott_auto_none` の `ott_gen.cjs` は作れず、失敗した module 側の挙動は再現できなかった。
 
 ## 2. 切り分けの結果
