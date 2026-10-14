@@ -8,7 +8,7 @@
 - 停止の trap 位置は `function_4133f0` (wasm-function[1352])。前回までの「stack 最上段が export 無し」は誤りで、export 名で解決すると `function_4133f0` である。
 - ftrace が 0 バイトのままである事実は確認した (`FS` export 済みの現行 build でも同じ)。停止が unit 18 の `GetLocaleInfoW` 反復の後に起きる事実も確認した。ただし「そのため file API に到達しない」という因果は未検証。
 
-## 2. 実測 (測定 commit `5d167ecd`、検証 HEAD `7738ce46` の clean worktree `work/wt_verify`)
+## 2. 実測 (測定 commit `5d167ecd`、再現 HEAD `7738ce46` の clean worktree `work/wt_verify`。現 HEAD `b589d48c` までコード差分 0)
 
 | 段階 | コマンド | 結果 |
 |---|---|---|
@@ -66,11 +66,11 @@
 
 - 測定 commit: `5d167ecd624185d98140f4d7bb641484a8ff3de2` (コード差分の最終 commit。commit 済み・clean)。
 - 測定の場所: `git worktree add --detach work/wt_verify 7738ce46` (main の作業ツリーは使わない)。素材 `work-m11.tar.zst` を worktree 直下に `tar --zstd -xf` で展開 (`tools/m11/work/` 233 エントリ・gitignore)。測定後 `git worktree remove --force work/wt_verify` で後始末する。
-- 鮮度 (§6 形式): `git diff 5d167ecd 7738ce46 -- tools/m11 tools/shimx --stat` の出力は次のとおり (測定 HEAD `7738ce46`)。
+- 鮮度 (§6 形式): `git diff 5d167ecd HEAD -- tools/m11 tools/shimx --stat` の出力は次のとおり (現 HEAD `b589d48c`)。
 
 ```
- tools/m11/REPORT_SHX-T27.md | 68 +++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+ tools/m11/REPORT_SHX-T27.md | 76 +++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 ```
 
-- 上記の後に REPORT 自身を修正した commit (`4ec4dfae`) を積んだ。`git diff 5d167ecd HEAD -- tools/m11 tools/shimx` は `tools/m11/REPORT_SHX-T27.md` のみで、コード差分は 0。
+- 差分は `tools/m11/REPORT_SHX-T27.md` のみで、コード差分は 0。この fix commit も REPORT のみを変更する。
