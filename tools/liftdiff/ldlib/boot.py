@@ -45,8 +45,9 @@ def _peek_u64(r, tok):
     return struct.unpack('<Q', bytes.fromhex(v[:16]))[0]
 
 
-def build_state(sess, upto=None, log=print, mode='units'):
+def build_state(sess, upto=None, log=print, mode='units', post=None):
     """native で unit 初期化を実行して状態を作る。
+    post(r, sess) を指定すると、unit 初期化の後・状態採取の前に native ランナ r で呼ばれる (戻り値は detail['post'])。
     戻り: dict(state, units_run, units_total, first_fail, mode, detail)"""
     t = sess.t
     ptr_rva = int(t['init_table_rva'], 16)
@@ -123,6 +124,8 @@ def build_state(sess, upto=None, log=print, mode='units'):
                 break   # 従来動作: 最初の失敗で止める
     if entry_ran and fails:
         log('[boot] unit 単位フェーズ: ok+%d / fail %d (最初: %s)' % (ok - (k if entry_ran else 0), len(fails), fails[0][:3]))
+    if post is not None:
+        detail['post'] = post(r, sess)
     st = _dump_state(r)
     r.close()
     detail['units_ok'] = ok
