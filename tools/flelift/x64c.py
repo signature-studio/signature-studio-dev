@@ -985,14 +985,14 @@ class FnLift:
             'vaddss': ('addss', True), 'vsubss': ('subss', False), 'vmulss': ('mulss', True), 'vdivss': ('divss', False),
             'vaddpd': ('addpd', True), 'vmulpd': ('mulpd', True),
             'vpxor': ('pxor', True), 'vpand': ('pand', True), 'vpor': ('por', True),
-            'vxorpd': ('xorpd', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vorps': ('orps', True),
+            'vxorpd': ('xorpd', True), 'vxorps': ('xorps', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vorps': ('orps', True),
             'vpaddq': ('paddq', True), 'vpaddd': ('paddd', True), 'vpsubq': ('psubq', False), 'vpsubd': ('psubd', False),
             'vunpcklpd': ('unpcklpd', False), 'vpunpckldq': ('punpckldq', False),
             'vpsrlq': ('psrlq', False), 'vpsllq': ('psllq', False), 'vpsrad': ('psrad', False),
             'vmovsd': ('movsd', False), 'vmovss': ('movss', False),
             'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
-            'vcvtpd2dq': 'cvtpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
+            'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
     VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
@@ -1007,6 +1007,11 @@ class FnLift:
             return self.vex2(ins, ops, self.VEX2[m], True)
         if m in self.VEXF:
             return self.vex2(ins, ops, self.VEXF[m], False)
+        if m == 'vpsrldq' and len(ops) == 3 and ops[2].type == X86_OP_IMM and self.isx(ins, ops[0]) and self.isx(ins, ops[1]):
+            di = self.xd(ins, ops[0]); n = ops[2].imm
+            self.L('{ X128 a_ = X[%d], r_; memset(&r_, 0, 16); int n_ = %d; if (n_ < 16) memcpy(r_.b, a_.b + n_, 16 - n_); X[%d] = r_; }' % (self.xd(ins, ops[1]), n, di))
+            self.L('memset(&YL[%d], 0, 16);' % di)
+            return
         raise Unsup(m)
 
     def vex2(self, ins, ops, leg, zero):
@@ -1021,6 +1026,13 @@ class FnLift:
         di = self.xd(ins, d)
         if self.isx(ins, s2) and self.xd(ins, s2) == di and self.xd(ins, s1) != di:
             if not comm:
+                if leg[:3] in ('sub', 'div') and leg[-2:] in ('sd', 'ss'):
+                    s1i = self.xd(ins, s1)
+                    f, T = ('df', 'double') if leg[-2:] == 'sd' else ('f', 'float')
+                    op = '-' if leg[:3] == 'sub' else '/'
+                    self.L('{ %s b_ = X[%d].%s[0]; %s a_ = X[%d].%s[0]; X[%d] = X[%d]; X[%d].%s[0] = a_ %s b_; }' % (T, di, f, T, s1i, f, di, s1i, di, f, op))
+                    self.L('memset(&YL[%d], 0, 16);' % di)
+                    return
                 raise Unsup('vex d==s2 ' + ins.mnemonic)
             getattr(self, 'i_' + leg)(ins, [d, s1])
             if leg[-2:] in ('sd', 'ss'):
@@ -1082,6 +1094,13 @@ class FnLift:
     def i_cmpnltps(self, ins, ops): self.cmpps_pred(ins, ops, 5)
     def i_cmpnleps(self, ins, ops): self.cmpps_pred(ins, ops, 6)
     def i_cmpordps(self, ins, ops): self.cmpps_pred(ins, ops, 7)
+
+    def cmppd_pred(self, ins, ops, p):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 2; k_++) X[%d].q[k_] = cmp_pred_f(%d, X[%d].df[k_], b_.df[k_]) ? ~0ULL : 0ULL; }' % (
+            self.xs(ins, ops[1], 'x128'), di, p, di))
+
+    def i_cmpneqpd(self, ins, ops): self.cmppd_pred(ins, ops, 4)
 
     def i_movlpd(self, ins, ops):
         d, s = ops
