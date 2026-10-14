@@ -88,6 +88,7 @@ FL_H(channels, getChannelName) { CH(0); return fl_ret_s(c, k->name); }
 FL_H(channels, setChannelName) { CH(0); const char *s = A_STR(1); set_name(k->name, s); return fl_ret_none(c); }
 FL_H(channels, isChannelSelected) { CH(0); return fl_ret_b(c, k->sel); }
 FL_H(channels, selectChannel) { CH(0); int64_t v = A_INT(1, -1); k->sel = TOG(k->sel, v); return fl_ret_none(c); }
+FL_H(channels, selectAll) { for (int i = 0; i < nch; i++) ch[i].sel = 1; return fl_ret_none(c); }
 FL_H(channels, deselectAll) { for (int i = 0; i < nch; i++) ch[i].sel = 0; return fl_ret_none(c); }
 FL_H(channels, muteChannel) { CH(0); int64_t v = A_INT(1, -1); k->mute = TOG(k->mute, v); return fl_ret_none(c); }
 FL_H(channels, soloChannel) { CH(0); k->solo = !k->solo; return fl_ret_none(c); }
