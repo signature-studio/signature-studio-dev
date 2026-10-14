@@ -234,3 +234,7 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 **未判明・未検証**: 生成 C の実行 (rax-in の正しさ・dispatch 表の挙動)。harness (b) が要る。
 
 **方針の当てはめ (PM 判断待ち)**: `docs/pm/DIRECTIVES.md` 指示 54 は「upstream からビルドできるものはビルドし、難しいものは lift」。`tools/shared/REPORT.md` (libblend2d 行) は Agg2D glue を「FL 独自」と分類しており、upstream の build 対象ではない。指示 54 に当てはめると glue は lift が既定で、C++ 再実装は lift が不可と示された場合だけになる。この当てはめは PM の確認が要る。Blend2D 内部と glue の帰属は未判定 (§11)。
+
+## 16. x64c の未対応 6 mnemonic の被覆 (#3138)
+
+結論: 閉包 50 の unsup_sites は **13 → 0**。差分試験は 44 PASS / 0 FAIL (新規 9 件)。FLEngine の lift 出力は変更前後でバイト一致。製品 KPI (起動・GUI) は未測定。閉包別の表・ネガティブコントロール・diff の詳細は `REPORT_APPENDIX_AGG2D.md` §16。`origin/main` (`6cfa2e8a`) の取り込み後 (測定 commit `5fc307db`) も同じ結果で、統合後の再測定は付録 §16 の「統合後の再測定」。

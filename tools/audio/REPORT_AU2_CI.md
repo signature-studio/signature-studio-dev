@@ -29,7 +29,7 @@
 
 - フル `e2e.sh` (約 9 分 + ASIO COM 経路 約 3 分) と 30 分ソーク: 行列にすると 1 run の 58 分上限を超えるため未実施
 - Firefox 行列: §9 で実施 (AU-23 #2540)
-- Windows / macOS runner の仮想オーディオ workflow: 未着手 (権限・検証手段の確認が先)
+- Windows / macOS runner の仮想オーディオ workflow: 差分化のみ (§10。未適用・未実行)
 
 ## 4. 未解決
 
@@ -72,7 +72,7 @@
 
 - 表の値: burst = `stats.burst_obs` (連続 process の総フレーム数の**最大**)、T_req = `ceil((burst×1.25 + B)/B)×B` (各 run の burst で計算)。セル内の範囲は n=3 の min〜max。表は `node tools/audio/au2_summary.mjs` の出力と一致する。
 - 元の 18 シナリオ実行 (n=3) はすべて PASS (underrun 0・ramp/sine 誤差 1.49e-8)。load avg は各 run 開始 0.0〜0.6。**ただし同 HEAD の再採取 (n=1, §5-4) では fake_r1 の `asio_sine_b256_d2` が underrun 1 で FAIL した**。元の n=3 と合わせても再現性は確定していない。
-- P2 の p99 は §10 で計測した (AU-30 #3151)。この節の表は p99 列の無い旧測定。
+- P2 の p99 は §11 で計測した (AU-30 #3151)。この節の表は p99 列の無い旧測定。
 
 ### 5-2. 30 分ソーク (P1) — 10 分 (2 回目 run) と 30 分 (3 回目 run)
 
@@ -152,8 +152,8 @@
 | ~~Firefox 行列 (PulseAudio null-sink × 48k/96k)~~ | ~~`tools/audio/harness` が Chrome CDP 専用~~ → 解消 (§9・AU-23 #2540) | — |
 | OPEN 較正 burst と run 中 burst のずれで grows が残る (係数は 125 維持・§5-5) | 96k null で grows 0〜3 回・underrun 0 (§5-5 の再測定)。係数の変更では解消しない | **[AU-28]** #3051 |
 | ~~30 分ソーク (null-sink, 48k B=256)~~ | ~~10 分 PASS のみ~~ → 解消 (§5-2 の 30 分 PASS) | — |
-| ~~P2 burst の p99~~ | ~~worklet が最大値しか公開しない~~ → 解消 (§10・AU-30 #3151: `burst_hist` を公開し結果 JSON に `burst_p99`)。Firefox 側は未配線 | #187 (Firefox の p99) |
-| Windows / macOS runner (任意) | 未着手 (受入 4) | [AU-32] #3164 |
+| ~~P2 burst の p99~~ | ~~worklet が最大値しか公開しない~~ → 解消 (§11・AU-30 #3151: `burst_hist` を公開し結果 JSON に `burst_p99`)。Firefox 側は未配線 | #187 (Firefox の p99) |
+| Windows / macOS runner (任意・受入 4) の P1〜P4 の実測 | workflow は差分化のみ (§10。適用も初回 dispatch も未実施)。Windows / macOS の値は無い | [AU-32] #3164 (本 PR で close。適用は PM が PR 本文の差分で行う) |
 | `asio_ramp_b128_d2` quick FAIL (§2) | 本 run では再実行していない。原因未切り分け | #187 |
 | fake の `asio_sine_b256_d2` の underrun 1 (再採取 n=1 で FAIL, §5-4) | 行列の再現性が未確定。原因未切り分け (`asio_ramp_b128_d2` と同種の疑い) | #187 (測定の追跡) |
 
@@ -228,7 +228,16 @@
 - **sink の規格**: 測定中に固定していない。各 rep 開始時の ci_null 規格は `results/au2/firefox_r*.json` の `pulse.ci_null_before` に記録 (rep 1 = `s16le 2ch 44100Hz`、rep 2・3 = `s16le 2ch 48000Hz`)。sink-input の規格は全 run で要求どおり (48000 / 96000 Hz、float32)。PulseAudio が sink 側へ再サンプルしたかは未確認 (`clock` は AudioContext 側の値)。
 - **rep 1 の差**: 48k の burst・T は rep 1 = 1152・1792、rep 2・3 = 1024・1536。96k は 3 rep とも 1920・2816。rep 1 の clock は 48020.6 Hz で rep 2 と同じ (旧測定の rep 1 の 46590 Hz は今回は出なかった)。rep 1 だけ開始時の sink 規格が 44100 Hz だった点は旧測定と同じ。rep 1 の 48k の burst の差の原因は未切り分け (§4)。
 
-## 10. P2 の p99 (AU-30 #3151)
+## 10. Windows / macOS の行列 (AU-32 #3164・未実行)
+
+- **状態**: workflow は `tools/audio/ci/audio-matrix.yaml` に置いた (未適用・未実行)。実装 App は `.github/workflows/` を push できない (`docs/WORKFLOW.md` §11(d))。適用は PR 本文の差分で PM が行う (§11(c))。
+- **構成**: ubuntu で `build.sh` を 1 回ビルドし `audio-web` artifact に載せる。Windows (Chrome・Edge) と macOS (Chrome) が `run.mjs --only asio_sine_b256_d2,asio_sine_b256_96k,asio_sine_b512_96k` を n=3 で実行する (§5-1 と同じ 3 シナリオ・既定の秒数)。結果は `<os>-latest_<browser>_r<rep>.json`。
+- **仮想オーディオ**: Windows は VB-CABLE (choco パッケージ `vb-cable` の存在を確認)、macOS は BlackHole 2ch (cask `blackhole-2ch` の存在を確認)。cask の表示は「インストール後に再起動が必要」。runner は再起動できないため、`coreaudiod` の再起動で足りるかは初回 dispatch で確かめる。
+- **検証 (ubuntu 上)**: `actionlint` (`uvx --from actionlint-py actionlint tools/audio/ci/audio-matrix.yaml`) は rc 0。`au2_summary.mjs` は、既存の `results/au2` と `results/au2_recheck` の出力が旧版と行単位で一致 (diff 0 行)。`<os>-latest_<browser>_r<rep>.json` の名前も読める (一時コピーで確認)。
+- **未検証 (範囲外)**: Windows / macOS での実行そのもの、仮想デバイスの導入と既定出力への切替、Edge の `CHROME` 指定。Safari は未対応 (ハーネスは Chrome CDP のみ)。Firefox は `au2.mjs`・`bidi.mjs` が pactl に依存するため、この行列には流用しない。
+- **P1〜P4 の値**: 未測定。初回の dispatch 結果はこの節に記録する (記録は PM)。
+
+## 11. P2 の p99 (AU-30 #3151)
 
 - **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出すようになった。null-sink は全 run PASS (underrun 0)。fake 48k は 1 件 FAIL (未解決・#187)。Firefox の p99 は未配線。
 - 測定 commit・行列・再現手順・未解決の全文は `REPORT_APPENDIX_3151.md` (250 行上限のため分割移動)。

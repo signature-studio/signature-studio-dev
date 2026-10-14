@@ -45,6 +45,7 @@ ro = [s for n, s in secs.items() if n in (".rdata", ".data")]
 lo = min(IMG + s.VirtualAddress for s in ro)
 hi = max(IMG + s.VirtualAddress + s.Misc_VirtualSize for s in ro)
 bases = T.collect_bases(text_raw, text_va, lo, hi)
+sections = [(n, IMG + s.VirtualAddress, IMG + s.VirtualAddress + s.Misc_VirtualSize) for n, s in secs.items()]
 print(f"base 候補 (.text 参照・.rdata/.data 内): {len(bases)} 件, entries/base = 512")
 all_hits = []
 for n, s in secs.items():
@@ -52,7 +53,7 @@ for n, s in secs.items():
         continue
     sva = IMG + s.VirtualAddress
     raw = data[s.PointerToRawData: s.PointerToRawData + s.SizeOfRawData]
-    hits, nb = T.scan_tables(bases, sva, raw, 512)
+    hits, nb = T.scan_tables(bases, sva, raw, 512, sections=sections)
     print(f"section {n:8s} base 内候補 {nb} 件 -> hit {len(hits)} 件")
     all_hits += hits
 for name in NAMED:

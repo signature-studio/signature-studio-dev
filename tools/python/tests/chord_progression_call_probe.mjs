@@ -1,6 +1,7 @@
 // Chord progression の代表関数を、flcpt / flrack を「読まれた属性を記録する」スタブ上で呼び、呼べた数・呼べなかった数と理由を表で出す (PY-22 #1053)。
 // 前提: chord_progression_e2e.mjs と同じ (dist/flpy.js 済み、work/fl_extract/ 済み)。実 FL の戻り値は未確定 (REPORT_PY22.md)。
-// 本 probe は**実装の代わりではない**。スタブは戻り値を一切作らず、例外・読まれた属性だけを記録する。
+// flcpt.cpt の CPT 4 メンバ (addChordMarker・getChordMarker・clearChordMarkers・chordMarkerCount) は src/flcpt.py の実装 (REPORT_PY30 §2)。
+// それ以外の属性と flrack は、戻り値を一切作らず例外・読まれた属性だけを記録するスタブ。本 probe は**実装の代わりではない**。
 // usage: node tests/chord_progression_call_probe.mjs
 import fs from "node:fs";
 import path from "node:path";
@@ -58,14 +59,13 @@ class Rec:
         return False
     def __gt__(self, o):
         return False
-flcpt = types.ModuleType('flcpt')
+import flcpt
 flrack = types.ModuleType('flrack')
-flcpt.cpt = Rec('cpt')
-flcpt.ChordMarker = type('ChordMarker', (), {})
-flcpt.ChordAlternative = type('ChordAlternative', (), {})
+class _CPTRec(flcpt.CPT):
+    def __getattr__(self, k):
+        return getattr(Rec('cpt'), k)
+flcpt.cpt = _CPTRec()
 flcpt.chordPool = Rec('chordPool')
-flcpt.CPT = type('CPT', (), {})
-flcpt.ChordPool = type('ChordPool', (), {})
 flrack.rack = types.SimpleNamespace(loop_starter_config='{"mock": true, "genres": {}, "loops": []}', flr=types.SimpleNamespace())
 flrack.flr = types.SimpleNamespace()
 flpianoroll.score.PPQ = 96
@@ -93,6 +93,8 @@ for (const [fn, args] of calls) {
   lines.length = 0;
   await py.run(`
 import control
+import flcpt
+flcpt.cpt.clearChordMarkers()
 SEEN.clear()
 _r = None
 _st = 'OK'
