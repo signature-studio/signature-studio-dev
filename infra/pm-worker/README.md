@@ -51,7 +51,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 Worker の自動着手 (`/oc` の投稿) を見送らせる印。PM の subagent が自分で実装する issue に付け、Worker が同じ issue に着手コメントを重ねて重複 PR を作るのを防ぐ。
 
 - **判定**: `src/classify.ts` が、`oc:hold` の付いた open な issue を `hold` 行に置く。launch (picks) と再投入の意図 (`oc-pm-intent`) の対象から外れる (意図は `counters.intentRejected.hold` に数える)。`/status` の `hold` はこの行の件数。`needs-user-input` (`user` 行) と違い、`/status` の `needs_user` には数えない。
-- **付ける (推奨)**: 起票時に `labels` を指定する。ラベルは issue の作成と同時に付くので、Worker が最初に受け取る `issues` 配送から見えており、着手と競合しない。
+- **付ける (推奨)**: 起票時に `labels` を指定する。ラベルは issue の作成と同時に付くので、Worker が最初に受け取る `issues` 配送から見えており、着手と競合しない (作成 API の仕様からの推論。実測は未検証)。
   `gh api repos/signature-studio/signature-studio-dev/issues -f title='[AREA-n] ...' -f body='...' -f 'labels[]=oc:hold'`
   起票後に `gh issue edit <N> --add-label oc:hold` で付けると、付与の前に次の tick が着手する窓が残るため、避ける。
 - **外す**: `gh issue edit <N> --remove-label oc:hold`。`issues` 配送で labels が更新され、次の tick (webhook の 2 秒後) から通常の分類に戻る。ready なら着手対象になる。
