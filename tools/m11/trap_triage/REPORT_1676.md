@@ -142,3 +142,17 @@
 |---|---|---|
 | 窓内で list B 構造体を書く命令 (関数 VA・命令) の確定 | 窓 (`icall 0x5c04a0` 直後〜`icall 0xf960` の前) まで確定。命令単位の watch 未実施 | 子 issue (親 #2057) |
 | 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 上記子 issue |
+
+## 10. #2099 の実測: 命令単位の書込み watch (未達・計装が unit 106 で停止)
+
+- 測定 commit: `637b70de` (origin/main。本節は追記のみで、コード差分は `trap_triage/store_watch_2099.sh`・`trap_triage/watch_addr_2099.c` の 2 ファイル)。
+- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`)・`toolchain-emsdk`・`toolchain-retdec`・`work-m11`・`work-liftdiff`。`work/lift_pe.sha256` は PE 指紋で手記録 (§6 と同じ)。
+- e2e `m11_e2e.sh` (非 `--full`、foreground、rc=0、wall 110 s、user 104 s): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6・§8・§9 と一致)。`--full` は `m2/work/ghidra_dll/functions_dll.csv` 不在で `m11_bounds.py` が落ちた (§6 と同じ)。
+- `probe1676_watch.mjs` (n=1): unit 114 `halt0`、`after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -->0x0, cnt -->1` (§8・§9 と一致)。
+- 命令単位の watch: 全 store 計装 (`watch_store_682.py`) に、監視番地を `0x10bd4c20`・幅 32 byte に変えた `trap_triage/store_watch_2099.sh 0 114 u114 114 114` を実行した。**`timeout 900` で rc=124、`[aw]` 0 件、unit 106 で停止** (`u114.err` の `unit` 行は 107 行)。REPORT_1046 §12-13 の unit 106 停止と同じ点。計装 build の後は `m11_build.sh` で clean な wasm に復元済み (復元後の `probe1676_watch.mjs` は上記と同じ結果)。
+- 結論: 窓内の書込み主体 (関数・命令) は本 run では未確定。全 store 計装では unit 114 に届かないため、watch の範囲を unit 114 の窓内の関数に絞る計装が必要。
+
+| 未達 (#2099 受入条件) | 状況 | 起票先 |
+|---|---|---|
+| 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 全 store 計装は unit 106 で停止。窓内の関数に絞った計装が未実施 | 子 issue (親 #2099) |
+| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 上記子 issue |
