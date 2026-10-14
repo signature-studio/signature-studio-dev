@@ -119,3 +119,21 @@ def legacy_p1(text, quiet=True):
         else:
             out.append(l)
     return '\n'.join(out), stats
+
+
+PC_TAG_RE = re.compile(r"%pc(\d+)([a-z]+\d*)\b")
+
+
+def canon_tags(text):
+    """legacy_p1 の一時名 `%pc<入力行 index><接尾>` を出現順の番号 `%pc<k><接尾>` へ改名する (全単射の α 変換)。
+
+    行 index は入力の空行数に依るため、#1664 (A7 の空行除去) で名前だけが変わる (分岐・命令の内容は不変)。
+    IR 一致ゲート (ott.same) はこの改名だけを無視する。検査は tests/test_unit.py T26。
+    """
+    seen = {}
+
+    def rep(m):
+        k = seen.setdefault(m.group(1), len(seen))
+        return "%%pc%d%s" % (k, m.group(2))
+
+    return PC_TAG_RE.sub(rep, text)
