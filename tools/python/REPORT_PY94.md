@@ -59,31 +59,32 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 - `host/fl_mock.mjs`: 状態 `undoPos` / `undoCount` / `undoLast` / `safeEdit` / `projTitle` / `projAuthor` / `projGenre` と、7 件の getter (NOARGS)。
 - `provider/fl_engine.c`: 同名の static 状態と `FL_H(general, ...)` 7 件。`fl_engine_reset` で初期化。`fl_ret_i` / `fl_ret_b` / `fl_ret_s`。
 - `tests/general_diff.mjs`: 呼出し 7 件を追加。引数個数違い 2 件 (`safeToEdit [1]`・`getProjectTitle [0]`) を追加。main の setter 16 件・clearLog・dumpScoreLog (#3046) と両方を残した。件数は下の `## 検証` 節。
-- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。期待値 (実装 128 / 未実装 307) は下の `## 検証` 節。
+- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。期待値 (実装 129 / 未実装 306) は下の `## 検証` 節。
 - main 取り込み (`3e76267f`) での解消: main の undo setter 3 件は別名の状態 (`undoHistoryPos` 等) に書いていたため、getter と同じ `undoPos`・`undoCount`・`undoLast` (C は `undo_pos`・`undo_count`・`undo_last`) に統一した。C 側の `static` 再宣言は重複するため削除した。
 - main 取り込み (`b34d93fe`・merge `a9328f26`) での解消: 4 ファイル (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/general_diff.mjs`・`tests/provider_check.mjs`) が競合した。どれも両側が別の項目を追加していたため、両側を残した (main の clearLog・dumpScoreLog と本 PR の pe94 7 件)。`tests/provider_check.mjs` の期待値は main の 121 / 314 に pe94 の 7 件を足した **128 / 307**。
+- main 取り込み (`56778a14`・merge `81e74083`) での解消: 競合は `tests/provider_check.mjs` の 1 ファイルだけだった。main 側の `pe102` (`playlist.muteTrackLock`・#2883) と本 PR の `pe94` を判定集合に両方残した。期待値は main の 122 / 313 に pe94 の 7 件を足した **129 / 306** (base 121 + pe94 7 + pe102 1。総数 435 は不変)。`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/general_diff.mjs` は auto merge。ハンドラ数 129 と下の全テストの PASS で整合を確認した。
 
 ## 検証
 
-測定 commit: `a9328f26` (main `b34d93fe` の取り込みの merge。`tools/python` のコードを変えた最後の commit)。以降の commit は `.md` だけを変える。
+測定 commit: `81e74083` (main `56778a14` の取り込みの merge。`tools/python` のコードを変えた最後の commit)。以降の commit は `.md` だけを変える。
 
-環境: 検証開始直前の load average 0.40 / 0.45 / 0.20 (`uptime`)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の実在を `ls` で確認し、`tar --zstd -xf` で必要な DATA block と PE (`block00031_PE.bin`・`block24429`・`block24430`・`block25159`・`block24618`) だけを `$RUNNER_TEMP/fl-win64/extracted` に展開した (2.8 秒)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md` §4)。`toolchain-emsdk` は使っていない。
+環境: テスト開始直前の load average 2.79 / 1.88 / 0.91 (`uptime`・23:44)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の実在を `ls` で確認し、`tar --zstd -xf` で必要な DATA block と PE (`block00031_PE.bin`・`block24429`・`block24430`・`block25159`・`block24618`) だけを `$RUNNER_TEMP/fl-win64/extracted` に展開した (2.9 秒)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md` §4)。`toolchain-emsdk` は使っていない。
 
 前提の生成物 (gitignore。worktree を新規に作ったため `work/` は再利用せず、すべて新規に生成した):
 
 | コマンド | 結果 |
 |---|---|
-| `bash fetch_inputs.sh` | rc 0 (0.27 秒) |
-| `bash build_cpython_wasm.sh` | rc 0 (実測 4 分 6.4 秒) |
-| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 (6.1 秒) |
-| `bash build_flpy_static.sh` | rc 0 (6.7 秒) |
+| `bash fetch_inputs.sh` | rc 0 (0.29 秒) |
+| `bash build_cpython_wasm.sh` | rc 0 (実測 4 分 11.8 秒) |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 (6.5 秒) |
+| `bash build_flpy_static.sh` | rc 0 (6.8 秒) |
 
-テスト (測定 commit `a9328f26`):
+テスト (測定 commit `81e74083`):
 
 | コマンド | 結果 |
 |---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 128 (`fl_table.c`: 435 関数) |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 128 / 未実装 307 / MCP 静的 60) |
+| `bash provider/build.sh` | rc 0・ハンドラ 129 (`fl_table.c`: 435 関数)・1.7 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 129 / 未実装 306 / MCP 静的 60)・0.5 秒 |
 | `node tests/general_diff.mjs` | calls 41・diffs 0・PASS |
 | `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS |
 | `node tests/channels_diff.mjs` | calls 161・diffs 0・PASS |
@@ -93,14 +94,16 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 | `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS |
 | `node tests/arrangement_diff.mjs` | calls 25・diffs 0・PASS |
 | `node tests/arrangement_selection_diff.mjs` | calls 8・diffs 0・PASS |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true (2.1 秒) |
+| `node tests/ui_display_diff.mjs` | ok_calls 12・bad_calls 11・diffs 0・PASS |
+| `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock_state_steps 8・PASS |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true・2 秒 |
 | `node tests/static_check.mjs` (`build_flpy_static.sh` 後) | `STATIC CHECK OK` (tool 別差 0/48) |
 
-- ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `undoPos` 既定値 (24 行目) を 0 から 1 にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1 (FAIL)。元に戻す (cmp で一致を確認) と calls 41・diffs 0・PASS (rc 0)。
+- ネガティブコントロール (`docs/WORKFLOW.md` §5・測定 commit `81e74083` で再実行): `host/fl_mock.mjs` の `undoPos` 既定値 (24 行目) を 0 から 1 にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1 (FAIL)。元に戻す (cmp で一致を確認) と calls 41・diffs 0・PASS (rc 0)。
 - コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
 
 ```
-$ git diff a9328f26 HEAD -- tools/python ':!*.md'
+$ git diff 81e74083 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
