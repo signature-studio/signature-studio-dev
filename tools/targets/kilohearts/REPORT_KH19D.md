@@ -53,18 +53,17 @@ python3 tools/targets/kilohearts/scripts/gain_x64c_closure.py $OUT/winpkg/HeartC
 | スクリプト全体 (`lift_closure_x64c.sh`・判定込み) | exit 0 | 46.0 s |
 
 - **負例 (ネガティブコントロール)**: `_fle_data_install` の段を外すと (§1 の `smoke_neg.cjs`)、`init ok` の後に `fle_run(gain process, zero args) EXC RuntimeError: memory access out of bounds`。`ok` 1・`EXC` 1 となり、判定 (`ok` 3・`EXC` 0) は失敗側に入る。
-- 時間は各 1 回の計測 (n=1)。変動の幅 (min–max レンジ) は未取得で、参考値として扱う。
+- 再実行 (`56c6f8cb`・本 fix の検証・n=1): `lift_closure_x64c.sh` は exit 0・`smoke: ok=3 EXC=0`・`kh.wasm` 25,295,206 B で、x64c の functions 148・insns 9,502・unlifted callees 0・imports 25 も上と同じ。負例も同じ (`init ok` の後に `EXC RuntimeError: memory access out of bounds`)。スクリプト全体は 70.0 s。
+- 時間は 2 回 (`f1c40af2` の 46.0 s・`56c6f8cb` の 70.0 s) の参考値で、変動は大きい。min–max レンジとしては扱わない (n=2 のため)。
 - smoke は**正しさの検証ではない**。入力 spec を与えていないため戻り値の値は意味を持たない。bit 突合は issue の範囲外。
 - 前回の測定 (`196f37ef`) と上の値は全段で同じ (functions 148・insns 9,502・`kh.wasm` 25,295,206 B・total 24,441,216 B・cmp 14,820,487 B)。lift 経路 (`tools/flelift/x64c.py`・`fle_data_gen.py`・`rt/`) と `gain_before_160.tsv` は `196f37ef` から変わっていない (`git diff --stat 196f37ef f1c40af2 -- <それら>` は空)。
-- unsup 285 site: 実行到達時は `ott_unsup` で停止する。多い順は `vmovntdq` 30・`vmovsd` 32・`vmovd` 29・`vmulsd` 25・`vaddsd` 23・`vmovq` 17・`vfmadd213sd` 16 (VEX / FMA 系)。
+- unsup 285 site: 実行到達時は `ott_unsup` で停止する。多い順は `vmovsd` 32・`vmovntdq` 30・`vmovd` 29・`vmulsd` 25・`vaddsd` 23・`vmovq` 17・`vfmadd213sd` 16 (VEX / FMA 系)。`fle_lifted.c` の `ott_unsup` 行 (`by zero` の 3 行を除く) を `56c6f8cb` で数え直し、285 site・48 種で一致。
 
 ## 3. 閉包の差分 (x64c 148 vs TSV 160)
 
-- 内訳 (`iat_thunk` 2・`tail_absorbed` 9・`seh_landing_pad` 1・`other` 0 と番地) は **[`REPORT_APPENDIX_3064.md` §1](REPORT_APPENDIX_3064.md)** が正本 (#3064 KH-37)。本節では数値を再掲しない。
-- 再現: `scripts/gain_x64c_closure.py` (§1 の最後のコマンド)。測定 commit `f1c40af2` で再実行し、hit 148・`iat_thunk` 2・`tail_absorbed` 9・`seh_landing_pad` 1・`other` 0 となり、APPENDIX §1 と一致することを確認した。
-- 差 12 は `gain_before_160.tsv` の 160 行と §2 の lift 済み 148 の算術差。内訳の分類は `gain_x64c_closure.py` の docstring どおり (IAT thunk は `jmp [rip+IAT]` を逆アセンブルで判定)。
-- 旧版の `closure_breakdown.py` は削除した (`f1c40af2`)。IAT thunk 判定が先頭 2 byte の `ff 25` だけを見て、REX.W 付きの `48 ff 25` (`0xfd81e4`・`0xfd81ec`) を取りこぼしに分類していたため。同じ分類を二重実装しない。
-- 原因の調査は子 issue #3064 (KH-37)。
+- 内訳 (件数と番地) は **[`REPORT_APPENDIX_3064.md` §1](REPORT_APPENDIX_3064.md)** が正本 (#3064 KH-37)。本節には再掲しない。
+- 再現: `scripts/gain_x64c_closure.py` (§1 の最後のコマンド)。測定 commit `f1c40af2` で再実行し、APPENDIX §1 と一致することを確認した。
+- 旧版の `closure_breakdown.py` は削除した (`f1c40af2`)。IAT thunk 判定が REX.W 付きの `jmp` を取りこぼしていたため。同じ分類を二重実装しない。
 
 ## 4. build の失敗点の記録 (同じ入力・手順の 3 試行)
 
@@ -93,4 +92,4 @@ python3 tools/targets/kilohearts/scripts/gain_x64c_closure.py $OUT/winpkg/HeartC
 | unsup 285 site (VEX / FMA 系 48 mnemonic 種) | 実行到達時に `ott_unsup` で停止 | #3065 (KH-38) |
 | smoke は trap の有無しか見ない。入力 spec を与えていないため戻り値は意味を持たない。FLEngine の vtable 窓 (#1936/#2005) に当たる Kilohearts 側の窓が無いかは未検討 | 正しさは未確認 | #3063 |
 | FLEngine の全 lift (`fle_lift.sh`) での回帰・`fle_data_gen.py` の FLEngine 固有窓 `0x42f670` の直書き (範囲判定で他 PE への誤用は防止) | §5 は敷設出力の一致のみ。窓の引数化は FLEngine 側の meta 生成に触れる | 親 #850 への提案 (PM 判断) |
-| bit 突合 (native 対照) | 範囲外 (issue 本文) | 起票なし |
+| bit 突合 (native 対照) | 範囲外 (issue 本文) | 未定 (#3063 本文どおり。liftlib の差分ハーネスで別途扱う) |
