@@ -32,7 +32,7 @@
 
 `fa_wc.py instr` の出力: `store total=5526 instrumented=5526 unhandled=0`。`fa_wc_build.sh` の出力の `__wchk` 挿入は 5527 行 (宣言 1 行を含む)。
 
-**WC 行 (HEAD `9b1b94e0` で 2026-10-14 に再実行・`fa_wc_drv.cjs` の stderr)**: 168 行 (21 IR 行 × 8 入力)。BLK 窓 (`0x36319000`–`0x36319020`) への書込みは 21 IR 行 (`0x36319008` 56 件・`0x36319010` 56 件・`0x36319018` 56 件)。入力 `work/fa_route/oi.flat.ll` は 25805 行・store 5526・`function_181057d20` 参照 88 で、`fa_wc.py instr` は `store total=5526 instrumented=5526 unhandled=0`。"emsc" (`63736d65`) を含む WC 行:
+**WC 行 (HEAD `1fff0e4f` で 2026-10-14 に再実行・`fa_wc_drv.cjs` の stderr。コード差分 0)**: 168 行 (21 IR 行 × 8 入力)。BLK 窓 (`0x36319000`–`0x36319020`) への書込みは 21 IR 行 (`0x36319008` 56 件・`0x36319010` 56 件・`0x36319018` 56 件)。入力 `work/fa_route/oi.flat.ll` は 25805 行・store 5526・`function_181057d20` 参照 88 で、`fa_wc.py instr` は `store total=5526 instrumented=5526 unhandled=0`。"emsc" (`63736d65`) を含む WC 行:
 
 | IR 行 | 関数 (`fn.json`) | 書込み先 | 値 | 件数 |
 |---|---|---|---|---|
@@ -62,14 +62,18 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `e1655883` (HEAD。コードを変えた最後の commit は `7273b6ac`。`git diff 7273b6ac HEAD -- tools/icall` は本付録 `REPORT_APPENDIX_1998.md` のみ) |
-| 素材 | `fl-win64`・`plugins-freshair` (fetch.sh: win 17 files, factory .epf 8)・`work-icall`・`toolchain-emsdk` (`/opt/emsdk`)。`toolchain-retdec` は本測定 (`fa_route_build.sh`・`fa_sweep.sh`) では未使用 |
+| 測定 commit | `7273b6ac` (コードを変えた最後の commit)。`git diff 7273b6ac 1fff0e4f -- tools/icall` は本付録 `REPORT_APPENDIX_1998.md` のみ (+40 / −12)。コード差分 0 |
+| 検証 HEAD | `1fff0e4f` (`7273b6ac` 以降は REPORT 文言のみ。`git diff 7273b6ac 1fff0e4f -- tools` の出力は `REPORT_APPENDIX_1998.md` の 1 ファイルのみ) |
+| 素材 | `fl-win64`・`plugins-freshair` (fetch.sh: win 17 files, factory .epf 8)・`work-icall`・`toolchain-emsdk` (`/opt/emsdk`)。`toolchain-retdec` は `fa_route_build.sh`・`fa_sweep.sh` では未使用 |
 | `tools/ott/native/build.sh` | OK (`work/libottnative.so`) |
-| `tools/icall/fa_route_build.sh` | OK、7.3 s |
-| `tools/icall/diff/fa_sweep.sh 8 60` (実測 1 回目) | 131 関数、70.8 s、load 0.65 → 0.89 (`uptime`)。`bit一致 47 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 9` |
-| 同 (2 回目・同一 HEAD) | 131 関数、関数単位で 1 回目と完全一致 (`diff` 0 件)。非決定性は無い |
+| `tools/icall/fa_route_build.sh` | OK、12.3 s |
+| `tools/icall/diff/fa_sweep.sh 8 60` (1 回目) | 131 関数、70.8 s、load (1 分平均) 0.98 → 1.21 (`uptime`、開始 1.55)。`bit一致 47 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 9` |
+| 同 (2 回目・同一 HEAD) | 131 関数、70.7 s、load (1 分平均) 0.98 → 1.11。関数単位で 1 回目と完全一致 (`sweep.jsonl` の `diff` 0 件) |
+| 同 (負荷下・3 回目) | 4 コアに busy loop 5 本をかけた状態 (load 6.46)。86.6 s。`bit一致 47 / 66 / 9 / 9`、関数単位で 1 回目と完全一致 |
 
-**REPORT の旧数値 (46 / 66 / 9 / 10) との差**: 実測は 47 / 66 / 9 / 9。差は 1 関数 (bit 一致 +1、値の不一致 −1)。どの関数かは未確定 (前回測定の数値を引き継いだため、旧測定の関数別 `sweep.jsonl` が無い)。`REPORT_APPENDIX_2009.md` §3 が既に「bit 一致から外れた関数の未確定」として記録している問題と同種で、本付録では数値を 47/66/9/9 に置き換えた。
+**REPORT の旧数値 (46 / 66 / 9 / 10) について**: 旧値は `REPORT_APPENDIX_2009.md` の OFF 行の数値 (`_ott_data_install` あり) で、今回の HEAD の実測では再現しなかった。HEAD で 3 回測り、関数単位で 47 が 3 回とも同じ判定になったため、本付録の数値は 47/66/9/9 とする。2009 の「47→46 の関数は未確定」は、`0x181065928` が HEAD で単体 `fa_cmp.py` 実行が SIGSEGV (`rip=0x1810806a0`) で bit 一致の候補にならないことから、この 47→46 の議論は今回の実測で解消した (2009 自体は未編集。未解決表の該当行は本付録の §4 で置き換える)。環境差 (負荷・パス) が原因かは、負荷下 (load 6.46) でも 47 だったため、負荷は原因ではないと判断する。
+
+**判定 47 の関数別内訳 (HEAD 実測)**: bit 一致 47 関数は `sweep.jsonl` の `match == n` かつ `mismatch == 0` で数えた (`status`・`wasm_err`・`native_err` が無い行)。wasm のみ err 9 (`0x1803b5500`・`0x1803fb6f0`・`0x18040c950`・`0x180ca1480`・`0x180da5f20`・`0x181057b38`・`0x181057d20`・`0x18106632c` は 8 入力 err、`0x180c8b280` は 2 入力 err)。値の不一致 9: `0x1803de190`・`0x180829c20`・`0x180c98240`・`0x180c99430`・`0x180da4030`・`0x181055400`・`0x181056a4c`・`0x181056aa0`・`0x18105d9fc`。
 
 `fa_cmp.py` の `mod._ott_data_install()` は `009c77bd` (測定 commit `7273b6ac` より前) で入っており、本測定はこれを含む。
 
@@ -92,6 +96,11 @@
 
 ```
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FA_DL=$RUNNER_TEMP/plugins-freshair RETDEC_ROOT=$HOME/retdec TMPDIR=$RUNNER_TEMP
+# 素材展開 (WORKFLOW.md §11): work-icall は tools/icall/work/ へ、fl-win64 は FL_WIN64_DIR へ
+tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C .
+mkdir -p "$FL_WIN64_DIR" "$FA_DL" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$FL_WIN64_DIR"
+tar --zstd -xf "$ARTIFACTS_DIR/plugins-freshair.tar.zst" -C "$FA_DL"
+bash tools/targets/freshair/fetch.sh   # SlateCore.core_64 等を work/win/ に作る (無いと fa_route_build.sh は exit 2)
 bash tools/ott/native/build.sh
 bash tools/icall/fa_route_build.sh
 bash tools/icall/diff/fa_wc_build.sh          # 監視付き wasm (work/fa_wc/fa_wc.cjs)
@@ -100,4 +109,4 @@ grep '^WC line=19132' err.txt                  # BLK+0 への書込み (IR 行 1
 bash tools/icall/diff/fa_sweep.sh 8 60
 ```
 
-範囲外: 値 `0x400000004` の生成元は本付録では未特定。IR 行から wasm オフセットへの変換も未実施。`diff/fa_wc_drv.cjs` は work/ の drv.cjs と同一 (引数: `<fa_wc.cjs 絶対パス> <VA>`)。
+範囲外: 値 `0x400000004` の生成元は本付録では未特定。IR 行から wasm オフセットへの変換も未実施。`diff/fa_wc_drv.cjs` の引数は `<fa_wc.cjs 絶対パス> <VA>`。
