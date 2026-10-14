@@ -1,7 +1,7 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
-import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
+import { classify, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
@@ -47,6 +47,16 @@ export interface Planned {
   n: number;
   art: string;
   relaunch: boolean;
+  // oc:no-pr の再投入の理由 (計数の対象。stop・split・blocked は再投入しない)
+  np?: "artifact" | "unknown";
+}
+
+// relaunch バケットの np:<n> (oc:no-pr の再投入の計数。count は artifact と unknown の再投入の合計)
+interface NoPrCount {
+  count: number;
+  unknown: number;
+  artifact: number;
+  art: string | null;
 }
 
 export interface Plan {
@@ -509,6 +519,10 @@ export class Engine {
     };
   }
 
+  private noPrState(n: number): NoPrCount {
+    return { count: 0, unknown: 0, artifact: 0, art: null, ...this.d.store.get<NoPrCount>("relaunch", `np:${n}`) };
+  }
+
   countActive(): number {
     let n = 0;
     for (const r of Object.values(this.s.runs)) {
@@ -534,12 +548,57 @@ export class Engine {
     const lastAct = (n: number): number =>
       Math.max(Date.parse(this.s.launchedAt[String(n)] ?? "") || 0, Date.parse(this.s.botLast[String(n)]?.at ?? "") || 0);
     const hasLabel = (n: number, l: string) => (labels.get(n) ?? []).includes(l);
-    const npCount = (n: number): number => this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0;
+    // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
+    const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
     const failed = (n: number): boolean => input.launchState?.[String(n)] === "failed";
+    // 既定の素材行 (PM の oc_artifacts 行。無ければ題名とラベルからの推定)。picks の既定と同じ。
+    const baseArt = (n: number): string => {
+      const b = this.s.pmArt[String(n)]?.line;
+      return b && validateArtLine(b) ? b : inferArtifacts(title.get(n) ?? "", labels.get(n) ?? []);
+    };
 
     const moveTo = (n: number, from: keyof Rows, to: () => void) => {
       (rows as any)[from] = (rows as any)[from].filter((x: any) => (Array.isArray(x) ? x[0] : x) !== n);
       to();
+    };
+
+    // oc:no-pr の issue は、最後の oc-run-outcome の reason で再着手を決める (PR を出さずに終わった run の後だけ)。
+    //  unknown: cooldown の後に 1 回だけ。artifact: 前回の oc_artifacts に無い allowlist 内の素材を足して 1 回 (足す素材が無ければ再投入しない)。
+    //  stop・split は PM agent (detectPm) に回す。blocked は blocker が close されるまで再投入しない。
+    const npPick = new Map<number, { art: string; np: "artifact" | "unknown" }>();
+    const noPr = (n: number, from: "ready" | "stopped"): void => {
+      const reason = this.s.sig[String(n)]?.outcome?.reason ?? "unknown";
+      const c = this.noPrState(n);
+      const prevNames = (c.art ?? baseArt(n)).replace("oc_artifacts:", "").trim().split(/\s+/).filter(Boolean);
+      let pick: { art: string; np: "artifact" | "unknown" } | null = null;
+      let to: "recent" | "stopped" | "blocked" = "stopped";
+      let note = reason;
+      if (reason === "blocked") {
+        to = "blocked";
+      } else if (reason === "stop" || reason === "split") {
+        to = "stopped";
+      } else if (nowMs - lastAct(n) < cool) {
+        to = "recent";
+        note = "oc:no-pr cooldown";
+      } else if (c.count >= NO_PR_MAX_RELAUNCH) {
+        note = "oc:no-pr x" + c.count;
+      } else if (reason === "unknown" && c.unknown === 0) {
+        pick = { art: baseArt(n), np: "unknown" };
+      } else if (reason === "artifact" && c.artifact === 0) {
+        const extra = neededArts(n, input).filter((a) => !prevNames.includes(a));
+        if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
+        else note = "artifact: 新しい素材なし";
+      } else {
+        note = `oc:no-pr ${reason} 再投入済み`;
+      }
+      if (pick) {
+        if (from === "stopped") moveTo(n, "stopped", () => rows.ready.push(n));
+        npPick.set(n, pick);
+      } else if (from === "ready") {
+        if (to === "blocked") moveTo(n, "ready", () => rows.blocked.push([n, []]));
+        else if (to === "recent") moveTo(n, "ready", () => rows.recent.push([n, note]));
+        else moveTo(n, "ready", () => rows.stopped.push([n, note]));
+      }
     };
 
     for (const n of [...rows.ready]) {
@@ -547,18 +606,17 @@ export class Engine {
       if (unknown.has(n)) moveTo(n, "ready", () => rows.blocked.push([n, []]));
       else if (kids.length) moveTo(n, "ready", () => rows.blocked.push([n, [...kids].sort((a, b) => a - b)]));
       else if (hasLabel(n, "oc:stuck")) moveTo(n, "ready", () => rows.user.push([n, "oc:stuck"]));
-      else if (hasLabel(n, "oc:no-pr") && nowMs - lastAct(n) < cool) moveTo(n, "ready", () => rows.recent.push([n, "oc:no-pr cooldown"]));
-      else if (hasLabel(n, "oc:no-pr") && npCount(n) >= NO_PR_MAX_RELAUNCH) moveTo(n, "ready", () => rows.stopped.push([n, "oc:no-pr x" + npCount(n)]));
+      else if (hasLabel(n, "oc:no-pr") && !held(n)) noPr(n, "ready");
     }
     for (const [n] of [...rows.relaunch]) {
       if ((children[String(n)] ?? []).length || hasLabel(n, "oc:stuck")) moveTo(n, "relaunch", () => rows.stopped.push([n, "parent/stuck"]));
     }
     // 親 (open な子を持つ) で、分類上 started / stopped / recent に入っているものは、そのままにする (着手対象ではないため)。
-    // oc:no-pr で、分類が stopped / recent に置いたものも cooldown 後は再着手してよい。
     for (const [n] of [...rows.stopped]) {
-      if (hasLabel(n, "oc:no-pr") && nowMs - lastAct(n) >= cool && npCount(n) < NO_PR_MAX_RELAUNCH && !(children[String(n)] ?? []).length && !hasLabel(n, "oc:stuck") && !unknown.has(n) && !failed(n)) {
-        moveTo(n, "stopped", () => rows.ready.push(n));
-      }
+      if (!hasLabel(n, "oc:no-pr") || (children[String(n)] ?? []).length || unknown.has(n)) continue;
+      // hold のラベルは再投入せず user に置く (ready に戻して下の hold の処理で移す)。観測できなかった投稿 (failed) は再投稿しない。
+      if (held(n)) moveTo(n, "stopped", () => rows.ready.push(n));
+      else if (!hasLabel(n, "oc:stuck") && !failed(n)) noPr(n, "stopped");
     }
 
     // 着手しても PR を出さない/出せない issue (pm-apply・needs-user-input) は、着手も再投入もしない。
@@ -591,10 +649,11 @@ export class Engine {
       const i = issueOf.get(n);
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
-      const cand = relMap.get(n) ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
+      const np = npPick.get(n);
+      const cand = relMap.get(n) ?? np?.art ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
       // 本文由来 (PM コメント・bot 報告) の行は、allowlist を通ったものだけを使う。通らなければ推定値に落とす。
       const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
-      picks.push({ n, art, relaunch: relMap.has(n) });
+      picks.push({ n, art, relaunch: relMap.has(n), np: np?.np });
     }
     const plan: Plan = {
       at: iso(nowMs),
@@ -699,9 +758,15 @@ export class Engine {
         const prev = this.d.store.get<{ count: number; art: string | null }>("relaunch", String(p.n)) ?? { count: 0, art: null };
         this.d.store.put("relaunch", String(p.n), { count: prev.count + 1, art: p.art });
       }
-      if ((this.s.issues[String(p.n)]?.labels ?? []).includes("oc:no-pr")) {
-        const c = this.d.store.get<{ count: number }>("relaunch", `np:${p.n}`)?.count ?? 0;
-        this.d.store.put("relaunch", `np:${p.n}`, { count: c + 1 });
+      // 計数は artifact / unknown の再投入だけ (stop・split・blocked は数えない)。
+      if (p.np) {
+        const c = this.noPrState(p.n);
+        this.d.store.put("relaunch", `np:${p.n}`, {
+          count: c.count + 1,
+          unknown: c.unknown + (p.np === "unknown" ? 1 : 0),
+          artifact: c.artifact + (p.np === "artifact" ? 1 : 0),
+          art: p.art,
+        });
       }
       this.meta.counters.launched++;
       this.pushLog({ kind: "launch", n: p.n, art: p.art });
