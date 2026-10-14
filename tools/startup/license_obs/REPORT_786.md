@@ -225,12 +225,15 @@
   - `mov ... ptr [...], 0x7fffffff` (メモリへの即値書込み): **269 件** (`write_mov_imm_0x7fffffff_to_mem`)。g1 への書込みに絞れていない (未完)。
 - 結論: g1 の意味は未確定。→ #1221。
 
-### 12.4 検証 (測定 commit: 本付録を含む HEAD)
+### 12.4 検証 (測定 commit: `c4eb485f` = コードを変えた最後の commit)
 
 | 項目 | 実測 |
 |---|---|
-| `probe_1414.py` 単体 | 約 60 秒・rc 0 |
-| `bash license_obs.sh` | 下記の PR 本文を参照 |
+| `probe_1414.py` 単体 (c4eb485f の内容) | 65.6 秒・rc 0 (`results/probe_1414.json` を再生成) |
+| `bash license_obs.sh` (c4eb485f・素材 fl-win64・load average 1 分値 0.75 開始時) | 2 分 15.7 秒・rc 0・`ALL OK`・PASS 39・FAIL 0 |
+| 比較: 変更前 (cb3a89a6・同素材・同スクリプト・load average 1 分値 0.46 開始時) | 2 分 14.0 秒・rc 0・`ALL OK`・PASS 39・FAIL 0 |
+
+- 変更前との差は 1.7 秒。PASS 件数は同数 (39)。
 
 ### 12.5 未解決 (起票先)
 
