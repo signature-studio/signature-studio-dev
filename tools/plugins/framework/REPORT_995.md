@@ -23,7 +23,7 @@
 
 ## 3. 実測 (n=1・測定 commit `e14a1a5d`)
 
-計測の素材: stage-1 dir (`toolchain-emsdk`・`work-fw-stage1` を使う stage-1/stage-2 の成果物)。取得元の run は記録が残っておらず未確認。本 run の `$ARTIFACTS_DIR` は `fl-win64` のみで、`/opt/emsdk` も無いため、この run では再実行していない。
+計測の素材: stage-1 dir (`toolchain-emsdk`・`work-fw-stage1` を使う stage-1/stage-2 の成果物)。取得元の run は記録が残っておらず未確認。本 run の `$ARTIFACTS_DIR` は `fl-win64` のみで、emsdk (`[EMSDK]`) も無いため、この run では再実行していない。
 
 | 手順 | 結果 | 所要 | load (1/5/15 分) |
 |---|---|---|---|
