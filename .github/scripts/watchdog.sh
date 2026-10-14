@@ -27,6 +27,13 @@
 # 読み取りに失敗した PR・mergeable が未確定の PR は、その回は何も操作せず次回に回す (fail-closed)。
 # fork からの PR (head.repo が本リポジトリでない) は CONFLICT でも dispatch しない (write 権限の run を第三者の入力で動かさない)。一覧に出して人が判断する。
 #
+# 入力不正の補正 (#CI-45): open PR で本文の oc_artifacts に許可されない語があり (prepare-event-context.sh が review を落とす)、
+#   この head に verdict が無い (review の打ち切り) なら、その語を除いて本文を直し (除いた語を PR にコメント: oc-artifacts-fixed:<head12>)、
+#   oc:stuck を外して review を再起動する。同じ head は 1 回まで。oc:stuck の理由が差し戻し上限 (oc-pm-intent: stuck) の PR は触らない。
+#   fork の PR は触らない。CONFLICT は対象外。
+# oc:stuck の滞留時間は issues/<N>/events の labeled (oc:stuck) から測り、stuck=N stuck-age-max=分 stuck-age-p50=分 (下側中央値) を出す。
+#   点検 1 回で読むのは最大 20 PR (更新の古い順)。
+#
 # 宙に浮いた issue (blocked でも着手済みでもない open issue) は、最後に floating-issues=N として数えて出力する (数えるだけ。#1950)。
 #
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
@@ -79,6 +86,37 @@ pr_artifacts() { # pr_artifacts <PR JSON>: PR 本文の oc_artifacts 行から�
   done
   printf '%s' "$out"
 }
+artifact_names() { # artifact_names <PR JSON>: oc_artifacts 行の語を 1 行 1 語で出す (prepare-event-context.sh と同じ分割)
+  local line
+  line="$(jq -r '.body // ""' <<< "$1" | grep -m1 -E '^[[:space:]]*oc_artifacts:' || true)"
+  printf '%s' "${line#*oc_artifacts:}" | tr -cd 'a-z0-9 -' | tr ' ' '\n' | grep -v '^$' || true
+}
+bad_artifacts() { # bad_artifacts <PR JSON>: prepare-event-context.sh が拒む語 (許可名に無い語。none は単独以外も拒む)
+  local names name total
+  names="$(artifact_names "$1")"
+  [ -n "$names" ] || return 0
+  total="$(printf '%s\n' "$names" | wc -l)"
+  while IFS= read -r name; do
+    if [ "$name" = none ]; then
+      [ "$total" -gt 1 ] && echo "$name"
+    elif ! printf '%s' "$name" | grep -qE "$ARTIFACT_RE"; then
+      echo "$name"
+    fi
+  done <<< "$names"
+  return 0
+}
+repair_artifacts() { # repair_artifacts <PR> <head> <PR JSON> <stuck 0|1>: 許可されない語を除いて本文を直し、review を再起動する (#CI-45)
+  local n="$1" head="$2" json="$3" stuck="$4" kept removed body f
+  kept="$(artifact_names "$json" | grep -E "$ARTIFACT_RE" | tr '\n' ' ' | sed 's/ *$//')"
+  removed="$(bad_artifacts "$json" | tr '\n' ' ' | sed 's/ *$//')"
+  body="$(jq -r '.body // ""' <<< "$json")"
+  f="${RUNNER_TEMP:-/tmp}/oc-artifacts-$n.md"
+  awk -v new="oc_artifacts: ${kept:-none}" 'BEGIN { d = 0 } !d && /^[[:space:]]*oc_artifacts:/ { print new; d = 1; next } { print }' <<< "$body" > "$f" || return 1
+  gh pr edit "$n" --repo "$R" --body-file "$f" > /dev/null || return 1
+  gh pr comment "$n" --repo "$R" --body "[watchdog] PR 本文の oc_artifacts に許可されていない素材名 (${removed}) があったため、review が起動せず打ち切られていました。その語を除いて本文を更新し、review を再起動します。<!-- oc-artifacts-fixed:${head:0:12} -->" > /dev/null || true
+  if [ "$stuck" = 1 ]; then gh pr edit "$n" --repo "$R" --remove-label oc:stuck > /dev/null || true; fi
+  reopen "$n" "$head"
+}
 mark_stuck() { # mark_stuck <PR>
   gh label create oc:stuck --repo "$R" --color B60205 --description "automatic review/fix recovery exhausted; needs a human decision" --force > /dev/null 2>&1 || true
   gh pr edit "$1" --repo "$R" --add-label oc:stuck > /dev/null 2>&1 || true
@@ -102,6 +140,19 @@ if ! pr_raw="$(gh api --paginate "repos/$R/pulls?state=open&per_page=100")"; the
 fi
 prs="$(jq -s 'add // [] | sort_by(.updated_at)' <<< "$pr_raw")"
 total="$(jq length <<< "$prs")"
+
+# oc:stuck の滞留時間 (#CI-45): 付与時刻は issues/<N>/events の labeled。読むのは最大 20 PR (更新の古い順)。
+stuck_nums="$(jq -c '[.[] | select([.labels[].name] | index("oc:stuck") != null) | .number]' <<< "$prs")"
+stuck_n="$(jq length <<< "$stuck_nums")"
+stuck_ages=()
+for sn in $(jq -r '.[0:20][]' <<< "$stuck_nums"); do
+  if ev="$(gh api --paginate "repos/$R/issues/$sn/events")"; then
+    at="$(jq -s -r '[.[][] | select(.event == "labeled" and .label.name == "oc:stuck") | .created_at] | last // ""' <<< "$ev")"
+    [ -n "$at" ] && stuck_ages+=("$(age_min "$at")")
+  else
+    echo "#$sn: failed to read events (stuck age unknown)"
+  fi
+done
 covered_n=0
 acted=0
 deferred=0
@@ -125,10 +176,15 @@ for i in $(seq 0 $((total - 1))); do
     continue
   fi
 
+  was_stuck=0
   if jq -e '[.labels[].name] | index("oc:stuck") != null' <<< "$pr" > /dev/null; then
-    echo "#$n STUCK_LABELLED: oc:stuck is set, waiting for a human decision"
-    tally[STUCK_LABELLED]=$((${tally[STUCK_LABELLED]:-0} + 1))
-    continue
+    # 入力不正 (許可されない素材名) の PR だけ、review が打ち切られたかを読み直して補正の候補にする。それ以外は人の判断待ちで触らない。
+    if [ -z "$(bad_artifacts "$pr")" ]; then
+      echo "#$n STUCK_LABELLED: oc:stuck is set, waiting for a human decision"
+      tally[STUCK_LABELLED]=$((${tally[STUCK_LABELLED]:-0} + 1))
+      continue
+    fi
+    was_stuck=1
   fi
 
   # --- IDLE: 理由を判定する。読めなかった PR・未確定の mergeable は操作せず次回に回す ---
@@ -165,6 +221,11 @@ for i in $(seq 0 $((total - 1))); do
 
   disp_n="$(jq -s --arg m "oc-dispatch:${head:0:12}" --arg who "$REVIEWER_LOGIN" \
     '[.[][] | select(.user.login == $who and .user.type == "Bot" and (.body | contains($m)))] | length' <<< "$cm_raw")"
+  # 入力不正の補正 (#CI-45): この head で補正済みか / 差し戻し上限 (fix-progress.sh の停止印) で止まった PR か
+  bad="$(bad_artifacts "$pr")"
+  repaired_n="$(jq -s --arg m "oc-artifacts-fixed:${head:0:12}" --arg who "$REVIEWER_LOGIN" \
+    '[.[][] | select(.user.login == $who and .user.type == "Bot" and (.body | contains($m)))] | length' <<< "$cm_raw")"
+  pm_stuck_n="$(jq -s '[.[][] | select((.body // "") | contains("oc-pm-intent: stuck"))] | length' <<< "$cm_raw")"
 
   reason=""
   if [ "$mergeable" = false ]; then
@@ -178,14 +239,26 @@ for i in $(seq 0 $((total - 1))); do
       *) reason=NOREVIEW ;;
     esac
   fi
+
+  # oc:stuck の PR は、入力不正で review が打ち切られた (verdict 無し・差し戻し上限ではない・未補正) 場合だけ補正する
+  if [ "$was_stuck" = 1 ] && { [ "$reason" != NOREVIEW ] || [ "$pm_stuck_n" -gt 0 ] || [ "$repaired_n" -gt 0 ]; }; then
+    echo "#$n STUCK_LABELLED: oc:stuck is set, input repair does not apply"
+    tally[STUCK_LABELLED]=$((${tally[STUCK_LABELLED]:-0} + 1))
+    continue
+  fi
+
   tally[$reason]=$((${tally[$reason]:-0} + 1))
   line="#$n $reason (updated ${upd_age}m ago)"
+  if [ "$reason" = NOREVIEW ] && [ -n "$bad" ]; then
+    line="$line [oc_artifacts に許可されない素材名: $(echo "$bad" | tr '\n' ' ' | sed 's/ *$//')]"
+  fi
   summary="$summary- $line"$'\n'
   echo "$line"
 
   # fork からの PR は dispatch しない: dispatch の run は write 権限で動き、fork の本文・コメント・ブランチ内容は第三者が書ける。
   # head.repo が読めない (削除された fork など) 場合も fork とみなす。oc:stuck は付けず、人が判断する。
-  if [ "$reason" = CONFLICT ] && [ "$(jq -r '.head.repo.full_name // ""' <<< "$pr")" != "$R" ]; then
+  # 入力不正の補正も本文を書き換えるので fork からの PR は触らない。
+  if { [ "$reason" = CONFLICT ] || { [ "$reason" = NOREVIEW ] && [ -n "$bad" ]; }; } && [ "$(jq -r '.head.repo.full_name // ""' <<< "$pr")" != "$R" ]; then
     echo "  skip: fork からの PR は自動対応しない (人が判断する。oc:stuck は付けない)"
     continue
   fi
@@ -203,8 +276,12 @@ for i in $(seq 0 $((total - 1))); do
 
   # 復旧に失敗し続ける PR を延々と叩かない。同じ head への watchdog の差し戻しが WD_MAX 回、または
   # review の自動再実行が尽きた (review-retry が 3 回) PR は oc:stuck を付けて止める (人の判断が要る)。
-  if { [ "$reason" != NOREVIEW ] && [ "$reason" != CONFLICT ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$retry_n" -ge 3 ]; } || { [ "$reason" = CONFLICT ] && [ "$disp_n" -ge "$DISPATCH_MAX" ]; }; then
-    echo "  STUCK: automatic recovery exhausted on ${head:0:7} (watchdog=$wd_n review-retry=$retry_n dispatch=$disp_n): labelled oc:stuck, no further action"
+  # 入力不正の補正が未実施なら、review 再起動の上限より先に補正する (補正で review が起動し直す)。
+  # 補正を 1 回しても入力不正が残る head は、人の判断が要る (oc:stuck)。
+  repair_due=0
+  if [ "$reason" = NOREVIEW ] && [ -n "$bad" ] && [ "$repaired_n" -eq 0 ]; then repair_due=1; fi
+  if { [ "$reason" != NOREVIEW ] && [ "$reason" != CONFLICT ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$repair_due" = 0 ] && [ "$retry_n" -ge 3 ]; } || { [ "$reason" = CONFLICT ] && [ "$disp_n" -ge "$DISPATCH_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ -n "$bad" ] && [ "$repaired_n" -ge 1 ]; }; then
+    echo "  STUCK: automatic recovery exhausted on ${head:0:7} (watchdog=$wd_n review-retry=$retry_n dispatch=$disp_n repaired=$repaired_n): labelled oc:stuck, no further action"
     do_it "oc:stuck on #$n" mark_stuck "$n"
     continue
   fi
@@ -235,7 +312,11 @@ for i in $(seq 0 $((total - 1))); do
       fi
       ;;
     NOREVIEW)
-      do_it "reopen #$n (restart the review)" reopen "$n" "$head"
+      if [ -n "$bad" ]; then
+        do_it "repair oc_artifacts (remove: $(echo "$bad" | tr '\n' ' ')) and reopen #$n" repair_artifacts "$n" "$head" "$pr" "$was_stuck"
+      else
+        do_it "reopen #$n (restart the review)" reopen "$n" "$head"
+      fi
       ;;
   esac
 done
@@ -267,12 +348,21 @@ if iss_raw="$(gh api --paginate "repos/$R/issues?state=open&per_page=100" 2> /de
 fi
 echo "$floating_line"
 
+stuck_line="stuck=$stuck_n stuck-age-max=unknown stuck-age-p50=unknown"
+if [ "${#stuck_ages[@]}" -gt 0 ]; then
+  mapfile -t sorted < <(printf '%s\n' "${stuck_ages[@]}" | sort -n)
+  stuck_line="stuck=$stuck_n stuck-age-max=${sorted[$((${#sorted[@]} - 1))]} stuck-age-p50=${sorted[$(((${#sorted[@]} - 1) / 2))]}"
+fi
+echo "$stuck_line"
+
 echo "open=$total covered(REVIEWING/FIXING)=$covered_n idle=$((total - covered_n)) acted=$acted deferred=$deferred"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
     echo "## PR watchdog"
     echo
     echo "open=$total / covered(REVIEWING・FIXING)=$covered_n / idle=$((total - covered_n)) / acted=$acted / deferred=$deferred"
+    echo
+    echo "$stuck_line"
     echo
     echo "$floating_line"
     echo
