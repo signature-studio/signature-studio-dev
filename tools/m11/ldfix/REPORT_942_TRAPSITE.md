@@ -72,7 +72,7 @@
 
 ## 5. 次の入口
 
-1. 53・87・138 の `*dest` に `value << 32` の値が入る経路。上流は `function_418210` (IR・53/138) と `function_59f9a0` (IR・87)。`function_418210` の entry の dest と、書込みの直前の値を記録する。
+1. 53・87・138 の `*dest` に `value << 32` の値が入る経路。→ unit 53 は解決: 書込みは `alloca ptr` への 4 byte 格納で、上位 4 byte の残骸が 8 byte 読みで入っていた (REPORT_942_PTRSLOT.md)。87・138 は未確定。
 2. unit 158: `function_414c70` (IR) が `function_4133f0` の `src` に文字列の中身を渡す経路。
 3. unit 17: `function_412c20` (IR) が `len = 3` に対して 6 を返す経路。
 4. unit 56・144・149: IR 版 `8c6530`・`407e20__lifted`・`412e40` の引き金の値 (記録の対象を広げる)。
