@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # SR-5 (#73): 参照 WAV の sha256 と基本メトリクスを JSON に書く (WAV 本体は commit しない)。
-# usage: python3 ref_manifest.py <render_f32.wav> <out.json>
-import hashlib, json, struct, sys
+# usage: python3 ref_manifest.py <render_f32.wav> <out.json> [empty|full]
+#   empty (既定): 専用の空 content dir (Tables 無し) の参照。主エントリ (sha256_file 等) を書き直す。
+#   full        : installer 全展開 content dir (Tables あり) の参照。out.json の content_full だけを更新する。
+import hashlib, json, os, struct, sys
 
 src, dst = sys.argv[1], sys.argv[2]
+cond = sys.argv[3] if len(sys.argv) > 3 else "empty"
+assert cond in ("empty", "full"), "condition must be empty|full"
 raw = open(src, "rb").read()
 assert raw[:4] == b"RIFF" and raw[8:12] == b"WAVE", "not a RIFF/WAVE file"
 p = 12
@@ -38,6 +42,7 @@ out = {
         "total_samples": n,
     },
     "render": {
+        "content": "work/ref_content (専用の空 dir・Tables 無し)。env S2REF_CONTENT で変更可",
         "dll": "work/Serum2_win64.vst3 (実 DLL, 無改変 unpatched, sha256 501e7bb3…5283)",
         "state": "plugin 既定 (Init, setState なし)",
         "midi": "NoteOn pitch=60 (S2HOST_PITCH 既定) block 0 / NoteOff block 24",
@@ -48,6 +53,19 @@ out = {
         "command": "bash tools/targets/serum2/host/ref_render.sh <outdir> 60",
     },
 }
+if cond == "full":
+    cur = json.load(open(dst))
+    cur["content_full"] = {
+        "content": "installer 全展開 (7z x、7,370 files、Tables あり) を S2REF_CONTENT に指定",
+        "sha256_data": out["sha256_data"],
+        "sha256_file": out["sha256_file"],
+        "metrics": {"peak": out["metrics"]["peak"], "rms": out["metrics"]["rms"]},
+    }
+    out = cur
+elif os.path.exists(dst):
+    prev = json.load(open(dst))
+    if "content_full" in prev:
+        out["content_full"] = prev["content_full"]
 json.dump(out, open(dst, "w"), indent=2, ensure_ascii=False)
 open(dst, "a").write("\n")
-print(json.dumps(out["metrics"], ensure_ascii=False))
+print(json.dumps(out["metrics"] if cond == "empty" else out["content_full"]["metrics"], ensure_ascii=False))

@@ -6,6 +6,7 @@
 #   candidate.wav  wasm 側の WAV (SR-4 出力の差し込み口)。省略時は参照同士の self-test とネガコンのみ。
 #   class          A-exact | B-ulp | C-statistical | D-spectral (既定 D-spectral: 参照は実 DSP の出力で bit 一致を要求しない)
 # 判定結果は work/harness/ (gitignore) に出し、ここでは 1 行ずつ [OK]/[NG] を表示する。
+# 参照 WAV は content dir (ref_render.sh の S2REF_CONTENT。既定は専用の空 dir) で変わる。pin は条件ごと (REPORT_SR5 §1)。
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FLP="$(cd "$HERE/../../../flp" && pwd)"
@@ -35,11 +36,17 @@ else
   ng "SHA-256 が不一致 (${SHA[*]}) — 非決定部分を許容クラス D で判定する必要あり"
 fi
 REF="$H/ref_1/render_f32.wav"
-PIN=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['sha256_file'])" "$HERE/ref_manifest.json")
+CONTENT_LINE="$(grep -m1 '^content=' "$H/ref_1.log" 2>/dev/null || echo 'content=? tables=?')"
+case "$CONTENT_LINE" in
+  *" tables=yes") PIN_KEY=content_full ;;
+  *)              PIN_KEY=main ;;
+esac
+echo "  content 条件: ${CONTENT_LINE##*/} (pin = ref_manifest.json の $PIN_KEY)"
+PIN=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print((d if sys.argv[2]=='main' else d[sys.argv[2]])['sha256_file'])" "$HERE/ref_manifest.json" "$PIN_KEY")
 if [ "${SHA[0]}" = "$PIN" ]; then
-  ok "参照 sha256 が ref_manifest.json と一致"
+  ok "参照 sha256 が ref_manifest.json ($PIN_KEY) と一致"
 else
-  ng "参照 sha256 が ref_manifest.json と不一致 (${SHA[0]:0:16} vs ${PIN:0:16})。DLL/state/MIDI が変わった可能性"
+  ng "参照 sha256 が ref_manifest.json ($PIN_KEY) と不一致 (${SHA[0]:0:16} vs ${PIN:0:16})。DLL/state/MIDI/content dir が変わった可能性"
 fi
 
 echo "== [2] 参照同士の self-test (A-exact で PASS) =="
