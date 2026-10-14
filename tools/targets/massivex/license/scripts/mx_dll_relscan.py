@@ -189,7 +189,7 @@ for t in TARGETS.values():
     for off in SR[t]:
         sn, va = sec_of(off)
         nt, nf = neighbors(off, va)
-        desc.append(f"at {va:#x} in {sn} (va%4={va % 4}, neighbors24 in-.text={nt} func-start={nf})")
+        desc.append(f"at {va:#x} in {sn} owner {owner(va)} (va%4={va % 4}, neighbors24 in-.text={nt} func-start={nf})")
     print(f"selfrel4 {rev[t]}: {len(SR[t])} hits", desc)
 for t in sorted(TARGETS.values()):
     line = []
