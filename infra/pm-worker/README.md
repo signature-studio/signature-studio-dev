@@ -70,7 +70,7 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 | kind | 検出 (すべて open の対象。起票者は後述の絞り込みを通ったものだけ) |
 |---|---|
 | `stuck` | `oc:stuck` の PR で、最新の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) に `<!-- oc-pm-intent: stuck pr=N ... -->` がある (`pr=` が当該 PR の番号) |
-| `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`) |
+| `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`)。または実装 run の打ち切りが連続して自動の再着手を止めた issue (『実装 run の打ち切りの連続』。`oc:no-pr` の標識は付かない) |
 | `needs_decision` | reviewer の最新の verdict が CHANGES_REQUESTED で、本文が `NEEDS_KEY` (`src/needs.ts`。`tools/pm/pm_needs.py` の `KEY` と同じ正規表現・同じ行分割) に一致し、その後に PM 応答が無い |
 | `user_answered` | `needs-user-input` の issue に、ラベルが付いた後に非 bot のユーザーのコメントが付いた (コメント者が `MEMBER` / `OWNER` / `COLLABORATOR` のものだけ。第三者のコメントでは起こさない #2461) |
 | `refs_orphan` | `Refs #N` のみ (閉じキーワード `Closes` / `Fixes` / `Resolves` の系が無い) で merge された PR の N が open で、本文に `親: #N` を持つ open の子が無い。`ref` は親 N (`src/refs.ts`。merge 時点の本文から番号だけを `prs[PR].refsOnlyNums` に残す) |
@@ -84,6 +84,19 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 - ラベル `pm-apply` / `needs-user-input` の issue (着手しても PR を出さない/出せない) は、`no_pr` の検出から除く。`plan()` は、この 2 ラベルの issue を ready・再投入の対象であっても着手せず `user` 行に置く (`oc:no-pr` の有無に依らない)。`user_answered` は `needs-user-input` が対象。`tools/pm/launch_issues.py` との差は PR 本文の未解決表に書く。
 - 検出するのは上の 5 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
 - `digest` (#2349・CI-70) は状態ではなく時刻で送る: `ref` は 0 だけ。初回の tick は起点を置くだけで、以後 24 時間に 1 回 (`meta/digestAt`)。送信に失敗した試行も 1 回と数え、毎分叩き直さない。dry-run は `would_dispatch_pm` に `digest#0` を記録するだけ。PM agent 側の集計は `.github/prompts/pm.md` の digest 節。
+
+## 実装 run の打ち切りの連続 (killed)
+
+実装 run (`issue_comment`) が **PR も出さずに** cancelled / failure / timed_out で終わると、`oc:no-pr` の標識が付かない (runner の shutdown では `record-run-outcome.sh` の `always()` step が走らない)。標識が無いと、Worker は『着手済みで run が終わった』issue として cooldown (3 時間) ごとに同じ指示で再着手し続ける。重い issue ではこれが同じ失敗の繰り返しになる。そこで **`workflow_run.completed` の conclusion だけで** (標識に依らず) 数える (`src/webhook.ts` の `applyKill`)。
+
+- **数える**: conclusion が `cancelled` / `failure` / `timed_out` で、題名が **一意な open issue** に当たる `issue_comment` の run。PR 上のコメントの run (題名が PR) や、同じ題名の open issue が複数あるときは数えない。
+- **数えない**: (a) open PR がある (ブランチ名 `N-...` か本文の `Closes` / `Refs` / `Fixes` / `Resolves #N`。着手済み)、または run の開始以降に merge された PR がある (run 中に open から merge まで済んだ PR は open の一覧に出ない。closed の PR は本文を持たないので、ブランチ名 `N-...` だけで当てる。`record-run-outcome.sh` と同じ考え方)、(b) `oc:stuck` `needs-user-input` `blocked` `pm-apply` のラベルか blocked_by がある (明示的な終了状態)、(c) **後続の run がある** (同じ題名の `issue_comment` の run で id が大きく、`skipped` で終わったものを除く。concurrency で置換された待機中の run の cancelled)。
+- **連続**: 成功した run は連続を断つ。`skipped` の run は断たない (agent 自身のコメントでも `issue_comment` の run が起き、`skipped` で終わる)。同じ run の再配送と順不同の配送は、最後に数えた run の id (`sig[N].killRun`) より大きい run だけを数えて重ねない。`killRun` は連続の解除では消さず、閉じた issue でも残す (run が prune された後の再配送も数えない)。
+- **止める**: 連続 **2 回** (`KILLED_STOP_AT`) で、`plan()` は ready・relaunch・recent から `stopped` (`killed x2`) に移す。`oc:no-pr` の cooldown・再投入の枠 (`np`) には載せない。`oc-pm` の **`no_pr`** (既存の kind。新しい kind は作らない) で PM agent の判断に回す。ラベル・コメントは書かない。
+- **解除 (連続を 0 に戻す)**: その issue の open PR が出た / issue が close された / 成功した run / kill より後の PM の応答 (PM のログインの通常コメント、PM のマーカー `oc-pm-decision:` `oc-pm-intent: relaunch` 付きの bot コメント) か人 (MEMBER / OWNER / COLLABORATOR) のコメント。**`/oc` の投稿は解除にしない** (Worker 自身の再投稿が連続を解かないように)。人の `/oc` では自動の再着手は止めたままで、`oc-pm` の `no_pr` だけを送らない (PM が応答済み)。その run がまた打ち切られれば再び送る。
+- **`/status`**: `killed_stopped` (止めている open issue の件数)、`killed_issues` (その番号。最大 100 件)。`pm_detected.no_pr` にも入る。
+- **限界**: (1) `completed` の配送を取りこぼすと数えない (reconcile が『一覧に無い』ことから付ける `conclusion=unknown` は数えない。失敗した配送の回収 #2339 が補う)。(2) 『push はしたが PR は出していない』run も PR 無しとして数える (`record-run-outcome.sh` と同じ定義)。(3) この版より前の打ち切りは数えない (連続は配送を受けた時点から)。(4) `prepare-event-context.sh` の `no_pr` は `oc-run-outcome` コメントを PM agent に渡すが、打ち切りの issue には無いので、PM agent には issue 本文とラベルだけが渡る。
+- 実測と受入条件は #2626。
 
 ## 自動 close: 規則 A (#2336)
 
