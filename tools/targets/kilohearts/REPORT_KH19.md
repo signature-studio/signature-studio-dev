@@ -211,13 +211,27 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 受入 2 (手検証集合と before 集合の差分 0 を書く): **未達** (手検証集合が空)。
 - 受入 3 (自動生成分を手検証済みと書かない): **達成** (本節と `verified` 列で明示)。
 
-## 9. #2155 (KH-34) 人手検証用ダンプの生成 (人手検証は未実施)
+## 9. #2155 (KH-34) 人手検証用ダンプの生成 (人手検証は未実施・ダンプは素材付きで再生成済み)
 
 - 基点 main: `6444b186`。本節の追加で変えたコードは `scripts/gain_manual_dump.py` (新規) のみ。既存 scripts は変えていない。
 - 素材: `plugins-kilohearts` を `tar --zstd -xf` で展開し、Windows 側 (`payload.dat` → `windows.zip/*` → `HeartCore.core_64` 76,642,304 B) だけを手で取り出した (mac 側は不要)。
 - 再生成: `rtti_walk.py` → `callgraph.py` (120,856 関数) → `gain_before_list.py <core> work/ms/callgraph.pkl work/ms/rtti_vtables.json gain <out>`。before_funcs = 160、roots = 27。列 1〜5 は正本 `gain_before_160.tsv` と全行一致。
-- 実測 (旧 `3e67338a`・4 vCPU・1 回・load average 0.31): `gain_manual_dump.py` 0.09 s。出力は 160 行すべて。call_site が命令境界に乗らない行は 0 件。
-- 修正 (レビュー指摘 2): ROOT 行の読み取りを 4 バイトから 16 バイトに変えた (`ins_at(f, 16)[:3]`)。4 バイトでは `push`/`mov` 1〜2 個分しか逆アセンブルされず「先頭 3 命令」と一致しなかった。
-- **未測定**: 上記修正後の `gain_manual_dump.py` の出力・ROOT 行の出力例・測定 commit は、素材 `plugins-kilohearts` (HeartCore.core_64) が無いため未取得。この commit での再生成 (`rtti_walk.py` → `callgraph.py` → `gain_before_list.py` → `gain_manual_dump.py`) を素材付きの run で行うまで、本節の ROOT 行の記述は未検証。
+- 修正 (レビュー指摘 2): ROOT 行の読み取りを 4 バイトから「関数の `size` 内に収まる命令を最大 3 個」に変えた (`ins_at(f, 48)` を `end = f + size` で切る)。4 バイトでは `push`/`mov` 1〜2 個分しか出ず、16 バイトでは `int3` パディングや 17 バイト超の命令で 3 個に届かない行が残った (旧 `cf0f042e` の #10 は 2 命令、#7 は `int3` を含んでいた)。
+- 測定 commit: `ce3e80e4` (コード変更の最後の commit)。main `6444b186`→`e082c4f1` の取り込み merge `6d48916d` 後、`git diff ce3e80e4 HEAD -- tools/targets/kilohearts/scripts` の出力は空 (差分 0)。
+- 測定 (素材 `plugins-kilohearts.tar.zst` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B。作業は `/home/runner/work/_temp/kh` 配下・`tools/**/work/` 不使用。4 vCPU・load average 1.00〜1.25・1 回):
+  - `rtti_walk.py`: vtable classes 6307 (約 1.8 s)
+  - `callgraph.py`: 120,856 関数、4 round で収束 (約 6.6 s)
+  - `gain_before_list.py`: before_funcs = 160、roots = 27 (約 0.3 s)。列 1〜5 は正本 `gain_before_160.tsv` と全行一致 (diff 0)
+  - `gain_manual_dump.py`: exit 0、0.10 s、出力 160 行 (`#` ヘッダ 160・ROOT 27)。call_site が命令境界に乗らない行 0 件
+  - 4 段の全チェーンを `ce3e80e4` (2 回目) と `6d48916d` (取り込み後) で実行し、`gain_manual_dump.py` の出力は 3 回 (`ce3e80e4` の既存 TSV 再入力・`ce3e80e4` 全チェーン・`6d48916d` 全チェーン) とも同一。
+- ROOT 行の出力例 (`#9`、`GainMasterDsp`):
+  ```
+  #9 0x1dac0 size=12 root=.?AVGainMasterDsp@gain@@
+    ROOT
+      0x1dac0: movsxd rax, edx
+      0x1dac3: mov rcx, qword ptr [rcx + 0x10]
+      0x1dac7: mov rax, qword ptr [rcx + rax*8]
+  ```
+- ROOT 行の命令数: 27 行中 20 行が 3 命令。残り 7 行は `size` が 1〜8 B の短い関数 (`ret` 等) で、関数内に 3 命令が存在しない (例: #7 `size=1`、`ret` のみ)。`size` を超えて読まないため、この 7 行は関数内の全命令を出す。
 - 判定: ダンプは人手検証の**材料**であり、検証結果ではない。`verified` 列は 160 行すべて `auto` のまま。手検証集合は空のため、受入 1・2 は未達。
-- 未達の追跡: 160 行の人手確認 (受入 1) と、手検証集合と before 集合の差分 (受入 2) は子 issue に切り出す。
+- 未達の追跡: 160 行の人手確認 (受入 1) と、手検証集合と before 集合の差分 (受入 2) は #2176 (KH-35) に残す。再測定は本節で完了済み (#2176 には含めない)。
