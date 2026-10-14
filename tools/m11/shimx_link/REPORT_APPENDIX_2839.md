@@ -13,7 +13,7 @@
 | 根因 | RetDec の署名 DB `share/retdec/support/generic/types/windows.json` で、`HMIDIOUT` の underlying 型が `unknown` (typedef 先が未定義)。この引数は IR で `i64` になる (実測。`unknown` が x86-64 のレジスタ幅に落ちる経路は観測から推定) |
 | 機械語との整合 | 呼出し元は `mov rcx, qword ptr [rcx+0x7c]` で 8 バイトのハンドルを読む。x64 の HMIDIOUT は 8 バイトなので、IR の `i64` は x64 の実幅と一致する。lift の誤りではない |
 | 不一致の本体 | x64 (8B) と wasm32 (4B) の target ABI の幅差。shimx は wasm32 規約で `HANDLE` = `ULONG_PTR` (4B) (`tools/shimx/src/shimx.h:63-64`、`midi_conv.c:13`) |
-| 採る修正方針 | **(b) 正規化 pass を恒久策として残す** (link 時の `i64`→`i32`。実装は PR #2796 の `sx_handle_norm.py`、未 merge)。(a) IR 生成側の型変更は採らない (§4) |
+| 採る修正方針 | **(b) 正規化 pass を恒久策として残す** (link 時の `i64`→`i32`。実装は PR #2796 の `sx_handle_norm.py` で、main に merge 済み (`a3e24270`、2026-10-14。`build.sh` の 2c で実行される))。(a) IR 生成側の型変更は採らない (§4) |
 
 ## 2. 機械語 ↔ IR ↔ 署名 DB の突合 (実測・測定 commit `97908347`)
 
@@ -37,7 +37,7 @@
 | RetDec の lift | `declare i1 @CloseHandle(i64*)`。引数は `i64*` (ポインタ) |
 | 署名 DB | `hObject`: `HANDLE -> PVOID -> pointer` |
 
-署名 DB が型を持つ (HANDLE 系) 場合は pointer になる。HMIDIOUT は `unknown` なので、pointer ではなく素の `i64` になる。
+CloseHandle では、署名 DB が型を持つ (HANDLE 系) 引数が pointer になった (1 件の観測。他の HANDLE 系への一般化はしていない)。HMIDIOUT は `unknown` なので、pointer ではなく素の `i64` になる。
 `windows.json` の typedef 先が `unknown` の型は全 435 件。マルチメディア系のハンドル (`HMIDI`・`HMIDIIN`・`HMIDIOUT`・`HMIDISTRM`・`HWAVEOUT`・`HWAVEIN`・`HDRVR`・`HACMDRIVER`) が含まれる。
 
 ## 4. 修正方針の判定 (受入 2)
@@ -46,7 +46,7 @@
 |---|---|---|---|
 | (a1) 署名 DB を pointer に直す | HMIDIOUT を `PVOID` 系へ | 不採用 | x64 では pointer も 8B で、IR の幅は `i64` のまま。pointer になると値のハンドルを pointer として扱うため、幅の一致だけを作って意味を壊す (CloseHandle の `i64*` と同じ形になる) |
 | (a2) lift 時に `i32` へ narrow | 署名 DB で HMIDIOUT を 4B 扱い | 不採用 | 機械語は 8B を読む。narrow すると x64 の値を lift 段で切り捨てた IR になり、lift の忠実性を落とす。`unknown` 型の全 435 件に波及する。署名 DB は外部 artifact (`toolchain-retdec`) で、repo の差分にならない |
-| (b) 正規化 pass を恒久策 | link 時に `midiOutShortMsg` の `i64` 引数を `i32` へ trunc (`sx_handle_norm.py`、PR #2796) | **採用** | 幅変換は target (wasm32) の規約なので link 層が持つ。lift の IR は x64 に忠実なまま。実装は PR #2796 に既にある |
+| (b) 正規化 pass を恒久策 | link 時に `midiOutShortMsg` の `i64` 引数を `i32` へ trunc (`sx_handle_norm.py`、PR #2796) | **採用** | 幅変換は target (wasm32) の規約なので link 層が持つ。lift の IR は x64 に忠実なまま。実装は PR #2796 で main に merge 済み |
 
 前提と残リスク: (b) の trunc が正しいのは、8B フィールドの上位 4B が 0 のときだけ。shimx の `midiOutOpen` は 4B の HANDLE を `LPHANDLE` に書く。上位 4B が 0 である確認は本 run で行っていない (§6)。
 
@@ -64,6 +64,5 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (b) 前提の「8B フィールドの上位 4B が 0」を実行で確認していない | trunc が上位ビットを捨てる。ハンドルが 4B を超える値なら誤る | #2877 (SHX-T32) の HEAD 再測定で確認 (既存 issue に追記) |
-| `sx_handle_norm.py` (b の実装) は未 merge | main の link は mismatch 1 のまま | PR #2796 (review 中) |
-| 全 boot IR (boot_final3) の再生成と e2e は未実施 | 本件は 1 関数の lift と静的突合。全体への波及は §10.3 の測定 (mismatch 1) と整合するが、再測定はしていない | #2877 |
+| (b) 前提の「8B フィールドの上位 4B が 0」を実行で確認していない | trunc が上位ビットを捨てる。ハンドルが 4B を超える値なら誤る | 本 PR の未解決表 (再測定のみ。子 issue は起票しない: WORKFLOW §3) |
+| 全 boot IR (boot_final3) の再生成と e2e は未実施 | 本件は 1 関数の lift と静的突合。全体への波及は §10.3 の測定 (mismatch 1) と整合するが、再測定はしていない | 本 PR の未解決表 (再測定のみ。子 issue は起票しない: WORKFLOW §3) |
