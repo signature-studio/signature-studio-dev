@@ -3,12 +3,14 @@
 
 IR に site の block が無い理由 (REPORT_2288 §8) を機械語の CFG で確かめる。
   1. 関数入口から jcc / jmp / call の後続を辿り、site に到達できるかを数える (BFS・命令単位)。
-  2. 定数分岐の枝刈り: c589b0 の flag 比較連鎖は同じ dword (VA 0x1504dd4) を読む。その唯一の書込み
-     (c59182 `mov dword ptr [rip+..], 8`) の値 8 に対し、`sub eax,6` (c59277) の後は 2 で、
-     c5927c `je c59299` と c59283 `je c5a7b8` は取られず、c5928e `jne c5d220` は必ず取られる。
-     枝刈りは PRUNE_C589B0 に列挙し、枝刈り無し (NONE) の到達性と並べて出す。
-  3. 書込み走査: config の関数区間 (boot*.drc.config.json) の全命令で VA 0x1504dd4 を rip 相対で指すものを数える。
+  2. c589b0 の定数分岐の枝刈り: c59271 `mov eax,[FLAG]` の読み値 v から、各分岐 (c5927c・c59283・c5928e) の
+     成否を算出する (prune_for_v)。v は (3) の支配の測定で c59182 の書込み値 8 に固定される。v ごとの結果も並べる。
+  3. 支配・書込み走査 (config の関数区間 boot*.drc.config.json の全命令):
+     (a) 入口から c59182 を除くと c59271 に届かない、(b) c5918c〜c59271 に call が無い、
+     (c) config 全関数で c5918c〜c59277 の外から内への直接分岐が 0 件 (config 外の image は未走査)。
+     FLAG を rip 相対で指す命令の数 (書込み W・読み R・アドレス取得 A)。欠落 store 2 本の rip 参照も数える。
 使い方: python3 ld104_reach.py [OUT.tsv]      環境変数: M11_WORK (既定 tools/m11/work)
+出力: OUT.tsv (site の到達) と、同じ dir の ld104_checks.txt (枝刈り表・支配・走査)
 """
 import glob
 import json
@@ -26,7 +28,12 @@ from ldmach_img import ImageMachine  # noqa: E402
 
 W = os.environ.get('M11_WORK', os.path.join(REPO, 'tools/m11/work'))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'results/ld104_reach.tsv')
+CHECKS = os.path.join(os.path.dirname(os.path.abspath(OUT)), 'ld104_checks.txt')
 FLAG = 0x1504dd4
+FLAG_WRITE = 0xc59182
+FLAG_READ = 0xc59271
+FLAG_RANGE = (0xc5918c, 0xc59277)
+STORES = (0x1504dd9, 0x1504dda)
 SITES = {
     'c589b0': ['c592c2', 'c5a6b4', 'c5a705', 'c5a750', 'c5a811', 'c5bc03', 'c5bc54', 'c5bc9f', 'c5bd1d',
                'c5d121', 'c5d172', 'c5d1bd'],
@@ -34,16 +41,27 @@ SITES = {
                 '129312c', '129450c', '129455d', '12945a8'],
 }
 ENTRY = {'c589b0': 0xc589b0, '128f9e0': 0x128f9e0}
-# (命令, 枝) の組。枝 'T' = 分岐を取る、'F' = 取らない (fallthrough) を削除する
-PRUNE_C589B0 = {(0xc5927c, 'T'), (0xc59283, 'T'), (0xc5928e, 'F')}
+# (分岐命令, 比較する値の差分 k, je 系なら True / jne 系なら False)。読み値 v に対し eax は v-6, v-10, v-11 になる
+FLAG_BRANCHES = ((0xc5927c, 6, True), (0xc59283, 10, True), (0xc5928e, 11, False))
 SPAN = 0x8000
+RIP = re.compile(r'\[rip ([+-]) (0x[0-9a-f]+)\]')
+DIRECT = re.compile(r'0x[0-9a-f]+$')
 
 
-def reach(mach, cs, entry, prune):
+def prune_for_v(v):
+    prune = set()
+    for a, k, zero_taken in FLAG_BRANCHES:
+        d = (v - k) & 0xffffffff
+        taken = (d == 0) if zero_taken else (d != 0)
+        prune.add((a, 'F' if taken else 'T'))
+    return prune
+
+
+def reach(mach, cs, entry, prune, block=frozenset()):
     seen, q, unknown = set(), deque([entry]), 0
     while q:
         a = q.popleft()
-        if a in seen or not (entry <= a < entry + SPAN):
+        if a in seen or a in block or not (entry <= a < entry + SPAN):
             continue
         seen.add(a)
         ins = next(cs.disasm(mach.read(a - mach.base, 16), a, 1), None)
@@ -53,13 +71,13 @@ def reach(mach, cs, entry, prune):
         nxt = a + ins.size
         if mn == 'ret' or mn == 'ud2':
             continue
-        if mn == 'jmp' and re.match(r'0x[0-9a-f]+$', op):
+        if mn == 'jmp' and DIRECT.match(op):
             q.append(int(op, 16))
             continue
         if mn == 'jmp':
             unknown += 1
             continue
-        if mn.startswith('j') and re.match(r'0x[0-9a-f]+$', op):
+        if mn.startswith('j') and DIRECT.match(op):
             t = int(op, 16)
             if (a, 'T') not in prune:
                 q.append(t)
@@ -70,10 +88,7 @@ def reach(mach, cs, entry, prune):
     return seen, unknown
 
 
-def write_scan(data, base):
-    hits = []
-    cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
-    rip = re.compile(r'\[rip ([+-]) (0x[0-9a-f]+)\]')
+def config_funcs(base):
     funcs = {}
     for p in glob.glob(os.path.join(W, 'boot*.drc.config.json')):
         for f in json.load(open(p))['functions']:
@@ -83,17 +98,51 @@ def write_scan(data, base):
                 continue
             if e > s and s >= base and e - s < 0x100000:
                 funcs[s] = max(e, funcs.get(s, 0))
+    return funcs
+
+
+def rip_hits(data, base, funcs, targets):
+    cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    hits = []
     for s, e in sorted(funcs.items()):
         for x in cs.disasm(data[s - base:e - base], s):
-            m = rip.search(x.op_str)
+            m = RIP.search(x.op_str)
             if not m:
                 continue
             d = int(m.group(2), 16) * (1 if m.group(1) == '+' else -1)
-            if x.address + x.size + d != FLAG:
+            t = x.address + x.size + d
+            if t not in targets:
                 continue
-            kind = 'W' if re.match(r'(?:mov|add|sub|and|or|xor|inc|dec)\w* (?:byte|word|dword|qword) ptr \[rip', x.mnemonic + ' ' + x.op_str) else 'R'
-            hits.append((x.address, x.mnemonic, x.op_str, kind, s))
+            if x.mnemonic == 'lea':
+                kind = 'A'
+            elif re.match(r'(?:mov|add|sub|and|or|xor|inc|dec)\w* (?:byte|word|dword|qword) ptr \[rip', x.mnemonic + ' ' + x.op_str):
+                kind = 'W'
+            else:
+                kind = 'R'
+            hits.append((x.address, x.mnemonic, x.op_str, kind, s, t))
     return hits
+
+
+def branches_into(data, base, funcs, lo, hi):
+    cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    into, indirect, direct = [], 0, 0
+    for s, e in sorted(funcs.items()):
+        for x in cs.disasm(data[s - base:e - base], s):
+            if not (x.mnemonic.startswith('j') or x.mnemonic == 'call'):
+                continue
+            if not DIRECT.match(x.op_str):
+                indirect += 1
+                continue
+            direct += 1
+            t = int(x.op_str, 16)
+            if lo <= t <= hi and not (lo <= x.address <= hi):
+                into.append((x.address, x.mnemonic, x.op_str))
+    return into, indirect, direct
+
+
+def calls_in(mach, cs, lo, hi):
+    code = mach.read(lo - mach.base, hi - lo + 16)
+    return [(x.address, x.mnemonic, x.op_str) for x in cs.disasm(code, lo) if x.address <= hi and x.mnemonic == 'call']
 
 
 def main():
@@ -101,10 +150,15 @@ def main():
     cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     data = open(os.path.join(W, 'm11_image.bin'), 'rb').read()
     rows = ['fn\tsite\treach_none\treach_pruned\tunknown_jmp_none\tverdict_reach']
-    summary = {}
+    checks = []
+
+    def log(s):
+        print(s)
+        checks.append(s)
+
     for fn, sites in SITES.items():
         e = ENTRY[fn]
-        prune = PRUNE_C589B0 if fn == 'c589b0' else set()
+        prune = prune_for_v(8) if fn == 'c589b0' else set()
         r_none, u_none = reach(mach, cs, e, set())
         r_pr, u_pr = reach(mach, cs, e, prune)
         cnt = {'reach': 0, 'dead': 0}
@@ -115,19 +169,50 @@ def main():
             v = 'REACH' if r_p else 'DEAD(枝刈り後)'
             cnt['reach' if r_p else 'dead'] += 1
             rows.append('\t'.join([fn, s, 'Y' if r_no else 'N', 'Y' if r_p else 'N', str(u_none), v]))
-        summary[fn] = (len(sites), cnt, len(r_none), len(r_pr), u_none, u_pr)
-        print('[ld104_reach] %s: site %d / 枝刈り無し到達 %d / 枝刈り後到達 %d / 枝刈り後 DEAD %d (CFG 到達命令 %d -> %d, jmp reg %d -> %d)' % (
+        log('[ld104_reach] %s: site %d / 枝刈り無し到達 %d / 枝刈り後到達 %d / 枝刈り後 DEAD %d (CFG 到達命令 %d -> %d, jmp reg %d -> %d)' % (
             fn, len(sites), sum(1 for s in sites if int(s, 16) in r_none), cnt['reach'], cnt['dead'],
             len(r_none), len(r_pr), u_none, u_pr))
-    hits = write_scan(data, mach.base)
-    W_hits = [h for h in hits if h[3] == 'W']
-    R_hits = [h for h in hits if h[3] == 'R']
-    print('[ld104_reach] VA 0x%x を rip 相対で指す命令 (config 関数区間): 書込み %d / 読み %d' % (FLAG, len(W_hits), len(R_hits)))
+
+    e = ENTRY['c589b0']
+    sites = [int(s, 16) for s in SITES['c589b0']]
+    log('[ld104_reach] c589b0 の読み値 v ごとの枝刈り (c59271 の読み値 v に対する分岐の成否・site 到達):')
+    scen = [('none', set()), ('NC: c5927c の fall のみ枝刈り', {(0xc5927c, 'F')})]
+    scen += [('v=%s' % hex(v), prune_for_v(v)) for v in (6, 8, 10, 11, 0x7fffffff)]
+    for name, p in scen:
+        r, _ = reach(mach, cs, e, p)
+        got = [('%x' % a) for a in sites if a in r]
+        pl = ' '.join('%x%s' % (a, m) for a, m in sorted(p))
+        log('  %-30s prune=[%s] REACH %2d/12 %s' % (name, pl, len(got), ' '.join(got)))
+
+    r_cut, _ = reach(mach, cs, e, set(), block={FLAG_WRITE})
+    r_full, _ = reach(mach, cs, e, set())
+    log('[ld104_reach] (a) 支配: c59271 到達 %s -> c59182 を除くと %s / c5918c 到達 %s -> %s' % (
+        'Y' if FLAG_READ in r_full else 'N', 'Y' if FLAG_READ in r_cut else 'N',
+        'Y' if FLAG_RANGE[0] in r_full else 'N', 'Y' if FLAG_RANGE[0] in r_cut else 'N'))
+    cl = calls_in(mach, cs, FLAG_RANGE[0], FLAG_READ)
+    log('[ld104_reach] (b) c5918c〜c59271 の call: %d 件 %s' % (len(cl), cl))
+
+    funcs = config_funcs(mach.base)
+    into, indirect, direct = branches_into(data, mach.base, funcs, FLAG_RANGE[0], FLAG_RANGE[1])
+    log('[ld104_reach] (c) config 関数 %d 本: 直接分岐・call %d 件 / 間接 %d 件。c5918c〜c59277 の外から内への直接分岐 %d 件 %s' % (
+        len(funcs), direct, indirect, len(into), into))
+
+    hits = rip_hits(data, mach.base, funcs, {FLAG})
+    kinds = {k: sum(1 for h in hits if h[3] == k) for k in 'WRA'}
+    log('[ld104_reach] VA 0x%x を rip 相対で指す命令 (config 関数区間): 書込み %d / 読み %d / アドレス取得 lea %d' % (
+        FLAG, kinds['W'], kinds['R'], kinds['A']))
     for h in hits:
-        print('  %x %s %s (%s) fn %x' % (h[0], h[1], h[2], h[3], h[4]))
+        log('  %x %s %s (%s) fn %x -> %x' % (h[0], h[1], h[2], h[3], h[4], h[5]))
+    st = rip_hits(data, mach.base, funcs, set(STORES))
+    log('[ld104_reach] 欠落 store 2 本 (VA 0x%x・0x%x) を rip 相対で指す命令 (config 関数区間): %d 件' % (STORES[0], STORES[1], len(st)))
+    for h in st:
+        log('  %x %s %s (%s) fn %x -> %x' % (h[0], h[1], h[2], h[3], h[4], h[5]))
+
     with open(OUT, 'w') as fh:
         fh.write('\n'.join(rows) + '\n')
-    print('[ld104_reach] -> %s' % OUT)
+    with open(CHECKS, 'w') as fh:
+        fh.write('\n'.join(checks) + '\n')
+    print('[ld104_reach] -> %s, %s' % (OUT, CHECKS))
 
 
 if __name__ == '__main__':

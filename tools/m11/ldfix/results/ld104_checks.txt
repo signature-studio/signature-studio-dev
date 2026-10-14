@@ -1,0 +1,23 @@
+[ld104_reach] c589b0: site 12 / 枝刈り無し到達 12 / 枝刈り後到達 0 / 枝刈り後 DEAD 12 (CFG 到達命令 3477 -> 468, jmp reg 0 -> 0)
+[ld104_reach] 128f9e0: site 12 / 枝刈り無し到達 12 / 枝刈り後到達 12 / 枝刈り後 DEAD 0 (CFG 到達命令 3681 -> 3681, jmp reg 0 -> 0)
+[ld104_reach] c589b0 の読み値 v ごとの枝刈り (c59271 の読み値 v に対する分岐の成否・site 到達):
+  none                           prune=[] REACH 12/12 c592c2 c5a6b4 c5a705 c5a750 c5a811 c5bc03 c5bc54 c5bc9f c5bd1d c5d121 c5d172 c5d1bd
+  NC: c5927c の fall のみ枝刈り        prune=[c5927cF] REACH  4/12 c592c2 c5a6b4 c5a705 c5a750
+  v=0x6                          prune=[c5927cF c59283T c5928eF] REACH  4/12 c592c2 c5a6b4 c5a705 c5a750
+  v=0x8                          prune=[c5927cT c59283T c5928eF] REACH  0/12 
+  v=0xa                          prune=[c5927cT c59283F c5928eF] REACH  0/12 
+  v=0xb                          prune=[c5927cT c59283T c5928eT] REACH  8/12 c5a811 c5bc03 c5bc54 c5bc9f c5bd1d c5d121 c5d172 c5d1bd
+  v=0x7fffffff                   prune=[c5927cT c59283T c5928eF] REACH  0/12 
+[ld104_reach] (a) 支配: c59271 到達 Y -> c59182 を除くと N / c5918c 到達 Y -> N
+[ld104_reach] (b) c5918c〜c59271 の call: 0 件 []
+[ld104_reach] (c) config 関数 8227 本: 直接分岐・call 61325 件 / 間接 4250 件。c5918c〜c59277 の外から内への直接分岐 0 件 []
+[ld104_reach] VA 0x1504dd4 を rip 相対で指す命令 (config 関数区間): 書込み 1 / 読み 4 / アドレス取得 lea 0
+  c59182 mov dword ptr [rip + 0x8abc48], 8 (W) fn c589b0 -> 1504dd4
+  c591a9 movsxd rcx, dword ptr [rip + 0x8abc24] (R) fn c589b0 -> 1504dd4
+  c591d4 movsxd rcx, dword ptr [rip + 0x8abbf9] (R) fn c589b0 -> 1504dd4
+  c59208 movsxd rcx, dword ptr [rip + 0x8abbc5] (R) fn c589b0 -> 1504dd4
+  c59271 mov eax, dword ptr [rip + 0x8abb5d] (R) fn c589b0 -> 1504dd4
+[ld104_reach] 欠落 store 2 本 (VA 0x1504dd9・0x1504dda) を rip 相対で指す命令 (config 関数区間): 3 件
+  c59255 cmp byte ptr [rip + 0x8abb7e], 0 (R) fn c589b0 -> 1504dda
+  c59264 mov byte ptr [rip + 0x8abb6f], al (W) fn c589b0 -> 1504dd9
+  c5926a mov byte ptr [rip + 0x8abb69], 1 (W) fn c589b0 -> 1504dda
