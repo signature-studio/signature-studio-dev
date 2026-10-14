@@ -50,7 +50,7 @@
 ## 2. `_PyInterpreterState_GetRefTotal` — FL PE は呼んでいない
 
 - 対応表 `analysis/pybind/pybind_map.json`: 束縛関数 `0xc395a0` の `lea` (0xc39e09) → resolver `0x4235f0` → slot `0x16b84e0`。release build の CPython には定義が無い (許容 1 件)。
-- 入力の展開 (`tools/python` で実行、gitignore の `work/` に置く): `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C work/py80 --wildcards '*block00031_PE.bin'` → `work/py80/extracted/block00031_PE.bin` (22,227,016 B、展開 2.9 秒)。
+- 入力の展開 (`tools/python` で実行、gitignore の `work/` に置く): `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py80 --wildcards '*block00031_PE.bin'` ([WIN64]・`$ARTIFACTS_DIR` は素材の置き場) → `work/py80/extracted/block00031_PE.bin` (22,227,016 B、展開 2.9 秒)。
 - 参照走査 `python3 analysis/pybind/slot_refs.py --pe work/py80/extracted/block00031_PE.bin --slot 0x16b84e0` (新規): rip 相対の参照は **1 件** (0xc39e18 の `mov [rip],rax`。束縛時の store)。呼出し・読出しは **0 件**。絶対 64bit / 32bit の参照も 0 件。出力は `0x16b84e0 disp_va=0xc39e18 opcode=mov [rip],reg` の 1 行 (6.5 秒。fix の commit で再実行して一致を確認)。
 - 走査の対照 (呼出しを拾えることの確認): `Py_NewInterpreterFromConfig` の slot `0x16b8250` は store (0xc395f8) と `call [rip]` (0xc3b46b)。
 - 束縛関数の逆アセ (`llvm-objdump -d`、0xc395a0〜0xc3a120): resolver `0x4235f0` の呼出し 110 件は全て、直後が `movq %rax, slot(%rip)` (格納)。戻り値の検査 (test / cmp / 分岐) は無い。よって束縛が NULL を返しても、読み込み時には止まらず、slot に無言で格納される。
