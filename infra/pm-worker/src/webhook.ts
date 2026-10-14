@@ -1,7 +1,9 @@
 // webhook 受信の純関数。署名を検証してから状態を変える (未検証の入力では状態を一切変えない)。
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
+import { bodyArtLine } from "./launch.ts";
 import { needsPmDecision } from "./needs.ts";
+import { rateMarkRun } from "./ratealert.ts";
 import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
 
 export const DEFAULT_REVIEWER_LOGIN = "oc-reviewer-for-signature-studio[bot]";
@@ -30,6 +32,8 @@ export interface IssueState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // 本文の最終の oc_artifacts 行 (検証済みの 1 行。先頭 4,000 字から抽出し、無ければ未設定)。launch の素材行の既定 (#2758)。本文が変わるたびに取り直す。
+  artLine?: string;
 }
 export interface PrState {
   number: number;
@@ -134,9 +138,11 @@ export interface PmState {
   launchedAt: Record<string, string>;
   // issue / PR 番号ごとの終端状態の手がかり
   sig: Record<string, Signal>;
+  // 率制限のマーカー (cause=rate_limit) を付けた run の id ごとの記録 (bot の投稿)。後続のコメントで上書きされない。判定は engine の rateAlert。
+  rateRuns: Record<string, { at: string; issue: number }>;
 }
 
-export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, botReport: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {} };
+export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, botReport: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {}, rateRuns: {} };
 
 export interface WebhookInput {
   secret: string;
@@ -199,6 +205,7 @@ function applyIssue(s: PmState, p: Json): PmState {
   const k = String(i.number);
   if (!newer(s.issues[k], i.updated_at)) return s;
   const closed = i.state === "closed";
+  const art = closed ? null : bodyArtLine(i.body ?? "");
   const summary = i.issue_dependencies_summary?.total_blocked_by;
   const next: IssueState = {
     number: i.number,
@@ -212,6 +219,7 @@ function applyIssue(s: PmState, p: Json): PmState {
     author: i.user?.login ?? s.issues[k]?.author,
     authorType: i.user?.type ?? s.issues[k]?.authorType,
     assoc: i.author_association ?? s.issues[k]?.assoc,
+    ...(art ? { artLine: art } : {}),
   };
   let out: PmState = { ...s, issues: { ...s.issues, [k]: next } };
   // needs-user-input が付いた時刻。labeled の配送だけが時刻を持つ (REST は engine が events から補う)。外れたら消す。
@@ -341,8 +349,20 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
   return setSig(s, k, patch);
 }
 
+// 率制限のマーカー (cause=rate_limit run=N) を、bot (実装・reviewer の App) の投稿から run id ごとに残す。issue でも PR でも数える。
+// botLast と違って後続のコメントで上書きされない。同じ run の 2 件目は残さない (先に来たものを残す)。
+function applyRateMarker(s: PmState, p: Json, botLogin: string, reviewer: string): PmState {
+  const c = p.comment;
+  const i = p.issue;
+  if (!c || !i || p.action !== "created" || typeof c.created_at !== "string") return s;
+  if (c.user?.login !== botLogin && c.user?.login !== reviewer) return s;
+  const run = rateMarkRun(c.body ?? "");
+  if (run === undefined || s.rateRuns[String(run)]) return s;
+  return { ...s, rateRuns: { ...s.rateRuns, [String(run)]: { at: c.created_at, issue: i.number } } };
+}
+
 function applyIssueComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = [], reviewer: string = DEFAULT_REVIEWER_LOGIN): PmState {
-  return applySignalComment(applyBotComment(s, p, botLogin, pmLogins), p, botLogin, pmLogins, reviewer);
+  return applyRateMarker(applySignalComment(applyBotComment(s, p, botLogin, pmLogins), p, botLogin, pmLogins, reviewer), p, botLogin, reviewer);
 }
 
 // reviewer の verdict (APPROVED / CHANGES_REQUESTED) を PR の手がかりに反映する。COMMENTED は verdict ではない。

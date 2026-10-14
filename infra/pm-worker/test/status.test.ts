@@ -69,6 +69,7 @@ const ADDED_KEYS = [
   "no_pr_needs_pm",
   "target_eff", "cap_est", "peak_running", "queued", "oldest_queued_age_min", "build",
   "last_redeliver_scan", "hook_failed_last_scan",
+  "demoted_reason", "shadow",
   // 同時実行の計数 (opencode.yaml の全 run を TARGET に数える)
   "active_all", "active_impl", "active_other", "active_by_event",
   // 自律運転の指標 (#2335)
@@ -82,8 +83,12 @@ const ADDED_KEYS = [
   "killed_stopped", "killed_issues",
   // VM の状態の取り込み (#2343)
   "launch_blocked", "imported_at",
+  // launch を止めている区間と、15 分以上止まっている (#2795)
+  "launch_halted", "launch_halted_overdue",
   // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
   "hold",
+  // 率制限の判定 (#2345・CI-66)。alert と、直近の評価の窓 (30 分) の件数・割合
+  "rate_limit_alert", "rate_limit_30m",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];
@@ -99,7 +104,7 @@ test("/status (d): 既存のキーは全て残り、追加するキーだけが�
   assert.equal(detail.phase, "launch");
   assert.equal(detail.launch_stop, null);
   assert.equal(detail.fresh, false);
-  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0 });
+  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0, demoted: 0, restored: 0 });
   assert.equal(detail.mode_close, "dry-run");
   assert.equal(detail.auto_close_detected, 0);
   assert.equal(detail.last_error, null);
