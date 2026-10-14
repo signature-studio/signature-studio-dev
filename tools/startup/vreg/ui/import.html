@@ -1,0 +1,45 @@
+<!doctype html><meta charset="utf-8"><title>vreg: .reg 取込</title>
+<style>body{font-family:sans-serif;margin:24px;max-width:760px}pre{background:#f4f4f4;padding:8px}</style>
+<h1>vreg: .reg 取込</h1>
+<p>正規ライセンスをお持ちの方が、ご自身で書き出した .reg を取り込みます。ファイルは生成・改変せず、そのまま保存して起動時に適用します。</p>
+<h2>.reg を取り込む</h2>
+<input type="file" id="reg-file" accept=".reg">
+<h2>MachineGuid</h2>
+<input id="machine-guid" size="40" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+<button id="apply-guid" type="button">設定</button>
+<h2>状態</h2>
+<pre id="status">読込中…</pre>
+<p id="msg" role="alert"></p>
+<script type="module">
+import createVregModule from '/build/vreg_wasm.mjs';
+import { LicenseImport } from '/js/license_import.mjs';
+import { IdbStore } from '/js/store.mjs';
+const seed = await (await fetch('/data/seed.json')).json();
+const $ = (id) => document.getElementById(id);
+const lic = await LicenseImport.open({ createModule: createVregModule, store: new IdbStore(), seed });
+window.licenseImport = lic;
+const render = () => { $('status').textContent = JSON.stringify(lic.status(), null, 2); };
+render();
+$('reg-file').addEventListener('change', async (ev) => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  try {
+    const info = await lic.importUserReg(new Uint8Array(await f.arrayBuffer()), f.name);
+    $('msg').textContent = `取り込みました: ${f.name} (値 ${info.values} 件)`;
+  } catch (e) {
+    $('msg').textContent = `取り込み失敗: ${e.message}`;
+  }
+  ev.target.value = '';
+  render();
+});
+$('apply-guid').addEventListener('click', async () => {
+  try {
+    await lic.setMachineGuid($('machine-guid').value.trim());
+    $('msg').textContent = 'MachineGuid を設定しました';
+  } catch (e) {
+    $('msg').textContent = `MachineGuid 設定失敗: ${e.message}`;
+  }
+  render();
+});
+window.ready = true;
+</script>
