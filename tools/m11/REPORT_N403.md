@@ -143,7 +143,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の ID は未付与。NULL 源の memcpy は下 §6-3 の候補で、既存類型との対応は未確認)。
 素材: `fl-win64` (`block00031_PE.bin` 22,227,016 B、展開 2.2 s)・`work-m11` (展開 2 s。`lift_pe.sha256` 無し)。
 `m11_e2e.sh` の全再生成 (指紋検査) は使わず、後段だけ `m11_lb_tolerant_repro.sh` で回した (gen_ir2 → data/image → lb_check → build → `m11_tolerant.mjs`)。
-`toolchain-emsdk` は展開せず runner 既存の `/opt/emsdk` を使った。`toolchain-retdec`・`work-liftdiff` は使っていない (lift を走らせていない)。
+`toolchain-emsdk` は展開せず runner 既存の emsdk ([EMSDK]、`docs/REFERENCES.md` §4) を使った。`toolchain-retdec`・`work-liftdiff` は使っていない (lift を走らせていない)。
 
 ### 6-1. 再現スクリプト (新規・issue の指定どおり)
 
