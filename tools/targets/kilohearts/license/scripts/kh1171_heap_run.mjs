@@ -1,0 +1,21 @@
+// node scripts/kh1171_heap_run.mjs <build_dir>/heapexec.mjs — HeapAlloc shim を wasm 内で実行し、0 返却・配置・16B 整列・内容保持を確認する (#1171)。
+const path = process.argv[2];
+const { default: KhLic } = await import(path);
+const m = await KhLic();
+const f = (n) => BigInt(m._test_heap(n));
+const KH_HEAP = 0x05000000n;
+const KH_HEAP_END = KH_HEAP + 0x100000n;
+const r = {};
+r.p1 = f(100n);
+r.p2 = f(16n);
+r.aligned = ((r.p1 | r.p2) & 15n) === 0n;
+r.in_heap = r.p1 >= KH_HEAP && r.p2 < KH_HEAP_END && r.p1 !== 0n && r.p2 !== 0n;
+m.HEAPU8.fill(0xab, Number(r.p1), Number(r.p1) + 100);
+r.big = f(0x200000n);
+r.huge = f(0xfffffffffffffff0n);
+r.max_first = f(0xf0000n);
+r.max_second = f(0xf0000n);
+let ok = true;
+for (let i = 0; i < 100; i++) if (m.HEAPU8[Number(r.p1) + i] !== 0xab) ok = false;
+r.p1_intact = ok;
+console.log(JSON.stringify(r, (k, v) => (typeof v === 'bigint' ? '0x' + v.toString(16) : v)));
