@@ -117,7 +117,7 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 ### 5-1. 差し戻し対応 (fix round 1) の検証
 
 - 検証は差し戻し時と同じコード (`10617273`) で行った。`provider`・`host`・`tests` は対応で変更していない (`git diff 1d71dd27 HEAD -- tools/python/provider tools/python/host tools/python/tests` = 0 行)。
-- emsdk: 上流から `emsdk install 6.0.12` でユーザー領域に導入し (`[EMSDK]` の symlink 先)、`emsdk activate 6.0.12` (`emcc --version` = 6.0.12)。`toolchain-emsdk` の素材は本 run では取得していない (`$HOME/artifacts` は `fl-win64` のみ)。次 run の素材指定は PR 本文の `oc_artifacts` 行。
+- emsdk: 上流から `emsdk install 6.0.12` でユーザー領域に導入し (`[EMSDK]` の symlink 先)、`emsdk activate 6.0.12` (`emcc --version` = 6.0.12)。`toolchain-emsdk` の素材は本 run では取得していない (素材置き場は `fl-win64` のみ)。次 run の素材指定は PR 本文の `oc_artifacts` 行。
 - `provider/build.sh` (EMSDK_ENV を上記に指定): real 1.301 s・警告 0 (出力は fl_table 行と flprov.js/wasm の 2 行のみ)。
 - `node tests/playlist_diff.mjs` (ビルド直後): calls 42・diffs 0・PASS・real 0.090 s。
 
