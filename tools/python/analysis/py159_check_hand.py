@@ -52,11 +52,17 @@ def compare(mach, hand):
     return hc == mc, "" if hc == mc else f"hand={hc!r} mach={mc!r}"
 
 
+NEGCTLS = ("r8d",)
+
+
 def main():
     args = sys.argv[1:]
     negctl = None
     if "--negctl" in args:
         k = args.index("--negctl")
+        if k + 1 >= len(args) or args[k + 1] not in NEGCTLS:
+            print(f"usage: --negctl {{{'|'.join(NEGCTLS)}}} (値なし・未知の値はエラー)", file=sys.stderr)
+            sys.exit(2)
         negctl = args[k + 1]
         del args[k:k + 2]
     ins, order = w.load(args[0])
