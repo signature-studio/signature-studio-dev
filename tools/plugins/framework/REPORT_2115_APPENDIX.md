@@ -119,7 +119,7 @@ index 1ae5159c..641239e2 100644
  void *TlsGetValue(int i) { void *r = (i >= 0 && i < 128) ? (void *)(uintptr_t)g_tls_slots[i] : 0; if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] TlsGetValue(%d) -> 0x%llx\n", i, (unsigned long long)(uintptr_t)r); return r; }
 ```
 
-- この差分は実行コードのため、WORKFLOW §6 の再測定の対象。**未実施** (fix round 6 と fix round 7 の両方): `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみで、`work-fw-stage1`・`toolchain-emsdk`・`toolchain-retdec` が無い。runner に `/opt/emsdk`・`/opt/retdec` も無いため、`fw_stage2.sh` と `hs_e2e.sh --fresh` を実行できない。PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1` で次 run に取得させる。構文は `clang -fsyntax-only` (`emscripten.h` を空スタブ) で修正前後ともエラー 0。merge 前の再測定は REPORT_2115.md §9 の未解決。
+- この差分は実行コードのため、WORKFLOW §6 の再測定の対象。**未実施** (fix round 6 と fix round 7 の両方): `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみで、`work-fw-stage1`・`toolchain-emsdk`・`toolchain-retdec` が無い。runner に [EMSDK]・[RETDEC] の導入先も無いため、`fw_stage2.sh` と `hs_e2e.sh --fresh` を実行できない。PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1` で次 run に取得させる。構文は `clang -fsyntax-only` (`emscripten.h` を空スタブ) で修正前後ともエラー 0。merge 前の再測定は REPORT_2115.md §9 の未解決。
 - 次 run の測定手順: 測定 commit は実行時の HEAD。`bash tools/plugins/framework/fw_stage2.sh` (SMOKE PASS・`dispatch=38 ff=0`) と `bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh` を実行し、所要・load (開始 → 終了)・PASS/FAIL をこの節に追記する。Phase B の OOB 位置・`rec`・E2E 項目は、§11.4 の対照 (4c00ec24) と比べる。Phase A が `dispatch=38 ff=0` から外れた場合は、表示カウンタ分離 (`058c2049`) との切り分けのため、同じ run で `4c00ec24` の `fw_rt.c` を対照に測る。
 
 ### 11.5 注入実験 (未採用)
