@@ -22,7 +22,7 @@ const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHas
 const mig = new Set(["channels.selectedChannel", "channels.fillEachNSteps", "general.getVersion", "transport.isPlaying", "ilmcp.forwardTutorialEvent"]);
 // PE 解析で意味論を確定した関数 (REPORT_PY69・PY-69 #2499)。channels.setChannelPitch は未確定のため含めない
 const pe39 = new Set(["channels.selectOneChannel"]);
-// PE 解析で意味論を確定した関数 (REPORT_PY61 §3 の muteTrackLock・PY-102 #2883)
+// PE 解析で value 引数の意味論 (準備判定を除く) を確定した関数 (REPORT_PY61 §3 の muteTrackLock・PY-102 #2883。準備判定は #2959)
 const pe102 = new Set(["playlist.muteTrackLock"]);
 // 公開 stub の戻り型・説明で意味論を決めた 6 関数 (REPORT_PY41 追補・REPORT_PY41_1514 追補・PY-41 #1514)。PE での範囲外 code 確認は未了
 const stub41 = new Set(["channels.isChannelMuted", "channels.isChannelSolo", "channels.getChannelColor", "channels.getGridBit", "channels.channelNumber", "channels.getChannelType"]);
