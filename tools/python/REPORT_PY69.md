@@ -5,7 +5,7 @@
 ## 解析の詳細 (PY-69)
 
 - 既知類型との関係: 該当なし (lift 作業ではない。PE 逆アセンブルによる意味論の確定)。
-- 測定 commit: `68aefd04` (コード変更の最後の commit。`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`analysis/flapi/pe_scan_store.py`。`683aef61` の後に mock の 2 番目引数の型検査と、差分テストの呼出し 3 件を足した)。
+- 測定 commit: `96de54b9` (コード変更の最後の commit。main の取り込み merge。PY-69 のコード変更は `68aefd04`: `provider/fl_engine.c`(コメント)・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`(コメント)・`analysis/flapi/pe_scan_store.py`。`683aef61` の後に mock の 2 番目引数の型検査と差分テストの呼出し 3 件を足した)。
 - 逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`。`-C` を省くと作業ツリーに展開される。実測 2.9 秒)。
 - 書込み箇所の列挙: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_scan_store.py 0x32c` (PE 全 `.text` 16,397,488 バイトの線形走査、19.6 秒、10 件)。
 
@@ -50,7 +50,7 @@
 - `provider/fl_engine.c` `FL_H(channels, selectOneChannel)`: `CH(0)` で範囲外を code 4、次に `(void)A_INT(1, 0)` で 2 番目の型を検査 (型違いは code 5)、`ch[i].sel = (i == _i)`。未モデル: useGlobalIndex・前提ゲート `0xd5af58`・選択ゲート `0xffac20`。
 - `host/fl_mock.mjs`: `arity(a, 1, 2)`、`ch(a[0])`、`argI(a, 1, 0)` (C と同じ型検査)、`c.sel = c === k`。
 
-### 検証 (コミット済み HEAD `68aefd04` で実行)
+### 検証 (コミット済み HEAD `96de54b9` で実行)
 
 | 検証 | 結果 |
 |---|---|
@@ -61,9 +61,9 @@
 | `node tests/all_tools.mjs` (mock) | 48/48 ok、soft_error 0、raised 0、host_calls 37425、callback_roundtrip true |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37425、callback_roundtrip true |
 
-- 所要 (実測, `68aefd04`): `build_cpython_wasm.sh` 2 分 42 秒、`build_flpy.sh` 4.6 秒、`provider/build.sh` 0.6 秒、`channels_diff` 0.04 秒、`provider_check` 0.23 秒、`all_tools` 1.09 秒 (mock) / 1.17 秒 (wasm)、`pe_scan_store.py 0x32c` 19.6 秒。
-- load average: nproc 4、`uptime` は 15:30:12 時点で `2.28 / 1.45 / 0.69`、15:30:15 時点で `2.10 / 1.42 / 0.68` (1・5・15 分平均)。ビルド中の値は採取していない。
-- 差分 0 の証跡: `git diff 68aefd04 HEAD -- tools/python/provider tools/python/host tools/python/tests` (本節を含む commit は docs のみのため出力 0 行。PR 作成時に実行して確認)。
+- 所要 (実測, `96de54b9`): `provider/build.sh` 0.6 秒、`build_flpy.sh` 4.8 秒、`channels_diff` 0.04 秒、`provider_check` 0.25 秒、`all_tools` 1.12 秒 (mock) / 1.13 秒 (wasm)。`build_cpython_wasm.sh` 2 分 42 秒と `pe_scan_store.py 0x32c` 19.6 秒は `68aefd04` での実測 (`96de54b9` では再実行していない)。
+- load average: nproc 4、`uptime` は 15:37:20 時点で `0.13 / 0.38 / 0.44` (1・5・15 分平均)。ビルド中の値は採取していない。
+- 差分 0 の証跡: `git diff 96de54b9 HEAD -- tools/python/provider tools/python/host tools/python/tests` (本節を含む commit は docs のみのため出力 0 行。PR 作成時に実行して確認)。
 
 ### 検証範囲 / 範囲外
 
