@@ -100,6 +100,8 @@ pre{white-space:pre-wrap;overflow:auto;max-height:50vh;background:var(--bg);bord
 <h2>issue の区分</h2>
 <div id="cats"></div>
 <div class="kv"><span class="k">ready_by_prio 着手待ちの区分 (critical / normal / low)</span><span class="v" id="v-ready_by_prio">—</span></div>
+<div class="kv"><span class="k">active_by_prio 実行中の run の区分 (critical / normal / low)</span><span class="v" id="v-active_by_prio">—</span></div>
+<div class="kv"><span class="k">low_cap prio:low の上限 (cap / running / applied)</span><span class="v" id="v-low_cap">—</span></div>
 </section>
 
 <section class="card">
@@ -176,7 +178,7 @@ pre{white-space:pre-wrap;overflow:auto;max-height:50vh;background:var(--bg);bord
     "active_all", "active_runs", "active_impl", "active_other", "queued", "room", "target", "target_eff",
     "counters", "open_prs", "open_prs_excl_stuck", "stuck_prs", "rest_remaining", "rest_used", "rest_reset_at",
     "sync_truncated", "reconcile_diff", "last_full_sync_rest_calls", "comment_window_h", "pm_detected",
-    "relaunch", "running", "dry_run_skipped_posts", "ready_by_prio"
+    "relaunch", "running", "dry_run_skipped_posts", "ready_by_prio", "active_by_prio", "low_cap"
   ].concat(CATS.map(function (c) { return c[0]; }));
   var last = null;
   var lastOk = 0;
@@ -317,6 +319,8 @@ pre{white-space:pre-wrap;overflow:auto;max-height:50vh;background:var(--bg);bord
     });
     put("v-running", fmtObj(s.running), "v");
     put("v-ready_by_prio", fmtObj(s.ready_by_prio), "v");
+    put("v-active_by_prio", fmtObj(s.active_by_prio), "v");
+    put("v-low_cap", fmtObj(s.low_cap), "v");
   }
 
   function band() {
