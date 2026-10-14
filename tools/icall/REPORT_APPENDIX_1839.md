@@ -36,7 +36,7 @@ before IR は `switch` 40 件すべてに `!insn.addr` が無く、畳み込み�
 
 ## 実測
 
-測定 commit: 本ブランチの audit 変更 commit (下記 `測定 commit`)。素材: `work-icall` の `rt_ott-F` (after.0.restored.ll / map.json / F.ranges)、
+測定 commit: `09ed7bbc` (audit 変更を含む最後のコード commit)。素材: `work-icall` の `rt_ott-F` (after.0.restored.ll / map.json / F.ranges)、
 `analysis-ott-binaries` の `OTT_vst2_win64.dll`。
 
 | 入力 | `--map` | jmptable (before) | jmptable (after) |
