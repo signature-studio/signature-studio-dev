@@ -425,5 +425,10 @@ PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次�
   依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
 - **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
   PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
+- **PR 起点の判断待ち (`needs_decision`)**: 対象は `needs-user-input` の issue でなく PR (ref は PR 番号)。reviewer の最新の差し戻し
+  (`CHANGES_REQUESTED`) の本文が PM の判断・起票を求めているとき (`review.needs`) に Worker が送る。条件は `infra/pm-worker/src/pm.ts` の `detectPm`。
+- **質問の前の状態確認**: 質問・`needs-user-input` を出す前に、対象 issue が closed でないこと、PR が merge 済みでないこと、
+  post-merge review の有無を確かめる。当たれば質問せず `rule=skip` で終える。closed の issue に残った `needs-user-input` は外す。
+  手順は `.github/prompts/pm.md` の「質問・`needs-user-input` の前に対象の状態を確認する」。
 - **不在中の自動判断**: PM agent が行った判断は `<!-- oc-pm-decision: rule=Rn reversible=yes/no -->` マーカーで残る。
-  事後の確認はダイジェスト ([CI-70]) で行う。
+  対象なしで終えた run は判断でなく `rule=skip` のマーカーを残す。事後の確認はダイジェスト ([CI-70]) で行う。
