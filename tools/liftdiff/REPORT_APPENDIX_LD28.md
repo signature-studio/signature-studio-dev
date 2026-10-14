@@ -24,3 +24,11 @@
   仮説: 32 件の一部は、この udiv が trap 経路 (0x409730) を誤って取ることで生じる。**未確認**: 32 件の stride 符号・経路の実測、および sdiv への修正後に食い違いが消えるかの再実行。
   `417c7a`〜`417c81` の `dword [rax+4]==1` 判定と 0x409410/0x409470 の分岐も未確認。
   子 issue: #1238 (LD-41) に追記 (動的確認の受入条件を持つ)。
+
+#### 0x418be0 (P2 20 件) の IR 側確認 (LD-28 受入条件 1・本 run の実測)
+- 機械語 (`block00031_PE.bin`): 呼出元 `0x41c820` は `0x41c875: call 0x418be0` の後、`0x41c88a: call 0x407030` を持つ。`0x407030` は IAT の `LoadStringW` への `jmp qword ptr [rip+...]` thunk (IAT RVA 0x1970c78)。
+- IR (`boot_final3.ll`): `function_41c820` は `%14 = call i32 @LoadStringW(...)` を**直接**呼ぶ (`function_407030` を経由しない)。`function_407030` 自体は `@LoadStringW` を呼ぶ定義として存在する (L105921)。したがって P2 の「`call 0x407030` の欠落」は、IR に thunk 呼出しが無いという表現の差で、呼出し脱落そのものとは言えない。
+- batch 実測 (`work-liftdiff` の `batch_closure.jsonl`・20 件・wasm_trap かつ unreachable・食い違い L = 0x418be0): native trace は全 20 件で `0x418be0 → 0x407030 → 0x413060`、wasm は `0x418be0 → 0x413060`。全 batch (17,324 case) で wasm trace に `0x407030` が現れるのは 0 件、native に現れるのは 317 件。
+- thunk `0x407030` を native trace から除いて比べると、20 件中 4 件は trace_head 内で一致、16 件は食い違いが残る (次の不一致 entry: `0x409410` vs `0x4133f0` 9 件・`0x4233b0` vs `0x413060` 3 件・`0x467910` vs `0x4133f0` 2 件・`0x409410` vs `0x43dd60` 1 件・`0x412c20` vs `0x412d60` 1 件)。
+- 結論: 0x418be0 系の食い違いは「thunk の脱落」だけでは説明できない。`0x407030` は表現差として扱い、残る分岐 (`0x41c820` 以後の `0x413060` 呼出し後の経路) は未特定。P2 の件数 (20) は results の分類どおりで、その原因ラベルは「thunk 脱落」から「未特定 (IR の thunk 呼出し無し・後続 trace で食い違い)」に読み替える。受入条件 1 の 0x418be0 は、この読替えで静的確認済み・原因は未達 → #1035 に残す。
+- 再現 (本 run の一回限りの解析・スクリプト未 commit): `batch_closure.jsonl` を読み、`wasm_trap` かつ detail が `unreachable` の case で、trace_head の最後の共通 entry が 0x418be0 のものを抽出。native 側から `0x407030` を除いた列と wasm 列を比較。PE は `LD_M11_PE=work/fl-win64/extracted/block00031_PE.bin`。
