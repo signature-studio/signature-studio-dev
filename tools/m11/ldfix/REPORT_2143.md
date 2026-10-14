@@ -14,6 +14,18 @@
 - 監査: `audit_undefload_dest.py` 5 入力 (boot0〜boot4 の norm0)。**55.4 秒** (user 55.0 秒)、load average 0.52〜0.64 (4 vCPU)、rc 0。
   出力: sites 2,729、`DEST_FRAME_IN_ESCAPED` 18・`REGLIVE` 2,502・`NOADDR` 193・`DEST_FRAME_OTHER` 9・`DEST_MEMREAD` 6・`DEST_RIPREAD` 1。
 - 旧監査 `audit_undefload.py` の sites は本セッションで測っていない (数値は引かない)。
+- **単位と分母** (数値ごとに 1 行。数え方は `audit_undefload.py` `scan_text` と `audit_undefload_dest.py` `main` の実装):
+
+  | 数値 | 単位 | 分母・除外 |
+  |---|---|---|
+  | scan records 2,846 (元入力) / 5,185 (`uselistorder` 除去後) | 名前無し alloca からの load 1 件 (`scan_text` の yield 1 件)。consumer 0 件も含む | 5 入力 norm0 の合計。`alloca` が `uselistorder` 等の load 以外の行で使われる関数の alloca は除外 |
+  | sites 2,729 (audit 出力) | 上の load 1 件のうち、直接 memop の無い consumer (REGLIVE 扱い等) を 1 件以上持つもの (`audit_undefload_dest.py` `main` の `sites.append`。直接 memop の consumer は分類から除く) | 区分の合計 18+2,502+193+9+6+1 = 2,729 |
+  | sites 4,910 (`uselistorder` 除去後の dest 版) | 上と同じ (dest 版 audit 出力) | 5 入力 norm0 の合計 (除去後) |
+  | `DEST_FRAME_IN_ESCAPED` 18 / 97、関数 18 / 61 | 分類された load 1 件 / 関数 (`fns_by_class`) | 上の sites の内訳 |
+  | F4 件数 10 / 0 | `fix_f4` が書いた `ldf4_*` 読み出しの件数 | F4 有 IR / F4 無 IR の 1 本ずつ |
+
+  注 (推定。コードの読みで、実測していない): scan records 2,846 と sites 2,729 の差は、scan が consumer 0 件の load も数え、audit が「直接 memop の無い consumer が 1 つも無い」record を落とすことによると読める。
+  §3 の旧記載「関数 2,729 → 3,442」は、2,729 が sites の件数と同じで単位が混ざっているため、**未検証として引用しない**。関数数は `repro_2143.sh strip` の `count_scan` が出す値で確定する (本 run では未実行)。
 
 ## 2. 受入条件 1: REGLIVE になる原因の機械語切り分け
 
@@ -41,11 +53,15 @@
   `scan_text` (`audit_undefload.py`) は、`%0` を含み `load` 以外の行を見つけると alloca を「bad」として除外する。
   `uselistorder` 行はその「load 以外の使われ方」に当たるため、132e8e0 の `%0` は site 抽出から外れ、関数ごと 0 件になる (`scan_text` の結果が空)。
   - 実測: `uselistorder` を含む元の norm0 では `function_132e8e0` の scan 結果は 0 件。同じ関数から `uselistorder` 行だけを除くと、`%1`・`%2` の 2 site が出る (`cons` 1 件ずつ)。
-  - 全体: `uselistorder` 行を全 norm0 から除くと、scan の site は **2,846 → 5,185 (+2,339)**、関数は 2,729 → 3,442。
+  - 全体: `uselistorder` 行を全 norm0 から除くと、scan records (単位は §1 の表) は **2,846 → 5,185 (+2,339)**。関数数は §1 の注のとおり未検証。
     `uselistorder` は LLVM の use-list order の注記で、値の意味は変えない。監査が注記で site を落としている。
-  - 同じ 5 入力で `uselistorder` 行を除いた dest 版の実測: sites 4,910・`DEST_FRAME_IN_ESCAPED` 97 (元入力は 18)・`REGLIVE` 4,461 (元入力は 2,502)。
+  - 同じ 5 入力で `uselistorder` 行を除いた dest 版の実測 (単位は §1 の表): sites 4,910・`DEST_FRAME_IN_ESCAPED` 97 (元入力は 18)・`REGLIVE` 4,461 (元入力は 2,502)。
     関数単位では `DEST_FRAME_IN_ESCAPED` 61 関数 (元入力は 18 関数)。増えた分は F4 修復対象 10 関数以外の関数。
     F4 修復 10 関数のうち dest 版で検出されるのは、元入力・除去後ともに 865020 の 1 件 (差 0)。
+
+再現 (§1・§3・§4・§5): `tools/m11/ldfix/repro_2143.sh` (`PE=... NORM0=... BOOT_FINAL=... bash repro_2143.sh [audit|strip|f4|neg]`)。
+  `audit` = §1 の監査、`strip` = §3 の `uselistorder` 除去実験 (scan records と dest 版)、`f4` = §4 の F4 有無 IR 作成と件数、`neg` = §5 の検査。
+  **注: 本 run では素材 (`work-m11` の norm0・`boot_final.ll`) が無く、`repro_2143.sh` は構文チェック (`bash -n`) のみ。数値は作者の実測で、再実行はしていない。**
 
 ## 4. 受入条件 2 (F4 の対象の構造): F4 が何を書き換えるか
 
@@ -91,7 +107,7 @@ F4 (`ldfix/ldfix.py` `fix_f4`) の修復は、`xor i64 0, 0` 残骸を **escape 
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `uselistorder` 行で `scan_text` が alloca を除外する (site +2,339) | 監査の site が実際より少ない。F4 系以外の脱落も見えない | #2141 [LD-78] (監査の置換・和集合の作業に含める) |
+| `uselistorder` 行で `scan_text` が alloca を除外する (scan records +2,339) | 監査の site が実際より少ない。F4 系以外の脱落も見えない | #2201 [LD-85] (open。監査の site 抽出の変更として、コメントで範囲に追加を依頼。#2141 [LD-78] は CLOSED のため不可) |
 | 監査が名前付き `stack_var_*` の read を見ない (F4 が対象とする型) | F4 のネガコンが監査で成立しない | #2201 [LD-85] |
 | 69c360 型 (read-modify-write を挟んだ writer chain の先を辿らない) | REGLIVE の偽陰性が残る | #2202 [LD-86] |
 | 旧監査 sites・ldfix 再生成 IR (`ir_conditions.json` 付き) での数値 | 本 REPORT は素材 norm0 での実測。REPORT_1866 の 2,737 と直接比べられない | #2144 [LD-80] |
