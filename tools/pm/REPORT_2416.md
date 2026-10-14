@@ -4,7 +4,7 @@
 > `tools/pm/REPORT.md` (250 行上限ちょうど) は変更していない。PM Worker の測定値は `tools/pm/REPORT.md` と本付録が正本 (`docs/DOC_MAP.md` §4)。
 > main の取り込みの履歴は `git log --merges` が正本で、本付録には書かない。
 
-**結論**: 測定 commit `887ae3df` の `npm test` (252 件)・`npm run test:unit` (19 件)・`npm run test:workers` (4 件) は、3 回ずつ全件 pass。測定の後に `src`・`test` を変えた commit は無い (§0-2)。wrangler 4.151.0 の dry-run (7 回) の結果: `--var` は bindings に `(hidden)` で出る。`--define` は引用符の有無によらず hash が bundle に入らない。引用符なしの `--define` は、hash の先頭が数字だと `Invalid define value` で exit 1 になる (測定 commit の hash は `8` 始まりで該当する)。実 Worker での反映は未確認 (README の `[未確認]`)。
+**結論**: 測定 commit `2e84269d` の `npm test` (279 件)・`npm run test:unit` (19 件)・`npm run test:workers` (4 件) は、3 回ずつ全件 pass。測定の後に `src`・`test` を変えた commit は無い (§0-2)。wrangler 4.151.0 の dry-run (7 回) の結果: `--var` は bindings に `(hidden)` で出る。`--define` は引用符の有無によらず hash が bundle に入らない。引用符なしの `--define` は、hash の先頭が数字だと `Invalid define value` で exit 1 になる (測定 commit の hash は `2` 始まりで該当する)。実 Worker での反映は未確認 (README の `[未確認]`)。
 
 ## 0. 取得方法・環境
 
@@ -12,7 +12,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `887ae3df` (`Merge origin/main into 2416-pm-worker-status-build`。main の取り込み。`infra/pm-worker/src`・`test` を最後に変えた commit) |
+| 測定 commit | `2e84269d` (`Merge origin/main into 2416-pm-worker-status-build (#2416)`。main (`cc6d6610`) の取り込み。`infra/pm-worker/src`・`test` を最後に変えた commit) |
 | 最終 HEAD | PR 本文の検証欄に書く (本付録を含む commit の hash は本付録に書けない)。測定 commit から最終 HEAD までの差分は docs だけ (§0-2) |
 | 作業ツリー | 測定時は `git status --porcelain` が空 (依存の `node_modules` は gitignore) |
 | 依存の入れ方 | `pnpm install --frozen-lockfile --config.minimum-release-age=0` (§0-4) |
@@ -25,12 +25,12 @@
 ### 0-2 測定したコードと最終 HEAD の差分 (WORKFLOW §5・§6)
 
 ```sh
-git diff 887ae3df HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l    # 0 (最終 HEAD。測定 commit の後は docs だけ)
-git diff c53d6583 887ae3df -- infra/pm-worker/src infra/pm-worker/test | wc -l # 825 (前版の測定 commit から今回の測定 commit までの差。main の取り込みで変わった分)
+git diff 2e84269d HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l    # 0 (最終 HEAD。測定 commit の後は docs だけ)
+git diff 887ae3df 2e84269d -- infra/pm-worker/src infra/pm-worker/test | wc -l # 1118 (前版の測定 commit から今回の測定 commit までの差。main の取り込みで変わった分)
 ```
 
-- 前版 (測定 commit `c53d6583`。`npm test` 253 件・`npm run test:unit` 10 件・`npm run test:workers` 4 件) は、main の取り込みで `src`・`test` が 825 行変わったため無効になった。その数値は git 履歴に残る。
-- 本付録の数値は、`src`・`test` を最後に変えた commit `887ae3df` で測った。最終 HEAD の hash は PR 本文の検証欄に書く。
+- 前版 (測定 commit `887ae3df`。`npm test` 252 件・`npm run test:unit` 19 件・`npm run test:workers` 4 件) は、main の取り込み (`cc6d6610`・#2518 など) で `src`・`test` が 1118 行変わったため無効になった。その数値は git 履歴に残る。
+- 本付録の数値は、`src`・`test` を最後に変えた commit `2e84269d` で測った。最終 HEAD の hash は PR 本文の検証欄に書く。
 
 ### 0-3 取得方法
 
@@ -42,7 +42,7 @@ git diff c53d6583 887ae3df -- infra/pm-worker/src infra/pm-worker/test | wc -l #
 
 ### 0-4 依存の入れ方 (release-age の診断用の設定)
 
-- 既定設定の `pnpm install --frozen-lockfile` は、lockfile の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` が公開から 24 時間未満のため `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。測定時 (2026-10-14 16:28Z 頃) も `pnpm install --frozen-lockfile --dry-run` で同じエラーを確認した。README『Workers Builds の接続状態と pnpm 経路』の release-age の項と同じ。
+- 既定設定の `pnpm install --frozen-lockfile` は、lockfile の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` が公開から 24 時間未満のため `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。測定時 (2026-10-14) も `pnpm install --frozen-lockfile --dry-run` で同じエラーを確認した。README『Workers Builds の接続状態と pnpm 経路』の release-age の項と同じ。
 - 測定は `--config.minimum-release-age=0` を付けて行った。診断用の設定で、lockfile・`pnpm-workspace.yaml` は変えていない (`--frozen-lockfile`)。解除の判断は PM (#2585 の範囲外)。
 - wrangler は `pnpm exec` を使うと、同じ release-age の事前チェックで WARN が出る。このため dry-run は `./node_modules/.bin/wrangler` を直接呼んだ (バージョンは同じ 4.151.0)。
 
@@ -50,22 +50,22 @@ git diff c53d6583 887ae3df -- infra/pm-worker/src infra/pm-worker/test | wc -l #
 
 | run | wall (s) | `# duration_ms` | pass / fail / cancelled | load (前 → 後、1/5/15 分) |
 |---|---:|---:|---|---|
-| 1 | 19.32 | 19156.9 | 252 / 0 / 0 | 0.08/0.14/0.07 → 1.13/0.38/0.15 |
-| 2 | 18.54 | 18401.7 | 252 / 0 / 0 | 1.13/0.38/0.15 → 1.93/0.61/0.23 |
-| 3 | 18.74 | 18601.7 | 252 / 0 / 0 | 1.93/0.61/0.23 → 2.50/0.85/0.32 |
-| **min–max** | **18.54–19.32** | **18401.7–19156.9** | 252 / 0 / 0 (3 回とも) | 1 分値の最大 2.50 (nproc 4 未満) |
+| 1 | 18.84 | 18703.5 | 279 / 0 / 0 | 0.09/0.43/0.29 → 0.64/0.54/0.33 |
+| 2 | 18.74 | 18594.9 | 279 / 0 / 0 | 0.64/0.54/0.33 → 1.83/0.83/0.43 |
+| 3 | 18.70 | 18564.6 | 279 / 0 / 0 | 1.83/0.83/0.43 → 2.05/0.95/0.48 |
+| **min–max** | **18.70–18.84** | **18564.6–18703.5** | 279 / 0 / 0 (3 回とも) | 1 分値の最大 2.05 (nproc 4 未満) |
 
-- TAP の `# tests 252`・`# skipped 0`・`# todo 0`・`# cancelled 0` (3 回とも同じ)。並列数は既定の 3。
-- 前版 (`c53d6583`) の wall は 12.59–12.89 s で、今回より短い。1 回目の実行で長かったのは `ネガコン (b): 毎分の tick が 3 日続いても digest は 24 時間に 1 件を超えない` (`duration_ms` 6013.7 ms) と `(f) open issue が 3,000 件超 → fresh=false` (同 4103.8 ms)。増えた理由の切り分けは未実施。
+- TAP の `# tests 279`・`# skipped 0`・`# todo 0`・`# cancelled 0` (3 回とも同じ)。並列数は既定の 3。
+- 1 回目の実行で `duration_ms` が長かったのは `ネガコン (b): 毎分の tick が 3 日続いても digest は 24 時間に 1 件を超えない` (5656.4 ms) と `(f) open issue が 3,000 件超 → fresh=false` (4292.5 ms)。
 
 ## 2. `npm run test:workers` (`vitest run --config vitest.config.ts`)
 
 | run | wall (s) | vitest `Duration` | Tests (pass / fail) | load (前 → 後、1/5/15 分) |
 |---|---:|---|---|---|
-| 1 | 2.59 | 1.51 s | 4 / 0 | 2.78/0.93/0.35 → 2.78/0.93/0.35 |
-| 2 | 2.53 | 1.49 s | 4 / 0 | 2.78/0.93/0.35 → 2.72/0.95/0.36 |
-| 3 | 2.58 | 1.51 s | 4 / 0 | 2.72/0.95/0.36 → 2.72/0.95/0.36 |
-| **min–max** | **2.53–2.59** | **1.49–1.51 s** | 4 / 0 (3 回とも) | — |
+| 1 | 2.58 | 1.49 s | 4 / 0 | 2.12/0.98/0.49 → 2.12/0.98/0.49 |
+| 2 | 2.66 | 1.61 s | 4 / 0 | 2.12/0.98/0.49 → 2.19/1.02/0.50 |
+| 3 | 2.56 | 1.50 s | 4 / 0 | 2.19/1.02/0.50 → 2.10/1.02/0.51 |
+| **min–max** | **2.56–2.66** | **1.49–1.61 s** | 4 / 0 (3 回とも) | — |
 
 - vitest の `Test Files  1 passed (1)`・`Tests  4 passed (4)` (3 回とも)。
 - wall と vitest の `Duration` は別の量。1 つの値に丸めて書かない。
@@ -74,16 +74,16 @@ git diff c53d6583 887ae3df -- infra/pm-worker/src infra/pm-worker/test | wc -l #
 
 | run | wall (s) | vitest `Duration` | Tests (pass / fail) | load (前 → 後、1/5/15 分) |
 |---|---:|---|---|---|
-| 1 | 1.59 | 1.15 s | 19 / 0 | 2.50/0.85/0.32 → 2.50/0.85/0.32 |
-| 2 | 1.48 | 1.03 s | 19 / 0 | 2.50/0.85/0.32 → 2.78/0.93/0.35 |
-| 3 | 1.63 | 1.18 s | 19 / 0 | 2.78/0.93/0.35 → 2.78/0.93/0.35 |
-| **min–max** | **1.48–1.63** | **1.03–1.18 s** | 19 / 0 (3 回とも) | — |
+| 1 | 1.65 | 1.21 s | 19 / 0 | 2.05/0.95/0.48 → 2.05/0.95/0.48 |
+| 2 | 1.64 | 1.19 s | 19 / 0 | 2.05/0.95/0.48 → 2.12/0.98/0.49 |
+| 3 | 1.68 | 1.24 s | 19 / 0 | 2.12/0.98/0.49 → 2.12/0.98/0.49 |
+| **min–max** | **1.64–1.68** | **1.19–1.24 s** | 19 / 0 (3 回とも) | — |
 
 - vitest の `Test Files  2 passed (2)`・`Tests  19 passed (19)` (3 回とも)。
 
 ## 3. wrangler の `--define` / `--var` (dry-run)
 
-すべて `CI=1 ./node_modules/.bin/wrangler deploy --dry-run --outdir <作業用の一時 dir>` に次の引数を足したもの。`<HASH>` は測定 commit の全 40 字 (`887ae3dfd874ef274df9fe2b3247ed8e952d4266`)。a2 は前版の測定 commit の hash (`c53d65838b2a4da4ccf425d505c419fba89a8281`、英字始まり)、a3 は数字始まりの例 (`1234567890abcdef1234567890abcdef12345678`)。dry-run は Cloudflare に接続せず、認証は不要。
+すべて `CI=1 ./node_modules/.bin/wrangler deploy --dry-run --outdir <作業用の一時 dir>` に次の引数を足したもの。`<HASH>` は測定 commit の全 40 字 (`2e84269dc81f03d452a8932bbd71ba1731891b5d`)。a2 は前版の測定 commit の hash (`c53d65838b2a4da4ccf425d505c419fba89a8281`、先頭が英字)、a3 は先頭が数字の例 (`1234567890abcdef1234567890abcdef12345678`)。dry-run は Cloudflare に接続せず、認証は不要。
 
 | 案 | 追加した引数 | exit | bindings | bundle (`index.js`) に hash が入るか |
 |---|---|---:|---|---|
@@ -96,14 +96,14 @@ git diff c53d6583 887ae3df -- infra/pm-worker/src infra/pm-worker/test | wc -l #
 | e | `--var TARGET:999` | 0 | `env.TARGET ("(hidden)")` (`[vars]` の `"58"` を上書き) | — (binding の上書きの確認) |
 
 - a と a3 の exit 1 は、hash の先頭が数字のとき `--define` の値が JS の値として解釈できないため。a2 は英字始まりで通るが、hash は bundle に入らない。`--define` は引用符の有無と hash の先頭文字によらず、build に値を渡せない。
-- a2・b・c・d・e の `Total Upload: 121.29 KiB / gzip: 37.41 KiB` (同一)。
+- a2・b・c・d・e の `Total Upload: 127.31 KiB / gzip: 38.97 KiB` (同一)。
 - c の `BUILD_COMMIT` は bindings に出るが、dry-run では値が `(hidden)` で見えない。届くことは実 Worker の `/status` でのみ確かめられる (§4-3)。
 
 ## 4. 検証範囲・ネガティブコントロール・未確認
 
 ### 4-1 検証範囲
 
-- `npm test` 252 件・`npm run test:unit` 19 件・`npm run test:workers` 4 件を、測定 commit と同一のコードで 3 回ずつ実行。wrangler dry-run は 7 回 (a・a2・a3・b・c・d・e) を各 1 回。
+- `npm test` 279 件・`npm run test:unit` 19 件・`npm run test:workers` 4 件を、測定 commit と同一のコードで 3 回ずつ実行。wrangler dry-run は 7 回 (a・a2・a3・b・c・d・e) を各 1 回。
 - `/status` の `build` の挙動は、既存テストで確認済み: `test/status.test.ts` (25 件。`BUILD_COMMIT` 未設定で `null`・形式が違う値は `null`・キー集合のスナップショットに `build` を含む)、`test/runtime/do.workers.test.ts` (workerd の DO env から hash を読む・未設定で `null`)。
 - wrangler は dry-run のみ (bindings の表示と bundle の内容)。
 
@@ -111,7 +111,7 @@ git diff c53d6583 887ae3df -- infra/pm-worker/src infra/pm-worker/test | wc -l #
 
 - **N1 (`build` を返さない変更で FAIL する)**: 測定用の一時コピー (repo の外。作業ツリーは変えていない) で `src/engine.ts` の `build: this.d.cfg.build,` を削除し、`node --experimental-strip-types --no-warnings --test test/status.test.ts` を実行 → `# pass 22`・`# fail 3` (FAIL は `/status (d)` のキー集合スナップショット、`build: デプロイ時の BUILD_COMMIT をそのまま返す…`、`build: commit hash の形 … null…` の 3 件)。未改変のコピーは `# pass 25`・`# fail 0`。
 - **N2**: §3 の a〜e は案の比較で、検査の負例ではない。a と a3 の exit 1 は hash の先頭文字で決まることの実測。
-- **N3**: `--var` を付けない deploy で `build` が `null` になることは、`test/status.test.ts` の未設定ケースで確認 (N1 の対象外の既存テスト)。README 手順 5 の『`null` のままなら反映とは判断しない』の前提。
+- **N3**: `--var` を付けない deploy で `build` が `null` になることは、`test/status.test.ts` の未設定ケースで確認 (README 手順 5 の『`null` のままなら反映とは判断しない』の前提)。
 
 ### 4-3 範囲外・未確認 (起票先)
 
@@ -127,13 +127,13 @@ git diff c53d6583 887ae3df -- infra/pm-worker/src infra/pm-worker/test | wc -l #
 ## 5. 再現コマンド
 
 ```sh
-# リポジトリ直下 (測定 commit 887ae3df)
-git diff 887ae3df HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l
+# リポジトリ直下 (測定 commit 2e84269d)
+git diff 2e84269d HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l
 cd infra/pm-worker && pnpm install --frozen-lockfile --config.minimum-release-age=0
 npm test                  # TAP 末尾の # pass / # duration_ms。wall は前後の時刻差
 npm run test:unit         # 出力の Duration / Tests 行
 npm run test:workers      # 出力の Duration / Tests 行
-H=$(git rev-parse 887ae3df)
+H=$(git rev-parse 2e84269d)
 CI=1 ./node_modules/.bin/wrangler deploy --dry-run --outdir work/dryrun/a --define BUILD_COMMIT:$H
 CI=1 ./node_modules/.bin/wrangler deploy --dry-run --outdir work/dryrun/b --define "BUILD_COMMIT:\"$H\""
 CI=1 ./node_modules/.bin/wrangler deploy --dry-run --outdir work/dryrun/c --var BUILD_COMMIT:$H
