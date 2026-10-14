@@ -4,6 +4,8 @@
  *   ks_semantic_gain <sc|kh> <core_64> <ncases> <seed>
  * state の配置は SC = KH + 0x38 (self 基準)。param 経路は SC が this+0x90→P、KH が ctx+0x3188→P。
  * PERTURB=1 のとき KH 側の v を 1 ulp ずらす (感度の負例)。
+ * CUR_PROBE=1 のとき入力 L を全サンプル 1.0 にする。ramp の cur はサンプルごとに L へ掛かるので、
+ * L 出力 = 逐次 cur (1.0*cur は厳密)。case の入力 (b・v・q28・mode・first・n) は stderr に P 行で出す。
  */
 #include <stdint.h>
 #include <stdio.h>
@@ -41,6 +43,8 @@ static uint8_t* map_pe(const char* path) {
 }
 
 static uint32_t rng;
+static int probe_cur;
+static uint32_t fbits(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }
 static uint32_t R32(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
 static float bitsf(uint32_t b) { float f; memcpy(&f, &b, 4); return f; }
 static float RF(float lo, float hi) { return lo + (hi - lo) * ((R32() >> 8) / 16777216.0f); }
@@ -83,6 +87,12 @@ static void run(int sc, uint64_t va, Case* c, int perturb, int dump, int idx) {
     uint8_t* aud = calloc(1, 0x40);                 /* L/R ptr と n (ctx 相当) */
     float *L = calloc(MAXN + 1, 4), *R = calloc(MAXN + 1, 4);
     memcpy(L, c->L, sizeof c->L); memcpy(R, c->R, sizeof c->R);
+    if (probe_cur) {
+        fprintf(stderr, "I%d ", idx);
+        for (int i = 0; i < c->n * 4; i++) fprintf(stderr, "%02x", ((const uint8_t*)c->L)[i]);
+        fprintf(stderr, "\n");
+        for (int i = 0; i < c->n; i++) L[i] = 1.0f;
+    }
     *(float**)(aud + 0) = L; *(float**)(aud + 8) = R; *(int*)(aud + 0x28) = c->n;
     uint8_t* vbuf = calloc(1, 0x40);                 /* 通知 vector (begin/end/cap) */
     int so = sc ? SO_SC : 0;
@@ -124,6 +134,10 @@ static void run(int sc, uint64_t va, Case* c, int perturb, int dump, int idx) {
         if (np == 0) printf("-");
         for (int i = 0; i < np; i++) printf("%08x", (uint32_t)(vec[i] - id));
     }
+    if (probe_cur) {
+        if (sc) fprintf(stderr, "S%d coef=%08x A=%08x B=%08x\n", idx, fbits(*(float*)(self + 0xa0)), fbits(*(float*)(self + 0xa4)), fbits(*(float*)(self + 0xa8)));
+        else fprintf(stderr, "K%d pos0=%08x inc=%08x a=%08x b=%08x\n", idx, fbits(c->pos), fbits(*(float*)(self + 0x68)), fbits(*(float*)(self + 0x6c)), fbits(*(float*)(self + 0x70)));
+    }
     printf(" ");
     if (c->n) { hexdump(L, c->n * 4); printf(" "); hexdump(R, c->n * 4); } else printf("- -");
     printf(" ");
@@ -138,6 +152,7 @@ int main(int argc, char** argv) {
     rng = (uint32_t)strtoul(argv[4], 0, 0) * 2654435761u + 12345u; if (!rng) rng = 1;
     int perturb = getenv("PERTURB") && getenv("PERTURB")[0] == '1';
     int dump = getenv("METER_DUMP") && getenv("METER_DUMP")[0] == '1';
+    probe_cur = getenv("CUR_PROBE") && getenv("CUR_PROBE")[0] == '1';
     map_pe(argv[2]);
     for (int i = 0; i < nc; i++) {
         Case c; memset(&c, 0, sizeof c);
