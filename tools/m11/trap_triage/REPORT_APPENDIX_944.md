@@ -88,6 +88,22 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 - 言えない: j=12 の値差 (`len 0→1`) が後続の結果を変えるか。全体 survey と単独実行で結果が違うため、「記録が trap を作る」「値差が trap を作る」のどちらも確定しない。
 - 未解決: 全体 survey で先行 unit のどの状態が unit 158 の ok/trap を分けるか (受入条件 1 の IR 突き合わせに含める)。
 
+### 5.1 測定 commit からの差分と鮮度 (WORKFLOW §6・#1268)
+
+`git diff c171b9dc cc73db0a -- tools/m11` は 15 files (413 insertions / 13 deletions)。測定 commit は `c171b9dc` のまま、差分が測定経路に乗らないことを示す (ファイル単位の判定。再測定は素材 `work-m11`・`toolchain-emsdk` が要るため本 PR では未実施)。
+
+測定経路: `trap_triage/repro_1389.sh` → `m11_build.sh` (ir_conditions.json は `m11_gen_ir2.sh` で作成) → `m11_survey.mjs` (import: `m11_ptrcheck.mjs`・`work/m11_boot.cjs`) → `trap_triage/cmp_1389.py`。単独実行は `trap_triage/survey_units.mjs` (`SV_ONLY`)。
+
+| ファイル | c171b9dc からの差分 | 測定結果への影響 |
+|---|---|---|
+| `m11_build.sh` | `M11_RT_INSTR`・`M11_OV_INSTR`・`M11_LINK_INSTR` を追加。既定値は `M11_INSTR_413060` と同じ。rt.o・ov.o の CF は `M11_INSTR_413060` の値だけを置換 (既定では置換前後で同一)。stamp に rt・ov の値を追加。EXPORTS の dest_obs 条件を `M11_LINK_INSTR` に変更 | 測定の 3 build (`M11_INSTR_413060=1`・RT/OV/LINK 未指定) は CF・EXPORTS が c171b9dc と同一。stamp の追加は作業領域の再コンパイル判定だけに効く (出力は変わらない) |
+| `m11_survey.mjs` | `dest_obs_n`・`dest_obs_hash` の出力を `mod._m11_dest_obs_n` が存在する時だけに条件化 | 測定 build (`M11_INSTR_413060=1`) では LINK 条件が 1 で export が存在するため、出力行は同一。`f413060_calls`・`f413060_units` 等は不変 |
+| `shimx_link/build.sh`・`shimx_link/gen_link.py`・`shimx_link/trace_rt.c`・`shimx_link/probe_unit23.mjs` | 変更あり | 測定経路から呼ばれない (`m11_build.sh`・`m11_survey.mjs`・`repro_1389.sh`・`cmp_1389.py` に参照なし) |
+| `ldfix/*`・`trap_triage/repro_1701_rt_ov.sh`・`trap_triage/REPORT_1701.md`・`REPORT_882.md` | 変更・新規 | 測定経路から呼ばれない (文書・別測定の再現スクリプト) |
+| `trap_triage/repro_1389.sh`・`trap_triage/cmp_1389.py`・`m11_gen_ir2.sh`・`m11_cond.py`・`m11_ptrcheck.mjs`・`survey_units.mjs`・`tools/shim`・`tools/shared` | 差分 0 | — |
+
+結論: 測定経路 (repro_1389・SV_ONLY=158 の単独実行) で実行されるコードの差分は、既定値では生成物と出力を変えない。`shimx_link/`・`ldfix/`・`repro_1701` は経路外。よって測定値 (c171b9dc) は HEAD `cc73db0a` の測定経路にも当てはまると読む。ただし HEAD での実機再測定は未実施 (未解決表)。
+
 ## 6. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
@@ -95,3 +111,36 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 | unit 158・j=12 の値差の後続経路 (呼出し元・後続の読出し) の IR 突き合わせと、ON trap の最上位 frame の取得 | 値差が結果に効くかの確定 (受入条件 1) | #2003 ([M11-N132]) |
 | 記録なしの ON (読出し 1 回のみ) の再測定 (build の切替が要る) | §9.2 の結論の再確認 | #2003 に含める |
 | issue 本文の `M11_DEST_GUARD=1` は repo に存在しない | 検証方法の記述が無効 | PM 判断 (issue 本文の修正) |
+
+## 9. #1864 追記: unit 158・j=12 の dest 値差の切り分け (部分)
+
+測定 commit: **`576c4976`** (origin/main。本節の作業では m11 のコードを変えていない。一時の計測変更は全て破棄)。
+`git diff 576c4976 HEAD -- tools/m11` は本節の文書追記のみ。
+
+### 9.1 再現 (同一 build 内・決定性)
+
+コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON・直列・単発)。判定 `PASS`。全体 1 分 51 秒 (`time` の real・load 開始 0.87 / 0.93 / 0.96)。
+- OFF 2 回: 記録 227 件が完全一致 (決定的)。
+- OFF/ON: 記録 227 件に対し、ON は 216 件 (unit・順番で揃った 216 件中の差分 1 件)。差は unit `0x26d1a0` の j=12 のみ。OFF `{st 0, len 0, rc 0}` / ON `{st 1, len 1, rc 1}`。
+
+### 9.2 読出しの副作用の切り分け (一時変更・測定後に破棄)
+
+`m11_dest_obs` の読出し・記録を 3 通りに分けて、ON の survey を取った (全て `M11_INSTR_413060=1`・`M11_OV_413060=1`):
+
+| 構成 | ok | trap | unit 158 | 読出し境界外 (st=3) | 備考 |
+|---|--:|--:|---|--:|---|
+| 記録あり (既定の計測) | 869 | 25 | trap | — | §8 と一致 |
+| 記録あり・境界チェック付き (dest 範囲外を検出) | 869 | 25 | trap | 0 件 (216 件中) | dest の範囲外アクセスではない |
+| 読出し 1 回のみ・記録なし | 870 | 24 | **ok** | — | 下表の比較で unit ラベル差 0 |
+
+- `units_off.json` (OFF) と `units_readonly.json` (読出し 1 回のみ・記録なし) を 942 unit で比較: **差 0 unit**。
+- よって ON の trap は、dest の読出しでも範囲外アクセスでもなく、**記録の書込み (`g_rec_*`・`g_dest_h` への書込み) が計測副作用として unit 158 の結果を変えている**と読める。
+- この結論は「読出し 1 回のみ」の ON が 870/24 に戻ることからの推論。`g_rec_*` の線形メモリ上の配置は未確認 (`llvm-nm` で wasm のシンボル表を引けず、未切り分け)。
+
+### 9.3 受入条件の判定 (#1864)
+
+1. **値差が結果に効くか (未確定)**: 読出しのみの ON では unit ラベルに差が出ない (§9.2)。ただし、値差 (j=12 の `len 0→1`) が後続の呼出し・読出しを変えるかは、IR で `0x26d1a0` の後続経路を追うまで確定しない。**未達**。
+   - #1945 (測定 commit `e5e3c7c2`): 観測副作用の可能性が高い (詳細は [REPORT_APPENDIX_944.md](REPORT_APPENDIX_944.md) §3)。
+2. **REPORT §9.3 追記・§4(a) 更新**: 本節 §9.3 で判定の材料を更新。意味的差か観測副作用かの結論は**未達** (上記 1 が未確定のため、§4 (a) は「観測の副作用が trap を作ることは確認。値差の結果への寄与は未確定」に留める)。
+   - **#2003 による訂正**: 上の「副作用が trap を作ることは確認」は**撤回**する。unit 158 を単独 (`SV_ONLY=158`) で実行すると、計測 OFF・既定 OFF を含む全 5 構成で trap する (最上位 frame `function_407a50__lifted`・各構成 1 回)。全体 survey の ok/trap は先行 unit の状態に依存すると読むのが自然で、観測副作用は確認されていない。測定は [REPORT_APPENDIX_944.md](REPORT_APPENDIX_944.md) §5 (測定 commit `c171b9dc`)。
+3. **決定的な測定と実測値**: 9.1 の OFF 2 回一致・所要時間・load を記録。**達成**。
