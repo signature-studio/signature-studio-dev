@@ -9,7 +9,7 @@
 - `tools/m11/m11_run.mjs`: 環境変数 `M11_PTRCHECK_MAX_NEW`。不合格なら M11_RESULT を出した後に `FAIL: ptrcheck ...` を stderr に出して exit 1。
 - `tools/m11/m11_survey.mjs`: 環境変数 `M11_PTRCHECK_SURVEY_MAX_NEW` (run と件数が違うので別変数)。同じ扱い。
 - `tools/m11/m11_ptrcheck_negctl.sh`: 次の 5 点を検査する。(a) 注入で差 +1 (b) 基準 = クリーンの実測値なら exit 0 (c) 同じ基準で注入すると exit 1 かつ FAIL 行 (d) 基準未設定の注入は exit 0 (e) 非整数の基準は exit 1。
-- `tools/m11/m11_e2e.sh`・`tools/m11/e2e_expect.env`: `M11_EXPECT_PTR_NEW_MAX` / `M11_EXPECT_PTR_SURVEY_NEW_MAX` を各実行に渡し、run・survey の終了コードを最終 rc に反映する。**既定は未設定 (ゲート off)**。
+- `tools/m11/m11_e2e.sh`・`tools/m11/e2e_expect.env`: `M11_EXPECT_PTR_NEW_MAX` / `M11_EXPECT_PTR_SURVEY_NEW_MAX` を各実行に渡し、run・survey の終了コードを最終 rc に反映する。**既定は未設定 (ゲート off)**。ただしゲート off でも、run・survey が非 0 で終わると (timeout の 124・未捕捉例外) e2e の最終 rc は非 0 になる。従来の最終 rc は judge と寛容起動の gate だけで決まっていた。
 
 ## 2. 受入条件の状態
 
@@ -48,10 +48,27 @@ load average (1 分値): run の直前 0.17、negctl の直前 0.32。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| fresh 再生成で run・survey の基準件数を実測し、`e2e_expect.env` に設定する | ゲートは e2e で有効化されていない (現在は情報出力のみ) | PM 起票を要求 (work-m11 素材の再生成手順。`REPORT_N1004.md` §4 と同じ) |
-| survey の実行検証 (`_m11_set_va_unit_budget` を持つ wasm と IR 来歴の記録) | survey のゲートが未実行 | 同上 |
-| 「残件 0」の判定基準 (LVA 整数と未 remap VA の区別) | 受入 1 の文言どおりの assert は未実装 | 親 #1004 / #403 で継続 |
+| fresh 再生成で run・survey の基準件数を実測し、`e2e_expect.env` に設定する | ゲートは e2e で有効化されていない (現在は情報出力のみ) | #2778 (open のまま。受入 1・2 の残り。素材の再生成手順は `REPORT_N1004.md` §4 と同じ) |
+| survey の実行検証 (`_m11_set_va_unit_budget` を持つ wasm と IR 来歴の記録) | survey のゲートが未実行 | #2778 (open のまま。受入 2 の残り) |
+| 「残件 0」の判定基準 (LVA 整数と未 remap VA の区別) | 受入 1 の文言どおりの assert は未実装 | #2778 (親 #1004 / #403 は closed のため) |
 
 ## 7. 測定 commit からの差分
 
-`git diff 53b90b53 -- tools/m11 ':!tools/m11/REPORT_N2778.md' | wc -c` の結果は **0** (コード差分 0 バイト)。本 REPORT の commit は REPORT_N2778.md と DOC_MAP の登録だけを変える。
+測定 commit `53b90b53` 以降のコード差分は `e2e_expect.env` のコメント 1 行 (参照節 §3 → §5) だけ。値と構文は変わらない (`source` した 6 個の変数の値が測定 commit と同一)。よって測定値は再測定せず採用する (素材 work-m11 は本 runner に無く、再測定はできない)。
+`git diff 53b90b53 -- tools/m11 ':!tools/m11/REPORT_N2778.md'` の出力 (754 バイト) は次のとおり。
+
+```diff
+diff --git a/tools/m11/e2e_expect.env b/tools/m11/e2e_expect.env
+index 85f92041..0762450c 100644
+--- a/tools/m11/e2e_expect.env
++++ b/tools/m11/e2e_expect.env
+@@ -9,6 +9,6 @@
+ : "${M11_EXPECT_STRICT_DONE:=56}"
+ : "${M11_EXPECT_SURVEY_OK_EXACT:=872}"
+ # #2778: ptrcheck ゲートの基準 (image_va_words_new の上限・run と survey は別々)。未設定 = 情報出力のみ (既定)。
+-# 基準は同一 wasm・image の実測値を入れる (ratchet)。値 0 は正当な LVA 整数のため使えない (REPORT_N2778.md §3)。
++# 基準は同一 wasm・image の実測値を入れる (ratchet)。値 0 は正当な LVA 整数のため使えない (REPORT_N2778.md §5)。
+ : "${M11_EXPECT_PTR_NEW_MAX:=}"
+ : "${M11_EXPECT_PTR_SURVEY_NEW_MAX:=}"
+```
+
