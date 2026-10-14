@@ -14,7 +14,7 @@
 ## 1. 測定条件
 
 - 測定 commit: **`4efe8c5b`** (コードを変えた最後の commit。driver `tools/liftdiff/ld122_origin.py` を含む。`fbb3cfca` で追加し `4efe8c5b` で label 名のみ変更)。
-- 素材: `fl-win64` (`extracted/block00031_PE.bin`・sha256 `b2c64da4…`)・`work-liftdiff` の `tools/liftdiff/work/m11` (`simd.c` sha256 `d82e2759…` 一致)・`work-m11`・`toolchain-emsdk` (`/opt/emsdk` 既存)。
+- 素材: `fl-win64` (`extracted/block00031_PE.bin`・sha256 `b2c64da4…`)・`work-liftdiff` の `tools/liftdiff/work/m11` (`simd.c` sha256 `d82e2759…` 一致)・`work-m11`・`toolchain-emsdk` (`[EMSDK]` 既存)。
 - wasm: `build_wasm.build(t, False)` で `5d88dda2` の worktree にて再ビルド (link 3.1 s)。`simd.c` は素材版のまま (sha256 `d82e2759…`)。以後 `ldlib`・`rt` は変えていない (§6)。
 - 測定機: 4 vCPU。全体 run 前の load 0.2〜0.3。
 
