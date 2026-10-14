@@ -1,7 +1,7 @@
 # liftlib 付録 — #2863: p1_legacy の IR 一致ゲートが #1664 (A7 空行除去) 後に FAIL する原因の確定と修復
 
 - 日付: 2026-10-14 / issue #2863 (`[PLG-F3-32]`) / 親 #2094 / 担当: `tools/liftlib/` (`liftlib/recipes/ott.py`・`liftlib/passes/p1_legacy.py`・`tests/test_unit.py`)
-- 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 のどれにも当たらない。意味の差ではなく SSA 一時名の差)
+- 既知類型との関係: D1a (P1 同型) と関係あり・未検証 (§5 参照)。ゲートの失敗原因 (`%pc` 一時名の差) 自体は意味の差ではない (§2)
 - 測定 commit (コードを変えた最後の commit): `054ee527` (`fix(liftlib): ignore %pc temp-name renumbering in IR gate (#2863)`)。
   `git diff 054ee527 HEAD -- tools/liftlib/liftlib tools/liftlib/tests tools/liftlib/liftlib_e2e.sh` の出力は空 (本付録の追加以降はコード差分 0)。
 - 修復前の測定 base: `13fcecca` (origin/main 取込み時点・修復前)。作業 worktree: `../ws-2863` (`2863-liftlib-p1-gate`)。素材 (gitignore 対象の `work/`) は本体の展開済みを `cp -a` で複写した。
@@ -14,7 +14,8 @@
 | 修復 | IR 一致ゲート (`ott.same`) の比較前に、`%pc` 一時名の出現順の全単射な改名 (`p1_legacy.canon_tags`) だけを両辺へ適用。ゲートの他の部分と `p1_legacy` 本体は変えていない |
 | `python3 -m liftlib ott --auto none` | 修復前 **FAIL** (IR 一致 O2a〜O4 の 6 項目が false・11.76 s) → 修復後 **PASS** (全 7 項目 true・e2e checks 8/0・出力 SHA 42/42 一致・n=3 で 10.88〜10.94 s) |
 | `python3 -m liftlib ott` (既定 auto f7,p1) | PASS (census junkHi 104 ≤ 104・e2e checks 8/0) |
-| `bash tools/liftlib/liftlib_e2e.sh --quick` 全体 | **未達**。FA/KH の素材 (`work-liftlib-targets`・`plugins-freshair`・`plugins-kilohearts`) が本 run に無く、前提検査で rc=2 (§4)。素材を足して再実行するまで、受入条件の `--quick` ALL PASS は未確認 |
+| `bash tools/liftlib/liftlib_e2e.sh --quick` 全体 | **未達** (修正 run でも未実行)。FA/KH の素材 (`work-liftlib-targets`・`plugins-freshair`・`plugins-kilohearts`) は `$ARTIFACTS_DIR` に無く、HEAD の前提検査で rc=2 (§4)。本 PR 本文の `oc_artifacts:` 行に 3 名を追加済み。素材の付いた run で再実行するまで、受入条件の `--quick` ALL PASS は未確認 |
+| P1 の分岐書換え | 挿入 18 箇所の置換 19 組のうち **適用 0 組** (実測・§5)。挿入フラグは使用 0 件。e2e は PASS だが、参照 `ir7e_p1.ll` も同じ状態で作られている |
 
 ## 1. 修復前の再現 (base `13fcecca`・`ott --auto none`)
 
@@ -56,11 +57,27 @@
 
 - ユニット (`python3 tests/test_unit.py` 相当): T1〜T5・T7〜T26 は PASS (T17b は `LL_XRET_*` 未設定で skip。`work/cab2863/run_each.py` で個別実行)。**T6 は FAIL**: `tools/targets/freshair/work/...` (FA の `SlateCore.core_64`) が無いため `FileNotFoundError`。本 run の素材に無く、修復とは無関係。
 - `bash tools/liftlib/liftlib_e2e.sh --quick`: **rc=2** (前提検査で停止)。`前提が無い: .../targets/freshair/work/win/Fresh Air/.../SlateCore.core_64 (bash tools/targets/freshair/fetch.sh)`。FA と KH の展開物は本 run に無い。必要な `oc_artifacts` 名は `work-liftlib-targets` `plugins-freshair` `plugins-kilohearts` (本 issue の `oc_artifacts:` 行には含まれているが、直近の依頼コメントの行には含まれていなかった)。
+- 修正 run (2026-10-14・fix モード・コード差分 0・文書のみ修正): `$ARTIFACTS_DIR` の一覧を確認し、3 名は無かった (§4 末尾の素材一覧と同じ)。`bash tools/liftlib/liftlib_e2e.sh --quick` を HEAD で実行 → rc=2 (前提検査で停止: `targets/freshair/work/win/Fresh Air/...` が無い。前提検査は最初の不足で止まるため kilohearts は未検査。`$ARTIFACTS_DIR` に `work-liftlib-targets` は無い)。FA/KH 部分と T6 は未実行。素材の付いた run でこの節を実測値に置き換える。
 - 素材の確認: `$ARTIFACTS_DIR` (R2 から展開された素材の置き場) には `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`plugins-ott`・`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib`・`work-icall`・`work-fw-stage1` のみ。展開先の `tools/targets/{freshair,kilohearts}/work` は存在しない。
 
-## 5. 未解決
+## 5. 分岐書換えの実測と未解決
+
+`legacy_p1(ott_lift.ll)` (入力 `tools/m6/work/ott_lift.ll`・修復後の `p1_legacy`・挿入 18 箇所) の測定:
+
+| 測定 | 結果 |
+|---|---|
+| 挿入した `%pc` フラグの定義 | cf 18・zf 18・pf 18 の計 54 本 |
+| 定義以外の使用 (使用箇所) | 0 件 (cf・zf・pf とも全て未使用) |
+| 出力の `br i1 %pc` | 0 本 |
+| 置換対象 (repmap) | 19 組 (br_cf 16・br_zf 1・or 1 箇所 = 2 組) |
+| 実装が書換えを行う行 `out[j]` に旧名が含まれる組 | **0 / 19** (適用 0 件) |
+| 挿入行数の和だけずらした正しい行に旧名が含まれる組 | 19 / 19 (旧名のまま残る) |
+
+- 原因: `repmap` は挿入前の行番号 `j` で登録するが、適用は挿入後の `out[j]` に対して行う。挿入行の分だけずれるため、書換えが当たらない (推定から実測で確定)。
+- 確認方法: `legacy_p1` の repmap 適用ループの直前で `inserts` と `repmap` を捕捉し (作業用の一時スクリプト・コミットしない)、`out[j]` と挿入行数の和だけずらした行を旧名の有無で比べた。
+- 影響: P1 の分岐は挿入フラグを参照しない (D1a 同型の対策が OTT で効いていない)。e2e (maxdev 0・SHA 42/42) は通るが、参照 `ir7e_p1.ll` も同じ状態 (`br i1 %pc` 0 件) で作られているため。直すと参照 IR・m10 出力・SHA の再測定が要る。本 PR では直さない (挙動変更のため PM 判断)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `liftlib_e2e.sh --quick` の FA/KH 部分 (`regress` の fa_gain・kh_gain) と T6 が未実行 (素材不足)。`oc_artifacts` に `work-liftlib-targets plugins-freshair plugins-kilohearts` を足して再実行が必要 | 受入条件 (`--quick` ALL PASS at HEAD) が未達。本 PR は部分達成 | #2863 (PM が依頼コメントの `oc_artifacts` を足して再起動) |
-| `p1_legacy` の分岐の書き換えが参照 IR に入っていない。挿入した `%pc` フラグ 36 本は使われるが、条件分岐 18 本 (`br i1 %cf.*`・`%zf.*`) は 1 本も `%pc` へ変わっていない (参照 `ir7e_p1.ll` でも `br i1 %pc` は 0 件)。`legacy_p1` の `repmap` が、挿入前の行番号 `j` で挿入後の `out[j]` を書き換えていることが原因と推定 (未検証) | 参照 chain の P1 (`DEFECTS.md` D1a 同型の対策) が OTT で効いていない可能性。e2e (maxdev 0・SHA 42/42) は通るため、影響の有無は未検証。修正すると参照 IR・m10 出力・SHA の再測定が要る | #2863 へのコメントで PM 判断を依頼 (子 issue は未起票) |
+| `liftlib_e2e.sh --quick` の FA/KH 部分 (`regress` の fa_gain・kh_gain) と T6 が未実行 (素材不足)。本 PR 本文の `oc_artifacts` に `work-liftlib-targets plugins-freshair plugins-kilohearts` を追加済み | 受入条件 (`--quick` ALL PASS at HEAD) が未達。本 PR は部分達成 | #2863 (素材の付いた review run で実行) |
+| `legacy_p1` の `repmap` が挿入前の行番号 `j` で登録し挿入後の `out[j]` に適用するため、分岐の書換えが 1 件も適用されない (実測 0 / 19・上表)。挿入フラグ (cf・zf・pf 各 18 本) は使用 0 件 | 参照 chain の P1 (`DEFECTS.md` D1a 同型の対策) が OTT で効いていない。e2e (maxdev 0・SHA 42/42) は通るが、参照 `ir7e_p1.ll` も同じ状態のため。直すと参照 IR・m10 出力・SHA の再測定が要る (本 PR では直さない) | #2863 へのコメントで PM 判断を依頼 (子 issue は未起票) |
