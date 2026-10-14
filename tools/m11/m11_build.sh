@@ -25,7 +25,7 @@ M11_OV_INSTR="${M11_OV_INSTR:-$M11_INSTR_413060}"   # #1701: ov.o をコンパ�
 M11_LINK_INSTR="${M11_LINK_INSTR:-$M11_INSTR_413060}"   # #1701: リンク時の EXPORTS (_m11_dest_obs_* 等) を足すか。既定は M11_INSTR_413060 と同じ
 M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_INSTR_40F960=${M11_INSTR_40F960:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0} -DM11_RT_PADPRE=${M11_RT_PADPRE:-0} -DM11_RT_PADPOST=${M11_RT_PADPOST:-0} -DM11_RT_EMPTY=${M11_RT_EMPTY:-0}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -142,7 +142,7 @@ cc() { # cc <src> <obj> [extra deps...]
 }
 # 別 TU (tools/shim, m11_rt/ov/win) が定義する Win32 API は winstubs から除外 (duplicate symbol 回避)
 for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.o; done
-S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060-rt$M11_RT_INSTR"
+S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060-rt$M11_RT_INSTR$( [ "${M11_RT_PADPRE:-0}${M11_RT_PADPOST:-0}${M11_RT_EMPTY:-0}" = 000 ] || echo "-pre${M11_RT_PADPRE:-0}-post${M11_RT_PADPOST:-0}-empty${M11_RT_EMPTY:-0}" )"   # #1952: 対照 knob (既定 0 のときは従来の stamp と同一)
 if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
 echo "$S_NEG" > work/neg_413060.stamp
 # #1176: work-m11 同梱の rt.o/win.o は古い snapshot のことがある (mtime だけでは判定できない: 同梱 obj が source より新しく見える)。
