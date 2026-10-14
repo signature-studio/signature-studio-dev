@@ -8,7 +8,7 @@ REPORT_APPENDIX_1025.md の後続節。親 #853 (ICALL-12)。REPORT.md §15 か�
 
 - 測定 commit (コードを変えた最後の commit): `63e150e2` (`tools/icall/kh_route_run.sh` を変更。`kh_route_build.sh` はヘッダ注記のみ)。
 - `63e150e2` の commit 時刻は 19:35:43 UTC。それ以前の測定 (19:21〜19:35) は未コミットの作業 tree で行われた。この窓の数値は次の clean 再測定で置き換える。
-- **clean 再測定 (本節の正本)**: コミット済み tree `b757a183` (worktree `/home/runner/work/ws-2845`・`git status` は空) で実行。build 2026-10-14 20:12:18 UTC 開始、run 20:13:29 UTC 開始。素材は `$ARTIFACTS_DIR` の `plugins-kilohearts`・`work-icall`・`work-liftlib` (展開先は `tools/icall/work/`・`tools/liftlib/work/`)、emcc は `/opt/emsdk`。
+- **clean 再測定 (本節の正本)**: コミット済み tree `b757a183` (`git worktree add` で作った clean checkout・`git status` は空) で実行。build 2026-10-14 20:12:18 UTC 開始、run 20:13:29 UTC 開始。素材は `$ARTIFACTS_DIR` の `plugins-kilohearts`・`work-icall`・`work-liftlib` (展開先は `tools/icall/work/`・`tools/liftlib/work/`)、emcc は `/opt/emsdk`。
 - 前版の「最終 HEAD で再実行し一致」の記述は、実行ログが無かったため撤回済み。レビュー run `38627376099` (clean `git archive b757a183`) でも同じ値を得たと報告されている (PR #2845 round 2)。
 
 証跡 (clean `b757a183`):
@@ -37,7 +37,7 @@ $ find tools/icall -type f -size +20M -not -path '*/work/*' | wc -l
 
 **rax 不一致 193 件の内訳**: 全件で native が `0x00005a…` (ネイティブ実行プロセス側のアドレス)、wasm が `< 0x40000000` (線形メモリ内オフセット。build 上限 `0x3c000000` より小さい)。両者は同じアドレス空間の値ではない。rax は判定 (bit 一致) には使わない。
 
-**wasm サイズの差 (m4)**: wasm 内に絶対パス `/home/runner/work/…` の文字列が 8 箇所埋め込まれている (`-g`)。同じ commit を build パス長 25 字 (`/home/runner/work/ws-2845`) と 58 字 (symlink・20:14:23〜20:15:25 UTC) で build したところ、50,774,127 B と 50,774,391 B だった (差 264 B = 8 × 33)。サイズはビルド絶対パス長 1 字あたり +8 B で線形に変わる。前版の記録 50,774,295 B (差 +168 B = 8 × 21) と、レビュー run の 50,774,239 B (差 +112 B = 8 × 14) は、記録時の build パス長が異なると見れば説明がつく (記録時のパス長は未記録のため未確認)。58 字の probe wasm は run していない。
+**wasm サイズの差 (m4)**: wasm 内に build 元の作業ディレクトリの絶対パス文字列が 8 箇所埋め込まれている (`-g`)。同じ commit を build パス長 25 字 (clean checkout の位置) と 58 字 (symlink 経由の同一 checkout・20:14:23〜20:15:25 UTC) で build したところ、50,774,127 B と 50,774,391 B だった (差 264 B = 8 × 33)。サイズはビルド絶対パス長 1 字あたり +8 B で線形に変わる。前版の記録 50,774,295 B (差 +168 B = 8 × 21) と、レビュー run の 50,774,239 B (差 +112 B = 8 × 14) は、記録時の build パス長が異なると見れば説明がつく (記録時のパス長は未記録のため未確認)。58 字の probe wasm は run していない。
 
 ### 原因: `_ott_data_install()` が呼ばれていなかった
 
