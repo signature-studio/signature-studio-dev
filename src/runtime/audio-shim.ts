@@ -345,7 +345,7 @@ export class FlAudioShim {
     const o: Record<string, number> = {};
     for (const k of ["underruns", "silence_frames", "quanta", "in_overruns", "wl_state", "out_read", "out_write",
       "in_write", "in_read", "gen", "cb_count", "cb_late", "cb_max_us", "wake_count", "wait_timeouts", "in_underflows",
-      "min_fill", "clock_jumps", "clock_jump_frames", "clock_skip_frames", "clock_dup_frames", "clock_jump_max", "clock_jump_max_q", "ring_frames", "buffer_frames", "depth", "sample_rate", "out_latency_us", "base_latency_us"] as FlaField[]) {
+      "min_fill", "clock_jumps", "clock_jump_frames", "clock_skip_frames", "clock_dup_frames", "clock_jump_max", "clock_jump_max_q", "clock_first_q", "clock_last_q", "cb_max_q", "ring_frames", "buffer_frames", "depth", "sample_rate", "out_latency_us", "base_latency_us"] as FlaField[]) {
       o[k] = this.ld(k) >>> 0;
     }
     return o;

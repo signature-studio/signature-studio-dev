@@ -57,6 +57,6 @@ Cloudflare Access は `worker` 型。R2 / zone Transform Rules は不要 (旧構
 
 ## 運用
 
-ブランチ → worktree → 実装 subagent → レビュー subagent → PM がマージ。既定ブランチ `main`
+ブランチ → worktree → 実装 subagent → レビュー subagent (検収) が approve 後にマージ。既定ブランチ `main`
 (旧 `master` は凍結) には変更を加えない。詳細は [`AGENTS.md`](AGENTS.md)・
 [`docs/WORKFLOW.md`](docs/WORKFLOW.md)。

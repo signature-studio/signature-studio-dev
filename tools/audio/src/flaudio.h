@@ -93,7 +93,9 @@ typedef struct fla_ctl {
     uint32_t clock_dup_frames; /* 168 clock_jump_frames の負の成分の絶対値 (重複・後退) */
     uint32_t clock_jump_max;   /* 172 1 回の jump の最大 abs (frames), gen 開始で 0 */
     uint32_t clock_jump_max_q; /* 176 その最大 jump が起きた quantum 番号 (process() の通し番号) */
-    uint32_t pad2[3];          /* 180 */
+    uint32_t clock_first_q;    /* 180 最初の jump の quantum 番号 (bit31=1 は負 = 重複・後退)。gen 開始で 0 */
+    uint32_t clock_last_q;     /* 184 直近の jump の quantum 番号 (bit31 は同上) */
+    uint32_t cb_max_q;         /* 188 cb_max_us を更新した時点の quantum 番号 (process() 通し番号) */
     /* ---- line3 @192: main thread が書く 時刻対応 (getOutputTimestamp) ---- */
     uint64_t ref_ctx_time_bits;/* 192 contextTime(f64) */
     uint64_t ref_epoch_ms_bits;/* 200 performance.timeOrigin+performanceTime(f64) */

@@ -215,3 +215,7 @@ main の取り込みで `tools/python` の 9 ファイルが変わった。`git 
 | `run_all.sh` 全体 rc=0 (前提チェックで rc=2。mac の `FLEngine_x64.dylib` が素材に無い。step 3b・4 も mac 依存。step 5〜15 は win のみで未検証) | run_all 全体の合格は未主張 | #2649 (PY-83) |
 | 初版ページの 180 秒 `PENDING` 1 回 (原因未特定、再現せず) | 検証の再現性に一抹の不確かさ | #2634 (本 PR で追跡。再発したら本節に追記) |
 | 静的版の実 FLEngine 連携・サブインタプリタ・pthread・Memory64 | §7d の未解決と同じ | 子 #2631・#2633 (PY-79・PY-80) |
+
+## 7g. run_all.sh を fl-win64 + toolchain-emsdk だけで rc=0 にする (#2649)
+
+**結論**: `bash tools/python/run_all.sh` は fl-win64 + toolchain-emsdk の素材だけで `== ALL OK` (rc=0)。mac 依存の step 3b・4 (mac 版)・7 と step 15 は SKIP。main 取り込み後の HEAD `6bec0214` で実測 (132 秒)。詳細・step 別所要・未解決は `tools/python/REPORT_APPENDIX_2649.md` (250 行上限のため分割移動。内容は削除していない)。

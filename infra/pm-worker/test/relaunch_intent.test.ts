@@ -313,3 +313,17 @@ test("統合 (M3 順序): 第三者の意図を処理した後に、より古い
   await tickNow(ctx);
   assert.equal(focusPosts(ctx).length, 1, "実装 App の意図は時刻に依らず処理される");
 });
+
+// 取り込み前 (IMPORT_REQUIRED=1) は、再投入の意図でも /oc を投稿しない (picks と同じ停止。round 6 B1)。意図は処理済みにせず、取り込み後の tick で投稿する。
+test("統合 (取り込み前): 実装 App の意図は、VM の状態を取り込むまで投稿 0 回 (launch_blocked=no-import)。取り込んだ後の tick で 1 回投稿する", async () => {
+  const ctx = await stopped({ LIVE_LAUNCH: "1", IMPORT_REQUIRED: "1" });
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+  await tickNow(ctx);
+  assert.equal((ctx.app.engine.status() as any).launch_blocked, "no-import");
+  assert.equal(postsTo(ctx, 21).length, 0, "取り込み前は投稿しない");
+  assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "待ちは拒否として数えない");
+  assert.equal(ctx.store.get<{ seen?: string }>("relaunch", "it:21")?.seen, undefined, "待ちは処理済みにしない");
+  ctx.app.engine.importVm({ launched: {}, relaunch: {}, pm_art: {}, phase: { review_only: false, open_prs: 0, since: at(0) } }, true);
+  await tickNow(ctx);
+  assert.equal(focusPosts(ctx).length, 1, "取り込んだ後の tick で投稿される");
+});
