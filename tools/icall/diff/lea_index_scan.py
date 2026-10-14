@@ -212,7 +212,7 @@ def scan(dis_path, exe):
         flow_x[k] = {r: sorted(set(v)) for r, v in regs.items() if all(x is not None for x in v)}
     # 線形走査
     state_x, last_def, cands, seen = {}, {}, [], set()
-    stats = {"lea_rip": 0, "idx_ops": 0, "base_pairs": 0}
+    stats = {"idx_ops": 0, "base_pairs": 0, "x_pairs": 0}
     for idx, (va, text) in enumerate(lines):
         if bound[idx]:
             state_x.clear()
@@ -240,6 +240,8 @@ def scan(dis_path, exe):
                 if base in state_x:
                     srcs.append(("線形", state_x[base]))
                 srcs.extend(("流れ非依存", x) for x in flow_x.get(key, {}).get(base, []))
+                if srcs:
+                    stats["x_pairs"] += 1
                 for method, X in srcs:
                     nS = {}
                     for s in SLOTS:
@@ -308,8 +310,8 @@ def verdict(c):
 
 def main():
     lines, cands, stats = scan(sys.argv[1], sys.argv[2])
-    print("# lea_index_scan: 命令 %d 件・添字付きメモリ式 %d 件・基底候補 (式,X の組) %d 件・候補 %d 件 (n が整数になる組。同一 (VA,式,X) は 1 件)"
-          % (len(lines), stats["idx_ops"], stats["base_pairs"], len(cands)))
+    print("# lea_index_scan: 命令 %d 件・添字付きメモリ式 %d 件・評価した基底・添字の組 %d 件・うち基底が lea-rip の X を持つ組 %d 件・候補 %d 件 (n が整数になる組。同一 (VA,式,X) は 1 件)"
+          % (len(lines), stats["idx_ops"], stats["base_pairs"], stats["x_pairs"], len(cands)))
     tally = defaultdict(int)
     for c in cands:
         v, cat, why = verdict(c)
