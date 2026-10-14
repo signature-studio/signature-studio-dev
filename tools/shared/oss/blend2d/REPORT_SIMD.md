@@ -52,7 +52,7 @@ PR #462 の初版 (`c8e52a6` 時点) で記録した値。旧スクリプトは�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | FL 実描画経路の画素比較 (fl-win64 素材が必要。本 runner は FL 本体を展開していない) | 実 FL 描画経路での一致は未確認 | #146 (受入条件に残存・既存 issue) |
-| Agg2D glue (~140 symbol, `AggCreateInstance`) の lift or C++ 再実装 | glue 未実装のため wasm 本採用は未達 | #146 (受入条件に残存。lift/再実装の方針決定は人判断) |
+| Agg2D glue (`AggCreateInstance`、規模は `REPORT_AGG2D.md` §14) の lift or C++ 再実装 | glue 未実装のため wasm 本採用は未達 | #146 (受入条件に残存。lift/再実装の方針決定は人判断) |
 | native JIT 比の再測定 (本 runner は native JIT を build していない) | 「wasm は JIT 比 約 4–5x」(`tools/shared/REPORT.md` §3.3 の既存値) を本 runner で再確認できていない | **起票依頼 (PM 判断)**: #146 へ追記 or 子 issue |
 | `-msse2` 併用は Blend2D simd 層がビルド失敗 (`math_p.h:198` / `Vec4xF32` 未定義) | SSE2 経路を wasm で有効化する手段が未確定 | **起票依頼 (PM 判断)**: #146 へ追記 or 子 issue |
 | `-msimd128` で速度差が出ない理由 (推定: 固定パイプラインの inner loop が x86 SSE2/AVX 専用に書かれているため。**未検証**) | SIMD 化の効果を得るには Blend2D 側に wasm SIMD 用 backend が必要かもしれない | **起票依頼 (PM 判断)**: 性能最適化の子 issue (#146 の「既知の問題として後で最適化」の範囲) |

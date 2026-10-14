@@ -10,4 +10,6 @@ bash "$HERE/../build.sh"
 bash "$HERE/build.sh"
 "$PY" "$HERE/fl_thread_surface.py" --json "$HERE/results/thread_surface.json" | tee "$HERE/results/thread_surface.txt"
 "$PY" "$HERE/fl_thread_surface.py" --negctl | tail -6      # exit 0 = gate が期待どおり FAIL (検出能力あり)
+"$PY" "$HERE/mixer_reach.py" --json "$HERE/results/mixer_reach.json" | tee "$HERE/results/mixer_reach.txt"
+"$PY" "$HERE/mixer_reach.py" --negctl | tail -3              # exit 0 = 入口を関数内部に差替えた gate が期待どおり FAIL
 node "$HERE/run.mjs" --reps "${REPS:-3}" --secs "${SECS:-6}" --out "$HERE/results/results.json"

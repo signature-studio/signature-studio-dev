@@ -3,11 +3,14 @@
 #   1) native build-python (3.12.1)   -> work/build-native   (cross-build 用 + dis 用)
 #   2) wasm32-emscripten (browser 系) -> work/build-wasm     (libpython3.12.a / python.js(stock) / usr/local stdlib zip)
 # 使い方: bash tools/python/build_cpython_wasm.sh   (再実行可: incremental)
+#   CPY_PTHREADS=1 で --enable-wasm-pthreads 版を別 build dir (work/build-wasm-pthread) に作る (PY-80, #2856)。
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$HERE/work"
 PYVER=3.12.1
 SRC="$WORK/Python-$PYVER"
+PT_FLAG=""; BDIR="build-wasm"
+if [ "${CPY_PTHREADS:-0}" = 1 ]; then PT_FLAG="--enable-wasm-pthreads"; BDIR="build-wasm-pthread"; fi
 mkdir -p "$WORK"
 
 if [ ! -d "$SRC" ]; then
@@ -31,8 +34,8 @@ fi
 # shellcheck disable=SC1091
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 BP="$WORK/build-native/python"
-mkdir -p "$WORK/build-wasm"
-cd "$WORK/build-wasm"
+mkdir -p "$WORK/$BDIR"
+cd "$WORK/$BDIR"
 if [ ! -f Makefile ]; then
   # 不要/ビルド不能モジュールを configure 段階で無効化 (sqlite3: port 依存を避ける, xxlimited: 動的リンク用 -fPIC 要求, CJK codec: 約 1MB)
   env py_cv_module__sqlite3=n/a py_cv_module_xxlimited=n/a py_cv_module_xxlimited_35=n/a \
@@ -44,7 +47,7 @@ if [ ! -f Makefile ]; then
       --host=wasm32-unknown-emscripten \
       --build="$("$SRC/config.guess")" \
       --with-emscripten-target=browser \
-      --disable-ipv6 \
+      --disable-ipv6 $PT_FLAG \
       OPT="-DNDEBUG -fwrapv -O3" \
       --with-build-python="$BP" >configure.log 2>&1
 fi
@@ -53,6 +56,7 @@ emmake make -j"$(nproc)" python.js >make.log 2>&1
 ls -la libpython3.12.a python.js python.wasm python.data
 
 # LGL-3 (#86): 再ビルド記録 (upstream 版・ソース sha256・configure 引数)。build_flpy.sh は CPython ソースにパッチを当てない
+[ "$BDIR" = build-wasm ] || exit 0  # pthread 版は upstream 版の記録 (LGL-3) を上書きしない
 node "$HERE/../legal/notices/record.mjs" --id "cpython-$PYVER" --name CPython --version "$PYVER" --license-spdx PSF-2.0 \
   --url "https://www.python.org/ftp/python/$PYVER/Python-$PYVER.tgz" --archive "$WORK/Python-$PYVER.tgz" \
   --src-dir "$SRC" --license-file LICENSE \

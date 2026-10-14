@@ -236,3 +236,8 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 - 結論: `.text` の大部分を ia32 x64c で lift した (起点は export・関数ポインタ・code 即値、直接 call の再帰降下)。 「全体」は未達で、残りの未被覆域は子 #2814 (PLG-G2-22) へ。
 - 未解決の `sahf` の AF 未反映と `fs:` の 0 埋め模型は silent divergence の候補で、#1223 へ送る (付録 §7)。
 - 測定値・区間内訳・再現手順は [REPORT_APPENDIX_1098.md](REPORT_APPENDIX_1098.md) (数値の正本は付録 §2・§3)。
+
+## 12. x87 subset の ia32 lowering と差分試験 (#1099、測定 commit `ce0f0872`)
+
+- 結論: x87 subset を ia32 で lower し、実 x87 との差分は主に 1 ulp。 x64 の出力は不変。 残りの x87 (超越関数ほか) は未 lower。
+- 方式 `docs/DECISIONS.md` D28 (f80→f64)。 測定値・ネガコン・検算・未解決は [REPORT_APPENDIX_1099.md](REPORT_APPENDIX_1099.md) (正本)。

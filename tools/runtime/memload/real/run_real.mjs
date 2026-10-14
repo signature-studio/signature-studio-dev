@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // RT-6 実 loader 試験 (#125) 1 コマンド: `node tools/runtime/memload/real/run_real.mjs [--neg-only|--pos-only]`
-// PluginPool を hostbridge の loader (host_vst2.wasm + hb_bridge.mjs。LoadLibraryW の採番だけ PoolBridge で置換) に接続し、lowbase 版 OTT を
+// PluginPool を hostbridge の loader (host_vst2.wasm + 共有 hb_bridge.mjs) に接続し、lowbase 版 OTT を
 // 150 種 + 320 pin で回す。各ケースは新しい headless Chrome (= 新しいレンダラ)。判定が崩れたら exit 1。
 // ネガティブコントロール (NEG) は「壊すと OOM / 判定 FAIL になる」ことを確認し、検出しなければ exit 1。
 // 前提: bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh (lowbase 版 OTT) と retdec/build_host_lb.sh (host_vst2.wasm)。
