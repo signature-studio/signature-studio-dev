@@ -89,9 +89,10 @@
 
 ## 7. 測定 commit と差分
 
-- 測定に使ったコード: `d32e3a32` (main)。route・fa_cmp・fa_sweep・ir_* の内容は、これ以降の HEAD と同一。
-- `git diff d32e3a32 6aa8a94d -- tools/icall tools/ott tools/m2 tools/m5 tools/m11 tools/targets/freshair tools/liftlib --stat` の出力は 2 ファイル (`tools/icall/diff/fa_va_sha.py` 新規 40 行・`tools/icall/REPORT_APPENDIX_2675.md` 61 行)。`fa_va_sha.py` は route からも sweep からも参照されない (`grep -rn fa_va_sha tools --include=*.sh --include=*.py` が 0 件)。route の再 build と sweep の結果は、d32e3a32 と HEAD で同一 (§4)。
-- 本 PR の追加: `tools/icall/diff/data_code_count.py` (測定用スクリプト・route の入力ではない)、本付録、`tools/icall/REPORT.md` §15 の 1 行 (行数は 250 のまま)、`docs/DOC_MAP.md` の登録行。
+- 測定 commit: `6aa8a94d` (origin/main)。route・fa_cmp・fa_sweep の初回測定は `d32e3a32` (main) で行い、`6aa8a94d` の worktree で route を再 build して sweep を再実行した (§4 の cmp が SAME)。
+- `git diff d32e3a32 6aa8a94d -- tools/icall tools/ott tools/m2 tools/m5 tools/m11 tools/targets/freshair tools/liftlib --stat` の出力は 2 ファイル (`tools/icall/diff/fa_va_sha.py` 新規 40 行・`tools/icall/REPORT_APPENDIX_2675.md` 61 行)。`fa_va_sha.py` は route からも sweep からも参照されない (`grep -rn fa_va_sha tools --include=*.sh --include=*.py` が 0 件)。
+- 本 PR のコード commit: `0ab44c27` (測定用 `tools/icall/diff/data_code_count.py` の追加のみ。route の入力ではない)。`git diff 6aa8a94d HEAD -- tools/icall/fa_route_build.sh tools/icall/ir_*.py tools/icall/frame_slot_restore.py tools/icall/vex_gen.py tools/icall/rt tools/icall/diff/fa_cmp.py tools/icall/diff/fa_sweep.sh tools/m2 tools/m5 tools/m11 tools/ott tools/targets/freshair tools/liftlib --stat` の出力は**空** (route・sweep の経路は差分 0)。
+- 本 PR の追加: 測定用スクリプト、本付録、`tools/icall/REPORT.md` §15 の 1 行 (行数は 250 のまま)、`docs/DOC_MAP.md` の登録行。
 
 ## 8. 再現
 
