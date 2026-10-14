@@ -33,6 +33,7 @@
   - `tests/trace_diverge_418be0.py` は 0x418be0 を最後の共通 entry とする unreachable case を 20 件数える。最初の食い違いは全件で `0x407030` の有無 (native のみ `0x418be0 → 0x407030 → 0x413060`、wasm は `0x418be0 → 0x413060`)。
   - thunk 0x407030 を除いて再比較すると、**参考値として 16 件** で食い違いが残る (直前の共通 entry 0x410320 が 10、0x446290 が 3、0x464c60 が 2、0x414ad0 が 1)。残り 4 件は trace_head 上限 (12 件) で判定不能。
   - 内訳の正本は `results/m11_418be0_thunk.md` (`tests/trace_diverge_418be0.py` で再生成)。16 / 4 は入力の出所が確定するまで受入の根拠に使わない。
+  - **現 head での 1 件再生成 (試行)**: `liftdiff.py batch targets/m11.json --set file:<1 件> --shards 1 --nobuild` を HEAD `ad7d455f` で 1 関数実行 (素材 `fl-win64` の `block00031_PE.bin`・`work-m11` の `tools/m11/work`・archive の `ld_wasm.cjs` を使用)。0x41c820 (`results` の代表 caller) は、closure 記録では `mismatch` (pattern 別: s/p0/q0 が `both_fault`/`native_fault`、qall が `diff`) だったが、現 head の 1 件再生成では `match` (pattern 別: s/p0/q0 が `native_fault`、qall が `both_fault`) で、pattern ごとの outcome も一致しない。`1c4b7c7e` 以降に `tools/liftdiff/ldlib`・`liftdiff.py`・`targets`・`rt` の 21 ファイルが変わっており (差分 1345 行)、closure と同じ生成条件ではない。shards 1 と 14 の差は未検証。このため現 head の 1 件値を closure の値の代わりに使わない。全件の再生成は子 issue [LD-60] に切り出す。
   - **生成 commit (未確定)**: 生成 commit・生成コマンドは記録に無い。
     - 素材内 `batch_closure.log` (`[batch] 7421 functions, shards=14` 〜 `done 602s`・ログ mtime 08:30:33 UTC) から、開始は 08:20:31 UTC (17:20:31 JST)、終了は 08:30:33 UTC と読める。
     - `[batch] done` 出力を持つ harness の初出 commit は `1c4b7c7e` (08:36:56 UTC = 17:36:56 JST) で、生成はそれより前。よって生成は当時の未 commit 作業ツリーで行われた可能性が高い (推定)。
