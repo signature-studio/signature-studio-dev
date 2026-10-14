@@ -74,6 +74,13 @@
 - 指摘の根拠として pr-lint の出力 (`<file>:<line>: <rule>: <message>`) を引用する。
 - pr-lint が通っている項目 (REPORT 行数・repo 外パス・oc_artifacts の値域・DOC_MAP 登録・Closes と受入の整合) は再指摘しない。
 
+### 自動 PR (STATUS 同期) の例外
+
+- 題名が `docs(status): sync merged PRs` で始まり、変更が `docs/STATUS.md` の `<!-- status-auto:begin -->` 〜 `<!-- status-auto:end -->` の**内側だけ**の PR は、定期ジョブ (`tools/pm/status_sync.py`) の自動 PR で、`Closes`/`Refs` を持たない。
+  この PR には、`Closes`/`Refs` の不在・受入条件の表・e2e の実測が無いことを指摘しない。
+- 例外は題名と diff の**両方**を満たすときだけ。自動節の外が 1 byte でも変わる PR、`docs/STATUS.md` 以外のファイルを含む PR、題名だけ似せた PR は通常の PR として扱う (`Closes`/`Refs` と受入条件を求める)。
+- 確認するのは 2 点だけ: (a) `git diff origin/main...<head> --stat` が `docs/STATUS.md` のみで、差分が上のマーカーの内側に収まること (b) 自動節に測定値 (小数・`%`・`ms` など) が無いこと。満たせば approve する。
+
 ## 差し戻しの書き方 (収束規則・マーカー・PM 判断の扱い)
 
 ### 収束規則

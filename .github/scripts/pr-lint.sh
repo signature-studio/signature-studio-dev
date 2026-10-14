@@ -1,6 +1,6 @@
 #!/bin/bash
 # pr-lint.sh — push 前に差し戻しの上位原因を決定的に検査する (#2322)。
-# 検査: (a) REPORT 行数上限 (b) 追加行の repo 外絶対パス (c) Closes/Refs と受入の整合
+# 検査: (a) REPORT 行数上限 (b) 追加行の repo 外絶対パス (c) Closes/Refs と受入の整合 (STATUS 自動節だけの自動 PR は除く)
 #       (d) oc_artifacts の値域 (watchdog.sh の ARTIFACT_RE) (e) 新規 REPORT の DOC_MAP 登録
 # 使い方: bash .github/scripts/pr-lint.sh --base <ref> --head <ref> --body-file <PR 本文ファイル>
 # 既定は警告のみ (終了 0)。OC_LINT_STRICT=1 で違反があれば終了 1。
@@ -51,10 +51,19 @@ while IFS=$'\t' read -r f n text; do
 done < <(git diff --unified=0 "$BASE...$HEAD_REF" -- . ':!.github/scripts/pr-lint.sh' ':!.github/scripts/tests/test-pr-lint.sh' \
   | awk '/^\+\+\+ /{f=substr($0,7); next} /^@@/{split($3,a,","); sub(/^\+/,"",a[1]); n=a[1]-1; next} /^\+/{n++; print f "\t" n "\t" substr($0,2); next}')
 
-# (c) Closes/Refs と受入の整合。自動 PR (題名 docs(status): sync で変更が docs/STATUS.md のみ) は対象外 (DOCS-21 で例外化)
+# (c) Closes/Refs と受入の整合。自動 PR (題名が "docs(status): sync merged PRs" で始まり、変更が docs/STATUS.md の
+#     status-auto 節の内側だけ) は Closes/Refs を持たないので対象外 (DOCS-21。--title を渡したときだけ判定する)
+strip_auto() { awk '/^<!-- status-auto:begin -->$/{print; skip=1; next} /^<!-- status-auto:end -->$/{skip=0} !skip{print}'; }
+marks() { grep -cE '^<!-- status-auto:(begin|end) -->$'; }
 sync_only=0
-case "$TITLE" in "docs(status): sync"*)
-  [ "$(git diff --name-only "$BASE...$HEAD_REF" | sort | tr '\n' ' ')" = "docs/STATUS.md " ] && sync_only=1 ;;
+case "$TITLE" in "docs(status): sync merged PRs"*)
+  if [ "$(git diff --name-only "$BASE...$HEAD_REF" | sort | tr '\n' ' ')" = "docs/STATUS.md " ]; then
+    mb="$(git merge-base "$BASE" "$HEAD_REF")"
+    if [ "$(git show "$mb:docs/STATUS.md" | marks)" = 2 ] && [ "$(git show "$HEAD_REF:docs/STATUS.md" | marks)" = 2 ] \
+      && cmp -s <(git show "$mb:docs/STATUS.md" | strip_auto) <(git show "$HEAD_REF:docs/STATUS.md" | strip_auto); then
+      sync_only=1
+    fi
+  fi ;;
 esac
 if [ "$sync_only" = 1 ]; then
   :
