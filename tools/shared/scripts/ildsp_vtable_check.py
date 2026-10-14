@@ -1,159 +1,194 @@
 #!/usr/bin/env python3
-"""ildsp_vtable.py の結果を、別の逆アセンブラ (GNU objdump) で検算する。
+"""ildsp_vtable.py の出力 (JSON) を、生バイトだけで読み直して照合する検算。
 
-usage: ildsp_vtable_check.py <vtable.json> [PE]
-  既定 PE: $FL_WIN64_DIR/extracted/block24360_PE.bin (tools/shared/paths.py)
-検算の範囲と限界:
-  - 検算するのは命令の復号だけ。関数集合 (JSON の function_rvas) は ildsp_vtable.py と共有する。
-    closure の辿り方 (.pdata の無い直接 call/jmp 先の扱いを含む) は検算しないので、取りこぼしは検出できない。
-  - 関数範囲は ildsp_vtable.py と同じ定義 (.pdata の終端。無ければ次の .pdata 先頭か .text 末尾)。
-  - 各範囲を `objdump -d -M intel --start-address --stop-address` で逆アセンブルし、命令開始アドレス (RVA) の
-    集合を capstone (ildsp_survey.sweep) の集合と比べる。
-  - 命令ごとに SIMD (xmm/ymm/zmm を含む) と間接 call (`call` の即値でない形) の判定も比べる。
-    `(bad)` 行と `.byte` 行は命令として数えない。
-  - 集合の差は KNOWN_DATA_IN_CODE の RVA と完全一致する場合のみ許す。それ以外の差は非 0 で終了する。
-  - JSON の命令数・SIMD 比・間接 call 数は、上の capstone 集合から再計算した値と一致しなければならない。
-  - 参考値として、同じ関数集合の末尾 jmp (即値でない jmp) を objdump の出力から分類し `[tail]` 行に出す
-    (IAT / 画像内ポインタ / reg / vcall 形 `[reg+disp]` / switch 形 `[base+idx*8]`)。判定には使わない。
-不一致が 1 件でもあれば非 0 で終了する。"""
-import sys, os, re, json, struct, subprocess, argparse, bisect
-HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(HERE, ".."))
-from paths import FL_WIN64_DIR
-import pefile, capstone
-import ildsp_survey as S
+usage: ildsp_vtable_check.py <json> [--pe <PE>]
+  既定 PE: JSON の "pe" フィールド。
+方式が別: pefile / capstone を使わず、PE ヘッダを struct で読み、命令は固定バイト列
+(lea rip / mov rcx,[rcx+8]; jmp rel32 / xor eax,eax; ret / call rel32 / call [rip+disp32]) で照合する。
+全件一致で ALL OK (exit 0)。1 件でも不一致なら FAIL を列挙して exit 1。
+"""
+import sys, os, json, struct, hashlib, argparse
 
-LINE_RE = re.compile(r"^\s*([0-9a-f]+):\t(.*)$")
-DIRECT_CALL_RE = re.compile(r"^call\s+0x[0-9a-f]+$")
-SIMD_RE = re.compile(r"\b(xmm|ymm|zmm)\d")
-# 既知差分 (RVA): 命令開始アドレスが capstone 側だけに現れる箇所。
-# TransientLooper の関数 0x190fa0 (範囲 0x190fa0-0x191c80) 内の 0x191c20 付近には switch 用の 4 byte RVA 表が埋まる。
-# 0x191c1f の `add ch,cl` (00 cd) は両者で同じ位置から復号される。0x191c28 の `c5 11 19` は不正な VEX 接頭辞で、
-# capstone は 1 byte 飛ばして 0x191c29 から `adc dword ptr [rcx], ebx` を 1 件数える。objdump は 0x191c28 を
-# `(bad)` として 3 byte を 1 行で消費し、0x191c29 を命令として出さない。
-KNOWN_DATA_IN_CODE = {"TransientLooper_CreateInstance": {0x191c29}}
-JMP_RE = re.compile(r"^(?:\S+ )*?jmp\s+([^#]*?)\s*(?:#\s*0x([0-9a-f]+).*)?$")
-DIRECT_JMP_RE = re.compile(r"^0x[0-9a-f]+$")
+fails = []
+
+
+def check(cond, msg):
+    if not cond:
+        fails.append(msg)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("json")
-    ap.add_argument("pe", nargs="?", default=os.path.join(FL_WIN64_DIR, "extracted", "block24360_PE.bin"))
+    ap.add_argument("--pe", default=None)
     a = ap.parse_args()
-    res = json.load(open(a.json))
+    J = json.load(open(a.json))
+    pe_path = a.pe or J["pe"]
+    raw = open(pe_path, "rb").read()
 
-    pe = pefile.PE(a.pe, fast_load=True)
-    ib = pe.OPTIONAL_HEADER.ImageBase
-    text = {s.Name.rstrip(b"\0").decode(): s for s in pe.sections}[".text"]
-    t_hi = text.VirtualAddress + text.Misc_VirtualSize
-    exc = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]]
-    image = pe.get_memory_mapped_image()
-    funcs = {}
-    for i in range(exc.Size // 12):
-        b, e, _ = struct.unpack_from("<III", image, exc.VirtualAddress + i * 12)
-        funcs[b] = e
-    fn_sorted = sorted(funcs)
-    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+    check(hashlib.sha256(raw).hexdigest() == J["pe_sha256"], "pe_sha256 が一致しない (別ファイルの JSON)")
 
-    def end_of(b):
-        if b in funcs:
-            return funcs[b]
-        i = bisect.bisect_right(fn_sorted, b)
-        return fn_sorted[i] if i < len(fn_sorted) else t_hi
+    # --- PE ヘッダを生バイトで読む
+    lfanew = struct.unpack_from("<I", raw, 0x3C)[0]
+    check(raw[lfanew:lfanew + 4] == b"PE\0\0", "PE signature")
+    nsec = struct.unpack_from("<H", raw, lfanew + 6)[0]
+    optsz = struct.unpack_from("<H", raw, lfanew + 20)[0]
+    opt = lfanew + 24
+    base = struct.unpack_from("<Q", raw, opt + 24)[0]
+    check(hex(base) == J["image_base"], f"image_base {hex(base)} != {J['image_base']}")
+    secs = []
+    for k in range(nsec):
+        o = opt + optsz + 40 * k
+        name = raw[o:o + 8].rstrip(b"\0").decode()
+        vsz, va, rsz, rptr = struct.unpack_from("<IIII", raw, o + 8)
+        secs.append((name, va, max(vsz, rsz), rptr, vsz))
+    text = [s for s in secs if s[0] == ".text"][0]
+    t_lo, t_hi = text[1], text[1] + text[4]
+    check(hex(t_lo) == J["text"]["lo"] and hex(t_hi) == J["text"]["hi"], ".text 範囲が一致しない")
 
-    iat = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IAT"]]
-    iat_lo, iat_hi = iat.VirtualAddress, iat.VirtualAddress + iat.Size
+    def off(rva):
+        for _, va, sz, ptr, _ in secs:
+            if va <= rva < va + sz:
+                return rva - va + ptr
+        raise KeyError(hex(rva))
 
-    def jmp_kind(m):
-        # 末尾 jmp の分類 (即値の jmp は None)。rip 相対は objdump の `# 0x...` (絶対アドレス) で参照先を見る
-        g = re.sub(r"<.*>", "", m.group(1)).strip()
-        if DIRECT_JMP_RE.match(g):
-            return None
-        if "[rip+" in g:
-            if m.group(2) is None:
-                return "imgptr"
-            t = int(m.group(2), 16) - ib
-            return "IAT" if iat_lo <= t < iat_hi else "imgptr"
-        if "[" in g:
-            return "switch" if "*" in g else "vcall"
-        return "reg"
+    def u64(rva):
+        return struct.unpack_from("<Q", raw, off(rva))[0]
 
-    cap_cache, obj_cache, jmp_cache = {}, {}, {}
+    def bytes_at(rva, n):
+        return raw[off(rva):off(rva) + n]
 
-    def capstone_range(b):
-        # RVA -> (simd, indirect call)
-        if b not in cap_cache:
-            cap_cache[b] = {addr: (S.classify(m, ops) == "simd", m.startswith("call") and not S.is_direct(ops))
-                            for addr, m, ops in S.sweep(md, bytes(image[b:end_of(b)]), b)}
-        return cap_cache[b]
+    def rel_target(site, n_prefix, n_total):
+        """site から n_prefix バイト後の rel32 の宛先 (次命令は site+n_total)。"""
+        rel = struct.unpack_from("<i", raw, off(site + n_prefix))[0]
+        return site + n_total + rel
 
-    def objdump_range(b):
-        # RVA -> (simd, indirect call)
-        if b not in obj_cache:
-            e = end_of(b)
-            out = subprocess.run(["objdump", "-d", "-M", "intel", "--no-show-raw-insn",
-                                  f"--start-address=0x{ib + b:x}", f"--stop-address=0x{ib + e:x}", a.pe],
-                                 capture_output=True, text=True, check=True, timeout=120).stdout
-            insns, jmps = {}, {}
-            for line in out.splitlines():
-                m = LINE_RE.match(line)
-                if not m:
-                    continue
-                body = m.group(2).strip()
-                if not body or body.startswith("(bad)") or body.startswith(".byte"):
-                    continue
-                addr = int(m.group(1), 16) - ib
-                insns[addr] = (bool(SIMD_RE.search(body)),
-                               body.startswith("call") and not DIRECT_CALL_RE.match(body))
-                jm = JMP_RE.match(body)
-                kind = jmp_kind(jm) if jm else None
-                if kind is not None:
-                    jmps[addr] = kind
-            obj_cache[b] = insns
-            jmp_cache[b] = jmps
-        return obj_cache[b]
+    # --- 1. CreateInstance の vptr 格納 lea
+    ci = J["create_instance"]
+    lea = int(ci["vptr_lea_at"], 16)
+    b = bytes_at(lea, 7)
+    check(b[:3] == bytes.fromhex("488d05"), f"CreateInstance の lea 命令でない: {b.hex()}")
+    check(b.hex() == ci["vptr_lea_bytes"], "vptr_lea_bytes が生バイトと一致しない")
+    check(rel_target(lea, 3, 7) == int(ci["vptr_target_rva"], 16), "lea の RIP 相対先が vptr_target_rva と一致しない")
+    check(bytes_at(lea + 7, 3) == bytes.fromhex("488907"), "lea の直後が mov [rdi],rax でない (vptr 格納でない)")
 
-    ok = True
-    for row in res["exports"]:
-        v = row["vtable"]
-        if v is None:
-            continue
-        cap, obj = {}, {}
-        for fh in v["function_rvas"]:
-            b = int(fh, 16)
-            for addr, f in capstone_range(b).items():
-                cap.setdefault(addr, f)
-            for addr, f in objdump_range(b).items():
-                obj.setdefault(addr, f)
-        only_cap = set(cap) - set(obj)
-        only_obj = set(obj) - set(cap)
-        known = KNOWN_DATA_IN_CODE.get(row["export"], set())
-        flags_ok = all(cap[x] == obj[x] for x in set(cap) & set(obj))
-        n_cap = len(cap)
-        simd_cap = sum(1 for s, _ in cap.values() if s)
-        ind_cap = sum(1 for _, c in cap.values() if c)
-        simd_ratio = round(simd_cap / max(n_cap, 1), 4)
-        ind_obj = sum(1 for _, c in obj.values() if c)
-        match = (only_cap == known and not only_obj and flags_ok and n_cap == v["instructions"]
-                 and ind_cap == v["indirect_calls"] and simd_ratio == v["simd_ratio"])
-        ok &= match
-        fmt = lambda s: "{" + ",".join(hex(x) for x in sorted(s)) + "}" if s else "{}"
-        print(f"[check] {row['export']}: insns json={v['instructions']} capstone={n_cap} objdump={len(obj)} | "
-              f"only_capstone={fmt(only_cap)} only_objdump={fmt(only_obj)} flags={'same' if flags_ok else 'DIFF'} | "
-              f"indirect capstone={ind_cap} objdump={ind_obj} | simd capstone={simd_ratio} json={v['simd_ratio']} "
-              f"-> {'OK' if match else 'MISMATCH'}")
-        tails = {}
-        for fh in v["function_rvas"]:
-            objdump_range(int(fh, 16))
-            for addr, k in jmp_cache[int(fh, 16)].items():
-                tails.setdefault(addr, k)
-        tc = {k: sum(1 for x in tails.values() if x == k) for k in ("IAT", "imgptr", "reg", "vcall", "switch")}
-        print(f"[tail] {row['export']}: IAT={tc['IAT']} imgptr={tc['imgptr']} reg={tc['reg']} "
-              f"vcall={tc['vcall']} switch={tc['switch']}")
-    print("[check] ALL OK" if ok else "[check] MISMATCH")
-    sys.exit(0 if ok else 1)
+    # --- 2. vtable
+    V = J["vtable"]
+    VT = int(V["rva"], 16)
+    check(V["rva"] == ci["vptr_target_rva"], "vtable.rva と vptr_target_rva が不一致")
+    n = V["slot_count"]
+    check(n == len(V["slots"]) == 6, f"slot 数 {n} (期待 6)")
+    for k in range(n):
+        v = u64(VT + 8 * k)
+        check(v - base == int(V["slots"][k]["target_rva"], 16), f"slot {k}: 生バイトの値 {hex(v)} が JSON と不一致")
+        check(t_lo <= v - base < t_hi, f"slot {k}: .text を指さない")
+    end_v = u64(VT + 8 * n)
+    check(hex(end_v) == V["end_value_va"], "slot 終端の値が JSON と不一致")
+    check(not (t_lo <= end_v - base < t_hi), "slot 終端が .text を指す (vtable 長が 6 で終わらない)")
+    check(V["end_in_text"] is False, "end_in_text フラグ不一致")
+
+    # --- 3. slot 種別ごとの生バイト照合
+    for s in V["slots"]:
+        t = int(s["target_rva"], 16)
+        k = s["index"]
+        if s["kind"] == "thunk_inner":
+            b = bytes_at(t, 9)
+            check(b[:4] == bytes.fromhex("488b4908") and b[4] == 0xE9,
+                  f"slot {k}: thunk の生バイトが mov rcx,[rcx+8]; jmp rel32 でない: {b.hex()}")
+            check(hex(rel_target(t, 5, 9)) == s["thunk_target"], f"slot {k}: thunk の jmp 先が JSON と不一致")
+        elif s["kind"] == "const_ret0":
+            check(bytes_at(t, 3) in (bytes.fromhex("31c0c3"), bytes.fromhex("33c0c3")),
+                  f"slot {k}: 定数返しの生バイトが xor eax,eax; ret でない")
+        elif s["kind"] == "function":
+            # 範囲内の全 e8 を生バイトで走査し、JSON の call 箇所と照合する (走査の偽陽性は lea 等の変位に E8 が入る場合のみ)
+            lo, hi = int(s["ranges"][0][0], 16), int(s["ranges"][-1][1], 16)
+            scan = set()
+            for x in range(lo, hi - 4):
+                if raw[off(x)] == 0xE8:
+                    tgt = rel_target(x, 1, 5)
+                    if t_lo <= tgt < t_hi:
+                        scan.add((hex(x), hex(tgt)))
+            js = {(c["site"], c["target"]) for c in s["calls"] if c["target"]}
+            check(js <= scan, f"slot {k}: JSON の call 箇所が生バイト走査で見つからない {sorted(js - scan)[:3]}")
+            check(len(scan) == len(js), f"slot {k}: 生バイト走査の call 数 {len(scan)} と JSON {len(js)} が不一致")
+            if s["stores_vptr"]:
+                # dtor の指紋: 解放 helper 0x1ac9b0 へ rdx=0x2f8 (内部オブジェクト) と rdx=0x10 (ラッパ) の 2 回の sized 呼出し
+                for sz in ("0x2f8", "0x10"):
+                    imm = struct.pack("<I", int(sz, 16))
+                    found = False
+                    for x in range(lo, hi - 5):
+                        if raw[off(x):off(x) + 5] == b"\xba" + imm:
+                            found = any(raw[off(y)] == 0xE8 and rel_target(y, 1, 5) == 0x1AC9B0
+                                        for y in range(x + 5, min(hi, x + 16)))
+                            if found:
+                                break
+                    check(found, f"slot {k}: mov edx,{sz} の直後に 0x1ac9b0 への call が無い")
+                for ref in s["stores_vptr"]:
+                    x = int(ref, 16)
+                    check(bytes_at(x, 3) == bytes.fromhex("488d05") and rel_target(x, 3, 7) == VT,
+                          f"slot {k}: stores_vptr {ref} が vtable への lea でない")
+        else:
+            fails.append(f"slot {k}: 未知の kind {s['kind']}")
+
+    # --- 4. closure: JSON が挙げた直接 call を生バイトで再確認し、closure 集合に閉じているかを見る
+    for key in ("closure_create_only", "closure_with_slots"):
+        cl = J[key]
+        starts = {int(f["start"], 16) for f in cl["function_starts"]}
+        check(len(starts) == cl["functions"], f"{key}: 関数数の不一致")
+        for site, tgt in cl["direct_call_sites"]:
+            x = int(site, 16)
+            check(raw[off(x)] == 0xE8 and rel_target(x, 1, 5) == int(tgt, 16),
+                  f"{key}: 直接 call {site} の生バイトが {tgt} を指さない")
+            check(int(tgt, 16) in starts or any(
+                int(r[0], 16) <= int(tgt, 16) < int(r[1], 16) for f in cl["function_starts"] for r in f["ranges"]),
+                f"{key}: 直接 call {site} -> {tgt} が closure に無い")
+        # 参考値: 関数範囲内の生バイト e8 のうち宛先が closure 外の .text 関数 (逆アセンブル由来の JSON と突き合わせる。偽陽性を含みうる)
+        ext = []
+        for f in cl["function_starts"]:
+            for r in f["ranges"]:
+                lo, hi = int(r[0], 16), int(r[1], 16)
+                for x in range(lo, hi - 4):
+                    if raw[off(x)] == 0xE8:
+                        tgt = rel_target(x, 1, 5)
+                        if t_lo <= tgt < t_hi and tgt not in starts:
+                            ext.append((hex(x), hex(tgt)))
+        print(f"[{key}] 参考: 生バイト e8 の closure 外宛先 = {len(ext)} 件 {ext[:4]}")
+
+    # --- 5. 間接 call / jmp の宛先スロット (rip 相対) を生バイトで確認
+    for key in ("closure_create_only", "closure_with_slots"):
+        for c in J[key]["indirect_calls"]:
+            x = int(c["site"], 16)
+            check(raw[off(x):off(x) + 2] == b"\xff\x15", f"{key}: 間接 call {c['site']} が call [rip+disp] でない")
+            slot = rel_target(x, 2, 6)
+            check(hex(slot) == c["slot_rva"], f"{key}: 間接 call {c['site']} のスロット RVA 不一致")
+            check(hex(u64(slot)) == c["slot_file_value"], f"{key}: 間接 call {c['site']} のスロット値不一致")
+
+    # --- 6. スロット領域の DIR64 再配置 (.reloc を生バイトで走査。DataDirectory[5] = BASERELOC)
+    rb_rva, rb_size = struct.unpack_from("<II", raw, opt + 112 + 8 * 5)
+    relocs = set()
+    p = off(rb_rva)
+    while p < off(rb_rva) + rb_size:
+        page, blk = struct.unpack_from("<II", raw, p)
+        if blk < 8:
+            fails.append(f".reloc ブロックの大きさが不正: {blk}")
+            break
+        for q in range(p + 8, p + blk, 2):
+            e = struct.unpack_from("<H", raw, q)[0]
+            if e >> 12 == 10:  # IMAGE_REL_BASED_DIR64
+                relocs.add(page + (e & 0xFFF))
+        p += blk
+    slot_relocs = sorted(x for x in relocs if 0x268000 <= x < 0x268300)
+    check(len(slot_relocs) == 16, f"スロット領域の DIR64 reloc 数 {len(slot_relocs)} (期待 16)")
+    check(0x268260 in relocs and 0x268268 in relocs, "0x268260 / 0x268268 のどちらかに DIR64 reloc が無い")
+    check(0x268088 not in relocs and 0x268090 not in relocs, "0x268088 / 0x268090 のどちらかに DIR64 reloc がある")
+    print(f"[.reloc] 0x268000–0x268300 の DIR64 = {len(slot_relocs)} 件: {' '.join(hex(x) for x in slot_relocs)}")
+
+    if fails:
+        for m in fails:
+            print("FAIL", m)
+        print(f"ildsp_vtable_check: FAIL {len(fails)} 件")
+        sys.exit(1)
+    print("ildsp_vtable_check: ALL OK")
 
 
 if __name__ == "__main__":
