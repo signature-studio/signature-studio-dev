@@ -50,7 +50,16 @@ FA-28 (#2097) まで未解決だった「probe 下 `out[0]=0` / probe 無し `ou
 ### 6.1 測定 commit と実測値 (PR 本文からの転記・未再検証)
 
 - 測定 commit: `962de2fb` (コード変更の最後の commit)。以下の数値は PR 本文 (実装側が `962de2fb` で報告した値) からの転記。本 fix のレビュー run では素材 (plugins-freshair) が無く再実行しておらず、これらの値は本セッションでは未検証。
-- 差分 0 の証跡: `git diff 962de2fb HEAD -- tools/targets/freshair/lift2` は、転記時点 (HEAD = `962de2fb`) で 0 行。その後の `native_ctrl.c` のコメント修正 (1 行) は下記 6.2 の commit に含まれ、この差分は 0 行ではない。
+- 差分の証跡: `git diff 962de2fb HEAD -- tools/targets/freshair/lift2` (HEAD = `1c55dce7`) の出力は次のとおり。コード変更は `native_ctrl.c` のコメント 1 行だけで、実行ロジックは変わっていない。
+
+  ```
+  diff --git a/tools/targets/freshair/lift2/native/native_ctrl.c b/tools/targets/freshair/lift2/native/native_ctrl.c
+  --- a/tools/targets/freshair/lift2/native/native_ctrl.c
+  +++ b/tools/targets/freshair/lift2/native/native_ctrl.c
+  @@ -60,7 +60,7 @@ static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key)
+  -    /* FA-29 (#2145): FA_P9GUARD=1 は ctl が poison (a5a5…) のとき +0xa8 を読まない (2 回目の呼出 C=Z で SEGV していた)。既定 OFF */
+  +    /* FA-29 (#2145): FA_P9GUARD=1 は ctl が poison (a5a5…) のとき +0xa8 を読まない (2 回目の呼出 C=Z では ctl を deref して ERR になっていた)。既定 OFF */
+  ```
 - `bash tools/targets/freshair/lift2/run_fa9.sh` (転記): rc=0, **GATE PASS**
   - (a) base: ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0
   - (b) alt: ERR=8/8 path=static / (b-wasm) alt: wasm ERR=8/8
