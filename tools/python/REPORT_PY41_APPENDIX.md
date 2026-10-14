@@ -161,3 +161,81 @@
 | vtbl 呼出し (3 件・`[rax+0x30]`) の呼出し先 | 受入 1 | #2874 (PY-99) |
 | 0x104caae の r9d 引数 (`call 0x12df2a0`) の式の照合 | 受入 2 の一部 | #2874 (PY-99)。未追記 (#2874 本文に項目なし) |
 | 0x104a924 の間接書込み (0xc61250 経由) を ACC に反映 | ACC の定義 | #2874 (PY-99) |
+
+## PY-99 (#3085・親 #2874): SLOT? 49 件の先行辺ごとの store 集合 (実測)
+
+親: #2874 (PY-99)。前段: 上節 PY-88 (#2788)。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
+前提: `analysis/py99_slot_paths.py` と #2874 の PR は main に無かった (`origin/main` に py99 のファイル・#2874 の commit が無いことを確認)。本節の script は新規作成した。
+測定 commit: `a5fb0d2d` (本節のコードを含む commit の 1 つ前の HEAD)。本 commit のコード変更は `analysis/py99_slot_paths.py` の新規 1 ファイルだけ (REPORT を除く)。`analysis/py88_writes.py`・`analysis/py64_check_expr.py`・`provider`・`host`・`tests` は無変更 (`git diff --stat a5fb0d2d HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は py99 の 1 行だけ)。
+
+### 結論 (部分達成・`Refs #3085`)
+
+- 受入 1 (SLOT? 49 件の書込みについて、合流の先行経路ごとの式を VA つきで記録): **script は実施、閉包は未達**。49 件の書込みから SLOT? の読み 77 件 (異なり) を取り、読みごとに合流 J と先行辺 p ごとの store 集合 S_p (VA と式) を出す。合流を持つ読みは 65 件 (先行辺 136)。閉じた書込みは **0/49**。
+- 受入 2 (閉じた式の検算 mismatch 0・ネガティブコントロールを数値で): 算法 A (前向き固定点) と算法 B (後ろ向き BFS) の 77 件で mismatch **0**。辺 1 本を外すと mismatch **15**・exit **1**。
+
+### 測定条件
+
+- 入力: `<work>/py53/fn.txt` (`<work>` は作業用ディレクトリ。PY-88 と同じ `block00031_PE.bin` 由来・4664 命令)。
+- 対象: `py88_writes.default_targets` の 65 件のうち、直接式で SLOT? のもの (`category` で判定) 49 件。
+- 読み: 49 件の式を組むとき py88 の `mem_read` が `SLOT[rbp+X]?@j` を返した読み (読む命令 r と X の組)。異なり 77 件。
+- 算法 B (後ろ向き): r から CFG の逆辺を BFS で遡り、`[rbp+X]` への dword/qword store で止める。線形に遡って最初の合流 J を求め、J の先行辺 p ごとに S_p を出す。CFG は fall-through・jmp・jcc (即値の target) から作る。間接分岐は 0 件 (ret は 1 件)。
+- 算法 A (前向き): 同じ X について reaching-definitions の固定点計算 (gen = 同 X の store・kill = 同 X の store)。読み r の IN(r) と B の到達 store 集合を 1 件ずつ比べる。
+- store の式: py88 の `Slicer.def_value` (線形)。式に `⚠合流`・`SLOT[` 等が残るものは未閉。
+
+### 件数 (実測・`python3 analysis/py99_slot_paths.py <work>/py53/fn.txt` の出力)
+
+| 項目 | 件数 |
+|---|---|
+| 対象の書込み (直接式で SLOT?) | 49 |
+| 異なる SLOT? の読み (書込み単位の和も 77) | 77 |
+| うち合流 J を持つ読み / 合流なし | 65 / 12 |
+| 先行辺の和 (合流 J の先行辺 p の総数) | 136 |
+| 入口 (IN) に届く読み | 0 |
+| 閉じた (読み,store) 対 / 未閉 | 17 / 77 |
+| 閉じた書込み | 0 / 49 |
+
+先行辺 p ごとの S_p のサイズ (`# 先行辺` 行):
+
+| \|S_p\| | 閉じた辺 | 未閉の辺 |
+|---|---|---|
+| 1 | 16 | 119 |
+| 2 | 0 | 1 |
+
+書込みごとの読み数 (`# 0x...` 行): 読み 1 件が 27 書込み・2 件が 16・3 件が 6 (計 49)。
+
+### 検算と negative control (実測)
+
+| 実行 | 対象 | mismatch | 終了コード |
+|---|---|---|---|
+| `analysis/py99_slot_paths.py <work>/py53/fn.txt` (算法 A と B) | 77 件 | 0 | 0 |
+| `analysis/py99_slot_paths.py <work>/py53/fn.txt --negctl drop-pred` | 77 件 | 15 | 1 |
+
+- negative control の辺: `0x104754a → 0x104755d` (合流 J = 0x104755d)。読み `0x1047b93 [rbp+0x520]` の S_p = {0x1047543} が、この辺以外に寄与していない store (`mov qword ptr [rbp+0x520], rax` の `0x1047543`) を選んだ。B の結果は {0x1047556} のみになり、A の {0x1047543, 0x1047556} と 15 件で食い違った (すべて X = 0x520 の読み)。
+- 選び方: 読みを VA 順に見て、S_p が他の先行辺の S_q に無い store を含む最初の p。
+
+### 限界
+
+- 閉じた式は、store の値の式に `⚠合流`・`SLOT[`・`ACC`・`IN[`・`_in`・`clob@`・`VCALL`・`CALL[`・`<`・`…`・`⚠addr-taken` のいずれも含まないもの。式の同値性は見ていない (文字列の規則)。
+- 算法 A と B は同じ CFG (`Cfg`) を使う。検算が見るのは store の到達計算だけで、CFG 構築の誤りは両方に効く。
+- 読みは py88 が SLOT? と判定した葉だけ。py88 が線形で IN とした読み (線形に先行 store が無い読み) は CFG 上の到達を見ていない (ループの戻り辺で届く store を取りこぼし得る)。
+- 解析した X は 21 種。そのうち `lea` で取られたものは 0 種。X と重なる別オフセットの frame store は 0 件、frame の非定数オフセット store は 0 件 (実測)。ポインタ経由の書込み (callee 内) は見ていない。
+- 算法 B の S_p の式は py88 の線形の式 (`def_value`) なので、store の値に含まれる他の SLOT? 葉は、その葉の読みの経路を別途解いていない。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 閉じた書込み 0/49: 未閉の (読み,store) 77 対。store 値に残る SLOT? 葉 (入れ子の読み) と ⚠合流 の閉包 | 受入 1 (閉じた式) | 親 #2874 の子 (子 issue 起票は PM が行う。起票先: #2874) |
+| ACC?⚠合流 (`[rbp+0x5b8]` の合流読み・30 件) を同じ算法で解く | 受入 1 の一部 (ACC 側) | #2874 (PY-99) の子 |
+| py88 が線形で IN とした読みの CFG 到達 (ループの戻り辺) | 取りこぼしの有無 | #2874 (PY-99) の子 |
+| CFG 構築 (A・B 共通) の検証。mismatch 0 は到達計算の一致のみ | 検算の範囲 | #2874 (PY-99) の子 |
+
+### 再現コマンド
+
+```
+cd tools/python
+python3 analysis/py99_slot_paths.py <work>/py53/fn.txt                      # 終了コード 0 (mismatch 0)
+python3 analysis/py99_slot_paths.py <work>/py53/fn.txt --negctl drop-pred   # 終了コード 1 (mismatch 15)
+```
+
+`<work>` は作業用ディレクトリ (`py53/fn.txt` を置く場所。PY-88 と同じ入力)。
