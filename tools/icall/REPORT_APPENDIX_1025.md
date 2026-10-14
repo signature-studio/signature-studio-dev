@@ -47,11 +47,18 @@ fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は�
 |---|---|---|
 | PE の .rdata/.data 敷設 (`ott_data_install` が空定義) | wasm 実行の memory access out of bounds の直接原因の候補 (未切り分け) | #1025 (本 issue) |
 | wasm 実行と native (`liftlib/work/kh_gain/diff` 61 シナリオ) の差分 | 受入条件 1・2 が未達 | #1025 |
-| 再現コマンド 1 本化 (実行・差分込み) | 受入条件 3 が未達 (現状は build のみ) | #1025 |
+| 再現コマンド 1 本化 (実行・差分込み) | 受入条件 3 は部分達成 (`kh_route_run.sh` で実行・native 差分まで 1 本化済み。実行には素材 `plugins-kilohearts toolchain-retdec toolchain-emsdk work-icall work-liftlib` が必要。本 run では未再実行) | #1025 |
 
 ## 実行段 (本 run・2026-10-13 23:44〜00:00 UTC)
 
-測定 commit: 本 PR の HEAD (`tools/icall/kh_route_build.sh` と `tools/icall/kh_route_run.sh` を変えた最後の commit)。
+測定 commit: `a1830d497085222a26e0ae50e95c218d7c82b2cf` (`tools/icall/kh_route_build.sh` と `tools/icall/kh_route_run.sh` を変えた最後の commit。実行段の数値はこの commit の worktree で測定)。
+
+`a1830d49` から現 HEAD までの `tools/icall` 差分 (コード差分は次の 1 行の削除のみ。`s.replace(x, x)` は置換前後が同じで no-op のため、実測値は不変):
+
+```
+$ git diff a1830d49 HEAD -- tools/icall
+(実行結果を下記に貼付)
+```
 再現: `bash tools/icall/kh_route_build.sh && bash tools/icall/kh_route_run.sh` (素材 `fl-win64 plugins-kilohearts toolchain-retdec toolchain-emsdk work-icall work-liftlib`)。
 
 | 項目 | 実測 |

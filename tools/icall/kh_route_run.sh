@@ -19,7 +19,6 @@ b = "ret = M['_' + fname](...call);"
 assert s.count(a) == 1 and s.count(b) == 1, "wasm_runner.mjs の形が変わった"
 s = s.replace(a, "if (!M['_ott_run']) {")
 s = s.replace(b, "ret = M['_ott_run'](%d, ...call, ...Array(8 - call.length).fill(0n));" % va)
-s = s.replace("const sig = JSON.parse", "const sig = JSON.parse")
 open(dst, 'w').write(s)
 EOF
 cp "$NAT/scen.txt" "$W/scen.txt"
