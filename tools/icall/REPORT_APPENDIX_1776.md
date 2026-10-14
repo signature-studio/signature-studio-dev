@@ -3,11 +3,11 @@
 ## #1776 (ICALL-39): 警告 10 件の段の帰属と、警告を出す edge 破棄の機構 (部分達成)
 
 素材: `fl-win64` (`extracted/block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0 install bundle)。
-測定 commit = `0b17ef9f` (origin/main 時点)。`tools/icall` のコードは変更していないため、差分は本文書の追加のみ。
-差分証跡 (HEAD = 本節の commit):
+測定 commit = `0b17ef9f` (origin/main 時点)。測定経路 (`fn_boundary_repro.sh`・`roundtrip.sh`) はこの commit から変更していない。
+差分証跡 (測定経路。空なら差分 0。検証 HEAD は PR 本文に記す):
 
 ```
-git diff 0b17ef9f HEAD -- tools/icall    # 本文書の追加のみ
+git diff 0b17ef9f HEAD -- tools/icall/fn_boundary_repro.sh tools/icall/roundtrip.sh    # 空 = 差分 0
 ```
 
 ### (1) 再現 (run A、`--print-after-all` 付き、foreground・1 回)
@@ -35,7 +35,7 @@ git diff 0b17ef9f HEAD -- tools/icall    # 本文書の追加のみ
 - CopyPropagationOptimizer は `runOnFunction()` の先頭で `cfgBuilder->getCFG(func)` を呼ぶ (upstream `src/llvmir2hll/optimizer/optimizers/copy_propagation_optimizer.cpp`、v5.0 で確認)。optimizer ごとに CFG 構築が走り、同じ edge 破棄が再出力されると読める (`getCFG` の内部の再構築有無は未確認)。SimpleCopyPropagationOptimizer も同型と推定 (未検証)。
 - `#1456` の記述「BIR 変換 → CFG 構築」は、最初の 2 件 (`removing code that is not reachable`) と一致する。残り 8 件は copy-propagation 系の CFG 再構築で、`#1592` 節の観測と一致する。
 - 表の「直後の出力」列は、その行の件数 (2) を 1 件ずつ分けた内訳を並べている (例: 1 行目は空文 1 件 + `rax_1_reload` 1 件)。行ごとの合計は 2、表全体では 空文 3・`var514` 2・`rax_1_reload` 5 (計 10)。
-- 結論: 10 件は「LLVM→HLL 段の最初の CFG 構築 (2 件)」と「copy-propagation 系の CFG 再構築 (8 件、同じ edge の再出力)」に分かれる。段の帰属は確定。
+- 結論: 10 件は「LLVM→HLL 段の最初の CFG 構築 (2 件)」と「copy-propagation 系の CFG 再構築 (8 件、同じ edge の再出力)」に分かれる。段の帰属はログ順による推定 (段内の対応は未検証)。
 
 ### (2a) 受入 1 の 5 件 (issue #1776 本文) と本 run A の対応
 
@@ -43,14 +43,14 @@ issue #1776 の受入 1 は「警告 5 件 (`var514`・`var512`・`# empty state
 
 | 受入 1 の項目 | 本 run A の件数 | 段 (表 (2) の行) | 判定 |
 |---|--:|---|---|
-| `# empty statement` | 3 | 1〜3 行目 (各 1 件) | 段を確定 |
-| `var514` | 2 | 4〜5 行目 (各 1 件) | 段を確定 |
+| `# empty statement` | 3 | 1〜3 行目 (各 1 件) | ログ順による段の推定 (段内は未検証) |
+| `var514` | 2 | 4〜5 行目 (各 1 件) | ログ順による段の推定 (段内は未検証) |
 | `var512` | 0 | (本 run A には出ない) | 対応する段は未確定 |
 | (受入 1 に無い) `rax_1_reload = rax_1_reg2mem` | 5 | 全行 | 本節の対象外 |
 
 - `var512` は本 run A の 10 件に無い。`#1592` 節 (`REPORT_APPENDIX_1592.md` 36 行目) と `REPORT_APPENDIX_851.md` (144 行目) では、同じ「`var*` 2 件」の枠が run ごとに `var512`・`var514`・`var515` と名前を変えて記録されている。本 run A の `var*` 2 件は `var514` のみ。
 - 受入 1 の「5 件」は A の 10 件のうち `# empty statement` 3 件と `var*` 2 件の合計に相当し、`var512` の名前は run 依存のため A では固定できない。したがって受入 1 の完全な 5 件照合は、本 run では成立しない (`var512` は D 側の出力などで別途確認が要る。未実測)。
-- 本 run の段の帰属 (表 (2)) は、A の `# empty statement` 3 件と `var514` 2 件の 5 件について確定している。
+- 本 run の段の帰属 (表 (2)) は、A の `# empty statement` 3 件と `var514` 2 件の 5 件について、ログ順による推定である (段内の対応は未検証)。
 
 ### (3) 警告の発生箇所と edge 破棄の機構 (upstream v5.0 ソース)
 
