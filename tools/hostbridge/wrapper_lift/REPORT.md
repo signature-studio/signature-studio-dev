@@ -250,7 +250,7 @@
 
 - 結論: 脱落は RetDec の隣接範囲の取り扱いが原因。`retdec_batch.py` で定義が出なかった範囲だけを再試行して修正。切り分けと測定は `REPORT_APPENDIX_1819.md`。
 
-## 12. #1679: loop 外 break・undeclared label の制御構造復元 (測定 commit: 82fcd645)
+## 12. #1679: loop 外 break・undeclared label の制御構造復元 (測定 commit: 98c5f8ca)
 
 - 結論: loop 外の `break -> 0x<VA>` は、飛び先の注釈 `// 0x<VA>` が同じ関数内にあるものだけ `goto lab_0x<VA>` に直す (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
 - 測定値 (emcc exit 0 件数・error 行数)・方式の根拠・未検証項目は付録 `REPORT_APPENDIX_1679.md` にのみ置く。残りは子 issue #1954 (HB-H41) と #2071 (HB-H42)。

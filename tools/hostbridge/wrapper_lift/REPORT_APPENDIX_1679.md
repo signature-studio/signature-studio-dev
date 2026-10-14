@@ -2,9 +2,9 @@
 
 > **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §12。本付録は計測の全文。
 
-測定 commit: `82fcd645` (現 HEAD。`retdec_batch.py` は main 取り込み (#1819 の `lift_set` 再試行) を含む状態で測定)。以降この commit から HEAD までの差分は付録・REPORT・PR 本文の文言のみで、測定経路のコードは変えていない。
-環境: `[RETDEC]` v5.0 (`toolchain-retdec`)・`[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP` に展開)。load average (1 分値) 0.71–0.95。
-RetDec batch (`retdec_batch.py`、BATCH=500、直列): block19091 は 19,816 / 19,816 ok、block23676 は 19,826 / 19,826 ok。どちらも RetDec 呼び出し 41 回・fail 0 (所要 202.12 s / 201.15 s)。
+測定 commit: `98c5f8ca` (測定時の HEAD。`retdec_batch.py` は main 取り込み (#1819 の `lift_set` 再試行) を含む)。以降この commit から HEAD までの差分は付録・REPORT の文言のみで、測定経路 (`retdec_batch.py`・`retdec_repair.py`・`retdec_gotofix.py`・`emcc_per_function.py`) のコードは変えていない。`git diff 98c5f8ca HEAD -- tools/hostbridge/wrapper_lift` の `.py` 差分は 0 件。
+環境: `[RETDEC]` v5.0 (`toolchain-retdec`)・`[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP` に展開)。load average (1 分値) 0.92–1.01。
+RetDec batch (`retdec_batch.py`、BATCH=500、直列): block19091 は 19,816 / 19,816 ok、block23676 は 19,826 / 19,826 ok。どちらも RetDec 呼び出し 41 回・fail 0 (所要 288.91 s / 288.02 s)。
 手順: `retdec_batch.py` → `retdec_repair.py --int-ptr` → `retdec_gotofix.py` → `emcc_per_function.py` (`emcc -c`、既定フラグ)。gotofix の件数は両 block とも `notloop` 78・`goto_replaced` 51・`skip_no_addr_in_func` 27・`label_inserted` 41。
 
 ## 1. 原因の切り分け (受入条件 1)
@@ -42,7 +42,8 @@ RetDec の出力 C に現れる goto 相当は 2 種類ある。
 | 修復 + goto 化 (本 PR) | **3 / 41** | **1,326** | **18,967** | **3 / 41** | **1,332** | **18,974** |
 
 - 分母は emcc の対象ファイル数 41 (`emcc_exit` の合計)。`emcc_per_function.py` の出力は `unattributed_error_lines` 1・`failclosed_files` 1 (block19091 / block23676 とも。fail-closed で 1 ファイルを失敗扱い)。
-- 所要 (emcc 合計、修復 + goto 化): 4.65 s / 4.65 s。
+- 所要 (emcc 合計 `emcc_seconds_sum`、修復 + goto 化): 9.06 s / 9.07 s (wall 11.77 s / 11.27 s)。修復なしは 9.89 s / 9.84 s、修復のみは 8.77 s / 8.90 s。
+- 件数の再確認 (現 HEAD 実測): 修復 + goto 化の `emcc_exit` は block19091 が `{"1": 38, "0": 3}`、block23676 も `{"1": 38, "0": 3}`。修復のみは `{"1": 39, "0": 2}` (両 block)、修復なしは `{"1": 40, "0": 1}` (両 block)。
 - 残り error (修復 + goto 化、clang `-fsyntax-only -ferror-limit=0` で集計): block19091 は error 行 1,327 のうち引数型不一致 `incompatible pointer types passing` 1,245 件・`statement not in loop` 27 件・`use of undeclared label` 16 件。block23676 は 1,333 行のうち引数型不一致 1,251 件・同 27 件・同 16 件。引数型不一致は子 issue #2071 (HB-H42) の範囲。
 - `skip_no_addr_in_func` 27 件 (飛び先の注釈が関数内に無い) は直していない。
 

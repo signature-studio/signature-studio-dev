@@ -13,6 +13,8 @@
 static uint64_t g_armed;
 static uint64_t g_acc_addr[MAXACC], g_acc_rip[MAXACC], g_acc_cnt[MAXACC];
 static int g_nacc;
+static uint64_t g_stub_va;
+static int g_stub_ret, g_stubbed;
 
 static void record(uint64_t a, uint64_t rip) {
     for (int i = 0; i < g_nacc; i++)
@@ -38,7 +40,18 @@ static void on_acc(int sig, siginfo_t* si, void* uc_) {
         g[REG_EFL] &= ~0x100;
         return;
     }
+    if (sig == SIGSEGV && g_stub_ret && g[REG_RIP] == g_stub_va) {
+        uint64_t* sp = (uint64_t*)g[REG_RSP];
+        g_stubbed++;
+        g[REG_RIP] = (greg_t)sp[0];
+        g[REG_RSP] += 8;
+        g[REG_RAX] = 0;
+        return;
+    }
     fprintf(stderr, "[slot_trace] fatal sig=%d rip=%#llx addr=%p\n", sig, (unsigned long long)g[REG_RIP], si->si_addr);
+    for (int i = 0; i < g_nacc; i++)
+        printf("ACC %llx %llx %llu\n", (unsigned long long)g_acc_addr[i], (unsigned long long)g_acc_rip[i], (unsigned long long)g_acc_cnt[i]);
+    fflush(stdout);
     _exit(95);
 }
 
@@ -56,6 +69,10 @@ int main(int argc, char** argv) {
                                        0x1813073f0, 0x1813073f8, 0x181307400, 0x181307408, 0x181307410, 0x181307418};
         ott_enc_slots(0x18125eaa8, enc, 12);
     }
+    if (getenv("SLOT_STUB_VA")) {
+        g_stub_va = strtoull(getenv("SLOT_STUB_VA"), NULL, 16);
+        g_stub_ret = 1;
+    }
     mprotect((void*)ZLO, ZHI - ZLO, PROT_NONE);
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGTRAP, &sa, NULL);
@@ -63,6 +80,7 @@ int main(int argc, char** argv) {
     mprotect((void*)ZLO, ZHI - ZLO, PROT_READ | PROT_WRITE);
     for (int i = 0; i < g_nacc; i++)
         printf("ACC %llx %llx %llu\n", (unsigned long long)g_acc_addr[i], (unsigned long long)g_acc_rip[i], (unsigned long long)g_acc_cnt[i]);
+    if (g_stubbed) printf("STUB %d\n", g_stubbed);
     printf("DONE %llx\n", (unsigned long long)fn);
     return 0;
 }
