@@ -76,3 +76,33 @@ cd tools/targets/serum2 && python3 host/sr1e_qi_map.py work/Serum2_win64.vst3 0x
 python3 host/sr1c_callers.py work/Serum2_win64.vst3 0xacf70 0xb4ea0
 bash host/e2e.sh   # 62/62, 71.9 s (測定 commit 83e6ff76)
 ```
+
+## 6. [SR-26 #1759] 実 FL Studio (fl-win64) の wrapper IID 観測と e2e 再測定
+
+- 日付: 2026-10-14 / 親: #255 / 作業ブランチ: `1759-sr26-wrapper-iid`
+- 測定 commit (コードを変えた最後の commit): **`899e4249`** (origin/main 取得時点)。本 run は `host/` のコードを変更していない。
+- 素材: `fl-win64` = `flstudio_win64_26.1.7.5653.exe` (1,106,033,456 B, NSIS 単一 exe)。`plugins-serum2` = `Install_Xfer_Serum2_2.1.5.exe`。`Serum2_win64.vst3` sha256 `501e7bb3…4e5283` (19,236,864 B) は §1-0 と一致。
+
+### 6-1. §2-3 の「未確認」の解消 (受入 1)
+
+- §4 の「`fl-win64` 本体 (`[0]`) は 7z で開けず未確認」は**誤り**だった。exe 自体は `7z l` で開け、`[0]` (1,105,955,048 B) は 7z の 1 段目で展開される。ただし `[0]` は NSIS の圧縮データストリーム (先頭 `DEADBEEF` + `NullsoftInst`) で、7z では再展開できない (`Cannot open the file as archive`)。
+- NSIS の LZMA ストリーム (`5d 00 00 80 00` props) を手動で展開した。PE (`MZ`) で始まるストリームは **312 個**、全て完全な PE (x64 `0x8664`) として再構成できた。
+- FL 本体の抽出: `FL Studio` / `Image-Line` の UTF-16 文字列を持つ大型 PE (6〜47 MB) を含む。
+- **実測**: 312 個の PE 全体を走査し、`IVst3ToAUWrapper` (`C5C6B8A3 95C08846 B0916F0B B697AA44`) と `IVst3ToAAXWrapper` (`C69D316D C5604262 B32C951B 93BEF4C6`) の 16 byte 列は**いずれの PE にも現れない** (0 件)。
+- 解釈: FL Studio の PE に wrapper IID の定数が無い。よって FL 本体が `IPlugInterfaceSupport` 経由でこの 2 IID を返す実装を持つ根拠は、静的には見当たらない。これは「応答しない」の**強い示唆**であり、実行時の QI 応答そのものは未観測 (静的のみ)。
+- 注意: 検索は INLINE_UID の LE バイト列のみ。IID を別経路 (文字列化・動的生成) で扱う実装は静的検索では拾えない。
+
+### 6-2. 未実施 (受入 2 の残り)
+
+- `0x4894c0` の所属 class と `0xacf70` の上位呼出連鎖は**今 run では未着手** (時間制限)。子 issue で扱う。
+
+### 6-3. e2e 再測定 (受入 3)
+
+- 実行: `bash tools/targets/serum2/host/e2e.sh` (worktree `ws-1759`、commit `899e4249`)。
+- 結果: **62/62 OK, 77.3 s** (`time` real 1m17.303s、exit 0)。NC1・NC2 は期待どおり (exit=1, NG=1)。
+- 前提: wine64 / mingw-w64 を apt で導入。`Serum2_win64.vst3` は `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` から複製。
+
+### 6-4. 既定の判断 (受入 3 の判定)
+
+- 静的観測 (§6-1) で FL 本体に wrapper IID が無いため、`S2HOST_WRAPPER_QI` の既定化は**行わない** (既定は無変更)。
+- #255 受入 #3 (controller 側 A/B) の判定は、§6-2 (writer の上位連鎖) が未特定のため、**未確定**のまま残る。
