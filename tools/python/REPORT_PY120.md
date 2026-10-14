@@ -171,6 +171,45 @@ $ git diff 53835669 HEAD -- tools/python/host tools/python/provider tools/python
 
 - 測定 commit 以前の main 側差分 (参考): `git diff --stat 236a8106 53835669 -- tools/python/analysis/flapi` は空。`tools/python/host`・`provider`・`tests` は取り込みで 8 files 変わった (main の `pe119`・`ui_state_diff` と、競合解消の `provider_check.mjs` を含む)。
 
+### 競合解消後の再測定 (merge `a18f0927`・main `65ea0ce3`)
+
+main (`65ea0ce3`) との競合は 3 件 (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`)。main 側の PY-121 (#2985・screen 5 関数) の追加と本件の追加が同じ位置に並んだもので、両側を残した (削除なし)。`provider_check.mjs` の期待値は、本件 `pe120` (1 件) と main の `pe121` (5 件) を合算して、実装 98・未実装 337 にした (main 単独は 97・338、本件単独は 93・342)。
+
+測定 commit: `a18f0927` (コードを変えた最後の commit。merge)。環境: runner (4 core)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` は fl-win64 から DATA block 4 件 (block24429・block24430・block25159・block24618) と PE 本体 `block00031_PE.bin` だけを展開した先。emsdk は `/opt/emsdk` (6.0.12・`EMSDK_ENV` の既定)。
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | rc 0 (fl_table.c: 435 関数・ハンドラ 98) | 1.35 秒 |
+| `bash build_cpython_wasm.sh` (stock・前提) | rc 0 | 4 分 7 秒 |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 | 6.2 秒 |
+| `FLPY_SKIP_TABLE=1 build_flpy_static.sh` | rc 0 | 6.6 秒 |
+| `CPY_PTHREADS=1 build_cpython_wasm.sh` (pthread・前提) | rc 0 | 2 分 14 秒 |
+| `CPY_PTHREADS=1 FLPY_SKIP_TABLE=1 build_flpy_static.sh` | rc 0 | 未計測 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 98 / 未実装 337 / MCP 静的 60) | 0.36 秒 |
+| `node tests/launchmap_diff.mjs` | calls 3、diffs 0、PASS | 0.05 秒 |
+| `node tests/general_diff.mjs` (回帰) | calls 9、diffs 0、PASS | 0.05 秒 |
+| `node tests/ui_state_diff.mjs` (回帰・pe119) | calls 12、diffs 0、PASS | 0.05 秒 |
+| `node tests/screen_diff.mjs` (main・pe121) | calls 32、diffs 0、PASS | 0.05 秒 |
+| `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS (calls 161 / 8 (rejects 4・midi_out 5) / 32 / 30 cases / 59 / 7 / 17) | 各 0.05〜0.06 秒 |
+| `node tests/smoke_direct.mjs` | rc 0 | 0.30 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2.21 秒 |
+| `FL_ENGINE=mock node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 (wasm と同値) | 未計測 |
+| `node tests/browser_check.mjs` | BROWSER OK (tools 48) | 2.17 秒 |
+| `node tests/static_check.mjs` | STATIC CHECK OK (tool 別差 0/48) | 0.41 秒 |
+| `node tests/static_browser_check.mjs` | STATIC BROWSER OK (sab_host_calls 37,425・static_host_calls 37,425・static_in_worker true) | 4.62 秒 |
+| `STATIC_WASM=flpy_static_pthread node tests/static_mt_check.mjs` | STATIC MT CHECK OK (single_vs_stock diff 0・host_calls 37,424、threads_2_tools 48、threads_4_tools 2、thread_mismatch 0、wall_ms 549) | 1.12 秒 |
+| `python3 analysis/flapi/pe_launchmap_entries.py` | rc 0、12 件中 OK 12 件。`length` は entry 0x151e078・fn 0xd791b0・flags 4 = flapi_flags 4 (OK) | 0.09 秒 |
+| `node tests/mcp_ui_check.mjs` / `node tests/midi_ui_check.mjs` | **未実行**。worktree に `vite` が無く (`ERR_MODULE_NOT_FOUND`)、依存の導入はこの run の時間枠外 | — |
+
+- static_mt の host_calls 37,424 と all_tools・static_browser_check の 37,425 の 1 差は、計数元が違うため (static_mt は stock 静的記録の tool 別合計との照合、all_tools は `engine.record.length`)。差の原因は未調査。wasm・mock・static_browser は 37,425 で一致する。
+- 負のコントロール: 前節の結果を引き継ぐ。本 merge で `fl_mock.mjs` の `launchPages` の既定値は 0 のまま (変えていない)。
+- コード差分 (測定 commit から HEAD まで、テスト・mock・C に効く範囲):
+
+```
+$ git diff a18f0927 HEAD -- tools/python/host tools/python/provider tools/python/tests
+(空)
+```
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
