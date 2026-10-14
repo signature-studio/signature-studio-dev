@@ -116,3 +116,24 @@ PYTHONPATH=. python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe <block00031_
 ```
 git diff 8483b900 HEAD -- tools/m11/ldfix/ldfix.py
 ```
+
+## 9. レビュー差し戻し後の対応 (fix モード)
+
+| 指摘 | 対応 | 状態 |
+|---|---|---|
+| 1. argv 由来 deref が `fix_f3c_use` の門に入る | `1af9cad2` で門 (a) を `u[4] == 'arg'` の deref に限定 (§2) | 解消 (diff で確認。実測は未) |
+| 2. 受入条件 3 が未達 | §5.5 の未解決に残す。`raw-after` の分類定義をどう扱うかは PM 判断 | PM 判断待ち |
+| 3. head での再測定 | この run の `$ARTIFACTS_DIR` に `work-m11` が無い (`fl-win64` のみ) | 未実施。PR 本文に `oc_artifacts: fl-win64 work-m11` を追加 |
+
+**測定 commit**: 最後に実測したコードは `c5e6944c` (§3〜§5)。修正後 HEAD (`1af9cad2`) での実測は無い。
+`trk_probe_1134.py`・`gate_5c44b0_1324.py`・`use_residual_509.py`・旧新 `cmp` は work-m11 素材が届いた run で head に対して実行する (§7)。
+
+実測 commit から修正後 HEAD までのコード差分 (`git diff c5e6944c HEAD -- tools/m11/ldfix`):
+
+```
+ tools/m11/ldfix/REPORT_1324.md |  32 ++++++++++++++++++++++++++------
+ tools/m11/ldfix/ldfix.py       |  10 +++++-----
+```
+
+`ldfix.py` の差分本体は §8 の `git diff` を参照。`lsf`・`ptr`・`raw` の判定は変えていない (§5.4)。
+§5.1 の旧新 `cmp` (IDENTICAL) は c5e6944c 時点の結果であり、`1af9cad2` で取り直すまで「修正後に IR が変わらない」とは言えない。
