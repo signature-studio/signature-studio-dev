@@ -3,12 +3,18 @@
 // 返す number は整数なら int、実数なら float になる。整数値の float は F(x) で明示。
 import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
+// PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。param 0..7 の既定値は stub 順、範囲外と param 8 (未モデル) は -1
+const STEP_DEF = [60, 100, 64, 120, 64, 64, 64, 0];
+const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 7 ? -1 : STEP_DEF[prm]);
 
 class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
+// mixer の色の R/B 入替え (REPORT_PY115.md §2)。MIX_DEFAULT_COLOR は未確定の既定値 (C の MIX_DEFAULT_COLOR と同じ仮置き)
+const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
+const MIX_DEFAULT_COLOR = 0x5a6b7c;
 
 export function createMockEngine() {
   const st = {
@@ -23,7 +29,7 @@ export function createMockEngine() {
     ],
     mixer: Array.from({ length: 127 }, (_, i) => ({
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
-      color: 0x5A6B7C, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
+      color: 0, colorSet: false, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
@@ -93,6 +99,20 @@ export function createMockEngine() {
     },
     // PY-41 (#1514): stub midi.CT_Sampler = 0 / CT_GenPlug = 2 を plugin 名で決める (C と同一・Hybrid 等は未モデル)
     "channels.getChannelType": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).plugin === "Sampler" ? 0 : 2; },
+    // PY-100 (#2879): PE 0xd5bb30 / 0xd5ba00 (C と同一)。引数を読んでから index を検査。padsStride 既定 16、0 は Range error
+    "channels.getCurrentStepParam": (...a) => {
+      arity(a, 3, 4);
+      const step = argI(a, 1, 0), prm = argI(a, 2, 0); argI(a, 3, 0);
+      return stepParam(ch(a[0]), step, prm);
+    },
+    "channels.getStepParam": (...a) => {
+      arity(a, 4, 5);
+      const step = argI(a, 0, 0), prm = argI(a, 1, 0), off = argI(a, 2, 0), st0 = argI(a, 3, 0), pads = argI(a, 4, 16);
+      if (pads === 0) throw new FlError("Range error", 4);
+      const q = Math.trunc(step / pads), idx = q + off;
+      if (idx < 0 || idx >= st.channels.length) throw RANGE();
+      return stepParam(st.channels[idx], step - q * pads + st0, prm);
+    },
     // PY-89 (#2805): C と同一。identity (全 channel が 1 グループ)・既定 -2 (未割当)
     "channels.getChannelIndex": (...a) => { arity(a, 1, 1); const i = ix(a[0]); ch(i); return i; },
     "channels.getChannelMidiInPort": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return -2; },
@@ -129,7 +149,8 @@ export function createMockEngine() {
     "mixer.setTrackVolume": (i, v) => { tr(i).vol = v; },
     "mixer.getTrackPan": (i) => F(tr(i).pan),
     "mixer.setTrackPan": (i, v) => { tr(i).pan = v; },
-    "mixer.setTrackColor": (i, c) => { tr(i).color = c; },
+    "mixer.setTrackColor": (i, c) => { const t = tr(i); t.color = (swapRb(c) | 0xff000000) >>> 0; t.colorSet = true; },
+    "mixer.getTrackColor": (i) => { const t = tr(i); return (swapRb(t.colorSet ? t.color : swapRb(MIX_DEFAULT_COLOR)) | 0xff000000) >>> 0; },
     "mixer.isTrackSelected": (i) => tr(i).sel,
     "mixer.muteTrack": (i, v) => { tr(i).mute = tog(tr(i).mute, v); },
     "mixer.soloTrack": (i) => { tr(i).solo = !tr(i).solo; },
@@ -148,7 +169,7 @@ export function createMockEngine() {
     "playlist.trackCount": () => st.playlist.length,
     "playlist.getTrackName": (i) => { i = ix(i); return st.playlist[i - 1]?.name ?? ""; }, // 範囲外は空文字 (C と同じ)
     "playlist.setTrackName": (i, n) => { pl(i).name = str(n); },
-    "playlist.setTrackColor": (i, c) => { pl(i).color = c; },
+    "playlist.setTrackColor": (i, c) => { pl(i).color = (((c & 0xff) << 16) | (c & 0xff00) | ((c >>> 16) & 0xff)) & 0xffffff; }, // FL の格納式 (C と同じ)
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
