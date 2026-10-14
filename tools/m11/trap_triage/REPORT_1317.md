@@ -195,7 +195,7 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
   - `git diff b36d3b5f HEAD -- tools/m11/m11_build.sh tools/m11/m11_rt.c` の出力は 4 行・20 行。main 取り込み (merge `b09ad4eb`) で入った #1952 の knob (`M11_RT_PADPRE`・`M11_RT_PADPOST`・`M11_RT_EMPTY`、既定 0)。`m11_rt.c` の追加は全て `#if M11_RT_*` 内、`m11_build.sh` の `S_NEG` は既定 0 のとき従来と同一の文字列になるため、既定 0 では build 出力は変わらない。
   - `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
   - 前の commit `731a232a` の計測値は無効 (旧 `static` カウンタはプロセス全体の累計)。全 diff は `REPORT_1317_APPENDIX.md` §12。
-- 旧記録 (§4a・§6〜§8) の rc=124 (`0..830`+880) は、素材 IR 依存の可能性がある。公開 RetDec 由来の IR では再現しなかった (下記)。
+- 旧記録 (§4a・§6〜§8) の rc=124 (`0..830`+880) は、旧 IR 依存の可能性がある。素材の RetDec v5.0 で再生成した IR では再現しなかった (下記)。
 - 旧計測 (`731a232a`) の「`40fb40` の連鎖長 10 万未満」は**無効**。`40f960` の確保サイズ (呼び出しごとに出力) は有効な値。
 - 再測定 (`b36d3b5f`・`M11_INSTR_40F960=1`・`M11_M2P=1`・`survey_units.mjs` 60 s 上限): 素材 `work-m11` / `work-liftdiff` / `fl-win64` を展開して実施。
   - 素材: `toolchain-retdec` を `$RUNNER_TEMP/tc/retdec` に、`toolchain-emsdk` を `$RUNNER_TEMP/tc/emsdk` に展開 (`tar --zstd -xf`)。RetDec は `retdec-decompiler --version` で v5.0 (commit `53e55b4`・build date 2022-12-08)。`/opt/retdec/bin/retdec-decompiler` と md5 が一致し、runner 既存版と同一。emsdk は `6.0.12` (`upstream/.emsdk_version` の `releases-6e9f6885...`)。`llvm-nm` は `emsdk/upstream/bin/llvm-nm` にあるため PATH に emsdk の bin を前置して build した (`RETDEC_ROOT=$RUNNER_TEMP/tc/retdec`・`EMSDK=$RUNNER_TEMP/tc/emsdk`)。
