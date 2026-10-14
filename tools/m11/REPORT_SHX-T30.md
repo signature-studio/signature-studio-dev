@@ -1,5 +1,7 @@
 # SHX-T30 (#2579): function_8c5eb0 の unreachable に至る分岐と値の出所、D19/D22/D23 との切り分け (親 #2446 / 関連 #699・#1630)
 
+既知類型との関係: 該当なし (D1a〜D23 のいずれとも違う。新類型 D24 として `docs/DEFECTS.md` に記録。§6)
+
 ## 1. 結論
 
 - `function_8c5eb0` の `unreachable` は RetDec の誤変換ではない。**D19 修復 pass `tools/m11/guard699/m11_guard699.py` が挿入した fail-fast ブロック `dec_label_pc_8c5ef5_g699_t` (`call void @llvm.trap()` + `unreachable`)** である。function_8c5eb0 の IR にある `unreachable` はこの 1 箇所だけ。
@@ -65,7 +67,8 @@ dec_label_pc_8c5ef5_g699:
 | `8c60df` | `mov rax,[rbp+0x80]`・`ret` | 戻り値 = 410360 の戻り値 |
 
 - 件数 ≤ 0 かつ `arg2` 下位 byte ≠ 0 の機械語の挙動は、arg3 == 0 のとき「`410360(obj)` を呼び、その戻り値を返す」、arg3 ≠ 0 のとき「先に `8ca670(arg3, obj)` を呼び、続けて同じ `410360(obj)` の呼出しと返却」。IR の `_t` (trap) はどちらとも違う。`_t` の修復は arg3 で分ける必要がある。
-- 直接 `call 0x8c5eb0` の呼出し元は 111 件 (`E8` rel32 の全走査)。**窓の定義**: `.pdata` の関数先頭から整列逆アセンブルした列で、呼出し命令の直前 14 命令。窓の中で `dl` (`rdx`) と `r8` を明示的に書く最後の命令で判定する (`mov dl, imm` の imm ≠ 0 を dl≠0、`xor edx,edx` を dl=0、`xor r8,r8`・`mov r8, 0` を r8 の定数 0)。窓の外で設定された値は見ていない。結果: dl≠0 が 99 件 (うち r8 が定数 0 が 46 件、定数 0 でない (例: `8d045f` は `mov r8, rsi`) が 53 件)、dl=0 (`xor edx,edx`) が 12 件。定数 0 でない 53 件は arg3 ≠ 0 の経路になりうるが、実行時の値は未確認。`8d03f7`〜`8d03fc` (`mov dl,1`・`xor r8,r8`・`call`) は arg3 == 0 の例。`_t` の修復は arg3 の分岐を含める。件数の正確な集計は修復の実装時に行う。
+- 直接 `call 0x8c5eb0` の呼出し元は 111 件 (`E8` rel32 の全走査)。**窓の定義**: 呼出し命令の直前 14 命令で、同じ関数 (`.pdata` の BeginAddress 以降) の中に限る。逆アセンブルは `objdump -d -M intel` の線形列。窓の中で `dl` (`rdx`) と `r8` を明示的に書く最後の命令で判定する (`mov dl, imm` の imm ≠ 0 を dl≠0、`xor edx,edx` を dl=0、`xor r8,r8`・`mov r8, 0` を r8 の定数 0)。窓の外で設定された値は見ていない。結果: dl≠0 が 99 件 (うち r8 が定数 0 が 46 件、定数 0 でない (例: `8d045f` は `mov r8, rsi`) が 53 件)、dl=0 (`xor edx,edx`) が 12 件。定数 0 でない 53 件は arg3 ≠ 0 の経路になりうるが、実行時の値は未確認。`8d03f7`〜`8d03fc` (`mov dl,1`・`xor r8,r8`・`call`) は arg3 == 0 の例。`_t` の修復は arg3 の分岐を含める。
+- **再現**: `python3 tools/m11/m11_t30_callsites.py <block00031_PE.bin>` (素材は fl-win64 の `extracted/block00031_PE.bin`、sha256 `b2c64da4…`)。出力は `direct calls to 0x8c5eb0: 111`・`dl: nz=99 zero=12 none=0 nonconst=0`・`dl nz の r8: zero=46 nonconst=53 none=0` で、本節の値と一致する (2026-10-14 実測)。
 - `m11_guard699.py` の docstring の「8c608d の rdx は未確定」と、`REPORT_699.md` §1 の注釈「機械語 8c608d は vtable 呼出し」は、逆アセンブルと一致しない。修復時に直す (§9)。
 - `function_8c5eb0` の IR で `unreachable` を含むのは `_t` だけ。`function_8c67a0`・`function_8c7c80`・`function_8c5c90`・`function_8c7450`・`function_410360` などの呼出し先にも `unreachable` は無い。`unreachable` の関数名の走査では、stale IR の 99 件から、新 IR で 100 件に増えたのは `function_8c5eb0` の 1 件 (`_t`) だけ。よって trap は `_t` で発生し、trap の発生は「件数 ≤ 0 かつ flag ≠ 0」の成立と同値。
 
@@ -100,7 +103,7 @@ dec_label_pc_8c5ef5_g699_t:
 
 ## 8. 検証の鮮度
 
-- 測定 commit: `26f90ada` (コードを変えた最後の commit)。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。差分の確認は `git diff 26f90ada HEAD -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行)。REPORT は自身の commit の hash を書けないため HEAD で書き、検証した HEAD の hash は PR 本文の『検証』に書く。
+- 測定 commit: `26f90ada` (コードを変えた最後の commit)。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。差分の確認は `git diff 26f90ada acc12101 -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行)。範囲の終点を固定 hash (`acc12101`・再測定した HEAD) にしたので、merge 後も同じ結果になる。`acc12101` より後に `tools/m11` へ増えたのは再現スクリプト `m11_t30_callsites.py` だけで、`git diff --stat acc12101 HEAD -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` で確認できる。最終 HEAD の hash は PR 本文の『検証』に書く。
 - コミット済み HEAD `acc12101` で、IR を元に戻したうえで `build.sh --trace --soft` と `t27_relink.sh` (`locale0`) を再実行し、§3 の baseline (`units_run=17`) と対照 (`units_run=53`・`threw=unreachable`・`total_calls=173`) が再現することを確認した。以後の commit は REPORT の文言だけを変えている。
 - `work-m11` の IR は stale。本 REPORT の IR は §2 の手順で作り直したもので、指紋の出自は未検証。
 
