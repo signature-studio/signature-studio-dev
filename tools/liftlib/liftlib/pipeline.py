@@ -204,6 +204,26 @@ def prepare(cfg, mod, workdir, stats):
     return ll_path, h_path, s_path
 
 
+def lb_link_flags(cfg):
+    """cfg.emcc.lb_layout (opt-in) があるとき lowbase の linear memory レイアウトを emcc のリンクフラグにする。
+    値: {"newbase": V-shift 先 LB_BASE, "init_mib": 省略時 GLOBAL_BASE から自動算出, "max_mib": 既定 64}。
+    規約は recipes/ott.py と同じ (-sINITIAL_MEMORY/-sMAXIMUM_MEMORY。lb_layout.layout が正本)。
+    未指定なら [] (既存 leaf の出力は不変)。"""
+    lb = cfg.get("emcc", {}).get("lb_layout")
+    if not lb:
+        return []
+    from . import lb_layout
+    img = Image(rpath(cfg["image"]))
+    base = int(str(lb["newbase"]), 0)
+    arena0 = lb_layout.up(base + img.size, 0x10000)
+    gb0 = lb_layout.up(arena0 + 0x100000, 0x10000)
+    init_mib = lb.get("init_mib") or max(24, (gb0 >> 20) + 17)
+    L = lb_layout.layout(base=base, image_size=img.size, arena_size=0x100000, init_mib=init_mib,
+                         max_mib=max(lb.get("max_mib", 64), init_mib))
+    return ["-sGLOBAL_BASE=%d" % L["LB_GLOBAL_BASE"], "-sINITIAL_MEMORY=%d" % L["LB_INIT"],
+            "-sMAXIMUM_MEMORY=%d" % L["LB_MAX"]]
+
+
 def emit(cfg, paths, workdir, profile="dev", tag=None):
     """prepare の出力 → emcc → <name>[.<tag>].cjs。profile は data/std_build.json (標準 = std)。
     dev (既定・後方互換) だけ cfg の emcc.opt を尊重する (旧 -O1)。それ以外は profile が最適化水準を決める。"""
@@ -219,6 +239,7 @@ def emit(cfg, paths, workdir, profile="dev", tag=None):
            + (em.get("variant_extra", {}).get(tag, []) if tag else [])
            + ["-sERROR_ON_UNDEFINED_SYMBOLS=1", "-sMODULARIZE=1", "-sENVIRONMENT=node", "-sALLOW_MEMORY_GROWTH=1",
               "-sEXPORTED_FUNCTIONS=" + ",".join(exports), "-sEXPORTED_RUNTIME_METHODS=HEAPU8", "--no-entry", "-o", out_js])
+    cmd += lb_link_flags(cfg)
     bad = SB.violations(profile, cmd)
     if bad:
         raise SB.StdBuildError("profile %s に禁止フラグ: %s" % (profile, " ".join(bad)))
