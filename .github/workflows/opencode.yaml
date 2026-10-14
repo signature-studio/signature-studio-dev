@@ -152,6 +152,11 @@ jobs:
       cancel-in-progress: false
     # opencode が暴走しても runner を既定の 6 時間は占有しない
     timeout-minutes: 60
+    # GITHUB_TOKEN は fix-progress.sh record が窓の印 (oc-fix-limit / oc-fix-reset) を PR に投稿するためだけに使う (#2622)。
+    # 実装 App 名義の印は agent が偽造できる。issues: write だけでは PR へのコメントが 403 になる (#2638 で実測)。
+    # agent の step には渡さない (agent の GH_TOKEN は実装 App のみ)。他の権限は付けない。
+    permissions:
+      pull-requests: write
     env:
       # workflow_dispatch は write 権限を持つ人手による起動なので書き込み可。
       # issue_comment は本文に oc_actions_allow_write を含む場合だけ書き込み可。
@@ -256,12 +261,14 @@ jobs:
         run: bash .github/scripts/assemble-prompt.sh
 
       # fix モード (reviewer の差し戻し) の進捗検証用に、起動時点の PR head を記録する。
+      # OC_MARK_TOKEN (job の GITHUB_TOKEN) はこの step の env だけに渡す。agent の step には渡さない (#2622)。
       - name: Record the PR head (fix mode)
         id: fixrec
         if: steps.context.outputs.should_run == 'true' && contains(fromJSON('["pull_request_review","repository_dispatch"]'), github.event_name)
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OC_MARK_TOKEN: ${{ github.token }}
         run: bash .github/scripts/fix-progress.sh record
 
       # fix モードは step に上限を置く: job の 60 分を使い切ると、下の検証・再試行 step が走る前に

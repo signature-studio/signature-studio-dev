@@ -247,3 +247,4 @@ bash tools/audio/e2e.sh --out tools/audio/work/results_parent.json   # 親 e2e 2
 | 実行 A は HEAD `fef39e5` (別コミット)。同一 HEAD での再現ではない | 同一 HEAD の再現条件が未確定 | #998 |
 
 負荷下の再現試験 (L1〜L3・§12-3 の A〜D) は [REPORT_APPENDIX_998.md](REPORT_APPENDIX_998.md) を参照。負荷下の完全実行 6 回中 2 回 underrun (`com_ramp_b256_d2`)。underrun 時は ring 充填が 0 まで枯渇 (`min_fill=0`)。原因は未特定。underrun 直前の充填推移 (producer 追従不足の形) は §12-4 (付録) を参照。
+2026-10-14 (#2777): 初期目標充填 T と underrun の実測・判定は [REPORT_APPENDIX_2777.md](REPORT_APPENDIX_2777.md)。原因は部分特定 (初期 depth 4 で 1 回のみ underrun を観測。母数不足)。対処の子 issue は #2934 ([AU-26])。受入条件 (原因と対処) は未達のまま。

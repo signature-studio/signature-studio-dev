@@ -1,14 +1,14 @@
 # 付録: icall #2695 (ICALL-81) — 0x180da6e60 の native harness 初期化と候補分類・0x1803dee20 の揺れ
 
 > 親: #2674。前段: `REPORT_APPENDIX_2508.md` §4 (候補 10 件の分類) と §3.5 (0x1803dee20 の揺れ)。
-> 測定 commit: `a2c2c126` (`fix(icall): correct hit_180da6e60 docstring name (#2695)`。コードを変えた最後の commit)。初版の測定は `63a82b32`。
+> 測定 commit: `0960c8be` (コードを変えた最後の commit。§8・§10)。§1〜§9 の個別の測定は各表・各節に書いた commit の値。初版の測定は `63a82b32`。
 > 既知類型との関係: 該当なし (`docs/DEFECTS.md` に対応 ID は無い)。harness 由来の**引数構造体の初期化欠落** (rcx の S・A・B を作らず SIGSEGV) であり、D12 (レジスタ比較の欠落) とは別。新類型として追記するかは PM 判断。
 
 ## 1. 結論
 
-- **0x180da6e60 の SIGSEGV は harness 側の初期化欠落で、件数 0 の経路に限って解消した** (native が落ちず、native/wasm とも 8/8 一致)。ただし一致は xmm0 の素通し (出力 = 入力) の一致で、構造体への副作用 (`A+0x19a4` の inc・cookie 検査) は比較していない。件数 >0 の loop 本体は harness で実行できていない。
-- **6 件の「誤り疑い」は判定できなかった**。件数 0 の経路では 6 件の store のうち No 1 (cookie store) だけが実行され、残り 5 件 (No 2・6・7・9・10) は件数 >0 の loop 内にあり、件数 1 では native が 10 秒以内に戻らない (ゼロ初期化の要素で hang)。miscompile とも無害とも確定しない。
-- **0x1803dee20 の native 既定出力は測定環境で異なり、未解決**。EPYC 9V45 の fix run (`a2c2c126`) では native が入力素通しで 3 条件とも 8/8 一致した。初版 (`63a82b32`・runner 未記録) と EPYC 7763 の review 再現、EPYC 9V74 の再確認 (`599f793c`) では native が `0000…` を返し、3 条件とも 0/8 だった。0/8 の環境では native の出力が heap 埋め値と一致する (0x00 → `0000…`、0xcc → `cccc…`)。測定経路 (`fa_cmp.py`・route 生成・libottnative 系) の差分は `a2c2c126..599f793c` で 0 行なので、測定経路の変更では説明できない。環境差の原因は未検証 (§5)。
+- **0x180da6e60 の SIGSEGV は harness 側の初期化欠落で、件数 0 の経路で解消した** (native が落ちず、native/wasm とも 8/8 一致)。件数 1 の hang は §10 で解消した (要素 0 の state 0・4・5・6・9 は戻る)。ただし一致は xmm0 の素通し (出力 = 入力) の一致で、構造体への副作用 (`A+0x19a4` の inc・cookie 検査) は比較していない。件数 >0 の state 1・2・3・7・8 は harness が未了 (SIGSEGV。§10.3)。
+- **6 件の「誤り疑い」は判定できなかった** (判定 0 件。§4・§10.5)。件数 0 の経路では 6 件の store のうち No 1 (cookie store) だけが実行され、残り 5 件 (No 2・6・7・9・10) は件数 >0 の loop 内 (type 2・8 の分岐内) にあり、§10 の修正後も 0 hit のまま。miscompile とも無害とも確定しない。
+- **0x1803dee20 の native 既定出力は測定ごとに異なり、未解決**。EPYC 9V45 の fix run (`a2c2c126`) では native が入力素通しで 3 条件とも 8/8 一致した。EPYC 7763 (`599f793c`)・EPYC 9V74 (`599f793c`)・初版 (`63a82b32`) では 0/8 (native `0000…`)。本 fix で HEAD (測定経路は `0960c8be` と同一) を EPYC 7763 で直接測ると 0/8 で、2 回・ASLR 無効でも同じだった (§5・§10.4)。同じ測定経路 (HEAD `9edd60a5`) を Intel Xeon 6973P-C で測ると入力素通し 8/8 で、heap 埋め値を変えても 8/8 だった (追補・§5)。出力は 2 通り (入力素通し: 9V45・6973P-C、`0000…`: 7763・9V74) で、原因は未検証。以前の §10.4 の「7763 で 8/8」は sweep の件数からの推定で、直接の測定ではなかった (訂正)。0/8 の環境では native の出力が heap 埋め値と一致する (0x00 → `0000…`、0xcc → `cccc…`)。測定経路の差分では説明できず、原因は未検証 (§5)。
 - **受入の達成状況**: 受入 1 = 部分 / 受入 2 = 未達 (判定 0 件) / 受入 3 = 未達 (native の既定出力が環境で異なり、harness 状態による説明は未確定)。受入 2・3 が未達のため PR は `Refs #2695`、issue は open のまま。
 
 ## 2. 測定条件
@@ -17,13 +17,14 @@
 |---|---|
 | 測定環境 (§3・§5・§6 の 9V45 の値) | fix run `a2c2c126` の runner (AMD EPYC 9V45、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。並列 1 (単一プロセス)。load は `uptime` の 1 分平均で、sweep 前 0.26・sweep 後 0.84 |
 | 測定環境 (§5・§6 の 9V74 の再確認) | `599f793c` で再測定した runner (AMD EPYC 9V74 80-Core、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。単一プロセス。sweep は 74.0 s (単独) |
+| 測定環境 (§5・§6・§10.4 の本 fix の再測定) | AMD EPYC 7763 64-Core (前回の fix の runner・4 vCPU)、`7e23750a` (測定経路は `0960c8be` と同一)。単一プロセス。load は `uptime` の 1 分平均で、fa_cmp の前 0.88、sweep 前 0.75・sweep 後 1.39。sweep は 73.8 s (単独)。追補 (§5・§6・§10.4、`9edd60a5`): Intel Xeon 6973P-C (本 runner・4 vCPU・Ubuntu 24.04・gcc 13.3.0・glibc 2.39)、sweep 71.3 s (単独)、sweep 後 load 0.88 |
 | 素材 | `work-icall` のみ (`tools/icall/work/` へ `tar --zstd -xf` で展開、実測 18.5 s)。`FA_CORE` は `tools/icall/work/rt_freshair-core/rw.dll` (未指定だと既定で `SlateCore.core_64` を探し、素材 plugins-freshair が要る) |
-| emsdk | 9V45 (`a2c2c126`) の run の素材に `toolchain-emsdk` は無かった。`[EMSDK]` (`docs/REFERENCES.md` §4) に上流 emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12` (19 s)。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。9V74 (`599f793c`) の run は `toolchain-emsdk` 素材を使った (`[EMSDK]` の emcc 6.0.12)。PR 本文の `oc_artifacts` に `toolchain-emsdk` を追加した |
+| emsdk | 9V45 (`a2c2c126`) と本 run (`9edd60a5`) の素材に `toolchain-emsdk` は無かった (R2 は `work-icall.tar.zst` のみ)。上流の emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12`。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。runner 上では [EMSDK] の所在へ symlink した (`fa_route_build.sh` が `source` する `emsdk_env.sh` の位置に合わせる。リポジトリには含まない)。9V74 (`599f793c`) の run は `toolchain-emsdk` 素材を使った。上流からの再取得経路は `[未確認]` (`docs/REFERENCES.md` §4)。PR 本文の `oc_artifacts` は `work-icall` のまま |
 | libottnative | `bash tools/ott/native/build.sh` で本 run に作り直した (`tools/ott/work/libottnative.so`。tarball には無い) |
 | fixed route 生成 | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh`: 5.6 s (単独実行) |
 | 単発 fa_cmp | n=8 で 0.2 s 前後 |
 | fa_sweep | `bash tools/icall/diff/fa_sweep.sh 8 60`: 70.4 s (単独) |
-| 件数 1 の確認 | `FA_LOOP_N=1 timeout 10` で時間切れ (終了コード 124)。10 秒以内に完了せず |
+| 件数 1 の確認 (`a2c2c126` 時点) | `FA_LOOP_N=1 timeout 10` で時間切れ (終了コード 124)。10 秒以内に完了せず。修正後の件数 1 は §10.3・§10.4 |
 
 ## 3. 受入 1: 0x180da6e60 の SIGSEGV 条件と harness 初期化
 
@@ -101,7 +102,7 @@ SIGSEGV はプロセス全体を落とす (`fa_sweep.sh` では 1 関数ずつ�
 
 判定できない理由:
 
-- 6 件はすべて件数 >0 の loop 内 (type 2 または type 8 の要素)。件数 1 を試すと native は 10 秒以内に戻らない (`FA_LOOP_N=1`)。ゼロ初期化の要素は `0x180da41a0` (連結リスト探索) に入り、そこで終わらないと推定 (未確認)。
+- 6 件はすべて件数 >0 の loop 内 (type 2 または type 8 の要素)。件数 1 の hang は `a2c2c126` 時点の観測 (`FA_LOOP_N=1`、10 秒以内に戻らない)。原因はゼロ初期化の要素が `0x180da41a0` (連結リスト探索) で止まることで、`node[0].next = nil` により解消した (§10.1)。残りの未実行 (No 2・6・7・9・10) は state 2・8 の分岐内。
 - 要素の状態機械を正しく作るには、A の vtable (仮想 callee) と O1・O2 を受ける callee の読み先が要る。stub の callee を置けば store の実行は見えるが、callee が値を読むかは分からない (読み先が未確定のまま)。
 - 件数 0 の経路で xmm0 を書く命令は確認していない。trace は候補 VA の実行の有無だけを見ており、xmm0 の書込み元は追っていない。xmm0 の素通し一致から、この関数の出力に影響する store が無いとは結論しない。
 
@@ -117,12 +118,16 @@ harness 状態別の結果 (n=8、先頭 1 点。wasm は全環境・全 8 点�
 | 初版 | `63a82b32` (`175ae662` の REPORT §5) | runner 未記録 | `0000000000000000` | `cccccccccccccccc` | `0000000000000000` | 0/8 (3 条件) |
 | review 再現 | `599f793c` (reviewer 報告) | AMD EPYC 7763 | `0000…` | `cccc…` | `0000…` | 0/8 (3 条件) |
 | 再確認 | `599f793c` (本 fix) | AMD EPYC 9V74 | `0000000000000000` | `cccccccccccccccc` | `0000000000000000` | 0/8 (3 条件) |
+| 旧 §10.4 の run | `0960c8be` | AMD EPYC 7763 | 直接の測定なし | 未測定 | 未測定 | 未確定 (8/8 は推定で書いた。訂正) |
+| 本 fix の再測定 (§10.4) | `7e23750a` (測定経路は `0960c8be` と同一) | AMD EPYC 7763 (前回の fix の runner) | `0000000000000000` (2 回) | `cccccccccccccccc` | 未測定 | 0/8 (既定・0xcc)。ASLR 無効 (`setarch x86_64 -R`) も 0/8 |
+| 追補 (§10.4) | `9edd60a5` (測定経路は `0960c8be` と同一) | Intel Xeon 6973P-C (本 runner) | 入力素通し 8/8 (2 回) | 入力素通し 8/8 (`FA_HEAP_FILL=0` も 8/8) | 入力素通し 8/8 | 8/8 (`setarch x86_64 -R` も 8/8) |
 
 - 9V74 の再確認では、既定・`FA_HEAP_FILL=0xcc`・`FA_HEAP_FILL=0`・`FA_ENC_INIT=1` の各条件とも上表の 0/8 の値になった (既定は 2 回実行して一致)。
-- 0/8 の 3 環境 (初版・7763・9V74) では、native の出力が heap 埋め値と一致する (0x00 → `0000…`、0xcc → `cccc…`)。値が heap から読まれたかどうかは未確認。
-- 8/8 の 9V45 では、heap 埋め値を変えても native は入力素通しのままだった (`a2c2c126` の測定)。9V45 だけが入力素通しを返す理由は未確認。
+- 0/8 の 3 環境 (初版・7763・9V74) では、native の出力が heap 埋め値と一致する (0x00 → `0000…`、0xcc → `cccc…`)。値が heap から読まれたかどうかは未確認。6973P-C では heap 埋め値を変えても入力素通しのままで、この対応は一般には成り立たない。
+- 8/8 の 9V45 (`a2c2c126`) では、heap 埋め値を変えても native は入力素通しのままだった。直接の測定で入力素通しを返したのは 9V45 だけで、0/8 の環境と分かれる理由は未確認。
+- 同じ 7763 で `599f793c` と本 fix の HEAD はどちらも 0/8 で、反転は無い (旧 `0960c8be` の 8/8 は推定だった)。`ptr_norm` (`3127f774`) は 0x1803dee20 の出力を変えない (native の 0 は PTR の範囲外。§10.4 の sweep 行で確認)。
 - `a2c2c126..599f793c` の測定経路の差分は 0 行。したがって、差の原因が測定経路の変更である可能性は低い。測定環境に由来するかは未検証。
-- **原因の候補 (未検証)**: CPU 機種、glibc・ASLR によるメモリ配置、`libottnative.so` のビルド条件。`tools/ott/native/build.sh` は `gcc -O1 -g -fPIC -shared` で、`-march` 等は指定していない。どの候補も確かめていない。
+- **原因の候補 (未検証)**: 素材の版、`libottnative.so` のビルド条件 (`tools/ott/native/build.sh` は `gcc -O1 -g -fPIC -shared`)。ASLR は除外寄り (ASLR 無効でも 0/8)。AMD (9V45・7763・9V74) の中に 2 通りがあり、CPU 系統でも分けられない。
 - wasm 側は全環境で入力素通しで、この点は環境によらず一致する。
 - **issue #2695 の観測との対応 (m2)**: 「#2674 の run では native・wasm が入力素通しで一致」は 9V45 の結果と一致し、0/8 の環境とは一致しない。#2674 の run の環境は記録が無い。heap 内容が入力値だった状態で説明できるかは確認できていない。未解決表に残す。
 
@@ -130,50 +135,115 @@ harness 状態別の結果 (n=8、先頭 1 点。wasm は全環境・全 8 点�
 
 `bash tools/icall/diff/fa_sweep.sh 8 60` (fixed route・`FA_FRAME_SLOT=1`):
 
-| 集計 | 2508 (測定 `05194cdc`/`50112f92`) | 初版 (`63a82b32`) | fix run (`a2c2c126`・9V45) | review 再現 (`599f793c`・7763) | 再確認 (`599f793c`・9V74) |
-|---|---|---|---|---|---|
-| bit 一致 | 54 | 55 | 56 | 55 | 55 |
-| native crash/timeout | 66 | 65 | 65 | 65 | 65 |
-| wasm のみ err | 8 | 8 | 8 | 8 | 8 |
-| 値の不一致 | 3 | 3 | 2 | 3 | 3 |
+| 集計 | 2508 (測定 `05194cdc`/`50112f92`) | 初版 (`63a82b32`) | fix run (`a2c2c126`・9V45) | review 再現 (`599f793c`・7763) | 再確認 (`599f793c`・9V74) | 本 fix (`7e23750a`・7763) |
+|---|---|---|---|---|---|---|
+| bit 一致 | 54 | 55 | 56 | 55 | 55 | 56 |
+| native crash/timeout | 66 | 65 | 65 | 65 | 65 | 65 |
+| wasm のみ err | 8 | 8 | 8 | 8 | 8 | 8 |
+| 値の不一致 | 3 | 3 | 2 | 3 | 3 | 2 |
 
-9V74 の再確認の実行時間は 74.0 s (単独)。9V45 の fix run は 70.4 s (単独)。
+9V74 の再確認の実行時間は 74.0 s (単独)。9V45 の fix run は 70.4 s (単独)。本 fix は 73.8 s (単独)。追補 (6973P-C・`9edd60a5`) は 71.3 s (単独) で、bit 一致 57 / crash 65 / wasm のみ err 8 / 値の不一致 1 (0x180da4030 のみ: native `0000…`・wasm 入力素通し)。表は変えていない。
 
 - 0x180da6e60 が crash から bit 一致へ変わったのは、全環境で同じ。
-- 0x1803dee20 は、9V45 では bit 一致 (入力素通し)、7763 と 9V74 では不一致 (native `0000…`)。
-- 値の不一致の内訳 (9V74 の再確認): 0x1803dee20 (native `0000…`)、0x180da4030 (native `0000…`・wasm は入力素通し)、0x18105d9fc (native `0000000050400010`・wasm `00000000104af418`、先頭 1 点)。7763 の review 再現でも同じ 3 件が不一致だった。
+- 0x1803dee20 は、9V45 と 6973P-C (追補) では bit 一致 (入力素通し)、7763 (`599f793c`・本 fix) と 9V74 では不一致 (native `0000…`)。
+- 値の不一致の内訳 (9V74 の再確認): 0x1803dee20 (native `0000…`)、0x180da4030 (native `0000…`・wasm は入力素通し)、0x18105d9fc (native `0000000050400010`・wasm `00000000104af418`、先頭 1 点)。本 fix の不一致は 0x1803dee20 と 0x180da4030 の 2 件で、0x18105d9fc は一致する (下の行)。
 - 0x180da4030 は 9V45 では native 正常・wasm 値が異なる (native の値は未記録)。0/8 の環境 (7763・9V74) では native `0000…`。環境差として併記する。
-- 0x18105d9fc は 9V45 で不一致 (値は未記録)。9V74 では上記の値。環境差かどうかは未確認。
+- 0x18105d9fc は `ptr_norm` (`3127f774`) より前の run で不一致だった (9V74 の再確認 = `599f793c` の不一致 3 件に含む)。9V45 (`a2c2c126`) の不一致 2 件のうち 1 件は 0x180da4030 (上の行)、もう 1 件の内訳は未記録。本 fix では PTR 扱いで 8/8 一致する (`FA_PTR_NORM=0` の実測 (6973P-C・`9edd60a5`): 0/8。native `0000000050400010`・wasm `00000000104af418`)。ポインタの基底差の吸収である。
 - 2 件とも本 issue の範囲外で、個別の調査は行っていない。
 
 ## 7. 再現
 
 ```sh
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C .            # tools/icall/work/ へ (実測 18.5 s)
-# toolchain-emsdk: [EMSDK] に上流 emsdk 6.0.12 を入れる (git clone で emsdk を取得し ./emsdk install 6.0.12 && ./emsdk activate 6.0.12)
+# toolchain-emsdk は本 run の素材に無い (R2 は work-icall のみ)。上流 emsdk 6.0.12 で測った: git clone で emsdk を取得し ./emsdk install 6.0.12 && ./emsdk activate 6.0.12 の後、その展開先を [EMSDK] とする (上流からの再取得経路は [未確認]・docs/REFERENCES.md §4)
 bash tools/ott/native/build.sh                                     # libottnative.so
 export FA_CORE="$PWD/tools/icall/work/rt_freshair-core/rw.dll"
 FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh                 # fixed route (単独 5.6 s)
 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8                 # 期待: match 8 / mismatch 0 (件数 0)
 FA_LOOP_N=0 python3 tools/icall/diff/hit_180da6e60.py 180da6e60   # 候補の実行 (件数 0): No 1・SIGSEGV 点・出口のみ 1
-python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8                 # 9V45: 8/8 (native 入力素通し) / 7763・9V74: 0/8 (native 0000…)
-FA_HEAP_FILL=0xcc python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45: 8/8 / 7763・9V74: 0/8 (native cccc…)
-FA_ENC_INIT=1 python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45: 8/8 / 7763・9V74: 0/8 (native 0000…)
-bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 9V45: bit一致 56 / 65 / 8 / 2 / 7763・9V74: 55 / 65 / 8 / 3
+FA_LOOP_N=1 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8     # 件数 1 (§10.4): match 8 / mismatch 0
+FA_LOOP_N=1 FA_ELEM_STATE=0 python3 tools/icall/diff/hit_180da6e60.py 180da6e60   # §10.3 state 0: 41a0・No 1・SIGSEGV 点・loop 先頭・出口が各 1
+FA_PTR_NORM=0 python3 tools/icall/diff/fa_cmp.py 18105d9fc --n 8   # 負の対照: match 0 / mismatch 8 (6973P-C 実測)
+python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8                 # 9V45・6973P-C: 8/8 (native 入力素通し) / 7763 (本 fix)・9V74: 0/8 (native 0000…)
+FA_HEAP_FILL=0xcc python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45・6973P-C: 8/8 / 7763・9V74: 0/8 (native cccc…)
+FA_ENC_INIT=1 python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45・6973P-C: 8/8 / 7763・9V74: 0/8 (native 0000…)
+bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 9V45: 56 / 65 / 8 / 2 · 7763 (本 fix): 56 / 65 / 8 / 2 · 9V74: 55 / 65 / 8 / 3 · 6973P-C: 57 / 65 / 8 / 1
 ```
 
 `xmm0_probe.py` は作っていない (`fa_cmp.py` の結果で足りたため)。issue #2695 の検証方法はこれを名指ししており、これは issue の検証方法からの逸脱である。
 
 ## 8. 測定 commit からの差分
 
-測定 commit `a2c2c126` から本付録を含む修正 commit までの測定経路の差分は 0 行。確認: `git diff a2c2c126 HEAD -- tools/icall/diff/fa_cmp.py tools/icall/fa_route_build.sh tools/icall/diff/fa_sweep.sh tools/icall/diff/hit_180da6e60.py tools/icall/frame_slot_restore.py tools/ott/native` の出力は空。`tools/icall/REPORT_APPENDIX_2675.md` と `tools/icall/diff/fa_va_sha.py` は main の取り込みで入った #2675 の成果 (測定経路ではない)。
+測定 commit `0960c8be` から HEAD までの測定経路の差分は 0 行。確認 (本 fix・HEAD): `git diff 0960c8be HEAD -- tools/icall/diff tools/icall/fa_route_build.sh tools/icall/frame_slot_restore.py tools/ott/native` の出力は 0 行。`a2c2c126`→`0960c8be` の変更 (`fa_cmp.py`・`hit_180da6e60.py` で 30 行追加・5 行削除) は nil 初期化と `FA_ELEM_STATE`・41a0 候補。`ptr_norm` (`3127f774`) は `a2c2c126` には無く、`0960c8be` の時点で入っている。`tools/icall/REPORT_APPENDIX_2675.md` と `tools/icall/diff/fa_va_sha.py` は main の取り込みで入った #2675 の成果 (測定経路ではない)。
 
 ## 9. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x180da6e60 の件数 >0 経路 (type 2・8 の要素の状態機械と仮想 callee の object) の harness | 6 件の判定が 0 件。件数 1 は hang (`0x180da41a0` の探索の原因未確認) | #2695 (本 issue に残す。analysis と harness の残件のため子 issue は起票していない) |
+| 0x180da6e60 の件数 >0 経路 (type 2・8 の要素の状態機械と仮想 callee の object) の harness | 6 件の判定が 0 件。件数 1 の hang は §10.1 で解消 (`node[0].next = nil`)。残件は state 2・8 の harness (§10.6) | #2695 (本 issue に残す。analysis と harness の残件のため子 issue は起票していない) |
 | No 1 (cookie store の IR 欠落) の検査が wasm で通る理由 (検査が読む値の出所) | 無害とも誤りとも未確定 | #2695 |
-| 0x1803dee20: native の既定出力が測定環境で異なる (9V45 は入力素通し、7763・9V74 は `0000…`)。原因は未検証 (CPU・glibc・ASLR・libottnative のビルド条件の候補)。#2674 の観測 (入力素通し) との対応も未確定 | 受入 3 が未達。0/8 の環境で、heap 埋め値から native 出力が来る経路 (どこから読まれるか) も未確認 | #2695 |
-| sweep の値の不一致 (0x180da4030・0x18105d9fc。0x1803dee20 は上の行と同じ) | 本 issue の範囲外の既存残件。0x180da4030 は native の値が環境で異なる (§6)。0x18105d9fc が環境差か否かは未確認 | #2508 (既存の残件として引き継ぎ) |
+| 0x1803dee20: native の既定出力が測定ごとに異なる (入力素通し: 9V45 (`a2c2c126`)・6973P-C (`9edd60a5`)。`0000…`: 7763 (`599f793c`・`7e23750a`)・9V74 (`599f793c`))。原因は未検証 (素材・libottnative のビルド条件の候補。ASLR は除外寄り)。#2674 の観測 (入力素通し) との対応も未確定 | 受入 3 が未達。0/8 の環境で、heap 埋め値から native 出力が来る経路 (どこから読まれるか) も未確認 | #2695 |
+| sweep の値の不一致 (本 fix の HEAD: 0x180da4030 と 0x1803dee20。0x1803dee20 は上の行と同じ) | 本 issue の範囲外の既存残件。0x180da4030 は native の値が環境で異なる (§6)。0x18105d9fc は `ptr_norm` で一致 (§6) | #2508 (既存の残件として引き継ぎ) |
 | 受入 2 の「miscompile か無害か」を判定するための callee 読み先の確定 | 分類結果が 0 件 | #2695 |
+
+## 10. 件数 1 の hang の原因と修正 (本 PR)
+
+> 測定 commit: `0960c8be` (コードを変えた最後の commit)。`0960c8be` より後の commit は docs (本付録・DOC_MAP) と main の取り込みだけで、取り込みで入った `tools/m11/ldfix`・`native_ctrl.c` は測定経路の外。`git diff 0960c8be HEAD -- tools/icall/diff tools/icall/fa_route_build.sh tools/ott/native` は 0 行 (§8)。
+
+### 10.1 結論
+
+- 件数 1 の hang は、要素 0 の state 0 が `0x180da41a0` を呼び、その lock-free 読み出し (`0x180da41b0`・`0x180da4215`〜`0x180da421e`) が空判定に進まず spin するため。原因はゼロ初期化の節点表。先頭節点 `node[0]` (= `(B+0xbf)&~63`) の next が nil (`0x4001`) でないと、`rax≠0` で cmpxchg・再試行を繰り返す。§2 の「未確認」の推定を確認した。
+- `node[0]` を nil (`0x4001`) にすると、state 0 は `0x180da42d6` で 0 を返し、要素を飛ばして戻る。件数 1 は native・wasm とも戻り、8/8 一致 (値は入力素通し)。件数 0 の既定経路は変わらず 8/8。
+- state 1・2・3・7・8 は A (`rcx+0x10`) の vtable・サブオブジェクトが無いため、native で SIGSEGV する。state 4・5・6・9 は state 0 に戻って空判定で戻る。
+- **受入 2 は未達のまま**。No 2・6・7・9・10 は trace で 1 hit も無い。これらは state 2 と state 8 の分岐内にあり、A の vtable (slot `+0x08`・`+0x30`) と仮想 callee の stub を作らないと実行されない。
+
+### 10.2 harness 変更
+
+- `tools/icall/diff/fa_cmp.py`: `NIL_NODE = 0x4001`。VA `0x180da6e60` のとき、件数 (`FA_LOOP_N`) に関係なく、native (`init_native`) と wasm (`MK_JS`) の両方で `node[0]` (`(B+0xbf)&~63`) に nil を書く。件数 0 でも書くが loop を飛ばすため結果は変わらない。
+- `tools/icall/diff/hit_180da6e60.py`: 環境変数 `FA_ELEM_STATE=S` で要素 0 の state (`+0x100108`) を S にする。候補に `0x180da41a0` (state 0 の 41a0 entry) を追加。
+
+### 10.3 測定 (件数 1・要素 0 の state を指定・単発)
+
+修正前は、state 0・4・5・6・9 が timeout (8 s)、1・2・3・7・8 が SIGSEGV。修正後の結果:
+
+| state | native (修正後) | trace の候補 hit |
+|--:|---|---|
+| 0 | 戻る (xmm0 = 入力) | 41a0 entry 1・No 1 1・SIGSEGV 点 1・loop 先頭 1・出口 1 |
+| 1 | SIGSEGV `rip=0x180da7084` (`[A+8]`=0 を経由した load) | — (落ちる) |
+| 2 | SIGSEGV `rip=0x180da6f27` (`[A]` vtable = 0) | — |
+| 3 | SIGSEGV `rip=0x180da6fe9` (`[A]` vtable = 0) | — |
+| 4 | 戻る | 同上 (41a0 entry 1・No 1 1・SIGSEGV 点 1・loop 先頭 1・出口 1) |
+| 5 | 戻る | 同上 |
+| 6 | 戻る | 同上 |
+| 7 | SIGSEGV `rip=0x180da71b8` (`[rdi+0x100128]` = 0) | — |
+| 8 | SIGSEGV `rip=0x180da72fc` (`[A]` vtable = 0) | — |
+| 9 | 戻る | 同上 |
+
+state 0・4・5・6・9 の trace は `FA_LOOP_N=1 FA_ELEM_STATE=S hit_180da6e60.py` (`ws-2823`・EPYC 7763・本 fix) で再確認。No 2・6・7・9・10 は 0 hit (state 2・8 の分岐内)。
+
+### 10.4 fa_cmp と sweep (測定 commit `7e23750a`・測定経路は `0960c8be` と同じ・EPYC 7763・単発)
+
+| 測定 | 結果 |
+|---|---|
+| `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh` | OK (単独 9.9 s) |
+| `FA_LOOP_N=0 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8` | match 8 / mismatch 0 / err 0 (件数 0・不変) |
+| `FA_LOOP_N=1 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8` | match 8 / mismatch 0 / native_err 0 / wasm_err 0 (修正前は hang) |
+| `python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8` (2 回とも同じ) | 0/8。1 行出力: `[{"va": "0x1803dee20", "n": 8, "match": 0, "mismatch": 8, "native_err": 0, "wasm_err": 0, "first": [[0, "0000000000000000", "c000c5300342457c"], [1, "0000000000000000", "3fd6a5368858d8d0"]]}]` |
+| 同上の `FA_HEAP_FILL=0xcc` / `setarch x86_64 -R` (ASLR 無効) | どちらも 0/8 (native は `cccccccccccccccc` / `0000000000000000`) |
+| `bash tools/icall/diff/fa_sweep.sh 8 60` | 73.8 s (単独)。bit 一致 56 / native crash・timeout 65 / wasm のみ err 8 / 値の不一致 2 (0x1803dee20・0x180da4030、ともに native `0000…`) |
+| 追補 (`9edd60a5`・6973P-C・単発): `FA_FRAME_SLOT=1 fa_route_build.sh` → `FA_LOOP_N=0`・`=1` の fa_cmp 180da6e60 → 18105d9fc (既定・`FA_PTR_NORM=0`) → 1803dee20 → sweep | route OK (6.3 s)。180da6e60: 件数 0・件数 1 とも 8/8。18105d9fc: 既定 8/8、`FA_PTR_NORM=0` 0/8 (native `0000000050400010`・wasm `00000000104af418`)。1803dee20: 8/8 (入力素通し。`FA_HEAP_FILL=0xcc`・`0`・`FA_ENC_INIT=1`・`setarch -R` も 8/8)。sweep 71.3 s (単独): bit 一致 57 / crash 65 / wasm のみ err 8 / 値の不一致 1 (0x180da4030) |
+
+旧 §10.4 (`0960c8be`) の sweep も同じ件数 (56/65/8/2) だったが、不一致の名前は記録していなかった。「0x1803dee20 は 8/8」はその件数からの推定で、直接の測定ではなかった (訂正)。0x18105d9fc は本 fix で 8/8 一致 (`ptr_norm` の PTR 扱い。`FA_PTR_NORM=0` は 0/8 (追補で実測)。§6)。0x1803dee20 の揺れは §5 の未解決に残す。
+
+### 10.5 受入の達成状況 (本 PR)
+
+- 受入 1: 部分。件数 0 と件数 1 (state 0・4・5・6・9) は戻る。件数 >0 の state 1・2・3・7・8 は SIGSEGV のまま (object graph の stub が無い)。
+- 受入 2: 未達。6 件の判定は 0 件 (No 2・6・7・9・10 は未実行、No 1 は保留のまま)。
+- 受入 3: 未達。0x1803dee20 の native 既定出力は環境で 2 通り (入力素通し 8/8: 9V45・6973P-C、`0000…` 0/8: 7763・9V74。§5・§10.4)。旧 run の 8/8 は推定だった。原因は未検証 (§5)。
+
+### 10.6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| state 2・8 の harness: A の vtable (`+0x08`・`+0x30`) と仮想 callee の stub、A+8 の table (state 1)、`[rdi+0x100128]` (state 7) | 6 件の判定 0 件のまま | #2695 |
+| 0x1803dee20 の native 既定出力の環境差 (§5) | 受入 3 未達 | #2695 |
