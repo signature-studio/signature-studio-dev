@@ -7,6 +7,7 @@ export type Bucket =
   | "pmArt"
   | "blockedBy"
   | "launchedAt"
+  | "sig"
   | "relaunch"
   | "meta";
 

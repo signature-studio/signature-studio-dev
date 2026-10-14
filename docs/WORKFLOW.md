@@ -98,7 +98,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
-   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D22 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D23 と `tools/icall/REPORT.md` §4 の D1〜D13 は
    **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
@@ -219,7 +219,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。`work-m11` は #516 qstore 以前の生成
     (`qstore_report.json`・`ir_conditions.json` 無し) で現 main の生成手順と一致しない (#680)。survey の基準には使わない。
-    IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §12・#728)。ただし reached_stage は 4 で trap が残り、IR の sha256 は実行ごとに変わる (未切り分け)。
+    IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §12・#728)。ただし reached_stage は 4 で trap が残る。IR の sha256 は A7 の空行除去 (#1664) より前は実行ごとに変わった (原因と修正後の一致は `tools/m11/REPORT_APPENDIX_960.md` §19)。
     `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
@@ -356,6 +356,11 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     annotation が読めないときは何もしない (watchdog が拾う)。
   - **watchdog の集計** (`watchdog.sh`): open issue で、blocked でなく、open PR が無く、実行中の implement run も無く、`oc:no-pr`・`needs-user-input`・`oc:stuck` も無い
     issue を `floating-issues=N` として出力する (step summary にも出る)。**数えるだけで何もしない** (launch は PM Worker の責務)。本文の『依存: #N』『親: #N』による待ちは見ないため、上限値の目安である。
+  - **PM Worker の停止検知** (`watchdog.sh`、#2328): `tools/pm/worker_url` の URL の `/status` を `curl -fsS -m 10` で読む。`configured` と `installed` がともに true
+    (一度でも稼働に入った Worker) で、`fresh` が false または `last_tick` が 15 分より古ければ、題名 `[CI-n] PM Worker 停止 (<日付>)`・ラベル `pm-worker-down` の issue を起票する
+    (本文は `/status` の写しと `@pycabbage`。`needs-user-input` は付けない)。**`configured:false` / `installed:false` (`/setup` 未了) では起票しない。**
+    重複排除: ラベル付きの open issue があれば追記のみ (1 時間に 1 回まで)、24 時間以内に close した issue は reopen して追記する。
+    回復 (`fresh` が true かつ `last_tick` が 5 分以内) で、open の障害 issue にコメントして close する。ファイルが無い・取得失敗・JSON 不正は警告だけで何もしない (終了コードは変えない)。
   - **bot の `/oc`** (#1949): PM 用 GitHub App の `/oc` は `vars.OC_PM_BOT_LOGIN` との完全一致 + `user.type == 'Bot'` で許可する (`.github/README.md`)。
 
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
