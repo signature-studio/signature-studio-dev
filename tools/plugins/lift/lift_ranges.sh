@@ -117,5 +117,7 @@ else
 fi
 # PLUG_AVX256=0 で fix_avx256 を飛ばす (synth/cpp_lift.sh は #534 の C++ DLL 結果を変えないため 0 にする)
 if [ "${PLUG_AVX256:-1}" = 1 ]; then python3 "$P/fix_avx256.py" "$OUT/$NAME.mp.ll" "$OUT/$NAME.final.ll"; else cp "$OUT/$NAME.mp.ll" "$OUT/$NAME.final.ll"; fi
+# VEX comis の flag を同一ブロック内の読み出しに反映 (#1774 [PLG-F3-14])。 呼び出し自体は残す (helper は stub のまま unimpl に残る)
+python3 "$P/vex_comis_flags.py" "$OUT/$NAME.final.ll" "$OUT/$NAME.vcf.ll" && mv "$OUT/$NAME.vcf.ll" "$OUT/$NAME.final.ll"
 python3 "$P/m11_simd2.py" "$OUT/$NAME.final.ll" 2> "$OUT/$NAME.simd.log" | sed 's#"\.\./msimd11_core\.h"#"msimd11_core.h"#' > "$OUT/${NAME}_simd.c"
 echo "[lift] OK: $OUT/$NAME.final.ll ($(wc -l < "$OUT/$NAME.final.ll") lines), $(grep -c '^define' "$OUT/$NAME.final.ll") defines, helpers: $(tail -3 "$OUT/$NAME.simd.log" | tr '\n' ' ')"
