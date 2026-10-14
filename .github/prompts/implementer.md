@@ -43,6 +43,7 @@
 7. **大物ファイル**: 20MiB 超の blob を commit しない。生成物は `work/` (gitignore) に置く。
 8. **ブランチ/PR**: 作業は `N-<slug>` (N = issue 番号) ブランチで行い、push 後 `gh pr create`
    (`--base main`)。body に `Closes #N`・受入条件・検証結果を書く。
+   受入条件を全て満たせないときは、issue の範囲を縮めて `Closes #N` にする (規範 11)。
 9. **マージ方法**: このリポジトリは merge commit のみ許可されている
    (`allow_squash_merge: false` / `allow_rebase_merge: false`)。Auto Merge は
    `gh pr merge --auto --merge` で有効化する。`--squash` / `--rebase` は必ず失敗する。
@@ -52,8 +53,14 @@
 11. **PR は常に ready で作る (draft 禁止)・base は常に main (stacked 禁止)**。open PR は
     「レビュー中」か「レビューを受けて修正中」のどちらかでなければならない (指示 122/123)。
     draft や、未 merge の別 PR を base にした PR は、そのどちらでもない状態を作る。
-    作業が未完でも ready で出し、本文に `Refs #N` と未解決を書く (未解決は起票先を付ける)。
-    1 run に収まらない作業の残りと未解決は、子 issue として**自分で起票してよい** (`docs/WORKFLOW.md` §3。題名の
+    作業が未完でも ready で出す。**PR は自分の issue を `Closes #N` で閉じる** (「`Refs #N` のみで merge」を原則にしない。
+    親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生む)。受入条件を全て満たせないときは、満たした範囲を
+    完了単位として **issue 自体の範囲を縮め** (未達の受入条件を子 issue に移し、元の issue の本文から外す)、`Closes #N` にする。
+    未解決は PR 本文の `| 未解決 | 影響 | 起票先 |` 表に書く。
+    1 run に収まらない**実装・修復の作業**の残りは、子 issue として**自分で起票してよい**。再測定・REPORT の文言修正・
+    「未解決の追跡」だけの子は起票しない (PR 本文の未解決表に書く)。**1 PR あたりの子は最大 3 件**。
+    親が子の完了待ちでも `blocked_by` は付けない (親を blocker にしない。子を親の blocker にもしない。子の本文の `親: #N` だけにする)
+    (`docs/WORKFLOW.md` §3。題名の
     `[AREA-n]` の n は既存の最大 + 1 を確認し、重複を作らない (`<AREA>` は親 issue の AREA に置換。確認コマンドは
     `docs/WORKFLOW.md` §3 ① の `gh issue list ... | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`)。
     起票の直前に同じ確認を再度行い、`grep -cF '[<AREA>-<n>]'` が 0 件であることを確かめてから起票する。
