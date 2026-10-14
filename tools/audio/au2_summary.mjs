@@ -8,8 +8,10 @@ import { fileURLToPath } from "node:url";
 
 const dir = process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "results/au2");
 const rows = new Map();
-for (const f of fs.readdirSync(dir).filter((x) => /^(fake|null)_r\d+\.json$/.test(x)).sort()) {
-  const cond = f.startsWith("fake") ? "Chrome fake シンク" : "Chrome PulseAudio null-sink";
+// Windows / macOS 行列 (tools/audio/ci/audio-matrix.yaml) の出力名 <os>-latest_<browser>_r<rep>.json も読む (条件名はそのまま出す)
+for (const f of fs.readdirSync(dir).filter((x) => /^(fake|null|(windows|macos)-latest_\w+)_r\d+\.json$/.test(x)).sort()) {
+  const prefix = f.replace(/_r\d+\.json$/, "");
+  const cond = prefix === "fake" ? "Chrome fake シンク" : prefix === "null" ? "Chrome PulseAudio null-sink" : prefix;
   for (const x of JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")).results) {
     const r = x.result, s = r?.stats ?? {}, ctx = r?.ctx ?? {};
     const B = r?.cfg?.buf ?? 0, burst = s.burst_obs ?? 0;

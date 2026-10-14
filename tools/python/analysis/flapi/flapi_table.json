@@ -785,9 +785,9 @@
        "default": null
       },
       {
-       "name": "arg1",
-       "type": null,
-       "default": "PE_OPTIONAL"
+       "name": "value",
+       "type": "int",
+       "default": "-1"
       }
      ],
      "returns": "None",
