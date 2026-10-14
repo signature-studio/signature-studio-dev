@@ -126,19 +126,18 @@ load average は測定中 0.73 前後。`check_682.py` は HEAD では未実行�
 
 結論: build を変えずに、node の inspector (`Debugger.setPauseOnExceptions` all) で RuntimeError が投げられた瞬間の wasm local を読めた。判定は不変 (unit 別ラベル JSON が通常 survey とバイト一致)。304・555 は `function_535bf2` の `obj = 0`、923 は `function_410b10` の `*(obj) = 0` (vptr が NULL) が OOB の直接原因。
 
-測定 commit `2ae50140` (`inspect_trap.mjs` を追加した commit。コードを変えた最後の commit)。上の測定は、その 1 つ後の `9e5ef3af` (同ファイルのヘッダのコメント 5 行だけを追加) で実行した。`git diff 2ae50140 HEAD -- tools ':!*.md'` の出力は `inspect_trap.mjs` の `+//` コメント 5 行のみ (`M11_INSPECT_PEEK`・`DUMP`・`FRAMES` の説明と 1 行の要約)。コード差分は 0。作業ベース `14150b46` (origin/main)。素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 0.17。node v22.23.3。
+測定 commit `e07712a4` (origin/main `67dffb5d` を取り込んだ merge)。`inspect_trap.mjs` の最終コードは `2ae50140`、その 1 つ後の `9e5ef3af` はヘッダのコメント 5 行だけを追加した (`git diff 2ae50140 HEAD -- tools/m11/trap_triage/inspect_trap.mjs` の出力は `+//` コメント 5 行のみ、コード差分 0)。取込み前 (作業ベース `14150b46` + `9e5ef3af`) でも同じ測定をして同じ結果だった (下表の右列)。`14150b46` → `67dffb5d` の tools/m11 の実行コード差分は `m11_build.sh`・`m11_ov.c` の `M11_INSTR_40F960` (既定 0 の計測 flag) と ldfix 配下の診断スクリプトの追加で、既定 build の出力は変わらなかった (取込み後の再測定で確認)。素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 0.12 (取込み後)・0.17 (取込み前)。node v22.23.3。
 
-| 工程 | 結果 | 所要 |
+| 工程 | 取込み後 `e07712a4` | 取込み前 `14150b46` + `9e5ef3af` |
 |---|---|---|
-| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490733 行、F1=902 errors=0) | 42.6 秒 |
-| `m11_build.sh` (既定) | rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`) | 21.5 秒 |
-| `m11_survey.mjs` (既定・inspector なし) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 13.4 秒 |
-| `check_682.py` (既定) | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | - |
-| `m11_survey.mjs` + `inspect_trap.mjs` (1 回目) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 21.8 秒 |
-| 同 (2 回目) | 同上 | 21.8 秒 |
-| `check_682.py` (inspector 版の unit JSON) | 2/5 (同じ) | - |
+| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490733 行、errors=0) / 42.9 秒 | rc=0 (同) / 42.6 秒 |
+| `m11_build.sh` (既定) | rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`) / 20.1 秒 | rc=0 (同) / 21.5 秒 |
+| `m11_survey.mjs` (既定・inspector なし) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 / 14.2 秒 | 同じ判定 / 13.4 秒 |
+| `check_682.py` (既定) | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | 同じ |
+| survey + `inspect_trap.mjs` ×2 | 2 回とも ok 870 / trap 24 / noproc 1 / miss 47 / 21.7 秒・21.5 秒 | 同じ判定 / 21.8 秒 ×2 |
+| `check_682.py` (inspector 版の unit JSON) | 2/5 (同じ) | 同じ |
 
-- 判定不変: inspector 版 2 回の `M11_SURVEY_UNITS` JSON は、inspector なしの JSON と `cmp` でバイト一致 (942 unit 全て同じラベル)。追加の試走 4 回 (測定 commit の前) も同じ。2 回の記録 JSONL も `cmp` で一致。
+- 判定不変: 取込み後・取込み前とも、inspector 版 2 回の `M11_SURVEY_UNITS` JSON は、inspector なしの JSON と `cmp` でバイト一致 (942 unit 全て同じラベル)。追加の試走 4 回も同じ。各 2 回の記録 JSONL も `cmp` で一致し、取込み前と取込み後の JSONL も一致した。
 - 手段: `trap_triage/inspect_trap.mjs` を `node --wasm-enforce-bounds-checks --import ... tools/m11/m11_survey.mjs` で preload する (build・C 版・wasm は無変更)。`Debugger.paused` で top frame の `local` scope を `Runtime.getProperties` で読み、すぐ resume する。
 - `--wasm-enforce-bounds-checks` が要る。既定 (trap handler による OOB 検出) では OOB 時の frame に local の side table が無く、`local` scope が空で返る (最小の wasm module で、フラグ無し = 空・有り = `$var0`/`$var1` の値、を確認)。フラグは範囲チェックを明示コードにするだけで、OOB の判定は同じ。
 - 事象と unit の対応: 非 halt0 の RuntimeError 17 件が、unit 別ラベルの trap のうち halt0 でない 17 unit と順序で 1 対 1 に対応する。304・555・923 は、事象の (wasm 関数 index, offset) が `M11_SURVEY_STACK` の先頭フレーム (3372:0x1a3376, 3372:0x1a3376, 14900:0x354f51) と一致した。
