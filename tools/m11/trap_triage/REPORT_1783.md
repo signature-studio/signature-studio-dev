@@ -152,3 +152,54 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 | boot 後の `0xf960` と静的 `0x40f960` の由来 | スロットの初期値の出所が未確定 | #2769 |
 | 7.4 の原本 (`SURVEY_UNITS` 行・`SLOT_BOOT` 行・`run1.err` 最終行) | repo 内の出力では 942 unit の完走を示せない | #2769 (同じ build・survey の再実行で引用) |
 | merge 後の main での再測定 | 測定対象が main と一致しない | 本 PR 本文の未解決表 (再測定のみのため子は起票しない) |
+
+## 8. #2769: 計装版の停止原因と全 942 unit の `[aw]` 採取
+
+**判定**: 受入 1 (停止の切り分け) は達成。受入 2 (全 942 unit の `0x1ac308` の `[aw]` 採取) は、計装の範囲を「スタック slot への直接 store を除く全 store」にして達成 (**0 件**)。ただし計装版の挙動は計装なし版と 2 unit (158・283) で一致しないため、0 件は「この計装版の実行で」の結論に限る。
+
+### 8.1 測定条件
+
+- 測定 commit: `796507e9` (コードを変えた最後の commit。run4 はこの commit の `store_watch_1783.sh` で実施)。
+- 素材: `fl-win64` → `/home/runner/work/_temp/fl-win64` (`FL_WIN64_DIR`)、`work-m11`・`work-liftdiff` は worktree の `tools/m11/work/`・`tools/liftdiff/work/` に展開、`toolchain-emsdk` は展開したが、`m11_build.sh` が `/opt/emsdk` を固定で読むため runner の `/opt/emsdk` (emcc 6.0.12 pin) を使った。
+- `m11_gen_ir2.sh` rc 0 (40.1 s、`boot_final.ll` 490,735 行)、`m11_build.sh` rc 0 (21.3 s、`signature mismatch: 0, undefined symbol: 0`)。
+
+### 8.2 計装なし (基準)
+
+- `SV_SLOT=0x1ac308 node trap_triage/survey_units.mjs` の stdout: `SLOT_BOOT 0x1ac308 0xf960`、`SURVEY_UNITS {"ok":872,"miss":47,"other":1,"halt0":7,"oob":14,"noproc":1}` (合計 942)。rc 0、10.1 s。値が変わった unit は 0 件 (`slot` 付き unit なし)。
+
+### 8.3 停止の切り分け (計装版)
+
+| 条件 | 結果 (実測) |
+|---|---|
+| 旧 script (全 store 計装、`ov.o` の `M11_FIX_682=0`) | unit 145 の開始行の直後で止まる。timeout 240 s で rc 124 |
+| `SV_TRACE_AT=145` (20 s) | unit 145 の icall 行は入口 `0x25c9f0` の 1 件のみ。以後の icall なし |
+| 全 store 計装、`ov.o` を base と同じ既定 (`M11_FIX_682=1`) | unit 106 で止まる。timeout 240 s で rc 124 |
+| 上と同じ + 同一 site の呼出し回数上限 5,000,000 で該当 unit を trap (`watch_addr_2769.c`) | 942 unit 完走 (1 s、rc 0)。打ち切りは 3 unit: 106 (site 11832)・145 (site 11833)・830 (site 42115) |
+| 全 store 計装、hook の本体を空にする (`m11_sw` は何もしない) | timeout 200 s で rc 124 (**挿入そのものが停止の原因**) |
+| 空 hook + スタック slot への直接 store を計装から外す (`ALLOCA_SKIP=1`) | 942 unit 完走 (rc 0)。kind は `{"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` |
+
+- 停止点の正体: 打ち切りで得た site 11832・11833 は `function_407800` の IR 106693・106694 (`sites.json`)。この関数は decommit の loop で、歩幅が `%1 = xor i64 0, 0` (定数 0) のため、`VirtualFree` が成功を返す間は終わらない形になっている。計装なしでは抜けるのに、計装版では抜けない。site 42115 は `function_bf86f0` の IR 381155。
+- 計装版の unit 145 は「遅い」のではなく「回り続ける」: 旧 script の進捗行は unit 0〜145 の開始が 0.15 s 以内に並ぶ (`unit 145` で止まる)。REPORT §7.5 の「20 分」は timeout までの時間であり、計装 store の遅さではない。
+- 機構: スタック slot (`alloca`) の番地を `ptrtoint` で外に出すことが効くと見ている。`function_407800` の `VirtualFree` の結果がなぜ変わるかは**未確定**。
+- 計装 site は 54,041 → 15,028 (39,013 は alloca を直接指す store。`watch_store_682.py` の `ALLOCA_SKIP=1`)。スタック slot への書込みは shadow stack 上で、0x1ac308 (イメージ内、SizeOfImage 0x18c0000 未満) には届かないと判断した。shadow stack の実配置は**未確認**。
+
+### 8.4 全 942 unit の `[aw]` 採取 (run4)
+
+- `bash trap_triage/store_watch_1783.sh run4` (commit `796507e9`、`timeout 300`、foreground): rc 0、52.0 s。
+  - `SURVEY_UNITS {"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` (942 unit 完走)。
+  - `[aw] hits: 0` (`run4.aw` の `[aw] ` 行 0 件・`sw-limit` 0 件)。`SV_SLOT` 付きの unit 0 件。
+  - 計装なし基準との kind 差分 2 unit: 158 (`ok`→`oob`)・283 (`ok`→`halt0`)。原因は未確認。
+  - script 終了後、`m11_boot.cjs.wasm` は計装なしに戻った (`site=%u addr=%x` 文字列 0 件)。
+- 判定の範囲: 0 件は「計装 15,028 site (alloca 直接 store を除く) の実行で `[W, W+8)` (W = 0x1ac308) に重なる書込みが無い」まで。計装版の挙動が基準と 2 unit 違うので、基準実行への直接の結論ではない。
+- 判定関数の確認 (native・`cc` で `watch_addr_1046.c` を直接コンパイル、`sw_selftest`): 0x1ac308・0x1ac30a・0x1ac30c (幅 4) は hit、0x1ac304 (幅 4)・0x1ac300 (幅 8) は非 hit。判定範囲は `[W, W+8)` で、コメントの「4B」より広い (上位集合なので取りこぼしは無い)。
+- wasm 実機での陽性対照 (既知の書込み番地で hit が出ること) は**未実施**。
+
+### 8.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 計装で `function_407800` の `VirtualFree` 結果が変わる機構 (スタック slot の `ptrtoint` が効く理由) | スタック slot を計装から外す前提が検証のみ | 本 PR 本文の未解決表 (追跡のみ・子は起票しない) |
+| 計装版と基準の kind 差分 (158・283) | 0 件の結論は計装版の実行に限る | 本 PR 本文の未解決表 (追跡のみ) |
+| wasm 実機での陽性対照 (既知の書込み番地で `[aw]` が出る確認) | 0 件が「書込みなし」か「検出漏れ」か未確定 | 本 PR 本文の未解決表 (追跡のみ) |
+| 0x1ac308 の値 `0xf960` と静的 `0x40f960` の由来 (§7.6) | スロットの初期値の出所が未確定 | #2769 のクローズ後も §7.8 と同じく未解決 |
+| native 側 `0x5ac308` の store 捕捉 | 両側の比較ができない | #2770 |
