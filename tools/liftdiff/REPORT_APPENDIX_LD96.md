@@ -157,7 +157,7 @@ git diff 7d434168 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/
   - `native_audited_cases`・`wasm_audited_cases`: 監査した case 数 (側ごと)。19 関数は全 case、非 19 関数は先頭 case の 1 件、`unexec` は 0。`control` 行は 11 件。
   - `native_z_n`・`native_z_first`・`native_z_last` (wasm 側も同じ): 先頭 case (pattern `z`) で高水位より外に残った非 0 バイト数 (`n`)。`first`・`last` は残存の最初と最後の非 0 バイトのオフセット。`-` は先頭 case が無い (`unexec`)。
   - `native_max_n`・`wasm_max_n`: 監査した全 case の `n` の最大。
-  - `mem_blocks`: 監査 case のうち最初に `diffs.mem.count` を持つ case の値。`count` は `ldlib/compare.py` の `cmp_mem` が返す mem 差分ブロックの数 (`first` は先頭 8 件まで)。rt は 1 領域の記録を `LD_MAX_BLOCKS` (3000・`rt/ld_core.h:532`) で打ち切り、`mem_trunc`=1 を出す (`rt/ld_core.h:543`・`746`)。TSV に `mem_trunc` 列は無い (raw 非収録) ため、上限と一致する 3000・3002 の 13 件は総数ではなく下限として扱い、打ち切りの有無は未確認。`-` の意味は関数の種類で違う: 19 関数は詳細を取るので `-` = 差分なし。それ以外の関数は詳細を取らないので `-` = 未記録。
+  - `mem_blocks`: 監査 case のうち最初に `diffs.mem.count` を持つ case の値。`count` は `ldlib/compare.py` の `cmp_mem` が返す mem 差分ブロックの数 (`first` は先頭 8 件まで)。rt は 1 case の mem 差分の記録数を `LD_MAX_BLOCKS` (3000・`rt/ld_core.h:532`) で打ち切り、`mem_trunc`=1 を出す (`rt/ld_core.h:539`・`543`・`746`。カウンタは case ごとに 0 に戻る)。TSV に `mem_trunc` 列は無い (raw 非収録) ため、上限と一致する 3000・3002 の 13 件は総数ではなく下限として扱い、打ち切りの有無は未確認。`-` の意味は関数の種類で違う: 19 関数は詳細を取るので `-` = 差分なし。それ以外の関数は詳細を取らないので `-` = 未記録。
   - `0x7850d0` (chunk1) の `mem_blocks` は 1 (差分 1 ブロック)。この関数は先頭 case で wasm 残存 11 B も持つ。ブロックの位置は raw データ (非収録) にあり、残存との対応は未確認 (§8.6)。
 - 列の定義 (`results/ld96_heap_residue_summary.tsv`・run × side): `functions` = 先頭 case を監査した関数数 (`solo` は対照を除く 18)。`audited_cases` = 監査 case 数。`z_with_residue` = 先頭 case で `n` > 0 の関数数。`z_n_min`・`z_n_max` = その `n` の最小・最大。`z_n_gt_1000` = `n` > 1000 の関数数。`z_n_sum` = `n` の合計。`control` 行は §8.2 の対照。
 
