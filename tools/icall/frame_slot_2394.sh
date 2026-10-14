@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # frame_slot_2394.sh — REPORT_APPENDIX_2394.md (ICALL-75 #2394) の 1 コマンド再現。
-#   前提: 素材 work-icall を展開済み (tools/icall/work/rt_freshair-core)・RetDec は /opt/retdec・emsdk は /opt/emsdk。
+#   前提: 素材 work-icall を展開済み (tools/icall/work/rt_freshair-core)・RetDec は [RETDEC] (RETDEC_ROOT)・emsdk は [EMSDK] (fa_route_build.sh が source する)。
 #   plugins-freshair は不要: 元 PE の decode 結果 (before.0.drc.dsm) と、元 PE + .icall section の rw.dll を使う。
 #   FA_CORE (data 敷設・native 実行用 DLL) は既定で rw.dll。SWEEP=1 で fa_sweep.sh 8 60 を base / fixed の両方で走らせる (各 75 秒前後)。
 set -euo pipefail
@@ -8,6 +8,7 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 RT="$HERE/work/rt_freshair-core"; EXP="$HERE/work/fa_exp"; mkdir -p "$EXP"
 export TMPDIR="${TMPDIR:-${RUNNER_TEMP:-/tmp}}"
 export FA_CORE="${FA_CORE:-$RT/rw.dll}"
+RETDEC="${RETDEC_ROOT:-/opt/retdec}"
 P="python3 $HERE/frame_slot_probe.py"
 for f in "$RT/before.0.drc.dsm" "$RT/before.0.drc.ll" "$RT/rw.dll" "$RT/after.0.restored.ll"; do
   [ -f "$f" ] || { echo "[2394] $f が無い: 素材 work-icall を展開 (tools/icall/work)" >&2; exit 2; }
@@ -15,7 +16,7 @@ done
 echo "## 1. 元の機械語 (before.0.drc.dsm を capstone で再 decode・rw.dll の同 VA と bytes 比較)"
 $P mc --dsm "$RT/before.0.drc.dsm" --va 0x181057b38 --pe "$RT/rw.dll"
 echo "## 2. RetDec の段ごとの stack_var (rw.dll の元 VA 0x181057b38-0x181057c05 を --print-after-all)"
-/opt/retdec/bin/retdec-decompiler "$RT/rw.dll" -o "$EXP/b38.c" --select-ranges 0x181057b38-0x181057c05 --select-decode-only --print-after-all > /dev/null 2> "$EXP/b38.err"
+"$RETDEC/bin/retdec-decompiler" "$RT/rw.dll" -o "$EXP/b38.c" --select-ranges 0x181057b38-0x181057c05 --select-decode-only --print-after-all > /dev/null 2> "$EXP/b38.err"
 $P phase --err "$EXP/b38.err" --func function_181057b38
 echo "## 3. 脱落 store の census (F.ranges 131 関数)"
 $P census --dsm "$RT/before.0.drc.dsm" --ll "$RT/before.0.drc.ll" --ranges "$RT/F.ranges"
