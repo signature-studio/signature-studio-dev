@@ -33,8 +33,8 @@ def main():
     count = int(sys.argv[2]) if len(sys.argv) > 2 else 60
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     code = read_va(start, count * 16)
-    for ins in md.disasm(code, start):
-        if ins.address >= start + count * 16:
+    for i, ins in enumerate(md.disasm(code, start)):
+        if i >= count:
             break
         m = re.search(r"\[rip ([+-]) (0x[0-9a-f]+)\]", ins.op_str)
         if not m:
