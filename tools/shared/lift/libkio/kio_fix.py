@@ -139,22 +139,47 @@ if dsm:
     for fn, kinds in SIGS.items():
         if not kinds or sum(k in ("f32", "f64") for k in kinds) < 2 or any(k in ("ref64", "f64ref") for k in kinds): continue
         patch(fn, lambda b, kinds=kinds: xmm_fix(b, kinds, INSNS))
-# [A'] 引数レジスタ接続の欠落: 単一 alloca に spill された k 番目の整数引数の load を、署名の k 番目 (ポインタ) に接続
-def arg_reg(body, kinds):
+# [A'] 引数レジスタ接続の欠落: 単一 alloca から読まれる整数 load を、DSM のレジスタ参照で署名の引数に接続する。
+#   署名の整数クラス引数 (fp 以外) の j 番目は SysV の SYSV[j] に入る。load の値が inttoptr されて DSM の
+#   メモリ参照 [reg] になる命令 (!insn.addr) から reg を得る。その命令に束縛できない load は、DSM がメモリ参照に使い、
+#   まだ束縛されていないポインタ引数のレジスタが 1 つだけ残るときに限り束縛する。判定できなければ変更しない。
+SYSV = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+FN_RANGE = {m.group(1): (int(m.group(2), 16), int(m.group(3), 16)) for m in re.finditer(r"(?m)^; function: (\S+) at 0x([0-9a-f]+) -- 0x([0-9a-f]+)", open(dsm, errors="replace").read())} if dsm else {}
+def mem_regs(a):
+    return {r for o in INSNS.get(a, ("", []))[1] for r in re.findall(r"\[(r\w+)", o)}
+def insn_of(body, v):
+    for line in body.split("\n"):
+        if re.search(r"inttoptr i64 " + re.escape(v) + r" to ", line):
+            m = re.search(r"!insn\.addr !(\d+)", line)
+            return META.get(m.group(1)) if m else None
+    return None
+def arg_reg(body, kinds, fn):
+    lo, hi = FN_RANGE.get(fn, (0, 0))
+    used = {r for a in INSNS if lo <= a < hi for r in mem_regs(a)}
+    ptr_arg, j = {}, 0
+    for i, k in enumerate(kinds):
+        if k in ("f32", "f64"): continue
+        if j < len(SYSV) and k in PTR: ptr_arg[SYSV[j]] = i + 1
+        j += 1
     for al in sorted(set(re.findall(r"(%\w+) = alloca i64", body))):
         if re.search(r"store [^\n]*, ptr " + re.escape(al) + r"[,\s]", body): continue
-        cnt = [0]
-        def rep(mm, kinds=kinds, cnt=cnt):
-            j = cnt[0]; cnt[0] += 1
-            if j < len(kinds) and kinds[j] in PTR:
-                return f"{mm.group(1)} = ptrtoint ptr %arg{j + 1} to i64\n"
-            return mm.group(0)
-        body = re.sub(r"(%\w+) = load i64, ptr " + re.escape(al) + r"\n", rep, body)
+        loads = re.findall(r"(%\w+) = load i64, ptr " + re.escape(al) + r"\n", body)
+        if not loads: continue
+        bound, free = {}, []
+        for v in loads:
+            regs = mem_regs(insn_of(body, v)) & set(ptr_arg)
+            if len(regs) == 1: bound[v] = ptr_arg[regs.pop()]
+            else: free.append(v)
+        left = [r for r in ptr_arg if r in used and ptr_arg[r] not in bound.values()]
+        if len(free) == 1 and len(left) == 1: bound[free[0]] = ptr_arg[left[0]]; free = []
+        if free or not bound: continue
+        for v, k in bound.items():
+            body = body.replace(f"{v} = load i64, ptr {al}\n", f"{v} = ptrtoint ptr %arg{k} to i64\n")
     return re.sub(r"(?m)^  uselistorder [^\n]*\n", "", body)
-if os.environ.get("KIO_ARGREG", "1") != "0":
+if os.environ.get("KIO_ARGREG", "1") != "0" and dsm:
     for fn, kinds in SIGS.items():
         if not kinds or not any(k in PTR for k in kinds): continue
         if any(k in ("f32", "f64", "f64ref") for k in kinds): continue
-        patch(fn, lambda b, kinds=kinds: arg_reg(b, kinds))
+        patch(fn, lambda b, kinds=kinds, fn=fn: arg_reg(b, kinds, fn))
 open(sys.argv[2], "w").write(s)
 print(f"[kio_fix] widened {n} functions")
