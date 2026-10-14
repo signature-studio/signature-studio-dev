@@ -21,7 +21,7 @@
 | zero-fill 部 | `0x18128f400`〜`0x18130a000` (0x7ac00 bytes) | 同上 |
 | decode 形式 | `mov r10,[cookie]` → `xor r10,[slot]` → `ror r10,cl` (cl = cookie & 0x3f) | `objdump -d -M intel` の `18103d3e3`〜`18103d3fd` |
 | decode 関数の例 | `0x181055400`: cookie を読み `xor rbx,[0x1813068f8]` → `ror rbx,cl` → 戻り値 | `objdump` の `181055400`〜`181055421` |
-| `ror ,cl` の総数 | 26 箇所 | `objdump` (`ror .*,cl$`) |
+| `ror ,cl` の総数 | 26 箇所 | `objdump` (`ror .*,cl$`)。**数え方は「`.text` 内の `ror <reg>,cl` 行の全数」** (decode 形式に限らない)。`REPORT_APPENDIX_1921.md` §2 の 23 箇所は「`xor reg,[cookie]` の直後に `ror reg,cl` が続く decode 形式だけ」の数で、定義が異なる。両者の差 3 箇所の内訳 (decode 形式以外の `ror ,cl` が何箇所か) は未確認。本 run では素材不在のため再測定していない |
 | cookie 参照の総数 | 5,241 箇所 | 大半は `mov rax,[cookie]` (スタック保護) |
 
 - objdump の出力では RIP 相対参照先が `# 0x...` で出る。capstone の線形スイープは `.text` の途中で停止するため、
@@ -76,3 +76,5 @@ python3 tools/icall/slatecore_fptr_table.py "$RUNNER_TEMP/sc_text.s"
 
 素材: `plugins-freshair` (`FA_DL=$RUNNER_TEMP/plugins-freshair bash tools/targets/freshair/fetch.sh` で
 `work/win/Fresh Air/.../SlateCore.core_64` が出る)。`fl-win64` は本 appendix の解析では不要。
+本 run (2026-10-14) では `plugins-freshair` が `$ARTIFACTS_DIR` に無く、§2・§3 の実測は再現していない (`fl-win64` の tar に SlateCore・Fresh Air は含まれないことを確認)。
+手順 (`tar --zstd -xf` → `fetch.sh` → `objdump` → `slatecore_fptr_table.py`) は本 commit で変更していない。素材を取得した run で §2・§3 を再測定すること。
