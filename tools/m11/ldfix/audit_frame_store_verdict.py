@@ -196,6 +196,8 @@ def main():
                 v, why = 'DROP', 'ALL_PATHS_STORE'
             elif outs == {'ENTRY'}:
                 v, why = 'LIVE-IN', 'NO_DEF_ON_ANY_PATH'
+            elif outs == {'ENTRY_AFTER_CALL'}:
+                v, why = 'UNDETERMINED', 'ONLY_ENTRY_AFTER_CALL'
             else:
                 v, why = 'UNDETERMINED', 'MIXED_OR_UNREACHABLE'
             per_site.append(dict(fn=fn, ty=s['ty'], addr='%x' % addr, mnem='%s %s' % (ins.mnemonic, ins.op_str),
