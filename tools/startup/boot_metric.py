@@ -11,12 +11,12 @@ commit は 2 種類を分けて持つ (混同しない):
   record.commit             : measured_commit から取る測定 commit。書かれていなければ null (null_reasons に理由)
 derived には、リテラルではなく出典の値から導いた項目の規則を書く。
 harness 構造による判定 (CreateFruityInstance 未到達) は、対象ディレクトリの非 work ファイルに
-呼出しの語が 0 件であることを検査してから用いる。
+呼出し構文 (コメント・.md・allow を除く) の CreateFruityInstance が 0 件であることを検査してから用いる。
 
 使い方:
   python3 tools/startup/boot_metric.py                 # boot_metric.json を書き出す
   python3 tools/startup/boot_metric.py --check         # 既存ファイルが再算出結果と一致するか (不一致は exit 1)
-  python3 tools/startup/boot_metric.py --route x64c    # 路線の現在値を標準出力へ (m11 / x64c / native-ref)
+  python3 tools/startup/boot_metric.py --route x64c    # 路線の現在値を標準出力へ (m11 / x64c / native-ref / flengine)
 """
 import argparse
 import json
@@ -49,6 +49,26 @@ X64_SURVEY = "tools/flelift/boot/results/survey.json"
 X64_REPORT = "tools/flelift/boot/REPORT.md"
 NATIVE_REPORT = "tools/liftdiff/REPORT_LD26.md"
 STARTUP = "tools/startup/STARTUP.md"
+FLE_APPENDIX = "tools/gui/flengine/REPORT_APPENDIX.md"
+FLE_APPENDIX_2880 = "tools/gui/flengine/REPORT_APPENDIX_2880.md"
+CFI_PROBE = "tools/gui/flengine/cfi_probe.mjs"
+
+COMMENT_LINE = ("#", "//", "/*", "* ", "*/")
+COMMENT_TAIL = re.compile(r"(^|\s)(#|//)\s.*$")
+
+
+def _call_re(word):
+    w = re.escape(word)
+    return re.compile(rf'(?<![@\w])_?{w}\s*\(|["\']_?{w}["\']')
+
+
+def _code_text(text):
+    out = []
+    for line in text.split("\n"):
+        if line.lstrip().startswith(COMMENT_LINE):
+            continue
+        out.append(COMMENT_TAIL.sub("", line))
+    return "\n".join(out)
 
 
 class MetricError(Exception):
@@ -66,10 +86,21 @@ def git_commit(root, rel):
     return out or None
 
 
+def git_show(root, commit, rel):
+    try:
+        return subprocess.run(
+            ["git", "-C", str(root), "show", f"{commit}:{rel}"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
 class Source:
-    def __init__(self, root, commit_of=None):
+    def __init__(self, root, commit_of=None, show_of=None):
         self.root = Path(root)
         self.commit_of = commit_of or (lambda rel: git_commit(self.root, rel))
+        self.show_of = show_of or (lambda rel, commit: git_show(self.root, commit, rel))
         self.cache = {}
         self.used = []
 
@@ -97,8 +128,18 @@ class Source:
         if entry not in self.used:
             self.used.append(entry)
 
-    def json_value(self, rel, dotted, measured=None):
-        cur = json.loads(self._text(rel))
+    def at_commit(self, rel, commit):
+        """測定 commit 時点の出典の内容 (作業ツリーの後の更新は読まない)。"""
+        key = (rel, commit)
+        if key not in self.cache:
+            text = self.show_of(rel, commit)
+            if text is None:
+                raise MetricError(f"測定 commit に出典が無い: {commit}:{rel}")
+            self.cache[key] = text
+        return self.cache[key]
+
+    def json_value(self, rel, dotted, measured=None, at=None):
+        cur = json.loads(self._text(rel) if at is None else self.at_commit(rel, at))
         for key in dotted.split("."):
             if not isinstance(cur, dict) or key not in cur:
                 raise MetricError(f"JSON に無い: {rel} :: {dotted}")
@@ -106,8 +147,8 @@ class Source:
         self._note(rel, f"json:{dotted}", measured)
         return cur
 
-    def reach_calls(self, rel, name, measured=None):
-        doc = json.loads(self._text(rel))
+    def reach_calls(self, rel, name, measured=None, at=None):
+        doc = json.loads(self._text(rel) if at is None else self.at_commit(rel, at))
         reach = doc.get("reach")
         if not isinstance(reach, list):
             raise MetricError(f"reach 配列が無い: {rel}")
@@ -167,33 +208,36 @@ class Source:
             raise MetricError(f"存在確認に失敗: {rel} :: {pattern}")
         self._note(rel, f"存在確認 /{pattern}/")
 
-    def absent(self, rel_dir, word):
-        """rel_dir 以下の非 work の実行ファイルに word が 0 件であることを検査する。
+    def absent(self, rel_dir, word, allow=()):
+        """rel_dir 以下の非 work の実行ファイルに word の呼出し構文が 0 件であることを検査する。
+        語の出現ではなく呼出し構文だけを数える (コメント行・行末コメント・.md・allow を除く)。
         .md は説明文であって呼出しではないので数えない (REPORT が『呼んでいない』と書くことを禁じないため)。"""
         base = self.root / rel_dir
         if not base.is_dir():
             raise MetricError(f"出典ディレクトリが無い: {rel_dir}")
+        call = _call_re(word)
         hits = []
         for dirpath, dirnames, filenames in os.walk(base):
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for name in filenames:
                 path = Path(dirpath) / name
-                if path.suffix == ".md":
+                rel = path.relative_to(self.root).as_posix()
+                if path.suffix == ".md" or rel in allow:
                     continue
                 try:
                     text = path.read_text(encoding="utf-8")
                 except (UnicodeDecodeError, OSError):
                     continue
-                if word in text:
-                    hits.append(str(path.relative_to(self.root)))
+                if call.search(_code_text(text)):
+                    hits.append(rel)
         if hits:
-            raise MetricError(f"{rel_dir} の非 work ファイルに {word} の参照がある: {hits[:3]}")
-        self._note(rel_dir, f"grep 0 件 /{word}/ (非 work・SKIP_DIRS を除く)")
+            raise MetricError(f"{rel_dir} の非 work ファイルに {word} の呼出しがある: {hits[:3]}")
+        self._note(rel_dir, f"grep 0 件 /{word}/ (呼出し構文・コメント/.md/allow を除く)")
 
 
-def _cfi(src, harness_dir):
+def _cfi(src, harness_dir, allow=()):
     """CreateFruityInstance の未到達: harness に呼出しが無く、STARTUP の DllMain の段が最後に到達する段。"""
-    src.absent(harness_dir, "CreateFruityInstance")
+    src.absent(harness_dir, "CreateFruityInstance", allow=allow)
     src.exists(STARTUP, r"^\| S11 \| host \|[^\n]*CreateFruityInstance")
     (last_step,) = src.find(STARTUP, r"^\| (S\d\d) \| host \|[^\n]*\*\*DllMain\*\*")
     return {"reached": False, "last_step": last_step}
@@ -372,7 +416,7 @@ def _m11_gui_boot(src):
         "total": int(total), "ok": int(run), "skipped": None, "failed": STOP_UNITS if threw else 0,
         "miss": None, "noproc": None, "dispatched": None, "uncovered": None,
     }
-    cfi = _cfi(src, GUI_DIR)
+    cfi = _cfi(src, GUI_DIR, allow=(CFI_PROBE,))
     nulls = {
         "units.skipped": "boot.json に units_skipped が無い (同名の baseline_boot.json は別ビルドで 4)",
         "units.dispatched": "boot.json に停止 unit の計数が無い",
@@ -399,15 +443,15 @@ def _m11_gui_survey(src):
         r"測定 commit `([0-9a-f]{8})`・judge [0-9]+/[0-9]+・S1 `(\d+)/(\d+)/(\d+)/(\d+)/(\d+)`",
         measured_group=0,
     )
-    total = src.json_value(GUI_SURVEY, "units_total", commit)
-    ok = src.json_value(GUI_SURVEY, "survey.ok", commit)
-    noproc = src.json_value(GUI_SURVEY, "survey.noproc", commit)
-    miss = src.json_value(GUI_SURVEY, "survey.miss", commit)
-    trap = src.json_value(GUI_SURVEY, "survey.trap", commit)
-    clobber = src.json_value(GUI_SURVEY, "survey.clobber", commit)
-    kinds = src.json_value(GUI_SURVEY, "survey.kinds", commit)
-    reg = src.reach_calls(GUI_SURVEY, "RegisterClassW", commit)
-    cwe = src.reach_calls(GUI_SURVEY, "CreateWindowExW", commit)
+    total = src.json_value(GUI_SURVEY, "units_total", commit, at=commit)
+    ok = src.json_value(GUI_SURVEY, "survey.ok", commit, at=commit)
+    noproc = src.json_value(GUI_SURVEY, "survey.noproc", commit, at=commit)
+    miss = src.json_value(GUI_SURVEY, "survey.miss", commit, at=commit)
+    trap = src.json_value(GUI_SURVEY, "survey.trap", commit, at=commit)
+    clobber = src.json_value(GUI_SURVEY, "survey.clobber", commit, at=commit)
+    kinds = src.json_value(GUI_SURVEY, "survey.kinds", commit, at=commit)
+    reg = src.reach_calls(GUI_SURVEY, "RegisterClassW", commit, at=commit)
+    cwe = src.reach_calls(GUI_SURVEY, "CreateWindowExW", commit, at=commit)
     if (int(ok), int(noproc), int(miss), int(trap), int(clobber)) != (
         int(ok_r), int(noproc_r), int(miss_r), int(trap_r), int(clobber_r)
     ):
@@ -532,14 +576,63 @@ def _native_ref(src):
     return rec
 
 
-def build(root=REPO, commit_of=None):
-    src = Source(root, commit_of)
+def _flengine_cfi(src):
+    src.begin()
+    (commit,) = src.match(FLE_APPENDIX_2880, "### 9-3.", r"`cfi_probe\.mjs`・commit `([0-9a-f]{8})`", commit_group=0)
+    (state,) = src.match(
+        FLE_APPENDIX_2880, "### 9-3.",
+        r"^\| `CreateFruityInstance\(0xC0, 0xEDE95A, host, &iface\)` \| `(Aborted)`", measured=commit,
+    )
+    if state != "Aborted":
+        raise MetricError("probe の CreateFruityInstance 呼出しが Aborted でない")
+    cs, api = src.match(
+        FLE_APPENDIX_2880, "### 9-3.",
+        r"`\[shim\] CS-MISS key=0x([0-9a-f]+)` → `FAIL-FAST: unimplemented Win32 API: (\w+) ", measured=commit,
+    )
+    (commit7,) = src.match(FLE_APPENDIX, "## 7.", r"\*\*測定 commit `([0-9a-f]{8})`\*\*", commit_group=0)
+    (api7,) = src.match(
+        FLE_APPENDIX, "### 7-4.",
+        r"`CreateFruityInstance` は `\[shim\] FAIL-FAST: unimplemented Win32 API: (\w+) \(", measured=commit7,
+    )
+    if api7 != api:
+        raise MetricError("REPORT_APPENDIX §7-4 と 2880 §9-3 の fail-fast API が食い違う")
+    (loadstring,) = src.match(
+        FLE_APPENDIX_2880, "### 9-3.",
+        r"\| GUI-REACH / icall_miss \| `(\w+)` ×3 のみ / \d+", measured=commit,
+    )
+    if loadstring != "LoadStringW":
+        raise MetricError("probe の GUI-REACH が LoadStringW のみでない")
+    src.exists(CFI_PROBE, r"\._CreateFruityInstance\(")
+    (last_step,) = src.find(STARTUP, r"^\| (S12) \| engine \| `0x1375990` 冒頭")
+    units = {k: None for k in ("total", "ok", "skipped", "failed", "miss", "noproc", "dispatched", "uncovered")}
+    stop = {"unit": None, "va": None, "kind": "fail-fast", "api": api, "cs": "0x" + cs}
+    cfi = {"reached": True, "last_step": last_step}
+    gui = {"RegisterClassW": 0, "CreateWindowExW": 0}
+    nulls = {
+        "stop.unit": "CreateFruityInstance の呼出しは unit 列の外 (probe の 1 回呼び)",
+        "stop.va": "呼出元 VA は未特定 (wasm name section 無し・#3077 [WIN-16])",
+    }
+    derived = {
+        "create_fruity_instance.last_step": "STARTUP の S12 行 (0x1375990 冒頭) = CreateFruityInstance の入口。到達の下限。S13 以降は未測定 (fail-fast の位置は #3077 で未特定)",
+        "gui_natural": "GUI-REACH (§9-3) は LoadStringW のみ。RegisterClassW・CreateWindowExW は一覧に無いので 0",
+        "stop": "CS-MISS 行の key (cs) と FAIL-FAST 行の API (api)。§7-4 と照合",
+    }
+    return _record(
+        "flengine-cfi-probe", "flengine", "cfi-probe",
+        "flengine boot7 + cfi_probe (DllMain attach の後に CreateFruityInstance を 1 回呼ぶ・REPORT_APPENDIX_2880 §9-3)",
+        units, stop, cfi, gui, commit, nulls, src.end(), derived=derived,
+    )
+
+
+def build(root=REPO, commit_of=None, show_of=None):
+    src = Source(root, commit_of, show_of)
     records = [
         _m11_tolerant(src),
         _m11_tolerant_skip(src),
         _m11_survey(src),
         _m11_gui_boot(src),
         _m11_gui_survey(src),
+        _flengine_cfi(src),
         _x64c_boot(src),
         _x64c_survey(src),
         _native_ref(src),
@@ -559,7 +652,7 @@ def render(doc):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="既存 boot_metric.json が再算出結果と一致するか検査する")
-    ap.add_argument("--route", help="路線の現在値だけを標準出力へ (m11 / x64c / native-ref)")
+    ap.add_argument("--route", help="路線の現在値だけを標準出力へ (m11 / x64c / native-ref / flengine)")
     ap.add_argument("--root", default=str(REPO), help="出典の起点 (既定: repo root。テスト用)")
     args = ap.parse_args(argv)
     try:

@@ -153,6 +153,32 @@ sed -i '$ s/.*/changed/' "$R/tools/x/REPORT.md"; commit_case n-report-250
 lint "$(body 'Closes #1\n')"
 { [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: REPORT ちょうど 250 行" || ng "ネガ: REPORT ちょうど 250 行 (rc=$RC)"
 
+# --- 起動結果 (f): boot_metric.json の更新 (#3191) ---
+new_case v-boot-metric
+mkdir -p "$R/tools/startup" && echo "x" >> "$R/tools/startup/x.txt"; commit_case v-boot-metric
+lint "$(body 'Closes #3191\n')"
+{ [ "$RC" = 1 ] && has_rule boot-metric; } && ok "起動結果の変更に boot_metric.json の更新が無いのを検出" || ng "起動結果の変更に boot_metric.json の更新が無いのを検出 (rc=$RC)"
+
+new_case v-boot-metric-empty-reason
+mkdir -p "$R/tools/startup" && echo "x" >> "$R/tools/startup/x.txt"; commit_case v-boot-metric-empty-reason
+lint "$(body 'Closes #3191\n\nboot_metric: unchanged ()\n')"
+{ [ "$RC" = 1 ] && has_rule boot-metric; } && ok "boot_metric: unchanged の理由が空なら違反" || ng "boot_metric: unchanged の理由が空なら違反 (rc=$RC)"
+
+new_case n-boot-metric-json
+mkdir -p "$R/tools/startup" && echo "x" >> "$R/tools/startup/x.txt"; echo "{}" > "$R/tools/startup/boot_metric.json"; commit_case n-boot-metric-json
+lint "$(body 'Closes #3191\n')"
+{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: 起動結果の変更と boot_metric.json の更新を同じ PR に含める" || ng "ネガ: 起動結果の変更と boot_metric.json の更新を同じ PR に含める (rc=$RC)"
+
+new_case n-boot-metric-unchanged
+mkdir -p "$R/tools/startup" && echo "x" >> "$R/tools/startup/x.txt"; commit_case n-boot-metric-unchanged
+lint "$(body 'Closes #3191\n\nboot_metric: unchanged (typo のみ)\n')"
+{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: boot_metric: unchanged (理由) の逃し弁" || ng "ネガ: boot_metric: unchanged (理由) の逃し弁 (rc=$RC)"
+
+new_case n-boot-metric-other
+mkdir -p "$R/tools/pm" && echo "x" >> "$R/tools/pm/x.txt"; commit_case n-boot-metric-other
+lint "$(body 'Closes #3191\n')"
+{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: 起動結果に関わらないファイルだけの変更" || ng "ネガ: 起動結果に関わらないファイルだけの変更 (rc=$RC)"
+
 echo
 echo "test-pr-lint: pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]
