@@ -71,3 +71,29 @@
 - 節ごとの FAIL 件数 (HEAD が節によって異なるため、合計は参考値): §19 (旧 HEAD `bb912951`) 1/11、§20 0/15、§21 0/27、§22 0/14 (改修前 1 + 改修後 13)、§23 1/12。計 **2 件 / 79 run** (11 + 15 + 27 + 14 + 12)。
 - `shim_port.not_implemented_yet` の console.error は全 12 run (PASS 含む) に出ている。失敗とは無関係。
 - 未解決 (追跡 **#863**): (a) producer 側の到達時刻 (fla_test の出力 quantum ごとの時刻) を capture に追加しないと切り分けられない。(b) 再現頻度は本節の個別 run 数で書く (無負荷 1/6・busy loop 6 本 0/6)。母数が少なく条件は未特定。
+
+## §24 照合に充填量・audio callback 間隔を追加 (測定 commit 529ab8e8、Refs #863)
+
+- 目的: 失敗時に producer / consumer を切り分ける材料として、worklet が既に capture へ書いている値を照合 (`verifyToneCapture`) で読むようにした。wasm 再ビルドは不要。
+  - `fill_at_first_underrun`: 最初の underrun の quantum で consume 前に記録された出力リング充填量 (frames)。0 付近なら producer 側の供給不足。
+  - `fill_min_before_first_underrun`: 最初の underrun 直前 32 quantum 内の充填量の最小値。段階的に低下していれば producer 遅延が先行。
+  - `cb_gap_max_ms` / `cb_gap_over20`: audio callback 間隔の最大値と 20 ms 超の回数。大きければ consumer (音声スレッド) 側の停止。
+- コード差分: `src/runtime/audio_app.ts` +21 行 / `tools/audio/integration/e2e.mjs` 1 行 (commit 529ab8e8)。
+- 測定: 素材 fl-win64 + toolchain-emsdk 展開、`bash tools/audio/integration/e2e.sh` を foreground で実行 (`TMPDIR=$RUNNER_TEMP`)。
+
+| run | load (開始時) | 結果 | dev:tone max_err | zero_runs | underrun | cb_gap_max_ms | cb_gap_over20 |
+|---|---|---|---|---|---|---|---|
+| 初回 (新フィールド確認) | 1.14 | 13/13 PASS exit 0 | 1.49e-8 | 0 | 0 | 11 | 0 |
+| b1 | 1.69 | 13/13 PASS exit 0 | 1.49e-8 | 0 | 0 | 11 | 0 |
+| b2 | 2.46 | 13/13 PASS exit 0 | 1.49e-8 | 0 | 0 | 11 | 0 |
+| b3 | 3.56 | 13/13 PASS exit 0 | 1.49e-8 | 0 | 0 | 11 | 0 |
+| b4 | 3.08 | 13/13 PASS exit 0 | 1.49e-8 | 0 | 0 | 11 | 0 |
+| b5 | 2.68 | 13/13 PASS exit 0 | 1.49e-8 | 0 | 0 | 11 | 0 |
+| b6 | 2.42 | 13/13 PASS exit 0 | 1.49e-8 | 0 | 0 | 11 | 0 |
+
+- 計 7 run 全 PASS。全 run で `fill_at_first_underrun=-1` / `fill_min_before_first_underrun=-1` (underrun 0)。
+- 初回の 13/13 PASS の所要は 10.2 s (`real`)。
+- 検証の注意: 最初の試行は未コミットの編集を含まない `git archive HEAD` を検証したため、新フィールドが `undefined` と出た。コミット後に再実行して値が出ることを確認したので、上の 7 run はコミット済み HEAD での結果。
+- 読み: 今回は underrun が 0 件のため、producer / consumer の切り分けは**未実施**。新フィールドは次回失敗時の判定材料になるが、現 HEAD では実測値は得られていない。
+- 再現頻度 (通算、§19〜§23 の既存集計に今回の 7 run を加算): FAIL 2 件 / 86 run (§19 1/11、§20 0/15、§21 0/27、§22 0/14、§23 1/12、§24 0/7)。母数が少なく条件は未特定。
+- 未解決 (追跡 **#863**): (a) producer 側の出力到達時刻 (fla_test の quantum ごとの時刻) は wasm 側の変更が必要で本 PR の範囲外。(b) 再現条件の特定。
