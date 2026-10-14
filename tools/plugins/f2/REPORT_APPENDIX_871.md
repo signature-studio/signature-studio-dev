@@ -185,3 +185,18 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - 残 mismatch の定義 (本付録・PR 本文で共通): 分母は leaf_diff の対象 23 関数。**残 mismatch 6 = 修正前からの未解決 6 関数** (回帰 0)。
 - 回帰 0x5de250 の機序 (wasm 側の読み値 vs native `0x70CF34`) は本 run でも未確定。`0x1C0` のずれの出どころと block 19006 の RVA 配置の扱いは #923 の子で切り分ける。
 - 影響範囲: 検証は leaf 23 関数に限る (§10.5)。非 leaf 7 関数 (30 − 23) の liftdiff は未実施 (#923)。
+
+## 10.13 (#871 run) HEAD `ae802a4c` での再測定 (素材付き・LD-23 の crash 修正)
+
+- 測定 commit: `ae802a4c` (コード変更は `tools/liftdiff/ldlib/session.py` の 1 行のみ)。`git diff 3b38f81d ae802a4c -- tools/liftdiff/ldlib/session.py` の差分は refine 対象の条件に `c['pattern'] in patterns` を足す 1 行。
+- 鮮度 (測定 commit から現 head まで): `git diff ae802a4c 52d1e1593ddbae4a5138b8976f975a4f297ee979 -- tools/liftdiff tools/plugins/f2` の実出力は `tools/plugins/f2/REPORT_APPENDIX_871.md | 14 ++++++++++++++` (1 file changed, 14 insertions(+)) のみ。コード差分は 0 (`:(exclude)*.md` を付けても空)。`docs/WORKFLOW.md` §6 により再測定は不要。
+- 素材: `fl-win64`・`toolchain-retdec`・`toolchain-emsdk` を run 内で展開/実在確認。展開先は `[RETDEC]`・`[EMSDK]` (`docs/REFERENCES.md` §4 の環境変数対応)。`[RETDEC]` は歴史的な lifter で、現行の主力は x64c / flelift / liftlib (`docs/DECISIONS.md` D5)。
+- `f2_step1.sh`: rc 0、9 分 43 秒、`DIFF count = 0`。IR leaf 55 / うち機械語でも間接 call 無し 23。
+- 不具合: `leaf_diff.sh` (修正前) は block 18979 で rc 1。LD-23 (#975, `0596772f`) の fvm case が `patterns` に無く、`session.py` の refine で `patterns.index` が `ValueError` になっていた。上の 1 行で解消。
+- `leaf_diff.sh` (修正後): rc 0、2 分 19 秒、load 0.50。**最終判定 一致 15 / 不一致 8 / 実行不能 0**。
+  - 0x5de250 (19006): match 8/8/11 (回帰は解消)。0x6f1650 (19059): match 11/11/11。0x6c8fc0 (18975): match。
+  - 不一致 8 のうち、0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0 は §10.12 の残 6 と同じ。加えて 0x73fa70 (18979) と 0x6ec2f0 (19059) (同一コード) が `callee_divergence` で mismatch。
+  - **新規不一致 2 件 (0x73fa70・0x6ec2f0) の原因は未切り分け**。§10.12 (`3b38f81d`) では両者とも match 7/7 だった。`3b38f81d` 以降に liftdiff 側へ入った変更 (LD-23 fvm の追加・#1526 等) のどれかが候補。切り分けは未実施。
+- 一致 17 の記録 (§10.12) との差は、この 2 件のみ。
+- 回帰 0x5de250 の機序 (§10.7) は本 run では未確認 (wasm 側の読み値比較は未実施)。
+- 未実施: `nc_leaf.py` (ネガコン)・30 関数 (317 箇所) の影響表・非 leaf 7 関数の liftdiff。

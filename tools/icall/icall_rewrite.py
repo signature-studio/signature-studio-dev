@@ -303,6 +303,18 @@ def stub_code(pos, blk):
 
 
 
+def jtm_head(raw):
+    """jmp [mem] (FF /4) を cmp qword [mem], imm32 (REX.W 81 /7) の先頭バイト列へ変換する。非対象は None。"""
+    i = raw.find(b'\xff')
+    if i not in (0, 1) or (i == 1 and not 0x40 <= raw[0] <= 0x4f):
+        return None
+    rex = raw[0] if i == 1 else 0
+    tail = raw[i + 1:]
+    if len(tail) < 2 or (tail[0] & 7) != 4 or (tail[0] >> 6) == 3:       # SIB 付き memory 形のみ (rip 相対・reg 形は対象外)
+        return None
+    return bytes([0x48 | (rex & 3), 0x81, (tail[0] & 0xC7) | 0x38]) + tail[1:]
+
+
 class Em:
     def __init__(self, pos):
         self.out = bytearray(); self.pos = pos
@@ -582,6 +594,14 @@ def main():
                 it.newlen = 16 * len(st.targets) + 2
                 njt += 1
                 continue
+            if a.jtchain and st is not None and st.kind == 'jmptable' and st.mn == 'jmp' and st.targets and ins.operands[0].type == x86.X86_OP_MEM \
+                    and all(0 <= t < 0x80000000 for t in st.targets):
+                head = jtm_head(bytes(ins.bytes))
+                if head is not None:
+                    it.tmpl = ('jtm', head, list(st.targets))
+                    it.newlen = (len(head) + 4 + 6) * len(st.targets) + 2
+                    njt += 1
+                    continue
             expand = False
             if st is not None and st.kind in ('vtable', 'reg', 'indexed', 'abs_mem') or (st is not None and st.kind == 'rip_data' and a.rip_data):
                 expand = True
@@ -697,6 +717,16 @@ def main():
                 assert len(em.out) == it.newlen
                 buf[off:off + it.newlen] = em.out
                 continue
+            if it.tmpl is not None and it.tmpl[0] == 'jtm':
+                head, tgts = it.tmpl[1], it.tmpl[2]
+                em = Em(it.newva)
+                for t in tgts:
+                    em.raw(head + p32(t))                                                    # cmp qword [mem], target
+                    em.raw(bytes([0x0f, 0x84]) + p32(omap[t] - (em.cur() + 6)))           # je new target
+                em.raw(b'\x0f\x0b')                                                          # ud2 (表外)
+                assert len(em.out) == it.newlen
+                buf[off:off + it.newlen] = em.out
+                continue
             if it.tmpl is not None and it.tmpl[0] == 'comis':
                 b = build_comis(ins, it.newva, blk, cstub_va)
                 assert len(b) == it.newlen, (hex(it.va), len(b), it.newlen)
@@ -771,7 +801,7 @@ def main():
             st = it.site
             if st is None or st.kind != 'jmptable' or not st.jt:
                 continue
-            if it.tmpl is not None and it.tmpl[0] == 'jt':
+            if it.tmpl is not None and it.tmpl[0] in ('jt', 'jtm'):
                 continue                       # 比較分岐列へ展開済み: 表は原 VA のまま
             taddr, scale, relb, n = st.jt
             if (taddr, scale) in jt_done:

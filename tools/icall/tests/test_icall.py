@@ -41,6 +41,10 @@ ins = next(cs.disasm(bytes.fromhex('488b4108'), 0x1000))
 check('derefix 対象外 [rcx+8]', R.derefix_pieces(ins) is None)
 ins = next(cs.disasm(bytes.fromhex('660f2f0510000000'), 0x1000))
 check('capstone disp_size 誤り (66 prefix rip-rel) を検知', ins.disp_size != 4, 'disp_size=%d' % ins.disp_size)
+check('jtm: jmp [r10+rdx*8+0x40] -> cmp qword [r10+rdx*8+0x40] (REX.W 81 /7)', R.jtm_head(bytes.fromhex('43ff64d240')) == bytes.fromhex('4b817cd240'))
+check('jtm: jmp [rax+rcx*8] -> cmp qword [rax+rcx*8]', R.jtm_head(bytes.fromhex('ff24c8')) == bytes.fromhex('48813cc8'))
+check('jtm: jmp [rip+disp] は対象外', R.jtm_head(bytes.fromhex('ff2500000000')) is None)
+check('jtm: jmp rax (reg 形) は対象外', R.jtm_head(bytes.fromhex('ffe0')) is None)
 
 # ---- stack 引数 (5 個目以降) の検出 (BLK+0x48 / STKBUF)
 class _It:

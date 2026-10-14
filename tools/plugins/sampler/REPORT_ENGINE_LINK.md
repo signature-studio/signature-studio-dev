@@ -6,7 +6,7 @@
 
 - 殻 (block 23663、ImageBase 0x400000) は `engine_x64.dll` を名前で読み、`DispatchToEngine` を名前で引く。 殻から `DispatchToEngine` を呼ぶ箇所は 9 件 (§4)。
 - 受入条件 4 は **部分達成**。 ロード経路・export 取得・呼出し箇所 9 件・各 selector 値は確定。 `DispatchToEngine` の引数規約 (`r8`/`r9` の意味・戻り値) は未解析。
-- 受入条件 1・2 は本 HEAD で **未再現** (§7)。 RetDec が runner に無く `sampler_engines.sh` が 900 s で打ち切られた。
+- 受入条件 1・2 は main `cb3a89a6` で **再現** (§7): `sampler_engines.sh` exit 0・`PASS 2/2`、`sampler_e2e.sh` exit 0・`PASS 7/7`。
 
 ## 2. 殻側の経路 (block 23663)
 
@@ -148,7 +148,6 @@
 | 殻の selector 9 件の `r8`/`r9` 引数の完全な意味・戻り値の型 (§8 で 7 件の意味を確定。sel 2・4 の内側 id の値と、sel 10 の `r8` 入力バッファの書込み元は未確定) | 本 #540 (継続) |
 | `--no-memory-limit` の n=1 測定の扱い (§5 参照) | 本 #540 (継続、受入条件 3 は判断まで完了) |
 | VEX helper の SSE 固定の動的確認 (直接 call 鎖では guard 無し。間接 call は未追跡) | #527 にコメント予定 (既存・重複起票せず) |
-| 受入条件 1・2 の再測定 (`sampler_engines.sh`) | 本 HEAD の検証 run は runner に [RETDEC] が無く未再現。 RetDec 環境のある run で再測定 (#540 継続) |
 
 ## 8. selector ごとの引数の意味 (受入条件 4 の続き)
 
@@ -181,6 +180,9 @@
 | 素材展開 `fl-win64.tar.zst` → `$RUNNER_TEMP/fl-win64` | 8.0 s、`block23663_PE.bin` / `block23664_PE.bin` 存在を確認 |
 | 殻の `ff /2` disp32=0x1c0 候補 (block23663) | 24 件 (§2a)。 9 件の selector (2,3,4,5,10,11,12,13,14) は §4 のとおり |
 | 殻の結線 0x843790〜0x84386a | 逆アセンブル成功 (`disasm_range.py`)、`[obj+0x1c0]` 保存・`[obj+0x1b8]` engine 保存を確認 |
-| `sampler_engines.sh` (受入条件 1・2) | **未再現**。 exit 124 (900 s 打ち切り)。 [RETDEC] の `retdec-decompiler` 不在 (`No such file or directory`)、`.ll` が出ず後段に進めない。 [EMSDK] も無し。 負荷 (load) は 0.02 前後で待機のみ |
+| 検証 HEAD (本 run) | main `cb3a89a6` の worktree `../ws-540` (ブランチ `540-engine-verify`)。 コード変更なし |
+| `sampler_engines.sh` (受入条件 1) | **exit 0・4:59.15 (299 s)**・Maximum RSS 3.52 GB (`/usr/bin/time -v`、2 engine 並列)・終了直後の load average 1.18 (1 分平均)。 `judge engines: PASS 2/2`。 23664: pdata 5,160 / lift_rc 0 / define 5,993 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 23677: pdata 2,355 / lift_rc 0 / define 2,525 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 (23677 は `emcc_c_rc` = 1、`emcc_c_rc_after_fixcmp` = 1、f80 処理後の `emcc_c_rc_after_f80` = 0 で判定を通る。 23664 は `emcc_c_rc` = 0。) ログに `do not know how to soften fp_extend` (final.ll / fixcmp.ll、計 2 件) が出るが、判定は PASS。 原因は未調査 |
+| `sampler_e2e.sh` (受入条件 2、既存 T0/T1 の emcc 退行確認) | **exit 0・14:13.43 (853 s)**・load average 4.80 (5 分平均、run 中盤)。 `judge shells: PASS 7/7` (lift_rc / emcc_c_rc / f80 全 0)。 batch 7 本すべて `rc=0 emcc_c=0 f80=0`。 `ids_crosscheck: 7/7` |
 
-- 参照のみ (本 HEAD の実測ではない): 前 run #643 の記録では `sampler_engines.sh` が main f0d65f32 で exit 0・321 s・`judge engines: PASS 2/2`。 run id は未確認。 受入条件 1・2 は、本 HEAD で再測定できるまで「未再現 (前 run #643 の値のみ)」として扱う。
+- 注記: 上の数値は本 run の 1 回の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
+- 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と本 run の値は同じ判定結果 (PASS 2/2)。 本 run は main cb3a89a6 での再現である。
