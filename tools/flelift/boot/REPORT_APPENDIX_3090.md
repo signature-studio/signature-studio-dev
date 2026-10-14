@@ -1,7 +1,6 @@
 # tools/flelift/boot — REPORT 付録 (FLE-12 (#3090): 0x6a7b70 の呼出元と幅の源)
 
-> `REPORT.md` §0 の 1 行から参照する付録。親は #3060 → #2702。本節の数値は HEAD `eed02ee7` (main `f81c46bb` を取り込んだ後) で採取した。
-> 修正前は取り込み前の `origin/main` `4b81e78a` を同じ手順で採取した (最新の取り込み後の修正前は未測定)。`0307d592` の run のログは保存されていないため再採取した。
+> `REPORT.md` §0 の 1 行から参照する付録。親は #3060 → #2702。計数の対照は、HEAD `b5ac0f2f` と修正前 `origin/main` `8d8d0e6a` (HEAD が取り込んだ main) を同一セッションで採取した (§1-0)。秒・RSS の表は HEAD `eed02ee7` の run (`eed02ee7` から `b5ac0f2f` まで計測対象コードの差分 0)。
 
 ## 結論 (先出し)
 
@@ -19,10 +18,31 @@
 - **0x15F34A0 の書込み元 (受入 3)**: 未了。lift C の `0x15f34a0` の参照は `s2:94092` (`0x6542eb` の `lea rdx,[0x15f34a0]`、
   `f_653f40` の登録ループで `f_653dd0` に渡す引数) の 1 箇所。直接の store は無く、終了前に 0 へ戻す箇所は特定していない。
 
-## 1. 計測 (HEAD `eed02ee7` で採取・修正前は取り込み前の `origin/main` `4b81e78a` を同手順で採取。`bash tools/flelift/boot/fle6_measure.sh`、素材 `fl-win64` + `toolchain-emsdk`)
+## 1. 計測 (`bash tools/flelift/boot/fle6_measure.sh`、素材 `fl-win64`・emsdk は runner 既設の `/opt/emsdk`)
 
-- 採取の経緯: `0307d592` の run のログは保存されていない。`a409cd6f` で再採取した後、main を 2 回取り込んだ (`4b81e78a`・`f81c46bb`)。1 回目で `fle_boot.c`・`fle6_measure.sh`・`build.sh`・`fle_boot.mjs` が、2 回目で `x64c.py`・`rt/fle_cpu.h` が変わったため、取り込み後の HEAD で採取し直した。前版の秒数・RSS 表は出典を確認できないため置き換えた。
-- 取り込み前の修正前 (`4b81e78a`) との差は `fle_boot.c` の診断行 20 行追加のみ (`git diff --stat 4b81e78a HEAD -- <測定対象 7 件>` の結果)。
+### 1-0. 同一セッションの対照 (HEAD `b5ac0f2f`・修正前 `8d8d0e6a`)
+
+- 採取: 2 つの detached worktree で同じ `fle6_measure.sh` を 1 回ずつ実行 (`FL_WIN64_DIR` 同一・`FLE_RSS_CAP_MB=13800`)。`8d8d0e6a` を 23:10:51 に、`b5ac0f2f` を 23:15:45 に開始した。
+- 差分: `git diff --stat 8d8d0e6a b5ac0f2f -- <計測対象 7 件>` は `fle_boot.c` +20 行のみ (x64c.py・rt/fle_cpu.h・build.sh 等は同一)。修正前との差は診断行 (`[fill6a7b70]`) の追加だけ。main 側も `f81c46bb..8d8d0e6a` で計測対象の変更 0 件。
+- 全体: `8d8d0e6a` 4 分 32 秒、`b5ac0f2f` 4 分 27 秒。link はどちらも mismatch 0 / undefined 0 / duplicate 0 (`fleboot_plain.cjs` は `b5ac0f2f` 127,080,172 B、`8d8d0e6a` 127,079,402 B)。
+- rc 3 は shim 有 (`FLE_IPP=1`) と ipp2 (`FLE_IPP=2`) の IPP 判定 NG (`ptr_15F34A0=0x0`) のため。`fle6_measure.sh` の仕様どおり (ネガコンは OK)。
+
+| 測定 | commit | units | GetMem | FreeMem | IPP 判定 | `[fill6a7b70]` 行 |
+|---|---|---|---|---|---|---|
+| shim 有 (`FLE_IPP=1`) | `b5ac0f2f` (HEAD・診断あり) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) | 7 |
+| ネガコン (`FLE_IPP=0`) | `b5ac0f2f` (HEAD・診断あり) | 209 | 1,891 | 776 | OK | 7 |
+| ipp2 (`FLE_IPP=2`) | `b5ac0f2f` (HEAD・診断あり) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) | 7 |
+| shim 有 | `8d8d0e6a` (修正前・診断なし) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) | 0 |
+| ネガコン | `8d8d0e6a` (修正前・診断なし) | 209 | 1,891 | 776 | OK | 0 |
+| ipp2 | `8d8d0e6a` (修正前・診断なし) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) | 0 |
+
+- `[fill6a7b70]` の 7 行 = dispatch 行 6 件 + 初回の `[fill6a7b70-src]` 行 1 件 (3 run とも同じ)。
+- 基準 (`REPORT.md` §9-2 の shim 有 2,314 / 1,199、ネガコン 1,891 / 776。測定 commit `a741a0ca`) は、修正前 `8d8d0e6a` の計数と同値。
+- 診断行の追加は計数を変えない (同一セッションで HEAD と修正前が同値)。
+
+### 1-a. 工程の秒・RSS (HEAD `eed02ee7` の run)
+
+- 採取の経緯: `0307d592` の run のログは保存されていない。`a409cd6f` で再採取した後、main を `4b81e78a`・`f81c46bb`・`8d8d0e6a` の順に取り込んだ。計測対象コードの最後の変更は `f81c46bb` の取り込み (`eed02ee7`) で、その run の秒・RSS を下に示す。`8d8d0e6a` の取り込みは計測対象を変えない。前版の秒数・RSS 表は出典を確認できないため置き換えた。
 
 | 工程 | 結果 | 秒 | ピーク RSS | load (開始 → 終了) |
 |---|---|---|---|---|
@@ -34,21 +54,8 @@
 | boot ipp2 (`FLE_IPP=2`) | units 209・stopped 209・IPP 判定 NG (`ptr_15F34A0=0x0`) | 24 | - | 1.80 → 1.64 |
 
 - 全体 4 分 09 秒 (`fle6_measure.sh` のログ時刻 22:47:55 → 22:52:04)。`nproc` 4。
-- link: mismatch 0 / undefined 0 / duplicate 0 (`fleboot_plain.cjs` 127,080,085 B。修正前 `4b81e78a` は 127,079,315 B)。
-- 計数 (units・GetMem / FreeMem):
-
-| 測定 | commit | units | GetMem | FreeMem | IPP 判定 |
-|---|---|---|---|---|---|
-| shim 有 (`FLE_IPP=1`) | `eed02ee7` (HEAD・診断あり) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
-| ネガコン (`FLE_IPP=0`) | `eed02ee7` (HEAD・診断あり) | 209 | 1,891 | 776 | OK |
-| ipp2 (`FLE_IPP=2`) | `eed02ee7` (HEAD・診断あり) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
-| shim 有 | `4b81e78a` (取り込み前の修正前 = origin/main・診断なし) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
-| ネガコン | `4b81e78a` (取り込み前の修正前・診断なし) | 209 | 1,891 | 776 | OK |
-| ipp2 | `4b81e78a` (取り込み前の修正前・診断なし) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
-
-- 基準 (`REPORT.md` §9-2 の shim 有 2,314 / 1,199、ネガコン 1,891 / 776) は測定 commit `a741a0ca` (FLE-9) の値で、上表の修正前 `4b81e78a` と同値。merge 前の修正前 `a5fb0d2d` でも同値を再測定済み。
-- 診断 probe (`fle_boot.c` の診断行) は出力のみで、計数と boot の経路を変えない (上表で HEAD と取り込み前の修正前が同値)。最新の取り込み (`f81c46bb`) 後の修正前は未測定。
-- rc 3 は shim 有 (`FLE_IPP=1`) と ipp2 (`FLE_IPP=2`) の IPP 判定が NG (`ptr_15F34A0=0x0`) のため。`fle6_measure.sh` の仕様どおり (ネガコンは OK)。
+- link: mismatch 0 / undefined 0 / duplicate 0 (`fleboot_plain.cjs` 127,080,085 B)。`b5ac0f2f` の 127,080,172 B との差 87 B の原因は未確認。
+- 計数 (units・GetMem / FreeMem) は §1-0 と同値 (shim 有 209・2,314 / 1,199、ネガコン 209・1,891 / 776、ipp2 209・2,314 / 1,199)。
 - **KPI (前後)**: FLEngine 起動の unit 通過 209 → **209 (変化なし)**。最初のウィンドウ: 未到達 (unit 209 の後の `MessageBoxA` → `exit(0)` のまま)。
 
 ### 1-1. 0x6a7b70 への dispatch の実測 (`fle_boot.c` の `[fill6a7b70]` 行、shim 有・ネガコンで同一)
@@ -78,17 +85,16 @@
 ## 2. 検証 (同一性・負例)
 
 - lift の即値: PE の `VA 0x81571b`・`VA 0x81572c` のバイト列 (pefile で読み出し・`48 b8 00 00 00 00 00 00 30 41`) は `movabs rax, 0x4130000000000000` で、lift C と一致。
-- 診断の追加だけで、既存の計測値 (units 209・GetMem/FreeMem) は不変 (§1)。
+- 診断行 20 行の追加だけが修正前 `8d8d0e6a` からの差 (§1-0 の `git diff --stat`)。同一セッションの既存の計測値 (units 209・GetMem/FreeMem) は HEAD と修正前で同値 (§1-0)。
 - 負例: 未実施 (本件は再現と特定のみ。修復を入れていない)。
 
 ## 3. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 面 `f_6cefb0(2^20, 2^20, 1)` が native で作られるか・alloc 失敗時の扱い (buf=0) と、fill の 6 行で止まる源 | unit 209 の MessageBoxA 直前の 0 埋め。修復の方向が決まらない | 子 issue (`[FLE-13]`、`親: #3090`) |
+| 面 `f_6cefb0(2^20, 2^20, 1)` が native で作られるか・alloc 失敗時の扱い (buf=0) と、fill の 6 行で止まる源 | unit 209 の MessageBoxA 直前の 0 埋め。修復の方向が決まらない | 子 issue #3112 (`[FLE-13]`、`親: #3090`) |
 | 0x15F34A0 を終了前に 0 へ戻す書込み元 (受入 3 の残り) | #3060 受入 4 の残り | 本 issue #3090 (Refs のため open のまま) |
-| 最新の取り込み (`f81c46bb`) 後の修正前 (`origin/main`) の計数は未測定。main 側の `x64c.py` 変更の影響は未確認 | 診断 probe の「計数を変えない」の確認が取り込み前のみ | 本 issue #3090 (次回の fix で測定) |
-| `[rbp+0x184]` の即値 2^20 が native の意図どおりか (clip・面の寸法の正規化の有無) | W の正しい値が決まらない | 子 issue `[FLE-13]` |
-| SPI / GetSystemMetrics の stub 出力 (現在 0) が W に入るか。native 相当の値で W が変わるか | W = 2^20 の依存先が未確定 (stub 値を変えた実測は未取得) | 子 issue `[FLE-13]` |
+| `[rbp+0x184]` の即値 2^20 が native の意図どおりか (clip・面の寸法の正規化の有無) | W の正しい値が決まらない | 子 issue #3112 (`[FLE-13]`) |
+| SPI / GetSystemMetrics の stub 出力 (現在 0) が W に入るか。native 相当の値で W が変わるか | W = 2^20 の依存先が未確定 (stub 値を変えた実測は未取得) | 子 issue #3112 (`[FLE-13]`) |
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 と照合。命令の即値・変換は PE と一致し、lift 欠陥の根拠は確認できない)。
