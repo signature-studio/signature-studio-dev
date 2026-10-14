@@ -61,4 +61,13 @@ python3 audit_undefload_dest.py <fl-win64 extracted/block00031_PE.bin> out.json 
 
 ## 測定 commit から HEAD までの差分
 
-(本文末尾の `git diff` 出力を参照。REPORT のみ追加のため、コード差分は 0 である。)
+`git diff d7998dca HEAD -- tools/m11/ldfix` (測定後の追加は本 REPORT と結果 JSON のみ):
+
+```
+ tools/m11/ldfix/REPORT_2202.md                     | 64 +++
+ tools/m11/ldfix/results/audit_undefload_dest_2202.json | 190 +++
+ tools/m11/ldfix/results/audit_undefload_dest_2202_head.json | 190 +++
+```
+
+`git diff d7998dca HEAD -- tools/m11/ldfix/audit_undefload_dest.py` の出力は 0 行 (コード差分なし)。
+したがって測定 commit の数値はそのまま HEAD の数値である。
