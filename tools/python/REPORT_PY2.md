@@ -70,7 +70,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 - 旧記録 (f6352cd、main 取り込み前の HEAD): `static_check` STATIC CHECK OK (差 0/48 ×2)、SAB 48/48・37,425、`tool_coverage.json` を 37,425 に再生成 (`plugins.getParamValueString/4` を反映)。mock 側の `get_highlight_names` は当時 main 未取り込みのため差が出なかった。
 - 旧記録 (5a0b3c3、クリーン worktree): `pybind_extract --check` OK、SAB+provider `all_tools` 48/48・37,424、`static_check` 3 回とも STATIC CHECK OK、0.29 / 0.30 / 0.28 秒 (load 1.10)。main 取り込み前の値で、現 head では使わない。
 - 範囲: node (メインスレッド) での静的版 48 tool と対応表。入力 (MCPTools.pyc 100,674B / midi.py / utils.py / `block00031_PE.bin`) は `fl-win64` 素材から配置 (`fetch_inputs.sh` が `work/fl-stubs` を clone する)。
-- 範囲外: **実 FLEngine wasm へのリンクは未実施** (実 FLEngine は MS5 部分起動止まりで `fl_api_call` を持たない)。本節の「FLEngine 側」は `provider/fl_engine.c` の最小エンジン状態。headless Chrome・Worker 内での静的版・`run_all.sh` 全体は未実施。静的版でのサブインタプリタ・複数スレッド・Memory64 は未検証。
+- 範囲外: **実 FLEngine wasm へのリンクは未実施** (実 FLEngine は MS5 部分起動止まりで `fl_api_call` を持たない)。本節の「FLEngine 側」は `provider/fl_engine.c` の最小エンジン状態。headless Chrome・Worker 内での静的版は §7e で実施 (#2634)。`run_all.sh` 全体は未達 (子 #2649)。静的版でのサブインタプリタ・複数スレッド・Memory64 は未検証。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -79,3 +79,57 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | wasm でのサブインタプリタ (`Py_NewInterpreterFromConfig`) 動作 | FL がサブインタプリタ運用なら MIDI/piano roll の分離に影響 | #76 (PY-6、REPORT §9 の T6) |
 | pthread 版での複数スレッド + GIL | MIDI スレッド分離の可否 | #76 (PY-6、REPORT §9 の T6) |
 | `build_flpy.sh` が追跡中の `flapi_table.json` / `FLAPI.md` を書き換える (runner に win PE / mac dylib が無いため) | 本 PR では再生成物をコミットしていない | 既存 (§10 の未解決と同一。env 化は別 issue で提案済み) |
+
+## 7e. 静的版の Worker 内実行と headless Chrome 比較・run_all.sh 全体 (PY-81, #2634)
+
+既知類型との関係: 該当なし (lift / 逆アセの欠陥類型ではない。検証は JS 側の経路と wasm の結果比較)。
+
+**結論**: `flpy_static.wasm` を module Worker 内で動かし、headless Chrome 上で SAB 版 (flpy + provider) と 48 tool を比較した。tool 別の status・result・host_calls・api_calls は **差 0/48** で、48/48 ok。`run_all.sh` 全体は **rc=2 (前提チェックで停止)** のため rc=0 は未達。mac 素材を要する部分は子 #2649 (PY-83) に分離。
+
+測定 commit: **`77448069`** (コードを変えた最後の commit)。以降の commit は本節を含む文書のみ。`git diff 77448069 HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行 (差分 0)。
+
+### 構成 (検証の作り)
+
+- `tests/browser/static.html` (main thread): (a) SAB 版 = `createWasmEngine` (`dist/flprov.js`) + `FlPython` (`dist/flpy.js`、module Worker + SAB 同期 RPC) で 48 tool を実行し、tool 別の 4 キーを集計。(b) 静的版 = `tests/browser/static_worker.mjs` を module Worker として起動し、Worker 内で `dist/flpy_static.js` を読んで 48 tool を実行 (JS import・SAB・JSON 往復なし)。trace の数え方は `tests/static_check.mjs` と同じ (通し番号の差分)。
+- `tests/static_browser_check.mjs`: `serve.mjs` + headless Chrome (CDP) で上の page を開き、結果 `RESULT {...}` を読んで判定。`STATIC_WASM=<名前>` で比較対象の静的 wasm を差し替える (負例用)。
+- 合格条件: 48 件すべて status ok、tool 別 4 キーの差 0、`static_host_calls` = `sab_host_calls`、callback 往復 true、静的版が Worker 内で動いた (`static_in_worker`)。
+- `run_all.sh` に step `10b` として追加 (step 10 の直後)。
+
+### 実測 (HEAD `77448069`。load は各 run 直前の `/proc/loadavg` 1 分値、runner 4 core、node v22.23.3、Chrome 155.0.8059.39 headless、emsdk は `[EMSDK]` 6.0.12)
+
+| 検証 | コマンド | 結果 | 所要 | load |
+|---|---|---|---|---|
+| 静的版 Worker + headless Chrome (正例 1 回目) | `node tests/static_browser_check.mjs` | **PASS**。48/48 ok (SAB 48・静的 48)、差 0/48、host_calls 37,425 = 37,425、callback 往復 true、Worker 内 true。SAB init 155 ms・tools 1,000 ms、静的 init 92 ms・tools 50 ms | wall 2.23 s | 0.67 |
+| 同 (正例 2 回目) | 同上 | PASS (同値。SAB init 150〜196 ms の範囲) | wall 2.26 s | 0.67 |
+| 同 (正例 3 回目) | 同上 | PASS (同値) | wall 2.44 s | 0.94 |
+| 負例: `getTrackName` の戻り値だけ `"NEG"` にした `flpy_static_neg` | `STATIC_WASM=flpy_static_neg node tests/static_browser_check.mjs` | **FAIL (rc=1)**。差 4/48: `route_channels_to_mixer`・`get_mixer_tracks_volume`・`get_mixer_routing`・`set_mixer_routing` の **result のみ** (status は全件 ok のまま)。host_calls 37,422 | wall 2.29 s | 0.94 |
+| 静的版 node 検査 (既存、メインスレッド) | `node tests/static_check.mjs` | **PASS** (STATIC CHECK OK)。SAB+provider 0/48・mock 0/48、48/48 ok、host_calls 37,425、callback 往復 true | 0.30 s | 0.94 |
+| 同 負例 | `STATIC_WASM=flpy_static_neg node tests/static_check.mjs` | **FAIL (rc=1)**。FAIL 10 行 (mock 比較で 4/48 + host_calls 合計 37,422 != 37,425 ほか) | — | — |
+| provider 単体 | `node tests/provider_check.mjs` | **PASS** (`"PASS":true`、functions 435・implemented 70) | 0.26 s | — |
+| SAB+provider 48 tool (wasm 版) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.16 s | 1.51 (直後) |
+| 既存 headless Chrome (SAB・mock) | `node tests/browser_check.mjs` | **PASS** (BROWSER OK、tools 48) | 1.04 s | 1.51 (直後) |
+| PY-2 Py_* 束縛対応表 | `analysis/pybind_extract.py --check --expect 110` | **PASS** (PYBIND CHECK OK、names 110・lib 内 109・許容 1) | 0.09 s | — |
+
+ビルド (本 run。素材 `fl-win64` の win 経路のみ、`FLPY_SKIP_TABLE=1`): `build_cpython_wasm.sh` 3 分 46.7 秒 rc=0 (開始時 load 0.49)。`build_flpy.sh` + `provider/build.sh` + `build_flpy_static.sh` 合計 11.3 秒、いずれも rc=0。サイズは `flpy_static.wasm` 5,967,865B・`flpy.wasm` 5,924,680B (§7d の値とは再ビルドによる差。同一ソースでも数百 B 変わる)。
+
+### run_all.sh 全体 (未達・理由を記録)
+
+- `bash tools/python/run_all.sh` は **rc=2、0.008 秒** で、前提チェックで停止: `FLEngine_x64.dylib が無い` (mac pkg の `pkg_extract/payload_out/.../Contents/Libs/`)。`analysis-mac-shared` は `docs/WORKFLOW.md` §11 の記述では `Shared/` の dylib 群 (25 本) だけで、この実行ファイルを含まない。
+- mac pkg を要する step は、前提チェックのほかに step 3b (`scripts_inventory.py`) と step 4 (`flapi_extract.py` の mac 版) (`run_all.sh` 内の注記どおり)。`build_flpy.sh` は表の再生成 (`flapi_table.py`) の入力を要するため、今回は `FLPY_SKIP_TABLE=1` で追跡済みの表を使った (mac 無しでの再生成の可否は未検証)。
+- step 5 以降 (win 素材だけで走る部分) は本節では個別に実行したもの (9b・9c・10・10b) だけで、残りは未検証。全体の再実行は子 #2649 (PY-83) で行う。
+
+### 観測 (未解決に残す点)
+
+- 本節の検証ページの**初版**で、1 回だけ `PENDING` のまま 180 秒止まった (段階表示が無く、SAB 段階か静的段階かは切り分けられなかった)。以後、最終版の正例を 9 回 (上表の 3 回 + 0849bd5c 時の 3 回 + 77448069 時の 3 回) 実行し、いずれも PASS。原因は特定していない。
+- `FlPython.create` の既定経路 (Worker の自動生成) と、呼び出し側が Worker を渡す経路の両方で、provider 版エンジン併用時に PASS を確認した (後者は最終版では使っていない)。
+
+### 検証範囲 / 範囲外
+
+- 範囲: Linux・headless Chrome 155 (`--no-sandbox`)・48 tool (`tests/tool_args.mjs` の引数表)・基準は同じ `flprov.wasm` を使う SAB+provider 版。
+- 範囲外: 実 FLEngine wasm への接続、MIDI スレッド・pthread・サブインタプリタ (静的版)、Memory64、他ブラウザ (Firefox・Safari) は未検証。`run_all.sh` の win 素材だけでの全体実行は未検証 (#2649)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `run_all.sh` 全体 rc=0 (前提チェックで rc=2。mac の `FLEngine_x64.dylib` が素材に無い。step 3b・4 も mac 依存。step 5〜15 は win のみで未検証) | run_all 全体の合格は未主張 | #2649 (PY-83) |
+| 初版ページの 180 秒 `PENDING` 1 回 (原因未特定、再現せず) | 検証の再現性に一抹の不確かさ | #2634 (本 PR で追跡。再発したら本節に追記) |
+| 静的版の実 FLEngine 連携・サブインタプリタ・pthread・Memory64 | §7d の未解決と同じ | #35・#76 (既存) |
