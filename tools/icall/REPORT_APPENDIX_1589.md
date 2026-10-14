@@ -58,7 +58,7 @@
 ### 4. 測定 commit と差分
 
 - 測定 commit: `6e7294c6` (§1・§3 を実行。§2 は前 run 記録のまま)。
-- 鮮度の証跡 (実行済み。HEAD = `cf9ab518` 時点の出力):
+- 鮮度の証跡 (実行済み。HEAD = `0fb02b0a` 時点の出力):
   - `git diff 6e7294c6 HEAD -- tools/icall` の `--stat`: `REPORT_APPENDIX_1589.md` 1 file のみ (文言の差分。実行コード 0)。
   - `git diff 69598b07 HEAD -- tools/icall/audit_icall.py tools/icall/roundtrip.sh tools/icall/icall_rewrite.py` の出力: 空 (§3 の監査コードは測定時から無変更)。
   - `git diff 4efa6820 HEAD -- tools/icall` の全差分は `REPORT_APPENDIX_1589.md`・`scan_jmpmem.py` (新規) のみ。
