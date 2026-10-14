@@ -44,6 +44,9 @@ export interface PrState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // merge の時刻と、本文が Refs #N のみ (Closes/Fixes なし) か。merge 済みの PR だけが持つ (本文そのものは持たない)。
+  mergedAt?: string;
+  refsOnly?: boolean;
 }
 // issue / PR ごとの終端状態の手がかり (oc-pm の検出に使う)。値は時刻・列挙値・真偽だけで、本文は持たない。
 export interface Signal {
@@ -151,6 +154,8 @@ export function setSig(s: PmState, k: string, patch: Partial<Signal>): PmState {
 }
 
 export const isBotUser = (u: Json | undefined | null): boolean => u?.type === "Bot" || /\[bot\]$/.test(u?.login ?? "");
+// 人として信じる author_association (起票者・コメント者の絞り込み。pm.ts の authorAllowed と userAt の両方で使う)。
+export const ASSOC_OK = ["MEMBER", "OWNER", "COLLABORATOR"];
 
 function applyIssue(s: PmState, p: Json): PmState {
   const i = p.issue;
@@ -281,7 +286,8 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
   if (rel && (!cur?.relaunch || (impl && !cur.relaunch.bot) || (impl === cur.relaunch.bot && notOlder(cur.relaunch, c)))) {
     patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: impl, ...rel };
   }
-  if (login && !isBotUser(c.user) && later(cur?.userAt)) patch.userAt = at;
+  // 人の回答は、非 bot かつ MEMBER / OWNER / COLLABORATOR のコメントだけ (第三者のコメントで PM を起こさない)。
+  if (login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association) && later(cur?.userAt)) patch.userAt = at;
   return setSig(s, k, patch);
 }
 
@@ -323,15 +329,23 @@ function applyDependencies(s: PmState, p: Json): PmState {
   return { ...s, blockedBy, issues };
 }
 
+// 本文が『Refs #N のみ』か (issue を閉じない merge の判定)。Closes / Fixes / Resolves の語が 1 つでもあれば false。大文字小文字は区別しない。
+const REFS_RE = /\bRefs:?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
+const CLOSE_RE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
+export function refsOnlyBody(body: string): boolean {
+  return REFS_RE.test(body) && !CLOSE_RE.test(body);
+}
+
 function applyPr(s: PmState, p: Json): PmState {
   const pr = p.pull_request;
   if (!pr) return s;
   const k = String(pr.number);
   if (!newer(s.prs[k], pr.updated_at)) return s;
+  const merged = !!pr.merged_at;
   const next: PrState = {
     number: pr.number,
     state: pr.state === "closed" ? "closed" : "open",
-    merged: !!pr.merged_at,
+    merged,
     draft: !!pr.draft,
     ref: pr.head?.ref ?? "",
     title: pr.title ?? "",
@@ -341,6 +355,8 @@ function applyPr(s: PmState, p: Json): PmState {
     author: pr.user?.login ?? s.prs[k]?.author,
     authorType: pr.user?.type ?? s.prs[k]?.authorType,
     assoc: pr.author_association ?? s.prs[k]?.assoc,
+    // 切り詰める前の完全な本文から真偽だけを取る (本文は保存しない)。
+    ...(merged ? { mergedAt: String(pr.merged_at), refsOnly: refsOnlyBody(pr.body ?? "") } : {}),
   };
   return { ...s, prs: { ...s.prs, [k]: next } };
 }

@@ -143,7 +143,7 @@ registry.json                      modules[]  = 実体 (wasm バイナリ + inst
  plugin : { path/alias:["OTT_x64.dll"], module:"…", exports:{ "VSTPluginMain":"VSTPluginMain", "main":"VSTPluginMain" }, name,vendor,uniqueId,format,arch,ui }
 ```
 - 解決: パスを `\`→`/`・basename・小文字化して alias 表を引く → 失敗は NULL + `ERROR_MOD_NOT_FOUND(126)`。`ps_file_magic/guid` (DB 側) でも引ける (パスが仮想化されるため)。
-- `LoadLibraryW` → module の refcount++ (初回のみ instance 生成 + `DllMain(PROCESS_ATTACH)` 相当の `hb_plugin_init`)。HMODULE は合成値 (`0x7ff6a0010000+n*0x10000`)。
+- `LoadLibraryW` → module の refcount++ (初回のみ instance 生成 + `DllMain(PROCESS_ATTACH)` 相当の `hb_plugin_init`)。HMODULE は合成値 (`0x7ff6a0010000+n*0x10000`、n は LoadLibraryW ごとの単調増加。解放後も再利用しない (#2520))。
   `FreeLibrary` → refcount-- → 0 で instance 破棄 (= ネイティブ DLL の statics 寿命と一致)。`GetModuleHandle/GetModuleFileName` は仮想パスを返す。
 - `GetProcAddress(h,name)` → **合成関数ポインタ (thunk slot VA, `0x7ff700000000+16*n`)**。FL/Wrapper (lift 済 x64) の間接呼出はこの VA を `icall(fn,a0..a5)` に落とす 1 点 (lift 側は `VA<THUNK_BASE` なら自モジュール関数表、以上なら bridge)。
 - **仮想 FS の PE スタブ (R6)**: `ModuleTable` は plugin ごとに最小 PE (約 1 KB: MZ→PE→optional header→`.edata`) を生成して仮想 FS の plugin パスに置く。`export` 名検査・bitness 判定・`GetFileSize/ps_file_size/date` は stub に対して正しく動く。
