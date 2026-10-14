@@ -50,7 +50,7 @@ Ghidra ログ: `DumpFunctions: 59009 functions`、image base `00400000`。
 最終 HEAD `dfbc2948` (測定後の既定分岐削除を含む) でも同じ経路を実行: **rc 0・67 秒**・load `0.10 0.58 0.72` → `0.90 0.74 0.77`・survey ok 872 / trap 23 / miss 46 / noproc 1 (同じ)。
 
 ## 7. コード差分 (測定 commit → HEAD)
-- 測定 commit `de8a34d5` の後のコード変更は `tools/m11/m11_ghidra_dll.sh` の 1 commit (`dfbc2948`) のみ。内容は注記 1 行と、既定 Ghidra パス `/opt/ghidra` の分岐の削除 (本 runner では `/opt/ghidra` が無く当該分岐は §3 の run で実行されていない。挙動は変えていない)。
+- 測定 commit `de8a34d5` の後のコード変更は `tools/m11/m11_ghidra_dll.sh` の 1 commit (`dfbc2948`) のみ。内容は注記 1 行と、既定 Ghidra 位置 ([GHIDRA] の既定 install 先) の分岐の削除 (本 runner ではその位置に Ghidra が無く当該分岐は §3 の run で実行されていない。挙動は変えていない)。
 - 残りは本 REPORT・`docs/DOC_MAP.md` の索引行・`docs/WORKFLOW.md` の 1 文 (コード不変)。
 - `git diff --stat de8a34d5 HEAD -- tools/m11` の実出力は PR 本文と issue コメントに添付する (本ファイル自身の行数を含むため、本文中には書けない)。
 
