@@ -155,7 +155,7 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 |---|---|
 | 測定 commit | `26f90ada` (origin/main・測定時の HEAD)。配線の最後のコード変更は `f8bd2ea0` (PR #2162) |
 | 素材 | `analysis-ott-binaries` → `$ANALYSIS_DIR/plugins/ott/binaries/`、`work-m6-ott`・`work-liftlib`・`work-icall` → 各 `tools/*/work/`。`OTT_DLL=$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll bash tools/liftlib/gen_ott_getparam_F.sh` で F.txt (`0x18011e5a0-0x18011e76c`、460 bytes) |
-| toolchain | runner 既存の [EMSDK] (`/opt/emsdk` の `emsdk_env.sh` を source)・[RETDEC] (`/opt/retdec/bin`)。素材 `toolchain-emsdk`・`toolchain-retdec` は取得・展開していない (oc_artifacts に含めない) |
+| toolchain | runner 既存の [EMSDK] (`emsdk_env.sh` を source)・[RETDEC] (`docs/REFERENCES.md` §4 の環境変数で解決)。素材 `toolchain-emsdk`・`toolchain-retdec` は取得・展開していない (oc_artifacts に含めない) |
 | 負荷 | 測定時の load average 0.2〜0.8 (4 コア) |
 
 ### 受入条件の判定
