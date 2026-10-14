@@ -68,7 +68,7 @@
 
 ## 6. 親の機械語と IR の突合 (`function_448490`)
 
-- 親の prologue (機械語): `push rbp; push rsi; push rbx; sub rsp, 0x50; mov rbp, rsp` → `rbp = entry_rsp − 104`。IR の `stack_var_-N` は entry_rsp 基準の名前なので、`rbp+K` は IR 名 `-104+K`。
+- 親の prologue (機械語): `push rbp; push rsi; push rbx; sub rsp, 0x50; mov rbp, rsp` → `rbp = entry_rsp − 104`。IR の `stack_var_-N` は entry_rsp 基準の名前と**推定**する (`%stack_var_-104` を rbp の object とみると、callee の +0x48・+0x4c が IR の `-32`・`-28` に一致するため。推定。確認は未実施)。この前提では `rbp+K` は IR 名 `-104+K`。
   - `[rbp+0x48]` = `-32`・`[rbp+0x4c]` = `-28`・`[rbp+0x70]` = `+8` (entry の rcx home slot)。
   - IR の `%stack_var_-104` は `alloca [6 x i64]` (48 B、`-104`〜`-56`)。callee が触る `+0x70` まで含めると 120 B 必要で、alloca が足りない。
 - 機械語の対応 (親):
