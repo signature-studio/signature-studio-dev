@@ -65,6 +65,8 @@ export interface DetectOpts {
   bots: string[];
   // Worker が oc:no-pr の issue を再投入した回数 (relaunch バケットの np:<n>)
   npCount: (n: number) => number;
+  // 新しい素材の無い artifact で、unknown の枠 (再投入 1 回) を使い切ったか (#3185。engine が数える。無ければ偽)
+  artSpent?: (n: number) => boolean;
 }
 
 const t = (s: string | undefined): number => (s ? Date.parse(s) : NaN);
@@ -92,8 +94,10 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
     const oc = sig.outcome;
     if (i.labels.includes(NO_PR_LABEL) && !i.labels.some((l) => HOLD_LABELS.includes(l)) && oc && !answeredAfter(sig.pmAt, oc.at)) {
       // split / stop は即。unknown は、Worker が再投入した後の run (outcome が最新の launch より後) でも終わった場合だけ。
+      // artifact は、新しい素材が無く unknown の枠で再投入した後の run でも終わった場合だけ (新しい素材がある分は Worker が足して 1 回再投入する)。
       const relaunched = o.npCount(i.number) >= 1 && t(oc.at) > t(s.launchedAt[k]);
-      if (oc.reason === "split" || oc.reason === "stop" || (oc.reason === "unknown" && relaunched)) {
+      const artDone = oc.reason === "artifact" && !!o.artSpent?.(i.number);
+      if (oc.reason === "split" || oc.reason === "stop" || (relaunched && (oc.reason === "unknown" || artDone))) {
         out.push({ kind: "no_pr", ref: i.number, at: oc.at });
       }
     }

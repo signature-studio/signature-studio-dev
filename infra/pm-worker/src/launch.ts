@@ -102,6 +102,7 @@ const BODY_LINES = [
   "/oc oc_actions_allow_write",
   "{art}",
   "PM が着手を依頼します (1 issue = 1 run)。この issue は、ブロックしている open な issue が無く、未着手です。",
+  "{recheck}",
   "{focus}",
   "1. issue 本文と該当 REPORT・過去コメントを読み、**未達の受入条件を特定**してください。",
   "   - 全て達成済みなら、根拠 (PR・commit・実測) をコメントして issue を close してください。",
@@ -111,12 +112,20 @@ const BODY_LINES = [
   "3. 素材が足りない場合は、必要な `oc_artifacts` 名を報告して停止してください。他の issue に依存することが分かった場合も、その issue 番号を報告して停止してください (PM が blocked_by を設定します)。",
 ];
 
+// 新しい素材の無い artifact の再投入 (#3185) だけに足す。前回の停止の理由が素材不足でない可能性がある。
+const RECHECK_LINE = "前回の停止の理由を再確認し、素材が足りない以外の理由 (分割要・依存・判断待ち) なら、その種類の手順に従ってください。";
 // 固定テンプレート。可変なのは素材行と focus (受入条件の番号 1〜9) だけで、allowlist を通ったものと数字しか入らない。
-export function buildLaunchBody(artLine: string, focus?: number): string {
+export function buildLaunchBody(artLine: string, focus?: number, recheck = false): string {
   if (!validateArtLine(artLine)) throw new Error(`invalid artifacts line: ${artLine}`);
   if (focus !== undefined && !(Number.isInteger(focus) && focus >= 1 && focus <= 9)) throw new Error(`invalid focus: ${focus}`);
   const focusLine = `この issue の受入条件 ${focus} だけを実装して PR を出してください。他の条件は子 issue にしてください。`;
-  return BODY_LINES.flatMap((l) => (l === "{focus}" ? (focus === undefined ? [] : [focusLine]) : [l === "{art}" ? artLine : l])).join("\n") + "\n";
+  return (
+    BODY_LINES.flatMap((l) => {
+      if (l === "{focus}") return focus === undefined ? [] : [focusLine];
+      if (l === "{recheck}") return recheck ? [RECHECK_LINE] : [];
+      return [l === "{art}" ? artLine : l];
+    }).join("\n") + "\n"
+  );
 }
 
 // PM の再投入の意図 (<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->) を、Worker が /oc として投稿してよいか。
