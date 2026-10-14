@@ -188,8 +188,9 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 
 - 測定 commit: `264893e2`。`git diff --stat 3a76c8cb 264893e2 -- scripts/rtti_walk.py scripts/callgraph.py scripts/vtable_closure.py scripts/extract_installer.sh gain_before_160.tsv` は空 (測定パイプラインと TSV は `3a76c8cb` 以降不変)。
   `3a76c8cb` からの追加は検査 2 本のみ: `scripts/verify_gain_tsv.py` (c38d37a4) と `scripts/gain_tsv_negctl.py` (264893e2)。
-- `git diff 264893e2 HEAD -- tools/targets/kilohearts/scripts` の出力は**空 (0 行)**。測定 commit から本節を書いた commit までの変更は `REPORT_KH19.md` のみ。
-  scripts 以下の実行コードは測定 commit から変えていないため、再測定は不要 (差分 0 の範囲)。
+- `git diff 264893e2 HEAD -- tools/targets/kilohearts/scripts` の出力は**空 (0 行)**。scripts 以下の実行コードは測定 commit から変えていないため、再測定は不要 (差分 0 の範囲)。
+- `git diff --stat 264893e2 HEAD -- tools/targets/kilohearts` の出力 (検証 HEAD 時点):
+  `REPORT_KH19.md` (+29/-1) と `license/KH656_REPORT.md` (+18)。後者は main 取り込み merge (`cba3379d` 以降) による main 側の変更で、測定対象 (scripts / TSV / 素材の展開手順) の外。
 - 検証起点 (測定を実行した HEAD) = 測定 commit `264893e2`。検証 HEAD (PR の最終 commit) とは区別する。
 
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
