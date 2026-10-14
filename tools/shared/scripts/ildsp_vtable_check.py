@@ -3,29 +3,34 @@
 
 usage: ildsp_vtable_check.py <vtable.json> [PE]
   既定 PE: $FL_WIN64_DIR/extracted/block24360_PE.bin (tools/shared/paths.py)
-検算の方法:
-  - ildsp_vtable.py の JSON から、export ごとの到達関数 (function_rvas) の一覧を読む。
-  - 各関数の範囲 [b, end) は ildsp_vtable.py と同じ定義 (.pdata の終端。無ければ次の .pdata 先頭) を使う。
-  - 範囲ごとに `objdump -d -M intel --start-address --stop-address` で逆アセンブルし、命令数・SIMD
-    (xmm/ymm/zmm を含む)・間接 call (`call` の即値でない形) を数える。`(bad)` と `.byte` 行は数えない
-    (capstone は復号できないバイトを 1 byte 飛ばして数えないため、そろえる)。
-  - export ごとの和集合の命令数・間接 call 数・SIMD 比を、ildsp_vtable.py の値と照合する。
-    命令数の差は KNOWN_DATA_IN_CODE に列挙した既知の 1 件 (データ埋め込み) のみ許す。
+検算の範囲と限界:
+  - 検算するのは命令の復号だけ。関数集合 (JSON の function_rvas) は ildsp_vtable.py と共有する。
+    closure の辿り方 (.pdata の無い直接 call/jmp 先の扱いを含む) は検算しないので、取りこぼしは検出できない。
+  - 関数範囲は ildsp_vtable.py と同じ定義 (.pdata の終端。無ければ次の .pdata 先頭か .text 末尾)。
+  - 各範囲を `objdump -d -M intel --start-address --stop-address` で逆アセンブルし、命令開始アドレス (RVA) の
+    集合を capstone (ildsp_survey.sweep) の集合と比べる。
+  - 命令ごとに SIMD (xmm/ymm/zmm を含む) と間接 call (`call` の即値でない形) の判定も比べる。
+    `(bad)` 行と `.byte` 行は命令として数えない。
+  - 集合の差は KNOWN_DATA_IN_CODE の RVA と完全一致する場合のみ許す。それ以外の差は非 0 で終了する。
+  - JSON の命令数・SIMD 比・間接 call 数は、上の capstone 集合から再計算した値と一致しなければならない。
 不一致が 1 件でもあれば非 0 で終了する。"""
 import sys, os, re, json, struct, subprocess, argparse, bisect
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, ".."))
 from paths import FL_WIN64_DIR
-import pefile
+import pefile, capstone
+import ildsp_survey as S
 
 LINE_RE = re.compile(r"^\s*([0-9a-f]+):\t(.*)$")
 DIRECT_CALL_RE = re.compile(r"^call\s+0x[0-9a-f]+$")
 SIMD_RE = re.compile(r"\b(xmm|ymm|zmm)\d")
-# 既知差分: 関数内に埋め込まれたデータ (switch のジャンプテーブル = 4 byte RVA の並び) を capstone が命令として
-# 数える分。TransientLooper の 0x190fa0 (範囲 0x190fa0-0x191c80) では 0x191c20 付近の表を capstone が
-# `int 0x10` 等として 1 命令数え、objdump は数えない。これ以外の差分は許さない。
-KNOWN_DATA_IN_CODE = {"TransientLooper_CreateInstance": 1}
+# 既知差分 (RVA): 命令開始アドレスが capstone 側だけに現れる箇所。
+# TransientLooper の関数 0x190fa0 (範囲 0x190fa0-0x191c80) 内の 0x191c20 付近には switch 用の 4 byte RVA 表が埋まる。
+# 0x191c1f の `add ch,cl` (00 cd) は両者で同じ位置から復号される。0x191c28 の `c5 11 19` は不正な VEX 接頭辞で、
+# capstone は 1 byte 飛ばして 0x191c29 から `adc dword ptr [rcx], ebx` を 1 件数える。objdump は 0x191c28 を
+# `(bad)` として 3 byte を 1 行で消費し、0x191c29 を命令として出さない。
+KNOWN_DATA_IN_CODE = {"TransientLooper_CreateInstance": {0x191c29}}
 
 
 def main():
@@ -46,6 +51,7 @@ def main():
         b, e, _ = struct.unpack_from("<III", image, exc.VirtualAddress + i * 12)
         funcs[b] = e
     fn_sorted = sorted(funcs)
+    md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 
     def end_of(b):
         if b in funcs:
@@ -53,50 +59,64 @@ def main():
         i = bisect.bisect_right(fn_sorted, b)
         return fn_sorted[i] if i < len(fn_sorted) else t_hi
 
-    cache = {}
+    cap_cache, obj_cache = {}, {}
+
+    def capstone_range(b):
+        # RVA -> (simd, indirect call)
+        if b not in cap_cache:
+            cap_cache[b] = {addr: (S.classify(m, ops) == "simd", m.startswith("call") and not S.is_direct(ops))
+                            for addr, m, ops in S.sweep(md, bytes(image[b:end_of(b)]), b)}
+        return cap_cache[b]
 
     def objdump_range(b):
-        if b in cache:
-            return cache[b]
-        e = end_of(b)
-        out = subprocess.run(["objdump", "-d", "-M", "intel", "--no-show-raw-insn",
-                              f"--start-address=0x{ib + b:x}", f"--stop-address=0x{ib + e:x}", a.pe],
-                             capture_output=True, text=True, check=True, timeout=120).stdout
-        n = simd = ic = 0
-        for line in out.splitlines():
-            m = LINE_RE.match(line)
-            if not m:
-                continue
-            body = m.group(2).strip()
-            if not body or body.startswith("(bad)") or body.startswith(".byte"):
-                continue
-            n += 1
-            if SIMD_RE.search(body):
-                simd += 1
-            if body.startswith("call") and not DIRECT_CALL_RE.match(body):
-                ic += 1
-        cache[b] = (n, simd, ic)
-        return cache[b]
+        # RVA -> (simd, indirect call)
+        if b not in obj_cache:
+            e = end_of(b)
+            out = subprocess.run(["objdump", "-d", "-M", "intel", "--no-show-raw-insn",
+                                  f"--start-address=0x{ib + b:x}", f"--stop-address=0x{ib + e:x}", a.pe],
+                                 capture_output=True, text=True, check=True, timeout=120).stdout
+            insns = {}
+            for line in out.splitlines():
+                m = LINE_RE.match(line)
+                if not m:
+                    continue
+                body = m.group(2).strip()
+                if not body or body.startswith("(bad)") or body.startswith(".byte"):
+                    continue
+                insns[int(m.group(1), 16) - ib] = (bool(SIMD_RE.search(body)),
+                                                  body.startswith("call") and not DIRECT_CALL_RE.match(body))
+            obj_cache[b] = insns
+        return obj_cache[b]
 
     ok = True
     for row in res["exports"]:
         v = row["vtable"]
         if v is None:
             continue
-        n_tot = s_tot = i_tot = 0
+        cap, obj = {}, {}
         for fh in v["function_rvas"]:
-            n, s, c = objdump_range(int(fh, 16))
-            n_tot += n
-            s_tot += s
-            i_tot += c
-        simd_ratio = round(s_tot / max(n_tot, 1), 4)
-        delta = v["instructions"] - n_tot
-        match = (delta == KNOWN_DATA_IN_CODE.get(row["export"], 0) and i_tot == v["indirect_calls"]
-                 and simd_ratio == v["simd_ratio"])
+            b = int(fh, 16)
+            for addr, f in capstone_range(b).items():
+                cap.setdefault(addr, f)
+            for addr, f in objdump_range(b).items():
+                obj.setdefault(addr, f)
+        only_cap = set(cap) - set(obj)
+        only_obj = set(obj) - set(cap)
+        known = KNOWN_DATA_IN_CODE.get(row["export"], set())
+        flags_ok = all(cap[x] == obj[x] for x in set(cap) & set(obj))
+        n_cap = len(cap)
+        simd_cap = sum(1 for s, _ in cap.values() if s)
+        ind_cap = sum(1 for _, c in cap.values() if c)
+        simd_ratio = round(simd_cap / max(n_cap, 1), 4)
+        ind_obj = sum(1 for _, c in obj.values() if c)
+        match = (only_cap == known and not only_obj and flags_ok and n_cap == v["instructions"]
+                 and ind_cap == v["indirect_calls"] and simd_ratio == v["simd_ratio"])
         ok &= match
-        print(f"[check] {row['export']}: insns capstone={v['instructions']} objdump={n_tot} delta={delta} | "
-              f"indirect capstone={v['indirect_calls']} objdump={i_tot} | "
-              f"simd capstone={v['simd_ratio']} objdump={simd_ratio} -> {'OK' if match else 'MISMATCH'}")
+        fmt = lambda s: "{" + ",".join(hex(x) for x in sorted(s)) + "}" if s else "{}"
+        print(f"[check] {row['export']}: insns json={v['instructions']} capstone={n_cap} objdump={len(obj)} | "
+              f"only_capstone={fmt(only_cap)} only_objdump={fmt(only_obj)} flags={'same' if flags_ok else 'DIFF'} | "
+              f"indirect capstone={ind_cap} objdump={ind_obj} | simd capstone={simd_ratio} json={v['simd_ratio']} "
+              f"-> {'OK' if match else 'MISMATCH'}")
     print("[check] ALL OK" if ok else "[check] MISMATCH")
     sys.exit(0 if ok else 1)
 

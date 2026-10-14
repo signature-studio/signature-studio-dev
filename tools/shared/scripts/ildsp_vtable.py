@@ -10,9 +10,12 @@ usage: ildsp_vtable.py [PE] [--out <json>]
      最初の箇所を探し、X を vtable の RVA とする (wrapper object の vtable)。
   2. vtable の先頭から、.text 内を指すポインタを slot として数える (最初に .text 外を指す所で打ち切り)。
   3. slot の先が thunk (`mov rcx, [rcx+8]` から始まり、直接 `jmp` で終わる 4 命令以下) なら、jmp 先を実体とする。
-  4. 実体から直接 call / 直接 tail jmp を辿った到達集合 (ildsp_survey.py と同じ closure 定義) を、slot の和集合で数える。
-     間接 call は辿らず件数のみ。
-  5. 集計は CreateInstance の closure と slot 先 closure の和集合。比較用に CreateInstance 単体の closure も出す。
+  4. 実体から直接 call / 直接 tail jmp を辿った到達集合を、slot の和集合で数える。
+     間接 call は辿らず件数のみ。直接先が .pdata に無い場合 (leaf 関数など) は、その先頭を関数とし、
+     次の .pdata 先頭までを範囲とする近似で辿る (ildsp_survey.py の closure は .pdata の無い先を捨てるため、
+     その数値は下限になる)。同一関数の範囲内の jmp (内部分岐) は関数として数えない。
+  5. 命令数・SIMD 比・間接 call 数は到達関数の命令開始アドレスの和集合で数える (重なる範囲の二重計上を避ける)。
+     集計は CreateInstance の closure と slot 先 closure の和集合。比較用に CreateInstance 単体の closure も出す。
 """
 import sys, os, re, json, argparse, struct, bisect
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -120,30 +123,29 @@ def main():
                 continue
             seen.add(f)
             for addr, m, ops in func_insns(f):
-                if m.startswith("call"):
-                    if S.is_direct(ops):
-                        g = owner(int(ops, 16))
-                        if g is not None:
-                            stack.append(g)
-                elif m == "jmp" and S.is_direct(ops):
-                    g = owner(int(ops, 16))
-                    if g is not None and g != f:
-                        stack.append(g)
+                if (m.startswith("call") or m == "jmp") and S.is_direct(ops):
+                    t = int(ops, 16)
+                    if t_lo <= t < t_hi and (m.startswith("call") or not (f <= t < end_of(f))):
+                        stack.append(owner(t) or t)
         return seen
 
     def stats(seen):
-        ins_n = simd = dc = ic = 0
+        insns = {}
         for f in seen:
             for addr, m, ops in func_insns(f):
-                ins_n += 1
-                if S.classify(m, ops) == "simd":
-                    simd += 1
-                if m.startswith("call"):
-                    if S.is_direct(ops):
-                        dc += 1
-                    else:
-                        ic += 1
-        return {"functions": len(seen), "instructions": ins_n,
+                insns.setdefault(addr, (m, ops))
+        simd = dc = ic = 0
+        for m, ops in insns.values():
+            if S.classify(m, ops) == "simd":
+                simd += 1
+            if m.startswith("call"):
+                if S.is_direct(ops):
+                    dc += 1
+                else:
+                    ic += 1
+        ins_n = len(insns)
+        return {"functions": len(seen), "nonpdata_functions": sum(1 for f in seen if f not in funcs),
+                "instructions": ins_n,
                 "simd_ratio": round(simd / max(ins_n, 1), 4),
                 "direct_calls": dc, "indirect_calls": ic,
                 "indirect_ratio": round(ic / max(dc + ic, 1), 4)}
