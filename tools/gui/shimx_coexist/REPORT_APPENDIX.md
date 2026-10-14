@@ -77,3 +77,42 @@
 - FLEngine 側の IR に `GetOpenFileNameW` 等の宣言が無いのは、`jmp` thunk 経由の呼出が lift で解決されていないことを示す (`REPORT_N1050.md` / `REPORT.md` §1 の間接 call 脱落と同根)。
 - 呼出の**実行時の有無**は依然として未確定。closure 外の関数で、unit 17 の trap (#1050) より後に到達するため、実 boot の trace では判定できない。
 - 受入条件 1 は**未達のまま**。方針決定 (受入条件 2) と gui mock 検査 (受入条件 3) も未着手。
+
+## 7. 明示 fail-fast の追加と再測定 (run 2026-10-14、SHX-T22)
+
+測定 commit: `bc6b8a32` (コードを変えた最後の commit。基点 `26f90ada` = origin/main)。素材 `work-m11` を展開 (snapshot IR)。`bash tools/m11/shimx_link/build.sh --trace --soft` は `signature mismatch=1` (#1628 残件) で rc=0。
+
+| 項目 | 基点 `26f90ada` | 測定 `bc6b8a32` |
+|---|---|---|
+| 逐次 boot (`run_trace.mjs`) | `units_run=17` `threw="memory access out of bounds"` `total_calls=97` | 同左 |
+| unit 隔離 survey (942 unit、`survey_trace.mjs`) | ok 789・oob 95・closure_outside 47・halt0 9・clobber 1・noproc 1・`api_units` 69・abort 0 (2 分 43 秒) | 同左 (abort 0) |
+| survey の `GetProcAddress miss` (`SHIMX_TRACE=1`) | 名前付きの miss は `dwmapi`・`user32`・`comctl32` 等。`SHBrowseForFolder` は 0 件。`shell32.dll!` の miss は 1 件 (unit 137・名前は空で同定できず) | 同左 |
+| `SHBrowseForFolderW/A`・`GetOpenFileNameW`・`GetSaveFileNameW`・`CoCreateInstance` の呼出 (survey) | 0 件 (abort 以外の unit は trap 前の呼出を計数) | 同左 |
+| IR (`boot_final3.ll`) の宣言 | `SHBrowseForFolder*`・`GetOpenFileNameW` 0 件。`CoCreateInstance` 宣言 1・呼出 2 | 同じ IR のため同左 |
+
+### 7-1. 判定
+
+- 受入条件 1 (実呼出の確認): **未達**。逐次 boot は unit 17 で止まる (`dllmain_done=false`)。unit 隔離の survey では、FL の init unit (942) のどれも、trap 前にフォルダ選択・ファイル選択・`CoCreateInstance` を呼ばない。ただし UI 操作 (メッセージ処理後の呼出) は init unit の外で、この測定では観測していない。
+- 受入条件 2 (未対応の明示): **部分**。`GetProcAddress("SHBrowseForFolderA/W")` の未登録を、`DWriteCreateFactory` と同じ `shim_unimplemented` で名前を出して fail-fast にした (`tools/shimx/src/module.c`、`test.sh` の `shbrowse`)。IFileDialog (`CoCreateInstance` の FileOpenDialog / FileSaveDialog) は**未対応のまま** (`REGDB_E_CLASSNOTREG` で黙って失敗する)。
+- 受入条件 3 (gui の node + mock 検査): **未達** (未着手)。
+
+### 7-2. 副作用の実測 (原因未特定)
+
+同じ `GetProcAddress` に、次の変種を入れて survey を取った (すべて `build.sh --trace --soft` 後に 1 回ずつ。`ok`・`api_units` の順に列挙)。
+
+| 変種 | survey 結果 |
+|---|---|
+| 長いメッセージ `SHBrowseForFolder (フォルダ選択は Web 未対応…)` の `shim_unimplemented` | ok 784・**abort 1** (unit 102: `unresolved function call: function_535c2e`)・`api_units` 49。survey は 1 秒で終わる (基点は 2 分 43 秒) |
+| 同じ分岐を `noinline` の補助関数へ移動 | 上と同じ (ok 784・abort 1) |
+| 無効分岐と新しい関数 1 個だけ (文字列なし) | 基点と一致 (ok 789・api 69) |
+| データだけ追加 (52 B の文字列配列) | 基点と一致 |
+| **短いメッセージ `SHBrowseForFolder`** (採用) | 基点と一致 (ok 789・api 69・abort 0) |
+
+- unit 102 の別実行 (前 unit を走らせた後に unit 102 だけ呼ぶ probe) でも、新版は VirtualAlloc 125 MB を繰り返した後に `function_535c2e` で abort する。`SHBrowseForFolder` の fail-fast は呼ばれていない。
+- 推定 (未検証): メッセージの長さやコードの配置で、m11 の lift 済みコードが参照する未初期化の領域やアドレスが変わる。この測定では原因を特定していない。以後、shimx の変更のたびに survey を取り直すこと。
+
+### 7-3. 未実施
+
+- FLEngine の起動 (`tools/flelift`) の KPI (dispatch 数・通過 unit 数) は測っていない。survey の `ok` 数 (基点と一致) のみ。
+- gui の node + mock 検査 (`tools/gui/test`) は未追加 (受入条件 3)。
+- CoCreateInstance の IFileDialog 経路 (未対応のまま)。
