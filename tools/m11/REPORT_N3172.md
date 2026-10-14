@@ -45,12 +45,14 @@ Ghidra ログ: `DumpFunctions: 59009 functions`、image base `00400000`。
 - FastMM4 (通常起動): GetMem 572 / FreeMem 20、VirtualAlloc 19 回 275.6 MB、先頭 1,310,704 B (MediumBlockPoolSize)。
 - wasm 6,047,577 B・trampoline 7,425・`ir_sha256` `7bfb67c4…` (過去値 `951e5b5d…` (REPORT_N1598) とは比較していない)。
 
-## 6. 既定経路の再確認 (コミット済み HEAD `de8a34d5`・非 `--full`)
+## 6. 既定経路の再確認 (非 `--full`)
 `bash tools/m11/m11_e2e.sh` (`functions_dll.csv`・`lift_pe.sha256` は §3 の run が作ったものを再利用): **rc 0・69 秒**・load `0.45 0.85 0.81` → `0.82 0.89 0.83`・survey ok 872 / trap 23 / miss 46 / noproc 1 (§5 と同じ)。CSV が有れば Ghidra 段は走らない (`m11_ghidra_dll.sh` は既存を検出して 0 を返す)。
+最終 HEAD `dfbc2948` (測定後の既定分岐削除を含む) でも同じ経路を実行: **rc 0・67 秒**・load `0.10 0.58 0.72` → `0.90 0.74 0.77`・survey ok 872 / trap 23 / miss 46 / noproc 1 (同じ)。
 
 ## 7. コード差分 (測定 commit → HEAD)
-- 測定 commit `de8a34d5` の後に入るのは本 REPORT・`docs/DOC_MAP.md` の索引行・`docs/WORKFLOW.md` の 1 文のみ (コード不変)。
-- `git diff --stat de8a34d5 HEAD -- tools/m11` は本ファイルの追加 1 件のみ (コード差分 0 行)。実出力は PR 本文と issue コメントに添付する (本ファイル自身の行数を含むため、本文中には書けない)。
+- 測定 commit `de8a34d5` の後のコード変更は `tools/m11/m11_ghidra_dll.sh` の 1 commit (`dfbc2948`) のみ。内容は注記 1 行と、既定 Ghidra パス `/opt/ghidra` の分岐の削除 (本 runner では `/opt/ghidra` が無く当該分岐は §3 の run で実行されていない。挙動は変えていない)。
+- 残りは本 REPORT・`docs/DOC_MAP.md` の索引行・`docs/WORKFLOW.md` の 1 文 (コード不変)。
+- `git diff --stat de8a34d5 HEAD -- tools/m11` の実出力は PR 本文と issue コメントに添付する (本ファイル自身の行数を含むため、本文中には書けない)。
 
 ## 8. 未解決
 | 未解決 | 影響 | 起票先 |
