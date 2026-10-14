@@ -205,3 +205,38 @@
 |---|---|---|
 | 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 窓に絞った計装の再測定 (コミット済み script) が未実施 (本節) | 子 issue (親 #2217) |
 | 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 子 issue (親 #2217) |
+
+## 13. #2270 の実測: 窓内の関数に絞った store 計装 (未達・陽性対照 0 件)
+
+- 測定 commit: `de28bcca` (本節のコード差分は `trap_triage/store_watch_2270.sh`・`watch_store_682.py` (`--fns` 追加)・`watch_addr_2099.c` (`M11_WATCH_ADDR_OVR` 追加) のみ)。5 ファイル (`store_watch_2270.sh`・`watch_store_682.py`・`watch_addr_2099.c`・`m11_e2e.sh`・`m11_build.sh`) の `git diff de28bcca HEAD` の出力は 0 行 (HEAD `19882188`)。`tools/m11` 全体の差分は `de28bcca..19882188` で 22 files (+1438/-96) で、main 取り込み分などを含む。
+- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`)・`work-m11`・`work-liftdiff` を worktree `ws-2270` に展開。`toolchain-emsdk`・`toolchain-retdec` は [EMSDK]・[RETDEC] の既設を使った (展開は未実施)。`work/lift_pe.sha256` を PE 指紋で手記録 (§6 と同じ)。
+- e2e `m11_e2e.sh` (非 `--full`・foreground・rc=0・wall 166 s・user 160 s・uptime load 1.11): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§8〜§11 と一致)。
+- baseline probe `probe1676_watch.mjs` (n=1・0.5 s): `unit 114 halt0`、`after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -->0x0, cnt -->1` (§8〜§11 と一致)。
+- 全 store 計装 `store_watch_2217.sh` (54,342 store): `w114` 10 分 45 秒で rc=124、`[aw]` 0 件、`unit 106` で停止 (§10・§11 と一致)。`diag` でも unit 0〜105 は 0〜1 ms で完走し、unit 106 だけが 10 分以上戻らなかった。
+- 窓に絞った計装 `store_watch_2270.sh` (`WATCH_FNS=function_8651a0,function_40f9e0,function_410320,function_410360,function_409410`・31 store): rc=0・45 秒で unit 114 まで完走。`[win] ON` 4 回・`OFF` 3〜4 回。`[aw]` は list B `0x10bd4c20` で 0 件。
+- 陽性対照 (`WATCH_ADDR=0x11f7254` = `[B+188]` の格納先、`function_8651a0` の IR 333629 行 = site 12 の store `store i64 %26, ptr %28` が `L` を格納する): `[aw]` 0 件。**計装が書込みを捉えることは示せていない** (陽性対照が不成立)。
+- 未確定の理由: `watch_store_682.py` の `site` 番号と IR 行の対応は `sites.json` で確認済み (site 12 = IR 333629)。`sw-all`・`[cnt]` の出力診断は、C 側の差し替えと `emcc` の順序の不備で 2 回とも出力に現れず、呼出し件数は未取得。計装 build が `m11_sw` を実際に呼んでいるかは本節で確定していない。本 run の runner には [EMSDK]・`work-m11` が無く、呼出し件数 (`[cnt]`) の再取得と陽性対照の再測定はできなかった。陽性対照は次段の子 issue #2369 (親 #2270) で行う。
+
+| 未達 (#2270 受入条件) | 状況 | 起票先 |
+|---|---|---|
+| 計装の陽性対照 (既知の書込みが `[aw]` に出る) | 0 件。計装の健全性は未確認 | 子 issue #2369 (親 #2270) |
+| 窓内で実行される全関数の網羅と list B `+8/+16` の書込み命令の確定 | 全 store 計装は unit 106 で停止。窓内 5 関数 (31 store) の計装では 0 件 (陽性対照も 0 件のため無効) | 子 issue #2369 (親 #2270) |
+| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体が未確定のため未着手 | 子 issue #2369 (親 #2270) |
+
+## 13b. #2369 の実測: 計装の陽性対照・窓内関数の網羅 (未達・list B の書込み主体は未特定)
+
+- 測定 commit: `9bd34d76` (本節の計装修正を含む最後の code commit)。本節のコード差分は `trap_triage/store_watch_2270.sh` の 1 行 (`M11_KEEP_BOOT_O=1` を `m11_build.sh` に付与) のみ。
+- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`)・`work-m11`・`work-liftdiff` を `$RUNNER_TEMP` と worktree `ws-2369` に展開。`work/ir_conditions.json` は無かったため `m11_gen_ir2.sh` を foreground で実行 (52 s、rc=0、`ldfix=applied`、`ir_sha256 08c7b646…`、`boot_final.ll` 490,733 行)。
+- 不具合 (修正済み): `store_watch_2270.sh` は計装 `boot.o` を作った後に `m11_build.sh` を呼ぶが、`M11_KEEP_BOOT_O=1` が無いため `m11_build.sh` 162 行で計装なし `boot.o` を作り直していた (build ログの `cc work/boot_final3.ll`)。付与後は計装 `boot.o` が残る。
+- 陽性対照 (1 回目): `WATCH_ADDR=0x11f7254` (`function_8651a0` の site 12 = IR 331561 行の store) は `[aw]` 0 件。`sites.json` で site 12 を含む窓内 store を引くと **窓内で一度も実行されない** ことが分かった (窓内の実書込みは site 19〜31 のみ)。前回の「陽性対照 0 件」は、この指定の誤りが原因と判断する (計装の健全性の否定ではない)。
+- 陽性対照 (2 回目・成立): `WATCH_ADDR=0x10be9160` (窓内で実書込みされる番地・site 19 が `val=0x10b58160` を書く) で `[aw] site=19 addr=10be9160 val=10b58160 width=8 hit=1` が 1 件出る。計装が窓内の書込みを捉えることを確認。
+- 窓内の書込み一覧 (`WATCH_FNS=function_8651a0,function_40f9e0,function_410320,function_410360,function_409410`・WATCH_ADDR 全域・trace 全件): 12 件。全て `function_8651a0` の site 20〜31 (番地 `0x10be9xxx`・`0x10a9f918`)。list B `0x10bd4c20` への書込みは 0 件。
+- 窓内の関数網羅 (IR 静的到達): 窓の根 5 関数から直接 `call` で到達する定義済み関数は **379**。`store_watch_2270.sh` で 379 関数を計装すると 3,127 store。`w114` は unit 106 で停止 (600 s で rc=124・`[aw]` 0 件)。全 store 計装 (§10・§13) と同じ停止位置。
+- 26 関数セット (§12 run f2) を `WATCH_ADDR=0x10bd4c20` で再測定: rc=0・unit 114 `halt0`・`[aw]` 0 件。
+- 未確認: `icall` 境界の間接 call 先 (trace は間接 call の標的を出すが、直接 call 先は出ない)。379 関数の網羅は直接 `call` だけを辿っており、間接 call 先は含まない。`0x40f960`・`0x40fb40`・`0x40fac0` は IR 定義が無く計装不可。
+
+| 未達 (#2369 受入条件) | 状況 | 起票先 |
+|---|---|---|
+| 計装の陽性対照 | 成立 (`0x10be9160` で `[aw]` 1 件)。前回 0 件は指定番地の誤り | 本 PR で達成 |
+| 窓内で実行される全関数の網羅・list B `+8/+16` を書く命令の確定 | 静的到達 379 関数の計装は unit 106 で停止。窓内 5 関数では list B への書込みなし | 子 issue (親 #2369) |
+| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体が未確定のため未着手 | 子 issue (親 #2369) |

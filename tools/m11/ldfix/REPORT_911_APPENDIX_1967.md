@@ -60,6 +60,34 @@
 
 ビルド注: 自前ビルドの `retdec-decompiler` は、隣に `retdec/share` を置かないと `Initialization` 後に無言終了した。実装 run (4dcab82d 時点) の計測は、素材 `toolchain-retdec` の share を使ったと記録されている (展開先は §6 の `rd/retdec/` 配下と推定: `rd/retdec/share`)。出所: #2038 のコメント https://github.com/signature-studio/signature-studio-dev/issues/2038#issuecomment-6165881740 (「`$ARTIFACTS_DIR` に fl-win64 / toolchain-retdec / work-m11 が実在することを `ls` で確認済み」)。実装 run の展開コマンドは記録に無く、この記述は再確認していない。fix run (5453dd3e 時点) の `$ARTIFACTS_DIR` には `toolchain-retdec` が無いため、share は再確認できない。
 
+## 6h. #2315 (LD-107): 666b10 の同一分岐判定と 41a670 との同一機構判定
+
+測定 commit: `e6cefa06` (main 基点。repo のコードは変えていない)。RetDec は `53e55b4b` (v5.0) のソースを GitHub から取得し、L165 の分岐直前に一時ログ (`TAG_PRE165`・`TAG_L167`) を入れてビルドした。ログは成果物に含めない (差分は `tools/m11/ldfix/retdec_constants_trace_2315.patch` の 15 行)。素材は `toolchain-retdec` の share と `fl-win64` の `block00031_PE.bin` (sha256 先頭 `b2c64da4`)。
+
+ビルド: `cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DRETDEC_COMPILE_YARA=OFF -DCMAKE_CXX_FLAGS="-include cstdint"` (C 側には付けない。付けると C コンパイラ確認で失敗)、`ninja -j4 retdec-decompiler` が 749 段で成功 (実測の所要は未計測。load average は開始時 1.28)。
+
+分岐 (L165) に入った時点の条件 (`root` = 記号木、`inst` = load) を単独範囲で出した結果:
+
+| 範囲 | 発火 (L167) | 発火命令 | root の値 | `root.ops.size()` |
+|---|---|---|---|---|
+| 0x41a6a0-0x41a6a3 | 1 | `%2 = load i64, i64* %1` | `@rax` (裸の GV) | 0 |
+| 0x41a6d3-0x41a6d6 | 1 | `%2 = load i64, i64* %1` | `@rcx` (裸の GV) | 0 |
+| 0x666b10-0x666b13 | 1 | `%2 = load i64, i64* %1` | `@r8` (裸の GV) | 0 |
+| 0x666b20-0x666b23 | 1 | `%2 = load i8, i8* %1` | `@rcx` | 0 |
+| 0x41a6b3-0x41a6b7 (対照) | 0 | — | — | — |
+
+- 単独範囲と全体範囲では、同じ機械語の load に付く GV 名が違う (41a6a0 は単独で `@rax`、全体で `@rcx`)。判定に使うのは GV 名ではなく「load の pointer が裸の GV で、`ops=0`」という形で、これは単独範囲でも全体範囲でも一致する。
+- 全体範囲での確認: 41a670-41a6f4 で L167 が 2 回 (いずれも `@rcx`・`ops=0`)。0x666a60-0x666b20 で 4 回 (`@r9`・`@rcx`・`@rcx`・`@rcx`)。ただし全体範囲のログは命令アドレスを持たないため、どの hit が 666b10 に当たるかは示せていない。666b10 の発火は単独範囲 (上表) で示す。
+
+段番号差の解消: `Constants optimization` は 41a670 でも 666a60 でも 1 回しか出ない同じ pass である。段番号が違うのは `--print-after-all` の添字の数え方で、`Module Verifier` の出力回数が違う (41a670 は 6 回、666a60 は 7 回) ため、同じ pass の添字が 16 と 17 にずれる。付録 §6g の残件「段番号差」は、同じ pass であることで解消した。
+
+判定 (受入 4 の残件を解消):
+- **同一分岐**: 666b10 は 41a6a0・41a6d3 と同じ v5.0 `constants.cpp` L167 の gv 分岐で、同じ条件形 (`LoadInst`・`root` が裸の GV・`ops<=1`) で発火する。
+- **同一機構**: 同一 pass・同一分岐・同一条件形のため、同一機構と判定する。機構の所在は lift 段 (`retdec-constants`、RetDec 本体の pass)。ldfix 段ではない。
+- 残件 (本 issue の外): 2019-03 版 (`6edcaaea`) との差 (`_toRemove.insert`) が結果に効くかは未確認。版差は #2314 (受入 1 の版) に移した。この分岐の値は、記号木の `inttoptr(load …)` が裸の GV に簡約された入力に依存する点も残る。
+
+所要 (実測・n=1): `retdec-decompiler-log 0x41a670-0x41a6f4 --select-decode-only --timeout 200` の real 4.466 秒 (load average は開始時 1.28)。
+
 版について (受入 1): issue #2038 は 2019-03 版相当でのビルドを求める。本 PR の実測は v5.0 (`53e55b4b`) のみ。2019-03 版 (`6edcaaea`) はソースを取得できたが、(1) fix run では `toolchain-retdec` が無く share の入手元が無い、(2) 2019-03 版のツリーに `share/` が無い、(3) LLVM は `avast-tl/llvm` の外部取得 (`3d1e5d0b`) を要する。fix run の上限 (40 分) では収まらないと判断し、ビルドしていない。PM 判断 (2026-10-14、出典: https://github.com/signature-studio/signature-studio-dev/issues/2038#issuecomment-6167618240) により、受入 1 は原文のまま子 issue #2314 に移した (v5.0 に改める (b) は採らない)。
 
 ## 6h. #2314 (LD-106): 2019-03 版 (`6edcaaea`) のソースビルド実測と、分岐発火確認の阻害要因
