@@ -19,7 +19,7 @@
 #define ROOT_NAME "Plugin database"
 
 typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; } Chan;
-typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
+typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; } Pl;
 
 static Chan ch[NCH_MAX];
@@ -55,7 +55,7 @@ void fl_engine_reset(void) {
         if (i == 0) set_name(mx[i].name, "Master");
         else if (i == 125) set_name(mx[i].name, "Current");
         else snprintf(mx[i].name, NAME, "Insert %d", i);
-        mx[i].vol = 0.8; mx[i].color = 0x5A6B7C; mx[i].sel = (i == 0);
+        mx[i].vol = 0.8; mx[i].sel = (i == 0);
         if (i) { mx[i].act[0] = 1; mx[i].lvl[0] = 1.0; }
     }
     for (int i = 0; i < NPL; i++) { snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
@@ -175,7 +175,10 @@ FL_H(channels, getStepParam) {
     return fl_ret_i(c, step_param(&ch[idx], step - q * pads + st0, prm));
 }
 
-/* ---- mixer (18) ---- */
+/* ---- mixer (19) ---- */
+/* 色の R/B 入替え (PY-115 / REPORT_PY115.md §2)。格納は入替え + alpha 0xff、取得は入替えを再度通して alpha 0xff。 */
+#define MIX_DEFAULT_COLOR 0x5A6B7Cu
+static uint32_t fl_swap_rb(uint32_t v) { return ((v & 0xff) << 16) | (v & 0xff00) | ((v >> 16) & 0xff); }
 FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
 FL_H(mixer, getTrackName) { MX(0); return fl_ret_s(c, t->name); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }
@@ -183,7 +186,11 @@ FL_H(mixer, getTrackVolume) { MX(0); int64_t m = A_INT(1, 0); return fl_ret_d(c,
 FL_H(mixer, setTrackVolume) { MX(0); t->vol = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(mixer, getTrackPan) { MX(0); return fl_ret_d(c, t->pan); }
 FL_H(mixer, setTrackPan) { MX(0); t->pan = A_DBL(1, 0); return fl_ret_none(c); }
-FL_H(mixer, setTrackColor) { MX(0); t->color = A_INT(1, 0); return fl_ret_none(c); }
+FL_H(mixer, setTrackColor) { MX(0); t->color = fl_swap_rb((uint32_t)A_INT(1, 0)) | 0xff000000u; t->color_set = 1; return fl_ret_none(c); }
+FL_H(mixer, getTrackColor) {
+    MX(0); uint32_t u = t->color_set ? (uint32_t)t->color : fl_swap_rb(MIX_DEFAULT_COLOR);
+    return fl_ret_i(c, (int64_t)(fl_swap_rb(u) | 0xff000000u));
+}
 FL_H(mixer, isTrackSelected) { MX(0); return fl_ret_b(c, t->sel); }
 FL_H(mixer, muteTrack) { MX(0); int64_t v = A_INT(1, -1); t->mute = TOG(t->mute, v); return fl_ret_none(c); }
 FL_H(mixer, soloTrack) { MX(0); t->solo = !t->solo; return fl_ret_none(c); }
@@ -228,7 +235,8 @@ FL_H(playlist, getTrackName) {
     return fl_ret_s(c, (i >= 1 && i <= NPL) ? pl[i - 1].name : ""); /* mock と同一: 範囲外は空文字 */
 }
 FL_H(playlist, setTrackName) { PL(0); const char *s = A_STR(1); set_name(p->name, s); return fl_ret_none(c); }
-FL_H(playlist, setTrackColor) { PL(0); p->color = A_INT(1, 0); return fl_ret_none(c); }
+/* FL の格納式 (setTrackColor 0xd55f30 → 0x12e5d80): R/B を入替えて 0xffffff で切る。getTrackColor の逆変換 */
+FL_H(playlist, setTrackColor) { PL(0); uint32_t u = (uint32_t)A_INT(1, 0); p->color = (int64_t)((((u & 0xff) << 16) | (u & 0xff00) | ((u >> 16) & 0xff)) & 0xffffff); return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
