@@ -127,7 +127,7 @@ thunk `0x180001830` (枠 `0x1804afca0`・表 `0x1804afca8`):
 |---|---|---|
 | IPPCODE 直接の入口 197 と dispatch 表の関数 186 (2 段目 251 を含む) の IPP API 同定と `tools/ipp` への対応 (D20 停止条件の判定を含む) | 置換できる入口数が確定しない | 子 T-SH-40 (#2613) |
 | dispatch 表経由で到達する `.text` 内の IPP 相当関数の同定 (上記 186 件の内訳と IPPCODE 直接 call を持つ 59 件) | 置換対象が過小になりうる | 子 T-SH-40 (#2613)。受入条件へ issue コメントで追記 |
-| thunk 頭 33 本の到達元 (実行時に計算されるアドレスの経路・枠の参照元) | 入口集合が静的に閉じない | 子 T-SH-40 (#2613) の検証項目 |
+| thunk 頭 33 本の到達元 (実行時に計算されるアドレスの経路・枠の参照元) | 入口集合が静的に閉じない | 子 T-SH-42 (#2643・実行時到達の動的確認。既存の受入条件) |
 | `.text` 本体の RetDec lift (4,556 関数)・KERNEL32 77 件の host 置換・side module の構成・除外フラグ | élastique の機能が wasm に無い | 子 T-SH-41 (#2614) |
 | release guard deny-list への élastique 追加 | 公開 tier への混入を機械検査できない | PM (D11・手元作業) |
 | mac 版 (`elastique_x64.dylib`、Accelerate 依存の扱い) | 本 REPORT は win 版のみ | 対象外。縮小後の親 #152 の範囲外のため、親 issue に残す (mac 版の扱いは親で判断) |
