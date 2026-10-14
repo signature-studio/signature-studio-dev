@@ -15,6 +15,9 @@ export type DetectedKind = (typeof DETECTED_KINDS)[number];
 export const DIGEST_KIND = "digest";
 export const DIGEST_REF = 0;
 export const DIGEST_EVERY_MS = 24 * 3_600_000;
+// rolling issue (題名 `[CI-n] 自律運転ダイジェスト (rolling)`) は本文だけを更新する issue。launch・再投入の対象から外す (classify)。
+// tools/pm/launch_issues.py の DIGEST_ROLLING_RE と同じ形にする (test-dispatch-context.sh が題名の一致を検査する)。
+export const DIGEST_ROLLING_RE = /^\[[A-Za-z]+-\d+\] 自律運転ダイジェスト \(rolling\)$/;
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";

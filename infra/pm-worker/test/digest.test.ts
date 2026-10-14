@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { configuredApp, j, markFresh, T0, type Call } from "./helpers.ts";
+import { configuredApp, issuePayload, j, markFresh, send, T0, type Call } from "./helpers.ts";
 import type { Ctx } from "./pm_helpers.ts";
 
 // 日次のダイジェスト (CI-70)。alarm の tick ごとに呼ばれ、送るのは 24 時間に 1 回の oc-pm kind=digest ref=0 だけ。
@@ -98,6 +98,18 @@ test("送信に失敗しても、その試行で 24 時間の枠を使う (毎�
   assert.equal(digestCalls(ctx.m.calls).length, 1, "1 時間後にも叩き直さない");
   await tickAfter(ctx, clock, 23 * H);
   assert.equal(digestCalls(ctx.m.calls).length, 2, "24 時間後に次の試行");
+});
+
+test("ネガコン (e): 日次 digest の rolling issue は plan() の picks・ready に入らない (通常の issue は従来どおり着手)", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock });
+  assert.equal((await send(ctx.app, "issues", issuePayload(70, { title: "[CI-70] 自律運転ダイジェスト (rolling)" }))).status, 202);
+  assert.equal((await send(ctx.app, "issues", issuePayload(71, { title: "[CI-71] 通常の issue" }))).status, 202);
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.picks.map((x) => x.n), [71]);
+  assert.deepEqual(p.rows.ready, [71]);
+  assert.ok(!p.picks.some((x) => x.n === 70));
 });
 
 test("ネガコン (d): config.ts に Team プランの更新日・課金の設定が無い", () => {

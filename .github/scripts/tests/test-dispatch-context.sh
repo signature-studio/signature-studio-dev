@@ -234,6 +234,13 @@ for s in '回答を反映して issue 本文を更新' '`needs-user-input` を�
   pm_has "$s"
   expect "pm.md user_answered: has '$s'" $?
 done
+# rolling issue の題名 (pm.md) は、launch から外す判定 (Worker の pm.ts・tools/pm/launch_issues.py) と同じ文字列であること。
+RT='自律運転ダイジェスト (rolling)'
+pm_has "$RT"
+expect "pm.md digest: the rolling issue title" $?
+RX='自律運転ダイジェスト \(rolling\)'
+grep -qF -- "$RX" "$HERE/../../../infra/pm-worker/src/pm.ts" && grep -qF -- "$RX" "$HERE/../../../tools/pm/launch_issues.py"
+expect "rolling issue title: pm.ts and launch_issues.py exclude the same title" $?
 
 # 11. repository_dispatch oc-pm (#2327): kind は列挙 9 値、ref は数字 1〜7 桁 (supply/digest/retro は 0 も可)。
 # payload の他のフィールドは指示文にも env にも入らない。対象は API で隔離し、起票者は許可 bot か MEMBER 以上だけ。
