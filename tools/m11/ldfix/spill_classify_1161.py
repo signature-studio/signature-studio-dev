@@ -8,7 +8,7 @@ status:
   確定   = 目視 (510) または候補判定 (1161) で TRUE_DROP / OK_LOAD / NO_CONSUMER と判定済み
   判定不能 = 候補判定で UNDETERMINED (根拠不足)
   未判定 = どちらの判定も無い (oracle 結果のみ)
-脱落関数の和集合 = store 宛 DROP (tally 既定) ∪ spill 宛 TRUE_DROP (確定分のみ)。候補の未判定は含めない。
+脱落関数 = drops_510.tsv の store 宛 ∪ frame 宛 (標準出力 [5]) と、spill 宛の確定 TRUE_DROP のうち [5] に無いもの (標準出力 [6])。候補の未判定は含めない。両者の和集合 = [5] の件数 + [6] の件数。
 使い方: python3 spill_classify_1161.py SSA.json [OUT.tsv]
 """
 import collections

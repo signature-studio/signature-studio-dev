@@ -32,7 +32,7 @@
 | EasyFLAC | OSS + 薄い wrapper | libFLAC **1.5.0** (mac)。crc8 は M2/M3 で lift 済 | 0.6M / 0.4M | 524/10 | libFLAC 再ビルド + 10 関数再実装 |
 | ILSvg | **OSS 派生** | cppfw **svgdom + svgren** + papki/utki/mikroxml + **AGG** (version 文字列なし。2.4 系は API 形状 `agg::trans_affine::parl_to_parl` / `gradient_radial_focus` からの**推定**) (3 export `svgCreate/Render/Destroy`) | 3.3M / 1.5M | 3/3 | upstream version 特定→再ビルド (T-SH-06) |
 | dsp_ippv2 | **Intel プロプラ + OSS 同梱** | Intel oneAPI **IPP 2021.7** (ippCore 文字列) + **AGG(Agg2D)** + **GPC** (`tristrip node creation`; 非商用条項) | 34M / 39.9M | 434/446 | **lift せず自前実装** (§2) |
-| elastique | 第三者プロプラ | zplane élastique **2.2.15** (`TElastiquePro`); win は静的 IPP 979KB 含む | 1.2M / 5.0M | 12/15 | lift (EULA 要確認) |
+| elastique | 第三者プロプラ | zplane élastique **2.2.15** (`TElastiquePro`); win は静的 IPP 979KB 含む | 1.2M / 5.0M | 12/15 | lift (所有者限定 tier のみ・D20) |
 | REX Shared Library | 第三者プロプラ | REX2 (`CREX2DecompressCallback`/`XREX2BadFormat`), 著作権表示 "Propellerhead Software AB 2000-2010" (Reason Studios 前身; win DLL の UTF-16 リソース) | – / 0.3M | – / 14 | 低優先 |
 | libkio | 第三者(NI) 派生 | GCC C++ + boost, 名前空間 **NI::GP / K4PO / K4PatchLib** (Kontakt4 patch lib); win は DirectWaveCtEngine.dll に内蔵 | 5.5M / 4.8M | 126/2 | T-SH-13; **lift PoC 済(部分)** |
 | ILTools / SGv2 / QuickFontCache | IL プロプラ (**FPC 3.2.3** mac / Delphi win, 同一 Pascal ソース) | `FPC 3.2.3 [2023/12/20] for x86_64 - Darwin` を 4 lib で確認。SGv2 ↔ win `FruityPlug_x64.dll` (export `CreatePlugInstance` 一致; 推定 → **訂正: 固定値の block24353 は VERSIONINFO で Maximus と判明し、この対応は採らない**。未特定 = `tools/fruityplug/REPORT.md`) | 4.6/8.1/4.7M / 3.7/5.9/2.1M | 5/2/8 | FLEngine と同 Delphi パイプライン (T-SH-12) |
@@ -168,13 +168,14 @@
 | T-SH-14 | beat_tracker lift (mac x86_64 SSE 版; Eigen) | 低 |
 | T-SH-15 | ildsp / libreverb: OTT 型 DSP lift (差分テスト基盤は本 PoC を流用) | 中 |
 | T-SH-16 | RetDec 欠陥 [A]-[E] の汎用 IR pass 化 + native 機械語実行による全関数差分テスト基盤 | **高** (全 lift の信頼性) |
-| T-SH-10/11 | élastique / REX (第三者バイナリ): EULA 確認後に lift | ユーザ判断待ち |
+| T-SH-10 | élastique: D20 で所有者限定 tier・side module・win 版 + 自前 IPP と確定。静的 IPP 入口の実測は `tools/shared/elastique/REPORT_152.md` | 実測済 (lift は子 T-SH-41) |
+| T-SH-11 | REX (第三者バイナリ): EULA 確認後に lift | ユーザ判断待ち |
 
 ## 6. 制約・未解決・ユーザ依頼
 - **未実施**: libFLAC/LAME/WavPack/FFmpeg の実ビルド (方針のみ; CPython は tools/python で実施済)、ILSvg の cppfw version 特定、Blend2D の wasm SIMD 試験、Agg2D glue、win 側 Blend2D の version 厳密特定 (win freetype.dll の版は 2.4.10 確定 #145)。
 - Blend2D version は「pre-v0.20 の 2024-12 時点」で近似 (FL が使う正確な commit は不明; symbol 集合比較で絞込み可)。
 - IPP の使用数は静的参照数で実行時カバレッジではない。本 tool 初版の win 12 / mac 159 は VAR 直接参照のみの下限値 (二段間接の数え落とし)。確定値 239 は tools/ipp。
-- **ユーザ依頼**: ① élastique / REX / IPP(再配布条件) / GPC(非商用条項) / NI 派生コードの EULA・ライセンス判断 (事実のみ記載)。② 素材追加は不要。
+- **ユーザ依頼**: ① REX / IPP(再配布条件) / GPC(非商用条項) / NI 派生コードの EULA・ライセンス判断 (事実のみ記載)。élastique は D20 で方針確定 (所有者限定 tier のみ) のため依頼から外す。② 素材追加は不要。
 
 ## 7. ファイル
 `run_all.sh`(e2e) / `scripts/`(win_catalog, mac_catalog, ipp_win_scan·all·validate, ipp_mac_scan·validate, ipp_static_mac, ipp_summary, classify, simd_stats, disasm, dump_strings) / `oss/{fetch_sources.sh,freetype,ogg,blend2d}` / `lift/libkio/`(funcs.txt, lift.sh, kio_fix.py, kio_simd.c, diff_test.py, run_wasm.mjs) / `data/`(classification, ipp_inventory, freetype_export_diff, libkio_lift_difftable[_raw])。`work/` は gitignore (slice・ビルド物・大 JSON)。

@@ -107,3 +107,67 @@
 - `0x6df110` (呼出元 `0x6df130` を含む) は `0x6db430` で解決し、失敗時に `0x6db460` (名前表の総当たり) へ進む。`0x6df110` への direct call は無い (関数ポインタ経由と推定)。`.text` 0x6da390 に `0x6df110` を値とする 8 バイト slot が 1 件あり (0x6da180 には `0x6df190` の slot)、その slot を読む rip 相対参照は検出していない (未確定)。
 - **VP (19267)**: `VSTPluginMain` (0x6dc268) の slot は 2 件 (0x741720 / 0x7417b0)。近傍 0x741700〜0x741718 の表を lea/rip で参照する。VP の解決関数は未追跡。
 - 判定: VC の名前表 → 解決関数 `0x6db460` → `0x6df110` までは静的に確定。`0x6df110` を実際に呼ぶ経路 (間接呼出の読み手) と、VP の解決関数は未了。殻と engine の結合方式全体は未確定のまま、受入 5 は本 issue に残す。
+
+## N. VST 入口解決の経路 (受入 5 の続き、本 run の測定)
+
+測定 commit: `f3c97305` (`engine_shell_ripref.py` の修正。コード差分の最終 commit。修正前は `8505816a`)。`git diff f3c97305 HEAD -- tools/plugins/modulation/ ':(exclude)*.md'` の出力: 空 (以後の差分は本付録の文書のみ)。
+測定対象は fl-win64 素材の殻 2 本 (`$ARTIFACTS_DIR/fl-win64.tar.zst` の `extracted/block19265_PE.bin` = VC、`block19267_PE.bin` = VP)。静的のみ。測定コマンドは §N.6。
+スクリプト: `engine_shell_ripref.py` (全バイト位置の総当たりで rip 相対・rel32・abs32 の参照を列挙)、`engine_shell_func.py` (.pdata 範囲・直接呼出元・関数ポインタ slot・逆アセンブル、IAT の import 名を付与)、`engine_shell_names.py` (名前表の復元)、`engine_shell_vst.py` (§M)。
+負の対照 (`engine_shell_ripref.py` の取りこぼし検出、§N.6 の 1・2): VC の `0x75158c` を `-n 1` で引くと、修正前 (`8505816a` と同一のスクリプト) は 0 件、修正後 (`f3c97305`) は 4 件 (`0x6e60f9` add・`0x6e6100` cmp・`0x6e6160` sub・`0x6e6167` cmp)。`-n 0` は修正前後とも同じ 4 件。
+正の対照: 既知の参照 (`0x6df130`→`0x6db460`、`0x6db488` の `lea`→`0x73e440`、`0x6dcd18` の `lea`→`0x741718`) を全て検出 (§N.6 の 3・5)。
+
+### N.1 名前表 (VC 0x73e440 / VP 0x741718、各 26 件)
+
+- 26 件は全て UTF-16 文字列へのポインタで、VC と VP で同一の並び。
+- 内訳: `main` の大文字小文字違い 16 通り (index 2〜17) と、`VSTPluginMain` の大文字小文字違い 9 通り (index 0・1・18〜25)。index 1 と 19 は同じ文字列 (`VSTPluginMain`) の重複。
+- 解釈 (推定): 殻は VST2 入口を GetProcAddress の大文字小文字違いで総当たりする。engine 側の export は `VSTPluginMain` / `main` (§J・REPORT §4)。
+
+### N.2 名前表の読み手 (rip 相対 lea を全位置から総当たりで列挙)
+
+| 殻 | 表 VA | lea 元 | 関数 (.pdata 範囲) | 役割 | 呼出 |
+|---|--:|--:|---|---|---|
+| VC | 0x73e440 | 0x6db488 | 0x6db460 (size 0x79) | 26 件を反復し、各名前を 0x6db430 に渡して非 0 の結果を返す | 直接: 0x6df130 (0x6df110 の内側) のみ |
+| VC | 0x73e440 | 0x6e6121 | 0x6e60f0 (size 0x51) | 初期化らしき分岐 (推定): counter (0x75158c) を `add` (0x6e60f9) し、加算後の値が 0 のとき (`cmp` 0x6e6100 の後、`jne` 0x6e6107 で分岐しないとき) 0x40e720 を 2 回呼んでから 0x411680 を r8=26 で呼ぶ。0x40e720・0x411680 の役割は未確認 | 間接: .text 関数ポインタ slot 0x6eff28 のみ |
+| VP | 0x741718 | 0x6dcd18 | 0x6dccf0 (size 0x79) | VC の 0x6db460 と同型 | 直接: 0x6e09c0 (thunk 0x6e09a0 の内側) のみ |
+| VP | 0x741718 | 0x6e79f1 | 0x6e79c0 (size 0x51) | VC の 0x6e60f0 と同型 (命令列を照合済み) | 間接: .text 関数ポインタ slot 0x6f3668 のみ |
+
+- VC の 0x6e60f0 は本 run で初めて確認した読み手 (§M までは 0x6db488 のみ)。
+
+### N.3 入口 thunk と .text 内の関数ポインタ表
+
+- 入口 thunk: VC `0x6df110` (size 0x2b) / VP `0x6e09a0` (size 0x2b)。引数 rdx = module、r8 = 名前。r8 ≠ 0 なら GetProcAddress ラッパーで名前を解決し、失敗時と r8 = 0 のときは名前表の総当たり (0x6db460 / 0x6dccf0) へ進む。
+- 入口 thunk は直接 call・rip 相対参照・abs32 のいずれでも参照されない (§N.6 の 3・5)。.text 内に 8 バイトの値として 1 件だけ存在する (VC slot `0x6da390`、VP slot `0x6dbc20`)。
+- その slot は 136 件の関数ポインタ表の中にある (VC 0x6d9f60〜0x6da3a0、VP 0x6db7f0〜0x6dbc30。いずれも末尾は排他的上限)。136 件は全て `.text` 内の値で、互いに異なる (§N.6 の 8)。入口はどちらも表の index 134。
+- 表を指す参照 (±0x220、§N.6 の 4・6。引数は表の先頭・中央・終端の 3 点):
+  - 表の外側から始まる命令のうち、表の内側を指すものは 0 件 (VC・VP とも)。
+  - 表の内側から始まる命令は VC 4 命令 (出力 6 行)、VP 2 命令 (出力 2 行)。いずれも表のバイト列 (関数ポインタ) を命令として誤デコードしたもの。その出力行のうち表の内側を指すものは VC 5 行 (`0x6da0a8`・`0x6da0b8`・`0x6da221`)、VP 2 行 (`0x6db928`・`0x6db970`)。
+  - 表の終端 (排他的上限) と等しい 8 バイト値が .text に 1 件ずつある (VC slot `0x6d9f28` = `0x6da3a0`、VP slot `0x6db7b8` = `0x6dbc30`)。表の先頭 (`0x6d9f60` / `0x6db7f0`) と等しい値は無い。終端値の読み手は未確認。
+- 結論: 入口 thunk を呼ぶ読み手 (= VST2 入口の呼出元) は静的には未特定。読み手は基点を計算で作る間接参照と推定 (未検証)。VC の PE ファイル内の `e8 00 00 00 00` (call 次命令) は 49 件 (§N.6 の 9)。位置取りの可能性は未検証。
+
+### N.4 GetProcAddress の経路 (推定を含む)
+
+- VC: 0x6db430 → 0x40ffe0 → 0x41d1b0 → 0x41d1a0。0x41d1a0 は `jmp qword ptr [rip+…]` で、IAT の `kernel32!GetProcAddress` を指す (`engine_shell_func.py` で確認)。
+- VP: 0x6dccc0 → 0x40ffe0 → 0x41d1d0 → 0x41d1c0 (IAT `kernel32!GetProcAddress`)。
+- 確認済み: 0x6db430 の `call 0x40ffe0` (0x6db444) と `call 0x41d1b0` (0x6db44f)、0x6dccc0 の `call 0x40ffe0` と `call 0x41d1d0` (§N.6 の 7)。
+- 確認済み: 0x41d1b0 は `shr rax,0x10; test rax,rax; jne` で `rdx` の上位 48 bit を見る。0 (序数) なら 0x41d1a0 へ `rdx` のまま渡し、非 0 (名前) なら 0x40f340・0x40f820 を経由してから 0x41d1a0 へ渡す (0x41d1d0 も同じ形で、序数側は 0x41d1c0 へ渡す)。
+- 推定を含む: 0x40ffe0 は `rcx` が非 0 ならそのまま返し、0 なら `[rip+0x2f4c31]+0x10` を返す (4 命令)。この関数の役割 (名前の変換など) と 0x40f340・0x40f820 の役割は未確認。
+
+### N.5 判定
+
+- 確定: 名前表 26 件の内容、名前表の読み手 (各殻 2 件)、入口 thunk の構造、GetProcAddress の経路 (IAT まで。0x40ffe0 の役割を除く)。
+- 未確定: 入口 thunk (VC 0x6df110 / VP 0x6e09a0) を呼ぶ箇所、すなわち VST2 engine の `VSTPluginMain` 呼出元。関数ポインタ表の読み手も未特定。表の終端値 (§N.3) の読み手も未特定。
+- 受入 5 のうち VC/VP の呼出元は未達のまま #527 に残す。
+
+### N.6 測定コマンド (測定 commit `f3c97305`)
+
+`<VC>` = `extracted/block19265_PE.bin`、`<VP>` = `extracted/block19267_PE.bin` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf` で展開したもの)。作業ディレクトリは `tools/plugins/modulation/`。値は全て 16 進 (`-n` の値も 16 進)。
+
+1. `python3 engine_shell_ripref.py <VC> -n 1 75158c` → ref 4 行 (負の対照)。修正前 (`8505816a`、スクリプトは同一) は 0 行。
+2. `python3 engine_shell_ripref.py <VC> -n 0 75158c` → ref 4 行 (同上)。
+3. `python3 engine_shell_ripref.py <VC> -n 0 6db460 6df110 6e60f0 73e440` → 出力 11 行。`0x6db460` は `0x6df130` の call のみ、`0x6df110` は slot `0x6da390` (abs32 も同じ位置) のみ、`0x6e60f0` は slot `0x6eff28` のみ、`0x73e440` は `0x6db488`・`0x6e6121` の lea の 2 件。
+4. `python3 engine_shell_ripref.py <VC> -n 220 6d9f60 6da180 6da3a0` → 出力 31 行。§N.3 の分類 (表の内側から始まる命令 4 件・6 行、外側から内側を指す参照 0 件、終端値 slot `0x6d9f28`)。
+5. `python3 engine_shell_ripref.py <VP> -n 0 6dccf0 6e09a0 6e79c0 741718` → 出力 11 行。`0x6dccf0` は `0x6e09c0` の call のみ、`0x6e09a0` は slot `0x6dbc20` のみ、`0x6e79c0` は slot `0x6f3668` のみ、`0x741718` は `0x6dcd18`・`0x6e79f1` の lea の 2 件。
+6. `python3 engine_shell_ripref.py <VP> -n 220 6db7f0 6dba10 6dbc30` → 出力 25 行。表の内側から始まる命令 2 件 (2 行)、外側から内側を指す参照 0 件、終端値 slot `0x6db7b8`。
+7. `python3 engine_shell_func.py <VC> <va> --dump` (`va` = 6db430・6e60f0・40ffe0・41d1b0)、`python3 engine_shell_func.py <VP> <va> --dump` (`va` = 6dccc0・6e79c0・41d1d0)。§N.2・§N.4 の逆アセンブルの根拠。
+8. 表の 136 要素: 表の範囲を 8 バイトずつ読み、値が `.text` 内にあり (VC・VP とも 136/136)、互いに異なる (136 種) ことを、インラインの python (`struct.unpack_from('<Q', ...)`) で確認。
+9. `python3 -c "import sys;print(open(sys.argv[1],'rb').read().count(b'\xe8\x00\x00\x00\x00'))" <VC>` → 49。

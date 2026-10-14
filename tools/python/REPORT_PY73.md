@@ -6,8 +6,9 @@
 ## 結論
 
 - 2 関数の**引数書式・戻り経路・例外 code と文言**を PE から確定した。`midiNoteOn` の範囲外は内部 code `-4` (文言 `Index out of range`)、状態ゲートは `-2` (`Operation unsafe at current time`)。
-- **未確定**: `incEventValue` の戻り値の型と値 (下位関数 `0x1051330` の出力が int か float ビット列か不一致)、`incEventValue` と `midiNoteOn` の副作用 (本体の `0x1051330`・`0x10002a0` の大半が未読)。推測では実装しない方針により、`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs` は変更 0 件。
+- **未確定** (1 回目の run 時点。2 回目 (§7) で一部確定): `incEventValue` の戻り値の型と値 (下位関数 `0x1051330` の出力が int か float ビット列か不一致)、`incEventValue` と `midiNoteOn` の副作用 (本体の `0x1051330`・`0x10002a0` の大半が未読)。推測では実装しない方針により、`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs` は変更 0 件。
 - 受入条件は 4 件中 1 件のみ部分達成。PR は `Refs #2547`。
+- 2 回目の run (§7): incEventValue の戻り値の型 (flags bit1 で int / float ビット列に分岐)・範囲外 code (`0x1051330` 本体に例外経路なし)・副作用 (`0x1051330` 本体はスタック書込みのみ) を PE で確定。呼出し先 `0x1046a30` の副作用は未確定 (§7-3)。cur・lo・hi・flags の値源は未確定のため、provider・mock は未実装。
 
 ## 測定
 
@@ -16,7 +17,7 @@
 - 文言の読み出し (本 PR で追加): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_errmsg_probe.py` → 終了 0・4 件すべて OK・実測 0.032 秒 (load average 0.10、並列 1)。
 - ネガティブコントロール: 分岐先 VA を 1 バイトずらす (`0xd82d18`→`0xd82d19`) と `lea ではない` で終了 (FAIL を確認)。
 - 測定 commit: `18d7bb4b` (`pe_errmsg_probe.py` の最終変更 (docstring を `$ARTIFACTS_DIR` 表記にした 1 行)。コードを変えた最後の commit)。
-- 差分 0 の証跡: `git diff 18d7bb4b HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本 REPORT を含む後続 commit は docs (本ファイルと `docs/DOC_MAP.md`) のみ。
+- 差分 0 の証跡: `git diff 18d7bb4b HEAD -- tools/python/analysis/flapi/pe_errmsg_probe.py tools/python/analysis/flapi/pe_disasm.py` の出力は 0 行 (測定対象の 2 ファイル)。`18d7bb4b` 以降に main から取り込んだ他 PR のコード (`tools/python/provider` 等) は測定対象外。本 PR の commit は docs のみ。
 - 検証範囲: PE の逆アセンブルと文言のみ。wasm・mock・C provider の実行 (`all_tools.mjs`) は未実行 (コード差分 0)。範囲外の主張はしない。
 
 ## 1. incEventValue (ハンドラ 0xd58ef0・書式 `Ii|d`)
@@ -25,9 +26,9 @@
 |---|---|
 | 引数解析 | 間接呼出し `[rax]` で `fmt` = `rip+0x58` (`Ii|d`)。eventId → `[rbp+0x3c]` (int)、step → `[rbp+0x38]` (int)、res → `[rbp+0x30]` (double) (0xd58f06-0xd58f1c) |
 | 既定値 | `movabs rax, 0x3fa5555555555555` (= 1/24) を res に先に置く (0xd58ef8)。PY-15 の既定値修正と一致 |
-| 解析失敗 | 戻り値 ≤ 0 で `call 0xd82c20(ecx=0)` (0xd58f5b) |
+| 解析失敗 | 戻り値 ≤ 0 で分岐 (0xd58f30 `jle 0xd58f5b`)。`mov ecx, eax` (0xd58f5b) で ecx = 解析の戻り値 eax (≤0) を渡し、`call 0xd82c20` (0xd58f5d) |
 | 成功 | `0x1051330(ecx=eventId, edx=step, xmm2=(float)res, r9=0, [rsp+0x20]=0x7fffffff)` (0xd58f49)。戻り値 eax を**そのまま** PyLong に変換 (`[0x88b329]` 経由、0xd58f57)。`0xd82c20` は通らない |
-| 範囲外 code | incEventValue 自体に検査は無い。検査は下位関数 1-b の内部にある (未確定) |
+| 範囲外 code | incEventValue 自体に検査は無い。検査は下位関数 1-b の内部にある (1 回目の記録。§7-3 で本体に例外経路が無いと確定) |
 
 1-b. 下位関数 `0x1051330` (eventId=ecx、step=edx、res=xmm2、ptr=r9、value=`[rbp+0xb0]`)。読めた範囲:
 - `[rbp+0xb0] == 0x7fffffff` (sentinel) なら `0x1046a30(eventId, 0, 2)` で現在値を取る (0x1051388-0x10513a3)。incEventValue は必ず sentinel を渡すため、呼出し側は現在値を持たない。
@@ -41,7 +42,7 @@
 | 項目 | PE 実測 (VA) |
 |---|---|
 | 引数解析 | `iii|i`: indexGlobal → `[rbp+0x4c]`、note → `[rbp+0x48]`、velocity → `[rbp+0x44]`、channel → `[rbp+0x40]` (既定 -1 = `0xffffffff`、0xd5c808) |
-| 解析失敗 | 戻り値 ≤ 0 で `0xd82c20(ecx=0)` (0xd5c8d5 経路) |
+| 解析失敗 | 戻り値 ≤ 0 で分岐 (0xd5c856 `jle 0xd5c8d3`)。`mov ecx, eax` (0xd5c8d3) で ecx = 解析の戻り値 eax (≤0) を渡し、`call 0xd82c20` (0xd5c8d5) |
 | 状態ゲート | `call 0x11d1430` の結果 `al` が偽なら内部 code `-2` (0xd5c861-0xd5c868) → `0xd82c20(-2)`。`0x11d1430` は global → vtable `[+0x88]` を呼ぶだけで、述語の意味は未確定 |
 | 範囲検査 | `0 <= indexGlobal <= [obj+0x10] - 1` (obj = `*(*(0x8859a7))`、0xd5c86a-0xd5c886)。外れると `-4` (0xd5c8cc) → `0xd82c20(-4)` |
 | 副作用 (範囲内のみ) | `call 0x63a730` の xmm0 に定数 `[rip+0x41]` を掛け、`*(double*)(*[0x884601])` に書く (0xd5c88b-0xd5c89f)。`0x63a730` と書込み先は未確定 |
@@ -72,15 +73,13 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| incEventValue の戻り値の型 (int か float ビット列か) と値。`0x1051330` の `[rbp+0x2c]` への書込み経路の統一 | provider の戻り値を決められない | #2547 (次 run) |
-| `0x1051330` の flags bit 1 == 0 の経路 (0x105151e 以降) と `0x1046a30`・`0x1050f90` の出力の意味 | incEventValue の副作用と範囲外 code が未確定 | #2547 |
 | midiNoteOn の本体 `0x10002a0` (note bit 31 経路・channel の扱い・note-on の状態変化) と `0x63a730`・書込み先 | midiNoteOn の副作用が未確定 | #2547 |
 | `0x11d1430` の述語 (`[+0x88]` の vtable 先) | -2 ゲートの条件が未確定 | #2547 |
 | 件数の出所 `0x8859a7` と要素配列の出所 `0x88596e` が同一オブジェクトか | 範囲検査と要素取得の整合が未確認 | #2547 |
 
 ## 5. 受入条件 (#2547) の判定
 
-- [ ] 2 関数の戻り値・範囲外 code・副作用を PE 解析箇所つきで REPORT に残す — **部分達成**。書式・戻り経路・midiNoteOn の範囲外 (-4)・ゲート (-2) と文言は確定。incEventValue の戻り値の型と、両関数の副作用は未確定 (§1・§2・§4)。
+- [ ] 2 関数の戻り値・範囲外 code・副作用を PE 解析箇所つきで REPORT に残す — **部分達成**。incEventValue は §7 で戻り値の型と、`0x1051330` 本体の範囲外 code (例外経路なし)・副作用 (スタック書込みのみ) を確定。呼出し先 `0x1046a30` の副作用は未確定 (§7-3)。midiNoteOn は範囲外 (-4)・ゲート (-2) と文言のみ確定し、副作用は未確定 (§2・§4)。
 - [ ] `provider/fl_engine.c` と `host/fl_mock.mjs` に 2 関数を実装 — **未達** (意味論が未確定。根拠の無い推測実装はしない)。
 - [ ] `tests/channels_diff.mjs` の呼出し列に追加し、mock と C の diffs 0 — **未達** (実装 0 件のため対象なし)。
 - [ ] `FL_ENGINE=wasm node tests/all_tools.mjs` が 48/48 ok — **未実行** (コード差分 0 のため、再測定の対象外)。
@@ -91,3 +90,58 @@
 - `0x11d1430` の vtable 先 (`[+0x88]`) を解決し、-2 の条件を確定する。
 - midiNoteOn は `0x10002a0` の note-on 経路で、channel の状態が変わる箇所 (書込み先オブジェクトのフィールド) を特定する。
 - 確定した事項ごとに REPORT に追記し、provider 実装は意味論が揃った関数から行う。
+
+## 7. 2 回目 run: incEventValue の戻り値の型・範囲外 code・本体の副作用の確定 (PE 実測)
+
+測定 (commit は `e1e816c2` = origin/main 基点。コード変更 0 のため、測定 commit は基点のまま):
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (実測 5.6 秒)。`toolchain-retdec` を `$RUNNER_TEMP/retdec-root` に展開 (実測 2.6 秒)。
+- RetDec: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 RETDEC_BIN=$RUNNER_TEMP/retdec-root/retdec/bin/retdec-decompiler bash analysis/flapi/pe_retdec.sh <out.c> 0x1051330-0x1051720` → 実測 7.2 秒、関数 1 件 (`0x1051330`-`0x10516f6`)。
+- 逆アセンブル: `analysis/flapi/pe_disasm.py 1051330 260` (242 行、終端 `ret` は 0x10516f5)。RetDec の分岐と逆アセンブルを照合した。
+- 定数の読出し (ファイルのバイト列): `0x10516f8`=0.0 (f32)、`0x10516fc`=1.0 (f32)、`0x1051700`=1.0 (f64)、`0x1051708`=100.0 (f64)。
+- 文言・分岐の再照合 (fix 2 回目、`pe_disasm.py`): `0xf82484` = `movss xmm0, dword ptr [rbp+0x34]`、`0xd58f30` = `jle 0xd58f5b`、`0xd58f5b` = `mov ecx, eax`、`0xd58f5d` = `call 0xd82c20`、`0xd5c856` = `jle 0xd5c8d3`、`0xd5c8d3` = `mov ecx, eax`。§1・§2・§7-2 の記述はこれに合わせた。
+- 差分 0 の証跡: 本 run のコード変更は 0。`git diff e1e816c2 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (commit `c301cb31` の時点で実行。以後の commit は docs のみ)。
+
+### 7-1. 経路 (ハンドラ 0xd58ef0)
+
+- 0xd58f28: 引数解析 (vtable 呼出し)。0xd58f49: `call 0x1051330` (ecx=eventId, edx=step, xmm2=res, r9=0, `[rsp+0x20]=0x7fffffff`)。0xd58f57: 戻り eax を PyLong 化して返す。0xd82c20 は解析失敗時のみ。
+- **書き戻しの呼出しは無い**。ハンドラの `call` は上の 4 箇所だけ。
+
+### 7-2. 下位関数 0x1051330 の計算 (RetDec と逆アセンブルの照合)
+
+入力: eventId=ebx、step=esi、res=xmm6 (=xmm2)、ptr=rdi (=r9)、cur=`[rbp+0xb0]` (0x7fffffff なら `0x1046a30(eventId, 0, 2)` で置換)。
+範囲: `0x1050f90(eventId, &lo, &hi)` で lo=`[rbp+0x28]`、hi=`[rbp+0x24]`、flags=戻り値 (r13)。range = max(hi-lo, 1)。
+
+**式は ptr==0 の場合**: ハンドラは `xor r9,r9` (0xd58f3e) で ptr=0 を固定して渡すため、incEventValue から ptr≠0 の経路には到達しない。`0x1051330` 内で ptr を使うのは `test rdi,rdi` (0x10513c3・0x1051596) と、`f823f0(ptr, …)` への引数渡し 6 箇所 (0x10513f4・0x1051431・0x10514a3・0x10515c2・0x10515ff・0x105167d) のみ。ptr≠0 の `f823f0` (0xf82429 以降) はグローバル書込み `0x7388c9` と呼出し `0x63a660`・`0xbaffb0` を持つが、本節では扱わない。
+
+分岐は flags の bit1 (`test r13b, 2`、0x10513ad) で決まる。
+
+(A) bit1 = 1 (float 型。0x10513b3 以降): 現在値は `movss` で float として読む。
+- step != 0 (0x105149d): `new = cur_f + (float)step × f823f0(ptr, res)`。`f823f0` は ptr==0 のとき xmm1 の値を xmm0 で返す (0xf823f0-0xf82408 で xmm1 を `[rbp+0x34]` に写し、0xf82484 `movss xmm0, dword ptr [rbp+0x34]` で返す)。clamp: new < 0.0 → 0.0、new > 1.0 → 1.0 (0x10514bf〜0x1051511)。
+- step == 0 (0x10513bb): ptr==0 のとき `result = (float)(1 - Round(cur_f))` (0x10513c8〜0x10513df)。
+- 結果は float のビット列として `[rbp+0x2c]` に書き、終端 0x10516dc の `mov eax,[rbp+0x2c]` で int として返す。
+
+(B) bit1 = 0 (int 型。0x105151e 以降):
+- 比例係数 res': eventId < 0x10000000 かつ `(eventId & 0xffff) == 0x302` なら `res' = 1.0 / range`。eventId == 0x40000005 なら `res' = 100.0 / range`。それ以外は `res' = res`。
+- step != 0 (0x1051677): `k = Round(range × res')` (`cvtsd2si`、最近接偶数)。k == 0 なら `k = 1 - 2 × (res' の符号ビット)` (±1)。`new = cur + step × k`、`result = min(max(new, lo), hi)`。
+- step == 0 (0x105157b、ptr==0 の場合): `pos = (float)((cur - lo) / range)`、`result = lo + Round((float)(1 - Round(pos)) × range)`。clamp は無い。
+
+`0x40c660` は `cvtsd2si rax, xmm0` (Round)。
+
+### 7-3. 結論 (incEventValue)
+
+| 項目 | 確定内容 |
+|---|---|
+| 戻り値の型 | int (32bit)。bit1 の立つ event (float 型) では **float のビット列を int として返す**。bit1 == 0 の event では整数値。未解決 1 の「int か float か」は、event の flags で決まるという答え |
+| 範囲外 code | `0x1051330` 本体に例外経路は無い (確定。`-2`・`-4` を返す経路も `0xd82c20` の呼出しも無く、分岐先は全て関数内、間接ジャンプ無し)。incEventValue の `0xd82c20` 呼出しは引数解析失敗のみ。呼出し先 `0x1046a30` 側の範囲外経路は未確定 (§7-4) |
+| 副作用 | `0x1051330` 本体はスタックへの書込みのみ (確定。宛先メモリは全て `[rbp+...]`)。ハンドラにも書込みは無い。呼出しは 0x1050f90・0x1046a30・0xf823f0・0x40c660 の 4 種のみ。`0xf823f0` は ptr==0 で xmm1 の値を xmm0 で返すだけ (0xf82484)。`0x40c660` は cvtsd2si (Round)。**呼出し先の副作用は未確定**: `0x1046a30(eventId, 0, 2)` は sentinel のたびに必ず実行され、本体はロック `0x4232e0`・`0x423980` を呼び、`rax` 基準の書込み (0x1046f16・0x10472d0 ほか) を持つ (本体の大半は未読)。`0x1050f90` の副作用も未読 |
+
+### 7-4. 残る未確定 (値源。実装はこれが決まるまで保留)
+
+| 未確定 | 影響 | 起票先 |
+|---|---|---|
+| `0x1050f90` の表 (件数 `[0x5938ad]→[+0x10]`、配列 `[0x59388e]→[+8]`) の中身と初期化元。item の `[+4]`=lo、`[+8]`=hi、`[+0xc]`=flags | lo・hi・flags の値が決まらない | #2547 |
+| 未登録 event の flags (`0x104d0d0`)・lo/hi (`0x1046a30(e,0,0x20)`・`(e,0x40000000,0x20)`) | 同上 | #2547 |
+| 現在値 `0x1046a30(eventId, 0, 2)` の出所 (store) と getter の副作用 | cur が決まらない。provider の状態モデルに入らない | #2547 |
+| midiNoteOn の本体 `0x10002a0`・`0x63a730`・`0x11d1430` (§2・§4 のまま) | midiNoteOn の副作用・ゲート条件が未確定 | #2547 |
+
+provider・mock の実装は、上の値源 (cur/lo/hi/flags) を状態モデルとして決める run の後に行う。推測の初期値では実装しない。
