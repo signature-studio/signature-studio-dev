@@ -163,6 +163,26 @@ def main():
             check(hex(slot) == c["slot_rva"], f"{key}: 間接 call {c['site']} のスロット RVA 不一致")
             check(hex(u64(slot)) == c["slot_file_value"], f"{key}: 間接 call {c['site']} のスロット値不一致")
 
+    # --- 6. スロット領域の DIR64 再配置 (.reloc を生バイトで走査。DataDirectory[5] = BASERELOC)
+    rb_rva, rb_size = struct.unpack_from("<II", raw, opt + 112 + 8 * 5)
+    relocs = set()
+    p = off(rb_rva)
+    while p < off(rb_rva) + rb_size:
+        page, blk = struct.unpack_from("<II", raw, p)
+        if blk < 8:
+            fails.append(f".reloc ブロックの大きさが不正: {blk}")
+            break
+        for q in range(p + 8, p + blk, 2):
+            e = struct.unpack_from("<H", raw, q)[0]
+            if e >> 12 == 10:  # IMAGE_REL_BASED_DIR64
+                relocs.add(page + (e & 0xFFF))
+        p += blk
+    slot_relocs = sorted(x for x in relocs if 0x268000 <= x < 0x268300)
+    check(len(slot_relocs) == 16, f"スロット領域の DIR64 reloc 数 {len(slot_relocs)} (期待 16)")
+    check(0x268260 in relocs and 0x268268 in relocs, "0x268260 / 0x268268 に DIR64 reloc が無い")
+    check(0x268088 not in relocs and 0x268090 not in relocs, "0x268088 / 0x268090 に DIR64 reloc がある")
+    print(f"[.reloc] 0x268000–0x268300 の DIR64 = {len(slot_relocs)} 件: {' '.join(hex(x) for x in slot_relocs)}")
+
     if fails:
         for m in fails:
             print("FAIL", m)
