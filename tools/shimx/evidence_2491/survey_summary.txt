@@ -1,0 +1,1 @@
+SXL_SURVEY {"variant":"m11_sx_trace_soft_fix","units":942,"kinds":{"ok":789,"oob":95,"closure_outside":47,"halt0":9,"clobber":1,"noproc":1},"reboots":1,"shimx_trace_msgs":{"[shimx] GetProcAddress miss: kernel32.dll!#39682":{"count":1,"first_unit":2},"[shimx] l
