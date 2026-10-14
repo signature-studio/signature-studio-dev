@@ -340,7 +340,7 @@
 | `tools/python/REPORT_PY73.md` | ~110 | PY-73 (#2547・途中記録): channels.incEventValue (`Ii|d`) と channels.midiNoteOn (`iii|i`) の PE 書式・戻り経路・例外 code (-2 unsafe / -4 range)・文言の確定。戻り値の型と副作用は未確定 (`analysis/flapi/pe_errmsg_probe.py` で文言を再現) |
 | `tools/python/REPORT_PY74.md` | ~50 | PY-1 ilmcp 意味論の整合 (#74, PR #763): getBrowserNames 木・getHighlightNames 21 件・addChannel/addEffect/storePRScript 検証の実測表、`tests/ilmcp_diff.mjs` の結果、NC (addEffect 検証を外して 2 件差分)、非 ASCII 空白の未解決。REPORT.md §7b-3 の実測表の全文 |
 | `tools/python/REPORT_PY8.md` | ~45 | PY-8 (#80): MIDI 1 イベント flapi 呼出し数・所要時間と遅いモード切り分け (REPORT.md の分割ではなく新規。250 行上限とは無関係) |
-| `tools/python/REPORT_PY84.md` | ~145 | PY-84 (#2663): fl-win64 の DATA block から chord progression の pyscript 2 本 (cpt / stack) と drum_patterns.json を抽出する同定規則 (内容一致・件数 fail-closed)。e2e 41/41 PASS (3 回)・NC・所要/load。run_all 全体の mac 前提チェック (rc=2) は #2649 の範囲で未達 |
+| `tools/python/REPORT_PY84.md` | ~156 | PY-84 (#2663): fl-win64 の DATA block から chord progression の pyscript 2 本 (cpt / stack) と drum_patterns.json を抽出する同定規則 (内容一致・件数 fail-closed)。e2e 41/41 PASS (3 回)・NC・所要/load。run_all 全体の mac 前提チェック (rc=2) は #2649 の範囲で未達 |
 | `tools/python/REPORT_PY15.md` | ~130 | PY-15 (#653): 省略引数のホスト受け渡し方式・kwlist 103 関数の誤束縛 0 検証・挙動変更の内訳・ネガコン (REPORT.md §16 の全文。250 行上限のため分離) |
 | `tools/python/REPORT_APPENDIX.md` | ~216 | python REPORT の分割移動節の全文: §7c (ilmcp 9 関数 PY-3 #82: 引数規約・検証・仮定・未解決)・§7b-2 (ilmcp.getBrowserNames 固定バッファ修正 #74 の全文)・§9 下流チケット案 T1〜T9・§PY-13 (build_flpy.sh の env 化 #588)・§12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81)・§14 (Piano roll scripting #79 の全文) (250 行上限のため無変更で分割移動) |
 | `tools/python/REPORT_PY2.md` | ~76 | PY-2 (#83/#115, REPORT §7d 本体の全文): CPython と flapi provider の同一 wasm 静的リンク・往復コスト・`Py_*` 動的束縛 110 名の対応表・スレッド/GIL 方針 |
