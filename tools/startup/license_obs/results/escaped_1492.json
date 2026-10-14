@@ -35,8 +35,8 @@
    "indirect-call": 10430
   },
   "untraced_events": {},
-  "elapsed_s": 23.39,
-  "elapsed_total_s": 25.13
+  "elapsed_s": 25.05,
+  "elapsed_total_s": 27.09
  },
  "only_linear": [],
  "only_cfg": [

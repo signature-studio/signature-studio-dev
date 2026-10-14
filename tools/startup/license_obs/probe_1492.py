@@ -7,9 +7,10 @@ probe_1220.py (線形走査) との違い:
     callee の戻り値 (rax のタグ) は呼出し元へ返す。
 限界 (未網羅・件数を結果 JSON の untraced に出す): 間接 call・間接 jmp (jump table)・.pdata 外への jmp・
 スタック渡し引数 (push したタグ)・深さ上限 (DEPTH_MAX)・callee 再帰。
-usage: python3 probe_1492.py [--write] [--no-slot] [--no-callee]  (環境変数 PROBE_DEPTH で callee 深さ上限)
+usage: python3 probe_1492.py [--write] [--no-slot] [--no-callee] [--no-rec-summary]  (環境変数 PROBE_DEPTH で callee 深さ上限)
   --no-slot: スタック退避の伝播を止める (ネガティブコントロール。退避経由は 0 件になるはず)
   --no-callee: callee 越しを止める (callee 越しの寄与を見る比較用)
+  --no-rec-summary: 再帰打切り (approx) の要約を空にする (アブレーション。再帰要約の寄与を見る比較用)
 """
 import json, os, re, struct, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +23,7 @@ DEPTH_MAX = int(os.environ.get('PROBE_DEPTH', '30'))
 INDIRECT_RIP = re.compile(r'^qword ptr \[rip ([+-]) 0x[0-9a-f]+\]$')
 HEXIMM = re.compile(r'^0x[0-9a-f]+$')
 EMPTY = frozenset()
+NO_REC = '--no-rec-summary' in sys.argv
 
 
 def direct_imm(x):
@@ -326,7 +328,7 @@ class Az:
             key = (tgt, frozenset(sig.items()))
             if key in self.inprog:
                 evs.append({'ev': 'approx', 'why': 'recursive', 'va': va})
-                cev, rax = self.approx.get(key, ([], EMPTY))
+                cev, rax = ([], EMPTY) if NO_REC else self.approx.get(key, ([], EMPTY))
             else:
                 cev, rax = self.analyze(tgt, sig)
             for e in cev:

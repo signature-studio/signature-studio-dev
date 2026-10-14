@@ -15,7 +15,10 @@
 
 - 再帰打切りを外し、`(callee, 入口タグ)` の要約を全体反復で求めた (`fixpoint`: 2 回目で要約が不変 = 収束)。
 - 10 件は `approx_recursive_call` に記録する (旧 `untraced_tagged_recursive_call`)。
-- アブレーション (再帰要約を空にした場合): 退避経由の集合は 345 件で同一。再帰打切りの 10 件は追加の退避アクセスを生まない。
+- アブレーション: `probe_1492.py --no-rec-summary` (再帰打切り時に callee の要約を空にする) を実行した。
+  - 退避経由の gradeChar byte アクセスは 207 読出し + 138 書込み = 345 件 (通常実行と同一)。キー集合 (`only_cfg` 69 件・`cfg_only_via_callee` 69 件・`approx_recursive_call` 10 件) も通常実行と完全一致。
+  - `results/escaped_1492.json` 比較: `elapsed_s` / `elapsed_total_s` 以外のキーは全て一致。
+  - 結論: 再帰打切りの 10 件は追加の退避アクセスを生まない。「345」は退避経由 byte アクセスの総数 (読出し 207 + 書込み 138) を指し、アブレーション前後で不変。
 
 ## 3. 件数 (受入 3)
 
@@ -39,6 +42,7 @@
 | `bash license_obs.sh` (1 回目・load average 1 分値 0.47 開始) | 2 分 47.89 秒・rc 0・`ALL OK`・FAIL 0 |
 | `bash license_obs.sh` (2 回目・load average 1 分値 0.34 開始) | 2 分 47.95 秒・rc 0・`ALL OK`・PASS 40・FAIL 0 (6/6) |
 | `probe_1492.py` 単体 (1 回目 / 2 回目) | 30.6 秒 / 25.3 秒 (`elapsed_total_s`) |
+| `probe_1492.py --no-rec-summary` (アブレーション・§2) | 26.95 秒 (`elapsed_total_s`)・PASS 207/69/20 |
 
 ## 5. 未解決 (起票先)
 
