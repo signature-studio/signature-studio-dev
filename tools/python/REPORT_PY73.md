@@ -15,8 +15,8 @@
 - 逆アセンブル: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (PY-39 の補助をそのまま使用)。
 - 文言の読み出し (本 PR で追加): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_errmsg_probe.py` → 終了 0・4 件すべて OK・実測 0.032 秒 (load average 0.10、並列 1)。
 - ネガティブコントロール: 分岐先 VA を 1 バイトずらす (`0xd82d18`→`0xd82d19`) と `lea ではない` で終了 (FAIL を確認)。
-- 測定 commit: `e3cb4c71` (`pe_errmsg_probe.py` の追加。コードを変えた最後の commit)。
-- 差分 0 の証跡: `git diff e3cb4c71 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本 REPORT を含む後続 commit は docs (本ファイルと `docs/DOC_MAP.md`) のみ。
+- 測定 commit: `18d7bb4b` (`pe_errmsg_probe.py` の最終変更 (docstring を `$ARTIFACTS_DIR` 表記にした 1 行)。コードを変えた最後の commit)。
+- 差分 0 の証跡: `git diff 18d7bb4b HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本 REPORT を含む後続 commit は docs (本ファイルと `docs/DOC_MAP.md`) のみ。
 - 検証範囲: PE の逆アセンブルと文言のみ。wasm・mock・C provider の実行 (`all_tools.mjs`) は未実行 (コード差分 0)。範囲外の主張はしない。
 
 ## 1. incEventValue (ハンドラ 0xd58ef0・書式 `Ii|d`)
