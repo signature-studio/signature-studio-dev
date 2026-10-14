@@ -4,17 +4,17 @@
 
 - **測定 commit**: `2f1b76fc` (コードを変えた最後の commit)。基準は origin/main `54bacdc0`。
 - **作業場所**: worktree `$RUNNER_TEMP/ws-448` (branch `448-relink-workdir`)。main チェックアウトは触っていない。
-- **素材**: `$ARTIFACTS_DIR` (`/home/runner/artifacts`) で fl-win64 / plugins-ott / toolchain-retdec / toolchain-emsdk / work-m6-ott / work-liftlib / analysis-ott-binaries の実在を ls で確認。
+- **素材**: `$ARTIFACTS_DIR` で fl-win64 / plugins-ott / toolchain-retdec / toolchain-emsdk / work-m6-ott / work-liftlib / analysis-ott-binaries の実在を ls で確認。
 
 ## 1. 受入 1・2: agent-setup の relink と張り直し件数
 
-- 実装: `.github/actions/agent-setup/action.yml` L162〜184 (commit 81b0283a / 06b22b73、PR #449)。`/home/ubuntu/work/webstudio/*` を指す絶対 symlink を `$GITHUB_WORKSPACE` 内へ `ln -sfn` で張り直す。find は `tools/*/work/*` に限定し、失敗は `extract_failed` に計上する。
+- 実装: `.github/actions/agent-setup/action.yml` L162〜184 (commit 81b0283a / 06b22b73、PR #449)。旧 `webstudio` 配下 (ubuntu 側の絶対パス) を指す symlink を `$GITHUB_WORKSPACE` 内へ `ln -sfn` で張り直す。find は `tools/*/work/*` に限定し、失敗は `extract_failed` に計上する。
 - 実測 (main チェックアウト、素材展開後):
 
 | 項目 | 件数 |
 |---|---|
 | `tools/*/work/*` 配下の絶対 symlink (全て `$GITHUB_WORKSPACE` 内を指す) | 201 |
-| 旧パス `/home/ubuntu/work/webstudio/*` を指す symlink | 0 |
+| 旧パス (ubuntu 側の絶対パス) を指す symlink | 0 |
 | dangling (`tools/liftlib/work/wt_cab238/tools/targets/{kilohearts,freshair}/work`) | 2 |
 
 - dangling 2 本は nested worktree (`wt_cab238`) 内の参照で、張り先 `tools/targets/{kilohearts,freshair}/work` は素材に含まれない。旧パスは 0 のため受入 2 は満たす。
@@ -41,7 +41,7 @@
   - [1] audit_va: 補正漏れ候補 0 → PASS
   - [2] liftlib ott `--lb-base 0x10000` / `0x1230000`: 両方 PASS (checks 8 / broken 0 / band maxdev 0.0)
   - [3] libottnative.so を HEAD から再ビルド → PASS。x64c 3 構成 (0x10000/16MiB, 0x1230000/40MiB, 0x10000/8MiB) × 89 scenario = **150,708 cell 全一致** (各構成 50,236 cell、max_ulp 0、state_diff_qwords 0)
-- 手当ての有無: DLL は `ANALYSIS_DIR=/home/runner/analysis` (agent-setup が環境に設定) 経由で `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` (sha256 `ecd51e05…`) を解決。手配置 0 件。Python 依存は `~/.local/agent-py` (#893) の venv が PATH 先頭。
+- 手当ての有無: DLL は agent-setup が設定する `ANALYSIS_DIR` 経由で `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` (sha256 `ecd51e05…`) を解決。手配置 0 件。Python 依存は `~/.local/agent-py` (#893) の venv が PATH 先頭。
 - 先行確認: 修正前の検証で、素材 .so を手で `build.sh` 再ビルドした状態でも同じ結果 (rc 0 / 150,708 cell) だった。本測定は素材を戻した状態でスクリプト単独に通した結果。
 
 ### 2.4 測定 commit 以降のコード差分
