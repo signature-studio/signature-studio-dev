@@ -50,7 +50,7 @@
 
 測定は `db86f35b` の内容で行った (ネガティブコントロールの一時変更は元に戻した)。環境: runner 4 core。測定開始直前の load average 2.55 (`uptime`、21:53:17。直前に flpy をリンクした直後のため高め)。
 
-再ビルド (`db86f35b` の内容から): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.8 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 106、1.2 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.7 秒)。`build_cpython_wasm.sh` は rc 0 (2 分 24 秒)。runner に `/opt/emsdk` が無いので、`emsdk install 6.0.12` と `activate 6.0.12` を `$RUNNER_TEMP/emsdk` に入れ、`/opt/emsdk` へ symlink した (`build_cpython_wasm.sh` は `/opt/emsdk/emsdk_env.sh` を直接 source し、環境変数では指定できないため)。symlink 前の `build_cpython_wasm.sh` は rc 1 で止まった (`/opt/emsdk` 不在)。`tools/python/src`・`build_cpython_wasm.sh` に変更は無い (`git diff fb0a1619 db86f35b -- tools/python/src tools/python/build_cpython_wasm.sh` は 0 行)。
+再ビルド (`db86f35b` の内容から): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.8 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 106、1.2 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.7 秒)。`build_cpython_wasm.sh` は rc 0 (2 分 24 秒)。runner に `[EMSDK]` が無いので、`emsdk install 6.0.12` と `activate 6.0.12` を `$RUNNER_TEMP/emsdk` に入れ、`[EMSDK]` の既定位置へ symlink した (`build_cpython_wasm.sh` は既定位置の `emsdk_env.sh` を直接 source し、環境変数では指定できないため)。symlink 前の `build_cpython_wasm.sh` は rc 1 で止まった (`[EMSDK]` 不在)。`tools/python/src`・`build_cpython_wasm.sh` に変更は無い (`git diff fb0a1619 db86f35b -- tools/python/src tools/python/build_cpython_wasm.sh` は 0 行)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
