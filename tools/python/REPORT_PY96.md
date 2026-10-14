@@ -7,7 +7,7 @@
 - 親 #2832 の 52 件 (screen 28・arrangement 12・launchMapPages 12) は 1 run に収まらないため、**arrangement の選択範囲読出し 4 件** (`selectionStart`・`selectionEnd`・`liveSelectionStart`・`selectionIsActive`) の範囲に縮めた。
 - 4 件は PE で「状態 field を読み、変換スロット `0x15e4280` に渡す」と確定し、mock と C provider に実装した。mock と C の差分は 0 (`tests/arrangement_selection_diff.mjs` 8 呼出し)。同名の `tests/arrangement_diff.mjs` は main の PY-152 のテストで、本 PR では変えていない。
 - **値は未確定**。初期値 `-1` (未選択) は仮置き。未選択が負値で表されることは PE 0xe43e80 で確認したが、負値が Python に何として返るかは変換先 `0x15e4280` が未同定のため未確定。
-- 親 #2832 の残りは、main の #2985 (screen 5 件・PR #3033) と #2983 (arrangement 6 件・PR #3044) の取り込み後で 37 件 (arrangement 2・launchMapPages 12・screen 23)。arrangement 2 件 (`currentTimeHint`・`getMarkerName`) は子 #3041 (`[PY-143]`)、launchMapPages 12 件は子 #2984 (`[PY-153]`)、screen 23 件は子 #3021・#3022・#3025。いずれも親 #2832 の子。
+- 親 #2832 の残りは、main の #2985 (screen 5 件・PR #3033) と #2983 (arrangement 6 件・PR #3044) の取り込み後で 37 件 (arrangement 2・launchMapPages 12・screen 23)。arrangement 2 件 (`currentTimeHint`・`getMarkerName`) は子 #3041 (`[PY-143]`)、launchMapPages 12 件は、`length` 1 件が子 #2984 (`[PY-153]`)、索引付き読出し 4 件が子 #3027 (`[PY-156]`)、init・updateMap・createOverlayMap・setMapItemTarget の 4 件が子 #3029 (`[PY-138]`)、processMapItem・releaseMapItem・checkMapForHiddenItem の 3 件が子 #3030 (`[PY-139]`)。screen 23 件は子 #3021・#3022・#3025。いずれも親 #2832 の子。
 
 ## 手段
 
@@ -85,7 +85,7 @@ $ git diff 270dc9d0 HEAD -- tools/python ':!*.md'
 | `liveSelectionStart` は flags=1 (VARARGS) で引数を読まない。provider は引数付きを code 5 にする | 引数付き呼出しの挙動が実機と違う可能性 | 子 #3043 (`[PY-144]`・引数個数の確定) |
 | 共通ヘルパ `0xd77e20` が選ぶ 2 つの状態 slot (A・B・C) の所有者 (どの arrangement 状態か) が未同定 | 選択値が何を指すかの意味論は未確定 | 子 #3043 (`[PY-144]`・`0xd77e20` の object を同定) |
 | 4 件の値 (初期値 `-1`) は実機未測定 | mock の値をそのまま正として扱えない | 再測定は子を起票しない。本表に残す |
-| 残り 37 件 (arrangement 2・launchMapPages 12・screen 23) | 未実装のまま | arrangement 2 件 (`currentTimeHint`・`getMarkerName`) は子 #3041 (`[PY-143]`)。launchMapPages 12 件は #2984 (`[PY-153]`)。screen 23 件は #3021・#3022・#3025 (親 #2832)。main の #2983・#2985 で実装済みの分は閉じた |
+| 残り 37 件 (arrangement 2・launchMapPages 12・screen 23) | 未実装のまま | arrangement 2 件 (`currentTimeHint`・`getMarkerName`) は子 #3041 (`[PY-143]`)。launchMapPages 12 件は `length` 1 件が #2984 (`[PY-153]`)、索引付き読出し 4 件が #3027 (`[PY-156]`)、init 系 4 件が #3029 (`[PY-138]`)、イベント処理 3 件が #3030 (`[PY-139]`)。screen 23 件は #3021・#3022・#3025 (親 #2832)。main の #2983・#2985 で実装済みの分は閉じた |
 
 ## 検証範囲 / 範囲外
 
