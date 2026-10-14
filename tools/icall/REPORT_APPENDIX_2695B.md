@@ -18,7 +18,7 @@
 | 項目 | 値 |
 |---|---|
 | runner (wasm 系・`43b8a780` の測定) | Intel Xeon 6973P-C (4 vCPU・Ubuntu 24.04・gcc 13.3.0・glibc 2.39)。sweep 前 load 0.17・sweep 後 0.74 |
-| runner (native trace・`06c46b21` の再測定) | AMD EPYC 9V74 (4 vCPU・load 0.40)。素材は `work-icall` の `tools/icall/work/rt_freshair-core` だけを展開 (6.7 s)。emcc が無い (`/opt/emsdk` 無し) ため wasm 側は再実行していない (§7) |
+| runner (native trace・`06c46b21` の再測定) | AMD EPYC 9V74 (4 vCPU・load 0.40)。素材は `work-icall` の `tools/icall/work/rt_freshair-core` だけを展開 (6.7 s)。emcc が無い (`[EMSDK]` の実体が無い) ため wasm 側は再実行していない (§7) |
 | 素材 (`43b8a780`) | `work-icall` のみ展開 (`tools/icall/work/`・`tar --zstd -xf` で 19.8 s)。`FA_CORE` = `tools/icall/work/rt_freshair-core/rw.dll`。emsdk は runner 既存の `[EMSDK]` (Emscripten 6.0.12 pin) を使用 |
 | libottnative | `bash tools/ott/native/build.sh` で作成 |
 | fixed route (`43b8a780`) | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh`: OK (6.9 s) |
