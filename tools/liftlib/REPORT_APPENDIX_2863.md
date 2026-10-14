@@ -2,8 +2,9 @@
 
 - 日付: 2026-10-14 / issue #2863 (`[PLG-F3-32]`) / 親 #2094 / 担当: `tools/liftlib/` (`liftlib/recipes/ott.py`・`liftlib/passes/p1_legacy.py`・`tests/test_unit.py`)
 - 既知類型との関係: D1a (P1 同型) と関係あり・未検証 (§5 参照)。ゲートの失敗原因 (`%pc` 一時名の差) 自体は意味の差ではない (§2)
-- 測定 commit (コードを変えた最後の commit): `054ee527` (`fix(liftlib): ignore %pc temp-name renumbering in IR gate (#2863)`)。
-  `git diff 054ee527 HEAD -- tools/liftlib/liftlib tools/liftlib/tests tools/liftlib/liftlib_e2e.sh` の出力は空 (本付録の追加以降はコード差分 0)。
+- 測定 commit (コードを変えた最後の commit): `dce097af` (`fix(liftlib): relink broken material symlinks in ott recipe (#2863)`)。
+  `git diff dce097af HEAD -- tools/liftlib/liftlib tools/liftlib/tests tools/liftlib/liftlib_e2e.sh` の出力は空 (本付録の追加以降はコード差分 0)。
+  `dce097af` 以前の IR 一致の修復 (`054ee527`) は変えていない。`dce097af` は素材の壊れた symlink の張り直し (`recipes/ott.py`) と既定値の表記だけ。
 - 修復前の測定 base: `13fcecca` (origin/main 取込み時点・修復前)。作業 worktree: `../ws-2863` (`2863-liftlib-p1-gate`)。素材 (gitignore 対象の `work/`) は本体の展開済みを `cp -a` で複写した。
 
 ## 0. 結論 (先出し)
@@ -13,8 +14,8 @@
 | 原因 | `p1_legacy.legacy_p1` の一時名 `%pc<入力行 index>` が、#1664 (A7 の空行除去) で変わった行 index に依る。名前だけが変わり、命令と分岐は不変 (名前を正規化した比較の差分は 0 行。§2) |
 | 修復 | IR 一致ゲート (`ott.same`) の比較前に、`%pc` 一時名の出現順の全単射な改名 (`p1_legacy.canon_tags`) だけを両辺へ適用。ゲートの他の部分と `p1_legacy` 本体は変えていない |
 | `python3 -m liftlib ott --auto none` | 修復前 **FAIL** (IR 一致 O2a〜O4 の 6 項目が false・11.76 s) → 修復後 **PASS** (全 7 項目 true・e2e checks 8/0・出力 SHA 42/42 一致・n=3 で 10.88〜10.94 s) |
-| `python3 -m liftlib ott` (既定 auto f7,p1) | PASS (census junkHi 104 ≤ 104・e2e checks 8/0) |
-| `bash tools/liftlib/liftlib_e2e.sh --quick` 全体 | **未達** (修正 run でも未実行)。FA/KH の素材 (`work-liftlib-targets`・`plugins-freshair`・`plugins-kilohearts`) は `$ARTIFACTS_DIR` に無く、HEAD の前提検査で rc=2 (§4)。本 PR 本文の `oc_artifacts:` 行に 3 名を追加済み。素材の付いた run で再実行するまで、受入条件の `--quick` ALL PASS は未確認 |
+| `python3 -m liftlib ott` (既定 auto f2,f7,p1) | PASS (census junkHi 104 ≤ 104・e2e checks 8/0・`dce097af`) |
+| `bash tools/liftlib/liftlib_e2e.sh --quick` 全体 (`dce097af`) | **ALL PASS** (rc=0・wall 257 s)。unit T1〜T26 ok (T6 含む)・fa_gain 400/400・kh_gain 366/366・ott PASS・ott_auto_none PASS。素材は `$ARTIFACTS_DIR` から展開 (§4) |
 | P1 の分岐書換え | 挿入 18 箇所の置換 19 組のうち **適用 0 組** (実測・§5)。挿入フラグは使用 0 件。e2e は PASS だが、参照 `ir7e_p1.ll` も同じ状態で作られている |
 
 ## 1. 修復前の再現 (base `13fcecca`・`ott --auto none`)
@@ -55,11 +56,16 @@
 
 ## 4. 検証の範囲と未実施
 
-- ユニット (`python3 tests/test_unit.py` 相当): T1〜T5・T7〜T26 は PASS (T17b は `LL_XRET_*` 未設定で skip。`work/cab2863/run_each.py` で個別実行)。**T6 は FAIL**: `tools/targets/freshair/work/...` (FA の `SlateCore.core_64`) が無いため `FileNotFoundError`。本 run の素材に無く、修復とは無関係。
-- `bash tools/liftlib/liftlib_e2e.sh --quick`: **rc=2** (前提検査で停止)。`前提が無い: .../targets/freshair/work/win/Fresh Air/.../SlateCore.core_64 (bash tools/targets/freshair/fetch.sh)`。FA と KH の展開物は本 run に無い。必要な `oc_artifacts` 名は `work-liftlib-targets` `plugins-freshair` `plugins-kilohearts` (本 issue の `oc_artifacts:` 行には含まれているが、直近の依頼コメントの行には含まれていなかった)。
-- 修正 run (2026-10-14・fix モード・コード差分 0・文書のみ修正): `$ARTIFACTS_DIR` の一覧を確認し、3 名は無かった (§4 末尾の素材一覧と同じ)。`bash tools/liftlib/liftlib_e2e.sh --quick` を HEAD で実行 → rc=2 (前提検査で停止: `targets/freshair/work/win/Fresh Air/...` が無い。前提検査は最初の不足で止まるため kilohearts は未検査。`$ARTIFACTS_DIR` に `work-liftlib-targets` は無い)。FA/KH 部分と T6 は未実行。素材の付いた run でこの節を実測値に置き換える。
-- 修正 run の HEAD で再現 (コード差分 0): `python3 -m liftlib ott --auto none` → **PASS** (IR 一致 7 項目 true・e2e checks 8/0・出力 SHA 42/42 equal・11.67 s。単独 run・load は未採取)。`tests/test_unit.py` の `t26()` を単独実行 → ok。作業用の `work/` は main の展開済みを `cp -a` で `tools/{m6,ott,m8,m9,m10,liftlib}/work` へ複写した (m8・m9・m10 を省くと O4 と outhash が「参照が無い」で NG になる)。
-- 素材の確認: `$ARTIFACTS_DIR` (R2 から展開された素材の置き場) には `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`plugins-ott`・`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib`・`work-icall`・`work-fw-stage1` のみ。展開先の `tools/targets/{freshair,kilohearts}/work` は存在しない。
+- ユニット (`python3 tests/test_unit.py`・`dce097af`): T1〜T26 ok。T17b は `LL_XRET_LL` / `LL_XRET_DLL` 未設定で skip (既存の仕様)。**T6 も ok** (FA の `SlateCore.core_64` を `work-liftlib-targets` から展開して通過)。`ALL UNIT TESTS PASS`。
+- `bash tools/liftlib/liftlib_e2e.sh --quick` (`dce097af`・foreground・単独 run): **rc=0・ALL PASS**・wall **257 s** (うち `regress` の elapsed 33.6 s)。起動直前の load average (1/5/15 分) = 0.32 / 0.67 / 0.35、nproc = 4。
+  - (a)(b)(c) `regress`: `fa_gain` **BIT-EXACT 400/400**・`kh_gain` **BIT-EXACT 366/366**
+  - `ott` (既定 auto `f2,f7,p1`): PASS。e2e checks 8/0・band maxdev 0.0 nbad 0・trap rc 0・census `[0x248]=0` junkHi **104 ≤ 104**・出力 SHA 比較は auto 既定のため適用外
+  - `ott_auto_none`: PASS。IR 一致 7 項目 **true**・e2e checks 8/0・出力 SHA **42/42 equal** (f0 21/21)
+- 素材 (`$ARTIFACTS_DIR` の 12 本のうち使ったもの): `work-liftlib-targets`・`work-m6-ott`・`work-liftlib` は `tar --zstd -xf` で worktree 直下へ展開 (tar の中身は repo 相対パス)。`plugins-freshair` は展開先 `$RUNNER_TEMP/plugins-freshair` を経て `tools/targets/freshair/fetch.sh` (`FA_DL`) に渡し、factory `.epf` 8 本を補完 (`win: 9 files, factory .epf: 8`)。`plugins-kilohearts` は展開していない (`work-liftlib-targets` に `tools/targets/kilohearts/work/winpkg/HeartCore.core_64` が入り、前提検査は通過)。
+- 素材の壊れた symlink: `work-liftlib`・`work-m6-ott` の同梱 symlink 201 件が VM の絶対パス `/home/ubuntu/work/webstudio/tools/m6/work/` を指していた。`recipes/ott.py` の `full_t1.drc.{ll,dsm}` 張り直し (`dce097af`) で、e2e が使う作業 dir 2 組 (`tools/liftlib/work/ott/work/`・`tools/liftlib/work/ott_auto_f2_f7_p1/work/`・計 4 件) が正しい向きになった。残り 197 件は過去の作業 dir (`cab238`・`hang`・`wt_cab238`・`ott_auto_f7` など) で、`--quick` の経路では参照されず PASS (gitignore 対象・本 PR の範囲外)。
+- `--quick` が省くもの (`liftlib_e2e.sh` の仕様): (d) SIMD helper・(e) 注入・(f) leaf spec。受入条件 (`--quick`) の範囲外で、本 run では未実行。
+- §1 の `054ee527` の計測 (3 回) は、`dce097af` と比べると IR・SHA の経路が違わない (差分は `recipes/ott.py` の symlink 張り直し 2 行と表記のみ・`git diff 054ee527 dce097af --stat` で確認)。`dce097af` の `ott_auto_none` は上記の run で再確認した (所要の再計測は未実施)。
+- 作業ツリーは `dce097af` の時点で main より 363 commit 遅れている。`git merge-tree` で main との衝突は無し (rc=0)。main は取り込んでいない (取り込むと測定済みコードと差が生じ、再測定が要るため)。
 
 ## 5. 分岐書換えの実測と未解決
 
@@ -80,5 +86,4 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `liftlib_e2e.sh --quick` の FA/KH 部分 (`regress` の fa_gain・kh_gain) と T6 が未実行 (素材不足)。本 PR 本文の `oc_artifacts` に `work-liftlib-targets plugins-freshair plugins-kilohearts` を追加済み | 受入条件 (`--quick` ALL PASS at HEAD) が未達。本 PR は部分達成 | #2863 (素材の付いた review run で実行) |
-| `legacy_p1` の `repmap` が挿入前の行番号 `j` で登録し挿入後の `out[j]` に適用するため、分岐の書換えが 1 件も適用されない (実測 0 / 19・上表)。挿入フラグ (cf・zf・pf 各 18 本) は使用 0 件 | 参照 chain の P1 (`DEFECTS.md` D1a 同型の対策) が OTT で効いていない。e2e (maxdev 0・SHA 42/42) は通るが、参照 `ir7e_p1.ll` も同じ状態のため。直すと参照 IR・m10 出力・SHA の再測定が要る (本 PR では直さない) | #2863 へのコメントで PM 判断を依頼 (子 issue は未起票) |
+| `legacy_p1` の `repmap` が挿入前の行番号 `j` で登録し挿入後の `out[j]` に適用するため、分岐の書換えが 1 件も適用されない (実測 0 / 19・上表)。挿入フラグ (cf・zf・pf 各 18 本) は使用 0 件 | 参照 chain の P1 (`DEFECTS.md` D1a 同型の対策) が OTT で効いていない。e2e (maxdev 0・SHA 42/42) は通るが、参照 `ir7e_p1.ll` も同じ状態のため。直すと参照 IR・m10 出力・SHA の再測定が要る (本 PR では直さない・挙動変更のため PM 判断) | #2094 (親) へ PM 判断を依頼 (子 issue は未起票) |
