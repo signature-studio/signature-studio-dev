@@ -115,23 +115,37 @@ if [ -z "$since" ]; then
   echo "::warning::could not tell when the run started: the run outcome is not recorded"
   exit 0
 fi
-# 更新順の新しい 30 件ずつ、run の開始より前の更新に届くまで (最大 3 頁)。作成または merge が run の開始以降のものだけ数える
+# 作成または merge が run の開始以降の PR
 SINCE='((.created_at // "") >= $since or (.merged_at // "") >= $since)'
-page=1
-while [ "$page" -le 3 ]; do
-  if ! recent="$(gh api "repos/$R/pulls?state=all&sort=updated&direction=desc&per_page=30&page=$page")"; then
-    echo "::warning::could not list recent PRs: the run outcome is not recorded"
-    exit 0
-  fi
-  if jq -s -e --arg n "$N" --arg since "$since" "[.[][] | select($MINE and $SINCE)] | length > 0" <<< "$recent" > /dev/null; then
-    echo "issue #$N has a PR created or merged since the run started ($since): started"
-    remove_label
-    exit 0
-  fi
-  jq -e --arg since "$since" '(.[-1].updated_at // "") < $since' <<< "$recent" > /dev/null && break
-  page=$((page + 1))
+
+# recent_pr <created|updated>: その順に新しい方から 30 件ずつ、<順>_at が run の開始より前になるまで (最大 3 頁) 読む。
+# 戻り値: 0 見つかった / 1 見つからなかった / 2 読めなかった / 3 3 頁読んでも run の開始に届かなかった
+# 更新順は実測で 30 件が約 6 分に当たる (2026-10-14)。run の最中に作られた PR は、作成順の方が確実に見つかる。
+recent_pr() {
+  local sort="$1" page=1 recent
+  while [ "$page" -le 3 ]; do
+    recent="$(gh api "repos/$R/pulls?state=all&sort=$sort&direction=desc&per_page=30&page=$page")" || return 2
+    jq -s -e --arg n "$N" --arg since "$since" "[.[][] | select($MINE and $SINCE)] | length > 0" <<< "$recent" > /dev/null && return 0
+    jq -e --arg since "$since" --arg f "${sort}_at" '(.[-1][$f] // "") < $since' <<< "$recent" > /dev/null && return 1
+    page=$((page + 1))
+  done
+  return 3
+}
+for order in created updated; do
+  recent_pr "$order"
+  case $? in
+    0)
+      echo "issue #$N has a PR created or merged since the run started ($since): started"
+      remove_label
+      exit 0
+      ;;
+    2)
+      echo "::warning::could not list recent PRs: the run outcome is not recorded"
+      exit 0
+      ;;
+    3) echo "::notice::3 pages of PRs by $order time did not reach the run start ($since)" ;;
+  esac
 done
-[ "$page" -le 3 ] || echo "::notice::3 pages of recent PRs did not reach the run start ($since): treated as no PR"
 
 # --- ここから: PR も push も無く、明示的な終了状態でもない -> oc:no-pr と構造化コメント ---
 f="${OC_OUTPUT_FILE:-${RUNNER_TEMP:-/tmp}/oc-output.jsonl}"
