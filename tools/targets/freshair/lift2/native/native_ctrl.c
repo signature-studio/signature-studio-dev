@@ -40,7 +40,18 @@ static void __attribute__((ms_abi)) map_hook(void* child, int id, float v, void*
 static unsigned char g_sv_ca[12], g_sv_da[12]; static unsigned char *g_p_ca, *g_p_da; static unsigned char* g_nodeZ;
 static void patch12(unsigned char* p, const void* t, unsigned char* sv) { memcpy(sv, p, 12); p[0] = 0x48; p[1] = 0xb8; memcpy(p + 2, &t, 8); p[10] = 0xff; p[11] = 0xe0; }
 typedef void* (__attribute__((ms_abi)) *ca1480_t)(void*, void*, void*); typedef void (__attribute__((ms_abi)) *da6c00_t)(void*, int, int, int);
+static int g_ca_depth;
 static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key) {
+    /* FA-30 (#2187): FA_CHAIN9=1 は call-through で入力 (C, key 先頭 2 語, key 位置) と戻り out[0..4] を記録する。
+     * setter (0x180c9d700) の再帰は out[0]==0 かつ out[2]!=0 のとき C=out[2], key=out[4] で行われる。 */
+    if (getenv("FA_CHAIN9")) { unsigned char tmp[12]; memcpy(tmp, g_sv_ca, 12); memcpy(g_p_ca, tmp, 12);
+        uint32_t kc = 0xffffffffu, k0 = 0xffffffffu; if (key) { memcpy(&kc, key, 4); memcpy(&k0, (char*)key + 4, 4); }
+        g_ca_depth++; void* r = ((ca1480_t)(g_p_ca))(C, out, key); g_ca_depth--;
+        patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca);
+        uint64_t o[5] = {0}; memcpy(o, out, 40);
+        fprintf(stderr, "CHAIN9 S%d depth=%d C=%p key=%p kc=%u k0=%u out0=%llx out1=%llx out2=%llx out3=%llx out4=%llx\n", g_trSidx, g_ca_depth, C, key, kc, k0,
+                (unsigned long long)o[0], (unsigned long long)o[1], (unsigned long long)o[2], (unsigned long long)o[3], (unsigned long long)o[4]);
+        (void)r; return r; }
     /* FA-29 (#2145): FA_P9MIN=1 は call-through のみ (観測なし・前後の out[0] だけ記録)。full probe との差を切り分ける */
     if (getenv("FA_P9MIN")) { unsigned char tmp[12]; memcpy(tmp, g_sv_ca, 12); memcpy(g_p_ca, tmp, 12);
         if (getenv("FA_P9RD")) { uint64_t c2d0, c328, ctl, h[3]; memcpy(&c2d0, (char*)C + 0x2d0, 8); memcpy(&c328, (char*)C + 0x328, 8); memcpy(&ctl, (char*)C + 0x318, 8); memcpy(h, (char*)ctl + 0xa8, 24); fprintf(stderr, "P9RD S%d ctl=%llx\n", g_trSidx, (unsigned long long)ctl); }

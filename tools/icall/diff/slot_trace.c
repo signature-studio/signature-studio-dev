@@ -49,6 +49,9 @@ static void on_acc(int sig, siginfo_t* si, void* uc_) {
         return;
     }
     fprintf(stderr, "[slot_trace] fatal sig=%d rip=%#llx addr=%p\n", sig, (unsigned long long)g[REG_RIP], si->si_addr);
+    for (int i = 0; i < g_nacc; i++)
+        printf("ACC %llx %llx %llu\n", (unsigned long long)g_acc_addr[i], (unsigned long long)g_acc_rip[i], (unsigned long long)g_acc_cnt[i]);
+    fflush(stdout);
     _exit(95);
 }
 
