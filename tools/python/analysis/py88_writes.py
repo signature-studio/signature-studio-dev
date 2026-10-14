@@ -42,7 +42,9 @@ MOVLIKE = {"mov", "movzx", "movsx", "movsxd", "movsd", "movq", "movd", "movss", 
 ARITH = {"imul", "shl", "shr", "sar", "and", "or", "xor", "neg", "not", "inc", "dec", "sal"}
 FLOATOP = {"mulsd": "*", "addsd": "+", "subsd": "-", "divsd": "/"}
 WRITE_FIRST = MOVLIKE | ARITH | FLOATOP.keys() | {"add", "sub", "lea", "cvtsi2sd", "cvttsd2si", "cvtsd2si"}
+STORE = MOVLIKE | ARITH | {"add", "sub", "adc", "sbb"}
 SIZE_RE = re.compile(r"^(byte|word|dword|qword) ptr \[(.*)\]$")
+IMM_RE = re.compile(r"-?(0x[0-9a-f]+|\d+)")
 TARGET_RE = re.compile(r"0x[0-9a-f]+")
 INNER_RE = re.compile(r"([+-]?)\s*([^\s+-]+)")
 DEPTH_LIMIT = 60
@@ -87,11 +89,6 @@ class Slicer:
                     self.addr_taken.add(int(mm.group(1), 16))
         self.memo = {}
 
-    def dst_fam(self, op):
-        if op in FAM:
-            return FAM[op]
-        return None
-
     def writes_fam(self, mnem, ops):
         if not ops:
             return None
@@ -119,7 +116,7 @@ class Slicer:
                 if fam in CALLER_SAVED:
                     res = f"clob@{a:#x}"
                     break
-            elif m in ("cmp", "test", "jmp", "ret", "nop") or m.startswith("j") or m.startswith("set") and False:
+            elif m in ("cmp", "test", "jmp", "ret", "nop") or m.startswith("j"):
                 pass
             elif m.startswith("cmov") and ops and FAM.get(ops[0]) == fam:
                 res = f"CMOV@{a:#x}({self.ev(ops[1], i, depth + 1)})"
@@ -133,8 +130,6 @@ class Slicer:
             i -= 1
         if res is None:
             res = f"{fam}_in"
-        if i >= 0 and self.order[i] not in ():
-            pass
         for j in range(i + 1, pos):
             if self.order[j] in self.targets:
                 res = res + f" ⚠合流@{self.order[j]:#x}"
@@ -192,8 +187,6 @@ class Slicer:
             return self.mem_read(addr, size, pos, depth + 1)
         if op in FAM:
             return self.resolve(FAM[op], pos, depth + 1)
-        if op.startswith("xmm") or op.startswith("0x") or op.lstrip("-").isdigit():
-            return op
         return op
 
     def addr_expr(self, inner, pos, depth):
@@ -232,14 +225,23 @@ class Slicer:
                 while j >= 0:
                     m, o = self.ins[self.order[j]]
                     ops = parse_ops(o)
-                    if len(ops) == 2 and ops[0].startswith(("dword ptr [rbp + ", "qword ptr [rbp + ")) and ops[0].split("[", 1)[1].rstrip("]") == f"rbp + {offv:#x}":
+                    if m in STORE and len(ops) == 2 and ops[0].startswith(("dword ptr [rbp + ", "qword ptr [rbp + ")) and ops[0].split("[", 1)[1].rstrip("]") == f"rbp + {offv:#x}":
                         break
                     j -= 1
                 joined = j >= 0 and any(self.order[k] in self.targets for k in range(j + 1, pos + 1))
                 if offv == ACC_SLOT:
-                    if j >= 0 and not joined and self.ins[self.order[j]][0] == "mov" and parse_ops(self.ins[self.order[j]][1])[1] in FAM:
-                        return self.resolve(FAM[parse_ops(self.ins[self.order[j]][1])[1]], j, depth + 1)
-                    return "ACC"
+                    if j < 0:
+                        return "ACC"
+                    if joined:
+                        jt = next(self.order[k] for k in range(j + 1, pos + 1) if self.order[k] in self.targets)
+                        return f"ACC?⚠合流@{jt:#x}"
+                    m, o = self.ins[self.order[j]]
+                    ops = parse_ops(o)
+                    if m == "mov" and ops[1] in FAM:
+                        return self.resolve(FAM[ops[1]], j, depth + 1)
+                    if m == "mov" and IMM_RE.fullmatch(ops[1]):
+                        return ops[1]
+                    return f"ACC?⚠store形@{self.order[j]:#x}"
                 if j < 0:
                     if offv in self.addr_taken:
                         return f"{size_name}[rbp+{offv:#x}]⚠addr-taken"
@@ -268,14 +270,23 @@ def default_targets(path):
 
 def category(e):
     if e.startswith("rint("):
-        return "rint(xmm0) (call 0x40c660)"
-    if e.startswith("CALL["):
-        return "CALL[未知の関数] の戻り値"
-    if e.startswith("VCALL"):
-        return "VCALL (vtbl 呼出しの戻り値)"
+        base = "rint(xmm0) (call 0x40c660)"
+    elif e.startswith("CALL["):
+        base = "CALL[未知の関数] の戻り値"
+    elif e.startswith("VCALL"):
+        base = "VCALL (vtbl 呼出しの戻り値)"
+    else:
+        base = "直接式"
+    marks = []
     if "SLOT[" in e:
-        return "SLOT? (フレーム変数が合流を越える・一意に決まらない)"
-    return "その他 (式は一意)"
+        marks.append("SLOT?")
+    if "ACC?⚠" in e:
+        marks.append("ACC?⚠合流")
+    if "⚠合流@" in re.sub(r"ACC\?⚠合流@0x[0-9a-f]+", "", e):
+        marks.append("レジスタ合流")
+    if "clob@" in e:
+        marks.append("call で clob")
+    return base + (" + 未確定: " + ",".join(marks) if marks else "")
 
 
 def main():
