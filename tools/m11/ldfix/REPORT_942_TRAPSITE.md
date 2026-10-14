@@ -1,6 +1,6 @@
 # REPORT_942_TRAPSITE — stage4 survey の trap 9 件の発生箇所と直接の引き金 (#942 受入 1・2)
 
-既知類型との関係: 新規類型は判定しない。unit 53・87・138 の引き金は「文字列 pointer の slot に、値が上位 32bit に入った 64bit 値 (下位 32bit = 0) が入る」形、unit 158 は「文字列の中身が pointer の位置に値として渡る」形。どちらも DEFECTS の既存類型 (D4 など、引数・slot の幅や deref の誤り) と同じ方向の候補。類型名の割当てと `docs/DEFECTS.md` の変更は PM 判断。
+既知類型との関係: 該当なし (新規類型は判定しない。引き金の形は DEFECTS の D4 (引数・slot の幅や deref の誤り) と同じ方向の候補)。類型名の割当てと `docs/DEFECTS.md` の変更は PM 判断。
 
 ## 0. 結論
 
@@ -48,23 +48,26 @@
 | 17 | IR `409c80` | a1=0x482cc・a2=6 (dst)・a3=6 (n) | dst=6 は 412c20 の戻り値 (§0 の推定) |
 | 149 | C `4133f0` | dest=0x10a9f918・src=0 | trap は IR `412e40` |
 | 56 | C `4133f0` | dest=0x10bbf264・src=0x1703f0 | trap は IR `8c6530` |
-| 56 | IR `8c6530` | a1=0x10b72420・a2=0x670067・a3=0x67006f | a2・a3 は UTF-16 "g"/"o" の中身と一致 |
+| 56 | IR `8c6530` | a1=0x10b72420・a2=0x670067・a3=0x67006f | a2 は UTF-16LE の "gg"、a3 は "og" (2 文字分の中身が値として渡る形。1 文字ずつの一致ではない) |
 | 144 | IR `407e20__lifted` | a1=0x10a9f860・a2=0 | 記録に引き金の値なし |
 | 149 | IR `407e20__lifted`・`412e40` | 407e20: a1=0x10bdbe00 / 412e40: a1=0x10a9f8f8・a2=2 | 同上 |
 
 - 記録域は `0x11FFF000`〜 (C 版は `0x11FFF400`・`0x11FFF420`)。SP は trap 時 0x10a9f5xx〜0x10a9f8xx で衝突しない。
 - 53・87・138 の old は全て下位 32bit が 0。値の由来 (`<< 32` が入る経路) は未特定。
+- 導出 (実測ではない): C 版 `function_418190` は `old != 0` のとき `D(old−0xc)` を読む (`m11_ov.c`)。old の下位 32bit が 0〜11 だと、32bit の番地が wrap して範囲外になり trap する。実測の 3 件は下位 32bit が 0 で、この条件に当たる。次の probe では、この条件を満たす値を書く上流 (`function_418210`・`function_59f9a0`) を追う。
 
 ## 3. 受入への反映
 
 - 受入 1 (trap 9 件の原因): **部分**。発生箇所は全件確定。直接の引き金は unit 53・87・138 (`*dest` の上位 32bit 値)、unit 158 (文字列の中身が値として渡る) で値まで確認。unit 17 は推定。56・144・149 は未確定。
 - 受入 2 (boot threw): **部分**。通常 boot の trap は unit 17 と同一箇所。上流の引き金は unit 17 の推定 (412c20 の戻り値 6)。
-- 受入 3: 変更なし (#1469 の判定を維持)。
+- 受入 3: 変更なし。#1469 (PR・MERGED) で達成済み。#1292 (issue) は CLOSED。
 
 ## 4. 測定
 
-- 測定 commit: `686fb627` (`trap_units.mjs` の chain 出力追加)。e2e の経路コードは origin/main `a8c02d48` と同一 (`git diff a8c02d48 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_450560.py tools/m11/m11_ov.c | wc -l` → `0`)。
-- e2e (HEAD `686fb627`): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` → **57.6 秒 (real)・rc 0・judge PASS**。load 0.89 / 0.60 / 0.33 (実行直後)。stage4 units 17/942・icall 24・threw OOB (base = fix)。survey ok 136 / trap 9 (base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
+- §1 の測定 commit: `686fb627` (`trap_units.mjs` の chain 出力追加)。差分 0 の証跡: `git diff 686fb627 HEAD -- tools/m11/ldfix/trap_units.mjs | wc -l` → `0`。
+- e2e の測定 commit: `dd6ec9ec` (main `46c92356` の取り込み後の HEAD)。e2e の経路は `686fb627` から変わっていない: `git diff 686fb627 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_450560.py tools/m11/m11_ov.c | wc -l` → `0`。
+- e2e (n=3・同一 HEAD): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` → **58・58・68 秒 (min–max 58–68 秒)・rc 0 (3/3)・judge PASS (3/3)**。実行直前の 1 分 load 0.33 / 1.76 / 1.34。stage4 units 17/942・icall 24・threw `memory access out of bounds` (base = fix)。survey ok 136 / trap 9 (base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
+- 参考 (n=1 の別 run): 57.6 秒 (`686fb627`)・67.8 秒 (review の再実行 `2df6909f`)。
 - probe 変種 (IR 版 + C 版の複製): build rc 0・units_run 17・threw OOB (base と同一)。§2 の値はこの変種の survey 実行による。
 
 ## 5. 次の入口
@@ -93,10 +96,7 @@ tar --zstd -xf <素材>/work-liftdiff.tar.zst -C .
 FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh
 S4_NAME=base S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap_units.mjs
 python3 tools/m11/ldfix/probe_942.py tools/m11/work/boot_final3.ll tools/m11/ldfix/work/probe_942.ll
-# C 版の複製: stage4.sh は $HERE/.. を M11 として読むので、$RUNNER_TEMP/v/tools/m11 に
-# tools/m11 の各要素を symlink し、ldfix は直下のファイルを copy する。m11_ov.c だけ
-# python3 tools/m11/ldfix/probe_c_942.py tools/m11/m11_ov.c <out.c> の出力に置き換える。
-(cd $RUNNER_TEMP/v/tools/m11/ldfix && bash stage4.sh work/probe_942.ll probe)
-S4_NAME=probe S4_IMAGE=tools/m11/work/m11_image.bin node $RUNNER_TEMP/v/tools/m11/ldfix/trap_probe_942.mjs
 python3 tools/m11/m11_wasmnames.py tools/m11/ldfix/work/stage4/base/m11_boot.cjs.wasm 14871 14873 725
 ```
+
+C 版 (`probe_c_942.py`・§2 の 53・87・138・158・17 の値) の再現は**本 fix では未実行** (review の m7)。review が行った手順: `cp tools/m11/m11_ov.c <退避先>` → `python3 tools/m11/ldfix/probe_c_942.py <退避先> tools/m11/m11_ov.c` で差し替え → `(cd tools/m11/ldfix && bash stage4.sh work/probe_942.ll probe)` と `S4_NAME=probe S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap_probe_942.mjs` を実行 → `cp <退避先> tools/m11/m11_ov.c` で戻す (`git checkout` は使わない)。戻した後、`git diff --stat -- tools/m11/m11_ov.c` が空であることを確認する。
