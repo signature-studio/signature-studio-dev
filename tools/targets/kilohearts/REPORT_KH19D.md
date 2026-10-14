@@ -7,7 +7,7 @@
 
 ## 0. 結論
 
-- 受入 1 の「KH-19b で確定した closure」はまだ確定していない (手検証 160 との差分判定は #2176 待ち)。本節が lift したのは**未確定の before 160** (直接 call 閉包の下界・機械生成)。確定 closure の lift は未実施 (子 issue KH-36)。
+- 受入 1 の「KH-19b で確定した closure」はまだ確定していない (手検証 160 との差分判定は #2176 待ち)。本節が lift したのは**未確定の before 160** (直接 call 閉包の下界・機械生成)。確定 closure の lift は未実施 (子 issue #3063)。
 - x64c で **148 関数**を lift した。before 160 との差 12 件の内訳は §3 (tail jmp 9・IAT thunk 2・取りこぼし 1)。
 - 最初の build 失敗点: **`fle_data_gen.py` に直書きされた FLEngine 固有の VA `0x42f670` の窓**。Kilohearts の像の外で負の番地になり、emcc が字句エラーで止まる (§4 の B)。範囲内に限る 1 行で解消。
 - 既定 ImageBase (`0x180000000`) のままでは wasm32 の番地に収まらない。像を `0x2000000` 起点へ shift すると、compile・link・smoke が通る (§4 の C)。ただし正しさは未検証 (bit 突合は範囲外)。
@@ -71,7 +71,7 @@ KH_CORE=<winpkg/HeartCore.core_64> OUT=<repo 外の出力先> EMSDK=<emsdk の�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 確定 closure (手検証 160 との差分 0) の lift と build | 受入 1 の「確定 closure」は未確定。本節は未確定の before 160 | KH-36 (子・前提 #2176) |
-| x64c の閉包の取りこぼし 1 件 (`0xfc7468`)・tail jmp と thunk の数え方 | 関数数 148 ≠ 160 | KH-37 (子) |
-| unsup 285 site (VEX / FMA 系 48 mnemonic 種) | 実行到達時に `ott_unsup` で停止 | KH-38 (子) |
+| 確定 closure (手検証 160 との差分 0) の lift と build | 受入 1 の「確定 closure」は未確定。本節は未確定の before 160 | #3063 (KH-36・前提 #2176) |
+| x64c の閉包の取りこぼし 1 件 (`0xfc7468`)・tail jmp と thunk の数え方 | 関数数 148 ≠ 160 | #3064 (KH-37) |
+| unsup 285 site (VEX / FMA 系 48 mnemonic 種) | 実行到達時に `ott_unsup` で停止 | #3065 (KH-38) |
 | bit 突合 (native 対照) | 範囲外 (issue 本文) | 起票なし |
