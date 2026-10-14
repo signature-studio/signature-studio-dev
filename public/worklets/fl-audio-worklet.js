@@ -96,6 +96,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
       const qv = Atomics.load(i, x.quanta) | (d < 0 ? 0x80000000 : 0);   // 位置: 最初と直近の jump (bit31 = 負)
       if (nj === 1) Atomics.store(i, x.clock_first_q, qv);
       Atomics.store(i, x.clock_last_q, qv);
+      if (nj <= 256) this.port.postMessage({ type: "clock_jump", q: Atomics.load(i, x.quanta), d, frame, prev: this.prevFrame, ms: Date.now() });   // 全件の位置 (上限 256 件)
       if (d > 0) Atomics.add(i, x.clock_skip_frames, d); else Atomics.add(i, x.clock_dup_frames, -d);
       if (Math.abs(d) > Atomics.load(i, x.clock_jump_max)) {
         Atomics.store(i, x.clock_jump_max, Math.abs(d));

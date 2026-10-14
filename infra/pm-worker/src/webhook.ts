@@ -1,6 +1,7 @@
 // webhook 受信の純関数。署名を検証してから状態を変える (未検証の入力では状態を一切変えない)。
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
+import { bodyArtLine } from "./launch.ts";
 import { needsPmDecision } from "./needs.ts";
 import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
 
@@ -30,6 +31,8 @@ export interface IssueState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // 本文の最終の oc_artifacts 行 (検証済みの 1 行。先頭 4,000 字から抽出し、無ければ未設定)。launch の素材行の既定 (#2758)。本文が変わるたびに取り直す。
+  artLine?: string;
 }
 export interface PrState {
   number: number;
@@ -199,6 +202,7 @@ function applyIssue(s: PmState, p: Json): PmState {
   const k = String(i.number);
   if (!newer(s.issues[k], i.updated_at)) return s;
   const closed = i.state === "closed";
+  const art = closed ? null : bodyArtLine(i.body ?? "");
   const summary = i.issue_dependencies_summary?.total_blocked_by;
   const next: IssueState = {
     number: i.number,
@@ -212,6 +216,7 @@ function applyIssue(s: PmState, p: Json): PmState {
     author: i.user?.login ?? s.issues[k]?.author,
     authorType: i.user?.type ?? s.issues[k]?.authorType,
     assoc: i.author_association ?? s.issues[k]?.assoc,
+    ...(art ? { artLine: art } : {}),
   };
   let out: PmState = { ...s, issues: { ...s.issues, [k]: next } };
   // needs-user-input が付いた時刻。labeled の配送だけが時刻を持つ (REST は engine が events から補う)。外れたら消す。
