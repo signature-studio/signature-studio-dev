@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { verifyJwtShape } from "./jwt.ts";
 import {
   BOT,
+  REPO,
   T0,
   commentPayload,
   configuredApp,
@@ -13,6 +14,7 @@ import {
   send,
   type Call,
 } from "./helpers.ts";
+import { prEv } from "./pm_helpers.ts";
 
 const comments = (calls: Call[]) => calls.filter((c) => c.method === "POST" && /\/issues\/\d+\/comments$/.test(c.url));
 const dispatches = (calls: Call[]) => calls.filter((c) => c.method === "POST" && c.url.endsWith("/dispatches"));
@@ -630,6 +632,33 @@ test("reconcile: webhook を取りこぼした完了 run・close・新規 issue 
   assert.equal(ctx.app.engine.countActive(), 0, "一覧に無い run は completed とみなす");
   assert.ok(ctx.m.calls.every((c) => c.method === "GET" || c.url.includes("/app/")), "reconcile は読むだけ");
   assert.ok(ctx.m.calls.filter((c) => !c.url.includes("/app/")).length <= 12, "REST は最小限");
+});
+
+test("reconcile (#2639): REST の一覧から取る停止印も、作者の型 Bot と markLogin で数える。型 User の同じ login・実装 App の印は数えない", async () => {
+  const at = new Date(T0 - 60_000).toISOString();
+  const stop = (n: number) => `上限 <!-- oc-fix-limit --> <!-- oc-pm-intent: stuck pr=${n} reason=ceiling -->`;
+  const comment = (id: number, n: number, user: { login: string; type: string }) => ({
+    id,
+    issue_url: `https://api.github.com/repos/${REPO.full_name}/issues/${n}`,
+    created_at: at,
+    user,
+    author_association: "NONE",
+    body: stop(n),
+  });
+  const ctx = await configuredApp({
+    now: { t: T0 },
+    handlers: syncHandlers({
+      comments: [
+        comment(100, 10, { login: "github-actions[bot]", type: "Bot" }),
+        comment(101, 11, { login: "github-actions[bot]", type: "User" }),
+        comment(102, 12, { login: BOT, type: "Bot" }),
+      ],
+    }),
+  });
+  for (const n of [10, 11, 12]) assert.equal((await send(ctx.app, "pull_request", prEv(n, { labels: ["oc:stuck"] }))).status, 202);
+  await markFresh(ctx);
+  await ctx.app.engine.reconcile(await (ctx.app.engine as any).d.gh());
+  assert.deepEqual(ctx.app.engine.detectPmTargets().map((t) => `${t.kind}#${t.ref}`), ["stuck#10"]);
 });
 
 test("reconcile: status=requested の run は一覧に出るので completed 扱いにしない", async () => {
