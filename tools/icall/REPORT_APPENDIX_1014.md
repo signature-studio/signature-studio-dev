@@ -10,7 +10,7 @@
   1. GVN 段: `function_1cc0000` は段 401 (`Global Value Numbering`)、`function_1cc9b70` は段 402。stub 呼出しを含むブロックは 114 / 121。
   2. SCCP 段: 段 405 / 406 (`Sparse Conditional Constant Propagation`)。stub 呼出しはこの段で減る (段ごとの数の正本は `REPORT_APPENDIX.md` §12.1。本付録 §2 の再実行で一致)。ブロック数はこの段では変わらない。
   3. 最初にブロック数が減る段 (Jump Threading): 段 413 / 414。ブロック数は 303 → 29、316 → 42。落ちた site のブロック 114 + 114 がここで消える。
-- `function_1cc9b70` の kept 8 site (6 ブロック) は SCCP 段と Jump Threading 段の後も残る。SCCP 段の stub 9 本は、kept 8 本と comis 1 本の内訳 (§3)。
+- `function_1cc9b70` の kept 8 site (6 ブロック、§3 の kept 列) は SCCP 段と Jump Threading 段の後も残る。SCCP 段で残る stub の段ごとの数は本付録に書かず、正本は `REPORT_APPENDIX.md` §12.1 (再実行との一致は §2)。
 
 ## 2. 測定
 
