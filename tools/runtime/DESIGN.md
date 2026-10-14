@@ -14,6 +14,7 @@
 | D4 | pthread | **emcc の pthread glue をそのまま使う** (`-pthread -sPROXY_TO_PTHREAD -sPTHREAD_POOL_SIZE=N`)。Module は `instantiateWasm` フックで自前 compile 済みを注入 | emcc pthread がヘッドレス Chrome で動作 (4 スレッド×1M atomic add = 4,000,000 一致、cond ping-pong 19µs)、Module 注入も動作 (§2.4) |
 | D5 | ブート/キャッシュ | wasm は **Worker 内 `fetch → compileStreaming`**、ハッシュ名 + `immutable` の **HTTP キャッシュ**。**IndexedDB への Module 保存は不可** (実測 DataCloneError)。Cache API は opt-in | compile は lazy で安価 (1.5ms/MiB)。code cache による追加高速化は観測されず (§3) |
 | D6 | COOP/COEP | `same-origin` + `require-corp`。wasm は **同一オリジン** 配信 (R2 カスタムドメイン同一ホスト) か、別オリジンなら `CORP: cross-origin` + CORS | `crossOriginIsolated=true` が SAB/Atomics.wait/共有メモリの前提 |
+| D7 | 機能検出 | **機能ごとに起動時 1 回検出し、ブラウザ名・UA では分岐しない**。既定は wasm32。memory64・JSPI は検出で切り替えず、無い場合の退避を §4.1 で定める | Firefox と WebKit 参考値で memory64・JSPI の有無が異なる (REPORT RT-9・`REPORT_APPENDIX_127.md`)。Safari は未測定のため可否を仮定しない |
 
 ## 1. メモリモデル
 
@@ -151,17 +152,29 @@ OPFS は Worker 内 `createSyncAccessHandle` が同期で使える (実測) → 
 
 e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome → 4 wasm を Worker で実行し **元の emcc glue を node で実行した参照値とビット一致を確認** (M10 hash `824c6c48`/`cdd4ee04`, M6 `fb31ca9a`, M1 stdout, M11 `{m11_dllmain_done:1}`/stage=1) + pump 自己検証 (2000 件欠落 0, WM_TIMER ≥3, 実ブロッキング wait 発生)。`--prod` は `vite build` + preview の本番バンドルで、`--cache=cacheapi --compile=bytes` で別経路も検証可。
 
-### 4.1 機能検出フォールバック (RT-9 設計案・**未実装**・Safari 入力待ち)
-入力: Chrome 154 / Firefox 157 は memory64・JSPI・shared memory・Worker 内 Atomics.wait・OffscreenCanvas がすべて可 (実測は REPORT.md)。Safari は未測定のため、以下は検出順序と退避先の設計で、Safari の可否は仮定しない。
+### 4.1 機能検出フォールバック (RT-9 確定・実装は未着手・Safari 実機は未検証)
+
+方針 (確定):
+- 検出は**機能ごと**に行う。ブラウザ名・UA で経路を分けない。
+- 検出は起動時に 1 回行い、結果を `window.__webstudio` 契約側へ公開する想定 (契約は未実装)。
+- 入力は Firefox 157 の実測 (`REPORT.md` RT-9 節・付録) と WebKit 26.0 の参考値 (`REPORT_APPENDIX_127.md`)。実測値は本節に複製しない。Safari の可否は仮定しない。
+- 既定は wasm32 (§1)。memory64 と JSPI は既定経路の前提にせず、無くても起動が成立する退避先を定める。
+
 | 機能 | 検出 | 無い場合の退避 |
 |---|---|---|
-| 実行可否 (必須) | `crossOriginIsolated && typeof SharedArrayBuffer` と shared Memory 生成 | pthread/ring 経路が成立しないため起動せず、非対応メッセージを表示 (退避なし) |
-| memory64 | `WebAssembly.validate` (features.json の `memory64`) と `new Memory({address:"i64"})` | §1 の決定どおり wasm32 が既定で、memory64 は退避トリガ時のみ使う。**検出結果で wasm32↔wasm64 を切替える実装は不要** (配信ビルドは wasm32 のみ) |
-| JSPI | `typeof WebAssembly.promising` と `Suspending` | §2 の決定どおり JSPI は副次手段。無ければ ring (`Atomics.wait`) 経路のみ。async→sync 橋渡しが必要な VFS は補助 Worker sync-RPC へ |
-| OffscreenCanvas | Worker 内 `getContext("webgl2")` 成功 | 失敗時はメインスレッド canvas + 描画コマンド転送 (RT-3 で設計)。headless では判定できない (Firefox の Worker 内 WebGL2 は Xvfb 非 headless で判定可、REPORT.md RT-9)。実機判定は Safari 等で必要 |
-| AudioWorklet | `ctx.audioWorklet.addModule` の成否 | 無音で起動せず明示エラー (音声は sample clock マスター: RT-4) |
-| Module 永続化 | IDB 保存は Chrome/Firefox とも不可 | HTTP キャッシュ + hash 名 immutable のみ (§3 の決定どおり) |
-検出は起動時に 1 回、結果を `window.__webstudio` 契約側へ公開する想定 (契約は未実装)。Firefox 固有の注意: 非 shared memory64 の大域 grow が遅い (REPORT.md の RT-9 節) ため、memory64 を使う場合は shared かつ事前確保を優先する。
+| 実行可否 (必須) | main: `crossOriginIsolated && typeof SharedArrayBuffer !== "undefined"`。Worker: shared Memory 生成と、`Atomics.wait` が `"timed-out"` を返すこと (TypeError でないこと) | ring 経路 (`Atomics.wait`) が成立しないため起動せず、非対応メッセージを表示 (退避なし) |
+| memory64 | `WebAssembly.validate` で memory64 モジュールを検証 | 既定は wasm32 のため不要。検出結果で wasm32↔wasm64 を切り替えない。wasm64 ビルドは §1.5 の退避トリガ時だけ使う |
+| JSPI | `typeof WebAssembly.promising === "function" && typeof WebAssembly.Suspending === "function"` | 副次手段のため無くても成立する。無ければ ring 経路のみ。async→sync の橋渡し (VFS 等) は補助 Worker の sync-RPC へ (§2.5、未実装) |
+| OffscreenCanvas | Worker 内で `transferControlToOffscreen()` と `getContext("2d")` が成功すること | メインスレッド canvas + 描画コマンド転送 (RT-3 で設計) |
+| Worker 内 WebGL2 | Worker 内で `getContext("webgl2")` (実行時に判定。headless では判定できない) | GUI の描画は 2D (RT-3)。GL 描画を使う段階で退避を設計する (未決) |
+| VFS (OPFS sync handle) | Worker 内で `navigator.storage.getDirectory()` と `createSyncAccessHandle` | **退避は未設計 (未解決)**。WebKit 参考値では `navigator.storage` が無い。Safari の有無は未確認 |
+| AudioWorklet | `ctx.audioWorklet.addModule` の成否と、`ctx.resume()` が時限内に解決すること | 無音で起動せず明示エラー (音声は sample clock マスター: RT-4)。時限の値は実装時に決める。Firefox は音声 backend が無いと `resume()` が解決しない |
+| Module 永続化 | IDB への `WebAssembly.Module` 保存 | Chrome / Firefox とも保存不可 (実測) のため、HTTP キャッシュ + hash 名 immutable のみ (§3) |
+
+Safari 実機の照合 (三項目):
+- Safari 実機の `window.__result` (#949 で依頼) が届いたら、上表の「検出」列と照合する。照合は新規 issue で行う。
+- 「実行可否」の項目が 1 つでも false なら非対応表示の範囲を見直す。それ以外の行が上表の前提と違えば、その行の「無い場合の退避」を改訂する。
+- 全項目が上表の前提と一致すれば、本節の見出しを「Safari 実機で確認」に変える。
 
 ## 5. 未解決・要確認
 1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Playwright WebKit 26.0 (Linux・Safari ではない参考値) は memory64・JSPI が無い (`REPORT_APPENDIX_127.md`)。Firefox の AudioWorklet は仮想音声 sink、Worker WebGL2 は Xvfb で判定済み (REPORT.md RT-9)。実音声デバイス・GPU での挙動は未測定。
@@ -170,3 +183,4 @@ e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome →
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU での OffscreenCanvas 性能は未測定。
 5. Memory 個数上限 (~125) と「プラグイン=1 Memory」方針の整合 (§1.4)。
 6. 性能ベンチは共有 VM 上 (load 9–20)。メモリ64 の定量は静かな機で再測が必要。
+7. VFS (OPFS sync handle) が無い環境での退避は未設計 (§4.1)。WebKit 参考値では `navigator.storage` が無い。Safari の有無は未確認。Safari 実機の照合の結果を見てから起票する。
