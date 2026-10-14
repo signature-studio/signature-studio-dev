@@ -74,17 +74,18 @@ PE から確定した契約 (保留の中身。実装には使わない):
 
 ## 検証
 
-測定 commit: `2310cdcb` (`analysis/flapi/pe_ui_ops_probe.py` 追加。以降の commit は md のみ)。ただし mock / C は本 PR で一切変えていないため、件数・差分は PY-27 基準の値と同じ。
+測定 commit: `2310cdcb` (`analysis/flapi/pe_ui_ops_probe.py` 追加)。検証は HEAD `13b6ae46` (REPORT・DOC_MAP のみ追加) の作業ツリー clean 状態で再実行した。mock / C は本 PR で一切変えていないため、件数・差分は PY-27 基準の値と同じ。
 
-環境: runner 4 core、load average は開始時 0.29 (`uptime`、20:52)。`FL_WIN64_DIR=/home/runner/work/_temp/fl-win64` (`block00031_PE.bin` と DATA 4 本を展開)。`/opt/emsdk` (6.0.12) を使用。
+環境: runner 4 core、load average は開始時 0.29 (`uptime`、20:52)、検証時 0.10 (21:04)。`FL_WIN64_DIR=/home/runner/work/_temp/fl-win64` (`block00031_PE.bin` と DATA 4 本を展開)。`/opt/emsdk` (6.0.12) を使用。
 
 前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 31 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒)・`bash provider/build.sh` (rc 0、1.0 秒、ハンドラ 83)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/provider_check.mjs` | PASS (435 / 実装 83 / 未実装 352 / MCP 静的 60)。PY-120 の増減は 0 のため期待値は据え置き | 0.29 秒 |
+| `bash provider/build.sh` (HEAD で再実行) | rc 0・ハンドラ 83 | 0.72 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 83 / 未実装 352 / MCP 静的 60)。PY-120 の増減は 0 のため期待値は据え置き | 0.28 秒 |
 | `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.39 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.25 秒 |
 | `py_compile analysis/flapi/pe_ui_ops_probe.py` | rc 0 | — |
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `windows` 既定値 (29 行) の `0: true` を `0: false` に変えると、`node tests/ui_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 17・diffs 0・PASS (rc 0)。
