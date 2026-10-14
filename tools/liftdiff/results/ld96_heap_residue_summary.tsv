@@ -1,6 +1,6 @@
 run	side	functions	audited_cases	z_with_residue	z_n_min	z_n_max	z_n_gt_1000	z_n_sum
-solo	native	19	209	1	1	1	0	1
-solo	wasm	19	205	1	1	1	0	1
+solo	native	18	198	0	-	-	0	0
+solo	wasm	18	194	0	-	-	0	0
 chunk0	native	399	409	0	-	-	0	0
 chunk0	wasm	399	409	0	-	-	0	0
 chunk1	native	400	580	0	-	-	0	0
