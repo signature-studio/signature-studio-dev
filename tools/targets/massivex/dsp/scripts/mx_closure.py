@@ -14,7 +14,13 @@ thunk 領域 = RVA 0x396e000-0x3970200 (jmp [rip+IAT] スタブ列。capstone �
   `call qword ptr [rip+X]` を括弧付きで印字するので startswith('0x') では拾わない。
   ここは明示除外)。
 
-usage: mx_closure.py <pe> <rtti_vtables.json> <out_prefix>
+MODE (第 4 引数・既定 linear):
+  linear = 旧方式。入口から次の入口まで線形に disasm (jump table・文字列窓も code 扱い)。
+  flow   = code/data 区別つき再帰降下 (MX-13)。入口から制御フローで到達する命令だけを code とする。
+           fall-through・直接 jmp/jcc (関数内は追う)・直接 call (callee)・tail jmp。間接 jmp
+           (jump table) の先は追わず、テーブル窓は decode しない (未解決件数 indirect_unres)。
+
+usage: mx_closure.py <pe> <rtti_vtables.json> <out_prefix> [linear|flow]
 """
 import sys, json, pickle, bisect, re, collections, struct
 import pefile, capstone
@@ -56,7 +62,6 @@ def main(path, vtp, outp):
 
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 
-    begins = sorted(fsz)
     # ---- seeds
     seeds = set(EXPORTS.values())
     vt = json.load(open(vtp))
@@ -75,13 +80,51 @@ def main(path, vtp, outp):
     for v in fam.values():
         seeds |= v
 
+    def flow(e, fb):
+        work, ins, cs = [e], set(), set()
+        nb = ni = un = 0
+        while work:
+            a = work.pop()
+            try:
+                for ea, iz, mn, ops in md.disasm_lite(data[off(a):off(a) + 4096], base + a):
+                    r = ea - base
+                    if r in ins or not (e <= r < fb):
+                        break
+                    ins.add(r)
+                    nb += iz
+                    ni += 1
+                    if mn in ('ret', 'int3', 'ud2', 'hlt'):
+                        break
+                    if mn == 'call':
+                        if ops.startswith('0x'):
+                            tg = int(ops, 16) - base
+                            if t_lo <= tg < t_hi and not (THUNK_LO <= tg < THUNK_HI):
+                                cs.add(tg)
+                        continue
+                    if mn.startswith('j'):
+                        if not ops.startswith('0x'):
+                            un += 1
+                        else:
+                            tg = int(ops, 16) - base
+                            if e <= tg < fb:
+                                work.append(tg)
+                            elif t_lo <= tg < t_hi and not (THUNK_LO <= tg < THUNK_HI):
+                                cs.add(tg)
+                        if mn == 'jmp':
+                            break
+            except capstone.CsError:
+                pass
+        return cs, nb, ni, un
+
     # ---- recursive descent over entry points only
     entries = set(seeds)
     callees = {}
     rounds = 0
+    rlog = []
     while True:
         rounds += 1
         new = set()
+        st = collections.Counter()
         sl = sorted(entries)
         for e in sl:
             if e in callees:
@@ -104,6 +147,15 @@ def main(path, vtp, outp):
             if sz <= 0:
                 callees[e] = []
                 continue
+            st['linear'] += sz
+            if MODE == 'flow':
+                cs, nb, ni, un = flow(e, e + sz)
+                st['reached'] += nb
+                st['insn'] += ni
+                st['unres'] += un
+                callees[e] = sorted(cs)
+                new |= {tg for tg in cs if tg not in entries}
+                continue
             cs = set()
             try:
                 for a, iz, mn, ops in md.disasm_lite(data[off(e):off(e) + sz], base + e):
@@ -120,7 +172,10 @@ def main(path, vtp, outp):
             callees[e] = sorted(cs)
         before = len(entries)
         entries |= new
-        sys.stderr.write('round %d entries %d (+%d)\n' % (rounds, len(entries), len(entries) - before))
+        rlog.append({'round': rounds, 'entries': len(entries), 'added': len(entries) - before,
+                     'linear_bytes': st['linear'], 'reached_bytes': st['reached'],
+                     'reached_insns': st['insn'], 'indirect_unres': st['unres']})
+        sys.stderr.write('round %d entries %d (+%d) %s\n' % (rounds, len(entries), len(entries) - before, rlog[-1]))
         if len(entries) == before:
             break
 
@@ -135,7 +190,8 @@ def main(path, vtp, outp):
             stk.extend(callees.get(f, ()))
         return seen
 
-    out = {'pe': path, 'base': hex(base), 'image_size': hex(pe.OPTIONAL_HEADER.SizeOfImage),
+    out = {'pe': path, 'mode': MODE, 'rounds_log': rlog,
+           'base': hex(base), 'image_size': hex(pe.OPTIONAL_HEADER.SizeOfImage),
            'pdata_funcs': len(fsz), 'pdata_bytes': sum(fsz.values()), 'text_size': t.Misc_VirtualSize,
            'n_family_slots': sum(len(v) for v in fam.values()),
            'family_classes': {k: len(v) for k, v in sorted(fam.items())},
@@ -167,4 +223,6 @@ def main(path, vtp, outp):
 
 
 if __name__ == '__main__':
+    MODE = sys.argv[4] if len(sys.argv) > 4 else 'linear'
+    assert MODE in ('linear', 'flow'), MODE
     main(sys.argv[1], sys.argv[2], sys.argv[3])
