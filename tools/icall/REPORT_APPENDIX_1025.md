@@ -41,7 +41,7 @@ $ git diff a42f84e1 HEAD -- tools/icall/kh_route_build.sh tools/icall/ir_*.py to
 fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は出典不明のハードコードだったため削除)、`ir_flatten.py --cfg` に `map.json` の `cfg_thunks` を渡す (OTT `ott_route.sh` と同じ生成式)。
 `cfg_thunks` が空であることは上表の `map.json` の値で確認済み。
 
-## 未解決
+## 未解決 (a42f84e1 時点・旧。現状は REPORT_APPENDIX_1025_FIX.md)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
