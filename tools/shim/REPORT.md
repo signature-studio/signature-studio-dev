@@ -79,7 +79,7 @@ fix round 1 (reviewer 指摘 1: emcc が無く test.sh を独立に再実行で�
 
 | 検証 | 結果 |
 |---|---|
-| `bash tools/shim/test.sh` (commit `7278e857`・ワークツリー clean・emsdk は `/opt/emsdk` を使用) | rc=0・所要 2.30 s (wall)・load average 0.29 / 0.29 / 0.13 (21:19 UTC)。MT `ALL PASS`・ST `ALL PASS`・fail-fast PASS (exit=1・stderr に関数名) |
+| `bash tools/shim/test.sh` (commit `7278e857`・ワークツリー clean・emsdk は `[EMSDK]` (docs/REFERENCES.md §4) を使用) | rc=0・所要 2.30 s (wall)・load average 0.29 / 0.29 / 0.13 (21:19 UTC)。MT `ALL PASS`・ST `ALL PASS`・fail-fast PASS (exit=1・stderr に関数名) |
 | ネガティブコントロール: 旧 `heap.c` (`origin/main`) + 新 `test_main.c` を `tools/shim` の一時コピーで実行 | rc=1・`[M4-shim] FAIL: MT unit test 失敗` (新テストが旧 FALSE を検出) |
 | `git diff 7278e857 HEAD -- tools/shim/src tools/shim/test` | 本 REPORT の commit 後に確認する (以後の code 差分 0 行の確認は PR 本文に記載) |
 
