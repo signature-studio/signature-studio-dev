@@ -309,6 +309,14 @@ UTF-16 blob は 1 pattern 1 本の固定で、長さや内容の変化を試し�
 flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無い) は未実測。
 起票先: 本 issue #235 (部分達成のため Refs)。
 
+### 12.1.1 LD-48 (#1398): VMT slot への仮 proc 番地配置 (部分達成)
+
+- 実装: `rt/ld_core.h` `ld_fakeproc_vmt` が snapshot 前に `?vmslot0..7` を index 0..7 で両ランナ同順に登録。`ldlib/cases.py` `make_blob_vm` は VMT slot k (arena+0x2000+8k) に `0x50010000+k*32` を書く。
+- 測定 commit: 作業 branch `1398-ld48-fvm-vmt` の実装 commit (base = origin/main 025bdd8a)。`liftdiff_e2e.sh --m11-only` は rc 0・`LIFTDIFF_E2E PASS` (3 分 12 秒・4 vCPU・load 0.99→6.18)。
+- sample:800 (同一 worktree で base / 新を連続実測・`--shards 12 --state auto`): base 361 / 229 / 210、新 361 / 232 / 207。
+- fvm の件数: 427 件 = native_fault 182 / both_fault 244 / hang 1。**equal / diff / wasm_trap は 0 件** (受入条件 (2) 未達)。native は `rip=0xb` で segv し、VMT slot の仮 proc まで到達していない (引数値を関数ポインタとして呼ぶ経路)。
+- 既存 pattern の遷移 (base → 新): `vm0` native_fault→diff 3・both_fault→wasm_trap 1・both_fault→hang 1、`p0` hang→native_fault 1、`pall`/`qall` both_fault→hang 各 1。登録 8 件で nfakeproc がずれ、GetProcAddress 応答の index も変わるため、この差は登録の副作用。受入条件 (3) は未達 (理由は上記、登録を VMT 専用の index 域へ分ける案が次の作業)。
+
 ### LD-24 (#976) 署名未対応 50 関数の内訳 (REPORT §12 から移動)
 
 m11 closure の `unsupported_sig` 50 件は未実装。分割先は #1193 と #1194。詳細・件数の注記・受入条件: [`REPORT_LD24.md`](REPORT_LD24.md)。

@@ -466,7 +466,21 @@ static void ld_add_wr(u64 rva, u64 len) {
   if (ld_nwr >= LD_MAX_WR) return;
   ld_wr[ld_nwr].rva = rva; ld_wr[ld_nwr].len = len; ld_wr[ld_nwr].pristine = NULL; ld_nwr++;
 }
+/* LD-48 (#1398): fvm の VMT slot k に置く仮 proc を、snapshot 前に index k で両ランナ同順に登録する
+ * (slot 値 = LD_FAKEPROC_BASE + k*LD_FAKEPROC_SZ = ld_fake_ptr(k)。cases.make_blob_vm と一致させる) */
+#define LD_VMT_SLOTS 8
+static void ld_fakeproc_vmt(void) {
+  static int done;
+  if (done) return;
+  done = 1;
+  if (ld_nfakeproc != 0) fprintf(stderr, "[ld_core] VMT slot 登録は仮 proc 0 件の時だけ行う (nfakeproc=%d)\n", ld_nfakeproc);
+  for (int k = 0; k < LD_VMT_SLOTS; k++) {
+    char nm[32]; snprintf(nm, sizeof nm, "?vmslot%d", k);
+    ld_fakeproc_get(0x5ffe0000ull, nm);
+  }
+}
 static void ld_snapshot(void) {
+  ld_fakeproc_vmt();
   for (int i = 0; i < ld_nwr; i++) {
     free(ld_wr[i].pristine);
     ld_wr[i].pristine = (u8*)malloc(ld_wr[i].len);
