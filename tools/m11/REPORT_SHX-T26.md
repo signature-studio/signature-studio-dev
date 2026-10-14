@@ -6,7 +6,7 @@
 
 - 測定 commit: `9741735f` (main 取り込み済み・本 PR は REPORT のみ)。素材 `work-m11.tar.zst` (`tools/m11/work/` に展開, gitignore)。
 - 測定経路の差分 (`git diff 9741735f HEAD -- tools/m11/shimx_link tools/m11/guard699 tools/m11/m11_build.sh tools/shimx`): 出力 0 行。測定に使った run_trace.mjs・build.sh・m11_guard699.py は無変更。
-- 範囲を広げた差分 (`git diff 9741735f HEAD -- tools/m11 tools/shimx`): main 取り込みで 10 ファイル (+692 −3) が入った。内訳は別 issue 由来の REPORT と `m11_argrecover_verify.py`・`m11_setother_ssa_value.py`・`judge_dump.py`・`ldfix/audit_undefload_dest.py` で、本測定の経路には含まれない。素材 `work-m11` が取得できないため、この差分込みの再測定は未実施。
+- 範囲を広げた差分 (`git diff 9741735f HEAD -- tools/m11 tools/shimx`): main 取り込みで入ったのは 9 ファイル (+643 −3)。内訳は別 issue 由来の REPORT と `m11_argrecover_verify.py`・`m11_setother_ssa_value.py`・`judge_dump.py`・`ldfix/audit_undefload_dest.py` で、本測定の経路には含まれない。PR 自身の `REPORT_SHX-T26.md` (+49) を含めた `tools/m11 tools/shimx` 全体は 10 ファイル (+692 −3)。素材 `work-m11` が取得できないため、この差分込みの再測定は未実施。
 - trap stack 最上段 `wasm-function[1352]` の関数名は **`function_4133f0`** (export 表で特定)。ただし番号 1352 は **D19 ガード適用版の wasm** のみで現れる。素材の snapshot wasm では同じ関数が `[1240]`。関数番号は build ごとに変わるため、番号単体では突き合わせられない。
 - `function_8c5eb0` (trace wasm の番号 5100) は **どの stack にも現れない** (snapshot・HEAD 再実行・ガード版の 3 run)。
 - D19 ガード (`icmp sle i32 %9, 0`) を当てても実 boot の停止位置は変わらない (`units_run=17`・`threw` 同一)。よって D19 の修復は本 trap の修復要件ではない。
