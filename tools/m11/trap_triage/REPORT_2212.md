@@ -17,7 +17,7 @@
 
 ## 2. 測定
 
-測定 commit `7d3e5cad`・直列・foreground・`FL_WIN64_DIR` (`[WIN64]`・`fl-win64` を展開) 設定・`work-m11` (`[WORK-M11]`) を repo 直下で展開 (`tar --zstd -xf` は `tools/m11/work/` を含むため repo ルートで行う) し、`m11_gen_ir2.sh` で IR を再生成 (ldfix: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0。REPORT_1952 と一致)。`[EMSDK]` は `toolchain-emsdk` 素材と `/opt/emsdk` 配置を確認して使用。
+測定 commit `7d3e5cad`・直列・foreground・`FL_WIN64_DIR` (`[WIN64]`・`fl-win64` を展開) 設定・`work-m11` (`[WORK-M11]`) を repo 直下で展開 (`tar --zstd -xf` は `tools/m11/work/` を含むため repo ルートで行う) し、`m11_gen_ir2.sh` で IR を再生成 (ldfix: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0。REPORT_1952 と一致)。`[EMSDK]` は `toolchain-emsdk` 素材の配置を確認して使用。
 
 - IR 再生成 `m11_gen_ir2.sh`: 所要 30.8 秒 (`time` 実測)。
 - n=1 (`repro_1952_rt_mech.sh 1`): 所要 3 分 58.8 秒 (`time` 実測)。
