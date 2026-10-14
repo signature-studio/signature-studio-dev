@@ -6,7 +6,7 @@
 
 測定 commit: **`b2c1d611`** (`tools/flp/s3_regread_xref.py` の最後のコード変更。追加は `f2fd830f`、ヒットごとの VA 出力と陰性対照 (`S3_DROP_CALL`) の追加は `b2c1d611`)。対象: 素材 `block00031_PE.bin` (FLEngine_x64.dll, 22,227,016 B)。再現: `uv run --with pefile --with capstone python3 tools/flp/s3_regread_xref.py $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`。
 
-**所要 (n=3、単一プロセス、4 コア、`uv run` 含む wall 時間)**: 18.46 / 18.58 / 18.72 s (min 18.46・max 18.72 s)。開始時の load average 1 分値は 0.50 / 0.64 / 0.74 (5 分値 0.46 / 0.49 / 0.53)。出力は 3 回とも同一。前版の 13.5 s は 1 回値で load を記録していなかったため置換した。
+**所要 (n=3、単一プロセス、4 コア、`uv run` 含む wall 時間)**: 1 回目 18.72 s・2 回目 18.58 s・3 回目 18.46 s (min 18.46・max 18.72 s)。各回の開始時 load average は 1 回目 0.50 (5 分値 0.46)・2 回目 0.64 (0.49)・3 回目 0.74 (0.53)。出力は 3 回とも同一。前版の 13.5 s は 1 回値で load を記録していなかったため置換した。
 
 **結論: 受入 1 の「読取り関数の VA」は未特定 (未達のまま)。** 静的に言えるのは次の 3 点。
 1. `WFBox`・`DitherBox`・`WAVRenderForm` の **UTF-16 リテラルは FLEngine に無い** (ASCII の出現だけ)。よって、この値名を文字列リテラルで読む関数は無い。読取りは部品名を実行時に得る汎用経路と見られる (推定)。
