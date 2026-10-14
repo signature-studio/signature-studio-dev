@@ -76,12 +76,36 @@ INT_RE = re.compile(r'^i(\d+)$')
 BLK_RE = re.compile(r'^dec_label_pc_([0-9a-fA-F]+):(\s*;.*)?$')
 
 
-def instrument(ll_in, ll_out, prefix='function_', blocks=False):
+SITE_BR_RE = re.compile(r'^\s*br i1 (%[^,\s]+), label ')
+SITE_CALL_RE = re.compile(r'^\s*(?:%[^\s=]+ = )?(?:tail |musttail )?call [^@]*@([A-Za-z0-9_.$]+)\(')
+DECLARE_NAME_RE = re.compile(r'^declare\s[^@]*@([A-Za-z0-9_.$]+)\(', re.M)
+
+
+def _site_store(fo, t, val):
+    fo.write('  %%%s.n = load volatile i64, ptr @ld_blk_n\n'
+             '  %%%s.i = and i64 %%%s.n, 65535\n'
+             '  %%%s.p = getelementptr inbounds [65536 x i64], ptr @ld_blk_arr, i64 0, i64 %%%s.i\n'
+             '  store volatile i64 %s, ptr %%%s.p\n'
+             '  %%%s.n1 = add i64 %%%s.n, 1\n'
+             '  store volatile i64 %%%s.n1, ptr @ld_blk_n\n' % (t, t, t, t, t, val, t, t, t, t))
+
+
+def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
     """各 `function_*` の entry に ld_trace(va, np, a0..a7, x0..x3) 呼出しを挿入する (意味不変)。
     blocks=True のとき、各 `dec_label_pc_<VA>:` の直後に ld_blk_arr への volatile store を挿入する (LD-64 / #1854)。
     call を使うと wasm の戻り値が変わるため store で記録する (LD-67 / #1906)。
+    sites=True (blocks=True 必須) のとき、block 内の conditional br と import 関数の call の直前に
+    site 記録 (1<<62 | kind<<56 | ord<<40 | va&0xffffffff。br は cond を bit 39 に載せる) を store する (LD-83 / #2192)。
+    kind 1 = br・2 = call、ord = block 内の site 通し番号 (0 始まり)。
     戻り値: 計装した関数数"""
     n = 0
+    declared = set()
+    if sites:
+        with open(ll_in, errors='replace') as f:
+            declared = set(DECLARE_NAME_RE.findall(f.read()))
+    cur_va = None
+    site_ord = 0
+    site_k = 0
     with open(ll_in, errors='replace') as fi, open(ll_out, 'w') as fo:
         pending = None
         for line in fi:
@@ -92,6 +116,8 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False):
                 if bm:
                     fo.write(line)
                     va = int(bm.group(1), 16)
+                    cur_va = va
+                    site_ord = 0
                     t = 'ldb%x' % va
                     fo.write('  %%%s.n = load volatile i64, ptr @ld_blk_n\n'
                              '  %%%s.i = and i64 %%%s.n, 65535\n'
@@ -110,6 +136,20 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False):
                     fo.write(line)
                 pending = None
                 continue
+            if sites and cur_va is not None:
+                sm = SITE_BR_RE.match(line)
+                cm = None if sm else SITE_CALL_RE.match(line)
+                if sm or (cm and cm.group(1) in declared and not SKIP_DECL.match(cm.group(1))):
+                    base = (1 << 62) | ((1 if sm else 2) << 56) | ((site_ord & 0xff) << 40) | (cur_va & 0xffffffff)
+                    site_ord += 1
+                    site_k += 1
+                    t = 'lds%d' % site_k
+                    if sm:
+                        fo.write('  %%%s.c = zext i1 %s to i64\n  %%%s.s = shl i64 %%%s.c, 39\n'
+                                 '  %%%s.v = add i64 %%%s.s, %d\n' % (t, sm.group(1), t, t, t, t, base))
+                        _site_store(fo, t, '%%%s.v' % t)
+                    else:
+                        _site_store(fo, t, str(base))
             fo.write(line)
             if line.startswith('define ') and line.rstrip().endswith('{'):
                 m = DEF_RE.match(line.rstrip('\n'))
