@@ -240,6 +240,18 @@ EMSCRIPTEN_KEEPALIVE int m11_stub_count(int i) { return (i >= 0 && i < g_stub_n)
 static unsigned long long g_probe[PROBE_MAX];
 void m11_probe(int i) { if (i >= 0 && i < PROBE_MAX) g_probe[i]++; }
 EMSCRIPTEN_KEEPALIVE double m11_probe_count(int i) { return (i >= 0 && i < PROBE_MAX) ? (double)g_probe[i] : -1.0; }
+/* #134 (計測専用; M11_PROBE_134=1 の IR probe からだけ呼ばれる。既定 build では呼び出し側が無い): function_8c5eb0 の入口 arg2 (f=0),
+ * guard の R = 410320 の戻り (f=1), list = 8c67a0(R) の戻り (f=2) を 64 件の環状配列に残す。f=3 は埋まった f のビット集合 */
+#define M11_P134_N 64
+static unsigned long long g_p134[M11_P134_N][4];
+static unsigned long long g_p134_n;
+void m11_p134_put(unsigned int f, unsigned long long v) {
+    if (f == 0) { g_p134_n++; for (int j = 0; j < 4; j++) g_p134[(g_p134_n - 1) % M11_P134_N][j] = 0; }
+    g_p134[(g_p134_n - 1) % M11_P134_N][f] = v;
+    g_p134[(g_p134_n - 1) % M11_P134_N][3] |= 1ull << f;
+}
+EMSCRIPTEN_KEEPALIVE double m11_p134_n(void) { return (double)g_p134_n; }
+EMSCRIPTEN_KEEPALIVE double m11_p134_get(int k, int f) { return (k >= 0 && f >= 0 && f < 4) ? (double)g_p134[k % M11_P134_N][f] : -1.0; }
 /* #944 (計測専用; M11_INSTR_413060=1 のときだけ有効): function_413060 呼出し後の dest の値を畳んだ指紋 (OFF/ON/ネガコンの比較用)。
  * M11_NEG_413060=1 のときだけ dest に +0x40 を書く既知変更 (b) を入れる。既定 build には含めない */
 #ifndef M11_INSTR_413060
