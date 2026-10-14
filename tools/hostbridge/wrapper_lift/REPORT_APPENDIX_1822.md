@@ -1,6 +1,6 @@
 # REPORT 付録 — #1822 (HB-H39): emcc exit 0 ファイルの wasm link と採用方式の比較
 
-> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §13。本付録は計測の全文。
+> **正本 (測定値)**: 本付録。`tools/hostbridge/wrapper_lift/REPORT.md` §13 は結論 1 行とリンクのみ。
 
 測定 commit: `7d15ceab` (`origin/main` 取り込み時点の HEAD。作業 HEAD はこの commit に本付録と REPORT の文言のみを足す)。
 `git diff 7d15ceab HEAD -- tools/hostbridge/wrapper_lift` の `.py` 差分は 0 件 (測定経路のコードは変えていない)。
@@ -70,7 +70,7 @@ wasm サイズは REPORT §7 の旧計測 (block19091 43,828,879 B・block23676 
 |---|---|---|
 | RetDec batch 出力のグローバル `g*` 衝突 (1,546 件) | RetDec 経路の wasm link が不能 | 本 PR では起票しない (採用方式に x64c を選んだため、RetDec 経路の修復は後続判断)。REPORT 付録に残す |
 | wasm 実行 (bit 一致)・CreatePlugInstance 到達 | 採用方式の実行検証 | #829 |
-| §12 の exit 0 値 (3 / 41) と本 run (17 / 41) の不一致 | 手順の記述の差 | 本 PR で REPORT §13 に明記 |
+| §12 の exit 0 値 (3 / 41) と本 run (17 / 41) の不一致 (§1 の差の原因は推定・未検証) | 手順の記述の差 | 本付録 §1 に明記 (再実行での確定は未実施) |
 
 ## 5. 再現手順
 
