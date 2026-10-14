@@ -6,7 +6,7 @@
 
 - 殻 (block 23663、ImageBase 0x400000) は `engine_x64.dll` を名前で読み、`DispatchToEngine` を名前で引く。 殻から `DispatchToEngine` を呼ぶ箇所は 9 件 (§4)。
 - 受入条件 4 は **部分達成**。 ロード経路・export 取得・呼出し箇所 9 件・各 selector 値は確定。 `DispatchToEngine` の引数規約 (`r8`/`r9` の意味・戻り値) は未解析。
-- 受入条件 1・2 は main `cb3a89a6` で **再現** (§7): `sampler_engines.sh` exit 0・`PASS 2/2`、`sampler_e2e.sh` exit 0・`PASS 7/7`。
+- 受入条件 1・2 は `PLUG_NO_STATIC_DETECT=0` 相当の経路 (RetDec argv が `5880a9f6` と同じ) では PASS (§7): `sampler_engines.sh` exit 0・`PASS 2/2`、`sampler_e2e.sh` exit 0・`PASS 7/7`。 既定経路 (HEAD、`PLUG_NO_STATIC_DETECT` 未設定 = 1) では `sampler_engines.sh` のみ PASS 2/2 を実測。 `sampler_e2e.sh` の既定経路は未測定 (起票先: #540)。 既定経路での受入条件 1・2 の達成は、`sampler_e2e.sh` 既定経路の実測が揃うまで未確認。
 
 ## 2. 殻側の経路 (block 23663)
 
@@ -155,7 +155,7 @@
 
 - 測定 commit: **`5880a9f6`** (下表の実測はこの commit のコードで行った。 `6769c2c7` の時点で記録された系列)。
 - 解析 HEAD (§9 の逆アセンブル・参照走査): `ba4babca`。 `git diff --stat ba4babca HEAD -- tools/plugins/sampler ':!*.md'` は空 (0 行)。
-- 測定 commit から現 head `c2155cc2` までの測定経路の差分 (`git diff --stat 5880a9f6 HEAD -- tools/plugins/lift tools/plugins/sampler ':!*.md'` = 16 files / 1072 insertions / 30 deletions。 内訳の要点):
+- 測定 commit `5880a9f6` から HEAD までの測定経路の差分 (`git diff --stat 5880a9f6 HEAD -- tools/plugins/lift tools/plugins/sampler ':!*.md'` = 16 files / 1072 insertions / 30 deletions。 既定経路の測定 HEAD `f73bcab0` からの測定経路の差分は 0 行 (`git diff f73bcab0 HEAD -- tools/plugins/lift tools/plugins/sampler ':!*.md'`)。 内訳の要点):
   - `tools/plugins/lift/lift_ranges.sh` (31 行追加・2 行削除) は測定経路に入る (上の訂正参照)。 RetDec 呼出の既定が変わるため、表は HEAD の既定では未測定 (`sampler_engines.sh` の既定経路は下の行で実測済み)。
   - `tools/plugins/sampler/` の 6 ファイルは別経路 (下の訂正参照)。 sampler 側の stat:
 
@@ -196,7 +196,7 @@
 | `sampler_e2e.sh` (受入条件 2、既存 T0/T1 の emcc 退行確認) | **exit 0・14:13.43 (853 s)**・load average 4.80 (5 分平均、run 中盤)。 `judge shells: PASS 7/7` (lift_rc / emcc_c_rc / f80 全 0)。 batch 7 本すべて `rc=0 emcc_c=0 f80=0`。 `ids_crosscheck: 7/7` |
 
 - 注記: 上の数値は本 run の 1 回の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
-- 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と本 run の値は同じ判定結果 (PASS 2/2)。 本 run は main cb3a89a6 での再現である。
+- 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と本 run の値は同じ判定結果 (PASS 2/2)。 本 run の測定 commit は上の記録のとおり (`cb3a89a6` または `5880a9f6`、未確定)。 前 run との比較は判定結果の一致のみで、同一 commit での再現とは書かない。
 - **測定 commit の記録の不整合 (未解決)**: 本書は測定 commit を §7 冒頭・表の見出しでは `5880a9f6`、上の表の行と §1 では `cb3a89a6` と記す。 どちらが表の実測を行った commit かは、本書の記録からは確定できない。 両 commit とも既定 (`PLUG_NO_STATIC_DETECT` 未設定) の RetDec argv に `--disable-static-code-detection` を含まない (`cb3a89a6` は `${PLUG_NO_STATIC_DETECT:+...}` で未設定時は空、`5880a9f6` は該当行なし) ため、表の argv 条件は両方に当てはまる。 確定には実測 commit の記録を正す再実行が要る (起票先: #540)。
 
 ## 8. selector ごとの引数の意味 (受入条件 4 の続き)
