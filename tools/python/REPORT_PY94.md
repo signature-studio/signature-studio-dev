@@ -73,7 +73,7 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 | `node tests/channels_diff.mjs` | calls 123、diffs 0、PASS | 0.04 秒 |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.62 秒 |
 
-- 件数の変化: PY-87 時点の実装 83 / 未実装 352 から、7 件を加えて 90 / 345。total は 435 のまま。`channels_diff` の calls は main の取り込みで 122 → 123。
+- 件数の変化: PY-87 時点の実装 83 / 未実装 352 から、7 件を加えて 90 / 345。total は 435 のまま (main 取り込み後の現在値は 93 / 342。上の再測定)。`channels_diff` の calls は main の取り込みで 122 → 123。
 - ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `undoPos` 既定値を `0` から `1` にすると、`node tests/general_diff.mjs` は `AssertionError` で rc 1 (FAIL)。元に戻すと calls 18・diffs 0・PASS (rc 0)。比較は同じ作業ツリーで行った。
 
 コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
@@ -84,6 +84,31 @@ $ git diff 9bba63c7 HEAD -- tools/python ':!*.md'
 ```
 
 本 REPORT を含む md のみの commit を後から足しても、この差分は 0 行のまま。
+
+### 再測定 (main 取り込み後)
+
+main (`4baa12af`) の取り込みで `tests/provider_check.mjs` が競合した。解消は、PR の `pe94` 集合と main の `pe100`・`pe115` 集合を両方残し、期待値を 93 / 342 にした。`provider/fl_engine.c`・`host/fl_mock.mjs` は自動マージで競合なし。
+
+測定 commit: `bdd66a55` (main 取り込みの merge。`tools/python` の .md 以外で最後にコードを変えた commit)。測定は `bdd66a55` の作業ツリー (`git status --porcelain` が空) で行った。
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | rc 0・ハンドラ 93 | 1.3 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 93 / 未実装 342 / MCP 静的 60) | 0.37 秒 |
+| `node tests/general_diff.mjs` | calls 18、diffs 0、PASS | 0.05 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.05 秒 |
+| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 | 2.1 秒 |
+| `bash build_flpy_static.sh` → `node tests/static_check.mjs` | rc 0、48/48 ok、`STATIC CHECK OK` | 6.5 秒 (build) |
+
+前提の生成物: `build_cpython_wasm.sh` (rc 0・incremental)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+
+コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
+
+```
+$ git diff bdd66a55 HEAD -- tools/python ':!*.md'
+(空)
+```
 
 ## 未解決
 
