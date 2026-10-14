@@ -20,7 +20,7 @@
 
 ## 3. 検証 (測定 commit `59c74ab5`)
 
-環境: ubuntu runner、emcc 6.0.12 (`/opt/emsdk`)、node 22、Chrome 155.0.8059.39。素材 `work-m11` の `boot_final3.ll` (sha1 `4a4a5fa01e`)。開始時 load average 1 分値 0.41–0.52。
+環境: ubuntu runner、emcc 6.0.12 (`[EMSDK]`)、node 22、Chrome 155.0.8059.39。素材 `work-m11` の `boot_final3.ll` (sha1 `4a4a5fa01e`)。開始時 load average 1 分値 0.41–0.52。
 
 | 検査 | 結果 | 所要 |
 |---|---|---|
@@ -30,7 +30,7 @@
 | NC2 (host 無し) | exit=1、C 側 fail **13** (変更前 14。save の fopen 検査 1 件を CreateFileW 検査へ置換したため) | — |
 | NC3 (新規: `handles.c` の CloseHandle から hook 呼出しを外す) | link rc=0、run exit=1、自動反映の検査 **FAIL=1** (期待どおり) | — |
 | `bash tools/gui/test/selftest.sh` | **506 passed / 0 failed** | 10.929 s |
-| `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/gui/shimx_coexist/browser_e2e.sh` | **14 PASS / 0 FAIL** (実 Chrome で window.open・picker・save 反映) | 11.443 s |
+| `EMSDK_ENV=[EMSDK]/emsdk_env.sh bash tools/gui/shimx_coexist/browser_e2e.sh` | **14 PASS / 0 FAIL** (実 Chrome で window.open・picker・save 反映) | 11.443 s |
 | `bash tools/gui/e2e.sh` | ALL PASS。OffscreenCanvas readback・on-screen screenshot とも golden **EXACT MATCH (0 px 差)**。sigprobe mismatch 0 / unresolved 0。stress EXACT MATCH | 2 分 38.888 s |
 | `bash tools/shimx/test.sh --quick` | rc 0、7/7 PASS (MT/ST・M4 互換・verify_sig m11 / m11_3 mismatch 0) | 53.101 s |
 | `tsc --noEmit` (`tsconfig.json`) | rc 0 | — |
@@ -50,7 +50,7 @@
 
 ```
 bash tools/gui/shimx_coexist/coexist.sh           # M11_IR 既定 tools/m11/work/boot_final3.ll (work-m11 を展開)、emsdk は /opt/emsdk
-EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/gui/shimx_coexist/browser_e2e.sh   # node_modules (tsc) を要する
+EMSDK_ENV=[EMSDK]/emsdk_env.sh bash tools/gui/shimx_coexist/browser_e2e.sh   # node_modules (tsc) を要する
 ```
 
 ## 6. 未解決 (起票先)
