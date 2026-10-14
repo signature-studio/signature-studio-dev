@@ -149,6 +149,38 @@ test("解除の後: 解除前の /oc から 30 分以内の新しい /oc では�
   assert.equal((await status(ctx)).demoted_reason, "double-oc #11");
 });
 
+// 降格中は oc-pm digest も止める (dispatch と同じ降格ゲート)。解除の後は次の 24 時間で送る。
+test("降格中は oc-pm digest を送らず would に数える。解除の後は送る", async () => {
+  const clock = { t: T0 };
+  const digestCalls = (calls: Call[]) => calls.filter((c) => c.method === "POST" && c.url.endsWith("/dispatches") && c.body?.client_payload?.kind === "digest");
+  const dispatchOk = (c: Call) => (c.url.endsWith("/dispatches") ? j(null, 204) : undefined);
+  const ctx = await configuredApp({ live: true, now: clock, handlers: [...writeHandlers, dispatchOk] });
+  const tick = async (at: number) => {
+    clock.t = at;
+    await markFresh(ctx);
+    await ctx.app.engine.tick();
+  };
+  for (const n of [11, 12]) await send(ctx.app, "issues", issuePayload(n));
+  await tick(T0);
+  clock.t = T0 + 1 * MIN;
+  await send(ctx.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
+  clock.t = T0 + 2 * MIN;
+  await send(ctx.app, "issue_comment", ocEv(11, 2, PM_BOT, T0 + 2 * MIN));
+  assert.equal((await status(ctx)).demoted_reason, "double-oc #11");
+  const before = (await status(ctx)).counters.wouldDispatchPm ?? 0;
+  await tick(T0 + 24 * 60 * MIN);
+  assert.equal(digestCalls(ctx.m.calls).length, 0, "降格中は digest を送らない");
+  const s = await status(ctx);
+  assert.ok(s.counters.wouldDispatchPm > before, "降格中の digest は wouldDispatchPm に数える");
+  assert.ok((ctx.app.engine.status() as any).would_dispatch_pm.some((x: any) => x.kind === "digest" && x.ref === 0), "would_dispatch_pm に digest#0 が残る");
+  assert.equal(s.counters.pmDispatched, 0);
+  const reset = await ctx.app.handle(new Request("https://pm.example/demote/reset", { method: "POST", headers: { authorization: PUSH } }));
+  assert.equal(reset.status, 200);
+  await tick(T0 + 48 * 60 * MIN);
+  assert.equal(digestCalls(ctx.m.calls).length, 1, "解除の後は次の 24 時間で digest を送る");
+  assert.equal((await status(ctx)).mode_dispatch, "live");
+});
+
 test("shadow: would_launch と VM の /oc を 15 分の窓で突き合わせ、issue 番号だけを出す (recall・precision・vm_only・worker_only)", async () => {
   const ctx = await configuredApp({ handlers: writeHandlers });
   for (const n of [11, 12, 13]) await send(ctx.app, "issues", issuePayload(n));

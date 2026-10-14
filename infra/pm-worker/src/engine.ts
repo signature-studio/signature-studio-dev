@@ -1064,7 +1064,7 @@ export class Engine {
     this.meta.digestAt = now;
     this.meta.counters = this.meta.counters ?? this.zero();
     const hist = [...this.pmHistory(), { kind: DIGEST_KIND, ref: DIGEST_REF, at: now }];
-    if (!this.d.cfg.liveDispatch || !gh) {
+    if (!this.dispatchLive() || !gh) {
       this.meta.counters.wouldDispatchPm = (this.meta.counters.wouldDispatchPm ?? 0) + 1;
       this.d.store.put("meta", this.pmHistoryKey(), hist);
       this.pushLog({ kind: "would-pm-dispatch", n: DIGEST_REF, note: DIGEST_KIND });
