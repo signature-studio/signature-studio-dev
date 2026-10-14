@@ -1,12 +1,20 @@
 # REPORT_APPENDIX_944 — unit 158・j=12 の dest 値差の後続経路 (#1945・#1864 の残り)
 
 REPORT_944.md §9.3 の付録。測定 commit: **`e5e3c7c2`** (origin/main。本節の作業ではコードを変えていない)。
-`git diff e5e3c7c2 HEAD -- tools/m11` は空。
+コード差分 0 (文書のみ)。確認コマンド: `git diff --stat e5e3c7c2 HEAD -- tools/m11`。出力:
+
+```
+ tools/m11/trap_triage/REPORT_944.md          |  1 +
+ tools/m11/trap_triage/REPORT_APPENDIX_944.md | 47 ++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
+```
+
+文書以外を除いた差分 `git diff e5e3c7c2 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_944.md' ':!tools/m11/trap_triage/REPORT_APPENDIX_944.md'` は 0 行。
 
 ## 1. 再現 (受入条件 3・同一 build 内の決定性)
 
 コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=$HOME/.local/agent-py/bin:$PATH bash tools/m11/trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON・直列・単発)。判定 `PASS`。全体 1 分 49 秒 (`time` の real・load 開始 0.93 / 1.03 / 1.01)。
-素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11` (`tools/m11/work/`)・`toolchain-emsdk` (`/opt/emsdk` 既存・`releases-6e9f6885`)。`m11_gen_ir2.sh` を 50 秒で実行 (ldfix F1=902 F3c=36 errors=0)。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・work-m11 (gitignore 対象の作業領域)・`toolchain-emsdk` ([EMSDK]・`releases-6e9f6885`)。`m11_gen_ir2.sh` を 50 秒で実行 (ldfix F1=902 F3c=36 errors=0)。
 
 | 構成 | 記録 (呼出し数) | 比較の結果 | survey elapsed |
 |---|--:|---|--:|
@@ -25,9 +33,9 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 ## 3. ON の trap (unit 158)
 
 - ON の survey: unit 158 は `memory access out of bounds` で trap (`detail` の `trap` 種別)。OFF は ok。
-- 同一 build (`M11_INSTR_413060=1 M11_OV_413060=1 M11_DEST_READ=1`・記録あり) の再実行で同じ trap (`detail_on.json`)。
+- 同一 build (`M11_INSTR_413060=1 M11_OV_413060=1 M11_DEST_READ=1`・記録あり) の再実行で同じ trap (証跡は gitignore 対象の作業領域。repo には含まれない)。
 - 最上位 frame は未取得 (detail は種別のみ。`top_frame_idx` は全体集計で unit 158 に紐付かない)。REPORT_684 の `414bb0` ←`652500` 系 (unit 158 は REPORT.md §最上位 frame 表の `414bb0` 群) と関係する可能性はあるが、**未検証**。
-- **読出しのみの ON (`M11_DEST_READ=0`・記録なし) の再測定**: unit 158 は **ok** (survey 870/24、REPORT_944 §9.2 と一致)。呼出し 28・getmem 140 (OFF は 139)・freemem 94 (OFF は 92)。`m11_build.sh` の stamp で build を切り替えて測定 (`build_on_read0.log`)。
+- **読出しのみの ON (`M11_DEST_READ=0`・記録なし) の再測定**: unit 158 は **ok** (survey 870/24、REPORT_944 §9.2 と一致)。呼出し 28・getmem 140 (OFF は 139)・freemem 94 (OFF は 92)。`m11_build.sh` の stamp (`M11_DEST_READ` を含む `work/neg_413060.stamp`) で build を切り替えて測定した。**実際に使った環境変数の組と実行手順は記録に残っておらず、repo にもこの測定を再現するスクリプトは無い** (`repro_1389.sh` は OFF/OFF/ON の 3 点のみで `M11_DEST_READ=0` を含まない)。下記は build 切替の仕組みからの再構成で、未検証: `M11_INSTR_413060=1 M11_OV_413060=1 M11_DEST_READ=0 bash m11_build.sh` → `M11_INSTR_413060=1 M11_SURVEY_COST=<out> node m11_survey.mjs`。証跡 (build ログ・survey 出力) は gitignore 対象の作業領域にあり repo には含まれない。本 PR の検証では再実行していない。
 - 記録あり ON (`M11_DEST_READ=1`) の unit 158 は trap で、呼出し 17 で止まり getmem 23・freemem 16 (OFF 139/92 と大きく違う)。
 - 以上から、観測を入れた ON で unit 158 が trap し、観測を止めた ON では ok になる。これは **記録側の読出し/書込みが unit 158 の実行を変えている**ことを示す。
 - ただし `DEST_READ=0` では j=12 の値を観測していないため、「ON の値差 (`len 0→1`) が後続の結果に効かない」とは言えない。値差が後続の呼出し・読出しを変えるかは、IR で unit 158 の後続経路を追うまで未確定 (受入条件 1)。
@@ -42,6 +50,6 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| unit 158・j=12 の値差の後続経路 (呼出し元・後続の読出し) の IR 突き合わせと、ON trap の最上位 frame の取得 | 値差が結果に効くかの確定 (受入条件 1) | 子 issue (本 PR の完了時に起票。番号は PR 本文・issue コメント参照) |
-| 記録なしの ON (読出し 1 回のみ) の再測定 (build の切替が要る) | §9.2 の結論の再確認 | 上記子 issue に含める |
+| unit 158・j=12 の値差の後続経路 (呼出し元・後続の読出し) の IR 突き合わせと、ON trap の最上位 frame の取得 | 値差が結果に効くかの確定 (受入条件 1) | #2003 ([M11-N132]) |
+| 記録なしの ON (読出し 1 回のみ) の再測定 (build の切替が要る) | §9.2 の結論の再確認 | #2003 に含める |
 | issue 本文の `M11_DEST_GUARD=1` は repo に存在しない | 検証方法の記述が無効 | PM 判断 (issue 本文の修正) |
