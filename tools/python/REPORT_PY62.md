@@ -4,7 +4,7 @@
 
 ## 結論
 
-- PY-61 の未読 26 件のうち、型・範囲 code と戻り値の変換が確定し、表の引数形で実装できる **8 件**を実装した: `getTrackColor`・`isTrackMuteLock`・`getTrackActivityLevelVis`・`getLiveLoopMode`・`getLiveTriggerMode`・`getLivePosSnap`・`getLiveTrigSnap`・`muteTrackLock` (反転のみ・§2)。
+- PY-61 の未読 26 件のうち、型・範囲 code と戻り値の変換が確定し、表の引数形で実装できる **8 件**を実装した: `getTrackColor`・`isTrackMuteLock`・`getTrackActivityLevelVis`・`getLiveLoopMode`・`getLiveTriggerMode`・`getLivePosSnap`・`getLiveTrigSnap`・`muteTrackLock` (value -1 と省略は反転、それ以外は下位 1 byte の設定・§2・§5-3)。
 - `provider/fl_engine.c`・`host/fl_mock.mjs` に実装し、`tests/playlist_diff.mjs` (42 呼出し・diffs 0) で mock と C を照合した。`tests/provider_check.mjs` の実装数は 77 → 85、未実装は 358 → 350。
 - 残り 18 件は実装しない (§3)。戻り値の意味が PY-61 で未確定の helper・操作コアに依存するため。
 - 既定値 (lock 0・活性度 0・各 live mode 0) は実機値を測っていない仮置き。
@@ -22,14 +22,14 @@ VA は `REPORT_PY61.md` §2。範囲外 index は両者とも code 4 (`Index out
 | getLiveTriggerMode (0xd573e0) | int | +0x44 |
 | getLivePosSnap (0xd57450) | int | +0x54 |
 | getLiveTrigSnap (0xd574c0) | int | +0x48 |
-| muteTrackLock (0xd565c0) | 表どおり 1 引数で呼ぶと +0xd5 byte を反転する (§2) | +0xd5 |
+| muteTrackLock (0xd565c0) | value -1 (省略を含む) で +0xd5 byte を反転、それ以外は下位 1 byte を書く (§2・§5-3) | +0xd5 |
 
 - getLive\* の 4 件は書込み側 (`incLive*` 等) が未実装のため、mock と C では既定値 0 のまま読める。muteTrackLock だけは呼出しで反転する (`isTrackMuteLock` に反映される)。
 - getLive\* 4 件 (`getLiveLoopMode`・`getLiveTriggerMode`・`getLivePosSnap`・`getLiveTrigSnap`) の戻り値は field の生の int である。enum の意味と既定値 0 は PY-61 から未確定のままで、本 PR では確定していない (既定値は仮置き)。
 
 ## 2. 実装しなかった部分と差
 
-- **muteTrackLock の `value` 引数** (binary の書式 `'i|i'`・既定 -1・-1 は反転、他は下位 1 byte を書く (`REPORT_PY61` §3))。生成表 `provider/gen/fl_table.c` の引数数は 1 (`sig.params` 由来、np=1) で、dispatch が 2 個目を code 5 で拒否する。C と mock は同じく code 5 を返す (`tests/playlist_diff.mjs` で確認)。表の不一致は §4、子 #2883 (PY-102)。
+- **muteTrackLock の `value` 引数** (binary の書式 `'i|i'`・既定 -1・-1 は反転、他は下位 1 byte を書く (`REPORT_PY61` §3))。main の #2927 で生成表 `provider/gen/fl_table.c` が kwsig 書式 (必須 1・最大 2) に合ったため、C と mock は value を受ける (`tests/playlist_diff.mjs` で確認・§5-3)。表の残りの不一致は §4、子 #2883 (PY-102)。
 - **準備判定 (-2)**: binary は vtable 呼出し `[rax+0x98]` で準備を判定するが、その述語は未確定。mock と C は常に準備済みとして扱う。
 - **getTrackColor と setTrackColor の byte 順**: `getTrackColor` は PY-61 の確定どおり R/B を入替えて返す。既存の `setTrackColor` (C・mock とも素の値を格納) は格納 byte 順を逆アセンブルしていない。そのため `setTrackColor(3, 0x123456)` の後の `getTrackColor(3)` は `0xff563412` を返す (実測・`tests/playlist_diff.mjs` の末尾)。set と get の round trip は一致しない。この 1 組の期待値は setter の格納順が確定するまで暫定である (既定案: 現状のまま)。
 
@@ -92,7 +92,7 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 | 24 | screen.unBlank | 0 | 1 | `i` | max > np |
 
 - 「`sig` が空」(np 0) の 10 件は `screen.*` の 10 件 (`screen.*` の `sig` 空は `#2554` (PY-70・positional-only の読み取り) と同じ系統の可能性があるが、未確認)。
-- `muteTrackLock` (#2) の 2 個目の引数 `value` は、表の np 1 では dispatch が受けない (§2)。
+- `muteTrackLock` (#2) の 2 個目の引数 `value` は、#2927 後の表 (最大 2) で dispatch が受け、C・mock とも §2 の規則で処理する (§5-3)。
 
 ## 5. 測定
 
@@ -154,27 +154,33 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 
 ### 5-3. main 取り込み後の再測定 (競合解消 merge)
 
-- 測定 commit (コードを最後に変えた commit): `ca8895d6` (`Merge remote-tracking branch 'origin/main' into 2027-py62-playlist-confirmed`)。main 側の PY-89 (#2805) の `channels.getChannelIndex`・`channels.getChannelMidiInPort` 2 件を取り込んだ。
-- 競合 2 箇所: `docs/DOC_MAP.md` (REPORT 行は両方残す)、`tools/python/tests/provider_check.mjs` (実装集合に `pl61` と `stub89` を両方入れ、件数を 87 / 348 に更新)。`fl_engine.c`・`fl_mock.mjs` は自動 merge で、重複実装は無い。
-- コード差分: `git diff ca8895d6 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の後続 commit は REPORT のみ)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` real 5.525 s)、`fetch_inputs.sh` (rc 0)、`build_cpython_wasm.sh` (real 4 分 13.061 秒・rc 0)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (real 6.221 s・rc 0)。
-- 測定時の load average (uptime の 1 分値): 2.68。
+- 測定 commit (コードを最後に変えた commit): `c0638cf3` (`test(python): playlist_diff covers muteTrackLock set semantics (#2027)`)。
+- 取り込み: main `15393741` (merge `ca8895d6`・`38be58be`)、main `a7ea7667` (merge `38be58be`)。main 側の PY-89 (#2805)・PY-87 (#2738) の provider・host・tests 変更と、#2927 (`46f5a007`・表の引数個数を kwsig 書式に合わせる) を取り込んだ。
+- 競合: `docs/DOC_MAP.md` (REPORT 行は両方残す)、`tools/python/tests/provider_check.mjs` (2 回。実装集合は pl61・stub89・pe87 を全て含め、件数は 91 / 344)。`fl_engine.c`・`fl_mock.mjs` は自動 merge で、重複実装は無い。
+- 表変更への対応 (`decb212c`): #2927 で `playlist.muteTrackLock` の表の引数数が 1 から kwsig `i|i` (必須 1・最大 2) になった。C と mock は REPORT_PY61 §3 の規則 (value -1 (省略を含む) は反転、それ以外は下位 1 byte を書く) を実装した。`tests/playlist_diff.mjs` に設定経路の呼出し 7 件を追加 (42 → 49 呼出し)。
+- NC: C の value 分岐を外して (常に反転) 再ビルド → `playlist_diff` FAIL (差分 3 件・rc 1)。元に戻して再ビルド → PASS (49 呼出し)。
+- コード差分: `git diff c0638cf3 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の後続 commit は REPORT と PR 本文のみ)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` real 5.525 s)、`fetch_inputs.sh` (rc 0)、`build_cpython_wasm.sh` (real 4 分 13.061 秒・rc 0。取り込み後は再ビルドしていない。`git diff --stat origin/main HEAD -- tools/python/build_cpython_wasm.sh tools/python/build_flpy.sh tools/python/src` は 0 行)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0・取り込み後に再ビルド)。
+- 測定時の load average (`/proc/loadavg` の 1 分値): 0.27。
 
-| 検証 | 結果 | 所要 |
+| 検証 (`c0638cf3`) | 結果 | 所要 |
 |---|---|---|
-| `provider/build.sh` | 成功・435 関数・ハンドラ 87 | real 1.590 s |
-| `node tests/playlist_diff.mjs` | calls 42・diffs 0・PASS | 0.046 s |
-| `node tests/provider_check.mjs` | functions 435・implemented 87・unimplemented 348・mcp_static 60・PASS | 0.355 s |
-| `node tests/channels_diff.mjs` | calls 122・diffs 0・PASS (main 取り込みで 15 呼出し増) | 0.052 s |
-| `node tests/mixer_diff.mjs` | calls 48・diffs 0・PASS | 0.051 s |
-| `node tests/device_diff.mjs` | calls 7・rejects 4・midi_out 4・diffs 0・PASS | 0.050 s |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・raised 0・host_calls 37425・callback_roundtrip true | real 2.135 s |
+| `provider/build.sh` | 成功・435 関数・ハンドラ 91 | real 0.916 s |
+| `node tests/playlist_diff.mjs` | calls 49・diffs 0・PASS | 0.048 s |
+| `node tests/provider_check.mjs` | functions 435・implemented 91・unimplemented 344・mcp_static 60・PASS | 0.367 s |
+| `node tests/channels_diff.mjs` | calls 123・diffs 0・PASS | 0.052 s |
+| `node tests/mixer_diff.mjs` | calls 49・diffs 0・PASS | 0.049 s |
+| `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS | 0.049 s |
+| `node tests/general_diff.mjs` | calls 9・diffs 0・PASS (main #2738) | 0.048 s |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・raised 0・host_calls 37425・callback_roundtrip true | real 2.081 s |
+
+§4 の表 (不一致 24 件) は `1d71dd27` 時点の表の測定で、#2927 の後の件数は未測定。
 
 ## 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| muteTrackLock の `value` 引数と、表の引数数の不一致 24 件 (比較可能な 273 件中・§4) | 2 個目の引数が C と mock で code 5 | #2883 (PY-102) |
+| 表の引数数の不一致 24 件 (比較可能な 273 件中・§4)。muteTrackLock の `value` は #2927 で表が合い本 PR で対応済み (§5-3)。残りの件数は #2927 後に未測定 | 不一致の関数で 2 個目以降の引数が code 5 になりうる | #2883 (PY-102) |
 | sig 欠落 30 件・kwsig.max 欠落 1 件 (比較対象外・§4-1) | 表の arity を未確認のまま | #2883 本文への追記 (PM 判断) |
 | getTrackColor と setTrackColor の格納 byte 順 (set→get の round trip が一致しない) | 色の設定と読出しが食い違う。期待値 `0xff563412` は setter 確定まで暫定 (既定案: 現状のまま) | #2809 (PY-91)。setter の逆アセンブルを対象へ追記する必要あり (PM 判断) |
 | getLive\* 4 件の戻り値の enum 意味と既定値 0 | 既定値の正しさ未確定 | #2809 (PY-91) |
