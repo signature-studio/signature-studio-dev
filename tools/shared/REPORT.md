@@ -168,7 +168,7 @@
 | T-SH-14 | beat_tracker lift (mac x86_64 SSE 版; Eigen) | 低 |
 | T-SH-15 | ildsp / libreverb: OTT 型 DSP lift (差分テスト基盤は本 PoC を流用) | 中 |
 | T-SH-16 | RetDec 欠陥 [A]-[E] の汎用 IR pass 化 + native 機械語実行による全関数差分テスト基盤 | **高** (全 lift の信頼性) |
-| T-SH-10 | élastique: D20 で所有者限定 tier・side module・win 版 + 自前 IPP と確定。静的 IPP 入口の実測は `tools/shared/elastique/REPORT.md` | 実測済 (lift は子 T-SH-41) |
+| T-SH-10 | élastique: D20 で所有者限定 tier・side module・win 版 + 自前 IPP と確定。静的 IPP 入口の実測は `tools/shared/elastique/REPORT_152.md` | 実測済 (lift は子 T-SH-41) |
 | T-SH-11 | REX (第三者バイナリ): EULA 確認後に lift | ユーザ判断待ち |
 
 ## 6. 制約・未解決・ユーザ依頼
