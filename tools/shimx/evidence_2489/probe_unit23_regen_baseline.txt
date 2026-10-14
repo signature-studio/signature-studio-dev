@@ -9,6 +9,6 @@ ret=2
 MISS_UNIQ 1 MISS_TOTAL 2
 MISS_AT|0 457860
 
-real	0m0.231s
-user	0m0.233s
-sys	0m0.048s
+real	0m0.377s
+user	0m0.376s
+sys	0m0.080s

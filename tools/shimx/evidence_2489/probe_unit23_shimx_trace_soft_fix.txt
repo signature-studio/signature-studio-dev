@@ -44,6 +44,6 @@ RET|unit 22 GetProcAddress a=0x56670 b=0x57fe0 r=0x0 name="VarBstrFromCy"
 RET|unit 22 GetProcAddress a=0x56670 b=0x57fee r=0x0 name="VarBstrFromDate"
 RET|unit 22 GetProcAddress a=0x56670 b=0x57ffe r=0x0 name="VarBstrFromBool"
 
-real	0m0.278s
-user	0m0.301s
-sys	0m0.064s
+real	0m0.427s
+user	0m0.459s
+sys	0m0.069s

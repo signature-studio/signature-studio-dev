@@ -39,7 +39,9 @@
 [sxlink] cc trace_wrap.c
 [sxlink] cc trace_rt.c
 [sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> <repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs
+rc=0
+[sha256 shimx cjs] 66181f8fb2e3edeafaf125dcbeccd8a3f7b4612d1658318875410e0de31af2da  work/shimx_link/m11_sx_trace_soft_fix.cjs
 
-real	0m10.595s
-user	0m9.035s
-sys	0m1.631s
+real	0m16.378s
+user	0m14.346s
+sys	0m2.043s

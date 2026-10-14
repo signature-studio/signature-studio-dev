@@ -6,6 +6,6 @@ exc=halt0
 [m11][UStrAsg] dest=0x315f0 src=0x0
 [m11][longjmp] Halt0 -> RestoreContext(ctx=0x11eac80): DllMain attach 完走として JS 例外で巻き戻す
 
-real	0m0.465s
-user	0m0.326s
-sys	0m0.244s
+real	0m0.727s
+user	0m0.476s
+sys	0m0.387s
