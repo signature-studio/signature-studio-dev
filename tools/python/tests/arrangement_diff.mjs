@@ -1,4 +1,4 @@
-// arrangement の選択範囲読出し (PY-96・#2832) の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と
+// arrangement の PE 根拠で実装した 6 関数 (PY-152・#2983) の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と
 // C provider (provider/fl_engine.c) に流し、各呼出しの戻り値・エラー code が一致することを確認する。
 //   node tests/arrangement_diff.mjs     (前提: provider/build.sh 済み)
 import fs from "node:fs";
@@ -21,22 +21,33 @@ const run = (eng, name, args) => {
 };
 
 const calls = [
-  ["arrangement.selectionStart", []], ["arrangement.selectionEnd", []],
-  ["arrangement.liveSelectionStart", []], ["arrangement.selectionIsActive", []],
+  ["arrangement.currentTime", [1]], ["arrangement.currentTime", [true]], ["arrangement.currentTime", [null]],
+  ["arrangement.selectionClear", []],
+  ["arrangement.selectionSet", [1, 2]], ["arrangement.selectionSet", [1, 2, true, false, 0]],
+  ["arrangement.liveSelection", [1, true]], ["arrangement.addAutoTimeMarker", [1, "Marker"]],
+  ["arrangement.jumpToMarker", [1]], ["arrangement.jumpToMarker", [-1, true]],
 ];
-// 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)。
-// liveSelectionStart は VARARGS で、provider は引数付きを code 5 にする仮定 (REPORT_PY96 の未解決表)
+// 引数個数違い: mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
-  ["arrangement.selectionStart", [1]], ["arrangement.selectionEnd", [0]],
-  ["arrangement.liveSelectionStart", [1]], ["arrangement.selectionIsActive", [0]],
+  ["arrangement.currentTime", []], ["arrangement.currentTime", [1, 2]],
+  ["arrangement.selectionClear", [1]],
+  ["arrangement.selectionSet", [1]], ["arrangement.selectionSet", [1, 2, 3, 4, 5, 6]],
+  ["arrangement.liveSelection", [1]], ["arrangement.addAutoTimeMarker", [1]],
+  ["arrangement.jumpToMarker", []], ["arrangement.jumpToMarker", [1, 2, 3]],
+];
+// 型違い: 整数・bool 以外 (文字列・小数) と、str 引数の None は code 5
+const types = [
+  ["arrangement.currentTime", ["x"]], ["arrangement.selectionSet", [1, "x"]],
+  ["arrangement.liveSelection", [1, 1.5]], ["arrangement.addAutoTimeMarker", [1, 2]],
+  ["arrangement.addAutoTimeMarker", [1, null]], ["arrangement.jumpToMarker", ["x"]],
 ];
 
 const diffs = [];
-for (const [name, args] of [...calls, ...arity]) {
+for (const [name, args] of [...calls, ...arity, ...types]) {
   const a = run(mock, name, args);
   const b = run(wasm, name, args);
   if (JSON.stringify(a) !== JSON.stringify(b)) diffs.push({ name, args, mock: a, wasm: b });
 }
 
 assert.deepEqual(diffs, [], `arrangement 差分 ${diffs.length} 件`);
-console.log(JSON.stringify({ calls: calls.length + arity.length, diffs: 0, PASS: true }));
+console.log(JSON.stringify({ calls: calls.length + arity.length + types.length, diffs: 0, PASS: true }));
