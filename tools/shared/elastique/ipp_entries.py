@@ -11,10 +11,12 @@
   表 T の各項が variant 本体。export 名 → variant 本体 (表の全項) を対応表にする。
 - 照合 = 本体の正規化命令列 (分岐先・rip 相対変位・大きな即値を伏せる) の SHA-1 一致。一致しなければ
   variant 集合に対する bigram Jaccard で上位を取り SequenceMatcher の比を出す (参考値、一致扱いはしない)。
+- 出力: data/entries.csv (197 行の対応表・コミット対象) と tools/shared/work/elastique/facts.json (中間物・gitignore)。
 - 関数ポインタ経由の到達: .text の lea rip 相対で IPPCODE を指す箇所・間接 call/jmp・
   .rdata/.data 中の IPPCODE 向き 8 byte 値を数え、入口集合との差を出す (静的確認。実行トレースではない)。
 """
 import collections
+import csv
 import difflib
 import hashlib
 import json
@@ -240,6 +242,28 @@ def indirect_scan(elq, md, entries):
     return lea_targets, ind_sites, data_ptrs, imm_ipp
 
 
+def write_csv(rows):
+    mat_path = os.path.join(HERE, '..', '..', 'ipp', 'data', 'ipp_matrix.csv')
+    poc = {r['name']: r['implemented_poc'] == '1' for r in csv.DictReader(open(mat_path))}
+    out = os.path.join(HERE, 'data', 'entries.csv')
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, 'w', newline='') as f:
+        w = csv.writer(f)
+        w.writerow(['entry_va', 'class', 'names', 'origin_exports', 'tools_ipp_poc', 'tokens', 'call_sites',
+                    'dsp_rva', 'dsp_depth', 'ratio'])
+        for r in rows:
+            named = r['class'] in ('identified', 'family_candidates')
+            names = r['export_names'] if named else []
+            impl = ''
+            if names:
+                impl = 'impl' if all(poc.get(n) for n in names) else (
+                    'stub_only' if not any(poc.get(n) for n in names) else 'mixed')
+            w.writerow([hex(r['entry_va']), r['class'], '|'.join(names), '|'.join(r['export_names']), impl,
+                        r['tokens'], r['call_sites'], '|'.join(r['dsp_rva'][:2]),
+                        r['dsp_depth'][0] if r['dsp_depth'] else '',
+                        r['ratio'] if r['ratio'] is not None else ''])
+
+
 def main():
     md = Cs(CS_ARCH_X86, CS_MODE_64)
     elq = load(ELQ)
@@ -351,6 +375,7 @@ def main():
     print(f'間接 call/jmp (.text): {len(ind)} 箇所 (例 {ind[:3]})')
     print(f'.rdata/.data の IPPCODE 向きポインタ: {len(data_ptrs)} (うち入口 {len(eset & data_ptrs)}、入口外 {len(data_ptrs - eset)})')
 
+    write_csv(rows)
     os.makedirs(WORK, exist_ok=True)
     json.dump({'elastique': os.path.basename(ELQ), 'dsp': os.path.basename(DSP),
                'entry_count': len(rows), 'entry_addresses': [r['entry_va'] for r in rows],
