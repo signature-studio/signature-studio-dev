@@ -1,7 +1,7 @@
 # 付録: icall #2508 (ICALL-78) — frame slot 復元の残件 (0x180da6e60 の候補分類・0x181057b38 の xmm0 不一致の切り分け)
 
 > 親: #2427 (ICALL-77, PR #2514 merge 済み・`FA_FRAME_SLOT=1` の pass)。受入 3 (`SlateCore.core_64` 205 B の sha256 照合) は素材 `plugins-freshair` が無いため本 run では未実施 (§6)。
-> 測定 commit: `0d29b5f4` (`fa_cmp.py` の harness 修正。コードを変えた最後の commit)。
+> 測定 commit: `faa2ed97` (`origin/main` 取り込みの merge。コードを変えた最後の commit)。`fa_cmp.py` の harness 修正は `0d29b5f4`。
 
 ## 1. 結論
 
@@ -14,10 +14,10 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `0d29b5f4` (`tools/icall/diff/fa_cmp.py` のみ変更)。以降のコード差分は §7 |
+| 測定 commit | `faa2ed97` (`origin/main` の merge。`fa_cmp.py` の harness 修正は `0d29b5f4`)。以降のコード差分は §7 |
 | 素材 | `work-icall` (`tools/icall/work/rt_freshair-core`: `rw.dll`・`before.0.drc.{dsm,ll}`・`after.0.restored.ll`・`map.json`・`F.ranges`)。`toolchain-retdec` ([RETDEC] 展開済み)・`toolchain-emsdk` ([EMSDK] 展開済み)・`fl-win64` (未使用)。`plugins-freshair` は未使用 (`FA_CORE=rw.dll`) |
 | 測定 | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh` (fixed) と既定 (base) の 2 route。各 `bash tools/icall/diff/fa_sweep.sh 8 60` (131 関数・1 並列) |
-| 所要・load | HEAD `50112f92` で実測。fixed sweep 74.0 s・73.4 s (2 回)、base sweep 73.8 s (2 回目。1 回目は未計時)。sweep 前後の load (1 分平均) は 0.5 〜 1.1 (`uptime`) |
+| 所要・load | `faa2ed97` で実測。fixed sweep 74.0 s (load 0.51 → 0.89)、base sweep 74.1 s (load 0.79 → 0.94)。HEAD `50112f92` では fixed 74.0 s・73.4 s、base 73.8 s。sweep 前後の load (1 分平均) は `uptime` の値 |
 | 比較 | `fa_cmp.py` の判定 (xmm0 の 64bit 比較、同一入力 8 点、seed 3) |
 
 ## 3. 0x181057b38 の切り分け (受入 2)
@@ -141,4 +141,6 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 
 ## 7. 測定 commit からの差分
 
-測定 commit `0d29b5f4` から HEAD までのコード差分 (`git diff 0d29b5f4 HEAD -- tools/icall`) は、本付録 (`REPORT_APPENDIX_2508.md`) の追加のみで、スクリプト・コードの差分は 0 行。
+測定 commit `faa2ed97` から HEAD までのコード差分は、本付録 (`REPORT_APPENDIX_2508.md`) の追記のみ。`git diff faa2ed97 HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_2508.md'` の出力は空 (スクリプト・コードの差分 0 行)。
+
+`faa2ed97` で取り込んだ main の変更 (`frame_slot_restore.py` の block 境界をまたぐ挿入の抑止ほか) の後も、0x181057b38 の復元は 2 件 (`frame_slot.json` の `restored` 2) のまま。fixed sweep は 54/66/8/3 で `ca7bd804` と同じ (値の不一致は同じ 3 関数)。base は 53/66/9/3。`fa_cmp.py 181057b38 --n 8` は match 8 / mismatch 0。
