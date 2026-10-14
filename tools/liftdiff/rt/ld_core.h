@@ -658,14 +658,18 @@ static void ld_case_begin(void) {
   ld_case.left_n = 0; ld_case.left_first = 0; ld_case.left_last = 0;
   if (ld_case.audit && ld_heap) {   /* LD-96: 復元の前に、前 case の書込みで高水位より外側に残った非 0 バイトを数える */
     u64 z = ld_heap_hw > LD_HEAP_RESERVED ? ld_heap_hw : LD_HEAP_RESERVED;
-    for (u64 i = z; i + 8 <= ld_heap_size; i += 8) {
-      u64 wv; memcpy(&wv, ld_heap + i, 8);
+    u64 probe = (z + 7) & ~7ull;
+    if (ld_case.audit == 2) ld_heap[probe] = 0x5a;   /* 対照: 既知の 1 B を高水位より外に置く (計数の後に消す) */
+    for (u64 i = z; i < ld_heap_size; i += 8) {
+      u64 n8 = ld_heap_size - i < 8 ? ld_heap_size - i : 8, wv = 0;   /* 末尾が 8 の倍数でない heap も数える */
+      memcpy(&wv, ld_heap + i, n8);
       if (!wv) continue;
-      for (int k = 0; k < 8; k++) if (ld_heap[i + k]) {
+      for (u64 k = 0; k < n8; k++) if (ld_heap[i + k]) {
         if (!ld_case.left_n) ld_case.left_first = i + k;
         ld_case.left_last = i + k; ld_case.left_n++;
       }
     }
+    if (ld_case.audit == 2) ld_heap[probe] = 0;
   }
   ld_restore_all();
   memset(ld_arena_pristine, 0, ld_arena_size);

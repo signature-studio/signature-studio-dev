@@ -40,6 +40,8 @@ def main():
     ap.add_argument('--only-part', type=int, default=None, help='full: この chunk だけ流す (chunk は run_functions ごとに新しいランナー)')
     ap.add_argument('--audit-part', type=int, default=None,
                     help='full: この chunk の全関数の先頭 case (pattern z) にも audit=1 を付ける (書き手の特定用)')
+    ap.add_argument('--control', action='store_true',
+                    help='対照: 19 関数の先頭の関数の先頭 case に audit=2 を付ける (計数直前に既知の 1 B を高水位外へ置く)')
     a = ap.parse_args()
     ns = argparse.Namespace(target=TARGET, state='auto')
     sess = Session(TARGET, shards=1, build=False, trace=True, timeout=10.0, state=liftdiff.state_path(ns))
@@ -53,10 +55,13 @@ def main():
     else:
         parts = [[v for v in vas if v in aud]]
     part_first = set(parts[a.audit_part]) if a.audit_part is not None else set()
+    ctrl_va = min(aud) if a.control else None
     orig = cases.case_line
 
     def patched(va, name_prefix, pattern, sig, trace=True, xfill=True, stkfill=None, extra=''):
-        if va in aud or (va in part_first and pattern == 'z'):
+        if ctrl_va is not None and va == ctrl_va and pattern == 'z':
+            extra = (extra + ' ' if extra else '') + 'audit=2'
+        elif va in aud or (va in part_first and pattern == 'z'):
             extra = (extra + ' ' if extra else '') + 'audit=1'
         return orig(va, name_prefix, pattern, sig, trace=trace, xfill=xfill, stkfill=stkfill, extra=extra)
     cases.case_line = patched
