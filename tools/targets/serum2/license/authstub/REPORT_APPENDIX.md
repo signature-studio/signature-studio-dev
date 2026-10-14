@@ -163,3 +163,34 @@ REPORT §14 の詳細。pass の仕様・結論は REPORT §14 が正本。
 - (a) icall 界面の整合 (BLK 前段 store): 未実装。子 issue #1497 (`[SR-22]`) に起票。
 - (b) N2b との適用順規約の文書化・patched 経路への L1 組込み: #1228 (SR-16) の範囲。
 - (c) 「faithful 経路」の定義と e2e 組込み先: リポジトリに定義が無い。本 run では raw lift + pass の census までを faithful 経路の測定とした。
+
+## 14d. N2b と L1 の適用順規約の実測 (#1228 / SR-16)
+
+- 判断の正本: REPORT §14d。本節は実測値のみ。
+- 測定 commit: `cb3a89a6` (origin/main 取り込み後・本節の追記前、コード変更なし)。
+- 素材: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3` (19,236,864 B・sha256 `501e7bb3…5283` 一致)。`toolchain-retdec` (RetDec v5.0)・`toolchain-emsdk` 使用。
+- raw lift: `work/lift/authstub.drc.ll` 711,017 B・sha256 先頭 16 桁 `05a6e15a8db8a92f`。§14c の値 (710,975 B・`5ce6d287…`) とは別 lift (RetDec cold 再生成による差。このため §14c の sha256 とは比較しない)。
+- `patched_base.ll` sha256 先頭 16 桁 `1003435dfc805931`、`raw_base.ll` `e8a23ae3beb00f3c`。
+
+### 到達性表 (`reach_l1.py`・0x1800c2b50)
+
+| 入力 | d5f (0x1800c2d5f) | d6f (0x1800c2d6f) | ef4 (L1 復元先) | f08 |
+|---|---|---|---|---|
+| raw | REACHABLE | REACHABLE | absent | REACHABLE |
+| raw + L1 | REACHABLE | REACHABLE | REACHABLE | REACHABLE |
+| patched (N1/N2a/N2b/N3) | unreachable | unreachable | absent | REACHABLE |
+| patched + L1 | unreachable | unreachable | unreachable | REACHABLE |
+
+- 機構: N2b-2 (0x1800c2d59 の `br i1 %106` を f08 へ強制) で d5f への辺が消える。L1 の `br` (0x1800c2d69) は d5f の中にあるため、patched では復元 block も到達不能。
+- ネガコン (受入 4): raw の L1 有無で ef4 が absent ↔ REACHABLE (pass が辺を戻すことの実測)。patched では L1 の有無で到達性が変わらない。よって「pass を外すと通知経路が patched から消える」は patched 経路では成立しない (通知経路は N2b により元から不達)。
+
+### 23/23 (patched 経路・L1 無し)
+
+- `bash e2e.sh` cold (`work/` 削除後・`TMPDIR=$RUNNER_TEMP`): rc 0・**23/23 PASS**・real **27.2 s** (RetDec lift 含む)・load 0.65→ (開始時 1 分平均 0.65)。
+- 本 e2e は L1 を組み込まない。よって不変確認であり、L1 適用後の 23/23 ではない (faithful 経路への L1 組込みは #1265 で扱う)。
+
+### 未達
+
+- 受入 4 のうち「patched で pass を外すと通知経路が消える」は上記の理由で patched では成立しない。faithful (raw) 側のネガコンは上表で実測。
+- icall #228 界面 (BLK 前段 store): 未実装。#1497 [SR-22]。
+- faithful 経路への L1 組込みと適用順の e2e 反映: #1265 [SR-17]。
