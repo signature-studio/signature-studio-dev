@@ -40,8 +40,10 @@
 | (b) stub | rc=0 72 / rc=124 1 / rc=95 47 / rc=97 3 / rc=98 8 | 11 | 4/12 | 0・なし・差 n/a | 2・{5, 6}・6・差 27 |
 | (c) T2 初期化 | rc=0 69 / rc=124 1 / rc=95 53 / rc=98 8 | 11 | 3/12 | 1・{1}・1・差 18 | 2・{5, 6}・6・差 27 |
 
-- 基準値 (issue 本文の baseline) との照合: rc=95 は 53 で一致、既知 12 hit は 3 で一致。zero-fill VA は issue 本文が 7 と書くが、実測は 10。`REPORT_APPENDIX_2225.md` §2.2・`REPORT_APPENDIX_2262.md`・`REPORT_APPENDIX_2280.md` も 10 で一致する。7 は #2120 (ICALL-59) 時点の値。
+- 基準値 (issue 本文の baseline) との照合: rc=95 は 53 で一致、既知 12 hit は 3 で一致。zero-fill VA は issue 本文が 7 と書くが、実測は 10。`REPORT_APPENDIX_2225.md` §2.2・`REPORT_APPENDIX_2262.md`・`REPORT_APPENDIX_2280.md` も 10 で一致する。
+  7 は #2170 (ICALL-61) の baseline 値で、`REPORT_APPENDIX_2197.md` (27〜28 行) と `REPORT_APPENDIX_2198.md` (33 行) が記録している (測定時の `slot_trace.c` は `ce200f95`・`fe6f0acc` 相当)。その版は fatal 時の ACC 出力を持たず、後の修正 (fatal 時 ACC 出力 +3 行) で `0x1813062e0`・`0x1813071c8`・`0x1813071d0` の 3 件が加わって 10 になった。#2120 (ICALL-59) は `slot_trace.c` の初版で、7 の出典ではない。
 - T2 の読出し (7 件・count は各 1): index 6 は関数 `0x18103d37c`・`0x18103d42c`・`0x18103d44c`・`0x181040f64`・`0x181057f48`・`0x18105e380`、index 5 は関数 `0x18105e338`。いずれも RIP は dispatcher `0x18105deaf` (T2 読出し命令)。
+- 表の「読出し」の分類について: `slot_trace.c` の `record` は SIGSEGV のアクセス種別 (読み/書き) を区別せず、アドレスと RIP だけを記録する。分類は RIP の命令で裏付ける。表の全件の RIP は dispatcher の load 命令 (`0x18105deaf`: `mov rcx,[r14+r15*8+0x13071a0]`、`0x18105def5`: `mov rbx,[r14+rsi*8+0x1307100]`) で、いずれも読出しである。
 - (a) で読出しを行った 7 関数の fatal は、すべて `rip=0x1810806a0 addr=(nil)` (`slot_trace_fatal.txt`)。
 
 ### 2.3 dispatcher の読出し経路 (機械語・`objdump -d` で確認)
@@ -76,7 +78,7 @@ dispatcher `0x18105de80` の要点 (r14 = `0x180000000` は関数先頭の `lea`
   - 読出し回数: 既定 harness では、T2 を読んだ関数は最初の読出しの後に止まる (§2.3)。
   - T2 初期化 (c) を入れても到達関数数は増えず、T1 の読出しが 1 件増えただけ。
 - 静的な call site の値の上限は、T2 の function id が 29、T1 の module id が 18。動的に観測したのは T2 index 5・6 と T1 index 1 だけで、T2 index 7〜29 と T1 index 2〜18 は未観測。
-- 既定条件の表記について: `slot_trace.sh` は `SLOT_ENC_INIT` が未指定でも空文字を渡す。C 側の `getenv` は空文字でも非 NULL を返すので、12 slot は常に敷かれる。`SLOT_ENC_INIT` を付けない実行 (`bash tools/icall/diff/slot_trace.sh`) は (a) と同一の結果になった (確認済み)。本付録の測定は全て `SLOT_ENC_INIT=1` で行ったので影響はない。`#2231` の群 C (`SLOT_ENC_INIT` 依存) の判定に関わるため、挙動の変更は本 PR では行わない。
+- 既定条件の表記について: `slot_trace.sh` は `SLOT_ENC_INIT` が未指定でも空文字を渡す。C 側の `getenv` は空文字でも非 NULL を返すので、12 slot は常に敷かれる。`SLOT_ENC_INIT` を付けない実行 (`bash tools/icall/diff/slot_trace.sh`) は (a) と同一の結果になった (確認済み)。その値は rc=0 69 / rc=124 1 / rc=95 53 / rc=98 8、zero-fill VA 10、既知 12 hit 3/12 で、§2.2 の (a) の行と一致する。この値は作成時の確認で、差し戻し対応の run では素材不足のため再測定していない (§5)。本付録の測定は全て `SLOT_ENC_INIT=1` で行ったので影響はない。`#2231` の群 C (`SLOT_ENC_INIT` 依存) の判定に関わるため、挙動の変更は本 PR では行わない。
 
 ## 4. 未解決
 
@@ -96,8 +98,10 @@ SLOT_ENC_INIT=1 SLOT_T2_INIT=1 bash tools/icall/diff/slot_trace.sh           # (
 python3 tools/icall/diff/dispatcher_ids.py <SlateCore.core_64>               # (d) 境界
 ```
 
-- 集計は `tools/icall/work/slot_trace_enc.txt` の末尾に出る (T1・T2 の index 別行と静的上限との差)。
+- 集計は `slot_trace.sh` 末尾の Python が**標準出力**に出す (`$OUT` には出ない)。`$OUT` (`tools/icall/work/slot_trace_enc.txt`) に入るのは F 行 (関数ごとの rc と ACC 件数) と ACC 行だけ。標準出力の行は、`funcs` (件数と rc 内訳)・`distinct zero-fill addrs`・`known 12 hit`・`T1 index` / `T2 index` (読まれた index ごとの `(addr, rip)`)・`T1 static entry 20 ...` / `T2 static entry 34 ...` (distinct・max read・static max・gap)。§2.2 の表は、各条件の標準出力からの転記である。
+- 各条件の実行は `$OUT` を上書きするので、標準出力は条件ごとにファイルへ保存してから次の条件を走らせる (例: `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh > work/a.txt`)。
 - `SlateCore.core_64` は `tools/targets/freshair/fetch.sh` が `tools/targets/freshair/work/win/Fresh Air/` に展開する。
+- 集計部の静的検算 (素材を使わない): スクリプトの Python 部を抜き出し、既知の ACC 行 (T2 index 5・6、T1 index 1) を与えると、`T2 static entry 34 distinct read 2 max read 6 static max 33 gap 27`・`T1 static entry 20 distinct read 1 max read 1 static max 19 gap 18` が出る (本付録の表と一致)。
 
 ## 6. 測定 commit からの差分
 
