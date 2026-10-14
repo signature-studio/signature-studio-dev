@@ -6,7 +6,7 @@
 
 - 測定 commit: `6444b186` (測定に使った main 作業ツリー)。本 PR の起点は `76168f2a` (origin/main)。
   `git diff 6444b186 76168f2a -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/m11_gen_ir2.sh tools/m11/m11_lift.sh tools/m2 tools/m5` の出力は 0 行
-  (差分は #2141 の REPORT・結果 JSON のみ)。本 PR のコード差分は 0 (REPORT_2143.md の追加のみ)。
+  (差分は #2141 の REPORT・結果 JSON のみ)。本 PR のコード差分は `repro_2143.sh` の追加 (69 行) のみ。計測対象 (`audit_undefload*.py`・`ldfix.py`・`m11_gen_ir2.sh`) の差分は 0。
 - 入力: `work-m11` 素材 (10/10 生成、`tools/m11/work/boot0..4.norm0.ll`・`boot_final.ll`)。`ir_conditions.json` は素材に無い。
   `boot5`・`boot6`・`functions_dll.csv` も素材に無い (`m11_gen_ir2.sh` の完全再生成は行っていない)。
   したがって本 REPORT の数値は **素材の norm0 を入力とした監査の実測** であり、`REPORT_1866.md` の再生成 IR (sites 2,737) とは直接比べない。
