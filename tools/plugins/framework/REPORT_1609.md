@@ -61,10 +61,10 @@ bash tools/plugins/framework/hostshim/hs_dbg.sh                # trap 直前の�
 
 | 手順 | 結果 | 所要時間 (real) | load (開始時) |
 |---|---|---|---|
-| `fw_stage2.sh` (`FL_WIN64_DIR` 指定・stage-1 再利用) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 4 分 48 秒 | 0.52 前後 (未計測の開始時) |
+| `fw_stage2.sh` (`FL_WIN64_DIR` 指定・stage-1 再利用) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 4 分 48 秒 | 未計測 (開始時の uptime は取っていない) |
 | `hs_e2e.sh --fresh` | exit 1 / Phase A `dispatch=38 ff=0` (回帰 OK) / Phase B `memory access out of bounds` / `status=0xffffffff plug=0x0 rec=7` | 1 分 26.9 秒 | 0.03 / 0.66 / 0.60 |
 
-- 1 回目 (§2) と同じ失敗 (Phase B OOB) を再現。Phase A 回帰は両回とも `dispatch=38 ff=0`。
+- 1 回目 (§2) と同じ失敗 (Phase B OOB) を再現。受入 2・3 の失敗ではなく、本 run は読解のみ。Phase A 回帰は両回とも `dispatch=38 ff=0`。
 
 ### 6.1 fail-soft 3 件の呼出側 (`hs_flat3.ll` の IR 読解)
 
