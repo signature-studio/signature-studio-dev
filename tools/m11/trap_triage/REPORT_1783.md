@@ -4,6 +4,8 @@
 
 親: #1588。前提の結論は `REPORT_1588.md` §4.5 を正とする (`0x5ac308` は実行時に書き換わり、静的参照 0 件)。
 
+> #2770 (LD-129) の節 (ld_native の 0x5ac308 書込み監視・旧 §8) は付録 `tools/m11/trap_triage/REPORT_APPENDIX_2770.md` §8 に分割移動した (250 行上限)。本ファイルの §8 は #2769 の節。
+
 ## 0. 検証環境
 
 - 測定 base: `origin/main` `6e001233` (branch `1783-m11-slot-5ac308-writer`)。
@@ -153,96 +155,75 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 | 7.4 の原本 (`SURVEY_UNITS` 行・`SLOT_BOOT` 行・`run1.err` 最終行) | repo 内の出力では 942 unit の完走を示せない | #2769 (同じ build・survey の再実行で引用) |
 | merge 後の main での再測定 | 測定対象が main と一致しない | 本 PR 本文の未解決表 (再測定のみのため子は起票しない) |
 
-## 8. #2770 (LD-129): native 側 0x5ac308 の書込み監視 (ld_native)
+## 8. #2769: 計装版の停止原因と全 942 unit の `[aw]` 採取
 
-**判定**: 受入 1 は実装済み (`rt/ld_native.c` の `LD_WATCH_ADDR`)。受入 2 は部分的: 監視付き F の 3 run で `0x5ac308` への書込みの記録は 0 件 (監視 page への書込み fault も 0 回)。ただし (a) 非摂動性は未確認 (§8.4)、(b) 942 unit のうち 14 unit は走っていない (§8.3)、(c) 書込み元は未特定。
+**判定**: 受入 1 (停止の切り分け) は達成。受入 2 (全 942 unit の `0x1ac308` の `[aw]`) は、計装の範囲を「スタック slot への直接 store を除く全 store」にして **0 件** (run4)。0 件は次の範囲に限る。(i) 計装した `store` 命令による書込みだけを見ている。rep 系 helper 経由の書込みは計装外 (§8.4)。(ii) 計装版の挙動は計装なし版と 2 unit (158・283) で一致しない。(iii) スタック slot を外した run4 の 0 件は、スタック配置が `0x1ac308` と重ならないという未確認の前提に依る (§8.3)。全 store を計装した run5 も 0 件だが、3 unit は site 上限で打ち切られている (§8.3.1)。
 
 ### 8.1 測定条件
 
-- 測定 commit: `8db3c10c` (コードを変えた最後の commit)。再測定の HEAD: `01e767de` (round 3 の指摘時点)。`git diff 8db3c10c 01e767de -- tools/liftdiff` は 0 行。
-- ビルド: `tools/liftdiff` で `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`。警告 3 件はすべて既存の `rt/ld_core.h` 由来 (`ld_native.c` は 0 件)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)、`work-m11`・`work-liftdiff` を `tools/*/work/` に展開。`--nobuild` のため `toolchain-emsdk` は不要。
-- 実行: 直列 (並列 1)。16 run の所要は 13.2〜17.7 s (python 起動込み)、1 分 load average は 0.63〜1.39。
-- 監視: `LD_WATCH_ADDR`・`LD_WATCH_OUT` の両方がある時だけ有効。監視 page を read/exec にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。TF で 1 命令実行してから page を戻す。書込みは通常どおり行われる (値を変えない設計。読取りだけの監視ではない)。
-- 行形式 `wp case=... rip_rva=... old=... new=... chg=...`。末尾に `wpsum faults=N timeouts=M alrm_def=K`。faults = 監視 page への書込み fault の総数 (page 単位で、窓の判定とは無関係)。timeouts = SIGALRM で打ち切った call 数。alrm_def = TF 待ち中に SIGALRM が保留された回数。
-- 窓: wp 行は、書込み先の開始アドレス (SIGSEGV の si_addr) が va-15〜va+7 のものだけ。`rt/ld_native.c` のコメントと同じく、書込み幅 16 以下を前提とする。幅 16 を超える書込みが窓の外から監視 8 バイトに重なると wp 行は出ないが、faults には入る。カーネル内の書込み (syscall の読込み先) は SIGSEGV を起こさないため faults に入らない (未確認)。
-- F の 0 件の強さ: wpsum faults = 0 は、その run で監視 page への書込みが 0 回だったことを示す。窓の仮定 (幅 16 以下) には依らない。上記のカーネル内書込みを除く。
-- アドレスの基底: §8 のアドレスは断りがない限り VA (= `0x400000` + RVA)。§8.2 の k の番地 `0x11eac98` と §8.2b の img の番地は RVA。
+- 測定 commit: `32377077` (コードを変えた最後の commit。`store_watch_1783.sh` に `M11_WATCH_SRC`・`M11_SW_LIMIT` を足し、`SURVEY_UNITS` の grep を直し、`watch_store_682.py` の前提コメントを未確認と書き直した)。base・run4・run5 はいずれもこの commit で実施した。
+- `git diff --stat 5940f848 32377077` は `trap_triage/store_watch_1783.sh` と `trap_triage/watch_store_682.py` の 2 件のみ。gen・build の入力 (`m11_gen_ir2.sh`・`m11_build.sh` 等) は変わっていない。gen・build は `5940f848` で実施した。
+- 素材: `fl-win64` を [WIN64] (`FL_WIN64_DIR`) に展開。`work-m11`・`work-liftdiff` は tar の中身が `tools/...` 相対なので、リポジトリ直下に展開した (`tools/m11/work/`・`tools/liftdiff/work/`、gitignore)。`toolchain-emsdk` は展開していない (下の emcc の理由)。
+- emcc: 基準の `m11_build.sh` は [EMSDK] の `emsdk_env.sh` を自分で source し、`store_watch_1783.sh` は `EMSDK_ENV` (同じ [EMSDK]) を source する。両方とも emcc **6.0.12** (`emcc --version`)。素材 `toolchain-emsdk` の `emscripten-version.txt` も 6.0.12 で、版は一致する。
+- `m11_gen_ir2.sh` rc 0 (41.7 s、`boot_final.ll` 490,735 行)、`m11_build.sh` rc 0 (24.0 s、`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
 
-### 8.2 実測と定義
+### 8.2 計装なし (基準)
 
-定義 (`ldlib/boot.py` の `build_state` と `liftdiff.py bootstate` の出力):
-- entry: `ep` case の status (`entry_status`) と、その時の `System.InitCount` (RVA `0x11eac98`) の値 k (log の `InitCount=`)。
-- 単位フェーズ ok+N = `detail.units_ok` − k。fail M = `detail.units_fail`。最初 P = `fails_head` の先頭の InitTable 添字。
-- 分母 = InitTable の全件 942。units_run = `detail.units_ok` (= k + ok+N)。未走 = 942 − units_run。
-- img_runs = STATE JSON の `img` の要素数。img bytes = その byte 数の合計。wp 件数 = `grep -c '^wp '`。
+- `SV_SLOT=0x1ac308 node trap_triage/survey_units.mjs` (32377077): stdout は `SLOT_BOOT 0x1ac308 0xf960`、`SURVEY_UNITS {"ok":872,"miss":47,"other":1,"halt0":7,"oob":14,"noproc":1}` (合計 942)。rc 0、10.4 s。
 
-同一 HEAD (`01e767de`) で 16 run を取り直した。`LD_WATCH_*` の値は VA。`LD_WATCH_OUT` は arm 時のみ作られる。
+### 8.3 停止の切り分け (計装版)
 
-| run 群 | 環境変数 | n (run 名) | entry | 単位フェーズ | units_run | img_runs・bytes | wp 件数 | wpsum faults/timeouts/alrm_def (run 別) |
-|---|---|---|---|---|---|---|---|---|
-| F | `LD_WATCH_ADDR=5ac308` | 3 (F, r2F, F3) | segv (rip RVA `0x26833d`)・k=246 | ok+682 / fail 3 / 最初 830 | 928/942 | 216・48,516 | 0 (各 run) | F 0/0/0・r2F 0/0/0・F3 0/0/0 |
-| C (陽性対照) | `LD_WATCH_ADDR=15eac98` (`System.InitCount` の VA) | 3 (C, r2C, C3) | 同左 | 同左 | 928/942 | 216・48,516 | 248 (各 run) | C 726/0/0・r2C 726/0/0・C3 726/0/0 |
-| B (監視なし) | なし | 6 (B, B2, B3, B4, r2B, r2B2) | 同左 | 同左 | 928/942 | 216・48,516 | — | — |
-| E2 | `LD_WATCH_OUT` のみ (arm なし) | 1 (E2) | 同左 | 同左 | 928/942 | 216・48,516 | — | — |
-| X6 | `LD_WATCH_ADDR=000000` (arm なし・F と同じ長さの OUT) | 1 (X6) | 同左 | 同左 | 928/942 | 216・48,516 | — | — |
-| X0 | `LD_WATCH_ADDR=0` (arm なし) | 2 (X0, X0b) | 同左 | 同左 | 928/942 | 215・48,484 | — | — |
+| 条件 | 結果 (実測) | 再測 |
+|---|---|---|
+| 旧 script (全 store 計装、`ov.o` の `M11_FIX_682=0`) | unit 145 の開始行の直後で止まる。timeout 240 s で rc 124 | 前 run の実測 (`796507e9` 以前) |
+| `SV_TRACE_AT=145` (20 s) | unit 145 の icall 行は入口 `0x25c9f0` の 1 件のみ。以後の icall なし | 前 run の実測 |
+| 全 store 計装、`M11_FIX_682=1` (base と同じ ov) | unit 106 で止まる。timeout 240 s で rc 124 | 前 run の実測 |
+| 上と同じ + 同一 site の呼出し回数上限 5,000,000 で該当 unit を trap (`watch_addr_2769.c`) | 942 unit 完走 (rc 0)。打ち切りは 3 unit: 106 (site 11832)・145 (site 11833)・830 (site 42115) | **run5 で再現** (§8.3.1) |
+| 全 store 計装、hook の本体を空にする (`m11_sw` は何もしない) | timeout 200 s で rc 124 (**挿入そのものが停止の原因**) | 前 run の実測 |
+| 空 hook + スタック slot への直接 store を計装から外す (`ALLOCA_SKIP=1`) | 942 unit 完走 (rc 0)。kind は `{"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` | 本 hook の run4 が同じ kind (§8.4) |
 
-- 16 run 全てで entry (segv・rip RVA `0x26833d`)・k=246・ok+682・fail 3・最初 830・units_run 928/942 が同一。
-- 旧版の表の img_runs 215 (48,484 byte) は X0・X0b の値だった。F・C・B 系は 216 (48,516 byte)。旧版の「F 行の 216 は再現せず」は取り消す。
-- 未走 14 unit (942 − 928): 単位フェーズの fail 3 件 (最初 830)、添字 246 (`start = k+1` で飛ばす) 1 件、残り 10 件は `units[i]==0` または `*proc==0` で飛ばした unit (2 種の内訳は未分解)。
-- SIGALRM 窓 (TF 待ち中の timeout): 監視付き 6 run は timeouts 0・alrm_def 0。窓を踏んだ run は無い。alrm_def の検出経路は、窓を踏ませる負の対照を取っていないため未検証。
+- 停止点の正体: 打ち切りで得た 3 site は、いずれも同じ関数内で alloca された名前への store。site 11832・11833 は `function_407800` の IR 106693・106694 (store 先 `%r14.05.reg2mem`・`%r13.04.reg2mem`、alloca は IR 106645・106644)。site 42115 は `function_bf86f0` の IR 381155 (store 先 `%stack_var_-324.0.reg2mem`、alloca は IR 380952)。`function_407800` は decommit の loop で、歩幅が `%1 = xor i64 0, 0` (定数 0) のため、`VirtualFree` が成功を返す間は終わらない形になっている。計装なしでは抜けるのに、計装版では抜けない。
+- 計装版の unit 145 は「遅い」のではなく「回り続ける」: 旧 script の進捗行は unit 0〜145 の開始が 0.15 s 以内に並ぶ (`unit 145` で止まる)。§7.5 の「20 分」は timeout までの時間であり、計装 store の遅さではない。
+- 機構: スタック slot (`alloca`) の番地を `ptrtoint` で外に出すことが効くと見ている。`function_407800` の `VirtualFree` の結果がなぜ変わるかは**未確定**。
+- 計装 site は 54,041 → 15,028 (39,013 は alloca の名前への store。`watch_store_682.py` の `ALLOCA_SKIP=1` で外す)。**スタック配置は未確認**: `0x1ac308` はイメージ内の番地 (SizeOfImage 0x18c0000 未満) なので shadow stack には届かないと見込んでいるが、これは前提であり実測していない (実行時の stack 範囲は未測定)。配置が重なれば、ALLOCA_SKIP=1 の 0 件は取りこぼしを含む。
 
-### 8.2b img の比較 (STATE JSON の img、RVA)
-
-- 215 要素の X0・X0b は 216 要素の他の run と要素数が違う (32 byte 少ない)。以下の比較は 216 要素の run 同士で行う。
-- 環境変数長: entry 時の rsp が run 群で違う (F・C・X6 系 `0x7fffffffbc50`、B 系 `0x7fffffffbcd0`、E2 `0x7fffffffbc80`、X0 系 `0x7fffffffbc60`)。B 系と F 系の差 (`0x11eac80` 付近のポインタ領域と `0x11f9451` の計 23 byte) は、arm されない X6 にも出る (X6 vs B: 23 byte)。arm の有無は X6 と比べて読む。
-- `0x11e69bf` (1 byte): 監視なしの B 系でも値が揺れる (B 03・B2 00・B3 01・B4 00・r2B 01・r2B2 01)。arm と無関係に変わるので、この 1 byte は arm の効果とは読めない。他の値: F 01・r2F 03・F3 02・C 00・r2C 03・C3 02・E2 00・X6 00。
-- arm の有無 (環境長を揃えた組):
-  - F vs X6: `0x11e69bf` の 1 byte のみ (01 と 00)。
-  - F3 vs X6: `0x11e69bf` の 1 byte のみ (02 と 00)。
-  - C vs X6 (3 run とも同じ): `0x11e69bf` の揺れに加え、`0x11ead38`〜`0x11ead52` の 11 byte (`00`↔`ff` の交互、3 run で同じ位置・同じ値)。C の監視 page は `System.InitCount` の page で、248 回書込まれる。F の監視 page は書込み 0 回。
-
-### 8.3 解釈
-
-- C の wp 248 件 (3 本とも同じ) で、検出器が働くことは確認した。
-- F の記録 0 件は「監視付き F の 3 run で `0x5ac308` への書込みが記録されず、監視 page への書込み fault も 0 回だった」ことを示す。「native boot では書かれない」とは書かない (§8.4)。
-- 集計 (entry・k・ok+N・fail・最初・units_run) は 16 run で同一。unit 単位の status・件数の比較は未実施。旧版の「unit ごとの status と件数は全 run で同一」は裏付けが無いため取り下げる。
-- 記録 0 件の範囲は、実際に走った 928 unit に限られる (未走 14 unit は §8.2)。
-- wasm 側の 0 件の根拠は §2 run2 の `.aw` の `grep -c '\[aw\] '` = 0 だけ (`[aw]` 検出経路は確認済み。wasm 側の陽性対照ではない)。§7.3 は unit 境界の値比較で書込みの証拠ではない。§7.5 は `SV_ERR_LOG` 未指定の run1 のため根拠にしない。
-- 書込み元は未特定。wasm 側は #2769、native 側は #2770。
-
-### 8.4 未確認 (非摂動性・受入 1)
-
-- 「監視が実行結果を変えない」は**未確認**。
-  - F (監視 page への書込み 0 回): img は X6 と `0x11e69bf` の 1 byte だけ違い、その byte は監視なしの run 間でも揺れる。ただし trace (呼出し列) は比較していない。
-  - C (監視 page への書込み 248 回): X6 と img の 11 byte が 3 run で同じ位置・同じ値で違う (§8.2b)。書込みが起きる条件では、arm が img を変えうる。原因は未確認。
-- 集計の一致は unit 単位の比較の代わりにならない (§8.3)。
-- 窓の仮定 (書込み幅 16 以下)・カーネル内の書込み (§8.1) は未検証。
-- SIGALRM 窓の alrm_def の検出経路は未検証 (§8.2)。
-
-### 8.5 再現
+### 8.3.1 再現 (`watch_addr_2769.c` の site 上限)
 
 ```sh
-export FL_WIN64_DIR=<fl-win64 の展開先>   # [WIN64] (docs/REFERENCES.md §4)
-cd tools/liftdiff
-gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
-rm -f work/wp_F.txt
-LD_WATCH_ADDR=5ac308 LD_WATCH_OUT=$PWD/work/wp_F.txt python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild
-grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
-# 陽性対照: LD_WATCH_ADDR=15eac98 (System.InitCount)
-# arm 無し・環境長を揃える対照: LD_WATCH_ADDR=000000 (OUT は F と同じ長さのパス)
-# 監視なし: 環境変数を付けない。実行ごとに work/m11/boot_state_hybrid.json を別名に退避してから次を回す
+export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス>   # [WIN64]・[EMSDK] (docs/REFERENCES.md §4)
+cd tools/m11
+bash m11_gen_ir2.sh && bash m11_build.sh
+M11_WATCH_SRC=trap_triage/watch_addr_2769.c ALLOCA_SKIP=0 timeout 300 bash trap_triage/store_watch_1783.sh run5
+grep -a "sw-limit" work/probe1783/run5.aw
 ```
 
-### 8.6 本 fix での変更と未解決
+- `ALLOCA_SKIP=0` で全 store (54,041 site) を計装する。site 番号はこの設定の番号で、`ALLOCA_SKIP=1` では番号がずれる。
+- `M11_SW_LIMIT` (既定 5,000,000) で site ごとの呼出し上限を変える。上限を超えた unit だけ trap し、survey は次の unit へ進む。
+- 期待される出力 (run5 の実測): `unit 106 [sw-limit] site=11832 n=5000001`・`unit 145 [sw-limit] site=11833 n=5000001`・`unit 830 [sw-limit] site=42115 n=5000001` の 3 行。
+- site → IR は `work/probe1783/sites.json` で引く (`"11832": {"fn": "function_407800", "line": 106693, ...}`)。
 
-- commit `8db3c10c` (fix): `wp_fault` で SIGALRM の元のマスクを保存し、`wp_finish` は元から block されていなかった時だけ解除する。TF 待ち中に保留された SIGALRM の回数を `alrm_def` に出す (`rt/ld_native.c` 単独、+5/−3)。
-- round 3 の fix (本 commit): REPORT §8 の文言と表だけを直した。`rt/ld_native.c` は変えていない。16 run は HEAD `01e767de` で取り直した (§8.2)。
+run5 の実測 (32377077): rc 0、42.0 s (build と restore を含む)。`instrumented stores: 54041`、`SURVEY_UNITS {"ok":865,"miss":47,"other":4,"halt0":7,"oob":15,"abort":3,"noproc":1}` (合計 942)、`[aw] hits: 0`、上の 3 行を確認。
+
+### 8.4 全 942 unit の `[aw]` 採取 (run4・run5)
+
+- run4 (32377077・既定の `ALLOCA_SKIP=1`・`watch_addr_1046.c`・`timeout 300`): rc 0、52.8 s。
+  - `instrumented stores: 15028`。`SURVEY_UNITS {"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` (942 unit 完走)。
+  - `[aw] hits: 0` (`run4.aw` の `[aw] ` 行 0 件)。
+- run5 (32377077・`ALLOCA_SKIP=0`・`watch_addr_2769.c`): `[aw]` 0 件。3 unit は site 上限で打ち切られ、その後の store は見ていない (§8.3.1)。
+- 計装なし基準との kind 差分 (run4): 158 (`ok`→`oob`)・283 (`ok`→`halt0`)。原因は未確認。
+- 判定の範囲: 0 件は「計装した store 命令 (run4 は 15,028 site・run5 は 54,041 site) の実行で、`[W, W+8)` (W = 0x1ac308) に重なる書込みが無い」まで。計装版の挙動が基準と 2 unit 違うので、基準実行への直接の結論ではない。
+- **計装外の書込み経路 (rep 系 helper)**: `[aw]` は IR の `store` 命令だけを計装する。`work/boot_final3.ll` は `__asm_rep_movsq_memcpy` (28 件)・`__asm_rep_movsb_memcpy` (1 件)・`__asm_rep_stosq_memset` (6 件) を外部宣言で呼ぶ。その実装 (`work/m11_simd.c` の rep 系 helper。`m11_simd2.py` で生成し `emcc -c` で wasm にリンク) は `m11_sw` を呼ばない (`grep -c m11_sw work/m11_simd.c` = 0)。したがって `0x1ac308` が rep movs/stos 経由で書かれても 0 件のままになる。**rep 系 helper 経由の書込みは計装外** (helper への監視の追加は未実施)。
+- 判定関数の確認 (前 run・native・`watch_addr_1046.c` を `cc` で直接コンパイルした `sw_selftest`): 0x1ac308・0x1ac30a・0x1ac30c (幅 4) は hit、0x1ac304 (幅 4)・0x1ac300 (幅 8) は非 hit。判定範囲は `[W, W+8)`。
+- wasm 実機での陽性対照 (既知の書込み番地で hit が出ること) は**未実施**。
+
+### 8.5 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| trace (呼出し列) を含む非摂動性の比較。C の arm で出る 11 byte の img 差 (§8.2b) の原因 | 受入 1 が未確定 | #2770 (本 issue に残す) |
-| 未走 14 unit の内訳 (skip 10 件の `units[i]==0` と `*proc==0` の分解) | 未走範囲の確定 | #2770 |
-| 窓の負の対照 (窓を踏ませる run・alrm_def の検出経路)、幅 16 を超える書込みとカーネル内書込みの扱い | 0 件の信頼性 | #2770 |
-| 全 942 unit の wasm 側 `[aw]` 採取と、書込み元の特定 | 書込み元が未確定 | #2769 |
+| 計装で `function_407800` の `VirtualFree` 結果が変わる機構 (スタック slot の `ptrtoint` が効く理由) | スタック slot を計装から外す前提が検証のみ | 本 PR 本文の未解決表 (追跡のみ・子は起票しない) |
+| スタック配置 (shadow stack の範囲) の実測。alloca 直接 store (`ALLOCA_SKIP=1` で外した 39,013 site) が `0x1ac308` に届かないことは未確認 | run4 の 0 件に取りこぼしがあるかが未確定。run5 の 0 件は 3 unit 打ち切りの範囲に限る | 本 PR 本文の未解決表 (追跡のみ) |
+| rep 系 helper (`__asm_rep_movsq_memcpy` 等) 経由の書込みは計装外 | `[aw]` 0 件は store 命令の範囲に限る | 本 PR 本文の未解決表 (追跡のみ) |
+| 計装版と基準の kind 差分 (158・283) | 0 件の結論は計装版の実行に限る | 本 PR 本文の未解決表 (追跡のみ) |
+| wasm 実機での陽性対照 (既知の書込み番地で `[aw]` が出る確認) | 0 件が「書込みなし」か「検出漏れ」か未確定 | 本 PR 本文の未解決表 (追跡のみ) |
+| 0x1ac308 の値 `0xf960` と静的 `0x40f960` の由来 (§7.6) | スロットの初期値の出所が未確定 | #2769 のクローズ後も §7.8 と同じく未解決 |
+| native 側 `0x5ac308` の store 捕捉 | 両側の比較ができない | #2770 |

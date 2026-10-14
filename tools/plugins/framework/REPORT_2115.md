@@ -5,7 +5,7 @@
 - 担当 issue: #2115 `[PLG-P0b-15]` (親 #2069 / 元 #2069 `[PLG-P0b-13]`)。
 - 起点: `origin/main` 637b70de。branch `2115-plg-p0b-15-0x4181e0-rcx`。
 - 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`extracted/block18983_PE.bin` を使用)、`work-fw-stage1` を worktree 直下の `tools/plugins/work/fw/` に展開。
-- コード変更: なし。`fw_hostfix.py` は 3b581236 と同一 (0x4181e0 注釈は `return 0` のまま)。TLS 0 埋めの stand-in は未採用の実験で、commit 91308efd に残す (戻した commit は 8858cc0f。§10)。
+- コード変更: 注釈は変更なし。`fw_hostfix.py` は 3b581236 と同一 (0x4181e0 注釈は `return 0` のまま)。診断表示 (trace) のみ `fw_boot.c`・`fw_rt.c` に追加 (付録 §11)。TLS 0 埋めの stand-in は未採用の実験で、commit 91308efd に残す (戻した commit は 8858cc0f。§10)。
 
 ## 1. 結論
 
@@ -205,16 +205,21 @@ for m in re.finditer(b"\xe8", d):
 | `rcx` 書換えの有無による呼出元の分類 | 本 REPORT では採用せず (戻り値に影響しないため判断は不要) | 未実施のまま (定義を決めてから再測定) |
 | REPORT_2069 §3.1 の解析対象の誤り (`block00031` を使用) | 前提の誤伝播 | 本 PR で §1 に訂正を記載 |
 | r3 系の引数付き呼出 (8 件) と 0 引数定義の不一致 | 引数規約の不整合 | #2115 (同上) |
-| fold deref (`0x40d6e0` / `[0x710040]`) と `plug != 0` | Phase B OOB | #1890 / #2008 (既存) |
+| fold deref (`0x40d6e0` / `[0x710040]`) と `plug != 0` | Phase B OOB | #2534 (`[PLG-P0b-19]`・OPEN。#1890 → #1935 → #2008 → #2426 → #2534 の移管先) |
 | 対照 (既定と同一コード) と stand-in 版 (未採用) の各 n=1 (`--fresh`・load 記録済み。付録 §10.3)。n≥3 の min–max は未実施 | 失敗位置 (`0x4e5fa6` の target 0 / `0x1712`) の解釈。stand-in 版を採用する判断の前提 | #2115 (継続。採用を検討する場合は n≥3) |
 | 同一の実行コードで §8 と付録 §10.3 の結果が食い違う。失敗位置の変化は n=1 で変動未評価 | Phase B 結果の解釈 | #2115 (継続) |
 | `hostshim/hs_e2e.sh` の増分判定 (49 行目) が `fw_hostfix.py` の変更を見ない (`--fresh` の測定には影響しない) | plain 実行で古い `hs_flat3.ll` が混入する余地 | #2115 (継続。測定ハーネスの修正は再測定を伴うため本 PR では未変更) |
-| main 側で 3b581236 以降に framework 8 ファイル (`fw_rt.c`・`fw_boot.c`・`hostshim/hs_preinit.mjs` 等) が変わった。merge 後の挙動は未測定。本 PR はコード差分 0 (docs のみ) のため、この merge 結果は本 PR の判定対象外 | merge 後の Phase A 回帰 (`dispatch=38 ff=0` の確認)。merge 時に確認 | #2115 (継続) |
+| 基点 `9f403c97` (PR の merge-base) から `origin/main` (fix round 5 の取得時点 `064af0d8`) までに framework の 5 ファイルが変わった: `fw_smoke_check.py` (+42/-10)・`hostshim/hs_irfix.py` (+64)・`hostshim/hs_plug.c` (+17・`hs_fw_init_tls`・#2571)・`fw_269_verify.sh`・`fw_pack_stage1.sh` (各 1 行のコメント)。本 PR はこれを取り込んでいない。merge 後の挙動は未測定 | merge 後は `fw_smoke_check.py` の判定 (`runerr`・`init_reach`。基準は `runerr=0 ff=0 init_reach=288`) を記録する。`dispatch=38` の PASS は完走の証拠にしない。main では既に FAIL (`REPORT_2571.md` §3・#2510)。merge 時に確認 | #2115 (継続) |
+| 基点 `9f403c97` の `hs_e2e_run` は framework 初期化 (TLS 初期化) を通らない。TLS 値を正しくしても OOB は残る (付録 §11.5 E3。E3 は n=1・所要と load は未記録 (ログも未保存))。main では #2571 (PR #2595・`9b352bd7`) が `hs_fw_init_tls()` で TLS 初期化を入れた。main の `REPORT_2571.md` §3 では初期化ありでも OOB が残る (本 PR では未測定) | 受入 2 (Phase B の変化) | #2115 (継続) |
+| `0x418120` の実行経路の訂正: `_InitLib` の hooks 表 (`0x6d6ef8`・reason=1 → `[+8]`) からの間接 call で実行される (§10.1 の「呼ばれない」は誤り) | 前提の訂正 | 付録 §11.1 で訂正済み |
+| lift の fold 欠陥: `function_4180a0` の引数 `ecx` が `ptrtoint @683` に化け、`function_4180d0` の戻り値が 1 になる | TLS block が正しく作られない | #2510 (`[PLG-P0b-18]`・OPEN。同じ類型の別インスタンスとしてコメントで追記)・付録 §11.3 |
+| `fw_rt.c` 表示カウンタ分離 (commit `058c2049`) の再測定 | 解消。付録 §11.4.1 で再測定済み (Phase A `dispatch=38 ff=0`・Phase B は 4c00ec24 と同じ OOB・`rec=7`・1 項目)。基準との差は表示行の heap アドレス 3 件のみ | — (解消) |
+| smoke 終端の `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` (smoke.log 47 行目。基準 4c00ec24 にも同一行。trace 由来ではない) | SMOKE PASS の判定には影響しない。address zero への書込みの有無は未調査 | #2115 (継続・原因は未調査) |
 
 ## 10. TLS index 未設定の確認と stand-in 版の実験 (未採用・測定 commit 91308efd)
 
 - 確認事実 (TLS index は `0x418120` でしか設定されず、`0x6d6e70` は `.data` で `0xFFFFFFFF`) と stand-in 版 (`fw_hostfix.py` 0x4181e0: `TlsAlloc` + 0 埋めブロック) の定義・実測は付録 `REPORT_2115_APPENDIX.md` §10.1〜§10.3。
 - **stand-in 版は未採用**。既定の注釈は 3b581236 の `return 0` のまま (戻した commit は 8858cc0f)。stand-in 版のコードは commit 91308efd を参照する。
 - 実測 (付録 §10.3・全て n=1): 対照 (既定と同一コード) と stand-in 版はどちらも Phase B が OOB。§8 との食い違い・失敗位置の変動は付録 §10.3 を参照。**受入 2 は未達。効果は未確認。**
-- 差分確認: `git diff 3b581236 HEAD -- tools/plugins/framework ':!*.md'` は 0 行 (既定のコードは対照の測定 commit 3b581236 と同一)。
-- 既定の値は付録 §10.3 の対照の実測を引用する。HEAD は対照と同一コードのため、追加の再測定は行わない (WORKFLOW §6)。
+- 差分確認: 既定の注釈 (`fw_hostfix.py`) は対照 3b581236 と同一。framework 全体は 3b581236 から HEAD で 3 ファイル (`fw_boot.c`・`fw_rt.c`・`hostshim/hs_preinit.mjs`) が違う。実行コードの基準は測定 commit `058c2049` (`git diff 058c2049 HEAD -- tools/plugins/framework ':!*.md'` は 0 行)。
+- HEAD の実行コードは測定 commit `058c2049` と同一のため、HEAD の実測は付録 §11.4.1 を引用する (WORKFLOW §6)。対照 3b581236 は既定の注釈 `fw_hostfix.py` の対照 (stand-in 版との比較) にだけ使う。

@@ -247,3 +247,4 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 
 ## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
 - 測定値の正本: [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)。
+## 20. PM Worker の降格 (#2340・PR #2469) の測定 (全文は [`REPORT_APPENDIX_2469.md`](REPORT_APPENDIX_2469.md))

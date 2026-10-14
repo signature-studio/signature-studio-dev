@@ -389,6 +389,82 @@ test("artifact の再投入: 報告が停止報告 (STOP_RE) でなければ、�
   assert.equal(pickArt(p, 85), undefined);
 });
 
+test("artifact の再投入 (#2758・noPr 経路): 本文が oc_artifacts: none でも、不足素材は none を外して fl-win64 を補って足す", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 74, { labels: ["oc:no-pr"], body: "oc_artifacts: none" });
+  await send(ctx.app, "issue_comment", commentPayload(74, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: none", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(74, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(74, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 74), "oc_artifacts: fl-win64 plugins-serum2");
+  const gh = await (ctx.app.engine as any).d.gh();
+  await ctx.app.engine.launch(gh);
+  const posts = postsTo(ctx.m.calls, 74);
+  assert.equal(posts.length, 1);
+  assert.match(posts[0].body.body, /^\/oc oc_actions_allow_write\noc_artifacts: fl-win64 plugins-serum2\n/);
+});
+
+test("artifact の再投入 (#2758・relaunch 経路): 本文が oc_artifacts: none でも、停止報告の不足素材は none を外して fl-win64 を補って足す", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 75, { body: "oc_artifacts: none" });
+  await send(ctx.app, "issue_comment", commentPayload(75, BOT, outcomeBody(1), atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(75, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.relaunch, [[75, "oc_artifacts: fl-win64 plugins-serum2"]]);
+  assert.equal(pickArt(p, 75), "oc_artifacts: fl-win64 plugins-serum2");
+});
+
+// 素材行の既定 (#2758): PM の行 → 本文の oc_artifacts 行 → 推定。
+test("launch (#2758): PM の行が無いとき、本文の oc_artifacts 行を素材行にする (推定とは違う行)", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 31, { body: "説明\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff\n" });
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 31), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff");
+});
+
+test("launch (#2758): 本文の悪い素材名は落ち、残りの行を使う (allowlist 外だけで全滅なら推定)", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 32, { body: "oc_artifacts: fl-win64 evil-thing work-m11" });
+  await seed(ctx, 33, { body: "oc_artifacts: evil-thing" });
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.equal(pickArt(p, 32), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(pickArt(p, 33), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk");
+});
+
+test("launch (#2758): PM の行は本文の行より優先する", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 34, { body: "oc_artifacts: fl-win64 work-m11" });
+  await send(ctx.app, "issue_comment", commentPayload(34, "pycabbage", "oc_artifacts: fl-win64 plugins-ott"));
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 34), "oc_artifacts: fl-win64 plugins-ott");
+});
+
+test("launch (#2758): 本文に素材行が無い・自然文なら推定 (従来どおり)", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 35, { body: "必要なし (実機採取のため ...)" });
+  await seed(ctx, 36);
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  for (const n of [35, 36]) assert.equal(pickArt(p, n), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk");
+});
+
+test("launch (#2758): 本文を編集すると素材行の既定も取り直す。行が消えたら推定に戻る", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 37, { body: "oc_artifacts: fl-win64 work-m11" });
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 37), "oc_artifacts: fl-win64 work-m11");
+  assert.equal((await send(ctx.app, "issues", issuePayload(37, { body: "oc_artifacts: fl-win64 plugins-ott", at: "2026-10-14T11:30:00Z" }))).status, 202);
+  assert.equal(pickArt(ctx.app.engine.plan(), 37), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal((await send(ctx.app, "issues", issuePayload(37, { body: "必要なし", at: "2026-10-14T11:45:00Z" }))).status, 202);
+  assert.equal(pickArt(ctx.app.engine.plan(), 37), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk");
+});
+
 // blocked の再着手 (#2650)。blocker が open の間は blocked の行に置き、0 になった報告につき 1 回だけ再着手する。
 const blockedOutcome = (run: number) => `<!-- oc-run-outcome: no-pr reason=blocked run=${run} -->\n[run-outcome] 依存が未解決のため、PR も push も出さずに終了しました。`;
 const isoAt = (ms: number) => new Date(ms).toISOString();
@@ -634,3 +710,51 @@ function syncHandlers(o: { issues?: any[]; blockers?: Record<number, any[]>; com
     },
   ];
 }
+
+const postOk = (c: Call) => (/\/issues\/\d+\/comments$/.test(c.url) && c.method === "POST" ? j({ html_url: "x" }, 201) : undefined);
+
+test("launch (prio:low の上限 #2721): critical が launch 可能な間は、未完了の low の run を数えて LOW_CAP までしか low を出さない。実行中の run は止めない", async () => {
+  const ctx = await configuredApp({ live: true, env: { TARGET: "50", BATCH: "25", LOW_CAP: "2" }, handlers: [postOk] });
+  await seed(ctx, 80, { labels: ["prio:low"], title: "[CI-80] low running" });
+  await send(ctx.app, "workflow_run", runPayload(1, "in_progress", { event: "issue_comment", title: "[CI-80] low running" }));
+  await seed(ctx, 81, { labels: ["prio:low"] });
+  await seed(ctx, 82, { labels: ["prio:low"] });
+  await seed(ctx, 83, { labels: ["prio:critical"] });
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  const plan = await ctx.app.engine.launch(gh);
+  assert.deepEqual(plan.picks.map((p) => p.n), [83, 81], "cap 2 - 実行中の low 1 = 1 件。82 は次の tick に回る");
+  assert.deepEqual(plan.low_cap, { cap: 2, running: 1, applied: true });
+  assert.deepEqual(comments(ctx.m.calls).map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["83", "81"]);
+  assert.equal(ctx.m.calls.filter((c) => c.url.endsWith("/cancel")).length, 0, "実行中の run は止めない");
+  // 投稿の後の状態: 83 は launch 済み (recent) になり、applied は偽になる。cap と running は投稿の前と同じ。
+  const s = ctx.app.engine.status() as any;
+  assert.deepEqual(s.active_by_prio, { critical: 0, normal: 0, low: 1 });
+  assert.deepEqual(s.low_cap, { cap: 2, running: 1, applied: false });
+});
+
+test("launch (prio:low の上限 #2721): critical が無ければ上限は効かず、blocked の critical は数えない", async () => {
+  const ctx = await configuredApp({ live: true, env: { TARGET: "50", BATCH: "25", LOW_CAP: "1" }, handlers: [postOk] });
+  await seed(ctx, 80, { labels: ["prio:low"], title: "[CI-80] low running" });
+  await send(ctx.app, "workflow_run", runPayload(1, "in_progress", { event: "issue_comment", title: "[CI-80] low running" }));
+  await seed(ctx, 81, { labels: ["prio:low"] });
+  await seed(ctx, 82, { labels: ["prio:low"] });
+  await seed(ctx, 85, { labels: ["prio:critical"], body: "blockedBy: #86" });
+  await seed(ctx, 86, {});
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  const plan = await ctx.app.engine.launch(gh);
+  assert.equal(plan.low_cap.applied, false, "blocked の critical は launch 可能ではない");
+  assert.deepEqual(plan.picks.map((p) => p.n), [86, 81, 82], "上限が効かないので low は両方出す (86 は 85 の blocker)");
+});
+
+test("launch (prio:low の上限 #2721): 着手済み (started) の critical も上限を効かせる", async () => {
+  const ctx = await configuredApp({ env: { TARGET: "50", BATCH: "25", LOW_CAP: "0" } });
+  await seed(ctx, 84, { labels: ["prio:critical"], title: "[CI-84] critical started" });
+  await send(ctx.app, "workflow_run", runPayload(2, "in_progress", { event: "issue_comment", title: "[CI-84] critical started" }));
+  await seed(ctx, 81, { labels: ["prio:low"] });
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.equal(p.plan.low_cap.applied, true);
+  assert.deepEqual(p.picks.map((x) => x.n), [], "LOW_CAP 0 かつ 84 は started なので、low (81) は出ない");
+});

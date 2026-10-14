@@ -9,6 +9,8 @@
 - **未確定** (1 回目の run 時点。2 回目 (§7) で一部確定): `incEventValue` の戻り値の型と値 (下位関数 `0x1051330` の出力が int か float ビット列か不一致)、`incEventValue` と `midiNoteOn` の副作用 (本体の `0x1051330`・`0x10002a0` の大半が未読)。推測では実装しない方針により、`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs` は変更 0 件。
 - 受入条件は 4 件中 1 件のみ部分達成。PR は `Refs #2547`。
 - 2 回目の run (§7): incEventValue の戻り値の型 (flags bit1 で int / float ビット列に分岐)・範囲外 code (`0x1051330` 本体に例外経路なし)・副作用 (`0x1051330` 本体はスタック書込みのみ) を PE で確定。呼出し先 `0x1046a30` の副作用は未確定 (§7-3)。cur・lo・hi・flags の値源は未確定のため、provider・mock は未実装。
+- 3 回目の run (§8): 事象表 (`0x1050f90` の探索経路) は eventId の初回参照で要素を作る遅延キャッシュと確定 (§7-4 の「初期化元」の未解決を解消。他の挿入経路は未確認)。残りは flags (`0x104d0d0`)・範囲と現在値 (`0x1046a30`)・midiNoteOn の本体と述語。provider・mock は引き続き未実装。
+- 4 回目 run (§9・#2816 を縮小して Closes): 事象 flags の分類器 `0x104d0d0` を確定。A 経路 (item ≠ 0 かつ `[item+0x64]==2`) 以外 (B 経路。item 無しと型の合わない item を含む) の flags は 0x00 か 0x04 のみで bit1 は立たない。残り (A 経路の getter・lo/hi/cur・表挿入) は子 #2887 (PY-103)。
 
 ## 測定
 
@@ -145,3 +147,104 @@
 | midiNoteOn の本体 `0x10002a0`・`0x63a730`・`0x11d1430` (§2・§4 のまま) | midiNoteOn の副作用・ゲート条件が未確定 | #2547 |
 
 provider・mock の実装は、上の値源 (cur/lo/hi/flags) を状態モデルとして決める run の後に行う。推測の初期値では実装しない。
+
+## 8. 3 回目 run: 事象表は遅延キャッシュ・midiNoteOn のゲート参照 (PE 実測)
+
+測定:
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (実測 5.6 秒)。逆アセンブルは `pe_disasm.py`、参照列挙は `pe_xref.py` (本 run で追加)。
+- 測定 commit: `ef2df235` (`analysis/flapi/pe_xref.py` の追加。コードを変えた最後の commit)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_xref.py 15e4868` → 終了 0、命令 5,022,467、hits 9、stores 0、34.0 秒 (load average 0.46、並列 1)。
+- ネガティブコントロール: `15e4869` (1 バイトずらし) → hits 0 (終了 0)。
+- 差分 0 の証跡: `git diff ef2df235 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 PR の commit は REPORT と DOC_MAP のみ)。
+- 表記の訂正: §7-4 の `[0x5938ad]`・`[0x59388e]` は rip 相対の disp 表記。実 VA は両方とも `0x15e4868` (次命令アドレス + disp)。値は §7 と同じ表を指す。
+
+### 8-1. 表の実体 (VA `0x15e4868` = 表ポインタ G1、`.data`)
+
+- G1 の再配置前の初期値は `0x193fc60` (`.bss` の静的オブジェクト P)。P は起動前ゼロ。
+- G1 への rip 相対 store は 0 件。参照 9 件は全て load: `0x1050fb4`・`0x1050fd3` (`0x1050f90` の探索)、`0x10510bc`・`0x10510db`・`0x105112f` (同関数の挿入)、`0x11b35da` (初期化関数 `0x11b3500` 系の中。`0x663d80(..., r8d=0x10)` の確保結果を `[P]` へ書く)、`0x11c8107`・`0x11d3af7`・`0x11d3b0c`。
+- よって表の本体は S = `[P]`。件数 = `[S+0x10]`、要素ポインタ配列 = `[S+8]`。確保直後の件数は未読 (`0x663d80` 未読)。
+
+### 8-2. 事象表は eventId の初回参照で作られる (`0x1050f90` の実測)
+
+- 二分探索 (`0x1050fb4`〜`0x105103c`) で見つかれば `lo = [item+4]`・`hi = [item+8]`・戻り値 = `[item+0xc]` (flags) (`0x1051019`〜`0x1051034`)。
+- 見つからなければ (`0x105103e`〜`0x1051098`):
+  - `flags = 0x104d0d0(eventId)` (`0x1051053`)。
+  - `flags & 2 ≠ 0`: `lo = 0`・`hi = 0x100000` (`0x1051062`〜`0x1051068`)。
+  - `flags & 2 = 0`: `lo = 0x1046a30(eventId, 0, 0x20)` (`0x1051075`〜`0x1051080`)、`hi = max(0x1046a30(eventId, 0x40000000, 0x20), lo + 1)` (`0x1051082`〜`0x10510a8`)。
+- `0x10510aa` で同じ表を再探索し、無ければ `0x664090` で新要素を作って key = eventId・lo・hi・flags を書く (`0x105112f`〜`0x1051151`、`0x664090` の本体は未読)。戻り値は flags (`0x1051161`)。
+- 結論: この探索関数の経路では、表は eventId の初回参照で要素が作られる遅延キャッシュ (他の挿入経路は未確認)。§7-4 の「表の中身と初期化元」は初期化元が「初回参照」と確定した。lo・hi・flags の値そのものは 8-3 の未確定に残る。
+
+### 8-3. 残る未確定 (値源と midiNoteOn)
+
+| 未確定 | 根拠 (VA) | 影響 | 起票先 |
+|---|---|---|---|
+| `0x104d0d0(eventId)` (flags 分類器) | `0x104d000` でオブジェクトを引き、`[+0x64]==2` で分岐。eventId の下位 16 bit と上位ビットで分岐。本体は未読 | 事象の flags (bit1 = float 型か) が決まらない | #2816 |
+| `0x1046a30(eventId, sub, mode)` (汎用の照会) | mode 0x20 で範囲、mode 2 で現在値 (§7-4 と同じ)。0x590 のスタックフレームで本体の大半は未読 | lo・hi・cur が決まらない | #2816 |
+| `0x664090` (挿入) と `[S+0x10]`・`[S+8]` の更新 | 挿入先の書込みは `0x105112f` の戻り先。本体は未読 | 件数・並びの正しさ | #2816 |
+| midiNoteOn の述語 `0x11d1430` | `mov rax,[G3]; mov rax,[rax]; mov rax,[rax+8]; mov rcx,rax; mov rax,[rax]; call [rax+0x88]` (this = `[[G3]+8]`、vtable 経由の 1 段の間接呼出し)。G3 = VA `0x15e4790` は 2422 箇所から読まれる広域グローバル (store 0 件)。`0x11d1460` は同形で `+0x90` | -2 ゲートの条件が決まらない | #2817 |
+| midiNoteOn 本体 `0x10002a0`・`0x63a730` | §2・§4 のまま | 副作用が決まらない | #2817 |
+
+### 8-4. 受入条件への影響
+
+- 1 件目 (戻り値・範囲外 code・副作用の REPORT 記録) は部分達成のまま。incEventValue の型・範囲外・本体副作用は §7 で確定。値源 (flags・範囲・現在値) は未確定。
+- 2・3・4 件目 (provider・mock の実装、channels_diff、all_tools 48/48) は未達。値源が決まるまで実装しない。
+- 残りは子 issue に分けた: incEventValue の値源 (`0x104d0d0`・`0x1046a30`・`0x664090`) は #2816、midiNoteOn の述語と本体 (`0x11d1430`・`0x10002a0`) は #2817。midiNoteOn は `[G3]+8` の vtable 先の解決が前提。
+
+## 9. 4 回目 run (#2816 を縮小): 事象 flags 分類器 0x104d0d0 の PE 確定
+
+測定:
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `*block00031_PE.bin` のみ展開 (実測 2.9 秒)。並列 1、load average 0.11〜0.24。
+- 逆アセンブル `pe_disasm.py 104d000 40`・`104d0d0 120`・`104d290 14`・`41a770 40` (いずれも終了 0)。RIP スロット `pe_flag_slots.py 104d0d0 104d290` → 終了 0・0.086 秒。参照列挙 `pe_xref.py 104d2a8,104d2a9` → hits 5・stores 0・63.2 秒。
+- ネガティブコントロール: `pe_xref.py 104d2aa` (1 バイトずらし) → hits 0・62.8 秒。検証範囲は PE の逆アセンブルと RIP 参照のみ (wasm・mock は未実行。コード差分 0)。
+- 測定 commit: `f95896a2` (`pe_flag_slots.py` の usage 修正。コードを変えた最後の commit)。差分 0 の証跡: `git diff f95896a2 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (以後の commit は REPORT と DOC_MAP のみ)。
+
+### 9-1. 入口と項目解決 (0x104d0d0 → 0x104d000)
+
+- 0x104d0d0 は eventId を受け、戻り値は `[rbp+0x27]` の 1 バイト (epilogue 0x104d284)。既定値は 0x00 (9-3)。
+- 0x104d000 は eventId の下位 16 bit `L` と上位 16 bit `H` で項目 (item) を引く。item が無ければ 0 を返す。
+  - `L ≥ 0x8000` かつ eventId ≤ 0x0fffffff: `H < O.[+0x10]` のとき `item = fe8bb0(O, H)` (`O = *(*(0x15e2218))`)。
+  - `L ≥ 0x8000` かつ eventId ∈ [0x70000000, 0xefffffff]: `p = (eventId-0x70000000)>>16`、`item = *(T+0x134c+(p>>6)*0x28f*8+(p&63)*8)` (`T = [0x15e06a0]`。境界検査なし)。
+- 上の 2 つの場合は eventId の写し `[rbx]` を `L-0x8000` に書き換える。それ以外は item = 0。`item ≠ 0` かつ `[item+0x64] == 2` なら A 経路、それ以外は B 経路 (eventId は元のまま)。
+
+### 9-2. flags の決まり方 (incEventValue の bit1 = 0x02 の判定)
+
+| 経路 | 条件 (VA) | 戻り flags | bit1 (0x02) |
+|---|---|---|---|
+| A | item ≠ 0・`[item+0x64]==2` (0x104d104・0x104d108)。`ref = 0x1331340(item, &ref)` (0x104d113)、`sub = ref.vt[+0x20](ref)` (0x104d123)。sub が 0 なら flags = 0 (0x104d12e) | `low8(sub.vt[+8](sub, 0x1a, L-0x8000, 0))` (0x104d142・0x104d145) | 未確定 (getter 未読・子 #2887) |
+| B0 | eventId == 0x40000002 (0x104d15e) | 0x04 | 0 |
+| B1 | eventId ≤ 0x0fffffff・L == 1 (0x104d186)・`H < O.[+0x10]` (0x104d1d8)・`fe8bb0(O, H)` の戻り値 `ret` で `[ret+0x160] ≠ 5` (0x104d1f3・0x104d1f8) | 0x04 (0x104d206) | 0 |
+| B2 | eventId ≤ 0x0fffffff・L ∈ {0x4, 0x201, 0x202, 0x205, 0x206} (0x104d195・0x104d19c・0x104d1a6) | 0x04 (0x104d216) | 0 |
+| B3 | eventId ∈ [0x70000000, 0xefffffff]・L ∈ {0x1fc1, 0x1fc2} (0x104d226・0x104d252) | 0x04 (0x104d271) | 0 |
+| — | 上記以外 | 0x00 | 0 |
+
+### 9-3. 参照する定数 (RIP 相対スロット。`pe_flag_slots.py` の出力)
+
+| スロット VA | section | 実バイト | 参照元 | 中身 |
+|---|---|---|---|---|
+| 0x104d2a8 | .text | 0x00 | 0x104d0e5 (既定値) | 0x104d2a7 の `add [rax], al` (00 00) の 2 バイト目 |
+| 0x104d2a9 | .text | 0x04 | 0x104d16a・0x104d206・0x104d216・0x104d271 (OR 定数) | 0x104d2a9 の `add al, 0xcc` (04 cc) の先頭バイト |
+| 0x15e2218 | .data | ptr 0x16bafc8 (ファイル値) | 0x104d030・0x104d03f・0x104d1b4・0x104d1e6 | 項目リスト `O` の参照元 (`O` の実体は未読) |
+
+- 0x104d2a8・0x104d2a9 は機械語の中にある。RIP 相対の参照は 5 件で、コードからの書込みは 0 件 (`pe_xref`)。ファイル上のバイトを実行時の値とみなすのは、この 2 点を前提にしている。`pe_flag_slots.py` を新設したのは、既存の `pe_rip_consts.py` が f32/f64 の再解釈しか出さず、生バイトと section を出さないため。
+
+### 9-4. 結論と影響
+
+- B 経路 (A 以外。item 無しと型の合わない item を含む) の flags は 0x00 か 0x04 だけで、bit1 は立たない。したがって B 経路の事象は `0x1051330` の int 側 (§7-2 の (B)) に入る。
+- bit1 が立つのは A 経路だけで、その値は getter の戻り値で決まる (未読)。
+- `0x1050f90` の表は登録時の flags を `[item+0xc]` に保存する (§8-2)。flags は初回参照時の分類で固定される。
+- 終端の `call 0x41a770` (引数 `rcx = &[rbp+0x28]`、0x104d27f) は、戻り値 `[rbp+0x27]` の読出し (0x104d284) の直前にある。B 経路では `[rbp+0x28]` が 0x104d0dc で 0 のままなので、0x41a770 は `cmp qword [rcx],0; je` で戻り、書込みは無い。A 経路では `[rbp+0x28]` が 0x1331340 の out 引数 (0x104d10f) になり、0x41a770 は非 0 の値を 0 に戻して `ref.vt[+0x10]` を呼ぶ (解放相当)。この呼出し先は未読で、`[rbp+0x27]` を変えないことは未確認 (A 経路の bit1 は子 #2887 で扱う)。
+
+### 9-5. 受入条件 (#2816 を縮小後)
+
+- [x] 0x104d0d0 の戻り値・分岐条件・定数の所在を PE 解析箇所つきで記録 (9-1〜9-3)。
+- [x] 推測の初期値では実装しない (provider・mock の変更 0)。
+- [ ] lo・hi・cur・A 経路の getter・表挿入は未達。子 #2887 (PY-103) に移し、#2816 の本文から外した。
+
+### 9-6. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| A 経路の getter (`0x1331340`・`ref.vt[+0x20]`・`sub.vt[+8](0x1a)`) | A 経路の事象の bit1 (float 型か) が未確定 | #2887 (PY-103) |
+| `0x1046a30` の mode 0x20 (lo・hi)・mode 2 (cur) | incEventValue の lo・hi・cur が未確定 | #2887 (PY-103) |
+| `0x664090` と O の初期化元 | 表の件数・並びの正しさが未確認 | #2887 (PY-103) |
+| 0x104d2a8・0x104d2a9 が機械語の一部である由来 | 0x00 / 0x04 が実行時の値と一致するかは未確認 | PM agent の判断待ち: 0x104d2a8・0x104d2a9 の値を実行時の値として扱ってよいか・既定案: 確認できるまで実装に使わない (本 PR は使っていない) |

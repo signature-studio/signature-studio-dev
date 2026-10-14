@@ -41,6 +41,11 @@ else echo '{"vstore_fixed": "skipped (negative control)"}' | tee "$W/fix_vstore.
 python3 "$T/m2/ir_normalize.py" "$W/oi.restored.ll" "$W/oi.norm0.ll" >/dev/null
 python3 "$T/m5/ir5_patch.py" "$W/oi.norm0.ll" "$W/oi.lift.ll" --report "$W/ir5.json" >/dev/null 2>&1
 cp "$W/oi.lift.ll" "$W/oi.p1.ll"   # comis は icall_rewrite の stub+sahf 経路で処理 (m6 ir6_pass P1 不要)
+# 5b. (#2865 opt-in・既定 off) BLK 参照を module-local global @__icall_blk へ張り替え、runtime も ICALL_BLK_GLOBAL で同じ global を使う
+if [ "${ICALL_BLK_GLOBAL:-0}" = "1" ]; then
+  python3 "$HERE/ir_blk_global.py" "$W/oi.p1.ll" "$W/oi.p1.bg.ll" --map "$W/map.json" | tee "$W/blk_global.json"; mv "$W/oi.p1.bg.ll" "$W/oi.p1.ll"
+  ICALL_EMCC_FLAGS="${ICALL_EMCC_FLAGS:-} -DICALL_BLK_GLOBAL"
+fi
 python3 "$HERE/ir_flatten.py" "$W/oi.p1.ll" "$W/oi.flat0.ll" --table "$W/oi.table.c" --cfg "$(python3 -c "import json;print(','.join('%x' % v for v in json.load(open('$W/map.json'))['cfg_thunks']))")"
 # CRT エラー報告経路 3 関数を C override (rt/icall_ovr.c) に置換 (R の ott_ovr.c 移植)
 python3 "$HERE/ir_override.py" "$W/oi.flat0.ll" "$W/oi.flat.ll" "${ICALL_OVR:-1801c8c00,1801c8cb8,1801a9a6c,1801a9b38}" | tee "$W/override.json"
