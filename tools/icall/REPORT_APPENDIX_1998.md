@@ -11,7 +11,7 @@
   - 行 19124 `store i64 %1, ptr %13` は任意アドレスへの "emsc" 書込み (`WCV`、BLK 範囲外の `0x104af4d8` 等 8 件)。"emsc" の発生源は行 19124 の `%1` で、これが 19132・19134 の値になる。
 - **値 "emsc" の出所は線形メモリの address 0 (null ページ)**。行 18807–18813 の load chain: `%23 = load [%1+8]` = `0x400000004` → `%25 = load [0x400000004]` = 0 → `%29 = load [0]` = "emsc" (§2)。
 - **emscripten のヌルページ sentinel**: 空の emscripten モジュール (main が 0 を返すだけ) でも address 0 から `65 6d 73 63` が見える。つまり "emsc" は route が敷設したデータではなく emscripten runtime 自身が置く値。
-- **分類 (暫定)**: 書込み命令 (store) は **lift 側** (lift が生成した IR の store)。ただし値は **null ページを指すポインタ chain** を経由する。ポインタ値 `0x400000004` の由来 (どの store が誤ったポインタを作ったか) は未特定。route 側 (data 敷設) は否定 (§3)。
+- **分類 (暫定)**: 書込み命令 (store) は **lift 側** (lift が生成した IR の store)。ただし値は **null ページを指すポインタ chain** を経由する。ポインタ値 `0x400000004` の由来は §6 で i32 2 本の 8B 読みと特定 (残は元の機械語との突合)。route 側 (data 敷設) は否定 (§3)。
 - **受入条件の充足状況**:
   - [x] BLK+0 への store 命令を IR 行まで特定 (行 19132)。
   - 未達は子 issue へ移した (PM 判断で #1998 の範囲を縮小): wasm オフセット・route/lift の最終分類 → #2310 (ICALL-72)、値 `0x400000004` の生成元 → #2311 (ICALL-73)。
@@ -86,7 +86,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 値 `0x400000004` の生成元 (ICALL-73 #2311 の実測): 全 5526 lifted store を `fa_wc.py` で監視し、`0x400000004` を書く store は **0 件** (`fa_wc2` 測定・181057b38 の 8 入力)。値は lifted store 由来ではなく、初期メモリ (DLL data 敷設 `ott_data_install` の範囲外 or C 側 runtime の書込み) にある。行 18807–18813 の load chain の起点の heap/data slot は未特定 | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #2311 (ICALL-73) (部分達成。残りは同 issue の範囲を縮小して継続) |
+| 値 `0x400000004` の生成元は §6 で特定 (i64 store は 0 件。`function_181057b38` の隣接 alloca 2 つに入る `store i32 4` 2 本の 8B 読み)。残: 元の機械語との突合 (SlateCore 未展開)、alloca 配置が RetDec 由来か元の stack frame 由来かの切り分け | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #2311 (ICALL-73) 残件 |
 | IR 行 19132 → wasm 命令オフセットの対応・route/lift の最終分類 | 受入条件「wasm オフセットか IR 命令まで」の wasm 側 | #2310 (ICALL-72) |
 | 引数付き lifted 関数の dispatch table 登録規則 | abort 6 件 (1852 付録 §2) | #1897 (ICALL-49) 既存 |
 | 監視の対象外: `llvm.memcpy` / `llvm.memset` 等の intrinsic、`cmpxchg` / `atomicrmw`、C 側 (`oi.*.c`・`rt/*.c`)、emscripten libc の書込み。集成体型 (`[N x T]`・`{...}`) の store は `fa_wc.py` が挿入せず件数を出す (`unhandled`) | 上記の書込みは BLK 窓への書込みを見逃しうる。`fa_wc.py` は `work/fa_route/oi.flat.ll` の 5526 store 中 5526 件を挿入 (未対応 0) で、この集合には該当しない | 本付録 (監視の限界として明記) |
@@ -108,4 +108,22 @@ grep '^WC line=19132' err.txt                  # BLK+0 への書込み (IR 行 1
 bash tools/icall/diff/fa_sweep.sh 8 60
 ```
 
-範囲外: 値 `0x400000004` の生成元は本付録では未特定。IR 行から wasm オフセットへの変換も未実施。`diff/fa_wc_drv.cjs` の引数は `<fa_wc.cjs 絶対パス> <VA>`。
+範囲外: IR 行から wasm オフセットへの変換は未実施 (#2310)。`diff/fa_wc_drv.cjs` の引数は `<fa_wc.cjs 絶対パス> <VA>`。
+
+## 6. 値 `0x400000004` の生成元 (ICALL-73 #2311)
+
+測定: `fa_wc_build.sh` を再ビルド (`$RUNNER_TEMP/emsdk` の `emsdk_env.sh` を使用)。`fa_wc_drv.cjs <fa_wc.cjs> 181057b38` の 8 入力。`fa_wc_rt.c` の監視条件を追加: 値 `0x400000004` の 64bit store と、`0x104af3c0`–`0x104af400` (値の読み元の窓)。
+
+| 観測 | 結果 |
+|---|---|
+| 値 `0x400000004` の 64bit store | **0 件** (8 入力。前回 #2382 の 0 件と一致) |
+| 行 18908 `store i32 4` (`stack_var_-56`) → `0x104af3e0` (4B) | 8 入力で 1 件ずつ (`WCV`) |
+| 行 18909 `store i32 4` (`stack_var_-52`) → `0x104af3e4` (4B) | 同上 (`WCV`) |
+| 行 18970 `store &stack_var_-52` → `0x36319010` (BLK+0x10) | 値 `0x104af3e4` (8 入力で 1 件ずつ) |
+| 行 18973 `store &stack_var_-24` → `0x36319018` (BLK+0x18) | 値 `0x104af3d8` (8 入力で 1 件ずつ) |
+
+- 値の作られ方: `function_181057b38` (IR 18881–18882) の alloca `stack_var_-56` (`0x104af3e0`) と `stack_var_-52` (`0x104af3e4`) に `store i32 4` を 2 本書く。下位 4B=4、上位 4B=4 なので、この 8B を i64 で読むと `0x400000004`。
+- 読み元: `function_181057a90` (IR 18807–18813) は `%1` = `load [0x36319018]` = `&stack_var_-24` (`0x104af3d8`)。`load [%1+8]` が `0x104af3e0` の 8B を読み、`0x400000004` を得る。`load [0x400000004]` = 0、`load [0]` = "emsc"。
+- つまり "emsc" は address 0 の sentinel を、この 8B 読みの連鎖で指している。
+
+**未確定**: (a) 元の x86 の機械語でも同じ 2 本の 4B store か (`SlateCore.core_64` 未展開のため未突合)、(b) alloca の配置が RetDec 由来か元の stack frame 由来か。(a) の突合は `fetch.sh` 実行後に行う。
