@@ -220,3 +220,18 @@
 
 - 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`、`toolchain-retdec` → `$RUNNER_TEMP/rd/retdec`、`toolchain-emsdk` → `$RUNNER_TEMP/em/emsdk`。`parse_setup_headers.py` / `extract_massivex.py` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致)。`work/extracted` は同ディレクトリへの symlink。
 - 注意: 検証途中、`-O1` と `-O2` を並列実行して `license/work/mx_fixed.vst3` を競合させ、`-O2` が PE 修復 assert で rc=1 になった。並列実行の誤りで、スクリプトの不具合ではない。上表は逐次実行・同一 commit での再測定値。
+
+### 12.10 MX-17 (#1857) 着手時の確認と e2e 基準値 (2026-10-14・測定 commit `8ea5d402`)
+
+- 結論: 受入条件 1〜3 は未達 (呼び出し元・差し替え点は未確定)。本 run は受入条件 4 の基準値取得のみ行った。未走査経路の走査は本 run では実施していない。RULES は変更しない。
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`、`parse_setup_headers.py` → `extract_massivex.py <exe> work/key key` で `Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致。extract の checksum 不一致 125/125 は既知事象)。`toolchain-retdec` → `$RUNNER_TEMP/rd/retdec`、`toolchain-emsdk` → `$RUNNER_TEMP/em/emsdk`。
+- selftest: `mx_table_refs.py --selftest` rc 0、`mx_indirect_refs.py --selftest` rc 0。
+
+| MX_OPT | 所要 (wall) | load (開始) | harness | 結果 | 備考 |
+|---|--:|--:|--:|---|---|
+| `-O0` | 56.8 s | 0.86 | 11/11 | PASS (exit 0) | `license/work` 冷間 (lift 再生成) |
+| `-O1` | 10 s | 1.07 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
+| `-O2` | 4 s | 1.30 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
+
+- 逐次実行 (`-O0` → `-O1` → `-O2`)。`-O0` の 56.8 s は作業 VM の 4 vCPU・load 0.86 時点の実測。
+- 残件 (受入条件 1〜3): 未走査の「文字列 index 経由の間接参照」と「関数ポインタを埋め込む構造体の `.data` 走査」。`acpt_verify_mx2.py` の N5/N6 機械検証 (受入条件 3) は未着手。残件は子 issue #1900 [MX-24] に分離して追跡する (#1857 は受入 4 のみに範囲を縮めて `Closes #1857`)。
