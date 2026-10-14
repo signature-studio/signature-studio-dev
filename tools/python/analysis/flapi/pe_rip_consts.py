@@ -4,7 +4,7 @@
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_consts.py <VA(16進)> [命令数]
 
 各行: 命令の VA・命令・参照先 VA・参照先の 8 byte (qword) と 4 byte (float として解釈した値)。
-参照先が .data/.bss の場合、PE ファイル上の値は 0 (実行時に初期化される) で、ここでは読めない。
+参照先が .bss (PE ファイル上に実体が無い) の場合は読めないので、値を出さない。
 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> extracted/block00031_PE.bin
 """
 import os
@@ -32,6 +32,8 @@ def main():
         rva = addr - base
         for vaddr, vsz, praw, rsz in secs:
             if vaddr <= rva < vaddr + max(vsz, rsz):
+                if rva - vaddr >= rsz:
+                    return None
                 fo = praw + (rva - vaddr)
                 return raw[fo:fo + n]
         return None
@@ -55,7 +57,7 @@ def main():
             target = ins.address + ins.size + disp
             data = read(target, 8)
             if data is None:
-                line += "  -> %s (section 外)" % hex(target)
+                line += "  -> %s (PE ファイル上に実体なし)" % hex(target)
             else:
                 q = struct.unpack("<Q", data)[0]
                 f = struct.unpack("<f", data[:4])[0]
