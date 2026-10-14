@@ -1,13 +1,13 @@
 # 付録: icall #2674 (ICALL-79) — frame slot 残件: 0x18105d9fc のオラクル修正・0x180da4030 の xmm0 脱落の説明
 
-> 親: #2508 (ICALL-78・付録 `REPORT_APPENDIX_2508.md`)。子: #2695 (ICALL-81: harness 初期化と 0x180da6e60 の 6 件の分類)・#2696 (ICALL-82: data 区分の脱落の修復)。
+> 親: #2508 (ICALL-78・付録 `REPORT_APPENDIX_2508.md`)。子: #2695 (ICALL-81: harness 初期化と 0x180da6e60 の 6 件の分類)・#2696 (ICALL-82: data 区分の脱落の実測。修復は子 #2708 (ICALL-83) へ移した)。
 > 測定 commit: `3127f774` (`fix(icall): compare user-space pointers as PTR in fa_cmp and add xmm0 origin tools (ICALL-79)`。コードを変えた最後の commit)。以降のコード差分は §8。
 > 既知類型との関係: 新類型 (DEFECTS.md に該当なし。§5 の行案)。
 
 ## 1. 結論
 
 - **受入 3 (0x18105d9fc の比較オラクル): 達成。** `fa_cmp.py` で x86-64 ユーザ空間の値 (`0 < v < 2^47`) を bit 比較せず `PTR` に畳む。0x18105d9fc は **0/8 → 8/8** (旧オラクルは native `0x50400010` と wasm `0x104af418` を別物として数えていた)。`FA_PTR_NORM=0` で旧挙動に戻る (負の対照)。
-- **受入 2 の 0x180da4030: 達成 (説明)。** native の 0 は、0x180da4030 の分岐先 (fall-through の実コード) が `movups xmm0,[rdi]`・`movups xmm0,[rdi+0x20]` で heap の 0 を読むため。wasm 側の IR はその分岐を `ret` で打ち切り、xmm0 は入力のまま残る。native の heap に既知パターンを書くと native xmm0 がそのパターンになり、読み出しを確認した (§4.3)。修復は子 #2696。
+- **受入 2 の 0x180da4030: 達成 (説明)。** native の 0 は、0x180da4030 の分岐先 (fall-through の実コード) が `movups xmm0,[rdi]`・`movups xmm0,[rdi+0x20]` で heap の 0 を読むため。wasm 側の IR はその分岐を `ret` で打ち切り、xmm0 は入力のまま残る。native の heap に既知パターンを書くと native xmm0 がそのパターンになり、読み出しを確認した (§4.3)。修復は子 #2708 (ICALL-83・親 #2696)。
 - **受入 2 の 0x1803dee20: 未了。** 本 run の HEAD では native・wasm とも入力素通しで **8/8 一致**。付録 2508 §3.5 の「native 0」は再現しなかった。揺れの原因は未特定 (子 #2695)。
 - **受入 1 (0x180da6e60 の 6 件の分類): 未達。** native は起動直後に SIGSEGV し、動的判定ができない。harness の修正が前提 (子 #2695)。
 - **sweep (fixed route・131 関数): 旧オラクル 55/66/8/2 → 新オラクル 56/66/8/1** (bit 一致 / native crash・timeout / wasm のみ err / 値の不一致)。値の不一致は 0x180da4030 の 1 件だけ。
@@ -34,7 +34,7 @@
 | `FA_PTR_NORM=0` (旧) | 0 | 8 |
 | 既定 (新) | **8** | 0 |
 
-- 限界: `PTR` は値を畳むので、ポインタのオフセットの差は検出しない。正規化された double の上位 16bit は 0 にならないため、この範囲はポインタ由来と見なせる。ただし subnormal は誤って `PTR` になりうる。
+- 限界: `PTR` は値を畳むので、ポインタのオフセットの差は検出しない。正規化された double の上位 16bit は 0 にならないため、この範囲はポインタ由来と見なせる。ただし subnormal は誤って `PTR` になりうる。両側が `(0, 2^47)` にあると整数どうしでも `PTR` に畳まれ、ポインタと非ポインタ整数の食い違いも一致扱いになる。現在の sweep の集計はこれで変わらない (旧オラクルから新オラクルで結果が変わった関数は 0x18105d9fc の 1 件だけ・§1)。
 - 負の対照: 値が double の 0x180da4030 は正規化で変わらず 0/8 のまま (不一致を隠していない)。
 
 ## 4. 0x180da4030: xmm0 の出所 (受入 2)
@@ -55,6 +55,7 @@
 ### 4.2 wasm 側 IR (`work/rt_freshair-core/after.0.restored.ll`, `function_180da4030`)
 
 - `br i1 %23` の偽側 `dec_label_pc_182320686` は `store` の後に `ret i64 %24` で終わり、0x180da4081 以降の命令を含まない。
+- 真側 `dec_label_pc_1823206a1` (`ax≠0x4001`) は `ret i64 0` で終わる。機械語では `jne 0x180da4059` → `0x180da4067` → `xor eax, eax` (0x180da407f) の経路が data 区分 (0x180da4081) へ fall-through し、movups xmm0 の 2 命令へ続く。この経路も IR に無く、脱落した側である。
 - xmm0 の出力は `%20 = __asm_movsd(load BLK+0x…)`、つまり入力の値をそのまま書き戻す。
 - 結論: lift は data 区分の境界で後続を切り、wasm では xmm0 が入力素通しになる (silent miscompile)。
 
@@ -66,13 +67,13 @@
 
 - native が 0 を返すのは、`[rdx+0x20]` の heap が 0 のまま読まれるため。パターンを書くと出力が変わる (xmm0 は heap のメモリ由来)。
 - wasm は入力素通し。第 2 の (`movups [rdi+0x20]`) 命令が IR に無いことと整合する。
-- 判定: **lift の脱落** (機械語を data と誤分類した後続の欠落)。修復の対象は子 #2696。
+- 判定: **lift の脱落** (機械語を data と誤分類した後続の欠落)。修復の対象は子 #2708 (ICALL-83)。
 
 ## 5. 新類型の行案 (`docs/DEFECTS.md` 形式。番号と採否は PM 判断)
 
 | 類型 | 分類 | 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
 |---|---|---|---|---|---|---|
-| D24 (案) | fe (RetDec の dsm 段) | wasm の出力が入力を素通し、native は heap 由来の値 | RetDec が実コードを `; data inside code section` と誤分類し、fall-through の後続 (`movups xmm0`・`ret`) が IR から消え、分岐先が `ret` で打ち切られる | 0x180da4030 (data 区分 0x180da4081–0x180da41a0)。dsm の data 区分は 307 件 | `data inside code section` の区分内に xmm 書込み・`ret` がある関数 | 子 #2696 |
+| D24 (案) | fe (RetDec の dsm 段) | wasm の出力が入力を素通し、native は heap 由来の値 | RetDec が実コードを `; data inside code section` と誤分類し、fall-through の後続 (`movups xmm0`・`ret`) が IR から消え、分岐先が `ret` で打ち切られる | 0x180da4030 (data 区分 0x180da4081–0x180da41a0)。dsm の data 区分は 307 件 | `data inside code section` の区分内に xmm 書込み・`ret` がある関数 | 子 #2708 |
 
 - D3 (メモリ宛 store の消失) や D1b (jcc 先の dead code 削除) とは、脱落の単位が「命令列 (区分) 全体」である点で異なる。
 
@@ -122,7 +123,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                  # 期待: bit�
 |---|---|---|
 | 0x180da6e60 の「誤り疑い」6 件 (2508 §4.2 の No 1・2・6・7・9・10) の分類 (受入 1 の残り) | 6 件は未判定。native は rcx の構造体を用意しないと実行できない | #2695 (ICALL-81) |
 | 0x1803dee20 の native 0 (付録 2508 §3.5) の再現と原因 (§6) | 1 関数の揺れ。本 run では再現せず | #2695 (ICALL-81) |
-| 0x180da4030 の後続 (data 区分の脱落) の修復 | 値の不一致 1 件 (silent miscompile) | #2696 (ICALL-82) |
-| data 区分に実コードを持つ他の closure 関数の有無 | 同型の脱落の範囲が未確認 | #2696 (ICALL-82) |
+| 0x180da4030 の後続 (data 区分の脱落) の修復 | 値の不一致 1 件 (silent miscompile) | #2708 (ICALL-83) |
+| data 区分に実コードを持つ他の closure 関数の有無 | #2696 (ICALL-82) の実測で A 型 8 件 (0x180da4030 を含む。#2708 本文)。他 7 件の修復と範囲の確定は未了 | #2708 (ICALL-83) |
 | 新類型 D24 (案) の `docs/DEFECTS.md` 追記 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
 | 2508 の残件 (受入 3 の sha256 照合は #2675、受入 4 の merge 規則、lift の ABI 仮想化 `BLK+0x88 := BLK+0x28` の欠落) | — | #2508・#2675 |
