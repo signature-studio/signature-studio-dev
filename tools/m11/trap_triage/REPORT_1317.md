@@ -190,7 +190,8 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 
 ## 12. 追補 (2026-10-14・#1317 8 回目 run): function_40f960 / 40fb40 の計測 (既定 OFF)
 
-- 測定 commit: `e7c5c062` (main 取り込み後の HEAD。`e7c5c062..HEAD` のコード差分は無し)。計測 probe は既定 0 で inert。
+- 測定 commit: `58e0126d` (main `4a476154` 取り込み後の HEAD)。取り込み前の HEAD `5de19a1d` (`tools/m11` のコードは `e7c5c062` と同一) でも同じ値を測定した。計測 probe は既定 0 で inert。
+- 取り込み差分 `git diff e7c5c062 58e0126d -- tools/m11 ':(exclude)*.md'` は 12 ファイル (+369/-7)。build・IR に入るのは `m11_build.sh` (CF 行・`S_NEG`・`ov_instr_40f960` stamp の追加のみ) と `m11_rt.c` (#1547 `M11_DEST_GUARD`、既定 0 で `#if` 内のみ)。`ldfix/ldfix.py`・`m11_gen_ir2.sh` は不変 (IR 生成経路は同一)。`ldfix/` の監査スクリプト・`shimx_link/probe_flag_1985.mjs`・`trap_triage/store_watch_*`・`watch_*` は build に入らない。
 - 既定 0 で build 出力が変わらない根拠 (`git diff --stat b36d3b5f e7c5c062`・6 ファイル 78 行追加 / 11 行削除。全文は `REPORT_1317_APPENDIX.md` §12):
   - `tools/m11/m11_ov.c` +17: #882 `M11_INSTR_40FFE0` 計測。`#if` 内のみ。既定 0 で追加されるコードなし。
   - `tools/m11/m11_post.py` +7/-1: 同 wrapper。`os.environ.get('M11_INSTR_40FFE0') == '1'` のときだけ PROBES と wrapper を追加。既定 0 では従来と同一。
@@ -207,6 +208,8 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 | `0..829`+880 | OFF | 0 | 1.7 s (2 回とも同値) | `ok 765 / oob 13 / miss 46 / other 1 / halt0 4 / abort 2` |
 | `0..830`+880 | ON | 124 (上限 60 s) | 60 s 超 | 完走せず。240 s 上限でも rc=124 (最後の出力は `unit 880`) |
 | `0..830`+880 | OFF | 124 (上限 60 s) | 60 s 超 | 完走せず (2 回とも rc=124) |
+
+- 測定 commit `58e0126d` (取り込み後): ON `0..829`+880 rc=0 1.35 s `ok 765 / halt0 4 / abort 2` (`40f960` 88 行・`chain_len` 86 行)、ON `0..830`+880 rc=124 (60 s)、OFF `0..829`+880 rc=0 1.72 s 同値、OFF `0..830`+880 rc=124 (60 s)。取り込み前 `5de19a1d` と同値。
 
 - ON と OFF で `0..829` の結果は一致した (取り込み前の記録にあった 1 件ずれは再現しなかった)。
 - `0..829` の `abort` 2 件 (unit 304 `0x483140`・unit 555 `0x7f2500`) は `m11_unresolved_function` での abort。前 run の記録には無く、未切り分け。

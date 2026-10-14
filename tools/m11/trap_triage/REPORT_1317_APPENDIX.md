@@ -23,7 +23,7 @@
 
 ## 12. (付録) #1317 8 回目 run: git diff b36d3b5f e7c5c062 -- tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/shimx_link/probe_trace_unit.mjs tools/m11/shimx_link/probe_unit23.mjs の全文
 
-基準 commit: `e7c5c062` (測定 commit `b36d3b5f` の後の main 取り込み HEAD)。
+diff の範囲: `b36d3b5f..e7c5c062` (`b36d3b5f` の後の main 取り込み HEAD。測定 commit は `58e0126d`。`e7c5c062..58e0126d` の差分は REPORT_1317.md §12 に記載)。
 
 ```diff
 diff --git a/tools/m11/m11_build.sh b/tools/m11/m11_build.sh
