@@ -103,7 +103,7 @@ export const issuePayload = (n: number, o: Partial<{ title: string; body: string
   },
 });
 
-export const runPayload = (id: number, status: string, o: { event?: string; title?: string; at?: string } = {}) => ({
+export const runPayload = (id: number, status: string, o: { event?: string; title?: string; at?: string; created?: string } = {}) => ({
   action: status === "completed" ? "completed" : "in_progress",
   repository: REPO,
   workflow_run: {
@@ -113,6 +113,7 @@ export const runPayload = (id: number, status: string, o: { event?: string; titl
     status,
     conclusion: status === "completed" ? "success" : null,
     updated_at: o.at ?? "2026-10-14T11:30:00Z",
+    created_at: o.created,
   },
 });
 
