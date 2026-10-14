@@ -3,7 +3,7 @@
 #   bash tools/hostbridge/lowbase/lowbase_e2e.sh [--no-chrome] [--quick]
 #   前提 (全て既存成果物; 無ければ指示を出して終了): tools/m10/work/ott_m10.ll (bash tools/m10/m10_e2e.sh), tools/hostbridge/work/ott_hb.cjs (bash tools/hostbridge/hostbridge.sh; 「再配置前」基準),
 #         tools/plugins/work/balance/{k.final.ll,k_simd.c} (bash tools/plugins/lift/t0_balance/t0_e2e.sh), python: capstone pefile (libottnative.so は毎回 build.sh で作り直す。素材 work-m6-ott 同梱の版は ott_enc_slots を欠く)
-#   所要: ビルド/試験すべて合わせて約 1〜2 分 (キャッシュ不要; 全ビルドは数秒)。tools/m6..m10, ott, plugins, shim, hostbridge の既存ファイルは読取のみ (生成物は lowbase/work).
+#   所要: ビルド/試験すべて合わせて約 1〜2 分 (キャッシュ不要; 全ビルドは数秒)。tools/m6..m10, ott, plugins, shim, hostbridge の既存ファイルは読取のみ (生成物は lowbase/work。ただし ott/work/libottnative.so は build.sh で毎回作り直す).
 set -uo pipefail
 LB="$(cd -- "$(dirname -- "$0")" && pwd)"; T="$LB/../.."; HB="$LB/.."
 export PATH="$HOME/.local/share/pnpm/bin:$HOME/.bun/bin:$PATH"
