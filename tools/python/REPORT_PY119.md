@@ -56,7 +56,7 @@
 
 測定 commit: `318cf021` (コードを変えた最後の commit。mock・C provider・provider_check・ui_state_diff)。測定は同 commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから行った。
 
-環境: runner 4 core、測定時の load average 0.68 (`uptime`)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は `/opt/emsdk/emsdk_env.sh` が既に存在したためそれを使った。前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+環境: runner 4 core、測定時の load average 0.68 (`uptime`)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`) の既定位置 (`provider/build.sh` の `EMSDK_ENV` 既定) が既に存在したため、それを使った。前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
