@@ -83,7 +83,7 @@ bash trap_triage/store_watch_1783.sh run1   # 全 unit 完走まで要時間 (ru
 ## 7. #1869 追記: 全 942 unit の値判定と計装版の停止点 (2026-10-14)
 
 - 測定 commit: `a10edf01` (`survey_units.mjs` に `SV_SLOT` を追加。以降 `tools/m11` のコードは同一)。
-- 素材: work-m11・toolchain-emsdk・fl-win64 を `$HOME/artifacts` から展開 (fl-win64 は `$RUNNER_TEMP`)。`m11_gen_ir2.sh` rc 0 (45.7 s)、`m11_build.sh` rc 0 (21.6 s)。
+- 素材: work-m11・toolchain-emsdk・fl-win64 を R2 素材から展開 (fl-win64 は一時ディレクトリ)。`m11_gen_ir2.sh` rc 0 (45.7 s)、`m11_build.sh` rc 0 (21.6 s)。
 - (a) 計装なし build・全 942 unit (`SV_SLOT=0x1ac308`): rc 0・11.4 s。boot_enter 後の `0x1ac308` の値は `0xf960`。**値が変わった unit は 0 件** (`work/probe1869/slot.json` に `slot` 付きの unit 無し)。値が同じままの書込みは、この方法では見えない。
 - (b) 計装版 `store_watch_1783.sh run1` (計装 54,041 store・`timeout 1500`): rc 124・25 分 19 秒。進捗行 `unit N` は unit N の**開始**を示す。完走は unit 0〜144 (145 unit)、`[aw]` は 0 件。**unit 145 が 25 分以上完走せず** (`run1.err` の最終行 `unit 145`)。計装なし版は同じ unit を含めて 11.4 s で完走する。
 - 前節 §2 の run2 の「unit 0〜145 (146 unit) を完走」は、進捗行を完走と読み違えた記述。完走は 0〜144 が正しい。
