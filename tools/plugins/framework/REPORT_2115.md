@@ -1,11 +1,11 @@
-# #2115 REPORT — 0x4181e0 の 0 引数呼出と `rcx` (前提の訂正・注釈は未変更)
+# #2115 REPORT — 0x4181e0 の 0 引数呼出と `rcx` (前提の訂正。注釈の置換は付録 §12)
 
 > **付録**: §10 の詳細は `REPORT_2115_APPENDIX.md` へ分割移動した (250 行上限のため。本文は改訂済み)。測定値の正本は付録 §10.3。
 
 - 担当 issue: #2115 `[PLG-P0b-15]` (親 #2069 / 元 #2069 `[PLG-P0b-13]`)。
 - 起点: `origin/main` 637b70de。branch `2115-plg-p0b-15-0x4181e0-rcx`。
 - 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`extracted/block18983_PE.bin` を使用)、`work-fw-stage1` を worktree 直下の `tools/plugins/work/fw/` に展開。
-- コード変更: 注釈は変更なし。`fw_hostfix.py` は 3b581236 と同一 (0x4181e0 注釈は `return 0` のまま)。診断表示 (trace) のみ `fw_boot.c`・`fw_rt.c` に追加 (付録 §11)。TLS 0 埋めの stand-in は未採用の実験で、commit 91308efd に残す (戻した commit は 8858cc0f。§10)。
+- コード変更 (この時点の記録): 注釈は変更なし。`fw_hostfix.py` は 3b581236 と同一 (0x4181e0 注釈は `return 0` のまま)。以後、`0x4180d0`・`0x4181e0` の注釈は付録 §12 で置換済み。診断表示 (trace) のみ `fw_boot.c`・`fw_rt.c` に追加 (付録 §11)。TLS 0 埋めの stand-in は未採用の実験で、commit 91308efd に残す (戻した commit は 8858cc0f。§10)。
 
 ## 1. 結論
 
@@ -54,16 +54,28 @@ REPORT_2069 の解析は FW の PE (`block18983_PE.bin`) ではなく `block0003
 
 - 前回の記録: 0 引数版 `@function_4181e0()` (`fw0.restored.ll:7185`) は `[BLK+0x20..0x40]` と `[BLK+0x88]` を読み、`[BLK+8]` (= 9048072) を読まない。`9048072` を使う IR は 0 件。(再確認: `grep -c 'i64 9048072'` は 12 ファイル全て 0 件。本体の読み書きは未再確認)
 - 前回の記録では、0 引数版の本体は `rcx` 非依存で、戻り値は `spec.select(TLS 経由の値, @global_var_7162d0)` の形を取る。(未再確認)
-- 0 引数呼出元 (`grep -c 'call i64 @function_4181e0()'`・round 3・round 4 で再確認): work-fw-stage1 の 10 ファイルで計 75 件 (fw0 14・fw1 10・fw2 7・fw3 2・fw4 6・fw5 12・fw6 8・fw7 8・r2 8・r3 0)。REPORT_2069 §3.2 の 142 件は、これに stage-2 の結合 IR `fw_all` (67 件・archive に無い) を加えた値。IR 行は未列挙。
+- 0 引数呼出元 (`grep -n 'call i64 @function_4181e0()' tools/plugins/work/fw/*.restored.ll` で IR 行を列挙。下表): work-fw-stage1 の 10 ファイルで計 75 件 (fw0 14・fw1 10・fw2 7・fw3 2・fw4 6・fw5 12・fw6 8・fw7 8・r2 8・r3 0)。REPORT_2069 §3.2 の 142 件は、この 75 に結合 IR `fw_all` の 67 件を加えた**二重計上の誤り** (`fw_all` は fw0〜fw7 の結合で archive に無い。67 は fw0〜fw7 の合計と一致)。
+
+| ファイル (件数) | 行番号 (`call i64 @function_4181e0()` の行) |
+|---|---|
+| fw0 (14) | 2360 4335 4406 4432 4547 70151 70170 70189 70208 70227 70246 70265 70284 70303 |
+| fw1 (10) | 2448 2506 2525 4978 6805 6829 6858 6877 49459 92020 |
+| fw2 (7) | 3833 6586 6784 7001 7058 44779 200852 |
+| fw3 (2) | 6196 6245 |
+| fw4 (6) | 4446 44674 44718 44750 44805 163636 |
+| fw5 (12) | 24860 24885 24994 25015 25034 25062 25109 39458 52055 52074 169839 169894 |
+| fw6 (8) | 2228 2270 2331 2406 38743 38778 38838 38894 |
+| fw7 (8) | 2480 2501 2524 2573 4468 50936 50997 51027 |
+| r2 (8) | 7927 7949 7968 111403 111407 199141 297088 297100 |
 - 引数付き呼出は r3 のみ 8 件 (r3 7054・7078・7100・82308・82312・144053・192518・192530)。0 引数定義との不一致は残る (受入 1 の付随確認・今回未検証)。
 
 ## 4. 受入条件の達成状況
 
 | # | 受入条件 | 結果 |
 |---|---|---|
-| 1 | 0 引数呼出元で `rcx` が失われる経路を確定し、REPORT に呼出元の IR 行を列挙 | **部分達成**。native では `rcx` は失われても読まれない (§2)。native 呼出元 68 件は call site 単位で一覧化 (§5)。lift 側の 0 引数呼出元 142 件の IR 行は**未列挙** (§3・§9 の未解決 #2115) |
-| 2 | 正しい戻り値を確定し `fw_hostfix.py` の 0x4181e0 注釈を修正 | **未達**。正しい戻り値は未確定。既定の注釈は 3b581236 の `return 0` のまま。0 埋め stand-in は未採用の実験 (§10)。OOB は解消していない |
-| 3 | 実測 (所要・load・PASS/FAIL) とネガティブコントロール | **部分達成**。注釈あり・注釈削除の 2 種を実測し、負のコントロールを記録 (§8)。測定値は §6 と同じ分担 (注釈版の負のコントロールは §8、stand-in 版 (未採用) と対照は付録 §10.3) |
+| 1 | 0 引数呼出元で `rcx` が失われる経路を確定し、REPORT に呼出元の IR 行を列挙 | **達成**。(a) native の getter は `rcx` を読まない (§2: 全経路で上書きされてから読まれる)。よって 0 引数呼出で `rcx` が失われても戻り値は変わらず、`[BLK+8]` の復元や呼出の版の統一は不要 (注釈版も `rcx` を読まない)。(b) lift 側の 0 引数呼出元 75 件の IR 行を §3 の表に列挙。native 呼出元 68 件は §5 |
+| 2 | 正しい戻り値を確定し `fw_hostfix.py` の 0x4181e0 注釈を修正 | **達成** (付録 §12・eeb6babf)。戻り値は per-thread block (0x288 byte) と確定 (§2・付録 §11.2)。注釈を native の TLS getter 意味に置換し、`fw_stage2` SMOKE PASS・Phase A `dispatch=38 ff=0` を維持。Phase B の変化 (失敗位置の target `0 → 0x1712`) を実測。Phase B の OOB 解消 (E2E PASS) は本 issue の受入ではなく #2911 へ移管 |
+| 3 | 実測 (所要・load・PASS/FAIL) とネガティブコントロール | **達成 (n=1)**。§8 (注釈あり・注釈削除) と付録 §12.3 (ネガティブコントロールは「対照: 現注釈 (`0x4181e0` `return 0`)」行。HEAD 行と同じ表で所要・load・PASS/FAIL を記録)。n≥3 の min–max は未実施で #2911 (受入 3) |
 
 ## 5. native 呼出元 (`block18983`・`call 0x4181e0` の直接 rel32)
 
@@ -158,7 +170,7 @@ tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64
 tar --zstd -xf $ARTIFACTS_DIR/work-fw-stage1.tar.zst            # repo ルートで展開 (§3 用・tools/plugins/work/fw/ に 12 ファイル)
 # block18983_PE.bin の .pdata で 0x4181e0 が関数先頭 (0x418233 まで) / 0x418190 は先頭でないことを確認
 # (pefile で DIRECTORY_ENTRY_EXCEPTION の BeginAddress を比較)
-grep -c 'call i64 @function_4181e0()' tools/plugins/work/fw/*.restored.ll   # 10 ファイルで計 75 件 (round 4 で確認)。142 件は stage-2 結合 IR fw_all (67 件・archive に無い) を加えた値
+grep -c 'call i64 @function_4181e0()' tools/plugins/work/fw/*.restored.ll   # 10 ファイルで計 75 件 (IR 行は §3 の表)。REPORT_2069 の 142 件は fw_all (67 件) を加えた二重計上
 grep -c 'i64 9048072' tools/plugins/work/fw/*.restored.ll                    # 0 件が期待値
 ```
 
@@ -200,21 +212,21 @@ for m in re.finditer(b"\xe8", d):
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `fw_hostfix.py` の 0x4181e0 注釈 (`return 0`) の妥当性。正しい TLS 値 (`gs:[0x58]` 配列と `[0x7162d0]`) の確定 | Phase B OOB の原因が注釈かどうか未確定 | #2115 (本 issue。受入 2・3 を継続) |
-| lift 側 0 引数呼出元の IR 行 (ファイル名・行番号) の列挙: work-fw-stage1 の 75 件と、stage-2 結合 IR `fw_all` の 67 件 | 受入 1 の残り | #2115 (次 run で生成して列挙) |
+| `fw_hostfix.py` の 0x4181e0 注釈 (`return 0`) の妥当性。正しい TLS 値 (`gs:[0x58]` 配列と `[0x7162d0]`) の確定 | 解消 (付録 §12 で native の TLS getter 意味に置換)。注釈の置換では Phase B OOB は解消せず (付録 §12.3) | — (解消) |
+| lift 側 0 引数呼出元の IR 行 (ファイル名・行番号) の列挙: work-fw-stage1 の 75 件 (`fw_all` の 67 件は fw0〜fw7 の結合で加算しない) | 解消 (§3 の表) | — (解消) |
 | `rcx` 書換えの有無による呼出元の分類 | 本 REPORT では採用せず (戻り値に影響しないため判断は不要) | 未実施のまま (定義を決めてから再測定) |
 | REPORT_2069 §3.1 の解析対象の誤り (`block00031` を使用) | 前提の誤伝播 | 本 PR で §1 に訂正を記載 |
-| r3 系の引数付き呼出 (8 件) と 0 引数定義の不一致 | 引数規約の不整合 | #2115 (同上) |
+| r3 系の引数付き呼出 (8 件) と 0 引数定義の不一致 | 引数規約の不整合 | #2911 (受入 4) |
 | fold deref (`0x40d6e0` / `[0x710040]`) と `plug != 0` | Phase B OOB | #2534 (`[PLG-P0b-19]`・OPEN。#1890 → #1935 → #2008 → #2426 → #2534 の移管先) |
-| 対照 (既定と同一コード) と stand-in 版 (未採用) の各 n=1 (`--fresh`・load 記録済み。付録 §10.3)。n≥3 の min–max は未実施 | 失敗位置 (`0x4e5fa6` の target 0 / `0x1712`) の解釈。stand-in 版を採用する判断の前提 | #2115 (継続。採用を検討する場合は n≥3) |
-| 同一の実行コードで §8 と付録 §10.3 の結果が食い違う。失敗位置の変化は n=1 で変動未評価 | Phase B 結果の解釈 | #2115 (継続) |
-| `hostshim/hs_e2e.sh` の増分判定 (49 行目) が `fw_hostfix.py` の変更を見ない (`--fresh` の測定には影響しない) | plain 実行で古い `hs_flat3.ll` が混入する余地 | #2115 (継続。測定ハーネスの修正は再測定を伴うため本 PR では未変更) |
-| 基点 `9f403c97` (PR の merge-base) から `origin/main` (fix round 5 の取得時点 `064af0d8`) までに framework の 5 ファイルが変わった: `fw_smoke_check.py` (+42/-10)・`hostshim/hs_irfix.py` (+64)・`hostshim/hs_plug.c` (+17・`hs_fw_init_tls`・#2571)・`fw_269_verify.sh`・`fw_pack_stage1.sh` (各 1 行のコメント)。（fix round 5 時点の記述。現基点 `bbb07d80` は `origin/main` と framework 同一のため取り込み済み・付録 §12.3） | `fw_smoke_check.py` の判定は付録 §12.3 で測定済み (`runerr=1`・`init_reach=16` で FAIL。基準は `runerr=0 ff=0 init_reach=288`)。`dispatch=38` の PASS は完走の証拠にしない。main では既に FAIL (`REPORT_2571.md` §3・#2510) | #2115 (継続) |
-| 基点 `9f403c97` の `hs_e2e_run` は framework 初期化 (TLS 初期化) を通らない。TLS 値を正しくしても OOB は残る (付録 §11.5 E3。E3 は n=1・所要と load は未記録 (ログも未保存))。main では #2571 (PR #2595・`9b352bd7`) が `hs_fw_init_tls()` で TLS 初期化を入れた。main の `REPORT_2571.md` §3 では初期化ありでも OOB が残る (本 PR では未測定) | 受入 2 (Phase B の変化) | #2115 (継続) |
+| 対照 (既定と同一コード) と stand-in 版 (未採用) の各 n=1 (`--fresh`・load 記録済み。付録 §10.3)。n≥3 の min–max は未実施 | 失敗位置 (`0x4e5fa6` の target 0 / `0x1712`) の解釈。stand-in 版を採用する判断の前提 | #2911 (受入 3 の n≥3。stand-in 版を採用する場合も同じ) |
+| 同一の実行コードで §8 と付録 §10.3 の結果が食い違う。失敗位置の変化は n=1 で変動未評価 | Phase B 結果の解釈 | #2911 (注意) |
+| `hostshim/hs_e2e.sh` の増分判定 (49 行目) が `fw_hostfix.py` の変更を見ない (`--fresh` の測定には影響しない) | plain 実行で古い `hs_flat3.ll` が混入する余地 | #2911 (注意。測定ハーネスの修正は再測定を伴うため未変更) |
+| 基点 `9f403c97` (PR の merge-base) から `origin/main` (fix round 5 の取得時点 `064af0d8`) までに framework の 5 ファイルが変わった: `fw_smoke_check.py` (+42/-10)・`hostshim/hs_irfix.py` (+64)・`hostshim/hs_plug.c` (+17・`hs_fw_init_tls`・#2571)・`fw_269_verify.sh`・`fw_pack_stage1.sh` (各 1 行のコメント)。（fix round 5 時点の記述。現基点 `bbb07d80` は `origin/main` と framework 同一のため取り込み済み・付録 §12.3） | `fw_smoke_check.py` の判定は付録 §12.3 で測定済み (`runerr=1`・`init_reach=16` で FAIL。基準は `runerr=0 ff=0 init_reach=288`)。`dispatch=38` の PASS は完走の証拠にしない。main では既に FAIL (`REPORT_2571.md` §3・#2510) | #2510 (OPEN) |
+| 基点 `9f403c97` の `hs_e2e_run` は framework 初期化 (TLS 初期化) を通らない。TLS 値を正しくしても OOB は残る (付録 §11.5 E3。E3 は n=1・所要と load は未記録 (ログも未保存))。main では #2571 (PR #2595・`9b352bd7`) が `hs_fw_init_tls()` で TLS 初期化を入れた。main の `REPORT_2571.md` §3 では初期化ありでも OOB が残る (本 PR では未測定) | 受入 2 (Phase B の変化) | #2911 (注意) |
 | `0x418120` の実行経路の訂正: `_InitLib` の hooks 表 (`0x6d6ef8`・reason=1 → `[+8]`) からの間接 call で実行される (§10.1 の「呼ばれない」は誤り) | 前提の訂正 | 付録 §11.1 で訂正済み |
 | lift の fold 欠陥: `function_4180a0` の引数 `ecx` が `ptrtoint @683` に化け、`function_4180d0` の戻り値が 1 になる | TLS block が正しく作られない | #2510 (`[PLG-P0b-18]`・OPEN。同じ類型の別インスタンスとしてコメントで追記)・付録 §11.3 |
 | `fw_rt.c` 表示カウンタ分離 (commit `058c2049`) の再測定 | 解消。付録 §11.4.1 で再測定済み (Phase A `dispatch=38 ff=0`・Phase B は 4c00ec24 と同じ OOB・`rec=7`・1 項目)。基準との差は表示行の heap アドレス 3 件のみ | — (解消) |
-| smoke 終端の `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` (smoke.log 47 行目。基準 4c00ec24 にも同一行。trace 由来ではない) | SMOKE PASS の判定には影響しない。address zero への書込みの有無は未調査 | #2115 (継続・原因は未調査) |
+| smoke 終端の `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` (smoke.log 47 行目。基準 4c00ec24 にも同一行。trace 由来ではない) | SMOKE PASS の判定には影響しない。address zero への書込みの有無は未調査 | #2911 (注意・原因は未調査) |
 
 ## 10. TLS index 未設定の確認と stand-in 版の実験 (未採用・測定 commit 91308efd)
 
