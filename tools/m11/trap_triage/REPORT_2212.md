@@ -2,10 +2,10 @@
 
 ## 0. 結論
 
-- 測定 commit: **`7d3e5cad`** (測定に使ったコードを変えた最後の commit。§7 のとおり、測定 build の入力は `16f4f199` からの差分を含む現 HEAD と同じ)。下の表 (§2) は `7d3e5cad` で測った n=3 (計 30 セル) の値で、生値は `table_2212.tsv`・`addr_2212.txt` に tracked。
+- 測定 commit: **`8b00eecd`** (測定に使ったコードを変えた最後の commit。main 取り込み merge。§7 のとおり、測定 build の入力は `8b00eecd` と同じ)。下の表 (§2) は `8b00eecd` で測った n=3 (計 30 セル) の値で、生値は `table_2212.tsv`・`addr_2212.txt` に tracked。
 - **受入条件 1 (リンク後の実アドレス)**: 測定済み (§3)。`g_dest_h` は **全構成で `10250f20`** で、PRE64・PRE4096 でも動かない。pad は `.bss` 上で `g_rec_h` の後ろに置かれ、`g_dest_h` より前には入らない。
 - **受入条件 2 (関数のみ・データ無しの対照)**: **部分達成**。NODATA は getmem **2012** (R0_rtOFF と同じ)・survey 870/24/0 で、C_noren の 2008 から動く。ただし NODATA は関数本体の書き込み (`g_dest_h`・`g_rec_*`) も消しているため、「関数のみ (本体そのまま)」の対照にはなっていない (§4)。
-- **受入条件 3 (n=3 の決定性)**: 達成。`7d3e5cad` で全 10 構成 × 3 回 (30 セル) を測り、IR md5・undefined・ok/trap/clobber・getmem・fastmm_getmem_impl・実アドレスが全セルで一致した (§2・`table_2212.tsv`・`addr_2212.txt`)。
+- **受入条件 3 (n=3 の決定性)**: 達成。`8b00eecd` で全 10 構成 × 3 回 (30 セル) を測り、IR md5・undefined・ok/trap/clobber・getmem・fastmm_getmem_impl・実アドレスが全セルで一致した (§2・`table_2212.tsv`・`addr_2212.txt`)。
 - **受入条件 4**: 既定 (A_default) は全 3 回 870/24/0・getmem 2012 で、変えていない。
 - **機序は未確定**: PRE64 と PRE4096 は両方 `g_dest_h` が同じ位置で、結果だけ違う (2006 と 2008)。「`g_dest_h` のアドレスが変わるから」では説明できない (§4)。
 
@@ -17,12 +17,11 @@
 
 ## 2. 測定
 
-測定 commit `7d3e5cad`・直列・foreground・`FL_WIN64_DIR` (`[WIN64]`・`fl-win64` を展開) 設定・`work-m11` (`[WORK-M11]`) を repo 直下で展開 (`tar --zstd -xf` は `tools/m11/work/` を含むため repo ルートで行う) し、`m11_gen_ir2.sh` で IR を再生成 (ldfix: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0。REPORT_1952 と一致)。`[EMSDK]` は `toolchain-emsdk` 素材の配置を確認して使用。
+測定 commit `8b00eecd`・直列・foreground・`FL_WIN64_DIR` (`[WIN64]`・`fl-win64` を展開) 設定・`work-m11` (`[WORK-M11]`) を repo 直下で展開 (`tar --zstd -xf` は `tools/m11/work/` を含むため repo ルートで行う) し、`m11_gen_ir2.sh` で IR を再生成 (ldfix: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0。REPORT_1952 と一致)。`[EMSDK]` は `toolchain-emsdk` 素材 (`/opt/emsdk`、emcc 配置を確認) を使用。
 
-- IR 再生成 `m11_gen_ir2.sh`: 所要 30.8 秒 (`time` 実測)。
-- n=1 (`repro_1952_rt_mech.sh 1`): 所要 3 分 58.8 秒 (`time` 実測)。
-- n=3 (`repro_1952_rt_mech.sh 3`): 所要 11 分 57.3 秒 (`time` 実測)・終了時 uptime load 1.00 (4 vCPU)。
-- 同一 HEAD で n=1 の 10 構成と既存の `16f4f199` 表 (§2 旧版) は全行一致した (IR md5・ok/trap/clobber・getmem・fastmm)。
+- IR 再生成 `m11_gen_ir2.sh`: rc=0・所要 42.6 秒 (`time` 実測)。
+- n=3 (`repro_1952_rt_mech.sh 3`): rc=0・所要 15 分 23.9 秒 (`time` 実測)・終了時 uptime load 1.01 (4 vCPU)。
+- 前回の測定 commit `7d3e5cad` の表 (旧 §2) と、本測定の 30 セルは全行一致した (IR md5・undefined・ok/trap/clobber・getmem・fastmm・実アドレス)。`table.tsv`・`addr.txt` を tracked 生値と突き合わせ、一致を確認。
 
 | 構成 | IR md5 | undefined | ok/trap/clobber | getmem | fastmm_getmem_impl | g_dest_h 実アドレス |
 |---|---|--:|--:|--:|--:|---|
@@ -77,20 +76,21 @@
 
 ## 7. 測定 commit からの差分
 
-測定 commit は `7d3e5cad` (§0)。この commit の `tools/m11` で §2 の表を測った。
+測定 commit は `8b00eecd` (§0)。この commit の `tools/m11` で §2 の表を測った。
 
-`16f4f199` から `7d3e5cad` までの差分 (旧測定 commit からの変更。測定対象に含まれる):
+前回の測定 commit `7d3e5cad` からの差分 (`8b00eecd` の main 取り込みで入った分。測定 build の入力になるものを含む):
 
 ```
-git diff 16f4f199 7d3e5cad --shortstat -- tools/m11
- 29 files changed, 2384 insertions(+), 108 deletions(-)   (REPORT_2212 を除く)
+git diff 7d3e5cad 8b00eecd --shortstat -- tools/m11 ':!tools/m11/trap_triage'
+ 22 files changed, 1264 insertions(+), 9 deletions(-)
+git diff 7d3e5cad 8b00eecd --stat -- tools/m11/m11_rt.c tools/m11/m11_build.sh
+ tools/m11/m11_build.sh |  4 ++--
+ tools/m11/m11_rt.c     | 14 +++++++++++++-
 ```
 
-測定 build の経路に入るのは次の 3 ファイル。既定 knob `M11_INSTR_40FFE0=0` の経路の出力は、今回の n=1 (旧表と全行一致) で従来と同じと確認した:
+- `tools/m11/m11_rt.c`: main 由来の `M11_DEST_GUARD` (#1547) を追加。既定 0 では `#if M11_DEST_GUARD` の分岐は無効だが、`unsigned long long k = g_dest_n;` の読出しが volatile な `dest` の読出しより前に移る。このため `rt.o` の機械語は変わりうるので、`8b00eecd` で全 30 セルを測り直した。
+- `tools/m11/m11_build.sh`: `CF` に `-DM11_DEST_GUARD=${M11_DEST_GUARD:-0}` を追加。stamp は `M11_DEST_GUARD` 非 0 のときだけ `-guard` を付け、既定 0 では従来と同じ値。
 
-- `tools/m11/m11_build.sh`: `CF` に `-DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0}` を追加。stamp の値が `"0"` から `"0:0"` に変わる。
-- `tools/m11/m11_ov.c`: `#if M11_INSTR_40FFE0` の計測関数 (+17 行。既定 0 では無効)。
-- `tools/m11/m11_post.py`: `M11_INSTR_40FFE0` の分岐と `tail` 行 (既定 0 では無効)。
+前回の `7d3e5cad` の測定値 (旧 §2) は、`8b00eecd` の再測定で全行一致した。
 
-残り 26 ファイルは main 由来の解析スクリプト・REPORT (`ldfix/`・`trap_triage/` 配下) で、測定 build には入らない。
-この REPORT の後続 commit は `trap_triage/` 配下の文書と tracked 生値のみを変えるため、`git diff 7d3e5cad HEAD -- tools/m11 ':!tools/m11/trap_triage'` は空になる (測定 build の入力は変わらない)。
+測定 commit `8b00eecd` から現 HEAD までの `tools/m11` (trap_triage を除く) の差分は、この commit のあとも 0 行 (`git diff 8b00eecd HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は空)。後続の commit は `trap_triage/` 配下の文書のみを変える。
