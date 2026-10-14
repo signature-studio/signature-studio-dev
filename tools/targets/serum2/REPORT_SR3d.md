@@ -76,9 +76,9 @@
 
 ## 5. 検証記録 (WORKFLOW §6)
 
-再現手順 (素材は `$HOME/artifacts/plugins-serum2.tar.zst`、`ARTIFACTS_DIR` の既定):
+再現手順 (素材は `[PLUGINS-SERUM2]` の `$ARTIFACTS_DIR/plugins-serum2.tar.zst`。`$RUNNER_TEMP` は作業用の展開先):
 
-1. 素材の展開 (installer のみ): `mkdir -p $RUNNER_TEMP/serum2 && cd $RUNNER_TEMP/serum2 && tar --zstd -xf $HOME/artifacts/plugins-serum2.tar.zst Install_Xfer_Serum2_2.1.5.exe`
+1. 素材の展開 (installer のみ): `mkdir -p $RUNNER_TEMP/serum2 && cd $RUNNER_TEMP/serum2 && tar --zstd -xf $ARTIFACTS_DIR/plugins-serum2.tar.zst Install_Xfer_Serum2_2.1.5.exe`
 2. 入力の取り出し: `cd tools/targets/serum2 && bash scripts/sr3_run.sh`。`work/Serum2_win64.vst3` を 7z で取り出し、cut 表 `out/sr3_cut_table.tsv` などを生成する。取り出しは `sr3_run.sh` の先頭部分が行い、scan は行わない。
 3. 線形走査: `python3 scripts/sr3d_fnptr_scan.py work/Serum2_win64.vst3 > out/sr3d_scan.txt` (`out/sr3_cut_table.tsv` を読むため、2 の後に実行する)。
 
