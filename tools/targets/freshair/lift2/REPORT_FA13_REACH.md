@@ -1,0 +1,46 @@
+# FA-13 (#905): rep movsb / stosw の実行到達の探索 (実測, 2026-10-14)
+
+前回までの結論 (`REPORT_APPENDIX.md` §11) の後続。受入 1 (実行到達 scenario) と 2 (ネガコン FAIL) を
+この run で再探索した。結論: **未達のまま**。受入の判定は変えない。
+
+## 測定条件
+
+- 測定 HEAD: `ec58d54b` (origin/main)。このコミットのコードは変更していない (一時 trap は元に戻し `cmp` 一致)。
+- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-freshair`。`plugins-freshair` を
+  `$RUNNER_TEMP/pf` に展開し `fetch.sh` で factory `.epf` 8 本を確認 (`win: 17 files, factory .epf: 8`)。
+- `build_ctrl.sh` (trap 無し): exit 0, real 35.5 s, `lifted 1256 funcs / failed 0`。
+- 一時版: `mlift/mlift_ops.py` の `h_rep_str` 先頭で `kind == 'movsb'` のとき `llvm.trap` + `unreachable` (movsb 39 サイト全体)。
+  `build_ctrl.sh` exit 0, `lifted 1165 funcs / failed 0`, `ctrl build ok`。
+
+## 実測
+
+| 入力 | wasm 側 `unreachable` | native 側 | 判定 |
+|---|---|---|---|
+| 既定 `run_ctrl.sh 2 5` (seed `0xFA2C0001`) | 1 件 (S2001) | `ERR S2001 sig=5` (SIGTRAP) | 両側 ERR のため `run_ctrl.sh` は **PASS** (15/15) |
+| seed `0xFA2C0002` | 0 | rc=134 (Aborted) | 判定外 |
+| seed `0xFA2C0003` | 1 | rc=99, ERR 1 | 判定外 (両側 ERR) |
+| seed `0x1` | 1 | rc=134, ERR 1 | 判定外 (両側 ERR) |
+| seed `0x2` | 1 | rc=134, ERR 1 | 判定外 (両側 ERR) |
+| seed `0x3` | 2 | rc=134, ERR 2 | 判定外 (両側 ERR) |
+| seed `0xFA2C0010` | 1 | rc=134, ERR 1 | 判定外 (両側 ERR) |
+| seed `0xFA2C0011` | 0 | rc=134, ERR 1 | 判定外 |
+| epf 8 本のみ (乱数なし, seed `0x1`) | 0 | rc=0, ERR 0, 8/8 行 | 届かない |
+| epf 8 本を 1 本ずつ | 0 (全 8 本) | — | 届かない |
+
+- `run_ctrl.sh 2 5` の一時版は exit 0・PASS だった。ただし wasm の trap を踏んだ scenario (S2001) は
+  native 側も同じ scenario で SIGTRAP しており、`run_ctrl.sh` は「両側で同一 scenario の ERR」を許容する。
+  このため、movsb 経路に届いてもネガコンは FAIL にならない。
+
+## 結論
+
+- 受入 1 (movsb/stosw の実行到達 scenario): **未達**。movsb は structured / random scenario で wasm に届くが、
+  その入力では native 側も ERR で落ちる (既知限界の乱数 OOB と同根)。native が正常終了する入力では届かない。
+- 受入 2 (ネガコン FAIL): **未達**。native が ERR で落ちない入力は movsb に届かないため、
+  「両側 ERR を許容しない」判定でも FAIL を作れない。
+- stosw: 本 run では trap 版を作っていない (movsb の調査が先)。未確認。
+
+## 次の作業 (起票先 #692 FA-11 に併記, 子 issue は起票しない)
+
+1. native が ERR で落ちない structured 入力の設計 (意味 field への注入を制限する)。乱数 OOB を避ける生成条件を決める。
+2. その入力で movsb trap が FAIL になることの実測、続けて stosw 単独 trap の到達確認。
+3. 判定規則: 「両側で同一 scenario の ERR」は PASS に数えない版を別途検討 (現行 `run_ctrl.sh` の仕様変更は別 issue)。
