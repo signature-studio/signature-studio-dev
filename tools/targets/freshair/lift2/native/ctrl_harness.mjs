@@ -51,6 +51,12 @@ for (const line of lines) {
     w64(C + 0x21b0, C + 0x21b8);                                  // map._Myhead = H
     for (let i = 0; i < 3; i++) w64(C + 0x21b8 + i * 8, C + 0x21b8);
     M.HEAPU8[C + 0x21d0] = 1; M.HEAPU8[C + 0x21d1] = 1;           // H._Isnil
+    if (process.env.FA_NODE1) { const N = al(0x40), Z = al(0x40), NB = al(0x30);   // FA-16: native_ctrl.c と同一の 1 ノード (FA_NODE1=1 のみ)
+      M.HEAPU8[N + 0x20] = 1; M.HEAPU8[N + 0x21] = 0;
+      w64(N + 0x00, C + 0x21b8); w64(N + 0x08, C + 0x21b8); w64(N + 0x10, C + 0x21b8);
+      w64(N + 0x28, Z); w64(N + 0x30, NB);
+      w64(NB, NB + 0x10); w32(NB + 8, 0x40); w32(NB + 0xc, 0x40); w64(NB + 0x18, RET0); w64(NB + 0x20, RET0);
+      w64(C + 0x21b8 + 0x00, N); w64(C + 0x21b8 + 0x08, N); w64(C + 0x21b8 + 0x10, N); }
     w64(C + 0x370, C + 0x620); w64(C + 0x480, C + 0x620);         // param block +0x10 = mgr (native_ctrl と同一のダミー mgr)
     w64(C + 0x620 + 0x10, C + 0x1900);
     w64(C + 0x1900 + 0x19a8, C + 0x1a00); w64(C + 0x1900 + 0x19b0, C + 0x1c00);

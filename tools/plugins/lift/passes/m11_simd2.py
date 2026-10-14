@@ -248,6 +248,12 @@ def gen_body(base, R, A):
                 '  u128 o; memcpy(&o, rs, 16); return o; }']
     if base == 'pmovsxdq' and n == 1 and A[0] == 'i128':
         return ['{ i32 xs[4]; i64 rs[2]; memcpy(xs, &a, 16); rs[0] = xs[0]; rs[1] = xs[1]; u128 o; memcpy(&o, rs, 16); return o; }']
+    fm = re.match(r'^vf(n?)m(add|sub)(132|213|231)sd$', base)
+    if fm and n == 3 and A[:2] == ['i128', 'i128'] and A[2] in ('i64', 'i128') and R == 'i128':
+        neg, sub, order = fm.groups()
+        stem = ('fn' if neg else 'f') + 'm' + ('s' if sub == 'sub' else ('' if neg else 'a'))
+        c = 'asd(c)' if A[2] == 'i64' else 'lane0_d(c)'
+        return ['return _%s%ssd(a, b, %s);' % (stem, order, c)]
     width = 16 if A and A[0] == 'i128' else 8
     if base in LANE and n == 2 and A[0] == A[1]:
         bits, expr = LANE[base]

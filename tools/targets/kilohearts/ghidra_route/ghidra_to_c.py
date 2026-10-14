@@ -126,6 +126,10 @@ def main():
             protos.append(s.split('{')[0].strip() + ';')
     out += protos
     out += [STUB[v] for v in STUB if ('FUN_%x' % v) in alltxt]
+    # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
+    defined = set(vas)
+    bodies = [re.sub(r'\bfunc_0x000(180f[0-9a-f]{5})\b', lambda m: 'FUN_' + m.group(1)
+                     if int(m.group(1), 16) in defined else m.group(0), b) for b in bodies]
     out += bodies
     # --- export wrapper (harness は i64×4 + 戻り値 kind で呼ぶ)
     sigs = {}

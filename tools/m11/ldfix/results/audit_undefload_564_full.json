@@ -1,0 +1,1635 @@
+{
+ "sites_total": 2846,
+ "by_class": {
+  "REGLIVE": 2509,
+  "FRAME_IN_ESCAPED": 56,
+  "NOADDR": 158,
+  "MEMREAD": 91,
+  "FRAME_NOT_ESCAPED": 19,
+  "RIPREAD": 13
+ },
+ "fns_by_class": {
+  "REGLIVE": 2444,
+  "FRAME_IN_ESCAPED": 53,
+  "NOADDR": 155,
+  "MEMREAD": 91,
+  "FRAME_NOT_ESCAPED": 19,
+  "RIPREAD": 13
+ },
+ "frame_in_escaped": [
+  {
+   "fn": "1006ec0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "1006fb6 cmp dword ptr [rbp + 0x2c], 1 => stack_var_-12+0"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "1006ec0",
+   "ty": "i8",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "1007021 cmp byte ptr [rbp + 0x2b], 0 => stack_var_-56+43"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "103aa50",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "103ab59 add r14d, dword ptr [rbp + 0x38] => stack_var_-152+8"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "10628a0",
+   "ty": "i16",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "10628c0 movzx rax, word ptr [rbp + 0x4e] => stack_var_-48+38"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "11e6e20",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "11e6fdb movss xmm0, dword ptr [rbp + 0x108] => stack_var_-288+192"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "129df10",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "129e1d6 sub esi, dword ptr [rbp + 0x88] => stack_var_-56+8"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "12cb2e0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "12cb416 mov r8d, dword ptr [rsp + 0x28] => stack_var_-40+8"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "13105d0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "1310837 add eax, dword ptr [rbp + 0x48] => stack_var_-52+4"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "1354630",
+   "ty": "i16",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "1354784 cmp word ptr [rbp + 0x1d2], 1 => stack_var_-72+2"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "40792b and qword ptr [rbp + 0x38], 0xffffffffffff0000 => stack_var_-104+24"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "40791e cmp dword ptr [rbp + 0x40], 0x10000 => stack_var_-104+32"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "412160",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "41217d cmp dword ptr [rbp + 0x170], 2 => stack_var_-280+336",
+    "4121d0 cmp dword ptr [rbp + 0x170], 0 => stack_var_-280+336",
+    "41228c cmp dword ptr [rbp + 0x170], 1 => stack_var_-280+336"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "418b40",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "418b57 cmp dword ptr [rbp + 0x40], 0x1000 => stack_var_-56+32"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "41ca30",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "41ca3e mov eax, dword ptr [rsp + 0x40] => stack_var_-56+32"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "441730",
+   "ty": "i16",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "44178f cmp word ptr [rbp + 0x6e], 0 => stack_var_-40+30",
+    "4417db cmp cx, word ptr [rax + 0x17a] [rax+378]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4488f0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "44892d cmp dword ptr [rbp + 0xd8], 0x1000 => stack_var_-1648+32"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "454090",
+   "ty": "i8",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "454637 cmp byte ptr [rbp + 0x16e], 1 => stack_var_-372+282",
+    "454670 cmp byte ptr [rbp + 0x16e], 1 => stack_var_-372+282",
+    "4546a9 cmp byte ptr [rbp + 0x16e], 1 => stack_var_-372+282"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45c170",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "45c1b5 mov eax, dword ptr [rbp + 0x40] => stack_var_-48+8"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45cda0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "45cdd9 movsxd rax, dword ptr [rbp + 0x40] => stack_var_-48+8"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45d8b0",
+   "ty": "i16",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "45da5b cmp word ptr [rbp + 0x3e], 0 => stack_var_-64+22"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45db40",
+   "ty": "i16",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "45db85 cmp word ptr [rbp + 0x40], 0 => stack_var_-48+8"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45dc20",
+   "ty": "i16",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "45dc69 cmp word ptr [rbp + 0x28], 0 => stack_var_-72+8"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "52a7f0",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "52a835 cmp qword ptr [rbp + 0x70], rcx => stack_var_-96+8"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "5c4dc0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "5c4e43 cmp dword ptr [rbp + 0x58], 0xc0c0c0 => stack_var_-1024+0"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "5cb210",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "5cb4aa cmp qword ptr [rbp + 0xc0], 0 => stack_var_-208+24"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "639c70",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "639c83 mov eax, dword ptr [rsp + 0x2c] => stack_var_-24+12"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "666c30",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "666c3e mov eax, dword ptr [rsp + 0x40] => stack_var_-56+32"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "694c80",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6951c8 movsd xmm1, qword ptr [rbp + 0xe8] => stack_var_-16+32"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "695640",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6956f9 cmp qword ptr [rbp + 0x38], 0 => stack_var_-72+24"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6c01a0",
+   "ty": "i128",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6c0207 mov r9d, dword ptr [rbp + 0x44] => stack_var_-56+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6c7610",
+   "ty": "i128",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6c7665 mov ecx, dword ptr [rbp + 0x44] => stack_var_-56+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6c7ca0",
+   "ty": "i128",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6c7ccc mov edx, dword ptr [rbp + 0x84] => stack_var_-56+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6ca580",
+   "ty": "i128",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6ca5c2 add dword ptr [rbp + 0x64], eax => stack_var_-56+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6ca6c0",
+   "ty": "i128",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6ca702 add dword ptr [rbp + 0x64], eax => stack_var_-56+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6ced00",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "6ced14 mov eax, dword ptr [rbp + 0x28] => stack_var_-24+8"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "71dd80",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "71ddc4 cmp qword ptr [rsp + 0x30], rcx => stack_var_-80+8"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "7e48d6 cvtsi2ss xmm0, dword ptr [rbp + 0x6c] => stack_var_-104+12"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "7e47b6 sub eax, dword ptr [rcx + 0x4dc] [rcx+1244]",
+    "7e4874 sub eax, dword ptr [rbp + 0x60] => stack_var_-104+0",
+    "7e4b0a cvtsi2ss xmm0, dword ptr [rbp + 0x68] => stack_var_-104+8"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "808930",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "80896d cmp dword ptr [rbp + 0x5c], 3 => stack_var_-84+8"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "808c80",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "808ca4 cmp dword ptr [rbp + 0x2c], 3 => stack_var_-52+8"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "81bfd0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "81bff3 mov eax, dword ptr [rsp + 0x2c] => stack_var_-32+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "81c0d0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "81c118 mov eax, dword ptr [rbp + 0x2c] => stack_var_-32+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "820d60",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "820dba add dword ptr [rbp + 0x30], ecx => stack_var_-40+0"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "824020",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "824069 add dword ptr [rbp + 0x30], eax => stack_var_-56+0"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "864f60",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "864f71 mov eax, dword ptr [rbp + 0x24] => stack_var_-24+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "864f80",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "864f94 sub eax, dword ptr [rbp + 0x20] => stack_var_-24+0"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "867220",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "867245 cmp dword ptr [rsp + 0x2c], 0 => stack_var_-16+4"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "92ea90",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "92eaaf cmp qword ptr [rsp + 0x48], 0 => stack_var_-32+16"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "bf8b40",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "bf8b68 mov eax, dword ptr [rbp + 0xac] => stack_var_-196+136"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "c38bd0",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "c38c08 cmp qword ptr [rbp + 0x78], 0 => stack_var_-88+56"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "c3b340",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "c3b46f cmp dword ptr [rbp + 0x60], 0 => stack_var_-120+32"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "c9cf70",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "c9cf8f cmp qword ptr [rsp + 0x48], 0 => stack_var_-32+16"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "da5400",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "da541f cmp qword ptr [rsp + 0x48], 0 => stack_var_-32+16"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "da5510",
+   "ty": "i64",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "da552f cmp qword ptr [rsp + 0x48], 0 => stack_var_-32+16"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "e8fba0",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "e8fc08 sub dword ptr [rbp + 0x48], ecx => stack_var_-56+8"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "f61710",
+   "ty": "i32",
+   "cls": "FRAME_IN_ESCAPED",
+   "detail": [
+    "f61ce6 mov r8d, dword ptr [rbp + 0x94] => stack_var_-56+4"
+   ],
+   "file": "boot3.norm0.ll"
+  }
+ ],
+ "frame_not_escaped": [
+  {
+   "fn": "12c6910",
+   "ty": "i64",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "12c691d mov eax, dword ptr [rbp + 0xc] [rbp+12]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "1306050",
+   "ty": "i64",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "130605d mov eax, dword ptr [rbp + 0xc] [rbp+12]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "44ce90",
+   "ty": "i8",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "44cea6 xor al, byte ptr [rbp + 0x2f] [rbp+47]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "5b0c80",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "5b0c95 cmp dword ptr [rbp + 0x24], 0 [rbp+36]",
+    "5b0c95 cmp dword ptr [rbp + 0x24], 0 [rbp+36]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6097c0",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "6097dc mov eax, dword ptr [rbp + 0x28] [rbp+40]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "609830",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "60984c mov eax, dword ptr [rbp + 0x2c] [rbp+44]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "609970",
+   "ty": "i64",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "609992 add eax, dword ptr [rbp + 0x20] [rbp+32]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "609b20",
+   "ty": "i64",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "609b42 sub eax, dword ptr [rbp + 0x20] [rbp+32]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "668310",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "668343 cvtss2sd xmm0, dword ptr [rbp + 0x30] [rbp+48]",
+    "668351 cvtss2sd xmm0, dword ptr [rbp + 0x30] [rbp+48]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "668390",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "6683bb movss xmm0, dword ptr [rbp + 0x30] [rbp+48]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6683d0",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "6683fb movss xmm0, dword ptr [rbp + 0x34] [rbp+52]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6a3040",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "6a3707 cvtss2sd xmm0, dword ptr [rbp + 0x2c] [rbp+44]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "775340",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "7759d3 movss xmm1, dword ptr [rbp + 0xac] [rbp+172]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "823ee0",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "823f10 mov eax, dword ptr [rbp + 0x20] [rbp+32]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "8258d0",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "825909 mov eax, dword ptr [rbp + 0x20] [rbp+32]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "825a00",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "825a35 mov eax, dword ptr [rbp + 0x20] [rbp+32]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "a965c0",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "a965f5 movss xmm1, dword ptr [rbp + 0x2c] [rbp+44]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "ddd4d0",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "ddd6b0 cvtsi2ss xmm2, dword ptr [rbp + 0x5c] [rbp+92]",
+    "ddd6f3 cvtsi2ss xmm2, dword ptr [rbp + 0x5c] [rbp+92]",
+    "ddd734 cvtsi2ss xmm2, dword ptr [rbp + 0x5c] [rbp+92]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "dddc30",
+   "ty": "i32",
+   "cls": "FRAME_NOT_ESCAPED",
+   "detail": [
+    "dddd0e cvtsi2ss xmm2, dword ptr [rbp + 0x5c] [rbp+92]",
+    "dddd6f cvtsi2ss xmm2, dword ptr [rbp + 0x5c] [rbp+92]",
+    "ddddff cvtsi2ss xmm2, dword ptr [rbp + 0x5c] [rbp+92]"
+   ],
+   "file": "boot2.norm0.ll"
+  }
+ ],
+ "frame_unresolved": [],
+ "memread_frame": [],
+ "memread": [
+  {
+   "fn": "1062830",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "1062830 movzx rax, byte ptr [rcx] [rcx+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "10e5020",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "10e5068 rep stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "12bf9b0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "12bfa2c stosq qword ptr [rdi], rax [rdi+0]",
+    "12bfa2e stosq qword ptr [rdi], rax [rdi+0]",
+    "12bfa30 stosd dword ptr [rdi], eax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "12c68f0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "12c68f0 mov eax, dword ptr [rcx] [rcx+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "12d20c0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "12d20d2 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "1354630",
+   "ty": "i32",
+   "cls": "MEMREAD",
+   "detail": [
+    "1354809 cmp ebx, dword ptr [rax + 8] [rax+8]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "13709d0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "1370a2c stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "40c4a0",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "40c4bb ucomisd xmm0, qword ptr [rcx + rdx*8] [rcx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "40f6e0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "40f6ed movzx rdi, byte ptr [rsi] [rsi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4103e0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4103e8 mov eax, dword ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4104d0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4104d2 lock xchg dword ptr [rcx], eax [rcx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "414aa0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "414ab7 movzx r8, byte ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4159e0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "415a83 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "416230",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "416263 movzx rax, byte ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "42d180",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "42d184 movzx eax, word ptr [rcx] [rcx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "42d290",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "42d294 movzx eax, word ptr [rcx] [rcx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "42d2c0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "42d2c4 movzx eax, word ptr [rcx] [rcx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "42d360",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "42d364 movzx rcx, word ptr [rcx] [rcx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "442b00",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "442b10 movzx rcx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4447d0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4447f5 mov eax, dword ptr [rsi] [rsi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "44bae0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "44bb42 stosq qword ptr [rdi], rax [rdi+0]",
+    "44bb44 stosq qword ptr [rdi], rax [rdi+0]",
+    "44bb46 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "44fce0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "44fe37 movzx rdx, word ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45b550",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45b560 movzx rcx, word ptr [rsi] [rsi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45bc90",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45bca4 movzx rax, word ptr [rsi] [rsi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45c040",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45c0f8 movzx rdx, word ptr [rax] [rax+0]",
+    "45c10e movzx rdx, word ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45c170",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45c1a7 movzx rdx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45c230",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45c241 movzx rcx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45cda0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45ce26 movzx rdx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45d040",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45d051 movzx rcx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45d8b0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45d8d3 movzx rsi, word ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45db40",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45db77 movzx rdx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45dc20",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45dc31 movzx rcx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45e1a0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45e21a movzx rdx, word ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45e360",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45e371 movzx rcx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45ec50",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45ec9c movzx rdx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45eda0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45edb1 movzx rcx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45f3c0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45f40c movzx rdx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "45f500",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "45f511 movzx rcx, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4615f0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "461619 movzx rcx, word ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "461ff0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "461fff movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462040",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46204b movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462070",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46207c movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4620a0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4620ab movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4620d0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4620db movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462100",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46210c movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462130",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46213c movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462160",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46216b movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462190",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46219c movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4621c0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4621d1 movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462200",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "462212 movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462240",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46224c movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462270",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "462282 movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4622f0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "462302 movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462370",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "46237c movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "462fc0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "463023 movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "463050",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "463099 movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "463260",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4633e3 movzx rax, word ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "463440",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "4635c3 movzx rax, word ptr [rax] [rax+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "4637c0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "463962 movzx rax, word ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "496fa0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "496faf stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "50ee30",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "50ef31 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "52d0f0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "52d153 cmp rcx, qword ptr [rax + 8] [rax+8]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "52d330",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "52d3d3 cmp rcx, qword ptr [rax + 8] [rax+8]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "598cd0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "598d4e rep stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "643410",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "643432 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6613b0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "6613cb mov ecx, dword ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "66e5e0",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "66e62a subsd xmm2, qword ptr [rdx + 0x18] [rdx+24]",
+    "66e69c subsd xmm2, qword ptr [rdx + 0x18] [rdx+24]",
+    "66e6f9 subsd xmm2, qword ptr [rdx + 0x18] [rdx+24]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "695a50",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "695a61 mulsd xmm1, qword ptr [r9] [r9+0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6ee1a0",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "6ee1e0 subsd xmm1, qword ptr [rbx + 0x550] [rbx+1360]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "773990",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "773ae1 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "7776a0",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "7776d8 ucomiss xmm0, dword ptr [rbx + rdi*4 + 0x3f4] [rbx+1012]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "783d00",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "784116 mov rax, qword ptr [rax] [rax+0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "784790",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "7847ad movzx rax, byte ptr [rdx] [rdx+0]",
+    "7847b3 movzx eax, word ptr [rdx] [rdx+0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "812dc0",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "812dc4 mulss xmm1, dword ptr [rcx + 0xc] [rcx+12]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "812e00",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "812e04 mulss xmm1, dword ptr [rcx + 0x18] [rcx+24]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "821370",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "82138b mov edi, dword ptr [rsi] [rsi+0]"
+   ],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "93ebf0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "93edb4 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "c40f80",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "c40f8f stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "cb8420",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "cb85a2 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "d27190",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "d27206 mulss xmm0, dword ptr [rax] [rax+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "d27520",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "d27535 mov eax, dword ptr [rbx] [rbx+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "d293d0",
+   "ty": "i64",
+   "cls": "MEMREAD",
+   "detail": [
+    "d2949d mov r8d, dword ptr [rax] [rax+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "d34e50",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "d34e74 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "d352c0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "d352d7 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "d35ed0",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "d35ef4 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "dd8510",
+   "ty": "i128",
+   "cls": "MEMREAD",
+   "detail": [
+    "dd8527 divsd xmm1, qword ptr [rcx + 0x10] [rcx+16]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "de2280",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "de22a4 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "e25f80",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "e25fe5 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "f6bb50",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "f6bb70 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "f8ec70",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "f8ecb8 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "ffa870",
+   "ty": "i1",
+   "cls": "MEMREAD",
+   "detail": [
+    "ffa886 stosq qword ptr [rdi], rax [rdi+0]"
+   ],
+   "file": "boot3.norm0.ll"
+  }
+ ],
+ "ripread": [
+  {
+   "fn": "1039c40",
+   "ty": "i32",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "1042d20",
+   "ty": "i32",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "1046a30",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "11d5570",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "1220b20",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "476930",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot0.norm0.ll"
+  },
+  {
+   "fn": "6614e0",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6926e0",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "6a3a90",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "7f2fe0",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot1.norm0.ll"
+  },
+  {
+   "fn": "cc33d0",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot2.norm0.ll"
+  },
+  {
+   "fn": "e7e1a0",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "ff8b60",
+   "ty": "i128",
+   "cls": "RIPREAD",
+   "detail": [],
+   "file": "boot3.norm0.ll"
+  }
+ ]
+}

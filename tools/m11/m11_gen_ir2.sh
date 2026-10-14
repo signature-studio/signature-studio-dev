@@ -45,7 +45,7 @@ if [ "${M11_LDFIX:-1}" = 0 ]; then
   python3 m11_cond.py ldfix=disabled
   echo "[gen_ir2] M11_LDFIX=0: ldfix を適用しない (ir_conditions.json ldfix=disabled; この IR は build できない)" >&2
 elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
-  python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json
+  python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json ${LDFIX_ARGS:-}
   mv work/boot_final.ldfix.ll work/boot_final.ll
   python3 m11_cond.py ldfix=applied
 else

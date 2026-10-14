@@ -99,3 +99,36 @@
   - `m11_sx_trace_soft.ftrace.jsonl` は **0 バイト (0 行)**。`FS` は export されており `ftrace_error` は無い。以前の `Aborted('FS' was not exported)` は古い `.cjs` 固有の事象で、現行 build では再現しない。
   - trap 位置は前回と同じ unit 17〜18 付近 (`wasm-function[1338]` が最上段、`dllmain_done=false`)。
 - 結論: 件数 >0 の実 boot ftrace は**未取得**。未達は本 issue に残す。原因の切り分け (§4 の 1 行目・3 行目) は lift 側の調査が必要で、本 run の上限では完了しない。
+
+## 7. SHX-T24 (#1493) の切り分け (検証 HEAD `3cdf8329`)
+
+検証の起点: `git rev-parse HEAD` = `3cdf83297f387b3dbddb6737b71175a9ae99560e` (origin/main 取り込み後)。`git diff 80c32a06 3cdf8329 -- tools/m11 tools/shimx` は 96 files / +17855 / -70 (本 §の対象外の変更を含む)。素材 `work-m11.tar.zst` を `tools/m11/work/` へ展開 (233 エントリ)。
+
+### 7-1. 受入条件の判定
+
+| 条件 | 判定 | 根拠 |
+|---|---|---|
+| `function_8c5eb0` が D19 と同一原因か | **同一原因とは判定できない (未確定)** | スナップショット IR `boot_final.ll` では件数 0 ガード (`icmp sle i32 %9, 0`) が無く D19 の型と一致する。ただし `m11_guard699.py --mode on` を当てた IR で実 boot しても `units_run=17`・同じ OOB で停止が変わらない (§7-3)。trap の stack (`run.json`) に `function_8c5eb0` (export 番号 5183) は現れない |
+| trace variant の `signature mismatch=1` の出所 | **既知の型不一致 (期待値 0 ではない)** | `link_trace_soft.log`: `midiOutShortMsg` の定義 `(i64, i32)` (`trace_wrap.o` 側) と `(i32, i32)` (`sx_midi_conv.o`、shimx 定義) の不一致。IR `boot_final3.ll` が `declare i32 @midiOutShortMsg(i64, i32)` のため、`gen/trace_wrap.c` が IR の型をそのまま写す。plain / `_fix` 版は trace ラッパを通らないため 0 件 |
+| 実 boot 停止より前の file API 到達経路 | **未特定** | 停止までの trace は 97 calls・26〜28 種。file API は 0 件。停止位置 unit 18 では `GetLocaleInfoW` が 66 回反復 (§7-2) |
+| ftrace 件数・api 内訳 (`SHIMX_TRACE_FILE`) | **未達 (0 行)** | `FS` は export 済みで `ftrace_error` は無いが、ファイルは 0 バイト (§7-3) |
+
+### 7-2. 停止までの呼出順 (実測, `m11_sx_trace_soft` 既定 IR)
+
+- `units_total=942` `units_run=17` `init_count_var=18` `icall_ok=24` `icall_miss=1` `dllmain_done=false` `threw="memory access out of bounds"`。
+- unit 別の trace calls: unit 0=5 / unit 2=21 / unit 16=3 / unit 17=2 / unit 18=66 (distinct 13)。
+- 末尾 26 件は全て unit 18 の `GetLocaleInfoW`。
+
+### 7-3. 再現と実験 (すべて `tools/m11/work/` 内・gitignore)
+
+- 再 build: `bash tools/m11/shimx_link/build.sh --trace --soft` rc=0 / `signature mismatch=1 undefined symbol=0 duplicate=0`。
+- ftrace の取り方: `SHIMX_TRACE_FILE=<パス>` の**パスは MEMFS の絶対パス** (例 `/ftrace.jsonl`) が必要。ホスト相対パス (`work/ftrace/...`) では guest が書けず `ftrace_error: No such file or directory`。MEMFS 絶対パスで実行しても `<tag>.ftrace.jsonl` は **0 バイト (0 行)**。
+- D19 ガード実験: `guard699/m11_guard699.py --mode on --cond 'icmp sle i32 %9, 0'` を `boot_final.ll` に適用 (1 箇所変更, `changed=True`) → `m11_post.py` → trace build → 実 boot。結果は `units_run=17` `dllmain_done=false` `threw` 同一、file API 0 件、ftrace 0 行。停止の原因は D19 ガードでは解消しない。
+- 検証後、`work/` は素材の展開し直しで元の内容 (`boot_final.ll` / `boot_final3.ll` / `boot_final3_sigs.h`) に戻した。
+
+### 7-4. 未解決 (起票先)
+
+- `function_8c5eb0` の trap 位置と D19 の関係 (stack の最上段が export 無しの `wasm-function[1352]`): 起票先 → #1629 (SHX-T26)。
+- `midiOutShortMsg` の IR 宣言 `i64` と shimx 定義 `i32` の不一致の解消 (`gen_link.py` 由来の trace wrapper 型): 起票先 → #1628 (SHX-T25)。
+- file API 到達を妨げる原因 (unit 18 の `GetLocaleInfoW` 反復の後にある `memory access out of bounds`) と ftrace 件数: 起票先 → #1630 (SHX-T27)。
+- 本 issue #1493 の受入条件 5 件のうち、上記 3 件の解消まで条件 1〜4 は未達。条件 5 (期待値不変) は本 PR では検証していない (コード変更なし)。
