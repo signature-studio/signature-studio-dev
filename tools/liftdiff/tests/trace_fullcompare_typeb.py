@@ -67,8 +67,6 @@ def reads_xmm0(f):
             continue
         if ops[0] == 'xmm0' and ins.mnemonic in WRITE_ONLY:
             return False
-        if ops[0] == 'xmm0' and ins.mnemonic in ('xorps', 'xorpd', 'pxor') and ops[1:] == ['xmm0']:
-            return False
         return True
     return False
 
