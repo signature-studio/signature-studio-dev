@@ -60,3 +60,36 @@
 | Worker の workerd テスト | `npm run test:workers` | 3 / 3 PASS | 4.3 s |
 | pm.md と dispatch 文脈の検査 | `bash .github/scripts/tests/test-dispatch-context.sh` | 135 passed・0 failed | 6.1 s |
 | launch 判定の Python テスト | `python3 -m unittest test_launch_issues` (`tools/pm`) | 8 / 8 OK | 0.14 s |
+
+## 7. main の 2 回目の取り込み後の再測定
+
+- 測定 commit: `5726e190` (コードを変えた最後の commit)。`origin/main` (`7deacf8f`) を merge した。競合は 3 箇所 (`docs/DOC_MAP.md` の索引表・`infra/pm-worker/src/engine.ts` の import・`infra/pm-worker/test/status.test.ts` の公開キー一覧)。どれも両側の追加を残した。`pm.ts` の `NEEDS_PM_LABEL`・`NO_PR_LABEL`・`STUCK_LABEL` と digest の定数は両方 export されている。
+- 測定 commit から HEAD までのコード差分: `git diff 5726e190 HEAD -- infra/pm-worker/ .github/ tools/pm/launch_issues.py tools/pm/test_launch_issues.py` の出力は 0 行 (HEAD はこの付録の commit だけ)。
+- §1 の測定 commit (`222ad49b`) から `5726e190` までの変更 (main の取り込み分を含む) は `git diff --stat 222ad49b 5726e190 -- infra/pm-worker/ .github/ tools/pm/launch_issues.py tools/pm/test_launch_issues.py` で次のとおり (`|` の右は行数):
+
+```
+ .github/scripts/tests/test-watchdog.sh       | 237 ++++++++++++++++++++++-
+ .github/scripts/watchdog.sh                  | 106 +++++++++++
+ infra/pm-worker/README.md                    |  23 ++-
+ infra/pm-worker/src/classify.ts              |   6 +-
+ infra/pm-worker/src/engine.ts                | 146 ++++++++++++--
+ infra/pm-worker/src/pm.ts                    |   6 +-
+ infra/pm-worker/src/webhook.ts               |  20 +-
+ infra/pm-worker/test/autonomy_status.test.ts | 272 +++++++++++++++++++++++++++
+ infra/pm-worker/test/classify.test.ts        |  26 +++
+ infra/pm-worker/test/engine.test.ts          |  62 +++++-
+ infra/pm-worker/test/pm_helpers.ts           |  12 +-
+ infra/pm-worker/test/pmdispatch.test.ts      |  82 +++++++-
+ infra/pm-worker/test/status.test.ts          |   2 +
+ 13 files changed, 955 insertions(+), 45 deletions(-)
+```
+
+- load average: 4 件の前後 4.99 → 6.45 (§6 と同様に高い負荷の下で測った。所要時間は §2・§6 と比べない)。
+
+| 検証 | コマンド | 結果 | 所要 (wall) |
+|---|---|---|---:|
+| Worker の node テスト | `npm test` (`infra/pm-worker`) | 188 / 188 PASS・0 FAIL | 25.9 s |
+| Worker の workerd テスト | `npm run test:workers` | 3 / 3 PASS | 4.4 s |
+| pm.md と dispatch 文脈の検査 | `bash .github/scripts/tests/test-dispatch-context.sh` | 135 passed・0 failed | 6.2 s |
+| launch 判定の Python テスト | `python3 -m unittest test_launch_issues` (`tools/pm`) | 8 / 8 OK | 0.13 s |
+| Worker の bundle | `bun build src/index.ts --target=browser --format=esm --external 'node:*'` (出力は作業ディレクトリの外) | 18 modules・exit 0 | 9 ms |
