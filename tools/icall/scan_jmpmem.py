@@ -22,12 +22,14 @@ def scan_pe(path):
     md.detail = True
     out = []
     for s, e in sorted(img.pdata.items()):
+        if e - s > MAX_FN:
+            continue
         code = img.read(s, e - s)
         if not code:
             continue
         sites = []
         for ins in md.disasm(code, s):
-            if ins.mnemonic not in ('jmp', 'call'):
+            if ins.mnemonic != 'jmp':
                 continue
             for op in ins.operands:
                 if op.type != x86.X86_OP_MEM:
@@ -35,9 +37,9 @@ def scan_pe(path):
                 m = op.mem
                 if m.index == 0 or m.base == x86.X86_REG_RIP:
                     continue
-                sites.append({'va': '0x%x' % ins.address, 'mn': ins.mnemonic})
+                sites.append('0x%x' % ins.address)
         if sites:
-            out.append({'pe': os.path.basename(path), 'fn': '0x%x-0x%x' % (s, e), 'size': e - s, 'sites': sites})
+            out.append({'pe': os.path.basename(path), 'fn': '0x%x-0x%x' % (s, e), 'sites': sites})
     return out
 
 
