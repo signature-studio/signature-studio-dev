@@ -192,15 +192,15 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
 `issues_state.json` (snapshot) / `phase.json` (LAUNCH か Review-Only) / `launched.json` (3 時間の重複防止) /
 `relaunch.json` (素材を足した再投入の履歴、最大 2 回) / `stop_deps_candidates.json`・`wave2_cat.json` (書き手は無い) / `*.log`。
 
-**VM 退役時の扱い: 下表の状態ファイルは Worker に取り込まず、破棄する** (取り込み口 `/admin/import` は [#2343](https://github.com/signature-studio/signature-studio-dev/issues/2343) で未実装)。
+**VM 退役時の扱い: 下表の状態ファイルは、Worker に取り込んでから破棄する。取り込む前には破棄しない。** 取り込みの手順は [`../../infra/pm-worker/README.md`](../../infra/pm-worker/README.md) の『VM の状態の取り込みと書き出し』による (取り込み口 `/admin/import` は [#2343](https://github.com/signature-studio/signature-studio-dev/issues/2343) の PR で入る)。`phase.json` は取り込まず、切替後の値は Worker の現在値を使う。
 件数と内訳は [`REPORT.md`](REPORT.md) §12 が正本。
 
 | 状態 | 後継 | 扱い | 影響 |
 |---|---|---|---|
-| `launched.json` | Worker の `launchedAt`。`PM_LOGINS` (PM 名義) の `/oc` コメントから再構成する (同期窓 24 時間、#2380) | 破棄 | 切替 (VM の timer 停止) 以後は書き込まれない。Worker は同じ情報を GitHub から読むので、窓内の二重化は起きない。**VM を戻すときは空から始まる**ため、戻す前に Worker を dry-run にする (両方が live だと二重投稿になる) |
-| `relaunch.json` | Worker の DO `relaunch` (切替後の再投入だけを記録) | 破棄 (取り込みは #2343) | 履歴の無い issue は、直近 24 時間に停止報告が来た場合に限り、最大 2 回余分に再投入され得る (同じ素材行を含む) |
-| `phase.json` | Worker の DO `meta/phase` (`phase.ts`。open PR (stuck を除く) が 80 を超えたら Review-Only、10 未満で解除、間は直前の値) | 破棄。切替時に VM の値 (`review_only=false`) を一度だけ保存済み (REPORT §12-5) | 保存が無い状態 (新しいデプロイ先・DO の再作成) は Review-Only で始まり、open PR が 10 以上の間は新規着手しない (安全側の停滞) |
-| `issues_state.json` | Worker の DO (`issues`・`pmArt`・`botLast`)。snapshot は持たない | 破棄 | PM の `oc_artifacts:` 行は、同期窓 (24 時間) より古いコメントからは新たに読まれない。DO に取り込み済みの古い行が残るかは未確認。必要な issue は PM が行を書き直す (#2343) |
+| `launched.json` | Worker の `launchedAt`。`PM_LOGINS` (PM 名義) の `/oc` コメントから再構成する (同期窓 24 時間、#2380) | 取り込んでから破棄 | 切替 (VM の timer 停止) 以後は書き込まれない。Worker は同じ情報を GitHub から読むので、窓内の二重化は起きない。**VM を戻すときは空から始まる**ため、戻す前に Worker を dry-run にする (両方が live だと二重投稿になる) |
+| `relaunch.json` | Worker の DO `relaunch` (切替後の再投入だけを記録) | 取り込んでから破棄 (#2343。取り込む前に `oc_artifacts: none <素材名>` の行を直す) | 履歴の無い issue は、直近 24 時間に停止報告が来た場合に限り、最大 2 回余分に再投入され得る (同じ素材行を含む) |
+| `phase.json` | Worker の DO `meta/phase` (`phase.ts`。open PR (stuck を除く) が 80 を超えたら Review-Only、10 未満で解除、間は直前の値) | 取り込まず破棄 (切替後は DO の現在値が正)。切替時に VM の値 (`review_only=false`) を一度だけ保存済み (REPORT §12-5) | 保存が無い状態 (新しいデプロイ先・DO の再作成) は Review-Only で始まり、open PR が 10 以上の間は新規着手しない (安全側の停滞) |
+| `issues_state.json` | Worker の DO (`issues`・`pmArt`・`botLast`)。snapshot は持たない | `pm_art` を取り込んでから破棄 | PM の `oc_artifacts:` 行は、同期窓 (24 時間) より古いコメントからは新たに読まれない。DO に取り込み済みの古い行が残るかは未確認。必要な issue は PM が行を書き直す (#2343) |
 | `*.log`・`*.log.err`・`*.log.tmp` | - | 退役時に破棄 | 判断の根拠は issue コメントと `REPORT.md` に残る |
 | `stop_deps_candidates.json`・`wave2_cat.json` | - | 破棄 | 実行時の状態。`tools/pm/.gitignore` の 2 行にだけ残り、リポジトリに書き手も読み手も無い。Worker は参照しないので影響なし |
 
