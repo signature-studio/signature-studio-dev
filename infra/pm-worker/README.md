@@ -54,6 +54,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event は問わない (TARGET に数える `active_runs` とは別) |
 | `dry_run_skipped_posts` | dry-run のために投稿しなかった書き込み (`/oc` 投稿 + `repository_dispatch`) の累計 (`counters.wouldLaunch + wouldDispatch`) |
 | `reconcile_diff` | `{last, total}`: reconcile が REST を適用して DO の内容が変わった entity (issue・PR・run・bot/PM のコメント) の件数と累計。webhook の欠落の指標。`updatedAt` だけの違い (コメント追加で進む) と full sync は数えない。配送遅延の最中の差も数えるので、1 回の小さな値は欠落とは限らない |
+| `build` | デプロイした commit hash (`wrangler deploy --var BUILD_COMMIT:<hash>` で渡した値)。渡していない・小文字 hex の 7〜40 字でないときは `null`。方式と理由は下の『再デプロイ』手順 4 |
 | `rest_remaining` / `rest_used` / `rest_reset_at` | Worker の GitHub REST クライアント (installation token) の全応答の `x-ratelimit-remaining` / `-used` / `-reset` (ヘッダが正。`gh api rate_limit` の本文は食い違う)。失敗応答も含む。ヘッダの無い応答・数値でない値では更新しない。一度も観測していなければ `null` (0 ではない)。JWT で叩く `/app/*` と、`/status?detail=1` の呼び出し側の token は別枠なので記録しない |
 
 **rate-guard**: `rest_remaining` が 1,500 未満の間は launch を止める (`launch_stop: "rate-guard"`)。1,499 で止まり、1,500 で継続する。未観測 (`null`) は止めない。
@@ -211,15 +212,17 @@ Workers Builds は接続しない (後述)。デプロイするのは **main に
    `authType` が `OAuth Token` でないときは、環境変数の token が OAuth より優先されている。止めて原因を調べる (この VM に token の環境変数を置かない。指示 4・9)。失敗したら後述の「OAuth が失効したとき」。
    OAuth の保存先 `~/.config/.wrangler/config/default.toml` は平文で token を含む。中身を表示・commit・コメントに貼らない。
 2. 戻し先の記録。デプロイ前に `wrangler deployments status` を実行し、稼働中の version id を控える (ロールバックの戻し先)。あわせて `curl -fsS "$PM_WORKER_URL/status"` の `mode` `mode_launch` `mode_dispatch` `fresh` `last_tick` を控える (`PM_WORKER_URL` は `tools/pm/README.md` の `pm_gate.sh` と同じ)。
-3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]`) が出る。migration の有無はここでは分からない。
-4. デプロイ: `wrangler deploy --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。
+3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir> --var BUILD_COMMIT:<commit hash>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]` と `BUILD_COMMIT`) が出る (`BUILD_COMMIT` の値は `(hidden)` で表示される)。migration の有無はここでは分からない。
+4. デプロイ: 作業する commit は main に merge 済みの HEAD (`git rev-parse HEAD` の全 40 字) にして、次のように渡す。`wrangler deploy --var BUILD_COMMIT:<commit hash 全体> --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。`--var` の値は `/status` の `build` に出る (手順 5)。
+   - **`BUILD_COMMIT` の渡し方 (#2416)。** `--var` を選んだ理由: (a) Worker のコードを書き換えない。(b) `wrangler.toml` の `[vars]` には置かず、deploy のたびに CLI から渡す。`--keep-vars` なしでは前回の deploy の値は残らないので、渡し忘れた deploy の `build` は古い hash ではなく `null` になる。(c) CLI の `--var` は `[vars]` の同名キーより優先される (wrangler 4.151.0 のソース `cli.js` で、CLI の値を config の binding の後に入れることを確認。dry-run で `--var TARGET:999` を付けると `TARGET` が `50` から `(hidden)` に変わることも確認)。`--define` は採らない: esbuild の定数置換でコード側に裸の識別子が要り、`env.BUILD_COMMIT` の参照は置換されない (dry-run でも値が bundle に入らないことを確認)。
    - **`[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。** `--keep-vars` なしの既定では、dashboard 等で変えた var は消える (`wrangler deploy --help` の説明)。特に `LIVE_LAUNCH` / `LIVE_DISPATCH`: dashboard 等で変えても、再デプロイすると `wrangler.toml` の値 (2026-10-14 以降は `"1"`) で置き換わる。切替の手順は「切替」節 (A・B) が正本で、値を変えるときも `wrangler.toml` を変えて merge してから deploy する (正本はリポジトリ)。デプロイ前に手順 2 の `mode` `mode_launch` `mode_dispatch` を見て、意図しない `live` → `dry-run` の変化が出ないことを確かめる。
    - secret (`STORE_KEY`) は deploy で消えない (ソースで `keepSecrets: true`、`--help` に『secrets are never deleted by deployments』)。`STORE_KEY` を作り直さない (App の鍵が復号できなくなる)。
    - Durable Object のコードを変えるだけなら migration は要らない (公式: <https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/>)。migration は適用済みの tag を飛ばして、新しい tag の分だけが deploy 時に適用される。現在の `wrangler.toml` は `v1` (`new_sqlite_classes = ["PmDO"]`) だけ。`[[migrations]]` を足す変更は、ロールバックできなくなる境界を作る (後述)。単独の PR・単独のデプロイにする。
 5. 反映の確認。
    - `wrangler deployments status` に、手順 4 の `--tag` と `--message` を持つ version が 100% で出る。出力の項目 (version id・Created・Tag・Message) はソースで確認した。実 Worker での表示は未確認 (末尾のチェックリスト)。
    - `curl -fsS "$PM_WORKER_URL/status"` が応答し、`fresh` が `true`、`last_tick` が deploy 後の時刻に進む。
-   - **現状の `/status` には、デプロイされた commit を識別する key が無い** (`src/engine.ts` の `status()`、main 0ca7f8c5)。そのため `/status` だけでは『新しい commit が反映された』と断定できない。上の `deployments status` の Tag / Message と、その commit で `/status` に足した・変えた key が応答に出ることを併せて見る。恒久策は [CI-84] #2416 (`/status` に `build` を載せる)。
+   - `curl -fsS "$PM_WORKER_URL/status"` の `build` が、手順 4 で `--var BUILD_COMMIT:` に渡した commit hash (全体) と一致すること。`null` のままなら、その deploy は `--var` を付けずに出ている (反映とは判断しない。手順 4 をやり直す)。`build` は公開の `/status` にも出る (集計の一部で、秘密ではない)。
+   - 反映の判定は `/status` の `build` で行う (外から見られる。watchdog や他の agent も同じ確認ができる)。`wrangler deployments status` の Tag / Message は、wrangler にログインした VM で 100% の version を確かめる補助に使う。
 
 ## ロールバック
 
@@ -265,3 +268,4 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
 - [ ] `[未確認]` `wrangler rollback` を本 Worker (migration は `v1` の 1 件のみ) で実行したときの成否。公式の制約は『lifecycle 変更を跨ぐと不可』で、本 Worker の `v1` 同士なら可と読めるが、実機では未実行。確認の方法: `LIVE_LAUNCH` / `LIVE_DISPATCH` を `"1"` にする前に、最初の再デプロイで 2 つ目の version ができた後、`wrangler rollback <旧 version> --message "rollback test"` で戻し、もう一度 deploy する。
 - [ ] `[未確認]` rollback で `[vars]` (特に `LIVE_LAUNCH` / `LIVE_DISPATCH`) と Cron の schedule が戻し先の version の値に戻るか。公式は『binding の先は変わらない』とだけ書き、`[vars]` と schedule の扱いは書いていない。`LIVE_LAUNCH` または `LIVE_DISPATCH` が `"1"` の運用中に rollback すると、戻し先の値が `"0"` ならその経路が dry-run に戻る (投稿・dispatch が止まる) 恐れがある。確認の方法: 上のテストの後に `GET /status` の `mode_launch` / `mode_dispatch` (と `mode`)、dashboard の Triggers の cron が残っていることを見る。
 - [ ] `[未確認]` `wrangler deployments status` と `wrangler versions list` の実際の出力 (Tag / Message の表示を含む)。項目名はソースで確認した。実 Worker での表示は未確認。
+- [ ] `[未確認]` `--var BUILD_COMMIT:<hash>` の値が、実 Worker の `/status` の `build` に出ること。`--var` を付けない deploy で `build` が `null` に戻ること (`--keep-vars` なしの既定。wrangler の help の説明どおりと読んだが、実機では未確認)。確認の方法: 次の再デプロイで手順 4 の hash を渡し、手順 5 の `build` が一致すること。`null` に戻る挙動は、`--var` を付けない deploy が次に行われたときに見る (テストのためだけの deploy はしない)。ローカルでは `wrangler deploy --dry-run` と vitest (node と workerd) で確認済み。

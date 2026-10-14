@@ -65,7 +65,7 @@ const EXISTING_KEYS = [
   "sync_truncated", "last_full_sync_rest_calls", "last_full_sync_comment_rest_calls", "comment_window_h", "comment_max_pages",
 ];
 const ADDED_KEYS = [
-  "last_webhook_at", "last_dispatch_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
+  "last_webhook_at", "last_dispatch_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected", "build",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];
@@ -101,6 +101,27 @@ test("/status: 観測の初期値は null / 0 (残量を 0 と誤読しない)",
   assert.equal(s.rest_remaining, null);
   assert.equal(s.rest_used, null);
   assert.equal(s.rest_reset_at, null);
+});
+
+// ---------------------------------------------------------------------------------------------------------------- build (#2416)
+test("build: デプロイ時の BUILD_COMMIT をそのまま返す。渡していなければ null (他のキーは変えない)", async () => {
+  const hash = "3d011ecd0d1f6b5f3f1b1b5a0a7c8c2e4f9a1b2c";
+  const set = await configuredApp({ env: { BUILD_COMMIT: hash } });
+  const s = (await (await get(set)).json()) as any;
+  assert.equal(s.build, hash);
+  assert.equal(s.mode, "dry-run");
+  assert.equal(s.phase, "launch");
+  const unset = await configuredApp();
+  assert.equal(((await (await get(unset)).json()) as any).build, null);
+});
+
+test("build: commit hash の形 (小文字 hex の 7〜40 字) でない値は null。token らしい値も出さない", async () => {
+  for (const v of ["", "main", "0123AB7", "0123ab", "ghp_0123456789abcdef0123456789abcdef", "0123abcd\nx", "a".repeat(41)]) {
+    const ctx = await configuredApp({ env: { BUILD_COMMIT: v } });
+    const body = await (await get(ctx)).text();
+    assert.equal((JSON.parse(body) as any).build, null, JSON.stringify(v));
+    assert.ok(!body.includes("ghp_"), "token らしい値は応答に出ない");
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------------------- 受入 1
