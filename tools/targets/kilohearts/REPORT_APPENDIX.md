@@ -61,3 +61,13 @@
 - 試行: 上記 3 件を `also` に追加した場合、emcc error は **14 → 26 件に悪化**。内訳は確定分 17 件のみ: `puStack_28` 3・`ppuStack_10` 2・`undefined` 2・`DAT_184162358` 1・`HeapAlloc`/`HeapFree` 各 1 (計 2)・`GetLastError` 2・`func_0x000180fe5c6c`・`func_0x000180fb6c0c`・`FUN_180fd2c90`・`FUN_180fd2c10`・`FUN_180fd1ac4` 各 1 (いずれも未関数化・計 5)。**残り 9 件は未分類** (保存ログが無く再集計できない)。追加 3 callee (`FUN_180fd4f30` 2・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1) の未宣言エラーが消えたかは未確認 (ログ無し・再実行不可)。この変更は採用せず、`ghidra_to_c.py` は HEAD のまま (`git status` に変更なし)。
 - 結論: 残件の閉包は 3 callee の追加では閉じない。`also` を広げる方向は、閉包を全件確定させる (decompile 集合の固定) まで退行する。次の一手は Win API (`HeapAlloc`/`HeapFree`/`GetLastError`/`SetLastError`) の stub 規則と、未関数化 callee の閉包を一括で確定する仕組みを先に決めること。
 - 未実施: `rcpps` 2 引数形 (`gen_simd.py` の 1 引数形のみ対応・ABI 未確定)・引数なし呼出の `param_1` ABI 推定・Resonator の native 突合・ablation・ネガコン。Stereo / Delay は未着手。
+
+#### 10-7k. #1746 (KH-26) run: IAT thunk 2 件の fail-fast stub 化 (部分・Resonator はビルド未通過)
+- 素材: `plugins-kilohearts` の Installer zip のみ展開 → payload.dat → windows.zip → HeartCore.core_64 (手展開, dmg 不要)。Ghidra 12.1.4 = GitHub release (zip sha256 `ddac49f9…d2db` 一致)、JDK 21 (Temurin 21)、emsdk 6.0.12 ([EMSDK])。測定 HEAD = `98885e93`。
+- IAT thunk の同定 (PE import table・x64 disassembly): `0x180fd81e4` = `jmp [rip+…]` → IAT `KERNEL32!FlsGetValue`、`0x180fd81ec` = 同 → `KERNEL32!FlsSetValue`。呼出元 (`0x180fd3144`・`0x180fd3xxx` 系) は引数を register で渡すが、Ghidra の C 出力はその引数を落として `func_0x000180fd81e4()`・`func_0x000180fd81ec(...)` と呼ぶ。
+- 変更 (`ghidra_route/ghidra_to_c.py` のみ、+7 行): `THUNK` 表を追加し、`func_0x000<va>()` の fail-fast stub (`abort()`) を生成する。Win API の意味は実装しない (到達時に abort し、突合で検出する方針。既存の `FUN_18004cf20` と同じ扱い)。
+- decompile (Resonator 集合 17 + 未関数化 callee 3 件 + Gain/Haas/Gate 10 関数 = 計 30 関数): **30/30 OK** (`summary.tsv`, `analyzeHeadless` wall 35.5 s, n=1)。
+- emcc (resonator, 修復なし, `-ferror-limit=0`, `emcc -c`, HEAD `98885e93`): **15 件** (`grep -c 'error:'`, rc 1, wall 0.12 s)。修復前 (同じ converter・同じ decompile 集合、THUNK 表なし) は **17 件** を同日に計測しており、本 run の修復で **17 → 15 件** (IAT thunk 2 件 `func_0x…81e4`・`81ec` の未宣言エラーのみ消えた)。§10-7i の 14 件とは基準 HEAD が異なるため直接比較しない。
+- 残件 (emcc 15 件): `param_1` 引数不足 3・`FUN_180fd4f30` 未宣言 2・引数数不一致 1・`rcpps` 1・`GetLastError`/`SetLastError` 各 1・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1・引数型不一致 3 (`undefined4[8]`→`short*`・`uint*`→`ushort*`・`float*`→`uint*`)・`V128` への int 代入 1。
+- 回帰 (同一 HEAD `98885e93`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-3 と一致。
+- 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`GetLastError`/`SetLastError` の stub 規則は未決定 (本 run は IAT thunk のみ)。
