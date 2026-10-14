@@ -195,7 +195,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 - 取り込み。`origin/main` `c98d2c99` を merge (`3aa3a256`)。競合は `tests/provider_check.mjs` の 1 箇所だけ。main 側は PY-152 の `pe152` (arrangement 6 関数) を追加し、本 PR 側は `pe102` (`playlist.muteTrackLock`) を追加した。両方を集合に入れ、件数は main の `impl 109・unimpl 326` に `pe102` の +1 を加えて `impl 110・unimpl 325` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`flapi_table.json`・`flapi_table.py`・`gen/fl_table.c` は自動マージで衝突なし。
 - 測定 commit: `3aa3a256` (コードを変えた最後の commit)。`git diff 3aa3a256 HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` は 0 行 (本節の追記だけが差分)。
 - 素材: `fl-win64` の 5 block (`block00031_PE`・`block24429_DATA`・`block24430_DATA`・`block25159_DATA`・`block24618_DATA`) を `$RUNNER_TEMP/fl-win64/extracted/` へ展開 (2.911 s)。`FL_WIN64_DIR` でこれを指した。`fetch_inputs.sh` で `work/` を作成 (stubs は git clone)。`toolchain-emsdk` 素材は本 run に無い。
-- emsdk: 上流 `emsdk install 6.0.12` を導入して `activate` し、`/opt/emsdk` へ symlink した (`build_cpython_wasm.sh` が既定位置を直書きするため)。CPython wasm は本 run で作成 (22:26:30 → 22:31:05、4 分 34.650 秒、exit 0。CPython 側のソースは変えていない)。
+- emsdk: 上流 `emsdk install 6.0.12` を導入して `activate` し、[EMSDK] の既定位置へ symlink した (`build_cpython_wasm.sh` が既定位置を直書きするため)。CPython wasm は本 run で作成 (22:26:30 → 22:31:05、4 分 34.650 秒、exit 0。CPython 側のソースは変えていない)。
 - 環境: GitHub Actions runner (4 コア)。`uptime` の load average は 22:25:05 に `0.24 0.17 0.07`、検証の最後 (22:33:01) に `0.56 1.23 0.71`。
 
 | 検証 | 実行 | 結果 | 所要 |
