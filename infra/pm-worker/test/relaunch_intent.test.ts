@@ -2,10 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildLaunchBody, checkRelaunchIntent, RELAUNCH_MAX_PER_WINDOW } from "../src/launch.ts";
 import { parseRelaunchIntent } from "../src/webhook.ts";
-import { configuredApp, issuePayload, j, markFresh, send, T0, type Call } from "./helpers.ts";
-import { commentEv, HUMAN, IMPL_BOT, REVIEWER, at } from "./pm_helpers.ts";
+import { configuredApp, issuePayload, j, markFresh, send, T0, type Call, type Handler } from "./helpers.ts";
+import { commentEv, HUMAN, IMPL_BOT, REVIEWER, at, prEv, type Ctx } from "./pm_helpers.ts";
 
-// PM の再投入の意図 (oc-pm-intent: relaunch) は、検査を全て通ったときだけ /oc として投稿する。
+// PM の再投入の意図 (oc-pm-intent: relaunch) は、検査を全て通し、分類で投稿してよい行のときだけ /oc として投稿する。
 // (a) allowlist 外の素材 (b) 実装 App 以外の書き手 (c) 24 時間で 4 回目 (d) focus=10 は拒否 (ネガコン)。
 
 const H = 3_600_000;
@@ -66,27 +66,56 @@ test("本文: focus があるときだけ受入条件の 1 行を足す。自由
   assert.throws(() => buildLaunchBody("oc_artifacts: fl-win64", 10));
 });
 
-// ---- webhook → tick → POST の統合 (意図経路だけが動くよう、oc:stuck の issue を 1 件だけ置く)
+// ---- webhook → tick → POST の統合
+// 対象は issue 21 の 1 件 (必要なら issue 22)。既定の状態は『停止報告 (bot・2 時間前) の後の stopped』で、PM の判断待ち = 意図の対象。
+// 意図の投稿は focus 行 (picks の /oc には無い) で数える。投稿 0 回のネガコンは、picks も止まっている状態だけで置く。
 
-const writeHandlers = [
+const FOCUS = "だけを実装して PR を出してください";
+const REPORT = "停止します。判断を求めます。";
+const GOOD = '<!-- oc-pm-intent: relaunch issue=21 arts="fl-win64 plugins-ott" focus=3 -->';
+const HUMAN_INTENT = '<!-- oc-pm-intent: relaunch issue=21 arts="fl-win64" -->';
+
+const writeHandlers: Handler[] = [
   (c: Call) => (c.method === "POST" && /\/issues\/\d+\/comments$/.test(c.url) ? j({ html_url: "x" }, 201) : undefined),
   (c: Call) => (c.method === "POST" && c.url.endsWith("/dispatches") ? j(null, 204) : undefined),
 ];
 
-async function intentRun(env: Record<string, string>, who: { login: string; type?: string }, marker: string, prep?: (store: any) => void) {
-  const ctx = await configuredApp({ env, handlers: writeHandlers });
-  assert.equal((await send(ctx.app, "issues", issuePayload(21, { labels: ["oc:stuck"] }))).status, 202);
-  prep?.(ctx.store);
-  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, who, `停止しました。${marker}`, at(5)))).status, 202);
-  await markFresh(ctx);
-  await ctx.app.engine.tick();
-  const posts = ctx.m.calls.filter((c: Call) => c.method === "POST" && c.url.endsWith("/issues/21/comments"));
-  return { ctx, posts, counters: (ctx.app.engine.status() as any).counters };
+const postsTo = (ctx: Ctx, n: number): Call[] => ctx.m.calls.filter((c: Call) => c.method === "POST" && c.url.endsWith(`/issues/${n}/comments`));
+const focusPosts = (ctx: Ctx): Call[] => postsTo(ctx, 21).filter((c) => String(c.body?.body).includes(FOCUS));
+
+interface Opts {
+  labels?: string[];
+  body?: string;
+  handlers?: Handler[];
+  pre?: (ctx: Ctx) => Promise<void>;
+  prep?: (ctx: Ctx) => void;
+  hours?: number;
 }
 
-const GOOD = '<!-- oc-pm-intent: relaunch issue=21 arts="fl-win64 plugins-ott" focus=3 -->';
+// 停止報告 (bot・T_BASE) を置いた issue 21。
+async function stopped(env: Record<string, string>, o: Opts = {}): Promise<Ctx> {
+  const ctx = await configuredApp({ env, handlers: [...(o.handlers ?? []), ...writeHandlers] });
+  assert.equal((await send(ctx.app, "issues", issuePayload(21, { labels: o.labels, body: o.body }))).status, 202);
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, REPORT, at(0)))).status, 202);
+  return ctx;
+}
 
-test("統合 (live): 実装 App の意図は 1 回だけ /oc として投稿し、focus 行と素材行を入れる。同じ意図は再投稿しない", async () => {
+async function tickNow(ctx: Ctx): Promise<void> {
+  await markFresh(ctx);
+  await ctx.app.engine.tick();
+}
+
+async function intentRun(env: Record<string, string>, who: { login: string; type?: string }, marker: string, o: Opts = {}) {
+  const ctx = await stopped(env, o);
+  await o.pre?.(ctx);
+  o.prep?.(ctx);
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, who, marker, at(5)))).status, 202);
+  if (o.hours) ctx.clock.t += o.hours * H;
+  await tickNow(ctx);
+  return { ctx, posts: postsTo(ctx, 21), counters: (ctx.app.engine.status() as any).counters };
+}
+
+test("統合 (live): 停止報告の後の実装 App の意図は 1 回だけ /oc として投稿し、focus 行と素材行を入れる。同じ意図は再投稿しない", async () => {
   const run = await intentRun({ LIVE_LAUNCH: "1" }, IMPL_BOT, GOOD);
   assert.equal(run.posts.length, 1);
   const body: string = run.posts[0].body.body;
@@ -95,9 +124,9 @@ test("統合 (live): 実装 App の意図は 1 回だけ /oc として投稿し�
   assert.ok(body.includes("この issue の受入条件 3 だけを実装して PR を出してください"));
   assert.equal(run.counters.intentLaunched, 1);
   assert.equal(run.counters.launched, 1);
-  await markFresh(run.ctx);
-  await run.ctx.app.engine.tick();
-  assert.equal(run.ctx.m.calls.filter((c: Call) => c.method === "POST" && c.url.endsWith("/issues/21/comments")).length, 1, "処理済みの意図は再投稿しない");
+  assert.equal(run.ctx.app.engine.s.botLast["21"]?.body, REPORT, "意図の投稿は停止報告の窓 (botLast) を動かさない");
+  await tickNow(run.ctx);
+  assert.equal(postsTo(run.ctx, 21).length, 1, "処理済みの意図は再投稿しない");
 });
 
 test("統合 (dry-run 既定): 投稿せず、would の記録だけ残す", async () => {
@@ -121,18 +150,102 @@ test("統合 (ネガコン a/b/d): 拒否は投稿 0 回で、理由を counters
   }
 });
 
-test("ネガコン (c): 24 時間に 3 回投稿済みなら、4 回目は投稿せず limit を記録する", async () => {
-  const run = await intentRun({ LIVE_LAUNCH: "1" }, IMPL_BOT, GOOD, (store) => {
-    store.put("relaunch", "it:21", { posted: [T0 - 1 * H, T0 - 2 * H, T0 - 3 * H] });
+test("統合 (c 窓): 24 時間に 3 回投稿済みなら 4 回目は投稿せず limit を記録する。25 時間前の投稿は数えないので投稿する", async () => {
+  const limited = await intentRun({ LIVE_LAUNCH: "1" }, IMPL_BOT, GOOD, {
+    prep: (ctx) => ctx.store.put("relaunch", "it:21", { posted: [T0 - 1 * H, T0 - 2 * H, T0 - 3 * H] }),
   });
-  assert.equal(run.posts.length, 0);
-  assert.equal(run.counters.intentRejected?.limit, 1);
+  assert.equal(limited.posts.length, 0);
+  assert.equal(limited.counters.intentRejected?.limit, 1);
+  const window = await intentRun({ LIVE_LAUNCH: "1" }, IMPL_BOT, GOOD, {
+    prep: (ctx) => ctx.store.put("relaunch", "it:21", { posted: [T0 - 25 * H, T0 - 2 * H, T0 - 3 * H] }),
+  });
+  assert.equal(window.posts.length, 1);
 });
 
-test("統合 (c 窓): 25 時間前の投稿は数えないので投稿する", async () => {
-  const run = await intentRun({ LIVE_LAUNCH: "1" }, IMPL_BOT, GOOD, (store) => {
-    store.put("relaunch", "it:21", { posted: [T0 - 25 * H, T0 - 2 * H, T0 - 3 * H] });
+// 分類で投稿してはいけない 6 状態 (指摘 B1) と、oc:no-pr の上限・未観測の launch。いずれも投稿 0 回で、理由を数える。
+const negatives: Array<[string, string, Opts]> = [
+  ["needs-user-input", "user", { labels: ["needs-user-input"] }],
+  ["pm-apply", "user", { labels: ["pm-apply"] }],
+  ["oc:stuck", "user", { labels: ["oc:stuck"] }],
+  ["open PR 21-x (started)", "started", { pre: async (ctx) => assert.equal((await send(ctx.app, "pull_request", { ...prEv(91), pull_request: { ...prEv(91).pull_request, head: { ref: "21-x" } } })).status, 202) }],
+  [
+    "依存: #22 (open) (blocked)",
+    "blocked",
+    {
+      body: "依存: #22",
+      pre: async (ctx) => assert.equal((await send(ctx.app, "issues", issuePayload(22))).status, 202),
+    },
+  ],
+  ["oc:no-pr + 上限 (np=3・cooldown 後)", "stopped", { labels: ["oc:no-pr"], hours: 4, prep: (ctx) => ctx.store.put("relaunch", "np:21", { count: 3 }) }],
+  [
+    "launch 未観測 (failed)",
+    "stopped",
+    { prep: (ctx) => ctx.store.put("launchObs", "21", { state: "failed", at: at(0), changedAt: at(0) }) },
+  ],
+];
+
+for (const [name, reason, o] of negatives) {
+  test(`ネガコン (B1): ${name} は意図で /oc を投稿せず、理由 ${reason} を数える`, async () => {
+    const run = await intentRun({ LIVE_LAUNCH: "1" }, IMPL_BOT, GOOD, o);
+    assert.equal(run.posts.length, 0, name);
+    assert.equal(focusPosts(run.ctx).length, 0, name);
+    assert.equal(run.counters.intentRejected?.[reason], 1, name);
   });
-  assert.equal(run.posts.length, 1);
+}
+
+test("統合 (oc:no-pr の cooldown 中): 投稿せず、処理済みにもしない。cooldown が過ぎたら投稿する", async () => {
+  const ctx = await stopped({ LIVE_LAUNCH: "1" }, { labels: ["oc:no-pr"] });
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+  await tickNow(ctx);
+  assert.equal(postsTo(ctx, 21).length, 0);
+  assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "待ちは拒否として数えない");
+  ctx.clock.t += 2 * H; // 報告 (10:00) から 4 時間。既定の cooldown (3 時間) を過ぎる
+  await tickNow(ctx);
+  assert.equal(postsTo(ctx, 21).length, 1);
+  assert.equal(focusPosts(ctx).length, 1, "意図の本文 (focus 行) で投稿された");
 });
 
+test("統合 (picks との競合): 同じ tick で ready の issue に意図があれば、意図の投稿が focus 付きで入り、picks は投稿しない", async () => {
+  const ctx = await configuredApp({ env: { LIVE_LAUNCH: "1" }, handlers: writeHandlers });
+  assert.equal((await send(ctx.app, "issues", issuePayload(22))).status, 202);
+  const intent22 = '<!-- oc-pm-intent: relaunch issue=22 arts="fl-win64 plugins-ott" focus=3 -->';
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(22, IMPL_BOT, intent22, at(5)))).status, 202);
+  await tickNow(ctx);
+  const ps = postsTo(ctx, 22);
+  assert.equal(ps.length, 1);
+  assert.ok(String(ps[0].body.body).includes(FOCUS), "picks が先に投稿して、意図が focus なしで処理済みになることはない");
+});
+
+test("統合 (書き手の競合): 第三者の意図は、実装 App の意図の前後どちらに来ても置き換えない", async () => {
+  for (const order of [
+    [
+      [IMPL_BOT, GOOD],
+      [HUMAN, HUMAN_INTENT],
+    ],
+    [
+      [HUMAN, HUMAN_INTENT],
+      [IMPL_BOT, GOOD],
+    ],
+  ] as const) {
+    const ctx = await stopped({ LIVE_LAUNCH: "1" });
+    for (const [i, [who, marker]] of order.entries()) {
+      assert.equal((await send(ctx.app, "issue_comment", commentEv(21, who, marker, at(5 + i)))).status, 202);
+    }
+    await tickNow(ctx);
+    const ps = postsTo(ctx, 21);
+    assert.equal(ps.length, 1);
+    assert.ok(String(ps[0].body.body).includes("oc_artifacts: fl-win64 plugins-ott"), "実装 App の素材行で投稿する");
+    assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "第三者の意図は残らない (拒否として数えない)");
+  }
+});
+
+test("統合 (中断の引き継ぎ): 意図の投稿が 403 で止まったら、同じ tick の picks も投稿しない", async () => {
+  const deny: Handler = (c: Call) => (c.method === "POST" && /\/issues\/21\/comments$/.test(c.url) ? j({ message: "forbidden" }, 403) : undefined);
+  const ctx = await stopped({ LIVE_LAUNCH: "1" }, { handlers: [deny] });
+  assert.equal((await send(ctx.app, "issues", issuePayload(22))).status, 202);
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+  await tickNow(ctx);
+  assert.equal(postsTo(ctx, 21).length, 1, "意図は 1 回試す");
+  assert.equal(postsTo(ctx, 22).length, 0, "止まった後は picks も投稿しない");
+  assert.equal((ctx.app.engine.status() as any).counters.launched, 0);
+});

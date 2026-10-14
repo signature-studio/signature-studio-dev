@@ -211,7 +211,8 @@ function applyBotComment(s: PmState, p: Json, botLogin: string, pmLogins: string
       next = { ...next, pmArt: { ...next.pmArt, [k]: { at: c.created_at, line: m[0], ...id } } };
     }
   }
-  if (isBot) {
+  // 再投入の意図は bot の投稿でも botLast (停止報告の窓) を動かさない。意図の直後に窓が立つと、分類が 1.5 時間 recent になるため。
+  if (isBot && !RELAUNCH_RE.test(c.body ?? "")) {
     const prev = s.botLast[k];
     if (!prev || notOlder(prev, c)) {
       next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000), ...id } } };
@@ -273,10 +274,12 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
     if (reason) patch.outcome = { at, reason };
   }
   if ((pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body))) && later(cur?.pmAt)) patch.pmAt = at;
-  // 再投入の意図は issue のコメントだけ。書き手が実装 App でないものも残す (engine が author として拒否し、counters に記録する)。
+  // 再投入の意図は issue のコメントだけ。実装 App の意図は第三者の意図より優先する (第三者の後に来ても置き換えない)。
+  // 同じ区分の中では最新を残す。どの順に適用しても結果は同じ。第三者の意図も残す (engine が author として拒否し、counters に記録する)。
   const rel = !("pull_request" in i) ? parseRelaunchIntent(body) : null;
-  if (rel && (!cur?.relaunch || notOlder(cur.relaunch, c))) {
-    patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: login === botLogin, ...rel };
+  const impl = login === botLogin;
+  if (rel && (!cur?.relaunch || (impl && !cur.relaunch.bot) || (impl === cur.relaunch.bot && notOlder(cur.relaunch, c)))) {
+    patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: impl, ...rel };
   }
   if (login && !isBotUser(c.user) && later(cur?.userAt)) patch.userAt = at;
   return setSig(s, k, patch);
