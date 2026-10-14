@@ -97,6 +97,7 @@
 | `tools/flelift/REPORT.md` | ~155 | x64c を FLEngine 向けに汎用化 |
 | `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 |
 | `tools/flelift/boot/REPORT_APPENDIX_2700.md` | ~40 | FLE-8 (#2698) の詳細 (REPORT §9 から移動: E-1 工程の実測・E-2 検証)。FLE-9 の shard 化の実測は REPORT §9 |
+| `tools/flelift/boot/REPORT_APPENDIX_3090.md` | ~80 | FLE-12 (#3090) の詳細: 0x6a7b70 への dispatch の呼出元 (0x6c7923 ← 0x815920)・幅 r8 の源 (即値 2^20 由来の推定)・未修復の理由・0x15F34A0 書込み元の未了。REPORT §0 から参照 |
 | `tools/qfclift/REPORT.md` | ~100 | T-SH-12 (#154 部分達成): QuickFontCache_x64.dll の x64c lift (6,347 関数・unsup 0) + SSSE3 handler 注入 (pshufb/pmulhrsw/phaddw) + native-vs-wasm の SSSE3 spot diff。ILTools は `tools/iltools/REPORT.md` 参照。FruityPlug は未着手 |
 | `tools/iltools/REPORT.md` | ~36 | T-SH-12 (#154): ILTools_x64.dll の x64c lift 測定 (11,747 関数・unsup 1,236 は全て x87 → 未達)。x87 命令一式が x64c 未対応 |
 | `tools/fruityplug/REPORT.md` | ~60 | T-SH-12 (#154): SGv2 の win 対応の検証。classify.py の block24353 (FruityPlug_x64.dll 名) は VERSIONINFO で Maximus と判明し SGv2 の根拠にならない。export 名は 133 本で非一意。mac 素材との突合は未達 |
