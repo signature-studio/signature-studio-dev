@@ -47,7 +47,7 @@
 
 ## 5. 行列の実測 (2 回目 run, 2026-10-14) — §1 の未確認事項を解消
 
-測定 commit = `54bacdc0` (main)。測定に使った `tools/audio/{src,harness,test}`・`public/worklets` は同 commit と同一 (差分確認は §8)。
+測定 commit = `54bacdc0` (main)。測定に使った `tools/audio/{src,harness,test}`・`public/worklets` は同 commit から差分あり (§8 の 6 ファイル・26 行。clock_jump の取り込みによる)。Chrome 行列の再測定は §4 の未解決。
 再現: `bash tools/audio/build.sh` → `bash tools/audio/au2_matrix.sh 3` → `node tools/audio/au2_summary.mjs` (この run は 2181abc0 時点の `au2_matrix.sh` で実行。接続採取と NC の追加は §5-4 の再採取から)。
 環境: ubuntu runner (4 vCPU), `google-chrome 154.0.8037.97`, PulseAudio 16.1 (apt 導入, `module-null-sink sink_name=ci_null` を既定 sink)。
 生結果 `results/au2/{fake,null}_r{1,2,3}.json` (各 3 シナリオ)、`results/au2/null_soak600.json` (ソーク)。
@@ -146,7 +146,7 @@
 ```
 
 - 差分の由来: `429f36bd` (clock_jump の正/負成分の別計上, #1570) が `54bacdc0` の後に main に入った。本 PR (#2540) の変更ではない。よって §5 の Chrome 行列は、この 26 行を含まないコードで測った値である。取り込み後 HEAD での Chrome 行列の再測定は §4 の未解決。
-- 本 PR で追加した `harness/bidi.mjs`・`harness/au2.mjs` は Firefox 専用 (Chrome の `run.mjs` は使わない) なので、上の範囲には含めていない。Firefox 行列の測定 commit と差分は §9-1。
+- 本 PR で追加した `harness/bidi.mjs`・`harness/au2.mjs` は Firefox 専用 (Chrome の `run.mjs` は使わない) なので、上の範囲には含めていない。Firefox 行列の測定 commit と差分は §9 冒頭。
 
 ## 9. Firefox 行列 (AU-23 #2540・WebDriver BiDi)
 
@@ -177,7 +177,7 @@
 | AudioWorklet 内 `Atomics.wait(…, timeout 20 ms)` | `timed-out`、経過 20 ms (3/3) | **成り立たない**: Firefox は worklet での wait を止めず、実際にブロックする |
 | AudioWorklet 内 `Atomics.notify` | `function` (3/3) | 成り立つ |
 
-- `public/worklets/fl-audio-worklet.js` は wait を呼ばず notify のみ (3 箇所) を使う (ほかに `Atomics.load/store/add` を使う)。そのため shim の動作は、worklet 内 wait が Firefox で成り立つかに依らない。
+- `public/worklets/fl-audio-worklet.js` は `Atomics.wait` を呼ばず、`Atomics.notify` のほか `Atomics.load/store/add/compareExchange` を使う。そのため shim の動作は、worklet 内 wait が Firefox で成り立つかに依らない。
 - 行列の 6 run がすべて underrun 0 で通ったことも、worklet が Firefox で正常に動いている証跡になる。Chrome・Safari の worklet は Firefox 側の測定の範囲外。
 
 ### 9-3 ネガティブコントロール (各 n=1)
