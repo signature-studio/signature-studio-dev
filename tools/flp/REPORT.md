@@ -231,4 +231,6 @@
   0024:trace:msgbox:MSGBOX_OnInit L"The validity of the program could not be verified. Please reinstall it and try again."
   ```
   `FLEngine_x64.dll` のロード行は無い。
+- 注: 再測定 (`-all`) の起動ログは 4 行 (`rundll32.exe` 0xc0000135 と `X connection ... broken`) で、rc 124 は出ていない。rc 124 と WinVerifyTrust/MSGBOX は trace 付きの再実行 (上記) でのみ確認した。
+- 検証起点: 測定 commit `155382c8` (コード差分の最終 commit)。`git diff 155382c8 HEAD -- tools/flp/s1_wine_probe.sh tools/startup tools/assets` = 空 (差分 0)。`git diff b9de32d0 HEAD -- tools/flp tools/startup tools/assets` は `s1_wine_probe.sh` の 1 行 (`WORK`) と本 REPORT の差分のみ。
 - 未解決: G03 回避手段 (oracle 用ローカルパッチ or wine DLL override) / S2・S3 全部 → #113 に残す (Refs #113)。
