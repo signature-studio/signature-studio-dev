@@ -128,3 +128,14 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 
 - 受入条件のうち「`vmovsd` store が unimpl から消える」「B1 の方式を選び、共有鎖への影響を測定する」は**未達**。 本 run では実装しない (共有鎖の測定が 1 run に収まらない)。
 - 受入条件 4 (19252 の `function_180019c20` の分岐が spill 読み戻し値と一致) は、F-1 の経路が確定した時点で確認できる。 その確認は子 issue に含める。
+
+## F. [PLG-F3-11] #1581: movntps (非テンポラル store) の宛先復元 (D17)
+
+- 測定 commit: **f941654a** (HEAD、コード変更は `2e2f1dfe`)。 `engine_lift.sh 19048` / `19252` を単独実行 (`TMPDIR=$RUNNER_TEMP`、foreground)。
+- 変更前 (`2e2f1dfe` の直前の main、`engine_lift.sh` 単独実行): 19048 `unimpl 5` (`movntps`・`vcomisd`・`vcomisd__22`・`vucomisd`・`vucomiss`)、19252 `unimpl 5` (`movntps`・`vcomisd`・`vmovsd` store・`vucomisd`・`vucomiss`)。
+- 変更後 (f941654a): 19048 `unimpl 4` (`vcomisd`・`vcomisd__22`・`vucomisd`・`vucomiss`) / `emcc_c_rc 1 → fixcmp 後 0` / lift 50 s。 19252 `unimpl 4` (`vcomisd`・`vmovsd` store・`vucomisd`・`vucomiss`) / `emcc_c_rc 0` / lift 13 s。
+- 生成 helper C (`engine<B>/e_simd.c`) の `emcc -c -msimd128 -w -O0`: 19048 rc 0、19252 rc 0。
+- `movntps` 呼び出しの残数 (`e.final.ll`・`e.fixcmp.ll`・`e.lift.ll`): 両 engine とも 0 件。 `e.norm0.ll` (ir5_patch 前) は 19048 で 8 件。
+- 受入条件の判定: (1) `movntps` が unimpl に出ない → 達成。 (2) `emcc -c` rc 0 → 達成。 (3) 復元方式を DECISIONS に記録 → 達成 (D17)。
+- 残件 (本 issue 外): `vcomisd`・`vucomisd`・`vucomiss` は #1774 / #1582 (flag 反映)、`vmovsd` store は #2017。
+- 共有鎖 (`ir5_patch.py`) の変更。 `movntps` を含む他 plugin の出力への影響は **未測定**。 OTT の `tools/liftlib/work/ott_lift.ll` 等で 8 件ずつ出るため、liftlib e2e (`tools/liftlib/liftlib_e2e.sh`) での回帰確認が要る (本 run では素材不足で未実行)。
