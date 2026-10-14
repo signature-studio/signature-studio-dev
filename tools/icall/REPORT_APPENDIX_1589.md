@@ -69,9 +69,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 現 HEAD の `audit_icall.py` で 153 PE の before 監査を再実行し、`jt_dropped > 0` の件数を確定する (旧 audit の「0 件」の検証) | 受入条件 1 の判定と「0 件」結論の鮮度 | 子 issue (次 run) |
-| 走査 265 関数 / 288 site の定義を特定する (現 HEAD の走査は 250 / 267) | 走査数値の再現性 | 次 run で実施 |
-| plugins-ott / plugins-freshair の `jmp [mem]` 監査 (受入条件 1 の本体) | 受入条件 1 の未達 | 次 run で実施 (素材: `plugins-ott` / `plugins-freshair`) |
+| 現 HEAD の `audit_icall.py` で 153 PE の before 監査を再実行し、`jt_dropped > 0` の件数を確定する (旧 audit の「0 件」の検証)。走査 265 関数 / 288 site の定義を特定する (現 HEAD は 250 / 267) | 受入条件 1・3 の判定と数値の鮮度 | #2387 `[ICALL-74]` |
+| plugins-ott / plugins-freshair の `jmp [mem]` 監査 (受入条件 1 の本体) | 受入条件 1 の未達 | #2387 `[ICALL-74]` (素材: `plugins-ott` / `plugins-freshair`) |
 | block24412 の `dropped → kept_indirect` が RetDec の jmp 復元か rewrite 後の call の計数か未切り分け | 復元の実証 (本 PR は分類変化の記録止まり) | 次 run で実施 (after IR の命令種) |
 | block24356 の rewrite 後 `jt_dropped` 0 → 51 (前 run 実測) | `#1402` の cmp/je 展開の副作用の疑い | #1402 配下 |
 | indexed tail jump の `other_insn:ret` 9 site の意味 | 監査定義上は良性。未検証 | 次 run で実施 |
