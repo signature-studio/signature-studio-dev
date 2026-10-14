@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ld115_e2e.sh — #2447 (LD-115) 1 コマンド再現。666a60 のループの修復 (fix_ld115.py) を検証する。
-#   1/5 現行 ldfix (ldfix.py) を work/boot_final.prealloca.ll に掛けて修復前 IR を作る (本番 m11_gen_ir2.sh と同じ入力・同じ pass)。
+#   1/5 現行 ldfix (ldfix.py) → fix_ld108.py を work/boot_final.prealloca.ll に掛けて修復前 IR を作る (本番 m11_gen_ir2.sh と同じ順序・同じ pass)。
 #       修復前 IR から 2 版を作る: MID = 回数初期値だけ直す / POST = 回数初期値 + ループ内 store を直す
-#   2/5 3 版 (修復前 / MID / POST) それぞれで wasm を build (m11_build.sh。ir_conditions は ldfix=applied)
+#   2/5 3 版 (修復前 / MID / POST) それぞれで wasm を build (m11_build.sh。ir_conditions は ldfix=applied ld108=applied)
 #   3/5 666a60 を 3 版の wasm で直接呼ぶ (dyn_ld115.mjs。期待: 修復前は trap、MID は slot.f16 のみ FAIL、POST は全 PASS)
 #   4/5 survey 942 unit を修復前 / POST で測る
 #   5/5 unit 単位の突合 (ok 退行 0 であること)
@@ -27,8 +27,9 @@ restore() {
 }
 trap restore EXIT
 
-step "1/5 現行 ldfix (修復前) と修復版 IR"
-"$PY" "$M11/ldfix/ldfix.py" "$W/boot_final.prealloca.ll" "$OUT/pre.ll" --pe "$PE_QS" --report "$OUT/ldfix_report.json" || exit 1
+step "1/5 現行 ldfix → fix_ld108 (修復前) と修復版 IR"
+"$PY" "$M11/ldfix/ldfix.py" "$W/boot_final.prealloca.ll" "$OUT/ldfix.ll" --pe "$PE_QS" --report "$OUT/ldfix_report.json" || exit 1
+"$PY" "$M11/ldfix/fix_ld108.py" "$OUT/ldfix.ll" "$OUT/pre.ll" || exit 1
 "$PY" "$HERE/fix_ld115.py" "$OUT/pre.ll" "$OUT/mid.ll" --only count || exit 1
 "$PY" "$HERE/fix_ld115.py" "$OUT/pre.ll" "$OUT/post.ll" || exit 1
 for k in mid post; do diff "$OUT/pre.ll" "$OUT/$k.ll" > "$OUT/ir_$k.diff"; echo "[ld115_e2e] $k の IR diff 行数: $(wc -l < "$OUT/ir_$k.diff")"; done
@@ -37,7 +38,7 @@ step "2/5 wasm build (修復前 → $OUT/pre, 中間 → $OUT/mid, 修復後 →
 cd "$M11" || exit 1
 for k in pre mid post; do
   cp "$OUT/$k.ll" "$W/boot_final.ll"
-  python3 m11_cond.py --reset ldfix=applied pe="$PE_QS" && python3 m11_cond.py --bind "$W/boot_final.ll" || exit 1
+  python3 m11_cond.py --reset ldfix=applied ld108=applied pe="$PE_QS" && python3 m11_cond.py --bind "$W/boot_final.ll" || exit 1
   rm -f "$W/obj/boot.o"
   timeout 1500 bash m11_build.sh > "$OUT/build_$k.log" 2>&1 || { echo "build 失敗: $OUT/build_$k.log"; exit 1; }
   cp "$W/m11_boot.cjs" "$OUT/$k/m11_boot.cjs"; cp "$W/m11_boot.cjs.wasm" "$OUT/$k/m11_boot.cjs.wasm"
