@@ -100,7 +100,7 @@ dec_label_pc_8c5ef5_g699_t:
 
 ## 8. 検証の鮮度
 
-- 測定 commit: `26f90ada`。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。検証 HEAD は `aef55706660507c66223286c12e0a222a8f5db69` (差し戻し round 2 の検証対象)。差分の確認は `git diff 26f90ada aef55706660507c66223286c12e0a222a8f5db69 -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行)。以後の commit は文言だけで、そのコード差分も 0 行。最終 HEAD の hash は PR 本文に書く。
+- 測定 commit: `26f90ada` (コードを変えた最後の commit)。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。差分の確認は `git diff 26f90ada HEAD -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行)。REPORT は自身の commit の hash を書けないため HEAD で書き、検証した HEAD の hash は PR 本文の『検証』に書く。
 - コミット済み HEAD `acc12101` で、IR を元に戻したうえで `build.sh --trace --soft` と `t27_relink.sh` (`locale0`) を再実行し、§3 の baseline (`units_run=17`) と対照 (`units_run=53`・`threw=unreachable`・`total_calls=173`) が再現することを確認した。以後の commit は REPORT の文言だけを変えている。
 - `work-m11` の IR は stale。本 REPORT の IR は §2 の手順で作り直したもので、指紋の出自は未検証。
 
