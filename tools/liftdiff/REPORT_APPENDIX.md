@@ -312,7 +312,9 @@ flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無
 ### 12.1.1 LD-48 (#1398): VMT slot への仮 proc 番地配置 (部分達成)
 
 - 実装 (review 1744 対応後): `rt/ld_core.h` の VMT 用仮 proc は静的 index 域 `LD_VMT_IDX0 (256)..263` (`?vmslot0..7`) に置く。`ld_nfakeproc` は増やさない (GetProcAddress 側の index 0..255 は不変)。`ld_fakeproc_valid` / `ld_fakeproc_name` が域を判定し、`fle_ldbridge.c` の `ott_dispatch` は両域を解決する。`ld_snapshot` 前の `ld_fakeproc_vmt_init` が番地式 `LD_FAKEPROC_BASE+i*SZ` の不一致を abort で検出する。仮 proc 上限超過も abort (旧: 0x50010000 を無言で返し proc 0 と衝突)。`ldlib/cases.py` `make_blob_vm` は VMT slot k に `0x50010000+(256+k)*32` を書く。
-- **未測定**: 修正後の base/新 sample:800 と `tests/fvm_transitions.py` は、この run で素材 (`work-m11`・`work-m6-ott`・`work-liftdiff`) が取得できず未実施。`$ARTIFACTS_DIR` には `fl-win64` のみ。既存 pattern の増減 0 は未確認。
+- **未測定 (現 head)**: 修正後の base/新 sample:800 と `tests/fvm_transitions.py` は、fix run で素材 (`work-m11`・`work-liftdiff`・`toolchain-emsdk`) が取得できず未実施。`$ARTIFACTS_DIR` には `fl-win64` のみ・`tools/m11/work`・`tools/liftdiff/work` は無く、手元で再生成もできない。既存 pattern の増減 0 は**未確認**。
+- **測定 commit と差分の証跡**: 修正後コードの測定 commit は未確定 (測定が無い)。`git diff 8ac5b169 HEAD -- tools/liftdiff` は 4 files・28+/20- で差分 0 ではない (`rt/ld_core.h`・`rt/fle_ldbridge.c`・`ldlib/cases.py`・本 REPORT_APPENDIX)。よって `docs/WORKFLOW.md` §6 により現 head での再測定が必要。
+- 検証 (fix run・この run で実施): `gcc -fsyntax-only -Wall -Wno-unused-function rt/ld_native.c` rc 0 / `python3 -m py_compile ldlib/cases.py` OK / `python3 tests/test_compare_ld11.py` 23 tests OK。`main` (59f0a5f9) を merge 済み (競合なし)。
 - 以下の実測値 (sample:800・fvm 件数・既存 pattern の遷移) は **修正前** の commit `8ac5b169` のもの (base = origin/main 025bdd8a)。現コードの値ではない。`liftdiff_e2e.sh --m11-only` は `8ac5b169` で rc 0・`LIFTDIFF_E2E PASS` (3 分 12 秒・4 vCPU・load 0.99→6.18)。
 - sample:800 (同一 worktree で base / 新を連続実測・`--shards 12 --state auto`): base 361 / 229 / 210、新 361 / 232 / 207。
 - fvm の件数: 427 件 = native_fault 182 / both_fault 244 / hang 1。**equal / diff / wasm_trap は 0 件** (受入条件 (2) 未達)。native は `rip=0xb` で segv し、VMT slot の仮 proc まで到達していない (引数値を関数ポインタとして呼ぶ経路)。
