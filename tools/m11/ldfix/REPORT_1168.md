@@ -68,13 +68,13 @@ e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、foreground、31 秒、emcc rc=0。�
 
 測定 commit: `7fc1088f` (origin/main)。以降のコード差分は `tools/m11/ldfix/survey_d17_multiload.py` の追加 (`git diff --stat 7fc1088f 8186adf3 -- tools/m11`: 1 file, +128)。
 
-- 素材: `work-m11` を `tools/m11/work/` に展開。`toolchain-emsdk` は `/opt/emsdk`。
-- e2e: `bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、31.5 秒、emcc rc=0)。数値は §4 と同一 (store CC 86→53 site、49→28 関数)。
+- 素材: `[WORK-M11]` を `tools/m11/work/` に展開。ツールチェーンは `[EMSDK]` (`docs/REFERENCES.md`)。
+- e2e: `bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、emcc rc=0)。測定値は §4 を参照。
 
 調査 (`survey_d17_multiload.py`、foreground、rc=0): 複数 load の K 組 32 のうち、dec_label_pc ブロック単位で「IR の K 読み出し本数 = 機械語の rip セル → deref 連鎖の本数」が一致したのは **8 組**。
 - 不一致 24 組の例: `100a3d0` K=`11e35c8` IR 5 / 機械 8、`128f9e0` K=`11e26a0` IR 14 / 機械 5、`ff63f0` K=`11e14a0` IR 15 / 機械 16。
 - ブロック一致 8 組 (`126bdb0`/`11e3550`、`128ade0`/`11e0390` など) も、同一ブロック内の load の順序は本数だけでは決まらない。
 
-結論: 機械語 site と IR load の 1:1 対応は、本数・型・ブロックのどれでも安全に決められない。誤った load を `%cellp` 経由に書き換えると silent miscompile になるため、規則は入れていない。受入条件 1 (1:1 規則の実装)・3 (ネガコン) は未達。受入条件 2 (store 宛 CELL_COLLAPSED の減少) も、本 run の修復 pass は単一 load 規則のみのため、残 53 site のまま。
+結論: 機械語 site と IR load の 1:1 対応は、本数・型・ブロックのどれでも安全に決められない。誤った load を `%cellp` 経由に書き換えると silent miscompile になるため、規則は入れていない。受入条件 1 (1:1 規則の実装)・3 (ネガコン) は未達。受入条件 2 (store 宛 CELL_COLLAPSED の減少) も、本 run の修復 pass は単一 load 規則のみのため、§4 の残 site 数のまま。
 
 次の作業 (#1375 で継続): 機械語側で rip セル → レジスタ → 後続 store/load の値の流れを命令単位で追う (`ldmach.py` 系の既存追跡を流用できるか要調査)。結べた load だけを修復し、結べない site 数を報告する。
