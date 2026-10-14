@@ -12,7 +12,8 @@
 - 集計 (7/7): spill 宛 unk site 178 / 71 関数。status 確定 123 (前 120) / 判定不能 29 (前 30) / 未判定 26 (前 28)
 - 脱落関数の和集合: spill 宛の確定 TRUE_DROP 関数 24 (前 23)。増分は `12cb680`。A ∪ B ∪ C = 69 + 6 = **75** (前 74)
 - 測定後の差分: `git diff ff010340 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)
-- 差し戻し後の修正 (文書のみ): REPORT の文言と PR 本文だけを変えた。コードと results は変えていない。e2e は再実行していない (修正 run では `work-m11` / `work-liftdiff` が `$ARTIFACTS_DIR` に無かった)
+- 差し戻し後の修正 (文書のみ): REPORT の文言と PR 本文だけを変えた。コードと results は変えていない (`git diff ff010340 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし)
+- 差し戻し後の e2e 再実行: `bd643abf` を `git archive` で repo 外に書き出し、素材 (`work-m11` / `work-liftdiff`) も repo 外に展開して `M11_WORK` / `LD_WORK` で指定した。`audit_lsf_ssa_e2e.sh` を foreground で実行: rc=0・real 157s・load average 0.48 → 0.96・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` は results/ と cmp 一致。集計も下の値と一致
 
 ## 2. 判定結果 (12cb680 の 3 site)
 
@@ -28,10 +29,18 @@
 
 - 関数 `12cb680` は `arg1` (rcx 入力) をコールバックのアドレスとして `call qword ptr [rbp+0x70]` で呼ぶ (機械語に 11 本)。IR (`boot_final3.ll` 85713–86490) の直接 call は 47 本だけで、間接 call も `%arg1` の参照も無い。spill の store と消費者の call は IR に無い。
 - 直接呼び出し元 (機械語) は 3 つ: `0x1003730`・`0x12a3ff0`・`0x13111a0`。IR の直接 call (`boot_final3.ll` 430・78322・100762 行) と一致する。既知の先 (rcx の定数) は次の 3 つ。
-  - `0x10036b0`: 先頭で `mov eax,[rcx+4]` (無条件に s.b を読む)
-  - `0x12a3ec0`: 先頭で `mov eax,[rbx+4]` (無条件に読む)。`0x12a3ff0` から呼ばれる (`candidate_verdicts_2922.jsonl` の evidence)
-  - `0x12ca330`: `12ca408` で `mov eax,[rbx+4]` (条件付きの経路で読む)
-- 呼び出し元と先の対応: 記録があるのは `0x12a3ff0` → `0x12a3ec0` のみ。`0x1003730` → `0x10036b0` と `0x13111a0` → `0x12ca330` は記録が無く、本 REPORT では確定しない (この修正 run では work-m11 が無く再照合できていない)。判定は先の読みだけで決まり、対応には依らない。
+  - `0x10036b0`: 先頭 (`0x10036b0`) で `mov eax,[rcx+4]` (無条件に s.b を読む)
+  - `0x12a3ec0`: `mov rbx,rcx` (`0x12a3ecd`) の直後の `0x12a3ed3` で `mov eax,[rbx+4]` (無条件に読む)
+  - `0x12ca330`: `0x12ca408` で `mov eax,[rbx+4]`。直前の `0x12ca406` の `je` を通らない条件付きの経路で読む
+- 呼び出し元と先の対応 (`m11_image.bin` を capstone で逆アセンブルし、`lea rcx,[rip+disp]` の解決先を確認。IMG_BASE `0x400000`):
+
+  | 呼び出し元 | `lea rcx` | `call 0x12cb680` | 先 (rcx) |
+  |---|---|---|---|
+  | `0x1003730` | `0x1003850` | `0x1003859` | `0x10036b0` |
+  | `0x12a3ff0` | `0x12a4290` | `0x12a429a` | `0x12a3ec0` |
+  | `0x13111a0` | `0x1311358` | `0x1311361` | `0x12ca330` |
+
+  判定は先の読みだけで決まり、対応には依らない。
 - 判定の基準: 既知の 3 先のうち 1 本以上で `[rcx+4]` (= s.b) の消費者が機械語に存在すること。IR の `12cb680` には間接 call が 1 本も無いため、spill の store と消費者の call が IR で落ちている。
 - 判定の基準の外: IR の `m11_tr_function_12cb680` (`boot_final3.ll` 499835 付近) は `%a0` を callee に渡す ABI 殻で、外部から任意の関数ポインタを受ける。その動的な先の全数は判定の前提に含めない。その先が実行時に到達するか、`[rcx+4]` を読まないかも判定していない。
 - 書き戻し `[rbx]` / `[rdi]` (`12cb908`・`12cba78`・`12cbad2`) の IR 対応は、spill の判定には使っていない (消費者の有無だけで判定した)。`12cb8e1` が判定不能だった理由 (REPORT_2245 §2) は、この書き戻しの要否だった。
@@ -41,7 +50,6 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `m11_tr_function_12cb680` の `%a0` 経路 (外部から渡される任意の関数ポインタ) の先 | 判定の基準の外 (既知 3 先の 1 本で判定が立つ)。その先が実行時に到達するか、`[rcx+4]` を読まないかは未確認 | PM (判定範囲の確認) |
-| 直接呼び出し元 `0x1003730`・`0x13111a0` と先 `0x10036b0`・`0x12ca330` の対応 | 判定には不要。§3 の対応のうち 2 組が未記録 | PM (追跡のみ) |
 | `12cb680` の間接 call 11 本 (`call [rbp+0x70]`) が IR に 0 本。関数内の他の store/load も同じ脱落か | 脱落関数の和集合 75 の類型 | PM (`docs/DEFECTS.md` 類型の判断) |
 | 書き戻し `[rbx]`・`[rdi]` (`12cb908`・`12cba78`・`12cbad2`) の IR 対応 | spill の判定とは別の store 脱落の有無 | PM (判定の要否) |
 
