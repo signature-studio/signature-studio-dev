@@ -51,11 +51,11 @@
 
 ## 検証
 
-測定 commit: 本 PR の最初の commit (`probe` と本 REPORT を含む)。以後の commit はこの REPORT の表の文言だけを変える。
+測定 commit: `2ecab288` (probe と本 REPORT を含む。コードを変えた最後の commit)。以後の commit は本 REPORT の文言だけを変える。`git diff 2ecab288 HEAD -- tools/python/analysis/flapi/pe_flrack_rack_probe.py` の出力は 0 行。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_flrack_rack_probe.py` | rc 0・`loop_starter_config` の行 `0x1513d58`・表 14 行 | 測定値は PR 本文に記載 |
+| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_flrack_rack_probe.py` (`2ecab288`) | rc 0・出力 15 行 (見出し 1 + 表 14 行)・`loop_starter_config` の行 `0x1513d58` | 0.382 秒 (user 0.372 秒・1 分 load 0.17) |
 | `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_xref.py 1513d58,1513e48` (参照元確認) | `0xd33ded`・`0xd3667f` の 2 件 | 62 秒 (前述) |
 
 ## 再現
