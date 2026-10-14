@@ -121,7 +121,7 @@ ff8b60	ff8c63	manual	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x30],
 1046a30	1047208	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x378], rax
 1046a30	10472ea	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x560], eax
 1046a30	1047556	cand	UNDETERMINED	判定不能	CELL_DEEP	mov qword ptr [rbp + 0x520], rax
-1046a30	10479c7	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x5b8], eax
+1046a30	10479c7	cand	UNDETERMINED	判定不能	-	mov dword ptr [rbp + 0x5b8], eax
 1046a30	104a9f6	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x320], rax
 1046a30	104c3f0	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x5b8], eax
 1046a30	104c56d	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x5b8], eax
