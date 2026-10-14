@@ -199,7 +199,7 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 
 ## 12. 実値採取の再試行 (#1426, 2026-10-14, n=1)
 
-測定 commit `cb3a89a6` (origin/main, 本 PR の作業ベース。コード変更なし)。`git diff cb3a89a6 HEAD -- tools/m11` は本節の追記のみ。素材は `$RUNNER_TEMP/fl-win64`・`tools/m11/work/` (work-m11)・`$RUNNER_TEMP/retdec`・`$RUNNER_TEMP/emsdk` に展開 (`/opt/emsdk`・`/opt/retdec` は既存)。`FL_WIN64_DIR` 指定。`M11_FIX_535BF2` 既定 0 (OFF)。load average は開始時 0.66。
+測定 commit `cb3a89a6` (origin/main, 本 PR の作業ベース。コード変更なし)。`git diff cb3a89a6 HEAD -- tools/m11` は本節の追記のみ。素材は `$RUNNER_TEMP/fl-win64`・`tools/m11/work/` (work-m11)・`$RUNNER_TEMP/retdec`・`$RUNNER_TEMP/emsdk` に展開 ([EMSDK]・[RETDEC] は既存)。`FL_WIN64_DIR` 指定。`M11_FIX_535BF2` 既定 0 (OFF)。load average は開始時 0.66。
 
 | 工程 | 結果 | 所要 |
 |---|---|---|
@@ -217,7 +217,7 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 | probe 後の復元 → 通常 build survey | ok 870 / trap 24 / noproc 1 / miss 47、check_682 2/5 (§10 と一致) | - | 14.4 秒 |
 
 - 復元 (`probe_entry.sh` の trap restore) で通常 build の判定は元に戻った。probe 版の結果は本判定に使わない。
-- 含意: 入口 dump の `call` を挿入すると、304・923 の OOB は trap でなく別経路 (halt0) に変わる。§11 の「挙動が変わる」は、この unit では trap 自体が消えることを意味する。OOB 直前の値を入口 dump で採る方式は、この 2 unit では使えない。
+- 含意: 入口 dump の `call` を挿入すると、304・923 の OOB は trap でなく別経路 (halt0) に変わる。§11 の「probe の挿入が OOB の挙動を変える」は、この unit では trap 自体が消えることを意味する。OOB 直前の値を入口 dump で採る方式は、この 2 unit では使えない。
 - `m11_survey.mjs` は wasm の関数 local を出さないため、trap 時点の `tbl`・`cnt`・`obj` の値はこの手段では読めない (§11 と同じ結論)。
 
 ### 判定 (本 run)
