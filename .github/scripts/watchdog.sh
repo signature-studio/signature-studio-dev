@@ -43,6 +43,14 @@
 #   fresh が true で last_tick が 5 分以内なら、open の障害 issue にコメントして close する。
 #   ファイルが無い・取得失敗・JSON 不正は警告だけ出して何もしない (終了コードは変えない)。OC_WORKER_URL_FILE で URL のファイルを差し替えられる (テスト用)。
 #
+# 暫定の oc-pm 起動 (#CI-50): Worker が live になるまで、PM agent の判断待ちの対象を repository_dispatch (oc-pm) で起動する。
+#   stuck : oc:stuck の PR で、最新の oc-fix-limit コメント (実装 App の投稿) に、当該 PR の oc-pm-intent: stuck がある (fix-progress.sh の停止印)
+#   no_pr : oc:no-pr の open issue で、最後の oc-run-outcome の reason が split か stop (pm-apply・needs-user-input の付いた issue は除く)
+#   送るのは kind と ref の 2 つだけ。送る前に対象へ <!-- oc-pm-dispatch:<ref> ts=... --> を残す (残せなければ送らない)。
+#   上限は 1 回の点検で 3 件、1 時間に 12 件、同じ ref に 24 時間で 3 件 (記録のコメントを数える。記録は REVIEWER_LOGIN の Bot だけ数える)。
+#   Worker の /status が mode=live かつ fresh=true なら送らない。/status が取れないときは live でないとみなして送る。
+#   記録の一覧が読めないときは送らない (fail-closed)。DRY=1 は計画だけ表示する。
+#
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
 #             RUNS_TOKEN (actions:read。省略時は GH_TOKEN), DRY=1 で操作せず計画だけ表示
 set -uo pipefail
@@ -51,6 +59,7 @@ set -uo pipefail
 R="$OC_REPO"
 DRY="${DRY:-0}"
 REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
+IMPLEMENTER_LOGIN="${OC_IMPLEMENTER_LOGIN:-opencode-for-signature-studio[bot]}"
 SETTLE_MIN="${OC_SETTLE_MINUTES:-4}"
 MAX_ACTIONS="${OC_MAX_ACTIONS:-12}"
 WD_MAX="${OC_WATCHDOG_MAX:-6}"
@@ -141,6 +150,7 @@ WORKER_REOPEN_SEC=86400
 WORKER_NOTE_MIN="${OC_WORKER_NOTE_MIN:-60}" # 既存の障害 issue への追記の最小間隔 (5 分ごとの点検でコメントを水増ししない)
 WORKER_TITLE_LIMIT=3000 # [CI-n] の採番に読む題名の件数 (gh の既定値では足りない)。これに達したら一覧が欠けうるので起票しない
 worker_line="worker=unknown"
+worker_status_json=""
 worker_open_issues() { # open で pm-worker-down ラベルの issue を「番号 作成時刻」で新しい順に出す。一覧が取れなければ失敗 (REST の一覧は PR だけを返す場合があるため gh issue list を使う)
   local raw
   raw="$(gh issue list --repo "$R" --state open --label "$WORKER_LABEL" --limit 200 --json number,createdAt,closedAt)" || return 1
@@ -259,6 +269,7 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
     worker_line="worker=skipped (bad status json)"
     return 0
   fi
+  worker_status_json="$body"
   cfg="$(jq -r .configured <<< "$body")"
   inst="$(jq -r .installed <<< "$body")"
   fresh="$(jq -r .fresh <<< "$body")"
@@ -525,6 +536,99 @@ echo "$stuck_line"
 worker_check
 echo "$worker_line"
 
+# --- 暫定の oc-pm 起動 (#CI-50)。判定と上限は冒頭の説明を正とする ---
+PM_PASS_MAX=3
+PM_HOUR_MAX=12
+PM_REF_DAY_MAX=3
+pm_dispatch() { # pm_dispatch <kind> <ref>: 記録のコメントを残してから oc-pm を送る。記録できなければ送らない (payload は kind と ref だけ)
+  local ts
+  ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  gh issue comment "$2" --repo "$R" --body "[watchdog] PM agent (oc-pm, kind=$1) を起動します。<!-- oc-pm-dispatch:$2 ts=$ts -->" > /dev/null || return 1
+  gh api -X POST "repos/$R/dispatches" -f event_type=oc-pm -F "client_payload[kind]=$1" -F "client_payload[ref]=$2" > /dev/null
+}
+pm_line="oc-pm sent=0"
+pm_cands=()
+if [ -n "$worker_status_json" ] && jq -e '.mode == "live" and .fresh == true' <<< "$worker_status_json" > /dev/null 2>&1; then
+  pm_line="oc-pm sent=0 (PM Worker is live and fresh; no dispatch)"
+else
+  for sn in $(jq -r '.[]' <<< "$stuck_nums"); do
+    if ! cm="$(gh api --paginate "repos/$R/issues/$sn/comments")"; then
+      echo "#$sn oc-pm: failed to read comments (not a candidate this pass)"
+      continue
+    fi
+    # 停止印は fix-progress.sh record が実装 App のトークンで書く (投稿者は実装 App)。intent は当該 PR の pr= のものだけ数える。
+    fixl="$(jq -s -r --arg who "$IMPLEMENTER_LOGIN" '[.[][] | select(.user.login == $who and .user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-limit -->")))] | last | .body // ""' <<< "$cm")"
+    if printf '%s' "$fixl" | grep -Eq "oc-pm-intent: stuck pr=${sn}([^0-9]|\$)"; then
+      pm_cands+=("stuck $sn")
+    fi
+  done
+  if nopr_raw="$(gh issue list --repo "$R" --state open --label oc:no-pr --limit 200 --json number,labels)"; then
+    [ "$(jq length <<< "$nopr_raw")" -ge 200 ] && echo "::warning::oc:no-pr list reached the limit (200); the rest are not checked this pass"
+    for n in $(jq -r '.[] | select(([.labels[].name] | any(. == "pm-apply" or . == "needs-user-input")) | not) | .number' <<< "$nopr_raw"); do
+      if ! cm="$(gh api --paginate "repos/$R/issues/$n/comments")"; then
+        echo "#$n oc-pm: failed to read comments (not a candidate this pass)"
+        continue
+      fi
+      outcome="$(jq -s -r '[.[][] | select(.user.type == "Bot" and ((.body // "") | contains("<!-- oc-run-outcome:")))] | last | .body // ""' <<< "$cm")"
+      reason="$(printf '%s' "$outcome" | grep -oE 'oc-run-outcome: no-pr reason=[a-z_]+' | head -n 1 | sed 's/.*reason=//')"
+      case "$reason" in
+        split | stop) pm_cands+=("no_pr $n") ;;
+      esac
+    done
+  else
+    echo "::warning::failed to list oc:no-pr issues; no no_pr dispatch this pass"
+  fi
+  if [ "${#pm_cands[@]}" -eq 0 ]; then
+    pm_line="oc-pm candidates=0 sent=0"
+  else
+    # 記録 (REVIEWER_LOGIN の Bot が残した oc-pm-dispatch) を 24 時間ぶん 1 回で読み、1 時間の件数と ref ごとの件数を数える。
+    since="$(date -u -d "@$((now - 86400))" +%Y-%m-%dT%H:%M:%SZ)"
+    pm_verb=sent
+    [ "$DRY" = 1 ] && pm_verb=planned
+    if ! ledger="$(gh api -X GET "repos/$R/issues/comments" -f since="$since" -f per_page=100 --paginate)" ||
+      ! records="$(jq -s -r --arg who "$REVIEWER_LOGIN" '[.[][] | select(.user.login == $who and .user.type == "Bot") | (.body // "") | scan("<!-- oc-pm-dispatch:([0-9]{1,7}) ts=([^ ]+) -->")] | .[] | "\(.[0]) \(.[1])"' <<< "$ledger")"; then
+      echo "::warning::failed to read the oc-pm dispatch records; no dispatch this pass"
+      pm_line="oc-pm candidates=${#pm_cands[@]} $pm_verb=0 (dispatch records unreadable)"
+    else
+      pm_hour=0
+      declare -A pm_day=()
+      while read -r ref_s ts_m; do
+        [ -n "$ref_s" ] || continue
+        ts_s="$(date -u -d "$ts_m" +%s 2> /dev/null)" || ts_s="$now"
+        age_s=$((now - ts_s))
+        [ "$age_s" -lt 3600 ] && pm_hour=$((pm_hour + 1))
+        [ "$age_s" -lt 86400 ] && pm_day[$ref_s]=$((${pm_day[$ref_s]:-0} + 1))
+      done <<< "$records"
+      pm_sent=0 pm_deferred=0 pm_skipped=0
+      for c in "${pm_cands[@]}"; do
+        kind="${c% *}" ref="${c#* }"
+        if [ "$pm_sent" -ge "$PM_PASS_MAX" ]; then
+          echo "oc-pm: $kind #$ref deferred (reached $PM_PASS_MAX in this pass)"
+          pm_deferred=$((pm_deferred + 1))
+          continue
+        fi
+        if [ "$pm_hour" -ge "$PM_HOUR_MAX" ]; then
+          echo "oc-pm: $kind #$ref deferred (reached $PM_HOUR_MAX in the last hour)"
+          pm_deferred=$((pm_deferred + 1))
+          continue
+        fi
+        if [ "${pm_day[$ref]:-0}" -ge "$PM_REF_DAY_MAX" ]; then
+          echo "oc-pm: $kind #$ref skipped (dispatched ${pm_day[$ref]} times in the last 24h)"
+          pm_skipped=$((pm_skipped + 1))
+          continue
+        fi
+        # 記録の後で送る。送信が失敗しても件数には数える (記録は残っているかもしれないため、上限は多めに数える)。
+        do_it "dispatch oc-pm kind=$kind for #$ref" pm_dispatch "$kind" "$ref"
+        pm_sent=$((pm_sent + 1))
+        pm_hour=$((pm_hour + 1))
+        pm_day[$ref]=$((${pm_day[$ref]:-0} + 1))
+      done
+      pm_line="oc-pm candidates=${#pm_cands[@]} $pm_verb=$pm_sent deferred=$pm_deferred skipped=$pm_skipped"
+    fi
+  fi
+fi
+echo "$pm_line"
+
 echo "open=$total covered(REVIEWING/FIXING)=$covered_n idle=$((total - covered_n)) acted=$acted deferred=$deferred"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
@@ -537,6 +641,8 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo "$floating_line"
     echo
     echo "$worker_line"
+    echo
+    echo "$pm_line"
     echo
     printf '%s' "$summary"
   } >> "$GITHUB_STEP_SUMMARY"

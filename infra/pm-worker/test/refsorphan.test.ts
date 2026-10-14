@@ -148,7 +148,7 @@ test("ネガコン (g): dry-run では fetch の POST が 0 回。/status の wo
   assert.equal(s.pm_detected.refs_orphan, 1);
 });
 
-test("REST (全体同期) の closed + merged の項目でも refsOnly が立つ。closed で merge されていない項目は立たない", async () => {
+test("REST (全体同期) の closed + merged の項目でも refsOnlyNums が立つ。closed で merge されていない項目は立たない", async () => {
   const rest = (c: Call) => {
     const u = new URL(c.url);
     if (u.pathname.endsWith("/pulls")) {
@@ -160,8 +160,8 @@ test("REST (全体同期) の closed + merged の項目でも refsOnly が立つ
   };
   const ctx = await configuredApp({ handlers: [rest] });
   await ctx.app.engine.fullSync(await (ctx.app.engine as any).d.gh());
-  assert.deepEqual(ctx.app.engine.s.prs["10"].refsOnly, [100]);
-  assert.equal(ctx.app.engine.s.prs["11"].refsOnly, undefined, "merge されていない closed は本文を残さない");
+  assert.deepEqual(ctx.app.engine.s.prs["10"].refsOnlyNums, [100]);
+  assert.equal(ctx.app.engine.s.prs["11"].refsOnlyNums, undefined, "merge されていない closed は本文を残さない");
   assert.deepEqual(targets(ctx), ["refs_orphan#100"]);
 });
 

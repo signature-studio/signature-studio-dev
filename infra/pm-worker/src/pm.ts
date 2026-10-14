@@ -1,7 +1,7 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
 // 検出に LLM は使わない。自由文は解析しない: ラベル・マーカー・番号の正規表現だけ (needs.ts・refs.ts)。issue / PR の自由文は payload に入れない。
 import { parentNumbers } from "./refs.ts";
-import { NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
+import { ASSOC_OK, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 
 // repository_dispatch の event_type "oc-pm" の kind (列挙 9 値)。prepare-event-context.sh の許可リストと同じ。
 export const PM_KINDS = ["stuck", "no_pr", "refs_orphan", "needs_decision", "stopped_report", "user_answered", "supply", "digest", "retro"] as const;
@@ -14,6 +14,8 @@ export type DetectedKind = (typeof DETECTED_KINDS)[number];
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
+// PM の判断待ちの印 (/status の集計だけに使う。検出の対象ではない)。
+export const NEEDS_PM_LABEL = "needs-pm";
 // 実装 agent が着手しても PR を出さない/出せない issue (pm-apply は PM が PAT で適用する workflow 変更、needs-user-input は依頼者待ち)。
 // no_pr の検出・再投入の対象から除く。
 export const HOLD_LABELS = ["pm-apply", "needs-user-input"];
@@ -38,8 +40,6 @@ export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 12, d
 export const KIND_LIMITS: Partial<Record<DetectedKind, { dupMs: number; dayMax: number }>> = {
   refs_orphan: { dupMs: 24 * 3_600_000, dayMax: 10 },
 };
-
-const ASSOC_OK = ["MEMBER", "OWNER", "COLLABORATOR"];
 
 // 対象の起票者が MEMBER / OWNER / COLLABORATOR か許可 bot か。未設定 (古い保存値) は許可しない。
 export function authorAllowed(x: { author?: string; authorType?: string; assoc?: string }, bots: string[]): boolean {
@@ -96,8 +96,8 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
   for (const i of Object.values(s.issues)) if (i.state === "open") for (const n of parentNumbers(i.body)) parents.add(n);
   const orphans = new Set<number>();
   for (const p of Object.values(s.prs)) {
-    if (!p.merged || !p.refsOnly?.length) continue;
-    for (const n of p.refsOnly) {
+    if (!p.merged || !p.refsOnlyNums?.length) continue;
+    for (const n of p.refsOnlyNums) {
       const parent = s.issues[String(n)];
       if (orphans.has(n) || !parent || parent.state !== "open" || parents.has(n) || !authorAllowed(parent, o.bots)) continue;
       orphans.add(n);
