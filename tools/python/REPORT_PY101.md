@@ -13,7 +13,7 @@
 
 - 測定 commit: `c5602929` (main (`94b6c6bd`) の取り込みの merge commit。コードを変えた最後の commit)。
 - コード範囲 `tools/python/{host,provider,tests}` の `git diff c5602929 HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
-- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に全展開 (4.1 秒)。`toolchain-emsdk` は `/opt/emsdk` が既にあり (`emsdk_env.sh` の実在を確認)、tarball は展開していない。`fetch_inputs.sh` rc 0。`build_cpython_wasm.sh` rc 0 (3 分 45 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (5.9 秒)。追跡ファイルの変更は 0 件。
+- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に全展開 (4.1 秒)。`toolchain-emsdk` は `[EMSDK]` が既に実在し (`emsdk_env.sh` の実在を確認)、tarball は展開していない。`fetch_inputs.sh` rc 0。`build_cpython_wasm.sh` rc 0 (3 分 45 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (5.9 秒)。追跡ファイルの変更は 0 件。
 - 環境: runner 4 core、node v22.23.3。測定終了時 (21:33) の load average 0.95 / 1.28 / 0.66。
 - 旧測定 (`09f6668b`・main 取り込み前の表) は根拠にしない。Git 履歴に残る。main (`94b6c6bd`) の取り込みは `c5602929` (merge)。競合は 2 箇所: `docs/DOC_MAP.md` (REPORT 表の行。両側の行を残した) と `tests/provider_check.mjs` (集合定義 `pe101`・`pe100` を両方残し、判定条件に両方を入れ、件数を 86→88・349→347 に直した)。
 
