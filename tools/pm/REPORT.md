@@ -210,40 +210,41 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ## 12. PM Worker の live 切替前の突き合わせ (#2443)
 
-測定した commit: `2f884d99` (main。PR の基点で、PR 内の Worker コードは変えていない)。取得時刻は UTC (2026-10-14)。VM: `issue_snapshot.py` → `launch_issues.py` の classify (13:18〜13:22Z)。Worker: dry-run (Version `7441616e`) の `GET /status?detail=1` (13:24Z。候補の全件を出すため一時ビルドで `TARGET=1000 BATCH=1000 NO_PR_COOLDOWN_H=24`)。
+測定した commit: `8a158e61` (`infra/pm-worker` は #2422 を含む origin/main と同一)。`git diff 2f884d99 8a158e61 -- infra/pm-worker/src infra/pm-worker/test` は 7 ファイル +722/−29 (engine.ts 132・app.ts 8・github.ts 18・ratelimit.ts 37 新・redact.ts 19 新・test 2 本)。launch の判定に効くのは engine.ts の rate-guard だけ。取得時刻は UTC (2026-10-14)。
+VM: 13:18〜13:22Z の `issue_snapshot.py` に増分 (`since=13:17Z`、REST 7 回) を当てて `launch_issues.py` の classify (13:52:32Z。`full_bot_body` は REST を使わず空にした。relaunch の素材追加の判定だけ変わり得る)。Worker: `GET /status?detail=1` (13:53:16Z。reconcile 13:52:15Z、Version は head から作った dry-run。候補の全件を出すため一時ビルドで `TARGET=1000 BATCH=1000 NO_PR_COOLDOWN_H=24`、`rest_remaining=4985`)。
 
 ### 12-1. 分類の件数 (全カテゴリ)
 
 | カテゴリ | VM | Worker | 差の理由 |
 |---|---:|---:|---|
-| blocked | 69 | 72 | +3: 親 #1274 #2145 #2152 (open な子を持つ。Worker は親を blocked に置く) |
-| started | 13 | 10 | −3: #2354 #2394 #2212 が close (13:20:30Z・13:20:49Z・13:23:25Z)。VM の per-issue 時刻は未保存のため推定 |
+| blocked | 69 | 76 | +7: 親 #73 #882 #1274 #1317 #2145 #2152 #2316 (open な子を持つ。Worker は親を blocked に置く) |
+| started | 6 | 6 | |
 | user | 2 | 2 | |
-| stopped | 280 | 278 | −2: #125 #448 は VM の `relaunch.json` で count=2 (上限) |
-| recent | 19 | 19 | |
+| stopped | 281 | 279 | −2: #125 #448 は VM の `relaunch.json` で count=2 (上限) |
+| recent | 10 | 10 | |
 | relaunch | 0 | 2 | +2: #125 #448 (Worker は履歴を持たず、最大 2 回の再投入) |
-| ready | 34 | 31 | −3: 上の親 3 件 |
-| 合計 | 417 | 414 | 417 − 3 (close) = 414 |
+| ready | 47 | 40 | −7: 上の親 7 件 |
+| 合計 | 415 | 415 | |
 
 ### 12-2. ready の集合 (issue 番号)
 
-- VM の ready 34 = Worker の ready 31 + 親 3 件。集合は未保存のため数からの推定: 共通 31 件 (#2446 #2447 を含む)、VM のみ 3 件 (親)、Worker のみ 0 件。art 行は記録上 29 件で差 0 (残り 2 件は未確認)。
-- `would_launch_now` は両側で同じ式 `(relaunch + ready)[: max(n, len(relaunch))]` (`launch_issues.py` の `cmd_launch`・`planLaunch`)。relaunch が 2 件あると ready の末尾 2 件 (#2446 #2447) が出力から落ちる。両側共通の仕様で差ではない。Worker の出力は relaunch #125 #448 と ready 29 件。
+- 共通 38 件 (Worker の `would_launch_now`)。art 行の差は 0。VM のみ 9 件: 親 7 件 + #2457 #2461。Worker のみ: relaunch #125 #448。
+- #2457 #2461 は `would_launch_now` に出ない。広げた設定では `(relaunch + ready)[: max(n, len(relaunch))]` が ready の末尾 2 件を落とす (`launch_issues.py` の `cmd_launch` と `planLaunch` で同じ式)。Worker の ready 40 = 38 + 2、VM の ready 47 − 親 7 = 40 から、この 2 件は Worker の ready に入っていると推定 (`/status` は ready の集合を出さない)。
 
 ### 12-3. `NO_PR_COOLDOWN_H`
 
-既定の 3 (13:23Z) では候補 (ready + relaunch) が 167 件 (ready 165 + relaunch 2)。ready 165 件のうち 134 件 (= 165 − 31) は全て `oc:no-pr` で、最後の着手か bot の報告から 3.1〜22.0 時間 (中央値 4.2 時間)。`24` では候補 33 件 (ready 31 + relaunch 2)。VM の classify も停止語を含む報告から 24 時間は stopped に置くので、24 が VM と同じ。
+既定の 3 (13:54Z、他は上と同じ) では Worker の ready が 183 件 (うち候補 181 + relaunch 2)。VM の ready に無い 141 件は全て `oc:no-pr` で、最後の着手か bot の報告から 3.0〜5.6 時間 (中央値 4.5 時間)。`24` ではこの 141 件が cooldown に入り、ready は 40 件。VM の classify も、停止語 (`stop_re`) を含む報告から 24 時間は stopped に置く (この 141 件は VM でも stopped)。
 
 ### 12-4. 二重着手の確認
 
-`launched.json` で VM が 3 時間以内 (10:22Z 以降) に着手したのは 114 件。うち Worker が選ぶのは 11 件 (#1170 #1527 #1570 #1974 #1985 #2159 #2258 #2265 #2272 #2288 #2303)。全て着手の 0.02〜0.64 時間後に bot が報告し (実行中の run 無し)、VM の classify でも ready。着手中で未報告の `recent` 19 件は VM と Worker で同数で、Worker の選択に入らない。
+`launched.json` で VM が 3 時間以内 (10:52Z 以降) に着手したのは 89 件。うち Worker が選ぶのは 13 件 (#942 #1170 #1527 #1817 #1974 #1985 #2159 #2258 #2265 #2272 #2288 #2303 #2310)。全て着手の 0.02〜0.42 時間後に bot が報告し、VM の ready にも入っている。着手中で未報告の `recent` は VM も Worker も 10 件で、Worker の選択に入らない。
 
 ### 12-5. 初回の保存状態
 
-旧版の保存は `comments?since=` を古い順に 40 ページ (4,000 件) で打ち切っていたため、直近の bot の報告を欠いた。phase は初期値の Review-Only (open PR 12 件 > 10 で解除されず)。一時ビルドで全体同期を前倒しし (13:17:10Z、REST 123 回・うちコメント 102 回・打ち切り無し・`fresh=true`)、phase を VM の `phase.json` (`review_only=false`) に合わせた。
+旧版の保存は `comments?since=` を古い順に 40 ページ (4,000 件) で打ち切っていたため、直近の bot の報告を欠いた。phase は初期値の Review-Only (open PR 12 件 > 10 で解除されず)。一時ビルドで全体同期を前倒しし (13:17:10Z、REST 123 回・うちコメント 102 回・打ち切り無し・`fresh=true`)、phase を VM の `phase.json` (`review_only=false`) に合わせた。前後 (13:15:52Z と 13:17:33Z、`NO_PR_COOLDOWN_H=3`) で ready 256 → 164、stopped 31 → 143。
 
 ### 12-6. 未解決
 
 - VM の `relaunch.json` (67 件。count=1 が 60、2 が 7) は Worker に無い。履歴の無い issue を最大 2 回余分に再投入し得る (#2343)。
 - 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343 が扱う phase の引継ぎ)。
-- 突き合わせは main 取り込み前の Worker で測った。以後 main に入った #2338 (rate-guard・`reconcile_diff`) は未測定。
+- rate-guard が実際に launch を止める場面は未測定 (`rest_remaining` は 4,985。fake gh のテストだけ)。
