@@ -89,7 +89,7 @@ export class ModuleTable {
 
 export class HostBridge {
   constructor(table, opts = {}) {
-    this.table = table; this.slots = []; this.loaded = new Map(); this.byHandle = new Map();
+    this.table = table; this.slots = []; this.loaded = new Map(); this.byHandle = new Map(); this.hseq = 0;
     this.proxy = new Map(); this.lastError = 0; this.depth = 0;
     this.errorMode = 0; this.lastLoadMode = 0; this.clock = opts.clock || (() => Date.now()); this.t0 = this.clock();
     this.stats = { icalls: 0, entryCalls: 0, dispatch: 0, process: 0, upcalls: 0, unmarshalled: 0, bytesIn: 0, bytesOut: 0, dispatchByOp: {}, upcallByOp: {} };
@@ -151,11 +151,14 @@ export class HostBridge {
       const guest = desc.acquire(); // 事前 prewarm 済み instance (sync 取得)
       guest.mod.hbHostCall = (eff, op, idx, vlo, vhi, ptr, opt) => this.upcall(guest, eff, op, idx, vlo, vhi, ptr, opt);
       guest.init();
-      lm = { desc, guest, refs: 1, handle: HMODULE_BASE + BigInt(this.loaded.size + 1) * 0x10000n, entrySlots: new Map() };
+      lm = { desc, guest, refs: 1, handle: this.allocHandle(), entrySlots: new Map() };
       this.loaded.set(desc.id, lm); this.byHandle.set(lm.handle, lm);
     }
     if (this.trace) this.trace(`LoadLibraryW("${path}") -> ${desc.id} hmodule=0x${lm.handle.toString(16)} refs=${lm.refs}`);
     return lm.handle;
+  }
+  allocHandle() { // 単調増加. loaded.size 基準だと解放後に生存中の handle と衝突する (#2520)
+    return HMODULE_BASE + BigInt(++this.hseq) * 0x10000n;
   }
   GetProcAddress(h, pName) {
     const lm = this.byHandle.get(u64(h));
