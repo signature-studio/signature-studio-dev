@@ -293,6 +293,7 @@ class Defchain:
         self.callers = None
         self.taken = set()
         self.mod = {}
+        self.clob = collections.Counter()
 
     def blocks(self, va):
         if va not in self.bl:
@@ -372,6 +373,13 @@ class Defchain:
                     changed = True
         self.mod = {va: (mod[va], opaque[va]) for va in fns}
 
+    def clob_kind(self, x, reg):
+        op = x.op_str
+        if not op.startswith('0x') or int(op, 16) not in self.mod:
+            return 'indirect'
+        mods, o = self.mod[int(op, 16)]
+        return 'opaque' if o else 'writes'
+
     def passes(self, x, reg):
         """直接 call の callee が reg を書かず (推移的にも)、間接 call を含まないなら、call を跨いで reg は保たれる."""
         op = x.op_str
@@ -394,6 +402,7 @@ class Defchain:
                 if x.mnemonic == 'call':
                     if self.passes(x, reg):
                         continue
+                    self.clob[self.clob_kind(x, reg)] += 1
                     out.add(('clobber', j)); killed = True; break
                 try:
                     rd, wr = x.regs_access()
@@ -560,6 +569,8 @@ def main():
                 stats['arg:' + kind] += 1
         stats['site:' + rec['status']] += 1
         sites.append(rec)
+    for k, v in dc.clob.items():
+        stats['clob:' + k] += v
     # site 単位の最終状態 (全引数が callee_unused / set_const なら「解決」)
     resolved = 0
     for r in sites:
