@@ -6,7 +6,7 @@ import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.t
 import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
+import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { haltNotifyDue, haltOverdue, haltReasons, nextHalt, type Halt } from "./halt.ts";
@@ -28,6 +28,7 @@ import {
   type HistoryEntry,
   type PmTarget,
 } from "./pm.ts";
+import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, rateHit } from "./ratealert.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
 import type { VmState } from "./vmstate.ts";
@@ -35,6 +36,7 @@ import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type
 import {
   applyEvent,
   EMPTY_STATE,
+  isOpencodeRun,
   KILLED_STOP_AT,
   NEEDS_USER_LABEL,
   reviewSignal,
@@ -194,6 +196,8 @@ interface Meta {
   redeliverAt?: number;
   // 直近の走査で見た status != OK の配送の件数
   redeliverFailed?: number;
+  // 率制限の判定 (#2345) の直近の評価。count / total は窓 (30 分) の件数、streak は条件を満たした評価の連続回数、alert は streak が RATE_STREAK 以上。
+  rateAlert?: { at: number; count: number; total: number; streak: number; alert: boolean };
   counters?: {
     launched: number;
     dispatched: number;
@@ -235,6 +239,7 @@ export interface Log {
     | "resync"
     | "would-redeliver"
     | "redeliver"
+    | "rate-alert"
     | "import"
     | "demote"
     | "restore";
@@ -243,7 +248,7 @@ export interface Log {
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig", "rateRuns"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -765,6 +770,14 @@ export class Engine {
         this.s = { ...this.s, runs: rest };
       }
     }
+    // 率制限のマーカーは run と同じ 1 時間で捨てる (判定の窓は 30 分)。
+    for (const [k, v] of Object.entries(this.s.rateRuns)) {
+      if (Date.parse(v.at) < cut) {
+        this.d.store.del("rateRuns", k);
+        const { [k]: _, ...rest } = this.s.rateRuns;
+        this.s = { ...this.s, rateRuns: rest };
+      }
+    }
     // 閉じた issue / PR の手がかりは使わない。数えた run の id (killRun) だけは残す (reopen の後に古い run の配送が届いても数え直さない)。
     for (const k of Object.keys(this.s.sig)) {
       const i = this.s.issues[k];
@@ -785,7 +798,7 @@ export class Engine {
     const s = this.s;
     const issues = Object.values(s.issues)
       .filter((i) => i.state === "open")
-      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount } }));
+      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount }, ...(i.artLine ? { artLine: i.artLine } : {}) }));
     const prs = (Object.values(s.prs) as PrState[]).map((p) => ({ number: p.number, state: p.state, ref: p.ref, body: p.body }));
     const runs = (Object.values(s.runs) as RunState[])
       .filter((r) => r.status !== "completed")
@@ -893,11 +906,9 @@ export class Engine {
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
     const failed = (n: number): boolean => input.launchState?.[String(n)] === "failed";
-    // 既定の素材行 (PM の oc_artifacts 行。無ければ題名とラベルからの推定)。picks の既定と同じ。
-    const baseArt = (n: number): string => {
-      const b = this.s.pmArt[String(n)]?.line;
-      return b && validateArtLine(b) ? b : inferArtifacts(title.get(n) ?? "", labels.get(n) ?? []);
-    };
+    // 既定の素材行 (PM の行 → 本文の行 → 推定)。picks の既定と同じ。
+    const artOf = new Map(snap.issues.map((i) => [i.number, i.artLine] as const));
+    const baseArt = (n: number): string => defaultArtLine(this.s.pmArt[String(n)]?.line, artOf.get(n), title.get(n) ?? "", labels.get(n) ?? []);
 
     const moveTo = (n: number, from: keyof Rows, to: () => void) => {
       (rows as any)[from] = (rows as any)[from].filter((x: any) => (Array.isArray(x) ? x[0] : x) !== n);
@@ -914,7 +925,6 @@ export class Engine {
       const outcome = this.s.sig[String(n)]?.outcome;
       const reason = outcome?.reason ?? "unknown";
       const c = this.noPrState(n);
-      const prevNames = (c.art ?? baseArt(n)).replace("oc_artifacts:", "").trim().split(/\s+/).filter(Boolean);
       let pick: { art: string; np: NoPrReason; reportAt?: string } | null = null;
       let recent = false;
       let note = reason;
@@ -934,8 +944,8 @@ export class Engine {
         // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。報告が無い (古い保存値) は新しい素材なし。
         const rep = snap.bot_report[String(n)];
         const stop = isStopReport(rep?.head ?? "");
-        const extra = stop ? neededArts(n, input).filter((a) => !prevNames.includes(a)) : [];
-        if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
+        const line = stop ? addArts(c.art ?? baseArt(n), neededArts(n, input)) : null;
+        if (line) pick = { art: line, np: "artifact" };
         else note = !rep || stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
       } else {
         note = `oc:no-pr ${reason} 再投入済み`;
@@ -1017,9 +1027,10 @@ export class Engine {
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
       const np = npPick.get(n);
-      const cand = relMap.get(n) ?? np?.art ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
-      // 本文由来 (PM コメント・bot 報告) の行は、allowlist を通ったものだけを使う。通らなければ推定値に落とす。
-      const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
+      const dflt = defaultArtLine(base, i.artLine, i.title, i.labels);
+      const cand = relMap.get(n) ?? np?.art ?? dflt;
+      // 素材行は allowlist を通ったものだけを使う。通らなければ既定 (PM の行 → 本文の行 → 推定) に落とす。
+      const art = validateArtLine(cand) ? cand : dflt;
       picks.push({ n, art, relaunch: relMap.has(n), np: np?.np, reportAt: np?.reportAt });
     }
     const plan: Plan = {
@@ -1616,7 +1627,10 @@ export class Engine {
       if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS || stale) await this.fullSync(gh);
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
       // 同期が古い・打ち切り中は run 一覧が不完全なので観測しない (launch と同じ条件)。偽の飽和を作らないため。
-      if (this.fresh()) this.observe(now);
+      if (this.fresh()) {
+        this.observe(now);
+        this.rateAlert();
+      }
       await this.watchdog(gh);
       await this.launch(gh);
       await this.haltNotify(gh);
@@ -1642,6 +1656,28 @@ export class Engine {
   // 次の alarm までの待ち (ms)。dirty (webhook 直後) は 2 秒、それ以外は 60 秒。
   nextDelayMs(): number {
     return this.dirty ? 2000 : 60_000;
+  }
+
+  // 率制限の判定 (#2345・CI-66)。直近 30 分に完了した opencode.yaml の run のうち、cause=rate_limit のマーカーがあるものを数える。
+  // 件数と割合の条件を RATE_STREAK 回連続で満たしたら alert。alert は通知しない (起票は CI-67)。REST は呼ばない。
+  // 評価は tick ごとだが、alarm と cron が重なった分は数えない (RATE_EVAL_GAP_MS 以内は評価しない)。
+  rateAlert(): void {
+    const now = this.d.now();
+    const prev = this.meta.rateAlert;
+    if (prev && now - prev.at < RATE_EVAL_GAP_MS) return;
+    let count = 0;
+    let total = 0;
+    for (const r of Object.values(this.s.runs)) {
+      if (r.status !== "completed" || !isOpencodeRun(r)) continue;
+      const t = Date.parse(r.updatedAt);
+      if (!(t > now - RATE_WINDOW_MS && t <= now)) continue;
+      total++;
+      if (this.s.rateRuns[String(r.id)]) count++;
+    }
+    const streak = rateHit(count, total) ? (prev && now - prev.at <= RATE_EVAL_MAX_GAP_MS ? prev.streak : 0) + 1 : 0;
+    const alert = streak >= RATE_STREAK;
+    if (alert !== (prev?.alert ?? false)) this.pushLog({ kind: "rate-alert", note: alert ? "on" : "off" });
+    this.meta.rateAlert = { at: now, count, total, streak, alert };
   }
 
   // ---------------------------------------------------------------- 観測
@@ -1791,6 +1827,17 @@ export class Engine {
       // dry-run のために投稿しなかった GitHub への書き込み (/oc 投稿 + repository_dispatch) の累計。
       dry_run_skipped_posts: counters.wouldLaunch + counters.wouldDispatch,
       reconcile_diff: this.meta.reconcileDiff ?? { last: 0, total: 0 },
+      // 率制限の判定 (#2345)。alert は 2 回連続で条件を満たしたとき true。rate_limit_30m は直近の評価の窓 (30 分) の件数と割合 (評価が無ければ null)。通知はしない。
+      rate_limit_alert: this.meta.rateAlert?.alert === true,
+      rate_limit_30m: this.meta.rateAlert
+        ? {
+            count: this.meta.rateAlert.count,
+            total: this.meta.rateAlert.total,
+            rate: this.meta.rateAlert.total ? this.meta.rateAlert.count / this.meta.rateAlert.total : null,
+            streak: this.meta.rateAlert.streak,
+            at: iso(this.meta.rateAlert.at),
+          }
+        : null,
       rest_remaining: rest?.remaining ?? null,
       rest_used: rest?.used ?? null,
       rest_reset_at: rest?.reset !== undefined ? iso(rest.reset * 1000) : null,
