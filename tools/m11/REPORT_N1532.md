@@ -27,7 +27,7 @@
 |---|---|---|---|
 | `bash tools/m11/m11_e2e.sh --full` (n=1) | 649 s (load 1.07→0.84 の開始・終了) | 0 | reached_stage 4 / units_run_full 53 / 942 / survey ok 872, trap 23 (oom 0, clobber 0), miss 46 / wasm 6,043,394 B / ldfix applied, qstore applied / ir_sha256 `dc193f12…` |
 
-- 旧 REPORT §14 (`852/42/46/1`, units_run 53) と比べ、survey ok は 852 → 872 (trap 42 → 23)。通常起動の units_run は同じ 53。survey の差は本 run の対象外 (原因未切り分け)。
+- 旧 REPORT §14 の最終行 (`866/29(2)/46/1`, units_run 53) と比べ、survey ok は 866 → 872。通常起動の units_run は同じ 53。survey の差は本 run の対象外 (原因未切り分け)。
 - `reached_stage 4` は REPORT §14 と同じ。停止理由は今回 `unreachable` (`function_8c5eb0` ← `function_56fde0` ← icall) で、旧 §14 の Halt0 停止 (unit 57) とは一致しない。差の原因は未切り分け (§7)。
 
 ## 4. 0 詰め引数 7 カテゴリの実測 (sigfix 0 詰め, `m11_sigfix_stats.sh`)
@@ -84,7 +84,7 @@ REPORT §9 の表示では `set_other 410 / inherit 1,172`・`xmm 48` と書か�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 新規 12 site (引数 20) の原因 commit の特定 (lift/tail/IR のどの段か) | 旧 1,963 と新 1,983 の差の説明が無い。受入条件「原因 commit を特定する」が未達 | 子 issue [M11-N116] (本 run で起票) |
+| 新規 12 site (引数 20) の原因 commit の特定 (lift/tail/IR のどの段か) | 旧 1,963 と新 1,983 の差の説明が無い。受入条件「原因 commit を特定する」が未達 | 子 issue #1702 [M11-N117] (本 run で起票) |
 | `m11_argrecover_verify.py` が stack 引数位置 (pos≥4) を扱えない (`ALIAS[4]` で KeyError) | 0 詰め 33 fixes のうち pos≥4 の 15 件 (pos4: 11 + pos5: 4) は独立検算できない | 上と同じ子 issue に併記 |
 | `m11_sigfix_stats.sh` が verify 失敗で TSV を再生成しない | `results/sigfix_zeropad_remaining.tsv` が旧値のまま。再現手順が途中で止まる | 上と同じ子 issue |
 | `m11_e2e.sh --full` の survey 結果が旧 REPORT §14 と異なる (ok 852 → 872) | 当 run の数値比較の前提が変わる | #132 にコメント (本 run では未調査) |
