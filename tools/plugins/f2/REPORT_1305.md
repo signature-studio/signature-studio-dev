@@ -243,10 +243,8 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 再現 (a70461d6。依存 `uv venv f2venv && uv pip install unicorn==2.1.4 pefile capstone`。リポジトリ直下から、`PE` は block19148_PE.bin): A `unicorn_trace.py $PE 0x83efb0 -H -m 2000000`、B `unicorn_trace.py $PE 0x83efb0 -H -p 0x409090 -m 2000000`、C `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000`。
 - 鮮度: `git diff a70461d6 HEAD -- 'tools/plugins/f2/*.py'` = 0 行 (a70461d6 以降の commit は REPORT のみ)。
 
-## 17. PLG-F3-30 (#2493): 0x867100 を構築するアリーナ初期化関数 (書込み元 rip、測定 commit da16bc06、block19148)
+## 17. PLG-F3-30 (#2493): 0x867100 を構築するアリーナ初期化関数 (書込み元 rip、測定 commit d49817f9、block19148)
 
-- 道具: `write_origin.py` (1b8b7eb1) は watch writes の書込み元 rip を囲む pdata 関数ごとに集計し、命令を逆アセンブルする。`write_origin_2493.sh <PE>` (da16bc06) が以下を一括で再現する (`bash tools/plugins/f2/write_origin_2493.sh $PE`、逐次、wall 7.00 秒、load 0.10→0.18、PE と venv は §11)。
-- 結果: `0x409090 -H -q 0x867100 -w 0x867100:0x867200` の書込み 28 件 (`0x867101`〜`0x8671e0`) は全件が pdata 関数 `[0x409090,0x4091d4)` 内の 7 命令 (rip `0x4090a1`〜`0x409159`) から出た。unmapped 0。3 回の出力は md5 一致 (`e20906a7…`)。関数は `mov r9d,0x2e` の 46 回ループ (`r8 += 0x40`) で、監視 0x867100:0x867200 は 4 ブロック×7 = 28 件、0x867100:0x867300 は 8 ブロック×7 = 56 件 (実測) と整合する。
-- 負の対照: `-w 0x867d00:0x867e00` は 0 件。アリーナを構築しない全経路 `0x83efb0 -H -w 0x867100:0x867200` も 0 件 (`UC_ERR_READ_UNMAPPED rip=0x407a5e`、§15 と一致)。
-- 判定: 受入 **達成**。アリーナ初期化関数は `0x409090`。呼出し経路 (`0x41bc8c` ← `0x41bc60`・表 `0x8526c0` が実行時に埋まる) は §15 のとおり未確定で、未解決は #2303 (親) に残す。
-- 鮮度: `git diff da16bc06 HEAD -- tools/plugins/f2/*.py tools/plugins/f2/*.sh` = 0 行 (以後の commit は本節のみ)。
+- 道具と再現: `write_origin.py` (1b8b7eb1)。`bash tools/plugins/f2/write_origin_2493.sh $PE` (d49817f9、PE と venv は §11) が以下を一括で再現する。逐次 n=3、wall 10.95・10.95・10.88 秒 (min–max 10.88〜10.95)、load (1 分値) 開始→終了 0.08→0.22・0.22→0.42・0.42→0.63、3 回の出力は md5 一致 (28 件版 `e20906a7…`・56 件版 `e264e012…`)。結果: `0x409090 -H -q 0x867100 -w 0x867100:0x867200` の書込み 28 件 (`0x867101`〜`0x8671e0`) は全件が pdata `[0x409090,0x4091d4)` 内の 7 種の rip (`0x4090a1`・`0x4090a5`・`0x4090a9`・`0x4090b1`・`0x4090f9`・`0x409104`・`0x409159`) から出た。unmapped 0。`-w 0x867100:0x867300` は 56 件 (8 ブロック×7、同じ関数・同じ 7 種)。
+- 負の対照: `-w 0x867d00:0x867e00` は 0 件。`0x83efb0 -H -w 0x867100:0x867200` (アリーナを構築しない経路) は 0 件で、`UC_ERR_READ_UNMAPPED rip=0x407a5e` で止まる。測定したのはこの 1 経路のみ (他の経路は未測定)。集計の対照: 合成の書込み 1 行 (rip=0x1000、pdata 外) は unmapped 1・関数 0 件。
+- 判定: 受入 **達成**。アリーナ初期化関数は `0x409090`。呼出し経路は §15 のとおり未確定 (未解決は #2303)。鮮度: `git diff d49817f9 HEAD -- tools/plugins/f2/*.py tools/plugins/f2/*.sh` = 0 行。
