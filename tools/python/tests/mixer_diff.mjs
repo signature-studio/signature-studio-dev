@@ -37,7 +37,10 @@ const seq = [
   ["mixer.getTrackPan", [1]],
   ["mixer.setTrackPan", [1, -0.25]],
   ["mixer.getTrackPan", [1]],
+  ["mixer.getTrackColor", [0]],
+  ["mixer.getTrackColor", [2]],
   ["mixer.setTrackColor", [1, 0x123456]],
+  ["mixer.getTrackColor", [1]],
   ["mixer.isTrackSelected", [0]],
   ["mixer.isTrackSelected", [2]],
   ["mixer.muteTrack", [1]],
@@ -71,6 +74,7 @@ const seq = [
   ["mixer.getTrackName", [127]],
   ["mixer.getTrackVolume", [-1, 0]],
   ["mixer.setTrackPan", [200, 0]],
+  ["mixer.getTrackColor", [127]],
 ];
 
 const diffs = [];
@@ -81,4 +85,7 @@ for (const [name, args] of seq) {
 }
 
 assert.deepEqual(diffs, [], `mixer 差分 ${diffs.length} 件`);
+// 既定経路 (未設定 track 2) の確定値 (.bss 0x15f6774 = 0xff636c71・REPORT_PY118)
+assert.deepEqual(run(mock, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
+assert.deepEqual(run(wasm, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
 console.log(JSON.stringify({ calls: seq.length, diffs: 0, PASS: true }));

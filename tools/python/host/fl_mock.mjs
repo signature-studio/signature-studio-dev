@@ -10,6 +10,8 @@ class FlError extends Error {
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
 
+const MIX_DEFAULT_COLOR = 0xff636c71;
+
 export function createMockEngine() {
   const st = {
     tempo: 130,
@@ -23,7 +25,7 @@ export function createMockEngine() {
     ],
     mixer: Array.from({ length: 127 }, (_, i) => ({
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
-      color: 0x5A6B7C, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
+      color: MIX_DEFAULT_COLOR, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
@@ -129,7 +131,12 @@ export function createMockEngine() {
     "mixer.setTrackVolume": (i, v) => { tr(i).vol = v; },
     "mixer.getTrackPan": (i) => F(tr(i).pan),
     "mixer.setTrackPan": (i, v) => { tr(i).pan = v; },
-    "mixer.setTrackColor": (i, c) => { tr(i).color = c; },
+    "mixer.setTrackColor": (i, c) => { tr(i).color = c; tr(i).colorSet = true; },
+    "mixer.getTrackColor": (i) => {
+      const t = tr(i);
+      const v = t.colorSet ? ((t.color & 0xff00ff00) | ((t.color & 0xff) << 16) | ((t.color >> 16) & 0xff)) : t.color;
+      return (v | 0xff000000) >>> 0;
+    },
     "mixer.isTrackSelected": (i) => tr(i).sel,
     "mixer.muteTrack": (i, v) => { tr(i).mute = tog(tr(i).mute, v); },
     "mixer.soloTrack": (i) => { tr(i).solo = !tr(i).solo; },

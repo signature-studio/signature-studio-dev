@@ -19,11 +19,13 @@
 #define ROOT_NAME "Plugin database"
 
 typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; } Chan;
-typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
+typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; int color_set; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
 typedef struct { char name[NAME]; int64_t color; } Pl;
 
 static Chan ch[NCH_MAX];
 static int nch;
+/* FL の既定 track 色 (.bss 0x15f6774 の初期値。init 0x770ba6・REPORT_PY118) */
+#define MIX_DEFAULT_COLOR 0xff636c71
 static Mix mx[NMIX];
 static Pl pl[NPL];
 static int win[NWIN];
@@ -55,7 +57,7 @@ void fl_engine_reset(void) {
         if (i == 0) set_name(mx[i].name, "Master");
         else if (i == 125) set_name(mx[i].name, "Current");
         else snprintf(mx[i].name, NAME, "Insert %d", i);
-        mx[i].vol = 0.8; mx[i].color = 0x5A6B7C; mx[i].sel = (i == 0);
+        mx[i].vol = 0.8; mx[i].color = MIX_DEFAULT_COLOR; mx[i].sel = (i == 0);
         if (i) { mx[i].act[0] = 1; mx[i].lvl[0] = 1.0; }
     }
     for (int i = 0; i < NPL; i++) { snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
@@ -158,7 +160,9 @@ FL_H(mixer, getTrackVolume) { MX(0); int64_t m = A_INT(1, 0); return fl_ret_d(c,
 FL_H(mixer, setTrackVolume) { MX(0); t->vol = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(mixer, getTrackPan) { MX(0); return fl_ret_d(c, t->pan); }
 FL_H(mixer, setTrackPan) { MX(0); t->pan = A_DBL(1, 0); return fl_ret_none(c); }
-FL_H(mixer, setTrackColor) { MX(0); t->color = A_INT(1, 0); return fl_ret_none(c); }
+FL_H(mixer, setTrackColor) { MX(0); t->color = A_INT(1, 0); t->color_set = 1; return fl_ret_none(c); }
+static uint32_t swap_rb(uint32_t x) { return (x & 0xff00ff00u) | ((x & 0xffu) << 16) | ((x >> 16) & 0xffu); }
+FL_H(mixer, getTrackColor) { MX(0); uint32_t v = (uint32_t)t->color; if (t->color_set) v = swap_rb(v); return fl_ret_i(c, v | 0xff000000u); }
 FL_H(mixer, isTrackSelected) { MX(0); return fl_ret_b(c, t->sel); }
 FL_H(mixer, muteTrack) { MX(0); int64_t v = A_INT(1, -1); t->mute = TOG(t->mute, v); return fl_ret_none(c); }
 FL_H(mixer, soloTrack) { MX(0); t->solo = !t->solo; return fl_ret_none(c); }
