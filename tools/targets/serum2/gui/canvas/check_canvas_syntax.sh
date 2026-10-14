@@ -18,6 +18,7 @@ fi
 
 rc_all=0
 for f in "$here"/canvas_bitmap.cpp "$here"/canvas_graphicspath.cpp \
+         "$here"/canvas_frame.cpp \
          "$here"/canvas_font.cpp "$here"/canvas_graphicsdevice.cpp; do
   log="$work/$(basename "$f").log"
   timeout 200 em++ -std=c++17 -fsyntax-only -I. -I"$here" "$f" > "$log" 2>&1

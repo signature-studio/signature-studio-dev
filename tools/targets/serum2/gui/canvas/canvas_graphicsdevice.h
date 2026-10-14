@@ -1,5 +1,6 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
-// 描画命令はラスタライザを持たないため、描画系は false (未描画) を返す。状態設定は値だけ保持する。
+// 描画命令はラスタライザを持たないため、描画系は false (未描画) を返す。
+// 状態設定は lineWidth・clipRect・fillColor・frameColor・globalAlpha だけ値を保持し、他 (lineStyle・drawMode・transformMatrix・global state の save/restore) は何もしない。
 
 #pragma once
 

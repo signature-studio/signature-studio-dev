@@ -55,3 +55,19 @@
 - **受入 3 (`--full` 2 回の `ir_sha256` 一致)**: **未実施**。`functions_dll.csv` の生成に Ghidra 12.1.4 が要るが、runner に `[GHIDRA]` が無く、`work-m11` 素材にも含まれない (`tools/m11/m11_bounds.py`・`m11_tail.py` が `m2/work/ghidra_dll/functions_dll.csv` を読む)。
 - **未解決**: (a) `--full` 2 回の実測と ir_sha256 一致の判定 (起票先 #1664 に残す)。(b) `@global_var_*` 行位置の差の有無 (同 #1664)。
 - 追加の注意: 全 range (`boot_ranges.txt` 全文) を 1 引数で渡すと `Argument list too long` で失敗する (`m11_lift_all.sh` が 1900 個ずつに分割する理由)。測定は `[RETDEC]` を使った。
+
+## 17. #1664 受入 3: HEAD `dcc609a9` (origin/main) で `--full` を 2 回実行 (Q1・Q2)
+
+- 測定 commit: `dcc609a9` (origin/main 起点の `1664-full-ir-sha`)。測定時点のコード差分 0。
+- 条件: PE `fl-win64` の `block00031_PE.bin` (sha256 `b2c64da4…`)・`toolchain-retdec` (`$RUNNER_TEMP/retdec`)・`work-m11`・`work-liftdiff`。Ghidra 12.1.4 (sha256 `ddac49f9…` 一致・JDK 21.0.12) で `tools/m2/work/ghidra_dll/functions_dll.csv` を再生成 (476 秒・rc 0・59,010 行)。`FL_WIN64_DIR` / `RETDEC_ROOT` / PATH は §14 と同じ。
+- Q2 の前に `work/ir_conditions.json`・`boot*.lift.ll`・`boot*.drc.*`・`boot_final.ll`・`lift_pe.sha256` を削除してから全再生成した。
+
+| 測定 | rc | 所要秒 | load (開始→終了) | ir_sha256 | reached_stage | survey ok / trap / miss |
+|---|---|---|---|---|---|---|
+| Q1 `m11_e2e.sh --full` | 0 | 531 (8 分 51 秒) | 1.06 → 1.08 | `e13e9bc5…` | 4 | 872 / 23 / 46 |
+| Q2 同 (生成物削除後に再生成) | 0 | 531 (8 分 51 秒) | 0.99 → 1.01 | `e13e9bc5…` | 4 | 872 / 23 / 46 |
+
+- **結論 (受入 3)**: 同一 HEAD・同一 PE・同一素材で `ir_sha256` が一致した (Q1 = Q2 = `e13e9bc5…`)。`M11_SUMMARY` の `units_run_full` 53 / `units_total` 942 / `stop_reason` も一致。
+- **注意 (一致の強さ)**: 同じ条件の過去の組 (§14 N1≠N2、§15 N3≠N4) は不一致だった。今回の 1 組の一致は非決定が消えた証拠ではない。`ir_sha256` を再現性の gate として使うなら、同条件の複数回 (3 回以上) 実測が要る。本 run では時間の都合で 2 回までとした。
+- **未実施 (受入 1・2 の残り)**: `--passes` 単位の切り分け、`@global_var_*` 行位置差の有無、`base.py` との整合記述。これらは本 PR の対象外で、#1664 に残す。
+- 再現: §14 と同じ。Ghidra は `analyzeHeadless <proj> dll_proj -import block00031_PE.bin -scriptPath tools/m2/ghidra_scripts -postScript DumpFunctions.java <csv>` (JDK 21 を JAVA_HOME に指定)。
