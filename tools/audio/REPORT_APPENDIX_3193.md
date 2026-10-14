@@ -31,12 +31,13 @@
 | probe の経路 (mock) | `SAFARIDRIVER=$PWD/tools/audio/test/safaridriver_mock.mjs node tools/audio/harness/safari_probe.mjs` | rc 1・`webSocketUrl` = null (mock は BiDi を返さない。経路の確認のみ) |
 | Chrome 回帰 (`run.mjs` の変更の影響) | `node tools/audio/harness/run.mjs --only asio_sine_b256_d2,asio_sine_b256_96k,asio_sine_b512_96k` | 測定 commit `7fdf2074` で **3/3 PASS** (underrun 0・silence 0・sine maxErr 1.49e-8・wall 89.1 s・load avg 0.18 → 0.06) |
 
-- Chrome の P1〜P3 の値 (参考・1 回・Linux の fake 出力): `asio_sine_b256_d2` burst 512・T 1536 (48000 Hz) / `asio_sine_b256_96k` burst 1024・T 2816 / `asio_sine_b512_96k` burst 1024・T 3072。REPORT_AU2_CI.md §5-1 の fake 行と同じ傾向。
+- Chrome の P1〜P3 の値 (fake 出力の burst・T) は本付録に再掲しない。`REPORT_AU2_CI.md` §5-1 の fake 行を参照 (測定 commit `54bacdc0`)。
 - 測定 commit `7fdf2074` 以後のコード差分: `git diff 7fdf2074 HEAD -- tools/audio/src tools/audio/harness tools/audio/test tools/audio/ci tools/audio/build.sh` の出力は 0 行 (本付録の追記は `tools/audio/REPORT*` だけ)。
 
 ## E. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| macOS で Safari の P1〜P4 (n=3) を実測し、`safari_probe.mjs` で BiDi 対応を確かめる (受入 3 と §B) | Safari の値・BiDi 対応は未確定。macOS の既定出力の切替も未確認 | [AU-36] (子 #3193) |
+| macOS で Safari の P1〜P4 (n=3) を実測し、`safari_probe.mjs` で BiDi 対応を確かめる (受入 3 と §B) | Safari の値・BiDi 対応は未確定。macOS の既定出力の切替も未確認 | [AU-36] (子 #3207) |
+| Safari で AudioContext が resume できるか (user gesture) | `chrome.mjs` は `Runtime.evaluate` に `userGesture: true` を付けるが、`safari.mjs` の `execute/async` に相当する操作が無い。`src/runtime/audio-shim.ts` は `new AudioContext` (175 行) の後に `resume()` (213 行) を呼ぶ。user gesture 無しでは AudioContext が suspended のまま止まる恐れがあり、未確認 | [AU-36] (子 #3207) |
 | 草案 yaml (Safari 行) の `.github/workflows/` への適用と macOS での初回 dispatch | 未適用では Safari 行を実行できない | #3192 (AU-34) |
