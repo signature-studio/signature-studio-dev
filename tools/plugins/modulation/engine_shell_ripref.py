@@ -77,6 +77,8 @@ def main(path, args):
                                 hit = ins
                             if op.type == capstone.x86.X86_OP_IMM and op.imm == sva + end + disp:
                                 hit = ins
+                    if hit is not None:
+                        break
                 if hit is not None:
                     tgt = sva + end + disp
                     print("  ref", hex(hit.address), hit.mnemonic, hit.op_str, "-> ", hex(tgt))
