@@ -96,7 +96,7 @@ python3 trap_triage/check_682.py work/probe714/units_714.json --units 304,555,92
 | 923 | 14900 `function_410b10` (OOB 直前 `i64.const 128; i64.sub` = `obj-0x80`) | `i32.load` | 1759 `function_4fb910` (呼出し鎖の上位は未確認) |
 
 - `function_4133f0` の C 転記 (`m11_ov.c`) は `src != nil` のとき `[src-8]` を読む。src がアドレス空間外の値になっているのが起点。
-- **未解決 (次の一手)**: `function_535ab0` が `4133f0` に渡す `src` の出どころ (呼出し元 `function_4fad10` の引数組立て) を、OOB 直前の値で確認する。`function_883140` 側の `i64.const 2074840` (0x1faa18) 付近の定数が、ポインタとして使われていないかも見る。
+- **未解決 (次の一手)**: `function_535ab0` が `4133f0` に渡す `src` の出どころ (呼出し元 `function_4fad10` の引数組立て) を、OOB 直前の値で確認する。`function_883140` 側の `i64.const 2074840` (0x1fa8d8) 付近の定数が、ポインタとして使われていないかも見る。
 
 ## 8. 結論 (本 run)
 
@@ -126,13 +126,13 @@ survey の集計は ok 870 / trap 24 / noproc 1 / miss 47 で、§7 (ok 869 / tr
 - `function_535bf2` (189324): `obj+0x10` を +1 して `tbl + cnt*24` を読み、`-1` なら `function_535c11(@m11num_1)` を呼ぶ。`function_535c11` (189355) は `[obj+8]+8` と `[items-8]` で境界を見る。
 - `function_535c11` の呼出し元: `function_4fa3d0` (178270 から始まる関数内 178436 / 178462 / 178501 / 178527)、`function_4fad10` (178917 から始まる関数内 179009 / 179035)。両方とも引数は `function_535240(obj_field, flag)` の戻り値で、`function_535240` は `function_535b30(const 1003752, flag, obj)` を呼ぶ。
 - `function_4fad10` は `function_535ab0` を 179017 で呼ぶ (`stack_var_-80` を渡す)。`function_535ab0` は `function_4133f0(arg, src)` を先に呼ぶ。
-- `function_4fb910` (179735) は `function_4fad10(load [18818720], arg1, arg2)` を呼ぶ。`function_4fb910` の呼出し元のうち 102123 (`function_136c660`) は `arg2 = 2074840` (0x1faa18) で呼ぶ。0x1faa18 は survey の image 範囲 (0x400000〜0x1ec0000) の外にある定数で、ポインタとして使われているかは未確認。
+- `function_4fb910` (179735) は `function_4fad10(load [18818720], arg1, arg2)` を呼ぶ。`function_4fb910` の呼出し元のうち 102123 (`function_136c660`) は `arg2 = 2074840` (0x1fa8d8) で呼ぶ。0x1fa8d8 は survey の image 範囲 (0x400000〜0x1ec0000) の外にある定数で、ポインタとして使われているかは未確認。
 - `function_4fb910` の 206344 / 206345 / 211067〜211069 でも同じ定数 (2074840) を arg2 にして呼ばれている。
 
 **次の一手 (未着手, 優先順)**
 
 1. `function_4fad10` の 179017 付近で `tbl` と `cnt` を作る `obj` (`function_535240` の第 1 引数) の由来を確認する。OOB 直前の `obj+8` / `obj+0x10` の値を JS 側で読むのが最短。
-2. `function_4fb910` の arg2 = 0x1faa18 が `function_4fad10` 内でどう使われるか (アドレスとして読まれるか) を確認する。
+2. `function_4fb910` の arg2 = 0x1fa8d8 が `function_4fad10` 内でどう使われるか (アドレスとして読まれるか) を確認する。
 3. 923: `function_410b10` の `obj` を渡す `function_4fb910` 側 (1759) の arg1 (= 16169216 系の定数) から辿る。
 
 ### 検証 (差し戻し対応 run, 2026-10-13)
@@ -243,4 +243,4 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 
 ## 14. obj の生成元 (#2785, 2026-10-14, n=1)
 
-304・555 の obj は `function_4fad10` 内で `535240`→`535b30`→`410320` が確保する node。`535c11` は `535bf2` へ渡す引数を IR で落としており (`call 535bf2()`)、obj は 0 になる。923 の obj は `G = [0x11f26a0]` で、設定は `52f1f0` → `4fa990`。HEAD `bbb07d80` の既定 survey は ok 872 / trap 22 (本節の基準 870/24 とは不一致、原因未特定)。受入 3 は達成、受入 4 は未達。詳細は [REPORT_APPENDIX_2785.md](REPORT_APPENDIX_2785.md)。
+結論: 304・555 の obj は `535c11` が `535bf2` へ渡す引数の欠落で 0 になる。923 の obj は `G = [0x11f26a0]` (設定は `52f1f0` → `4fa990`)。受入 3 達成・受入 4 未達。詳細と測定値は [REPORT_APPENDIX_2785.md](REPORT_APPENDIX_2785.md)。
