@@ -345,6 +345,7 @@
 | `tools/plugins/framework/REPORT_985.md` | ~50 | PLG-P0b-1 (#985, 部分達成): hs_e2e 判定の是正 (Phase B 例外 = FAIL・誤 PASS の実測) と RTL fold deref の現状。`plug != 0` は未達で子 #1229 へ |
 | `tools/plugins/framework/REPORT_2115_APPENDIX.md` | ~50 | framework REPORT_2115 §10 (TLS index 未設定の確認・未採用の stand-in 版の実験・n=1 の実測と対照) を REPORT_2115.md から分割移動 (250 行上限・本文は改訂済み)。測定値の正本 |
 | `tools/plugins/framework/REPORT_P0c9.md` | ~36 | P0c-9 (#610) stage-1 成果物の素材化 (`fw_pack_stage1.sh` pack/verify・`work-fw-stage1` allowlist)。REPORT.md から分割移動 |
+| `tools/plugins/framework/REPORT_2426.md` | ~78 | PLG-P0b-17 (#2426): hs InitUnits の OOB 1 件目 `function_414390` の入力定数化 (`hs_irfix.py` `fix_414390`) の原因・修復・実測と、次の OOB `function_40c4d0` の記録。新規 (分割移動なし) |
 | `tools/plugins/p0c/REPORT.md` | ~139 | kernel 表妥当性検証 + f80 assessment (§1〜§7)。§8〜§16 は `REPORT_APPENDIX_A.md`〜`F.md` に分割し、本体末尾に付録索引 (#378) |
 | `tools/plugins/p0c/REPORT_APPENDIX_A.md` | ~164 | p0c §8 (P0c-2 CAB-241 f80→f64 lowering)・§9 (P0c-3 CAB-251 x87 スタック模型修復) 全文 (#378 で無変更分割移動) |
 | `tools/plugins/p0c/REPORT_APPENDIX_B.md` | ~189 | p0c §10 (P0c-4 CAB-196 ext-emulation mode) 全文 (同上) |
