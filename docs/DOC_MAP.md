@@ -62,7 +62,7 @@
 | `deploy/EDGE-SIM.md` | ~30 | edge-sim の調整一覧 |
 | `tools/e2e/REPORT.md` | ~120 | ブラウザ E2E ハーネスと配信構成の実測 |
 | `tools/hosting/REPORT.md` | ~135 | 既定ホスト名だけで COOP/COEP を成立させる配信構成 (案 S の根拠) |
-| `tools/legal/REPORT.md` | ~180 | LGL-6 (#89) / LGL-10 (#2498): Massive X の同梱 EULA (実測: 同梱なし。Inno Setup 6.4.2 形式・CRC 不一致の記録・再確認と `.dmg` の件数)・Fresh Air の同梱 EULA (ファイル名判定で無し・件数の定義)・Xfer 公式規約ページの取得結果。LEGAL.md §7 の実測値の正本 |
+| `tools/legal/REPORT.md` | ~216 | LGL-6 (#89) / LGL-10 (#2498): Massive X の同梱 EULA (実測: 同梱なし。Inno Setup 6.4.2 形式・CRC 不一致の記録・再確認と `.dmg` の件数)・Fresh Air の同梱 EULA (ファイル名判定と User Guide PDF 本文の検索で無し・件数の定義)・Xfer 公式規約ページの取得結果・公開 FAQ hub の取得結果。LEGAL.md §7 の実測値の正本 |
 | `tools/legal/release-guard/REPORT.md` | ~75 | release guard (LGL-2): 公開前に dist を走査し FL/プラグイン由来バイト列を検出して失敗させる deny-list ゲート |
 | `tools/legal/terms-watch/REPORT.md` | ~145 | terms-watch (LGL-5): 各社 EULA/ToU の取得 (Xfer は NSIS インストーラのヘッダから)・正規化ハッシュ比較・台帳更新・差分時非ゼロ終了 |
 | `tools/legal/notices/REPORT.md` | ~110 | THIRD_PARTY_NOTICES 自動生成 (LGL-3): OSS 再ビルド記録 (upstream 版・configure 引数・パッチ) + FL 同梱表記 15 本 + フォント一覧から NOTICES を生成し、記録なしの同梱 OSS を CI/stage ゲートで検出 |
@@ -329,7 +329,8 @@
 | `tools/python/REPORT_PY67.md` | 242 | PY-67 (#2159, 部分・未達): `0x196eba0` (g) への書込み元を `0x86a4e1` (関数 `0x86a470`) と特定。PY-71 (#2501, §5): g の値 P の型 (vptr `0x13063c8`) と `0xffe370` の所属を特定。受入条件 2b・3・4 は未確定 |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |
-| `tools/python/REPORT_PY39.md` | ~215 | PY-39 (#1527): channels 操作 7 関数の PE ハンドラ位置・PyArg 書式・引数の確定。他関数の戻り値・範囲外 code は未確定。`analysis/flapi/pe_handler_probe.py` の測定と selectAll 等 4 件の表エントリの扱い。#2548 の節は `REPORT_PY39_2548.md` へ分割移動 (250 行上限) |
+| `tools/python/REPORT_PY39.md` | ~220 | PY-39 (#1527): channels 操作 7 関数の PE ハンドラ位置・PyArg 書式・引数の確定。他関数の戻り値・範囲外 code は未確定。`analysis/flapi/pe_handler_probe.py` の測定と selectAll 等 4 件の表エントリの扱い。PY-69 節は `REPORT_PY69.md`、#2548 の節は `REPORT_PY39_2548.md` へ分割移動 (250 行上限) |
+| `tools/python/REPORT_PY69.md` | ~109 | PY-69 (#2499): `selectOneChannel` の PE 意味論。排他選択 (`0x11e84a0`→setter `0xff8a90`)・stack 引数の出所・前提ゲート `0xd5af58`・後段ゲート `0xd82c6a`・選択ゲート `0xffac20` の読解と未解決 ([PY-82] #2642)。`analysis/flapi/pe_scan_store.py` の書込み箇所列挙 |
 | `tools/python/REPORT_PY39_2548.md` | ~80 | PY-39 追補 (#2548): setStepParameterByIndex の呼出し経路・status 表 (範囲外 `-4`)・param 3〜8 の副作用を PE で確定 (REPORT_PY39.md の節の分割移動)。param 0〜2・item 列挙・述語の型は未確定 (子 #2581) |
 | `tools/python/REPORT_PY70.md` | ~95 | PY-70 (#2500): flapi 表の生成器が stub の位置専用引数 (`/`) を読み落としていた不具合の修正 (`channels.processRECEvent` 0→3 引数)。引数個数が変わった 15 関数と未解決 (stub/PE の個数不一致 24 件) の一覧。残りの 4 関数の意味論は子 #2544・#2547・#2548 |
 | `tools/python/REPORT_PY35.md` | ~61 | PY-35 (#1345): patterns 未実装 31 関数の意味論は repo 内に根拠無し (実装 0・コード変更 0)。読み取り 14 件 #1667 (PY-42)・選択/移動/書き込み 17 件 #1668 (PY-43) に分割 |
@@ -452,6 +453,7 @@
 | `tools/pm/REPORT_APPENDIX_2591.md` | ~60 | #2591 (pm.md の `needs_decision` の PR 起点化・`rule=skip`・投稿・質問の前の確認) の検証記録。修正本体は #2603 で main に入った。main の版の検査・ネガコンの測定 (測定 commit と検査件数・結果は付録 §2)。`REPORT.md` は 250 行上限のため本体へ追記しない |
 | `tools/pm/REPORT.md` | ~222 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380 (全文は付録)・`idle_report.sh` の検証 #2354 (全文は付録)・PM Worker の live 切替前の突き合わせ #2443・R2 素材投入の頻度 #2434・`pm_wake.sh` の判定テストと live 確認 #2347・PM Worker の同時実行の上限の推定 #2381)。RETRO・DIRECTIVES の数値の正本 |
 | `tools/pm/REPORT_APPENDIX_2380.md` | ~32 | tools/pm REPORT §10 (PM Worker のコメント同期 #2380) の全文。250 行上限のため REPORT.md から分割移動 (#2434) |
+| `tools/pm/REPORT_2416.md` | ~140 | PM Worker の build 表示 (#2416、PR #2477 の差し戻し round 1・5): `npm test`・`npm run test:unit`・`npm run test:workers` の n=3 実測 (測定 commit と件数は本付録が正本。wall と vitest Duration を分けて記録)、wrangler `--define` / `--var` の dry-run 結果 (README『再デプロイ』手順 4 の根拠)。`REPORT.md` は無変更 |
 | `tools/pm/REPORT_2336.md` | ~98 | PM Worker の規則 A (merged PR を持つ親 issue の自動 close・#2336) の実データ dry-run の実測 (Worker の判定と別実装の再計算の照合・候補の内訳・ネガコン・判定条件を外したときの FAIL)。運用の正本は `infra/pm-worker/README.md` |
 | `tools/pm/REPORT_APPENDIX_2354.md` | ~62 | tools/pm REPORT §11 (`idle_report.sh` の検証 #2354) の全文。250 行上限のため REPORT.md から分割移動 (#2381 の PR のレビュー指摘への対応)。fake gh の判定 41 件・実データの検算・未解決 (soak の合格ライン) |
 | `tools/pm/REPORT_APPENDIX_2337.md` | ~60 | tools/pm REPORT §16 の全文 (oc-pm の refs_orphan 検出 #2337・PR #2478: 測定・ネガコン・Refs のみ判定の差)。250 行上限のため REPORT.md から分割移動。測定値の正本は本付録 |
@@ -477,9 +479,10 @@
 | `docs/pm/DIRECTIVES.md` | 依頼者 (user) 指示の**逐語原文**と PM の解釈・反映先 | 原文の改変 (追記のみ)・測定値 |
 | `docs/pm/RETRO_2026-10-13.md` | Actions 移行後 2 日間のショートレトロ (事実・原因・対策。依頼者指示 121) | 測定値 (正本は `tools/pm/REPORT.md`。本書は結論と link のみ)・指示の逐語原文 (`DIRECTIVES.md` が正本)・repo 外絶対パス |
 | `tools/pm/REPORT.md` | PM 運用の実測の**正本** (PR 件数・PR とチケットの対応・Project V2 Status (参考値)・Actions run 集計。基準時刻と取得方法を併記) | 技術実装・指示の逐語原文・チケット状態の判断 (`STATUS.md`・issue/PR の状態 (`docs/WORKFLOW.md` §3) が正本) |
+| `tools/pm/REPORT_2416.md` | PM Worker の build 表示 (#2416) の測定値の**正本** (付録。`npm test`・`npm run test:unit`・`npm run test:workers` の n=3 実測と取得方法、wrangler `--define` / `--var` の dry-run 結果) | 技術実装の手順 (README が正本)・指示の逐語原文・チケット状態の判断・repo 外絶対パス |
 | `tools/pm/REPORT_APPENDIX_2380.md`・`tools/pm/REPORT_APPENDIX_2354.md` | REPORT §10・§11 の分割移動先 (無変更の全文)。測定値の正本は付録側 | 本体 `REPORT.md` へ戻す追記・同じ節の要約の重複 (本体は要約とリンクだけ) |
 | `tools/pm/README.md` | PM 運用ツールの一覧・『VM 退役後の扱い』(全ファイルの後継・廃止の表)・VM の状態ファイルの扱いの決定 (取り込み or 破棄と影響)・前提・環境変数・運用の約束 | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報・状態ファイルの中身や件数 (決定と影響だけを書く) |
-| `infra/pm-worker/README.md` | PM Worker (Cloudflare) の構成・デプロイ・**再デプロイ (wrangler の OAuth)**・ロールバック・OAuth 失効時の手順・`[未確認]` のチェックリスト | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報 (token・OAuth の保存ファイルの中身)・repo 外絶対パス |
+| `infra/pm-worker/README.md` | PM Worker (Cloudflare) の構成・デプロイ・**再デプロイ (wrangler の OAuth)**・ロールバック・OAuth 失効時の手順・`[未確認]` のチェックリスト | 測定値 (`tools/pm/REPORT.md`・付録 `tools/pm/REPORT_2416.md` が正本)・認証情報 (token・OAuth の保存ファイルの中身)・repo 外絶対パス |
 | `tools/pm/status_sync.py` (+ `test_status_sync.py`) | `docs/STATUS.md` の自動節 (`status-auto` マーカーの内側) を、直近 24 時間の merge PR を MS / サブシステムに写像した件数と代表 PR 番号で更新する決定的スクリプト (REST のみ)。写像表は `docs/STATUS.md` の `status-map` ブロックが正本。テスト: `python3 -m unittest tools/pm/test_status_sync.py` | 測定値 (自動節にも書かない。正本は各 `REPORT.md`)・自動節の外の編集・認証情報 |
 | `docs/pm/README.md` | `docs/pm/` の索引 (3 ファイルの役割のみ) | DIRECTIVES の内容の繰り返し・分析内容 |
 | `docs/pm/PREDECESSOR_ANALYSIS.md` | 解任された前任 PM セッションの分析 (混乱の原因・証拠・再発防止ルールへの反映) | 指示の逐語原文 (`DIRECTIVES.md` が正本)・状態や未解決事項 (`STATUS.md`・`HANDOFF` が正本)・repo 外絶対パス |
