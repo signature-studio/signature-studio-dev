@@ -11,9 +11,9 @@
 
 ## 測定
 
-- 測定 commit: `1e4d805e` (LD-62 の predict 整数化)。HEAD は `b64b15d8`。
-- `git diff 1e4d805e HEAD -- tools/liftdiff/tests/trace_417b70_trap.py` は 0 行 (`b64b15d8` は main 取り込みのみ)。
-- 再現コマンド (rc=0, 所要 0.76 秒, 素材: `fl-win64` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`work-liftdiff` と `work-m11` を worktree の `tools/liftdiff/work/` と `tools/m11/work/` に展開):
+- trap 側の測定 commit: `1e4d805e` (LD-62 の predict 整数化)。`git diff 1e4d805e HEAD -- tools/liftdiff/tests/trace_417b70_trap.py` は 0 行。
+- 境界値側 (`trace_417b70_boundary.py`) は重複 cnt の削除で変更した。測定 commit はその修正 commit (PR 本文に記載)。
+- 再現コマンド (rc=0, 所要 1.21 秒 (シェル実測), load 未計測。素材: `fl-win64` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`work-liftdiff` と `work-m11` を worktree の `tools/liftdiff/work/` と `tools/m11/work/` に展開):
 
   ```sh
   FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/liftdiff/tests/trace_417b70_trap.py > tools/liftdiff/results/m11_417b70_trap_inputs.md
@@ -22,8 +22,8 @@
 - 出力の正本: [`results/m11_417b70_trap_inputs.md`](results/m11_417b70_trap_inputs.md) (生成物)。
 - 境界値の計算: `python3 tools/liftdiff/tests/trace_417b70_boundary.py > tools/liftdiff/results/m11_417b70_div_boundary.md` (素材不要)。
   - 出力: [`results/m11_417b70_div_boundary.md`](results/m11_417b70_div_boundary.md)。
-  - p = k·cnt + r (k ∈ {1,2,3,5,7,16,1000,2^31−1}, r ∈ {−1,0,1}) の 120 件を exact (Fraction) と比べると、旧式は 39 件不一致、新式は 0 件。
-  - 旧式で `cnt = 2^60+1` の 1 行だけ見れば 8 件不一致 (PR 本文の「8 件」はこの行)。
+  - p = k·cnt + r (k ∈ {1,2,3,5,7,16,1000,2^31−1}, r ∈ {−1,0,1}) の 4 種の cnt (計 96 件) を exact (Fraction) と比べると、旧式は 31 件不一致、新式は 0 件。
+  - cnt の重複 (`(1<<60)+1` と `1152921504606846977` は同値) は除いてある。旧式で `cnt = 2^60+1` の 1 行だけ見ると 8 件不一致。
 
 ## 実測 (native, 8 入力)
 
