@@ -1128,7 +1128,7 @@ def _f3c_note_uses(cs, i, st, uses):
                 return
             if not o1.mem.index and not o1.mem.disp and mb and o1.size in (4, 8):
                 sv = st.get(mb)
-                if sv and sv[0] == 'arg':
+                if sv and sv[0] in ('arg', 'argv'):
                     uses.append(('deref', i.address, sv[1], o1.size * 8))
                     return
         if o0.type == 3 and o1.type == 1:
@@ -1243,6 +1243,31 @@ def _f3c_static_state(cs, ins):
     return sreg, sslot
 
 
+def _f3c_bump_slots(cs, ins, sslot):
+    """引数ポインタを写し、ループ内で `add/sub [slot], imm` だけで前進させる frame slot → argN (#1324)。
+    slot への書き込みが「argN の reg からの 64bit mov」1 本と bump だけの slot を採る。値は argN+可変なので、
+    deref 記録 ('argv') にだけ使い、lsf/ptr/raw/fix_f3c_use の判定には使わない"""
+    st = {r: ('arg', n) for r, n in ARGREG_ARG.items()}
+    plain, bump = collections.defaultdict(list), collections.Counter()
+    for i in ins:
+        ops = i.operands
+        if ops and ops[0].type == 3 and i.mnemonic not in ('cmp', 'test', 'push'):
+            b = gprnorm(cs, ops[0].mem.base) if ops[0].mem.base else None
+            if b in ('rbp', 'rsp') and not ops[0].mem.index:
+                k = (b, ops[0].mem.disp)
+                if i.mnemonic in ('add', 'sub') and len(ops) == 2 and ops[1].type == 2:
+                    bump[k] += 1
+                else:
+                    sv = st.get(gprnorm(cs, ops[1].reg)) if i.mnemonic == 'mov' and len(ops) == 2 and ops[1].type == 1 else None
+                    plain[k].append(sv[1] if sv and sv[0] == 'arg' and ops[0].size == 8 else None)
+        _f3c_step(cs, i, st, None, None)
+    out = {}
+    for k, srcs in plain.items():
+        if bump[k] and len(srcs) == 1 and srcs[0] is not None and k not in sslot:
+            out[k] = srcs[0]
+    return out
+
+
 def _f3c_regs_by_block(cs, blocks, sreg):
     """各ブロック先頭で argN をそのまま持っている reg: 引数 reg (rcx/rdx/r8/r9) と、entry で 1 回代入された callee-saved reg (sreg)。
     reg を書く命令 (def 自身を除く。call は volatile 全部を書く) があるブロックの後続へ到達閉包を取り、その外側だけを残す"""
@@ -1312,10 +1337,13 @@ def f3c_track(fv):
     blocks.append(cur)
     keep, argof = _f3c_regs_by_block(fv.cs, blocks, sreg)
     lsf, ptr, uses = [], collections.Counter(), []
+    bumps = _f3c_bump_slots(fv.cs, ins, sslot)
     for k, b in enumerate(blocks):
         st = {r: ('arg', argof[r]) for r in keep[k]}
         for (bs, d), n in sslot.items():
             st[('m', bs, d)] = ('arg', n)
+        for (bs, d), n in bumps.items():
+            st[('m', bs, d)] = ('argv', n)
         for i in b:
             _f3c_step(fv.cs, i, st, lsf, ptr, uses)
     return lsf, ptr, uses, {i.address for i in blocks[0]}
