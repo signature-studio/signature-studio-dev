@@ -4,7 +4,7 @@
 
 親: #2874 (PY-99)。前段: `REPORT_PY41_APPENDIX.md` の PY-88 (#2788) 節。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
 前提: 同名 path `analysis/py99_slot_paths.py` は #2874 の script (PR #3092・main 取り込み済み) が使う。本節の script は同名を避けて `analysis/py99_merge_sets.py` に改名した (main 取り込み時の add/add 競合の解消。両方の内容を残す)。2 本の統合は未決 (未解決表)。
-測定 commit: `cbe89029` (negctl の S_p 表示と `--md` を入れたコード commit)。main 取り込み後の `3d25011b` で再測定し、stdout と表が一致した。`git diff cbe89029 3d25011b -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 9 ファイル (+344/−3)。py99 の入力 `py88_writes.py`・`py53_dispatch.py` は 0 行。
+測定 commit: `13ad4d36` (main 取り込みと競合解消の merge commit。script の改名を含む最後のコード commit)。main 取り込み前の `cbe89029` (negctl の S_p 表示と `--md` を入れたコード commit) の script を同じ入力で走らせた stdout と、`13ad4d36` の stdout は diff 0 行で一致した。`git diff 13ad4d36 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行 (本 commit は REPORT のみ)。py99 の入力 `py88_writes.py`・`py53_dispatch.py` は `git diff cbe89029 13ad4d36` で 0 行。
 
 ### 結論 (受入 2 達成・受入 1 の閉包は子 #3104 に移管・`Closes #3085` (範囲縮小))
 
@@ -18,6 +18,7 @@
 - 算法 B (後ろ向き): r から CFG の逆辺を BFS で遡り、`[rbp+X]` への dword/qword store で止める。線形に遡って最初の合流 J と、J の先行辺 p ごとの S_p を出す。CFG は fall-through・jmp・jcc から作る (間接分岐 0 件)。
 - 算法 A (前向き): 同じ X の reaching-definitions 固定点 (gen・kill = 同 X の store)。読み r の IN(r) と B を 1 件ずつ比べる。
 - store の式: py88 の `Slicer.def_value` (線形)。式に `⚠合流`・`SLOT[` 等が残るものは未閉。
+- 実行 (`13ad4d36`・コミット済み HEAD): 既定 0.556 秒 (exit 0)・`--negctl drop-pred` 0.564 秒 (exit 1)。load average (1 分値) 0.07。素材の展開 (`tar --zstd -xf` で `block00031_PE.bin`) 2.8 秒。
 
 ### 件数 (実測・`python3 analysis/py99_merge_sets.py work/py53/fn.txt` の出力)
 
