@@ -46,9 +46,9 @@
 
 | 測定 | `0x42f670` | `0x42f680` | `0x42f690` | `0x42f698` |
 |---|---|---|---|---|
-| native (PE 初期値・#1936 実測) | `0x449380` | `0x40f9b0` | `0x40f9d0` | — |
-| wasm fresh 修正前 | `0x0` | `0x0` | `0x0` | `0x0` |
 | wasm fresh 修正後 (`cbe7967b`) | `0x449380` | `0x40f9b0` | `0x40f9d0` | `0x4493a0` |
+
+native 値と修正前 (`0x0`) は §9-5 の表を参照。
 
 4. **`0x44a590` の再採点 (受入 3)**: `liftdiff.py run targets/flelift.json --fn 0x44a590 --state auto` の判定は、修正前後とも `verdict=mismatch`、tag `callee_divergence` (medium, entry_va #2)・`unlifted_callee` (high, 閉包外 indirect call 22 件、最後の VA `0x0`)。窓の追加だけでは `unlifted_callee` は消えなかった。(#1936 時点の記録は 18 件。今回は 22 件で、同一ではない。)
 5. **e2e**: `bash tools/flelift/fle_e2e.sh` (`cbe7967b` HEAD): **PASS**、136 秒、load avg 約 1.0。同じ修正を入れた作業ツリー (commit 前) での実行も PASS (141 秒)。
