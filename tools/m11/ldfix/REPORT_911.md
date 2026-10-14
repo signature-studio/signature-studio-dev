@@ -208,6 +208,25 @@ RetDec のソースは公開リポジトリ (avast/retdec) から取得して照
 
 判定: 受入 1 後半 (変換規則の特定) は **ソース上の該当分岐までで達成**。発火の実行確認は子 issue に残す。
 
+## 6e. #1432 (LD-49): 受入 2 — 666b10 の段 17 判定 (ビルド不要)
+
+測定 commit: `origin/main` `00083cdb` (コード変更なし)。素材: `toolchain-retdec` (版 2019-03-08) と `fl-win64` の `block00031_PE.bin`。
+
+```
+RETDEC=<retdec-decompiler> PE=<block00031_PE.bin> python3 tools/m11/ldfix/retdec_stage_1091.py 666a60 666a60 666b20 666b10 --out <DIR>
+```
+
+- 所要 9.458 秒 (real、n=1)。load average 実行前 1.10 / 実行後 1.16。
+- 出力 (`666b10` の `mov r8,[r8]`):
+
+| 段 | 段名 | IR |
+|---|---|---|
+| 1 | Input binary to LLVM IR decoding | `load @r8` → `inttoptr` → `load` → `store @r8` |
+| 17 | Constants optimization | `load @rcx` → `store @r8` (誤。`rcx` = slot 先頭) |
+| 19 | LLVM instruction optimization using RDA | 17 と同じ |
+
+判定: 666b10 の変化は **段 17 の Constants optimization** で起き、41a6a0 (段 16) と同じ「ポインタ経由の load が gv の直接 load に畳まれる」形である。段 1 は RetDec の decoder 段で、ldfix 段ではない。**同一機構とまでは未確定**。分岐 L164〜171 への到達は受入 1 (発火確認) に依存する。
+
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
 
 - 検証 HEAD: PR head の hash は PR 本文と `gh pr view` が正本 (REPORT 内には書かない。自己参照になるため)。
