@@ -191,3 +191,32 @@
 | `-O2` | 73.9 s | 0.90 | 11/11 | PASS (exit 0) |
 
 - 素材: `toolchain-retdec` (`$RUNNER_TEMP/rd/retdec`) と `toolchain-emsdk` (`$RUNNER_TEMP/em/emsdk`) を `RETDEC` / `EMSDK` で指定。`license/e2e.sh` 本体は未変更 (`mx_lic_stub.py` も未変更)。
+
+### 12.9 テーブル基準 (E) の総当たり (#1613 [MX-11]・2026-10-14)
+
+- 新規スクリプト `license/scripts/mx_table_refs.py` (`--selftest` 付き)。`.text` の RIP 相対 mem 実効先・即値のうち `.rdata`/`.data` に入る VA を表の base 候補 (177,327 件) とし、各 base から先頭 512 個の 4B 符号付き値 d を読んで `base + d` が対象 15 VA (読み手 5 関数 + N5/N6 文字列 10 VA) に一致するかを判定。
+- 自己検査: `--selftest` で既知の表 entry 1 件を検出 → PASS (rc 0)。
+- 測定 commit `a2cbc607` (実 PE md5 `622993e7…`・`load` 0.10 開始時): 所要 2 min 31 s。
+
+| 対象 | (E) hit |
+|---|--:|
+| 読み手 5 関数 (N6-1〜5) | 0 |
+| N6 文字列 0x184ffcf87 / 0x184ffd03f / 0x184ffd092 / 0x184ffd0d6 / 0x184ffd131 | 0 |
+| N6 文字列 0x184ffcfe8 | 1 |
+| N5 MXDemoPopup.qml / demoExpired / subscriptionExpired | 0 |
+| N5 demoExpiredChanged | 2 (同一 base 0x1847f8cb8 の idx 30 / 200) |
+
+- **判定: 実参照ではなく誤検出と判定**。(a) 対照 40 件 (`.rdata` 内ランダム VA) で 1 対象あたり平均 0.05 件のランダム hit があり、実測 3 件 (10 対象) はその水準。(b) hit の周辺 entry を復号すると、`base+d` が前後で `.data`・`.rdata`・セクション外 (`None`) に散り、表として一貫性が無い (`work/tbl_inspect.py` で確認)。
+- 結論: テーブル基準でも読み手 5 関数と N5 文字列の参照元は**確定しない**。N6 読み手の呼び出し元と N5 の読み手は、直接参照 (§12.7)・絶対/RVA/RIP/自己相対 (§12.8)・テーブル基準 (本節) の 4 系統 + (E) で 0 件。残るのは文字列 index 経由など未走査の間接参照。
+- 差し替え点は未確定のため `license/scripts/mx_lic_stub.py` の RULES は**変更しない** (根拠なしの br_force / store は silent miscompile になる)。受入条件 2 は未達。`acpt_verify_mx2.py` の拡張 (受入条件 4) も未着手。
+
+#### e2e (受入条件 3・測定 commit `a2cbc607`)
+
+| MX_OPT | 所要 (wall) | load (開始) | harness | 結果 | 備考 |
+|---|--:|--:|--:|---|---|
+| `-O0` | 61.8 s | 0.10 | 11/11 | PASS (exit 0) | `license/work` 削除後 (冷間・lift 再生成) |
+| `-O1` | 4.8 s | 0.23 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
+| `-O2` | 4.7 s | 0.16 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
+
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`、`toolchain-retdec` → `$RUNNER_TEMP/rd/retdec`、`toolchain-emsdk` → `$RUNNER_TEMP/em/emsdk`。`parse_setup_headers.py` / `extract_massivex.py` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致)。`work/extracted` は同ディレクトリへの symlink。
+- 注意: 検証途中、`-O1` と `-O2` を並列実行して `license/work/mx_fixed.vst3` を競合させ、`-O2` が PE 修復 assert で rc=1 になった。並列実行の誤りで、スクリプトの不具合ではない。上表は逐次実行・同一 commit での再測定値。

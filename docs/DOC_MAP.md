@@ -105,6 +105,7 @@
 | `tools/liftdiff/REPORT_LD24.md` | ~70 | liftdiff LD-24 (#976) 節: m11 closure `unsupported_sig` 50 件の内訳と #1193 / #1194 への分割 (署名内訳は IR 未照合)。REPORT.md §12 から参照 |
 | `tools/liftdiff/tests/ld24_sig_breakdown.py` | ~110 | LD-24 (#976) の署名内訳スクリプト: `unsupported_sig` 50 行の va/name を IR (`boot_final3.ll`) の define/declare 行から引き、署名形ごとの件数と #1193/#1194 振り分けを出力 (IR 必須・IR 無しは終了コード 1) |
 | `tools/liftdiff/REPORT_LD39.md` | ~75 | liftdiff LD-39 (#1194) 節 (途中報告): i128 / %tagPOINT の 11 関数の振り分けと機械語入口の実測。i128 の渡し方は 2 候補とも未決。case 生成・runner は未実装 |
+| `tools/liftdiff/REPORT_APPENDIX_LD53.md` | ~60 | liftdiff LD-53 (#1546) 節: i128 引数の呼出し側全件 (命令境界の線形走査: 40c660 5021 件中 xmm0 4828 件) と呼び先の判定。投入形 (a)/(b) は 691dd0 1 件のみ残り未決。IR 型誤りの修正は #976 残件 |
 | `tools/liftdiff/tests/ld39_abi_dump.py` | ~80 | LD-39 (#1194) の ABI 入口ダンプ: 11 関数の PE 先頭命令列を capstone で並べ、jmp thunk の IAT 先を解決する。ABI は断定せず、判定は REPORT_LD39.md で人が行う |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
 | `tools/icall/REPORT_APPENDIX.md` | ~214 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行)・§16 (#852 FLEngine jump table) の全文 (250 行上限のため分割移動) |
@@ -149,6 +150,7 @@
 | `tools/m11/REPORT_N1176.md` | ~45 | #1176 (M11-N71): work-m11 同梱の古い obj/rt.o・win.o が build を落とす件の再現 (rc・所要の実測)・`m11_build.sh` の mtime 判定の穴を source sha256 判定に変えた修正・`--full` の未検証範囲 (Ghidra 素材不足) |
 | `tools/m11/REPORT_N715.md` | ~70 | #715: m11_e2e.sh 回帰ゲートの期待値 fail-closed 化・判定分岐の実測・e2e 再現試行 (`work-m11` 不足で fail-closed 停止)・PR 作成者の報告値 (未再現) の所在 |
 | `tools/m11/REPORT_N27.md` | ~238 | #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化・IR 生成条件と指紋の記録・同一 runner の n=3 再現・NC 試験・`--full` は入力 CSV 欠落で未成功 (§10)・レビュー指摘の扱い・§13 73532f8 (c) 数値の切り分け) (環境間一致は未実測)。§14 (#960 `--full` 2 回実行の段の切り分け) は要約のみで全文は `REPORT_APPENDIX_960.md` |
+| `tools/m11/REPORT_N1598.md` | ~60 | #1598 (M11-N104): `m11_e2e.sh` 既定経路を HEAD `4c3f7458` で rc 0 まで再通し (623 秒・judge PASS)。Ghidra 12.1.4 (sha256 一致・JDK 21) で `functions_dll.csv` 59,010 行を作成。trap (stage 4) は残存 |
 | `tools/m11/REPORT_N1415.md` | 70 | #1415: snapshot IR (`69c774de…`) と再生成 IR の段ごとの sha256 切り分け (merge・asmfix までは一致)。`alloca [N x i64]` 54 件は R8 導入前 pass (`159d9fc0~1`) で再現。ldfix の `ldfxc` 差 54 件と (b)(d) は未解決 (子 issue) |
 | `tools/m11/REPORT_N1165.md` | ~110 | #1165: 旧 IR (818/21/56/77) の再現 (`d6a17b64` 手順で ok 818・oob 21・halt0 56)・ldfix の有無による差 (818 ↔ 828)・ldfix 無し build の opt-in 経路 (`M11_ALLOW_LDFIX_DISABLED=1`)・HEAD の 2×2 測定。lift 段の起点と e2e 全体は未解決 (#1165) |
 | `tools/m11/REPORT_APPENDIX_960.md` | ~22 | m11 REPORT_N27 §14 (#960: `--full` を同一 HEAD・同一 PE で 2 回実行し、IR の差の段を切り分け) の全文。250 行上限のため無変更で分割移動 |
@@ -280,7 +282,7 @@
 | `tools/plugins/reverb_delay/REPORT.md` | ~246 | PLG-F4 reverb-delay 9 本: 固有閉包 lift・gate 付き e2e・host/kernel/IPP 依存・T3 engine の到達性 (#201)。§12 に #523 追補 (engine 再測定・E6 修復)、§13 の詳細は `REPORT_APPENDIX.md` |
 | `tools/plugins/reverb_delay/REPORT_APPENDIX.md` | ~37 | reverb_delay REPORT §13 全文 (#523 追補): engine 19000 (`PLUG_F80_LOWER=1`) と 19165 (IPPCODE + AVX 78 除外) の再測定表、19165 の segfault と新類型 E7 (f80 ビット操作の lowering 漏れ)、再現手順、#523 受入条件への対応。§12 との run の違いを明記 |
 | `tools/plugins/modulation/REPORT.md` | ~247 | PLG-F5 modulation 8 本: 固有閉包 lift の再現・exit code 付き判定・間接 call 脱落の判定・閉包境界 (frontier の先) の監査・C++ engine 4 本の到達性 (#202)。§4.1 に殻と engine の結合方式 (受入 5) の実測 |
-| `tools/plugins/modulation/REPORT_APPENDIX_527.md` | ~75 | PLG-F5-2 (#527) の engine 到達性 gate (`engine_judge.py`) の NC と 4 本の判定結果 (§I)、殻の動的ロード呼出の静的特定 (§J、`engine_shell_gpa.py`)、殻の engine 名参照と呼出経路 (§K、`engine_shell_entry.py`)。 |
+| `tools/plugins/modulation/REPORT_APPENDIX_527.md` | ~100 | PLG-F5-2 (#527) の engine 到達性 gate (`engine_judge.py`) の NC と 4 本の判定結果 (§I)、殻の動的ロード呼出の静的特定 (§J、`engine_shell_gpa.py`)、殻の engine 名参照と呼出経路 (§K、`engine_shell_entry.py`。§L で `engine_shell_chain.py` により再確認)。 |
 | `tools/plugins/modulation/REPORT_APPENDIX.md` | ~62 | PLG-F5-2 (#527) の付録。§A〜§F は f80 段 (`p0c/f80_lower.py`) の経緯・失敗内容・実行条件・未実装 helper の経緯。§G は殻と engine の結合方式の結論 1 行 (測定値は REPORT §4.1)。§H は判定 (gate) 設計の表 (REPORT §5 から分割移動) |
 | `tools/plugins/hostx/REPORT.md` | ~145 | PLG-X host 統合 / big3p 12 本の方針決定 (lift する 6 / しない 2 / ユーザ判断 4) と閉包 lift の再現・間接 call 脱落の監査 (#210) |
 | `tools/plugins/g1/REPORT.md` | ~250 | PLG-G1 synth-simple + drum-synth 14 本: 閉包 lift・host/kernel/間接 call 監査・C++ DLL 7 本・gate とネガコン (#206) |
@@ -294,7 +296,8 @@
 | `tools/plugins/p0c/REPORT_APPENDIX_B.md` | ~189 | p0c §10 (P0c-4 CAB-196 ext-emulation mode) 全文 (同上) |
 | `tools/plugins/p0c/REPORT_APPENDIX_C.md` | ~203 | p0c §11 (P0c-4 CAB-253 ARG pass ABI 推定強化) 全文 (同上) |
 | `tools/plugins/p0c/REPORT_APPENDIX_D.md` | ~159 | p0c §12 (P0c-5 #269)・§13 (P0c-7 #310) 全文 (同上) |
-| `tools/plugins/p0c/REPORT_APPENDIX_E.md` | ~207 | p0c §14 (P0c-6 #277)・§15 (環境パス置換 #346)・§15.4 (#360 full e2e before/after) 全文 (同上・§15.4 は main 追記分) |
+| `tools/plugins/p0c/REPORT_APPENDIX_E.md` | ~222 | p0c §14 (P0c-6 #277)・§15 (環境パス置換 #346)・§15.4 (#360 full e2e before/after) 全文 (同上・§15.4 は main 追記分)。§14.6〜§14.8 (#983・#982・#331 残件の現況) は `REPORT_APPENDIX_E2.md` に分割移動 |
+| `tools/plugins/p0c/REPORT_APPENDIX_E2.md` | ~95 | p0c §14.6 (#983 残差 3 kernel の原因と修復)・§14.7 (#982 0x5de3e0 の上位 dword store 復元)・§14.8 (#331 残件の現況) の全文 (`REPORT_APPENDIX_E.md` から分割移動・無変更) |
 | `tools/plugins/p0c/REPORT_APPENDIX_F.md` | ~62 | p0c §16 (P0c-8 #311 ext IR の wasm32 検証 + framework 統合) 全文 (同上・E の 250 行上限のため分割) |
 | `tools/plugins/dynamics/REPORT_APPENDIX.md` | ~25 | dynamics REPORT §4 の「脱落の原因 (#1412)」の全文 (250 行上限のため分割移動。 静的検出 (`statically linked function`) による `.pdata` define 脱落 208 件の内訳と切替実測) |
 | `tools/plugins/sampler/REPORT.md` | ~245 | PLG-G3 (#208) sampler 8 本: lift 前提の実測。 engine lift 鎖の根本原因と `emcc -c` gate・NC。 §2b (#537 推移閉包) は REPORT_INDIRECT.md (#208 / #540) |
@@ -350,6 +353,7 @@
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~113 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・FA-18 の切り分け (§A3-2)・meter 更新式の照合 (§A3-3, #1467)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)・語単位切り分け (§A5, `ks_rdata_value.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 |
+| `tools/targets/freshair/REPORT_APPENDIX_FA22.md` | ~60 | freshair FA-22 (#1578) の付録。FA_NODE1=1 時の setter 0x180c9d74c の失敗形 (逆アセンブル・実測)。部分達成で、判定は子 #1789・#1791 に分割 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA16.md` | ~50 | freshair REPORT §12-5 (未解決: 非空 controller map による 0x180da6c00 到達) の静的読み付録 (FA-16 #1182)。0x180ca1480 の分岐・0x180ca7db0 の map lower_bound ノード配置・0x180c9d700 / 0x180da6c00 の入口条件。実行による検証は含まない。REPORT §12-5 から分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~180 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照)。FA-14 (#907): §7 回帰セットの seed 依存実測・§8 受入の未達と起票先 (#1105)・§9 lift2_e2e 実測 (実測 commit `c531a0cb`) |

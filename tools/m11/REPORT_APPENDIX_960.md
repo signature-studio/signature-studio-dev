@@ -35,3 +35,23 @@
 - **前回 §14 との関係**: §14 は HEAD `29f63707` で 870/25/46 (N1)、N2 は ok 870 のみ。HEAD が違うため件数は直接比較できない。差の起点が段ごとに変わるため、差は実行ごとに揺れると判断する。
 - **扱いの提案 (受入 3・PM 判断待ち)**: `ir_sha256` は実行ごとの固定指紋として使えない。survey 基準は件数 (ok / trap / miss / reached_stage) で比較する方針を、今回 2 回の一致で支持する。ただし 2 回だけの一致であり、trap / miss の unit 単位の一致は未確認。
 - 再現: §14 と同じ (`FL_WIN64_DIR=<fl-win64>` / `RETDEC_ROOT=<[RETDEC]>/retdec` / `PATH=<[RETDEC]>/bin:$PATH` で `bash tools/m11/m11_e2e.sh --full` を 2 回)。
+
+## 16. #1664: RetDec 段 (drc.ll) の非決定の原因特定 (部分達成・`--full` 2 回は未実施)
+
+- 測定 commit: `0eaf2989` (origin/main 起点の `1664-retdec-uselistorder`)。測定時点のコード差分 0 (本 PR はこの節だけを追加)。
+- 条件: PE `fl-win64` の `block00031_PE.bin`・RetDec `[RETDEC]/bin/retdec-decompiler` (v5.0)・`work-m11` の `boot_ranges.txt` (先頭 N 個の range)。`m2/ir_normalize.py` と `m5/ir5_patch.py` (A7) はリポジトリ版を使用。
+- 測定 (RetDec 単体・同一 range・同一 PE):
+
+| 測定 | range 数 | 所要秒 | load | drc.ll の md5 | 差分行 (drc.ll) | A7 後 lift.ll の md5 |
+|---|---|---|---|---|---|---|
+| subset r1 / r2 | 150 | 6 / 5 | 0.34 | `cbee7ce0` / `da00f50d` | 2 行 (`uselistorder` 1 行の並び) | `23c8ea5b` / `23c8ea5b` |
+| subset s3〜s8 | 150 | 未計測 (timeout 90 内に完了) | — | 6 回中 5 種類 (`669013af` が 2 回) (`cc6dac6c` `669013af` `669013af` `907ab19c` `7eae26d1` `ae3a6356`) | 全て `uselistorder` 行の並びのみ | 6 回すべて `23c8ea5b` |
+| chunk 0 a / b | 1900 | 25 / 23 | 0.34 | 一致 | 0 | (未生成) |
+
+- **原因 (範囲内)**: 差は RetDec の `uselistorder` 指示行の並び (LLVM use-list order) だけ。`ir_normalize.py` は変えず、A7 (`ir5_patch.py` の `uselistorder` 行除去) を通すと、150 range の 8 回 (r1, r2, s3〜s8) で `lift.ll` が全一致した。
+- **未確認 (§14 の記述との差)**: §14 は `@global_var_*` 定義行の位置の差も挙げたが、本節の subset では再現しなかった。`--full` (全 range・Ghidra 入力) でのみ出るかは未切り分け。
+- **受入 1 (原因の段)**: 「RetDec drc.ll の `uselistorder` 並びが揺れる」までは確定。`--passes` 単位の切り分けは未実施。
+- **受入 2 (固定化)**: 既存の A7 段が `uselistorder` を除去しているため、`lift.ll` 段では既に吸収されている。新たな正規化は未実装 (不要の可能性が高い)。ただし `boot_final.ll` の行順差 (§14 の記述) を A7 後の段で消せるかは未確認。
+- **受入 3 (`--full` 2 回の `ir_sha256` 一致)**: **未実施**。`functions_dll.csv` の生成に Ghidra 12.1.4 が要るが、runner に `[GHIDRA]` が無く、`work-m11` 素材にも含まれない (`tools/m11/m11_bounds.py`・`m11_tail.py` が `m2/work/ghidra_dll/functions_dll.csv` を読む)。
+- **未解決**: (a) `--full` 2 回の実測と ir_sha256 一致の判定 (起票先 #1664 に残す)。(b) `@global_var_*` 行位置の差の有無 (同 #1664)。
+- 追加の注意: 全 range (`boot_ranges.txt` 全文) を 1 引数で渡すと `Argument list too long` で失敗する (`m11_lift_all.sh` が 1900 個ずつに分割する理由)。測定は `[RETDEC]` を使った。
