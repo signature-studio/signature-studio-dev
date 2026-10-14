@@ -25,7 +25,7 @@
 | ライン | 書き手 | 主なフィールド |
 |---|---|---|
 | 0 (@0) 構成 | wasm (open 時) | magic, state, sample_rate, out_ch, in_ch, ring_frames, ring_mask, buffer_frames, depth, rebuffer_frames, out/in_ring_ptr, flags, dev_events |
-| 1 (@64) | worklet | dev_frames(u64), dev_ctx_time_bits(f64), out_read, in_write, underruns, silence_frames, quanta, in_overruns, wl_state, clock_seq(seqlock), play_start_frame, clock_jumps/_frames |
+| 1 (@64) | worklet | dev_frames(u64), dev_ctx_time_bits(f64), out_read, in_write, underruns, silence_frames, quanta, in_overruns, wl_state, clock_seq(seqlock), play_start_frame, clock_jumps/_frames, clock_skip_frames/clock_dup_frames/clock_jump_max/clock_jump_max_q (@164-179, burst_obs の後の pad2 から割当) |
 | 2 (@128) | producer | out_write, in_read, wake_target, gen, go, tick_target, notify_ms, burst_obs(worklet 書) |
 | 3 (@192) | main | ref_ctx_time_bits, ref_epoch_ms_bits (seqlock), out/base_latency_us |
 | 4 (@256) | wasm↔main | cmd_seq/op/arg[4], ack_seq/status/res[4], ctrl_ready |
@@ -66,7 +66,7 @@ worklet は quantum 毎に `avail = write-read` を見る:
 - `avail < 128`: `avail` 分を消費し残りは無音。**declick**: 最後の値から 32 フレームで線形減衰 (無音部分のみ書換え、有効サンプルは不変)。`underruns++`, `silence_frames += 128-avail`、`BUFFERING` 状態へ。
 - `BUFFERING`: 無音出力・非消費・`dev_frames` は進行。`avail ≥ rebuffer_frames(=B)` で復帰、復帰先頭 32 フレームをフェードイン。起動直後の初回バッファリングは underrun に数えない。
 - データは**捨てない**: 欠落の代わりに無音が挿入され以降は遅れて再生 (ネイティブ ASIO が前バッファを再生して遅延する挙動と同型)。FL の転送位置は FL 自身の生成フレームで決まるため整合は保たれる。
-- ブラウザ側スキップ (`currentFrame` が process() 間で連続しない) は `clock_jumps/clock_jump_frames` に別計上 (shim の underrun と区別)。
+- ブラウザ側スキップ (`currentFrame` が process() 間で連続しない) は `clock_jumps/clock_jump_frames` に別計上 (shim の underrun と区別)。`clock_jump_frames` は符号付き合計で正負が相殺しうるため、正の成分 `clock_skip_frames` (描画されなかったフレーム) と負の成分の絶対値 `clock_dup_frames` を別に持つ。`clock_jump_max` / `clock_jump_max_q` は 1 回の最大 jump と発生 quantum 番号。
 - `AudioContext` の suspended/interrupted/closed は main が `dev_events` に立て、producer が `asioMessage(kAsioResetRequest)` を送る。
 
 ## 6. クロック同期 (worklet = master)

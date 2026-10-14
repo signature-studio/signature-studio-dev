@@ -1,0 +1,19 @@
+[guard699] mode=on before='icmp sle i32 %9, 0' after='icmp sle i32 %9, 0' changed=False
+[fix912] mode=off replaced=0
+[m11_post][sigfix] call site 署名書換え: 6675 (型未対応で skip: 1)
+[m11_post][sigfix] 0 詰め call site: 1049 (0 詰め引数 2064)
+[m11_post] weak defines: 7421, trampolines: 7399, max params: 12 -> work/boot_final3.ll
+[m11build] cc ../shim/src/heap.c
+[m11build] cc ../shim/src/failfast.c
+[m11build] cc ../shim/src/file.c
+[m11build] cc ../shim/src/timer.c
+[m11build] cc ../shim/src/sync.c
+[m11build] cc m11_rt.c
+[m11build] cc m11_win.c
+[m11build] cc work/boot_final3.ll
+[m11build] cc work/m11_simd.c
+[m11build] cc work/m11_winstubs.c
+[m11build] cc work/m11_fnstubs.c
+[m11build] cc m11_ov.c
+[m11build] cc work/m11_data.c
+[m11build] OK: work/m11_boot.cjs(+.wasm)  wasm-ld signature mismatch: 0, undefined symbol: 0

@@ -174,7 +174,7 @@ await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + 
     console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(28)} ${msg}` +
       (r ? `\n       cb=${st.cb_count ?? st.fills} late=${st.cb_late ?? "-"} cb_max=${st.cb_max_us ?? st.fill_max_us}us burst=${st.burst_obs ?? "-"} T=${st.T ?? "-"} (${st.T ? (st.T * 1000 / r.sr).toFixed(1) : "-"}ms) lat_changes=${st.latency_changes ?? "-"} wake_hist=${JSON.stringify(st.wake_hist)} ` +
         `dev_fill[min/avg/max]=${r.verify?.device_fill?.min}/${r.verify?.device_fill?.avg?.toFixed(0)}/${r.verify?.device_fill?.max} ` +
-        `jumps=${r.snapshot?.clock_jumps}/${r.snapshot?.clock_jump_frames}f lat(in/out)=${r.reported?.lat_in ?? "-"}/${r.reported?.lat_out ?? "-"} clock=${r.clock?.rate_hz?.toFixed(1) ?? "-"}Hz` : ""));
+        `jumps=${r.snapshot?.clock_jumps}/${r.snapshot?.clock_jump_frames}f (skip=${r.snapshot?.clock_skip_frames}f dup=${r.snapshot?.clock_dup_frames}f max=${r.snapshot?.clock_jump_max}f@q${r.snapshot?.clock_jump_max_q}) lat(in/out)=${r.reported?.lat_in ?? "-"}/${r.reported?.lat_out ?? "-"} clock=${r.clock?.rate_hz?.toFixed(1) ?? "-"}Hz` : ""));
   }
 });
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
