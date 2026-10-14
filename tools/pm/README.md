@@ -110,7 +110,7 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
 ## 運用の約束
 
 - **Cloudflare のリソース (worker・token) は新規に作らない**。R2 への投入は既存 token の一時昇格だけで行い、
-  終わったら必ず Read のみへ戻す (手順は `watch_runs.notes.md`)。
+  終わったら必ず Read のみへ戻す (手順は `docs/WORKFLOW.md` §11)。
 - `git add -A` / `git add .`、破壊的な git 操作、`pkill -f` (自分のシェルを殺す) は使わない。
 - 10 秒以上の待機は使わず、`timeout N tail -f /dev/null` で行う。10 秒未満の再試行間隔 (2〜4 秒・0.4〜1.5 秒) の `time.sleep` だけは許容する。
 - 新規着手は、Opened PR が 10 件を下回れば開始、80 件を超えれば Review-Only (指示 130)。
