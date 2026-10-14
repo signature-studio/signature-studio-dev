@@ -107,8 +107,11 @@ index 39480f0a..5a9c1929 100644
 
 ## 5c. 407a50 入口の参照先の実測 (次 run の受入条件 1 の途中結果)
 
-- 測定 commit: `8cd50a1d` (本 PR の HEAD。base は origin/main `984ff34f`)。HEAD で ON・OFF を再測定し、§5c の表と一致することを確認した。素材は fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (35.8 s、ldfix=applied、F1=902、errors=0)、build ON rc=0 (18.3 s)。
-- probe: `probe_entry.py` の `407a50` 入口に読み取り専用の 2 行を追加 (`[raw407]`: `[arg-8]` の値、`[chain407]`: `arg1 < 2601` の表引き (`18770492 + (arg+7)/8`) から `rbx` (`16404744 + 16*b`) → `[rbx+8]` → `[[rbx+8]+24]` の chain)。読み取りは `rd64`/`rd8` が image 範囲 (`0x10000`〜`0x20000000`) のみ読み、範囲外は `0xdead` を返す。
+- 測定 commit: `8cd50a1d` (base は origin/main `984ff34f`)。下表の値はこの commit の probe の結果で、**撤回済み** (下記の訂正を参照)。素材は fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (35.8 s、ldfix=applied、F1=902、errors=0)、build ON rc=0 (18.3 s)。
+- probe: `probe_entry.py` の `407a50` 入口に読み取り専用の 2 行を追加 (`[raw407]`: `[arg-8]` の値、`[chain407]`: `arg1 < 2601` の表引き (`18770492 + (arg+7)/8`) から `rbx` (`16404744 + 16*b`) → `[rbx+8]` → `[[rbx+8]+24]` の chain)。`rd64`/`rd8` は image 範囲 (`0x10000`〜`0x20000000`) のみ読み、範囲外は `0xdead` を返す。
+- 訂正 (レビュー指摘 1): 旧 `[raw407]` 行は上限 `0x1500000` だけを判定し、下限 `0x10000` の判定が無かった。そのため `arg1-8` が image 範囲外 (表の入口 1〜6 では 0x3fc・0x20・0xe・0x1a・0x80) でも低位アドレスを直接 deref していた。表の `[arg-8]` 値 (`0`・`0x10bd4e00`・`0x10bd4da00000`・`0x4e000000000010bd` 等) はこの範囲外読みを含むため、文書 (範囲外は `0xdead`) と一致しない。`[raw407]` は `rd64(p)` に直した (修正は commit `470cb820`)。修正後の値は未測定。
+- 撤回: 下表の `[arg-8]` 列は採らない。`[chain407]` 列は `arg1 < 2601` の枝でだけ `rd8`/`rd64` を使うが、旧 probe の値を根拠にした ON/OFF の差 (入口 5 以降の `m`) も確定扱いしない。
+- 未実施 (本 run): 修正 probe での ON/OFF 再測定。`toolchain-retdec` / `toolchain-emsdk` / `work-m11` が本 run の `$ARTIFACTS_DIR` に無く、PR 本文にも `oc_artifacts:` 行が無いため (`docs/WORKFLOW.md` §11)。再測定には `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` を本文に書いて再起動が要る。
 - ON・OFF とも全 942 unit の probe 版 survey (`SV_ERR_LOG` で unit 番号付きの全 stderr を採取)。unit 190 の `407a50` 入口を順に並べた:
 
 | 順 | 入口 arg1 | `[raw407]` の `[arg-8]` | `[chain407]` (ON / OFF) |
