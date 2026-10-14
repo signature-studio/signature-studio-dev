@@ -147,3 +147,20 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 判定 (受入条件): 1 (`0x41bf30` 呼出し後の `[0x86b188]` の確定) **達成** (`0x41bf30` のまま、書換えなし)。2 (レジスタ経由の書込みの実行時トレース) **部分達成** (T1 は関数単位で書込み 0 件。プログラム全体の実行は未実施)。3 (`[rbx]` → `0x8c3ca8` の確定) **未達** (`0x4113f2` で `0x41bf30` が入るが、`0x41196b` が後で 0 を書く)。4 (REPORT §9 への記録) **達成** (本節と §9 の注記)。waiver は変更しない。
 - 静的側の照合 (issue 検証方法): `python3 tools/plugins/f2/slot_write_scan.py <block19148_PE.bin> 0x86b180 0x86b190` = `relocs overlapping: 1`・`direct accesses (rip/abs disp), excluding lea: 0` (wall 24.29 秒、load 0.12 → 0.42)。実行可能セクションは `.text` のみ。
 - 再現: `python3 tools/plugins/f2/unicorn_trace.py <block19148_PE.bin> 0x41bf30 -q 0x86b188 -q 0x8c3ca8 -w 0x86b188:0x86b190 -m 100000` と `python3 tools/plugins/f2/unicorn_trace.py <block19148_PE.bin> 0x411330 -r rcx=0x40000000 -r rdx=0x40000100 -r r8=0x86b128 -r r9=0x86b188 -a 0 -a 0x40000200 -a 1 -a 0 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 200000`。
+
+## 11. PLG-F3-23 (#2259): 0x8c3ca8 の最終値の実行経路 (測定 commit は本 PR の commit、block19148)
+
+- 入力: `PE=$RUNNER_TEMP/extracted/block19148_PE.bin` (`cd $RUNNER_TEMP && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block19148_PE.bin`、5,904,384 bytes)。依存: `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。以下のコマンドは `export PATH=$RUNNER_TEMP/f2venv/bin:$PATH` の下で、リポジトリ直下から実行。
+- 受入 1 (`0x411940` の実呼出し元と `rcx`): `callsite_scan.py <PE> 0x411940 0x8c3ca8 0x8c3c80` の結果は直接呼出し元 2 件 `0x411acf` (`rcx = lea 0x8c3da8`、`0x411ac8`) と `0x411bb8` (`rcx = lea 0x8c3c80`、`0x411bb1`)。両方 `0x411a80` の pdata 範囲 [0x411a80,0x411c05) 内。`0x411acf` の `rcx=0x8c3da8` は `callsite_scan` の `lea` 由来で、動的トレースでは未到達 (`0x8525f0`・`0x83efb0` の両経路で `-t 0x411acf` が 0 件)。実行時に実測した rcx は `0x411bb8`・`0x411940` の `0x8c3c80` のみ。`0x411940` 本体は、`rcx` が指す構造体の +0x38 から 0x1e qword をローカルへ退避し、`rsi = [rcx]` として `rep movsq` で `rcx` 自身へ 0x25 qword コピーする (コピー元は `[rcx]` が指す領域)。よって `0x8c3ca8` (= `0x8c3c80+0x28`) は `[[rcx]+0x28]` で上書きされる。`0x411bb8` 経路では `rcx = 0x8c3c80`、`[0x8c3c80]` は `0x411330` が格納したスタック上の構造体ポインタ。
+- 受入 2 (実データ経路で最終値): **未達**。DLL エントリ `0x8525f0`・export `CreatePlugInstance` (`0x83efb0`) の両方から unicorn で実行したが、ホストの実引数 (rcx = plugin host 構造体) が無く、
+  - `0x8525f0` 経由: `0x41c740` の第 1 引数はスタック上のゼロ領域。`0x411940` が `0x8c3c80` にコピーする元は 0 で、`0x41196b` が `0x8c3ca8` に書く値は 0 (`0x4113f2` の `0x41bf30` は直後に上書きされる)。実データの値ではない。
+  - `0x83efb0` 経由: 引数を与えないと `UC_ERR_FETCH_PROT` (rip=0x0・`rax=0x0`) で停止する。最後に実行された命令は `0x7772be` で、`[rsp]=0x7772c0` の間接 call がゼロの関数ポインタを呼んでいる (読み出し違反ではない)。`-r rcx=0x400000` を与えたときだけ `UC_ERR_READ_UNMAPPED` (rip=0x7772be・`rax=0x400000`) になる。どちらの場合も `0x411a80` (`0x411940`・`0x411bb8` の親) には届かない。
+- 再現コマンド (`$PE` は入力の PE):
+  - 受入 1: `python3 tools/plugins/f2/callsite_scan.py $PE 0x411940 0x8c3ca8 0x8c3c80`
+  - 受入 1 (動的): `python3 tools/plugins/f2/unicorn_trace.py $PE 0x8525f0 -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` (rcx=0x8c3c80 で各 1 回・`0x41196b` が 0 を書く)
+  - 受入 2 (`0x8525f0`・書込み): 上と同じコマンド (watch writes 2 件: `rip=0x4113f2` が 0x41bf30、`rip=0x41196b` が 0)
+  - 受入 2 (`0x83efb0`・引数なし): `python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` → `UC_ERR_FETCH_PROT rip=0x0 rax=0x0`
+  - 受入 2 (`0x83efb0`・rcx 指定): `python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -r rcx=0x400000 -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` → `UC_ERR_READ_UNMAPPED rip=0x7772be rax=0x400000`
+- 追加した道具: `unicorn_trace.py -t <VA>` (そのアドレスに入るたびに rcx/rdx と [rcx]・[rcx+0x28] を最初の 20 回まで出す)。
+- 判定: 受入 1 **達成**、受入 2 **未達** (実引数が無い)、受入 3 (プログラム全体の経路の書込み追跡) **未達** (`0x83efb0` 経路が合成入力で止まる)。waiver は変更しない。
+- 未解決 (起票先: 本 issue の残件。実引数を与える経路の確定が必要): `CreatePlugInstance` のホスト引数 (`0x777290` の読み出し先) を実 FL の呼出し値で与えること、またはホストが `CreatePlugInstance` に渡す構造体の形を決めること。これが決まるまで `0x8c3ca8` の最終値は確定しない。
