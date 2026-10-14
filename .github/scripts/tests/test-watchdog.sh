@@ -46,6 +46,10 @@ if [ "$1" = pr ] || [ "$1" = label ] || [ "$1" = issue ]; then
     echo "Pull request is not mergeable" >&2
     exit 1
   fi
+  if [ "$1 $2" = "issue comment" ] && [ -n "${FAKE_COMMENT_FAILS:-}" ]; then
+    echo "fake gh: injected comment failure" >&2
+    exit 1
+  fi
   exit 0
 fi
 shift
@@ -91,7 +95,7 @@ not_logged() { ! grep -q -- "$1" "$LOG"; }
 OLD="2020-01-01T00:00:00Z"
 REVIEWER="oc-reviewer-for-signature-studio[bot]"
 
-reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; : > "$FAKE_CURL_LOG"; unset FAKE_MERGE_FAILS FAKE_FAIL FAKE_CURL_FAIL; export OC_WORKER_URL_FILE="$TMP/no-worker-url"; }
+reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; : > "$FAKE_CURL_LOG"; unset FAKE_MERGE_FAILS FAKE_COMMENT_FAILS FAKE_FAIL FAKE_CURL_FAIL; export OC_WORKER_URL_FILE="$TMP/no-worker-url"; }
 fx() { printf '%s' "$2" > "$FIX/${1//\//_}"; } # fx <path> <json>
 # runs / PR 一覧は全ケース共通の形。active_runs は workflow_runs の JSON (既定は空)。
 base() { # base <prs json> [active runs json]
@@ -1007,6 +1011,13 @@ pm_base
 DRY=1 wd
 grep -q 'DRY: dispatch oc-pm kind=stuck for #60' "$TMP/out" && not_logged 'dispatches' && not_logged 'issue comment'
 expect "DRY=1 plans the oc-pm dispatch without sending or recording" $?
+
+# 39a2. 記録のコメントが残せなければ送らない (記録が無いと上限が効かない)。終了コードは変わらない
+reset
+pm_base
+FAKE_COMMENT_FAILS=1 wd; rc=$?
+[ "$rc" = 0 ] && logged 'issue comment 60 ' && not_logged 'dispatches' && grep -q 'failed: dispatch oc-pm kind=stuck for #60' "$TMP/out"
+expect "the record comment cannot be written -> no dispatch (fail-closed), exit 0" $?
 
 # 39b. 記録の一覧が読めなければ送らない (fail-closed)。終了コードは変わらない
 reset
