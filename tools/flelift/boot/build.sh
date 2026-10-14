@@ -18,7 +18,7 @@ OPT="${FLE_CC_OPT:--O0}"
 LBL="${FLE_LABEL:-$V}"
 mkdir -p "$W/obj" "$W/tmp"
 export TMPDIR="$W/tmp"
-set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
+set +u; source "${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" > /dev/null 2>&1; set -u
 
 # ---- 生成物が無い場合のみ gen (entries/link_defs/imp bridge/textwin) ----
 [ -f "$W/fle_entries_boot.json" ] || python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W"
