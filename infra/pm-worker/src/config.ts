@@ -4,6 +4,8 @@ import { DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 
 // 既定の TARGET は 80。GitHub の同時 job 上限 (60) を超えた分は queued になり、常時 60 に張り付くための余裕。
 export const DEFAULT_TARGET_WORKER = 80;
+export const DEFAULT_QUEUE_MARGIN = 10;
+export const DEFAULT_TARGET_MIN = 30;
 export const DEFAULT_REPO = "signature-studio/signature-studio-dev";
 
 export const MIN_COMMENT_WINDOW_H = 24;
@@ -17,6 +19,9 @@ export interface Env {
   REPO?: string;
   ORG?: string;
   TARGET?: string;
+  // 同時実行の上限 (推定) に足す余裕 (既定 10) と、target_eff の下限 (既定 30)。TARGET は上限のまま。
+  QUEUE_MARGIN?: string;
+  TARGET_MIN?: string;
   BATCH?: string;
   // "1" のときだけ GitHub へ書き込む。それ以外 (未設定を含む) は dry-run。
   // LIVE は launch (/oc コメント) と dispatch (repository_dispatch) の両方を一度に切り替える従来のスイッチ。
@@ -48,6 +53,8 @@ export interface Config {
   repo: string;
   org: string;
   target: number;
+  queueMargin: number;
+  targetMin: number;
   batch: number;
   // launch の /oc コメント投稿を実行するか。
   liveLaunch: boolean;
@@ -86,6 +93,8 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     repo,
     org: env.ORG ?? repo.split("/")[0],
     target: num(env.TARGET, DEFAULT_TARGET_WORKER),
+    queueMargin: num(env.QUEUE_MARGIN, DEFAULT_QUEUE_MARGIN),
+    targetMin: num(env.TARGET_MIN, DEFAULT_TARGET_MIN),
     batch: num(env.BATCH, DEFAULT_BATCH),
     liveLaunch: liveFlag(env.LIVE_LAUNCH, env.LIVE),
     liveDispatch: liveFlag(env.LIVE_DISPATCH, env.LIVE),

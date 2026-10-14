@@ -208,3 +208,7 @@
 | `setStepParameterByIndex`・`midiNoteOn`・`incEventValue` の意味論と `processRECEvent` の flapi 署名修正 | 未実装 4 件 | [PY-70] #2500 |
 | `d843d0` の `425210`・`526190` (同期待ち) の中身 | 同期実行の前提 (callback 完了後に `*result` を読む) が未確認 | 未解決表のみ (親 #1527 に残す) |
 | `c38bc0()`・`0xd82c20` の戻り値の写像 | None 扱いと範囲外 code の根拠が未確認 | 未解決表のみ (親 #1527 に残す) |
+
+## 追加解析 (#2548 の run): setStepParameterByIndex の呼出し経路・status・副作用
+
+本文は `REPORT_PY39_2548.md` に分割移動した (250 行上限のため)。結論: 呼出し経路・status 表・範囲外 `-4`・param 3〜8 の副作用を PE で確定。param 0〜2・item 列挙・述語の型は未確定で、子 issue #2581 (`[PY-78]`) に移した。
