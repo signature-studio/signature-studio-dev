@@ -5,7 +5,7 @@
 
 既定の属性名は loop_starter_config。各名前の char* を指す qword を .data 上で探し、その行の前後を
 名前が 0 になる終端まで読んで表示する。type の値は CPython の PyMemberDef の T_* 番号に対応する
-(0x01 = T_INT・0x03 = T_FLOAT・0x10 = T_OBJECT_EX)。offset は全行 0 で、値の格納先は表からは読めない。
+(0x01 = T_INT・0x03 = T_FLOAT・0x0e = T_BOOL・0x10 = T_OBJECT_EX)。offset は全行 0 で、値の格納先は表からは読めない。
 """
 import os
 import re
@@ -16,7 +16,7 @@ import pefile
 
 PE = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
 DEFAULT_NAMES = ["loop_starter_config"]
-TYPE_NAMES = {0x01: "T_INT", 0x03: "T_FLOAT", 0x10: "T_OBJECT_EX"}
+TYPE_NAMES = {0x01: "T_INT", 0x03: "T_FLOAT", 0x0E: "T_BOOL", 0x10: "T_OBJECT_EX"}
 
 
 def main():
