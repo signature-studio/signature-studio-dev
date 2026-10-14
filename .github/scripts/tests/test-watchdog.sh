@@ -421,5 +421,71 @@ GITHUB_STEP_SUMMARY="$TMP/summary.md" wd
 grep -q 'floating-issues=1' "$TMP/summary.md"
 expect "floating-issues is written to the step summary" $?
 
+# 25. 許可されない素材名 (fetchsh) を含む本文で review が打ち切られた PR -> 名前を除いて本文を直し、コメントして review を再起動する (#CI-45)
+reset
+base "[$(pr 40 a40abc false "$OLD" '[]' $'oc_artifacts: fl-win64 fetchsh\n本文')]"
+detail 40 true
+wd
+logged 'pr edit 40 .*--body-file' && grep -q '^oc_artifacts: fl-win64$' "$TMP/oc-artifacts-40.md" && logged 'pr comment 40 .*oc-artifacts-fixed:a40abc' && logged 'pr close 40' && logged 'pr reopen 40'
+expect "bad oc_artifacts name -> body repaired, marker comment, review restarted" $?
+
+# 26. ネガコン: 許可名のみの本文は補正しない (通常の review 再起動だけ)
+reset
+base "[$(pr 41 b41bcd false "$OLD" '[]' $'oc_artifacts: fl-win64 toolchain-emsdk\n本文')]"
+detail 41 true
+wd
+logged 'pr reopen 41' && not_logged 'body-file' && not_logged 'oc-artifacts-fixed'
+expect "allowlisted names only -> no repair" $?
+
+# 27. ネガコン: 補正済みマーカーがある head の 2 回目は、本文を再度書き換えず oc:stuck で止める (同じ head は 1 回まで)
+reset
+base "[$(pr 42 c42cde false "$OLD" '[]' $'oc_artifacts: fetchsh\n本文')]"
+detail 42 true "[]" "[$(printf '{"user":{"login":"%s","type":"Bot"},"body":"x <!-- oc-artifacts-fixed:c42cde -->"}' "$REVIEWER")]"
+wd
+not_logged 'body-file' && not_logged 'pr reopen 42' && logged 'pr edit 42 .*--add-label oc:stuck'
+expect "second repair on the same head -> no rewrite, oc:stuck" $?
+
+# 28. ネガコン: fork の PR は本文を書き換えない
+reset
+base "[$(pr 43 d43def false "$OLD" '[]' $'oc_artifacts: fetchsh\n本文' fork-user/signature-studio-dev)]"
+detail 43 true
+wd
+not_logged 'body-file' && not_logged 'pr reopen 43' && grep -q 'fork からの PR' "$TMP/out"
+expect "fork PR with a bad name -> not touched" $?
+
+# 29. 差し戻し上限で oc:stuck になった PR (oc-pm-intent: stuck) は、入力不正があっても補正しない (ネガコン)
+reset
+base "[$(pr 44 e44efa false "$OLD" '[{"name":"oc:stuck"}]' $'oc_artifacts: fetchsh\n本文')]"
+detail 44 true "[]" "[$(printf '{"user":{"login":"%s","type":"Bot"},"body":"stop <!-- oc-pm-intent: stuck pr=44 reason=reset -->"}' "$REVIEWER")]"
+wd
+not_logged 'body-file' && not_logged 'remove-label' && not_logged 'pr reopen 44' && grep -q 'STUCK_LABELLED' "$TMP/out"
+expect "review-limit oc:stuck PR is not repaired (negative control)" $?
+
+# 30. oc:stuck が review 打ち切り (入力不正) で付いた PR は、補正して oc:stuck を外し review を再起動する
+reset
+base "[$(pr 45 f45fab false "$OLD" '[{"name":"oc:stuck"}]' $'oc_artifacts: plugins-ott fetchsh\n本文')]"
+detail 45 true
+wd
+logged 'pr edit 45 .*--remove-label oc:stuck' && logged 'pr reopen 45' && grep -q '^oc_artifacts: plugins-ott$' "$TMP/oc-artifacts-45.md"
+expect "stuck by input error -> repaired, label removed, review restarted" $?
+
+# 31. stuck の滞留時間: events の labeled (oc:stuck) から max / p50 を出す (固定の events。p50 は下側中央値)
+reset
+base "[$(pr 50 g50aa0 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 51 g51aa1 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 52 g52aa2 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/50/events' '[{"event":"labeled","label":{"name":"oc:stuck"},"created_at":"2020-01-01T00:00:00Z"}]'
+fx 'repos/o/r/issues/51/events' '[{"event":"labeled","label":{"name":"oc:stuck"},"created_at":"2020-01-02T00:00:00Z"}]'
+fx 'repos/o/r/issues/52/events' '[{"event":"unlabeled","label":{"name":"oc:stuck"},"created_at":"2019-12-31T00:00:00Z"},{"event":"labeled","label":{"name":"oc:stuck"},"created_at":"2020-01-03T00:00:00Z"}]'
+wd
+grep -q '^stuck=3 ' "$TMP/out" && a="$(sed -n 's/.*stuck-age-max=\([0-9]*\) .*/\1/p' "$TMP/out")" && p="$(sed -n 's/.*stuck-age-p50=\([0-9]*\).*/\1/p' "$TMP/out")" && [ $((a - p)) = 1440 ] && [ "$p" -gt 0 ]
+expect "stuck age: stuck=3, max - p50 = 1440 min (labeled from events, latest labeled used)" $?
+
+# 32. 本文の補正は DRY=1 では何もしない
+reset
+base "[$(pr 46 h46bc0 false "$OLD" '[]' $'oc_artifacts: fetchsh\n本文')]"
+detail 46 true
+DRY=1 wd
+not_logged 'body-file' && not_logged 'pr reopen 46' && grep -q 'DRY: repair oc_artifacts' "$TMP/out"
+expect "DRY=1 plans the repair without acting" $?
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]
