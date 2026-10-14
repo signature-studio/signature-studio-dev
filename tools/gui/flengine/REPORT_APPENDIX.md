@@ -4,10 +4,10 @@
 
 ## 6i. S1 (soft) の unit 304/555 調査 (#1442 / GUI-21)
 
-**現 HEAD の実測を正とする** (測定 commit `719f1c43` = `origin/main` (`d72318c0` 相当の取り込み後) を merge した HEAD のコード)。
+**測定 commit `719f1c43`。実行コードは現 HEAD と同一** (`git diff 719f1c43 HEAD -- tools/gui tools/m11 tools/shim tools/shared ':!*/results/*' ':!*.md'` が 0 行。差分は `tools/gui/flengine/REPORT*.md` の文書のみ)。
 
-実行: `EMSDK_ENV=/opt/emsdk/emsdk_env.sh RETDEC=/opt/retdec/bin/retdec-decompiler FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/gui/flengine/e2e.sh` (foreground・1 回・runner 4 vCPU・直列)。
-素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11` (`tools/m11/work/` に展開)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`)・`x86_64-w64-mingw32-gcc` (`apt-mingw`)。
+実行: `EMSDK_ENV=[EMSDK]/emsdk_env.sh RETDEC=[RETDEC]/bin/retdec-decompiler FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/gui/flengine/e2e.sh` (foreground・1 回・runner 4 vCPU・直列)。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11` (`tools/m11/work/` に展開)・`toolchain-emsdk` (`[EMSDK]`)・`toolchain-retdec` (`[RETDEC]`)・`x86_64-w64-mingw32-gcc` (`[APT-MINGW]`)。
 
 | 実行 (測定 commit `719f1c43`) | rc | 所要 | load (開始→終了) | 結果 |
 |---|---|---|---|---|

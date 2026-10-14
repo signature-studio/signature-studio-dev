@@ -133,7 +133,7 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 ## 6. 検証
 
 実行: `ANALYSIS_DIR=$RUNNER_TEMP FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=<pefile・capstone の venv>:$PATH bash tools/gui/flengine/e2e.sh` (現 HEAD = `3885765a`。main `6aa4b397` 取込済 (`de8d603e`)、REPORT・probe.json のみ変更。runner 4 vCPU, 直列)。
-素材の前提 (本 run で確認): `$HOME/artifacts` の `fl-win64` / `work-m11` / `toolchain-emsdk` / `toolchain-retdec` を展開し、`tools/m11/m11_gen_ir2.sh` を素材 `tools/m11/work/` で 1 回実行 (`ir_conditions.json` の `ldfix=applied`、gitignore 対象で commit なし)。`apt-mingw` は `/usr/bin/x86_64-w64-mingw32-gcc`。
+素材の前提 (本 run で確認): `$HOME/artifacts` の `fl-win64` / `work-m11` / `toolchain-emsdk` / `toolchain-retdec` を展開し、`tools/m11/m11_gen_ir2.sh` を素材 `tools/m11/work/` で 1 回実行 (`ir_conditions.json` の `ldfix=applied`、gitignore 対象で commit なし)。`apt-mingw` は `[APT-MINGW]`。
 
 | 回 | rc | 所要 (e2e.sh の done) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | ネガコン |
 |---|---|---|---|---|---|---|
