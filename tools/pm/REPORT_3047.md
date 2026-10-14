@@ -37,7 +37,7 @@
 
 M1 の複製では既定 URL の 2 件 (`tools/pm/worker_url` の確認) も落ちた。複製にそのファイルを入れていないことによる見かけ上の失敗で、本物の worktree では PASS。
 
-差分: `git diff e0275601 HEAD -- .github/scripts infra/pm-worker` の出力は 0 行 (本付録の commit は tools/pm だけを変える)。
+差分 (取り込み前): `git diff e0275601 5a2b3da6 -- .github/scripts infra/pm-worker` の出力は 0 行 (本付録の commit は tools/pm だけを変える)。取り込み後の再測定は §5。
 
 ## 3. 本番 `/status` の読み取り (変更を入れる前、読み取りのみ)
 
@@ -51,3 +51,16 @@ M1 の複製では既定 URL の 2 件 (`tools/pm/worker_url` の確認) も落�
 | 回復時の自動 close は入れていない (受入条件外) | 率制限が戻っても `oc:rate-limit` の issue は人が close するまで open のまま | PM の判断 (本 issue の受入条件外) |
 | merge 後の本番の点検で `rate=ok` が出ることの実 run での確認 | 未確認 (本番の点検ログの 1 回分) | merge 後の次の watchdog の run で確認する |
 | `test-pr-loop.sh` が runner の `GITHUB_*` 変数を引き継ぐと 6 件 FAIL (変更前から同じ) | scripts-test の結果が実行環境で変わる。本 PR の変更とは無関係 | PM の判断 (テストの環境を空にするかは本 issue の範囲外) |
+
+## 5. main 取り込み後の再測定 (測定 commit `ebcb7dac`)
+
+main (`3e8c8d25`) との競合 (`docs/DOC_MAP.md` の表の末尾・両側とも行を追加) を解消して取り込んだ merge commit `ebcb7dac`。競合は表の行の両立のみ (`REPORT_3047.md` と main 側の `REPORT_3050.md` の 2 行を残す)。watchdog のコードは取り込みで変わっていない。
+
+| 測定 (`ebcb7dac`) | 結果 |
+|---|---|
+| `bash .github/scripts/tests/test-watchdog.sh` | rc 0・**144 passed / 0 failed**・wall 19 s |
+| `.github/workflows/scripts-test.yaml` と同じ glob (`.github/scripts/tests/test-*.sh`・`tools/pm/test_*.sh`・`tools/pm/test_*.py`、各テストを `GITHUB_STEP_SUMMARY=/dev/null` で実行) | 16 本中 15 本 rc 0。`test-pr-loop.sh` のみ rc 1 (127 passed / 6 failed)。同じ 6 件が main (`origin/main`) の版でも FAIL (`127 passed / 6 failed`)。`env -i` では PR 版も main 版も 133 passed / 0 failed |
+| `bash .github/scripts/pr-lint.sh --base origin/main --head HEAD --body-file <PR 本文>` | violations=0 (strict=0, report_max=250) |
+| `shellcheck -S warning .github/scripts/watchdog.sh` | 警告 0 |
+
+差分: `git diff e0275601 ebcb7dac -- .github/scripts/watchdog.sh .github/scripts/tests/test-watchdog.sh` の出力は 0 行。取り込みで変わったのは main 側の `.github/scripts/tests/test-dispatch-context.sh`・`infra/pm-worker/` などで、本 PR の差分 (`origin/main..HEAD`) には入っていない。mutation (M1〜M7) は watchdog のコードが変わっていないため再実行していない (§2 の結果がそのまま成り立つ)。
