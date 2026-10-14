@@ -102,7 +102,7 @@ index ab3ba4c0..4a9d4642 100644
 - step 0 は全バッファが一致し、`rax` も一致 (0x67)。発散は step 1 以降。
 - 最初の発散の代表 (シナリオ 0・step 1): `self` の 16 bit 境界外 (+106) から始まる。`self` +104 は native `0x0000803c` (f32 0.015625)・wasm `0x00000000` (0)、+108 は native 1.0・wasm 0.5。+136 は native `0xb4fa3e3e` (0.186503)・wasm `0xa528083e` (0.132968)。
 - 食い違いの頻度: `P` +8 (291)・`L` +0 (275)・`R` +0 (274)・`self` +104 (211)・`self` +106 (64)・`self` +107 (27)。half-word・byte 単位のずれが多く、部分幅ストア (`movss`・`movd` 系) の lane / merge 規則が疑わしい。
-- `xmm0` 欄は step 0 で native `0x3e315071`・wasm `0`。`ott_xmm0` の読み出し経路か戻り値の扱いの差か未確定 (差分としては未分類)。
+- `xmm0` 欄は step 0 で native `0x3e315071`・wasm `0`。(訂正済み: 末尾節参照。runner の表示上の差で、lift の差ではない)
 
 判定: **受入 1・2 は引き続き未達**。wasm 実行は安定 (trap 0) したが、native と bit 一致するのは 61/366 step。食い違いの原因切り分けは次の入口 (下記) に残す。
 
@@ -110,7 +110,7 @@ index ab3ba4c0..4a9d4642 100644
 
 1. step 1 で最初に書かれる `self` の f32 フィールド (+104・+108) を生成する命令を、wasm IR 上で特定する (`insn.addr` を `rt_kilohearts-gain/after.0.restored.ll` の `!insn.addr` と突き合わせる)。
 2. その命令が `__asm_movss` / `__asm_movd` 系 helper を経由するなら、helper の部分幅 merge 規則を native (`movss` 同等) と比較する。
-3. `xmm0` 欄の不一致は `ott_xmm0` の戻り値規約を確認してから分類する。
+3. (訂正済み: 末尾節参照。`xmm0` 欄の不一致は runner 側の表示だったので、次の入口には含めない。)
 
 ## 再測定と step 1 の差分の切り分け (2026-10-14 03:35〜03:41 UTC・HEAD `72260b63`)
 
@@ -146,7 +146,7 @@ index ab3ba4c0..4a9d4642 100644
 
 - 「PE data 未敷設が trap の原因」→ 解消済み (trap 0)。
 - 「部分幅 store の lane 規則のみ」→ +108 の値が丸ごと異なるため、単独の原因とは言えない。未確定。
-- 未確認: step 1 入力の xmm / フラグが `out_native.txt` と `out_wasm.txt` のどちらでも比較されていないこと。`ott_xmm0` の戻り値規約も未確認 (step 0 の `xmm0` 欄が native `0x3e315071`・wasm `0`)。
+- 未確認: step 1 入力の xmm / フラグが `out_native.txt` と `out_wasm.txt` のどちらでも比較されていないこと。`ott_xmm0` の読み出しは末尾節で修正済み (訂正済み: 末尾節参照)。
 
 ### 次の入口 (更新)
 
@@ -156,10 +156,10 @@ index ab3ba4c0..4a9d4642 100644
 
 ## runner 修正と xmm0 欄の訂正 (2026-10-14 06:04〜06:25 UTC)
 
-測定 commit: 本 commit (`tools/icall/kh_route_run.sh` を変えた最後の commit)。素材は main の checkout の `work/` を symlink で参照。
+測定 commit: `4d131493` (`tools/icall/kh_route_run.sh` を変えた最後の commit)。`4d131493..HEAD` のコード差分 (`tools/icall`) は 0 行。素材は ws-1025 worktree の `work/` に展開 (`work-icall` / `work-liftlib` / `kh_pe/HeartCore.core_64`)。
 
-- 訂正: 前節までの「xmm0 欄の不一致 (native `0x3e315071`・wasm `0`)」は lift の差ではなく runner の表示上の差だった。`kh_route_run.sh` が複製する `wasm_runner.mjs` は R 行の xmm0 を常に `0` で出力していた。本 commit で `M._ott_xmm0()` を読むよう修正 (native_runner の `xmm0_out[0]` と同じ意味)。
-- 修正後の実測 (HEAD 本 commit・再現コマンド `bash tools/icall/kh_route_build.sh && bash tools/icall/kh_route_run.sh`):
+- 訂正: 前節までの「xmm0 欄の不一致 (native `0x3e315071`・wasm `0`)」は lift の差ではなく runner の表示上の差だった。`kh_route_run.sh` が複製する `wasm_runner.mjs` は R 行の xmm0 を常に `0` で出力していた。commit `4d131493` で `M._ott_xmm0()` を読むよう修正 (native_runner の `xmm0_out[0]` と同じ意味)。
+- 修正後の実測 (測定 commit `4d131493`・ws-1025 worktree・再現コマンド `bash tools/icall/kh_route_build.sh && bash tools/icall/kh_route_run.sh`):
 
 | 項目 | 実測 |
 |---|---|
