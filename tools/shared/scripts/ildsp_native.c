@@ -194,6 +194,7 @@ static uint64_t unimpl_total(void) { uint64_t t = 0; for (int i = 0; i < g_nunim
 
 int main(int argc, char** argv) {
     if (argc < 2) { fprintf(stderr, "usage: ildsp_native <PE> [--neg-lea]\n"); return 2; }
+    setvbuf(stdout, NULL, _IOLBF, 0);
     int neg = 0, only_k = -1, only_v = -1;
     for (int i = 2; i < argc; i++) {
         if (!strcmp(argv[i], "--neg-lea")) neg = 1;
@@ -234,6 +235,7 @@ int main(int argc, char** argv) {
             uint64_t h0[NHOOK]; for (size_t i = 0; i < NHOOK; i++) h0[i] = g_hooks[i].hits;
             uint64_t u0 = unimpl_total();
             uint64_t rdx = (k == 4) ? in : rdx_list[v];
+            printf("call k=%d variant=%d rdx=0x%llx wrapper=0x%llx\n", k, v, (unsigned long long)rdx, (unsigned long long)w);
             uint64_t rax = ((Fn4)fn)(w, rdx, 0, 0);
             memcpy(after, (void*)in, OBJ_SZ);
             printf("slot k=%d variant=%d rdx=0x%llx fn=0x%llx rax=0x%llx unimpl_calls=%llu",

@@ -32,13 +32,19 @@ def main():
     a = ap.parse_args()
     build()
     cmd = [BIN, a.pe, "--slot", "0", "0"] + (["--neg-lea"] if a.neg else [])
-    p = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    out = p.stdout
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        rc, out = p.returncode, p.stdout
+    except subprocess.TimeoutExpired as e:
+        rc = None
+        out = e.stdout.decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
     print(out.strip())
     m = re.search(r"create wrapper=(0x[0-9a-f]+) vptr=(0x[0-9a-f]+)", out)
     fails = []
-    if p.returncode != 0:
-        fails.append(f"ildsp_native rc={p.returncode}")
+    if rc is None:
+        fails.append("ildsp_native timeout (60 秒)")
+    elif rc != 0:
+        fails.append(f"ildsp_native rc={rc}")
     if not m:
         fails.append("create 行が出力に無い")
     else:
