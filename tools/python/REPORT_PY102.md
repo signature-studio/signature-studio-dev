@@ -156,7 +156,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
   - `setTrackColor`: main の格納式を採用。`muteTrackLock` は残す。
   - `fl_engine.c` の構造体: `Mix.color_set` (main) と `Pl.lock` (本 PR) を両方残す。
   - `provider_check.mjs`: `pe102` と `pe115` を両方の集合に入れる。件数は main の `impl 84` に muteTrackLock の +1 で `impl 85・unimpl 350`。
-- 測定 commit: `4f621cad` (コードを変えた最後の commit)。`4f621cad` から HEAD までのコード差分は 0 行 (`git diff 4f621cad HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests`)。
+- 測定 commit: `4f621cad` (コードを変えた最後の commit)。その後 main (`e87eb52a`) を取り込んだ (merge `329a0564`)。`4f621cad` から取り込み後までのコード差分は、main の新規 `tools/python/analysis/flapi/pe_slot_writers.py` (72 行。build と test から参照されない) だけ。`provider`・`host`・`tests`・`flapi_table.py`・`flapi_table.json` の差分は 0 行 (`git diff 4f621cad HEAD -- tools/python/analysis/flapi_table.py tools/python/analysis/flapi/flapi_table.json tools/python/provider tools/python/host tools/python/tests`)。
 - `4ecc1062` からの差分は main 側の変更を含む (`git diff --stat 4ecc1062 4f621cad -- <同範囲>` = 6 files, 229 insertions(+), 13 deletions(-))。そのため §測定の値は再測定し、本節が正本になる。
 - 環境: GitHub Actions runner (4 コア)。開始時 `/proc/loadavg` は `0.17 0.34 0.18`。素材は `fl-win64` の 5 block を `FL_WIN64_DIR` 配下に展開 (`extracted/`)。emsdk は [EMSDK] の既定パスに 6.0.12 を上流から取得して配置 (`toolchain-emsdk` 素材は本 run に無い)。stubs は `fetch_inputs.sh`。CPython wasm は `build_cpython_wasm.sh` で作成。
 
