@@ -15,7 +15,7 @@
 - 素材: `work-m11` を worktree に展開 (`tools/m11/work/`・gitignore)。PE は `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B、sha256 `b2c64da4…9f9496d`)。
 - IR の作り直し: `work/lift_pe.sha256` に上記 PE の sha256 を手で書いてから `bash tools/m11/m11_gen_ir2.sh` (非 `--full`。lift は素材の `boot0〜4.lift.ll`・`boot5` を使う)。46 s・ok。続けて `bash tools/m11/m11_build.sh` 22 s・`[m11build] OK … signature mismatch: 0, undefined symbol: 0`。
   - 前提 (T27 §2 と同じ): 指紋は手で書いた。素材の lift を生成した PE との一致は未検証。`--full` は Ghidra (`functions_dll.csv`) が runner に無いため未実施。
-- shimx: `bash tools/m11/shimx_link/build.sh --trace --soft` rc 0・13.2 s・`signature mismatch=1 undefined symbol=0 duplicate=0`。実 boot は `SHIMX_TRACE_FILE=/ftrace.jsonl node tools/m11/shimx_link/run_trace.mjs <cjs> --out DIR` で rc 0・0.41 s。
+- shimx: `bash tools/m11/shimx_link/build.sh --trace --soft` rc 0・13.2 s (commit 前の初回)・`signature mismatch=0 undefined symbol=0 duplicate=0`。実 boot は `SHIMX_TRACE_FILE=/ftrace.jsonl node tools/m11/shimx_link/run_trace.mjs <cjs> --out DIR` で rc 0・0.41 s。
 - 負荷: 測定時の uptime 1 分平均 1.09 (nproc 4)。
 
 ## 3. 検出器 `tools/m11/frame_share/detect.py`
@@ -79,22 +79,23 @@
 - したがって親の IR は `[rbp+0x4c]` の初期値を持たない。callee の `[+76]` の読み・加算は親の値を経由しない。原因 (RetDec の stack var 検出か後段 pass のどれか) は未確認。
 - 親の `[rbp+0x48]` (`-32`) は loop 変数として `stack_var_-32.*.reg2mem` の SSA 分解で扱われ、callee の `[+72]` の rmw (+1) が IR の値に反映されない。D23 の機構 (callee が親の値を別の場所から読む) と整合する。
 
-## 7. baseline (修復前・新 IR・測定 commit は本 PR の HEAD)
+## 7. baseline (修復前・新 IR・測定 commit は `e0ff2fa0` (検出器のコミット)。HEAD で再現済み)
 
 | 段階 | 結果 |
 |---|---|
-| `bash tools/m11/shimx_link/build.sh --trace --soft` | rc 0・13.2 s・`signature mismatch=1 undefined symbol=0 duplicate=0` |
+| `bash tools/m11/shimx_link/build.sh --trace --soft` | rc 0・`[sxlink] OK trace_soft: signature mismatch=0 undefined symbol=0 duplicate=0` (commit 前の初回・HEAD `e0ff2fa0` の 2 回とも同じ) |
 | 実 boot (`run_trace.mjs`) | rc 0・0.41 s・`units_run=17` `icall_ok=24` `icall_miss=1` `dllmain_done=true` `longjmp_hit=1` `boot_rc="1"` `threw=null` |
 | trace | `total_calls=106` `distinct_called=29` `dropped=0`・ftrace 0 行 (T27 §4-A と一致) |
 | 停止の証跡 (stderr) | `[m11][VA] #1 addr=0 size=1989214208 (0x76910000)` → `Cannot enlarge memory … limit is 2147483648 bytes` → `[m11][VA] OOM want=1989.2MB … (NULL を返す)` → `[m11][MessageBoxA] caption='Error' text='Runtime error   0 at 00000000102A0410'` |
 
-- 注: `signature mismatch=1` は T27 から変わらない既知の値 (修復の対象外)。
+- 注: T27 §4-A は `signature mismatch=1` と記録しているが、本 run の 2 回の build はいずれも 0 だった。差の原因は未確認 (`tools/m11/work/shimx_link/link_trace_soft.log` は現在 0 件)。重複・未定義は両者とも 0。
 - 修復 OFF のネガコンと修復 ON の比較は、修復を入れた子 issue で行う (本 PR は修復を含まない)。
 
 ## 8. 検証の鮮度
 
-- 本 PR の commit 内容は `tools/m11/frame_share/detect.py` (新規) と本 REPORT・`docs/DEFECTS.md`・`docs/DOC_MAP.md` の更新のみ。IR・shimx の入力には触れていない。
-- 測定は commit 前の同一コードで実施し、commit 後に HEAD でも再実行して数値の一致を確認する (結果は PR 本文と issue コメント。HEAD の hash はそこに書く)。
+- 測定 commit: `e0ff2fa0` (検出器 `tools/m11/frame_share/detect.py` を追加したコミット。§4・§7 の数値はこの commit の検出器で採取した)。
+- `e0ff2fa0` で再実行 (HEAD と同じ IR・同じ手順): 検出 `closure 7421`・`mov 渡し 307`・`D23 信号 301`・親 63・callee 94 (§4 と一致)。shimx `build.sh --trace --soft` は `mismatch=0`、実 boot は `units_run=17`・`dllmain_done=true`・`total_calls=106`・ftrace 0 行 (§7 と一致)。
+- `e0ff2fa0` から HEAD までのコード差分: `git diff e0ff2fa0 HEAD -- tools/m11/frame_share tools/m11/shimx_link tools/m11/*.py tools/m11/*.sh tools/m11/ldfix` の出力は 0 行 (本 REPORT の文言修正のみ)。差分 0 のため、この REPORT の数値は再測定していない。
 
 ## 9. 未解決 (起票先)
 
