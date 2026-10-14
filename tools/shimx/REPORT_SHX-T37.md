@@ -12,7 +12,7 @@
 
 ## 1. 不正入力の戻り値と GetLastError (実測と文書の対照)
 
-shimx の値は `tools/shimx/evidence_3070/run.sh` (ST ビルド・1 ケース 1 プロセス) の実測。errcode は呼び出し前に 0 へ戻した GetLastError で、0 は「呼び出しが設定しなかった」。M4 の行番号は `tools/shim/test/test_main.c` (測定 commit `0ff22979`。test_main.c は `875eba29` から変わっていない)。native は `tools/liftdiff/rt/ld_core.h` の `ld_model_call` (:245 から) の読み取り。GlobalLock :313・GlobalUnlock :314・GlobalFree :436 は明示分岐、HeapReAlloc は既定 :460 の 0。`ld_stub` (:462) は `ld_model_call` を呼んで記録するラッパ。
+shimx の値は `tools/shimx/evidence_3070/run.sh` (ST ビルド・1 ケース 1 プロセス) の実測。errcode は呼び出し前に 0 へ戻した GetLastError で、0 は「呼び出しが設定しなかった」。M4 の行番号は `tools/shim/test/test_main.c` (測定 commit `5cca7cb4`。test_main.c は `875eba29` から変わっていない)。native は `tools/liftdiff/rt/ld_core.h` の `ld_model_call` (:245 から) の読み取り。GlobalLock :313・GlobalUnlock :314・GlobalFree :436 は明示分岐、HeapReAlloc は既定 :460 の 0。`ld_stub` (:462) は `ld_model_call` を呼んで記録するラッパ。
 
 | 関数 | 入力 | shimx 戻り値 / errcode | M4 契約 | native 参照 | MSDN 記載 |
 |---|---|---|---|---|---|
@@ -43,34 +43,48 @@ shimx の値は `tools/shimx/evidence_3070/run.sh` (ST ビルド・1 ケース 1
 - 負の対照: `run.sh` が `work/src_rc/` に範囲検査を外した複製 (`heap.c` の範囲検査行を旧版の 1 行に戻す) で同じ probe を回し、4 関数すべてが `RuntimeError: memory access out of bounds` で trap することを確かめる (`work/probe_rc.tsv`・4 行)。範囲検査の有無で trap が決まることの確認。
 - 本 PR は `tools/shimx/src` を変えない。`run.sh` の対照部は、範囲検査が main に入った後も挿入位置が無くならないよう、「外す」向きに直した (旧版は範囲検査を入れる向きで、main では挿入位置が消えて `rc=1` になった)。
 
-## 4. 検証 (測定 commit `0ff22979`)
+## 4. 検証 (測定 commit `5cca7cb4`)
 
-測定 commit: `0ff22979` (`origin/main` (`eeca4ded`) を取り込んだ競合解消 merge の HEAD。SHX-T35 #3056 を含む)。`eeca4ded..0ff22979` の `tools/shimx/src`・`tools/shim/src`・`tools/shim/test` は 0 行 (§4.4)。旧測定 (`875eba29`) は取り込み前の値で、以下に置き換えた。
+測定 commit: `5cca7cb4` (コードを変えた最後の commit。`tools/shimx/evidence_3070/run.sh` の対照部を直した)。実測は `622a9276` (実測時の PR HEAD。`5cca7cb4` からの差分は REPORT のみ) で、各検証を 3 回ずつ foreground・直列に実行した。`origin/main` (`79d5e7c8`) とも対象範囲の差分は 0 行 (§4.4)。
 
-### 4.1 `bash tools/shimx/test.sh` (step 5 を含む) — rc=0 (全 step PASS)
+### 4.1 `bash tools/shimx/test.sh` (step 5 を含む) — n=3・3 回とも rc=0 (全 step PASS)
 
-- 1 回実行 (n=1): 所要 46 s (wall)。load average 0.33 0.35 0.17 → 0.68 0.44 0.21 (開始→終了)。
-- step 0〜7 すべて PASS: step 2 MT `PASS (8 グループ)`、step 3 ST `PASS`、step 4 fail-fast、step 5 M4 (MT/ST) `PASS`、step 6 カバレッジ、step 6b `sig_test ALL PASS` (verify_ott は SKIP: `tools/m8/work/ott_m8.ll` 等が無い)、step 7 `697 公開関数 × MT/ST × M4 互換 × fail-fast 全 PASS`。
+| 回 | rc | 所要 (wall) | load average (1 分値・開始→終了) |
+|---|---|---|---|
+| 1 | 0 | 50.2 s | 0.37 → 0.73 |
+| 2 | 0 | 48.5 s | 0.44 → 0.74 |
+| 3 | 0 | 48.2 s | 0.70 → 0.91 |
+
+- 所要の min–max: **48.2–50.2 s** (n=3)。並列数: 計測は 1 件ずつ直列 (並列 1)。スクリプト内では、オブジェクトビルド (`tools/shimx/scripts/build_objs.sh`) の emcc が 1 本ずつ直列 (1)、MT テストの pthread pool が 12 (`tools/shimx/flags.sh` の `SHIMX_EMCC_MT`)、M4 互換 MT の pool が 8 (step 5)。実行機の vCPU は 4 (`nproc`)。
+- 3 回とも同じ結果: step 2 MT `PASS (8 グループ)`、step 3 ST `PASS`、step 4 fail-fast 13 件 + ExitProcess(7)、step 5 M4 (MT/ST) `PASS`、step 6b `sig_test ALL PASS` (verify_ott は SKIP: `tools/m8/work/ott_m8.ll` または `tools/m6/work` が無い)、step 7 `697 公開関数 × MT/ST × M4 互換 × fail-fast 全 PASS`。
 - 旧測定 (`875eba29`) の step 5 FAIL (`test_main.c:203`) は、SHX-T35 (#3056) で HeapFree が M4 契約に揃ったため解消した。
-- step 6 は inventory.md・BACKLOG.md・data/coverage.json・data/inventory.csv を再生成する。本 run の再生成結果は commit 済みと一致しなかった (例: BACKLOG の P0 行 194 → 0。`verify_ott` の SKIP が原因と疑われるが未確認)。生成物は本 PR に含めず、`git restore` で HEAD に戻した。
+- step 6 は inventory.md・BACKLOG.md・data/coverage.json・data/inventory.csv を再生成する。3 回の再生成結果は互いに同一 (`cmp`) だが、commit 済みとは一致しない。BACKLOG の件数は集計表の P0 行の件数列で、数え方は `grep -E '^\| P0 \| [0-9]+ \| [0-9]+ \|' tools/shimx/BACKLOG.md | cut -d'|' -f3`。commit 済み **194**、再生成後 **0** (3 回とも)。0 になる原因はコードで確認した: P0 は `work/ir_m11.json` と `work/ott/result.json` から作られ (`tools/shimx/scripts/gen_inventory.py` :99-100・:161-162)、どちらも M11・M8 の IR (`tools/m11/work/boot_final2.ll`・`tools/m8/work/ott_m8.ll`) が無いため作られない (実測時の `tools/shimx/work/` に `ir_m11.json` は無く、`ott/` は空)。
+- 再生成した 4 ファイルは `git restore` で commit 済みに戻し、PR に含めない (`git status --short` は空)。
 
-### 4.2 `bash tools/shimx/evidence_3070/run.sh` — rc=0
+### 4.2 `bash tools/shimx/evidence_3070/run.sh` — n=3・3 回とも rc=0
 
-- 2 回実行 (n=2 の成功): 1 回目 rc=0 (時間は未計測)、2 回目 5 s (wall)。load average 0.32 0.38 0.20 → 0.38 0.39 0.20 (2 回目の開始→終了)。
-- 表本体 34 行 (`work/probe.tsv`) の TRAP は 0 件 (旧測定の 0xFFFFFFF0 の 4 行 TRAP は消えた)。対照 4 行 (`work/probe_rc.tsv`) は 4 関数すべて TRAP。
-- 1 回目の前に、対照の挿入位置 (旧 `blk_ok` の 1 行) が main の SHX-T35 で消えたため、`run.sh` が `rc=1` で止まった。対照を「範囲検査を外す」向きに直した (`run.sh` の対照部のみ・表本体の probe は変えていない)。
-- 実行には `EMSDK_ENV` (`docs/REFERENCES.md` の `[EMSDK]` の `emsdk_env.sh`) が要る。本 run は `[EMSDK]` の `emsdk_env.sh` を `EMSDK_ENV` に指定して実行。
+| 回 | rc | 所要 (wall) | load average (1 分値・開始→終了) |
+|---|---|---|---|
+| 1 | 0 | 6.30 s | 1.24 → 1.20 |
+| 2 | 0 | 6.33 s | 1.20 → 1.18 |
+| 3 | 0 | 6.35 s | 1.18 → 1.17 |
+
+- 所要の min–max: **6.30–6.35 s** (n=3)。並列数: 直列 1 (emcc は 1 回でビルドし、probe は node を 1 プロセスずつ起動する)。
+- 3 回の表本体 (`tools/shimx/evidence_3070/work/probe.tsv`・34 行) と対照 (`probe_rc.tsv`・注記 1 行 + 4 行) は、それぞれ `cmp` で一致。表本体の TRAP は 0 件、対照の TRAP は 4 件 (§4.3)。
+- 初期の修正: 対照の挿入位置 (旧 `blk_ok` の 1 行) が main の SHX-T35 で消えたため、`run.sh` が `rc=1` で止まった。対照を「範囲検査を外す」向きに直した (`run.sh` の対照部のみ・表本体の probe は変えていない。修正は `5cca7cb4`)。
+- 実行には `EMSDK_ENV` (`docs/REFERENCES.md` の `[EMSDK]` = `/opt/emsdk/emsdk_env.sh`) が要る。本 run は `EMSDK_ENV=/opt/emsdk/emsdk_env.sh` で実行。
 
 ### 4.3 ネガティブコントロール
 
-- 範囲検査を外した複製で 4 関数すべてが再び trap すること (§3・`work/probe_rc.tsv`)。範囲検査の有無で 0xFFFFFFF0 の trap が決まる。
+- 範囲検査を外した複製で 4 関数すべてが再び trap すること (§3・`probe_rc.tsv`)。3 回とも 4/4 TRAP。範囲検査の有無で 0xFFFFFFF0 の trap が決まる。
 - M4 の HeapFree 検査 (step 5) は、SHX-T35 の前後で PASS/FAIL が変わる。旧測定の FAIL (`:203`) は再現しない (§4.1)。
 
 ### 4.4 差分・生成物
 
-- `git diff 0ff22979 HEAD -- tools/shimx/src tools/shim/src tools/shim/test` は 0 行 (本 PR の HEAD で確認)。`eeca4ded..0ff22979` も 0 行。
+- `git diff 5cca7cb4 HEAD -- tools/shimx/src tools/shim/src tools/shim/test tools/shimx/evidence_3070` は 0 行 (最終 HEAD で確認)。実測時の `622a9276` でも 0 行。
+- `git diff 622a9276 origin/main -- tools/shimx/src tools/shim/src tools/shim/test` は 0 行 (`origin/main` = `79d5e7c8`)。main の取り込みで測定対象は変わらない。
 - 旧測定 (`875eba29`) からの差分は、`git diff 875eba29 0ff22979 -- tools/shimx/src tools/shim/src tools/shim/test` で 43 行 (`tools/shimx/src/heap.c` +6/-2 = SHX-T35 の範囲検査と HeapFree の TRUE 応答、`tools/shim/src/sync.c` +5/-1 = #2880 の CS-MISS 出力)。この差分を受けて再測定した。
-- 差分の範囲を実行コードに絞った理由: 受入の `git diff 875eba29 HEAD -- tools/shimx` は本 PR が追加する REPORT と evidence だけを数える (既存ファイルの変更・削除は 0)。既存のコードが変わらないことを見るため、判定は実行コードの範囲で行う。
+- 差分の範囲を実行コードに絞った理由: 受入の `git diff 875eba29 HEAD -- tools/shimx` は本 PR が追加する REPORT と evidence だけを数える (既存ファイルの変更・削除は 0)。既存のコードが変わらないことを見るため、判定は実行コード (`src`・`shim/src`・`shim/test`) と測定対象の `evidence_3070` の範囲で行う。
 - 20 MiB 超の blob: `find tools/shimx/evidence_3070 -type f -size +20M -not -path '*/work/*'` は 0 件。
 
 ## 5. 製品 KPI
