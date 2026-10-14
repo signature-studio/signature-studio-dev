@@ -24,7 +24,7 @@ class FlShimProcessor extends AudioWorkletProcessor {
     this.L = o.layout;
     this.buffer = o.buffer;
     this.ctlPtr = o.ctlPtr;
-    this.i32 = new Int32Array(this.buffer, this.ctlPtr, 96);
+    this.i32 = new Int32Array(this.buffer, this.ctlPtr, 128);
     this.ix = {};
     for (const k of Object.keys(this.L)) this.ix[k] = this.L[k] >> 2;
     this.f64 = new Float64Array(1);
@@ -104,10 +104,13 @@ class FlShimProcessor extends AudioWorkletProcessor {
       }
     }
     this.prevFrame = frame;
-    {   // バースト長の観測: Date.now() 差 <=1ms で連続する process() の総フレーム数の最大値を burst_obs に公開
+    {   // バースト長の観測: Date.now() 差 <=1ms で連続する process() の総フレーム数の最大値を burst_obs に公開。run の終わりごとに長さを burst_hist (512 f 刻み・末尾 bin は以上) へ加算
       const nowb = Date.now();
       if (this.burstPrevMs > 0 && nowb - this.burstPrevMs <= 1) this.burstRun += Q;
-      else this.burstRun = Q;
+      else {
+        if (this.burstRun > 0) Atomics.add(i, x.burst_hist + Math.min(31, (this.burstRun / 512) | 0), 1);
+        this.burstRun = Q;
+      }
       this.burstPrevMs = nowb;
       if (this.burstRun > Atomics.load(i, x.burst_obs)) Atomics.store(i, x.burst_obs, this.burstRun);
     }

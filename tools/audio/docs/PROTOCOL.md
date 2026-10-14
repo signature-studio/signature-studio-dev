@@ -20,7 +20,7 @@
 
 ## 2. 制御ブロック `fla_ctl_t` (384B, 64B ライン × 6) と ring
 
-オフセットの単一の真実は `src/flaudio.h`。TS は `src/runtime/audio-layout.ts` に同表を持ち、起動時に wasm の `fla_layout_off(i)` と全 59 項目を照合 (不一致 → throw = fail-fast)。worklet は固定値を持たず `processorOptions.layout` を使う。
+オフセットの単一の真実は `src/flaudio.h`。TS は `src/runtime/audio-layout.ts` に同表を持ち、起動時に wasm の `fla_layout_off(i)` と全 67 項目を照合 (不一致 → throw = fail-fast)。worklet は固定値を持たず `processorOptions.layout` を使う。
 
 | ライン | 書き手 | 主なフィールド |
 |---|---|---|
@@ -28,6 +28,7 @@
 | 1 (@64) | worklet | dev_frames(u64), dev_ctx_time_bits(f64), out_read, in_write, underruns, silence_frames, quanta, in_overruns, wl_state, clock_seq(seqlock), play_start_frame, clock_jumps/_frames, clock_skip_frames/clock_dup_frames/clock_jump_max/clock_jump_max_q (@164-179, burst_obs の後の pad2 から割当) |
 | 2 (@128) | producer | out_write, in_read, wake_target, gen, go, tick_target, notify_ms, burst_obs(worklet 書) |
 | 3 (@192) | main | ref_ctx_time_bits, ref_epoch_ms_bits (seqlock), out/base_latency_us |
+| 6 (@384) | worklet | burst_hist[32] (連続 process() の 1 run 終了ごとに bin=floor(len/512) を +1。末尾 bin は以上。AU-30 #3151) |
 | 4 (@256) | wasm↔main | cmd_seq/op/arg[4], ack_seq/status/res[4], ctrl_ready |
 | 5 (@320) | producer | cb_count/late/max_us, wake_count, wait_timeouts, in_underflows, min_fill, wake_hist[6] |
 

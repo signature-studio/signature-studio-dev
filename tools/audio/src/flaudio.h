@@ -130,9 +130,13 @@ typedef struct fla_ctl {
     uint32_t fill_samples;     /* 356 */
     /* 360..383 */
     uint32_t wake_hist[6];     /* 360 wake 遅延ヒストグラム (ms): <1,<2,<4,<8,<16,>=16 (Date.now 分解能 ±1ms) */
+    /* ---- line6 @384: worklet が書く (AU-30 #3151) ---- */
+    uint32_t burst_hist[32];   /* 384 バースト長ヒストグラム: 連続 process() (Date.now 差 <=1ms) の 1 run が終わるごとに bin=floor(len/512) を +1。末尾 bin は >=15872 f を含む */
 } fla_ctl_t;
 
-#define FLA_CTL_SIZE 384u
+#define FLA_CTL_SIZE 512u
+#define FLA_BURST_BIN 512u         /* burst_hist の bin 幅 (frames)。worklet は同じ値を持つ (fl-audio-worklet.js) */
+#define FLA_BURST_BINS 32u
 
 /* ---- ABI 自己検証用: JS が同じ配列を持つ (audio-layout.ts) ---- */
 typedef struct { const char *name; uint32_t off; } fla_layout_entry_t;

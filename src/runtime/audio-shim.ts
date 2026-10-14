@@ -110,7 +110,7 @@ export class FlAudioShim {
     const n = this.api.layoutCount();
     verifyLayout(n, (i) => this.api.layoutOff(i), (i) => this.api.layoutName(i));
     this.ctlPtr = this.api.ctlPtr();
-    this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, 96);
+    this.i32 = new Int32Array(this.api.getBuffer(), this.ctlPtr, 128);
     this.st("ctrl_ready", 1);
     Atomics.notify(this.i32, this.ix("ctrl_ready"));
     this.offInput = this.opts.input?.on((e) => {

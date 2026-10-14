@@ -4,7 +4,7 @@
  * (verifyLayout が wasm の fla_layout_off() と照合し、不一致なら fail-fast) のために持つ。
  */
 export const FLA_ABI = 1;
-export const FLA_CTL_SIZE = 384;
+export const FLA_CTL_SIZE = 512;
 export const FLA_QUANTUM = 128;
 
 export const FLA_LAYOUT = {
@@ -18,7 +18,7 @@ export const FLA_LAYOUT = {
   ref_ctx_time_bits: 192, ref_epoch_ms_bits: 200, ref_seq: 208, out_latency_us: 212, base_latency_us: 216,
   cmd_seq: 256, cmd_op: 260, cmd_arg: 264, ack_seq: 280, ack_status: 284, ack_res: 288, ctrl_ready: 304,
   cb_count: 320, cb_late: 324, cb_max_us: 328, cb_sum_us_lo: 332, wake_count: 336, wait_timeouts: 340,
-  in_underflows: 344, min_fill: 348, fill_sum_lo: 352, fill_samples: 356, wake_hist: 360,
+  in_underflows: 344, min_fill: 348, fill_sum_lo: 352, fill_samples: 356, wake_hist: 360, burst_hist: 384,
 } as const;
 export type FlaField = keyof typeof FLA_LAYOUT;
 
