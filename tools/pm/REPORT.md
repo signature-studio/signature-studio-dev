@@ -237,12 +237,14 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 - 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。
 
-## 18. 実装 App の自己 merge の実測 (#2600・PR #2624)
+## 18. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
+- 測定 commit `17eb4e16` (main `13329492` を取り込んだ merge。測定は取り込み後の HEAD で実施)、測定時刻 2026-10-14T16:29Z。偽の opencode (`OPENCODE_BIN`)・`timeout` で打ち切り (リポジトリ外の検証スクリプト)。
+- 結果: 文面ファイルあり (`heartbeat_msg_audit.txt`・間隔 1 秒・timeout 4) 送信 3 回 (監査 3・既定 0)、初回 1.02 秒後。未設定 (間隔 1 秒・timeout 4) 送信 3 回 (既定 3)、初回 1.01 秒後。文面ファイルあり・間隔 2 秒・timeout 4 は送信 1 回 (初回 2.02 秒後。2 回目は 4 秒の打ち切り後)。存在しない・空・空白のみの文面ファイルは終了 1・送信 0 (標準エラー `PM_HEARTBEAT_MSG_FILE is missing or empty`)。`PM_SESSION_ID` 無しは終了 1・送信 0。`bash -n tools/pm/heartbeat.sh` OK。`bash tools/pm/test_pm_wake.sh` 20 passed, 0 failed。
+- 差分 (コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行 (本節を commit した後の HEAD でも同じ)。`git diff 83f93e44 HEAD -- ...` (同じパス) も 0 行。
+- 注: 節番号は §18 (§17 は main の #2342 の節が使っているため)。前回 (`5573e550`) の記載の「間隔 2 秒で送信 2 回」は、本測定 (timeout 4) では 1 回だった。2 回目は初回 (2.02 秒) + 間隔 2 秒で timeout 4 秒を過ぎるため。
+- 取り込みと再測定 (round 4): main `e1e816c2` を merge commit `384e2cbe` で取り込んだ (競合なし。`heartbeat.sh` は PR 側の版のまま)。README の VM 記述 (commit `517bbb13`) を直した後の HEAD で同じ測定を再実行した。送信回数・終了コード・初回送信の遅延 (1.01 秒・2.01 秒) は上の結果と同じ。
+- 差分 (round 4): `git diff 17eb4e16 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行。
 
-- **測定の基準**: 基準時刻 2026-10-14T16:36:11Z (UTC)。集計窓は mergedAt が 2026-10-13T16:36:11Z〜2026-10-14T16:36:11Z の 24 時間。取得: `gh pr list --repo signature-studio/signature-studio-dev --state merged --search "merged:2026-10-13T16:36:11Z..2026-10-14T16:36:11Z" --limit 1000 --json number,createdAt,mergedAt,mergedBy` (件数 980 は上限 1000 未満で、窓の全件)。PR #2624 の fix run で取得。
-- **件数と割合**: 980 件のうち merged_by が実装 App (`app/opencode-for-signature-studio`) の自己 merge は **119 件 (12.14%)**。内訳は reviewer App 859 件・人 2 件。全件の数え上げのため信頼区間は付けない。
-- **作成から merge まで** (119 件の `createdAt`→`mergedAt`): 最小 4 秒・中央値 12 秒・最大 137 秒。
-- **merge 前の review** (119 件・`pulls/N/reviews` の `submitted_at` ≤ `mergedAt`): 118 件は 0 件。1 件 (#1927) は oc-reviewer App の `CHANGES_REQUESTED` の 10 秒後に実装 App が merge した。
-- **原因**: `.github/prompts/implementer.md` 規範 9 が `gh pr merge --auto --merge` を指示していた (`8e4b343d`、2026-10-12 追加)。main に承認必須の Ruleset が無く (`branches/main/protection` は 404、ruleset 24866584 に `pull_request` ルールは無い)、`allow_auto_merge: true` のため Auto Merge は即時 merge になった。
-- **対応**: 規範 9 から Auto Merge の指示を消し、実装者の merge を禁止した。merge は approve した reviewer が同じ run で行う (PR #2624)。
-- **未検証**: 承認の無い PR への auto-merge の挙動 (REST に有効化 API が無く GraphQL が要る)。Ruleset 未適用の下での技術的な防止 (PR #2624 の未解決表)。
+## 19. 実装 App の自己 merge の実測 (#2600・PR #2624)
+
+- 結論: 実装 App の自己 merge の原因 (規範 9 の Auto Merge 指示) と対応は PR #2624 で入った。測定値・取得方法・未検証の項目は全文の付録 [`REPORT_APPENDIX_2600.md`](REPORT_APPENDIX_2600.md) §19 が正本 (250 行上限のため分割移動)。

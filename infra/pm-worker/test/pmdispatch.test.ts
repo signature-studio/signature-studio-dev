@@ -469,7 +469,7 @@ test("closed になった PR / issue の手がかりは reconcile の prune で�
 
 // ---------------------------------------------------------------- pm-apply / needs-user-input (依頼者・PM 適用の待ち) は対象外
 test("ネガコン (g): pm-apply / needs-user-input が付いた oc:no-pr の issue は、検出も oc-pm の送信も /oc の再投入も 0 回", async () => {
-  const clock = { t: T0 + 4 * 3_600_000 };
+  const clock = { t: T0 + 7 * 3_600_000 };
   const ctx = await configuredApp({
     live: true,
     now: clock,
