@@ -11,7 +11,7 @@
 - `provider_check` の「実装」に数える 1 件 (`launchMapPages.length`) は、PE の例外経路 (`obj.+0x50 == 0` で code -7) を持たない**仮置きの値** (mock・C とも常に 0 を返す)。確定したのは呼出し経路と戻り型までで、値そのものは確定していない。
 - 残り **11 件は未確定**。読んだ範囲・確定に必要な情報・未確定の理由を下の表 (§保留) に書き、子 issue 3 件に分けた (#3027・#3029・#3030)。
 - issue の範囲を縮めた (受入条件のうち 1 件分を完了単位とし、残りは子へ移した。`Closes #2984`)。
-- 再測定 (HEAD `0549e22b`・§再取り込み後の再測定): 全 e2e を HEAD で実行した。FAIL は 1 件のみ (`static_subinterp_browser` の flpy_static64 で反復時に wasm メモリが増える。既知の #2918・本 PR の前から同値)。wasm32 の静的版は 12/12 PASS。
+- 再測定 (HEAD `a0b6f97f`・§再取り込み後の再測定 (2)): 全 e2e を HEAD で実行した。FAIL は 1 件のみ (`static_subinterp_browser` の flpy_static64 で反復時に wasm メモリが増える。既知の #2918・本 PR の前から同値)。wasm32 の静的版は 12/12 PASS。
 
 ## 手段
 
@@ -197,6 +197,38 @@ $ git diff a2a56bf8 HEAD -- tools/python/host tools/python/provider tools/python
 (空)
 ```
 
+### 再取り込み後の再測定 (2) (merge `a0b6f97f`・main `f81c46bb`・HEAD で測り直し)
+
+main (`f81c46bb`) を取り込んだ merge `a0b6f97f` の競合は 3 ファイル 7 箇所。`host/fl_mock.mjs`・`provider/fl_engine.c` は、main の PY-96 (選択範囲 4 件) と PY-121 (#2982・表示・メニュー 6 件) の追加と、本件の `launchPages`・`lm_pages`・`launchMapPages.length` を両側残しで解消した。`tests/provider_check.mjs` は集合定義と条件式に main の `pe96`・`pe121_2982` と本件の `pe120` を並べ、期待値を実装 120 / 未実装 315 にした (main の 119 / 316 に本件の 1 件を加えた値)。rebase・force push はしていない。
+
+測定 commit: `a0b6f97f` (コードを変えた最後の commit。merge)。環境: runner (4 core)。素材は `fl-win64` から DATA block 4 件と PE 本体 (`block00031_PE.bin`) を、`toolchain-emsdk` を展開した emsdk ([EMSDK] 6.0.12) で使った。vite は本体 checkout の `node_modules` を symlink して解決した (コミットしない)。CPython wasm (32 bit・64 bit・pthread) は HEAD で再ビルドした (流用なし)。
+
+| コマンド | 結果 | wall (s) |
+|---|---|---|
+| `fetch_inputs.sh` / `provider/build.sh` | rc 0 (fl_table.c: 435 関数・ハンドラ 120) | 1 / 13 |
+| `build_cpython_wasm.sh` / `CPY_PTHREADS=1 build_cpython_wasm.sh` / `build_cpython_wasm64.sh` | 全て rc 0 | 230 / 124 / 173 |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` / `build_flpy_static.sh` / `CPY_PTHREADS=1 … build_flpy_static.sh` / `FLPY_MEMORY64=1 … build_flpy_static.sh` | 全て rc 0 | 10 / 6 / 18 / 7 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 120 / 未実装 315 / MCP 静的 60) | 0 |
+| `launchmap_diff` / `general_diff` / `ui_state_diff` / `screen_diff` / `arrangement_diff` / `arrangement_selection_diff` | 全て diffs 0、PASS (calls 3 / 25 / 12 / 32 / 25 / 8) | 0 |
+| `ui_display_diff` | PASS (ok 12・bad 11・diffs 0) | 0 |
+| `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS (calls 161 / 8 / 32 / 30 cases / 59 / 7 / 17) | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2 |
+| `browser_check` / `static_check` | BROWSER OK (tools 48) / STATIC CHECK OK (1 回) | 10 / 0 |
+| `static_browser_check` | STATIC BROWSER OK (sab_host_calls 37,425・static_in_worker true) | 3 |
+| `STATIC_WASM=flpy_static STATIC_MEM64=0 static_subinterp_browser` | STATIC SUBINTERP OK (12/12 PASS) | 22 |
+| `static_subinterp_browser` (flpy_static64・MEMORY64=1) | **FAIL (12 check 中 11 PASS)**。前節と同じ失敗 (150 回の作成/実行/破棄で wasm メモリが増える: 33,554,432 → 48,365,568 B、+14,811,136 B)。#2918 (既知) | 27 |
+| `STATIC_WASM=flpy_static_pthread static_mt_check` | STATIC MT CHECK OK (runs 50・threads_2_tools 48・threads_4_tools 2・thread_mismatch 0) | 1 |
+| `mcp_ui_check` / `midi_ui_check` | MCP UI OK (tools/list = 48) / MIDI UI OK | 3 / 2 |
+| `python3 analysis/flapi/pe_launchmap_entries.py` | 12/12 OK | 0 |
+
+- 負のコントロール (`launchPages` を 1 にすると `launchmap_diff` が FAIL する確認) は今回は再実行していない。前節の結果を引き継ぐ。mock の `launchPages` の既定値は 0 のまま。
+- コード差分 (測定 commit `a0b6f97f` から HEAD まで、テスト・mock・C・解析に効く範囲): 下の出力を HEAD で取った。
+
+```
+$ git diff a0b6f97f HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis/flapi
+(空)
+```
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
@@ -205,4 +237,4 @@ $ git diff a2a56bf8 HEAD -- tools/python/host tools/python/provider tools/python
 | `length` の件数ヘッダ `[arr-8]` の意味 (件数か容量か)・未初期化経路 (code -7 の例外化の述語)・実行時初期値 (mock・C の 0 は仮置き。provider_check の実装 1 件はこの仮置き値) | 件数の意味は推定。未初期化時の挙動は未モデル。mock・C の値が実機と違う可能性 | #3029 (PY-138) |
 | `0xd843d0` の同一性 (本件と #3001 PY-125 の dispatch) | 下位関数の二重確定の可能性 | #3029・#3030 (未確認) |
 | `static_subinterp_browser` (flpy_static64・MEMORY64=1) の FAIL 1 件 (150 回の反復で wasm メモリが +14.8 MB 増える) | 長時間の反復で wasm メモリが増える。本 PR の前から同値 (`REPORT_PY109.md`) | #2918 (既存・PY-108) |
-| `static_check` の単発 FAIL (12 回中 1 回・FAIL 行は未採取・以後の再現なし) | 原因未特定。再発時に比べられる一次情報が無い | 未起票 (単発・未再現。再発時に FAIL 行を採取して起票) |
+| `static_check` の単発 FAIL (前節の 12 回中 1 回・FAIL 行は未採取)。今回の 1 回は OK | 原因未特定。再発時に比べられる一次情報が無い | 未起票 (単発・未再現。再発時に FAIL 行を採取して起票) |
