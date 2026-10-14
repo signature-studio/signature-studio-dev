@@ -1,86 +1,95 @@
 # liftlib #3067 — `legacy_p1` の repmap が挿入前の行番号で登録され、分岐の書換えが 0/19 件しか当たらない
 
-- 既知類型との関係: **D1a (P1 同型)** (`docs/DEFECTS.md`)。comis 後の jcc が直前の comis 由来の cf/zf を使う欠陥の対策 (`fcmp`: CF=lt∨uno, ZF=eq∨uno, PF=uno) が OTT の legacy P1 で効いていなかった。
-- 親: #2863 (`[PLG-F3-32]` p1_legacy の IR 一致ゲート)。本件の修正は #2863 の本 PR (#2947) では直さず、本 issue で行う (issue 本文の判断どおり)。
+- 既知類型との関係: **D1a (P1 同型)** (`docs/DEFECTS.md`)。修正対象の 19 組 (分岐 17 + or 1 行の 2 組) は D1a 同型。残留の分岐 (§4) は **未判定**。
+- 親: #2863 (`[PLG-F3-32]` p1_legacy の IR 一致ゲート・**CLOSED**)。本件の修正は #3067 で行う。残留は子 #3137 (`[LIFTLIB-22]`)。
 - 担当 dir: `tools/liftlib/`。`tools/m6/` (RetDec 路線・D5 凍結) は読取のみ。
-- 測定 commit (コードを変えた最後の commit): **`81adaffa`**。修正前の基点: `origin/main` `718e90fb`。
-- コード差分の確認 (差分 0 の証跡は本付録の commit 後に取る): `git diff 81adaffa HEAD -- tools/liftlib/liftlib tools/liftlib/tests tools/liftlib/liftlib_e2e.sh tools/liftlib/p1_repmap_census.py`
+- 修正前の基点: `origin/main` `718e90fb`。**main 取り込み**: merge `15d01f87` (origin/main `4b81e78a`)。
+- **測定 commit (コードを変えた最後の commit)**: `c8316dc7` (`fix(liftlib): align T2/T26 with pre-fix reference and run all unit tests (#3067)`)。以後の commit は REPORT のみ。
 
-## 1. 原因 (2 点)
+## 1. 原因 (2 点) と差分の確認
 
 `tools/liftlib/liftlib/passes/p1_legacy.py` の `legacy_p1`:
 
 1. **行番号のずれ**: repmap は挿入前の行番号 `j` で登録されるが、適用は挿入後の `out[j]` に対して行われていた。挿入した行数の分だけずれ、書換えが当たらない (issue 本文の実測 0/19 を再現)。
-2. **`%%pc` の生成**: 旧名は `%` 無し (`cf.N`) で登録され、新名は `%pcNcf` (`%` 付き) である。`str.replace` で置換すると `%%pcNcf` になり、仮に行がずれていなくても不正な IR になる。
+2. **`%%pc` の生成**: 旧名は `%` 無し (`cf.N.reload`) で登録され、新名は `%pcNcf` (`%` 付き)。`str.replace` で置換すると `%%pcNcf` になる。
 
-修正: repmap を挿入前の原行 `lines[j]` に適用してから挿入する。旧名は `%` 付き・後続文字の境界付き (`(?![\w.\-])`) で置換し、`cf.1` が `cf.18` に当たらないようにする。
+修正: repmap を挿入前の原行 `lines[j]` に適用してから挿入する。旧名は `%` 付き・後続文字の境界付きで置換する。
 
-## 2. 受入条件 1: 置換対象 19 組の適用 (実測)
+差分 (測定 commit 以降、記録時点 HEAD = 本 REPORT の親 commit):
+`git diff c8316dc7 HEAD -- tools/liftlib/liftlib tools/liftlib/tests tools/liftlib/liftlib_e2e.sh tools/liftlib/p1_repmap_census.py` = **0 行**。
+(main 取り込みで変わった `p1_legacy.py` の 18 行は main 由来の `canon_tags` (#2863) で、本件の修正ではない。)
+
+## 2. 受入条件 1: 置換対象 19 組の適用 (実測 @ `c8316dc7`)
 
 入力: `tools/m6/work/ott_lift.ll` (挿入前の OTT lift IR, 25,338 行)。再現: `cd tools/liftlib && python3 p1_repmap_census.py [--module <旧 p1_legacy.py>]`
 
-| 指標 | 修正前 (`718e90fb`) | 修正後 (`81adaffa`) | 期待 |
-|---|---|---|---|
-| entries (repmap の組数) | 19 | 19 | 19 |
-| `br i1 %pcN<cf\|zf\|pf>` (書換え後) | 0 | **17** | br 系 17 |
-| `or i1 %pcN.., %pcN..` の行 | 0 | **1** (2 組) | or 系 1 行 |
-| `%%pc` | 0 | 0 | 0 |
-| 書換えで残る `br i1 %<cf\|zf\|pf>.N` | 18 | **1** | 1 (下記) |
-| difflib: 変更行数 | 0 | **18** | 18 (br 17 + or 1) |
-| difflib: 変更行から消えた旧名トークン | 0 | **19** | 19 |
-| difflib: 変更行で `%pc` を含まない行 | 0 | 0 | 0 |
+| 指標 | 修正前 (`718e90fb`, PR 本文の実測) | 修正後 (`c8316dc7`) |
+|---|---|---|
+| entries (repmap の組数) | 19 | **19** |
+| 書換えの br (`br i1 %pcN<cf\|zf\|pf>`) | 0 | **17** |
+| 書換えの or 行 (2 組) | 0 | **1** |
+| `%%pc` | 0 | **0** |
+| 書換えで残る `br i1 %<cf\|zf\|pf>.N` | 18 | **1** (窓外・`icmp` 由来、修正前から残る) |
+| difflib: 変更行 / 消えた旧名トークン / `%pc` を含まない変更行 | 0 / 0 / 0 | **18 / 19 / 0** |
 
 - 修正前は `%pc` へ 1 件も書き換わらない (0/19 の再現)。修正後は 19 組すべてが適用される。
-- 残る 1 件は `dec_label_pc_1801c966f` の分岐 (`%zf.1 = icmp eq i8 %2, 0` 直後)。`icmp` 由来で comis 挿入の窓 (直前 13 行) の外にあるため、対象外の分岐 (修正前から残る)。
-- 挿入した定義が分岐を支配するか: 窓 (comis 行 → 分岐行) の間にラベル行が 0 件 (書換え 17 件すべて同一基本ブロック内)。
-- 負の対照: 修正前のコード (`--module` に `718e90fb` 版) で `br_applied=0`・`diff_removed=0` となり、検出器が書換えの有無を区別することを確認。
+- 残る 1 件は `dec_label_pc_1801c966f` の分岐。窓 (comis 直後 13 行) の外。
+- 書換え 17 件は、comis 行から分岐行までの間にラベル行が 0 件 (同一基本ブロック内)。
+- 負の対照: 修正前のコード (`--module` に `718e90fb` 版) では `br_applied=0`・`diff_removed=0` となり、検出器が書換えの有無を区別する。
 
-## 3. 受入条件 2: e2e の結果 (実測)
+## 3. 受入条件 2: unit と e2e の結果 (実測 @ `c8316dc7`)
 
-測定: `bash tools/liftlib/liftlib_e2e.sh --quick` (load avg 0.55 / 0.77 / 0.53、所要 35〜40 秒・regress 内 32〜37 秒)。
+### 3.1 単体テスト (`python3 tests/test_unit.py`・所要 159.7 秒・load avg 0.6)
 
-| 項目 | 修正前 `718e90fb` | 修正後 `81adaffa` (参照は元のまま) | 修正後 + 参照再生成 (work/ のみ) |
-|---|---|---|---|
-| unit T2 (p1_legacy == `ir7e_p1/p2/p3.ll`) | PASS | **FAIL** (AssertionError: 参照は修正前の出力) | PASS |
-| fa_gain / kh_gain (BIT-EXACT) | PASS (400/400, 366/366) | PASS (同) | PASS (同) |
-| ott (既定 auto f7,p1) | PASS (census junkHi 104 ≤ 104) | PASS (同) | PASS (同) |
-| ott_auto_none: IR 一致 O2a〜O4 | 6 件 不一致 (既存・#2863) | 6 件 不一致 (同じ) | 同じ 6 件 不一致 |
-| ott_auto_none: 出力 SHA (vs m10 参照) | equal true・42/42 (f0 21/21, distinct 40) | **equal false** (f0 3/21, distinct 34) | equal false (同) |
-| 全体 | FAIL | FAIL | FAIL |
+結果: `ALL UNIT TESTS PASS (27)`。終了コード 0。各テストの結果:
 
-- **修正前の全体も FAIL** (`ott_auto_none` の IR 一致 O2a〜O4 が #2863 由来で既に不一致)。修正により新たに落ちるのは unit T2 と SHA gate。
-- **参照再生成** (work/ のみ・コミットしない): `ir7e_p1.ll`・`ir7e_p2.ll`・`ir7e_p3.ll` を修正後の `legacy_p1` で作り直した。元の参照との差は 3 本とも 36 行 (変更 18 行)。R2 の `work-m6-ott` は未更新のため、CI の再取得では旧参照に戻る (§6 の未解決 1)。
-- **O2a〜O4 の不一致の原因は `%pc` 番号のみ** (修正の影響ではない): `ott` は `dump(strip=True)` で空行を除いた IR を入力にするため、`%pc<行番号>` の番号がずれる (空行除去 #1664 後の既知事象・#2863)。`work/ott/ott_lift.ll` を入力にした `legacy_p1` の出力は、`%pc\d+` → `%pcN` 正規化後に参照と一致 (True・生の比較は False)。
+T1 ok / T2 ok (修正前参照との差は repmap 18 行のみ・inserts=18 shift=38 gdata=400) / T3 ok / T4 ok / T5 ok / T6 ok / T7 ok / T8 ok / T9 ok / T10 ok / T11 ok / T12 ok / T13 ok / T14 ok / T15 ok / T16 ok / T16b ok / T17a ok / T17b **skip** (`LL_XRET_LL`/`LL_XRET_DLL` 未設定) / T18 ok / T19 ok (Serum2 PE 無しで add_func は skip) / T20 ok / T21 ok / T22 ok / T23 ok / T24 ok / T25 ok / T26 ok (改名 18 種・修正前参照との差は repmap 18 行)。
 
-### 出力 census (`--auto none` の OTT 出力・修正前後)
+- ランナーの変更: 失敗があっても全テストを実行し、失敗を最後に一覧表示する (`FAIL n/27: ...`)。終了コードは失敗があれば 1。**失敗経路は本 run では未実測** (全件 PASS のため)。
+- T2・T26 の前提: 修正前参照 (`tools/m6/work/ir7e_p*.ll`) との差は repmap の 18 行だけ (`repmap_delta`)。参照は work/ のみで commit 不可。R2 (`work-m6-ott`) 再投入で参照が修正後になったら `==` の完全一致に戻す。
+- T26 は、参照に依らず修正後の出力同士で「空行除去による改名の不変性・ネガ (ult→ule) の検出・写像の一意性と単射」を検査する。
 
-| param=0x248 の振幅 | 修正前 normal / junkHi / absmax | 修正後 normal / junkHi / absmax |
-|---|---|---|
-| 0 | 69 / 175 / 1.67e20 | **140 / 104** / 1.67e18 |
-| 1 | 254 / 252 / 1.13e36 | 258 / 248 / 1.13e34 |
+### 3.2 `bash tools/liftlib/liftlib_e2e.sh --quick` (`c8316dc7`・全体 3 分 28 秒・rc=1)
 
-- 既定 auto (`ott`) の census は修正前後で同一 (normal 140 / junkHi 104 / [1] normal 259・junkTiny 1)。
-- 解釈 (推定): D1a の対策で junk 出力 (junkHi・absmax) が減った。方向は一致するが、**native 実機との一致は本測定では判定していない** (§6 の未解決 4)。
+| 項目 | 結果 (実測) |
+|---|---|
+| (0) unit | PASS (27/27・上記) |
+| fa_gain (BIT-EXACT) | PASS (400/400 steps・400 scenarios) |
+| kh_gain (BIT-EXACT) | PASS (366/366 steps・61 scenarios) |
+| ott (既定 auto f2,f7,p1) | PASS (census junkHi 104 ≤ 104・e2e checks 8 / broken 0) |
+| ott_auto_none: IR 一致 | O1 true / **O2a・O2b・O2c・O3a・O3b・O4 false** |
+| ott_auto_none: 出力 SHA | **未判定** (下記) |
+| ott_auto_none | **FAIL** |
+
+- IR 不一致 6 件の内訳: 修正前参照との差 (repmap 18 行) と、既存の `%pc` 行番号差 (#2863 の既知事象)。gate 側の比較は `canon_tags` で改名を無視する (T26 で確認)。repmap 18 行は改名では消えないため、参照再投入まで不一致になる。
+- **SHA 突合は未判定**。1 回の run で 2 モジュール × 42 組合せ (約 7 分/モジュール・PR 本文の実測) を走らせる必要があり、残り時間に収まらなかった。加えて、`node tools/liftlib/recipes/ott_outhash.mjs` の出力が JSON でなく失敗した (`outhash 実行失敗: Expecting value`・原因は未切り分け)。参照 `tools/m10/work/ott_m10.cjs` は `work-m6-ott` 素材から展開して用意した (`.wasm` は未展開)。
+- 参考 (前回測定・`81adaffa`・PR 本文の表): 修正前 `718e90fb` は SHA 42/42 (f0 21/21)、修正後 `81adaffa` は 3/21 (f0)。`c8316dc7` では再測定していない。修正後の値が正しいかは native 実機と未照合 (§6)。
+- 全体 3 分 28 秒 (総計・unit 込み)。regress 部分は 46.5 秒 (初回) / 22.0 秒 (キャッシュ後の再実行)。
 
 ## 4. 受入条件 3: DEFECTS 類型の判定
 
-- **D1a 同型 (既知)**。根拠: 修正後の書換えは `docs/DEFECTS.md` D1a の対策式そのもの (`cf = lt ∨ uno`・`zf = eq ∨ uno`・`pf = uno`、`p1_legacy.py` の `cf`/`zf`/`pf` 定義)。書換え対象は comis 直後 13 行の `br` と `or` で、D1a の検出信号「`__asm_(u)comis*` の後続 jcc の br 条件が comis 由来でない」に該当していた。
-- 新しい類型は見つからなかった。`%%pc` 生成は同じ repmap 適用の不具合で、本件に含めて直した。
+- **修正対象の 19 組: D1a 同型 (判定済み)**。根拠: 修正後の書換えは `docs/DEFECTS.md` D1a の対策式そのもの (`cf = lt ∨ uno`・`zf = eq ∨ uno`・`pf = uno`、`p1_legacy.py` の定義)。書換え対象は comis 直後 13 行の `br` と `or` で、D1a の検出信号「`__asm_(u)comis*` の後続 jcc の br 条件が comis 由来でない」に該当していた。
+- **修正対象外の残留: 未判定** (`c8316dc7`・`stats.hits`):
+  - `br_other` **17 件**: comis 直後の窓 (13 行) 内の最初の `br i1 %N` が cf/zf/pf の名前参照でない (条件値は `%28` 等の番号 SSA 値)。
+  - `no_branch` **66 件**: 窓内で書換え対象が 0 件。うち 17 件は `br_other` と重なる (`br_other` で break して repl が空になるため両方に計上される)。残り **49 件**は窓 13 行内に br/or が無い (`__asm_comisd` 25・`__asm_comiss` 11 ほか)。
+  - D1a 同型かどうかは本 PR では判定していない。起票先: **#3137** (`[LIFTLIB-22]`・親 #3067)。
 
 ## 5. 再現
 
 ```sh
 cd tools/liftlib
-python3 p1_repmap_census.py                          # 修正後 (HEAD)
+python3 p1_repmap_census.py                           # 修正後 (HEAD)
 python3 p1_repmap_census.py --module <旧 p1_legacy.py> # 修正前 (git show 718e90fb:tools/liftlib/liftlib/passes/p1_legacy.py)
-bash liftlib_e2e.sh --quick                          # 約 35 秒
+python3 tests/test_unit.py                            # 約 160 秒 (T1〜T26)
+bash liftlib_e2e.sh --quick                           # 約 3.5 分 (unit 込み)
 ```
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `tools/m6/work` の参照 IR (`ir7e_p1/p2/p3.ll`) と m10 SHA 基準 (42/42) は修正前の P1 出力。R2 `work-m6-ott` を再投入するまで、CI の `liftlib_e2e --quick` は T2 と SHA gate が FAIL のまま | e2e が FAIL のまま。参照は work/ のみで commit 不可 | PM / 依頼者 (`docs/WORKFLOW.md` §11 の R2 再投入) |
-| O2a〜O4 の IR 一致 FAIL (`%pc` 行番号) | 修正前から FAIL。正規化すると一致 | #2863 (既存・PR #2947 が gate で正規化) |
-| `tools/m6/ir6_pass.py` (vendored) に同じ repmap の欠陥。RetDec 路線 (D5 凍結) のため未修正 | m6 路線の出力は修正前と同じ | #2863 へのコメント (既存) |
-| 修正後の OTT 出力 (SHA 3/21 f0) の正しさは native 実機と未照合 | SHA gate の基準を新しい出力へ置き換える判断が必要 | PM 判断 (#3067 の完了コメント) |
+| 参照 IR (`ir7e_p1/p2/p3.ll`) と m10 SHA 基準 (42/42) は修正前の P1 出力。R2 `work-m6-ott` を再投入するまで、T2・T26 は repmap 18 行の差を許容し、ott_auto_none の IR 一致 O2a〜O4 は不一致のまま | 参照は work/ のみで commit 不可。再投入後に `==` へ戻す | PM / 依頼者 (`docs/WORKFLOW.md` §11 の R2 再投入) |
+| 残留分岐 (`br_other` 17 / `no_branch` 49) の D1a 同型判定と対策 | 修正対象外。件数は §4 | #3137 (`[LIFTLIB-22]`・子) |
+| SHA 突合 (outhash) が `c8316dc7` で未判定 (node の JSON 出力の失敗・1 回約 14 分) | 修正後 OTT 出力の SHA gate が未判定 | PM 判断 (#3067 の完了コメント) |
+| 修正後の OTT 出力 (SHA 3/21 f0 @ `81adaffa`) の正しさは native 実機と未照合 | SHA gate の基準を新しい出力へ置き換える判断が必要 | PM 判断 (基準差し替えは既定で行わない) |
+| `tools/m6/ir6_pass.py` (vendored) に同じ repmap の欠陥。RetDec 路線 (D5 凍結) | m6 路線の出力は修正前と同じ | PM (D5 凍結の判断・新規作業なし) |
