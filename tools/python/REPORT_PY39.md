@@ -218,3 +218,21 @@
 ## 追加解析 (#2548 の run): setStepParameterByIndex の呼出し経路・status・副作用
 
 本文は `REPORT_PY39_2548.md` に分割移動した (250 行上限のため)。結論: 呼出し経路・status 表・範囲外 `-4`・param 3〜8 の副作用を PE で確定。param 0〜2・item 列挙・述語の型は未確定で、子 issue #2581 (`[PY-78]`) に移した。
+
+## 8 回目 run: selectAll の `*p` (0x154528c) の書込み候補を列挙
+
+- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py 0x154528c 0x15e3a60` (本 run で追加。終了 0・hits 50・25.8 秒)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (2.3 秒)。
+- `0x154528c` を直接参照する RIP 相対命令は 0 件。`0x15e3a60` (`*p` を格納するスロット) を参照する 50 件はすべて読込み (`mov rax|rcx, qword ptr [rip+…]`) で、スロットへの書込みは無い。よって `*p` の書込みは、このスロットを読んだ後の間接書込みになる。
+- 読込み直後の `mov dword ptr [reg], …` (`*p` への書込み候補。読込み後 14 命令内・call 前までの走査):
+
+| 書込み VA | 命令 | 読み取れた内容 |
+|---|---|---|
+| 0x103b781 | `mov [rcx], eax` | 所属関数の先頭・引数は未読 |
+| 0x103b9ec / 0x103ba02 | `mov [rax], esi` / `mov [rax], ebx` | 関数 0x103b950 (引数 ecx=ebx・edx=esi)。`*p == ebx` なら `*p = esi`、それ以外で `*p == esi` なら `*p = ebx` (入替え)。呼出元は E8 走査で 0x103bb1a・0x103bc1b (別関数の内部) |
+| 0x103be3a | `mov [rax], ecx` | 所属関数は未読 |
+| 0x103c01c | `mov [rax], esi` | 所属関数は未読 |
+
+- 別フィールドへの書込み: 0x1003e32 の `mov dword ptr [rax+0x798], 0` は `p+0x798` (`*p` ではない)。`ffac20` の `item+0x798` との対応は未確認。
+- 結論: `*p` の書込み候補 4 箇所を列挙したが、selectAll の経路 (0xd5b150 → 0xd843d0 → 0xd5b100 → 0x11e8670) がこれらを通るかは未確認。実行時の値も未確定。`selectAll` の実装は見送る。
+- 次に読む対象: 0x103b950 の呼出元 (0x103bb1a・0x103bc1b) の関数先頭、0x103b781・0x103be3a・0x103c01c の所属関数と引数、それらが selectAll の経路から呼ばれるかの call 連鎖。
+- 受入条件 (#1527) の扱い: selectAll の未解決は本節の候補列挙までとし、残りは子 issue に移した (本 PR の本文を参照)。
