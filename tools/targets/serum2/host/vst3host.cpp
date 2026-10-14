@@ -79,11 +79,28 @@ static LONG CALLBACK watchVeh(PEXCEPTION_POINTERS ep) {
     if (m) GetModuleFileNameA(m, mod, MAX_PATH);
     L("[watch] hit#%d RIP=%p (base=%p, %s) value=%d", gWatchHits, (void*)c->Rip, (void*)m,
       strrchr(mod, '\\') ? strrchr(mod, '\\') + 1 : mod, *gWatchAddr);
-    // スタック上の戻り番地候補 (関数 0xacf70 の呼出元を実行時に確定するため、RSP 以上の qword を 8 個出す)
-    for (int k = 0; k < 64 && m; k++) {
-      const DWORD64 ret = *(const DWORD64*)(c->Rsp + 8 * k);
-      if (ret > (DWORD64)m && ret < (DWORD64)m + 0x2000000)
-        L("[watch] stack[%d]=%p RVA=0x%llx", k, (void*)ret, (unsigned long long)(ret - (DWORD64)m));
+    // SR-27 #1836: frame pointer 省略のため RSP 走査ではなく .pdata の unwind 情報で呼出連鎖を辿る
+    {
+      CONTEXT u = *c;
+      for (int depth = 0; depth < 32; depth++) {
+        DWORD64 base = 0;
+        PRUNTIME_FUNCTION rf = RtlLookupFunctionEntry(u.Rip, &base, nullptr);
+        if (!rf) {
+          L("[unwind] d=%d RIP=%p no-pdata", depth, (void*)u.Rip);
+          break;
+        }
+        HMODULE um = nullptr;
+        char umod[MAX_PATH] = "?";
+        GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, (LPCSTR)(uintptr_t)u.Rip, &um);
+        if (um) GetModuleFileNameA(um, umod, MAX_PATH);
+        L("[unwind] d=%d RIP=%p mod=%s fn=0x%lx (base=%p) rva=0x%llx", depth, (void*)u.Rip,
+          strrchr(umod, '\\') ? strrchr(umod, '\\') + 1 : umod, (unsigned long)rf->BeginAddress, (void*)base,
+          (unsigned long long)(u.Rip - base));
+        PVOID hd = nullptr;
+        ULONG64 est = 0;
+        RtlVirtualUnwind(UNW_FLAG_NHANDLER, base, u.Rip, rf, &u, &hd, &est, nullptr);
+        if (!u.Rip) break;
+      }
     }
     if (m) {  // QI の IID 候補 (lea rdx の解決先 RVA 0x11be750 / 0x11be8e8, 実行時に .data へ格納される)
       const DWORD rvas[2] = {0x11be750, 0x11be8e8};
