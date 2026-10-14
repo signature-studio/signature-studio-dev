@@ -142,3 +142,45 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 - **注意**: 上書き時 `basis` は表の根拠文に置換されるため、CSV 由来の「コード既定値 ReadInt/ReadBool=…」文言は 112 件で失われる (値は不変)。§3 の既定値由来件数を `value_conf` ベースに改めたのはこのため。
 - **回帰 (実測)**: `bash tools/startup/vreg/vreg.sh` exit 0 (C 単体 / shimx 結合 ST+MT+M4 / symcheck / wasm / node 22/22 / Chrome 実 IndexedDB)、`bash tools/startup/keyfix/keyfix_e2e.sh` exit 0 (上記 + pathreg 6 groups + `verify_consistency.py` 6 項目 ALL PASS)。
 - **残 (keyfix 担当範囲)**: `apply_keys.py` への廃止注記と `keyfix_e2e.sh` step 1 からの `apply_keys.py` 除去は keyfix 側の編集が必要 (本チケットでは未実施)。
+
+## 12. #116 (ST-T9) ユーザ .reg 取込の入口 (vreg 側・2026-10-14)
+
+**結論**: ユーザが自分で書き出した .reg を仮想レジストリへ取り込む入口 (`ui/import.html`) と、MachineGuid のユーザ指定を追加した。実 Chrome の IndexedDB で、取込と MachineGuid が再読込をまたいで残ることを確認した。製品 `src/` の startup への結線は本節の範囲外 (子 issue)。FLEngine は起動していない。
+
+**本 PR が定めた受入範囲 (#116 本文に受入条件の記載なし)**
+
+| 条件 | 結果 |
+|---|---|
+| 取込: 選んだ .reg を受理し、取込後 `observeRegistration()` が登録済み・mode=external になる | PASS (値 3 件) |
+| 不正: 1 行目ヘッダ不一致・値なしは拒否し、取込済みの状態を変えない | PASS |
+| 生成しない: 受理したバイト列をそのまま保存し、鍵の生成・改変はしない | 設計 (`js/license_import.mjs`) |
+| 永続: 再読込後も取込内容と MachineGuid が残り、既定 placeholder に戻らない | PASS |
+| MachineGuid: ユーザが 8-4-4-4-12 の 16 進で指定 (保存は小文字) | PASS |
+
+**設計**
+- `js/license_import.mjs`: 取込バイト列を `<profile>#user-reg` キーで store に保存し、以後の boot で `externalReg` として最後に適用する。external モードでは seed の license 値を除き、ユーザ値だけが残る。
+- 取込と MachineGuid 変更は「保存 → 仮想レジストリを開き直す」で行う。取込直後の状態と再読込後の状態が一致する。
+- 開き直した後に `flush(true)` で決定値を記録する。vreg は新規プロファイル以外で記録しないため、これが無いと MachineGuid が再読込で戻る (e2e で検出して修正)。
+
+**実測 (測定 commit `361e35d6`・コードを変えた最後の commit)**
+
+| 項目 | 結果 |
+|---|---|
+| 実行 | `RUNTIME_TMP=<一時ディレクトリ> bash tools/startup/vreg/vreg.sh` |
+| 所要 / exit / load (実行前 1 分平均) | 12.03 s / 0 / 0.31 |
+| C 単体 (`test_vreg.c`) | ALL PASS |
+| shimx 既存テスト (st / mt / M4) | ALL PASS × 3 |
+| symcheck | vreg 要求 38 シンボルを shimx reg.c が全て定義 (reg.c 公開 45) |
+| node テスト | 24 / 24 PASS (既存 22 + `checkUserReg` 2) |
+| Chrome e2e `e2e_chrome.mjs` (既存) | PASS |
+| Chrome e2e `e2e_import_ui.mjs` (新規) | PASS: 初回 placeholder → 取込 (external) → 不正拒否 → MachineGuid 設定 → reload で取込と GUID 維持 |
+
+測定後のコード差分: `git diff 361e35d6 HEAD -- tools/startup/vreg ':!tools/startup/vreg/REPORT.md'` の出力は 0 行 (本節の追記は REPORT のみ)。
+
+**未解決**
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 製品 `src/` の startup への vreg 結線 (wasm の製品バンドル組込みと、製品 UI の入口への配置) | 製品ユーザは取込を使えない | 子 issue (#116 の issue コメント参照) |
+| 取込の取消し UI。取込済みの値のうち seed 外のキーは HKCU に残る | 取消しは profile 削除でしかできない | 子 issue (同上) |
+| 取込が 0x10c7cd0 の本検証を通るか (gradeChar > 0x40) | ライセンス判定への効果は未確認 | #785 (ST-T16 子-1) |
