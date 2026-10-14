@@ -142,3 +142,11 @@
 - **比較した方式**: (a) ヘッダの式をそのまま使う (採用)、(b) IR 側の引数順を並べ替えて 132 形に統一する。
 - **根拠**: 実機 FMA3 との照合で 12 形すべての値が一致。ただし fnm/fnms の 6 形は ±0 と NaN の符号が実機と異なる。 検証手順と数値は `tools/plugins/dynamics/REPORT.md` §4 を参照。
 - **影響**: 両 engine の FMA 残件は unimpl から消えた (件数は REPORT §4)。 符号差は未解決。 movntps・vmovsd store・ucomis/comis の flag は未対応で、子 issue に分割した。
+
+## D15 — VEX の comis/ucomis (vcomisd / vucomisd / vucomiss) の flag は SSE 形へ委譲せず、IR 側で反映する
+
+- **状態**: 採用 (2026-10-14, issue #1582 [PLG-F3-12])
+- **決定**: `__asm_v{,u}comis*` を `m11_simd2.py` の SSE 形 (no-op) へ委譲しない。 flag (CF/ZF/PF) は IR 側で反映する。 反映方式は子 issue [PLG-F3-14] で決める。
+- **比較した方式**: (a) VEX 形を SSE 形の `(void)a; (void)b;` へ委譲して `unimpl` から消す (不採用)、(b) 既存 `lift/passes/ir6_pass.py` ([P1]) を lift 鎖に入れる (単独では不足。 19252 の comis 76 箇所中 insert 3 箇所のみ)、(c) `icall_rewrite.py` の comis 経路 (stub + sahf) を plugins 側に移植する (未評価)。
+- **理由**: (a) は flag を反映しないまま stub を消すため、`declares_unimpl` が 0 になっても silent な flag 欠落が検出できなくなる。 `lift/passes/m11_simd2.py` の既存コメントも同じ方針 (「委譲せず stub のまま残す」)。 実測は `tools/plugins/sampler/REPORT_APPENDIX_1582.md` §7b。
+- **影響**: 19252 / 19048 の unimpl に `vcomisd` / `vucomisd` / `vucomiss` が残る。 これを消すには flag 反映の実装が要るため、子 issue に分割した。
