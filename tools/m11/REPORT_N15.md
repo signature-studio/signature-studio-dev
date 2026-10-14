@@ -50,5 +50,24 @@
 - 全再生成 (`m11_bounds.py`) が要求する `functions_dll.csv` の問題は前回と同じく未解決 (#1141 のコメントで追跡)。
 - 未測定 (#1141 残り): 4c3baa4 (boot5 / 467c40 間接 call) の単独無効化は前回の boot5 除去のみ。faee5b6 の `SysReAllocStringLen`・`SysStringLen` 単独の寄与は未測定。
 
+### #1141 再実行 (run 3): 4c3baa4 の 467c40 override と BSTR 単独の無効化 (測定 commit cd83e84c = origin/main)
+
+起点 `cd83e84c` (main)。`work-m11` を `tools/m11/work/` に展開、PE は `$RUNNER_TEMP/win64/extracted/block00031_PE.bin` (sha256 b2c64da4…)。`work/lift_pe.sha256` は PE の sha256 を手で書いた差分経路 (前回と同じ限界)。boot5 は本 run で RetDec lift 済み (`lift boot5 (RetDec): ok`)。load は各実行とも 0.6〜1.1。
+
+| 構成 | units_run | 停止 | survey ok/trap/miss/clobber | e2e 所要 | rc |
+|---|---|---|---|---|---|
+| baseline (cd83e84c, gate 無し) | 53 | `unreachable` @ function_8c5eb0 | 872/23/46/0 | 155 s | 0 |
+| gate 導入後・既定 (override 有効) | 53 | 同上 | 872/23/46/0 | 48 s | 0 |
+| D: `function_467c40` (4c3baa4 の間接 call 復元) を無効 | 22 | Halt0 経由の早期終了 | 871/24/46/0 | 47 s | 0 |
+| E: `SysReAllocStringLen` (faee5b6 の BSTR) を無効 | 53 | 同上 (baseline と同じ) | 872/23/46/0 | 48 s | 0 |
+| F: `SysStringLen` (faee5b6 の BSTR) を無効 | 53 | 同上 (baseline と同じ) | 872/23/46/0 | 48 s | 0 |
+| 復元後 (HEAD の既定) | 53 | 同上 | 872/23/46/0 | 49 s | 0 |
+
+- gate の確認: D は `llvm-nm work/obj/ov.o` で `function_467c40` の定義が消えたことを確認。E/F は `win.o` で該当シンボルの定義が 0 件になったことを確認。
+- 方式: 一時 gate (`#if !M11_ABL_*`) を `m11_ov.c` / `m11_win.c` に入れ、`m11_build.sh` の CF に `${M11_ABL_CF:-}` を一時的に足して 1 つずつ測定。測定後に `git restore` で全て戻し、`tools/m11` の差分は 0。
+- 読み取り: 4c3baa4 の 467c40 間接 call 復元 (`function_467c40` override) が units_run 53 を支えている。これを外すと 22 unit で Halt0 に落ちる。faee5b6 の BSTR 系 (`SysReAllocStringLen`・`SysStringLen`) は単独では units_run に影響しない (53 のまま)。
+- 注意: 今回の D は 467c40 override を外す単独の変化。boot5 (25 関数の lift 追加) と 467c40 の組み合わせ分解はしていない。ov.o は gate 変更でキャッシュ無効化され再コンパイル済み。faee5b6 の `_DynArraySetLength`・`_ReallocMem` (前回 run 2 の A/B) と合わせると、faee5b6 の寄与は override の 3 点のうち 417b70・409470 が退行を抑え、BSTR 系は影響無し、と読める。
+- 受入 2 (`_CopyArray` kind 12) は今 run では未実施 (子 issue #1511 で扱う)。
+
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 本体 REPORT.md から移動)
 main `6e5c8dac` で通常起動・survey は完走 (53/942, survey ok 870)。ネガコン (boot5 除去) は 52/942 で「元の停止に戻る」は不成立。faee5b6 の二分は逆パッチが衝突し未成立。詳細は `REPORT_N15.md` §16。
