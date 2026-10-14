@@ -148,6 +148,8 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 ## 14. 5 回目の再着手 run: unit 単位の値遷移 probe (HEAD `72260b63` = origin/main、コード変更なし)
 
 - 測定 commit: `72260b63` (コード差分 0。計装は本節の probe のみ・survey 本体は不変)。
+- 差分 0 の証跡 (`git diff --stat 72260b63 HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/survey_units.mjs tools/m11/m11_win.c tools/m11/ldfix/` の出力は空。範囲内のコード差分 0):
+- 本 PR の差分は `git diff --stat 72260b63 HEAD -- tools/m11` で `tools/m11/trap_triage/REPORT_1046.md` (+14) と `tools/m11/trap_triage/probe_1046_watch.mjs` (+32) の 2 ファイルのみ。
 - 再現: `m11_gen_ir2.sh` rc 0 (36.2 s、490,733 行) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0: `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
 - 新規 `trap_triage/probe_1046_watch.mjs`: 各 unit 実行の前後で `0x10a9f910` の 8B を読み、値が変わった unit を出す (読取りのみ、IR 不変)。全 942 unit を **13.1 s** で完走 (§12・§13 の全 store 計装は 900〜1500 秒で打ち切り)。
 - 値の遷移 (抜粋・実測):

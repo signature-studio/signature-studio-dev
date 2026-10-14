@@ -1,5 +1,5 @@
-// #1046 probe (work/ のみ・commit しない): 各 unit 実行の前後で監視番地の 8B を読み, 値が変わった unit を出す.
-// IR・survey 本体は変更しない (読取りのみ). usage: node probe_1046_watch.mjs <from> <to>
+// #1046 読取りのみの診断 probe: 各 unit 実行の前後で監視番地 0x10a9f910 の 8B を読み, 値が変わった unit を出す.
+// IR・survey 本体は変更しない. usage: node probe_1046_watch.mjs <from> <to>
 import fs from 'fs';
 const M11 = new URL('../', import.meta.url).pathname.replace(/\/$/, '');
 const W = 0x10a9f910;
