@@ -1,9 +1,9 @@
 # liftdiff LD-53 (#1546) — i128 引数の呼出し側全件と投入形の判定 (部分達成)
 
 > 親: #1526 (LD-51)。`REPORT_LD39.md` §8 から参照する付録 (LD-39 本体が 250 行上限に近いため別置き)。
-> 測定 commit: `d16d7f5d` (origin/main)。コードは変えていない (本節は REPORT のみ)。
+> 測定 commit: `3f330f17` (分類スクリプトを含む commit。`d16d7f5d` からの実行コード差分は 0 行。§6 参照)。
 > 素材: `fl-win64` の `extracted/block00031_PE.bin` (展開先 `$RUNNER_TEMP/fl-win64/`)、`work-m11` の `tools/m11/work/boot_final3.ll` (展開先 `tools/m11/work/`)。
-> 分類スクリプトは `tools/liftdiff/work/ld53_callers_linear.py` と `tools/m11/work/ld53_callers.py` (gitignore。commit しない)。
+> 分類スクリプト: `tools/liftdiff/tests/ld53_callers_linear.py` (commit 対象)。前版の `work/` 配下のスクリプトは使わない。
 
 ## 1. IR 署名 (実測)
 
@@ -11,15 +11,17 @@
 
 ## 2. 呼出し側の全件 (命令境界の線形逆アセンブル)
 
-`ld53_callers_linear.py <PE>` rc=0 (34.6 秒)。`call rel32` を命令境界で数え、直前 12 命令で引数の準備を分類した。
+`python3 tools/liftdiff/tests/ld53_callers_linear.py <PE>` rc=0 (37.98 秒、命令数 5,022,467)。`call rel32` を命令境界で数え、直前の制御転送 (call/jmp/ret/j*) までの最大 12 命令で引数の準備を分類した。
 
 | VA | call (命令境界) | xmm0 に double | 準備が見えない |
 |---|---|---|---|
-| `40c660` | 5021 | 4828 | 193 |
+| `40c660` | 5021 | 4827 | 194 |
 | `40c750` | 543 | 530 | 13 |
-| `653c80` | 3 | — | 3 件とも r8 に整数 (`imul`・`movsxd`・`mov`) を入れる。r9 は設定されない |
+| `653c80` | 3 | — | 3 件とも r8 に整数 (`imul`・`movsxd`・`mov`) を入れる。r9 は 3 件とも窓内に設定がない |
 
-IR 側 (lift 済みの `call @function_<VA>(`): `40c660` は 956 件のうち 937 件、`40c750` は 41 件のうち 38 件が `__asm_*` (xmm 命令) の結果を `i128` に入れている。`653c80` は IR 上 2 件で、いずれも `zext`/`sext` の整数。
+注: 前版 (`d16d7f5d`・`work/` 配下のスクリプト) の数値は 4828 / 193。窓の打ち切り条件 (制御転送で止める) の違いによる 1 件差で、結論は変わらない。
+
+IR 側 (lift 済みの `call @function_<VA>(`): `40c660` は 956 件のうち 937 件、`40c750` は 41 件のうち 38 件が `__asm_*` (xmm 命令) の結果を `i128` に入れている。`653c80` は IR 上 2 件で、いずれも `zext`/`sext` の整数。(この IR 側の件数は前版の測定値で、本 run では再計算していない。)
 
 ## 3. 呼び先 (IR define と機械語)
 
@@ -30,7 +32,7 @@ IR 側 (lift 済みの `call @function_<VA>(`): `40c660` は 956 件のうち 93
 ## 4. 判定
 
 - 候補 (b) ポインタ渡し: `653c80` はポインタを逆参照しない。呼出し側も r8 に整数の積を入れる。**整合しない**。
-- 候補 (a) 2 レジスタ分解: (a) なら呼出し側は i128 の高位を r9 に入れるはずだが、3 件とも r9 を設定しない。**整合しない**。本体が r9 を読まない点も、(a) の高位の扱いと合わない。
+- 候補 (a) 2 レジスタ分解: (a) なら呼出し側は i128 の高位を r9 に入れるはずだが、3 件とも r9 を窓内で設定しない。**整合しない**。本体が r9 を読まない点も、(a) の高位の扱いと合わない。
 - `40c660` `40c750`: 実入力は xmm0 の double で、`i128` の準備は無い。IR 型の誤りの**疑い** (全件の IR 側確認は未了)。
 - `691dd0` (`i64,i128,i64`): IR 側の呼出しは `zext`/`sext` の整数 5 件 (定数 1 件を含む)。高位 0 の整数と読めるため、(a)/(b) のどちらとも整合する。**区別できない**。
 
@@ -48,6 +50,6 @@ IR 側 (lift 済みの `call @function_<VA>(`): `40c660` は 956 件のうち 93
 
 ## 6. 検証
 
-- 測定 commit `d16d7f5d`。コード差分は 0 行: `git diff d16d7f5d HEAD -- tools/liftdiff/ldlib tools/liftdiff/tests` の出力は空 (本 PR は REPORT と導線のみ)。
-- `ld39_abi_dump.py` rc=0 (IR 有り・0.19 秒)。`ld53_callers_linear.py` rc=0 (34.6 秒)。
+- 測定 commit `3f330f17`。`d16d7f5d` から HEAD までのコード差分は、測定スクリプトの追加 (`tools/liftdiff/tests/ld53_callers_linear.py`) のみ。`ldlib` は差分 0 行。
+- `ld53_callers_linear.py` rc=0 (37.98 秒)。`ld39_abi_dump.py` は本 run で再実行していない (前版の実測 rc=0・0.19 秒を §1 で引用するのみ)。
 - 範囲外: e2e (`liftdiff_e2e.sh`) は実行していない。コードを変えていないため挙動は変わらない。
