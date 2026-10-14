@@ -24,6 +24,12 @@ def load(path=DLL):
     r = _lib.ott_load(path.encode())
     if r != 0: raise RuntimeError('ott_load failed %d' % r)
 
+_lib.ott_enc_slots.argtypes = [ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
+def enc_slots(cookie_va, slot_vas):
+    """encoded slot を enc(NULL)=cookie に初期化する (CRT 初期化相当の一部)。"""
+    arr = (ctypes.c_uint64 * len(slot_vas))(*slot_vas)
+    _lib.ott_enc_slots(cookie_va, arr, len(slot_vas))
+
 def call(fn, gpr=(), xmm=(), stk=()):
     """gpr: 最大 4 個の整数引数 (位置 0..3 = rcx,rdx,r8,r9), xmm: 位置 0..3 の raw 64bit (f32 は f32b() を 32bit で, f64 は f64b())。
        戻り: (rax, xmm0_raw64)"""
