@@ -13,6 +13,8 @@ export const DEFAULT_REPO = "signature-studio/signature-studio-dev";
 export const MIN_COMMENT_WINDOW_H = 24;
 export const DEFAULT_COMMENT_WINDOW_H = 24;
 export const DEFAULT_COMMENT_MAX_PAGES = 80;
+// oc:no-pr の再着手の間隔 (時間)。最後の報告・/oc の投稿からこの時間が過ぎるまで再着手しない。wrangler.toml の NO_PR_COOLDOWN_H と揃える (test/active.test.ts が両方を見る)。
+export const DEFAULT_NO_PR_COOLDOWN_H = 6;
 
 export interface Env {
   PM: { idFromName(n: string): unknown; get(id: unknown): { fetch(r: Request): Promise<Response> } };
@@ -112,7 +114,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     pmLogins: (env.PM_LOGINS ?? "pycabbage").split(",").map((s) => s.trim()).filter(Boolean),
     watchdogIntervalS: num(env.WATCHDOG_INTERVAL_S, 300),
     reconcileIntervalS: num(env.RECONCILE_INTERVAL_S, 300),
-    noPrCooldownH: num(env.NO_PR_COOLDOWN_H, 3),
+    noPrCooldownH: num(env.NO_PR_COOLDOWN_H, DEFAULT_NO_PR_COOLDOWN_H),
     // classify が見る bot の報告は 24 時間以内。窓がそれより短いと、取りこぼした報告で誤って着手する。
     commentWindowH: Math.max(MIN_COMMENT_WINDOW_H, num(env.COMMENT_WINDOW_H, DEFAULT_COMMENT_WINDOW_H)),
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),

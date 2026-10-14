@@ -300,6 +300,7 @@
 | `tools/hostbridge/lowbase/REPORT.md` | ~125 | VA 敷設 base 可変化 (+ `x64c/` に x64c ラッパ 3 本目: `x64c/lb_x64c.py` は `tools/ott/lift/x64c.py` を無改変 import) |
 | `tools/hostbridge/nfo/REPORT.md` | ~148 | Plugin database (`.nfo`/`.fst`) 書式解読 + 合成 DB 生成器。§10〜§12 は `REPORT_APPENDIX_A.md`・§13〜§14 は `REPORT_APPENDIX_B.md` に分割 |
 | `tools/hostbridge/nfo/REPORT_APPENDIX_A.md` | ~112 | nfo §10〜§12 全文 (実機 OTT.fst / `.Plugins.ini`+VerifiedIDs 照合 / VST3 path 規則・KH magic・Massive X CID。#437 で無変更分割移動) |
+| `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_829.md` | ~88 | #829 (HB-H20): x64c wasm build の中間物サイズ (C・`.o`)・unsup 内訳と CreatePlugInstance (0x86ab10) 入場ログ・最初に失敗する関数の実測。表に無い値の正本。exit・秒・load・wasm サイズは REPORT §14 の表が正本 |
 | `tools/hostbridge/nfo/REPORT_APPENDIX_B.md` | ~150 | nfo §13〜§14 全文 (generateDb→wvfs 結線 e2e CAB-216 + 検収。#437 で無変更分割移動) |
 | `tools/gui/flengine/REPORT.md` | ~244 | GUI-3 (#174) 実 FLEngine lift × GUI shim 結合: 自然起動・survey で shim に実到達した API、指向呼出、gate 12 + ネガコン 5。§8 = GUI-12 (#566) `__pe_image` の m11_data_gen 方式統合 (実 FLEngine PE parity・ネガコン) |
 | `tools/gui/REPORT.md` | ~235 | gui-shim (Win32 user32/gdi32 → OffscreenCanvas)。§9 = GUI-4 (#180) の要約 (全文は `REPORT_APPENDIX.md`)。§10 = GUI-5 (#181) 24/8/4/1bpp DIB・mono DDB と wasm SIMD128 行カーネルの実測。§11 = GUI-9 (#186) FreeType テキスト (要約のみ・全文は `REPORT_APPENDIX_B.md`)。§12 = GUI-12 (#489) headless host surface 画素 UAF の修正と 50 回連続 + ネガコン。§13 = GUI-13 (#615) gui_wasm.sh への FreeType 組込み + ブラウザ上テキスト描画 e2e。§14 = GUI-7 (#183) popup/tooltip z 順・NC 領域・無効領域複数矩形・DPI (FL 非依存部; 要約のみ・全文は `REPORT_APPENDIX_C.md`)。§15 = GUI-8 (#184) e2e の agent-browser/puppeteer 載せ替え・長時間ストレス・Firefox 取込み (要約のみ・全文は `REPORT_GUI8.md`)。§16 = GUI-5 続き (#181) e2e 全体の全試行と wasm shim 全体の SIMD/scalar 比較 (要約のみ・全文は `REPORT_APPENDIX.md` §16)。§17 = GUI-6 (#182) 入力品質 (キー配列 US/DE/FR・IME・タッチ/ZOOM・Pointer Lock/ClipCursor; 要約のみ・全文は `REPORT_APPENDIX.md` §14) |
@@ -343,7 +344,7 @@
 | `tools/python/REPORT_PY8.md` | ~45 | PY-8 (#80): MIDI 1 イベント flapi 呼出し数・所要時間と遅いモード切り分け (REPORT.md の分割ではなく新規。250 行上限とは無関係) |
 | `tools/python/REPORT_PY15.md` | ~130 | PY-15 (#653): 省略引数のホスト受け渡し方式・kwlist 103 関数の誤束縛 0 検証・挙動変更の内訳・ネガコン (REPORT.md §16 の全文。250 行上限のため分離) |
 | `tools/python/REPORT_APPENDIX.md` | ~216 | python REPORT の分割移動節の全文: §7c (ilmcp 9 関数 PY-3 #82: 引数規約・検証・仮定・未解決)・§7b-2 (ilmcp.getBrowserNames 固定バッファ修正 #74 の全文)・§9 下流チケット案 T1〜T9・§PY-13 (build_flpy.sh の env 化 #588)・§12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81)・§14 (Piano roll scripting #79 の全文) (250 行上限のため無変更で分割移動) |
-| `tools/python/REPORT_PY2.md` | ~76 | PY-2 (#83/#115, REPORT §7d 本体の全文): CPython と flapi provider の同一 wasm 静的リンク・往復コスト・`Py_*` 動的束縛 110 名の対応表・スレッド/GIL 方針 |
+| `tools/python/REPORT_PY2.md` | ~215 | PY-2 (#83/#115, REPORT §7d 本体の全文): CPython と flapi provider の同一 wasm 静的リンク・往復コスト・`Py_*` 動的束縛 110 名の対応表・スレッド/GIL 方針。§7f (PY-81 #2634): 静的版の Worker 内実行と headless Chrome での SAB 版との 48 tool 比較・run_all.sh 全体の未達理由 |
 | `tools/python/REPORT_APPENDIX.md` | ~50 | python REPORT §PY-13 (build_flpy.sh の env 化 #588) と §12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/python/REPORT_PY16.md` | ~100 | PY-16 (#654): stubs 既定値 `midi.*` の評価 (eval 撤去・許可式の評価器・検証・ネガコン) の全文 (REPORT.md §15 の分割移動) |
 | `tools/python/REPORT_PY27.md` | ~70 | PY-27 (#1138): ui / general / screen / arrangement / launchMapPages の mock 対応状況・`tests/ui_diff.mjs` の結果・保留 150 件 |
@@ -394,6 +395,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_894.md` | ~62 | slayer_engine_ia32 REPORT §9.5・§9.6 (#894 events[] 探索) の全文を分割移動した付録。 `scan_events.py` の所要 (n=3 min–max)・load・鮮度証跡 (`git diff` 実出力) を含む。 REPORT.md は 250 行上限のため分割 |
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
+| `tools/shared/elastique/REPORT.md` | ~140 | élastique 2.2.15 (win x64) の静的 IPP 入口 197 件の API 同定 (T-SH-40 / #2613): 線形走査の入口再現・dsp_ippv2 の本体照合 (一意名 8・族候補 26・未同定 163)・tools/ipp の stub 名 28 (stub のみ 18・混在 16 入口。#2613 受入 2)・間接経路の静的確認。対応表は `data/entries.csv` |
 | `tools/shared/REPORT_APPENDIX.md` | ~110 | shared REPORT の分割移動節の全文: §A win freetype.dll の版判定 (#145, 上流 VER-2-4-{10,11,12} 照合の実測)・§10 ライブラリのビルド詳細 (libFLAC/LAME/WavPack/FFmpeg/ILSvg)・§12 検収記録 (2026-10-11)。250 行上限のため無変更で分割移動 |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 | `tools/shared/oss/ilsvg/REPORT.md` | ~50 | ILSvg の版の組 probe (#877): svgdom 0.4.7 は emcc 26/26 cpp OK、svgren 0.6.3 / 0.5.9 は svgdom 0.4.7 と enum 名不一致で版の組は未確定 (未解決 #927) |
@@ -452,10 +454,11 @@
 | `tools/pm/REPORT_APPENDIX_2349.md` | ~95 | PM Worker の日次 digest (#2349・CI-70・`oc-pm kind=digest ref=0`): 24 時間の起点・2 回目の抑止・1 日 1 件・dry-run・送信失敗の枠・rolling issue の launch 除外の実測 (測定 commit `5726e190`・main 取り込み後の再測定 §7)、24 時間ガードと rolling 除外の mutation で FAIL を確認、pm.md の digest / user_answered 節の検査。REPORT.md が 250 行上限のため別置き |
 | `tools/pm/REPORT_APPENDIX_2461.md` | ~64 | PM Worker の `user_answered` の回答を MEMBER / OWNER / COLLABORATOR のコメントに限る (#2461)。変更の要点・件数・テスト a〜c・測定 (`npm test` 163 件・`test:workers` 3 件・所要)・ネガコン A/B・未解決。`REPORT.md` は 250 行上限のため本体へ追記しない |
 | `tools/pm/REPORT_APPENDIX_2591.md` | ~60 | #2591 (pm.md の `needs_decision` の PR 起点化・`rule=skip`・投稿・質問の前の確認) の検証記録。修正本体は #2603 で main に入った。main の版の検査・ネガコンの測定 (測定 commit と検査件数・結果は付録 §2)。`REPORT.md` は 250 行上限のため本体へ追記しない |
-| `tools/pm/REPORT.md` | ~222 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380 (全文は付録)・`idle_report.sh` の検証 #2354 (全文は付録)・PM Worker の live 切替前の突き合わせ #2443・R2 素材投入の頻度 #2434・`pm_wake.sh` の判定テストと live 確認 #2347・PM Worker の同時実行の上限の推定 #2381)。RETRO・DIRECTIVES の数値の正本 |
+| `tools/pm/REPORT.md` | ~249 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380 (全文は付録)・`idle_report.sh` の検証 #2354 (全文は付録)・PM Worker の live 切替前の突き合わせ #2443・R2 素材投入の頻度 #2434・`pm_wake.sh` の判定テストと live 確認 #2347・PM Worker の同時実行の上限の推定 #2381・main の Ruleset の実測 #2648 は §19 (参照のみ。本体は `REPORT_2648.md`))。RETRO・DIRECTIVES の数値の正本 |
 | `tools/pm/REPORT_APPENDIX_2380.md` | ~32 | tools/pm REPORT §10 (PM Worker のコメント同期 #2380) の全文。250 行上限のため REPORT.md から分割移動 (#2434) |
 | `tools/pm/REPORT_2416.md` | ~140 | PM Worker の build 表示 (#2416、PR #2477 の差し戻し round 1・5): `npm test`・`npm run test:unit`・`npm run test:workers` の n=3 実測 (測定 commit と件数は本付録が正本。wall と vitest Duration を分けて記録)、wrangler `--define` / `--var` の dry-run 結果 (README『再デプロイ』手順 4 の根拠)。`REPORT.md` は無変更 |
 | `tools/pm/REPORT_2336.md` | ~98 | PM Worker の規則 A (merged PR を持つ親 issue の自動 close・#2336) の実データ dry-run の実測 (Worker の判定と別実装の再計算の照合・候補の内訳・ネガコン・判定条件を外したときの FAIL)。運用の正本は `infra/pm-worker/README.md` |
+| `tools/pm/REPORT_2648.md` | ~50 | main の Ruleset `main-require-review` (#2648・ADR D27) の実測: 設定 (API)・merge の窓の件数・実装 App の merge 前承認の件数 (数値は付録 §3)・取得コマンドと jq 式。REPORT.md §19 から分割移動 (250 行上限) |
 | `tools/pm/REPORT_APPENDIX_2354.md` | ~62 | tools/pm REPORT §11 (`idle_report.sh` の検証 #2354) の全文。250 行上限のため REPORT.md から分割移動 (#2381 の PR のレビュー指摘への対応)。fake gh の判定 41 件・実データの検算・未解決 (soak の合格ライン) |
 | `tools/pm/REPORT_APPENDIX_2337.md` | ~60 | tools/pm REPORT §16 の全文 (oc-pm の refs_orphan 検出 #2337・PR #2478: 測定・ネガコン・Refs のみ判定の差)。250 行上限のため REPORT.md から分割移動。測定値の正本は本付録 |
 | `tools/targets/freshair/lift2/REPORT_FA15.md` | ~60 | lift2 FA-15 (#1105): ctrl closure の ymm (AVX2 256bit) lowering (`vpcmpeqw`/`vpxor`/`vpmovmskb` ymm・`vzeroupper`)。`build_ctrl.sh` の `failed` 1→0、`lift2_e2e.sh` ALL PASS の実測 |
@@ -481,6 +484,7 @@
 | `docs/pm/RETRO_2026-10-13.md` | Actions 移行後 2 日間のショートレトロ (事実・原因・対策。依頼者指示 121) | 測定値 (正本は `tools/pm/REPORT.md`。本書は結論と link のみ)・指示の逐語原文 (`DIRECTIVES.md` が正本)・repo 外絶対パス |
 | `tools/pm/REPORT.md` | PM 運用の実測の**正本** (PR 件数・PR とチケットの対応・Project V2 Status (参考値)・Actions run 集計。基準時刻と取得方法を併記) | 技術実装・指示の逐語原文・チケット状態の判断 (`STATUS.md`・issue/PR の状態 (`docs/WORKFLOW.md` §3) が正本) |
 | `tools/pm/REPORT_2416.md` | PM Worker の build 表示 (#2416) の測定値の**正本** (付録。`npm test`・`npm run test:unit`・`npm run test:workers` の n=3 実測と取得方法、wrangler `--define` / `--var` の dry-run 結果) | 技術実装の手順 (README が正本)・指示の逐語原文・チケット状態の判断・repo 外絶対パス |
+| `tools/pm/REPORT_2648.md` | main の Ruleset `main-require-review` (#2648・ADR D27) の測定値の**正本** (付録。設定の API 値・merge の窓の件数・取得コマンドと jq 式) | 方式の決定 (DECISIONS.md D27 が正本)・手順 (WORKFLOW.md §2 が正本)・bypass の値を手順書に複製すること |
 | `tools/pm/REPORT_APPENDIX_2380.md`・`tools/pm/REPORT_APPENDIX_2354.md` | REPORT §10・§11 の分割移動先 (無変更の全文)。測定値の正本は付録側 | 本体 `REPORT.md` へ戻す追記・同じ節の要約の重複 (本体は要約とリンクだけ) |
 | `tools/pm/README.md` | PM 運用ツールの一覧・『VM 退役後の扱い』(全ファイルの後継・廃止の表)・VM の状態ファイルの扱いの決定 (取り込み or 破棄と影響)・前提・環境変数・運用の約束 | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報・状態ファイルの中身や件数 (決定と影響だけを書く) |
 | `infra/pm-worker/README.md` | PM Worker (Cloudflare) の構成・デプロイ・**再デプロイ (wrangler の OAuth)**・ロールバック・OAuth 失効時の手順・`[未確認]` のチェックリスト | 測定値 (`tools/pm/REPORT.md`・付録 `tools/pm/REPORT_2416.md` が正本)・認証情報 (token・OAuth の保存ファイルの中身)・repo 外絶対パス |

@@ -244,3 +244,6 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 注: 節番号は §18 (§17 は main の #2342 の節が使っているため)。前回 (`5573e550`) の記載の「間隔 2 秒で送信 2 回」は、本測定 (timeout 4) では 1 回だった。2 回目は初回 (2.02 秒) + 間隔 2 秒で timeout 4 秒を過ぎるため。
 - 取り込みと再測定 (round 4): main `e1e816c2` を merge commit `384e2cbe` で取り込んだ (競合なし。`heartbeat.sh` は PR 側の版のまま)。README の VM 記述 (commit `517bbb13`) を直した後の HEAD で同じ測定を再実行した。送信回数・終了コード・初回送信の遅延 (1.01 秒・2.01 秒) は上の結果と同じ。
 - 差分 (round 4): `git diff 17eb4e16 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行。
+
+## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
+- 測定値の正本: [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)。
