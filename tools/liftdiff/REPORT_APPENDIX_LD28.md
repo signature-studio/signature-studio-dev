@@ -89,13 +89,17 @@
 - **コード差分 (測定 commit → HEAD・候補の判定に影響する範囲)**: `git diff 1c4b7c7e origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (LD-74 の「候補範囲で差分 0」は、この範囲には当てはまらない)。
 
 #### 候補 `38d53ac8` の全件 closure rebuild (LD-101 / #2277)
-- **測定 commit = `38d53ac8`** (候補 commit そのものを detached worktree で checkout して測定。`git worktree add --detach ../ws-2277-38d53ac8 38d53ac8`)。素材は `fl-win64` + `work-m11` + `work-liftdiff` (`$HOME/artifacts` から展開)。
+- **測定 commit = `38d53ac8`** (候補 commit そのものを detached worktree で checkout して測定。`git worktree add --detach ../ws-2277-38d53ac8 38d53ac8`)。素材は `fl-win64` + `work-m11` + `work-liftdiff` (`$ARTIFACTS_DIR` から展開)。
 - **ビルド**: `liftdiff.py build` を `38d53ac8` のソースから実行 (rc 0・`sig_mismatch 0`・`undefined 1`・wasm 4,439,240 B・link 2.1 s)。`1c4b7c7e` のビルド結果 (#2242) と同じ。
-- **batch**: `batch --set closure --shards 14 --nobuild` (ビルド直後。target は `pe` だけ `fl-win64` 展開先へ向けた repo 外の複製 `_temp/m11_2277.json`。`targets/m11.json` は変更していない)。rc 0・**584 s** (`[batch] done 584s`)・load 1.42 (開始時) → 6.39 (終了時・shards 14)。
+- **batch**: `batch --set closure --shards 14 --nobuild` (ビルド直後。target は `pe` だけ `fl-win64` 展開先へ向けた repo 外の複製 `_temp/m11_2277.json`。`targets/m11.json` は変更していない)。rc 0・**584 s** (`[batch] done 584s`)・load 1.42 (開始時) → 6.39 (終了時・shards 14)。**n=1 の単発値** (再測定なし。min–max レンジは未取得)。
 - **集計**: 一致 3,092 / 不一致 1,524 / 実行不能 2,805 (記録 2,273 / 2,892 / 2,256 と不一致)。`1c4b7c7e` の rebuild (#2242) と同じ件数。
-- **記録との verdict 一致**: 7,421 関数中 5,705 (`1c4b7c7e` の rebuild と同じ)。
+- **記録との verdict 一致**: 7,421 関数中 5,705 (`1c4b7c7e` の rebuild と同じ)。**この run では再計算できていない** (入力 jsonl が素材 `work-liftdiff` にあり、fix run の `$ARTIFACTS_DIR` に無い)。数値は 2026-10-14 の初回実行の記録。
+- **集計の再現コマンド (指摘 1)**: `bash tools/liftdiff/ld101_aggregate.sh tools/liftdiff/work/2277/batch_closure.jsonl` (内部で `liftdiff.py summary` と `tests/trace_diverge_418be0.py` を実行)。出力の再取得は未実施。
 - **入力 jsonl**: `work/2277/batch_closure.jsonl` の sha256 = `e1676e39…4255` (記録 `work/m11/batch_closure.jsonl` = `810b4d3a…bf6` とは別物。件数は上記の通り)。
 - **対象 2 関数**: `0x418be0` = 記録 match / rebuild match。`0x41c820` = 記録 mismatch (tag `icall_drop`) / rebuild **match** (記録の mismatch は再現せず)。
 - **`trace_diverge_418be0.py` (rc 0)**: 本 commit の `tests/` には当該スクリプトが無い (候補の tree が古い) ため、main の版 (`209ebda4` 時点) を全件 jsonl に与えた。除外 1 件 (解析不能要素)・対象 0 件。記録 jsonl で得た 20 件 (16 + 4) は、この rebuild では再現しない。
+- **ネガティブコントロール (指摘 2・未実施)**: 同じ版の `tests/trace_diverge_418be0.py` を記録 jsonl (`work/m11/batch_closure.jsonl`) に与えて 20 件 (16 + 4) が出ることの再実行は、この run では素材 `work-m11` が無く未実施。0 件が偽陰性でないことの証跡は未確定。
 - **結論**: `38d53ac8` も記録 (2,273 / 2,892 / 2,256) の生成 commit ではない。`0x41c820` mismatch も再現しない。`1c4b7c7e` と `38d53ac8` は件数・対象 2 関数の判定が同一。残りの候補 `9e9c1315` / `930c6dbc` は #2276 / #2278 で扱う。
 - **コード差分 (測定 commit → origin/main・判定に影響し得る範囲)**: `git diff 38d53ac8 origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (diff 全体 2,329 行)。測定は候補 commit 自身で行ったため、この差分は現 head との比較時にだけ効く。
+- **鮮度の証跡 (`38d53ac8` → HEAD `f9a7d1a5`・指摘 3)**: `git diff --stat 38d53ac8 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の出力 (25 files changed, 1528 insertions(+), 91 deletions(-))。主な内訳: `ldlib/boot.py` 160 / `ldlib/clift.py` 217 (新規) / `ldlib/classify.py` 39 / `ldlib/session.py` 64 / `rt/ld_core.h` 368 / `rt/fle_ldbridge.c` 183 (新規)。全文 (diff 2,329 行) は同じコマンドで再現する。
+- **この差分が候補の結論に影響しない理由**: 候補 `38d53ac8` の判定 (集計・対象 2 関数) は `38d53ac8` のソースで build・batch した成果物 (`work/2277`) から出ており、HEAD 側の差分はその成果物を変えない。HEAD 側の差分が効くのは HEAD で再実行したときだけ。
