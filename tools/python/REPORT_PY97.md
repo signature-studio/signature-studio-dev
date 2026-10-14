@@ -104,7 +104,7 @@ reset → 同じ tool を逐次 2 回 → 各回の status・host_calls を JSON
 
 - 測定 commit: **`c1b3204c`** (`origin/main` `8a2c6370` を取り込んだ merge commit)。以降の commit は本節を含む文書だけ (§9 末尾の差分 0 行の確認)。
 - 競合の解消 (3 件): `build_flpy_static.sh` は `CPY_PTHREADS` (本 PR) と main の `CPY_BUILD`・`FLPY_MEMORY64` (`MEM64` 配列)・`_flpy_subinterp_run` の export を両立させた (main の変更は全て残す)。`REPORT_PY80.md` は main 側 (#2633 の報告、93 行) をそのまま残し、本 PR の報告を本ファイルへ移した。参照先を追従させた: `docs/DOC_MAP.md` (登録先)・`REPORT_PY2.md` の未解決表 (2/4 スレッドの実測先)・`tests/static_mt_check.mjs` の参照 (§4)。
-- 環境: GitHub Actions runner (4 core)、emcc 6.0.12 (runner の `/opt/emsdk`)、node v22.23.3。素材: fl-win64 ([WIN64]) から `extracted/` の 5 block (`block00031_PE.bin`・`block24429/24430/24618/25159_DATA.bin`) を展開。`toolchain-emsdk` の tar は展開していない (`/opt/emsdk` を使用)。load は各 run 直前の `/proc/loadavg` 1 分値。
+- 環境: GitHub Actions runner (4 core)、emcc 6.0.12 ([EMSDK]、runner 上の既存の emsdk)、node v22.23.3。素材: fl-win64 ([WIN64]) から `extracted/` の 5 block (`block00031_PE.bin`・`block24429/24430/24618/25159_DATA.bin`) を展開。`toolchain-emsdk` ([EMSDK]) の tar は展開していない (runner 上の既存の emsdk を使用)。load は各 run 直前の OS の 1 分 loadavg の値。
 
 | ビルド (cwd = tools/python) | 結果 | 所要 |
 |---|---|---|
