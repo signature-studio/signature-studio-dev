@@ -2,7 +2,7 @@
 
 > **正本の宣言**: `infra/pm-worker/README.md` の build 節 (『再デプロイ』手順 4・5、『ロールバック』3) の根拠。PR #2477 の差し戻し round 1 への対応。
 > `tools/pm/REPORT.md` (250 行上限ちょうど) は変更していない。PM Worker の測定値は `tools/pm/REPORT.md` と本付録が正本 (`docs/DOC_MAP.md` §4)。
-> PR #2477 が `origin/main` と競合したため main を取り込んだ (競合解消)。main は取り込み中にも進み、3 回取り込んだ。取り込みで `infra/pm-worker/src`・`test` が変わったので、測定は最後の取り込み commit で取り直した (§0-2)。
+> PR #2477 が `origin/main` と競合したため main を取り込んだ (競合解消)。main は取り込み中にも進み、取り込みは 4 回 (うち 3 回で `infra/pm-worker/src`・`test` が変わった)。測定は、`src`・`test` を最後に変えた取り込み commit で取り直した (§0-2)。
 
 **結論**: 検証 HEAD `c8f2fdc8` の `npm test` (183 件) と `npm run test:workers` (4 件) は、3 回とも全件 pass。`wrangler` 4.151.0 の dry-run では、`--define` は引用符付きでも引用符なしでも hash は bundle に入らない (引用符なしは hash の先頭文字で結果が変わる。§3)。`--var` は bindings に `(hidden)` で出る。実 Worker での反映は未確認 (README の `[未確認]`)。
 
