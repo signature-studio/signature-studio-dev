@@ -104,6 +104,6 @@ PR の競合解消のため `origin/main` (`13fcecca`) を merge した。main �
 | `tests/test_unit.py` | `ALL UNIT TESTS PASS` (T1〜T25 ok。20:17:07〜20:22:27 = 5 分 20 秒) |
 | 負荷 | leafspec 開始時 0.29 / 0.38 / 0.19、test_unit 開始時 0.66 / 0.53 / 0.28 (runner 4 コア) |
 
-- 素材: `work-liftlib` / `work-icall` (`tools/icall/work/ott_F.txt` のみ展開) / `work-m6-ott` / `work-liftlib-targets` / `analysis-ott-binaries` (`OTT_DLL` 指定) / `toolchain-emsdk` (`/opt/emsdk`)。`ott_getparam.drc.ll` は素材に無いため、RetDec (`/opt/retdec`) で範囲 `0x18011e5a0-0x18011e6ff` から再生成した (rc=0)。
+- 素材: `work-liftlib` / `work-icall` (`tools/icall/work/ott_F.txt` のみ展開) / `work-m6-ott` / `work-liftlib-targets` / `analysis-ott-binaries` (`OTT_DLL` 指定) / `toolchain-emsdk` ([EMSDK])。`ott_getparam.drc.ll` は素材に無いため、RetDec ([RETDEC]) で範囲 `0x18011e5a0-0x18011e6ff` から再生成した (rc=0)。
 - 再現: `cd tools/liftlib && OTT_DLL=<analysis>/plugins/ott/binaries/OTT_vst2_win64.dll python3 -m liftlib leafspec targets/ott_getparam.json --n 200`、`OTT_DLL=... python3 tests/test_unit.py`
 - 差分確認: `git diff 9d1dcf2e HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l` → 0 (以降の commit は文書のみ)。
