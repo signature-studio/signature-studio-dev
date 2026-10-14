@@ -112,90 +112,9 @@
 
 ## 検証
 
-### 履歴: 初回測定 (測定 commit `eba7e821`・main 取り込み前。当時の HEAD の結果)
+### 履歴 (初回〜merge `a2a56bf8` の測定)
 
-測定 commit: `eba7e821` (当時のコードを変えた最後の commit。`feat(flapi): confirm launchMapPages.length from PE 0xd791b0 (PY-120, #2984)`)。ベース `eec639a3` (main 取り込み済み)。
-
-環境: runner (4 core)。開始時の load average 0.51 (`uptime`)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。前提の生成物 (gitignore・work/ と dist/): `fetch_inputs.sh` rc 0 (初回は DATA block が無く rc 1。`block24429`・`block24430`・`block25159`・`block24618*` を展開して再実行し rc 0)、`build_cpython_wasm.sh` rc 0 (初回 chain 全体 4 分 14 秒、cpython 込み)、`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0、`provider/build.sh` rc 0。
-
-| コマンド | 結果 | wall |
-|---|---|---|
-| `node tests/provider_check.mjs` | PASS (435 / 実装 84 / 未実装 351 / MCP 静的 60) | 0.37 秒 |
-| `node tests/launchmap_diff.mjs` | calls 3、diffs 0、PASS | 0.05 秒 |
-| `node tests/general_diff.mjs` (回帰) | calls 9、diffs 0、PASS | 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.11 秒 |
-| `python3 analysis/flapi/pe_launchmap_entries.py` | 12 件、全て OK (flags 照合) | — |
-
-- ベース (変更前、同じ環境): `provider_check` は実装 83 / 未実装 352 で PASS、`all_tools` 48/48、`general_diff` PASS。
-- ネガティブコントロール: `host/fl_mock.mjs` の `launchPages` を 0 から 1 にすると、`node tests/launchmap_diff.mjs` は `AssertionError [ERR_ASSERTION]: launchMapPages 差分 1 件` で rc 1 (FAIL)。0 に戻すと PASS (rc 0)。
-- 当時 (HEAD `eba7e821`) のコード差分 (テスト・mock・C に効く範囲): 空 (0 行)。現 HEAD では空ではない (後続の main 取り込みによる差分。§再取り込み後の再測定 を参照)。
-
-  この REPORT と解析スクリプト (`analysis/flapi/pe_launchmap_entries.py`) は測定 commit の後に加えた。どちらもテスト・provider のビルドに入らない。
-
-### 履歴: main 取り込み後の再測定 (merge `53835669`・main `00ca9f1b`。当時の HEAD の結果)
-
-main (`00ca9f1b`) を取り込んだ merge `53835669` で、競合は 2 件だった。(1) `tests/provider_check.mjs` の集合定義と条件式: main の `pe119` (ui ゲッター 6 件) と本件の `pe120` の両方を残した。(2) `docs/DOC_MAP.md` の表末尾: main の `REPORT_PY119.md` 行と本件の `REPORT_PY120_2984.md` 行の両方を残した。期待値は実装 93 / 未実装 342 (main の 92 / 343 に本件の 1 件を加えた値)。
-
-測定 commit: `53835669` (当時のコードを変えた最後の commit)。環境: runner (load average 0.4〜3.0)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` は fl-win64 から DATA block 4 件 (block24429・block24430・block25159・block24618) だけを展開した先。emsdk は `[EMSDK]` (docs/REFERENCES.md)。
-
-| コマンド | 結果 | wall |
-|---|---|---|
-| `bash provider/build.sh` | rc 0 (fl_table.c: 435 関数・ハンドラ 93) | 1.5 秒 |
-| `bash build_cpython_wasm.sh` | rc 0 (前提。CPython 3.12.1 wasm) | 249 秒 |
-| `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 | 6 秒 |
-| `FLPY_SKIP_TABLE=1 build_flpy_static.sh` | rc 0 | 6 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 93 / 未実装 342 / MCP 静的 60) | 0.36 秒 |
-| `node tests/launchmap_diff.mjs` | calls 3、diffs 0、PASS | 0.05 秒 |
-| `node tests/general_diff.mjs` (回帰) | calls 9、diffs 0、PASS | 0.05 秒 |
-| `node tests/ui_state_diff.mjs` (回帰・pe119) | calls 12、diffs 0、PASS | 0.05 秒 |
-| `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS (calls 161 / 8 / 32 / 30 cases / 59 / 7 / 17) | 各 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback_roundtrip true | 2.1 秒 |
-| `node tests/browser_check.mjs` | BROWSER OK (tools 48) | 8.9 秒 |
-| `node tests/mcp_ui_check.mjs` / `node tests/midi_ui_check.mjs` | MCP UI OK / MIDI UI OK | 2.2 秒 / 2.8 秒 |
-| `node tests/static_check.mjs` | STATIC CHECK OK | 0.4 秒 |
-| `node tests/static_browser_check.mjs` | STATIC BROWSER OK (sab_host_calls 37,425・static_host_calls 37,425・static_in_worker true) | 4.5 秒 |
-| `node tests/static_mt_check.mjs` | **未再測定**。pthread 版 (`CPY_PTHREADS=1` の CPython wasm) の再ビルドが要り、この run の時間枠に入らなかった。`236a8106` 時点の結果は本 HEAD の値ではない | — |
-| `python3 analysis/flapi/pe_launchmap_entries.py` | **未再実行**。`block00031_PE.bin` (PE 本体) を展開していない。`tools/python/analysis/flapi` は main 取り込みで変わっていない (下の diff) | — |
-
-- 前提の順序: `provider_check` は `dist/flpy.js` (CPython wasm) と `work/midi.py` 等 (`fetch_inputs.sh`) を要するため、上の build を先に行った。
-- 当時 (HEAD `53835669`) のコード差分: 空 (0 行)。現 HEAD では空ではない (後続の取り込みによる差分)。
-
-- 測定 commit 以前の main 側差分 (参考): `git diff --stat 236a8106 53835669 -- tools/python/analysis/flapi` は空。`tools/python/host`・`provider`・`tests` は取り込みで 8 files 変わった (main の `pe119`・`ui_state_diff` と、競合解消の `provider_check.mjs` を含む)。
-
-### 再取り込み後の再測定 (merge `a2a56bf8`・main `5191cf9f`・HEAD `0549e22b` で測り直し)
-
-測定 commit: `a2a56bf8` (コードを変えた最後の commit。merge)。測定時の HEAD: `0549e22b` (差し戻し対応の測定。以後の commit は本 REPORT と PR 本文のみ)。環境: runner (4 core)。`FL_WIN64_DIR` は fl-win64 から DATA block 4 件と PE 本体 (`block00031_PE.bin`) だけを展開した先。emsdk は [EMSDK] (6.0.12)。vite は本体 checkout の `node_modules` を symlink して解決した (コミットしない)。
-
-CPython wasm は HEAD で再ビルドした (流用なし): `fetch_inputs.sh` → `build_cpython_wasm.sh` (rc 0)、`build_cpython_wasm64.sh` (rc 0。`EMSDK_ENV` に [EMSDK] の `emsdk_env.sh` を指定する。未指定では rc 1)、`CPY_PTHREADS=1 build_cpython_wasm.sh` (rc 0)。
-
-| コマンド | 結果 | wall (s) |
-|---|---|---|
-| `provider/build.sh` / `FLPY_SKIP_TABLE=1 build_flpy.sh` / `FLPY_SKIP_TABLE=1 build_flpy_static.sh` | 全て rc 0 (fl_table.c: 435 関数・ハンドラ 110) | — |
-| `FLPY_MEMORY64=1 CPY_BUILD=… STATIC_OUT=flpy_static64 FLPY_SKIP_TABLE=1 build_flpy_static.sh` / `CPY_PTHREADS=1 FLPY_SKIP_TABLE=1 build_flpy_static.sh` | 全て rc 0 (flpy_static64・flpy_static_pthread) | — |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 110 / 未実装 325 / MCP 静的 60) | 0 |
-| `node tests/launchmap_diff.mjs` | calls 3、diffs 0、PASS | 0 |
-| `node tests/general_diff.mjs` (回帰) | calls 25、diffs 0、PASS | 0 |
-| `node tests/ui_state_diff.mjs` / `screen_diff.mjs` / `arrangement_diff.mjs` (main 由来) | calls 12 / 32 / 25、diffs 0、PASS | 0 |
-| `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS (calls 161 / 8 (rejects 4・midi_out 5) / 32 (state_checks 9) / 30 cases / 59 / 7 / 17) | 0〜1 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 1 |
-| `node tests/browser_check.mjs` | BROWSER OK (tools 48) | 1 |
-| `node tests/static_check.mjs` | STATIC CHECK OK。ただし 12 回実行のうち 1 回目 (ループ内) だけ rc 1 (`STATIC CHECK FAIL (1)`)。FAIL 行は採取していない。残り 11 回は全て OK | 1 |
-| `node tests/static_browser_check.mjs` | STATIC BROWSER OK (sab_host_calls 37,425・static_host_calls 37,425・static_in_worker true) | 2 |
-| `node tests/static_subinterp_browser.mjs` (既定 flpy_static64・MEMORY64=1) | **FAIL (12 check 中 11 PASS)**。失敗は「150 回 (50×3) の作成/実行/破棄で wasm メモリが増えない」: 33,554,432 → 48,365,568 B (+14,811,136 B)。`REPORT_PY109.md` の記録と同値。既知 (#2918) | 20 |
-| `STATIC_WASM=flpy_static STATIC_MEM64=0 node tests/static_subinterp_browser.mjs` (wasm32 静的版) | STATIC SUBINTERP OK (12/12 PASS) | 17 |
-| `STATIC_WASM=flpy_static_pthread node tests/static_mt_check.mjs` | STATIC MT CHECK OK (runs 50、threads_2_tools 48、threads_4_tools 2、thread_mismatch 0) | 1 |
-| `node tests/mcp_ui_check.mjs` | MCP UI OK (tools/list = 48) | 2 |
-| `node tests/midi_ui_check.mjs` | MIDI UI OK | 2 |
-| `python3 analysis/flapi/pe_launchmap_entries.py` | 12/12 OK (PE 本体を展開して再実行) | 0 |
-
-- static_mt の host_calls (37,424) と all_tools・static_browser_check (37,425) の 1 差は計数元の違い。原因は未調査 (各 check の判定条件どおりで FAIL ではない)。
-- 負のコントロール: 前節の結果を引き継ぐ。`fl_mock.mjs` の `launchPages` の既定値は 0 のまま。
-- コード差分 (測定 commit `a2a56bf8` から HEAD まで、テスト・mock・C・解析に効く範囲): 下の出力を HEAD で取った。
-
-```
-$ git diff a2a56bf8 HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis/flapi
-(空)
-```
+`REPORT_APPENDIX_2984.md` に分割移動 (内容は削除していない)。
 
 ### 再取り込み後の再測定 (2) (merge `a0b6f97f`・main `f81c46bb`・HEAD で測り直し)
 
@@ -216,16 +135,41 @@ main (`f81c46bb`) を取り込んだ merge `a0b6f97f` の競合は 3 ファイ�
 | `browser_check` / `static_check` | BROWSER OK (tools 48) / STATIC CHECK OK (1 回) | 10 / 0 |
 | `static_browser_check` | STATIC BROWSER OK (sab_host_calls 37,425・static_in_worker true) | 3 |
 | `STATIC_WASM=flpy_static STATIC_MEM64=0 static_subinterp_browser` | STATIC SUBINTERP OK (12/12 PASS) | 22 |
-| `static_subinterp_browser` (flpy_static64・MEMORY64=1) | **FAIL (12 check 中 11 PASS)**。前節と同じ失敗 (150 回の作成/実行/破棄で wasm メモリが増える: 33,554,432 → 48,365,568 B、+14,811,136 B)。#2918 (既知) | 27 |
+| `static_subinterp_browser` (flpy_static64・MEMORY64=1) | **FAIL (12 check 中 11 PASS)**。付録の merge `a2a56bf8` 節と同じ失敗 (150 回の作成/実行/破棄で wasm メモリが増える: 33,554,432 → 48,365,568 B、+14,811,136 B)。#2918 (既知) | 27 |
 | `STATIC_WASM=flpy_static_pthread static_mt_check` | STATIC MT CHECK OK (runs 50・threads_2_tools 48・threads_4_tools 2・thread_mismatch 0) | 1 |
 | `mcp_ui_check` / `midi_ui_check` | MCP UI OK (tools/list = 48) / MIDI UI OK | 3 / 2 |
 | `python3 analysis/flapi/pe_launchmap_entries.py` | 12/12 OK | 0 |
 
-- 負のコントロール (`launchPages` を 1 にすると `launchmap_diff` が FAIL する確認) は今回は再実行していない。前節の結果を引き継ぐ。mock の `launchPages` の既定値は 0 のまま。
+- 負のコントロール (`launchPages` を 1 にすると `launchmap_diff` が FAIL する確認) は今回は再実行していない。付録の merge `a2a56bf8` 節の結果を引き継ぐ。mock の `launchPages` の既定値は 0 のまま。
 - コード差分 (測定 commit `a0b6f97f` から HEAD まで、テスト・mock・C・解析に効く範囲): 下の出力を HEAD で取った。
 
 ```
 $ git diff a0b6f97f HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis/flapi
+(空)
+```
+
+### 再取り込み後の再測定 (3) (merge `38927307`・main `1b37410c`・HEAD で測り直し)
+
+main (`1b37410c`) を取り込んだ merge `38927307` の競合は 2 ファイル 2 箇所。`host/fl_mock.mjs` は本件の `launchMapPages.length` と main の PY-125 (`general.clearLog`・`general.dumpScoreLog`) を両方残した。`tests/provider_check.mjs` は判定集合に `pe120` と `pe125` の両方を入れ、期待値を main の 121/314 から 122/313 (本件の 1 件を加算) に直した。`provider/fl_engine.c` は自動マージ (`lm_pages`・PY-125 の関数が 1 回ずつ残ることを grep で確認)。
+
+測定 commit: `38927307` (コードを変えた最後の commit。merge)。環境: runner (4 core)。素材: `fl-win64` から DATA block 4 件と PE 本体 (`block00031_PE.bin`) を展開。emsdk は `/opt/emsdk` (6.0.12・runner 同梱。`toolchain-emsdk` の tarball は展開していない)。ブラウザ系は本体 checkout の `node_modules` を symlink して実行した (コミットしない)。
+
+| コマンド | 結果 | wall (s) |
+|---|---|---|
+| `fetch_inputs.sh` / `build_cpython_wasm.sh` (32 bit) | rc 0 / rc 0 | 1 / 255 |
+| `provider/build.sh` / `build_flpy.sh` / `build_flpy_static.sh` | 全て rc 0 | 1 / 7 / 7 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 122 / 未実装 313 / MCP 静的 60) | 1 |
+| `launchmap` / `general` / `ui_state` / `screen` / `arrangement` / `arrangement_selection` / `ui_display` / `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS (calls 3 / 32 / 12 / 32 / 25 / 8 / ok 12・bad 11 / 161 / 8 / 32 / 30 cases / 59 / 7 / 17) | 0 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、soft_error 0、raised 0、host_calls 37,425、callback_roundtrip true | 2 |
+| `python3 analysis/flapi/pe_launchmap_entries.py` / `static_check.mjs` | 12/12 OK / STATIC CHECK OK | 0 / 0 |
+| `browser_check` / `static_browser_check` / `mcp_ui_check` / `midi_ui_check` | BROWSER OK (tools 48) / STATIC BROWSER OK (sab_host_calls 37,425) / MCP UI OK (tools/list = 48) / MIDI UI OK | 12 / 4 / 2 / 3 |
+| `STATIC_WASM=flpy_static STATIC_MEM64=0 static_subinterp_browser` | STATIC SUBINTERP OK (12/12 PASS) | 23 |
+
+- 今回は未実行: `static_subinterp_browser` (flpy_static64・MEMORY64=1)・`static_mt_check`・負のコントロール (`launchPages` を 1 にして `launchmap_diff` が FAIL する確認)。いずれも CPython の再ビルド (64 bit・pthread) か再実行が要る。前回の結果は本測定の根拠にしない。
+- コード差分 (測定 commit `38927307` から HEAD まで、テスト・mock・C・解析に効く範囲): 下の出力を HEAD で取った (REPORT のみの commit が HEAD)。
+
+```
+$ git diff 38927307 HEAD -- tools/python/host tools/python/provider tools/python/tests tools/python/analysis/flapi
 (空)
 ```
 
@@ -237,4 +181,5 @@ $ git diff a0b6f97f HEAD -- tools/python/host tools/python/provider tools/python
 | `length` の件数ヘッダ `[arr-8]` の意味 (件数か容量か)・未初期化経路 (code -7 の例外化の述語)・実行時初期値 (mock・C の 0 は仮置き。provider_check の実装 1 件はこの仮置き値) | 件数の意味は推定。未初期化時の挙動は未モデル。mock・C の値が実機と違う可能性 | #3029 (PY-138) |
 | `0xd843d0` の同一性 (本件と #3001 PY-125 の dispatch) | 下位関数の二重確定の可能性 | #3029・#3030 (未確認) |
 | `static_subinterp_browser` (flpy_static64・MEMORY64=1) の FAIL 1 件 (150 回の反復で wasm メモリが +14.8 MB 増える) | 長時間の反復で wasm メモリが増える。本 PR の前から同値 (`REPORT_PY109.md`) | #2918 (既存・PY-108) |
-| `static_check` の単発 FAIL (前節の 12 回中 1 回・FAIL 行は未採取)。今回の 1 回は OK | 原因未特定。再発時に比べられる一次情報が無い | 未起票 (単発・未再現。再発時に FAIL 行を採取して起票) |
+| `static_check` の単発 FAIL (過去測定 (付録) の 12 回中 1 回・FAIL 行は未採取)。今回の 1 回は OK | 原因未特定。再発時に比べられる一次情報が無い | 未起票 (単発・未再現。再発時に FAIL 行を採取して起票) |
+| 今回 (merge `38927307`) 未実行: `static_subinterp_browser` (flpy_static64・MEMORY64=1)・`static_mt_check`・負のコントロール (`launchPages` を 1 にする確認) | pthread と 64 bit の wasm 経路・launchmap の検査の感度は今回未確認。mock・C の差分テストは全て diffs 0 | 未起票 (再測定の追跡。次の検証 run で再実行する) |
