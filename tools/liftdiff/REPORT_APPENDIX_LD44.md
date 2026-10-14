@@ -16,10 +16,10 @@
 - 素材: `fl-win64` (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)・`work-m11`・`work-liftdiff`・`work-m6-ott`・`analysis-ott-binaries` (`ANALYSIS_DIR=$HOME/analysis`)・`toolchain-emsdk` を展開して使用
 - 生データ: `tools/liftdiff/results/ld44_*`。batch の stdout は `ld44_*_92a145a5.log`、件数は `ld44_m11_sample800_counts_92a145a5.tsv`、関数単位の突合は `ld44_m11_sample800_verdict_n3_e2econd_92a145a5.tsv`
 
-## 2. 8 関数の再確認 (`liftdiff.py run --nobuild`)
+## 2. `1801c67a0` の再確認 (`liftdiff.py run --nobuild`)
 
-- `1801c67a0` を全 pattern で再実行: z/s/p0/p1/p01/pall/qall は `both_fault` (native segv・wasm trap)、u16/vm0 は `wasm_trap` (native ok・wasm abort)。LD-16 §8.3 の観測と一致する。
-- `1801ab1d0` / `1801ab258` / `1801ab3ec` / `1801c5e84` / `1801c621c` / `1801c682c` / `1801c69cc` の個別再実行は本 run では未実施。
+- 再確認したのは `1801c67a0` の 1 関数のみ。`1801c67a0` を全 pattern で再実行: z/s/p0/p1/p01/pall/qall は `both_fault` (native segv・wasm trap)、u16/vm0 は `wasm_trap` (native ok・wasm abort)。LD-16 §8.3 の観測と一致する。
+- 他 7 関数 (`1801ab1d0` / `1801ab258` / `1801ab3ec` / `1801c5e84` / `1801c621c` / `1801c682c` / `1801c69cc`) は**未実施**。OTT 8 関数の再確認は未達。
 
 ## 3. sample:800 の再測定
 
@@ -47,6 +47,16 @@
 
 ## 4. 測定の注意 (訂正)
 
+- 測定 commit: `92a145a5`。HEAD までの測定経路の差分 (`git diff 92a145a5 HEAD -- tools/liftdiff/ldlib`) は次の 1 行のみ。
+  ```
+  tools/liftdiff/ldlib/session.py | 2 +-
+  -                if c['outcome'] in ('diff', 'wasm_trap') and not refined and c.get('wasm_status') != 'timeout':
+  +                if c['outcome'] in ('diff', 'wasm_trap') and not refined and c.get('wasm_status') != 'timeout' and c['pattern'] in patterns:
+  ```
+  この差分は `ae802a4c` (fvm pattern の refine を除外する修正) に由来する。batch は `patterns=None` で `PATTERN_NAMES` (fvm を含まない) を渡すため、batch の case 集合は変わらない見込みだが、**未検証**。
+- 差分の集計 (`git diff --stat 92a145a5 HEAD -- tools/liftdiff tools/m8 tools/ott tools/m11`): 24 files changed, 646 insertions(+), 41 deletions(-)。
+- 再測定 (差分の反映) は未実施。素材 `work-m11` と `toolchain-emsdk` が本 run に無いため (`targets/m11.json` が `tools/m11/work/` を要求)。次の run で `oc_artifacts: fl-win64 work-m11 toolchain-emsdk work-liftdiff` を指定して再測定する (子 issue 起票先は §6)。
+
 - 最初に `--shards 4` (`--state` なし) で測った値 (352 / 170 / 278) を e2e 条件と取り違えないこと。e2e の [4/4] は `--shards 12 --state auto` で、こちらが基準。
 - `ld44_*` の `.log` は batch の stdout のみで、ケース単位の `native_status`・`wasm_status` は含まれない。`case outcome` の hang の内訳 (native か wasm の timeout か) は依然として未確定。
 
@@ -57,5 +67,6 @@
 | 8 関数の命令単位 trace (native と wasm の各 step) | §8.3 は entry・call 単位のまま | LD-57 (#1636) |
 | `1801c67a0` の `m8_fail` 発火条件の確認 (入口ガードの範囲と arena の不一致が原因か) | 仮説のみ。ガードを外した再 build で確認が必要 | LD-58 (#1637) |
 | sample:800 の件数揺れ (e2e 条件で 361/360) と `0x959a40` の verdict 変化の原因。shard 数・state 指定・負荷との関係 | 再現条件は一部確認のみ。内訳は未確定 | LD-58 (#1637) |
+| 測定 commit `92a145a5` 以降の `session.py` 1 行差分 (§4) を反映した batch の再測定 | 差分込みの件数・verdict は未確認。`92a145a5` の値は差分前の結果 | 本 PR で `oc_artifacts: fl-win64 work-m11 toolchain-emsdk work-liftdiff` を指定して再実行 (未実施。次の run) |
 
 注: 子 issue の番号は `gh issue list` の最大値 (LD-56) + 1・+2 で取り、重複 0 件を確認した。
