@@ -1,4 +1,5 @@
-import type { Env } from "./config.ts";
+import { bearerToken, canPushRepo } from "./admin.ts";
+import { DEFAULT_REPO, type Env } from "./config.ts";
 import { PmDO } from "./do.ts";
 
 export { PmDO };
@@ -13,6 +14,13 @@ function stub(env: Env) {
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const u = new URL(req.url);
+    // 管理用 (#2339)。認証は入口で行い、通らなければ 404 を返して DO を呼ばない (存在を示さない)。通ったら DO で実行する。
+    if (u.pathname === "/admin/resync") {
+      const token = bearerToken(req.headers.get("authorization"));
+      const ok = req.method === "POST" && !!token && (await canPushRepo(token, env.REPO ?? DEFAULT_REPO, (i, init) => fetch(i, init)));
+      if (!ok) return new Response("not found", { status: 404 });
+      return stub(env).fetch(req);
+    }
     if (!PUBLIC_PATHS.has(u.pathname)) return new Response("not found", { status: 404 });
     if (u.pathname === "/webhook") {
       if (req.method !== "POST") return new Response("method not allowed", { status: 405 });

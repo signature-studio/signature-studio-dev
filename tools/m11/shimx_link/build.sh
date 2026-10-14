@@ -135,7 +135,7 @@ OBJS+=("${_multi[@]}")
 [ $MIDI = 1 ] && read -ra _midi <<< "$MIDIOBJ" && OBJS+=("${_midi[@]}")
 WSEXP=""; [ $WS = 1 ] && WSEXP=_sx_ws_probe_cpuid,_sx_ws_probe_g03,_sx_ws_probe_g12,_sx_ws_stat,_sx_ws_loadlib_miss,_winstubs_stats,_winstubs_loadlib_miss,_winstubs_cpuid,
 [ $MIDI = 1 ] && WSEXP="${WSEXP}_sx_midi_probe_numdevs,_flm_init,"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_GetLastError,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
 OUT="$W/m11_sx_$TAG"
 emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
