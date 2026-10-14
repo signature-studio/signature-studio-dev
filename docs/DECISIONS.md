@@ -230,3 +230,27 @@
 - **比較した方式**: (a) 空 dir を正のまま据え置く、(b) 全展開を正とし空 dir を variant に残す (採用)、(c) 両条件を正として判定を 2 通り走らせる。
 - **理由**: 同じ DLL・MIDI・サンプルレートでも content dir の中身で参照の出力が変わる。wasm 本体が読む content は SR-6 の設計で導入後の installer の全展開 (Tables を含む) であり、SR-46 の factory preset も全展開の `Presets/` からしか取れない。比較条件を wasm 側の読み方に揃えるため (a) は採らず、(c) は判定基準を二重にするため採らない。根拠と実測は `tools/targets/serum2/host/REPORT_SR5.md` §4。
 - **影響**: 参照 pin の主エントリが全展開になる。空 dir 条件は `content_empty` として残る。全展開 content を読む wasm 本体への FS shim 接続は未確認で、#2383 の比較時に確認する (`tools/targets/serum2/host/REPORT_SR5.md` §4.4)。
+
+## D24 — `user_answered` の根拠は人のコメントだけとし、許可 bot のコメントは含めない
+
+- **状態**: 採用 (2026-10-15, issue #2524 [CI-101]。#2461 受入 1 の残件。依頼者不在中に PM 補助が既定案で判断)
+- **決定**: `user_answered` (依頼者の回答の検出) の根拠は、`MEMBER` / `OWNER` / `COLLABORATOR` の人のコメントだけとする。許可 bot (実装 App `opencode-for-signature-studio[bot]`・reviewer App `oc-reviewer-for-signature-studio[bot]`) のコメントは根拠に含めない。起票者の判定 (`authorAllowed`) は変えない。
+- **比較した方式**: (a) 人のコメントだけ (採用・既定。現行実装を凍結)、(b) 許可 bot のコメントも含める (#2461 受入 1 の原文)。
+- **理由**: 許可 bot の投稿を根拠にすると、実装 agent 自身の run 結果コメントで `needs-user-input` の issue が `oc-pm` を起動し得る。依頼者の回答は人のコメントとして従来どおり検出されるため、(a) で人の回答への影響は無い。
+- **影響**: #2461 受入 1 の「か許可 bot」の部分は #2524 に原文のまま移した。PR #2490 の差分が本決定の既定を実装している。許可 bot を根拠に含めるには、本 ADR を覆す新しい決定が要る (戻し方は #2524)。
+
+## D25 — 再投入の意図 `focus=K` の K は受入条件の番号 (1〜9) とする
+
+- **状態**: 採用 (2026-10-15, issue #2575 [CI-105]。親 #2475。依頼者不在中に PM 補助が既定案で判断)
+- **決定**: 再投入の意図 `focus=K` の K は、issue 番号ではなく**受入条件の番号 (1〜9)** とする。検査 (`infra/pm-worker/src/launch.ts` の `checkRelaunchIntent`) は 1〜9 だけを受け入れ、それ以外の focus は拒否する (`counters.intentRejected.focus` に数え、投稿は行わない)。focus の無い意図は従来どおり動く。
+- **比較した方式**: (a) 受入条件の番号 1〜9 (採用。PR #2511 の実装と親 #2475 の受入条件 1・2 の定義)、(b) issue 番号 (`.github/prompts/pm.md` の現在の書き方と例 `focus=778`)。
+- **理由**: focus は issue 内のどの受入条件を見直すかの指定である。issue 番号を入れると `issue=` と同じ値になり (pm.md の例 `issue=778 ... focus=778` は意味が重なる)、指定の役目を果たさない。
+- **影響**: `.github/prompts/pm.md` の focus の説明と例は、現在 issue 番号のままで実装と食い違う。直すのは `.github/` の変更として依頼者が反映する (PM agent は行わない)。反映までは PM は focus を付けない。issue 番号に変える場合は `checkRelaunchIntent` と `buildLaunchBody` を直す実装 PR が要る。
+
+## D26 — 降格は Worker の `/oc` と Worker 以外の PM ログインの `/oc` の組だけを数える
+
+- **状態**: 採用 (2026-10-15, PR #2469 / issue #2340 受入条件 4 の読み。依頼者不在中に PM 補助が既定案で判断)
+- **決定**: 同じ issue に 30 分以内の 2 回目の `/oc` による降格 (dry-run への復帰) は、**Worker が投稿した `/oc` と、Worker 以外の PM ログイン (PM の個人アカウント・VM 側) が投稿した `/oc` の組だけ**を数える。Worker 同士の組と、個人アカウント同士の組は降格の根拠にしない。
+- **比較した方式**: (a) Worker と Worker 以外の PM ログインの組だけ (採用)、(b) PM ログイン (Worker と個人アカウント) の `/oc` であれば組の種類を問わず数える (PR #2469 の head 時点の `noteOc()` の判定)。
+- **理由**: #2340 の表題は「誤投稿での自動 dry-run 復帰」で、受入条件 4 が防ぐのは Worker と手動運用 (VM) が同じ issue に二重に `/oc` を投稿する事故である。Worker 同士・個人アカウント同士の組は、受入条件 4 の対象 (Worker と VM の二重投稿) の外にある。
+- **影響**: PR #2469 (head 時点) の `noteOc()` は、PM ログインの `/oc` を Worker の区別なく、同じ issue の 30 分以内の任意の 2 件で数えるため、本決定と食い違う。#2469 の判定を (a) に合わせるか、本決定を覆す決定を残すかは PM が決める (実装の修正は本 ADR の範囲外)。解除は `POST /demote/reset` のまま変えない。
