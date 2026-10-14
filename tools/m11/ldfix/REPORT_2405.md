@@ -1,9 +1,9 @@
 # REPORT #2405 — RetDec 2019-03 版の share 入手経路と、41a6a0 での gv 分岐の発火確認 (LD-113)
 
-親: #2314 (LD-106) / #2038 (LD-75)。付録 `REPORT_911_APPENDIX_1967.md` §6g の続き。#2405 は結果を同付録 §6i に書くよう求めるが、§6i は #2314 の PR #2406 が追加する節で、本 PR の時点では main に無い。同じ末尾に追記すると PR 同士が衝突するため、本 REPORT に別置きにした。
+親: #2314 (LD-106) / #2038 (LD-75)。付録 `REPORT_911_APPENDIX_1967.md` §6g・§6i の続き。#2405 は結果を同付録 §6i に追記するよう求めており、§6i 末尾に結論と測定 commit・主な実測値だけを追記した。表・コマンド・各範囲の結果は本 REPORT に置く。
 
 **結論**
-1. 2019-03-03 の share (`retdec-support_2019-03-03.tar.xz`) の入手経路は**確定できなかった (入手不可)**。GitHub の release asset が無く、複製も見つからない (§1)。
+1. 2019-03-03 の share (`retdec-support_2019-03-03.tar.xz`) の入手経路は**無いと確定した (入手不可)**。GitHub の release asset が消えており、複製も見つからない (§1)。
 2. 代用 share ([RETDEC] v5.0 の share を 2019 版のレイアウトに合わせたもの。§2) で **2019 版 `retdec-decompiler.py` を起動でき**、`checkForGlobalInInstruction` の gv 分岐 (2019 版 L163〜168) が **41a6a0 で 1 回発火する**ことを実測した (§4)。41a6d3・666b10・666b20 も各 1 回、対照 41a6b3 は 0。件数・root・`ops` が v5.0 (付録 §6g・§6h) と一致した。
 3. 発火後の IR も v5.0 と同じ形になる: Constants optimization で 41a6a0 の `load *rax` が `load @rcx` に変わる (§5)。違いは、2019 版では不要になった `inttoptr` が残ること。
 4. 限界: share は 2019-03-03 の実物ではない。一時ログ付きビルド。各範囲 n=1 (2 つのビルドで同じ結果)。
@@ -106,4 +106,4 @@ v5.0 (REPORT_911 §6c・§6e) との比較: 値の変化 (`load *rax` → `load 
 - 測定 commit (コードを変えた最後の commit): `c810b847`。以降の自分の変更は REPORT_2405.md と DOC_MAP の追加だけで、`git diff c810b847 HEAD -- tools/m11/ldfix/retdec2019_gv_2405.sh tools/m11/ldfix/retdec_constants_trace_2405.patch tools/m11/ldfix/retdec_stage_1091.py` の出力は 0 行。
 - 範囲 (§4)・変種 B・段別 IR (§5) は `c810b847` のスクリプトで、2 つのビルドの両方に実行した。ビルドの 1 回目は同じコマンドの手実行、2 回目は `ad9d6adb` 版のスクリプトの `all` (build・install は最終版と同一)。
 - 所要: `stages` は 1 回目のビルドで real 14.4 s、2 回目で 18.6 s (n=1)。範囲の real は §4。
-- 上記は main 取り込み前の測定。取り込み後の `tools/m11/ldfix/` の差分は他 issue の追加だけで、測定したスクリプト・パッチ・`retdec_stage_1091.py` は変わらない。
+- main 取り込み (`264030a7`) 後も、測定したスクリプト・パッチ・`retdec_stage_1091.py` は `c810b847` から変わらない (上の `git diff` が 0 行)。取り込みで入った `tools/m11/ldfix/` の差分は他 issue の追加だけで、測定経路に入らない。

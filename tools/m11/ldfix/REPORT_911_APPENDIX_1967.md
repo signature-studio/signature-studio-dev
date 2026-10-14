@@ -132,3 +132,10 @@ time make -j4                                                                   
 
 残件 (#2405): 2019 版の share 入手経路の確定 (2019-03-03 の share を別経路で得る、または 2019 版 `retdec-decompiler` 相当の起動方法を確立) → 41a6a0 での `checkForGlobalInInstruction` の L163〜168 発火確認 (`TAG` 一時ログ付きビルドも含む)。
 素材の入力: `block00031_PE.bin` は `fl-win64` 内 `extracted/`、sha256 先頭 `b2c64da4` (付録 §6f と一致)。
+
+### 追記 (#2405 / LD-113): 2019 版での gv 分岐の発火確認 (表・コマンド・全範囲の結果は `REPORT_2405.md`)
+
+測定 commit: `c810b847` (`retdec2019_gv_2405.sh`・`retdec_constants_trace_2405.patch`)。阻害要因 1 (share 404) は、GitHub の release asset・tag・Wayback・fork のどこにも 2019-03-03 の物が無く、**入手経路なしと確定**した。代わりに [RETDEC] (v5.0) の share に `version.txt=2019-03-03` と旧レイアウトの symlink を合わせた代用 share を置くと `make install` が通り、阻害要因 3 (CLI の差・ラッパー不可) もラッパー `retdec-decompiler.py` 経由で解消した。
+- 一時ログ付きの 2019 版ビルド (`make -j4`、n=1 ずつ): real 679.1 s (11 分 19 秒)・675.5 s、rc=0。
+- **41a6a0 で gv 分岐 (2019 版 L163〜168) は 1 回発火する** (root = 裸の GV `@rax`・`ops=0`)。41a6d3・666b10・666b20 も各 1、対照 41a6b3 は 0。件数・root は v5.0 の §6g・§6h と一致。範囲ごとの real は 4.1〜5.8 s (n=1)。
+- Constants optimization で 41a6a0 が `load *rax` → `load @rcx` になる (2019 版は段 15、v5.0 は段 16)。2019 版は不要な `inttoptr` が残る点だけが違う。
