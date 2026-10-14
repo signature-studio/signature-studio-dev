@@ -70,7 +70,7 @@ setup() { # <head> <labels json> <n changes_requested reviews>
   fx repos/o/r/issues/7 "{\"labels\":$2}"
   local r="[" i
   for ((i = 0; i < $3; i++)); do
-    r="$r{\"user\":{\"login\":\"oc-reviewer-for-signature-studio[bot]\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"c$i\",\"submitted_at\":\"2026-02-01T00:00:00Z\"},"
+    r="$r{\"user\":{\"login\":\"oc-reviewer-for-signature-studio[bot]\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"c$i\",\"submitted_at\":\"2026-02-01T00:00:00Z\",\"body\":\"\"},"
   done
   fx repos/o/r/pulls/7/reviews "${r%,}]"
   fx repos/o/r/issues/7/comments '[]'
@@ -80,7 +80,7 @@ reviews() { # <submitted_at> <count> [<submitted_at> <count> ...]: oc-reviewer �
   local s="" i
   while [ $# -ge 2 ]; do
     for ((i = 0; i < $2; i++)); do
-      s="$s{\"user\":{\"login\":\"oc-reviewer-for-signature-studio[bot]\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"c\",\"submitted_at\":\"$1\"},"
+      s="$s{\"user\":{\"login\":\"oc-reviewer-for-signature-studio[bot]\"},\"state\":\"CHANGES_REQUESTED\",\"commit_id\":\"c\",\"submitted_at\":\"$1\",\"body\":\"\"},"
     done
     shift 2
   done
@@ -158,14 +158,14 @@ logged 'reason=ceiling'; expect "ネガ (d): 停止理由 reason=ceiling" $?
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv "" 5 1)"
 run_fix record > /dev/null
-grep -qx 'stop=false' "$TMP/out"; expect "ネガ (e): マーカー欠落 (unknown) の 1 窓目 -> 自動再開" $?
+grep -qx 'stop=false' "$TMP/out"; expect "ネガ (e): classes 空 (unknown) の 1 窓目 -> 自動再開" $?
 logged 'oc-fix-reset n=1'; expect "ネガ (e): 1 窓目は oc-fix-reset n=1" $?
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(cat_rv "$(seq_rv "" 5 1)" "$(seq_rv "" 5 6)")"
 fx repos/o/r/issues/7/comments "$(jq -nc '[{created_at:"2026-01-05T12:00:00Z",user:{login:"github-actions[bot]",type:"Bot"},body:"<!-- oc-fix-reset n=1 -->"}]')"
 run_fix record > /dev/null
-grep -qx 'stop=true' "$TMP/out"; expect "ネガ (e): マーカー欠落の 2 窓目 -> stop=true" $?
+grep -qx 'stop=true' "$TMP/out"; expect "ネガ (e): classes 空 (unknown) の 2 窓目 -> stop=true" $?
 logged 'reason=unknown'; expect "ネガ (e): 停止理由 reason=unknown" $?
 
 setup aaa '[]' 0
@@ -175,6 +175,33 @@ fx repos/o/r/issues/comments "$(jq -nc --arg t "$now" '[range(0;6)|{created_at:$
 run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ネガ (f): 1 時間に 7 件目の reset -> stop=true" $?
 logged 'reason=ceiling'; expect "ネガ (f): 停止理由は reason=ceiling" $?
+
+echo "== fix-progress.sh record (本文はあるがマーカーの無い差し戻しは unknown として数える #2894)"
+# nm_seq <start-day> <count>: 本文はあるが oc-review マーカーの無い oc-reviewer の差し戻し (件ごとに本文は別)
+nm_seq() {
+  local i a=()
+  for ((i = 0; i < $2; i++)); do
+    a+=("$(jq -nc --arg t "2026-01-$(printf %02d $(($1 + i)))T00:00:00Z" --arg b "${SENT[$(((($1 + i) - 1) % 15))]}" '{user:{login:"oc-reviewer-for-signature-studio[bot]"},state:"CHANGES_REQUESTED",commit_id:"c",submitted_at:$t,body:$b}')")
+  done
+  printf '%s\n' "${a[@]}" | jq -sc .
+}
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(nm_seq 1 5)"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "マーカー無し (本文あり) の 5 件 -> stop=false (素通りしない)" $?
+logged 'oc-fix-reset n=1'; expect "マーカー無しの 1 窓目は oc-fix-reset n=1 で窓を閉じる" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(cat_rv "$(nm_seq 1 5)" "$(nm_seq 6 5)")"
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-01-05T12:00:00Z","user":{"login":"github-actions[bot]","type":"Bot"},"body":"<!-- oc-fix-reset n=1 -->"}]'
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "マーカー無しの 2 窓目 -> stop=true" $?
+logged 'reason=unknown'; expect "マーカー無しの 2 窓目の停止理由は reason=unknown" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(jq -nc '[range(0;5) as $i | {user:{login:"oc-reviewer-for-signature-studio[bot]"},state:"CHANGES_REQUESTED",commit_id:"c",submitted_at:"2026-01-01T00:00:00Z",body:"- 指摘\($i)\n<!-- oc-review: v=1 round=1 blocking=1 minor=0 -->"}]')"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out" && logged 'oc-fix-reset n=1'; expect "classes= の無いマーカーの 5 件 -> 1 窓目で自動再開 (unknown)" $?
 
 # 停止コメント (oc-fix-limit) より前の差し戻しは数えない: ラベルを外して再開できる
 setup aaa '[]' 5
@@ -190,7 +217,7 @@ grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後の差し戻�
 
 setup aaa '[]' 5
 fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"github-actions[bot]","type":"Bot"},"body":"stop <!-- oc-fix-limit -->"}]'
-fx repos/o/r/pulls/7/reviews "$(jq -c '. + [range(0;5)|{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"CHANGES_REQUESTED","commit_id":"n","submitted_at":"2026-04-01T00:00:00Z"}]' < "$FIX/repos_o_r_pulls_7_reviews")"
+fx repos/o/r/pulls/7/reviews "$(jq -c '. + [range(0;5)|{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"CHANGES_REQUESTED","commit_id":"n","submitted_at":"2026-04-01T00:00:00Z","body":""}]' < "$FIX/repos_o_r_pulls_7_reviews")"
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後に再び 5 件 (マーカー無し = unknown の 1 窓目) -> 自動再開" $?
 logged 'oc-fix-reset n=1'; expect "停止コメントの後の 1 窓目は oc-fix-reset n=1" $?
