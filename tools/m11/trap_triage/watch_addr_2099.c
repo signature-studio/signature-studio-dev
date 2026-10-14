@@ -4,7 +4,10 @@
 #include <stdint.h>
 typedef unsigned int u32;
 typedef unsigned long long u64;
-#define M11_WATCH_ADDR 0x10bd4c20u
+#ifndef M11_WATCH_ADDR_OVR
+#define M11_WATCH_ADDR_OVR 0x10bd4c20u
+#endif
+#define M11_WATCH_ADDR M11_WATCH_ADDR_OVR
 static u64 n_hit = 0;
 static int watch_on = 0;
 void m11_watch_on(int on) { watch_on = on; }
