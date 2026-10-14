@@ -19,7 +19,13 @@ if [ ! -f "$DLL" ]; then echo "[fa_route] $DLL が無い: 素材 plugins-freshai
 BLK_SHIFTED="$(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(hex(m['blk']-0x180000000+0x30000000))" "$MAP")"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 # 1. 復元後 IR の後処理
-python3 "$HERE/ir_fix_mask.py" "$SRC" "$W/oi.restored.ll" > "$W/fix_mask.json"
+# ICALL-70: cookie global (0x18125eaa8) の load 幅 i32 → i64 (RetDec の global 型決定段が i32 と型付け、#2262 付録 §3)
+if [ "${FA_FIX_COOKIE:-1}" = "1" ]; then
+  python3 "$HERE/ir_fix_cookie.py" "$SRC" "$W/cookie_fixed.ll" > "$W/fix_cookie.json"; SRC_FIX="$W/cookie_fixed.ll"
+else
+  SRC_FIX="$SRC"
+fi
+python3 "$HERE/ir_fix_mask.py" "$SRC_FIX" "$W/oi.restored.ll" > "$W/fix_mask.json"
 python3 "$HERE/ir_fix_vstore.py" "$W/oi.restored.ll" "$W/oi.restored1.ll" > "$W/fix_vstore.json"; mv "$W/oi.restored1.ll" "$W/oi.restored.ll"
 # 2. normalize / ir5_patch → flatten (画像全域を shift)
 python3 "$T/m2/ir_normalize.py" "$W/oi.restored.ll" "$W/oi.norm0.ll" >/dev/null
