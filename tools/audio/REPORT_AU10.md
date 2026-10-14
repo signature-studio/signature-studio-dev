@@ -96,3 +96,19 @@
 - 30 分ソークの `cb_max` spike (18 ms 級) は今回の 1 回で再現せず (169 µs)。前回 d7d91d2 の 184 µs と合わせ 2 回とも 1 ms 未満。spike の発生時刻・原因は未特定。
 - `clock_jumps` は 30 分ソークで 14 件だが `clock_jump_frames` は 0。件数は試行ごとに 4 → 14 と変動し、欠落フレームは無い。ramp は全フレーム bit-exact。発生源 (ブラウザ側スキップか計測タイミングか) は未特定。
 - 次の切り分けは子 issue で行う (下記)。
+
+### 16.5 AU-21 (#1570) 追加切り分け: head `60932d35` (main, コード変更なし)
+
+測定 commit: `60932d35` (origin/main 起点、本 run は `tools/audio/REPORT_AU10.md` のみ変更)。環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後 (emcc 6.0.12, `/opt/emsdk` 既存を使用。`toolchain-emsdk` 展開は不要)。生ログ・JSON は `tools/audio/work/soak10/` (gitignore)。
+
+| 試行 | 結果 | 所要 / load (start → end) |
+|---|---|---|
+| `--soak 10` 1 回目 | **FAIL (exit 1)**: underruns 1, silence 7,680 f, ramp mismatches 427,520 / 481,024 f, cb_max 174,074 µs, T=1024 (21.3 ms), dev_fill min 0 / avg 888 / max 1280, lat_changes 2 | 43.3 s / 0.27 → 0.64 |
+| `--soak 10` 2〜5 回目 | 4/4 PASS: underruns 0, silence 0, ramp 0 / 480,512〜481,024 f, lat_changes 0, dev_fill min 1024, cb_max 70 / 80 / 370 / 405 µs | 各 63〜64 s / 0.09〜0.64 |
+| `--soak30` (1800 s, 無負荷) 1 回目 | **PASS (exit 1 完了)**: underruns 0, silence 0, ramp 0 / 86,408,192 f, workletErrors 0, cb 337,534 回 late 0, **cb_max 475 µs**, T=1536, dev_fill 1024/1329/1536, **clock_jumps 2 / clock_jump_frames 0**, lat_changes 0, secs_wall 1800.18 | 1802 s / 0.07 → 0.00 |
+
+判定:
+- 10 秒ソーク FAIL は今回 1/6 回で再現 (通算 head `57519ca`〜`60932d35` で 2/21)。FAIL 試行の特徴 (T が 1024〜1280、dev_fill min 0、lat_changes ≥ 1、underrun 1) は前回の FAIL (T=1280、dev_fill min 0) と同一形。**原因は未特定**。FAIL 試行の `T`・dev_fill・underrun・lat_changes は採取済み (上表)。ただし発生源 (ラッチ直後の initial fill か、ワーカ起床の遅延か) を切り分けるデータは無い。
+- 30 分ソークの `cb_max` は今回 475 µs で、ms 級 spike は再現せず。通算 3 回で最大 475 µs。
+- `clock_jumps` は 30 分で 2 件 (試行ごとに 2 / 4 / 14 と変動)。`clock_jump_frames` は通算 0 のまま。ramp は全フレーム bit-exact のため実スキップの証拠は無い。発生源 (worklet `currentFrame` の非連続が実スキップか計測タイミングか) は未特定。
+- 未解決: 10 秒 FAIL の原因、clock_jumps の発生源。cb_max ms 級 spike は今回も未再現。
