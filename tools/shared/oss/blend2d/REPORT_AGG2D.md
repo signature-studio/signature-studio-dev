@@ -195,8 +195,8 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 
 ## 14. vtable の所属クラス (MSVC RTTI の COL)
 
-> 測定 commit: `b77ab6c4` (`agg2d_rtti.py` を追加した commit。以後のコード差分は本ファイルのみ)。
-> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_rtti.py` (依存: `pefile`・`capstone`、0.09 s)。出力は `tools/shared/work/agg2d_rtti.json` (gitignore)。vtable VA は `agg2d_vtable.py` の検出関数を流用。
+> 測定 commit: `bef37ac3` (`agg2d_rtti.py` に vtable 書き込み箇所の走査を追加した commit)。`git diff bef37ac3 HEAD -- tools/shared/oss/blend2d/*.py '*.sh'` の出力は 0 行 (以後の変更は本ファイル・`tools/shared/REPORT.md`・`REPORT_SIMD.md` の文言のみ)。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_rtti.py [出力 JSON]` (依存: `pefile`・`capstone`)。所要はプロセス全体の wall で n=3 の min–max **129–130 ms** (load average 1 分値 0.12、nproc 4、各回の前後で同値)。出力の既定は `tools/shared/work/agg2d_rtti.json` (gitignore)。vtable VA は `agg2d_vtable.py` の検出関数を流用。
 
 | 項目 | 値 | 根拠 |
 |---|---|---|
@@ -204,11 +204,15 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 | COL VA (`vtable[-1]`) | `0x1801e29b8` | x64 COL (signature = 1) |
 | 所属クラス | `.?AVAgg2D@?A0x604ded79@@` (Agg2D、無名名前空間) | COL → TypeDescriptor |
 | 基底クラス | `.?AVAgg2DIntf@@` の 1 個 | ClassHierarchyDescriptor |
-| 同じ COL を指す vtable | **1 個** (本 vtable のみ、slot 130) | `.rdata` 全 qword 走査 |
+| 同じ COL を指す vtable | **1 個** (本 vtable 自身のみ。その vtable は 130 slot) | `.rdata` 全 qword 走査 |
 | `Agg2DIntf` の COL / 独立 vtable | **0 / 0** | 同上 |
+| vtable を書く RIP 相対 `lea` | **2 か所**: `0x1800568b2` (ctor `0x1800568a0` 内、§5 の箇所)・`0x180056add` (関数 `0x180056ad0` 内) | `.text` のバイト走査 (`rip_lea_hits`: REX.W `8d` の disp が vtable を指すもの) を capstone で `lea` と確認 |
+
+**ネガティブコントロール** (WORKFLOW §5): vtable VA を +8 した scratch (`git archive bef37ac3` の複製、出力は `$RUNNER_TEMP`) で `agg2d_rtti.py` を実行すると **rc=1** で `vtable[-1] = 0x180056700 が .rdata 外。COL ではない` と終了し、JSON は出ない。書き込み走査も VA `0x1801dbec8` (+8) で **0 件** (VA は 2 件)。
 
 **判明**:
-- 130 slot の vtable は Agg2D 具象クラスの vtable で、DLL 内で COL を指す vtable は 1 個。`AggCreateInstance` が返すオブジェクトの vtable はこれに限られる (vtable を書くのは ctor の 1 か所のみ、§5)。
+- 130 slot の vtable は Agg2D 具象クラスの vtable で、DLL 内で COL を指す vtable は 1 個。`AggCreateInstance` が返すオブジェクトの vtable はこれに限られる。vtable を書くのは **2 か所** (ctor `0x1800568b2`、`0x180056ad0` の関数)で、どちらも同じ vtable `0x1801dbec0` を書く (RIP 相対 lea の走査による。絶対アドレスによる書き込みは本測定の対象外で、未検証)。
+- `0x180056ad0` は先頭で `[rcx]` に vtable を書いた後、`[rcx+0x160]` へ `lock xadd` を行う。デストラクタ等の可能性があるが、役割は未検証。
 - (a) の glue の範囲の上限は、この vtable の **実体 81 slot (unique 78 関数)**。残り 49 slot は同一の `ret 0` (`0x18000c530`、`REPORT_APPENDIX_AGG2D.md` §12)。
 - `Agg2DIntf` は独立 vtable を持たない。FL 側がどのインタフェース型で呼ぶかは、Agg2D vtable の slot 順に依る (単一継承の slot 順は未検証)。
 
