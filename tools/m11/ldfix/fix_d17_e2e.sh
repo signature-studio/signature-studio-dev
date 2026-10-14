@@ -32,8 +32,10 @@ cmp "$OUT/spill_repair_2794.tsv" "$HERE/results/spill_repair_2794.tsv" || { echo
 "$PY" "$HERE/check_spill_2794.py" "$OUT/ssa_base.json" "$OUT/ssa_fix.json" "$OUT/spill_2794.json" "$HERE/results/spill37_1169.tsv" /dev/null > /dev/null
 if [ $? -eq 0 ]; then echo "[fix_d17_e2e] FAIL: ネガコン (修復を外した audit) が PASS した" >&2; exit 1; fi
 echo "[fix_d17_e2e] ネガコン: 修復を外した audit では突合が FAIL (期待どおり)"
-"$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill_nogate.ll" \
-  --tsv "$HERE/results/spill37_1169.tsv" --gate none | head -1
+nogate="$("$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill_nogate.ll" \
+  --tsv "$HERE/results/spill37_1169.tsv" --gate none)" || exit 1
+echo "$nogate" | head -1
+echo "$nogate" | head -1 | grep -q '^spill fixed=24 skipped=0 ' || { echo "[fix_d17_e2e] FAIL: ネガコン 2 (--gate none) が 24 件を書き換えない" >&2; exit 1; }
 step "6/6 emcc 構文検証 (修復 IR)"
 if ! source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1 || ! command -v emcc > /dev/null 2>&1; then
   echo "[fix_d17_e2e] FAIL: emsdk が無い (/opt/emsdk/emsdk_env.sh の source か emcc の検出に失敗)" >&2
