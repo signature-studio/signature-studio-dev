@@ -1,6 +1,6 @@
 # PLG-F2-8 (#2726) 付録: 残不一致 6 関数の原因切り分けと #547 ablation の再定義
 
-REPORT §11 の根拠。測定 commit `26f90ada` (origin/main 取り込み時点)。lift 経路 (`tools/plugins/lift`・`tools/plugins/f2`・`tools/liftdiff/ldlib`・`tools/plugins/p0c`) はこの commit から変更していない。run 中に origin/main は `3d900214` へ進んだが、その差分は `tools/liftdiff/results/` の追加のみ。
+REPORT §11 の根拠。測定 commit `26f90ada` (origin/main 取り込み時点)。本 PR は lift 経路のファイルを変更していない (既存ファイルの変更は docs のみ。新規の probe `tools/plugins/f2/xmm_slot_probe.py` は lift 経路に入らない)。PR 作成後に origin/main (`2e50b801`) を merge commit `6ba2e47e` で取り込んだ。測定範囲 (lift 経路・p0c・f2・liftdiff・m11/ldfix・inventory・shared) の非 docs 変更は 11 件 (`tools/liftdiff/tests/ld53_arg_regs.py`・`tools/liftdiff/tests/oob_414ad0_27.py`・`tools/m11/ldfix/fix_d17_e2e.sh`・`tools/m11/ldfix/spill37_1169.py`・`tools/m11/ldfix/spill_classify_1161.py`・`tools/plugins/f2/f2_step2.sh`・`tools/plugins/f2/icall_gate_waivers.json`・`tools/plugins/f2/nc_waiver_proof.py`・`tools/plugins/f2/waiver_proof.py`・`tools/plugins/f2/xmm_slot_probe.py`・`tools/plugins/lift/passes/test_movntps_store.py`) で、いずれも測定経路から参照されない (確認結果: 参照元は docs・結果ファイルと各領域の検査・e2e スクリプト (測定経路の外) だけで、`test_movntps_store.py` は `REPORT_APPENDIX_2094.md` からのみ参照され、`lift_ranges.sh` は passes を名前で呼ぶ)。よって測定 commit `26f90ada` の出力は、HEAD でも有効とみなす。
 
 ## 0. 測定条件
 
@@ -10,11 +10,13 @@ REPORT §11 の根拠。測定 commit `26f90ada` (origin/main 取り込み時点
 - `leaf_diff.sh`: V1 **134 秒** (rc 0)、V0 **128 秒** (rc 0)。各 1 回。
 - 最終判定 (23 関数): V0・V1 とも **一致 15 / 不一致 8 / 実行不能 0**。
 
-## 1. ablation の再定義 (pass on/off)
+## 1. ablation の再定義 (V0 → V1)
 
-旧受入 (「pass を外すと 8 関数が戻る」) は成立しない。pass on/off で不一致数は 8 のまま、戻る関数は 0 件 (`REPORT.md` §9.1 の 4 と同じ結論)。再定義は「署名が変わる関数の IR 差分と判定を並べる」。対象は 0x6b0ef0・0x6ca5c0・0x6f1650。
+arm: V0 = `PLUG_XMMARG=0 PLUG_LDFIX=0`、V1 = `PLUG_XMMARG=1 PLUG_LDFIX=1` (いずれも `PLUG_ICALL=0`)。
 
-| VA (block) | V0 (pass off): IR 署名 / 一次採点 / 最終 | V1 (pass on): IR 署名 / 一次採点 / 最終 | IR 差分 (`p.final.ll`) |
+旧受入 (「pass を外すと 8 関数が戻る」) は成立しない。V0 → V1 で不一致数は 8 のまま、戻る関数は 0 件 (`REPORT_APPENDIX.md` §9.1 の 4 と同じ結論)。再定義は「署名が変わる関数の IR 差分と判定を並べる」。対象は 0x6b0ef0・0x6ca5c0・0x6f1650。
+
+| VA (block) | V0: IR 署名 / 一次採点 / 最終 | V1: IR 署名 / 一次採点 / 最終 | IR 差分 (`p.final.ll`) |
 |---|---|---|---|
 | 0x6b0ef0 (18982) | `i64(i64, i64)` / mismatch 0/8/11 / mismatch | `i64(i64, i64, double %in.xmm2)` / mismatch 7/8/11 / mismatch | 9 行: 署名 +1、`%in.xmm2.bits` 定義追加、`xor i128 0, 0` → `zext i64 %in.xmm2.bits to i128` |
 | 0x6ca5c0 (19013) | 同上 | 同上 | 同上 (同一コード) |
@@ -23,6 +25,11 @@ REPORT §11 の根拠。測定 commit `26f90ada` (origin/main 取り込み時点
 - V0 と V1 の 23 関数の判定を `leaf_report.md` の行で比べると、差は上の 3 関数 (一次採点と署名) のみ。最終判定の集合は同一。
 - 一次採点が変わるのは 0x6b0ef0・0x6ca5c0 (0/8 → 7/8)。残る 1 case の不一致は、§3 の「届かない xmm 入力」と整合する (case の入力を直接 trace で確認したわけではない)。
 - 0x6f1650 は署名だけ変わり、判定は両方 match。過去に不一致だった原因は image 配置 (`REPORT_APPENDIX_871.md` §10.1〜§10.2 の `mk_targets` 修正で解消) で、pass とは無関係。
+- 上表の 0x6b0ef0・0x6ca5c0 の IR 差分 (9 行) と一次採点の変化 (0/8 → 7/8) は、XMMARG と LDFIX の合成による変化として読む。XMMARG 単独の寄与は本 PR では測っていない。
+
+XMMARG 単独の最終判定の根拠は §9 (HEAD 2f77ace、`PLUG_XMMARG=1`、LDFIX 既定 OFF) の 15/8 だけである。XMMARG 単独 arm (`PLUG_XMMARG=1 PLUG_LDFIX=0`) の一次採点は本 PR で未実測。
+
+V1 の lift で ldfix が適用された件数 (`*.ldfix.json`) は記録していない。V1 の work/ は PR に含まれず、本 run の素材 (`$ARTIFACTS_DIR` は `fl-win64` のみ) には `toolchain-retdec` が無いため再測定できない。
 
 ## 2. 残 6 関数の原因 (V1 lift の `p.xa.json` の数値)
 
@@ -71,7 +78,8 @@ REPORT §11 の根拠。測定 commit `26f90ada` (origin/main 取り込み時点
 |---|---|---|
 | `fix_xmm_args.py` の xmm 入力 slot 判定を CFG 解析へ置換し、0x6b0ef0・0x6ca5c0 の部分復元を止める | 部分復元による silent の誤り | #2850 [PLG-F2-9] |
 | no_placeholder 2 関数 (0x6bfec0・0x6c9b60) と slot_occupied 2 関数 (0x6c8c90・0x6cc2e0) の修復 | 4 関数が未修復 | #2850 [PLG-F2-9] |
-| 呼出し元の xmm 値 (closure 内の call site で 0 を渡す) | closure 内の呼出しで float 値が失われる | #613 (既存。`REPORT_APPENDIX.md` §9.3) |
+| 呼出し元の xmm 値 (closure 内の call site で 0 を渡す) | closure 内の呼出しで float 値が失われる | #2762 (open。M11 の同種課題 `call_arity_mismatch` の xmm 呼出し側引数。2026-10-14 に f2 の事例を追記) |
+| XMMARG 単独 arm の一次採点と V1 の ldfix 適用件数 (B1 の数値の帰属) | 受入 5 の数値の帰属 | #2850 (検証手順の再測定に併せて実測。2026-10-14 にコメントで追記) |
 
 ## 6. 再現
 

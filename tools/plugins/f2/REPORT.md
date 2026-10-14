@@ -5,6 +5,7 @@
 - 検証起点 commit: **09d9fd8** (origin/main 0f22d9c を基点とする `199-plg-f2-eq-filter-step1`)。数値はすべてこの HEAD から `bash tools/plugins/f2/f2_step1.sh` を 3 回実行して取得。
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/f2/` のみ (生成物は `tools/plugins/work/` = gitignore)
 - 既知類型との関係: **(icall §4) D1 = 間接 call/jmp 脱落** が 11 閉包すべてで再現 (§3)。(DEFECTS.md) D15 は x64c stage-0 経路の同種事象で、本件は RetDec 経路 (別経路)。新規類型なし。
+- 既知類型との関係 (#2726・§11): **(DEFECTS.md) D5** (xmm 引数脱落) の残件 (no_placeholder・slot_occupied・引数の割当て)。新規類型なし。
 - 範囲: issue #199 の手順 1 (固有閉包 lift → `emcc -c`) と、手順 3 (差分試験) の実行可否の判定まで。**§8 (#515) で「機械語にも間接 call 無し」の leaf 23 関数だけ関数単位差分を実施**。**手順 2〜4 と出口条件 (差分試験 bit-exact) は未達** (§5)。
 
 ## 0. 結論 (先出し)
@@ -229,13 +230,13 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 受入条件 1 は**未達** (不一致 8 のまま。pass は opt-in `PLUG_XMMARG=1`・既定 OFF)。HEAD `2f77ace` での実測 (6 block lift・`leaf_diff.sh` n=3・`nc_leaf.py`) は一致 15 / 不一致 8 / 実行不能 0 で、接続前と同一。分類器 (`xmm_arg_drop`) の変更は liftdiff 全体に効くが、既存 results (`tools/liftdiff/results/*`・`tools/flelift/boot/results/mixed_summary.md`) は旧分類のまま・再分類は未実施。実測・未解決は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9。
 
 ## 10. PLG-F2-5 (#613): #232 (LD-1) `ldfix` の接続 (opt-in `PLUG_LDFIX=1`) → 付録
-受入条件 1 は**未達** (不一致 6 のまま)。受入条件 3 は**部分判定** (F2 の修復は適用可)。詳細は [`REPORT_APPENDIX_613.md`](REPORT_APPENDIX_613.md)。
+受入条件 1 は**未達** (不一致 6 のまま)。受入条件 3 は**未達に改める**: #613 の B arm (`PLUG_LDFIX=1`) で一致に変わったとした 0x6b0ef0・0x6ca5c0 は、現行の V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`、測定 commit 26f90ada) で再現せず、両方とも不一致 (最終判定 15/8)。LDFIX を入れても最終判定は変わらない。詳細は [`REPORT_APPENDIX_613.md`](REPORT_APPENDIX_613.md) 末尾の追補 (#2726)。
 ## 10.1 (#871 部分) 0x6f1650 の切り分け → 付録
 0x6f1650 (19059) の不一致は image 配置 (RVA) と IR 絶対 VA 定数のずれが原因と確定。修正は未実施で #871 に残す。詳細は [`REPORT_APPENDIX_871.md`](REPORT_APPENDIX_871.md)。
 
 ## 11. PLG-F2-8 (#2726): 残不一致 6 関数の原因切り分けと #547 ablation の再定義 → 付録
 
-- 結論: pass on/off (`PLUG_XMMARG` 0/1) で一致 15 / 不一致 8 / 実行不能 0 が同一。判定が変わった関数は 0 件。一次採点が変わったのは 0x6b0ef0・0x6ca5c0 (0/8 → 7/8、不一致のまま)。測定 commit `26f90ada`。
+- 結論: arm V0 (`PLUG_XMMARG=0 PLUG_LDFIX=0`) と V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`) で一致 15 / 不一致 8 / 実行不能 0 が同一。V1 は XMMARG と LDFIX を同時に切り替えた arm で、両者の寄与は分離していない。判定が変わった関数は 0 件。一次採点が変わったのは 0x6b0ef0・0x6ca5c0 (0/8 → 7/8、不一致のまま)。測定 commit `26f90ada`。
 - 残 6 関数の原因 (1 行ずつ):
 
 | VA (block) | 原因 | 根拠 |
