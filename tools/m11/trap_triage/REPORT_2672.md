@@ -95,7 +95,8 @@ build 入力 (m11 の IR・C・build スクリプト) は origin/main `208b4ef9`
 ## 7. 再現
 
 ```sh
-export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64   # tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C "$RUNNER_TEMP/fl-win64"
+mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C "$RUNNER_TEMP/fl-win64"   # 展開先を先に作る (WORKFLOW §11)
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64
 tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst -C .                       # tools/m11/work/ (素材)
 tar --zstd -xf $ARTIFACTS_DIR/toolchain-emsdk.tar.zst -C "$RUNNER_TEMP"   # $RUNNER_TEMP/emsdk/upstream/bin に wasm-opt・wasm-dis
 export PATH="$RUNNER_TEMP/emsdk/upstream/bin:$PATH"
@@ -120,4 +121,5 @@ python3 tools/m11/trap_triage/compare_kinds_2672.py tools/m11/work/trap_triage/b
 - 測定 commit: `c05f4b16` (コードを変えた最後の commit)。build 出力 (`m11_boot.cjs.wasm`) は `86e83ad5` の作業ツリーで生成した。その後の code 変更は比較スクリプト `compare_kinds_2672.py` の追加・修正のみで、build 入力ではない。
 - build 入力 (IR・C・build スクリプト) は origin/main `208b4ef9` と同一。`git diff --stat 208b4ef9 c05f4b16 -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_rt.c tools/m11/m11_win.c tools/m11/trap_triage/survey_units.mjs tools/m11/ldfix` の出力は空。
 - 測定 commit 以降の `tools/m11` の差分: 本 REPORT を更新した commit 時点で `git diff --stat c05f4b16 HEAD -- tools/m11` は本ファイルのみ (コード差分 0)。main 取り込み後の再測定は不要 (`docs/WORKFLOW.md` §6)。
+- origin/main (`b7df55e6`) は `208b4ef9` 以降に `tools/m11` の 20 ファイル (`ldfix/` の解析スクリプト・結果・REPORT、`shimx_link/`、`trap_triage/REPORT_1620.md`・`trap_w1620.py`) を更新している。いずれも IR 生成・build・survey の経路から呼ばれず、`ldfix/ldfix.py` と C ソース・`m11_build.sh`・`survey_units.mjs` は `208b4ef9` と差分 0 (`git diff --stat 208b4ef9 origin/main -- tools/m11` の内訳で確認)。`git merge-tree` は衝突なし。
 - 参考: `git diff --stat 39fe9fad c05f4b16 -- tools/m11` は `REPORT_2672.md` と `compare_kinds_2672.py` の 2 ファイル。
