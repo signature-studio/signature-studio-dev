@@ -108,3 +108,15 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `FA_NODE1=1` で `out[0]` が 0 (probe 下) と poison (probe 無し) になる不一致 | out[0] と node Z の照合が未了 (受入 2) | #1791 (本 issue に残す) |
+
+## 11. FA-25 (#1791) 追補: probe 無しの out[0] 実読 (受入 2 の再測定)
+
+- 追加: `FA_OUT0=1` のときだけ、setter `0x180c9d741` の fault 時に `[rsp+0x48]` (= out[0]) を表示 (`pe_map.h`)。`FA_NODE1=1` 時は node Z のアドレスを `NODEZ` 行に出す (`native_ctrl.c`)。既定動作は不変。
+- 実測 (probe 無し, `FA_OUT0=1 FA_NODE1=1`, 8 epf 本): 8 本すべて `OUT0 rip=180c9d741 out0 = Z+0x2b0` (例: Z=`...084750`, out0=`...084a00`)。node Z (`[out0]` の候補) とは一致しない。`[out0+0x10]` は `Z+0x2c0` で、rcx=`a5a5a5a5a5a5a5a5` (poison) と整合する。
+- probe 下 (`FA_PROBE9=1`, 同じ node 構成) は `out[0]=0` (`FA9CA ... out0=0 found=0`)。probe 無しと probe 下で `out[0]` が 0 と `Z+0x2b0` に分かれ、probe 自体が呼出経路を変えている可能性が高い。原因は未特定。
+- 判定基準 (run_fa9 (a)) は変更していない。受入 2 (out[0] と node Z の照合) は**未達**。
+
+### 測定 (測定 commit `7959db1c` = HEAD, 差分 0)
+- `bash tools/targets/freshair/lift2/run_fa9.sh`: load 0.52→0.55, wall 3 s, **GATE PASS** / (a) ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン
+- `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5`: **BIT-EXACT 15/15** (wall 3 s, rc=0)
+- 差分: `git diff 7959db1c HEAD -- tools/targets/freshair/lift2` の出力 0 行。
