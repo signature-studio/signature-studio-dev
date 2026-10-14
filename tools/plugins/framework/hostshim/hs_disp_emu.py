@@ -44,6 +44,8 @@ WATCH = {0x131bb5c, 0x13281af, 0x1320dd9, 0x1322b53, 0x131b8dd, 0x1320840}
 # HS_DISP_RET_ARG=1 のとき、機械語で rax=第1引数 と確定した callee は rcx を返す (#1222 §7)
 RET_ARG = os.environ.get('HS_DISP_RET_ARG') == '1'
 RET_ARG_VA = {0x412d60, 0x416230}
+# HS_DISP_PATH=1 のとき結果に実行経路 (path) と callout の位置 (callout_at: (path 上の位置, 呼出先)) を含める (#2886 の格納元解析用)
+KEEP_PATH = os.environ.get('HS_DISP_PATH') == '1'
 # HS_DISP_RET_SPEC="VA:rcx,VA:host,..." で callee ごとの戻り値を指定する (#1222 §8)。
 # rcx = 第1引数を返す / host = HOST 領域 (有効ポインタ) を返す。未指定の callee は従来どおり 0。
 RET_SPEC = {}
@@ -70,7 +72,7 @@ def run_one(ident, image, base, size, pe_data_sections):
     uc.mem_map(SENT & ~(PAGE - 1), PAGE, UC_PROT_ALL)
     uc.mem_write(SENT, b'\xf4')  # hlt (SENT 到達の検出用)
 
-    st = {'steps': 0, 'stop': None, 'callouts': [], 'path': [], 'unmapped': 0, 'trail': [], 'hit': [], 'pages': Counter()}
+    st = {'steps': 0, 'stop': None, 'callouts': [], 'callout_at': [], 'path': [], 'unmapped': 0, 'trail': [], 'hit': [], 'pages': Counter()}
     fn_range = (FN_LO, FN_HI)
 
     def on_code(uc_, addr, sz, _):
@@ -88,6 +90,7 @@ def run_one(ident, image, base, size, pe_data_sections):
             sp = uc_.reg_read(UC_X86_REG_RSP)
             ret = int.from_bytes(uc_.mem_read(sp, 8), 'little')
             st['callouts'].append('0x%x' % addr)
+            st['callout_at'].append((len(st['path']), addr))
             ret_rax = 0
             if RET_ARG and addr in RET_ARG_VA:
                 ret_rax = uc_.reg_read(UC_X86_REG_RCX)
@@ -147,6 +150,8 @@ def run_one(ident, image, base, size, pe_data_sections):
         'unmapped': st['unmapped'],
         'unmapped_pages': {'0x%x/%s' % (p, a): n for (p, a), n in st['pages'].items()},
         'hit': st['hit'],
+        'path': st['path'] if KEEP_PATH else None,
+        'callout_at': st['callout_at'] if KEEP_PATH else None,
     }
 
 
