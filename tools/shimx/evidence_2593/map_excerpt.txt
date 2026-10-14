@@ -1,0 +1,2 @@
+9141:       -   1bea3f       5a         obj/boot_trace_fix.o:(function_457c40)
+9143:       -   1bea99      325         obj/boot_trace_fix.o:(function_457c70)

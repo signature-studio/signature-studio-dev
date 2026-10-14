@@ -91,7 +91,7 @@ test("検証済みの配送を増分保存し、再起動 (新しい接続) 後�
     const rows = b.storage.sql.exec("SELECT kind, key FROM pm_entities ORDER BY kind, key").toArray();
     assert.deepEqual(
       rows.map((r) => `${r.kind}:${r.key}`),
-      ["bot_last:1", "issue:1", "pr:9"],
+      ["bot_last:1", "bot_report:1", "issue:1", "pr:9"],
     );
     const bl = b.storage.sql.exec("SELECT json FROM pm_entities WHERE kind = 'bot_last'").toArray()[0];
     assert.equal(JSON.parse(String(bl.json)).body, "着手");

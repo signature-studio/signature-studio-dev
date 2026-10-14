@@ -20,6 +20,13 @@ static uint64_t g_first_seq[MAXN], g_seq;
 static uint32_t g_log[LOGCAP];   /* idx<<16 | unit */
 static uint32_t g_log_n, g_dropped;
 static int g_print;
+static int g_stack;
+
+/* SHX-T9k #2593: 呼出し直前の GetLastError と呼出し元の wasm スタック (JS の Error.stack 由来の wasm-function[n]:0xOFF) を記録する */
+unsigned int GetLastError(void);
+EM_JS(void, sxt_js_stack, (int idx, unsigned int le), {
+    (globalThis.sxt_stk = globalThis.sxt_stk || []).push([idx, le, new Error().stack]);
+});
 
 void sxt_enter(int idx) {
     uint32_t unit = *(volatile uint32_t*)(uintptr_t)(0x11eac98u + M11_LB_BASE);
@@ -27,7 +34,9 @@ void sxt_enter(int idx) {
     g_last_unit[idx] = unit;
     if (g_log_n < LOGCAP) g_log[g_log_n++] = ((uint32_t)idx << 16) | (unit & 0xffffu); else g_dropped++;
     g_seq++;
-    if (g_print) fprintf(stderr, "[sxt] #%llu unit=%u %s%s\n", (unsigned long long)g_seq, unit, sxt_names[idx], sxt_is_gui[idx] ? " (GUI/audio stub)" : "");
+    unsigned int le = GetLastError();
+    if (g_print) fprintf(stderr, "[sxt] #%llu unit=%u le=%u %s%s\n", (unsigned long long)g_seq, unit, le, sxt_names[idx], sxt_is_gui[idx] ? " (GUI/audio stub)" : "");
+    if (g_stack) sxt_js_stack(idx, le);
 }
 
 #define RETCAP 256
@@ -58,6 +67,7 @@ EMSCRIPTEN_KEEPALIVE double sxt_ret_b(uint32_t k) { return (double)g_ret_b[k]; }
 EMSCRIPTEN_KEEPALIVE double sxt_ret_r(uint32_t k) { return (double)g_ret_r[k]; }
 
 EMSCRIPTEN_KEEPALIVE void sxt_set_print(int v) { g_print = v; }
+EMSCRIPTEN_KEEPALIVE void sxt_set_stack(int v) { g_stack = v; }
 EMSCRIPTEN_KEEPALIVE int sxt_n(void) { return sxt_n_names; }
 EMSCRIPTEN_KEEPALIVE const char* sxt_name(int i) { return sxt_names[i]; }
 EMSCRIPTEN_KEEPALIVE int sxt_gui(int i) { return sxt_is_gui[i]; }

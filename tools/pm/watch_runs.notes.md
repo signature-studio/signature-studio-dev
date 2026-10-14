@@ -27,7 +27,7 @@ watch_runs.sh の完了通知ごとに、結果処理と合わせて実行する
 
 ## 2026-10-13 13:10Z 追記 (heartbeat 処理で判明)
 - 差し戻しが 6〜10 回に積み上がる主因は、reviewer が『実装 agent では解消しない』と書いた PM 判断・起票を PM が決めていなかったこと。
-  `python3 $PM_DIR/pm_needs.py` で、最新の差し戻しが PM 判断を求めていて PM の応答が無い PR を洗い出す (REST のみ。所要は REPORT §8)。heartbeat のたびに実行して、未回答を 0 にする。
+  `python3 $PM_DIR/pm_needs.py` で、最新の差し戻しが PM 判断を求めていて PM の応答が無い PR を洗い出す (REST のみ。所要は REPORT §8)。当時は 30 分版の heartbeat のたびに実行した。現在は Worker の `needs.ts` が同じ検出を担い、監査専用の heartbeat (指示 145) からは実行しない。
 - 積み PR の merge 順はブランチの積み方で決まる (判断前に `git log origin/main..<branch>` / 差分に含まれる他 PR の commit を確認する)。
   例: #551(merged) → #624 → #676 → #708 → #720。誤って逆順を指示したら、すぐ PR と issue に訂正コメントを出す。
 - WORKFLOW §3 (#835) に従い実装 agent が起票してよい。milestone・優先度・Status は PM が確定する。reviewer が『起票先番号』を要求したら、起票前に `gh api "search/issues?q=repo:R+%22CI-13%22+in:title"` で番号の重複を必ず確認 (CI-13 が #725 と重複しかけた)。
