@@ -42,4 +42,4 @@
 - clean rebuild: `bash tools/shimx/evidence_2491/repro.sh` の build → `[sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0`。`m11_sx_trace_soft_fix.cjs.wasm` の sha256 先頭 `11c74a05…` (初回と同一)。`repro.sh` 全体 (build と probe) の所要 11 秒。
 - probe unit 1〜23: `probe: SAME` (保存出力 `evidence_2491/probe_u23_shimx_site.txt` と diff 0 行)。
 - survey 942 unit: ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 (初回と同一)。所要 2 分 25 秒 (開始時 load 0.64、4 CPU)。`check_survey_vs_1255.py` で `evidence_1255` と kind 差分 0・shim_calls 差分 0。
-- 素材: `work-m11`・`work-liftdiff` を `$ARTIFACTS_DIR` から展開 (実在確認済み)。EMSDK は `/opt/emsdk` を使用。
+- 素材: `work-m11`・`work-liftdiff` を `$ARTIFACTS_DIR` から展開 (実在確認済み)。EMSDK は [EMSDK] (`docs/REFERENCES.md`) の環境を使用。
