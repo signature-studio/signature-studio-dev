@@ -1,6 +1,6 @@
 // cpi_reach.mjs: lift 済み Fruity Wrapper (wasm) で CreatePlugInstance (VA 0x86ab10) への入場を確認する (#829 受入 2)。
 // usage: node cpi_reach.mjs <cpi.cjs> <image.bin> <ImageBase 16進> <entry VA 16進> [a0 16進] [a1 16進]
-// 判定は JSON 1 行で出す: entered = 入場ログ "[cpi] enter <entry VA>" を受けたか。false なら err の末尾が最初に失敗した地点。
+// 判定は JSON で出す (null, 1 で整形するため複数行): entered = 入場ログ "[cpi] enter <entry VA>" を受けたか。false なら err_tail の末尾が最初に失敗した地点。
 // a0/a1 省略時は 0 (NULL)。ゼロ埋めの guest 領域 (例 0x30000000) を渡すと、NULL の逆参照で落ちる地点を越えられるかを見る。
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
