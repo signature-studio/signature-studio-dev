@@ -1,7 +1,7 @@
 {
  "mode": "boot",
  "dllmain_done": false,
- "boot_threw": "memory access out of bounds",
+ "boot_threw": "unreachable",
  "boot_failfast": null,
  "units_total": 942,
  "units_run": 52,
@@ -34,7 +34,9 @@
   "FastMM_GetMem(407a50)": 570,
   "FastMM_FreeMem(407e20)": 20,
   "InitUnits": 0,
-  "Halt0": 0
+  "Halt0": 0,
+  "ListFind(4fa210)": 0,
+  "ListRaise(47a250)": 0
  },
  "va_calls": 19,
  "va_bytes": 275644416
