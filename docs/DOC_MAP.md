@@ -164,7 +164,7 @@
 | `tools/m11/rtl/REPORT.md` | ~248 | Delphi RTL の VA 範囲確定 + RTL 帯 (System/Types/SysUtils 1,172 関数) の lifter 別 liftdiff 採点 (#129) + x64c 不一致の主因タグ分類 (§9・集計は `classify_x64c_mismatch.py`・結果は `results/x64c_mismatch_classify.txt`・#410)。§7-4 は `REPORT_APPENDIX_129.md`・§9-4 は `REPORT_APPENDIX_1721.md`・§9-5 は `REPORT_APPENDIX_1936.md` に分割 (250 行上限) |
 | `tools/m11/rtl/REPORT_APPENDIX_129.md` | ~17 | m11/rtl REPORT §7-4 全文 (`ff28834` レビュー指摘対応の後処理検証・ネガコン・ImageBase 化の注記)。REPORT.md から分割移動 |
 | `tools/m11/rtl/REPORT_APPENDIX_1721.md` | ~22 | m11/rtl REPORT §9-4 全文 (`0x44a4d8` の wasm probe 実測と表)。REPORT.md から分割移動 |
-| `tools/m11/rtl/REPORT_APPENDIX_1936.md` | ~36 | m11/rtl REPORT §9-5 全文 (vtable `0x42f670` の native/wasm 実測・敷設経路・退行 5 件の分類)。REPORT.md から分割移動 |
+| `tools/m11/rtl/REPORT_APPENDIX_1936.md` | ~59 | m11/rtl REPORT §9-5 全文 (vtable `0x42f670` の native/wasm 実測・敷設経路・退行 5 件の分類)。REPORT.md から分割移動 |
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/qstore/REPORT.md` | ~90 | 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS D17) の検出・修復・idx 87/898/58–63 の帰属・#513 取り込み後の実測 (#516) |
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
@@ -357,7 +357,8 @@
 | `tools/targets/serum2/sr4/REPORT.md` | ~110 | SR-4 (#75) DSP 段階 lift 第 1 段: vtable root 56 関数の対象表 + pilot lift 9 本 (実機 vs wasm 差分) + strict gate + ネガコン |
 | `tools/targets/serum2/gui/REPORT.md` | ~76 | SR-7 (#68, 部分達成): Splice 3 テンプレートの実体化分岐は未特定 / overlay_demo_version は template 定義 0 件 (静的確認のみ) |
 | `tools/targets/serum2/gui/REPORT_SR24.md` | ~111 | SR-24 (#1710): Splice テンプレート実体化分岐の静的解析。sub-controller 振り分け `0x1804a1950` まで特定、demo bit 書込元・demo ダイアログ呼出元を列挙。分岐の特定は未達 (子 #1917) |
-| `tools/targets/serum2/gui/REPORT_SR28.md` | ~110 | SR-28 (#1917): Splice テンプレートの選択経路 (vtable 0x180a86b88 の設定元まで)・demo ダイアログ呼出元の vtable 位置。選択関数と demo bit 結線は未達 |
+| `tools/targets/serum2/gui/REPORT_SR28.md` | ~110 | SR-28 (#1917): Splice テンプレートの選択経路 (vtable 0x180a86b88 の設定元まで)・demo ダイアログ呼出元の vtable 位置。選択関数と demo bit 結線は未達 (SR-30 で訂正) |
+| `tools/targets/serum2/gui/REPORT_SR30.md` | ~100 | SR-30 (#2000): REPORT_SR28 の vtable 0x180a86b88 前提の訂正 (RTTI は SerumEditor の sub-object)。Splice 生成の直接呼出元と demo bit 読書 (0x1800c2b50 / 0x1800c6090) を列挙。選択 state 条件と間接経路は未達 (子 #2053〜#2055) |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~47 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017) |
