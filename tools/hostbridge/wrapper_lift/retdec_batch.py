@@ -160,6 +160,31 @@ def measure(name):
     print(json.dumps({k: v for k, v in res.items() if k != "failed_funcs"}, ensure_ascii=False))
 
 
+def def_match(text, va):
+    for rx in (DEF_RE, RANGE_DEF_RE):
+        for m in rx.finditer(text):
+            if int(m.group(1), 16) == va:
+                return m
+    return None
+
+
+def nc_remove(text):
+    before = defined_in(text)
+    by_name = {int(m.group(1), 16) for m in DEF_RE.finditer(text)}
+    by_range = {int(m.group(1), 16) for m in RANGE_DEF_RE.finditer(text)}
+    va = min(by_range - by_name or before)
+    m = def_match(text, va)
+    text2 = text[:m.start()] + text[m.end():]
+    after = defined_in(text2)
+    return {
+        "defined_before": len(before),
+        "target": "0x%x" % va,
+        "removed_header": m.group(0).strip(),
+        "defined_after": len(after),
+        "target_status_after": "ok" if va in after else "no_definition",
+    }
+
+
 def negative_control(name="block19091_PE.bin"):
     path = os.path.join(FL, name)
     rngs = funcs_of(Image(path))[:NC_N]
@@ -168,19 +193,9 @@ def negative_control(name="block19091_PE.bin"):
     if rc != 0:
         print(json.dumps({"nc": "retdec_failed", "rc": rc, "err": err}, ensure_ascii=False))
         return
-    before = defined_in(text)
-    va = min(before)
-    m = next(m for m in DEF_RE.finditer(text) if int(m.group(1), 16) == va)
-    text2 = text[:m.start()] + text[m.end():]
-    after = defined_in(text2)
-    print(json.dumps({
-        "batch_funcs": len(rngs),
-        "defined_before": len(before),
-        "target": "0x%x" % va,
-        "removed_header": m.group(0).strip(),
-        "defined_after": len(after),
-        "target_status_after": "ok" if va in after else "no_definition",
-    }, ensure_ascii=False))
+    res = nc_remove(text)
+    res["batch_funcs"] = len(rngs)
+    print(json.dumps(res, ensure_ascii=False))
 
 
 if __name__ == "__main__":
