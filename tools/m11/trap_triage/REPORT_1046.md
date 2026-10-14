@@ -163,7 +163,7 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 
 ## 15. #1288 再着手 run (HEAD `04a7ff1a` 起点): 監視版の全 unit 実行は unit 106 で停止 (結論なし)
 
-- 測定 commit: `04a7ff1a` (コード変更なし。本節の追記のみ)。`git diff --stat 04a7ff1a HEAD -- tools/m11` は本節の追記に限られ、コード差分 0。
+- 測定 commit: `04a7ff1a` (コード変更なし。本節の追記のみ)。`tools/m11` 全体の差分は main 取り込みで 7 ファイル (+145 行: `REPORT_N15.md`・`REPORT_1274.md`・`REPORT_1317.md`・`REPORT_1463.md`・`trap_triage/probe_1046_watch.mjs`・`trap_triage/probe_entry.py`・`REPORT_1046.md`) あるが、§15 の実測経路 (`m11_gen_ir2.sh`・`m11_build.sh`・`survey_units.mjs`・`m11_ptrcheck.mjs`・`ldfix/`・`m11_win.c`・`store_watch_1046.sh`・`watch_addr_1046.c`) の差分は 0 (`git diff --quiet 04a7ff1a 6edffd41 -- <上記>` が空)。`probe_1046_watch.mjs`・`probe_entry.py` は §15 の実行に使っていない。
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11`・`work-liftdiff` は `tools/m11/work`・`tools/liftdiff/work` に展開済み。retdec・emsdk は `/opt` にあり。
 - 再現 (`04a7ff1a`): `m11_gen_ir2.sh` rc 0 (38.8 s、490,733 行) → `m11_build.sh` rc 0 (18.0 s) → `survey_units.mjs` rc 0 (9.0 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2・§9〜§12 と一致。load average 約 1.0。
 - 全 store 計装版 (`store_watch_1046.sh`、監視番地 `0x10a9f910`) の試行:
@@ -171,7 +171,7 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
   - 全 942 unit (`full1`): `timeout 1500` で打ち切り (rc 124、25 分 15 秒)。`full1.err` の最後の行は `unit 106` で、その時刻は 03:18 (開始直後)。以後 25 分間 unit 107 以降の行も `[aw]` も出なかった。`[aw]` は 0 件。
   - 通常 build の survey は同じ 942 unit を 9 秒で完走する。計装版だけが unit 106 付近で進まなくなる (計装 IR の副作用、または unit 106 の実行時間の大幅な増加。切り分け未了)。
 - 記録上の注意 (本 run で判明):
-  - 監視版の `[aw]` 行は `watch_addr_1046.c` の `LOG_MAX 4000` で上限があるが、今回は 0 件のため上限には達していない。前 run (§12) の「unit 106 付近で打ち切り」は、今回の挙動 (unit 106 で停止) と一致する。
+  - 監視版の `[aw]` 行は `watch_addr_1046.c` の `LOG_MAX 4000` で上限があるが、今回は 0 件のため上限には達していない。§12 では `[aw]` を unit 106 付近まで記録したが、本 run は 0 件で不一致。原因は未切り分け (§13 の注記と同じ)。
   - `store_watch_1046.sh` は最後の `grep -c "^\[sw\]"` が 0 件で終了コード 1 を返す (`[sw]` ではなく `[aw]` を数えるべき)。survey の結果には影響しない。
   - `store_watch_682.sh` は生成した `survey_sv.mjs` を `work/probe682/` に置くため、`import ... './m11_ptrcheck.mjs'` が解決できず survey が起動しない (`ERR_MODULE_NOT_FOUND`)。`store_watch_1046.sh` は `tools/m11/` 直下に `survey_sv_1046.mjs` を置くので影響しない。
 - 受入の判定 (本 run): 1 は §10 で達成済み。2 (`0x92492493`) は未着手。3 は未確定 (書込み元 store の特定が未了)。4 は修復未実施で未達。
