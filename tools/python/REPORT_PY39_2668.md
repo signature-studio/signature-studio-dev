@@ -33,7 +33,7 @@
 
 ### 測定
 
-- 測定 commit: `4fe5d043` (コード変更の最後の commit。`pe_callgraph.py` に `callers` mode と `--callee-starts` を足した。`fwd` の既定の結果は `9172cfc9`・`64d751bd` と同じ)。`git diff 4fe5d043 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は本 REPORT の commit 時点で 0 行 (本 PR はこれらのコードを変えない)。
+- 測定 commit: `e9d3a847` (main を取り込んだ merge commit)。`pe_callgraph.py` の最後の変更は `4fe5d043` (`callers` mode と `--callee-starts` を追加) で、`git diff 4fe5d043 e9d3a847 -- tools/python/analysis/flapi/pe_callgraph.py` は 0 行。`git diff e9d3a847 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は本 REPORT の commit 時点で 0 行 (本 PR はこれらのコードを変えない)。main 取り込みで provider/host/tests に入った差分は他 PR のもので、解析は素材 (`block00031_PE.bin`) と `pe_callgraph.py` だけを読むため結果に影響しない。取り込み後の commit で測り直した。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` から `block00031_PE.bin` のみ展開 (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・2.8 秒)。展開先はリポジトリ外 (`$RUNNER_TEMP/flpy39`)。`FL_WIN64_DIR=<展開先>` で `extracted/block00031_PE.bin` を読む。
 - 再現 (`FL_WIN64_DIR=<展開先>` で実行):
   - 所属関数: `python3 analysis/flapi/pe_callgraph.py func 0x103b781 0x103b9ec 0x103be3a 0x103c01c`
@@ -41,7 +41,7 @@
   - 前進閉包: `python3 analysis/flapi/pe_callgraph.py fwd 0xd5b150,0xd843d0,0xd5b100,0x11e8670,0xff8a90,0xffac20 0x103b710,0x103b950,0x103ba10,0x103bd60,0x103bec0 60`
   - 閉包の補正版: 上の `fwd` に `--callee-starts` を付ける
   - 段 6: `python3 analysis/flapi/pe_disasm.py 0xd82c20 70` と、各 `lea rdx, [rip+…]` 先の文字列 (下表)
-- 実測 (`4fe5d043`・クリーンな worktree・コミット済み HEAD): `callers` 終了 0・36.5 秒。`fwd` 終了 0・36.8 秒 (閉包 566 関数・間接 call 191 箇所・標的 hit 0)。`fwd --callee-starts` 終了 0・37.4 秒 (閉包 665 関数・間接 call 208 箇所・標的 hit 0)。`func` は下表と一致。load average (1 分値) 0.76 → 1.07 (4 core)・並列数 1 (単一プロセスの線形走査)。
+- 実測 (`e9d3a847`・クリーンな worktree・コミット済み HEAD): `callers` 終了 0・36.9 秒。`fwd` 終了 0・36.8 秒 (閉包 566 関数・間接 call 191 箇所・標的 hit 0)。`fwd --callee-starts` 終了 0・37.0 秒 (閉包 665 関数・間接 call 208 箇所・標的 hit 0)。`func` は下表と一致。load average (1 分値) 0.11 → 0.92 (4 core)・並列数 1 (単一プロセスの線形走査)。同じ結果を `4fe5d043` でも得た。
 
 ### `*p` の書込み元の所属関数と直接 call
 
