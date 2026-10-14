@@ -2,7 +2,7 @@
 
 - 日付: 2026-10-14 / 親: #1710 (SR-24 残件) / 前段: `gui/REPORT_SR24.md` §2-§4
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は受入条件 4 (範囲外・GUI lift 時)。
-- 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3`。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` / 19,236,864 B (SR-24 と一致)。`work/` (gitignore) に置いた。
+- 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3`。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` / 19,236,864 B (SR-24 と一致)。作業用 scratch dir (リポジトリ外・`$SCRATCH`、runner の `_temp` 配下) に置いた。
 - 検証起点: 本 PR の測定 commit (下記 §0-1)。
 
 ## 0. 結論
@@ -22,20 +22,24 @@
 ## 1. 再現手順・実測 (本 run, runner 上)
 
 ```sh
-# cwd: tools/targets/serum2/ (work/ は gitignore)
-tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" -C work --wildcards '*Install_Xfer_Serum2_2.1.5.exe'
-7z x -y -owork/exe_extract work/Install_Xfer_Serum2_2.1.5.exe
-cp -f 'work/exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' work/Serum2_win64.vst3
-work/venv/bin/python gui/extract_uidesc.py work/Serum2_win64.vst3 work/uidesc.json
-work/venv/bin/python gui/xref_rva.py work/Serum2_win64.vst3 fc55b4 1195f14
+# $SCRATCH: リポジトリ外の作業用 dir (例: runner の _temp 配下)。cwd はリポジトリ直下
+mkdir -p "$SCRATCH" && cd "$SCRATCH"
+tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" --wildcards '*Install_Xfer_Serum2_2.1.5.exe'
+7z x -y -oexe_extract Install_Xfer_Serum2_2.1.5.exe
+cp -f 'exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' Serum2_win64.vst3
+uv venv -q venv --python 3.14 && uv pip install -q -p venv/bin/python pefile capstone zstandard
+R=<repo>/tools/targets/serum2
+venv/bin/python $R/gui/extract_uidesc.py Serum2_win64.vst3 uidesc.json
+venv/bin/python $R/gui/xref_rva.py Serum2_win64.vst3 fc55b4 1195f14
 ```
 
-- 依存: `pefile` `capstone` `zstandard` (venv `work/venv`、python 3.14)。
-- 実測 (n=1, 逐次, load は `uptime` の 1 分平均):
-  - `extract_uidesc.py`: real 3.187 s, load 0.26 (07:57)。出力 2,093,822 B (SR-24 と一致)。
-  - `xref_rva.py` (fc55b4 / 1195f14): real 7.916 s, load 0.32 (07:57)。出力 `0x1804a22a1: lea rdx, [rip + 0xb2490c] -> 0x180fc6bb4 (file 0xfc55b4)` 1 件 (SR-24 と一致)。
-- 入力の sha256 と uidesc の bytes は SR-24 の値と一致し、SR-24 の測定を再現できた。
-- 補助スクリプト (`work/sr28_*.py`) は `work/` のみに置き、commit していない。以下 §2-§4 の数値はそれらの実出力。
+- 依存: `pefile` `capstone` `zstandard` (scratch の venv、python 3.14)。
+- 入力: インストーラ `Install_Xfer_Serum2_2.1.5.exe` (sha256 `507b726d…`) から展開した `Serum2_win64.vst3` (sha256 `501e7bb3…` / 19,236,864 B)。
+- 実測 (本 run, n=1, 逐次, load は実行直前の `uptime` 1 分平均):
+  - `extract_uidesc.py`: real 3.51 s, load 0.64 (2026-10-14 08:12:43)。出力 2,093,822 B (SR-24 と一致)。
+  - `xref_rva.py` (fc55b4 / 1195f14): real 8.95 s, load 0.67 (08:12:46)。出力 `0x1804a22a1: lea rdx, [rip + 0xb2490c] -> 0x180fc6bb4 (file 0xfc55b4)` 1 件 (SR-24 と一致)。
+- 入力の Serum2.vst3 の sha256 と uidesc の bytes は SR-24 の値と一致し、SR-24 の測定を再現できた。
+- §2〜§4 の補助スクリプト (旧 `sr28_*.py`) は repo 外に置いたもので commit していない。本 run では再実行できなかったため (スクリプトが runner に残っていない)、§2〜§4 の数値は**前 run の値** (測定 commit `ce9f1f34` 時点の実出力) である。
 
 ## 2. state → template の選択経路 (受入条件 1)
 
