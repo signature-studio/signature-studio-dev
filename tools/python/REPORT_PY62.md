@@ -152,6 +152,24 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 
 **NC-P (provider_check)**: `provider/fl_engine.c:205` の `FL_H(playlist, isTrackMuteLock)` 行を削除して再ビルド。`gen_provider.py --check-handlers` は rc 0 で通過し (ハンドラ 84)、`provider/build.sh` も rc 0。`provider_check.mjs` は `AssertionError [ERR_ASSERTION]: 実装済みのはず: playlist.isTrackMuteLock が未実装` で rc 1 (FAIL)。元に戻して再ビルドした後は PASS (implemented 85)。ビルドの検査 (`--check-handlers`) は削除を検出せず、検出は provider_check の実装数検査だけが行う。
 
+### 5-3. main 取り込み後の再測定 (競合解消 merge)
+
+- 測定 commit (コードを最後に変えた commit): `ca8895d6` (`Merge remote-tracking branch 'origin/main' into 2027-py62-playlist-confirmed`)。main 側の PY-89 (#2805) の `channels.getChannelIndex`・`channels.getChannelMidiInPort` 2 件を取り込んだ。
+- 競合 2 箇所: `docs/DOC_MAP.md` (REPORT 行は両方残す)、`tools/python/tests/provider_check.mjs` (実装集合に `pl61` と `stub89` を両方入れ、件数を 87 / 348 に更新)。`fl_engine.c`・`fl_mock.mjs` は自動 merge で、重複実装は無い。
+- コード差分: `git diff ca8895d6 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節の後続 commit は REPORT のみ)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` real 5.525 s)、`fetch_inputs.sh` (rc 0)、`build_cpython_wasm.sh` (real 4 分 13.061 秒・rc 0)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (real 6.221 s・rc 0)。
+- 測定時の load average (uptime の 1 分値): 2.68。
+
+| 検証 | 結果 | 所要 |
+|---|---|---|
+| `provider/build.sh` | 成功・435 関数・ハンドラ 87 | real 1.590 s |
+| `node tests/playlist_diff.mjs` | calls 42・diffs 0・PASS | 0.046 s |
+| `node tests/provider_check.mjs` | functions 435・implemented 87・unimplemented 348・mcp_static 60・PASS | 0.355 s |
+| `node tests/channels_diff.mjs` | calls 122・diffs 0・PASS (main 取り込みで 15 呼出し増) | 0.052 s |
+| `node tests/mixer_diff.mjs` | calls 48・diffs 0・PASS | 0.051 s |
+| `node tests/device_diff.mjs` | calls 7・rejects 4・midi_out 4・diffs 0・PASS | 0.050 s |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・raised 0・host_calls 37425・callback_roundtrip true | real 2.135 s |
+
 ## 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
