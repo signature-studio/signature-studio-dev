@@ -43,10 +43,10 @@ def main():
         tdrva, cdrva = u32(col + 12), u32(col + 16)
         td = IB + tdrva
         name = cstr(td + 0x10)  # TypeDescriptor: pVFTable(8) spare(8) name[]
-        print('vtable 0x%x  COL=0x%x sig=%d offset=0x%x cdOffset=0x%x' % (vt, col, sig, off, cdoff))
+        cd = IB + cdrva
+        print('vtable 0x%x  COL=0x%x sig=%d offset=0x%x cdOffset=0x%x cd=0x%x' % (vt, col, sig, off, cdoff, cd))
         print('  type = %s' % name)
         # RTTIClassHierarchyDescriptor: signature(+0) attributes(+4) numBaseClasses(+8) pBaseClassArray(+12, RVA)
-        cd = IB + cdrva
         numbase = u32(cd + 8)
         arr = IB + u32(cd + 12)
         for i in range(numbase):
