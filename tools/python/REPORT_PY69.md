@@ -76,7 +76,7 @@
 
 ### 差し戻し round 2 の再実行 (HEAD `0ef43b21`)
 
-- 入力: fl-win64 から `block24429`・`block24430`・`block25159`・`block24618` の 4 block を `tar --zstd -xf` で `FL_WIN64_DIR/extracted` に展開し、`fetch_inputs.sh` で `work/` を作った。`build_cpython_wasm.sh` は 4 分 10 秒 (初回)、`FLPY_SKIP_TABLE=1 build_flpy.sh` は 6.2 秒、`provider/build.sh` は OK (ハンドラ 71)。emsdk は `/opt/emsdk`。
+- 入力: fl-win64 から `block24429`・`block24430`・`block25159`・`block24618` の 4 block を `tar --zstd -xf` で `FL_WIN64_DIR/extracted` に展開し、`fetch_inputs.sh` で `work/` を作った。`build_cpython_wasm.sh` は 4 分 10 秒 (初回)、`FLPY_SKIP_TABLE=1 build_flpy.sh` は 6.2 秒、`provider/build.sh` は OK (ハンドラ 71)。emsdk は [EMSDK] (`toolchain-emsdk`)。
 - `channels_diff`: 69 呼出し、diffs 0、PASS。`provider_check`: functions 435、implemented 71、unimplemented 364、mcp_static 60、PASS。`all_tools`: mock・`FL_ENGINE=wasm` とも 48/48 ok、soft_error 0、raised 0、host_calls 37425、callback_roundtrip true。
 - 差分 0 の証跡: `git diff 96de54b9 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (HEAD `0ef43b21`)。
 - load average: `uptime` 16:18:12 時点で `1.81 / 1.68 / 0.83` (ビルド直後。テスト単体の値は採取していない)。
