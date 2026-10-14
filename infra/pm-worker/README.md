@@ -184,7 +184,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 - **区間**: 止まった時刻を `meta.halt.since` に保存する。止まり続けている間は起点を変えない。全ての条件が無くなると区間を消す (次の停止の起点に使い回さない)。
 - **/status**: `launch_halted` (`{reason, since}`。止まっていなければ `null`) と `launch_halted_overdue` (15 分以上止まり、かつ `ready` と `room` がある間は `true`)。
 - **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 12 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。降格中 (`demoted_reason` がある間) は送らず、区間の 1 回も使わずに保留する (解除の後に送る。降格中の would は 60 分に 1 回まで数える)。
-- **限界**: `digest` の PM run が受け取るのは kind と ref だけで、`/status` は読まない (oc-pm の workflow に `PM_WORKER_URL` は無い)。そのため通知を受けた PM agent は『launch が止まっている』とは分からず、通常の digest の集計をする。停止の理由を通知に載せるには、CI 側 (`.github/scripts/watchdog.sh` が `/status` を読んで障害 issue を起票する経路) への接続が要る。この PR の範囲外 (未解決の表に起票先を書く)。
+- **限界**: `digest` の PM run が Worker から受け取るのは kind と ref だけで、`launch_halted` (停止の理由と時刻) は読まない。そのため通知を受けた PM agent は『launch が止まっている』とは分からず、通常の digest の集計をする。率制限は別で、digest の PM run は緊急の判定に `tools/pm/worker_url` の `/status` を `curl` で読む (`rate_limit_alert`・`rest_remaining`。#2539・`.github/prompts/pm.md` の digest 節)。停止の理由を通知に載せる経路 (`.github/scripts/watchdog.sh` が `/status` を読んで障害 issue を起票する経路への接続) は CI-135 (#2848) の範囲で、この README の範囲外。
 - **変異テスト**: `npm run test:mutation` が、既定値・閾値・区間の起点・解消・重複抑止・降格中の通知 (降格ゲートと保留) の 9 か所を 1 つずつ壊し、テストが落ちることを確かめる (`scripts/mutation_halt.mjs`)。
 
 ## /oc 投稿の観測 (#2342)
