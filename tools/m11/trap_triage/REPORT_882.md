@@ -210,4 +210,4 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 
 - §12 (7 回目の run・HEAD `edef8fa0`): `[m11][p144]` の `p-144=0x9078558948704d89` が `work-m11` 由来 IR の probe ON 2 回で再現。受入条件 2 は部分達成。全文は付録 `REPORT_882_APPENDIX.md` §12。
 - §13 (8 回目の run・測定 commit `b559594b`): `40ffe0` の入口 probe で `arg1=0` (null)・`[0]=0xc343f0` が `40ff70` に渡ることを実測 (HEAD `31bbe1a2` までコード差分 0)。受入条件 2 は部分達成。全文は付録 `REPORT_882_APPENDIX.md` §13。
-- §14 (9 回目の run・測定 commit `a28a8e30`): `60a270` の入口 probe で、`40ffe0` の arg1 (= `60a270` の this) が unit 895 で `0` (null) と実測。受入条件 2 は部分達成。全文は付録 `REPORT_882_APPENDIX.md` §14。
+- §14 (9 回目の run・測定 commit `a28a8e30`): `60a270` の入口 probe で、`40ffe0` の arg1 (= `60a270` の this) が unit 895 で `0` (null) と実測。受入条件 2 は部分達成。競合解消 merge `8963d89b` で 4 build とも再測定し §14.3 と一致 (付録 §14.6)。全文は付録 `REPORT_882_APPENDIX.md` §14。

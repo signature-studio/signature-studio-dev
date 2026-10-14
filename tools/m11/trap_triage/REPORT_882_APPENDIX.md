@@ -132,14 +132,24 @@
 |---|---|---|
 | `60a270` の `this` (= `rcx`) の出所。`60a270` の caller を特定し、その caller の入口 probe で `this` を観測する | 受入条件 2 | #2373 (親 #882) |
 | probe 組み合わせで unit 304・555 の分類が動く (ON で oob→ok)。3 つ全部 ON で OFF と一致する理由 | 計測 hook が分類を変える | #1602 (`[M11-N105]`。採取前後で ok/trap が変わらないことを示す受入条件を持つ) |
-
-### 14.6 現 head での鮮度 (未再測定)
-
-- 測定 commit `a28a8e30` から検証 head `a3a026ae` (main 取り込み merge) までで、測定に使うファイルに差分がある。
-  `git diff a28a8e30 a3a026ae -- tools/m11/m11_rt.c tools/m11/m11_build.sh` の出力は次のとおり (差分 0 ではない)。
-  - `m11_build.sh`: CF に `-DM11_DEST_GUARD=${M11_DEST_GUARD:-0}` を追加。`S_NEG` の stamp に `-guard` の項を追加 (既定 0 では従来と同一の値)。
-  - `m11_rt.c`: `M11_DEST_GUARD` (既定 0) の分岐を追加。既定 0 でも `m11_dest_obs` の読出し位置 (`v` の読出しが `k` の代入の後) が変わる。
-- したがって §14.3 の実測値は `a28a8e30` の build に対する値で、現 head の値ではない。
-- 現 head の再測定 (OFF / `60A270` 単独 / `40FFE0`+`40FF70` / 3 つ全部 ON) は、`work-m11`・`work-liftdiff` が要るため、この fix run では未実施。
-  `$ARTIFACTS_DIR` には `fl-win64` しか無かった。次の review run で `oc_artifacts: fl-win64 work-m11 work-liftdiff` により再測定する。
 | `functions_dll.csv` 素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM agent の判断待ち: `functions_dll.csv` を素材に含めるか。既定案: 含めず、`m11_e2e.sh` 全体は未実行のまま |
+
+### 14.6 現 head での再測定 (競合解消 merge `8963d89b`)
+
+- 測定 commit: `8963d89b` (`origin/main` `fec12353` を取り込む merge。コードを変えた最後の commit)。競合は `tools/m11/m11_build.sh` の `CF=` 行 1 か所のみで、main の `-DM11_INSTR_40F960` (#1317) と本 PR の `-DM11_INSTR_60A270` (#882) を両方残して解消した。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下に展開。`/opt/emsdk` は無かったため emsdk 6.0.12 を `emsdk install 6.0.12` で入れた。`llvm-nm` が PATH に無かったため emsdk 同梱の `llvm-nm` を PATH に通した。
+- `m11_gen_ir2.sh` rc=0 (29.7 s、`ldfix` errors=0)。`m11_build.sh` は 4 build とも rc=0 (15〜16 s、`wasm-ld signature mismatch: 0`)。`survey_units.mjs` (`SV_RAW=1`) は 4 回とも rc=0 (6.3〜6.6 s)。load average (1 分) は 0.72〜1.21。
+- 前回の測定 commit `a28a8e30` から測定 commit までの差: `git diff --numstat a28a8e30 8963d89b -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py` は `m11_build.sh` +4/-2・`m11_ov.c` +16/-0・`m11_rt.c` +13/-1 (`m11_post.py` は差分なし)。内容は次のとおりで、いずれも既定 0 では build 出力を変えない。
+  - `m11_build.sh`: CF に `-DM11_DEST_GUARD` (#1547)・`-DM11_INSTR_40F960` (#1317) を追加。`S_NEG` の stamp に `-guard` の項を追加。`ov_instr_40f960.stamp` を追加。
+  - `m11_ov.c`: `M11_INSTR_40F960` (既定 0) の計測分岐のみ。
+  - `m11_rt.c`: `M11_DEST_GUARD` (既定 0) の分岐を追加。既定 0 でも `m11_dest_obs` の `v` の読出し位置が変わる。
+
+| build (probe) | survey 集計 | unit 895 の観測 (`err` 先頭 3 行) | 895 以外の kind 差 (OFF 比) |
+|---|---|---|---|
+| OFF (既定 0) | `ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1` | `Runtime error 210 at 0000000010251450` のみ | — |
+| `60A270` 単独 | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` | `[m11][a270] #1 this=0x0 [this]=0xc343f0 [this+a9]=0` (#2・#3 も同じ) | unit 304・555 が oob→ok |
+| `40FFE0`+`40FF70` | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` | `[m11][ffe0] #1 arg1=0x0 v=[arg1]=0xc343f0 p-144=0x9078558948704d89`、`[m11][p144] #1 arg1=0xc343f0 p-144=0x9078558948704d89 word[head]=0` | unit 304・555 が oob→ok |
+| 3 つ全部 ON | `ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1` | `[m11][a270]` の 3 行 (上と同じ値) | なし |
+
+- 4 行とも §14.3 (測定 commit `a28a8e30`) と集計・unit 895 の値が一致した。現 head でも `60a270` の `this = 0` (null)、`[this] = 0xc343f0` で、受入条件 2 (部分達成) の結論は変わらない。
+- 測定 commit `8963d89b` から本 REPORT を含む commit までのコード差分: `git diff 8963d89b HEAD -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py` は 0 (docs のみ)。
