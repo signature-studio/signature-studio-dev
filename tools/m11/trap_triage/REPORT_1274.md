@@ -185,7 +185,7 @@ index 39480f0a..5a9c1929 100644
 
 - 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11 を展開 (`work-m11` は `tools/m11/work/` を内包するため、展開先は `tools/m11/` 直下)。IR `m11_gen_ir2.sh` rc=0 (51.4 s、ldfix=applied、F1=902、errors=0)。
 - 切り分け変更: `m11_ov.c` の `m11_vcall` に `M11_NOVCALL` (既定 0) を入れ、1 のとき ICALL_AT を呼ばず `self` を返す。`m11_build.sh` の CF に `-DM11_NOVCALL=${M11_NOVCALL:-0}` を追加。既定 0 では出力は変わらない。
-- **注意 (キャッシュ)**: `ov.o` は `work/ov_*.stamp` で一部の macro だけ無効化される。`M11_NOVCALL` は stamp の対象外のため、最初の測定 (`ov.o` 再利用) は `M11_NOVCALL=1` が効いていなかった (869/15 は stale)。`rm -f work/obj/ov.o` の後に測り直した値のみ採る。
+- **注意 (キャッシュ)**: `ov.o` は `work/ov_*.stamp` で一部の macro だけ無効化される。`M11_NOVCALL` は stamp の対象外のため、最初の測定 (`ov.o` 再利用) は `M11_NOVCALL=1` が効いていなかった可能性がある (869/15 は stale の疑い、未確定)。`rm -f work/obj/ov.o` の後に測り直した値のみ採る。
 - 測定 (全 942 unit、`SV_RAW=1`、各 build は `ov.o` を作り直した後):
 
 | build | ok / oob / abort / halt0 | unit 190 |
@@ -195,7 +195,7 @@ index 39480f0a..5a9c1929 100644
 | ON + `M11_NOVCALL=1` (410360 の vcall 経路を外す) | 869 / 15 / 2 / 6 | oob |
 
 - `survey_diff.py` OFF→ON: ok 退行 unit は **190 の 1 件** (ok→oob)。kind 変化は 190 (ok→oob)・304・555 (oob→abort, #1275)。
-- `survey_diff.py` ON→ON+NOVCALL: 変化は unit 314 の halt0→oob の 1 件のみ (kind 変化、ok 退行なし)。unit 190 は oob のまま。ok 退行は 0。
+- `survey_diff.py` ON→ON+NOVCALL: 変化は unit 314 の halt0→oob の 1 件のみ (kind 変化、ok 退行なし)。unit 190 は oob のまま。ok 退行は 0。 (注: 本行の NOVCALL 合計は 941 で不完全。§5g 参照。unit 314 は未再確認)
 - 読み: 410360 の vcall 経路 (`site 0x41037d`) を外しても unit 190 の oob は消えない。unit 190 の trap は 410360 を経由しない (§3 と一致)。受入条件 1 の「原因の特定」は依然未達。
 - 注意 (§5d の再検討): §5d の「9b4b00 の書込みを 1 文ずつ外す (8 通り)」「table 差し替えを外す」の測定は `define` の差し替えで、`ov.o` の stamp 対象外。stale な `ov.o` が使われていた可能性があり、§5d の「ON-only 差分は説明できない」は未確認に格下げする。再測定は未実施 (次手)。
 - 未達 (受入条件): 1 (unit 190 の `[arg-8]` 参照先の変化の特定)・2 (DEFECTS 類型への分類)・3 (ON の ok 退行 0 の unit 単位確認: 190 が残る)。起票先: #1642。
@@ -207,3 +207,22 @@ index 39480f0a..5a9c1929 100644
 参考 (測定 commit 外): `7e665077` から `91655f69` までの main 取り込み由来の `tools/m11` 差分は 4 files (48 insertions, 3 deletions)。内訳は §5e の diff (`m11_build.sh` の 2 分岐、`probe_entry.sh` の `M11_KEEP_BOOT_O=1` 1 行) と ldfix の results (jsonl・tsv、data)。
 - `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。
 - `find tools/m11/trap_triage -type f -size +20M`: 0 件 (20MiB 超の blob なし)。
+
+## 5g. ov.o 再作成後の NOVCALL 再測定 (測定 commit `5229fe5f` = origin/main、#1642)
+
+- 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11 を展開 (`work-m11` の展開先は `tools/m11/` 直下)。`m11_gen_ir2.sh` rc=0 (51 s、F1=902、errors=0)。
+- 各 build の前に `work/obj/ov.o` を消してから作り直した (§5f の stale 疑いへの対処)。全 942 unit の survey は各 13〜14 s。
+
+| build | ok / oob / abort / halt0 | unit 190 |
+|---|---|---|
+| ON (`M11_OV_CLASSCREATE=1`) | 869 / 15 / 2 / 7 | oob |
+| OFF (`M11_OV_CLASSCREATE=0`) | 870 / 16 / 0 / 7 | ok |
+| ON + `M11_NOVCALL=1` (ov.o 作り直し) | 869 / 16 / 2 / 6 | oob |
+
+- `survey_diff.py` OFF→ON: ok 退行 unit は **190 の 1 件** (ok→oob)。§5f の結果と一致。
+- `survey_diff.py` ON→ON+NOVCALL: ok 退行 0。変化は halt0→oob の 1 件のみ (halt0 7→6、oob 15→16 と整合)。unit 190 は oob のまま。**この 1 件の unit 番号は本 run の出力に保存していなかったため、特定できていない** (§5f の unit 314 は未確認)。
+- 同一構成の値の食い違い: §5f の ON+NOVCALL 行 (869/15/2/6) は ok+oob+abort+halt0 の合計が 892 で、miss 47・other 1・noproc 1 を足すと 941 となり、全 942 unit と一致しない。§5g の同行 (869/16/2/6) は ok〜halt0 の合計 893 に miss 47・other 1・noproc 1 を足すと 942 となり、全 unit と一致する。§5f の NOVCALL 行は survey が欠けた状態の値である可能性が高いが、原因は未特定。
+- 断定の撤回: 前版の「§5f の 869/15 は stale な ov.o によるものだった」は根拠が無いため撤回する。本 run で ov.o を作り直したのは §5g の 3 build のみ。
+- 結論の範囲: 作り直した単発の NOVCALL (869/16/2/6) では unit 190 が oob のまま。ここから言えるのは「vcall 経路を外しても 190 の oob は消えなかった (1 回・未再現)」まで。410360 の vcall 経路が原因でないとは断定しない。NOVCALL は未再現のため、再測定が必要。
+- 未確定: §5d の `9b4b00` 書込みマスク測定は define 差し替えで、ov.o の stamp 対象外のため、stale の可能性が残る。再測定は未実施 (次 run: `m11_ov.c` の書込みマスクを `ov.o` 作り直しで測る)。
+- 未達 (受入条件): 1 (ON で 1 ノードずれる書込元の特定)・2 (DEFECTS 類型への分類)・3 (ON の ok 退行 0 の unit 単位確認: 190 が残る)。起票先: #1642。
