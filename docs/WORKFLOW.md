@@ -66,7 +66,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 | 役割 | 着手時 | 完了時 | 禁止 |
 |---|---|---|---|
 | 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更・**自分の PR の merge (Auto Merge を含む)** |
-| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
+| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント → **approve と同じ run で merge** (§11) / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
 | PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | 方針変更・是正 (merge は検収が行う。PM は contents 権限を持たず merge しない) | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない

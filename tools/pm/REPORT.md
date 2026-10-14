@@ -221,3 +221,10 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | 純関数: 30 分の streak・観測の空きをまたがない・観測の保持 | 「saturatedRunning」「nextCap / capValue」「観測の保持」 |
 
 review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
+
+## 16. 実装 App の自己 merge の実測 (#2600・PR #2624)
+
+- **測定** (別 subagent の実測。取得時刻・クエリは #2600 本文に記録が無い。PR #2624 の作成者は再測定していない): 直近 24 時間の merged PR 986 件のうち約 119 件 (12%、95% CI 83〜157) が、merged_by = 実装 App (`opencode-for-signature-studio[bot]`) の自己 merge だった。PR 作成の 6〜45 秒後に merge され、merge 前の review は 0 件 (確認できた 19/19)。確認できた 8 件は全てコードを含み、`.github/scripts` と `infra/pm-worker` を含む。
+- **原因**: `.github/prompts/implementer.md` 規範 9 が `gh pr merge --auto --merge` を指示していた (`8e4b343d`、2026-10-12 追加)。main に承認必須の Ruleset が無く (`branches/main/protection` は 404、ruleset 24866584 に `pull_request` ルールは無い)、`allow_auto_merge: true` のため Auto Merge は即時 merge になった。
+- **対応**: 規範 9 から Auto Merge の指示を消し、実装者の merge を禁止した。merge は approve した reviewer が同じ run で行う (PR #2624)。
+- **未検証**: 承認の無い PR への auto-merge の挙動 (REST に有効化 API が無く GraphQL が要る)。Ruleset 未適用の下での技術的な防止 (PR #2624 の未解決表)。
