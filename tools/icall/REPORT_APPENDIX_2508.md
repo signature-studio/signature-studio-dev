@@ -9,7 +9,7 @@
 - 同じ修正で、素通しの関数 8 件が「不一致」から「一致」に変わった (§3.4)。fixed route の `fa_sweep` (131 関数・HEAD で再実行) は **値の不一致 11 → 3、bit 一致 46 → 54** (旧 harness → 新 harness)。PR 初版の bit 一致 55 は HEAD の再実行で再現せず、差は `0x1803dee20` の 1 件 (§3.5)。
 - **0x180da6e60 の候補 10 件は部分分類**。route が使う IR (`after.0.restored.ll`) に store が無いのは 8 件。うち 2 件はこの関数内に読みが無く (無害とは断定しない)、6 件は仮想 call に渡す構造体の内部または cookie 検査の入力で、読み先・値の出所が静的に確定せず「誤り疑い」のまま。残り 2 件は route IR に store があり、before IR との比較による誤検出 (§4)。
 - 受入 4 (16B 結合 merge 規則の検証) は本 PR で完了 (§8)。merge 規則が成立するのは 0x181057b38 の 2 組だけで、0x180da6e60 は 3 条件のいずれかが欠けて不成立。
-- 残件は子 issue に移した (§6)。受入 3 は #2675 (ICALL-80) で解決済み (`REPORT_APPENDIX_2675.md`)。0x180da6e60 の誤り疑い 6 件と 0x1803dee20 → #2695 (ICALL-81)。0x180da4030 の脱落修復 → #2708 (ICALL-83)。0x180da4030 と 0x18105d9fc の xmm0 の説明 → #2674 (ICALL-79)。
+- 残件は子 issue に移した (§6)。受入 3 は #2675 (ICALL-80) で解決済み (`REPORT_APPENDIX_2675.md`)。0x180da6e60 の誤り疑い 6 件と 0x1803dee20 → #2695 (ICALL-81)。0x180da4030 の脱落修復 → #2708 (ICALL-83)。0x180da4030 と 0x18105d9fc の xmm0 の説明 → 解決済み (`REPORT_APPENDIX_2674.md` §1)。
 
 ## 2. 測定条件
 
@@ -54,6 +54,8 @@ dsm の連続領域を capstone で decode し、xmm0 を書く命令と call �
 - **lift 側の残論点 (未解決・§6)**: lift の ABI 仮想化は関数 entry で `BLK+0x88 := BLK+0x28` を行わない。xmm0 を素通しする関数を nested に呼び、直後に xmm0 を読む caller で同じ不一致が出るかは未確認。Win64 ABI では void 関数の xmm0 は戻り値ではないため、実害の有無は未確定。
 
 ### 3.4 sweep への影響 (fixed route・同一 commit で再測定)
+
+> 注: この節の fa_sweep 数値 (54/66/8/3 など) は測定時の tree (`05194cdc`・HEAD `50112f92`) の値。その後 main で `tools/icall/ir_fix_vstore.py` (`fa_route_build.sh` が呼ぶ) と `tools/icall/diff/fa_cmp.py` (#2674) が変わったため、現在の tree で引用するには再測定が要る。
 
 | 関数 | 旧 harness (3dbb35e の `fa_cmp.py`) | 新 harness (`0d29b5f4`) | native の先頭出力 |
 |---|---|---|---|
@@ -120,7 +122,7 @@ bash tools/ott/native/build.sh                                    # fa_cmp / fa_
 export FA_CORE="$PWD/tools/icall/work/rt_freshair-core/rw.dll"   # plugins-freshair が無いときの代替
 FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh               # fixed route (base は FA_FRAME_SLOT を付けない)
 python3 tools/icall/diff/fa_cmp.py 181057b38 --n 8               # 期待: match 8 / mismatch 0
-bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                 # 期待 (fixed・HEAD 50112f92 で実測): bit一致 54 / 66 / 8 / 3
+bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                 # 期待 (fixed・HEAD 50112f92 で実測。測定時の tree の値・§3.4 の注): bit一致 54 / 66 / 8 / 3
 python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core/after.0.restored.ll \
   --dsm tools/icall/work/rt_freshair-core/before.0.drc.dsm --before-ll tools/icall/work/rt_freshair-core/before.0.drc.ll \
   --ranges tools/icall/work/rt_freshair-core/F.ranges --out tools/icall/work/fa_exp/x.ll --report tools/icall/work/fa_exp/x.json   # 候補 12 件 (0x180da6e60 の 10 件 + 0x181057b38 の 2 件)
@@ -128,16 +130,16 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 
 ## 6. 未解決 (起票先)
 
-> 起票先 (現在の issue 本文に合わせた): 受入 3 は #2675 (ICALL-80) で解決済み。0x180da6e60 の誤り疑い 6 件と 0x1803dee20 → #2695 (ICALL-81)。0x180da4030 の脱落修復 → #2708 (ICALL-83)。0x180da4030 と 0x18105d9fc の xmm0 の説明 → #2674 (ICALL-79)。受入 4 は §8 で解決。PM 判断 (コメント 6174007294) のとおり、lift ABI の仮想化は起票せず本付録に「未確認」として残す (未起票)。候補検出の基準は変えず before IR 基準を維持する (誤検出は §4.2 に残す)。`docs/DEFECTS.md` への追記は本 PR では編集しない (未起票・`docs/WORKFLOW.md` §5)。
+> 起票先 (現在の issue 本文に合わせた): 受入 3 は #2675 (ICALL-80) で解決済み。0x180da6e60 の誤り疑い 6 件と 0x1803dee20 → #2695 (ICALL-81)。0x180da4030 の脱落修復 → #2708 (ICALL-83)。0x180da4030 と 0x18105d9fc の xmm0 の説明 → 解決済み (`REPORT_APPENDIX_2674.md` §1)。受入 4 は §8 で解決。PM 判断 (コメント 6174007294) のとおり、lift ABI の仮想化は起票せず本付録に「未確認」として残す (未起票)。候補検出の基準は変えず before IR 基準を維持する (誤検出は §4.2 に残す)。`docs/DEFECTS.md` への追記は本 PR では編集しない (未起票・`docs/WORKFLOW.md` §5)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 受入 3: `SlateCore.core_64` の `0x181057b38`–`0x181057c05` (205 B) の sha256 照合 | 解決済み。`rw.dll` の同 VA と一致 (`REPORT_APPENDIX_2675.md` §1) | 解決済み (#2675・`REPORT_APPENDIX_2675.md`) |
 | 0x180da6e60 の「誤り疑い」6 件 (§4.2 の 1・2・6・7・9・10) と 0x1803dee20 の値の不一致 | 仮想 callee の読み先と cookie 検査の入力の出所が未確定。native は起動時 SIGSEGV | #2695 (ICALL-81) |
 | lift の ABI 仮想化: 関数 entry で `BLK+0x88 := BLK+0x28` が無い (xmm0 素通しの nested 呼出し) | nested 呼出し後に xmm0 を読む caller で不一致の可能性。未確認 | 未起票 (PM 判断: 起票しない。本付録に「未確認」として残す) |
-| `0x180da4030` の native 0 / wasm 入力 (xmm0 の差。連続命令に書込み無し) | closure 内の 1 関数で silent 差分の可能性。説明 (xmm0 の出所) は #2674、脱落修復 (dsm の data 区分に入っている実コード 0x180da4081–0x180da4176) は #2708 | #2674 (ICALL-79) (説明)・#2708 (ICALL-83) (修復) |
+| `0x180da4030` の native 0 / wasm 入力 (xmm0 の差。連続命令に書込み無し) | closure 内の 1 関数で silent 差分の可能性。説明 (xmm0 の出所) は解決済み。脱落修復 (dsm の data 区分に入っている実コード 0x180da4081–0x180da4176) は未修復 | 解決済み (`REPORT_APPENDIX_2674.md` §1) (説明)・#2708 (ICALL-83) (修復) |
 | `0x1803dee20` の native 0 / wasm 入力 (ctor。戻り値は rax、xmm0 は callee の残留値。旧 harness でも不一致) | 値の不一致 1 件。seed 修正とは無関係。深い連鎖 (`0x18100be74` → `0x1810553d0` 付近) は未追跡 | #2695 (ICALL-81) |
-| `0x18105d9fc` の xmm0 がヒープポインタ (native と wasm でアドレスが違う) | 比較オラクルの問題。関数の値の正しさは未判定 | #2674 (ICALL-79) |
+| `0x18105d9fc` の xmm0 がヒープポインタ (native と wasm でアドレスが違う) | 比較オラクルの問題は `fa_cmp.py` の PTR 正規化で解決 (0/8 → 8/8) | 解決済み (`REPORT_APPENDIX_2674.md` §1) |
 | 候補検出の基準を route IR (after) にする | 誤検出 2/10 (本件) | 未起票 (PM 判断: 変えない。before IR 基準を維持し、誤検出は §4.2 に残す) |
 | `fa_sweep` の揺れ: PR 初版の fixed 55/66/8/2 が HEAD の再実行 (2 回) で 54/66/8/3 に変わった (差は `0x1803dee20` の 1 件・§3.5)。旧 46/66/9/9 とも違う | 原因未特定。1 関数分の揺れとして追記済み | #2302 (追記済み: [コメント](https://github.com/signature-studio/signature-studio-dev/issues/2302#issuecomment-6172956250)) |
 | `docs/DEFECTS.md` への新類型 (passthrough の出力スロット未初期化) の追記 | 横断正本への反映 | 未起票 (PM 判断: 本 PR では編集しない。`docs/WORKFLOW.md` §5) |
@@ -150,7 +152,7 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 
 ## 8. 受入 4: 16B 結合 merge 規則の検証 (本 PR)
 
-> 測定 commit: `d35279ab` (`origin/main`)。本 PR はコードを変えず、付録だけを足す。§8 の実行経路 (`tools/icall/frame_slot_restore.py`・`frame_slot_probe.py`・`fa_route_build.sh`・`diff/fa_cmp.py`・`diff/fa_sweep.sh`・`tools/m11/m11_simd2.py`・`msimd11_core.h`) の `git diff d35279ab HEAD` は 0 行。`05194cdc..d35279ab` では `tools/m11/shimx_link/` の 4 ファイルだけが変わっており、fa route が使う `tools/m11/m11_simd2.py`・`msimd11_core.h` は変わっていない。main 取り込み (`027a0961`) で測定経路の外の 6 files が変わった (`git diff --stat d35279ab HEAD -- tools/icall tools/ott tools/m2 tools/m5 tools/m11 tools/targets/freshair tools/liftlib ':!tools/icall/REPORT_APPENDIX_2508.md'` = 6 files・337 insertions・1 deletion。内訳は新規 5 files (`REPORT_APPENDIX_2675.md`・`diff/fa_va_sha.py`・`m11/ldfix/REPORT_1161.md`・`m11/trap_triage/REPORT_1620.md`・`m11/trap_triage/trap_w1620.py`) と、`m11/ldfix/spill_classify_1161.py` の docstring 1 行)。この 6 files は §8 の実行経路の外。
+> 測定 commit: `d35279ab` (`origin/main`)。本 PR はコードを変えず、付録だけを足す。§8.4 が import・実行する `tools/icall/frame_slot_restore.py`・`frame_slot_probe.py` の `git diff d35279ab HEAD` は 0 行 (§8 の実行経路はこの 2 files に絞る。`fa_route_build.sh`・`diff/fa_cmp.py`・`diff/fa_sweep.sh` は §8.4 の手順では実行しない)。`05194cdc..d35279ab` では `tools/m11/shimx_link/` の 4 ファイルだけが変わっており、fa route が使う `tools/m11/m11_simd2.py`・`msimd11_core.h` は変わっていない。main 取り込み (`5d4fc937`・`origin/main` `363c39ed`) 後の測定経路の差分は `git diff --stat d35279ab HEAD -- tools/icall tools/ott tools/m2 tools/m5 tools/m11 tools/targets/freshair tools/liftlib ':!tools/icall/REPORT_APPENDIX_2508.md'` = 41 files・2317 insertions・31 deletions。`tools/icall/diff/fa_cmp.py` (13 行・#2674 の PTR 正規化) と `tools/icall/ir_fix_vstore.py` (26 行) などを含み、いずれも §8.4 の実行経路の外。
 
 ### 8.1 結論
 
@@ -218,4 +220,4 @@ for va in ['0x180da6e60', '0x181057b38']:
 PY
 ```
 
-期待値 (実データ・`F.ranges` 131 関数): `changed: ['0x181057b38'] of 131`。(1)(2)(3) は §8.2 の表と一致する。`0x181057b38` の 2 候補は (1) が解決、(2) が True、(3) が True。`0x180da6e60` の 10 候補は (1) がすべて None。(2) が True になるのは No 2・6・9 (X = −49・−33・−9、E = −57・−41・−17) の 3 件だけで、その 3 件の (3) は False。(2) は `scan` の `escaped` (= lea の disp − 8) との比較で、`E in escaped` ⇔ X が lea の disp と一致する。`0x180da6e60` の lea の disp は −0x31 (−49)・−0x21 (−33)・−9・+0x1f (31、`0x180da7111`) で、+0x1f に対応する候補は無い。ネガティブコントロール (NC): `0x181057b38` の E = −24・−48 の alloca を 1 件ずつ外すと、`merged` からその組が消え `created` に X (−16・−40) が入る。実測済み (本 PR の再検証・素材 `work-icall` の `rt_freshair-core/` のみ展開・`tools/icall` は `d35279ab` と同一コード): `changed: ['0x181057b38'] of 131`、候補 12・復元 2。(1)(2)(3) は上の期待値と一致。NC は E = −24 を外すと merged `[[-48,-40]]`・created `[-16]`、E = −48 を外すと merged `[[-24,-16]]`・created `[-40]` (コードの分岐からの予測どおり)。
+期待値 (実データ・`F.ranges` 131 関数): `changed: ['0x181057b38'] of 131`。(1)(2)(3) は §8.2 の表と一致する。`0x181057b38` の 2 候補は (1) が解決、(2) が True、(3) が True。`0x180da6e60` の 10 候補は (1) がすべて None。(2) が True になるのは No 2・6・9 (X = −49・−33・−9、E = −57・−41・−17) の 3 件だけで、その 3 件の (3) は False。(2) は `scan` の `escaped` (= lea の disp − 8) との比較で、`E in escaped` ⇔ X が lea の disp と一致する。`0x180da6e60` の lea の disp は −0x31 (−49)・−0x21 (−33)・−9・+0x1f (31、`0x180da7111`) で、+0x1f に対応する候補は無い。ネガティブコントロール (NC): `0x181057b38` の E = −24・−48 の alloca を 1 件ずつ外すと、`merged` からその組が消え `created` に X (−16・−40) が入る。実測済み (HEAD `5d4fc937`・`git archive` で一時ディレクトリに取り出した `tools/icall`・素材 `work-icall` の `rt_freshair-core/` のみ展開。§8.4 が使う `frame_slot_restore.py`・`frame_slot_probe.py` は `d35279ab` と同一): `changed: ['0x181057b38'] of 131`、候補 12・復元 2。(1)(2)(3) は上の期待値と一致。NC は E = −24 を外すと merged `[[-48,-40]]`・created `[-16]`、E = −48 を外すと merged `[[-24,-16]]`・created `[-40]` (コードの分岐からの予測どおり)。
