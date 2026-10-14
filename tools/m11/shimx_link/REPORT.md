@@ -220,3 +220,8 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 **結論**: 閉包リンクは現 main で再びリンクできる (修正前は exit 1)。ただし現 IR の boot は unit 17 で `rc=1` により停止し、FL の自然経路で LoadLibrary が 1 回も呼ばれない。`winstubs_loadlib_miss` の lift 実機取得 (受入) は未達。`LOADLIB_MISS ["WebView2Loader.dll"]` は引き続き probe 由来。
 
 **差分確認 (測定 commit から HEAD まで・コード範囲)**: `git diff e7491b4f HEAD -- tools/m11/shimx_link/build.sh tools/m11/shimx_link/*.c tools/m11/shimx_link/*.py` の出力は 0 行 (本節は REPORT のみ変更)。
+
+## 11. 旧 main の link 失敗の修正と `--midi` の winstubs 結線 (#179 SHX-T6)
+
+- 結論: 旧 main (`46c92356`) で実測した 4 variant (既定・`--ws`・`--midi`・`--ws --midi`) は全て `undefined exported symbol: "_sxt_count"` で rc 1 だった。`sxt_*` を `--trace` 限定にする修正は #2732 (`e7491b4f`、§10.3) で main に入り済み。`--midi` の e2e と `--ws --midi` の boot 基準は測定 commit `397c4161` で確認 (`midi_e2e.mjs` 3/3 PASS、`ws_e2e.mjs` PASS 19 / BOOT init 18 / units 17/942)。
+- 修正前後の表・e2e 実測・起動 KPI・残件: `tools/m11/shimx_link/REPORT_APPENDIX_179.md` (§11.1〜§11.4)。

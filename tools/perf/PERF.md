@@ -21,7 +21,7 @@
    FLEngine 規模相当 (K=10: 32MiB/89,360 関数) で **96 ms (stream) / 43 ms (bytes)**、300MiB/893,600 関数でも 0.4〜0.6 s。
    eager (`--no-wasm-lazy-compilation`) は K=10 で 0.9 s・K=30 で 2.4〜4.1 s、**TurboFan 全量は K=10 で 10.7 s / 24 CPU 秒**。
 5. **起動時間を支配するのは転送** (K=10 を 100 Mbps で 2.8 s; compile は stream で隠れる)。brotli-11 で実 wasm は **31%**。
-6. **AudioWorklet には `WebAssembly.Module` を postMessage できない** (`messageerror`)。bytes を transfer して worklet 内で compile。
+6. **AudioWorklet への `WebAssembly.Module` の postMessage は Chrome 154 で受信できない** (`messageerror`)。版・ブラウザで異なり、Firefox 157 は受信 OK、Chrome 155 の再実行も受信 OK (`tools/perf/REPORT_P7.md` §7)。bytes を transfer して worklet 内で compile (採用方式)。
    同一プロセス内 NativeModule キャッシュが効き、main で eager compile 済みなら worklet の compile は **481→33 ms**。
 7. **IndexedDB に Module は保存不可** (`DataCloneError`)。bytes は IDB/Cache API に保存可。Chrome 自動 wasm code cache は
    headless では観測できず (4 ロード + 2.5s idle で `Code Cache/wasm` エントリ 0)。lazy 既定なので必須ではない。
@@ -96,7 +96,7 @@ inline 閾値超過)。**提言: lift pass で `__asm_*` を直接 LLVM vector I
 |---|---|
 | IndexedDB に `WebAssembly.Module` | **不可** (`DataCloneError: A WebAssembly.Module can not be serialized for storage`) |
 | `structuredClone` / postMessage → Worker | 可 (12.9〜14 ms) |
-| postMessage → **AudioWorklet** | **不可** (`messageerror`)。bytes transfer → worklet 内 `WebAssembly.compile` は可 (OTT 1 ms / K400 38 ms) |
+| postMessage → **AudioWorklet** | **Chrome 154 では不可** (`messageerror`)。Firefox 157 では受信 OK (版・ブラウザ別。`REPORT_P7.md` §7)。bytes transfer → worklet 内 `WebAssembly.compile` は可 (OTT 1 ms / K400 38 ms) |
 | 同一プロセス NativeModule 共有 | main で eager compile (481 ms) → worklet の同一 bytes compile **33 ms**。main の Module を生存させる |
 | bytes を IDB 保存 | 32MiB: put 174 ms / get 72 ms / 再 compile (lazy) 54 ms |
 | Cache API (`Cache.put` → `match` → `compileStreaming`) | 可。32MiB で 71〜94 ms。エントリ = wasm bytes のみ (code 側ストリーム無し) |
