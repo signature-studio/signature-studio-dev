@@ -175,3 +175,55 @@ index ab3ba4c0..4a9d4642 100644
 - step 0 で全バッファ一致しているため、step 1 で初めて現れる入力 (step 0 の出力で更新された状態、もしくは `ott_run` の引数 ABI) が疑わしい。`ms_ctx` は native 側で毎回 `memset` されており、状態の持ち越しは native に無い。wasm 側の持ち越しは未確認。
 
 判定: 受入 1・2 は引き続き未達。受入 3 (再現 1 本) は build + run で実行まで通ることを確認済み。
+
+## movups 欠落の修復と comis 入力の採取 (2026-10-14 17:23〜17:40 UTC)
+
+測定 commit: `8d26ce7c` (`tools/icall/ir_fix_vstore.py`・`kh_route_build.sh`・`tests/test_icall.py` を変えた最後の commit)。`8d26ce7c..HEAD` のコード差分は本節の文言のみ (下記 `git diff`)。
+
+素材: `plugins-kilohearts` → Installer zip → payload.dat → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B) を `tools/icall/work/kh_pe/` に配置。`work-icall` / `work-liftlib` は main checkout の `work/` を symlink で参照。
+
+| 項目 | 実測 (commit `8d26ce7c`) |
+|---|---|
+| `kh_route_build.sh` | rc 0 / real 40.8 s / `kh_route.wasm` 50,774,295 B |
+| `kh_route_run.sh` | rc 0 / real 0.195 s / scenarios 61 / steps 366 / wasm_trap 0 |
+| bit 一致 | 61/366 (直前 HEAD と同値) |
+| 不一致バッファ (step 数) | self 305・P 293・L 291・R 290 (直前 HEAD と同値) |
+| `fix_vstore` | fixed 1 / **direct 63** / unresolved 20 (直前: fixed 1 / unresolved 83) |
+
+### 1. 欠落していた store (修復済み・差分の原因の一部)
+
+kh_gain 本体 `0x1804b03d1` の `movups [self+104], xmm` は、RetDec が `%50 = load [%49]` と `call void @__asm_movups(i128 %50, i128 %47)` に落とし、no-op helper のまま残っていた (`%49 = inttoptr (%0+104)`・`%0` = self)。`ir_fix_vstore.py` は宛先が alloca でないため unresolved とし、16 バイト store が wasm から消えていた。
+
+`--direct` (既定 off・kh 経路のみ on) で、宛先 `%P` の load と helper 呼出しの 2 箇所しか使われないものを `store i128 %S, i128* %P` に置換する (63 件)。既定 off の出力は、kh 経路の入力 IR で旧版と完全一致 (`cmp` 0 差分)。OTT/FA 経路 (`ott_route.sh`・`fa_route_build.sh`) は既定 off のため変化しない。
+
+修復後も bit 一致件数は変わらない (61/366)。この store だけでは step 1 の差分は説明できない。
+
+### 2. 分岐条件の入力 (debug build で採取・リポジトリには含めない)
+
+`0x1804b03d1` の直前の分岐は `ucomisd(a, 1e-15)` の CF で決まる (`a = |xmm0 − self[+112]|`、`CF=1` で store 経路)。debug 版 (`__icall_comis` に fprintf を入れた一時ビルド、scenario 0 のみ) で採取した値:
+
+| step | comis: a (BLK+0xA0) | b (BLK+0xA8) | fl (BLK+0xB0) | comis 時の self+112 | native の直前 step 後の self+112 |
+|---|---|---|---|---|---|
+| 1 | 0 | 1e-15 | 1 (CF=1) | 1.0 | 1.0 (step 0 後) |
+| 2 | 0 | 1e-15 | 1 | 0.5 | 0.5 (step 1 後) |
+| 3 | 0 | 1e-15 | 1 | 0.5 | 0.5 (step 2 後) |
+| 4 | 0 | 1e-15 | 1 | 2.5 | 2.5 (step 3 後) |
+| 5 | 0 | 1e-15 | 1 | 3.0 | 3.0 (step 4 後) |
+
+(step 0 では comis は呼ばれない。)`self+112` の入力値は native と一致する。一方、`a = 0` は xmm0 ローカル (`%xmm0.0.reload`) が 1.0 であることを意味する。`%xmm0.0.reload` の出所は IR 上 `%14 = load [ctx+12680]` (P のポインタ) → `movss [%14+4]` の経路が候補だが、**未検証**。native 側の `a` と xmm0 ローカルの値は未取得。
+
+### 3. 未解決 (起票先: #1025 本体)
+
+- step 1 の `self+104` 最終値は native `0x3c800000` (0.015625)・wasm `0`。`shufps(movq(xmm0), 2)` の lane 0 は定義上 0 なので、この値は修復した store ではなく、後続の別 store か別経路で書かれる。未特定。
+- native 側の comis 入力 (`a`・xmm0 ローカル) が wasm と一致するかは未確認。native の trace が無いため (`native_runner` は ll_ms_call 内部を見られない)。
+- 残 unresolved 20 件は `__asm_vmovdqa.25` 系 (i256)。fail-fast stub で、本 run の trap 0 から実行されていないと見てよい (間接確認)。
+
+### 次の入口
+
+1. wasm 側で `self+104`〜`self+119` への書込みを全て log する debug 版を作り、step 1 の最後の書込みを特定する (`!insn.addr` で IR に対応付ける)。
+2. native 側は gdb (`ll_ms_call` の直後で `self+104` の watchpoint) で同じ書込みを取り、値と命令を照合する。gdb が無ければ native_runner に一時 trace を入れる。
+3. 上 2 点が揃った後に、`xmm0.0.reload` の出所 (`ctx+12680` → P) の値を native と比較する。
+
+### 判定
+
+受入 1・2 は引き続き未達。受入 3 (再現 1 本) は build + run まで実行できることを再確認 (上表)。
