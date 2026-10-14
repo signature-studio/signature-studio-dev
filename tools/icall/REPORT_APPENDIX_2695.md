@@ -177,3 +177,62 @@ bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 9V45: bit�
 | 0x1803dee20: native の既定出力が測定環境で異なる (9V45 は入力素通し、7763・9V74 は `0000…`)。原因は未検証 (CPU・glibc・ASLR・libottnative のビルド条件の候補)。#2674 の観測 (入力素通し) との対応も未確定 | 受入 3 が未達。0/8 の環境で、heap 埋め値から native 出力が来る経路 (どこから読まれるか) も未確認 | #2695 |
 | sweep の値の不一致 (0x180da4030・0x18105d9fc。0x1803dee20 は上の行と同じ) | 本 issue の範囲外の既存残件。0x180da4030 は native の値が環境で異なる (§6)。0x18105d9fc が環境差か否かは未確認 | #2508 (既存の残件として引き継ぎ) |
 | 受入 2 の「miscompile か無害か」を判定するための callee 読み先の確定 | 分類結果が 0 件 | #2695 |
+
+## 10. 件数 1 の hang の原因と修正 (本 PR)
+
+> 測定 commit: `0960c8be` (コードを変えた最後の commit)。以降の commit は本節の追記のみ。`git diff 0960c8be HEAD -- tools/icall/diff tools/icall/fa_route_build.sh tools/ott/native` は 0 行。
+
+### 10.1 結論
+
+- 件数 1 の hang は、要素 0 の state 0 が `0x180da41a0` を呼び、その lock-free 読み出し (`0x180da41b0`・`0x180da4215`〜`0x180da421e`) が空判定に進まず spin するため。原因はゼロ初期化の節点表。先頭節点 `node[0]` (= `(B+0xbf)&~63`) の next が nil (`0x4001`) でないと、`rax≠0` で cmpxchg・再試行を繰り返す。§2 の「未確認」の推定を確認した。
+- `node[0]` を nil (`0x4001`) にすると、state 0 は `0x180da42d6` で 0 を返し、要素を飛ばして戻る。件数 1 は native・wasm とも戻り、8/8 一致 (値は入力素通し)。件数 0 の既定経路は変わらず 8/8。
+- state 1・2・3・7・8 は A (`rcx+0x10`) の vtable・サブオブジェクトが無いため、native で SIGSEGV する。state 4・5・6・9 は state 0 に戻って空判定で戻る。
+- **受入 2 は未達のまま**。No 2・6・7・9・10 は trace で 1 hit も無い。これらは state 2 と state 8 の分岐内にあり、A の vtable (slot `+0x08`・`+0x30`) と仮想 callee の stub を作らないと実行されない。
+
+### 10.2 harness 変更
+
+- `tools/icall/diff/fa_cmp.py`: `NIL_NODE = 0x4001`。VA `0x180da6e60` の件数 >0 のとき、native (`init_native`) と wasm (`MK_JS`) の両方で `node[0]` (`(B+0xbf)&~63`) に nil を書く。件数 0 は loop を飛ばすため結果は変わらない。
+- `tools/icall/diff/hit_180da6e60.py`: 環境変数 `FA_ELEM_STATE=S` で要素 0 の state (`+0x100108`) を S にする。候補に `0x180da41a0` (state 0 の 41a0 entry) を追加。
+
+### 10.3 測定 (件数 1・要素 0 の state を指定・単発)
+
+修正前は、state 0・4・5・6・9 が timeout (8 s)、1・2・3・7・8 が SIGSEGV。修正後の結果:
+
+| state | native (修正後) | trace の候補 hit |
+|--:|---|---|
+| 0 | 戻る (xmm0 = 入力) | 41a0 entry 1・No 1 1・出口 1・loop 先頭 1 |
+| 1 | SIGSEGV `rip=0x180da7084` (`[A+8]`=0 を経由した load) | — (落ちる) |
+| 2 | SIGSEGV `rip=0x180da6f27` (`[A]` vtable = 0) | — |
+| 3 | SIGSEGV `rip=0x180da6fe9` (`[A]` vtable = 0) | — |
+| 4 | 戻る | 41a0 entry 1・No 1 1・出口 1 |
+| 5 | 戻る | 同上 |
+| 6 | 戻る | 同上 |
+| 7 | SIGSEGV `rip=0x180da71b8` (`[rdi+0x100128]` = 0) | — |
+| 8 | SIGSEGV `rip=0x180da72fc` (`[A]` vtable = 0) | — |
+| 9 | 戻る | 同上 |
+
+No 2・6・7・9・10 は 0 hit (state 2・8 の分岐内)。
+
+### 10.4 fa_cmp と sweep (修正後・単発)
+
+| 測定 | 結果 |
+|---|---|
+| `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh` | OK (単独 9.6 s) |
+| `FA_LOOP_N=0 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8` | match 8 / mismatch 0 / err 0 (件数 0・不変) |
+| `FA_LOOP_N=1 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8` | match 8 / mismatch 0 / native_err 0 / wasm_err 0 (修正前は hang) |
+| `bash tools/icall/diff/fa_sweep.sh 8 60` | 73.7 s (単独)。bit 一致 56 / native crash・timeout 65 / wasm のみ err 8 / 値の不一致 2 |
+
+sweep の値の不一致は 2 件。`0x1803dee20` は本 run で native 入力素通し (8/8)、残りは `0x180da4030`・`0x18105d9fc` 系の既存残件 (§6)。本 run の runner は AMD EPYC 7763 だが、同じ 7763 の前回 (§6・`599f793c`) では 0x1803dee20 が `0000…` で 3 件だった。CPU 機種だけでは説明できない揺れとして、§5 の未解決に残す。
+
+### 10.5 受入の達成状況 (本 PR)
+
+- 受入 1: 部分。件数 0 と件数 1 (state 0・4・5・6・9) は戻る。件数 >0 の state 1・2・3・7・8 は SIGSEGV のまま (object graph の stub が無い)。
+- 受入 2: 未達。6 件の判定は 0 件 (No 2・6・7・9・10 は未実行、No 1 は保留のまま)。
+- 受入 3: 本 PR では未着手 (§5 の状況のまま)。
+
+### 10.6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| state 2・8 の harness: A の vtable (`+0x08`・`+0x30`) と仮想 callee の stub、A+8 の table (state 1)、`[rdi+0x100128]` (state 7) | 6 件の判定 0 件のまま | #2695 |
+| 0x1803dee20 の native 既定出力の環境差 (§5) | 受入 3 未達 | #2695 |
