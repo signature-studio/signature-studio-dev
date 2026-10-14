@@ -1,13 +1,13 @@
 # PY-84 (#2663): chord progression の pyscript 2 本と drum patterns を fl-win64 から抽出する
 
 - 対象: `tools/python/analysis/extract_pyc_blocks.py` (抽出器) と `tools/python/run_all.sh` の step 15。
-- 測定 commit: `0b6417df` (抽出器と step 15 を変えた最後のコード commit)。
+- 測定 commit: `0537b23e` (コードを変えた最後の commit。`tests/chord_progression_e2e.mjs` の冒頭コメント 2 行の変更で、実行される文は変えていない)。抽出器と step 15 の最後の変更は `0b6417df`。
 
 ## 1. 結論
 
 fl-win64 の DATA block だけから、抽出器が `drum_patterns.json` と `pyscript/{cpt,stack}.pyscript` を出すようになった。`tests/chord_progression_e2e.mjs` は 3 回とも 41/41 PASS (exit 0)。step 15 の 2 行を単独で実行しても PASS。
 
-**run_all 全体は未達**。先頭の mac pkg 前提チェックで rc=2 のまま止まる (§8)。これは #2649 (PY-83) の範囲で、本 run では触らない。e2e の入力は mock 条件つき (§9)。実 FL との照合は #81。
+**run_all 全体は未達**。main 取り込み前の run_all は先頭の mac pkg 前提チェックで rc=2 のまま止まる (§8)。取り込み後の run_all 全体は本 run では未実行。これは #2649 (PY-83) の範囲で、本 run では触らない。e2e の入力は mock 条件つき (§9)。実 FL との照合は #81。
 
 ## 2. 既知類型との関係
 
@@ -17,7 +17,7 @@ fl-win64 の DATA block だけから、抽出器が `drum_patterns.json` と `py
 
 | 条件 | 結果 | 根拠 |
 |---|---|---|
-| (1) run_all の step 15 が fl-win64 だけで SKIP されず動く | **run_all 全体は未達** (前提チェックで rc=2)。step 15 の抽出と e2e は単独で実行して PASS | §6 (step 15 の抽出・e2e)、§8 |
+| (1) run_all の step 15 が fl-win64 だけで SKIP されず動く | **run_all 全体は未達** (取り込み前は前提チェックで rc=2。取り込み後は未実行)。step 15 の 2 行 (抽出と e2e) は単独で実行して PASS、SKIP のガードは外した | §6 (step 15 の抽出・e2e)、§8 |
 | (2) `chord_progression_e2e.mjs` が PASS | 達成: 41/41 PASS × 3 回 | §6 |
 | (3) drum_patterns.json と pyscript の同定経路を書く | 達成 | §4.2 |
 | (4) 所要・load average・PASS/FAIL を書く | 達成 | §6 |
@@ -76,31 +76,33 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 
 ## 6. 実測
 
-測定 commit `0b6417df`。手順の時刻は UTC。
+測定 commit `0537b23e` (コードを変えた最後の commit)。ビルドは `work/build-native`・`work/build-wasm` を消してから作り直した。時刻は runner の時計 (`uptime`・`date`)。
 
-| 工程 | 回 | wall | load avg (1 分, 開始時 uptime) | 結果 |
+| 工程 | 回 | wall | load avg (1 分, 開始時) | 結果 |
 |---|---|---|---|---|
-| `build_cpython_wasm.sh` (timeout 900) | 1 | 3 分 56 秒 | — (終了時 2.93、17:21:25) | rc=0 |
-| `FLPY_SKIP_TABLE=1 build_flpy.sh` (timeout 300) | 1 | 22 秒 | — | rc=0 |
-| step 15 の抽出 (`rm -rf work/fl_extract` の後、PY312) | 1 | 4.31 秒 | 2.59 (17:22:00) | rc=0 |
-| `chord_progression_e2e.mjs` | 1 | 0.605 秒 | 2.08 | 41 PASS / 0 FAIL、rc=0 |
-| `chord_progression_e2e.mjs` | 2 | 0.553 秒 | 2.08 | 41 PASS / 0 FAIL、rc=0 |
-| `chord_progression_e2e.mjs` | 3 | 0.552 秒 | 2.08 | 41 PASS / 0 FAIL、rc=0 |
+| `build_cpython_wasm.sh` (timeout 900、build-native・build-wasm 削除後) | 1 | 164 秒 | 0.71 (17:40:59) | rc=0 |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` (timeout 300) | 1 | 4 秒 | 2.01 (17:43:50) | rc=0 |
+| step 15 の抽出 (`rm -rf work/fl_extract` の後、PY312) | 1 | 3.403 秒 | 2.42 (17:38:33) | rc=0 |
+| step 15 の抽出 (同上) | 2 | 4 秒 | 2.01 (17:43:50) | rc=0 |
+| `chord_progression_e2e.mjs` | 1 | 0.381 秒 | 1.71 (17:44:02) | 41 PASS / 0 FAIL、rc=0 |
+| `chord_progression_e2e.mjs` | 2 | 0.403 秒 | 1.71 | 41 PASS / 0 FAIL、rc=0 |
+| `chord_progression_e2e.mjs` | 3 | 0.380 秒 | 1.71 | 41 PASS / 0 FAIL、rc=0 |
+| step 15 の 2 行 (`set -euo pipefail` 下、抽出 + e2e) を main 取り込み後の `ad343fd4` で再実行 | 1 | 3.925 秒 | 0.20 (17:46:25) | rc=0、SAME 3 件、41 PASS / 0 FAIL |
 
-- load average: e2e の 3 回で 1 分平均は 2.08 (nproc = 4)。
-- e2e の末尾 JSON は 3 回とも `"total":41,"pass":41,"fail":0`。
+- load average: e2e の 3 回は 1 分平均 1.71 (nproc = 4)。
+- e2e の末尾 JSON は `0537b23e` の 3 回と `ad343fd4` の 3 回 (378 / 439 / 387 ms) のすべてで `"total":41,"pass":41,"fail":0`。
 - step 15 の抽出 (`PY312` と `FL_WIN64_DIR` は run_all と同じ値): rc=0、出力 `{"pyc": 40, "text_candidates": 18, "skipped": 0, "pyscript": 2, "drum_patterns": 1}`。`cmp` で SAME_drum・SAME_cpt・SAME_stack (§4.3 と同じ)。
-- 残骸の確認: 抽出前に `work/fl_extract/stale/old_test.pyc` を置いてから step 15 (`rm -rf` + 抽出) を実行 → 残骸は消えていた (`stale_exists=no`)。
-- 前回測定 (`a623fec6`) から変えたのは、step 15 の `rm -rf` と要約行の `drum_patterns` 件数 (manifest から数える) の 2 点。抽出 3 ファイルの出力は前回と同一。
-- PR の base (`main`) は測定後に進んだ。`git merge-tree` で HEAD と現 main は競合なし (rc=0) のため取り込んでいない。
-- 測定後の差分: `git diff 0b6417df HEAD -- tools/python ':!tools/python/REPORT_PY84.md' | wc -l` の出力は `0`。範囲は `tools/python` 全体 (tests/・host/・src/・analysis/・build スクリプトを含む)。HEAD 側に増えるのは REPORT_PY84.md の commit だけ。
+- 残骸の確認 (`0b6417df` で実施。以後 step 15 の `rm -rf` の行は変えていない): 抽出前に `work/fl_extract/stale/old_test.pyc` を置いてから step 15 (`rm -rf` + 抽出) を実行 → 残骸は消えていた (`stale_exists=no`)。
+- main の取り込み (`ad343fd4`、main `69b1bc82` との merge): 競合は `tools/python/run_all.sh` の step 15 だけ。main 側の SKIP ガード (`[ -s … ] || SKIP`) は外し、PR 側の 2 行 (`rm -rf` + `$PY312` の抽出、続けて e2e) にした。抽出器は 3 ファイルを書き、`set -euo pipefail` により失敗時は run_all が止まる。SKIP で通さないため、受入条件 (1) に合う。
+- 測定対象の差分: `git diff 0537b23e HEAD -- tools/python/analysis/extract_pyc_blocks.py tools/python/build_cpython_wasm.sh tools/python/build_flpy.sh tools/python/fetch_inputs.sh tools/python/host tools/python/src tools/python/tests/chord_progression_e2e.mjs | wc -l` の出力は `0`。main 側で増えたファイル (`analysis/py71_*`・`tests/static_browser_check.mjs` 等) は測定対象の外。
+- 0b6417df から 0537b23e までの差分 (`git diff 0b6417df 0537b23e -- tools/python ':!tools/python/REPORT_PY84.md'`): REPORT_PY22.md (1 行)・REPORT_PY7.md (手順 2 行)・`tests/chord_progression_e2e.mjs` の冒頭コメント 2 行。実行される文は変わっていない。
 
-### 6.1 ネガティブコントロール (測定 commit `0b6417df`)
+### 6.1 ネガティブコントロール (測定 commit `0537b23e`)
 
 | 対象 | 操作 | 結果 |
 |---|---|---|
 | e2e | `node tests/chord_progression_e2e.mjs --neg` (`Chords/data.pyc` の先頭 1 バイトを反転) | `{"total":41,"pass":34,"fail":7}`、FAIL 7 件、rc=1。内訳: `Chords/data.pyc` 自身 1 件、それを import する `control.pyc`・`control_rack.pyc`・`util.pyc`・`util_rack.pyc` の 4 件、pyscript の `cpt.pyscript`・`stack.pyscript` の 2 件 (いずれも `ImportError: bad magic number in 'Chords.data'`) |
-| 抽出器 | block24797 だけを除いた 20309 件の symlink dir (`$RUNNER_TEMP/nc84/src`) を `FL_WIN64_DIR` に指定して抽出 | stderr `ERROR: drum_patterns: 0 block () が一致 (期待 1)`、rc=3、出力 dir は作られない。pyscript 2 件は一致したまま (規則単位で判定) |
+| 抽出器 | `extracted/` の全 25166 entry から `block24797_DATA.bin` だけを除いた symlink dir (25165 件・`$RUNNER_TEMP/nc84b/src`) を `FL_WIN64_DIR` に指定して抽出 | stderr は `ERROR: drum_patterns: 0 block () が一致 (期待 1)` の 1 行だけ (pyscript 2 規則はエラーにならなかった)、rc=3、`work/nc84_out` は作られない |
 
 ## 7. 検証範囲
 
@@ -112,7 +114,8 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 
 ## 8. run_all 全体の前提チェック
 
-`bash run_all.sh` (HEAD `0b6417df`、`FL_MAC_DIR` は既定値 = `env.sh` の値のまま): rc=2。`ERROR: 前提不足で停止: …FLEngine_x64.dylib が無い`。step 1 より前で止まり、何も生成しない。mac pkg の `pkg_extract` が無いため。#2649 の範囲なので直していない。
+main 取り込み前の `bash run_all.sh` (HEAD `0537b23e`、`FL_MAC_DIR` は既定値 = `env.sh` の値のまま): rc=2。`ERROR: 前提不足で停止: …FLEngine_x64.dylib が無い`。step 1 より前で止まり、何も生成しない。mac pkg の `pkg_extract` が無いため。#2649 の範囲なので直していない。
+main 取り込み後 (`ad343fd4`) の run_all 全体は本 run では実行していない (全 step が走るため。#2649 の範囲)。step 15 の 2 行は §6 で再実行した。
 
 ## 9. e2e の mock 条件
 
