@@ -11,7 +11,7 @@ main 起点で stage-1 を再生成して stage-2 を再現すると REPORT_3120
 
 - 測定 commit: **`8d8d0e6a`** (origin/main・枝 `3150-plg-p0b-31-blk-writers` の起点。パイプラインのコードは変更していない)。
 - 測定 run: run ID は未記録。REPORT 初版の commit `1cc935d3` (2026-10-14 23:24:22 UTC) より前に実施した (時刻は上限)。当時の素材は `work-fw-stage1`・`work-liftlib` を含み、RetDec 8 chunk を実行できた。
-- 現在の検証 run (`de9fb827` 以降) では素材が違う: `$ARTIFACTS_DIR` は `fl-win64` のみで、`/opt/retdec` も無い。よって §1 の表は再現できない。§8 の手順は当時の素材が要る。
+- 現在の検証 run (`de9fb827` 以降) では素材が違う: `$ARTIFACTS_DIR` は `fl-win64` のみで、RetDec の実行ファイルも無い (`[RETDEC]`・`toolchain-retdec` は `docs/REFERENCES.md`)。よって §1 の表は再現できない。§8 の手順は当時の素材が要る。
 - 素材 (測定時): `work-fw-stage1`・`work-liftlib` を展開。`fl-win64` は member 2 本 (`extracted/block18983_PE.bin`・`extracted/block00031_PE.bin`) のみ `$RUNNER_TEMP/fl-win64` へ展開。
 - 実行環境 (測定時): runner 4 vCPU・RAM 15 GiB。
 
