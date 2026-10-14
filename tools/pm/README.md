@@ -70,10 +70,10 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `heartbeat.sh` | PM agent | PM セッションへの定期プロンプトは、`pm` job (`oc-pm`) と Worker の `oc-pm` 送信が担う。`pm-heartbeat.service` は無効化済み | `pm` job の実 run が `oc-pm-decision` を残すことを確認してから削除 (親 #2319 の A4) | #2347 |
 | `idle_report.sh` | 残す | REST のみで VM に依存しない。watchdog の担当なし時間の計測として残す (VM 停止の判定用の役は終わった) | なし | #2354 |
 | `issue_snapshot.py` | 廃止 | open issue の集計は Worker の同期 (`fullSync`・`reconcile`) が担う。`launch_issues.py` だけが読んでいた | `launch_issues.py` と同時に削除。状態の扱いは下の『状態ファイル』の節 | #2355 |
-| `launch_issues.py` | Worker | `plan`・`launch` は Worker が live (`/oc` の投稿と着手の判断)。`blocked` (GitHub の依存欄への同期) は Worker が書かないため、退役後は依存欄が新規分で更新されない。判定は本文の `blockedBy:` を Worker の `classify.ts` が読むので、影響は表示のみ | 『状態ファイル』の節の扱いを反映してから削除。依存欄の同期が要るなら別 issue | #2355 |
+| `launch_issues.py` | Worker | `plan`・`launch` は Worker が live (`/oc` の投稿と着手の判断)。`blocked` (GitHub の依存欄への同期) は Worker が書かないため、退役後は依存欄が新規分で更新されない。判定は本文の `blockedBy:` を Worker の `classify.ts` が読むので、影響は表示のみ | 『状態ファイル』の節の扱いを反映してから削除。`classify_crosscheck.py`・`phase_crosscheck.py` (`infra/pm-worker/test/`) が `launch_issues.py` を importlib で読み、`classify.test.ts`・`phase.test.ts` がそれを `python3` で呼ぶため、先に crosscheck の Python 依存を fixture 固定に置き換える。依存欄の同期が要るなら別 issue | #2355 |
 | `manual_deps.json` | 残す (Worker が import) | 停止報告に根拠のある依存。Worker のビルドが `infra/pm-worker/src/config.ts` の 1 行目で読むため、移すとビルドが壊れる | パスを変えない | - |
 | `pm_gate.sh` | 廃止 | Worker が live の間に VM の launch・ping を止める standby ゲート。VM の timer を再開しないので不要 (#2341 は closed) | 削除のみ | #2355 |
-| `pm_needs.py` | Worker | 差し戻しが PM 判断を求めて未回答の PR の検出は、Worker の `needs.ts` (同じ語彙 `NEEDS_KEY`) が担う | 削除のみ | - |
+| `pm_needs.py` | Worker | 差し戻しが PM 判断を求めて未回答の PR の検出は、Worker の `needs.ts` (同じ語彙 `NEEDS_KEY`) が担う。ただし `infra/pm-worker/test/needs_crosscheck.py` が `pm_needs.py` の `KEY` を importlib で読み、`needs.test.ts` がそれを `python3` で呼ぶため、ファイルを消すとこのテストが落ちる | crosscheck の Python 依存を fixture 固定に置き換えてから削除 (`needs_crosscheck.py` が `pm_needs.py` を読まない形にする) | - |
 | `pm_watchdog_ping.sh` | Worker | `oc-watchdog` の 5 分送信は Worker の `LIVE_DISPATCH` が担う (2026-10-14 から live) | 削除のみ。timer は停止済み | #2355 |
 | `pr_gaps.py` | `watchdog.sh` | 『レビュー中・修正中・担当なし』の分類は `watchdog.sh` が点検ごとに出す (`open=… covered=… idle=…`) | 削除のみ | - |
 | `rerun_review.sh` | `watchdog.sh` | review の再起動 (close→reopen) は、`watchdog.sh` の NOREVIEW が `reopen-pr.sh` で行う | 削除のみ | #2355 |
@@ -87,7 +87,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `systemd/pm-watchdog.service` | Worker | `oc-watchdog` の送信は Worker (`LIVE_DISPATCH`) | 停止済み | #2355 |
 | `systemd/pm-watchdog.timer` | Worker | 同上 | 停止済み | #2355 |
 | `test_idle_report.sh` | 残す | `idle_report.sh` と同じ | なし | #2354 |
-| `test_launch_issues.py` | 廃止 | `launch_issues.py` と同時。Worker の規則は `infra/pm-worker/test/` (vitest と `*_crosscheck.py`) で確かめる | `launch_issues.py` と同時に削除 | #2355 |
+| `test_launch_issues.py` | 廃止 | `launch_issues.py` と同時。Worker の規則は `infra/pm-worker/test/` (vitest と `*_crosscheck.py`) で確かめる。ただし `*_crosscheck.py` は `launch_issues.py` を importlib で読むので、この依存を fixture 固定に置き換えてから削除する | `launch_issues.py` と同時に削除 (crosscheck の依存の置き換えが先) | #2355 |
 | `test_pm_gate.sh` | 廃止 | `pm_gate.sh` と同時 | 同上 | #2355 |
 | `test_status_sync.py` | 未実装 (#2362) | `status_sync.py` の検証。後継の workflow が入るまで残す | `status_sync.py` と同時に削除 (後継 #2362 が main に入るまで残す) | #2362 |
 | `watch_runs.notes.md` | 廃止 | `watch_runs.sh` の注記。測定値は `REPORT.md` §8 に移送済み | `watch_runs.sh` と同時に削除 | #2355 |
