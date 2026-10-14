@@ -109,7 +109,38 @@ describe("失敗した webhook 配送の回収 (#2339)", () => {
     expect(posted).toEqual([2]);
   });
 
-  it("既定 (LIVE_REDELIVER 未設定) は POST しない。一覧を読んで送るはずだった件数だけ数え、同じ guid は 1 回だけ数える", async () => {
+  it.each([403, 429])("(g) 再配送の POST が %i で落ちたら、その走査は残りを送らない (失敗は lastError に残さず記録する)", async (code) => {
+    const attempts: number[] = [];
+    const deny = (c: Call) => {
+      const m = /\/app\/hook\/deliveries\/(\d+)\/attempts$/.exec(c.url);
+      if (c.method !== "POST" || !m) return undefined;
+      attempts.push(Number(m[1]));
+      return j({ message: "denied" }, code);
+    };
+    const ctx = await configuredApp({ env: { LIVE_REDELIVER: "1" }, handlers: [repoAuth, repoLists(), deny, hook(() => failing([2, 3, 4]), [])] });
+    await markFresh(ctx);
+    await scanAfter(ctx);
+    expect(attempts).toHaveLength(1);
+    const s = ctx.app.engine.status() as any;
+    expect(s.counters.redelivered).toBe(0);
+    expect(s.last_error).toBeNull();
+    expect(s.log.some((l: any) => l.kind === "error" && /redeliver \d+: /.test(l.note))).toBe(true);
+  });
+
+  it("(i) rate-guard 中 (rest_remaining < 1500) は LIVE_REDELIVER=1 でも POST しない。窓内の失敗 guid を数えるだけ", async () => {
+    const posted: number[] = [];
+    const store = new MemoryStore();
+    store.put("meta", "main", { rest: { remaining: 100 } });
+    const ctx = await configuredApp({ store, env: { LIVE_REDELIVER: "1" }, handlers: [repoAuth, repoLists(), hook(() => failing([2, 5]), posted)] });
+    await markFresh(ctx);
+    await scanAfter(ctx);
+    expect(posted).toEqual([]);
+    const s = ctx.app.engine.status() as any;
+    expect(s.counters.wouldRedeliver).toBe(2);
+    expect(s.counters.redelivered).toBe(0);
+  });
+
+  it("既定 (LIVE_REDELIVER 未設定) は POST しない。一覧を読んで窓内の失敗 guid の数だけ数え、同じ guid は 1 回だけ数える", async () => {
     const posted: number[] = [];
     const ctx = await configuredApp({ handlers: [repoAuth, repoLists(), hook(() => failing([2, 5]), posted)] });
     await markFresh(ctx);
@@ -220,5 +251,26 @@ describe("POST /admin/resync (#2339)", () => {
     expect(ctx.app.engine.s.launchedAt["11"]).toBe(launchedAt);
     expect(s.open_issues).toBe(1);
     expect(s.log.some((l: any) => l.kind === "resync")).toBe(true);
+  });
+
+  it("(j) tick の最中の resync は 409 で、同時には走らない (枠も消費しない)。tick が終われば通る", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const hold = async (c: Call) => {
+      if (c.method === "GET" && c.url.includes("/actions/runs")) await gate;
+      return undefined;
+    };
+    const ctx = await configuredApp({ handlers: [repoAuth, hold, repoLists()] });
+    const t = ctx.app.engine.tick();
+    try {
+      const busy = await ctx.app.handle(new Request(RESYNC, { method: "POST", headers: { authorization: PUSH } }));
+      expect(busy.status).toBe(409);
+    } finally {
+      release();
+      await t;
+    }
+    expect((ctx.app.engine.status() as any).log.some((l: any) => l.kind === "resync")).toBe(false);
+    const ok = await ctx.app.handle(new Request(RESYNC, { method: "POST", headers: { authorization: PUSH } }));
+    expect(ok.status).toBe(200);
   });
 });

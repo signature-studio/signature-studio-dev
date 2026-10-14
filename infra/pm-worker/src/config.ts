@@ -51,7 +51,7 @@ export interface Config {
   liveLaunch: boolean;
   // repository_dispatch (oc-watchdog と oc-pm) の送信を実行するか。
   liveDispatch: boolean;
-  // 失敗した webhook 配送の再配送を実行するか (既定 false: 一覧を読んで送るはずだった件数だけ記録する)。
+  // 失敗した webhook 配送の再配送を実行するか (既定 false: 一覧を読んで、窓内の失敗 guid の数だけ記録する。POST はしない)。
   liveRedeliver: boolean;
   botLogin: string;
   pmLogins: string[];

@@ -1,5 +1,5 @@
 // 管理用 endpoint (POST /admin/resync) の認証。新しい API token は作らず、呼び出し側が自分の GitHub token (Bearer) で
-// repo の push 権限を示せたときだけ通す (/status?detail=1 と同じ方式)。token は保存せず、GitHub への確認に 1 回使うだけ。
+// repo の push 権限を示せたときだけ通す (/status?detail=1 と同じ方式)。token は保存せず、GitHub への確認 (入口と DO で各 1 回・キャッシュ無し) に使うだけ。
 // 入口 (index.ts) と DO (app.ts) の両方で使う。未認証・不明な token は呼び出し元で 404 にする (存在を示さない)。
 import type { FetchFn } from "./github.ts";
 

@@ -345,7 +345,7 @@ export class Engine {
     this.saveMeta();
   }
 
-  // 管理用の全体同期 (POST /admin/resync)。REST の内容で派生状態を作り直す (fullSync と同じ。ページ上限も同じ)。
+  // 管理用の全体同期 (POST /admin/resync)。REST の内容で派生状態を上書きで同期する (fullSync と同じ。upsert なので窓の外の古い派生状態は消えない。ページ上限も同じ)。
   // 永続状態 (launchedAt・relaunch・planned・phase・counters) は同期が触らないので残る。busy の間 (tick と同時) は走らせない。
   async resync(gh: Gh): Promise<{ status: "ok" } | { status: "limited"; retryAfterS: number } | { status: "busy" }> {
     if (this.busy) return { status: "busy" };
@@ -919,7 +919,7 @@ export class Engine {
 
   // 失敗した webhook 配送の回収 (#2339)。GitHub は失敗した配送を自動で再送しないので、App の配送一覧 (JWT) から
   // status != OK のものを古い順に選ぶ。同じ guid に OK の配送が 1 つでもあれば回収済みとみなす。
-  // POST は LIVE_REDELIVER=1 かつ rate-guard が無いときだけ。dry-run は guid ごとに 1 回だけ数える (counters.wouldRedeliver)。
+  // POST は LIVE_REDELIVER=1 かつ rate-guard が無いときだけ。それ以外 (dry-run と rate-guard 中) は、窓内で初めて見た失敗 guid を 1 回ずつ数える (counters.wouldRedeliver。上限は掛けない)。
   async redeliver(app: Gh | null): Promise<void> {
     const now = this.d.now();
     if (!app || now - (this.meta.redeliverAt ?? 0) < REDELIVER_EVERY_MS) return;
@@ -1012,16 +1012,16 @@ export class Engine {
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
-      // 配送の回収は launch と独立に行い、失敗しても他の処理と lastError を止めない。
-      try {
-        await this.redeliver(this.d.app ? await this.d.app() : null);
-      } catch {
-        this.pushLog({ kind: "error", note: "hook redeliver failed" });
-      }
       this.meta.lastError = undefined;
     } catch (e) {
       this.setError(now, e instanceof GhError ? e.message : "tick failed");
       this.pushLog({ kind: "error", note: this.meta.lastError?.what });
+    }
+    // 配送の回収は、この tick の同期・watchdog・launch が例外を投げても走らせる (別の try)。失敗は記録だけして lastError には残さない。
+    try {
+      await this.redeliver(this.d.app ? await this.d.app() : null);
+    } catch {
+      this.pushLog({ kind: "error", note: "hook redeliver failed" });
     }
     this.sampleOpen(now);
     this.saveMeta();
@@ -1125,7 +1125,7 @@ export class Engine {
       counters,
       last_webhook_at: this.meta.lastWebhookAt ? iso(this.meta.lastWebhookAt) : null,
       last_dispatch_at: this.meta.lastDispatchAt ? iso(this.meta.lastDispatchAt) : null,
-      // 失敗した webhook 配送の回収 (#2339)。件数は counters.redelivered (送った) と counters.wouldRedeliver (LIVE_REDELIVER 未設定で送らなかった)。
+      // 失敗した webhook 配送の回収 (#2339)。件数は counters.redelivered (送った) と counters.wouldRedeliver (送らなかった間に、窓内で初めて見た失敗 guid の数)。
       last_redeliver_scan: this.meta.redeliverAt ? iso(this.meta.redeliverAt) : null,
       hook_failed_last_scan: this.meta.redeliverFailed ?? null,
       running,
