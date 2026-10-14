@@ -86,7 +86,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 値 `0x400000004` を作る store (null ページを指すポインタの生成元) の特定 (行 19124 の `%1` が "emsc" を運ぶ。`%1` の起点は未特定) | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #2311 (ICALL-73) |
+| 値 `0x400000004` の生成元 (ICALL-73 #2311 の実測): 全 5526 lifted store を `fa_wc.py` で監視し、`0x400000004` を書く store は **0 件** (`fa_wc2` 測定・181057b38 の 8 入力)。値は lifted store 由来ではなく、初期メモリ (DLL data 敷設 `ott_data_install` の範囲外 or C 側 runtime の書込み) にある。行 18807–18813 の load chain の起点の heap/data slot は未特定 | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #2311 (ICALL-73) (部分達成。残りは同 issue の範囲を縮小して継続) |
 | IR 行 19132 → wasm 命令オフセットの対応・route/lift の最終分類 | 受入条件「wasm オフセットか IR 命令まで」の wasm 側 | #2310 (ICALL-72) |
 | 引数付き lifted 関数の dispatch table 登録規則 | abort 6 件 (1852 付録 §2) | #1897 (ICALL-49) 既存 |
 | 監視の対象外: `llvm.memcpy` / `llvm.memset` 等の intrinsic、`cmpxchg` / `atomicrmw`、C 側 (`oi.*.c`・`rt/*.c`)、emscripten libc の書込み。集成体型 (`[N x T]`・`{...}`) の store は `fa_wc.py` が挿入せず件数を出す (`unhandled`) | 上記の書込みは BLK 窓への書込みを見逃しうる。`fa_wc.py` は `work/fa_route/oi.flat.ll` の 5526 store 中 5526 件を挿入 (未対応 0) で、この集合には該当しない | 本付録 (監視の限界として明記) |

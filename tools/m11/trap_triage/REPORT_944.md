@@ -247,4 +247,4 @@ dest 読出しを止めても 871/23 のまま。よって dest 読出しが原�
 
 ## 9. #1864 追記 (全文は付録へ分割移動)
 9.1〜9.3 の全文は [REPORT_APPENDIX_944.md](REPORT_APPENDIX_944.md) §7 (旧 §9・250 行上限のため分割移動・内容は不変)。§9.3 の撤回は §4 (a) に同じ訂正がある。 #2118 の追記 (旧 §10) の全文は同付録 §9。
-## 11. #2152 追記 (M11-N141・部分): 数値・手順・結論は [REPORT_APPENDIX_2152.md](REPORT_APPENDIX_2152.md)。結論は未決・未解決は #2203
+#1547 追記 (全文は [REPORT_944_APPENDIX_1547.md](tools/m11/trap_triage/REPORT_944_APPENDIX_1547.md)): `M11_DEST_GUARD=1` で unit 158 は ok に戻るが、値差 (j=12) は残る。判定は未決 (§4 (a))。

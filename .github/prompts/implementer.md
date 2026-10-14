@@ -109,6 +109,8 @@
 
 ## 完了時
 
+- PR を出す前に `bash .github/scripts/pr-lint.sh --base origin/main --head HEAD --body-file <PR 本文ファイル>` を実行し、
+  出力された違反 (REPORT 行数・repo 外パス・Closes と未達の整合・oc_artifacts の値域・DOC_MAP 未登録) を直してから push する。
 - 最終回答に: コミット hash・PR URL・e2e 実測結果・未解決 (起票先付き) を含めること。
 - **最終回答と同じ内容を、必ず `gh issue comment <N>` で起点の issue に投稿すること** (完了・停止・
   失敗のいずれでも)。最終回答は run の外からは読めない。投稿が無い run は「結果不明」として
