@@ -144,3 +144,27 @@
 
 - 計測直前 `uptime` の load average 1.19 / 1.44 / 0.79 (nproc 4)。検証範囲は §6 と同じ (実 FLEngine の値とは比較していない)。
 - 差分: `git diff 9d49d429 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。本 commit は `tools/python/REPORT_PY100.md` だけを変える。
+
+## 10. main 再取り込み後の再測定 (測定 commit `bf653917`)
+
+- 経緯: main が `eec639a3` (#2971 ほか) へ進み、PR ブランチ HEAD `48b950c1` と再び競合した。`git merge origin/main` で解消した (rebase なし)。
+  - `tools/python/tests/provider_check.mjs` のみ競合 (2 箇所)。期待集合 `pe100` (本 PR) と `pe87` (main・PY-87 #2738 の general ゲッター 4 件) を両方残し、期待値を実装 81 → 85・未実装 354 → 350 に直した (`functions` 435 は不変)。
+  - `fl_engine.c`・`fl_mock.mjs`・`channels_diff.mjs` は自動マージ。
+- 検証の差: main 側で `channels_diff.mjs` に `channels.soloChannel` の呼出しが 1 件、`device_diff.mjs` の `device.midiOutMsg` に 6 個目の引数の検査が入った (`git diff 48b950c1 bf653917 -- tools/python/tests`)。そのため呼出し数は 160 → 161、device 照合は 7 → 8 (rejects 4)。
+- 入力: fl-win64 の PE (`block00031_PE.bin`) と DATA 4 本だけを `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf ... --wildcards`、3.7 秒)。emsdk は `/opt/emsdk` (emcc 6.0.12) を使った。`fetch_inputs.sh` は `FL_WIN64_DIR` 指定で実行。
+
+| 検査 | コマンド (`tools/python` で実行) | 結果 | 所要 |
+|---|---|---|---|
+| provider build | `bash provider/build.sh` | rc 0 | 1.348 秒 |
+| CPython wasm | `bash build_cpython_wasm.sh` | rc 0 | 4 分 14.958 秒 |
+| flpy link | `FLPY_SKIP_TABLE=1 FL_WIN64_DIR=<展開先> bash build_flpy.sh` | rc 0 | 6.303 秒 |
+| 件数・ABI | `node tests/provider_check.mjs` | PASS (functions 435・implemented 85・unimplemented 350・mcp_static 60) | 0.565 秒 |
+| C と mock の差分 | `node tests/channels_diff.mjs` | PASS (calls 161・diffs 0) | 0.053 秒 |
+| general 照合 (PY-87) | `node tests/general_diff.mjs` | PASS (calls 9・diffs 0) | 0.047 秒 |
+| 48 tool (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok (soft_error 0・raised 0・host_calls 37425) | 2.215 秒 |
+| 48 tool (mock) | `node tests/all_tools.mjs` | 48/48 ok (host_calls 37425) | 2.117 秒 |
+| MIDI device 照合 | `node tests/device_diff.mjs` | PASS (calls 8・rejects 4・midi_out 5・diffs 0) | 0.052 秒 |
+
+- 計測直前 `uptime` の load average 2.59 / 1.89 / 0.89 (nproc 4)。build 開始時は 0.57 / 0.38 / 0.16。
+- 差分: `git diff bf653917 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。本 commit は `tools/python/REPORT_PY100.md` だけを変える。
+- 検証は実 FLEngine との比較ではない (§6 と同じ範囲)。
