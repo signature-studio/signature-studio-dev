@@ -8,6 +8,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseFlp } from '../src/flp.ts';
 import { parseWrapperChunk, writeWrapperChunk, parseWrapperData } from '../src/summary.ts';
+import { generateDb } from '../../hostbridge/nfo/src/generate.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ottFst = join(here, '..', '..', 'hostbridge', 'nfo', 'evidence', 'real_machine', 'OTT.fst');
@@ -42,6 +43,20 @@ test('NEGATIVE: wrong version / truncation / trailing garbage are rejected; a br
   const w = parseWrapperChunk(c)!;
   const dropped = writeWrapperChunk({ ...w, records: w.records.filter((r) => r.id !== 50) });
   assert.notEqual(hex(dropped), hex(c));
+});
+
+test('h10 generated DB .fst (5 entries): chunk round-trips byte-exactly and every record id is known to the Wrapper reader', () => {
+  const specs = JSON.parse(readFileSync(join(here, '..', '..', 'hostbridge', 'nfo', 'specs', 'wasm_plugins.json'), 'utf8')).plugins;
+  const generated = generateDb(specs);
+  assert.equal(generated.entries.length, 5);
+  const known = new Set([1, 2, 30, 31, 32, 50, 51, 52, 53, 54, 55, 56, 57, 58]);
+  for (const e of generated.entries) {
+    const c = chunksOf(generated.files.get(e.fst)!)[0];
+    const w = parseWrapperChunk(c);
+    assert.ok(w, e.spec.name);
+    assert.equal(hex(writeWrapperChunk(w)), hex(c), e.spec.name);
+    assert.ok(w.records.every((r) => known.has(r.id)), `${e.spec.name}: unknown ids`);
+  }
 });
 
 const flpDir = process.env.WRAPPER_FLP_DIR;
