@@ -406,7 +406,7 @@ main `f3ffd7ba` 取り込み後の head `bde0c341` で、§6e の測定 commit `
 | `bash tools/gui/flengine/e2e.sh` (head `bde0c341`) | **1** | 325 s (load 1.12→1.33) | build 段で停止。`wasm-ld: error: duplicate symbol: GetMonitorInfoW` (同上 2 件)。judge は実行されず |
 | `bash tools/gui/e2e.sh` (head `bde0c341`) | **0** | 301 s (load 3.47→0.89) | ALL PASS (simd / 6c/6 fail-fast / present / input / stress (negctl 2/2 exit 1) / selftest 506 passed 0 failed)。ASan の `heap-use-after-free` 等の出力 0 件 |
 
-**判定**: `gui/e2e.sh` は現 head で PASS。`flengine/e2e.sh` と `f4_e2e.sh` は main 由来の重複定義 (#1096 `6f979463` の `tools/m11/m11_win.c` と `tools/gui/build/gui_adapt_w32.c`) で build 段が止まり、S1 の judge と F4 の gate は現 head では未測定。`a88aabfa` の測定値は main 取り込み前のものなので、現 head の値としては使わない。
+**判定 (bde0c341 時点の記録)**: `gui/e2e.sh` は PASS。`flengine/e2e.sh` と `f4_e2e.sh` は main 由来の重複定義 (#1096 `6f979463` の `tools/m11/m11_win.c` と `tools/gui/build/gui_adapt_w32.c`) で build 段が止まった。この時点の S1 と F4 の gate は未測定。`a88aabfa` の測定値は main 取り込み前のものなので、現 head の値としては使わない。**重複は `97db5a58` の weak 化で解消済み。現 head の値は §6h。**
 
 **GetMonitorInfoW 重複の扱い**: 重複の解消 (どちらの定義を正とするか) は build 仕様の判断を要するため、本 run では commit しない。起票先は子 issue **#1559** (`[M11-N102]`)。
 
@@ -418,6 +418,22 @@ main `f3ffd7ba` 取り込み後の head `bde0c341` で、§6e の測定 commit `
 | `bash tools/m11/ldfix/f4_e2e.sh` (head `bde0c341` + 回避) | **0** | 387 s (load 1.06) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待どおり FAIL。`RegisterClassW` pre 2 / noand 2 / post 3。`function_52a7f0` ret pre `0x0` → noand `0x0` → post **`0x110000f`** (本 IR (wndseed 無し) の値)。survey pre/noand/post = `870/1/47/24` |
 
 結論: 回避版では S1 の値は main と同じ (`870/1/47/24/0`)。R2 は重複の片方が消えたことで 2 件欠落する (§6f の回避の副作用と同じ形)。したがって flengine の判定 (12/14) は、重複の解消方法を決めるまで確定しない。判定式・baseline は変えていない。
+
+## 6h. weak 化後の現 head の実測 (PM 指示 #577。測定 commit `97db5a58`)
+
+`m11_win.c` の `EnumDisplayMonitors` / `GetMonitorInfoW` に `__attribute__((weak))` を付けた 1 変更 (`97db5a58`、差分 2 関数のみ) の head で、3 本を foreground・各 1 回。素材は `ws-577/work/` (gitignore) に展開。`retdec-decompiler` と `EMSDK_ENV` は `ws-577/work/toolchain/` を指定。
+
+| 実行 | rc | 所要 | load (開始→終了) | 結果 |
+|---|---|---|---|---|
+| `bash tools/m11/ldfix/f4_e2e.sh` | **0** | 411 s | 0.89 → 1.30 | build 段は通過 (重複定義の解消を確認)。gate F1/F2/D1/D2/P1/A1 全 PASS。ネガコン N1〜N4 期待どおり FAIL。RegisterClassW pre 2 / noand 2 / post 3、ret pre `0x0` → noand `0x0` → post `0x110000f`。survey pre/noand/post = `870/1/47/24` |
+| `bash tools/gui/flengine/e2e.sh` | **1** | 460 s | 1.18 → 1.23 | build 段通過。**judge 13/14**。FAIL は **S1 のみ**: `870/1/47/24/0` (base `872/1/47/22/0`)。R1・R2 (floor 19、reached 33)・B1 52・S2・P1〜P5・W1 は PASS。ネガコン N1〜N9 期待どおり FAIL。selftest 506 passed / 0 failed |
+| `bash tools/gui/e2e.sh` | **0** | 211 s | 1.58 → 3.37 | **ALL PASS** (simd / 6c/6 fail-fast / text / stress (50000 frames ×2、negctl 2/2 exit 1) / selftest)。`heap-use-after-free` 0 件 |
+
+前提 (回避版との違い): 回避版 (`--allow-multiple-definition`) は `m11_win.c` と GUI 側の両方を連結して片方を捨てる。weak 版は GUI 側の強い定義が勝つ。両者で `EnumDisplayMonitors` / `GetMonitorInfoW` の使われる定義が同じかは、R2 の `missing` の変化で見る。今回の R2 は `missing=[]` で PASS。
+
+S1 の値 `870/1/47/24/0` は §6f の main と同値で、判定式・baseline は変えていない。#1442 で扱う。
+
+`tools/gui/flengine/results/*.json` と `baseline_boot.json` は本実測で再生成された出力 (`GetMem` 等の probe 値・`gui_shared_ptr` の 1 件・`ir_sha256` が現 head で変わる)。本 commit に含める。
 
 ## 6f. origin/main の S1 実測 (PR #577 の PM 指示 1。main commit `b4a8422c`)
 

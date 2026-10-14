@@ -247,9 +247,9 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 1958,
+  "GetMem": 1959,
   "FreeMem": 158,
-  "FastMM_GetMem(407a50)": 2042,
+  "FastMM_GetMem(407a50)": 2043,
   "FastMM_FreeMem(407e20)": 162,
   "InitUnits": 0,
   "Halt0": 7,
