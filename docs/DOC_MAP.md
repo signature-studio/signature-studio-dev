@@ -104,7 +104,7 @@
 | `tools/liftdiff/REPORT_APPENDIX_LD25.md` | ~80 | liftdiff REPORT §12 末尾の LD-25 行 (InitUnits の空振り一致・InitTable 充足の boot 状態) の全文: 機械語で確定した原因・units/hybrid の precondition 実測・sample:800 の判定遷移。検査は `tools/liftdiff/tests/check_initunits.py` (LD-25 / #977) |
 | `tools/liftdiff/REPORT_APPENDIX_LD42.md` | ~50 | liftdiff LD-42 (#1248) の実測: units/hybrid の sample:800 判定遷移 (関数単位の突合は `tests/ld42_transition.py`)、TLS precondition、既定 batch を units に据え置く判断 (保留・子 #1464 で判断)。方式決定は DECISIONS D13 |
 | `tools/liftdiff/REPORT_APPENDIX_LD40.md` | ~34 | liftdiff LD-40 (#1199) の既存コード確認 (native `ld_fake_ptr` の thunk・wasm `ott_dispatch` 捕捉・fvm VMT 0 埋め)、未達理由 (1 run の上限内で完結せず)、子 issue #1398 (LD-48) への分割 |
-| `tools/liftdiff/REPORT_APPENDIX_865.md` | ~20 | liftdiff LD-18 (#865) 新規節: trace_head 外 27 件の 414ad0 到達確認 (25/27)・OOB 最上位 frame 集計 (239 件、件数定義と 222 件との差)。`REPORT_APPENDIX.md` は 250 行上限のため増やさず別置き |
+| `tools/liftdiff/REPORT_APPENDIX_865.md` | ~20 | liftdiff LD-18 (#865) 新規節: trace_head 外 27 件の 414ad0 到達確認 (26/27)・OOB 最上位 frame 集計 (239 件、件数定義と 222 件との差)。`REPORT_APPENDIX.md` は 250 行上限のため増やさず別置き |
 | `tools/liftdiff/REPORT_APPENDIX_LD28.md` | ~26 | liftdiff LD-28 (#1035) の型 C・D 原因候補 (P1〜P3)・0x417b70 の idiv/udiv 仮説の節全文 (REPORT_APPENDIX §9 から分割移動)。測定 commit・鮮度の証跡・数値例 (count = 1 の反例を含む) |
 | `tools/liftdiff/REPORT_APPENDIX_LD62.md` | ~50 | liftdiff LD-62 (#1767) の実測: 0x417b70 の除算 trap 入力 8 件 (native 全件 segv・U1〜U4 未解決) と、予測式の境界値 (旧 float 除算 vs 整数除算、96 件) の計算。生成物は `results/m11_417b70_trap_inputs.md`・`results/m11_417b70_div_boundary.md` |
 | `tools/liftdiff/REPORT_APPENDIX_LD96.md` | ~168 | liftdiff LD-96 (#2258): sample:800 shard 1 の件数揺れの切り分け (部分達成)。高水位外の heap 残存の計測は §8 (測定値は `results/ld96_heap_residue*.tsv`)。未解明の残作業は #2258 |
