@@ -66,6 +66,7 @@ const EXISTING_KEYS = [
 ];
 const ADDED_KEYS = [
   "last_webhook_at", "last_dispatch_at", "last_digest_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
+  "no_pr_needs_pm",
   "target_eff", "cap_est", "peak_running", "queued", "oldest_queued_age_min",
   "last_redeliver_scan", "hook_failed_last_scan",
   // 同時実行の計数 (opencode.yaml の全 run を TARGET に数える)

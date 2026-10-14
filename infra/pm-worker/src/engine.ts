@@ -2,7 +2,7 @@
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { countOpencodeRuns, type ActiveCount } from "./active.ts";
-import { classify, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
+import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
@@ -180,7 +180,7 @@ export interface Log {
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -203,6 +203,11 @@ export function persistDiff(prev: PmState, next: PmState, store: Store): void {
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 const ART_LINE_RE = /^\s*`?(oc_artifacts:[^\n`]*)`?\s*$/m;
+// 分類に渡す bot 報告の要約 (先頭 400 字と oc_artifacts 行)。
+const digestBot = (b: { at: string; body: string }): Snapshot["bot_last"][string] => {
+  const am = ART_LINE_RE.exec(b.body);
+  return { at: b.at, head: b.body.slice(0, 400), art: am ? am[1].trim() : null };
+};
 
 export interface EngineDeps {
   store: Store;
@@ -589,12 +594,17 @@ export class Engine {
       .filter((r) => r.status !== "completed")
       .map((r) => ({ id: r.id, event: r.event, title: r.title }));
     const bot_last: Snapshot["bot_last"] = {};
+    for (const [k, b] of Object.entries(s.botLast)) bot_last[k] = digestBot(b);
+    const bot_report: Snapshot["bot_report"] = {};
+    for (const [k, b] of Object.entries(s.botReport)) bot_report[k] = digestBot(b);
+    // 停止判定 (run-outcome を除く) は botLast の本文で見る。素材名は直前の報告 (botReport) から読む。無い (古い保存値) issue は空 = 新しい素材なし。
     const fullBotBody: Record<string, string> = {};
-    for (const [k, b] of Object.entries(s.botLast)) {
-      const am = ART_LINE_RE.exec(b.body);
-      bot_last[k] = { at: b.at, head: b.body.slice(0, 400), art: am ? am[1].trim() : null };
-      fullBotBody[k] = b.body;
-    }
+    for (const [k, b] of Object.entries(s.botLast)) fullBotBody[k] = b.body;
+    const reportBody: Record<string, string> = {};
+    for (const [k, b] of Object.entries(s.botReport)) reportBody[k] = b.body;
+    // 最後の run-outcome の reason (webhook が sig に保存する)。
+    const outcomeReason: Record<string, string> = {};
+    for (const [k, g] of Object.entries(s.sig)) if (g.outcome) outcomeReason[k] = g.outcome.reason;
     const liveBlockers: Record<string, number[]> = {};
     const unknown = new Set<number>();
     for (const i of issues) {
@@ -612,8 +622,8 @@ export class Engine {
     const launchState: Record<string, LaunchState> = {};
     for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) launchState[k] = v.state;
     return {
-      snap: { issues, prs, runs, bot_last, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody },
+      snap: { issues, prs, runs, bot_last, bot_report, pm_art: s.pmArt },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
       unknown,
     };
   }
@@ -706,9 +716,12 @@ export class Engine {
       } else if (reason === "unknown" && c.unknown === 0) {
         pick = { art: baseArt(n), np: "unknown" };
       } else if (reason === "artifact" && c.artifact === 0) {
-        const extra = neededArts(n, input).filter((a) => !prevNames.includes(a));
+        // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。報告が無い (古い保存値) は新しい素材なし。
+        const rep = snap.bot_report[String(n)];
+        const stop = isStopReport(rep?.head ?? "");
+        const extra = stop ? neededArts(n, input).filter((a) => !prevNames.includes(a)) : [];
         if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
-        else note = "artifact: 新しい素材なし";
+        else note = !rep || stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
       } else {
         note = `oc:no-pr ${reason} 再投入済み`;
       }
@@ -1353,6 +1366,8 @@ export class Engine {
       relaunch: c("relaunch"),
       user: c("user"),
       stopped: c("stopped"),
+      // 最後の run-outcome が artifact で止まり、新しい素材が無く再投入しないもの (PM の判断待ち)。
+      no_pr_needs_pm: rows.stopped.filter(([n]) => (this.s.issues[String(n)]?.labels ?? []).includes("oc:no-pr") && this.s.sig[String(n)]?.outcome?.reason === "artifact").length,
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
       pm_detected: pmDetected,
