@@ -11,7 +11,7 @@
 ## 2. 変更
 
 - `tools/icall/fa_ranges_2079.txt` (新規): `fa_ranges_1633.txt` (HEAD の 151 関数) に `0x1810806a0` を root として `closure.py` で再計算した **152 関数**。
-- 再生成手順 (`work/` は gitignore): `closure.py --roots fa_ranges_1633.txt,<0x1810806a0> --out ...` → `roundtrip.sh <SlateCore.core_64> <範囲> freshair-core` (`CHUNKS` は既定 1) → `fa_route_build.sh`。
+- 再生成手順 (`work/` は gitignore): `closure.py --pe <SlateCore.core_64> --roots tools/icall/fa_ranges_2079.txt --out ...` (152 関数。§6 と同一) → `roundtrip.sh <SlateCore.core_64> tools/icall/fa_ranges_2079.txt freshair-core` (`CHUNKS` は既定 1) → `fa_route_build.sh`。`--roots` はカンマ区切りの**ファイルパス**の一覧で、`fa_ranges_2079.txt` には root `0x1810806a0` を含む。
 
 注意 (CHUNKS): `CHUNKS=4` で回すと `after.0.restored.ll` に全関数が入らず、`fa_route` の table が 36 件になる。`fa_route_build.sh` は chunk 0 しか読まないため、既定 1 で回すこと。
 
@@ -32,16 +32,20 @@ sweep の `funcs 142` は closure 152 との差 10 件を含む。その 10 件�
 ## 4. 残った wasm abort の切り分け
 
 - `fa_route` の FAIL-FAST: `[icall] FAIL-FAST: unresolved indirect target 0xb77e88c8000 at site VA 0x310553e6`。site `0x1810553e6` の間接 call で、target 値は image 外の不正値。
-- 値は `0x1810806a0` の shifted 値ではない。符号化 (encoded) された関数ポインタを復号せずに使っている疑いがある。これは ICALL-57 (#2081、encoded 表の連続範囲と数) の範囲と推定 (未検証)。
+- 値は `0x1810806a0` の shifted 値ではない。符号化 (encoded) された関数ポインタを復号せずに使っている疑いがある。
+- #2081 (ICALL-57、`REPORT_APPENDIX_2081.md`・main 取り込み済み) の結論との整合:
+  - **支持する**: #2081 §2 は SlateCore の encode 形式 (`mov r10,[cookie]` → `xor r10,[slot]` → `ror r10,cl`) と decode 関数 `0x181055400` を確認している。符号化された値を復号せずに使うという本節の疑いは、この形式と整合する。
+  - **矛盾しない**: #2081 §3 では slot `0x1813068f8` の encode 側の書込みが `0x1810553c8` と確認されている。`0x1810553c8` は失敗 site を含む関数 `0x1810553d0` の直前である。
+  - **未確認**: site `0x1810553e6` の target が encoded 表由来かどうかは未確認。#2081 では表の連続範囲と entry 数が静的解析では未確定で (受入条件 1・3 は未達)、確定には実行時トレースが要る。その作業は #2120 (ICALL-59) に移った。
 - `0x181065928`: wasm 側は `Maximum call stack size exceeded`。再帰の疑い (未切り分け)。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x1810553d0` の site `0x1810553e6` が不正 target `0xb77e88c8000` を呼ぶ (encoded 関数ポインタの復号が疑われる)。受入条件 1 の値の不一致解消 | `0x1810553d0` の wasm abort | #2081 (ICALL-57) で確認予定 (推定・未検証) |
+| `0x1810553d0` の site `0x1810553e6` が不正 target `0xb77e88c8000` を呼ぶ (encoded 関数ポインタの復号が疑われる)。受入条件 1 の値の不一致解消 | `0x1810553d0` の wasm abort | #2120 (ICALL-59)。#2081 の結論どおり、decode 関数の実行時トレースで確認する (未検証) |
 | `0x181065928` の wasm 側 stack overflow (`RangeError`) と native SIGSEGV (基準なし) | 受入条件 2 の件数変化の確定 | #2079 (本 issue。再現の切り分けを残す) |
-| encoded 表 (api-set 相当) の連続範囲と数 | 受入条件 2 | #2081 (ICALL-57) |
+| encoded 表 (api-set 相当) の連続範囲と数 | 受入条件 2 | #2120 (ICALL-59)。#2081 (ICALL-57) は静的解析で範囲を確定できなかった |
 | crash 残り 3 件の原因切り分け | 前 run の残件 | #2083 (ICALL-58) |
 | 実経路で必要な未実装 import の実装 | 同上 | #1922 (ICALL-52) |
 
