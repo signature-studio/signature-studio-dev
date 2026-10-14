@@ -26,7 +26,7 @@ undefined / duplicate は全件 0。修正前の値は旧 build.sh を一時コ�
 - 修正前と並べる値の出典は次のとおり。どれも**本測定の IR と同一ではない**:
   - `units_run 17 / threw OOB / total_calls 97 / distinct_called 28 / dropped 0`: `tools/m11/REPORT_SHX-T27.md` §A-1-2 (main `e051402a`・`build.sh --trace --soft` は `signature mismatch=1`)。同節は **stale な work-m11 IR** での値 (T27 §1・§4-F)。
   - `icall_ok 24`: `tools/m11/REPORT_SHX-T26.md` §1 の表 (D19 ガード版の build・`signature mismatch=1`)。**ガードを加えた別 IR** の値。同じ stale IR の snapshot run は `icall_ok 19 / total_calls 94` (T26 §2)。
-- 結論: 修正前後で boot 到達点が同じかは、**同一 IR で修正前を測っていないため確認できていない**。本 run は emcc (`/opt/emsdk`) と `work-m11` が無く、IR を作り直せなかった。
+- 結論: 修正前後で boot 到達点が同じかは、**同一 IR で修正前を測っていないため確認できていない**。本 run は emcc (`[EMSDK]`) と `work-m11` が無く、IR を作り直せなかった。
 
 ### 12.3 e2e (測定 commit `e0e35f9a`)
 
@@ -48,7 +48,7 @@ undefined / duplicate は全件 0。修正前の値は旧 build.sh を一時コ�
 | `declare dso_local ...` (属性付き) | rc 0・i64 呼出し残 3 (無言) | rc 1 (fail-closed) |
 | 宣言無し・参照あり | rc 0・i64 呼出し残 2 (無言) | rc 1 (fail-closed) |
 
-- ビルドと e2e の再測定は未実施。`build.sh` の 6 variant・ws/midi/trace の e2e は、emcc と work-m11 が無いため本 run では動かせなかった。fail-closed 化の後の再測定は未解決 (#2444 にコメント)。
+- ビルドと e2e の再測定は未実施。`build.sh` の 6 variant・ws/midi/trace の e2e は、emcc ([EMSDK]) と work-m11 が無いため本 run では動かせなかった。fail-closed 化の後の再測定は未解決 (#2444 にコメント)。
 
 コード差分 (測定 commit から HEAD まで・`tools/m11/shimx_link/*.py`): `git diff e0e35f9a 763a599d -- tools/m11/shimx_link/sx_handle_norm.py`
 
