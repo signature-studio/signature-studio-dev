@@ -124,7 +124,26 @@ LIVE-IN:
 ### 3.4 受入条件 4: コード差分
 
 - 測定 commit `a511e0c7` から HEAD までの `tools/m11/ldfix` の差分は、この REPORT と結果 JSON・negctl の追加のみ。判定器 `.py` の差分は 0 行 (`audit_frame_store_verdict.py`)。
-- 差分出力は下記 §3.5 を参照 (測定 commit から HEAD までの `git diff --stat` と `.py` 差分の出力)。
+- 差分出力は下記 §3.5 を参照。判定器の測定 commit は `a511e0c7` のまま (判定器 `.py` に差分が無いため再測定は不要)。negctl は HEAD で実行した (§3.3)。
+
+### 3.5 差分の出力 (WORKFLOW §6)
+
+コマンド: `git diff --stat a511e0c7 HEAD -- tools/m11/ldfix`、`git diff --name-status a511e0c7 HEAD -- tools/m11/ldfix`、`git diff a511e0c7 HEAD -- tools/m11/ldfix/audit_frame_store_verdict.py | wc -l`。測定 HEAD は `8756da9e` (negctl と未判定一覧を含む commit)。以降の commit は REPORT の文言だけを変える。
+
+```
+ tools/m11/ldfix/REPORT_2185.md                     |  146 +++
+ tools/m11/ldfix/negctl_frame_store_2185.py         |   61 ++
+ .../ldfix/results/frame_store_verdict_2185.json    | 1067 ++++++++++++++++++++
+ .../m11/ldfix/results/negctl_frame_store_2185.json |  108 ++
+ 4 files changed, 1382 insertions(+)
+A	tools/m11/ldfix/REPORT_2185.md
+A	tools/m11/ldfix/negctl_frame_store_2185.py
+A	tools/m11/ldfix/results/frame_store_verdict_2185.json
+A	tools/m11/ldfix/results/negctl_frame_store_2185.json
+0
+```
+
+判定器 `audit_frame_store_verdict.py` の差分は 0 行。追加 4 件はいずれも判定の結果・検証スクリプト・REPORT。
 
 ## 4. 旧版 (REPORT_2144) との差
 
