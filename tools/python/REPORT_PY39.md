@@ -168,7 +168,7 @@
 | `node tests/provider_check.mjs` | `{"functions":435,"implemented":70,"unimplemented":365,"mcp_static":60,"PASS":true}` | 0.373 秒 |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` | 2.052 秒 |
 | `node tests/all_tools.mjs` (mock) | 48/48 ok・host_calls 37425 | 2.033 秒 |
-| 前提: `fetch_inputs.sh` (`FL_WIN64_DIR=work/fl`) / `build_cpython_wasm.sh` / `FLPY_SKIP_TABLE=1 EMSDK_DIR=/opt/emsdk build_flpy.sh` | 成功 | 0.612 秒 / 240.835 秒 / 6.042 秒 |
+| 前提: `fetch_inputs.sh` (`FL_WIN64_DIR=work/fl`) / `build_cpython_wasm.sh` / `FLPY_SKIP_TABLE=1 EMSDK_DIR=<[EMSDK]> build_flpy.sh` | 成功 | 0.612 秒 / 240.835 秒 / 6.042 秒 |
 
 - 測定時 load average (1 分値): 0.53 (4 core)。
 - 差分 0 の証跡: `git diff c6485d55^ 481bcd62 -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (測定 commit のコードは親 `54bacdc0` と同一)。本 REPORT を含む後続 commit でも `git diff 481bcd62 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行。
