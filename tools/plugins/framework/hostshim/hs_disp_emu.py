@@ -15,6 +15,7 @@
 依存: unicorn (pip install unicorn)。
 使い方: FL_WIN64_DIR=<展開先> python3 hs_disp_emu.py [IDs...]   (既定 0..255)
         HS_DISP_OUT=<path.json> を付けると全 ID の結果を JSON に出す。
+        HS_DISP_STACK_FILL=<バイト値> で実行前のスタック内容を指定する (未指定は 0 埋め・#2782)。
 """
 import os
 import sys
@@ -22,7 +23,7 @@ import json
 from collections import Counter
 
 import pefile
-from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED, UC_PROT_ALL
+from unicorn import Uc, UC_ARCH_X86, UC_MODE_64, UC_HOOK_CODE, UC_HOOK_MEM_UNMAPPED, UC_HOOK_MEM_WRITE, UC_PROT_ALL
 from unicorn import UC_MEM_READ_UNMAPPED, UC_MEM_WRITE_UNMAPPED, UC_MEM_FETCH_UNMAPPED
 from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_RSP, UC_X86_REG_RBP, UC_X86_REG_R8, UC_X86_REG_R9, UC_X86_REG_RIP
 
@@ -50,6 +51,14 @@ RET_SPEC = {}
 for _item in filter(None, os.environ.get('HS_DISP_RET_SPEC', '').split(',')):
     _va, _mode = _item.split(':')
     RET_SPEC[int(_va, 0)] = _mode
+# 応答値の格納先 [rbp+0x11a0] (#2782)。Dispatcher 末尾 0x1328a38 の `mov rax,[rbp+0x11a0]` が応答になる。
+# rbp = STACK_TOP-40-0x1838 (entry rsp=STACK_TOP-8・push 4 本・sub 0x1838)。
+RESP_SLOT = STACK_TOP - 40 - 0x1838 + 0x11a0
+RESP_READ_VA = 0x1328a38  # mov rax,[rbp+0x11a0] (応答の読み出し)
+# HS_DISP_STACK_FILL=<バイト値> でスタック領域を指定値で埋める (未指定は従来どおり 0 埋め)。
+# 応答スロットが全 ID で書かれない経路の値が、スタックの初期内容に依存するかを試す (#2782)。
+_FILL = os.environ.get('HS_DISP_STACK_FILL')
+STACK_FILL = int(_FILL, 0) if _FILL else None
 ACCESS_NAME = {UC_MEM_READ_UNMAPPED: 'read', UC_MEM_WRITE_UNMAPPED: 'write', UC_MEM_FETCH_UNMAPPED: 'fetch'}
 
 
@@ -69,8 +78,11 @@ def run_one(ident, image, base, size, pe_data_sections):
     uc.mem_map(STACK_BASE, STACK_SIZE, UC_PROT_ALL)
     uc.mem_map(SENT & ~(PAGE - 1), PAGE, UC_PROT_ALL)
     uc.mem_write(SENT, b'\xf4')  # hlt (SENT 到達の検出用)
+    if STACK_FILL is not None:
+        uc.mem_write(STACK_BASE, bytes([STACK_FILL]) * STACK_SIZE)
 
-    st = {'steps': 0, 'stop': None, 'callouts': [], 'path': [], 'unmapped': 0, 'trail': [], 'hit': [], 'pages': Counter()}
+    st = {'steps': 0, 'stop': None, 'callouts': [], 'path': [], 'unmapped': 0, 'trail': [], 'hit': [], 'pages': Counter(),
+          'slot_writes': []}
     fn_range = (FN_LO, FN_HI)
 
     def on_code(uc_, addr, sz, _):
@@ -83,6 +95,8 @@ def run_one(ident, image, base, size, pe_data_sections):
             st['stop'] = 'return'
             uc_.emu_stop()
             return
+        if addr == RESP_READ_VA:
+            st['rbp_ok'] = uc_.reg_read(UC_X86_REG_RBP) == RESP_SLOT - 0x11a0
         if not (fn_range[0] <= addr < fn_range[1]):
             # 関数外へ入った = call 先 (外部 / 他関数)。戻り先を pop して rax=0 で戻す
             sp = uc_.reg_read(UC_X86_REG_RSP)
@@ -117,8 +131,12 @@ def run_one(ident, image, base, size, pe_data_sections):
             return False
         return True
 
+    def on_slot_write(uc_, access, addr, sz, val, _):
+        st['slot_writes'].append('0x%x=0x%x' % (uc_.reg_read(UC_X86_REG_RIP), val))
+
     uc.hook_add(UC_HOOK_CODE, on_code, begin=base, end=base + size - 1)
     uc.hook_add(UC_HOOK_MEM_UNMAPPED, on_unmapped)
+    uc.hook_add(UC_HOOK_MEM_WRITE, on_slot_write, begin=RESP_SLOT, end=RESP_SLOT + 7)
 
     sp = STACK_TOP
     uc.mem_write(sp + 0x20, (0).to_bytes(8, 'little'))       # Value (caller [rsp+0x20])
@@ -147,6 +165,8 @@ def run_one(ident, image, base, size, pe_data_sections):
         'unmapped': st['unmapped'],
         'unmapped_pages': {'0x%x/%s' % (p, a): n for (p, a), n in st['pages'].items()},
         'hit': st['hit'],
+        'slot_writes': st['slot_writes'],
+        'rbp_ok': st.get('rbp_ok'),
     }
 
 
@@ -173,6 +193,12 @@ def main():
         sum(1 for r in res.values() if r['unmapped']), sum(pages.values()), len(pages),
         len(set(k.split('/')[0] for k in pages))))
     print('unmapped top (page/access, count over all IDs): %s' % ', '.join('%s=%d' % kv for kv in pages.most_common(5)))
+    no_write = sorted(k for k, r in res.items() if not r['slot_writes'])
+    print('slot [rbp+0x11a0]: IDs with no write = %d (stack_fill=%s) rbp_ok=%d / mismatch=%d / unreached=%d' % (
+        len(no_write), 'none' if STACK_FILL is None else '0x%02x' % STACK_FILL,
+        sum(1 for r in res.values() if r['rbp_ok'] is True), sum(1 for r in res.values() if r['rbp_ok'] is False),
+        sum(1 for r in res.values() if r['rbp_ok'] is None)))
+    print('slot no-write IDs: %s' % ' '.join('0x%02x' % k for k in no_write))
     out = os.environ.get('HS_DISP_OUT')
     if out:
         json.dump({'%d' % k: v for k, v in res.items()}, open(out, 'w'), indent=1)
