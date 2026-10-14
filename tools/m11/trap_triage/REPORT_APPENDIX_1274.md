@@ -18,17 +18,17 @@
 
 ## 5k. ON-only override の 4 要素同時除外と 410360 戻り値の切り分け (#2131 次 run)
 
-- 測定 commit: `016cc403` (= origin/main、worktree `ws-2131`)。`all_off` の build・survey は HEAD で測定 (`ov.o` 作り直し、測定後に `m11_ov.c` を復元し `git status` で差分 0 を確認)。
-- 素材: fl-win64 (`FL_WIN64_DIR`)・toolchain-retdec・toolchain-emsdk・work-m11 を展開。`m11_gen_ir2.sh` rc=0 (41 s、F1=902、errors=0)。
-- 基準 ON (`SV_RAW=1`、全 942 unit): `ok 869 / oob 15 / abort 2 / halt0 7 / miss 47 / noproc 1 / other 1` (§5i と一致)。測定元は前 run の `a1d55799` 作業ツリーで、本 run では再測定していない。出所は未検証: 当時の作業ツリーが未コミット WIP を含まなかったことを示す記録が無い。`git diff a1d55799 016cc403 -- tools/m11` は `REPORT_1676.md`・`REPORT_SHX-T27.md`・`store_watch_2217.sh` の 3 ファイル (93 行追加、ビルド入力のコードは無し)。再測定は、`toolchain-retdec`・`toolchain-emsdk`・`work-m11` が本 run の素材に無いため行えなかった。
+- 測定 commit: `016cc403` (= origin/main)。変種の build・survey はこの commit のソースに変種の差し替えを足して行った (`ov.o` 作り直し、測定後に `m11_ov.c` を復元し `git status` で差分 0 を確認)。
+- 素材 (測定時): fl-win64・toolchain-retdec・toolchain-emsdk・work-m11 を展開。`m11_gen_ir2.sh` rc=0 (41 s、F1=902、errors=0)。本 run の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` しか無く、toolchain-retdec・toolchain-emsdk・work-m11 は無いため、本 run では再測定できない。
+- 基準 ON (`SV_RAW=1`、全 942 unit) の再測定は未実施。前 run の値 (`ok 869 / oob 15 / abort 2 / halt0 7`) は測定元が `a1d55799` 作業ツリーで、clean だった証跡が無く出所は未検証のため、本節の比較には使わない。`git diff a1d55799 016cc403 -- tools/m11` はビルド入力のコードに差分が無い (`REPORT_1676.md`・`REPORT_SHX-T27.md`・`store_watch_2217.sh` の 3 ファイル)。
 
 | 変種 (ON のまま外すもの) | 測定 commit | ok / oob / abort / halt0 | unit 190 |
 |---|---|---|---|
 | `all_off`: 41c130 disp・9b4b00 disp・413060 gate・410360 vcall (`M11_NOVCALL=1`) を同時に外す | `016cc403` | 869 / 16 / 2 / 6 | oob |
 | `ret0_410360`: 410360 の C 版の戻り値だけ 0 にする | `016cc403` | 未測定 (survey が 400 s で timeout) | 未測定 |
 
-- 読み (all_off): 上の 4 要素を同時に外しても unit 190 は oob のまま (n=1)。つまり ON-only の C 転記のうち、この 4 要素の範囲には原因が無い。abort 2 は残る (OFF は abort 0)。
-- 基準 ON と all_off の差: halt0 7→6、oob 15→16 (ok 869・abort 2 は同じ)。よって 1 unit が halt0 から oob に移っている。移った unit 番号は未特定。unit 別の JSON (基準 ON・all_off) が本 run に無く、`survey_diff` で比較できなかった。unit 190 の結論 (oob のまま) には影響しない。
+- 読み (all_off): 上の 4 要素を同時に外しても unit 190 は oob のまま (n=1)。つまり ON-only の C 転記のうち、この 4 要素の範囲には原因が無い。all_off の結果では abort 2 が残る。
+- 基準 ON との unit 別比較は未実施。`ablate_2131.py` は変種ごとの JSON を引数で渡された出力先 (`OUT`) に書くが、all_off の JSON は repo・`work/` のどちらにも保存されておらず、`survey_diff` で比較できない。よって「halt0 から oob に移った 1 unit」の記述は採らず、移った unit の番号は未特定。unit 190 の結論 (oob のまま) には影響しない。
 - `ret0_410360` は survey が 400 s で timeout した。通常時の所要時間は本 run で測っていないため、比較の根拠は無い。410360 の戻り値を 0 にすると、呼出し側が hang する可能性がある (推定。未検証)。原因は未切り分け。
 - 測定に使った一時変更 (`all_off`・`ret0_410360` の define 差し替え) は本 PR の script にのみ残し、`m11_ov.c` は変更していない。
 - 未達 (受入条件 1・2): ON の `407a50` の `[arg-8]` 参照先を変える書込元は未特定。次の候補は、ON の build で変わる `407a50` の呼出し先 (481790・412d60・4133f0) の書込み、または 410360 の戻り値 (呼出し側の観測) の扱い。
