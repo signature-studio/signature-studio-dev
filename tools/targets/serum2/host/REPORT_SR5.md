@@ -26,11 +26,16 @@
 
 ## 2. 既存 e2e への影響 (測定 commit 以降のコード差分)
 
-`vst3host.cpp` の変更は `dcafb442` の 1 commit のみ。測定 commit から HEAD までのコード差分は 0 (測定は HEAD で実施)。
+`vst3host.cpp` の変更は `dcafb442` の 1 commit のみ。測定 commit 以降の host 配下のコード差分は以下 (`92f88190` で追加: 表記修正と `set -e` 下の終了コード処理)。
 
 ```
-git diff dcafb442 HEAD -- tools/targets/serum2/host   → (空)
+git diff dcafb442 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
+  ref_harness.sh   : 表示文言 data → file SHA-256 (1 行)
+  ref_manifest.json / ref_manifest.py : runner 表記 /usr/lib/wine/wine64 → apt wine 9.0 (1 行ずつ)
+  ref_render.sh    : wine 実行を `|| RC=$?` に変更 (RC=0 を先置き)
 ```
+
+この差分は実行経路を変えるため、`92f88190` 上での再測定が必要。ただし本 run では `wine64` と `plugins-serum2` (実 DLL) が無く、`ref_harness.sh` と `e2e.sh` を再実行できなかった。上の表の数値は `dcafb442` 時点の実測であり、`92f88190` の実測ではない。`bash -n` による構文確認のみ `92f88190` で実施 (OK)。再測定は素材 `plugins-serum2` を依頼に追加して行う (未解決 #3)。
 
 `S2HOST_PITCH` 未設定時は従来どおり pitch 60、WAV は追加出力のみで既存の summary・ログは変えない。
 
@@ -41,3 +46,4 @@ git diff dcafb442 HEAD -- tools/targets/serum2/host   → (空)
 | wasm 候補 (SR-4 の WAV) との比較 | 受入 4。入力口は `ref_harness.sh <candidate.wav> <class>` で用意済み | #2383 [SR-45] (親: #73) |
 | 参照は既定 Init state のみ (ファクトリ preset 未使用) | 「固定 state (preset 1〜数本)」の受入に届かない。Init 合成は preset 未取得時の許容 | #2384 [SR-46] (親: #73) |
 | C/D 許容閾値は暫定 (ORACLE §7) | ネイティブ FL の golden 待ち。Serum 2 の閾値は本件で再校正していない | ORACLE §7 (既存) |
+| `92f88190` 上の再測定 (ref_harness / e2e) | 測定 commit `dcafb442` 以降に実行経路を変える差分あり。本 run では素材 `plugins-serum2` が無く未実施 | 本 PR で `oc_artifacts: fl-win64 plugins-serum2` を付けて再起動 (起票先: PR #2385) |
