@@ -48,7 +48,7 @@
 #### 現 head での全件再生成と記録の比較 (LD-60 / #1736)
 - **再生成の基準 = `576c4976`** (測定時の `origin/main`)。ただし再生成の値は `576c4976` のコードの結果とは言えない。fix run で `git diff 576c4976 8a75e60a -- tools/liftdiff` を確認すると 17 ファイル・444 行追加の差分があり、空ではない (同一コードという前版の主張は誤りだった)。
   - 鮮度の正本は上の `200cc2b4` 側 (測定に使う 3 ファイルの差分 0 行) で、`576c4976` 基準の差分は参考値。
-  - 比較 (検証 HEAD `c66ddd7b`): `git diff 576c4976 c66ddd7b -- tools/liftdiff` = 20 files・592 insertions・10 deletions (本 REPORT の追記 7 insertions・6 deletions を含む)。`origin/main` と HEAD の `git diff -- tools/liftdiff` は `REPORT_APPENDIX_LD28.md` のみ (merge 後の HEAD で確認)。merge 前後で `tools/liftdiff` のコードは変わっていない (`git diff 848d83fd 85e75eec -- tools/liftdiff` = 0 行)。
+  - 比較 (検証 HEAD `c66ddd7b`): `git diff 576c4976 c66ddd7b -- tools/liftdiff` = 20 files・592 insertions・10 deletions (本 REPORT の追記 7 insertions・6 deletions を含む)。`origin/main` と HEAD の `git diff --stat -- tools/liftdiff` は `REPORT_APPENDIX_LD28.md` と `results/m11_418be0_thunk.md` (1 行の再生成差分) の 2 files・20 insertions・6 deletions (merge 後の HEAD で確認)。コードの差分は 0 行。merge 前後で `tools/liftdiff` のコードは変わっていない (`git diff 848d83fd 85e75eec -- tools/liftdiff` = 0 行)。
 - **コマンド**: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/liftdiff/liftdiff.py batch tools/liftdiff/targets/m11.json --set closure --shards 14 --nobuild --out tools/liftdiff/work/m11/batch_closure_head.jsonl` (build は同じ target で事前に実施)。
 - **入力・出力 sha256**: 素材 `block00031_PE.bin` = `b2c64da4…9496d` (22,227,016 bytes)。比較対象の記録 `batch_closure.jsonl` = `810b4d3a…bf6` (49,316,750 bytes)。再生成出力 `batch_closure_head.jsonl` = `b7990688…ae462` (51,854,845 bytes)。
 - **所要**: 858 s (shards 14・4 コア・開始時 load average 0.41・RC 0)。
