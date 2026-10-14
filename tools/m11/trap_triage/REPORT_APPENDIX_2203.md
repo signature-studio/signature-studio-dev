@@ -1,6 +1,6 @@
 # REPORT_APPENDIX_2203 — unit 158 の j=12 が読む 2 区間の OFF/ON 比較 (#2203, 親 #2152)
 
-測定 commit: **`99ca61b2`** (コードを変えた最後の commit = 計装の追加)。最終測定はこの commit の状態で再実行した (§3)。HEAD からこの commit までのコード差分は 0 (§5)。
+測定 commit: **`da002968`** (コードを変えた最後の commit = 計測 script から repo 外絶対パスを外した commit)。計装の追加は `99ca61b2`。最終測定はこの commit の状態で再実行した (§3)。`99ca61b2` で取った値と全出力は一致した。HEAD からこの commit までのコード差分は 0 (§5)。
 
 ## 1. 結論 (受入条件 1〜4)
 
@@ -10,7 +10,7 @@
   - j=12 の `len` 差 (0 vs 1): **意味的差** (推定)。呼出し元で決まる `len` が j<12 の状態差から変わる。伝播経路は未追跡 (§6 (a))。
   - ON だけ trap する件 (entry 指紋を入れた観測版): **観測副作用**。同じ観測を入れた OFF は ok (§3 表 1)。
 - **受入 3 (OFF の dest 値の直接記録と 1 対 1 比較)**: 達成。OFF (lift 版 IR) の entry 出力 (`[d413060]`) を取った。j=0〜16 の dest は ON と全件一致。`len` は j=12 だけ不一致 (OFF 0 / ON 1)。
-- **受入 4 (決定性・所要・load)**: 達成。4 構成 (clean ON/OFF・dest-build ON/OFF) すべてで同一 build の 2 回の出力が `cmp` 一致。node 1 回の所要は 361〜387 ms。開始時 load は 0.46〜0.92 (4 core)。最終測定の全体は 145 秒 (build 5 回 + 実行 8 回)。
+- **受入 4 (決定性・所要・load)**: 達成。4 構成 (clean ON/OFF・dest-build ON/OFF) すべてで同一 build の 2 回の出力が `cmp` 一致。node 1 回の所要は 363〜377 ms。dest 実行の開始時 load は 0.27〜0.78 (4 core)。最終測定の所要は dest 2 構成が 107 秒 (build 3 回 + 実行 4 回)、clean 2 構成が 46 秒 (build 2 回 + 実行 4 回)。
 
 ## 2. 計装 (読取りのみ・値と分岐は不変)
 
@@ -19,16 +19,16 @@
 - 実行: `bash trap_triage/dest_2203.sh <off|on> <out>` (build → 同一 build で 2 回実行 → `cmp`)。runner は `trap_triage/run_dest_2203.mjs` (`unit 0,1,158`)。
 - clean は `M11_OV_413060={0,1} M11_INSTR_413060=0 M11_DEST_READ=1 bash m11_build.sh` の後に runner を実行 (計装なし)。
 
-## 3. 実測 (HEAD `99ca61b2`)
+## 3. 実測 (測定 commit `da002968`・HEAD で再現)
 
-表 1: unit 0・1・158 の結果と決定性 (IR は `m11_gen_ir2.sh` 再生成後・`ldfix errors=0`)。
+表 1: unit 0・1・158 の結果と決定性 (`da002968`・IR は `m11_gen_ir2.sh` 再生成後・`ldfix errors=0`)。
 
 | 構成 | 計装 | unit 0 | unit 1 | unit 158 | 2 回の出力 | 1 回の所要 (node) |
 |---|---|---|---|---|---|--:|
-| clean OFF (`M11_OV_413060=0`) | なし | ok | ok | ok | 一致 | 364 / 361 ms |
-| clean ON (`M11_OV_413060=1`) | なし | ok | ok | ok | 一致 | 375 / 378 ms |
-| dest-build OFF | entry 指紋 + dest (IR 挿入) | ok | ok | ok | 一致 | 373 / 379 ms |
-| dest-build ON | entry 指紋 + dest + j=12 pre/post (C 版) | ok | ok | **trap: memory access out of bounds** (entry 17 件目の後) | 一致 | 387 / 375 ms |
+| clean OFF (`M11_OV_413060=0`) | なし | ok | ok | ok | 一致 | 371 / 377 ms |
+| clean ON (`M11_OV_413060=1`) | なし | ok | ok | ok | 一致 | 377 / 363 ms |
+| dest-build OFF | entry 指紋 + dest (IR 挿入) | ok | ok | ok | 一致 | 368 / 376 ms |
+| dest-build ON | entry 指紋 + dest + j=12 pre/post (C 版) | ok | ok | **trap: memory access out of bounds** (entry 17 件目の後) | 一致 | 372 / 370 ms |
 
 表 2: unit 158 の `function_413060` 呼出し (entry 0 始まり・dest-build の出力)。entry 0〜11 は dest・len・A・B・w が OFF/ON で全件一致。B は entry 0 の呼出し後に一度だけ変わり (`160c3baea1fede5a`→`9ddaad939734f7ba`)、以後は両者で不変 (`w`=`0x4b0` は全件不変)。
 
@@ -58,7 +58,7 @@
 
 ## 5. コード差分 (受入 4・規約 6)
 
-- 測定 commit `99ca61b2` から HEAD までのコード範囲の差分は、この付録を含む docs 以外 0 行 (`git diff 99ca61b2 HEAD -- tools/m11/m11_ov.c tools/m11/trap_triage/dest_2203.py tools/m11/trap_triage/dest_2203.sh tools/m11/trap_triage/run_dest_2203.mjs` は空)。
+- 測定 commit `da002968` から HEAD までのコード範囲の差分は 0 行 (`git diff da002968 HEAD -- tools/m11/m11_ov.c tools/m11/trap_triage/dest_2203.py tools/m11/trap_triage/dest_2203.sh tools/m11/trap_triage/run_dest_2203.mjs` は空。以後の commit は docs のみ)。
 - 再測定は不要 (測定 commit で実行した)。
 
 ## 6. 未解決 (起票先)
