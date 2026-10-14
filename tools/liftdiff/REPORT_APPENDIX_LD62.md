@@ -52,3 +52,13 @@ trace 先頭 (`t[0]` は hex 文字列。全文は results 側):
 | U2 | 予測と不一致: `stride 2147483647, count 3` は site1/site2 とも予測 False だが `0x409730` に入る (trace 6 件目で入り、FN 直後ではない)。予測式の前提 (どの経路で trap に入るか) がこの入力で成り立たない理由は未判定 | 予測式の妥当性。判定結果そのものは未確定 | #1767 残 |
 | U3 | 正の stride (16) の入力が trap に入らない原因 (struct 配置) | 受入条件 1 の一部 | #1767 残 |
 | U4 | sdiv (符号付き) 再実行で食い違いが消えるか | 受入条件 2 未達 | #1767 残 |
+
+## sdiv 再実行 (受入条件 2・U4)
+
+- 手順: `boot_final3.ll` の 125366 行 `%29 = udiv i64 %28, %arg4` だけを `sdiv` に変えた IR (`tools/m11/work/boot_final3_sdiv.ll`) から wasm を作り (`work/m11_sdiv`、ビルド 8.1 秒・rc 0)、udiv 版 (`work/m11`) と同じ 8 入力で native と比べる。
+- 再現: `FL_WIN64_DIR=<展開先> python3 tools/liftdiff/tests/trace_417b70_sdiv_rerun.py > tools/liftdiff/results/m11_417b70_sdiv_rerun.md` (rc 0・所要 11.9 秒・load 0.78 (起動直後))。
+- 結果: [`results/m11_417b70_sdiv_rerun.md`](results/m11_417b70_sdiv_rerun.md)。
+  - native は 8 件すべて `segv` (除算より前。stride 16 count 1 は `rip_rva=0x7a97`、stride -16 count 1 は `0x17e4a` で fault 位置が入力ごとに違う)。
+  - udiv 版・sdiv 版 wasm は 8 件すべて `trap`。比較は全件 `both_fault` で、**sdiv 化で食い違いが消えたかは判定できない** (U4 未達)。
+  - wasm の trace 先頭は udiv / sdiv で差がある (例: stride 16 count 1 は sdiv 版が `0x409410 → 0x407a50 → 0x407770 → 0x409730` と trap へ入る)。ただし native が先に segv するため、この差が正しいかは判定できない。
+- 未達の原因: native 側が 8 入力すべて除算に到達しない。入力の struct 配置 (U1・U3) が未解決のため、比較の基準が無い。
