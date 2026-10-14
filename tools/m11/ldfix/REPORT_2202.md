@@ -11,9 +11,9 @@
 ## 測定条件
 
 - 測定 commit: `860f8b0c` (fix(ldfix): read dest in rcl/rcr consumers for dest trace (#2202))。コードを最後に変えた commit。以後 `audit_undefload_dest.py` のコードは変わっていない (下の差分節を参照)
-- 検証 HEAD: `860f8b0c` (コード)。その後の文書 commit で HEAD が進んでも、測定対象コードの差分は 0 行 (差分節を参照)
-- 入力: `work-m11` の `tools/m11/work/boot{0,1,2,3,4}.norm0.ll` (5 入力, `$HOME/artifacts/work-m11.tar.zst` から展開。gitignore・commit しない)
-- PE: `fl-win64` の `extracted/block00031_PE.bin` (`$HOME/artifacts/fl-win64.tar.zst` から展開。commit しない)
+- コード差分: 測定 commit から HEAD まで 0 行 (差分節を参照)。以後の文書 commit で HEAD が進んでも同じ
+- 入力: `work-m11` の `tools/m11/work/boot{0,1,2,3,4}.norm0.ll` (5 入力, `docs/REFERENCES.md` の `[WORK-M11]` の展開先。gitignore・commit しない)
+- PE: `fl-win64` の `extracted/block00031_PE.bin` (`oc_artifacts: fl-win64` で取得し、`docs/WORKFLOW.md` §11 の手順で展開。commit しない)
 - 比較基準 (before): `cdc67bb8` 時点の `audit_undefload_dest.py` (`git show cdc67bb8:...`)。出力は `dest_riprip` を含むよう作業用コピーで 1 箇所だけ補った (`work/2202/base/`)。分類ロジックは cdc67bb8 のまま。依存 (`ldmach.py`・`ldframe.py`・`audit_undefload.py`) は cdc67bb8 → HEAD で不変
 - 実行: `python3 audit_undefload_dest.py <PE> <OUT> boot{0..4}.norm0.ll`。rc 0。
   - 測定 (`860f8b0c`): real 39.24 秒 (`time` 実測。`user` 38.88 秒)。実行前後の load average 0.68 → 0.90
@@ -68,7 +68,7 @@ python3 tools/m11/ldfix/audit_undefload_dest.py extracted/block00031_PE.bin out.
 
 ## 測定 commit から検証 HEAD までの差分 (コード)
 
-測定 commit `860f8b0c` → 検証 HEAD (本 PR の head。`git diff 860f8b0c HEAD -- tools/m11/ldfix/audit_undefload_dest.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldframe.py tools/m11/ldfix/audit_undefload.py` の実出力):
+測定 commit `860f8b0c` → HEAD (本 PR の最新 commit は PR 本文を参照):`git diff 860f8b0c HEAD -- tools/m11/ldfix/audit_undefload_dest.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldframe.py tools/m11/ldfix/audit_undefload.py` の実出力):
 
 ```
 (空: 差分 0 行)
@@ -94,12 +94,12 @@ PR head `255d5a53` の review (request-changes) への対応 (測定 commit `711
 
 ### 検証スクリプト
 
-`tools/m11/ldfix/verify_dest_2202.py` (commit `07cb1f47`、回帰ケース 3d・3e は `860f8b0c` で追加)。入力: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst extracted/block00031_PE.bin`)。合成機械語は同ファイル内に記載。
+`tools/m11/ldfix/verify_dest_2202.py` (commit `07cb1f47`、回帰ケース 3d・3e は `860f8b0c` で追加)。入力: `fl-win64` の `extracted/block00031_PE.bin` (`docs/WORKFLOW.md` §11 の `oc_artifacts: fl-win64` 手順で展開)。合成機械語は同ファイル内に記載。
 
-実行 (検証 HEAD `860f8b0c`、リポジトリ直下で実行。`timeout 300`・rc 0):
+実行 (測定 commit `860f8b0c`、リポジトリ直下で実行。`timeout 300`・rc 0):
 
 ```
-$ python3 tools/m11/ldfix/verify_dest_2202.py $RUNNER_TEMP/pe2202/extracted/block00031_PE.bin
+$ python3 tools/m11/ldfix/verify_dest_2202.py extracted/block00031_PE.bin
 [1] PE 69c381 eax <- 69c378 mov eax, dword ptr [rip + 0xf58576] : rip_rva=0x15f48f4  OK
 [2a add eax,ecx (ecx=reg def)] consumer cmp eax, 0 -> writer mov ecx, edx  mem=False  OK
 [2b shl eax,cl (cl=rip read)] consumer cmp eax, 0 -> writer mov ecx, dword ptr [rip + 0x1fa]  mem=True  OK
