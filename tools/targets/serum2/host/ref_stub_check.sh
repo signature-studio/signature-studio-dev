@@ -8,7 +8,7 @@ FLP="$(cd "$HERE/../../../flp" && pwd)"
 T="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/sr5stub.XXXXXX")"
 trap 'rm -rf "$T"' EXIT
 S="$T/tools/targets/serum2"
-mkdir -p "$T/bin" "$S/work" "$S/host/work/build"
+mkdir -p "$T/bin" "$S/work/content_full/Tables" "$S/host/work/build"
 cp "$HERE"/ref_render.sh "$HERE"/ref_harness.sh "$HERE"/ref_manifest.json "$S/host/"
 ln -s "$FLP" "$T/tools/flp"
 : > "$S/host/work/build/vst3host.exe"
@@ -39,11 +39,11 @@ out="$(STUB_RC=0 bash "$S/host/ref_render.sh" "$T/o0" 60 2>&1)"; rc=$?
 chk "rc=0 のとき exit" "$rc" 0
 
 echo "== content dir (S2REF_CONTENT) =="
-printf '%s' "$out" | grep -q '^content=.*/work/ref_content tables=no$' && echo "  [OK] 既定は専用の空 dir (tables=no)" || { echo "  [NG] 既定の content 表示が不正"; FAIL=$((FAIL+1)); }
-mkdir -p "$T/full/Tables"
-out="$(S2REF_CONTENT="$T/full" bash "$S/host/ref_render.sh" "$T/ofull" 60 2>&1)"; rc=$?
-chk "S2REF_CONTENT=<Tables あり dir> の exit" "$rc" 0
-printf '%s' "$out" | grep -q "^content=$T/full tables=yes$" && echo "  [OK] 指定 dir と tables=yes を表示" || { echo "  [NG] 指定 dir / tables=yes が表示されない"; FAIL=$((FAIL+1)); }
+printf '%s' "$out" | grep -q '^content=.*/work/content_full tables=yes$' && echo "  [OK] 既定は installer 全展開 (tables=yes)" || { echo "  [NG] 既定の content 表示が不正"; FAIL=$((FAIL+1)); }
+mkdir -p "$T/empty"
+out="$(S2REF_CONTENT="$T/empty" bash "$S/host/ref_render.sh" "$T/oempty" 60 2>&1)"; rc=$?
+chk "S2REF_CONTENT=<空 dir> の exit" "$rc" 0
+printf '%s' "$out" | grep -q "^content=$T/empty tables=no$" && echo "  [OK] 指定 dir と tables=no を表示" || { echo "  [NG] 指定 dir / tables=no が表示されない"; FAIL=$((FAIL+1)); }
 S2REF_CONTENT="$T/none" bash "$S/host/ref_render.sh" "$T/onone" 60 >/dev/null 2>&1; chk "存在しない S2REF_CONTENT の exit" "$?" 1
 
 echo "== harness 全体 (stub WAV。ref_manifest.json 照合のみ NG が正) =="

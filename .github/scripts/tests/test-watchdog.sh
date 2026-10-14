@@ -46,6 +46,10 @@ if [ "$1" = pr ] || [ "$1" = label ] || [ "$1" = issue ]; then
     echo "Pull request is not mergeable" >&2
     exit 1
   fi
+  if [ "$1 $2" = "issue comment" ] && [ -n "${FAKE_COMMENT_FAILS:-}" ]; then
+    echo "fake gh: injected comment failure" >&2
+    exit 1
+  fi
   exit 0
 fi
 shift
@@ -91,7 +95,7 @@ not_logged() { ! grep -q -- "$1" "$LOG"; }
 OLD="2020-01-01T00:00:00Z"
 REVIEWER="oc-reviewer-for-signature-studio[bot]"
 
-reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; : > "$FAKE_CURL_LOG"; unset FAKE_MERGE_FAILS FAKE_FAIL FAKE_CURL_FAIL; export OC_WORKER_URL_FILE="$TMP/no-worker-url"; }
+reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; : > "$FAKE_CURL_LOG"; unset FAKE_MERGE_FAILS FAKE_COMMENT_FAILS FAKE_FAIL FAKE_CURL_FAIL; export OC_WORKER_URL_FILE="$TMP/no-worker-url"; }
 fx() { printf '%s' "$2" > "$FIX/${1//\//_}"; } # fx <path> <json>
 # runs / PR 一覧は全ケース共通の形。active_runs は workflow_runs の JSON (既定は空)。
 base() { # base <prs json> [active runs json]
@@ -109,7 +113,7 @@ run_sha() { local p="$1" sha="$2" nums="" ; shift 2; for n in "$@"; do nums="$nu
 pr() { printf '{"number":%s,"title":"PR %s","head":{"sha":"%s","repo":{"full_name":"%s"}},"draft":%s,"updated_at":"%s","labels":%s,"body":%s}' "$1" "$1" "$2" "${7:-o/r}" "$3" "$4" "${5:-[]}" "$(jq -Rn --arg b "${6:-}" '$b')"; }
 # detail <n> <mergeable> <reviews json> <comments json>
 detail() {
-  fx "repos/o/r/pulls/$1" "{\"mergeable\":$2}"
+  fx "repos/o/r/pulls/$1" "{\"state\":\"open\",\"merged_at\":null,\"mergeable\":$2}" # state / merged_at は reopen-pr.sh が読む (#2597)
   fx "repos/o/r/pulls/$1/reviews" "${3:-[]}"
   fx "repos/o/r/issues/$1/comments" "${4:-[]}"
 }
@@ -819,6 +823,237 @@ worker true true true "$(ago 1)"
 GITHUB_STEP_SUMMARY="$TMP/summary-w.md" wd
 grep -q '^worker=ok' "$TMP/summary-w.md"
 expect "worker status is written to the step summary" $?
+
+# 34〜. 暫定の oc-pm 起動 (#CI-50)。停止 PR (oc:stuck) は issues/<N>/comments、oc:no-pr の issue は issue list、記録の一覧は issues/comments (fixture)。
+tcm() { jq -nc --arg l "$1" --arg t "$2" --arg b "$3" '{user:{login:$l,type:$t},body:$b}'; } # tcm <login> <type> <body>
+ago_s() { date -u -d "@$(($(date -u +%s) - $1))" +%Y-%m-%dT%H:%M:%SZ; }                    # ago_s <秒前>: GitHub の時刻の形
+mk() { tcm "$REVIEWER" Bot "<!-- oc-pm-dispatch:$1 ts=$(ago_s "$2") -->"; }                  # mk <ref> <秒前>: reviewer の記録 (oc-pm-dispatch)
+LIMIT_INTENT='差し戻しが上限に達したため停止します。<!-- oc-fix-limit --> <!-- oc-pm-intent: stuck pr=60 reason=ceiling -->'
+limit_for() { printf '差し戻しが上限に達したため停止します。<!-- oc-fix-limit --> <!-- oc-pm-intent: stuck pr=%s reason=ceiling -->' "$1"; } # limit_for <PR 番号>: その PR の停止印
+OPENCODE='opencode-for-signature-studio[bot]'
+nopr() { fx 'issue-list?state=open&label=oc:no-pr' "[$1]"; }  # nopr <issue の JSON (,区切り)>: gh issue list --label oc:no-pr
+nrow() { printf '{"number":%s,"labels":[%s]}' "$1" "$2"; }   # nrow <番号> <labels の中身>
+ledger() { fx 'repos/o/r/issues/comments' "[$1]"; }          # ledger <記録の comment JSON (,区切り)>: 実 repo の REST (since 付き) の代わり
+pm_status() { # pm_status <mode> <fresh>: fake /status と URL ファイル
+  printf '{"mode":"%s","configured":true,"installed":true,"fresh":%s,"last_tick":"%s"}' "$1" "$2" "$(ago 1)" > "$FAKE_STATUS"
+  printf 'https://pm.example.test\n' > "$TMP/worker_url"
+  export OC_WORKER_URL_FILE="$TMP/worker_url"
+}
+pm_base() { # 既定: oc:stuck の PR 60 (最新の停止印に intent あり)、oc:no-pr は無し、記録は無し
+  base "[$(pr 60 a60 false "$OLD" '[{"name":"oc:stuck"}]')]"
+  fx 'repos/o/r/issues/60/comments' "[$(tcm "$OPENCODE" Bot "$LIMIT_INTENT")]"
+  nopr ''
+  ledger ''
+}
+
+# 34. oc:stuck の PR で、最新の oc-fix-limit に oc-pm-intent: stuck がある -> oc-pm (kind=stuck ref=60)。送る前に記録のコメントを残す
+reset
+pm_base
+wd
+logged 'api -X POST repos/o/r/dispatches -f event_type=oc-pm' && logged 'client_payload\[kind\]=stuck' && logged 'client_payload\[ref\]=60'
+expect "stuck PR with oc-pm-intent -> repository_dispatch oc-pm (kind=stuck ref=60)" $?
+
+# 34a. 記録のコメント (oc-pm-dispatch:<ref> ts=) は送信より前に残す
+[ "$(grep -n 'issue comment 60 ' "$LOG" | head -n 1 | cut -d: -f1)" -lt "$(grep -n 'api -X POST repos/o/r/dispatches' "$LOG" | head -n 1 | cut -d: -f1)" ] && logged 'oc-pm-dispatch:60 ts='
+expect "the dispatch record comment is written before the dispatch" $?
+
+# 34b. payload は kind と ref の 2 つだけ (自由文を入れない)
+[ "$(grep -o 'client_payload\[[a-z_]*\]' "$LOG" | sort -u | tr '\n' ' ')" = 'client_payload[kind] client_payload[ref] ' ]
+expect "payload keys are exactly kind and ref" $?
+
+# 34c. ネガコン: oc-pm-intent が無い停止 PR は送らない
+reset
+base "[$(pr 61 a61 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/61/comments' "[$(tcm "$OPENCODE" Bot '差し戻しが上限に達しました。<!-- oc-fix-limit -->')]"
+nopr ''; ledger ''
+wd
+not_logged 'dispatches' && not_logged 'oc-pm-dispatch'
+expect "ネガコン: stuck PR without oc-pm-intent is not dispatched" $?
+
+# 34d. 最新の oc-fix-limit だけを見る: 古い停止印に intent があっても、最新に無ければ送らない。逆なら送る
+reset
+base "[$(pr 62 a62 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 63 a63 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/62/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-fix-limit -->'),$(tcm "$OPENCODE" Bot "$(limit_for 62)")]"
+fx 'repos/o/r/issues/63/comments' "[$(tcm "$OPENCODE" Bot "$(limit_for 63)"),$(tcm "$OPENCODE" Bot '<!-- oc-fix-limit -->')]"
+nopr ''; ledger ''
+wd
+logged 'client_payload\[ref\]=62' && not_logged 'client_payload\[ref\]=63'
+expect "only the latest oc-fix-limit decides the intent (ref 62 sent, ref 63 not)" $?
+
+# 34e. ネガコン: 実装 App の login でも Bot でない投稿の停止印の intent は数えない
+reset
+base "[$(pr 64 a64 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/64/comments' "[$(tcm "$OPENCODE" User "$(limit_for 64)")]"
+nopr ''; ledger ''
+wd
+not_logged 'dispatches'
+expect "ネガコン: an intent from a non-bot account is not trusted" $?
+
+# 34f. ネガコン: reviewer の Bot が投稿した停止印は数えない (停止印は実装 App が書く)
+reset
+base "[$(pr 74 a74 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/74/comments' "[$(tcm "$REVIEWER" Bot '<!-- oc-fix-limit --> <!-- oc-pm-intent: stuck pr=74 reason=ceiling -->')]"
+nopr ''; ledger ''
+wd
+not_logged 'dispatches'
+expect "ネガコン: a stop mark posted by the reviewer bot is not counted" $?
+
+# 34g. ネガコン: 別の PR 番号を指すコピーの停止印は数えない (pr=60 は #6 の接頭辞ではなく、#75 とも別)
+reset
+base "[$(pr 6 a6 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 75 a75 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/6/comments' "[$(tcm "$OPENCODE" Bot "$LIMIT_INTENT")]"
+fx 'repos/o/r/issues/75/comments' "[$(tcm "$OPENCODE" Bot "$LIMIT_INTENT")]"
+nopr ''; ledger ''
+wd
+not_logged 'dispatches'
+expect "ネガコン: an intent naming another PR (pr=60 copied to #6 and #75) is not counted" $?
+
+# 35. oc:no-pr の issue で最後の oc-run-outcome の reason が split / stop -> oc-pm (kind=no_pr)。artifact と、後から変わった issue は送らない
+reset
+base '[]'
+nopr "$(nrow 70 '{"name":"oc:no-pr"}'),$(nrow 71 '{"name":"oc:no-pr"}'),$(nrow 72 '{"name":"oc:no-pr"}'),$(nrow 73 '{"name":"oc:no-pr"}')"
+fx 'repos/o/r/issues/70/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-run-outcome: no-pr reason=split run=1 -->')]"
+fx 'repos/o/r/issues/71/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-run-outcome: no-pr reason=artifact run=2 -->')]"
+fx 'repos/o/r/issues/72/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-run-outcome: no-pr reason=stop run=3 -->')]"
+fx 'repos/o/r/issues/73/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-run-outcome: no-pr reason=split run=4 -->'),$(tcm "$OPENCODE" Bot '<!-- oc-run-outcome: no-pr reason=artifact run=5 -->')]"
+ledger ''
+wd
+logged 'client_payload\[kind\]=no_pr' && logged 'client_payload\[ref\]=70' && logged 'client_payload\[ref\]=72' && not_logged 'client_payload\[ref\]=71' && not_logged 'client_payload\[ref\]=73'
+expect "no_pr: reason=split/stop is dispatched, reason=artifact and a later artifact are not" $?
+
+# 35a. ネガコン: pm-apply / needs-user-input の付いた oc:no-pr の issue は、reason が split でも dispatch / コメントが 0 回
+reset
+base '[]'
+nopr "$(nrow 80 '{"name":"oc:no-pr"},{"name":"pm-apply"}'),$(nrow 81 '{"name":"oc:no-pr"},{"name":"needs-user-input"}')"
+fx 'repos/o/r/issues/80/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-run-outcome: no-pr reason=split run=1 -->')]"
+fx 'repos/o/r/issues/81/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-run-outcome: no-pr reason=split run=2 -->')]"
+ledger ''
+wd
+not_logged 'dispatches' && not_logged 'issue comment 8[01] '
+expect "ネガコン: pm-apply / needs-user-input issues get no dispatch and no comment" $?
+
+# 35b. oc:no-pr の一覧が上限 (200 件) に達したら、取りこぼしを警告する (送るかどうかは変えない)
+reset
+base '[]'
+rows=(); for i in $(seq 1 200); do rows+=("$(nrow "$i" '{"name":"oc:no-pr"}')"); done
+nopr "$(IFS=,; echo "${rows[*]}")"
+ledger ''
+wd
+grep -q 'oc:no-pr list reached the limit (200)' "$TMP/out"
+expect "oc:no-pr list at the limit (200) -> warning" $?
+
+# 36. ネガコン: Worker が mode=live かつ fresh=true なら送らない (partial・fresh=false・取れない は送る)
+reset
+pm_base
+pm_status live true
+wd
+not_logged 'dispatches' && grep -q 'oc-pm sent=0 (PM Worker is live' "$TMP/out"
+expect "ネガコン: PM Worker live and fresh -> no dispatch" $?
+
+reset
+pm_base
+pm_status partial true
+wd
+logged 'client_payload\[ref\]=60'
+expect "PM Worker partial (not both live) -> dispatch" $?
+
+reset
+pm_base
+pm_status live false
+wd
+logged 'client_payload\[ref\]=60'
+expect "PM Worker live but not fresh -> dispatch" $?
+
+reset
+pm_base
+pm_status live true
+FAKE_CURL_FAIL=28 wd
+logged 'client_payload\[ref\]=60'
+expect "/status unreachable -> treated as not live -> dispatch" $?
+
+# 37. 同じ ref は 24 時間で 3 回まで (記録のコメントを数える)。2 回と 25 時間前の 1 回は数えない
+reset
+pm_base
+ledger "$(mk 60 600),$(mk 60 3000),$(mk 60 90000)"
+wd
+logged 'client_payload\[ref\]=60'
+expect "same ref: 2 records in 24h (and one older than 24h) -> still dispatched" $?
+
+# 37a. ネガコン: 24 時間に 3 回済みの ref は送らない
+reset
+pm_base
+ledger "$(mk 60 600),$(mk 60 3000),$(mk 60 20000)"
+wd
+not_logged 'dispatches' && grep -q 'oc-pm: stuck #60 skipped (dispatched 3 times' "$TMP/out"
+expect "ネガコン: a ref already dispatched 3 times in 24h is skipped" $?
+
+# 37b. ネガコン: 記録の偽装 (reviewer 以外の第三者の oc-pm-dispatch) は数えない
+reset
+pm_base
+ledger "$(tcm "$OPENCODE" Bot '<!-- oc-pm-dispatch:60 ts=2026-10-14T14:00:00Z -->'),$(tcm "$REVIEWER" User '<!-- oc-pm-dispatch:60 ts=2026-10-14T14:00:00Z -->'),$(mk 60 3000),$(mk 60 600)"
+wd
+logged 'client_payload\[ref\]=60'
+expect "ネガコン: records by others are not counted (only the 2 by the reviewer bot count)" $?
+
+# 38. 1 時間に 12 件まで。12 件済みなら次は送らない (ネガコン)。11 件なら送る
+reset
+pm_base
+m=(); for i in $(seq 900 911); do m+=("$(mk "$i" 600)"); done
+ledger "$(IFS=,; echo "${m[*]}")"
+wd
+not_logged 'dispatches' && grep -q 'deferred (reached 12 in the last hour)' "$TMP/out"
+expect "12 dispatches in the last hour -> no dispatch (deferred)" $?
+
+reset
+pm_base
+m=(); for i in $(seq 900 910); do m+=("$(mk "$i" 600)"); done
+ledger "$(IFS=,; echo "${m[*]}")"
+wd
+logged 'client_payload\[ref\]=60'
+expect "11 dispatches in the last hour -> still dispatched" $?
+
+# 39. 1 回の点検で送るのは 3 件まで。17 件の停止 PR を DRY=1 で点検すると 3 件だけ計画され、何も送らない
+reset
+rows=()
+for i in $(seq 101 117); do
+  rows+=("$(pr "$i" "a$i" false "$OLD" '[{"name":"oc:stuck"}]')")
+  fx "repos/o/r/issues/$i/comments" "[$(tcm "$OPENCODE" Bot "$(limit_for "$i")")]"
+done
+base "[$(IFS=,; echo "${rows[*]}")]"
+nopr ''; ledger ''
+DRY=1 wd
+[ "$(grep -c 'DRY: dispatch oc-pm kind=stuck' "$TMP/out")" = 3 ] && grep -q 'oc-pm candidates=17 planned=3 deferred=14' "$TMP/out" && not_logged 'dispatches' && not_logged 'issue comment'
+expect "17 stopped PRs: DRY=1 plans only 3 dispatches (the rest deferred), no write" $?
+
+# 39a. DRY=1 は送らない (計画だけ)
+reset
+pm_base
+DRY=1 wd
+grep -q 'DRY: dispatch oc-pm kind=stuck for #60' "$TMP/out" && not_logged 'dispatches' && not_logged 'issue comment'
+expect "DRY=1 plans the oc-pm dispatch without sending or recording" $?
+
+# 39a2. 記録のコメントが残せなければ送らない (記録が無いと上限が効かない)。終了コードは変わらない
+reset
+pm_base
+FAKE_COMMENT_FAILS=1 wd; rc=$?
+[ "$rc" = 0 ] && logged 'issue comment 60 ' && not_logged 'dispatches' && grep -q 'failed: dispatch oc-pm kind=stuck for #60' "$TMP/out"
+expect "the record comment cannot be written -> no dispatch (fail-closed), exit 0" $?
+
+# 39b. 記録の一覧が読めなければ送らない (fail-closed)。終了コードは変わらない
+reset
+pm_base
+FAKE_FAIL='issues/comments' wd; rc=$?
+[ "$rc" = 0 ] && not_logged 'dispatches' && grep -q 'failed to read the oc-pm dispatch records' "$TMP/out"
+expect "dispatch records unreadable -> no dispatch (fail-closed), exit 0" $?
+
+# 39c. 停止 PR の comments が読めなければ、その PR だけ候補から外す (他は続く)
+reset
+base "[$(pr 65 a65 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 66 a66 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/66/comments' "[$(tcm "$OPENCODE" Bot "$(limit_for 66)")]"
+nopr ''; ledger ''
+wd
+logged 'client_payload\[ref\]=66' && grep -q '#65 oc-pm: failed to read comments' "$TMP/out"
+expect "a stuck PR whose comments cannot be read is skipped, the others continue" $?
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]

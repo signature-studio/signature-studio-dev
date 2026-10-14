@@ -6,8 +6,8 @@
 # 依存: pefile・unicorn (pip install unicorn)。未解決の間接 call で止まる場合は fault 行に戻り番地を出す。
 # usage: python3 unicorn_trace.py <block_PE.bin> <entry_hex> [-r reg=hex ...] [-a hex ...]
 #                                 [-w lo:hi ...] [-q hex ...] [-m MAX_INSN]
-#                                 [-d addr=val ...] [-t hex ...] [-p hex ...] [-H] [-V]
-#   -p: 本体の前に同じメモリ上で順に実行する関数 (arena 初期化)。-V: VirtualAlloc を合成メモリで返す。
+#                                 [-d addr=val ...] [-t hex ...] [-p hex[:reg=val,...] ...] [-H] [-V] [-z]
+#   -p: 本体の前に同じメモリ上で順に実行する関数 (arena 初期化・DllMain)。-V: VirtualAlloc を合成メモリで返す。
 #   -d: 実行前に qword を書く (ホスト構造体の合成用)。-t: 番地に入るたびに rcx/rdx/r8/r9 を出す。
 import argparse
 import collections
@@ -17,7 +17,7 @@ import pefile
 import unicorn
 from unicorn import (Uc, UcError, UC_ARCH_X86, UC_MODE_64, UC_PROT_ALL, UC_PROT_READ,
                      UC_PROT_WRITE, UC_HOOK_CODE, UC_HOOK_MEM_WRITE)
-from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX,
+from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RBP, UC_X86_REG_RCX, UC_X86_REG_RDX,
                                UC_X86_REG_RSP, UC_X86_REG_RIP)
 
 PAGE = 0x1000
@@ -54,13 +54,16 @@ def main():
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
     ap.add_argument('-d', action='append', default=[], help='実行前に書く qword addr=val (hex)')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
-                    help='この VA に入ったとき rcx/rdx の値と [rcx]・[rcx+0x28] を出す (最初の 20 回)')
-    ap.add_argument('-p', action='append', default=[], type=lambda s: int(s, 0),
-                    help='本体の前に同じメモリ上で順に実行する関数 (arena 初期化等。rcx/rdx は -H の host)')
+                    help='この VA に入ったとき rcx/rdx の値と [rcx]・[rcx+0x28]・[[rcx]+0x28]・rax・rbp・[rax+0x28] を出す (最初の 20 回)')
+    ap.add_argument('-p', action='append', default=[],
+                    help='本体の前に同じメモリ上で順に実行する関数 hex (arena 初期化等。rcx/rdx は -H の host)。'
+                         'hex:reg=val,... で、その前処理だけ初期レジスタを与える (DllMain の reason=rdx=1 等)')
     ap.add_argument('-V', action='store_true',
-                    help='kernel32!VirtualAlloc が 64KB 境界で POOL (0x50000000〜) の領域を返す (dwSize=rdx)')
+                    help='kernel32!VirtualAlloc が 64KB 境界で POOL (0x50000000〜) の領域を返す (dwSize=rdx。pool 超過は error を出して 0)')
     ap.add_argument('-H', action='store_true',
                     help='合成 host: rcx を SCRATCH+0x10000 の host に向け、[host]=vtable (0x40 スロット、全て ret stub)')
+    ap.add_argument('-z', action='store_true',
+                    help='page 0 (NULL 付近) を読取専用にする。NULL this への書込みを UC_ERR_WRITE_PROT で止める (既定は RW のまま)')
     a = ap.parse_args()
 
     data = open(a.pe, 'rb').read()
@@ -77,6 +80,8 @@ def main():
     # gs:[0x58] -> TLS 配列 (gs base = 0 のため、アドレス 0x58 を直接読む)
     uc.mem_map(0, 0x2000, UC_PROT_READ | UC_PROT_WRITE)
     uc.mem_write(0x58, struct.pack('<Q', 0x1000))
+    if a.z:
+        uc.mem_protect(0, PAGE, UC_PROT_READ)
 
     names = {}
     k = 0
@@ -138,13 +143,30 @@ def main():
                     struct.unpack('<Q', uc_.mem_read(rcx + 0x28, 8))[0])
             except UcError:
                 info += ' (rcx 未マップ)'
+            try:
+                info += ' [[rcx]+0x28]=%#x' % struct.unpack('<Q', uc_.mem_read(
+                    struct.unpack('<Q', uc_.mem_read(rcx, 8))[0] + 0x28, 8))[0]
+            except UcError:
+                info += ' ([[rcx]+0x28] 未マップ)'
+            rax = uc_.reg_read(UC_X86_REG_RAX)
+            info += ' rax=%#x rbp=%#x' % (rax, uc_.reg_read(UC_X86_REG_RBP))
+            try:
+                info += ' [rax+0x28]=%#x' % struct.unpack('<Q', uc_.mem_read(rax + 0x28, 8))[0]
+            except UcError:
+                info += ' ([rax+0x28] 未マップ)'
             print(info)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
-            if a.V and names[addr] == 'kernel32.dll!VirtualAlloc':
+            if a.V and names[addr].lower() == 'kernel32.dll!virtualalloc':
                 size = uc_.reg_read(UC_X86_REG_RDX)
-                uc_.reg_write(UC_X86_REG_RAX, pool[0])
-                pool[0] += (size + 0xffff) & ~0xffff
+                need = (size + 0xffff) & ~0xffff
+                if pool[0] + need > POOL + POOL_SIZE:
+                    print('error: VirtualAlloc dwSize=%#x は pool の残り %#x を超える (戻り 0)' % (
+                        size, POOL + POOL_SIZE - pool[0]))
+                    uc_.reg_write(UC_X86_REG_RAX, 0)
+                else:
+                    uc_.reg_write(UC_X86_REG_RAX, pool[0])
+                    pool[0] += need
             else:
                 uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 
@@ -161,7 +183,7 @@ def main():
     for q in a.q:
         print('before [%#x] = %#x' % (q, struct.unpack('<Q', uc.mem_read(q, 8))[0]))
 
-    def enter(fn, final):
+    def enter(fn, final, regs=()):
         rsp = STACK_TOP - 0x208
         uc.mem_write(rsp, struct.pack('<Q', SENT))
         if final:
@@ -171,10 +193,9 @@ def main():
         if a.H:
             uc.reg_write(UC_X86_REG_RCX, host)
             uc.reg_write(UC_X86_REG_RDX, host)
-        if final:
-            for item in a.r:
-                name, val = item.split('=')
-                uc.reg_write(reg_id(name), int(val, 0))
+        for item in (a.r if final else regs):
+            name, val = item.split('=')
+            uc.reg_write(reg_id(name), int(val, 0))
         st = 'returned to sentinel'
         try:
             uc.emu_start(fn, SENT, count=a.m)
@@ -182,8 +203,10 @@ def main():
             st = 'UcError %s' % e
         return st
 
-    for p in a.p:
-        st = enter(p, False)
+    for item in a.p:
+        p, _, regs = item.partition(':')
+        p = int(p, 0)
+        st = enter(p, False, [r for r in regs.split(',') if r])
         print('prelude %#x: %s rip=%#x rax=%#x' % (p, st, uc.reg_read(UC_X86_REG_RIP),
                                                   uc.reg_read(UC_X86_REG_RAX)))
     status = enter(a.entry, True)

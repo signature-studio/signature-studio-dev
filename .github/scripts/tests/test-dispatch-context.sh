@@ -222,6 +222,46 @@ pm_has '<!-- oc-pm-decision: rule=Rn reversible=yes/no -->'
 expect "pm.md: the oc-pm-decision marker format" $?
 pm_has '<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->'
 expect "pm.md: the oc-pm-intent marker format" $?
+# needs_decision は PR 起点 (Worker の detectPm と同じ条件)、対象なしは rule=skip、投稿前の /oc 検査、質問前の状態確認 (#2591)
+PMTS="$HERE/../../../infra/pm-worker/src/pm.ts"
+NEEDSTS="$HERE/../../../infra/pm-worker/src/needs.ts"
+COND='sig.review?.state === "CHANGES_REQUESTED" && sig.review.needs'
+KEY='PM 判断|PM に求める|PM が決め|PM の決定|起票依頼|PM 起票|PM 採番|PM 承認|PM が .*(起票|判断)'
+pm_has "$COND"
+expect "pm.md: needs_decision quotes the Worker's PR-origin condition (CHANGES_REQUESTED + review.needs)" $?
+grep -qF -- "$COND" "$PMTS"
+expect "pm.md's quoted needs_decision condition is still in infra/pm-worker/src/pm.ts" $?
+pm_has "$KEY"
+expect "pm.md: needs_decision quotes NEEDS_KEY" $?
+grep -qF -- "$KEY" "$NEEDSTS"
+expect "pm.md's quoted NEEDS_KEY is still in infra/pm-worker/src/needs.ts" $?
+pm_has '<!-- oc-pm-decision: rule=skip reversible=yes -->'
+expect "pm.md: rule=skip for no target (R9 is not reused)" $?
+pm_has "grep -c '/oc'"
+expect "pm.md: the /oc count check before posting is a required step" $?
+pm_has '否定形・引用・説明であっても書かない'
+expect "pm.md: a /oc string is banned even in negation, quote or explanation" $?
+pm_has '質問・`needs-user-input` の前に対象の状態を確認する'
+expect "pm.md: closed / merged / post-merge review are checked before asking" $?
+
+# 10b. 不在中ダイジェスト (CI-70 #2349): digest 節は 24 時間ごと・件数だけ・1 日 1 件までの緊急コメント。user_answered は回答を反映して確定する。
+pm_has '### `digest`'
+expect "pm.md has the kind section 'digest'" $?
+for s in '24 時間ごと' '直近 24 時間' '本文・題名の個票は読み出さない' '件数と最古' '自律運転ダイジェスト (rolling)' '本文は件数の表だけ' '個票 (issue・PR の題名や本文) は書かない' '1 日 1 件まで' '<!-- oc-pm-digest-alert -->' '<!-- oc-auto-close rule=Rn -->' '<!-- oc-fix-reset'; do
+  pm_has "$s"
+  expect "pm.md digest: has '$s'" $?
+done
+for s in '回答を反映して issue 本文を更新' '`needs-user-input` を外す' '「確定」コメント' '回答が曖昧なとき' '聞き直す'; do
+  pm_has "$s"
+  expect "pm.md user_answered: has '$s'" $?
+done
+# rolling issue の題名 (pm.md) は、launch から外す判定 (Worker の pm.ts・tools/pm/launch_issues.py) と同じ文字列であること。
+RT='自律運転ダイジェスト (rolling)'
+pm_has "$RT"
+expect "pm.md digest: the rolling issue title" $?
+RX='自律運転ダイジェスト \(rolling\)'
+grep -qF -- "$RX" "$HERE/../../../infra/pm-worker/src/pm.ts" && grep -qF -- "$RX" "$HERE/../../../tools/pm/launch_issues.py"
+expect "rolling issue title: pm.ts and launch_issues.py exclude the same title" $?
 
 # 11. repository_dispatch oc-pm (#2327): kind は列挙 9 値、ref は数字 1〜7 桁 (supply/digest/retro は 0 も可)。
 # payload の他のフィールドは指示文にも env にも入らない。対象は API で隔離し、起票者は許可 bot か MEMBER 以上だけ。

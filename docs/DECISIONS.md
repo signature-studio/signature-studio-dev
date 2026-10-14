@@ -222,3 +222,35 @@
 - **比較した方式**: Razer・ReWired・FL Mobile は A (対象外) / B (no-op の殻として lift、または x64c の測定後に再判断) / C (実機能の提供、または RetDec 鎖で lift)。ZGE は A (対象外) / B (保留) / C (ZGE の実行系を WebGL で再実装)。
 - **理由**: Razer は周辺機器の LED 制御、ReWired は別プロセスの ReWire ホストとのルーティングで、どちらもブラウザに相手方がおらず、音声処理も無い (demo 出現なし)。FL Mobile は demo 出現が無く、.NET CLR (`mscoree.dll`)・`ws2_32` (D3 の対象外) を持ち、C++ engine の窓 lift が一部 `emcc -c` に失敗する (追跡は #527)。推定工数に対して利用実績がほぼ無く、élastique・DirectWave を内包する点も D20 の所有者限定 tier の範囲を広げるだけになる。ZGE は demo・preset があってユーザに見えるが、閉包が取れず (`plugin_closure` が vtable 入口を 0 件しか見つけない)、描画も #29 待ちのため、保留が可逆で進捗を止めない。値は `tools/plugins/hostx/REPORT.md` §1・§2・§4。
 - **影響**: `tools/plugins/hostx/REPORT.md` §0・§1 の区分を確定に合わせた。#558・#560 は close、#559 は #29 に blocked_by を付けて open のまま。#210 の lift 対象は 6 本 (Wrapper×2 / Patcher×2 / MIDI Out / Video Player)。A とした 5 本を再開する場合は新しい ADR を要する (FL Mobile は x64c 経路 (`tools/flelift`) の測定から)。
+
+## D23 — Serum 2 参照音源の content 条件は installer 全展開を正とし、空 dir は variant に残す
+
+- **状態**: 採用 (2026-10-14, issue #2414 [SR-47]。親 #73)
+- **決定**: 参照 WAV の content dir の正は installer 全展開 (Tables・Presets あり) とする。`ref_render.sh` の既定と `ref_manifest.json` の主エントリをこの条件に切り替える。専用の空 dir は variant (`content_empty`) として残す。
+- **比較した方式**: (a) 空 dir を正のまま据え置く、(b) 全展開を正とし空 dir を variant に残す (採用)、(c) 両条件を正として判定を 2 通り走らせる。
+- **理由**: 同じ DLL・MIDI・サンプルレートでも content dir の中身で参照の出力が変わる。wasm 本体が読む content は SR-6 の設計で導入後の installer の全展開 (Tables を含む) であり、SR-46 の factory preset も全展開の `Presets/` からしか取れない。比較条件を wasm 側の読み方に揃えるため (a) は採らず、(c) は判定基準を二重にするため採らない。根拠と実測は `tools/targets/serum2/host/REPORT_SR5.md` §4。
+- **影響**: 参照 pin の主エントリが全展開になる。空 dir 条件は `content_empty` として残る。全展開 content を読む wasm 本体への FS shim 接続は未確認で、#2383 の比較時に確認する (`tools/targets/serum2/host/REPORT_SR5.md` §4.4)。
+
+## D24 — `user_answered` の根拠は人 (MEMBER / OWNER / COLLABORATOR) のコメントだけとし、許可 bot のコメントは含めない
+
+- **状態**: 採用 (2026-10-15, issue #2524 [CI-101]。親 #2461。PM 補助 subagent が依頼者の不在中に代理で判断)
+- **決定**: `needs-user-input` の issue で依頼者の回答 (`user_answered`) とみなすのは、`author_association` が `MEMBER` / `OWNER` / `COLLABORATOR` の**人**のコメントだけ。許可 bot (実装 App・reviewer App・PM App) のコメントは根拠にしない。PR #2490 の実装 (`infra/pm-worker/src/webhook.ts` の `userAt`) をそのまま凍結し、#2461 の受入 1 の「か許可 bot」は取り下げる。
+- **比較した方式**: (a) 人のコメントだけ (採用)、(b) 実装 App・reviewer App のコメントも含める (#2461 受入 1 の原文)、(c) 人と PM App のコメント。
+- **理由**: `user_answered` は「依頼者が答えた」ことを表す印で、答えを書けるのは人だけである。`docs/WORKFLOW.md` §12 と `.github/prompts/pm.md` の `user_answered` の節は、どちらも「依頼者 (人間) が返したコメント」と定めており、(b)(c) はこの定義と合わない。(b) は、`needs-user-input` の issue に実装 agent が run 結果を書くたびに `oc-pm` が起き、同じ ref への 24 時間 3 回の上限を使い切って、後から来る本物の回答を処理できなくする。PM agent が bot の文面を回答と読み、`needs-user-input` を外す誤りも起こしうる。(c) の PM App は PM 自身の出力で、自分の出力で自分を起こす経路になる。人の回答は `MEMBER` / `OWNER` / `COLLABORATOR` のアカウントから入るため、bot を足さなくても取りこぼさない。
+- **影響**: Worker・文書の変更は無い。#2524 は close。人の回答の検出は従来どおり。許可 bot を含める要件が将来出たら、新しい ADR を起こして #2461 の受入 1 を取り戻す (ループ抑止を超えないことの確認が要る)。
+
+## D25 — 再投入の意図 `focus=K` の K は受入条件の番号 (1〜9) とし、`pm.md` の記述を実装に合わせる
+
+- **状態**: 採用 (2026-10-15, issue #2575 [CI-105]。親 #2475、PR #2511。PM 補助 subagent が代理で判断)
+- **決定**: `<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->` の `K` は、再投入する issue の**受入条件の番号** (1〜9 の整数・任意) とする。Worker (#2511) は 1〜9 以外を拒否して `counters.intentRejected.focus` に数える。`.github/prompts/pm.md` の「issue 番号」の説明と `focus=778` の例を、受入条件の番号に直す (#2575 の実装 PR)。`infra/pm-worker/` は変えない。
+- **比較した方式**: (a) 受入条件の番号 (採用)、(b) issue 番号。
+- **理由**: 親 #2475 の受入 1・2 と、`buildLaunchBody` の固定文 (「この issue の受入条件 K だけを実装して PR を出してください。他の条件は子 issue にしてください」) が受入条件の番号で定義している。`pm.md` の「issue 番号」は初稿 (#2326) の書き方で、実装の契約とずれていた。(b) は、`issue=N` が再投入先を既に指すため `focus` に issue 番号を取る意味が重ならず、別 issue を指す場合は存在・親子関係・open の検査 (REST) と固定文の書き換えが増えて、注入の面も広がる。(a) の検査は定数 1〜9 で済む。これは `.github/prompts/pm.md` の境界 U6 (`AGENTS.md`・`docs/WORKFLOW.md` §1・`docs/pm/DIRECTIVES.md` の改訂) に当たらない。規則を変えず、マーカーの引数の説明を実装に合わせる訂正であり、`.github/prompts/` は実装 App が変更できる (前例 #2433)。
+- **影響**: 訂正が merge されるまで、PM は `focus` を付けない (付けると検査で拒否される。focus の無い意図は従来どおり動く)。#2511 の merge を待たずに訂正を進められる。
+
+## D26 — 降格 (二重 `/oc` の検出) は「Worker の投稿」と「Worker 以外の PM ログインの投稿」の組だけを数える
+
+- **状態**: 採用 (2026-10-15, PR #2469 [#2340 の降格と shadow の部分実装]。PM 補助 subagent が代理で判断)
+- **決定**: #2340 受入条件 4 の「同じ issue に 30 分以内に 2 回目の `/oc`」の「2 回目」は、Worker (PM App) の `/oc` と、Worker 以外の PM ログイン (個人アカウント。VM と手動の投稿) の `/oc` の組 (先後は問わない) に限る。Worker 同士の組と、個人アカウント同士の組は数えない。受入条件の原文は消さず、読みを #2340 のコメントと PR #2469 に追記する。降格で `oc-watchdog`・`oc-pm` の dispatch も止めること、解除が手動 (`POST /demote/reset`) だけであることは、PM 判断 (R7) のまま変えない。
+- **比較した方式**: (a) 現実装: PM のログイン同士の組を全て数える、(b) Worker と Worker 以外の組だけを数える (採用)、(c) 降格をやめて shadow だけにする、(d) (a) のまま relaunch の経路だけ除く。
+- **理由**: 降格の目的は、Worker が live の間に、別の投稿者 (VM・PM の手動) と同じ issue を二重に起動する事故を止めることである。(a) は、停止報告の後に素材を足して再投入する Worker 自身の正当な `/oc` (この経路に待ち時間は無い) を二重と数え、最初の再投入で自己降格する。降格すると launch と dispatch が止まり、解除は手動だけなので、依頼者の不在 (最大 2 日。`docs/WORKFLOW.md` §11) の間、自律運転が止まる。個人アカウント同士の組は Worker の挙動と無関係で、降格しても原因を止められない。Worker 自身の投稿頻度は別の上限 (#2475 の同じ issue 24 時間 3 回など) で抑える。(c) は受入条件 4 の安全網を失う。(d) は経路ごとの例外が増えて、新しい経路が足されるたびに漏れる。
+- **影響**: PR #2469 に、組の条件の変更と、ネガコン (Worker 同士は降格しない、個人同士は降格しない) を含む回帰テストの追加を依頼する。この変更が入る前の版は、`wrangler.toml` が live のままなので再デプロイしない。昇格 (受入条件 2・3、`LIVE=auto`) は未実装のままで、#2340 に残る。

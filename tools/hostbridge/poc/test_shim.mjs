@@ -2,7 +2,7 @@
 //   CreateProcessW fail-fast・bridged 無効化の単体試験 + ネガコン (実装を外すと FAIL することの確認).
 //   OTT 非依存: host は実 host_vst2 を使わず WebAssembly.Memory だけを持つ偽 instance、guest は偽 descriptor.
 //   node tools/hostbridge/poc/test_shim.mjs
-import { ModuleTable, HostBridge, SEM_NOOPENFILEERRORBOX, THUNK_BASE } from './hb_bridge.mjs';
+import { ModuleTable, HostBridge, SEM_NOOPENFILEERRORBOX, THUNK_BASE, HMODULE_BASE } from './hb_bridge.mjs';
 
 const PATH = 'C:\\Program Files\\Common Files\\VST2\\Xfer Records\\OTT_x64.dll';
 const MISSING = 'C:\\nope\\missing.dll';
@@ -116,6 +116,26 @@ function runSuite(opts = {}, quiet = false) {
     const va = b.GetProcAddress(h, putCStr(host, 'VSTPluginMain', 0x400));
     check('S8 LoadLibraryW→GetProcAddress の既存 OTT 経路は従来どおり', h !== 0n && va >= THUNK_BASE && b.errorMode === 0);
   }
+
+  // S9 HMODULE 一意性 (#2520): 解放で loaded.size が減っても、再ロードや別 module のロードで生存中の handle と衝突しない
+  {
+    const { b, host, table } = setup(opts);
+    const names = ['A_x64.dll', 'B_x64.dll', 'C_x64.dll'];
+    names.forEach((n, i) => table.register(fakeDesc(`xfer.${'abc'[i]}.vst2`, [n], { VSTPluginMain: 'VSTPluginMain' })));
+    const ld = (n) => b.LoadLibraryW(putWStr(host, n, 0x100));
+    const hA = ld(names[0]), hB = ld(names[1]), hC = ld(names[2]);
+    b.FreeLibrary(hA);
+    const hA2 = ld(names[0]);
+    check('S9a 解放後の再ロードが生存中の別 module と同じ HMODULE を返さない', hA2 !== hB && hA2 !== hC && b.byHandle.size === b.loaded.size, `hB=0x${hB.toString(16)} hC=0x${hC.toString(16)} hA2=0x${hA2.toString(16)} byHandle=${b.byHandle.size} loaded=${b.loaded.size}`);
+    let clash = 0;
+    for (let i = 0; i < 9; i++) {
+      const lm = [...b.loaded.values()][i % b.loaded.size];
+      b.FreeLibrary(lm.handle);
+      ld(lm.desc.aliases[0]);
+      if (b.byHandle.size !== b.loaded.size) clash++;
+    }
+    check('S9b ロード→解放→再ロードを 9 回繰り返しても生存 handle は相異なる', clash === 0, `clash=${clash}`);
+  }
   return fails;
 }
 
@@ -129,6 +149,7 @@ class CaseInsensitive extends HostBridge { readCStr(u8, p, max) { return super.r
 class NoRefcount extends HostBridge { FreeLibrary(h) { return super.FreeLibrary(h) && 0 || 1; } }
 class ReleaseAtOnce extends HostBridge { FreeLibrary(h) { const lm = this.byHandle.get(BigInt.asUintN(64, BigInt(h))); if (lm) lm.refs = 1; return super.FreeLibrary(h); } }
 class ConstClock extends HostBridge { timeGetTime() { return 0; } }
+class SizeHandle extends HostBridge { allocHandle() { return HMODULE_BASE + BigInt(this.loaded.size + 1) * 0x10000n; } }
 class SilentCreateProcess extends HostBridge { CreateProcessW() { return 1; } }
 class NoBridgeDisable extends ModuleTable { register(desc) { this.byId.set(desc.id, desc); for (const a of desc.aliases) this.alias.set(a.toLowerCase(), desc); this.alias.set(desc.id.toLowerCase(), desc); return this; } }
 const mutants = [
@@ -136,6 +157,7 @@ const mutants = [
   ['GetProcAddress が大文字小文字を無視', { BridgeCls: CaseInsensitive }],
   ['FreeLibrary が refcount を無視 (常に解放)', { BridgeCls: ReleaseAtOnce }],
   ['timeGetTime が定数 0', { BridgeCls: ConstClock }],
+  ['HMODULE 採番を loaded.size 基準に戻す (解放後に衝突)', { BridgeCls: SizeHandle }],
   ['CreateProcessW が黙って成功', { BridgeCls: SilentCreateProcess }],
   ['bridged 強制無効化を外す (register 素通し)', { TableCls: NoBridgeDisable }],
 ];

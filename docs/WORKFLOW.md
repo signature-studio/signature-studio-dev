@@ -244,8 +244,16 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
     作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可)。
-    R2 への投入は PM が行う (S3 multipart、R2 から再ダウンロードした sha256 と梱包元の一致を確認する)。
+    R2 への投入の手順は下の「R2 への投入 (VM 非依存の手順)」。現状は PM が VM 上で行い、VM 退役後の担い手は依頼者とする。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
+- **R2 への投入 (VM 非依存の手順・#2434)**: 担い手は依頼者 (現状の PM は VM 上で行う。VM 退役後は依頼者が行う)。
+  素材の原本の所在は `docs/REFERENCES.md` の「素材の原本と R2 bundle の対応」、投入の頻度は `tools/pm/REPORT.md` §13 が正本。
+  1. **権限を昇格**: Cloudflare で R2 の API token の権限を、バケット `signature-studio-artifacts` に限り「Workers R2 Storage Bucket Item Read」から「Read + Write」へ変える。画面上の操作名は `[未確認]`。昇格中は、この token を使う全ての経路が書ける (Actions の `CF_R2_*` が同じ token かは `[未確認]`)。投入は短時間で終える。
+  2. **投入**: 梱包した `<name>.tar.zst` を S3 互換 API で置く。大きい object は aws cli が multipart で送る (`tools/plugins/framework/fw_pack_stage1.sh` の注記と同じ形): `aws s3 cp <name>.tar.zst s3://signature-studio-artifacts/artifacts/<name>.tar.zst --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`。S3 のキーは環境変数で渡し、値を repo・ログ・issue に書かない。
+  3. **照合**: R2 から同じ object を取り直し、梱包元と sha256 が一致することを確認する。不一致なら 2 からやり直す。
+  4. **権限を戻す**: 手順 1 の逆 (Read のみ)。戻したことを確認する方法は `[未確認]`。
+  5. **許可名を足す場合**: 同じ PR で `.github/scripts/prepare-event-context.sh` と `.github/scripts/watchdog.sh` の `ARTIFACT_RE` と、本節の許可名一覧を更新する。`pr-lint.sh` は watchdog.sh の値を読むため、`grep -n '^ARTIFACT_RE=' .github/scripts/*.sh` で両者の一致を確認する。
+  - **Actions から投入しない理由**: (1) Actions の R2 認証 (`CF_ACCOUNT_ID`・`CF_R2_ACCESS_KEY_ID`・`CF_R2_SECRET_ACCESS_KEY`) は素材の取得に使う。`tools/pm/README.md` の運用の約束は、投入を「R2 への投入は既存 token の一時昇格だけで行い、終わったら必ず Read のみへ戻す」と定める。Write 可能な token を repo secret に置くと、`/oc` を書ける人の run (実装 agent を含む) がバケットに書ける。(2) 原本の一部は VM のディスクにしか無い (`docs/REFERENCES.md` の原本表)。run からは `~/ダウンロード/` や mac pkg の展開物を再作成できない。
 - **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
   (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
   tools/ のスクリプトは `tools/shared/env.sh` (bash)・`paths.py`・`paths.mjs` 経由でこの変数を読む
@@ -303,6 +311,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
     確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
     close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
+    先に PR の状態を読み、merge 済み・close 済み (未 merge) なら再 review する対象が無いので notice を残して成功で終わる (fix run が merge 済みの PR を close しようとして `could not close PR` で落ちない。#2597)。状態を読めない・open のまま close できないのは失敗にする。
     reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
     必ず走らせられる。この変更は App に `workflows` 権限が無く
     agent は push できないため、PM が `.github/workflows/` を直接 push して適用した (現行の運用は下の「workflow 変更の運用」)。
@@ -359,7 +368,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   PR を出さずに終わっていた (着手報告のみ・停止報告・1 run に収まらない・素材不足)。
 
   - **implement の終了時** (`record-run-outcome.sh`、`opencode.yaml` の最終 step。`always()` で、agent の失敗・cancel の後も走る。job は失敗させない):
-    issue の `/oc` run が、open PR も、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
+    issue の `/oc` run が、open PR も (run の開始以降に作成・merge された PR を含む。#2590)、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
     issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> run=<run id> -->` を残す。
     PM Worker はコメント本文を解析せず、**ラベルとマーカー**で扱う。`oc:no-pr` は、次の run が PR を出す (または issue が close・明示的な状態になる) と、この script が外す。
     `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ。優先順 artifact > blocked > split > stop):
@@ -417,5 +426,10 @@ PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次�
   依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
 - **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
   PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
+- **PR 起点の判断待ち (`needs_decision`)**: 対象は `needs-user-input` の issue でなく PR (ref は PR 番号)。reviewer の最新の差し戻し
+  (`CHANGES_REQUESTED`) の本文が PM の判断・起票を求めているとき (`review.needs`) に Worker が送る。条件は `infra/pm-worker/src/pm.ts` の `detectPm`。
+- **質問の前の状態確認**: 質問・`needs-user-input` を出す前に、対象 issue が closed でないこと、PR が merge 済みでないこと、
+  post-merge review の有無を確かめる。当たれば質問せず `rule=skip` で終える。closed の issue に残った `needs-user-input` は外す。
+  手順は `.github/prompts/pm.md` の「質問・`needs-user-input` の前に対象の状態を確認する」。
 - **不在中の自動判断**: PM agent が行った判断は `<!-- oc-pm-decision: rule=Rn reversible=yes/no -->` マーカーで残る。
-  事後の確認はダイジェスト ([CI-70]) で行う。
+  対象なしで終えた run は判断でなく `rule=skip` のマーカーを残す。事後の確認はダイジェスト ([CI-70]) で行う。

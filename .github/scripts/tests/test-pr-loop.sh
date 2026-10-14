@@ -12,7 +12,8 @@ export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0
 
 # fake gh: `gh api [--paginate] [-X M] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
 # `gh pr comment|close|reopen` と POST は $LOG に記録するだけ。
-# FAKE_REOPEN_FAILS=N なら、最初の N 回の `gh pr reopen` を失敗させる。
+# FAKE_REOPEN_FAILS=N なら、最初の N 回の `gh pr reopen` を失敗させる。FAKE_CLOSE_FAILS=1 なら `gh pr close` を失敗させる。
+# fixture <名前>.2 があれば、2 回目以降の同じ path の読み取りはそちらを返す (close の間に PR の状態が変わった競合の再現)。
 FIX="$TMP/fixtures"
 LOG="$TMP/gh.log"
 mkdir -p "$FIX" "$TMP/bin"
@@ -20,6 +21,7 @@ cat > "$TMP/bin/gh" << 'EOF'
 #!/bin/bash
 echo "gh $*" >> "$FAKE_LOG"
 if [ "$1" = pr ]; then
+  [ "$2" = close ] && [ -n "${FAKE_CLOSE_FAILS:-}" ] && exit 1
   if [ "$2" = reopen ] && [ -n "${FAKE_REOPEN_FAILS:-}" ]; then
     n=$(($(cat "$FAKE_FIX/reopen_calls" 2> /dev/null || echo 0) + 1))
     echo "$n" > "$FAKE_FIX/reopen_calls"
@@ -42,6 +44,11 @@ done
 [ "$method" = POST ] && exit 0
 f="$FAKE_FIX/${path//\//_}"
 [ -f "$f" ] || { echo "fake gh: no fixture for $path" >&2; exit 1; }
+if [ -f "$f.2" ]; then
+  n=$(($(cat "$f.reads" 2> /dev/null || echo 0) + 1))
+  echo "$n" > "$f.reads"
+  [ "$n" -ge 2 ] && f="$f.2"
+fi
 if [ -n "$jq_expr" ]; then jq -r "$jq_expr" < "$f"; else cat "$f"; fi
 EOF
 chmod +x "$TMP/bin/gh"
@@ -236,17 +243,55 @@ grep -qx 'result=none' "$TMP/out"; expect "起動前の bot コメント・他�
 
 echo "== reopen-pr.sh (close -> reopen。reopen は 3 回まで再試行)"
 reset
+fx repos/o/r/pulls/7 '{"state":"open","merged_at":null}'
 FAKE_REOPEN_FAILS=1 bash "$SCRIPTS/reopen-pr.sh" > "$TMP/v.out" 2>&1; rc=$?
 { [ $rc = 0 ] && logged 'pr close 7' && [ "$(grep -c 'pr reopen 7' "$LOG")" = 2 ]; }; expect "reopen が 1 回失敗しても再試行で再開する" $?
 ! logged 'issues/7/labels'; expect "再開できたら oc:stuck を付けない" $?
 
 reset
+fx repos/o/r/pulls/7 '{"state":"open","merged_at":null}'
 FAKE_REOPEN_FAILS=99 bash "$SCRIPTS/reopen-pr.sh" > "$TMP/v.out" 2>&1; rc=$?
 { [ $rc = 1 ] && [ "$(grep -c 'pr reopen 7' "$LOG")" = 3 ]; }; expect "reopen が 3 回失敗 -> 非 0 で終わる" $?
 { logged 'issues/7/labels' && logged 'pr comment 7'; }; expect "reopen 失敗時は oc:stuck を付けて PR にコメントする" $?
 
+echo "== reopen-pr.sh: PR の状態 (#2597。merge 済み・close 済みは想定内で 0、本当のエラーは失敗)"
+reopen_run() { bash "$SCRIPTS/reopen-pr.sh" > "$TMP/v.out" 2>&1; }
+untouched() { ! logged 'pr close' && ! logged 'pr reopen' && ! logged 'issues/7/labels' && ! logged 'pr comment'; }
+
+reset
+fx repos/o/r/pulls/7 '{"state":"closed","merged_at":"2026-01-01T00:00:00Z"}'
+reopen_run; rc=$?
+{ [ $rc = 0 ] && untouched && grep -q 'already merged' "$TMP/v.out"; }; expect "merge 済みの PR -> close も reopen もせず 0 で終わる (ラベル・コメントも付けない)" $?
+
+reset
+fx repos/o/r/pulls/7 '{"state":"closed","merged_at":null}'
+reopen_run; rc=$?
+{ [ $rc = 0 ] && untouched && grep -q 'not reopened' "$TMP/v.out"; }; expect "close 済み (未 merge) の PR -> 人が閉じたものを reopen せず 0 で終わる" $?
+
+reset
+reopen_run; rc=$?
+{ [ $rc = 1 ] && untouched && grep -q 'could not read the state' "$TMP/v.out"; }; expect "PR の状態を読めない -> 隠さず失敗する (close しない)" $?
+
+reset
+fx repos/o/r/pulls/7 '{"state":"open","merged_at":null}'
+FAKE_CLOSE_FAILS=1 reopen_run; rc=$?
+{ [ $rc = 1 ] && logged 'pr close 7' && ! logged 'pr reopen' && grep -q 'could not close PR #7' "$TMP/v.out"; }; expect "open のまま close できない (本当のエラー) -> 'could not close PR' で失敗する" $?
+
+reset
+fx repos/o/r/pulls/7 '{"state":"open","merged_at":null}'
+fx repos/o/r/pulls/7.2 '{"state":"closed","merged_at":"2026-01-01T00:00:00Z"}'
+FAKE_CLOSE_FAILS=1 reopen_run; rc=$?
+{ [ $rc = 0 ] && logged 'pr close 7' && ! logged 'pr reopen' && ! logged 'issues/7/labels' && grep -q 'merged while it was being closed' "$TMP/v.out"; }; expect "open と読んだ後、close の間に merge された競合 -> 0 で終わる" $?
+
+reset
+fx repos/o/r/pulls/7 '{"state":"open","merged_at":null}'
+fx repos/o/r/pulls/7.2 '{"state":"closed","merged_at":null}'
+FAKE_CLOSE_FAILS=1 reopen_run; rc=$?
+{ [ $rc = 0 ] && logged 'pr close 7' && logged 'pr reopen 7'; }; expect "close が失敗したが closed になっている -> PR を closed のまま残さず reopen に進む" $?
+
 echo "== fix-progress.sh reopen (旧 workflow との互換)"
 reset
+fx repos/o/r/pulls/7 '{"state":"open","merged_at":null}'
 run_fix reopen > /dev/null 2>&1; rc=$?
 { [ $rc = 0 ] && logged 'pr close 7' && logged 'pr reopen 7'; }; expect "reopen サブコマンドは reopen-pr.sh に委譲する" $?
 
