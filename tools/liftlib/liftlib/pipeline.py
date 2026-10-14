@@ -142,7 +142,8 @@ def _repair_ll(cfg, raw_path, img, log, detect_only=False):
     if passes.get("gdata") and not detect_only:
         sh = passes.get("shift")
         if sh:
-            text2, n = remap.shift_va(mod.dump(), int(str(sh["base"]), 0), int(str(sh["newbase"]), 0))
+            text2, n = remap.shift_va(mod.dump(), int(str(sh["base"]), 0), int(str(sh["newbase"]), 0),
+                                      add_forms=bool(sh.get("add_forms")))
             mod = IR.Module.parse(text2)
             stats["shift_numeric"] = n
         stats["gdata"] = remap.gdata(mod, img, mode=passes["gdata"], base=img.base,

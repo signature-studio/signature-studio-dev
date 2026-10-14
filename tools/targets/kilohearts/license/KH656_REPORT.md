@@ -78,3 +78,97 @@
 - 範囲内: module F の build (lift→stub→emcc)・`kh249_check.mjs` (17 項目)・未 lift callee の census。
 - 範囲外: 閉包展開の完了、分類結果の lift IR 照合、native oracle との突合、module A/B/E/snapin 6 種の再実行 (本変更は F のみ)。
 - 作業ログ: 素材 (`plugins-kilohearts` の Windows installer zip 3.8 GB) は `$RUNNER_TEMP/kh_src` に展開し、`tools/targets/kilohearts/work/winpkg` (gitignore) に Windows 側のみ展開。emsdk/retdec は `[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md`) の既設を使用。Python 依存は `$RUNNER_TEMP/kh_venv` (pefile/capstone/numpy)。
+
+## 7. 閉包 313 関数の入口 OOB の切り分け (#1821 / KH-29、実測)
+
+測定 commit: `19fd9d73` (main)。コード差分は本節 (REPORT のみ) を除き 0 (`lic_config.json` は HEAD に戻した)。
+環境: nproc=4・load average は実行中 0.1〜0.6。`plugins-kilohearts` は R2 から取得し installer 抽出 (`work/winpkg`)。
+Windows 側の抽出は成功、macOS 側は `llvm-lipo` が無く rc=127 (本件は Windows 側のみ使用)。
+
+### 7.1 閉包の再現
+
+`python3 scripts/kh656_closure.py --rounds 6` (1 分 53 秒): round 1 (lift 8→40 未 lift) → round 2 build 失敗 (`i256`: `0x180f89cf0`・`0x180fb6124` 除外) → round 3 (lift 42) → round 4 (lift 80) → round 5 (lift 166) → round 6 build 失敗 (`i256` 判定で `1813846e0` を除外)。
+
+round 6 の失敗の扱い: `kh656_closure.py` は `dropped_i256` に `1813846e0` を載せたが、`n1.ll` に `1813846e0` の定義は無く (確認済み)、i256 による除外の根拠は無い。`1813846e0` は memset で、module F の shims に未登録だったため閉包に入った。shim 登録 (module F shims に `1813846e0: memset`) を加えると 313 集合で build が通る。round 6 の失敗原因 (`dropped_i256` の判定経路) は未特定。
+
+### 7.2 測定値 (HEAD 行はコミット HEAD の state、166・313 行は未コミットの `lic_config` 一時変更で実行)
+
+166 行と 313 行は、閉包展開スクリプトが書き換えた未コミットの `lic_config` で測定した (測定後に HEAD へ戻した)。313 行は未コミットの `lic_config` 一時変更。
+
+| 集合 | lift | wasm B | undefined import | 入口 `function_180ef7fc0` |
+|---|---|---|---|---|
+| HEAD (main) | 8 | §3 参照 | 0 | `unlifted callee 0x180112a30` (ok=17 ng=0) |
+| round 5 集合 (§7.1 の round 5 = lift 166) | 166 | 876,174 | 0 | `unlifted callee 0x180138a30` (ok=16 ng=1) |
+| round 6 相当 (+shim memset・313 行は未コミットの `lic_config` 一時変更) | 313 | 1,543,853 | 0 | **`memory access out of bounds` (再現)** |
+
+313 集合は §7.1 の round 6 (build 失敗 `1813846e0`) に memset shim を登録して再 build した集合。round 6 の失敗そのものはこの表には載せていない。313 集合の wasm は REPORT 上の `1,543,901 B` と 48 B 異なる (emcc 環境差)。入口の症状は一致。
+
+### 7.3 OOB の発生 VA (wasm 関数名: `-g` 版で特定)
+
+`emcc -g` (同 `final.ll`・同 flags、名前付き wasm) で入口を実行した stack (313 集合):
+
+```
+kh_180ef7fc0 → kh_18012e420 → kh_1801d3b60 → kh_180138750 → kh_180138a30 → kh_180f88394 → kh_180fa7678 (trap)
+```
+
+- **OOB の発生 VA: `0x180fa7678` (wasm 関数 `kh_180fa7678`)**。この関数は 409 行、store/load 174 件、`@rsp` の書換え 10 件。
+- trap は関数内部の memory 命令 (オフセット未特定)。命令単位の VA は未確定。
+- 入口の `@rsp` は `kh_stack + 65464` (`kh_stack[65536]`)。`kh_stack_ptr()` の base は wasm 内 `0x39a0` (実測)。
+
+### 7.4 原因の判定 (未確定)
+
+- DEFECTS.md の類型 (D1a〜D22) で**該当 ID は未判定**。`D11` (絶対 VA が wasm32 で切り捨て → OOB) と `D17` (ポインタ局所の縮小) が形の上で近いが、本件は trap 命令を未特定のため当てはめできない。
+- 「lift の誤り (silent miscompile) か、メモリ配置・stack の問題か」は**本 run では判定できなかった**。`kh_180fa7678` が 10 箇所で `@rsp` を書換えるため、stack 方向の誤りの可能性が高いが、未確認。
+- 閉包 313 の入口経路は `kh_180fa7678` までで停止する (fail-fast の `unlifted callee` には届かない)。
+
+### 7.5 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `kh_180fa7678` 内の trap 命令 (VA 単位・wasm 命令オフセット) の特定 | 原因 (lift 誤り / 配置) の判定不能 | #1821 継続 |
+| 原因の判定 (silent miscompile か配置/stack か) と DEFECTS 類型 ID | 受入 2 未達 | #1821 継続 |
+| `kh656_closure.py` の `i256_defs()` の誤判定 (memset `1813846e0` を i256 扱い) | 閉包の自動化が round 6 で止まる | #1817 (KH-28) |
+| 閉包の収束 (未 lift 40 → 154) | 受入 1 未達 | #1817 (KH-28) |
+
+## 8. 閉包展開の再試行 (#1761 / KH-27、実測)
+
+`scripts/kh656_closure.py --rounds 6` を実行した。`#710` (Win32 import 宣言) は closed、`#709` (ymm) は open。
+
+検証起点 (commit の役割を分ける):
+
+- **測定対象のコード**: `0eaf2989` (main 取り込み済みの license 版コード)。
+- **本節を記録した commit (REPORT のみ)**: `98c0f477`。コードは `0eaf2989` と同一 (`git diff 0eaf2989 98c0f477 -- tools/targets/kilohearts/license ':!*KH656_REPORT.md'` = 0 行)。
+- **本 commit (検証 HEAD)**: コード差分は 0 (`git diff 98c0f477 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT.md'` = 0 行)。変更は本 REPORT のみ。
+- コードの差分が 0 のため、`lic_build.py --module F` の再測定は不要 (`docs/WORKFLOW.md` §6)。
+
+| ラウンド | lift 数 | 未 lift callee | 結果 |
+|---|---|---|---|
+| 0 (HEAD) | 8 | 40 | build 成功 (wasm 54,394 B・sha `7ba79e65…`) |
+| 1 | 8 → +34 | 40 | build 失敗 (`i256` = AVX2 2 件を除外) |
+| 2 (再 build) | 42 | 44 | build 成功 (wasm 192,136 B) |
+| 3 | 80 | 92 | build 成功 (wasm 436,971 B) |
+| 4 | 166 | 154 | build 成功 (wasm 876,222 B) |
+| 5 | 313 | — | build 失敗 (記録上の結果。原因の分類は未確認) |
+
+round 5 の扱い (確認結果):
+
+- `1813846e0` は shim ではなく、**module F の shims に未登録の関数**である。`lic_config.json` で `memset` の C shim として登録されているのは module E (line 219) のみで、module F の `shims` は `180f878e0`・`180f8791c`・`181384040`・`180107430` の 4 件。そのため閉包 (`kh656_closure.py`) がこの番地を lift 対象として加えた。`scen_gate.h` の注記 (memset = C shim) は module E の設定と一致し、F の設定の漏れを示す。
+- 「i256 (AVX2) の除外」という分類の根拠 (関数本体の命令) は、本記録では確認していない (`n1.ll` が保存されていない)。よって「i256 1 件」という分類は未確認の記述として扱う。
+- 本 run には `work/` と `plugins-kilohearts` 素材が無く、round 5 の build 失敗は再現していない。表の round 5 の結果は、記録された元のログに基づく記述に留まる。
+- 修正方針 (未実施): module F の `shims` に `1813846e0: memset` を追加すれば、閉包から除外され E と同じ扱いになる。この変更は閉包の再測定を伴うため、本 PR では行わず、#1817 で扱う。
+
+- 閉包は**収束しない**。未 lift callee は 40 → 154 と増え、ラウンドごとに新しい callee が出る。6 ラウンドの上限でも `todo == []` に届かなかった。
+- 「313 関数 lift・wasm 1,543,901 B・`kh249_check.mjs` の入口が `memory access out of bounds`」という結果は、**round 5 は build 失敗のため wasm が存在せず、この実行結果は測定値ではない**。round 2〜4 の build の入口 (`kh249_check.mjs`) 実行結果は本記録に残っていない。閉包を広げた状態の入口挙動は本記録では未確認であり、#1821 (KH-29) で切り分ける。
+- 上記の変更は**コミットしていない** (`lic_config.json` は HEAD に戻した)。HEAD の状態は再 build で上記と一致 (wasm 54,394 B・sha `7ba79e65…`・undefined import 0・`kh249_check` ok=17 ng=0・入口 `unlifted callee 0x180112a30`)。
+- 所要: 閉包 6 ラウンド 1 分 36 秒 (`time`)、HEAD の `lic_build.py --module F` 12.25 秒 (`time`)、終了時 load average 0.08 / 0.08 / 0.14 (4 CPU)。
+- 測定 commit と HEAD の関係: HEAD の `lic_build.py --module F` の結果 (上記) は `0eaf2989` のコードで得た。`98c0f477` は本節の REPORT のみを追加した commit で、コード差分は 0。本 commit の `git diff 98c0f477 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT.md'` も 0 行。
+- 閉包 6 ラウンドの結果 (表の round 1〜4・5) は、ログ・`stat.json` が `work/` に残っておらず、本記録の値のみが根拠。再現には `plugins-kilohearts` 素材が必要 (`oc_artifacts: plugins-kilohearts toolchain-retdec toolchain-emsdk`)。
+
+**受入条件の判定**: 2 (入口を越えた分類結果の照合) と 3 (ネガティブコントロール) は未達のまま。閉包の収束が取れないため、受入 1 も未完。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 閉包の収束 (未 lift callee 40 → 154 と増加。STL map/string/vector・EH の lift/shim 方針) | 受入 1・2 未達 | #1817 [KH-28] |
+| 313 関数 lift 時の入口 `memory access out of bounds` | 閉包を広げた状態の実行検証不能 | #1821 [KH-29] |
+| ymm (AVX2) 2 件 `0x180f89cf0` / `0x180fb6124` の lift | 閉包を広げると build 失敗 (記録上。round 5 の原因は未確認) | #709 (KH-14・既存) |
+| 0x180ef7fc0 の native oracle (ctx-fuzz) | bit 照合不可 | #1761 継続 |

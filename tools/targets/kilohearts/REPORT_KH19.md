@@ -133,6 +133,20 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 家族規則 (`*MasterDsp` / `*Dsp` / `*DspModel` の vtable slot のみを候補にする) の closure 関数数 (`before_funcs`) は未記録。160 関数との集合比較は未実施。手検証の 160 関数一覧はリポジトリに無いため、差分 0 は主張しない。
 - **受入 2 の判定: 未達のまま**。家族規則を採用するかは、手検証の一覧を得てから判断する。
 
+## 7. #1619 (KH-19e) 対照 Gain の before 160 一覧と検証 (測定 commit `3a76c8cb`, 4 vCPU)
+
+- 検証起点: 測定 commit は `3a76c8cb` (コードを変えた最後の commit)。以降の `764b1719` と本節の追記 commit は REPORT_KH19.md の追記のみ。`git diff 3a76c8cb HEAD -- tools/targets/kilohearts` は REPORT_KH19.md だけ。PR 本文の検証 HEAD は、この節を含む最新 HEAD に揃える。
+- 数値の再測定: 素材 `plugins-kilohearts` は本 run の `$ARTIFACTS_DIR` に無い (`fl-win64` のみ) ため、`rtti_walk` / `callgraph` / `vtable_closure` は本 run では再実行していない。before / after の値は §2・§5 の値と一致 (ここでは書き直さない)。
+- 測定時の所要 (4 vCPU・各 1 回): `rtti_walk.py` 1.8 s → `callgraph.py` 7.8 s → `vtable_closure.py gain all` 11.3 s。測定時の load average は記録していない (未記録)。
+- 一覧: `gain_before_160.tsv` (正本・生成: `scripts/gain_before_list.py`)。列は `func_rva` / `size` / `root_class` / `parent_rva` / `call_site_rva` / `verified`。`verified` 列は全行 `auto` (機械生成)。
+- 本 run の新規検査 (TSV のみ。`python3` で読み込み。load average 1 分平均 0.40・4 vCPU の時点で実行):
+  - 行数 160 (ヘッダ除く)。§2 の before 160 と一致。`func_rva` の重複 0 件。
+  - `verified` は `auto` 160 行・`manual` 0 行。
+  - `root_class` が空でない行 (root) は `parent_rva` が空。それ以外の全行は `parent_rva` が一覧内にあり、親を辿ると root に到達する (欠落 0 件)。
+- 差分: 一覧は `vtable_closure` と同じ `direct_closure(roots)` から作るため、「before 160 の再現が一覧と一致する」ことは自明にしか確認できず、手検証の代替にはならない。
+- **受入 1 (各関数を手で確認) は未達**。受入 2 (手検証 160 との差分 0) は未達。`verified` 列を `manual` に変える行は、本 run では 0 件。
+- 人手検証の範囲と差分の判定は #1816 (KH-19f) に切り出す。
+
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
-未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は部分達成・open のまま)。rip_data は #849、lift 失敗点は #850 (§4)。
+未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は CLOSED。受入 2 は未達のまま)。rip_data は #849、lift 失敗点は #850 (§4)。

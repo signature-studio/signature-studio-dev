@@ -36,6 +36,12 @@ STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ル
     0x1813846e0: 'void* FUN_1813846e0(void* d, int c, ulonglong n) { return memset(d, c, (size_t)n); }',
     0x18004cf20: 'longlong FUN_18004cf20(void* a, void* b, void* c) { abort(); return 0; }',
 }
+# IAT thunk (jmp [rip+disp] → KERNEL32 の import) → fail-fast stub。Ghidra は thunk の引数を落として `func_0x000<va>(...)` と呼ぶ。
+# 引数無しの定義 (`()`) は呼出の arity を問わない。Win API の意味は実装しない (到達時に abort し、突合で検出する)。
+THUNK = {
+    0x180fd81e4: 'longlong func_0x000180fd81e4() { abort(); return 0; } /* KERNEL32!FlsGetValue */',
+    0x180fd81ec: 'longlong func_0x000180fd81ec() { abort(); return 0; } /* KERNEL32!FlsSetValue */',
+}
 
 
 def pe_bytes(pe, va, n):
@@ -127,6 +133,7 @@ def main():
             protos.append(s.split('{')[0].strip() + ';')
     out += protos
     out += [STUB[v] for v in STUB if ('FUN_%x' % v) in alltxt]
+    out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt]
     # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
     defined = set(vas)
     bodies = [re.sub(r'\bfunc_0x000(180f[0-9a-f]{5})\b', lambda m: 'FUN_' + m.group(1)

@@ -50,8 +50,11 @@ def funcs_of(img):
     return out
 
 
+RANGE_DEF_RE = re.compile(r"^// Address range: 0x([0-9a-f]+) - 0x[0-9a-f]+\n(?:    //[^\n]*\n)*?^[^\s/][^\n;=]*\b\w+\s*\([^\n;{}]*\)\s*\{", re.M)
+
+
 def defined_in(text):
-    return {int(m.group(1), 16) for m in DEF_RE.finditer(text)}
+    return {int(m.group(1), 16) for m in DEF_RE.finditer(text)} | {int(m.group(1), 16) for m in RANGE_DEF_RE.finditer(text)}
 
 
 def last_error(log):
@@ -111,11 +114,25 @@ def lift_set(path, rngs, tag, stats):
     rc, text, err = run_ranges(path, rngs, tag, stats)
     if rc == 0:
         defined = defined_in(text)
+        missing = []
         for (b, e) in rngs:
             if b in defined:
                 stats["ok"] += 1
             else:
-                record_fail(stats, b, e, "no_definition")
+                missing.append((b, e))
+        if not missing:
+            return
+        if len(rngs) == 1:
+            record_fail(stats, rngs[0][0], rngs[0][1], "no_definition")
+            return
+        # 直前範囲の終端が対象の開始と隣接すると、RetDec は対象を 1 バイト手前の VA 名で出すことがある (REPORT §10)。
+        # 定義が出なかった範囲だけを再試行する (単独なら正しく出る)。
+        if len(missing) < len(rngs):
+            lift_set(path, missing, tag + "m", stats)
+            return
+        mid = len(rngs) // 2
+        lift_set(path, rngs[:mid], tag + "a", stats)
+        lift_set(path, rngs[mid:], tag + "b", stats)
         return
     if len(rngs) == 1:
         b, e = rngs[0]
@@ -157,6 +174,31 @@ def measure(name):
     print(json.dumps({k: v for k, v in res.items() if k != "failed_funcs"}, ensure_ascii=False))
 
 
+def def_match(text, va):
+    for rx in (DEF_RE, RANGE_DEF_RE):
+        for m in rx.finditer(text):
+            if int(m.group(1), 16) == va:
+                return m
+    return None
+
+
+def nc_remove(text):
+    before = defined_in(text)
+    by_name = {int(m.group(1), 16) for m in DEF_RE.finditer(text)}
+    by_range = {int(m.group(1), 16) for m in RANGE_DEF_RE.finditer(text)}
+    va = min(by_range - by_name or before)
+    m = def_match(text, va)
+    text2 = text[:m.start()] + text[m.end():]
+    after = defined_in(text2)
+    return {
+        "defined_before": len(before),
+        "target": "0x%x" % va,
+        "removed_header": m.group(0).strip(),
+        "defined_after": len(after),
+        "target_status_after": "ok" if va in after else "no_definition",
+    }
+
+
 def negative_control(name="block19091_PE.bin"):
     path = os.path.join(FL, name)
     rngs = funcs_of(Image(path))[:NC_N]
@@ -165,19 +207,9 @@ def negative_control(name="block19091_PE.bin"):
     if rc != 0:
         print(json.dumps({"nc": "retdec_failed", "rc": rc, "err": err}, ensure_ascii=False))
         return
-    before = defined_in(text)
-    va = min(before)
-    m = next(m for m in DEF_RE.finditer(text) if int(m.group(1), 16) == va)
-    text2 = text[:m.start()] + text[m.end():]
-    after = defined_in(text2)
-    print(json.dumps({
-        "batch_funcs": len(rngs),
-        "defined_before": len(before),
-        "target": "0x%x" % va,
-        "removed_header": m.group(0).strip(),
-        "defined_after": len(after),
-        "target_status_after": "ok" if va in after else "no_definition",
-    }, ensure_ascii=False))
+    res = nc_remove(text)
+    res["batch_funcs"] = len(rngs)
+    print(json.dumps(res, ensure_ascii=False))
 
 
 if __name__ == "__main__":
