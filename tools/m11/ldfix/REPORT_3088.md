@@ -7,7 +7,7 @@
 
 - 測定 commit: `7c197cd3` (本 PR のコード変更の最後の commit)。`git diff 7c197cd3 HEAD -- tools/liftdiff tools/m11/ldfix/unexec4_3088.sh` = 0 行 (以降は本 REPORT の追加のみ)。
 - target: `tools/liftdiff/targets/m11.json` (IR = `tools/m11/work/boot_final3.ll`)。boot 状態 = `work/m11/boot_state.json`。wasm は HEAD の `rt/` から再 build (`wasm_size` 4457524・`sig_mismatch` 0)。
-- 素材: fl-win64 (`extracted/block00031_PE.bin` のみ展開し `FL_WIN64_DIR=$HOME/analysis/win64`)・work-m11・work-liftdiff・toolchain-emsdk ([EMSDK])。
+- 素材: fl-win64 (`extracted/block00031_PE.bin` のみ展開し、`FL_WIN64_DIR` は [WIN64] の展開先)・work-m11・work-liftdiff・toolchain-emsdk ([EMSDK])。
 - 所要: 反復 3 回を含む `unexec4_3088.sh` 1 回 = 97.9 s (real)。load average 0.27 (終了時点)。
 
 ## 2. 受入条件
