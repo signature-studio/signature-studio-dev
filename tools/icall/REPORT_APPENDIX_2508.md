@@ -142,6 +142,6 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 
 ## 7. 測定 commit からの差分
 
-測定 commit `05194cdc` から HEAD までのコード差分は、本付録 (`REPORT_APPENDIX_2508.md`) の追記のみ。`git diff 05194cdc HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_2508.md'` の出力は空 (スクリプト・コードの差分 0 行)。
+測定 commit `05194cdc` から HEAD `a62ff3cf` までの測定経路 (`tools/icall`・`tools/ott`・`tools/m2`・`tools/m5`・`tools/m11`・`tools/targets/freshair`・`tools/liftlib`) のコード差分は 0 行。`git diff 05194cdc HEAD -- tools/icall tools/ott tools/m2 tools/m5 tools/m11 tools/targets/freshair tools/liftlib ':!tools/icall/REPORT_APPENDIX_2508.md'` の出力は空。
 
 `05194cdc` は `origin/main` (`9b352bd7`) を取り込んだ merge。`faa2ed97` (`f3102162` 取り込み。`frame_slot_restore.py` の block 境界をまたぐ挿入の抑止を含む) と `05194cdc` の判定は、fixed・base とも全 131 関数で一致。後から入った `icall_rewrite.py`・`mk_franges.py`・`check_blk_domain.py` は測定経路 (`fa_route_build.sh`・`frame_slot_restore.py`・`fa_sweep.sh`・`fa_cmp.py`) から呼ばれない (`ir_flatten.py`・`vex_gen.py` のコメントに名前があるのみ)。0x181057b38 の復元は 2 件 (`frame_slot.json` の `restored` 2) のまま。fixed sweep は 54/66/8/3 で `ca7bd804` と同じ。base は 53/66/9/3。`fa_cmp.py 181057b38 --n 8` は fixed match 8 / mismatch 0、base wasm_err 8。
