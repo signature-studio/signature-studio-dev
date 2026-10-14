@@ -11,6 +11,8 @@
  *   node x.cjs exit       : ExitProcess(7) → exit hook + 終了コード 7
  *   node x.cjs deadlock   : ST ビルドで INFINITE 待ちが起こり得る場合 fail-fast
  *   node x.cjs shbrowse   : SHBrowseForFolderW の GetProcAddress → 未対応として fail-fast (SHX-T22 #1179)
+ *   node x.cjs ifiledialog: CoCreateInstance(FileOpenDialog) → 未対応として fail-fast (SHX-T33 #2916)
+ *   node x.cjs ifilesave  : CoCreateInstance(FileSaveDialog) → 未対応として fail-fast (SHX-T33 #2916)
  */
 #include "test_common.h"
 
@@ -44,6 +46,12 @@ int main(int argc, char** argv) {
     }
     if (!strcmp(mode, "shbrowse")) {                                       /* SHX-T22 #1179: フォルダ選択は未対応 = 名前を出して fail-fast */
         GetProcAddress(GetModuleHandleW(W("shell32.dll")), "SHBrowseForFolderW");
+        return 0;
+    }
+    if (!strcmp(mode, "ifiledialog") || !strcmp(mode, "ifilesave")) {      /* SHX-T33 #2916: IFileDialog の CoCreateInstance は未対応 = 名前を出して fail-fast */
+        GUID clsid; LPVOID obj = NULL;
+        CLSIDFromString(W(!strcmp(mode, "ifiledialog") ? "{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}" : "{C0B4E2F3-BA21-4773-8DBA-335EC946EB8B}"), &clsid);
+        CoCreateInstance((uint64_t)(uintptr_t)&clsid, NULL, 1, &clsid, &obj);
         return 0;
     }
     if (!strcmp(mode, "exit")) { shimx_set_exit_hook(exit_hook); ExitProcess(7); return 0; }
