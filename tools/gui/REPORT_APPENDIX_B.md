@@ -87,3 +87,25 @@
 - **結果**: 10/10 rc=0 / `[gui-e2e] ALL PASS`。各ログに `heap-use-after-free` / UAF の出現 0 件。stress 本体は ALL PASS (drop 0)。ネガコンの `FAIL` 行は期待された拒否 (exit 1 を検出) で、rc には影響しない。
 - **受入条件 3 点目 (`e2e.sh` ALL PASS 維持)**: 本 run で連続 10 回の rc=0 を確認 (#1217 の n≥10 基準を満たす)。
 - **未解決 (移管先は変更なし)**: 修正前 ASan ログの再取得と flake の Closes 判定は #740 / #1217 (GUI-20) で扱う。#186 の判定には含めない。
+
+## GUI-20 追補 (#1217 run: origin/main 連続 10 回 rc 0)
+
+測定 commit `61ce9782` (origin/main、コード変更なし)。`git diff f2370c95 61ce9782 -- tools/gui ':!*.md'` と `tools/e2e` の差分は 0 行 (前回 head との差は REPORT のみ)。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で同一 worktree (`ws-1217`) に連続 10 回実行。素材: fl-win64 / toolchain-emsdk / toolchain-retdec を `$ARTIFACTS_DIR` で実在確認、`/opt/emsdk`・`/opt/retdec`・`/usr/bin/x86_64-w64-mingw32-gcc` を利用。前処理: `pnpm install --frozen-lockfile`、`tools/e2e` の `npm ci` (e2e.sh の自動導入)。
+
+| run | rc | 実時間 | 開始時 load (1 分値) | 結果 | step 6h CDP timeout |
+|---|---|---|---|---|---|
+| 1 | 0 | 319 s (初回 setup 込み) | 0.04 | ALL PASS | 0 |
+| 2 | 0 | 207 s | 2.56 | ALL PASS | 0 |
+| 3 | 0 | 206 s | 2.12 | ALL PASS | 0 |
+| 4 | 0 | 209 s | 3.41 | ALL PASS | 0 |
+| 5 | 0 | 209 s | 1.64 | ALL PASS | 0 |
+| 6 | 0 | 209 s | 1.77 | ALL PASS | 0 |
+| 7 | 0 | 211 s | 2.28 | ALL PASS | 0 |
+| 8 | 0 | 208 s | 1.81 | ALL PASS | 0 |
+| 9 | 0 | 207 s | 2.36 | ALL PASS | 0 |
+| 10 | 0 | 208 s | 3.01 | ALL PASS | 0 |
+
+- 判定: 受入条件 2 (n≥10 連続 rc 0) は **達成** (10/10)。ただし前回 head `f2370c95` の run4 (rc 1, CDP timeout) は今回 0/10 で再現せず。
+- 受入条件 1 (CDP timeout 原因の特定) は **未達**。今回の 10 run では再現しなかったため原因は未切り分け。CLI (agent-browser linux-x64) の既定 action timeout は `AGENT_BROWSER_DEFAULT_TIMEOUT` = 25000 ms。stress.mjs の watchdog は 20 分で、今回の失敗メッセージ (`CDP command timed out: Runtime.evaluate`) は CLI 側の 25 s 待ちから来ている。
+- 受入条件 3 (#740 の修正前 ASan 再現ログ) は **未達** (未取得)。
+- 未解決の起票先: AC1・AC3 は子 issue に切り出し (下記 Issue 番号を最終回答に記載)。
