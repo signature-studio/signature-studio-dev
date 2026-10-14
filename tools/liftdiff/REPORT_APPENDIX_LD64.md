@@ -15,7 +15,7 @@
 
 - 測定 commit: `ab190bbd` (`feat(liftdiff): opt-in IR block-entry trace for wasm`。コード差分の最終 commit)。
 - 測定 runner: 4 vCPU・メモリ 15 GiB。load average (測定終了時) 0.04 / 0.09 / 0.12。
-- 素材: `work-liftdiff`・`work-m6-ott`・`analysis-ott-binaries` (`$HOME/analysis/plugins/ott/binaries/`)・`toolchain-emsdk` (`/opt/emsdk`)。`fl-win64` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` に展開して指定。
+- 素材: `work-liftdiff`・`work-m6-ott`・`analysis-ott-binaries` (`[ANALYSIS-PLUGINS]` の `ott/binaries/`)・`toolchain-emsdk` (`[EMSDK]`)。`fl-win64` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` に展開して指定。
 - 実行コマンド (6 関数 × pattern):
   `python3 liftdiff.py run targets/ott_old_blk.json --fn 0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc --pattern vm0,u16 --nobuild --notrace --verbose --json work/ld64/blk_all.json`
 - 所要 (**n=1 の参考値。結論には使わない**): 6 関数 × 2 pattern の run は `ott_old` 5.553 s・`ott_old_blk` 5.551 s (`--nobuild --notrace`)。`ott_old_blk` の wasm link は 0.6 s (`build_wasm.py --force` のログ `link 0.6s`)。n=1 のため min–max レンジは出せない (`docs/WORKFLOW.md` §5)。
