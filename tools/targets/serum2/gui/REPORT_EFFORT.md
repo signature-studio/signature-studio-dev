@@ -166,7 +166,8 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 | `VSTGUI::CTextLabel` (upstream 宣言あり) | 1 | 3 | 105 / 90、2 / 2、3 / 3 |
 | `XferOnOffButton` (Xfer 固有) | 1 | 4 | 85 / 74、2 / 2、3 / 3、3 / 2 |
 
-- 解釈: `XferOnOffButton` の置換側は、vtable 上で約 74 関数 (異なる関数数の最大値) が対象。本体サイズは未測定。
+- 解釈: 数値は継承込みの上限値であり、置換側の実数は未確定。upstream 宣言ありの `CTextLabel` (置換対象ではない) も同じ方法で 90 関数と数えられており、継承分が大半を占めることを示す。`XferOnOffButton` の 74 は「継承元との差分で override のみを数えた値」ではない。vtable 間の和集合は未算出 (vtable ごとの値のみ記録)。本体サイズは未測定。
+- 次の測定: 継承元 vtable (RTTI の base class array) との差分を取り、override された関数だけを数える (未着手。#1920 の範囲)。
 
 ### 9-3. 受入条件 2: 最小 PoC の canvas 描画の試行
 
@@ -177,5 +178,5 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 
 ### 9-4. 測定 commit と検証
 
-- 測定 commit: 本 §9 と `gui/vtable_measure.py` を含む commit (PR 本文に hash)。以後この commit までのコード差分は 0 (`git diff <測定 commit> HEAD -- tools/targets/serum2/gui/*.py` が空であること)。
+- 測定 commit: `31927856` (本 §9 と `gui/vtable_measure.py` を追加した commit。コードを変えた最後の commit)。PR の head は後続の docs 修正で進むため、測定 commit とは別物。REPORT 自身の hash は本文に書けないため、PR 本文には「測定 commit = `31927856`」と書き、head は PR の検証節で別に示す。以後この commit までのコード差分は 0 (`git diff 31927856 HEAD -- tools/targets/serum2/gui/*.py` が空であること)。
 - 再現: `work/venv/bin/python vtable_measure.py work/Serum2_win64.vst3 XferOnOffButton CTextLabel@VSTGUI`。
