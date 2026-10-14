@@ -171,6 +171,31 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 - `0xf960` (icall 値) が IR のどの関数に解決されるかを、`m11_icall` の `tkey` 変換 (`target + 0x400000 - M11_LB_BASE`) と `m11_disp_tab` の突合で特定する。`0x40f960` が表に無い理由 (lift 漏れ・別 VA への写像) を先に確定する。
 - 解決先が確定するまで、#1786 の計装 (連鎖の循環検出) は着手しない。
 
+## 11. 追補 (2026-10-14・#1317 7 回目 run): icall 0xf960 の解決先を IR/C で確定
+
+- 測定 commit: `82c44c61` (origin/main)。本追補のみが差分 (コード差分 0)。
+- 素材: fl-win64 ([WIN64])・toolchain-retdec・work-m11 (`tools/m11/work`)・work-liftdiff を展開。emsdk は [EMSDK]。`capstone` / `pefile` は import 可。
+- IR (ON, `M11_M2P=1`): `m11_gen_ir2.sh` rc=0 (`F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0`) / `m11_build.sh` rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
+- 再現 (上限 60 s):
+  - `0..829`+880: rc=0、1.77 s、`{"ok":765,"oob":13,"miss":46,"other":1,"halt0":4,"abort":2}`。
+  - `0..830`+880: rc=124、60 s 打ち切り。
+- trace (`SV_PROG=1 SV_TRACE_AT=880`, `0..830`+880): unit 880 の後の出力は `icall 0xf960` → `GetFileVersionInfoSizeW` stub → `UStrAsg` ×2 で、以降は無し (§3・§4a と同じ)。
+- **解決先の確定 (前 run の「IR に無い」を訂正)**:
+  - `m11_ov.c` の `disp_find` は `case 0x40f960: return tr_40f960;` で、`tr_40f960` は `function_40f960(a0)` を呼ぶ (`m11_ov.c` 87 行)。`0xf960` の icall 値は `tkey = 0xf960 + 0x400000` の PE VA `0x40f960` として解決される。
+  - `function_40f960` (`m11_ov.c` 482 行) は `System.TObject.NewInstance` の既定実体で、`function_409410((unsigned)D(self-0x80))` で確保し、`function_40fb40(self, obj)` (InitInstance) を返す。
+  - 前 run の「`m11_disp_tab` に `0x40f960`/`0x40fb40` が無い」は正しいが、`0x40f960` は表ではなく `disp_find` の switch で解決される。`0x40fb40` は IR 関数ではなく C 転記で、`boot_final.ll` に定義が無いのは仕様どおり。前 run の「計装が届かない」の原因は、wrapper を IR 側に入れたことにある (C 転記側の `function_40fb40` には入れていない)。
+- 停止候補 (未確定): 停止は `function_40f960` 内の (a) `function_409410` 側 (trace の stub 行はこの経路で出る) か (b) `function_40fb40` の 2 つのループのどちらか。trace の最後の出力が stub 行の後なので、(a) の確保サイズ `D(self-0x80)` が過大、または (b) の連鎖が循環、のどちらかと見る。どちらかは未計測。
+- 次の一手: `function_40f960` の入口で `D(self-0x80)` (確保サイズ) と、`function_40fb40` 入口の `self` を `m11_ov.c` の C 側に `fprintf` で出す (`M11_INSTR_40F960` 相当、既定 OFF)。サイズが大きければ確保元 (830 が残す値) を辿る。
+
+### 受入の状況 (本 run 末)
+
+| 受入 | 状態 |
+|---|---|
+| 1. 830 が残す状態 | 未達 (未特定。停止経路は `function_40f960` まで確定) |
+| 2. 停止命令・wasm frame | 部分 (`function_40f960` の入口まで。確保サイズ・ループの特定は未了) |
+| 3. 修正案 | 未達 |
+| 4. 修正後の完走 | 未実施 (停止は再現済み) |
+
 ## 9. 子 issue (起票先)
 
 | 未解決 | 起票先 |
