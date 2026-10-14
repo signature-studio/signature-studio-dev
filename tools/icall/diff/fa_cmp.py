@@ -28,6 +28,7 @@ def wasm_run(vas, xs):
         "const vas = %s, xs = %s;\n"
         "m().then((mod) => {\n"
         "  const out = {};\n"
+        "  mod._ott_data_install();\n"
         "  for (const va of vas) {\n"
         "    out[va] = [];\n"
         "    for (const x of xs) {\n"
