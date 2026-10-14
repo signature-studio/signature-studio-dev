@@ -5,3 +5,7 @@ exc=halt0
 [m11][stub-notimpl] FormatMessageW called (0 を返して継続)
 [m11][UStrAsg] dest=0x315f0 src=0x0
 [m11][longjmp] Halt0 -> RestoreContext(ctx=0x11eac80): DllMain attach 完走として JS 例外で巻き戻す
+
+real	0m0.296s
+user	0m0.319s
+sys	0m0.086s

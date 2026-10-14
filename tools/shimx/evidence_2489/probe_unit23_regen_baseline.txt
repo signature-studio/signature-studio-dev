@@ -8,3 +8,7 @@ ret=2
 (sxt 無し: 既存 M11 ビルド)
 MISS_UNIQ 1 MISS_TOTAL 2
 MISS_AT|0 457860
+
+real	0m0.300s
+user	0m0.272s
+sys	0m0.085s
