@@ -238,6 +238,7 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。
 
 ## 18. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
-- 測定 commit `55b21686` (コードを変えた最後の commit)、測定時刻 2026-10-14T16:14Z。偽の opencode・間隔 1 秒・`timeout 4`: 文面ファイルあり 送信 3 回 (監査 3・既定 0)、未設定 送信 3 回 (既定 3)、存在しない・空・空白のみ・PM_SESSION_ID 無しは終了 1・送信 0。初回送信は間隔 2 秒で 2.01 秒後。`bash tools/pm/test_pm_wake.sh` 20 passed。
-- 差分 (測定 commit から HEAD まで・コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は空 (差分 0)。
-- main 取り込み後の再測定 (main `eb9fd703` を merge commit `a7d33197` で取り込み。自動 merge で競合なし): 上と同じ 7 シナリオを fake opencode で再実行し、結果は上の数値と一致。`git diff 83f93e44 HEAD -- tools/pm docs/pm` の出力は空 (取り込みで pm 配下は変わらない)。`bash tools/pm/test_pm_wake.sh` 20 passed (同 merge)。
+- 測定 commit `17eb4e16` (main `13329492` を取り込んだ merge。測定は取り込み後の HEAD で実施)、測定時刻 2026-10-14T16:29Z。偽の opencode (`OPENCODE_BIN`)・`timeout` で打ち切り (リポジトリ外の検証スクリプト)。
+- 結果: 文面ファイルあり (`heartbeat_msg_audit.txt`・間隔 1 秒・timeout 4) 送信 3 回 (監査 3・既定 0)、初回 1.02 秒後。未設定 (間隔 1 秒・timeout 4) 送信 3 回 (既定 3)、初回 1.01 秒後。文面ファイルあり・間隔 2 秒・timeout 4 は送信 1 回 (初回 2.02 秒後。2 回目は 4 秒の打ち切り後)。存在しない・空・空白のみの文面ファイルは終了 1・送信 0 (標準エラー `PM_HEARTBEAT_MSG_FILE is missing or empty`)。`PM_SESSION_ID` 無しは終了 1・送信 0。`bash -n tools/pm/heartbeat.sh` OK。`bash tools/pm/test_pm_wake.sh` 20 passed, 0 failed。
+- 差分 (コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行 (本節を commit した後の HEAD でも同じ)。`git diff 83f93e44 HEAD -- ...` (同じパス) も 0 行。
+- 注: 節番号は §18 (§17 は main の #2342 の節が使っているため)。前回 (`5573e550`) の記載の「間隔 2 秒で送信 2 回」は、本測定 (timeout 4) では 1 回だった。2 回目は初回 (2.02 秒) + 間隔 2 秒で timeout 4 秒を過ぎるため。
