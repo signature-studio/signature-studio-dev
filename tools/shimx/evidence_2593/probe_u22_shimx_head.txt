@@ -1,0 +1,71 @@
+unit 22 (trace) ret=1 lasterr=126
+[sxt] #107 unit=22 le=0 GetModuleHandleW
+[sxt] #108 unit=22 le=0 GetProcAddress
+[sxt] #109 unit=22 le=126 GetProcAddress
+[sxt] #110 unit=22 le=126 GetProcAddress
+[sxt] #111 unit=22 le=126 GetProcAddress
+[sxt] #112 unit=22 le=126 GetProcAddress
+[sxt] #113 unit=22 le=126 GetProcAddress
+[sxt] #114 unit=22 le=126 GetProcAddress
+[sxt] #115 unit=22 le=126 GetProcAddress
+[sxt] #116 unit=22 le=126 GetProcAddress
+[sxt] #117 unit=22 le=126 GetProcAddress
+[sxt] #118 unit=22 le=126 GetProcAddress
+[sxt] #119 unit=22 le=126 GetProcAddress
+[sxt] #120 unit=22 le=126 GetProcAddress
+[sxt] #121 unit=22 le=126 GetProcAddress
+[sxt] #122 unit=22 le=126 GetProcAddress
+[sxt] #123 unit=22 le=126 GetProcAddress
+[sxt] #124 unit=22 le=126 GetProcAddress
+[sxt] #125 unit=22 le=126 GetProcAddress
+[sxt] #126 unit=22 le=126 GetProcAddress
+[sxt] #127 unit=22 le=126 GetProcAddress
+[sxt] #128 unit=22 le=126 GetProcAddress
+[sxt] #129 unit=22 le=126 GetProcAddress
+sxt_stk records=23
+#0 idx=62 le=0 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16648]:0x396024 | at wasm://wasm/0185b436:wasm-function[4612]:0x1beac0 | at wasm://wasm/0185b436:wasm-function[4614]:0x1bee8d
+#1 idx=64 le=0 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bead6
+#2 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1beaf8
+#3 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1beb1a
+#4 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1beb3c
+#5 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1beb5e
+#6 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1beb80
+#7 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1beba2
+#8 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bebc4
+#9 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bebe6
+#10 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bec08
+#11 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bec2a
+#12 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bec4c
+#13 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bec6e
+#14 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bec90
+#15 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1becb2
+#16 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1becd4
+#17 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1becf6
+#18 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bed18
+#19 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bed3a
+#20 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bed5c
+#21 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1bed7e
+#22 idx=64 le=126 at sxt_js_stack (<repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs:5459:96) | at wasm://wasm/0185b436:wasm-function[16942]:0x39c163 | at wasm://wasm/0185b436:wasm-function[16650]:0x3960e9 | at wasm://wasm/0185b436:wasm-function[4611]:0x1bea6d | at wasm://wasm/0185b436:wasm-function[4612]:0x1beda0
+ret GetModuleHandleW lpModuleName=0x57f0c "oleaut32.dll" -> 0x11443000
+ret GetProcAddress hModule=0x56670 proc="VariantChangeTypeEx" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarNeg" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarNot" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarAdd" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarSub" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarMul" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarDiv" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarIdiv" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarMod" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarAnd" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarOr" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarXor" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarCmp" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarI4FromStr" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarR4FromStr" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarR8FromStr" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarDateFromStr" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarCyFromStr" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarBoolFromStr" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarBstrFromCy" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarBstrFromDate" -> 0x0
+ret GetProcAddress hModule=0x56670 proc="VarBstrFromBool" -> 0x0

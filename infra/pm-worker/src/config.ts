@@ -31,6 +31,8 @@ export interface Env {
   LIVE?: string;
   LIVE_LAUNCH?: string;
   LIVE_DISPATCH?: string;
+  // 規則 A の自動 close (autoclose.ts) を実行するか。"1" のときだけ。LIVE には従わない (close は副作用が大きいので個別に明示する)。
+  LIVE_CLOSE?: string;
   // "1" のときだけ、失敗した webhook 配送を GitHub に再配送する (POST /app/hook/deliveries/{id}/attempts)。LIVE には従わない (単独のスイッチ・#2339)。
   LIVE_REDELIVER?: string;
   // 実装 App (bot) のログイン。bot_last (最後の報告) の判定に使う。
@@ -47,6 +49,8 @@ export interface Env {
   STUCK_HIGH?: string;
   // reviewer App の bot ログイン。review の verdict とマーカー付きコメントの信頼に使う。
   REVIEWER_LOGIN?: string;
+  // デプロイした commit hash (`wrangler deploy --var BUILD_COMMIT:<hash>`)。wrangler.toml の [vars] には置かない (渡さなければ未設定)。/status の build に出す。
+  BUILD_COMMIT?: string;
 }
 
 export interface Config {
@@ -60,6 +64,8 @@ export interface Config {
   liveLaunch: boolean;
   // repository_dispatch (oc-watchdog と oc-pm) の送信を実行するか。
   liveDispatch: boolean;
+  // 規則 A の自動 close を実行するか (LIVE_CLOSE="1" のときだけ。既定は記録のみ)。
+  liveClose: boolean;
   // 失敗した webhook 配送の再配送を実行するか (既定 false: 一覧を読んで送るはずだった件数だけ記録する)。
   liveRedeliver: boolean;
   botLogin: string;
@@ -73,6 +79,8 @@ export interface Config {
   reviewerLogin: string;
   // oc-pm の対象にしてよい bot の起票者。人は author_association (OWNER / MEMBER / COLLABORATOR) で絞る。
   pmTargetBots: string[];
+  // デプロイした commit hash。未設定・hash の形でない値は null (自由文を /status に出さない)。
+  build: string | null;
   manualDeps: Record<string, number[]>;
 }
 
@@ -80,6 +88,8 @@ const num = (v: string | undefined, d: number): number => {
   const n = Number(v);
   return v !== undefined && v !== "" && Number.isFinite(n) && n >= 0 ? n : d;
 };
+
+const buildCommit = (v: string | undefined): string | null => (v !== undefined && /^[0-9a-f]{7,40}$/.test(v) ? v : null);
 
 // 個別のスイッチが設定されていればそれに従い ("1" だけが live)、未設定のときだけ LIVE に従う。
 const liveFlag = (own: string | undefined, legacy: string | undefined): boolean => (own !== undefined ? own === "1" : legacy === "1");
@@ -96,6 +106,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     batch: num(env.BATCH, DEFAULT_BATCH),
     liveLaunch: liveFlag(env.LIVE_LAUNCH, env.LIVE),
     liveDispatch: liveFlag(env.LIVE_DISPATCH, env.LIVE),
+    liveClose: env.LIVE_CLOSE === "1",
     liveRedeliver: env.LIVE_REDELIVER === "1",
     botLogin: env.BOT_LOGIN ?? "opencode-for-signature-studio[bot]",
     pmLogins: (env.PM_LOGINS ?? "pycabbage").split(",").map((s) => s.trim()).filter(Boolean),
@@ -108,6 +119,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     stuckHigh: num(env.STUCK_HIGH, 40),
     reviewerLogin: env.REVIEWER_LOGIN ?? DEFAULT_REVIEWER_LOGIN,
     pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]"],
+    build: buildCommit(env.BUILD_COMMIT),
     manualDeps,
   };
 }
