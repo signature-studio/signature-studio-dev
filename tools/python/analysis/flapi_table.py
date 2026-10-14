@@ -67,10 +67,11 @@ def stub_sigs(mod):
         for node in tree.body:
             if isinstance(node, ast.FunctionDef):
                 a = node.args
-                names = [x.arg for x in a.args]
+                pos = a.posonlyargs + a.args
+                names = [x.arg for x in pos]
                 defaults = [None] * (len(names) - len(a.defaults)) + [ast.unparse(d) for d in a.defaults]
                 params = [{"name": n, "type": ast.unparse(x.annotation) if x.annotation else None, "default": d}
-                          for n, x, d in zip(names, a.args, defaults)]
+                          for n, x, d in zip(names, pos, defaults)]
                 sigs[node.name] = {"params": params, "returns": ast.unparse(node.returns) if node.returns else None}
     return sigs
 

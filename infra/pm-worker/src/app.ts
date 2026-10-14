@@ -1,9 +1,10 @@
 // Worker の HTTP 面 (/webhook /setup /setup/callback /status /tick)。Durable Object (do.ts) の中で動く。
 // 保管先・時刻・fetch は注入する。App の id / private key / webhook secret は AES-GCM で封じて保管し、応答にもログにも出さない。
+import { bearerToken, canPushRepo } from "./admin.ts";
 import type { Config } from "./config.ts";
 import { openText, randomToken, safeEqual, sealText } from "./crypto.ts";
 import { Engine } from "./engine.ts";
-import { Gh, InstallationAuth, type FetchFn } from "./github.ts";
+import { appJwt, Gh, InstallationAuth, type FetchFn } from "./github.ts";
 import type { Store } from "./kvstore.ts";
 import { WEBHOOK_EVENTS } from "./webhook.ts";
 
@@ -33,8 +34,8 @@ const html = (body: string, status = 200): Response =>
     status,
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
   });
-const json = (o: unknown, status = 200): Response =>
-  new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store" } });
+const json = (o: unknown, status = 200, extra: Record<string, string> = {}): Response =>
+  new Response(JSON.stringify(o), { status, headers: { "content-type": "application/json", "cache-control": "no-store", ...extra } });
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 
 // 権限と購読イベントの正本。contents: write は repository_dispatch (POST /repos/{o}/{r}/dispatches) に必要 (GitHub 公式の
@@ -58,6 +59,7 @@ export class PmApp {
   private wh: string | null = null;
   private auth: InstallationAuth | null = null;
   private gh: Gh | null = null;
+  private appJwtGh: Gh | null = null;
   private readonly authCache = new Map<string, { ok: boolean; until: number }>();
 
   constructor(d: AppDeps) {
@@ -67,6 +69,7 @@ export class PmApp {
       cfg: d.cfg,
       now: d.now,
       gh: () => this.getGh(),
+      app: () => this.getAppGh(),
       pmBotLogin: () => {
         const a = d.store.get<AppRecord>("meta", "app");
         return a ? `${a.slug}[bot]` : null;
@@ -109,6 +112,16 @@ export class PmApp {
     return this.gh;
   }
 
+  // App の JWT で叩く REST (GET /app/hook/deliveries と再配送)。installation token とは枠が別なので、レート情報は engine に渡さない。
+  private async getAppGh(): Promise<Gh | null> {
+    const rec = this.record();
+    if (!rec) return null;
+    if (!this.creds) this.creds = { appId: rec.appId, pem: await openText(this.d.storeKey, rec.pemSealed), installationId: rec.installationId };
+    const creds = this.creds;
+    if (!this.appJwtGh) this.appJwtGh = new Gh(this.d.fetch, () => appJwt(creds.appId, creds.pem, Math.floor(this.d.now() / 1000)), this.d.cfg.repo);
+    return this.appJwtGh;
+  }
+
   private async webhookSecret(): Promise<string | null> {
     if (this.wh) return this.wh;
     const r = this.record();
@@ -128,7 +141,26 @@ export class PmApp {
       const r = await this.engine.tick();
       return json({ ok: true, ready: r.ready });
     }
+    if (p === "/admin/resync" && req.method === "POST") return this.resync(req);
     return json({ error: "not found" }, 404);
+  }
+
+  // ---------------------------------------------------------------- /admin/resync (#2339)
+  // 認証は入口 (index.ts) でも行い、通らなければ DO を呼ばない。ここでも同じ確認をする (未認証は 404 で状態を変えない)。
+  private async resync(req: Request): Promise<Response> {
+    const token = bearerToken(req.headers.get("authorization"));
+    if (!token || !(await canPushRepo(token, this.d.cfg.repo, this.d.fetch))) return json({ error: "not found" }, 404);
+    const gh = await this.getGh();
+    if (!gh) return json({ error: "not configured" }, 503);
+    let r: Awaited<ReturnType<Engine["resync"]>>;
+    try {
+      r = await this.engine.resync(gh);
+    } catch {
+      return json({ error: "sync failed" }, 502);
+    }
+    if (r.status === "limited") return json({ error: "rate limited", retry_after_s: r.retryAfterS }, 429, { "retry-after": String(r.retryAfterS) });
+    if (r.status === "busy") return json({ error: "busy" }, 409);
+    return json({ ok: true, resynced: true });
   }
 
   // ---------------------------------------------------------------- /webhook
@@ -218,19 +250,12 @@ export class PmApp {
   }
 
   private async callerCanPush(h: string | null): Promise<boolean> {
-    const m = /^Bearer (\S{10,255})$/.exec(h ?? "");
-    if (!m) return false;
-    const key = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(m[1])))).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const token = bearerToken(h);
+    if (!token) return false;
+    const key = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)))).map((b) => b.toString(16).padStart(2, "0")).join("");
     const c = this.authCache.get(key);
     if (c && c.until > this.d.now()) return c.ok;
-    const r = await this.d.fetch(`https://api.github.com/repos/${this.d.cfg.repo}`, {
-      headers: { authorization: `Bearer ${m[1]}`, accept: "application/vnd.github+json", "user-agent": "signature-studio-pm-worker" },
-    });
-    let ok = false;
-    if (r.ok) {
-      const j = (await r.json()) as { permissions?: { push?: boolean; admin?: boolean } };
-      ok = !!(j.permissions?.push || j.permissions?.admin);
-    } else void r.body?.cancel();
+    const ok = await canPushRepo(token, this.d.cfg.repo, this.d.fetch);
     this.authCache.set(key, { ok, until: this.d.now() + 60_000 });
     return ok;
   }
