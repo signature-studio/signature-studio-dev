@@ -10,3 +10,7 @@ pm_watchdog_ping.log
 pm_watchdog_ping.log.err
 pm_watchdog_ping.log.tmp
 __pycache__/
+pm_wake.state.json
+pm_wake.state.json.tmp
+pm_wake.log
+pm_wake.log.tmp
