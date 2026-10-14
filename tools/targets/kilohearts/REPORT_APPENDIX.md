@@ -108,6 +108,11 @@
   - `FUN_180fcf904` = 引数 `float` (xmm0)・戻り値 `short` (ax)。呼出元 2 件: `FUN_180fbc1f4` (xmm0 = `afStackX_8[0]`、入力 float)・`FUN_180fbbfb8` (xmm0 = `param_2`)。`void` 宣言は誤り。
   - `FUN_180fbdfcc` = 引数 `short*` (rcx)・戻り値 `short`。呼出元 1 件: `FUN_180fbbfb8` (rcx = 入力 `param_1`)。
   - `FUN_180fbdef4` = 引数 2 個 (rcx, dx)。呼出元 1 件: `FUN_180fbc1f4` (rcx = `&afStackX_10`・dx = 0)。Ghidra の呼出しの 3 個目 (r8) は callee が読まないため落とす。
+- 未確認 (review 指摘 1・2、fix モード #2127 で確認を試みた結果):
+  - 上記「呼出元の確定」の逆アセンブル出力は repo に保存されておらず、再現できない。
+  - `FUN_180fbbfb8` の `param_2`・`FUN_180fbc1f4` の `afStackX_8[0]` の Ghidra 宣言型 (float か整数型か) は未確認。整数型なら `FUN_180fcf904(param_2)` の C 代入は数値変換になり、機械語 (xmm0 にビットを載せる) と一致しない。`FUN_180fcf904(u2f(param_2))` への修正は、宣言型が確定するまで行わない (`param_2` が float なら u2f 追加で別の誤りになる)。
+  - `FUN_180fbdef4` の r8 を落とす根拠は、callee 本体の逆アセンブルで読むレジスタを確認していない。根拠は `snapins/lift/gen_stubs_sigs.py` の fint shim (手書き) の記述のみ。
+  - 確認には HeartCore.core_64 が要る (`fl-win64` には無い)。`oc_artifacts: fl-win64 plugins-kilohearts` での再起動が必要。
 - 変更: `patches.py` に `ABI` 表 (resonator 7 規則)、`ghidra_to_c.py` で適用し各規則の件数が 1 でなければ停止 (assert)。gain/haas/gate には適用されない。
 - emcc (resonator, 修復なし, `-ferror-limit=0`, `emcc -c`, rc 1, `grep -c 'error:'`):
   - 変更前 (HEAD `b7cfd62e` = origin/main 時点の resonator 生成, §10-7m と同じ件数): **8 件**。
