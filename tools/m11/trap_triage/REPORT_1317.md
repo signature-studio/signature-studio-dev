@@ -174,7 +174,7 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 ## 11. 追補 (2026-10-14・#1317 7 回目 run): icall 0xf960 の解決先を IR/C で確定
 
 - 測定 commit: `82c44c61` (origin/main)。本追補のみが差分 (コード差分 0)。
-- 素材: fl-win64 (`$RUNNER_TEMP/fl`)・toolchain-retdec・work-m11 (`tools/m11/work`)・work-liftdiff を展開。emsdk は `/opt/emsdk`。`capstone` / `pefile` は import 可。
+- 素材: fl-win64 ([WIN64])・toolchain-retdec・work-m11 (`tools/m11/work`)・work-liftdiff を展開。emsdk は [EMSDK]。`capstone` / `pefile` は import 可。
 - IR (ON, `M11_M2P=1`): `m11_gen_ir2.sh` rc=0 (`F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0`) / `m11_build.sh` rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
 - 再現 (上限 60 s):
   - `0..829`+880: rc=0、1.77 s、`{"ok":765,"oob":13,"miss":46,"other":1,"halt0":4,"abort":2}`。
