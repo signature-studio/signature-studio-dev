@@ -89,6 +89,24 @@ const undoProbe = (() => {
     };
 })();
 boot.undo_probe = undoProbe;
+// PY-123 (#3028): 監視 slot の変化点 (fle_boot.c の py_watch・40 B/件)。site: 0=fle_run 直前 1=unit 前 2=unit 後 3=memset 後
+const pyEvents = (() => {
+    const n = Number(m._fle_py_ev_n()), p = Number(m._fle_py_ev_ptr());
+    const dv = new DataView(m.HEAPU8.buffer);
+    const hx = (v) => '0x' + v.toString(16);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+        const b = p + 40 * i;
+        out.push({
+            unit: dv.getUint32(b, true), site: dv.getUint32(b + 4, true),
+            slot: hx(dv.getUint32(b + 8, true)), proc: hx(dv.getUint32(b + 12, true)),
+            old: hx(dv.getBigUint64(b + 16, true)), new: hx(dv.getBigUint64(b + 24, true)), aux: hx(dv.getBigUint64(b + 32, true)),
+        });
+    }
+    return { n, over: Number(m._fle_py_ev_over()), events: out };
+})();
+boot.py_events = pyEvents;
+console.log('FLEBOOT_PY123 ' + JSON.stringify(pyEvents));
 // FLE-6: dsp_ippv2 GetProcAddress 結果 (0x15F34A0 = ippsZero_8u の登録値) と IPP 呼出の証跡
 boot.ipp_ptr_15F34A0 = rd64(0x15F34A0);
 boot.ipp_ptr_15F40E8 = rd64(0x15F40E8);
