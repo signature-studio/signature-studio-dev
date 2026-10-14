@@ -73,7 +73,7 @@ python3 tools/targets/kilohearts/scripts/closure_breakdown.py <winpkg/HeartCore.
 - 試行 B の原因箇所: `tools/flelift/fle_data_gen.py` の `for a, n in [(0x42f670, 0x30)]`。本 PR で `IMG <= a < IMG + SizeOfImage` の判定を足した。FLEngine (像内) では従来どおり追加される。
 - 試行 A の補足 (未確認): 直書き窓は VA 版では `IMG + rva` が打ち消し合い `0x42f670` へ書き込む。emcc の静的領域と重なるかは確認していない。
 
-## 5. FLEngine 側の回帰確認 (HEAD `0f52976e` で実行。以降 `scripts`・`flelift` は未変更)
+## 5. FLEngine 側の回帰確認 (HEAD `0f52976e` と `d6a0b320` で実行。以降 `scripts`・`flelift` は未変更)
 
 - `scripts/fle_data_gen_cmp.sh` (素材: `fl-win64` の `block00031_PE.bin`・meta は空の合成値 `{}`):
   - `cmp old/new: 一致 (14820487 B)` — 旧版 (`196f37ef^` の `fle_data_gen.py`) と新版 (HEAD) の出力が一致。
