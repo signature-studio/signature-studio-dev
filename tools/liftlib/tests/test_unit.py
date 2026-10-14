@@ -839,7 +839,24 @@ def t26():
     print("T26 ok (%%pc 改名だけ無視: 行 %d・改名 %d 種・ネガ FAIL 確認)" % (len(a), len(m)))
 
 
+def t27():
+    """[LIFTLIB-23 #3145] ott_outhash の出力読取 (recipes/ott.outhash_json)。stdout に JSON 以外の行が混じっても最後の JSON 行を読む。
+    JSON が無い失敗 (module の exit 等) は rc と stdout/stderr の抜粋を例外に残し, 「Expecting value」だけで終わらせない。"""
+    import subprocess
+    from liftlib.recipes import ott as OTT
+    good = subprocess.CompletedProcess(["node"], 0, stdout='noise\n{"p0_f0_a0": "ab"}\n', stderr="")
+    assert OTT.outhash_json(good) == {"p0_f0_a0": "ab"}
+    bad = subprocess.CompletedProcess(["node"], 1, stdout="", stderr="[m6_rt] FAIL: fail-fast stub called\n")
+    try:
+        OTT.outhash_json(bad)
+    except RuntimeError as ex:
+        assert "rc=1" in str(ex) and "fail-fast" in str(ex), str(ex)
+    else:
+        raise AssertionError("JSON 無しは例外になること")
+    print("T27 ok (ott_outhash 出力読取: 混在行の最後の JSON を読む・JSON 無しは rc と stderr を例外に残す)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26, t27):
         f()
     print("ALL UNIT TESTS PASS")
