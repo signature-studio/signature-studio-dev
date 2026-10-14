@@ -12,8 +12,9 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
   `CreateEngine` (0x18000b1a0) / `entry_point` (0x18000bb98) で、RetDec は名前付きの `function:` として出力しており、
   `define @CreateEngine` / `define @entry_point` は final.ll に存在する。 `engine_defs.py` は `function_<VA>` 形式しか見ないため、この 2 件は偽陽性。
 - ネガティブ/切替の実測: `PLUG_NO_STATIC_DETECT=1 bash tools/plugins/dynamics/engine_lift.sh 19048` で `missing_define` 210 → **2** (97 B)、`missing_ref` 67 → **0**、`define` 1,504 → 1,712。
-- 19252 は切替前後とも 2 件 (165 B) で不変 (静的検出の対象外。 原因は未特定のまま)。
-- ただし切替後の 19048 は `emcc -c` rc 1 (fixcmp 後も rc 1): `e.final.ll` の `%arg2` i32/i64 不整合 (既存の修正対象) の後に、`e.fixcmp.ll` で `%penv` の i64/ptr 不整合が露見 (未修正)。 既定の切替は `lift_ranges.sh` の既定値 (#1486) に関わるため、既定の変更は本 run では行わない。
+- 残りの 2 件 (19252 の 165 B / 19048 の 97 B) は、いずれも dsm で `function: <名前> at <VA>` として出る `CreateEngine` / `entry_point` で、`final.ll` に `define @CreateEngine` / `define @entry_point` が存在する。 `engine_defs.py` の偽陽性だったため、本 run で名前付き define を計上するように修正した (commit db4fe1f0)。 これで両 engine の実在の欠落は 0 件。
+- 既定値 (`lift_ranges.sh` の `PLUG_NO_STATIC_DETECT:-1`) は commit 0d51d876 (#1536) で切替済み。 本 run は既定のまま測定した。
+- `engine_fixcmp.py` の `%penv` 修正は commit 5457975c (#1163) で入っており、切替後の 19048 は fixcmp 後 `emcc -c` rc 0。 raw の `final.ll` は `%arg2` i32/i64 の型不整合で rc 1 のまま (既存の修正対象。 `engine_fixcmp.py` で吸収)。
 
 ## B. fixcmp の call 引数拡張による 19048 の `emcc -c` 解消 (#1163 run)
 

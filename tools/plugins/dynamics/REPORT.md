@@ -111,10 +111,10 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 | engine | RetDec rc | final.ll define | `.pdata` で define 無し | f80 関数 | 未実装 helper (うち VEX) | `emcc -c` | 局所修復後の `emcc -c` |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| 19252 Transient | 0 | 551 | 2 / 522 (165 B) | 0 (既定の `PLUG_F80_LOWER=1` で 1 → 0) | 59 | **0 (成功)** (旧 1 失敗) | — (不要) |
-| 19048 Multiband | 0 | 1,504 | 210 / 1,658 (22,916 B) | 0 | 34 | 1 (失敗) | **0 (成功)** (`engine_fixcmp.py` の i32 修正後) |
+| 19252 Transient | 0 | 551 | 0 / 522 | 0 (既定の `PLUG_F80_LOWER=1` で 1 → 0) | 5 | **0 (成功)** (旧 1 失敗) | — (不要) |
+| 19048 Multiband | 0 | 1,712 | 0 / 1,658 | 0 | 5 | 1 (失敗) | **0 (成功)** (`engine_fixcmp.py` の i32 修正後) |
 
-- 2026-10-14 実測 (測定 commit `711d9ece` = 本 PR の差分、`engine_lift.sh` 単独実行、Transient 14 s / Multiband 50 s)。 未実装 helper の列は `e.simd.log` の `unimplemented N` の値。 旧表の 66 (57) / 39 (31) は distinct 宣言数で数え方が違うため直接比べない。
+- 2026-10-14 実測 (測定 commit `db4fe1f0`、`engine_lift.sh` 単独実行、Transient 16 s / Multiband 64 s)。 未実装 helper の列は `e.simd.log` の `unimplemented N` の値。 旧表の 66 (57) / 39 (31) は distinct 宣言数で数え方が違うため直接比べない。
 - 未実装 helper の内訳 (`m11_simd2.py`、`tools/plugins/lift/passes/`)。 VEX 形 (`v*`) は同名 SSE 形へ委譲 (dst 上位は src1 由来で SSE 形の a 由来と一致する扱い) したうえで、cvt 2 オペランド形・`cvtpd2dq`/`cvttpd2dq`・`pmovsxdq`・`rep_movsb_memcpy`・`rep_stosw_memset`・`int`/`int3` (到達で abort) を追加した。
 
   | engine | 変更前 (HEAD) | 変更後 (711d9ece) | 残件 |
@@ -135,7 +135,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 19048 は 210 件のうち 67 件が call 先として `declare` だけ残り、link 時に未解決になる。
   19252 の 2 件は参照なし。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
-- **脱落の原因 (#1412、測定 commit と差分証跡は §5)**: 既定の RetDec の静的検出が、19048 の欠落 210 件のうち 208 件を除去していた (`statically linked function`)。 静的検出を切ると `missing_define` 210 → 2、`define` 1,504 → 1,712。 詳細と切替後の `emcc -c` rc 1 の内訳は付録 `REPORT_APPENDIX.md` §A。
+- **脱落の原因 (#1412)**: 19048 の欠落 210 件のうち 208 件は RetDec の静的検出 (`statically linked function`) による除去。 残り 2 件 (19252・19048 とも `CreateEngine` / `entry_point`) は名前付き define で存在する偽陽性。 集計を直した HEAD (db4fe1f0) で `missing_define` は両 engine とも 0。 詳細は付録 `REPORT_APPENDIX.md` §A。
 - 失敗の連鎖と修正 (clang は最初の型エラーで止まるため 1 件ずつ露見。 修正は engine 局所の `dynamics/engine_fixcmp.py`、共有鎖には未組込):
   1. 両 engine: `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → 修正済み (19252 は該当 0 件、19048 は 1 件)。
   2. 19048: `inttoptr i64 %arg2` で `%arg2` が i32 → 修正済み (`zext i32 → i64` を挿入。 `function_18004f7f8` の 1 件)。 修正後の `emcc -c` rc 0。
@@ -155,7 +155,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 - 測定 commit: **cb3a89a6** (origin/main)。 この後の差分は文書のみ (REPORT.md の分割移動・REPORT_APPENDIX.md 新設・DOC_MAP 索引 1 行)。
   `git diff cb3a89a6 HEAD -- tools/plugins/dynamics ':!*.md'` の出力は空 (コード差分 0 の証跡)。 文書差分の概要は `git diff cb3a89a6 HEAD -- tools/plugins/dynamics --stat` で REPORT.md のみ。 `docs/WORKFLOW.md` §6 に従い現 HEAD での e2e 再測定は不要 (下の `engine_lift.sh` 再測定は HEAD で実施)。
-- §4 の数値を HEAD で再測定 (`engine_lift.sh 19048`・`PLUG_NO_STATIC_DETECT` 無し / 有り): `define` 1,504 / `missing_define` 210 (67 call 先) → 切替後 `define` 1,712 / `missing_define` 2 / `missing_ref` 0。 `statically linked function` の開始 VA 一致 208 / 210 (残り 2 件は `CreateEngine` / `entry_point`)。 一致判定は `ranges.txt` と dsm の突き合わせによる実測。
+- §4 の数値は db4fe1f0 で再測定 (本文 §4 の表と付録 §A)。 静的検出の切替前後の内訳は付録 §A。
 
 | 項目 | 実測 |
 |---|---|
@@ -224,7 +224,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 | 差分試験 bit-exact (出口条件 3)。 Eff_Render 単位の native / wasm harness が無く、P0a/P0b 未完 | #200 を閉じられない | #195 / #196 の完了後に #200 を再開 (Closes はその時)。 harness は新規子チケットを PM に起票依頼: 「[PLG-F3a] Eff_Render 単位の native(ms_abi VA 敷設) ⟷ wasm 差分 harness」 |
 | Render test .flp の E2E (出口条件 4) | 同上 | FLEngine 統合待ち。 親 #14 / #200 |
 | engine 2 本の未実装 helper 宣言 (Transient 12 / Multiband 6、FMA・movntps・vmovsd store・ucomis flag) | T2 の 2 本 (Multiband / Transient) | #1408 ([PLG-F3-8]) |
-| `.pdata` 範囲の define 脱落 (Multiband 210 件 / Transient 2 件)。 原因未特定 | T2 の 2 本 | #1412 ([PLG-F3-9]) |
+| `.pdata` 範囲の define 脱落 (Multiband 210 件 / Transient 2 件) | T2 の 2 本 | 解消済み (#1412。 偽陽性の集計を修正、db4fe1f0) |
 | `emcc -c` (`e.final.ll` と生成 helper C の両方) は 2 本とも rc 0 で達成済み (型エラー 3 類型は `engine_fixcmp.py` と `PLG_F80_LOWER` で解消) | — | 解消済み (#1163) |
 | Transient engine の f80 1 関数 | engine の wasm 化 | #197 (`f80_lower.py` の適用) にコメント |
 | 0x5dee90 の P0c 汎用 harness 残差 (2,565,360) | Maximus / Soundgoodizer の kernel 保証 | #331 (既存) にこの依存を追記 |
