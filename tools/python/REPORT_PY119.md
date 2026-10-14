@@ -54,25 +54,26 @@
 
 ## 検証
 
-測定 commit: `318cf021` (コードを変えた最後の commit。mock・C provider・provider_check・ui_state_diff)。測定は同 commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから行った。
+測定 commit: `2f4564fe` (コードを変えた最後の commit。origin/main 取り込みの merge。`tests/provider_check.mjs` の期待値を main 側 `pe115` と合算: 実装 90 / 未実装 345)。測定は同 commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を再実行してから行った。
 
-環境: runner 4 core、測定時の load average 0.68 (`uptime`)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`) の既定位置 (`provider/build.sh` の `EMSDK_ENV` 既定) が既に存在したため、それを使った。前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+環境: runner 4 core、測定時の load average 2.36 (`uptime`、21:17:17)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`) の既定位置 `/opt/emsdk` を使った。前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、21:13:42〜21:16:50 の 188 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 89 (83 + 6) | — |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 89 / 未実装 346 / MCP 静的 60) | 0.36 秒 |
-| `node tests/ui_state_diff.mjs` (新規) | calls 12、diffs 0、PASS | 0.04 秒 |
-| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.05 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.97 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 90 (84 + 6) | 1.13 秒 (emcc キャッシュ済み) |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 90 / 未実装 345 / MCP 静的 60) | 0.279 秒 |
+| `node tests/ui_state_diff.mjs` (新規) | calls 12、diffs 0、PASS | 0.03 秒 |
+| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.03 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.03 秒 |
+| `node tests/mixer_diff.mjs` | calls 57、diffs 0、PASS | 未計測 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.273 秒 |
 
-ネガティブコントロール: `host/fl_mock.mjs` の `ui.getFocusedFormID` の既定値を `0` から `1` にすると、`node tests/ui_state_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 12・diffs 0・PASS (rc 0)。
+ネガティブコントロール: `host/fl_mock.mjs` の `ui.getFocusedFormID` の既定値を `0` から `1` にすると、`node tests/ui_state_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 12・diffs 0・PASS (rc 0)。HEAD (`2f4564fe`) で再現。
 
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 318cf021 HEAD -- tools/python ':!*.md'
+$ git diff 2f4564fe HEAD -- tools/python ':!*.md'
 (空)
 ```
 
