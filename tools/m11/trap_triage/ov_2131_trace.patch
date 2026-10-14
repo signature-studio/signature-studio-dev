@@ -1,0 +1,50 @@
+--- a/tools/m11/m11_ov.c
++++ b/tools/m11/m11_ov.c
+@@ -113,6 +113,7 @@
+ /* 41c130  `or eax,-1; lock xadd [rcx+8],eax; ret` = TInterfacedObject.AfterConstruction (FRefCount を 1→0 に戻す。NewInstance 41c160 が 1 にしている)。
+  * 410360 ON で [vmt-0x50] 経由の呼出しが現れるが closure 外のため miss (skip) になり FRefCount が 1 のまま残っていた (#595)。戻り値は xadd の旧値 */
+ static u64 tr_41c130(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) {
++    if (g_trace) M11_TRACE("[ov] tr_41c130 a0=0x%llx\n", a0);
+     u32 old = *(volatile u32*)(uintptr_t)(a0 + 8); *(volatile u32*)(uintptr_t)(a0 + 8) = old - 1; return old;
+ }
+ static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7);
+@@ -878,6 +879,7 @@
+  * site は元バイナリの `call [rbx-0x50]` の VA 0x41037d (逆アセンブルで確認) */
+ static u64 m11_vcall(u32 site, u64 target, u64 self) {
+     if (target == R(0x10070)) {
++        if (g_trace) M11_TRACE("[ov] vcall-ret0 site=0x%x\n", site);
+         icall_bump(&g_isite, site, 0);
+         icall_bump(&g_itgt, 0x410070u, 0);
+         return self;
+@@ -888,6 +890,7 @@
+     return ICALL_AT(site, target, self, 0, 0, 0, 0, 0, 0, 0);
+ }
+ unsigned long long function_410360(unsigned long long inst) {
++    if (g_trace) M11_TRACE("[ov] 410360 inst=0x%llx\n", inst);
+     m11_vcall(0x41037d, Q(Q(inst) - 0x50), inst);
+     return inst;
+ }
+@@ -895,6 +898,7 @@
+ /* function_9b5450  VA 0x9b5450  (ユーザクラス初期化: フィールドを 0 クリアし 412d60 で解放) (#704)
+  * 逆アセンブル: mov qword/dword [rcx+off],0 (0x5c,0x20,0x88,0x78,0x08,0x64,0x6c,0x10,0x50,0x74) → lea rcx,[rcx+0x28]; call 412d60; ret */
+ static void function_9b5450(u64 rcx) {
++    if (g_trace) M11_TRACE("[ov] 9b5450 rcx=0x%llx\n", rcx);
+     Q(rcx + 0x5c) = 0;
+     Q(rcx + 0x20) = 0;
+     Q(rcx + 0x88) = 0;
+@@ -914,6 +918,7 @@
+  *   call 412d60(rbx+0x28); dword [rbx+0x30]=0xffffff9d; ret
+  * closure 外 (boot_fns.json に無い) のため m11_icall が miss していた (REPORT_595 §2.3)。 */
+ static u64 function_9b4b00(u64 rcx) {
++    if (g_trace) M11_TRACE("[ov] 9b4b00 rcx=0x%llx\n", rcx);
+     u64 rbx = rcx;
+     u64 rax = function_481790((void*)(uintptr_t)Q(R(0x805a8)), 1);
+     Q(rbx + 0x54) = rax;
+@@ -951,6 +956,7 @@
+ void m11_dest_obs(unsigned long long dest);
+ #endif
+ unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
++    if (g_trace) M11_TRACE("[ov] 413060 dest=0x%llx len=%llu\n", dest, len);
+ #if M11_INSTR_413060
+     m11_probe(8);
+ #endif

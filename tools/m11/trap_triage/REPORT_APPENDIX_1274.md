@@ -65,3 +65,58 @@
 - `survey_diff.py` OFF→ON: ok 退行 unit は **190 の 1 件** (ok→oob)。kind 変化は 190 (ok→oob)・304・555 (oob→abort, #1275)。§5j・§2 と一致。
 - 読み: 現 main でも同じ数値が再現した。書込元の切り分け (ON-only override の除外や書込マスク) は本 run では未実施。§5h・§5i で否定済みの 3 要素 (9b4b00/9b5450 の書込み、41c130・9b4b00 の disp、413060 の override) を再実施しても新しい情報は得られないため、次の切り分けは別経路 (ON build で変わる lift 本体側の書込み、ov.o 以外の gate) に絞る必要がある。
 - 未達: 受入条件 1 (書込元の特定)・2 (DEFECTS 類型への分類)・3 (ON の ok 退行 0: unit 190 が残る)。起票先: #1642 (親 #1274)。
+
+## 5l. unit 190 の ON/OFF 分岐を同一メモリ状態で切り分ける (#2131 次 run・測定 commit `3b581236` = origin/main)
+
+- 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開 (`FL_WIN64_DIR`=`$RUNNER_TEMP/fl-win64`、`RETDEC_ROOT`=`$RUNNER_TEMP/retdec`、`EMSDK`=`$RUNNER_TEMP/emsdk`)。`m11_gen_ir2.sh` rc=0 (33 s、ldfix=applied、F1=902、errors=0)。ON・OFF の build rc=0 (ov.o を毎回作り直した)。
+- 測定: `trap_triage/lockstep_2131.mjs` (新規)。ON と OFF の wasm を同一プロセスの 2 インスタンスで unit 0..190 の順に並走させ、unit ごとに kind と HEAPU8 の差 (4 KiB ページ単位) と SP を比べる。survey_units.mjs と同じ呼出し順 (boot → unit 順、error 時のみ SP 復元)。
+- 並走の再現: unit 0..189 は ON/OFF の kind が全て一致 (不一致 0 件)。unit 190 は ON `oob` / OFF `ok` (全体 survey の値と一致)。
+- 差分の出所: boot 直後の差分は 2 ページ (`0x10250000`-`0x10252000`)。unit 189 直後は 24 ページ、SP は両者 `0x10a9fa10`、heap 長は両者 `1051590656` で一致。`0xfa5010` は unit 87 で最初に分かれ (ON `0x26ec19` / OFF `0x26ec76`)、`0xfa5320` は unit 158 で最初に分かれる (ON `0x10bbe510` / OFF `0x10bbe5a0`、差 0x90)。`0xfa5320` は 407a50 の chain が読むリスト先頭。
+
+### 同一状態の切り分け (unit 189 直後のメモリと SP を揃えて unit 190 だけ走らせる)
+
+| 状態 (189 直後) | code | unit 190 |
+|---|---|---|
+| OFF の状態 | OFF | ok |
+| ON の状態 | ON | oob |
+| ON の差分 24 ページを OFF へ (状態は ON と一致) | OFF | ok |
+| OFF の差分ページを ON へ (状態は OFF と一致) | ON | oob |
+| ON の状態 (差分 24 ページを OFF へ) → `0xfa5320` と `0xfa5010` だけ OFF の値へ | ON | oob |
+| OFF の状態 | vall (下記) | oob |
+| ON の状態 | vall | oob |
+| ON の状態 | v413 | oob |
+| ON の状態 | vnc | oob |
+| ON の状態 | vdisp | oob |
+| ON の状態 | vx | ok |
+| OFF の状態 | vx | ok |
+| OFF の状態 | vy | ok |
+| OFF の状態 | vz | oob |
+
+- variant の定義は `trap_triage/variants_2131.py` (vdisp: 41c130・9b4b00 の disp entry を外す / v413: 413060 の C override を外す / vnc: 410360 の vcall を `M11_NOVCALL=1` で外す / vall: vdisp+v413+vnc / vx: vdisp+v413 で 410360 の本体を `return inst;` だけにする / vy: vdisp+v413 で 410360 の VMT 読み `Q(Q(inst)-0x50)` だけ残す / vz: vdisp+v413 で 410360 の `m11_vcall` の shortcut 内の icall_bump 2 回だけ残す)。
+- 読み: 同じメモリ状態でも、ON 専用の code を走らせると unit 190 は oob になる (ON の状態と OFF の状態を入れ替えても code で決まる)。vall (ON 専用の差を 4 要素外した版) も OFF の状態で oob になる。vy (VMT 読みだけ残す) は ok、vz (icall 計数だけ残す) は oob。よって trap に効くのは 410360 の ON 専用 code のうち icall 計数 (`icall_bump` 2 回) の側で、VMT 読みだけでは起きない。計数が trap を起こす仕組みは未特定。
+- 注意: 差分ページを移す試験は 2 つの build のメモリを比べるため、build 間でデータ配置が違うページ (例: `0x10250000` の文字列定数) を含む。`0x10250000` が唯一の原因という読みは、後述の instrumented 版の結果に基づくもので、build 間の配置差の可能性が高く採らない。`0xfa5320` を OFF の値へ直しても ON の trap は消えない (表の 5 行目) ので、リスト先頭の 0x90 ずれ単独では説明できない。
+
+### 補助 (unit 158 と unit 190 の ON 専用 code の実行)
+
+- `ov_2131_trace.patch` (m11_ov.c の ON 専用 entry に `g_trace` で囲んだ trace を入れる差分。trace は unit 190 と 158 だけ有効にした。OFF の状態には無影響)。このパッチを入れた instrumented 版では、差分ページが 57 になり SP も `0x10a9fab0` (OFF `0x10a9fa10`) とずれるため、補助としてのみ使う。
+  - unit 158: ON 専用の `410360` が 17 回、`413060` (C 版 UStrFromPWCharLen) が 28 回走る。
+  - unit 190: `410360` が 3 回 (うち 1 回は `inst=0xe660`、直後に `icall 0xf960` を経て trap)、`413060` が 11 回。`41c130`・`9b4b00`・`9b5450` は走らない。
+  - 同じ trace の UStrAsg 列は、ON と OFF で 6 件目まで一致し、ON は 6 件目の後で trap、OFF は 24 件まで続く。
+- v413 (413060 の gate を外した ON 版) の並走では `0xfa5320` は unit 190 まで OFF と一致する (分岐 0 件)。一方 unit 15 の kind が `miss` (OFF は `ok`) に変わり、unit 190 は oob のまま。0x90 のずれは 413060 の override が作るが、v413 は別の差を持つため、ここでは trap の原因と結論しない。
+- `boot_probe_2131.mjs` (新規): boot 直後の差分ページ (`0x10250000`) の中身を出す。ON は `"[m11][fail-fast] unresolved function call: %s"`、OFF は `"[m11][stub-notimpl] %s called ..."` の位置にあり、build ごとの文字列定数の配置差。
+
+### 結論 (部分達成)
+
+- 確定: unit 190 の ON 限定の trap は、同じメモリ状態 (unit 189 直後、SP 一致) で ON 専用 code を走らせたときだけ起きる。ON 専用 code のうち、410360 の m11_vcall 内の icall 計数 (`icall_bump`) だけで OFF の状態から oob が再現する (vz)。VMT 読みだけでは再現しない (vy)。
+- 未確定: icall 計数がなぜ oob を起こすか (計数表 `g_isite`・`g_itgt` の linear memory 上の位置と、407a50 の chain・スタックとの重なり)。`0xfa5320` の 0x90 ずれは 413060 override 由来 (v413 で消える) だが、単独では trap の原因ではない (LS_FIX)。
+- 受入条件: 1 (書込元の特定) は未達。2 (REPORT 記録) は本節で部分達成。3 (ok 退行 0) は未達 (unit 190 が残る)。
+
+### 次 run の作業 (起票先 #2131)
+
+- (a) `g_isite`・`g_itgt` の表 (`_e`・`_h`・`n`) の linear address を vz の build で特定し、unit 190 中の計数書込みの address を watch する (watch 版は挙動が変わるので、書込みの address だけを見る)。
+- (b) vz の oob の frame (`SV_RAW=1` の生 frame) を、410360 の icall_bump の前後で比べ、どの load/store が範囲外かを切り分ける。
+- (c) 0xfa5010 (unit 87) の値の出所 (build 間の定数配置か、実行時の書込みか) を、unit 87 の trace で切り分ける。
+
+### 差分 (測定 commit `3b581236` から本 PR の HEAD まで、tools/m11 の build 入力)
+
+- `git diff 3b581236 HEAD -- tools/m11 ':(exclude)*.md'` の対象は本 PR で追加した `trap_triage/lockstep_2131.mjs`・`boot_probe_2131.mjs`・`variants_2131.py`・`ov_2131_trace.patch` の 4 ファイルのみ。`m11_ov.c` ほか build 入力は測定 commit から変えていない (作業ツリーで一時的に変えた `m11_ov.c` は各 variant の後に元へ戻した)。
