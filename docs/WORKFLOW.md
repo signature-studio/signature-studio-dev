@@ -90,19 +90,21 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 分類 | 判定 (GitHub の事実) | 意味・次の一手 |
 |---|---|---|
-| `user` | `needs-user-input` ラベルが付いている | 依頼者の回答待ち。自動着手しない |
-| `blocked` | open な blocked_by (issue dependencies) がある、本文の依存行 (`依存:`・`blockedBy:` など) が open な issue を指す、または子 issue を持つ親で PR が無い | blocker が close されるまで着手しない |
+| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 依頼者の回答・適用待ち。自動着手しない |
+| `blocked` | open な blocked_by (issue dependencies) がある、本文の依存行 (`依存:`・`blockedBy:` など) が open な issue を指す、`tools/pm/manual_deps.json` の依存 (停止報告に根拠のあるもの) が open、または子 issue を持つ親で PR が無い | blocker が close されるまで着手しない |
 | `started` (着手済み) | open PR が `N-<slug>` ブランチか `Closes/Refs/Fixes #N` で紐づく、または実装 run が稼働中 | 実装・レビュー・修正の途中。二重に着手しない |
-| `stopped` | bot の最後のコメントが停止報告で、再投入の素材が無い、または再投入の上限 (2 回) に達した | PM の判断待ち |
+| `stopped` | 直近 24 時間以内の bot の最後のコメントが停止報告で、再投入の素材が無い、または再投入の上限 (2 回) に達した | PM の判断待ち |
 | `ready` | 上のどれにも当たらない (未着手・非ブロック) | 次の `launch` の対象 |
 
+- 停止報告の窓は **24 時間**。24 時間を過ぎた停止報告は `stopped` にならず、`ready` 扱いで次の `launch` の対象になる (`classify` の窓は `launch_issues.py` と Worker で同じ)。
+- `pm-apply` の issue は、Worker の `plan()` が着手も再投入もせず `user` 行に置く (`oc:no-pr` の有無に依らない)。
 - `recent` (`/oc` の投稿から 3 時間以内で報告がまだ無い、または bot のコメントから 1.5 時間以内) は着手直後の待ちとして `started` と同様に扱う。
   `relaunch` (停止報告の素材名で再投入する候補) は `plan` の一時分類。`oc:stuck` の PR は着手数の律速に数えない。
 - **Project V2 の Status は参考**。VM の `tools/pm/sync_status.py` が動いている間だけ同期し、VM 退役後は更新されない。
   判断の根拠にしない (根拠: #2353 の PM 判断)。
 - **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
 - **1 状態遷移 = 1 コメント**。コメントなしの状態変更は禁止。
-- **分類を変えるラベル (`needs-user-input`・`oc:stuck`・`oc:no-pr`) と milestone の変更は PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
+- **分類を変えるラベル (`needs-user-input`・`pm-apply`・`oc:stuck`・`oc:no-pr`) と milestone の変更は PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
 - **中断・ブロックで終了する場合**: issue は open のまま (分類は `started` か `stopped`)。中断コメント (到達点・WIP 所在・再開手順) を残し、
   最終回答の冒頭に「未完・open のまま」と明記。
 
