@@ -114,9 +114,10 @@
 ## 追加解析 (7 回目 run・PY-72 #2542): setChannelPitch の意味論
 
 - 対象: `channels.setChannelPitch` (flapi `(int, float, int=0, int=PIM_None, bool=False)`)。前提の `[PY-72]` 子 issue は親 #2499 の「7 回目 run」節を参照するが、`origin/main` (`1bb996f0`) の本 REPORT にその節は無い。本節が 7 回目の記録。
-- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` と `analysis/flapi/pe_rip_consts.py <VA> <命令数>` (本 run で追加)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin' -C <展開先>` (`-C` は `--wildcards` の前に置く。後ろだとカレントに展開される)。
+- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` と `analysis/flapi/pe_rip_consts.py <VA> <命令数>` (本 run で追加。どちらも `<命令数>` 命令で打ち切る)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (`-C` は `-xf` の直後に置く。`--wildcards` の後ろに置くと GNU tar 1.35 でカレントに展開される。正しい順では `<展開先>/extracted/block00031_PE.bin` に出る)。実測 1.7 秒。
 - 既知類型との関係: 該当なし (lift 作業ではない)。
-- 測定 commit: `1bb996f0` (コード変更なし。本 PR は本 REPORT と `analysis/flapi/pe_rip_consts.py` のみ)。差分 0 の証跡: `git diff 1bb996f0 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
+- 測定 commit: `00a01625` (`pe_rip_consts.py` の窓を命令数で打ち切るよう直した commit。`pe_disasm.py` は `1bb996f0` 以降変更なし)。差分 0 の証跡: `git diff 00a01625 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続の commit は本 REPORT と `docs/DOC_MAP.md` のみ)。
+- 再実行 (`00a01625`・展開 1.7 秒): `pe_disasm.py 0xd5aa30 75` 終了 0・`pe_disasm.py 0xd5a720 180` 終了 0 (call 14 件、`ret` は `0xd5a9dc`、`0xffac20` 0 件)・`pe_rip_consts.py 0xd5a720 180` 終了 0 (RIP 参照 12 件。`260` でも 12 件)。
 
 ### 結論 (PE 実測で確定した範囲)
 
@@ -129,8 +130,9 @@
 |---|---|
 | 書式 | `if\|iii` (`0xd5aaaa`〜`0xd5aadf` の出力先 `[rbp+0xa8]`=index・`[rbp+0xac]`=value(float)・`[rbp+0xa4]`=pitchUnit・`[rbp+0xa0]`=pickupMode・`[rbp+0x9c]`=useGlobalIndex) |
 | 既定値 | 省略時は pitchUnit=0・pickupMode=0・useGlobalIndex=0 (`0xd5aa68`〜`0xd5aa7c` で 0 を書く)。flapi の既定 `PIM_None` が 0 かは未確認 |
-| 委譲 | `0xd5e620(self)` の結果 `rbx` を対象とし、`0xd843d0(rbx, &out, r8=0xd5a720, r9=0, index, &value, pitchUnit, pickupMode, useGlobalIndex, 0, 1)` を呼ぶ (`0xd5aaf3` で `r8 = 0xd5a720` = callback を確認) |
-| 戻り値 | `out` の下位 32bit を `0xd82c20` に渡し、その戻り値を返す (`0xd5ab53`〜`0xd5ab5a`) |
+| 委譲 | `0xd5e620(self)` の戻り値 `rax` が指す値を `rbx` に読む (`0xd5aa65` `mov rbx, [rax]`)。`0xd843d0(rbx, &out, r8=0xd5a720, r9=0, index, &value, pitchUnit, pickupMode, useGlobalIndex, 0, 1)` を呼ぶ (`0xd5aaf3` で `r8 = 0xd5a720` = callback を確認) |
+| 戻り値 | `out` の下位 32bit を `0xd82c20` に渡し、その戻り値を返す (`0xd5ab4c`〜`0xd5ab5a`) |
+| 解析失敗の経路 | 書式解析の戻り値 `eax` が 0 以下 (`0xd5aae7` の `jle 0xd5ab53`) のとき、`out` を経由せず `mov ecx, eax` (`0xd5ab53`) で**その戻り値をそのまま** `0xd82c20` の第 1 引数にする。`0xd82c20` の戻り値を返す経路は成功時と同じ。この経路の status 解釈は未確定 (未確定 6) |
 
 ### task 生成 `0xd843d0`
 
@@ -152,7 +154,7 @@
 5. value 検査 `0x477180(value)`: `0x450c10` の分類が 8 (NaN) なら `status := -1` (`0xd5a79f`)。**NaN → -1**。±inf は検査されず、後段のクランプで処理される。
 6. pitchUnit (`[task+0x28]`):
    - **0**: `v' = clamp(0.5·v + 0.5, 0, 1)` (float 演算。定数 `*[0x15e4000]`=0.5、`[0xd5a9e0]`=0.5 (double)、`[0xd5a9e8]`=2^30)。`n = cvtsd2si(v'·2^30 + (0.5-2^-54))` (`0x40c660` = `cvtsd2si`)。`0xf81ce0(key, pickupMode)` を呼んだ後、`0x1051d20(key, n, 0x3fd, 0, 0, 0.0f, 0)`。`key = ((chan+0x794) & 0xffff) << 16 | 4` (`0xd5a7cf`〜`0xd5a880`)。
-   - **1**: `N = [chan+0x2f4]`。`v' = clamp(0.5·(v / (100·N)) + 0.5, 0, 1)` (`divss` で `N·100`。`0xd5a88a`〜`0xd5a956`)。以降は 0 と同じ tail。
+   - **1**: `N = [chan+0x2f4]`。`v' = clamp(0.5·(v / (100·N)) + 0.5, 0, 1)` (`divss` で `N·100`。`0xd5a88a`〜`0xd5a956`)。以降は 0 と同じ tail。N が 0 なら 0 除算になる (商は ±inf または NaN。未確定 5)。
    - **2**: `N := clamp(cvtsd2si(v), 1, 48)` (`0xd5a958`〜`0xd5a97c`)。続けて `0x117baa0` → `0x40fe90` → `0x617920` → `0x425210(…, 0x550, chan+0x794, 0)` (通知。中身未読)。
    - その他の値: 何もせず終了 (status 0 のまま = 成功扱い。`0xd5a7c4`)。
 7. 注意: value は Python の `float` 引数なので、float32 に丸めてから検査・演算する (`movss` 系)。pitchUnit=2 で `cvtsd2si` が int64 範囲外なら `0x8000000000000000` になり、`clamp(…, 1, 48)` で 1 になる。
@@ -175,12 +177,12 @@
 2. guard: `0xd5a74f` の大域オブジェクトの vtable `[+0x98]` と、`0xd84f30` の判定 (`[item+0x50]` 系)。
 3. path C の後段: `0x117baa0`・`0x40fe90`・`0x617920` (N の更新後の処理)。
 4. 一覧 A/B の中身 (`0x5dcad3` / `0x5da9a8` が指す一覧の要素型と、両者の関係)。
-5. `N = [chan+0x2f4]` の初期値 (channel 生成時の既定)。
+5. `N = [chan+0x2f4]` の初期値 (channel 生成時の既定)。pitchUnit=1 の `divss` で N が 0 だと 0 除算になる。N が 0 になり得るか (初期値・更新経路) と、0 のときの商 (±inf/NaN) の後段 clamp での扱いは未確認。0 除算を避ける処理は推測で書かない。
 6. 成功時の戻り値 `0xc38bc0(0)` の型と、`0xd82c20` の `[rip+0x860485]` 分岐の意味。
 
 ### 受入条件 (#2542) の判定
 
 - [x] setChannelPitch の戻り値・範囲外 code・value (`0x477180`)・pitchUnit の各分岐を PE 解析箇所つきで REPORT に残す — 本節で達成 (未確定の項目は上の 1〜6)。
-- [ ] `useGlobalIndex=1` の表 (`0x1005730` の dl≠0) と `0xffac20` を PE で確定 — 部分達成。`dl≠0` の一覧 A は `0x1005730` で確定したが、中身と `0xffac20` は未読 (setChannelPitch の経路では `0xffac20` を呼ばない: 0xd5a720 の全 call 先に無い)。子 issue へ移す。
+- [ ] `useGlobalIndex=1` の表 (`0x1005730` の dl≠0) と `0xffac20` を PE で確定 — 部分達成。`dl≠0` の一覧 A は `0x1005730` で確定した。一覧 A/B の中身は子 #2562 の範囲外 (PY-77 #2576) へ移した。`0xffac20` は setChannelPitch の経路外のため本 issue の対象外: callback `0xd5a720` の全 call 14 件 (guard の間接 call 1 件を含む) の直接先に `0xffac20` は無い (`pe_disasm.py 0xd5a720 180` で実測、`ret` は `0xd5a9dc`)。
 - [ ] `provider/fl_engine.c` と `host/fl_mock.mjs` に実装・`channels_diff` の diffs 0 — 未達。効果関数が未確定のため、本 PR では実装しない。子 issue へ移す。
 - [ ] `provider_check.mjs` の pe39 集合・`all_tools.mjs` 48/48 — 未達 (実装後の作業)。子 issue へ移す。
