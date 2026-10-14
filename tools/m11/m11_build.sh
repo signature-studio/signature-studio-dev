@@ -154,7 +154,7 @@ if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c 
   M11_EXCLUDE=work/defined_c.txt python3 m11_genstubs.py work/boot_final.ll work > work/genstubs.log
   touch work/m11_winstubs.c work/m11_fnstubs.c
 fi
-cc work/boot_final3.ll work/obj/boot.o
+if [ "${M11_KEEP_BOOT_O:-0}" != 1 ] || [ ! -f work/obj/boot.o ]; then cc work/boot_final3.ll work/obj/boot.o; fi   # #1756: probe_entry.sh は差し替えた probe 版 boot.o を残す
 cc work/m11_simd.c work/obj/simd.o msimd11_core.h
 cc work/m11_winstubs.c work/obj/winstubs.o
 cc work/m11_fnstubs.c work/obj/fnstubs.o
