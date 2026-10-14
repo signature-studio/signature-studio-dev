@@ -1,5 +1,5 @@
 // 同時実行の計数 (純関数)。Actions の同時実行の上限 (Team プランの 60) は opencode.yaml の全 run が共有するので、
-// room (= TARGET - active) の active には、event を問わず opencode.yaml の未完了の run を全て数える。
+// room (= target_eff - active。推定が無ければ TARGET - active) の active には、event を問わず opencode.yaml の未完了の run を全て数える。
 // VM 版 (tools/pm/launch_issues.py の active_runs) は実装・fix の run だけを数えていた。review (pull_request) や oc-pm・watchdog は数えず、
 // その分だけ上限を超えて queued が出た。別 workflow (scripts-test.yaml など) の run は別枠なので数えない。
 import { isOpencodeRun, type RunState } from "./webhook.ts";
@@ -12,8 +12,6 @@ export interface ActiveCount {
   other: number;
   // impl + other。room の基準。
   all: number;
-  // all のうち、まだ実行に入っていない run (in_progress 以外: queued・pending・waiting・requested)
-  queued: number;
   // all の内訳。repository_dispatch は run-name の先頭 (oc-fix・oc-pm・watchdog) で分ける。
   byEvent: Record<string, number>;
 }
@@ -25,13 +23,12 @@ function eventKey(r: RunState): string {
 }
 
 export function countOpencodeRuns(runs: Iterable<RunState>): ActiveCount {
-  const c: ActiveCount = { impl: 0, other: 0, all: 0, queued: 0, byEvent: {} };
+  const c: ActiveCount = { impl: 0, other: 0, all: 0, byEvent: {} };
   for (const r of runs) {
     if (r.status === "completed" || !isOpencodeRun(r)) continue;
     c.all++;
     if (IMPL_EVENTS.includes(r.event)) c.impl++;
     else c.other++;
-    if (r.status !== "in_progress") c.queued++;
     const k = eventKey(r);
     c.byEvent[k] = (c.byEvent[k] ?? 0) + 1;
   }

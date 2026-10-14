@@ -66,9 +66,10 @@ const EXISTING_KEYS = [
 ];
 const ADDED_KEYS = [
   "last_webhook_at", "last_dispatch_at", "last_digest_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
+  "target_eff", "cap_est", "peak_running", "queued", "oldest_queued_age_min",
   "last_redeliver_scan", "hook_failed_last_scan",
   // 同時実行の計数 (opencode.yaml の全 run を TARGET に数える)
-  "active_all", "active_impl", "active_other", "queued", "active_by_event",
+  "active_all", "active_impl", "active_other", "active_by_event",
   // 自律運転の指標 (#2335)
   "stuck", "stuck_age_max_min", "needs_pm", "needs_user", "no_pr_by_reason", "refs_only_merge_rate_24h", "open_issues_delta_24h", "pm_dispatch_1h",
   "launch_unobserved",

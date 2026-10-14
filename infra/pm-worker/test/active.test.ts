@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { countOpencodeRuns } from "../src/active.ts";
 import { loadConfig } from "../src/config.ts";
 import { isOpencodeRun, workflowFile, type RunState } from "../src/webhook.ts";
-import { configuredApp, issuePayload, j, markFresh, runPayload, send, type Call } from "./helpers.ts";
+import { configuredApp, issuePayload, j, markFresh, runPayload, send, T0, type Call } from "./helpers.ts";
 
 const OPENCODE = ".github/workflows/opencode.yaml";
 
@@ -42,7 +42,7 @@ const legacyActive = (runs: RunState[]): number =>
 
 const run = (id: number, status: string, event: string, o: Partial<RunState> = {}): RunState => ({ id, event, title: `run ${id}`, status, conclusion: null, updatedAt: "2026-10-14T11:30:00Z", ...o });
 
-test("countOpencodeRuns: event を問わず opencode.yaml の未完了の run を全て数え、impl / other / queued / event 別に分ける", () => {
+test("countOpencodeRuns: event を問わず opencode.yaml の未完了の run を全て数え、impl / other / event 別に分ける", () => {
   const c = countOpencodeRuns([
     run(1, "in_progress", "issue_comment", { wf: "opencode.yaml" }),
     run(2, "queued", "workflow_dispatch", { wf: "opencode.yaml" }),
@@ -59,7 +59,6 @@ test("countOpencodeRuns: event を問わず opencode.yaml の未完了の run �
     impl: 2,
     other: 7,
     all: 9,
-    queued: 4,
     byEvent: { issue_comment: 1, workflow_dispatch: 1, pull_request: 1, pull_request_review: 1, "repository_dispatch:oc-fix": 1, "repository_dispatch:oc-pm": 1, "repository_dispatch:watchdog": 1, schedule: 1, push: 1 },
   });
 });
@@ -90,7 +89,7 @@ test("実測 (15:30Z): opencode.yaml は 47 件。旧い数え方だと 23 件�
   const runs = Object.values(ctx.app.engine.s.runs);
   assert.equal(legacyActive(runs), 23, "旧: 別 workflow の workflow_dispatch まで数え、pull_request の review は数えない");
   const c = ctx.app.engine.activeRuns();
-  assert.deepEqual({ impl: c.impl, other: c.other, all: c.all, queued: c.queued }, { impl: 4, other: 43, all: 47, queued: 4 });
+  assert.deepEqual({ impl: c.impl, other: c.other, all: c.all }, { impl: 4, other: 43, all: 47 });
   assert.deepEqual(c.byEvent, { issue_comment: 4, pull_request: 25, pull_request_review: 14, "repository_dispatch:oc-fix": 4 });
   await markFresh(ctx);
   const s = ctx.app.engine.status() as any;
@@ -99,7 +98,7 @@ test("実測 (15:30Z): opencode.yaml は 47 件。旧い数え方だと 23 件�
   assert.equal(s.active_all, 47);
   assert.equal(s.active_impl, 4);
   assert.equal(s.active_other, 43);
-  assert.equal(s.queued, 4);
+  assert.equal(s.queued, 5, "queued は #2381 の定義のまま (workflow を問わず queued・pending・waiting の合計)");
   assert.equal(s.room, 11, "58 - 47");
   assert.deepEqual(s.running, { in_progress: 44, queued: 1, pending: 4 }, "running は従来どおり workflow を問わない");
 });
@@ -176,6 +175,21 @@ test("reconcile: REST の run (path 付き) で、path の無かった保存値�
   await ctx.app.engine.reconcile((await (ctx.app.engine as any).d.gh()) as any);
   assert.equal(ctx.app.engine.countActive(), 1);
   assert.equal(ctx.app.engine.s.runs["2"].wf, "scripts-test.yaml");
+});
+
+test("#2381 との結合: room = target_eff - active_all。推定の上限があれば target_eff が下がり、active_all を引いた残りが room になる", async () => {
+  const ctx = await configuredApp();
+  await loadMeasured(ctx);
+  await markFresh(ctx);
+  const room = (cap: { value: number; at: number } | undefined) => {
+    ctx.app.engine.meta.cap = cap;
+    const s = ctx.app.engine.status() as any;
+    return [s.target_eff, s.room, s.active_all];
+  };
+  assert.deepEqual(room(undefined), [58, 11, 47], "推定が無ければ target_eff = TARGET");
+  assert.deepEqual(room({ value: 55, at: T0 }), [58, 11, 47], "55 + 余裕 10 は TARGET を超えない");
+  assert.deepEqual(room({ value: 40, at: T0 }), [50, 3, 47]);
+  assert.deepEqual(room({ value: 20, at: T0 }), [30, 0, 47], "下限 30 でも active_all が上回れば room は 0");
 });
 
 test("TARGET: 既定は 58 (opencode.yaml の run の総数の目標)。wrangler.toml も 58 で、env で下げられる", () => {
