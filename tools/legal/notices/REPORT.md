@@ -180,6 +180,22 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 
 測定 commit `989b8655` から HEAD までのコード差分 (`git diff 989b8655 HEAD -- tools/legal/notices/*.mjs tools/legal/notices/registry.json tools/gui/test/fonts.tsv`) は出力なし (差分 0)。main 取り込み後の再測定は不要。
 
+### main 取り込み後の再測定 (PR #2747 の競合解消・検証起点 `d3dd60c4`・ws-935 worktree・fl-win64 は `$RUNNER_TEMP/fl-win64` へ展開・node_modules は main checkout のものを symlink)
+
+- 競合は `registry.json` (font-asset 2 件の `coveredBy`) と `REPORT.md` (本節と #816 追補の並び)。`registry.json` は main 側を採用した (`coveredBy` は台帳 `tools/gui/test/fonts.tsv` のみ。main の `bd9108ff` が `fetch_fonts.sh` を外した形で、PR が足していた `fonts.tsv` は main に既に入っている)。`REPORT.md` は両方の節を残した (削除なし)。`lib.mjs`・`notices.test.mjs`・`e2e.sh` は競合せず、PR の変更をそのまま保持した。
+- 測定 commit は merge `d3dd60c4` (コードを変えた最後の commit)。
+
+| 項目 (`d3dd60c4`) | 実測 |
+|---|---|
+| `node --test tools/legal/notices/notices.test.mjs` (取得物あり・e2e §7 の取得後) | 55 pass / 0 fail / 0 skipped・305–309 ms (n=3) |
+| 同 (取得物なし・worktree 直後) | 52 pass / 0 fail / 3 skipped・340 ms (n=1) |
+| `node tools/legal/notices/cli.mjs check` | PASS components=22 (bundled 20) records=12 fonts=129 artifacts=0 (exit 0) |
+| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/legal/notices/e2e.sh` (n=3) | ALL PASS・PASS 30 / FAIL 0・31.4 / 28.0 / 27.8 s (load average 終了時 1.11 / 0.96 / 1.47) |
+
+- 初回の e2e 1 回は `vite build` が `node_modules/.bin/vite` 無しで FAIL した (新規 worktree に node_modules が無い環境起因。コードの変更は無い)。node_modules を symlink して再実行し、上表の結果を得た。
+
+鮮度 (`docs/WORKFLOW.md` §6): `git diff d3dd60c4 HEAD -- tools/legal/notices tools/gui/test/fonts.tsv tools/gui/test/fetch_fonts.sh ':!tools/legal/notices/REPORT.md'` の出力は空 (0 行)。検証 HEAD は本 REPORT 更新 commit。
+
 ## 範囲 / 範囲外
 
 検証範囲: 既存 05-stage 呼び出し元の回帰 (`pnpm release-guard:test`・`chunked.test.mjs`)・fl-win64 素材 (FL 同梱表記 15 本・ファイル一覧)・emsdk 6.0.12 で実行した上記 7 本の build.sh・`vite build`・`05-stage.mjs`。
