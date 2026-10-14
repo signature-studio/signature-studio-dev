@@ -107,7 +107,8 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 | `trap_triage/REPORT_944.md`・`REPORT_APPENDIX_944.md` | 文書 | — |
 | `repro_1389.sh`・`cmp_1389.py`・`m11_gen_ir2.sh`・`m11_ptrcheck.mjs`・`survey_units.mjs` | 差分 0 | — |
 
-- 測定 commit `a22c1aef` から本文書を含む HEAD までの差分は、文書 (`REPORT_944.md`・`REPORT_APPENDIX_944.md`) のみ。確認: `git diff --stat a22c1aef HEAD -- tools/m11`。
+- 測定経路 (列挙したファイル: `m11_build.sh`・`m11_survey.mjs`・`m11_gen_ir2.sh`・`m11_cond.py`・`ldfix/ldfix.py`・`trap_triage/repro_1389.sh`・`trap_triage/cmp_1389.py`・`trap_triage/survey_units.mjs`・`trap_triage/m11_ptrcheck.mjs`) の差分は 0 行 (`git diff --stat a22c1aef HEAD -- <列挙ファイル>` の出力が 0 行)。
+- `a22c1aef..HEAD` の `tools/m11` 全体の差分 (`git diff --stat a22c1aef HEAD -- tools/m11`・30 files) は、main 取り込み由来の非測定ファイルを含む。非測定のコード: `ldfix/window_survey_1980.py`・`shimx_link/survey_frames.mjs`・`trap_triage/state_158.mjs`・`trap_triage/writers_2118.mjs`・`trap_triage/n139_writers.py`・`trap_triage/watch_range_2118.c`・`trap_triage/ablate_2131.py`・`trap_triage/mask9b_measure.py`・`trap_triage/probe1676_u114.mjs`・`trap_triage/probe1676_watch.mjs`・`trap_triage/ov_1602_probe_r2.patch`・`m11_sdiv_variant.py`。ほかは文書と結果ファイル。
 
 ## 6. 未解決 (起票先付き)
 
@@ -115,7 +116,7 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 |---|---|---|
 | unit 158・j=12 の値差の後続経路 (呼出し元・後続の読出し) の IR 突き合わせと、ON trap の最上位 frame の取得 | 値差が結果に効くかの確定 (受入条件 1) | #2003 ([M11-N132]) |
 | 記録あり ON の全体 survey での unit 158 の trap frame (5.2 は単独実行の frame) | 全体 survey の trap 位置と単独 frame の一致の確認 | #2003 に含める (未起票) |
-| issue 本文の `M11_DEST_GUARD=1` は repo に存在しない | 検証方法の記述が無効 | PM 判断 (issue 本文の修正) |
+| issue 本文の `M11_DEST_GUARD=1` は repo に存在しない | 検証方法の記述が無効 | #1858 の merge で解消 (PM 判断済み) |
 
 ## 7. #1864 追記 (旧 §9・番号を通し直した): unit 158・j=12 の dest 値差の切り分け (部分)
 
@@ -148,7 +149,7 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
    - #1945 (測定 commit `e5e3c7c2`): 観測副作用の可能性が高い (詳細は [REPORT_APPENDIX_944.md](REPORT_APPENDIX_944.md) §3)。
    - #2056 (付録 §8): unit 158 は先行 unit 1 (`0x1ce10`) の残す heap/global の 2 区間 (`0xfa5108`〜・`0x11e69b0`〜) の状態に依存する (最小集合で確認)。2 区間を書く関数と後続経路の IR 突合は未了。
 2. **REPORT §7.3 追記・§4(a) 更新**: 本節 §7.3 で判定の材料を更新。意味的差か観測副作用かの結論は**未達** (上記 1 が未確定のため、§4 (a) は「観測の副作用が trap を作ることは確認。値差の結果への寄与は未確定」に留める)。
-   - **#2003 による訂正**: 上の「副作用が trap を作ることは確認」は**撤回**する。unit 158 を単独 (`SV_ONLY=158`) で実行すると、計測 OFF・既定 OFF を含む全 5 構成で trap する (最上位 frame `function_407a50__lifted`・各構成 1 回)。全体 survey の ok/trap は先行 unit の状態に依存すると読むのが自然で、観測副作用は確認されていない。測定は [REPORT_APPENDIX_944.md](REPORT_APPENDIX_944.md) §5 (測定 commit `a22c1aef`)。
+   - **#2003 による訂正**: 上の「副作用が trap を作ることは確認」は**撤回**する。unit 158 を単独 (`SV_ONLY=158`) で実行すると、計測 OFF・既定 OFF を含む全 5 構成で trap する (最上位 frame `function_407a50__lifted`・各構成 2 回)。全体 survey の ok/trap は先行 unit の状態に依存すると読むのが自然で、観測副作用は確認されていない。測定は [REPORT_APPENDIX_944.md](REPORT_APPENDIX_944.md) §5 (測定 commit `a22c1aef`)。
 3. **決定的な測定と実測値**: 9.1 の OFF 2 回一致・所要時間・load を記録。**達成**。
 
 ## 8. #2056: unit 158 の ok/trap を分ける先行 unit の状態 (受入条件 1 の一部)
