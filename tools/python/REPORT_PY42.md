@@ -32,6 +32,7 @@
 | getPatternLength | "i" | 索引 0..999 の範囲外は範囲外エラー。要素の +0x44 が正なら `値 / (除数グローバル)`、そうでなければ既定値 `0x12d09e0` (0xd657e0) | 除数グローバルの意味・既定値の算出 |
 | isPatternDefault | "i" | 索引の範囲を `cmp 1` と `cmp 0x3e7` で検査 (**下限が 1 で、他の索引関数の 0 と異なる**)。`0x12d8d30` を呼ぶ (0xd66060) | 述語の引数の組み方 |
 | isPatternSelected | "i" | 索引を `index-1` に変換して `0xea7420` へ渡し、bool を返す。グローバル `[rcx+0xd34]` が null なら false (0xd65ff0) | 0 ベースへの変換の意味。`0xea7420` の中身 |
+| getBlockSetStatus | "iiii" (4 整数) | 4 整数を PyArg で取り、`0x4f2990` で処理した後、`0x12d8740` の結果を間接呼出しで Python 値にして返す。PyArg 失敗時は `0x12d8740` を通らず `0xd82c20` 経由で戻る (0xd658a0) | 戻り値の意味・4 引数 (left/top/right/bottom) の意味 |
 
 ## 未解決の疑い (要確認)
 
@@ -51,4 +52,4 @@
 | 未確定 11 関数 (patternCount・patternNumber・getActivePatternGroup・getPatternGroupCount・getPatternGroupName・getPatternsInGroup・getChannelLoopStyle・getBlockSetStatus・getPatternLength・isPatternDefault・isPatternSelected) の戻り値・引数・副作用 | C provider・mock の実装が 0 件のまま | #1804 (`[PY-48]`) |
 | 索引の基準 (0 始まり / 1 始まり) の不統一 | 実装すると索引がずれる | #1804 |
 | flapi_table の署名と実機 PyArg 書式の不一致 (3 件) | 表の署名を信じると引数検査が誤る | #1804 |
-| getBlockSetStatus の戻り値・4 つの出力引数の意味 | 未実装 | #1804 |
+| getBlockSetStatus の戻り値・4 つの入力引数 (left/top/right/bottom) の意味 | 未実装 | #1804 |
