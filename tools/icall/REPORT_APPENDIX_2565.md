@@ -7,24 +7,25 @@
 ## 0. 検証起点と測定 commit
 
 - 検証起点: `origin/main` `acb7d6d4`。worktree `../ws-2565`・branch `2565-icall-blk-placement`。
-- **測定 commit (コードを変えた最後の commit): `66629a9e`**。修正本体は `f4be6900` (`tools/icall/icall_rewrite.py`・`tools/icall/check_blk_domain.py`)、`66629a9e` で再現用の `tools/icall/mk_franges.py` を足した。測定は `66629a9e` で取り直し、`f4be6900` の DLL と `cmp` で一致 (§3)。
+- **測定 commit (コードを変えた最後の commit): `62e8006f`**。修正本体は `f4be6900` (`tools/icall/icall_rewrite.py`・`tools/icall/check_blk_domain.py`)、`66629a9e` で再現用の `tools/icall/mk_franges.py` を足した。`62e8006f` は `origin/main` (`c5215019`) の取り込み merge で、`tools/icall` では `frame_slot_restore.py` だけが変わった (`tools/icall` の他の `.py` から import されない: grep 確認)。`icall_rewrite.py`・`check_blk_domain.py`・`mk_franges.py`・`audit_icall.py` は `66629a9e` から変わっていない。測定は `62e8006f` で取り直し、`f4be6900` の DLL と `cmp` で一致 (§3)。
 - 差分の確認 (本書の commit より後も、コード範囲は変わらない):
   ```
-  git diff 66629a9e HEAD -- tools/icall ':!*.md'     # 出力は空 (差分 0)
+  git diff 62e8006f HEAD -- tools/icall ':!*.md'     # 出力は空 (差分 0)
   ```
+- 検証範囲: 同入力の DLL 再生成と `check_blk_domain.py` (§2・§3)、`tools/icall/tests/test_icall.py` (unit 部のみ PASS。pe 部は OTT DLL が無く SKIP)。RetDec の再生成と stage-2 の判定は未実施 (子 #2566)。
 - 素材: `work-fw-stage1` を repo ルートで展開 (tar 内の path が `tools/plugins/work/fw/` を含む)。`fl-win64` は `extracted/block18983_PE.bin` のみ `$RUNNER_TEMP/fl-win64/` へ展開 (`FL_WIN64_DIR` 相当)。他の素材は使わない。
-- F.ranges は `tools/icall/mk_franges.py` で作った (fw_prep.py は `work/fw_hash_counts.json` を要するため使わず。規約は同じ。11,736 件 = 成果物 `fw_map.json` の `nfuncs`)。
+- F.ranges は `tools/icall/mk_franges.py` で作った。選択条件は `fw_prep.py` の `funcs_of` と同じ (`.pdata` のうち CHAININFO (`u & 1`) 以外・生バイト長が一致するもの。fw_prep.py は `work/fw_hash_counts.json` を要するため直接は使わない)。件数 11,736 は成果物 `fw_map.json` の `nfuncs` と一致する。成果物の F.ranges は素材 tar に無く、内容は照合していない。
 - 実行環境: runner 4 vCPU・RAM 15 GiB。並列 1 (icall_rewrite は直列)。所要は実測 (下表)。load は終了後の 1 分値 `0.20` のみ採った (実行中の load は未計測)。
 
 ## 1. 配置の方式 (issue の 2 案と採らなかった理由)
 
-issue の受入 1 は「`sect_end` 以降へ置く」か「BLK 専用の書込み可能セクション」を挙げる。どちらも採らず、**BLK の VA を据え置く** 方式にした。
+issue の受入 1 は「`sect_end` 以降へ置く」か「BLK 専用の書込み可能セクション」を挙げる。どちらも採らず、**BLK の VA を据え置く** 方式にした。この方式を受入 1 の充足として認めるかは PM 判断 (§5)。
 
 | 案 | 内容 | 採否 | 根拠 |
 |---|---|---|---|
 | (a) BLK を `sect_end` 以降へ移す | BLK の VA が変わる | 不採用 | BLK の VA `0x8A1000` は消費側に直書きされている: `fw_rt.c`・`fw_boot.c`・`hostshim/hostshim.c` `hs_plug.c` `hs_utl.c` (`FW_BLK`)、`fw_run.mjs`・`hostshim/hs_*.mjs` (`0x8a1000+o` を 0 埋め)、`fw_stage2.sh`・`fw_table.py`・`fw_retw.py`・`fw_hostfix.py`・`hostshim/hs_*.sh` (`--blk 0x8A1000`)。移すと、`fw_run.mjs` 系の 0 埋めが再配置済みの関数コードを壊す (silent)。 |
 | (b) BLK 専用の書込み可能セクション | 別セクションに置く | 不採用 (今回) | `0x8A1000` は `.icall` の VA 範囲 (`0x7A1000`〜) の中にあるため、別セクションにするには `.icall` を BLK の前後で分割し、PE のセクション表を変える。関数の配置は (c) と同じく BLK 域を空けることになる。RetDec が BLK slot を `constant` にする機構も未特定 (REPORT_2510 §3.3) なので、機構が分かってから選ぶ案として残す (子 #2566 の調査項目)。 |
-| (c) **採用**: VA 据え置き・再配置を `place()` で BLK 域の外へ送る | `.icall` 内に 0 埋めの 0x280 B を残す | 採用 | 消費側の変更が 0。BLK 域は `[0x8A1000, 0x8A1280)` のまま。BLK より後ろの関数は VA が変わる (同入力の旧版と比べ 11,736 件中 9,567 件がシフト。BLK より前の 2,170 件は 2,169 件が VA 不変で、移動したのは BLK と重なっていた `0x494cf0` の 1 件だけ)。成果物 (stage-1) は旧 layout なので子 #2566 で再生成する。 |
+| (c) **採用**: VA 据え置き・再配置を `place()` で BLK 域の外へ送る | `.icall` 内に 0 埋めの 0x280 B を残す | 採用 (受入 1 の充足は PM 判断。§5) | 消費側の変更が 0。BLK 域は `[0x8A1000, 0x8A1280)` のまま。BLK より後ろの関数は VA が変わる (同入力の旧版と比べ 11,736 件中 9,567 件がシフト。BLK より前の 2,170 件は 2,169 件が VA 不変で、BLK より前から移動したのは `0x48a5c0` (`0x8a0f90` → `0x8a1280`) の 1 件だけ。`0x494cf0` は同入力の旧版では BLK より後ろ (`0x8ae860` → `0x8aeb50`) で、成果物 (旧 layout) の交差関数 (§2))。成果物 (stage-1) は旧 layout なので子 #2566 で再生成する。 |
 
 実装 (`icall_rewrite.py`): `blk` を layout より前に決める (既定値は不変)。`place(c, n)` は `[c, c+n)` が BLK 域と重なれば BLK 域の直後 (16 byte 整列) へ送る。関数の配置・stub・comis_stub の全てに適用する。`blk_overlap()` は再配置範囲と BLK 域の交差を返し、交差があれば `sys.exit` (fail-closed)。BLK 域は emit 前に 0 埋めし、emit 後に非ゼロが無いことを assert する。map に `blk_reserve` (0x280) を足した。
 
@@ -40,7 +41,7 @@ issue の受入 1 は「`sect_end` 以降へ置く」か「BLK 専用の書込�
 | 修正版 + `--blk-va 0x8a0fe0` (旧関数位置へ強制) | 0 | 0 | 0 |
 
 - ※ 成果物の非重複違反 1 件は `stub` (0xd01e20) と `comis_stub` (0xd01e70) の重なりで、成果物は古い版で作られ `stub_len` キーが無い (stub 長 0x50)。現版の stub 長は 162 B のため、`check_blk_domain.py` は既定値 162 を当てて数えている。成果物の再生成は子 #2566。
-- **成果物は現版で再生成できない** (同じ PE と同じ F.ranges で `section_size` が `0x560E8D` ではなく `0x5A650D`、交差も 1 件でなく 4 件)。したがって成果物の 1 件は「旧配置の基準値」としてだけ使う。修正の判定は同じ入力での旧版と新版の比較で取る。
+- **成果物は現版で再生成できない** (同じ PE と、§0 の規約で再生成した F.ranges で `section_size` が `0x560E8D` ではなく `0x5A650D`、交差も 1 件でなく 4 件)。したがって成果物の 1 件は「旧配置の基準値」としてだけ使う。修正の判定は同じ入力での旧版と新版の比較で取る。
 
 出力 PE (`f4be6900` の `icall_rewrite.py`・入力 `block18983_PE.bin`):
 
@@ -64,6 +65,8 @@ issue の受入 1 は「`sect_end` 以降へ置く」か「BLK 専用の書込�
 | 旧コードで同入力の再生成 | `acb7d6d4` | rc 0 (`section +5924109 B`・交差 4) | 22 s (15:17:06→15:17:28) | 1 / 終了後 0.20 |
 | 修正版で同入力の再生成 | `f4be6900` | rc 0 (`section +5924861 B`・交差 0) | 23 s (15:19:04→15:19:27) | 1 / 終了後 0.20 |
 | **測定 (HEAD)**: F.ranges を `mk_franges.py` で再生成 → `icall_rewrite.py` → `check_blk_domain.py` | `66629a9e` | rc 0 (交差 0・非重複違反 0・BLK 域の非ゼロ 0)。DLL は `f4be6900` の出力と `cmp` 一致 | 23 s (15:25:27→15:25:50) | 1 / 終了後 0.20 |
+| fix round 1 の再測定 (`origin/main` 取り込み後): 修正版と旧版 (`acb7d6d4`) を同じ F.ranges で再生成し、新旧の map で BLK より前の移動を比べた。`check_blk_domain.py` で検算 | `62e8006f` (旧版は `acb7d6d4`) | 修正版 rc 0 (交差 0・非重複違反 0)。DLL は取り込み前の出力と `cmp` 一致。旧版 rc 0 (`section +5924109 B`・交差 4)。BLK より前から移動した関数は `0x48a5c0` の 1 件、`0x494cf0` は同入力の旧版で BLK より後ろ | 修正版 22.7 s / 旧版 21.8 s (`time` の real) | 1 / 終了後 load は未採取 |
+| `tools/icall/tests/test_icall.py` (round 1) | `62e8006f` | unit 30 件 PASS・pe 部は SKIP (OTT DLL 無し)・`RESULT PASS (0 failed)` | 0.14 s | 1 / — |
 | `check_blk_domain.py` (4 入力: 成果物・同入力旧版・修正版・強制 `--blk-va`) | `f4be6900` | rc 1・rc 1・rc 0・rc 0 | 各 1 s 未満 | — |
 
 ## 4. 変更ファイル
@@ -88,7 +91,7 @@ python3 ../../../icall/check_blk_domain.py fw_map.json; echo rc=$?              
 
 | 受入 | 状態 | 根拠 |
 |---|---|---|
-| 1. BLK を再配置範囲の後ろ・または専用セクションへ | **達成 (方式は (c))**。issue の 2 案は §1 の理由で採らず、BLK 域を再配置範囲の外へ置いた | §1・§2 (交差 0) |
+| 1. BLK を再配置範囲の後ろ・または専用セクションへ | **本 issue の範囲から外した** (原文は子 #2604 `[PLG-P0b-23]` へ移管し、#2565 の本文からも外した)。方式 (c) を受入 1 の充足として認めるかは PM 判断 (既定案: (c) のまま)。(c) の根拠は §1・§2 (交差 0) | §1・§2・子 #2604 |
 | 2. BLK 域と再配置範囲の交差を検査し、重なれば exit 1 | 達成 (`blk_overlap` + `sys.exit`。経路は CLI から到達しない) | §2 の境界テスト |
 | 3. BLK 域を 0 埋め・コードバイトを残さない | 達成 | §2 (640 B の非ゼロ 0・emit 後 assert) |
 | 4. 負のコントロールを数値で | 達成 (旧 1 件 (成果物) / 4 件 (同入力) → 修正後 0 件) | §2 |
@@ -99,4 +102,5 @@ python3 ../../../icall/check_blk_domain.py fw_map.json; echo rc=$?              
 |---|---|---|
 | stage-1 の再生成 (RetDec) と stage-2 smoke の PASS (n≥3)・`init_reach` の計測 | 本件の効果は未確認。成果物 `work-fw-stage1` は旧 layout で、現版から再生成できない | 子 **#2566** `[PLG-P0b-21]` (既存) |
 | RetDec が BLK slot を `constant` として宣言する機構 (REPORT_2510 §3.3) | 0 埋めで `"$"` の fold は消えるはずだが、0 への fold が起きるかは未確認。起きる場合は (b) の別セクション案を検討 | #2566 の調査項目 |
-| DEFECTS.md の D24 候補の登録 | 類型が未登録 | PM 判断 (REPORT_2510 §6) |
+| PM agent の判断待ち: D24 を DEFECTS.md に登録するか (`docs/DECISIONS.md` の D24 は別の ADR で、番号が衝突する)・既定案: REPORT_2510 §6 の行案で登録 | 類型が未登録 | PM (REPORT_2510 §6) |
+| PM agent の判断待ち: 受入 1 を方式 (c) で満たしてよいか・既定案: (c) のまま | issue の 2 案 (`sect_end` 以降・専用セクション) のどちらでもない | 子 #2604 `[PLG-P0b-23]` (受入 1 の原文) |
