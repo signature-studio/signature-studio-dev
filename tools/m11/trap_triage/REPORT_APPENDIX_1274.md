@@ -69,7 +69,7 @@
 ## 5l. unit 190 の ON/OFF 分岐を同一メモリ状態で切り分ける (#2131 次 run・測定 commit `3b581236` = origin/main)
 
 - 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開 (`FL_WIN64_DIR`=`$RUNNER_TEMP/fl-win64`、`RETDEC_ROOT`=`$RUNNER_TEMP/retdec`、`EMSDK`=`$RUNNER_TEMP/emsdk`)。`m11_gen_ir2.sh` rc=0 (51 s、ldfix=applied、F1=902、errors=0)。ON・OFF の build rc=0 (ov.o を毎回作り直した)。
-- build 指紋 (fix round 2 の測定): ON (`M11_OV_CLASSCREATE=1`) の `m11_boot.cjs.wasm` sha256 `38d00710708d9b9cb1610648f8b4daa03db5d820daad47b30002e0ec2960a7f2`、OFF (`=0`) の `bb85e7ac0d69919a10791c24854bfac907ac3e468c0bb897a95ca8198c6c47ef`、`work/ir_conditions.json` の `ir_sha256` `b47a4d3a2555b74c8866d06794fb0b6a4535c4ac9d5a60015853975f512b70da`。IR の sha256 は実行ごとに変わるため、以下の raw 値はこの指紋の build でのみ成り立つ。
+- build 指紋 (fix round 2 の測定): ON (`M11_OV_CLASSCREATE=1`) の `m11_boot.cjs.wasm` sha256 `38d00710708d9b9cb1610648f8b4daa03db5d820daad47b30002e0ec2960a7f2`、OFF (`=0`) の `bb85e7ac0d69919a10791c24854bfac907ac3e468c0bb897a95ca8198c6c47ef`、`work/ir_conditions.json` の `ir_sha256` `b47a4d3a2555b74c8866d06794fb0b6a4535c4ac9d5a60015853975f512b70da`。この commit (`3b581236` から build 入力は変えていない) では、round 3 の再実行で再生成した IR の `ir_sha256` と wasm sha256 が上記と一致した。以下の raw 値は、この指紋の build でのみ成り立つ。
 - 測定 commit: build 入力は `3b581236` から変えていない。fix round 2 で `trap_triage/lockstep_2131.mjs` の LS_FIX 行に `fix: diffPages now=` の出力を 1 行足した (診断のみ)。
 - 測定: `trap_triage/lockstep_2131.mjs` (新規)。ON と OFF の wasm を同一プロセスの 2 インスタンスで unit 0..190 の順に並走させ、unit ごとに kind と HEAPU8 の差 (4 KiB ページ単位) と SP を比べる。survey_units.mjs と同じ呼出し順 (boot → unit 順、error 時のみ SP 復元)。
 - 並走の基準 (強制なし、`LS_A=on LS_B=off LS_CKPT=189 LS_MAX=190 LS_TARGET=190 LS_MAXTESTS=0`、13 s): boot 直後の差分 2 ページ、unit 189 直後 24 ページ、SP は両者 `0x10a9fa10`、heap 長は両者 `1051590656`。unit 0..189 の kind 不一致 0 件、unit 190 は ON `oob` / OFF `ok`。
@@ -96,12 +96,13 @@
 | 11 | ON | vx | A=on, B=vx | `LS_FORCEB=1` | 24 | 0 | oob / ok | 0 | 1 |
 | 12 | ON | vy | A=on, B=vy | `LS_FORCEB=1` | 24 | 0 | oob / ok | 0 | 1 |
 | 13 | ON | vz | A=on, B=vz | `LS_FORCEB=1` | 23 | 0 | oob / oob | 0 | 1 |
-| 14 | ON (2 語だけ書換え) | ON | A=on, B=off | `LS_FIX=fa5320,fa5010` (A の 2 語だけ) | — | 23 (fix 直後の実測。2 語は同じ 4 KiB ページ `0xfa5000` 内) | oob / — | 0 | 1 |
+| 14 | ON (2 語だけ書換え) | ON | A=on, B=off | `LS_FIX=fa5320,fa5010` (A の 2 語だけ) | — | 23 (fix 直後の実測。2 語は同じ 4 KiB ページ `0xfa5000` 内) | oob / ok | 0 | 1 |
 
 - variant の定義は `trap_triage/variants_2131.py` (vdisp: 41c130・9b4b00 の disp entry を外す / v413: 413060 の C override を外す / vnc: 410360 の `m11_vcall` で shortcut (`target == R(0x10070)`) 以外の `ICALL_AT` dispatch だけを外す (`M11_NOVCALL=1`。shortcut 内の icall_bump 2 回は残る) / vall: vdisp+v413+vnc (shortcut 内の icall 計数は残る) / vx: vdisp+v413 で 410360 の本体を `return inst;` だけにする (VMT 読みも計数も外す) / vy: vdisp+v413 で 410360 の VMT 読み `Q(Q(inst)-0x50)` だけ残す / vz: vdisp+v413 で 410360 の `m11_vcall` の shortcut 内の icall_bump 2 回だけ残す (target は `R(0x10070)`))。
 - 読み (表の実測・n=1): 行 1・2 で状態と code を入れ替えても結果は code で決まる (ON 状態 + OFF code は ok、OFF 状態 + ON code は oob)。行 3・4・5 (OFF 状態) と行 11・12・13 (ON 状態) を合わせると、vz (shortcut 内の icall 計数だけ残す) は oob、vy (VMT 読みだけ残す) と vx (両方外す) は ok。よって trap を起こすのは 410360 の shortcut 内の icall 計数 (`icall_bump` 2 回) で、VMT 読みだけでは起きない、と読める。計数が trap を起こす仕組みは未特定。
 - vnc (shortcut 外の `ICALL_AT` dispatch だけ外す) でも ON は oob のまま (行 9) なので、trace の `inst=0xe660` の経路 (下の補助) は trap の必要条件ではない、と読める。
 - vall は計数を残すため、vall からは計数の必要性は判定できない。判定に使うのは vz (計数のみ) / vy (VMT 読みのみ) / vx (両方なし) の比較。
+- 非加法: 行 10 (vdisp 単独) の unit 42・45・138 の ok→miss は、vdisp に v413 と vnc を加えた行 7 (vall) では 0 件。同様に行 8 (v413 単独) の unit 15 の miss も行 7 では 0 件。効果は加法的ではない。どの要素が打ち消すかは、2 要素の組合せ (vdisp+v413、vdisp+vnc) を測るまで未確定。
 - 注意: 差分ページを移す試験は 2 つの build のメモリを比べるため、build 間で配置の違うページを含みうる。boot 直後の差分ページの中身は補助の項を参照 (文字列の配置差ではない)。`0x10250000` 単独を写す試験は未実施のため、その寄与は未確認。`0xfa5320` を OFF の値へ直しても ON の trap は消えない (行 14) ので、リスト先頭の 0x90 ずれ単独では説明できない。
 
 ### 補助 (unit 158 と unit 190 の ON 専用 code の実行・boot 直後の差分)
