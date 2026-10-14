@@ -2,6 +2,7 @@
 """#3009: 殻 (block23663) → engine (block23664) の DispatchToEngine の selector 2・4 の戻り値と、
 殻の wrapper (sel 2 = 0x846a80、sel 4 = 0x846ac0) の呼出し元の内側 id・戻り値の使用を出す。
 また関数 0x84bc30 と 0x843930 への参照 (pdata の全関数の命令単位の走査) を出す。
+参照は 3 種: 命令の即値・RIP 相対 (.text を含む)、データ section (.text 以外) の 4 byte RVA、全 section の 8 byte 絶対 VA。
 usage: dispatch_selectors.py <fl-win64 extracted dir> [--nc]
   --nc: 期待値を 1 つ変えて exit 1 になることを確かめる (negative control)。 通常実行は期待値が一致すれば exit 0。
 """
@@ -30,8 +31,13 @@ class Image:
         self.pe = pefile.PE(path, fast_load=True)
         self.base = self.pe.OPTIONAL_HEADER.ImageBase
         self.pe.parse_data_directories(
-            directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]]
+            directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"],
+                         pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_BASERELOC"]]
         )
+        self.relocs = {b.struct.VirtualAddress + (e.struct.Data & 0xFFF)
+                       for b in getattr(self.pe, "DIRECTORY_ENTRY_BASERELOC", [])
+                       for e in b.entries
+                       if e.type == pefile.RELOCATION_TYPE["IMAGE_REL_BASED_DIR64"]}
         self.secs = [
             (self.base + s.VirtualAddress, s.Misc_VirtualSize, s.get_data(), s.Name.rstrip(b"\0").decode())
             for s in self.pe.sections
@@ -148,6 +154,19 @@ def all_refs(img, targets):
     return hits
 
 
+def abs8_refs(img, target):
+    """全 section (.text を含む) の 8 byte 絶対 VA。 位置・8 byte 整列・.reloc の DIR64 項目の有無を返す。"""
+    pat = target.to_bytes(8, "little")
+    hits = []
+    for lo, sz, d, name in img.secs:
+        k = d.find(pat)
+        while k != -1:
+            va = lo + k
+            hits.append((va, name, va % 8 == 0, (va - img.base) in img.relocs))
+            k = d.find(pat, k + 1)
+    return hits
+
+
 def main():
     args = [a for a in sys.argv[1:] if a != "--nc"]
     nc = "--nc" in sys.argv[1:]
@@ -201,7 +220,7 @@ def main():
     mask = shell.rd(mask_va, 1)[0]
     allowed = [k for k in range(8) if (1 << k) & mask]
     print(f"  {mv.mnemonic} {mv.op_str} -> mask byte {mask:#x} @ {mask_va:#x}; esi in 0..7 with bit set: {allowed}")
-    print("  (esi=3 は [obj+0x7c8]+0x48e != 0 のとき 0xc に写るため、0x84bd8f には届かない)")
+    print("  (esi=3 は [obj+0x7c8]+0x48e != 0 のとき 0xc に写るため、flag == 0 のときだけ 0x84bd8f に届く)")
     expect("0x84bd8f inner ids (esi in 0..7 with mask bit)", allowed, [3, 7])
 
     print("\n## 参照走査 (命令の即値・RIP 相対・データ内 RVA4)")
@@ -213,12 +232,20 @@ def main():
     for t, want in ((TARGET_INNER, 0), (TARGET_STR, 6)):
         code_refs = [r for r in refs[t] if not r[1].startswith("DATA")]
         data_refs = [r for r in refs[t] if r[1].startswith("DATA")]
-        print(f"### {t:#x}: code {len(code_refs)} / data {len(data_refs)}")
+        print(f"### {t:#x}: code {len(code_refs)} / data {len(data_refs)} (data は .text 以外の 4 byte RVA)")
         for a, txt, fs in sorted(code_refs):
             print(f"  {a:#x}: {txt} [fn {fs:#x}]")
         for a, txt, _ in sorted(data_refs):
             print(f"  {a:#x}: {txt}")
         expect(f"{t:#x} code refs", len(code_refs), want)
+
+    print("\n## 8 byte 絶対 VA (全 section、.text を含む)")
+    for t, want in ((TARGET_INNER, [0x84A468]), (WRAP_SEL2, []), (WRAP_SEL4, []), (TARGET_STR, []), (0x843D30, [])):
+        hits = abs8_refs(shell, t)
+        print(f"### {t:#x}: {len(hits)} hits")
+        for va, name, al8, rel in hits:
+            print(f"  {va:#x} in {name} (8 byte 整列={al8}, .reloc DIR64={rel})")
+        expect(f"{t:#x} abs8 refs", [h[0] for h in hits], want)
 
     print("\nRESULT:", "FAIL " + ", ".join(fails) if fails else "PASS")
     sys.exit(1 if fails else 0)
