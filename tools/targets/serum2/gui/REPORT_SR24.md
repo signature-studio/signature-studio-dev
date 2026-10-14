@@ -18,8 +18,8 @@
 ### 0-1. 測定 commit と差分 (WORKFLOW §6)
 
 - 測定 commit: `6af8b94a` (コードを変えた最後の commit。`xref_rva.py` はこの commit で作成)。
-- `git diff 6af8b94a HEAD -- 'tools/targets/serum2/gui/*.py'` の出力は **0 行** (スクリプトの差分 0)。
-- `git diff --stat 6af8b94a HEAD -- tools/targets/serum2/gui` の実出力: `REPORT_SR24.md | 31 +++++++++++++++++++++----------` (21 insertions, 10 deletions)。本 commit 群は REPORT の文言修正のみで、測定対象のコードは変わっていない。
+- `git diff 6af8b94a HEAD -- 'tools/targets/serum2/gui/*.py'` の実出力: 0 行 (コード差分 0)。
+- `git diff --stat 6af8b94a HEAD -- tools/targets/serum2/gui` の実出力: `tools/targets/serum2/gui/REPORT_SR24.md | 38 +++++++++++++++++++++++---------` (28 insertions, 10 deletions)。gui 範囲で変わったのは本 REPORT (文書) のみで、測定対象のコード差分は 0 (変更は文書のみ)。
 - 本 run の環境: runner 上で `Serum2_win64.vst3` を作れず、上記の実測は再現していない (§1・§4 参照)。
 
 ## 1. 再現手順
