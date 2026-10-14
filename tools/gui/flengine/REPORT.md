@@ -374,8 +374,6 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 
 WIN-4 (#2715・部分達成): `CreateFruityInstance` の閉包 (2,071 関数) を boot7 として取り込み、呼出しまで到達した (`EnterCriticalSection` で fail-fast)。測定 commit `5f9d7cbd`・判定と未解決は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §7 を正とする。
 
-WIN-11 (#2880・部分達成): fail-fast の CS は `0x12bd390` (実測)。呼出元 VA と boot の trap 地点は未特定 (子 issue `[WIN-16]`)。測定 commit `ae963e28`・詳細は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §9 を正とする。
-
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
