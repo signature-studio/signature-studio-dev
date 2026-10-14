@@ -9,11 +9,17 @@
 
 | 受入条件 | 判定 |
 |---|---|
-| 1. state → template の分岐関数を特定 | **未達**。テンプレート名 (`SpliceRTO` / `SpliceExpired` / `SpliceMaxLimit`) は平文・UTF-16 のどちらにも無く、名前で分岐する関数を見つけられなかった。分かったのは sub-controller 生成の経路 (§2) まで |
-| 2. 分岐が demo bit (+0x22792) に依存することの静的確認 | **未達**。demo bit の読み出し箇所は特定した (§3) が、Splice 表示条件との結線は未確認 |
-| 3. overlay_demo_version(_mini) が patch 後に到達不能 | **未達**。demo ダイアログ呼出 `0x1800501c0` の 5 呼出元のうち、2 関数は直接呼出が無く (vtable 等の間接経路)、到達性を閉じられなかった (§4) |
+| 1. state → template の分岐関数を特定 | **未達** (子 #1917 へ移す)。テンプレート名 (`SpliceRTO` / `SpliceExpired` / `SpliceMaxLimit`) は平文・UTF-16 のどちらにも無く、名前で分岐する関数を見つけられなかった。分かったのは sub-controller 生成の経路 (§2) まで |
+| 2. 分岐が demo bit (+0x22792) に依存することの静的確認 | **未達** (子 #1917 へ移す)。demo bit の読み出し箇所は特定した (§3) が、Splice 表示条件との結線は未確認 |
+| 3. overlay_demo_version(_mini) が patch 後に到達不能 | **未達** (子 #1917 へ移す)。demo ダイアログ呼出 `0x1800501c0` の 5 呼出元のうち、2 関数は直接呼出が無く (vtable 等の間接経路)、到達性を閉じられなかった (§4) |
 | 4. REPORT に記録 | 本ファイルで実施。`tools/targets/serum2/REPORT.md` は 250 行上限のため無変更 |
-| 5. 実 VSTGUI の動的確認 | 範囲外 (GUI lift 時。新 issue に移す) |
+| 5. 実 VSTGUI の動的確認 | 範囲外 (GUI lift 時。`#68` 残作業として追跡) |
+
+### 0-1. 測定 commit と差分 (WORKFLOW §6)
+
+- 測定 commit: `6af8b94a` (コードを変えた最後の commit。`xref_rva.py` はこの commit で作成)。
+- `git diff 6af8b94a HEAD -- tools/targets/serum2/gui` の出力は **0 行** (差分 0。コード・スクリプトの変更なし。本 commit は文書のみ)。
+- 本 run の環境: runner 上で `Serum2_win64.vst3` を作れず、上記の実測は再現していない (§1・§4 参照)。
 
 ## 1. 再現手順
 
@@ -27,7 +33,10 @@ work/venv/bin/python gui/xref_rva.py work/Serum2_win64.vst3 fc55b4 1195f14      
 ```
 
 - 依存: `pefile` `capstone` `zstandard` (venv `work/venv`)。
-- 所要 (real, 逐次): `xref_rva.py` 8.87 s (`.text` 全走査)。`extract_uidesc.py` / 逆アセンブル補助スクリプトの所要は未計測。load は未計測。
+- 所要 (前 run の値・real, 逐次, n=1): `xref_rva.py` 8.87 s (`.text` 全走査)。**load average は未記録** (前 run で `uptime` を取っていない)。
+- **本 run (再測定) の状況**: 素材 `plugins-serum2` が runner 上に無く (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ。その中身にも Serum2 は無い)、入力 `Serum2_win64.vst3` を作れなかった。よって `xref_rva.py` の再測定・`extract_uidesc.py` の再測定は**未実施**。上記 8.87 s と 2,093,822 B は前 run の値で、本 run では再現していない。
+- `extract_uidesc.py`: **未計測** (理由: 入力 `Serum2_win64.vst3` が本 run で作れないため)。
+- 再測定の条件 (未解決 (6) で追跡): `plugins-serum2` を依頼に `oc_artifacts:` で指定して取得し、`uptime` を実行前後に記録、逐次で n≥3 の min–max を取る。
 
 ## 2. 分岐の探索結果 (実測)
 
@@ -80,14 +89,16 @@ work/venv/bin/python gui/xref_rva.py work/Serum2_win64.vst3 fc55b4 1195f14      
 | 0x1800760e1 | 0x180075d90 (size 0x368) | 0x1800684c4 |
 
 - 直接呼出元が無い 2 関数 (0x18004fad0 / 0x18004ffc0) は、到達性が間接経路に依存するため**静的には閉じられなかった**。
+- ネガティブコントロール・検算 (objdump 等による rip 参照元の別手段確認、vtable 位置の確認) は**本 run では未実施**。理由: 入力 `Serum2_win64.vst3` が runner 上に無いため、いずれも実バイナリに対して実行できない。前 run の `0x1804a22a1` 1 件・`0x1800501c0` 呼出元 5 箇所は未検算のまま記載している (未解決 (6) で追跡)。
 - patch 後の到達不能を言うには、(a) 0x18004fad0 / 0x18004ffc0 の vtable 上の位置、(b) 0x1800506b0・0x180075d90 の各上流が demo bit で分岐するか、の確認が要る。本 run では未実施。
 
 ## 5. 残る作業 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (1) state → template 名の選択経路 (名前で分岐しない場合の index / vtable 経路) | `authstub` N7 の「非表示固定」が未検証 | 子 issue (本 PR 本文の表を参照) |
-| (2) demo bit と Splice 表示条件の結線 (§3 の 0x1800aa336 / 0x1800ac7b0 / 0x1800b95ae を含む) | 受入条件 2 | 同上 |
-| (3) 0x18004fad0 / 0x18004ffc0 の vtable 位置と demo ダイアログ到達性 | 受入条件 3 | 同上 |
-| (4) 0x180796090 の解析 | 受入条件 1 の補助 | 同上 |
-| (5) 実 VSTGUI 上の動的確認 | 受入条件 5 | GUI lift 時 (`#68` 残作業) |
+| (1) state → template 名の選択経路 (名前で分岐しない場合の index / vtable 経路) | `authstub` N7 の「非表示固定」が未検証 | #1917 |
+| (2) demo bit と Splice 表示条件の結線 (§3 の 0x1800aa336 / 0x1800ac7b0 / 0x1800b95ae を含む) | 受入条件 2 | #1917 |
+| (3) 0x18004fad0 / 0x18004ffc0 の vtable 位置と demo ダイアログ到達性 | 受入条件 3 | #1917 |
+| (4) 0x180796090 の解析 | 受入条件 1 の補助 | #1917 |
+| (5) 実 VSTGUI 上の動的確認 | 受入条件 5 | `#68` 残作業 (GUI lift 時) |
+| (6) 本 run での再測定・検算・負例 (xref_rva.py の 8.87 s / load / uidesc 計測、ネガティブコントロール、objdump 等による検算) | §1・§4 の数値が未検算 | `#1917` (素材 `plugins-serum2` を依頼で取得してから実施) |
