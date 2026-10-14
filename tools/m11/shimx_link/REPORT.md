@@ -230,5 +230,5 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 ## 12. midiOutShortMsg の HANDLE 幅 (#1628 SHX-T25): IR 側の正規化 (要約)
 
 - 結論: IR 側の宣言と呼出しを i32 に揃える正規化 (`sx_handle_norm.py`、`build.sh` 2c) で、plain / trace の `signature mismatch` 1 → 0 (測定 commit `e0e35f9a`)。切り詰めは HMIDIOUT の値を変えない。
-- 測定値・修正前の出典と IR 同一性の限界・e2e の範囲: 付録 `REPORT_APPENDIX_1628.md` §12 が正本。fail-closed 化 (`763a599d`) は未測定のため本 PR から外した (付録 §12.4)。
-- 未解決の起票先: IR 生成側の根本 → #2839 `[SHX-T31]`。fail-closed 化の復元と HEAD での再測定 (942 survey・plain の boot 到達点を含む) → #2877 `[SHX-T32]`。
+- 測定値・修正前の出典と IR 同一性の限界・e2e の範囲: 付録 `REPORT_APPENDIX_1628.md` §12 が正本。fail-closed 化 (`763a599d`) は `c4a575ce` で復元し、HEAD で再測定した (付録 §12.6・#2877 `[SHX-T32]`)。
+- 未解決: IR 生成側の根本 → #2839 `[SHX-T31]`。ws_e2e の旧基準 (init 18 / PASS 19) が本環境で再現しない → 付録 §12.5 (本 PR の未解決表)。
