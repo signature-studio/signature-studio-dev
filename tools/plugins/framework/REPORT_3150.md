@@ -83,9 +83,17 @@ python3 tools/plugins/framework/fw_blk_writers.py tools/plugins/work/fw/fw_flat4
 
 ## 9. コード差分 (測定 commit 以降)
 
-測定 commit `8d8d0e6a` 以降に追加するのは解析スクリプト `tools/plugins/framework/fw_blk_writers.py` のみ。パイプライン (`fw_*.sh`・`icall_rewrite.py`) は参照しない。
+本 PR が追加するのは解析スクリプト `tools/plugins/framework/fw_blk_writers.py` のみ。パイプライン (`fw_*.sh`・`icall_rewrite.py`) は参照しない。
+
+main 取り込み (merge commit `063b07b7`) で、測定 commit 以降の `tools/liftlib` の変更 (OTT 経路の `p1_legacy.py`・`recipes/ott.py` ほか) が HEAD に入った。framework の stage-1 (`fw_lift.sh`) は liftlib を読まない。stage-2 が直接 import する `liftlib.passes.base`・`liftlib.simd.gen` は下の差分に含まれない。
 
 ```sh
-git diff 8d8d0e6a HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'
-#  A tools/plugins/framework/fw_blk_writers.py   (解析専用・stage-1/2 の出力に影響しない)
+git diff --stat 8d8d0e6a HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'
+#  tools/liftlib/liftlib/passes/p1_legacy.py | 21 ++++----
+#  tools/liftlib/liftlib/recipes/ott.py      | 16 +++++-
+#  tools/liftlib/liftlib_e2e.sh              |  2 +
+#  tools/liftlib/p1_repmap_census.py         | 68 ++++++++++++++++++++++++++
+#  tools/liftlib/tests/test_unit.py          | 81 +++++++++++++++++++++++++------
+#  tools/plugins/framework/fw_blk_writers.py | 71 +++++++++++++++++++++++++++
+#  6 files changed, 233 insertions(+), 26 deletions(-)
 ```
