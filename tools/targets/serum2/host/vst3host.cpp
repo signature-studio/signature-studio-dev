@@ -1189,13 +1189,15 @@ int main(int argc, char** argv) {
     ParamChanges* inParams = new ParamChanges();
     ParamChanges* outParams = new ParamChanges();
 
+    // SR-5: 参照レンダの MIDI ノート (既定 60)。ネガコンは S2HOST_PITCH で別ノートにする
+    const int notePitch = getenv("S2HOST_PITCH") ? atoi(getenv("S2HOST_PITCH")) : 60;
     Event noteOn;
     memset(&noteOn, 0, sizeof(noteOn));
     noteOn.busIndex = 0;
     noteOn.type = Event::kNoteOnEvent;
     noteOn.sampleOffset = 0;
     noteOn.noteOn.channel = 0;
-    noteOn.noteOn.pitch = 60;
+    noteOn.noteOn.pitch = (int16)notePitch;
     noteOn.noteOn.tuning = 0.f;
     noteOn.noteOn.velocity = 1.0f;
     noteOn.noteOn.length = -1;
@@ -1232,7 +1234,7 @@ int main(int argc, char** argv) {
         off.type = Event::kNoteOffEvent;
         off.sampleOffset = 0;
         off.noteOff.channel = 0;
-        off.noteOff.pitch = 60;
+        off.noteOff.pitch = (int16)notePitch;
         off.noteOff.velocity = 0.f;
         off.noteOff.tuning = 0.f;
         off.noteOff.noteId = 1;
@@ -1290,6 +1292,27 @@ int main(int argc, char** argv) {
         if (!allOut.empty()) fwrite(allOut.data(), sizeof(float), allOut.size(), f);
         fclose(f);
       }
+    }
+    // SR-5: 参照 WAV (32-bit float, 2ch, SR 48 kHz)。WAV 本体は work/ に置き commit しない
+    {
+      std::string wp = outDir + "\\render_f32.wav";
+      FILE* f = fopen(wp.c_str(), "wb");
+      if (f) {
+        const uint32_t dataBytes = (uint32_t)(allOut.size() * sizeof(float));
+        const uint32_t rate = 48000;
+        const uint16_t ch = 2, bits = 32, fmtTag = 3;
+        const uint16_t align = ch * bits / 8;
+        const uint32_t byteRate = rate * align;
+        const uint32_t fmtSize = 16, riffSize = 4 + (8 + fmtSize) + (8 + dataBytes);
+        fwrite("RIFF", 1, 4, f); fwrite(&riffSize, 4, 1, f); fwrite("WAVE", 1, 4, f);
+        fwrite("fmt ", 1, 4, f); fwrite(&fmtSize, 4, 1, f);
+        fwrite(&fmtTag, 2, 1, f); fwrite(&ch, 2, 1, f); fwrite(&rate, 4, 1, f);
+        fwrite(&byteRate, 4, 1, f); fwrite(&align, 2, 1, f); fwrite(&bits, 2, 1, f);
+        fwrite("data", 1, 4, f); fwrite(&dataBytes, 4, 1, f);
+        if (!allOut.empty()) fwrite(allOut.data(), sizeof(float), allOut.size(), f);
+        fclose(f);
+      }
+      L("[render] render_f32.wav (32-bit float, 2ch, 48000 Hz, %u frames)", (unsigned)(allOut.size() / 2));
     }
     L("[audio] outputEvents(plugin→host)=%lld inEvents(host→plugin)=%lld",
       outEvents->pluginAdds, inEvents->ev.size());
