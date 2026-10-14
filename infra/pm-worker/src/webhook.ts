@@ -61,6 +61,8 @@ export interface Signal {
   labelAt?: string;
   // reviews を REST で一度取得した
   revChecked?: boolean;
+  // 最新の oc-pm-intent: relaunch (issue コメント)。書き手が実装 App かどうか (bot) と、マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
+  relaunch?: { at: string; id?: number; bot: boolean; issue: string; arts: string; focus: string | null };
 }
 export interface RunState {
   id: number;
@@ -237,6 +239,18 @@ export function parseOutcomeReason(body: string): string | null {
   return OUTCOME_REASONS.includes(m[1]) ? m[1] : "unknown";
 }
 
+// oc-pm-intent: relaunch の属性を字句のまま取り出す (検証は engine の checkRelaunchIntent)。マーカーが無ければ null。
+const RELAUNCH_RE = /<!-- oc-pm-intent: relaunch ([^>]{0,300})-->/;
+export function parseRelaunchIntent(body: string): { issue: string; arts: string; focus: string | null } | null {
+  const m = RELAUNCH_RE.exec(body);
+  if (!m) return null;
+  return {
+    issue: /(?:^|\s)issue=(\S*)/.exec(m[1])?.[1] ?? "",
+    arts: /(?:^|\s)arts="([^"]*)"/.exec(m[1])?.[1] ?? "",
+    focus: /(?:^|\s)focus=(\S*)/.exec(m[1])?.[1] ?? null,
+  };
+}
+
 // コメントから終端状態の手がかりを取る。マーカーは bot (実装 App・reviewer App) の投稿だけを信じる (誰でもコメントできるため)。
 function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: string[], reviewer: string): PmState {
   const c = p.comment;
@@ -257,6 +271,11 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
     if (reason) patch.outcome = { at, reason };
   }
   if ((pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body))) && later(cur?.pmAt)) patch.pmAt = at;
+  // 再投入の意図は issue のコメントだけ。書き手が実装 App でないものも残す (engine が author として拒否し、counters に記録する)。
+  const rel = !("pull_request" in i) ? parseRelaunchIntent(body) : null;
+  if (rel && (!cur?.relaunch || notOlder(cur.relaunch, c))) {
+    patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: login === botLogin, ...rel };
+  }
   if (login && !isBotUser(c.user) && later(cur?.userAt)) patch.userAt = at;
   return setSig(s, k, patch);
 }

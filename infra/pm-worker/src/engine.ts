@@ -4,7 +4,7 @@
 import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
+import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
@@ -82,6 +82,10 @@ interface Meta {
     reconciles: number;
     pmDispatched?: number;
     wouldDispatchPm?: number;
+    // 再投入の意図 (oc-pm-intent: relaunch)。投稿した数・dry-run で記録した数・検査で拒否した数 (理由ごと)。
+    intentLaunched?: number;
+    intentWouldLaunch?: number;
+    intentRejected?: Record<string, number>;
   };
 }
 
@@ -433,7 +437,7 @@ export class Engine {
     this.saveMeta();
   }
 
-  private zero() {
+  private zero(): NonNullable<Meta["counters"]> {
     return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0 };
   }
 
@@ -651,23 +655,80 @@ export class Engine {
         if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
         continue;
       }
-      const at = iso(this.d.now());
-      this.d.store.put("launchedAt", String(p.n), at);
-      this.s = { ...this.s, launchedAt: { ...this.s.launchedAt, [String(p.n)]: at } };
+      this.markPosted(p.n, iso(this.d.now()));
       if (p.relaunch) {
         const prev = this.d.store.get<{ count: number; art: string | null }>("relaunch", String(p.n)) ?? { count: 0, art: null };
         this.d.store.put("relaunch", String(p.n), { count: prev.count + 1, art: p.art });
       }
-      if ((this.s.issues[String(p.n)]?.labels ?? []).includes("oc:no-pr")) {
-        const c = this.d.store.get<{ count: number }>("relaunch", `np:${p.n}`)?.count ?? 0;
-        this.d.store.put("relaunch", `np:${p.n}`, { count: c + 1 });
-      }
       this.meta.counters.launched++;
       this.pushLog({ kind: "launch", n: p.n, art: p.art });
     }
+    if (!(plan.phase.review_only || plan.stop)) await this.relaunchIntents(gh, !!live, planned);
     this.d.store.put("meta", "planned", planned);
     this.saveMeta();
     return plan;
+  }
+
+  // /oc を投稿した issue の印: launchedAt と、oc:no-pr の再着手の数。
+  private markPosted(n: number, at: string): void {
+    this.d.store.put("launchedAt", String(n), at);
+    this.s = { ...this.s, launchedAt: { ...this.s.launchedAt, [String(n)]: at } };
+    if ((this.s.issues[String(n)]?.labels ?? []).includes("oc:no-pr")) {
+      const c = this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0;
+      this.d.store.put("relaunch", `np:${n}`, { count: c + 1 });
+    }
+  }
+
+  // 再投入の意図 (oc-pm-intent: relaunch)。picks とは別経路で、checkRelaunchIntent の検査を全て通したものだけ /oc を投稿する。
+  // 検査に落ちた意図は理由を counters.intentRejected に数え、その意図は処理済みにする (毎 tick 数え直さない)。
+  // dry-run では投稿せず記録だけする。処理済みにはしないので、live に切り替えると投稿される。
+  private async relaunchIntents(gh: Gh | null, live: boolean, planned: Record<string, number>): Promise<void> {
+    const nowMs = this.d.now();
+    for (const [k, sig] of Object.entries(this.s.sig)) {
+      const r = sig.relaunch;
+      const issue = this.s.issues[k];
+      if (!r || !issue || issue.state !== "open") continue;
+      const n = Number(k);
+      const key = `it:${k}`;
+      const st = this.d.store.get<{ seen?: string; posted?: number[] }>("relaunch", key) ?? {};
+      const at = Date.parse(r.at);
+      if (st.seen && at <= Date.parse(st.seen)) continue;
+      // 投稿の後 (PM の手動の /oc を含む) に出た意図は、もう処理しない。
+      if ((Date.parse(this.s.launchedAt[k] ?? "") || 0) >= at) {
+        this.d.store.put("relaunch", key, { ...st, seen: r.at });
+        continue;
+      }
+      const c = (this.meta.counters ??= this.zero());
+      const v = checkRelaunchIntent(n, r, st.posted ?? [], nowMs);
+      if (!v.ok) {
+        c.intentRejected = { ...(c.intentRejected ?? {}), [v.reason]: (c.intentRejected?.[v.reason] ?? 0) + 1 };
+        this.d.store.put("relaunch", key, { ...st, seen: r.at });
+        this.pushLog({ kind: "skip", n, note: `relaunch intent rejected: ${v.reason}` });
+        continue;
+      }
+      if (!live) {
+        // dry-run: launch の計画と同じく、同じ issue は 3 時間は再掲しない。
+        if (nowMs - (planned[key] ?? 0) < 3 * 3_600_000) continue;
+        planned[key] = nowMs;
+        c.intentWouldLaunch = (c.intentWouldLaunch ?? 0) + 1;
+        this.pushLog({ kind: "would-launch", n, art: v.art, note: "relaunch intent" });
+        continue;
+      }
+      if (restGuardOn(this.meta.rest?.remaining)) break;
+      try {
+        await gh!.comment(n, buildLaunchBody(v.art, v.focus));
+      } catch (e) {
+        this.pushLog({ kind: "error", n, note: e instanceof GhError ? e.message : "comment failed" });
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+        continue;
+      }
+      this.markPosted(n, iso(nowMs));
+      const posted = [...(st.posted ?? []), nowMs].filter((t) => nowMs - t < RELAUNCH_WINDOW_MS);
+      this.d.store.put("relaunch", key, { seen: r.at, posted });
+      c.launched++;
+      c.intentLaunched = (c.intentLaunched ?? 0) + 1;
+      this.pushLog({ kind: "launch", n, art: v.art, note: "relaunch intent" });
+    }
   }
 
   async watchdog(gh: Gh | null): Promise<"dispatched" | "would" | "skipped"> {

@@ -22,7 +22,9 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
 5. relaunch (`oc:no-pr` の再投入・素材の追加) も 1 tick の枠 `min(room, BATCH, relaunch + ready)` に入り、残りの枠を ready が使う (`src/launch.ts` の `planLaunch`)。relaunch は room や BATCH を超えても全件出す。枠を `ready` の件数だけで頭打ちにする VM の `launch_issues.py` の式とは、relaunch がある tick で最大 relaunch の件数だけ差が出る (VM の式は変えていない)。relaunch は classify が issue ごとに 2 回までに絞る。
 
-`/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。
+`/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行と、再投入の意図に `focus=K` があるときの受入条件 1 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。
+
+再投入の意図 (`<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->`、#2475): 最新の意図マーカーを issue ごとに保持し、次を**全て**通ったときだけ `/oc` を投稿する (`src/launch.ts` の `checkRelaunchIntent`)。書き手は実装 App・`issue=` がコメントの issue と一致・`arts` が `ALLOW_ARTS` の部分集合・`focus` は 1〜9 (任意)・同じ issue に 24 時間で 3 回まで。停止中 (review-only・stuck 上限・REST の残量不足) と、投稿後に出た意図は処理しない。拒否は理由ごとに `counters.intentRejected` へ数え、その意図は処理済みにする。投稿の可否は `LIVE_LAUNCH` に従い (既定 dry-run。`counters.intentWouldLaunch` に記録)。
 
 ## oc-pm: PM agent を起こす終端状態の検出と送信 (#2333)
 
