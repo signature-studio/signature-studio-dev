@@ -19,7 +19,18 @@ void ld_trace(u64 va, u32 np, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u6
   u64 a[8] = { a0, a1, a2, a3, a4, a5, a6, a7 }, x[4] = { x0, x1, x2, x3 };
   ld_trace_rec(va, np, a, x);
 }
-void ld_blk(u64 va) { ld_blk_rec(va); }
+/* LD-67 (#1906): IR block 入口は call ではなく volatile store で記録する (call を入れると wasm の戻り値が変わるため)。
+ * IR 側は index を 65535 でマスクするため、ld_blk_n が 65536 を超えると古い要素が上書きされる (blk_over で検知する)。
+ * ld_blk_sync() が case 終了時に ld_blks へ移す。 */
+volatile u64 ld_blk_n;
+volatile u64 ld_blk_arr[65536];
+static void ld_blk_sync(void) {
+  u64 n = ld_blk_n;
+  ld_blk_n = 0;
+  if (!ld_blk_on) return;
+  if (n > 65536) { ld_blk_over += (int)(n - 65536); n = 65536; }
+  for (u64 i = 0; i < n; i++) ld_blk_rec(ld_blk_arr[i]);
+}
 u64 __readgsqword(u64 off) { return *(u64*)(g_heap + LD_TEB_OFF + off); }
 int32_t* m11_counter_ptr(void) { return &g_counter; }
 void m11_probe(int i) { (void)i; }
@@ -55,6 +66,7 @@ EMSCRIPTEN_KEEPALIVE int ld_w_nargs(void) { return ld_case.nargs; }
 /* inbuf = "status\0detail\0rtype\0" */
 EMSCRIPTEN_KEEPALIVE const char* ld_w_case_end(u64 rax, u64 rdx, u64 x0, u64 x1, int has_ret) {
   const char* st = g_inbuf; const char* det = st + strlen(st) + 1; const char* rt = det + strlen(det) + 1;
+  ld_blk_sync();
   const char* j = ld_case_end(st, det, 0, 0, rax, rdx, x0, x1, has_ret);
   /* rtype を JSON 末尾に追加 (最後の '}' の前) */
   size_t n = strlen(ld_out);
