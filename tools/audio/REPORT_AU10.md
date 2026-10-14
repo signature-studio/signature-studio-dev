@@ -201,15 +201,17 @@
 | **`--soak30 --busy 14`** (1800 s, busy 14 本並走, 21:35〜22:05 UTC) | **PASS (exit 1 完了)**: underruns 0, silence 0, ramp **0 / 86,394,752 f**, workletErrors 0, cb 337,478 回 late 0, **cb_max 400 µs** (cb_max_q 24,640 ≈ 65.7 s), T=1536 固定 (lat_changes 0), dev_fill 512/1311/1536, **clock_jumps 2 件** (dup −128 f @ q631980 → skip +128 f @ q631981, 符号付き合計 0), secs_wall 1800.107 | 1803.8 s / 9.99 → 終了時 (busy 停止直後) 1 分/5 分/15 分平均 16.86 / 16.59 / 14.48 |
 
 判定:
-- 負荷下 (busy 14 本、load avg 10〜17) の 30 分ソークを現 head で初めて実施し、PASS。ramp は全フレーム bit-exact、underrun 0。cb_max 400 µs で ms 級 spike は未再現。旧 head の §16.2 (busy 14, cb_max 450 µs) とも同程度。
-- clock_jumps は 2 件で、§16.10 と同じ「dup −128 の直後に skip +128」の隣接ペア 1 組。負荷下で件数が増えたかは n=1 のため判断できない。同一 frame の process() が 2 回呼ばれる条件は**未特定**。
-- 10 秒ソーク FAIL: 本 run では反復せず、動作確認の 1 回 (負荷下) が PASS のみ。通算 2/45 (分母 +1)。原因は**未特定**。
+- 負荷下 (busy 14 本) の 30 分ソークを現 head で初めて実施し、PASS。ramp は全フレーム bit-exact、underrun 0。cb_max 400 µs で ms 級 spike は未再現。旧 head の §16.2 (busy 14, cb_max 450 µs) とも同程度。
+- 負荷: 開始時 load 9.99 は busy 起動前 (`loadStart`) の値で、直前の 10 秒ソーク (busy 14、終了時 12.84) の残留と読める。busy 起動後に load avg が 10 を超えた正確な時刻は**未記録**。終了時の 1 分平均は 16.86。
+- clock_jumps は 2 件で、§16.10 と同じ「dup −128 の直後に skip +128」の隣接ペア 1 組。負荷下で件数が増えたかは n=1 のため判断できない。同一 frame の process() が 2 回呼ばれる条件は**未特定** (子 issue #3115)。
+- cb_max ≥ 1 ms の無負荷 30 分は、§16.3〜§16.10 の 8 回の範囲では 1 回 (§16.9)。範囲外の §16.1 (6aa4b39) を含めると 2 回。本節の負荷下 1 回は該当しない。
+- 10 秒ソーク FAIL: 本 run では反復せず、動作確認の 1 回 (負荷下) が PASS のみ。通算 2/45 の内訳は、無負荷 2/44 (§16.10 までの通算) と負荷下 0/1 (本節)。原因は**未特定**。
 
-鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `306ecc9b` → 本 REPORT commit の `git diff --stat 306ecc9b HEAD -- tools/audio public/worklets src/runtime` は REPORT_AU10.md のみ (PR 作成時点で確認)。
+鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `306ecc9b`。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 10 秒ソーク FAIL の原因 (通算 2/45) | 30 分実測の信頼性 | #1570 (FAIL 時は cb_max_q・dev_fill・underrun・clock_jump_log を採取) |
-| clock_jumps の発生源 (隣接ペアで同一 frame の process() が 2 回呼ばれる条件) | 無害判定の根拠は sample 照合のみ | #1570 |
-| cb_max 1,055 µs (§16.9) の原因 | 単発の 1 ms 超。原因不明 | #1570 |
-| 負荷の強さを変えた 30 分ソークの反復 (現在 n=1) | 負荷と clock_jumps・cb_max の関係は未確定 | #1570 |
+| 10 秒ソーク FAIL の原因 (通算 2/45) | 30 分実測の信頼性 | なし (再現待ち。FAIL 時は cb_max_q・dev_fill・underrun・clock_jump_log を採取) |
+| clock_jumps の発生源 (隣接ペアで同一 frame の process() が 2 回呼ばれる条件) | 無害判定の根拠は sample 照合のみ | #3115 [AU-29] (絶対値カウンタの追加。親 #1570) |
+| cb_max 1,055 µs (§16.9) の原因 | 単発の 1 ms 超。原因未特定 | なし (再測定・原因未特定のため子 issue を起票しない) |
+| 負荷の強さを変えた 30 分ソークの反復 (現在 n=1) | 負荷と clock_jumps・cb_max の関係は未確定 | なし (再測定のみ) |
