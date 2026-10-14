@@ -85,6 +85,9 @@
 ```
 
 - load average: 4 件の前後 4.99 → 6.45 (§6 と同様に高い負荷の下で測った。所要時間は §2・§6 と比べない)。
+- ネガコン (`5726e190` で再実施。どちらも元に戻した後の差分は 0 行):
+  - 24 時間ガード `if (false && ...)` → `digest.test.ts` の 4 件が FAIL (初回・(a)・(b)・送信失敗)。
+  - rolling 除外を無効化 (`classify.ts`・`launch_issues.py`) → `digest.test.ts` (e) と `test_digest_rolling_issue_is_not_ready` が FAIL。
 
 | 検証 | コマンド | 結果 | 所要 (wall) |
 |---|---|---|---:|
