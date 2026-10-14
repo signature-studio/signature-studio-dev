@@ -1,13 +1,13 @@
 # PY-84 (#2663): chord progression の pyscript 2 本と drum patterns を fl-win64 から抽出する
 
 - 対象: `tools/python/analysis/extract_pyc_blocks.py` (抽出器) と `tools/python/run_all.sh` の step 15。
-- 測定 commit: `0537b23e` (コードを変えた最後の commit。`tests/chord_progression_e2e.mjs` の冒頭コメント 2 行の変更で、実行される文は変えていない)。抽出器と step 15 の最後の変更は `0b6417df`。
+- 測定 commit: `0537b23e` (コードを変えた最後の commit。`tests/chord_progression_e2e.mjs` の冒頭コメント 2 行の変更で、実行される文は変えていない)。抽出器と step 15 の最後の変更は `0b6417df`。run_all 全体 (§8) は `41d9c3b9` で測定した (その後の commit は docs のみ)。
 
 ## 1. 結論
 
 fl-win64 の DATA block だけから、抽出器が `drum_patterns.json` と `pyscript/{cpt,stack}.pyscript` を出すようになった。`tests/chord_progression_e2e.mjs` は 3 回とも 41/41 PASS (exit 0)。step 15 の 2 行を単独で実行しても PASS。
 
-**run_all 全体は未達**。main 取り込み前の run_all は先頭の mac pkg 前提チェックで rc=2 のまま止まる (§8)。取り込み後の run_all 全体は本 run では未実行。これは #2649 (PY-83) の範囲で、本 run では触らない。e2e の入力は mock 条件つき (§9)。実 FL との照合は #81。
+**run_all 全体が fl-win64 と toolchain-emsdk だけで rc=0** (最終行 `== ALL OK`、測定 commit `41d9c3b9`、§8)。step 15 は SKIP されず実行される。mac pkg を読む step (3b・4 の mac 版・7) は既存の SKIP 分岐 (#2649) に入り、追跡済みの出力を使った。e2e の入力は mock 条件つき (§9)。実 FL との照合は #81。
 
 ## 2. 既知類型との関係
 
@@ -17,7 +17,7 @@ fl-win64 の DATA block だけから、抽出器が `drum_patterns.json` と `py
 
 | 条件 | 結果 | 根拠 |
 |---|---|---|
-| (1) run_all の step 15 が fl-win64 だけで SKIP されず動く | **run_all 全体は未達** (取り込み前は前提チェックで rc=2。取り込み後は未実行)。step 15 の 2 行 (抽出と e2e) は単独で実行して PASS、SKIP のガードは外した | §6 (step 15 の抽出・e2e)、§8 |
+| (1) fl-win64 だけで `run_all.sh` が rc=0 になり、step 15 が SKIP されず通る | **達成**: run_all 全体 rc=0 (`== ALL OK`、§8)。step 15 は SKIP ガードなしで実行。素材は fl-win64 と toolchain-emsdk (後者は flpy のビルド道具で FL の素材ではない) | §8、§6 (step 15 の抽出・e2e) |
 | (2) `chord_progression_e2e.mjs` が PASS | 達成: 41/41 PASS × 3 回 | §6 |
 | (3) drum_patterns.json と pyscript の同定経路を書く | 達成 | §4.2 |
 | (4) 所要・load average・PASS/FAIL を書く | 達成 | §6 |
@@ -70,7 +70,7 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 
 - 同定を 2 段にした。第 1 段で全 block を分類し、件数を検証する。第 2 段で書き出す。検証に失敗したら何も書かない。
 - 出力: `<out>/pyscript/{cpt,stack}.pyscript`・`<out>/drum_patterns.json` (いずれもバイト列をそのまま書く)・`manifest.json` の `pyscript` と `drum_patterns` キー。`pyc`・`text`・`skipped` は変えていない。
-- 要約 JSON に `pyscript` と `drum_patterns` の件数を追加 (`drum_patterns` は manifest から数える)。
+- 要約 JSON に `pyscript` と `drum_patterns` を追加。`drum_patterns` は manifest にあれば 1、無ければ 0 で、件数ではなく存在判定。成功時は規則がちょうど 1 block (0 件・2 件以上は exit 3 で何も書かない) なので、成功した run では常に 1。
 - `FL_WIN64_DIR` は `extracted/` を指す契約のまま。
 - `run_all.sh` step 15 は、実行前に `work/fl_extract` を `rm -rf` してから抽出する (古い出力の残骸を残さない。§6 で確認)。`$PY312` と `FL_WIN64_DIR/extracted` を使う。
 
@@ -107,15 +107,42 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 ## 7. 検証範囲
 
 - 範囲内: fl-win64 から抽出器が出す 3 ファイルと、それを入力にした e2e。
-- 範囲外: run_all 全体 (#2649)、実機 FL との照合 (#81)、`flcpt`/`flrack` の関数実装 (#1327)。
+- 範囲外: mac pkg を読む step の実測 (CI に mac pkg の素材が無いため、3b・4 の mac 版・7 は SKIP。#2649 の SKIP 分岐)、実機 FL との照合 (#81)、`flcpt`/`flrack` の関数実装 (#1327)。
 - `FLPY_SKIP_TABLE=1` で `build_flpy.sh` の flapi 表の再生成を省き、追跡済みの `flapi_table.json` を使った。表は更新されていない。
 - toolchain-emsdk は flpy.js のビルドに必要 (`build_flpy.sh` が `EMSDK_DIR` を要求する)。e2e の入力そのものではない。
 - e2e の PASS は「取り出した pyc / pyscript / json が import・exec できる」ことの確認。値の正しさは示さない (§9)。
 
-## 8. run_all 全体の前提チェック
+## 8. run_all 全体 (測定 commit `41d9c3b9`)
 
-main 取り込み前の `bash run_all.sh` (HEAD `0537b23e`、`FL_MAC_DIR` は既定値 = `env.sh` の値のまま): rc=2。`ERROR: 前提不足で停止: …FLEngine_x64.dylib が無い`。step 1 より前で止まり、何も生成しない。mac pkg の `pkg_extract` が無いため。#2649 の範囲なので直していない。
-main 取り込み後 (`ad343fd4`) の run_all 全体は本 run では実行していない (全 step が走るため。#2649 の範囲)。step 15 の 2 行は §6 で再実行した。
+- 測定 commit: `41d9c3b9`。`ad343fd4` 以降の差分は docs だけ (末尾の差分確認)。worktree `ws-2686` を新規作成 (`work/` 無し) し、root で `pnpm install --frozen-lockfile` (rc=0) を済ませてから実行した。
+- 素材: `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`、`extracted/` 25166 件)、`$RUNNER_TEMP/emsdk` (`EMSDK_DIR`、toolchain-emsdk。flpy のビルド道具で FL の素材ではない)。`FL_MAC_DIR=$RUNNER_TEMP/no-such-mac` (存在しないパス) で mac pkg を無しにした。
+- コマンド: `timeout 1200 bash tools/python/run_all.sh` (ログは step の見出しごとに時刻と load を付けて記録)。
+
+**結果: rc=0、最終行 `== ALL OK`。** 18:13:07 から 18:19:47 まで (合計 6 分 40 秒)。開始時の load avg は 1 分 0.95・5 分 0.58 (nproc = 4)。実行後の `git status --short` は空 (追跡ファイルは変わらなかった)。
+
+| step | 開始 | 所要 | load 1 分 (開始時) | 結果 |
+|---|---|---|---|---|
+| 1 inputs (`fetch_inputs.sh`) | 18:13:07 | 1 秒未満 | 0.95 | rc=0 |
+| 2 CPython 3.12.1 wasm (`build_cpython_wasm.sh`、native・wasm を新規ビルド) | 18:13:07 | 241 秒 | 0.95 | rc=0 |
+| 3・3b・4 (MCPTools 解析・65 本の import・flapi 抽出) | 18:17:08 | 2 秒 | 3.06 | 3b と 4 の mac 版は **SKIP** |
+| 5 flpy link (`build_flpy.sh`、flapi 表の再生成を含む) | 18:17:10 | 23 秒 | 2.89 | rc=0 |
+| 6・7 (smoke・builtin 一覧) | 18:17:33 | 1 秒未満 | 3.07 | 7 の `python_inventory` は **SKIP** |
+| 8・8b・9・9b (PoC・kwsig・48 tools・C provider 版) | 18:17:33 | 7 秒 | 3.07 → 2.91 | 48/48 ok (kwsig: misbind 0) |
+| 9c PY-2 (`pybind_extract`・`build_flpy_static`・`static_check`) | 18:17:40 | 6 秒 | 2.75 | STATIC CHECK OK |
+| 9c ilmcp・pyscript・flpianoroll (9c・9c') | 18:17:46 | 4 秒 | 3.01 → 2.93 | ilmcp 25/25、pyscript 72/72、flpianoroll 11/11 (members 64/64) |
+| 9d pyscript を Chrome で実行 (`tools/e2e` の `npm ci` を含む) | 18:17:50 | 18 秒 | 2.93 | 72 checks PASS |
+| 10・10b・11・12 (Chrome・static 比較・MCP UI・MIDI) | 18:18:08 | 9 秒 | 3.06 → 3.12 | BROWSER OK・STATIC BROWSER OK・MCP UI OK・MIDI SCRIPT OK (29 checks、failed 0)・MIDI BUNDLED OK |
+| 13 サブインタプリタ (probe・NEG・旧 flpy.c のネガコン) | 18:18:17 | 82 秒 | 3.12 → 2.07 | SUBINTERP OK (19 checks)・NEG DETECTED・旧版のネガコン DETECTED |
+| 14 MIDI UI (Chrome) | 18:19:39 | 3 秒 | 2.07 | MIDI UI OK |
+| 15 chord progression (抽出 + e2e) | 18:19:42 | 5 秒 | 2.38 | 抽出 rc=0、e2e 41/41 PASS |
+| `== ALL OK` | 18:19:47 | — | 2.35 | rc=0 |
+
+- SKIP は 3 件で、いずれも `MAC_PKG=0` の分岐 (#2649): 3b (`analysis/scripts_inventory.json`)、4 の mac 版 (`analysis/flapi/raw_mac_{x86_64,arm64}.json`)、7 (`analysis/python_inventory.json`)。追跡済みの出力を使った。win64 側 (`raw_win64.json`・`flapi_table`) は実行した。
+- step 5 は `FLPY_SKIP_TABLE` を使わず、flapi 表の再生成を含めて実行した。再生成の結果は追跡ファイルと一致した (`git status` 空)。
+- 9d の `npm warn EBADENGINE`: `agent-browser@0.39.0` は node >= 24 を要求し、実行環境は node v22.23.3。警告のみで、step 9d は PASS した。
+- 取り込み前の `0537b23e` の run_all は、step 1 より前の mac pkg 前提チェックで rc=2 だった (`FLEngine_x64.dylib` が無い)。その後 #2649 で SKIP 分岐が入り、上の結果になった。
+
+差分確認 (測定 commit から現 HEAD まで): `git diff 41d9c3b9 HEAD -- tools/python ':!tools/python/REPORT_PY84.md' | wc -l` の出力は `0`。
 
 ## 9. e2e の mock 条件
 
@@ -152,6 +179,5 @@ cmp work/fl_extract/drum_patterns.json "$FL_WIN64_DIR/extracted/block24797_DATA.
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| run_all 全体の mac 前提チェック (`FL_MAC_DIR` の `pkg_extract` 不在で rc=2) | run_all 全体が通らない。step 1 以降は未検証 | #2649 (PY-83) |
 | mock 値 (`loop_starter_config` の genres 流用・PPQ 96・`pattern_presets.cpt` 空) の実 FL 照合 | e2e の PASS は import・exec 可否の確認まで | #81 (PY-9) |
 | `flcpt` / `flrack` の関数実装 | e2e は属性のダミーで動かしている | #1327 |
