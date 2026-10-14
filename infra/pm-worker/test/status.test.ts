@@ -85,6 +85,8 @@ const ADDED_KEYS = [
   "launch_blocked", "imported_at",
   // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
   "hold",
+  // 率制限の判定 (#2345・CI-66)。alert と、直近の評価の窓 (30 分) の件数・割合
+  "rate_limit_alert", "rate_limit_30m",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];

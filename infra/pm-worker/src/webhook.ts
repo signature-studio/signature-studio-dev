@@ -3,6 +3,7 @@
 import { verifySignature } from "./hmac.ts";
 import { bodyArtLine } from "./launch.ts";
 import { needsPmDecision } from "./needs.ts";
+import { rateMarkRun } from "./ratealert.ts";
 import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
 
 export const DEFAULT_REVIEWER_LOGIN = "oc-reviewer-for-signature-studio[bot]";
@@ -137,9 +138,11 @@ export interface PmState {
   launchedAt: Record<string, string>;
   // issue / PR 番号ごとの終端状態の手がかり
   sig: Record<string, Signal>;
+  // 率制限のマーカー (cause=rate_limit) を付けた run の id ごとの記録 (bot の投稿)。後続のコメントで上書きされない。判定は engine の rateAlert。
+  rateRuns: Record<string, { at: string; issue: number }>;
 }
 
-export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, botReport: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {} };
+export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, botReport: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {}, rateRuns: {} };
 
 export interface WebhookInput {
   secret: string;
@@ -346,8 +349,20 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
   return setSig(s, k, patch);
 }
 
+// 率制限のマーカー (cause=rate_limit run=N) を、bot (実装・reviewer の App) の投稿から run id ごとに残す。issue でも PR でも数える。
+// botLast と違って後続のコメントで上書きされない。同じ run の 2 件目は残さない (先に来たものを残す)。
+function applyRateMarker(s: PmState, p: Json, botLogin: string, reviewer: string): PmState {
+  const c = p.comment;
+  const i = p.issue;
+  if (!c || !i || p.action !== "created" || typeof c.created_at !== "string") return s;
+  if (c.user?.login !== botLogin && c.user?.login !== reviewer) return s;
+  const run = rateMarkRun(c.body ?? "");
+  if (run === undefined || s.rateRuns[String(run)]) return s;
+  return { ...s, rateRuns: { ...s.rateRuns, [String(run)]: { at: c.created_at, issue: i.number } } };
+}
+
 function applyIssueComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = [], reviewer: string = DEFAULT_REVIEWER_LOGIN): PmState {
-  return applySignalComment(applyBotComment(s, p, botLogin, pmLogins), p, botLogin, pmLogins, reviewer);
+  return applyRateMarker(applySignalComment(applyBotComment(s, p, botLogin, pmLogins), p, botLogin, pmLogins, reviewer), p, botLogin, reviewer);
 }
 
 // reviewer の verdict (APPROVED / CHANGES_REQUESTED) を PR の手がかりに反映する。COMMENTED は verdict ではない。
