@@ -4,13 +4,13 @@
 
 ## 1. 測定
 
-- 測定 commit: `dfc7968c` (`origin/main` (`3ef67b40`) を取り込んだ merge commit)。e2e が読むパスのコードを変えた最後の commit。判定データ追記と tsv 再生成は `72fd4a51` で行い、取り込み後の `dfc7968c` で e2e を再測定した。
+- 測定 commit: `dfc7968c` (`origin/main` (`3ef67b40`) を取り込んだ merge commit)。e2e が読むパスは `72fd4a51` から `dfc7968c` まで差分 0 (下の鮮度確認) のため、この commit で e2e を測定した。判定データ追記と tsv 再生成は `72fd4a51` で行った。
 - e2e: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (直列・並列数 1)。
 
 | 実行 | commit | real | uptime load | 結果 |
 |---|---|---|---|---|
 | 判定追記時 | `72fd4a51` | 2m51.9s | 0.99 | rc=0・7/7 |
-| PR 作成時 (merge 後) | `dfc7968c` | 2m1.2s | 0.65 → 0.97 | rc=0・7/7 |
+| 競合解消時 (main 取り込み後) | `dfc7968c` | 2m1.2s | 0.65 → 0.97 | rc=0・7/7 |
 | レビュー (`git archive dfc7968c` で再実行) | `dfc7968c` | 2m35.7s | 0.95 | rc=0・7/7 |
 | 修正 run (worktree で `dfc7968c` を実行) | `dfc7968c` | 2m11.4s ※ | 0.30 → 0.96 | rc=0・7/7 |
 
