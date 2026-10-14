@@ -107,6 +107,21 @@ rc=0
 
 3 版の最後の公開 (05:54:48.543Z) から 24 時間を過ぎるのは 2026-10-15T05:54:48Z 以降。`minimumReleaseAgeExclude` を外すと、それまで frozen lockfile の install が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落ちる (4-1)。
 
+### 4-6. main 取り込み後の再測定 (測定 commit `12aca053`)
+
+§4-1〜4-5 は測定 commit `e11ab9a9` の値。`12aca053` は `origin/main` (`58d1183b`) を取り込んだ merge commit で、`infra/pm-worker` の lockfile・package.json・pnpm-workspace.yaml は `e11ab9a9` と同一。`wrangler.toml` は main と同一。テストは main 側の `refs_orphan` のテストが増えて 201 → 213 件。既定設定・CLI 上書きなし、作業 tree は `12aca053` のまま (`infra/pm-worker` の `node_modules` を削除して再作成)。
+
+| 検証 | 結果 | rc |
+|---|---|---|
+| `CI=true pnpm install --frozen-lockfile` | `✓ Lockfile passes supply-chain policies (verified 1m ago)` → `Packages: +79` → `Done in 66ms using pnpm v12.10.1` (store のキャッシュ済み検証。未キャッシュの検証は §4-1) | 0 |
+| `pnpm test` | tests 213 / pass 213 / fail 0 (15.5 s) | 0 |
+| `pnpm run test:unit` | 10/10 (vitest 783 ms) | 0 |
+| `pnpm run test:workers` | 3/3 (vitest 1.39 s) | 0 |
+| `pnpm exec wrangler deploy --dry-run --outdir <一時 dir>` | Total Upload 109.30 KiB / gzip 33.88 KiB。bindings は `PM` (PmDO) と `[vars]` 10 個 | 0 |
+| `unstable_readConfig` の observability | `{"enabled":true,"head_sampling_rate":1}`・DO binding 1 件 | — |
+
+`git diff 12aca053 HEAD -- infra/pm-worker` の出力は空 (測定後の commit は `tools/pm/` だけを変える)。
+
 ## 5. 未解決
 
 未解決の一覧 (起票先つき) は PR #2586 の本文の未解決表が正本。本書には数値だけを残す。
