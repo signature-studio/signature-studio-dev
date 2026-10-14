@@ -9,6 +9,7 @@
   復元: RetDec の命名 stack_var_X は X = disp - 8。候補の slot X の alloca が無ければ、直下 X-8 が lea で取られた i64 alloca の
         ときは両者を 16B の 1 alloca にまとめる (X-8 が下位・X が上位)。そうでなければ alloca i64 を足す。
         値の store は、insn.addr が元 VA より大きい最初の IR 命令の直前に挿入する。
+        その直前までに基本ブロックの境界 (label・terminator) があるときは戻さない (挿入点の所属ブロックが決まらないため)。
   出力: 復元後 IR と、関数ごとの検出・解決・適用の JSON (--report)。
 """
 import argparse, json, os, re, sys
@@ -148,7 +149,19 @@ def edit(fn, restores, escaped, md, gl_text):
                 return i
         return len(lines) - 1
 
+    def same_block(p):
+        for j in range(p - 1, -1, -1):
+            l = lines[j]
+            if re.match(r'^(?:[A-Za-z0-9_.$-]+:|;\s*<label>:)', l) or re.match(r'^\s+(br|switch|ret|unreachable|indirectbr)\b', l):
+                return False
+            if '!insn.addr' in l and 'alloca' not in l:
+                return True
+        return True
+
     for addr, Xt, kind, pv in sorted(restores):
+        if not same_block(body_pos(addr)):
+            log['skipped'].append(['0x%x' % addr, 'block boundary before insertion point'])
+            continue
         if ensure(Xt) != 'i64':
             log['skipped'].append(['0x%x' % addr, 'target slot not i64'])
             continue
@@ -189,9 +202,10 @@ def main():
     md = {int(n): int(v) for n, v in re.findall(r'^!(\d+) = !\{i64 (\d+)\}', text, flags=re.M)}
     rep = {}
     for va in sorted(wanted):
-        insns = decode(fns.get(va) or [])
-        if not insns:
+        raw = fns.get(va) or []
+        if not raw or not fsp.frame_ops(raw)[2]:
             continue
+        insns = decode(raw)
         cands, restores, escaped = scan(insns, irb.get(va, set()))
         if not cands:
             continue
