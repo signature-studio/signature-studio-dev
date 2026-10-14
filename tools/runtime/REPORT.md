@@ -91,7 +91,7 @@
 - **RT-3 (GUI)** `transferControlToOffscreen` → fl-runtime Worker 内描画、入力イベントを `PumpRing.push` へ (マウス移動 coalesce は producer 側)。`src/index.ts` の `?runtime=` フックと共存。
 - **RT-4 (audio)** worklet は ring 消費専用 (Atomics.wait 不可)。sample clock マスターと underrun 無音ポリシー、ring ABI 共有。
 - **RT-5 (VFS)** OPFS `createSyncAccessHandle` を第一候補、async 必須経路は JSPI または補助 Worker sync-RPC。
-- **RT-6 (plugin loader)** 同時ロード DLL <100 の予算管理 (遅延ロード/アンロード時の参照解放/小プラグイン統合) と 100+ ロードの負荷試験。**予算 + LRU プール + 負荷試験は実装済み** (下記「RT-6 実測」)。未了: 実プラグイン loader への接続・小プラグイン同居 (Refs #125)。
+- **RT-6 (plugin loader)** 同時ロード DLL <100 の予算管理 (遅延ロード/アンロード時の参照解放/小プラグイン統合) と 100+ ロードの負荷試験。**予算 + LRU プール + 負荷試験は実装済み** (下記「RT-6 実測」)。実プラグイン loader への接続は完了 (「RT-6 実 loader 接続」節)。未了: SAB 共有カウンタの既定経路への配線・小プラグイン同居 (Refs #125)。
 - **RT-7 (deploy / M12)** R2: COOP/COEP/CORP 注入、wasm は同一オリジン、`Content-Encoding: br`、hash 名 immutable、`manifest.json` は no-cache。
 - **RT-8 (CI)** lift 成果物ごとに wasm32/wasm64 両ビルドを回し 4GiB 超仮定を早期検出。**OTT 分は実装済み** (`ci/wasm64_check.sh`、下記「RT-8 実測」)。未了: (a) M11 boot closure 等 OTT 以外の target (`ci/targets/<name>.sh` を足す方式)、(b) GitHub Actions への常設 (素材が R2 の work-* のため workflow 化には素材取得の設計が要る)。
 - **RT-9 (互換)** Firefox/Safari マトリクス取得と JSPI/memory64 の機能検出フォールバック設計。
@@ -153,3 +153,32 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 | Kilohearts 47 stub 等の 1 wasm 同居 (prefix + base 割当 + CPU 状態分離。#91 REPORT §7) | pool で追い出せない常駐が 124 を超える場合の最終回避策。未実装 | #96 (HB-H7) に連携コメント |
 | Firefox / Safari の Memory 上限測定 | 予算値 96 は Chrome 実測のみに基づく | RT-9 (#127 系) へコメント |
 | 追い出し時の `dispose` で呼ぶプラグイン終了処理 (FL 側 state 保存) の仕様 | pool は dispose フックだけ提供 | #125 へコメント |
+
+## RT-6 実 loader 接続 (#125 2 回目): PluginPool → hostbridge 実 loader → lowbase 版 OTT
+既知類型との関係 (DEFECTS.md): 該当なし (ランタイム資源管理)。測定 commit `80b69fa2` (コード変更の最終 commit)。`git diff 80b69fa2 HEAD -- tools/runtime/memload/real src/runtime` (測定後の文書のみ commit で差分 0 を確認する行を末尾に付す)。
+- 実装: `tools/runtime/memload/real/real_worker.mjs` (Worker) と `run_real.mjs` (Chrome ドライバ、`pnpm runtime:memload:real`)。`PluginPool` (`src/runtime/memory_budget.ts` を transpile) の loader を hostbridge の `LoadLibraryW` (`prewarm` した EmscriptenGuest を sync 取得) に、dispose を `FreeLibrary` に接続。OTT は `tools/hostbridge/lowbase/retdec/build_m10_lb.sh` の lowbase 版 (LB_BASE 0x10000, initial 24 MiB / max 64 MiB, `ott_hb.wasm` 848,256 B)。host は `retdec/build_host_lb.sh` (`host_vst2.wasm` 3,734 B)。
+- 入力素材 (展開確認済み): `work-m6-ott` (`tools/m10/work/ott_m10.ll` 955,899 B を lowbase 再ビルドに使用)。`plugins-ott` は NSIS インストーラ。`7z x` で取り出した `OTT_x64.dll` (PE32+, ImageBase 0x180000000, SizeOfImage 0x308000, 3,146,752 B) を `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` として配置。`toolchain-emsdk` は runner の `/opt/emsdk` (emcc 6.0.12) を使用 (artifact は展開していない)。`toolchain-retdec` は ott_m10.ll があるため不使用。
+- 試験内容: 150 種の alias (同一 OTT ファイル、各々独立の Memory) を sweep で 1 回ずつ pin、続けて 170 回の偏った pin (70% が先頭 40 種、同時 pin 最大 3)。cap は `DEFAULT_PLUGIN_CAPACITY` 96。cold ロード直後の初回 block (128 frame) の出力 sha256 を基準 (同ページ内の最初の cold ロード) と照合。warm pin はパラメータ読み戻し (param 0 = 0.5) で instance の取り違えを見る。最後に全 unpin → 全 unload。
+- 実測 (コミット済み `80b69fa2` を clean worktree で 3 回, Chrome 154.0.8037.97, 4 vCPU, 1 分 loadavg 0.58→1.70 (各回開始時)):
+  | 項目 | run1 | run2 | run3 |
+  |---|---|---|---|
+  | pool 試験 PASS (pins 320 / loads 165 / evictions 69 / 生存 96 / peakSize 96 / peakInUse 96) | PASS | PASS | PASS |
+  | cold 照合 (165 件) 全て基準と bit 一致 / warm pin param 不一致 | 0 / 0 | 0 / 0 | 0 / 0 |
+  | 全 unload 後 size / inUse / bridge 登録 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 |
+  | 試験本体 run (Chrome 内) | 1.85 s | 1.86 s | 1.81 s |
+  | ネガコン neg_cap130 (cap を実測上限超) | OOM at load 124 | OOM at load 124 | OOM at load 125 |
+  | ネガコン neg_nofree (dispose で FreeLibrary しない) | OOM at load 124 | OOM at load 124 | OOM at load 124 |
+  | ALL PASS / exit / wall | ALL PASS / 0 / 7.05 s | ALL PASS / 0 / 6.92 s | ALL PASS / 0 / 7.09 s |
+- 判定: 累計ロード 165 (> 124)、追い出し 69 で生存は 96 以下。実 OTT lowbase で、Memory 個数上限 (124) を超えるロードを pool 経由で通した。
+- 実測で確定した事項: (a) `FreeLibrary` が Memory 参照を落とす唯一の経路 (dispose で呼ばないと bridge が握り続け、pool の追い出しに関係なく 124 で OOM)。(b) `host_close` は単一の `g_info.hmodule` (最後に load した plugin) を解放するため、任意の plugin の解放には使えない。pool は `bridge.FreeLibrary(handle)` を直接呼ぶ。(c) 採番の衝突 (コードから導出、再現試験は未実施): `hb_bridge.mjs` の `LoadLibraryW` は `handle = HMODULE_BASE + (loaded.size + 1) * 0x10000` で採番するため、解放後の再ロードが既存 handle と一致し得る。本試験は `PoolBridge` (LoadLibraryW を単調採番に置換した派生クラス) で回避し、共有 poc 側は未修正。
+- 範囲外 / 検証範囲: Chrome 154 のみ (Firefox/Safari 未測定)。Worker 1 本のみ (per-thread カウンタ、SAB 共有カウンタは未配線)。異なる DLL の同時ロードは未実施 (plugins-ott は OTT のみ)。cold 照合の基準は node 参照ではなく同ページの最初の cold ロード (node との bit 突合は lowbase e2e 側で 500 block 実施済み)。warm pin は OTT が block 間で DSP 状態を持つため出力を照合しない。
+- 再現: `bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh` (前提: `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll`、`tools/m10/work/ott_m10.ll`) → `bash tools/hostbridge/lowbase/retdec/build_host_lb.sh` → `pnpm runtime:memload:real` (`--pos-only` / `--neg-only` 可)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `MemoryBudget` の SharedArrayBuffer カウンタを `PluginPool` の既定経路 (Worker) に配線し、main+Worker 合算の 124 を pool 経路で試験 | 本試験は per-thread カウンタ。実運用の上限は未検証 | #125 (次 run) |
+| `hb_bridge.mjs` `LoadLibraryW` の handle 採番 (`loaded.size + 1`) の解放後衝突を再現し、共有 poc 側を修正 | 本試験は派生クラスで回避。共有 poc は未修正 | #125 (次 run) |
+| dispose 時の FL 側 state 保存仕様 | pool は dispose フックだけ提供 | #125 へコメント |
+| 常駐が 124 超の 1 wasm 同居 | 既存 | #96 (HB-H7) |
+| Firefox / Safari の Memory 上限 | 既存 | #127 (RT-9) |
+| OTT 以外の DLL (freshair / serum2 / massivex) の同時ロード | 異なる lift 系統の実 DLL は未試験 | PM 判断 (素材追加依頼) |
