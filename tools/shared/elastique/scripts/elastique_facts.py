@@ -158,6 +158,15 @@ def main():
             v, = struct.unpack_from("<Q", image, i)
             if inside(v, ipp):
                 ptrs += 1
+    linear = collections.Counter()
+    rip_linear = 0
+    for ins in insns(txt[0], txt[1]):
+        if ins.mnemonic in ("call", "jmp") and ins.operands and ins.operands[0].type == CS_OP_IMM:
+            if inside(ins.operands[0].imm, ipp):
+                linear[ins.operands[0].imm] += 1
+        for op in ins.operands:
+            if op.type == CS_OP_MEM and op.mem.base == X86_REG_RIP and inside(ins.address + ins.size + op.mem.disp, ipp):
+                rip_linear += 1
     callee_sizes = []
     pd_starts = {a: b for a, b in funcs}
     for t in entry_sites:
@@ -179,6 +188,10 @@ def main():
         "text_to_ipp_call_sites": sum(entry_sites.values()),
         "text_to_ipp_entries_distinct": len(entry_sites),
         "text_to_ipp_entries_with_pdata": len(callee_sizes),
+        "text_linear_ipp_sites": sum(linear.values()),
+        "text_linear_ipp_entries": len(linear),
+        "ipp_entries_union": len(set(linear) | set(entry_sites)),
+        "ipp_entries_only_outside_pdata": len(set(linear) - set(entry_sites)),
         "text_funcs_calling_ipp": len(callers),
         "text_to_ipp_entry_pdata_size_min_med_max_sum": [
             callee_sizes[0], callee_sizes[len(callee_sizes) // 2], callee_sizes[-1], sum(callee_sizes)
@@ -187,9 +200,10 @@ def main():
         "ipp_indirect": dict(ipp_ind),
         "text_indirect": dict(text_ind),
         "rip_refs_text_to_ipp": text_rip_ipp,
+        "rip_refs_text_to_ipp_linear": rip_linear,
         "rip_refs_ipp_to_ipp": ipp_rip_ipp,
         "abs_8byte_ptrs_into_ipp": ptrs,
-        "entry_addresses": [hex(t) for t, _ in entry_sites.most_common()],
+        "entry_addresses": [hex(t) for t in sorted(set(linear) | set(entry_sites))],
     }
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(os.path.join(OUT_DIR, "facts.json"), "w") as f:
