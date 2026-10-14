@@ -74,3 +74,4 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 ### D-2. 検証
 
 - 測定 summary (`work/dynamics/engine<B>/summary.csv`) は `work/` (gitignore 対象) にあり commit しない。
+- コード差分 (§D の「出力は 0 行」の根拠・`docs/WORKFLOW.md` §6): `git diff 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics ':!*.md' | wc -l` → **0**。 `:!*.md` を外すと文書差分 54 行 (`REPORT.md` 1 行 + `REPORT_APPENDIX.md` 34 行 + 本節の追記分)。 `git diff --stat 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics` は `REPORT.md` と `REPORT_APPENDIX.md` の 2 件のみ。 測定 commit `30a7b5b4` は HEAD の祖先。
