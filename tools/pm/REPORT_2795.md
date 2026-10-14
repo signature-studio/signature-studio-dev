@@ -5,17 +5,31 @@
 
 ## 0. 結論
 
-- 測定 commit `dc2723cc` で、node:test 344 件・vitest unit 45 件・vitest workers 7 件がすべて PASS。変異テストは 7 変異すべて killed (§2・§3)。
+- 測定 commit `3fb1dd18` (origin/main `b2b052ce` の取り込み後) で、node:test 353 件・vitest unit 45 件・vitest workers 7 件がすべて PASS。変異テストは 7 変異すべて killed (§2・§3)。
+- 取り込み前の `dc2723cc` では node:test が 344 件。増えた 9 件は main の `test/demote_shadow.test.ts` (§1)。
 - 本番 `/status` (2026-10-14T19:54:43Z・読み取りのみ) には `launch_halted` のキーが無い。本番は未 deploy のため (§4)。停止区間は無く、`imported_at` は設定済み。
 - 本番の launch の挙動はまだ変わらない。deploy 後の停止の観測は未測定 (§5)。
 
 ## 1. 測定の対象
 
-- 測定 commit: `dc2723cc` (`fix(pm-worker): limit the no-import notes to IMPORT_REQUIRED=1 (#2795)`)。pm-worker のコードや文書を変えた最後の commit。
-- 差し戻し (`2c8eb023` の review) への対応: README 15 行目の『取り込み前は launch しない』を `IMPORT_REQUIRED=1` のときだけに限定した。minor への対応で、`src/engine.ts` の同じ趣旨のコメント 1 行も限定した。
-- レビューは `2c8eb023` から HEAD までの差分 0 を想定していたが、engine.ts のコメントを 1 行変えたため差分は 1 行ある (下の出力。挙動は変わらない)。そのため測定 commit `dc2723cc` で全テストを取り直した (§2)。
-- 測定 commit から HEAD までの差分 (付録の commit は `tools/pm/` と `docs/DOC_MAP.md` だけを変える): `git diff dc2723cc HEAD -- infra/pm-worker` は 0 行。
-- レビュー時の head `2c8eb023` から測定 commit までの差分 (`git diff 2c8eb023 dc2723cc -- infra/pm-worker ':!infra/pm-worker/README.md'`。README の変更は 1 行で、実行されない文書):
+- 測定 commit: `3fb1dd18` (`Merge remote-tracking branch 'origin/main' into 2795-pm-launch-halt`)。`infra/pm-worker` を変えた最後の commit。
+- 経緯 (時系列):
+  - `2c8eb023`: レビュー時の head。本 PR の実装。
+  - `dc2723cc`: 差し戻し (review round 1) への対応。README 15 行目の『取り込み前は launch しない』を `IMPORT_REQUIRED=1` のときだけに限定した。minor への対応で、`src/engine.ts` の同じ趣旨のコメント 1 行も限定した。
+  - `e8102f9e`: 本付録と `docs/DOC_MAP.md` の索引。`tools/pm/` と `docs/DOC_MAP.md` だけを変える。
+  - `3fb1dd18`: origin/main `b2b052ce` を取り込んだ merge。`docs/DOC_MAP.md` の表の衝突 1 件を解消した (両方の行を残し、`tools/pm/REPORT.md` の目安は main の `~250` を採用)。
+- レビューは `2c8eb023` から HEAD までの差分 0 を想定していた。実際には、コメント 1 行の変更と main の取り込みで差分が出た。そのため測定 commit `3fb1dd18` で全テストを取り直した (§2)。
+- main の取り込みで `infra/pm-worker` に入った変更 (`git diff --stat dc2723cc 3fb1dd18 -- infra/pm-worker`):
+
+```
+ infra/pm-worker/src/app.ts                 |   8 +
+ infra/pm-worker/src/engine.ts              | 143 +++++++++++++++--
+ infra/pm-worker/test/demote_shadow.test.ts | 244 +++++++++++++++++++++++++++++
+ infra/pm-worker/test/status.test.ts        |   3 +-
+ 4 files changed, 386 insertions(+), 12 deletions(-)
+```
+
+- レビュー時の head `2c8eb023` から `dc2723cc` までの差分 (`git diff 2c8eb023 dc2723cc -- infra/pm-worker ':!infra/pm-worker/README.md'`)。README の変更は 1 行で、実行されない文書:
 
 ```diff
 diff --git a/infra/pm-worker/src/engine.ts b/infra/pm-worker/src/engine.ts
@@ -33,22 +47,25 @@ index 89059e7d..0e242b15 100644
        blocked: c("blocked"),
 ```
 
+- 測定 commit から HEAD までの差分: `git diff 3fb1dd18 HEAD -- infra/pm-worker` は 0 行 (付録の commit は `tools/pm/` と `docs/DOC_MAP.md` だけを変える。§6)。
 
-## 2. テスト (`infra/pm-worker`・測定 commit `dc2723cc`)
+## 2. テスト (`infra/pm-worker`・測定 commit `3fb1dd18`)
 
-測定はコミット済みの作業ツリー (`git status` は clean) で行った。依存は `pnpm install --frozen-lockfile` (2.1 s。`vitest` 4.1.11・`@cloudflare/vitest-plugin` 1.4.1・`wrangler` 4.150.0)。Node は v22.23.3。
+測定はコミット済みの作業ツリー (`git status` は clean) で行った。依存は `pnpm install --frozen-lockfile`。Node は v22.23.3。
 
 | コマンド | 件数 | 結果 | 所要 (real) | load (1 分平均) |
 |---|---:|---|---:|---|
-| `node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` (n=3) | 344 | 344 PASS / 0 FAIL (3 回とも) | 12.77〜13.18 s (min–max) | 開始時 0.47・1.14・1.46 |
-| `npm run test:unit` (`vitest run --config vitest.unit.config.ts`・fetch モック) | 45 (4 files) | 45 PASS / 0 FAIL | 1.91 s | 0.78 → 0.78 |
-| `npm run test:workers` (`vitest run --config vitest.config.ts`・workerd・実 Durable Object) | 7 (2 files) | 7 PASS / 0 FAIL | 2.25 s | 0.72 → 0.72 |
-| `node --experimental-strip-types --no-warnings --test test/halt.test.ts test/halt_engine.test.ts` | 8 (本 PR の新規。`halt.test.ts` 6・`halt_engine.test.ts` 2) | 8 PASS / 0 FAIL | — | — |
+| `node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` (n=3) | 353 | 353 PASS / 0 FAIL (3 回とも) | 13.35〜13.45 s (min–max) | 開始時 0.23・0.75・1.50 |
+| `npm run test:unit` (vitest unit・fetch モック) | 45 (4 files) | 45 PASS / 0 FAIL | 1.70 s | 1.29 → 1.29 |
+| `npm run test:workers` (vitest + workerd・実 Durable Object) | 7 (2 files) | 7 PASS / 0 FAIL | 2.12 s | 1.29 → 1.29 |
+| `npm run test:mutation` | 7 変異 | killed 7・survived 0 | 2.52 s | 1.29 → 1.27 |
+| `node ... test/halt.test.ts test/halt_engine.test.ts` | 8 (本 PR の新規。6 + 2) | 8 PASS / 0 FAIL | — | — |
+| `node ... test/demote_shadow.test.ts` (main 取り込みの新規) | 9 | 9 PASS / 0 FAIL | — | — |
 
-- node:test の件数 344 のうち本 PR の新規は 8 件。既存の `test/status.test.ts` の snapshot にキーを 2 つ足した (件数は増えない)。
-- 単発の所要 (node:test の `# duration_ms`) は 12,749 ms。unit・workers の件数と結果は n=1。
+- 旧値 (取り込み前の `dc2723cc`・同じ手順): node:test 344 件 (n=3・12.77〜13.18 s)、vitest unit 45、vitest workers 7、変異 7 killed。main の取り込みで node:test の件数だけが増えた (344 + 9 = 353)。
+- `halt*.test.ts` の 8 件は、本 PR の既存の 344 件の内訳に含まれる。既存の `test/status.test.ts` の snapshot にキーを 2 つ足した (件数は増えない)。
 
-## 3. 変異テスト (`npm run test:mutation`・測定 commit `dc2723cc`)
+## 3. 変異テスト (`npm run test:mutation`・測定 commit `3fb1dd18`)
 
 `scripts/mutation_halt.mjs` が規則を 1 か所ずつ壊し、`test/halt.test.ts` と `test/halt_engine.test.ts` が落ちることを確かめる。各変異の後は元の `src/` に戻す (`finally`)。終了後の `git status` は clean。
 
@@ -62,11 +79,11 @@ index 89059e7d..0e242b15 100644
 | 6 | 条件が 0 になっても区間を消さない | `src/halt.ts` | killed |
 | 7 | 同じ停止区間の重複抑止 (`notifiedAt`) を外す | `src/halt.ts` | killed |
 
-結果: `mutants=7 survived=0` (2.47 s。load 0.74 → 0.92)。
+結果: `mutants=7 survived=0` (2.52 s。load 1.29 → 1.27)。
 
 ## 4. 本番 `/status` (読み取りのみ)
 
-- 取得: `GET https://signature-studio-pm.pycabbage.workers.dev/status` (URL は `tools/pm/worker_url`)。取得時刻 2026-10-14T19:54:43Z。書き込みは行っていない。
+- 取得: `GET https://signature-studio-pm.pycabbage.workers.dev/status` (URL は `tools/pm/worker_url`)。取得時刻 2026-10-14T19:54:43Z。書き込みは行っていない。測定 commit とは独立 (本番は本 PR のコードを含まない)。
 - 本番 Worker は未 deploy で、`launch_halted` と `launch_halted_overdue` のキーを返さない (`has("launch_halted") = false`)。以下は既存の項目の値。
 
 | キー | 値 (19:54:43Z) |
@@ -101,6 +118,6 @@ node --experimental-strip-types --no-warnings --test 'test/*.test.ts'
 npm run test:unit
 npm run test:workers
 npm run test:mutation
-git diff dc2723cc HEAD -- infra/pm-worker
+git diff 3fb1dd18 HEAD -- infra/pm-worker
 curl -fsS "$(tr -d '\n' < ../../tools/pm/worker_url)/status"
 ```
