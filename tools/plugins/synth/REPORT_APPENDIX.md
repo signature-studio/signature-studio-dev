@@ -208,3 +208,27 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 - 欠落 define は **211 → 209** (B 25,828 → 25,411)。 defines 1391 → 1393 (+2)。 参照欠落 `missing_ref` 67 は不変 (改名は `@<名前>` の参照も書き換えるが、欠落参照の集計は変わらなかった)。
 - 受入条件 `missing_define` = 0 は **未達**。 残り 209 件は §C-1 (a) の RetDec 静的検出 (`statically linked function`) で、 `PLUG_NO_STATIC_DETECT=1` (#1486 の opt-in) の既定化が要る。 起票先: #1536。
 - `emcc -c` は既定・opt-in とも rc 1 (E3 が先に止める)。 両者の `first_errors.txt` は同一。
+
+## F. main (ba4babca) での 9 本再測定と known.json 更新 (#534)
+
+- 測定 HEAD: **ba4babca** (origin/main)。 コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/plugins/synth/cpp_lift.sh <block> 2400` を 9 本 `xargs -P 3`。 既定 `HLL_CAP=300`、既定の opt-in (`PLUG_I32PTR_FUNCS` は 21202 のみ既定で ON)。 素材 `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` を `$HOME/artifacts` から展開して使用。
+- 総経過 **569 s** (9 本、終了コード 0 が 9 本)。 load (測定後) `2.04`。
+
+| block | 名前 | pdata | lift_rc | defines | f80 | unimpl | i256 | emcc_c_rc | missing_define | lift_s |
+|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| 21202 | BooBass_Eng | 1,579 | 0 | 1,393 | 0 | 2 | 3 | **0** | 211 | 61 |
+| 23914 | Kepler engine | 3,194 | 0 | 3,697 | 0 | 34 | 3 | **0** | 2 | 219 |
+| 23916 | Kepler Exo engine | 3,193 | 0 | 3,694 | 1 | 35 | 3 | 1 | 2 | 243 |
+| 23944 | Morphine | 3,050 | 0 | 3,321 | 0 | 41 | 24 | **0** | 1 | 471 |
+| 24159 | PoiZone engine | 1,638 | 0 | 1,790 | 0 | 36 | 3 | **0** | 1 | 63 |
+| 24163 | Sakura engine | 1,644 | 0 | 1,707 | 1 | 21 | 3 | 1 | 1 | 79 |
+| 24167 | Sawer engine | 1,676 | 0 | 1,833 | 1 | 22 | 3 | 1 | 1 | 78 |
+| 24216 | Toxic Biohazard | 1,841 | 0 | 1,927 | 1 | 30 | 3 | 1 | 1 | 141 |
+| 24298 | Transistor Bass engine | 3,257 | 0 | 3,741 | 0 | 21 | 3 | **0** | 2 | 189 |
+
+- `emcc -c` 通過 **5/9**: 21202 BooBass_Eng (E3 は `PLUG_I32PTR_FUNCS` の既定化で解消)・23914・23944・24159・24298。 不通過 4 本は f80 libcall (`fp_round` / `fp_extend` 系、23916・24163・24167・24216)。
+- 21202 の `missing_define` は 211 のまま (#1301・#1486・#1536 の範囲)。 9 本とも `missing_define` は 0 ではない (1〜211) ため、受入条件は未達。
+
+### known.json の更新
+- `judge.py` (judge only, C++ 9 行) の結果は **FIXED 1 (21202 の `emcc_c_rc`)**。 FIXED は exit 1 になるため、21202 の `emcc_c_rc` を `known.json` から外した。 変更後の判定: `judge: 9 rows; PASS 0 / KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0`、exit 0。
+- 判定 CSV は `cpp_lift.sh` の summary.csv を `mk_status.py` と同じ列対応で並べて作った (shell 12 本は未測定のため、`synth_e2e.sh` 全体の判定は未実行)。

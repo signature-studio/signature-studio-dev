@@ -3,7 +3,6 @@
   "name": "BooBass (cpp-engine)",
   "fails": [
    "declares_unimpl",
-   "emcc_c_rc",
    "i256_trap",
    "missing_define"
   ],
