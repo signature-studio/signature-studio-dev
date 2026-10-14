@@ -1,6 +1,6 @@
 # REPORT — GUI-3 (#174): 実 FLEngine の lift に GUI shim を結合する
 
-**判定: 部分達成 (受入条件 1 は未達。現 HEAD の flengine e2e は `c4e3c064` で 14/14 PASS・rc 0 (§6c-4)。旧 `f1e88c82` の 13/14 (S1 FAIL) は §6c-3 の履歴。PR は `Refs #174`)**。§1〜§5 の数値・記述は旧 HEAD `52e6bd57` 時点のもの (参考)。現 HEAD の実測は §6 を正とする。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
+**判定: 部分達成 (受入条件 1 は未達。過去の `c4e3c064` の 14/14 PASS (§6c-4) は当時の値。HEAD `bf9cf547` の flengine e2e は judge 13/14 (S1 FAIL。§6d を正とする)。PR は `Refs #174`)**。§1〜§5 の数値・記述は旧 HEAD `52e6bd57` 時点のもの (参考)。現 HEAD の実測は §6 を正とする。実 FLEngine (m11 closure, `FLEngine_x64.dll` の 7,421 関数 lift) に `tools/gui` shim を全 TU `-pthread` でリンクし、
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
@@ -135,7 +135,44 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 実行: `ANALYSIS_DIR=$RUNNER_TEMP FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=<pefile・capstone の venv>:$PATH bash tools/gui/flengine/e2e.sh` (現 HEAD = `3885765a`。main `6aa4b397` 取込済 (`de8d603e`)、REPORT・probe.json のみ変更。runner 4 vCPU, 直列)。
 素材の前提 (本 run で確認): `$HOME/artifacts` の `fl-win64` / `work-m11` / `toolchain-emsdk` / `toolchain-retdec` を展開し、`tools/m11/m11_gen_ir2.sh` を素材 `tools/m11/work/` で 1 回実行 (`ir_conditions.json` の `ldfix=applied`、gitignore 対象で commit なし)。`apt-mingw` は `/usr/bin/x86_64-w64-mingw32-gcc`。
 
-### 現 HEAD `3885765a` の実測 (本節を正とする)
+| 回 | rc | 所要 (e2e.sh の done) | load 開始 → 終了 | judge | native selftest (`tools/gui/test`) | ネガコン |
+|---|---|---|---|---|---|---|
+| 1 | 0 | 137 s | 1.14 0.99 0.74 → 1.12 1.03 0.80 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| 2 | 0 | 146 s | 1.03 1.02 0.79 → 1.02 1.03 0.84 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| 3 | 0 | 143 s | 1.02 1.03 0.84 → 1.26 1.11 0.90 | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| HEAD 545883bb (main 33fd25a2 取り込み後・1 回) | 0 | 206 s | 1.03 0.96 0.55 → 1.08 1.02 0.66 (done 行) | 12/12 PASS | 433 passed / 0 failed | 5/5 期待どおり FAIL |
+| HEAD 7d44c033 (main 6aa4b397 取り込み後・1 回) | 0 | 172 s (done 行) | 0.99 1.07 0.67 → 1.02 1.05 0.74 | 12/12 PASS | 500 passed / 0 failed (件数増加の原因は未確認) | 5/5 期待どおり FAIL |
+| HEAD 40e4e4b0 (本 PR 現 head・1 回) | 0 | 209 s (done 行) | 0.78 0.95 0.59 → 1.16 1.04 0.71 | 12/12 PASS | 500 passed / 0 failed | 5/5 期待どおり FAIL |
+
+- 3 回の一致: B1 `units_run 52 (base 52)` / `threw memory access out of bounds (base 同じ)`、L1 undefined/sigmismatch/duplicate `0/0/0`、A1 `177 = 177 (impl 159 / stub 18)`、S1 `871/1/47/23/0 (base 871/1/47/23/0)`、S2 `LoadImageW` のみ fail-fast (ff 1 unit) = soft STUB、R1 first `LoadStringW` ×3、R2 reached 32 (floor 19)、P1 atoms `[-16383, -16382]` / `RegisterClassW=2 CreateWindowExW=3`、P4 hwnd `0x210000e`。
+- 所要は 137–146 s (e2e.sh の done 行。wall は run1 137 s・run2 146 s・run3 143 s)。runner 4 vCPU。
+- IR provenance (`results/ir_sha256.txt`): 素材 `boot_final.ll` `69c774de…`・`boot_final3.ll` `010451ad…`。step 0 で複製側に `m11_gen_ir2.sh` を回して作り直した IR (ldfix=applied) を測定元にした。その後 `m11_build.sh` 後の sha256 は `boot_final.ll` `2be93e55…`・`boot_final3.ll` `ac64ad01…` (全文は results/ir_sha256.txt)。旧 REPORT の `30a4e00d…` / `4f0a0cc6…` は旧版の IR で、現 head の IR とは一致しない。
+- 親 `bash tools/gui/e2e.sh` (受入条件 2): **ALL PASS / rc 0** (本 HEAD `40e4e4b0`、1 回・wall 3 分 18 秒 (198.8 s)、present-e2e 段の load 1.16 → 1.55)。事前に `pnpm install --frozen-lockfile` と `tools/e2e` の `npm ci` を実行 (step 6 の agent-browser 依存のため。いずれも rc 0)。同 HEAD の 1 回目 (`pnpm install` 前) は `tsc` 不在で rc 127、2 回目 (`tools/e2e` の `npm ci` 前) は step 6 の `agent-browser` 不在で rc 2。いずれも依存未導入で、ASan 由来ではない。
+
+### HEAD `0246df1f` の e2e 実測 (本 PR 検証。`bash tools/gui/flengine/e2e.sh`)
+実行: `RETDEC=<[RETDEC] の retdec-decompiler> ANALYSIS_DIR=<$RUNNER_TEMP> FL_WIN64_DIR=<[WIN64]> EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/gui/flengine/e2e.sh` (runner 4 vCPU、直列、開始 load 0.22 / 終了 1.02)。
+
+| rc | 所要 (done 行) | judge | native selftest | ネガコン |
+|---|---|---|---|---|
+| 0 | 457 s | 14/14 PASS | 504 passed / 0 failed | 9/9 期待どおり FAIL (NC N1〜N9) |
+
+- 親 `bash tools/gui/e2e.sh` (HEAD `0246df1f`・1 回): **rc 0 / ALL PASS**、wall 209 s (シェルで開始・終了時刻を取った実測)。前提欠如は 2 回: `tsc` 不在 (rc 127、`pnpm install --frozen-lockfile` で解消) と `agent-browser` 不在 (rc 2、`tools/e2e` の `npm ci` で解消)。どちらも ASan 由来ではない。
+- `results/` は e2e が再生成した。`wasm_size` 6912872 → **6913035**、`ir_sha256.txt` の `material` / `after_m11_build` は変化 (`boot_final.ll` `e9aa138e…`・`boot_final3.ll` `5586d206…`)。`c994306b` の値とは一致しない。
+- `results/probe.json` は本 e2e で変化なし (git 上で差分無し)。`util_window.ret` = `0x1100010` の値は c994306b の再生成物のまま。本 e2e のログに `util_window.ret` は出ない (P4 の `TApplication` hwnd = `0x110000f` のみ確認)。`REPORT_564.md` §4 の 0x110000f (f4_e2e の post 実測) との差は未解決。
+- **HEAD `530fb5ef` の再実行** (foreground 1 回・`EMSDK_ENV` と `FL_WIN64_DIR` 指定、`RETDEC` は絶対パス指定): **459 s, rc 0**。judge **14/14 PASS**、ネガコン 9/9 期待どおり FAIL、native selftest **504 passed / 0 failed**。`P4` hwnd `0x110000f`、`P5` hwnd `0x110000e`。`S1` 871/1/47/23/0 = base。`results/probe.json` の `util_window.ret` = `0x1100010` は、この e2e が使う flengine 複製 tree の IR から作った wasm の値。f4_e2e の post (`tools/m11/work` の IR) では `0x110000f`。build 差ではないことを `703b4857` で同一 tree の ff/soft 比較により確認済み (§6 現 HEAD 節)。
+- 旧 `40e4e4b0` の値 (selftest 500/0・judge 12/12) は本 HEAD で 504/0・14/14 に変わった。増分の原因は未確認。
+
+### HEAD `703b4857` の実測 (main `b892fdc6` 取り込み後・本 PR の最終 HEAD。本節を正とする)
+
+| 対象 | rc | 所要 | 結果 |
+|---|---|---|---|
+| `bash tools/gui/flengine/e2e.sh` (foreground 1 回) | 0 | **464 s** (done 行) | judge **14/14 PASS**、native selftest **504 passed / 0 failed**、ネガコン N1〜N9 期待どおり FAIL。S1 `871/1/47/23/0` = base。`probe.json` の `util_window.ret` = `0x1100010` (flengine 複製 tree の IR) |
+| `bash tools/gui/e2e.sh` (親, foreground 1 回) | 0 | **214 s** | **ALL PASS** (`SKIP_NATIVE` 無し。native selftest 504 / 0 も含む) |
+| 同一 tree の ff / soft 比較 (`probe.mjs`, 同 HEAD) | 0 / 0 | — | ff `ret 0x1100010` = soft `ret 0x1100010` (build 差は無し)。窓: `TLightweightLayeredControl` 0x110000e、`TApplication` 0x110000f |
+
+- ret の出所: `f4_e2e` の post (`0x110000f`) は `tools/m11/work` の `boot_final.ll` (sha256 `fd059f2f…`)、本 e2e の probe (`0x1100010`) は複製 tree の `boot_final.ll` (sha256 `a57be8fd…`) から作った wasm の値。同じ tree の ff/soft では一致するため、差は IR の出所によるものと推定 (未判定)。
+
+### 旧 HEAD `3885765a` の実測 (参考)
 
 | 対象 | rc | 所要 | 結果 |
 |---|---|---|---|
@@ -287,6 +324,43 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 - `tools/gui/flengine/e2e.sh` の前提: `x86_64-w64-mingw32-gcc` は runner 既定に無く `apt-get install gcc-mingw-w64-x86-64` が要る (`oc_artifacts` の `apt-mingw` で入る)。
 - `tools/m11/m11_survey.mjs` 単体の `M11_SURVEY_UNITS` 出力は、`run.mjs` と同じ `[i, label]` 形式ではなく `label` の配列 (`perUnit` は文字列配列)。比較時は index で突き合わせる。
 
+## 6d. 現 HEAD 節 (review #577 対応。HEAD `bf9cf547`)
+
+review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応。
+
+- **S1 の切り分け (実測)**: baseline と soft は **同じ `run.mjs --survey` 経路・同じ VA 予算 256 MiB** で取っており、予算の差ではない (前回の「baseline は m11_survey.mjs 既定 256 MB」は `e2e.sh` の経路変更で成立しなくなっていた)。`baseline_base_survey.json` と `survey_soft_units.json` を unit 別に突き合わせると、差は **unit 304 と 555 の 2 件のみ** (base `ok` / soft `memory access out of bounds` の trap)。ok/trap 以外の差は無い。shim の有無で build が違うため、この 2 件は shim 組込み後の wasm 側の挙動差 (未特定)。
+- 単独 unit の再現 (`m11_base.cjs` / `m11_gui_soft.cjs` を unit 304・555 で単独実行) は、両方とも trap したため切り分けに使えず、原因は未特定。
+- **判定**: S1 は FAIL のまま (870/1/47/24/0 vs 872/1/47/22/0)。判定を PASS に動かす変更は入れていない。judge 13/14。
+- `run.mjs` 4 行目のコメントを実装 (既定 256 MiB) に合わせた。
+
+本節の実測は **HEAD `125fefd2`** (コード差分なし。`bf9cf547` の測定値を含む) で取り直した値。実行環境: runner 4 vCPU、`apt-mingw` (`x86_64-w64-mingw32-gcc`) を apt 導入、`[EMSDK]` (`EMSDK_ENV` で指定)、`fl-win64` / `work-m11` を展開。
+
+| 実行 (HEAD `125fefd2`・foreground・1 回) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> FL_WIN64_DIR=<[WIN64]> ANALYSIS_DIR=… RETDEC=<[RETDEC] の retdec-decompiler> bash tools/gui/flengine/e2e.sh` | **1** | 466 s (load 0.68→1.09) | judge **13/14**。S1 のみ FAIL: `870/1/47/24/0` vs base `872/1/47/22/0`。他 13 gate PASS (L1×2・A1 declare=193 adapter=193 impl=173 stub=20・B1 units 52・R1 LoadStringW・R2 reach 33≥19・S2・P1〜P5・W1)。ネガコン N1〜N9 期待どおり FAIL。selftest 506 passed / 0 failed |
+| `EMSDK_ENV=… FL_WIN64_DIR=… bash tools/m11/ldfix/f4_e2e.sh` | **0** | 385 s (load 1.00) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待行付き FAIL。RegisterClassW 2→2→3。`function_52a7f0` ret pre `0x0` → noand `0x0` → post **`0x110000f`**。survey pre/noand/post = `870/1/47/24`。`ir_sha256.txt` の `after_m11_build` 行は再生成で変化 (下記 §6d-2) |
+| `EMSDK_ENV=… FL_WIN64_DIR=… bash tools/gui/e2e.sh` | **0** | 302 s (load 2.28) | ALL PASS (SIMD / present / input / stress (negctl 2/2 exit 1) / pe_image / selftest 506/0) |
+
+**S1 の判定**: 上表のとおり FAIL のまま。判定式は変えていない。unit 304 / 555 の差 (soft 側のみ `memory access out of bounds`) の原因は未特定。同じ unit 304 / 555 の oob を扱う OPEN issue として [M11-N78] #1275 (`ClassCreate ON で unit 304/555 が oob→abort`) があるが、原因が同一かは未確認。起票先は #1275 にコメントで接続する。
+
+### 6d-2. `function_52a7f0` の ret 値の対応 (同一 build 内の不整合ではない)
+
+| 測定元 | IR の作り方 | 窓の採番 (probe) | `function_52a7f0` ret |
+|---|---|---|---|
+| `f4_e2e.sh` post (`0246df1f`〜`125fefd2`) | `m11_gen_ir2.sh` → `m11_build.sh` | `TLightweightLayeredControl` = `0x0` (未生成)、`TApplication` = `0x210000e` | `0x110000f` |
+| `flengine/e2e.sh` probe (`125fefd2`) | 上記に加え `m11_wndseed.sh` (boot6 seed。WNDPROC 閉包を追加) | `TLightweightLayeredControl` = `0x110000e`、`TApplication` = `0x110000f` | `0x1100010` |
+
+- 両者とも soft build・同じ `probe.mjs` で取っている。差は IR (`m11_wndseed.sh` の有無) で、`e2e.sh` は step 0 で wndseed を回し、`f4_e2e.sh` は回さない (スクリプトで確認済み)。窓の採番が変わる機構は推定 (未検証)。
+- したがって受入条件 3 の値は **「f4 の IR (wndseed 無し) では `0x110000f`、wndseed 込みの最終 IR では `0x1100010`」**。どちらも `0x0` からの修復を示す。一意の値は wndseed 込みの最終 IR (flengine の値) とする。f4 の値は f4 の構成でのみ有効。
+
+### 6d-3. 注記 (run 上の前提)
+
+- `x86_64-w64-mingw32-gcc` は runner に無かったため `apt-get install gcc-mingw-w64-x86-64` で導入 (`apt-mingw` 素材の代替)。初回の flengine e2e は前提欠如 (rc 2) で止まり、導入後に再実行。
+- `tools/m11/work` は `work-m11` の展開先 (gitignore。commit しない)。
+
+
+注記: `tools/gui/e2e.sh` の初回は `node_modules` 不在で step 5 (tsc) が rc 127 だった (`pnpm install` で解消。環境要件)。
+
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
@@ -299,54 +373,94 @@ main 取込後の木 (`c37522c`) で S1 が FAIL (828/67 vs 864/31) したため
 | `LoadStringW` の資源 ID 供給 hook (`gui_set_resource_provider` ← shimx / PE .rsrc) | LoadStringW が常に空文字 | #174 に所見 / GUI-2 または shimx |
 | survey の順序依存 (非 pthread と pthread で 10 unit が trap↔ok で動く、§5-6) | survey の unit 別結果が build 条件と前 unit の状態に依存する。S1 の比較は同一 build (`--base`) に限る | PM 起票依頼 (m11 survey 隔離の状態汚染。m11 側の件) |
 | 実ブラウザ host 結線 (`GuiHost.attach`・FL ワーカ化・UI スレッドのスタック量 §2-2 #8) | node の headless host のみ。描画 (#32) は別 | #32 / #121 |
-| `tools/m11/m11_e2e.sh` と `m11_gen_ir2.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない) | runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `gen_ir2` を使わず素材 IR で行う | m11 に `FL_WIN64_DIR` 参照を提案 (#132 の未解決と同件。PM 起票依頼) |
-| 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
+| `tools/m11/m11_e2e.sh` が PE パスを `[ANALYSIS-DIR]` の固定既定値で持つ (`[WIN64]` 経由にしていない)。`m11_gen_ir2.sh` は本 PR で `FL_WIN64_DIR` 参照に変更済み | `m11_e2e.sh` を直接使うと runner では ldfix が黙ってスキップされ数値が変わる。本 PR の測定は `m11_gen_ir2.sh` (FL_WIN64_DIR 経由) を使う | m11_e2e.sh に `FL_WIN64_DIR` 参照を入れる件は PM 起票依頼 (#132 の未解決と同件) |
+| 前回 run で観測した selftest (ASAN) の `heap-use-after-free` (`gui_headless` の描画スレッドと `surf_free`。前 run で約 2/8 で再現) | 本 HEAD の 3 回では再現せず (433/0 ×3)。HEAD 7d44c033 の 1 回 (500/0) でも再現せず。main 側の #489 系 (headless surface UAF) の merge を含む HEAD での結果。再現率の定量確認は未実施 | PM 起票依頼 (gui_headless の描画と surf_free の排他) |
 
-## 8. `__pe_image` の m11_data_gen 方式統合 (#566 / GUI-12; #174 スコープ 3)
+## 6e. 再測定と main 切り分け (PR #577 の PM 指示 1・2。測定 commit `a88aabfa`)
 
-**結論**: RetDec C 経路 (`tools/gui/lift/gui_lift_post.py`) の `__pe_image` を、m11 と同じ .reloc DIR64 補正規則の共通モジュール `tools/gui/lift/pe_image.py` に統合した。実 FLEngine PE で m11_data_gen.py の出力とバイト一致 (§8-3)。
+測定対象のコード差分は `22062917` 以降 0 (`git diff 22062917 a88aabfa -- tools/gui tools/m11` は `results/` のみ)。`a88aabfa` は `results/baseline_boot.json` と `results/ir_sha256.txt` の再生成のみ commit。
 
-### 8-1. 設計
-経路が 2 つあり、データの置き方が違う。FLEngine の結線 (本 REPORT §1〜6) は m11 IR 経路で、`__pe_image` は使っておらず、元から m11_data.c / m11_image.bin (LVA 固定敷設) である。`__pe_image` は RetDec C 経路 (テスト PE・プラグイン DLL 向け) だけにある。
+| 実行 (foreground・1 回・rc は実測) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `flengine/e2e.sh` (HEAD `22062917`、`pnpm install` 前は gui/e2e.sh のみ tsc 欠落) | **1** | 304 s (load 1.00→1.00) | judge **13/14**。S1 FAIL `870/1/47/24/0` (base `872/1/47/22/0`)。他 13 PASS。P1 `RegisterClassW=3`、P4 `hwnd=0x110000f`、P5 `hwnd=0x110000e`。ネガコン N1〜N9 期待どおり FAIL |
+| `flengine/e2e.sh` (**origin/main `c6f70c98`**、検証用 worktree `work/main_wt`) | **1** | — | **main 単体は build 段で停止**: `wasm-ld: duplicate symbol: GetMonitorInfoW` (#1096 `6f979463` の `tools/m11/m11_win.c` と `tools/gui/build/gui_adapt_w32.c` の重複)。S1 まで到達せず |
+| 同 (main、重複 2 関数 `GetMonitorInfoW`・`EnumDisplayMonitors` を scratch で削除。**コミットしない**) | **1** | 301 s (load 1.00→1.00) | judge **13/14**。**S1 FAIL `870/1/47/24/0` (base `872/1/47/22/0`)**。S1 の値は HEAD と同一 |
+| `gui/e2e.sh` (HEAD `a88aabfa`、`pnpm install --frozen-lockfile` 後) | **0** | 139 s (load 2.60→1.60) | ALL PASS (selftest 506/0、stress negctl 2/2 exit 1、text/pe_image/present/input ALL PASS) |
+| `m11/ldfix/f4_e2e.sh` (HEAD `a88aabfa`) | **0** | 249 s (load 1.04→1.27) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待行付き FAIL。RegisterClassW pre 2 / noand 2 / post 3。survey `870/1/47/24` |
 
-| | m11 経路 (FLEngine) | RetDec C 経路 |
-|---|---|---|
-| 敷設先 | linear memory の固定アドレス LVA = RVA + LB | C の静的配列 `__pe_image` (アドレスはリンク時まで不定) |
-| イメージ内ポインタ (.reloc DIR64) | 静的に書換え (`m11_data_gen.py`) | **従来は未補正**で生 VA のまま (§8-2) |
-| 統合後 | 変更なし (m11 は読取専用) | `pe_image.runtime_image` が再配置テーブル (image offset) を出し、`gui_lift_entry()` 先頭の `__pe_image_fixup()` が `delta = &__pe_image[0] - ImageBase` を加算 |
+**切り分けの結論 (PM 指示 1)**: S1 FAIL は main でも同じ値で再現する。したがって **この PR の変更が原因ではない**。S1 の判定は緩和していない (FAIL のまま)。原因特定は子 issue **#1442** (`[GUI-21]`、親 #564) に起票。#1275 ([M11-N78]) とは対象 unit が一致するが、同系統かは未確認。main でも同値 (S1 FAIL) であることは、この PR の原因ではないことの根拠。S1 の gate PASS の根拠ではない。追跡 #1442。
 
-共通にした規則 (`pe_image.py`): DIR64 の走査 (page==0 / 不正 block で打切り)。lva モード (`rebase_sections`) は m11_data_gen.py と同じ境界 `lo <= r <= lo + len(sd) - 8` (末尾 slot を含む)。runtime モードの補正対象は `base < v < base + span` で、.text を指す値 (関数 VA) は fnmap の鍵なので補正しない。
+注記: main の build 段の重複は scratch の削除で回避しただけで、main 側の修正は行っていない。起票先は本 PR の範囲外 (`#1096` の作者 / m11 系の PM 判断)。
 
-### 8-2. 実測した既存欠陥 (統合前)
-- イメージ内ポインタが生 VA (`0x14000xxxx`) のまま: 文字列ポインタ表・配列要素へのポインタ・連結リストを持つテスト PE を lift すると**クラッシュ** (補正を出さない `--no-pe-reloc` で再現, rc 139)。従来の gui_app.c は data にイメージ内ポインタを持たないので e2e では出なかった。
-- 配列 global (`char *g3[4] = {…}; // 0x…`) は `#define` されず、gcc が `gN undeclared` で落ちる。→ 配列 lvalue (`*(T (*)[N])(__pe_image+off)`) のマクロにした。
+**ret 値の IR 併記 (PM 指示・受入条件 3)**: `function_52a7f0` の ret は IR ごとに異なる値。どの IR の値か:
+- `f4_e2e.sh` の post IR (`m11_gen_ir2.sh` → `m11_build.sh`、wndseed 無し): **`0x110000f`**
+- `flengine/e2e.sh` の最終 IR (wndseed 込み。`m11_wndseed.sh` を実行): **`0x1100010`** (§6d-2)
 
-### 8-3. 検証 (`tools/gui/flengine/pe_image_parity.py`, `tools/gui/test/pe_image_e2e.sh`)
+## 6g. 現 head の再測定 (review `bde0c341` 差し戻しの必須 2。main 取り込み後)
 
-| 検査 | 結果 (実測) |
+main `f3ffd7ba` 取り込み後の head `bde0c341` で、§6e の測定 commit `a88aabfa` 以降のコード差分を再測定した。`git diff a88aabfa bde0c341 -- tools/gui tools/m11` のうち `.sh`・`.py`・`.c`・`.h`・`.inc` 等の実行コードは `m11_win.c` (#1096 由来) と `gui/build/*` の main 側差分のみ (main が重複定義を持ち込んだ)。
+
+| 実行 (foreground・1 回・rc は実測) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `bash tools/m11/ldfix/f4_e2e.sh` (head `bde0c341`) | **2** | 86 s (load 0.59→1.03) | **build 段で停止** (gui build 失敗 (pre))。`wasm-ld: duplicate symbol: GetMonitorInfoW` と `EnumDisplayMonitors` (`obj/win.o` と `gui/gui_adapt_w32.o`)。F4 の gate には到達せず |
+| `bash tools/gui/flengine/e2e.sh` (head `bde0c341`) | **1** | 325 s (load 1.12→1.33) | build 段で停止。`wasm-ld: error: duplicate symbol: GetMonitorInfoW` (同上 2 件)。judge は実行されず |
+| `bash tools/gui/e2e.sh` (head `bde0c341`) | **0** | 301 s (load 3.47→0.89) | ALL PASS (simd / 6c/6 fail-fast / present / input / stress (negctl 2/2 exit 1) / selftest 506 passed 0 failed)。ASan の `heap-use-after-free` 等の出力 0 件 |
+
+**判定 (bde0c341 時点の記録)**: `gui/e2e.sh` は PASS。`flengine/e2e.sh` と `f4_e2e.sh` は main 由来の重複定義 (#1096 `6f979463` の `tools/m11/m11_win.c` と `tools/gui/build/gui_adapt_w32.c`) で build 段が止まった。この時点の S1 と F4 の gate は未測定。`a88aabfa` の測定値は main 取り込み前のものなので、現 head の値としては使わない。**重複は `97db5a58` の weak 化で解消済み。現 head の値は §6h。**
+
+**GetMonitorInfoW 重複の扱い**: 重複の解消 (どちらの定義を正とするか) は build 仕様の判断を要するため、本 run では commit しない。起票先は子 issue **#1559** (`[M11-N102]`)。
+
+**回避版の実測 (参考・commit していない)**: `tools/gui/flengine/build.sh` のリンク行に `-Wl,--allow-multiple-definition` を一時的に足して測定し、測定後に元へ戻した (`git status` は測定後クリーン)。
+
+| 実行 (回避版・foreground・1 回) | rc | 所要 | 結果 |
+|---|---|---|---|
+| `bash tools/gui/flengine/e2e.sh` (head `bde0c341` + 回避) | **1** | 467 s (load 1.13→1.07) | judge **12/14**。**R2 FAIL** `reached 31 (expected floor 19); missing=['EnumDisplayMonitors', 'GetMonitorInfoW']`。**S1 FAIL** `870/1/47/24/0` (base `872/1/47/22/0`、main と同値)。他 PASS: L1×2・A1 (193/193/173/20)・B1 52・R1・S2・P1 (RegisterClassW=3)・P2〜P5・W1。ネガコン N1〜N9 期待どおり FAIL |
+| `bash tools/m11/ldfix/f4_e2e.sh` (head `bde0c341` + 回避) | **0** | 387 s (load 1.06) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待どおり FAIL。`RegisterClassW` pre 2 / noand 2 / post 3。`function_52a7f0` ret pre `0x0` → noand `0x0` → post **`0x110000f`** (本 IR (wndseed 無し) の値)。survey pre/noand/post = `870/1/47/24` |
+
+結論: 回避版では S1 の値は main と同じ (`870/1/47/24/0`)。R2 は重複の片方が消えたことで 2 件欠落する (§6f の回避の副作用と同じ形)。したがって flengine の判定 (12/14) は、重複の解消方法を決めるまで確定しない。S1 の判定式は変えていない。baseline の値は §6h 冒頭の注記のとおり再生成で変わっている (判定式ではない)。
+
+## 6h. weak 化後の現 head の実測 (PM 指示 #577。測定 commit `97db5a58`)
+
+`m11_win.c` の `EnumDisplayMonitors` / `GetMonitorInfoW` に `__attribute__((weak))` を付けた 1 変更 (`97db5a58`、差分 2 関数のみ) の head で、3 本を foreground・各 1 回。素材は `ws-577/work/` (gitignore) に展開。`retdec-decompiler` と `EMSDK_ENV` は `ws-577/work/toolchain/` を指定。
+
+| 実行 | rc | 所要 | load (開始→終了) | 結果 |
+|---|---|---|---|---|
+| `bash tools/m11/ldfix/f4_e2e.sh` | **0** | 411 s | 0.89 → 1.30 | build 段は通過 (重複定義の解消を確認)。gate F1/F2/D1/D2/P1/A1 全 PASS。ネガコン N1〜N4 期待どおり FAIL。RegisterClassW pre 2 / noand 2 / post 3、ret pre `0x0` → noand `0x0` → post `0x110000f`。survey pre/noand/post = `870/1/47/24` |
+| `bash tools/gui/flengine/e2e.sh` | **1** | 460 s | 1.18 → 1.23 | build 段通過。**judge 13/14**。FAIL は **S1 のみ**: `870/1/47/24/0` (base `872/1/47/22/0`)。R1・R2 (floor 19、reached 33)・B1 52・S2・P1〜P5・W1 は PASS。ネガコン N1〜N9 期待どおり FAIL。selftest 506 passed / 0 failed |
+| `bash tools/gui/e2e.sh` | **0** | 211 s | 1.58 → 3.37 | **ALL PASS** (simd / 6c/6 fail-fast / text / stress (50000 frames ×2、negctl 2/2 exit 1) / selftest)。`heap-use-after-free` 0 件 |
+
+前提 (回避版との違い): 回避版 (`--allow-multiple-definition`) は `m11_win.c` と GUI 側の両方を連結して片方を捨てる。weak 版は GUI 側の強い定義が勝つ。両者で `EnumDisplayMonitors` / `GetMonitorInfoW` の使われる定義が同じかは、R2 の `missing` の変化で見る。今回の R2 は `missing=[]` で PASS。
+
+S1 の値 `870/1/47/24/0` は §6f の main と同値で、**S1 の判定式は変えていない**。#1442 で扱う。
+
+**baseline の値の変化 (再生成によるもの。判定式は変えていない)**: `results/baseline_survey.json` の現値は `ok 872 / trap 22` (kinds: unreachable 1 / halt0->longjmp 7 / OOB 14)、`results/baseline_boot.json` の `threw` は `unreachable` (`units_run 52` は不変)。旧値は `baseline_survey` が `871 / 23`、`threw` が `memory access out of bounds`。両ファイルは `tools/gui/flengine/e2e.sh` が毎回 m11 baseline を測り直して `results/` にコピーする生成物 (e2e.sh の 36〜41 行・64 行)で、判定基準を手で書き換えた値ではない。main 取り込み後の再生成で値が変わった。
+- `baseline_survey.json` の現値は commit `bf9cf547` で初めて現れた (それ以前は `52e6bd57`〜`d96a0fa8` の `871 / 23`)。
+- `baseline_boot.json` の `threw` が `unreachable` になったのは `d96a0fa8` から (それ以前は `memory access out of bounds`)。
+- 現 `results/` を作った run は**特定できなかった** (run ID は確認していない)。main の値 (871 / 23) に戻すと、現 IR の実測と食い違う古い値を残すことになるため戻していない。
+
+**S2 gate の変更 (`judge.py`、commit `8a6dcf4b`。S1 の判定式とは別)**:
+- 旧式: `ffu <= stub_soft and not (kinds.gui_failfast and not ffu)`。ff で fail-fast になった API は、soft で必ず STUB でなければならなかった (`ffu` = ff survey の fail-fast API 集合、`stub_soft` = soft の STUB API 集合)。
+- 新式: `sfu <= ffu and ffu <= (stub_soft | sfu)` (`sfu` = soft survey の fail-fast API 集合)。soft が ff に無い fail-fast を増やさないこと、ff の fail-fast API は soft で STUB か fail-fast のままであること、の 2 条件。
+- 変えた理由: fail-fast は API 単位ではなく **action 単位** で起きる (例: §5-5 の `SystemParametersInfoW` の未対応 action)。旧式は、同じ API が soft で別の action として fail-fast すると FAIL になり、action の違いを表せなかった。新式は「soft で fail-fast が増えない」を直接検査する。
+- 注意: 新式は旧式より**緩い** (ff の fail-fast API が soft で fail-fast のままでも PASS する)。
+- 現 head の値で旧式を手計算した (既存の `results/survey_ff.json` と `survey_soft.json` から。再実行はしていない): ff の fail-fast 集合 = `{LoadImageW}`、soft の STUB 集合 = `{LoadImageW}`、soft の fail-fast 集合 = `{}`。**旧式 = PASS、新式 = PASS**。S2 の判定結果は変わらない。
+
+`tools/gui/flengine/results/*.json` と `baseline_boot.json` は本実測で再生成された出力 (`GetMem` 等の probe 値・`gui_shared_ptr` の 1 件・`ir_sha256` が現 head で変わる)。本 commit に含める。
+
+## 6f. origin/main の S1 実測 (PR #577 の PM 指示 1。main commit `b4a8422c`)
+
+PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 PR が原因」。S1 の判定式は変えていない。
+
+| 項目 | 値 |
 |---|---|
-| P1 共通モジュール == m11_data_gen.py 出力 (実 FLEngine PE, LB=0 / 0x10000) | 一致 (.data 2,359,304 B / .rdata 69 B)。DIR64 全 278,531、補正 **10,284** (.data) / 0 (.rdata)。`7a73c02` 時点で `block00031_PE.bin` (fl-win64 tar 内) に対し再実行: exit 0、P1 PASS (LB=0 / LB=0x10000)、P2 PASS、N1〜N3 PASS |
-| runtime 方式の内訳 (INFO; .text 外のスロット, 実測) | 補正対象 2,354 (全て .data) / .text 宛で非補正 8,044 (.data 7,930 + .didata 114) / image 外 0。`7a73c02` 再実行で同値 (`rebased 2354` / `text_kept 8044` / `outside_image 0`)。lva 方式の .data 補正 10,284 との突合: 2,354 + 7,930 = 10,284 で一致 |
-| RetDec C 経路の実行テスト (`pe_image_app.c`: 文字列表 / 配列要素ポインタ / 連結リスト / 関数ポインタ表) | lift の戻り値 = host gcc 直ビルドの戻り値 (34622010)。補正スロット 7 |
+| 測定対象 | `origin/main` = `b4a8422c` (Merge #1443)。検証用 worktree (detached・本 PR の branch ではない)。素材 `work-m11` / `work-liftdiff` / `fl-win64` は同じ展開物 |
+| 手順 | `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> RETDEC=<[RETDEC] の retdec-decompiler> FL_WIN64_DIR=<[WIN64]> ANALYSIS_DIR=… bash tools/gui/flengine/e2e.sh` (foreground・1 回) |
+| rc / 所要 / load | **1** / 445 s / 0.62→1.65 (nproc 4) |
+| S1 survey parity (soft) | **FAIL `870/1/47/24/0` (base `872/1/47/22/0`)** |
+| 判定 | 12/14 (S1 FAIL、**R2 FAIL**)。他 L1×2・A1・B1・R1・S2・P1〜P5・W1 は PASS |
 
-旧 P3 (`tools/m11/work/m11_data.c` との比較) は判定から外した。その m11_data.c は #572 より前に生成されたもので、末尾 slot を補正していない (`<` 規則の出力) ため、現行 `m11_data_gen.py` の出力との一致 (P1) を判定基準とする。
+**main 側の build 段の回避 (本実測だけの前提。main に修正は入れていない)**: main `b4a8422c` は `wasm-ld: duplicate symbol: GetMonitorInfoW / EnumDisplayMonitors` で build 段で止まる (`tools/m11/m11_win.c` (#1096) と `tools/gui/build/gui_adapt_w32.c` (`gen_api.py` 生成) の重複)。scratch の `tools/gui/flengine/build.sh` のリンク行に `-Wl,--allow-multiple-definition` を足して通した (`obj/*.o` を先に並べるので `m11_win.c` 側の定義が使われる)。この変更は commit していない。
 
-ネガティブコントロール (全て「一致してはならない」を要求。判定が不合格なら非 0): parity N1 補正値 1 bit 破壊 → FAIL / N2 補正ゼロの実装 → FAIL / N3 セクション欠落 → FAIL、pe_image_e2e N1 `--no-pe-reloc` → クラッシュ (rc 139) / N2 再配置表を 1 件ずらす → クラッシュ (rc 139)。
+**R2 の FAIL は回避の副作用の可能性が高い (未確定)**: 回避後の main では `EnumDisplayMonitors` / `GetMonitorInfoW` が reach に出ず (`missing=['EnumDisplayMonitors', 'GetMonitorInfoW']`、reached 30 ≥ floor 19 だが欠落 2 件で FAIL)。直前の main 測定 (§6e、ソース側で重複を削除した版) では R2 PASS の 13/14 だった。回避方法で R2 が変わるため、本節の R2 は main の欠陥の根拠にしない。S1 の値は両方法で `870/1/47/24/0` と一致する。
 
-### 8-4. 未達・未実測
-- 実 FLEngine 全体 (7,421 関数) を RetDec C 経路に通した実測は無い (FLEngine は m11 の LLVM IR 経路。RetDec C に通すのは規模上非現実的) ため、実 PE での検証は「規則の一致 (バイト比較)」までで、RetDec が出す `gN` 分割の実 FLEngine 上の挙動は未検証。
-- runtime 方式の補正対象は「値が SizeOfImage 内を指し、かつ .text 宛でない」DIR64。image 外を指す値は 0 件 (実測)。`.didata` の DIR64 114 件は全て .text 宛で、m11 (.data/.rdata のみ敷設) は補正しない。
-- `__pe_image` は 1 配列で SizeOfImage 全体 (FLEngine なら 25 MiB 超) を抱えるため、大きな PE には向かない (20 MiB 超 blob を commit しない規約。生成物は work/ 側)。
-
-### 8-5. m11_data_gen.py の境界条件 (解消)
-`m11_data_gen.py` は当初 `lo <= r < lo + len(sd) - 8` で DIR64 スロットを選んでおり、セクション末尾の 8 バイト slot (実 FLEngine の `.data` 末尾 RVA `0x11e5000`、値 `0x425f00` = .text 宛の関数ポインタ) が補正されなかった。
-`#572` (`10c8278`) で `<=` に修正済み。本 PR の `pe_image.py` lva モード (`lo <= r <= lo + len(sd) - 8`) も同じ境界に揃えてある (`c39ca16`)。`7a73c02` で `pe_image_parity.py` が exit 0 (補正 10,284 = m11 と一致)。
-
-## 9. 未解決 (#566)
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| RetDec C 経路で実 FLEngine 規模の PE を通した実測なし (§8-4) | `gN` 分割の実機挙動が未検証 | 範囲外 (FLEngine は m11 IR 経路) |
-| §1〜§5 の数値・記述 (秒数・survey・`52e6bd57` 時点) は参考。現 HEAD の値は §6 の表を正とする | 本 PR の後続 commit で本文を書き直すのは別作業 (文書の整理) | 本 PR 内で行う (未実施なら PR 本文で明示) |
-| `tools/gui/e2e.sh` step 6 (headless Chrome) の前提 (`tools/e2e` の `npm ci` 後に `agent-browser` が存在すること) を e2e.sh が検査しない。前提不足のときは ENOENT で落ちる | 前提を満たせば step 6 は PASS (§6)。前提検査が無いため、初回 run は原因が分かりにくい | #826 (GUI-18、#184 の子) |
-
-範囲外: 実ブラウザ・Canvas 描画、audio、UI スレッドのスタック量、`gui_reach` の性能影響 (INTEGRATION §4-12 の未計測は継続)。
+**結論**: S1 の `870/1/47/24/0` (base `872/1/47/22/0`) は `origin/main` (`b4a8422c`) でも同一。**PR #577 の変更が原因ではない**。S1 は FAIL のまま (判定を緩和していない)。原因の追跡は子 issue **#1442** (`[GUI-21]`、親 #564)。#1275 (`[M11-N78]`) とは対象 unit が一致するが、同一原因か・同系統かは未確認 (機械語・IR の突合は未実施)。

@@ -128,7 +128,7 @@ GUI 系 DLL (user32.dll, gdi32.dll, comctl32.dll, comdlg32.dll, opengl32.dll, ux
 | DestroyWindow | user32 | window | 9 | IMPL |  |
 | IsIconic | user32 | window | 9 | IMPL |  |
 | LockWindowUpdate | user32 | paint | 9 | IMPL |  |
-| RegisterClassW | user32 | window | 9 | IMPL | ●probe |
+| RegisterClassW | user32 | window | 9 | IMPL | ●survey/probe |
 | SetCapture | user32 | input | 9 | IMPL |  |
 | GdiFlush | gdi32 | bitmap/blit | 8 | IMPL |  |
 | PatBlt | gdi32 | bitmap/blit | 8 | IMPL |  |
