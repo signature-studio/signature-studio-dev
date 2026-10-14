@@ -227,12 +227,13 @@
 |---|---|---|---|
 | isChannelMuted | 0xd59790 | bool | `mute` を返す |
 | isChannelSolo | 0xd59a80 | bool | `solo` を返す |
-| getChannelColor | 0xd594b0 | int | `color` (0xRRGGBB) を返す |
+| getChannelColor | 0xd594b0 | int | `color` をそのまま返す (stub: 0x--BBGGRR) |
 | getGridBit | 0xd5b420 | bool | `steps[position]` を返す (0..63 外は code 4) |
 | channelNumber | 0xd58f80 | int | 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。無選択は canBeNone で -1 / 0 |
 
-- 範囲外 code: 5 関数とも channels 共通の `CH` 検査 (code 4 "Index out of range")。PE で `-4` を確認したのは `selectOneChannel` のみ (REPORT_PY69)。他 4 関数は PE 未確認。
+- 範囲外 code: 4 関数 (isChannelMuted・isChannelSolo・getChannelColor・getGridBit) は channels 共通の `CH` 検査 (code 4 "Index out of range")。PE で `-4` を確認したのは `selectOneChannel` のみ (REPORT_PY69)。この 4 関数は PE 未確認。`channelNumber` は index 引数が無いため範囲外 code を持たず、offset 超過は最後の選択を返す。
 - 仮置き (stub に記述なし): `getGridBit` の position 範囲は `setGridBit` と同じ 0..63。`channelNumber` の負の offset は先頭扱い。useGlobalIndex は未モデル (グループ無し・既存関数と同じ扱い)。
+- PM agent の判断待ち: getGridBit の position は必須か (PE fmt `i|ii` は任意、stub と生成表は必須)・既定案: stub 準拠 (現実装)。
 
 ### 測定 (測定 commit `fde09f94`・コード変更の最後の commit)
 
