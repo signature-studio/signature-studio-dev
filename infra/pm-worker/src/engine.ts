@@ -7,7 +7,7 @@ import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
-import { advanceLaunch, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
+import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import {
@@ -631,10 +631,14 @@ export class Engine {
     const relaunch: ClassifyInput["relaunch"] = {};
     for (const [k, v] of this.d.store.all<{ count: number; art: string | null }>("relaunch")) relaunch[k] = v;
     const launchState: Record<string, LaunchState> = {};
-    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) launchState[k] = v.state;
+    const launchDoneAt: Record<string, string> = {};
+    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) {
+      launchState[k] = v.state;
+      if (v.state === "observed" && v.doneAt !== undefined) launchDoneAt[k] = v.doneAt;
+    }
     return {
       snap: { issues, prs, runs, bot_last, bot_report, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, launchDoneAt, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
       unknown,
     };
   }
@@ -846,7 +850,7 @@ export class Engine {
     return this.d.store.get<PhaseState>("meta", "phase") ?? { review_only: true };
   }
 
-  // 投稿した /oc の観測を進める (launchObs)。書くのは状態が変わったときだけ。失敗の判定は同期が新しいときだけ。
+  // 投稿した /oc の観測を進める (launchObs)。書くのは状態が変わったとき・観測した run の完了時刻が進んだときだけ。失敗の判定は同期が新しいときだけ。
   // dry-run は投稿しないので launchObs を作らず、ここでは何もしない。
   private observeLaunches(): void {
     const fresh = this.fresh();
@@ -855,10 +859,11 @@ export class Engine {
     for (const [k, obs] of this.d.store.all<LaunchObs>("launchObs")) {
       const title = this.s.issues[k]?.title;
       if (title === undefined) continue;
-      const next = advanceLaunch(obs, now, observedBy(runs, title, Date.parse(obs.at)), fresh);
+      const launchedMs = Date.parse(obs.at);
+      const next = advanceLaunch(obs, now, observedBy(runs, title, launchedMs), fresh, doneAtOf(runs, title, launchedMs));
       if (!next) continue;
       this.d.store.put("launchObs", k, next);
-      this.pushLog({ kind: next.state === "failed" ? "unobserved" : "observed", n: Number(k), note: next.state === "failed" ? "launch not observed in 5 min" : undefined });
+      if (next.state !== obs.state) this.pushLog({ kind: next.state === "failed" ? "unobserved" : "observed", n: Number(k), note: next.state === "failed" ? "launch not observed in 5 min" : undefined });
     }
   }
 
