@@ -125,3 +125,6 @@ REXGetCreatorInfo / REXGetInfo の閉包 (x64c で 35 関数・982 命令) を l
 FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/rex/lift_x64c.sh all   # ok + neg-cmp + neg-ctx
 ```
 `<fl-win64 展開先>` は `extracted/block24351_PE.bin` を含むディレクトリ (`tar --zstd -xf fl-win64.tar.zst -C <dir> extracted/block24351_PE.bin`)。生成物は `tools/shared/work/lift/rex/` (gitignore)。
+
+### 7.8 測定後のコード差分 (差分 0 の証跡)
+`git diff 7bbd5c86 HEAD -- tools/shared/lift/rex ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし。以降は本 REPORT の文言のみ)。
