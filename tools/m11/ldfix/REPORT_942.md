@@ -245,13 +245,4 @@ survey (n=3 とも同値。min–max は全 run で同一):
 
 ## 10. bin 表 P/F の由来とサイズ→bin 表 (#942 受入 1・2・run 6)
 
-測定 commit: `047f97c5` (origin/main)。素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を展開。
-`bash tools/m11/ldfix/ldfix_e2e.sh` は 68.7 秒・rc 0・judge PASS (units 17/942・icall 24・threw `memory access out of bounds`・survey ok 136 / trap 9、base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
-
-- 照合 (`python3 tools/m11/ldfix/bin_table_source.py`): k184 / k185 / k186 の P (`0x7a50` 等) は、PE `.data` の RVA `0xfa5c90` / `0xfa5ca0` / `0xfa5cb0` に生値 `0x407a50` / `0x408040` / `0x408870` (LVA 補正前) として入っている。3 スロットとも .reloc の対象。k236 の P `0xa027` は RVA `0xfa5fd0` に生値 `0xa027` (reloc 外)。
-- 512 スロット (bin 表 k=0..255 の P/F、LVA) を PE `.data` の生値と照合 (reloc 補正のみ): 512/512 一致。つまり bin 表の初期値は PE 静的データ由来で、イメージ段階で既に入っている。
-- PE 上の k187 以降はバイト列 (機械語でない) で、bin 表の由来として扱える値ではない。
-- サイズ→bin 表 (`0x11e6a3c`・326 バイト・`function_407a50` が `size/8` で索引) (`bin_size_probe.mjs`): PRE は全 0、boot 後は非 0 324 件・最大 bin 番号 172。**k184 以上を指す参照は 0 件**。
-- 結論: k184〜186・k215・k236 の不正な P/F は、サイズ→bin 表から参照されない bin であり、FastMM_GetMem の通常経路 (サイズ ≤ 2600) では読まれない。unit 17 の trap の発生 load (`function_407a50` の `[P+24]` 読み) に k184 が直接関与するという仮説は、この観測では支持されない。
-- 注意: `bin_table_pre_boot.mjs` の `OOB` 表示は `F<8 || F>=MEM` の機械的判定で、F=0x1 などの値も OOB になる。boot 後の 47 件の大半 (`P=0xfa5xxx`・`F=0x1`) はこの判定による見かけの OOB で、実際の trap とは対応しない。
-- 未解決 (起票先): サイズ→bin 表の 172 以下の bin 中で、boot 後に F が不正な bin (trap の発生源候補) の特定 → #942 (次 run)。bin 表 P の書き込み元 (boot で self-loop 化される処理) → #942 (次 run)。
+結論 1 行: bin 表 P/F の初期値は PE `.data` 由来 (512/512 一致)。k184〜186・k215・k236 の不正値はサイズ→bin 表から参照されない bin で、通常経路 (サイズ ≤ 2600) では読まれない。詳細・実測値・未解決 (#942 次 run) は [REPORT_942_APPENDIX.md §10](REPORT_942_APPENDIX.md) を参照。
