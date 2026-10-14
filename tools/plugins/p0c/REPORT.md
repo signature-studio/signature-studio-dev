@@ -167,13 +167,13 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | `p0c2_e2e.sh` | 0 | 50 s | 7.86 → 3.98 |
 
 k80 lift 単体 (`PLUG_CANON_ALLOCA=1`) の旧所要時間: **未測定 (条件不明)** (測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が無い)。下記の再測定 (HEAD `b38ff403`) の値とは別扱い。
-- **再測定 (HEAD `b38ff403`・測定 commit 以降の差分分)**: `$ARTIFACTS_DIR` に `toolchain-retdec` があり、`/opt/retdec/bin/retdec-decompiler` は展開アーカイブと sha256 一致 (`9d49ffcf...`)。両 opt-in 変数 (`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`) は未設定、`PLUG_CANON_ALLOCA=1` のみで `lift_ranges.sh` を 1 回実行 (ranges 80 件は `kernel_table.py` から生成し直し)。
-  - rc = 0 / 所要 2 s (秒精度) / `/proc/loadavg` 1 分値 0.52 → 0.52 (開始・終了時)
+- **再測定 (HEAD `b38ff403`・測定 commit 以降の差分分)**: `$ARTIFACTS_DIR` に `toolchain-retdec` があり、[RETDEC] の `retdec-decompiler` は展開アーカイブと sha256 一致 (`9d49ffcf...`)。両 opt-in 変数 (`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`) は未設定、`PLUG_CANON_ALLOCA=1` のみで `lift_ranges.sh` を 1 回実行 (ranges 80 件は `kernel_table.py` から生成し直し)。
+  - rc = 0 / 所要 2 s (秒精度) / load (1 分値) 0.52 → 0.52 (開始・終了時)
   - RetDec 実行の確認: `PLUG_REUSE_DRC` 未設定。`k80.retdec.log` に phase 出力 (最終 `cleanup` 1.76 s)。所要 2 s は RetDec を 80 range・`--select-decode-only` で走らせた実時間。
   - `k80.lift.ll` sha256 = `628fa71edeca59318c75e48287cc09e108b09894240b12b34393d64b80ac3b6f` (**一致**)
   - 参考: `k80.drc.ll` sha256 = `b760d51a94f6fa7496b211360b1415576bdc8e12f397345b42d32a11d49e9c52` (受入 2' は未達のまま。#1560)
 - 再測定不可 (履歴。HEAD `9d943df3` 時点の記録): 修正時点の runner には `toolchain-retdec` ([RETDEC]) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
-- 再試行 (fix モード, HEAD `9d943df3`): `$ARTIFACTS_DIR` は `fl-win64` のみ。`[RETDEC]` の実体が無いため RetDec 段を実行できず、k80 lift を再実行していない (rc・所要・load・sha256 は未取得)。`oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に追記し、次回の run で再測定する。
+- 再試行 (fix モード, HEAD `9d943df3`): `$ARTIFACTS_DIR` は `fl-win64` のみ。`[RETDEC]` の実体が無いため RetDec 段を実行できず、k80 lift を再実行していない (rc・所要・load・sha256 は未取得)。`oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に追記した。この時点の再測定は未実施 (後続の HEAD `b38ff403` 再測定で実施済み。上記「再測定」行)。
 - 一致判定 (受入条件 2・3) は lift の sha256 と `p0c2_sweep.csv` の `cmp` で行い、所要時間には依存しない。
 
 ### 検証の注記
