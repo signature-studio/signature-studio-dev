@@ -71,3 +71,15 @@
 - 残件 (emcc 15 件): `param_1` 引数不足 3・`FUN_180fd4f30` 未宣言 2・引数数不一致 1・`rcpps` 1・`GetLastError`/`SetLastError` 各 1・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1・引数型不一致 3 (`undefined4[8]`→`short*`・`uint*`→`ushort*`・`float*`→`uint*`)・`V128` への int 代入 1。
 - 回帰 (同一 HEAD `98885e93`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-3 と一致。
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`GetLastError`/`SetLastError` の stub 規則は未決定 (本 run は IAT thunk のみ)。
+
+#### 10-7l. #1926 (KH-30) run: GetLastError/SetLastError の shim 状態変数化 (部分・Resonator はビルド未通過)
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64 (手展開, dmg 不要, `work/winpkg/` = gitignore)。Ghidra 12.1.4 = GitHub release `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 先頭 16 桁 `ddac49f9…` 一致)、JDK 21 (Temurin 21.0.12)、emsdk 6.0.12 ([EMSDK])。
+- 測定 commit = `50652246` (コード変更の最後の commit)。`git diff 50652246 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は 0 行。
+- 変更 (`ghidra_route/ghidra_shim.h` のみ、+4 行): `GetLastError()` / `SetLastError(uint)` を `static uint LastErrorState` の読み書きとして定義。Win API の意味は未確定で、到達時の挙動は突合で検証する (fail-fast にはしていない)。
+- decompile (Resonator 17 + 未関数化 callee 3 + Gain/Haas/Gate 10 = 計 30 関数): **30/30 OK** (`summary.tsv`, `analyzeHeadless` wall 17–19 s, n=1)。
+- emcc (resonator, 修復なし, `-ferror-limit=0`, `emcc -c`): **15 → 13 件** (`grep -c 'error:'`)。shim 変更前 (HEAD `00083cdb`) は本 run で 15 件を再現。消えたのは `GetLastError`・`SetLastError` 各 1 件のみ。
+- 残件 13 件 (列挙の和 = 13): `param_1` 引数不足 3・未宣言 `FUN_180fd4f30` 2・引数数不一致 1・`undefined4[8]`→`short*` 1・`uint*`→`ushort*` 1・`float*`→`uint*` 1・`rcpps` 2 引数形 1・未宣言 `FUN_180fd51cc` 1・未宣言 `FUN_180fd2d38` 1・`V128` への int 代入 1。
+- 試行 (採用せず、`ghidra_to_c.py` は HEAD のまま): `also` に `0x180fd4f30`・`0x180fd51cc`・`0x180fd2d38` を追加すると **13 → 26 件に悪化**。新規分は `puStack_28` 3・`ppuStack_10` 2・`undefined` 2・`DAT_184162358` 1・`HeapAlloc`/`HeapFree` 各 1・未関数化 `func_0x000180fe5c6c`・`func_0x000180fb6c0c`・`FUN_180fd2c90`・`FUN_180fd2c10`・`FUN_180fd1ac4` 各 1 ほか。callee を足すと閉包が広がるという §10-7j の結論と同じ。
+- 回帰 (commit `50652246`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7k と一致。
+- 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (ディレクトリ未作成が原因。`mkdir -p` 後に解消)。
+- 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`rcpps` 2 引数形・`param_1` ABI・未関数化 callee 閉包・型不一致は未着手。
