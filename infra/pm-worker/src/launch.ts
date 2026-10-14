@@ -126,24 +126,45 @@ export function noPrCooldownMs(labels: string[], cooldownH: number): number {
   return prioOf(labels) === "critical" ? ms / 2 : ms;
 }
 
+// prio:low の同時実行の上限 (LOW_CAP)。applied は『着手済みか launch 可能で blocked でない prio:critical が 1 件以上ある』ときだけ真 (engine が決める)。
+// 真の間は、未完了の prio:low の run (running) を数えて、新しい prio:low の launch を cap までに抑える。実行中の run は止めない。
+export interface LowCap {
+  cap: number;
+  running: number;
+  applied: boolean;
+}
+
+// 新しく launch してよい prio:low の残り。上限が効かないときは無限。
+export function lowAllowance(low: LowCap): number {
+  return low.applied ? Math.max(0, low.cap - low.running) : Infinity;
+}
+
 export interface LaunchInput {
   ready: ReadyIssue[];
   relaunch: number[];
   active: number;
   target?: number;
   batch?: number;
+  low?: LowCap & { isLow: (n: number) => boolean };
 }
 
 // 1 tick の枠: room = TARGET - active、枠 = min(room, BATCH, relaunch + ready)。relaunch も枠に入り、残りを ready が使う。
 // relaunch は枠 (room・BATCH) を超えても全件出す。枠を ready の件数で頭打ちにする launch_issues.py の式とは、
 // relaunch がある tick で最大 relaunch 件だけ差が出る。
-// picks = (relaunch + ready)[: max(枠, len(relaunch))]
+// picks = (relaunch + ready)[: max(枠, len(relaunch))]。prio:low の上限 (low) に達した分は、枠に入る前に落とす (並びの末尾なので他を遊ばせない)。
 export function planLaunch(input: LaunchInput): { room: number; picks: number[] } {
   const target = input.target ?? DEFAULT_TARGET;
   const batch = input.batch ?? DEFAULT_BATCH;
   const room = Math.max(0, target - input.active);
-  const relaunch = input.relaunch.length;
-  const frame = Math.min(room, batch, relaunch + input.ready.length);
-  const order = [...input.relaunch, ...sortReady(input.ready).map((r) => r.n)];
-  return { room, picks: order.slice(0, Math.max(frame, relaunch)) };
+  let left = input.low ? lowAllowance(input.low) : Infinity;
+  const admit = (n: number): boolean => {
+    if (!input.low?.isLow(n)) return true;
+    if (left <= 0) return false;
+    left--;
+    return true;
+  };
+  const relaunch = input.relaunch.filter(admit);
+  const ready = sortReady(input.ready).map((r) => r.n).filter(admit);
+  const frame = Math.min(room, batch, relaunch.length + ready.length);
+  return { room, picks: [...relaunch, ...ready].slice(0, Math.max(frame, relaunch.length)) };
 }

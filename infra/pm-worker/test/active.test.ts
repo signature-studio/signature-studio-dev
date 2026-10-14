@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { countOpencodeRuns } from "../src/active.ts";
+import { countOpencodeRuns, countRunsByPrio } from "../src/active.ts";
 import { loadConfig } from "../src/config.ts";
 import { isOpencodeRun, workflowFile, type RunState } from "../src/webhook.ts";
 import { configuredApp, issuePayload, j, markFresh, runPayload, send, T0, type Call } from "./helpers.ts";
@@ -204,4 +204,40 @@ test("NO_PR_COOLDOWN_H: 既定は 6 時間。wrangler.toml も 6 で、env で�
   assert.equal(loadConfig({ NO_PR_COOLDOWN_H: "2" }, {}).noPrCooldownH, 2);
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   assert.match(toml, /^NO_PR_COOLDOWN_H = "6"$/m);
+});
+
+test("LOW_CAP: 既定は 10。空・空白・非数・負は既定に戻し、0 は有効。wrangler.toml も 10 (#2721)", () => {
+  assert.equal(loadConfig({}, {}).lowCap, 10);
+  assert.equal(loadConfig({ LOW_CAP: "" }, {}).lowCap, 10);
+  assert.equal(loadConfig({ LOW_CAP: "  " }, {}).lowCap, 10);
+  assert.equal(loadConfig({ LOW_CAP: "abc" }, {}).lowCap, 10);
+  assert.equal(loadConfig({ LOW_CAP: "-1" }, {}).lowCap, 10);
+  assert.equal(loadConfig({ LOW_CAP: "0" }, {}).lowCap, 0);
+  assert.equal(loadConfig({ LOW_CAP: "4" }, {}).lowCap, 4);
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  assert.match(toml, /^LOW_CAP = "10"$/m);
+});
+
+test("active: 未完了の opencode.yaml の run を区分別に数える。合計は all と一致し、対応の取れない run は normal (#2721)", () => {
+  const issues = [
+    { title: "[A-1] a", labels: ["prio:low"] },
+    { title: "[A-2] b", labels: ["prio:critical"] },
+    { title: "[A-3] c", labels: [] },
+    { title: "[A-4] dup", labels: ["prio:low"] },
+    { title: "[A-4] dup", labels: [] },
+  ];
+  const run = (id: number, event: string, title: string, status: string, wf?: string) =>
+    ({ id, event, title, status, conclusion: null, updatedAt: "2026-10-14T11:00:00Z", ...(wf ? { wf } : {}) }) as RunState;
+  const runs = [
+    run(1, "issue_comment", "[A-1] a", "in_progress"),
+    run(2, "workflow_dispatch", " [A-2] b ", "queued"),
+    run(3, "issue_comment", "[A-3] c", "completed"),
+    run(4, "issue_comment", "[A-4] dup", "in_progress"),
+    run(5, "pull_request_review", "[A-1] a", "in_progress"),
+    run(6, "issue_comment", "unknown", "in_progress"),
+    run(7, "issue_comment", "[A-1] a", "in_progress", "other.yaml"),
+  ];
+  const by = countRunsByPrio(runs, issues);
+  assert.deepEqual(by, { critical: 1, normal: 3, low: 1 });
+  assert.equal(by.critical + by.normal + by.low, countOpencodeRuns(runs).all);
 });

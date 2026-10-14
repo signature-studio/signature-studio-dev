@@ -76,6 +76,8 @@ const ADDED_KEYS = [
   "mode_close", "auto_close_detected", "launch_unobserved",
   // 着手待ちの区分別の件数 (prio:critical / prio:low。#2683)
   "ready_by_prio",
+  // 未完了の run の区分別の件数と、prio:low の上限 (LOW_CAP。#2721)
+  "active_by_prio", "low_cap",
   // 実装 run の打ち切りが連続して自動の再着手を止めた issue
   "killed_stopped", "killed_issues",
   // VM の状態の取り込み (#2343)
