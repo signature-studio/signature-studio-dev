@@ -230,3 +230,15 @@ survey (n=3 とも同値。min–max は全 run で同一):
 | `function_4133f0` (unit 0x6d5700) の F3a 修復後も残る trap の発生 load | 受入 1 | #942 (次 run) |
 | unit 144 (0x25c540) の halt0 → OOB の因果 (`function_407e20__lifted`) | 受入 2・3 | #942 (次 run) |
 | unit 0x6d9ba0 (halt0) の修復との帰属 (frame 無し) | 受入 3 | #942 (次 run) |
+
+## 9. bin 表の boot 前後の状態 (#942 受入 1・2・run 5)
+
+測定 commit: `35e6031e` (origin/main)。素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk / toolchain-retdec を展開。
+`bash tools/m11/ldfix/ldfix_e2e.sh` は 36.7 秒・rc 0・judge PASS (units 17/942・icall 24・threw `memory access out of bounds`・survey ok 136 / trap 9、base = fix)。
+
+- 計測: `S4_NAME=base S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/bin_table_pre_boot.mjs` (commit 済み)。
+- PRE (イメージ読込直後・boot 前): k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k236 P=0xa027 の F が OOB。k215 P=0xee は F=0。
+- 上記 4 つの P は PE `.data` 上の生値 `0x407a50` / `0x408040` / `0x408870` / `0xa027` の上位 `0x40` を落とした値 (`m11_image.bin` は VA→LVA 補正済み) **と推定**。本 run では、生値 `0x407a50` / `0x408040` / `0x408870` / `0xa027` が PE `.data` 内に各 1 箇所 (8 バイト LE) あることだけ照合した。上位 `0x40` 欠けの因果は未確認。PE 上の値は `.text` の関数先頭アドレスに見える。
+- POST (boot 後): OOB 47 件 (57 行中。PRE の 4 件を足した全体は 51 件)。boot 中に bin 表スロットの多くが bin 表自身 (`0xfa5xxx`) を指すため、F の読みが OOB 扱いになる。走査が FastMM の正しい空きリストを表しているかは未確認。
+- 結論 (受入 1・2 の進捗): 「bin 表の不正値がイメージ段階から存在する」ことは PRE で確認。ただし、これが「書き込み元が boot 前のイメージ」を意味するかは未確認 (P 値の対応先が bin ヘッダか、隣接する別データかを切り分けていない)。ldfix の修復前後で差は無い (base = fix)。
+- 未解決 (起票先): P/F の由来 (bin ヘッダか否か) の切り分けと、POST で OOB になるスロットの書き込み元 → #942 (次 run)。

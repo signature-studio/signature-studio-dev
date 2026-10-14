@@ -45,6 +45,40 @@ fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| PE の .rdata/.data 敷設 (`ott_data_install` が空定義) | wasm 実行の memory access out of bounds の直接原因の候補 (未切り分け) | #1025 (本 issue) |
+| (解消済み) PE の .rdata/.data 敷設: 旧 `ott_data_install` 空定義は廃止し、`data_gen.py` で敷設 (実行段節参照) | wasm 実行の memory access out of bounds の原因候補だったもの | #1025 (本 issue) |
 | wasm 実行と native (`liftlib/work/kh_gain/diff` 61 シナリオ) の差分 | 受入条件 1・2 が未達 | #1025 |
-| 再現コマンド 1 本化 (実行・差分込み) | 受入条件 3 が未達 (現状は build のみ) | #1025 |
+| 再現コマンド 1 本化 (実行・差分込み) | 受入条件 3 は部分達成 (`kh_route_run.sh` で実行・native 差分まで 1 本化済み。実行には素材 `plugins-kilohearts toolchain-retdec toolchain-emsdk work-icall work-liftlib` が必要。本 run では未再実行) | #1025 |
+
+## 実行段 (本 run・2026-10-13 23:44〜00:00 UTC)
+
+測定 commit: `a1830d497085222a26e0ae50e95c218d7c82b2cf` (`tools/icall/kh_route_build.sh` と `tools/icall/kh_route_run.sh` を変えた最後の commit。実行段の数値はこの commit の worktree で測定)。
+
+`a1830d49..HEAD` の `tools/icall` のコード差分は 1 行の削除のみ (`s.replace(x, x)` は置換前後が同じ no-op のため、実行結果は不変)。付録自身の文言修正は除く (`git diff a1830d49 HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_1025.md'` の出力):
+
+```
+diff --git a/tools/icall/kh_route_run.sh b/tools/icall/kh_route_run.sh
+index ab3ba4c0..4a9d4642 100644
+--- a/tools/icall/kh_route_run.sh
++++ b/tools/icall/kh_route_run.sh
+@@ -19,7 +19,6 @@ b = "ret = M['_' + fname](...call);"
+ assert s.count(a) == 1 and s.count(b) == 1, "wasm_runner.mjs の形が変わった"
+ s = s.replace(a, "if (!M['_ott_run']) {")
+ s = s.replace(b, "ret = M['_ott_run'](%d, ...call, ...Array(8 - call.length).fill(0n));" % va)
+-s = s.replace("const sig = JSON.parse", "const sig = JSON.parse")
+ open(dst, 'w').write(s)
+ EOF
+ cp "$NAT/scen.txt" "$W/scen.txt"
+```
+
+再現: `bash tools/icall/kh_route_build.sh && bash tools/icall/kh_route_run.sh` (素材 `fl-win64 plugins-kilohearts toolchain-retdec toolchain-emsdk work-icall work-liftlib`)。
+
+| 項目 | 実測 |
+|---|---|
+| BLK | map.json `blk` (0x18a25c000) − 0x150000000 = `0x3a25c000` (前回の 0x18a25c000 は wasm32 の範囲外) |
+| flatten 窓 | `--limit 0x0c000000`。既定 0x4800000 では icall section (0x18625c000) と BLK が窓外で shift されず、`memory access out of bounds` の原因だった |
+| PE data | `data_gen.py` で `.rdata/.data/_RDATA` 敷設 (空定義を廃止)。`i64 consts shifted` 202 → 8123 |
+| wasm | `kh_route.wasm` 50,762,457 B (PE data 込み) |
+| wasm 実行 (61 シナリオ, native と同じ scen.txt) | trap 0 / 366 steps。`rax` 一致 173/366 |
+| native との比較 | **bit 一致 61/366 steps**。不一致バッファ: self 305・P 293・L 291・R 290 (step 数) |
+
+判定: **受入 1・2 は未達**。wasm が trap せず 366 step を返すところまで成立した。残る差分は float 系バッファ (`self` の f32 フィールド・`L`/`R` 出力) と `rax` の不一致で、原因は未切り分け (候補: `__asm_movss` 系 SIMD helper の lane 扱い、`__icall_comis` のフラグ、`ott_run` の引数 ABI)。

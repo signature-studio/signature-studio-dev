@@ -244,3 +244,6 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 試行: `also` に `FUN_180fd4f30`・`FUN_180fd51cc`・`FUN_180fd2d38` を追加 → decompile 20 件 OK (error 件数は未集計)。さらに `FUN_180fd2c90`・`FUN_180fd2c10`・`FUN_180fd1ac4`・`func_0x…e5c6c`・`func_0x…b6c0c` を追加 → decompile 25 件 OK、error 38 件 (`grep -c error:`)。新たに未解決 `func_0x…1f84`・`1f30`・`FUN_180fd2f20`・`FUN_180fd1b00`・`LOCK`/`UNLOCK`・`HeapAlloc`/`HeapFree` が出現。閉包は収束しなかったため、converter の変更は破棄 (コミットなし)。
 - 逆アセンブル (capstone, IAT 判定): `func_0x…81e4`・`81ec` は `jmp [rip+…]` の IAT thunk (Win API 経由)。`func_0x…bdfcc`・`648c`・`662c`・`bdef4` は通常の関数先頭。`func_0x…1f84`・`1f30` は `movsxd` で始まる通常関数。thunk は関数名の書換えでなく Win API stub として扱う必要がある。
 - 結論: callee を Ghidra 出力どおり `also` に足す方式は閉包が広がるだけで、emcc は改善しない。次 run は (a) IAT thunk を stub 化する規則、(b) `LOCK`/`UNLOCK`・`MXCSR` の意味付け、の 2 点を先に決める。
+
+#### 10-7g. #1215 (KH-23) 再 run: 呼出名 `func_0x…` の統一 (部分)
+- 結論: `ghidra_to_c.py` の呼出名統一で emcc error 31 → 25 件。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。詳細と実測は付録 `REPORT_APPENDIX.md` §10-7g。

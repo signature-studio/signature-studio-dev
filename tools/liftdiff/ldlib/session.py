@@ -174,7 +174,7 @@ class Session:
         if with_refine:
             refined = False
             for c in rec['cases']:
-                if c['outcome'] in ('diff', 'wasm_trap') and not refined and c.get('wasm_status') != 'timeout':
+                if c['outcome'] in ('diff', 'wasm_trap') and not refined and c.get('wasm_status') != 'timeout' and c['pattern'] in patterns:
                     refined = True
                     i = patterns.index(c['pattern'])
                     l1 = cases.case_line(va, name, c['pattern'], sig, trace=False, stkfill=0x00)

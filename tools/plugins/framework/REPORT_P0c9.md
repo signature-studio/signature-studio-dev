@@ -104,3 +104,19 @@
 | 受入条件 4: `hs_e2e.sh` の ext 版 E2E | 既定と ext 版の E2E 同等性が未確認 | #1283 (P0c-16, 親 #1253) |
 | 受入条件 5: `skip:no-ext-values` 3 件の原因確定 | ext 化されない関数の原因が未特定 | #1283 |
 | `rewritten` 件数の再集計 (`fw_f80.ll.ext.json`) | 作成者 run の値のみ。本 run では未取得 | #1283 |
+
+## P0c-16 (#1283): ext 版の hs_e2e 実測と skip:no-ext-values の解消確認
+
+測定 commit: `35e6031e` (origin/main = 作業ブランチ起点・コード変更なし)。素材: `fl-win64` `toolchain-emsdk` `work-fw-stage1` (`toolchain-retdec` は未使用)。
+
+| 実測 | 結果 |
+|---|---|
+| ext 指定 7 関数 (`function_5dfbe0,5dfc90,5dfd30,5dfdb0,5de820,5dedf0,5dfb60`) の `fw_stage2.sh` | exit 0・約 415 s。`ext=7 skip=0`。`function_5dfb60` / `5dfbe0` / `5dfc90` も `ext` (rewritten 13 / 21 / 18) |
+| 同上の `hs_e2e.sh --fresh` (ext 版中間生成物) | exit 1・Phase A PASS (dispatch=38 ff=0)・Phase B `memory access out of bounds` (`status=0xffffffff plug=0x0 rec=7`)・2 分 39 秒 |
+| 既定 (FW_EXT_FUNCS 未指定) の `fw_stage2.sh` | exit 0・smoke PASS・wasm 15,062,043 B |
+| 既定の `hs_e2e.sh --fresh` | exit 1・Phase B 同一の OOB (`status=0xffffffff plug=0x0 rec=7`)・2 分 37 秒 |
+
+結論:
+- `skip:no-ext-values` 3 件は、PR #1284 で RE_EXT_* が `!insn.addr` 行に一致するよう修正されたことで解消した。原因は正規表現の行末前提 (`\s*$`)。
+- ext 版 E2E の FAIL は既定版と同一の Phase B OOB であり、ext 固有の差分ではない。Phase B の OOB は #1229 (PLG-P0b-4) が扱う。
+- `f80_lower.py` / `fw_f80.py` / `fw_stage2.sh` のコード差分は `7d8b7d51..35e6031e` で 0 行。
