@@ -65,7 +65,7 @@ python3 tools/m11/ldfix/audit_lsf.py tools/m11/work/boot_final3.ll tools/m11/wor
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 前半 23 site の機械語 + IR 両面の分類 (測定時点で 0 件確定) | spill 宛の脱落関数の和集合 69 が未確定。前半 19 関数が和集合に入るかが未判定 | #2264 (open のまま。次 run で分類を継続) |
+| 前半 23 site の機械語 + IR 両面の分類 (測定時点で 0 件確定。§8 で 11 site を判定済み、残り 12 site は移管) | spill 宛の脱落関数の和集合 69 が未確定。前半 19 関数が和集合に入るかが未判定 (§8.3 の 2 関数は PM 判断待ち) | #2438 (LD-114。残り 12 site。#2264 は §8 の 11 site 判定で範囲を縮めて Closes) |
 | 後半 23 site の分類 | 同上 | #2265 (LD-98) |
 | UNDETERMINED 7 site の IR 側再検証 | 同上 | #2253 (LD-95・既存) |
 | 群 A / 群 B の分類 | 同上 | #2244 / #2245 (既存) |
@@ -113,8 +113,10 @@ python3 tools/m11/ldfix/audit_lsf.py tools/m11/work/boot_final3.ll tools/m11/wor
 - 未判定 12 site は子 issue #2438 に移した (415610 の 1 site、415c30 の 2 site、417b70、41e490、45a2a0、45b170、45c290、45d0a0 の 2 site、45d610、45f560)。
 - `tally_510.py` の [8] (store 宛 + frame 宛の目視・oracle 候補) は 69 のまま。`candidate_verdicts_1161.jsonl` は tally_510 に算入されない設計のため、変化しない。
 - `spill_classify_1161.py` の [6] では、spill 宛の確定 TRUE_DROP 20 関数のうち drops_510.tsv に無いものが 4120c0・41a5d0 の 2 関数 (和集合の追加候補)。和集合への正式な反映は tally 側の扱いを決める必要があるため、本 PR では行わない。
+- PM agent の判断待ち: 2 関数を脱落集合 (tally_510) へ入れるか・既定案: 入れない (候補判定は算入しない設計のまま。本 PR で既存の数値は変えない)。
 
 ### 8.4 検証の範囲
 
 - 判定の根拠は機械語 (`audit_lsf.descend` と capstone の逆アセンブル、PE 経路) と IR (`boot_final3.ll`、`function_X__lifted` または `function_X`) の両方を見た。確認したのは上の 11 site のみ。
 - e2e の 7/7 は判定追加の前後で成立 (rc=0)。判定の正しさを e2e は保証しない (step 7 は tsv の再生成と cmp のみ)。
+- 差し戻し対応 (review の指摘 1) の run では、素材 work-m11 / work-liftdiff が `$ARTIFACTS_DIR` に無く (fl-win64 のみ)、IR 側 (`boot_final3.ll`) の突合と `audit_lsf_ssa_e2e.sh` の再実行は行っていない。PR 本文の `oc_artifacts:` 行により review job が素材を取得して独立に検証する。本節の数値 (§8 冒頭) は 2 回目の run の実測のまま。
