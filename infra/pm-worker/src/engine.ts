@@ -9,7 +9,7 @@ import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./
 import { advanceLaunch, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
-import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
+import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, NEEDS_PM_LABEL, NO_PR_LABEL, STUCK_LABEL, type HistoryEntry, type PmTarget } from "./pm.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
 import {
@@ -34,6 +34,15 @@ const NO_PR_MAX_RELAUNCH = 3;
 // oc-watchdog の最短送信間隔は WATCHDOG_INTERVAL_S (既定 300 秒 = VM の pm_watchdog_ping.sh と同じ 5 分) から、この分だけ短い。
 // tick は毎分 (cron と alarm) で、わずかに早い tick を弾くと次の送信が 1 分遅れ、周期が 6 分になるため。
 export const WATCHDOG_JITTER_MS = 30_000;
+// open issue 数の履歴は 1 時間ごとに 1 点、最大 48 点 (48 時間分)。open_issues_delta_24h の基準に使う。
+export const OPEN_SAMPLE_MS = 3_600_000;
+export const OPEN_SAMPLE_MAX = 48;
+const DAY_MS = 24 * 3_600_000;
+
+export interface OpenSample {
+  at: number;
+  open: number;
+}
 
 export interface Planned {
   n: number;
@@ -610,6 +619,16 @@ export class Engine {
     return !!this.meta.fullSyncAt && !!this.meta.reconcileAt && this.d.now() - this.meta.reconcileAt < STALE_AFTER_MS && !this.meta.syncTruncated;
   }
 
+  // open issue 数を 1 時間ごとに記録する。同期が古い間・一覧を打ち切った間は記録しない (誤った数を残さない)。
+  private sampleOpen(now: number): void {
+    if (!this.fresh()) return;
+    const hist = this.d.store.get<OpenSample[]>("meta", "openHist") ?? [];
+    const last = hist[hist.length - 1];
+    if (last && now - last.at < OPEN_SAMPLE_MS) return;
+    const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
+    this.d.store.put("meta", "openHist", [...hist, { at: now, open }].slice(-OPEN_SAMPLE_MAX));
+  }
+
   // Review-Only の状態は DO に保存する (未保存なら review_only: true)。
   private phase(): PhaseState {
     return this.d.store.get<PhaseState>("meta", "phase") ?? { review_only: true };
@@ -868,6 +887,7 @@ export class Engine {
       this.setError(now, e instanceof GhError ? e.message : "tick failed");
       this.pushLog({ kind: "error", note: this.meta.lastError?.what });
     }
+    this.sampleOpen(now);
     this.saveMeta();
     return { ready: true };
   }
@@ -904,6 +924,28 @@ export class Engine {
     const counters = this.meta.counters ?? this.zero();
     const rest = this.meta.rest;
     const lastError = this.meta.lastError ? { ...this.meta.lastError, what: this.clean(this.meta.lastError.what) } : null;
+    // 自律運転の指標。件数と時間だけで、題名・本文・login は出さない (issue / PR 番号は可)。
+    const now = this.d.now();
+    const openIssues = Object.values(this.s.issues).filter((i) => i.state === "open");
+    const openPrs = Object.values(this.s.prs).filter((p) => p.state === "open");
+    const withLabel = (l: string) => (x: { labels?: string[] }) => (x.labels ?? []).includes(l);
+    const stuckAges = openPrs
+      .filter(withLabel(STUCK_LABEL))
+      .map((p) => Math.max(0, Math.floor((now - Date.parse(this.s.sig[String(p.number)]?.stop?.at ?? p.updatedAt)) / 60_000)));
+    const noPrByReason = { split: 0, artifact: 0, unknown: 0, blocked: 0, stop: 0 };
+    for (const i of openIssues.filter(withLabel(NO_PR_LABEL))) {
+      const r = this.s.sig[String(i.number)]?.outcome?.reason;
+      if (r && r in noPrByReason) noPrByReason[r as keyof typeof noPrByReason]++;
+    }
+    const countLabel = (l: string) => openIssues.filter(withLabel(l)).length + openPrs.filter(withLabel(l)).length;
+    const mergedDay = Object.values(this.s.prs).filter((p) => {
+      const t = p.mergedAt ? Date.parse(p.mergedAt) : NaN;
+      return p.merged && t > now - DAY_MS && t <= now;
+    });
+    const refsOnly = mergedDay.filter((p) => p.refsOnly === true).length;
+    // 24 時間前以前の点のうち最も新しいもの。無ければ (履歴が 24 時間分に満たない) null。
+    let base: OpenSample | undefined;
+    for (const h of this.d.store.get<OpenSample[]>("meta", "openHist") ?? []) if (h.at <= now - DAY_MS && (!base || h.at > base.at)) base = h;
     return {
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
@@ -931,6 +973,14 @@ export class Engine {
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
       pm_detected: pmDetected,
+      stuck: stuckAges.length,
+      stuck_age_max_min: stuckAges.length ? Math.max(...stuckAges) : null,
+      needs_pm: countLabel(NEEDS_PM_LABEL),
+      needs_user: countLabel(NEEDS_USER_LABEL),
+      no_pr_by_reason: noPrByReason,
+      refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
+      open_issues_delta_24h: base ? open - base.open : null,
+      pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
       // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE_DISPATCH では空。
       would_dispatch_pm: this.d.cfg.liveDispatch ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
       last_full_sync: this.meta.fullSyncAt ? iso(this.meta.fullSyncAt) : null,

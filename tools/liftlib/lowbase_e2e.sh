@@ -12,8 +12,9 @@
 #       bit 一致を再現 (tools/hostbridge/lowbase の成果物と同じ水準。成果物は work/x64c_* に分離)
 #   --full : 追加で tools/hostbridge/lowbase/lowbase_e2e.sh 全体 (RetDec chain + 同居 + Chrome) を走らせる
 #
-# 前提 (読取のみ): tools/m6/work の OTT lift 成果物, tools/m10/work/ott_m10.{ll,cjs}, tools/ott/work/libottnative.so,
+# 前提 (読取のみ): tools/m6/work の OTT lift 成果物, tools/m10/work/ott_m10.{ll,cjs},
 #                 tools/hostbridge/lowbase (audit_va.py / build_x64c.sh / diff/matrix.py), python3 (capstone, pefile)
+#                 libottnative.so は [3] で tools/ott/native/build.sh が HEAD ソースから作る (素材の .so は古い場合がある)
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"; T="$HERE/.."; LB="$T/hostbridge/lowbase"
 source "$T/shared/env.sh"
@@ -48,7 +49,7 @@ for B in 0x10000 0x1230000; do
 done
 
 step "[3] x64c native bit 一致の再現: 3 構成 × 89 scenario (150,708 cell)"
-[ -e "$T/ott/work/libottnative.so" ] || { echo "前提無し: tools/ott/work/libottnative.so (bash tools/ott/... )" >&2; exit 2; }
+bash "$T/ott/native/build.sh" > "work/build_native.log" 2>&1; chk $? "libottnative.so を HEAD ソースから再ビルド (tools/ott/native/build.sh・素材の .so は使わない)"
 TOT=0
 for spec in "0x10000 16" "0x1230000 40" "0x10000 8"; do
   set -- $spec; B=$1; MI=$2

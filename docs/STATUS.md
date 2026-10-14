@@ -1,7 +1,7 @@
 # STATUS — 技術進捗の正本
 
-本ファイルが**技術進捗**に関する唯一の正本である (チケット状態の正本は Project V2 の Status
-フィールド + issue の open/closed。`docs/WORKFLOW.md` §3)。
+本ファイルが**技術進捗**に関する唯一の正本である (チケット状態の正本は issue の open/closed + ラベル + PR の状態。
+分類の表は `docs/WORKFLOW.md` §3。Project V2 の Status は参考)。
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
 - 更新責任: merge の事実を反映する更新は agent も PR で行ってよい。自動節 (§5) は `tools/pm/status_sync.py` が更新する (#2361)。方針の変更・MS の定義の改訂は PM。
