@@ -168,19 +168,21 @@ C (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) は同じ順序で引�
 - [x] 3. mock と C の差分検査で diffs 0 — `tests/channels_diff.mjs` 192 呼出し、diffs 0。
 - [x] 4. `FL_ENGINE=wasm node tests/all_tools.mjs` が 48/48 ok — 実測 48/48 (下表)。
 
-### 8.5 検証 (測定 commit `ecaa7658`)
+### 8.5 検証 (測定 commit `7ff61a39`)
 
-- 測定 commit: `ecaa7658` (コードを変えた最後の commit。対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`)。
-- 差分確認: `git diff ecaa7658 HEAD -- tools/python/provider tools/python/host tools/python/tests` は REPORT 更新 commit 以降 0 行 (REPORT のみの変更)。再測定は不要。
-- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf <archive> -C <dir> extracted/...`)。CPython 3.12.1 wasm は `build_cpython_wasm.sh` で作成 (rc 0・約 3.5 分)。`FLPY_SKIP_TABLE=1 build_flpy.sh` で flpy を作成 (rc 0)。
+- 測定 commit: `7ff61a39` (main 取り込みの merge。コードを変えた最後の commit。前回の測定は `ecaa7658`。PY-40 の対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`)。
+- 差分確認: `git diff 7ff61a39 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (REPORT のみの変更)。再測定は不要。
+- HEAD `454b1cc1` (その後の main 取り込み merge) で下表の検証を再実行し、同じ結果を再現した (provider build・provider_check・channels_diff・all_tools・tests/*_diff.mjs 14 本)。
+- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf <archive> -C <dir> extracted/...`)。CPython 3.12.1 wasm は `build_cpython_wasm.sh` で作成 (rc 0・実測 4 分 28 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` で flpy を作成 (rc 0)。emsdk 6.0.12 は本 run で `/opt/emsdk` に導入。`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) で `work/midi.py`・`work/utils.py` 等を配置 (rc 0)。
 
 | 検証 | 結果 (実測) |
 |---|---|
-| `bash provider/build.sh` | rc 0。`gen_provider.py --check-handlers` の handler 126。`dist/flprov.wasm` 60,417 B |
-| `node tests/channels_diff.mjs` | calls 192・diffs 0・PASS |
-| ネガティブコントロール (mock の focusEditor の index 範囲検査を外す) | diffs 2 件 (`focusEditor [3]`・`focusEditor [-1,false]`)・exit 1。元に戻すと PASS |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (1.3 秒) |
-| `node tests/provider_check.mjs` | functions 435・implemented 126・unimplemented 309・mcp_static 60・PASS |
+| `bash provider/build.sh` | rc 0。`gen_provider.py --check-handlers` の handler 129 (main の PY-101・PY-102 を含む)。`dist/flprov.wasm` 60,710 B |
+| `node tests/channels_diff.mjs` | calls 201・diffs 0・PASS (main の GridBit 9 呼出しを含む) |
+| ネガティブコントロール (mock の focusEditor の index 範囲検査を外す) | 再実行していない。`ecaa7658` 時点の記録は diffs 2 件・exit 1。merge は focusEditor の周辺を変えていない |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (2.3 秒) |
+| `node tests/provider_check.mjs` | functions 435・implemented 129・unimplemented 306・mcp_static 60・PASS |
+| `node tests/*_diff.mjs` (14 本) | 全て rc 0・diffs 0・PASS (arrangement・arrangement_selection・channels・device・general・ilmcp・midi_path・mixer・playlist・screen・transport・ui・ui_display・ui_state) |
 
 - 起動・GUI の KPI (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウ) は**動かしていない** (flapi の引数検査だけの変更で、FLEngine の boot は実行していない)。
 - 解析手段: 静的 (`analysis/flapi/pe_disasm.py` 系)。素材の `block00031_PE.bin` を使う再解析は run 7 では行っていない (§8.3 の未確定点は run 2〜6 の記録のとおり)。
