@@ -142,3 +142,60 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | §15.4 | #360: 追加素材での full e2e before/after (main で #378 後に追記) | `REPORT_APPENDIX_E.md` |
 | §15.6 | #346 受入 2: 現 HEAD (4b3616e5) での置換前後 e2e 一致 | `REPORT_APPENDIX_F.md` |
 | §16 | P0c-8 (#311): ext IR の wasm32 検証 + framework 統合 | `REPORT_APPENDIX_F.md` |
+
+## 17. #1366 (CI-26): lift 段の alloca 並び正規化と before/after 一致
+
+- **方式**: `lift_ranges.sh` に opt-in 段 (`PLUG_CANON_ALLOCA=1`) を追加し、`ir5_patch` (A7 で uselistorder 除去済み) の後に `liftlib.passes.base.canon_alloca_order` を掛ける。正本は liftlib 側 (`passes/canon_alloca.py` は import のラッパ)。既定 0 のため他の lift は不変。p0c_e2e.sh の k80 lift だけ有効化。理由: 比較時だけ正規化すると `k80.lift.ll` 自体が揺れたまま残るため、lift 段で固定した。
+- **測定 commit**: `d5959204`。
+- **素材**: `fl-win64` (`[WIN64]` の `extracted/block18983_PE.bin`)、`toolchain-retdec` (`[RETDEC]`, RetDec v5.0)。`toolchain-emsdk` (`[EMSDK]`, clang-24)。
+- **llvm-as**: `toolchain-emsdk` に `llvm-as` が無いため、システムの LLVM 18 の `llvm-as` を PATH に追加して `p0c2_e2e.sh` step [4] を通した (スクリプトは無変更)。
+
+### 受入条件の結果
+
+| 条件 | 結果 |
+|---|---|
+| 1. lift 段で canon_alloca 相当の正規化 | 達成 (上記 opt-in 段) |
+| 2. 同一入力 2 回で `lift.ll` / `final.ll` の sha256 一致 | 達成。`lift.ll` `628fa71e...` 両 run 一致、`final.ll` `5a5aee3c...` 両 run 一致 |
+| 2'. `drc.ll` (RetDec 生出力) の sha256 一致 | **未達**。alloca 並びと `uselistorder` 行が実行ごとに揺れる。正規化後 (run_base + canon) の base は一致。→ #1560 |
+| 3. 置換前後の p0c2 出力一致 (lift の取り直しなし) | 達成。canon 無し lift (`d38a7c66...`) と canon 有り lift (`628fa71e...`) を同一 p0c2 に通し、`p0c2_sweep.csv` が `cmp` 一致 |
+
+### 実測 (HEAD `d5959204`・素の work/ から再生成)
+
+| e2e | rc | 所要 | load (前→後) |
+|---|---|---|---|
+| `p0c_e2e.sh` (lift 込み・k80 80 kernel) | 0 | 514 s | 0.70 → 7.86 |
+| `p0c2_e2e.sh` | 0 | 50 s | 7.86 → 3.98 |
+
+k80 lift 単体の測定commit時点の旧所要時間は**記録しない**。測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が無く、条件不明の数値は判定に使えないため。`b38ff403` 以降の所要時間は下記の 3 run を記録する。
+- **再測定 (PM run と reviewer の実測・測定 commit 以降の差分分)**: 条件は `PLUG_CANON_ALLOCA=1` のみ。`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`・`PLUG_REUSE_DRC` は未設定 (RetDec を実行)。素材は `fl-win64` と `toolchain-retdec` を展開して使用。入力は `kernel_table.json` から生成した k80 ranges (80 kernel。`tools/plugins/lift/kernel_ranges_balance.txt` と一致)。一時ディレクトリで実行。
+  - 「所要」の定義: `lift_ranges.sh` 1 回の実行の lift 全体 wall (RetDec 段を含む)。「最終 `cleanup`」は `k80.retdec.log` 最後の phase の時間で、RetDec 段の内訳の 1 つ。
+  - 測定 run は 3 回 (rc は記録のある run すべて 0):
+    - PM run (HEAD `b38ff403`): 所要 2 s (秒精度)・最終 `cleanup` 1.76 s・`k80.drc.ll` = `b760d51a…`
+    - reviewer 1 回目 (HEAD `b38ff403`): 所要は記録なし (旧記載の「4 s」は条件・定義が確認できないため採用しない)・`k80.drc.ll` = `aa52403e…`
+    - reviewer 2 回目 (HEAD `1ad307fd`): 所要 4.4 s・最終 `cleanup` 2.93 s・`k80.drc.ll` = `097478ab…`
+    - 所要の min–max: 2 s〜4.4 s (記録のある 2 run)
+  - `k80.lift.ll` sha256 = `628fa71edeca59318c75e48287cc09e108b09894240b12b34393d64b80ac3b6f` (**一致**。PM run と reviewer 2 回目の 2 run で確認。全長)
+  - `k80.final.ll` sha256 = `5a5aee3c…` (一致。先頭 8 桁のみ確認。全長は review 本文に無い)
+  - `k80.drc.ll` sha256 は実行ごとに揺れる (受入 2' 未達の根拠。#1560 に紐づけ): `b760d51a…` (PM run) / `aa52403e…` (reviewer 1 回目) / `097478ab…` (reviewer 2 回目)。単独の値は参考にしない。
+  - 注: 本 run (fix モード) では再測定していない (PM 指示)。上記は PM run と reviewer の実測の転記。
+- 再測定不可 (履歴。HEAD `9d943df3` 時点の記録): 修正時点の runner には `toolchain-retdec` ([RETDEC]) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
+- 再試行 (fix モード, HEAD `9d943df3`): `$ARTIFACTS_DIR` は `fl-win64` のみ。`[RETDEC]` の実体が無いため RetDec 段を実行できず、k80 lift を再実行していない (rc・所要・load・sha256 は未取得)。`oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に追記した。この時点の再測定は未実施 (後続の HEAD `b38ff403` 再測定で実施済み。上記「再測定」行)。
+- 一致判定 (受入条件 2・3) は lift の sha256 と `p0c2_sweep.csv` の `cmp` で行い、所要時間には依存しない。
+
+### 検証の注記
+- 置換前後の lift 比較は同じ `block18983_PE.bin` / 同じ 80 ranges。`before` は `PLUG_CANON_ALLOCA` 未設定、`after` は設定。p0c2 の before/after は `work/k80.lift.ll` を差し替えて各 1 回ずつ実行 (50 s / 51 s)。
+- `argfix.ll` (中間 IR) のテキストは alloca 番号が変わるため before/after で byte 差が出る。最終判定の `p0c2_sweep.csv` は一致。
+
+### 差分 (測定 commit 以降のコード差分)
+測定 commit = `d5959204`。p0c 配下のコード差分は 0 (`git diff d5959204 HEAD -- tools/plugins/p0c` は `REPORT.md` の 32 行追加のみ)。
+
+ただし k80 lift が実行する `tools/plugins/lift/lift_ranges.sh` は main 取り込み (`243f75d9`) で変わっている (`git diff d5959204 HEAD -- tools/plugins/lift/lift_ranges.sh`):
+- `PLUG_NO_STATIC_DETECT` (RetDec に `--disable-static-code-detection`) を追加。展開は `${PLUG_NO_STATIC_DETECT:+...}` で、未設定時は空になる。
+- `PLUG_I32PTR_FUNCS` の有無で `fix_i32_ptr_arg.py` を通す `i3.ll` 段を追加。未設定時は `cp` で従来どおり。
+
+既定 (両変数未設定) の経路は、bash で展開を確認し引数・出力とも変わらないと判断した。`p0c_e2e.sh` は両変数を設定しない。`lift_ranges.sh` は `bash -n` を通る。
+
+これは「差分 0」ではない。`WORKFLOW.md` §6 に従い、差分分 (k80 lift が通る `lift_ranges.sh`) を HEAD `b38ff403` で再測定した (上記「再測定」行。reviewer の実測。`k80.lift.ll` sha256 一致)。§17 の lift 514 s / p0c2 50 s は `d5959204` 時点の値。p0c2 は `k80.lift.ll` の sha256 一致により同一入力とみなし、再実行していない。
+
+- **PM 判断 (#1366 コメント)**: 「既定経路の等価性での受入」(§6 例外 (b)) は**採用しない**。再測定で `k80.lift.ll` の一致を確認したため、例外は不要。受入 2' の未達 (生の `k80.drc.ll`) は #1560 [CI-28] に分割し、本 PR は `Refs #1366` の部分達成とする。
+- 現 head は `b38ff403` 以降、REPORT.md (本節の記述) のみの差分。コード差分は無い。
