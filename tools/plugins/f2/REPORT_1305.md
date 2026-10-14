@@ -229,7 +229,7 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
   - 鮮度: `git diff 4048b18a 458a92f2 -- tools/plugins/f2/fn_refs.py tools/plugins/f2/unicorn_trace.py` = 0 行 (測定対象の `.py` は不変)。
   - `fn_refs.py $PE 0x407a00 0x867c88 0x41b290 0x41b2c0 0x847120 0x409090 0x867100`: rc=0、wall 12.96 秒。出力は上記の結論と一致 (`0x407a00` の格納元は `0x867c88` のみ、`0x867c88` の rip 参照は `0x4093ae`・`0x409455`・`0x41b294`、`0x407a00` への rel32 は 9 件、`0x867100` への lea は 4 件)。
   - `unicorn_trace.py $PE 0x83efb0 -H -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、`UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0x0`、書込み 0 件。
-  - `unicorn_trace.py $PE 0x409090 -H -q 0x867100 -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、書込み 28 件 (rip=0x4090a1〜0x4090f9)。
+  - `unicorn_trace.py $PE 0x409090 -H -q 0x867100 -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、書込み 28 件 (rip=0x4090a1〜0x409159 の 7 種)。
 - 未解決 (#2303 の残件。起票先は本 issue。実経路で `0x847120`・`0x409090` を呼ぶ上位関数を確定する必要あり): (a) `0x847120` の呼出し元 `0x83f637` が `0x83efb0` の経路に乗るか、(b) `0x409090` の呼出し元 `0x41bc60` (表 `0x8526c0`) が実行時に埋まる経路、(c) `[rax-8]` のチャンクヘッダ形式 (受入 3)、(d) `0x411bb8` 記録 (受入 5)。
 
 ## 16. PLG-F3-27 続き (#2303): arena の前処理と chunk header 形式 (部分、測定 commit a70461d6、block19148)
