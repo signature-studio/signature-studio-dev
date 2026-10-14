@@ -170,7 +170,7 @@
 
 ### 測定
 
-- 測定 commit: `04f04b9b` (解析スクリプト `analysis/py160_reach.py`・`analysis/py160_dis.py` を入れた commit)。`git diff 04f04b9b HEAD -- tools/python/analysis` の出力は 0 行 (後続は REPORT のみ)。
+- 測定 commit: `04f04b9b` (解析スクリプト `analysis/py160_reach.py`・`analysis/py160_dis.py` を入れた commit)。測定に使った script の差分 `git diff 04f04b9b HEAD -- tools/python/analysis/py160_reach.py tools/python/analysis/py160_dis.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py88_writes.py` の出力は 0 行 (検証時点の HEAD)。`tools/python/analysis` 全体では main 取り込みで別 script 4 件が増えたが、本測定では使っていない。
 - 素材: `oc_artifacts: fl-win64`。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/py64 --wildcards '*block00031_PE.bin'` (2.9 秒)。`work/` は gitignore。
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` (`fn=4664`)。補助: `python3 analysis/py160_dis.py <PE> <lo> <hi>`。
 - 到達定義: `python3 analysis/py160_reach.py work/py53/fn.txt` (fn.txt の全 jcc/jmp 辺から CFG を作る。799 ブロック・間接ジャンプ 0 件)。kill は `dword ptr [rbp + 0x5b8]` への直接 store (74 命令)。部分幅の書込みは 0 件。`[rbp+0x5b8]` のアドレスを取る `lea` は 0x104a924 の 1 箇所のみで、その `call 0xc61250` (0x104a92b) を may-gen (kill なし) として入れる。
