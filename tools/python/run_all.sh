@@ -7,12 +7,14 @@ cd "$HERE"
 command -v node >/dev/null || export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 # shellcheck disable=SC1091
 source "$HERE/../shared/env.sh"   # FL_WIN64_DIR / FL_MAC_DIR 等 (環境変数があればそれを優先)
-FL_MAC="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Libs/FLEngine_x64.dylib"
+FL_MAC_APP="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app"
+FL_MAC="$FL_MAC_APP/Contents/Libs/FLEngine_x64.dylib"
 FL_WIN="$FL_WIN64_DIR/extracted/block00031_PE.bin"
-# step 3b (scripts_inventory) と step 4 (flapi 抽出) は mac pkg 全体が要る。欠けていれば空出力を作らず先頭で止める (#630)
-for f in "$FL_MAC" "$FL_WIN" "$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/System/Tools/MCP/MCPTools.pyc"; do
-  [ -f "$f" ] || { echo "ERROR: 前提不足で停止: $f が無い (mac は FL_MAC_DIR に pkg_extract が要る。analysis-mac-shared は Shared/ のみ / #630)" >&2; exit 2; }
-done
+[ -s "$FL_WIN" ] || { echo "ERROR: 前提不足で停止: $FL_WIN が無い (oc_artifacts: fl-win64 / FL_WIN64_DIR)" >&2; exit 2; }
+# mac pkg (pkg_extract) は win64 素材だけの環境には無い (analysis-mac-shared は Shared/ のみ / #630)。
+# mac pkg を読む step (3b・4 の mac 版・7) は pkg があるときだけ実行し、無いときは追跡済みの出力を使う (#2649)
+MAC_PKG=0
+[ -f "$FL_MAC" ] && [ -f "$FL_MAC_APP/Contents/Resources/FL/System/Tools/MCP/MCPTools.pyc" ] && MAC_PKG=1
 step() { printf '\n== %s\n' "$*"; }
 PY312="$HERE/work/build-native/install/bin/python3.12"
 
@@ -20,16 +22,22 @@ step "1. inputs";               bash fetch_inputs.sh
 step "2. CPython 3.12.1 wasm";  bash build_cpython_wasm.sh | tail -4
 step "3. MCPTools.pyc 解析 (3.12 dis/marshal)"; "$PY312" analysis/mcp_extract.py > analysis/mcp/mcp_tools.json
 python3 -c "import json;d=json.load(open('analysis/mcp/mcp_tools.json'));print('tools:',d['tool_count'],'imports:',len(d['imports']))"
-step "3b. FL 同梱スクリプト 65 本の import 実測"; "$PY312" analysis/scripts_inventory.py > analysis/scripts_inventory.json
+step "3b. FL 同梱スクリプト 65 本の import 実測"
+if [ "$MAC_PKG" = 1 ]; then "$PY312" analysis/scripts_inventory.py > analysis/scripts_inventory.json; else echo "SKIP: mac pkg なし ($FL_MAC_APP)。追跡済み analysis/scripts_inventory.json を使う (#2649)"; fi
 python3 -c "import json;d=json.load(open('analysis/scripts_inventory.json'));print('files:',sum(d['counts'].values()),'stdlib:',len(d['stdlib_modules_used']),'fl modules:',len(d['fl_modules_used']))"
 step "4. flapi 抽出 (mac x86_64/arm64 + win)"
-python3 analysis/flapi_extract.py "$FL_MAC" --arch x86_64 > analysis/flapi/raw_mac_x86_64.json
-python3 analysis/flapi_extract.py "$FL_MAC" --arch arm64  > analysis/flapi/raw_mac_arm64.json
+if [ "$MAC_PKG" = 1 ]; then
+  python3 analysis/flapi_extract.py "$FL_MAC" --arch x86_64 > analysis/flapi/raw_mac_x86_64.json
+  python3 analysis/flapi_extract.py "$FL_MAC" --arch arm64  > analysis/flapi/raw_mac_arm64.json
+else
+  echo "SKIP: mac 版 (x86_64/arm64) は mac pkg なし。追跡済み analysis/flapi/raw_mac_*.json を使う (#2649)"
+fi
 python3 analysis/flapi_extract.py "$FL_WIN"               > analysis/flapi/raw_win64.json
 python3 analysis/flapi_table.py
 step "5. flpy link";           bash build_flpy.sh | tail -4
 step "6. smoke (print(1+1) + stdlib)"; node tests/smoke_direct.mjs
-step "7. builtin 一覧 / FL 同梱 Python 差分"; node tests/dump_builtins.mjs; python3 analysis/py_inventory.py > analysis/python_inventory.json
+step "7. builtin 一覧 / FL 同梱 Python 差分"; node tests/dump_builtins.mjs
+if [ "$MAC_PKG" = 1 ]; then python3 analysis/py_inventory.py > analysis/python_inventory.json; else echo "SKIP: mac pkg なし。追跡済み analysis/python_inventory.json を使う (#2649)"; fi
 step "8. PoC: MCPTools.pyc on wasm Python + flapi mock (Worker/SAB RPC)"; node tests/poc_mcp.mjs | grep -E '"(tools|init_ms|host_calls|roundtrip_us_per_flapi_call)"|POC'
 step "8b. kwargs 省略引数の誤束縛 0 検証 (PY-15 #653, wasm 不要)"; python3 tests/kwsig_bind_check.py
 step "9. 48 tools 全実行"; node tests/all_tools.mjs
@@ -49,6 +57,7 @@ node tests/pyscript_browser.mjs --dump work/pyscript_chrome.json | grep -E '^\{"
 python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json
 python3 tests/pyscript_compare.py work/pyscript_node.json work/pyscript_chrome.json --neg >/dev/null && { echo "NEG が不一致を検出しなかった"; exit 1; } || true   # ネガコン: exit 1 で検出できたとき正常
 step "10. headless Chrome (module Worker + SAB)"; node tests/browser_check.mjs
+step "10b. headless Chrome: Worker 内の静的版 (flpy_static) 48 tool を SAB 版 (flpy + provider) と比較 (PY-81 #2634)"; node tests/static_browser_check.mjs
 step "11. MCP JSON-RPC を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-4 #77)"; (cd "$HERE/../.." && node tools/python/tests/mcp_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "12. MIDI scripting ホスト (PY-6 #76): device script ローダ・27 callback・Web MIDI 結線 (合成 fixture) + 同梱 device script"
 node tests/midi_script.mjs | cut -c1-300
@@ -60,6 +69,6 @@ node tests/subinterp_probe.mjs --neg | cut -c1-120 || [ $? -eq 1 ]
 bash tests/subinterp_negcontrol_old.sh | tail -2                     # ネガコン: 修正前 flpy.c (PY-12 #587) で probe が FAIL すること
 step "14. MIDI scripting を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-6 #76)"; (cd "$HERE/../.." && node tools/python/tests/midi_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "15. Chord progression 41 本 (pyc 39 + pyscript 2) の import / 実行 (PY-7 #78, mock 条件つき)"
-[ -d work/fl_extract ] || python3 analysis/extract_pyc_blocks.py work/fl_extract
+rm -rf work/fl_extract; FL_WIN64_DIR="$FL_WIN64_DIR/extracted" "$PY312" analysis/extract_pyc_blocks.py work/fl_extract | tail -1
 node tests/chord_progression_e2e.mjs | tail -1
 step "ALL OK"

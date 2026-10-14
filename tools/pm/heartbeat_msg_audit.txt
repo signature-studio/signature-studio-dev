@@ -1,0 +1,13 @@
+[heartbeat 2時間ごと / 自動送信 / 監査 + 停滞の是正] 依頼者の指示 (PM と GitHub Actions agent にはプロジェクトを前進させる責任がある。停滞を確認したら即座に修正する) に基づく定時点検です。判断はすべて PM に委ねられています。
+1) 監査 (調査は読み取り専用の subagent に回し、結果は自分で検証する。REST は 1 本あたり 150 回以内):
+   - Actions: 直近 2 時間と 24 時間の run を workflow 別・結論別に集計し、failure/cancelled は原因別 (LLM 障害、runner 打ち切り exit 143、素材名の誤記、step の不具合など) に分ける。in_progress/queued と同時 60 に対する使用率。Workers Builds の成否と Worker の /status (fresh、last_tick、active_all、launched/dispatched/pmDispatched、ready/stopped/blocked、ready_by_prio)。
+   - チケット: open の issue/PR の増減、oc:stuck・needs-user-input・oc:no-pr の件数と滞留時間、担当なしの open PR、approve 済みで未 merge の PR、Refs のみで merge された親、blocked_by の循環、題名番号の重複。
+   - 開発フロー: 1 時間あたりの merge 件数と review の待ち時間、差し戻し回数/PR、レビューを経ない merge (merged_by が実装 App で merge 前に APPROVED なし) の件数、Ruleset main-require-review が active か、PM agent (oc-pm) の動作、REST の残量。
+2) 製品 KPI (必須。前回の値は /home/ubuntu/work/analysis/kpi_last.json。比較して記録し、更新する):
+   - K1 FLEngine 起動: x64c 路線 (tools/flelift/boot/REPORT.md の dispatch/完走数) と RetDec 路線 (tools/m11/REPORT.md の通過 unit 数、到達段)。
+   - K2 最初の FL ウィンドウ: ブラウザで FL の実物が描画された証拠 (スクリーンショットと PR) の有無。
+   - K3 臨界経路 (ラベル prio:critical): open 件数、稼働中の run 数、直近 6 時間の merge 件数。
+3) 停滞の判定 (いずれかに該当): K1 が 4 時間以上不変で、かつ prio:critical の merge が直近 6 時間で 0 件 / prio:critical の稼働 run が 0 本 / ready=0 かつ room>0 が 1 時間以上 / merge が直近 2 時間で 5 件未満 / 同じ issue の再着手ループ / docs・Refs のみの PR が直近 24 時間の merge の過半。
+4) 停滞を確認したら、その場で是正する (調査・実行は subagent に委任し、判断は PM が行って issue/PR に記録する): 臨界経路の issue を起票・分割・優先化する、詰まりの原因 (RAM、依存、素材、レビュー待ち、循環、Worker の規則) を除く、周辺作業の優先度を下げる、D5 (x64c 主力) に反する作業を止める。依頼者の判断を待たない (依頼者の領分は、実機、資格情報、課金、法的な最終判断のみ)。
+5) 重大 (secrets の漏えい、review gate の迂回、全体の停止) は直ちに依頼者へ知らせ、結果を GitHub Discussions に残す。
+6) 要約の投稿: 点検の結果 (KPI K1〜K3 の前回比、見つけた異常、行った是正と issue/PR 番号) を、報告スレッドにコメントとして追記する。スレッドの node id は /home/ubuntu/work/analysis/discussion_report.json の id。GraphQL の addDiscussionComment(discussionId, body) を 1 回だけ使う。本文に `/oc` を含む文字列、内部パス、認証情報を書かない。公開の場なので未修正のセキュリティの細部を書かない。

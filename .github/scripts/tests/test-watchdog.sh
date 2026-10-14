@@ -177,6 +177,15 @@ wd
 not_logged 'repos/o/r/dispatches' && not_logged 'add-label oc:stuck'
 expect "conflict PR without head.repo -> treated as fork, no dispatch" $?
 
+# 1i. fork からの差し戻し PR (FIX_IDLE) も dispatch しない (write 権限の run を第三者の入力で動かさない)。oc:stuck も付けず、一覧に出して次へ進む
+reset
+base "[$(pr 1 aaa111 false "$OLD" '[]' '' fork-user/signature-studio-dev),$(pr 2 bbb222 true "$OLD")]"
+detail 1 true "[$(review "$REVIEWER" aaa111 CHANGES_REQUESTED)]"
+detail 2 true
+wd
+not_logged 'repos/o/r/dispatches' && not_logged 'oc-dispatch' && not_logged 'add-label oc:stuck' && logged 'pr ready 2' && grep -q 'fork からの PR' "$TMP/out"
+expect "fork changes_requested PR -> no dispatch, no oc:stuck, listed and skipped" $?
+
 # 1d. マーカーを偽装した他アカウントのコメントは数えない
 reset
 base "[$(pr 1 aaa111 false "$OLD")]"
@@ -209,13 +218,21 @@ wd
 logged 'pr ready 2'
 expect "draft -> ready" $?
 
-# 3. 現在の head に差し戻しがあるのに fix が無い -> [watchdog] 再提出
+# 3. 現在の head に差し戻しがあるのに fix が無い -> repository_dispatch (oc-fix, changes-requested)。差し戻しは再提出しない (#719)
 reset
 base "[$(pr 3 ccc333 false "$OLD")]"
 detail 3 true "[$(review "$REVIEWER" ccc333 CHANGES_REQUESTED)]"
 wd
-logged 'pr review 3 .*--request-changes' && logged '\[watchdog\]'
-expect "unfixed changes_requested -> [watchdog] re-request" $?
+logged 'client_payload\[pr\]=3' && logged 'client_payload\[reason\]=changes-requested' && not_logged 'pr review 3'
+expect "unfixed changes_requested -> repository_dispatch oc-fix (no re-request)" $?
+
+# 3b. 同じ head の差し戻しの fix dispatch が上限 (3 回) に達したら oc:stuck で止める (#719)
+reset
+base "[$(pr 3 ccc333 false "$OLD")]"
+detail 3 true "[$(review "$REVIEWER" ccc333 CHANGES_REQUESTED)]" "[$(for _ in 1 2 3; do printf '{"user":{"login":"%s","type":"Bot"},"body":"x <!-- oc-dispatch:ccc333 -->"},' "$REVIEWER"; done | sed 's/,$//')]"
+wd
+logged 'pr edit 3 .*--add-label oc:stuck' && not_logged 'repos/o/r/dispatches'
+expect "changes_requested dispatch limit reached -> oc:stuck, no more dispatch" $?
 
 # 4. approve 済みで未 merge -> --match-head-commit 付きで merge
 reset
@@ -831,6 +848,7 @@ mk() { tcm "$REVIEWER" Bot "<!-- oc-pm-dispatch:$1 ts=$(ago_s "$2") -->"; }     
 LIMIT_INTENT='差し戻しが上限に達したため停止します。<!-- oc-fix-limit --> <!-- oc-pm-intent: stuck pr=60 reason=ceiling -->'
 limit_for() { printf '差し戻しが上限に達したため停止します。<!-- oc-fix-limit --> <!-- oc-pm-intent: stuck pr=%s reason=ceiling -->' "$1"; } # limit_for <PR 番号>: その PR の停止印
 OPENCODE='opencode-for-signature-studio[bot]'
+MARK='github-actions[bot]' # 窓の印 (oc-fix-limit) の作者 = job の GITHUB_TOKEN (#2622)
 nopr() { fx 'issue-list?state=open&label=oc:no-pr' "[$1]"; }  # nopr <issue の JSON (,区切り)>: gh issue list --label oc:no-pr
 nrow() { printf '{"number":%s,"labels":[%s]}' "$1" "$2"; }   # nrow <番号> <labels の中身>
 ledger() { fx 'repos/o/r/issues/comments' "[$1]"; }          # ledger <記録の comment JSON (,区切り)>: 実 repo の REST (since 付き) の代わり
@@ -841,7 +859,7 @@ pm_status() { # pm_status <mode> <fresh>: fake /status と URL ファイル
 }
 pm_base() { # 既定: oc:stuck の PR 60 (最新の停止印に intent あり)、oc:no-pr は無し、記録は無し
   base "[$(pr 60 a60 false "$OLD" '[{"name":"oc:stuck"}]')]"
-  fx 'repos/o/r/issues/60/comments' "[$(tcm "$OPENCODE" Bot "$LIMIT_INTENT")]"
+  fx 'repos/o/r/issues/60/comments' "[$(tcm "$MARK" Bot "$LIMIT_INTENT")]"
   nopr ''
   ledger ''
 }
@@ -864,7 +882,7 @@ expect "payload keys are exactly kind and ref" $?
 # 34c. ネガコン: oc-pm-intent が無い停止 PR は送らない
 reset
 base "[$(pr 61 a61 false "$OLD" '[{"name":"oc:stuck"}]')]"
-fx 'repos/o/r/issues/61/comments' "[$(tcm "$OPENCODE" Bot '差し戻しが上限に達しました。<!-- oc-fix-limit -->')]"
+fx 'repos/o/r/issues/61/comments' "[$(tcm "$MARK" Bot '差し戻しが上限に達しました。<!-- oc-fix-limit -->')]"
 nopr ''; ledger ''
 wd
 not_logged 'dispatches' && not_logged 'oc-pm-dispatch'
@@ -873,8 +891,8 @@ expect "ネガコン: stuck PR without oc-pm-intent is not dispatched" $?
 # 34d. 最新の oc-fix-limit だけを見る: 古い停止印に intent があっても、最新に無ければ送らない。逆なら送る
 reset
 base "[$(pr 62 a62 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 63 a63 false "$OLD" '[{"name":"oc:stuck"}]')]"
-fx 'repos/o/r/issues/62/comments' "[$(tcm "$OPENCODE" Bot '<!-- oc-fix-limit -->'),$(tcm "$OPENCODE" Bot "$(limit_for 62)")]"
-fx 'repos/o/r/issues/63/comments' "[$(tcm "$OPENCODE" Bot "$(limit_for 63)"),$(tcm "$OPENCODE" Bot '<!-- oc-fix-limit -->')]"
+fx 'repos/o/r/issues/62/comments' "[$(tcm "$MARK" Bot '<!-- oc-fix-limit -->'),$(tcm "$MARK" Bot "$(limit_for 62)")]"
+fx 'repos/o/r/issues/63/comments' "[$(tcm "$MARK" Bot "$(limit_for 63)"),$(tcm "$MARK" Bot '<!-- oc-fix-limit -->')]"
 nopr ''; ledger ''
 wd
 logged 'client_payload\[ref\]=62' && not_logged 'client_payload\[ref\]=63'
@@ -898,11 +916,20 @@ wd
 not_logged 'dispatches'
 expect "ネガコン: a stop mark posted by the reviewer bot is not counted" $?
 
+# 34g. ネガコン (#2622): 実装 App (agent と同じ token) 名義の偽の停止印は intent として数えない
+reset
+base "[$(pr 65 a65 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/65/comments' "[$(tcm "$OPENCODE" Bot "$(limit_for 65)")]"
+nopr ''; ledger ''
+wd
+not_logged 'dispatches'
+expect "ネガコン: a forged stop mark posted under the implementer App is not trusted" $?
+
 # 34g. ネガコン: 別の PR 番号を指すコピーの停止印は数えない (pr=60 は #6 の接頭辞ではなく、#75 とも別)
 reset
 base "[$(pr 6 a6 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 75 a75 false "$OLD" '[{"name":"oc:stuck"}]')]"
-fx 'repos/o/r/issues/6/comments' "[$(tcm "$OPENCODE" Bot "$LIMIT_INTENT")]"
-fx 'repos/o/r/issues/75/comments' "[$(tcm "$OPENCODE" Bot "$LIMIT_INTENT")]"
+fx 'repos/o/r/issues/6/comments' "[$(tcm "$MARK" Bot "$LIMIT_INTENT")]"
+fx 'repos/o/r/issues/75/comments' "[$(tcm "$MARK" Bot "$LIMIT_INTENT")]"
 nopr ''; ledger ''
 wd
 not_logged 'dispatches'
@@ -1017,7 +1044,7 @@ reset
 rows=()
 for i in $(seq 101 117); do
   rows+=("$(pr "$i" "a$i" false "$OLD" '[{"name":"oc:stuck"}]')")
-  fx "repos/o/r/issues/$i/comments" "[$(tcm "$OPENCODE" Bot "$(limit_for "$i")")]"
+  fx "repos/o/r/issues/$i/comments" "[$(tcm "$MARK" Bot "$(limit_for "$i")")]"
 done
 base "[$(IFS=,; echo "${rows[*]}")]"
 nopr ''; ledger ''
@@ -1049,7 +1076,7 @@ expect "dispatch records unreadable -> no dispatch (fail-closed), exit 0" $?
 # 39c. 停止 PR の comments が読めなければ、その PR だけ候補から外す (他は続く)
 reset
 base "[$(pr 65 a65 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 66 a66 false "$OLD" '[{"name":"oc:stuck"}]')]"
-fx 'repos/o/r/issues/66/comments' "[$(tcm "$OPENCODE" Bot "$(limit_for 66)")]"
+fx 'repos/o/r/issues/66/comments' "[$(tcm "$MARK" Bot "$(limit_for 66)")]"
 nopr ''; ledger ''
 wd
 logged 'client_payload\[ref\]=66' && grep -q '#65 oc-pm: failed to read comments' "$TMP/out"

@@ -242,8 +242,36 @@ EMSCRIPTEN_KEEPALIVE unsigned m11_unit_va(int i) {
     return (unsigned)Q(Q(tbl + 8) + (u64)i * 16);
 }
 
+/* 寛容起動 (#2714 WIN-3): g_tolerant=1 のとき InitUnits は JS 側の逐次ループ (m11_tolerant.mjs) に渡す.
+ * InitTable は strict と同じく 1 度だけ読む (units / count). 各 unit の呼出しは JS が try/catch で隔離して次へ進む.
+ * 既定 0 の経路 (strict・survey) は変えない. */
+static int g_tolerant = 0;
+static u64 g_tol_units = 0;
+static u32 g_tol_count = 0;
+EMSCRIPTEN_KEEPALIVE void m11_set_tolerant(int v) { g_tolerant = v; }
+EMSCRIPTEN_KEEPALIVE unsigned m11_tol_units(void) { return (unsigned)g_tol_units; }
+EMSCRIPTEN_KEEPALIVE int m11_tol_count(void) { return (int)g_tol_count; }
+EM_JS(void, m11_tolerant_hook, (), { Module.m11_tolerant_run(); });
+/* 寛容起動の 1 unit: strict の InitUnits ループ 1 周と同じ (InitCount = i+1, proc NULL は 0, ICALL_AT の site は 0x412126).
+ * 戻り 0=proc 無し 1=実行 2=closure 外 (miss). trap は呼出し側 (JS) へ例外で返る */
+EMSCRIPTEN_KEEPALIVE int m11_call_unit_at(unsigned units, int i) {
+    u64 proc = Q((u64)units + (u64)i * 16);
+    D(R(0x11eac98)) = (u32)(i + 1);
+    if (!proc) return 0;
+    u32 m0 = (u32)g_icall_miss;
+    ICALL_AT(0x412126, proc, 0, 0, 0, 0, 0, 0, 0, 0);
+    return (u32)g_icall_miss != m0 ? 2 : 1;
+}
+
 u64 function_4120c0(void) {
     u64 tbl = Q(R(0x11eac90));
+    if (g_tolerant) {
+        g_tol_units = tbl ? Q(tbl + 8) : 0;
+        g_tol_count = tbl ? D(tbl) : 0;
+        g_units_total = g_tol_count;
+        m11_tolerant_hook();
+        return (u64)g_tol_count;
+    }
     if (g_survey) { g_units_total = tbl ? D(tbl) : 0; return 0; }
     if (g_trace) M11_TRACE("[m11][InitUnits] InitTable=0x%llx\n", tbl);
     if (!tbl) return 0;

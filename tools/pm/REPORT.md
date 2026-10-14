@@ -222,6 +222,29 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
 
-## 16. PM Worker の降格 (#2340・PR #2469) の測定
+## 16. oc-pm の refs_orphan 検出 (#2337・PR #2478)
 
-測定 commit `e78527db` (コードを変えた最後の commit。main `f3102162` (#2485) の取り込みと、降格のネガコンの組み直しを含む)。`git diff e78527db HEAD -- infra/pm-worker` の出力は空 (差分 0)。測定値・ネガコン (変異 a〜e) は `tools/pm/REPORT_APPENDIX_2469.md` (250 行上限のため分割)。
+- 測定 commit: `b7fb7a40` (main `b3c699d4` の取り込み merge。修正本体は `ebfd0a41`)。全文 (測定・ネガコン・Refs のみ判定の差): [`REPORT_APPENDIX_2337.md`](REPORT_APPENDIX_2337.md) (§16 の分割移動)。
+- 結論: `npm test` 213 件 PASS / 0 FAIL (n=3)。`test:unit` 10 件・`test:workers` 3 件 PASS。ネガコン 5 種は各 1 件ずつ壊して FAIL を確認。
+- 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
+
+## 17. /oc 投稿の観測のネガコン (#2342・#2473 の vitest 化)
+
+- 測定 commit: `dd9931bf` (`test/launchobs.test.ts` を `test/unit/launchobs.test.ts` に移して vitest 化。README の 1 行)。worktree で `pnpm install --frozen-lockfile --config.minimum-release-age=0` (診断用。既定設定は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`)。
+- 結論: `test:unit` (vitest) **19 件 PASS** (うち観測 9 件)・2.1 s。`test:workers` **3 件 PASS**・1.5 s。`npm test` (node:test) **204 件 PASS / 0 FAIL**・17.7 s。load 0.33 (Node 22.23.3)。
+- ネガコン: `src/launchobs.ts` を 1 行ずつ壊して FAIL を確認。(b) の題名一致を外す → (b) と純関数の 2 件 FAIL。5 分の境界 `>` を `>=` → (a) と純関数の 2 件 FAIL。元に戻した後 `git diff -- src` は 0 行。
+- 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。PR #2655 で実装 (結論と測定の全文は [`REPORT_APPENDIX_2645.md`](REPORT_APPENDIX_2645.md))。
+
+## 18. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
+- 測定 commit `17eb4e16` (main `13329492` を取り込んだ merge。測定は取り込み後の HEAD で実施)、測定時刻 2026-10-14T16:29Z。偽の opencode (`OPENCODE_BIN`)・`timeout` で打ち切り (リポジトリ外の検証スクリプト)。
+- 結果: 文面ファイルあり (`heartbeat_msg_audit.txt`・間隔 1 秒・timeout 4) 送信 3 回 (監査 3・既定 0)、初回 1.02 秒後。未設定 (間隔 1 秒・timeout 4) 送信 3 回 (既定 3)、初回 1.01 秒後。文面ファイルあり・間隔 2 秒・timeout 4 は送信 1 回 (初回 2.02 秒後。2 回目は 4 秒の打ち切り後)。存在しない・空・空白のみの文面ファイルは終了 1・送信 0 (標準エラー `PM_HEARTBEAT_MSG_FILE is missing or empty`)。`PM_SESSION_ID` 無しは終了 1・送信 0。`bash -n tools/pm/heartbeat.sh` OK。`bash tools/pm/test_pm_wake.sh` 20 passed, 0 failed。
+- 差分 (コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行 (本節を commit した後の HEAD でも同じ)。`git diff 83f93e44 HEAD -- ...` (同じパス) も 0 行。
+- 注: 節番号は §18 (§17 は main の #2342 の節が使っているため)。前回 (`5573e550`) の記載の「間隔 2 秒で送信 2 回」は、本測定 (timeout 4) では 1 回だった。2 回目は初回 (2.02 秒) + 間隔 2 秒で timeout 4 秒を過ぎるため。
+- 取り込みと再測定 (round 4): main `e1e816c2` を merge commit `384e2cbe` で取り込んだ (競合なし。`heartbeat.sh` は PR 側の版のまま)。README の VM 記述 (commit `517bbb13`) を直した後の HEAD で同じ測定を再実行した。送信回数・終了コード・初回送信の遅延 (1.01 秒・2.01 秒) は上の結果と同じ。
+- 差分 (round 4): `git diff 17eb4e16 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行。
+
+## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
+- 測定値の正本: [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)。
+## 20. PM Worker の降格 (#2340・PR #2469) の測定 (全文は [`REPORT_APPENDIX_2469.md`](REPORT_APPENDIX_2469.md))

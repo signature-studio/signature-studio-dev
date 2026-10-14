@@ -39,8 +39,41 @@ const hex = (i) => '0x' + mod._m11_unit_va(i).toString(16);
 const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(941)];
 const snap = new Uint8Array(img.length);
 const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(941) === unitVa0[1];
+// #134 probe (既定 off): unit 56 が 8c5eb0 へ渡す this (VMT。linear = VA-0x400000) の状態 (件数 +0x14, vtable, vtable[-0x50])。guard の入力 R ではない (REPORT_134 §4)
+const P134 = process.env.M11_PROBE_134 === '1';
+const P134_OBJS = (process.env.M11_PROBE_134_OBJS || '1469800,1470128').split(',').map(Number);
+const P134_UNIT = Number(process.env.M11_PROBE_134_UNIT || '56');
+const p134obj = () => {
+  const dv = new DataView(mod.HEAPU8.buffer);
+  return P134_OBJS.map((a) => {
+    const vt = dv.getBigUint64(a, true), lin = vt >= 0x400000n ? Number(vt) - 0x400000 : Number(vt), m = lin - 0x50;
+    return { addr: a, cnt: dv.getInt32(a + 0x14, true), vt: '0x' + vt.toString(16), vt_va: '0x' + (lin + 0x400000).toString(16), vt_m50: m >= 0 && m + 8 <= dv.byteLength ? '0x' + dv.getBigUint64(m, true).toString(16) : null,
+      img_cnt: img.readInt32LE(a + 0x14), img_vt: '0x' + img.readBigUInt64LE(a).toString(16), img_vt_m50: m >= 0 && m + 8 <= img.length ? '0x' + img.readBigUInt64LE(m).toString(16) : null };
+  });
+};
+// #134 (M11_PROBE_134=1 で build した wasm のみ): 8c5eb0 の入口 arg2・guard の R (410320 戻り)・list (8c67a0(R) 戻り) を IR probe から読む。
+// R と list それぞれについて +0x14 (i32)・先頭 qword・[先頭 qword - 0x50] を読む。NC は同じ式を 1 byte ずらして読む
+const p134ir = () => {
+  const dv = new DataView(mod.HEAPU8.buffer), n = Number(mod._m11_p134_n());
+  const deref = (x) => {
+    if (x < 0 || x + 0x18 > dv.byteLength) return { addr: '0x' + x.toString(16), oor: true };
+    const vt = dv.getBigUint64(x, true), m = Number(vt) - 0x50;
+    return { addr: '0x' + x.toString(16), cnt_0x14: dv.getInt32(x + 0x14, true), first_qword: '0x' + vt.toString(16),
+      vt_m50: m >= 0 && m + 8 <= dv.byteLength ? '0x' + dv.getBigUint64(m, true).toString(16) : null,
+      nc_cnt_0x14: dv.getInt32(x + 0x15, true), nc_first_qword: '0x' + dv.getBigUint64(x + 1, true).toString(16) };
+  };
+  const recs = [];
+  for (let k = Math.max(0, n - 2); k < n; k++) {
+    const a2 = mod._m11_p134_get(k, 0), mask = mod._m11_p134_get(k, 3), R = mod._m11_p134_get(k, 1), L = mod._m11_p134_get(k, 2);
+    recs.push({ k, arg2_dl: '0x' + (a2 & 0xff).toString(16), arg2_bit7: (a2 & 0x80) !== 0, mask,
+      R: mask & 2 ? deref(R) : null, list: mask & 4 ? deref(L) : null });
+  }
+  return { n, recs };
+};
+const p134hist = [];
 for (let i = 0; i < 942; i++) {
   const va = hex(i);
+  if (P134) p134hist.push(JSON.stringify(p134obj()));
   snap.set(mod.HEAPU8.subarray(0, img.length));
   mod._m11_va_unit_begin();
   const oom0 = Number(mod._m11_va_oom()), big0 = Number(mod._m11_va_big());
@@ -49,6 +82,8 @@ for (let i = 0; i < 942; i++) {
   let r, err = null;
   try { r = mod._m11_call_unit(i); } catch (e) { err = e; }
   const clob = !tableIntact();
+  if (P134 && i === P134_UNIT) console.error('[probe134] unit ' + i + ' ' + va + ' err=' + JSON.stringify(err ? String((err && err.message) || err) : null) + ' trap_state=' + JSON.stringify(p134obj()));
+  if (P134 && i === P134_UNIT) console.error('[probe134] unit ' + i + ' ir=' + JSON.stringify(p134ir()));
   if (clob) { mod.HEAPU8.set(snap, 0); }
   const hadOom = Number(mod._m11_va_oom()) > oom0;
   perUnitCost.push({ i, va, va_bytes: Number(mod._m11_va_used()) - vaUsed0, getmem: Number(mod._m11_probe_count(0)) - gm0,
@@ -82,6 +117,11 @@ for (let i = 0; i < 942; i++) {
   if (m) topFrames[m[1]] = (topFrames[m[1]] || 0) + 1;
   if (first.length < 12) first.push(va);
   mod.__emscripten_stack_restore(sp0);
+}
+if (P134) {
+  const post = JSON.stringify(p134obj()), changed = [];
+  for (let i = 0; i < 942; i++) if (p134hist[i] !== (i + 1 < 942 ? p134hist[i + 1] : post)) changed.push(i);
+  console.error('[probe134] summary ' + JSON.stringify({ entry_unit: P134_UNIT, entry: JSON.parse(p134hist[P134_UNIT]), end: JSON.parse(post), changed_after_unit: changed.slice(0, 40) }));
 }
 if (process.env.M11_SURVEY_UNITS) fs.writeFileSync(process.env.M11_SURVEY_UNITS, JSON.stringify(perUnit));
 if (process.env.M11_SURVEY_DETAIL) fs.writeFileSync(process.env.M11_SURVEY_DETAIL, JSON.stringify(detail));

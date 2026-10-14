@@ -2,6 +2,7 @@
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
 import { needsPmDecision } from "./needs.ts";
+import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
 
 export const DEFAULT_REVIEWER_LOGIN = "oc-reviewer-for-signature-studio[bot]";
 export const NEEDS_USER_LABEL = "needs-user-input";
@@ -44,9 +45,16 @@ export interface PrState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // 保存前の全文 (body は切るか closed で空にするため) から取った参照。古い保存値には無い (規則 A は無いものを参照しない)。
+  // closes: Closes / Fixes / Resolves / Refs で参照する issue 番号 (規則 A の merged PR)。
+  closes?: number[];
+  // mentions: 題名と本文に現れる #番号。open PR が親 issue を参照しているかの判定 (規則 A の除外) に使う。
+  mentions?: number[];
   // merge の時刻と、本文が Refs #N のみ (Closes/Fixes なし) か。merge 済みの PR だけが持つ (本文そのものは持たない)。
   mergedAt?: string;
   refsOnly?: boolean;
+  // merge 済み (closed) の PR の本文から読んだ Refs #N の番号 (閉じキーワードが無いときだけ。oc-pm の refs_orphan)。番号だけで、本文は持たない。
+  refsOnlyNums?: number[];
 }
 // issue / PR ごとの終端状態の手がかり (oc-pm の検出に使う)。値は時刻・列挙値・真偽だけで、本文は持たない。
 export interface Signal {
@@ -64,7 +72,20 @@ export interface Signal {
   labelAt?: string;
   // reviews を REST で一度取得した
   revChecked?: boolean;
+  // 実装 run (issue_comment) が PR も出さずに打ち切られた (cancelled / failure / timed_out) 連続回数。KILLED_STOP_AT 回で自動の再着手を止める。
+  // at はその run の完了時刻。PR・close・PM/人のコメント・成功した run で消す。
+  kill?: { count: number; at: string };
+  // 最後に数えた run の id。kill とは別に持ち、連続を消しても残す (完了済みの run の配送が再送・順不同で届いても、同じ run を数え直さない)。
+  killRun?: number;
+  // 最新の oc-pm-intent: relaunch (issue コメント)。書き手が実装 App かどうか (bot) と、マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
+  relaunch?: { at: string; id?: number; bot: boolean; issue: string; arts: string; focus: string | null };
 }
+
+// 打ち切られた run を連続でこの回数数えた issue は、自動で再着手しない (oc:no-pr の reason=killed 相当)。PM agent (oc-pm の no_pr) の判断に回す。
+export const KILLED_STOP_AT = 2;
+const KILL_CONCLUSIONS = ["cancelled", "failure", "timed_out"];
+// record-run-outcome.sh の『明示的な終了状態』(oc:stuck / needs-user-input / blocked) に、Worker の pm-apply (#2423 で user に置く issue) を足したもの。打ち切りを数えない。
+const EXPLICIT_LABELS = ["oc:stuck", "needs-user-input", "blocked", "pm-apply"];
 export interface RunState {
   id: number;
   event: string;
@@ -74,7 +95,22 @@ export interface RunState {
   updatedAt: string;
   // run の作成時刻 (launch の観測に使う)。古い state には無い。
   createdAt?: string;
+  // run を起こした workflow のファイル名 (`.github/workflows/opencode.yaml` なら `opencode.yaml`)。古い state には無い。
+  wf?: string;
 }
+
+// 同時実行の上限 (60) を食う opencode.yaml の run だけを TARGET に数える。他の workflow (scripts-test.yaml など) は別枠。
+export const OPENCODE_WORKFLOW = "opencode.yaml";
+
+// workflow_run.path (REST は `.github/workflows/x.yaml`、ref 付きの形 `...@refs/heads/main` もあり得る) からファイル名を取る。
+export function workflowFile(path: unknown): string | undefined {
+  if (typeof path !== "string" || path === "") return undefined;
+  const file = path.split("@")[0].split("/").pop() ?? "";
+  return file === "" ? undefined : file;
+}
+
+// path を持たない run (古い保存値、path の無い配送) は opencode.yaml として数える。数え漏らして上限を超えるより、過大に数えるほうを選ぶ。
+export const isOpencodeRun = (r: RunState): boolean => r.wf === undefined || r.wf === OPENCODE_WORKFLOW;
 export interface BotComment {
   issueNumber: number;
   at: string;
@@ -88,6 +124,8 @@ export interface PmState {
   runs: Record<string, RunState>;
   // issue ごとの最後の bot コメント (分類の bot_last に相当)
   botLast: Record<string, BotComment>;
+  // issue ごとの最後の bot の報告 (run-outcome・PM のマーカーを含むコメントを除く)。停止報告の素材名 (neededArts) の入力。botLast は run-outcome で上書きされるため別に持つ。
+  botReport: Record<string, BotComment>;
   // PM のコメントに書かれた最後の `oc_artifacts:` 行 (分類の pm_art に相当)
   pmArt: Record<string, { at: string; line: string; id?: number }>;
   // issue dependencies (blocked_by) の blocker 番号 (open/closed 問わず。分類側で open だけに絞る)
@@ -98,7 +136,7 @@ export interface PmState {
   sig: Record<string, Signal>;
 }
 
-export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {} };
+export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, botReport: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {} };
 
 export interface WebhookInput {
   secret: string;
@@ -177,6 +215,7 @@ function applyIssue(s: PmState, p: Json): PmState {
   };
   let out: PmState = { ...s, issues: { ...s.issues, [k]: next } };
   // needs-user-input が付いた時刻。labeled の配送だけが時刻を持つ (REST は engine が events から補う)。外れたら消す。
+  if (closed) out = setSig(out, k, { kill: undefined });
   if (closed || !next.labels.includes(NEEDS_USER_LABEL)) out = setSig(out, k, { labelAt: undefined });
   else if (p.action === "labeled" && p.label?.name === NEEDS_USER_LABEL) out = setSig(out, k, { labelAt: i.updated_at });
   return out;
@@ -192,6 +231,10 @@ function notOlder(prev: { at: string; id?: number }, c: Json): boolean {
   if (a !== b) return a > b;
   return typeof c.id === "number" && typeof prev.id === "number" ? c.id >= prev.id : true;
 }
+
+// run-outcome (実装 run の終了記録) と PM のマーカーを含むコメントは、停止報告ではない (tools/pm/issue_snapshot.py の bot_last_of と同じ)。
+const NON_REPORT_MARKS = ["<!-- oc-run-outcome:", "<!-- oc-pm-"];
+const isReportBody = (body: string): boolean => !NON_REPORT_MARKS.some((m) => body.includes(m));
 
 function applyBotComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = []): PmState {
   const c = p.comment;
@@ -214,10 +257,15 @@ function applyBotComment(s: PmState, p: Json, botLogin: string, pmLogins: string
       next = { ...next, pmArt: { ...next.pmArt, [k]: { at: c.created_at, line: m[0], ...id } } };
     }
   }
-  if (isBot) {
+  // 再投入の意図は bot の投稿でも botLast (停止報告の窓) を動かさない。意図の直後に窓が立つと、分類が 1.5 時間 recent になるため。
+  if (isBot && !RELAUNCH_RE.test(c.body ?? "")) {
     const prev = s.botLast[k];
     if (!prev || notOlder(prev, c)) {
       next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000), ...id } } };
+    }
+    const prevR = s.botReport[k];
+    if (isReportBody(c.body ?? "") && (!prevR || notOlder(prevR, c))) {
+      next = { ...next, botReport: { ...next.botReport, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000), ...id } } };
     }
   }
   return next;
@@ -244,6 +292,18 @@ export function parseOutcomeReason(body: string): string | null {
   return OUTCOME_REASONS.includes(m[1]) ? m[1] : "unknown";
 }
 
+// oc-pm-intent: relaunch の属性を字句のまま取り出す (検証は engine の checkRelaunchIntent)。マーカーが無ければ null。
+const RELAUNCH_RE = /<!-- oc-pm-intent: relaunch ([^>]{0,300})-->/;
+export function parseRelaunchIntent(body: string): { issue: string; arts: string; focus: string | null } | null {
+  const m = RELAUNCH_RE.exec(body);
+  if (!m) return null;
+  return {
+    issue: /(?:^|\s)issue=(\S*)/.exec(m[1])?.[1] ?? "",
+    arts: /(?:^|\s)arts="([^"]*)"/.exec(m[1])?.[1] ?? "",
+    focus: /(?:^|\s)focus=(\S*)/.exec(m[1])?.[1] ?? null,
+  };
+}
+
 // コメントから終端状態の手がかりを取る。マーカーは bot (実装 App・reviewer App) の投稿だけを信じる (誰でもコメントできるため)。
 function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: string[], reviewer: string): PmState {
   const c = p.comment;
@@ -264,8 +324,20 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
     if (reason) patch.outcome = { at, reason };
   }
   if ((pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body))) && later(cur?.pmAt)) patch.pmAt = at;
+  // 再投入の意図は issue のコメントだけ。実装 App の意図は第三者の意図より優先する (第三者の後に来ても置き換えない)。
+  // 同じ区分の中では最新を残す。どの順に適用しても結果は同じ。第三者の意図も残す (engine が author として拒否し、counters に記録する)。
+  const rel = !("pull_request" in i) ? parseRelaunchIntent(body) : null;
+  const impl = login === botLogin;
+  if (rel && (!cur?.relaunch || (impl && !cur.relaunch.bot) || (impl === cur.relaunch.bot && notOlder(cur.relaunch, c)))) {
+    patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: impl, ...rel };
+  }
   // 人の回答は、非 bot かつ MEMBER / OWNER / COLLABORATOR のコメントだけ (第三者のコメントで PM を起こさない)。
-  if (login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association) && later(cur?.userAt)) patch.userAt = at;
+  const human = !!login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association);
+  if (human && later(cur?.userAt)) patch.userAt = at;
+  // 打ち切りの連続は、その後の PM の応答 (PM のログインか PM のマーカー付き bot コメント) か人の回答で解く。`/oc` の投稿は着手であって応答ではない
+  // (Worker 自身の再投稿が解除にならないように。PM のログインは Worker の PM App を含む)。
+  const answered = !/^\/oc\b/m.test(body) && (pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body)) || human);
+  if (answered && cur?.kill && Date.parse(at) > Date.parse(cur.kill.at)) patch.kill = undefined;
   return setSig(s, k, patch);
 }
 
@@ -295,7 +367,6 @@ function applyDependencies(s: PmState, p: Json): PmState {
   const adding = p.action === "blocked_by_added" || p.action === "blocking_added";
   const has = cur.includes(blocker);
   if (adding === has) return s;
-  const known = k in s.blockedBy || !adding;
   const nextList = adding ? [...cur, blocker].sort((a: number, b: number) => a - b) : cur.filter((x) => x !== blocker);
   const summary = p.blocked_issue?.issue_dependencies_summary?.total_blocked_by;
   const blockedBy = { ...s.blockedBy, [k]: nextList };
@@ -319,6 +390,7 @@ function applyPr(s: PmState, p: Json): PmState {
   if (!pr) return s;
   const k = String(pr.number);
   if (!newer(s.prs[k], pr.updated_at)) return s;
+  const full = typeof pr.body === "string" ? pr.body : "";
   const merged = !!pr.merged_at;
   const next: PrState = {
     number: pr.number,
@@ -327,14 +399,18 @@ function applyPr(s: PmState, p: Json): PmState {
     draft: !!pr.draft,
     ref: pr.head?.ref ?? "",
     title: pr.title ?? "",
-    body: pr.state === "closed" ? "" : (pr.body ?? "").slice(0, 3000),
+    body: pr.state === "closed" ? "" : full.slice(0, 3000),
     labels: Array.isArray(pr.labels) ? pr.labels.map((l: any) => String(l?.name ?? "")) : [],
     updatedAt: pr.updated_at,
     author: pr.user?.login ?? s.prs[k]?.author,
     authorType: pr.user?.type ?? s.prs[k]?.authorType,
     assoc: pr.author_association ?? s.prs[k]?.assoc,
+    closes: closeRefs(full),
+    mentions: mentionRefs(`${pr.title ?? ""}\n${full}`),
     // 切り詰める前の完全な本文から真偽だけを取る (本文は保存しない)。
     ...(merged ? { mergedAt: String(pr.merged_at), refsOnly: refsOnlyBody(pr.body ?? "") } : {}),
+    // 本文は closed で捨てるので、merge 時点の本文から Refs の番号だけを残す (REST の一覧・webhook のどちらでも同じ)。
+    ...(pr.state === "closed" && pr.merged_at ? { refsOnlyNums: refsOnlyNumbers(pr.body ?? "") } : {}),
   };
   return { ...s, prs: { ...s.prs, [k]: next } };
 }
@@ -357,6 +433,8 @@ function applyRun(s: PmState, p: Json): PmState {
   if (!w) return s;
   const k = String(w.id);
   if (!newer(s.runs[k], w.updated_at)) return s;
+  // path は run 自身 (REST・webhook とも) か、webhook の workflow オブジェクトにある。配送に無いときは既知の値を残す。
+  const wf = workflowFile(w.path ?? p.workflow?.path) ?? s.runs[k]?.wf;
   const next: RunState = {
     id: w.id,
     event: w.event,
@@ -365,8 +443,68 @@ function applyRun(s: PmState, p: Json): PmState {
     conclusion: w.conclusion ?? null,
     updatedAt: w.updated_at,
     ...(typeof w.created_at === "string" ? { createdAt: w.created_at } : {}),
+    ...(wf ? { wf } : {}),
   };
   return { ...s, runs: { ...s.runs, [k]: next } };
+}
+
+// issue n を指す open PR があるか (ブランチ名 <n>-... か本文の Closes / Refs / Fixes / Resolves #n。record-run-outcome.sh と同じ判定・同じ語の集合)。
+const PR_MENTION_RE = /\b(?:closes|refs|fixes|resolves) #(\d+)/gi;
+function prIssues(pr: { ref?: string; body?: string }): number[] {
+  const out = new Set<number>();
+  const m = /^(\d+)-/.exec(pr.ref ?? "");
+  if (m) out.add(Number(m[1]));
+  for (const x of (pr.body ?? "").matchAll(PR_MENTION_RE)) out.add(Number(x[1]));
+  return [...out];
+}
+export function hasOpenPr(s: PmState, n: number): boolean {
+  return Object.values(s.prs).some((p) => p.state === "open" && prIssues(p).includes(n));
+}
+// open な PR に加えて、since 以降に merge された PR も着手の証拠にする (run 中に open から merge まで済んだ PR は open の一覧に出ない。record-run-outcome.sh と同じ)。
+// closed の PR は本文を持たない (applyPr) ので、merge 済みの PR はブランチ名 N-... だけで当てる。
+function hasPrSince(s: PmState, n: number, since: string | undefined): boolean {
+  const t = Date.parse(since ?? "");
+  return Object.values(s.prs).some(
+    (p) => prIssues(p).includes(n) && (p.state === "open" || (p.merged && Number.isFinite(t) && Date.parse(p.mergedAt ?? "") >= t)),
+  );
+}
+
+// PR が出たら、その issue の打ち切りの連続を消す (着手済みになった)。
+function clearKillByPr(s: PmState, pr: Json | undefined): PmState {
+  if (!pr || pr.state !== "open") return s;
+  let out = s;
+  for (const n of prIssues({ ref: pr.head?.ref, body: pr.body })) out = s.sig[String(n)]?.kill ? setSig(out, String(n), { kill: undefined }) : out;
+  return out;
+}
+
+// 完了した実装 run (issue_comment) が PR も出さずに打ち切られた回数を、issue ごとに数える (record-run-outcome.sh の always() step は
+// runner の shutdown で走らないので、oc:no-pr は付かない。conclusion は workflow_run の配送で分かる)。
+//  - 数える: conclusion が cancelled / failure / timed_out。題名が一意な open issue に当たり、PR (open か run の開始以降に merge) も明示的な終了状態も無い。
+//  - 数えない: 後続の run がある (concurrency で置換された待機中の run。コメントで起きて skipped になった run は後続に数えない)。
+//  - 成功した run は連続を断つ。skipped などの run は断たない (agent 自身のコメントでも issue_comment の run が起きる)。
+// 同じ run の再配送と順不同の配送は、最後に数えた run の id (killRun。連続の解除では消さない) より大きい run だけを数えて重ねない。
+function applyKill(prev: PmState, next: PmState, w: Json | undefined): PmState {
+  if (next === prev || !w) return next;
+  const run = next.runs[String(w.id)];
+  if (!run || run.event !== "issue_comment" || run.status !== "completed") return next;
+  // conclusion が分かっている完了済みの run の再配送は数えない (reconcile が『一覧に無い』ことから付ける conclusion=unknown は、本当の完了の配送で上書きする)
+  const was = prev.runs[String(w.id)];
+  if (was?.status === "completed" && was.conclusion !== "unknown") return next;
+  const conclusion = run.conclusion ?? "";
+  if (conclusion !== "success" && !KILL_CONCLUSIONS.includes(conclusion)) return next;
+  const title = run.title.trim();
+  const hits = Object.values(next.issues).filter((i) => i.state === "open" && i.title.trim() === title);
+  if (hits.length !== 1) return next;
+  const issue = hits[0];
+  const k = String(issue.number);
+  const cur = next.sig[k]?.kill;
+  const counted = next.sig[k]?.killRun;
+  if (counted !== undefined && run.id <= counted) return next;
+  if (conclusion === "success") return cur ? setSig(next, k, { kill: undefined }) : next;
+  if (Object.values(next.runs).some((r) => r.id > run.id && r.event === "issue_comment" && r.title.trim() === title && !(r.status === "completed" && r.conclusion === "skipped"))) return next;
+  if (issue.labels.some((l) => EXPLICIT_LABELS.includes(l)) || issue.blockedByCount > 0) return next;
+  if (hasPrSince(next, issue.number, run.createdAt)) return cur ? setSig(next, k, { kill: undefined }) : next;
+  return setSig(next, k, { kill: { count: (cur?.count ?? 0) + 1, at: run.updatedAt }, killRun: run.id });
 }
 
 export function applyEvent(
@@ -385,11 +523,11 @@ export function applyEvent(
     case "issue_dependencies":
       return applyDependencies(s, payload);
     case "pull_request":
-      return applyPr(s, payload);
+      return clearKillByPr(applyPr(s, payload), payload.pull_request);
     case "pull_request_review":
-      return applyReview(s, payload, reviewerLogin);
+      return clearKillByPr(applyReview(s, payload, reviewerLogin), payload.pull_request);
     case "workflow_run":
-      return applyRun(s, payload);
+      return applyKill(s, applyRun(s, payload), payload.workflow_run);
   }
 }
 

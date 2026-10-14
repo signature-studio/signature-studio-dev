@@ -46,25 +46,57 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                                                   ├ PR review (approve / request changes)
    │                                                                   └ 誤記は fix commit で同 branch に push
    ├ review approve 確認 ──────────────────────────────────────────────┤
-   └ gh pr merge --merge ──→ branch/worktree 削除
+   └ (検収が approve と同じ run で gh pr merge --merge) ──→ branch/worktree 削除
 ```
 
 - 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度は PM が確定する。Project の Status は参考で、§3)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
-- **merge は PM のみ**。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
+- **実装者は自分の PR を merge しない** (`gh pr merge`・`--auto`・REST `pulls/N/merge`・`enablePullRequestAutoMerge` を含む。#2600)。
+  merge は独立した検収 (Actions 上は oc-reviewer) が approve した同じ run で行う (下の「merge の担い手と main の Ruleset」節・§11)。
+  実装者が merge すると、独立した review を経ない自己 merge になる。
+  merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
 - **競合時**: `git rebase origin/main` で解消してから `push --force-with-lease` (自分 branch のみ)。
 - **既定ブランチは `main`** (`origin/HEAD → origin/main`)。旧 `origin/master` は `main` の祖先で
   12+ commits 遅れの凍結枝。master を base にした PR・master への pull/push は行わない。
+
+### merge の担い手と main の Ruleset (`main-require-review`)
+
+- **Ruleset**: GitHub Ruleset `main-require-review` (id `25094342`。対象は既定ブランチ `~DEFAULT_BRANCH`、enforcement `active`、
+  2026-10-14 16:03Z 作成)。main への merge は **APPROVED の承認が 1 件以上**ある PR だけが通る (`required_approving_review_count=1`)。
+  merge 方式は merge commit のみ (`allowed_merge_methods=[merge]`)。CODEOWNERS・最後の push 後の承認・thread 解決は要求しない。
+- **効果**: 承認の無い PR の merge は 405 で失敗する。reviewer App (`oc-reviewer-for-signature-studio`) の APPROVED は承認として数えられる
+  (PM の canary 記録。再測定していない。所見と取得方法は `tools/pm/REPORT_2648.md`)。実装 App 単独の承認では merge できない見込み (未検証)。
+- **通常経路**: reviewer App が approve し、同じ run で `gh pr merge --merge --match-head-commit <レビューした head>` を行う
+  (`.github/prompts/reviewer.md` の手順 4)。実装 agent が Auto Merge を予約 (`--auto`) しても、承認が要るため
+  承認の後に merge される見込み。**Auto Merge の挙動は未検証。**
+- **PM の緊急 merge (Admin bypass)**: 次の手順。bypass の設定の有無は実測 (`tools/pm/REPORT_2648.md`) を参照し、
+  緊急 merge の前に手順 2 の `gh api ... --jq .bypass_actors` で確かめる (設定は変わりうるため、本書には値を書かない)。
+  1. まず reviewer App に承認させ、承認の後に merge する (通常経路)。
+  2. bypass が要るときは、PM が Ruleset に Admin (`RepositoryRole`、`pull_request` モード) の bypass を設定する。設定の有無は
+     `gh api repos/signature-studio/signature-studio-dev/rulesets/25094342 --jq .bypass_actors` で確かめる。
+  3. 緊急 merge の理由と PR 番号を issue に残す。bypass の設定から merge までの一連は**未検証**。
+- **無効化・ロールバック**: `enforcement` を `disabled` にする。部分 JSON ではなく、取得した全体 JSON の `enforcement` だけを書き換えて PUT する
+  (PUT は未実行・未検証。作業ファイルは gitignore 対象の `work/` に置く):
+
+  ```
+  gh api repos/signature-studio/signature-studio-dev/rulesets/25094342 > work/ruleset.json
+  jq '.enforcement = "disabled" | del(.id, .node_id, .source, .source_type, .created_at, .updated_at, .current_user_can_bypass, ._links)' work/ruleset.json > work/ruleset-off.json
+  gh api -X PUT repos/signature-studio/signature-studio-dev/rulesets/25094342 --input work/ruleset-off.json
+  ```
+
+  戻すときは `enforcement` を `active` にして同じ PUT を行う。無効化・bypass の設定変更は PM が issue に記録する。
+- **未解決 (未検証)**: reviewer token が取れない場合の挙動は `.github/README.md` の「main の Ruleset」節。本節の merge 担い手は
+  AGENTS.md §1 の「merge は PM が行う」と食い違うが、AGENTS.md は規約の要約なので、この変更では直さない (PM 判断)。
 
 ## 3. ステータスと責任区分
 
 | 役割 | 着手時 | 完了時 | 禁止 |
 |---|---|---|---|
-| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更 |
-| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge・方針変更・是正 | — |
+| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更・**自分の PR の merge (Auto Merge を含む)** |
+| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント → **approve と同じ run で merge** (§11) / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | 緊急時の merge (通常は reviewer App。下の節)・方針変更・是正 | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
@@ -119,6 +151,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
    既存抽出物で足りないことを確認し、確認コマンドと結果を併記)。
+6. **路線 (D5)**: 新規の lift・起動の作業は x64c / flelift / liftlib を使う。RetDec 路線 (`tools/m6`〜`tools/m11`) は、issue が明示した場合と、起動指標を動かす PM 承認済みの場合を除き、新規の作業を始めない (D5: `docs/DECISIONS.md`)。
 
 ## 5. 成果物の書き方 (報告の質)
 
@@ -163,6 +196,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - 例: `docs(liftlib): ...`・`fix(plugins): report corrections (CAB-269)`・
   `feat(kh): add DecompAt2 ghidra postScript`。
 - PR は `--base main` を基本 (repo の既定ブランチ = `main`)。body に `Closes #N`・受入条件・検証結果を書く。
+- **起動・GUI・ウィンドウに関わる PR は、本文に製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)、最初のウィンドウの有無) を書く。動かせなかったときは『動かしていない』と書く。** 起動・GUI に関わらない PR は KPI を書かなくてよい。
+- **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。定期 STATUS 同期の自動 PR (`docs(status): sync merged PRs`、`tools/pm/status_sync.py`) も例外 (`docs/STATUS.md` の status-auto 節の内側だけを変える PR に限る)。
 - **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
   10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
 
@@ -239,7 +274,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
-    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `$HOME/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れ、その bin を PATH 先頭に置く (#893)。venv 無しで動かす場合は同じ venv を手で作る。
+    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `~/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れる (#893)。版と hash は `.github/actions/agent-setup/requirements-py.txt` で固定し、`--require-hashes` で入れる (#2621)。venv の bin は PATH に載せず、`python` / `python3` を venv の python へ委譲するラッパーの dir (`~/.local/agent-py-shim`) を PATH 先頭に置く。venv 無しで動かす場合は同じ venv を手で作る。
     `ir_conditions.json` は生成時の PE の絶対パスを記録し、`m11_build.sh` は現在の PE と一致しないと build を拒否するため、別の環境で作った json を素材に同梱しても使えない。
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
@@ -319,7 +354,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (Copilot の review は来ないことがあり、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
     review が担当するので検証は免除する。
-  - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
+  - **fix**: 起動前に `fix-progress.sh record` が、merge 済み・close 済み (未 merge) の PR と、差し戻しの元の review の commit が現在の head と違う (古い head への差し戻し) の場合は、agent を起動せず notice のみを残して終える (`stop=true`。`oc:stuck` は付けない。#2601)。agent を起動した後は、run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
     review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
     判定・再試行・reopen・失敗の各 step は `!cancelled()` なので、agent step が失敗しても走る。run の cancel では走らない
     (step の timeout 後に走るかは未実測。merge 後の実 run で確認する)。
@@ -340,6 +375,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
     未レビューの commit を巻き込まない。
+  - **merge の担い手**: 実装 agent は自分の PR を merge しない。Auto Merge も使わない (承認なしで即時 merge され、review を迂回する。
+    2026-10-14 是正。#2600)。reviewer が approve した同じ run で `gh pr merge --merge --delete-branch --match-head-commit <head>` を実行する。
+    `.github/scripts/tests/test-no-self-merge.sh` が、実装プロンプトに merge の指示が戻っていないことを検査する。
   - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
     未完でも ready で出す。満たした範囲に issue の範囲を縮めて `Closes #N` とし、未解決は子 issue か PR 本文の未解決表に書く (§3)。前提 PR が未 merge の作業は着手しない。
 
@@ -352,10 +390,10 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   | main と競合している | `repository_dispatch` (type `oc-fix`) で fix モードの実装 run を起動する。競合 PR は `pull_request`・`pull_request_review` でワークフローが起動せず、差し戻しでは動かせない (往復回数を消費するだけ)。dispatch は競合に左右されない。同じ head への dispatch は 3 回までで、超えたら `oc:stuck`。fork からの PR (`head.repo` が本リポジトリでない) は dispatch しない (write 権限の run を第三者の入力で動かさないため)。`oc:stuck` も付けず、一覧に出して人が判断する |
   | draft | ready にする |
   | 現在の head に verdict が無い | close -> reopen で review を再起動する |
-  | 差し戻し済みだが fix が動いていない | `[watchdog]` の request-changes を出し直す (-> fix) |
+  | 差し戻し済みだが fix が動いていない | `repository_dispatch` (type `oc-fix`、理由 `changes-requested`) で fix モードの実装 run を起動する。差し戻しの再提出は使わない (approve 後に main が進んで merge できなくなった差し戻しは、review の run が作られないことがあるため。経緯は #719)。同じ head への dispatch の上限は競合と同じ 3 回で、超えたら `oc:stuck`。fork からの PR (`head.repo` が本リポジトリでない) は dispatch しない (競合と同じく `oc:stuck` も付けず、一覧に出して人が判断する) |
   | approve 済みで未 merge | `gh pr merge --merge --match-head-commit <head>`。失敗したら `[merge-failed]` の request-changes |
 
-  **repository_dispatch (oc-fix)**: 送れるのは `contents: write` を持つトークンだけ。payload は PR 番号 (数字のみ)・理由 (`conflict`)・
+  **repository_dispatch (oc-fix)**: 送れるのは `contents: write` を持つトークンだけ。payload は PR 番号 (数字のみ)・理由 (`conflict` / `changes-requested`)・
   素材名 (PR 本文の `oc_artifacts:` から allowlist に一致する語だけ) で、自由な文字列は持たない。`prepare-event-context.sh` が
   値域を検証し、指示文は理由から組み立てる。run は `run-name` が `oc-fix #<PR 番号>` になり、watchdog はこの名前で担当 run を突き合わせる。
   dispatch の前に `<!-- oc-dispatch:<head12> -->` のマーカー付きコメントを残し、同じ head への回数を数える。

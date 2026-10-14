@@ -3,7 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "npm@10.9.2",
   "scripts": {
     "test": "node --experimental-strip-types --no-warnings --test 'test/*.test.ts'",
     "test:workers": "vitest run --config vitest.config.ts",
@@ -12,8 +11,8 @@
     "test:unit": "vitest run --config vitest.unit.config.ts"
   },
   "devDependencies": {
-    "@cloudflare/vitest-plugin": "^1.4.2",
+    "@cloudflare/vitest-plugin": "^1.4.1",
     "vitest": "^4.1.11",
-    "wrangler": "^4.151.0"
+    "wrangler": "^4.150.0"
   }
 }

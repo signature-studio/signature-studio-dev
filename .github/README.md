@@ -43,7 +43,7 @@ github.event.comment.user.type == 'Bot' && github.event.comment.user.login == va
 | `scripts/assemble-prompt.sh` | イベント文脈を実装エージェント用プロンプトに流し込む |
 | `scripts/assemble-reviewer-prompt.sh` | 同じ方式でレビュワー用プロンプトを組み立てる |
 | `scripts/record-run-outcome.sh` / `review-recover.sh` | implement が PR を出さずに終わった issue への `oc:no-pr` ラベルと `<!-- oc-run-outcome: ... -->` マーカー、review の runner 打ち切りの即時再起動 (上限は review-retry 3 回。#1950)。詳細は `docs/WORKFLOW.md` §11 |
-| `scripts/fix-progress.sh` / `verify-review-verdict.sh` / `reopen-pr.sh` | 差し戻し後の fix の進捗判定・往復の上限、verdict の検証、close -> reopen による review の再起動 (reopen は 3 回まで再試行。merge 済み・close 済みの PR は何もせず成功) |
+| `scripts/fix-progress.sh` / `verify-review-verdict.sh` / `reopen-pr.sh` | 差し戻し後の fix の進捗判定・往復の上限 (merge 済み・close 済みの PR や古い head への差し戻しは agent を起動せず notice のみ。#2601)、verdict の検証、close -> reopen による review の再起動 (reopen は 3 回まで再試行。merge 済み・close 済みの PR は何もせず成功) |
 | `prompts/implementer.md` | 実装エージェントの行動規範 (スコープ・commit 規約・実測必須・マージ方法・規約への導線) |
 | `prompts/reviewer.md` | レビュワーエージェントの役割 (approve/request-changes・マージ) |
 
@@ -55,9 +55,9 @@ github.event.comment.user.type == 'Bot' && github.event.comment.user.login == va
 
 1. Issue に `/oc <instruction>` をコメント (`oc_actions_allow_write` を含めると書き込み可)
    → **implement ジョブ**: イベント文脈の隔離 → App トークン取得 → checkout →
-   素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成・Auto Merge 有効化
+   素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成 (実装者は自分の PR を merge しない)
 2. PR が open / synchronize / reopen → **review ジョブ**: 差分取得 →
-   レビュワーエージェントが検証 → approve/request-changes → 必要なら `gh pr merge --merge --delete-branch`
+   レビュワーエージェントが検証 → approve/request-changes → approve したら同じ run で `gh pr merge --merge --delete-branch`
 3. PR に `/oc <instruction>` → コンフリクト解決などの追加作業
 
 `pull_request` の `synchronize` (PR が更新されるたび) でも review ジョブが起動する。
@@ -139,9 +139,9 @@ aws s3 cp s3://signature-studio-artifacts/artifacts/<prefix>.tar.zst "$HOME/arti
 `CF_ACCOUNT_ID` / `CF_R2_ACCESS_KEY_ID` / `CF_R2_SECRET_ACCESS_KEY`
 
 **任意**: `OC_REVIEW_APP_PRIVATE_KEY`。設定がない場合、レビュワーは実装 App と同一
-identity になり **自分自身の PR を approve できない** (comment + 直接 merge に
-フォールバック)。設定していても installation が `contents:write` /
-`pull-requests:write` を grant していない場合は同じフォールバックになる。
+identity になり **自分自身の PR を approve できない**。このときレビュワーは approve も merge もせず、
+理由をコメントに書いて終える (#2600)。設定していても installation が `contents:write` /
+`pull-requests:write` を grant していない場合も同じ扱いになる。
 
 `workflow_dispatch` の入力は `prompt` と opencode の pin 3 つ。dispatch は write
 権限を持つ人手による起動なので、常に書き込み可として扱う。
@@ -156,8 +156,21 @@ allow_squash_merge: false
 allow_rebase_merge: false
 ```
 
-`gh pr merge --squash` は必ず失敗する。プロンプトも `gh pr merge --auto --merge` /
-`gh pr merge --merge --delete-branch` を使う。
+`gh pr merge --squash` は必ず失敗する。merge は reviewer が approve した後に
+`gh pr merge --merge --delete-branch --match-head-commit <head>` で行う。
+**実装者は自分の PR を merge しない** (`gh pr merge`・`--auto`・REST `pulls/N/merge`・`enablePullRequestAutoMerge` を実行しない)。
+Auto Merge は承認なしで即時 merge され、独立した review を迂回するため、実装プロンプトから外した (#2600)。
+
+## main の Ruleset (承認必須)
+
+main への merge には承認 (APPROVED) 1 件以上が要る (Ruleset `main-require-review`、id `25094342`、2026-10-14 16:03Z 作成)。
+仕様・緊急 merge・無効化の手順は `docs/WORKFLOW.md` §2 の「merge の担い手と main の Ruleset」節が正本。
+
+- **reviewer token の取得失敗時 (未検証)**: `OC_REVIEW_APP_PRIVATE_KEY` が未設定、または installation の権限が足りないと、
+  reviewer は実装 App と同じ identity になり approve できない。承認が無いので直接 merge も失敗し、PR は承認されないまま止まる見込み。
+  この挙動は実 run で確かめていない。
+- **Auto Merge (`--auto`) の挙動 (未検証)**: Auto Merge を有効化した PR が、承認の後に自動で merge されるかは確かめていない。
+  承認が無い間は merge されず残る見込み。
 
 ## 規約
 

@@ -1,6 +1,7 @@
 // Chord progression (System/Tools/Chord progression) の pyc 39 本 + pyscript 2 本の import / エントリポイント実行 (PY-7 #78)。
 // 前提: `FL_WIN64_DIR=<fl-win64 展開先> bash build_flpy.sh` 済み (dist/flpy.js)、
-//       `python3 analysis/extract_pyc_blocks.py work/fl_extract` 済み (FL 由来・gitignore)。
+//       `FL_WIN64_DIR=<fl-win64 展開先>/extracted "$PY312" analysis/extract_pyc_blocks.py work/fl_extract` 済み
+//       (`$PY312` = `work/build-native/install/bin/python3.12`・FL 由来・gitignore)。
 // 実 FL の戻り値は未確定。import 時に要る値 (flrack.rack.loop_starter_config の JSON・flpianoroll.score.PPQ・rack.flr 等) は
 // tests 側の mock 値で固定する。mock 値は根拠なし (REPORT の表に明記)。実 FL 照合は #81 (PY-9)。
 // usage: node tests/chord_progression_e2e.mjs [--neg]    (--neg: 先頭 1 バイトを壊した pyc で FAIL になることを確認)

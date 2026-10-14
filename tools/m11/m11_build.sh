@@ -118,19 +118,38 @@ echo "$S_INSTR" > work/instr_413060.stamp
 S_INSTR40="${M11_INSTR_40FF70:-0}:${M11_INSTR_40FFE0:-0}:${M11_INSTR_60A270:-0}"
 if [ "$(cat work/instr_40ff70.stamp 2>/dev/null || echo none)" != "$S_INSTR40" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_INSTR40" > work/instr_40ff70.stamp
+S_P134="${M11_PROBE_134:-0}"   # #134: 1 = 計測用 IR probe (8c5eb0 の arg2・R・list; trap_triage/probe134_ir.py) を boot_final3.ll に入れる。既定 0 では入れない
+if [ "$(cat work/instr_134.stamp 2>/dev/null || echo 0)" != "$S_P134" ]; then rm -f work/boot_final3.ll; fi
+echo "$S_P134" > work/instr_134.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
-if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
+# #954 (M11-N54): M11_XMM_ARGS=1 = 機械語が xmm0..3 を入力に読む callee の IR 署名へ float/double 引数を復元する (fix_xmm_args.py, #547)。
+#   既定 0 (従来どおり復元しない)。1 のときだけ post (m11_post) の入力を boot_final.xa.ll に差し替える。切替えは stamp で post 結果を無効化する。
+#   M11_XMM_SKIP=f1,f2 は復元から外す関数 (fix_xmm_args.py の --skip-funcs。退行の二分探索用)。
+XMM_S="${M11_XMM_ARGS:-0}:${M11_XMM_SKIP:-}"
+if [ "$(cat work/xmm_args.stamp 2>/dev/null || echo 0)" != "$XMM_S" ]; then rm -f work/boot_final3.ll work/boot_final.xa.ll; fi
+echo "$XMM_S" > work/xmm_args.stamp
+POST_IN=work/boot_final.ll
+if [ "${M11_XMM_ARGS:-0}" = 1 ]; then
+  if [ ! -f work/boot_final.xa.ll ] || [ work/boot_final.ll -nt work/boot_final.xa.ll ] || [ ../plugins/lift/passes/fix_xmm_args.py -nt work/boot_final.xa.ll ]; then
+    SKIP_ARG=""; [ -n "${M11_XMM_SKIP:-}" ] && SKIP_ARG="--skip-funcs $M11_XMM_SKIP"
+    python3 ../plugins/lift/passes/fix_xmm_args.py work/boot_final.ll work/boot_final.xa.tmp.ll --pe "$PE_QS" --report work/xmm_args_report.json $SKIP_ARG
+    mv work/boot_final.xa.tmp.ll work/boot_final.xa.ll
+  fi
+  POST_IN=work/boot_final.xa.ll
+fi
+if [ ! -f work/boot_final3.ll ] || [ "$POST_IN" -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
   # M11_SIGFIX_RECOVER=1 (#131): sigfix の 0 詰め site を機械語突合し、定数代入が確定する引数だけ復元 (m11_argrecover.py)
   if [ "${M11_SIGFIX_RECOVER:-0}" = 1 ]; then
     PE="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
-    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
     FIXES="${M11_SIGFIX_FIXES:-work/sigfix_fixes.json}"
     [ -n "${M11_SIGFIX_FIXES:-}" ] || python3 m11_argrecover.py work/sigfix_pads.json --pe "$PE" --lb "$M11_LB_BASE" --out "$FIXES"
-    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
   else
-    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json
   fi
 fi
+if [ "$S_P134" = 1 ]; then python3 trap_triage/probe134_ir.py work/boot_final3.ll || exit 1; fi   # #134 計測専用 (既定 0 では何もしない)
 # SIMD helper (C) は IR の declare から署名駆動で再生成 (m11_simd2.py)
 if [ ! -f work/m11_simd.c ] || [ work/boot_final.ll -nt work/m11_simd.c ] || [ m11_simd2.py -nt work/m11_simd.c ]; then
   python3 m11_simd2.py work/boot_final.ll > work/m11_simd.c 2> work/simd2.log
@@ -207,14 +226,14 @@ cc work/m11_data.c work/obj/data.o
 
 INITMEM="$((0x12000000))"
 MAXMEM="$((0x72000000))"
-EXPORTS=_GetLastError,_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_VirtualAlloc,_VirtualFree,_m11_va_used,_m11_va_calls,_m11_va_live,_m11_va_peak,_m11_va_oom,_m11_va_freed,_m11_va_freed_bytes,_m11_va_free_unknown,_m11_va_free_skipped,_m11_va_decommit,_m11_va_big,_m11_set_vfree_noop,_m11_set_va_bigtrace,_m11_set_va_stack_at,_m11_set_va_unit_budget,_m11_va_unit_begin,_m11_va_denied,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS=_GetLastError,_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_VirtualAlloc,_VirtualFree,_m11_va_used,_m11_va_calls,_m11_va_live,_m11_va_peak,_m11_va_oom,_m11_va_freed,_m11_va_freed_bytes,_m11_va_free_unknown,_m11_va_free_skipped,_m11_va_decommit,_m11_va_big,_m11_set_vfree_noop,_m11_set_va_bigtrace,_m11_set_va_stack_at,_m11_set_va_unit_budget,_m11_va_unit_begin,_m11_va_denied,_m11_set_trace,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_icall_cnt_n,_m11_icall_cnt_key,_m11_icall_cnt_ok,_m11_icall_cnt_miss,_m11_icall_cnt_drop,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_m11_set_tolerant,_m11_call_unit_at,_m11_tol_units,_m11_tol_count,__emscripten_stack_restore,_emscripten_stack_get_current
 emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=m11create \
   -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 \
   --no-entry -Wl,--export-all \
   -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction \
-  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_LINK_INSTR" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec )$( [ "${M11_ENTRY_PROBE:-0}" = 1 ] && echo ,_m11_fe_get,_m11_fe_clear ) \
+  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_LINK_INSTR" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec )$( [ "$S_P134" = 1 ] && echo ,_m11_p134_n,_m11_p134_get )$( [ "${M11_ENTRY_PROBE:-0}" = 1 ] && echo ,_m11_fe_get,_m11_fe_clear ) \
   -Wl,--initial-memory="$INITMEM" -Wl,--max-memory="$MAXMEM" $( [ -n "${M11_LINK_MAP:-}" ] && echo -Wl,-Map="$M11_LINK_MAP" ) 2> work/link.log || { tail -30 work/link.log; exit 1; }
 mv work/m11_boot.cjs.tmp work/m11_boot.cjs
 python3 m11_postjs.py work/m11_boot.cjs 2>/dev/null

@@ -154,6 +154,9 @@ edge-sim の `audioworklet`・`console-clean` が `/wasm/audio/manifest.json` �
   FL 未統合の現状では `E2E_REQUIRE_FL=1` は FAIL する (意図通り)。
 - 実測 (HEAD 8bf83d9、Chrome 154、node v22.23.3): `--driver both --targets preview,edge-sim,dev` = **PASS 50 / FAIL 0 / SKIP 10** (28.1s、`webstudio-contract` 6/6 PASS = `{"state":"booting","frames":0}`、fl-boot 6 SKIP + edge-policy 4 SKIP)。
   `E2E_REQUIRE_FL=1 --targets preview` (agent-browser) = PASS 8 / **FAIL 1 (fl-boot: 180146ms 待って `{"state":"booting","frames":0}`)** / SKIP 1、合計 3m2.9s。
+- 再測定 (HEAD `e2e15aec` = `origin/main` (`5bbeea0a`) を取り込んだ PR #2744 head、Chrome 154、node v22.23.3、emsdk 6.0.12): `E2E_REQUIRE_FL=1 bash tools/e2e/run.sh --driver agent-browser --targets preview` = **PASS 8 / FAIL 1 (fl-boot: 180185ms 待って `{"state":"booting","frames":0}`) / SKIP 1**、rc 1、所要 197 s (1791999621 → 1791999818)、load 0.38 → 0.63。`webstudio-contract` は `{"state":"booting","frames":0}` で PASS (41ms)。ログ `tools/e2e/work/logs/fl-boot-head-e2e15aec.log` (gitignore 配下)。
+  - 測定 commit = `e2e15aec`。`git diff e2e15aec HEAD -- src tools/e2e ':(exclude)tools/e2e/REPORT.md'` は 0 行 (測定後の差分は本 REPORT と docs のみ)。
+  - 環境: `toolchain-emsdk` 素材は本 run の `$ARTIFACTS_DIR` に無い。最初の run は `tools/audio/build.sh` の `[audio] emcc not found` で停止 (5 s・rc 1・fl-boot 未到達)。上流 emsdk 6.0.12 を `$RUNNER_TEMP/emsdk` へ `emsdk install 6.0.12` (28 s) で入れ、`EMSDK_ENV` で指定して再実行した。
 - 単体テスト: `node --test tools/e2e/webstudio_state.test.mjs` (遷移 6 ケース)。
 - 未実施: `agent-browser diff screenshot` による FL 画面のスクリーンショット差分 (基準画像となる FL 起動画面が無いため。#32 後)。
 

@@ -1,0 +1,657 @@
+{
+  "schema": "boot_metric/v1",
+  "generated_by": "tools/startup/boot_metric.py (手で編集しない)",
+  "definition": "起動指標 = STARTUP.md のステップ到達 + unit 内訳 (completed / skipped / failed / miss / noproc)。数え方の対応は tools/startup/REPORT.md §8",
+  "records": [
+    {
+      "id": "m11-tolerant-sequential",
+      "route": "m11",
+      "mode": "tolerant-sequential",
+      "build": "m11 通常起動 (RetDec 路線、#134 の 6654322 / de50ffa 行)",
+      "commit": "de50ffa",
+      "units": {
+        "total": 942,
+        "ok": 53,
+        "skipped": 3,
+        "failed": 1,
+        "miss": null,
+        "noproc": null,
+        "dispatched": 57,
+        "uncovered": null
+      },
+      "stop": {
+        "unit": 57,
+        "va": "0x16fde0",
+        "kind": "halt0"
+      },
+      "create_fruity_instance": {
+        "reached": false,
+        "last_step": "S09"
+      },
+      "gui_natural": null,
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "units.miss": "逐次起動は icall miss を skipped に含めて数える (§14 内訳)。miss を別に出していない",
+        "units.noproc": "逐次起動の計数に proc 無しは無い (survey 行にのみ在る)",
+        "units.uncovered": "逐次起動では使わない",
+        "gui_natural": "通常起動 (GUI 結合なし) の GUI 計数は無い。GUI 結合版は m11-gui-tolerant",
+        "probes": "出典に probes の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.total": "§14 表行の survey 列 (ok+trap+miss+noproc) の合計。942 と一致を検査",
+        "units.failed": "停止 unit 1 本 (表行の「unit N 後に Halt0」)",
+        "units.dispatched": "units_run + units_skipped + 停止 unit 1 本。停止 unit 番号 (表行) と一致を検査",
+        "create_fruity_instance": "harness 構造による (m11 の非 work ファイルに CreateFruityInstance の参照 0 件・STARTUP の DllMain の段が最後)"
+      },
+      "source": [
+        {
+          "file": "tools/m11/REPORT.md",
+          "locator": "md:## 14. /^\\| `(de50ffa)` [^|]*\\| (\\d+) \\| [^|]*\\| (\\d+)/(\\d+)\\((\\d+)\\)/(\\d+)/(\\d+)/",
+          "measured_commit": "de50ffa",
+          "file_last_commit": "54acb751"
+        },
+        {
+          "file": "tools/m11/REPORT.md",
+          "locator": "md:## 14. /units_skipped = (\\d+) の内訳/",
+          "measured_commit": null,
+          "file_last_commit": "54acb751"
+        },
+        {
+          "file": "tools/m11/REPORT.md",
+          "locator": "md:## 14. /^\\| `(6654322)` \\(\\+414ad0・43a3f0 転記, n=3\\) \\| \\*\\*\\d+\\*\\* \\| unit (\\d+) \\((0x[0-9a-f]+)\\) 後に (Halt0)/",
+          "measured_commit": "6654322",
+          "file_last_commit": "54acb751"
+        },
+        {
+          "file": "tools/m11",
+          "locator": "grep 0 件 /CreateFruityInstance/ (非 work・SKIP_DIRS を除く)",
+          "measured_commit": null,
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "存在確認 /^\\| S11 \\| host \\|[^\\n]*CreateFruityInstance/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "md: /^\\| (S\\d\\d) \\| host \\|[^\\n]*\\*\\*DllMain\\*\\*/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        }
+      ]
+    },
+    {
+      "id": "m11-tolerant-skip",
+      "route": "m11",
+      "mode": "tolerant-skip",
+      "build": "m11 寛容起動 (失敗 unit を skipped として 942 unit を逐次続行・REPORT_N2714 §0・§1 C 行)",
+      "commit": "cf64d9c8",
+      "units": {
+        "total": 942,
+        "ok": 874,
+        "skipped": 67,
+        "failed": 21,
+        "miss": 46,
+        "noproc": 1,
+        "dispatched": 942,
+        "uncovered": null
+      },
+      "stop": null,
+      "create_fruity_instance": {
+        "reached": false,
+        "last_step": "S09"
+      },
+      "gui_natural": null,
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "units.uncovered": "逐次起動では使わない",
+        "stop": "寛容起動は停止 unit を持たない (942 試行を最後まで回す)。終端の Halt0→longjmp (boot_rc=1) は stage 6 の定義に当たらない (REPORT_N2714 §6)",
+        "gui_natural": "寛容起動は GUI 結合なし。GUI 結合版は m11-gui-tolerant",
+        "probes": "出典に probes の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.total": "寛容起動の試行数。§0 の本文と §1 表の試行数を照合し、942 と一致を検査",
+        "units.skipped": "miss + halt0 + oob + unreachable (§0 の内訳と一致を検査)",
+        "units.failed": "halt0 + oob + unreachable (trap。skipped のうち miss を除いたもの)",
+        "units.dispatched": "試行数 (§0 の本文)。ok + noproc + skipped の合計と一致を検査",
+        "create_fruity_instance": "harness 構造による (m11 の非 work の実行ファイル (.md を除く) に CreateFruityInstance の参照 0 件・STARTUP の DllMain の段が最後)"
+      },
+      "source": [
+        {
+          "file": "tools/m11/REPORT_N2714.md",
+          "locator": "md:## 1. /^- 測定 commit: `([0-9a-f]{8})`/",
+          "measured_commit": "cf64d9c8",
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/m11/REPORT_N2714.md",
+          "locator": "md:## 0. /で (\\d+) unit を全て試行した\\*\\*。ok (\\d+) / noproc (\\d+) / skipped (\\d+) \\(miss (\\d+)・halt0 (\\d+)・oob (\\d+)・unreachable (\\d+)\\)/",
+          "measured_commit": "cf64d9c8",
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/m11/REPORT_N2714.md",
+          "locator": "md:## 1. /^\\| C 寛容起動 \\(本 PR\\) \\| — \\| (\\d+) 試行・ok (\\d+)・noproc (\\d+)・skip (\\d+)・boot_rc=\\d+ \\| — \\|/",
+          "measured_commit": "cf64d9c8",
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/m11",
+          "locator": "grep 0 件 /CreateFruityInstance/ (非 work・SKIP_DIRS を除く)",
+          "measured_commit": null,
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "存在確認 /^\\| S11 \\| host \\|[^\\n]*CreateFruityInstance/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "md: /^\\| (S\\d\\d) \\| host \\|[^\\n]*\\*\\*DllMain\\*\\*/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        }
+      ]
+    },
+    {
+      "id": "m11-isolated-survey",
+      "route": "m11",
+      "mode": "isolated-survey",
+      "build": "m11 隔離 survey (全再生成 IR, 測定 commit は表の値)",
+      "commit": "7e149974",
+      "units": {
+        "total": 942,
+        "ok": 872,
+        "skipped": null,
+        "failed": 23,
+        "miss": 46,
+        "noproc": 1,
+        "dispatched": null,
+        "uncovered": null
+      },
+      "stop": null,
+      "create_fruity_instance": null,
+      "gui_natural": null,
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "units.skipped": "survey は unit を隔離実行するため skip の概念が無い",
+        "units.dispatched": "survey は 942 本すべてを 1 本ずつ実行する",
+        "stop": "survey は unit 別の判定で、停止位置を持たない",
+        "create_fruity_instance": "survey は DllMain を通さず unit を 1 本ずつ呼ぶ",
+        "gui_natural": "GUI 計数は m11-gui-survey を参照",
+        "units.uncovered": "出典に uncovered の計数が無い",
+        "probes": "出典に probes の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.total": "survey 行の合計 (ok+trap+miss+noproc)。942 と一致を検査"
+      },
+      "source": [
+        {
+          "file": "tools/m11/REPORT_APPENDIX_1430.md",
+          "locator": "md:## 基準 (before) /測定 commit `([0-9a-f]{8})`/",
+          "measured_commit": "7e149974",
+          "file_last_commit": "aadd6e81"
+        },
+        {
+          "file": "tools/m11/REPORT_APPENDIX_1430.md",
+          "locator": "md:## 基準 (before) /^\\| survey \\(全再生成直後, unit 別 942 本\\) \\| \\*\\*ok (\\d+) / trap (\\d+) / miss (\\d+) / noproc (\\d+)\\*\\*/",
+          "measured_commit": "7e149974",
+          "file_last_commit": "aadd6e81"
+        }
+      ]
+    },
+    {
+      "id": "m11-gui-tolerant",
+      "route": "m11",
+      "mode": "tolerant-sequential",
+      "build": "m11 + GUI shim 結合の通常起動 (gui/flengine boot.json)",
+      "commit": "703b4857",
+      "units": {
+        "total": 942,
+        "ok": 52,
+        "skipped": null,
+        "failed": 1,
+        "miss": null,
+        "noproc": null,
+        "dispatched": null,
+        "uncovered": null
+      },
+      "stop": null,
+      "create_fruity_instance": {
+        "reached": false,
+        "last_step": "S09"
+      },
+      "gui_natural": {
+        "RegisterClassW": 0,
+        "CreateWindowExW": 0
+      },
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "units.skipped": "boot.json に units_skipped が無い (同名の baseline_boot.json は別ビルドで 4)",
+        "units.dispatched": "boot.json に停止 unit の計数が無い",
+        "stop": "boot.json は停止 unit を持たない。boot_threw の値 (unreachable) は REPORT §6d の memory access out of bounds と食い違う (未解決表)",
+        "probes": "boot.json の probes は本 schema の probes 項目 (x64c の GetMem/FreeMem) と別の計数のため採らない",
+        "units.miss": "出典に miss の計数が無い",
+        "units.noproc": "出典に noproc の計数が無い",
+        "units.uncovered": "出典に uncovered の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.ok": "boot.json の units_run をそのまま採る (m11 §14 と同じ完了数の計数と仮定。boot.json に内訳は無く、検査はしていない)",
+        "units.failed": "boot_threw があれば停止 unit 1 本",
+        "create_fruity_instance": "harness 構造による (gui/flengine の非 work ファイルに CreateFruityInstance の参照 0 件・STARTUP の DllMain の段が最後)"
+      },
+      "source": [
+        {
+          "file": "tools/gui/flengine/REPORT.md",
+          "locator": "md: /^### HEAD `([0-9a-f]{8})` の実測 \\(.*本節を正とする\\)/",
+          "measured_commit": "703b4857",
+          "file_last_commit": "fcf6909b"
+        },
+        {
+          "file": "tools/gui/flengine/results/boot.json",
+          "locator": "json:units_run",
+          "measured_commit": "703b4857",
+          "file_last_commit": "c1a81f39"
+        },
+        {
+          "file": "tools/gui/flengine/results/boot.json",
+          "locator": "json:boot_threw",
+          "measured_commit": "703b4857",
+          "file_last_commit": "c1a81f39"
+        },
+        {
+          "file": "tools/gui/flengine/results/boot.json",
+          "locator": "json:units_total",
+          "measured_commit": "703b4857",
+          "file_last_commit": "c1a81f39"
+        },
+        {
+          "file": "tools/gui/flengine/results/boot.json",
+          "locator": "json:reach[RegisterClassW].calls (配列に無ければ 0)",
+          "measured_commit": "703b4857",
+          "file_last_commit": "c1a81f39"
+        },
+        {
+          "file": "tools/gui/flengine/results/boot.json",
+          "locator": "json:reach[CreateWindowExW].calls (配列に無ければ 0)",
+          "measured_commit": "703b4857",
+          "file_last_commit": "c1a81f39"
+        },
+        {
+          "file": "tools/gui/flengine",
+          "locator": "grep 0 件 /CreateFruityInstance/ (非 work・SKIP_DIRS を除く)",
+          "measured_commit": null,
+          "file_last_commit": "75eae2b8"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "存在確認 /^\\| S11 \\| host \\|[^\\n]*CreateFruityInstance/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "md: /^\\| (S\\d\\d) \\| host \\|[^\\n]*\\*\\*DllMain\\*\\*/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        }
+      ]
+    },
+    {
+      "id": "m11-gui-survey",
+      "route": "m11",
+      "mode": "isolated-survey",
+      "build": "m11 + GUI shim (soft stub) の隔離 survey (gui/flengine survey_soft.json)",
+      "commit": "719f1c43",
+      "units": {
+        "total": 942,
+        "ok": 870,
+        "skipped": null,
+        "failed": 24,
+        "miss": 47,
+        "noproc": 1,
+        "dispatched": null,
+        "uncovered": null
+      },
+      "stop": null,
+      "create_fruity_instance": null,
+      "gui_natural": {
+        "RegisterClassW": 2,
+        "CreateWindowExW": 2
+      },
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "units.skipped": "survey は skip の概念が無い",
+        "stop": "survey は unit 別の判定で、停止位置を持たない",
+        "create_fruity_instance": "survey は DllMain を通さない",
+        "units.dispatched": "出典に dispatched の計数が無い",
+        "units.uncovered": "出典に uncovered の計数が無い",
+        "probes": "出典に probes の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.total": "survey の units_total。ok+noproc+miss+trap の合計と 942 を検査",
+        "units.failed": "survey の trap (kinds の合計と一致を検査。REPORT の S1 値とも照合)"
+      },
+      "source": [
+        {
+          "file": "tools/gui/flengine/REPORT.md",
+          "locator": "md: /測定 commit `([0-9a-f]{8})`・judge [0-9]+/[0-9]+・S1 `(\\d+)/(\\d+)/(\\d+)/(\\d+)/(\\d+)`/",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "fcf6909b"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:units_total",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:survey.ok",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:survey.noproc",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:survey.miss",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:survey.trap",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:survey.clobber",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:survey.kinds",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:reach[RegisterClassW].calls (配列に無ければ 0)",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        },
+        {
+          "file": "tools/gui/flengine/results/survey_soft.json",
+          "locator": "json:reach[CreateWindowExW].calls (配列に無ければ 0)",
+          "measured_commit": "719f1c43",
+          "file_last_commit": "52424296"
+        }
+      ]
+    },
+    {
+      "id": "x64c-strict-sequential",
+      "route": "x64c",
+      "mode": "strict-sequential",
+      "build": "x64c boot 連鎖 plain variant (FLE-5 末 / boot_summary_plain.json)",
+      "commit": null,
+      "units": {
+        "total": 942,
+        "ok": 208,
+        "skipped": null,
+        "failed": 1,
+        "miss": null,
+        "noproc": null,
+        "dispatched": 209,
+        "uncovered": null
+      },
+      "stop": {
+        "unit": 209,
+        "va": "0x816e80",
+        "kind": "oob"
+      },
+      "create_fruity_instance": {
+        "reached": false,
+        "last_step": "S09"
+      },
+      "gui_natural": null,
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": {
+        "getmem": 1886,
+        "freemem": 776
+      },
+      "null_reasons": {
+        "commit": "表行・節・JSON に測定 commit の記載が無い (source の file_last_commit は測定 commit ではない)",
+        "units.skipped": "boot 出力に skip の計数が無い",
+        "units.miss": "boot 出力に miss の計数が無い",
+        "units.noproc": "boot 出力に proc 無しの計数が無い",
+        "gui_natural": "boot_summary_plain.json に GUI 計数が無い",
+        "units.uncovered": "出典に uncovered の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.ok": "units_run − 停止 unit 1 本 (threw がある場合)",
+        "units.dispatched": "boot.units_run (停止 unit 番号 stopped_at_1based と一致を検査)",
+        "create_fruity_instance": "harness 構造による (flelift/boot の非 work ファイルに CreateFruityInstance の参照 0 件・STARTUP の DllMain の段が最後)"
+      },
+      "source": [
+        {
+          "file": "tools/flelift/boot/results/boot_summary_plain.json",
+          "locator": "json:boot.units_total",
+          "measured_commit": null,
+          "file_last_commit": "ac5d6d46"
+        },
+        {
+          "file": "tools/flelift/boot/results/boot_summary_plain.json",
+          "locator": "json:boot.units_run",
+          "measured_commit": null,
+          "file_last_commit": "ac5d6d46"
+        },
+        {
+          "file": "tools/flelift/boot/results/boot_summary_plain.json",
+          "locator": "json:boot.threw.cls",
+          "measured_commit": null,
+          "file_last_commit": "ac5d6d46"
+        },
+        {
+          "file": "tools/flelift/boot/results/boot_summary_plain.json",
+          "locator": "json:boot.stopped_at_1based",
+          "measured_commit": null,
+          "file_last_commit": "ac5d6d46"
+        },
+        {
+          "file": "tools/flelift/boot/results/boot_summary_plain.json",
+          "locator": "json:boot.getmem",
+          "measured_commit": null,
+          "file_last_commit": "ac5d6d46"
+        },
+        {
+          "file": "tools/flelift/boot/results/boot_summary_plain.json",
+          "locator": "json:boot.freemem",
+          "measured_commit": null,
+          "file_last_commit": "ac5d6d46"
+        },
+        {
+          "file": "tools/flelift/boot/REPORT.md",
+          "locator": "md:### 4-1. /^\\| plain \\| [^|]*\\| \\*\\*209 dispatch\\*\\* / oob \\(`f_([0-9a-f]+)`\\)/",
+          "measured_commit": null,
+          "file_last_commit": "619d9553"
+        },
+        {
+          "file": "tools/flelift/boot",
+          "locator": "grep 0 件 /CreateFruityInstance/ (非 work・SKIP_DIRS を除く)",
+          "measured_commit": null,
+          "file_last_commit": "619d9553"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "存在確認 /^\\| S11 \\| host \\|[^\\n]*CreateFruityInstance/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "md: /^\\| (S\\d\\d) \\| host \\|[^\\n]*\\*\\*DllMain\\*\\*/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        }
+      ]
+    },
+    {
+      "id": "x64c-isolated-survey",
+      "route": "x64c",
+      "mode": "isolated-survey",
+      "build": "x64c 隔離 survey (FLE-5 末 / survey.json)",
+      "commit": null,
+      "units": {
+        "total": 942,
+        "ok": 892,
+        "skipped": null,
+        "failed": 3,
+        "miss": null,
+        "noproc": null,
+        "dispatched": null,
+        "uncovered": 47
+      },
+      "stop": null,
+      "create_fruity_instance": null,
+      "gui_natural": null,
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "commit": "表行・節・JSON に測定 commit の記載が無い (source の file_last_commit は測定 commit ではない)",
+        "units.miss": "survey.json は closure 外と proc 無しを分けない (合計 uncovered のみ)",
+        "units.noproc": "同上",
+        "stop": "survey は unit 別の判定で、停止位置を持たない",
+        "gui_natural": "survey.json に GUI 計数が無い",
+        "create_fruity_instance": "survey は DllMain を通さない",
+        "units.skipped": "出典に skipped の計数が無い",
+        "units.dispatched": "出典に dispatched の計数が無い",
+        "probes": "出典に probes の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.uncovered": "boot_summary_plain の units_total − survey の units_covered"
+      },
+      "source": [
+        {
+          "file": "tools/flelift/boot/results/boot_summary_plain.json",
+          "locator": "json:boot.units_total",
+          "measured_commit": null,
+          "file_last_commit": "ac5d6d46"
+        },
+        {
+          "file": "tools/flelift/boot/results/survey.json",
+          "locator": "json:units_covered",
+          "measured_commit": null,
+          "file_last_commit": "12958453"
+        },
+        {
+          "file": "tools/flelift/boot/results/survey.json",
+          "locator": "json:byCls.ok",
+          "measured_commit": null,
+          "file_last_commit": "12958453"
+        },
+        {
+          "file": "tools/flelift/boot/results/survey.json",
+          "locator": "json:byCls.unlifted",
+          "measured_commit": null,
+          "file_last_commit": "12958453"
+        }
+      ]
+    },
+    {
+      "id": "native-ref-hybrid",
+      "route": "native-ref",
+      "mode": "native-hybrid",
+      "build": "native 実機械語の hybrid 起動 (wasm ではない。参照値)",
+      "commit": "2ca85816",
+      "units": {
+        "total": 942,
+        "ok": 928,
+        "skipped": null,
+        "failed": null,
+        "miss": null,
+        "noproc": null,
+        "dispatched": null,
+        "uncovered": null
+      },
+      "stop": null,
+      "create_fruity_instance": null,
+      "gui_natural": null,
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "units.failed": "first_fail 830 が失敗か停止かは REPORT に定義が無い。first_fail は record の first_fail に置いた (未解決表)",
+        "units.skipped": "REPORT に skip の計数が無い",
+        "stop": "停止位置は first_fail として別記",
+        "create_fruity_instance": "native 参照は STARTUP の段を計数していない",
+        "gui_natural": "native 参照は GUI を計数していない",
+        "units.miss": "出典に miss の計数が無い",
+        "units.noproc": "出典に noproc の計数が無い",
+        "units.dispatched": "出典に dispatched の計数が無い",
+        "units.uncovered": "出典に uncovered の計数が無い",
+        "probes": "出典に probes の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {},
+      "source": [
+        {
+          "file": "tools/liftdiff/REPORT_LD26.md",
+          "locator": "md:# liftdiff /測定 commit: `([0-9a-f]{8})`/",
+          "measured_commit": "2ca85816",
+          "file_last_commit": "b3d2905b"
+        },
+        {
+          "file": "tools/liftdiff/REPORT_LD26.md",
+          "locator": "md:## 1. /`units_run (\\d+)/(\\d+)`/",
+          "measured_commit": "2ca85816",
+          "file_last_commit": "b3d2905b"
+        },
+        {
+          "file": "tools/liftdiff/REPORT_LD26.md",
+          "locator": "md:## 1. /`first_fail (\\d+)`/",
+          "measured_commit": "2ca85816",
+          "file_last_commit": "b3d2905b"
+        }
+      ],
+      "first_fail": 830
+    }
+  ]
+}

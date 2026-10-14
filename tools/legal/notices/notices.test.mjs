@@ -294,6 +294,7 @@ test("validateFontAsset: 正常な実データは通る", () => assert.deepEqual
 
 for (const [name, mutate, re] of [
   ["取得スクリプトの検証 sha256 と食い違う", (c) => { c.fontAsset.files[0].sha256 = "1".repeat(64); }, /取得スクリプトの検証値に無い/],
+  ["別の部品の sha256 を当てる (名前と sha256 の対応が食い違う)", (c) => { c.fontAsset.files[0].sha256 = realFont("barlow").fontAsset.files[0].sha256; }, /取得スクリプトの検証値に無い/],
   ["ライセンス本文の改ざん", (c) => { c.fontAsset.licenseFile.text += "x"; }, /licenseFile の sha256 が本文と一致しない/],
   ["ライセンス本文が無い", (c) => { delete c.fontAsset.licenseFile.text; }, /licenseFile .* が無い/],
   ["upstream が commit 固定でない", (c) => { c.fontAsset.commit = "main"; }, /40hex/],

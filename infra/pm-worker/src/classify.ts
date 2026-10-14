@@ -3,7 +3,8 @@
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
 import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
 import type { LaunchState } from "./launchobs.ts";
-import { DIGEST_ROLLING_RE } from "./pm.ts";
+import { parentOf } from "./refs.ts";
+import { DIGEST_ROLLING_RE, OC_HOLD_LABEL } from "./pm.ts";
 
 export interface SnapIssue {
   number: number;
@@ -33,6 +34,8 @@ export interface Snapshot {
   prs: SnapPr[];
   runs: SnapRun[];
   bot_last: Record<string, BotLast>;
+  // 直前の報告 (run-outcome・PM のマーカーを含むコメントを除く)。停止報告の判定と素材の再投入に使う。bot_last は run-outcome で上書きされる。
+  bot_report: Record<string, BotLast>;
   pm_art: Record<string, { at: string; line: string }>;
 }
 export interface RelaunchState {
@@ -44,18 +47,26 @@ export interface ClassifyInput {
   launched: Record<string, string>;
   // 投稿の観測状態 (launchobs.ts)。無い issue は観測記録の無い古い launch (従来の 3 時間判定)。
   launchState?: Record<string, LaunchState>;
+  // 観測済み launch の、観測した run の完了時刻 (launchobs.ts の doneAt)。ある観測済み launch は完了から 3 時間を recent の基準にする。無ければ投稿から 3 時間。
+  launchDoneAt?: Record<string, string>;
   relaunch: Record<string, RelaunchState>;
   // manual_deps.json (キーは issue 番号の文字列)。
   manualDeps: Record<string, number[]>;
   // issue dependencies (blocked_by) の open な番号。total_blocked_by > 0 の issue ごとに必要。
   liveBlockers: Record<string, number[]>;
-  // 最後の bot コメントの全文 (停止報告の素材名抽出に使う)。
+  // 最後の bot コメントの全文 (run-outcome・PM 応答の除外判定 = stopHit に使う)。素材名は reportBody から読む。
   fullBotBody: Record<string, string>;
+  // 直前の報告の全文 (run-outcome を除く)。素材名の抽出に使う (neededArts)。
+  reportBody: Record<string, string>;
+  // 最後の run-outcome の reason (stop / split / blocked / artifact / unknown)。素材による再投入は artifact のときだけ。
+  outcomeReason: Record<string, string>;
 }
 export interface Rows {
   blocked: Array<[number, number[]]>;
   started: Array<[number, string[]]>;
   user: Array<[number, string]>;
+  // oc:hold の issue (#2651)。Worker の自動着手を見送る。launch_issues.py に無い区分 (Worker 版の拡張)。
+  hold: Array<[number, string]>;
   stopped: Array<[number, string]>;
   recent: Array<[number, string]>;
   relaunch: Array<[number, string]>;
@@ -91,12 +102,8 @@ function graph(d: Snapshot, input: ClassifyInput) {
 
   const children = new Map<number, number[]>();
   for (const [n, i] of iss) {
-    const m = /^親\s*[:：]\s*(.+)$/m.exec(i.body);
-    if (!m) continue;
-    const first = /#(\d+)/.exec(m[1]);
-    if (!first) continue;
-    const pn = Number(first[1]);
-    if (nums.has(pn) && pn !== n) {
+    const pn = parentOf(i.body);
+    if (pn !== null && nums.has(pn) && pn !== n) {
       const c = children.get(pn) ?? [];
       c.push(n);
       children.set(pn, c);
@@ -174,13 +181,19 @@ function startedMap(d: Snapshot, iss: Map<number, SnapIssue>): Map<number, strin
 
 export function neededArts(n: number, input: ClassifyInput): string[] {
   const out: string[] = [];
-  for (const line of lines(input.fullBotBody[String(n)] ?? "")) {
+  for (const line of lines(input.reportBody[String(n)] ?? "")) {
     if (!NEED_RE.test(line)) continue;
     for (const a of ALLOW_ARTS) if (wordBounded(a).test(line) && !out.includes(a)) out.push(a);
   }
   return out;
 }
 
+const artTokens = (line: string | null | undefined): string[] =>
+  (line ?? "").replaceAll("oc_artifacts:", "").split(/\s+/).filter(Boolean);
+// 行の素材名 (allowlist 内) のうち、base に無いもの。
+const newArts = (line: string | null | undefined, base: string[]): string[] =>
+  artTokens(line).filter((a) => ALLOW_ARTS.includes(a) && !base.includes(a));
+export const isStopReport = (text: string): boolean => STOP_RE.test(text);
 const head90 = (s: string): string => Array.from(s).slice(0, 90).join("").replaceAll("\n", " ");
 const fmt1 = (x: number): string => x.toFixed(1);
 
@@ -195,7 +208,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
   const { iss, blockers, children } = graph(d, input);
   const st = startedMap(d, iss);
   const ageH = (ts: string) => (input.nowMs - Date.parse(ts)) / 3_600_000;
-  const rows: Rows = { blocked: [], started: [], user: [], stopped: [], recent: [], relaunch: [], ready: [] };
+  const rows: Rows = { blocked: [], started: [], user: [], hold: [], stopped: [], recent: [], relaunch: [], ready: [] };
 
   const blocksCount = new Map<number, number>();
   for (const bs of blockers.values()) for (const b of bs) blocksCount.set(b, (blocksCount.get(b) ?? 0) + 1);
@@ -213,6 +226,8 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     const bl = d.bot_last[k];
     if (i.labels.includes("needs-user-input")) {
       rows.user.push([n, ""]);
+    } else if (i.labels.includes(OC_HOLD_LABEL)) {
+      rows.hold.push([n, ""]);
     } else if (bs && bs.size > 0) {
       rows.blocked.push([n, [...bs].sort((a, b) => a - b)]);
     } else if (st.has(n)) {
@@ -220,28 +235,37 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     } else {
       const reported = !!bl && (!isLaunched || ageH(bl.at) < ageH(launchedAt));
       const stopHit = !!bl && STOP_RE.test(bl.head) && !OUTCOME_OR_PM_RE.test(input.fullBotBody[k] ?? "");
+      // 素材による再投入は、直前の報告 (rep) が停止報告で、最後の run-outcome が artifact のときだけ。
+      const rep = d.bot_report[k];
+      const repStop = !!rep && STOP_RE.test(rep.head);
+      const material = repStop && input.outcomeReason[k] === "artifact";
       const ls = input.launchState?.[k];
+      // 観測済みで完了を見た run があれば、その完了から 3 時間を recent にする (run が進行中は started が先に効く)。
+      const doneAt = ls === "observed" ? input.launchDoneAt?.[k] : undefined;
       // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
       if (ls === "failed") {
         rows.stopped.push([n, "launch-unobserved"]);
       } else if (isLaunched && ls === "launched" && !reported) {
         rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
-      } else if (isLaunched && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
+      } else if (isLaunched && doneAt !== undefined && ageH(doneAt) < 3 && !reported) {
+        rows.recent.push([n, `run finished ${fmt1(ageH(doneAt))}h ago`]);
+      } else if (isLaunched && doneAt === undefined && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
         rows.recent.push([n, `launched ${fmt1(ageH(launchedAt))}h ago`]);
       } else if (bl && reported && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
         const baseLine = artifactsFor(n, i);
-        const base = baseLine.replaceAll("oc_artifacts:", "").split(/\s+/).filter(Boolean);
-        const extra = neededArts(n, input).filter((a) => !base.includes(a));
+        const base = artTokens(baseLine);
+        const extra = material ? neededArts(n, input).filter((a) => !base.includes(a)) : [];
         let cand: string | null = extra.length ? "oc_artifacts: " + [...base, ...extra].join(" ") : null;
-        if (!cand && bl.art && bl.art !== baseLine) cand = bl.art;
+        if (!cand && material && newArts(rep?.art, base).length) cand = rep?.art ?? null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else rows.stopped.push([n, head90(bl.head)]);
       } else if (bl && ageH(bl.at) < 1.5) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
       } else if (bl && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
-        if (bl.art && bl.art !== rl.art && rl.count < 2 && bl.art !== artifactsFor(n, i)) rows.relaunch.push([n, bl.art]);
+        const cand = material && newArts(rep?.art, artTokens(artifactsFor(n, i))).length ? (rep?.art ?? null) : null;
+        if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else rows.stopped.push([n, head90(bl.head)]);
       } else {
         rows.ready.push(n);
@@ -249,7 +273,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     }
   }
 
-  const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0 }));
+  const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0, labels: iss.get(n)?.labels ?? [] }));
   rows.ready = sortReady(ready).map((r) => r.n);
   return {
     rows,

@@ -51,6 +51,10 @@ const icallDelta = (a, b) => {
   return d;
 };
 const icall_boot = icallCounts();
+// SV_SLOT=<wasm 番地>: 各 unit の前後で 4B の値を読み、変わった unit だけ rec.slot = [前, 後] を付ける (#1869). 計装なしで書込み unit を特定する用
+const slotAt = process.env.SV_SLOT ? Number(process.env.SV_SLOT) : null;
+const slotVal = () => { const h = mod.HEAPU8; return (h[slotAt] | h[slotAt + 1] << 8 | h[slotAt + 2] << 16 | h[slotAt + 3] << 24) >>> 0; };
+if (slotAt !== null) console.log('SLOT_BOOT 0x' + slotAt.toString(16) + ' ' + '0x' + slotVal().toString(16));
 const per = [];
 const only = process.env.SV_ONLY ? process.env.SV_ONLY.split(',').map(Number) : null;
 const skip = process.env.SV_SKIP ? process.env.SV_SKIP.split(',').map(Number) : [];
@@ -62,6 +66,7 @@ for (let i = 0; i < 942; i++) {
   const before = stubCounts(); const va0 = Number(mod._m11_va_used());
   const miss0 = mod._m11_icall_miss(), uniq0 = mod._m11_icall_miss_uniq();
   const ic0 = icallCounts();
+  const slot0 = slotAt !== null ? slotVal() : 0;
   const e0 = errs.length;
   curUnit = i;
   if (process.env.SV_PROG) fs.writeSync(2, 'unit ' + i + '\n');
@@ -86,6 +91,7 @@ for (let i = 0; i < 942; i++) {
   const d = {}; for (const k in after) if (after[k] !== (before[k] || 0)) d[k] = after[k] - (before[k] || 0);
   if (Object.keys(d).length) rec.stubs = d;
   const ic = icallNamed(icallDelta(ic0, icallCounts())); if (Object.keys(ic).length) rec.icall = ic;
+  if (slotAt !== null && slotVal() !== slot0) rec.slot = ['0x' + slot0.toString(16), '0x' + slotVal().toString(16)];
   if (errs.length > e0) rec.err = errs.slice(e0).slice(0, 3);
   per.push(rec);
 }

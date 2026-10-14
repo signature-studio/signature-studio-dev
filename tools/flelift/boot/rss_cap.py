@@ -4,7 +4,8 @@
 #   python3 rss_cap.py --cap-mb 13800 --log rss.log -- <command...>
 #
 # 終了コードは子の終了コード。上限超過で kill した場合は 143 (SIGTERM 相当) で終わり、
-# ピーク RSS (MB) と経過秒を標準エラーに出す。kill は子 PID への kill のみ (pkill・kill 0 は使わない)。
+# ピーク RSS (MB) と経過秒を標準エラーに出す。kill は子とその子孫 (例: emcc が起動した clang) の
+# PID 指定のみ (pkill・kill 0 は使わない)。
 import argparse
 import os
 import signal
@@ -35,6 +36,32 @@ def tree_pids(root):
         out.append(p)
         stack.extend(kids.get(p, []))
     return out
+
+
+def alive(pid):
+    try:
+        with open(f'/proc/{pid}/stat') as f:
+            return f.read().rsplit(')', 1)[1].split()[0] != 'Z'
+    except OSError:
+        return False
+
+
+def kill_pids(pids):
+    # 親から順に SIGTERM、猶予 5 秒で残ったものだけ SIGKILL。PID 指定のみ (pkill・kill 0 は使わない)。
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.time() + 5
+    while time.time() < deadline and any(alive(p) for p in pids):
+        time.sleep(0.2)
+    for pid in pids:
+        if alive(pid):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
 
 
 def rss_kb(pid):
@@ -86,9 +113,10 @@ def main():
             peak_kb = total
         emit(f'rss={total // 1024}MB peak={peak_kb // 1024}MB memavail={mem_available_mb()}MB')
         if total // 1024 > args.cap_mb:
-            emit(f'CAP EXCEEDED rss={total // 1024}MB > {args.cap_mb}MB: kill pid={proc.pid}')
+            pids = tree_pids(proc.pid)
+            emit(f'CAP EXCEEDED rss={total // 1024}MB > {args.cap_mb}MB: kill pids={pids}')
             killed = True
-            os.kill(proc.pid, signal.SIGTERM)
+            kill_pids(pids)
             proc.wait()
             rc = 143
             break

@@ -236,6 +236,9 @@
   "plugins.getParamValue": [
    4
   ],
+  "plugins.getParamValueString": [
+   4
+  ],
   "plugins.getPluginName": [
    2,
    4
@@ -1257,6 +1260,7 @@
     "plugins.getParamCount/3",
     "plugins.getParamName/4",
     "plugins.getParamValue/4",
+    "plugins.getParamValueString/4",
     "plugins.getPluginName/4",
     "plugins.isValid/1",
     "plugins.isValid/2"

@@ -12,7 +12,7 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
   トークンの平文保存や PAT への切替で回避しない。依頼者に解錠を依頼する)。
 - `python3`、`jq`、`curl`、systemd user (`systemctl --user`)。heartbeat は OpenCode CLI を使う。
 - 操作は **REST を基本**にする。GraphQL は 5,000 点/時の枠を使い切った実績がある (RETRO §D)。
-  GraphQL を使うのは次だけ: `pr_gaps.py` (PR 一覧の全ページ取得)、`sync_status.py` (Project V2 の Status 更新)、`gh pr ready`。`find_unreviewed.sh` は REST (`--paginate`) を使う。
+  GraphQL を使うのは次だけ: `pr_gaps.py` (PR 一覧の全ページ取得)、`sync_status.py` (Project V2 の Status 更新)、`gh pr ready`。heartbeat の文面が PM に依頼する Discussions への要約 (`addDiscussionComment`) は 1 回だけ使う。`find_unreviewed.sh` は REST (`--paginate`) を使う。
 
 ## 環境変数
 
@@ -31,12 +31,18 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 
 ## ツール
 
-> 2026-10-14 の切替で、VM の timer と `heartbeat.sh` の役は Worker と Actions に移った (timer は停止したまま再開しない)。各ファイルの後継と退役の扱いは『VM 退役後の扱い』の表が正本。
+> 2026-10-14 の切替で、VM の timer と `heartbeat.sh` の着手・点検の役は Worker と Actions に移った (timer は停止したまま再開しない)。各ファイルの後継と退役の扱いは『VM 退役後の扱い』の表が正本。
+>
+> **heartbeat の文面は『監査 + 停滞の是正』(指示 145)。着手 (launch)・watchdog は Worker、PM の判断と是正は PM agent。** VM での再開 (指示 145 の `enable --now`) は、実測の記録が無く未確認 (#2607)。
+> `pm-heartbeat.service` だけを 2 時間ごと (`PM_HEARTBEAT_SECONDS=7200`) に動かし、文面は `heartbeat_msg_audit.txt` (`PM_HEARTBEAT_MSG_FILE`)。文面は VM の `pm-heartbeat` が送る最新版と一字一句同じ (停滞の是正・製品 KPI・Discussions への要約を含む)。
+> 文面が依頼するのは、Actions・チケット・開発フローの監査、製品 KPI (K1〜K3) の前回比の記録、停滞の判定と是正 (調査は subagent に委任し、判断は PM が issue/PR に記録する)、重大事象の依頼者への通知、報告スレッドへの要約の追記。`pm-launch.timer`・`pm-watchdog.timer` は再開しない (Worker と二重になる)。戻し方: `systemctl --user disable --now pm-heartbeat.service`。
+> `heartbeat.sh` は起動時に 1 回だけ文面を読む。文面を変えたら `systemctl --user restart pm-heartbeat.service` で再起動する (次の送信までのタイマーが戻る)。
+> 文面中の VM 上のパス 2 か所 (KPI の前回値と、報告スレッドの情報を置いたファイル) は VM 固有の運用値。文面は VM の版と同じに保ち、repo 側では書き換えない。
 
 | ファイル | 用途 |
 |---|---|
 | `watch_runs.sh` | 実行中の Actions run を REST で監視し、1 本終わるたびに 1 行出して終了する。**終了通知を受けたら、結果の処理より先に再起動する** (指示 116)。詳細は [`watch_runs.notes.md`](watch_runs.notes.md) |
-| `heartbeat.sh` | 30 分ごとに PM のセッションへ作業継続のプロンプトを送る (指示 102・116・120)。`systemd/pm-heartbeat.service`。置換は `pm_wake.sh` (下の『heartbeat からの置換』) |
+| `heartbeat.sh` | `PM_HEARTBEAT_SECONDS` (既定 1800) ごとに PM のセッションへ固定文を送る。env `PM_HEARTBEAT_MSG_FILE` があればその文面、無ければ内蔵の 30 分版 (指示 102・116・120。着手・点検の指示を含むため使わない)。運用は `heartbeat_msg_audit.txt` + 7200 秒の監査と停滞の是正 (指示 145)。`systemd/pm-heartbeat.service`。必要なときだけ起こす置換は `pm_wake.sh` (下の『heartbeat からの置換』) |
 | `pm_wake.sh` | `/status` を読み、PM のセッションが必要なときだけ固定文を送る (`heartbeat.sh` の置換。#2347)。送るのは needs_pm > 0・fresh=false が 30 分続く・stuck_age_max_min > 360 のどれかのときだけで、送信は 3 時間に 1 回・24 時間に 6 回まで。終了コードは 0 (判定の結果) / 1 (セッション ID 無し) / 2 (`/status` の取得・解析失敗。`needs_pm` が無い古い Worker も含む) / 3 (送信失敗)。テスト: `bash tools/pm/test_pm_wake.sh` |
 | `pm_watchdog_ping.sh` | 5 分ごとに `repository_dispatch` (`oc-watchdog`) を送り、Actions の watchdog を起こす (GitHub の schedule が発火しないため)。`systemd/pm-watchdog.*` |
 | `pm_gate.sh` | `pm_gate.sh <command...>`。Worker (`infra/pm-worker`) が primary (`/status` が `mode=live`・`fresh=true`・`last_tick` が 15 分以内) の間は command を実行せず終了 0 にする。それ以外 (取得失敗・dry-run・JSON 不正) は command を実行する (fail-open)。URL は env `PM_WORKER_URL`、無ければ `tools/pm/worker_url`。テスト: `bash tools/pm/test_pm_gate.sh` |
@@ -47,7 +53,7 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 | `manual_deps.json` | 停止報告に根拠のある依存 (子 → [依存先])。**追跡する設定ファイル** (他の json は状態で、`.gitignore`) |
 | `rest_heal.py` | open PR を CONFLICT / FIX / NOREVIEW / DRAFT / APPROVED / COVERED / STUCK_LABELLED に分類し、足りない次の一手を `/oc` コメントか close→reopen で補う。watchdog (`.github/scripts/watchdog.sh`) の補助 |
 | `sync_status.py` | Project V2 の Status を PR / Issue の実態に同期する (冪等)。Status は参考で、チケット状態の正は issue の open/closed + ラベル + PR (`docs/WORKFLOW.md` §3)。実行しないと Status が陳腐化する。**退役後は同期をやめる (根拠: #2356。下表)** |
-| `pm_needs.py` | 最新の差し戻しが PM 判断を求めていて、PM の応答が無い PR を列挙する。heartbeat のたびに実行して未回答を 0 にする |
+| `pm_needs.py` | 最新の差し戻しが PM 判断を求めていて、PM の応答が無い PR を列挙する。未回答の検出は Worker の `needs.ts` が担い、heartbeat からは実行しない (指示 145)。手で確かめるときだけ使う |
 | `idle_report.sh` | watchdog の run 履歴から『idle>0 が 15 分以上続いた回数』を数える (VM の `pm-watchdog.timer` を止めてよいかの soak 判定用)。REST のみ。`idle_report.sh --since <ISO> --until <ISO>`。使い方は下の節。テスト: `bash tools/pm/test_idle_report.sh` |
 | `pr_gaps.py` | open PR を「レビュー中 / 修正中 / 担当なし」に分類する |
 | `dismiss_spam.py` | watchdog が水増しした `(watchdog)` の request-changes を取り下げる (`DRY=1` で確認) |
@@ -71,7 +77,8 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `dismiss_spam.py` | 廃止 | 旧 watchdog が『(watchdog)』を付けて出した request-changes の取り下げ (#731) の一回限りの後始末。ただし現行の `watchdog.sh` の FIX_IDLE も本文の末尾に同じ `(watchdog)` を付けて reviewer の token で出すため、このスクリプトは現行の FIX_IDLE も取り下げ対象にする | 退役前に、FIX_IDLE の本文から marker を外す (または判定を変える) 変更を main に入れてから、`DRY=1` で対象 0 件を確認して削除する。それまで watchdog の稼働中には実行しない | #2355 |
 | `find_silent_runs.sh` | 廃止 (後継: `record-run-outcome.sh`。App token が発行された run でだけ動く。token が無ければ何もしない (`.github/workflows/opencode.yaml` の `Record the run outcome` step)) | implement の run の末尾 (`if: always()`) で `record-run-outcome.sh` が、PR も push も無い終了 (success を含む) に `oc:no-pr` と理由マーカーを残す。報告の無い success は、この経路で `oc:no-pr` として見える | 削除のみ | #2355 |
 | `find_unreviewed.sh` | `watchdog.sh` | verdict の無い現在 head の PR (NOREVIEW) を `watchdog.sh` が点検ごとに戻す | 削除のみ | #2355 |
-| `heartbeat.sh` | PM agent・`pm_wake.sh` | PM セッションへの定期プロンプトは、`pm` job (`oc-pm`) と Worker の `oc-pm` 送信が担う。必要なときだけ起こす補助は `pm_wake.sh` (#2347)。`pm-heartbeat.service` は無効化済み | `pm` job の実 run が `oc-pm-decision` を残すことを確認してから削除 (親 #2319 の A4) | #2347 |
+| `heartbeat.sh` | 残す (監査と停滞の是正。指示 145) | 着手・watchdog の役は Worker・`pm` job (`oc-pm`) が担う。2 時間ごとに、監査と停滞の是正の依頼を `PM_HEARTBEAT_MSG_FILE` の文面で送る (指示 145。VM での再開は未確認)。内蔵の 30 分版の文面は使わない。必要なときだけ起こす補助は `pm_wake.sh` (#2347) | なし (停止は `disable --now`) | #2347・#2607 |
+| `heartbeat_msg_audit.txt` | 残す (監査と停滞の是正。指示 145) | `heartbeat.sh` が `PM_HEARTBEAT_MSG_FILE` で読む文面。監査・製品 KPI・停滞の判定と是正・重大事象の通知・報告スレッドへの要約の依頼 (VM 固有のパス 2 か所を含む) | なし | #2607 |
 | `idle_report.sh` | 残す | REST のみで VM に依存しない。watchdog の担当なし時間の計測として残す (VM 停止の判定用の役は終わった) | なし | #2354 |
 | `issue_snapshot.py` | 廃止 | open issue の集計は Worker の同期 (`fullSync`・`reconcile`) が担う。`launch_issues.py` だけが読んでいた | `launch_issues.py` と同時に削除。状態の扱いは下の『状態ファイル』の節 | #2355 |
 | `launch_issues.py` | Worker | `plan`・`launch` は Worker が live (`/oc` の投稿と着手の判断)。`blocked` (GitHub の依存欄への同期) は Worker が書かないため、退役後は依存欄が新規分で更新されない。判定は本文の `blockedBy:` を Worker の `classify.ts` が読むので、影響は表示のみ | 『状態ファイル』の節の扱いを反映してから削除。`classify_crosscheck.py`・`phase_crosscheck.py` (`infra/pm-worker/test/`) が `launch_issues.py` を importlib で読み、`classify.test.ts`・`phase.test.ts` がそれを `python3` で呼ぶため、先に crosscheck の Python 依存を fixture 固定に置き換える。依存欄の同期が要るなら別 issue | #2355 |
@@ -86,7 +93,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `restart_failed.sh` | 実装 run: Worker (`oc:no-pr` の再着手)。review 側: `watchdog.sh` (NOREVIEW → `reopen-pr.sh`) | 失敗した実装 run の再投入は、`oc:no-pr` の再着手 (`NO_PR_COOLDOWN_H`) に置き換わる。即時の再投入は無くなり、再着手は cooldown の後になる。review 側は watchdog の点検 (NOREVIEW) で戻るため、即時の再起動は無くなる。レート制限の判定は #2344 | 遅れを許容する判断を PR 本文に書いてから削除。理由別の再着手は #2334 | #2334・#2344 |
 | `status_sync.py` | 未実装 (#2362) | `docs/STATUS.md` の自動節を更新する後継の workflow が未配線 (pm-apply) | 後継が main に入るまで残す。入らない間は STATUS の自動節が古いままになる | #2362 |
 | `sync_status.py` | 廃止 | Project V2 の Status 同期を退役と同時にやめる (PM 判断 2026-10-14)。根拠は #2356 (PM App に Projects の書き込み権限を追加するかの依頼者への質問。既定は『追加しない』で not_planned で閉じた)。このため App の token では Project V2 の Status を更新できず、Status は参考扱い | 済 (#2435) | #2435 |
-| `systemd/pm-heartbeat.service` | 廃止 (後継は `pm` job) | 無効化済み | 削除のみ (systemd の変更は PM が行う) | #2355 |
+| `systemd/pm-heartbeat.service` | 残す (監査と停滞の是正。指示 145) | 指示 145 の `enable --now` は VM での実施が未確認。間隔と文面は env で指定する (例の unit に記載) | なし (systemd の変更は PM が行う) | #2607 |
 | `systemd/pm-launch.service` | Worker | `/oc` の投稿は Worker (`LIVE_LAUNCH`)。timer は 2026-10-14 に停止し、再開しない | 停止済み。ファイルの削除は退役の最後 | #2355 |
 | `systemd/pm-launch.timer` | Worker | 同上 | 停止済み | #2355 |
 | `systemd/pm-wake.service` | 例 (有効化は PM) | `pm_wake.sh` の unit の例。`/PATH/TO/...` を置換して使う。VM の timer は停止したまま | なし | #2347 |
@@ -121,7 +128,7 @@ systemd の変更自体は PM が行う (この README には含まれない)。
 
 ## heartbeat からの置換 (`pm_wake.sh`)
 
-`heartbeat.sh` は 30 分ごとに PM セッションを無条件で起こす。`pm_wake.sh` は、PM のセッションでしか進まないものがあるときだけ起こす (#2347、親 #2319)。
+`heartbeat.sh` は、内蔵の文面 (30 分版) では PM セッションを無条件で起こす (運用は 2 時間ごとの監査と是正の文面。上の注)。`pm_wake.sh` は、PM のセッションでしか進まないものがあるときだけ起こす (#2347、親 #2319)。
 systemd timer から 10 分ごとに 1 回ずつ呼ぶ。`/status` (公開・集計のみ) を `curl` で 1 回読み、次の kind のどれかのときだけ固定文を `opencode api post` で送る。
 
 | kind | 条件 | 送る文面 |
@@ -139,9 +146,9 @@ systemd timer から 10 分ごとに 1 回ずつ呼ぶ。`/status` (公開・集
 1. PM セッション ID を 1 行でファイルに書く (例: `~/.config/pm-wake/session_id`)。
 2. 1 回だけ手で動かして記録を確かめる: `PM_SESSION_ID_FILE=~/.config/pm-wake/session_id bash tools/pm/pm_wake.sh; echo $?` のあと、`tools/pm/pm_wake.log` の最後の行を読む。
 3. `systemd/pm-wake.service` と `systemd/pm-wake.timer` の `/PATH/TO/...` を置換し、`~/.config/systemd/user/` に置く。`systemctl --user daemon-reload` の後に `systemctl --user enable --now pm-wake.timer`。
-4. `pm-heartbeat.service` は無効化したままにする。
+4. `pm-heartbeat.service` は、内蔵の 30 分版の文面では無効化したままにする (監査と是正の文面・7200 秒での稼働は指示 145。上の注)。
 
-戻し方: `systemctl --user disable --now pm-wake.timer`。heartbeat に戻すなら `systemctl --user enable --now pm-heartbeat.service` (`heartbeat.sh` は変えていない)。
+戻し方: `systemctl --user disable --now pm-wake.timer`。heartbeat を内蔵の 30 分版に戻すなら、`systemd/pm-heartbeat.service` の `PM_HEARTBEAT_SECONDS=7200` と `PM_HEARTBEAT_MSG_FILE` の 2 行を外してから `systemctl --user enable --now pm-heartbeat.service` (`heartbeat.sh` の既定の文面・間隔は変えていない。VM の drop-in も同じ 2 行を外す)。
 
 ## watchdog の担当なし時間を集計する (`idle_report.sh`)
 
@@ -180,22 +187,22 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
   終了コード 3 で中断する (結果の JSON は出さない)。ログ本文は blob へのリダイレクト先から返りヘッダが無いので、直前の jobs 応答の値で見る。
 - `--cache FILE`: 完了した run の読み取り結果 (JSONL) を run ごとに追記し、次回は jobs・ログを取りに行かない。中断しても続きから再開できる。
 - 終了コード: 0 正常 / 2 引数不正 / 3 残量不足で中断 / 4 API 失敗・1 窓の run が多すぎる。
-- 検証: `bash tools/pm/test_idle_report.sh` (fake gh。idle=0 が続く・14 分 (ネガコン)・16 分・idle=0 を挟む・残量 1,499 の中断ほか)。結果は [`REPORT.md`](REPORT.md) §11。
+- 検証: `bash tools/pm/test_idle_report.sh` (fake gh。idle=0 が続く・14 分 (ネガコン)・16 分・idle=0 を挟む・残量 1,499 の中断ほか)。結果は [`REPORT_APPENDIX_2354.md`](REPORT_APPENDIX_2354.md) (REPORT §11 の付録)。
 
 ## 状態ファイル (`PM_DIR` に作られる。コミットしない)
 
 `issues_state.json` (snapshot) / `phase.json` (LAUNCH か Review-Only) / `launched.json` (3 時間の重複防止) /
 `relaunch.json` (素材を足した再投入の履歴、最大 2 回) / `stop_deps_candidates.json`・`wave2_cat.json` (書き手は無い) / `*.log`。
 
-**VM 退役時の扱い: 下表の状態ファイルは Worker に取り込まず、破棄する** (取り込み口 `/admin/import` は [#2343](https://github.com/signature-studio/signature-studio-dev/issues/2343) で未実装)。
+**VM 退役時の扱い: 下表の状態ファイルは、Worker に取り込んでから破棄する。取り込む前には破棄しない。** 取り込みの手順は [`../../infra/pm-worker/README.md`](../../infra/pm-worker/README.md) の『VM の状態の取り込みと書き出し』による (取り込み口 `/admin/import` は [#2343](https://github.com/signature-studio/signature-studio-dev/issues/2343) の PR で入る)。`phase.json` は取り込まず、切替後の値は Worker の現在値を使う。
 件数と内訳は [`REPORT.md`](REPORT.md) §12 が正本。
 
 | 状態 | 後継 | 扱い | 影響 |
 |---|---|---|---|
-| `launched.json` | Worker の `launchedAt`。`PM_LOGINS` (PM 名義) の `/oc` コメントから再構成する (同期窓 24 時間、#2380) | 破棄 | 切替 (VM の timer 停止) 以後は書き込まれない。Worker は同じ情報を GitHub から読むので、窓内の二重化は起きない。**VM を戻すときは空から始まる**ため、戻す前に Worker を dry-run にする (両方が live だと二重投稿になる) |
-| `relaunch.json` | Worker の DO `relaunch` (切替後の再投入だけを記録) | 破棄 (取り込みは #2343) | 履歴の無い issue は、直近 24 時間に停止報告が来た場合に限り、最大 2 回余分に再投入され得る (同じ素材行を含む) |
-| `phase.json` | Worker の DO `meta/phase` (`phase.ts`。open PR (stuck を除く) が 80 を超えたら Review-Only、10 未満で解除、間は直前の値) | 破棄。切替時に VM の値 (`review_only=false`) を一度だけ保存済み (REPORT §12-5) | 保存が無い状態 (新しいデプロイ先・DO の再作成) は Review-Only で始まり、open PR が 10 以上の間は新規着手しない (安全側の停滞) |
-| `issues_state.json` | Worker の DO (`issues`・`pmArt`・`botLast`)。snapshot は持たない | 破棄 | PM の `oc_artifacts:` 行は、同期窓 (24 時間) より古いコメントからは新たに読まれない。DO に取り込み済みの古い行が残るかは未確認。必要な issue は PM が行を書き直す (#2343) |
+| `launched.json` | Worker の `launchedAt`。`PM_LOGINS` (PM 名義) の `/oc` コメントから再構成する (同期窓 24 時間、#2380) | 取り込んでから破棄 | 切替 (VM の timer 停止) 以後は書き込まれない。Worker は同じ情報を GitHub から読むので、窓内の二重化は起きない。**VM を戻すときは空から始まる**ため、戻す前に Worker を dry-run にする (両方が live だと二重投稿になる) |
+| `relaunch.json` | Worker の DO `relaunch` (切替後の再投入だけを記録) | 取り込んでから破棄 (#2343。取り込む前に `oc_artifacts: none <素材名>` の行を直す) | 履歴の無い issue は、直近 24 時間に停止報告が来た場合に限り、最大 2 回余分に再投入され得る (同じ素材行を含む) |
+| `phase.json` | Worker の DO `meta/phase` (`phase.ts`。open PR (stuck を除く) が 80 を超えたら Review-Only、10 未満で解除、間は直前の値) | 取り込まず破棄 (切替後は DO の現在値が正)。切替時に VM の値 (`review_only=false`) を一度だけ保存済み (REPORT §12-5) | 保存が無い状態 (新しいデプロイ先・DO の再作成) は Review-Only で始まり、open PR が 10 以上の間は新規着手しない (安全側の停滞) |
+| `issues_state.json` | Worker の DO (`issues`・`pmArt`・`botLast`)。snapshot は持たない | `pm_art` を取り込んでから破棄 | PM の `oc_artifacts:` 行は、同期窓 (24 時間) より古いコメントからは新たに読まれない。DO に取り込み済みの古い行が残るかは未確認。必要な issue は PM が行を書き直す (#2343) |
 | `*.log`・`*.log.err`・`*.log.tmp` | - | 退役時に破棄 | 判断の根拠は issue コメントと `REPORT.md` に残る |
 | `stop_deps_candidates.json`・`wave2_cat.json` | - | 破棄 | 実行時の状態。`tools/pm/.gitignore` の 2 行にだけ残り、リポジトリに書き手も読み手も無い。Worker は参照しないので影響なし |
 

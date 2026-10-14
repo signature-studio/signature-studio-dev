@@ -96,8 +96,14 @@ step "実行 A: 通常起動 (DllMain attach → InitUnits ループ)"
 M11_TRACE=$TRACE timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1 || true
 step "実行 B: unit survey (942 unit を try/catch 隔離)"
 timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1 || true
+step "実行 C: 寛容起動 (InitUnits を逐次 942 unit・失敗 unit は skipped として続行; #2714)"
+M11_TOLERANT_OUT=work/tolerant_units.json timeout 600 node m11_tolerant.mjs > work/e2e_tolerant.out 2>&1 || true
 
 # #715: 回帰ゲート。期待値 (e2e_expect.env・環境変数で上書き可) を下回れば judge が非 0 を返し、e2e も非 0 で終わる
 python3 m11_judge.py --require-stage "$M11_EXPECT_STAGE" --min-survey-ok "$M11_EXPECT_SURVEY_OK"; rc=$?
+# #2714: 寛容起動のゲート (942 unit 試行・集計の整合) と strict・survey の完全一致の回帰, およびネガコン (退行入力を検出できること)
+python3 m11_tolerant_gate.py --strict-done "$M11_EXPECT_STRICT_DONE" --survey-ok "$M11_EXPECT_SURVEY_OK_EXACT"; rct=$?
+python3 m11_tolerant_gate.py --negctl --strict-done "$M11_EXPECT_STRICT_DONE" --survey-ok "$M11_EXPECT_SURVEY_OK_EXACT"; rcn=$?
+[ "$rct" = 0 ] && [ "$rcn" = 0 ] || rc=1
 python3 m11_icall_audit.py 2>/dev/null | tail -1 || true
 exit $rc
