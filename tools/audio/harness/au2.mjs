@@ -9,10 +9,13 @@ const args = process.argv.slice(2);
 const argOf = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
 const rep = +argOf("--rep", "1");
 const secs = +argOf("--secs", "10");
+// --extra: 全シナリオの query に追加する (ネガティブコントロール用。例: hiccup_ms=60&hiccup_every=200 で underrun を強制し FAIL することを確認)
+const extra = argOf("--extra", "");
 const outFile = argOf("--out", path.join(here, "../results/au2", `firefox_r${rep}.json`));
+const withExtra = (q) => (extra ? `${q}&${extra}` : q);
 const SCEN = [
-  { name: "asio_sine_b256_d2", sr: 48000, q: `api=asio&mode=sine&buf=256&depth=2&secs=${secs}` },
-  { name: "asio_sine_b256_96k", sr: 96000, q: `api=asio&mode=sine&buf=256&depth=2&sr=96000&secs=${secs}` },
+  { name: "asio_sine_b256_d2", sr: 48000, q: withExtra(`api=asio&mode=sine&buf=256&depth=2&secs=${secs}`) },
+  { name: "asio_sine_b256_96k", sr: 96000, q: withExtra(`api=asio&mode=sine&buf=256&depth=2&sr=96000&secs=${secs}`) },
 ];
 // 受入 4: AudioWorklet・SharedArrayBuffer・Atomics.wait の制約。worklet 内の Atomics.wait が可能か、notify が使えるかを実測する
 const PROBE = `(async () => {
@@ -69,7 +72,7 @@ await withFirefox({ root: path.join(here, "../build/web"), page: "index.html?" +
   }
   probe = await ff.eval(PROBE);
 });
-const out = { browser: "firefox", rep, secs, date: new Date().toISOString(), load_start: loadStart, load_end: os.loadavg(), nproc: os.cpus().length,
+const out = { browser: "firefox", rep, secs, extra, date: new Date().toISOString(), load_start: loadStart, load_end: os.loadavg(), nproc: os.cpus().length,
   wall_s: (Date.now() - tStart) / 1000, pulse: { default_sink: pactl("get-default-sink").trim(), ci_null_before: sinkBefore }, probe, results };
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile, JSON.stringify(out, null, 1));
