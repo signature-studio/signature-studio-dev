@@ -50,7 +50,7 @@ test('generated DB: layout, every entry accepted by the FL-reader model, preset 
     assert.equal(name203, e.spec.name);
     if (e.spec.format === 'vst3') {
       assert.equal(guidToString(f.guid), guidToString(tuidFromHex(e.spec.guid!)));
-      assert.equal(w.kind, 8);
+      assert.equal(w.version, 8);
     } else {
       assert.equal(f.magic, magicOf(e.spec.magic));
     }
