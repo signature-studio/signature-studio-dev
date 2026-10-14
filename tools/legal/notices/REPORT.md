@@ -196,6 +196,17 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 
 鮮度 (`docs/WORKFLOW.md` §6): `git diff d3dd60c4 HEAD -- tools/legal/notices tools/gui/test/fonts.tsv tools/gui/test/fetch_fonts.sh ':!tools/legal/notices/REPORT.md'` の出力は空 (0 行)。検証 HEAD は本 REPORT 更新 commit。
 
+### main の `check` 失敗の修正 (#935・workflow 配線の前提。検証起点 `7c85004e` + `registry.json` 2 行・クリーン worktree・素材なし)
+
+- 原因: #116 (`39465297`) が追加した `tools/startup/vreg/js/license_import.mjs` と `tools/startup/vreg/test/license_import.test.mjs` が、ライセンスファイル名の正規表現 (`REL_LICENSE_NAME`) に名前だけ一致し、「記録なしの同梱 OSS」と誤検出された (`license_obs.sh` と同じ型。OSS のライセンス文ではなく vreg の .reg 取り込みスクリプトとテスト)。`notices.test.mjs` の 2 件 (実 registry の整合・CLI の check) と `cli.mjs check` が main で赤になっていた。workflow を配線するとこの赤が PR の job に出るため、同じ PR で `ignoreLicensePaths` に 2 ファイルを登録した (正規表現は変えない)。
+
+| 項目 (n=3。min–max) | 修正前 `7c85004e` | 修正後 |
+|---|---|---|
+| `node --test tools/legal/notices/notices.test.mjs` | 55 tests / 50 pass / 2 fail / 3 skipped (n=1) | 55 tests / 52 pass / 0 fail / 3 skipped・254–262 ms |
+| `node tools/legal/notices/cli.mjs check` | exit 1・FAIL (2 件) | exit 0・PASS components=22 (bundled 20) records=12 fonts=129 artifacts=0 |
+
+- 検出力の確認 (NEG。`NOTICES_REGISTRY` に `/tmp/opencode` の複製 registry を渡す。リポジトリの registry は触らない): `ignoreLicensePaths` を空にすると `check` は exit 1 (FAIL 3 件: `license_obs.sh`・`license_import.mjs`・`license_import.test.mjs`)。`ffmpeg` の `coveredBy` を空にすると exit 1 (`tools/shared/oss/ffmpeg/build.sh: OSS 再ビルドスクリプトが registry の coveredBy に無い`)。登録を足しても未登録の検出は落ちていない。
+
 ## 範囲 / 範囲外
 
 検証範囲: 既存 05-stage 呼び出し元の回帰 (`pnpm release-guard:test`・`chunked.test.mjs`)・fl-win64 素材 (FL 同梱表記 15 本・ファイル一覧)・emsdk 6.0.12 で実行した上記 7 本の build.sh・`vite build`・`05-stage.mjs`。
