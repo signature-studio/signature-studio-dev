@@ -7,7 +7,7 @@
 
 - 停止印 `<!-- oc-fix-limit -->` は、作者 `github-actions[bot]` (型 Bot) の投稿だけを信じる。実装 App 名義の偽の停止印 (+ `oc-pm-intent: stuck`) では、oc-pm の stuck 対象にならない。
 - 測定 commit `a1085785`。node:test 395 件 (n=3 とも全件 PASS)・vitest 70 + 7 件・変異テスト 9 件 (killed 9)・本件の変異 5 件 (killed 5)・`.github/scripts/tests/test-*.sh` 11 本 (全 PASS)。
-- 本番 (deploy 後): launch は止まらない (`stuck-ceiling` は label 基準)。oc-pm の stuck 対象から外れるのは、旧 workflow で実装 App 名義に付いた印だけ (open な `oc:stuck` 4 件の実測は §5。外れるのは PR #2819 の 1 件)。
+- 本番 (deploy 後): launch は止まらない (`stuck-ceiling` は label 基準)。deploy は保存済みの停止印を消さない。旧 workflow で実装 App 名義に付いた印 (PR #2819 の 1 件) は、保存値として残る。oc-pm の stuck 対象 (`detectPm`) かどうかは、停止印より後の PM 応答 (`pmAt`) で決まる (open な `oc:stuck` 4 件の実測は §5)。
 
 ## 1. 測定の対象
 
@@ -61,12 +61,13 @@
 | #2995 | 2026-10-14T22:20:03Z | github-actions[bot] (Bot) | 作者の条件は満たす (従来どおり) |
 | #2885 | 2026-10-14T21:40:13Z | github-actions[bot] (Bot) | 作者の条件は満たす (従来どおり) |
 | #2842 | 2026-10-14T21:01:37Z | github-actions[bot] (Bot) | 作者の条件は満たす (従来どおり) |
-| #2819 | 2026-10-14T20:29:50Z | opencode-for-signature-studio[bot] (Bot) | **外れる**。印は #2851 の merge (20:43:31Z) より前に、旧 workflow で実装 App の token から投稿された |
+| #2819 | 2026-10-14T20:29:50Z | opencode-for-signature-studio[bot] (Bot) | 変わらない見込み。印は #2851 の merge (20:43:31Z) より前に、旧 workflow で実装 App の token から投稿された。deploy は保存値を消さないので、印は保存値として残る。停止印より後の PM 応答 `oc-pm-decision` (20:53:48Z・`botLogin` の投稿なので `pmAt` になる) を取り込み済みなら、`detectPm` は対象にしない |
 
 - launch: 止まらない。`launch_halted` の `stuck-ceiling` は `countOpenPrs` の label 数 (`src/phase.ts`) で決まり、停止印を読まない。現在 4 件 (`STUCK_HIGH` = 40 未満)。既定のままで止まる条件は増えない。
-- `/status` の `stuck_age_max_min`: 信じられる停止印が無い PR は PR の `updated_at` を起点にする (`engine.ts` の `stuckAges`)。#2819 は起点が 20:29:50Z から PR の更新時刻へ変わる。
-- 既存の状態の扱い: 新しい印 (#2851 以後) は `github-actions[bot]` で投稿される。旧い印 (実装 App 名義) は deploy 後に信じない。watchdog.sh は #2622 以降これを信じないため、oc-pm の stuck 起動の判定は Worker と watchdog で揃う。
-- deploy: 本 PR は deploy しない (deploy は PM の作業)。deploy 後の `/status` の実測は未実施 (§6)。
+- `/status` の `stuck_age_max_min`: 保存済みの停止印の時刻を起点にする (`engine.ts` の `stuckAges`)。停止印が無い PR だけ PR の `updated_at` を起点にする。#2819 は保存済みの停止印があるため、起点は 20:29:50Z のまま変わらない。
+- 本番の実測 (2026-10-14T22:42:20Z・deploy 前・本番 `/status`): `mode=live`・`fresh=true`・`stuck=4`・`stuck_age_max_min=132` (20:29:50Z からの経過)・`pm_detected.stuck=0`。
+- 既存の状態の扱い: 新しい印 (#2851 以後) は `github-actions[bot]` で投稿される。Worker は保存値を起動時に読み直し (`store.ts` の `loadState`)、保存値の作者は再検査しない。作者の判定が効くのは、届いた・reconcile で取り込んだコメントだけ。保存済みの停止印を消すのは、閉じた issue / PR の掃除 (`engine.ts` の `prune`) だけ。watchdog.sh は Worker が live のとき oc-pm を起動せず、live でないときだけ最新の停止印 (作者が `MARK_LOGIN` の投稿) で判定する。
+- deploy: 本 PR は deploy しない (deploy は PM の作業)。deploy 後は `/status` の `pm_detected.stuck` (stuck の対象数) と `stuck_age_max_min` を見る。#2819 の起点が 20:29:50Z のままなら、保存値が残っている。
 
 ## 6. 差分確認・未解決・範囲
 
@@ -75,8 +76,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| #2819 (`oc:stuck`) は旧い印 (実装 App 名義) しか無い。deploy 後は oc-pm の stuck 対象から外れる | 自動の PM 起動が効かない 1 件。ラベルは残る | PM 判断 (ラベルを外して再開させるか、手動で扱うか)。子 issue は未起票 |
-| `fix-progress.sh` は `OC_MARK_TOKEN` が空のとき、停止印を実装 App の `GH_TOKEN` で投稿する (`GH_TOKEN="${MARK_TOKEN:-${GH_TOKEN:-}}"`)。現行 workflow は常に `OC_MARK_TOKEN` を渡すため、この経路には入らない | 将来 `OC_MARK_TOKEN` が外れると、停止の印は PM に届かない (ラベルは付く) | PM 判断 (このフォールバックを外すか)。子 issue は未起票 |
+| #2819 (`oc:stuck`) の停止印は実装 App 名義で、deploy 前に保存された。保存値は deploy 後も残る。停止印より後に PM 応答 (20:53:48Z) があり、取り込み済みなら `detectPm` は対象にしない | `detectPm` の対象外は deploy の前後で変わらない。`stuck_age_max_min` の起点は 20:29:50Z のまま (ラベルは残る) | PM agent の判断待ち: #2819 を `oc:stuck` のまま残すか、ラベルを外して再開させるか・既定案: ラベルと印は触らず、現状のまま残す。子 issue は未起票 |
+| `fix-progress.sh` は `OC_MARK_TOKEN` が空のとき、停止印を実装 App の `GH_TOKEN` で投稿する (`GH_TOKEN="${MARK_TOKEN:-${GH_TOKEN:-}}"`)。現行 workflow は常に `OC_MARK_TOKEN` を渡すため、この経路には入らない | 将来 `OC_MARK_TOKEN` が外れると、停止の印は PM に届かない (ラベルは付く) | PM agent の判断待ち: このフォールバックを外すか・既定案: フォールバックを外す (実装 App の token で停止印を書かない)。子 issue は未起票 |
 | deploy 後の本番 `/status` (`launch_halted`・`stuck_age_max_min`) と oc-pm の stuck 起動は未測定 | 本番での効き方は未確認 | PM (deploy 後に確認) |
 
 - 検証範囲: `infra/pm-worker` のテスト (fake の webhook・fake gh)、`prepare-event-context.sh` の fake gh 試験、停止印の実投稿元 (`gh api` の実測 4 件)。
