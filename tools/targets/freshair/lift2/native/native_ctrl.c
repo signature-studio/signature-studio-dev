@@ -108,7 +108,7 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
           W64(N, 0x00, C + 0x21b8); W64(N, 0x08, C + 0x21b8); W64(N, 0x10, C + 0x21b8);
           W64(N, 0x28, Z); W64(N, 0x30, NB);
           W64(NB, 0, NB + 0x10); W32(NB, 8, 0x40); W32(NB, 0xc, 0x40); W64(NB, 0x18, 0x1803b4070ULL); W64(NB, 0x20, 0x1803b4070ULL);
-          W64(C + 0x21b8, 0x00, N); W64(C + 0x21b8, 0x08, N); W64(C + 0x21b8, 0x10, N); if (k == 0) g_nodeZ = Z; }
+          W64(C + 0x21b8, 0x00, N); W64(C + 0x21b8, 0x08, N); W64(C + 0x21b8, 0x10, N); if (k == 0) { g_nodeZ = Z; if (getenv("FA_OUT0")) fprintf(stderr, "NODEZ Z=%p\n", (void*)Z); } }
         /* param block +0x10 = mgr。mgr は driver 0x180da68c0 が [mgr+0x19a8/0x19b0] (shared_ptr pair) を
          * 読むため、ダミー mgr を渡す (C+0x1900 = 0x1a00B, +0x19a8 = self, +0x19b0 = C+0x1c00 blk refcount=0x40)。 */
         W64(C, 0x370, C + 0x620); W64(C, 0x480, C + 0x620);

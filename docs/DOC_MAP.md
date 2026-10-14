@@ -110,6 +110,7 @@
 | `tools/liftdiff/tests/ld39_abi_dump.py` | ~80 | LD-39 (#1194) の ABI 入口ダンプ: 11 関数の PE 先頭命令列を capstone で並べ、jmp thunk の IAT 先を解決する。ABI は断定せず、判定は REPORT_LD39.md で人が行う |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
 | `tools/icall/REPORT_APPENDIX.md` | ~214 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行)・§16 (#852 FLEngine jump table) の全文 (250 行上限のため分割移動) |
+| `tools/icall/REPORT_APPENDIX_2081.md` | ~78 | icall #2081 (ICALL-57): SlateCore encoded slot の静的解析 (`slatecore_fptr_table.py`)。受入条件 1・3 は未達で #2120 へ。受入条件 2 は部分達成 (12 slot は zero-fill 部の参照として確認) |
 | `tools/icall/REPORT_APPENDIX_1921.md` | ~72 | icall #1921 (ICALL-51): SlateCore の encoded 関数ポインタ表・cookie の特定と、native loader の enc(NULL)=cookie 初期化 (`FA_ENC_INIT=1`)。受入条件 1・2 は部分達成 (wasm 側と api-set 表は #2009・#1922 へ移管)。`fa_sweep.sh 8 60` の件数変化の実測を含む |
 | `tools/icall/REPORT_APPENDIX_1838.md` | ~50 | icall #1838 (ICALL-41): CHAININFO 断片による Fresh Air 範囲の伸長 (`prep_targets.py` の `chain_end`・親同一性チェック)。実 PE での伸長件数・roundtrip の再測定は素材待ち (本付録 §3 に状態を記す) |
 | `tools/icall/REPORT_APPENDIX_1067.md` | ~71 | icall REPORT §13 (#1026: Fresh Air 残落ち 6 件) の全文 (`REPORT_APPENDIX.md` §13 から分割移動) と、#1067 (ICALL-20) の段別切り分け。段別の主張は推定・既存記録のみで、dump 再生成は未実施 (素材 `work-icall`・`plugins-freshair` が要る) |
@@ -164,7 +165,7 @@
 | `tools/m11/rtl/REPORT.md` | ~248 | Delphi RTL の VA 範囲確定 + RTL 帯 (System/Types/SysUtils 1,172 関数) の lifter 別 liftdiff 採点 (#129) + x64c 不一致の主因タグ分類 (§9・集計は `classify_x64c_mismatch.py`・結果は `results/x64c_mismatch_classify.txt`・#410)。§7-4 は `REPORT_APPENDIX_129.md`・§9-4 は `REPORT_APPENDIX_1721.md`・§9-5 は `REPORT_APPENDIX_1936.md` に分割 (250 行上限) |
 | `tools/m11/rtl/REPORT_APPENDIX_129.md` | ~17 | m11/rtl REPORT §7-4 全文 (`ff28834` レビュー指摘対応の後処理検証・ネガコン・ImageBase 化の注記)。REPORT.md から分割移動 |
 | `tools/m11/rtl/REPORT_APPENDIX_1721.md` | ~22 | m11/rtl REPORT §9-4 全文 (`0x44a4d8` の wasm probe 実測と表)。REPORT.md から分割移動 |
-| `tools/m11/rtl/REPORT_APPENDIX_1936.md` | ~36 | m11/rtl REPORT §9-5 全文 (vtable `0x42f670` の native/wasm 実測・敷設経路・退行 5 件の分類)。REPORT.md から分割移動 |
+| `tools/m11/rtl/REPORT_APPENDIX_1936.md` | ~59 | m11/rtl REPORT §9-5 全文 (vtable `0x42f670` の native/wasm 実測・敷設経路・退行 5 件の分類)。REPORT.md から分割移動 |
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/qstore/REPORT.md` | ~90 | 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS D17) の検出・修復・idx 87/898/58–63 の帰属・#513 取り込み後の実測 (#516) |
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
@@ -357,7 +358,8 @@
 | `tools/targets/serum2/sr4/REPORT.md` | ~110 | SR-4 (#75) DSP 段階 lift 第 1 段: vtable root 56 関数の対象表 + pilot lift 9 本 (実機 vs wasm 差分) + strict gate + ネガコン |
 | `tools/targets/serum2/gui/REPORT.md` | ~76 | SR-7 (#68, 部分達成): Splice 3 テンプレートの実体化分岐は未特定 / overlay_demo_version は template 定義 0 件 (静的確認のみ) |
 | `tools/targets/serum2/gui/REPORT_SR24.md` | ~111 | SR-24 (#1710): Splice テンプレート実体化分岐の静的解析。sub-controller 振り分け `0x1804a1950` まで特定、demo bit 書込元・demo ダイアログ呼出元を列挙。分岐の特定は未達 (子 #1917) |
-| `tools/targets/serum2/gui/REPORT_SR28.md` | ~110 | SR-28 (#1917): Splice テンプレートの選択経路 (vtable 0x180a86b88 の設定元まで)・demo ダイアログ呼出元の vtable 位置。選択関数と demo bit 結線は未達 |
+| `tools/targets/serum2/gui/REPORT_SR28.md` | ~110 | SR-28 (#1917): Splice テンプレートの選択経路 (vtable 0x180a86b88 の設定元まで)・demo ダイアログ呼出元の vtable 位置。選択関数と demo bit 結線は未達 (SR-30 で訂正) |
+| `tools/targets/serum2/gui/REPORT_SR30.md` | ~100 | SR-30 (#2000): REPORT_SR28 の vtable 0x180a86b88 前提の訂正 (RTTI は SerumEditor の sub-object)。Splice 生成の直接呼出元と demo bit 読書 (0x1800c2b50 / 0x1800c6090) を列挙。選択 state 条件と間接経路は未達 (子 #2053〜#2055) |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~47 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017) |
@@ -369,7 +371,7 @@
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
-| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~113 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・FA-18 の切り分け (§A3-2)・meter 更新式の照合 (§A3-3, #1467)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)・語単位切り分け (§A5, `ks_rdata_value.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 |
+| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~113 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・FA-18 の切り分け (§A3-2)・meter 更新式の照合 (§A3-3, #1467)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)・語単位切り分け (§A5, `ks_rdata_value.py`)・RVA 候補の指す先の切り分け (§A5-3, `ks_rdata_rva_table.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA22.md` | ~60 | freshair FA-22 (#1578) の付録。FA_NODE1=1 時の setter 0x180c9d74c の失敗形 (逆アセンブル・実測)。部分達成で、判定は子 #1789・#1791 に分割 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA16.md` | ~50 | freshair REPORT §12-5 (未解決: 非空 controller map による 0x180da6c00 到達) の静的読み付録 (FA-16 #1182)。0x180ca1480 の分岐・0x180ca7db0 の map lower_bound ノード配置・0x180c9d700 / 0x180da6c00 の入口条件。実行による検証は含まない。REPORT §12-5 から分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
