@@ -58,7 +58,10 @@
 
 ## 6. 追加の測定 (2 回目 run)
 
-- 測定 commit: 本 run の新規 `tools/python/analysis/py59_refs.py` の commit (初版)。前回の測定 commit `2f115b91` からの差分は新規ファイル 1 本のみ。
+- 測定 commit: `ec02f804` (新規 `tools/python/analysis/py59_refs.py` を追加した commit)。
+  - 前回の測定 commit `2f115b91` からの差分: `git diff --stat 2f115b91 ec02f804 -- tools/python` は 18 ファイル・916 行追加 (main 取り込み分 py54・py58 等を含む)。
+  - PY-59 の実行コードは変わっていない: `git diff 2f115b91 HEAD -- tools/python/analysis/py59_func.py tools/python/analysis/py59_callers.py` の出力は 0 行。
+  - `py59_refs.py` は `git log --oneline -- tools/python/analysis/py59_refs.py` で `ec02f804` のみ (初登場)。
 - 新規スクリプト `tools/python/analysis/py59_refs.py <PE.bin> <VA>...` は `.pdata` の関数単位で逆アセンブルし、rip 相対で指定 VA を参照する命令を列挙する。実測 33.6 秒 (`.text` 全体)。
 - global slot `0x16baaf0` (`0xebf558` で `0xec53b0` の `this` として読む) を rip 相対で参照する箇所は 13 件 (`0xebf51e`・`0xebf528`・`0xebf53f`・`0xebf54b`・`0xebf558`・`0xebf584`・`0xebf58e`・`0xebf7b2`・`0xebf7bb`・`0xebfb04`・`0xebfb12`・`0xec652e`・`0xec6537`)。
   - 直接の書込みは `0xebf7bb`・`0xec6537` の `mov qword [slot], 0` の 2 箇所のみ。
