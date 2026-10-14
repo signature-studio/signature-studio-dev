@@ -144,3 +144,68 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 - よって BLK の張り替え (受入条件 1) 単独では wasm trap は消えず、画像 VA 側の shift が要る。
 
 修正方針 (未実装・子 issue へ): `remap.shift_va` に加算定数 (`add ... , <image VA>`) を含める拡張、または leaf 側に `passes.shift` を入れて `newbase` を wasm 線形メモリ内へ移す。いずれも ott 既存 recipe (`recipes/ott.py` の `shift_va`) の出力に影響しうるため、ott_route / ott_iargs の前後一致を確認してから入れる。
+
+## #1583 の受入判定と実測 (HB-H33・2026-10-14)
+
+依存だった #2128 (PR #2162) と子 #1770・#1873 は merge / close 済み。BLK の張り替え (本付録 §「方式の判定」(a)) は `passes.icall.blk_global` として実装済みで、本節はその受入を実測で判定する。
+
+### 測定 config
+
+| 項目 | 値 |
+|---|---|
+| 測定 commit | `26f90ada` (origin/main・測定時の HEAD)。配線の最後のコード変更は `f8bd2ea0` (PR #2162) |
+| 素材 | `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/`、`work-m6-ott`・`work-liftlib`・`work-icall` → 各 `tools/*/work/`。`OTT_DLL=$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll bash tools/liftlib/gen_ott_getparam_F.sh` で F.txt (`0x18011e5a0-0x18011e76c`、460 bytes) |
+| toolchain | [EMSDK] (`emsdk_env.sh` を source)・[RETDEC] (runner 既存)。`toolchain-*` の tar は展開していない |
+| 負荷 | 測定時の load average 0.2〜0.8 (4 コア) |
+
+### 受入条件の判定
+
+| # | 受入条件 (#1583 本文) | 判定 | 根拠 |
+|---|---|---|---|
+| 1 | BLK 参照を module-local global へ | 達成 (leaf 経路) | restore 後 IR (`ott_getparam.drc.restored.ll`) の BLK 範囲 inttoptr 135 件 (offset 0x00〜0x98。`+0x80` 29 件・`+0x88` 23 件を含む) → `ott_getparam_fixed.ll` では BLK 範囲の inttoptr 0 件、`@__icall_blk` の GEP 135 件 (宣言 1 行を含めて 136 行)。`blk_global` 置換数は `pipeline_report.json` の `icall_blk_global` = 135 |
+| 2 | opt-in (既定 off) か `ott_getparam` 限定 | 達成 | `pipeline.py` は `passes.icall.blk_global` が真のときだけ置換。有効化しているのは `targets/ott_getparam.json` の 1 箇所 (`grep` で他 target に無し)。`icall_rt.c` の変更は `ICALL_BLK_GLOBAL` の `#ifdef` 内で、未定義時は `BLK_ADDR = ICALL_BLK` (従来と同値)。`ott_route` は当該フラグを定義せず、icall_e2e の matrix が全 cell 一致 |
+| 3 | `test_icall.py` と `icall_e2e.sh` が PASS・前後の実測 | 達成 | 下の「icall_e2e」表 |
+| 4 | leafspec の wasm_trap 0 | 達成 | 200 → 0 (下の「leafspec」表) |
+| 5 | ネガコン | 達成 | 配線を外すと wasm_trap 200 に戻る (下の表) |
+
+route 側の `ir_icall_restore.py` が出す `blk+0xb0` の load は、この leaf の IR には現れない (0 件)。route 側の BLK は `0x34308000` で、`ott_route` の初期メモリ `0x36000000` の内側にあり trap しない。route の張り替えは受入 2 の「`ott_route` の出力を変えない」と衝突するため行っていない (未解決表)。
+
+### leafspec (`python3 -m liftlib leafspec targets/ott_getparam.json --n 200`)
+
+| 設定 | rc | wall | match / mismatch / native_crash / wasm_trap | gate |
+|---|---|---|---|---|
+| 配線あり (HEAD `26f90ada`) | 1 | 3.8 s | 147 / 53 / 0 / **0** | FAIL (rate 0.735, thr 1.00。残りは xmm0 不一致 53 件・#1270 の範囲) |
+| ネガコン: 配線を外す (`f8bd2ea0` の 5 ファイル `tools/icall/rt/icall_rt.c`・`tools/liftlib/liftlib/passes/icall.py`・`tools/liftlib/liftlib/pipeline.py`・`tools/liftlib/targets/ott_getparam.json`・`tools/liftlib/tests/test_unit.py` を親 `f8bd2ea0^` の版へ一時的に差し替え。測定後に作業前の版へ戻し、`git status` が空であることを確認) | 1 | 1.6 s | 0 / 200 / 0 / **200** | FAIL (rate 0.000) |
+
+ネガコンで差し替えた 5 ファイルは `f8bd2ea0` 以降に変更が無いことを `git log f8bd2ea0..HEAD -- <5 files>` (0 件) で確認してから行った。`base.py`・`simd/gen.py` の後続差分は配線と無関係で、両方の測定で同じに残した。
+
+### icall_e2e (`ANALYSIS_DIR=$HOME/analysis PLUGINS_DIR=$HOME/analysis/plugins bash tools/icall/icall_e2e.sh`)
+
+| 段 | 結果 |
+|---|---|
+| [1/4] route build | OK (`ott_route.sh`・約 95 s 全体) |
+| [2/4] unit / rewriter | `test_icall.py`: RESULT PASS (0 failed) |
+| [3/4] 監査 (OTT closure F・282 関数) | 非 IAT 間接 call 81: RetDec 素通しの落ち **70 → 0** (復元後)。tail-jmp 11: **11 → 0**。jump table 8: RetDec 未解決 1 → cmp/je 列へ 8 展開。判定 PASS (基準: 落ち >= 60 → <= 8 かつ tail-jmp 落ち 0) |
+| [4/4] matrix (89 scenario) | failed **0**・cells 50236・bit-equal **50236**・max_ulp 0・state_diff_qwords 0 |
+| CRT 関数単位 gate | PASS (SSE2 経路 6 関数・FMA3 経路・負入力・override 4/4 すべて xmm0 bit-equal 600/600) |
+| 最終 | `[icall_e2e] PASS` (rc 0) |
+
+注: 1 回目 (run1) は `tools/ott/work/libottnative.so` (素材 `work-m6-ott` 同梱・2026-10-12 build) が `ott_enc_slots` を欠き、matrix 89 件 FAIL・CRT gate FAIL になった。`bash tools/ott/native/build.sh` で再ビルド (`ott_enc_slots` を export) してから run2 で PASS した。監査表の FA・KH・FLEngine の行は `audit_*.json` の保存値で、この run では再測定していない。
+
+### 差分 0 の確認
+
+測定 commit `26f90ada` から、この PR の HEAD までのコード差分 (測定経路・REPORT を除く) は 0 行。
+
+```
+$ git diff 26f90ada HEAD -- tools/icall tools/liftlib/liftlib tools/liftlib/targets tools/liftlib/tests | wc -l
+0
+```
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `work-m6-ott` 同梱の `libottnative.so` が旧 build (`ott_enc_slots` 欠落)。icall_e2e の前提は `bash tools/ott/native/build.sh` での再ビルド | 再ビルドしないと matrix 89 件と CRT gate が FAIL | 素材の再梱包 (依頼者・PM 判断。起票先は未定) |
+| leafspec の gate FAIL (match 147/200、xmm0 不一致 53 件) | 受入 4 は wasm_trap のみ。gate は未達 | #1270 (HB-H29) |
+| dispatch 表が根 1 関数のみ・FAIL-FAST 未検証 | 間接 call の target 解決が未検証 | #2161 (HB-H44) |
+| route 側 (`ir_icall_restore.py` の `blk+0xb0`・`ott_route`) の BLK 張り替えは未実施 | route は trap しない (matrix 全一致)。受入 2 の出力不変の制約に従う | 本 issue の範囲外として扱う (PM 判断) |
