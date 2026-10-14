@@ -113,6 +113,17 @@ unit 隔離実行 (§4-E) と、新 IR の survey (`survey_trace.mjs`・942 unit
 ```
 
 - この差分は `t27_relink.sh` が `emsdk_env.sh` の場所を `build.sh` から取る変更 (repo 外パスの直書きを避ける lint 対応)で、挙動は不変。変更後の版で §4-D (`locale0`) を再実行し、同じ結果 (`units_run=53`・`unreachable`・ftrace 0 行・4.0 s) を得た。
+- origin/main 取り込み後 (merge commit `7f7fbfd3`) の鮮度: `git diff e4be81ff HEAD --stat -- tools/m11/m11_build.sh tools/m11/m11_post.py tools/m11/m11_ov.c tools/m11/shimx_link tools/shimx` の出力:
+
+```
+ tools/m11/m11_build.sh                         |  6 +++---
+ tools/m11/m11_ov.c                             | 20 ++++++++++++++++++++
+ tools/m11/m11_post.py                          |  7 ++++++-
+ tools/m11/shimx_link/experiments/t27_relink.sh |  4 +++-
+ 4 files changed, 32 insertions(+), 5 deletions(-)
+```
+
+- main 側の 3 ファイルの変更は、既定 OFF の計測専用 flag (`M11_INSTR_60A270`・`M11_PRINT_DEST_2118`) の追加だけで、既定の IR 生成・build 経路は変わらない。取り込み後の merge 済みツリーで `build.sh --trace --soft` (`m11_ov.c` 再 compile 込み・7.9 s) と実 boot を再実行し、同じ結果 (`units_run=17`・`dllmain_done=true`・`total_calls=106`・`distinct_called=29`・ftrace 0 行) を得た。IR の作り直し (§2) と §4-B〜E は取り込み前の測定のまま再実行していない。
 - 再現: §2 の手順で IR を作り直し、§4 の各コマンドを実行する。`experiments/t27_nc_swap.py` の stale 側 IR は `work-m11.tar.zst` から `tools/m11/work/boot_final3.ll` だけを別 dir に展開して使う。
 
 ---
