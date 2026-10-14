@@ -63,6 +63,7 @@ PE (`block00031_PE.bin`, VA 0x450560, capstone 線型 disasm) の実行:
 - 走査: `python3 tools/m11/ldfix/scan_spill_deref_2502.py tools/m11/work/boot_final3.ll --pe $FL_WIN64_DIR/extracted/block00031_PE.bin --out <json>`
 - 定義 (機械語): (S) 引数レジスタ rcx/rdx/r8/r9 を `[rsp+X]` に退避 → (L) `[rsp+X]` を別レジスタに読み直す → (D) その値を 1 段 deref して引数レジスタへ入れる → (C) D の後 6 命令以内に `call`。
 - alias の規則 (e080db82 で修正): 値がスピル引数のまま残るレジスタ (alias) は、そのレジスタを書く命令で消す。`mov` 以外の命令 (`lea`・`add` など) も対象で、`cmp`・`test` は書かないので除く。引数レジスタへ deref した後は、宛先の alias も消す。部分レジスタ (`eax` 等) は 64bit 名に寄せてから判定する。
+- 既知の限界 (結果には影響しない): 宛先は `, ` 区切りの 2 オペランド命令でしか読まないため、1 オペランド命令 (`inc`・`neg`・`pop`・`setcc` など) は宛先の alias を消さない。暗黙に書くレジスタ (`cqo`・`cdqe`・`mul`・`div` など) と 8/16bit 部分レジスタ (`al` 等) も扱っていない。これらを加えた一時の変種 (非 commit。`call`・`jmp`・`cmp`・`test`・`push` は書かない扱い) でも 14 関数 / 16 箇所と、deref・call の VA の組は現行版と完全に一致した。
 - 結果: IR 関数 7421 / .pdata 有り 6969 / **候補関数 14 / deref 箇所 16**。
 
 | VA | 退避元の引数 | deref 箇所 (VA) → call (VA) |
