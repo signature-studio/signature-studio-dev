@@ -167,7 +167,7 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 | o2/o3lto p50 比 | 1.18〜1.20 (単体測定 1.15〜1.29) | 0.9〜2.0 |
 | wasm bytes o0 / o2 / o3lto | 1,030,416 / 707,139 / 680,905 | 上記上限 |
 | p50 µs (参考) o0 / o2 / o3lto | 328.65〜335.24 / 57.74〜57.88 / 48.39〜49.12 | 判定に使わない |
-| 測定 commit `2d6c45fe` の全体 (agent-setup 展開の `/opt/emsdk`・`$HOME/analysis`) | 82 s・load 0.27→1.06・PASS 11/11 (o0/o2 7.59・o2/o3lto 1.18) | 上記 |
+| 測定 commit `2d6c45fe` の全体 (素材は agent-setup 展開の `[EMSDK]`・`[ANALYSIS-PLUGINS]`) | 82 s・load 0.27→1.06・PASS 11/11 (o0/o2 7.59・o2/o3lto 1.18) | 上記 |
 
 ネガティブコントロール (`judge.mjs` へ入力を壊して FAIL を確認; いずれも exit 1): 期待署名を `deadbeef` → 3 件 FAIL (8/11) / o2 bytes 上限 700,000 → FAIL (707,139) / o0/o2 比下限 8 → FAIL (5.52) / o2 の p50 を 3 倍 (o2 退行の模擬) → o0/o2 1.84・o2/o3lto 3.71 で 2 件 FAIL / 1 行だけ署名を `6b1696f1` に改ざん → FAIL。
 
