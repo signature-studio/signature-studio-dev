@@ -7,21 +7,23 @@
 ## 0. 結論
 
 - TRUE_DROP 24 site のうち **9 site を修復**した。IR に K (セル) を読む load が 1 本、機械語にもセルの読み出しが 1 箇所だけという 1 対 1 の site に限る (`fix_spill_2794.py`)。spill 宛 CELL_COLLAPSED は **37 → 28 site**。
-- 残り 15 site は直さない。6 site は IR の読み出しが機械語より少ない (lift 段の欠落の疑い)、9 site は読み出し数は一致するが、どの読み出しが どの load に対応するか 1 対 1 に決まらない。
-- 受入条件 5 件を満たす: 24 site の判定記録 (§2)・1 対 1 の修復とネガコン (§4・§5)・残数の実測 (§5)・emcc 通過 (§5)・e2e 1 コマンド再現 (§8)。
+- 残り 15 site は直さない。6 site (B: #1・4・8・14・15・24) は IR の読み出しが機械語より少ない (lift 段の欠落の疑い) で、子 #2940 [LD-141] に移した (§3-2)。9 site (C: #2・6・7・13・17・18・20・21・22) は読み出し数は一致するが、どの読み出しが どの load に対応するか 1 対 1 に決まらないため、子 #2910 [LD-137] に移した。
+- 受入条件 (#2794 本文を C 9 site を外して縮めた後の内容) を満たす: 15 site の判定記録 (§2)・1 対 1 の修復とネガコン (§4・§5)・残数の実測 (§5)・emcc 通過 (§5)・e2e 1 コマンド再現 (§8)。C 9 site の判定は子 #2910 の受入。
 
 ## 1. 測定条件
 
-- 測定 commit: `f5b35a1d` (コードを変えた最後の commit: `fix(m11): repair spill TRUE_DROP sites with 1-to-1 machine check (#2794)`)。作業 worktree `ws-2794` (branch `2794-spill-true-drop-repair`)、起点 `origin/main` = `40dd4460`。
-- 素材: `work-m11` を `tools/m11/work/` に展開 (`boot_final3.ll` 21.7 MB・`m11_image.bin`・`boot*.drc.config.json`)。`work-m11` は #516 以前の snapshot で、結論はこの IR に限る (REPORT_1169 §1 と同じ注意)。emcc は runner 既存の `[EMSDK]` を使い、`toolchain-emsdk` の展開は不要だった。`work-liftdiff` は本 e2e では未使用 (受入の `oc_artifacts` 行には残す)。
-- 実行: `bash tools/m11/ldfix/fix_d17_e2e.sh` (`RUNNER_TEMP` を `TMPDIR` として使用、foreground)。
-- 実測 (測定 commit `f5b35a1d`、n=2。レンジは未取得): real 46.50 s / 46.40 s、rc=0 / rc=0、load average (1 分) 0.85 / 0.93。対照として、修復 pass を入れる前の `40dd4460` で同じ script の既存 5 step を回すと real 31.10 s、rc=0、load average 0.85 (1 分)。増分 15.30 s (46.40 − 31.10) は、修復 pass と修復後 audit (step 5) の追加による。
-- 測定後の差分 (測定 commit から HEAD までのコード差分。この REPORT を追加する commit 以外は無い):
+- 測定 commit: `95536527` (コードを変えた最後の commit: `fix(m11): assert the no-gate negative control count in e2e (#2794)`)。作業 worktree `ws-2915` (branch `2794-spill-true-drop-repair`。#2915 の差し戻し対応で追補)。前版の測定 commit は `f5b35a1d` (`fix(m11): repair spill TRUE_DROP sites with 1-to-1 machine check (#2794)`)、起点 `origin/main` = `40dd4460`。
+- 素材: `work-m11` を `$RUNNER_TEMP/m11work` に展開し、`M11_WORK=<その tools/m11/work>` で指定 (`tools/m11/work/` への展開は行わない)。`work-m11` は #516 以前の snapshot で、結論はこの IR に限る (REPORT_1169 §1 と同じ注意)。emcc は runner 既存の `[EMSDK]` を使い、`toolchain-emsdk` の展開は不要だった。`work-liftdiff` は本 e2e では未使用 (受入の `oc_artifacts` 行には残す)。
+- 実行: `bash tools/m11/ldfix/fix_d17_e2e.sh` (`TMPDIR` は `RUNNER_TEMP`、foreground)。
+- 実測 (測定 commit `95536527`、n=2): real 46.84 s / 46.51 s、rc=0 / rc=0、load average (1 分、実行前) 0.71 / 0.87。前版 (`f5b35a1d`) の実測は real 46.50 s / 46.40 s、rc=0 / rc=0 で、同じ範囲。対照として、修復 pass を入れる前の `40dd4460` で同じ script の既存 5 step を回すと real 31.10 s、rc=0、load average 0.85 (1 分)。増分 15.30 s (46.40 − 31.10) は、修復 pass と修復後 audit (step 5) の追加による。
+- 測定後の差分 (測定 commit から HEAD までのコード差分。この REPORT を追加する commit 以外は無い)。e2e が実行する依存 (`fix_d17.py`・`audit_lsf*.py`・`ldmach*.py`・`spill37_1169.py`・`lb_base.py`) と本修復の 3 本、結果 TSV を含む:
 
   ```
-  git diff f5b35a1d HEAD -- tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/results
+  git diff 95536527 HEAD -- tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf*.py tools/m11/ldfix/ldmach*.py tools/m11/ldfix/spill37_1169.py tools/m11/ldfix/fix_spill_2794.py tools/m11/ldfix/check_spill_2794.py tools/m11/ldfix/results tools/m11/lb_base.py
   (空: 差分 0)
   ```
+
+  前版 (`f5b35a1d`) から `95536527` までの変更は e2e 本体 (`fix_d17_e2e.sh`) のネガコン 2 の件数 assert だけ (m4)。修復の IR・判定・突合のコードは変えていない。
 
 ## 2. 判定 (受入 1): TRUE_DROP 24 site の 1 site ずつの記録
 
@@ -60,6 +62,7 @@ M = 機械語で X に触れる rip 相対アクセスの数 (`audit_lsf.descend
 
 - B (欠落の疑い): M > I。IR に機械語の読み出しが無い。どの block が落ちたかは site ごとには未特定 (§3 は 1003c20 のみの照合)。
 - C (対応未決): M = I ≥ 2。読み出し数は合うが、対応付けの根拠 (支配関係・値の流れ) を持たないため触らない。
+- M は `audit_lsf.descend` が辿る命令のうち rip 相対オペランドを持つもの (`rip_touches`) だけを数える。絶対アドレスや計算で得たアドレスで同じセルに触れるアクセスは数えない。1 対 1 ゲートは必要条件であって十分条件ではない (同じセルへの別経路の読み出しは見えない)。
 
 ## 3. 1003c20 の IR 照合 (REPORT_1169 §3 の未検証項目)
 
@@ -69,6 +72,22 @@ REPORT_1169 §3 が「未検証」とした 1003c20 を、機械語と IR で照
 - IR `function_1003c20` (`boot_final3.ll` 845〜912 行): K = 0x11e2218 の読み出しは 1 本 (`%5 = load i32, ptr inttoptr (i64 18752024)`)。定数 1940 (0x794) の比較は無く、間接 call (`call [rbx+0x1a0]`) も無い。IR の call は直接 5 本 (`function_4232e0`・`function_663aa0`・`function_423980`・`function_bd68e0`・`function_11d5520`)。
 - よって (a) 不成立側のブロックが IR から丸ごと欠落している (lift 段の欠落)、(b) 1003c73 は IR i32 に対して機械語が 64 bit の store (幅が一致しない)。どちらも 1 対 1 ではないため、この site は修復していない。
 - REPORT_1169 §3 の「IR と機械語の対応が取れていない兆候」は、(a) (M=2・I=1 と間接 call の欠落) で裏付けられた。
+
+### 3-2. B 6 site の機械語・IR の行番号 (子 #2940 の本文と同じ)
+
+M = `rip_touches` で数えた機械語の読み出し命令のアドレス。I の行 = `boot_final3.ll` で `i64 K to ptr` が出る行 (`grep -n`)。関数範囲は IR の `define` から `}` までの行。
+
+| 関数 | store site | K | M / I | 機械語の読み出し (命令アドレス) | IR の K の load (行) | IR 関数範囲 (行) |
+|---|---|---|--:|---|---|---|
+| 1003c20 | 1003c73 | 11e2218 | 2 / 1 | 1003c4f, 1003c69 | 857 | 845–912 |
+| 1046a30 | 104c3f0 | 11e36d8 | 3 / 2 | 104c328, 104c343, 104c3e7 | 23545, 23594 | 16267–24295 |
+| 11f16b0 | 11f1785 | 11e14a8 | 3 / 2 | 11f1742, 11f174e, 11f177c | 49517, 49537 | 49474–49605 |
+| 128c320 | 128ca3f | 11e42e0 | 7 / 3 | 128c832, 128c84a, 128c86e, 128ca36, 128ca8e, 128caa6, 128cacd | 74580, 74729, 74736 | 74166–76137 |
+| 12a4450 | 12a4531 | 11e26a0 | 4 / 3 | 12a4513, 12a4528, 12a4583, 12a45c6 | 78582, 78626, 78642 | 78475–78729 |
+| ff8b60 | ff8c63 | 11e0c60 | 2 / 1 | ff8c0c, ff8c5a | 493304 | 493210–493326 |
+
+- 6 site とも M > I。IR の K の読み出しが機械語より少ない (読み出しが欠けている)。どの block が落ちたかは、この表では特定していない (起点の特定は子 #2940)。
+- 1003c20 の (a) (不成立側の欠落) は §3 で確認済み。他の 5 関数は未確認。
 
 ## 4. 修復 pass (受入 2)
 
@@ -90,7 +109,8 @@ REPORT_1169 §3 が「未検証」とした 1003c20 を、機械語と IR で照
 
 直した IR は `%16 = select` の分岐 (`test eax,0x30000; je`) と同じ位置で使われ、機械語の意味と一致する。
 
-修復後の audit では、直した 9 site が CELL_COLLAPSED から CELL_DEEP へ移った。見送った 15 site は CELL_COLLAPSED のまま残る。alg1/alg2/alg3 のフラグ数は変わらない (alg3 58、alg_any 65。修復前後で同じ)。
+修復後の audit では、直した 9 site が CELL_COLLAPSED から CELL_DEEP へ移った。見送った 15 site は CELL_COLLAPSED のまま残る。
+alg1/alg2/alg3 のフラグ数は、spill 修復では変わらない。比較元は fix_d17 後の audit (e2e step 3) で、alg3 58 / alg_any 65。spill 修復後の audit (step 5) も同じ値。原 IR (step 1) からは alg3 77 → 58、alg_any 83 → 65 に変わるが、これは fix_d17 (step 2) による変化で、spill 修復による変化は 0。
 
 ## 5. 検証 (受入 3・4) とネガティブコントロール
 
@@ -102,7 +122,7 @@ REPORT_1169 §3 が「未検証」とした 1003c20 を、機械語と IR で照
 
 - 突合 `check_spill_2794.py` (修復前後の audit と報告を照合): C1 修復後の集合 ⊆ 修復前の集合、C2 消えた集合 = 報告の修復集合、C3 修復は TRUE_DROP だけ。3 つとも満たして `RESULT: PASS` (rc=0)。
 - ネガコン 1 (修復を外す): 修復後 audit の代わりに d17 のみの audit を渡すと `FAIL C2: 消えた site 0 件 != 修復した site 9 件` (rc=1)。e2e で FAIL することを確認している。
-- ネガコン 2 (1 対 1 ゲートを外す): `--gate none` で 24 件を書き換える (ゲートあり 9 件)。残り 15 件は読み出しが複数ある関数で、先頭の K 読み出しを任意に選ぶことになる。ゲートは誤修復の防止に必要。
+- ネガコン 2 (1 対 1 ゲートを外す): `--gate none` で 24 件を書き換える (ゲートあり 9 件)。残り 15 件は読み出しが複数ある関数で、先頭の K 読み出しを任意に選ぶことになる。ゲートは誤修復の防止に必要。e2e は出力の `spill fixed=24 skipped=0` を grep で assert する (一致しなければ rc=1。`95536527` で追加)。
 - emcc: 修復 IR (`boot_spill.ll`) を `emcc -c -O0 -g1` で通す (rc=0)。
 - e2e: `bash tools/m11/ldfix/fix_d17_e2e.sh` rc=0 (測定 commit で n=2、§1)。
 
@@ -116,8 +136,8 @@ REPORT_1169 §3 が「未検証」とした 1003c20 を、機械語と IR で照
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 対応未決 9 site (C 分類: #2・6・7・13・17・18・20・21・22。読み出し数は一致、対応付けの根拠なし) | spill 宛 CELL_COLLAPSED 28 のうち 9 が残る | 子 issue #2910 [LD-137] (本 PR で起票) |
-| 読み出し欠落 6 site (B 分類: #1・4・8・14・15・24。IR の読み出しが機械語より少ない) | 修復できない。lift 段の欠落の起点は未特定 | 既存 #2705 (LD-125) と同じ類型 (lift 段で落ちた機械語の起点特定)。#2705 に追記 |
+| 対応未決 9 site (C 分類: #2・6・7・13・17・18・20・21・22。読み出し数は一致、対応付けの根拠なし) | spill 宛 CELL_COLLAPSED 28 のうち 9 が残る | 子 issue #2910 [LD-137] (#2794 本文から移した) |
+| 読み出し欠落 6 site (B 分類: #1・4・8・14・15・24。IR の読み出しが機械語より少ない。§3-2) | 修復できない。lift 段の欠落の起点は未特定 | 子 issue #2940 [LD-141] (本 PR で起票。#2705 (LD-125・`128f9e0` 専用) とは別の関数) |
 | 判定不能 7 site (UNDETERMINED) | 判定なし。修復対象外 | #2253 (LD-95) (既存) |
 | NO_CONSUMER 4 site・OK_LOAD 2 site | 判定確定どおり修復対象外 | — (判定確定) |
 | 修復 IR の実行検証 (FLEngine 起動) | 意味の正しさは機械語照合のみ | PM 判断 (本 issue の範囲外) |
