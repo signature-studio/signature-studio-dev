@@ -1,0 +1,66 @@
+# tools/python REPORT: PY-87 general 状態読出しゲッター 4 件の PE 確定と C provider 実装 (#2738, 親 #941, 子 #2830・#2831・#2832)
+
+> 正本: `tools/python/REPORT_PY27.md` (保留 150 件の出自)。本付録は PY-87 の実測のみ。
+
+## 結論
+
+- #1138 (PY-27) で保留した未実装 150 件のうち **4 件** (`general.getChangedFlag` / `getUseMetronome` / `getPrecount` / `getRecPPQ`) を PE で確定し、mock と C provider に実装した。mock と C の差分は 0 (`tests/general_diff.mjs` 9 呼出し)。
+- **値は未確定**。4 関数はいずれも「engine の状態 1 つを読んで Python の値に変換して返す」だけで、初期値は mock と C で揃えた仮置き (`changed 0` / `useMetronome false` / `precount false` / `recPPQ 96`)。実機値は未実測。`recPPQ 96` は仮置きで、実機の既定値とは確認していない。
+- 残り **146 件** は 3 件の子 issue に分けた: general 25 (#2830, PY-94) / ui 69 (#2831, PY-95) / screen 28 + arrangement 12 + launchMapPages 12 = 52 (#2832, PY-96)。
+
+## 手段
+
+- ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>` (`block00031_PE.bin` のみ。展開は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'`)。PyMethodDef のエントリ VA と関数先頭 VA (`fn`) を得る。
+- 逆アセンブル: 同じ probe の先頭 40 命令 (`HEAD=40`)。RIP 相対の絶対アドレス = 次命令 + disp で求めた。
+- 戻り型: 公開 stub (IL-Group FL-Studio-API-Stubs 由来、`analysis/flapi/flapi_table.json` の `sig.returns`)。
+
+## 確定した 4 関数 (PE 根拠)
+
+| 関数 | PyMethodDef entry | fn (VA) | 読む状態 (状態ポインタ slot) | 変換 | stub の戻り型 |
+|---|---|---|---|---|---|
+| `general.getChangedFlag` | 0x151aae0 | 0xd69800 | dword (slot 0x15e0bd0) | `call [slot 0x15e4280]` | int |
+| `general.getUseMetronome` | 0x151ab00 | 0xd69820 | byte (slot 0x15e1498) | `call [slot 0x15e4280]` | bool |
+| `general.getPrecount` | 0x151ab20 | 0xd69840 | byte (slot 0x15e0c08) | `call [slot 0x15e4280]` | bool |
+| `general.getRecPPQ` | 0x151aa60 | 0xd69330 | dword (slot 0x15e01c8) | `call [slot 0x15e4280]` | int |
+
+- 4 関数とも `flags=4` (METH_NOARGS)。先頭で `sub rsp` → 状態を読む → 変換呼出し → `ret` のみで、副作用・分岐は無い。
+- 変換呼出しの間接スロットは 4 件とも絶対アドレス `0x15e4280` に一致する。同じスロットは `transport.isPlaying` (bool, fn 0xd68430) にも現れる。
+- **bool と int は PE から区別できない**: 変換は `rcx` (値 1 個) だけを渡し、型の情報を渡さない。型は stub の `returns` に従う。FLEngine 側の変換関数の同定 (`0x15e4280` の先の関数) は未了。
+
+## 保留 (本 run で未解析・子 issue へ)
+
+- 本 run で逆アセンブルしたのは上の 4 件のみ。残り 146 件は未解析で、各 handler の VA の所在は `pe_handler_probe.py` で引ける (子 issue #2830・#2831・#2832 に名前を列挙)。
+- 参考の一次観察 (結論ではない): `general.getRecPPB` (fn 0xd69310) は `call 0xd68d90` の戻り値から `+0xb20` の dword を読む。`general.safeToEdit` (0xd6a2c0) は object の仮想関数 `[rax+0x98]` の戻り値を bool として返す。どちらも状態の所在の同定が要る。
+
+## 検証
+
+測定 commit: `239cf962` (コードを変えた最後の commit。main (`88cdda96`) を取り込んだ merge。衝突は `tools/python/tests/provider_check.mjs` の定数表と件数だけで、両側の集合 (stub41・stub89・pe87) を残して解消した)。測定は同 commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を再実行してから行った。
+環境: runner 4 core、測定開始時の load average 1.80 (`uptime`)。`FL_WIN64_DIR` は [WIN64] の展開先 (`$RUNNER_TEMP/fl-win64`、`fl-win64` を展開)。素材 `toolchain-emsdk` は `$ARTIFACTS_DIR` に無かったため、[EMSDK] (`docs/REFERENCES.md`) の規定位置に upstream から `git clone` + `emsdk install 6.0.12` で取得し、`emsdk activate 6.0.12` した。
+
+前提の生成物 (測定前に作成・gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 14 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0)。
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | rc 0・ハンドラ 83 | — |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 83 / 未実装 352 / MCP 静的 60) | 0.28 秒 |
+| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.04 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
+| `node tests/channels_diff.mjs` | calls 122、diffs 0、PASS (main 由来の stub89 を含む) | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.51 秒 |
+
+件数の変化: 本 PR 単独 (base `bae12679`) は実装 80 / 未実装 355 だった。main の取り込みで公開 stub 確定が増えた: `channels.getChannelType` (REPORT_PY41_1514、main `88b0f1c3` で加わった) → 実装 81 / 未実装 354。さらに main `88cdda96` が `channels.getChannelIndex`・`channels.getChannelMidiInPort` (REPORT_PY41_1514 追補・PY-89) を stub 確定として加えたため、実装 83 / 未実装 352 になった。内訳: MCP 60 + device 5 + mig 5 + pe39 1 + stub41 6 + stub89 2 + pe87 4 = 83 (total 435)。上の表は取り込み後の値。
+
+ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `changedFlag` 既定値 (17 行目) を `0` から `1` にすると、`node tests/general_diff.mjs` は `AssertionError: general 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 9・diffs 0・PASS (rc 0)。比較は同じ commit で行った。
+
+コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外。本 REPORT を含む md のみの commit を後から足しても 0 行のまま):
+
+```
+$ git diff 239cf962 HEAD -- tools/python ':!*.md'
+(空)
+```
+
+## 未解決
+
+- 4 関数の値 (`changed` / `useMetronome` / `precount` / `recPPQ`) は仮置き。実機の値は未実測。mock の値をそのまま正として扱わないこと。
+- bool / int の変換関数 (`0x15e4280` の先) は未同定。stub の `returns` を正とした。
+- 残り 146 件: 子 issue #2830 (general 25)・#2831 (ui 69)・#2832 (screen 28 + arrangement 12 + launchMapPages 12)。

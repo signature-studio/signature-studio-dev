@@ -28,9 +28,9 @@ fn	site	source	verdict	status	oracle	text
 45e3c0	45e7a8	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0x28], rax
 45e3c0	45e7d3	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0x28], rax
 45f560	45f938	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp + 0x28], rax
-466af0	466bca	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
-466af0	466d9b	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
-466af0	466e03	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x38], rax
+466af0	466bca	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
+466af0	466d9b	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
+466af0	466e03	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x38], rax
 4fa3d0	4fa681	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x58], rax
 4fa3d0	4fa7aa	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x40], rax
 4fad10	4faf0b	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x38], rax
@@ -91,10 +91,10 @@ cf3790	cf3f55	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa0], rax
 cf3790	cf3fd3	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x98], rax
 cf3790	cf3fe1	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x90], rax
 dcdde0	dcdeee	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0x58], eax
-ddf630	ddf6b5	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
-ddf630	ddf6c6	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xb8], rax
-ddf630	ddff5a	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xa0], rax
-ddf630	de0bfe	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xc0], rax
+ddf630	ddf6b5	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
+ddf630	ddf6c6	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xb8], rax
+ddf630	ddff5a	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xa0], rax
+ddf630	de0bfe	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xc0], rax
 e4f410	e4f4e1	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x20], eax
 ea7ae0	ea7c61	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x20], eax
 ea7ae0	ea7c97	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x28], eax
