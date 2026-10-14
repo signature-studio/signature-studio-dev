@@ -24,6 +24,8 @@ step() { echo "[ld108_e2e] $*"; }
 chk() { # chk <名前> <rc 0 なら PASS>
   if [ "$2" = 0 ]; then echo "[ld108_e2e] PASS $1"; else echo "[ld108_e2e] FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
+# 異常値 (REPORT_2316 §4 の ok 136 / miss 797 型) が出たとき、実行環境の差を後から突き合わせられるよう毎回記録する (#2402)
+step "環境: node $(node --version) / python $($PY --version 2>&1 | cut -d' ' -f2) / nproc $(nproc) / MemAvailable $(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo) MiB / load $(cut -d' ' -f1-3 /proc/loadavg)"
 # 元の IR (work/) を退避し、終了時に必ず戻す (本スクリプトは work/boot_final*.ll と ir_conditions.json を書き換える)
 cp "$W/boot_final.ll" "$OUT/orig_boot_final.ll"; cp "$W/boot_final3.ll" "$OUT/orig_boot_final3.ll"
 [ -f "$W/ir_conditions.json" ] && cp "$W/ir_conditions.json" "$OUT/orig_ir_conditions.json"
@@ -86,6 +88,14 @@ cp "$OUT/post/m11_boot.cjs" "$W/m11_boot.cjs"; cp "$OUT/post/m11_boot.cjs.wasm" 
 timeout 900 node trap_triage/survey_units.mjs "$OUT/sv_post.json" | tail -1
 python3 trap_triage/survey_diff.py "$OUT/sv_pre.json" "$OUT/sv_post.json" | tee "$OUT/survey_diff.txt" | tail -8
 grep -q '^ok 退行 unit: 0 ' "$OUT/survey_diff.txt"; chk "ok 退行 0" $?
+"$PY" - "$OUT/sv_pre.json" "$OUT/sv_post.json" <<'PYEOF'
+import collections, json, sys
+for p in sys.argv[1:]:
+    c = collections.Counter(r['kind'] for r in json.load(open(p)))
+    if c['miss'] > 200:
+        print('SURVEY_ANOMALY', p, dict(c)); sys.exit(1)
+PYEOF
+chk "survey が miss 過多の異常形 (REPORT_2316 §4 の ok 136 / miss 797 型。通常は miss 47) でない" $?
 
 step "6/6 ネガティブコントロール"
 sed 's/^define i64 @function_41a670(i64 %arg1)/define i64 @function_41a670(i32 %arg1)/' "$OUT/pre.ll" > "$OUT/neg_i32.ll"
