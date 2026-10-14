@@ -33,8 +33,10 @@
 | channels 差分 | `node tests/channels_diff.mjs` | calls 132・diffs 0・PASS | 0.12 秒 |
 | general 差分 | `node tests/general_diff.mjs` | calls 9・diffs 0・PASS | — |
 | device 差分 | `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS | — |
-| 実装数 (flpy 非依存の節) | `node tests/provider_check.mjs` の第 1・2・2b・6 節 | functions 435・implemented 86・unimplemented 349・mcp_static 60・PASS | — |
-| 第 3 節・全 tool | `tests/provider_check.mjs` 第 3 節・`FL_ENGINE=wasm node tests/all_tools.mjs` | 未実行 (`dist/flpy.js` と `work/midi.py` が runner に無い) | — |
+| 実装数 | `node tests/provider_check.mjs` (第 3 節の flpy を含む全体) | functions 435・implemented 86・unimplemented 349・mcp_static 60・PASS | 0.39 秒 |
+| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・callback_roundtrip true・PASS | 2.06 秒 |
+
+- flpy の用意 (同じ測定 commit で): `fl-win64` を `tar --zstd -xf` で展開 (5.6 秒)。`build_cpython_wasm.sh` rc 0 (4 分 15 秒)。`fetch_inputs.sh` rc 0。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (6.3 秒。`analysis/flapi` は再生成しない)。追跡ファイルの変更は 0 件。
 
 - KPI: 起動・GUI に関わらない PR のため対象外。
 
