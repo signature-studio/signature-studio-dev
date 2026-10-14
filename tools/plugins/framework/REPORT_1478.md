@@ -1,10 +1,10 @@
-# #1478 REPORT — Phase B の trap site 0x40d6e0 (icall) の特定と実測 (途中経過)
+# #1478 REPORT — Phase B の trap site の候補 0x40d6e0 (icall) と実測 (途中経過)
 
 - 担当 issue: #1478 `[PLG-P0b-5]` (親 #1229 系列・#985)。部分達成のため `Refs #1478`。
 - 起点: `origin/main` cb3a89a6。worktree `ws-1478`・branch `1478-plg-p0b-5-phase-b-trap`。
 - 前提の経緯: `tools/plugins/framework/REPORT_1229.md` §2〜§4 (fail-soft 3 件の追加と次の trap の記録)。
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 / `work-fw-stage1` をリポジトリルートで展開 /
-  `toolchain-emsdk`・`toolchain-retdec` は `/opt/emsdk`・`/opt/retdec` の実在を確認。
+  `toolchain-emsdk`・`toolchain-retdec` は `[EMSDK]`・`[RETDEC]` の実在を確認。
   `plugins-ott` は未使用 (本 run の hs 系は framework の FL export 表だけで足りた)。
 
 ## 1. 受入条件の達成状況
@@ -12,7 +12,7 @@
 | # | 受入条件 | 結果 |
 |---|---|---|
 | 1 | Phase B で `plug != 0` を実測 | **未達** (`plug=0x0`・Phase B は `memory access out of bounds`)。子 issue へ (§4) |
-| 2 | 次の trap site を `hs_dbg.sh` で特定し、原因を塞ぐ | **部分達成**。trap site 特定 (§3)。原因の修正は未着手 (§4) |
+| 2 | 次の trap site を `hs_dbg.sh` で特定し、原因を塞ぐ | **部分達成**。trap site の候補を §3 で絞り込み (確定は未了)。原因の修正は未着手 (§4) |
 | 3 | fail-soft 3 件 (0x52cf40 / 0x4e6060 / 0x4181e0) の戻り値の意味を確定 | **未達**。呼出側の読解は本 run で着手せず (§4) |
 | 4 | REPORT に実測 (所要時間・load・PASS/FAIL)・Phase A 回帰 `dispatch=38 ff=0` | **達成** (§2) |
 
@@ -31,7 +31,7 @@
 
 ## 3. trap site の特定
 
-`hs_dbg.sh` の trace 末尾 (trap 直前 15 件):
+`hs_dbg.sh` の trace 末尾 (trap 直前の末尾 6 件):
 
 ```
 0x40bce0 → 0x40edb0 → 0x40bd20 → 0x40d820 → 0x40d6e0 → 0x40e720 → [EXC memory access out of bounds]
