@@ -101,4 +101,4 @@ F3d 適用 IR は `ldfix.py --passes f3d --only 45b170,45d0a0,45f560` で作る 
 
 - 本 PR は起動・GUI に関わらないため、製品 KPI は書かない。launch (`infra/pm-worker/`) にも触れない。
 - 既定経路は変えていない (F3d は opt-in のまま。`ldfix.py` と results/ は不変)。
-- 本 run の素材は `$HOME/artifacts` の `work-m11`・`work-liftdiff`・`fl-win64` (展開先は §6)。
+- 素材は R2 の artifacts bundle の `work-m11`・`work-liftdiff`・`fl-win64` を展開して使った (展開先は §6)。
