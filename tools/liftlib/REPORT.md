@@ -5,7 +5,7 @@
 > [`REPORT_APPENDIX_B.md`](REPORT_APPENDIX_B.md) (§13〜§16)・[`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§17・§18)・[`REPORT_APPENDIX_C.md`](REPORT_APPENDIX_C.md) (§19)・[`REPORT_APPENDIX_D.md`](REPORT_APPENDIX_D.md) (§22)。
 > 節番号は全ファイルで通し番号 (本体の §N 参照は付録の同番号節を指す)。
 > #2128 (ott_getparam leaf への icall runtime 配線・測定 commit `f8bd2ea0`・部分達成): [`REPORT_APPENDIX_2128.md`](REPORT_APPENDIX_2128.md)。
-> #2181 (ott_getparam F=281 の SSA dominance 修復・部分達成・測定 commit `b1c2d148`): [`REPORT_APPENDIX_2181.md`](REPORT_APPENDIX_2181.md)。
+> #2181 (ott_getparam F=281 の SSA dominance 修復・部分達成・測定 commit `b1c2d148`): [`REPORT_APPENDIX_2181.md`](REPORT_APPENDIX_2181.md)。 #3067 (`legacy_p1` の repmap を挿入前の行へ適用・測定 commit `81adaffa`): [`REPORT_APPENDIX_3067.md`](REPORT_APPENDIX_3067.md)。
 
 - 日付: 2026-10-11 / 担当 dir: `tools/liftlib/` (他 dir は読取のみ) / 再現: `bash tools/liftlib/liftlib_e2e.sh` (キャッシュ時 約 25 秒 + leaf spec 約 4 分, `--fresh` で FA/KH を RetDec lift から約 1 分)
 - 数値はすべて本 dir で実測。推定は「推定」と明記。
