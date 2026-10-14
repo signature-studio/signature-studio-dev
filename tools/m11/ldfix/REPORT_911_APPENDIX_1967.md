@@ -89,3 +89,46 @@
 所要 (実測・n=1): `retdec-decompiler-log 0x41a670-0x41a6f4 --select-decode-only --timeout 200` の real 4.466 秒 (load average は開始時 1.28)。
 
 版について (受入 1): issue #2038 は 2019-03 版相当でのビルドを求める。本 PR の実測は v5.0 (`53e55b4b`) のみ。2019-03 版 (`6edcaaea`) はソースを取得できたが、(1) fix run では `toolchain-retdec` が無く share の入手元が無い、(2) 2019-03 版のツリーに `share/` が無い、(3) LLVM は `avast-tl/llvm` の外部取得 (`3d1e5d0b`) を要する。fix run の上限 (40 分) では収まらないと判断し、ビルドしていない。PM 判断 (2026-10-14、出典: https://github.com/signature-studio/signature-studio-dev/issues/2038#issuecomment-6167618240) により、受入 1 は原文のまま子 issue #2314 に移した (v5.0 に改める (b) は採らない)。
+
+## 6i. #2314 (LD-106): 2019-03 版 (`6edcaaea`) のソースビルド実測と、分岐発火確認の阻害要因
+
+測定 commit: `e6cefa06` (main)。本 run は repo のコードを変えていない (2019-03 版は外部ソースを GitHub から取得して測った)。初回 PR head `c81c9f9a` (2026-10-14) では `git diff e6cefa06 c81c9f9a -- tools/m11/ldfix` が本節の追記のみ (+23 行)。main 取り込み後の HEAD との差分には main 側の変更も入るため、この確認は `c81c9f9a` に対してのみ成り立つ。
+ビルド対象: avast/retdec `6edcaaea` (2019-03-09) を `git clone` で取得し、`deps/` は同梱のもの (LLVM は `avast-tl/llvm` `3d1e5d0b` を CMake が取得)。
+
+ビルド 1 回目 (実装 run・Makefile generator・`RelWithDebInfo`・`-j4`・4 コア・RAM 15GB。load average は make 前後の `uptime`):
+- クリーン (`build-clean`・`CXXFLAGS=-include cstdint -include string`): real 644 s (10 分 44 秒)。rc=0。load average 1.19 → 4.95。n=1。
+- cmake の configure 引数と `time` を付けた正確なコマンド行は、実装 run で記録されていない (確認できない)。このため 644 s が configure・LLVM ソース取得・`make install` を含むかは、この測定からは言えない。生ログも残っていない。
+- 前段の試行 (LLVM 段で ninja が失敗・pelib/yaramod の sub-build を再実行) は本測定に含めない。
+
+ビルド 2 回目 (fix run の再測定・コマンド記録あり・n=1。repo の HEAD は `62aef8b9`、測定にコードは使っていない。4 コア・RAM 15GB):
+```
+# 作業ディレクトリを W とする。W/retdec がソース、W/build-remeasure がビルド先
+git clone https://github.com/avast/retdec && git -C retdec checkout 6edcaaea   # 取得 2.6 s (測定外)
+sudo apt-get install -y libfl-dev                                              # 5 s (測定外)
+mkdir build-remeasure && cd build-remeasure
+export CXXFLAGS="-include cstdint -include string"
+time cmake ../retdec -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=../install   # real 3.7 s・rc=0
+time make -j4                                                                         # real 860 s (14 分 20 秒)・rc=0
+```
+- 上の記録の初版は `cmake ..` としていたが、cwd が W のままだと `..` は RetDec のソース (CMakeLists.txt) を指さず、configure は失敗する。本 run で同じ cwd (W で `cmake ..`) を試し、rc=1 (`does not appear to contain CMakeLists.txt`) を確認した。前回 run の実際の cwd は本 run から確認できないため、構成を上のとおり `cmake ../retdec` に明示して書き直した。修正後の構成で configure 段のみ再確認した (測定外。real 3.8 s・rc=0)。
+- load average は make 開始時 0.31 → 終了時 4.84。2 回目 (本再測定) では `make install` を実行していない (計測外)。share の 404 は 1 回目 (実装 run) の `make install` で観測したもので、本再測定では再確認していない (§6i の阻害要因 1)。
+- LLVM ソース (`external/src/llvm-project`、71M) の取得は `make` の中で行われるが、ExternalProject の download stamp は make 開始 (12:33:15Z) の 3 秒後 (12:33:18Z) で、取得時間は 860 s に含まれるが数秒。LLVM のビルド完了は make 開始の 6 分 17 秒後 (12:39:32Z)、yaramod は 1 分 32 秒後 (12:34:47Z)。残りは RetDec 本体。
+- 644 s と 860 s の差の原因は未確認 (1 回目のコマンドが不明で、run も別)。どちらも 60 分未満。
+- cfg.log・make.log は成果物にしない (runner の一時領域で run 終了時に破棄される)。
+
+ビルド時に必要だった回避 (v5.0 と異なる点):
+- GCC 13 で `std::uintN_t`・`std::string` が未 include: `CXXFLAGS` に `-include cstdint -include string` を付けた (`CMAKE_CXX_FLAGS` だけでは pelib の ExternalProject に届かない)。
+- yaramod の configure が `FLEX_INCLUDE_DIR` で失敗: `libfl-dev` を apt で導入 (`/usr/include/FlexLexer.h`)。
+- 2019 版には `RETDEC_COMPILE_YARA` が無い (v5.0 の回避は使えない)。
+
+判定 (縮小後の #2314 の受入):
+- **受入 1 (ソースビルド + 所要時間の実測) は達成**。real 644 s = 10 分 44 秒 (1 回目)・860 s = 14 分 20 秒 (2 回目の `make -j4`)、いずれも rc=0・n=1 ずつ。60 分に収まる。
+- **受入 2 (41a6a0 での分岐発火確認) は未実施** → #2405 に移した。前提の 2019 版 `retdec-decompiler` を起動できなかったため (下の阻害要因)。受入 1 の不足ではない。
+
+受入 2 の前提を満たせなかった阻害要因 (#2405 の背景):
+1. `make install` が `cmake/install-share.py` で `retdec-support_2019-03-03.tar.xz` を取得し、HTTP 404 で失敗する (`github.com/avast-tl/retdec-support/releases/download/2019-03-03/...`。release API も 404。tag `2019-03-03` は存在するが LICENSE・README (172K) のみ)。share を入手できない。
+2. `toolchain-retdec` の share は `2019-03-08` (v5.0 同梱)。`2019-03-03` の代替にはならない (版が違う)。
+3. 2019 版の `retdec-bin2llvmir` は v5.0 と CLI が異なる (`--select-ranges` 無し。`-select-fncs` は値を取らず入力パスを解釈できない)。`retdec-decompiler.py` ラッパーは install 段が落ちるため使えない。
+
+残件 (#2405): 2019 版の share 入手経路の確定 (2019-03-03 の share を別経路で得る、または 2019 版 `retdec-decompiler` 相当の起動方法を確立) → 41a6a0 での `checkForGlobalInInstruction` の L163〜168 発火確認 (`TAG` 一時ログ付きビルドも含む)。
+素材の入力: `block00031_PE.bin` は `fl-win64` 内 `extracted/`、sha256 先頭 `b2c64da4` (付録 §6f と一致)。

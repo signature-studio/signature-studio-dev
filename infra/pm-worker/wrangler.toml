@@ -17,6 +17,9 @@ BOT_LOGIN = "opencode-for-signature-studio[bot]"
 PM_LOGINS = "pycabbage"
 LIVE_LAUNCH = "0"
 LIVE_DISPATCH = "0"
+# コメントの全体同期は新しい順に 24 時間分を読む。窓内の件数は実測で既定の上限 (80 ページ = 8,000 件) を超える
+# (tools/pm/REPORT.md §10) ので、そのままだと全体同期のたびに打ち切りになる。余裕を見て 150 ページ (15,000 件) にする。
+COMMENT_MAX_PAGES = "150"
 
 [[durable_objects.bindings]]
 name = "PM"

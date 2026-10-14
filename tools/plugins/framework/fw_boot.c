@@ -59,7 +59,7 @@ __attribute__((used)) long long fw_ov_startlib(void) {
  *   Q(r13+0x10)=rdx  Q(r13+0x20)=r8  Q(r13)=rcx
  *   D(r13+0x34) = call 0x404bc0
  *   reason==0 → D(r13+0x18)=D(Q(r13+0x10)) : 0
- *   Q(0x716030)=0x404C00  Q(0x716038)=0x404C10  Q(r13+8)=1  B(r13+0x30)=reason+1
+ *   Q(0x710030)=0x404C00  Q(0x710038)=0x404C10  Q(r13+8)=1  B(r13+0x30)=reason+1
  *   Q(r13+0x28)=Q(hooks)
  *   reason∈{1,2} → call Q(hooks+reason*8) (BLK 現状のまま)
  *   Q([rbp+0x160])=dllproc ≠ 0 → ecx=reason rdx=reserved で call dllproc
@@ -79,8 +79,8 @@ static uint64_t fw_ov_InitLib(uint64_t ctx, uint64_t pkg, uint64_t tblctx, uint6
     Q(r13) = ctx;
     D(r13 + 0x34) = (uint32_t)fw_call_cur(0x404bc0);
     if (reason == 0) D(r13 + 0x18) = (uint32_t)Q(Q(r13 + 0x10)); else D(r13 + 0x18) = 0;
-    Q(0x716030) = 0x404C00;
-    Q(0x716038) = 0x404C10;
+    Q(0x710030) = 0x404C00;
+    Q(0x710038) = 0x404C10;
     Q(r13 + 8) = 1;
     B(r13 + 0x30) = (uint8_t)(reason + 1);
     Q(r13 + 0x28) = Q(hooks);

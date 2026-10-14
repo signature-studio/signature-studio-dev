@@ -1,9 +1,9 @@
-# #2008 REPORT — 0x710030/0x710040 の値確定と Phase B の plug != 0 実測 (未達・調査記録)
+# #2008 REPORT — 0x710030/0x710040 の値確定と Phase B の plug != 0 実測 (3 回目 run で値確定・Phase B は別原因で子へ移管)
 
-- 担当 issue: #2008 `[PLG-P0b-11]` (親 #1935 系列)。受入 1 (0x710030/0x710040 の値確定) と 受入 2 (Phase B の plug != 0) は **未達**。受入 3 (Phase A 回帰 `dispatch=38 ff=0` の毎回確認) は **達成**。
-- 起点: `origin/main` c171b9dc。worktree `ws-2008`・branch `2008-plg-p0b-11`。
-- 測定 commit: `c171b9dc` (コード変更なし。本 REPORT の追加のみ)。
-- 既知類型との関係: 該当なし (lift 欠陥ではなく、FL 本体の外部状態 (export table) 不在による soft-miss)。
+- 担当 issue: #2008 `[PLG-P0b-11]` (親 #1935 系列)。**3 回目 run (§8) の結論**: 受入 1 (0x710030/0x710040 の値確定) は**達成** (値・書込み元・動的確認。「FL export table」前提は誤りで §8.1 が正本)、受入 3 (Phase A 回帰の毎回確認と n≥3) は**達成**。受入 2 (Phase B の plug != 0) は **未達**。3 変数が原因であるとは確認されず、有力な候補は RTL 未初期化 (InitUnits の途中停止・§8.3。原因は未確定) のため子 issue へ移管した。
+- §2〜§7 は 1・2 回目 run の記録。「FL 本体の export function table」「`[0x710040]==0` の経路を塞ぐ」「0x710040 の書込み元は 0 件」は **§8 で訂正済み** (読むときは §8 を優先)。
+- 起点・測定 commit は各節に記載 (1 回目 `c171b9dc`、2 回目 `32d2cedc`、3 回目 §8.4)。
+- 既知類型との関係: §2〜§7 の「外部状態不在による soft-miss」は誤り。InitUnits が途中で停止すること自体は実測 (§8.3)。停止原因が lift 欠陥 (RetDec が引数・サイズの定数を `ptrtoint @global` に化かす型) かどうかは候補のまま未確定で、本節では確定しない (`docs/DEFECTS.md` D21 とは別型の候補という位置づけ。同一とは未確認)。
 
 ## 1. 実測
 
@@ -112,3 +112,94 @@ bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh # Phase A PASS・Phase B
 | `function_40d6e0` の `@684` 条件が lift 由来か | 分岐の正しさが未確定 | #2008 |
 | Phase B `memory access out of bounds` と ID `0x10000738` | ctor 連鎖が途中で落ちる (受入 2) | #2008 |
 | 所要時間 n≥3 のレンジ未取得 (§7 の実測を参照) | 受入 3 の毎回計測 | #2008 |
+
+## 8. 3 回目 run: 3 変数の値確定と Phase B 未達の原因候補
+
+起点 `origin/main` 14150b46。branch `2008-plg-p0b-11-writer`。素材は `fl-win64`・`work-fw-stage1`・`work-liftlib` を展開 (§5)。
+
+### 8.1 3 変数の値 (受入 1・達成)
+
+`function_40d6e0` (`0x40d6e0`) は Delphi RTL の `raise` (`0x0EEDFADE` = Delphi 例外コード、`0x40d820` は `r8=0` で呼ぶだけの薄い wrapper)。3 変数は FL 本体の export table ではなく、RTL の例外フックである。
+
+| 変数 | native の値 | native の書込み元 (PE VA) | 役割 |
+|---|---|---|---|
+| `0x710030` | `0x404c00` (`jmp [IAT RaiseException]`) | `_InitLib` `0x40db20` の `0x40dbb4`、System unit Init `0x417ee0` の `0x417f2e` | `RaiseExceptionProc` |
+| `0x710038` | `0x404c10` (`jmp [IAT RtlUnwind]`) | 同 `0x40dbc2`、`0x417f3c` | `RTLUnwindProc` |
+| `0x710040` | `0x43d940` | unit Init `0x43db30` → `0x43d9a0` の `0x43da31`〜`0x43da3f`: `.data` の変数アドレス表 `0x70edb8` (値 `0x710040`) を `rax` に読み、`lea rcx,[0x43d940]` → `mov [rax],rcx` | 例外通知フック (`0x40d6e0` が組む `0x0EEDFADE` の例外レコードを受け、`0x43d940` は ExceptionInformation の例外オブジェクトを `0x426c20` のクラスで判定して仮想呼出する) |
+
+- `0x710040` の書込みを前 run が 0 件としたのは、rip 相対の直接参照だけを走査し、`.data` の変数アドレス表を介した間接書込みを見ていなかったため。`0x43d9a0` は同じ表引きで `0x70e910` / `0x70ed40` / `0x70eb20` / `0x70ed08` / `0x70ed48` / `0x70f2a8` / `0x70e8c0` が指す変数にも関数ポインタ等を書く (先頭で `0x43c780` を 2 回呼んで `0x7165c0` / `0x7165c8` にオブジェクトも作る)。
+- `0x43db30` は InitTable (`0x6c1460`、`0x122` = 290 unit、16 byte/entry = Init,FInit) の idx 16。`0x417ee0` は idx 1、`0x445a40` は idx 18。
+- 動的確認: hostfix 適用ビルド (`hs_route.cjs`) で DllMain(attach) を先に走らせると `[0x710030]=0x404c00`・`[0x710038]=0x404c10`・`[0x710040]=0x43d940` になる (`hostshim/hs_preinit.mjs`)。
+- バグ修正: `fw_boot.c` の `_InitLib` override は `0x716030` / `0x716038` に書いていた (native は `0x710030` / `0x710038`)。修正前は `[0x716030]=0x404c00` の誤書込みを実測し、修正後は 0。Phase A・B の結果は不変 (§8.4)。
+
+### 8.2 「経路を塞ぐ」前提の訂正
+
+- `[0x710040]==0` は native でも正常 (通知フック無し)。`40d753 cmp [0x710040],0 / je 0x40d7f0` で通知を飛ばし、`call [0x710030]` (RaiseException) に進む。塞ぐ対象ではない。
+- **scratch 観測・未再現**: Phase B 単体 (DllMain を呼ばない) に 3 変数を直接書いて `_hs_e2e_run` を実行 (`0x710040` は 0 と `0x43d940` の 2 通り)。`0x40d807` の soft-miss は 4 件 → 0 件 (named import `RaiseException` 未実装 fail-soft 1 件に置換)、soft-miss 総数は 40 → 36 と観測された。status・`plug`・`rec`・OOB は不変 (`plug=0x0 rec=8`)。seed 実験のスクリプトは本 commit に無く、1 コマンドでは再現できない。このため「3 変数は Phase B 失敗の真因ではない」は観測から得た仮説として扱い、確定とはしない。
+
+### 8.3 原因候補: InitUnits が途中で止まり RTL が初期化されない
+
+- Phase B (`hs_e2e_run`) は DllMain も InitUnits も呼ばず、生の image (`.bss` ゼロ) から `CreatePlugInstance` に入る。
+- **Phase A の `dispatch=38` は InitUnits の完走ではないと推定する (scratch 観測・未再現)**。`MessageBoxA` を JS 例外にした診断ビルド (scratch・非 commit) の wasm スタックで観測した: idx 16 の Init `0x43db30` → `0x43d9a0` → `0x43c780` → `0x417bc0` → `0x40ea20` → `0x40e5e0` → `_GetMem` `0x407010` → `0x407330` → `0x4072d0` → `0x4072b0` → `Error` `0x40e400` → `Halt0` `0x40e270` → `MessageBoxA "Error: Runtime 268436792 at 0000000010000710"`。コードと番地が fold された global (`0x10000638` / `0x10000710`) で、`fw_hostfix.py` 冒頭が説明する `0x40e5e0`/`0x407010` の fold (文字列長 = `@153` のアドレス) と同じ領域。その後 FInit 16 件 → `RestoreContext` → `exit(0)` を「Halt0 到達 = PASS」と数えた場合に 38 になるという内訳 (16 Init + 16 FInit + 6 other) は、この scratch 観測に基づく解釈で、本 commit の script からは再現できない。
+- hostfix の `0x40e5e0`/`0x407010` override を持つ `hs_route.cjs` は idx 16 を越える (`0x710040` が書かれる) が、counter=19 (idx 18、Init `0x445a40`) で OOB: `0x445a40` → `0x415220` → `0x414de0` → `0x414390` (wide string copy)。直前に `decode-miss function_40f833` と `GetNativeSystemInfo` 未実装 fail-soft。OOB 時点のレジスタ (scratch 観測・未再現) は rcx=`0x11a75a96`・rdx=`0x105`・r8=`0x1118a6a0` で、いずれも linear memory 内に見える。OOB の直接原因は未確定。
+- `function_415220` は native が入力 rdx (呼出元 `0x445ae6 xor edx,edx` で 0) を `0x414de0` に渡す箇所で `ptrtoint @110` を渡している。これを入力 BLK+0x10 に戻す scratch IR 修正で再ビルドしたが OOB は不変だった (scratch 観測・未再現)。別因が残るとすれば未検証の候補は `0x40ffe0` 経由の `r8` と `GetModuleFileNameW` 相当の戻り。この IR 修正は本 commit に含まれない。
+
+### 8.4 実測
+
+環境: 4 vCPU。load は開始 → 終了の 1 分値 (`/proc/loadavg` または `uptime`)。
+
+| 手順 | commit | 結果 | 所要 (real) | load |
+|---|---|---|---|---|
+| `fw_stage2.sh --fresh` (stage-1 再利用・n=1) | 14150b46 | rc 0・`SMOKE PASS` `dispatch=38 units_done=0 va=1 heap=1 ff=0` | 10 分 40 秒 (12:18:39 → 12:29:19) | 0.36 → 未記録 |
+| `fw_stage2.sh` (増分: `fw_route.cjs` を消し emcc + smoke のみ・n=1) | 34cb8e29 | rc 0・`SMOKE PASS` 同値・`ff=0` | 25 秒 | 0.18 → 0.46 |
+| `hs_e2e.sh --fresh` (baseline) | 14150b46 | rc 1。Phase A `dispatch=38 ff=0`。Phase B OOB・`plug=0x0 rec=8`・`E2E FAIL: 3 項目` | 114.47 秒 (診断用 emcc と並行実行) | 未記録 |
+| `hs_e2e.sh --fresh` (n=3) | 34cb8e29 | 3 回とも rc 1・Phase A `dispatch=38 ff=0`・Phase B `status=0xffffffff plug=0x0 rec=8`・`E2E FAIL: 3 項目` | 116 / 115.26 / 143.44 秒 (レンジ 115.3〜143.4) | 2 回目 0.52 → 0.93、3 回目 0.93 → 1.00 |
+| `hs_e2e.sh` (増分・n=3) | 34cb8e29 | 3 回とも同一結果 | 0.254 / 0.255 / 0.254 秒 | 0.35 → 0.35 / 0.35 → 0.35 / 0.35 → 0.56 |
+
+- §1 の所要時間の不整合 (85 秒と 0.2 秒) は `--fresh` (emcc 再ビルド込み) と増分 (node 実行のみ) の違い。
+- Phase B の失敗 3 項目: `memory access out of bounds` / Dispatcher ID 列に `0x10000738` が混入 / `id=0x47` の `a0=0x10000808`。いずれも 14150b46 から不変。
+- 測定 commit は 34cb8e29 (`fw_boot.c` の修正。`fw_rt.c` は 882cdac1 でコメントのみ変更)。34cb8e29 から HEAD までのコード差分 (`git diff 34cb8e29 HEAD -- tools/plugins/framework ':!*.md'` の実出力) は次のとおり。コメント 3 行の置換のみで、実行コードは不変。
+
+```diff
+diff --git a/tools/plugins/framework/fw_rt.c b/tools/plugins/framework/fw_rt.c
+index 33560ff2..a6675587 100644
+--- a/tools/plugins/framework/fw_rt.c
++++ b/tools/plugins/framework/fw_rt.c
+@@ -59,9 +59,9 @@ void __icall_dispatch(uint64_t site) {
+     long long (*f)(void) = lookup((uint32_t)t);
+     if (!f || (t >> 32)) {
+         /* CAB-195: host shim 連鎖 (CreatePlugInstance → ctor) では, Delphi framework が
+-         * FL 本体 (FLEngine) の **export function table** (image 外 VA, 例 0x710030) を
+-         * 経由する経路が到達する (0x40d6e0 → 0x710030 = FL 内部 API の函数ポインタ)。
+-         * headless では FL 本体がロードされていないので呼出は不能。
++         * Delphi RTL の例外フック (0x710030 = RaiseException thunk 0x404c00, 0x710038 = RtlUnwind
++         * thunk 0x404c10, 0x710040 = 0x43d940: REPORT_2008 §8) が未初期化 (target 0) のまま呼ばれる。
++         * Phase B は DllMain/InitUnits を通らないので呼出は不能。
+          * 連鎖検証を止めないため fail-soft (0 を返し記録) にする。
+          * fw_ff ではない (exit しない) ので回復可能。 */
+         g_dispatch_cnt++;
+```
+
+
+### 8.5 再現
+
+```sh
+bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh                    # 先に実行 (work/hs/hs_route.cjs を作る)
+cd tools/plugins/work/hs && node ../../framework/hostshim/hs_preinit.mjs ../fw/fw_image.bin hs_route.cjs
+# 期待 (未実測。本 run では実出力を採取していない。実出力への置換は次の run で行う): DllMain 例外 OOB (function_414390)・unit counter=19・[0x710030]=0x404c00 [0x710038]=0x404c10 [0x710040]=0x43d940
+```
+
+静的確認 (native): `objdump -d -M intel fw_icall.dll --section=.text` で `# 0x710030` / `# 0x710040` を grep し、`0x43d9a0` と `0x70edb8` を読む。診断ビルドの手順 (`MessageBoxA` を JS 例外にして wasm スタックを得る) と seed 実験は scratch で行い commit していない (§8.2・§8.3 の scratch 観測)。
+
+### 8.6 受入条件と未解決
+
+| # | 受入条件 | 結果 |
+|---|---|---|
+| 1 | 3 変数の正しい値の確定 | **達成** (§8.1。export table 由来という前提は誤り・§8.2) |
+| 2 | Phase B で `plug != 0` | **未達** (原因は未確定。候補は RTL 未初期化の途中停止・§8.3) |
+| 3 | Phase A 回帰 `dispatch=38 ff=0` の毎回確認と n≥3 | **達成** (§8.4)。ただし 38 の意味 (idx 16 の RunError 終端で InitUnits 完走の基準ではない) は scratch 観測で未再現 (§8.3) |
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| Phase A の `dispatch=38` が「idx 16 の RunError 終端」であること (scratch 観測・未再現)。基準の再定義と、stage-2 ビルドへの `0x40e5e0`/`0x407010` 相当の修復 | InitUnits 完走が検証されていない | #2425 (基準の再定義・idx 16) |
+| hs ビルドの InitUnits が idx 18 (`0x445a40` → `0x415220` → `0x414de0` → `0x414390`) で OOB (§8.3)。その先の unit と Phase B の `plug != 0` | 受入 2 の本体 | #2426 (idx 18 の OOB・`plug != 0`) |
