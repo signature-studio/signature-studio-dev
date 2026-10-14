@@ -21,6 +21,16 @@ def arg(name, default):
     return type(default)(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default
 
 
+def ptr_norm(h):
+    # ICALL-79 (#2674): xmm0 が x86-64 のユーザ空間アドレス (0 < v < 2^47) なら bit を比べず PTR に畳む。
+    # native と wasm はヒープの基底が違うため、ポインタを返す関数は bit が必ず食い違う (0x18105d9fc)。
+    # 正規化された double は上位 16bit が 0 にならないので、この範囲は実質ポインタ由来。subnormal は誤って PTR になりうる。
+    # FA_PTR_NORM=0 で従来の bit 比較に戻す (負の対照)。
+    if os.environ.get('FA_PTR_NORM', '1') == '0' or h.startswith('ERR'):
+        return h
+    return 'PTR' if 0 < int(h, 16) < (1 << 47) else h
+
+
 def blk_xmm0_out():
     # ICALL-78 (#2508): BLK+0x88 = ott_xmm0 が読む出力スロット。ott_run は入力 xmm0 を BLK+0x28 にだけ置くので、
     # xmm0 を素通しする関数 (native は入力のまま返す) で出力が未初期化の 0 になる。native と同じく入力で初期化してから呼ぶ。
@@ -77,7 +87,7 @@ def main():
     w = wasm_run([hex(v) for v in vas], xs)
     res = []
     for va in vas:
-        nv = nat[va]; wv = w.get(hex(va), [])
+        nv = [ptr_norm(h) for h in nat[va]]; wv = [ptr_norm(h) for h in w.get(hex(va), [])]
         pairs = list(zip(nv, wv))
         match = sum(1 for a, b in pairs if a == b and not a.startswith('ERR'))
         mism = [(i, a, b) for i, (a, b) in enumerate(pairs) if a != b]
