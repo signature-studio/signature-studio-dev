@@ -137,7 +137,7 @@ $ git diff eba7e821 HEAD -- tools/python/host tools/python/provider tools/python
 
 main (`0064cfbc`) を取り込んだ merge で、競合は `tests/provider_check.mjs` の集合定義 (main の `pe115` と本件の `pe120`) だけだった。両方を残して解消し、期待値は実装 87 / 未実装 348 (main の 86 / 349 に本件の 1 件を加えた値)。
 
-測定 commit: `5a95319a` (コードを変えた最後の commit)。環境は runner。`FL_WIN64_DIR` は fl-win64 から DATA block 4 件だけ展開した先、emsdk は `/opt/emsdk`。
+測定 commit: `5a95319a` (コードを変えた最後の commit)。環境は runner。`FL_WIN64_DIR` は fl-win64 から DATA block 4 件だけ展開した先、emsdk は `[EMSDK]` (docs/REFERENCES.md)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
