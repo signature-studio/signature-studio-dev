@@ -44,7 +44,7 @@ for m, fs in t["modules"].items():
             fmt_by_flags[ks["flags"]] = fmt_by_flags.get(ks["flags"], 0) + 1
 print(f"functions={n_fn} with_fmt={n_fmt} {sorted(fmt_by_flags.items())} with_kwlist={n_kw} dup_kwlist={dup_kwlists}")
 assert n_fn == 435 and n_kw == 103
-assert fmt_by_flags == {1: 200, 3: 103} and n_fmt == 303
+assert fmt_by_flags == {1: 201, 3: 103} and n_fmt == 304  # flags=1 の 201 件目は plugins.getPresetCount (kw 形式・PY-116 #2952)
 assert dup_kwlists == ["arrangement.selectionSet"]
 
 fl_api.install(os.path.join(ROOT, "analysis/flapi/flapi_table.json"))
@@ -238,6 +238,7 @@ src = open(os.path.join(ROOT, "src", "fl_api.py"), encoding="utf-8").read()
 assert re.search(r"\beval\s*\(", src) is None, "src/fl_api.py に eval( が残っている"
 # (11) PY-116 (#2952): wrapper が PyArg_Parse* に渡す非 0 の出力ポインタ数 (outs) と、書式が消費する数 (ptrs) の照合。
 #      不一致は screen.addTextLine (siiii) と screen.addMeter (iiii|i) の 2 件だけで、どちらも wrapper が書式より 1 個多く渡す (REPORT_PY116.md §2)。
+#      plugins.getPresetCount は flags=1 だが kw 形式 (PyArg_ParseTupleAndKeywords 相当) で呼ぶ唯一の VARARGS 関数で、書式 i|ii・出力 3 個・kwlist を持つ。
 kwt = json.load(open(os.path.join(ROOT, "analysis/flapi/flapi_kwargs.json")))
 outs_n, outs_bad = 0, []
 for m, fs in kwt["modules"].items():
@@ -248,5 +249,12 @@ for m, fs in kwt["modules"].items():
         if e["outs"] != e["ptrs"]:
             outs_bad.append(f"{m}.{n}:{e['ptrs']}/{e['outs']}")
 print(f"書式とポインタ数の照合 {outs_n} 件・不一致 {sorted(outs_bad)}")
-assert outs_n == 303 and sorted(outs_bad) == ["screen.addMeter:5/6", "screen.addTextLine:5/6"], (outs_n, outs_bad)
+assert outs_n == 304 and sorted(outs_bad) == ["screen.addMeter:5/6", "screen.addTextLine:5/6"], (outs_n, outs_bad)
+no_fmt_outs = sorted(f"{m}.{n}:{e['flags']}/{e['outs']}" for m, fs in kwt["modules"].items() for n, e in fs.items()
+                     if e["fmt"] is None and e["outs"])
+print(f"書式無し かつ 出力ポインタ >0: {len(no_fmt_outs)} 件 {no_fmt_outs}")
+assert no_fmt_outs == [], no_fmt_outs  # 照合から黙って外れる関数を作らない (件数と名前を固定)
+g = kwt["modules"]["plugins"]["getPresetCount"]
+assert (g["flags"], g["fmt"], g["outs"], g["kwlist"]) == (1, "i|ii", 3, ["index", "slotIndex", "useGlobalIndex"]), g
+assert "kwlist" not in t["modules"]["plugins"]["getPresetCount"]["kwsig"]  # flags=1 は kwlist を kwsig に載せない (kwargs は拒否のまま)
 print("kwsig_check: OK")

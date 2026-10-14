@@ -7,8 +7,9 @@
 方式 (rodata の並び順ではなくコードの参照関係を使う):
   1. .data 内の PyMethodDef 相当表 (32B 刻み: name*, fn*, flags, doc*) を走査。
   2. 各 fn の冒頭を逆アセンブルし、最初の call までの `lea reg,[rip+disp]` を回収。
-     flags=3 (VARARGS|KEYWORDS): r8=書式, r9=kwlist (char* 配列, NULL 終端)
-     flags=1 (VARARGS のみ)    : rdx=書式 (kwlist 無し = 実 FL はキーワード引数を受けない)
+     呼出し形式は kw_form で決める (PY-116 #2952):
+     kw 形式 (flags=3 は必ず、flags=1 は `mov rdx, r8` がある場合): PyArg_ParseTupleAndKeywords 相当。r8=書式, r9=kwlist (char* 配列, NULL 終端)
+     非 kw 形式 (flags=1 の大半)  : PyArg_ParseTuple 相当。rdx=書式。kwlist 無し (実 FL はキーワード引数を受けない)
      flags=4 (NOARGS)          : 引数なし (PyArg_Parse* を呼ばないので書式は復元しない)
      最初の間接 call (= PyArg_Parse* のインポート表呼出し) 直前までの lea [rip+x] を見る。
      その前に ret / int3 に当たったら (= 関数末尾を越えて隣の関数の lea を拾うことになる) 書式無しとする。
@@ -95,6 +96,28 @@ class Image:
         va0 = self.base + s.VirtualAddress - s.PointerToRawData
         return [(va0 + t[0][0], [e for _, e in t]) for t in tables]
 
+    def pyarg_setup(self, fn):
+        """PyArg_Parse* の直前 (前の direct call より後) の命令列。間接 call に届かない・関数末尾に当たったら None。"""
+        o = self.off(fn)
+        seq = []
+        for i in self.md.disasm(self.b[o:o + 0x200], fn):
+            if i.mnemonic in ("ret", "int3"):
+                return None
+            if i.mnemonic == "call":
+                if i.op_str.startswith("qword ptr ["):
+                    return seq  # PyArg_Parse* はインポート表経由の間接 call
+                seq = []
+                continue
+            seq.append(i)
+        return None
+
+    def kw_form(self, fn, flags):
+        """PyArg_Parse* へ kwargs を渡す形式か (rdx = r8 の kwargs・r8 = 書式・r9 = kwlist)。
+        flags&2 (METH_KEYWORDS) は全件この形式。flags=1 (VARARGS のみ) でこの形式なのは plugins.getPresetCount の 1 件だけ
+        (PY-116 #2952)。CPython は VARARGS 呼出しで r8 を設定しないので、その関数の kwargs は呼出し元の不定値になる。"""
+        seq = self.pyarg_setup(fn) or []
+        return bool(flags & 2) or any(i.mnemonic == "mov" and i.op_str == "rdx, r8" for i in seq)
+
     def wrapper_args(self, fn, flags):
         """ラッパー冒頭 (最初の間接 call まで) の lea [rip+x] を回収し (fmt, kwlist) を返す。"""
         if flags & 4:
@@ -113,7 +136,7 @@ class Image:
                 lea[i.reg_name(i.operands[0].reg)] = i.address + i.size + i.operands[1].mem.disp
         if not parsed:
             return None, None
-        kw = flags & 2
+        kw = self.kw_form(fn, flags)
         fmt_reg = "r8" if kw else "rdx"
         fmt = self.cstr(lea.get(fmt_reg), 40) if fmt_reg in lea else None
         if fmt is not None and not FMT.match(fmt):
@@ -138,20 +161,10 @@ class Image:
         非 kw: r8, r9, [rsp+0x20].. が出力 (rdx=書式)。kw: [rsp+0x20].. が出力 (r8=書式, r9=kwlist)。NULL (0) の引数は数えない。"""
         if flags & 4:
             return None
-        o = self.off(fn)
-        seq = []
-        for i in self.md.disasm(self.b[o:o + 0x200], fn):
-            if i.mnemonic in ("ret", "int3"):
-                return None
-            if i.mnemonic == "call":
-                if i.op_str.startswith("qword ptr ["):
-                    break
-                seq = []
-                continue
-            seq.append(i)
-        else:
+        seq = self.pyarg_setup(fn)
+        if seq is None:
             return None
-        kw = flags & 2
+        kw = self.kw_form(fn, flags)
         slots = []
         for i in seq:
             m = re.match(r"qword ptr \[rsp \+ (0x[0-9a-f]+)\], r[a-z0-9]+$", i.op_str)
@@ -198,7 +211,7 @@ def fmt_units(fmt):
 def kwsig_of(e):
     """flapi_table.json の関数エントリに載せる `kwsig` (実バイナリ由来の引数仕様)。"""
     s = {"flags": e["flags"], "fmt": e["fmt"]}
-    if e.get("kwlist") is not None:
+    if e.get("kwlist") is not None and e["flags"] & 2:  # flags=1 の kwlist は記録のみ (CPython は VARARGS 呼出しの kwargs を拒否する)
         s["kwlist"] = e["kwlist"]
     if "max" in e:
         s["required"], s["max"] = e["required"], e["max"]
