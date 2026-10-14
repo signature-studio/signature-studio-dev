@@ -178,12 +178,12 @@ $ git diff 71005b39 HEAD -- tools/python/host tools/python/provider tools/python
 
 ### 再測定 (4) (測定 commit `71005b39`・HEAD `4f855fde` で実行)
 
-測定 commit は `71005b39` (コードを変えた最後の commit)。`4f855fde` は REPORT のみの commit。(3) の表にあった未実行の項目を、HEAD のコードで実行した。素材は `fl-win64` から `block00031_PE.bin` と DATA block 4 件を `$RUNNER_TEMP` の `fl-win64-3039` へ展開した (`tar --zstd -xf --wildcards`)。emsdk は `/opt/emsdk` (runner 同梱・[EMSDK])。`toolchain-emsdk` は展開していない (不使用)。`mcp_ui_check`・`midi_ui_check` は本体 checkout の `node_modules` を symlink して実行した (commit していない)。CPython wasm は 32 bit・pthread・64 bit の 3 種を HEAD で再ビルドした (流用なし)。
+測定 commit は `71005b39` (コードを変えた最後の commit)。`4f855fde` は REPORT のみの commit。(3) の表にあった未実行の項目を、HEAD のコードで実行した。素材は `fl-win64` から `block00031_PE.bin` と DATA block 4 件を `$RUNNER_TEMP` の `fl-win64-3039` へ展開した (`tar --zstd -xf --wildcards`)。emsdk は [EMSDK] (runner 同梱・6.0.12)。`toolchain-emsdk` は展開していない (不使用)。`mcp_ui_check`・`midi_ui_check` は本体 checkout の `node_modules` を symlink して実行した (commit していない)。CPython wasm は 32 bit・pthread・64 bit の 3 種を HEAD で再ビルドした (流用なし)。
 
 | コマンド | 結果 | wall (s) |
 |---|---|---|
 | `fetch_inputs.sh` / `provider/build.sh` | rc 0 / rc 0 (fl_table.c: 435 関数・ハンドラ 123) | 2 (合計) |
-| `build_cpython_wasm.sh` (32 bit・native 込み) / `CPY_PTHREADS=1 build_cpython_wasm.sh` / `EMSDK_ENV=/opt/emsdk/emsdk_env.sh build_cpython_wasm64.sh` | 全て rc 0 | 254 / 146 / 192 |
+| `build_cpython_wasm.sh` (32 bit・native 込み) / `CPY_PTHREADS=1 build_cpython_wasm.sh` / `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> build_cpython_wasm64.sh` | 全て rc 0 | 254 / 146 / 192 |
 | `FLPY_SKIP_TABLE=1 build_flpy.sh` / `build_flpy_static.sh` / `CPY_PTHREADS=1 … build_flpy_static.sh` / `FLPY_MEMORY64=1 CPY_BUILD=… STATIC_OUT=flpy_static64 … build_flpy_static.sh` | 全て rc 0 | 27 (4 本の合計) |
 | `node tests/provider_check.mjs` | PASS (435 / 実装 123 / 未実装 312 / MCP 静的 60) | 6 (下の 5 行の合計) |
 | `launchmap_diff` / `general_diff` / `ui_state_diff` / `screen_diff` | 全て diffs 0、PASS (calls 3 / 32 / 12 / 32) | 同上 |
