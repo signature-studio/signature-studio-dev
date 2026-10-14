@@ -63,7 +63,7 @@
 
 測定 commit: `6ed3cfe1` (コードを変えた最後の commit。main `eeca4ded` を取り込んだ merge)。競合は `tools/python` の 4 ファイル (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/general_diff.mjs`・`tests/provider_check.mjs`) で、いずれも main 側と本 PR 側の追加を両方残した (関数・エントリの削除なし)。`provider_check.mjs` の期待値は両側の件数を合算 (実装 111・未実装 324)。直前の測定は `bd7db129` (main `65ea0ce3` 取り込み後)。以後の commit は本 REPORT_PY125.md のみ。
 main 取り込みの `tools/python` 側の変更 (`git diff --stat 65ea0ce3 eeca4ded -- tools/python ':!*.md'`) は 9 ファイル (+344/-3。`analysis/py159_*`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/arrangement_diff.mjs`・`general_diff.mjs`・`provider_check.mjs` など)。本 PR の `tools/python` 差分は main 比で 4 ファイル (+16/-3)。
-環境: runner 4 core。`uptime` 22:26:59 (`all_tools` 直後) の load average 1.82 (1 分値)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`)、`FL_WIN64_DIR` はその展開先。`toolchain-emsdk` は本測定では展開せず、`/opt/emsdk` (6.0.12。`upstream/emscripten/emscripten-version.txt` で確認。pin と同版) を使った。`build_cpython_wasm.sh`・`build_flpy.sh`・`provider/build.sh` が `/opt/emsdk` を直接 source するため。
+環境: runner 4 core。`uptime` 22:26:59 (`all_tools` 直後) の load average 1.82 (1 分値)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`)、`FL_WIN64_DIR` はその展開先。`toolchain-emsdk` は本測定では展開せず、[EMSDK] (6.0.12。`upstream/emscripten/emscripten-version.txt` で確認。pin と同版) を使った。`build_cpython_wasm.sh`・`build_flpy.sh`・`provider/build.sh` が [EMSDK] を直接 source するため。
 
 前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0、0.65 秒)・`bash build_cpython_wasm.sh` (rc 0、239.2 秒。merge commit `6ed3cfe1` の tree で作成)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.1 秒)・`bash provider/build.sh` (rc 0、1.3 秒)。ハンドラ数は `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` で 111 (`fl_table.c: 435 関数, ハンドラ 111`)。
 
