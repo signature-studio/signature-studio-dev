@@ -2,6 +2,7 @@
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
 import { needsPmDecision } from "./needs.ts";
+import { closeRefs, mentionRefs } from "./refs.ts";
 
 export const DEFAULT_REVIEWER_LOGIN = "oc-reviewer-for-signature-studio[bot]";
 export const NEEDS_USER_LABEL = "needs-user-input";
@@ -44,6 +45,11 @@ export interface PrState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // 保存前の全文 (body は切るか closed で空にするため) から取った参照。古い保存値には無い (規則 A は無いものを参照しない)。
+  // closes: Closes / Fixes / Resolves / Refs で参照する issue 番号 (規則 A の merged PR)。
+  closes?: number[];
+  // mentions: 題名と本文に現れる #番号。open PR が親 issue を参照しているかの判定 (規則 A の除外) に使う。
+  mentions?: number[];
 }
 // issue / PR ごとの終端状態の手がかり (oc-pm の検出に使う)。値は時刻・列挙値・真偽だけで、本文は持たない。
 export interface Signal {
@@ -304,6 +310,7 @@ function applyPr(s: PmState, p: Json): PmState {
   if (!pr) return s;
   const k = String(pr.number);
   if (!newer(s.prs[k], pr.updated_at)) return s;
+  const full = typeof pr.body === "string" ? pr.body : "";
   const next: PrState = {
     number: pr.number,
     state: pr.state === "closed" ? "closed" : "open",
@@ -311,12 +318,14 @@ function applyPr(s: PmState, p: Json): PmState {
     draft: !!pr.draft,
     ref: pr.head?.ref ?? "",
     title: pr.title ?? "",
-    body: pr.state === "closed" ? "" : (pr.body ?? "").slice(0, 3000),
+    body: pr.state === "closed" ? "" : full.slice(0, 3000),
     labels: Array.isArray(pr.labels) ? pr.labels.map((l: any) => String(l?.name ?? "")) : [],
     updatedAt: pr.updated_at,
     author: pr.user?.login ?? s.prs[k]?.author,
     authorType: pr.user?.type ?? s.prs[k]?.authorType,
     assoc: pr.author_association ?? s.prs[k]?.assoc,
+    closes: closeRefs(full),
+    mentions: mentionRefs(`${pr.title ?? ""}\n${full}`),
   };
   return { ...s, prs: { ...s.prs, [k]: next } };
 }

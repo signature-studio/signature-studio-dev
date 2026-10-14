@@ -23,6 +23,8 @@ export interface Env {
   LIVE?: string;
   LIVE_LAUNCH?: string;
   LIVE_DISPATCH?: string;
+  // 規則 A の自動 close (autoclose.ts) を実行するか。"1" のときだけ。LIVE には従わない (close は副作用が大きいので個別に明示する)。
+  LIVE_CLOSE?: string;
   // 実装 App (bot) のログイン。bot_last (最後の報告) の判定に使う。
   BOT_LOGIN?: string;
   // PM の人間アカウント (PAT)。PM App の bot ログインは slug から自動で加える。
@@ -48,6 +50,8 @@ export interface Config {
   liveLaunch: boolean;
   // repository_dispatch (oc-watchdog と oc-pm) の送信を実行するか。
   liveDispatch: boolean;
+  // 規則 A の自動 close を実行するか (LIVE_CLOSE="1" のときだけ。既定は記録のみ)。
+  liveClose: boolean;
   botLogin: string;
   pmLogins: string[];
   watchdogIntervalS: number;
@@ -80,6 +84,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     batch: num(env.BATCH, DEFAULT_BATCH),
     liveLaunch: liveFlag(env.LIVE_LAUNCH, env.LIVE),
     liveDispatch: liveFlag(env.LIVE_DISPATCH, env.LIVE),
+    liveClose: env.LIVE_CLOSE === "1",
     botLogin: env.BOT_LOGIN ?? "opencode-for-signature-studio[bot]",
     pmLogins: (env.PM_LOGINS ?? "pycabbage").split(",").map((s) => s.trim()).filter(Boolean),
     watchdogIntervalS: num(env.WATCHDOG_INTERVAL_S, 300),

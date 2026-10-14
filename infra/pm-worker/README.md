@@ -43,6 +43,30 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 - ラベル `pm-apply` / `needs-user-input` の issue (着手しても PR を出さない/出せない) は、`no_pr` の検出から除く。`plan()` は、この 2 ラベルの issue を ready・再投入の対象であっても着手せず `user` 行に置く (`oc:no-pr` の有無に依らない)。`user_answered` は `needs-user-input` が対象。`tools/pm/launch_issues.py` との差は PR 本文の未解決表に書く。
 - 検出するのは上の 4 kind。`refs_orphan` は [CI-58]、`supply` / `digest` は [CI-71] / [CI-70] が担当する。
 
+## 自動 close: 規則 A (#2336)
+
+merged PR を持つ親 issue を閉じる (`src/autoclose.ts`)。判定は保存状態だけで行い REST は呼ばない。tick の最後 (`autoClose`) で動く。
+全てを満たす open issue N を閉じる:
+
+1. N を Closes / Fixes / Resolves / Refs で参照する merged PR がある (参照は PR 本文の全文から取り `PrState.closes` に持つ)
+2. N を親 (『親: #N』) とする open の子 issue が 1 つ以上ある
+3. N に `needs-user-input` が付いていない
+4. N の番号を題名・本文に含む open PR がない (`PrState.mentions`)
+5. N を blocker にしている open issue が、N の子以外にない
+
+- **保存の範囲**: merged PR の参照は、Worker が見たものだけ (webhook、または全体同期の窓 24 時間)。窓より前に merge された PR は見ていないので、その親は閉じない (保守的な側に倒す)。
+- **抜けは閉じないほうに倒す**: `mentions` の無い open PR (保存形式の移行前) が 1 件でもあれば全体で閉じない。blocked_by の一覧が不明な open issue があれば、子でない限り全体で閉じない。同期が古い間 (`fresh=false`) も閉じない。
+- 1 tick で最大 5 件。同じ issue は書き込みを試してから 24 時間は再試行しない (閉じ損ねた後のコメントの二重投稿を防ぐ)。
+- **書き込みは `LIVE_CLOSE="1"` のときだけ** (`LIVE` や `LIVE_LAUNCH` / `LIVE_DISPATCH` では動かない)。既定は記録のみ: `/status` の `counters.wouldClose` と log の `would-close`。`mode_close` が `live` / `dry-run` を示す。
+- live の順序: コメント (`[auto-close] 規則 A: merged PR #<x>、残りは #<c> が追跡 <!-- oc-auto-close: rule=A -->`) → `PATCH` で `state=closed`・`state_reason=completed` (PM App の token、issues:write)。閉じた後の状態は Worker の手元でも closed にする。
+
+### 誤って閉じたとき
+
+1. 対象の一覧: `gh api -X GET search/issues -f q='repo:signature-studio/signature-studio-dev "oc-auto-close: rule=A" in:comments' --jq '.items[]|"#\(.number) \(.title)"'`
+2. 再開: `gh issue reopen <N>`。
+3. **再開だけでは、次の tick で閉じ直す** (条件が残っている限り)。`needs-user-input` を付けて条件 3 で外すか (依頼者の判断に回す)、子や merged PR の状況を直す。
+4. 規則 A を止める: `LIVE_CLOSE` を `"0"` (または外す) にして再デプロイする。`/status` の `mode_close` が `dry-run` になる。
+
 ## /status の観測 (#2338)
 
 Worker の健全性を外から判断するための集計。既存のキーは変えず、次を足した (個票・自由文は出さない)。
@@ -160,6 +184,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `LIVE_LAUNCH` | launch の `/oc` コメント投稿 (`POST /repos/{o}/{r}/issues/{n}/comments`) | `"1"` (2026-10-14〜。コードの既定は dry-run) |
 | `LIVE_DISPATCH` | `repository_dispatch` の送信 (`POST /repos/{o}/{r}/dispatches`)。`oc-watchdog` と、oc-pm 節の `oc-pm` (PM agent の起動) の両方。別スイッチは無い | `"1"` (同上) |
 | `LIVE` (旧) | 上の 2 つのうち、未設定のほうにだけ効く (両方の既定値) | (置かない) |
+| `LIVE_CLOSE` | 規則 A の自動 close (コメント + `state=closed`)。`"1"` のときだけ書く。`LIVE` では動かない | 未設定 (dry-run)。`wrangler.toml` には置かない |
 | `TARGET` | 同時に走らせる run の目標 (room = TARGET − active) | `"50"` (暫定。80 に戻す作業は #2458) |
 | `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"24"` (暫定。コードの既定は 3) |
 

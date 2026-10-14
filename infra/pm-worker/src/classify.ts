@@ -2,6 +2,7 @@
 // GitHub・現在時刻・ローカルファイルは読まず、呼び出し側が ClassifyInput で渡す。
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
 import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
+import { parentOf } from "./refs.ts";
 
 export interface SnapIssue {
   number: number;
@@ -85,12 +86,8 @@ function graph(d: Snapshot, input: ClassifyInput) {
 
   const children = new Map<number, number[]>();
   for (const [n, i] of iss) {
-    const m = /^親\s*[:：]\s*(.+)$/m.exec(i.body);
-    if (!m) continue;
-    const first = /#(\d+)/.exec(m[1]);
-    if (!first) continue;
-    const pn = Number(first[1]);
-    if (nums.has(pn) && pn !== n) {
+    const pn = parentOf(i.body);
+    if (pn !== null && nums.has(pn) && pn !== n) {
       const c = children.get(pn) ?? [];
       c.push(n);
       children.set(pn, c);

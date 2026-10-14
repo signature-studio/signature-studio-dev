@@ -1,6 +1,7 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
+import { AUTO_CLOSE_MAX, AUTO_CLOSE_RETRY_MS, AUTO_CLOSE_WOULD_MS, closeComment, detectRuleA, type CloseTarget } from "./autoclose.ts";
 import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
@@ -82,12 +83,14 @@ interface Meta {
     reconciles: number;
     pmDispatched?: number;
     wouldDispatchPm?: number;
+    closed?: number;
+    wouldClose?: number;
   };
 }
 
 export interface Log {
   at: string;
-  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "would-pm-dispatch" | "pm-dispatch" | "error" | "skip" | "truncated" | "recovered";
+  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "would-pm-dispatch" | "pm-dispatch" | "would-close" | "close" | "error" | "skip" | "truncated" | "recovered";
   n?: number;
   art?: string;
   note?: string;
@@ -434,7 +437,7 @@ export class Engine {
   }
 
   private zero() {
-    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0 };
+    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0 };
   }
 
   // 完了して 1 時間たった run は捨てる (順不同配送の判定に使う期間だけ持つ)。
@@ -753,6 +756,58 @@ export class Engine {
     return out;
   }
 
+  // ---------------------------------------------------------------- 自動 close (規則 A)
+  // merged PR を持つ親 issue を閉じる (判定は autoclose.ts の detectRuleA)。LIVE_CLOSE="1" のときだけ書く。既定は記録のみ (counters.wouldClose)。
+  // 1 tick に最大 AUTO_CLOSE_MAX 件。同じ issue は書き込みの試行から 24 時間は再試行しない (閉じた後の配送遅延で二重にコメントしない)。
+  // 同期が古い間は閉じない (一覧の取りこぼしで、参照の無いものを閉じないため)。
+  async autoClose(gh: Gh | null): Promise<{ closed: CloseTarget[]; would: CloseTarget[] }> {
+    const out = { closed: [] as CloseTarget[], would: [] as CloseTarget[] };
+    if (!this.fresh()) return out;
+    const live = !!(this.d.cfg.liveClose && gh);
+    const now = this.d.now();
+    const key = live ? "autoClose" : "autoCloseWould";
+    const hold = live ? AUTO_CLOSE_RETRY_MS : AUTO_CLOSE_WOULD_MS;
+    const seen: Record<string, number> = {};
+    for (const [k, at] of Object.entries(this.d.store.get<Record<string, number>>("meta", key) ?? {})) if (now - at < hold) seen[k] = at;
+    const picks = detectRuleA(this.s)
+      .filter((t) => !(String(t.n) in seen))
+      .slice(0, AUTO_CLOSE_MAX);
+    if (picks.length === 0) return out;
+    this.meta.counters = this.meta.counters ?? this.zero();
+    for (const t of picks) {
+      if (!live) {
+        seen[String(t.n)] = now;
+        this.meta.counters.wouldClose = (this.meta.counters.wouldClose ?? 0) + 1;
+        this.pushLog({ kind: "would-close", n: t.n, note: `rule A merged #${t.mergedPr} child #${t.child}` });
+        out.would.push(t);
+        continue;
+      }
+      // レート制限の守りに当たったら、まだ試していない候補は記録しない (次の tick で改めて試す)。
+      if (restGuardOn(this.meta.rest?.remaining)) break;
+      seen[String(t.n)] = now;
+      try {
+        await gh!.comment(t.n, closeComment(t));
+        await gh!.closeIssue(t.n);
+      } catch (e) {
+        this.pushLog({ kind: "error", n: t.n, note: e instanceof GhError ? `auto-close: ${e.message}` : "auto-close failed" });
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+        continue;
+      }
+      const cur = this.s.issues[String(t.n)];
+      if (cur) {
+        const next: IssueState = { ...cur, state: "closed", labels: [], body: "", updatedAt: iso(now) };
+        this.d.store.put("issues", String(t.n), next);
+        this.s = { ...this.s, issues: { ...this.s.issues, [String(t.n)]: next } };
+      }
+      this.meta.counters.closed = (this.meta.counters.closed ?? 0) + 1;
+      this.pushLog({ kind: "close", n: t.n, note: `rule A merged #${t.mergedPr}` });
+      out.closed.push(t);
+    }
+    this.d.store.put("meta", key, seen);
+    this.saveMeta();
+    return out;
+  }
+
   // 1 回の点検。alarm (毎分・webhook 後 2 秒) と cron (毎分) の両方から呼ばれる。
   async tick(): Promise<{ ready: boolean }> {
     // cron と alarm が重なっても、同時に 2 回は走らせない (二重投稿の防止)。
@@ -785,6 +840,7 @@ export class Engine {
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
+      await this.autoClose(gh);
       this.meta.lastError = undefined;
     } catch (e) {
       this.setError(now, e instanceof GhError ? e.message : "tick failed");
@@ -824,6 +880,9 @@ export class Engine {
       mode: this.d.cfg.liveLaunch && this.d.cfg.liveDispatch ? "live" : this.d.cfg.liveLaunch || this.d.cfg.liveDispatch ? "partial" : "dry-run",
       mode_launch: this.d.cfg.liveLaunch ? "live" : "dry-run",
       mode_dispatch: this.d.cfg.liveDispatch ? "live" : "dry-run",
+      mode_close: this.d.cfg.liveClose ? "live" : "dry-run",
+      // 規則 A の候補数 (issue 番号は出さない。記録は counters.wouldClose と log の would-close)。
+      auto_close_detected: detectRuleA(this.s).length,
       active_runs: plan.active,
       target: plan.target,
       room: plan.room,
