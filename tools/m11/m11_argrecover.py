@@ -208,6 +208,25 @@ def _set_why(fn, ins):
     return 'other'
 
 
+def stack_imm_of(fn, call_idx, pos):
+    """stack 引数の直前窓の書込が 'mov byte|dword ptr [rsp+disp], imm' なら (値, 書込幅 bit) を返す.
+    書込幅が引数の型幅を決めるときだけ採用するため、呼出し側で型と照合する (m11_post.py の fix 適用)."""
+    j = call_idx - 1
+    while j >= 0:
+        ins = fn.ins[j]
+        if ins.mnemonic in ('call', 'ret', 'jmp') or ins.mnemonic.startswith('j') or ins.address in fn.targets:
+            return None
+        for m in ldmach.memops_of(fn.cs, ins):
+            if m['write'] and m['base'] == 'rsp' and m['disp'] == 0x20 + 8 * (pos - 4):
+                ops = ins.operands
+                if ins.mnemonic == 'mov' and len(ops) == 2 and ops[1].type == capstone.CS_OP_IMM and ops[0].type == capstone.CS_OP_MEM:
+                    bits = ops[0].size * 8
+                    return (ops[1].imm & ((1 << bits) - 1), bits)
+                return None
+        j -= 1
+    return None
+
+
 def const_of(fn, ins, reg, lb):
     mn, ops = ins.mnemonic, ins.operands
     if mn == 'xor' and len(ops) == 2 and ops[0].type == capstone.CS_OP_REG and ops[1].type == capstone.CS_OP_REG and ops[0].reg == ops[1].reg:
@@ -289,6 +308,10 @@ def main():
                                 s_src = src_of(cf, ci, pos)
                                 stats['src:%s:%s' % (kind, s_src)] += 1
                                 rec.setdefault('src', {})[pos] = s_src
+                                sc = stack_imm_of(cf, ci, pos) if pos >= 4 and s_src == 'imm' else None
+                                if sc is not None:
+                                    fixes.append({'caller': p['caller'], 'callee': p['callee'], 'k': p['k'], 'pos': pos, 'const': {'kind': 'int', 'val': sc[0]}, 'bits': sc[1]})
+                                    stats['stack_imm_fix'] += 1
                         stats['why:%s:%s' % (kind, why)] += 1
                 rec['args'][pos] = kind
                 stats['arg:' + kind] += 1
