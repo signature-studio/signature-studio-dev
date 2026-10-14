@@ -139,9 +139,9 @@ aws s3 cp s3://signature-studio-artifacts/artifacts/<prefix>.tar.zst "$HOME/arti
 `CF_ACCOUNT_ID` / `CF_R2_ACCESS_KEY_ID` / `CF_R2_SECRET_ACCESS_KEY`
 
 **任意**: `OC_REVIEW_APP_PRIVATE_KEY`。設定がない場合、レビュワーは実装 App と同一
-identity になり **自分自身の PR を approve できない** (comment + 直接 merge に
-フォールバック)。設定していても installation が `contents:write` /
-`pull-requests:write` を grant していない場合は同じフォールバックになる。
+identity になり **自分自身の PR を approve できない**。このときレビュワーは approve も merge もせず、
+理由をコメントに書いて終える (#2600)。設定していても installation が `contents:write` /
+`pull-requests:write` を grant していない場合も同じ扱いになる。
 
 `workflow_dispatch` の入力は `prompt` と opencode の pin 3 つ。dispatch は write
 権限を持つ人手による起動なので、常に書き込み可として扱う。

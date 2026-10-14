@@ -24,7 +24,7 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 ## 1. 基本フロー
 
 ```
-ブランチを切る → worktree 作成 → 実装 subagent → レビュー subagent → PM (main) がマージ
+ブランチを切る → worktree 作成 → 実装 subagent → レビュー subagent (検収) が approve 後にマージ
 ```
 
 - **既定ブランチは `main`**。旧 `master` は `main` の祖先で凍結した過去枝。

@@ -118,9 +118,8 @@ PM は不在のことがある。reviewer は PM を待って verdict を保留�
 
 ## 注意
 
-- 自分が approve できない立場 (同一 App identity) の場合は approve をスキップし、
-  コメント + マージ (許可されていれば) を行う。プロジェクト設定で approve が必須なら、
-  その旨をコメントして終了する。
+- 自分が approve できない立場 (reviewer token 欠落で実装 App 名義) の場合は、approve も merge もしない。
+  理由 (reviewer token 欠落) をコメントに書いて終える (#2600)。
 - diff が 10 万文字を超える場合は前半を重点的にレビューし、残りは「未レビュー」と明記する。
 - **素材は PR 本文の `oc_artifacts:` 行で指定される** (例: `oc_artifacts: plugins-serum2 toolchain-retdec`)。
   指定名と展開先は `docs/WORKFLOW.md` §11 が正本。PR 本文に行が無く、e2e の再実行に素材が要るときは、

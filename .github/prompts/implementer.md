@@ -48,7 +48,7 @@
    `enablePullRequestAutoMerge` は、どれも実行してはならない。merge は独立した reviewer が approve した後に
    reviewer が行う。禁止の理由: Auto Merge は承認なしで即時に merge され、独立した review を迂回する
    (経緯と実測は #2600)。
-   PR を出したら、review の結果 (approve / 差し戻し) を待つ。
+   PR を出したら run を終える。approve・差し戻しは review job が別 run で判断する。
 10. **sleep による 10 秒以上の待機は禁止**。CI・ビルド等の完了確認は 1 コマンドの
     ポーリングで行う。複数回の確認が必要なら各回を独立した短いコマンドにし、
     連続 sleep を組まない。

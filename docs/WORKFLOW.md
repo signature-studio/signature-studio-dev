@@ -46,7 +46,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                                                   ├ PR review (approve / request changes)
    │                                                                   └ 誤記は fix commit で同 branch に push
    ├ review approve 確認 ──────────────────────────────────────────────┤
-   └ gh pr merge --merge ──→ branch/worktree 削除
+   └ (検収が approve と同じ run で gh pr merge --merge) ──→ branch/worktree 削除
 ```
 
 - 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度は PM が確定する。Project の Status は参考で、§3)。
@@ -54,7 +54,7 @@ PM (main)                      subagent (実装)                  subagent (検�
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
 - **実装者は自分の PR を merge しない** (`gh pr merge`・`--auto`・REST `pulls/N/merge`・`enablePullRequestAutoMerge` を含む。#2600)。
-  merge は独立した検収 (Actions 上は oc-reviewer) が approve した後に、検収または PM が行う (§11)。
+  merge は独立した検収 (Actions 上は oc-reviewer) が approve した同じ run で行う (§11)。PM は merge しない (contents 権限を持たない。`.github/prompts/pm.md`)。
   実装者が merge すると、独立した review を経ない自己 merge になる。
   merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
 - **競合時**: `git rebase origin/main` で解消してから `push --force-with-lease` (自分 branch のみ)。
@@ -67,7 +67,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 |---|---|---|---|
 | 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更・**自分の PR の merge (Auto Merge を含む)** |
 | 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge (検収の approve 後)・方針変更・是正 | — |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | 方針変更・是正 (merge は検収が行う。PM は contents 権限を持たず merge しない) | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。

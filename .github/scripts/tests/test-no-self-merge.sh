@@ -115,5 +115,20 @@ for f in .github/README.md docs/WORKFLOW.md; do
 done
 expect "文書: README と WORKFLOW が『実装者は自分の PR を merge しない』を明記している" "$miss"
 
+# 7. 検収の prompt: approve できない立場 (reviewer token 欠落) で approve / merge させる文が無い。旧版の文は検出される
+SELF_MERGE_RE='コメント \+ マージ|マージ \(許可されていれば\)|merge directly|if the project allows|同一 App identity の場合は approve をスキップし'
+bad=0
+for f in .github/prompts/reviewer.md .github/scripts/assemble-reviewer-prompt.sh; do
+  hits="$(grep -n -E "$SELF_MERGE_RE" "$ROOT/$f" || true)"
+  if [ -n "$hits" ]; then
+    printf '%s\n' "$hits" | sed "s#^#  | $f:#"
+    bad=1
+  fi
+done
+expect "検収 prompt: approve できない立場で approve / merge させる文が無い (reviewer.md・assemble-reviewer-prompt.sh)" "$bad"
+printf '%s\n' '- 自分が approve できない立場 (同一 App identity) の場合は approve をスキップし、' '  コメント + マージ (許可されていれば) を行う。' > "$TMP/old-reviewer.md"
+grep -q -E "$SELF_MERGE_RE" "$TMP/old-reviewer.md"
+expect "ネガコン: 同一 identity で『コメント + マージ』を行う旧版の注意は検出される" $?
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]
