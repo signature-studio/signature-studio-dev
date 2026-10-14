@@ -4,19 +4,23 @@ compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
-# 既定は dry-run (経路ごとのスイッチを "1" にしない限り GitHub へ書き込まない)。切替は PM の判断 (README)。
+# コードの既定は dry-run (経路ごとのスイッチが "1" でない限り GitHub へ書き込まない)。この toml は 2026-10-14 から live (VM の timer は停止中。README『切替の記録』)。
 #   LIVE_LAUNCH   = launch の /oc コメント投稿
 #   LIVE_DISPATCH = repository_dispatch (oc-watchdog) の送信
+# 戻すときは該当のスイッチを "0" にして再デプロイする (VM の timer は再開しない)。
 # 旧スイッチ LIVE ("1" で両方) は、LIVE_LAUNCH / LIVE_DISPATCH が未設定のときだけ効く。値は秘密ではない。
 [vars]
 REPO = "signature-studio/signature-studio-dev"
 ORG = "signature-studio"
-TARGET = "80"
+# 暫定: live の最初の 1 時間は 50 で様子を見る (80 に戻す PR は別)。
+TARGET = "50"
 BATCH = "25"
 BOT_LOGIN = "opencode-for-signature-studio[bot]"
 PM_LOGINS = "pycabbage"
-LIVE_LAUNCH = "0"
-LIVE_DISPATCH = "0"
+LIVE_LAUNCH = "1"
+LIVE_DISPATCH = "1"
+# 暫定: oc:no-pr の再着手の間隔 (時間)。既定は 3。理由別の再着手 (#2334) が入るまで、理由を見ない再投入を抑える。
+NO_PR_COOLDOWN_H = "24"
 # コメントの全体同期は新しい順に 24 時間分を読む。窓内の件数は実測で既定の上限 (80 ページ = 8,000 件) を超える
 # (tools/pm/REPORT.md §10) ので、そのままだと全体同期のたびに打ち切りになる。余裕を見て 150 ページ (15,000 件) にする。
 COMMENT_MAX_PAGES = "150"
