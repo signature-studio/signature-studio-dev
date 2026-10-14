@@ -7,7 +7,7 @@
 - IR: `boot_final3.ll` の `%29 = udiv i64 %28, %arg4` (符号なし・前回 run の記録では 125366 行)、続く `icmp eq`・`br`、偽側の `unreachable` (前回 run の記録では 125368〜125372 行)。
 - 除算の入力: 被除数 = stride (`[rbp+0x48]`) × count (`[rbp+0x60]`)、除数 = count。count は `417bb8`〜`417bbd` で正の値が保証された後の値。
 - 符号付きと符号なしで結果が一致するのは count = 1 のとき。count ≥ 2 かつ積が負なら、符号なし除算は stride を返さない (例: stride −16・count 2)。
-- **未確認** (#1576 の受入条件): trap 経路 (0x409730) へ実際に入る入力の実測 (trace_head は関数入口 VA のみで除算入力を記録していない)、sdiv 修正後に食い違いが消えるかの再実行。動的確認は子 issue #1767 に切り出した。
+- **未確認** (#1576 の受入条件): trap 経路 (0x409730) へ実際に入る入力の実測 (trace_head は関数入口 VA のみで除算入力を記録していない)、sdiv 修正後に食い違いが消えるかの再実行。動的確認は子 issue #1767 に切り出した (LD-62 の実測は [`REPORT_APPENDIX_LD62.md`](REPORT_APPENDIX_LD62.md))。
 
 #### P3 の残り L の静的確認 (#1576・LD-54)
 - 測定 commit: `d16d7f5d` (コード変更の最後の commit)。`git diff d16d7f5d HEAD -- tools/ ':!*.md'` は出力 0 行 (変更は本 md ファイルのみ)。
