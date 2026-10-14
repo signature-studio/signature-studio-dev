@@ -182,6 +182,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/m11/REPORT.md` | ~229 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)・§11 (#572, 要約のみ)・§12 survey の OOM/clobber 分離 (#513)・§13 (#516 qstore D17, 要約のみ)。§8 (LB_BASE #222)・§9 (sigfix #131)・§10 の commit 別測定表 (#132, §10a)・§10 の一部 (真因・修正 4 点・NC・次 blocker, §10b) は `REPORT_APPENDIX.md` に分割 |
+| `tools/m11/REPORT_N2768.md` | ~185 | #2768 (M11-N155): 寛容起動で skip した unit が trap までに heap へ書いた範囲 (72 unit の表)・上位のリスク評価 (推定)・PR #2752 との環境差。heap 範囲の結論は REPORT §0 を参照。集計は `m11_tolerant_heap.py`・測定は `m11_tolerant.mjs` の `M11_HEAP_FROM`/`M11_HEAP_OUT` |
 | `tools/m11/REPORT_N2714.md` | ~150 | #2714 (WIN-3): m11 寛容起動 (tolerant boot) の実測 (942 試行・ok 874・skip 67 の種類別・DllMain 戻り値 1)・skip unit の状態欠落リスク順位 (推定)・既存経路の回帰 (strict 56・survey 872) とネガコン。実装は `m11_tolerant.mjs`・`m11_tolerant_gate.py`・§4-2 の区間内訳は `m11_tolerant_sections.py` |
 | `tools/m11/REPORT_N15.md` | ~16 | m11 REPORT §16 (#490 main HEAD の 4c3baa4 / faee5b6 状態の実測・ネガコン) の付録 (250 行上限のため分割) |
 | `tools/m11/REPORT_APPENDIX_1430.md` | ~60 | m11 #1430 の基準 (before) 節の全文 (`REPORT_APPENDIX.md` §9 の後続。xmm 引数の callee 署名復元の前測定 (survey 基準 ok/trap/miss/noproc の実測)・`work-m11` 由来の 7 カテゴリ (和 1,963)。全再生成 IR の測定は #1532) |
