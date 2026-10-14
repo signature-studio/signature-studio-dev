@@ -67,6 +67,7 @@ setup() { # <head> <labels json> <n changes_requested reviews>
   done
   fx repos/o/r/pulls/7/reviews "${r%,}]"
   fx repos/o/r/issues/7/comments '[]'
+  fx repos/o/r/issues/comments '[]'
 }
 reviews() { # <submitted_at> <count> [<submitted_at> <count> ...]: oc-reviewer の CHANGES_REQUESTED review の JSON 配列
   local s="" i
@@ -82,18 +83,90 @@ stop_at() { # <created_at> [login]: 停止コメント (マーカー付き) の 
   printf '[{"created_at":"%s","user":{"login":"%s"},"body":"上限 <!-- oc-fix-limit -->"}]' "$1" "${2:-opencode-for-signature-studio[bot]}"
 }
 run_fix() { GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" bash "$SCRIPTS/fix-progress.sh" "$@"; }
+# rv <submitted_at> <classes> <body>: oc-reviewer の CHANGES_REQUESTED review (本文末尾に oc-review マーカー)
+rv() {
+  jq -nc --arg t "$1" --arg c "$2" --arg b "$3" '{user:{login:"oc-reviewer-for-signature-studio[bot]"},state:"CHANGES_REQUESTED",commit_id:"c",submitted_at:$t,body:($b + "\n<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=" + $c + " -->")}'
+}
+# seq_rv <classes> <count> <start-day>: 1 日ずつ進む差し戻し (本文は件ごとに語が違う = 繰り返しではない)
+SENT=("- 数値Aを修正" "- 関数Bの戻り値" "- 文書Cの節番号" "- 図Dの欠落" "- 引数Eの型" "- 表Fの単位" "- 注釈Gの出典" "- 式Hの係数" "- 用語Iの統一" "- 章Jの見出し" "- 行Kの誤記" "- 項Lの参照" "- 段Mの順序" "- 語Nの表記" "- 例Oの計算")
+seq_rv() {
+  local i a=()
+  for ((i = 0; i < $2; i++)); do
+    a+=("$(rv "2026-01-$(printf %02d $(($3 + i)))T00:00:00Z" "$1" "${SENT[$(((($3 + i) - 1) % 15))]}")")
+  done
+  printf '%s\n' "${a[@]}" | jq -sc .
+}
+cat_rv() { jq -nc --argjson a "$1" --argjson b "$2" '$a + $b'; }
+bot_comment() { # <created_at> <body>: 実装 bot の PR コメント (JSON)
+  jq -nc --arg t "$1" --arg b "$2" '{created_at:$t,user:{login:"opencode-for-signature-studio[bot]"},body:$b}'
+}
 
-echo "== fix-progress.sh record (往復の上限 5 件)"
-setup aaa '[]' 3
+echo "== fix-progress.sh record (往復の上限 5 件・窓の分類 #2323)"
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "3 件の差し戻し -> stop=false" $?
 grep -qx 'OC_HEAD_BEFORE=aaa' "$TMP/env"; expect "起動時の head を記録する" $?
 
-setup aaa '[]' 5
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
 run_fix record > /dev/null
-grep -qx 'stop=true' "$TMP/out"; expect "5 件で stop=true" $?
-logged 'issues/7/labels'; expect "oc:stuck ラベルを付ける" $?
-logged 'pr comment 7'; expect "PR に停止のコメントを残す" $?
+grep -qx 'stop=false' "$TMP/out"; expect "正例: 5 件すべて doc (本文は別々) -> stop=false" $?
+logged 'oc-fix-reset n=1'; expect "正例: 窓を閉じる oc-fix-reset n=1 をコメントする" $?
+! logged 'issues/7/labels'; expect "自動再開では oc:stuck を付けない" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(cat_rv "$(seq_rv doc 2 1)" "$(seq_rv code 3 3)")"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "ネガ (a): 直近 3 件に code -> stop=true" $?
+logged 'oc-pm-intent: stuck pr=7 reason=code'; expect "ネガ (a): 停止理由 reason=code の intent マーカーを残す" $?
+logged 'issues/7/labels'; expect "ネガ (a): oc:stuck を付ける" $?
+
+setup aaa '[]' 0
+rep1="$(rv 2026-01-05T00:00:00Z doc '- 同じ指摘: 数値を直す')"
+rep2="$(rv 2026-01-06T00:00:00Z doc '- 同じ指摘: 数値を直す')"
+rep3="$(rv 2026-01-07T00:00:00Z doc '- 同じ指摘: 数値を直す')"
+fx repos/o/r/pulls/7/reviews "$(cat_rv "$(seq_rv doc 2 1)" "$(printf '%s\n%s\n%s\n' "$rep1" "$rep2" "$rep3" | jq -sc .)")"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "ネガ (b): 同じ指摘が 3 周 -> stop=true" $?
+logged 'reason=repeat'; expect "ネガ (b): 停止理由 reason=repeat" $?
+
+setup aaa '[]' 0
+cf="$(rv 2026-01-01T00:00:00Z conflict '- 競合を解消')"
+cf2="$(rv 2026-01-02T00:00:00Z conflict '- 競合を解消')"
+fx repos/o/r/pulls/7/reviews "$(cat_rv "$(printf '%s\n%s\n' "$cf" "$cf2" | jq -sc .)" "$(seq_rv doc 3 3)")"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "ネガ (c): conflict 2 件 + doc 3 件 -> 計数 3 で stop=false" $?
+! logged 'oc-fix-reset'; expect "ネガ (c): 計数 3 なので窓を閉じない" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(cat_rv "$(cat_rv "$(seq_rv doc 5 1)" '[]')" "$(seq_rv doc 5 6)")"
+fx repos/o/r/issues/7/comments "$(jq -nc '[{created_at:"2026-01-05T12:00:00Z",user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=1 -->"},{created_at:"2026-01-10T12:00:00Z",user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=2 -->"}]')"
+fx repos/o/r/pulls/7/reviews "$(cat_rv "$(seq_rv doc 15 1)" '[]')"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "ネガ (d): 合計 15 件 -> stop=true" $?
+logged 'reason=ceiling'; expect "ネガ (d): 停止理由 reason=ceiling" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv "" 5 1)"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "ネガ (e): マーカー欠落 (unknown) の 1 窓目 -> 自動再開" $?
+logged 'oc-fix-reset n=1'; expect "ネガ (e): 1 窓目は oc-fix-reset n=1" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(cat_rv "$(seq_rv "" 5 1)" "$(seq_rv "" 5 6)")"
+fx repos/o/r/issues/7/comments "$(jq -nc '[{created_at:"2026-01-05T12:00:00Z",user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=1 -->"}]')"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "ネガ (e): マーカー欠落の 2 窓目 -> stop=true" $?
+logged 'reason=unknown'; expect "ネガ (e): 停止理由 reason=unknown" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
+now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+fx repos/o/r/issues/comments "$(jq -nc --arg t "$now" '[range(0;6)|{created_at:$t,user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=1 -->"}]')"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "ネガ (f): 1 時間に 7 件目の reset -> stop=true" $?
+logged 'reason=ceiling'; expect "ネガ (f): 停止理由は reason=ceiling" $?
 
 # 停止コメント (oc-fix-limit) より前の差し戻しは数えない: ラベルを外して再開できる
 setup aaa '[]' 5
@@ -111,7 +184,8 @@ setup aaa '[]' 5
 fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"},"body":"stop <!-- oc-fix-limit -->"}]'
 fx repos/o/r/pulls/7/reviews "$(jq -c '. + [range(0;5)|{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"CHANGES_REQUESTED","commit_id":"n","submitted_at":"2026-04-01T00:00:00Z"}]' < "$FIX/repos_o_r_pulls_7_reviews")"
 run_fix record > /dev/null
-grep -qx 'stop=true' "$TMP/out"; expect "停止コメントの後に再び 5 件 -> stop=true" $?
+grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後に再び 5 件 (マーカー無し = unknown の 1 窓目) -> 自動再開" $?
+logged 'oc-fix-reset n=1'; expect "停止コメントの後の 1 窓目は oc-fix-reset n=1" $?
 
 # 起動主体は完全一致: 名前が似ているだけの bot の差し戻しは数えない
 setup aaa '[]' 0
@@ -124,7 +198,7 @@ run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ラベル済みなら stop=true" $?
 ! logged 'pr comment'; expect "ラベル済みなら再コメントしない" $?
 
-echo "== fix-progress.sh record (上限は直前の停止コメント以降の差し戻しを数える)"
+echo "== fix-progress.sh record (窓は直前の停止コメント以降の差し戻しを数える)"
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(reviews 2026-01-01T00:00:00Z 5 2026-01-03T00:00:00Z 1)"
 fx repos/o/r/issues/7/comments "$(stop_at 2026-01-02T00:00:00Z)"
@@ -136,14 +210,14 @@ setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(reviews 2026-01-01T00:00:00Z 5 2026-01-03T00:00:00Z 5)"
 fx repos/o/r/issues/7/comments "$(stop_at 2026-01-02T00:00:00Z)"
 run_fix record > /dev/null
-grep -qx 'stop=true' "$TMP/out"; expect "停止コメントの後に上限ぶん差し戻し -> stop=true" $?
-logged 'pr comment 7'; expect "再度の停止で PR にコメントする" $?
+grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後に 5 件 (unknown の 1 窓目) -> 自動再開 (停止前の 5 件は数えない)" $?
+logged 'oc-fix-reset n=1'; expect "1 窓目なので oc-fix-reset n=1" $?
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(reviews 2026-01-01T00:00:00Z 5 2026-01-03T00:00:00Z 1)"
 fx repos/o/r/issues/7/comments "$(stop_at 2026-01-02T00:00:00Z someone)"
 run_fix record > /dev/null
-grep -qx 'stop=true' "$TMP/out"; expect "他人の oc-fix-limit マーカーは区切りにしない (6 件 -> stop=true)" $?
+grep -qx 'stop=false' "$TMP/out"; expect "他人の oc-fix-limit マーカーは区切りにしない (6 件を窓として数える -> 1 窓目で再開)" $?
 
 echo "== fix-progress.sh check (pushed / answered / none)"
 setup bbb '[]' 1
@@ -235,6 +309,46 @@ verify; rc=$?
 vsetup NONE
 env -u OC_REPO -u OC_PR_NUMBER GH_TOKEN=x GITHUB_EVENT_PATH=/dev/null RUNNER_TEMP="$TMP" bash "$SCRIPTS/verify-review-verdict.sh" > "$TMP/v.out" 2>&1; rc=$?
 { [ $rc = 0 ] && ! logged 'pr close' && ! logged 'pr reopen' && ! logged 'pr comment'; }; expect "Prepare PR context 失敗で OC_REPO/OC_PR_NUMBER が無い -> 何もせず 0 で終わる (二次失敗しない)" $?
+
+echo "== verify-review-verdict.sh (差し戻し本文の oc-review マーカーは警告のみ #2320 / CI-42)"
+# vrev <body>: head hhh への CHANGES_REQUESTED review (本文 = <body>) を 1 件仕込んで検証する
+vrev() {
+  vsetup NONE
+  fx repos/o/r/pulls/7/reviews "$(jq -nc --arg b "$1" '[{user:{login:"oc-reviewer-for-signature-studio[bot]"},state:"CHANGES_REQUESTED",commit_id:"hhh",body:$b}]')"
+  verify; rc=$?
+}
+warn() { grep -q '::warning::' "$TMP/v.out"; }
+
+vrev "- 指摘 1
+<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=doc,remeasure -->"
+{ [ $rc = 0 ] && ! warn && ! logged 'pr reopen'; }; expect "正しいマーカー -> 警告なし・verdict をそのまま採用 (rc 0)" $?
+
+vrev "- 指摘 1"
+{ [ $rc = 0 ] && warn && grep -q 'no <!-- oc-review' "$TMP/v.out" && ! logged 'pr reopen'; }; expect "マーカー欠落 -> 警告が出て終了コード 0・再起動しない" $?
+
+vrev "- 指摘 1
+<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=doc,bogus -->"
+{ [ $rc = 0 ] && grep -q 'unknown class: bogus' "$TMP/v.out"; }; expect "classes に未知語 -> 警告 (終了コード 0)" $?
+
+vrev "- 指摘 1
+<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=doc -->
+追記"
+{ [ $rc = 0 ] && grep -q 'not the last line' "$TMP/v.out"; }; expect "マーカーが末尾行でない -> 警告" $?
+
+vrev "- 指摘 1
+<!-- oc-review: v=2 round=1 blocking=1 minor=0 classes=doc -->"
+{ [ $rc = 0 ] && grep -q 'unsupported version: v=2' "$TMP/v.out"; }; expect "v=1 以外 -> 警告" $?
+
+echo "== reviewer.md の文言 (収束規則・マーカー・PM 判断表。旧文言の再混入を検出 #2320 / CI-42)"
+# stale_phrase <file>: 旧文言 (PM に起票を求める) が残っていれば 0 を返す
+stale_phrase() { grep -qE '起票を PM に求める|PM に(依頼|求める)する' "$1"; }
+REVIEWER_MD="$SCRIPTS/../prompts/reviewer.md"
+grep -q '収束規則' "$REVIEWER_MD" && grep -q '<!-- oc-review: v=1 round=<n>' "$REVIEWER_MD" && grep -q 'PM 判断が絡む指摘の扱い' "$REVIEWER_MD"
+expect "reviewer.md に収束規則・マーカー書式・PM 判断表がある" $?
+! stale_phrase "$REVIEWER_MD"; expect "reviewer.md に旧文言『起票を PM に求める』が無い" $?
+# ネガコン: 旧文言を戻した一時コピーでは同じ検査が fail する
+printf '%s\n' '(issue が無ければ起票を PM に求める)' > "$TMP/reviewer-neg.md"
+stale_phrase "$TMP/reviewer-neg.md"; expect "ネガコン: 旧文言を戻すと検査が検出する" $?
 
 echo "== review-recover.sh (review job が打ち切られたら watchdog を待たず同じ head で再起動 #1950 / CI-38)"
 # rrun <annotation> [review-retry マーカー数]: 初期化 -> review job の annotation を仕込んで review-recover.sh を走らせる

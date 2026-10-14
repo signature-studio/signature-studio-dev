@@ -7,7 +7,7 @@
 
 ## 0. 結論 (先出し)
 
-1. **12 本の分類**: lift する **6 本** (Wrapper×2 / Patcher×2 / MIDI Out / Video Player)、lift しない (推奨・ユーザ確認) **2 本** (Razer Chroma / ReWired)、ユーザ判断 **4 本** (ZGE / FL Mobile×3)。判断が要る 3 件は needs-user-input で起票: **#558** (Razer・ReWired)・**#559** (ZGE)・**#560** (FL Mobile×3)。回答がなければ #558 は「lift しない」、#559 は「保留 (#29 待ち)」、#560 は「対象外」で進める。
+1. **12 本の分類**: lift する **6 本** (Wrapper×2 / Patcher×2 / MIDI Out / Video Player)、当初の区分は lift しない **2 本** (Razer Chroma / ReWired)、ユーザ判断 **4 本** (ZGE / FL Mobile×3)。2026-10-14 に PM が確定した (`docs/DECISIONS.md` D22): Razer・ReWired (#558)・FL Mobile×3 (#560) は lift しない、ZGE (#559) は保留 (#29 待ち)。
 2. **「big3p 12 本」は呼称が不正確**: `PLUGIN_MATRIX` の scope は host 8 + big3p 4 (ZGE と FL Mobile×3)。推定 81 人日の内訳は host 21 + big3p 60 (matrix の Tier 規則 est_days の合計; 根拠の薄い機械推定)。同じ matrix の host の `Control Surface` は #205 (PLG-F8)、big3p の `DirectWave` / `FLEX` は `batch_plan.md` §7 の PLG-G4 側にあり、12 本には含まれない。
 3. **lift の前提は再現した**: 合格必須 7 閉包 (Wrapper×2 / Patcher×2 / MIDI Out / Razer Chroma / Video Player) は RetDec + pass 鎖で **7/7 が `lift_rc=0`・`emcc -c` rc=0・未実装 helper 0**。ReWired は f80 2 関数で `emcc -c` が失敗 (p0c の f80→f64 lowering を当てれば通る)。ZGE 殻は閉包が 0 件で lift 不能 (未計測)。
 4. **間接 call は #514 の復元で IR に載るようになったが、gate は未達**: 8 閉包の機械語側の間接 call site は 2,181 (audit) / 2,297 (線形 sweep)、IR 側の `@__icall_dispatch` は 2,178。`f2/icall_gate.py` (#514 の回帰ゲート) で **8 閉包中 6 本 FAIL**。未被覆 site は **120** (F1)、site 不明の dispatch は 1 (F3, 23674)。MIDI Out (69) と Razer Chroma (23) は PASS。
@@ -15,7 +15,7 @@
 
 ## 1. 方針決定 (12 本の分類)
 
-区分: **A = lift する** / **B = lift しない (推奨; ユーザ確認待ち)** / **C = ユーザ判断**。工数は matrix の Tier 規則 est_days (機械推定)。demo = demo .flp の出現数、preset = preset 数 (`PLUGIN_MATRIX.json` の `usage`)。
+区分: **A = lift する** / **B = lift しない (D22 で確定)** / **C = 当初のユーザ判断 (D22 で確定: FL Mobile×3 は lift しない、ZGE は保留 (#29 待ち))**。工数は matrix の Tier 規則 est_days (機械推定)。demo = demo .flp の出現数、preset = preset 数 (`PLUGIN_MATRIX.json` の `usage`)。
 
 | plugin | block | Tier / 工数 | 区分 | 根拠 | 依存・次 |
 |---|--:|---|---|---|---|
@@ -34,7 +34,7 @@
 
 - **機能単位で切り落とすもの** (`docs/DECISIONS.md` D3 外部通信機能は対象外): Wrapper / Patcher の FL Cloud 系 (RTTI の `TCloudPluginsLicenseEngine` / `TFLCloudPluginHost`)、32bit プラグイン用 `ilbridge.exe` bridged 経路 (#24 の設計どおり wasm では instance 分離で代替)、ZGE の NDI、FL Mobile の winsock。
 - **A の合計工数**: matrix の est_days で 4+4+4+4+0.5+1.5 = **18 人日**。ただし §3 のとおり icall gate が未達のため、実作業量の見積りは #514 完了後に再推定する。
-- 区分 B/C の 6 本は、ユーザ判断までの間 lift しない。FLP 上の未対応プラグインを「state を保持して素通し」にする共通扱いは各 issue に選択肢として書いた。
+- 区分 B/C の 6 本は lift しない (ZGE は #29 待ちの保留)。FLP 上の未対応プラグインは「state を保持して素通し」にする (`docs/DECISIONS.md` D22)。
 
 ## 2. 手順 1: 固有閉包 lift の結果 (`work/batch/status.csv`)
 
@@ -130,9 +130,9 @@
 |---|---|---|
 | icall 復元の未被覆 120 site (F1: 19091 10 / 23676 10 / 19220 45 / 24155 44 / 23674 10 / 24161 1) と site 不明 dispatch 1 件 (F3: 23674) | 8 閉包中 6 本が `icall_gate.py` FAIL。差分試験の前提が未達 | 既存 **#514** にコメント (本 PR の gate 出力を添付) |
 | 差分試験 (native ms_abi vs wasm) と共有 framework wasm / Host shim とのリンク | 出口条件 | 既存 #195 (P0a) / #196 (P0b) / #197 (P0c) の完了待ち。本 issue #210 に残す |
-| Razer Chroma・ReWired の対象外確定 | 区分 B | **#558** (needs-user-input) |
-| ZGE の扱い。殻の閉包が 0 件になる原因 (標準入口を持たない構造か) は未切り分け | 区分 C | **#559** (needs-user-input) |
-| FL Mobile×3 の扱い。C++ engine の窓 lift が 6 窓中 2 窓で失敗 | 区分 C | **#560** (needs-user-input)・技術面は既存 #527 |
+| Razer Chroma・ReWired の対象外確定 | 区分 B | **#558** (D22 で確定・close) |
+| ZGE の扱い。殻の閉包が 0 件になる原因 (標準入口を持たない構造か) は未切り分け | 区分 C | **#559** (D22 で保留と確定。#29 に blocked_by) |
+| FL Mobile×3 の扱い。C++ engine の窓 lift が 6 窓中 2 窓で失敗 | 区分 C | **#560** (D22 で対象外と確定・close)・技術面は既存 #527 |
 | Wrapper の host ID 54 / Patcher の host ID 96 が `hs_ids.json` に未登録 | Wrapper / Patcher を framework とリンクする段 | 既存 #196 (P0b) にコメント |
 | MIDI Out の出力先 (Web MIDI) の shim | MIDI Out の動作 | 既存 **#196** (P0b Host shim) にコメント。Host shim の vtable 送出先として Web MIDI 出力を追加する範囲 |
 | 線形 sweep と audit_icall の差 (+116 site) の切り分け | §3 の機械語側の精度 (gate は線形 sweep を正本とする) | 既存 **#514** にコメント (gate 化の一部として扱う) |
