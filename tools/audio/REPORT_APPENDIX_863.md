@@ -116,3 +116,13 @@
 - 読み: 失敗 run では `fill_at_first_underrun=0` (underrun の時点でリングは空)。`cb_gap_max_ms=11` / `cb_gap_over20=0` で、audio callback 間隔は 20 ms を超えていない。ただし fill 推移は取れていないため、producer 遅延か consumer 停止かは**未確定**。
 - 通算 (§19〜§25 の同一 e2e): FAIL 3 件 / 計 131 run (§19〜§24 の 2 件 / 86 run に、本節の 45 run・FAIL 1 件を加算)。本節の FAIL は旧 HEAD `b6361886` の初回 1 run のみで、probe 後の 44 run は全 PASS。
 - 未解決 (追跡 **#863**): (a) fill 推移を含む失敗 log が未取得 (次回失敗時に `fill_trace` で判定)。(b) 同一フレーム 56576 が 3 回出る理由は未特定 (起動からの相対位置が固定なら、決定的な起動経路の問題の可能性)。(c) producer 側の到達時刻 (wasm 側の変更) は本 PR の範囲外。
+
+## 26 AU-15 (#863) 断続失敗の捕獲試行 (hunt.sh・連続 131 run 全 PASS)
+
+- 測定 commit: `c604805c` (`tools/audio/integration/hunt.sh` を追加。検証対象のコード (`e2e.sh`・`e2e.mjs`・`src/runtime`) は変更なし)。`origin/main` `8d632b57` の上に 1 commit。
+- 方法: `EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk/emsdk_env.sh TMPDIR=$RUNNER_TEMP bash tools/audio/integration/hunt.sh 300 1380` を foreground で実行。`hunt.sh` は `e2e.sh` を繰り返し、最初の FAIL で止めて全出力を `tools/audio/work/hunt/fail_<n>.log` に残す (gitignore)。時間上限 1380 s。素材は `toolchain-emsdk` のみ展開 (e2e の経路は `fl-win64` を参照しない)。
+- 結果: **131 run 全 PASS** (exit 0・各 run 13/13 PASS)。FAIL 0 のため捕獲ログは無し。1 run の wall は 10〜11 s (build 込み)、開始時 load は 0.54〜2.68 (無負荷。busy loop なし)。
+- 通算 (§19〜§26 の同一 e2e): FAIL 3 件 / 計 262 run。失敗 3 件はいずれも HEAD が異なる (`bb912951`・`1e3ee7af`・`b6361886`)。失敗後の 44 run (§25 の probe 後) と本節の 131 run、計 175 run は全 PASS。
+- 統計の読み: 通算率は約 1.1% (3/262)。その率なら 131 run で 0 件となる確率は約 0.23 (0.989^131)。0 件は「率が下がった」の根拠にはならない。
+- 既存の位置情報からの読み (§25 の失敗 1 件・probe 前の旧 HEAD のため fill 推移 `fill_trace` は無し): `fill_at_first_underrun=0` (underrun の時点でリングは空)、`fill_min_before_first_underrun=0`、`cb_gap_max_ms=11`・`cb_gap_over20=0` (audio callback の 20 ms 超は無い)。よって **consumer (音声スレッドの停止) で説明できる証拠は無い**。リングの供給不足 (producer 側の遅れ) に寄る読みだが、fill 推移つきの失敗は 0 件で、producer 側の到達時刻も取っていないため、producer 遅延と断定はできない。
+- 未解決 (追跡 **#863**): (a) 失敗の捕獲は `hunt.sh` を長く回す run が必要 (1 run ≈ 10 s、時間上限内で約 130 run)。(b) producer 側の到達時刻は wasm 側の変更が要る (本 PR の範囲外)。(c) 再現条件 (負荷・タイミング) は未特定。
