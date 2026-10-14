@@ -9,6 +9,7 @@ IR (lift 段から) は store 値を `%2 = load [arg1+8]` (変位 8) で代用�
 
 使い方: python3 fix_ld108.py IN.ll OUT.ll
 """
+import os
 import re
 import sys
 
@@ -16,7 +17,8 @@ FN = re.compile(r'^define [^\n]*@function_41a670\(.*?\n}\n', re.M | re.S)
 DEF = re.compile(r'^define [^\n]*@function_41a670\(([^)]*)\)', re.M)
 ARG1 = re.compile(r'i64(?: [a-z_]+)* %arg1')
 BLK = re.compile(r'^dec_label_pc_41a69c:[^\n]*\n(.*?)(?=^dec_label_pc_|\Z)', re.M | re.S)
-HEAD_ST = 'store i64 %2, ptr inttoptr (i64 16404608 to ptr), align 8'
+LB = int(os.environ.get('M11_LB_BASE', '0'), 0)   # #222: head の LVA = 0xFA5080 + LB_BASE (IR の VA→LVA remap と同じ)
+HEAD_ST = 'store i64 %%2, ptr inttoptr (i64 %d to ptr), align 8' % (16404608 + LB)
 RAX_ST = 'store i64 %2, ptr %rax.0.reg2mem'
 
 

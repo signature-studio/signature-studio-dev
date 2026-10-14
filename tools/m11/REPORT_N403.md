@@ -136,3 +136,69 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
   unit 745 の LB=0 側 OOB も LB 依存の別経路の可能性があるが、未確認。
 - 次の一手 (未着手): `function_412770` と `function_411d20` の IR で、Halt を呼ぶ条件の比較に使われる定数・ポインタを取り、
   LB=0 と LB=0x10000 の `boot_final.ll` の該当箇所を diff する。`m11_remap_count.py` の未 remap 即値 (§3) と突合する。
+
+## 6. #3160 の再測定: LB=0x10000 の寛容起動は 600 s で打ち切られず、LB 依存の unit 差は 8 件
+
+既知類型との関係: 該当なし (新しい候補: LB 直書きの定数を持つ IR 修復 pass が LB≠0 で不適用になる。類型 ID は未付与)。
+測定主体: 本 PR の作業 runner (2026-10-14)。素材は work-m11 (#516 以前の snapshot)・fl-win64・toolchain-emsdk (`[EMSDK]`)。
+`m11_e2e.sh` の全再生成は使わず、lift 成果物 (boot0〜4.lift.ll) から後段 (gen_ir2 → 画像 → lb_check → build → 寛容起動) を実行する (`tools/m11/m11_lb_tolerant_repro.sh`)。
+測定 commit: `17b078a1` (コードを変えた最後の commit。直前の `9a00a57c` で測った値も同じ)。`git diff 17b078a1 HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空 (差分 0)。
+
+### 6-1 LB 別の結果 (`bash tools/m11/m11_lb_tolerant_repro.sh 0 work/repro_lb0` / `... 0x10000 work/repro_lb10000`)
+
+| 項目 | LB=0 | LB=0x10000 |
+|---|---|---|
+| 寛容起動 wall (timeout 600) | 16.8–17.0 s (n=3) | 20.2–20.5 s (n=4) |
+| attempted / ok / noproc / miss / skipped | 942 / 867 / 1 / 47 / 74 | 942 / 867 / 1 / 47 / 74 |
+| skipped の内訳 | oob 19・halt0 7・unreachable 1 | oob 16・halt0 8・abort 2・unreachable 1 |
+| hook_ran (InitUnits 本体の呼出し) | true (1 回) | true (1 回) |
+| lb_check (静的検査) | PASS | PASS |
+
+LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (16.8 s)。LB=0x10000: `17b078a1` の repro (20.25 s)・`9a00a57c` の repro (20.2 s)・`var_A` (20.5 s)・`fixed` (20.5 s)。
+再実行は unit 別の記録 (942 件) が一致した (`m11_lb_unit_diff.py` の差 0)。
+
+### 6-2 LB=0 と LB=0x10000 の unit 結果差 (`python3 tools/m11/m11_lb_unit_diff.py tools/m11/work/repro_lb0/tolerant_units.json tools/m11/work/repro_lb10000/tolerant_units.json`・kind 差 8)
+
+| index | VA (LB=0 側) | LB=0 | LB=0x10000 | §2 の表 (引用) |
+|---|---|---|---|---|
+| 40 | 0x105bd0 | ok | halt0 | 一致 |
+| 153 | 0x265b90 | ok | oob | 一致 |
+| 158 | 0x26d1a0 | ok | oob | 一致 |
+| 745 | 0xabb3b0 | oob | ok | 一致 |
+| 291 | 0x432660 | oob | ok | §2 に無し (新規) |
+| 296 | 0x446130 | oob | ok | §2 に無し (新規) |
+| 304 | 0x483140 | oob | abort | §2 に無し (新規) |
+| 555 | 0x7f2500 | oob | abort | §2 に無し (新規) |
+
+- §2 の 4 件は再現した。§5 の「食い違いは 4 件のみ」は引用元の記録での値で、本測定では 8 件。
+- 陽性対照 (差が出ること) は LB=0 と LB=0x10000 の比較 (差 8)。陰性対照 (同一 LB の再実行) は差 0。
+
+### 6-3 候補の切り分け (寛容起動の打ち切り)
+
+- ハング・無限ループ: 再現せず。942 試行が全て 20 s 以内に完了 (`attempted` = `units_total` = 942)。
+- InitUnits の再入: 再現せず。`hook_ran` は 1 回。`attempted` は 942 で、二重起動の痕跡なし。Halt0 (dllmain 経由) は 8 件を skip として処理。
+- 未 remap の image VA 即値 (§3): 件数は LB 間で同じ (`m11_remap_count.py`: LB=0 IR も LB=0x10000 IR も `unremapped` 4,364)。件数の差は 6-2 の原因ではない。
+- 元の報告 (`M11_LB_BASE=0x10000` で 600 s 打ち切り) は、この snapshot とこの commit では再現しなかった。元の打ち切りの原因は未特定。
+
+### 6-4 e2e 経路を止めていた LB 直書き (本 PR で修正)
+
+- `ldfix/fix_ld108.py` (#2402): 照合文字列が LB=0 の LVA `0xFA5080` (16404608) を直書きしていた。LB=0x10000 の IR では head が 16470144 に remap されており、修正前は `m11_gen_ir2.sh` が `store 行が想定と違う` の assert で止まった (gen_ir2 rc=1 を実測)。
+- `fix912/m11_fix912.py` (#912): VMT 定数 `994072` (0xF2D18) も同じ。LB=0x10000 の IR では `1059608`。修正前は `m11_build.sh` が `[fix912] FAIL: 対象行が無い (before=0 after=0)` で止まった (実測)。
+- 修正: どちらも `M11_LB_BASE` を加算して照合する。LB=0 の照合文字列は旧値と一致 (`HEAD_ST`・`OLD`・`NEW` を LB=0 で確認)。
+- ld108 を外した版 (`M11_FIX_LD108=0 M11_ALLOW_LD108_DISABLED=1`) の寛容起動も、unit 結果は fixed 版と差 0。この unit 集合では ld108 の適用は結果を変えない。
+
+### 6-5 未確認・限界
+
+- lift 成果物 (boot0〜4.lift.ll) が fl-win64 の PE から作られたことは未確認。work-m11 に `work/lift_pe.sha256` が無く、§5 のような手書きの指紋は使っていない。
+- LB=0 の寛容起動は ok 867 / skipped 74 で、`m11_tolerant_gate.py` の pin (ok 874 / skipped 67) と一致しない。snapshot の IR と pin の基準 (`--full` 再生成) が違うと推定 (未確認)。
+- `m11_e2e.sh` の全経路 (`M11_LB_BASE=0x10000 bash m11_e2e.sh`) は未実行 (全再生成に入るため)。
+- 寛容起動の `ptrcheck` はゲート未設定 (`M11_PTRCHECK_MAX_NEW` 無し)。`image_va_words_new` は LB=0x10000 で 71987、LB=0 で 72042。
+- 再現手順: `bash tools/m11/m11_lb_tolerant_repro.sh <LB> <出力>` (要 `FL_WIN64_DIR`・work-m11)。ネガティブ対照の具体例: 修正前の commit `e9881327` で LB=0x10000 の gen_ir2 は止まる (6-4)。
+
+### 6-6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| LB=0 と LB=0x10000 の unit 結果差 8 件 (特に unit 40 の Halt0・unit 745 の oob) の原因 | LB 依存の寛容起動の結果が変わる。silent 誤りの可能性 | 子 issue (本 PR の Closes #3160 の後に起票) |
+| 元の 600 s 打ち切りの原因 (本 snapshot では再現せず) | 報告の根拠が再現しない | 本 issue の §6-3 に記録。再現には lift_pe.sha256 付きの完全な成果物が要る |
+| LB=0 寛容起動の pin (874/67) と snapshot の値 (867/74) の差 | gate 数値の基準が snapshot と不一致 | PM 確認 (`--full` 再生成での再測定が要る) |
