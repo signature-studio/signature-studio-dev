@@ -28,7 +28,7 @@
 | ブラウザ | google-chrome 154.0.8037.97 (HeadlessChrome/154.0.0.0)。`--headless=new --no-sandbox --disable-gpu` |
 | node (比較用のみ) | v22.23.3 |
 | emcc | 6.0.12 ([EMSDK] の pin)。上流 `emscripten-core/emsdk` を `git clone --depth 1` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` で導入 |
-| /opt/emsdk | 上の導入先へのシンボリックリンク。`build_cpython_wasm.sh` と `build_flpy_static.sh` (既定) が `/opt/emsdk/emsdk_env.sh` を直書きしているため |
+| [EMSDK] の所在 | 上の導入先へのシンボリックリンク (`docs/REFERENCES.md` の [EMSDK])。`build_cpython_wasm.sh` と `build_flpy_static.sh` (既定) は [EMSDK] の `emsdk_env.sh` を直書きしているため |
 | CPython | 3.12.1 (python.org の Python-3.12.1.tgz、record の source sha256 は d01ec6a33bc1…) |
 | 機械 | nproc = 4。ビルドは `make -j4` |
 
@@ -38,7 +38,7 @@
 
 ```
 bash tools/python/build_cpython_wasm.sh                                       # native build-python + wasm32 (work/build-wasm)
-EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/python/build_cpython_wasm64.sh   # wasm64 libpython (work/build-wasm64)
+EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/python/build_cpython_wasm64.sh   # wasm64 libpython (work/build-wasm64)
 cd tools/python
 FLPY_MEMORY64=1 CPY_BUILD=$PWD/work/build-wasm64 STATIC_OUT=flpy_static64 bash build_flpy_static.sh  # dist/flpy_static64.*
 bash build_flpy_static.sh                                                     # dist/flpy_static.* (wasm32 既定)
