@@ -94,8 +94,8 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 
 - 測定 commit (コードを最後に変えた commit): `851fbcfe` (`Merge origin/main into 2027-py62-playlist-confirmed (#2027)`。main `ae46c71a` を取り込み、競合 4 件を解消)。
 - コード差分: `git diff 851fbcfe HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 commit の後続は REPORT と `docs/DOC_MAP.md` だけ)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst` real 7.185 s)。`FL_WIN64_DIR` は展開先の親 (`$RUNNER_TEMP/fl-win64`) を指す (`extracted/` を付けるのは script)。初回は `extracted` まで指定して `fetch_inputs.sh` が rc 1 となり、親を指定し直して rc 0。
-- emsdk: runner 同梱 `/opt/emsdk` (emcc 6.0.12) を使用。`toolchain-emsdk` も `$HOME/artifacts` から展開 (real 8.650 s) したが、その `emsdk_env.sh` は `/opt/emsdk` を指す設定を含み、`build_cpython_wasm.sh` も `/opt/emsdk` を固定で読むため使わなかった。PR 本文の `oc_artifacts` 行は素材の取得指定 (review run の再現用)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst` real 7.185 s)。`FL_WIN64_DIR` は展開先の親 (`$RUNNER_TEMP/fl-win64`) を指す (`extracted/` を付けるのは script)。初回は `extracted` まで指定して `fetch_inputs.sh` が rc 1 となり、親を指定し直して rc 0。
+- emsdk: runner 同梱 `[EMSDK]` (emcc 6.0.12) を使用。`toolchain-emsdk` も `$ARTIFACTS_DIR` から展開 (real 8.650 s) したが、その `emsdk_env.sh` は `[EMSDK]` を指す設定を含み、`build_cpython_wasm.sh` も `[EMSDK]` を固定で読むため使わなかった。PR 本文の `oc_artifacts` 行は素材の取得指定 (review run の再現用)。
 - 前段: `fetch_inputs.sh` rc 0 (`work/` 配置)、`build_cpython_wasm.sh` real 2 分 42.762 s rc 0、`FLPY_SKIP_TABLE=1 build_flpy.sh` real 3.955 s rc 0。
 - 検証時の load average: 実行直前の `/proc/loadavg` の 1 分値 0.52 (並列 1、n=1。所要は `date` の差)。
 
