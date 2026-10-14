@@ -117,3 +117,36 @@ FL_WIN64_DIR=... M11_PE=... bash m11_build.sh                  # 既定 (K12=0)
 SV_ERR_LOG=work/s1511/err.txt node trap_triage/survey_units.mjs work/s1511/out.json
 M11_INSTR_K12=1 bash m11_build.sh                              # 計測 probe 入り
 ```
+
+### #1670 [M11-N114] _CopyArray kind 12 (416720) の到達経路と K12 probe の副作用切り分け (#1511 の残り)
+
+測定 commit `5ff58a9e` (コード変更の最後の commit。起点 `7e665077` = main)。4 vCPU・load 0.53〜0.99 (各 build/survey の前後で `uptime` 記録)。素材 `fl-win64` (`$RUNNER_TEMP/fl-win64`) と `work-m11` を展開し、`m11_gen_ir2.sh` (51 s・rc 0・ldfix applied) → `m11_build.sh` (25 s)。survey は各 13 s。
+
+**変更点**: `m11_build.sh` に `M11_TRACE_ISOLATE` (既定 1) を `-D` で渡し、stamp で `ov.o` を作り直す。`M11_TRACE_ISOLATE=0` で #495 の SP 退避を外した trace (ネガコン) を作れるようにした。既定値は従来と同一。
+
+| 構成 (`5ff58a9e`) | ok/miss/other/halt0/oob/abort/noproc | stderr 行 | `[K12HIT]` | `[CA_KIND]` |
+|---|---|---|---|---|
+| iso1 K12=0 (既定) | 870/47/1/7/16/0/1 | 70 | 0 | 0 |
+| iso0 K12=0 | 870/47/1/7/15/1/1 | 72 | 0 | 0 |
+| iso1 K12=1 | 872/47/1/7/14/0/1 | 86 | 0 | 16 (全件 kind=18) |
+| iso0 K12=1 | 872/47/1/7/14/0/1 | 86 | 0 | 16 (全件 kind=18) |
+
+既定構成の数値は REPORT 上の #1511 節 (870/47/1/7/16/1, 70 行) と一致。
+
+- **受入 2 (kind 12 の到達経路)**: **未特定**。全 4 構成で `[K12HIT]` は 0 件。`[CA_KIND]` は unit 17/86/357/496 の計 16 回のみで全件 kind=18。IR 上の `function_416db0` 呼出し元は 12 箇所 (`boot_final.ll` を `grep` で確認) だが、どの呼出しが kind 12 を渡すかは未確認 (呼出し元ごとの kind を確かめる probe は未実施)。boot 段階 (unit -1) の `[CA_KIND]` は 0 件。
+- **受入 3 (probe の副作用)**: unit 304 と 555 は K12=1 で oob→ok に変わる (iso1 でも iso0 でも同じ)。isolation の有無は差を作らない (iso0 K12=1 = iso1 K12=1)。ただし 304 と 555 では `[CA_KIND]`・`[K12HIT]` が一度も出ていない (`_CopyArray` を呼ばない unit)。よって出力の汚染 (#495) では説明できず、probe 入り build の機械語差が原因と推定 (推定。未切り分け)。
+- **trace isolation の効果 (ネガコン)**: `M11_TRACE_ISOLATE=0` で unit 555 だけが oob→abort (`unresolved function call: function_535c2e`)。unit 304 は変わらない。isolation は既定 build では 555 の結果を変えている。
+- 注: 旧版の bug を修正した。最初の試行で `M11_TRACE_ISOLATE` を `-D` に渡さず `ov.o` が再ビルドされない状態があったため、その試行の数値 (iso0 の wasm が同一に見えた件) は捨て、上表は全構成を build し直した結果。
+
+stderr 件数は `SV_ERR_LOG` 出力の行数 (`wc -l`)。
+
+**再現**:
+```
+cd tools/m11
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin
+bash m11_gen_ir2.sh
+M11_TRACE_ISOLATE=0 M11_INSTR_K12=1 bash m11_build.sh     # 構成は変数で切替 (既定 1 / 0)
+SV_ERR_LOG=work/s1670/err.txt node trap_triage/survey_units.mjs work/s1670/out.json
+```
+
+**鮮度**: `git diff 5ff58a9e HEAD -- tools/m11` は 0 行 (本節の追加のみ)。
