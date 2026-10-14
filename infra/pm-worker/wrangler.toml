@@ -12,8 +12,9 @@ workers_dev = true
 [vars]
 REPO = "signature-studio/signature-studio-dev"
 ORG = "signature-studio"
-# 暫定: live の最初の 1 時間は 50 で様子を見る (80 に戻す PR は別)。
-TARGET = "50"
+# 同時に走らせる opencode.yaml の run の総数の目標 (実装・review・fix・oc-pm・watchdog の全て。数え方は src/active.ts)。
+# 同時実行の上限 60 (Team プラン) から 2 を残す (oc-pm・watchdog と、投稿直後でまだ run が現れていない分の余裕)。
+TARGET = "58"
 BATCH = "25"
 BOT_LOGIN = "opencode-for-signature-studio[bot]"
 PM_LOGINS = "pycabbage"
@@ -22,7 +23,7 @@ LIVE_DISPATCH = "1"
 # 暫定: oc:no-pr の再着手の間隔 (時間)。既定は 3。理由別の再着手 (#2334) が入るまで、理由を見ない再投入を抑える。
 NO_PR_COOLDOWN_H = "24"
 # コメントの全体同期は新しい順に 24 時間分を読む。窓内の件数は実測で既定の上限 (80 ページ = 8,000 件) を超える
-# (tools/pm/REPORT.md §10) ので、そのままだと全体同期のたびに打ち切りになる。余裕を見て 150 ページ (15,000 件) にする。
+# (tools/pm/REPORT_APPENDIX_2380.md) ので、そのままだと全体同期のたびに打ち切りになる。余裕を見て 150 ページ (15,000 件) にする。
 COMMENT_MAX_PAGES = "150"
 
 # この table が無いと wrangler deploy は Workers Logs を無効にする (#2585)。消さない。

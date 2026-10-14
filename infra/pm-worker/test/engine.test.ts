@@ -45,7 +45,7 @@ test("launch (LIVE): room = TARGET - active、BATCH で絞り、固定テンプ�
     env: { TARGET: "5", BATCH: "2" },
     handlers: [(c) => (/\/issues\/\d+\/comments$/.test(c.url) && c.method === "POST" ? j({ html_url: "x" }, 201) : undefined)],
   });
-  // 稼働 run 2 件 (issue_comment と pull_request_review は数える。pull_request は数えない)
+  // 稼働 run 3 件 (opencode.yaml の run は event を問わず全て数える。pull_request = review も数える)
   await send(ctx.app, "workflow_run", runPayload(1, "in_progress", { event: "issue_comment" }));
   await send(ctx.app, "workflow_run", runPayload(2, "queued", { event: "pull_request_review" }));
   await send(ctx.app, "workflow_run", runPayload(3, "in_progress", { event: "pull_request" }));
@@ -53,8 +53,8 @@ test("launch (LIVE): room = TARGET - active、BATCH で絞り、固定テンプ�
   await markFresh(ctx);
   const gh = await (ctx.app.engine as any).d.gh();
   const plan = await ctx.app.engine.launch(gh);
-  assert.equal(plan.active, 2);
-  assert.equal(plan.room, 3);
+  assert.equal(plan.active, 3);
+  assert.equal(plan.room, 2);
   const cs = comments(ctx.m.calls);
   assert.equal(cs.length, 2, "BATCH=2");
   assert.deepEqual(cs.map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["21", "22"]);
@@ -219,6 +219,123 @@ test("launch: pm-apply と oc:no-pr の issue は、停止報告 (stopped) に�
   assert.deepEqual(p.rows.stopped, [], "停止報告のままにしない");
   assert.deepEqual(p.rows.user, [[66, "pm-apply"]]);
   assert.deepEqual(p.picks.map((x) => x.n), []);
+});
+
+// artifact の再投入 (#2334 の規則。素材名は run-outcome で上書きされない直前の報告 botReport から読む)。cooldown (3 時間) を過ぎてから再投入する。
+const HOUR = 3_600_000;
+const atT0 = (ms: number) => new Date(T0 + ms).toISOString();
+const PM_APP = "oc-pm-for-signature-studio[bot]";
+// run-outcome.sh の文面と同じ形 (素材名は含まない。artifact=素材不足 の語だけ含む)。
+const outcomeBody = (run: number, reason = "artifact") =>
+  `<!-- oc-run-outcome: no-pr reason=${reason} run=${run} -->\n[run-outcome] この run は PR も push も出さずに終了しました。理由の分類: artifact (stop=判断待ち・停止, split=1 run に収まらない, blocked=依存, artifact=素材不足, unknown=不明)。`;
+// 凡例 (『素材不足』の語) を外した run-outcome。停止判定が run-outcome の本文に依らないことを見る。
+const plainOutcomeBody = (run: number) => `<!-- oc-run-outcome: no-pr reason=artifact run=${run} -->\n[run-outcome] この run は PR も push も出さずに終了しました。`;
+const postsTo = (calls: Call[], n: number) => comments(calls).filter((c) => c.url.includes(`/issues/${n}/`));
+const pickArt = (p: { picks: Array<{ n: number; art: string }> }, n: number) => p.picks.find((x) => x.n === n)?.art;
+const noPrNeeds = (ctx: Awaited<ReturnType<typeof configuredApp>>) => (ctx.app.engine.status() as any).no_pr_needs_pm;
+
+test("artifact の再投入 (f・ネガコン): 停止報告の素材が前回の oc_artifacts と同じなら再投入しない。run-outcome の後も報告を読み、増えなければ止まる", async () => {
+  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 70, { labels: ["oc:no-pr"] });
+  await send(ctx.app, "issue_comment", commentPayload(70, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(70, BOT, "停止します。素材不足: toolchain-emsdk が無い", atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(70, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.relaunch, []);
+  assert.equal(pickArt(p, 70), undefined, "前回の oc_artifacts と同じ素材だけ → 再投入しない");
+  assert.deepEqual(p.rows.stopped.map(([n]) => n), [70]);
+  assert.equal(noPrNeeds(ctx), 1);
+  const gh = await (ctx.app.engine as any).d.gh();
+  await ctx.app.engine.launch(gh);
+  assert.equal(postsTo(ctx.m.calls, 70).length, 0);
+});
+
+test("artifact の再投入 (g): 新しい素材を挙げた停止報告で 1 回だけ再投入し、同じ素材の報告が続けば 2 回目は再投入しない", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 71, { labels: ["oc:no-pr"] });
+  const report = "停止します。素材不足: plugins-serum2 が無い";
+  await send(ctx.app, "issue_comment", commentPayload(71, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(71, BOT, report, atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(71, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  // 1 回目: 報告の新しい素材 (plugins-serum2) を足して再投入。run-outcome が botLast を上書きしていても報告を読める。
+  const p1 = ctx.app.engine.plan();
+  assert.equal(pickArt(p1, 71), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2");
+  await ctx.app.engine.launch(gh);
+  const first = postsTo(ctx.m.calls, 71);
+  assert.equal(first.length, 1);
+  assert.match(first[0].body.body, /^\/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2\n/);
+  // 投稿は PM App のコメントとして webhook で戻る (pmArt が更新される)。その後、同じ素材の報告が続く。
+  await send(ctx.app, "issue_comment", commentPayload(71, PM_APP, first[0].body.body, atT0(0)));
+  await send(ctx.app, "issue_comment", commentPayload(71, BOT, report, atT0(5 * 60_000)));
+  await send(ctx.app, "issue_comment", commentPayload(71, BOT, outcomeBody(2), atT0(5 * 60_000 + 1000)));
+  clock.t += 4 * HOUR;
+  await markFresh(ctx);
+  const p2 = ctx.app.engine.plan();
+  assert.ok(!p2.picks.some((x) => x.n === 71), "2 回目は再投入しない");
+  assert.deepEqual(p2.rows.stopped.map(([n]) => n), [71]);
+  assert.equal(noPrNeeds(ctx), 1);
+  await ctx.app.engine.launch(gh);
+  assert.equal(postsTo(ctx.m.calls, 71).length, 1);
+});
+
+test("artifact の再投入: 保存値に botReport が無い (古い保存値) issue は報告の素材を読めず、新しい素材なし として止まる", async () => {
+  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 72, { labels: ["oc:no-pr"] });
+  await send(ctx.app, "issue_comment", commentPayload(72, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(72, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(72, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  await markFresh(ctx);
+  ctx.app.engine.s = { ...ctx.app.engine.s, botReport: {} };
+  const p = ctx.app.engine.plan();
+  assert.equal(pickArt(p, 72), undefined);
+  assert.deepEqual(p.rows.stopped.map(([n]) => n), [72]);
+  assert.equal(noPrNeeds(ctx), 1);
+});
+
+test("artifact の再投入 (ネガコン): 最後の run-outcome が split・stop・blocked・unknown なら、報告に新しい素材があっても cooldown の後も素材を足さない", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  const cases: Array<[number, string]> = [[80, "split"], [81, "stop"], [82, "blocked"], [83, "unknown"]];
+  for (const [n, reason] of cases) {
+    await seed(ctx, n, { labels: ["oc:no-pr"] });
+    await send(ctx.app, "issue_comment", commentPayload(n, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
+    await send(ctx.app, "issue_comment", commentPayload(n, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR)));
+    await send(ctx.app, "issue_comment", commentPayload(n, BOT, outcomeBody(1, reason), atT0(-4 * HOUR + 1000)));
+  }
+  clock.t += 4 * HOUR;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.relaunch, []);
+  assert.equal(noPrNeeds(ctx), 0, "artifact 以外の reason は no_pr_needs_pm に数えない");
+  // cooldown の後は一般の経路 (base の素材のまま) に回るが、報告の新しい素材は足さない。
+  for (const x of p.picks.filter((x) => cases.some(([n]) => n === x.n))) assert.ok(!x.art.includes("plugins-serum2"), `#${x.n}`);
+});
+
+test("artifact の再投入: 凡例 (『素材不足』の語) を外した run-outcome でも、報告が停止報告なら 1 回再投入する", async () => {
+  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 84, { labels: ["oc:no-pr"] });
+  await send(ctx.app, "issue_comment", commentPayload(84, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(84, BOT, "停止します。plugins-serum2 が無いため着手できません", atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(84, BOT, plainOutcomeBody(1), atT0(-4 * HOUR + 1000)));
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.equal(pickArt(p, 84), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2");
+});
+
+test("artifact の再投入: 報告が停止報告 (STOP_RE) でなければ、素材が挙がっていても再投入しない", async () => {
+  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 85, { labels: ["oc:no-pr"] });
+  await send(ctx.app, "issue_comment", commentPayload(85, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(85, BOT, "作業は続けます。plugins-serum2 が無い", atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(85, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.relaunch, []);
+  assert.equal(pickArt(p, 85), undefined);
 });
 
 test("launch: 状態が古い (reconcile が 15 分以上止まっている) 間は投稿しない", async () => {

@@ -1,0 +1,2 @@
+  %6 = call ptr @GetProcAddress(ptr %5, ptr %arg2)
+  %0 = call ptr @GetModuleHandleW(ptr getelementptr inbounds ([13 x i16], ptr inttoptr (i64 360204 to ptr), i64 0, i64 0))
