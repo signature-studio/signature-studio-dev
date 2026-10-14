@@ -13,7 +13,7 @@
   **`f_653f40` (VCL フォーム登録ルーチン) が早期 return して
   fill コールバック `0x15F34A0` が未設定** であることを 5 段の逆引きで実証 (付録 §B 3-5)。
 - ラウンドごとの詳細 (FLE-2〜FLE-5 の成果・修正 3 件・FLE-4/5 の逆引き 5 段) は `REPORT_APPENDIX.md` §A・§B。**FLE-12 (#3090)**: unit 209 直後の `0x6a7b70` の呼出元は `0x6c7923` ← `0x815920` (`f_815050`)、幅 r8 = 矩形の幅 = 2^20 (即値 `0x4130000000000000` 由来の推定)、修復は未了 (`REPORT_APPENDIX_3090.md`)。
-- **FLE-9 (§9, #2700) の結果**: lift → 8 shard clang (cap 内・計 89 s) → link (mismatch/undefined/dup 0) → boot まで到達。units_run は shim 有・ネガコンとも 209 のまま (停止点: `MessageBoxA` → `exit(0)`)。shim 有の IPP 判定は NG (#2702 が追う)。
+- **FLE-9 (§9, #2700) の結果**: lift → 8 shard clang (cap 内・計 89 s) → link (mismatch/undefined/dup 0) → boot まで到達。units_run は shim 有・ネガコンとも 209 のまま (停止点: `MessageBoxA` → `exit(0)`)。shim 有の IPP 判定は NG (終了時の 0x15F34A0 は 0。FLE-10 (§10, #2702): shim 有でも units は前進せず 209)。
 
 
 ## 1. 成果物 (tools/flelift/boot/)
@@ -221,30 +221,29 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | unit 209 の後の `MessageBoxA` → `exit(0)` の原因 | 次の blocker (最初のウィンドウ未達) | 既存 #2702 (同上) |
 | 既定経路 (root 0x6a7b70 無し) の boot 未測定 | 209 据え置きの確認が未了 | 既存 #2702 作業 1 |
 
-## 10. FLE-6: dsp_ippv2 shim と 0x6a7b70 root (#672, PR #681)
+## 10. FLE-10 (#2702): dsp_ippv2 shim では units が前進しない (測定 commit `4869ad16`)
 
-- **真因 (#672 の 08:07 UTC 実測コメントが出典)**: `0x15F34A0` = `ippsZero_8u`。`LoadLibraryW("dsp_ippv2_x64.dll")` の失敗 → `f_653f40` の early return → 登録されず 0。`f_414ec0` (UStrCopy) の out=0 は VCL リーダの誤りではなく、この連鎖の結果。**FLE-5 の「VCL リーダ起因」は誤認**。lift 欠陥ではなく host shim の欠落。
-- **shim** (`fle_boot.c`): `shimx_set_load_hook` で dsp_ippv2 を擬似 HMODULE 登録、`imp_GetProcAddress` が名前ごとのトークンを返す。`ippsZero_8u` のみ実装、他は `R[0]=0` の fail-soft + 呼出計数。`LoadLibrary` hook は `#if !FLEBOOT_NOSX` 内のため **nosx variant では dsp_ippv2 は解決されない (意図どおり)**。
-- **DEFECTS.md 照合**: 該当なし。D15 (メモリ間接 call の空ブロック) とは別事象。lift 欠陥ではないことを #672 で実測済み。
-- **fail-soft の silent miscompile 面**: `ipp_call` は `ippsZero_8u` 以外の全 IPP で何もせず `R[0]=0` を返す。IppStatus 系は ippStsNoErr のまま出力を埋めず、`ippMalloc` (0x15F33C0) は NULL 相当。units_run の前進がこの stub 由来の可能性がある。**呼ばれた IPP 名と回数の全一覧は実測未了 (起票依頼 ①)**。
-- **0x6a7b70 root**: `boot_roots.json` からは**除外したまま** (blocklist と REPORT §0/§5/§7 の不変条件を維持)。`fle6_measure.sh` だけが `FLE_EXTRA_ROOTS=0x6a7b70` で一時的に root 化する。survey 非破裂は未確認 (起票依頼 ②)。
-- **summary への証跡** (`fle_boot.mjs`): `ipp.ptr_15F34A0` / `ipp.ptr_15F40E8` / `ipp.total` / `ipp.called` を JSON と `FLEBOOT_RESULT` に出す。`FLEBOOT_IPP_CHECK` 行で判定 (shim 有: 0x15F34A0 ≠ 0 / `FLE_IPP=0`: = 0)、NG は exit 3。`fle6_measure.sh` の `run_boot` は `fle_boot.mjs` の rc を `rc` に捕まえて伝播し、判定行・JSON が無ければ exit 4 で止まる (`grep 'FLEBOOT_RESULT' ... || true` は表示用で判定には使わない)。
-- `dbg_probe.mjs` は main にも本 PR の head にも存在しないため、本 PR では扱わない (観測は `fle_boot.mjs` の summary に統合する方針)。
+- **既知類型との関係: 該当なし** (DEFECTS.md D1a〜D23 を照合。IPP stub の fail-soft は類型に無い)。ただし既定経路では下記の no-op (`ippsZero_8u` 未適用) があり、#2702 が懸念した silent miscompile の一種。DEFECTS.md の類型 ID は付与していない (類型への追記の要否は #3060 の検証後に判断)。FLE-6 (#672) の旧 §10 全文は `REPORT_APPENDIX_2702.md` §E。
+- **結論**: shim 有 (`FLE_IPP=1`) も `FLE_IPP=2` も units_run は **209** (ネガコンと同じ)。boot 209 までに呼ばれた IPP は `ippsZero_8u` の 2 回だけで、他は 0 件。fail-soft 依存の前進は**観測されない** (前進 0 unit)。
+- **既定経路** (root 無し・`FLE_IPP` 未指定): units 209 / GetMem 1,890 / FreeMem 776 / 関数 29,907 で REPORT §2 FLE-5 列と**一致** (差 0)。停止は `unlifted 0x6a7b70`。
+- **既定経路の no-op (`ippsZero_8u` 未適用)**: 既定経路では呼出点 0x67264b の `call` が `dispatch(0)` (icall-miss) となり、`ret 0` で戻る (ログ `[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x67264d)`)。`ippsZero_8u` は実行されず、ゼロ埋めは未適用 (出力の内容は未確認)。`ipp.called` が空なのは IPP 関数に到達していないため。shim 有では同じ呼出点の target が `ippsZero_8u` (非 0) になる。units 209 と GetMem/FreeMem が FLE-5 列と一致するのは、この no-op の後も boot が進むためで、出力の一致を示すものではない。
+- **停止点** (root 有の全 variant): unit 209 の後の `MessageBoxA` (text 空) → `ExitProcess(0)` (ret `0x412a12`)。最初のウィンドウは未達。次の blocker は #3060 [FLE-11]。
 
-| 項目 | 状態 |
-|---|---|
-| lift/clang/link/boot の到達 | **到達 (FLE-9・§9-1)**。boot は unit 209 で停止 (`MessageBoxA` → `exit(0)`)。最初のウィンドウは未達 |
-| shim 有 / ネガコン (`0x15F34A0` 判定) | **取得 (§9-1)**: shim 有は NG (`ptr_15F34A0=0x0`)、ネガコンは OK |
-| units_run の前進・次の停止点 | **209 のまま** (shim 有・ネガコン同値、§9-2)。前 run の値 (209) は #672 08:07 コメントに残るが、本 PR では比較していない |
-| `ipp.called` 全件・`stopped_at` | shim 有: `ippsZero_8u` ×2 のみ・`stopped_at`=209 (両方) |
-| survey 再実測 (0x6a7b70 root の非破裂確認) | **未取得 (#918)**。0x6a7b70 の恒久 root 化は採用しない (PM 判断 4/14 のまま) |
-| 既定経路 (`FLE_IPP` 未指定) の非変化 | **未測定**。「209 据え置き」とは書かない |
+| route (lift closure 2) | units | GetMem / FreeMem | ipp.called (名 × 回数) | 停止 |
+|---|--:|--:|---|---|
+| shim `FLE_IPP=1` (root 有) | 209 | 2,314 / 1,199 | ippsZero_8u × 2 (初回 ret 0x67264d) | exit(0) @0x412a12 |
+| ネガコン `FLE_IPP=0` (root 有) | 209 | 1,891 / 776 | なし | exit(0) @0x412a12 |
+| mode 2 `FLE_IPP=2` (root 有) | 209 | 2,314 / 1,199 | ippsZero_8u × 2 | 非 ippsZero の IPP 0 件 → exit(0) |
+| 既定 (root 無し・未指定) | 209 | 1,890 / 776 | なし (0x67264b が dispatch(0) = icall-miss で ret 0・`ippsZero_8u` 未適用) | unlifted 0x6a7b70 |
 
-起票依頼: ① IPP fail-soft の呼出名一覧と silent miscompile 検査 ② survey 再実測と 0x6a7b70 root 化の可否判断 (PM 判断) ③ `bash tools/flelift/boot/fle6_measure.sh` を emsdk 込みの runner で再採取 (素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`)。
-`boot_e2e.sh` / `build.sh` / `iterate_roots.sh` の `[EMSDK]` 直書きは既存の書式で、本 PR の範囲外 (起票依頼 ④)。
+- **機構** (実測): `fle_lifted_s5.c` の `/* 672644 */ mov rax,[0x15e0a48]` の次が `/* 67264b */ call qword ptr [rax]` (`FF 10`・2 byte)。PE の逆アセンブルでも同じ。push される戻り番地は 0x67264d (summary の `ipp.called` の ret はこの値)。呼出時の target は shim 有で `ippsZero_8u` (非 0)、既定経路で 0 (`dispatch(0)`)。終了時の `[0x15e0a48]` は shim 有で 0、既定経路で 0x15F34A0 で、呼出時の値とは一致しない。shim 有で登録が呼出時には効いていたが終了前に 0 へ戻る経路は**推定** (書換え元は未特定)。よって `FLEBOOT_IPP_CHECK` (終了時の 0x15F34A0 を見る) の NG は呼出しの不発を示さない。
+- shim 有と negctl の差: `getproc` 511 / 88、GetMem・FreeMem もともに +423。units は同じだが実行経路は同一ではない (+423 の内訳は未確認)。mode 2 (`FLE_IPP=2`) の停止経路 (`g_ipp_stop`) は未発火 (`ipp_stop`=null・発火の確認は未実施)。「非 ippsZero の呼出し 0 件」は `ipp.total` の計数 (停止判定より前) から有効。
 
-### 10.x 実測の試行
+測定は route ごと n=1 (変動の min–max は未測定)。測定 commit `4869ad16` (`fle_boot.mjs` の L101 コメントの訂正のみ。コードを変えた最後の commit)。経緯: `56e515e1` → main 取り込み merge `a0f659bf` (`fle_boot.mjs` に PY-123 の `undo_probe` 出力が入り、結果 JSON に `undo_probe` 項目が増えた。units・GetMem/FreeMem・停止点は不変) → `6b62f031` (REPORT と結果 JSON の再採取) → `4869ad16` (呼出点の訂正)。`4869ad16` で再測定した結果 JSON は `6b62f031` の版とバイト一致。コード差分 `git diff 4869ad16 HEAD -- tools/flelift/x64c.py tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` は空 (差分 0)。工程秒・RSS・再現コマンドは `REPORT_APPENDIX_2702.md` §A・§B。
 
-- 結論 (fix run 2026-10-13): **この PR では lift が runner の上限内で完走しない** (cap 13800MB で実測 4 が kill)。clang・boot・ネガコン・`FLEBOOT_IPP_CHECK` は未到達で、分割 lift は #918 (FLE-7)。実測 1〜4 の詳細と経緯は `REPORT_APPENDIX.md` §C。
-- **実測 4 (PM 指示の 1 回採取, 16:43 UTC 開始, head は本 commit)**: `rss_cap.py --cap-mb 13800` で `x64c.py --closure 1` (`FLE_EXTRA_ROOTS=0x6a7b70`)。**126 s・ピーク RSS 13832MB で kill (rc=143)**。closure 2 は再採取せず、実測 3 の時間切れを残す。
-- 既定経路: shim は既定で無効 (`55acfb6d`)。`FLE_IPP=1` のときだけ有効。boot 未到達のため、既定経路の数値 (209 据え置き等) が変わるかは未測定。
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 209 後の `MessageBoxA` (text 空) の text 源と呼出元 | 最初のウィンドウ未達 (次の blocker) | #3060 [FLE-11] |
+| 呼出時の `[0x15e0a48]`・`0x15F34A0` と、終了前に 0 へ戻す書込み元 | ippsZero 登録経路の確定。IPP_CHECK の観測点 | #3060 (受入条件に追加) |
+| 既定経路で `ippsZero_8u` の呼出点 0x67264b の target が 0 (icall-miss) になる経路。出力のゼロ埋めが未適用 | 既定経路 (`FLE_IPP` 未指定) の出力内容 (silent miscompile の疑い) | #3060 (受入条件に追加) |
+| 既定経路の survey 再実測・0x6a7b70 root 化の可否 | 0x6a7b70 を恒久 root にするかの判断 | #918 (親・PM 判断) |
