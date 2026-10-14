@@ -777,6 +777,11 @@
        "name": "index",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": "-1"
       }
      ],
      "returns": "None"

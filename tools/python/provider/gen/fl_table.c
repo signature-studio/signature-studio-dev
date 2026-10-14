@@ -469,7 +469,7 @@ const fl_desc fl_table[] = {
     /* 28*/ {"playlist", "liveTimeToBlockNum", 'i', 1, 1, "i", h_playlist_liveTimeToBlockNum},
     /* 29*/ {"playlist", "lockDisplayZone", 'n', 2, 2, "ii", h_playlist_lockDisplayZone},
     /* 30*/ {"playlist", "muteTrack", 'n', 2, 1, "ii", h_playlist_muteTrack},
-    /* 31*/ {"playlist", "muteTrackLock", 'n', 1, 1, "i", h_playlist_muteTrackLock},
+    /* 31*/ {"playlist", "muteTrackLock", 'n', 2, 1, "ii", h_playlist_muteTrackLock},
     /* 32*/ {"playlist", "refreshLiveClips", 'n', 0, 0, "", h_playlist_refreshLiveClips},
     /* 33*/ {"playlist", "scrollTo", 'n', 4, 4, "iiii", h_playlist_scrollTo},
     /* 34*/ {"playlist", "selectAll", 'n', 0, 0, "", h_playlist_selectAll},
