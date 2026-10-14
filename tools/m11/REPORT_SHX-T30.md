@@ -4,7 +4,7 @@
 
 - `function_8c5eb0` の `unreachable` は RetDec の誤変換ではない。**D19 修復 pass `tools/m11/guard699/m11_guard699.py` が挿入した fail-fast ブロック `dec_label_pc_8c5ef5_g699_t` (`call void @llvm.trap()` + `unreachable`)** である。function_8c5eb0 の IR にある `unreachable` はこの 1 箇所だけ。
 - trap に至る分岐は次の 2 条件の連言: **件数 `i32 [X+0x14]` ≤ 0** (`icmp sle`) かつ **`arg2` の下位 byte ≠ 0**。
-- 機械語では同じ経路は正常に進む。件数 ≤ 0 で本体を飛ばした後、`arg2` 下位 byte ≠ 0 なら、`arg3` ≠ 0 のとき先に `8c6071`〜`8c607f` で `call 0x8ca670(arg3, obj)` を呼び、続けて `8c608d` で `call 0x410360` を呼んでその戻り値を `[rbp+0x80]` に格納し、`8c60df` で返す (§4)。`_t` の fail-fast はこの正常経路を止めている。`m11_guard699.py` の「8c608d の rdx は未確定」という理由は、機械語の 8c608d〜8c60a0 が rdx を使わないため成り立たない。
+- 機械語では同じ経路は正常に進む。件数 ≤ 0 で本体を飛ばした後、`arg2` 下位 byte ≠ 0 なら、`arg3` ≠ 0 のとき先に `8c6071`〜`8c607f` で `call 0x8ca670(arg3, obj)` を呼び、続けて `8c608d` で `call 0x410360` を呼んでその戻り値を `[rbp+0x80]` に格納し、`8c60df` で返す (§4)。`_t` の fail-fast はこの正常経路を止めている。`m11_guard699.py` の「8c608d の rdx は未確定」という理由は成り立たない。機械語は 8c608d〜8c6094 で呼出し側が rdx を設定せず、`410360` は rdx を読まずに vtable 先へ渡す (§4)。
 - D19・D22・D23 のいずれとも違う。件数 0 のガードは IR に正しく復元されている (§6)。よって新類型 **D24** (修復 pass の fail-fast が正常経路を止める) として `docs/DEFECTS.md` に記録する。
 - 試験 (work 内の IR を直接パッチし、commit していない): `_t` を「`call 410360(obj)` → その戻り値を返す」に置換すると、同じ locale0 対照で unit 57 を越え、`units_run` 53 → 110・`dllmain_done=true` になる (§7)。この置換が正しいのは arg3 == 0 の呼出し経路だけで、arg3 ≠ 0 では `call 8ca670(arg3, obj)` を先に行う必要がある (§4・§7)。修復の適用と以後の実測は親 #2446 の受入 3 に移す。
 - 未確定: 件数が 0 になる上流 (`function_8c67a0(obj)` の先で list に項目が積まれない理由) は特定していない (§5・§9)。
@@ -58,20 +58,20 @@ dec_label_pc_8c5ef5_g699:
 | `8c6066`〜`8c606f` | `cmp qword [rbp+0x90],0`・`je 0x8c6084` | arg3 == 0 |
 | `8c6071`〜`8c607f` | `mov rcx,[rbp+0x90]`・`mov rdx,[rbp+0x80]`・`call 0x8ca670` | arg3 ≠ 0 のときだけ実行。`8c6084` の前に `call 8ca670(arg3, obj)` (guard699 の `_e` 枝と同じ呼出し) |
 | `8c6084`〜`8c608b` | `cmp byte [rbp+0x88],0`・`je 0x8c60df` | `arg2` 下位 byte。0 なら `8c60df` へ |
-| `8c608d` | `mov rcx,[rbp+0x80]` | 引数は rcx のみ。**rdx は設定もされず使われもしない** |
+| `8c608d` | `mov rcx,[rbp+0x80]` | 引数は rcx のみ。**呼出し側は rdx を設定しない** (`410360` は rdx を読まず、`call [rbx-0x50]` で vtable 先へそのまま渡す) |
 | `8c6094` | `call 0x410360` | 直接 call (vtable ではない) |
 | `8c6099` | `mov [rbp+0x80],rax` | 戻り値を obj スロットへ |
 | `8c60a0` | `jmp 0x8c60df` | |
 | `8c60df` | `mov rax,[rbp+0x80]`・`ret` | 戻り値 = 410360 の戻り値 |
 
 - 件数 ≤ 0 かつ `arg2` 下位 byte ≠ 0 の機械語の挙動は、arg3 == 0 のとき「`410360(obj)` を呼び、その戻り値を返す」、arg3 ≠ 0 のとき「先に `8ca670(arg3, obj)` を呼び、続けて同じ `410360(obj)` の呼出しと返却」。IR の `_t` (trap) はどちらとも違う。`_t` の修復は arg3 で分ける必要がある。
-- 直接 `call 0x8c5eb0` の呼出し元は 111 件 (`E8` rel32 の全走査で確定)。直前 14 命令の窓で `dl` と `r8` (arg3) を判定した**推定値** (近似。窓の外で設定された値は見ていない): `dl` ≠ 0 (trap に入りうる経路。件数 ≤ 0 は別に必要) が 99 件、そのうち `r8` の窓内の最後の書込みが定数 0 と判定できたのは 46 件、定数 0 でない (例: `8d045f` は `mov r8, rsi`) のは 53 件。`dl` = 0 は 12 件。`8d03f7`〜`8d03fc` (`mov dl,1`・`xor r8,r8`・`call`) は arg3 == 0 の例。arg3 ≠ 0 の trap 経路の呼出しは実在するため、`_t` の修復は arg3 の分岐を含める。件数の正確な集計は修復の実装時に行う。
+- 直接 `call 0x8c5eb0` の呼出し元は 111 件 (`E8` rel32 の全走査)。**窓の定義**: `.pdata` の関数先頭から整列逆アセンブルした列で、呼出し命令の直前 14 命令。窓の中で `dl` (`rdx`) と `r8` を明示的に書く最後の命令で判定する (`mov dl, imm` の imm ≠ 0 を dl≠0、`xor edx,edx` を dl=0、`xor r8,r8`・`mov r8, 0` を r8 の定数 0)。窓の外で設定された値は見ていない。結果: dl≠0 が 99 件 (うち r8 が定数 0 が 46 件、定数 0 でない (例: `8d045f` は `mov r8, rsi`) が 53 件)、dl=0 (`xor edx,edx`) が 12 件。定数 0 でない 53 件は arg3 ≠ 0 の経路になりうるが、実行時の値は未確認。`8d03f7`〜`8d03fc` (`mov dl,1`・`xor r8,r8`・`call`) は arg3 == 0 の例。`_t` の修復は arg3 の分岐を含める。件数の正確な集計は修復の実装時に行う。
 - `m11_guard699.py` の docstring の「8c608d の rdx は未確定」と、`REPORT_699.md` §1 の注釈「機械語 8c608d は vtable 呼出し」は、逆アセンブルと一致しない。修復時に直す (§9)。
 - `function_8c5eb0` の IR で `unreachable` を含むのは `_t` だけ。`function_8c67a0`・`function_8c7c80`・`function_8c5c90`・`function_8c7450`・`function_410360` などの呼出し先にも `unreachable` は無い。`unreachable` の関数名の走査では、stale IR の 99 件から、新 IR で 100 件に増えたのは `function_8c5eb0` の 1 件 (`_t`) だけ。よって trap は `_t` で発生し、trap の発生は「件数 ≤ 0 かつ flag ≠ 0」の成立と同値。
 
 ## 5. 条件値の出所
 
-- **flag (`arg2` 下位 byte)**: 呼出し元 `function_56fde0` の IR (`boot_final3.ll` の 200789 行・200802 行) では `arg2 = (定数 & -256) | 1` で、下位 byte は定数 `1`、`arg3` は `i64 0`。機械語にも同型の呼出し `mov dl,1`・`xor r8,r8`・`call 0x8c5eb0` がある (`0x8d03f7`〜`0x8d03fc`)。ただし `56fde0` 本体の VA と IR の対応は未突合。この呼出しは arg3 == 0 の例で、他の呼出し元の arg3 は §4 のとおり一様ではない。
+- **flag (`arg2` 下位 byte)**: 呼出し元 `function_56fde0` の IR (`boot_final3.ll` の 200789 行・200802 行) では `arg2 = (定数 & -256) | 1` で、下位 byte は定数 `1`、`arg3` は `i64 0`。機械語 (`.pdata` の `56fde0`〜`5702bf`) では、epilogue `5702ba` の直前に `570291 mov dl,1`・`570293 xor r8,r8`・`570296 call 0x8c5eb0` があり、同様に `5702a9 mov dl,1`・`5702ab xor r8,r8`・`5702ae call 0x8c5eb0` がある。呼出しの個数 (2) と値 (dl の下位 byte = 1、arg3 = 0) は IR の記述と整合する。ただし IR の行番号と VA の 1 対 1 の対応は未突合 (`boot_final3.ll` は本 run に無い)。同型の例として `0x8d03f7`〜`0x8d03fc` (`.pdata` 上 `8d0380` 始まりの別関数) も arg3 == 0。他の呼出し元の arg3 は §4 のとおり一様ではない。
 - **件数 (`[X+0x14]`, i32)**: `X = function_8c67a0(obj)` = `function_8c7c80(function_8c5c90(), obj)`。機械語 `8c67a0`〜`8c67b3` は rdx に 0 を入れず、`8c5c90` の戻り値を rcx、`obj` を rdx にして `8c7c80` を呼ぶ。`8c5c90` (`8c5c94`〜`8c5cb3`) は引数を読まず、遅延初期化済みのグローバル `[rip+0xb49d1e]` を返す getter。`obj` は 56fde0 が渡す定数アドレス (LVA の `1469800` / `1470128`)。件数 ≤ 0 は trap の発生から確定する (§4)。**件数の正確な値と、どの処理で件数が 0 になるかは未測定**。GetLocaleInfoW の 0 返却との因果も確認していない。
 
 ## 6. D19 / D22 / D23 との切り分け
@@ -100,7 +100,7 @@ dec_label_pc_8c5ef5_g699_t:
 
 ## 8. 検証の鮮度
 
-- 測定 commit: `26f90ada`。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。差分の確認は `git diff 26f90ada HEAD -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行。HEAD の hash は PR 本文に書く)。
+- 測定 commit: `26f90ada`。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。検証 HEAD は `aef55706660507c66223286c12e0a222a8f5db69` (差し戻し round 2 の検証対象)。差分の確認は `git diff 26f90ada aef55706660507c66223286c12e0a222a8f5db69 -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T30.md'` (出力 0 行)。以後の commit は文言だけで、そのコード差分も 0 行。最終 HEAD の hash は PR 本文に書く。
 - コミット済み HEAD `acc12101` で、IR を元に戻したうえで `build.sh --trace --soft` と `t27_relink.sh` (`locale0`) を再実行し、§3 の baseline (`units_run=17`) と対照 (`units_run=53`・`threw=unreachable`・`total_calls=173`) が再現することを確認した。以後の commit は REPORT の文言だけを変えている。
 - `work-m11` の IR は stale。本 REPORT の IR は §2 の手順で作り直したもので、指紋の出自は未検証。
 
