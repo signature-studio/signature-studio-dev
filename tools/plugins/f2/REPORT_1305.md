@@ -174,3 +174,15 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
   - `0x407a5e` の `and rcx, [rax-8]` で `UC_ERR_READ_UNMAPPED` (rip=0x407a5e・rax=0)。直前の `0x407a20` は `[rbx+8]`・`[rdx+0x18]`・`[rax-8]` を読むアロケータ状の処理。
 - 判定: 受入 1 (`0x411a80` 到達) **未達**。受入 2 (`0x411bb8` 呼出し時の記録) と受入 3 (`-w` によるプログラム全体の書込み追跡) は受入 1 が前提のため未実施。waiver は変更しない。
 - 残件 (子 issue に移す): `0x407a20` が読むブロック構造 (`[rax-8]` のヘッダ形式、`[rbx]`・`[rbx+8]`・`[rdx+0x18]` の初期化) を PE 内の初期化コードから復元し、合成 host/obj に入れる。
+
+## 13. PLG-F3-26 (#2295): 0x407a20 の入力状態と呼出し経路 (測定 commit e53d845b、block19148)
+
+- 入力: `$RUNNER_TEMP/ex/extracted/block19148_PE.bin` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst extracted/block19148_PE.bin`、5,904,384 B)。依存: `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。
+- 再現 (e53d845b、逐次、load 0.28 → 0.33): `unicorn_trace.py $PE 0x83efb0 -H -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` = `UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0`、wall 1.68 s、RSS 227,384 KB。§12 と一致。
+- 0x407a20 の入口レジスタ (一時的な計測コピーで取得、リポジトリ外): `rbx=0x867100` (.data)・`rdx=0x9`・`rcx=0x48`・`r8=0x8bfa3c`・`esi` は `[0x4b7682 相当の rip 相対 byte]` の結果。`0x867100` の初期内容は `00 00 10 00 00 00 00 00` (qword 0 = `0x0000000000100000`)、以降 0。
+- 命令列 (0x407a43〜0x407a5e) の意味: `rdx=[rbx+8]` が 0 のとき `[rdx+0x18]` が読めず、後続 `and rcx,[rax-8]` が `rax=0` で `UC_ERR_READ_UNMAPPED`。`cmp rdx,rbx; je 0x407a74` は `[rbx+8]==rbx` で空を表す循環リスト。すなわち `0x867100` 付近の bin が**自己参照で初期化されていない**ことが直接の原因。
+- 計測 (リポジトリ外の一時コピー、`0x867100` の `[+8]`・`[+0x10]` に自己ポインタを置く): 1 段目の読出しは通過し、`0x407a94` の `mov qword [rax-8], rdx` (rax=0) で `UC_ERR_WRITE_UNMAPPED`。つまり自己参照だけでは不足で、**`[rax-8]` が指す有効なチャンクヘッダ** (ヒープ/アリーナ領域) が要る。`0x867100` だけの seed では受入 1 は達成しない。
+- 呼出し経路の探索 (`.text` 全走査、capstone): `0x407a20` への直接 `call` は **0 件**、同アドレスへの `jcc`/`jmp` は **0 件**。よって `0x407a20` は間接 (関数ポインタ・vtable・テーブル) 経由でのみ到達する。`0x867100` への rip 相対参照は `.text` 内に **0 件** (`scan.py`)。アリーナの初期化は別のレジスタ経由 (ベースポインタ) で行われる可能性が高い。
+- 判定: 受入 1 (`0x407a20` が読むブロック構造の復元) **未達**。原因と必要な入力は上記で確定したが、初期化経路 (間接呼出し元と、`0x867100` のアリーナを構築する関数) が未特定のため、ヘッダ形式を PE 内から復元できていない。受入 2〜4 は受入 1 が前提のため未実施。waiver は変更しない。
+- 未解決 (本 issue #2295 の残件、次 run で追跡): (1) `0x407a20` の間接呼出し元 (`.data`/`.rdata` の関数ポインタ・vtable から逆引き)、(2) `0x867100` を指すアリーナ構築関数 (レジスタベースの書込み追跡: unicorn `-w 0x867100:0x867200` で書込み元 rip を取る)、(3) `[rax-8]` のチャンクヘッダ形式 (`0x407a94`・`0x407b98` の `and rdi,[rsi-8]` の使用から逆算)。
+- 再現: 上記 unicorn コマンド。`scan.py` (rip 相対参照の走査、capstone) は §13 の本文に記載の手順で再現できる (リポジトリには置かない)。
