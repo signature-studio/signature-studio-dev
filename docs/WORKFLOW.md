@@ -165,7 +165,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `feat(kh): add DecompAt2 ghidra postScript`。
 - PR は `--base main` を基本 (repo の既定ブランチ = `main`)。body に `Closes #N`・受入条件・検証結果を書く。
 - **起動・GUI・ウィンドウに関わる PR は、本文に製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)、最初のウィンドウの有無) を書く。動かせなかったときは『動かしていない』と書く。** 起動・GUI に関わらない PR は KPI を書かなくてよい。
-- **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。
+- **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。定期 STATUS 同期の自動 PR (`docs(status): sync merged PRs`、`tools/pm/status_sync.py`) も例外 (`docs/STATUS.md` の status-auto 節の内側だけを変える PR に限る)。
 - **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
   10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
 
