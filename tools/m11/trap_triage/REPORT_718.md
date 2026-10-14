@@ -22,9 +22,9 @@
   | 修正前 (`BLK_RE` 旧版, `916d9932`) | 6969 | 25618 | 1423 | 7058 | 406 |
   | 修正後 (接尾辞対応, `e7f3062e`) | 6969 | 25618 | 1380 | 6868 | 288 |
   | 修正後 + back-edge 判定修正 (`028e40a0` 単独) | 6969 | 25618 | 1380 | 6868 | 208 |
-  | **現 HEAD (`e9bca3b6`)** | 6969 | 25618 | 1380 | 6868 | **288** |
+  | 最終版 (`e9bca3b6`, #1190 時の記録) | 6969 | 25618 | 1380 | 6868 | **288** |
 
-  測定 commit は `e9bca3b6` (コードを変えた最後の commit)。鮮度の証跡: `git diff e9bca3b6 HEAD -- tools/m11/guard699/` は 0 行。
+  表の最終行は `e9bca3b6` 時点の前版記録であり、本 run では再測定していない。`git diff e9bca3b6 HEAD -- tools/m11/guard699/` は 0 行。
   `028e40a0` 単独では strict が 208 になった。これは指摘 1 の修正で、頭ブロックを back-edge 候補から外したことによる回帰である
   (単一ブロックの自己ループ `104c711` 型の back-edge を取りこぼした。除去 80 件は全て、ループ先頭への入口が先頭より前のブロックと先頭自身の自己ループだけという形)。
   `e9bca3b6` で頭自身を候補に戻し、実 IR の strict 一覧は `e7f3062e` と集合一致 (除去 0・追加 0) になった。
@@ -51,9 +51,8 @@
 
 ## 4a. 件ごとの真偽判定 (#1187・部分達成)
 
-- 測定 commit: `e9bca3b6` (コードを変えた最後の commit)。本 PR は `tools/m11/trap_triage/` のみ変更し、`git diff e9bca3b6 HEAD -- tools/m11/guard699/` は 0 行。
-- 入力: `work-m11` の `tools/m11/work/boot_final.ll` (19,787,837 B, sha256 `69c774de…a43`)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
-- 再実行: `scan_guard.py` で strict 288・dropped 1380・dropped_target_not_label 6868 (jcc 25618・fn 6969)。§3 の現 HEAD 行と一致 (実行 3.4 秒)。
+- 注記: 本節の件数 (288) は前版の記録であり、本 run では再実行していない (入力 `boot_final.ll` (`work-m11`) が無いため)。§3 の表は前版の記録として扱う。
+- 再現に必要な入力: `work-m11` の `boot_final.ll` (19,787,837 B 記録)、`fl-win64` の `block00031_PE.bin`。
 - 判定規則 (件ごと・機械語と IR の突合):
   1. 機械語: 候補 jcc の直前の `cmp` 被演算子 (レジスタ/メモリ) と条件コード (`jg` 等) を取る。
   2. IR: 対応する loop_head 側の判定 (`icmp`) を SSA を遡って同じ値に結ぶ。
@@ -64,8 +63,8 @@
 
 ## 4b. 件ごとの判定の続き (#1498・保留)
 
-- 測定 commit: `e9bca3b6` (§3・§4a と同じ。コードを変えた最後の commit)。`git diff e9bca3b6 HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py` は 0 行 (`1e3ee7af` 以降も同じ)。
-- 入力: `boot_final.ll` (`work-m11`) はこの run に無く、`scan_guard.py` の再実行も `strict_evidence.py` の実行もしていない。したがって本節は件数の再現も、TSV の生成もしていない。§3 の 288 は前版の実測値 (`e9bca3b6`) として扱う。
+- 数値の出所: §4c と同じ (前版の記録。本 run では再測定していない)。`git diff 088d9eaf HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py` は 0 行。
+- 入力: `boot_final.ll` (`work-m11`) はこの run に無く、`scan_guard.py` の再実行も `strict_evidence.py` の実行もしていない。したがって本節は件数の再現も、TSV の生成もしていない。§3 の 288 は前版の記録として扱う。
 - 証拠表: `tools/m11/trap_triage/strict_evidence.py` は strict 候補ごとに機械語 (jcc 直前 2 命令) と IR (帰属ブロックの終端・loop_head の icmp 本数) を TSV に書くスクリプトで、判定はしない。TSV はコミットしない (`work/` 配下に生成する)。
 - 判定: 3 件 (`10039be`・`1003a66`・`1003b10`) とも**保留**。前版の「真陽性」判定 (IR の `dec_label_pc_*` を根拠にしたもの) は、IR を見ずに書かれていたため撤回する。
 - 偽陽性率: 未測定 (判定母数 0)。
@@ -90,6 +89,20 @@
 - 観察 (判定前の所見・確定ではない): 例えば `function_1017ca0` (データ行 5) は機械語の `cmp ebx, r13d` に対し IR の loop_head に入口 icmp が無く、末尾の `%46 = icmp eq (r13−1), 0` のカウンタ判定だけがある。ただし判定は別途 SSA を遡って行うまで保留。
 - 再現: `python3 tools/m11/guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json` → `python3 tools/m11/trap_triage/strict_evidence.py ... --out strict_evidence.tsv` → `python3 tools/m11/trap_triage/judge_dump.py <boot_final.ll> strict_evidence.tsv 4 98`。
 - 残り (未解決): データ行 4〜98 の 95 件の件ごとの判定。起票先: #1653 (本 issue、Refs)。
+
+## 4c. 証拠表の行 99〜193 (#1654・部分達成: 判定 0 件)
+
+- 数値の出所 (未確定): 本節の内訳 (jcc・IR 終端・icmp 本数・95 件) は本 run で再現していない。`strict_evidence.py` は `088d9eaf` で導入され、その後 `e4f16b6e` で変更されている。数値を出した版の commit は特定できないため、前版の記録として扱い、確定値にしない。`git diff 088d9eaf HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py` は 0 行 (`guard699/` と `ldmach.py` は不変)。
+- 入力: `work-m11` の `boot_final.ll` (本 run に無い)、`fl-win64` の `block00031_PE.bin`。
+- 再実行: 未実施 (本 run。`scan_guard.py`・`strict_evidence.py` とも走らせていない)。
+- 対象: データ行 99〜193 (ヘッダ除く 1 始まり) の 95 件。内訳は次のとおり。
+  - jcc: `jg` 94 件、`jle` 1 件 (`function_a97930`)。
+  - IR 側の帰属ブロック終端: 95 件すべて無条件 `br` (`br i1` 無し)。
+  - loop_head の icmp 本数: 0 件 11、1 件 39、2 件 40、3 件 2、5 件 1、6 件 2。
+- **判定件数 0 / 95・偽陽性件数 0 (判定未完)**。偽陽性率は未測定。
+- 判定方法 (件ごと。未実施): 機械語は jcc 直前の cmp/test の被演算子を取る。IR は loop_head の icmp の被演算子を SSA (`%<reg>.N.*`) まで遡り、機械語の被演算子と同じ値に結べるかを見る。レジスタ名の一致だけでは根拠にならない (IR は `reg2mem` の alloca 経由で値を運ぶため、名前の一致と値の同一性は一致しない)。
+- 試作した自動突合は、レジスタ名の一致だけで偽陽性にしてしまうためコミットしていない。
+- 残作業: 95 件の件ごと判定 (受入条件 1・2)。本 issue (#1654) の範囲として未解決のまま残す。
 
 ## 5. 再現
 

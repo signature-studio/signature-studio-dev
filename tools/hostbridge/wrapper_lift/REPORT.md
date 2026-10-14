@@ -191,11 +191,11 @@
 **採用方式 (暫定、受入条件 4)**: **x64c (Wrapper 経由) を採用候補とする**。両 block が生成・`emcc -c`・wasm link を通る。RetDec 分割 lift は、修復なしの `emcc -c` 通過が未計測 (旧値は撤回) で、修復 (undeclared helper・goto/label) が必要なため build 可否が出ない。
 ただし x64c の実行結果 (bit 一致) と CreatePlugInstance 到達 (#829) は未検証。よって「採用」は build 経路の判定であり、実行検証は残る。
 
-## 8. #1339: RetDec 分割 lift 出力 C の修復 (検証 HEAD: 本 PR の commit、2026-10-13 run)
+## 8. #1339: RetDec 分割 lift 出力 C の修復 (測定 commit: a10c1f60、2026-10-13 run)
 
-測定 commit: 本 PR の最後のコード commit。環境: `[RETDEC]` v5.0・`[EMSDK]` 6.0.12 (emcc)・clang 同梱、`fl-win64`、`work-*` 系は未使用。
+測定 commit: a10c1f60 (`DEF_RE` を直した commit。以降のコード変更は §10 の判定修正)。環境: `[RETDEC]` v5.0・`[EMSDK]` 6.0.12 (emcc)・clang 同梱、`fl-win64`、`work-*` 系は未使用。
 
-**判定の誤りの修正 (§5 の `no_definition` 93 件の原因)**: `DEF_RE` の `[^;=]*` が改行をまたぎ、前関数の閉じ `}` 直後のコメント行から次の定義行までを 1 つの一致に飲み込んでいた。その結果、定義行が見えず `no_definition` になっていた。`[^\n;=]*` / `[^\n;{}]*` に直して再計算すると、93 件のうち 89 件は定義あり。残り 4 件 (0x41c480・0x570b30 と block19091 の 0x86ab10 / 0x87cdf0、block23676 の 0x86a970 / 0x87cfc0) は RetDec 出力に定義が無い。`no_definition` の 4 件は §1 の decode 不能範囲とは重ならない。原因は未特定。`0x86ab10` / `0x86a970` は CreatePlugInstance。
+**判定の修正**: `DEF_RE` の `[^;=]*` が改行をまたぎ、定義行を見落としていた。`[^\n;=]*` / `[^\n;{}]*` に直した。残った `no_definition` 件数と原因は §10 を正本とする (本節の表は a10c1f60 時点の値)。
 
 **修復なしの emcc `-c` (関数単位・修正後 DEF_RE、`emcc_per_function.py`)**:
 
@@ -229,3 +229,13 @@
 
 - 結論: int/pointer 混在 (`-Wint-conversion`) は修復済み (block19091_0.c で 46 → 0、全 40 ファイルで修復後 0)。emcc exit 0 は 40 ファイル中 1 件のみで受入条件 3 は未達 (残りは goto/break 94 件と引数型不一致 1,245 件)。未達は子 issue #1679 (HB-H35)・#1680 (HB-H36) に分割。
 - 測定表・残り error の内訳 (合計 1,377)・受入条件の判定・再測定手順・未検証項目は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md` (§9 全文の分割移動) を参照。
+
+## 10. #1522: `no_definition` 残り 4 件の原因 (測定 commit: 05db246f)
+
+- 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。
+- 判定の取りこぼし (3 件): 旧 `DEF_RE` は `function_<VA>` 名だけを定義とみなした。RetDec は関数名を別名で出すことがあり、`0x41c480` は `__dbk_fcall_wrapper`、`0x86ab10` / `0x86a970` は `CreatePlugInstance`、`0x87cdf0` / `0x87cfc0` は `entry_point`。単独 range の RetDec 出力 (exit 0) で定義を確認。判定に `// Address range: 0x<VA> - ...` 直後の関数定義を追加して修正。
+- batch 固有の脱落 (1 件): `0x570b30` は batch (500 関数) 内の出力に定義もヘッダも無い。単独 range・2 件ペアでは `function_570b30` として出る。batch の RetDec 出力が範囲を落とす現象で、原因は未特定。
+- 再計測 (retdec_batch.py、判定修正後): block19091 は 19,816 中 19,815 ok・1 件 `no_definition` (0x570b30)、block23676 は 19,826 中 19,825 ok・1 件 (0x570b30)。RetDec 呼び出し 40 回、全 exit 0。所要 273.95 s / 274.23 s。load average 0.01–0.28。
+- 修正前の値 (旧判定): §8 の表 (a10c1f60 時点) を参照。
+- ネガティブコントロール (範囲ヘッダ経由の定義を 1 行削除して `ok` → `no_definition` に変わることの実測): 本 run は未実施。RetDec (`toolchain-retdec`) が素材に無く、`retdec_batch.py --nc` を実行できなかった。合成入力での確認のみ: `// Address range: 0x1000 - 0x1010` + `int64_t __dbk_fcall_wrapper(...) {` の 2 関数を入力すると `defined_before`=2・対象 0x1000 の削除後 `target_status_after`=`no_definition`。`negative_control()` は範囲ヘッダ経由の VA を選ぶよう修正 (`nc_remove`)。実 RetDec 出力での数値は再実行で埋める。
+- 未達 (受入条件 2・3): emcc exit 0 の wasm link と方式比較表は本 run で未実施。REPORT §9 の通り emcc exit 0 は 40 ファイル中 1 件 (#1679・#1680 が未完)。
