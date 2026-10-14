@@ -122,7 +122,7 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ## 10. PM Worker のコメント同期 (#2380)
 
-コメントの窓の件数・ページ数・所要の実測、`COMMENT_MAX_PAGES` の根拠、単体テストとネガコン。全文は [`REPORT_APPENDIX_2380.md`](REPORT_APPENDIX_2380.md) (§10 の分割移動)。
+全文は [`REPORT_APPENDIX_2380.md`](REPORT_APPENDIX_2380.md) (250 行上限のため分割移動・#2434)。
 
 ## 11. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
 
@@ -169,12 +169,25 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - VM の `relaunch.json` (67 件。count=1 が 60、2 が 7) は Worker に無い。履歴の無い issue を最大 2 回余分に再投入し得る (#2343)。
 - 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343)。rate-guard が launch を止める場面と、live の oc-pm 送信 (PM agent の起動) は未測定 (fake gh のテストだけ)。
 
-## 13. oc-pm の refs_orphan 検出 (#2337・PR #2478)
+## 13. R2 素材投入の頻度 (#2434・手順は `docs/WORKFLOW.md` §11)
+
+既知類型との関係: 該当なし (PM 運用の記録)。測定時刻 2026-10-14T14:33:25Z (`date -u`)。
+ここで数えるのは **許可名 (`ARTIFACT_RE`) を増やした回数**であり、R2 への投入回数ではない。
+
+- 数え方: main の first-parent 履歴で、`.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE=` 行が親と変わった merge を数える。再現: `git log --first-parent --format='%h %cI %s' -G'^ARTIFACT_RE=' -- .github/scripts/prepare-event-context.sh`
+- 結果: **7 件** (初回 `7bd4ce08` 2026-10-12T19:10:33Z の 1 件 + 追加 6 件: #293・#318・#320・#646・#610・#761)。最後の追加は `3fed6297` (#761) の 2026-10-13T14:23:39Z。issue 本文の「5 回」とは数えが違う (7 回が実測)。
+- 最後の追加から測定時刻まで **0 件** (24 時間 9 分 46 秒)。
+- 独立検算: 同じ first-parent 履歴を Python で線形に走査し、名前の集合の増分で数えた → 7 件 (初回 1 + 増分 6) で一致。commit 単位の `git log -G` (feature branch の commit を含む) でも 7 件 (`ba6e25f9`〜`9e52c39d`)。
+- watchdog 側の copy (`.github/scripts/watchdog.sh`。`pr-lint.sh` が読む) は後から追随した: `analysis-mac-shared` は `3b2346a0` (2026-10-13T14:22:02Z)、`work-fw-stage1` は `33a18408` (2026-10-13T15:13:01Z) で入った。`9e52c39d` の時点の watchdog.sh には mac-shared が無い (grep 0 件)。
+- R2 への投入の記録: repo 内にあるのは 2026-10-12 の全素材の再投入 1 回 (依頼者操作。`docs/pm/RETRO_2026-10-13.md`)。PM が VM で記録したとされる昇格ログは 1 件 (2026-10-13T14:16:50Z) だが、本 run では VM のログを確認していない `[未確認]`。
+- 未解決: open の #874 ([CI-18] mac pkg 素材の R2 化) の投入状況は本 run で未確認 (R2 の一覧は認証情報を使わずに取得していない)。起票先: 既存の #874 (新規起票なし)。
+
+## 14. oc-pm の refs_orphan 検出 (#2337・PR #2478)
 
 - 測定 commit: `20fcb6e1` (コードを変えた最後の commit。`src/pm.ts` の説明文と REST 経路のテストを足した。その前に main `c965bb19` を取り込んだ merge `15c4b4be`)。取得時刻は UTC (2026-10-14)。環境: runner (4 コア)・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
 - 差分の証跡: `git diff 20fcb6e1 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 
-### 13-1. 測定
+### 14-1. 測定
 
 | 項目 | 結果 |
 |---|---|
@@ -183,7 +196,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | `npm run test:workers` (vitest + workerd) | 3 件 PASS / 0 FAIL。2.69 s。load 2.09 |
 | `bun build src/index.ts --target=browser --format=esm --external 'node:*'` | 81.37 KB (81,373 bytes)。`--minify` を付けると 53.96 KB (53,956 bytes) |
 
-### 13-2. ネガコン (1 件を壊して FAIL を確認)
+### 14-2. ネガコン (1 件を壊して FAIL を確認)
 
 `infra/pm-worker` を scratch に複写し (他のリポジトリ部分は symlink)、下の 1 箇所だけを変えて `npm test` を回した。worktree は変えていない。
 
@@ -193,7 +206,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | `src/webhook.ts`: `pr.state === "closed" && pr.merged_at ?` の `pr.merged_at` を外す | FAIL 1 (PASS 171) | REST 経路 (merge されていない項目に `refsOnly` が立つ)。検出の結果は変わらない (`detectPm` が `p.merged` で先に弾く) |
 | `src/pm.ts`: `refs_orphan` の `dayMax` 10 を 1000 に | FAIL 1 (PASS 171) | ネガコン (d) (1 日 11 件目の上限) |
 
-### 13-3. 検証範囲
+### 14-3. 検証範囲
 
 - 検証は fetch のモック (node:test と vitest) まで。実 GitHub API・Cloudflare 上の Worker・live の送信は未実行。
 - `LIVE_*` のスイッチの値は変更していない (`wrangler.toml` は comment の参照先だけ直した)。

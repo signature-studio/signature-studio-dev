@@ -1,6 +1,4 @@
-# tools/pm 付録: REPORT §10 の全文 (PM Worker のコメント同期 #2380)
-
-> **REPORT の付録**: `tools/pm/REPORT.md` §10 の全文 (250 行上限のため無変更で分割移動)。測定値の正本はこの付録。
+# tools/pm REPORT 付録 — §10 の全文 (REPORT.md から分割移動・#2434)
 
 ## 10. PM Worker のコメント同期 (#2380)
 
@@ -31,3 +29,4 @@
 旧実装相当 (昇順・40 ページ・窓 48 時間) は 48 時間 12,000 件の fixture で古い側の 4,000 件しか読めず、2 時間前の `/oc` と最新の bot 報告が入らない (テスト (a))。
 
 測定 commit から HEAD までのコード差分: `git diff 7e8df56f HEAD -- infra/pm-worker/src infra/pm-worker/test` は出力なし (差分 0)。
+
