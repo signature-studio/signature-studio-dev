@@ -10,6 +10,8 @@ export const T0 = Date.parse("2026-10-14T12:00:00Z");
 export const STORE_KEY = b64u(new Uint8Array(32).fill(7));
 export const WH_SECRET = "wh-secret-for-tests";
 export const BOT = "opencode-for-signature-studio[bot]";
+// 停止印 (oc-fix-limit) の作者 = job の GITHUB_TOKEN (#2639)
+export const MARK = "github-actions[bot]";
 
 export interface Call {
   method: string;
@@ -123,7 +125,7 @@ export const commentPayload = (n: number, login: string, body: string, at = "202
   action: "created",
   repository: REPO,
   issue: { number: n },
-  comment: { user: { login }, body, created_at: at },
+  comment: { user: { login, type: login.endsWith("[bot]") ? "Bot" : "User" }, body, created_at: at },
 });
 
 // engine を「同期済み」にする (fullSyncAt / reconcileAt を now に置く)。

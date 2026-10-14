@@ -51,7 +51,7 @@
 #   fresh=false の間の値は古いかもしれないので使わない (停止は pm-worker-down が扱う)。
 #
 # 暫定の oc-pm 起動 (#CI-50): Worker が live になるまで、PM agent の判断待ちの対象を repository_dispatch (oc-pm) で起動する。
-#   stuck : oc:stuck の PR で、最新の oc-fix-limit コメント (実装 App の投稿) に、当該 PR の oc-pm-intent: stuck がある (fix-progress.sh の停止印)
+#   stuck : oc:stuck の PR で、最新の oc-fix-limit コメント (github-actions[bot] の投稿) に、当該 PR の oc-pm-intent: stuck がある (fix-progress.sh の停止印)
 #   no_pr : oc:no-pr の open issue で、最後の oc-run-outcome の reason が split か stop (pm-apply・needs-user-input の付いた issue は除く)
 #   送るのは kind と ref の 2 つだけ。送る前に対象へ <!-- oc-pm-dispatch:<ref> ts=... --> を残す (残せなければ送らない)。
 #   上限は 1 回の点検で 3 件、1 時間に 12 件、同じ ref に 24 時間で 3 件 (記録のコメントを数える。記録は REVIEWER_LOGIN の Bot だけ数える)。

@@ -244,3 +244,5 @@
 - `git diff 7d1d0e2e HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は 0 行 (この節の追記 commit は REPORT のみ)。
 
 - 未実施: Delay の native 突合 (emcc 未通過のため)。#3073 [KH-41] の範囲。`swi(3)` と SIMD 疑似関数の意味付けは #3095 [KH-43]。
+#### 10-7r. #3071 (KH-39) 1 単位: Stereo の emcc 残件の機械修復 (部分・emcc 39 → 10 件・Stereo はビルド未通過)
+- 結論・測定・ABI 規則 1〜11・未解決 1〜5 の全文は付録 `REPORT_APPENDIX_3071.md` §10-7r へ分割移動した (本ファイル 250 行上限・内容は削除していない)。
