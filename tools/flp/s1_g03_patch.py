@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-# #113 S1: G03 (Authenticode 検査, tools/startup/GATES.md) を oracle 用ローカルコピー上で通すための 2 箇所のパッチ。
-# 対象: FL64.exe の検査失敗分岐 (VA 0x140006eaf, je→jmp) と FLEngine_x64.dll の 2 つの検査失敗分岐
+# #113 S1: G03 (Authenticode 検査, tools/startup/GATES.md) を oracle 用ローカルコピー上で通すための 3 箇所のパッチ。
+# 対象: FL64.exe の検査分岐 (VA 0x140006eaf, je→jmp) と FLEngine_x64.dll の 2 つの検査分岐
 # (自身 VA 0x1375ee9 / ホスト EXE VA 0x137633e, jne→jmp)。
-# 期待バイトを照合してから書き換える。入力はインストール木の コピー (commit・配布しない)。
+# 各分岐の飛び先は検査成功側、フォールスルーは戻り値 -2 の失敗側 (objdump で確認)。
+# 書換えは飛び先を変えない無条件 jmp で、検査結果を無視し成功側へ継続させる。
+# 期待バイトを照合してから書き換える。入力はインストール木のコピー (commit・配布しない)。
 import sys
 import pefile
 
