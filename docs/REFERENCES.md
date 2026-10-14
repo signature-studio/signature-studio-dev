@@ -41,6 +41,26 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 | `[DOWNLOADS]` | `~/ダウンロード/` | 元インストーラ・プラグイン素材 (FL win/mac、OTT、Kilohearts、Serum2、Fresh Air、Massive X)。Vital / Surge XT / Dexed は対象外 |
 | `[PLUGINS-SERUM2]` | `$ARTIFACTS_DIR/plugins-serum2.tar.zst` (Actions では `$HOME/artifacts/` に R2 から配置。取得指定は `docs/WORKFLOW.md` §11 の `oc_artifacts: plugins-serum2`) | Xfer Serum 2 のインストーラ `Install_Xfer_Serum2_2.1.5.exe` を含む `.tar.zst` (展開は `tar --zstd -xf` で行い、展開先は各 REPORT で `work/` 配下に指定) |
 
+### 素材の原本と R2 bundle の対応 (#2434)
+
+R2 の bundle (`artifacts/<name>.tar.zst`) と、その原本の所在。原本が作業 VM のディスクにしか無いものは、VM を止める・消すと失われる。
+`[未確認]` は本 run で中身や所在を確認していない項目。R2 上の object の有無は、認証情報を使わないため本 run では見ていない。
+
+| bundle | 原本の所在 (ID) | bundle の中身 | VM だけに残るもの |
+|---|---|---|---|
+| `fl-win64` | installer の原本は `[DOWNLOADS]`。展開物は `[WIN64]` | 実測 (`tar --zstd -tf`): 最上位に installer `flstudio_win64_26.1.7.5653.exe` と `extracted/`。原本 installer の複製を含む | `block_manifest.json`・`pe_metadata.json` (`docs/WORKFLOW.md` §11: tarball に含まれない) |
+| `toolchain-retdec` | 上流 RetDec v5.0 の配布物 (取得元は本台帳に無い `[未確認]`)。展開先は `[RETDEC]` | 最上位 `retdec/` (install tree)。実装 run の実測。本 run の素材には無く再現していない | bundle が唯一の複製かは `[未確認]` |
+| `toolchain-emsdk` | 上流 emsdk (版は `tools/m1/flags.sh` の pin)。展開先は `[EMSDK]` | 最上位 `emsdk/`。実装 run の実測。本 run の素材には無く再現していない | 上流からの再取得経路は `[未確認]` |
+| `plugins-ott` | `[DOWNLOADS]` (Xfer OTT 1.37。`docs/LEGAL.md`) | `[未確認]` (本 run では展開していない) | `[DOWNLOADS]` は VM 上 (`~/ダウンロード/`)。R2 上の有無は run ごとに変わり得る (`tools/plugins/reverb_delay/REPORT_APPENDIX.md` は不在を記録) |
+| `plugins-freshair` | `[DOWNLOADS]` (Fresh Air 1.0.9。`docs/LEGAL.md`) | `docs/WORKFLOW.md` §11 の記述: 最上位 `Fresh Air.Win.zip` / `Fresh Air.pkg` (`[未確認]`) | `[DOWNLOADS]` は VM 上 |
+| `plugins-serum2` | `[PLUGINS-SERUM2]` (bundle そのものが原本の複製) | installer `Install_Xfer_Serum2_2.1.5.exe` の記述 (`[未確認]`) | 二次の所在は `[未確認]` |
+| `plugins-massivex` | `[DOWNLOADS]` (Massive X) | `[未確認]`。`docs/LEGAL.md` は『未取得』と記す | `[DOWNLOADS]` は VM 上 |
+| `plugins-kilohearts` | `[DOWNLOADS]` (Kilohearts Installer 2026-03 release。`docs/LEGAL.md`) | `[未確認]` | `[DOWNLOADS]` は VM 上 |
+| `analysis-ott-binaries` | 展開元は `[DOWNLOADS]` の OTT。展開物の所在は `[ANALYSIS-PLUGINS]` の `ott/binaries/` | `OTT_vst2_win64.dll` ほかの実機バイナリ (`docs/WORKFLOW.md` §11 の記述) | 原本 (`[DOWNLOADS]`) は VM 上。R2 の複製の有無は `[未確認]` |
+| `analysis-mac-shared` | FL mac 版の原本 (pkg・dmg) は `[DOWNLOADS]`。展開物は `[MAC]` の `pkg_extract/payload_out/` | FL mac の `Shared/` の dylib 25 本 (`docs/WORKFLOW.md` §11 の記述。取得実績は `tools/shared/oss/ilsvg/REPORT.md`) | **VM を止める/消すと失われる可能性がある**: mac pkg の残り (`Libs/FLEngine_x64.dylib`・MCP pyc・`Resources/FL`) は analysis-mac-shared に無い (`tools/python/REPORT_PY15.md:221`)。R2 全体の有無は `[未確認]` (`#874` [CI-18] が open で、その投入を扱う) |
+| `work-*` (7 種: m11・liftdiff・m6-ott・liftlib-targets・liftlib・icall・fw-stage1) | 派生物で原本ではない。再生成手順は各 REPORT が正本 | 検証スナップショット (gitignore 対象) | 再生成に VM 専用の道具 (例: `[GHIDRA]`) が要るかは `[未確認]` |
+| `apt-mingw` | R2 の素材ではない (runner に apt 導入) | — | — |
+
 ### ローカルツール
 
 | ID | 所在 | 版 |

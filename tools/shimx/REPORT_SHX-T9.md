@@ -160,11 +160,32 @@
 | shimx `--fix` 無し | 0 | 同左 | 同左 | `halt0` | `icall 0x67f00` → `UStrAsg dest=0x315f0` → Halt0 (`FormatMessageW` に進まない) |
 | baseline (`m11_boot.cjs`) | 0 | 同左 | 同左 | `halt0` | `icall 0x67f00` → `FormatMessageW` (stub) → `UStrAsg dest=0x315f0` → Halt0 |
 
-- 確定: `ret=2` は `--fix` の有無に依存する (`--fix` 無しの shimx は baseline と同じ exc=`halt0`)。`0x11f1114` と `Q(6712)` は 3 版で一致しており、unit 23 の入口状態は分岐の原因ではない。
+- ~~確定: `ret=2` は `--fix` の有無に依存する (`--fix` 無しの shimx は baseline と同じ exc=`halt0`)。~~ **【訂正・誤り】** `--fix` 無しの成果物が古かった。§3.3.4 参照。`0x11f1114` と `Q(6712)` は 3 版で一致しており、unit 23 の入口状態は分岐の原因ではない。
 - 確定 (trace の差): exc は baseline と `--fix` 無し shimx で同じ `halt0` だが、**trace は異なる**。baseline は `0x67f00` の直後に `FormatMessageW` stub へ進み、`--fix` 無し shimx は進まずに Halt0 になる。両者の差は `FormatMessageW` の有無で現れる。`--fix` 無し shimx と baseline の差は、`--fix` の IR に由来するとまでは言えない (IR 側の比較は未実測)。
 - 推定 (未確認): `--fix` 有りの shimx 版が `0xf960` に進む機構。`function_467f00` (IR `boot_final3.ll` L174409 付近) は flag==0 のとき `function_40f9e0(arg, (arg2&~0xff)|1)` を呼ぶ。`function_40f9e0` が `function_410320` (`_ClassCreate`) を経由し `ICALL_AT(Q(self-0x30))` = `0xf960` に至る経路は、`tools/liftdiff/REPORT.md` §9 と `REPORT_APPENDIX.md` §9 では `function_410320` の lift 後 IR に VMT 間接 call が無い (`ret %arg1` のみ) と記録されており、矛盾する。この `--fix` IR 上の該当 call は本 PR の素材 (`work-m11` 未展開) では確認できていない。`0xf960` 進入そのものは trace で実測 (上表) だが、その IR 経路は未確認のため、「IR の構造どおり」とは書かない。
 - 未確定: baseline が `0x67f00` の直後に `FormatMessageW` へ進む理由。`m11_boot.cjs` は `--fix` 無しの別 IR 由来で、`0x67f00` の入口 `arg2` (icall 時の引数) と `m11_icall` の dispatch 先の比較は未実測。残りの差はここにある (起票先: #1985 に残す)。
 - 注記: `probe_flag_shimx_fix.txt` は先頭 80 行のみ保存 (`[m11][UStrAsg]` の繰り返しを省略)。全行は再現コマンドで得られる。
+- 【訂正】本節の「推定」「未確定 (baseline の FormatMessageW)」は §3.3.4 で解決した (`0xf960` の機構は `m11_ov.c` の C 転記。baseline は古い成果物)。
+
+#### 3.3.4 訂正と unit 23 の経路 (SHX-T9f #1985 続き)
+
+- **訂正 1 (`--fix` 依存は誤り)**: §3.3.3 の「`ret=2` は `--fix` の有無に依存する」は誤り。`--fix` 無しの `m11_sx_trace_soft.cjs` は 2026-10-12 11:27 の古い成果物だった。clean rebuild (`build.sh --trace --soft`・`[sxlink] OK`) では `--fix` 有りと同じ `ret=2` になる。`boot_fixed.ll` と `boot_final3.ll` は diff 0 行で、`--fix` の差は `sx_liftfix.c` の `function_412e00` (_WStrClr) 強定義だけ。unit 23 の結果は変えない。
+- **訂正 2 (baseline は現行コードではない)**: baseline の `m11_boot.cjs` は snapshot 由来で、現行 main の `m11_ov.c` と別物。`work/obj/ov.o` (2026-10-12 18:08 生成) には `function_410320`・`function_40f960`・`function_40fb40`・`function_467c40` の T シンボルが無い。shimx 版がリンクする `work/shimx_link/obj/m11_ov.o` には 4 つとも有る (`evidence_1985/ov_symbols_snapshot_vs_fresh.txt`)。よって §3.3.3 の「baseline が `FormatMessageW` へ進む」は古い lifted 版 `function_467c40` の経路で、現行コードの比較にならない。
+- 測定: `tools/m11/shimx_link/probe_lasterr_1985.mjs` (unit 1〜22 の後、unit 23 の直前)。3 版とも同一: `P = Q(0x11e3af0) = 0x11f10e0`、`slot = Q(P) = 0x457860`、初期化フラグ `0x11f1114 = 0`。
+- 測定 commit: `af6115db` (probe と証跡の追加。shimx・m11 のコードは origin/main `54bacdc0` から無変更)。`git diff af6115db HEAD -- tools/m11/shimx_link tools/shimx/src` の出力: 0 行 (本節は REPORT のみ)。
+
+| 版 (unit 23 直前は同一) | unit 23 の結果 | GetLastError (終了時) | trace の要点 (`evidence_1985/probe_lasterr_*.txt`) |
+|---|---|---|---|
+| baseline (古い `m11_boot.cjs`) | `halt0` | 1 | `icall 0x67f00` → `FormatMessageW` (stub) → `UStrAsg dest=0x315f0` → Halt0 |
+| shimx `--trace --soft` (clean rebuild, `--fix` 無し) | `ret=2` | 0 | `icall 0x67f00` → `icall 0xf960` → `icall-miss 0x457860` → `UStrAsg dest=0x11f1120`… → `icall-miss 0x457860` → … |
+| shimx `--trace --soft --fix` (clean rebuild) | `ret=2` | 0 | 同左 |
+
+- **現行コードの unit 23 経路** (IR と `m11_ov.c` の突合。trace と一致):
+  1. `icall 0x67f00` = `function_467f00` (`boot_final3.ll` L174409)。初期化フラグ 0 なので init 経路に入る。
+  2. `function_40f9e0(6712, arg2|1)` は低バイトが 1 のため `function_410320(6712, 1)` を呼ぶ。IR 上の `function_410320` は `ret %arg1` だが、現行 `m11_ov.c` の C 転記 (#418) が上書きし、`ICALL_AT(0x41032e, Q(self-0x30))` (vmtNewInstance) を呼ぶ。これが `icall 0xf960` (`function_40f960` = GetMem + InitInstance)。
+  3. `function_467c40` (`m11_ov.c` 転記): `slot = Q(R(0x11e3af0)) = 0x11f10e0`、`Q(slot) = 0x457860` (§3.3.2 の fallback) ≠ 0 なので VarBstrFromBool 呼出しに入る。`ICALL_AT(0x467cc9)` と `ICALL_AT(0x467d5d)` が閉じた closure 外の `0x457860` を踏み、icall-miss (ret 0) になる。trace の `UStrAsg dest=0x11f1120`・`0x11f1128`・`0x11f1138`… は転記の書込み先 `R(0x11f1120)` 等と一致する。
+  4. 含意: slot が fallback の `0x457860` のまま非 0 だと、ゲートを通って VarBstrFromBool 呼出し (icall-miss) に入る。slot が本物の `VarBstrFromBool` で埋まった場合の経路は未測定 (#1607 の範囲)。
+- **未達 (受入条件 1・2・3 の残り)**: (a) `function_457c70` の呼出し元 PC は未記録 (wrapper 未拡張)。起票: #2491 (`[SHX-T9i]`)。(b) baseline の比較は、現行 `m11_ov.c` で `m11_boot.cjs` を再生成して初めて成立する。再生成には `m11_gen_ir2.sh` (`ir_conditions.json`・fl-win64・pefile/capstone) が要り、本 run では完了していない。起票: #2489 (`[SHX-T9h]`)。
 
 ### 3.4 検証の commit と差分 (WORKFLOW §6)
 
@@ -201,7 +222,8 @@
 | survey unit 160 以降の range 連鎖 | 解消 (harness 修正) | #773 |
 | survey の unit 単位差分: unit 115 の fail-fast 差 | 差の機構を推定 (§3.1)。CS ポインタ一致は未比較 | #1255 (`[SHX-T9c]`) |
 | survey の unit 単位差分: unit 23 の分岐・oob 増 57 件の内訳 | 未説明 | #1465 (`[SHX-T9d]`) |
-| unit 23 の slot 0x15f10e0 の埋まり経路 (`function_457c70` の呼出し unit・戻り値) と baseline の 0xf960 以降の分岐 | 未説明 (miss 先 0x457860 は実測で確定) | #1985 (`[SHX-T9f]`) |
+| unit 23 の slot 0x11f10e0 の埋まり経路 (`function_457c70` の呼出し unit・戻り値) と、現行コードの 0xf960 以降の経路 | 現行経路は実測で確定 (§3.3.4)。呼出し元 PC は未記録 | #2491 (`[SHX-T9i]`) |
+| baseline (`m11_boot.cjs`) の unit 23 比較 | 古い成果物のため無効。現行 `m11_ov.c` で再ビルドが要る | #2489 (`[SHX-T9h]`) |
 | oob 増 57 件の unit 単位 frame 分類 | 未説明 | #1986 (`[SHX-T9g]`) |
 
 ## 5. 再現性
