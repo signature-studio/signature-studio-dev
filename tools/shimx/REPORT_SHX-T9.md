@@ -148,6 +148,22 @@
 - 測定 commit: `98508612` (trace 取得に使った `probe_trace_unit.mjs` を追加した commit)。slot 訂正の commit は `c718dd00` (`probe_unit23.mjs` の 4 行)。`git show 98508612:tools/m11/shimx_link/probe_trace_unit.mjs` と作業ツリーのファイルは byte 一致。
 - `git diff 98508612 HEAD -- tools/m11/shimx_link tools/shimx/src`: 出力 0 行 (測定後の変更は REPORT と evidence のみ)。
 
+#### 3.3.3 unit 23 直前の状態と --fix 依存の確認 (SHX-T9f #1985 続き)
+
+- 測定: `tools/m11/shimx_link/probe_flag_1985.mjs` (unit 1〜22 の後、unit 23 の直前の状態を読んでから unit 23 を 1 回 trace)。shimx 版は `build.sh --trace --soft --fix` の clean rebuild (`obj/`・`gen/` 削除後、`[sxlink] OK`、load 0.96 / 4 CPU)。証跡: `tools/shimx/evidence_1985/probe_flag_{shimx_fix,shimx_nofix,baseline}.txt`。
+- 結果 (3 版とも同じ入口状態):
+
+| 版 | unit 23 直前の `0x11f1114` (初期化フラグ) | `Q(6712)` | slot `0x11f10e0` | unit 23 の結果 |
+|---|---|---|---|---|
+| shimx `--fix` (clean rebuild) | 0 | `0x1c0200250000` | `0x457860` | `ret=2` (`0xf960` 進入 → icall-miss `0x457860`) |
+| shimx `--fix` 無し | 0 | 同左 | 同左 | `halt0` (`FormatMessageW` 経路に入らず `0x67f00` 直後で Halt0) |
+| baseline (`m11_boot.cjs`) | 0 | 同左 | 同左 | `halt0` |
+
+- 確定: `ret=2` は `--fix` の IR に依存する (`--fix` 無しの shimx は baseline と同じ `halt0`)。`0x11f1114` と `Q(6712)` は 3 版で一致しており、unit 23 の入口状態は分岐の原因ではない。
+- 確定: `function_467f00` (IR) は flag==0 のとき `function_40f9e0(arg, (arg2&~0xff)|1)` を無条件に呼ぶ。`function_40f9e0` は下位バイトが非 0 なら `function_410320` (`_ClassCreate`) → `ICALL_AT(Q(self-0x30))` = `0xf960` へ進む。したがって shimx 版の `0xf960` 進入は IR の構造どおり。
+- 未確定: baseline が `0x67f00` の直後に `FormatMessageW` へ進む理由。`m11_boot.cjs` は `--fix` 無しの別 IR 由来で、`0x67f00` の入口 `arg2` (icall 時の引数) と `m11_icall` の dispatch 先の比較は未実測。残りの差はここにある (起票先: #1985 に残す)。
+- 注記: `probe_flag_shimx_fix.txt` は先頭 80 行のみ保存 (`[m11][UStrAsg]` の繰り返しを省略)。全行は再現コマンドで得られる。
+
 ### 3.4 検証の commit と差分 (WORKFLOW §6)
 
 - 測定の基底: `522da441` (origin/main)。測定に使った probe は本 PR で `tools/m11/shimx_link/probe_unit23.mjs` として追加 (測定対象の shimx・m11 のコードは未変更)。
