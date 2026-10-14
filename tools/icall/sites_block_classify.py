@@ -10,7 +10,7 @@ OUTDIR/summary.txt (集計)。
 """
 import bisect, collections, json, os, re, subprocess, sys, tempfile
 
-RETDEC = os.environ.get('RETDEC_BIN', '/opt/retdec/bin/retdec-decompiler')
+RETDEC = os.environ.get('RETDEC_BIN') or sys.exit('RETDEC_BIN に retdec-decompiler を指定する (docs/REFERENCES.md [RETDEC])')
 HDR = re.compile(rb'^\*\*\* IR Dump After (.*) \*\*\*$')
 DEF = re.compile(r'^define\b.*@(function_\w+)\(')
 LAB = re.compile(r'^([A-Za-z_.$][\w.$-]*):')
