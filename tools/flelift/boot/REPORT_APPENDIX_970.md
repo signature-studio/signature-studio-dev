@@ -75,7 +75,7 @@ python3 tools/flelift/boot/variant_summary.py --check                  # §C-2 �
 FLE_IPP=0 FLE_BOOT_VARIANT=plain node tools/flelift/boot/fle_boot.mjs $FLE_BOOT_WORK/fleboot_plain.cjs <out.json> --boot-only   # §C-3
 ```
 
-素材: `oc_artifacts: fl-win64 toolchain-emsdk`。emsdk は `git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` (本 run で導入。`/opt/emsdk` は無い (`[EMSDK]` 参照))。生成物は repo 外の `FLE_BOOT_WORK` に置く (`tools/**/work/` を作業場にしない)。
+素材: `oc_artifacts: fl-win64 toolchain-emsdk`。emsdk は `git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` (本 run で導入。既定の emsdk 位置は無い)。生成物は repo 外の `FLE_BOOT_WORK` に置く (`tools/**/work/` を作業場にしない)。
 
 ## F. 未解決
 
