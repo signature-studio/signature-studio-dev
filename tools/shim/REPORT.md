@@ -39,6 +39,13 @@
 | `git diff a4a620a9 HEAD -- tools/shim/src tools/shim/test` | 0 行 (差分 0。以後の commit は REPORT のみ) |
 | 20 MiB 超の blob (`find tools/shim -type f -size +20M -not -path '*/work/*'`) | 0 件 |
 
+fix round 1 (reviewer 指摘 1: emcc が無く test.sh を独立に再実行できなかった件) の再実行。`toolchain-emsdk` が無い run では、上流から `git clone --depth 1 https://github.com/emscripten-core/emsdk.git` → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12` で emsdk を入れ、`EMSDK_ENV` で指す。HEAD `577fae4a` は code が測定 commit `a4a620a9` と同一 (上の差分 0)。
+
+| 再実行 (HEAD `577fae4a`・ワークツリー clean・`emcc --version` = 6.0.12) | 結果 |
+|---|---|
+| `EMSDK_ENV=$HOME/emsdk/emsdk_env.sh bash tools/shim/test.sh` | rc=0・所要 3.29 s (wall)・load average 0.62 / 0.44 / 0.20 (19:51 UTC)。MT `ALL PASS`・ST `ALL PASS`・fail-fast PASS (exit=1・stderr に関数名) |
+| ネガティブコントロール: 旧 `heap.c` (`a4a620a9^`) + 新 `test_main.c` を `tools/shim` の一時コピーで ST ビルド | rc=1・stdout 0 行・stderr `RuntimeError: memory access out of bounds` |
+
 ## 4. 製品 KPI (`docs/WORKFLOW.md` §7)
 
 - 本 PR は `tools/gui/flengine/build.sh` と `tools/m11/m11_build.sh` が取り込む shim を変える。
