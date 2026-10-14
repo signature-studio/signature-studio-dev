@@ -172,7 +172,24 @@
 | 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 全 store 計装は unit 106 で停止。窓内の関数だけの計装が必要 | 子 issue #2217 (親 #2165) |
 | 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 子 issue #2217 |
 
-## 12. #2217 の実測: 窓に絞った store 計装 (未達・計装 build の挙動はコミット済み script で未確認)
+## 12. #2254 の実測: 関数限定の store 計装 (未達・書込み主体は未特定)
+
+- 測定 commit: `92856da8` (origin/main 取り込み時点)。本節で追加したのは `trap_triage/watch_fn_2254.py` (指定関数の store だけに `m11_sw` を入れる計装生成) と `trap_triage/store_watch_2254.sh` (その build と unit 114 の実行) の 2 ファイルのみ。`git diff 92856da8 HEAD -- tools/m11` の差分には、この 2 ファイルと REPORT 追記のほかに main 取り込み分 (`store_watch_2217.sh`・`ld92_machine_evidence.py`・ld92 の tsv など) を含む。
+- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`)・`work-m11`。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で `m11_e2e.sh` を foreground 実行 (wall 1m42s、user 1m37s、load 1.18)。`functions_dll.csv` は素材に無いため非 `--full` 経路で通すため、`work/lift_pe.sha256` を PE 指紋 `b2c64da4…` で手記録した (§6 と同じ)。結果: rc=0、reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6・§8〜§11 と一致)。
+- baseline (`probe1676_watch.mjs`、n=1): unit 114 `halt0`、`after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -->0x0, cnt -->1` (§8〜§11 と一致)。
+- 関数限定計装 (`store_watch_2254.sh <fns> <tag> 114`、foreground、rc=0、unit 114 `halt0`。所要時間は未記録: 転記元のログが無く、本 run の runner では再実行できない (`/opt/emsdk`・`work-m11` 不在)):
+  - run f1: `function_8651a0`・`410320`・`5267f0`・`8659f0`・`424d60` の 42 store に計装。`[aw]` 0 件。
+  - run f2: 26 関数 (f1 に加え `40f9e0`・`410360`・`8663b0`・`424220`・`424c50`・`4252c0`・`5c0d40`・`50aa70`・`8661d0`・`865c50`・`865b20`・`866170`・`417fc0`・`418210`・`418190`・`409410`・`409440`・`424960`・`425100`・`4250e0`・`424ee0`) の 91 store に計装。`[aw]` 0 件。
+- 計装の健全性: build は OK (`boot_sw.ll` の `m11_sw` 呼出し 91 件)。ただし陽性対照 (既知の書込みが `[aw]` に出ること) は未実施。`[aw]` 0 件を「書込みなし」と断定できない。
+- 未確認: `0x40f960` (`TObject.NewInstance`)・`0x40fb40`・`0x40fac0` は `boot_final3.ll` に定義が無く計装できない。窓内で実行される全関数の網羅も未確認 (`icall` 境界の間接 call は IR から追えない)。
+- 手順の注意: 測定 commit `92856da8` 時点では `store_watch_2217.sh` は存在しなかった (現 HEAD には main 取り込みで存在する。本 run は `store_watch_2254.sh` を作成)。`m11_build.sh` は `FL_WIN64_DIR` (`[WIN64]`) を付けないと `m11_cond.py` の記録 PE (`[ANALYSIS-DIR]` 配下) と食い違い build を拒否する。
+
+| 未達 (#2254 受入条件) | 状況 | 起票先 |
+|---|---|---|
+| 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 候補 26 関数の計装で `[aw]` 0 件。陽性対照と網羅が未了 | 子 issue #2270 (親 #2254) |
+| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 子 issue #2270 (親 #2254) |
+
+## 13. #2217 の実測: 窓に絞った store 計装 (未達・計装 build の挙動はコミット済み script で未確認)
 
 - 測定 commit: `27a324e0` (origin/main)。本 PR 自身のコード差分は `trap_triage/store_watch_2217.sh` の追加のみ (`tools/m11` 全体の差分には main 取り込み分を含む)。
 - 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)・`toolchain-emsdk`・`toolchain-retdec`・`work-m11`・`work-liftdiff` を展開。`work/lift_pe.sha256` は PE 指紋で手記録 (§6 と同じ)。
@@ -187,7 +204,7 @@
 | 未達 (#2217 受入条件) | 状況 | 起票先 |
 |---|---|---|
 | 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 窓に絞った計装の再測定 (コミット済み script) が未実施 (本節) | 子 issue (親 #2217) |
-| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 上記子 issue |
+| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 子 issue (親 #2217) |
 
 ## 13. #2270 の実測: 窓内の関数に絞った store 計装 (未達・陽性対照 0 件)
 
