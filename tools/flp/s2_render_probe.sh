@@ -23,8 +23,8 @@ export PATH="/usr/lib/wine:$PATH"
 mkdir -p "$WORKDIR"
 cp "$SRC/$NAME" "$WORKDIR/"
 
-cp "$EXT/$(ls "$EXT" | grep -E '^block00038_')" "$INST/FL64.exe"
-cp "$EXT/$(ls "$EXT" | grep -E '^block00031_')" "$INST/FLEngine_x64.dll"
+cp "$EXT"/block00038_* "$INST/FL64.exe"
+cp "$EXT"/block00031_* "$INST/FLEngine_x64.dll"
 (cd "$INST" && python3 "$ROOT/tools/flp/s1_g03_patch.py" FL64.exe && python3 "$ROOT/tools/flp/s1_g03_patch.py" FLEngine_x64.dll)
 
 wine64 reg add 'HKCU\Software\Image-Line\FL Studio 26\Devices\Audio output' /v 'Sample rate' /t REG_SZ /d 48000 /f >/dev/null 2>&1 || true

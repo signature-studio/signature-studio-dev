@@ -36,8 +36,8 @@ for idx, paths in d.items():
 EOF
 
 # G03 (Authenticode) を oracle 用ローカルコピー上で通す: FL64.exe / FLEngine_x64.dll を block から取り直し、s1_g03_patch.py で 3 箇所を書き換える。
-cp "$EXT/$(ls "$EXT" | grep -E '^block00038_')" "$INST/FL64.exe"
-cp "$EXT/$(ls "$EXT" | grep -E '^block00031_')" "$INST/FLEngine_x64.dll"
+cp "$EXT"/block00038_* "$INST/FL64.exe"
+cp "$EXT"/block00031_* "$INST/FLEngine_x64.dll"
 python3 "$ROOT/tools/flp/s1_g03_patch.py" "$INST/FL64.exe"
 python3 "$ROOT/tools/flp/s1_g03_patch.py" "$INST/FLEngine_x64.dll"
 
