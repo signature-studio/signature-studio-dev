@@ -96,7 +96,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 | 実行 | `bash tools/ott/native/build.sh` (rc 0)、`SWEEP=1 bash tools/icall/frame_slot_2394.sh` (rc 0・§1〜§6 全部と base/fixed/sep の sweep)、`FA_CORE=<rw.dll> bash tools/icall/diff/fa_sweep.sh 8 60` (rc 0) |
 | 所要 | `frame_slot_2394.sh` 193.6 s (15:18:31 → 15:21:45)、`fa_sweep.sh 8 60` 71.4 s (15:22:30 → 15:23:41) |
 | load (`uptime` の 1 分平均) | `frame_slot_2394.sh` 開始 1.37 → 終了 1.12、`fa_sweep.sh` 開始 0.68 → 終了 0.99 (4 vCPU・逐次) |
-| 素材 | `work-icall` (`tools/icall/work/rt_freshair-core`・`rw.dll`)、RetDec は runner 既設の `/opt/retdec` (`RETDEC_ROOT` 既定)。emsdk: 本 run の素材 (`$ARTIFACTS_DIR`) に `toolchain-emsdk` は無かったため、上流 `emscripten-core/emsdk` を pin 版 `6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN`) で `/opt/emsdk` に導入した (`emsdk install 6.0.12`・`emcc` の sanity 通過)。`plugins-freshair`・`fl-win64` は未使用 |
+| 素材 | `work-icall` (`tools/icall/work/rt_freshair-core`・`rw.dll`)、RetDec は runner 既設の [RETDEC] (`RETDEC_ROOT` 既定)。emsdk: 本 run の素材 (`$ARTIFACTS_DIR`) に `toolchain-emsdk` は無かったため、上流 `emscripten-core/emsdk` を pin 版 `6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN`) で [EMSDK] に導入した (`emsdk install 6.0.12`・`emcc` の sanity 通過)。`plugins-freshair`・`fl-win64` は未使用 |
 
 > 注: 旧版の検証 HEAD `54bacdc0` の値 (`fa_sweep.sh 8 60` の 47 / 66 / 9 / 9) は、本節の `6f7e941a` の実測と同じ値だった。§6-2・§6-4・§6-5 は `6f7e941a` の実測で置き換えた。
 
