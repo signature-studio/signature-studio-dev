@@ -1,6 +1,6 @@
 # 付録: icall #2231 (ICALL-67) — fatal RIP 群 B/C/D/E/G/H の引数由来と群 I の正体
 
-> 親: #2198 (ICALL-63)。前付録: `REPORT_APPENDIX_2198.md` §2.3。本 run は受入条件 1〜3 の切り分けまで。
+> 親: #2198 (ICALL-63)。前付録: `REPORT_APPENDIX_2198.md` §2.3。本 run は受入条件 1 の一部・2・3 の切り分けまで。
 > 測定 commit: `4c59ce30` (`slot_trace.sh` の fatal 行抽出に `regs` / `heap_args` を追加。計測条件は不変)。
 > 検証 HEAD と差分の証跡は §5。
 
@@ -28,23 +28,25 @@
 ### 2.1 測定条件
 
 - 再現: `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (baseline) / `SLOT_STUB_VA=1810806a0 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (stub)。
-- 所要 (検証 HEAD の 1 回目の実測):
-  - baseline: 12.77 s real / user 11.31 s / sys 1.82 s。load average (1 分) 0.93 (10:41 開始時)。
-  - stub: 12.66 s real / user 11.30 s / sys 1.75 s。load average 0.89 (10:41 開始時)。
-- 別 run (レビュー側の再実行) では baseline 17.6 s real / user 11.0 s / load 2.20 で、本 run より遅い。
-  同じ harness でも負荷で wall time が変わるため、時間は参考値。rc・件数の内訳は両 run で一致した (§2.2)。
-- 素材: `plugins-freshair` (`Fresh Air.Win.zip` を `fetch.sh` で展開)・`work-icall`・`work-liftlib` を `$HOME/artifacts` から展開。`tools/ott/native/build.sh` は OK。
+- 検証 HEAD `071b1023` の worktree で、foreground・1 run ずつ実行。n=3 (各条件)。
+  - baseline: real 12.15–12.17 s / user 10.96–10.98 s / sys 1.65–1.69 s。
+  - stub: real 12.16–12.96 s / user 10.93–10.95 s / sys 1.71–1.73 s。
+  - 各 run 開始直前の load average (1 分): 0.71–0.84。
+- 時間は n=3 の min–max。同じ harness でも負荷で wall time は変わるため、時間は参考値。rc・件数は全 run で一致した (§2.2)。
+- 素材: `plugins-freshair` (`Fresh Air.Win.zip` を `fetch.sh` で展開)・`work-icall`・`work-liftlib` を `$ARTIFACTS_DIR` から展開。`tools/ott/native/build.sh` は OK。
 
-### 2.2 集計 (clean run)
+### 2.2 集計
 
 | 条件 | rc 内訳 | zero-fill VA 数 | 既知 12 hit |
 |---|---|--:|--:|
 | baseline | rc=0: 69, rc=124: 1, rc=95: 53, rc=98: 8 | 10 | 3/12 |
 | stub 有効 | rc=0: 73, rc=124: 1, rc=95: 47, rc=97: 2, rc=98: 8 | 11 | 4/12 |
 
-- stub の `rc=97` は 2 件 (レビュー側の clean run と一致)。前版の「3 件」は誤記で、本版で 2 件に直した。
+- baseline は sweep 3 回すべて同じ内訳。stub は sweep 6 回すべて同じ内訳 (rc=0: 73 / rc=97: 2)。
+- stub の `rc=97` は `18105bb90`・`18105bea0` の 2 件。
 - `0x1813068d0` が stub 有効で新規 hit (2198 と同じ)。
-- 注意: 同じ出力ファイルに対して実行を重ねると `F` 行が重複する (作業中の計数誤り)。本表は各 run をクリーンに取り直した値のみ。
+- 未切り分けの不一致: `18105d8ac` は sweep 内では rc=0 (確認した 1 回の sweep で `F 18105d8ac rc=0`)、1 関数だけを単体で起動すると stub 条件で rc=97 (20/20 回)。レビュー側の実測 (rc=0: 72 / rc=97: 3・`18105d8ac` が rc=97) は、この単体条件と同じ結果。
+  sweep と単体の差 (実行方法・環境変数・stdout の扱い) は調べた範囲では原因を特定できず、§4 に残す。
 - fatal 行の保存: `slot_trace_fatal.txt` に `fatal` / `regs` / `heap_args` の 3 種が入る (base: 53 件ずつ・stub: 47 件ずつ)。
 
 ### 2.3 群ごとの確定結果 (baseline / stub)
@@ -104,10 +106,19 @@ cp tools/icall/work/slot_trace_fatal.txt tools/icall/work/fatal_stub.txt
 | 群 D (入口 `0x18105c1cc` 行の `ecx=0x50001b80`)・群 G (入口 `0x180ca2450` 行の `rcx=0x50000370`) の heap 域値の起源 | 受入条件 1 (群 D・G の残り) | #2247 (ICALL-68) |
 | 群 I の thunk 呼出し元 (harness の entry か guest 内の call 元か) | 群 I の機構の上流 | #2247 (ICALL-68) |
 | 群 C の `SLOT_ENC_INIT` 依存が guest の意図か harness の artefact か | 受入条件 2 の解釈 | #2247 (ICALL-68) |
+| `18105d8ac` の stub 条件 rc が sweep (rc=0) と単体 (rc=97) で食い違う原因 | 付録 §2.2 の stub の rc 内訳 (rc=0 と rc=97 の 1 件ずつ) | 本 PR の未解決表のみ (追跡。子は起票しない) |
 
 ## 5. 検証
 
 - 測定 commit: `4c59ce30` (`tools/icall/diff/slot_trace.sh` の fatal 抽出修正。`tools/icall/diff` の計測コードの最後の変更)。
-- 検証 HEAD: 本付録を含む最新 commit (PR 本文と PR コメントに記載)。
-- `git diff 4c59ce30 HEAD -- tools/icall/diff tools/ott` の出力は 0 行 (測定 commit 以降のコード差分は無し)。
-- 参考: `git diff 2c1c8121 4c59ce30 -- tools/icall/diff` は `slot_trace.sh` の 1 行 (`grep fatal` → `grep -E 'fatal|regs|heap_args'`) のみ。
+- 検証 HEAD: `071b1023` (main 取り込み merge・競合解消後)。§2 の実測はこの HEAD の worktree で行った。
+- `git diff 4c59ce30 071b1023 -- tools/icall/diff tools/ott` の出力:
+
+  ```
+   tools/icall/diff/slot_table_reach.py | 31 +++++++++++++++++++++++++++++++
+   1 file changed, 31 insertions(+)
+  ```
+
+  測定対象 (`slot_trace.c`・`slot_trace.sh`・`tools/ott`) は差分 0。差分は main 取り込み由来の `slot_table_reach.py` の新規追加のみ。
+- `slot_table_reach.py` は harness (`slot_trace.sh`・`slot_trace.c`) から呼ばれない (判定手順として `REPORT_APPENDIX_2197.md` から参照されるだけ)。
+- `git diff 2c1c8121 071b1023 -- tools/icall/diff` は `slot_trace.sh` の 1 行 (抽出 grep の修正) のみ。
