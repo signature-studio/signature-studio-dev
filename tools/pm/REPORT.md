@@ -246,6 +246,5 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 ## 15. heartbeat の監査文面と空ファイル検査 (#2607・指示 145)
 
-既知類型との関係: 該当なし (PM 運用の記録)。測定 commit `3f624789` (コードを変えた最後の commit)、測定時刻 2026-10-14T16:09Z。
-- 偽の opencode・間隔 1 秒・`timeout 4`: 文面ファイルあり 送信 3 回 (監査文面 3 回・既定 0 回)、未設定 送信 3 回 (既定 3 回)、存在しない・空・空白のみは終了 1・送信 0。初回送信は間隔 2 秒で 2.01 秒後。`bash tools/pm/test_pm_wake.sh` 20 passed。
+- 測定 commit `3f624789` (コードを変えた最後の commit)、測定時刻 2026-10-14T16:09Z。偽の opencode・間隔 1 秒・`timeout 4`: 文面ファイルあり 送信 3 回 (監査文面 3 回・既定 0 回)、未設定 送信 3 回 (既定 3 回)、存在しない・空・空白のみは終了 1・送信 0。初回送信は間隔 2 秒で 2.01 秒後。`bash tools/pm/test_pm_wake.sh` 20 passed。
 - 差分 (測定 commit から HEAD まで・コード範囲): `git diff 3f624789 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は空 (差分 0)。
