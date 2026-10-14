@@ -79,12 +79,12 @@ def main():
                 continue
             f = facts[s]
             ev = ('機械語 %s (2 段 deref・K=0x%x・V=0x%x)。消費者 %s。'
-                  'IR: %s 本体 (76541〜77198 行) に %s の alloca・store・load は %d 件 (alloca %s)。'
+                  'IR: %s 本体 (%d〜%d 行) に %s の alloca・store・load は %d 件 (alloca %s)。'
                   'K の load は IR 本体に %d 件。RetDec 出力 boot3.drc.ll の同関数 (%d〜%d 行) にも %s の言及は %d 件 '
                   '(m11 後処理より前の段で欠落)。config の locals には %s が宣言済み (%s)。'
                   'IR に store も読みも無く、TRUE_DROP / OK_LOAD / NO_CONSUMER の結線 (IR の store→load) が立たないため判定不能。'
                   '欠落の原因は RetDec 段の未確定 (子 issue)。'
-                  % (f['chain'], f['k'], f['v'], f['refs'][0], FN_NAME, f['name'],
+                  % (f['chain'], f['k'], f['v'], f['refs'][0], FN_NAME, start + 1, end + 1, f['name'],
                      f['mentions'], 'yes' if f['alloca'] else 'no', k_loads, ds + 1, de,
                      f['name'], f['drc'], f['name'], 'yes' if f['cfg'] else 'no'))
             add.append(json.dumps({'fn': '128f9e0', 'site': s, 'verdict': 'UNDETERMINED', 'evidence': ev},
