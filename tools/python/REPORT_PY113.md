@@ -55,7 +55,7 @@
 - 検証 1 (C の文法): `gcc -fsyntax-only -Wall -Wextra -I provider -I provider/gen provider/fl_engine.c` → rc 0。
 - 検証 2 (mock の格納値を state から読む、`node`): `0x123456` → stored `0x563412` (getter `0xff123456`) PASS、`0xABCDEF` → `0xefcdab` PASS、`0xFF0000FF` → `0xff0000` (getter `0xff0000ff`) PASS。
 - 検証 3 (逆アセ): §3 の `settrackcolor_facts.py` が 4 PASS・算法一致。
-- **未実測**: `provider/build.sh` (emcc) と `node tests/channels_diff.mjs` (C と mock の差分 0)。このランナーに `/opt/emsdk/emsdk_env.sh` が無く、`toolchain-emsdk` は本 run の `oc_artifacts` に無いため、wasm を作れなかった。`channels_diff.mjs` の playlist 部分は戻り値だけを比べ、setTrackColor は戻り値 `None` のため、格納式の変更で差分は出ない見込み (推定。実測していない)。→ 子 #2949。
+- **未実測**: `provider/build.sh` (emcc) と `node tests/channels_diff.mjs` (C と mock の差分 0)。このランナーに emsdk (`provider/build.sh` の `EMSDK_ENV` の既定先) が無く、`toolchain-emsdk` は本 run の `oc_artifacts` に無いため、wasm を作れなかった。`channels_diff.mjs` の playlist 部分は戻り値だけを比べ、setTrackColor は戻り値 `None` のため、格納式の変更で差分は出ない見込み (推定。実測していない)。→ 子 #2949。
 
 ## 6. 差分の確認
 
