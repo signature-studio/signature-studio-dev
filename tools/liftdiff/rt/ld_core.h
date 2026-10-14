@@ -558,7 +558,8 @@ typedef struct {
   char blob[24];
   int nargs; char kind[16]; u64 val[16];   /* 位置引数: kind 'i'(int/ptr) 'd'(f64 bits) 'f'(f32 bits) */
   u64 rax;
-  int trace, xfill, stkfill, keep, blk;
+  int trace, xfill, stkfill, keep, blk, audit;
+  u64 left_n, left_first, left_last;   /* LD-96 (#2258): audit=1 のとき case 開始時に、高水位より外側へ残った heap の非 0 バイト数 */
   int npatch; struct { int region; u64 off; u8 data[64]; int len; } patch[16];
   char abi[16];
 } ld_case_t;
@@ -616,6 +617,7 @@ static int ld_parse_case(char* line) {
     else if (!strcmp(t, "stkfill")) ld_case.stkfill = (int)strtol(v, NULL, 16);
     else if (!strcmp(t, "keep")) ld_case.keep = atoi(v);
     else if (!strcmp(t, "blk")) ld_case.blk = atoi(v);
+    else if (!strcmp(t, "audit")) ld_case.audit = atoi(v);
     else if (!strcmp(t, "xfill")) ld_case.xfill = atoi(v);
     else if (!strcmp(t, "args")) {
       char* s2; for (char* a = strtok_r(v, ",", &s2); a && ld_case.nargs < 16; a = strtok_r(NULL, ",", &s2)) {
@@ -652,6 +654,18 @@ static void ld_case_begin(void) {
     ld_ncalls = 0; ld_calls_over = 0; ld_ntr = 0; ld_tr_over = 0; ld_trace_on = ld_case.trace;
     ld_nblk = 0; ld_blk_over = 0; ld_blk_on = ld_case.blk;
     return;
+  }
+  ld_case.left_n = 0; ld_case.left_first = 0; ld_case.left_last = 0;
+  if (ld_case.audit && ld_heap) {   /* LD-96: 復元の前に、前 case の書込みで高水位より外側に残った非 0 バイトを数える */
+    u64 z = ld_heap_hw > LD_HEAP_RESERVED ? ld_heap_hw : LD_HEAP_RESERVED;
+    for (u64 i = z; i + 8 <= ld_heap_size; i += 8) {
+      u64 wv; memcpy(&wv, ld_heap + i, 8);
+      if (!wv) continue;
+      for (int k = 0; k < 8; k++) if (ld_heap[i + k]) {
+        if (!ld_case.left_n) ld_case.left_first = i + k;
+        ld_case.left_last = i + k; ld_case.left_n++;
+      }
+    }
   }
   ld_restore_all();
   memset(ld_arena_pristine, 0, ld_arena_size);
@@ -725,7 +739,9 @@ static const char* ld_case_end(const char* status, const char* detail, u64 fault
     memcpy(ref, ld_heap_pristine, ld_heap_pristine_len < ld_heap_hw ? ld_heap_pristine_len : ld_heap_hw);
     ld_diff_region("heap", ld_heap + LD_HEAP_RESERVED, ref + LD_HEAP_RESERVED, LD_HEAP_RESERVED, ld_heap_hw - LD_HEAP_RESERVED, &first, &trunc);
     free(ref); }
-  ld_ob("],\"mem_blocks\":%d,\"mem_trunc\":%d,\"heap_used\":%llu}", ld_nblk_total, trunc, (unsigned long long)ld_heap_used);
+  ld_ob("],\"mem_blocks\":%d,\"mem_trunc\":%d,\"heap_used\":%llu", ld_nblk_total, trunc, (unsigned long long)ld_heap_used);
+  if (ld_case.audit) ld_ob(",\"heap_left\":{\"n\":%llu,\"first\":\"0x%llx\",\"last\":\"0x%llx\"}", (unsigned long long)ld_case.left_n, (unsigned long long)ld_case.left_first, (unsigned long long)ld_case.left_last);
+  ld_ob("}");
   return ld_out;
 }
 
