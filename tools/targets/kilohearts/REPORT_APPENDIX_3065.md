@@ -1,6 +1,6 @@
 # REPORT APPENDIX 3065 — KH-38 (#3065): 対照 Gain closure の unsup (VEX/FMA 系) を flelift x64c で被覆
 
-> 本付録は KH-38 の新規実測節。本体の導線は `REPORT_KH19.md` §10。issue が挙げた `REPORT_KH19D.md` と `lift_closure_x64c.sh` は main に存在しなかったため、実測は本付録に置き、スクリプトは `scripts/lift_closure_x64c.sh` として新設した。
+> 本付録は KH-38 の新規実測節。本体の導線は `REPORT_KH19.md` §11。issue が挙げた `REPORT_KH19D.md` と `lift_closure_x64c.sh` は main に存在しなかったため、実測は本付録に置き、スクリプトは `scripts/lift_closure_x64c.sh` として新設した。
 
 ## 0. 結論
 
