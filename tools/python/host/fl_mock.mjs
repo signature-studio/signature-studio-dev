@@ -21,6 +21,7 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -198,6 +199,12 @@ export function createMockEngine() {
     // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
     "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
     "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
+    // PY-121 (#2985): screen 状態の 5 関数 (PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "screen.isBlanked": (...a) => { arity(a, 0, 0); return st.screenBlanked; },
+    "screen.isUnBlank": (...a) => { arity(a, 0, 0); return st.screenUnBlank; },
+    "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
+    "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
+    "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },

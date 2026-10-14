@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int scr_blanked, scr_unblank, scr_active;
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -64,6 +65,7 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -260,6 +262,13 @@ FL_H(general, getRecPPQ) { NARGS(0, 0); return fl_ret_i(c, rec_ppq); }
 /* PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない */
 FL_H(general, clearLog) { NARGS(0, 0); return fl_ret_none(c); }
 FL_H(general, dumpScoreLog) { NARGS(1, 2); (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+
+/* ---- screen (5) ---- PY-121 (#2985): PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740 (REPORT_PY121_2985)。値は未実測の仮置き */
+FL_H(screen, isBlanked) { NARGS(0, 0); return fl_ret_b(c, scr_blanked); }
+FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
+FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
+FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
+FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
