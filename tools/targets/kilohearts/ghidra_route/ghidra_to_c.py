@@ -38,8 +38,8 @@ STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ル
 }
 
 
-RCPPS_HELPER = r'''/* rcpps: Ghidra は `rcpps(dst, src)` の 2 引数形で出す (dst は未使用)。実機 (AMD Ryzen 9 9950X) の rcp 近似表で 4 lane を計算。
- * 表と指数則は snapins/lift/gen_simd.py の kh_rcp_exact と同一。 */
+RCPPS_HELPER = r'''/* rcpps_w: Ghidra の `auVarD = rcpps(in_XMMk, auVarS)` (第 1 引数は旧 dst で未使用・第 2 引数が源) を、dst へ書き戻す形にする。
+ * 実機 (AMD Ryzen 9 9950X) の rcp 近似表で 4 lane を計算。表と指数則は snapins/lift/gen_simd.py の kh_rcp_exact と同一。 */
 static const uint32_t kh_at_rcp[4096] = %(RCP)s;
 static inline uint32_t kh_rcp_exact(uint32_t x) {
     uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
@@ -48,16 +48,15 @@ static inline uint32_t kh_rcp_exact(uint32_t x) {
     int t = 253 - (int)e;
     return t <= 0 ? s : (s | ((uint32_t)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);
 }
-static inline V128 rcpps(V128 dst, V128 src) {
+static inline void rcpps_w(V128 *dst, V128 src) {
     V128 r;
-    (void)dst;
     for (int i = 0; i < 4; i++) {
         uint32_t x, y;
         memcpy(&x, src.b + 4 * i, 4);
         y = kh_rcp_exact(x);
         memcpy(r.b + 4 * i, &y, 4);
     }
-    return r;
+    *dst = r;
 }
 '''
 
@@ -127,6 +126,7 @@ def main():
     # --- 前方宣言 (Ghidra の定義シグネチャから)
     protos = []
     bodies = []
+    rcpps_n = 0
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
@@ -150,8 +150,10 @@ def main():
         if 'stackpair' in fixes:
             t = re.sub(r'\blonglong lStack_e8;\n\s*longlong lStack_e0;', 'longlong lStk[2];', t)
             t = t.replace('&lStack_e8', 'lStk').replace('lStack_e8', 'lStk[0]').replace('lStack_e0', 'lStk[1]')
-        if re.search(r'^\s*rcpps\(', t, re.M):
-            raise SystemExit('FUN_%x: rcpps の戻り値が捨てられている (文頭の呼出し)。代入先を確認すること' % va)
+        t, nrc = re.subn(r'^([ \t]*)(auVar\d+) = rcpps\(in_XMM\d+,[ \t]*(auVar\d+)\);', r'\1rcpps_w(&\2, \3);', t, flags=re.M)
+        if re.search(r'\brcpps\(', t):
+            raise SystemExit('FUN_%x: rcpps の形が想定外 (`auVarD = rcpps(in_XMMk, auVarS);` 以外)。dst 書戻しを保証できないため停止' % va)
+        rcpps_n += nrc
         m = re.search(r'^([\w \*]+?)\s*\n?\s*FUN_%x\((.*?)\)\s*\n\s*\{' % va, t, re.S | re.M)
         if not m:
             m = re.search(r'^([\w \*]+?)\s+FUN_%x\((.*?)\)\s*\{?' % va, t, re.S | re.M)
@@ -161,7 +163,7 @@ def main():
     for va, s in STUB.items():
         if ('FUN_%x' % va) in alltxt:
             protos.append(s.split('{')[0].strip() + ';')
-    if re.search(r'\brcpps\(', alltxt):
+    if rcpps_n:
         out.append(RCPPS_HELPER % {'RCP': rcp_table_literal()})
     out += protos
     out += [STUB[v] for v in STUB if ('FUN_%x' % v) in alltxt]
