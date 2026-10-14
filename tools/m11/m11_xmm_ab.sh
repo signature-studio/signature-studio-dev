@@ -2,7 +2,7 @@
 # #1479 (M11-2): xmm 引数の callee 署名復元 (fix_xmm_args.py, M11_XMM_ARGS=1, #954) の unit 別 A/B.
 # 同一 IR・同一 PE で既定 (M11_XMM_ARGS=0) と opt-in (=1) の survey を取り、unit 別 (942 本) に ok→非 ok の退行を判定する。
 # 判定: ok 喪失 (ok→非 ok) が 1 件以上、または unit 838/882/885 が ok でなければ終了 1。negative control で判定器自体を検査する。
-# 前提: work/boot_final.ll と work/ir_conditions.json (m11_build.sh と同じ)、FL_WIN64_DIR、/opt/emsdk、node。出力は work/xmm_ab/ (gitignore)。
+# 前提: work/boot_final.ll と work/ir_conditions.json (m11_build.sh と同じ)、FL_WIN64_DIR、emsdk ([EMSDK]・docs/REFERENCES.md)、node。出力は work/xmm_ab/ (gitignore)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 cd "$HERE"
