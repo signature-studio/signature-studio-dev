@@ -83,6 +83,35 @@ test("選定: 明示の TARGET / BATCH を尊重", () => {
   assert.deepEqual(p.picks, [1, 2]);
 });
 
+test("選定: relaunch 2 件 + ready 5 件 (枠に余裕あり) は、relaunch 2 件と ready 5 件を全件出す", () => {
+  const ready = Array.from({ length: 5 }, (_, i) => ({ n: 100 + i, title: "t", blocksCount: 0 }));
+  const p = planLaunch({ ready, relaunch: [7, 8], active: 0, target: 1000, batch: 1000 });
+  assert.deepEqual(p.picks, [7, 8, 100, 101, 102, 103, 104]);
+});
+
+test("選定: relaunch 2 件 + ready 40 件 (BATCH で頭打ち) は、枠 25 件に relaunch が先頭で入る", () => {
+  const ready = Array.from({ length: 40 }, (_, i) => ({ n: 100 + i, title: "t", blocksCount: 0 }));
+  const p = planLaunch({ ready, relaunch: [7, 8], active: 0 });
+  assert.equal(p.picks.length, 25);
+  assert.deepEqual(p.picks.slice(0, 3), [7, 8, 100]);
+  assert.equal(p.picks[24], 122);
+});
+
+test("選定: relaunch 2 件 + ready 1 件 (ready が少ない) は、ready を落とさない", () => {
+  const ready = [{ n: 100, title: "t", blocksCount: 0 }];
+  const p = planLaunch({ ready, relaunch: [7, 8], active: 0 });
+  assert.deepEqual(p.picks, [7, 8, 100]);
+});
+
+test("選定: relaunch は room を使う。room を超える relaunch も全件出し、新規は出さない", () => {
+  const ready = Array.from({ length: 10 }, (_, i) => ({ n: 100 + i, title: "t", blocksCount: 0 }));
+  const inRoom = planLaunch({ ready, relaunch: [1, 2], active: 48 });
+  assert.equal(inRoom.room, 2);
+  assert.deepEqual(inRoom.picks, [1, 2]);
+  const over = planLaunch({ ready, relaunch: [1, 2, 3], active: 48 });
+  assert.deepEqual(over.picks, [1, 2, 3]);
+});
+
 test("allowlist は infer が返す全素材名を含む", () => {
   assert.ok(ALLOW_ARTS.includes("work-m6-ott"));
 });
