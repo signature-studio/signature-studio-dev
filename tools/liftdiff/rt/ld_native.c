@@ -166,7 +166,7 @@ static void step_end(void) {
  * TF の待ち (g_wp_pend) の間は SIGALRM を block する (timeout で page が RWX のまま残るのを防ぐ)。
  * LD_STEP_N・trace と同時には使わない。 */
 static u64 g_wp_va, g_wp_page, g_wp_rip, g_wp_addr, g_wp_old, g_wp_rsp, g_wp_rax, g_wp_rcx, g_wp_nflt, g_tmo_n;
-static u8 g_wp_ins[16]; static int g_wp_call, g_wp_hit; static volatile int g_wp_pend; static FILE* g_wp_fp;
+static u8 g_wp_ins[16]; static int g_wp_call, g_wp_hit, g_wp_alrm_was; static volatile int g_wp_pend; static FILE* g_wp_fp; static u64 g_wp_alrm_def;
 static void wp_prot(int rw) { mprotect((void*)(uintptr_t)g_wp_page, 4096, rw ? PROT_READ | PROT_WRITE | PROT_EXEC : PROT_READ | PROT_EXEC); }
 static void wp_arm(void) {
   const char* a = getenv("LD_WATCH_ADDR"); const char* o = getenv("LD_WATCH_OUT");
@@ -178,6 +178,7 @@ static void wp_arm(void) {
 }
 static void wp_fault(ucontext_t* uc, u64 addr) {
   greg_t* g = uc->uc_mcontext.gregs; sigset_t blk; sigemptyset(&blk); sigaddset(&blk, SIGALRM);
+  g_wp_alrm_was = sigismember(&uc->uc_sigmask, SIGALRM);
   sigprocmask(SIG_BLOCK, &blk, NULL); sigaddset(&uc->uc_sigmask, SIGALRM);
   g_wp_nflt++;
   g_wp_addr = addr; g_wp_rip = (u64)g[REG_RIP]; g_wp_rsp = (u64)g[REG_RSP]; g_wp_rax = (u64)g[REG_RAX]; g_wp_rcx = (u64)g[REG_RCX];
@@ -189,7 +190,8 @@ static void wp_finish(ucontext_t* uc) {
   greg_t* g = uc->uc_mcontext.gregs;
   u64 nw; memcpy(&nw, (void*)(uintptr_t)g_wp_va, 8);
   wp_prot(0); g[REG_EFL] &= ~0x100; g_wp_pend = 0;
-  sigdelset(&uc->uc_sigmask, SIGALRM);
+  sigset_t pn; sigpending(&pn); if (sigismember(&pn, SIGALRM)) g_wp_alrm_def++;
+  if (!g_wp_alrm_was) sigdelset(&uc->uc_sigmask, SIGALRM);
   if (g_wp_hit) {
     fprintf(g_wp_fp, "wp case=%s call=%d rip_rva=%#llx rip=%#llx addr=%#llx old=%016llx new=%016llx chg=%d rsp=%#llx rax=%#llx rcx=%#llx ins=",
             ld_case.id, g_wp_call, (unsigned long long)(g_wp_rip - g_imgbase), (unsigned long long)g_wp_rip, (unsigned long long)g_wp_addr,
@@ -381,6 +383,6 @@ int main(int argc, char** argv) {
       ld_state_cmd(l, a ? a : "", b ? b : "");
     } else if (!strcmp(l, "QUIT")) break;
   }
-  if (g_wp_fp) { fprintf(g_wp_fp, "wpsum faults=%llu timeouts=%llu\n", (unsigned long long)g_wp_nflt, (unsigned long long)g_tmo_n); fclose(g_wp_fp); }
+  if (g_wp_fp) { fprintf(g_wp_fp, "wpsum faults=%llu timeouts=%llu alrm_def=%llu\n", (unsigned long long)g_wp_nflt, (unsigned long long)g_tmo_n, (unsigned long long)g_wp_alrm_def); fclose(g_wp_fp); }
   return 0;
 }
