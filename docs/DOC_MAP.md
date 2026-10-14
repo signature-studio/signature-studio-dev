@@ -222,6 +222,7 @@
 | `tools/m11/trap_triage/REPORT_2212.md` | ~115 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
 | `tools/m11/trap_triage/REPORT_714.md` | ~246 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_2203.md` | ~115 | #2203: unit 158 の j=12 の 2 区間 (A/B) の OFF/ON 比較。ON は 412c20 前後の指紋、OFF は IR 挿入で dest/len を記録。判定は clean ON/OFF とも ok・観測版 ON の trap は観測副作用。len 差の上流は未追跡 (#2152) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_1602.md` | ~191 | #1602: C 版内 stderr 計測 (§13)・hook 変種 (§14)・範囲内常時出力版 (§15) の不採用試行と、V8 inspector (`inspect_trap.mjs`、build 不変) による trap 時点の wasm local 採取 (§16、判定不変・304/555/923 の実値) |
 | `tools/m11/trap_triage/REPORT_1352.md` | ~50 | #1352: 計測 build (`M11_INSTR_413060=1`) の OFF は HEAD `1be53b3f` で既定と同じ 870/24/0 (871/23 は再現せず)・`M11_DEST_READ=0` でも 870/24/0。3 点切り分けは未実施・再現 `repro_1352.sh` |
 | `tools/m11/trap_triage/REPORT_2672.md` | 125 | #2672: unit 477 の `0x10a9f910` 下位 4B 書込みの主体 (C 版 `function_4133f0` の shadow stack 局所、`m11_ov.c:340`)。wasm 側 store 計装 (`watch_store_2672.mjs`・`store_sites_2672.py`) の陰性対照 (942 unit の kind 差分 0)・陽性対照 (OLD=0 で unit 1 hit)・類型案 (管理型局所のゼロ初期化欠落、仮説) |
@@ -249,7 +250,7 @@
 | `tools/m11/trap_triage/REPORT_861.md` | ~70 | unit 189 (409470 ReallocMem) の IR↔逆アセンブル突合・既存 C 転記 (#474) のネガコン (転記なしで 189 は halt0、ok→非 ok 24 件)・転記あり/なしの回帰 (unit 368 のみ)・未解決の起票先 (#861) |
 | `tools/m11/trap_triage/REPORT_1043.md` | ~60 | unit 368 の 409470 VA-big 確保の原因 (`function_980ed0` の 10 進 `inttoptr` 1 件の VA→LVA remap 漏れ)・`pass_m2q_fn980ed0` による修復・ネガコン/修復の survey (ok 869→870, 変化は 368 の halt0→ok のみ)・残件 (#861 受入 4) |
 | `tools/m11/trap_triage/REPORT_1046.md` | ~67 | #1046 unit 492 OOB 途中経過 (`4133f0` の入力値は未実測・受入 4 のみ達成・受入 1–3 は #1288) |
-| `tools/m11/trap_triage/REPORT_1620.md` | ~122 | #1620: unit 477 の `0x10a9f910` 下位 4B 上書きの書込み元 (IR store 経路ではない見込み・書込み主体は未特定)。埋め値依存の位置 (unit 134)・C 呼出し計装の副作用 (unit 304)・計装 `trap_w1620.py` |
+| `tools/m11/trap_triage/REPORT_1620.md` | ~204 | #1620: unit 477 の `0x10a9f910` 下位 4B 上書きの書込み元 (IR store 経路ではない見込み・書込み主体は未特定)。埋め値依存の位置 (unit 134) は §10 で検証不能と訂正。C 呼出し計装の副作用 (unit 304)・計装 `trap_w1620.py`。§10: `0x10a9f910` への書込みは初期 SP の配置 (C 側の静的データ量) で消える (HEAD で前提が再現しない)・埋め実験の訂正 |
 | `tools/m11/trap_triage/REPORT_596.md` | ~125 | work-m11 snapshot 基準の OOB 21 unit の最上位 frame 分類・4f9f40 系/414ad0 系の観測・#307 の OOB との同軸突合 (#596) |
 | `tools/m11/trap_triage/REPORT_494.md` | ~125 | survey の per-unit JSON に間接 call の site / target 別 hit 数 (`icall` 欄) を常設・#482 の復元を hit 数だけで検収 (#494) |
 | `tools/m11/trap_triage/REPORT_683.md` | ~110 | function_414ad0 (SetLength) の `[arg1]` deref 復元の C 転記 (gate `M11_OV_414AD0`) と IR 版の A/B。結論・測定値は REPORT_683 (#683) |
