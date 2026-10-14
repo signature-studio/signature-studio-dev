@@ -23,7 +23,7 @@ ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pend.has(m.id)
 const send = (method, params = {}) => new Promise((r) => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
 await send("Runtime.enable"); await send("Page.enable");
 const t0 = Date.now();
-await send("Page.navigate", { url: `http://127.0.0.1:${port}/tests/browser/static.html` });
+await send("Page.navigate", { url: `http://127.0.0.1:${port}/tests/browser/static.html?static=${process.env.STATIC_WASM || "flpy_static"}` });
 let text = "PENDING";
 for (let i = 0; i < 900 && !/^RESULT /.test(text); i++) {
   await new Promise((r) => setTimeout(r, 200));

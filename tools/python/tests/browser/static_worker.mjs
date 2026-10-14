@@ -6,10 +6,10 @@ import { A } from "/tests/tool_args.mjs";
 const J = JSON.stringify;
 const get = async (p) => new Uint8Array(await (await fetch(p)).arrayBuffer());
 
-async function runStatic() {
+async function runStatic(name) {
   const t0 = performance.now();
   const ids = await (await fetch("/analysis/flapi/flapi_ids.json")).json();
-  const create = (await import("/dist/flpy_static.js")).default;
+  const create = (await import(`/dist/${name}.js`)).default;
   const M = await create({
     locateFile: (p) => new URL(`/dist/${p}`, self.location.href).href,
     print() {}, printErr() {},
@@ -59,7 +59,7 @@ async function runStatic() {
 
 self.onmessage = async (e) => {
   try {
-    postMessage({ id: e.data.id, ok: await runStatic() });
+    postMessage({ id: e.data.id, ok: await runStatic(e.data.wasm) });
   } catch (err) {
     postMessage({ id: e.data.id, err: String(err && err.stack || err) });
   }

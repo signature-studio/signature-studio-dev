@@ -46,13 +46,14 @@ try {
   const stat = await new Promise((res, rej) => {
     w.onmessage = (e) => (e.data.err !== undefined ? rej(new Error(e.data.err)) : res(e.data.ok));
     w.onerror = (e) => rej(new Error(String(e.message || e)));
-    w.postMessage({ id: 1 });
+    w.postMessage({ id: 1, wasm: new URL(location.href).searchParams.get("static") || "flpy_static" });
   });
   w.terminate();
   out.static_init_ms = stat.summary.init_ms;
   out.static_tools_ms = stat.summary.tools_ms;
   out.static_in_worker = stat.summary.in_worker;
   out.static_host_calls = stat.summary.host_calls;
+  out.static_wasm = new URL(location.href).searchParams.get("static") || "flpy_static";
 
   // (c) 比較: tool 別 4 キー完全一致
   const KEYS = ["status", "result", "host_calls", "api_calls"];
