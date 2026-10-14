@@ -29,7 +29,7 @@ python3 gui/strategy_count.py work/uidesc.json out/rtti_classes.txt > work/gui_s
 python3 gui/effort_measure.py work/uidesc.json work/vstgui4/vstgui > work/effort_measure.txt
 ```
 
-- 入力 sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` は `gui/REPORT.md` §9-1 の値と一致 (本 run で `$ARTIFACTS_DIR/plugins-serum2.tar.zst` から再展開して照合)。
+- 入力 sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` は `gui/REPORT.md` §9-1 の値 (前版 `f0212bab` で照合)。本 HEAD では `plugins-serum2` が未展開のため再照合していない。
 - 依存: `pefile` `capstone` `zstandard` (venv `work/venv`、`uv venv` + `uv pip install`)。
 - upstream: tag `vstgui4_14_3` (commit `b1e82355`) を depth 1 で clone。14.0〜14.3 のどれかは未確定 (`gui/REPORT.md` §11) のため、14.3 の宣言照合は**版の差に対して頑健な範囲のみ**使う (宣言の有無は 14.0〜14.3 で同一と仮定。仮定は未検証)。
 
@@ -83,7 +83,7 @@ python3 gui/effort_measure.py work/uidesc.json work/vstgui4/vstgui > work/effort
 
 - `CTextLabel` (uidesc 26 参照・属性キー 34) + `XferOnOffButton` (43 参照・属性キー 15) は、uidesc 上で `CViewContainer` と組み合わせた template が存在する。
 - 最小 template の例: `GranularOscBottomDefault` (4 class: `CViewContainer` `HoverView` `VectorKnob` `XferOnOffButton`)。`Voicing` (4 class: `BitmapTextParamDisp` `CTextLabel` `CViewContainer` `XferOnOffButton`) は `HoverView` を含まない。ただし `BitmapTextParamDisp` (Xfer 固有) の置換を要するため、upstream のみでは閉じない。
-- **`{CTextLabel, XferOnOffButton, CViewContainer}` だけで閉じる sub-controller 無しの template は 3 件** (`ArpBrowser` `ClipBrowser` `Empty`) で、いずれも `XferOnOffButton` を含まない。つまり PoC は「uidesc 1 template の完全実体化」ではなく「Xfer 固有 2 種を含む最小 template の部分実体化」になる。
+- **`{CTextLabel, XferOnOffButton, CViewContainer}` だけで閉じる sub-controller 無しの template は 3 件** (`ArpBrowser` `ClipBrowser` `Empty`) で、いずれも `XferOnOffButton` を含まない。つまり PoC は「uidesc 1 template の完全実体化」ではなく「Xfer 固有 1 種 (`XferOnOffButton`) を含む最小 template の部分実体化」になる (`CTextLabel` は upstream 宣言あり)。
 
 ## 3. 判定
 
@@ -104,12 +104,38 @@ python3 gui/effort_measure.py work/uidesc.json work/vstgui4/vstgui > work/effort
 
 ## 5. 検証
 
-- 入力の sha256 は `gui/REPORT.md` §9-1 の値と一致 (上記 §1)。
-- `strategy_count.py` の出力は、コミット済みの `out/gui_strategy_count.txt` と**一致** (`diff` で確認)。
-- `effort_measure.py` の出力 (`work/effort_measure.txt`): 所要 0.93 s real (逐次, load 未計測)。
+- 以下の §2 の値は**前版 `f0212bab` での測定値**。本 HEAD では再実行していない (入力 `work/uidesc.json` は `plugins-serum2` の展開が要る)。
+- 前版では、入力の sha256 は `gui/REPORT.md` §9-1 の値と一致 (§1)。`strategy_count.py` の出力は、コミット済みの `out/gui_strategy_count.txt` と一致 (`diff`)。
+- 前版の `effort_measure.py` の出力 (`work/effort_measure.txt`): 所要 0.93 s real (逐次, load 未計測)。
 - ネガティブコントロール: C 接頭辞 ヒューリスティックが誤る 5 種 (`CBitmapTextEdit` 等) を宣言照合で検出。宣言照合の偽陰性は、前方宣言のみのクラス (`CKickButton` `COnOffButton` 等) で一度生じたため、宣言の正規表現は `class|struct <名>\b` の単語一致に限定して再照合済み (`gui/effort_measure.py` の `upstream_has`)。
 - 範囲外: 実 VSTGUI 実行、wasm/canvas 上の表示、工数 (人日)、mac 版。
 
-## 6. 測定 commit
+## 6. PoC 境界の対象量 (2026-10-14 run, #1351 残件)
 
-- 測定時の HEAD: 本 PR のコミット (`git log -1`)。コード変更は `gui/effort_measure.py` (新規) と本 REPORT のみ。
+PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入条件 2)。起点は upstream の宣言ファイルで、`#include "..."` を再帰的に辿る (`gui/effort_poc.py`)。
+
+| 区分 | ファイル | 行数 | バイト |
+|---|---|---|---|
+| include 閉包 (`platform/` 除く) | 55 | 13,373 | 408,005 |
+| `platform/` (閉包内) | 13 | 897 | 29,435 |
+| 合計 | 68 | 14,270 | 437,440 |
+
+- 起点 (seed): `CTextLabel` `CViewContainer` `CView` `CControl` `CBitmap` `CDrawContext` の宣言ファイル。
+- canvas 側で実装が要る純粋仮想インタフェース (`lib/platform/iplatform*.h` と `platformfactory.h`、計 16 ファイル): **159 関数**。`effort_poc.py` が出力する (コメント除去後に `virtual ... = 0;` を数える。`grep -cE '=\s*0\s*;'` の行数 (frame 25 / graphicsdevice 31 / platformfactory 20 / graphicspath 13 / font 7 / framecallback 10) と一致を確認済み)。
+  - 内訳 (ファイル別): graphicsdevice 31 / frame 25 / platformfactory 20 / graphicspath 13 / textedit 17 / framecallback 10 / openglview 10 / bitmap 7 / font 7 / viewlayer 6 / gradient 3 / resourceinputstream 3 / timer 3 / fileselector 2 / optionmenu 1 / string 1。
+  - 前版の「133 関数・内訳 frame 22 / graphicsdevice 22 …」は、コードから再現できなかったため撤回する。
+- PoC で最低限要る関数の部分集合 (bitmap / font / graphicspath / graphicsdevice / frame / factory の 6 ファイル) の関数数は、上記の内訳から合計 **103 関数** (bitmap 7 + font 7 + graphicspath 13 + graphicsdevice 31 + frame 25 + factory 20)。ただし「PoC で最低限要る 6 種」の選定は**本 run の判断で、閉包が実際に要求するかは未検証** (リンク・実行で確定する)。選定根拠: 「CTextLabel 系 + XferOnOffButton を canvas に描く」に直接使う描画・文字・ビットマップ・フレーム・ファクトリ。
+- Xfer 固有は `XferOnOffButton` の 1 種のみ (uidesc 上 43 参照)。`CTextLabel` は upstream VSTGUI に宣言がある (§0 の upstream 12 種に含まれる) ため、置換対象ではない (uidesc 上 26 参照)。`XferOnOffButton` の**関数数・バイトは未実測**。Xfer の .text 上での対応付けが要る (`gui/REPORT.md` §5-1 の注記どおり)。
+
+## 7. 工数 (人日) について (本 run の判断)
+
+- 工数は**本 run では推定値を出さない**。入力として §2・§6 の対象量は揃った。
+- 換算係数 (行/人日・関数/人日) を本リポジトリは持たない。係数を置くと、実測でない精度が数字に混入する。
+- 受入条件 1 の「工数の根拠」は、対象量 (本 REPORT §2 / §6) で根拠の材料は示した。人日そのものは未達として残し、判断はユーザに委ねる。
+
+## 8. 測定 commit
+
+- 測定 commit: `0444a3f3` (`gui/effort_poc.py` に純粋仮想の計数を追加した commit。コードを変えた最後の commit)。初版 `f0212bab` は include 閉包のみを計数していた。
+- `git diff 0444a3f3 HEAD -- tools/targets/serum2/gui/*.py` の出力: 空 (差分 0)。REPORT 文書のみの後続 commit は測定対象のコードを変えない。
+- §6 の純粋仮想の計数は `0444a3f3` の `effort_poc.py` で測定。同一入力の 2 回実行で出力が一致 (`cmp` で確認)。
+- `effort_measure.py` / `strategy_count.py` の §2 の値は前版 `f0212bab` での測定値。本 HEAD では再実行していない (入力 `work/uidesc.json` は `plugins-serum2` の展開が要る)。
