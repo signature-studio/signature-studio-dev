@@ -244,6 +244,6 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - live (読み取りのみの `GET /status`、15:18Z): `needs_pm`・`stuck`・`stuck_age_max_min` が返らない。`pm_wake.sh` は `result=status-failed reason=parse`・exit 2 で、送信は 0 件。本番 Worker は #2335 の変更を含まない版と見られる `[未確認: デプロイ版]`。再デプロイ後に needs_pm 経路が有効になる。
 - 差分 (測定 commit から HEAD まで・コード範囲): `git diff edb3ab39 HEAD -- tools/pm/pm_wake.sh tools/pm/test_pm_wake.sh tools/pm/systemd` の出力は空 (差分 0)。
 
-## 15. PM Worker の降格中の digest 抑止 (#2340・PR #2469 round 3)
+## 15. PM Worker の降格 (#2340・PR #2469) の測定
 
-測定 commit `a258a7d8` (コードを変えた最後の commit)。`git diff a258a7d8 HEAD -- infra/pm-worker` の出力は空 (差分 0)。測定値・ネガコンは `tools/pm/REPORT_APPENDIX_2469.md` (250 行上限のため分割)。
+測定 commit `76932e18` (コードを変えた最後の commit)。`git diff 76932e18 HEAD -- infra/pm-worker` の出力は空 (差分 0)。測定値・ネガコンは `tools/pm/REPORT_APPENDIX_2469.md` (250 行上限のため分割)。
