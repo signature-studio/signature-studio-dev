@@ -239,10 +239,10 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 
 ## 18. 観測済み launch の 3 時間 recent を、観測した run の完了から数える (#2645)
 
-測定した commit: `cd72e291` (コードを変えた最後の commit。base は origin/main `927cd651`)。測定時刻は UTC 2026-10-14 16:27〜16:28。
+測定した commit: `252bc259` (コードを変えた最後の commit。main `e1e816c2` の取り込み merge で競合 3 件を解消)。測定時刻は UTC 2026-10-14 16:43〜16:44。
 - 結論: 観測済み launch の `recent` の基準を、投稿時刻から、観測した run の完了時刻 (`launchObs.doneAt` = `RunState.updatedAt`) に置き換えた。完了時刻が無い観測済み launch と観測記録の無い古い launch は、従来どおり投稿から 3 時間。
-- 単体 `node --test`: **252 pass / 0 fail**、12.7 s、load 0.76 → 1.08 (増分 1 件は `test/launchobs.test.ts` の (e))。vitest unit (`test/unit`): **19 pass / 0 fail**、0.8 s (増分 9 件は `test/unit/launch_observed.test.ts`: 分類 (a)〜(d) と完了時刻の 2 種)。vitest workers: **3 pass / 0 fail**、1.2 s。
-- ネガコン (各 1 件ずつ壊して FAIL を確認し、元に戻して確認): M1 進行中の run を started にしない → (a) FAIL。M2 完了でなく投稿から 3 時間 → (b)(c) FAIL。M3 完了から 3 時間の上限を外す → (c) FAIL。M4 完了時刻なしの投稿からの窓を 0 → (d1) FAIL。M5 同じ窓を 30 時間 → (d2) FAIL。M6 完了時刻を見ない → (b)(c) FAIL。M7 `doneAtOf` が進行中の run を含める → 2 件 FAIL。M8 完了時刻を前へだけ進めない → advanceLaunch 1 件 FAIL。M9 observed への遷移で完了時刻を残さない → advanceLaunch 1 件 FAIL。M10 engine が完了時刻を渡さない → `launchobs.test.ts` で 1 件 FAIL (9 pass / 1 fail)。
+- 単体 `node --test`: **277 pass / 0 fail**、18.8 s、load 0.37 → 1.39 (本 PR の増分 0 件。(e) は main が vitest 化した `test/unit/launchobs.test.ts` へ移した)。vitest unit (`test/unit`): **29 pass / 0 fail**、1.35 s (main の 19 件に増分 10 件: `test/unit/launch_observed.test.ts` の 9 件 (分類 (a)〜(d) と完了時刻の 2 種) と `test/unit/launchobs.test.ts` の (e) 1 件)。vitest workers: **3 pass / 0 fail**、1.54 s。
+- ネガコン (各 1 件ずつ壊して FAIL を確認し、元に戻して確認): M1〜M9 は取り込み前の `cd72e291` で測定。M1 進行中の run を started にしない → (a) FAIL。M2 完了でなく投稿から 3 時間 → (b)(c) FAIL。M3 完了から 3 時間の上限を外す → (c) FAIL。M4 完了時刻なしの投稿からの窓を 0 → (d1) FAIL。M5 同じ窓を 30 時間 → (d2) FAIL。M6 完了時刻を見ない → (b)(c) FAIL。M7 `doneAtOf` が進行中の run を含める → 2 件 FAIL。M8 完了時刻を前へだけ進めない → advanceLaunch 1 件 FAIL。M9 observed への遷移で完了時刻を残さない → advanceLaunch 1 件 FAIL。取り込み後も観測の分岐は変わっていない (`launchobs.ts` は無変更、`classify.ts` の観測の行は差分 0)。M10 engine が完了時刻を渡さない → 取り込み後の `test/unit/launchobs.test.ts` の (e) 1 件 FAIL (28 pass / 1 fail)。
 - 互換: `tools/pm/launch_issues.py`・`test/fixtures/classify.input.json` は変更なし。`test/classify.test.ts` の Python 突き合わせ (`launchState` を渡さない入力) は通る。
-- 差分の証跡: `git diff cd72e291 HEAD -- infra/pm-worker` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 差分の証跡: `git diff 252bc259 HEAD -- infra/pm-worker` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 - 未解決: 本番 Worker への反映 (デプロイ) は #2645 の範囲外。反映後の挙動は本番で未確認。
