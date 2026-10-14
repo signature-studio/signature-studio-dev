@@ -176,10 +176,10 @@
 
 ### 測定条件
 
-- 測定 commit: 本節と同じ commit (`analysis/py99_slot_paths.py` の最終版を含む)。前段の測定 commit は `7e6c748a` (py88_writes.py・py64_check_expr.py の最後の変更)。`git diff 7e6c748a HEAD -- tools/python/analysis/py88_writes.py tools/python/analysis/py64_check_expr.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py64_branch_regions.py tools/python/analysis/py60_objdump_check.py` の出力は 0 行。`git diff 7e6c748a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 7386 行 (31 ファイル・main に取り込まれた他 PR の差分で、本節の対象外)。
+- 測定 commit: `69530065` (`analysis/py99_slot_paths.py` の最後のコード commit。`--lea-write` の追加を含む)。`41a6d7af` で測った 171 読みの結果は、`69530065` で再測定して一致した。前段の測定 commit は `7e6c748a` (py88_writes.py・py64_check_expr.py の最後の変更)。`git diff 7e6c748a HEAD -- tools/python/analysis/py88_writes.py tools/python/analysis/py64_check_expr.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py64_branch_regions.py tools/python/analysis/py60_objdump_check.py` の出力は 0 行。`git diff 69530065 HEAD -- tools/python/analysis` の出力は 0 行。
 - 素材: `oc_artifacts: fl-win64`。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'` は 1.58 秒 (展開前後で一致)。
 - 逆アセンブル: 既存の `work/py53/fn.txt` (fn=4664)。
-- 実行: `python3 analysis/py99_slot_paths.py work/py53/fn.txt > work/py99/paths.txt 2> work/py99/summary.txt` (exit 0・0.25 秒)。load average (1 分値): 0.02 (21:45:58)・0.00 (21:47:20)。
+- 実行: `python3 analysis/py99_slot_paths.py work/py53/fn.txt --lea-write > work/py99/paths.txt 2> work/py99/summary.txt` (exit 0・`time` の real 0.53 秒)。load average (1 分値): 0.21 (22:08:55)。
 - CFG: 関数内の jcc/jmp の辺 614・間接 jmp 0 件。`python3 analysis/py60_objdump_check.py work/py64/extracted/block00031_PE.bin work/py53/fn.txt` は objdump 614 辺・agree 614・disagree 0 (exit 0)。
 
 ### 結果 (読み 171 件。65 書込みの式の評価に現れた `[rbp+X]` の読みを (読み位置, X) で重複除去)
@@ -212,7 +212,7 @@
 ### 限界
 
 - 格納値が別の読み (SLOT[...] 等) に依存する 63 件と、入口レジスタに帰着する 32 件は値を閉じていない。経路列挙は store までで、格納レジスタの値の合流は越えていない。
-- `[rbp+0x5b8]` (ACC) は lea で取られている。間接書込み (0xc61250 経由) は対象外で、ACC 30 件の結論は直接書込みだけを仮定している。
+- `[rbp+0x5b8]` (ACC) は lea で取られている。間接書込み (0xc61250 経由) は lea を may-write とみなして検査した (`--lea-write`): lea から直接 store を経ずに届く ACC 読みは 0 件 (lea から届く節点 155 件)。よって ACC 30 件の結論は変わらない。ただし書込み幅は 0x5b8 の 1 スロットと仮定しており、0xc61250 本体は未読。
 - 対象は py88 と同じく dword/qword の `[rbp+X]` 書込みのみ (byte/word の部分書込みは見ない)。call は `[rbp+X]` を書かないと仮定 (addr-taken の X を除く)。
 - 0x104caae の r9d 引数 (`call 0x12df2a0`) は対象外。
 
@@ -222,7 +222,7 @@
 |---|---|---|
 | 格納値が別の読みに依存する 63 件 (T) の閉じた式 | 受入 1 の残り | #3085 (PY-158) |
 | 入口レジスタに帰着する 32 件 (ACC 30 件を含む) の引数の意味・全件の式表 | 受入 3 | #3086 (PY-159) |
-| ACC (`[rbp+0x5b8]`) の間接書込み 0x104a924 (lea・0xc61250 経由) の影響 | ACC 30 件の結論 | #3087 (PY-160) |
+| 0xc61250 本体の書込み幅 (0x5b8 の 1 スロット超への書込み)。lea 経由で届く ACC 読みは 0 件と検査済み | 0x5b8 以外のスロットの読みの到達 | #3087 (PY-160) |
 | 0x104caae の r9d 引数 (`call 0x12df2a0`) | 受入 2 の一部 | #3087 (PY-160) |
 | 0x104b7ec の SLOT? 印の線形 store が真の到達 store でない例 (1 件) | py88 の印の解釈 | #3085 (PY-158) |
 

@@ -7,7 +7,7 @@
 
 - `call 0x10469f0` の本体 (17 命令・0x10469f0〜0x1046a1d) は `edx + rint(2^-30 · ecx · (r8d − edx))` を返す。rint は `call 0x40c660` (`cvtsd2si rax, xmm0`・最近接偶数)、2^-30 は RIP 相対 qword 0x1046a20。
 - 7 件の呼出しの ecx (= 読み時点の `[rbp+0x5b8]`) は、すべて入口 store 0x1046d6b の edx (`d_in`) に帰着する。よって 7 件の戻り値は `e = edx_in` の式になる。
-- 式が閉じたのは 5 件 (`e` と定数のみ)。残り 2 件は edx・r8d が SLOT 依存 (0x104a48f・0x104b843)、1 件は `call 0x7a0c20` の戻り値に依存 (0x1049b31)。未確定 3 件は子 #3085・#3087 へ。
+- 式が閉じたのは 4 件 (`e` と定数のみ)。残り 2 件は edx・r8d が SLOT 依存 (0x104a48f・0x104b843)、1 件は `call 0x7a0c20` の戻り値に依存 (0x1049b31)。未確定 3 件は子 #3085・#3087 へ。
 
 ## 逆アセンブル (0x10469f0 の本体・`analysis/py99_call10469f0.py` の実測出力)
 
@@ -27,26 +27,27 @@
 
 ## 7 件の戻り値式 (`py88_out.txt` の CALL 行。e = edx_in)
 
-| 呼出し VA | ecx | edx | r8d | 戻り値 |
+| 呼出し VA (call 命令) | ecx | edx | r8d | 戻り値 |
 |---|---|---|---|---|
-| 0x1047719 | e | 0 | 0x3200 | rint(2^-30·e·12800) |
-| 0x1047969 | e | 0 | 0x3200 | rint(2^-30·e·12800) |
-| 0x1047d98 | e | −4800 (0xffffed40) | 4800 (0x12c0) | −4800 + rint(2^-30·e·9600) |
-| 0x1049b31 | e | 0 | X − 1 (X = `call 0x7a0c20` の戻り値・未確定) | rint(2^-30·e·(X−1)) ※X 未確定 |
+| 0x1047714 | e | 0 | 0x3200 | rint(2^-30·e·12800) |
+| 0x1047964 | e | 0 | 0x3200 | rint(2^-30·e·12800) |
+| 0x1047d93 | e | −4800 (0xffffed40) | 4800 (0x12c0) | −4800 + rint(2^-30·e·9600) |
+| 0x1049b2c | e | 0 | X − 1 (X = `call 0x7a0c20` の戻り値・未確定) | rint(2^-30·e·(X−1)) ※X 未確定 |
 | 0x104a48f | e | −M | M (M = M32[M64[G[0x15e44c8]] + SLOT[rbp+0x56c]·4]・未確定) | −M + rint(2^-30·e·2M) ※M 未確定 |
-| 0x104b305 | e | 0 | 0x3e80 (16000) | rint(2^-30·e·16000) |
-| 0x104b843 | e | A (SLOT[rbp+0x5c0] 系・未確定) | B (同じ基底・未確定) | A + rint(2^-30·e·(B−A)) ※A・B 未確定 |
+| 0x104b300 | e | 0 | 0x3e80 (16000) | rint(2^-30·e·16000) |
+| 0x104b83e | e | A (SLOT[rbp+0x5c0] 系・未確定) | B (同じ基底・未確定) | A + rint(2^-30·e·(B−A)) ※A・B 未確定 |
 
 - ecx の e の根拠: 7 件の ecx 読み (0x1047706・0x1047956・0x1047d82・0x1049b1d・0x104a47a・0x104b2f2・0x104b7f9) は、すべて到達 store が 0x1046d6b の 1 件・値は `d_in` (`py99_slot_paths.py` の出力)。前向き検算も mismatch 0。
-- 注意: `[rbp+0x5b8]` は lea で取られている (0x104a924)。間接書込みの影響は PY-99 節の未解決 (#3087)。
+- 注意: `[rbp+0x5b8]` は lea で取られている (0x104a924)。lea を間接書込み (may-write) とみなして検査した (`py99_slot_paths.py --lea-write`): lea から直接 store を経ずに届く `[rbp+0x5b8]` の読みは 0 件 (30 件のうち 0・lea から届く節点 155 件)。7 件の ecx 読みもこの 30 件に含まれ、影響を受けない。書込み幅は 0x5b8 の 1 スロットと仮定 (0xc61250 本体は未読・表は #3087)。
 - e の値 (呼出し元が 0x1046a30 に渡す edx) は本付録の対象外 (PY-53 #1911 の範囲)。
 
 ## 検証
 
-- 測定 commit: `28090312` (`analysis/py99_call10469f0.py` を含む最後のコード commit)。`git diff 28090312 HEAD -- tools/python/analysis` は 0 行 (後続の commit は REPORT と DOC_MAP のみ)。
+- 測定 commit: `69530065` (`analysis/py99_call10469f0.py`・`analysis/py99_slot_paths.py` の最後のコード commit)。`git diff 69530065 HEAD -- tools/python/analysis` は 0 行 (後続の commit は REPORT と DOC_MAP のみ)。
 - `cd tools/python && python3 analysis/py99_call10469f0.py work/py64/extracted/block00031_PE.bin` → 14 命令の期待列・K=2^-30・rint=`cvtsd2si` の 3 項目すべて一致、`PASS`、exit 0。
 - 同 `--negctl` (期待列の 1 命令を `sub ebx, eax` に変更) → `FAIL`、exit 1 (検出力あり)。
 - `python3 analysis/py99_slot_paths.py work/py53/fn.txt 0x1047706 0x1047956 0x1047d82 0x1049b1d 0x104a47a 0x104b2f2 0x104b7f9` → 7 件すべて `store 0x1046d6b ... : d_in`、`forward cross-check: n=7 mismatch=0`、exit 0。
+- `python3 analysis/py99_slot_paths.py work/py53/fn.txt --lea-write` → `lea-write: lea ['0x104a924'] から直接 store を経ずに届く節点 155、[rbp+0x5b8] の読み 0 / 30`、exit 0 (節点 155 > 0 は検査が動いている確認)。
 
 ## 限界
 
