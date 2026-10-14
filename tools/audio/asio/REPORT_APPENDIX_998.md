@@ -68,3 +68,23 @@ harness (`harness/chunk_verify.mjs`) の結果 JSON に `underrun_trace` (初回
 | 同一条件での underrun 頻度の確定 (T1〜T3 は 1/3 のみ) | 頻度の母集団が小さい | #998 |
 
 注: 本付録の検証は worktree `998-underrun-diag` の絶対パスで行った。途中、誤って main の共有ワークツリーで 1 回 e2e を走らせた (exit 0・4/4 PASS・trace なし)。その成果物 (`tools/audio/asio/work/`) は削除済みで、本節の表には含めない。
+
+### 12-5. producer 側 wake 遅延の計測 (2026-10-14・測定 commit `68270216`・コード差分は下記のみ)
+
+`com_test.c` の結果 JSON に既存の `wake_hist` (futex 起床の遅延ヒストグラム `<1,<2,<4,<8,<16,>=16` ms) を追加した。flasio・worklet・判定基準・ゲートは無変更。負荷は `yes` 4 本 (4 コア runner)・e2e は worktree の絶対パスで foreground・実行後に PID 指定で停止。
+
+| 実行 | exit | 所要 | 実行後 load | `com_ramp_b256_d2` underruns / silence | min_fill | cb_late | wait_timeouts | wake_hist (b256_d2) |
+|---|---|---|---|---|---|---|---|---|
+| W1 | 0 | 219 s | 6.48 | 0 / 0 | 384 | 0 | 0 | [765,13,2,1,0,0] |
+| W2 | 0 | 215 s | 7.67 | 0 / 0 | 384 | 0 | 0 | [569,16,1,0,0,0] |
+| W3 | 0 | 218 s | 7.86 | 0 / 0 | 896 | 0 | 0 | [749,7,7,0,0,0] |
+
+- W1・W2 は同じ計測コードで、W3 は測定 commit `68270216` の HEAD。3 回とも 4 シナリオ PASS。W1・W2 の時点のコードは W3 と同じ (コミット前に build 済み)。
+- W1〜W3 の b256_d2 では wake の 8 ms 以上の起床は 0 回 (`>=16` も 0)。`wait_timeouts` も 0。
+- 本計測の母集団は負荷下 3 回で underrun 0。§12-3・§12-4 の underrun 2 回 (A・T1) を再現していない。ゲートを緩めた根拠にはならない。
+- 結論: producer の futex 起床遅延は underrun の原因として確認されなかった。§12-4 の「bufferSwitch 内の停止」仮説は、wake 側の遅延ではなく bufferSwitch (JS 往復) 側に残る。未検証。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| underrun の直接原因 (wake 遅延は計測上なし。bufferSwitch 内の JS 往復が候補) | 受入条件 2 が未達 | #998 |
+| 同一条件で underrun を再現する手段 (負荷 4 本では 6 回中 2 回 → 本 run は 0/3) | 頻度と原因の切り分けができない | #998 |
