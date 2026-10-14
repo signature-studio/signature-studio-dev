@@ -86,12 +86,12 @@
 
 - 3 回の data SHA-256 は全て一致 (T2 の決定性は、16-bit 出力では成立)。
 - 出力 sample rate は、wine レジストリ `HKCU\Software\Image-Line\FL Studio 26\Devices\Audio output` の `Sample rate` (既定 44100) を 48000 に書き換えると 48000 Hz になる (確認済み)。
-- 未達: 目標の **32-bit float** が出ない。`/R` の trace (`WINEDEBUG=+reg`) では、書き出し設定の鍵 `General\WAVRenderForm` は開かれるが、その中の値 (`WAV bit depth`・`Export WAV`・`Dither`) は読まれていない。値を変えても形式は変わらなかった (`WAV bit depth`=2・3、`Export WAV`=2 で 16-bit のまま)。`/E`・`/O` を付けても WAV は出るが 16-bit、`/F` を付けると WAV は出ない。ビット深度を決める経路は未特定。
+- 未達: 目標の **32-bit float** が出ない。`/R` の trace (`WINEDEBUG=+reg`) では、書き出し設定の鍵 `General\WAVRenderForm` は開かれるが、その中の値 (`WAV bit depth`・`Export WAV`・`Dither`) は読まれていない。値を変えても形式は変わらなかった (`WAV bit depth`=2・3、`Export WAV`=2 で 16-bit のまま)。`/E`・`/O` を付けても WAV は出るが 16-bit、`/F` を付けると WAV は出ない。ビット深度を決める経路は未特定。 追加試行 (各 rc 0): `DS_32BitBufBox`=1、`LastExportedFormats`=4 / 16 でも 16-bit のまま。
 - 再現の注意: `wine64 reg add` の直後に FL64.exe を起動すると rc 231 で即終了する。`wineserver -k` で止めると正常に戻る (`s2_render_probe.sh` に反映済み)。
 
 **未解決** (`| 未解決 | 影響 | 起票先 |`)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 書き出しのビット深度を 32-bit float にする経路 (`/R` が読む設定) の特定 | S2 の受入「48 kHz / 32-bit float / dither off」が未達 | #113 (Refs) |
-| Render tests 82 本 + Demo 3 本の全数書き出しと、sha256・メトリクス JSON の commit (S3) | 未着手 | #113 (Refs) |
+| 書き出しのビット深度を 32-bit float にする経路 (`/R` が読む設定) の特定 | S2 の受入「48 kHz / 32-bit float / dither off」が未達 | #2546 (子、親 #113) |
+| Render tests 82 本 + Demo 3 本の全数書き出しと、sha256・メトリクス JSON の commit (S3) | 未着手 | #2546 (子、親 #113) |
 | 書き出し WAV の内容 (音色・レベル) の妥当性は未確認。T5 の C/D 閾値の校正には使えない | #106 の閾値確定が未着手 | #106 |
