@@ -139,7 +139,7 @@ cc() { # cc <src> <obj> [extra deps...]
 }
 # 別 TU (tools/shim, m11_rt/ov/win) が定義する Win32 API は winstubs から除外 (duplicate symbol 回避)
 for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.o; done
-S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060"
+S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060-${M11_DEST_GUARD:-0}"   # #1547: DEST_GUARD も rt.o の作り直し判定に入れる
 if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
 echo "$S_NEG" > work/neg_413060.stamp
 # #1176: work-m11 同梱の rt.o/win.o は古い snapshot のことがある (mtime だけでは判定できない: 同梱 obj が source より新しく見える)。
