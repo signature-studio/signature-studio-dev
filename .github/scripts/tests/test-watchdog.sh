@@ -362,5 +362,64 @@ DRY=1 wd
 not_logged 'pr ready' && grep -q 'DRY: ready #17' "$TMP/out"
 expect "DRY=1 plans without acting" $?
 
+# 24. 宙に浮いた issue の集計 (#1950): open issue で、blocked でなく、open PR が無く、実行中の implement run も無く、
+#     oc:no-pr / needs-user-input / oc:stuck も無いものを数えて出力する。数えるだけで、何も操作しない。
+# iss <n> <title> <labels json> [blocked_by] [pull_request を持つか]
+iss() { local pr=""; [ -n "${5:-}" ] && pr=',"pull_request":{"url":"u"}'; printf '{"number":%s,"title":"%s","labels":%s,"issue_dependencies_summary":{"blocked_by":%s}%s}' "$1" "$2" "${3:-[]}" "${4:-0}" "$pr"; }
+issues() { fx 'repos/o/r/issues?state=open&per_page=100' "[$1]"; }
+floating() { grep -E '^floating-issues=' "$TMP/out"; }
+
+reset
+base "[$(pr 30 aaa300 false "$OLD" '[]' $'Closes #102\n' | sed 's/"head":{/"head":{"ref":"102-has-pr",/')]"
+detail 30 true
+ISS="$(iss 101 'floating issue' '[]'),$(iss 102 'has a PR' '[]'),$(iss 103 'blocked label' '[{"name":"blocked"}]'),$(iss 104 'open blocker' '[]' 2),$(iss 105 'no-pr label' '[{"name":"oc:no-pr"}]'),$(iss 106 'needs input' '[{"name":"needs-user-input"}]'),$(iss 107 'stuck' '[{"name":"oc:stuck"}]'),$(iss 108 'a PR not an issue' '[]' 0 1),$(iss 109 'another floating' '[{"name":"area:x"}]')"
+issues "$ISS"
+wd
+floating | grep -q '^floating-issues=2 ' && floating | grep -q 'first: #101 #109'
+expect "floating issues are counted (blocked / PR / oc:no-pr / needs-user-input / oc:stuck / pull requests excluded)" $?
+# 集計は GET を 1 回呼ぶだけ。issue への書き込み・ラベル操作・dispatch は無い (PR 30 の点検による pr comment/close/reopen は別)。
+! grep -E '^gh (api -X|label|issue)' "$LOG" | grep -q . && not_logged 'repos/o/r/issues/10' && not_logged 'repos/o/r/dispatches' && [ "$(grep -c 'issues?state=open' "$LOG")" = 1 ]
+expect "counting floating issues makes no write (one GET of the open issues, no issue/label/dispatch call)" $?
+
+# 24b. 実行中の implement run (issue_comment でタイトルが issue と一致) がある issue は着手済み
+reset
+base '[]' '[{"event":"issue_comment","display_title":"running issue","path":".github/workflows/opencode.yaml","pull_requests":[]}]'
+issues "$(iss 110 'running issue' '[]'),$(iss 111 'idle issue' '[]')"
+wd
+floating | grep -q '^floating-issues=1 .*#111' && ! floating | grep -q '#110'
+expect "an issue with a running implement run is started, not floating" $?
+
+# 24c. 別の workflow の run は担当にならない
+reset
+base '[]' '[{"event":"issue_comment","display_title":"running issue","path":".github/workflows/scripts-test.yaml","pull_requests":[]}]'
+issues "$(iss 110 'running issue' '[]')"
+wd
+floating | grep -q '^floating-issues=1 '
+expect "a run of another workflow does not cover the issue" $?
+
+# 24d. 0 件
+reset
+base '[]'
+issues "$(iss 112 'x' '[{"name":"oc:no-pr"}]')"
+wd
+floating | grep -q '^floating-issues=0 ' && ! floating | grep -q 'first:'
+expect "no floating issue -> floating-issues=0" $?
+
+# 24e. issue 一覧が取れなくても PR の点検は続く (unknown と出す。exit 0)
+reset
+base "[$(pr 31 bbb310 true "$OLD")]"
+detail 31 true
+FAKE_FAIL='issues?state=open' wd; rc=$?
+[ "$rc" = 0 ] && floating | grep -q 'floating-issues=unknown' && logged 'pr ready 31'
+expect "issue list fails -> floating-issues=unknown, the PR pass still runs" $?
+
+# 24f. 集計は step summary にも出る
+reset
+base '[]'
+issues "$(iss 113 'floating' '[]')"
+GITHUB_STEP_SUMMARY="$TMP/summary.md" wd
+grep -q 'floating-issues=1' "$TMP/summary.md"
+expect "floating-issues is written to the step summary" $?
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]

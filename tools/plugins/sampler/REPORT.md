@@ -160,7 +160,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 - 判定 (`judge.py engines`) = lift_rc 0 / defines>0 / pdata>0 / 行が揃う / 最終 IR の `emcc -c` rc 0 (`emcc_c_rc_after_f80`) / `missing_ref` 0。 不合格は exit 1。 以上は到達性の実測で、engine の正しさは示していない。 殻 (Slicer 2) との結合方式 (`DispatchToEngine`・LoadLibrary 経路) は未解析。
 
 - E1 (`icmp P ptr %a, %argN` の i64 被演算子) は 2 pass で直す: `fix_ptr_params.py` (ptr 仮引数を i64 化し、その使用箇所に inttoptr・PR 追加) と main の `fix_icmp_ptr.py` (i64 被演算子に inttoptr・#545)。 合成 `.ll` で役割分担を確認: 片方だけでは残りが落ち、両方を順に通すと二重の inttoptr は出ない。 統合は別 issue。
-- `fold_const_ops` (`ir5_patch.py`) は cast の元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる (5bc59f1)。 回帰テスト `passes/test_fold_const_ops.py` 4 件。 旧版では 3 件 FAIL (255 / 65535 / 2^64-1)。
+- `fold_const_ops` (`ir5_patch.py`) は cast の元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる (5bc59f1)。 回帰テスト `passes/test_fold_const_ops.py` 4 件。 旧版では 3 件 FAIL (255 / 65535 / 2^64-1)。 19048 の i32 仮引数の型揃え (#1834) は [REPORT_APPENDIX_1834.md](REPORT_APPENDIX_1834.md)、 `emcc_c_rc_after_fixcmp` 1 → 0。
 
 ## 6. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner)
 

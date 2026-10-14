@@ -99,6 +99,28 @@
 
 - 測定 commit: `604e900f` (origin/main)。本 PR の変更は `tools/shimx/REPORT_SHX-T9.md` と `tools/shimx/evidence_1255/` のみで、測定対象のコード (`tools/m11/shimx_link/`・`tools/shimx/src`) には差分が無い。
 
+### 3.3 unit 23 の icall miss と slot 0x15f10e0 (#1607 SHX-T9e の実測)
+
+測定: `tools/m11/shimx_link/probe_unit23.mjs` (unit 1〜22 を順に実行した後、unit 23 (index 22) を 1 回実行)。shimx 版は `build.sh --trace --soft --fix` (clean rebuild, `[sxlink] OK`)、baseline は `work-m11` の `m11_boot.cjs`。load 約 0.3 (4 CPU)。出力は `tools/shimx/evidence_1607/probe_u23_{shimx,baseline}.txt`。
+
+| 項目 | shimx 版 | baseline |
+|---|---|---|
+| unit 23 (LVA 0x67f00) の戻り値 | `ret=2` (closure_outside) | `halt0` |
+| icall miss (unique / total) | 2 / 3 (`0x4476d0`・**`0x457860`**) | 0 / 0 |
+| `.bss` 0x15f10e0 (VarBstrFromBool slot) の値: unit 23 の前 / 後 | 0x0 / 0x0 | 0x0 / 0x0 |
+| unit 20〜22 の間の GetProcAddress 呼出し (sxt 計数) | 6 → 6 (unit 22 で GetModuleHandleW 6 → 7) | sxt 計数なし (未取得) |
+
+- unit 23 の miss 先 `0x457860` は REPORT §3.1 の仮説 (slot の fallback) と一致した。shimx 版でのみ発生する。
+- unit 23 の直前まで slot 0x15f10e0 は 0 のまま。`function_457c70` (slot を `GetProcAddress(oleaut32,"VarBstrFromBool")` で埋める) が unit 1〜22 の中で呼ばれていないことが sxt 計数から読める (unit 22 までの GetProcAddress 増分は 0)。
+- 未確定: `function_457c70` の呼出し元 (`function_458020` 経由) が unit 何番で起きるか、`GetModuleHandleW(oleaut32)` / `GetProcAddress` の戻り値。sxt 計数は呼出し回数のみで戻り値を持たないため、戻り値は wrapper の追加が要る。起票先: #1985 (`[SHX-T9f]`)。
+- baseline 側は sxt 計数が無く (`m11_boot.cjs` に `_sxt_*` 無し)、GetProcAddress 呼出しの有無は未取得。baseline の unit 23 が `0xf960` 以降どの分岐に入るかも未特定。起票先: #1985 (`[SHX-T9f]`)。
+- oob 増 57 件の unit 単位 frame 分類は未着手。起票先: #1986 (`[SHX-T9g]`)。
+
+### 3.4 検証の commit と差分 (WORKFLOW §6)
+
+- 測定の基底: `522da441` (origin/main)。測定に使った probe は本 PR で `tools/m11/shimx_link/probe_unit23.mjs` として追加 (測定対象の shimx・m11 のコードは未変更)。
+- `git diff 522da441 HEAD -- tools/m11/shimx_link tools/shimx/src` の差分は probe 1 本の追加のみ。
+
 ## 4. 残一覧 (BACKLOG 反映用の要約)
 
 | 区分 | 件数 | 起票先 |
@@ -112,6 +134,8 @@
 | survey unit 160 以降の range 連鎖 | 解消 (harness 修正) | #773 |
 | survey の unit 単位差分: unit 115 の fail-fast 差 | 差の機構を推定 (§3.1)。CS ポインタ一致は未比較 | #1255 (`[SHX-T9c]`) |
 | survey の unit 単位差分: unit 23 の分岐・oob 増 57 件の内訳 | 未説明 | #1465 (`[SHX-T9d]`) |
+| unit 23 の slot 0x15f10e0 の埋まり経路 (`function_457c70` の呼出し unit・戻り値) と baseline の 0xf960 以降の分岐 | 未説明 (miss 先 0x457860 は実測で確定) | #1985 (`[SHX-T9f]`) |
+| oob 増 57 件の unit 単位 frame 分類 | 未説明 | #1986 (`[SHX-T9g]`) |
 
 ## 5. 再現性
 

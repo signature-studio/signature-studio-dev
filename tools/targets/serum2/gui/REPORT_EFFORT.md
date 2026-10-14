@@ -139,3 +139,44 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 - `git diff 0444a3f3 HEAD -- tools/targets/serum2/gui/*.py` の出力: 空 (差分 0)。REPORT 文書のみの後続 commit は測定対象のコードを変えない。
 - §6 の純粋仮想の計数は `0444a3f3` の `effort_poc.py` で測定。同一入力の 2 回実行で出力が一致 (`cmp` で確認)。
 - `effort_measure.py` / `strategy_count.py` の §2 の値は前版 `f0212bab` での測定値。本 HEAD では再実行していない (入力 `work/uidesc.json` は `plugins-serum2` の展開が要る)。
+
+## 9. 2026-10-14 run (#1738): (b) 置換側の対象量と PoC の canvas 描画の試行
+
+- 範囲: 受入条件 1 (置換側の対象量) の残り (バイナリ側の vtable 由来の関数数)、受入条件 2 (最小 PoC の canvas 描画) の試行。人日は出さない (§7)。
+- 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` から取り出した `Serum2_win64.vst3` (sha256 `501e7bb3…`, §1 の値と一致)。upstream `vstgui4_14_3` (depth 1)。
+- 実行環境: `tools/targets/serum2/gui/work/` (gitignore)。venv は `uv venv` + `pefile capstone zstandard`。emsdk 6.0.12 (`toolchain-emsdk` 展開)。
+
+### 9-1. 再測定 (HEAD の入力で再実行)
+
+| スクリプト | 結果 | 前版 §2 との比較 |
+|---|---|---|
+| `extract_uidesc.py` | 2,093,822 B | 一致 |
+| `strategy_count.py` | `out/gui_strategy_count.txt` と diff 0 | 一致 |
+| `effort_measure.py` | 0.90 s real | 値は §2 と一致 (91 種 / 594 参照、upstream 宣言 12 種 / 223 参照、sub-controller 61 種 / 159 参照、Xfer 依存 template 120 / 123) |
+| `effort_poc.py` | include 閉包 68 files / 14,270 行 / 437,440 B、純粋仮想 159 関数 (16 files) | §6 と一致 |
+
+### 9-2. 受入条件 1: Xfer 固有 2 種の vtable 由来の関数数 (`vtable_measure.py`)
+
+- 方法: PE の MSVC RTTI (`.?AV<cls>@<ns>@@`) → COL → vtable を辿り、vtable の各スロットのうち `.text` を指すものを数える。
+- 限界: 継承元の関数を含む (vtable に展開されているため)。関数本体のバイト数は Ghidra が要るため未測定。
+- 結果:
+
+| クラス | TypeDescriptor | vtable 数 | vtable ごとのスロット数 / 異なる関数数 |
+|---|---|---|---|
+| `VSTGUI::CTextLabel` (upstream 宣言あり) | 1 | 3 | 105 / 90、2 / 2、3 / 3 |
+| `XferOnOffButton` (Xfer 固有) | 1 | 4 | 85 / 74、2 / 2、3 / 3、3 / 2 |
+
+- 解釈: 数値は継承込みの上限値であり、置換側の実数は未確定。upstream 宣言ありの `CTextLabel` (置換対象ではない) も同じ方法で 90 関数と数えられており、継承分が大半を占めることを示す。`XferOnOffButton` の 74 は「継承元との差分で override のみを数えた値」ではない。vtable 間の和集合は未算出 (vtable ごとの値のみ記録)。本体サイズは未測定。
+- 次の測定: 継承元 vtable (RTTI の base class array) との差分を取り、override された関数だけを数える (未着手。#1920 の範囲)。
+
+### 9-3. 受入条件 2: 最小 PoC の canvas 描画の試行
+
+- emsdk: `toolchain-emsdk` の展開で `emcc` 6.0.12 が動くことを確認。
+- 阻害要因 1 (実測): `vstguibase.h:139` が `#error unsupported system/compiler` で停止する。判定は `_WIN32` / `__APPLE__` / `__linux__` のみで、Emscripten (`__EMSCRIPTEN__`) を含まない。
+- 阻害要因 2 (実測): `-D__linux__=1` を補うと、PoC の seed 6 宣言 (`ctextlabel.h` `cviewcontainer.h` `cview.h` `ccontrol.h` `cbitmap.h` `cdrawcontext.h`) の構文チェックは 0 error (rc 0)。ただし `__linux__` の補正は測定用の回避であり、wasm 向けの正しい分岐ではない。
+- 未達: canvas 側の純粋仮想 159 関数 (16 files) の実装、リンク、描画、`XferOnOffButton` の .text 対応付け。いずれもこの run では未着手。
+
+### 9-4. 測定 commit と検証
+
+- 測定 commit: `31927856` (本 §9 と `gui/vtable_measure.py` を追加した commit。コードを変えた最後の commit)。PR の head は後続の docs 修正で進むため、測定 commit とは別物。REPORT 自身の hash は本文に書けないため、PR 本文には「測定 commit = `31927856`」と書き、head は PR の検証節で別に示す。以後この commit までのコード差分は 0 (`git diff 31927856 HEAD -- tools/targets/serum2/gui/*.py` が空であること)。
+- 再現: `work/venv/bin/python vtable_measure.py work/Serum2_win64.vst3 XferOnOffButton CTextLabel@VSTGUI`。

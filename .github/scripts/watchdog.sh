@@ -27,6 +27,8 @@
 # 読み取りに失敗した PR・mergeable が未確定の PR は、その回は何も操作せず次回に回す (fail-closed)。
 # fork からの PR (head.repo が本リポジトリでない) は CONFLICT でも dispatch しない (write 権限の run を第三者の入力で動かさない)。一覧に出して人が判断する。
 #
+# 宙に浮いた issue (blocked でも着手済みでもない open issue) は、最後に floating-issues=N として数えて出力する (数えるだけ。#1950)。
+#
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
 #             RUNS_TOKEN (actions:read。省略時は GH_TOKEN), DRY=1 で操作せず計画だけ表示
 set -uo pipefail
@@ -238,12 +240,41 @@ for i in $(seq 0 $((total - 1))); do
   esac
 done
 
+# --- 宙に浮いた issue の集計 (数えるだけ。何も操作しない。launch は PM Worker の責務) (#1950) ---
+# 依頼者指示: 全ての issue は常に『blocked』『着手済み』『closed』のいずれかであるべき。
+# 宙に浮いている = open issue で、次のどれにも当たらないもの:
+#   blocked   : ラベル blocked、または GitHub の issue dependencies に open な blocker がある (issue_dependencies_summary.blocked_by > 0)
+#   着手済み   : この issue を指す open PR がある (ブランチ名 <N>-... か本文の Closes/Refs/Fixes #N)、または実行中の implement run がある
+#               (issue_comment / workflow_dispatch の run で、run のタイトルが issue のタイトルと一致する)
+#   明示的な終了状態 : ラベル oc:no-pr (implement run が PR も push も出さずに終了した印。record-run-outcome.sh)、needs-user-input、oc:stuck
+# 本文の『依存: #N』『親: #N』による待ちは見ない (PM Worker の分類の責務)。そのため、これは上限値の目安である。
+# 一覧が取れなければ警告だけ出し、PR の点検結果には影響させない。
+floating_line="floating-issues=unknown (could not list open issues)"
+if iss_raw="$(gh api --paginate "repos/$R/issues?state=open&per_page=100" 2> /dev/null)"; then
+  floating="$(jq -s --argjson prs "$prs" --argjson active "$active" '
+    [ .[][] | select(.pull_request == null)
+      | . as $i
+      | select(([$i.labels[].name] | any(. == "blocked" or . == "oc:no-pr" or . == "needs-user-input" or . == "oc:stuck")) | not)
+      | select((($i.issue_dependencies_summary.blocked_by // 0) > 0) | not)
+      | select(any($prs[]; ((.head.ref // "") | test("^" + ($i.number | tostring) + "-")) or ((.body // "") | test("(Closes|Refs|Fixes|Resolves) #" + ($i.number | tostring) + "([^0-9]|$)"; "i"))) | not)
+      | select(any($active[]; .path == ".github/workflows/opencode.yaml" and (.event == "issue_comment" or .event == "workflow_dispatch") and (.title | gsub("^\\s+|\\s+$"; "")) == ($i.title | gsub("^\\s+|\\s+$"; ""))) | not)
+      | $i.number ] | sort' <<< "$iss_raw" 2> /dev/null)" || floating=""
+  if [ -n "$floating" ]; then
+    floating_n="$(jq length <<< "$floating")"
+    floating_line="floating-issues=$floating_n (open, not blocked, no open PR, no running implement run, none of oc:no-pr / needs-user-input / oc:stuck)"
+    [ "$floating_n" -gt 0 ] && floating_line="$floating_line first: $(jq -r '.[0:20] | map("#" + tostring) | join(" ")' <<< "$floating")"
+  fi
+fi
+echo "$floating_line"
+
 echo "open=$total covered(REVIEWING/FIXING)=$covered_n idle=$((total - covered_n)) acted=$acted deferred=$deferred"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
     echo "## PR watchdog"
     echo
     echo "open=$total / covered(REVIEWING・FIXING)=$covered_n / idle=$((total - covered_n)) / acted=$acted / deferred=$deferred"
+    echo
+    echo "$floating_line"
     echo
     printf '%s' "$summary"
   } >> "$GITHUB_STEP_SUMMARY"
