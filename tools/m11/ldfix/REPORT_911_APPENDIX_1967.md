@@ -90,25 +90,28 @@
 
 版について (受入 1): issue #2038 は 2019-03 版相当でのビルドを求める。本 PR の実測は v5.0 (`53e55b4b`) のみ。2019-03 版 (`6edcaaea`) はソースを取得できたが、(1) fix run では `toolchain-retdec` が無く share の入手元が無い、(2) 2019-03 版のツリーに `share/` が無い、(3) LLVM は `avast-tl/llvm` の外部取得 (`3d1e5d0b`) を要する。fix run の上限 (40 分) では収まらないと判断し、ビルドしていない。PM 判断 (2026-10-14、出典: https://github.com/signature-studio/signature-studio-dev/issues/2038#issuecomment-6167618240) により、受入 1 は原文のまま子 issue #2314 に移した (v5.0 に改める (b) は採らない)。
 
-## 6h. #2314 (LD-106): 2019-03 版 (`6edcaaea`) のソースビルド実測と、分岐発火確認の阻害要因
+## 6i. #2314 (LD-106): 2019-03 版 (`6edcaaea`) のソースビルド実測と、分岐発火確認の阻害要因
 
-測定 commit: `e6cefa06` (main。本 run は repo のコードを変えていない。`git diff e6cefa06 HEAD -- tools/m11/ldfix` は本節の追記のみ)。
+測定 commit: `e6cefa06` (main)。本 run は repo のコードを変えていない (2019-03 版は外部ソースを GitHub から取得して測った)。初回 PR head `c81c9f9a` (2026-10-14) では `git diff e6cefa06 c81c9f9a -- tools/m11/ldfix` が本節の追記のみ (+23 行)。main 取り込み後の HEAD との差分には main 側の変更も入るため、この確認は `c81c9f9a` に対してのみ成り立つ。
 ビルド対象: avast/retdec `6edcaaea` (2019-03-09) を `git clone` で取得し、`deps/` は同梱のもの (LLVM は `avast-tl/llvm` `3d1e5d0b` を CMake が取得)。
 
 ビルド (Makefile generator・`RelWithDebInfo`・`-j4`・4 コア・RAM 15GB。load average は make 前後の `uptime`):
 - クリーン 1 回目 (`build-clean`・`CXXFLAGS=-include cstdint -include string`): real 644 s (10 分 44 秒)。rc=0。load average 1.19 → 4.95。n=1。
-- 前段の試行 (LLVM 段で ninja が失敗・pelib/yaramod の sub-build を再実行) は 本測定に含めない。
+- 前段の試行 (LLVM 段で ninja が失敗・pelib/yaramod の sub-build を再実行) は本測定に含めない。
 
 ビルド時に必要だった回避 (v5.0 と異なる点):
 - GCC 13 で `std::uintN_t`・`std::string` が未 include: `CXXFLAGS` に `-include cstdint -include string` を付けた (`CMAKE_CXX_FLAGS` だけでは pelib の ExternalProject に届かない)。
 - yaramod の configure が `FLEX_INCLUDE_DIR` で失敗: `libfl-dev` を apt で導入 (`/usr/include/FlexLexer.h`)。
 - 2019 版には `RETDEC_COMPILE_YARA` が無い (v5.0 の回避は使えない)。
 
-未達 (受入 1 の後半・受入 2): 2019 版の `retdec-decompiler` を得られなかった。
+判定 (縮小後の #2314 の受入):
+- **受入 1 (ソースビルド + 所要時間の実測) は達成**。real 644 s = 10 分 44 秒 < 60 分・rc=0・n=1。60 分に収まる。
+- **受入 2 (41a6a0 での分岐発火確認) は未実施** → #2405 に移した。前提の 2019 版 `retdec-decompiler` を起動できなかったため (下の阻害要因)。受入 1 の不足ではない。
+
+受入 2 の前提を満たせなかった阻害要因 (#2405 の背景):
 1. `make install` が `cmake/install-share.py` で `retdec-support_2019-03-03.tar.xz` を取得し、HTTP 404 で失敗する (`github.com/avast-tl/retdec-support/releases/download/2019-03-03/...`。release API も 404。tag `2019-03-03` は存在するが LICENSE・README (172K) のみ)。share を入手できない。
 2. `toolchain-retdec` の share は `2019-03-08` (v5.0 同梱)。`2019-03-03` の代替にはならない (版が違う)。
 3. 2019 版の `retdec-bin2llvmir` は v5.0 と CLI が異なる (`--select-ranges` 無し。`-select-fncs` は値を取らず入力パスを解釈できない)。`retdec-decompiler.py` ラッパーは install 段が落ちるため使えない。
 
-判定: 受入 1 は **部分達成** (2019 版のソースビルドは実測した。ただし実行可能な 2019 版バイナリを得ていない)。受入 2 (41a6a0 での分岐発火確認) は **未実施** (前提の 2019 版バイナリが無い)。
-残件 (子 issue に移す): 2019 版の share 入手経路の確定 (2019-03-03 の share を別経路で得る、または 2019 版 `retdec-decompiler` 相当の起動方法を確立) → 41a6a0 での `checkForGlobalInInstruction` の L163〜168 発火確認 (`TAG` 一時ログ付きビルドも含む)。
+残件 (#2405): 2019 版の share 入手経路の確定 (2019-03-03 の share を別経路で得る、または 2019 版 `retdec-decompiler` 相当の起動方法を確立) → 41a6a0 での `checkForGlobalInInstruction` の L163〜168 発火確認 (`TAG` 一時ログ付きビルドも含む)。
 素材の入力: `block00031_PE.bin` は `fl-win64` 内 `extracted/`、sha256 先頭 `b2c64da4` (付録 §6f と一致)。
