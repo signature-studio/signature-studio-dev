@@ -85,7 +85,8 @@ def _conv(val, frm, to, tmp):
         if ints[to] == 32:
             return ['  %s = ptrtoint ptr %s to i32' % (n, val)], n
         n2 = tmp()
-        return ['  %s = ptrtoint ptr %s to i32' % (n, val), '  %s = zext i32 %s to %s' % (n2, n, to)], n2
+        op = 'trunc' if ints[to] < 32 else 'zext'   # #2715: i8/i1/i16 への変換は trunc (zext は狭い型へ書けない)
+        return ['  %s = ptrtoint ptr %s to i32' % (n, val), '  %s = %s i32 %s to %s' % (n2, op, n, to)], n2
     if frm in ints and to == 'ptr':
         if ints[frm] == 32:
             return ['  %s = inttoptr i32 %s to ptr' % (n, val)], n

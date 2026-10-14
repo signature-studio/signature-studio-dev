@@ -7,15 +7,15 @@
  "units_run": 0,
  "init_count": 895,
  "survey": {
-  "ok": 870,
+  "ok": 872,
   "noproc": 1,
   "miss": 47,
-  "trap": 24,
+  "trap": 22,
   "clobber": 0,
   "kinds": {
    "unreachable": 1,
    "halt0->longjmp": 7,
-   "memory access out of bounds": 16
+   "memory access out of bounds": 14
   },
   "failfast_units": {}
  },
@@ -286,9 +286,9 @@
   "GetFileVersionInfoSizeW:1"
  ],
  "probes": {
-  "GetMem": 2012,
+  "GetMem": 2006,
   "FreeMem": 162,
-  "FastMM_GetMem(407a50)": 2096,
+  "FastMM_GetMem(407a50)": 2089,
   "FastMM_FreeMem(407e20)": 166,
   "InitUnits": 0,
   "Halt0": 8,
