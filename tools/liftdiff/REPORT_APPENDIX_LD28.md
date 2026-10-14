@@ -106,3 +106,9 @@
 - **コード差分 (測定 commit → origin/main・判定に影響し得る範囲)**: `git diff 38d53ac8 origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (diff 全体 2,329 行)。測定は候補 commit 自身で行ったため、この差分は現 head との比較時にだけ効く。
 - **鮮度の証跡 (`38d53ac8` → HEAD `f9a7d1a5`・指摘 3)**: `git diff --stat 38d53ac8 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の出力 (25 files changed, 1528 insertions(+), 91 deletions(-))。主な内訳: `ldlib/boot.py` 160 / `ldlib/clift.py` 217 (新規) / `ldlib/classify.py` 39 / `ldlib/session.py` 64 / `rt/ld_core.h` 368 / `rt/fle_ldbridge.c` 183 (新規)。全文 (diff 2,329 行) は同じコマンドで再現する。
 - **この差分が候補の結論に影響しない理由**: 候補 `38d53ac8` の判定 (集計・対象 2 関数) は `38d53ac8` のソースで build・batch した成果物 (`work/2277`) から出ており、HEAD 側の差分はその成果物を変えない。HEAD 側の差分が効くのは HEAD で再実行したときだけ。
+- **#2277 の範囲 (受入条件 1・2 のみ)**: 受入条件 3 (全件 jsonl で `trace_diverge_418be0.py` が rc 0) は、素材に `work/2277/batch_closure.jsonl` が無いため本 PR では満たせない。範囲を縮め、未達分を下表に移す。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 受入条件 3: `38d53ac8` の全件 jsonl (`work/2277/batch_closure.jsonl`) に対する `trace_diverge_418be0.py` の rc 0 確認 | 全件版の trace_diverge 結果が未確認。3,092 / 1,524 / 2,805・5,705 も再計算できない | 再測定 (`38d53ac8` の build と batch) が要る。`oc_artifacts: fl-win64 work-m11 work-liftdiff` の新規 run で実施。子 issue にはしない (未解決表のみ) |
+| n=1 の min–max レンジ (584 s・load 1.42 → 6.39) | 単発値 | 同上 |
