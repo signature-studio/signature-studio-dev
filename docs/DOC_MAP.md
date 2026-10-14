@@ -32,6 +32,7 @@
 | `tools/perf/results/compress.md` | 同上 |
 | `tools/perf/p8/results/TABLES.md` | `tools/perf/p8/tables.mjs` (入力 `results/p8.jsonl`) |
 | `tools/icall/disp_size/results/TABLES.md` | disp_size 監査 driver |
+| `tools/icall/REPORT_APPENDIX_3136_candidates.tsv` | `tools/icall/diff/lea_index_scan.py` の候補行 (ICALL-86 / #3136・SlateCore.core_64・先頭行 `自動生成:`) |
 | `tools/icall/disp_size/results/consumers.md` | 同上 |
 | `tools/liftdiff/results/*.md` | `liftdiff` 採点名 driver |
 | `tools/m11/shimx_link/results/*.md` | `shimx_link` 計測 |
@@ -160,6 +161,7 @@
 | `tools/icall/REPORT_APPENDIX_2565.md` | ~110 | icall #2565 (PLG-P0b-20): BLK (0x8A1000) を再配置範囲の外へ。BLK の VA は据え置き、`icall_rewrite.py` の `place()` が関数・stub を BLK 域 `[blk, blk+0x280)` の後ろへ送る。成果物の交差 1 件 → 修正後 0 件・PE の BLK 域 0 埋め。検算は `check_blk_domain.py`、F.ranges は `mk_franges.py` |
 | `tools/icall/REPORT_APPENDIX_2696.md` | ~129 | icall #2696 (ICALL-82): closure 関数のうち dsm の data 区分に実コードを含む関数の実測 (件数は候補。非コード対照でも一部が通るため確定ではない)。修復と受入 3 は子 #2708 (ICALL-83)。測定値・定義・negative control の正本 |
 | `tools/icall/REPORT_APPENDIX_2900.md` | ~103 | icall #2900 (ICALL-84): 4 命令 (`180703913`・`180703b7c`・`1806dbe61`・`1806f7431`) の添字上限の確定 (部分達成)。受入 3 (baseline rc=95: 53・既知 12 中 hit 3) を再現。`180703913` は `18070390b` の fall-through でのみ入り、その経路では到達しない (静的・直接 jump 照合は未実施)。float の基底 `rax` は未確認。届く添字の算術と負の対照は `tools/icall/diff/index_reach.py`。動的採取は int3 が closure の挙動を変えるため不採用。残件は #3089 (ICALL-85) |
+| `tools/icall/REPORT_APPENDIX_3136.md` | ~150 | icall #3136 (ICALL-86): SlateCore.core_64 の lea 基底の添字参照の全数列挙 (`diff/lea_index_scan.py`・負の対照 `lea_index_scan_selftest.sh`)。定数一致で届く候補は無く、届かない・届き得る の内訳と限界は本付録。候補全行は `REPORT_APPENDIX_3136_candidates.tsv`。値域未確定の残件は #3089 (ICALL-85)。表 A・B は呼出し元の値域に依る |
 | `tools/icall/REPORT_APPENDIX_2310.md` | ~180 | icall #2310 (ICALL-72): BLK+0 (0x36319008) 書込み store の wasm オフセット対応の付録。route/lift 分類は §6 で完了 (受入条件 2)。脱落 store の修復は #2427 → #2514 (merge 済み)、残件は #2508。`fa_sweep.sh 8 60` の実測 (bit 一致 46 / 値の不一致 10) は 1998 §4 の 47 / 9 が正本で、±1 揺れは #2302 で追跡 |
 | `tools/icall/REPORT_APPENDIX_2079.md` | ~62 | icall #2079 (ICALL-56): closure 外 indirect target `0x1810806a0` の扱い (closure root に追加・152 関数)。`fa_sweep.sh` の実測と、`0x1810553d0` の値の不一致が未解消であること (#2120 で追跡) |
 | `tools/icall/REPORT_APPENDIX_1921.md` | ~72 | icall #1921 (ICALL-51): SlateCore の encoded 関数ポインタ表・cookie の特定と、native loader の enc(NULL)=cookie 初期化 (`FA_ENC_INIT=1`)。受入条件 1・2 は部分達成 (wasm 側と api-set 表は #2009・#1922 へ移管)。`fa_sweep.sh 8 60` の件数変化の実測を含む |
@@ -330,6 +332,7 @@
 | `tools/shimx/REPORT_SHX-T9h.md` | ~49 | SHX-T9h (#2489): 現行 `m11_ov.c` から baseline を再生成して unit 23 を shimx 版と比較。測定値の正本。REPORT_SHX-T9.md の旧 §3.3.5 から分割移動 (250 行上限のため) |
 | `tools/shimx/REPORT_SHX-T9i.md` | ~45 | SHX-T9i (#2491): unit 23 の GetModuleHandleW/GetProcAddress の呼出し元 site と戻り値の実測 (§3.3.5)・survey 942 unit の回帰確認 (§3.3.6)。REPORT_SHX-T9.md §3.3.5・§3.3.6 から分割 (250 行上限) |
 | `tools/shimx/REPORT_SHX-T9j.md` | ~80 | SHX-T9j (#2533): unit 23 の GetLastError を再生成 baseline と shimx `--trace --soft --fix` の両版で実測 (REPORT_SHX-T9.md §3.3.4 の追補) |
+| `tools/shimx/REPORT_SHX-T39.md` | 99 | SHX-T39 (#3149): unit 23 の baseline が 0xf960 の後に入る分岐条件 (`function_467c40` の slot ゲート) の IR 行つき特定。証跡と IR 行の再抽出は `tools/shimx/evidence_3149/` (`repro.sh`)。 |
 | `tools/shimx/REPORT_SHX-T9k.md` | ~76 | SHX-T9k (#2593): unit 22 の GetLastError=126 の発生元 (GetProcAddress の 1 回目) と、IR 行番号 ↔ wasm バイトオフセットの対応 (REPORT_SHX-T9j.md §2.4 の後続) |
 | `tools/shimx/REPORT_SHX-T35.md` | ~118 | SHX-T35 (#3023): HeapFree の範囲外ポインタを M4 契約に揃えた判断と測定 (REPORT.md は 250 行上限のため付録) |
 | `tools/shimx/REPORT_SHX-T37.md` | 103 | SHX-T37 (#3070): HeapReAlloc・GlobalLock/GlobalUnlock/GlobalFree の不正入力の戻り値・GetLastError を M4 契約・native 参照・MSDN と突き合わせた表と「直さない」判断。実測は `tools/shimx/evidence_3070/run.sh`。範囲外 trap は #3056 (merge 済み) で解消 |
