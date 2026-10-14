@@ -4,7 +4,7 @@
 
 **判定: 達成 (issue の範囲を縮めた)**。配線・ir_conditions / IR diff・通常 build の wasm での実測・survey 突合・`%arg1` assert・DEFECTS 更新は達成。受入条件 4 の ok 絶対値は 869 と 870 の差の原因を特定した。**136 は本 run で再現せず、原因は未特定**のため、「136 の原因特定」は issue の受入条件から外した (§5・§8)。
 
-測定 commit: `16447b9b` (コードを変えた最後の commit)。以後の commit は REPORT・DOC_MAP・REPORT_2316 の追記のみで、`git diff 16447b9b HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md' ':(exclude)tools/m11/ldfix/REPORT_2316.md'` の出力は 0 行 (§7)。
+測定 commit: `28d10d58` (origin/main `5c7bc303` を取り込んだ merge commit。コードを変えた最後の commit)。以後の commit は本 REPORT だけで、`git diff 28d10d58 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行 (§7)。取り込み前の `16447b9b` でも同じ値だった (§7)。
 
 ## 1. 受入条件
 
@@ -96,9 +96,11 @@ FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/ldfix/ld108_e2e.sh
 
 前提: `tools/m11/work` に work-m11 の展開、[EMSDK] (`docs/REFERENCES.md`)、Python の `capstone`・`pefile`。終了時に `work/boot_final*.ll` と `ir_conditions.json` を元に戻す。
 
-実測 (測定 commit `16447b9b`、foreground 1 回): rc 0、`LD108_E2E_SUMMARY fail=0`、real 3 分 31.655 秒 (211.7 秒)、load average (1 分) 1.64 (開始) → 1.02 (終了)、node v22.23.3・python 3.14.8・nproc 4・MemAvailable 14445 MiB。同一内容の 1 つ前の run (commit `9cc0b4e4`、検査 2 件の追加前) も 208.7 秒・`fail=0` で、ir_sha256・survey の値は一致した。
+実測 (測定 commit `28d10d58`、foreground 1 回): rc 0、`LD108_E2E_SUMMARY fail=0` (PASS 14 検査)、real 3 分 26.207 秒 (206.2 秒)、load average (1 分) 0.16 (開始) → 0.97 (終了)、node v22.23.3・python 3.14.8・nproc 4・MemAvailable 14404 MiB。ir_sha256・survey・直接呼びの値は §3・§4 と一致した。
 
-`git diff 16447b9b HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md' ':(exclude)tools/m11/ldfix/REPORT_2316.md'` の出力: 0 行 (REPORT 以外のコード差分なし)。
+main 取り込み前の run も同じ値だった (ir_sha256 3 種・survey 870 / 870・直接呼び): commit `16447b9b` で real 211.7 秒・`fail=0` (load 1.64 → 1.02)、commit `9cc0b4e4` (検査 2 件の追加前) で 208.7 秒・`fail=0`。取り込みで入った main 側のコード差分は `M11_INSTR_60A270` (既定 0 の計測 knob)・`m11_ov.c`・`m11_post.py` で、既定値の経路は変わらない。
+
+`git diff 28d10d58 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力: 0 行 (REPORT 以外のコード差分なし)。
 
 ## 8. 未解決
 
