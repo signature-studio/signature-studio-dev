@@ -52,6 +52,8 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 | `[_TEST]` | `/opt/_test/` | toolchain E2E 実証のスクラッチ領域 (`tools/m1` が参照) |
 | `[PNPM-HOME]` | `/home/ubuntu/.local/share/pnpm/bin` | pnpm (と同梱 node) のユーザローカル配置 (`tools/shared`・`tools/audio/asio` が参照) |
 | `[APT-MINGW]` | `/usr/bin/x86_64-w64-mingw32-gcc` (apt 導入の MinGW-w64 クロスコンパイラ) | 版は未記録 (`tools/gui/flengine/REPORT_APPENDIX.md` §6i の実行で使用。再現時は `x86_64-w64-mingw32-gcc --version` の出力を REPORT に残す) |
+| `[INNOEXTRACT]` | Ubuntu noble の apt パッケージ `innoextract_1.9-0.1build1` (`apt-get download` で取得し `dpkg -x`。依存の boost 1.83 も同様に展開)。調査用ビルドの元は https://github.com/dscharrer/innoextract の master `6e9e34ed` (版表に Inno Setup 6.4.2 を足したパッチ版。repo 外で作業し、リポジトリには含めない) | stock 1.9 (`tools/legal/REPORT.md` §1-1 で使用) / master `6e9e34ed` (調査用) |
+| `[7ZIP]` | `/usr/bin/7z` (runner 同梱) と https://www.7-zip.org/a/7z2600-linux-x64.tar.xz (sha256 `c74dc4a48492cde43f5fec10d53fb2a66f520e4a62a69d630c44cb22c477edc6`) を展開した `7zz` | 23.01 (同梱) / 26.00 (公式 Linux x64。`tools/legal/REPORT.md` §1-1 で使用) |
 
 ---
 
