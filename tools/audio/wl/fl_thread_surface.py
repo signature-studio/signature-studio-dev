@@ -20,30 +20,10 @@ NEG = "--negctl" in sys.argv
 MAIN_PE = os.path.join(FL_WIN64_DIR, "extracted", "block00031_PE.bin")
 NEG_PE = os.environ.get("NEG_PE")
 
-CLASSES = {
-    "thread_create": {"CreateThread", "_beginthreadex", "_beginthread", "CreateRemoteThread", "QueueUserWorkItem",
-                      "CreateThreadpoolWork", "SubmitThreadpoolWork", "CreateTimerQueueTimer", "SetTimer", "timeSetEvent"},
-    "blocking_wait": {"WaitForSingleObject", "WaitForSingleObjectEx", "WaitForMultipleObjects", "WaitForMultipleObjectsEx",
-                      "MsgWaitForMultipleObjects", "MsgWaitForMultipleObjectsEx", "Sleep", "SleepEx", "SwitchToThread",
-                      "SignalObjectAndWait", "GetQueuedCompletionStatus", "WaitOnAddress", "SleepConditionVariableCS",
-                      "SleepConditionVariableSRW", "EnterCriticalSection", "AcquireSRWLockExclusive", "AcquireSRWLockShared",
-                      "WaitForThreadpoolWorkCallbacks"},
-    "nonblocking_sync": {"InitializeCriticalSection", "InitializeCriticalSectionAndSpinCount", "LeaveCriticalSection",
-                         "TryEnterCriticalSection", "DeleteCriticalSection", "SetEvent", "ResetEvent", "CreateEventA", "CreateEventW",
-                         "CreateEventExW", "CreateSemaphoreA", "CreateSemaphoreW", "ReleaseSemaphore", "CreateMutexA", "CreateMutexW",
-                         "ReleaseMutex", "ReleaseSRWLockExclusive", "ReleaseSRWLockShared", "WakeByAddressSingle", "WakeByAddressAll",
-                         "WakeConditionVariable", "WakeAllConditionVariable", "InitializeSRWLock"},
-    "atomic": {"InterlockedIncrement", "InterlockedDecrement", "InterlockedExchange", "InterlockedExchangeAdd",
-               "InterlockedCompareExchange", "InterlockedCompareExchange64", "InterlockedExchange64"},
-    "thread_attr": {"SetThreadPriority", "GetThreadPriority", "SetThreadAffinityMask", "SetProcessAffinityMask", "GetCurrentThreadId",
-                    "TlsAlloc", "TlsGetValue", "TlsSetValue", "TlsFree", "FlsAlloc", "FlsGetValue", "FlsSetValue",
-                    "AvSetMmThreadCharacteristicsA", "AvSetMmThreadCharacteristicsW", "SetThreadIdealProcessor", "ExitThread",
-                    "TerminateThread", "SuspendThread", "ResumeThread"},
-}
+from thread_api import CLASSES, API2CLASS
 # gate: FLEngine は FL ミキサ/ASIO/MIDI/ファイル I/O スレッドを持つ DAW。これらが 0 件ならスキャナ (または対象 PE) が壊れている
 GATE = [("thread_create", "CreateThread", 1), ("blocking_wait", "WaitForSingleObject", 1),
         ("nonblocking_sync", "SetEvent", 1), ("blocking_wait", "Sleep", 1)]
-API2CLASS = {a: c for c, s in CLASSES.items() for a in s}
 
 path = NEG_PE if (NEG and NEG_PE) else MAIN_PE
 # 出力 (stdout / JSON) に絶対パスを残さない: FL_WIN64_DIR 配下なら相対, それ以外は basename
