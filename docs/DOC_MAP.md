@@ -241,6 +241,7 @@
 | `tools/m11/ldfix/REPORT_2405.md` | ~109 | LD-113 (#2405): RetDec 2019-03 版 (`6edcaaea`) の gv 分岐 (constants.cpp L163〜168) の発火実測。2019-03-03 の share (retdec-support) は入手不可と確定し、代用 share で 41a6a0・41a6d3・666b10 の発火を v5.0 と件数・root まで一致で確認。一時ログ付きビルドの所要。再現は `retdec2019_gv_2405.sh` |
 | `tools/m11/ldfix/REPORT_2396.md` | ~120 | LD-111 (#2396): `audit_lsf_disp.py` の変位形を `audit_lsf.py` に統合 (既存 3 判定は byte 不変、SUSPECT_DISP_VAS を並べて出力)。残 SUSPECT 3 件 (6677a0・d237e0・de1da0) を機械語 `movs` の列挙漏れ (誤検出) と確定し、列挙を拡張して 4 → 1 件 (41a670 のみ、修復後 0)。独立算法 `triage_ld111.py` の突合と NC 5 本 |
 | `tools/m11/ldfix/REPORT_2402.md` | ~110 | LD-112 (#2402): `fix_ld108.py` を `m11_gen_ir2.sh` の ldfix 直後に常設配線 (`ld108` 記録・`m11_build.sh` の拒否・`%arg1` 型 assert)。`ir_conditions` と IR diff (41a670 の 1 関数だけ)、通常 build の wasm での直接呼び、survey 942 unit の突合 (ok 退行 0)、ok 絶対値 869 / 870 の差は IR の出所まで特定 (どの変更が差を生むかは未特定)、136 型は再現せず原因未特定。`666a60` の修復は #2447 |
+| `tools/m11/ldfix/REPORT_2502.md` | ~130 | CI-100 (#2502): `function_450560` の 2 段 deref 脱落 (DEFECTS D4) を機械語 18 命令照合付きの IR 修復 `fix_450560.py` で直す。4 変種の e2e 実測 (GetMem/icall は C 転記と一致、トラップ OOB は不変)、同類型の機械語走査 `scan_spill_deref_2502.py` (候補 15 関数 22 箇所)、ネガティブコントロール 2 本。IR 側確認は #2555、本番配線は #2556 |
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 
