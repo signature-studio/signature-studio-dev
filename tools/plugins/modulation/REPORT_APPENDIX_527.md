@@ -79,7 +79,7 @@
 ## L. 殻の engine export 名の lea 参照と呼出先 (受入 5、`engine_shell_chain.py`)
 
 測定: `python3 modulation/engine_shell_chain.py <block_PE.bin>` (fl-win64 extracted の殻 4 本、静的のみ、rip 相対 lea のみ列挙)。
-§K (`engine_shell_entry.py`) は同じ参照を列挙するが、文字列を 1 箇所しか見ないため VC/VP の参照が落ちる。本節は文字列の全出現を走査する `engine_shell_chain.py` で取り直した (§K は履歴として残す)。
+§K (`engine_shell_entry.py`) と §L (`engine_shell_chain.py`) は、どちらも文字列の全出現を `find` の繰り返しで走査する (`engine_shell_entry.py` は VA ごとに `setdefault` で登録)。殻 4 本で両スクリプトの lea 参照と直後の call 先を突き合わせ、一致を確認した。§L は §K の表を呼出先の確認も含めて再確認したもので、置換ではない (§K は履歴として残す)。VC/VP の `VSTPluginMain` は両スクリプトとも rip 相対 lea を検出しない。
 
 | 殻 | 文字列 (VA) | lea 元 → 直後の call | 所見 |
 |--:|---|---|---|
