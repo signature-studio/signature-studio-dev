@@ -1,0 +1,54 @@
+{
+ "tag": "post",
+ "f4_fns": 10,
+ "f4_vas": [
+  "132e8e0",
+  "41ca30",
+  "44d1c0",
+  "52a7f0",
+  "666c30",
+  "69c360",
+  "71dd80",
+  "864f60",
+  "865020",
+  "977e40"
+ ],
+ "f4_sites": [
+  "132e8e0@132e9c4->stack_var_-40+0",
+  "41ca30@41ca3e->stack_var_-56+32",
+  "44d1c0@44d1fc->stack_var_-48+0",
+  "52a7f0@52a835->stack_var_-96+8",
+  "666c30@666c3e->stack_var_-56+32",
+  "69c360@69c36e->stack_var_-56+40",
+  "71dd80@71ddc4->stack_var_-80+8",
+  "864f60@864f71->stack_var_-24+4",
+  "865020@86503c->stack_var_-48+36",
+  "977e40@977e6f->stack_var_-64+0"
+ ],
+ "f4_consumer_and": [
+  "52a7f0@52a835",
+  "71dd80@71ddc4"
+ ],
+ "ir_52a7f0_xor_used": false,
+ "ir_52a7f0_ldf4": true,
+ "reg_calls": 3,
+ "util_ret": "0x110000f",
+ "util_err": null,
+ "classes": [
+  [
+   "TLightweightLayeredControl",
+   -16383
+  ],
+  [
+   "TApplication",
+   -16382
+  ]
+ ],
+ "units_run": 52,
+ "init_count": 54,
+ "icall_miss": 5,
+ "ok": 870,
+ "noproc": 1,
+ "miss": 47,
+ "trap": 24
+}

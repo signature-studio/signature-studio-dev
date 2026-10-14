@@ -53,7 +53,20 @@ kind が変わった unit (OFF → ON):
 | ON の ok 退行 0 (受入条件 3) | unit 190 の 1 件が残る | #1274 (本 issue、次 run) |
 | REPORT_912 §3 の `function_412e40` 記録と、現 main の `function_407a50` の差 | 記録の食い違い。どちらの IR/commit で起きたかは未切り分け | #912 (親 issue へ申し送り) |
 
-## 5. 差分 (測定 commit から本 PR の HEAD まで)
+## 5. 再測定 (次 run、測定 commit `8483b900` = origin/main `Merge #1631`)
+
+- IR: `m11_gen_ir2.sh` rc=0 (44.5 s、ldfix=applied、F1=902、errors=0)。素材は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`RETDEC_ROOT=$HOME/retdec` で展開。
+- build: `M11_OV_CLASSCREATE=1` rc=0 (25.7 s、signature mismatch 0・undefined 0)、`=0` rc=0。
+- survey: `SV_RAW=1 node trap_triage/survey_units.mjs` (ON 12.5 s、OFF。load 0.6 以下)。
+  - ON: `ok 869 / oob 15 / abort 2 / halt0 7 / miss 47 / noproc 1 / other 1`
+  - OFF: `ok 870 / oob 16 / halt0 7 / miss 47 / noproc 1 / other 1`
+  - `survey_diff.py` (OFF → ON): ok 退行 unit は **190 の 1 件** (ok → oob)。304・555 は oob → abort (#1275)。
+- unit 190 の生 frame (`SV_ONLY=190 SV_RAW=1`、ON) は §3 と同じ経路 (`407a50` → `409410` → `6ced90` → `6cf2a0` → `6cf480`) を示す。前回 PR #1490 の結果と一致。
+- 注: 全 unit の通常 survey で unit 190 の `frames` 欄の先頭は `function_412e40` を示す。`SV_ONLY` の単独実行 (生 frame) と全体実行で最内フレームが違う。どちらが REPORT_912 §3 の `412e40` に対応するかは未切り分け (#912 へ申し送り)。
+- 静的確認: `407a50` (`@function_407a50`) は `arg < 2601` で `(arg+7)/8` の表 (`18770492` 基点) を引く枝と、それ以外の枝を持つ連結リスト操作。`409410(1028)` は `sext(1028)` を渡す (1028 < 2601 なので表引き枝)。
+- 未実施: `407a50` 入口の実 pointer 値の計測 (probe 機構が `m11_post.py` / `m11_ov.c` に無く、新設が必要)。受入条件 1 の未達はこのため。起票先は #1642 (親 #1274)。
+
+## 6. 差分 (測定 commit から本 PR の HEAD まで)
 
 測定 commit `851c342e` から本 PR の HEAD までの `tools/m11` のコード差分は 0 (REPORT_1274.md の追加のみ)。`git diff 851c342e HEAD -- tools/m11 ':(exclude)*.md'` は 0 行。
 - `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。

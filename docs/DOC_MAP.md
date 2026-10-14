@@ -107,7 +107,9 @@
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
 | `tools/icall/REPORT_APPENDIX.md` | ~214 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行)・§16 (#852 FLEngine jump table) の全文 (250 行上限のため分割移動) |
 | `tools/icall/REPORT_APPENDIX_1067.md` | ~71 | icall REPORT §13 (#1026: Fresh Air 残落ち 6 件) の全文 (`REPORT_APPENDIX.md` §13 から分割移動) と、#1067 (ICALL-20) の段別切り分け。段別の主張は推定・既存記録のみで、dump 再生成は未実施 (素材 `work-icall`・`plugins-freshair` が要る) |
+| `tools/icall/REPORT_APPENDIX_1451.md` | ~70 | icall #1451 (ICALL-28): Fresh Air SlateCore closure 131 関数の wasm route (`fa_route_build.sh`) と native xmm0 bit 比較の付録。内訳 bit 一致 41 / native crash 66 / wasm のみ err 15 / 値不一致 9 (`fa_sweep.sh` 出力が正本)。未了は子 #1606・#1632・#1633 |
 | `tools/icall/REPORT_APPENDIX_1298.md` | ~56 | icall #1298 (ICALL-24): Fresh Air 残落ち 6 件の RetDec 段欠落の切り分け (素材 dump の再解析・段は推定、pass 未特定。dump 生成 commit は未確定)。REPORT §13 の段別主張の根拠 |
+| `tools/icall/REPORT_APPENDIX_1454.md` | ~75 | icall #1454 (ICALL-29): Fresh Air 残落ち 6 件の切り分け。lock/xadd の IR diff (空)・--backend-no-opts 比較 (間接 call 検出不能のため未確定)・pass 別計測の未達。子 #1612 |
 | `tools/icall/REPORT_APPENDIX_1206.md` | ~23 | icall #1206 (ICALL-21) の全文 (旧 `REPORT_APPENDIX.md` §17 の分割移動・無変更)。jump table の cmp/je 展開の効果の実測。`REPORT_APPENDIX.md` §17 は 1 行要約とリンクのみ |
 | `tools/icall/REPORT_APPENDIX_851.md` | ~40 | icall #851 (`0x128c320` の関数境界誤認 = decode 範囲分割) の全文。`REPORT_APPENDIX.md` §15 の別置き (250 行上限のため)。現 HEAD の A〜D 実測と、前回 `adc7f577` の chunk 実測 (未再現) を含む |
 | `tools/icall/REPORT_APPENDIX_1402.md` | ~21 | icall #1402 (ICALL-26) の jmp [mem] 形 jump table の cmp/je 展開 (jtm) の実装と、FLEngine 0x40d210--0x40d31b の before/after 実測 (dropped 0→0・未解決 → #1589)。REPORT_APPENDIX.md は 250 行上限のため増やさず別置き |
@@ -180,6 +182,7 @@
 | `tools/m11/ldfix/REPORT_484.md` | ~130 | ldfix が 5c0270 の D4 脱落を検出できなかった理由 (F3c の門 G1〜G5) と load→store 脱落の全数監査 (#484) |
 | `tools/m11/ldfix/REPORT_509.md` | ~165 | F3c 門の拡張と LSF 脱落 8 関数 / 11 site の IR 修復、消費者形 (`fix_f3c_use`) の監査、残存誤り (41a670 / 666a60) (#509) |
 | `tools/m11/ldfix/REPORT_510.md` | ~150 | base が引数由来でない load→store (370 site / 169 関数) の判定軸: SSA 対応の静的判定 vs liftdiff 動的差分の実測比較と脱落数 (#510) |
+| `tools/m11/ldfix/REPORT_564.md` | ~60 | escape 済み stack_var 内部 read の undef 化 (AllocateHWnd 52a7f0 の `cmp [TempClass.lpfnWndProc]`)。ldfix F4 の修復 10 関数と RegisterClassW 到達の実測・全数走査 (#564) |
 | `tools/m11/ldfix/REPORT_968.md` | ~50 | D17 修復 pass (rip 相対セルの 2 段 deref 潰れ) の部分達成: 単一 load の 24 関数を修復、残りは子 issue (#968) |
 | `tools/m11/ldfix/REPORT_930.md` | ~100 | 消費者形 pure 残 23 関数 (24 引数) の残件分類 (first-deref-not-entry 18 関数 ほか) とネガコン。survey 到達数は再現未了 (#930) |
 | `tools/m11/ldfix/REPORT_1134.md` | ~50 | 消費者形 pure 残の部分達成 (原因の記録のみ): tracker-no-deref 3 関数 (75a180・db6480・dc27c0) の機構 (引数 slot のループ内書き換え・2 段 deref)、5c44b0 (none) の理由の一部。修正・修復・再測定は未着手で #1324 (LD-45)・#1325 (LD-46) (#1134) |
@@ -338,7 +341,7 @@
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
-| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~76 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 (§A5 = `ks_rdata_value.py` の語単位切り分け) |
+| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~113 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・FA-18 の切り分け (§A3-2)・meter 更新式の照合 (§A3-3, #1467)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)・語単位切り分け (§A5, `ks_rdata_value.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA16.md` | ~50 | freshair REPORT §12-5 (未解決: 非空 controller map による 0x180da6c00 到達) の静的読み付録 (FA-16 #1182)。0x180ca1480 の分岐・0x180ca7db0 の map lower_bound ノード配置・0x180c9d700 / 0x180da6c00 の入口条件。実行による検証は含まない。REPORT §12-5 から分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~180 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照)。FA-14 (#907): §7 回帰セットの seed 依存実測・§8 受入の未達と起票先 (#1105)・§9 lift2_e2e 実測 (実測 commit `c531a0cb`) |
@@ -372,7 +375,7 @@
 | `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
 | `docs/LEGAL_TERMS_LEDGER.{json,md}` | 各社規約の取得台帳 (取得日・版表記・正規化テキストの SHA-256)。`.json` が正本、`.md` は自動生成 | 規約本文・手編集 (`pnpm terms-watch` が更新) |
 | `docs/DOC_MAP.md` | 本書。REPORT.md 索引・行数上限ルール・自動生成一覧・本章 | 技術内容・測定値 |
-| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D20 (横断正本) | 個別ケースの詳細 (report 側) |
+| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D22 (横断正本) | 個別ケースの詳細 (report 側) |
 | `docs/HANDOFF/<日付>.md` | 引継ぎ要約 (方針・ブロッカー・次の一手)。最新のみ保持 | 状態の正本 (STATUS.md へ)・数値の羅列 |
 | `tools/<area>/REPORT.md` | **測定値・実測数値・検証結果の単一の正本** (日本語/英文を問わず) | なし (ここが正本) |
 | `tools/<area>/README.md` | **ナビゲーションのみ** (何をする dir か・E2E コマンド・関連ファイル) | 測定値・状態表 |

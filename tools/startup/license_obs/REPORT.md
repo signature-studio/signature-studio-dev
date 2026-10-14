@@ -51,7 +51,8 @@
 | `run_cases.py` | 入力ケース実行 (unit 初期化を先に実行) → `results/cases.json`・`results/CASES.md` (自動生成) |
 | `verify.py` | 検算 (capstone 非依存の生バイト走査・gradeChar 追跡の別算法・不変条件・ケース期待値・unit 初期化節の独立導出・ILRegKey 非空ケースと judge 突合・ネガコン) |
 | `probe_786.py` / `REPORT_786.md` | #786: 0x10d3a30・0x11cb000・0x10d50d0 の呼出し元・参照元・ループ条件 (読取専用)。付録 `REPORT_786.md` |
-| `probe_1492.py` / `REPORT_786.md` §12 | #1492: 基本ブロック追跡 (分岐合流・callee 越し) で退避経由 gradeChar を再計数。線形走査と一致 (207/69/20)。付録 `REPORT_786.md` §12 |
+| `probe_1492.py` / `REPORT_786.md` §13 | #1492: 基本ブロック追跡 (分岐合流・callee 越し) で退避経由 gradeChar を再計数。線形走査と一致 (207/69/20)。付録 `REPORT_786.md` §13 |
+| `probe_1414.py` / `REPORT_786.md` §12 | #1414: 0x10c7cd0 の間接 call を通常経路 6 入力で観測 (9 ターゲット・0x11cb000/0x10d50d0 は未到達)、0x10d3a30 の強制実行 (g1/g2 を書換え・F1 は書込み無し、F2/F3 は 0x10c7850 内で停止)。付録 `REPORT_786.md` §12 |
 | `probe_1221.py` / `REPORT_786.md` §8 | #1221: unicorn code hook で 0x11cb000・0x10d50d0・0x10d3a30 の到達を観測 (6 入力とも未到達)、g1〜g8 の実行後の値、0x10c7850 の戻り値 (0x7fffffff)。付録 `REPORT_786.md` §8 |
 
 ## 3. 結果
