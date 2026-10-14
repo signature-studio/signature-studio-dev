@@ -2,7 +2,7 @@
 
 ## 1. 結論
 
-- **unit 18 の OOB (`function_4133f0`) は、素材 `work-m11` の IR が古い (alloca 拡幅が現行より前の版。IR の差は §4-B の alloca 型のみ) ために出ていた。** 現行の生成手順 (`m11_e2e.sh`) で IR を作り直すと消える。前 2 run の「stack 最上段を export 名で解決」「呼出チェーンの静的確認」は、この古い IR 上の調査だった。
+- **unit 18 の OOB (`function_4133f0`) は、素材 `work-m11` の IR (`boot_final3.ll`) が現行の後処理 (`m11_gen_ir2.sh`) と違う版だったことと関係する。** 保存済み lift に現行の `m11_gen_ir2.sh` を当てて IR を作り直すと、新 IR の実 boot で OOB は出ない (§4-A)。新 IR の一部関数の alloca を古い形に戻すと、同じ OOB が再現する (§4-B)。stale と新 IR の差分の主因は alloca 型の拡幅だが、alloca 以外の差分も残る (§4-F)。lift は boot5 を除いて再実行していないため、`--full` の IR での再現は未確認 (§2・§7)。前 2 run の「stack 最上段を export 名で解決」「呼出チェーンの静的確認」は、この stale IR 上の調査だった。
   - ネガコン (§4-B): 新 IR のうち `function_44bae0` の alloca (`stack_var_-88`: `i64` → `[11 x i64]`) だけを古い形に戻すと、OOB が同じ形 (`old=0x100000000`・`units_run=17`) で再現する。`446400` だけ・`44bb70` だけを戻しても再現しない。
 - 「`GetLocaleInfoW` 66 回反復」は誤読だった。**66 は unit 18 の shimx 呼出の総数**で、`GetLocaleInfoW` は古い IR で 48 回・新 IR で 54 回。いずれも有限回で、無限反復ではない。呼出元は `function_446400` (§3)。
 - 新 IR での逐次 boot は **別の欠陥で止まる**: `function_448490` の入れ子手続 `function_4483f0` が親フレームを正しく読めず、`VirtualAlloc(0x76910000)` を要求 → NULL → `MessageBoxA "Runtime error 0 at …"` → Halt0 → longjmp (`dllmain_done=true`、`units_run=17`)。新類型 **D23 候補** (§5)。
@@ -11,10 +11,12 @@
 
 ## 2. 測定条件
 
-- 測定 commit: `e4be81ff030538ab524e2fd7a6adbc6de901f07c` (コード差分の最終 commit。本 REPORT のみが後続)。
+- 測定 commit: `e4be81ff030538ab524e2fd7a6adbc6de901f07c` (コードを変えた最後の commit)。再測定 (§8) は head `f3063892` で行った。`f3063892` のコードは main 取り込みの merge `7f7fbfd3` と同一 (差分は REPORT のみ)。
 - 場所: `git worktree add ../ws-1630` (main の共有ツリーは使わない)。`work-m11` を `tar --zstd -xf` で worktree に展開 (`tools/m11/work/` 233 エントリ・gitignore)。`fl-win64` は `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` を指定。
-- **IR の作り直し** (これが本 REPORT の前提): `work-m11` には `lift_pe.sha256` が無いため、そのままの `m11_e2e.sh` は `--full` (Ghidra 要) に入って落ちる (`functions_dll.csv` 無し)。PE の sha256 を `tools/m11/work/lift_pe.sha256` に書いてから `bash tools/m11/m11_e2e.sh` を実行した。
-  - 結果: `gen_ir2` / `lift boot5 (RetDec)` / `gen_ir2 (boot5 追加)` / `m11_data_gen` / `m11_image_gen` / `build` が ok、所要 2 分 47 秒。`M11_SUMMARY`: `reached_stage=4`・`units_run_full=53`・`survey_ok=872`・`survey_trap=23`・停止は `function_8c5eb0`。`ir_conditions`: `ldfix=applied` `qstore=applied`、`ir_sha256=6909f85d…bacbcc62` (IR の sha256 は実行ごとに変わる。#1664)。
+- **IR の作り直し** (これが本 REPORT の前提。head `f3063892` で再実行し、結果は §8): `work-m11` には `lift_pe.sha256` が無いため、そのままの `m11_e2e.sh` は `--full` (Ghidra 要) に入って落ちる (`functions_dll.csv` 無し)。PE の sha256 を `tools/m11/work/lift_pe.sha256` に手で書き、非 `--full` 経路の `bash tools/m11/m11_e2e.sh` を実行した。
+  - `need_lift=0` となり `--full` (scan → bounds → lift 4 chunk) は走っていない。lift は素材の `boot0〜3.lift.ll` をそのまま使った。再実行したのは `boot5.lift.ll` (素材に無かったため RetDec で lift) と `gen_ir2` 2 回 (後処理) のみ。
+  - 指紋の出自は未検証 (手で書いた値が素材の lift を作った PE と一致するかは確かめていない)。`--full` の IR での再現は未確認。`tools/m11/REPORT_N112.md` §5 が退けた方法 (手書き指紋で差分経路に入る) に当たるため、本 REPORT の結論はこの前提つきで読むこと。
+  - 結果 (前 run・測定 commit 時): `gen_ir2` / `lift boot5 (RetDec)` / `gen_ir2 (boot5 追加)` / `m11_data_gen` / `m11_image_gen` / `build` が ok、所要 2 分 47 秒。`M11_SUMMARY`: `reached_stage=4`・`units_run_full=53`・`survey_ok=872`・`survey_trap=23`・停止は `function_8c5eb0`。`ir_conditions`: `ldfix=applied` `qstore=applied`、`ir_sha256=6909f85d…bacbcc62`。再測定 (§8) でも `ir_sha256` の前後 8 桁と `M11_SUMMARY` の値が一致した (#1664 で扱う)。
 - 以降の shimx リンク測定は全てこの新 IR (`work/boot_final3.ll`) 上。測定時 load (1 分平均) 0.27〜0.7。
 
 ## 3. 受入条件ごとの回答
@@ -23,9 +25,9 @@
 |---|---|---|
 | `GetLocaleInfoW` 反復の呼出元と、止まらない理由 | 達成 | 呼出元は `function_446400` (薄いラッパ `function_446370` / `function_4463d0` 経由)。反復は有限 (48→54 回)。「止まらない」という前提が誤り。止まる要因は §1 の 2 段 (古い IR の OOB → 新 IR の入れ子手続欠陥)。IR 上の観察では、`function_446400` は locale の各項目を連続して読み、日付/時刻書式の変換 (`function_448350` → `function_448490`) を呼ぶ (Delphi の locale 書式設定の初期化に相当すると推定。実コードとの突合は未実施) |
 | 停止より前に file API が呼ばれるべき経路と呼出順 | 達成 (経路は unit 隔離実行で確定。逐次 boot では未到達) | §6 |
-| ftrace 件数 > 0 を実測 | 達成 (unit 隔離実行で 10 行)。逐次 boot は 0 行のまま | §4-E |
+| ftrace 件数 > 0 を実測 | 達成 (unit 隔離実行で 10 行)。逐次 boot は 0 行のまま | §4-E。判定根拠: 逐次 boot は停止 1 (§5) より前に file API へ届かず 0 行 (§4-A)。survey と同じ unit 隔離方式で数えた 10 行で「> 0」を満たしたと判定した。この判定の妥当性は検収側が見る |
 | 件数と api 内訳を REPORT に記録 | 達成 | §4-E |
-| commit 済み HEAD で再現 | 達成 | §2 の測定 commit |
+| commit 済み HEAD で再現 | 達成 | §2 の測定 commit (`e4be81ff`) と §8 の再測定 (`f3063892`) |
 | (移管) `function_8c5eb0` の D19 と別原因の類型を DEFECTS.md 候補に記録 | **未達 → #2446 へ移管** | 原因の切り分けが先 (本文「原因切り分け後に類型名を付ける」)。#1630 の本文から外した。§7 |
 
 ## 4. 実測 (測定 commit `e4be81ff`)
@@ -73,6 +75,18 @@ survey_trace.mjs と同じ方式 (survey モード boot → unit 1〜300 を順�
 | 発生 unit | 150 (2 行・LVA `0x264260`)・159 (4 行・`0x26d1a0`)・191 (2 行・`0x2cf480`)・281 (2 行・`0x416010`)。全て各 unit で `GetModuleFileNameW` 3 回の後に `GetFileAttributesW`、unit は `oob` で終わる |
 | 行の内容 | 全 10 行 `guest=""` (空文字列)・`ok=false`・`err=123` (ERROR_INVALID_NAME) |
 
+### 4-F. stale IR と新 IR の差分 (`experiments/t27_ir_diff.py <stale> <new>`)
+
+stale = `work-m11` の `boot_final3.ll` (sha256 `010451ad…`)、新 = head `f3063892` の `m11_e2e.sh` で再生成した `boot_final3.ll` (`5e2cb369…`)。
+
+| 項目 | 値 |
+|---|---|
+| 生の差分 | hunk 6213。変更行は stale 15797 (alloca 2503 / その他 13294)・新 18085 (alloca 2611 / その他 15474)。2697 関数に差分 |
+| SSA 名 (`%xxx`) を `%V` に潰した差分 | hunk 1976。stale 2745 行 (alloca 2423・load/store 297・その他 25)・新 5033 行 (alloca 2531・load/store 788・その他 1714) |
+
+- 正規化後の変更行 7778 のうち alloca 行は 4954 (4954 / 7778)。alloca 行の変更の中心は、stale 側の `alloca iN` 2161 行・`alloca ptr` 224 行と、新側の `alloca [N x iN]` 2379 行 (型の拡幅)。
+- alloca 以外も残る (load/store 1085 行・その他 1739 行)。その他 1739 行の内容 (新側の `br`・`icmp`・`ret` 等) は未分類。「差分は alloca 型のみ」とは言えない。
+
 ## 5. 新しい停止: 入れ子手続の親フレーム共有 (D23 候補)
 
 - 機械語 (`function_448490`): `function_4483f0` への call が 8 箇所あり、目視した直前の命令は `mov rcx, rbp`。`function_4483f0` は `[rbx+0x70]` (親の引数 `rcx` の home slot)・`[rbx+0x4c]`・`[rbx+0x48]` (親の局所) を読み、`[rbx+0x4c]` と `[rbx+0x48]` を +1 する Delphi の入れ子手続 (`Append`)。
@@ -101,30 +115,30 @@ unit 隔離実行 (§4-E) と、新 IR の survey (`survey_trace.mjs`・942 unit
 |---|---|---|
 | 入れ子手続 (`function_4483f0` ほか) の親フレーム共有の修復と D23 の昇格 (§5) | unit 18 を越えられず、逐次 boot の ftrace が 0 のまま | #2444 (SHX-T28) |
 | `function_8c5eb0` の `unreachable` (unit 57) の原因切り分けと DEFECTS.md への類型記録 (移管項目) | 停止 2。D19 と別原因の類型が未命名 | #2446 (SHX-T29) |
-| unit 150 等の `GetFileAttributesW` が空 path になる原因 | file API の引数が意味を持たない | 上 2 件の解消後に再測定 (子は起票しない) |
+| unit 150 等の `GetFileAttributesW` が空 path になる原因 | file API の引数が意味を持たない | #2444 の修復後に再測定 (#2444 にコメント)。子は起票しない |
+| `work-m11` の IR が現行の `m11_gen_ir2.sh` より古い (§1・§4-F)。`lift_pe.sha256` が無く、指紋の出自は未検証。`--full` の IR での再現は未確認 | 本 REPORT の IR 上の結論 (例: #1629 T26 の `wasm-function[1352]` = `function_4133f0` の特定) は stale 側の IR 上で得たもの | (a) `work-m11` の再作成は PM (R2 投入。`docs/WORKFLOW.md` §11)。`--full` の再現性は #1664 にコメント (本 run の `ir_sha256` 前後 8 桁の一致を添える)。(b) stale IR 上の既存結論の再確認は #2446 にコメント、または PM 判断 |
 
 ## 8. 検証の鮮度
 
-- 測定 commit: `e4be81ff030538ab524e2fd7a6adbc6de901f07c`。そこから HEAD までのコード差分は 1 ファイルだけ。`git diff e4be81ff HEAD --stat -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T27.md'` の出力:
-
-```
- tools/m11/shimx_link/experiments/t27_relink.sh | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-```
-
-- この差分は `t27_relink.sh` が `emsdk_env.sh` の場所を `build.sh` から取る変更 (repo 外パスの直書きを避ける lint 対応)で、挙動は不変。変更後の版で §4-D (`locale0`) を再実行し、同じ結果 (`units_run=53`・`unreachable`・ftrace 0 行・4.0 s) を得た。
-- origin/main 取り込み後 (merge commit `7f7fbfd3`) の鮮度: `git diff e4be81ff HEAD --stat -- tools/m11/m11_build.sh tools/m11/m11_post.py tools/m11/m11_ov.c tools/m11/shimx_link tools/shimx` の出力:
+- 測定 commit: `e4be81ff030538ab524e2fd7a6adbc6de901f07c`。再測定は head `f3063892` (コードは merge `7f7fbfd3` と同一) で行った。`e4be81ff` から `f3063892` までの `tools/m11`・`tools/shimx` の差分は 25 ファイル・+1488/−73 (`git diff --stat e4be81ff f3063892 -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T27.md'`)。測定経路のうち差分のあるファイルは次の 4 つ:
 
 ```
  tools/m11/m11_build.sh                         |  6 +++---
  tools/m11/m11_ov.c                             | 20 ++++++++++++++++++++
  tools/m11/m11_post.py                          |  7 ++++++-
  tools/m11/shimx_link/experiments/t27_relink.sh |  4 +++-
- 4 files changed, 32 insertions(+), 5 deletions(-)
 ```
 
-- main 側の 3 ファイルの変更は、既定 OFF の計測専用 flag (`M11_INSTR_60A270`・`M11_PRINT_DEST_2118`) の追加だけで、既定の IR 生成・build 経路は変わらない。取り込み後の merge 済みツリーで `build.sh --trace --soft` (`m11_ov.c` 再 compile 込み・7.9 s) と実 boot を再実行し、同じ結果 (`units_run=17`・`dllmain_done=true`・`total_calls=106`・`distinct_called=29`・ftrace 0 行) を得た。IR の作り直し (§2) と §4-B〜E は取り込み前の測定のまま再実行していない。
-- 再現: §2 の手順で IR を作り直し、§4 の各コマンドを実行する。`experiments/t27_nc_swap.py` の stale 側 IR は `work-m11.tar.zst` から `tools/m11/work/boot_final3.ll` だけを別 dir に展開して使う。
+- 内訳: `m11_build.sh` は stamp に計測 flag の既定値 (0) を足しただけ。`m11_post.py` と `m11_ov.c` は `M11_INSTR_60A270` (と `M11_PRINT_DEST_2118`) の計測 probe の追加で、既定 0 では無効。`t27_relink.sh` は emsdk の場所を `build.sh` から取る変更 (挙動不変)。残りの差分 (`ldfix/`・`trap_triage/`・`REPORT`) は測定経路外。`m11_gen_ir2.sh` が呼ぶのは `ldfix/ldfix.py` だけで、これは差分なし。`ldfix/`・`trap_triage/` の差分ファイルは `m11_e2e.sh`・`m11_gen_ir2.sh`・`m11_build.sh`・`shimx_link/build.sh`・`run_trace.mjs` のどれからも参照されない (grep で確認)。
+- 既定値の確認 (実測): 同じ入力 `work/boot_final.ll` に、pre-merge 版 (`git show e4be81ff:tools/m11/m11_post.py`) と head 版を既定の引数 (`--report` のみ) で実行した。`boot_final3.ll` は両者とも sha256 `5e2cb369…` で `cmp` 一致、`post_report.json` も一致。
+- stamp の注意: `S_INSTR40` と `S413` に既定値の表記が加わったため、既存の `work/` では初回 build で `boot_final3.ll` と `ov.o` を作り直す (出力は同一。キャッシュの無効化のみ)。
+- 再測定 (head `f3063892`・load 1 分平均 0.48・nproc 4・逐次実行):
+  - `bash tools/m11/m11_e2e.sh` (§2 の手順): 3 分 11 秒・rc 0。`M11_SUMMARY` は `reached_stage=4`・`units_run_full=53`・`survey_ok=872`・`survey_trap=23`・`ir_sha256` 前後 8 桁 `6909f85d…bacbcc62` で、§2 の前 run と一致。build (emcc 増分) ok。
+  - `bash tools/m11/shimx_link/build.sh --trace --soft`: rc 0 / 17.5 s / `signature mismatch=1 undefined symbol=0 duplicate=0`。前 run の 7.6 s と差がある (原因は未確認。本節の時間は比較に使わない)。
+  - 実 boot (`run_trace.mjs`): rc 0 / 0.46 s / `units_run=17` `icall_ok=24` `icall_miss=1` `dllmain_done=true` `longjmp_hit=1` / `total_calls=106` `distinct_called=29` `dropped=0` / ftrace 0 行。§4-A と同じ値。
+  - stale と新の IR の差分は §4-F (`experiments/t27_ir_diff.py`)。
+- 測定 commit `f3063892` から HEAD までのコード差分: `git diff f3063892 HEAD -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T27.md'` の出力は `experiments/t27_ir_diff.py` の新規追加 1 件だけ (測定経路外)。
+- 再現: §2 の手順で IR を作り直し、§4 の各コマンドを実行する。`experiments/t27_nc_swap.py` の stale 側 IR は `work-m11.tar.zst` から `tools/m11/work/boot_final3.ll` だけを別 dir に展開して使う。§4-F は `experiments/t27_ir_diff.py <stale> <new>` で再現する。
 
 ---
 
