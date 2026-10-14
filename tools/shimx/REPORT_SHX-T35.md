@@ -7,7 +7,7 @@
 - 失敗箇所: `tools/shim/test/test_main.c:204` `CHECK(GetLastError() == ERROR_INVALID_FUNCTION);` (HeapFree に範囲外ポインタ `0x1` を渡した直後)。`CHECK` は失敗時に `exit(1)` する。
 - 原因: `tools/shimx/src/heap.c` の `HeapFree` は `!blk_ok(p)` のとき `ERROR_INVALID_PARAMETER` (87) を設定していた。M4 テストは `ERROR_INVALID_FUNCTION` (1) を期待する。テストは無改変で使う。
 - 範囲検査の欠落: `blk_ok` は NULL とアライメントだけを見ていた。テストの範囲外値 `0x1`・`0x3`・`0xFFFFFFF0`・`0xFFFFFFFC` のうち、`0xFFFFFFF0` は 16 の倍数のため、範囲検査が無いと `raw_of` で linear memory の外を読む (§4 のネガティブコントロール 2 で trap を確認)。
-- 再現コマンド: `bash tools/shimx/test.sh` (基点は origin/main `940c0d6a`。issue 記載の `0064cfbc` 系から進んでいるが、`tools/shimx` と `tools/shim` は `git diff --stat 0064cfbc 940c0d6a -- tools/shimx tools/shim` が 0 行で、対象コードは同一)。
+- 再現コマンド: `bash tools/shimx/test.sh` (基点は origin/main `940c0d6a`。コミット `0064cfbc` から `940c0d6a` までの `tools/shimx` と `tools/shim` の差は `git diff --stat 0064cfbc 940c0d6a -- tools/shimx tools/shim` が 0 行で、対象コードは同一)。
 
 ## 2. 契約の判断
 
@@ -93,8 +93,8 @@
 ### 4.5 測定 commit と差分
 
 - 測定 commit: `8fdaee48f6cf8c47794a9379f2b855dbac8a2960` (`fix(shimx): HeapFree の範囲外ポインタを M4 契約に揃え blk_ok に範囲検査を入れる (SHX-T35, #3023)`)。
-- `git diff 8fdaee48 HEAD -- tools/shimx/src` の出力: **0 行** (測定 commit 時点で HEAD = `8fdaee48`)。
-- `git diff --stat 8fdaee48 HEAD -- tools/shimx`: 測定 commit 時点では 0 行。この後の差分は本 REPORT の追加 1 件 (`tools/shimx/REPORT_SHX-T35.md`・118 行) のみ。
+- `git diff 8fdaee48 HEAD -- tools/shimx/src` の出力: **0 行** (測定 commit `8fdaee48` 時点の HEAD。`f096cb41` 以降も、この範囲に変更は無い)。
+- `git diff --stat 8fdaee48 f096cb41 -- tools/shimx`: 1 file changed, 118 insertions(+) (`tools/shimx/REPORT_SHX-T35.md`)。以降の REPORT 修正 commit は REPORT の行数だけを変える。最終 head の stat は PR 本文に書く。
 
 ## 5. 検証範囲 / 範囲外
 
@@ -110,9 +110,10 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| step 2 の emcc が exit 0 のまま `build/shimx_test_mt.js` を出さない事象 (元 issue で 4 回中 1 回。本測定の 6 run では再現せず、原因未特定) | test.sh が偽の失敗・成功を出し得る | #2916 へのコメント |
-| 他関数のエラーコード差: `HeapReAlloc` (ERROR_INVALID_PARAMETER)、`GlobalLock`/`GlobalUnlock`/`GlobalFree` (ERROR_INVALID_HANDLE) は M4 テストが未検査 | native と wasm で不正入力時の errcode が揃わない | #2821 |
-| `HeapFree` の Win32 実仕様 errcode (推定 ERROR_INVALID_PARAMETER・未検証) | M4 優先の判断の根拠が推定のみ | #2821 |
-| test.sh step 6 が M11/M8 入力欠落の環境で inventory・BACKLOG・coverage を空の値で再生成する。`shimx_*` フック数の既存ずれ (69 → 78) も含む | 生成物を commit すると M11/OTT 列が消える。commit 判断を誤りやすい | #2916 へのコメント |
+| step 2 の emcc が exit 0 のまま `build/shimx_test_mt.js` を出さない事象 (元 issue で 4 回中 1 回。本測定の 6 run では再現せず、原因未特定) | test.sh が偽の失敗・成功を出し得る | #3069 (`[SHX-T36]`) |
+| test.sh step 6 が M11/M8 入力欠落の環境で inventory・BACKLOG・coverage を空の値で再生成する。`shimx_*` フック数の既存ずれ (69 → 78) も含む | 生成物を commit すると M11/OTT 列が消える。commit 判断を誤りやすい | #3069 (`[SHX-T36]`) |
+| 他関数のエラーコード差: `HeapReAlloc` (ERROR_INVALID_PARAMETER)、`GlobalLock`/`GlobalUnlock`/`GlobalFree` (ERROR_INVALID_HANDLE) は M4 テストが未検査 | native と wasm で不正入力時の errcode が揃わない | #3070 (`[SHX-T37]`)。LD 側の応答表は #2821 |
+| `HeapFree` の Win32 実仕様 errcode (推定 ERROR_INVALID_PARAMETER・未検証) | M4 優先の判断の根拠が推定のみ | #3070 (`[SHX-T37]`) |
+| PM agent の判断待ち: HeapFree の範囲外応答を M4 (FALSE / ERROR_INVALID_FUNCTION) と native 参照 (TRUE) のどちらに統一するか・既定案: M4 (現行 test.sh step 5 の契約。本 PR はこれに沿う) | open PR #3049 (`tools/shim/test/test_main.c` の HeapFree 期待を TRUE / ERROR_SUCCESS に変更) と衝突する。#3049 が merge されると shimx step 5 が必ず FAIL する | PM 判断 (#3049 と本 PR の契約の統一) |
 
-関連: #2916 (親)・#2802 (`block_ok` の範囲検査の元)・#2821 (native/wasm の応答表統一)。
+関連: #2916 (親 issue。CLOSED のため追跡は #3069・#3070 に移した)・#2802 (`block_ok` の範囲検査の元)・#2821 (native/wasm の応答表統一)・#3049 (open PR・HeapFree 契約が衝突)。
