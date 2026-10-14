@@ -14,6 +14,9 @@ export const HUMAN: Author = { login: "pycabbage", type: "User", assoc: "OWNER" 
 export const OUTSIDER: Author = { login: "stranger", type: "User", assoc: "NONE" };
 export const IMPL_BOT: Author = { login: IMPL, type: "Bot", assoc: "NONE" };
 export const EVIL_BOT: Author = { login: "evil-app[bot]", type: "Bot", assoc: "NONE" };
+export const MEMBER_USER: Author = { login: "member-user", type: "User", assoc: "MEMBER" };
+export const COLLAB_USER: Author = { login: "collab-user", type: "User", assoc: "COLLABORATOR" };
+export const CONTRIB_USER: Author = { login: "contrib-user", type: "User", assoc: "CONTRIBUTOR" };
 
 export const iso = (ms: number): string => new Date(ms).toISOString();
 
@@ -61,11 +64,16 @@ export const prEv = (n: number, o: { labels?: string[]; author?: Author; at?: st
   };
 };
 
-export const commentEv = (n: number, who: { login: string; type?: string }, body: string, at: string, isPr = false) => ({
+export const commentEv = (n: number, who: { login: string; type?: string; assoc?: string }, body: string, at: string, isPr = false) => ({
   action: "created",
   repository: REPO,
   issue: isPr ? { number: n, pull_request: {} } : { number: n },
-  comment: { user: { login: who.login, type: who.type ?? (who.login.endsWith("[bot]") ? "Bot" : "User") }, body, created_at: at },
+  comment: {
+    user: { login: who.login, type: who.type ?? (who.login.endsWith("[bot]") ? "Bot" : "User") },
+    author_association: who.assoc ?? "NONE",
+    body,
+    created_at: at,
+  },
 });
 
 export const reviewEv = (n: number, body: string, at: string, o: { state?: string; login?: string; action?: string } = {}) => ({

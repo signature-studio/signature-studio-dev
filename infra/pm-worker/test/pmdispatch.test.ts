@@ -1,11 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { configuredApp, j, markFresh, T0, type Call } from "./helpers.ts";
+import { configuredApp, j, markFresh, REPO, T0, type Call } from "./helpers.ts";
 import {
+  CONTRIB_USER,
+  COLLAB_USER,
   EVIL_BOT,
   HUMAN,
   IMPL,
   IMPL_BOT,
+  MEMBER_USER,
   OUTSIDER,
   REVIEWER,
   at,
@@ -148,6 +151,63 @@ test("検出 user_answered: needs-user-input の open issue に、ラベル後�
     ["issues", issueEv(53, { labels: [], action: "unlabeled", label: "needs-user-input", at: at(13) })],
   ]);
   assert.deepEqual(targets(ctx), ["user_answered#51"]);
+});
+
+const labeledUserInput = (n: number): [string, unknown] => ["issues", issueEv(n, { labels: ["needs-user-input"], action: "labeled", label: "needs-user-input", at: at(10) })];
+
+test("ネガコン (user_answered): NONE / CONTRIBUTOR の第三者のコメントだけでは oc-pm を送らない。MEMBER の回答で送る", async () => {
+  const ctx = await live();
+  await sendAll(ctx, [labeledUserInput(57), ["issue_comment", commentEv(57, OUTSIDER, "横から失礼", at(11))], ["issue_comment", commentEv(57, CONTRIB_USER, "A です", at(12))]]);
+  await markFresh(ctx);
+  await ctx.app.engine.pmDispatch(await (ctx.app.engine as any).d.gh());
+  assert.equal(pmCalls(ctx.m.calls).length, 0);
+  await sendAll(ctx, [["issue_comment", commentEv(57, MEMBER_USER, "A です", at(13))]]);
+  await ctx.app.engine.pmDispatch(await (ctx.app.engine as any).d.gh());
+  assert.deepEqual(pmCalls(ctx.m.calls).map((c) => c.body.client_payload), [{ kind: "user_answered", ref: 57 }]);
+});
+
+test("検出 user_answered (ネガコン): コメント者が NONE / CONTRIBUTOR の第三者なら起こさない。MEMBER・COLLABORATOR の回答は起こす", async () => {
+  const ctx = await configuredApp();
+  await sendAll(ctx, [
+    labeledUserInput(54),
+    ["issue_comment", commentEv(54, OUTSIDER, "A です", at(11))],
+    ["issue_comment", commentEv(54, CONTRIB_USER, "A です", at(12))],
+    labeledUserInput(55),
+    ["issue_comment", commentEv(55, MEMBER_USER, "A", at(12))],
+    labeledUserInput(56),
+    ["issue_comment", commentEv(56, COLLAB_USER, "A", at(12))],
+    // 判定時刻は人の回答のまま (後から来た第三者のコメントで上書きされない)
+    ["issue_comment", commentEv(55, OUTSIDER, "横から失礼", at(30))],
+  ]);
+  assert.deepEqual(targets(ctx), ["user_answered#55", "user_answered#56"]);
+  assert.equal(ctx.app.engine.detectPmTargets().find((t) => t.ref === 55)?.at, at(12));
+});
+
+test("REST: 同期で読んだコメントも author_association で絞る (第三者の REST のコメントでは起こさない)", async () => {
+  const ctx = await configuredApp({
+    handlers: [
+      (c) => {
+        if (c.method !== "GET" || !new URL(c.url).pathname.endsWith("/issues/comments")) return undefined;
+        const comment = (n: number, login: string, assoc: string) => ({
+          id: n,
+          issue_url: `https://api.github.com/repos/${REPO.full_name}/issues/${n}`,
+          created_at: at(12),
+          user: { login, type: "User" },
+          author_association: assoc,
+          body: "A",
+        });
+        return j([comment(70, OUTSIDER.login, "NONE"), comment(71, "member-user", "MEMBER")]);
+      },
+    ],
+  });
+  await sendAll(ctx, [
+    ["issues", issueEv(70, { labels: ["needs-user-input"], action: "labeled", label: "needs-user-input", at: at(10) })],
+    ["issues", issueEv(71, { labels: ["needs-user-input"], action: "labeled", label: "needs-user-input", at: at(10) })],
+  ]);
+  assert.deepEqual(targets(ctx), []);
+  const gh = await (ctx.app.engine as any).d.gh();
+  await (ctx.app.engine as any).syncComments(gh, Date.parse(at(0)));
+  assert.deepEqual(targets(ctx), ["user_answered#71"]);
 });
 
 // ---------------------------------------------------------------- REST の補完
