@@ -22,7 +22,7 @@
 - 降格中の停止通知の修正 (`git diff 694ac41c 28d33f67 -- infra/pm-worker/src/engine.ts` の要点):
   - 旧: `if (!this.d.cfg.liveDispatch || !gh)` で送るかを決めていたため、降格中でも `LIVE_DISPATCH=1` なら live で送っていた。
   - 新: 送るかは `dispatchLive()` (降格を含む) で決める。降格中 (`held`) は区間の `notifiedAt` を立てず保留する。解除の後に送る。dry-run (`LIVE_DISPATCH=0`) は従来どおり 1 区間 1 回。降格中の would は pmWould 履歴の 60 分の重複抑止に従う。
-- 測定 commit から HEAD までの差分: `git diff 28d33f67 HEAD -- infra/pm-worker` は 0 行 (この付録の commit は `tools/pm/` だけを変える。§6)。
+- 測定 commit から HEAD までの差分: `git diff 28d33f67 HEAD -- infra/pm-worker ':!infra/pm-worker/README.md'` は 0 行。`infra/pm-worker` で変わるのは `README.md` だけ (round 3 の文書修正: 変異テストの件数の記載を外した)。テストと `scripts/` は README を読まない (`readFile` の対象は `src/config.ts`・`wrangler.toml`・fixture のみ)。このため §2・§3 は測定 commit `28d33f67` の値のまま。
 
 ## 2. テスト (`infra/pm-worker`・測定 commit `28d33f67`)
 
@@ -94,6 +94,6 @@ node --experimental-strip-types --no-warnings --test 'test/*.test.ts'
 npm run test:unit
 npm run test:workers
 npm run test:mutation
-git diff 28d33f67 HEAD -- infra/pm-worker
+git diff 28d33f67 HEAD -- infra/pm-worker ':!infra/pm-worker/README.md'
 curl -fsS "$(tr -d '\n' < ../../tools/pm/worker_url)/status"
 ```

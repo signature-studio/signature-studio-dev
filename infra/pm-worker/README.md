@@ -287,7 +287,7 @@ Worker の状態 (Durable Object) に、VM が持っていた `launched`・`rela
 cd infra/pm-worker && npm test      # Node >= 22.6 (--experimental-strip-types)。依存パッケージなし。Python 3 が要る (突き合わせ)
 cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン・/oc 投稿の観測 (#2342) のネガコン・VM の状態の取り込み (#2343 test/unit/vm_import.test.ts)・取り込みの本文を作る補助スクリプト (#2799 test/unit/build_import.test.ts)
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
-cd infra/pm-worker && npm run test:mutation # launch の停止の規則 (#2795) を 1 か所ずつ壊し、test/halt*.test.ts が落ちることを確かめる (7 変異)
+cd infra/pm-worker && npm run test:mutation # launch の停止の規則 (#2795) を 1 か所ずつ壊し、test/halt*.test.ts が落ちることを確かめる (件数は tools/pm/REPORT_2795.md §3)
 ```
 
 依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。既定設定 (`minimumReleaseAge` を変えない) の `pnpm install --frozen-lockfile` が通る版の組を lock に入れてある (理由と版の選び方は『Workers Builds の接続状態と pnpm 経路』の節の release-age の項)。
