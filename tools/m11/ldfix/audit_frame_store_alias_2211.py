@@ -137,7 +137,10 @@ def sync_range(cs, seq):
         L = adds[0]
     for x in seq:
         if x.mnemonic.startswith('j') and x.operands and x.operands[0].type == capstone.CS_OP_IMM:
-            if seq[0].address <= x.operands[0].imm <= A:
+            t = x.operands[0].imm
+            if seq[0].address <= t <= A:
+                return None
+            if A < t < L and not (A < x.address < L):
                 return None
     for x in seq:
         if A < x.address < L and x.operands and x.operands[0].type == capstone.CS_OP_REG and writes_dst(x.mnemonic):
