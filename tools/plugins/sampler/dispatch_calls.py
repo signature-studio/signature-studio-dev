@@ -75,7 +75,7 @@ def def_of(insns, idx, fam, depth=0):
         if ins.mnemonic in ('mov', 'movsxd', 'movzx') and len(ops) == 2 and ops[1].type == CS_OP_REG and depth < 2:
             src = FAMILY.get(ins.reg_name(ops[1].reg))
             if src:
-                d, v, why = def_of(insns, j, src, depth + 1)
+                _, v, why = def_of(insns, j, src, depth + 1)
                 return ins, v, why
         return ins, None, 'other'
     return None, None, 'start'
@@ -90,7 +90,7 @@ def scan(path):
         end_va = lo + m.end()
         ff = lo + m.start()
         site = None
-        for st in (m.start() - 1, m.start()):
+        for st in [s for s in (m.start() - 1, m.start()) if s >= 0]:
             ins = decode(md, data, lo, lo + st, lo + st + 12)
             if ins and ins[0].mnemonic == 'call' and '0x1c0]' in ins[0].op_str and ins[0].address + ins[0].size == end_va:
                 site = ins[0].address
