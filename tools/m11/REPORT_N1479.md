@@ -5,7 +5,7 @@
 ## 1. 結論
 
 - 方式は既存の opt-in `M11_XMM_ARGS=1` (`tools/plugins/lift/passes/fix_xmm_args.py`, #547) を採用する。既定 OFF は変えない (既定を ON にするかは PM 判断。§7)。
-- 測定 commit `35b0ad0a` (HEAD) で、同一 IR・同一 PE の既定 (0) と opt-in (1) を unit 別 942 本で比較した。**unit 別差 0 件・ok 喪失 0 件・unit 838/882/885 は両 arm とも ok**。
+- 測定 commit `e244259e` (測定時の HEAD) で、同一 IR・同一 PE の既定 (0) と opt-in (1) を unit 別 942 本で比較した。**unit 別差 0 件・ok 喪失 0 件・unit 838/882/885 は両 arm とも ok**。
 - 基準 `7e149974` の全再生成 (ok 872 / trap 23 / miss 46 / noproc 1) との直接比較は**未実施**。素材の IR が別物で、全再生成には Ghidra 込みの再生成が要る (§5)。
 - 0 詰め 7 カテゴリの和 1,983 は #1532 (`392d8ba5`) で実測済み。1,172→1,185 の原因 commit は未特定 (§6)。
 
@@ -13,13 +13,13 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `35b0ad0a` (本 PR の A/B スクリプトを追加した commit。コード変更の最後の commit)。HEAD でも再実行し同じ結果 |
+| 測定 commit | `e244259e` (A/B スクリプトの最後のコード変更 commit。前 commit `35b0ad0a` の前提コメントを修正)。コミット済み HEAD で再実行し同じ結果 |
 | IR | `$ARTIFACTS_DIR/work-m11` の `tools/m11/work/boot_final.ll` (生成 commit 不明)。展開直後の sha256 `69c774de…` (N54 の指紋と一致)。build の qstore・alloca 適用後の `ir_sha256` は `666ce8fb…` |
 | 条件記録 | `work/ir_conditions.json` は同梱されていないため、`pe`・`ldfix=applied`・`ld108=applied` を手で記録して `--bind` した (N54・N154 と同じ扱い。正規の生成経路ではない) |
 | PE | fl-win64 `extracted/block00031_PE.bin` (sha256 `b2c64da4…` 一致) |
 | 実行環境 | 4 vCPU、load 0.16 (開始時 `uptime`)、node・capstone・pefile 入り venv |
 
-## 3. 測定値 (HEAD `35b0ad0a`, `bash tools/m11/m11_xmm_ab.sh`)
+## 3. 測定値 (HEAD `e244259e`, `bash tools/m11/m11_xmm_ab.sh`)
 
 | 測定 | 既定 (`M11_XMM_ARGS=0`) | opt-in (`=1`) |
 |---|---|---|
@@ -34,12 +34,12 @@
 
 - 判定の機械化: `tools/m11/m11_xmm_ab.sh` が ok 喪失または watch unit (838/882/885) の非 ok で終了 1 にする。判定器は、unit 838 を ok→trap に改変した写しで FAIL を検出することを毎回確認する (`[negctl]` 行)。
 - 所要時間: スクリプト全体 1 分 7 秒 (rc 0、n=1)。HEAD での再実行も同じ結果 (survey の unit 別 JSON が byte 一致)。
-- 同一 IR の絶対値は commit によって動く。本 IR では 869 (N54 表 1、98c2183) / 871 (N154 表 1、0ea7df21) / 869 (本 REPORT、35b0ad0a) で、絶対値の比較は意味が無い。**有効な比較は同一 commit 内の A/B だけ**。
+- 同一 IR の絶対値は commit によって動く。本 IR では 869 (N54 表 1、98c2183) / 871 (N154 表 1、0ea7df21) / 869 (本 REPORT、e244259e) で、絶対値の比較は意味が無い。**有効な比較は同一 commit 内の A/B だけ**。
 
 ## 4. 差分と再現
 
-- 測定 commit `35b0ad0a` から HEAD までの tools/m11 のコード差分 (本 REPORT を除く): `git diff --stat 35b0ad0a HEAD -- tools/m11 ':!tools/m11/REPORT_N1479.md'` は出力 0 件。
-- 再現: `export FL_WIN64_DIR=<fl-win64 展開先> PATH="$HOME/.local/agent-py/bin:$PATH"; cd tools/m11 && bash m11_xmm_ab.sh` (前提: `work/boot_final.ll`・`work/ir_conditions.json`・`/opt/emsdk`)。出力は `work/xmm_ab/`。
+- 測定 commit `e244259e` から HEAD までの tools/m11 のコード差分 (本 REPORT を除く): `git diff --stat e244259e HEAD -- tools/m11 ':!tools/m11/REPORT_N1479.md'` は出力 0 件。
+- 再現: `export FL_WIN64_DIR=<fl-win64 展開先> PATH="$HOME/.local/agent-py/bin:$PATH"; cd tools/m11 && bash m11_xmm_ab.sh` (前提: `work/boot_final.ll`・`work/ir_conditions.json`・emsdk (`[EMSDK]`))。出力は `work/xmm_ab/`。
 
 ## 5. 基準 (`7e149974` 全再生成) との関係 (未実施)
 
