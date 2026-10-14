@@ -19,7 +19,8 @@
 - 測定 commit: `84c1ccde` (コード変更の最後。`pe_rip_consts.py` の参照先デリファレンス追加)。`pe_rip_consts.py` は本節で新規に追加 (issue 本文が参照する名前。`pe_disasm.py` と同じ方式)。
 - 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/fl extracted/block00031_PE.bin` (2.9 秒)。`--wildcards '*block00031_PE.bin'` 形式は本 run の環境で 0 件展開になったため、メンバー名を直接指定した。`tools/python/work/` は gitignore 対象。
 - 実行: `FL_WIN64_DIR=<絶対パス>/tools/python/work/fl python3 analysis/flapi/pe_disasm.py <VA> <N>` と `pe_rip_consts.py <VA> <N>`。8 回の実行は全て終了 0、合計 0.64 秒、load average 0.09 (15:15 時点)。
-- 差分 0 の証跡: 本節の commit 以降で `tools/python/analysis/flapi/` に触れる commit は無い。`git diff 84c1ccde HEAD -- tools/python/analysis/flapi` の出力は 0 行 (検証 HEAD は本節の docs commit)。
+- 差分の証跡 (初回測定): 本節の commit 以降で `tools/python/analysis/flapi/` に触れる PR 内 commit は無かった。`git diff 84c1ccde HEAD -- tools/python/analysis/flapi` の出力は 0 行。
+- 再測定 (main 取り込み後): 測定 commit `dc8b76bd` (`origin/main` を取り込んだ merge commit。`git diff 84c1ccde dc8b76bd -- tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_rip_consts.py` の出力は 0 行)。main 側の変更は flapi 配下の他ファイルに入った (`git diff --stat 84c1ccde dc8b76bd -- tools/python/analysis/flapi`: 4 files, +324 / −15)。`block00031_PE.bin` は同じ方式で展開 (2.3 秒)。8 回の実行 (`pe_disasm.py` と `pe_rip_consts.py` × VA `d5aa30 83`・`d5a720 152`・`1051d20 700`・`d843d0 80`) は全て終了 0・Traceback 0 件、合計 0.60 秒、load average 0.45 (1 分値)。本節の主要な対応 (`0xd5a796` の `call 0x477180`、`0xd5a880`・`0xd5a951` の `call 0x1051d20`、定数 `0xd5a9e0`・`0xd5a9e8`・`0xd5a9f0`) は再測定の出力で一致。
 
 ### 1. 呼び出し連鎖 (`0xd5aa30`、`pe_disasm.py d5aa30 83`)
 
