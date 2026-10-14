@@ -69,6 +69,8 @@ export interface RunState {
   status: string;
   conclusion: string | null;
   updatedAt: string;
+  // run の作成時刻 (launch の観測に使う)。古い state には無い。
+  createdAt?: string;
 }
 export interface BotComment {
   issueNumber: number;
@@ -349,6 +351,7 @@ function applyRun(s: PmState, p: Json): PmState {
     status: w.status ?? "",
     conclusion: w.conclusion ?? null,
     updatedAt: w.updated_at,
+    ...(typeof w.created_at === "string" ? { createdAt: w.created_at } : {}),
   };
   return { ...s, runs: { ...s.runs, [k]: next } };
 }
