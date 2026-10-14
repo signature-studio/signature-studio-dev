@@ -14,8 +14,8 @@
 - 測定 commit: `ee087e2b` (`analysis/py63_refs.py` の出力件数追加と `analysis/py63_negctl.py` の追加。この commit 以後にコードは変えていない)。
   基点は `6f144c45` (origin/main)。
 - 差分 (測定 commit から HEAD まで、コード範囲 `tools/python`): 下記 `git diff` の出力を参照。
-- 素材: `[WIN64]` (`docs/REFERENCES.md`) の `extracted/block00031_PE.bin`。取得は `$HOME/artifacts/fl-win64.tar.zst` (R2 由来の `oc_artifacts: fl-win64`) から
-  `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C tools/python/work/py63 --wildcards '*block00031_PE.bin'`。実測 2.81 秒 (wall)、load は未計測。
+- 素材: `[WIN64]` (`docs/REFERENCES.md`) の `extracted/block00031_PE.bin`。取得指定は `oc_artifacts: fl-win64` (`docs/WORKFLOW.md` §11)。
+  展開は `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C tools/python/work/py63 --wildcards '*block00031_PE.bin'` (`$ARTIFACTS_DIR` は `docs/REFERENCES.md` の `[WIN64]` の配置先)。実測 2.81 秒 (wall)、load は未計測。
   展開先 `tools/python/work/py63/` は gitignore。
 - PE 実測 (`pefile`, fast_load): ファイルサイズ 22,227,016 bytes、ImageBase `0x400000`。
   `.text` は VA `0x1000`・RawPtr `0x400`・RawSize 16,397,824。`.data` は VA `0xfa5000`・RawPtr `0xfa3a00`。
@@ -29,7 +29,7 @@
 
 ```sh
 cd tools/python
-tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C work/py63 --wildcards '*block00031_PE.bin'
+tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py63 --wildcards '*block00031_PE.bin'
 P=work/py63/extracted/block00031_PE.bin
 python3 analysis/py63_refs.py $P 0xffe370     # rel32 none / abs64 total=1 (格納位置 file_off=0xbe2298)
 python3 -c "import struct,sys; d=open('$P','rb').read(); print(hex(struct.unpack_from('<Q',d,0xfe2e98-0x400000-0x1000+0x400)[0]))"   # 0xffe370
