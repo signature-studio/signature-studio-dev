@@ -118,7 +118,7 @@
 
 - 対照 (§10.3 の 3b581236) と同じ失敗形 (Phase B OOB・rec=7・1 項目)。1 回測定 (n=1)。
 - 表示行 (`[fw][ov] hooks[...]`・`[fw][tls] ...`) の追加は dispatch 数を変えない (smoke の dispatch=38 は維持)。
-- 測定 commit `4c00ec24` の framework コードは、表示行を入れた `86b6bdc2` の親 `9f403c97` に対して表示行のみ (`git diff 9f403c97 4c00ec24 -- tools/plugins/framework ':!*.md'`: `fw_boot.c` +3 と `fw_rt.c` の trace 行)。現在の `origin/main` (`3a6fcf81`) とは framework で 65 行の差がある (main が先に進んだため。merge 後の挙動は未測定・REPORT_2115.md §9)。
+- 測定 commit `4c00ec24` の framework コードは、表示行を入れた `86b6bdc2` の親 `9f403c97` に対して表示行のみ (`git diff 9f403c97 4c00ec24 -- tools/plugins/framework ':!*.md'`: `fw_boot.c` +3 と `fw_rt.c` の trace 行)。基点 `9f403c97` から `origin/main` (fix round 5 の取得時点 `064af0d8`) までに framework の 5 ファイルが変わった: `fw_smoke_check.py` (+42/-10)・`hostshim/hs_irfix.py` (+64)・`hostshim/hs_plug.c` (+17・`hs_fw_init_tls`・#2571)・`fw_269_verify.sh`・`fw_pack_stage1.sh` (各 1 行のコメント)。本 PR はこれを取り込んでいない。merge 後の挙動は未測定 (REPORT_2115.md §9・起票先 #2115)。
 - 測定後の実行コード差分 (fix round 6・commit `058c2049`・`fw_rt.c` の表示カウンタを分離): `git diff 4c00ec24 058c2049 -- tools/plugins/framework ':!*.md'` の出力は次の 23 行。LocalAlloc の trace は `g_local_trace`、TLS 関数の trace は `g_tls_trace` で数える。戻り値と分岐は変わらない (表示のみ)。
 
 ```diff
@@ -155,10 +155,10 @@ index 1ae5159c..641239e2 100644
 | 条件 | commit | Phase A | Phase B |
 |---|---|---|---|
 | E1: `0x4180d0` を native の意味に注釈 (`0x4181e0` の `return 0` は残す) | 未コミット (未採用・本 PR に含めない) | — | 数値は報告しない (未コミットの WIP のため WORKFLOW §6 により判定に使わない)。採用する場合はコミットして HEAD 上で再測定する |
-| E3: Phase B の `hs_e2e_run` の先頭で `fw_call_cur(0x418120)` を 1 回呼ぶ + `0x4180d0` 注釈 + `0x4181e0` 注釈の削除 | `f850508a` (revert `4c00ec24` で戻し)。所要・load は未記録 (ログも時刻も保存していない。WORKFLOW §5 の未充足。未採用のため再測定しない) | `dispatch=38 ff=0` | `rec=7`・1 項目・OOB。TLS は `TlsAlloc → 1`・`TlsSetValue(1, 0x118b6628)`・`TlsGetValue(1) → 0x118b6628` (正しい block)。失敗位置は変化: `0x40d807` の soft-miss (target 0) は消え、`0x4e5fa6` の間接 target が文字列バイト列 `0x6572432000000000` になる |
+| E3: Phase B の `hs_e2e_run` で `fw_hs_install()` の直後に `fw_call_cur(0x418120)` を 1 回呼ぶ + `0x4180d0` を native の意味に置換 + `0x4181e0` の注釈 (`return 0`) を削除 | `f850508a` (revert `4c00ec24` で戻し)。所要・load は未記録 (ログも時刻も保存していない。WORKFLOW §5 の未充足。未採用のため再測定しない) | `dispatch=38 ff=0` | `rec=7`・1 項目・OOB。TLS は `TlsAlloc → 1`・`TlsSetValue(1, 0x118b6628)`・`TlsGetValue(1) → 0x118b6628` (正しい block)。失敗位置は `0x40d807` の soft-miss (target 0) から `0x4e5fa6` の文字列 target (`0x6572432000000000`) へ変わる。main (#2571) との違い: 注入位置は同じ (`fw_hs_install()` の直後)。E3 のコードは `[0x7162d8]` を明示的に立てず、`0x4181e0` の注釈を外して block を返させる。main は `[0x7162d8]=1` を立ててから `0x418120` を呼び、`0x4181e0` の注釈 (常に 0 を返す) を残す。失敗形の詳細は `REPORT_2571.md` §3 |
 
 ### 11.6 結論
 
 - 受入 2 は未達。戻り値の内容は次の形で確定した: getter は、`[0x7162d8]` が 1 なら `TlsGetValue(idx)`、0 なら `g_tls_slots[idx]` を返し、どちらも `0x4180d0` が確保した 0x288 byte の per-thread block を指す。`return 0` 注釈は、この block の代わりに 0 を返す。
-- Phase B は framework 初期化を通らない (`hs_plug.c` `hs_e2e_run` → `CreatePlugInstance`)。TLS 値を正しくしても OOB は消えず、block の内容 (`+568`) の native 初期化元が次の壁。これは子 issue #2571 に分割する。
+- Phase B は、基点 `9f403c97` では framework 初期化を通らない (`hs_plug.c` `hs_e2e_run` → `CreatePlugInstance`)。TLS 値を正しくしても OOB は消えず、block の内容 (`+568`) の native 初期化元が次の壁。main では #2571 (PR #2595) が TLS 初期化 (`hs_fw_init_tls`) を入れたが、`REPORT_2571.md` §3 では初期化ありでも OOB が残る。残る OOB の起票先は #2115 (継続)。
 - 注釈の変更 (E3) は Phase B の失敗形を変えるだけで、E2E は PASS にならない (E3 の実測は §11.5)。E1 は未コミットのため判定に使わない。採用はしない。
