@@ -1,7 +1,7 @@
 # tools/pm — PM 運用ツール (VM 版。退役の途中)
 
 PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停止し、再開しない運用に切り替えた
-(監査専用の heartbeat だけは指示 145 で再開する。下の『heartbeat (監査専用・指示 145)』。`infra/pm-worker/README.md` の『切替の記録』)。`/oc` の投稿と `oc-watchdog`・`oc-pm` の送信は Worker
+(監査専用の heartbeat は指示 145 で追加した。VM への設定は下の『heartbeat (監査専用・指示 145)』に従う。`infra/pm-worker/README.md` の『切替の記録』)。`/oc` の投稿と `oc-watchdog`・`oc-pm` の送信は Worker
 (`infra/pm-worker`、Cloudflare) が担い、点検は Actions の `watchdog.sh`、PM の判断は Actions の `pm` job (PM agent) に移した (配線済み。実 run の確認は親 #2319 の A4)。
 このディレクトリの大半は VM 版のツールで、後継と退役の扱いは下の『VM 退役後の扱い』の表が正本。実装 agent は使わない。
 数値の正本は [`REPORT.md`](REPORT.md)、運用規約の正本は `docs/WORKFLOW.md` §11。
@@ -36,7 +36,7 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 | ファイル | 用途 |
 |---|---|
 | `watch_runs.sh` | 実行中の Actions run を REST で監視し、1 本終わるたびに 1 行出して終了する。**終了通知を受けたら、結果の処理より先に再起動する** (指示 116)。詳細は [`watch_runs.notes.md`](watch_runs.notes.md) |
-| `heartbeat.sh` | VM では 2 時間ごとに PM のセッションへ監査専用の文面を送る (指示 145)。間隔は `PM_HEARTBEAT_SECONDS` (既定 1800 秒)、文面は `PM_HEARTBEAT_MSG_FILE` (未設定なら作業継続の既定文面。指示 102・116・120)。`systemd/pm-heartbeat.service`。作業継続の置換は `pm_wake.sh` (下の『heartbeat からの置換』) |
+| `heartbeat.sh` | drop-in で `PM_HEARTBEAT_SECONDS=7200` を設定すると、2 時間ごとに PM のセッションへ監査専用の文面を送る (指示 145)。既定の間隔は `PM_HEARTBEAT_SECONDS` 1800 秒。文面は `PM_HEARTBEAT_MSG_FILE` (未設定なら作業継続の既定文面。指示 102・116・120)。`systemd/pm-heartbeat.service`。作業継続の置換は `pm_wake.sh` (下の『heartbeat からの置換』) |
 | `pm_wake.sh` | `/status` を読み、PM のセッションが必要なときだけ固定文を送る (`heartbeat.sh` の置換。#2347)。送るのは needs_pm > 0・fresh=false が 30 分続く・stuck_age_max_min > 360 のどれかのときだけで、送信は 3 時間に 1 回・24 時間に 6 回まで。終了コードは 0 (判定の結果) / 1 (セッション ID 無し) / 2 (`/status` の取得・解析失敗。`needs_pm` が無い古い Worker も含む) / 3 (送信失敗)。テスト: `bash tools/pm/test_pm_wake.sh` |
 | `pm_watchdog_ping.sh` | 5 分ごとに `repository_dispatch` (`oc-watchdog`) を送り、Actions の watchdog を起こす (GitHub の schedule が発火しないため)。`systemd/pm-watchdog.*` |
 | `pm_gate.sh` | `pm_gate.sh <command...>`。Worker (`infra/pm-worker`) が primary (`/status` が `mode=live`・`fresh=true`・`last_tick` が 15 分以内) の間は command を実行せず終了 0 にする。それ以外 (取得失敗・dry-run・JSON 不正) は command を実行する (fail-open)。URL は env `PM_WORKER_URL`、無ければ `tools/pm/worker_url`。テスト: `bash tools/pm/test_pm_gate.sh` |
@@ -59,9 +59,9 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 ## heartbeat (監査専用・指示 145)
 
 heartbeat は監査専用。着手・watchdog は Worker (`infra/pm-worker`) が担う (点検の本体は Actions の `watchdog.sh`)。
-`heartbeat.sh` は `PM_HEARTBEAT_SECONDS` ごと (VM は 7200) に `PM_HEARTBEAT_MSG_FILE` の文面 (`heartbeat_msg_audit.txt`) を PM セッションへ送る。
+drop-in `~/.config/systemd/user/pm-heartbeat.service.d/audit.conf` (`[Service]` の下に `Environment=PM_HEARTBEAT_SECONDS=7200` と `Environment=PM_HEARTBEAT_MSG_FILE=<repo>/tools/pm/heartbeat_msg_audit.txt`) を置いてから `enable --now` すると、`heartbeat.sh` は 2 時間ごとに `heartbeat_msg_audit.txt` の文面を PM セッションへ送る。drop-in が無いと既定の作業継続の文面になる。
 送るのは監査 (Actions・チケットの状況を含む開発フロー) だけ。`pm-launch.timer`・`pm-watchdog.timer` は再開しない (Worker と二重になる)。
-VM の上書きは drop-in `~/.config/systemd/user/pm-heartbeat.service.d/audit.conf` (`[Service]` の下に `Environment=PM_HEARTBEAT_SECONDS=7200` と `Environment=PM_HEARTBEAT_MSG_FILE=<repo>/tools/pm/heartbeat_msg_audit.txt`)。
+VM での設定の実施と実測は子 issue #2637 (`[DOCS-26]`) で PM が記録する。
 
 ## VM 退役後の扱い
 
