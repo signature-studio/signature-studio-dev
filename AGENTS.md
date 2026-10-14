@@ -32,8 +32,9 @@ Signature Studio (webstudio) のリポジトリで作業する**全エージェ�
 - **全作業は subagent 委任**。1 チケット = 1 subagent、10 tool call 超は必ず委任 —
   `docs/WORKFLOW.md` §7。
 - worktree は親 dir の `ws-<N>`。main の共有ワークツリーは触らない — `docs/WORKFLOW.md` §2。
-- **検収は独立 subagent**。approve / request changes の 2 値。merge は PM が行い、自分で完了にしない —
-  `docs/WORKFLOW.md` §3・§5。
+- **検収は独立 subagent**。approve / request changes の 2 値。merge は検収の approve 後に検収 / PM が行い、
+  実装者は自分の PR を merge しない (Auto Merge を含む)。自分で完了にしない —
+  `docs/WORKFLOW.md` §2・§3・§5。
 - PR は `--base main`。body に `Closes #N`・受入条件・検証結果 — `docs/WORKFLOW.md` §7・§9。
 
 ## 2. ドキュメント責務 (原則)
