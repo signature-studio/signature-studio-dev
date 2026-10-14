@@ -178,7 +178,8 @@ print(f"legacy bind が通った kw 呼出し {n_cmp} 件のうち新も同結�
 assert known == {"channels.getChannelVolume", "channels.getStepParam", "channels.setChannelPitch", "channels.soloChannel",
                  "device.forwardMIDICC", "general.saveUndo", "mixer.automateEvent", "mixer.getEventIDName",
                  "mixer.getTrackVolume", "plugins.getColor", "plugins.getParamValueString"}, known
-assert (n_cmp, n_same) == (224, 208), (n_cmp, n_same)
+# PY-70 (#2500): stub の positional-only 引数 (`/`) を table に反映したため、署名を得た 15 関数が比較対象に入った (+5 件、全て同結果・差は増えない)
+assert (n_cmp, n_same) == (229, 213), (n_cmp, n_same)
 
 # (9) kwlist の重複名 (arrangement.selectionSet は ['selStart','selStart','selectNotes',...]; バイナリ由来)
 #     最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)

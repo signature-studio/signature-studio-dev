@@ -66,6 +66,9 @@ EM_JS(void, m11_stk_restore, (unsigned sp), {
 #ifndef M11_INSTR_K12
 #define M11_INSTR_K12 0   /* 1 = _CopyArray kind 12 (416720) の到達を stderr に出す計測専用 probe. 既定 0 は build 出力に影響しない */
 #endif
+#ifndef M11_FIX_50A830
+#define M11_FIX_50A830 0   /* 1 = function_50a830 (list Add) の Grow/Notify 復元 (#2439). 既定 0 は lift 版 */
+#endif
 
 static int g_trace = 0;
 static u64 g_icall_ok = 0, g_icall_miss = 0, g_icall_viaVA = 0;
@@ -105,6 +108,10 @@ static u64 tr_479b10(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
     for (int i = 0; i < 8; i++) h = (h ^ (u32)((a1 >> (8 * i)) & 0xff)) * 0x1000193u;
     return h;
 }
+#if M11_FIX_50A830
+u64 function_50aac0(u64 self);
+static u64 tr_50aac0(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64 a7) { return function_50aac0(a0); }
+#endif
 
 #ifndef M11_OV_CLASSCREATE
 #define M11_OV_CLASSCREATE 0
@@ -136,6 +143,10 @@ static m11_tr_t disp_find(u32 va) {
     case 0x478c70: return tr_478c70;
     case 0x479b00: return tr_479b00;
     case 0x479b10: return tr_479b10;
+#if M11_FIX_50A830
+    case 0x50aac0: return tr_50aac0;   /* list の Grow (VMT slot 0 = function_50a830 の Grow 呼出し, #2439) */
+    case 0x50b3f0: return tr_ret0;     /* list の Notify (VMT slot 1 = ret 1 命令, #2439) */
+#endif
 #if M11_OV_CLASSCREATE
     case 0x41c130: return tr_41c130;   /* TInterfacedObject.AfterConstruction (#595) */
     case 0x9b4b00: return tr_9b4b00;   /* ユーザクラス AfterConstruction (closure 外; #704) */
@@ -542,6 +553,65 @@ u64 function_47b260(u64 self, void* src, u64 unused) {
 #if M11_NOTIFY_682
     if (Q(self + 0x20)) ICALL_AT(0x47b2ae, Q(self + 0x20), Q(self + 0x18), s, 1, 0, 0, 0, 0, 0);
 #endif
+    return cnt;
+}
+#endif
+
+/* function_50a830  VA 0x50a830  (list Add: rcx = self (rbx), rdx = 追加する値 item (rsi); 戻り = 旧 Count) (#2439)
+ * 逆アセンブル: cnt = [self+0x10]; cnt == [self+0x18] (Capacity) なら rcx = self で call [VMT slot 0] (Grow);
+ *   [[self+8] + cnt*8] = item; [self+0x10] += 1; item != 0 かつ VMT != [RVA 0xc9af8] なら call [VMT slot 1](self, item, 0) (Notify).
+ * RetDec は `cmp/jne` ごと条件ブロックの `call [r13]` (Grow) と `call [rbx+8]` (Notify) を落とした (DEFECTS D15 同型; REPORT_2408 §4).
+ * Grow 実体 0x50aac0 と SetCapacity 0x50ade0 は IR に無いため下で転記し、disp_find に登録する. Notify 実体 0x50b3f0 は ret 1 命令.
+ * 既定 OFF (M11_FIX_50A830=0) は lift 版 (IR) を使う. ON で Grow/Notify が呼ばれ、list の FItems と Capacity が更新される. */
+#if M11_FIX_50A830
+/* function_50ade0  VA 0x50ade0  (SetCapacity(self, newcap)): newcap < Count なら 50a9a0 (エラー経路); newcap != Capacity なら
+ *   417fc0(&FItems, ti, 1, newcap) (DynArraySetLength) の後 Capacity := newcap. rdx の ti = Q(RVA 0xc9730), 50a9a0 の rdx = Q(RVA 0x11e2a30). */
+u64 function_50ade0(u64 self, u64 newcap) {
+    if ((long long)newcap < (long long)Q(self + 0x10)) function_50a9a0(Q(self), (void*)(uintptr_t)Q(R(0x11e2a30)), newcap, 0);
+    if (newcap != Q(self + 0x18)) {
+        function_417fc0((void*)(uintptr_t)(self + 8), (void*)(uintptr_t)Q(R(0xc9730)), 1, newcap);
+        Q(self + 0x18) = newcap;
+    }
+    return 0;
+}
+/* function_50aac0  VA 0x50aac0  (List Grow = VMT slot 0; rcx = self): newlen = Count+1. hook 全域 G (RVA 0x11e4390) の指す *P が非 0 なら
+ *   newcap = call *P(cap, newlen) (m11_icall). 無ければ cap > 0x40 → 3*cap/2 (符号付き), 8 < cap ≤ 0x40 → +16, それ以外 → +4 を
+ *   newcap >= newlen まで繰り返す. 最後に function_50ade0(self, newcap). */
+u64 function_50aac0(u64 self) {
+    long long newlen = (long long)Q(self + 0x10) + 1;
+    u64 cap = Q(self + 0x18);
+    u64 hook = Q(R(0x11e4390));
+    u64 newcap;
+    if (hook && Q(hook)) {
+        newcap = ICALL_AT(0x50aaf0, Q(hook), cap, (u64)newlen, 0, 0, 0, 0, 0, 0);
+    } else {
+        long long r = (long long)cap;
+        do {
+            if (r > 0x40) {
+                long long t = 3 * r;
+                long long cf = t & 1;
+                t >>= 1;
+                if (t < 0) t += cf;
+                r = t;
+            } else if (r > 8) {
+                r += 0x10;
+            } else {
+                r += 4;
+            }
+            if (r < 0) function_448d20();
+        } while (r < newlen);
+        newcap = (u64)r;
+    }
+    function_50ade0(self, newcap);
+    return 0;
+}
+/* function_50a830 本体 (rcx = self, rdx = item). Grow・Notify は VMT 経由 (ICALL_AT). 呼出し元は IR の 27 件 (REPORT_2408 §4). */
+u64 function_50a830(u64 self, u64 item) {
+    u64 cnt = Q(self + 0x10);
+    if (cnt == Q(self + 0x18)) ICALL_AT(0x50a84f, Q(Q(self)), self, 0, 0, 0, 0, 0, 0, 0);
+    Q(Q(self + 8) + cnt * 8) = item;
+    Q(self + 0x10) = cnt + 1;
+    if (item && Q(self) != Q(R(0xc9af8))) ICALL_AT(0x50a87d, Q(Q(self) + 8), self, item, 0, 0, 0, 0, 0, 0);
     return cnt;
 }
 #endif

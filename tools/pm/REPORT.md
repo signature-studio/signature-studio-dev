@@ -170,7 +170,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - VM の `relaunch.json` (67 件。count=1 が 60、2 が 7) は Worker に無い。履歴の無い issue を最大 2 回余分に再投入し得る (#2343)。
 - 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343)。rate-guard が launch を止める場面と、live の oc-pm 送信 (PM agent の起動) は未測定 (fake gh のテストだけ)。
 
-## 13. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
+## 14. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
 
 測定した commit: `aeaaa591` (コードを変えた最後の commit。main `7c072bd0` の取り込みと review 指摘の修正を含む)。取得時刻は UTC (2026-10-14)。`git diff aeaaa591 HEAD -- infra/pm-worker` は 0 行 (以後の commit は `tools/pm` と `docs` だけ)。
 

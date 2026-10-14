@@ -229,14 +229,22 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
   - 鮮度: `git diff 4048b18a 458a92f2 -- tools/plugins/f2/fn_refs.py tools/plugins/f2/unicorn_trace.py` = 0 行 (測定対象の `.py` は不変)。
   - `fn_refs.py $PE 0x407a00 0x867c88 0x41b290 0x41b2c0 0x847120 0x409090 0x867100`: rc=0、wall 12.96 秒。出力は上記の結論と一致 (`0x407a00` の格納元は `0x867c88` のみ、`0x867c88` の rip 参照は `0x4093ae`・`0x409455`・`0x41b294`、`0x407a00` への rel32 は 9 件、`0x867100` への lea は 4 件)。
   - `unicorn_trace.py $PE 0x83efb0 -H -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、`UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0x0`、書込み 0 件。
-  - `unicorn_trace.py $PE 0x409090 -H -q 0x867100 -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、書込み 28 件 (rip=0x4090a1〜0x4090f9)。
+  - `unicorn_trace.py $PE 0x409090 -H -q 0x867100 -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、書込み 28 件 (rip=0x4090a1〜0x409159 の 7 種)。
 - 未解決 (#2303 の残件。起票先は本 issue。実経路で `0x847120`・`0x409090` を呼ぶ上位関数を確定する必要あり): (a) `0x847120` の呼出し元 `0x83f637` が `0x83efb0` の経路に乗るか、(b) `0x409090` の呼出し元 `0x41bc60` (表 `0x8526c0`) が実行時に埋まる経路、(c) `[rax-8]` のチャンクヘッダ形式 (受入 3)、(d) `0x411bb8` 記録 (受入 5)。
 
-## 16. PLG-F3-27 続き (#2303): arena の前処理と chunk header 形式 (部分、測定 commit 8eda24a9、block19148)
+## 16. PLG-F3-27 続き (#2303): arena の前処理と chunk header 形式 (部分、測定 commit a70461d6、block19148)
 
-- 道具 (8eda24a9): `unicorn_trace.py` に `-p hex` (本体の前に同じメモリで実行する関数。arena 初期化 `0x409090` 用) と `-V` (VirtualAlloc が 0x50000000〜 の pool を 64KB 境界で返す) を追加。既定の挙動は不変。
-- 測定 (逐次、load 0.03→0.10、各 wall 1.69〜1.75 秒、RSS 約 227〜237 MB): A `-H` は `UC_ERR_READ_UNMAPPED rip=0x407a5e` (§15 と一致)。B `-H -p 0x409090` は `0x407a20` を通過し、`VirtualAlloc` の戻り 0 で `rip=0x41bfaa` (エラー経路)。C `-H -V -p 0x409090` は初回確保 (`0x407630`→`0x407c21`) まで進み、pool への書込み 44 件の後、`UC_ERR_INSN_INVALID rip=0x50138d06` (pool 内) で停止。
-- 受入 3 (chunk header) **達成** (C の書込み元 rip より): blk=`0x50138cc0`。`[blk-8]`=size+6 (`0x407c25`)、`[blk+0]`=所有 bin `0x867200` (`0x407c31`)、`[blk+0x18]`=空きリスト先頭 0、`[blk+0x20]`=使用数 1 (`0x407c34`・`0x407c38`)。最初の obj (`blk+0x30`) の `[obj-8]`=blk (`0x407c60`)。確保済みの `[obj-8]` は所有 blk。空き obj の `[obj-8]` は次の空き obj へのリンク (読取り側 `0x407a5e` の `and rcx,[rax-8]` からの推定。書込み側は未観測)。
+- 訂正 (a70461d6): 8eda24a9 の `-V` は import 名の完全一致で判定していたため、DLL 名の大文字小文字が違う PE では無音で無効になった。同一 PE の大文字化コピーで旧版は B と同じ `rip=0x41bfaa`、新版は C と同じ結果になることを確認。`POOL_SIZE` (128 MiB) 超過は `error:` を出して 0 を返す (`POOL_SIZE` を 1 MiB に縮めた一時コピーで確認)。既定の挙動と C の出力は 8eda24a9 版 (= origin/main の `unicorn_trace.py`) と A・C の出力が全文一致。
+- 道具 (a70461d6): `unicorn_trace.py` に `-p hex` (本体の前に同じメモリで実行する関数。arena 初期化 `0x409090` 用) と `-V` (VirtualAlloc が 0x50000000〜 の pool を 64KB 境界で返す) を追加。既定の挙動は不変。
+- 測定 (逐次、n=3、load 0.36→0.46): wall A 1.22〜1.27 秒・B 1.23〜1.37 秒・C 1.24〜1.31 秒、RSS A/B 約 227 MB・C 約 237 MB。A `-H` は `UC_ERR_READ_UNMAPPED rip=0x407a5e` (§15 と一致)。B `-H -p 0x409090` は `0x407a20` を通過し、`VirtualAlloc` の戻り 0 で `rip=0x41bfaa` (エラー経路)。C `-H -V -p 0x409090` は初回確保 (`0x407630`→`0x407c21`) まで進み、pool への書込み 44 件の後、`UC_ERR_INSN_INVALID rip=0x50138d06` (pool 内) で停止。
+- 受入 3 (chunk header) **部分達成** (使用中ヘッダは実測、空きリンクは推定): blk=`0x50138cc0`。`[blk-8]`=size+6 (`0x407c25`)、`[blk+0]`=所有 bin `0x867200` (`0x407c31`)、`[blk+0x18]`=空きリスト先頭 0、`[blk+0x20]`=使用数 1 (`0x407c34`・`0x407c38`)。最初の obj (`blk+0x30`) の `[obj-8]`=blk (`0x407c60`)。空き obj の `[obj-8]` は次の空き obj へのリンクと推定 (読取り側 `0x407a5e` の `and rcx,[rax-8]` から)。`[blk+0x18]`=0 のため書込み側は未観測で、検証は子 #2468 に移す。
 - 受入 4 (0x411a80 到達) **未達**: 停止点 `0x50138cf0`→`0x50138d06` (pool)。`0x5da06d` (`mov rax,[rax]`) は 1 回実行され、そのときの rcx (this) は 0。停止と this の対応は未確定。`0x407520` が `[blk+0]` を `0x867200`→`0x8c02c0` に書換える (`0x407553`) ことも確認。
-- 受入 5 (0x411bb8 の記録) **未達** (受入 4 が前提)。残件は子 issue に分割 (PR 本文の未解決表)。
-- 再現 (8eda24a9): `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000` (C)。
+- 受入 5 (0x411bb8 の記録) **未達** (受入 4 が前提)。残件は子 #2468 に移した。
+- 再現 (a70461d6。依存 `uv venv f2venv && uv pip install unicorn==2.1.4 pefile capstone`。リポジトリ直下から、`PE` は block19148_PE.bin): A `unicorn_trace.py $PE 0x83efb0 -H -m 2000000`、B `unicorn_trace.py $PE 0x83efb0 -H -p 0x409090 -m 2000000`、C `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000`。
+- 鮮度: `git diff a70461d6 HEAD -- 'tools/plugins/f2/*.py'` = 0 行 (a70461d6 以降の commit は REPORT のみ)。
+
+## 17. PLG-F3-30 (#2493): 0x867100 を構築するアリーナ初期化関数 (書込み元 rip、測定 commit d49817f9、block19148)
+
+- 道具と再現: `write_origin.py` (1b8b7eb1)。`bash tools/plugins/f2/write_origin_2493.sh $PE` (d49817f9、PE と venv は §11) が以下を一括で再現する。逐次 n=3、wall 10.95・10.95・10.88 秒 (min–max 10.88〜10.95)、load (1 分値) 開始→終了 0.08→0.22・0.22→0.42・0.42→0.63、3 回の出力は md5 一致 (28 件版 `e20906a7…`・56 件版 `e264e012…`)。結果: `0x409090 -H -q 0x867100 -w 0x867100:0x867200` の書込み 28 件 (`0x867101`〜`0x8671e0`) は全件が pdata `[0x409090,0x4091d4)` 内の 7 種の rip (`0x4090a1`・`0x4090a5`・`0x4090a9`・`0x4090b1`・`0x4090f9`・`0x409104`・`0x409159`) から出た。unmapped 0。`-w 0x867100:0x867300` は 56 件 (8 ブロック×7、同じ関数・同じ 7 種)。
+- 負の対照: `-w 0x867d00:0x867e00` は 0 件。`0x83efb0 -H -w 0x867100:0x867200` (アリーナを構築しない経路) は 0 件で、`UC_ERR_READ_UNMAPPED rip=0x407a5e` で止まる。測定したのはこの 1 経路のみ (他の経路は未測定)。集計の対照: 合成の書込み 1 行 (rip=0x1000、pdata 外) は unmapped 1・関数 0 件。
+- 判定: 受入 **達成**。アリーナ初期化関数は `0x409090`。呼出し経路は §15 のとおり未確定 (未解決は #2303)。鮮度: `git diff d49817f9 HEAD -- tools/plugins/f2/*.py tools/plugins/f2/*.sh` = 0 行。
