@@ -12,7 +12,7 @@
 #   NODATA    : C + 関数 m11_dest_obs は残し、静的データ (g_dest_h・g_rec_*・g_dest_n) を無くす (#2212 の対照)
 # 直列・単発。判定は表示のみ。出力は work/split_1952/ (gitignore)。
 # #2212: 各構成のリンク map を map_<tag>.txt に残し、g_dest_h・g_rec_*・pad の実アドレス (wasm 上) を表に出す。
-# 前提: work/ が m11_gen_ir2.sh 生成済み、FL_WIN64_DIR 設定済み、/opt/emsdk 配置済み。
+# 前提: work/ が m11_gen_ir2.sh 生成済み、FL_WIN64_DIR 設定済み、[EMSDK] 配置済み (docs/REFERENCES.md)。
 # 使い方: bash tools/m11/trap_triage/repro_1952_rt_mech.sh [N] [CONFIG...]   (N = 反復回数・既定 1)
 set -u
 cd "$(dirname "$0")/.."   # tools/m11 へ
