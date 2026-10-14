@@ -22,7 +22,7 @@
 |---|--:|
 | 母集団 (MX-10 整合候補 0/2/3 件) | 7,498 (160 / 7,274 / 64) |
 | 再判定後 0 件 | 458 |
-| 再判定後 1 件 (確定) | 7,008 |
+| 再判定後 1 件 (整合候補が一意) | 7,008 |
 | 再判定後 2 件以上 (未確定) | 32 |
 
 全 19,420 件に対する内訳 (`mx_unres_decode.py`・完全復号のみ): 候補 1 件 (plain) 16,326 / 2 件 2,918 / 3 件 16 / 0 件 160。これは MX-10 時点の plain 11,922 件から増えた分 (4,404 件) が、完全復号で候補を落とせたことによる。
@@ -40,8 +40,10 @@
 ## 4. 検証
 
 - **測定 commit (コードを変えた最後の commit)**: `eaa4da33` (`feat(massivex): decode unresolved UNWIND_INFO candidates and recheck MX-10 population (Refs #1624)`)。e2e が使うコードは base (`2626e445`) と同一 (`git diff 2626e445 eaa4da33 -- tools/targets/massivex` は dsp/scripts の新規 4 本と REPORT のみ、既存ファイルの変更なし)。
-- **e2e (`bash dsp/e2e.sh`・測定 commit・n=1)**: rc 0 / `OK elapsed=43s` / load 0.02 0.01 0.01 → 0.50 0.14 0.06。
+- **e2e (`bash dsp/e2e.sh`・測定 commit・n=1、時間は参考・判定は PASS のみ)**: rc 0 / `OK elapsed=43s` / load 0.02 0.01 0.01 → 0.50 0.14 0.06。
 - **negctl (`bash dsp/negctl.sh`・測定 commit)**: NC1 unsup 67 / NC2 unsup 746 / NC3 insns 31 unsup 0 → 3 件とも FAIL<期待> (rc 0)。
 - **probe (`mx_unres_probe.py`・測定 commit)**: valid 186,961 / 解決不能 19,420 / 整合候補 0・2・3 件 = 160・7,274・64 (REPORT_MX10 §2 と一致)。
 - **母集団の再判定 (`mx_unres_orig7498.py`・測定 commit)**: 0/2/3 件の母集団 7,498 → 再判定後 0 件 458 / 1 件 7,008 / 2 件 32。
 - **全件の完全復号 (`mx_unres_decode.py`・測定 commit)**: 19,420 件 → 候補 1 件 16,326 / 2 件 2,918 / 3 件 16 / 0 件 160。
+- **測定 commit から HEAD までのコード差分 (差分 0 の証跡)**: `git diff eaa4da33 HEAD -- tools/targets/massivex/dsp/scripts` の出力は空 (`| wc -c` = 0)。測定 commit 以降の HEAD の変更は本 REPORT のみ。実測値は測定 commit `eaa4da33` のままで有効。
+- **素材の再確認**: 本 review 修正 run の `$ARTIFACTS_DIR` には `fl-win64` のみで `plugins-massivex` は無いため、e2e と `mx_unres_*.py` の再実行は行っていない (測定は `eaa4da33` で実施)。
