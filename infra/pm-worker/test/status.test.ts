@@ -66,6 +66,7 @@ const EXISTING_KEYS = [
 ];
 const ADDED_KEYS = [
   "last_webhook_at", "last_dispatch_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
+  "demoted_reason", "shadow",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];
@@ -81,7 +82,7 @@ test("/status (d): 既存のキーは全て残り、追加するキーだけが�
   assert.equal(detail.phase, "launch");
   assert.equal(detail.launch_stop, null);
   assert.equal(detail.fresh, false);
-  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0 });
+  assert.deepEqual(detail.counters, { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, demoted: 0, restored: 0 });
   assert.equal(detail.last_error, null);
   assert.deepEqual(detail.log, []);
   assert.deepEqual(detail.would_launch_now, []);

@@ -124,6 +124,7 @@ export class PmApp {
     if (p === "/setup" && req.method === "GET") return this.setup(u);
     if (p === "/setup/callback" && req.method === "GET") return this.callback(u);
     if (p === "/status" && req.method === "GET") return this.status(req);
+    if (p === "/demote/reset" && req.method === "POST") return this.resetDemote(req);
     if (p === "/tick" && req.method === "POST") {
       const r = await this.engine.tick();
       return json({ ok: true, ready: r.ready });
@@ -215,6 +216,13 @@ export class PmApp {
     }
     if (!(await this.callerCanPush(req.headers.get("authorization")))) return json({ error: "unauthorized" }, 401);
     return json(s);
+  }
+
+  // ---------------------------------------------------------------- 降格の解除 (#2340)
+  // 自動では戻さない。repo の push 権限を示す token (Bearer) を持つ人だけが、/status の demoted_reason を見てから呼ぶ。
+  private async resetDemote(req: Request): Promise<Response> {
+    if (!(await this.callerCanPush(req.headers.get("authorization")))) return json({ error: "unauthorized" }, 401);
+    return json({ ok: true, reset: this.engine.resetDemote() });
   }
 
   private async callerCanPush(h: string | null): Promise<boolean> {
