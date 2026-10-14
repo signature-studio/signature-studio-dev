@@ -15,6 +15,8 @@ PM の launch / watchdog を、VM のポーリング (systemd timer) から **we
 | `GET /setup` `GET /setup/callback` | GitHub App `oc-pm-for-signature-studio` の manifest flow (org 所有)。`/setup` は無認証だが、期限内 (1 時間) の state があれば上書きせず同じ state を返す。state は org 所有の App への変換に成功したときだけ消費する |
 | `GET /status` | 集計のみ (実行中 run 数・ready/blocked 数・最終 reconcile 時刻・モード・健全性の観測。下の『/status の観測』)。`mode_launch` / `mode_dispatch` が経路ごとのモード (`live` / `dry-run`)。`mode` は両方 `live` のときだけ `live` (片方だけなら `partial`、どちらもなら `dry-run`。`tools/pm/pm_gate.sh` は `mode=live` を『VM の command を止めてよい』と読む)。`?detail=1` は repo の push 権限を持つ GitHub token (Bearer) が必要 |
 
+`GET /` (#2658) は `/status` を 15 秒ごとに読む簡易 GUI (単一 HTML。`src/gui.ts`。DO は呼ばない)。外部のスクリプト・スタイル・フォントを読まず、CSP は `default-src 'none'` + 応答ごとの nonce (App の秘密鍵を持つ制御面に、外部の供給元の侵害を持ち込まないため)。値は `textContent` だけで描く。
+
 launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出力 (固定 JSON を Python 版と TS 版の両方で読む突き合わせテスト: `test/classify.test.ts`)。差分は次の 6 点で、いずれも issue 本文を解析しない。
 
 1. blocked_by の一覧が不明な issue は着手しない。
