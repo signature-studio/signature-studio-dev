@@ -23,12 +23,13 @@
 | ref 3 回の file SHA-256 | 一致 `672007a06d1482ada6f846ec8f5e8a763a2586e032dbabe5fb5432332bd332c1` | 一致 `b4fd6d642b2d0a8f8e4b075b91b029ca4c6fc95ed3688c3e9397cf03ea416420` |
 | data 部 SHA-256 | `7adcbc28…81fce` | `87fb7149…058ef` |
 | peak / rms | 0.790915 / 0.310052 (非ゼロ 16,380/16,384 cell) | 0.691102 / 0.269762 |
-| ref_manifest.json との pin 照合 | 一致 (主) | 一致 (`content_full`) |
+| ref_manifest.json との pin 照合 | 一致 (測定当時の主 pin。現在のキーは `content_empty`) | 一致 (現在の主エントリ `main` = JSON の top-level。旧キー `content_full` は主エントリに統合 (§4.2)) |
 | self-test (ref_1 vs ref_2, A-exact) | PASS (bit-exact) | PASS (bit-exact) |
 | ネガコン 別ノート (D-spectral) | FAIL: rmsDiff 3.4 dB・STFT 4086/4102 bin・LUFS 差 0.438 | FAIL: rmsDiff 4.3 dB・STFT 4902/4922 bin・LUFS 差 1.852 |
 | ネガコン 1 サンプル改変 (A-exact) | FAIL: maxUlp 671089 | FAIL: maxUlp 1342177 |
 | `ref_harness.sh` | NG=0, 14.0 s, load 0.30 | NG=0, 14.0 s, load 0.21 |
 
+- 件数: 「全展開 7,370 files」は installer 全展開 (`7z x`) の files 数で、`$COMMONFILES64` (8 files) と `$PLUGINSDIR` (5 files) を含む。「7,357 files」は wasm 側が読む content の 7 グループ (`tools/assets/serum2/REPORT.md` §2)。差 13 files は content ではない。
 - `saved_controller_state.bin` は 2 条件 (と `exe_extract` = DLL のみ) で同一。`saved_processor_state.bin` は空 dir と DLL のみの `exe_extract` で同一 (1,200 B)、全展開だけ異なる (1,253 B)。出力 WAV の差は content 由来で、DLL・MIDI・SR は同じ。
 - 既存 `e2e.sh` (測定 commit `8680cf44`。content は `work/exe_extract` = DLL のみ展開): **62/62 OK, 69.5 s, load 0.23**、NC1/NC2 とも期待どおり (exit 1, NG=1)。
 - 履歴 (測定 commit `dcafb442`。参照は `exe_extract` を CWD にしていた): `ref_harness.sh` NG=0, 13.6 s, load 0.33 / `e2e.sh` 62/62 OK, 67.3 s, load 0.12。空 dir と pin が同じ `672007a0…` なので、`dcafb442` からの content dir 切替で参照は変わっていない。
@@ -39,8 +40,8 @@
 `vst3host.cpp` の変更は `dcafb442` の 1 commit のみ (WAV 書出と `S2HOST_PITCH` 追加。`S2HOST_PITCH` 未設定時は従来どおり pitch 60、WAV は追加出力のみで既存の summary・ログは変えない)。`dcafb442` 以降の host 配下のコード差分 (`92f88190`: 表記修正と `set -e` 下の終了コード処理、`8680cf44`: content dir の専用化と PATH 優先) は、いずれも `8680cf44` 上の `ref_harness.sh`・`e2e.sh` の実測に含まれる。
 
 ```
-git diff 8680cf44 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
-(出力: 空。測定 commit 以降のコード差分は 0)
+git diff 8680cf44 f108211e -- tools/targets/serum2/host ':(exclude)*.md'
+(出力: 空 = 0 行。f108211e 以降の host のコード差分は SR-47 (#2414) の変更で、§4.3 の基点 4993995f から見て扱う)
 ```
 
 ### 2.1 実 DLL なしの補助確認 (stub wine64。再測定ではない)
@@ -67,7 +68,7 @@ git diff 8680cf44 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
 ### 4.1 判断 (正 = installer 全展開)
 
 - **比較先の現状**: wasm 側 (SR-4 #75) はまだ WAV を出していない。`tools/targets/serum2/sr4/REPORT.md` の pilot は関数単位の bit 比較 (liftlib harness のランダム scenario) で、content dir を読まない。よって比較条件は**将来の wasm 本体が読む content** から決める。
-- **wasm 本体が読む content**: SR-6 (`tools/assets/serum2/REPORT.md`) は素材 `plugins-serum2` の installer を `7z x` で全展開し、7 グループ 7,357 files (Tables 289 files を含む) を LazyVfs で配信する設計で、全 files の sha256 一致まで確認済み。wasm 側が読むのはこの全展開 content。
+- **wasm 本体が読む content**: SR-6 (`tools/assets/serum2/REPORT.md`) は素材 `plugins-serum2` の installer を `7z x` で全展開し、7 グループ 7,357 files (Tables 289 files を含む。全展開 7,370 files から §1 の 13 files を除いたもの) を LazyVfs で配信する設計で、全 files の sha256 一致まで確認済み。SR-6 の設計では wasm 側はこの全展開 content を読む。Serum 2 本体への FS shim 接続は未確認 (§4.4)。
 - **SR-46 (#2384) との整合**: factory preset は全展開の `Presets/` からのみ取れる。全展開に揃えると SR-46 と同じ content 条件になる。
 - **判定への影響**: 同じ DLL・MIDI・SR で content だけ変えると別の音になる (§1: 空 dir peak 0.790915 / 全展開 0.691102)。条件の選択は判定結果を変えるため、導入後の状態 (installer は Tables 等を導入する: `tools/targets/serum2/REPORT.md` §1.1) に合わせる。
 
