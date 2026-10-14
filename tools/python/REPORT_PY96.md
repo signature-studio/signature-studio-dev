@@ -7,7 +7,7 @@
 - 親 #2832 の 52 件 (screen 28・arrangement 12・launchMapPages 12) は 1 run に収まらないため、**arrangement の選択範囲読出し 4 件** (`selectionStart`・`selectionEnd`・`liveSelectionStart`・`selectionIsActive`) の範囲に縮めた。
 - 4 件は PE で「状態 field を読み、変換スロット `0x15e4280` に渡す」と確定し、mock と C provider に実装した。mock と C の差分は 0 (`tests/arrangement_diff.mjs` 8 呼出し)。
 - **値は未確定**。初期値 `-1` (未選択) は仮置き。未選択が負値で表されることは PE 0xe43e80 で確認したが、負値が Python に何として返るかは変換先 `0x15e4280` が未同定のため未確定。
-- 残り 48 件は子 issue 3 件に分けた: arrangement 残り 8 件 #2983 (`[PY-152]`)・launchMapPages 12 件 #2984 (`[PY-153]`)・screen 28 件 #2985 (`[PY-154]`)。いずれも親 #2832 の子。(題名の番号は、旧題名 `[PY-119]`〜`[PY-121]` が #2977〜#2985 で重複していたため付け替えた。issue 番号は変えていない)
+- 残り 48 件は子 issue 3 件に分けた: arrangement 残り 8 件 #2983 (`[PY-152]`)・launchMapPages 12 件 #2984 (`[PY-153]`)・screen 28 件 #2985 (`[PY-154]`)。いずれも親 #2832 の子。(題名の番号は、同じ番号の題名が他の issue と重複していたため付け替えた。issue 番号は変えていない)
 
 ## 手段
 
