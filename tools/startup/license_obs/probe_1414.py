@@ -14,7 +14,7 @@ import unicorn.x86_const as C  # noqa: E402
 from unicorn import UC_HOOK_CODE  # noqa: E402
 from emu_reg import Emu, Reg  # noqa: E402
 from run_cases import seed_license  # noqa: E402
-from peidx import Image  # noqa: E402
+from peidx import Image, rip_target  # noqa: E402
 
 CASES = (
     ('A1 ILRegKey 無し cl=0', dict(drop_il=True), 0),
@@ -25,6 +25,7 @@ CASES = (
     ('D1 非正規 128 文字 cl=1', dict(il_override='0123456789ABCDEF' * 8), 1),
 )
 
+G1_SLOT = 0x15e14a8   # g1 のスロット (rip 相対参照の対象)
 G1 = 0x14f852c        # 0x10d3a30 の g1・g3・g4 が指す dword (sentinel 0x7fffffff)
 G2 = 0x16b6e58        # g2 (byte)
 F = 0x10d3a30
@@ -42,6 +43,24 @@ def indirect_sites(img):
         if ins.mnemonic == 'call' and not ins.op_str.startswith('0x'):
             out.append((ins.address, ins.size, ins.operands[0], md))
     return out
+
+
+def static_enum(img):
+    rip_g1 = []
+    rip_slot = []
+    imm_7fff = []
+    for lo, hi, insns in img.iter_insns():
+        for ins in insns:
+            tgt = rip_target(ins)
+            if tgt == G1:
+                rip_g1.append(hex(ins.address))
+            if tgt == G1_SLOT:
+                rip_slot.append(hex(ins.address))
+            if ins.mnemonic == 'mov' and ins.op_str.endswith(', 0x7fffffff') and ' ptr [' in ins.op_str:
+                imm_7fff.append(hex(ins.address))
+    return {'rip_ref_G1_0x14f852c': len(rip_g1), 'rip_ref_G1_SLOT_0x15e14a8': len(rip_slot),
+            'write_mov_imm_0x7fffffff_to_mem': len(imm_7fff),
+            'addrs_rip_ref_G1_SLOT': rip_slot, 'addrs_write_mov_imm_0x7fffffff': imm_7fff}
 
 
 def resolve(uc, op, md, addr, size):
@@ -77,7 +96,8 @@ def run_trace(name, reg, cl):
                 flags.append((k, hex(t)))
         e.uc.hook_add(UC_HOOK_CODE, cb, begin=addr, end=addr)
     st = e.run(cl=cl)
-    return {'case': name, 'status': st if st == 'ok' else st[:160], 'sites_executed': len(seen),
+    return {'case': name, 'status': st if st == 'ok' else st[:160], 'static_indirect_sites': len(sites),
+            'sites_executed': len(seen),
             'targets_hit': flags, 'seen': seen}
 
 
@@ -114,7 +134,8 @@ def main():
         run_force('F3 g1=sentinel g2=1 (強制)', 0x7fffffff, 1),
     ]
     os.makedirs(os.path.join(HERE, 'results'), exist_ok=True)
-    json.dump({'trace': trace, 'force': force}, open(os.path.join(HERE, 'results', 'probe_1414.json'), 'w'),
+    static = static_enum(Image())
+    json.dump({'static': static, 'trace': trace, 'force': force}, open(os.path.join(HERE, 'results', 'probe_1414.json'), 'w'),
               indent=1, ensure_ascii=False)
     for t in trace:
         print(t['case'], '|', t['status'][:80], '| sites executed', t['sites_executed'], '| targets hit', t['targets_hit'])
