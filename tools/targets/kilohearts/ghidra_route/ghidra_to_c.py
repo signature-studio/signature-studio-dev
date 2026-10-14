@@ -38,6 +38,40 @@ STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ル
 }
 
 
+RCPPS_HELPER = r'''/* rcpps: Ghidra は `rcpps(dst, src)` の 2 引数形で出す (dst は未使用)。実機 (AMD Ryzen 9 9950X) の rcp 近似表で 4 lane を計算。
+ * 表と指数則は snapins/lift/gen_simd.py の kh_rcp_exact と同一。 */
+static const uint32_t kh_at_rcp[4096] = %(RCP)s;
+static inline uint32_t kh_rcp_exact(uint32_t x) {
+    uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
+    if (e == 0) return s | 0x7f800000u;
+    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : s;
+    int t = 253 - (int)e;
+    return t <= 0 ? s : (s | ((uint32_t)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);
+}
+static inline V128 rcpps(V128 dst, V128 src) {
+    V128 r;
+    (void)dst;
+    for (int i = 0; i < 4; i++) {
+        uint32_t x, y;
+        memcpy(&x, src.b + 4 * i, 4);
+        y = kh_rcp_exact(x);
+        memcpy(r.b + 4 * i, &y, 4);
+    }
+    return r;
+}
+'''
+
+
+def rcp_table_literal():
+    import base64
+    import struct
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'scripts', 'approx_tables.b64')
+    b64 = ''.join(l for l in open(p) if not l.startswith('#'))
+    blob = base64.b64decode(''.join(b64.split()))
+    assert len(blob) == 3 * 4096 * 4, len(blob)
+    return '{%s}' % ','.join(str(v) for v in struct.unpack('<4096I', blob[:4096 * 4]))
+
+
 def pe_bytes(pe, va, n):
     rva = va - pe.OPTIONAL_HEADER.ImageBase
     return pe.get_data(rva, n)
@@ -96,7 +130,7 @@ def main():
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
-        t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
+        t = re.sub(r'undefined1 (auVar\d+|in_XMM\d+) \[16\];', r'V128 \1;', t)
         if tbase is not None:
             t = re.sub(r'&UNK_([0-9a-f]{8,9})\b', lambda m: '((unsigned char*)gt_%x + 0x%x)' % (tbase, int(m.group(1), 16) - tbase), t)
         t = re.sub(r'\*\(undefined1 \(\*\) \[16\]\)\((.*?)\) = (auVar\d+) << 0x20;', r'v128_store_shl32((void*)(\1), \2);', t)
@@ -125,6 +159,8 @@ def main():
     for va, s in STUB.items():
         if ('FUN_%x' % va) in alltxt:
             protos.append(s.split('{')[0].strip() + ';')
+    if re.search(r'\brcpps\(', alltxt):
+        out.append(RCPPS_HELPER % {'RCP': rcp_table_literal()})
     out += protos
     out += [STUB[v] for v in STUB if ('FUN_%x' % v) in alltxt]
     # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
