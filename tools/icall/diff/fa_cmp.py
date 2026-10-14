@@ -25,6 +25,7 @@ def ptr_norm(h):
     # ICALL-79 (#2674): xmm0 が x86-64 のユーザ空間アドレス (0 < v < 2^47) なら bit を比べず PTR に畳む。
     # native と wasm はヒープの基底が違うため、ポインタを返す関数は bit が必ず食い違う (0x18105d9fc)。
     # 正規化された double は上位 16bit が 0 にならないので、この範囲は実質ポインタ由来。subnormal は誤って PTR になりうる。
+    # 両側が (0, 2^47) にあると整数どうしでも PTR に畳まれ、ポインタと非ポインタ整数の食い違いも一致扱いになる。
     # FA_PTR_NORM=0 で従来の bit 比較に戻す (負の対照)。
     if os.environ.get('FA_PTR_NORM', '1') == '0' or h.startswith('ERR'):
         return h

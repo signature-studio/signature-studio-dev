@@ -7,7 +7,6 @@ capstone で線形に復号して、xmm0 を書く命令・call・ret を列挙�
 範囲は FN_VA から次の `; function:` ラベルの直前まで (--end で上書き可)。"""
 import sys, re, bisect
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64
-from capstone.x86_const import X86_REG_XMM0
 
 HEX = re.compile(r'^(0x[0-9a-f]+):\s+([0-9a-f ]+?)\s*[|\t]')
 
