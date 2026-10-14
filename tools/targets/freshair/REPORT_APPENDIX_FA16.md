@@ -93,7 +93,7 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 
 ## 10. FA-25 (#1791): FA_NODE1=1 の fault 値の採取と out[0] の照合
 
-- 付録 `REPORT_APPENDIX_FA22.md` は本 checkout に無い。FA-22 の記述 (`rip=180c9d74c addr=0x50`) は `FA_ALT9=1` の結果 (§6 (b)) で、`FA_NODE1=1` の結果ではなかった。
+- 付録 `REPORT_APPENDIX_FA22.md` (`83842a6b` で追加済み) の FA-22 の記述 (`rip=180c9d74c addr=0x50`) は `FA_ALT9=1` の結果 (§6 (b)) で、`FA_NODE1=1` の結果ではなかった。
 - `FA_NODE1=1` (probe 無し, 実測): `ERR S900 sig=11 rip=180c9d741 addr=0 ... rcx=a5a5a5a5a5a5a5a5 rdx=0`。`0x180c9d741` は `mov rax,[rcx]` (setter の vtable 読み)。`rcx` は `[out0+0x10]` で、ヒープ poison 値 `a5a5...` が入っている。`a5a5...` は非 canonical アドレスなので #GP となり、Linux は `si_addr=0` を返す。`si_addr` と `rcx` の不一致は採取の誤りではない (`on_sig` は `si_addr` と `REG_RCX` を同一 ucontext から読む)。
 - 旧 probe の `found=1` は誤り: `ca1480_probe` は `out+0x10` を見ていた。修正後 (`found = out[0] != 0`) は `found=0` (S900–S907, key={1,0}, 8/8)。
 - `probe_guard` 版 (`[C+0x318]+0xa8` の読みを範囲内に限る) でも `out[0]=0` で、node Z (`out[0]` 候補) とは一致しない。`out[0]=0` と setter の `rcx=[out0+0x10]` の poison は両立しない。probe 自体が呼出順を変えている可能性があり、未解決。
@@ -107,12 +107,15 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `FA_NODE1=1` で `out[0]` が 0 (probe 下) と poison (probe 無し) になる不一致 | out[0] と node Z の照合が未了 (受入 2) | #1791 (本 issue に残す) |
+| `FA_NODE1=1` で `out[0]` が 0 (probe 下) と poison (probe 無し) になる不一致 | out[0] と node Z の照合が未了 (受入 2) | #2097 (FA-28) |
 
 ## 11. FA-25 (#1791) 追補: probe 無しの out[0] 実読 (受入 2 の再測定)
 
-- 追加: `FA_OUT0=1` のときだけ、setter `0x180c9d741` の fault 時に `[rsp+0x48]` (= out[0]) を表示 (`pe_map.h`)。`FA_NODE1=1` 時は node Z のアドレスを `NODEZ` 行に出す (`native_ctrl.c`)。既定動作は不変。
+- 追加: `FA_OUT0=1` のときだけ、setter `0x180c9d741` の fault 時に `[rsp+0x48]` (= out[0]) を表示 (`pe_map.h`)。`FA_OUT0=1` と `FA_NODE1=1` の両方が要るとき node Z のアドレスを `NODEZ` 行に出す (`native_ctrl.c`)。既定動作は不変。
 - 実測 (probe 無し, `FA_OUT0=1 FA_NODE1=1`, 8 epf 本): 8 本すべて `OUT0 rip=180c9d741 out0 = Z+0x2b0` (例: Z=`...084750`, out0=`...084a00`)。node Z (`[out0]` の候補) とは一致しない。`[out0+0x10]` は `Z+0x2c0` で、rcx=`a5a5a5a5a5a5a5a5` (poison) と整合する。
+- 再現 (上記の実測の手順。probe 無し = `FA_PROBE9` を付けない。入力は factory `.epf` 8 本 = `ctrl_scen.txt` 先頭 8 行、stderr の `OUT0` 行を抽出):
+  `cd tools/targets/freshair/lift2 && bash build_ctrl.sh && cd work/ctrl && python3 ../../gen_ctrl_scen.py ctrl_scen.txt 2 5 0xFA2C0001 && head -8 ctrl_scen.txt > fa9_epf.txt && clang -O1 -ffp-contract=off -frounding-math -w -o native_ctrl_out0 ../../native/native_ctrl.c && FA_OUT0=1 FA_NODE1=1 FA_HEAP_ZERO=1 ./native_ctrl_out0 "../../../work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64" fa9_epf.txt 0 2>&1 >/dev/null | grep -E '^(OUT0|NODEZ)'`
+  (実行バイナリ = `native_ctrl_out0`。`run_fa9.sh` は `FA_PROBE9=1` 版 (`native_probe9`) なので、この `OUT0` 行は出ない。本 run では素材 `plugins-freshair` が無く未実行。実測は `7959db1c`。)
 - probe 下 (`FA_PROBE9=1`, 同じ node 構成) は `out[0]=0` (`FA9CA ... out0=0 found=0`)。probe 無しと probe 下で `out[0]` が 0 と `Z+0x2b0` に分かれ、probe 自体が呼出経路を変えている可能性が高い。原因は未特定。
 - 判定基準 (run_fa9 (a)) は変更していない。受入 2 (out[0] と node Z の照合) は**未達**。
 
