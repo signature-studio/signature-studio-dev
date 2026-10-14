@@ -11,8 +11,8 @@
 ## 2. 測定の条件
 - 測定 commit: `4c3f7458` (origin/main、Merge PR #1781)。コード変更なし。本 PR は本 REPORT の追加のみ。
 - ブランチ・worktree: `1598-m11-n104-e2e-ghidra` / `ws-1598`。
-- 素材: `work-m11`・`work-liftdiff` を worktree の `tools/m11/work/`・`tools/liftdiff/work/` に展開 (gitignore)。`fl-win64` は `extracted/block00031_PE.bin` (sha256 `b2c64da4…`・REPORT_N1415 と一致) を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に指定。`toolchain-retdec`・`toolchain-emsdk` は `/opt/retdec`・`/opt/emsdk` が既に存在したためそのまま使用。
-- Ghidra: 公式 release `ghidra_12.1.4_PUBLIC_20260921.zip` を取得し sha256 `ddac49f9…` 一致を確認。JDK は `/usr/lib/jvm/temurin-21-jdk-amd64` (21)。`MAXMEM=8G`。
+- 素材: `work-m11`・`work-liftdiff` を worktree の `tools/m11/work/`・`tools/liftdiff/work/` に展開 (gitignore)。`fl-win64` は `extracted/block00031_PE.bin` (sha256 `b2c64da4…`・REPORT_N1415 と一致) を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に指定。`toolchain-retdec`・`toolchain-emsdk` は `[RETDEC]`・`[EMSDK]` が既に存在したためそのまま使用。
+- Ghidra: 公式 release `ghidra_12.1.4_PUBLIC_20260921.zip` を取得し sha256 `ddac49f9…` 一致を確認。JDK は Temurin 21 (JDK 21)。`MAXMEM=8G`。
 - 環境: 4 vCPU, 15 GiB。実行開始時 load average 0.20 (1 分平均)・終了後 0.01。
 - Python: capstone / pefile 導入済み (ldfix が有効)。
 
