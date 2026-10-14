@@ -59,7 +59,7 @@ shimx の値は `tools/shimx/evidence_3070/run.sh` (ST ビルド・1 ケース 1
 - 2 回実行 (n=2 の成功): 1 回目 rc=0 (時間は未計測)、2 回目 5 s (wall)。load average 0.32 0.38 0.20 → 0.38 0.39 0.20 (2 回目の開始→終了)。
 - 表本体 34 行 (`work/probe.tsv`) の TRAP は 0 件 (旧測定の 0xFFFFFFF0 の 4 行 TRAP は消えた)。対照 4 行 (`work/probe_rc.tsv`) は 4 関数すべて TRAP。
 - 1 回目の前に、対照の挿入位置 (旧 `blk_ok` の 1 行) が main の SHX-T35 で消えたため、`run.sh` が `rc=1` で止まった。対照を「範囲検査を外す」向きに直した (`run.sh` の対照部のみ・表本体の probe は変えていない)。
-- 実行には `EMSDK_ENV` (`docs/REFERENCES.md` の `[EMSDK]` の `emsdk_env.sh`) が要る。本 run は `/opt/emsdk/emsdk_env.sh` で実行。
+- 実行には `EMSDK_ENV` (`docs/REFERENCES.md` の `[EMSDK]` の `emsdk_env.sh`) が要る。本 run は `[EMSDK]` の `emsdk_env.sh` を `EMSDK_ENV` に指定して実行。
 
 ### 4.3 ネガティブコントロール
 
