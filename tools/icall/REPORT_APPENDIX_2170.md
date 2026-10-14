@@ -69,10 +69,13 @@ stub 後の fatal RIP (`fatal_stub.txt`, 47 行): `0x18103d494` 4・`0x180c8b9c0
 bash tools/ott/native/build.sh
 FA_DL="$RUNNER_TEMP/plugins-freshair" bash tools/targets/freshair/fetch.sh
 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh                          # ベースライン
+cp tools/icall/work/slot_trace_fatal.txt tools/icall/work/fatal_base.txt     # 退避 (手作業)
 SLOT_STUB_VA=1810806a0 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh   # stub 有効
+cp tools/icall/work/slot_trace_fatal.txt tools/icall/work/fatal_stub.txt     # 退避 (手作業)
 ```
 
 - 結果ファイル: `tools/icall/work/slot_trace_enc.txt` (集計)・`tools/icall/work/slot_trace_fatal.txt` (fatal 行。gitignore)。
+- `slot_trace.sh` は毎 run `slot_trace_fatal.txt` を上書きする。§2.3 の `fatal_base.txt`・§2.4 の `fatal_stub.txt` は、上の `cp` で各 run の直後に退避した名前であり、スクリプトが生成するファイルではない。
 - 素材: `work-icall` (`tools/icall/work/`)・`plugins-freshair` (`fetch.sh` で `tools/targets/freshair/work/`)。
 
 ## 4. 未解決
