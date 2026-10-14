@@ -6,7 +6,7 @@ import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.t
 import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
+import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
@@ -781,7 +781,7 @@ export class Engine {
     const s = this.s;
     const issues = Object.values(s.issues)
       .filter((i) => i.state === "open")
-      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount } }));
+      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount }, ...(i.artLine ? { artLine: i.artLine } : {}) }));
     const prs = (Object.values(s.prs) as PrState[]).map((p) => ({ number: p.number, state: p.state, ref: p.ref, body: p.body }));
     const runs = (Object.values(s.runs) as RunState[])
       .filter((r) => r.status !== "completed")
@@ -889,11 +889,9 @@ export class Engine {
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
     const failed = (n: number): boolean => input.launchState?.[String(n)] === "failed";
-    // 既定の素材行 (PM の oc_artifacts 行。無ければ題名とラベルからの推定)。picks の既定と同じ。
-    const baseArt = (n: number): string => {
-      const b = this.s.pmArt[String(n)]?.line;
-      return b && validateArtLine(b) ? b : inferArtifacts(title.get(n) ?? "", labels.get(n) ?? []);
-    };
+    // 既定の素材行 (PM の行 → 本文の行 → 推定)。picks の既定と同じ。
+    const artOf = new Map(snap.issues.map((i) => [i.number, i.artLine] as const));
+    const baseArt = (n: number): string => defaultArtLine(this.s.pmArt[String(n)]?.line, artOf.get(n), title.get(n) ?? "", labels.get(n) ?? []);
 
     const moveTo = (n: number, from: keyof Rows, to: () => void) => {
       (rows as any)[from] = (rows as any)[from].filter((x: any) => (Array.isArray(x) ? x[0] : x) !== n);
@@ -910,7 +908,6 @@ export class Engine {
       const outcome = this.s.sig[String(n)]?.outcome;
       const reason = outcome?.reason ?? "unknown";
       const c = this.noPrState(n);
-      const prevNames = (c.art ?? baseArt(n)).replace("oc_artifacts:", "").trim().split(/\s+/).filter(Boolean);
       let pick: { art: string; np: NoPrReason; reportAt?: string } | null = null;
       let recent = false;
       let note = reason;
@@ -930,8 +927,8 @@ export class Engine {
         // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。報告が無い (古い保存値) は新しい素材なし。
         const rep = snap.bot_report[String(n)];
         const stop = isStopReport(rep?.head ?? "");
-        const extra = stop ? neededArts(n, input).filter((a) => !prevNames.includes(a)) : [];
-        if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
+        const line = stop ? addArts(c.art ?? baseArt(n), neededArts(n, input)) : null;
+        if (line) pick = { art: line, np: "artifact" };
         else note = !rep || stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
       } else {
         note = `oc:no-pr ${reason} 再投入済み`;
@@ -1013,9 +1010,10 @@ export class Engine {
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
       const np = npPick.get(n);
-      const cand = relMap.get(n) ?? np?.art ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
-      // 本文由来 (PM コメント・bot 報告) の行は、allowlist を通ったものだけを使う。通らなければ推定値に落とす。
-      const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
+      const dflt = defaultArtLine(base, i.artLine, i.title, i.labels);
+      const cand = relMap.get(n) ?? np?.art ?? dflt;
+      // 素材行は allowlist を通ったものだけを使う。通らなければ既定 (PM の行 → 本文の行 → 推定) に落とす。
+      const art = validateArtLine(cand) ? cand : dflt;
       picks.push({ n, art, relaunch: relMap.has(n), np: np?.np, reportAt: np?.reportAt });
     }
     const plan: Plan = {

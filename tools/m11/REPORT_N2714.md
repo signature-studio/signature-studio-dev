@@ -151,7 +151,7 @@ trap 21 unit の修復と miss 46 の `0xfa9390` の出所特定は、次の作�
 |---|---|---|
 | miss 46 unit の Init ポインタ `0xfa9390` (関数先頭ではない値・closure 外)。出所未確認 | 46 unit (4.9%) の初期化が丸ごと実行されない | PM 判断 (#132 の系統か、新規の子) |
 | trap 21 unit の修復 (順位 1 の `.text` 書換え 9 B を含む) | skip 67 のため stage 5/6 未達 | #132 (範囲外として残す) |
-| 失敗 unit の heap 範囲は未計測 | 状態欠落のリスクが image の失敗 unit に限られる | 子 #2768 (移管済み) |
+| 失敗 unit の heap 範囲は未計測 → #2768 で計測 (`REPORT_N2768.md`) | 計測済み。成功 unit 側の heap は未計測 | 完了 (#2768) |
 | 成功 874 unit の書込み範囲は未計測 | 成功 unit 側の状態欠落は見ていない | PR 本文の未解決表に留める (起票しない。#2768 の範囲外) |
 | survey の FastMM 通算 GetMem -4 (fastmm_getmem_impl -5)。原因未切り分け | 判定には入らない (ok・trap は一致) | 本 PR の未解決表 (再測定の子は起票しない) |
 | 寛容起動の終端 (Halt0→longjmp, boot_rc=1) を stage 6 に含めるか | judge の定義と食い違う | PM 判断 (judge の定義) |
