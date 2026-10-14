@@ -240,5 +240,6 @@
 ## 11. Windows / macOS 行列への Firefox・Safari 追加 (AU-33 #3168・部分達成)
 
 - 測定 commit: `9aa9239b` (コード最終)。`git diff 9aa9239b HEAD -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の出力は 0 行。
-- 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で 9/9 PASS。既定出力の判定を OS 別にした。Safari は経路未作成 (#3193 [AU-35])、Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
-- 変更・再現・NC・Safari の理由・未解決表の全文は `REPORT_APPENDIX_3168.md` §B〜§F (250 行上限のため分割移動)。
+- 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で 9/9 PASS。既定出力の判定を OS 別にした。Safari は main 時点で経路なし (進行中は子 PR #3208・#3193 [AU-35])、Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
+- issue 指定の `git diff 9aa9239b HEAD -- tools/audio` は 12 ファイル。非 0 は PR 自身の記録 10 件と main 由来 2 件 (`au2_summary.mjs`・`ci/audio-matrix.yaml`)。
+- 測定範囲 (build 入力を含む)・issue 指定範囲の内訳・変更・再現・NC・Safari の理由・未解決表の全文は `REPORT_APPENDIX_3168.md` §A〜§F (250 行上限のため分割移動)。

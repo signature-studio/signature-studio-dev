@@ -7,6 +7,10 @@
 - 測定 commit: `9aa9239b` (`feat(audio): Firefox 行列の既定出力判定を OS 別にし 3 シナリオへ揃える`)。以後は REPORT と `results/` の追加だけで、コードは変えていない。
 - 変更前 main: `1b37410c` (ベースライン測定の commit)。
 - `git diff 9aa9239b HEAD -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の出力: 空 (0 行)。
+- (a) 実行コードの範囲 (build.sh の入力を含む): `git diff --stat 9aa9239b HEAD -- tools/audio/src tools/audio/harness tools/audio/test tools/audio/build.sh tools/audio/flags.sh tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs public/worklets src/runtime` の出力: 空 (0 行)。`flags.sh` は build.sh が source する入力で、REPORT_AU2_CI.md §9 の列挙には無かったため足した。
+- (b) issue #3168 指定の範囲: `git diff --stat 9aa9239b HEAD -- tools/audio` の出力は 12 ファイル (5095 行追加・4 行削除)。内訳は次の 2 種。
+  - PR 自身の記録 10 件: `REPORT_APPENDIX_3168.md`・`REPORT_AU2_CI.md`・`results/au2_ff_ubuntu/` 下の JSON 8 件 (`firefox_r1`〜`r3`・`neg/*.json`・`base_main_1b37410c/firefox_r1`〜`r3`)。
+  - main 由来 2 件: `tools/audio/au2_summary.mjs`・`tools/audio/ci/audio-matrix.yaml` (commit `d4049432`。main 取り込みの merge `c9c45ea6` で入った)。前者は Chrome 行列 (`au2_matrix.sh`) の集計、後者は workflow 定義で、Firefox e2e はどちらも実行しない。
 - `git diff 1b37410c 9aa9239b -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の変更: 4 ファイル、45 行追加・23 行削除 (`au2.mjs` 42 行・`bidi.mjs` 5 行・`au2_firefox_matrix.sh` 8 行・`au2_firefox_summary.mjs` 13 行)。
 
 ## B. 変更の中身
@@ -21,7 +25,7 @@
 ## C. ubuntu での再現 (受入 1 の ubuntu 部分)
 
 - 環境: ubuntu runner (4 vCPU)、Firefox 157.0 (headless)、PulseAudio 16.1 (apt 導入。`module-null-sink sink_name=ci_null` を既定 sink)、emsdk は `toolchain-emsdk` を `$RUNNER_TEMP` に展開 (`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh`)。`bash tools/audio/build.sh` は 15.2 s で成功。
-- 再現コマンド: `AU2_OUT=tools/audio/results/au2_ff_ubuntu bash tools/audio/au2_firefox_matrix.sh 3` (終了 0)。wall 41.0 s / 40.5 s / 40.6 s、load (1 分値) 開始 0.22 / 0.18 / 0.26、終了 0.18 / 0.36 / 0.26。
+- 再現コマンド: `AU2_OUT=tools/audio/results/au2_ff_ubuntu bash tools/audio/au2_firefox_matrix.sh 3` (終了 0)。wall 41.0 s / 40.5 s / 40.6 s、load (1 分値) 開始 0.22 / 0.18 / 0.36、終了 0.18 / 0.36 / 0.26。
 - 結果: **9/9 PASS** (3 rep × 3 シナリオ。underrun 0・sine 誤差 1.49e-8・zeroRuns 0・`ctx.sampleRate` 一致・worklet エラー 0・既定 sink 接続 3/3)。集計 (`node tools/audio/au2_firefox_summary.mjs tools/audio/results/au2_ff_ubuntu`):
 
 | browser | sampleRate | シナリオ | n | PASS | underruns | burst (f) | T (f) | clock (Hz) | baseLatency (s) | outputLatency (s) | 既定出力に接続 | sink-input の規格 |
@@ -39,19 +43,19 @@
 | NC | 操作 | 期待 | 実測 |
 |---|---|---|---|
 | 期待外れの sink | `pactl load-module module-null-sink sink_name=ci_other`・`set-default-sink ci_other` → `au2.mjs --rep 1 --secs 4` → `set-default-sink ci_null` | 両方 FAIL・rc≠0 | **0/3 PASS**・rc=1。3 シナリオとも `on_expected=false`・underrun 0・sine 誤差 1.49e-8 (音声は正しいが sink だけが外れる) (`neg/sink_other_r1.json`) |
-| 強制 underrun | `au2.mjs --rep 1 --secs 4 --extra "hiccup_ms=60&hiccup_every=200"` | 両方 FAIL・rc≠0 | **0/3 PASS**・rc=1。underrun 3 / 7 / 3・silence 3840〜21120 f・`on_expected=true` (`neg/hiccup_r1.json`) |
+| 強制 underrun | `au2.mjs --rep 1 --secs 4 --extra "hiccup_ms=60&hiccup_every=200"` | 両方 FAIL・rc≠0 | **0/3 PASS**・rc=1。underrun 3 / 7 / 3・silence 3968〜21120 f・`on_expected=true` (`neg/hiccup_r1.json`) |
 
 ## E. Safari (macOS) と Windows / macOS (未検証)
 
-- **Safari**: 経路を作っていない。理由: (1) この runner は Linux で Safari を起動できず、P1〜P4 を実測できない。(2) 既存の harness は Chrome CDP (`chrome.mjs`) と Firefox WebDriver BiDi (`bidi.mjs`) の 2 経路のみで、Safari 用の経路が無い。(3) Safari が WebDriver BiDi に対応するかは本 run で未確認 `[未確認]`。
-- **代替案 (未着手)**: macOS runner で `safaridriver` (WebDriver classic) から `au2.mjs` 相当を駆動する経路。`safaridriver --enable` と Safari の remote automation 許可が要る `[未確認: 手順は macOS 実機で確認]`。既定出力の判定は darwin 分岐 (`BlackHole 2ch`) を使う。起票先: #3193 [AU-35] (未着手のまま追跡)。
-- **Windows / macOS の Firefox 行**: `audio-matrix.yaml` は PR #3169 (branch `3164-au32-win-mac-audio-matrix`) にのみ在り、main には無い。Firefox 行の追加は #3169 の merge 後に PM が行う。追加する内容: matrix に `os: windows-latest / browser: firefox / firefox: 'C:\Program Files\Mozilla Firefox\firefox.exe'` と `os: macos-latest / browser: firefox / firefox: '/Applications/Firefox.app/Contents/MacOS/firefox'` を足し、`measure` の step で `browser == firefox` の行は `node tools/audio/harness/au2.mjs --rep $rep --out audio-results/...` を呼ぶ (`FIREFOX` env を渡す)。Chrome 行は従来どおり `run.mjs`。
+- **Safari**: main 時点では経路なし (進行中は子 PR #3208 (`3193-safari-safaridriver`、open))。理由: (1) この runner は Linux で Safari を起動できず、P1〜P4 を実測できない。(2) main の harness は Chrome CDP (`chrome.mjs`) と Firefox WebDriver BiDi (`bidi.mjs`) の 2 経路のみで、Safari 用の経路が無い。(3) Safari が WebDriver BiDi に対応するかは本 run で未確認 `[未確認]`。
+- **代替案**: macOS runner で `safaridriver` (WebDriver classic) から `au2.mjs` 相当を駆動する経路。`safaridriver --enable` と Safari の remote automation 許可が要る `[未確認: 手順は macOS 実機で確認]`。既定出力の判定は darwin 分岐 (`BlackHole 2ch`) を使う。実装は子 PR #3208 で進行中。起票先: #3193 [AU-35]。
+- **Windows / macOS の Firefox 行**: `audio-matrix.yaml` は #3169 (branch `3164-au32-win-mac-audio-matrix`、merge `ac7ad1c6`・2026-10-14T23:27:19Z) で main に入った (origin/main の yaml は 94 行)。前提の #3169 merge は満たされている。Firefox 行はまだ無い (yaml に `firefox` の記述が 0 件)。Firefox 行の追加は #3192 [AU-34] で行う。追加する内容: matrix に `os: windows-latest / browser: firefox / firefox: 'C:\Program Files\Mozilla Firefox\firefox.exe'` と `os: macos-latest / browser: firefox / firefox: '/Applications/Firefox.app/Contents/MacOS/firefox'` を足し、`measure` の step で `browser == firefox` の行は `node tools/audio/harness/au2.mjs --rep $rep --out audio-results/...` を呼ぶ (`FIREFOX` env を渡す)。Chrome 行は従来どおり `run.mjs`。
 - **未検証**: `win32`・`darwin` の判定分岐 (PowerShell の `Get-AudioDevice`・`SwitchAudioSource`) は Linux runner では実行していない。`node --check` 通過のみ。dispatch 結果は適用後に記録する (起票先 #3192 [AU-34])。
 
 ## F. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| Windows / macOS の Firefox 行 (yaml) は #3169 未 merge のため未適用。Win/mac の dispatch 結果なし | 受入 1 の Win/mac は未達 | #3192 [AU-34] (#3169 merge 後に PM が適用・dispatch し、§10 に記録) |
+| Windows / macOS の Firefox 行 (yaml) は main に未適用 (#3169 は merge 済み)。Win/mac の dispatch 結果なし | 受入 1 の Win/mac は未達 | #3192 [AU-34] (Firefox 行の適用と dispatch を行い、§10 に記録) |
 | `win32`・`darwin` の判定分岐は未実行 | 判定の実機確認が無い | #3192 [AU-34] (dispatch の結果で確かめる) |
-| Safari (macOS) の P1〜P4 | 未測定。経路は未着手 | #3193 [AU-35] (代替案 E) |
+| Safari (macOS) の P1〜P4 | 未測定。main 時点では経路なし (進行中は #3208) | #3193 [AU-35] (代替案 E) |
