@@ -7,6 +7,7 @@ elastique_facts.py の追補 (同じ入力・同じ作業出力先)。依存: ca
      thunk は `call 初期化スタブ` → `movsxd rax,[索引]` → `lea r10,[表]` → `jmp [r10+rax*8]`。
   B. IPPCODE の線形走査 (pdata に依らない・不正命令は 1 byte 飛ばす) の外向き直接分岐と、その飛び先のセクション。
   C. .reloc の DIR64 を全件照合 (絶対 8 バイトポインタの陽性対照・陰性対照)。
+  D. 全節の 8 バイト整列位置を走査し、thunk 頭・枠アドレスを値に持つ箇所を節別に数える。
 """
 import bisect
 import collections
@@ -241,6 +242,17 @@ def main():
                 dir64["IPPCODE" if inside(v, ipp) else (".text" if inside(v, txt) else sect_of(v))] += 1
         off += blk
 
+    # ---- D. 8 バイト整列位置の値としての参照 (全節) -------------------------
+    qword_head = collections.Counter()
+    qword_slot = collections.Counter()
+    for s in sections:
+        for off in range(0, s["vsize"] - 7, 8):
+            v = struct.unpack_from("<Q", image, s["va"] + off)[0]
+            if v in head_set:
+                qword_head[s["name"]] += 1
+            if v in slot_map:
+                qword_slot[s["name"]] += 1
+
     tgt_summary = collections.Counter()
     for T, ti in tinfo.items():
         tgt_summary[(ti["section"], ti["pdata"], "IPPCODEへ直接分岐あり" if ti["ipp_direct_targets"] else "なし")] += 1
@@ -274,6 +286,7 @@ def main():
         },
         "C_reloc": {"dir64_total": total, "dir64_target_section": dict(dir64),
                     "dir64_at_slots": slot_dir64, "dir64_value_is_thunk_head": head_dir64},
+        "D_qword_refs": {"thunk頭の値 (節別)": dict(qword_head), "枠アドレスの値 (節別)": dict(qword_slot)},
     }
     out = {"file": os.path.basename(dll), "summary": summary, "linear_out_list": lin_out,
            "records": {k: [hex(x) if x else "0" for x in v] for k, v in recs.items()},
