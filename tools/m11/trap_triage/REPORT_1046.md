@@ -105,3 +105,17 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 1. `0x10a9f910` に `0x100000003` を書いた store の特定 (`watch_store_682` 方式で `addr == 0x10a9f910` の書込み元 IR site を取る)。
 2. その store が D17 (qword → i32 縮退) か別類型かの判定。
 3. `4473f0` の `0x92492493` 配列長計算は未検証 (受入 2)。
+
+## 11. 再着手 run (HEAD `cb3a89a6` 起点): 書込み元 store の探索 (途中・結論なし)
+
+- 再現: `m11_gen_ir2.sh` rc 0 (29.0 s) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0 (6.7 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2 と一致。
+- 計装: `trap_triage/watch_addr_1046.c` (監視番地 `0x10a9f910` の固定版。`watch_store_682.c` の `[[g+8]+8]` 監視は使わない) と `trap_triage/store_watch_1046.sh` (`SV_ONLY` で unit を絞れる)。全 store に `m11_sw` を入れる IR は `watch_store_682.py` を流用。
+- 全 942 unit 実行 (監視版): `[aw]` は unit 106 付近まで記録されたが 900 秒の上限で打ち切り。`0x10a9f910` への書込みは unit の前半から多数 (`val=10bd48f0`、`val=537301`、`val=10bb6820` 等)。
+- `SV_ONLY=492` 単独 (監視版): `[aw]` 0 件、survey は `oob 1`。全 unit 実行で見えた書込みは unit 492 単独では起きない。`0x10a9f910` の値は前の unit が共有ヒープに残した状態に依存する。
+- 結論: 書込み元 store は未特定。単独 unit では再現しないため、OOB 直前の書込みを探すには全 unit 実行の監視が要るが、この run の時間では完了できなかった。
+
+### 次の手順 (#1288 を継続)
+
+1. 監視版を全 unit 実行で完走させる (`store_watch_1046.sh` を `timeout` の上限を延ばして実行。900 秒では不足)。
+2. 最後の `[aw]` 書込み (`val=0x100000003` 相当の store) の `site` を `sites.json` で IR 行に戻す。
+3. その store が D17 (qword → i32 縮退) か別類型かを判定する。
