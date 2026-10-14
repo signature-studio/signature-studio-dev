@@ -173,3 +173,37 @@
 - 読み (観測事実のみ): 無負荷の 4 run では全 wake が 2 ms 未満 (<1 ms と <2 ms の 2 区間のみ)。`yes` ×12 の 2 run では 2〜4 ms の区間に 21 / 9 回入り、≥8 ms は 0 回、underrun は 0 だった。負荷は `yes` ×12 の 1 段階だけで、負荷量と起床遅延の関係 (用量反応) は測っていない。`wake_hist` は PASS/FAIL の判定条件 (`rec` の条件式) に入っておらず、負例も作っていないため、判定指標としての感度は未検証。判定への組み込みも未検証。
 - 失敗の記録 (通算): §19・§23・§25 の FAIL 3 件はいずれも、その節で最初に走らせた e2e run (§19 は初回 1 run・§23 は無負荷の 1 回目・§25 は旧 HEAD の初回)。同じく節内の初回 run でも §21・§22 (改修前)・§24・本節は PASS。母数が少ないため「初回 run で起きやすい」は**仮説**に留める。FAIL の位置は 3 件とも `first_err_frame = first_underrun_frame = 56576` (quantum 442)。
 - 未解決 (追跡 **#863**): (a) 失敗時刻と照合できる producer 側の時系列 (quantum ごとの起床時刻) は wasm (`flasio.c`) の変更が必要で、本節の範囲外。(b) 再現条件の特定。(c) 初回 run の仮説の検証 (再起動直後・キャッシュ状態を分けた実測)。
+
+## 29 AU-15 (#863) 失敗 1 件の位置情報と producer 起床の照合 (測定 commit `6ca613d2`)
+
+- 変更 (`6ca613d2`): `producerStats()` に `cb_count`・`cb_max_us`・`cb_max_q` を追加し、e2e の判定行に `prod_cb_count=` `prod_cb_max_us=` `prod_cb_max_q=` を出す。コード差分は `src/runtime/audio-shim.ts` と `tools/audio/integration/e2e.mjs` のみ (`ws-863` worktree、`origin/main` `198be2e6` の上の 1 commit)。
+- 測定: 素材 `toolchain-emsdk` のみ展開 (`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk/emsdk_env.sh`)、`TMPDIR=$RUNNER_TEMP`、foreground。
+
+| 区分 | run 数 | 結果 | 備考 |
+|---|---|---|---|
+| 単発 1 (`198be2e6`・emsdk 展開直後) | 1 | **FAIL** (dev:tone / dev:underruns。exit 1) | emcc の sysroot キャッシュ生成を含む初回。VM 起動から約 4 分 |
+| 単発 2 (`6ca613d2`) | 1 | 13/13 PASS | dev `prod_cb_max_us=489 prod_cb_max_q=797`・preview `489 / 436` |
+| hunt 1 (時間上限 420 s) | 35 | 35/35 PASS | summary は hunt 2 で上書きされた (結果行のみ記録) |
+| hunt 2 (時間上限 1140 s) | 96 | 96/96 PASS | load 0.85〜2.75・wall 11〜13 s |
+
+### 失敗 run の位置情報 (単発 1・dev のみ。preview は PASS)
+
+`dev:tone max_err=8.44e-1 rms=0.3525 zero_runs=1 first_err_frame=56320 first_zero_run_frame=56351 underrun_cap=1 first_underrun_frame=56320 last_underrun_frame=56320 fill_at_first_underrun=0 fill_min_before_first_underrun=0 cb_gap_max_ms=11 cb_gap_over20=0 prod_wake_hist=303/7/0/0/0/0 prod_wake_count=310 prod_wait_timeouts=0`
+
+`fill_trace` (最初の underrun までの 32 quantum・古い順): `896,768,640,768,896,768,640,768,896,768,640,1024,896,768,640,1024,896,768,640,1024,896,768,640,1024,896,768,640,512,384,256,128,0`
+
+- 充填は 4 quantum ごとに 1 回、`640 → 1024` の跳ね (producer の書き込み) を繰り返していた。最後の周期だけ `640 → 512` の後に跳ねが無く、`512 → 384 → 256 → 128 → 0` と 4 quantum 続けて減って underrun になった。
+- 充填の低下が段階的であるため、producer 側の書き込み不足の形と読める。
+- ただし起床は速い: `prod_wake_hist` (run 全体の累計) は 8 ms 以上が 0 件で、notify から起床までの遅れは観測されていない。起床後〜書き込みまでの区間 (OS の preemption・JS の GC を含む) は未計測。
+- この run には `cb_max_us` が出ていない (項目の追加は後)。PASS の 2 run では producer のコールバック最大が 489 µs (約 0.5 ms) で、コールバック自体が長い証拠は今回の失敗 run には無い。
+- §25 で「3 件とも `first_err_frame = first_underrun_frame = 56576`」と書いたが、本件は 56320 (quantum 440) で同一フレームは崩れた。
+- 初回 run の仮説 (§28 (c)): 失敗 4 件中 3 件 (§19・§23・§25) と本件は、いずれも節の初回 run または検証 VM 起動直後の run。反例 (初回 PASS の節) も複数あるため仮説のまま。
+
+### 通算
+
+- 失敗は §19・§23・§25 の 3 件と本節の 1 件で計 4 件。§19〜§28 の 387 run に本節 133 run (単発 2 + hunt 131) を加えて **4 件 / 520 run** (率約 0.8%)。
+- 次回失敗時は `prod_cb_max_us` / `prod_cb_max_q` の判定行と `fill_trace` を取得する。起床後〜書き込みの区間は wasm (`flasio.c` の `thread_fn`) に時刻を残さないと計れない。
+
+### 未解決 (追跡 **#863**)
+
+(a) 起床後〜書き込みの区間の計測 (wasm の変更が要る。新規 issue は起票していない)。(b) 再現条件の特定 (負荷・タイミングとも相関は見えていない)。(c) 初回 run 仮説の検証 (キャッシュ状態を分けた実測)。

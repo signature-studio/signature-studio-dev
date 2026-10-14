@@ -18,6 +18,11 @@
 #define FLA_QUANTUM    128u        /* AudioWorklet render quantum (固定) */
 #define FLA_MAX_CH     8u          /* コンパイル時上限 (FL ILWASAPI 実測は 2in/2out) */
 #define FLA_MAX_RING   (1u << 15)  /* ring_frames 上限 (2 の冪) */
+/* 目標充填 T の安全係数 (%): T の下限 = burst × FLA_BURST_PCT/100 + 2B。OPEN 較正 (flaudio.c) と実行中の拡張 (flasio.c) で共用。
+ * 既定 125 は AU-24 (#2541) の実測で維持 (130/150 は grows と遅延を増やし、grows 0 にならなかった)。 */
+#ifndef FLA_BURST_PCT
+#define FLA_BURST_PCT 125u
+#endif
 
 /* ctl.state */
 enum { FLA_ST_CLOSED = 0, FLA_ST_OPENED = 1, FLA_ST_RUNNING = 2 };

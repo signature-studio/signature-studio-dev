@@ -34,6 +34,10 @@ const arity = [
   // PY-125: 個数違い・型違い (code 5)
   ["general.clearLog", [1]], ["general.dumpScoreLog", []], ["general.dumpScoreLog", [0, 1, 2]],
   ["general.dumpScoreLog", ["x"]],
+  ["general.setRecPPQ", [24]], ["general.setRecPPQ", [960]], ["general.setRecPPQ", [23]], ["general.setRecPPQ", [961]],
+  ["general.setNumerator", [1]], ["general.setNumerator", [16]], ["general.setNumerator", [0]], ["general.setNumerator", [17]],
+  ["general.setDenominator", [2]], ["general.setDenominator", [16]], ["general.setDenominator", [1]], ["general.setDenominator", [17]],
+  ["general.setUndoHistoryPos", [0]], ["general.setUndoHistoryPos", [-5]], ["general.setUndoHistoryCount", [3]], ["general.setUndoHistoryLast", [7]],
 ];
 
 const diffs = [];
