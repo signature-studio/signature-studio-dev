@@ -6,14 +6,14 @@ L = 完全 trace で native/wasm が最後に一致する entry。caller = L の
 
 ## 1. 類型 (xfill × class)
 
-| xfill | X (xmm 引数脱落) | M (0x40a380 の stmxcsr 経路) | R (未特定) | 計 |
+| xfill | X (xmm 引数脱落) | M (MXCSR 経路) | R (未特定) | 計 |
 |---:|---:|---:|---:|---:|
-| 1 | 28 | 1 | 5 | 34 |
-| 0 | 25 | 3 | 6 | 34 |
+| 1 | 28 | 2 | 4 | 34 |
+| 0 | 25 | 4 | 5 | 34 |
 
 - **X (xmm_arg_drop)**: 呼出元 (または L) の entry で「xmm0 を書かれる前に読む」関数があり、その entry の x0 が native ≠ wasm。IR では該当関数の xmm0 入力が `call i64 @__asm_movsd(i128 0)` (`xor i128 0, 0`) に置き換わる (例: `function_40c1d0`)。既存類型 `xmm_arg_drop` (`tools/liftdiff/docs/FORMAT.md` の類型表 107 行)。修復は #547 (PLG-F2-4) の接続で行う。
-- **M (0x40a380 経路)**: L = 0x40a380 (`stmxcsr`/`ldmxcsr`)。直前の entry は 0x40a3b0 (`stmxcsr` で MXCSR を rax に返す leaf)。L の後、native は戻って終了し、wasm は `call 0x409730` 側へ進んで trap する。0x40a1c0 が MXCSR 例外フラグを判定する (`test eax, 0x20/0x10/8/4` → `call 0x409730`) ため、この分岐の候補だが、wasm 側の MXCSR の値と分岐の確定は未確認 (#1034 に残す)。
-- **R (未特定)**: X にも M にも入らない。戻り後の分岐は下記 §3 の行に出ている (L 0x12f9ed0 / 0xfea6a0 / 0x40ae30 / 0x40a3b0 ほか)。個別原因は未特定。
+- **M (MXCSR 経路)**: L = 0x40a380 (`stmxcsr`/`ldmxcsr` で MXCSR を書く leaf) または 0x40a3b0 (`stmxcsr [rsp]; pop rax; ret` で MXCSR を返す leaf)。wasm の `function_40a3b0` は IR で `call void @__asm_stmxcsr(i32 0)` + `ret i64 0` (`work/m11/ir_instr.ll` の `define weak i64 @function_40a3b0`) のため戻り値は常に 0。native の戻り値は実際の MXCSR (Linux 既定 0x1f80 のため 0 ではないと想定するが、native の戻り値は直接計測していない)。0 は FP 例外の全アンマスク扱いとなり、0x40a1c0 の FP 例外判定 (`test eax, 0x20/0x10/8/4` → `call 0x409730`) が wasm 側で例外を送出する。`tools/m11/m11_ov.c` は同じ欠陥 (#417) に `function_40a3b0 → 0x1f80` の上書きを持つが、この IR (liftdiff の build) では `ret i64 0` のままで、上書きは反映されていない。上書きの効果は未実測。
+- **R (未特定)**: X にも M にも入らない。戻り後の分岐は §3 の該当行。L 0x12f9ed0 (3 件、`mov rax,[rip+…]; test; mov rax,[rax-8]` の大域ポインタの長さを返す leaf。native/wasm の大域の初期状態の差を疑うが未確認)、L 0xfea6a0 (引数オブジェクトのフィールドを読んで al を返す leaf。0xff0600 の `je` が al で決まる)、L 0x4769f0 (完全 trace で notB、xfill=0)、L 0x40ae30 ほか。個別原因は未特定。
 
 ## 2. 0x40a3d0 (leaf `movzx rax, word [rcx+rdx*2]; ret`) の戻り値 rax
 
@@ -160,9 +160,9 @@ fn=0x9ce9e0 pat=p0 xfill=1 class=X L_full=0x40a3d0 typeB_full=B next(native,wasm
    L_x0(native,wasm)=0x408f480000000000,0x0 caller=0x40c1d0 call@0x40c1ee caller_x0(native,wasm)=0x408f480000000000,0x0 post=[mov ecx, eax ; cmp cx, 0x8000 ; jb 0x40c24c ; movabs rax, 0x8000000000000000] jcc=jb 0x40c24c
 fn=0x9ce9e0 pat=p0 xfill=0 class=X L_full=0x40a3d0 typeB_full=B next(native,wasm)=('0x40c0e0', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x408f480000000000,0x0 caller=0x40c1d0 call@0x40c1ee caller_x0(native,wasm)=0x408f480000000000,0x0 post=[mov ecx, eax ; cmp cx, 0x8000 ; jb 0x40c24c ; movabs rax, 0x8000000000000000] jcc=jb 0x40c24c
-fn=0x40ef40 pat=p1 xfill=1 class=R L_full=0x40a3b0 typeB_full=B next(native,wasm)=('0x40a360', '0x40a1c0') native=ok wasm=trap
+fn=0x40ef40 pat=p1 xfill=1 class=M L_full=0x40a3b0 typeB_full=B next(native,wasm)=('0x40a360', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x3ff4000000000000,0x0 caller=0x40a2c0 call@0x40a2d1 caller_x0(native,wasm)=0x3ff4000000000000,0x0 post=[mov edi, eax ; mov eax, esi ; not eax ; mov ecx, edi] jcc=-
-fn=0x40ef40 pat=p1 xfill=0 class=R L_full=0x40a3b0 typeB_full=B next(native,wasm)=('0x40a360', '0x40a1c0') native=ok wasm=trap
+fn=0x40ef40 pat=p1 xfill=0 class=M L_full=0x40a3b0 typeB_full=B next(native,wasm)=('0x40a360', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x0,0x0 caller=0x40a2c0 call@0x40a2d1 caller_x0(native,wasm)=0x0,0x0 post=[mov edi, eax ; mov eax, esi ; not eax ; mov ecx, edi] jcc=-
 fn=0xcb9eb0 pat=p0 xfill=1 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0xcc32f0', '0x40c1d0') native=ok wasm=trap
    L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
@@ -192,5 +192,5 @@ fn=0xcd1a70 pat=p0 xfill=1 class=X L_full=0x40c660 typeB_full=B next(native,wasm
    L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
 fn=0xcd1a70 pat=p0 xfill=0 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0xcc32f0', '0x40c1d0') native=ok wasm=trap
    L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
-## 集計 (xfill, class): [((0, 'M'), 3), ((0, 'R'), 6), ((0, 'X'), 25), ((1, 'M'), 1), ((1, 'R'), 5), ((1, 'X'), 28)]
+## 集計 (xfill, class): [((0, 'M'), 4), ((0, 'R'), 5), ((0, 'X'), 25), ((1, 'M'), 2), ((1, 'R'), 4), ((1, 'X'), 28)]
 ```

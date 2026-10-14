@@ -10,7 +10,7 @@ xfill 既定 (1) と xfill=0 の両方で、ランナの完全 trace を取り�
 TARGET.json は targets/m11.json を使う (pe は ${FL_WIN64_DIR}/extracted/block00031_PE.bin を指す)。
 入力 batch 既定 = tools/liftdiff/work/m11/batch_closure.jsonl。ビルド済み work/ を要する (再ビルドはしない)。
 結果は stdout に出す (results/ への書き込みはしない)。
-class: X = xmm0 入力の脱落 (呼出元/L の entry で xmm0 を読み、x0 が native≠wasm) / M = L が 0x40a380 / R = 未特定。
+class: X = xmm0 入力の脱落 (呼出元/L の entry で xmm0 を読み、x0 が native≠wasm) / M = L が MXCSR 系 (0x40a380 / 0x40a3b0) / R = 未特定。
 """
 import collections
 import json
@@ -131,7 +131,7 @@ try:
             site, post, jcc = call_site(caller, Lf) if Lf is not None else (None, None, None)
             if Lf is None:
                 cls = '-'
-            elif Lf == 0x40a380:
+            elif Lf in (0x40a380, 0x40a3b0):
                 cls = 'M'
             elif (cx and cx[0] != cx[1] and reads_xmm0(caller)) or (lx[0] != lx[1] and reads_xmm0(Lf)):
                 cls = 'X'
