@@ -191,7 +191,7 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 ## 12. 追補 (2026-10-14・#1317 8 回目 run): function_40f960 / 40fb40 の計測 (既定 OFF)
 
 - 測定 commit: `b36d3b5f` (計測 probe のコードはこの commit で最後に変わった。`M11_INSTR_40F960` 既定 0)。
-  - `git diff b36d3b5f HEAD -- tools/m11/m11_ov.c` は出力なし (差分 0)。
+  - `git diff b36d3b5f HEAD -- tools/m11/m11_ov.c` は 28 行 (main 取り込み `ab13d73d` で入った #882 の `M11_INSTR_40FFE0` 計測。既定 0 では `#if` 内で inert)。`40f960` / `40fb40` の計測コードは変わらない。
   - `git diff b36d3b5f HEAD -- tools/m11/m11_build.sh tools/m11/m11_rt.c` の出力は 4 行・20 行。main 取り込み (merge `b09ad4eb`) で入った #1952 の knob (`M11_RT_PADPRE`・`M11_RT_PADPOST`・`M11_RT_EMPTY`、既定 0)。`m11_rt.c` の追加は全て `#if M11_RT_*` 内、`m11_build.sh` の `S_NEG` は既定 0 のとき従来と同一の文字列になるため、既定 0 では build 出力は変わらない。
   - `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
   - 前の commit `731a232a` の計測値は無効 (旧 `static` カウンタはプロセス全体の累計)。全 diff は `REPORT_1317_APPENDIX.md` §12。
@@ -205,7 +205,8 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
   - 対照 (`M11_INSTR_40F960=0`・同 IR): `0..829`+880 rc=0 6.9 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":14}`、`0..830`+880 rc=0 13.0 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":15}`。計測 probe の ON/OFF で結果は 1 件ずれる (`ok`・`halt0`)。
   - 扱い: probe ON の結果は挙動を 1 件変えるため、停止判定には使わない。ずれの原因は未切り分け。各条件は 1 回の測定で、再現性 (2 回目の値) は未確認。
   - **REPORT §4a・§6〜§8 の「`0..830`+880 は rc=124」とは再現が一致しない**。今回の IR (素材の RetDec v5.0 で再生成) と旧 IR の差が原因かは未切り分け (旧 IR は `ir_conditions.json` が無く、同一条件で作り直せない)。
-  - 再測定の追加 (同じ `b36d3b5f` の build・素材 RetDec 再生成 IR): OFF 0..829 を 3 回 (`ok 764 / halt0 6` 3 回とも一致)。ON 0..829 は 2 回 (`ok 763 / halt0 7` 2 回とも一致)。ON と OFF のずれは再現する。
+  - 再測定の追加 (素材 RetDec 再生成 IR・`b36d3b5f` の build): OFF 0..829 を 3 回 (`ok 764 / halt0 6` 3 回とも一致)。ON 0..829 は 2 回 (`ok 763 / halt0 7` 2 回とも一致)。ON と OFF のずれは再現する。
+  - main 取り込み後の HEAD `e7c5c062` で build し直して再測定: ON `0..829`+880 rc=0 6.44 s `ok 763 / halt0 7` (`40f960` 521・`chain_len` 521・abort 0)、ON `0..830`+880 rc=0 12.21 s `ok 763 / halt0 7` (523・523・abort 0)、OFF `0..829`+880 rc=0 6.92 s `ok 764 / halt0 6`、OFF `0..830`+880 rc=0 12.90 s `ok 764 / halt0 6`。取り込み前と同じ値。
 
 | 条件 | `40f960` の呼び出し (self, size) | `40fb40` の chain_len 最大 | 最後の出力 |
 |---|---|---|---|
