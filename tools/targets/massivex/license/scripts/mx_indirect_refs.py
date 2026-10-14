@@ -51,19 +51,25 @@ def scan_data(data, base_va, targets):
             hits["abs8"][t].append(base_va + i)
             i = buf.find(q, i + 1)
     # 4B RVA (image base 相対) と 4B 自己相对
-    arr = np.frombuffer(buf[: len(buf) // 4 * 4], dtype="<i4")
+    # 開始 offset k = 0..3 ごとに 4B 配列化し、任意バイト位置を重複なく覆う
     ib = IMAGE_BASE
-    for t in targets:
-        r = (t - ib) & 0xFFFFFFFF
-        idx = np.nonzero(arr.view(np.uint32) == r)[0]
-        for j in idx:
-            hits["rva4"][t].append(base_va + int(j) * 4)
-        # 自己相対: 位置 p の値 d で p + d == t (d は符号付き)
-        p_va = base_va + np.arange(arr.size, dtype=np.int64) * 4
-        cand = p_va + arr.astype(np.int64)
-        idx2 = np.nonzero(cand == t)[0]
-        for j in idx2:
-            hits["self4"][t].append(int(p_va[j]))
+    for k in range(4):
+        arr = np.frombuffer(buf[k: k + (len(buf) - k) // 4 * 4], dtype="<i4")
+        off = base_va + k
+        for t in targets:
+            r = (t - ib) & 0xFFFFFFFF
+            idx = np.nonzero(arr.view(np.uint32) == r)[0]
+            for j in idx:
+                hits["rva4"][t].append(off + int(j) * 4)
+            # 自己相対: 位置 p の値 d で p + d == t (d は符号付き)
+            p_va = off + np.arange(arr.size, dtype=np.int64) * 4
+            cand = p_va + arr.astype(np.int64)
+            idx2 = np.nonzero(cand == t)[0]
+            for j in idx2:
+                hits["self4"][t].append(int(p_va[j]))
+    for key in ("rva4", "self4"):
+        for t in targets:
+            hits[key][t].sort()
     return hits
 
 
@@ -111,7 +117,13 @@ def selftest():
     ok_b = len(d["rva4"][t0]) == 1
     ok_d = len(d["self4"][t0]) == 1
     print(f"selftest abs8={len(d['abs8'][t0])} rva4={len(d['rva4'][t0])} self4={len(d['self4'][t0])} rip/imm={len(hits[t0])} (期待 1/1/1/1)")
-    ok = ok_a and ok_b and ok_c and ok_d
+    ud = bytearray(b"\x00" * 64)
+    ud[1:5] = ((t0 - IMAGE_BASE) & 0xFFFFFFFF).to_bytes(4, "little")
+    ud[33:37] = (t0 - (0x180100000 + 33)).to_bytes(4, "little", signed=True)
+    du = scan_data(bytes(ud), 0x180100000, TARGETS)
+    ok_u = du["rva4"][t0] == [0x180100000 + 1] and du["self4"][t0] == [0x180100000 + 33]
+    print(f"selftest unaligned rva4={[hex(x) for x in du['rva4'][t0]]} self4={[hex(x) for x in du['self4'][t0]]} (期待 offset 1 / 33)")
+    ok = ok_a and ok_b and ok_c and ok_d and ok_u
     print("selftest:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 
