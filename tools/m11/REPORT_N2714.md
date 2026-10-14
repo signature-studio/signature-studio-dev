@@ -17,7 +17,7 @@
 
 - 測定 commit: `3c0019a6` (コードを変えた最後の commit。base は origin/main `46c92356`)。
   `git diff 3c0019a6 HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` の出力は、本 REPORT を含めた最終 HEAD で 0 行 (§7)。
-- 環境: runner 4 vCPU・Node v22.23.3・`/opt/emsdk`。素材 work-m11 を展開し、`m11_gen_ir2.sh` を実行して `ir_conditions.json` を作った (ldfix=applied・qstore=applied・ld108=applied・ir_sha256 `de46cada…`)。
+- 環境: runner 4 vCPU・Node v22.23.3・emsdk は [EMSDK] (`docs/REFERENCES.md`)。素材 work-m11 を展開し、`m11_gen_ir2.sh` を実行して `ir_conditions.json` を作った (ldfix=applied・qstore=applied・ld108=applied・ir_sha256 `de46cada…`)。
   PE は `fl-win64` の `extracted/block00031_PE.bin` (sha256 `b2c64da4…`)。
 - **注記 (素材の不足)**: 素材 work-m11 に `work/lift_pe.sha256` が無かった。e2e は PE 指紋が一致しないと RetDec の全再生成に入るが、再生成に必要な `tools/m2/work` が無い。
   そこで**現 PE の sha256 を `work/lift_pe.sha256` に手で書いた** (全再生成はしていない)。整合の確認: strict の完了数 53+3=56 は REPORT.md §14 と一致した。survey ok 872 は issue #2714 本文の値と一致した (REPORT.md §14 の survey 866 とは差がある。原因は未切り分け)。
