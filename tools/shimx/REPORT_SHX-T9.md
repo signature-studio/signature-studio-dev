@@ -186,6 +186,7 @@
   3. `function_467c40` (`m11_ov.c` 転記): `slot = Q(R(0x11e3af0)) = 0x11f10e0`、`Q(slot) = 0x457860` (§3.3.2 の fallback) ≠ 0 なので VarBstrFromBool 呼出しに入る。`ICALL_AT(0x467cc9)` と `ICALL_AT(0x467d5d)` が閉じた closure 外の `0x457860` を踏み、icall-miss (ret 0) になる。trace の `UStrAsg dest=0x11f1120`・`0x11f1128`・`0x11f1138`… は転記の書込み先 `R(0x11f1120)` 等と一致する。
   4. 含意: slot が fallback の `0x457860` のまま非 0 だと、ゲートを通って VarBstrFromBool 呼出し (icall-miss) に入る。slot が本物の `VarBstrFromBool` で埋まった場合の経路は未測定 (#1607 の範囲)。
 - **未達 (受入条件 1・2・3 の残り)**: (a) `function_457c70` の呼出し元 PC は未記録 (wrapper 未拡張)。起票: #2491 (`[SHX-T9i]`)。(b) baseline の比較は、現行 `m11_ov.c` で `m11_boot.cjs` を再生成して初めて成立する。再生成には `m11_gen_ir2.sh` (`ir_conditions.json`・fl-win64・pefile/capstone) が要り、本 run では完了していない。起票: #2489 (`[SHX-T9h]`)。
+- 追補 (SHX-T9j #2533): 現行 `m11_ov.c` で再生成した baseline と shimx `--trace --soft --fix` の unit 23 GetLastError を実測。経路は両版とも `ret=2`・icall-miss `0x457860`。GetLastError は baseline 0 / shimx 126。詳細と旧値との差は `tools/shimx/REPORT_SHX-T9j.md`。
 
 ### 3.4 検証の commit と差分 (WORKFLOW §6)
 
