@@ -1,6 +1,6 @@
 # #1324 (LD-45): tracker-no-deref 3 関数の記号実行の修正・5c44b0 の門の確定
 
-**判定: 受入条件 1・2・3 達成 (測定 commit `5b6d03c2` = main 取り込み後の HEAD で実測)。e2e は未実施 (理由は §6)。`Refs #1324`。**
+**判定: 受入条件 1・2・3 達成 (測定 commit `154b45f5` = main 取り込み後の HEAD で実測)。e2e は未実施 (理由は §6)。`Refs #1324`。**
 
 既知類型との関係: 該当なし (DEFECTS.md の類型ではなく ldfix の記号実行の取りこぼし。#1134 REPORT_1134.md §2 の機構を前提にした)。
 
@@ -23,7 +23,7 @@
 
 ## 3. 受入条件 1: deref 記録 (`python3 ldfix/trk_probe_1134.py`)
 
-測定 commit `5b6d03c2`。実行時間 0.9 秒。出力は下表と一致 (判定の PASS/FAIL 出力は無い)。
+測定 commit `154b45f5`。実行時間 0.9 秒。出力は下表と一致 (判定の PASS/FAIL 出力は無い)。
 
 | 関数 | 修正前 deref | 修正後 deref (実測) | 出所 | 機械語の位置 |
 |---|---|---|---|---|
@@ -34,7 +34,7 @@
 
 ## 4. 受入条件 2: 5c44b0 (none) の確定 (`python3 ldfix/gate_5c44b0_1324.py`)
 
-測定 commit `5b6d03c2`。実行時間 0.5 秒。
+測定 commit `154b45f5`。実行時間 0.5 秒。
 
 - arg2 は門 (a)(b)(c) を通る (`deref` が entry 内・64bit・出所 `'arg'`、`raw` 0、IR に `load ptr %arg2` 直接 0)。
 - 置換候補 `rep_idx=[21,45,88]` の先頭 21 行目は `entry_end=20` 以降 (ラベル `dec_label_pc_5c4512:` の後) にあり、`fix_f3c_use` は `rep['f3c_use_not_entry']` で見送る。
@@ -43,18 +43,19 @@
 
 ## 5. 受入条件 3: 既存分類との比較
 
-### 5.1 ldfix 出力 IR の一致 (実測・測定 commit `5b6d03c2`)
+### 5.1 ldfix 出力 IR の一致 (実測・測定 commit `154b45f5`)
 
 - 入力: `work/boot_final3.ll` (修復前 IR 相当)、`--pe work/extracted/block00031_PE.bin` (fl-win64 の `extracted/block00031_PE.bin` を展開)。
-- 新 = `5b6d03c2` (本 PR 取り込み後)。比較先 = `origin/main` の `tools/m11` を `git archive` で別ディレクトリに展開して実行。
-- `cmp head.ll main.ll` → **IDENTICAL** (21,772,659 bytes)。
+- 新 = `154b45f5` (本 PR 取り込み後)。比較先 = `origin/main` の `tools/m11` を `git archive` で別ディレクトリに展開して実行。
+- `cmp head.ll main.ll` → **IDENTICAL** (21,774,486 bytes)。
 - `F1=0 / F1v=0 / F2=0 / F3a=2 / F3b=0 / F3c(store-arg)=33 / F4(frame-read)=10 (errors=0)`。
 - 本 PR の効果だけを IR で見るため、`bumps = {}` (argv 無効) 版でも同じ入力を出力した: `cmp abl.ll head.ll` → **IDENTICAL**、`cmp abl.ll main.ll` → **IDENTICAL**。この入力では argv 由来の deref は IR を変えない (分類だけが変わる)。
-- 8483b900 との `cmp` は main 側に入った別 PR の F4 差 (`F4=10`) を含むため、本 PR の判定根拠に使わない。
+- 8483b900 との `cmp` は main 側に入った別 PR の F4 差 (`F4=10`) を含むため、本 PR の判定根拠に使わない。実測 (`154b45f5` で `8483b900` の `tools/m11` を `git archive` して実行): `cmp` → DIFFER。先頭差分 byte 4250885 (line 102546)。出力サイズは 8483b900 が 21,772,659 bytes、head が 21,774,486 bytes (差 1,827 bytes。F4 の出力分)。
+- ablation 版 (`bumps={}`) の分類表と head の分類表の差は §5.2 の 3 組のみ (`diff` で実測)。
 
 ### 5.2 分類表 (`python3 ldfix/use_residual_509.py work/boot_final3.ll work/m11_image.bin 'work/boot*.drc.config.json' ldfix/results/audit_509_pre.json all`)
 
-測定 commit `5b6d03c2`。合計 56 (関数, 引数) / 52 関数。
+測定 commit `154b45f5`。合計 56 (関数, 引数) / 52 関数。
 
 | 分類 | 修正後 (実測) | ablation (`bumps={}`、修正前相当) |
 |---|---|---|
@@ -76,7 +77,7 @@ ablation の実行: `ldfix.py` の `bumps = _f3c_bump_slots(...)` を `bumps = {
 ### 5.3 db6480 arg4 の `raw-after` の由来 (出所の直接測定)
 
 - 分類の定義: `raw-after` = 「最初の deref より後に、同じ argN の生の使用がある」。
-- `python3 ldfix/origin_probe_1324.py` (測定 commit `5b6d03c2` で実測) の出力:
+- `python3 ldfix/origin_probe_1324.py` (測定 commit `154b45f5` で実測) の出力:
   - function_75a180 arg4: `('deref', 7709291, 4, 64, 'argv')`
   - function_db6480 arg4: `('deref', 14378363, 4, 32, 'argv')`・`('raw', 14378480, 4)`
   - function_dc27c0 arg2: `('deref', 14428262, 2, 32, 'argv')`・`('deref', 14428369, 2, 32, 'argv')`
@@ -99,7 +100,7 @@ ablation の実行: `ldfix.py` の `bumps = _f3c_bump_slots(...)` を `bumps = {
 
 ## 6. 検証範囲
 
-- **実測 (測定 commit `5b6d03c2`)**: `trk_probe_1134.py` (§3)・`gate_5c44b0_1324.py` (§4)・`use_residual_509.py` 全 56 組 (§5.2)・ablation (§5.2)・`origin_probe_1324.py` (§5.3)・ldfix 出力 IR の head と main の `cmp` (§5.1)。
+- **実測 (測定 commit `154b45f5`)**: `trk_probe_1134.py` (§3)・`gate_5c44b0_1324.py` (§4)・`use_residual_509.py` 全 56 組 (§5.2)・ablation (§5.2)・`origin_probe_1324.py` (§5.3)・ldfix 出力 IR の head と main の `cmp` (§5.1)。
 - **e2e (`ldfix_509_e2e.sh` の 6/7 wasm 比較・7/7 動的確認) は未実施**。IR の一致 (§5.1) は main との比較のみ。wasm の e2e 比較は行っていない。e2e の実行は本 PR の範囲外 (修復を入れる #1325 で行う)。
 - **範囲外**: `REPORT_930` の 23/24 と 30/33 の不一致 (#1134 §4 で未調査として残件。本 PR では触らない)。
 
@@ -118,7 +119,16 @@ PYTHONPATH=. python3 ldfix/ldfix.py work/boot_final3.ll out.ll --pe work/extract
 
 ## 8. 測定 commit と差分
 
-測定 commit: `5b6d03c2` (main 取り込み後の HEAD。`tools/m11/ldfix/ldfix.py` は main 由来の変更を含む)。
+測定 commit: `154b45f5` (現 HEAD。main 取り込み merge `5b6d03c2` 以降のコード差分は 0)。
+
+```
+git diff 5b6d03c2 HEAD -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/*.py tools/m11/ldfix/*.sh
+(出力なし: コード差分 0)
+git diff 5b6d03c2 HEAD -- tools/m11/ldfix
+ tools/m11/ldfix/REPORT_1324.md | 86 ++++++++++++++++++++++--------------------
+```
+
+`tools/m11/ldfix/ldfix.py` は main 由来の変更 (F4 パス) を含む。
 
 本 PR の ldfix の差分 (main 取り込み前の PR 自身の変更):
 
@@ -138,5 +148,5 @@ git diff origin/main 5b6d03c2 -- tools/m11/ldfix/ldfix.py
 |---|---|---|
 | 1. argv 由来 deref が `fix_f3c_use` の門に入る | `1af9cad2` で門 (a) を `u[4] == 'arg'` の deref に限定 (§2) | 解消 (修正 commit 時点の diff で確認) |
 | 2. 受入条件 3 が未達 | ablation と出所測定で示した (§5.2・§5.3) | 達成 |
-| 3. head での再測定 | `work-m11` 素材が届いたので測定 commit `5b6d03c2` で再測定 (§3・§4・§5) | 実測済み |
-| 4. REPORT の測定 commit が head と不一致 | §3〜§5 の数値を測定 commit `5b6d03c2` に統一 | 解消 |
+| 3. head での再測定 | `work-m11` 素材が届いたので測定 commit `154b45f5` で再測定 (§3・§4・§5) | 実測済み |
+| 4. REPORT の測定 commit が head と不一致 | §3〜§5 の数値を測定 commit `154b45f5` に統一 | 解消 |
