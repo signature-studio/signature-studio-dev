@@ -70,6 +70,14 @@ const seq = [
   ["mixer.getTrackName", [127]],
   ["mixer.getTrackVolume", [-1, 0]],
   ["mixer.setTrackPan", [200, 0]],
+  // PY-115 (#2950): getTrackName の maxLen (>0 のとき末尾の mask 外文字を削って先頭 maxLen 文字へ切る。0・既定 -1 は全文)
+  ["mixer.getTrackName", [0, 3]],
+  ["mixer.getTrackName", [1, 4]],
+  ["mixer.getTrackName", [1, 0]],
+  ["mixer.getTrackName", [1]],
+  ["mixer.getTrackName", [1, 100]],
+  ["mixer.getTrackName", [0, 1]],
+  ["mixer.getTrackName", [1, "x"]],
 ];
 
 const diffs = [];

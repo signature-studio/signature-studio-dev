@@ -38,6 +38,20 @@ export function createMockEngine() {
   const pl = (i) => { i = ix(i); if (i < 1 || i > st.playlist.length) throw RANGE(); return st.playlist[i - 1]; };
   const tr = (i) => { if (!st.mixer[i]) throw RANGE(); return st.mixer[i]; };
   const tog = (cur, v) => (v === undefined || v === -1 ? !cur : !!v);
+  // PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から mask 外の文字 (母音・記号・空白) を削り、先頭 maxLen 文字へ切る (C provider の track_name_fit と同一・ASCII 前提)
+  const KEEP = new Set("0123456789BCDFGHJKLMNPQRSTVWXYZ");
+  const fitName = (s, m) => {
+    if (m <= 0 || s.length <= m) return s;
+    let t = s;
+    for (let i = t.length; i >= 1; i--) {
+      const c = t[i - 1];
+      if (!KEEP.has(c >= "a" && c <= "z" ? c.toUpperCase() : c)) {
+        t = t.slice(0, i - 1) + t.slice(i);
+        if (t.length <= m) break;
+      }
+    }
+    return t.slice(0, m);
+  };
   // fl_provider の引数検査 (fl_dispatch.c type_ok / fl_a_int) と同じ: None は既定値、bool と整数のみ可、他は code 5
   const argI = (a, i, def) => {
     const v = a[i];
@@ -105,7 +119,13 @@ export function createMockEngine() {
       st.channels.forEach((c) => (c.sel = c === k));
     },
     "channels.muteChannel": (i, v) => { ch(i).mute = tog(ch(i).mute, v); },
-    "channels.soloChannel": (i) => { ch(i).solo = !ch(i).solo; },
+    // PE 0xd59b40 → 0xd843d0: value == -1 は反転、他は現在値の下位 1 B と一致すれば不変・不一致なら反転 (C と同一)。useGlobalIndex は未モデル (型検査のみ)
+    "channels.soloChannel": (...a) => {
+      const k = ch(a[0]);
+      const v = argI(a, 1, -1);
+      argI(a, 2, 0);
+      if (v === -1 || (v & 0xff) !== +k.solo) k.solo = !k.solo;
+    },
     "channels.getChannelVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(ch(i).vol, 1e-6) / 0.78125) : ch(i).vol),
     "channels.setChannelVolume": (i, v) => { ch(i).vol = v; },
     "channels.getChannelPan": (i) => F(ch(i).pan),
@@ -122,7 +142,7 @@ export function createMockEngine() {
     "channels.quickQuantize": (i) => { ch(i); },
     "channels.showEditor": (i) => { ch(i); },
     "mixer.trackCount": () => st.mixer.length,
-    "mixer.getTrackName": (i) => tr(i).name,
+    "mixer.getTrackName": (i, m) => fitName(tr(i).name, argI([i, m], 1, -1)),
     "mixer.setTrackName": (i, n) => { tr(i).name = n; },
     "mixer.getTrackVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(tr(i).vol, 1e-6) / 0.8) : tr(i).vol),
     "mixer.setTrackVolume": (i, v) => { tr(i).vol = v; },

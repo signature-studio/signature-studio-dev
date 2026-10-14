@@ -143,6 +143,24 @@ const seq = [
   ["playlist.setTrackColor", [3, 0xABCDEF]],
   ["playlist.setTrackName", [0, "x"]],
   ["playlist.setTrackColor", [501, 1]],
+  // PY-115 (#2950): soloChannel の value (-1 は反転、他は現在値の下位 1 B と比較して不一致なら反転)・useGlobalIndex (型検査のみ)。isChannelSolo で状態を比べる
+  ["channels.soloChannel", [0, -1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 0]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 2]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 2]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, 256]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, -1, 1]],
+  ["channels.isChannelSolo", [0]],
+  ["channels.soloChannel", [0, "x"]],
 ];
 
 const diffs = [];

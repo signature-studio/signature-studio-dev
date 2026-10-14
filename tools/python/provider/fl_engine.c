@@ -119,7 +119,8 @@ FL_H(channels, selectOneChannel) {
     return fl_ret_none(c);
 }
 FL_H(channels, muteChannel) { CH(0); int64_t v = A_INT(1, -1); k->mute = TOG(k->mute, v); return fl_ret_none(c); }
-FL_H(channels, soloChannel) { CH(0); k->solo = !k->solo; return fl_ret_none(c); }
+/* PE 0xd59b40 (job 実行) → 0xd843d0: value == -1 は反転、他は現在値 (0/1) の下位 1 B と一致すれば不変・不一致なら反転。useGlobalIndex は未モデル (PE は lookup container を切替える) */
+FL_H(channels, soloChannel) { CH(0); int64_t v = A_INT(1, -1); (void)A_INT(2, 0); if (v == -1 || (uint8_t)v != k->solo) k->solo = !k->solo; return fl_ret_none(c); }
 FL_H(channels, getChannelVolume) { CH(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(k->vol, 0.78125) : k->vol); }
 FL_H(channels, setChannelVolume) { CH(0); k->vol = A_DBL(1, 0); return fl_ret_none(c); }
 FL_H(channels, getChannelPan) { CH(0); return fl_ret_d(c, k->pan); }
@@ -150,7 +151,19 @@ FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
 
 /* ---- mixer (18) ---- */
 FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
-FL_H(mixer, getTrackName) { MX(0); return fl_ret_s(c, t->name); }
+/* PE 0x12be470 (maxLen > 0 のみ): 長さが maxLen を超えるとき末尾から、mask 外の文字 (母音 AEIOU・記号・空白。mask = 0-9 と大文字子音) を削除し、最後に先頭 maxLen 文字へ切る。
+ * PE の文字列は UTF-16。ここは ASCII 前提 (非 ASCII 名は未確認) */
+static void track_name_fit(char *s, int64_t m) {
+    if (m <= 0 || (int64_t)strlen(s) <= m) return;
+    for (int64_t i = (int64_t)strlen(s); i >= 1; i--) {
+        if (!strchr("0123456789BCDFGHJKLMNPQRSTVWXYZ", toupper((unsigned char)s[i - 1]))) {
+            memmove(s + i - 1, s + i, strlen(s + i) + 1);
+            if ((int64_t)strlen(s) <= m) break;
+        }
+    }
+    if ((int64_t)strlen(s) > m) s[m] = 0;
+}
+FL_H(mixer, getTrackName) { MX(0); int64_t m = A_INT(1, -1); char b[NAME]; snprintf(b, sizeof b, "%s", t->name); track_name_fit(b, m); return fl_ret_s(c, b); }
 FL_H(mixer, setTrackName) { MX(0); const char *s = A_STR(1); set_name(t->name, s); return fl_ret_none(c); }
 FL_H(mixer, getTrackVolume) { MX(0); int64_t m = A_INT(1, 0); return fl_ret_d(c, m ? db(t->vol, 0.8) : t->vol); }
 FL_H(mixer, setTrackVolume) { MX(0); t->vol = A_DBL(1, 0); return fl_ret_none(c); }
