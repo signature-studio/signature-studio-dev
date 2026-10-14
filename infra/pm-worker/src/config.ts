@@ -6,6 +6,7 @@ import { DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 export const DEFAULT_TARGET_WORKER = 80;
 export const DEFAULT_QUEUE_MARGIN = 10;
 export const DEFAULT_TARGET_MIN = 30;
+export const DEFAULT_REPO = "signature-studio/signature-studio-dev";
 
 export const MIN_COMMENT_WINDOW_H = 24;
 export const DEFAULT_COMMENT_WINDOW_H = 24;
@@ -28,6 +29,8 @@ export interface Env {
   LIVE?: string;
   LIVE_LAUNCH?: string;
   LIVE_DISPATCH?: string;
+  // "1" のときだけ、失敗した webhook 配送を GitHub に再配送する (POST /app/hook/deliveries/{id}/attempts)。LIVE には従わない (単独のスイッチ・#2339)。
+  LIVE_REDELIVER?: string;
   // 実装 App (bot) のログイン。bot_last (最後の報告) の判定に使う。
   BOT_LOGIN?: string;
   // PM の人間アカウント (PAT)。PM App の bot ログインは slug から自動で加える。
@@ -55,6 +58,8 @@ export interface Config {
   liveLaunch: boolean;
   // repository_dispatch (oc-watchdog と oc-pm) の送信を実行するか。
   liveDispatch: boolean;
+  // 失敗した webhook 配送の再配送を実行するか (既定 false: 一覧を読んで送るはずだった件数だけ記録する)。
+  liveRedeliver: boolean;
   botLogin: string;
   pmLogins: string[];
   watchdogIntervalS: number;
@@ -78,7 +83,7 @@ const num = (v: string | undefined, d: number): number => {
 const liveFlag = (own: string | undefined, legacy: string | undefined): boolean => (own !== undefined ? own === "1" : legacy === "1");
 
 export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[]> = manualDepsJson as Record<string, number[]>): Config {
-  const repo = env.REPO ?? "signature-studio/signature-studio-dev";
+  const repo = env.REPO ?? DEFAULT_REPO;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) throw new Error("bad REPO");
   return {
     repo,
@@ -89,6 +94,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     batch: num(env.BATCH, DEFAULT_BATCH),
     liveLaunch: liveFlag(env.LIVE_LAUNCH, env.LIVE),
     liveDispatch: liveFlag(env.LIVE_DISPATCH, env.LIVE),
+    liveRedeliver: env.LIVE_REDELIVER === "1",
     botLogin: env.BOT_LOGIN ?? "opencode-for-signature-studio[bot]",
     pmLogins: (env.PM_LOGINS ?? "pycabbage").split(",").map((s) => s.trim()).filter(Boolean),
     watchdogIntervalS: num(env.WATCHDOG_INTERVAL_S, 300),

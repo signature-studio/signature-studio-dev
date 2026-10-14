@@ -2,7 +2,7 @@
 
 PM の launch / watchdog を、VM のポーリング (systemd timer) から **webhook 駆動 + Cron / alarm** の Cloudflare Worker に移す (#1751)。
 コードの既定は **dry-run** (GitHub へは書き込まない)。稼働中の `wrangler.toml` は 2026-10-14 から **live** (後述『切替の記録』)。書き込みの有効化と VM timer の停止は PM の判断。
-書き込みは経路ごとに独立したスイッチを持つ: launch の `/oc` コメント投稿 = `LIVE_LAUNCH`、`repository_dispatch` (`oc-watchdog` と `oc-pm`) の送信 = `LIVE_DISPATCH` (#2417)。
+書き込みは経路ごとに独立したスイッチを持つ: launch の `/oc` コメント投稿 = `LIVE_LAUNCH`、`repository_dispatch` (`oc-watchdog` と `oc-pm`) の送信 = `LIVE_DISPATCH` (#2417)、失敗した webhook 配送の再送 = `LIVE_REDELIVER` (#2339。未設定なら記録のみ)。
 
 ## 構成
 
@@ -11,6 +11,7 @@ PM の launch / watchdog を、VM のポーリング (systemd timer) から **we
 | `POST /webhook` | GitHub App の webhook。`X-Hub-Signature-256` を HMAC-SHA256 (定数時間) で検証してから状態に反映する。対象: `issues` `issue_comment` `issue_dependencies` `pull_request` `pull_request_review` `workflow_run` |
 | Durable Object `PmDO` (SQLite) | issue / PR / run / 最後の bot 報告 / blocked_by / launch 時刻を保持。App の鍵は AES-GCM で封じて保管 |
 | alarm (webhook の 2 秒後 / 毎分) と Cron Trigger (毎分) | `tick`: 同期 (6 時間ごとに full、5 分ごとに reconcile)・`repository_dispatch` (`oc-watchdog`、前回の送信から 5 分未満は送らない。`LIVE_DISPATCH`。検出した `oc-pm` も同じスイッチ)・launch (`LIVE_LAUNCH`) |
+| `POST /admin/resync` | 管理用の全体同期 (#2339)。派生状態を REST の内容で作り直す (`fullSync` と同じ。永続状態は触らない)。認証は呼び出し側の GitHub token (Bearer) が repo の push 権限を持つこと (新規の API token は作らない)。**未認証・不明な token・読み取りだけの token は 404** (入口で DO を呼ばない)。1 時間に 2 回まで、3 回目は 429 (`retry-after`) |
 | `GET /setup` `GET /setup/callback` | GitHub App `oc-pm-for-signature-studio` の manifest flow (org 所有)。`/setup` は無認証だが、期限内 (1 時間) の state があれば上書きせず同じ state を返す。state は org 所有の App への変換に成功したときだけ消費する |
 | `GET /status` | 集計のみ (実行中 run 数・ready/blocked 数・最終 reconcile 時刻・モード・健全性の観測。下の『/status の観測』)。`mode_launch` / `mode_dispatch` が経路ごとのモード (`live` / `dry-run`)。`mode` は両方 `live` のときだけ `live` (片方だけなら `partial`、どちらもなら `dry-run`。`tools/pm/pm_gate.sh` は `mode=live` を『VM の command を止めてよい』と読む)。`?detail=1` は repo の push 権限を持つ GitHub token (Bearer) が必要 |
 
@@ -106,6 +107,15 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
 
 現行の `wrangler.toml` は `TARGET="50"` なので、推定が 40 以上のとき `target_eff` は 50 に張り付く (上限 60 でも 50 まで)。`TARGET` を 80 に戻すまでは、この上限が効く。
 
+## 失敗した webhook 配送の回収と `/admin/resync` (#2339)
+
+- **再送**: GitHub は失敗した配送を自動で再送しない。tick は 5 分ごとに、App の JWT (`appJwt`。installation token とは別枠) で `GET /app/hook/deliveries?per_page=100` を 1 ページ読み、`status != OK` の配送を古い順に `POST /app/hook/deliveries/{id}/attempts` で再送する。同じ `guid` に OK の配送が 1 つでもあれば回収済みとみなして触らない。再送された配送 (`redelivery: true`) は、失敗しても再送しない (連鎖させない。元の配送の上限だけで止まる)。
+- **上限**: 1 回の走査で再送は 10 件まで (試行の少ないものから)。同じ `guid` は 3 回まで (失敗した試行も数える)。rate-guard (`rest_remaining` < 1,500) の間は再送しない。
+- **スイッチ**: `LIVE_REDELIVER` が `"1"` のときだけ POST する。`LIVE` には従わない (単独のスイッチ)。未設定 (既定) は一覧を読むだけで、送るはずだった配送を guid ごとに 1 回ずつ `counters.wouldRedeliver` に数える。
+- **観測**: `/status` の `counters.redelivered` (送った件数の累計)・`counters.wouldRedeliver`・`last_redeliver_scan` (最後の走査の時刻)・`hook_failed_last_scan` (直近の一覧で `status != OK` だった配送の件数)。
+- **限界**: 1 走査は最新 100 件の 1 ページだけを読む。それより古い失敗は読まない (GitHub は配送を約 3 日保持する)。失敗が 1 日に 100 件を超えると取りこぼし得る。
+- **`POST /admin/resync`**: 派生状態 (issue・PR・run・コメント・blocked_by・レビュー) を `fullSync` で作り直す。ページ上限と REST の回数は全体同期と同じ。永続状態 (`launchedAt`・`relaunch`・`planned`・`phase`・`counters`) は同期が触らないので残る。1 時間に 2 回まで (試行は失敗しても数える)、3 回目は 429。tick と同時には走らせない (409)。認証と 404 の扱いは上の表を参照。
+
 ## 同期の窓と打ち切り
 
 - 全体同期 (6 時間ごと) と reconcile (5 分ごと) は、GitHub の一覧を `per_page=100` のページで読む。`Gh.list` は、上限ページで止めて続きがあるときだけ `truncated=true` を返す
@@ -130,7 +140,11 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
 
 ```
 cd infra/pm-worker && npm test      # Node >= 22.6 (--experimental-strip-types)。依存パッケージなし。Python 3 が要る (突き合わせ)
+cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン
+cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
+
+`npm ci` が要る (`test:unit` と `test:workers` は devDependencies の vitest を使う)。
 
 `npm run build` は bun、デプロイは wrangler を使う。wrangler は `login --device` がある版 (公式 docs の例は 4.119.0 の出力。VM は 4.151.0 で `--device` の存在を `wrangler login --help` で確認済み)。VM では root 不要で `$HOME/.local/bin` に置く
 (`npm install --prefix $HOME/.local/wrangler wrangler@<版>`、bun は npm の `bun` パッケージ)。

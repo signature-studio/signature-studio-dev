@@ -170,7 +170,28 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - VM の `relaunch.json` (67 件。count=1 が 60、2 が 7) は Worker に無い。履歴の無い issue を最大 2 回余分に再投入し得る (#2343)。
 - 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343)。rate-guard が launch を止める場面と、live の oc-pm 送信 (PM agent の起動) は未測定 (fake gh のテストだけ)。
 
-## 14. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
+## 13. R2 素材投入の頻度 (#2434・手順は `docs/WORKFLOW.md` §11)
+
+既知類型との関係: 該当なし (PM 運用の記録)。測定時刻 2026-10-14T14:33:25Z (`date -u`)。
+ここで数えるのは **許可名 (`ARTIFACT_RE`) を増やした回数**であり、R2 への投入回数ではない。
+
+- 数え方: main の first-parent 履歴で、`.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE=` 行が親と変わった merge を数える。再現: `git log --first-parent --format='%h %cI %s' -G'^ARTIFACT_RE=' -- .github/scripts/prepare-event-context.sh`
+- 結果: **7 件** (初回 `7bd4ce08` 2026-10-12T19:10:33Z の 1 件 + 追加 6 件: #293・#318・#320・#646・#610・#761)。最後の追加は `3fed6297` (#761) の 2026-10-13T14:23:39Z。issue 本文の「5 回」とは数えが違う (7 回が実測)。
+- 最後の追加から測定時刻まで **0 件** (24 時間 9 分 46 秒)。
+- 独立検算: 同じ first-parent 履歴を Python で線形に走査し、名前の集合の増分で数えた → 7 件 (初回 1 + 増分 6) で一致。commit 単位の `git log -G` (feature branch の commit を含む) でも 7 件 (`ba6e25f9`〜`9e52c39d`)。
+- watchdog 側の copy (`.github/scripts/watchdog.sh`。`pr-lint.sh` が読む) は後から追随した: `analysis-mac-shared` は `3b2346a0` (2026-10-13T14:22:02Z)、`work-fw-stage1` は `33a18408` (2026-10-13T15:13:01Z) で入った。`9e52c39d` の時点の watchdog.sh には mac-shared が無い (grep 0 件)。
+- R2 への投入の記録: repo 内にあるのは 2026-10-12 の全素材の再投入 1 回 (依頼者操作。`docs/pm/RETRO_2026-10-13.md`)。PM が VM で記録したとされる昇格ログは 1 件 (2026-10-13T14:16:50Z) だが、本 run では VM のログを確認していない `[未確認]`。
+- 未解決: open の #874 ([CI-18] mac pkg 素材の R2 化) の投入状況は本 run で未確認 (R2 の一覧は認証情報を使わずに取得していない)。起票先: 既存の #874 (新規起票なし)。
+
+## 14. `pm_wake.sh` の判定テストと live の確認 (#2347)
+
+既知類型との関係: 該当なし (PM 運用の記録)。測定 commit `edb3ab39` (コードを変えた最後の commit)、測定時刻 2026-10-14T15:19Z (`date -u`)。
+- テスト `bash tools/pm/test_pm_wake.sh`: **20 passed, 0 failed**、所要 **0.70 s** (fake curl・fake opencode。ネットワーク不使用。ネガコン 10 件を含む)。
+- ネガコンの確認: 間隔を 0 にした一時複製では c1・c2・f2 が、上限と fresh 判定を壊した複製では d2・d3・g2 が FAIL (いずれも 17 passed, 3 failed)。
+- live (読み取りのみの `GET /status`、15:18Z): `needs_pm`・`stuck`・`stuck_age_max_min` が返らない。`pm_wake.sh` は `result=status-failed reason=parse`・exit 2 で、送信は 0 件。本番 Worker は #2335 の変更を含まない版と見られる `[未確認: デプロイ版]`。再デプロイ後に needs_pm 経路が有効になる。
+- 差分 (測定 commit から HEAD まで・コード範囲): `git diff edb3ab39 HEAD -- tools/pm/pm_wake.sh tools/pm/test_pm_wake.sh tools/pm/systemd` の出力は空 (差分 0)。
+
+## 15. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
 
 測定した commit: `8e4f299c` (コードを変えた最後の commit。origin/main `3a6fcf81` の取り込みと競合の解消を含む)。取得時刻は UTC (2026-10-14)。`git diff aeaaa591 8e4f299c -- infra/pm-worker` は 995 行 (main 側の取り込み分を含む。PR 自身の差分は `git diff 3a6fcf81 8e4f299c -- infra/pm-worker` の 532 行)。以後の commit は `tools/pm` と `docs` だけで、`git diff 8e4f299c HEAD -- infra/pm-worker` は 0 行。
 
@@ -194,16 +215,3 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | 純関数: 30 分の streak・観測の空きをまたがない・観測の保持 | 「saturatedRunning」「nextCap / capValue」「観測の保持」 |
 
 review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
-
-## 13. R2 素材投入の頻度 (#2434・手順は `docs/WORKFLOW.md` §11)
-
-既知類型との関係: 該当なし (PM 運用の記録)。測定時刻 2026-10-14T14:33:25Z (`date -u`)。
-ここで数えるのは **許可名 (`ARTIFACT_RE`) を増やした回数**であり、R2 への投入回数ではない。
-
-- 数え方: main の first-parent 履歴で、`.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE=` 行が親と変わった merge を数える。再現: `git log --first-parent --format='%h %cI %s' -G'^ARTIFACT_RE=' -- .github/scripts/prepare-event-context.sh`
-- 結果: **7 件** (初回 `7bd4ce08` 2026-10-12T19:10:33Z の 1 件 + 追加 6 件: #293・#318・#320・#646・#610・#761)。最後の追加は `3fed6297` (#761) の 2026-10-13T14:23:39Z。issue 本文の「5 回」とは数えが違う (7 回が実測)。
-- 最後の追加から測定時刻まで **0 件** (24 時間 9 分 46 秒)。
-- 独立検算: 同じ first-parent 履歴を Python で線形に走査し、名前の集合の増分で数えた → 7 件 (初回 1 + 増分 6) で一致。commit 単位の `git log -G` (feature branch の commit を含む) でも 7 件 (`ba6e25f9`〜`9e52c39d`)。
-- watchdog 側の copy (`.github/scripts/watchdog.sh`。`pr-lint.sh` が読む) は後から追随した: `analysis-mac-shared` は `3b2346a0` (2026-10-13T14:22:02Z)、`work-fw-stage1` は `33a18408` (2026-10-13T15:13:01Z) で入った。`9e52c39d` の時点の watchdog.sh には mac-shared が無い (grep 0 件)。
-- R2 への投入の記録: repo 内にあるのは 2026-10-12 の全素材の再投入 1 回 (依頼者操作。`docs/pm/RETRO_2026-10-13.md`)。PM が VM で記録したとされる昇格ログは 1 件 (2026-10-13T14:16:50Z) だが、本 run では VM のログを確認していない `[未確認]`。
-- 未解決: open の #874 ([CI-18] mac pkg 素材の R2 化) の投入状況は本 run で未確認 (R2 の一覧は認証情報を使わずに取得していない)。起票先: 既存の #874 (新規起票なし)。
