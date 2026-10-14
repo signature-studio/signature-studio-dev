@@ -117,12 +117,13 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 | 観測 | 結果 |
 |---|---|
 | 値 `0x400000004` の 64bit store | **0 件** (8 入力。前回 #2382 の 0 件と一致) |
-| 行 18908 `store i32 4` → `0x104af3e0` (4B) | 8 入力で 1 件ずつ (`WCV`) |
-| 行 18909 `store i32 4` → `0x104af3e4` (4B) | 同上 (`WCV`) |
-| 行 18967・18970・18973 (`function_181057b38`) | BLK+0x8・+0x10・+0x18 に、それぞれ `stack_var_-52`・`stack_var_-56`・`stack_var_-24` のアドレスを書く |
+| 行 18908 `store i32 4` (`stack_var_-56`) → `0x104af3e0` (4B) | 8 入力で 1 件ずつ (`WCV`) |
+| 行 18909 `store i32 4` (`stack_var_-52`) → `0x104af3e4` (4B) | 同上 (`WCV`) |
+| 行 18970 `store &stack_var_-52` → `0x36319010` (BLK+0x8) | 値 `0x104af3e4` (8 入力で 1 件ずつ) |
+| 行 18973 `store &stack_var_-24` → `0x36319018` (BLK+0x10) | 値 `0x104af3d8` (8 入力で 1 件ずつ) |
 
-- 値の作られ方: `function_181057b38` (IR 18881–18882) の alloca `stack_var_-56` (=0x104af3e4 側) と `stack_var_-52` (=0x104af3e8 側) に `store i32 4` を 2 本書く。下位 4B=4、上位 4B=4 なので、この 8B を i64 で読むと `0x400000004`。
-- 読み元: `function_181057a90` (IR 18807–18813) は引数 `%1` = BLK+0x18 の値 (= `stack_var_-24` のアドレス `0x104af3d8`)。`load [%1+8]` が `0x104af3e0` の 8B を読み、`0x400000004` を得る。`load [0x400000004]` = 0、`load [0]` = "emsc"。
+- 値の作られ方: `function_181057b38` (IR 18881–18882) の alloca `stack_var_-56` (`0x104af3e0`) と `stack_var_-52` (`0x104af3e4`) に `store i32 4` を 2 本書く。下位 4B=4、上位 4B=4 なので、この 8B を i64 で読むと `0x400000004`。
+- 読み元: `function_181057a90` (IR 18807–18813) は `%1` = `load [0x36319018]` = `&stack_var_-24` (`0x104af3d8`)。`load [%1+8]` が `0x104af3e0` の 8B を読み、`0x400000004` を得る。`load [0x400000004]` = 0、`load [0]` = "emsc"。
 - つまり "emsc" は address 0 の sentinel を、この 8B 読みの連鎖で指している。
 
 **未確定**: (a) 元の x86 の機械語でも同じ 2 本の 4B store か (`SlateCore.core_64` 未展開のため未突合)、(b) alloca の配置が RetDec 由来か元の stack frame 由来か。(a) の突合は `fetch.sh` 実行後に行う。
