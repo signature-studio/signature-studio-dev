@@ -7,7 +7,7 @@
 ## 0. 結論
 
 1. **参照レンダラ**: `ref_render.sh` で実 DLL を wine64 上から駆動し、32-bit float WAV を書く (`vst3host.cpp` に WAV 書出と `S2HOST_PITCH` を追加)。既定 state (Init)・48 kHz・128 frames・64 blocks・NoteOn C4 (block 0) / NoteOff (block 24)。WAV 本体は `work/` (gitignore)、commit は `ref_manifest.json` (sha256・基本メトリクス・再生成コマンド) のみ。
-2. **再現性**: 同一入力 3 回で data の SHA-256 が一致 (`672007a0…`)。ORACLE T2 を満たした。許容クラス D の反映は不要。
+2. **再現性**: 同一入力 3 回で WAV ファイル全体の SHA-256 が一致 (`672007a0…`、data 部 `7adcbc28…`)。ORACLE T2 を満たした。許容クラス D の反映は不要。
 3. **ハーネス**: 判定は `tools/flp` の `judgeWav` (`cli/wavcmp.ts`) を `bun` で呼ぶ (runner の Node は 22 で `.ts` の type-stripping が使えないため)。
 4. **ネガコン (両方 FAIL)**: 別ノート C#4 を D-spectral で FAIL (rmsDiff 3.4 dB・STFT 4086/4102 bin が >0.1 dB・LUFS 差 0.438)。1 サンプル (+0.01) 改変を A-exact で FAIL (maxUlp 671089)。
 5. **未達 (受入 4)**: wasm 側との比較は SR-4 の WAV が無いため未実施。入力口 (第 1 引数) までを作った。残りは子 issue に移した (§3)。
@@ -16,7 +16,7 @@
 
 | 項目 | 値 |
 |---|---|
-| ref 3 回の data SHA-256 | 一致 (`672007a06d1482ada6f846ec8f5e8a763a2586e032dbabe5fb5432332bd332c1` の file sha と、data `7adcbc28…81fce`) |
+| ref 3 回の file SHA-256 (`sha256_file`) | 一致 `672007a06d1482ada6f846ec8f5e8a763a2586e032dbabe5fb5432332bd332c1` (data 部 `sha256_data` = `7adcbc28…81fce`) |
 | self-test (ref_1 vs ref_2, A-exact) | PASS (bit-exact) |
 | ネガコン 別ノート (D-spectral) | FAIL |
 | ネガコン 1 サンプル改変 (A-exact) | FAIL |

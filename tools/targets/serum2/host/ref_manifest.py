@@ -44,7 +44,7 @@ out = {
         "blocks": 64,
         "block_frames": 128,
         "sample_rate": 48000,
-        "runner": "wine64 (/usr/lib/wine/wine64), Actions runner",
+        "runner": "wine64 (apt wine 9.0), Actions runner",
         "command": "bash tools/targets/serum2/host/ref_render.sh <outdir> 60",
     },
 }

@@ -30,7 +30,7 @@ for i in 1 2 3; do
   [ -f "$H/ref_$i/render_f32.wav" ] && SHA+=("$(sha256sum "$H/ref_$i/render_f32.wav" | cut -d' ' -f1)")
 done
 if [ "${#SHA[@]}" -eq 3 ] && [ "${SHA[0]}" = "${SHA[1]}" ] && [ "${SHA[1]}" = "${SHA[2]}" ]; then
-  ok "3 回の data SHA-256 が一致 (${SHA[0]:0:16}…)"
+  ok "3 回の file SHA-256 が一致 (${SHA[0]:0:16}…)"
 else
   ng "SHA-256 が不一致 (${SHA[*]}) — 非決定部分を許容クラス D で判定する必要あり"
 fi

@@ -18,8 +18,8 @@ export PATH="/usr/lib/wine:$PATH"
 [ -f "$SERUM_DIR/work/Serum2_win64.vst3" ] || { echo "FAIL: $SERUM_DIR/work/Serum2_win64.vst3 が無い (素材 plugins-serum2 を展開すること)" >&2; exit 1; }
 ZS2='Z:'"${SERUM_DIR//\//\\}"
 OUTW="Z:${OUT//\//\\}"
-S2HOST_PITCH="$PITCH" timeout 300 wine64 "$W/build/vst3host.exe" "$ZS2\\work\\Serum2_win64.vst3" - "$OUTW" 64 "$ZS2\\work\\exe_extract" > "$OUT/console.txt" 2>&1
-RC=$?
+RC=0
+S2HOST_PITCH="$PITCH" timeout 300 wine64 "$W/build/vst3host.exe" "$ZS2\\work\\Serum2_win64.vst3" - "$OUTW" 64 "$ZS2\\work\\exe_extract" > "$OUT/console.txt" 2>&1 || RC=$?
 echo "wine exit=$RC out=$OUT pitch=$PITCH"
 [ -f "$OUT/render_f32.wav" ] || { echo "FAIL: render_f32.wav が出ていない" >&2; exit 1; }
 exit "$RC"
