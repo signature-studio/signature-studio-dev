@@ -56,7 +56,7 @@ def main():
         if ins.mnemonic == "ret":
             break
     ok_seq = got == expect
-    for i, (g, e) in enumerate(zip(got, expect)):
+    for i, (g, _) in enumerate(zip(got, expect)):
         print(f"{ins_list[i].address:#x}: {g}")
     ok_len = len(got) == len(expect)
 

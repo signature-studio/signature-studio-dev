@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PY-99 (#2874): [rbp+X] の読みごとに、CFG を後ろ向きに辿って届く store と格納値の式を列挙する (実機不要)。
 
-  python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [<VA> ...] [--negctl {fallthrough,expect}]
+  python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [<VA> ...] [--negctl {fallthrough,expect}] [--lea-write]
 
 - 対象は py88_writes の 65 書込みの式を評価する過程で現れる [rbp+X] の読み (Slicer.mem_read を記録する)。
 - T: py88 の結果が SLOT[...]? または ACC?⚠ で始まる読み (印つき)。U: それ以外 (py88 の線形結果が一意)。
@@ -9,6 +9,7 @@
 - 辺: fall-through と jcc/jmp の target (関数内のみ)。store は py88 と同じ dword/qword ptr [rbp+X] への書込み。
 - --negctl fallthrough: 分岐辺を全部落として列挙する (変わる読みの件数で検出力を見る)。
 - --negctl expect: U の先頭 1 件の期待式を書き換える (不一致 1 で exit 1 になるはず)。
+- --lea-write: lea [rbp+X] を間接書込み (may-write) とみなし、そこから直接の store を経ずに届く [rbp+X] の読みを数える (診断のみ・exit に影響しない)。
 - 突合の不一致が 1 件以上なら exit 1。経路の列挙結果は stdout、集計は stderr に出す。
 """
 import os
@@ -20,11 +21,14 @@ import py88_writes as w  # noqa: E402
 
 SIZES = ("dword ptr [rbp + ", "qword ptr [rbp + ")
 UNRESOLVED = ("SLOT[", "ACC", "IN[", "⚠", "_in", "clob@", "…", "OP:")
+LEA = {"on": False}
 
 
 def store_slot(ins, a):
     m, o = ins[a]
     ops = w.parse_ops(o)
+    if LEA["on"] and m == "lea" and len(ops) == 2 and ops[1].startswith("[rbp + "):
+        return int(ops[1].split("+ ")[1].rstrip("]"), 16)
     if m not in w.STORE or not ops or not ops[0].startswith(SIZES):
         return None
     return int(ops[0].split("+ ")[1].rstrip("]"), 16)
@@ -134,6 +138,8 @@ def classify(sl, stores):
 
 def main():
     args = sys.argv[1:]
+    lea_chk = "--lea-write" in args
+    args = [a for a in args if a != "--lea-write"]
     neg = None
     if "--negctl" in args:
         k = args.index("--negctl")
@@ -231,6 +237,17 @@ def main():
         print(f"# {v:3d}  {k}", file=sys.stderr)
     print(f"# U n={len(U)} match={match} mismatch={mismatch}; forward n={len(T) + len(U)} mismatch={fmis}",
           file=sys.stderr)
+
+    if lea_chk:
+        LEA["on"] = True
+        lv = [a for a in order if ins[a][0] == "lea" and store_slot(ins, a) == 0x5B8]
+        fw = forward(sl, cfg[0], 0x5B8, entry)
+        acc = [p for p, X, _ in T + U if X == 0x5B8]
+        hit = [p for p in acc if fw.get(p, set()) & set(lv)]
+        nodes = sum(1 for t in fw.values() if t & set(lv))
+        LEA["on"] = False
+        print(f"# lea-write: lea {[hex(a) for a in lv]} から直接 store を経ずに届く節点 {nodes}、"
+              f"[rbp+0x5b8] の読み {len(hit)} / {len(acc)} (hit={[hex(p) for p in hit]})", file=sys.stderr)
     return 0 if mismatch == 0 and fmis == 0 else 1
 
 
