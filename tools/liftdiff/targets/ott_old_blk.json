@@ -1,0 +1,18 @@
+{
+  "name": "ott_old_blk",
+  "desc": "ott_old と同一の lift・stub。wasm 側に IR basic block 入口の記録 (ld_blk) を入れた計装版 (LD-64 / #1854)。比較判定は ott_old と同じ",
+  "pe": "${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll",
+  "ir": "tools/ott/work/ott.ll",
+  "image": null,
+  "wasm_origin": "0x30000000",
+  "fn_prefix": "function_",
+  "block_trace": true,
+  "extra_sources": [
+    "tools/m6/msimd6.c", "tools/m6/work/m6_stubs.c", "tools/m6/work/m6_data.c", "tools/shim/src/heap.c", "tools/shim/src/failfast.c",
+    "tools/ott/rt/ott_rt.c", "tools/m6/work/m6_stubs_hand.c", "tools/m6/work/m6_stubs_hand2.c", "tools/m8/m8_rt.c", "tools/m9/m9_rt.c", "tools/ott/rt/ott_boot.c"
+  ],
+  "init_exports": ["m6_data_install"],
+  "initial_memory": 905969664,
+  "max_memory": 905969664,
+  "global_base": 268435456
+}

@@ -1,0 +1,29 @@
+{
+  "name": "ott_old_blk_off",
+  "desc": "ott_old \u3068\u540c\u4e00\u306e lift\u30fbstub\u3002wasm \u5074\u306b IR basic block \u5165\u53e3\u306e\u8a18\u9332 (ld_blk) \u3092\u5165\u308c\u305f\u8a08\u88c5\u7248 (LD-64 / #1854)\u3002\u6bd4\u8f03\u5224\u5b9a\u306f ott_old \u3068\u540c\u3058",
+  "pe": "${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll",
+  "ir": "tools/ott/work/ott.ll",
+  "image": null,
+  "wasm_origin": "0x30000000",
+  "fn_prefix": "function_",
+  "block_trace": false,
+  "extra_sources": [
+    "tools/m6/msimd6.c",
+    "tools/m6/work/m6_stubs.c",
+    "tools/m6/work/m6_data.c",
+    "tools/shim/src/heap.c",
+    "tools/shim/src/failfast.c",
+    "tools/ott/rt/ott_rt.c",
+    "tools/m6/work/m6_stubs_hand.c",
+    "tools/m6/work/m6_stubs_hand2.c",
+    "tools/m8/m8_rt.c",
+    "tools/m9/m9_rt.c",
+    "tools/ott/rt/ott_boot.c"
+  ],
+  "init_exports": [
+    "m6_data_install"
+  ],
+  "initial_memory": 905969664,
+  "max_memory": 905969664,
+  "global_base": 268435456
+}

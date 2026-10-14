@@ -63,7 +63,7 @@ def build(t, force=False):
     ir2 = W + '/ir_instr.ll'
     if force or newer(ir, ir2):
         t0 = time.time()
-        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'))
+        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'), blocks=bool(t.get('block_trace')))
         print('[build] instrumented %d functions (%.1fs)' % (n, time.time() - t0))
     extra_objs = []
     extra_defined = set()
