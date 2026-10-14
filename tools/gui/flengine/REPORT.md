@@ -417,7 +417,7 @@ main `f3ffd7ba` 取り込み後の head `bde0c341` で、§6e の測定 commit `
 | `bash tools/gui/flengine/e2e.sh` (head `bde0c341` + 回避) | **1** | 467 s (load 1.13→1.07) | judge **12/14**。**R2 FAIL** `reached 31 (expected floor 19); missing=['EnumDisplayMonitors', 'GetMonitorInfoW']`。**S1 FAIL** `870/1/47/24/0` (base `872/1/47/22/0`、main と同値)。他 PASS: L1×2・A1 (193/193/173/20)・B1 52・R1・S2・P1 (RegisterClassW=3)・P2〜P5・W1。ネガコン N1〜N9 期待どおり FAIL |
 | `bash tools/m11/ldfix/f4_e2e.sh` (head `bde0c341` + 回避) | **0** | 387 s (load 1.06) | 6 gate PASS (F1/F2/D1/D2/P1/A1)。ネガコン 4/4 期待どおり FAIL。`RegisterClassW` pre 2 / noand 2 / post 3。`function_52a7f0` ret pre `0x0` → noand `0x0` → post **`0x110000f`** (本 IR (wndseed 無し) の値)。survey pre/noand/post = `870/1/47/24` |
 
-結論: 回避版では S1 の値は main と同じ (`870/1/47/24/0`)。R2 は重複の片方が消えたことで 2 件欠落する (§6f の回避の副作用と同じ形)。したがって flengine の判定 (12/14) は、重複の解消方法を決めるまで確定しない。判定式・baseline は変えていない。
+結論: 回避版では S1 の値は main と同じ (`870/1/47/24/0`)。R2 は重複の片方が消えたことで 2 件欠落する (§6f の回避の副作用と同じ形)。したがって flengine の判定 (12/14) は、重複の解消方法を決めるまで確定しない。S1 の判定式は変えていない。baseline の値は §6h 冒頭の注記のとおり再生成で変わっている (判定式ではない)。
 
 ## 6h. weak 化後の現 head の実測 (PM 指示 #577。測定 commit `97db5a58`)
 
@@ -431,13 +431,25 @@ main `f3ffd7ba` 取り込み後の head `bde0c341` で、§6e の測定 commit `
 
 前提 (回避版との違い): 回避版 (`--allow-multiple-definition`) は `m11_win.c` と GUI 側の両方を連結して片方を捨てる。weak 版は GUI 側の強い定義が勝つ。両者で `EnumDisplayMonitors` / `GetMonitorInfoW` の使われる定義が同じかは、R2 の `missing` の変化で見る。今回の R2 は `missing=[]` で PASS。
 
-S1 の値 `870/1/47/24/0` は §6f の main と同値で、判定式・baseline は変えていない。#1442 で扱う。
+S1 の値 `870/1/47/24/0` は §6f の main と同値で、**S1 の判定式は変えていない**。#1442 で扱う。
+
+**baseline の値の変化 (再生成によるもの。判定式は変えていない)**: `results/baseline_survey.json` の現値は `ok 872 / trap 22` (kinds: unreachable 1 / halt0->longjmp 7 / OOB 14)、`results/baseline_boot.json` の `threw` は `unreachable` (`units_run 52` は不変)。旧値は `baseline_survey` が `871 / 23`、`threw` が `memory access out of bounds`。両ファイルは `tools/gui/flengine/e2e.sh` が毎回 m11 baseline を測り直して `results/` にコピーする生成物 (e2e.sh の 36〜41 行・64 行)で、判定基準を手で書き換えた値ではない。main 取り込み後の再生成で値が変わった。
+- `baseline_survey.json` の現値は commit `bf9cf547` で初めて現れた (それ以前は `52e6bd57`〜`d96a0fa8` の `871 / 23`)。
+- `baseline_boot.json` の `threw` が `unreachable` になったのは `d96a0fa8` から (それ以前は `memory access out of bounds`)。
+- 現 `results/` を作った run は**特定できなかった** (run ID は確認していない)。main の値 (871 / 23) に戻すと、現 IR の実測と食い違う古い値を残すことになるため戻していない。
+
+**S2 gate の変更 (`judge.py`、commit `8a6dcf4b`。S1 の判定式とは別)**:
+- 旧式: `ffu <= stub_soft and not (kinds.gui_failfast and not ffu)`。ff で fail-fast になった API は、soft で必ず STUB でなければならなかった (`ffu` = ff survey の fail-fast API 集合、`stub_soft` = soft の STUB API 集合)。
+- 新式: `sfu <= ffu and ffu <= (stub_soft | sfu)` (`sfu` = soft survey の fail-fast API 集合)。soft が ff に無い fail-fast を増やさないこと、ff の fail-fast API は soft で STUB か fail-fast のままであること、の 2 条件。
+- 変えた理由: fail-fast は API 単位ではなく **action 単位** で起きる (例: §5-5 の `SystemParametersInfoW` の未対応 action)。旧式は、同じ API が soft で別の action として fail-fast すると FAIL になり、action の違いを表せなかった。新式は「soft で fail-fast が増えない」を直接検査する。
+- 注意: 新式は旧式より**緩い** (ff の fail-fast API が soft で fail-fast のままでも PASS する)。
+- 現 head の値で旧式を手計算した (既存の `results/survey_ff.json` と `survey_soft.json` から。再実行はしていない): ff の fail-fast 集合 = `{LoadImageW}`、soft の STUB 集合 = `{LoadImageW}`、soft の fail-fast 集合 = `{}`。**旧式 = PASS、新式 = PASS**。S2 の判定結果は変わらない。
 
 `tools/gui/flengine/results/*.json` と `baseline_boot.json` は本実測で再生成された出力 (`GetMem` 等の probe 値・`gui_shared_ptr` の 1 件・`ir_sha256` が現 head で変わる)。本 commit に含める。
 
 ## 6f. origin/main の S1 実測 (PR #577 の PM 指示 1。main commit `b4a8422c`)
 
-PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 PR が原因」。判定式・baseline 値は変えていない。
+PM 指示: 「main でも同じ 870 vs 872 なら既存の欠陥、違えば本 PR が原因」。S1 の判定式は変えていない。
 
 | 項目 | 値 |
 |---|---|
