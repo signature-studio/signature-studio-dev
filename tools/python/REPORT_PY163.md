@@ -13,8 +13,8 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB・素材の置き場は実行環境の `ARTIFACTS_DIR`) から `block00031_PE.bin` (22,227,016 B) を展開。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py163 --wildcards '*block00031_PE.bin'` (2.9 秒)。`work/` は gitignore。
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py163/extracted/block00031_PE.bin work/py163/py53` → `fn=4664 dispatch=13 r8d_tests=174` (0.10 秒)。入力は `work/py163/py53/fn.txt`。
-- 測定: `python3 analysis/py163_vcall.py work/py163/py53/fn.txt --check` → `# bfs-check n=12 mismatch=0`・`# n=12 mismatch=0`・exit 0。実時間 0.37 秒 (user 0.37 秒)・load average 0.28 (run 中の `uptime`)。
-- 測定 commit: `aa61c729` (`analysis/py163_vcall.py` の最後のコード commit)。`git diff aa61c729 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT・DOC_MAP・付録のみ)。
+- 測定: `python3 analysis/py163_vcall.py work/py163/py53/fn.txt --check` → `# bfs-check n=12 mismatch=0`・`# n=12 mismatch=0`・exit 0。実時間 0.378 秒 (user 0.367 秒)・load average 0.47 (実行直前の `uptime`)。
+- 測定 commit: `2bbd3e3b` (main の取り込み merge。PR の解析コードは `aa61c729` と同じ)。merge で main 側の `tools/python/analysis/py99_merge_sets.{py,md}`・`flapi/pe_selection_check.py`・`host`/`provider`/`tests` の変更が入ったため、取り込み後に再測定した。`py163_vcall.py` が import する `py88_writes.py`・`py160_reach.py` と、`py53_dispatch.py` は `aa61c729` から main まで変更なし。`git diff 2bbd3e3b HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT・DOC_MAP のみ)。
 - 検証範囲: callee の書込みは `OUT_KILL`/`OUT_GEN` の 2 件 (0x1331340・0xc61250) のみをモデル化した。`lea` で渡された他のアドレス (`[rbp+0x510]` 7 件・`[rbp+0x588]` 2 件) は、対象スロット (0x410・0x548・0x5b8) と重ならないと仮定した。渡すオブジェクトの大きさは未確認 (範囲外)。
 - e2e: 対象外 (解析スクリプトだけの変更で wasm 出力に影響しない)。製品 KPI: 対象外 (起動・GUI に関わらない)。
 
