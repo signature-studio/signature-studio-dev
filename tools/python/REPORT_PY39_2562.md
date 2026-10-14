@@ -16,15 +16,15 @@
 
 ### 測定
 
-- 測定 commit: `84c1ccde` (コード変更の最後。`pe_rip_consts.py` の参照先デリファレンス追加)。`pe_rip_consts.py` は本節で新規に追加 (issue 本文が参照する名前。`pe_disasm.py` と同じ方式)。
-- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/fl extracted/block00031_PE.bin` (2.9 秒)。`--wildcards '*block00031_PE.bin'` 形式は本 run の環境で 0 件展開になったため、メンバー名を直接指定した。`tools/python/work/` は gitignore 対象。
-- 実行: `FL_WIN64_DIR=<絶対パス>/tools/python/work/fl python3 analysis/flapi/pe_disasm.py <VA> <N>` と `pe_rip_consts.py <VA> <N>`。8 回の実行は全て終了 0、合計 0.64 秒、load average 0.09 (15:15 時点)。
-- 差分の証跡 (初回測定): 本節の commit 以降で `tools/python/analysis/flapi/` に触れる PR 内 commit は無かった。`git diff 84c1ccde HEAD -- tools/python/analysis/flapi` の出力は 0 行。
-- 再測定 (main 取り込み後): 測定 commit `dc8b76bd` (`origin/main` を取り込んだ merge commit。`git diff 84c1ccde dc8b76bd -- tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_rip_consts.py` の出力は 0 行)。main 側の変更は flapi 配下の他ファイルに入った (`git diff --stat 84c1ccde dc8b76bd -- tools/python/analysis/flapi`: 4 files, +324 / −15)。`block00031_PE.bin` は同じ方式で展開 (2.3 秒)。8 回の実行 (`pe_disasm.py` と `pe_rip_consts.py` × VA `d5aa30 83`・`d5a720 152`・`1051d20 700`・`d843d0 80`) は全て終了 0・Traceback 0 件、合計 0.60 秒、load average 0.45 (1 分値)。本節の主要な対応 (`0xd5a796` の `call 0x477180`、`0xd5a880`・`0xd5a951` の `call 0x1051d20`、定数 `0xd5a9e0`・`0xd5a9e8`・`0xd5a9f0`) は再測定の出力で一致。
+- 測定 commit: `c8cafaf9` (コード変更の最後。`pe_rip_consts.py` の `.bss` 修正)。`pe_rip_consts.py` は本節で新規に追加 (issue 本文が参照する名前。`pe_disasm.py` と同じ方式)。前回の測定 (`dc8b76bd` 時点) は、`.bss` を指す参照の先の値が偽の版だった。
+- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/fl extracted/block00031_PE.bin`。`--wildcards '*block00031_PE.bin'` 形式は本 run の環境で 0 件展開になったため、メンバー名を直接指定した。`tools/python/work/` は gitignore 対象。
+- 実行: `FL_WIN64_DIR=<絶対パス>/tools/python/work/fl python3 analysis/flapi/pe_disasm.py <VA> <N>` と `pe_rip_consts.py <VA> <N>`。8 回の実行 (VA `d5aa30 83`・`d5a720 152`・`1051d20 700`・`d843d0 80` × 2 ツール) は全て終了 0・Traceback 0 件、合計 0.72 秒、load average 0.13 (1 分値)。
+- 差分の証跡: `git diff c8cafaf9 HEAD -- tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_rip_consts.py` の出力は 0 行 (測定 commit より後の commit はこの節の docs だけ)。`tools/python/analysis/flapi` 全体には main 側の別ファイルの変更が入っているが、測定対象外。
+- 修正前 (`a605aaa0`、`.bss` 修正前) との比較: 同じ 4 VA の `pe_rip_consts.py` 出力 980 行のうち変わったのは 53 行だけ。`*ptr` の番地が `.bss` にある 48 件の値を削除 (file 上の別バイトだった偽の値)、`.bss` を直接参照する 5 件を「PE ファイル上に実体なし」に変更。`.data`・`.text` 内の値 (本節の引用値を含む) と `pe_disasm.py` の出力は変わらない。
 
 ### 1. 呼び出し連鎖 (`0xd5aa30`、`pe_disasm.py d5aa30 83`)
 
-- `0xd5aadf` の間接呼び出し (`[rip+0x889ac9]`。書式 `if|iii` を渡す解析関数と推定) の出力先: index `[rbp+0xa8]`、value (float) `[rbp+0xac]`、pitchUnit `[rbp+0xa4]`、pickupMode `[rbp+0xa0]`、useGlobalIndex `[rbp+0x9c]`。既定値は 0 (`0xd5aa68`〜`0xd5aa7c`)。
+- `0xd5aadf` の間接呼び出し (`[rip+0x889ac9]`。書式 `if|iii` を渡す解析関数と推定) の出力先: index `[rbp+0xa8]`、value (float) `[rbp+0xac]`、pitchUnit `[rbp+0xa4]`、pickupMode `[rbp+0xa0]`、useGlobalIndex `[rbp+0x9c]`。pitchUnit・pickupMode・useGlobalIndex の既定値は 0 (`0xd5aa68`〜`0xd5aa7c` で初期化)。index と value は初期化されず、解析関数が書く出力 (`lea` で渡す)。
 - `0xd5aaf3` で callback の VA を `lea r8,[rip-0x3da]` で渡す → `0xd5a720` (`0xd5aafa − 0x3da`)。
 - `0xd5ab47`: `call 0xd843d0` の stack 引数は 7 個: index・`&value`・pitchUnit・pickupMode・useGlobalIndex・0・byte 1。
 - `0xd5ab55`: 戻り値は `call 0xd82c20` (ecx = `[rbp+0x80]` の値、または解析失敗時の PyArg 戻り値)。
@@ -52,8 +52,8 @@ rbx = callback の第 1 引数 (ctx)。ctx のフィールドは使い方から�
 - 引数 (プロローグ `0x1051d20`〜`0x1051d34` と `[rbp+...]` 参照から): rcx → `[rbp+0x60]` = key、edx → `[rbp+0x68]` = n、r8d → `[rbp+0x70]` = flags、r9d → ebx = bool、5 番目 (stack) → `[rbp+0x80]` = int、6 番目 → `[rbp+0x88]` = float、7 番目 → `[rbp+0x90]` = ptr。`rbp = entry_rsp − 0x58` から導いた。
 - 本呼び出しは 5 番目 = 0 なので `0x1051da8` の `cmp [rbp+0x80],0; jle` で `0x1051e7e` に入る。float (`[rbp+0x88]`) を読むのは `0x1051de5` と `0x1051e4b` だけで、どちらも 5 番目 > 0 の経路。**本経路では float 0.0 は読まれない**。
 - `0x1051e7e`: sil = `byte[[[G_a]]+0xf30 + 0x49e] != 0` または `[[G_b]]+0x10 > 0` (G_a=`[rip+0x58f533]`、G_b=`[rip+0x58e179]`)。状態フラグ。意味は未確定。
-- ebx=0 のため `0x1051f45`。sil=0 → `0x1051f98`: `n1 = 0xf824b0([rbp+0x90], n)`、`n2 = 0x1051c90(rbp, n1)`、`0x104cf90(key, n2, flags)`。sil≠0 → `flags & 0x20` (flags = 0x3fd は bit 0x20 を持つ) → `0x1051720(rbp, 0)` の戻り値が 2 なら上と同じ chain、それ以外は書込み無しで終了。
-- 0x4000 の OR (`0x1051d9e`) は key が −33/−32 の変換分岐 (`0x1051d55`〜) だけの処理。本呼び出しの key (packed handle) は負にならないので通らない。
+- ebx=0 のため `0x1051f45`。sil=0 → `0x1051f98`: `n1 = 0xf824b0([rbp+0x90], n)`、`n2 = 0x1051c90(rbp, n1)`、`0x104cf90(key, n2, flags)`。sil≠0 → `flags & 0x20 = 0` なら `je 0x1051f98` (`0x1051f52`) で chain に進み、chain の後に `0xf82c20` を呼ぶ。`flags & 0x20 ≠ 0` (flags = 0x3fd はこちら) なら `0x1051720(rbp, 0)` の戻り値が 2 のとき chain (`0xf82c20` は呼ばない)、それ以外は書込み無しで終了。sil=0 は chain の後に何も呼ばず終了。
+- 0x4000 の OR (`0x1051d9e`) は key が −33/−32 の変換分岐 (`0x1051d55`〜) だけの処理。本呼び出しの key は `((chan+0x794)&0xffff)<<16 | 4` で下位 16 bit が 0x0004 のため、−33/−32 (下位 16 bit が 0xffdf/0xffe0) と一致せず、入口の unsigned 比較 (`0x1051d49`〜`0x1051d53`、key が 0xFFFFFFDF/0xFFFFFFE0 のときだけ変換分岐 `0x1051d55` へ入る) を通らない。key の上位ビットが立つと負になるが、判定は下位 16 bit で決まるので結論は同じ。よって `mov dil, 1` (`0x1051da5`) は通らず edi=0。
 - 解釈 (推定): `0x3fd` は param id ではなく flags の語 (bit 0x20 を見る・0x4000 を立てる)。`0x104cf90(key, n2, flags)` が書込み口の候補。未読のため「値の書込み」とは確定できない。
 
 ### 4. 未確定と移送先
