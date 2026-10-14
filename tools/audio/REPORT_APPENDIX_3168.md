@@ -4,13 +4,16 @@
 
 ## A. 測定 commit と差分
 
-- 測定 commit: `9aa9239b` (`feat(audio): Firefox 行列の既定出力判定を OS 別にし 3 シナリオへ揃える`)。以後は REPORT と `results/` の追加だけで、コードは変えていない。
+- 測定 commit: `9aa9239b` (`feat(audio): Firefox 行列の既定出力判定を OS 別にし 3 シナリオへ揃える`)。Firefox 9/9 はこの commit のコードで測った。以後の本 PR の commit は REPORT・results・DOC_MAP の追加と修正だけで、コードは変えていない。ただし main の取り込み (merge `c9c45ea6`・`fa57175d`) で main 由来のコードが入った (下の (a)・(b))。
 - 変更前 main: `1b37410c` (ベースライン測定の commit)。
-- `git diff 9aa9239b HEAD -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の出力: 空 (0 行)。
-- (a) 実行コードの範囲 (build.sh の入力を含む): `git diff --stat 9aa9239b HEAD -- tools/audio/src tools/audio/harness tools/audio/test tools/audio/build.sh tools/audio/flags.sh tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs public/worklets src/runtime` の出力: 空 (0 行)。`flags.sh` は build.sh が source する入力で、REPORT_AU2_CI.md §9 の列挙には無かったため足した。
-- (b) issue #3168 指定の範囲: `git diff --stat 9aa9239b HEAD -- tools/audio` の出力は 12 ファイル (5095 行追加・4 行削除)。内訳は次の 2 種。
+- `git diff 9aa9239b HEAD -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の出力: 測定 commit では 0 行。HEAD `fa57175d` では 3 ファイル (103 行追加・5 行削除。`harness/run.mjs`・`harness/safari.mjs`・`harness/safari_probe.mjs`。いずれも main 由来で、Firefox e2e は読まない)。
+- (a) 実行コードの範囲 (build.sh の入力を含む): `git diff --stat 9aa9239b HEAD -- tools/audio/src tools/audio/harness tools/audio/test tools/audio/build.sh tools/audio/flags.sh tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs public/worklets src/runtime` の出力: 測定 commit では 0 行。HEAD `fa57175d` では 8 ファイル (225 行追加・9 行削除)。`flags.sh` は build.sh が source する入力で、REPORT_AU2_CI.md §9 の列挙には無かったため足した。
+  - Firefox e2e の入力 2 件: `public/worklets/fl-audio-worklet.js` (3 行)・`src/runtime/audio-shim.ts` (7 行)。build.sh が配置・コンパイルし、e2e が実行する。どちらも main の `7c5ee224` (AU-29 #3115) 由来。**この 2 件が変わったため、HEAD の Firefox 結果は 9aa9239b の 9/9 で代替できない** (§F の再測定)。
+  - Firefox e2e が読まない 6 件: `harness/run.mjs`・`harness/safari.mjs`・`harness/safari_probe.mjs`・`test/safari_mock_test.mjs`・`test/safaridriver_mock.mjs`・`test/worklet_jump_check.mjs` (main 由来)。`au2.mjs` → `bidi.mjs` → `chrome.mjs` の import 鎖に無く、build.sh も copy しない。
+- (b) issue #3168 指定の範囲: `git diff --stat 9aa9239b HEAD -- tools/audio` の出力は 20 ファイル (5474 行追加・9 行削除・HEAD `fa57175d`)。内訳は次の 2 種。
   - PR 自身の記録 10 件: `REPORT_APPENDIX_3168.md`・`REPORT_AU2_CI.md`・`results/au2_ff_ubuntu/` 下の JSON 8 件 (`firefox_r1`〜`r3`・`neg/*.json`・`base_main_1b37410c/firefox_r1`〜`r3`)。
-  - main 由来 2 件: `tools/audio/au2_summary.mjs`・`tools/audio/ci/audio-matrix.yaml` (commit `d4049432`。main 取り込みの merge `c9c45ea6` で入った)。前者は Chrome 行列 (`au2_matrix.sh`) の集計、後者は workflow 定義で、Firefox e2e はどちらも実行しない。
+  - main 由来 10 件: `REPORT_APPENDIX_3193.md`・`REPORT_AU29.md`・`au2_summary.mjs`・`ci/audio-matrix.yaml` と、上の (a) の Firefox e2e が読まない 6 件 (AU-29・AU-32・AU-35 の追加)。`au2_summary.mjs` (Chrome 行列 `au2_matrix.sh` の集計) と `ci/audio-matrix.yaml` (workflow 定義) は、Firefox e2e が実行しない。
+- (c) HEAD での再測定: 未実施。この run には PulseAudio (`pactl`)・`emcc`・`toolchain-emsdk` が無く (`$ARTIFACTS_DIR` は `fl-win64` のみ)、`au2_firefox_matrix.sh` を HEAD で実行できなかった。HEAD で 9/9 を確かめるには、`oc_artifacts: toolchain-emsdk` を付けた run で再実行する (§F)。
 - `git diff 1b37410c 9aa9239b -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の変更: 4 ファイル、45 行追加・23 行削除 (`au2.mjs` 42 行・`bidi.mjs` 5 行・`au2_firefox_matrix.sh` 8 行・`au2_firefox_summary.mjs` 13 行)。
 
 ## B. 変更の中身
@@ -47,9 +50,9 @@
 
 ## E. Safari (macOS) と Windows / macOS (未検証)
 
-- **Safari**: main 時点では経路なし (進行中は子 PR #3208 (`3193-safari-safaridriver`、open))。理由: (1) この runner は Linux で Safari を起動できず、P1〜P4 を実測できない。(2) main の harness は Chrome CDP (`chrome.mjs`) と Firefox WebDriver BiDi (`bidi.mjs`) の 2 経路のみで、Safari 用の経路が無い。(3) Safari が WebDriver BiDi に対応するかは本 run で未確認 `[未確認]`。
-- **代替案**: macOS runner で `safaridriver` (WebDriver classic) から `au2.mjs` 相当を駆動する経路。`safaridriver --enable` と Safari の remote automation 許可が要る `[未確認: 手順は macOS 実機で確認]`。既定出力の判定は darwin 分岐 (`BlackHole 2ch`) を使う。実装は子 PR #3208 で進行中。起票先: #3193 [AU-35]。
-- **Windows / macOS の Firefox 行**: `audio-matrix.yaml` は #3169 (branch `3164-au32-win-mac-audio-matrix`、merge `ac7ad1c6`・2026-10-14T23:27:19Z) で main に入った (origin/main の yaml は 94 行)。前提の #3169 merge は満たされている。Firefox 行はまだ無い (yaml に `firefox` の記述が 0 件)。Firefox 行の追加は #3192 [AU-34] で行う。追加する内容: matrix に `os: windows-latest / browser: firefox / firefox: 'C:\Program Files\Mozilla Firefox\firefox.exe'` と `os: macos-latest / browser: firefox / firefox: '/Applications/Firefox.app/Contents/MacOS/firefox'` を足し、`measure` の step で `browser == firefox` の行は `node tools/audio/harness/au2.mjs --rep $rep --out audio-results/...` を呼ぶ (`FIREFOX` env を渡す)。Chrome 行は従来どおり `run.mjs`。
+- **Safari**: 経路は #3208 (AU-35 #3193) で main に入った (merge `83060945`・2026-10-14T23:51:51Z・`harness/safari.mjs`)。測定 commit `9aa9239b` の時点では経路が無かった。理由 (測定時): (1) この runner は Linux で Safari を起動できず、P1〜P4 を実測できない。(2) harness は Chrome CDP (`chrome.mjs`) と Firefox WebDriver BiDi (`bidi.mjs`) の 2 経路のみだった。(3) Safari が WebDriver BiDi に対応するかは本 run で未確認 `[未確認]`。
+- **代替案**: macOS runner で `safaridriver` (WebDriver classic) から `au2.mjs` 相当を駆動する経路。`safaridriver --enable` と Safari の remote automation 許可が要る `[未確認: 手順は macOS 実機で確認]`。既定出力の判定は darwin 分岐 (`BlackHole 2ch`) を使う。実装は #3208 で main に入った。残りの macOS 実測の起票先: #3207 [AU-36] (`REPORT_APPENDIX_3193.md` が正本)。
+- **Windows / macOS の Firefox 行**: `audio-matrix.yaml` は #3169 (branch `3164-au32-win-mac-audio-matrix`、merge `ac7ad1c6`・2026-10-14T23:27:19Z) で main に入った (origin/main の yaml は 100 行)。前提の #3169 merge は満たされている。Safari 行 (`browser: safari`) は #3208 で入ったが、Firefox 行はまだ無い (yaml に `firefox` の記述が 0 件)。Firefox 行の追加は #3192 [AU-34] で行う。追加する内容: matrix に `os: windows-latest / browser: firefox / firefox: 'C:\Program Files\Mozilla Firefox\firefox.exe'` と `os: macos-latest / browser: firefox / firefox: '/Applications/Firefox.app/Contents/MacOS/firefox'` を足し、`measure` の step で `browser == firefox` の行は `node tools/audio/harness/au2.mjs --rep $rep --out audio-results/...` を呼ぶ (`FIREFOX` env を渡す)。Chrome 行は従来どおり `run.mjs`。
 - **未検証**: `win32`・`darwin` の判定分岐 (PowerShell の `Get-AudioDevice`・`SwitchAudioSource`) は Linux runner では実行していない。`node --check` 通過のみ。dispatch 結果は適用後に記録する (起票先 #3192 [AU-34])。
 
 ## F. 未解決 (起票先付き)
@@ -58,4 +61,5 @@
 |---|---|---|
 | Windows / macOS の Firefox 行 (yaml) は main に未適用 (#3169 は merge 済み)。Win/mac の dispatch 結果なし | 受入 1 の Win/mac は未達 | #3192 [AU-34] (Firefox 行の適用と dispatch を行い、§10 に記録) |
 | `win32`・`darwin` の判定分岐は未実行 | 判定の実機確認が無い | #3192 [AU-34] (dispatch の結果で確かめる) |
-| Safari (macOS) の P1〜P4 | 未測定。main 時点では経路なし (進行中は #3208) | #3193 [AU-35] (代替案 E) |
+| Safari (macOS) の P1〜P4 | 未測定 (経路は #3208 で main 入り) | #3207 [AU-36] (`REPORT_APPENDIX_3193.md` が正本) |
+| HEAD `fa57175d` の Firefox 9/9 の再測定 | main 取り込みで e2e の入力 2 件 (worklet・audio-shim) が変わった。この run に PulseAudio・emcc・toolchain-emsdk が無く未実施 | 本 PR の再実行 (`oc_artifacts: toolchain-emsdk` を付けた run で `au2_firefox_matrix.sh 3` を実行し、§A (a) の差分と結果を REPORT に記録) |
