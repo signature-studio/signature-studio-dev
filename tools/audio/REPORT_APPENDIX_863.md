@@ -121,8 +121,37 @@
 
 - 測定 commit: `c604805c` (`tools/audio/integration/hunt.sh` を追加。検証対象のコード (`e2e.sh`・`e2e.mjs`・`src/runtime`) は変更なし)。`origin/main` `8d632b57` の上に 1 commit。
 - 方法: `EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk/emsdk_env.sh TMPDIR=$RUNNER_TEMP bash tools/audio/integration/hunt.sh 300 1380` を foreground で実行。`hunt.sh` は `e2e.sh` を繰り返し、最初の FAIL で止めて全出力を `tools/audio/work/hunt/fail_<n>.log` に残す (gitignore)。時間上限 1380 s。素材は `toolchain-emsdk` のみ展開 (e2e の経路は `fl-win64` を参照しない)。
-- 結果: **131 run 全 PASS** (exit 0・各 run 13/13 PASS)。FAIL 0 のため捕獲ログは無し。1 run の wall は 10〜11 s (build 込み)、開始時 load は 0.54〜2.68 (無負荷。busy loop なし)。
+- 結果: **131 run 全 PASS** (exit 0)。各 run の 13/13 は当時の summary に残っていない (exit 0 と e2e.mjs の check 数 13 (6 × 2 モード + N2) から導く。summary に check 欄を入れたのは §27)。FAIL 0 のため捕獲ログは無し。1 run の wall は 10〜11 s (build 込み)。load は**実行直後の 1 分 load** (`bash e2e.sh` の後に `/proc/loadavg` を読んだ値で、run 自身の負荷を含む) で 0.54〜2.68。「無負荷」は busy loop を足していない意味で、開始時の load は測っていない。
 - 通算 (§19〜§26 の同一 e2e): FAIL 3 件 / 計 262 run。失敗 3 件はいずれも HEAD が異なる (`bb912951`・`1e3ee7af`・`b6361886`)。失敗後の 44 run (§25 の probe 後) と本節の 131 run、計 175 run は全 PASS。
 - 統計の読み: 通算率は約 1.1% (3/262)。その率なら 131 run で 0 件となる確率は約 0.23 (0.989^131)。0 件は「率が下がった」の根拠にはならない。
 - 既存の位置情報からの読み (§25 の失敗 1 件・probe 前の旧 HEAD のため fill 推移 `fill_trace` は無し): `fill_at_first_underrun=0` (underrun の時点でリングは空)、`fill_min_before_first_underrun=0`、`cb_gap_max_ms=11`・`cb_gap_over20=0` (audio callback の 20 ms 超は無い)。よって **consumer (音声スレッドの停止) で説明できる証拠は無い**。リングの供給不足 (producer 側の遅れ) に寄る読みだが、fill 推移つきの失敗は 0 件で、producer 側の到達時刻も取っていないため、producer 遅延と断定はできない。
-- 未解決 (追跡 **#863**): (a) 失敗の捕獲は `hunt.sh` を長く回す run が必要 (1 run ≈ 10 s、時間上限内で約 130 run)。(b) producer 側の到達時刻は wasm 側の変更が要る (本 PR の範囲外)。(c) 再現条件 (負荷・タイミング) は未特定。
+- 未解決 (追跡 **#863**): (a) 失敗の捕獲は `hunt.sh` を長く回す run が必要 (1 run ≈ 10 s、時間上限内で約 130 run)。(b) producer 側の到達時刻は wasm 側の変更が要る (本 PR の範囲外)。(c) 再現条件 (負荷・タイミング) は未特定。(d) §25(b) の反証を残す: 3 件の FAIL はいずれも `first_err_frame = 56576` (quantum 442) で、HEAD と負荷量が違っても一致する。「producer 側の遅れに寄る読み」だけでは説明できず、「起動からの相対位置が固定 (決定的な起動経路)」の可能性が消えていない。本節の 131 run は FAIL 0 のため判定材料にならない。
+
+## 27 AU-15 (#863) hunt.sh の失敗経路の修正と実測 (測定 commit `c37dd517`)
+
+- 修正前の不具合 (`hunt.sh` の §26 版): run の出力を捨て、失敗時に `tools/audio/work/e2e_last.log` を `cp` していた。`e2e_last.log` を書くのは `e2e.sh` の `tee` (検査段に入ってから) だけなので、ビルド段 (patch・stage_app・tsc・vite build) で落ちた run では前回 run の PASS ログがそのまま捕獲された。`cp` の失敗も無言だった。
+- 修正: `bash e2e.sh > <出力>/last.log 2>&1` で run ごとの stdout / stderr 全体 (ビルド段を含む) を受け、FAIL 時だけ `mv` で `fail_<n>.log` へ移す (`mv` 失敗は exit 1 で報告)。PASS 行には e2e.mjs の `[au9] N/M PASS` 行を載せ、`check=13/13 PASS` を run ごとの根拠として残す。
+- 変更範囲: `git diff c604805c c37dd517 -- tools/audio/integration` は `hunt.sh` の 9 行追加・4 行削除のみ。`e2e.sh`・`e2e.mjs`・`src/runtime` は変更なし。
+
+### 負例 (NC): FAIL 経路の実測
+
+| NC | 条件 (EMSDK_ENV) | 結果 |
+|---|---|---|
+| NC-1 (§26 の不具合の再現形) | 1 回目だけ本物の emsdk を source し、2 回目は source しない (emcc が PATH に無い状態で、ビルド段が落ちる)。`hunt.sh 3 600` (HEAD `c37dd517`) | run 1 PASS `check=13/13 PASS` → run 2 FAIL `exit=1` → hunt exit 1 (run 3 へ進まず)。`fail_2.log` は 2 行 (`[au9] index.ts は適用済み` と `[audio] emcc not found`)。PASS 行 0 件 |
+| NC-1' (旧 hunt.sh) | NC-1 と同じ条件で `c604805c` の hunt.sh を実行 | `fail_2.log` に run 1 の PASS 行が 14 件残り、`emcc not found` は 0 件。レビューの指摘どおり不具合を再現 |
+| NC-2 | 存在しないパス (emcc が PATH に無い)。`hunt.sh 3 600` (HEAD `c37dd517`) | run 1 FAIL `exit=1` → hunt exit 1。`fail_1.log` に `emcc not found` が入る (1 件) |
+
+- NC の wrapper は `$RUNNER_TEMP` に置いた一時ファイルで、リポジトリには含めない。
+- NC-1' は旧 hunt.sh を一時的に `tools/audio/integration/` へ置いて実行し、直後に削除した (未コミット)。
+
+### PASS 側の再測定 (変更後 HEAD)
+
+- 測定: `c37dd517` (コードを変えた最後の commit)。`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk/emsdk_env.sh TMPDIR=$RUNNER_TEMP bash tools/audio/integration/hunt.sh 40 300` を foreground・時間上限 300 s で実行。
+- emsdk: 素材 `toolchain-emsdk` は本 run の `$ARTIFACTS_DIR` に無かったため、上流 tag `6.0.12` (`tools/m1/flags.sh` の pin と同版) を `emsdk install 6.0.12` / `activate` で取得した。`emcc --version` は 6.0.12。R2 の toolchain-emsdk との同一性は未確認。
+- 結果: **27 run 全 PASS** (exit 0・各 run `check=13/13 PASS`)、FAIL 0。hunt は時間上限で停止 (`[hunt] 時間上限 300s 到達: PASS 27 run / FAIL 0`)。
+- 1 run の wall は 11〜12 s。実行直後の 1 分 load は 0.28〜3.05 (run 自身の負荷を含む。busy loop なし)。
+
+### 注 (鮮度・範囲)
+
+- 測定 base `8d632b57` は現 `origin/main` `b7df55e6` より古い。main では `src/runtime/audio-layout.ts` (+1 行) と `src/runtime/audio-shim.ts` (2 行変更) が変わっており、本測定には入っていない (未測定)。PR head の鮮度は保たれている (`git diff c604805c HEAD -- src/runtime` は 0 行)。
+- 通算 (§19〜§27 の同一 e2e): FAIL 3 件 / 計 289 run。§26 の未解決 (a)(b)(c)(d) は残る。捕獲の仕組みは NC で検証済みだが、失敗の再現は未達 (追跡 **#863**)。
