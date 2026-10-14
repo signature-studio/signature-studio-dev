@@ -7,7 +7,7 @@
 ## 0. 検証起点と測定 commit
 
 - 検証起点 = 測定 commit: `origin/main` `3dbb35e0` (worktree `../ws-2510`・branch `2510-plg-p0b-18-stage2-fold`)。本 PR はコードを変えない (REPORT と DOC_MAP の追記のみ)。
-- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に、`work-liftlib` を `tools/liftlib/work/` に展開 (`tar --zstd -xf`・gitignore)。`/opt/emsdk`・`/opt/retdec` は runner に既存 (確認: `ls /opt/emsdk/emsdk_env.sh /opt/retdec/bin/retdec-decompiler`) のため展開しなかった。`fl-win64` は stage-2 が `fw_icall.dll` (work-fw-stage1 同梱) を使うため未展開。
+- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に、`work-liftlib` を `tools/liftlib/work/` に展開 (`tar --zstd -xf`・gitignore)。`[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md` §4) は runner に既存 (確認: `ls` で `emsdk_env.sh`・`retdec-decompiler` の実在を確認) のため展開しなかった。`fl-win64` は stage-2 が `fw_icall.dll` (work-fw-stage1 同梱) を使うため未展開。
 - 実行環境: runner 4 vCPU・RAM 15 GiB。
 
 ## 1. stage-2 の再現 (n=1)
