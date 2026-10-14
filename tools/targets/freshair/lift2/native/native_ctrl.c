@@ -51,7 +51,9 @@ static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key)
     uint64_t o0, o1, o2; memcpy(&o0, out, 8); memcpy(&o1, (char*)out + 8, 8); memcpy(&o2, (char*)out + 0x10, 8);
     fprintf(stderr, "FA9CA S%d eq=%d kc=%u k0=%u path=%s ret=%s out0=%llx out1=%llx found=%d hdr=%llx,%llx,%llx\n", g_trSidx, a2d0 == a328, kc, k0, pth,
             r == out ? "out" : "?", (unsigned long long)o0, (unsigned long long)o1, o0 != 0, (unsigned long long)h[0], (unsigned long long)h[1], (unsigned long long)h[2]);
-    if (o0) { uint64_t o16 = 0; memcpy(&o16, (char*)o0 + 0x10, 8); fprintf(stderr, "FA9OBJ S%d out0_is_Z=%d obj=%llx obj+0x10=%llx\n", g_trSidx, (unsigned char*)o0 == g_nodeZ, (unsigned long long)o0, (unsigned long long)o16); }
+    /* 観測のみ: out[0] が自前で確保した node Z の値オブジェクトを指すときだけ +0x10 を読む (想定外の値は deref しない) */
+    if (o0) { int isZ = g_nodeZ && (unsigned char*)o0 == g_nodeZ; uint64_t o16 = 0; if (isZ) memcpy(&o16, (char*)o0 + 0x10, 8);
+              fprintf(stderr, "FA9OBJ S%d out0_is_Z=%d obj=%llx obj+0x10=%llx\n", g_trSidx, isZ, (unsigned long long)o0, (unsigned long long)o16); }
     return r;
 }
 static void __attribute__((ms_abi)) da6c00_probe(void* T, int id, int idx, int r9) {
