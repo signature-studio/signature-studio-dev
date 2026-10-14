@@ -24,7 +24,8 @@ def rows(path):
 
 
 def frame_collapsed(audit_path):
-    audit = json.load(open(audit_path))
+    with open(audit_path) as f:
+        audit = json.load(f)
     out = set()
     for va, v in audit['functions'].items():
         for s in v['sites']:
@@ -37,9 +38,10 @@ def frame_collapsed(audit_path):
 def main():
     if len(sys.argv) not in (3, 4):
         sys.exit(__doc__)
-    out_path, audits = sys.argv[1], sys.argv[2:]
-    sites = frame_collapsed(audits[0])
-    for a in audits[1:]:
+    out_path, audit_path = sys.argv[1], sys.argv[2]
+    after_paths = sys.argv[3:]
+    sites = frame_collapsed(audit_path)
+    for a in after_paths:
         if frame_collapsed(a) != sites:
             print('FAIL: 修復後の audit の spill 宛 CELL_COLLAPSED 集合が修復前と不一致 (%s)' % a, file=sys.stderr)
             sys.exit(1)
@@ -59,7 +61,7 @@ def main():
     with open(out_path, 'w') as f:
         f.write('\n'.join(lines) + '\n')
     print('spill 宛 CELL_COLLAPSED site %d / 関数 %d (audit %d 本で一致)'
-          % (len(sites), len({k[0] for k in sites}), len(audits)))
+          % (len(sites), len({k[0] for k in sites}), 1 + len(after_paths)))
     for k, n in sorted(cnt.items(), key=lambda x: -x[1]):
         print('%s %s: site %d / 関数 %d' % (k[0], k[1], n, len(fns[k])))
 
