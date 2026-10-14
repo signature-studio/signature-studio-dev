@@ -104,19 +104,23 @@
 
 #### 10-7n. #2087 (KH-33) run: Resonator emcc の param_1 引数 ABI 復元 (部分・Resonator はビルド未通過)
 - 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64 (手展開)。Ghidra 12.1.4 = GitHub release `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 先頭 16 桁 `ddac49f9…` 一致)、JDK 21 (Temurin)、emsdk 6.0.12 ([EMSDK])。測定 commit = `81090e96` (コード変更は `ghidra_route/ghidra_to_c.py`・`ghidra_route/patches.py` のみ)。
-- 呼出元の記録 (前 run の capstone 逆アセンブルによる。出力は repo に未保存で本 run では再現不能のため、**未検証の記録**として扱う。以下の ABI は規則の根拠にはなるが、宣言型・読みレジスタは下記「未確認」が解消されるまで確定しない):
-  - `FUN_180fcf904` = 引数 `float` (xmm0)・戻り値 `short` (ax)。呼出元 2 件: `FUN_180fbc1f4` (xmm0 = `afStackX_8[0]`、入力 float)・`FUN_180fbbfb8` (xmm0 = `param_2`)。`void` 宣言は誤り。
-  - `FUN_180fbdfcc` = 引数 `short*` (rcx)・戻り値 `short`。呼出元 1 件: `FUN_180fbbfb8` (rcx = 入力 `param_1`)。
-  - `FUN_180fbdef4` = 引数 2 個 (rcx, dx)。呼出元 1 件: `FUN_180fbc1f4` (rcx = `&afStackX_10`・dx = 0)。Ghidra の呼出しの 3 個目 (r8) は callee が読まないため落とす。
-- 未確認 (review 指摘 1・2、fix モード #2127 で確認を試みた結果):
-  - 上記「呼出元の確定」の逆アセンブル出力は repo に保存されておらず、再現できない。
-  - `FUN_180fbbfb8` の `param_2`・`FUN_180fbc1f4` の `afStackX_8[0]` の Ghidra 宣言型 (float か整数型か) は未確認。整数型なら `FUN_180fcf904(param_2)` の C 代入は数値変換になり、機械語 (xmm0 にビットを載せる) と一致しない。`FUN_180fcf904(u2f(param_2))` への修正は、宣言型が確定するまで行わない (`param_2` が float なら u2f 追加で別の誤りになる)。
-  - `FUN_180fbdef4` の r8 を落とす根拠は、callee 本体の逆アセンブルで読むレジスタを確認していない。根拠は `snapins/lift/gen_stubs_sigs.py` の fint shim (手書き) の記述のみ。
-  - 確認には HeartCore.core_64 が要る (`fl-win64` には無い)。`oc_artifacts: fl-win64 plugins-kilohearts` での再起動が必要。
+- 素材展開 (fix run 2 / HEAD `0d6c73a5`): `plugins-kilohearts.tar.zst` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B, REPORT 値と一致)。Ghidra 12.1.4 の zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致。emsdk 6.0.12 を `emsdk install` で導入。
+- 呼出元・callee の確定 (本 run で Ghidra decompile 5 関数 + capstone 逆アセンブル、`analyzeHeadless` wall 29.2 s):
+  - 宣言型 (Ghidra 出力を引用):
+    - `FUN_180fbbfb8`: `short FUN_180fbbfb8(float *param_1,float param_2,int param_3)` → `param_2` は **float**。
+    - `FUN_180fbc1f4`: `float afStackX_8 [2];` → `afStackX_8[0]` は **float**。
+    - `FUN_180fcf904`: `void FUN_180fcf904(undefined4 param_1)` (Ghidra の宣言。戻り値は呼出元の `sVar1` / `sVar2` = short)。
+    - `FUN_180fbdfcc`: `short FUN_180fbdfcc(short *param_1)`。
+    - `FUN_180fbdef4`: `ulonglong FUN_180fbdef4(ushort *param_1,short param_2)` → 引数は **2 個**。
+  - 機械語の確認: 呼出元 `FUN_180fbbfb8` は `movaps xmm0, xmm6` (xmm6 = `param_2`) の直後に `call 0x180fcf904` (`0x180fbbfe9`)。呼出元 `FUN_180fbc1f4` は `movaps xmm6, xmm0` (xmm0 = 入力 float) の後に `call 0x180fcf904` (`0x180fbc206`)。callee `FUN_180fcf904` は `movss [rsp+8], xmm0` で xmm0 を読み、戻り値は `ax` (`shr eax,0x10; and eax,0x8000`)。よって引数は float、戻り値は short で、`FUN_180fcf904(float)` の規則は機械語と一致する。
+  - `FUN_180fbdef4` の読みレジスタ (callee 本体 213 B を capstone で全命令走査): 入力として読むのは **rcx・dx の 2 つのみ**。冒頭 `mov r8, rcx` は rcx からのコピーで、r8 は読む前に書かれる。r9 は `mov r9d, 0x96` で先に書かれてから読まれる。`xor edx,edx` は零化で入力ではない。呼出元 `FUN_180fbc1f4` は `lea rcx,[rsp+0x48]` と `xor edx,edx` の後に `call 0x180fbdef4` (`0x180fbc24e`) で、r8 は設定しない。よって 3 個目の引数 (r8) を落とす規則は正しい。
+  - `FUN_180fbdfcc` の呼出元 `FUN_180fbbfb8` は `mov rbx, rcx` (rcx = 入力 `param_1`) の後に `call 0x180fbdfcc` (`0x180fbbfde`)。
+- 変更: `patches.py` の ABI 表 (resonator 7 規則) は本 run で変更なし (`git diff 81090e96 HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行)。ABI 表の各規則は生成 C で 1 件ずつ適用されていることを確認 (`resonator.c`: `FUN_180fcf904(float param_1)`・`FUN_180fbdef4(ushort*, short)` の宣言)。
 - 変更: `patches.py` に `ABI` 表 (resonator 7 規則)、`ghidra_to_c.py` で適用し各規則の件数が 1 でなければ停止 (assert)。gain/haas/gate には適用されない。
 - emcc (resonator, 修復なし, `-ferror-limit=0`, `emcc -c`, rc 1, `grep -c 'error:'`):
   - 変更前 (HEAD `b7cfd62e` = origin/main 時点の resonator 生成, §10-7m と同じ件数): **8 件**。
   - 変更後 (HEAD `81090e96`): **4 件**。消えたもの = `param_1` 不足 3 (`FUN_180fcf904` 呼出元 2 件・`FUN_180fbdfcc` 呼出元 1 件) と引数数不一致 1 (`FUN_180fbdef4`)。
+  - 再測定 (fix run 2, HEAD `0d6c73a5`, 同じ Ghidra 出力を再生成): `build_cmp.sh` の `-Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=incompatible-pointer-types-discards-qualifiers` を付けると **4 件** (未宣言 callee のみ)。フラグを付けない `emcc -c -ferror-limit=0 -w -Ighidra_route` では **7 件** (うち pointer 型不一致 3 件 = `resonator.c:527`・`:614`・`:742`。`build_cmp.sh` は同フラグで warning 扱いにして通している既存挙動で、本 run の ABI 規則とは無関係)。
   - 残件 4 件 = 未宣言 callee のみ: `FUN_180fd4f30` 2・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1。閉包は [KH-31] #1989 の範囲 (§10-7j の試行で callee 追加は 13→26 件に悪化するため、本 run では扱わない)。
 - 回帰 (HEAD `81090e96`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7m と一致。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。`mkdir -p` で解消)。
