@@ -97,7 +97,7 @@ dec_label_pc_8c5ef5_g699_t:
 ## 8. 検証の鮮度
 
 - 測定 commit: `26f90ada`。本 PR はコードを変えない (変更は REPORT_SHX-T30.md・DEFECTS.md・DOC_MAP.md のみ)。
-- 本 PR の commit 後の HEAD で、IR を元に戻したうえで `build.sh --trace --soft` と `t27_relink.sh locale0` を再実行し、§3 の値 (baseline 17 / locale0 53 / unreachable) が再現することを確認する (§10)。
+- コミット済み HEAD `acc12101` で、IR を元に戻したうえで `build.sh --trace --soft` と `t27_relink.sh` (`locale0`) を再実行し、§3 の baseline (`units_run=17`) と対照 (`units_run=53`・`threw=unreachable`・`total_calls=173`) が再現することを確認した。以後の commit は REPORT の文言だけを変えている。
 - `work-m11` の IR は stale。本 REPORT の IR は §2 の手順で作り直したもので、指紋の出自は未検証。
 
 ## 9. 未解決 (起票先)
