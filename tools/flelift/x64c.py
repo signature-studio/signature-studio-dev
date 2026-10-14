@@ -29,7 +29,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
 usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME]
-               [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000]
+               [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000] [--cfg-rax]
 """
 import sys, json, struct, argparse, bisect, collections, os, shutil, contextlib
 import pefile
@@ -92,6 +92,12 @@ class PEInfo:
             for imp in ent.imports:
                 nm = imp.name.decode() if imp.name else 'ord%d' % imp.ordinal
                 self.iat[imp.address] = nm
+        # MSVC CFG: call/jmp [GuardCFDispatchFunctionPointer] の先は jmp rax の thunk で、宛先は rax に入っている
+        self.cfg_slots = set()
+        lc = getattr(pe, 'DIRECTORY_ENTRY_LOAD_CONFIG', None)
+        if lc is not None and getattr(lc.struct, 'GuardCFDispatchFunctionPointer', 0):
+            self.cfg_slots.add(lc.struct.GuardCFDispatchFunctionPointer)
+        self.cfg_rax = False
         self.pdata = []
         for s in pe.sections:
             if s.Name.startswith(b'.pdata'):
@@ -793,6 +799,8 @@ class FnLift:
             slot = ins.address + ins.size + op.mem.disp
             if slot in self.pe.iat:
                 return self.L('imp_%s(); return;' % self.pe.iat[slot])
+            if self.pe.cfg_rax and slot in self.pe.cfg_slots:
+                return self.L('ott_dispatch(R[RAX]); return;')
         # 間接 tail jmp (CFG dispatch / longjmp 形 / IAT 経由等): target を値として dispatch
         return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, 8))
 
@@ -819,6 +827,8 @@ class FnLift:
             slot = ins.address + ins.size + op.mem.disp
             if slot in self.pe.iat:
                 return self.L(self.call_stmt(ins, 'imp_%s();' % self.pe.iat[slot]))
+            if self.pe.cfg_rax and slot in self.pe.cfg_slots:
+                return self.L(self.call_stmt(ins, 'ott_dispatch(R[RAX]);'))
         self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, 8) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
 
     def i_ret(self, ins, ops):
@@ -975,14 +985,14 @@ class FnLift:
             'vaddss': ('addss', True), 'vsubss': ('subss', False), 'vmulss': ('mulss', True), 'vdivss': ('divss', False),
             'vaddpd': ('addpd', True), 'vmulpd': ('mulpd', True),
             'vpxor': ('pxor', True), 'vpand': ('pand', True), 'vpor': ('por', True),
-            'vxorpd': ('xorpd', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vorps': ('orps', True),
+            'vxorpd': ('xorpd', True), 'vxorps': ('xorps', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vorps': ('orps', True),
             'vpaddq': ('paddq', True), 'vpaddd': ('paddd', True), 'vpsubq': ('psubq', False), 'vpsubd': ('psubd', False),
             'vunpcklpd': ('unpcklpd', False), 'vpunpckldq': ('punpckldq', False),
             'vpsrlq': ('psrlq', False), 'vpsllq': ('psllq', False), 'vpsrad': ('psrad', False),
             'vmovsd': ('movsd', False), 'vmovss': ('movss', False),
             'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
-            'vcvtpd2dq': 'cvtpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
+            'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
     VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
 
     def vex_leg(self, ins, ops, m):
@@ -997,6 +1007,11 @@ class FnLift:
             return self.vex2(ins, ops, self.VEX2[m], True)
         if m in self.VEXF:
             return self.vex2(ins, ops, self.VEXF[m], False)
+        if m == 'vpsrldq' and len(ops) == 3 and ops[2].type == X86_OP_IMM and self.isx(ins, ops[0]) and self.isx(ins, ops[1]):
+            di = self.xd(ins, ops[0]); n = ops[2].imm
+            self.L('{ X128 a_ = X[%d], r_; memset(&r_, 0, 16); int n_ = %d; if (n_ < 16) memcpy(r_.b, a_.b + n_, 16 - n_); X[%d] = r_; }' % (self.xd(ins, ops[1]), n, di))
+            self.L('memset(&YL[%d], 0, 16);' % di)
+            return
         raise Unsup(m)
 
     def vex2(self, ins, ops, leg, zero):
@@ -1011,6 +1026,13 @@ class FnLift:
         di = self.xd(ins, d)
         if self.isx(ins, s2) and self.xd(ins, s2) == di and self.xd(ins, s1) != di:
             if not comm:
+                if leg[:3] in ('sub', 'div') and leg[-2:] in ('sd', 'ss'):
+                    s1i = self.xd(ins, s1)
+                    f, T = ('df', 'double') if leg[-2:] == 'sd' else ('f', 'float')
+                    op = '-' if leg[:3] == 'sub' else '/'
+                    self.L('{ %s b_ = X[%d].%s[0]; %s a_ = X[%d].%s[0]; X[%d] = X[%d]; X[%d].%s[0] = a_ %s b_; }' % (T, di, f, T, s1i, f, di, s1i, di, f, op))
+                    self.L('memset(&YL[%d], 0, 16);' % di)
+                    return
                 raise Unsup('vex d==s2 ' + ins.mnemonic)
             getattr(self, 'i_' + leg)(ins, [d, s1])
             if leg[-2:] in ('sd', 'ss'):
@@ -1072,6 +1094,13 @@ class FnLift:
     def i_cmpnltps(self, ins, ops): self.cmpps_pred(ins, ops, 5)
     def i_cmpnleps(self, ins, ops): self.cmpps_pred(ins, ops, 6)
     def i_cmpordps(self, ins, ops): self.cmpps_pred(ins, ops, 7)
+
+    def cmppd_pred(self, ins, ops, p):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 2; k_++) X[%d].q[k_] = cmp_pred_f(%d, X[%d].df[k_], b_.df[k_]) ? ~0ULL : 0ULL; }' % (
+            self.xs(ins, ops[1], 'x128'), di, p, di))
+
+    def i_cmpneqpd(self, ins, ops): self.cmppd_pred(ins, ops, 4)
 
     def i_movlpd(self, ins, ops):
         d, s = ops
@@ -1684,11 +1713,13 @@ def main():
     ap.add_argument('--shift', type=lambda x: int(x, 0), default=0)
     ap.add_argument('--img-size', type=lambda x: int(x, 0), default=0x18c0000)
     ap.add_argument('--impbase', type=lambda x: int(x, 0), default=0x1D80000, help='IAT slot に敷設する pseudo-VA 基準 (dispatch が imp 呼出に解決)')
+    ap.add_argument('--cfg-rax', action='store_true', help='MSVC CFG の call/jmp [GuardCFDispatch] の宛先を rax から取る (既定 OFF = 従来どおり LD64(slot) を dispatch)')
     ap.add_argument('--shards', type=int, default=1, help='N>1 で fle_lifted.c を fle_lifted_s<k>.c (k<N) の N 本に分ける (関数は i%%N、ott_dispatch・weak imp・imp_tab は shard 0 のみ。1 は従来の単一ファイル)')
     a = ap.parse_args()
     IMG = a.img; SHIFT = a.shift; IMG_SIZE = a.img_size
     overrides = {int(x.split('=')[0], 16): x.split('=')[1] for x in a.override}
     pe = PEInfo(a.pe)
+    pe.cfg_rax = a.cfg_rax
     cfg = json.load(open(a.entries))
     entries = set(IMG + r for r in cfg.get('calltgt', [])) | set(cfg.get('roots', []))
     md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True

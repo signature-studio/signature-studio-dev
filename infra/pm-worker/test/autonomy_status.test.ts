@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { refsOnlyBody } from "../src/webhook.ts";
-import { BOT, REPO, T0, commentPayload, configuredApp, issuePayload, j, markFresh, runPayload, send, type Call } from "./helpers.ts";
+import { BOT, MARK, REPO, T0, commentPayload, configuredApp, issuePayload, j, markFresh, runPayload, send, type Call } from "./helpers.ts";
 import { outcomeBody, stopBody } from "./pm_helpers.ts";
 
 type Ctx = Awaited<ReturnType<typeof configuredApp>>;
@@ -54,7 +54,7 @@ function syncWorld() {
 async function seedStuck(ctx: Ctx, prs: number[]) {
   for (const n of prs) {
     await send(ctx.app, "pull_request", prPayload(n, { labels: ["oc:stuck"], updatedAt: T0 - 5 * MIN }));
-    await send(ctx.app, "issue_comment", commentPayload(n, BOT, stopBody(n), iso(T0 - 10 * MIN)));
+    await send(ctx.app, "issue_comment", commentPayload(n, MARK, stopBody(n), iso(T0 - 10 * MIN)));
   }
 }
 
@@ -74,7 +74,7 @@ test("自律運転の指標: 空の状態では件数は 0、率・差・起点�
 test("stuck / stuck_age_max_min: oc:stuck の open PR。起点は最新の停止コメント (更新時刻ではない)。closed と他のラベルは数えない", async () => {
   const ctx = await configuredApp();
   await send(ctx.app, "pull_request", prPayload(10, { labels: ["oc:stuck"], updatedAt: T0 - 5 * MIN }));
-  await send(ctx.app, "issue_comment", commentPayload(10, BOT, stopBody(10), iso(T0 - 120 * MIN)));
+  await send(ctx.app, "issue_comment", commentPayload(10, MARK, stopBody(10), iso(T0 - 120 * MIN)));
   await send(ctx.app, "pull_request", prPayload(11, { labels: ["oc:stuck"], updatedAt: T0 - 45 * MIN }));
   await send(ctx.app, "pull_request", prPayload(12, { labels: ["oc:ready"], updatedAt: T0 - 900 * MIN }));
   await send(ctx.app, "pull_request", prPayload(13, { state: "closed", labels: ["oc:stuck"], updatedAt: T0 - 900 * MIN }));
@@ -257,7 +257,7 @@ test("ネガコン (a): 題名・本文・コメント・ブランチ名・run �
   await send(ctx.app, "issue_comment", commentPayload(1, "pycabbage", evil));
   await send(ctx.app, "issue_comment", commentPayload(2, "pycabbage", evil));
   await send(ctx.app, "pull_request", prPayload(10, { labels: ["oc:stuck"], title: evil, body: evil, updatedAt: T0 - 5 * MIN }));
-  await send(ctx.app, "issue_comment", commentPayload(10, BOT, `${stopBody(10)} ${evil}`, iso(T0 - 20 * MIN)));
+  await send(ctx.app, "issue_comment", commentPayload(10, MARK, `${stopBody(10)} ${evil}`, iso(T0 - 20 * MIN)));
   await send(ctx.app, "pull_request", prPayload(11, { state: "closed", mergedAt: T0 - 30 * MIN, body: `Refs #1 ${evil}`, title: evil }));
   await send(ctx.app, "workflow_run", runPayload(7, "in_progress", { title: evil }));
   const text = await (await ctx.app.handle(new Request("https://pm.example/status"))).text();

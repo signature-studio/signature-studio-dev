@@ -136,7 +136,7 @@ const ff = {};
 for (const l of errs) { const m = /unresolved function call: (\S+)/.exec(l); if (m) ff[m[1]] = (ff[m[1]] || 0) + 1; }
 const stubs = [];
 for (let i = 0; i < (mod._m11_stub_uniq() || 0); i++) stubs.push(mod.UTF8ToString(mod._m11_stub_name(i)) + ':' + mod._m11_stub_count(i));
-const ptrcheck = ptrCheck(mod, ptrPreSet, 'M11_PTRCHECK_SURVEY_MAX_NEW');   // #2778: survey の基準は run と別 (unit 実行後の件数)
+const ptrcheck = ptrCheck(mod, ptrPreSet, 'M11_PTRCHECK_SURVEY_MAX_NEW', 'M11_PTRCHECK_SURVEY_UNREMAP_MAX');   // #2778: survey の基準は run と別 (unit 実行後の件数)。#3113: 分類 B の基準も別
 console.log('M11_SURVEY ' + JSON.stringify({
   ptrcheck,
   dllmain_done: done, boot_threw: bootThrew, units: 942, ...res, trap_oom: trapOom, trap_other: res.trap - trapOom, ok_with_oom: okWithOom,
@@ -159,5 +159,9 @@ console.log('M11_SURVEY ' + JSON.stringify({
 }));
 if (!ptrcheck.gate.pass) {   // #2778: ptrcheck ゲート不合格 (M11_PTRCHECK_SURVEY_MAX_NEW). JSON は出した後に非 0
   console.error('FAIL: survey ptrcheck image_va_words_new=' + ptrcheck.image_va_words_new + ' > max=' + ptrcheck.gate.max + ' (' + ptrcheck.gate.env + ')');
+  process.exitCode = 1;
+}
+if (!ptrcheck.unremap.gate.pass) {   // #3113: 未 remap の疑い (分類 B) の基準不合格・分類ファイル欠落 (fail-closed)
+  console.error('FAIL: survey ptrcheck unremap_cand=' + ptrcheck.unremap.unremap_cand + ' > max=' + ptrcheck.unremap.gate.max + ' (' + ptrcheck.unremap.gate.env + ', classes=' + ptrcheck.unremap.classes.file + ' available=' + ptrcheck.unremap.classes.available + ')');
   process.exitCode = 1;
 }
