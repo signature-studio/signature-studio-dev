@@ -92,7 +92,7 @@ reader が読む id の表は上のとおり (`h10_check.py` が dispatch tree �
 |---|---|
 | `nfo/FORMAT.md` §8 | 先頭 u32 8 = **format version** (許容 5–12、Wrapper 自身の writer = 12、DB の FL 11.5.5 writer = 8)。record 1/30/31/32/53/57 の欠落時既定、57 の意味を追記 (本 PR で更新) |
 | `nfo/FORMAT.md` §9・`nfo/REPORT.md` §6-2/3 | 未確認から解消へ (本 PR で更新、本文は複製せず本書へリンク) |
-| `tools/flp` `parseWrapperData` | `kind (8 = VST2, 10 = VST3)` は誤り (VST3 の実機 OTT.fst も 8)。`id 50` を必須とする点も Wrapper と異なる (Wrapper は欠落を class 0 とする)。修正は未実施 (#110 にコメント) |
+| `tools/flp` `parseWrapperData` | `kind (8 = VST2, 10 = VST3)` は誤り (VST3 の実機 OTT.fst も 8)。`id 50` を必須とする点も Wrapper と異なる (Wrapper は欠落を class 0 とする)。修正済み (#110: `version` / `plugclass` に改名、`parseWrapperChunk` で gate と record walk を Wrapper に合わせた。検証は `tools/flp/test/wrapper_real.test.ts`) |
 | 生成器 (`nfo/src/fst.ts`) | ASCII の出力は**変更なし** (version 8・ANSI は FL 11.5.5 writer と同一)。非 ASCII の扱いは #549 で追加 (§9) |
 
 ## 6. 検証

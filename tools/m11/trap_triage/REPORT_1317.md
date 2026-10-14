@@ -152,24 +152,9 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 - 循環の計装は未実施。`SV_WATCH` (`oob_top.mjs`) は各 unit の境界で固定 lva を辿る仕組みで、`0x40fb40` の `rcx` は実行時のレジスタ値なので、そのままでは連鎖を追えない。guest 側の計装 (IR 生成への追加) が要るため、1 run では終わらないと判断し、子 issue に切り出した (§9)。
 - 受入の状況は §6 の表のまま (1・3・4 未達、2 部分)。
 
-## 10. 追補 (2026-10-14・#1786 run): `0x40fb40` 計装の試行と判明事項
+## 10. 追補 (2026-10-14・#1786 run): `0x40fb40` 計装の試行 (要約)
 
-- 測定 commit: `381dd7c2` (origin/main)。コード差分は無し (計装は試行後に破棄)。
-- 素材: fl-win64 (`$RUNNER_TEMP/extracted`)・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。capstone / pefile を pip で補った。
-- IR (ON, `M11_M2P=1`): `m11_gen_ir2.sh` 51 s rc=0 (`F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0`)。build 25 s rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。load 0.5 前後。
-- 再現 (上限 60 s): `0..829`+880 = rc=0 / 1.74 s。`0..830`+880 = rc=124 / 60.02 s。境界は §6〜8 と一致。
-
-### 判明事項 (停止候補 `0x40fb40` は build に存在しない)
-
-- `boot_final.ll` / `boot_final3.ll` に `function_40fb40`・`function_40f960` の定義・呼出しが無い。間接 call 表 `m11_disp_tab` にも `4258624` (`0x40fb40`)・`4258144` (`0x40f960`) の登録が無い。
-- そのため、§4a・§6 の「`0xf960` → `0x40f960` → `0x40fb40` の連鎖」は、IR 上では辿れる経路ではない。`0xf960` の icall 値 (変換前) も IR から解決できていない。
-- 入口 hook (`M11_INSTR_40FB40` 相当、`m11_post.py` の wrapper) を試したが、wrapper を入れる対象が IR に無いため 1 回も発火しなかった (`0..830`+880 の stderr は 0 行)。計装は測定対象に届かないので、コードは残さず破棄した。
-- 従って、§6 の「`0x40fb40` の連鎖走査の循環」は**仮説のまま**。循環の有無は未計測。
-
-### 次の一手 (起票先: 本 issue #1317)
-
-- `0xf960` (icall 値) が IR のどの関数に解決されるかを、`m11_icall` の `tkey` 変換 (`target + 0x400000 - M11_LB_BASE`) と `m11_disp_tab` の突合で特定する。`0x40f960` が表に無い理由 (lift 漏れ・別 VA への写像) を先に確定する。
-- 解決先が確定するまで、#1786 の計装 (連鎖の循環検出) は着手しない。
+- IR 側 wrapper は `40fb40` に届かず計装は破棄。全文 (判明事項・次の一手) は `REPORT_1317_APPENDIX.md` §10。
 
 ## 11. 追補 (2026-10-14・#1317 7 回目 run): icall 0xf960 の解決先を IR/C で確定
 
@@ -202,3 +187,41 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 |---|---|
 | `0x40fb40` の `[rcx-0x78]` 連鎖の循環有無 (guest 計装で連鎖長・循環を計測) | #1786 `[M11-N121]` (親 #1317) |
 | 830 が残す状態 (受入 1)・修正案 (受入 3)・修正後の完走 (受入 4) | 本 issue #1317 (次の run) |
+
+## 12. 追補 (2026-10-14・#1317 8 回目 run): function_40f960 / 40fb40 の計測 (既定 OFF)
+
+- 測定 commit: `58e0126d` (main `4a476154` 取り込み後の HEAD)。取り込み前の HEAD `5de19a1d` (`tools/m11` のコードは `e7c5c062` と同一) でも同じ値を測定した。計測 probe は既定 0 で inert。
+- 取り込み差分 `git diff e7c5c062 58e0126d -- tools/m11 ':(exclude)*.md'` は 12 ファイル (+369/-7)。build・IR に入るのは `m11_build.sh` (CF 行・`S_NEG`・`ov_instr_40f960` stamp の追加のみ) と `m11_rt.c` (#1547 `M11_DEST_GUARD`、既定 0 で `#if` 内のみ)。`ldfix/ldfix.py`・`m11_gen_ir2.sh` は不変 (IR 生成経路は同一)。`ldfix/` の監査スクリプト・`shimx_link/probe_flag_1985.mjs`・`trap_triage/store_watch_*`・`watch_*` は build に入らない。
+- 既定 0 で build 出力が変わらない根拠 (`git diff --stat b36d3b5f e7c5c062`・6 ファイル 78 行追加 / 11 行削除。全文は `REPORT_1317_APPENDIX.md` §12):
+  - `tools/m11/m11_ov.c` +17: #882 `M11_INSTR_40FFE0` 計測。`#if` 内のみ。既定 0 で追加されるコードなし。
+  - `tools/m11/m11_post.py` +6/-1: 同 wrapper。`os.environ.get('M11_INSTR_40FFE0') == '1'` のときだけ PROBES と wrapper を追加。既定 0 では従来と同一。
+  - `tools/m11/m11_build.sh` 13 行: `M11_INSTR_40FFE0` の CF 追加と stamp 形式 (`0:0`)。既定 0 では CF に `-DM11_INSTR_40FFE0=0` が増えるだけ (ov.o の再生成は stamp 変化時のみ)。`S_NEG` は既定 0 で従来と同一。build 出力の bit 同一性は未検証。
+  - `tools/m11/m11_rt.c` +20: #1952 の `M11_RT_*` knob。`#if` 内のみ。
+  - `tools/m11/shimx_link/probe_trace_unit.mjs` +24 / `probe_unit23.mjs` 8 行: 独立した shimx 系 probe。`m11_build.sh`・`survey_units.mjs` からは呼ばれない (grep 確認)。`probe_unit23.mjs` は slot アドレス定数を `0x15f10e0` から `0x11f10e0` (LVA) に直したもの。
+- 素材: `fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-retdec` (v5.0・commit `53e55b4`・[RETDEC] と md5 一致)・`toolchain-emsdk` (6.0.12、[EMSDK]) を展開。`llvm-nm` は emsdk の `upstream/bin` を PATH に前置。
+- IR: 素材の RetDec で `m11_gen_ir2.sh` を再生成 (rc=0・51.5 s・`ldfix errors=0`・`ir_sha256` `3506a9…`・`boot_final.ll` 490,733 行)。前 run の `08c7b6…` とは一致しない。2 回目の再生成 (後続の再測定の前) の `ir_sha256` も `3506a9…`。
+- 測定 (`M11_M2P=1`・`survey_units.mjs`・上限 60 s・load 0.8〜1.0)。
+
+| 条件 | build | rc | 所要 | 結果 |
+|---|---|---|---|---|
+| `0..829`+880 | ON (`M11_INSTR_40F960=1`) | 0 | 1.3〜1.4 s (4 回とも同値) | `ok 765 / oob 13 / miss 46 / other 1 / halt0 4 / abort 2` |
+| `0..829`+880 | OFF | 0 | 1.7 s (2 回とも同値) | `ok 765 / oob 13 / miss 46 / other 1 / halt0 4 / abort 2` |
+| `0..830`+880 | ON | 124 (上限 60 s) | 60 s 超 | 完走せず。240 s 上限でも rc=124 (最後の出力は `unit 880`) |
+| `0..830`+880 | OFF | 124 (上限 60 s) | 60 s 超 | 完走せず (2 回とも rc=124) |
+
+- 測定 commit `58e0126d` (取り込み後): ON `0..829`+880 rc=0 1.35 s `ok 765 / halt0 4 / abort 2` (`40f960` 88 行・`chain_len` 86 行)、ON `0..830`+880 rc=124 (60 s)、OFF `0..829`+880 rc=0 1.72 s 同値、OFF `0..830`+880 rc=124 (60 s)。取り込み前 `5de19a1d` と同値。
+
+- ON と OFF で `0..829` の結果は一致した (取り込み前の記録にあった 1 件ずれは再現しなかった)。
+- `0..829` の `abort` 2 件 (unit 304 `0x483140`・unit 555 `0x7f2500`) は `m11_unresolved_function` での abort。前 run の記録には無く、未切り分け。
+- 計測ログ: ON `0..829` の JSON に `[m11][40f960]` 行 88 件・`chain_len=` 行 86 件。`0..830` は JSON 未出力 (上限で打ち切り) のため集計なし。
+- 前 run (`b36d3b5f` 時点) の数値 (`ok 763`・`40f960` 521 件・`0..830` rc=0 13 s) は今回の IR と一致せず再現しない。IR が異なるため比較もできず、本節では採用しない (旧値は git 履歴の `b36d3b5f` 版 REPORT に残る)。
+- 結論 (今回の実測): `0..830`+880 は ON/OFF とも完走せず、停止は §4a・§6〜§8 の rc=124 と一致する。`40f960`/`40fb40` の計測は `0..829` で動くが、停止する `0..830` では出力を取れていないため、(a) 確保サイズ過大・(b) 連鎖の循環の判定は未確定。
+
+| 受入 | 状態 |
+|---|---|
+| 1. 830 が残す状態 | 未達 (830 を含めると 880 で停止。残す状態は未特定) |
+| 2. 停止命令・wasm frame | 未達 (停止位置の trace 未取得) |
+| 3. 修正案 | 未達 |
+| 4. 修正後の完走 | 未達 (`0..830`+880 は ON/OFF とも rc=124) |
+
+- 次の一手: `0..830` の停止位置を `SV_TRACE_AT=880` (§3 の手順) で ON/OFF 別に取り、`40f960` の呼び出しを 880 直前まで出力する。

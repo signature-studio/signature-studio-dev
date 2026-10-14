@@ -31,8 +31,9 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
 | `watch_runs.sh` | 実行中の Actions run を REST で監視し、1 本終わるたびに 1 行出して終了する。**終了通知を受けたら、結果の処理より先に再起動する** (指示 116)。詳細は [`watch_runs.notes.md`](watch_runs.notes.md) |
 | `heartbeat.sh` | 30 分ごとに PM のセッションへ作業継続のプロンプトを送る (指示 102・116・120)。`systemd/pm-heartbeat.service` |
 | `pm_watchdog_ping.sh` | 5 分ごとに `repository_dispatch` (`oc-watchdog`) を送り、Actions の watchdog を起こす (GitHub の schedule が発火しないため)。`systemd/pm-watchdog.*` |
+| `pm_gate.sh` | `pm_gate.sh <command...>`。Worker (`infra/pm-worker`) が primary (`/status` が `mode=live`・`fresh=true`・`last_tick` が 15 分以内) の間は command を実行せず終了 0 にする。それ以外 (取得失敗・dry-run・JSON 不正) は command を実行する (fail-open)。URL は env `PM_WORKER_URL`、無ければ `tools/pm/worker_url`。テスト: `bash tools/pm/test_pm_gate.sh` |
 | `launch_issues.py` | 指示 130〜132 の自動着手。`plan` (仕分け) / `blocked` (blocked_by を GitHub に同期) / `launch` (`/oc` コメントで着手)。`systemd/pm-launch.*` が 10 分おきに `launch` を実行。Opened PR 数は `oc:stuck` の PR を除き、stuck が `STUCK_HIGH` (既定 40) を超えたら launch を止める。停止報告の判定は run-outcome・PM マーカー付きコメントを除く (#2325)。テスト: `python3 -m unittest tools/pm/test_launch_issues.py` |
-| `../../infra/pm-worker/` | `launch_issues.py` の launch と `pm_watchdog_ping.sh` の代替 (Cloudflare Worker。webhook + Cron/alarm 駆動)。現在は dry-run のみで、`pm-launch.timer` / `pm-watchdog.timer` は引き続きこちらが正本。切替手順は `infra/pm-worker/README.md` |
+| `../../infra/pm-worker/` | `launch_issues.py` の launch と `pm_watchdog_ping.sh` の代替 (Cloudflare Worker。webhook + Cron/alarm 駆動)。現在は dry-run のみで、`pm-launch.timer` / `pm-watchdog.timer` は引き続きこちらが正本。切替手順は `infra/pm-worker/README.md` (dispatch だけを先に live にする手順は『切替 A』) |
 | `issue_snapshot.py` | open の issue / PR / run / 最新の bot コメントを `issues_state.json` に保存する (`launch_issues.py` が呼ぶ) |
 | `manual_deps.json` | 停止報告に根拠のある依存 (子 → [依存先])。**追跡する設定ファイル** (他の json は状態で、`.gitignore`) |
 | `rest_heal.py` | open PR を CONFLICT / FIX / NOREVIEW / DRAFT / APPROVED / COVERED / STUCK_LABELLED に分類し、足りない次の一手を `/oc` コメントか close→reopen で補う。watchdog (`.github/scripts/watchdog.sh`) の補助 |
@@ -44,6 +45,21 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
 | `find_unreviewed.sh` / `rerun_review.sh` | review が付いていない ready PR の列挙 / PR の close→reopen で review を再起動 (素材名を引数に取る) |
 | `restart_failed.sh` | 失敗した run の再投入 (`impl` / `review` / `both`、`SINCE`) |
 | `systemd/` | user unit の例。`/PATH/TO/REPO` を置換して `~/.config/systemd/user/` に置く |
+
+## Worker 稼働中の standby (`pm_gate.sh`)
+
+Worker が primary になった後も、VM の timer は止めず standby にする (Worker が止まったときの自動フェイルオーバー)。
+`pm_gate.sh` で `ExecStart` を包むと、Worker が健全な間は VM 側の command を実行せず二重投稿を避けられる。
+ゲートは `curl` で `/status` を 1 回読むだけで、`gh` や GitHub REST は使わない。
+
+例 (`~/.config/systemd/user/pm-launch.service` の `ExecStart`。`pm-watchdog.service` も同じ形):
+
+```
+ExecStart=/bin/bash /PATH/TO/REPO/tools/pm/pm_gate.sh /usr/bin/env python3 /PATH/TO/REPO/tools/pm/launch_issues.py launch
+```
+
+戻し方: `ExecStart` を gate なしの元の行に戻し、`systemctl --user daemon-reload` を実行する。
+systemd の変更自体は PM が行う (この README には含まれない)。
 
 ## 状態ファイル (`PM_DIR` に作られる。コミットしない)
 

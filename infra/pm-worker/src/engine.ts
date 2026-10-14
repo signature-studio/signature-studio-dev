@@ -1,10 +1,12 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
-// 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、LIVE=1 のときだけ GitHub に書く。
+// 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
+//   launch (/oc コメント) = LIVE_LAUNCH、dispatch (repository_dispatch の oc-watchdog) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
 import type { Store } from "./kvstore.ts";
+import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import {
   applyEvent,
   EMPTY_STATE,
@@ -21,6 +23,9 @@ export const FULL_SYNC_EVERY_MS = 6 * 3_600_000;
 // reconcile がこれ以上止まっていたら、状態が古いとみなして launch しない (誤った着手を避ける)。
 export const STALE_AFTER_MS = 15 * 60_000;
 const NO_PR_MAX_RELAUNCH = 3;
+// oc-watchdog の最短送信間隔は WATCHDOG_INTERVAL_S (既定 300 秒 = VM の pm_watchdog_ping.sh と同じ 5 分) から、この分だけ短い。
+// tick は毎分 (cron と alarm) で、わずかに早い tick を弾くと次の送信が 1 分遅れ、周期が 6 分になるため。
+export const WATCHDOG_JITTER_MS = 30_000;
 
 export interface Planned {
   n: number;
@@ -34,6 +39,12 @@ export interface Plan {
   target: number;
   room: number;
   picks: Planned[];
+  // Review-Only (指示 130)。true の間は picks を空にする。
+  phase: PhaseState;
+  open_prs_excl_stuck: number;
+  stuck_prs: number;
+  // launch を止める理由 (stuck-ceiling)。止めないなら undefined。
+  stop?: string;
 }
 
 interface Meta {
@@ -350,7 +361,14 @@ export class Engine {
     const relMap = new Map(rows.relaunch);
     const picks: Planned[] = [];
     const issueOf = new Map(snap.issues.map((i) => [i.number, i] as const));
-    for (const n of sel.picks) {
+    // Review-Only と stuck の上限は、どちらも新規着手 (picks) を空にする。数え方は VM 版 (launch_issues.py) と同じ。
+    const pr = countOpenPrs(Object.values(this.s.prs).map((p) => ({ state: p.state, labels: p.labels ?? [] })));
+    const prev = this.phase();
+    const phase: PhaseState = { review_only: nextReviewOnly(prev.review_only, pr.openExclStuck), open_prs: pr.openExclStuck };
+    phase.since = phase.review_only !== prev.review_only || !prev.since ? iso(nowMs) : prev.since;
+    const stop = pr.stuck > this.d.cfg.stuckHigh ? "stuck-ceiling" : undefined;
+    const gated = phase.review_only || !!stop;
+    for (const n of gated ? [] : sel.picks) {
       const i = issueOf.get(n);
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
@@ -359,13 +377,28 @@ export class Engine {
       const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
       picks.push({ n, art, relaunch: relMap.has(n) });
     }
-    const plan: Plan = { at: iso(nowMs), active, target: this.d.cfg.target, room: sel.room, picks };
+    const plan: Plan = {
+      at: iso(nowMs),
+      active,
+      target: this.d.cfg.target,
+      room: sel.room,
+      picks,
+      phase,
+      open_prs_excl_stuck: pr.openExclStuck,
+      stuck_prs: pr.stuck,
+      stop,
+    };
     return { rows, plan, picks };
   }
 
   // ---------------------------------------------------------------- 実行
   private fresh(): boolean {
     return !!this.meta.fullSyncAt && !!this.meta.reconcileAt && this.d.now() - this.meta.reconcileAt < STALE_AFTER_MS;
+  }
+
+  // Review-Only の状態は DO に保存する (未保存なら review_only: true)。
+  private phase(): PhaseState {
+    return this.d.store.get<PhaseState>("meta", "phase") ?? { review_only: true };
   }
 
   async launch(gh: Gh | null): Promise<Plan> {
@@ -377,7 +410,8 @@ export class Engine {
       this.saveMeta();
       return plan;
     }
-    const live = this.d.cfg.live && gh;
+    this.d.store.put("meta", "phase", plan.phase);
+    const live = this.d.cfg.liveLaunch && gh;
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     for (const p of picks) {
       let body: string;
@@ -422,12 +456,12 @@ export class Engine {
   }
 
   async watchdog(gh: Gh | null): Promise<"dispatched" | "would" | "skipped"> {
-    const every = this.d.cfg.watchdogIntervalS * 1000;
+    const minGap = Math.max(0, this.d.cfg.watchdogIntervalS * 1000 - WATCHDOG_JITTER_MS);
     const last = this.meta.watchdogAt ?? 0;
-    // cron と alarm の両方が呼ぶので、周期の半分以内の再送は捨てる。
-    if (this.d.now() - last < every / 2) return "skipped";
+    // cron と alarm の両方が毎分呼ぶ。前回の送信 (dry-run では記録) から周期が過ぎるまでは送らない。送信に失敗したときは記録しないので次の tick で再試行する。
+    if (this.d.now() - last < minGap) return "skipped";
     this.meta.counters = this.meta.counters ?? this.zero();
-    if (!this.d.cfg.live || !gh) {
+    if (!this.d.cfg.liveDispatch || !gh) {
       this.meta.watchdogAt = this.d.now();
       this.meta.counters.wouldDispatch++;
       this.saveMeta();
@@ -499,12 +533,20 @@ export class Engine {
     const c = (k: keyof Rows) => rows[k].length;
     const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
     return {
-      mode: this.d.cfg.live ? "live" : "dry-run",
+      // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
+      // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
+      mode: this.d.cfg.liveLaunch && this.d.cfg.liveDispatch ? "live" : this.d.cfg.liveLaunch || this.d.cfg.liveDispatch ? "partial" : "dry-run",
+      mode_launch: this.d.cfg.liveLaunch ? "live" : "dry-run",
+      mode_dispatch: this.d.cfg.liveDispatch ? "live" : "dry-run",
       active_runs: plan.active,
       target: plan.target,
       room: plan.room,
       open_issues: open,
       open_prs: Object.values(this.s.prs).filter((p) => p.state === "open").length,
+      phase: plan.phase.review_only ? "review-only" : "launch",
+      open_prs_excl_stuck: plan.open_prs_excl_stuck,
+      stuck_prs: plan.stuck_prs,
+      launch_stop: plan.stop ?? null,
       blocked: c("blocked"),
       started: c("started"),
       ready: c("ready"),

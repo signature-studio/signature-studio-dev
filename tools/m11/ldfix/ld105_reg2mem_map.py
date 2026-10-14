@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '../../..'))
 sys.path.insert(0, HERE)
 from ldmach_img import ImageMachine  # noqa: E402
+from ld110_reg2mem_link import frame_size  # noqa: E402
 
 W = os.environ.get('M11_WORK', os.path.join(REPO, 'tools/m11/work'))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'results/ld105_reg2mem_map.tsv')
@@ -48,8 +49,12 @@ def slot_of(site):
     return int(m.group(1), 16)
 
 
+FRAME = frame_size(ins)
+
+
 def ir_name(disp):
-    return 'stack_var_-%d' % (disp + 8)
+    # 旧式 -(disp+8) は frame 位置の仮定が誤り (#2389)。cf3790 は F=472 (push 4 本 + sub rsp 0x1b8)
+    return 'stack_var_-%d' % (FRAME - disp)
 
 
 rows = ['site\tdisp\tslot\talloca\tir_stores\tir_reload_use\tmachine_prev5\tir_store_value_def']

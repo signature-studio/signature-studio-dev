@@ -26,7 +26,7 @@ test('wrapper .fst parses with tools/flp and round-trips byte-exact', () => {
 test('chunk is accepted by the flp wrapper-data parser: kind 8, records 2,50,51,54,55,56', () => {
   const c = buildWrapperChunk({ plugclass: 0, displayName: 'OTT', filename: 'C:\\VST2\\OTT_x64.dll', vendor: 'Xfer Records', magic: 0x58665454 });
   const v = parseWrapperData(c)!;
-  assert.equal(v.kind, 8);
+  assert.equal(v.version, 8);
   assert.equal(v.fourcc, 'TTfX'); // raw LE u32 bytes of uniqueID 'XfTT'
   assert.equal(v.name, 'OTT_x64');
   assert.equal(v.path, 'C:\\VST2\\OTT_x64.dll');

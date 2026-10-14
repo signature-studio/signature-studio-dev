@@ -115,8 +115,9 @@ test('NEGATIVE: version gate — 13 rejected, -1 ignored, 4 → legacy reader, 5
   assert.equal(readWrapperChunk(build(-1 >>> 0, base)).status, 'ignored-minus1');
   assert.equal(readWrapperChunk(build(4, base)).status, 'legacy-reader');
   for (const v of [5, 6, 7, 8, 9, 10, 11, 12]) assert.equal(readWrapperChunk(build(v, base)).status, 'ok', `v${v}`);
-  // tools/flp labels this u32 "kind (8 = VST2, 10 = VST3)": the Wrapper treats it as a format version (a VST3 .fst carries 8)
-  assert.equal(parseWrapperData(chunkOf(realOtt))!.kind, 8);
+  // the leading u32 is a format version (a VST3 .fst carries 8), and tools/flp must agree with the Wrapper reader
+  assert.equal(parseWrapperData(chunkOf(realOtt))!.version, 8);
+  assert.equal(parseWrapperData(chunkOf(realOtt))!.plugclass, 7);
   assert.equal(readWrapperChunk(chunkOf(realOtt)).fields.plugclass, 7);
 });
 
