@@ -89,7 +89,7 @@
 - **所見 2 (fake の代理性)**: fake の burst 512 (48k)・1024 (96k) は、null-sink の 1152・3456〜4480 を代表しない。fake の値で T を決めると、96k で T が不足する。
   - fake 96k・B=256 の T0=2816 からは、同じ逆算で open 時の較正 burst を **推定 1920 または 2048** と読める。これは run 中の最大 `burst_obs` (1024) とは別の量で、表の `burst max` と同一視しない。
 - **係数の候補 (計算値, 未適用)**: 96k・B=256・burst 4480 → 係数 1.25 で T=5888 / 1.30 で 6144 / 1.50 で 7168。B=512 → 1.25 で 6144 / 1.50 で 7680。48k・B=256・burst 1152 → 1.25 で 1792 / 1.50 で 2048。
-  係数の値は遅延とのトレードオフのため、PM 判断。係数は `tools/audio/src/flasio.c:225` の `need = (burst + burst/4 + 2B−1)/B·B` (実行中の拡張式。`grows` はこの式で増える) にある。本 PR では変更しない → 子 issue **[AU-24]** で実装する。
+  係数の値は遅延とのトレードオフのため、PM 判断。係数は `tools/audio/src/flasio.c:225` の `need = (burst + burst/4 + 2B−1)/B·B` (実行中の拡張式。`grows` はこの式で増える) にある。AU-24 (#2541) で実測し、係数は 125 のまま維持した (§5-5)。
 
 ### 5-4. 接続の根拠・NC・再採取 (同コード, n=1)
 
@@ -111,12 +111,30 @@
 - **FAIL 1 件 (未解決)**: fake_r1 の `asio_sine_b256_d2` (再採取の 1 件目) で underrun 1・silence 384・sine maxErr 9.98e-1・zeroRuns 1 (欠落と位相ずれ)。最終 T は 1536 (実行中に grows 1 回で拡張)。同条件の元の 3 回 (§5-1) はすべて PASS で、再現性は未確定。原因は未切り分け (§2 の `asio_ramp_b128_d2` FAIL と同種の疑い、未確認)。
 - 再採取の 6 件のうち 5 件 PASS。null 側はこの再採取でも underrun 0・PASS。
 
+### 5-5. 安全係数の実測 (AU-24 #2541・係数は 125 のまま維持)
+
+- 測定 commit = `a2ca18f4` (`FLA_BURST_PCT` 導入。既定 125 は変更前と同値)。以後のコード差分は `git diff --stat a2ca18f4 HEAD -- tools/audio/src` の 0 行 (この節を含む commit は REPORT のみ)。
+- 対象: null-sink (PulseAudio `ci_null`) の `asio_sine_b256_96k` (B=256・96k・sine・10 s) を各係数で n=3。係数は `FLA_DEFS="-DFLA_BURST_PCT=<値>" bash tools/audio/build.sh` で変え、`node tools/audio/harness/run.mjs --only asio_sine_b256_96k --out <json>` を PulseAudio 起動中に実行。各 rep の sink-input に `Google Chrome` が現れ、`ci_null` へ接続していることを `*_sinkinputs.txt` で確認。
+- 環境: ubuntu runner (4 vCPU)・google-chrome 154.0.8037.97・PulseAudio 16.1 (apt 導入)。
+
+| FLA_BURST_PCT | OPEN 較正 T0 (run 1/2/3) | 最終 T | grows (run 1/2/3) | underrun (run 1/2/3) | burst_obs | 判定 |
+|---|---|---|---|---|---|---|
+| 125 (変更前と同値) | 4608 / 4608 / 4608 | 4608 | 0 / 0 / 0 | 0 / 0 / 0 | 3456 ×3 | PASS・grows 0 |
+| 130 | 3328 / 4608 / 4608 | 4864 | 2 / 1 / 1 | 0 / 0 / 0 | 3456 ×3 | PASS・grows あり・T +256 |
+| 150 | 5376 ×3 | 5632 | 1 / 1 / 1 | 0 / 0 / 0 | 3456 ×3 | PASS・grows あり・T +1024 |
+
+- **結論**: 係数を上げても grows は 0 にならず、最終 T が 256〜1024 フレーム (96k で 2.7〜10.7 ms) 増える。係数は 125 のまま維持する (PM 判断の材料)。
+- **grows が残る原因**: OPEN 較正の初期 T0 (phase 1 の `res[0]` から導く) は run ごとに 3328 相当と 4608 の間で揺れ、run 中 burst 3456 の要求値 (125 で 4608) と 1 段 (256 フレーム) ずれる場合がある。係数を変えると 256 フレームの境界が移るだけで、grows は消えない。§5-3 の旧測定 (run 中 burst 4480) は本測定では再現せず、その場合の要求値 (130: 6144 / 150: 7168) は初期 T0 を上回るため grows は残る。→ 子 issue **[AU-28]** #3051。
+- **underrun**: 6 run (130・150 含む) すべて 0。
+- **e2e 回帰**: `node tools/audio/harness/run.mjs --quick --out <json>` は 44/44 PASS (wall 251.9 s・開始時 load avg (1 分) 0.18)。`inventory.sh`・`tsc --noEmit`・`asio/e2e.sh` (COM 経路) は本測定では未実施。
+- **範囲外 (未実施)**: `au2_matrix.sh 3` 全体 (fake 側・48k 行列) は時間内に収まらず未実施。本節は null 96k のみ。DirectSound 側 `flds.c:258` の 1.25 は未変更 (§6・[AU-28])。
+
 ## 6. 未解決 (実測ではなく実装が必要なものは子 issue)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | ~~Firefox 行列 (PulseAudio null-sink × 48k/96k)~~ | ~~`tools/audio/harness` が Chrome CDP 専用~~ → 解消 (§9・AU-23 #2540) | — |
-| OPEN 較正の安全係数 (1.25 → 候補 1.30〜1.50) の実装と e2e 再測定 | 96k の null-sink で、初回の T 不足を run 中の grows で補っている | **[AU-24]** (子 issue, 実装) |
+| OPEN 較正 burst と run 中 burst のずれで grows が残る (係数は 125 維持・§5-5) | 96k null で grows 0〜2 回・underrun 0。係数の変更では解消しない | **[AU-28]** #3051 |
 | 30 分ソーク (null-sink, 48k B=256) | 10 分 PASS のみ。30 分の underrun 0 は未確認 | #187 (測定のみのため子にせず残す) |
 | P2 burst の p99 | worklet が最大値しか公開しない。分布は未計測 | #187 (worklet 拡張が要るため次 run) |
 | Windows / macOS runner (任意) | 未着手 (受入 4) | #187 |
