@@ -14,6 +14,8 @@
 
 leafspec の gate は FAIL のまま (`match_rate_excl_crash` 0.735 < 1.0)。これは #1270 (HB-H29) の範囲で、本 issue の範囲外。
 
+main 取り込み後の再測定 (merge `9d1dcf2e`) は §7 (同値)。
+
 ## 1. 測定 config
 
 | 項目 | 値 |
@@ -87,3 +89,21 @@ emcc の link 段で出た順の障害: dominance ×4 → 重複シンボル (Wi
 | 支配しない値の代替が無い call 引数 176 件 (0 を渡す。0x1801c2a84 の r8, rsp 基準 lea の r9 など) | 呼出先に 0 の誤値が入る可能性 (match への影響は未測定) | 子 #2861 (HB-H49) |
 | leafspec gate FAIL (match 147/200, rate 0.735) | gate 未達 | #1270 (HB-H29) (既存) |
 | iargs を使う他 cfg の回帰 (`_bind_use` の副作用) | 支配しない値を使っていた既存出力の変化 | 本 PR の未解決 (未測定) |
+
+## 7. main 取り込み後の再測定 (merge `9d1dcf2e`)
+
+PR の競合解消のため `origin/main` (`13fcecca`) を merge した。main 側も liftlib を変えているため、`b1c2d148` 基準の差分確認は非 0 になる。以下は merge commit で再測定した結果。
+
+| 項目 | 結果 (実測) |
+|---|---|
+| 測定 commit (コードを変えた最後の commit) | `9d1dcf2e` (merge。競合は `docs/DOC_MAP.md` の 1 行のみ。`REPORT_APPENDIX_883.md` 行は main 側の更新版を採用) |
+| leafspec `ott_getparam_idx` | match **147** / mismatch 53 / native_crash 0 / wasm_trap 0 (gate FAIL: rate 0.735, thr 1.00。#1270)。wall 96 秒 (20:14:54〜20:16:30。RetDec 22.4 秒を含む) |
+| emcc | 成功。`ott_getparam.wasm` 771,909 B |
+| `icall_tbl_n` / stubs | 105 / 35 |
+| iargs | `site_unbound` 176 / `args_added` 462 / `sites_fixed` 376 (§4.1 の変更後と同値) |
+| `tests/test_unit.py` | `ALL UNIT TESTS PASS` (T1〜T25 ok。20:17:07〜20:22:27 = 5 分 20 秒) |
+| 負荷 | leafspec 開始時 0.29 / 0.38 / 0.19、test_unit 開始時 0.66 / 0.53 / 0.28 (runner 4 コア) |
+
+- 素材: `work-liftlib` / `work-icall` (`tools/icall/work/ott_F.txt` のみ展開) / `work-m6-ott` / `work-liftlib-targets` / `analysis-ott-binaries` (`OTT_DLL` 指定) / `toolchain-emsdk` (`/opt/emsdk`)。`ott_getparam.drc.ll` は素材に無いため、RetDec (`/opt/retdec`) で範囲 `0x18011e5a0-0x18011e6ff` から再生成した (rc=0)。
+- 再現: `cd tools/liftlib && OTT_DLL=<analysis>/plugins/ott/binaries/OTT_vst2_win64.dll python3 -m liftlib leafspec targets/ott_getparam.json --n 200`、`OTT_DLL=... python3 tests/test_unit.py`
+- 差分確認: `git diff 9d1dcf2e HEAD -- tools/liftlib/liftlib tools/liftlib/targets tools/icall/rt | wc -l` → 0 (以降の commit は文書のみ)。
