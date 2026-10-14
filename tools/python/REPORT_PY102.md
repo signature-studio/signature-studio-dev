@@ -17,7 +17,7 @@
 - 差分 0 の証跡: `git diff 63fbd940 HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本 REPORT の commit で増えたのは `tools/python/REPORT_PY102.md` と `docs/DOC_MAP.md` だけ。
 - 検証起点: origin/main `b2b052ce`。
 - 環境: GitHub Actions runner (4 コア)。測定前の `/proc/loadavg` は `0.28 1.14 0.74`、検証の途中は `0.45`〜`0.49` (1 分値)。並列 1 本。
-- 素材: `fl-win64` は `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.86 s)。emsdk は runner に入っている既定値 (`EMSDK_DIR` の既定、emcc 6.0.12) を使った。`toolchain-emsdk` の展開はしていない。
+- 素材: `fl-win64` は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.86 s)。emsdk は runner に入っている既定値 (`EMSDK_DIR` の既定、emcc 6.0.12) を使った。`toolchain-emsdk` の展開はしていない。
 - 素材の利用: `fetch_inputs.sh` で win64 の DATA block から midi.py・utils.py・MCPTools.pyc・device script を配置。stub は `git clone --depth 1 IL-Group/FL-Studio-API-Stubs` (work/ 配下、gitignore)。CPython wasm は `build_cpython_wasm.sh` で作成 (4 分 13 秒)。
 
 ### 検証の実測 (コード commit `445dbf9c`。件数は `63fbd940` で再確認済み)
