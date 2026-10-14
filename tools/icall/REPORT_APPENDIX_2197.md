@@ -19,14 +19,18 @@
 
 `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (closure 131 関数):
 
-- 測定 commit: `ce200f95` (コードを変えた commit。変更は `tools/icall/diff/slot_table_reach.py` の追加のみ)。
-- 所要 12.997 s (real) / user 11.026 s / sys 1.817 s。load average 0.64 (10:18, 開始時)。
-- 結果: funcs 131 / exit rc=0: 69, rc=124: 1, rc=95: 53, rc=98: 8 / zero-fill VA 7 個 / 既知 12 中 hit 3・miss 9。
-- #2170 (REPORT_APPENDIX_2170 §2.1) のベースラインと一致。
-- 鮮度の根拠: 直前の `origin/main` の `f5d2aa3b` から測定 commit `ce200f95` までの測定対象範囲の差分は 0 行。
+- 測定 commit: `fda2d4a6` (コードを変えた最後の commit。PR 側の変更は `slot_table_reach.py` 追加と付録。main 取り込み merge で `slot_trace.c` の fatal 時 ACC 出力 +3 行が入った)。
+- 実行時刻: 10:36:44 開始 (runner 時刻)。load average (uptime の 1 分値) 1.55 (開始時) / 1.50 (終了時 10:36:58)。
+- 所要: 14.156 s (real) / user 10.782 s / sys 1.397 s。
+- 結果: funcs 131 / exit rc=0: 69, rc=124: 1, rc=95: 53, rc=98: 8 / zero-fill VA 10 個 / 既知 12 中 hit 3・miss 9。
+- zero-fill VA 10 個: `0x1813062d0` `0x1813062e0` `0x1813068f8` `0x181306ce0` `0x1813070f8` `0x1813071c8` `0x1813071d0` `0x1813073f0` `0x181307418` `0x181307420`。
+- #2170 のベースライン (zero-fill 7) との差: 上の「比較」を参照。#2170 の 7 件と本測定の 10 件は、旧版 `slot_trace.c` で測った 7 件と一致する。
+- 比較 (旧版): 同条件で `ce200f95` の `slot_trace.c` を実行すると zero-fill VA 7 個 (`0x1813062e0`・`0x1813071c8`・`0x1813071d0` が無い)。
+  増えた 3 件は全て rc=95 (fatal) の関数からの ACC (`slot_trace_enc.txt` の F 行で確認)。既知 12 の判定 (hit 3・miss 9) は変わらない。
+- 鮮度の根拠: 測定 commit から HEAD までの測定対象範囲の差分 (`docs/WORKFLOW.md` §6)。測定 commit = コード差分の最終 commit のため 0 行。
 
 ```
-$ git diff f5d2aa3b ce200f95 -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott tools/targets/freshair tools/icall/work
+$ git diff fda2d4a6 HEAD -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott tools/targets/freshair tools/icall/work
 (出力なし・0 行)
 ```
 
@@ -72,6 +76,8 @@ SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh
 objdump -d -M intel "tools/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64" > tools/icall/work/core64_dis.txt
 python3 tools/icall/diff/slot_table_reach.py tools/icall/work/core64_dis.txt
 ```
+
+- 素材の展開 (fda2d4a6 で実施): `tar --zstd -xf $ARTIFACTS_DIR/plugins-freshair.tar.zst -C $RUNNER_TEMP/plugins-freshair` → `fetch.sh` の出力は `[fetch] win: 17 files, factory .epf: 8, mac: 0 files` (WARN: `Fresh Air.pkg` または xar が無いため mac 展開を skip。lift2 は win のみ使う)。`SlateCore.core_64` (36285952 bytes) の存在を確認。
 
 ## 5. 未解決
 
