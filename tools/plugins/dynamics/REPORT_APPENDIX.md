@@ -139,3 +139,24 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 - 受入条件の判定: (1) `movntps` が unimpl に出ない → 達成。 (2) `emcc -c` rc 0 → 達成。 (3) 復元方式を DECISIONS に記録 → 達成 (D17)。
 - 残件 (本 issue 外): `vcomisd`・`vucomisd`・`vucomiss` は #1774 / #1582 (flag 反映)、`vmovsd` store は #2017。
 - 共有鎖 (`ir5_patch.py`) の変更。 `movntps` を含む他 plugin の出力への影響は **未測定**。 OTT の `tools/liftlib/work/ott_lift.ll` 等で 8 件ずつ出るため、liftlib e2e (`tools/liftlib/liftlib_e2e.sh`) での回帰確認が要る (本 run では素材不足で未実行)。
+
+## G. [PLG-F3-19] #2047: B1 の 0 埋め内訳と方式選定 (測定 HEAD: b073ffa3)
+
+- 測定: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/plugins/dynamics/engine_lift.sh 19252 900` を HEAD `b073ffa3` で foreground 実行。 結果 `19252,522,0,551,0,5,0,0,0,17,0,0,0,29,549` (lift_rc 0 / define 551 / unimpl 5 / emcc_c_rc 0 / fixcmp 後 emcc rc 0)。 所要 21.6 s (`time` 実測)、load average (1 分) 0.87 → 0.90。
+- 残件 (`e.simd.log`): `__asm_movntps`・`__asm_vcomisd`・`__asm_vmovsd(i64,i128)`・`__asm_vucomisd`・`__asm_vucomiss` の 5 件。 `vmovsd` store 形は本 run でも unimpl のまま (受入条件 1 は未達)。
+- **B1 の 0 埋め 322 件の内訳** (`e.lift.ll` の `= xor i64 0, 0` 行、再現: `python3 dynamics/b1_measure.py work/dynamics/engine19252`):
+  - 関数数 187、合計 322 (grep 検算 322 と一致)。
+  - 上位: `function_180010e10` 8・`function_18000499e` 8・`function_1800078a0` 7・`function_18001392e` 6・`function_18001373b` 6。
+  - `function_180019c20` は 4 件 (`%1` 由来の load は 3 件。 4 件目の出所は未確認)。
+- `function_180019c20` の検証 (e.drc.ll): `alloca i64 %1` への `store` は 0 件、`%1` 由来の load は 3 件、関数内の `__asm_vmovsd` 呼出は 28 件。 RetDec が rsp 相対の spill を store の無い `%1` に併合している、という §F の結論を再確認した。
+- **方式選定**: 候補 B (RetDec 出力の spill 併合 `%1` を、機械語の rsp オフセット (0x20・0x30) ごとの slot に分けて store/load を復元する pass を、`function_180019c20` 系の rsp 併合に限定して追加) を採用する。 理由: 候補 A (B1 の 0 埋めを条件付きで止める) は、判定に rsp オフセット情報が要り、結局 B と同じ解析が要る上、共有 lift 鎖 (全 plugin) の差分測定が前提になる。 B は B1 の挙動を変えないため、共有鎖への影響は pass が発火する関数に限られる。 **実装は未着手** (#2017 の範囲)。
+- 共有鎖への影響 (B1 を変えた場合の全 plugin 差分) は**未測定**。 候補 A を採らないため、本 run では測らない。 (未解決・起票先: #2017)
+
+### G-1. 判定 (本 run)
+
+- 採用: 方式 B を選定 (上記)。 実装と「`vmovsd` store が unimpl から消える」「`emcc -c` rc 0 のまま」「分岐値の一致確認」は #2017 に残す。
+- 受入条件 (issue #2047 本文) の対応:
+  1. `vmovsd` store が unimpl から消える → **未達** (#2017)。
+  2. `emcc -c` rc 0 → 現 HEAD で rc 0 (維持)。 ただし変更は無いので本 run の寄与ではない。
+  3. 方式の選定と B1 内訳の測定 → **達成** (本節)。 共有鎖への影響の測定 → **未達** (#2017)。
+  4. `function_180019c20` の分岐値 = spill 読み戻し値の IR 確認 → **未達** (#2017)。
