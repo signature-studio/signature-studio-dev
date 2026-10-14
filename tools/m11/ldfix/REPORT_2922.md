@@ -6,14 +6,14 @@
 
 ## 1. 測定
 
-- 測定 commit: `be5f4697` (`origin/main` の `e87eb52a` を取り込んだ merge。ldfix のコードは `55ed65a2` から変えていない)。直前の測定 commit は `55ed65a2` (`origin/main` の `3d37a190` を取り込んだ merge)。取り込み前の PR 測定は `ff010340` (基点 `71bf0957`)
-- main 取り込み (`be5f4697`): `origin/main` (`e87eb52a`) を merge。競合なし (auto-merge)。main 側の変更は `docs/DOC_MAP.md` (REPORT_1620 行) と `tools/m11/trap_triage/` のみで、ldfix のコードと results は変わらない
+- 測定 commit: `e272ee3c` (`origin/main` の `bf725b96` を取り込んだ merge。コードを変えた最後の commit)。直前の測定 commit は `be5f4697` (`e87eb52a` の取り込み)・`55ed65a2` (`3d37a190` の取り込み)。取り込み前の PR 測定は `ff010340` (基点 `71bf0957`)
+- main 取り込み: (1) `55ed65a2`: `origin/main` (`3d37a190`) を merge。競合は `docs/DOC_MAP.md` と `spill_classify_1161.py` の 2 箇所。(2) `be5f4697`: `origin/main` (`e87eb52a`) を merge。競合なし。(3) `e272ee3c`: `origin/main` (`bf725b96`・#2837 を含む) を merge。競合は `spill_classify_1161.py` の docstring 1 箇所で、2837 と 2922 の候補判定の両方を残した。`spill178_1161.tsv` は統合後の script で再生成し、merge の結果と一致。rebase はしていない
 - 素材: `work-m11` / `work-liftdiff` は repo 外に展開し、`M11_WORK` / `LD_WORK` で指定した (repo の `tools/**/work/` には置かない)。実行は `git archive` で repo 外に書き出した HEAD で行った
-- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground)。`be5f4697` で rc=0・real 122s・load average 0.89 → 1.13・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)。`55ed65a2` では rc=0・real 159s・load average 0.10 → 1.10・7/7 完了
+- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground)。`e272ee3c` で rc=0・real 123s・load average 0.04 → 0.91・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)。`be5f4697` では rc=0・real 122s・load average 0.89 → 1.13・7/7 完了 (cmp OK)。`55ed65a2` では rc=0・real 159s・load average 0.10 → 1.10・7/7 完了
 - 取り込み前の測定 (`ff010340`): rc=0・real 154s・load average 0.93・7/7 完了・cmp OK
-- 集計 (7/7、`be5f4697`。`55ed65a2` と同値): spill 宛 unk site 178 / 71 関数。status 確定 127 (前 124) / 判定不能 29 (前 30) / 未判定 22 (前 24)。「前」は `origin/main` (`3d37a190`) の `spill_classify_1161.py` を同じ `ssa.json` に当てた実測 (`results/spill178_1161.tsv` と一致)
-- 脱落関数の和集合: spill 宛の確定 TRUE_DROP 関数 25 (前 24)。増分は `12cb680`。A ∪ B ∪ C = 69 + 7 = **76** (前 75)
-- 測定後の差分: `git diff be5f4697 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)。`git diff 55ed65a2 be5f4697 -- (同範囲)` も出力なし
+- 集計 (7/7、`e272ee3c`): spill 宛 unk site 178 / 71 関数。status 確定 139 (前 136) / 判定不能 29 (前 30) / 未判定 10 (前 12)。「前」は `origin/main` (`bf725b96`) の `spill_classify_1161.py` を同じ `ssa.json` に当てた実測 (main の `results/spill178_1161.tsv` と一致)
+- 脱落関数の和集合: spill 宛の確定 TRUE_DROP 関数 26 (前 25)。増分は `12cb680`。A ∪ B ∪ C = 69 + 8 = **77** (前 76 = 69 + 7)
+- 測定後の差分: `git diff e272ee3c HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)。HEAD の増分は REPORT の文言のみ
 - 差し戻し後の修正 (文書のみ): REPORT の文言と PR 本文だけを変えた。コードと results は変えていない
 - 差し戻し後の e2e 再実行 (取り込み前の `bd643abf`): rc=0・real 157s・load average 0.48 → 0.96・7/7 完了・cmp 一致。集計は確定 123 / 判定不能 29 / 未判定 26 (取り込み前の値)
 
@@ -52,7 +52,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `m11_tr_function_12cb680` の `%a0` 経路 (外部から渡される任意の関数ポインタ) の先 | 判定の基準の外 (既知 3 先の 1 本で判定が立つ)。その先が実行時に到達するか、`[rcx+4]` を読まないかは未確認 | PM (判定範囲の確認) |
-| `12cb680` の間接 call 11 本 (`call [rbp+0x70]`) が IR に 0 本。関数内の他の store/load も同じ脱落か | 脱落関数の和集合 75 の類型 | PM (`docs/DEFECTS.md` 類型の判断) |
+| `12cb680` の間接 call 11 本 (`call [rbp+0x70]`) が IR に 0 本。関数内の他の store/load も同じ脱落か | 脱落関数の和集合 77 の類型 | PM (`docs/DEFECTS.md` 類型の判断) |
 | 書き戻し `[rbx]`・`[rdi]` (`12cb908`・`12cba78`・`12cbad2`) の IR 対応 | spill の判定とは別の store 脱落の有無 | PM (判定の要否) |
 
 ## 5. 再現
