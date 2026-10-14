@@ -414,7 +414,7 @@ unsigned long long function_412d60(unsigned long long dest, unsigned long long u
  *   elem=Q(ti+6+B(ti+1)) があり len=Q(old-8)!=0 なら 0x416230(old, Q(elem), len) (要素 finalize) → 0x409440(old-0x10). 戻り値 = dest */
 unsigned long long function_418190(unsigned long long dest, unsigned long long ti, unsigned long long unused) {
     (void)unused;
-    u64 old = Q(dest);
+    u64 old = D(dest);  /* IR の ptr 格納は 4 byte (wasm32)。8 byte 読みは上位 4 byte の残骸を拾う (#942) */
     if (old) {
         Q(dest) = 0;
         int rc = (int)D(old - 0xc);
