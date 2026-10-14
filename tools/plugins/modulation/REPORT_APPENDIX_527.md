@@ -107,3 +107,47 @@
 - `0x6df110` (呼出元 `0x6df130` を含む) は `0x6db430` で解決し、失敗時に `0x6db460` (名前表の総当たり) へ進む。`0x6df110` への direct call は無い (関数ポインタ経由と推定)。`.text` 0x6da390 に `0x6df110` を値とする 8 バイト slot が 1 件あり (0x6da180 には `0x6df190` の slot)、その slot を読む rip 相対参照は検出していない (未確定)。
 - **VP (19267)**: `VSTPluginMain` (0x6dc268) の slot は 2 件 (0x741720 / 0x7417b0)。近傍 0x741700〜0x741718 の表を lea/rip で参照する。VP の解決関数は未追跡。
 - 判定: VC の名前表 → 解決関数 `0x6db460` → `0x6df110` までは静的に確定。`0x6df110` を実際に呼ぶ経路 (間接呼出の読み手) と、VP の解決関数は未了。殻と engine の結合方式全体は未確定のまま、受入 5 は本 issue に残す。
+
+## N. VST 入口解決の経路 (受入 5 の続き、本 run の測定)
+
+測定 commit: `8505816a` (コード差分の最終 commit)。`git diff 8505816a HEAD -- tools/plugins/modulation/ ':(exclude)*.md'` の出力: 空 (以後の差分は本付録の文書のみ)。
+測定対象は fl-win64 素材の殻 2 本 (`$ARTIFACTS_DIR/fl-win64.tar.zst` の `extracted/block19265_PE.bin` = VC、`block19267_PE.bin` = VP)。静的のみ。
+スクリプト: `engine_shell_ripref.py` (全バイト位置の総当たりで rip 相対・rel32・abs32 の参照を列挙)、`engine_shell_func.py` (.pdata 範囲・直接呼出元・関数ポインタ slot・逆アセンブル、IAT の import 名を付与)、`engine_shell_names.py` (名前表の復元)、`engine_shell_vst.py` (§M)。
+測定値の総和: 17 コマンドの実行時間は 72 s (sec 列の和。`engine_shell_vst.py` の VP が 51 s)。
+正の対照: 既知の参照 (`0x6df130`→`0x6db460`、`0x6db488` の `lea`→`0x73e440`、`0x6dcd18` の `lea`→`0x741718`) を全て検出。
+
+### N.1 名前表 (VC 0x73e440 / VP 0x741718、各 26 件)
+
+- 26 件は全て UTF-16 文字列へのポインタで、VC と VP で同一の並び。
+- 内訳: `main` の大文字小文字違い 16 通り (index 2〜17) と、`VSTPluginMain` の大文字小文字違い 9 通り (index 0・1・18〜25)。index 1 と 19 は同じ文字列 (`VSTPluginMain`) の重複。
+- 解釈 (推定): 殻は VST2 入口を GetProcAddress の大文字小文字違いで総当たりする。engine 側の export は `VSTPluginMain` / `main` (§J・REPORT §4)。
+
+### N.2 名前表の読み手 (rip 相対 lea を全位置から総当たりで列挙)
+
+| 殻 | 表 VA | lea 元 | 関数 (.pdata 範囲) | 役割 | 呼出 |
+|---|--:|--:|---|---|---|
+| VC | 0x73e440 | 0x6db488 | 0x6db460 (size 0x79) | 26 件を反復し、各名前を 0x6db430 に渡して非 0 の結果を返す | 直接: 0x6df130 (0x6df110 の内側) のみ |
+| VC | 0x73e440 | 0x6e6121 | 0x6e60f0 (size 0x51) | 一度きりの初期化 (counter が 0 のとき表を整え、0x411680 を r8=26 で呼ぶ) | 間接: .text 関数ポインタ slot 0x6eff28 のみ |
+| VP | 0x741718 | 0x6dcd18 | 0x6dccf0 (size 0x79) | VC の 0x6db460 と同型 | 直接: 0x6e09c0 (thunk 0x6e09a0 の内側) のみ |
+| VP | 0x741718 | 0x6e79f1 | 0x6e79c0 (size 0x51) | VC の 0x6e60f0 と同型 | 間接: .text 関数ポインタ slot 0x6f3668 のみ |
+
+- VC の 0x6e60f0 は本 run で初めて確認した読み手 (§M までは 0x6db488 のみ)。
+
+### N.3 入口 thunk と .text 内の関数ポインタ表
+
+- 入口 thunk: VC `0x6df110` (size 0x2b) / VP `0x6e09a0` (size 0x2b)。引数 rdx = module、r8 = 名前。r8 ≠ 0 なら GetProcAddress ラッパーで名前を解決し、失敗時と r8 = 0 のときは名前表の総当たり (0x6db460 / 0x6dccf0) へ進む。
+- 入口 thunk は直接 call・rip 相対参照・abs32 のいずれでも参照されない。.text 内に 8 バイトの値として 1 件だけ存在する (VC slot `0x6da390`、VP slot `0x6dbc20`)。
+- その slot は 136 件の関数ポインタ表の中にある (VC 0x6d9f60〜0x6da3a0、VP 0x6db7f0〜0x6dbc30)。入口はどちらも表の index 134。
+- 表そのもの (先頭や表内の任意位置) を指す rip 相対参照は、表の範囲 ±0x220 で見つからない。表の範囲内で候補に出た 3 件 (VC) と 1 件 (VP) は、表要素のバイト列を命令として誤デコードしたもの。
+- 結論: 入口 thunk を呼ぶ読み手 (= VST2 入口の呼出元) は静的には未特定。読み手は基点を計算で作る間接参照と推定 (未検証)。VC の PE ファイル全体に `e8 00 00 00 00` (call 次命令) が 49 件あり、位置取りの可能性は未検証。
+
+### N.4 GetProcAddress の経路 (確認済み)
+
+- VC: 0x6db430 → 0x40ffe0 (名前の変換。詳細は未確認) → 0x41d1b0 (序数か名前かで分岐するラッパー) → 0x41d1a0。0x41d1a0 は `jmp qword ptr [rip+…]` で、IAT の `kernel32!GetProcAddress` を指す (`engine_shell_func.py` で確認)。
+- VP: 0x6dccc0 → 0x40ffe0 → 0x41d1d0 (ラッパー) → 0x41d1c0 (IAT `kernel32!GetProcAddress`)。
+
+### N.5 判定
+
+- 確定: 名前表 26 件の内容、名前表の読み手 (各殻 2 件)、入口 thunk の構造、GetProcAddress の経路。
+- 未確定: 入口 thunk (VC 0x6df110 / VP 0x6e09a0) を呼ぶ箇所、すなわち VST2 engine の `VSTPluginMain` 呼出元。関数ポインタ表の読み手も未特定。
+- 受入 5 のうち VC/VP の呼出元は未達のまま #527 に残す。
