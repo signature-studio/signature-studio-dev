@@ -169,7 +169,7 @@
 
 ### §A5-3. RVA 候補 72 組の指す先の切り分け (#2052, 実測)
 
-- 測定 commit: `590206da` (`ks_rdata_rva_table.py` を追加した commit)。`git diff 590206da HEAD -- tools/targets/freshair` は 0 行 (本節の文書のみ)。
+- 測定 commit: `590206da` (`ks_rdata_rva_table.py` を追加した commit)。`590206da` から本 fix までの `ks_rdata_rva_table.py` の差分は `--sensitivity` モードの追加のみで、`main()` (RVA 候補の分類経路) は不変。
 - 再現: `ks_identity.sh` → `ks_rdata_class.py` → `ks_rdata_value.py` (§A5 と同じ入力) → `python3 ks_rdata_rva_table.py <HeartCore.core_64> <SlateCore.core_64> rdata_class.json out.json`。素材は `plugins-kilohearts` (`HeartCore.core_64`) と `plugins-freshair` (`SlateCore.core_64`)。
 - 方法: `rva_pair` 72 組 (§A5-2) の各組について、指す先の 32 B を dword 単位で読み、先頭から RVA dword (上位 32 bit が 0・セクション範囲内) の連続長 `run` を数える (最大 16)。`run >= 2` を RVA テーブル、それ未満を整数定数とした。
 - 結果 (測定 commit `590206da`、`ks_rdata_rva_table.py` の JSON を 2 回実行で byte 一致、EXIT=0、0.27 s real、load 0.13、nproc=4):
@@ -183,12 +183,14 @@
 | 整数定数と判定された組 | 72 (指す先の 8 B: 一致 0・不一致 72) |
 
 - 感度の確認 (陽性対照・同じ分類器): KH の `.rdata` を 32 B 境界で走査すると、`run = 0` 599,263 ブロック・`run = 1` 49,084・`run >= 2` 33,479 ブロック。つまり分類器は RVA 列を検出できる (0 件は検出不能の結果ではない)。
+  - 再現: `python3 ks_rdata_rva_table.py --sensitivity <HeartCore.core_64>` (`ks_rdata_rva_table.py` の `sensitivity()`。`rva_run` と同じ判定で `.rdata` を 32 B 境界ごとに 3 区分する)。素材は `plugins-kilohearts` (`HeartCore.core_64`)。
+  - 注記: 上記 3 区分の数値は測定 commit `590206da` の実測値。`--sensitivity` は本 commit で追加したため、KH 素材での HEAD 再実行はこの run では未実施 (`plugins-kilohearts` が `$ARTIFACTS_DIR` に無い)。fl-win64 の exe での動作確認のみ (`blocks` 196 ブロック・EXIT=0)。
 - 関数別 (value 17 件): `rva_pair` を持つ関数は 7 件 (`0x18100ca28` 15・`0x18100cc50` 12・`0x18103d218` 23・`0x18103d47c` 12・`0x180f9e540` 2・`0x18105aec8` 4・`0x18105bb90` 4 の合計 72)。残り 10 件は `rva_pair` が 0。
 - 併せて §A5-2 の語単位結果と突き合わせると、72 組の SC 側 16 B は全て KH の `.rdata` 内に存在しない (`rva_off_absent` 72)。
 
 判定:
 - 受入 1 (RVA テーブルか整数定数かの切り分け): **達成**。72 組は全て RVA テーブルではない (指す先の先頭 dword が RVA でない)。整数定数側に分類。
-- 受入 2 (RVA 差分で正規化した上で value 17 件を再判定): **達成 (正規化不要と判定)**。RVA テーブルでないため、配置差の正規化を適用する対象が無い。正規化なしの再判定は 17 件とも `value_differs` のまま (§A5-2 と同じ)。
+- 受入 2 (RVA 差分で正規化した上で value 17 件を再判定): **達成 (正規化不要と判定)**。RVA テーブルでないため、配置差の正規化を適用する対象が無い。正規化なしの再判定は 17 件とも `value_differs` のまま。この再判定は §A5-2 の結果をそのまま引用しており、`RVA 対象なし` のため §A5-2 の判定を据え置く (新たな再計算は行っていない)。
 - 受入 3 (本節の追記): 本節で達成。
 
 判定の限界:

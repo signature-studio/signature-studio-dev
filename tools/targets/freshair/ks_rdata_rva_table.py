@@ -7,7 +7,9 @@
 - 指す先が RVA テーブルでない組は、RVA 差分による正規化の対象にならない (配置差で説明できない)。
   その組は整数定数 (または RVA でない別データ) として扱い、指す先の 8 B の一致を見る。
 - 出力: 組ごとの run (SC/KH)、分類 (table / const)、指す先 8 B の一致、関数ごとの件数。
+- --sensitivity: 分類器の陽性対照。.rdata を 32 B 境界で走査し、先頭ブロックの run で 3 区分 (0 / 1 / >=2) を数える。
 usage: ks_rdata_rva_table.py <HeartCore.core_64> <SlateCore.core_64> <ks_rdata_class.json> <out.json>
+       ks_rdata_rva_table.py --sensitivity <PE>
 """
 import sys, os, json, struct, collections
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -74,5 +76,35 @@ def main(kp, sp, cls_json, out):
     json.dump(dict(summary=res, funcs=funcs), open(out, 'w'), indent=1, sort_keys=True)
 
 
+class _Raw:
+    """.text/.pdata を要求しない読み取り専用の PE 窓 (rva_run が使う属性だけ)。"""
+
+    def __init__(self, path):
+        import pefile
+        self.pe = pefile.PE(path, fast_load=True)
+        self.base = self.pe.OPTIONAL_HEADER.ImageBase
+        self.data = open(path, 'rb').read()
+        self.secs = {s.Name.rstrip(b'\0').decode(): s for s in self.pe.sections}
+
+    def rva_bytes(self, rva, n):
+        s = next(s for s in self.pe.sections if s.VirtualAddress <= rva < s.VirtualAddress + s.Misc_VirtualSize)
+        o = s.PointerToRawData + rva - s.VirtualAddress
+        return self.data[o:o + n]
+
+
+def sensitivity(path):
+    pe = _Raw(path)
+    rd = pe.secs['.rdata']
+    lo, hi = rd.VirtualAddress, rd.VirtualAddress + rd.Misc_VirtualSize
+    c = collections.Counter()
+    for rva in range(lo, hi, 32):
+        r = rva_run(pe, rva)
+        c['run0' if r == 0 else 'run1' if r == 1 else 'run>=2'] += 1
+    print(json.dumps(dict(path=os.path.basename(path), blocks=sum(c.values()), **dict(sorted(c.items()))), sort_keys=True))
+
+
 if __name__ == '__main__':
-    main(*sys.argv[1:5])
+    if sys.argv[1] == '--sensitivity':
+        sensitivity(sys.argv[2])
+    else:
+        main(*sys.argv[1:5])
