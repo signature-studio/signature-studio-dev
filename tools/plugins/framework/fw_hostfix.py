@@ -171,16 +171,20 @@ OVERRIDES = {
   store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
   ret i64 0
 }''',
-    # 0x52cf40: RTL ハッシュ表検索 (native: CRC32(name) バケット巡回)。呼出元 0x40bce0 経由で
-    # 到達し, 本体が [@24+56] の u16 (name 長) を name ポインタとして 0x52ce00 に渡すため
-    # CRC32 のバイト読取が OOB (hs_dbg 実測: 0x52ecc0 → 0x40bce0 → 0x40b3f0 → 0x40bce0 →
-    # 0x52cf40 → 0x52ce00 で trap)。「見つからない」= 0 を返す fail-soft (REPORT_1229.md §2)。
+    # 0x52cf40: native では命令境界ではなく, .pdata 関数 [0x52ce50,0x52cf67) の途中
+    # (0x52cf3e の mov の内部)。native に 0x52cf40 への直接 call は無く (E8 走査 0 件),
+    # 0x52ce00 へ分岐する経路も無い (REPORT_2070.md §3.1)。よって lift の function_52cf40 は
+    # 途中から decode された artifact。旧注釈の「CRC32 → 0x52ce00 で OOB」は誤り。
+    # 0 を返す fail-soft は呼出元 (0x52d230) の「不一致 = 0」分岐に合わせた stub (意味づけは推定)。
     0x52cf40: '''define i64 @function_52cf40() local_unnamed_addr {
   store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
   ret i64 0
 }''',
-    # 0x4e6060: 0x4e5fc0 から呼ばれる自己再帰 (fold で停止条件が崩れ, hs_dbg 実測で同一
-    # 関数に 40 段入って "Maximum call stack size exceeded")。「該当なし」= 0 で fail-soft。
+    # 0x4e6060: native では関数ではなく RTTI 文字列 "Object>.ParrayofT" の領域 (.text 内・.pdata 外)。
+    # 0x4e5f50 (= "tem.Generics.Defaults" の領域) と同様, native に直接 call は無い (E8 走査 0 件)。
+    # 旧注釈の「0x4e5fc0 からの自己再帰」も, 0x4e5fc0 が .pdata 外のデータ領域で関数として成立しない
+    # (REPORT_2070.md §3.2)。lift の function_4e6060 は文字列を関数として decode した artifact。
+    # 「該当なし」= 0 の fail-soft は呼出元の分岐を通すための stub で, native の根拠は無い。
     0x4e6060: '''define i64 @function_4e6060() local_unnamed_addr {
   store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
   ret i64 0

@@ -1,0 +1,80 @@
+diff --git a/tools/m11/m11_build.sh b/tools/m11/m11_build.sh
+index 1cd10b1d..3ac6eff6 100755
+--- a/tools/m11/m11_build.sh
++++ b/tools/m11/m11_build.sh
+@@ -25,7 +25,7 @@ M11_OV_INSTR="${M11_OV_INSTR:-$M11_INSTR_413060}"   # #1701: ov.o をコンパ
+ M11_LINK_INSTR="${M11_LINK_INSTR:-$M11_INSTR_413060}"   # #1701: リンク時の EXPORTS (_m11_dest_obs_* 等) を足すか。既定は M11_INSTR_413060 と同じ
+ M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
+ M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
+-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0}"
++CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_INSTR_1602=${M11_INSTR_1602:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0}"
+ # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
+ python3 - <<PYEOF
+ import sys
+@@ -189,6 +189,9 @@ if [ "$(cat work/ov_instr_40ff70.stamp 2>/dev/null || echo none)" != "${M11_INST
+ if [ "$(cat work/ov_entry_probe.stamp 2>/dev/null || echo 0)" != "${M11_ENTRY_PROBE:-0}" ]; then rm -f work/obj/ov.o; fi
+ echo "${M11_ENTRY_PROBE:-0}" > work/ov_entry_probe.stamp
+ echo "${M11_INSTR_40FF70:-0}" > work/ov_instr_40ff70.stamp
++# #1602: 計測 probe (M11_INSTR_1602) の ON/OFF で古い ov.o を再リンクしない
++if [ "$(cat work/ov_instr_1602.stamp 2>/dev/null || echo none)" != "${M11_INSTR_1602:-0}" ]; then rm -f work/obj/ov.o; fi
++echo "${M11_INSTR_1602:-0}" > work/ov_instr_1602.stamp
+ echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
+ CF="${CF_BASE//-DM11_INSTR_413060=$M11_INSTR_413060/-DM11_INSTR_413060=$M11_OV_INSTR}" cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
+ cc work/m11_data.c work/obj/data.o
+diff --git a/tools/m11/m11_ov.c b/tools/m11/m11_ov.c
+index 98fed71c..492a82a7 100644
+--- a/tools/m11/m11_ov.c
++++ b/tools/m11/m11_ov.c
+@@ -552,6 +552,22 @@ u64 function_535c11(u64 self) {
+ }
+ u64 function_535bf2(u64 self) {
+     u64 items;
++#if M11_INSTR_1602
++    {
++        unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
++        int self_in = self >= 0x18 && self + 0x18 <= heap;
++        unsigned long long p8 = self_in ? *(volatile unsigned long long*)(uintptr_t)(self + 8) : 0;
++        int p8_in = p8 >= 8 && p8 + 16 <= heap;
++        unsigned long long tbl = p8_in ? *(volatile unsigned long long*)(uintptr_t)(p8 + 8) : 0;
++        unsigned long long cnt = self_in ? *(volatile unsigned long long*)(uintptr_t)(self + 0x10) : 0;
++        int tbl_in = tbl >= 8 && tbl + 8 <= heap;
++        unsigned long long e = tbl + (cnt + 1) * 24;
++        int e_in = tbl_in && e + 4 <= heap;
++        if (!(self_in && p8_in && tbl_in && e_in))
++            M11_TRACE("[m11][1602] 535bf2 self=0x%llx self_in=%d [self+8]=0x%llx p8_in=%d tbl=0x%llx tbl_in=%d cnt=%llu e=0x%llx e_in=%d heap=0x%llx\n",
++                      self, self_in, p8, p8_in, tbl, tbl_in, cnt, e, e_in, heap);
++    }
++#endif
+     Q(self + 0x10) += 1;
+     items = Q(Q(self + 8) + 8);
+     if (*(volatile u32*)(uintptr_t)(items + Q(self + 0x10) * 24) != 0xffffffffu) return (items & ~0xffULL) | 1;
+@@ -1116,7 +1132,29 @@ static u64 ov_getter_478c70(u64 info, u64 size) {
+  *   勝った値が new と異なれば new を 407e20 (FreeMem) で解放. 戻り = *rsi & ~1. */
+ extern unsigned long long function_410650(void);
+ extern unsigned long long function_407e20(unsigned long long);
++#ifndef M11_INSTR_1602
++#define M11_INSTR_1602 0
++#endif
++#if M11_INSTR_1602
++/* #1602 計測専用: obj と [obj]-0x80 (InstanceSize の読出し先) が線形メモリ内かを読む. 範囲外のときだけ stderr に出す.
++ * 読めない値は読まない (範囲外の時点で本体も trap する位置なので、判定は変わらない). */
++static void m11_1602_410b10(unsigned long long obj) {
++    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
++    int obj_in = obj >= 0x80 && obj + 8 <= heap;
++    unsigned long long vmt = obj_in ? *(volatile unsigned long long*)(uintptr_t)obj : 0;
++    int vmt_in = vmt >= 0x80 && vmt + 4 <= heap;
++    unsigned long long isz = vmt_in ? *(volatile unsigned int*)(uintptr_t)(vmt - 0x80) : 0;
++    int isz_in = vmt_in && vmt - 0x80 + 4 <= heap;
++    unsigned long long slot = obj + isz - 8;
++    int slot_in = isz_in && slot >= 8 && slot + 8 <= heap;
++    if (!(obj_in && vmt_in && isz_in && slot_in))
++        M11_TRACE("[m11][1602] 410b10 obj=0x%llx obj_in=%d vmt=0x%llx vmt_in=%d isz=0x%llx slot=0x%llx slot_in=%d heap=0x%llx\n", obj, obj_in, vmt, vmt_in, isz, slot, slot_in, heap);
++}
++#endif
+ unsigned long long function_410b10(unsigned long long obj) {
++#if M11_INSTR_1602
++    m11_1602_410b10(obj);
++#endif
+     u64 slot = obj + (u64)(long long)(int)D(Q(obj) - 0x80) - 8;
+     u64 cur = Q(slot);
+     u64 mon = cur & ~1ull;

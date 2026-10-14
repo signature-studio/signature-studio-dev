@@ -110,6 +110,7 @@
 | `tools/liftdiff/tests/ld39_abi_dump.py` | ~80 | LD-39 (#1194) の ABI 入口ダンプ: 11 関数の PE 先頭命令列を capstone で並べ、jmp thunk の IAT 先を解決する。ABI は断定せず、判定は REPORT_LD39.md で人が行う |
 | `tools/icall/REPORT.md` | ~245 | 間接 call/jmp 落ち監査 + 復元 pass。§10.1 (#530)・§11 (ICALL-6 #361)・§12 (ICALL-16 #1023) は要約のみで全文は `REPORT_APPENDIX.md` §14 に分割。§13 (#1026 Fresh Air 残落ち 6 件) は結論 1 行のみで全文は `REPORT_APPENDIX_1067.md` §13 |
 | `tools/icall/REPORT_APPENDIX.md` | ~214 | icall REPORT §10.1 (#530 OTT 回帰再実行)・§11 (ICALL-6 #361)・§12 (#229 FLEngine 分割 lift・§12.1 ICALL-9 #847)・§14 (ICALL-16 #1023 stack 引数の実測。REPORT §12 から分割移動)・§15 (#851 の結論 1 行)・§16 (#852 FLEngine jump table) の全文 (250 行上限のため分割移動) |
+| `tools/icall/REPORT_APPENDIX_2081.md` | ~78 | icall #2081 (ICALL-57): SlateCore encoded slot の静的解析 (`slatecore_fptr_table.py`)。受入条件 1・3 は未達で #2120 へ。受入条件 2 は部分達成 (12 slot は zero-fill 部の参照として確認) |
 | `tools/icall/REPORT_APPENDIX_1921.md` | ~72 | icall #1921 (ICALL-51): SlateCore の encoded 関数ポインタ表・cookie の特定と、native loader の enc(NULL)=cookie 初期化 (`FA_ENC_INIT=1`)。受入条件 1・2 は部分達成 (wasm 側と api-set 表は #2009・#1922 へ移管)。`fa_sweep.sh 8 60` の件数変化の実測を含む |
 | `tools/icall/REPORT_APPENDIX_1838.md` | ~50 | icall #1838 (ICALL-41): CHAININFO 断片による Fresh Air 範囲の伸長 (`prep_targets.py` の `chain_end`・親同一性チェック)。実 PE での伸長件数・roundtrip の再測定は素材待ち (本付録 §3 に状態を記す) |
 | `tools/icall/REPORT_APPENDIX_1067.md` | ~71 | icall REPORT §13 (#1026: Fresh Air 残落ち 6 件) の全文 (`REPORT_APPENDIX.md` §13 から分割移動) と、#1067 (ICALL-20) の段別切り分け。段別の主張は推定・既存記録のみで、dump 再生成は未実施 (素材 `work-icall`・`plugins-freshair` が要る) |
@@ -370,7 +371,7 @@
 | `tools/targets/kilohearts/snapins/REPORT.md` | ~200 | KH 共通基盤 lift + SnapinMasterDsp ホストハーネス |
 | `tools/targets/kilohearts/ui_eval/REPORT.md` | ~135 | KH-7 Kilohearts UI (Skia CPU ラスタ) → M7 HUD 接続可否評価 |
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
-| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~113 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・FA-18 の切り分け (§A3-2)・meter 更新式の照合 (§A3-3, #1467)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)・語単位切り分け (§A5, `ks_rdata_value.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 |
+| `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~113 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・FA-18 の切り分け (§A3-2)・meter 更新式の照合 (§A3-3, #1467)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)・語単位切り分け (§A5, `ks_rdata_value.py`)・RVA 候補の指す先の切り分け (§A5-3, `ks_rdata_rva_table.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA22.md` | ~60 | freshair FA-22 (#1578) の付録。FA_NODE1=1 時の setter 0x180c9d74c の失敗形 (逆アセンブル・実測)。部分達成で、判定は子 #1789・#1791 に分割 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA16.md` | ~50 | freshair REPORT §12-5 (未解決: 非空 controller map による 0x180da6c00 到達) の静的読み付録 (FA-16 #1182)。0x180ca1480 の分岐・0x180ca7db0 の map lower_bound ノード配置・0x180c9d700 / 0x180da6c00 の入口条件。実行による検証は含まない。REPORT §12-5 から分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
