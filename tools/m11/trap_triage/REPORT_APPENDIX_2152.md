@@ -1,6 +1,6 @@
 # REPORT_APPENDIX_2152 — unit 158 の後続経路と ON 書換えの 2 区間計装 (#2152, 親 #2118)
 
-REPORT_944.md の #2152 追記 (旧 §11) の付録。測定 commit: **`28425bf8`** (コードを変えた最後の commit = main (`1825c26a`) 取り込み後の merge。実測はこの commit の状態で行った)。
+REPORT_944.md の #2152 追記 (旧 §11) の付録。測定 commit: **`8627b643`** (コードを変えた最後の commit = main (`3b581236`) 取り込み後の merge。実測はこの commit の状態で行った)。
 
 ## 1. 結論 (受入条件 1〜4)
 
@@ -50,15 +50,15 @@ j=12 (0 始まりで 13 行目) は `dest=0x10a9e0b8 len=1`。`n>0` 経路で `f
 
 ## 4. 決定性・所要・load (受入 4)
 
-測定 commit `28425bf8` の状態での実測 (4 core・各行の load は開始時の 1 分平均)。
+測定 commit `8627b643` の状態での実測 (4 core・各行の load は開始時の 1 分平均)。
 
 | 測定 | 内容 | 結果 | elapsed | load (開始) |
 |---|---|---|--:|--:|
-| 既定 survey | `M11_OV_413060=0 M11_INSTR_413060=0 bash m11_build.sh` → `node m11_survey.mjs` | ok 870 / trap 24 / miss 47 / noproc 1 / units 942 | build 17.3 s + survey 8.5 s = 25.8 s | 0.95 |
-| repro_1389 | `trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON) | **PASS**。OFF/OFF2 は 227 件完全一致。OFF/ON は 216 件で揃い差分 1 件 (unit `0x26d1a0` j=12: `st/len/rc` 0→1、`h` 変化) | 全体 73.4 s (survey 8.7 / 8.9 / 8.7 s) | 1.07 / 1.05 / 1.03 |
-| watch OFF | `watch_2118.sh off` (clean・dest・watch の 3 build と実行を含む) | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 64.4 s | 0.89 |
-| watch ON | `watch_2118.sh on` (同上) | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 64.7 s | 1.03 |
-| watch ON 再実行 | 同上 | `[rw]` 集合は前回の ON・OFF と完全一致 | 63.7 s | 0.61 |
+| 既定 survey | `M11_OV_413060=0 M11_INSTR_413060=0 bash m11_build.sh` → `node m11_survey.mjs` | ok 870 / trap 24 / miss 47 / noproc 1 / units 942 | build 17.0 s + survey 8.7 s = 25.7 s | 0.82 |
+| repro_1389 | `trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON) | **PASS**。OFF/OFF2 は 227 件完全一致。OFF/ON は 216 件で揃い差分 1 件 (unit `0x26d1a0` j=12: `st/len/rc` 0→1、`h` 変化) | 全体 73.3 s (survey 8.9 / 8.8 / 8.7 s) | 0.76 / 0.83 / 0.89 |
+| watch OFF | `watch_2118.sh off` (clean・dest・watch の 3 build と実行を含む) | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 64.4 s | 0.88 |
+| watch ON | `watch_2118.sh on` (同上) | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 64.3 s | 0.92 |
+| watch ON 再実行 | 同上 | `[rw]` 集合は前回の ON・OFF と完全一致 | 64.2 s | 1.11 |
 
 dest 段 (`M11_PRINT_DEST_2118=1`) は `watch_2118.sh` の中で実行される。ON は `[d413060]` 28 件・0,1,158 = ok/ok/ok、OFF は `[d413060]` 0 件・0,1,158 = ok/ok/ok。dest 段の所要は個別には計っておらず、watch 行の elapsed に含まれる。
 
@@ -70,7 +70,7 @@ watch 系の 2 回の ON で `[rw]` 集合が一致 (決定的)。
 ## 5. 実行環境
 
 - 素材: `fl-win64`・`work-m11`・`toolchain-emsdk` (`$HOME/artifacts` から展開)。`m11_gen_ir2.sh` で `ir_conditions.json` 生成 (ldfix F1=902 F3c=36 errors=0)。
-- `m11_gen_ir2.sh` 所要 32.4 s (測定 commit で再生成し、ldfix F1=902 F3c=36 errors=0 を確認)。
+- `m11_gen_ir2.sh` 所要 32.3 s (測定 commit で再生成し、ldfix F1=902 F3c=36 errors=0 を確認)。
 - `work-m11` 付属の `work/m11_boot.cjs` のままでは survey が `_m11_set_va_unit_budget` 未定義で落ちたため、`m11_gen_ir2.sh` → `m11_build.sh` で作り直してから測定した。
 - IR の unit 名は `function_<VA>` で、VA `0x26d1a0` は `function_66d1a0` (base `0x400000`)。REPORT_944 §10 の `function_41ce10` (VA `0x1ce10`) と同じ規則。
 
