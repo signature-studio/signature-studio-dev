@@ -18,8 +18,8 @@ else
   BDIR=build-wasm64; HOST=wasm64-unknown-emscripten; FLAGS=()
 fi
 
-# shellcheck disable=SC1091
-source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
+# shellcheck disable=SC1090
+source "${EMSDK_ENV:?EMSDK_ENV に [EMSDK] の emsdk_env.sh を指定する}" >/dev/null 2>&1
 mkdir -p "$WORK/$BDIR"
 cd "$WORK/$BDIR"
 if [ ! -f Makefile ]; then
