@@ -62,6 +62,31 @@
 - 結論: 残件の閉包は 3 callee の追加では閉じない。`also` を広げる方向は、閉包を全件確定させる (decompile 集合の固定) まで退行する。次の一手は Win API (`HeapAlloc`/`HeapFree`/`GetLastError`/`SetLastError`) の stub 規則と、未関数化 callee の閉包を一括で確定する仕組みを先に決めること。
 - 未実施: `rcpps` 2 引数形 (`gen_simd.py` の 1 引数形のみ対応・ABI 未確定)・引数なし呼出の `param_1` ABI 推定・Resonator の native 突合・ablation・ネガコン。Stereo / Delay は未着手。
 
+#### 10-7o. #1405 (KH-25) 1 単位: rcpps 代入形の固定と converter ガード (部分・Resonator は emcc 未通過)
+- 素材: `plugins-kilohearts` (Installer zip) → payload.dat → windows.zip (`1ccb1df8…`) → `HeartCore.core_64` を手展開。Ghidra 12.1.4 = GitHub release `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 `ddac49f9…d2db` 一致)、JDK 21 (Temurin 21)、emsdk 6.0.12 (`git clone` + `emsdk install 6.0.12`, `emcc 6.0.12`)。
+- **測定 commit**: `1ecf9bb3` (`ghidra_route/ghidra_to_c.py` にガードを入れた最後の commit)。`git diff 1ecf9bb3 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は 0 行 (本節の数値はこの commit で実測)。
+- 変更 (diff 実態。`git diff 5bbfa3d2 1ecf9bb3 -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` で確認):
+  1. `ghidra_to_c.py`: `RCPPS_HELPER` の入力読み出しを `*(uint32_t*)` から `memcpy` に変更 (strict aliasing で `-O2` が誤値を返すため)。helper は `V128 rcpps(undefined1 dst[16], V128 src)` で、戻り値を返す。dst は使わない。
+  2. `ghidra_to_c.py`: `rcpps(` を含む行が `^\s*\w+ = rcpps\(\w+,\s*\w+\);\s*$` に合わない場合 (戻り値を捨てる形) は `SystemExit` で停止するガードを追加 (commit `1ecf9bb3`)。
+  3. `ghidra_shim.h`: `GetLastError`/`SetLastError` を追加 (**常に 0 を返す stub**・`SetLastError` は無視。native harness `scen_khmath`/`scen_khmaster` と同じ扱い。状態変数 `g_last_error` は使っていない)。
+  4. `snapins/scripts/rcpps_helper_check.c`: 戻り値 `rcpps(NULL, s)` を `_mm_rcp_ps` と突合する形に書き直し。
+- **rcpps の実源・代入先 (decompile 実測)**: `plugins-kilohearts` の `HeartCore.core_64` から `DecompEach.java` で Resonator の 17 関数を decompile → 17/17 OK (`summary.tsv`, `analyzeHeadless` wall 32 s)。`rcpps(` を含む行は **1 件** (`180743390.c:63`):
+  ```c
+  auVar26._8_8_ = 0;
+  auVar30 = rcpps(in_XMM2,auVar26);
+  fVar18 = auVar30._0_4_;
+  ```
+  - 逆アセンブル (`objdump -M intel`, `0x180743419`): `rcpps xmm2,xmm1` → `mulps xmm1,xmm2`。
+  - 引数: 第 1 引数 `in_XMM2` は未使用の旧 dst、**源は第 2 引数 `auVar26`**。結果の代入先は `auVar30` (後続で読まれる)。
+  - 関数: `0x180743390` (`FUN_180743390`) の内部。harness 記録の `0x180743419` と一致。
+- **代入形の件数 (本測定)**: Resonator 17 関数の `rcpps(` 行 = **1 件**、うち代入形 `X = rcpps(D, S);` = 1 件、非代入形 = 0 件。ガードは代入形 1 件を通し、非代入形の probe (`rcpps(in_XMM2,auVar26);`) を停止することを確認。
+- **生成 C の不変性 (Gain/Haas/Gate)**: `5bbfa3d2` の converter と `1ecf9bb3` の converter で、Gain 1 関数・Haas 5 関数・Gate 3 関数の生成 C を `diff` し、3 本ともバイト一致 (`ghidra_route` 変更は rcpps 関数内と shim の追加のみで、Gain/Haas/Gate の生成 C は不変)。
+- **rcpps 突合 (`snapins/scripts/rcpps_helper_check.c`, 測定 HEAD `1ecf9bb3`)**: 2,000,000 × 4 = 8,000,000 lane (seed 7)、`-O2` mismatch **0** (0.14 s)、`-O0` mismatch **0** (0.25 s)。修正前 (`*(uint32_t*)` 読み, `-O2`) は mismatch 7,984,440 / 8,000,000 (同一 harness の旧測定値)。
+- **Resonator emcc (測定 HEAD `1ecf9bb3`, `ghidra_to_c.py resonator --fix bitcast,intload,stackpair,assoc,concat`, `emcc -c -ferror-limit=0`)**: error **7 件**・rc 1。rcpps 由来 **0 件**。残件 (件数の正本): ポインタ型不一致 3 件 (`resonator.c:529`・`616`・`744`: `float[6]`/`float*`/`uint*` と `ushort*`・`uint*` の不一致) と未関数化 callee 4 件 (`FUN_180fd51cc`・`FUN_180fd2d38`・`FUN_180fd4f30` × 2)。`GetLastError`/`SetLastError` 由来 0 件。IAT thunk `81e4`/`81ec` 由来 0 件 (`98885e93` で stub 化済み)。
+  - 旧 converter (`5bbfa3d2`) の同条件 emcc は 13 件 (同じ decompile・`--fix` 同一)。差分は rcpps 代入形の変換 (`rcpps_w` → 値返し helper) と THUNK 表の反映によるもので、件数差の内訳は本節では分解していない。
+- **回帰 (`native_ref` 1000 trial / seed 7, `build_cmp.sh` と同じ emcc 条件, 測定 HEAD `1ecf9bb3`)**: Gain **1000/1000** bit-exact (wasm 15,161 B, emcc 0.69 s)・Haas **1000/1000** (16,878 B, 0.65 s)・Gate **1000/1000** (17,367 B, 0.65 s)。wasm サイズは §10-3 と一致。
+- 未実施: Resonator の native 全バイト突合 (1000 trial)・ablation・ネガコン (emcc 未通過のため)。残件の起票先は PR 本文の未解決表を参照。
+- 注: `main` の `98885e93` (#1746) で IAT thunk `81e4`/`81ec` は fail-fast stub 化済み (取り込み済み。#1746 は close 済み)。
 #### 10-7k. #1746 (KH-26) run: IAT thunk 2 件の fail-fast stub 化 (部分・Resonator はビルド未通過)
 - 素材: `plugins-kilohearts` の Installer zip のみ展開 → payload.dat → windows.zip → HeartCore.core_64 (手展開, dmg 不要)。Ghidra 12.1.4 = GitHub release (zip sha256 `ddac49f9…d2db` 一致)、JDK 21 (Temurin 21)、emsdk 6.0.12 ([EMSDK])。測定 HEAD = `98885e93`。
 - IAT thunk の同定 (PE import table・x64 disassembly): `0x180fd81e4` = `jmp [rip+…]` → IAT `KERNEL32!FlsGetValue`、`0x180fd81ec` = 同 → `KERNEL32!FlsSetValue`。呼出元 (`0x180fd3144`・`0x180fd3xxx` 系) は引数を register で渡すが、Ghidra の C 出力はその引数を落として `func_0x000180fd81e4()`・`func_0x000180fd81ec(...)` と呼ぶ。
