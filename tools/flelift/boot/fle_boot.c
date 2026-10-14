@@ -540,6 +540,27 @@ void fle_ov_freemem(void) {
     R[3] = save_rbx; R[0] = 0;
 }
 
+/* 寛容起動 (#2719, WIN-3 相当): g_tolerant=1 のとき InitUnits は JS の逐次ループ (fle_boot.mjs) に渡す.
+ * JS 側が unit ごとに try/catch で隔離し、失敗は skipped と記録して次へ進む。既定 (0) の挙動は変えない。 */
+static int g_tolerant = 0;
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_tolerant(int v) { g_tolerant = (v != 0); }
+EM_JS(void, fle_tolerant_hook, (), { Module.fle_tolerant_run(); });
+/* InitUnits の 1 周 (unit i) と同じ手順。戻り 0 = proc NULL / 1 = [proc]==0 (empty) / 2 = 実行。trap は JS 例外で抜ける */
+EMSCRIPTEN_KEEPALIVE int fle_call_unit_at(int i) {
+    u64 tbl = LD64(INITCTX_TABLE);
+    u64 proc = LD64(LD64(tbl + 8) + 16ull * (u64)(u32)i);
+    ST32(INITCTX_COUNT, (u32)i + 1);
+    if (!proc) return 0;
+    if (LD64(proc) == 0) { g_units_empty++; return 1; }
+    g_units_run++;
+    R[4] -= 8; ST64(R[4], 0x412129ull);
+    R[1] = 0; R[2] = 0; R[8] = 0; R[9] = 0;
+    ott_dispatch(proc);
+    return 2;
+}
+EMSCRIPTEN_KEEPALIVE u32 fle_rsp_get(void) { return (u32)R[4]; }
+EMSCRIPTEN_KEEPALIVE void fle_rsp_set(u32 v) { R[4] = v; }
+
 /* f_4120c0 = System.InitUnits — boot: 計数つき unit 連鎖 / survey: total のみ設定して戻る */
 void fle_ov_initunits(void) {
     u64 tbl = LD64(INITCTX_TABLE);
@@ -548,6 +569,7 @@ void fle_ov_initunits(void) {
     u64 units = LD64(tbl + 8);
     g_units_total = count;
     if (g_survey) return;
+    if (g_tolerant) { fle_tolerant_hook(); return; }
     for (u32 i = 0; i < count; i++) {
         u64 proc = LD64(units + 16ull * i);
         ST32(INITCTX_COUNT, i + 1);

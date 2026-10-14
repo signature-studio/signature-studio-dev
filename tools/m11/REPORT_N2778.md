@@ -48,8 +48,8 @@ load average (1 分値): run の直前 0.17、negctl の直前 0.32。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 「残件 0」の判定基準 (LVA 整数と未 remap VA の区別) | 受入 1 の文言どおりの assert は未実装 (ratchet で代替) | #3113 (本 issue の受入 1 の残り) |
-| `m11_e2e.sh --full` の全再生成 (scan・bounds・lift・Ghidra) を本 runner で通す | 基準値の CI 側での再現は未検証。素材に `functions_dll.csv` と `lift_pe.sha256` が無く、全再生成は fail-closed で止まる (§8.1) | #3113 のコメント https://github.com/signature-studio/signature-studio-dev/issues/3113#issuecomment-6179927966 (再現素材・`functions_dll.csv` の生成手順・`lift_pe.sha256` の出どころ) |
+| 「残件 0」の判定基準 (LVA 整数と未 remap VA の区別) | 受入 1 の文言どおりの assert は未実装 (ratchet で代替)。分類 B の基準は #3113 (PR #3130) で定めた | #3129 (fresh 再生成での分類 B 件数の実測。`tools/m11/REPORT_N3113.md` §7) |
+| `m11_e2e.sh --full` の全再生成 (scan・bounds・lift・Ghidra) を本 runner で通す | 基準値の CI 側での再現は未検証。素材に `functions_dll.csv` と `lift_pe.sha256` が無く、全再生成は fail-closed で止まる (§8.1) | #3129 のコメント https://github.com/signature-studio/signature-studio-dev/issues/3129#issuecomment-6180450191 (再現素材・`functions_dll.csv` の生成手順・`lift_pe.sha256` の出どころ。#3113 のコメントから移した) |
 
 ## 7. 前回 PR (測定 commit 53b90b53) の差分 (履歴)
 
@@ -88,7 +88,7 @@ index 85f92041..0762450c 100644
 boot5 を入れなかった版 (IR sha256 `7c653b0f…`) は survey ok 870 で、e2e の完全一致期待値 `M11_EXPECT_SURVEY_OK_EXACT=872` と合わなかった。以後の基準は boot5 込みの値だけを採る。
 boot5 込みの IR sha256 は `de46cadaaedc17866ea8e8ed3c1ce4d0d5f14dc219ca65eabe0cc06c6fff8636`。
 
-§8.2 の測定に使った wasm (step 3 で作った 6,033,114 B) と `m11_image.bin` の sha256 は**未記録**。両方とも本 PR の fix run の runner に残っておらず、推測で書かない。後から同一性を照合できるよう、step 1–3 を再実行したときにこの節へ両方の sha256 を追記する。追跡先は未解決表 (§6) の #3113 コメント。
+§8.2 の測定に使った wasm (step 3 で作った 6,033,114 B) と `m11_image.bin` の sha256 は**未記録**。両方とも本 PR の fix run の runner に残っておらず、推測で書かない。後から同一性を照合できるよう、step 1–3 を再実行したときにこの節へ両方の sha256 を追記する。追跡先は未解決表 (§6) の #3129 コメント (#3113 のコメントから移した)。
 
 ### 8.2 実測 (測定 commit 9b795530・単独実行)
 

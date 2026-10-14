@@ -44,6 +44,59 @@ function classify(e) {
     return { cls: 'trap', msg: s.slice(0, 160) };
 }
 
+// ---------------- 寛容起動 (#2719, m11 WIN-3 相当) ----------------
+// FLE_TOLERANT=1: InitUnits を逐次ループ (fle_tolerant_run) に渡す (C 側 g_tolerant)。unit ごとに try/catch で隔離し、
+// 失敗 (例外・longjmp) は skipped と記録して次へ進む。trap 後は C stack と guest RSP を戻す。image は戻さない (状態は unit 間で持ち越す)。
+// FLE_TOLERANT=2 は診断用: 失敗 unit の後で InitTable (ヘッダと units 配列) を起動時の値へ戻す (状態の補修。既定ではない)。
+const TOL_MODE = { '1': 1, '2': 2 }[process.env.FLE_TOLERANT] || 0;
+const TOLERANT = TOL_MODE !== 0;
+const SKIP_KINDS = new Set(['halt0', 'oob', 'trap', 'unlifted', 'badjump', 'unsup', 'exit', 'raise', 'soft', 'clobber']);
+m._fle_boot_set_tolerant(TOLERANT ? 1 : 0);
+const tol = { on: TOL_MODE, started: 0, hook_ran: false, kinds: {}, skipped: [], miss_units: [], units: [], restored: 0 };
+if (TOLERANT) m.fle_tolerant_run = () => {
+    tol.hook_ran = true;
+    const count = Number(m._fle_units_total());
+    const cstk = Number(m._emscripten_stack_get_current());
+    const rsp0 = Number(m._fle_rsp_get());
+    // InitContext (0x15eac90 の InitTable ポインタ 16B) と InitTable (ヘッダ 16B・units 配列) の起動時の値。unit の後で proc が 0 に変わったら clobber (m11 の clobber と同じ判定)
+    const tblP = m.HEAPU32[0x15eac90 >>> 2], unitsP = m.HEAPU32[(tblP + 8) >>> 2];
+    const ctxSnap = U8.slice(0x15eac90, 0x15eac90 + 16), tblSnap = U8.slice(tblP, tblP + 16), unitsSnap = U8.slice(unitsP, unitsP + 16 * count);
+    const procs0 = []; for (let i = 0; i < count; i++) procs0.push(Number(m._fle_unit_proc(i)));
+    const heads0 = procs0.map((p) => (p ? U8.slice(p, p + 8) : null));   // unit proc 先頭 8B (empty 判定の textwin 値)
+    for (let i = 0; i < count; i++) {
+        tol.started++;
+        const proc = Number(m._fle_unit_proc(i));
+        const lj0 = Number(m._fle_n_longjmp()), d0 = Number(m._fle_n_disp0());
+        const gm0 = Number(m._fle_n_getmem()), fm0 = Number(m._fle_n_freemem());
+        let r = null, err = null;
+        try { r = Number(m._fle_call_unit_at(i)); } catch (e) { err = e; }
+        m.__emscripten_stack_restore(cstk);
+        m._fle_rsp_set(rsp0);
+        const lj = Number(m._fle_n_longjmp()) - lj0, dsp0 = Number(m._fle_n_disp0()) - d0;
+        const rec = { i, va: '0x' + proc.toString(16) };
+        let kind;
+        if (err) {
+            const c = classify(err);
+            kind = c.cls;
+            if (c.target !== undefined) rec.target = '0x' + (Number(c.target) >>> 0).toString(16);
+            if (c.code !== undefined) rec.code = c.code;
+            if (c.msg) rec.msg = c.msg.slice(0, 120);
+        } else if (r === 0) kind = procs0[i] ? 'clobber' : 'noproc';   // 起動時は proc があったのに 0 → 直前の unit が units 配列を壊した
+        else if (r === 1) kind = 'empty';
+        else if (lj > 0) kind = 'halt0';
+        else kind = 'ok';
+        if (dsp0 > 0 && !err) tol.miss_units.push([i, dsp0]);   // dispatch(0) で fail-soft に戻った unit (silent miscompile の候補)
+        tol.kinds[kind] = (tol.kinds[kind] || 0) + 1;
+        if (SKIP_KINDS.has(kind)) { rec.kind = kind; rec.gm = Number(m._fle_n_getmem()) - gm0; rec.fm = Number(m._fle_n_freemem()) - fm0; tol.skipped.push(rec); }
+        tol.units.push([i, kind, rec.va, Number(m._fle_n_getmem()) - gm0, Number(m._fle_n_freemem()) - fm0, dsp0]);
+        if (TOL_MODE === 2 && SKIP_KINDS.has(kind)) {
+            U8.set(ctxSnap, 0x15eac90); U8.set(tblSnap, tblP); U8.set(unitsSnap, unitsP);
+            for (let k = 0; k < count; k++) if (heads0[k]) U8.set(heads0[k], procs0[k]);
+            tol.restored++;
+        }
+    }
+};
+
 // ---------------- boot phase ----------------
 const before = { mm: mmTable(), units_arr_ptr: rd64(PKG + 8), count: m.HEAPU32[PKG / 4] };
 let boot = { rc: null, threw: null, units_run: 0, units_total: 0, units_empty: 0, rax: null, longjmp: 0 };
@@ -137,6 +190,31 @@ for (let i = 0; i < Number(m._fle_ipp_names()); i++) {
 // (guest stack 復元で確認、dbg_u18.mjs 参照)。unit#18 (0x455790) は未到達。
 boot.stopped_at_1based = boot.units_run;
 
+// ---------------- CreateFruityInstance 観測 (#2719) ----------------
+// 寛容起動の後で CreateFruityInstance (0x1375990) を 1 回呼ぶ。soft (未実装 import) の呼出し回数の差分で、
+// 呼出中に現れた API 名を記録する (RegisterClassW / CreateWindowExW の自然到達の有無)。
+const softSnap = () => { const mp = new Map(); for (let i = 0; i < Number(m._fle_n_soft_uniq()); i++) mp.set(m._fle_soft_name(i), Number(m._fle_soft_count(i))); return mp; };
+let cfi = null;
+if (TOLERANT) {
+    const CFI_VA = 0x1375990;
+    const cstk0 = Number(m._emscripten_stack_get_current()), rsp0 = Number(m._fle_rsp_get());
+    const lj0 = Number(m._fle_n_longjmp()), s0 = softSnap(), e0 = Number(m._fle_n_exit());
+    let cr = null, cerr = null;
+    try { cr = m._fle_run(CFI_VA, 0n, 0n, 0n, 0n, 0n, 0n, 0n, 0n); } catch (e) { cerr = e; }
+    m.__emscripten_stack_restore(cstk0); m._fle_rsp_set(rsp0);
+    const s1 = softSnap(), called = [];
+    for (const [nm, c] of s1) { const d = c - (s0.get(nm) || 0); if (d > 0) called.push([nm, d]); }
+    cfi = {
+        va: '0x' + CFI_VA.toString(16),
+        rc: cerr ? null : '0x' + BigInt.asUintN(64, BigInt(cr)).toString(16),
+        threw: cerr ? classify(cerr) : null,
+        longjmp: Number(m._fle_n_longjmp()) - lj0, exit: Number(m._fle_n_exit()) - e0,
+        // dispatch リングの末尾 4 件 (CFI 呼出し中の最後の関数 VA。trap 地点の推定に使う)
+        last_dispatch: [124, 125, 126, 127].map((k) => '0x' + (Number(m._fle_ring_at(k)) >>> 0).toString(16)),
+        soft_called: called.sort((a, b) => b[1] - a[1]).slice(0, 60),
+    };
+}
+
 // ---------------- survey phase (942 unit 隔離) ----------------
 let survey = null;
 if (SURVEY) {
@@ -188,6 +266,8 @@ const summary = {
     wasm_size: (() => { try { return readFileSync(cjs + '.wasm').size; } catch { return null; } })(),
     boot,
     survey,
+    tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, skipped: tol.skipped, miss_units: tol.miss_units, units: tol.units } : null,
+    cfi,
     soft_top: softs.slice(0, 40),
     ipp: { mode: IPP_MODE, on: IPP_ON, ptr_15F34A0: boot.ipp_ptr_15F34A0, ptr_15F40E8: boot.ipp_ptr_15F40E8, total: boot.ipp_total, called: boot.ipp_called, stop: boot.ipp_stop, token_at: boot.ipp_token_at, call_slot: boot.ipp_call_slot },
     notes: {
@@ -211,10 +291,13 @@ console.log('FLEBOOT_RESULT ' + JSON.stringify({
     survey: survey && survey.byCls ? survey.byCls : (survey && survey.prologue_threw || null),
     ipp_mode: IPP_MODE, ipp_on: IPP_ON, ipp_ptr_15F34A0: boot.ipp_ptr_15F34A0,
     ipp_total: boot.ipp_total, ipp_called: boot.ipp_called, ipp_stop: boot.ipp_stop,
+    tolerant: TOLERANT ? { mode: TOL_MODE, started: tol.started, hook_ran: tol.hook_ran, kinds: tol.kinds, skipped_n: tol.skipped.length, restored: tol.restored, miss_units: tol.miss_units.length } : null,
+    cfi: cfi && { rc: cfi.rc, threw: cfi.threw && cfi.threw.cls, longjmp: cfi.longjmp, exit: cfi.exit },
 }));
 console.log('FLEBOOT_UNDO ' + JSON.stringify(undoProbe));
 // FLE-6 ネガコン判定: shim 無し (既定 / FLE_IPP=0) なら 0x15F34A0 = 0、shim 有り (FLE_IPP=1) なら非 0 でなければならない。
 // mode 2 (#2702) は停止を測る測定モードなので判定しない (ok の値は出すが終了コードは変えない)。
 const ippPtrOk = IPP_ON ? !/^0x0+$/.test(boot.ipp_ptr_15F34A0) : /^0x0+$/.test(boot.ipp_ptr_15F34A0);
 console.log('FLEBOOT_IPP_CHECK ' + JSON.stringify({ mode: IPP_MODE, ptr_15F34A0: boot.ipp_ptr_15F34A0, ok: ippPtrOk }));
-if (!ippPtrOk && IPP_MODE !== 2) process.exitCode = 3;
+// 寛容起動 (#2719) は測定のみ: root 有の 0x15F34A0 は終了時に消えるため (#3060) 判定に使わない
+if (!ippPtrOk && IPP_MODE !== 2 && !TOLERANT) process.exitCode = 3;
