@@ -66,6 +66,7 @@ HEAD の 3 回で、verdict の変化は 0 件 (`ld32_verdict_cmp.py`)。`0x959a
 - HEAD の測定で、fvm 由来の case で `outcome` が diff / wasm_trap (timeout 除く) のものは **0 件** (3 回とも。`work/m11/batch_head_r{1,2,3}.jsonl` を集計)。したがって HEAD の 3 回では、新条件は旧条件と同じ refine 判定になる。
 - ただし、これは HEAD の測定データからの確認で、旧コード (`92a145a5`) を同じ HEAD の素材で走らせた比較ではない。92a145a5 の r1 (361) と HEAD の r1 (360) の 1 件差が差分由来かどうかは、この測定では確定しない (run 間の揺れの範囲内に見える)。
 - 差分の集計 (`git diff --stat 92a145a5 HEAD -- tools/liftdiff tools/m8 tools/ott tools/m11`): **24 files changed, 660 insertions(+), 41 deletions(-)**。`be017fb1` 時点でも同じ値。
+- 測定 commit `be017fb1` から HEAD までのコード差分 (`git diff --stat be017fb1 HEAD -- tools/liftdiff tools/m8 tools/ott tools/m11`、`results/` と本 REPORT を除く): **0 件** (`git diff be017fb1 HEAD -- tools/liftdiff/ldlib` も空)。よって測定値は HEAD の内容そのものに対応する。
 
 ## 5. 未解決
 
