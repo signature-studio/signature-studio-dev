@@ -68,7 +68,7 @@
 - `repro_1588.sh` (18.2 s、開始時 load 0.97): p01 = mismatch、`first divergence index=5`、wasm 最上位 `function_4133f0` (`6525b0 → 652830 → 414c70 → 4133f0`)。0x66ea90 は z・2 回とも `unexec` (`native_null_deref_all_patterns`)、case outcome は `both_fault`、wasm 最上位 `function_414ad0`。§1・§2 と一致。
 - 27 件再走 (`tests/rerun_414ad0_27.sh`、2 分 40 秒、全 rc 0) の出力を、既存の生成元 (`tests/oob_414ad0_27.py`) にそのまま通すと commit 済み md と完全一致した。
 - 生成元の誤り: 同スクリプトは `outcome == 'wasm_trap'` だけを集計し、`both_fault` (native fault かつ wasm trap、`ldlib/compare.py:212`) を `NO_TRAP:both_fault` と表示していた。`wasm_trap` と `both_fault` を集計するよう 1 行修正。
-- 修正後の再生成: 0x66ea90 の行は `function_414ad0 | 有 | 21`、集計は 26/27 (修正前 25/27)。`results/m11_oob_414ad0_27.md` は修正後の生成元で再生成し、差分は該当行と集計行のみ。`REPORT_APPENDIX_865.md`・`REPORT_APPENDIX.md`・`docs/DOC_MAP.md` の 25/27 を 26/27 に揃えた。
+- 修正後の再生成: 0x66ea90 の行は `function_414ad0 | 有 | 21`、集計は 26/27 (修正前 25/27)。`results/m11_oob_414ad0_27.md` は修正後の生成元で再生成し、差分は該当行と集計行のみ。`REPORT_APPENDIX_865.md`・`docs/DOC_MAP.md` の 25/27 を 26/27 に揃えた。`REPORT_APPENDIX.md` の 25/27 (行 133) と 0x66ea90 の記述 (行 151) は未修正: 同ファイルは main で 385 行 (上限 250) のため、分割移動の後に直す (PR 本文の未解決表)。
 - コード差分 (測定 commit `26f90ada` から HEAD まで、REPORT と results を除く): `git diff 26f90ada HEAD -- tools/liftdiff tools/m11 ':(exclude)*REPORT*' ':(exclude)*results*'` の出力は次の 1 行 (`tests/oob_414ad0_27.py`)。
 
 ```diff
