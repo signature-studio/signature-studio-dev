@@ -260,4 +260,4 @@ FLEngine 0x40d253 `jmp [r10+rdx*8+0x40]` (Delphi `sub rdx,8` 形) は、基点 `
 
 ## 17. #1206 (ICALL-21): jump table の cmp/je 展開の効果 (測定 commit `f7bebc7b` = main)
 
-全文は `REPORT_APPENDIX_1206.md` (250 行上限のため分割移動)。結論: FLEngine の展開効果は構造上 0 (メモリ形 `jmp [mem]` は対象外)。Balance は jt 0 件。Fresh Air の jt_dropped は 2 件 (`sites_after.json`) と 1 件 (`audit_fa.json`) で不一致・原因未確定。OTT F は未再実行。未解決 → #1402 (ICALL-26) / #1403 (ICALL-27)。#1402 の実測は `REPORT_APPENDIX_1402.md`。
+全文は `REPORT_APPENDIX_1206.md` (250 行上限のため分割移動)。結論: FLEngine の展開効果は構造上 0 (メモリ形 `jmp [mem]` は対象外)。Balance は jt 0 件。Fresh Air の jt_dropped は 2 件 (`sites_after.json`) と 1 件 (`audit_fa.json`) で不一致・原因未確定。OTT F の展開後残件数は #1573 で実測済み (`REPORT_APPENDIX_1573.md`)。未解決 → #1402 (ICALL-26) / #1403 (ICALL-27) / #1763 (ICALL-38)。#1402 の実測は `REPORT_APPENDIX_1402.md`。

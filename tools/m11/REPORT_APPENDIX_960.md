@@ -21,6 +21,25 @@
 - **未解決**: RetDec 段の出力順を固定する修正 (drc.ll の正規化、または RetDec 側の順序固定) は未実施。起票先 #668。
 - 再現: `FL_WIN64_DIR=<fl-win64>/ RETDEC_ROOT=<[RETDEC]>/retdec PATH=<[RETDEC]>/bin:$PATH bash tools/m11/m11_e2e.sh --full` を 2 回 (間に `work/` の boot*/ir_conditions を削除)。
 
+## 18. #1664 受入 1 の残り: RetDec 単体の `--print-after-all` で段を切り分け (`--passes` 相当)
+
+- 測定 commit: `c2f67568` (origin/main 起点の `1664-retdec-passes-split`)。測定時点のコード差分 0。
+- 条件: PE `fl-win64` の `block00031_PE.bin` (sha256 `b2c64da4…`)・`toolchain-retdec` (v5.0・`retdec-decompiler`)・`work-m11` の `boot_ranges.txt` 先頭 150 range (`--select-decode-only`・timeout 250〜500)。RetDec の `--print-after-all` (stderr) で LLVM pass ごとの IR を取った。
+- RetDec の CLI に `--passes` は無い。pass 単位の切り分けは `--print-after-all` を使った。
+
+| 測定 | rc | drc.ll md5 | A7 後 lift.ll md5 | pass dump (stderr) md5 | 差分行 |
+|---|---|---|---|---|---|
+| P1 (`--print-after-all`) | 0 | `cc6dac6c` | `23c8ea5b` | `340d476b` | — |
+| P2 (同) | 0 | `fbd7af02` | `23c8ea5b` | `340d476b` | drc.ll 1 行 (`uselistorder @WriteFile`) |
+| N1〜N3 (dump なし) | 0 | `ee485e91` / `cbee7ce0` / `cbee7ce0` | `23c8ea5b` ×3 | — | 同上 |
+| Z1・Z2 (`setarch x86_64 -R`・ASLR 無効) | 0 | `7eae26d1` / `7eae26d1` | 未計測 | — | — |
+
+- **結論 (pass 単位)**: `--print-after-all` の stderr (約 17,954 件の IR dump・81 MB) は P1 と P2 で md5 が完全一致した。`uselistorder` は pass dump に 1 行も現れない (0 件)。最終 `drc.ll` の差は `@WriteFile` の `uselistorder` 1 行の並び (`{ 0, 1, 2, 4, 3 }` と `{ 2, 0, 1, 4, 3 }`) だけ。つまり並びは LLVM の最終 writer 段で生じ、pass の中身の差では無い。
+- **結論 (ASLR)**: ASLR を無効にすると 2 回とも `7eae26d1` で一致した。並びの揺れは実行ごとのアドレス (ポインタ) の割り当てに由来する可能性が高い。ただし ASLR を無効にしたときの `lift.ll` 段は未計測で、この結論は「可能性が高い」止まり。
+- **受入 2 (固定化)**: A7 (`tools/m5/ir5_patch.py` の `uselistorder` 行除去) を通した `lift.ll` は、上記の 5 本の drc.ll (md5 4 種類) すべてで `23c8ea5b` に収束した。`tools/liftlib/liftlib/passes/base.py` の `normalize()` (A7) も同じ正規表現で除去し、P1・N1・N2 の 3 本の出力が `94a8363c` で一致した (Z1 は lift 段が未計測のため対象外)。新しい正規化は不要と判断する。
+- **未解決**: (a) `--passes` 相当の段の切り分けは `--print-after-all` で代替した。LLVM writer 段で並びが変わる仕組みそのものは未確認。(b) ASLR 無効時の `lift.ll` 段は未計測。(c) `@global_var_*` 行位置差 (§14) は今回の 150 range では再現せず、未切り分け (`--full` 全 range で要確認)。
+- 再現: `RETDEC=<[RETDEC]>/bin/retdec-decompiler`・PE `block00031_PE.bin` で `retdec-decompiler <PE> -o x.drc.c --select-ranges "$(cat r150.txt)" --select-decode-only --print-after-all 2> x.pass.log` を 2 回。`drc.ll` の md5 と `uselistorder` 行を比較。ASLR 無効は `setarch x86_64 -R` を前置。
+
 ## 15. #960 追補: HEAD `58b7e990` (origin/main) で `--full` を 2 回実行 (N3・N4)
 
 - 条件: HEAD `58b7e990`・PE `fl-win64` の `block00031_PE.bin` (sha256 `b2c64da4…`)・`toolchain-retdec`・`work-m11`・`work-liftdiff`。Ghidra 12.1.4 (sha256 `ddac49f9…` 一致) で `functions_dll.csv` を再生成 (8 分 3 秒・rc 0・59 010 行・JDK 21)。N4 の前に `work/` の lift・IR 生成物と `ir_conditions.json` を削除。
