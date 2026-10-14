@@ -40,10 +40,10 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 - ファイル内の絶対値 `0x196eba0` の 8 バイト一致は `.data` の 1 箇所のみ (file offset `0x11e2738`、VA `0x15e3d38`)。ImageBase (`0x400000`) を足していない値のため、再配置済みポインタかどうかは未確定。
 - `0x15e3d38` を RIP 相対で load する箇所は 40 件以上 (`0xd5c8f4`・`0xfc6ffb`…)。この slot の store 元は未確認 (下記「未完」)。
 
-### 0xffe370 / 0xffa930 (`0xfe2e98` の表)
+### スロット 52・53 の表 (`0xfe2e98` の表。値は REPORT_PY71.md §3)
 
-- `0xbe2298` (file offset) に `0xffe370`、`0xbe22a0` に `0xffa930` の 8 バイト絶対値。表を指す絶対値・RIP 相対参照は 0 件。
-- `0xffe370` の命令: `mov dword [rcx+0x794], edx`・続けて `[rcx+0x9c]` への書込み、`[rcx+0x7ac]` の読込み。`rcx` が受ける対象は引数で、所属クラスは不明。
+- `0xbe2298` (file offset) にスロット 52 の値、`0xbe22a0` にスロット 53 の値の 8 バイト絶対値。表を指す絶対値・RIP 相対参照は 0 件。
+- スロット 52 の先頭命令: `mov dword [rcx+0x794], edx`・続けて `[rcx+0x9c]` への書込み、`[rcx+0x7ac]` の読込み。`rcx` が受ける対象は引数で、所属クラスは不明 (§5 で TPublicChannel と確定)。
 - 直接 call/jmp 0 件。間接呼出し (vtable 経由) の経路は未特定。
 
 ### 0xec60ae (`[rbp+0x120]` 上)
@@ -131,7 +131,7 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | P (= `*g`) の型: `0x86a4cf` の `call [A-0x30]` の戻り値型と、A = `*(0x1306300)` の由来 | `0x1306dbf`・`0x130760f` の `+0x794` の対象型が確定しない (受入条件 1 後半) | 子 issue #2501 (`[PY-71]`) |
-| 受入条件 2〜4 (`0xffe370` の所属・`0xec60ae` の型・`0x8ed012` の chan 判定) | 未達のまま | 子 issue #2501 (`[PY-71]`) |
+| 受入条件 2〜4 (`0xffe370` の所属・`0xec60ae` の型・`0x8ed012` の chan 判定) | 未達のまま | 子 issue #2501 (`[PY-71]`)。PY-71 で 1・2a 完了、残りは #2701 (`[PY-86]`) |
 | g への書込みの網羅 (スタック経由・呼出しをまたぐ経路・base+offset で作った `&g`) | depth 1 の 0 件から「書込み無し」は言えない。書込み元の列挙は未了 | 親 #2159 への提案 (PM 判断) |
 
 ## 5. PY-71 (#2501): g の値 P の型・0xffe370 の所属 (追加解析)
@@ -140,8 +140,8 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 
 | # | 受入条件 (#2501) | 結果 |
 |---|---|---|
-| 1 | `0x86a4cf` の `call [A-0x30]` の戻り値型と g の値 P の型 | **達成**。P は vptr `0x13063c8`・サイズ `0x840` のクラス (クラス名は TGraphEditorForm。RTTI に残る。`REPORT_PY71.md` §1・§2) |
-| 2 | `0xffe370` の所属クラスと呼出し元 | 所属は**達成** (vptr `0xfe2cf8`・サイズ `0x8a8` のクラス、仮想スロット 52)。呼出し元は**未達** |
+| 1 | `0x86a4cf` の `call [A-0x30]` の戻り値型と g の値 P の型 | **達成**。P は TGraphEditorForm (非 chan)。VMT・サイズ・親鎖は `REPORT_PY71.md` §1・§2 |
+| 2 | `0xffe370` の所属クラスと呼出し元 | 所属は**達成** (TPublicChannel・仮想スロット 52。`REPORT_PY71.md` §1・§3)。呼出し元は**未達** (子 #2701) |
 | 3 | `0xec60ae` の対象型 (chan 以外なら除外) | **未達** (`[rbp+0x120]` の出所を追えず) |
 | 4 | `0x8ed012` の `[rbp+0x70]` が chan か | **未達** (判定材料を得られず) |
 
@@ -202,29 +202,29 @@ $ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
 1. 書込み: `0x86a4e1` の `mov [rax], rcx` (P を `*r8` へ)。`r8 = &g`。関数 `0x86a470` は `this=rcx`・`A=rdx`・`out=r8`。
 2. 直接 call は 2 件。`0x10dc775` は `out=&[rbp+0x68]` (ローカル。g ではない)。もう 1 件は thunk `0x11c8950` (`0x11c896d`) で、`this=*(0x15e50f8)`・`A=rcx`・`out=rdx` に並べ替える。
 3. thunk `0x11c8950` の呼出しは 23 件。g へ書くのは fn `0x11be0a0` (11 件の内) の `0x11be457`。その直前で `rcx=*(0x1306300)=A`、`rdx=*(0x15e3d38)=&g` (`0x11be450`)。
-4. `A = *(0x1306300) = 0x13063c8` (`.text` の静的値)。`0x1306300` への RIP 相対の書込みは 0 件。
-5. `call [A-0x30]`: `[0x1306398] = 0x40f960` (F)。F は `size = dword[this-0x80] = 0x840` を読み、`0x409410(size)` で確保、`0x40fb40(this, X)` で `*X = this` (vptr = A) を書いて `X` を返す。よって P = X (新規 `0x840` バイトのオブジェクト)。
+4. `A = *(0x1306300)` (`.text` の静的値。VMT の値は `REPORT_PY71.md` §1)。`0x1306300` への RIP 相対の書込みは 0 件。
+5. `call [A-0x30]`: `[0x1306398] = 0x40f960` (F)。F は `size = dword[this-0x80]` (値は `REPORT_PY71.md` §1) を読み、`0x409410(size)` で確保、`0x40fb40(this, X)` で `*X = this` (vptr = A) を書いて `X` を返す。よって P = X (新規のオブジェクト。サイズは §1 の値)。
 6. `0x409410` の確保は `call [0x13a5c90]` の間接呼出しで、`0x13a5c90` は `.data` の静的値 `0x407a50`。`0x407a50` は先頭 `push rbp` で、同関数内 (int3 を挟まない線形逆アセンブル) の `0x407b06`・`0x407b15`・`0x407b28`・`0x407b56` に `f0 0f b0 23` (`lock cmpxchg byte ptr [rbx], ah`) がある。アロケータと見なす根拠はこの 4 件。
 
-### 5.2 P の型 (vptr `0x13063c8`)
+### 5.2 P の型 (vptr A。VMT の値は `REPORT_PY71.md` §1)
 
 - `[A]=0x619200` (先頭スロット) で、vtable は 110 スロット。`0x86a4ef`〜`0x86a4f6` は `mov rax,[P]`・`mov rax,[rax]` (vptr) の後に `call [rax+0x78]` を呼ぶ (vtable スロット 15 = `0x80c850`)。
-- `0x1306dbf` (`mov [rcx+0x794], rax`・`rcx=g`) と `0x130760f` (`mov [rax+0x794], r14`・`rax=g`) はどちらも P の `+0x794` へ書く。`0x794 < 0x840` で、対象型は vptr A のクラス。
+- `0x1306dbf` (`mov [rcx+0x794], rax`・`rcx=g`) と `0x130760f` (`mov [rax+0x794], r14`・`rax=g`) はどちらも P の `+0x794` へ書く。`0x794` は P のインスタンスサイズ (`REPORT_PY71.md` §1) より小さく、対象型は vptr A のクラス。
 - 訂正: 「クラス名は無い (stripped)」は誤り。クラス名は TGraphEditorForm で RTTI に残る (`REPORT_PY71.md` §1)。非 chan の判定は 5.4 の近似ではなく、この名前で行う。
 
-### 5.3 0xffe370 の所属 (vptr `0xfe2cf8`)
+### 5.3 スロット 52 の所属 (vptr V = TPublicChannel)
 
-- `V = 0xfe2cf8` (クラス名 TPublicChannel。親 TChannel。`REPORT_PY71.md` §1): `[V-0x80] = 0x8a8` (サイズ)、`[V-0x30] = 0x40f960` (A と同じ factory F)。`0xfe2c78..0xfe2cf0` (V-0x80..V-0x8) は V の 16 語のメタデータ (A の `A-0x80..A-0x8` と同じ形)。
-- 仮想表 `0xfe2cf8..0xfe2ea0` は 54 スロット。`0xffe370` = スロット 52 (`+0x1a0`)、`0xffa930` = スロット 53。`0xffe370` は `[rcx+0x794]`・`[rcx+0x9c]` を書き、`[rcx+0x7ac]` を読む (V のメソッドとして整合)。
-- 表を指す参照は、RIP 相対・即値の参照 0 件 (`0xfe2c80+8k` の 69 個全て。「ネガティブコントロール」節の検出器で確認)。絶対 8 バイト値 `0xfe2cf8` は 2 件 (`.text` の `0xfe2c30`・`0xfe2ed8` に格納)。同じスキャンで `0xfe2d00`・`0xfe2e00` にも絶対値の格納が 1 件ずつある (VA `0x94ab97`・`0x94aba7`)。隣接値は `0x15ec29800` と交互に並び、V の vtable 列とは別の構造。未調査。
-- 未解決: 呼出し元 (V のインスタンスの `call [reg+0x1a0]`) と、V の vptr を書く箇所。`0xfe2c30`・`0xfe2ed8` の格納元も未追跡。
+- V は TPublicChannel の VMT (値は `REPORT_PY71.md` §1・§3)。`[V-0x80]` (サイズ・同 §1)、`[V-0x30] = 0x40f960` (A と同じ factory F)。`0xfe2c78..0xfe2cf0` (V-0x80..V-0x8) は V の 16 語のメタデータ (A の `A-0x80..A-0x8` と同じ形)。
+- 仮想表は 54 スロット (V から `0xfe2ea0` まで)。スロット 52 (`+0x1a0`)・53 (`+0x1a8`) の値は `REPORT_PY71.md` §3 が正本。スロット 52 は `[rcx+0x794]`・`[rcx+0x9c]` を書き、`[rcx+0x7ac]` を読む (V のメソッドとして整合)。
+- 表を指す参照は、RIP 相対・即値の参照 0 件 (`0xfe2c80+8k` の 69 個全て。「ネガティブコントロール」節の検出器で確認)。絶対 8 バイト値 V は 2 件 (`.text` の `0xfe2c30`・`0xfe2ed8` に格納)。同じスキャンで `0xfe2d00`・`0xfe2e00` にも絶対値の格納が 1 件ずつある (VA `0x94ab97`・`0x94aba7`)。隣接値は `0x15ec29800` と交互に並び、V の vtable 列とは別の構造。未調査。
+- 未解決 (子 #2701): 呼出し元 (V のインスタンスの `call [reg+0x1a0]`) と、V の vptr を書く箇所。`0xfe2c30`・`0xfe2ed8` の格納元も未追跡。
 
 ### 5.4 chan 判定の材料 (近似。vtable 単位・ベース不問の disp 一致)
 
-| クラス (vptr) | サイズ | `+0x714` | `+0x718` | `+0x739` | `+0x794` |
-|---|---|---|---|---|---|
-| P: A `0x13063c8` | `0x840` | 1/110 | 1/110 | 0/110 | 0/110 |
-| V `0xfe2cf8` | `0x8a8` | 0/54 | 0/54 | 0/54 | 12/54 |
+| クラス (値は `REPORT_PY71.md` §1) | `+0x714` | `+0x718` | `+0x739` | `+0x794` |
+|---|---|---|---|---|
+| P: A (TGraphEditorForm) | 1/110 | 1/110 | 0/110 | 0/110 |
+| V (TPublicChannel) | 0/54 | 0/54 | 0/54 | 12/54 |
 
 (数値はスロット数。`py71_vtable.py`。chan の判定根拠 (`+0x714`・`+0x718`・`+0x739`) は両クラスとも弱く、chan とは確定できない。)
 
@@ -232,10 +232,10 @@ $ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0xec60ae` の `[rbp+0x120]` の出所 (`push rbp` を 0x3000 バイト内に見つけられず) | 受入条件 3 | #2501 (Refs で残す) |
-| `0x8ed012` の `[rbp+0x70]` の出所 (関数先頭は未特定。直前の `push rbp` `0x8ea780` は `sub rsp,0x28` の別関数で、`[rbp+0x70]` の代入元ではない) | 受入条件 4 | #2501 |
-| V (`0xfe2cf8`) のインスタンス生成箇所と、`call [reg+0x1a0]` の呼出し元 | 受入条件 2 (呼出し元) | #2501 |
-| A (`0x13063c8`) の chan 判定 | クラス名 TGraphEditorForm で非 chan と確定 (`REPORT_PY71.md` §2)。解決済み | — |
+| `0xec60ae` の `[rbp+0x120]` の出所 (`push rbp` を 0x3000 バイト内に見つけられず) | 受入条件 3 | #2701 |
+| `0x8ed012` の `[rbp+0x70]` の出所 (関数先頭は未特定。直前の `push rbp` `0x8ea780` は `sub rsp,0x28` の別関数で、`[rbp+0x70]` の代入元ではない) | 受入条件 4 | #2701 |
+| V (TPublicChannel) のインスタンス生成箇所と、`call [reg+0x1a0]` の呼出し元 | 受入条件 2b | #2701 |
+| A の chan 判定 | TGraphEditorForm で非 chan と確定 (`REPORT_PY71.md` §2)。解決済み | — |
 
 ### 名称
 
