@@ -1,6 +1,6 @@
 # 付録: icall #2508 (ICALL-78) — frame slot 復元の残件 (0x180da6e60 の候補分類・0x181057b38 の xmm0 不一致の切り分け)
 
-> 親: #2427 (ICALL-77, PR #2514 merge 済み・`FA_FRAME_SLOT=1` の pass)。受入 3 (`SlateCore.core_64` 205 B の sha256 照合) は素材 `plugins-freshair` が無いため本 run では未実施 (§6)。受入 4 (16B 結合 merge 規則の他関数での検証) も本 run では未実施 (§6)。
+> 親: #2427 (ICALL-77, PR #2514 merge 済み・`FA_FRAME_SLOT=1` の pass)。受入 3 (`SlateCore.core_64` 205 B の sha256 照合) は素材 `plugins-freshair` が無いため本 run では未実施 (§6)。受入 4 (16B 結合 merge 規則の検証) は本 PR で §8 に実施。
 > 測定 commit: `05194cdc` (`origin/main` (`9b352bd7`) 取り込みの merge。コードを変えた最後の commit)。`fa_cmp.py` の harness 修正は `0d29b5f4`。
 
 ## 1. 結論
@@ -8,7 +8,8 @@
 - **0x181057b38 の 8/8 不一致は harness 由来**。関数と callee の機械語は xmm0 を一度も書かず、native は入力 xmm0 をそのまま返す (素通し)。wasm 側は戻り値の出力スロット BLK+0x88 を `ott_run` が初期化しないため、0 を返していた。`tools/icall/diff/fa_cmp.py` で入力値を BLK+0x88 に置いてから呼ぶよう修正し、0x181057b38 は **8/8 一致** (修正前 0/8)。
 - 同じ修正で、素通しの関数 8 件が「不一致」から「一致」に変わった (§3.4)。fixed route の `fa_sweep` (131 関数・HEAD で再実行) は **値の不一致 11 → 3、bit 一致 46 → 54** (旧 harness → 新 harness)。PR 初版の bit 一致 55 は HEAD の再実行で再現せず、差は `0x1803dee20` の 1 件 (§3.5)。
 - **0x180da6e60 の候補 10 件は部分分類**。route が使う IR (`after.0.restored.ll`) に store が無いのは 8 件。うち 2 件はこの関数内に読みが無く (無害とは断定しない)、6 件は仮想 call に渡す構造体の内部または cookie 検査の入力で、読み先・値の出所が静的に確定せず「誤り疑い」のまま。残り 2 件は route IR に store があり、before IR との比較による誤検出 (§4)。
-- 残件 (受入 1 の残り・受入 3・受入 4) は未達。PR は `Refs #2508` とし、残件を #2508 に残す (§6)。
+- 受入 4 (16B 結合 merge 規則の検証) は本 PR で完了 (§8)。merge 規則が成立するのは 0x181057b38 の 2 組だけで、0x180da6e60 は 3 条件のいずれかが欠けて不成立。
+- 残件 (受入 1 の残り・受入 3) は子 issue に移し、#2508 の本文から外した: 受入 3 → #2675 (ICALL-80)、0x180da6e60 の誤り疑い 6 件と xmm0 不一致の判定 → #2674 (ICALL-79) (§6)。
 
 ## 2. 測定条件
 
@@ -127,6 +128,8 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 
 ## 6. 未解決 (起票先)
 
+> 本 PR 時点の起票先: 受入 3 → #2675 (ICALL-80)。0x180da6e60 の誤り疑い 6 件・0x180da4030・0x1803dee20・0x18105d9fc → #2674 (ICALL-79)。lift ABI・候補検出の基準・`docs/DEFECTS.md` は PM 判断 (`docs/WORKFLOW.md` §5)。merge 規則の表の行は §8 で解決。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 受入 3: `SlateCore.core_64` の `0x181057b38`–`0x181057c05` (205 B) の sha256 照合 (本 run は `plugins-freshair` 無し) | 根拠は PE decode の比較のみ | #2508 (`oc_artifacts` に `plugins-freshair` を足して再依頼) |
@@ -145,3 +148,61 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 測定 commit `05194cdc` から HEAD `a62ff3cf` までの測定経路 (`tools/icall`・`tools/ott`・`tools/m2`・`tools/m5`・`tools/m11`・`tools/targets/freshair`・`tools/liftlib`) のコード差分は 0 行。`git diff 05194cdc HEAD -- tools/icall tools/ott tools/m2 tools/m5 tools/m11 tools/targets/freshair tools/liftlib ':!tools/icall/REPORT_APPENDIX_2508.md'` の出力は空。
 
 `05194cdc` は `origin/main` (`9b352bd7`) を取り込んだ merge。`faa2ed97` (`f3102162` 取り込み。`frame_slot_restore.py` の block 境界をまたぐ挿入の抑止を含む) と `05194cdc` の判定は、fixed・base とも全 131 関数で一致。後から入った `icall_rewrite.py`・`mk_franges.py`・`check_blk_domain.py` は測定経路 (`fa_route_build.sh`・`frame_slot_restore.py`・`fa_sweep.sh`・`fa_cmp.py`) から呼ばれない (`ir_flatten.py`・`vex_gen.py` のコメントに名前があるのみ)。0x181057b38 の復元は 2 件 (`frame_slot.json` の `restored` 2) のまま。fixed sweep は 54/66/8/3 で `ca7bd804` と同じ。base は 53/66/9/3。`fa_cmp.py 181057b38 --n 8` は fixed match 8 / mismatch 0、base wasm_err 8。
+
+## 8. 受入 4: 16B 結合 merge 規則の検証 (本 PR)
+
+> 測定 commit: `d35279ab` (`origin/main`)。本 PR はコードを変えず、付録だけを足す。pass 関連の `git diff 05194cdc HEAD -- tools/icall/frame_slot_restore.py tools/icall/frame_slot_probe.py tools/icall/fa_route_build.sh tools/icall/diff` の出力は空 (0 行)。§7 の広い範囲では `tools/m11/shimx_link/` の 4 ファイルだけが変わっており、fa route が使う `tools/m11/m11_simd2.py`・`msimd11_core.h` は変わっていない。
+
+### 8.1 結論
+
+- merge 規則 (`frame_slot_restore.py` の `ensure`) が成立するのは、`F.ranges` の 131 関数のうち **0x181057b38 の 2 組だけ**。
+- 0x180da6e60 は、値の解決 (条件 1) が 10/10 で不成立。結合先の相手 (条件 2) は 3 件で成立するが、相手の `i64` alloca が IR に無く (条件 3) 結合されない。
+- 候補 (脱落 store) を持つ関数は、この closure では 0x181057b38 と 0x180da6e60 の 2 つだけ。したがって他関数への一般化は、この closure では検証対象が無い。
+
+### 8.2 手順と結果
+
+1. `frame_slot_restore.py` を `F.ranges` の全 131 関数に適用し、`--report` の JSON で候補・復元・merge を集計した (候補 12 件・解決して戻す 2 件。`HEAD` での再実行は main 側の実行と JSON が一致)。
+2. 復元前の IR (`after.0.restored.ll`) と復元後の IR を関数単位で比べた。変わった関数は `0x181057b38` だけ (131 関数中 1)。
+3. 候補ごとに、merge 規則の 3 条件を確認した。
+
+| 関数 | 候補 | (1) 値が解決 | 復元 | merge | (2) X が lea の disp と一致 | (3) E の `i64` alloca が IR にある |
+|---|--:|--:|--:|---|--:|--:|
+| `0x181057b38` | 2 | 2 | 2 | 2 組: E=-24・X=-16 / E=-48・X=-40 | 2 / 2 | 2 / 2 |
+| `0x180da6e60` | 10 | 0 | 0 | 0 | 3 / 10 (No 2・6・9) | 0 / 3 |
+
+- 条件 (1): 戻す store の値が、同一基本ブロック内の lea (frame slot の address か global の VA) で解決できること。
+- 条件 (2): 結合先 X (store の target slot) が、lea で取られた slot の 8B 上にあること。E = X-8 が lea で取られていることと同じ。
+- 条件 (3): E の `i64` alloca が IR にあり、まだ結合されていないこと。
+
+### 8.3 適用条件 (成立しない関数の理由)
+
+merge 規則は 3 条件がすべて成り立つときだけ起きる。成り立たないときは、`ensure` が X 用の `i64` alloca を単独で作るか、値が解決できないため候補のまま残る。
+
+- **0x180da6e60 の値 (条件 1) が解決できない理由**: No 2・7 は `[rdx+8]`・`[rdi+0x100130]` の読み出し (load)、No 6 は `r15` が同一 BB で未定義、No 9・10 は `xor ecx,ecx` によるゼロ化 (resolver は lea だけを解決する)、No 1 は stack cookie、No 3・4 は読みが無い、No 5・8 は route IR に store があり検出の誤り (§4.2 の分類どおり)。
+- **0x180da6e60 の E が無い理由 (条件 3)**: (2) が成立する No 2・6・9 の E は、それぞれ `stack_var_-57`・`-41`・`-17`。この関数の `i64` alloca は `stack_var_-104`・`-128`・`-144` だけで、E の alloca が無い。値の解決を足しても、結合ではなく単独の alloca が増えるだけになる。
+- 条件 (1) の拡張 (`xor` ゼロ化の解決) は、No 9・10 を復元対象にし得る。ただし条件 (3) が不成立のため merge は起きない。拡張の要否は ICALL-79 の分類結果を見て決める (本 PR では未実施)。
+
+### 8.4 再現
+
+```sh
+cd tools/icall
+python3 frame_slot_restore.py --ir work/rt_freshair-core/after.0.restored.ll --dsm work/rt_freshair-core/before.0.drc.dsm \
+  --before-ll work/rt_freshair-core/before.0.drc.ll --ranges work/rt_freshair-core/F.ranges \
+  --out work/fa_exp2/x.ll --report work/fa_exp2/x.json
+python3 - <<'PY'
+import json, re
+b = open('work/rt_freshair-core/after.0.restored.ll', errors='replace').read()
+n = open('work/fa_exp2/x.ll', errors='replace').read()
+fn = lambda t: {m.group(1): m.group(0) for m in re.finditer(r'^define [^\n]*@function_([0-9a-f]+)\(.*?^\}', t, flags=re.M | re.S)}
+fb, fx = fn(b), fn(n)
+print('changed:', ['0x' + k for k in fb if fb[k] != fx.get(k)], 'of', len(fb))
+rep = json.load(open('work/fa_exp2/x.json'))
+for va in ['0x180da6e60', '0x181057b38']:
+    al = set(int(x) for x in re.findall(r'%stack_var_(-?\d+) = alloca i64', fb[va[2:]]))
+    for c in rep[va]['candidates']:
+        X = c['disp'] - 8; E = X - 8
+        print(va, c['va'], 'X', X, 'E', E, 'E_i64_alloca', E in al, 'value', c['value'])
+PY
+```
+
+期待値: `changed: ['0x181057b38'] of 131`。`0x181057b38` の 2 候補は E の alloca が有り、`0x180da6e60` の候補は E の alloca が無い (または値 None)。条件 (2) は `scan` の `escaped` (= lea の disp − 8) との比較で、E ∈ escaped ⇔ X が lea の disp と一致する。上の再現スクリプトはこれを出力しない。`0x180da6e60` の lea の disp は −0x31 (−49)・−0x21 (−33)・−9 で、(2) が成立する候補の X と一致する (No 2 の X=−49、No 6 の X=−33、No 9 の X=−9)。
