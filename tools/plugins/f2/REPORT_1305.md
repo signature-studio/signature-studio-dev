@@ -188,8 +188,9 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 判定 (受入条件): 1 (実引数で `0x411a80` に届く) **未達**。`0x407a20` 系が読むヒープ/リンク構造を PE 内の静的情報から合成する必要がある。2 (`0x411bb8` の `[0x8c3c80]`・`[[rcx]+0x28]` の確定) **未達**。3 (`0x83efb0` 起点の `-w 0x8c3ca8:0x8c3cb0`) **未達** (受入 1 が前提)。REPORT の結論 (§9・§10) は変更しない。waiver は変更しない。
 - 残件 (#2272 で追跡): host 構造体の合成を `0x407a20` 系まで行い、`0x411a80` に届かせる。届いた後に `0x411bb8`・`0x411940` の trace と `0x8c3ca8` の最終値を確定する。
 
-## 14. PLG-F3-26 (#2295): 0x407a20 の入力状態と呼出し経路 (測定 commit e53d845b、block19148)
+## 14. PLG-F3-26 (#2295): 0x407a20 の入力状態と呼出し経路 (測定 commit 6d471846、block19148)
 
+- 測定 commit: **6d471846** (この節の `-t`・`-d`・走査の件数・`esi`/バイトの読み値は、すべて 6d471846 で取得した)。e53d845b の測定 (1.68 s、同じ fault) は旧測定として残すだけで、判定の根拠にしない。e53d845b からの差分は `unicorn_trace.py` +9 行 (main 側の `-d` 追加) と `jump_scan.py` 新規。`tools/plugins/f2/` の差分は `git diff e53d845b 6d471846 -- tools/plugins/f2/` で確認できる。
 - 入力: `$RUNNER_TEMP/ex/extracted/block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/ex extracted/block19148_PE.bin`、5,904,384 B)。依存: `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。
 - 再現 (逐次、`PE=$RUNNER_TEMP/ex/extracted/block19148_PE.bin`): `python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` = `UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0x0`。§12 と一致。
 - 走査の再現 (リポジトリ内の script):
