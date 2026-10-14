@@ -230,6 +230,12 @@
 - 結論: int/pointer 混在 (`-Wint-conversion`) は修復済み (block19091_0.c で 46 → 0、全 40 ファイルで修復後 0)。emcc exit 0 は 40 ファイル中 1 件のみで受入条件 3 は未達 (残りは goto/break 94 件と引数型不一致 1,245 件)。未達は子 issue #1679 (HB-H35)・#1680 (HB-H36) に分割。
 - 測定表・残り error の内訳 (合計 1,377)・受入条件の判定・再測定手順・未検証項目は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md` (§9 全文の分割移動) を参照。
 
+## 11. #1680: 引数型不一致 (`incompatible pointer types passing`) の修復 (測定 commit: f6913004)
+
+- 結論: 宣言側 `int16_t *` は正しい (Win32 LPCWSTR・PE 内 UTF-16LE と一致)。呼出側の `L"..."` (wasm32 で 4B) を `(int16_t *)u"..."` に直す (`retdec_repair.py --wide`)。両 block で `incompatible pointer types passing` は 1,245 / 1,251 → 0、error 行は 1,377 / 1,383 → 132、emcc exit 0 は 1 → 11 (40 件中)。
+- 判定の根拠・代表例 3 種・全件の UTF-16LE 裏取り・測定表・再現手順は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1680.md` を参照。
+- 未達: 残り 132 件 (goto/break・label・代入型不一致) → #1679 (HB-H35)。修復後の実行 (bit 一致) と wasm link は未検証。
+
 ## 10. #1522: `no_definition` 残り 4 件の原因 (測定 commit: 05db246f)
 
 - 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。
