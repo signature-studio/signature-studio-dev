@@ -32,7 +32,7 @@ before は `audit_icall.py --pe OTT_vst2_win64.dll --funcs F.ranges --ir rt_ott-
 | 0x1801a31fb | jmp r9 | 17 | **jt_dropped** | jt_dropped |
 | 0x1801ac729 | jmp rcx | 5 | jt_present | jt_dropped |
 
-- 0x1801a31fb は before の時点で既に `jt_dropped`。issue の「7 site が遷移」と合うが、落ちている 1 件は 0x1801a31fb ではなく before の段階で落ちていた site。遷移した 7 件と before 段階落ち 1 件は別機構として扱う (本 run では未切り分け)。
+- before 段階で既に `jt_dropped` だったのは 0x1801a31fb の 1 件。残り 7 件が before `jt_present` → after `jt_dropped` に遷移した。この 1 件と遷移 7 件は別機構として扱う (本 run では未切り分け)。
 - rewrite は 8 site すべて `jt-chain` 展開 (`rewrite.txt`: `jt-chain 8`)。`map.json` の `insn_ranges` で各 jt 比較列は元 VA に区間対応づけられている (例: 0x18011e279 → new 0x18030b095, 146 B)。
 
 ## 機構の根拠
