@@ -11,15 +11,16 @@
 
 ## 測定
 
-測定 commit: `4efa6820` (`tools/icall` のコード変更なし。HEAD 時点の `roundtrip.sh` / `audit_icall.py` を使用)。
+測定 commit: **§1〜§3 は特定できない**。前 run の記録で、実行 commit が記録されていない。前 run の block24356 実測は `60932d35` 時点として引用されている (下の「前 run との差分」)。`60932d35..4efa6820` の間で `tools/icall/audit_icall.py` が変わっている (`09ed7bbc` で jt_folded 分類を追加、+32/-3 行)。jt_folded の有無で jt_dropped の値が変わりうるため、§2 の `jt_dropped 0` がどちらの audit で出たかは未確認。よって §1〜§3 の数値は **前 run 記録・現 HEAD では未再測定** として扱う。
 素材: `fl-win64` (`block*_PE.bin` 313 本)、`toolchain-retdec`。
 
-**provenance**: 以下 §1・§2・§3 の数値は **前 run の記録値**。本 run (c1b89edf 側の fix モード) では RetDec (`/opt/retdec`) と `work/` (scan・監査 JSON) が無く、再現できなかった。本 run で実測した項目は「代替の確認」(下の §0) だけ。
+**provenance**: 以下 §1・§2・§3 の数値は **前 run の記録値**。本 run では RetDec ([RETDEC]) と `work/` (scan・監査 JSON) が無く、再現できなかった。本 run で実測した項目は「代替の確認」(下の §0) だけ。
 
 ### 0. 本 run での確認
 
-- `/opt/retdec/bin/retdec-decompiler` 不在、`tools/icall/work/` 不在のため、§1〜§3 の再実行は不可。
+- [RETDEC] (`docs/REFERENCES.md`) の実行環境と `tools/icall/work/` が本 run に無いため、§1〜§3 の再実行は不可。
 - `git diff 4efa6820 HEAD -- tools/icall` のコード差分 0 (付録 1 ファイルのみ)。
+- `git diff 60932d35 4efa6820 -- tools/icall/audit_icall.py` は +32/-3 行 (`09ed7bbc`)。§1〜§3 の測定 commit を特定できない理由。
 
 ### 1. 走査 (前 run 記録値・`.pdata` 関数単位・capstone)
 
@@ -62,8 +63,8 @@ RetDec 出力の命令種は、この run では RetDec 未配備のため **未
 
 ### 4. 測定 commit と差分
 
-- 測定 commit: `4efa6820` (HEAD 時点で `tools/icall` 変更なし)。
-- `git diff 4efa6820 HEAD -- tools/icall` は本 commit で追加する本付録のみ。
+- §1〜§3 の測定 commit: 特定不可 (上の「測定」節)。前 run の記録値のため、現 HEAD での再測定は未実施。
+- `git diff 4efa6820 HEAD -- tools/icall` は本 commit 群で追加した本付録のみ (コード差分 0)。
 
 ## 前 run との差分
 
