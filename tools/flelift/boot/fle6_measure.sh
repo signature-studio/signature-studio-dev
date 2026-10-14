@@ -23,6 +23,8 @@ PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 SS_EMSDK_ENV="${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}"  # emsdk_env.sh は EMSDK_ENV を unset するので別名にする
 [ -f "$SS_EMSDK_ENV" ] || { echo "[fle6] emsdk_env.sh not found: $SS_EMSDK_ENV (SS_EMSDK_ENV で指定)"; exit 2; }
 export FLE_EXTRA_ROOTS="${FLE_EXTRA_ROOTS:-0x6a7b70}"
+# lifted C は N 本 (fle_lifted_s<k>.c) に分けて並列 clang する (FLE-9, #2700)。1 にすると単一 TU (cap 11000MB で打ち切り)。
+export FLE_SHARDS="${FLE_SHARDS:-8}"
 export TMPDIR="$W/tmp"
 mkdir -p "$W/tmp" "$W/obj" "$HERE/results"
 set +u; source "$SS_EMSDK_ENV" > /dev/null 2>&1; set -u
@@ -41,7 +43,7 @@ python3 "$HERE/rss_cap.py" --cap-mb "${FLE_RSS_CAP_MB:-13800}" --log "$W/rss_lif
   python3 "$FLE/x64c.py" --pe "$PE" --entries "$W/fle_entries_boot.json" --out "$LIFT" --closure "${FLE_LIFT_CLOSURE:-2}" \
   --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000 \
   --override 0x4126f0=fle_ov_longjmp --override 0x409410=fle_ov_getmem \
-  --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits | tail -3
+  --override 0x409440=fle_ov_freemem --override 0x4120c0=fle_ov_initunits --shards "$FLE_SHARDS" | tail -3
 python3 "$FLE/fle_data_gen.py" "$PE" "$LIFT/fle_data.c" "$LIFT/lift_meta.json" > /dev/null
 python3 "$HERE/gen_boot.py" --pe "$PE" --meta "$LIFT/lift_meta.json" --out "$W" > /dev/null
 elapsed "lift" "$T"
@@ -59,7 +61,8 @@ run_boot() {
   grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
   [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }
-  [ "$rc" = 0 ] || { echo "[fle6] $1: fle_boot.mjs が rc=$rc で終了 (IPP 判定 NG なら 3) ($log)"; exit "$rc"; }
+  # 判定 NG (rc=3) でも shim 有・ネガコンの両方を採取してから最後に非 0 で終わる (片方の数値を欠かさない)。
+  [ "$rc" = 0 ] || { echo "[fle6] $1: fle_boot.mjs が rc=$rc で終了 (IPP 判定 NG なら 3) ($log)"; FAIL_RC="$rc"; }
 }
 
 T=$(date +%s); stage "boot"
@@ -70,3 +73,4 @@ T=$(date +%s); stage "negctl (FLE_IPP=0)"
 run_boot negctl "$HERE/results/boot_summary_fle6_negctl.json" 0
 elapsed "negctl" "$T"
 echo "[fle6] end $(date -u +%H:%M:%S)"
+[ -z "${FAIL_RC:-}" ] || exit "$FAIL_RC"
