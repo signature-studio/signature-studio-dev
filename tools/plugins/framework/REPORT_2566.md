@@ -10,7 +10,7 @@ stage-1 の再生成 (RetDec 8 chunk) は 5 分 42 秒で完走し、BLK と再�
 ## 1. 検証起点と測定 commit
 
 - 起点: `origin/main` `8fd940bb`。修正 commit (測定 commit): **`66a3dbe1`** (`fix(plugins): bind the DllMain spill to %arg1/%arg2 when BLK is zero-filled (#2566)`)。worktree `../ws-2566`・branch `2566-plg-p0b-21-relift`。
-- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に、`work-liftlib` を `tools/liftlib/work/` に展開 (gitignore)。`fl-win64` は member 2 本だけを `$RUNNER_TEMP/fl-win64/extracted/` に展開 (`block18983_PE.bin`・`block00031_PE.bin`、各 2.5 秒以下)。`toolchain-retdec`・`toolchain-emsdk` は runner 既存の `/opt/retdec`・`/opt/emsdk` を使用。`plugins-ott` は未使用。
+- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に、`work-liftlib` を `tools/liftlib/work/` に展開 (gitignore)。`fl-win64` は member 2 本だけを `$RUNNER_TEMP/fl-win64/extracted/` に展開 (`block18983_PE.bin`・`block00031_PE.bin`、各 2.5 秒以下)。`toolchain-retdec`・`toolchain-emsdk` は runner 既存の `[RETDEC]`・`[EMSDK]` (`docs/REFERENCES.md` §4) を使用。`plugins-ott` は未使用。
 - 補助物: `fw_prep.py` が読む `tools/plugins/work/fw_hash_counts.json` は `{}` で代用 (framework 統計の出力のみに影響し、`F.ranges` は全 Balance 関数から作られるため件数は不変。確認: 11,736 件 = 旧 `fw_map.json` の `nfuncs`)。
 - 実行環境: nproc 4・RAM 15 GiB。load average は今回のステップでは未計測。
 
