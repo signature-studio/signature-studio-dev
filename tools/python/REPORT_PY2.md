@@ -59,7 +59,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 
 - **Python を実行してよいのは UI スレッドと MIDI スレッドだけ。audio スレッド (AudioWorklet) からは呼ばない**。FL の API 自身が audio 側で `Operation unsafe at current time` (code 3) を返す設計と一致。AudioWorklet 内では `Atomics.wait` が TypeError で使えない (runtime REPORT)。
 - 同一 wasm 内なので `_flhost.call` は呼出し元スレッドの上で同期に完結し、callback (`ilmcp.showHighlight` の `whenDone` など) も同じスレッドで戻る。FL 本来の「同一プロセス・同一スレッド」と同じ。
-- GIL: FL は `PyGILState_*` を使わず `PyEval_SaveThread/RestoreThread` + `PyThreadState_New/Swap` を束縛する (上表)。静的版では `SaveThread → RestoreThread` の往復後も tool が動くことを確認済み。**pthread (複数スレッドから同時に Python) 版のビルド・実行は未検証**。単一スレッド wasm 版 (本 PR) は MIDI と UI を 1 つのスレッドで直列に処理する前提で、MIDI スレッドを別スレッドにする場合は pthread ビルド + `PyThreadState_New` 方式が要る (子 #2633 PY-80)。
+- GIL: FL は `PyGILState_*` を使わず `PyEval_SaveThread/RestoreThread` + `PyThreadState_New/Swap` を束縛する (上表)。静的版では `SaveThread → RestoreThread` の往復後も tool が動くことを確認済み。**pthread (複数スレッドから同時に Python) 版は #2856 (PY-97) で静的リンクと 2/4 スレッドからの tool 呼出しを実測済み (`REPORT_PY80.md`)**。単一スレッド wasm 版 (本 PR) は MIDI と UI を 1 つのスレッドで直列に処理する前提で、MIDI スレッドを別スレッドにする場合は pthread ビルド + `PyThreadState_New` 方式が要る (子 #2633 PY-80)。
 - メモリモデル (#25): **wasm32 に決定済み** (`tools/runtime/REPORT.md`、Memory64 は退避路)。本 PR は wasm32 でリンクしており、wasm32 の範囲では依存を満たす。provider の追加は +34,146B と小さく、Memory64 へ移る場合も同じ手順で再リンクできる想定 (**Memory64 でのリンクは未検証**)。
 
 ### 検証範囲 / 範囲外
@@ -77,7 +77,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | 実 FLEngine wasm へのリンク (`fl_api_call` を FLEngine の内部 API に繋ぐ) | 本節は provider のモック状態で実測しており、実エンジンの意味差は未検証 | 子 #2631 (PY-79)。FLEngine 起動 (MS5) が前提 |
 | `_PyInterpreterState_GetRefTotal` を FL が実際に使うか | 使うなら upstream release build では束縛が失敗する (FL 側の失敗時挙動は未確認) | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
 | wasm でのサブインタプリタ (`Py_NewInterpreterFromConfig`) 動作 | FL がサブインタプリタ運用なら MIDI/piano roll の分離に影響 | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
-| pthread 版での複数スレッド + GIL | MIDI スレッド分離の可否 | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
+| pthread 版での複数スレッド + GIL | MIDI スレッド分離の可否 | 静的 pthread 版の 2/4 スレッド実測は #2856 (PY-97、`REPORT_PY97.md`)。残件 (サブインタプリタ・負のコントロール) は子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
 
 ## 7e. 再検証 (測定 commit 322f81b6) と #83 の受入条件の判定
 

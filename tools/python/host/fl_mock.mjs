@@ -3,6 +3,9 @@
 // 返す number は整数なら int、実数なら float になる。整数値の float は F(x) で明示。
 import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
+// PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。param 0..7 の既定値は stub 順、範囲外と param 8 (未モデル) は -1
+const STEP_DEF = [60, 100, 64, 120, 64, 64, 64, 0];
+const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 7 ? -1 : STEP_DEF[prm]);
 
 class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
@@ -96,6 +99,20 @@ export function createMockEngine() {
     },
     // PY-41 (#1514): stub midi.CT_Sampler = 0 / CT_GenPlug = 2 を plugin 名で決める (C と同一・Hybrid 等は未モデル)
     "channels.getChannelType": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).plugin === "Sampler" ? 0 : 2; },
+    // PY-100 (#2879): PE 0xd5bb30 / 0xd5ba00 (C と同一)。引数を読んでから index を検査。padsStride 既定 16、0 は Range error
+    "channels.getCurrentStepParam": (...a) => {
+      arity(a, 3, 4);
+      const step = argI(a, 1, 0), prm = argI(a, 2, 0); argI(a, 3, 0);
+      return stepParam(ch(a[0]), step, prm);
+    },
+    "channels.getStepParam": (...a) => {
+      arity(a, 4, 5);
+      const step = argI(a, 0, 0), prm = argI(a, 1, 0), off = argI(a, 2, 0), st0 = argI(a, 3, 0), pads = argI(a, 4, 16);
+      if (pads === 0) throw new FlError("Range error", 4);
+      const q = Math.trunc(step / pads), idx = q + off;
+      if (idx < 0 || idx >= st.channels.length) throw RANGE();
+      return stepParam(st.channels[idx], step - q * pads + st0, prm);
+    },
     // PY-89 (#2805): C と同一。identity (全 channel が 1 グループ)・既定 -2 (未割当)
     "channels.getChannelIndex": (...a) => { arity(a, 1, 1); const i = ix(a[0]); ch(i); return i; },
     "channels.getChannelMidiInPort": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return -2; },
