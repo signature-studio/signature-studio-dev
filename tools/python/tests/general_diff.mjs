@@ -24,11 +24,15 @@ const calls = [
   ["general.getChangedFlag", []], ["general.getUseMetronome", []],
   ["general.getPrecount", []], ["general.getRecPPQ", []],
   ["general.getVersion", []],
+  // PY-94 (#2830): 状態読出し 7 件 (REPORT_PY94)
+  ["general.getUndoHistoryPos", []], ["general.getUndoHistoryCount", []], ["general.getUndoHistoryLast", []],
+  ["general.safeToEdit", []], ["general.getProjectTitle", []], ["general.getProjectAuthor", []], ["general.getProjectGenre", []],
 ];
 // 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
   ["general.getChangedFlag", [1]], ["general.getUseMetronome", [0]],
   ["general.getPrecount", [1]], ["general.getRecPPQ", [0]],
+  ["general.safeToEdit", [1]], ["general.getProjectTitle", [0]],
 ];
 
 const diffs = [];

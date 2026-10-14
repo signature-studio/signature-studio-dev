@@ -15,6 +15,7 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    undoPos: 0, undoCount: 0, undoLast: 0, safeEdit: true, projTitle: "", projAuthor: "", projGenre: "",
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -167,6 +168,14 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-94 (#2830): 状態 1 つを返すだけの 7 関数 (REPORT_PY94)。値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "general.getUndoHistoryPos": (...a) => { arity(a, 0, 0); return st.undoPos; },
+    "general.getUndoHistoryCount": (...a) => { arity(a, 0, 0); return st.undoCount; },
+    "general.getUndoHistoryLast": (...a) => { arity(a, 0, 0); return st.undoLast; },
+    "general.safeToEdit": (...a) => { arity(a, 0, 0); return st.safeEdit; },
+    "general.getProjectTitle": (...a) => { arity(a, 0, 0); return st.projTitle; },
+    "general.getProjectAuthor": (...a) => { arity(a, 0, 0); return st.projAuthor; },
+    "general.getProjectGenre": (...a) => { arity(a, 0, 0); return st.projGenre; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },

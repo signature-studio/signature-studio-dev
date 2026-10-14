@@ -37,6 +37,8 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int undo_pos, undo_count, undo_last, safe_edit;
+static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -64,6 +66,8 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
+    set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
     dev_port = 0; midi_out_n = 0; sel_chan = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -216,6 +220,15 @@ FL_H(general, getChangedFlag) { NARGS(0, 0); return fl_ret_i(c, changed_flag); }
 FL_H(general, getUseMetronome) { NARGS(0, 0); return fl_ret_b(c, use_metronome); }
 FL_H(general, getPrecount) { NARGS(0, 0); return fl_ret_b(c, precount); }
 FL_H(general, getRecPPQ) { NARGS(0, 0); return fl_ret_i(c, rec_ppq); }
+/* PY-94 (#2830): PE 0xd69a90/0xd69ab0/0xd69ad0 は状態の dword 1 つを読んで 0x15e4280 に渡す。0xd6a2c0 は vtbl[0x98] の bool。
+   0xd6a2f0/0xd6a3a0/0xd6a450 は project 物 (*(G)+0x10) の vtbl 0x20/0x28/0x30 から文字列を得る。値は未実測の仮置き (REPORT_PY94) */
+FL_H(general, getUndoHistoryPos) { NARGS(0, 0); return fl_ret_i(c, undo_pos); }
+FL_H(general, getUndoHistoryCount) { NARGS(0, 0); return fl_ret_i(c, undo_count); }
+FL_H(general, getUndoHistoryLast) { NARGS(0, 0); return fl_ret_i(c, undo_last); }
+FL_H(general, safeToEdit) { NARGS(0, 0); return fl_ret_b(c, safe_edit); }
+FL_H(general, getProjectTitle) { NARGS(0, 0); return fl_ret_s(c, proj_title); }
+FL_H(general, getProjectAuthor) { NARGS(0, 0); return fl_ret_s(c, proj_author); }
+FL_H(general, getProjectGenre) { NARGS(0, 0); return fl_ret_s(c, proj_genre); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
