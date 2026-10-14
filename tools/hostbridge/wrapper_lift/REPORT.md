@@ -229,3 +229,21 @@
 
 - 結論: **採用方式は x64c (`x64c_wrapper.py`)**。RetDec 経路は batch 間でグローバル名 `g*` が衝突し wasm link できない。測定値・手順・未検証項目の正本は付録 `REPORT_APPENDIX_1822.md`。
 - 未検証: wasm の実行 (bit 一致)・CreatePlugInstance 到達 (#829)。
+
+## 14. #829: x64c wasm build と CreatePlugInstance 入場 (測定 commit: a55fd489)
+
+- 結論: **x64c の wasm build は両 block で exit 0**。**CreatePlugInstance (VA 0x86ab10) への入場を実測で確認** (`[cpi] enter 0x86ab10`)。入場後は host 引数が無く最初の間接 call で停止するため、完走は未検証。詳細は付録 `REPORT_APPENDIX_829.md`。
+- 既知類型との関係: 該当なし (停止は host 未構成による実行時 trap)。検証起点: `origin/main` @ `9b352bd7`。測定 commit: `a55fd489`。`git diff a55fd489 HEAD -- tools/hostbridge/wrapper_lift` の実行コード (`*.py`・`*.sh`・`*.mjs`・`*.c`) 差分は 0 行。
+
+| 段 (block19091 / block23676) | exit | 秒 | load (1 分値・開始→終了) | 並列 |
+|---|---|---|---|---|
+| x64c 生成 | 0 / 0 | 67 / 67 | 1.13→1.08 / 0.21→0.76 | 1 |
+| `emcc -c` | 0 / 0 | 45 / 45 | 0.99→1.04 / 0.76→0.93 | 1 |
+| wasm link (43,828,879 B / 43,833,146 B) | 0 / 0 | 11 / 1 | 1.03→1.49 / 0.93→0.93 | 1 |
+
+- 到達 (block19091): NULL host・ゼロ埋め host の両方で `entered=true`。最初に失敗する関数は `f_77fbb0` の `0x77fbf3` `call qword ptr [rax]` (host 由来の値が無いことが原因と推定。未検証)。NC (別 VA) は `entered=false` (弱い NC)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| CreatePlugInstance の完走 (host object の再構成) | 完走・Dispatcher 実行・bit 一致は未検証 | 未起票 (PM 判断) |
+| block23676 の入場 (VA 0x86a970) | build のみ検証 | 未起票 (PM 判断) |
