@@ -31,3 +31,12 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 - 生成 helper C (`tools/plugins/work/dynamics/simdchk<B>/m11_simd.c`、`msimd11_core.h` を親 dir に置いて `emcc -c`): 19252 rc 0 / 19048 rc 0。
 - 未実装 helper の残件は両 engine とも 5 件 (`movntps`・`vmovsd` store・`vcomisd`・`vucomisd`・`vucomiss`。19048 は `vcomisd__22` を含む)。 #1408 の範囲。
 - 共有鎖 (`lift/passes/`・`lift_ranges.sh`) への影響なし (本変更は `dynamics/engine_fixcmp.py` のみ)。
+
+## C. 旧測定 (REPORT §4 から分割移動)
+
+- 測定 commit `c0afd85b` (本 HEAD、`engine_lift.sh` 単独実行、19252 23 s / 19048 61 s)。 `engine_lift.sh` の出力: 19252 `unimpl 12 / emcc_c_rc 0 / missing_define 2`、19048 `unimpl 6 / emcc_c_rc 1 → fixcmp 後 0 / missing_define 210`。 `711d9ece` の値と一致 (表は変更なし)。
+- 生成 helper C (`*_simd.c`) の `emcc -c`: 本 HEAD の `m11_simd2.py` で `tools/plugins/work/dynamics/simdchk<B>/m11_simd.c` を生成 (入力 `work/dynamics/engine<B>/e.final.ll`、`python3 lift/passes/m11_simd2.py <final.ll> > m11_simd.c`)。 `#include "../msimd11_core.h"` を `"msimd11_core.h"` に書換えて `emcc -c -msimd128 -w -O0 m11_simd.c -o o.o`。 結果: 19252 rc 0、19048 rc 0。 両 engine とも `__asm_int3` の宣言は `declare i64 @__asm_int3()` (戻り値あり版) のため、int3 の `void` 版の経路は通らない。
+- 測定 commit `711d9ece` 以降のコード差分: `git diff 711d9ece HEAD -- tools/plugins/lift/passes/m11_simd2.py` は int3 の 1 行のみ (`f2bbad10`)。 `hs_callee_disasm.py` は `engine_lift.sh` の実行経路外 (reviewer 確認)。 この差分を含む `c0afd85b` で再測定し、表の値は一致した。
+- int3 の影響: 両 engine の `e.final.ll` の `__asm_int3` は `i64` 戻り値の宣言 (1 件ずつ) のため、旧 void 版の `return 0;` 問題には当たらない。 `void` 版の修正そのものは合成 `.ll` のみで確認 (下記)。
+- int3 修正 (`m11_simd2.py`・本 HEAD): `void` 版は `abort()` のみ、戻り値あり版は `abort(); return 0;` を生成する。 `int3` を含む合成 `.ll` (`declare void @__asm_int3()` と `declare i32 @__asm_int3__1()`) で生成した C を `clang -c -Wall -Werror=return-type` で検査: 修正後 rc 0、修正前 (`f50ca8ad`) は `void function '__asm_int3' should not return a value` で rc 1。 engine 出力での確認は、上の「生成 helper C」の `emcc -c` rc 0 (両 engine、`c0afd85b`) で行った。 合成 `.ll` の検査は `void` 版の分岐を直接見るためのもの。
+- 以上は到達性の実測で、engine の正しさは何も示していない。
