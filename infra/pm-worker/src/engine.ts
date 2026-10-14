@@ -1373,8 +1373,8 @@ export class Engine {
     return detectPm(this.s, {
       bots: this.d.cfg.pmTargetBots,
       npCount: (n) => this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0,
-      // 新しい素材の無い artifact は、unknown の枠 (再投入 1 回) を使い切ってから oc-pm に回す (#3185)。
-      artSpent: (n) => this.artExtra(n) === null && this.noPrState(n).unknown >= 1,
+      // 新しい素材の無い artifact は、unknown の枠 (再投入 1 回) を使い切るか、再投入の上限に達したら oc-pm に回す (#3185)。
+      artSpent: (n) => this.artExtra(n) === null && (this.noPrState(n).unknown >= 1 || this.noPrState(n).count >= NO_PR_MAX_RELAUNCH),
     });
   }
 

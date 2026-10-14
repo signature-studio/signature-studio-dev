@@ -324,6 +324,26 @@ test("artifact の再投入 (f): 停止報告の素材が前回の oc_artifacts 
   assert.equal(postsTo(ctx.m.calls, 70).length, 1);
 });
 
+test("artifact の上限 (#3185): 再投入の上限に達した新しい素材なし artifact は、unknown の枠を使わなくても oc-pm (no_pr) に回し、再投入しない", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  const owned: any = issuePayload(90, { labels: ["oc:no-pr"] });
+  owned.issue.user = { login: "pycabbage", type: "User" };
+  owned.issue.author_association = "OWNER";
+  assert.equal((await send(ctx.app, "issues", owned)).status, 202);
+  await send(ctx.app, "issue_comment", commentPayload(90, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(90, BOT, "停止します。素材不足: toolchain-emsdk が無い", atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(90, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  // blocked・PM の意図による再投入で上限 (NO_PR_MAX_RELAUNCH = 3) に達し、unknown の枠は使っていない状態。
+  ctx.store.put("relaunch", "np:90", { count: 3, unknown: 0, artifact: 0, art: "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk" });
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.ok(!p.picks.some((x) => x.n === 90), "上限に達したら再投入しない");
+  assert.deepEqual(p.rows.stopped, [[90, "oc:no-pr x3"]]);
+  assert.ok(ctx.app.engine.detectPmTargets().some((t) => t.kind === "no_pr" && t.ref === 90), "oc-pm (no_pr) に回す");
+});
+
 test("artifact の再投入 (g): 新しい素材を挙げた停止報告で 1 回だけ再投入し、同じ素材の報告が続けば unknown の枠で 1 回だけ再投入する (#3185)", async () => {
   const clock = { t: T0 };
   const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });

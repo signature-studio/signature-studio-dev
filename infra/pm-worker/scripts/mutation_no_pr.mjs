@@ -17,6 +17,7 @@ const MUTANTS = [
   { name: "unknown の枠を数えない (fallback を何度でも出す)", file: "src/engine.ts", from: 'unknown: c.unknown + (p.np === "unknown" ? 1 : 0),', to: "unknown: c.unknown," },
   { name: "unknown の枠の上限を外す (fallback の c.unknown === 0 を外す)", file: "src/engine.ts", from: '} else if (reason === "artifact" && c.unknown === 0) {', to: '} else if (reason === "artifact" && c.unknown < 99) {' },
   { name: "再投入後の素材なし artifact を oc-pm に渡さない", file: "src/pm.ts", from: "const artDone = oc.reason === \"artifact\" && !!o.artSpent?.(i.number);", to: "const artDone = false;" },
+  { name: "上限に達した素材なし artifact を oc-pm に渡さない (artSpent の上限の枝を外す)", file: "src/engine.ts", from: "this.noPrState(n).unknown >= 1 || this.noPrState(n).count >= NO_PR_MAX_RELAUNCH", to: "this.noPrState(n).unknown >= 1" },
   { name: "再確認の 1 行を本文から外す", file: "src/launch.ts", from: 'if (l === "{recheck}") return recheck ? [RECHECK_LINE] : [];', to: 'if (l === "{recheck}") return [];' },
 ];
 
