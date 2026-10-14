@@ -1,14 +1,14 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
-import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
+import { classify, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
 import { advanceLaunch, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
-import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
+import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, NEEDS_PM_LABEL, NO_PR_LABEL, STUCK_LABEL, type HistoryEntry, type PmTarget } from "./pm.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
 import {
@@ -53,10 +53,30 @@ export interface WouldRec {
   ns: number[];
 }
 
+// open issue 数の履歴は 1 時間ごとに 1 点、最大 48 点 (48 時間分)。open_issues_delta_24h の基準に使う。
+export const OPEN_SAMPLE_MS = 3_600_000;
+export const OPEN_SAMPLE_MAX = 48;
+const DAY_MS = 24 * 3_600_000;
+
+export interface OpenSample {
+  at: number;
+  open: number;
+}
+
 export interface Planned {
   n: number;
   art: string;
   relaunch: boolean;
+  // oc:no-pr の再投入の理由 (計数の対象。stop・split・blocked は再投入しない)
+  np?: "artifact" | "unknown";
+}
+
+// relaunch バケットの np:<n> (oc:no-pr の再投入の計数。count は artifact と unknown の再投入の合計)
+interface NoPrCount {
+  count: number;
+  unknown: number;
+  artifact: number;
+  art: string | null;
 }
 
 export interface Plan {
@@ -434,7 +454,7 @@ export class Engine {
     let diff = 0;
     // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
     const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
-    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, body: mine.has(c.user?.login) ? c.body : "" });
+    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: mine.has(c.user?.login) ? c.body : "" });
     const cs = this.note(
       "comments",
       await gh.list<any>(
@@ -609,6 +629,10 @@ export class Engine {
     };
   }
 
+  private noPrState(n: number): NoPrCount {
+    return { count: 0, unknown: 0, artifact: 0, art: null, ...this.d.store.get<NoPrCount>("relaunch", `np:${n}`) };
+  }
+
   countActive(): number {
     let n = 0;
     for (const r of Object.values(this.s.runs)) {
@@ -634,12 +658,57 @@ export class Engine {
     const lastAct = (n: number): number =>
       Math.max(Date.parse(this.s.launchedAt[String(n)] ?? "") || 0, Date.parse(this.s.botLast[String(n)]?.at ?? "") || 0);
     const hasLabel = (n: number, l: string) => (labels.get(n) ?? []).includes(l);
-    const npCount = (n: number): number => this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0;
+    // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
+    const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
     const failed = (n: number): boolean => input.launchState?.[String(n)] === "failed";
+    // 既定の素材行 (PM の oc_artifacts 行。無ければ題名とラベルからの推定)。picks の既定と同じ。
+    const baseArt = (n: number): string => {
+      const b = this.s.pmArt[String(n)]?.line;
+      return b && validateArtLine(b) ? b : inferArtifacts(title.get(n) ?? "", labels.get(n) ?? []);
+    };
 
     const moveTo = (n: number, from: keyof Rows, to: () => void) => {
       (rows as any)[from] = (rows as any)[from].filter((x: any) => (Array.isArray(x) ? x[0] : x) !== n);
       to();
+    };
+
+    // oc:no-pr の issue は、最後の oc-run-outcome の reason で再着手を決める (PR を出さずに終わった run の後だけ)。
+    //  unknown: cooldown の後に 1 回だけ。artifact: 前回の oc_artifacts に無い allowlist 内の素材を足して 1 回 (足す素材が無ければ再投入しない)。
+    //  stop・split は PM agent (detectPm) に回す。blocked は blocker が close されるまで再投入しない。
+    const npPick = new Map<number, { art: string; np: "artifact" | "unknown" }>();
+    const noPr = (n: number, from: "ready" | "stopped"): void => {
+      const reason = this.s.sig[String(n)]?.outcome?.reason ?? "unknown";
+      const c = this.noPrState(n);
+      const prevNames = (c.art ?? baseArt(n)).replace("oc_artifacts:", "").trim().split(/\s+/).filter(Boolean);
+      let pick: { art: string; np: "artifact" | "unknown" } | null = null;
+      let to: "recent" | "stopped" | "blocked" = "stopped";
+      let note = reason;
+      if (reason === "blocked") {
+        to = "blocked";
+      } else if (reason === "stop" || reason === "split") {
+        to = "stopped";
+      } else if (nowMs - lastAct(n) < cool) {
+        to = "recent";
+        note = "oc:no-pr cooldown";
+      } else if (c.count >= NO_PR_MAX_RELAUNCH) {
+        note = "oc:no-pr x" + c.count;
+      } else if (reason === "unknown" && c.unknown === 0) {
+        pick = { art: baseArt(n), np: "unknown" };
+      } else if (reason === "artifact" && c.artifact === 0) {
+        const extra = neededArts(n, input).filter((a) => !prevNames.includes(a));
+        if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
+        else note = "artifact: 新しい素材なし";
+      } else {
+        note = `oc:no-pr ${reason} 再投入済み`;
+      }
+      if (pick) {
+        if (from === "stopped") moveTo(n, "stopped", () => rows.ready.push(n));
+        npPick.set(n, pick);
+      } else if (from === "ready") {
+        if (to === "blocked") moveTo(n, "ready", () => rows.blocked.push([n, []]));
+        else if (to === "recent") moveTo(n, "ready", () => rows.recent.push([n, note]));
+        else moveTo(n, "ready", () => rows.stopped.push([n, note]));
+      }
     };
 
     for (const n of [...rows.ready]) {
@@ -647,18 +716,17 @@ export class Engine {
       if (unknown.has(n)) moveTo(n, "ready", () => rows.blocked.push([n, []]));
       else if (kids.length) moveTo(n, "ready", () => rows.blocked.push([n, [...kids].sort((a, b) => a - b)]));
       else if (hasLabel(n, "oc:stuck")) moveTo(n, "ready", () => rows.user.push([n, "oc:stuck"]));
-      else if (hasLabel(n, "oc:no-pr") && nowMs - lastAct(n) < cool) moveTo(n, "ready", () => rows.recent.push([n, "oc:no-pr cooldown"]));
-      else if (hasLabel(n, "oc:no-pr") && npCount(n) >= NO_PR_MAX_RELAUNCH) moveTo(n, "ready", () => rows.stopped.push([n, "oc:no-pr x" + npCount(n)]));
+      else if (hasLabel(n, "oc:no-pr") && !held(n)) noPr(n, "ready");
     }
     for (const [n] of [...rows.relaunch]) {
       if ((children[String(n)] ?? []).length || hasLabel(n, "oc:stuck")) moveTo(n, "relaunch", () => rows.stopped.push([n, "parent/stuck"]));
     }
     // 親 (open な子を持つ) で、分類上 started / stopped / recent に入っているものは、そのままにする (着手対象ではないため)。
-    // oc:no-pr で、分類が stopped / recent に置いたものも cooldown 後は再着手してよい。
     for (const [n] of [...rows.stopped]) {
-      if (hasLabel(n, "oc:no-pr") && nowMs - lastAct(n) >= cool && npCount(n) < NO_PR_MAX_RELAUNCH && !(children[String(n)] ?? []).length && !hasLabel(n, "oc:stuck") && !unknown.has(n) && !failed(n)) {
-        moveTo(n, "stopped", () => rows.ready.push(n));
-      }
+      if (!hasLabel(n, "oc:no-pr") || (children[String(n)] ?? []).length || unknown.has(n)) continue;
+      // hold のラベルは再投入せず user に置く (ready に戻して下の hold の処理で移す)。観測できなかった投稿 (failed) は再投稿しない。
+      if (held(n)) moveTo(n, "stopped", () => rows.ready.push(n));
+      else if (!hasLabel(n, "oc:stuck") && !failed(n)) noPr(n, "stopped");
     }
 
     // 着手しても PR を出さない/出せない issue (pm-apply・needs-user-input) は、着手も再投入もしない。
@@ -691,10 +759,11 @@ export class Engine {
       const i = issueOf.get(n);
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
-      const cand = relMap.get(n) ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
+      const np = npPick.get(n);
+      const cand = relMap.get(n) ?? np?.art ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
       // 本文由来 (PM コメント・bot 報告) の行は、allowlist を通ったものだけを使う。通らなければ推定値に落とす。
       const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
-      picks.push({ n, art, relaunch: relMap.has(n) });
+      picks.push({ n, art, relaunch: relMap.has(n), np: np?.np });
     }
     const plan: Plan = {
       at: iso(nowMs),
@@ -714,6 +783,16 @@ export class Engine {
   // 同期が古い、または一覧を打ち切った (取りこぼしがあり得る) 間は false。launch と watchdog はこの間は書かない。
   private fresh(): boolean {
     return !!this.meta.fullSyncAt && !!this.meta.reconcileAt && this.d.now() - this.meta.reconcileAt < STALE_AFTER_MS && !this.meta.syncTruncated;
+  }
+
+  // open issue 数を 1 時間ごとに記録する。同期が古い間・一覧を打ち切った間は記録しない (誤った数を残さない)。
+  private sampleOpen(now: number): void {
+    if (!this.fresh()) return;
+    const hist = this.d.store.get<OpenSample[]>("meta", "openHist") ?? [];
+    const last = hist[hist.length - 1];
+    if (last && now - last.at < OPEN_SAMPLE_MS) return;
+    const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
+    this.d.store.put("meta", "openHist", [...hist, { at: now, open }].slice(-OPEN_SAMPLE_MAX));
   }
 
   // Review-Only の状態は DO に保存する (未保存なら review_only: true)。
@@ -793,9 +872,15 @@ export class Engine {
         const prev = this.d.store.get<{ count: number; art: string | null }>("relaunch", String(p.n)) ?? { count: 0, art: null };
         this.d.store.put("relaunch", String(p.n), { count: prev.count + 1, art: p.art });
       }
-      if ((this.s.issues[String(p.n)]?.labels ?? []).includes("oc:no-pr")) {
-        const c = this.d.store.get<{ count: number }>("relaunch", `np:${p.n}`)?.count ?? 0;
-        this.d.store.put("relaunch", `np:${p.n}`, { count: c + 1 });
+      // 計数は artifact / unknown の再投入だけ (stop・split・blocked は数えない)。
+      if (p.np) {
+        const c = this.noPrState(p.n);
+        this.d.store.put("relaunch", `np:${p.n}`, {
+          count: c.count + 1,
+          unknown: c.unknown + (p.np === "unknown" ? 1 : 0),
+          artifact: c.artifact + (p.np === "artifact" ? 1 : 0),
+          art: p.art,
+        });
       }
       this.meta.counters.launched++;
       this.pushLog({ kind: "launch", n: p.n, art: p.art });
@@ -925,6 +1010,7 @@ export class Engine {
       this.setError(now, e instanceof GhError ? e.message : "tick failed");
       this.pushLog({ kind: "error", note: this.meta.lastError?.what });
     }
+    this.sampleOpen(now);
     this.saveMeta();
     return { ready: true };
   }
@@ -961,6 +1047,28 @@ export class Engine {
     const counters = this.meta.counters ?? this.zero();
     const rest = this.meta.rest;
     const lastError = this.meta.lastError ? { ...this.meta.lastError, what: this.clean(this.meta.lastError.what) } : null;
+    // 自律運転の指標。件数と時間だけで、題名・本文・login は出さない (issue / PR 番号は可)。
+    const now = this.d.now();
+    const openIssues = Object.values(this.s.issues).filter((i) => i.state === "open");
+    const openPrs = Object.values(this.s.prs).filter((p) => p.state === "open");
+    const withLabel = (l: string) => (x: { labels?: string[] }) => (x.labels ?? []).includes(l);
+    const stuckAges = openPrs
+      .filter(withLabel(STUCK_LABEL))
+      .map((p) => Math.max(0, Math.floor((now - Date.parse(this.s.sig[String(p.number)]?.stop?.at ?? p.updatedAt)) / 60_000)));
+    const noPrByReason = { split: 0, artifact: 0, unknown: 0, blocked: 0, stop: 0 };
+    for (const i of openIssues.filter(withLabel(NO_PR_LABEL))) {
+      const r = this.s.sig[String(i.number)]?.outcome?.reason;
+      if (r && r in noPrByReason) noPrByReason[r as keyof typeof noPrByReason]++;
+    }
+    const countLabel = (l: string) => openIssues.filter(withLabel(l)).length + openPrs.filter(withLabel(l)).length;
+    const mergedDay = Object.values(this.s.prs).filter((p) => {
+      const t = p.mergedAt ? Date.parse(p.mergedAt) : NaN;
+      return p.merged && t > now - DAY_MS && t <= now;
+    });
+    const refsOnly = mergedDay.filter((p) => p.refsOnly === true).length;
+    // 24 時間前以前の点のうち最も新しいもの。無ければ (履歴が 24 時間分に満たない) null。
+    let base: OpenSample | undefined;
+    for (const h of this.d.store.get<OpenSample[]>("meta", "openHist") ?? []) if (h.at <= now - DAY_MS && (!base || h.at > base.at)) base = h;
     return {
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
@@ -988,6 +1096,14 @@ export class Engine {
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
       pm_detected: pmDetected,
+      stuck: stuckAges.length,
+      stuck_age_max_min: stuckAges.length ? Math.max(...stuckAges) : null,
+      needs_pm: countLabel(NEEDS_PM_LABEL),
+      needs_user: countLabel(NEEDS_USER_LABEL),
+      no_pr_by_reason: noPrByReason,
+      refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
+      open_issues_delta_24h: base ? open - base.open : null,
+      pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
       // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE_DISPATCH では空。
       would_dispatch_pm: this.dispatchLive() ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
       last_full_sync: this.meta.fullSyncAt ? iso(this.meta.fullSyncAt) : null,

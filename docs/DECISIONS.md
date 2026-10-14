@@ -222,3 +222,11 @@
 - **比較した方式**: Razer・ReWired・FL Mobile は A (対象外) / B (no-op の殻として lift、または x64c の測定後に再判断) / C (実機能の提供、または RetDec 鎖で lift)。ZGE は A (対象外) / B (保留) / C (ZGE の実行系を WebGL で再実装)。
 - **理由**: Razer は周辺機器の LED 制御、ReWired は別プロセスの ReWire ホストとのルーティングで、どちらもブラウザに相手方がおらず、音声処理も無い (demo 出現なし)。FL Mobile は demo 出現が無く、.NET CLR (`mscoree.dll`)・`ws2_32` (D3 の対象外) を持ち、C++ engine の窓 lift が一部 `emcc -c` に失敗する (追跡は #527)。推定工数に対して利用実績がほぼ無く、élastique・DirectWave を内包する点も D20 の所有者限定 tier の範囲を広げるだけになる。ZGE は demo・preset があってユーザに見えるが、閉包が取れず (`plugin_closure` が vtable 入口を 0 件しか見つけない)、描画も #29 待ちのため、保留が可逆で進捗を止めない。値は `tools/plugins/hostx/REPORT.md` §1・§2・§4。
 - **影響**: `tools/plugins/hostx/REPORT.md` §0・§1 の区分を確定に合わせた。#558・#560 は close、#559 は #29 に blocked_by を付けて open のまま。#210 の lift 対象は 6 本 (Wrapper×2 / Patcher×2 / MIDI Out / Video Player)。A とした 5 本を再開する場合は新しい ADR を要する (FL Mobile は x64c 経路 (`tools/flelift`) の測定から)。
+
+## D23 — Serum 2 参照音源の content 条件は installer 全展開を正とし、空 dir は variant に残す
+
+- **状態**: 採用 (2026-10-14, issue #2414 [SR-47]。親 #73)
+- **決定**: 参照 WAV の content dir の正は installer 全展開 (Tables・Presets あり) とする。`ref_render.sh` の既定と `ref_manifest.json` の主エントリをこの条件に切り替える。専用の空 dir は variant (`content_empty`) として残す。
+- **比較した方式**: (a) 空 dir を正のまま据え置く、(b) 全展開を正とし空 dir を variant に残す (採用)、(c) 両条件を正として判定を 2 通り走らせる。
+- **理由**: 同じ DLL・MIDI・サンプルレートでも content dir の中身で参照の出力が変わる。wasm 本体が読む content は SR-6 の設計で導入後の installer の全展開 (Tables を含む) であり、SR-46 の factory preset も全展開の `Presets/` からしか取れない。比較条件を wasm 側の読み方に揃えるため (a) は採らず、(c) は判定基準を二重にするため採らない。根拠と実測は `tools/targets/serum2/host/REPORT_SR5.md` §4。
+- **影響**: 参照 pin の主エントリが全展開になる。空 dir 条件は `content_empty` として残る。全展開 content を読む wasm 本体への FS shim 接続は未確認で、#2383 の比較時に確認する (`tools/targets/serum2/host/REPORT_SR5.md` §4.4)。
