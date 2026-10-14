@@ -4,17 +4,17 @@
   受入 2 (fail-soft 3 件の戻り値の意味) は部分達成。受入 3 (REPORT 実測) は達成 (§2)。
 - 起点: `origin/main` 47ee8a17。worktree `ws-1848`・branch `1848-plg-failsoft-retval`。
 - 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-fw-stage1`・`work-liftlib`・`work-icall` は repo ルート展開。
-  `toolchain-emsdk` / `toolchain-retdec` は runner の `/opt/emsdk`・`/opt/retdec` を使用 (展開せず)。
+  `toolchain-emsdk` / `toolchain-retdec` は runner 側に既設の `[EMSDK]`・`[RETDEC]` を使用 (展開せず)。
   `plugins-ott` は本 run の手順では未使用。
-  `ANALYSIS_DIR=$RUNNER_TEMP/analysis` を設定 (`shared/env.sh` の既定 `/home/ubuntu/...` は runner に無い)。
+  `ANALYSIS_DIR=$RUNNER_TEMP/analysis` を設定 (`shared/env.sh` の既定値 (`[ANALYSIS-DIR]`) は runner に無い)。
 
 ## 1. 受入条件の達成状況
 
 | 出典 | 受入条件 | 結果 |
 |---|---|---|
-| #1848 #1 | fold deref を塞ぎ `hs_e2e.sh --fresh` の Phase B で `plug != 0` | **未達**。`0x710030` / `0x710040` の正しい値は FL 本体 export table 由来 (REPORT_1609 §3)。本 run では塞いでいない。子へ移管 (§5) |
-| #1848 #2 | fail-soft 3 件 (`0x52cf40` / `0x4e6060` / `0x4181e0`) の戻り値の意味を呼出側読解で確定 | **部分達成**。`0x52cf40` と `0x4181e0` は「0 = 該当なし」と一致しない可能性が高い (§3)。`0x4e6060` は未確定。確定は子へ移管 |
-| #1848 #3 | REPORT に実測値 (所要時間・load・PASS/FAIL) | **達成** (§2) |
+| 旧 #1848 項目 1 (移管) | fold deref を塞ぎ `hs_e2e.sh --fresh` の Phase B で `plug != 0` | **未達**。`0x710030` / `0x710040` の正しい値は FL 本体 export table 由来 (REPORT_1609 §3)。本 run では塞いでいない。子へ移管 (§5) |
+| 旧 #1848 項目 2 (一部移管) | fail-soft 3 件 (`0x52cf40` / `0x4e6060` / `0x4181e0`) の戻り値の意味を呼出側読解で確定 | **部分達成**。`0x52cf40` と `0x4181e0` は「0 = 該当なし」と一致しない可能性が高い (§3)。`0x4e6060` は未確定。確定は子へ移管 |
+| 旧 #1848 項目 3 (本 REPORT で達成) | REPORT に実測値 (所要時間・load・PASS/FAIL) | **達成** (§2) |
 
 ## 2. 実測
 
