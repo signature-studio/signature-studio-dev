@@ -99,7 +99,7 @@
 
 ### 16.5 AU-21 (#1570) 追加切り分け: head `60932d35` (main, コード変更なし)
 
-測定 commit: `60932d35` (origin/main 起点、本 run は `tools/audio/REPORT_AU10.md` のみ変更)。環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後 ([EMSDK] (emcc 6.0.12) 既存を使用。`toolchain-emsdk` 展開は不要)。生ログ・JSON は `tools/audio/work/soak10/` (gitignore)。
+測定 commit: `60932d35` (origin/main 起点、本 run は `tools/audio/REPORT_AU10.md` のみ変更)。環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後、[EMSDK] (emcc 6.0.12) 既存を使用。`toolchain-emsdk` 展開は不要)。生ログ・JSON は `tools/audio/work/soak10/` (gitignore)。
 
 | 試行 | 結果 | 所要 / load (start → end) |
 |---|---|---|
