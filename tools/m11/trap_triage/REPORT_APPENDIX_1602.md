@@ -61,7 +61,7 @@ load average は測定中 0.73 前後。`check_682.py` は HEAD では未実行�
 
 ## 14. 再試行 (#1602 r2, 2026-10-14, n=1)
 
-測定 commit `0d9b5385` (origin/main、本 PR の作業ベース。コード変更なし)。素材 fl-win64・toolchain-retdec (`/opt/retdec`)・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 1.03。
+測定 commit `0d9b5385` (origin/main、本 PR の作業ベース。コード変更なし)。素材 fl-win64・toolchain-retdec ([RETDEC])・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 1.03。
 
 | 工程 | 結果 | 所要 |
 |---|---|---|
