@@ -16,6 +16,22 @@
 - 読み: 41c130・9b4b00 の disp、413060 の override は、単独でも両方でも unit 190 の oob を消さない。したがって ON で `407a50` の `[arg-8]` 参照先を変える書込元は、これら 3 つの override の中には無い。
 - 未確定: 各変種は 1 回測定 (n=1)。残る候補は ON の build で変わる他の lift 本体 (`407a50` の呼出し先の書込み) と、ov.o 以外の gate。書込元の特定は未達 (受入条件 1・2 は未達、#2131 の次 run)。
 
+## 5k. ON-only override の 4 要素同時除外と 410360 戻り値の切り分け (#2131 次 run)
+
+- 測定 commit: `016cc403` (= origin/main、worktree `ws-2131`)。`all_off` の build・survey は HEAD で測定 (`ov.o` 作り直し、測定後に `m11_ov.c` を復元し `git status` で差分 0 を確認)。
+- 素材: fl-win64 (`FL_WIN64_DIR`)・toolchain-retdec・toolchain-emsdk・work-m11 を展開。`m11_gen_ir2.sh` rc=0 (41 s、F1=902、errors=0)。
+- 基準 (`016cc403`、`SV_RAW=1`、全 942 unit): ON は §5i と同じ構成。基準の再測定は本 run では行っていない (`a1d55799` 作業ツリーでは ON `ok 869 / oob 15 / abort 2 / halt0 7 / miss 47 / noproc 1 / other 1` を確認)。
+
+| 変種 (ON のまま外すもの) | 測定 commit | ok / oob / abort / halt0 | unit 190 |
+|---|---|---|---|
+| `all_off`: 41c130 disp・9b4b00 disp・413060 gate・410360 vcall (`M11_NOVCALL=1`) を同時に外す | `016cc403` | 869 / 16 / 2 / 6 | oob |
+| `ret0_410360`: 410360 の C 版の戻り値だけ 0 にする | `016cc403` | 未測定 (survey が 400 s で timeout) | 未測定 |
+
+- 読み (all_off): 上の 4 要素を同時に外しても unit 190 は oob のまま (n=1)。つまり ON-only の C 転記のうち、この 4 要素の範囲には原因が無い。abort 2 は残る (OFF は abort 0)。
+- `ret0_410360` は survey が 400 s で timeout した (通常は約 13 s)。410360 の戻り値を 0 にすると、呼出し側が hang する可能性が高い。原因は未切り分け。
+- 測定に使った一時変更 (`all_off`・`ret0_410360` の define 差し替え) は本 PR の script にのみ残し、`m11_ov.c` は変更していない。
+- 未達 (受入条件 1・2): ON の `407a50` の `[arg-8]` 参照先を変える書込元は未特定。次の候補は、ON の build で変わる `407a50` の呼出し先 (481790・412d60・4133f0) の書込み、または 410360 の戻り値 (呼出し側の観測) の扱い。
+
 ## 5j. origin/main での再現 (測定 commit `e082c4f1` = origin/main、#1274 再 run)
 
 - 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開 (`FL_WIN64_DIR` = fl-win64 の展開先 `$RUNNER_TEMP/fl-win64`、`extracted/..` 形式は使わない)。`m11_gen_ir2.sh` rc=0 (F1=902、errors=0)。
