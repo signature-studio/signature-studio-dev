@@ -1,3 +1,13 @@
+# #1602 計測 patch (計測専用・本体には入れない・git apply 可)
+#
+# 適用先: 4c3f7458 (origin/main 相当)。`git apply --check` で確認。
+# 効く条件: M11_INSTR_1602=1 (m11_build.sh の CF に -DM11_INSTR_1602 が入る)。
+#   - function_535bf2 の計測本体 (読取り) は #if M11_FIX_535BF2 の内側。FIX=0 (既定) ではコンパイルされない。
+#     読取りを効かせるには M11_FIX_535BF2=1 が要る。
+#   - function_410b10 側の hook m11_1602_410b10 は本体が (void)obj; の空関数。読取りは含まない。
+#   よって FIX=0 の INSTR=1 build で変わるのは ov.o の再ビルド (stamp) と空関数呼出しだけ。
+# 測定結果と解釈: tools/m11/trap_triage/REPORT_APPENDIX_1602.md §13。
+#
 diff --git a/tools/m11/m11_build.sh b/tools/m11/m11_build.sh
 index d715e6fc..d5001540 100755
 --- a/tools/m11/m11_build.sh
