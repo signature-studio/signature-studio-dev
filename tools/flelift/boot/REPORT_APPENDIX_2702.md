@@ -1,20 +1,20 @@
 # tools/flelift/boot — FLE-10 (#2702) 付録: IPP 停止 mode・既定経路・工程の実測
 
 > 正本: `tools/flelift/boot/REPORT.md` §10。本書は §10 の詳細 (工程秒・再現コマンド・呼出し点の実測・旧 §10 の全文)。
-> 測定 commit: `56e515e1` (コードを変えた最後の commit)。`git diff 56e515e1 HEAD -- tools/flelift/boot` の差分は REPORT と本書のみ。
-> 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23)。
+> 測定 commit: `4869ad16` (`fle_boot.mjs` の L101 コメントの訂正のみ。コードを変えた最後の commit)。`git diff 4869ad16 HEAD -- tools/flelift/x64c.py tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` は空 (差分 0)。
+> 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23)。ただし既定経路の `ippsZero_8u` 未適用 (no-op) は REPORT §10 を参照。
 
-## A. 工程の実測 (`fle6_measure.sh` 1 回ずつ・4 core・n=1)
+## A. 工程の実測 (測定 commit `4869ad16`・`fle6_measure.sh` 1 回ずつ・4 core・n=1)
 
 | route | 工程 | 秒 | ピーク RSS | 備考 |
 |---|---|--:|--:|---|
-| root 有 (`FLE_EXTRA_ROOTS` 既定 0x6a7b70) | gen-A | 7 | - | load 1 分値 0.24 開始 |
-| | lift (closure 2・cap 13800MB) | 83 | 609MB | 29,908 関数・1,557,903 insn・unlifted callees 1,681 |
-| | clang shard ×8 (`-P3`・cap 5000MB) | 103 | 2,182〜2,660MB (8 shard) | 8/8 OK・cap 超過 0 件 |
-| | link | - | - | mismatch 0 / undefined 0 / duplicate 0・wasm 127,079,110 B |
-| | boot shim `FLE_IPP=1` / negctl `FLE_IPP=0` / ipp2 `FLE_IPP=2` | 24 / 25 / 23 | - | 合計 265 s (21:13:57〜21:18:22)・load 最大 1.93 |
-| 既定 (root 無し・`FLE_IPP` 未指定) | gen-A / lift / clang | 7 / 81 / 101 | 610MB / 2,240〜2,531MB | 29,907 関数・1,557,882 insn |
-| | link / boot default | - / 10 | - | wasm 127,076,763 B・合計 199 s (21:18:33〜21:21:52)・load 最大 1.91 |
+| root 有 (`FLE_EXTRA_ROOTS` 既定 0x6a7b70) | gen-A | 5 | - | 開始時 load 1 分値 1.14 |
+| | lift (closure 2・cap 13800MB) | 48 | 609MB | 29,908 関数・1,557,903 insn・unlifted callees 1,681 |
+| | clang plain (lifted C ×8 shard・link 含む) | 60 | shard 2,202〜2,670MB (8 shard) | 8/8 OK・cap 超過 0 件・mismatch 0 / undefined 0 / duplicate 0・wasm 127,079,315 B |
+| | boot shim `FLE_IPP=1` / negctl `FLE_IPP=0` / ipp2 `FLE_IPP=2` | 14 / 13 / 15 | - | 合計 155 s (22:11:48〜22:14:23)・load 最大 1.68。shim の rc 3 は IPP 判定 NG (既存の判定どおり) |
+| 既定 (root 無し・`FLE_IPP` 未指定) | gen-A / lift / clang plain / boot default | 6 / 49 / 58 / 5 | lift 610MB | 29,907 関数・1,557,882 insn・wasm 127,076,968 B・合計 118 s (22:14:32〜22:16:30)・load 最大 1.84 |
+
+- 旧 run (測定 commit `56e515e1`・21:13〜21:18・前回の PR 本文の値。本 commit の値とは別 run): gen-A 7 / lift 83 / clang 103 / boot 24・25・23 (合計 265 s)。既定経路は lift 81 / clang 101 / boot 10 (合計 199 s)。
 
 ## B. 再現コマンド
 
@@ -36,10 +36,11 @@ FLE_IPP=<0|1|2|空> FLE_BOOT_VARIANT=plain node tools/flelift/boot/fle_boot.mjs 
 | shim `FLE_IPP=1` | ippsZero_8u × 2 (初回 ret 0x67264d) | 0x0 | 0x0 | 0 件 |
 | mode 2 `FLE_IPP=2` | ippsZero_8u × 2 | 0x0 | 0x0 | 0 件 |
 | ネガコン `FLE_IPP=0` | なし | 0x0 | 0x0 | - |
-| 既定 (root 無し) | なし。0x67264d に `dispatch(0)` (icall-miss) ×1 | 0x15f34a0 | 0x0 | - |
+| 既定 (root 無し) | なし。呼出点 0x67264b の call (戻り 0x67264d) が `dispatch(0)` (icall-miss) ×1 → ret 0 | 0x15f34a0 | 0x0 | - |
 
-- 0x67264d は `fle_lifted_s5.c` の `mov rax,[0x15e0a48]` → `call qword ptr [rax]` (lift 行の実測)。
-- ippsZero_8u が 0x67264d から呼ばれたのは root 有の 2 回だけ。mode 2 は非 ippsZero の IPP 呼出しが 0 件で、停止条件に達しなかった。
+- 呼出点は `0x67264b`。`fle_lifted_s5.c` の `/* 672644 */ mov rax,[0x15e0a48]` の次が `/* 67264b */ call qword ptr [rax]` (`FF 10`・2 byte)。push される戻り番地は `0x67264d` (`ipp.called` の ret)。0x67264d は呼出点ではない。
+- ippsZero_8u が呼出点 0x67264b から呼ばれたのは root 有の 2 回だけ (shim・ipp2)。mode 2 は非 ippsZero の IPP 呼出しが 0 件で、停止条件に達しなかった (停止経路 `g_ipp_stop` は未発火)。
+- 呼出時の target: shim 有は `ippsZero_8u`、既定経路は 0。既定経路のログ行は `[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x67264d)`。
 
 ## D. 停止点 (root 有・unit 209 の後)
 
