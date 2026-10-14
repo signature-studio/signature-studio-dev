@@ -11,7 +11,7 @@
   - 訂正 (LD-47 review, §4 参照): 上記の「`tools/m11` のコードを最後に変えた commit」と「以降は docs のみ」は誤り。`tools/m11` の非 md 変更は `916d9932..12586095` に 18 件ある。`tools/m11` のコードを最後に変えた commit は `02e2c5a2` (`12586095` の祖先)。本 §1 の実測の基準は §4 の測定 commit `12586095` とする。
 - 素材: `[WORK-M11]` (`docs/REFERENCES.md` §1。取得指定 `oc_artifacts: work-m11`、展開先 `tools/m11/work/`)
 - 鮮度の証跡 (`git diff 916d9932 HEAD -- tools/m11`、`*.md` を除く): 空 = コード差分 0 (`git diff 916d9932 HEAD --name-only -- tools/m11` の結果は `*.md` のみ)
-  - 訂正 (LD-47 review): 上記の証跡は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` の非 md は 18 件 (`git diff --numstat` で +698 / -27)。空ではない。正しい鮮度の証跡は `git diff 12586095 HEAD -- tools/m11` の非 md = 0 件 (§4 参照)。
+  - 訂正 (LD-47 review): 上記の証跡は誤り。`916d9932` 以降の `tools/m11` 非 md 差分は 0 件ではない。鮮度の正本判定は §4 の e2e 経路 (3 ファイル) の差分 0 を参照。
 
 - cfg は glob をクォートして渡す (`'../work/boot*.drc.config.json'`)。クォートしないと `boot0` 1 本だけになり、
   集計が `lsf_sites_arg 29` になる (誤り)。クォートすると `90 / 370 / 169` となり、REPORT_968 の修復前と一致する。
@@ -19,10 +19,9 @@
 
 ## 2. 対応付けの調査結果
 
-対象 28 関数 (K 単位で 32 組。IR load が 1 本だけの K は除く) について、K を読む IR load の本数と、機械語側で `mov r,[rip+X]` が X=K を指す本数を比べた。
+対象 28 関数 (K 単位で 32 組。IR load が 1 本だけの K は除く) の対応付けを検討した。本節には数値を書かない。K ごとの本数の比較は §5 (deref 連鎖の数え方) が唯一の正本。
 
-- 同数は 17 組、異なるのは 15 組 (例: `100a3d0` K=`11e35c8` IR 5 / 機械 8、`128f9e0` K=`11e26a0` IR 14 / 機械 17、`d0cee0` K=`11e4080` IR 11 / 機械 13、`ff63f0` K=`11e14a0` IR 15 / 機械 16)。
-- 機械側の参照には、load 以外 (store 先・アドレス計算) も含まれる。そのため本数の差だけでは対応を決められない。
+- 機械側の rip 参照には、load 以外 (store 先・アドレス計算) も含まれる。そのため本数の差だけでは対応を決められない。
 - 同じ K を読む load が同一関数内に複数あり、かつ型 (`load ptr` / `load i32`) が混在する例がある (`e53810`, K=`0x11e0120`: `load ptr` 1 本と `load i32` 1 本)。型だけでは一意に決まらない。
 - `11d47c0` (K=`0x11e0120`) は IR load 2 本が同一型 (`load i32`) で、機械側の site 2 本 (`mov dword ptr [rax], ecx`) も同型。順序で対応させる根拠はあるが、本数が一致する他の関数で検証していない。
 
@@ -43,7 +42,7 @@
 
 - 訂正: §3 の「修復前 53 site」は誤り。`REPORT_968.md` §2 の表では 53 は**修復後**の値。現 HEAD の修復前は store 宛 CELL_COLLAPSED **86 site / 49 関数**。
 - 訂正: §1 の鮮度記述「`916d9932` 以降はドキュメントのみ」は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` の非 md は **18 件**、`git diff --numstat 916d9932 HEAD -- tools/m11` の非 md は **+698 / -27** (本節の旧記載「51 件・988 行」は誤り。LD-47 review で計測し直した)。`tools/m11` のコードを最後に変えた commit は `02e2c5a2` (`12586095` の祖先)。
-- 訂正: §1 の「空 = コード差分 0」の証跡も誤り (上記 18 件と矛盾する)。測定 commit `12586095` から本 PR の HEAD までの `tools/m11` の非 md 差分は 0 件 (`git diff --name-only 12586095 HEAD -- tools/m11 | grep -v '\.md$'` の結果は空)。したがって §4 の数値は本 PR の HEAD でも有効。上記の再現は測定 commit `12586095` の tools/m11 で行った。
+- 訂正: §1 の「空 = コード差分 0」の証跡も誤り。測定 commit `12586095` から本 PR の HEAD までの `tools/m11` の非 md 差分は 0 件ではない (件数は HEAD ごとに変わるため本文に書かない。`git diff --name-only 12586095 HEAD -- tools/m11 | grep -v '\.md$'` で再計算する)。e2e の経路 (`fix_d17_e2e.sh`・`audit_lsf_ssa.py`・`fix_d17.py`) はこの範囲で変更なし (`git diff --quiet 12586095 HEAD -- <3 files>` が 0)。`m11_build.sh`・`m11_gen_ir2.sh`・`ldfix.py` 等は e2e スクリプトから呼ばれない。上記の再現は測定 commit `12586095` の tools/m11 で行った。
 
 e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、foreground、31 秒、emcc rc=0。測定 commit `12586095`):
 
@@ -63,3 +62,18 @@ e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、foreground、31 秒、emcc rc=0。�
 再測定 (PR #1539 fix run、2026-10-14、HEAD `70d02dba` + 本 commit の REPORT のみ差分。コードは `12586095` と同一):
 素材 `[WORK-M11]` と `[EMSDK]` を展開 (`$ARTIFACTS_DIR` に配置済み。`tools/m11/work/` に展開)。`bash tools/m11/ldfix/fix_d17_e2e.sh` を foreground で実行: 31 秒、emcc rc=0、load 0.37→0.68。
 出力 JSON (`$RUNNER_TEMP/fix_d17_e2e/ssa_{base,fix}.json`) から数えた値は上表と一致: 修復前 store CC site 86 / 関数 49、store CELL_DEEP 19、spill CC 37 → 修復後 store CC 53 / 関数 28、store CELL_DEEP 52、spill CC 37。alg3 flagged 77 → 58。
+
+## 5. LD-47 (#1375) 対応付けの調査: 1:1 規則は未実装 (部分達成)
+
+測定 commit: `7fc1088f` (origin/main)。以降の `tools/m11` のコード差分は、`tools/m11/ldfix/survey_d17_multiload.py` の追加と、main 取り込み由来の `tools/m11/trap_triage/probe1507_listB.mjs` の 2 件。
+
+- 素材: `[WORK-M11]` を `tools/m11/work/` に展開。ツールチェーンは `[EMSDK]` (`docs/REFERENCES.md`)。
+- e2e: `bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、emcc rc=0)。測定値は §4 を参照。
+
+調査 (`survey_d17_multiload.py`、foreground、rc=0): 複数 load の K 組 32 のうち、dec_label_pc ブロック単位で「IR の K 読み出し本数 = 機械語の rip セル → deref 連鎖の本数」が一致したのは **8 組**。
+- 不一致 24 組の例: `100a3d0` K=`11e35c8` IR 5 / 機械 8、`128f9e0` K=`11e26a0` IR 14 / 機械 5、`ff63f0` K=`11e14a0` IR 15 / 機械 16。
+- ブロック一致 8 組 (`126bdb0`/`11e3550`、`128ade0`/`11e0390` など) も、同一ブロック内の load の順序は本数だけでは決まらない。
+
+結論: 機械語 site と IR load の 1:1 対応は、本数・型・ブロックのどれでも安全に決められない。誤った load を `%cellp` 経由に書き換えると silent miscompile になるため、規則は入れていない。受入条件 1 (1:1 規則の実装)・3 (ネガコン) は未達。受入条件 2 (store 宛 CELL_COLLAPSED の減少) も、本 run の修復 pass は単一 load 規則のみのため、§4 の残 site 数のまま。
+
+次の作業 (#1375 で継続): 機械語側で rip セル → レジスタ → 後続 store/load の値の流れを命令単位で追う (`ldmach.py` 系の既存追跡を流用できるか要調査)。結べた load だけを修復し、結べない site 数を報告する。

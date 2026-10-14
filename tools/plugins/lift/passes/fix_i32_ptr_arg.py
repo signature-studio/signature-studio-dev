@@ -17,9 +17,11 @@
     - `%V = trunc i64 %W to i32` で定義された %V → `%i3x.N = add i64 %W, 0` を call の直前に挿入し、それを渡す
       (同値の 0 拡張でなく上位 32bit を保つ。%V の定義は変えない: 他の i32 使用を壊さないため)
       定義の探索は同一関数内を全行対象に行う (距離制限なし)。
-    - それ以外 (仮引数・load 結果など) → 失敗。`i64` 化すると定義と型が合わず不正 IR になるため。
+    - 呼出元 C の `i32` 仮引数 `%P` → `i64 %P` で渡し、C の仮引数 `%P` も `i64` 化する (伝播; C を後で処理する)。
+      C の本体で `%P` が使われるのは、`i64 %P` を渡す変換済み関数の呼出だけでなければならない (それ以外なら失敗)。
+    - それ以外 (load 結果など) → 失敗。`i64` 化すると定義と型が合わず不正 IR になるため。
   - 失敗時は出力を書かず、理由を stderr に出して非 0 終了する (lift_ranges.sh は set -e で止まる)。
-  - 成功時は分類 (const / trunc / decl) の件数を stderr に出す。--report で呼出ごとの JSON も書く。"""
+  - 成功時は分類 (const / trunc / decl / param) の件数を stderr に出す。--report で呼出ごとの JSON も書く。"""
 import re, sys, json
 
 I32_MAX = 2 ** 31 - 1
@@ -72,6 +74,21 @@ def _fn_start(lines, j):
     raise PassError('呼出 (line %d) を含む define が無い' % (j + 1))
 
 
+def _fn_name(line):
+    return re.search(r'@([-\w.$]+)\(', line).group(1)
+
+
+def _i32_params(define_line):
+    op = define_line.index('(', define_line.index('@'))
+    cl = _close(define_line, op)
+    out = set()
+    for a in _split(define_line[op + 1:cl]):
+        t = a.split()
+        if len(t) >= 2 and t[0] == 'i32' and t[1].startswith('%'):
+            out.add(t[1])
+    return out
+
+
 def _trunc_src(lines, j, v, fstart):
     pat = re.compile(r'^\s*' + re.escape(v) + r' = trunc i64 (%\S+) to i32\s*$')
     for q in range(j - 1, fstart - 1, -1):
@@ -88,7 +105,7 @@ def _icmp_ok(m, ctx):
     return ''
 
 
-def process(text, fn):
+def process(text, fn, ctx):
     lines = text.split('\n')
     at = '@' + fn
     defs = [i for i, l in enumerate(lines)
@@ -104,6 +121,7 @@ def process(text, fn):
     args = _split(dl[op + 1:cl])
     bidx = _fn_end(lines, idx)
     body = lines[idx + 1:bidx + 1]
+    forced = set(ctx['forced'].get(fn, set()))
 
     targets = []
     for k, a in enumerate(args):
@@ -112,17 +130,40 @@ def process(text, fn):
             nm = t[1]
             if any(re.search(r'inttoptr i64 ' + re.escape(nm) + r' to ptr', b) for b in body):
                 targets.append((k, nm))
+    names = [nm for _, nm in targets]
+    for nm in sorted(forced):
+        ks = [k for k, a in enumerate(args) if a.split()[:2] == ['i32', nm]]
+        if not ks:
+            raise PassError('%s に伝播で i64 化すべき i32 仮引数 %s が無い' % (fn, nm))
+        if nm not in names:
+            targets.append((ks[0], nm))
+            names.append(nm)
     if not targets:
         return text, [{'func': fn, 'defined': True, 'args': []}]
 
-    names = [nm for _, nm in targets]
     for nm in names:
-        for b in body:
-            s = re.sub(r'inttoptr i64 ' + re.escape(nm) + r' to ptr', '', b)
-            s = re.sub(r'icmp (eq|ne) i32 ' + re.escape(nm) + r', (-?\d+)(?![\w.])',
-                       lambda m: _icmp_ok(m, b), s)
-            if re.search(re.escape(nm) + r'(?![\w.$])', s):
-                raise PassError('本体で %s が inttoptr / icmp 以外に使われる (%s)' % (nm, b.strip()))
+        if nm not in forced:
+            for b in body:
+                s = re.sub(r'inttoptr i64 ' + re.escape(nm) + r' to ptr', '', b)
+                s = re.sub(r'icmp (eq|ne) i32 ' + re.escape(nm) + r', (-?\d+)(?![\w.])',
+                           lambda m: _icmp_ok(m, b), s)
+                if re.search(re.escape(nm) + r'(?![\w.$])', s):
+                    raise PassError('本体で %s が inttoptr / icmp 以外に使われる (%s)' % (nm, b.strip()))
+        else:
+            for b in body:
+                if not re.search(re.escape(nm) + r'(?![\w.$])', b):
+                    continue
+                if not re.search(r'\bcall\b', b):
+                    raise PassError('伝播対象 %s が呼出以外に使われる (%s)' % (nm, b.strip()))
+                if re.search(r'\bi32 ' + re.escape(nm) + r'(?![\w.$])', b) or \
+                        not re.search(r'\bi64 ' + re.escape(nm) + r'(?![\w.$])', b):
+                    raise PassError('伝播対象 %s の呼出が未変換 (%s)' % (nm, b.strip()))
+                rest = re.sub(r'\bi64 ' + re.escape(nm) + r'(?![\w.$])', '', b)
+                if re.search(re.escape(nm) + r'(?![\w.$])', rest):
+                    raise PassError('伝播対象 %s が呼出の引数以外に使われる (%s)' % (nm, b.strip()))
+                callee = _fn_name(b)
+                if callee not in ctx['done']:
+                    raise PassError('伝播対象 %s の受け先 %s が未変換 (%s)' % (nm, callee, b.strip()))
 
     out = list(lines)
     for j in range(idx + 1, bidx + 1):
@@ -174,19 +215,28 @@ def process(text, fn):
                 new_parts[k] = 'i64 %d' % c
                 kinds.append('const')
             elif re.fullmatch(r'%[-\w.$]+', v):
-                src = _trunc_src(lines, j, v, _fn_start(lines, j))
-                if src is None:
-                    raise PassError('呼出の実引数 %s が trunc 定義でも定数でもない (line %d): %s' % (v, j + 1, l.strip()))
-                while True:
-                    n += 1
-                    name = '%%i3x.%d' % n
-                    if name not in used:
-                        break
-                used.add(name)
-                indent = re.match(r'\s*', l).group(0)
-                inserts.setdefault(j, []).append('%s%s = add i64 %s, 0' % (indent, name, src))
-                new_parts[k] = 'i64 ' + name
-                kinds.append('trunc')
+                fs = _fn_start(lines, j)
+                src = _trunc_src(lines, j, v, fs)
+                if src is not None:
+                    while True:
+                        n += 1
+                        name = '%%i3x.%d' % n
+                        if name not in used:
+                            break
+                    used.add(name)
+                    indent = re.match(r'\s*', l).group(0)
+                    inserts.setdefault(j, []).append('%s%s = add i64 %s, 0' % (indent, name, src))
+                    new_parts[k] = 'i64 ' + name
+                    kinds.append('trunc')
+                elif v in _i32_params(lines[fs]):
+                    caller = _fn_name(lines[fs])
+                    if caller == fn or caller not in ctx['roots'] or caller in ctx['done']:
+                        raise PassError('%s の仮引数 %s を伝播できない (呼出元 %s は --func に未指定、または処理済み/自身; line %d)' % (fn, v, caller, j + 1))
+                    ctx['forced'].setdefault(caller, set()).add(v)
+                    new_parts[k] = 'i64 ' + v
+                    kinds.append('param')
+                else:
+                    raise PassError('呼出の実引数 %s が trunc 定義・定数・i32 仮引数のいずれでもない (line %d): %s' % (v, j + 1, l.strip()))
             else:
                 raise PassError('呼出の実引数 %s が未対応の形 (line %d): %s' % (v, j + 1, l.strip()))
         out[j] = l[:op + 1] + ', '.join(new_parts) + l[cl:]
@@ -198,6 +248,18 @@ def process(text, fn):
         final.extend(inserts.get(j, []))
         final.append(l)
     return '\n'.join(final), report
+
+
+def run(text, roots):
+    ctx = {'forced': {}, 'done': set(), 'roots': set(roots)}
+    report = []
+    for fn in roots:
+        if fn in ctx['done']:
+            continue
+        text, r = process(text, fn, ctx)
+        ctx['done'].add(fn)
+        report += r
+    return text, report
 
 
 def main():
@@ -214,11 +276,8 @@ def main():
         del argv[i:i + 2]
     inp, outp = argv[0], argv[1]
     text = open(inp).read()
-    report = []
     try:
-        for fn in funcs:
-            text, r = process(text, fn)
-            report += r
+        text, report = run(text, funcs)
     except PassError as e:
         print('[P-T2] FAIL: %s (出力は書かない)' % e, file=sys.stderr)
         sys.exit(1)

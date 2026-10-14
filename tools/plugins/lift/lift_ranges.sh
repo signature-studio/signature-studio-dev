@@ -59,6 +59,10 @@ if [ "${PLUG_ICALL:-0}" = "1" ]; then
 fi
 python3 "$P/ir_normalize.py" "$DRC_LL" "$OUT/$NAME.norm0.ll"
 python3 "$P/ir5_patch.py" "$OUT/$NAME.norm0.ll" "$OUT/$NAME.lift.ll" --report "$OUT/$NAME.ir5.json" 2>&1 | tail -3
+# opt-in (PLUG_NAME_DEFS=1): RetDec が名前 (export 名 / entry_point) で出した define を function_<VA> に改名 (#1537)。 既定 0 のため他の lift の出力は変わらない
+if [ "${PLUG_NAME_DEFS:-0}" = "1" ]; then
+  python3 "$P/name_defs_to_va.py" "$OUT/$NAME.lift.ll" "$PE" "$RANGES"
+fi
 # opt-in (PLUG_CANON_ALLOCA=1; p0c_e2e.sh が立てる): RetDec の alloca 並び非決定を正規化 (LIFTLIB-11 / #887)。
 # 既定 0 のため他の lift の出力は変わらない。uselistorder は ir5_patch (A7) で除去済みの後に掛ける。
 if [ "${PLUG_CANON_ALLOCA:-0}" = "1" ]; then

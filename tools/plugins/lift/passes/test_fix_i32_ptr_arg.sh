@@ -108,4 +108,39 @@ define i64 @caller(i64 %a) {
 }
 EOF
 check_fail "$W/icmp_var.ll" icmp_var
+
+# 6. 伝播 (#1509): 呼出元 C の i32 仮引数 %arg1 を、C 自身を --func に指定して i64 化する。
+#    C の %arg1 は変換済み callee へ渡すだけ。C の呼出は i32 0 / trunc 定義 / 定数の 3 形を含む。
+cat > "$W/propagate.ll" <<EOF
+$callee
+
+define i64 @function_180056120(i32 %arg1, i64 %arg2) {
+  %p = inttoptr i64 %arg2 to ptr
+  %r = call i64 @function_180049450(i64 %arg2, i32 %arg1)
+  ret i64 %r
+}
+
+define i64 @outer(i64 %a) {
+  %W = add i64 %a, 1
+  %V = trunc i64 %W to i32
+  %r1 = call i64 @function_180056120(i32 0, i64 %a)
+  %r2 = call i64 @function_180056120(i32 %V, i64 %a)
+  ret i64 %r1
+}
+EOF
+python3 "$PASS" "$W/propagate.ll" "$W/propagate.out.ll" --func function_180049450 --func function_180056120 2>"$W/propagate.err" || { echo "FAIL propagate" >&2; exit 1; }
+"$CLANG" -x ir -fsyntax-only "$W/propagate.out.ll"
+grep -q 'define i64 @function_180056120(i64 %arg1' "$W/propagate.out.ll" || { echo "FAIL propagate: 仮引数が i64 化されていない" >&2; exit 1; }
+echo "PASS propagate: $(cat "$W/propagate.err")"
+
+# 7. --func の順序が逆 (呼出元を先に処理) → 失敗 (受け先が処理前で伝播できない)。
+if python3 "$PASS" "$W/propagate.ll" "$W/prop_rev.out.ll" --func function_180056120 --func function_180049450 2>"$W/prop_rev.err"; then
+  echo "FAIL prop_rev: 失敗すべきだが成功した" >&2
+  exit 1
+fi
+if [ -e "$W/prop_rev.out.ll" ]; then
+  echo "FAIL prop_rev: 失敗時に出力を書いた" >&2
+  exit 1
+fi
+echo "PASS prop_rev (expected fail): $(cat "$W/prop_rev.err")"
 echo "ALL PASS"

@@ -16,5 +16,6 @@ PY="$LICENSE_OBS_VENV/bin/python"
 step "2/4 scan_consumers";  "$PY" scan_consumers.py
 step "3/4 run_cases";       "$PY" run_cases.py
 step "4/5 verify";          "$PY" verify.py
-step "5/5 escaped (#1220)";   "$PY" probe_1220.py --write
+step "5/6 escaped (#1220)";   "$PY" probe_1220.py --write
+step "6/6 escaped CFG (#1492)"; "$PY" probe_1492.py --write
 step "ALL OK"

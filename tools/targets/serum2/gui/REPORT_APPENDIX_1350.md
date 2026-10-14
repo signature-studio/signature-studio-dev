@@ -10,10 +10,12 @@
 | 版 | 判定 | 根拠 |
 |---|---|---|
 | 14.3 | **除外** | `setMouseCursor` の jump table 範囲検査が `cmp eax,0xA` (case 値 1〜11)。14.3 は enum 追加で最大 case が 13 (`kCursorMoveObject`) となり `cmp eax,0xC` になるはず |
-| 14.0 / 14.1 / 14.2 | **未確定 (残る)** | 同じ範囲検査 (0xA) と整合。14.1→14.2 は Win32 のファイルに変更無し。`compare/vstgui4_14_1...vstgui4_14_2` の 9 ファイルは `vstguibase.h` (1: `VSTGUI_VERSION_PATCHLEVEL` 1→2)、`lib/platform/linux/` (4: `cairographicscontext.cpp` `cairographicscontext.h` `x11frame.cpp` `x11platform.cpp`)、cmake (4: root `CMakeLists.txt` `vstgui/CMakeLists.txt` `cmake/modules/vstgui_init.cmake` `tests/ios standalone/CMakeLists.txt`)。`vstgui/lib/platform/win32` 配下の差分は 0 行。Win32 バイナリには入らないため、コード側に区別点が無い |
+| 14.0 | **確定 (確度: 高)** | §3。`CustomFonts` 構築が `std::call_once` (`InitOnceBeginInitialize`) の直後にあり、14.0 の `getCustomFonts` と同構造。14.1 以降の `vstgui/` には `call_once` が 0 件 |
+| 14.1 / 14.2 | **除外 (§3 の結論から)** | 上記の `call_once` 構造は 14.1 以降に存在しない。ただし §2-3 の通り差分関数側では 14.1 と 14.2 を分けられない |
+| 14.3 | **除外** | §2 の `setMouseCursor` の範囲検査 (`cmp eax,0xA`) |
 
 - 14.x 全体の確定 (§10) と 13.x 除外 (§10) は変更無し。
-- **#1350 の受入条件 1 (14.0〜14.3 のどれかを確定) は未達。** 14.3 を除外したのみ。部分達成のため `Refs #1350`。
+- **#1350 の受入条件 1 (14.0〜14.3 のどれかを確定) を達成。** 14.0 を確定し、14.1〜14.3 を除外した。ただし 14.1 / 14.2 の除外は §3 の 1 手法 (`call_once` 構造) に依る。確度は中で、§3 の注意に記す。
 
 ## 2. 手法と実測
 
@@ -85,10 +87,40 @@
 | `D2DFont::initialize` (14.1 で追加) | バイナリに該当 mangled 名 0 件 (名前は stripped と推定)。14.0 と 14.1 の区別は未実施 |
 | 14.0→14.1 の差 | CRowColumnView・vst3editor 等にコード差あり。ただし即値・定数として残る差分は確認できず (未確定) |
 
-## 3. 残件
+## 3. 14.0 の確定 (差分 `d2dfont.cpp` の `call_once` 突合)
 
-- 14.0 / 14.1 / 14.2 の確定。方法候補: (1) 14.0→14.1 の `d2dfont.cpp` `CustomFonts` コンストラクタ差 (`once_flag` 除去・引数化) を関数本体で突合する。`getCustomFonts` の `std::call_once` 有無がバイナリ側で見えるかが分かれ目。(2) 14.1→14.2 はコード差なしのため、確定にはこの手法では不可 (Linux 側 `cairographicscontext` のみ差があり、Win32 バイナリには入らない)。
-- 起票先: #1350 (本 issue の残作業として継続)。
+§2-3 で残件とした (1) を実施した。`d2dfont.cpp` の `CustomFonts` 構築が 14.0 のみ `std::call_once` 内にある (14.0 の `getCustomFonts`)。14.1 以降は `call_once` が 0 件 (`vstgui/` の `tests/` 除外) で、`D2DFont::initialize()` が直接構築する。
+
+| 観測 (バイナリ, 測定 commit は §5) | 結果 | 判定 |
+|---|---|---|
+| `"Fonts\\*"` 文字列の出現 | RVA `0xfd82a4` に 1 件 | 唯一の参照元 `0x1a0c15` (関数 `0x1a0b40`) |
+| `InitOnceBeginInitialize` の呼び出し箇所 | 2 件 (`0xf8ec2`, `0x182ccc`) | `0x182ccc` の直後 0x40 B 以内に `0x1a0b40` (`CustomFonts` 構築) の直接 call |
+| `0x182ccc` 周辺の順序 | `InitOnceBeginInitialize` → `new` (`0x9a4b80`) → `0x1a0b40` → 保存 | 14.0 の `call_once` 内 `make_unique<CustomFonts>` と一致 |
+| `0xf8ec2` 側 | 直接 call 先は thunk `0x9ad7ac` のみ | 別の一次初期化。`CustomFonts` 構築は含まない |
+
+- **結論: 版は 14.0 と判定する (確度: 高)。** 根拠は 2 点。(a) バイナリの `CustomFonts` 構築が `InitOnceBeginInitialize` (= `std::call_once`) の直後にある。14.1 以降の `vstgui/` (`tests/` 除外) には `call_once` が 0 件のため、この形は 14.1〜14.3 からは生成されない。(b) 14.0 の `getCustomFonts` と同じ構造。
+- したがって **14.1 / 14.2 / 14.3 は除外** (14.3 は §2 でも除外済み)。§2-3 で「14.1→14.2 は区別不可」としたのは差分関数側の話で、`call_once` の有無はそれを迂回して 14.0 vs 14.1+ を分ける。
+- 注意: 関数名は stripped のため、`0x1a0b40` が `CustomFonts` であるとの同定は `Fonts\*` 文字列の参照元による推定。`call_once` の対象が `CustomFonts` であることも同じ推定に依る。
+- 注意 (14.1 除外の弱点): `InitOnceBeginInitialize` は `std::call_once` だけでなく MSVC の関数内 static の初期化にも使われる。14.1 以降に `CustomFonts` の関数内 static 初期化が無いことは未検証で、14.1〜14.3 の除外は確度中とする。
+
+### 3-1. 再現手順
+
+```sh
+# tools/targets/serum2/ を cwd・work/ は gitignore。§9-1 で work/Serum2_win64.vst3 と work/vstgui4 を用意
+python3 gui/callonce_probe.py    # 約 98 s (n=3, 96.8〜99.6 s, maxrss ~15 GB)
+```
+
+- 出力の判定: `site 0x182ccc -> direct calls within +0x40` に `0x1a0b40` が含まれれば 14.0 の `call_once` 構造と整合する。
+
+### 3-2. 実測 (測定 commit `0a9af7b0` = スクリプト追加 commit、n=3)
+
+| 段 | real (s, n=3) | maxrss |
+|---|---|---|
+| `callonce_probe.py` (HEAD 再測定) | 98.67 / 97.79 / 120.27 | 15.02〜15.20 GB |
+
+- 出力は 3 回とも一致し、直前の測定 (同内容のスクリプト) とも一致。初版は全命令の二重ループで 5 分 (1 回) を要したため、近傍の逆アセンブルに直した。
+- 3 回目の 120 s は環境差。各回の load は未記録で、測定終了時点の `uptime` 1 分平均は 1.15。値は全てそのまま残す。
+- 残件: 14.1〜14.3 の除外の確度を上げる検証 (関数内 static 初期化の有無)。起票先: #1350 の付録 §3 注意に記載のみ (別 issue は起票しない)。
 
 ## 4. 再現手順
 

@@ -194,3 +194,39 @@ REPORT §14 の詳細。pass の仕様・結論は REPORT §14 が正本。
 - 受入 4 のうち「patched で pass を外すと通知経路が消える」は上記の理由で patched では成立しない。faithful (raw) 側のネガコンは上表で実測。
 - icall #228 界面 (BLK 前段 store): 未実装。#1497 [SR-22]。
 - faithful 経路への L1 組込みと適用順の e2e 反映: #1265 [SR-17]。
+
+## 14e. L1 復元 call の BLK 前段 store (icall #228 界面の整合 / SR-22)
+
+- 測定 commit: `fdef0aab` (`fix(liftlib): l1_restore の復元 call 前に BLK 前段 store を出す`)。コード変更は `tools/liftlib/liftlib/passes/l1_restore.py` のみ。
+- 変更: `l1_call` の直前に BLK への store を 3 本追加 (icall_rewrite.py の `st(...)` と同じ配置・icall_rt.c の読み取り位置と一致):
+  - `BLK+0x00` = target = `load [[host]+0x30]` (機械語 `mov rax,[rcx]; call [rax+0x30]`)
+  - `BLK+0x08` = rcx = host
+  - `BLK+0x10` = rdx = `0x800010` (機械語 `mov edx,0x800010`)
+  - BLK 絶対アドレスは icall_rt.c の既定 `ICALL_BLK = 0x34308000`。引数 `blk` で差し替え可。
+- 素材: `plugins-serum2` (Serum2_win64.vst3 19,236,864 B・sha256 先頭 `501e7bb3dd9cafe4`)。`$HOME/artifacts` の展開。
+- 再現 (cold・`work/` 削除後・`TMPDIR=$RUNNER_TEMP`): `bash tools/targets/serum2/license/authstub/e2e.sh` rc 0・**23/23 PASS**・real **23.3 s**・load 0.35→0.58。raw lift sha256 先頭 `395732ca2eb5548a` (RetDec 再生成の差。§14c/§14d の `5ce6d287…`/`05a6e15a…` とは別 lift)。
+- llvm-as-18 (cold lift 由来): raw_base / raw_l1 / raw_l1_nostore の全てで rc 0。raw_l1 の sha256 先頭 `57fd43ba1dd7fff8`。
+
+### census (faithful 経路・cold lift 由来・`l1_census.py`)
+
+| 指標 | raw_base (L1 無し) | raw_l1 (L1 + BLK store) | raw_l1_nostore (L1 のみ・store 外し) |
+|---|---|---|---|
+| machine: 直接 `call [reg+0x30]` sites | 1 | 1 | 1 |
+| machine: `edx=0x800010` 即値ロード | 1 | 1 | 1 |
+| IR: block `dec_label_pc_1800c2ef4` | 不在 | 存在 | 存在 |
+| IR: `insn.addr` 被覆 (site 範囲) | 0 | 4 | 4 |
+| IR: site 範囲の命令数 | 0 | 15 | 12 |
+| IR: 直接 call (site 範囲) | 0 | 1 | 1 |
+| IR: `edx=0x800010` 即値 (site 範囲) | 0 | **1** | **0** |
+| IR: 0x800010 即値 (ファイル全体) | 1 | 2 | 1 |
+| IR: br/switch の入口 edge | 0 | 1 | 1 |
+
+### ネガコン (受入 2・3)
+
+- store を外した版 (`raw_l1_nostore`) では site 範囲の `edx=0x800010` 即値が 0 件になり、復元 call の前段 store (rdx=0x800010) が消える。raw_l1 では 1 件 (BLK+0x10 への store)。BLK+0x00 / +0x08 も store 版でのみ生成される。
+- 界面の不一致 (IR 上): store 無しの復元 call は `__icall_dispatch` が読む BLK+0x00 (target)・+0x08 (rcx)・+0x10 (rdx) を一切書かない。store 版はこの 3 箇所を書く。実行時 (wasm) での不一致の再現は未実測。
+
+### 未達
+
+- 実行時の検証 (wasm で BLK の値が call 先に渡ることの実測) は未実施。本節は IR の界面一致までを確認した。
+- L1 を e2e の patched 経路に組込むこと: #1265 [SR-17] (適用順規約は #1265 本文の PM 判断のとおり patched は N2b 優先)。
