@@ -19,3 +19,4 @@
 - **未検証 (本 run)**: IR 側 (`udiv`/`sdiv` の有無) と `trace_diverge_cd.py` の再実行 (`results/m11_unreachable_cd.md` との diff。前回 run の所要 13.3 s は本 run の値ではない)。入力の `tools/m11/work/boot_final3.ll` と `tools/liftdiff/work/m11/batch_closure.jsonl` が本 run の素材に無く、実行できなかった。前回 run の記録は再現できていない主張として扱う。
 - 再実行の入力を揃える手順: PR 本文の `oc_artifacts: fl-win64 work-m11 work-liftdiff` で素材を取得し、`python3 tools/liftdiff/tests/trace_diverge_cd.py > tools/liftdiff/results/m11_unreachable_cd.md` を実行して `git diff --stat -- tools/liftdiff/results/m11_unreachable_cd.md` の結果を本節に記録する。
 - 0x476c30・0x462ed0 の原因は未特定。件数は `results/m11_unreachable_cd.md` の P3 行を正本とする。
+- 範囲の変更 (#1576 の本文を縮めて `Closes #1576`): 0x417b70 の動的確認・sdiv 再実行は #1767 へ移した。`results/` 再計算と P3 の原因特定は本 PR の範囲外となり、PR 本文の未解決表に残す (起票は PM)。
