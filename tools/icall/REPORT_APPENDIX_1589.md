@@ -58,9 +58,10 @@
 ### 4. 測定 commit と差分
 
 - 測定 commit: `6e7294c6` (§1・§3 を実行。§2 は前 run 記録のまま)。
-- `git diff 6e7294c6 b0ee9709 -- tools/icall` の出力: `REPORT_APPENDIX_1589.md` のみ (コード差分 0)。
-- `git diff 69598b07 b0ee9709 -- tools/icall/audit_icall.py tools/icall/roundtrip.sh tools/icall/icall_rewrite.py` の出力: 空 (§3 の監査コードは測定時から無変更)。
-- `git diff 4efa6820 b0ee9709 -- tools/icall` の全差分は `REPORT_APPENDIX_1589.md`・`scan_jmpmem.py` (新規) のみ。
+- 鮮度の証跡 (実行済み。HEAD = `cf9ab518` 時点の出力):
+  - `git diff 6e7294c6 HEAD -- tools/icall` の `--stat`: `REPORT_APPENDIX_1589.md` 1 file のみ (文言の差分。実行コード 0)。
+  - `git diff 69598b07 HEAD -- tools/icall/audit_icall.py tools/icall/roundtrip.sh tools/icall/icall_rewrite.py` の出力: 空 (§3 の監査コードは測定時から無変更)。
+  - `git diff 4efa6820 HEAD -- tools/icall` の全差分は `REPORT_APPENDIX_1589.md`・`scan_jmpmem.py` (新規) のみ。
 - 受入条件 3 の判定: **部分達成** (§3 は現 HEAD で再測定。§1・§2 は前 run 記録のまま)。
 
 ## 前 run との差分
