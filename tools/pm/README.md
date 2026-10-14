@@ -33,6 +33,7 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
 | `pm_watchdog_ping.sh` | 5 分ごとに `repository_dispatch` (`oc-watchdog`) を送り、Actions の watchdog を起こす (GitHub の schedule が発火しないため)。`systemd/pm-watchdog.*` |
 | `pm_gate.sh` | `pm_gate.sh <command...>`。Worker (`infra/pm-worker`) が primary (`/status` が `mode=live`・`fresh=true`・`last_tick` が 15 分以内) の間は command を実行せず終了 0 にする。それ以外 (取得失敗・dry-run・JSON 不正) は command を実行する (fail-open)。URL は env `PM_WORKER_URL`、無ければ `tools/pm/worker_url`。テスト: `bash tools/pm/test_pm_gate.sh` |
 | `launch_issues.py` | 指示 130〜132 の自動着手。`plan` (仕分け) / `blocked` (blocked_by を GitHub に同期) / `launch` (`/oc` コメントで着手)。`systemd/pm-launch.*` が 10 分おきに `launch` を実行。Opened PR 数は `oc:stuck` の PR を除き、stuck が `STUCK_HIGH` (既定 40) を超えたら launch を止める。停止報告の判定は run-outcome・PM マーカー付きコメントを除く (#2325)。テスト: `python3 -m unittest tools/pm/test_launch_issues.py` |
+| `worker_url` | Worker (`infra/pm-worker`) の URL (1 行・末尾の `/` なし)。`pm_gate.sh` と Actions の `watchdog.sh` が `<URL>/status` を読む。`watchdog.sh` は Worker が止まっていれば障害 issue (ラベル `pm-worker-down`) を起票する (`docs/WORKFLOW.md` §11) |
 | `../../infra/pm-worker/` | `launch_issues.py` の launch と `pm_watchdog_ping.sh` の代替 (Cloudflare Worker。webhook + Cron/alarm 駆動)。現在は dry-run のみで、`pm-launch.timer` / `pm-watchdog.timer` は引き続きこちらが正本。切替手順は `infra/pm-worker/README.md` (dispatch だけを先に live にする手順は『切替 A』) |
 | `issue_snapshot.py` | open の issue / PR / run / 最新の bot コメントを `issues_state.json` に保存する (`launch_issues.py` が呼ぶ) |
 | `manual_deps.json` | 停止報告に根拠のある依存 (子 → [依存先])。**追跡する設定ファイル** (他の json は状態で、`.gitignore`) |
