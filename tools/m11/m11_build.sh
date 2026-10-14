@@ -54,6 +54,14 @@ if [ "$(python3 m11_cond.py --get ldfix)" = disabled ] && [ "${M11_ALLOW_LDFIX_D
 elif [ "$(python3 m11_cond.py --get ldfix)" != applied ]; then
   echo "[m11build] ERROR: work/ir_conditions.json に ldfix=applied の記録無し (現在: '$(python3 m11_cond.py --get ldfix)')。m11_gen_ir2.sh で IR を作り直すこと (ldfix 無しで測るなら M11_ALLOW_LDFIX_DISABLED=1)" >&2; exit 2
 fi
+# #2402: ldfix 適用 IR は fix_ld108 (41a670 の head 解除 store, D20) の適用記録も要る。M11_FIX_LD108=0 で作った IR (ld108=disabled) は A/B 測定用で、明示 opt-in のときだけ build する
+if [ "$(python3 m11_cond.py --get ldfix)" = applied ]; then
+  if [ "$(python3 m11_cond.py --get ld108)" = disabled ] && [ "${M11_ALLOW_LD108_DISABLED:-0}" = 1 ]; then
+    echo "[m11build] WARNING: M11_ALLOW_LD108_DISABLED=1: fix_ld108 無しの IR で build する (ir_conditions.json ld108=disabled)" >&2
+  elif [ "$(python3 m11_cond.py --get ld108)" != applied ]; then
+    echo "[m11build] ERROR: work/ir_conditions.json に ld108=applied の記録無し (現在: '$(python3 m11_cond.py --get ld108)')。m11_gen_ir2.sh で IR を作り直すこと (fix_ld108 無しで測るなら M11_FIX_LD108=0 で作り直し、M11_ALLOW_LD108_DISABLED=1)" >&2; exit 2
+  fi
+fi
 # #680 (review): 記録の無い差替え (正規 pass を経ない IR の書換え) を拒否する。正規 pass は直後に --bind で指紋を更新する
 if ! python3 m11_cond.py --check work/boot_final.ll; then
   echo "[m11build] ERROR: work/boot_final.ll が ir_conditions.json の指紋と不一致。m11_gen_ir2.sh で IR を作り直すこと" >&2; exit 2
