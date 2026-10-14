@@ -2,7 +2,7 @@
 
 # #2585: pm-worker の Workers Builds install と Workers Logs の測定
 
-測定 commit: `fc4e5915` (`infra/pm-worker/` のコードを変えた最後の commit。PR #2586)。検証は同じ commit で既定設定のまま行った。環境: pnpm 12.10.1 (root `devEngines` と同じ)・Node v22.23.3 (runner)・wrangler 4.151.0。
+測定 commit: `e11ab9a9` (`infra/pm-worker/` のコードを変えた最後の commit。`origin/main` (`f3102162`) を取り込んだ merge。main 側の `src/`・`test/` の変更を含むため、取り込み前の `fc4e5915` から再測定した)。PR #2586。検証は測定 commit を `git archive` で別 dir に展開し、既定設定のまま行った。環境: pnpm 12.10.1 (root `devEngines` と同じ)・Node v22.23.3 (runner)・wrangler 4.151.0。
 
 ## 0. 取得方法
 
@@ -43,7 +43,7 @@
 - 差分が無い merge 37 件のうち 11 件にも、ビルドが作成された (2026-10-14 の観測)。
 - 公式は『push event の変更ファイルが 0 件ならパス判定を飛ばして build する』と書く。原因は未確認。
 
-## 4. 検証 (測定 commit `fc4e5915`、既定設定・CLI 上書きなし)
+## 4. 検証 (測定 commit `e11ab9a9`、既定設定・CLI 上書きなし)
 
 ### 4-1. `pnpm install --frozen-lockfile`
 
@@ -55,7 +55,7 @@ Error: ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION
 3 lockfile entries failed verification: @cloudflare/vitest-plugin@1.4.2, miniflare@5.20261012.0-beta, wrangler@4.151.0
 ```
 
-修正後 (`fc4e5915`): rc=0
+修正後 (`fc4e5915` の展開で未キャッシュの検証: rc=0。`e11ab9a9` は lockfile が同一で、`git diff fc4e5915 e11ab9a9 -- infra/pm-worker/pnpm-lock.yaml` は差分 0。`e11ab9a9` の展開では検証結果がキャッシュ表示): rc=0
 
 ```
 ✓ Lockfile passes supply-chain policies (159 entries in 415ms)
@@ -73,22 +73,26 @@ Done in 1.8s using pnpm v12.10.1
 rc=0
 ```
 
-### 4-2. テスト
+`e11ab9a9` の展開 (`git archive HEAD package.json infra/pm-worker tools/pm`) の install: `✓ Lockfile passes supply-chain policies (verified 4m ago)` → `Packages: +79` → `Done in 60ms using pnpm v12.10.1` → rc=0。
+
+### 4-2. テスト (`e11ab9a9` の展開)
 
 | コマンド | 結果 | rc |
 |---|---|---|
-| `pnpm test` | tests 188 / pass 188 / fail 0 (11 s) | 0 |
-| `pnpm run test:unit` | 10/10 (3 s) | 0 |
-| `pnpm run test:workers` | 3/3 (5 s) | 0 |
+| `pnpm test` | tests 201 / pass 201 / fail 0 (10 s) | 0 |
+| `pnpm run test:unit` | 10/10 (2 s) | 0 |
+| `pnpm run test:workers` | 3/3 (4 s) | 0 |
+
+`tools/pm` を含めて展開する必要がある (突き合わせテストが `tools/pm/*.py` を読む)。
 
 ### 4-3. dry-run と observability の読み取り
 
-- `pnpm exec wrangler deploy --dry-run --outdir <一時 dir>`: rc=0。Total Upload 103.45 KiB / gzip 31.98 KiB。bindings は `PM` (PmDO) と `[vars]` 10 個 (`REPO` `ORG` `TARGET=50` `BATCH=25` `BOT_LOGIN` `PM_LOGINS` `LIVE_LAUNCH=1` `LIVE_DISPATCH=1` `NO_PR_COOLDOWN_H=24` `COMMENT_MAX_PAGES=150`)。
+- `pnpm exec wrangler deploy --dry-run --outdir <一時 dir>`: rc=0。Total Upload 107.48 KiB / gzip 33.40 KiB。bindings は `PM` (PmDO) と `[vars]` 10 個 (`REPO` `ORG` `TARGET=50` `BATCH=25` `BOT_LOGIN` `PM_LOGINS` `LIVE_LAUNCH=1` `LIVE_DISPATCH=1` `NO_PR_COOLDOWN_H=24` `COMMENT_MAX_PAGES=150`)。
 - `unstable_readConfig({ config: 'wrangler.toml' })` の `observability`: `{"enabled":true,"head_sampling_rate":1}`。
 
 ### 4-4. fsevents の darwin 模擬 (Copilot の指摘の確認)
 
-- 方法: `git archive fc4e5915 infra/pm-worker` を一時 dir に展開し、`pnpm-workspace.yaml` に `supportedArchitectures: {os: [darwin], cpu: [arm64]}` を足して `CI=true pnpm install --frozen-lockfile`。Linux runner での模擬で、実機の macOS では確認していない。
+- 方法: `git archive fc4e5915 infra/pm-worker` を一時 dir に展開し、`pnpm-workspace.yaml` に `supportedArchitectures: {os: [darwin], cpu: [arm64]}` を足して `CI=true pnpm install --frozen-lockfile`。Linux runner での模擬で、実機の macOS では確認していない。lockfile は `e11ab9a9` と同一。
 - 結果: rc=0。`fsevents@2.3.3` は `node_modules/.pnpm` に入った。`node_modules/.modules.yaml` の `pendingBuilds` は `[]`。
 - `fsevents@2.3.3` の tarball (`npm pack`) の `scripts` は `clean`・`build`・`test`・`prepublishOnly` だけで、`install`・`preinstall`・`postinstall` は無い。`fsevents.node` は同梱されている。
 - 旧 `package-lock.json` は fsevents に `hasInstallScript: true` を記録していたが、tarball と食い違う。記録の根拠は未確認。`allowBuilds` への追加は不要と判断した。
