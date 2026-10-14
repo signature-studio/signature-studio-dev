@@ -38,7 +38,7 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
 | `issue_snapshot.py` | open の issue / PR / run / 最新の bot コメントを `issues_state.json` に保存する (`launch_issues.py` が呼ぶ) |
 | `manual_deps.json` | 停止報告に根拠のある依存 (子 → [依存先])。**追跡する設定ファイル** (他の json は状態で、`.gitignore`) |
 | `rest_heal.py` | open PR を CONFLICT / FIX / NOREVIEW / DRAFT / APPROVED / COVERED / STUCK_LABELLED に分類し、足りない次の一手を `/oc` コメントか close→reopen で補う。watchdog (`.github/scripts/watchdog.sh`) の補助 |
-| `sync_status.py` | Project V2 の Status を PR / Issue の実態に同期する (冪等)。実行しないと Status が陳腐化する |
+| `sync_status.py` | Project V2 の Status を PR / Issue の実態に同期する (冪等)。Status は参考で、チケット状態の正は issue の open/closed + ラベル + PR (`docs/WORKFLOW.md` §3)。実行しないと Status が陳腐化する。**退役後は同期をやめる (根拠: #2353 の PM 判断)** |
 | `pm_needs.py` | 最新の差し戻しが PM 判断を求めていて、PM の応答が無い PR を列挙する。heartbeat のたびに実行して未回答を 0 にする |
 | `idle_report.sh` | watchdog の run 履歴から『idle>0 が 15 分以上続いた回数』を数える (VM の `pm-watchdog.timer` を止めてよいかの soak 判定用)。REST のみ。`idle_report.sh --since <ISO> --until <ISO>`。使い方は下の節。テスト: `bash tools/pm/test_idle_report.sh` |
 | `pr_gaps.py` | open PR を「レビュー中 / 修正中 / 担当なし」に分類する |
@@ -110,7 +110,7 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
 ## 運用の約束
 
 - **Cloudflare のリソース (worker・token) は新規に作らない**。R2 への投入は既存 token の一時昇格だけで行い、
-  終わったら必ず Read のみへ戻す (手順は `watch_runs.notes.md`)。
+  終わったら必ず Read のみへ戻す (手順は `docs/WORKFLOW.md` §11)。
 - `git add -A` / `git add .`、破壊的な git 操作、`pkill -f` (自分のシェルを殺す) は使わない。
 - 10 秒以上の待機は使わず、`timeout N tail -f /dev/null` で行う。10 秒未満の再試行間隔 (2〜4 秒・0.4〜1.5 秒) の `time.sleep` だけは許容する。
 - 新規着手は、Opened PR が 10 件を下回れば開始、80 件を超えれば Review-Only (指示 130)。

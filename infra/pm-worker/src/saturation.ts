@@ -4,6 +4,8 @@
 export const SAT_WINDOW_MS = 24 * 3_600_000;
 // queued > 0 のまま running が同じ値で続いた時間。これ以上続いたときだけ飽和とみなす。
 export const SAT_FLAT_MS = 30 * 60_000;
+// 連続する 2 件の観測の間隔がこれを超えたら、その間は連続とみなさない (同期が古く観測しなかった間をまたいで streak を数えない)。
+export const SAT_GAP_MS = 2 * 60_000;
 
 // t: 観測時刻 (epoch ms)。r: in_progress の数。q: queued・pending・waiting の数。1 分ごとに 1 件 (同じ分は後の値で置き換える)。
 export interface Sample {
@@ -25,7 +27,7 @@ export function saturatedRunning(obs: Sample[]): number | undefined {
   let first = last;
   for (let i = obs.length - 2; i >= 0; i--) {
     const x = obs[i];
-    if (x.q <= 0 || x.r !== last.r) break;
+    if (x.q <= 0 || x.r !== last.r || obs[i + 1].t - x.t > SAT_GAP_MS) break;
     first = x;
   }
   return last.t - first.t >= SAT_FLAT_MS ? last.r : undefined;

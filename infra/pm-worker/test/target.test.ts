@@ -45,14 +45,17 @@ test("saturatedRunning: queued>0 かつ running が同じ値で 30 分続いた�
   assert.equal(saturatedRunning(mk(31, 40, 0)), undefined, "queued=0 は未飽和");
   const dip = mk(31, 60, 20).map((x, i) => (i === 15 ? { ...x, r: 59 } : x));
   assert.equal(saturatedRunning(dip), undefined, "同じ値が途切れた時点で streak は最後の値から数え直す");
+  const gapped = [...mk(21, 60, 20), ...mk(11, 60, 20).map((x) => ({ ...x, t: x.t + 50 * MIN }))];
+  assert.equal(saturatedRunning(gapped), undefined, "観測の空き (20〜50 分) をまたぐ streak は数えない (実際に平坦だったのは 10 分)");
   assert.ok(SAT_FLAT_MS === 30 * MIN && SAT_WINDOW_MS === 24 * 60 * MIN);
 });
 
 test("nextCap / capValue: 24 時間たつと推定は消える。上限を下げたあとの古い peak では押し上げない", () => {
-  const cap = nextCap(undefined, [{ t: 0, r: 60, q: 20 }, { t: 31 * MIN, r: 60, q: 20 }], 31 * MIN);
+  const flat: Sample[] = Array.from({ length: 32 }, (_, i) => ({ t: i * MIN, r: 60, q: 20 }));
+  const cap = nextCap(undefined, flat, 31 * MIN);
   assert.deepEqual(cap, { value: 60, at: 31 * MIN });
   // 60 の peak は cap.at より前。20 で飽和したら 20 へ下げ、以後の 20 の観測では上がらない
-  const obs: Sample[] = [{ t: 0, r: 60, q: 20 }, { t: 31 * MIN, r: 60, q: 20 }];
+  const obs: Sample[] = [...flat];
   for (let i = 0; i < 31; i++) obs.push({ t: (32 + i) * MIN, r: 20, q: 15 });
   const down = nextCap(cap, obs, (32 + 30) * MIN);
   assert.deepEqual(down, { value: 20, at: 62 * MIN });
