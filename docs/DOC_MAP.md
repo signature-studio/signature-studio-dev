@@ -266,8 +266,8 @@
 | `tools/m11/ldfix/REPORT_2679.md` | ~106 | LD-120 (#2679): spill 宛 未判定 `128f9e0` の 12 site を UNDETERMINED と判定 (frame slot `stack_var_-760〜-1336` が IR 本体・RetDec の lift/drc に無い根拠・`ld120_frame_128f9e0.py` が生成・`ld120_controls.py` が対照と F の数値)。欠落の起点 (lift 段の block `0x1290610` の打ち切り) は子 #2705 (LD-125) |
 | `tools/m11/ldfix/REPORT_942.md` | 248 | #942 (CI-22) stage4 の memory access out of bounds の切り分け (部分達成)。trap 9 件の unit 別最上位 frame・boot threw の入口・bin 表の観測 (§9)・サイズ→bin 表 (§10 は要約)。§8-3 の全表と §10 の詳細は付録 |
 | `tools/m11/ldfix/REPORT_942_APPENDIX.md` | 209 | #942 REPORT の付録。§8-3 (trap 最上位 frame 表)・§10〜§14 (bin 表・通常 boot の trap 位置・lift 誤り候補) の全文 (250 行上限のため分割移動) |
-| `tools/m11/ldfix/REPORT_942_TRAPSITE.md` | 102 | #942 (CI-22): stage4 survey の trap 9 件の発生箇所 (unit 別) と引き金の実測。unit 53 の上流は REPORT_942_PTRSLOT.md で解決 |
-| `tools/m11/ldfix/REPORT_942_PTRSLOT.md` | 85 | #942 (CI-22): unit 53 の trap の原因。IR の `alloca ptr` (wasm32 で 4 byte) への null 格納と C 版 418190 の 8 byte 旧値読みの幅不一致 (残骸 0x100000000)。`418190` の旧値読みを 4 byte にして解消 (`5fe8dbe0`)。E3 (4133f0/412d60 も同じ) の boot は 887MB OOM に進むため採用しない |
+| `tools/m11/ldfix/REPORT_942_TRAPSITE.md` | 102 | #942 (CI-22): stage4 survey の trap 9 件の発生箇所 (unit 別) と引き金。unit 53 の上流は D17 (qstore 対象 slot)。他は未確定 |
+| `tools/m11/ldfix/REPORT_942_PTRSLOT.md` | 83 | #942 (CI-22): unit 53 の trap の上流は D17 (4B 初期化 slot を 8B で読む類型・qstore が対象)。C 側の変更案は撤回。測定の経緯は REPORT 本文 |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 | `tools/m11/shimx_link/REPORT_APPENDIX_179.md` | ~49 | M11 closure の旧 main link 失敗 (`sxt_*` export) の修正前後・`--midi` / `--ws --midi` の e2e 実測・起動 KPI (#179 SHX-T6)。REPORT §11 の全文を分割移動 (250 行上限のため) |
 

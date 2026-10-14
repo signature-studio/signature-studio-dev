@@ -1,13 +1,14 @@
 # REPORT_942_TRAPSITE — stage4 survey の trap 9 件の発生箇所と直接の引き金 (#942 受入 1・2)
 
-既知類型との関係: 該当なし (新規類型は判定しない。引き金の形は DEFECTS の D4 (引数・slot の幅や deref の誤り) と同じ方向の候補)。類型名の割当てと `docs/DEFECTS.md` の変更は PM 判断。
+既知類型との関係: unit 53 は **D17** (4B 初期化 slot を 8B で読む。qstore 対象) — 上流の確定は `REPORT_942_PTRSLOT.md`。unit 87・138 は同じ読み形の候補だが上流は未確定。unit 158・17 などは既知類型に当たるかを未判定 (D4 と同じ方向の候補)。`docs/DEFECTS.md` の変更は PM 判断。
 
 ## 0. 結論
 
 - survey の trap 9 件 (OOB 8・halt0 1。halt0 は unit 114 で trap ではない) は、**全件で最内 frame と wasm 位置を確定**した。OOB 8 件は 6 箇所に分かれる。
 - **実行されるのは C 版の 2 関数**: `function_4133f0` と `function_418190` は `tools/m11/m11_ov.c` の C 転記で置換されている (IR 版は実行されない)。
 - 直接の引き金 (C 版・IR 版の probe で実測):
-  - **unit 53・87・138** (C 版 `function_418190` @0x350ea4 の共通箇所): 参照カウントの読み `wrap(old)−12` の old (= `*dest`) が **0x100000000・0x76800000000・0x1ce900000000**。下位 32bit が 0 で、上位 32bit に小さい値 (1・0x768・0x1ce9) が入っている。32bit 値が 32bit ずれた形に見える。書込み元は未特定 (上流 `function_418210`・`function_59f9a0`)。
+  - **unit 53** (C 版 `function_418190` @0x350ea4): 参照カウントの読み `wrap(old)−12` の old (= `*dest`) が **0x100000000**。`function_8cbb00` の 4B 初期化 slot (`%stack_var_-48`) を 8B で読んだ残骸で、上流は D17 (`REPORT_942_PTRSLOT.md`・qstore 対象)。
+  - **unit 87・138** (同じ C 版 `function_418190` @0x350ea4): old が **0x76800000000・0x1ce900000000**。下位 32bit が 0 で、上位 32bit に小さい値 (0x768・0x1ce9) が入っている。同じ読み形だが、書込み元は未確定 (上流 `function_418210`・`function_59f9a0`)。
   - **unit 158 (VA 0)**: C 版 `function_4133f0` の `src` = `0x0063006100630074` (UTF-16 の "tcac" の中身)。これを `function_409c80` (IR) が `dst = 0`・`n = 0x1a904afc` で受けて trap。`n` は `function_412c20(0x8d48257e)` 由来。上流は `function_414c70` (IR)。
   - **unit 17** (C 版 `function_4133f0` の末尾 `old = Q(dest)` → `D(old−8)`): `412c20(3)` が 6 を返し、それが `*dest` に残ったと推定 (推定。trap した呼出しの値は未記録)。
   - unit 56・144・149 (IR 版 `function_8c6530`・`function_407e20__lifted`・`function_412e40`): 引き金は §2 の IR 版の記録だけでは確定しない。
@@ -53,12 +54,12 @@
 | 149 | IR `407e20__lifted`・`412e40` | 407e20: a1=0x10bdbe00 / 412e40: a1=0x10a9f8f8・a2=2 | 同上 |
 
 - 記録域は `0x11FFF000`〜 (C 版は `0x11FFF400`・`0x11FFF420`)。SP は trap 時 0x10a9f5xx〜0x10a9f8xx で衝突しない。
-- 53・87・138 の old は全て下位 32bit が 0。値の由来 (`<< 32` が入る経路) は未特定。
+- 53 の old の由来は D17 (`REPORT_942_PTRSLOT.md` §0)。87・138 の old は下位 32bit が 0 だが、`<< 32` が入る経路は未特定。
 - 導出 (実測ではない): C 版 `function_418190` は `old != 0` のとき `D(old−0xc)` を読む (`m11_ov.c`)。old の下位 32bit が 0〜11 だと、32bit の番地が wrap して範囲外になり trap する。実測の 3 件は下位 32bit が 0 で、この条件に当たる。次の probe では、この条件を満たす値を書く上流 (`function_418210`・`function_59f9a0`) を追う。
 
 ## 3. 受入への反映
 
-- 受入 1 (trap 9 件の原因): **部分**。発生箇所は全件確定。直接の引き金は unit 53・87・138 (`*dest` の上位 32bit 値)、unit 158 (文字列の中身が値として渡る) で値まで確認。unit 17 は推定。56・144・149 は未確定。
+- 受入 1 (trap 9 件の原因): **部分**。発生箇所は全件確定。直接の引き金は unit 53 (上流は D17 の 4B 初期化 slot・推定を含む)、87・138 (`*dest` の上位 32bit 値・上流未確定)、158 (文字列の中身が値として渡る) で値まで確認。unit 17 は推定。56・144・149 は未確定。
 - 受入 2 (boot threw): **部分**。通常 boot の trap は unit 17 と同一箇所。上流の引き金は unit 17 の推定 (412c20 の戻り値 6)。
 - 受入 3: 変更なし。#1469 (PR・MERGED) で達成済み。#1292 (issue) は CLOSED。
 
@@ -72,7 +73,7 @@
 
 ## 5. 次の入口
 
-1. 53・87・138 の `*dest` に `value << 32` の値が入る経路。→ unit 53 は解決: 書込みは `alloca ptr` への 4 byte 格納で、上位 4 byte の残骸が 8 byte 読みで入っていた (REPORT_942_PTRSLOT.md)。87・138 は未確定。
+1. 87・138 の `*dest` に `value << 32` の値が入る経路 (上流 `function_418210`・`function_59f9a0`)。unit 53 は上流を確定: `function_8cbb00` の 4B 初期化 slot (D17・qstore 対象。`REPORT_942_PTRSLOT.md`)。qstore 適用 IR での消失は未実測。
 2. unit 158: `function_414c70` (IR) が `function_4133f0` の `src` に文字列の中身を渡す経路。
 3. unit 17: `function_412c20` (IR) が `len = 3` に対して 6 を返す経路。
 4. unit 56・144・149: IR 版 `8c6530`・`407e20__lifted`・`412e40` の引き金の値 (記録の対象を広げる)。
@@ -81,11 +82,12 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `*dest` に `value << 32` が入る経路 (unit 53・87・138 の上流 `function_418210`・`function_59f9a0`) | 受入 1 (OOB 3 件) | #942 (次 run) |
+| unit 53 の trap が qstore 適用 IR で消えることの実測 (上流は D17 と推定) | 受入 1 | #942 (次 run・`REPORT_942_PTRSLOT.md` §5) |
+| `*dest` に `value << 32` が入る経路 (unit 87・138 の上流 `function_418210`・`function_59f9a0`) | 受入 1 (OOB 2 件) | #942 (次 run) |
 | unit 158 の上流 (`function_414c70` が `src` に文字列の中身を渡す経路) | 受入 1・2 | #942 (次 run) |
 | unit 17 の `function_412c20` が 6 を返す経路 (推定の確定) | 受入 1・2 | #942 (次 run) |
 | unit 56・144・149 の引き金の値 | 受入 1 | #942 (次 run) |
-| work-m11 の IR と現 main の不一致 | 測定の母体が現 main と違う | 既存 #680 |
+| 測定の母体 (`boot_final3.ll`) が qstore 前の IR だった | 測定の base が現 main の IR と違う (§1 の表は qstore 前の値) | #942 (次 run・qstore=applied で再測定) |
 
 ## 7. 再現
 
