@@ -18,7 +18,7 @@ KNOWN = [0x1813068D0, 0x1813068F8, 0x181306900, 0x181306908, 0x181306910, 0x1813
          0x1813073F0, 0x1813073F8, 0x181307400, 0x181307408, 0x181307410, 0x181307418]
 IMAGE_BASE = 0x180000000
 INS = re.compile(r"\s*([0-9a-f]+):\t(?:[0-9a-f]{2} )+\s*\t?(.*)$")
-RIP = re.compile(r"\[rip\+0x[0-9a-f]+\].*# 0x([0-9a-f]+)$")
+RIP = re.compile(r"\[rip\+0x[0-9a-f]+\].*# (?:0x)?([0-9a-f]+)")
 IDX = re.compile(r"\[(?P<base>[a-z0-9]+)\+(?P<idx>[a-z0-9]+)\*(?P<sc>[1248])\+0x(?P<disp>[0-9a-f]+)\]")
 
 dis_path, exe_path = Path(sys.argv[1]), sys.argv[2]
