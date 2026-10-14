@@ -14,11 +14,11 @@
 
 ## 2. 測定
 
-- 測定 commit: `29ae3986` (分類スクリプト `tools/icall/sites_block_classify.py` を追加した commit)。
+- 測定 commit: `321cfb96` (分類スクリプト `tools/icall/sites_block_classify.py` の最終版。追加 `29ae3986`・RetDec パスを `RETDEC_BIN` で指定する修正 `321cfb96`)。
 - 入力: `measure_flengine_split.sh` の出力 (HEAD `26f90ada`、素材 `fl-win64` の `block00031_PE.bin`、4 core)。
   - `measure_flengine_split.sh`: real 130.4 s。base 366 / c2 366 (基準どおり)。site 374 (0xc589b0 側 183 / 0x128f9e0 側 191)。
   - 段 dump: `passes_stub` 709 段。
-- `sites_block_classify.py` (`29ae3986`): real 67.3 s (user 20.6 s / sys 46.8 s)。RetDec v5.0 (`/opt/retdec`) で段 dump を 1 回取り、709 段を関数ごとに解析する。
+- `sites_block_classify.py` (`321cfb96`): real 66.6 s (user 20.7 s / sys 45.9 s、loadavg 0.22 → 0.80)。RetDec v5.0 (`[RETDEC]`、`RETDEC_BIN` で指定) で段 dump を 1 回取り、709 段を関数ごとに解析する。
 - 段 dump の stub と site の対応: 全 stub 呼出しには `!insn.addr` が付く段がある (段 81 〜 100 の全モジュール段。以後は関数別モジュールになり付かない)。その最後の段 100 (`Global Variable Optimizer`) の stub 375 件のうち 374 件が site と 1:1 に対応した。残る 1 件は comis stub (`function_1cd3fe0`)。
   - 対応規則: stub の `!insn.addr` は `sites[].new` の直後 (+78 バイトが 367 件、+81 バイトが 7 件)。最寄りの下位の `new` へ割り当てる。
   - 段 81 を使うと、段 81 〜 100 の間の block 組み直しで 12 site の label が変わる。GVN に近い段 100 を採用した。
@@ -43,6 +43,6 @@
 ## 5. 検証
 
 - 再現: `FL_WIN64_DIR=<fl-win64 展開先>/extracted bash tools/icall/measure_flengine_split.sh <outdir>` の後、`python3 tools/icall/sites_block_classify.py <outdir>/base/rw.dll <outdir>/base/after.ranges <outdir>/base/map.json <outdir>/base/sites_after.json <outdir2>`。段 dump は `<outdir2>/print_after_all.txt` に残る。
-- `29ae3986` で再実行した `summary.txt` と `site_block.tsv` は、作業ツリー版の出力と `cmp` で一致。
-- 測定経路の差分 (`git diff --stat 26f90ada 29ae3986 -- tools/icall/measure_flengine_split.sh tools/icall/roundtrip.sh tools/icall/audit_icall.py tools/icall/icall_rewrite.py tools/icall/ir_icall_restore.py tools/icall/passes_stub_count.py tools/icall/sccp_stub_drop.py`) は出力 0 行。
-- コード差分 (`git diff 29ae3986 HEAD -- tools/icall ':!*.md'`) は本付録の変更後も出力 0 行。
+- `321cfb96` で再実行 (`RETDEC_BIN` 指定) した `summary.txt` と `site_block.tsv` は、前版 (`29ae3986`) の出力と `cmp` で一致。
+- 測定経路の差分 (`git diff --stat 26f90ada 321cfb96 -- tools/icall/measure_flengine_split.sh tools/icall/roundtrip.sh tools/icall/audit_icall.py tools/icall/icall_rewrite.py tools/icall/ir_icall_restore.py tools/icall/passes_stub_count.py tools/icall/sccp_stub_drop.py`) は出力 0 行。
+- コード差分 (`git diff 321cfb96 HEAD -- tools/icall ':!*.md'`) は本付録の変更後も出力 0 行。
