@@ -2,9 +2,10 @@
 
 > **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §12。本付録は計測の全文。
 
-測定 commit: `10d45b08` (`retdec_gotofix.py` / `goto_jump_check.py` を追加した commit。本 PR でこの commit 以降に変えたのは main 取り込みによる `retdec_batch.py` (+16 / -2、#1819 の `lift_set` 再試行) のみ)。
-**本付録の値は `10d45b08` 時点の値で、現 HEAD (`retdec_batch.py` が変わった状態) では未測定。** 現 HEAD での再測定は `toolchain-retdec` / `toolchain-emsdk` の素材が必要で、未実施 (fix run `3f2ed9d0` の runner に素材が無かった)。再測定は `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` 付きの run で行い、結果を本節の表に置き換える。
-環境: `[RETDEC]` v5.0 (`toolchain-retdec`)・`[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP` に展開)。load average (1 分値) 0.07–0.74。
+測定 commit: `82fcd645` (現 HEAD。`retdec_batch.py` は main 取り込み (#1819 の `lift_set` 再試行) を含む状態で測定)。以降この commit から HEAD までの差分は付録・REPORT・PR 本文の文言のみで、測定経路のコードは変えていない。
+環境: `[RETDEC]` v5.0 (`toolchain-retdec`)・`[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP` に展開)。load average (1 分値) 0.71–0.95。
+RetDec batch (`retdec_batch.py`、BATCH=500、直列): block19091 は 19,816 / 19,816 ok、block23676 は 19,826 / 19,826 ok。どちらも RetDec 呼び出し 41 回・fail 0 (所要 202.12 s / 201.15 s)。
+手順: `retdec_batch.py` → `retdec_repair.py --int-ptr` → `retdec_gotofix.py` → `emcc_per_function.py` (`emcc -c`、既定フラグ)。gotofix の件数は両 block とも `notloop` 78・`goto_replaced` 51・`skip_no_addr_in_func` 27・`label_inserted` 41。
 
 ## 1. 原因の切り分け (受入条件 1)
 
@@ -34,21 +35,22 @@ RetDec の出力 C に現れる goto 相当は 2 種類ある。
 
 ## 3. 修復後の emcc exit 0 件数 (受入条件 3)
 
-| 条件 | block19091 exit 0 | error 行 | 通過関数 (19,816 / 19,826 中) | block23676 exit 0 | error 行 | 通過関数 |
+| 条件 | block19091 exit 0 | error 行 | 通過関数 (19,816 中) | block23676 exit 0 | error 行 | 通過関数 (19,826 中) |
 |---|---|---|---|---|---|---|
-| 修復なし (§9 の再掲) | 0 / 40 | 11,432 | 16,815 | 0 / 40 | 11,475 | 16,821 |
-| 修復のみ (`--int-ptr`、§9 と一致) | 1 / 40 | 1,377 | 18,932 | 1 / 40 | 1,383 | 18,939 |
-| 修復 + goto 化 (本 PR) | **2 / 40** | **1,326** | **18,966** | **2 / 40** | **1,332** | **18,973** |
+| 修復なし | 1 / 41 | 11,432 | 16,816 | 1 / 41 | 11,475 | 16,822 |
+| 修復のみ (`--int-ptr`) | 2 / 41 | 1,377 | 18,933 | 2 / 41 | 1,383 | 18,940 |
+| 修復 + goto 化 (本 PR) | **3 / 41** | **1,326** | **18,967** | **3 / 41** | **1,332** | **18,974** |
 
-- 所要 (emcc 合計): 修復 + goto 化 8.83 s / 8.81 s。
-- 残り error (block23676、修復 + goto 化): 引数型不一致 `incompatible pointer types passing` 1,245 件 (#1680 の範囲)・`statement not in loop` 27 件・`use of undeclared label` 16 件 (計 43 件が本 issue の残り)。
+- 分母は emcc の対象ファイル数 41 (`emcc_exit` の合計)。`emcc_per_function.py` の出力は `unattributed_error_lines` 1・`failclosed_files` 1 (block19091 / block23676 とも。fail-closed で 1 ファイルを失敗扱い)。
+- 所要 (emcc 合計、修復 + goto 化): 4.65 s / 4.65 s。
+- 残り error (修復 + goto 化、clang `-fsyntax-only -ferror-limit=0` で集計): block19091 は error 行 1,327 のうち引数型不一致 `incompatible pointer types passing` 1,245 件・`statement not in loop` 27 件・`use of undeclared label` 16 件。block23676 は 1,333 行のうち引数型不一致 1,251 件・同 27 件・同 16 件。引数型不一致は子 issue #2071 (HB-H42) の範囲。
 - `skip_no_addr_in_func` 27 件 (飛び先の注釈が関数内に無い) は直していない。
 
 ## 4. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `statement not in loop` 27 件 (飛び先の注釈無し)・`use of undeclared label` 16 件 | exit 0 が 40 件中 2 件のみ | #1954 (HB-H41) |
-| 引数型不一致 1,245 件 | exit 0 が 40 件中 2 件のみ (主因) | #1680 (HB-H36) |
+| `statement not in loop` 27 件 (飛び先の注釈無し)・`use of undeclared label` 16 件 | exit 0 が 41 件中 3 件のみ | #1954 (HB-H41) |
+| 引数型不一致 1,245 件 (block23676 は 1,251 件) | exit 0 が 41 件中 3 件のみ (主因) | #2071 (HB-H42) |
 | 飛び先の jump が機械語に無い `break` 113 件 | 飛び先の正しさ未検証 | #1954 (HB-H41) の範囲 |
 | 修復後の wasm 実行 (bit 一致) | 制御構造の正しさ未検証 | 本 issue の範囲外。実行検証は #829 (HB-H20) 系で扱う |
