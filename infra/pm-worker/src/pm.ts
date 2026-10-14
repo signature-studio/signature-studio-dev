@@ -13,6 +13,8 @@ export type DetectedKind = (typeof DETECTED_KINDS)[number];
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
+// PM の判断待ちの印 (/status の集計だけに使う。検出の対象ではない)。
+export const NEEDS_PM_LABEL = "needs-pm";
 // 実装 agent が着手しても PR を出さない/出せない issue (pm-apply は PM が PAT で適用する workflow 変更、needs-user-input は依頼者待ち)。
 // no_pr の検出・再投入の対象から除く。
 export const HOLD_LABELS = ["pm-apply", "needs-user-input"];
