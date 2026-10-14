@@ -192,6 +192,7 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 
 - 測定 commit: `b36d3b5f` (計測 probe のコードはこの commit で最後に変わった。`M11_INSTR_40F960` 既定 0)。検証 HEAD `93e5fcb9`。
   - `git diff b36d3b5f 93e5fcb9 -- tools/m11/m11_ov.c tools/m11/m11_build.sh` は出力なし (差分 0)。
+  - main 取り込み (merge `b09ad4eb`) で `m11_rt.c` と `m11_build.sh` に #1952 の knob (`M11_RT_PADPRE`・`M11_RT_PADPOST`・`M11_RT_EMPTY`、既定 0) が入った。既定 0 では `S_NEG` の文字列も build 出力も変わらない。今回の計測 (既定 0) には影響しない。
   - `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
   - 前の commit `731a232a` の計測値は無効 (旧 `static` カウンタはプロセス全体の累計)。全 diff は `REPORT_1317_APPENDIX.md` §12。
 - 旧記録 (§4a・§6〜§8) の rc=124 (`0..830`+880) は、素材 IR 依存の可能性がある。公開 RetDec 由来の IR では再現しなかった (下記)。
