@@ -32,6 +32,8 @@ export interface Snapshot {
   prs: SnapPr[];
   runs: SnapRun[];
   bot_last: Record<string, BotLast>;
+  // 直前の報告 (run-outcome・PM のマーカーを含むコメントを除く)。停止報告の判定と素材の再投入に使う。bot_last は run-outcome で上書きされる。
+  bot_report: Record<string, BotLast>;
   pm_art: Record<string, { at: string; line: string }>;
 }
 export interface RelaunchState {
@@ -48,8 +50,10 @@ export interface ClassifyInput {
   manualDeps: Record<string, number[]>;
   // issue dependencies (blocked_by) の open な番号。total_blocked_by > 0 の issue ごとに必要。
   liveBlockers: Record<string, number[]>;
-  // 最後の bot コメントの全文 (停止報告の素材名抽出に使う)。
+  // 直前の報告の全文 (素材名の抽出に使う)。
   fullBotBody: Record<string, string>;
+  // 最後の run-outcome の reason (stop / split / blocked / artifact / unknown)。素材による再投入は artifact のときだけ。
+  outcomeReason: Record<string, string>;
 }
 export interface Rows {
   blocked: Array<[number, number[]]>;
@@ -178,6 +182,11 @@ function neededArts(n: number, input: ClassifyInput): string[] {
   return out;
 }
 
+const artTokens = (line: string | null | undefined): string[] =>
+  (line ?? "").replaceAll("oc_artifacts:", "").split(/\s+/).filter(Boolean);
+// 行の素材名 (allowlist 内) のうち、base に無いもの。
+const newArts = (line: string | null | undefined, base: string[]): string[] =>
+  artTokens(line).filter((a) => ALLOW_ARTS.includes(a) && !base.includes(a));
 const head90 = (s: string): string => Array.from(s).slice(0, 90).join("").replaceAll("\n", " ");
 const fmt1 = (x: number): string => x.toFixed(1);
 
@@ -186,7 +195,7 @@ export interface Classified {
   blocksCount: Record<string, number>;
   // 親 (open) -> open な子の番号。
   children: Record<string, number[]>;
-  // 停止報告を読んで素材を足そうとしたが、増えなかった (前回の oc_artifacts と同じ) issue。
+  // 最後の run-outcome が artifact で止まり、素材を足そうとしたが増えなかった (前回の oc_artifacts と同じ) issue。
   noNewArt: number[];
 }
 
@@ -218,6 +227,12 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     } else {
       const reported = !!bl && (!isLaunched || ageH(bl.at) < ageH(launchedAt));
       const stopHit = !!bl && STOP_RE.test(bl.head);
+      // 素材による再投入は、直前の報告 (rep) が停止報告で、最後の run-outcome が artifact のときだけ。
+      // 停止の判定は従来どおり bot_last も見る (stopLike)。bot_last は run-outcome で、その凡例の語にも一致しうる。
+      const rep = d.bot_report[k];
+      const repStop = !!rep && STOP_RE.test(rep.head);
+      const artOk = input.outcomeReason[k] === "artifact";
+      const stopLike = stopHit || repStop;
       const ls = input.launchState?.[k];
       // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
       if (ls === "failed") {
@@ -226,23 +241,26 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
       } else if (isLaunched && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
         rows.recent.push([n, `launched ${fmt1(ageH(launchedAt))}h ago`]);
-      } else if (bl && reported && ageH(bl.at) < 24 && stopHit) {
+      } else if (bl && reported && ageH(bl.at) < 24 && stopLike) {
         const rl = rlOf(n);
         const baseLine = artifactsFor(n, i);
-        const base = baseLine.replaceAll("oc_artifacts:", "").split(/\s+/).filter(Boolean);
-        const extra = neededArts(n, input).filter((a) => !base.includes(a));
+        const base = artTokens(baseLine);
+        const material = artOk && repStop;
+        const extra = material ? neededArts(n, input).filter((a) => !base.includes(a)) : [];
         let cand: string | null = extra.length ? "oc_artifacts: " + [...base, ...extra].join(" ") : null;
-        if (!cand && bl.art && bl.art !== baseLine) cand = bl.art;
+        if (!cand && material && newArts(rep?.art, base).length) cand = rep?.art ?? null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else {
           rows.stopped.push([n, head90(bl.head)]);
-          if (!cand || cand === rl.art) noNewArt.push(n);
+          if (artOk && (!cand || cand === rl.art)) noNewArt.push(n);
         }
       } else if (bl && ageH(bl.at) < 1.5) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
-      } else if (bl && ageH(bl.at) < 24 && stopHit) {
+      } else if (bl && ageH(bl.at) < 24 && stopLike) {
         const rl = rlOf(n);
-        if (bl.art && bl.art !== rl.art && rl.count < 2 && bl.art !== artifactsFor(n, i)) rows.relaunch.push([n, bl.art]);
+        const baseArts = artTokens(artifactsFor(n, i));
+        const cand = artOk && repStop && newArts(rep?.art, baseArts).length ? (rep?.art ?? null) : null;
+        if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else rows.stopped.push([n, head90(bl.head)]);
       } else {
         rows.ready.push(n);

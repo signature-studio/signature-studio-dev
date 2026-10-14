@@ -126,6 +126,11 @@ export function persistDiff(prev: PmState, next: PmState, store: Store): void {
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 const ART_LINE_RE = /^\s*`?(oc_artifacts:[^\n`]*)`?\s*$/m;
+// 分類に渡す bot 報告の要約 (先頭 400 字と oc_artifacts 行)。
+const digestBot = (b: { at: string; body: string }): Snapshot["bot_last"][string] => {
+  const am = ART_LINE_RE.exec(b.body);
+  return { at: b.at, head: b.body.slice(0, 400), art: am ? am[1].trim() : null };
+};
 
 export interface EngineDeps {
   store: Store;
@@ -480,13 +485,15 @@ export class Engine {
       .filter((r) => r.status !== "completed")
       .map((r) => ({ id: r.id, event: r.event, title: r.title }));
     const bot_last: Snapshot["bot_last"] = {};
-    for (const [k, b] of Object.entries(s.botLast)) {
-      const am = ART_LINE_RE.exec(b.body);
-      bot_last[k] = { at: b.at, head: b.body.slice(0, 400), art: am ? am[1].trim() : null };
-    }
+    for (const [k, b] of Object.entries(s.botLast)) bot_last[k] = digestBot(b);
+    const bot_report: Snapshot["bot_report"] = {};
+    for (const [k, b] of Object.entries(s.botReport)) bot_report[k] = digestBot(b);
     // 素材名は直前の報告 (botReport) から読む。無い (古い保存値) issue は空 = 新しい素材なし。
     const fullBotBody: Record<string, string> = {};
     for (const [k, b] of Object.entries(s.botReport)) fullBotBody[k] = b.body;
+    // 最後の run-outcome の reason (webhook が sig に保存する)。
+    const outcomeReason: Record<string, string> = {};
+    for (const [k, g] of Object.entries(s.sig)) if (g.outcome) outcomeReason[k] = g.outcome.reason;
     const liveBlockers: Record<string, number[]> = {};
     const unknown = new Set<number>();
     for (const i of issues) {
@@ -504,8 +511,8 @@ export class Engine {
     const launchState: Record<string, LaunchState> = {};
     for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) launchState[k] = v.state;
     return {
-      snap: { issues, prs, runs, bot_last, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody },
+      snap: { issues, prs, runs, bot_last, bot_report, pm_art: s.pmArt },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, outcomeReason },
       unknown,
     };
   }
@@ -608,7 +615,7 @@ export class Engine {
       stuck_prs: pr.stuck,
       stop,
     };
-    // 素材が増えず止まった oc:no-pr の件数 (cooldown 後に再着手へ回ったものは含めない)。
+    // 最後の run-outcome が artifact で、素材が増えず止まった oc:no-pr (cooldown 後に再着手へ回ったものは含めない)。
     const noNewArt = cls.noNewArt.filter((n) => hasLabel(n, "oc:no-pr") && rows.stopped.some(([x]) => x === n));
     return { rows, plan, picks, noNewArt };
   }
@@ -914,7 +921,7 @@ export class Engine {
       relaunch: c("relaunch"),
       user: c("user"),
       stopped: c("stopped"),
-      // oc:no-pr で止まったもののうち、停止報告に新しい素材が無く再投入しないもの (PM の判断待ち)。
+      // 最後の run-outcome が artifact で止まり、新しい素材が無く再投入しないもの (PM の判断待ち)。
       no_pr_needs_pm: noNewArt.length,
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
