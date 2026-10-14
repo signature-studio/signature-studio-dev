@@ -95,6 +95,8 @@ HEAD (スタブ: 全属性を Rec が記録):
 
 注: 変更後の表は行ごとに初期化した結果。HEAD の表は状態を持たないスタブ。`apply_chord_preset` の「OK」は `chordMarkerCount` が 0 の早期 return (HEAD と同じ)。
 
+測定 commit: `1f31671` (コードを変えた最後の commit。上の表はこの commit で再現した)。`git diff 1f31671 HEAD -- tools/python/src tools/python/tests tools/python/build_flpy.sh` の出力は空 (本 REPORT の追記以外に変更なし)。
+
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
