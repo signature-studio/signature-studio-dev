@@ -46,8 +46,8 @@ RET_ARG = os.environ.get('HS_DISP_RET_ARG') == '1'
 RET_ARG_VA = {0x412d60, 0x416230}
 # HS_DISP_PATH=1 のとき結果に実行経路 (path) と callout の位置 (callout_at: (path 上の位置, 呼出先)) を含める (#2886 の格納元解析用)
 KEEP_PATH = os.environ.get('HS_DISP_PATH') == '1'
-# HS_DISP_RET_SPEC="VA:rcx,VA:host,..." で callee ごとの戻り値を指定する (#1222 §8)。
-# rcx = 第1引数を返す / host = HOST 領域 (有効ポインタ) を返す。未指定の callee は従来どおり 0。
+# HS_DISP_RET_SPEC="VA:rcx,VA:host,VA:one,..." で callee ごとの戻り値を指定する (#1222 §8)。
+# rcx = 第1引数を返す / host = HOST 領域 (有効ポインタ) を返す / one = 1 を返す (#2886)。未指定の callee は従来どおり 0。
 RET_SPEC = {}
 for _item in filter(None, os.environ.get('HS_DISP_RET_SPEC', '').split(',')):
     _va, _mode = _item.split(':')
@@ -95,7 +95,8 @@ def run_one(ident, image, base, size, pe_data_sections):
             if RET_ARG and addr in RET_ARG_VA:
                 ret_rax = uc_.reg_read(UC_X86_REG_RCX)
             if addr in RET_SPEC:
-                ret_rax = uc_.reg_read(UC_X86_REG_RCX) if RET_SPEC[addr] == 'rcx' else HOST
+                mode = RET_SPEC[addr]
+                ret_rax = uc_.reg_read(UC_X86_REG_RCX) if mode == 'rcx' else (1 if mode == 'one' else HOST)
             uc_.reg_write(UC_X86_REG_RAX, ret_rax)
             uc_.reg_write(UC_X86_REG_RSP, sp + 8)
             uc_.reg_write(UC_X86_REG_RIP, ret)
