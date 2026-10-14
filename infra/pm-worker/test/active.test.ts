@@ -198,3 +198,10 @@ test("TARGET: 既定は 58 (opencode.yaml の run の総数の目標)。wrangler
   const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   assert.match(toml, /^TARGET = "58"$/m);
 });
+
+test("NO_PR_COOLDOWN_H: 既定は 6 時間。wrangler.toml も 6 で、env で変えられる (#2650)", () => {
+  assert.equal(loadConfig({}, {}).noPrCooldownH, 6);
+  assert.equal(loadConfig({ NO_PR_COOLDOWN_H: "2" }, {}).noPrCooldownH, 2);
+  const toml = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+  assert.match(toml, /^NO_PR_COOLDOWN_H = "6"$/m);
+});

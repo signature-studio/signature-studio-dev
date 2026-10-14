@@ -176,7 +176,7 @@ test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら reason=unk
   let p = ctx.app.engine.plan();
   assert.ok(!p.picks.some((x) => x.n === 60));
   assert.deepEqual(p.rows.recent.map(([n]) => n), [60]);
-  clock.t += 4 * 3_600_000;
+  clock.t += 7 * 3_600_000;
   await markFresh(ctx);
   p = ctx.app.engine.plan();
   assert.deepEqual(p.picks.map((x) => x.n), [60]);
@@ -185,7 +185,7 @@ test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら reason=unk
   await ctx.app.engine.launch(gh);
   // 再投稿の run は現れない (観測できない)。5 分で failed になり、stopped のまま再投稿しない。
   for (let i = 0; i < 3; i++) {
-    clock.t += 4 * 3_600_000;
+    clock.t += 7 * 3_600_000;
     await markFresh(ctx);
     await ctx.app.engine.launch(gh);
   }
@@ -195,10 +195,10 @@ test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら reason=unk
   assert.deepEqual(p.rows.stopped.map(([n]) => n), [60]);
 });
 
-test("launch: oc:no-pr の stop・split・blocked・新しい素材の無い artifact は cooldown の後も再着手しない", async () => {
+test("launch: oc:no-pr の stop・split・新しい素材の無い artifact は cooldown の後も再着手しない", async () => {
   const clock = { t: T0 };
   const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
-  for (const [n, reason] of [[61, "stop"], [62, "split"], [63, "blocked"], [64, "artifact"]] as const) {
+  for (const [n, reason] of [[61, "stop"], [62, "split"], [64, "artifact"]] as const) {
     await seed(ctx, n, { labels: ["oc:no-pr"] });
     await send(ctx.app, "issue_comment", commentPayload(n, BOT, `<!-- oc-run-outcome: no-pr reason=${reason} run=1 -->\n完了`, new Date(T0 - 30 * 60_000).toISOString()));
   }
@@ -206,7 +206,7 @@ test("launch: oc:no-pr の stop・split・blocked・新しい素材の無い art
   await markFresh(ctx);
   const p = ctx.app.engine.plan();
   assert.deepEqual(p.picks.map((x) => x.n), []);
-  assert.deepEqual(p.rows.blocked.map(([n]) => n), [63]);
+  assert.deepEqual(p.rows.blocked.map(([n]) => n), []);
   assert.deepEqual(p.rows.stopped.map(([n]) => n).sort(), [61, 62, 64]);
 });
 
@@ -219,7 +219,7 @@ test("launch: oc:no-pr の本文に『素材不足』があっても、run-outco
   let p = ctx.app.engine.plan();
   assert.deepEqual(p.rows.stopped.map(([n]) => n), [], "停止報告にしない");
   assert.deepEqual(p.rows.recent.map(([n]) => n), [65]);
-  clock.t += 4 * 3_600_000;
+  clock.t += 7 * 3_600_000;
   await markFresh(ctx);
   p = ctx.app.engine.plan();
   assert.deepEqual(p.picks.map((x) => x.n), [65]);
@@ -231,7 +231,7 @@ test("launch: pm-apply と oc:no-pr の issue は、停止報告 (stopped) に�
   await seed(ctx, 66, { labels: ["oc:no-pr", "pm-apply"] });
   await send(ctx.app, "issue_comment", commentPayload(66, BOT, "判断を求めるため停止します", new Date(T0 - 30 * 60_000).toISOString()));
   await markFresh(ctx);
-  clock.t += 4 * 3_600_000;
+  clock.t += 7 * 3_600_000;
   await markFresh(ctx);
   const p = ctx.app.engine.plan();
   assert.deepEqual(p.rows.stopped, [], "停止報告のままにしない");
@@ -253,11 +253,13 @@ const pickArt = (p: { picks: Array<{ n: number; art: string }> }, n: number) => 
 const noPrNeeds = (ctx: Awaited<ReturnType<typeof configuredApp>>) => (ctx.app.engine.status() as any).no_pr_needs_pm;
 
 test("artifact の再投入 (f・ネガコン): 停止報告の素材が前回の oc_artifacts と同じなら再投入しない。run-outcome の後も報告を読み、増えなければ止まる", async () => {
-  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
   await seed(ctx, 70, { labels: ["oc:no-pr"] });
   await send(ctx.app, "issue_comment", commentPayload(70, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(70, BOT, "停止します。素材不足: toolchain-emsdk が無い", atT0(-4 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(70, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
   await markFresh(ctx);
   const p = ctx.app.engine.plan();
   assert.deepEqual(p.rows.relaunch, []);
@@ -277,6 +279,7 @@ test("artifact の再投入 (g): 新しい素材を挙げた停止報告で 1 �
   await send(ctx.app, "issue_comment", commentPayload(71, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(71, BOT, report, atT0(-4 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(71, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
   await markFresh(ctx);
   const gh = await (ctx.app.engine as any).d.gh();
   // 1 回目: 報告の新しい素材 (plugins-serum2) を足して再投入。run-outcome が botLast を上書きしていても報告を読める。
@@ -287,10 +290,10 @@ test("artifact の再投入 (g): 新しい素材を挙げた停止報告で 1 �
   assert.equal(first.length, 1);
   assert.match(first[0].body.body, /^\/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2\n/);
   // 投稿は PM App のコメントとして webhook で戻る (pmArt が更新される)。その後、同じ素材の報告が続く。
-  await send(ctx.app, "issue_comment", commentPayload(71, PM_APP, first[0].body.body, atT0(0)));
-  await send(ctx.app, "issue_comment", commentPayload(71, BOT, report, atT0(5 * 60_000)));
-  await send(ctx.app, "issue_comment", commentPayload(71, BOT, outcomeBody(2), atT0(5 * 60_000 + 1000)));
-  clock.t += 4 * HOUR;
+  await send(ctx.app, "issue_comment", commentPayload(71, PM_APP, first[0].body.body, atT0(7 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(71, BOT, report, atT0(7 * HOUR + 5 * 60_000)));
+  await send(ctx.app, "issue_comment", commentPayload(71, BOT, outcomeBody(2), atT0(7 * HOUR + 5 * 60_000 + 1000)));
+  clock.t += 7 * HOUR;
   await markFresh(ctx);
   const p2 = ctx.app.engine.plan();
   assert.ok(!p2.picks.some((x) => x.n === 71), "2 回目は再投入しない");
@@ -301,11 +304,13 @@ test("artifact の再投入 (g): 新しい素材を挙げた停止報告で 1 �
 });
 
 test("artifact の再投入: 保存値に botReport が無い (古い保存値) issue は報告の素材を読めず、新しい素材なし として止まる", async () => {
-  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
   await seed(ctx, 72, { labels: ["oc:no-pr"] });
   await send(ctx.app, "issue_comment", commentPayload(72, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(72, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(72, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
   await markFresh(ctx);
   ctx.app.engine.s = { ...ctx.app.engine.s, botReport: {} };
   const p = ctx.app.engine.plan();
@@ -324,7 +329,7 @@ test("artifact の再投入 (ネガコン): 最後の run-outcome が split・st
     await send(ctx.app, "issue_comment", commentPayload(n, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR)));
     await send(ctx.app, "issue_comment", commentPayload(n, BOT, outcomeBody(1, reason), atT0(-4 * HOUR + 1000)));
   }
-  clock.t += 4 * HOUR;
+  clock.t += 7 * HOUR;
   await markFresh(ctx);
   const p = ctx.app.engine.plan();
   assert.deepEqual(p.rows.relaunch, []);
@@ -334,11 +339,13 @@ test("artifact の再投入 (ネガコン): 最後の run-outcome が split・st
 });
 
 test("artifact の再投入: 凡例 (『素材不足』の語) を外した run-outcome でも、報告が停止報告なら 1 回再投入する", async () => {
-  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
   await seed(ctx, 84, { labels: ["oc:no-pr"] });
   await send(ctx.app, "issue_comment", commentPayload(84, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk", atT0(-5 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(84, BOT, "停止します。plugins-serum2 が無いため着手できません", atT0(-4 * HOUR)));
   await send(ctx.app, "issue_comment", commentPayload(84, BOT, plainOutcomeBody(1), atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
   await markFresh(ctx);
   const p = ctx.app.engine.plan();
   assert.equal(pickArt(p, 84), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2");
@@ -354,6 +361,104 @@ test("artifact の再投入: 報告が停止報告 (STOP_RE) でなければ、�
   const p = ctx.app.engine.plan();
   assert.deepEqual(p.rows.relaunch, []);
   assert.equal(pickArt(p, 85), undefined);
+});
+
+// blocked の再着手 (#2650)。blocker が open の間は blocked の行に置き、0 になった報告につき 1 回だけ再着手する。
+const blockedOutcome = (run: number) => `<!-- oc-run-outcome: no-pr reason=blocked run=${run} -->\n[run-outcome] 依存が未解決のため、PR も push も出さずに終了しました。`;
+const isoAt = (ms: number) => new Date(ms).toISOString();
+
+test("blocked (#2650): blocker が open の間は再着手せず blocked に置く。close したら報告につき 1 回だけ再着手し、以後の tick では二重に投稿しない", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 100, { labels: ["oc:no-pr"], body: "依存: #101" });
+  await seed(ctx, 101);
+  await send(ctx.app, "issue_comment", commentPayload(100, BOT, blockedOutcome(1), atT0(-30 * 60_000)));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  let p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.blocked, [[100, [101]]], "blocker (#101) が open の間は blocked の行");
+  assert.ok(!p.picks.some((x) => x.n === 100));
+  await ctx.app.engine.launch(gh);
+  assert.equal(postsTo(ctx.m.calls, 100).length, 0);
+  // blocker が close した tick で 1 回だけ再着手する (np = blocked)。
+  await send(ctx.app, "issues", issuePayload(101, { state: "closed", at: isoAt(clock.t) }));
+  await markFresh(ctx);
+  p = ctx.app.engine.plan();
+  assert.equal(p.picks.find((x) => x.n === 100)?.np, "blocked");
+  await ctx.app.engine.launch(gh);
+  assert.equal(postsTo(ctx.m.calls, 100).length, 1);
+  assert.equal(ctx.store.get<any>("relaunch", "np:100")?.blocked, atT0(-30 * 60_000), "再着手の根拠の報告を記録する");
+  // 投稿を run として観測し、run が終わったあとも、同じ報告では二度目を出さない。
+  await send(ctx.app, "workflow_run", runPayload(20, "in_progress", { event: "issue_comment", title: "[CI-100] t100", created: isoAt(clock.t) }));
+  await markFresh(ctx);
+  await ctx.app.engine.launch(gh);
+  await send(ctx.app, "workflow_run", runPayload(20, "completed", { event: "issue_comment", title: "[CI-100] t100", created: isoAt(clock.t) }));
+  for (let i = 0; i < 3; i++) {
+    clock.t += 7 * HOUR;
+    await markFresh(ctx);
+    await ctx.app.engine.launch(gh);
+  }
+  assert.equal(postsTo(ctx.m.calls, 100).length, 1, "同じ報告では 1 回だけ");
+  p = ctx.app.engine.plan();
+  assert.ok(!p.picks.some((x) => x.n === 100));
+  assert.ok(p.rows.stopped.some(([n, note]) => n === 100 && note === "oc:no-pr blocked 再着手済み"));
+});
+
+test("blocked (#2650): 解除の後に blocked へ戻って再び解除されても、報告が新しくならなければ再着手しない。新しい報告には、もう 1 回だけ再着手する", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 110, { labels: ["oc:no-pr"], body: "依存: #111" });
+  await seed(ctx, 111);
+  await send(ctx.app, "issue_comment", commentPayload(110, BOT, blockedOutcome(1), atT0(-30 * 60_000)));
+  await send(ctx.app, "issues", issuePayload(111, { state: "closed", at: atT0(-60_000) }));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  await ctx.app.engine.launch(gh);
+  assert.equal(postsTo(ctx.m.calls, 110).length, 1, "最初の解除で 1 回");
+  // 投稿を run として観測し、run を終える。
+  await send(ctx.app, "workflow_run", runPayload(21, "in_progress", { event: "issue_comment", title: "[CI-110] t110", created: isoAt(clock.t) }));
+  await markFresh(ctx);
+  await ctx.app.engine.launch(gh);
+  await send(ctx.app, "workflow_run", runPayload(21, "completed", { event: "issue_comment", title: "[CI-110] t110", created: isoAt(clock.t) }));
+  // 報告 (run-outcome) は増えないまま、新しい blocker (#112) が付いてから解除される。
+  await seed(ctx, 112);
+  await send(ctx.app, "issues", issuePayload(110, { labels: ["oc:no-pr"], body: "依存: #112", at: isoAt(clock.t) }));
+  await markFresh(ctx);
+  let p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.blocked, [[110, [112]]]);
+  await send(ctx.app, "issues", issuePayload(112, { state: "closed", at: isoAt(clock.t) }));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  p = ctx.app.engine.plan();
+  assert.ok(!p.picks.some((x) => x.n === 110), "同じ報告では再着手しない");
+  assert.ok(p.rows.stopped.some(([n, note]) => n === 110 && note === "oc:no-pr blocked 再着手済み"));
+  // 新しい報告 (blocked) が出たら、その報告につき 1 回だけ再着手する。
+  await send(ctx.app, "issue_comment", commentPayload(110, BOT, blockedOutcome(2), isoAt(clock.t)));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  p = ctx.app.engine.plan();
+  assert.equal(p.picks.find((x) => x.n === 110)?.np, "blocked");
+  await ctx.app.engine.launch(gh);
+  assert.equal(postsTo(ctx.m.calls, 110).length, 2);
+  assert.equal(ctx.store.get<any>("relaunch", "np:110")?.count, 2);
+});
+
+test("blocked (#2650): blocker が一覧に無い blocked の報告も、報告につき 1 回だけ cooldown の後に再着手する (上限 3 回の計数に入る)", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 120, { labels: ["oc:no-pr"] });
+  await send(ctx.app, "issue_comment", commentPayload(120, BOT, blockedOutcome(1), atT0(-30 * 60_000)));
+  await markFresh(ctx);
+  assert.deepEqual(ctx.app.engine.plan().rows.recent.map(([n]) => n), [120], "cooldown の間は recent");
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.equal(p.picks.find((x) => x.n === 120)?.np, "blocked");
+  await ctx.app.engine.launch(await (ctx.app.engine as any).d.gh());
+  assert.equal(postsTo(ctx.m.calls, 120).length, 1);
+  assert.equal(ctx.store.get<any>("relaunch", "np:120")?.count, 1);
 });
 
 test("launch: 状態が古い (reconcile が 15 分以上止まっている) 間は投稿しない", async () => {
