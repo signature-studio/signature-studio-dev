@@ -344,3 +344,53 @@ EMSCRIPTEN_KEEPALIVE double flpy_bench_c(int fn_id, int n) {
     return (double)(b.tv_sec - a.tv_sec) * 1e9 + (double)(b.tv_nsec - a.tv_nsec);
 }
 #endif
+
+#if defined(FLPY_STATIC) && defined(FLPY_PTHREAD)
+/* PY-80 (#2856): 別スレッドから Python を実行する経路 (FL が束縛する PyThreadState_New / PyEval_RestoreThread /
+ * PyEval_SaveThread で GIL を受け渡す)。各 pthread が自分の thread state を作って GIL を取り、flpy_call_json を 1 回呼ぶ。
+ * 戻り値は各スレッドの call_json 結果を並べた JSON 配列 ([{"ok":..}|{"err":..}, ...])。flpy_free で解放。 */
+#include <pthread.h>
+#define FLPY_MT_MAX 8
+typedef struct { PyInterpreterState *interp; const char *target; const char *args; char *out; } flpy_mt_job;
+
+static void *flpy_mt_worker(void *p) {
+    flpy_mt_job *j = (flpy_mt_job *)p;
+    PyThreadState *ts = PyThreadState_New(j->interp);
+    PyEval_RestoreThread(ts);
+    j->out = flpy_call_json(j->target, j->args);
+    PyThreadState_Clear(ts);
+    PyThreadState_DeleteCurrent();
+    return NULL;
+}
+
+EMSCRIPTEN_KEEPALIVE char *flpy_mt_call(int nthreads, const char *target, const char *args) {
+    if (nthreads < 1) nthreads = 1;
+    if (nthreads > FLPY_MT_MAX) nthreads = FLPY_MT_MAX;
+    pthread_t th[FLPY_MT_MAX];
+    flpy_mt_job jobs[FLPY_MT_MAX];
+    int started[FLPY_MT_MAX] = {0};
+    PyInterpreterState *interp = PyInterpreterState_Get();
+    PyThreadState *main_ts = PyEval_SaveThread();
+    for (int i = 0; i < nthreads; i++) {
+        jobs[i] = (flpy_mt_job){interp, target, args, NULL};
+        started[i] = pthread_create(&th[i], NULL, flpy_mt_worker, &jobs[i]) == 0;
+        if (!started[i]) jobs[i].out = strdup("{\"err\":\"pthread_create failed\"}");
+    }
+    for (int i = 0; i < nthreads; i++) if (started[i]) pthread_join(th[i], NULL);
+    PyEval_RestoreThread(main_ts);
+    size_t len = 3;
+    for (int i = 0; i < nthreads; i++) len += strlen(jobs[i].out) + 1;
+    char *buf = malloc(len), *w = buf;
+    *w++ = '[';
+    for (int i = 0; i < nthreads; i++) {
+        if (i) *w++ = ',';
+        size_t n = strlen(jobs[i].out);
+        memcpy(w, jobs[i].out, n);
+        w += n;
+        free(jobs[i].out);
+    }
+    *w++ = ']';
+    *w = 0;
+    return buf;
+}
+#endif
