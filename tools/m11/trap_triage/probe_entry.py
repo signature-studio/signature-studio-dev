@@ -37,10 +37,15 @@ open(os.path.join(out, 'probe.c'), 'w').write(r'''#include <stdio.h>
 typedef unsigned long long u64;
 static int ok(u64 x) { return x >= 0x10000 && x < 0x20000000; }
 static u64 q(u64 x) { return ok(x) ? *(volatile u64*)(uintptr_t)x : 0xdeadULL; }
+static int in_img(u64 x) { return x >= 0x10000 && x < 0x20000000; }
+static u64 rd64(u64 x) { return in_img(x) ? *(volatile u64*)(uintptr_t)x : 0xdeadULL; }
+static u64 rd8(u64 x) { return in_img(x) ? *(volatile unsigned char*)(uintptr_t)x : 0xdeadULL; }
 /* a1 / a2 と, a1 をオブジェクトとみた [a1] [a1+8] [[a1+8]+8] [[a1+8]+0x10] (TList: FItems / Count 位置) を出す */
 void m11_pe(u64 fn, u64 a1, u64 a2, u64 a3, u64 a4) {
     u64 l = q(a1 + 8);
     fprintf(stderr, "[pe] %llx a=%llx %llx %llx %llx | [a1]=%llx [a1+8]=%llx [[a1+8]+8]=%llx [[a1+8]+0x10]=%llx\n", fn, a1, a2, a3, a4, q(a1), l, q(l + 8), q(l + 0x10));
+    if (fn == 0x407a50ULL) { u64 p = a1 - 8; fprintf(stderr, "[raw407] a1=%llx p=%llx v=%llx\n", a1, p, rd64(p));
+        if (a1 < 2601) { u64 b = rd8(18770492ULL + (a1 + 7) / 8); u64 rb = 16404744ULL + 16 * b; u64 n = rd64(rb + 8); u64 m = rd64(n + 24); fprintf(stderr, "[chain407] b=%llx rbx=%llx n=%llx m=%llx m-8=%llx\n", b, rb, n, m, m - 8); } }
 }
 ''')
 if WATCH:   # 各 fn 入口で chain を読み, 前回から値が変わっていたら「直前の fn の入口〜この fn の入口の間」に書込みがあったと出す
