@@ -221,3 +221,10 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | 純関数: 30 分の streak・観測の空きをまたがない・観測の保持 | 「saturatedRunning」「nextCap / capValue」「観測の保持」 |
 
 review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
+
+## 16. oc-pm の refs_orphan 検出 (#2337・PR #2478)
+
+- 測定 commit: `b7fb7a40` (main `b3c699d4` の取り込み merge。修正本体は `ebfd0a41`)。全文 (測定・ネガコン・Refs のみ判定の差): [`REPORT_APPENDIX_2337.md`](REPORT_APPENDIX_2337.md) (§16 の分割移動)。
+- 結論: `npm test` 213 件 PASS / 0 FAIL (n=3)。`test:unit` 10 件・`test:workers` 3 件 PASS。ネガコン 5 種は各 1 件ずつ壊して FAIL を確認。
+- 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
