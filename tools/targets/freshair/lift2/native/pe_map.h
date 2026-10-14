@@ -57,6 +57,9 @@ static void on_sig(int s, siginfo_t* si, void* uc) {
             if (v >= 0x180000001ULL && v < 0x181300000ULL) { fprintf(stderr, "  [%d] ret=%llx\n", k, v); found++; }
         }
     }
+    if (getenv("FA_OUT0") && g_fault_rip == 0x180c9d741ULL) { /* FA-25: probe 無しで setter の [rsp+0x48] (= out[0]) を実読 */
+        unsigned long long o0 = *(unsigned long long*)(u->uc_mcontext.gregs[REG_RSP] + 0x48);
+        fprintf(stderr, "OUT0 rip=%llx out0=%llx\n", g_fault_rip, o0); }
     if (g_in_guard) siglongjmp(g_jb, s); _exit(99); }
 static void guard_install(void) {
     struct sigaction sa; memset(&sa, 0, sizeof sa); sa.sa_sigaction = on_sig; sa.sa_flags = SA_NODEFER | SA_SIGINFO;
