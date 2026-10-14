@@ -53,6 +53,14 @@ export interface WouldRec {
   ns: number[];
 }
 
+// 管理用の全体同期 (POST /admin/resync) は 1 時間に RESYNC_PER_HOUR 回まで (試行は失敗しても数える)。
+export const RESYNC_PER_HOUR = 2;
+// 失敗した配送の走査は REDELIVER_EVERY_MS ごと。1 走査の再配送は REDELIVER_MAX_PER_SCAN 件まで、同じ guid は REDELIVER_MAX_PER_GUID 回まで。
+export const REDELIVER_EVERY_MS = 5 * 60_000;
+export const REDELIVER_MAX_PER_SCAN = 10;
+export const REDELIVER_MAX_PER_GUID = 3;
+const HOUR_MS = 3_600_000;
+
 // open issue 数の履歴は 1 時間ごとに 1 点、最大 48 点 (48 時間分)。open_issues_delta_24h の基準に使う。
 export const OPEN_SAMPLE_MS = 3_600_000;
 export const OPEN_SAMPLE_MAX = 48;
@@ -118,6 +126,14 @@ interface Meta {
   // 直近の全体同期の REST 回数 (全体 / うちコメント一覧)。
   fullSyncCalls?: number;
   fullSyncCommentCalls?: number;
+  // 管理用の全体同期の時刻 (直近 1 時間の分だけ持つ)。
+  resyncs?: number[];
+  // 失敗した webhook 配送の回収 (#2339)。guid ごとの再配送の試行回数 (live のときだけ増える) と最後に触れた時刻。
+  // 走査のたびに、一覧に失敗として残っている guid だけを残す。
+  redeliver?: Record<string, { n: number; at: number }>;
+  redeliverAt?: number;
+  // 直近の走査で見た status != OK の配送の件数
+  redeliverFailed?: number;
   counters?: {
     launched: number;
     dispatched: number;
@@ -126,6 +142,8 @@ interface Meta {
     reconciles: number;
     pmDispatched?: number;
     wouldDispatchPm?: number;
+    redelivered?: number;
+    wouldRedeliver?: number;
     demoted?: number;
     restored?: number;
   };
@@ -133,7 +151,24 @@ interface Meta {
 
 export interface Log {
   at: string;
-  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "would-pm-dispatch" | "pm-dispatch" | "error" | "skip" | "truncated" | "recovered" | "unobserved" | "observed" | "demote" | "restore";
+  kind:
+    | "would-launch"
+    | "launch"
+    | "would-dispatch"
+    | "dispatch"
+    | "would-pm-dispatch"
+    | "pm-dispatch"
+    | "error"
+    | "skip"
+    | "truncated"
+    | "recovered"
+    | "unobserved"
+    | "observed"
+    | "resync"
+    | "would-redeliver"
+    | "redeliver"
+    | "demote"
+    | "restore";
   n?: number;
   art?: string;
   note?: string;
@@ -173,6 +208,8 @@ export interface EngineDeps {
   pmBotLogin: () => string | null;
   // status・ログから取り除く実行時の secret (webhook secret・PEM・token など)。
   secrets?: () => string[];
+  // App の JWT で叩く REST (配送の一覧と再配送)。installation token の枠とは別なので、レート情報は持ち込まない。未設定なら再配送しない。
+  app?: () => Promise<Gh | null>;
 }
 
 const COUNTED_BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "launchedAt"] as const;
@@ -421,6 +458,30 @@ export class Engine {
     this.saveMeta();
   }
 
+  // 管理用の全体同期 (POST /admin/resync)。REST の内容で派生状態を作り直す (fullSync と同じ。ページ上限も同じ)。
+  // 永続状態 (launchedAt・relaunch・planned・phase・counters) は同期が触らないので残る。busy の間 (tick と同時) は走らせない。
+  async resync(gh: Gh): Promise<{ status: "ok" } | { status: "limited"; retryAfterS: number } | { status: "busy" }> {
+    if (this.busy) return { status: "busy" };
+    const now = this.d.now();
+    const recent = (this.meta.resyncs ?? []).filter((t) => now - t < HOUR_MS);
+    if (recent.length >= RESYNC_PER_HOUR) return { status: "limited", retryAfterS: Math.ceil((recent[0] + HOUR_MS - now) / 1000) };
+    this.meta.resyncs = [...recent, now];
+    this.saveMeta();
+    this.busy = true;
+    try {
+      await this.fullSync(gh);
+      this.pushLog({ kind: "resync", note: "ok" });
+    } catch (e) {
+      this.setError(now, e instanceof GhError ? e.message : "resync failed");
+      this.pushLog({ kind: "error", note: this.meta.lastError?.what });
+      this.saveMeta();
+      throw e;
+    } finally {
+      this.busy = false;
+    }
+    return { status: "ok" };
+  }
+
   private async syncRuns(gh: Gh): Promise<number> {
     const R = this.d.cfg.repo;
     let diff = 0;
@@ -564,7 +625,7 @@ export class Engine {
   }
 
   private zero() {
-    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, demoted: 0, restored: 0 };
+    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, redelivered: 0, wouldRedeliver: 0, demoted: 0, restored: 0 };
   }
 
   // 完了して 1 時間たった run は捨てる (順不同配送の判定に使う期間だけ持つ)。
@@ -973,6 +1034,69 @@ export class Engine {
     return out;
   }
 
+  // 失敗した webhook 配送の回収 (#2339)。GitHub は失敗した配送を自動で再送しないので、App の配送一覧 (JWT) から
+  // status != OK のものを古い順に選ぶ。同じ guid に OK の配送が 1 つでもあれば回収済みとみなす。
+  // POST は LIVE_REDELIVER=1 かつ rate-guard が無いときだけ。dry-run は guid ごとに 1 回だけ数える (counters.wouldRedeliver)。
+  async redeliver(app: Gh | null): Promise<void> {
+    const now = this.d.now();
+    if (!app || now - (this.meta.redeliverAt ?? 0) < REDELIVER_EVERY_MS) return;
+    this.meta.redeliverAt = now;
+    this.meta.counters = this.meta.counters ?? this.zero();
+    let list: unknown;
+    try {
+      list = (await app.req<unknown>("GET", "/app/hook/deliveries?per_page=100")).json;
+    } catch (e) {
+      this.pushLog({ kind: "error", note: e instanceof GhError ? `hook deliveries: ${e.message}` : "hook deliveries failed" });
+      this.saveMeta();
+      return;
+    }
+    const all: any[] = Array.isArray(list) ? list.filter((d) => !!d && typeof d === "object") : [];
+    const okGuids = new Set(all.filter((d) => d.status === "OK").map((d) => String(d.guid ?? d.id)));
+    // 同じ guid は 1 回だけ扱う。古い順 (一覧は新しい順)。再送された配送 (redelivery) は再送しない: 再送の失敗を再送すると連鎖し、
+    // guid が変わる実装では guid の上限で止まらないため。元の配送 (redelivery=false) の上限 (3 回) だけで止める。
+    const byGuid = new Map<string, any>();
+    for (const d of [...all].reverse()) {
+      if (d.status === "OK" || d.redelivery === true || !Number.isInteger(d.id)) continue;
+      const guid = String(d.guid ?? d.id);
+      if (okGuids.has(guid) || byGuid.has(guid)) continue;
+      byGuid.set(guid, d);
+    }
+    const book = this.meta.redeliver ?? {};
+    const keep: Record<string, { n: number; at: number }> = {};
+    for (const guid of byGuid.keys()) keep[guid] = book[guid] ?? { n: 0, at: now };
+    const live = this.d.cfg.liveRedeliver && !restGuardOn(this.meta.rest?.remaining);
+    // 試行の少ないものから送る (同じ回数の中では古い順。安定ソート)。古いものの再試行で、新しい失敗が上限の外に押し出されないように。
+    const order = [...byGuid.entries()].sort((a, b) => keep[a[0]].n - keep[b[0]].n);
+    let sent = 0;
+    for (const [guid, d] of order) {
+      const prev = keep[guid];
+      if (prev.n >= REDELIVER_MAX_PER_GUID) continue;
+      if (!live) {
+        if (book[guid] === undefined) {
+          this.meta.counters.wouldRedeliver = (this.meta.counters.wouldRedeliver ?? 0) + 1;
+          this.pushLog({ kind: "would-redeliver", note: `delivery ${d.id}` });
+        }
+        continue;
+      }
+      if (sent >= REDELIVER_MAX_PER_SCAN) continue;
+      sent++;
+      // 失敗した試行も数える (同じ配送を毎分叩かない。上限はそのまま効く)。
+      keep[guid] = { n: prev.n + 1, at: now };
+      try {
+        await app.req("POST", `/app/hook/deliveries/${d.id}/attempts`);
+      } catch (e) {
+        this.pushLog({ kind: "error", note: e instanceof GhError ? `redeliver ${d.id}: ${e.message}` : `redeliver ${d.id} failed` });
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+        continue;
+      }
+      this.meta.counters.redelivered = (this.meta.counters.redelivered ?? 0) + 1;
+      this.pushLog({ kind: "redeliver", note: `delivery ${d.id} attempt ${prev.n + 1}` });
+    }
+    this.meta.redeliver = keep;
+    this.meta.redeliverFailed = all.filter((d) => d.status !== "OK").length;
+    this.saveMeta();
+  }
+
   // 1 回の点検。alarm (毎分・webhook 後 2 秒) と cron (毎分) の両方から呼ばれる。
   async tick(): Promise<{ ready: boolean }> {
     // cron と alarm が重なっても、同時に 2 回は走らせない (二重投稿の防止)。
@@ -1005,6 +1129,12 @@ export class Engine {
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
+      // 配送の回収は launch と独立に行い、失敗しても他の処理と lastError を止めない。
+      try {
+        await this.redeliver(this.d.app ? await this.d.app() : null);
+      } catch {
+        this.pushLog({ kind: "error", note: "hook redeliver failed" });
+      }
       this.meta.lastError = undefined;
     } catch (e) {
       this.setError(now, e instanceof GhError ? e.message : "tick failed");
@@ -1044,7 +1174,8 @@ export class Engine {
       else if (r.status === "queued") running.queued++;
       else if (r.status === "pending") running.pending++;
     }
-    const counters = this.meta.counters ?? this.zero();
+    // 既存の counters に無いキー (#2339 の redelivered・wouldRedeliver など) は 0 として出す。
+    const counters = { ...this.zero(), ...(this.meta.counters ?? {}) };
     const rest = this.meta.rest;
     const lastError = this.meta.lastError ? { ...this.meta.lastError, what: this.clean(this.meta.lastError.what) } : null;
     // 自律運転の指標。件数と時間だけで、題名・本文・login は出さない (issue / PR 番号は可)。
@@ -1114,6 +1245,9 @@ export class Engine {
       counters,
       last_webhook_at: this.meta.lastWebhookAt ? iso(this.meta.lastWebhookAt) : null,
       last_dispatch_at: this.meta.lastDispatchAt ? iso(this.meta.lastDispatchAt) : null,
+      // 失敗した webhook 配送の回収 (#2339)。件数は counters.redelivered (送った) と counters.wouldRedeliver (LIVE_REDELIVER 未設定で送らなかった)。
+      last_redeliver_scan: this.meta.redeliverAt ? iso(this.meta.redeliverAt) : null,
+      hook_failed_last_scan: this.meta.redeliverFailed ?? null,
       running,
       // 投稿したが 5 分たっても run が現れなかった issue。自動では再投稿しない (人が見る)。
       launch_unobserved: this.launchUnobserved(),
