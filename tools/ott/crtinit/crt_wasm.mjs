@@ -1,6 +1,7 @@
 // entry_wasm.mjs — VST 入口 scenarios を lift 済み wasm (x64c, tools/ott/entry/lift_entry.sh 産物) で実行し
 // entry_nat.py と同一 schema の JSON を吐く。
 //   MOD=tools/ott/work/entrylift/ottl_entry.cjs SCEN=tools/ott/work/entrylift/scen.json OUT=result.json node entry_wasm.mjs
+//   APISET_READBACK=1 のときだけ api-set 表 (34 entry) を init 直後 (apiset_init) と実行後 (apiset_after) に出す (ICALL-76・REPORT §10)。
 // ott_run(va, a0..a3, x0..x3): MS x64 ABI の整数引数 → R[RCX..R9], float 引数 → X[xmm 位置]。
 // 5/6 引数目 (dispatcher の ptr/opt) は _ott_set_stackarg(0/1) で guest stack に置く。
 import fs from 'fs';
@@ -26,6 +27,10 @@ const mod = api.mod;
 const U8 = mod.HEAPU8, U32 = mod.HEAPU32, F32 = mod.HEAPF32, dv = new DataView(U8.buffer, U8.byteOffset, U8.length);
 mod._ott_data_install();
 if (CRT_INIT) mod._ott_crt_init_tables();
+const APISET = sh(0x18026c9f0), APISET_N = 34;   // ICALL-76: 表は 34 entry (0x110 B)
+const readApiset = () => Array.from({ length: APISET_N }, (_, i) => dv.getBigUint64(APISET + 8 * i, true));
+const APISET_RB = process.env.APISET_READBACK === '1';
+const apiset_init = APISET_RB ? readApiset() : null;
 
 const f32b = api.f32b;                      // float → BigInt bits
 const big = (v) => BigInt.asUintN(64, BigInt(v));
@@ -111,6 +116,11 @@ const alog = [];
 const amBase = mod._ott_am_counts();
 const am = Array.from(new Uint32Array(U8.buffer, U8.byteOffset + amBase, 64));
 const out = { calls, obj: obj ? hex(obj, 0x328) : null, eff_ptr: eff, obj_ptr: obj, alog, am };
+if (APISET_RB) {
+  const hx = (v) => v.toString(16).padStart(16, '0');
+  out.apiset_init = apiset_init.map(hx);
+  out.apiset_after = readApiset().map(hx);
+}
 const jrepl = (k, v) => {
   if (typeof v !== 'bigint') return v;
   const n = Number(BigInt.asUintN(64, v));

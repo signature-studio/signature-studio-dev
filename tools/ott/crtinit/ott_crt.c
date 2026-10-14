@@ -9,7 +9,7 @@
  *    なり「解決済み」と誤解されて CFG dispatch (0x1801d2750 jmp rax) が暴走する — これが
  *    native SIGSEGV / wasm ott_unlifted の共通 root cause (実測: 両側 ret=0x...1c3e06 で一致)。
  *    実 CRT 初期化の観測可能な効果 = 全 encoded slot を enc(NULL) = cookie に初期化する
- *    ことなので、ここでは api-set 表 (0x18026c9f0, 32 entry) と個別 encoded slot
+ *    ことなので、ここでは api-set 表 (0x18026c9f0, 34 entry) と個別 encoded slot
  *    (0x18026c028 / 0x18026c388 / 0x18026cb40 / 0x18026cb88 = _matherr user hook) に
  *    cookie を書く。DllMain / _initterm_e / _initterm は実行しない ((a) 実 lift ではなく
  *    (b) C 等価置換の判断 — 根拠は REPORT.md §2)。
@@ -34,7 +34,7 @@
 #define GADDR(rva) (ott_gbase + (rva))
 #define COOKIE_RVA 0x260ce0ull
 #define APISET_TABLE_RVA 0x26c9f0ull
-#define APISET_N 32
+#define APISET_N 34              /* 0x18026c9f0〜0x18026cb00 (0x110 B)。CRT 初期化 0x1801c43a4 の rep stosq 個数 (and ecx,0x22) と一致 */
 #define FLS_INDEX_RVA 0x2610e4ull
 #define TRAMP_RVA 0x2f9000ull            /* trampoline 窓 (FlsAlloc = +0x00, 以下 16 B 刻み) */
 static const uint64_t ENCODED_SLOT_RVA[] = { 0x26c028, 0x26c388, 0x26cb40, 0x26cb88 };
