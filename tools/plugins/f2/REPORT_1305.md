@@ -243,15 +243,8 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 再現 (a70461d6。依存 `uv venv f2venv && uv pip install unicorn==2.1.4 pefile capstone`。リポジトリ直下から、`PE` は block19148_PE.bin): A `unicorn_trace.py $PE 0x83efb0 -H -m 2000000`、B `unicorn_trace.py $PE 0x83efb0 -H -p 0x409090 -m 2000000`、C `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000`。
 - 鮮度: `git diff a70461d6 HEAD -- 'tools/plugins/f2/*.py'` = 0 行 (a70461d6 以降の commit は REPORT のみ)。
 
-<<<<<<< HEAD
-## 17. PLG-F3-29 (#2492): 0x407a20 の間接呼出し元 (`.data` 表 0x867c88 から逆引き、測定 commit 5c25928b、block19148)
-
-- 結論: `0x407a20` の VA 自身への参照 (qword・rip 相対/絶対・IMM・4 バイト一致) は 0 件 (道具で検索・ネガティブコントロール済み)。囲む関数 `0x407a00` の格納元は `.data` `0x867c88` (表 6 要素) の 1 件のみ。要素 0 を呼ぶ間接 call は 3 件 (`0x4093ae`・`0x409455`・`0x41b294`)、実経路 (`-H`) で通るのは `0x4093ae` のみ。未解決 `[0x5bac78]` の表は #2468 (コメント追記)。
-- 詳細・道具の修正・ネガティブコントロール・検算・検証記録は `tools/plugins/f2/REPORT_2492.md` が正本 (`docs/DOC_MAP.md` §3)。
-=======
 ## 17. PLG-F3-30 (#2493): 0x867100 を構築するアリーナ初期化関数 (書込み元 rip、測定 commit d49817f9、block19148)
 
 - 道具と再現: `write_origin.py` (1b8b7eb1)。`bash tools/plugins/f2/write_origin_2493.sh $PE` (d49817f9、PE と venv は §11) が以下を一括で再現する。逐次 n=3、wall 10.95・10.95・10.88 秒 (min–max 10.88〜10.95)、load (1 分値) 開始→終了 0.08→0.22・0.22→0.42・0.42→0.63、3 回の出力は md5 一致 (28 件版 `e20906a7…`・56 件版 `e264e012…`)。結果: `0x409090 -H -q 0x867100 -w 0x867100:0x867200` の書込み 28 件 (`0x867101`〜`0x8671e0`) は全件が pdata `[0x409090,0x4091d4)` 内の 7 種の rip (`0x4090a1`・`0x4090a5`・`0x4090a9`・`0x4090b1`・`0x4090f9`・`0x409104`・`0x409159`) から出た。unmapped 0。`-w 0x867100:0x867300` は 56 件 (8 ブロック×7、同じ関数・同じ 7 種)。
 - 負の対照: `-w 0x867d00:0x867e00` は 0 件。`0x83efb0 -H -w 0x867100:0x867200` (アリーナを構築しない経路) は 0 件で、`UC_ERR_READ_UNMAPPED rip=0x407a5e` で止まる。測定したのはこの 1 経路のみ (他の経路は未測定)。集計の対照: 合成の書込み 1 行 (rip=0x1000、pdata 外) は unmapped 1・関数 0 件。
 - 判定: 受入 **達成**。アリーナ初期化関数は `0x409090`。呼出し経路は §15 のとおり未確定 (未解決は #2303)。鮮度: `git diff d49817f9 HEAD -- tools/plugins/f2/*.py tools/plugins/f2/*.sh` = 0 行。
->>>>>>> origin/main
