@@ -74,7 +74,8 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `last_webhook_at` | 署名を検証できた webhook の最後の受信時刻 (401 では進めない)。無ければ `null` |
 | `last_dispatch_at` | `repository_dispatch` (`oc-watchdog`) に成功した最後の時刻。dry-run では `null` のまま (would は既存の `last_watchdog`) |
 | `last_digest_at` | 直近の digest (`oc-pm kind=digest`) を試行した時刻。起点の tick・送信・送信失敗・dry-run の記録を含む (24 時間に 1 回進む)。無ければ `null` |
-| `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event は問わない (TARGET に数える `active_runs` とは別) |
+| `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event は問わない (TARGET に数える `active_runs` とは別)。`running.queued` は status が `queued` のものだけ (`pending`・`waiting` は数えない)。top-level の `queued` は queued・pending・waiting の合計で、定義が違う |
+| `target_eff` / `cap_est` / `peak_running` / `queued` / `oldest_queued_age_min` | 同時実行の上限の推定 (#2381)。`target_eff` は launch の目標、`cap_est` は推定の上限 (無ければ `null`)、`peak_running` は直近 24 時間の tick ごとの `in_progress` の最大値。`queued` は queued・pending・waiting の数、`oldest_queued_age_min` は最も古い queued の経過分 (無ければ `null`)。詳細は下の節 |
 | `dry_run_skipped_posts` | dry-run のために投稿しなかった書き込み (`/oc` 投稿 + `repository_dispatch`) の累計 (`counters.wouldLaunch + wouldDispatch`) |
 | `reconcile_diff` | `{last, total}`: reconcile が REST を適用して DO の内容が変わった entity (issue・PR・run・bot/PM のコメント) の件数と累計。webhook の欠落の指標。`updatedAt` だけの違い (コメント追加で進む) と full sync は数えない。配送遅延の最中の差も数えるので、1 回の小さな値は欠落とは限らない |
 | `rest_remaining` / `rest_used` / `rest_reset_at` | Worker の GitHub REST クライアント (installation token) の全応答の `x-ratelimit-remaining` / `-used` / `-reset` (ヘッダが正。`gh api rate_limit` の本文は食い違う)。失敗応答も含む。ヘッダの無い応答・数値でない値では更新しない。一度も観測していなければ `null` (0 ではない)。JWT で叩く `/app/*` と、`/status?detail=1` の呼び出し側の token は別枠なので記録しない |
@@ -106,6 +107,21 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 **secrets を出さない**: `/status` は集計だけで、issue のタイトル・本文・コメントは載せない。自由文は `last_error.what` とログの `note` だけ (どちらも `?detail=1` のみ)。
 これらと `console.log` は `src/redact.ts` を通し、PEM・`gh*_` / `github_pat_` の token・JWT・`Bearer …`・`sha256=…` と、実行時に分かっている secret (webhook secret・PEM・STORE_KEY・直近の installation token) を `[redacted]` にする。
 
+## 同時実行の上限の推定 (#2381)
+
+GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 など)。固定の `TARGET` だと、上限が下がったときに queued が際限なく積まれる。そこで tick ごとに run 数を観測し、上限を推定する (`src/saturation.ts` の純関数。GitHub への書き込みは増やさない)。
+
+- 観測: 全 event の run を `in_progress` (running) と `queued`・`pending`・`waiting` (queued) に数え、1 分ごとに 1 件を `meta/obs` に残す (24 時間で捨てる)。
+  記録するのは `fresh` な tick だけ (launch と同じ条件)。同期が古い間や一覧を打ち切った間は run 一覧が不完全で、偽の飽和を作り得るため記録しない。
+- 飽和: queued > 0 のまま running が**同じ値で 30 分続いた**とき、その値を `cap_est` とする。途中で running が変わればそこから数え直す。
+  連続する 2 件の観測の間隔が 2 分 (`SAT_GAP_MS`) を超えたら、その間は連続とみなさない (空いた後の streak は空きの後の観測から数える)。
+- 引き上げ: 推定の後の観測 (`cap_est` を決めた時刻以降) の peak が推定を超えたら、その peak に上げる (上限が上がった場合)。古い peak で押し上げ直さないよう、窓は推定を決めた時刻から始まる。
+- 期限: 推定を決めた (更新した) 時刻から 24 時間たって更新が無ければ推定を消す。
+- 目標: `target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))`。推定が無ければ `TARGET` のまま。`room = target_eff − active` (`active` は TARGET と同じ数え方)。
+- env: `QUEUE_MARGIN` (既定 10)、`TARGET_MIN` (既定 30)。`TARGET` は上限のままで、推定はそれを超えない。
+
+現行の `wrangler.toml` は `TARGET="50"` なので、推定が 40 以上のとき `target_eff` は 50 に張り付く (上限 60 でも 50 まで)。`TARGET` を 80 に戻すまでは、この上限が効く。
+
 ## 失敗した webhook 配送の回収と `/admin/resync` (#2339)
 
 - **再送**: GitHub は失敗した配送を自動で再送しない。tick は 5 分ごとに、App の JWT (`appJwt`。installation token とは別枠) で `GET /app/hook/deliveries?per_page=100` を 1 ページ読み、`status != OK` の配送を古い順に `POST /app/hook/deliveries/{id}/attempts` で再送する。同じ `guid` に OK の配送が 1 つでもあれば回収済みとみなして触らない。再送された配送 (`redelivery: true`) は、失敗しても再送しない (連鎖させない。元の配送の上限だけで止まる)。
@@ -129,7 +145,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 ## ファイル構成
 
 - `src/index.ts` Worker の入口 (対象外のイベントは DO を起こさず捨てる)。`src/do.ts` Durable Object `PmDO` (SQLite の `kv` 表 + alarm)。
-- `src/app.ts` HTTP 面 (`/webhook` `/setup` `/setup/callback` `/status` `/tick`)。`src/engine.ts` 同期・分類・launch・watchdog・status。`src/ratelimit.ts` `src/redact.ts` は #2338 の rate limit の解釈と自由文の redact (純関数)。
+- `src/app.ts` HTTP 面 (`/webhook` `/setup` `/setup/callback` `/status` `/tick`)。`src/engine.ts` 同期・分類・launch・watchdog・status。`src/ratelimit.ts` `src/redact.ts` は #2338 の rate limit の解釈と自由文の redact (純関数)。`src/saturation.ts` は #2381 の同時実行の上限の推定 (純関数)。
 - `src/webhook.ts` `src/classify.ts` `src/launch.ts` `src/hmac.ts` は純関数 (#1751 / #1795)。`src/pm.ts` (oc-pm の検出・抑止) と `src/needs.ts` (PM 判断を求める語彙) も純関数 (#2333)。
 - `src/store.ts` `src/route.ts` は #1882 の entity 単位の SQLite 増分保存 (`receiveWebhook`)。`src/kvstore.ts` は Engine が使う汎用の保管 (bucket/key)。
   Worker の本番経路は `index.ts` → `do.ts` → `app.ts` → `engine.ts` (kvstore)。`store.ts` / `route.ts` は #1882 のテスト (`test/route.test.ts`) で検証される増分保存の実装で、
@@ -143,7 +159,7 @@ cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd �
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 
-`npm ci` が要る (`test:unit` と `test:workers` は devDependencies の vitest を使う)。
+依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。既定設定の `pnpm install --frozen-lockfile` は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する (理由は『Workers Builds の接続状態と pnpm 経路』の節の release-age の項)。
 
 `npm run build` は bun、デプロイは wrangler を使う。wrangler は `login --device` がある版 (公式 docs の例は 4.119.0 の出力。VM は 4.151.0 で `--device` の存在を `wrangler login --help` で確認済み)。VM では root 不要で `$HOME/.local/bin` に置く
 (`npm install --prefix $HOME/.local/wrangler wrangler@<版>`、bun は npm の `bun` パッケージ)。
@@ -216,7 +232,9 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `LIVE_LAUNCH` | launch の `/oc` コメント投稿 (`POST /repos/{o}/{r}/issues/{n}/comments`) | `"1"` (2026-10-14〜。コードの既定は dry-run) |
 | `LIVE_DISPATCH` | `repository_dispatch` の送信 (`POST /repos/{o}/{r}/dispatches`)。`oc-watchdog` と、oc-pm 節の `oc-pm` (PM agent の起動) の両方。別スイッチは無い | `"1"` (同上) |
 | `LIVE` (旧) | 上の 2 つのうち、未設定のほうにだけ効く (両方の既定値) | (置かない) |
-| `TARGET` | 同時に走らせる run の目標 (room = TARGET − active) | `"50"` (暫定。80 に戻す作業は #2458) |
+| `TARGET` | 同時に走らせる run の上限 (room = target_eff − active。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"50"` (暫定。80 に戻す作業は #2458) |
+| `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
+| `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
 | `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"24"` (暫定。コードの既定は 3) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
@@ -254,7 +272,7 @@ Worker が送る type は `oc-watchdog` と `oc-pm` の 2 つだけ。`oc-watchd
 ## 再デプロイ (PM。VM に残した wrangler の OAuth)
 
 Worker のコード (`src/`・`wrangler.toml`) を変更して main に merge したら、PM が VM から再デプロイする。認証は初回デプロイで保存された OAuth を使う (wrangler が refresh token で access token を自動更新する)。
-Workers Builds は接続しない (後述)。デプロイするのは **main に merge 済みの commit だけ**。以下のコマンドは wrangler 4.151.0 で、`--help` とソース、認証なしで実行できるものは実行して確認した。実 Worker への実行は未確認の項目として最後に列挙する。
+Workers Builds の接続状態は後述の『Workers Builds の接続状態と pnpm 経路』を見る。デプロイするのは **main に merge 済みの commit だけ**。以下のコマンドは wrangler 4.151.0 で、`--help` とソース、認証なしで実行できるものは実行して確認した。実 Worker への実行は未確認の項目として最後に列挙する。
 
 1. 認証の確認 (token の値は表示しない・書かない)。
 
@@ -310,7 +328,20 @@ Workers Builds は接続しない (後述)。デプロイするのは **main に
 
 ## Workers Builds を接続しない理由
 
+> **注意 (#2585)**: 下の判断 (接続しない) は、2026-10-14 の実測で Workers Builds のビルド記録が見えた事実と食い違う。接続の有無と判断の見直しは PM (#2357) が決める。接続の状態と pnpm 経路の注意は次の節を見る。
+
 Workers Builds (Cloudflare 側に repo を接続し、main への merge で自動ビルド・デプロイする機能) は、既定ではビルド用の API token を Cloudflare がアカウントに**自動で発行**する (公式: <https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token>)。依頼者の指示 4・9 (無断で token を作らない・secrets を平文で保存しない) の趣旨に反しうるため、PM 判断 (2026-10-14、#2357 [CI-78]) で接続しないと決めた。代わりに、上の手順で PM が VM の OAuth を使って再デプロイする。引き換えに、merge から反映までは PM の操作を待ち、OAuth が失効している間は反映できない (稼働中の Worker は止まらない)。依頼者が判断を変えたら、#2357 を再開して判断する。
+
+## Workers Builds の接続状態と pnpm 経路 (#2585)
+
+- **Workers Logs (observability)**: `wrangler.toml` の `[observability]` (`enabled = true`) が無いと、`wrangler deploy` は Workers Logs を無効にする設定を送る。`[observability]` の table は消さない。
+- **pnpm 経路**: Workers Builds は、リポジトリ直下の `package.json` の `packageManager` (`pnpm@12.10.1`) から pnpm を選び、`infra/pm-worker` で `pnpm install --frozen-lockfile` を実行する。そのため `infra/pm-worker` は pnpm のプロジェクトにしてある。
+  - `pnpm-lock.yaml`: `package-lock.json` から `pnpm import` で作った。版は変えていない。`package-lock.json` は置かない。
+  - `pnpm-workspace.yaml` の `allowBuilds` (esbuild・workerd): pnpm 12 は既定で依存の build script を止める。無いと `ERR_PNPM_IGNORED_BUILDS` で install が落ちる。新しい依存が install script を持つときは、ここに足す。
+  - `infra/pm-worker/package.json` に npm の `packageManager` を書かない。pnpm 12 は npm 指定のプロジェクトで実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。
+- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。ただし既定設定の install は 2026-10-15 05:55Z まで失敗する。下の release-age の項)。
+- 2026-10-14 の時点で、Workers Builds の install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。merge 後の Workers Builds の結果は、この README では確認していない。
+- **pnpm 12 の release-age (既定設定では 2026-10-15 05:55Z まで install が失敗する)**: pnpm 12.10.1 は既定で `minimumReleaseAge` = 1440 分 (公開から 24 時間未満の版を拒否する)。`pnpm-lock.yaml` の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` は 2026-10-14 05:43Z〜05:55Z に公開された版なので、既定設定の `pnpm install --frozen-lockfile` は `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。3 件が 24 時間を過ぎる 2026-10-15 05:55Z 以降は既定設定で通る見込み (未確認)。それまでの診断は `--config.minimum-release-age=0` を付けた install で行える (診断用。README の手順にはしない)。`minimumReleaseAgeExclude` での除外や版の変更は入れていない (#2585 の範囲外。PM 判断)。Workers Builds が pnpm 12.10.1 の既定を使うなら、同じ失敗が出る (推定。未確認)。
 
 ## 確認できていない点 `[未確認]` のチェックリスト
 

@@ -9,7 +9,7 @@ fn	site	store_text	後続読み出し件数	後続書き込み件数	lea件数	�
 6c3700	6c3c78	mov dword ptr [rsp + 0x20], eax	0	0	0	-
 6c3d20	6c44bd	mov dword ptr [rsp + 0x20], eax	0	0	0	-
 6c5930	6c6125	mov dword ptr [rsp + 0x20], ebx	0	0	0	-
-76e720	76e74f	mov qword ptr [rbp + 8], rax	0	0	0	-
+76e720	76e74f	mov qword ptr [rbp + 8], rax	1	1	0	76e774 mov qword ptr [rbp + 8], rax | 76e778 mov rax, qword ptr [rbp + 8]
 775340	77545c	mov qword ptr [rbp + 0x90], rax	12	3	0	775657 mov r8, qword ptr [rbp + 0x90] | 7756ca mov qword ptr [rbp + 0x90], rax | 775707 mov rdx, qword ptr [rbp + 0x90]
 775340	77593b	mov qword ptr [rbp + 0x70], rax	2	0	0	7759f6 mov rcx, qword ptr [rbp + 0x70] | 775a29 mov rcx, qword ptr [rbp + 0x70]
 815050	815220	mov qword ptr [rbp + 0x128], rax	3	1	0	815227 cmp qword ptr [rbp + 0x128], 0 | 815231 mov rax, qword ptr [rbp + 0x128] | 81523c mov qword ptr [rbp + 0x128], rax
