@@ -49,6 +49,8 @@ def main():
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
                     help='この VA に入ったとき rcx/rdx の値と [rcx]・[rcx+0x28] を出す (最初の 20 回)')
+    ap.add_argument('-H', action='store_true',
+                    help='合成 host: rcx を SCRATCH+0x10000 の host に向け、[host]=vtable (0x40 スロット、全て ret stub)')
     a = ap.parse_args()
 
     data = open(a.pe, 'rb').read()
@@ -86,6 +88,24 @@ def main():
     for i, v in enumerate(a.a):
         uc.mem_write(rsp + 0x28 + 8 * i, struct.pack('<Q', v))
     uc.reg_write(UC_X86_REG_RSP, rsp)
+    rets = {}
+    if a.H:
+        host = SCRATCH + 0x10000
+        vtab = SCRATCH + 0x11000
+        obj = SCRATCH + 0x12000
+        otab = SCRATCH + 0x13000
+        uc.mem_write(host, struct.pack('<Q', vtab))
+        uc.mem_write(obj, struct.pack('<Q', otab))
+        for base, tab, nm in ((host, vtab, 'host'), (obj, otab, 'obj')):
+            for i in range(0x40):
+                sva = STUB + 16 * (k + i + (0 if nm == 'host' else 0x40))
+                uc.mem_write(sva, b'\xc3')
+                names[sva] = '%s.vtable[%#x]' % (nm, 8 * i)
+                uc.mem_write(tab + 8 * i, struct.pack('<Q', sva))
+                if nm == 'host' and i == 0:
+                    rets[sva] = obj
+        uc.reg_write(UC_X86_REG_RCX, host)
+        uc.reg_write(UC_X86_REG_RDX, host)
     for item in a.r:
         name, val = item.split('=')
         uc.reg_write(reg_id(name), int(val, 0))
@@ -112,7 +132,7 @@ def main():
             print(info)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
-            uc_.reg_write(UC_X86_REG_RAX, 0)
+            uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 
     def on_write(uc_, access, addr, size, value, ud):
         if len(log) < LOG_LIMIT:
