@@ -117,7 +117,7 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 ### 5-1. 差し戻し対応 (fix round 1) の検証
 
 - 検証は差し戻し時と同じコード (`10617273`) で行った。`provider`・`host`・`tests` は対応で変更していない (`git diff 1d71dd27 HEAD -- tools/python/provider tools/python/host tools/python/tests` = 0 行)。
-- emsdk: 上流から `emsdk install 6.0.12` で `$HOME/emsdk` に導入し、`emsdk activate 6.0.12` (`emcc --version` = 6.0.12)。`toolchain-emsdk` の素材は本 run では取得していない (`$HOME/artifacts` は `fl-win64` のみ)。次 run の素材指定は PR 本文の `oc_artifacts` 行。
+- emsdk: 上流から `emsdk install 6.0.12` でユーザー領域に導入し (`[EMSDK]` の symlink 先)、`emsdk activate 6.0.12` (`emcc --version` = 6.0.12)。`toolchain-emsdk` の素材は本 run では取得していない (`$HOME/artifacts` は `fl-win64` のみ)。次 run の素材指定は PR 本文の `oc_artifacts` 行。
 - `provider/build.sh` (EMSDK_ENV を上記に指定): real 1.301 s・警告 0 (出力は fl_table 行と flprov.js/wasm の 2 行のみ)。
 - `node tests/playlist_diff.mjs` (ビルド直後): calls 42・diffs 0・PASS・real 0.090 s。
 
@@ -147,7 +147,7 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 ### 5-2. provider_check の前段と NC
 
 - 前段 (同じ runner・同じ HEAD のコード): `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (real 5.530 s)、`fetch_inputs.sh` (rc 0・`work/midi.py` 等を配置)、`build_cpython_wasm.sh` (wasm 段 real 2 分 45.8 秒・rc 0。1 回目の試行は native 段が完了し wasm 段で止まった: real 1 分 50.7 秒・rc 1)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (real 5.954 s・rc 0)。
-- 1 回目の失敗の原因: `build_cpython_wasm.sh` は `/opt/emsdk/emsdk_env.sh` を固定で読み、この runner では存在しなかった (`source` が失敗して静かに終了)。`/opt/emsdk` を `$HOME/emsdk` への symlink にして解消した。repo の script は変更していない (runner 上の環境設定)。
+- 1 回目の失敗の原因: `build_cpython_wasm.sh` は `[EMSDK]` の `emsdk_env.sh` を固定で読み、この runner では存在しなかった (`source` が失敗して静かに終了)。`[EMSDK]` の位置を導入先への symlink にして解消した。repo の script は変更していない (runner 上の環境設定)。
 - `node tests/provider_check.mjs` (HEAD と同じコード): functions 435・implemented 85・unimplemented 350・mcp_static 60・PASS・real 0.36 s。
 
 **NC-P (provider_check)**: `provider/fl_engine.c:205` の `FL_H(playlist, isTrackMuteLock)` 行を削除して再ビルド。`gen_provider.py --check-handlers` は rc 0 で通過し (ハンドラ 84)、`provider/build.sh` も rc 0。`provider_check.mjs` は `AssertionError [ERR_ASSERTION]: 実装済みのはず: playlist.isTrackMuteLock が未実装` で rc 1 (FAIL)。元に戻して再ビルドした後は PASS (implemented 85)。ビルドの検査 (`--check-handlers`) は削除を検出せず、検出は provider_check の実装数検査だけが行う。
