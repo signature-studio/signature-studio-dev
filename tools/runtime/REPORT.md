@@ -237,4 +237,4 @@ index ee164c21..49382281 100644
      if (!r.refHash) f.push("出力 sha256 の基準が無い");
      if (r.bridgeLoaded !== r.finalSize || r.bridgeHandles !== r.bridgeLoaded) f.push(`bridge の登録数 ${r.bridgeLoaded} / 一意 handle ${r.bridgeHandles} が生存 entry ${r.finalSize} と一致しない`);
 ```
-- **HEAD (`114ee54e`) の e2e は再測定していない**。本 run の素材は `fl-win64` のみで、OTT の e2e を再現できなかった。PR 本文の `oc_artifacts: work-m6-ott analysis-ott-binaries toolchain-emsdk` が揃う run で再測定する。上の表の実測値は測定 commit `80b69fa2` のもの。
+- **コード HEAD (`114ee54e`。後続の `079dca82` は本節の文書のみ) の e2e は再測定していない**。本 run の素材は `fl-win64` のみで、OTT の e2e を再現できなかった。PR 本文の `oc_artifacts: work-m6-ott analysis-ott-binaries toolchain-emsdk` が揃う run で再測定する。上の表の実測値は測定 commit `80b69fa2` のもの。
