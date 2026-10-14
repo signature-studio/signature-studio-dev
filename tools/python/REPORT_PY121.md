@@ -31,7 +31,13 @@
   - `this = *(*(*(0x15e4790)) + 8)` (`0xd6a1b0`〜`0xd6a1c1`)。`general.safeToEdit` (0xd6a2c0) と同じ読み方 (REPORT_PY87 の観察と一致)。
   - 本体の対象 `V(0x15e0ff8)` (`0xd6a1d6`・`0xd6a026` で同じ global)。
 - `0xd843d0` が `task[+0x60]` を `*out` へ写す箇所は**未確認** (推定。写す処理を見ないと、out が -2 のまま返る経路の有無が言えない)。
-- 結果変換 `0xd82c20(code)`: `code ≥ 0` は `0xc38bc0` へ分岐 (戻り値は未同定。None と推定・推定と明記)。`code < 0` は別経路 (述語 `vtbl[+0x88]` を見る後段、`0xd82c6a`〜)。**述語偽 (-2) のときに Python 側が None を返すか例外を投げるかは未確定**。
+- 結果変換 `0xd82c20(code)` (入口で `[rbp+0x24]` = code、戻り値 rax は `[rbp+0x28]`。`pe_disasm.py d82c20` で確認):
+  - (a) `code == 0` (`0xd82c35`〜`0xd82c3a`): `0xd82c3c` で関数ポインタ (`call [rax]`、`[rip+0x860485]` 経由) を呼び、戻り値 rax の null を見る (真偽の述語ではなくポインタ返し)。非 null なら `0xd82c4a` で戻り値を 0 とし、`0xc38bc0` を呼ばずに `0xd82dda` へ戻る。null なら (b) と同じ経路 (`0xd82c55` → `0xd82c5c`)。
+  - (b) `code ≥ 0` (`0xd82c58`〜`0xd82c5a` の `jl` が成立しない。(a) の null を含む): `0xd82c5c` で `0xc38bc0` を呼び、その戻り値を `0xd82c61` で戻り値とする。
+  - (c) `code < 0` (`0xd82c5a` の `jl 0xd82c6a` が成立): `0xd82c6a`〜`0xd82c84` で `this` (`*(*(*(0x15e4790))+8)`) の `vtbl[+0x88]()` を呼ぶ。
+    - 偽なら `0xd82dd0` で引数を設定せず `0xc38bc0` を呼ぶ (rcx は述語呼出し後で未定義。(b) と同じ `0xc38bc0`)。
+    - 真なら `0xd82c8c`〜 の code 別の分岐へ進む。`-1`〜`-3` は `0xd82cce`〜、`-4` は `0xd82d3c`、`-5`〜`-8` は `0xd82d4e`〜`0xd82d84`、`-9` 以下は `0xd82d96`。どの分岐も RIP 相対の文字列を `0x4135e0` で `[rbp+0x38]` に書いたのち `0xd82da6` へ進み、`0x414000` → `call [rbx]` (rcx = `*(*(0x15e1140))`、rdx = 文字列。例外設定の形に見えるが、関数名と引数の意味は未同定) → `0xd82dc8` で戻り値 0 を返す。
+- 戻り値の意味は未確定 (`0xc38bc0` の戻り値は None と推定・推定と明記)。よって、述語偽 (`code < 0` かつ `vtbl[+0x88]` が偽) のときに Python 側が None を返すか例外を投げるかは、`0xc38bc0` の同定まで確定しない。述語真の経路 (c-真) は、code 別のメッセージを設定して 0 を返す形。
 
 ## getRecPPB の切替 (`0xd68d90`)
 
@@ -43,9 +49,10 @@
 
 ## 手段
 
+- 実行の cwd は全て `tools/python/` (`analysis/flapi/` は `tools/python/analysis/flapi/`)。
 - 展開: `mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` (2.9 秒・`extracted/block00031_PE.bin`)。
-- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_handler_probe.py clearLog dumpScoreLog processRECEvent getRecPPB` (entry と fn が flapi 表の `fn_va` と一致)。
-- 逆アセンブル: `python3 analysis/flapi/pe_disasm.py <VA 16 進> <命令数>` (本文の VA は全て、このコマンドで読んだもの)。
+- probe: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_handler_probe.py clearLog dumpScoreLog processRECEvent getRecPPB` (entry と fn が `analysis/flapi/flapi_kwargs.json` の `fn_va` と一致。`flapi_table.json` には `fn_va` が無い)。
+- 逆アセンブル: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_disasm.py <VA 16 進> <命令数>` (本文の VA は全て、このコマンドで読んだもの)。
 - RIP 相対の絶対アドレス = 次命令のアドレス + disp32 で手計算。検算: `0xd68d90`・`0xd68d9d` の 2 命令が同じ `0x15e4558` を指すこと、`0xd6a1b0`・`0xd6a000`・`0xd6a1d6`・`0xd6a026` の指す先が各々 `0x15e4790`・`0x15e0ff8` で一致すること。
 
 ## 検証
