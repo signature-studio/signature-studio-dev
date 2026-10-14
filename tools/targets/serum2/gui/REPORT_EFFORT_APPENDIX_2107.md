@@ -22,5 +22,6 @@
   - `gui/canvas/check_canvas_syntax.sh` (`-D__linux__` 補正なし): `canvas_bitmap.cpp` rc=0 errors=0、`canvas_graphicspath.cpp` rc=0 errors=0、`canvas_frame.cpp` rc=0 errors=0、`canvas_font.cpp` rc=0 errors=0、`canvas_graphicsdevice.cpp` rc=0 errors=0。script rc=0、所要 2.04 s real。load 1.21 (測定直前)。
   - `gui/canvas/check_concrete.cpp` (§13 のコマンド): rc=0。
   - `gui/check_wasm_syntax.sh` (seed 6): rc=0 errors=0。
-- 測定 commit `89495465` から HEAD までのコード差分: 空 (本節の commit が最後のコード変更)。
+- 測定 commit `89495465` から HEAD (`cdb3f89f`) までのコード差分: 空 (`git diff 89495465 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/check_wasm_syntax.sh` は 0 行)。
+- HEAD `cdb3f89f` での再実測 (2026-10-14 run、em++ 6.0.12、vstgui4_14_3 は `$RUNNER_TEMP` に clone し `gui/work` を使わず symlink で指定): `check_canvas_syntax.sh` の 5 ファイル rc=0 errors=0、script rc=0、elapsed 4.31 s、load 0.68 (開始時)。`check_concrete.cpp` rc=0。`check_wasm_syntax.sh` seed 6 rc=0 errors=0。
 - 差分の扱い (本 fix run の訂正): 前版の `22e33688` 測定は HEAD の `canvas_frame.*`・`check_concrete.cpp` を含まなかった。今回 HEAD 版を全て実測し直した (上記)。
