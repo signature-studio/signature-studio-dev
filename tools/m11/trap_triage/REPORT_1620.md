@@ -18,7 +18,7 @@
 | aa | 866 | 18 | 2 |
 
 - kind が変わる unit は 8 件: 134 (なし ok → aa oob)・144 (なし oob → 00 ok)・149・153・158・265・304 (oob → abort)・555 (oob → abort)。最初の分岐は unit 134 (埋め aa)。
-- 結果が埋め値に依存する = lift 側が書かれていない stack 領域を読んでいる。§19 の結論を survey で再確認した。
+- 結果が埋め値に依存する。推定: lift 側が書かれていない stack 領域を読んでいる (命令レベルでは未確認)。§19 の結論を survey で再確認した。
 
 ## 3. unit 134 (埋め aa) の trap 位置
 
@@ -44,28 +44,75 @@
 
 ## 6. C 呼出しなしの計装 (`tools/m11/trap_triage/trap_w1620.py`)
 
-- 方式: IR の全 store 54,041 件 (store 行の全数と一致、未マッチ 0) の直前に、「`0x10a9f910` の下位 4B が OLD と等しく、store 範囲がその 4B と重なる」を判定する。真なら、site 固有の OOB アドレス (`0xE0000000 + site`) への volatile load に `select` で差し替える。C 呼出し・新規 global は無い。site は trap の wasm 位置から引く (`sites_trap.json`)。
-- 陰性対照 (OLD = `0x1029e5d8`、unit 477 直前の値): 0..477 の全 unit で kind と frames が対照と一致 (差 0)。site trap は発火しなかった。unit 477 の trap は従来どおりの自然 OOB (`function_903d20` wasm[5371]:0x5c949c、`i64.load offset=0` = `*(arg-8)` の参照カウント読み)。
-- 陽性対照 (OLD = 0): unit 1 で発火 (W への初回書込みを検出)。検出機構は IR store に対して動く。OLD = 0 では 75 unit の kind が変わるが、これは trap で unit が止まるため。
-- 解釈: 0..477 の実行で、`0x10a9f910` の下位 4B が `0x1029e5d8` の間に、W と重なる IR store は実行されていない。よって unit 477 の `0x1029e5d8 → 2` (下位 4B) の書込みは、IR の store 経路ではなく、C 側 (`m11_simd.c`・`m11_rt.c`・`m11_win.c`・`m11_fnstubs.c`・shim の C、またはそれらの生成元) の書込みと推定する。根拠: IR の store は全数計装済み、`llvm.memcpy`/`llvm.memset` の呼出しは IR に 0 件。
+- 方式: IR の全 store 54,041 件 (store 行の全数と一致、未マッチ 0) の直前に、「`0x10a9f910` の下位 4B が OLD と等しく、store 範囲がその 4B と重なる」を判定する。真なら、site 固有の OOB アドレス (`0xE0000000 + site`) への volatile load に `select` で差し替える。C 呼出し・新規 global は無い。trap の wasm 位置から site を引く処理は未実装 (`sites_trap.json` は site → fn・line・store のみ。wasm 位置は持たない)。
+- 陰性対照 (OLD = `0x1029e5d8`、unit 477 直前の値): 0..477 の全 unit で kind と frames が対照と一致 (差 0)。site trap の発火は見られなかった。
+  - 判定基準: 対照 (計装なし・同じ経路) と、各 unit の kind と frames (wasm 関数名の列) が一致すること。wasm offset は計装でコードサイズが変わるため比べない。判定は関数単位なので、同一関数内の先行発火は区別できない。
+  - unit 477 の trap は従来どおりの自然 OOB と推定 (`function_903d20` wasm[5371]:0x5c949c、命令は `i64.load offset=0` と推定 = `*(arg-8)` の参照カウント読み。命令種は未確認)。
+- 陽性対照 (OLD = 0): unit 1 で `ok → oob` (`memory access out of bounds`) で発火 (W への初回書込みを検出)。検出機構は IR store に対して動く。OLD = 0 では 0..477 の 69 unit の kind が変わる (oob 75 件。`SURVEY_UNITS` の `oob: 75` と同じ run)。全 942 unit では 115 unit (ok→oob 106、halt0→oob 7、miss→oob 1、other→oob 1)。kind が変わるのは、発火した unit が trap で止まるため。942 unit の数は差し戻し (round 1) のレビュー run が同じ計装で再現した値 (本 PR での再測定ではない)。
+- 解釈: 0..477 の実行で、`0x10a9f910` の下位 4B が `0x1029e5d8` の間に、W と重なる IR store は実行されていない。よって unit 477 の `0x1029e5d8 → 2` (下位 4B) の書込みは、IR の store 経路ではなく、C 側 (`m11_simd.c`・`m11_rt.c`・`m11_win.c`・`m11_fnstubs.c`・shim の C、またはそれらの生成元) の書込みと推定する。根拠: IR の store は全数計装済み、`llvm.memcpy`/`llvm.memset` の呼出しは IR に 0 件。「C 側」は推定。IR に store として無い書込みの候補は、ほかに 2 つ残る (棄却していない): 機械語 store の lift 脱落、closure 外の関数。
 
 ## 7. 含意
 
 - D17 (IR の qword store が 4B に縮退) の仮説は、unit 477 の下位 4B 書込みには当てはまらない (その書込みは IR store ではない)。
-- 残る構図: 上位 4B の `1` は 477 より前の 8B 書込み (`0x1_1029e5d8`、§14) の残り。下位 4B だけを後から C 側が書き、上位が残る。「上位が残る」は埋め値依存 (§2・§19) と整合する。
-- 次の手順 (子 issue に分割): (a) C 側の書込み主体を特定する。C 呼出しを増やさない方式 (C 側で「W と重なる & 下位 4B == OLD」のとき不正アドレスへ書いて trap) で、対応する C 関数を絞る。(b) 陽性対照を先に取る。(c) 0..477 の kind と frames が計装なしの基準と一致することを実測で確認する。
+- 残る構図 (推定): 上位 4B の `1` は 477 より前の 8B 書込み (`0x1_1029e5d8`、§14) の残り。下位 4B だけを後から C 側が書き、上位が残る。「上位が残る」は埋め値依存 (§2・§19) と整合する。
+- 次の手順 (子 issue に分割): (a) C 側の書込み主体を特定する。C 呼出しを増やさない方式 (C 側で「W と重なる & 下位 4B == OLD」のとき不正アドレスへ書いて trap) で、対応する C 関数を絞る。(b) 陽性対照を先に取る。(c) 0..477 の kind と frames が計装なしの基準と一致することを実測で確認する。(d) IR に store として無いことを判定する: 機械語 store の lift 脱落・closure 外の関数を候補に含め、棄却または特定する (#2672)。
 
 ## 8. 受入条件の判定
 
 | # | 条件 | 判定 |
 |---|---|---|
-| 1 | 書込み元 store の IR site | 未達。IR store 経路ではないと判明 (§6)。C 側の書込み主体は未特定 (子 issue) |
+| 1 | 書込み元 store の IR site | 未達。IR store 経路ではない見込み (§6)。書込み主体は未特定 (子 #2672) |
 | 2 | D17 か別類型か | 未達。unit 477 の書込みは IR 縮退 (D17) に当たらない見込み (§7) |
 | 3 | 修復後の回帰 | 未達 (修復未実施) |
 
 ## 9. 差分 0 の証跡 / 再現
 
 - 測定 commit `2ba1bce8`: 追加は `tools/m11/trap_triage/trap_w1620.py` のみ。`git diff --stat f4fa48f9 HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_rt.c tools/m11/m11_win.c tools/m11/trap_triage/survey_units.mjs tools/m11/ldfix` の出力は空 (既存コードの差分 0)。
+- 修正 commit `debd55d0` (表示と docstring のみ。計装ロジックは不変)。`git diff 2ba1bce8 HEAD -- tools/m11/trap_triage/trap_w1620.py` の出力 (`debd55d0` 時点で確認。以後この範囲は変えていない):
+
+```diff
+diff --git a/tools/m11/trap_triage/trap_w1620.py b/tools/m11/trap_triage/trap_w1620.py
+index 799cc5cd..c171bab2 100644
+--- a/tools/m11/trap_triage/trap_w1620.py
++++ b/tools/m11/trap_triage/trap_w1620.py
+@@ -2,7 +2,7 @@
+ """trap_w1620.py (#1620): 監視番地 W への「上書き元」を、C 関数呼出しを使わずに捕まえる IR 計装。
+   W の下位 4B が OLD (既定 0x1029e5d8, unit 477 直前の値) で、store 範囲が W と重なるとき、その store を
+   site 固有の OOB アドレス (0xE0000000 + site) への volatile load に差し替える。
+-  → survey の trap frame (wasm offset) から site を引ける。計装は select と load だけで C 呼出しを含まない
++  → trap の wasm 位置から site を引く処理は未実装 (sites_trap.json に wasm 位置は無い)。計装は select と load だけで C 呼出しを含まない
+      (watch_store_682.py の m11_sw 呼出しは unit 304 の結果を変えた: REPORT_1046 §20)。
+   usage: trap_w1620.py [--src work/boot_final3.ll] [--out work/probe1620] [--w 0x10a9f910] [--old 0x1029e5d8]
+   出力: <out>/boot_trap.ll と <out>/sites_trap.json (site -> {fn, line, store})。"""
+@@ -19,15 +19,17 @@ OLD = int(opt('--old', '0x1029e5d8'), 0)
+ os.makedirs(out, exist_ok=True)
+ 
+ STORE = re.compile(r'^(\s*)store (.*), ptr (nonnull )?(%[-a-zA-Z$._0-9]+|@[-a-zA-Z$._0-9"]+|inttoptr \(i64 (-?\d+) to ptr\)|null)(, align \d+)?\s*$')
++STORE_ANY = re.compile(r'^\s*store ')
+ DEF = re.compile(r'^define [^\n@]*@([-a-zA-Z$._0-9"]+)\(')
+ WIDTH = {'i1': 1, 'i8': 1, 'i16': 2, 'i32': 4, 'i64': 8, 'ptr': 4, 'float': 4, 'double': 8}
+ 
+ lines = open(src_path).read().split('\n')
+-outl = []; fn = '?'; site = 0; sites = {}; skipped = 0
++outl = []; fn = '?'; site = 0; sites = {}; unmatched = 0
+ for ln, line in enumerate(lines, 1):
+     m = DEF.match(line)
+     if m: fn = m.group(1)
+     s = STORE.match(line)
++    if not s and STORE_ANY.match(line): unmatched += 1
+     if not s or fn == '?':
+         outl.append(line); continue
+     ind, vs, ptr = s.group(1), s.group(2), s.group(4)
+@@ -49,4 +51,4 @@ for ln, line in enumerate(lines, 1):
+     ]
+ open(os.path.join(out, 'boot_trap.ll'), 'w').write('\n'.join(outl))
+ json.dump(sites, open(os.path.join(out, 'sites_trap.json'), 'w'), indent=1)
+-print(f'trap sites: {site} (skipped 0)')
++print(f'trap sites: {site} (unmatched store lines: {unmatched}; 計装されない store)')
+```
+
+- 出力一致: 同じ入力 (main 側の作業ツリーにある `tools/m11/work/boot_final3.ll`、21 MiB) で旧版と新版を走らせ、`boot_trap.ll` の sha256 は両方 `517da10a…`、`sites_trap.json` は両方 `45ab0c1e…` (一致)。表示は `unmatched store lines: 0`。旧版の `(skipped 0)` は常に 0 の固定値で、未マッチ件数ではなかった。合成入力 (`!tbaa` 付きの store を 1 件含む) では `unmatched store lines: 1` を出すことを確認。
+- 確認: `grep -cE '^\s*store ' work/boot_final3.ll` = 54,041 = `sites_trap.json` の件数 (未マッチ 0 の判定は、この 2 数の一致で行う)。
 - 計装 build は `work/` にだけ置き、各回の後に `m11_build.sh` で基準へ戻した (restore rc 0 を 4 回確認)。`git status` に `work/` 以外の差分なし。
 - 再現 (`CF` は `store_watch_2270.sh` と同じ `-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=0 -DM11_OV_CLASSCREATE=0 -I.`):
   1. `python3 trap_triage/trap_w1620.py --out work/probe1620 --old 0x1029e5d8`
