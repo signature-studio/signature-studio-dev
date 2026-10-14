@@ -119,3 +119,61 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
   そのため「ページ跨ぎで欠落が無い」とは断定せず、その時点の 1 スナップショットの一致として扱う。
 - `status=completed` は GitHub API の 1000 件上限があるため、本ツールは使わない (対象は実行中の 4 状態のみ)。
 - 件数が 100 件を超える状態の再現は、本 run ではできなかった (実行中 run が 50 件前後)。
+
+## 10. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
+
+既知類型との関係: 該当なし (lift の欠陥ではなく PM 運用ツール)。使い方と数え方の定義は [`README.md`](README.md) の `idle_report.sh` の節。
+
+- 測定 commit: `f10dfd36` (コードを変えた最後の commit)。それ以降の `tools/pm/idle_report.sh` `tools/pm/test_idle_report.sh` の差分: `git diff f10dfd36 HEAD -- tools/pm/idle_report.sh tools/pm/test_idle_report.sh` の出力は 0 行。
+- 環境: runner (4 コア)。load average は各測定の直後の `/proc/loadavg` の 1 分値。
+
+### 10-1. fake gh のテスト (`bash tools/pm/test_idle_report.sh`)
+
+| 項目 | 結果 |
+|---|---|
+| 判定数 | 41 件中 41 PASS・0 FAIL (3 回とも同じ) |
+| 所要 (n=3) | 8.0〜8.3 秒 (load 0.36〜0.57) |
+| (a) idle=0 が 10 標本 | 0 回 |
+| (b) idle>0 が 14 分 (ネガコン) | 0 回 (区間 14 分)。`--threshold-min 14` なら 1 回 |
+| (b2) idle>0 がちょうど 15 分 | 1 回 (境界は数える) |
+| (c) idle>0 が 16 分 | 1 回 (区間 16 分・標本 9 件・最大 idle=3) |
+| (d) idle=0 を挟む | 16 分 + 0 + 16 分 → 2 回。10 分 + 0 + 10 分 → 0 回 (区間 2 つ、合算しない) |
+| (e) `X-Ratelimit-Remaining` | 1,499 → 終了コード 3・標準エラーに `X-Ratelimit-Remaining=1499`・JSON は出さない。1,500 → 続行。jobs 応答だけ 1,499 でも中断 |
+| 全ページ・窓の分割 | `per_page=2`・窓 1 時間で、窓の境界をまたぐ 20 分の区間を 1 回・標本 6 件 (欠落・重複なし)・`page=2` を取得 |
+| 窓の上限 | `total_count` が 1,000 超 → 終了コード 4 |
+| REST のみ | gh の呼び出しは全て `api <path>`。graphql の呼び出し 0 件 (fake gh は graphql を exit 99 にする) |
+
+ネガコン (実装を 1 行壊して FAIL を確認。コピーに対して実施):
+
+| 壊し方 | FAIL した判定 |
+|---|---|
+| 区間の判定 `>=` を `>` に | 3 件 (b の閾値 14 分・b2・ANSI 付き 15 分) |
+| 残量の検査を無効化 | 4 件 (e の全部) |
+| idle=0 で区間を閉じない | 3 件 (d の全部) |
+
+### 10-2. 実データの確認 (`signature-studio/signature-studio-dev` の REST)
+
+2026-10-14T12:42Z に取得。`--since 2026-10-14T10:00:00Z --until 2026-10-14T12:30:00Z --bucket hour --events` 既定 (3 event)。
+
+| 項目 | 値 |
+|---|---|
+| run 一覧 (3 event・重複除去後) | 155 件 (うち oc-fix 19・watchdog job が cancelled でログ無し 12) |
+| 標本 | 124 件 (idle>0: 112 件・最大 idle=19・最長の標本間隔 4.97 分・15 分超の間隔 0 回) |
+| idle>0 が 15 分以上続いた回数 | 1 回 (10:00:33Z〜12:07:40Z の 127.12 分) |
+| 同 (`excluding_stuck_labelled`: STUCK_LABELLED の行数を引いた idle) | 2 回 (11:10:04Z〜11:25:52Z の 15.8 分と 11:34:59Z〜12:07:40Z の 32.68 分) |
+| 所要・API | 143 秒 (load 0.19)・276 回・`X-Ratelimit-Remaining` の最小 3,954 |
+| `--cache` 付きの 2 回目 | 7 秒・API 4 回 (cache_hits 136) |
+
+- 別算法の検算: 取得した標本 (`--cache` の JSONL) を Python で集計し直した (時刻順に idle>0 を畳む。ツールの jq とは別の実装)。
+  通常の idle は 1 回 (127.12 分)・stuck 除外は 2 回 (15.8 分・32.68 分) で一致した。
+- この期間は oc:stuck の PR が残っており、通常の idle は 127 分連続で 0 にならなかった。stuck 除外の値で soak を判定する理由は README に書いた。
+
+### 10-3. 検証範囲・未解決
+
+範囲外: `schedule` の run は実リポジトリで 0 件 (cron が発火していない) のため、実ログでの確認は `push`・`repository_dispatch` のみ。
+レート制限の中断と 1,000 件上限は fake gh でだけ確認した (実 API で残量を 1,500 未満にはしていない)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `schedule` の run の実ログ (watchdog job の idle 行) を未確認 | cron が発火し始めたとき、標本が読めない可能性 (読めなければ `runs.skipped.no_idle_line` に数えるので気づける) | #2355 (timer 停止の手順書) の soak 開始時の確認項目としてコメント |
+| soak の合格ライン (何日・何回までを許すか) は未決 | ツールは回数を出すだけで、判定はしない | #2355 にコメント (判定は PM) |
