@@ -154,6 +154,31 @@ FL_H(channels, fillEachNSteps) {
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
+/* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす (生成条件は未確定)。
+ * 既定値は stub の並び (param 0..7 = pitch 60・velocity 100・release 64・fine pitch 120・pan 64・mod X 64・mod Y 64・ticks 0)。
+ * 構造体が無い・param が 0..7 の外は -1 (PE: 構造体 NULL で -1)。param 8 (PE: byte +0x11) は既定値未確定のため未モデル (-1) */
+static const int64_t step_def[8] = {60, 100, 64, 120, 64, 64, 64, 0};
+static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
+    if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 7) return -1;
+    return step_def[prm];
+}
+/* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
+FL_H(channels, getCurrentStepParam) {
+    NARGS(3, 4);
+    int64_t step = A_INT(1, 0), prm = A_INT(2, 0);
+    (void)A_INT(3, 0);
+    CH(0);
+    return fl_ret_i(c, step_param(k, step, prm));
+}
+/* PE 0xd5ba00: 5 引数 (padsStride 既定 16)。padsStride 0 は Range error。対象 channel は list[step / padsStride + offset]、位置は step % padsStride + startPos */
+FL_H(channels, getStepParam) {
+    NARGS(4, 5);
+    int64_t step = A_INT(0, 0), prm = A_INT(1, 0), off = A_INT(2, 0), st0 = A_INT(3, 0), pads = A_INT(4, 16);
+    if (pads == 0) return fl_err(c, FL_E_RANGE, "Range error");
+    int64_t q = step / pads, idx = q + off;
+    if (idx < 0 || idx >= nch) RANGE();
+    return fl_ret_i(c, step_param(&ch[idx], step - q * pads + st0, prm));
+}
 
 /* ---- mixer (19) ---- */
 /* 色の R/B 入替え (PY-115 / REPORT_PY115.md §2)。格納は入替え + alpha 0xff、取得は入替えを再度通して alpha 0xff。 */
