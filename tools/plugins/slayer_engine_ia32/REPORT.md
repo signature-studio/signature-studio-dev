@@ -231,8 +231,8 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 - 範囲: これは closure 2 (8 関数) のみ。 受入 1 の「.text 全体 (73,002 B)」は未達 (#1098)。 x87 の意味論は未実装 (#1099)。 gate C1〜C4 は本節では通していない。
 - 注意: `0x10001300` (opcode dispatcher) を root にした場合の jump table 検証は `tools/ott/REPORT.md` §14 を参照。
 
-## 11. .text 全体の ia32 lift (#1098、測定 commit `85c51739`)
+## 11. .text の ia32 lift (#1098、測定 commit `c6b52428`)
 
-- 結論: 起点を export・`.rdata`/`.data` の関数ポインタ (243)・code 即値 (10) とし、直接 call を再帰降下して **465 関数・命令 20,632** を lift。 `.text` の被覆は **84.46%** (61,654 / 73,002 B)。 未被覆 11,348 B は 239 区間で、受入 1 の「全体」は未達 → 子 #2814 (PLG-G2-22)。
-- `emcc -c` rc 0 (594,830 B)。 jump table 22 本 (case 181) は生データと 22/22 一致、絶対 disp32 の IAT 参照 75 件は import 名と 75/75 一致 (ネガコンはいずれも FAIL)。 gate C1〜C4 は PASS (n=3, 634〜640 ms)。
-- 関数境界の根拠、被覆の内訳、x64/closure 2 の回帰、未解決は `REPORT_APPENDIX_1098.md` (§1〜§7)。
+- 結論: `.text` の大部分を ia32 x64c で lift した (起点は export・関数ポインタ・code 即値、直接 call の再帰降下)。 「全体」は未達で、残りの未被覆域は子 #2814 (PLG-G2-22) へ。
+- 未解決の `sahf` の AF 未反映と `fs:` の 0 埋め模型は silent divergence の候補で、#1223 へ送る (付録 §7)。
+- 測定値・区間内訳・再現手順は [REPORT_APPENDIX_1098.md](REPORT_APPENDIX_1098.md) (数値の正本は付録 §2・§3)。
