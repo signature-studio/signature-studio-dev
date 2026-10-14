@@ -164,7 +164,7 @@ e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome →
 検出は起動時に 1 回、結果を `window.__webstudio` 契約側へ公開する想定 (契約は未実装)。Firefox 固有の注意: 非 shared memory64 の大域 grow が遅い (REPORT.md の RT-9 節) ため、memory64 を使う場合は shared かつ事前確保を優先する。
 
 ## 5. 未解決・要確認
-1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Firefox の AudioWorklet / Worker WebGL2 は headless で判定不能。
+1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Firefox の AudioWorklet / Worker WebGL2 は headless で判定不能 (Worker WebGL2 は Xvfb 非 headless で判定できた。REPORT.md RT-9)。
 2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は RT-10 (#128) で実測済み (x64c boot 連鎖。数値は [`rt10/REPORT.md`](rt10/REPORT.md))。合成からの外挿との差もそちら。
 3. 本番 FL ビルドを pthread 化した boot e2e: shim MT 自己テストでは実証済み (RT-2 #120, 実測は REPORT.md)。実 FLEngine lift での確認は未実施。
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU での OffscreenCanvas 性能は未測定。
