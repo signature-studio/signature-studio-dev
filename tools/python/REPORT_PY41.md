@@ -196,7 +196,7 @@
 
 - 測定: `analysis/py53_dispatch.py` (capstone・4,664 命令) と `analysis/py60_objdump_check.py` (objdump 2.42 で独立に取得)。素材 `fl-win64` は `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で展開 (2.5 秒)。
 - 照合: jcc/jmp の辺 **614 件** を capstone と objdump で比べ、**一致 614・不一致 0** (exit 0)。
-- 戻り値 `[rbp+0x584]` の書込みは 3 箇所のみ: 0x1046d79 (`= -1`)・0x104cc6b (`= eax`、直前 0x104cc65 の `eax = [rbp+0x5b8]`)・0x104ccba (読出し、ret 値)。
+- 戻り値 `[rbp+0x584]` の書込みは 2 箇所のみ: 0x1046d79 (`= -1`)・0x104cc6b (`= eax`、直前 0x104cc65 の `eax = [rbp+0x5b8]`)。読出しは 0x104ccba (ret 値) の 1 箇所。
 - `[rbp+0x5b8]` の書込みは **74 箇所** (`mov dword ptr [rbp+0x5b8], reg`)。個々の式は未確定 (子 issue)。
 - 出口の入辺 (実測):
   - 0x104cc65 (`[rbp+0x5b8]` を読む): 0x104cc39 の `je` (r8d&0x80 = 0) と、0x104cc60 からの fall-through。
