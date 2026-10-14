@@ -239,3 +239,8 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 - factory 未実装の原因: `platformfactory.h` → `platformfwd.h:36` が `static_assert (false, "unknown platform")` で止まる。`vstguibase_emscripten.patch` は `WASM 1` のみで `LINUX` を立てないため。factory の 20 関数はこの分岐が決まるまで実装・検証できない (#2139)。
 - 未検証: リンク・実行・描画 (#2065 の範囲)。
 - 測定 commit: `c9a7329a` (コードを変えた最後の commit。本節の REPORT 修正は含まない)。
+
+## 13. 2026-10-14 run (#2107 / SR-39): canvas platform の font・graphicsdevice (wasm)
+
+- 結論: font 7 + graphicsdevice 31 (計 38 関数) を wasm 実装。構文検査は測定 commit `89495465` で 5/5 rc=0、具象性検査 (`check_concrete.cpp`) rc=0。リンク・閉包確定・描画は未実施 (#2065)。
+- 詳細・実測・測定 commit と差分: 付録 `REPORT_EFFORT_APPENDIX_2107.md` (本節の全文)。
