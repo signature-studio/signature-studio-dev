@@ -154,3 +154,29 @@
 - 負荷下の 30 分ソークは本 run では未実施 (§16.2 が最新)。
 
 鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `c2f67568` → HEAD の `git diff --stat c2f67568 HEAD -- tools/audio` は REPORT_AU10.md のみ (下記 PR 作成時点で確認)。
+
+### 16.8 AU-21 (#1570) 切り分け 4: head `429f36bd` (clock_jump の計上分離)
+
+測定 commit: `429f36bd` (origin/main `54bacdc0` 起点の worktree `ws-1570`)。コード変更は worklet の計上分離と、それを読み出す C/TS 表・snapshot・harness 表示の追加: `clock_jump_frames` の符号付き合計に加え、正の成分 `clock_skip_frames` (描画されなかったフレーム)・負の成分の絶対値 `clock_dup_frames`・1 回の最大 jump `clock_jump_max` と発生 quantum 番号 `clock_jump_max_q` を追加 (`pad2` の未使用領域、既存オフセットは不変)。C 表 (`flaudio.h` / `flaudio.c`)・TS 表と snapshot (`audio-layout.ts` / `audio-shim.ts`)・harness 表示 (`run.mjs`) を同時更新。環境: GitHub runner 4 core / 15 GiB, headless google-chrome 154, `bash tools/audio/build.sh` OK (3.1 s, emcc 6.0.12, [EMSDK] 既存)。生ログは `tools/audio/work/soak10/` (gitignore)。
+
+| 試行 | 結果 | 所要 / load (開始→終了, UTC) |
+|---|---|---|
+| `--soak 10` 1 回目 (build 直後) | PASS: underruns 0, ramp 0 / 480,512 f, T=1536, cb_max 3,140 µs, jumps 0 (skip 0 / dup 0) | 64.3 s / 0.07 → 0.02 (14:34:36〜14:35:40) |
+| `--soak 10` 2〜4 回目 | 3/3 PASS: underruns 0, ramp 0 / 480,512〜481,024 f, T=1536, cb_max 114 / 409 / 79 µs, jumps 0 (全 3 回) | 3 回合計 189 s (15:06:24〜15:09:35) |
+| **`--soak30` (1800 s, 無負荷)** | **PASS**: underruns 0, silence 0, ramp 0 / 86,404,352 f, workletErrors 0, cb 337,515 回 late 0, **cb_max 155 µs**, T=1536, dev_fill 1024/1308/1536, lat_changes 0, secs_wall 1800.08, **clock_jumps 2 / clock_jump_frames 0 (skip +128 f ×1, dup −128 f ×1, max 128 f @ quantum 274,688)** | 1801.6 s / 0.02 → 0.00 (14:36:00〜15:06:01) |
+
+判定:
+- 30 分ソーク (無負荷) の通算は 6 回 (`d7d91d2`・`12586095`・`60932d35`・`5229fe5f`・`c2f67568`・`429f36bd`)。cb_max は 184 / 169 / 475 / 344 / 385 / 155 µs で、いずれも 1 ms 未満。ms 級 spike は未再現。
+- clock_jumps (新計上): 本試行の 2 件は「描画されなかった 1 quantum (+128)」と「重複 1 quantum (−128)」で、符号付き合計 0 のため従来の `clock_jump_frames` には 0 として現れていた。通算 6 回の 30 分試行の件数 4 / 14 / 2 / 8 / 4 / 2 はすべて偶数で、符号付き合計は全て 0。「±の組で出る」仮説と整合するが、この 1 試行では 2 件が隣接していたか未確認 (`clock_jump_max_q` は最初の 1 件のみ記録)。ramp は全フレーム bit-exact で、データ欠落の証拠は無い。**発生源 (ブラウザ描画時刻のずれか、計測側か) は未特定**。
+- 10 秒ソーク FAIL: 本 head では 0/4 回 (初回含む)。通算 (head `57519ca`〜`429f36bd`) で 2/35。原因は**未特定**。初回 run の cb_max 3,140 µs は FAIL 試行の 174 ms とは桁が異なり、関係は未確認。
+- 負荷下の 30 分ソークは本 run では未実施 (§16.2 が最新)。
+
+未解決:
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 10 秒ソーク FAIL の原因 (通算 2/35) | 30 分実測の信頼性 | #1570 (再現待ち。FAIL 時は `clock_jump_max_q`・dev_fill・underrun を採取) |
+| clock_jumps の発生源: 2 件の隣接性と、±組の仮説の検証 (30 分試行を追加して全件の位置を取る必要あり) | 「実スキップか計測か」の切り分けが未完 | #1570 |
+| 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock/ spike は未計測 | #1570 |
+
+鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `429f36bd` → HEAD の `git diff --stat 429f36bd HEAD -- tools/audio public/worklets src/runtime` は REPORT_AU10.md のみ (修正 commit 時点で確認。e2e が取り込むのは `build.sh` が cp する `public/worklets/fl-audio-worklet.js` と、トランスパイルされる `src/runtime/`)。
