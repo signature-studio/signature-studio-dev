@@ -103,3 +103,14 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 受入条件の判定: 1 (間接 call の解決) **部分達成** (3 件は前回どおり RaiseException、1 件は格納 0 のみ確認、残り 19 件は未解決)。2 (`slot_no_store` の格納元まで辿る) **未達** (`.bss` 5 件は PE 内に格納が無く、「解決不能」の理由は上記)。3 (19245 も同じ判定) **達成** (同一構成)。4 (reason 反映・#529 へ報告) **未達**: 解決の範囲が 3 件 + 1 件の確認で、waiver の reason を書き換える根拠が不足するため、判断材料を本節に残し、waiver は変更しない。
 - 再現 (8a06cad5): `python3 tools/plugins/f2/indirect_resolve.py 19148` / `19245` の `classification`、および `python3 tools/plugins/f2/raise_reach_frontier.py 19148` / `19245` (= visited 31・indirect 23・unresolved 1・raise_api 1)。
 - 次の段 (未解決の起票先: #1499 の残件として本 issue で追跡): 実行時に slot へ書く経路 (`0x8bd2f0` の参照元の関数表、`0x8bf0a0` の書込み元) を 2 段以上追う解析。これは静的 1 段の範囲を超えるため、別の解析 (動的トレース) が要る。
+
+## 8. PLG-F3-13 (#1656): slot_no_store の 2 段目解析 (部分)
+
+- 道具: `tools/plugins/f2/slot_base_store.py` を追加。`.bss` slot を含むグローバル構造体の base を `lea reg,[rip+base]` で取り (base = slot - 0x100 .. slot)、同じ関数内の `mov [reg+disp], X` (disp = slot - base) の格納元を集める。unicorn は未使用 (導入はしたが、本段は静的で足りた)。
+- 測定 (基準 origin/main 1c57d524、19148 と 19245 は同一構成):
+  - 19148 `slot_no_store` 5 件: `0x8c3ca8` は base `0x8c3c80` (disp 40) の lea 3 件・同関数内の格納 1 件 (`0x4113f2`: `mov [r13+0x28], rax`、関数 `0x411330`)。`0x8bf3d8` は base `0x8bf3b0` の lea 3 件・格納 0 件。`0x8bf068`・`0x8bf048`・`0x8bf040` は base 候補 0 件。
+  - 19245 `slot_no_store` 5 件: `0x8aeca8` (= `0x8c3ca8` と同型、格納 1 件 `0x4113f2`)、`0x8aa3d8` (格納 0 件)、`0x8aa040`・`0x8aa048`・`0x8aa068` は候補 0 件。
+- `0x4113f2` の格納値は `rax = [rbx]` (呼出し元が渡すポインタ先の値) で、定数でも関数 VA でもない。格納先 r13 は `[rbp+0x170] < 2` で `0x8c3c80` か `0x8c3da8` に分岐する。よって `0x8c3ca8` の内容は呼出し元の引数で決まり、PE 内の静的解析からは決まらない。
+- 判定: 受入条件 1 (slot_no_store の書込み元) は **部分達成**。書込み元 1 件 (`0x411330`) を特定したが、その値は実行時依存のため、呼出し先は未確定。残り 4 件 (`.bss`) は PE 内に格納 0 件で、2 段目でも書込み元なし。解決不能の理由: 格納は PE 外 (実行時の別モジュール・別経路) で行われる可能性が高い。
+- 未達 (次の段): `object_or_register_based` 14 件の vtable 型確定 (受入条件 2・3) は未着手。実行時トレース (unicorn で `0x411330` の呼出し経路を再現) が必要で、本 run では時間が足りない。
+- 再現: `python3 tools/plugins/f2/indirect_resolve.py 19148` / `19245` (classification は §7 と同じ) と、`python3 tools/plugins/f2/slot_base_store.py 19148 0x8c3ca8 0x8bf068 0x8bf048 0x8bf3d8 0x8bf040`。
