@@ -70,6 +70,23 @@
 - 注意: これらはいずれも「外すと lift 版 (RetDec・既知の D7 型欠陥) に戻って壊れる」結果であり、faee5b6 が退行を起こしたことの実証ではない。今回の D は 467c40 override を外す単独の変化。boot5 (25 関数の lift 追加) と 467c40 の組み合わせ分解はしていない。ov.o は gate 変更でキャッシュ無効化され再コンパイル済み。
 - 受入 2 (`_CopyArray` kind 12) は今 run では未実施 (子 issue #1511 で扱う)。
 
+### #1141 再実行 (run 4): boot5 と 467c40 の組み合わせ分解 (測定 commit 3d21715b = origin/main)
+
+起点 `3d21715b` (origin/main) で worktree `ws-1141` を作成。`work-m11` を `tools/m11/work/` に展開 (アーカイブが `tools/m11/work/` を含んでいたため一段戻して配置)、PE は `$RUNNER_TEMP/win64/extracted/block00031_PE.bin` (sha256 b2c64da4…)。`work/lift_pe.sha256` は PE の sha256 を手で書いた差分経路 (前回までと同じ限界)。load は各実行とも 0.6〜1.0 程度。
+
+| 構成 | IR sha256 (先頭 8) | units_run | 停止 | survey ok/trap/miss/clobber | e2e 所要 | rc |
+|---|---|---|---|---|---|---|
+| baseline (3d21715b, boot5 あり, gate 無し) | 6909f85d | 53 | `unreachable` @ function_8c5eb0 | 872/23/46/0 | 170 s | 0 |
+| I: boot5 あり + `function_467c40` 無効 (boot5 を退避せず gate だけ入れた試行) | 6909f85d (baseline と同一) | 22 | Halt0 経由の早期終了 | 871/24/46/0 | 113 s | 0 |
+| H: boot5 無し + `function_467c40` 無効 | b47a4d3a | 22 | Halt0 経由の早期終了 | 870/25/46/0 | 53 s | 0 |
+
+- 未実施: 構成 G (boot5 無し・467c40 有効) は測っていない。復元後の baseline 再実行も未実施 (作業ツリーは `git restore` で main と一致を確認したのみ)。
+- gate の確認: 467c40 gate は `#ifndef M11_ABL_467C40` を `m11_ov.c` に入れ、`m11_build.sh` の CF に `${M11_ABL_CF:-}` を一時的に足して有効化。`nm work/obj/ov.o` は本 run で `file format not recognized` となり確認できていない。構成 I の 871/24/46 が run 3 の D と一致したことを、gate が効いた根拠とする (前回 run 3 は `llvm-nm` で確認済み)。
+- 構成 I の結果: `m11_e2e.sh` は `m11_extra_ranges5.txt` が有ると boot5 を再 lift するため、boot5 を外すには退避が必要。退避せずに gate だけ入れた試行が I。
+- 読み取り: boot5 の有無は、467c40 が無効のとき units_run を変えない (22 → 22)。467c40 の間接 call 復元が units_run 53 を支える、という run 3 の結論を、boot5 を外した状態でも再確認できた。boot5 単独の影響 (467c40 有効時の 53 → 52 の変化) は、今 run では構成 G が未実施のため未確定。前回 PR #1362 の 96e608df での値 (53→52) とは起点が異なる。
+- 未測定 (#1141 残り): 構成 G (boot5 除去・467c40 有効) の完走可否、4c3baa4 の残り部分 (boot5 と 467c40 以外の hunk)、`SysReAllocStringLen`・`SysStringLen` の組み合わせ。
+- 作業ツリーの後始末: gate・退避・ビルド変更はすべて `git restore` で戻し、`tools/m11` の追跡ファイル差分は 0 (`m11_extra_ranges5.txt` は退避から復元済み)。
+
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 本体 REPORT.md から移動)
 main `6e5c8dac` で通常起動・survey は完走 (53/942, survey ok 870)。ネガコン (boot5 除去) は 52/942 で「元の停止に戻る」は不成立。faee5b6 の二分は逆パッチが衝突し未成立。詳細は `REPORT_N15.md` §16。
 
