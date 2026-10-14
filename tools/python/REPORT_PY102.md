@@ -195,7 +195,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 - 取り込み。`origin/main` `91610209` を merge (`8ceec7c9`)。競合は `tests/provider_check.mjs` の 1 箇所だけ。main 側は PY-96 (#2832) の `pe96` (arrangement の選択範囲 4 関数) を追加した。両方を集合に入れ、件数は main の `impl 119・unimpl 316` に `pe102` の +1 を加えて `impl 120・unimpl 315` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`flapi_table.py`・`gen/fl_table.c` は自動マージで衝突なし。
 - 測定 commit: `8ceec7c9` (コードを変えた最後の commit)。本節の追記だけを後続の commit で加える。`git diff 8ceec7c9 HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` は 0 行。
 - 前回の測定 (`e3b67424`) の全文は `REPORT_PY102_APPENDIX_2883.md` へ移した。
-- 素材: `fl-win64` の 5 block (`block00031_PE`・`block24429_DATA`・`block24430_DATA`・`block25159_DATA`・`block24618_DATA`) を `$RUNNER_TEMP/fl-win64/extracted/` へ展開 (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/<上の 5 件>`)。`FL_WIN64_DIR` でこれを指した。`fetch_inputs.sh` で `work/` を作成。emsdk は上流 `emsdk install 6.0.12` を `/opt/emsdk` に導入して `activate` した (`toolchain-emsdk` 素材は本 run に無い)。
+- 素材: `fl-win64` の 5 block (`block00031_PE`・`block24429_DATA`・`block24430_DATA`・`block25159_DATA`・`block24618_DATA`) を `$RUNNER_TEMP/fl-win64/extracted/` へ展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/<上の 5 件>`)。`FL_WIN64_DIR` でこれを指した。`fetch_inputs.sh` で `work/` を作成。emsdk は上流 `emsdk install 6.0.12` を [EMSDK] の既定位置に導入して `activate` した (`toolchain-emsdk` 素材は本 run に無い)。
 - CPython wasm: `build_cpython_wasm.sh` で作成 (exit 0・4m24.633s。本 run で作成。CPython 側のソースは変えていない)。
 - 環境: GitHub Actions runner (4 コア)。開始時の `uptime` の load average は `0.21 0.20 0.09` (22:52)、検証後は `0.71 1.33 0.77` (22:59)。並列 1 本。
 
