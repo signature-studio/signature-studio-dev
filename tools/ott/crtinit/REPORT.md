@@ -9,6 +9,7 @@
   - 既存 entry **85 scenario** を CRT 初期化版 build で全数再突合 = **85/85 PASS** (旧 build では native が crash していた float 経路も含め nat_crash 0)。
   - 既存 DSP e2e **89 scenario・全 cell bit-exact (正本 `tools/ott/REPORT.md`)** の継続 PASS と entry e2e (旧 build 全 85) PASS
     (旧 build — 改変は lifter の mxcsr 1 点のみ, §4)。
+- **ICALL-76 訂正 (§10)**: api-set 表は **34 entry** (0x110 B)。旧記載「32 entry」と `APISET_N 32` は誤りだった。修正後も判定 (crt_e2e PASS・9 本 / 85 件) は不変。
 - **CRT 初期化は (b) C 等価置換を採用** (DllMain / `_CRT_INIT` / `_initterm*` は実行しない):
   UCRT が `__security_cookie` で encode する関数ポインタ表 (**api-set 表 0x18026c9f0** ほか 4 slot) を
   `enc(NULL) = cookie` に事前初期化 + `__FlsIndex` 設定 + loader 系 import 4 種 (LoadLibraryExW /
@@ -55,7 +56,7 @@
 ### 2.1 実行した CRT 経路 (実測 — DllMain は不使用)
 
 ```
-[静的状態]  .data: api-set 表 0x18026c9f0 (32 entry, 全 0) / __security_cookie 0x180260ce0 = 0x2b992ddfa232 (静的既定)
+[静的状態]  .data: api-set 表 0x18026c9f0 (34 entry, 全 0) / __security_cookie 0x180260ce0 = 0x2b992ddfa232 (静的既定)
             / __FlsIndex 0x1802610e4 = -1 / _matherr hook 0x18026cb88 = 0
 [formatter 呼出]  effGetParamDisplay(0x18011e770) → fmt dispatch(0x18011e250) → snprintf(0x180105320)
             → vsnprintf(0x1801aaf5c) → __acrt_getptd(0x1801c20c8)
@@ -95,7 +96,7 @@ CAB-137 で「wasm も同一 fail-fast」と記録されていた現象の正体
 
 | 状態 | 実 CRT での初期化 | 本置換での扱い (native = wasm) | DSP/表示結果への影響 (実測) |
 |---|---|---|---|
-| api-set 関数ポインタ表 0x18026c9f0 (32 entry) | enc(NULL) 埋め → 遅延解決 | `ott_crt_init_tables` が enc(NULL)=cookie を書く → 解決は DLL 自身の機械語 | getptd が成立し errno/locale が参照可能に。**無いと fail-fast** |
+| api-set 関数ポインタ表 0x18026c9f0 (34 entry) | enc(NULL) 埋め → 遅延解決 | `ott_crt_init_tables` が enc(NULL)=cookie を書く → 解決は DLL 自身の機械語 | getptd が成立し errno/locale が参照可能に。**無いと fail-fast** |
 | 個別 encoded slot 0x18026c028 / c388 / cb40 / **cb88 (_matherr hook)** | 同上 | 同上。cb88 = 0 decode → **user _matherr なし** が確定 | `__math_err` が clean path (errno 設定のみ) を通る。hook あり経路は未実行 |
 | `__FlsIndex` 0x1802610e4 | `__acrt_initialize_thread_local_storage` (0x1801c2194) = FlsAlloc の返値 | **1 を直接設定** (FlsAlloc 第 1 返値相当; 以降の FlsAlloc は 2 から) | 未設定だと native 実測で **formatter call 毎に 968 B PTD が漏出** (11 call → 11 個)。設定で 1 個に収束し alog が両側一致 |
 | PTD (0x3c8 B, HeapAlloc) | calloc + `__acrt_...init` 0x1801c1cb8 | **実機械語のまま実行** (両側) | errno 初期 0 / **C locale (小数点 `.`)** / `_matherr=NULL`。`%f` 表示の小数点と errno 0x21/0x22 設定はここから来る |
@@ -172,11 +173,41 @@ CAB-137 で「wasm も同一 fail-fast」と記録されていた現象の正体
 ## 9. 再現
 
 ```sh
-bash tools/ott/crtinit/crt_e2e.sh                 # 全工程 (coverage 再取得含む 約 10 分)
-CRT_COV_SKIP=1 CRT_LIFT_SKIP=1 bash tools/ott/crtinit/crt_e2e.sh   # 再利用 (約 6 分)
+# 前提: ANALYSIS_DIR に analysis-ott-binaries を展開 (plugins/ott/binaries/OTT_vst2_win64.dll)
+bash tools/ott/native/build.sh                    # 先に libottnative.so を作り直す (古い work/ の .so は ott_enc_slots を持たず [1/6] が落ちる)
+bash tools/ott/crtinit/crt_e2e.sh                 # 全工程 (§10 実測: 2 分 49 秒)
+CRT_COV_SKIP=1 CRT_LIFT_SKIP=1 bash tools/ott/crtinit/crt_e2e.sh   # 再利用
 OTT_CRTINIT=0 python3 tools/ott/crtinit/crt_nat.py --out /tmp/n.json --scen tools/ott/work/crtlift/scen_crt.json --only flt_disp_def   # 陰性対照 (native)
 OTT_CRTINIT=0 MOD=$PWD/tools/ott/work/crtlift/ottl_crt.cjs SCEN=$PWD/tools/ott/work/crtlift/scen_crt.json NAME=flt_disp_def OUT=/tmp/w.json node tools/ott/crtinit/crt_wasm.mjs  # 陰性対照 (wasm)
 bash tools/ott/ott_e2e.sh                          # DSP 89 scenario (旧 build, 無改変)
 bash tools/ott/entry/entry_e2e.sh --quick          # entry 85 (旧 build, 無改変)
 # 前提: tools/ott/ott_e2e.sh が PASS する環境 (python3 capstone/pefile, gcc, emsdk 6.0.12, node ≥22)
 ```
+
+## 10. ICALL-76 訂正: api-set 表は 34 entry (APISET_N 32 → 34)
+
+- **根拠**: CRT 初期化 0x1801c43a4 の `rep stosq` 個数 (`and ecx, 0x22`) = 34。表は 0x18026c9f0〜0x18026cb00 (0x110 B)。
+  `python3 tools/icall/diff/dispatcher_ids.py <OTT_vst2_win64.dll> 0x1801c38c8 0x18026c950 0x18026c9f0 0x18021e500` の
+  T2 function_id 即値の最大は 29 (call site 30 件・distinct 21)。
+- **修正**: `ott_crt.c` と `crt_native.c` の `APISET_N` を 34 に。native 基準側も同じ 32 だったため両方直した (片側だけだと両側の初期状態が食い違う)。
+- **index 32・33 は実行されない (直接確認)**: 解決 (§2.1) は解決時に表 entry へ encode 値を書き戻す。よって実行された entry は初期値 enc(NULL)=cookie から変わる。修正後 build (`7eaf9d46`) で scenario を 1 本ずつ実行し、各実行後に guest メモリの表 0..33 を読んだ (読み出しは `crt_wasm.mjs` に末尾で足した作業用コピーで、コミットしていない)。
+  - 実行: crt 新 9 本 + `entrylift/scen.json` 86 本 = **95 run・全 run 成功** (scen.json は name 重複が 1 件あり、一意な scenario は 85 件 = matrix85 と同数)。
+  - 結果: 初期値から変わった index は **{5, 6} のみ** (§2.1 の FlsGetValue / FlsSetValue wrapper に対応し、dispatcher 静的解析の call site id 5・6 と一致)。**32・33 は 95/95 で cookie のまま = いずれの scenario でも解決されていない。**
+  - 補助 (静的): call site が渡す function id の最大は 29 (32・33 を渡す直接 call は無い)。
+  - 修正前の帰結: 修正前は両側とも 32・33 が生値 0 だった。生値 0 は decode すると 0xae64b77e88c8000 (非 0) になり、解決済みとして CFG dispatch され fail-fast する (§2.2)。修正前の 94 scenario が全 PASS だったことも、32・33 の未 decode と整合する。
+  - 限界: 観測は上記 95 scenario の範囲。将来 32・33 を解決する経路が実行されれば、表への書き戻しとして同じ方法で検知できる。
+- **初回 run の FAIL (環境起因)**: `tools/ott/work/` の snapshot にあった `libottnative.so` は古く `ott_enc_slots` を持たない。[1/6] が落ちて native 側が古い coverage のまま動き、94 件が FAIL した。`bash tools/ott/native/build.sh` で作り直すと PASS (§9)。
+- **測定** (`crt_e2e.sh` 全工程):
+
+| 項目 | 修正前 `54bacdc0` | 修正後 `7eaf9d46` (測定 commit) |
+|---|---|---|
+| `crt_e2e.sh` 総合 | PASS (2 分 55 秒, 14:36:55〜14:39:50) | PASS (2 分 49 秒, 14:41:53〜14:44:42) |
+| 新 scenario 9 本 | PASS 9 / FAIL 0 | PASS 9 / FAIL 0 |
+| 既存 entry 85 再突合 | PASS 85 / FAIL 0 | PASS 85 / FAIL 0 |
+| 陰性対照 native SIGSEGV / wasm ott_unlifted | OK / OK | OK / OK |
+| `ott_e2e.sh` (DSP) / `entry_e2e.sh --quick` | PASS / PASS | PASS / PASS |
+| lift 集合 (x64c) | 260 関数 / 16,378 命令 | 260 関数 / 16,378 命令 |
+
+- load average (1 分): 修正後 run は開始 0.24 / 終了 1.44 (4 コア)。修正前 run は未採取。
+- **測定 commit から HEAD までのコード差分**: `git diff 7eaf9d46 HEAD -- tools/ott/crtinit/*.c tools/ott/crtinit/*.py tools/ott/crtinit/*.sh tools/ott/crtinit/*.mjs` は 0 行 (測定後にコードは変えていない。以降の変更は本 REPORT のみ)。
+- **未解決 (本 PR 外)**: `tools/ott/accept/acc_crt_table.py` の `N = 32` (検収用の読み取りスクリプト) と `tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 は PM 判断のため未修正。
