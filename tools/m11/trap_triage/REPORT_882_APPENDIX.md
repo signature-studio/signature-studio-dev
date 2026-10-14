@@ -87,3 +87,49 @@
 | 895 の halt0 が null `arg1` の経路に由来するか (`412770` の null memcpy との関係) | 受入条件 2 | #1080 (親 #684) |
 | probe ON の集計 (872/14) と OFF (870/16) の差 | 計測 hook が分類を変える | #684 (PM 判断) |
 | `functions_dll.csv` 素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM 判断 |
+
+## 14. 9 回目の run: `60a270` の入口 probe (`M11_INSTR_60A270`) と `this` の値
+
+既知類型との関係: 該当なし (計測 hook の追加のみ。既出 D4 変種 (DEFECTS.md) の範囲で読む)。
+
+測定 commit: `a28a8e30` (コード変更の最後の commit。`tools/m11/m11_ov.c` / `m11_post.py` / `m11_build.sh` の 3 ファイル)。
+素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下に展開 (tarball は `tools/m11/work/` を含む)。
+`m11_gen_ir2.sh` rc=0 (33.8 s)。load average は測定中 0.8–1.0。
+
+### 14.1 機械語 (`disasm_fn.py 60a270`、size 125)
+
+- `60a270` は `40ffe0` を `dx=0xffcd` / `dx=0xffef` で 2 回呼ぶ。どちらも `rcx = rbx` (this) を渡す。`rbx = rcx` (入口の this) である。
+- したがって `40ffe0` の arg1 = `60a270` の this。`60a270` の入口で this を観測すれば、`40ffe0` の arg1 の値が分かる。
+
+### 14.2 実装
+
+- `m11_ov.c`: `M11_INSTR_60A270=1` のときだけ `m11_a270_obs(this)` を定義。`this`、`[this]`、`[this+0xa9]` を `[m11][a270]` として stderr に出す。線形メモリ外は読まない。
+- `m11_post.py`: `PROBES[0x60a270]` を末尾に追加 (既存 index 不変)。wrapper 先頭で `m11_a270_obs(%p0)` を呼ぶ。
+- `m11_build.sh`: CF に `-DM11_INSTR_60A270` を渡し、stamp を `40ff70:40ffe0:60a270` の組にする。既定 0 は従来どおり。
+
+### 14.3 測定 (`SV_RAW=1 node trap_triage/survey_units.mjs <out>`、全て rc=0)
+
+| build (probe) | survey 集計 | unit 895 の観測 (`err` 先頭 3 行) | 895 以外の kind 差 (OFF 比) |
+|---|---|---|---|
+| OFF (既定 0) | `ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1` | (出力なし) | — |
+| `60A270` 単独 | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` | `[m11][a270] #1 this=0x0 [this]=0xc343f0 [this+a9]=0` (#2・#3 も同じ) | unit 304・555 が oob→ok |
+| `40FFE0`+`40FF70` | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` | `[m11][ffe0] #1 arg1=0x0 v=[arg1]=0xc343f0 p-144=0x9078558948704d89`、`[m11][p144] #1 arg1=0xc343f0 ... word[head]=0` | unit 304・555 が oob→ok (§13 と一致) |
+| 3 つ全部 ON | `ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1` | `[m11][a270]` の 3 行が先に埋まり、`ffe0`/`p144` は rec.err の 3 行上限で見えない | なし (OFF と同じ kind) |
+
+- 読み: unit 895 の `60a270` は 3 回呼ばれ、いずれも `this = 0` (null)。`[this] = 0xc343f0` で、`40ffe0` の `arg1 = 0` (§13) と一致する。`this` が null で `40ffe0` → `40ff70` に入る経路が 895 にある。
+- 3 つ全部 ON の集計が OFF と一致するのは、probe の組み合わせで unit 304・555 の分類が戻るため。probe 同士の干渉か、rec.err 上限の見え方かは未切り分け (前節の注意と同じ)。probe の ON/OFF で分類が動くので、ON の集計は基準に使わない。
+- 既定 build (probe OFF) は `870 / 16` で §8・§9・§11・§13 と一致。既定の挙動は変わらない。
+
+### 14.4 受入条件
+
+1. unit 95 `47ad70` の index / arg1: 未達 (現行 main で OOB 不発。観測対象が無い)。
+2. unit 895 `40ff70` の `p-144`: **部分達成**。`60a270` の `this` が null であることを実測 (`40ffe0` の arg1 = 0 と一致)。null の `this` を渡す caller (`60a270` の caller と `rcx` の出所) は未特定。
+3. DEFECTS 行案: 未達 (新規類型未確定)。
+
+### 14.5 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `60a270` の `this` (= `rcx`) の出所。`60a270` の caller を特定し、その caller の入口 probe で `this` を観測する | 受入条件 2 | 子 issue (親 #882) |
+| probe 組み合わせで unit 304・555 の分類が動く (ON で oob→ok)。3 つ全部 ON で OFF と一致する理由 | 計測 hook が分類を変える | #684 (PM 判断) |
+| `functions_dll.csv` 素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM 判断 |
