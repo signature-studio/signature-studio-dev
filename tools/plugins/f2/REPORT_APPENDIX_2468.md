@@ -1,6 +1,6 @@
 # tools/plugins/f2 REPORT_APPENDIX_2468 — PLG-F3-28 (#2468): 0x5da070 の間接 call 先と停止点の対応 (受入 1 達成。残件は子 #2574 へ。測定 commit 62636cd4、block19148)
 
-- 測定 commit: **62636cd4** (`origin/main` の取り込み merge。main 側の `unicorn_trace.py` 修正 a70461d6 を含む)。本 PR のコード変更は `unicorn_trace.py` が ccb6af73、`fn_refs.py` が a72a9109。`git diff 62636cd4 HEAD -- tools/plugins/f2/*.py` の出力は §6。以降の commit は本ファイルと REPORT_1305.md の文言のみ。
+- 測定 commit: **62636cd4** (`origin/main` の取り込み merge。main 側の `unicorn_trace.py` 修正 a70461d6 を含む)。本 PR のコード変更は `unicorn_trace.py` が ccb6af73、`fn_refs.py` が a72a9109。測定に使ったファイルは 62636cd4 以降変わっていない (§6)。
 - 既知類型との関係: (DEFECTS.md) 該当なし。NULL this 参照は、合成 host (`-H`) の未初期化グローバルに由来する harness 側の欠落で、lift の miscompile ではない。waiver (`icall_gate_waivers.json`) は変更しない。
 - 担当 dir: `tools/plugins/f2/` のみ。入力は `$RUNNER_TEMP/ex/extracted/block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/ex extracted/block19148_PE.bin`)。依存は `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。
 - 範囲: unicorn による実行と静的走査のみ。実 FL の host 値は得られないため、host は合成 (`-H`)。
@@ -122,7 +122,7 @@ status: UcError Write to write-protected memory (UC_ERR_WRITE_PROT) rip=0x412613
 
 ## 6. 検証 (測定 commit 62636cd4)
 
-- 鮮度: `git diff 62636cd4 HEAD -- tools/plugins/f2/*.py` = 出力なし (HEAD は文書のみの commit)。
+- 鮮度: `git diff 62636cd4 HEAD -- tools/plugins/f2/unicorn_trace.py tools/plugins/f2/fn_refs.py tools/plugins/f2/slot_write_scan.py` = 出力なし。同じ dir に main 側で増えた `write_origin.py` (#2493、本件の測定に不使用) は `git diff 62636cd4 HEAD -- tools/plugins/f2/*.py` に 81 行追加として出る。
 - 再現 (`T=$RUNNER_TEMP/f2venv/bin/python`、`PE=$RUNNER_TEMP/ex/extracted/block19148_PE.bin`、リポジトリ直下で実行):
   - A: `$T tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -t 0x5da05f -t 0x5da06d -t 0x5da070 -t 0x501319d0 -m 2000000`
   - A の書込み元 (受入 1 の `0x28`): `$T tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x28:0x30 -m 2000000`
