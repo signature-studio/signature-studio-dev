@@ -4,12 +4,14 @@
 
 ## 1. 結論
 
-- **受入条件 1 (wasm オフセットまで特定): 達成**。`0x36319008` に "emsc" (`0x63736d65`) を書く store (IR 行 19132) は、wasm の関数 `function_181057d20` 内の **`i64.store offset=909217800` (wasm ファイル内オフセット `0x427be`)** に対応する。
+- **受入条件 1 (wasm オフセットまで特定): 達成** (測定 HEAD `1fff0e4f` 時点の値)。`0x36319008` に "emsc" (`0x63736d65`) を書く store (IR 行 19132) は、wasm の関数 `function_181057d20` 内の **`i64.store offset=909217800` (wasm ファイル内オフセット `0x427be`)** に対応する。この行 19132 と `0x427be` は `1fff0e4f` の値。検証 HEAD `54bacdc0` (§6) では同じ store の IR 行が 19056 に変わっており、本 HEAD の wasm オフセットは未確認 (§6-3 の (e))。
 - **受入条件 2 (route 側 / lift 側の分類): 達成 (lift 側に分類)**。store 命令は lift が生成した `function_181057d20` の中にあり、route 側 (data 敷設) は 1998 付録 §3 で否定済み。値 "emsc" を作る `0x400000004` は、RetDec の RDA 段で脱落する frame store 2 本の欠落から生じる (元の機械語は 4B store 2 本)。根拠と HEAD 再測定は §6。
-- **既知類型との関係**: D23 候補 (`REPORT_APPENDIX_2394.md` §6・新規、DEFECTS.md 未編集)。
+- **既知類型との関係**: D24 候補 (`REPORT_APPENDIX_2394.md` §6・新規、DEFECTS.md 未編集)。
 - **受入条件 3 (`fa_sweep.sh 8 60` の wasm のみ err 件数): 達成**。wasm のみ err は 9 件で、現状の件数と一致 (実測は §3)。
 
 ## 2. 対応の詳細 (実測)
+
+測定 HEAD は `1fff0e4f` (下表の IR 行 19132・wasm オフセット `0x427be` はこの HEAD の値。検証 HEAD `54bacdc0` の値は §6-3)。
 
 測定: `fa_wc_build.sh` で監視付き wasm (`work/fa_wc/fa_wc.cjs`) を作り、`fa_wc_drv.cjs` で `181057b38` を 8 入力で実行。
 
@@ -47,7 +49,9 @@ DWARF の行表 (`llvm-dwarfdump --debug-line`) には `.ll` の行情報が無�
 | §6 で分類済み (#2310 の受入条件 2)。脱落 store を戻す pass → #2427 (ICALL-77) | 受入条件 2 | #2427 (ICALL-77) |
 | `fa_sweep` の bit 一致の ±1 揺れ (本 run 46、1998 は 47) | sweep 件数の判定精度 | #2302 (ICALL-71) |
 
-## 5. 再現
+## 5. 再現 (測定 HEAD `1fff0e4f` 時点)
+
+以下の `19132`・`0x427be` は `1fff0e4f` の値。検証 HEAD `54bacdc0` では BLK+0 の store は IR 行 19056 になり、この grep では得られない (§6-3)。検証 HEAD の wasm オフセットは未確認。
 
 ```
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FA_DL=$RUNNER_TEMP/plugins-freshair TMPDIR=$RUNNER_TEMP
@@ -76,7 +80,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 - route 側の否定: `ott_data_install` が書くのは `0x310c4000`・`0x3125c000`・`0x31354000` のみで BLK を含まない。DLL の bytes に "emsc" は無い (`REPORT_APPENDIX_1998.md` §3。本 HEAD の `rw.dll` でも `emsc` の出現 0 件を確認)。
 - 元の機械語: `0x181057b38` の 2 本の 4B store (`mov [rbp-0x30],eax`・`mov [rbp-0x2c],eax`)。8B で読む命令は無い (`REPORT_APPENDIX_2394.md` §2)。
 - 真因: RetDec の `LLVM instruction optimization using RDA` 段で `[rbp-8]` (`0x181057b71`)・`[rbp-0x20]` (`0x181057b87`) の 2 本の frame store が IR から脱落する (`REPORT_APPENDIX_2394.md` §3 の段別表)。2 store を戻し 16B 1 alloca にすると BLK+0 への "emsc" 書込みは 8 → 0 (`REPORT_APPENDIX_2394.md` §4)。
-- 既知類型との関係: D23 候補 (`REPORT_APPENDIX_2394.md` §6・新規、DEFECTS.md 未編集)。
+- 既知類型との関係: D24 候補 (`REPORT_APPENDIX_2394.md` §6・新規、DEFECTS.md 未編集)。
 - 脱落 store を戻す IR pass の一般化は本付録の範囲外 (#2427 / ICALL-77)。
 
 ### 6-1. HEAD 再測定 (WORKFLOW §6)
@@ -104,11 +108,11 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 - §2 (RDA 段の表): `REPORT_APPENDIX_2394.md` §3 の段別表と全セル一致。
 - §3 (census): F 131・dsm に命令あり 130・frame pointer 型 4・rbp 相対 mov store 29・脱落 21・候補 12 件 / 2 関数 (`181057b38` が 2 件、`180da6e60` が 10 件)。`REPORT_APPENDIX_2394.md` §5 と一致。
 
-### 6-3. IR 行番号の差 (本 HEAD で確認)
+### 6-3. IR 行番号の差 (検証 HEAD `54bacdc0` で確認)
 
-- 本 HEAD の `work/fa_route/oi.flat.ll` は 25694 行。`REPORT_APPENDIX_1998.md` §2 の 25805 行 (旧 HEAD `1fff0e4f`) とは一致しない。
-- BLK+0 への "emsc" 書込みの WC 行は本 HEAD では `line=19056` (8 件)。§2 と `REPORT_APPENDIX_1998.md` §2 の行 19132 は旧 IR の番号で、本 HEAD の WC 行には 19132 が現れない。
-- wasm 側: 本 HEAD の `i64.const 19056` は `fa_wc.wasm` の 0x42799。直後の `i64.store offset=909217800` の位置 (§2 の 0x427be に相当するもの) は未再確認。
+- 検証 HEAD の `work/fa_route/oi.flat.ll` は 25694 行。`REPORT_APPENDIX_1998.md` §2 の 25805 行 (測定 HEAD `1fff0e4f`) とは一致しない。
+- BLK+0 への "emsc" 書込みの WC 行は検証 HEAD では `line=19056` (8 件)。§2 と `REPORT_APPENDIX_1998.md` §2 の行 19132 は `1fff0e4f` の IR の番号で、検証 HEAD の WC 行には 19132 が現れない。
+- wasm 側: 検証 HEAD の `i64.const 19056` は `fa_wc.wasm` の 0x42799。直後の `i64.store offset=909217800` の位置 (§2 の 0x427be に相当するもの) は未再確認 (`work-icall`・`toolchain-retdec` を展開した環境で `fa_wc_build.sh` から再導出する)。
 - 行番号の差の原因は未切り分け。`1fff0e4f`..`2c8088f4` の間に `tools/icall/fa_route_build.sh` と `tools/icall/rt/icall_rt.c` が変更されている (`git diff --stat`)。行番号を引くときは測定 commit を併記すること。
 
 ### 6-4. 再現
