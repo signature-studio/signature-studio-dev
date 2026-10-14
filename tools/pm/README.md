@@ -77,10 +77,14 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
 - オプション: `--repo OWNER/REPO` (省略時は env `OC_REPO`、無ければ git の origin)、`--threshold-min 15`、
   `--events repository_dispatch,schedule,push` (既定は 3 つ全部)、`--bucket day|hour`、`--cache FILE`。
 - 数え方: 標本は watchdog の 1 回の点検 (run の watchdog job のログの最後の `idle=` 行と、その行の時刻)。
-  idle>0 の標本が途切れず続く間を 1 つの区間とし、最初と最後の標本の間隔が閾値 (15 分) 以上なら 1 回と数える。
-  15 分ちょうども数える (標本の間隔が粗く、実際の担当なし時間は計測値以上のため)。idle=0 の標本を挟むと別の区間になる。
-  標本の欠落 (間隔が 15 分超) は区間を切らず、`samples.gaps_over_threshold` に数える。0 回を『問題なし』と読む前に、
-  `samples.count` と `gaps_over_threshold` を見る (標本が 0 件なら要約に警告を出す)。
+  idle>0 の標本が途切れず続く間を 1 つの区間とし、その最初と最後の標本の時刻の差が閾値 (15 分) 以上なら 1 回と数える (ちょうども数える)。
+  idle=0 の標本を挟むと別の区間になる。標本の欠落 (間隔が 15 分超) は区間を切らず、`samples.gaps_over_threshold` に数える。
+  0 回を『問題なし』と読む前に、`samples.count` と `gaps_over_threshold` を見る (標本が 0 件なら要約に警告を出す)。
+- 誤差は両方向で、計測値は下限とも上限とも言えない:
+  - 両端: 区間の直前 (idle=0 の標本の後) と直後 (idle=0 の標本の前) で idle>0 が始まっていた・続いていた可能性があり、実際の担当なし時間は計測値より長いことがある (過小)。
+  - 標本の間: 2 つの idle>0 の標本の間で idle=0 に戻っていても見えず、1 区間に合算される (過大)。欠落 (間隔が 15 分超) をまたぐ区間は中の状態が不明なので、この誤差が大きくなりうる。
+  - よって 0 回を『問題なし』の根拠にしない。`samples.longest_gap_min` と `gaps_over_threshold` を併せて見る。
+- 期間は run の作成時刻 (`created_at`) で切る。標本の時刻 (watchdog の idle 行の時刻) は run の作成より後ろになり、`--until` を数分越えて出うる。
 - **oc:stuck の PR は idle に入り続ける**: watchdog は `oc:stuck` の PR を触らず、カバー済みにもしない。
   stuck が 1 件でも残る間は idle>0 が続き、回数は soak 判定の指標にならない。同じログの `#N STUCK_LABELLED:` の行数を引いた
   idle での回数を `excluding_stuck_labelled` に出す (人の判断待ちを除いた担当なし)。soak 判定は後者で見る。
