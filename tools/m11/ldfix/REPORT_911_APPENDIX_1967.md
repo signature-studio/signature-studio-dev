@@ -48,7 +48,7 @@
 
 機構の所在は lift 段と推定する (`retdec-constants` は RetDec 本体の pass で、ldfix 段ではない。pass の特定はソース読みによる)。
 
-残件: 上の 3 点 (段番号差・L167 条件の一致・2019-03 版との差) は、記号木の中身を出す一時ログ付きビルドと 2019-03 版の再ビルドを要する。fix run (5453dd3e 時点) では `$ARTIFACTS_DIR` に `fl-win64` のみあり、`toolchain-retdec` も 2019-03 版の `share/` も無いため実施できなかった。残件の起票先は PR 本文の未解決表を参照 (#1091 は CLOSED のため、再測定の残件は PM の判断待ち)。
+残件: 上の 3 点 (段番号差・L167 条件の一致・2019-03 版との差) は、記号木の中身を出す一時ログ付きビルドと 2019-03 版の再ビルドを要する。fix run (5453dd3e 時点) では `$ARTIFACTS_DIR` に `fl-win64` のみあり、`toolchain-retdec` も 2019-03 版の `share/` も無いため実施できなかった。残件は PM 判断 (2026-10-14) により子 issue に移した: 段番号差・L167 条件の一致は #2315 (受入 4)、2019-03 版との差は #2314 (受入 1 の版)、検出信号・修復・wasm 実測・DEFECTS 行は #2316 (#1091 の残り)。
 
 注: 単独範囲の件数は §6f の表と一致した (41a6a0 = 1、41a6d3 = 1、666b10 = 1、対照 41a6b3 = 0)。
 
@@ -57,6 +57,6 @@
 - 単独範囲の測定で位置が確定しているのは、L150 が 41a693-41a69a の 1 回、L167 が 41a6a0-41a6a3 と 41a6d3-41a6d6 の各 1 回。全体範囲の L150 のうち残りの **2 回の発火アドレスは未確認**である。
 - L167 の結論 (41a6a0・41a6d3・666b10 が L167 で発火) は単独範囲の件数に基づくため、全体範囲の未確認の件数には依存しない。全体範囲の件数の再確認は、範囲を分けた測定 (41a670-41a68f・41a69b-41a69f・41a6a4-41a6d2・41a6d7-41a6f4 など) で行う。本 run では未実施。
 
-ビルド注: 自前ビルドの `retdec-decompiler` は、隣に `retdec/share` を置かないと `Initialization` 後に無言終了した。実装 run (4dcab82d 時点) の計測は、素材 `toolchain-retdec` の share を使ったと記録されている (展開先は §6 の `rd/retdec/` 配下と推定: `rd/retdec/share`)。実装 run の展開コマンドは記録に無く、この記述は再確認していない。fix run (5453dd3e 時点) の `$ARTIFACTS_DIR` には `toolchain-retdec` が無いため、share は再確認できない。
+ビルド注: 自前ビルドの `retdec-decompiler` は、隣に `retdec/share` を置かないと `Initialization` 後に無言終了した。実装 run (4dcab82d 時点) の計測は、素材 `toolchain-retdec` の share を使ったと記録されている (展開先は §6 の `rd/retdec/` 配下と推定: `rd/retdec/share`)。出所: #2038 のコメント https://github.com/signature-studio/signature-studio-dev/issues/2038#issuecomment-6165881740 (「`$ARTIFACTS_DIR` に fl-win64 / toolchain-retdec / work-m11 が実在することを `ls` で確認済み」)。実装 run の展開コマンドは記録に無く、この記述は再確認していない。fix run (5453dd3e 時点) の `$ARTIFACTS_DIR` には `toolchain-retdec` が無いため、share は再確認できない。
 
-版について (受入 1): issue #2038 は 2019-03 版相当でのビルドを求める。本 PR の実測は v5.0 (`53e55b4b`) のみ。2019-03 版 (`6edcaaea`) はソースを取得できたが、(1) fix run では `toolchain-retdec` が無く share の入手元が無い、(2) 2019-03 版のツリーに `share/` が無い、(3) LLVM は `avast-tl/llvm` の外部取得 (`3d1e5d0b`) を要する。fix run の上限 (40 分) では収まらないと判断し、ビルドしていない。受入条件の版の扱い (v5.0 で測るか、2019-03 版で再測定するか) は PM の判断とする。
+版について (受入 1): issue #2038 は 2019-03 版相当でのビルドを求める。本 PR の実測は v5.0 (`53e55b4b`) のみ。2019-03 版 (`6edcaaea`) はソースを取得できたが、(1) fix run では `toolchain-retdec` が無く share の入手元が無い、(2) 2019-03 版のツリーに `share/` が無い、(3) LLVM は `avast-tl/llvm` の外部取得 (`3d1e5d0b`) を要する。fix run の上限 (40 分) では収まらないと判断し、ビルドしていない。PM 判断 (2026-10-14) により、受入 1 は原文のまま子 issue #2314 に移した (v5.0 に改める (b) は採らない)。
