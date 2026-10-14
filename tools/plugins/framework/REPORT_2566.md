@@ -66,8 +66,8 @@ stage-1 の再生成 (RetDec 8 chunk) は 5 分 42 秒で完走し、BLK と再�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| InitUnits 中の `Runtime error 203 at 0x1` (smoke FAIL の原因) と受入 1 (`init_reach=288`) | smoke PASS 不可 | 子 **A** (本 issue の子・`親: #2566`) |
-| 受入 2 の 123 行の内訳・受入 3 (init_reach 直接呼出)・受入 4 (n≥3)・受入 5 (constant 化の機構)・section 伸び `+0x45970` の切り分け | 修復の効果の確定 | 子 **B** (本 issue の子・`親: #2566`) |
+| InitUnits 中の `Runtime error 203 at 0x1` (smoke FAIL の原因) と受入 1 (`init_reach=288`) | smoke PASS 不可 | 子 **A** = #3120 (本 issue の子・`親: #2566`) |
+| 受入 2 の 123 行の内訳・受入 3 (init_reach 直接呼出)・受入 4 (n≥3)・受入 5 (constant 化の機構)・section 伸び `+0x45970` の切り分け | 修復の効果の確定 | 子 **B** = #3121 (本 issue の子・`親: #2566`) |
 | `fw_prep.py` の `fw_hash_counts.json` 依存 (本 run は `{}` で代用) | 再現時に framework 統計が変わる | 子 B の本文に記載 |
 
 ## 7. 再現手順
