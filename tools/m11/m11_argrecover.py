@@ -17,7 +17,7 @@
     stack_*       : 位置>=4 の同分類 (窓内の [rsp+disp] 書込を見る).
 使い方: python3 m11_argrecover.py PADS.json --pe PE --out fixes.json [--lb 0x0]
 """
-import argparse, bisect, collections, json, os, sys
+import argparse, array, bisect, collections, json, os, re, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, 'ldfix'))
@@ -244,6 +244,235 @@ def const_of(fn, ins, reg, lb):
     return None
 
 
+FULL_NAMES = {'rcx': ('rcx', 'ecx'), 'rdx': ('rdx', 'edx'), 'r8': ('r8', 'r8d'), 'r9': ('r9', 'r9d')}
+PRIO = ['conflict', 'xmm_callee', 'call_clobber', 'partial_def', 'nonconst_def', 'unknown_pred', 'addr_taken', 'no_caller', 'no_value', 'depth']
+MAXD = 8
+
+
+class Blocks:
+    """関数内の基本ブロック (leader = 入口・jump 先・jump/ret の直後). preds は fall-through と直接 jump の逆辺."""
+
+    def __init__(self, fn):
+        ins, n = fn.ins, len(fn.ins)
+        idx = {a: i for i, a in enumerate(fn.addrs)}
+        lead = {0}
+        self.indirect = False
+        for i, x in enumerate(ins):
+            if x.mnemonic.startswith('j') or x.mnemonic.startswith('ret'):
+                if i + 1 < n:
+                    lead.add(i + 1)
+                if x.mnemonic.startswith('j'):
+                    if x.operands and x.operands[0].type == capstone.CS_OP_IMM:
+                        if x.operands[0].imm in idx:
+                            lead.add(idx[x.operands[0].imm])
+                    elif x.mnemonic == 'jmp':
+                        self.indirect = True
+        self.starts = sorted(lead)
+        self.ends = self.starts[1:] + [n]
+        self.preds = [[] for _ in self.starts]
+        for b, e in enumerate(self.ends):
+            x = ins[e - 1]
+            if x.mnemonic.startswith('j') and x.operands and x.operands[0].type == capstone.CS_OP_IMM and x.operands[0].imm in idx:
+                self.preds[self.blk_of(idx[x.operands[0].imm])].append(b)
+            if not (x.mnemonic == 'jmp' or x.mnemonic.startswith('ret')) and b + 1 < len(self.starts):
+                self.preds[b + 1].append(b)
+
+    def blk_of(self, i):
+        return bisect.bisect_right(self.starts, i) - 1
+
+
+class Defchain:
+    """窓の外の live-in (inherit) を呼出元まで追跡して値を決める (M11-N87 / #1373).
+    at(f, i, pos): 関数 f の命令 i 直前で reg(pos) の到達定義を後ろ向きに集める (基本ブロック単位・全経路の和).
+    entry(f, pos): f 入口の値 = 直接 call / tail jmp の呼出元で at() を取った値の集合 (f のアドレスが取られていれば不明).
+    結果は (値の集合 {(kind, val)}, 復元不能の理由の集合)。値が 1 つで理由が空のときだけ実値化する。"""
+
+    def __init__(self, mach, F, lb):
+        self.m, self.F, self.lb = mach, F, lb
+        self.bl, self.memo, self.cuts = {}, {}, 0
+        self.callers = None
+        self.taken = set()
+        self.mod = {}
+
+    def blocks(self, va):
+        if va not in self.bl:
+            fn = self.F(va)
+            self.bl[va] = Blocks(fn) if fn.ins else None
+        return self.bl[va]
+
+    def build_index(self):
+        cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+        fns = self.m.fns
+        self.callers = collections.defaultdict(list)
+        for s in self.m.pef.sections:
+            nm = s.Name.rstrip(b'\0').decode('latin1')
+            if nm in ('.text', '.pdata'):
+                continue
+            d = s.get_data()
+            q = array.array('Q', d[:len(d) // 8 * 8])
+            self.taken |= set(q) & set(fns)
+        rip = re.compile(r'\[rip ([+-]) 0x([0-9a-f]+)\]')
+        for va, (rva, size) in fns.items():
+            for i, x in enumerate(cs.disasm(self.m.read(rva, size), va)):
+                mn, op = x.mnemonic, x.op_str
+                if mn == 'call' and op.startswith('0x') and int(op, 16) in fns:
+                    self.callers[int(op, 16)].append((va, i))
+                elif mn.startswith('j') and op.startswith('0x') and int(op, 16) in fns and not (va <= int(op, 16) < va + size):
+                    self.callers[int(op, 16)].append((va, i))
+                elif mn == 'lea' and '[rip' in op:
+                    mm = rip.search(op)
+                    if mm:
+                        disp = int(mm.group(2), 16) * (1 if mm.group(1) == '+' else -1)
+                        t = x.address + x.size + disp
+                        if t in fns:
+                            self.taken.add(t)
+        self.build_mod()
+
+    def build_mod(self):
+        """各関数が引数レジスタ (rcx/rdx/r8/r9) を書きうるか (推移閉包・直接 call/tail jmp の辺で伝播).
+        opaque = 間接 call / 解決できない直接 call を含む (任意に書きうる)."""
+        cs, fns = self.m.cs, self.m.fns
+        own, opq, edges = {}, {}, {}
+        for va, (rva, size) in fns.items():
+            mods, o, es = set(), False, set()
+            for x in cs.disasm(self.m.read(rva, size), va):
+                mn, op = x.mnemonic, x.op_str
+                if mn == 'call' or mn.startswith('j'):
+                    if op.startswith('0x'):
+                        t = int(op, 16)
+                        if mn != 'call' and va <= t < va + size:
+                            pass
+                        elif t in fns:
+                            es.add(t)
+                        else:
+                            o = True
+                    elif mn == 'call':
+                        o = True
+                try:
+                    rd, wr = x.regs_access()
+                except capstone.CsError:
+                    o = True
+                    continue
+                for r in wr:
+                    f = reg_family(cs, r)
+                    if f in FULL_NAMES:
+                        mods.add(f)
+            own[va], opq[va], edges[va] = mods, o, es
+        mod = {va: set(own[va]) for va in fns}
+        opaque = dict(opq)
+        changed = True
+        while changed:
+            changed = False
+            for va in fns:
+                n0, o0 = len(mod[va]), opaque[va]
+                for g in edges[va]:
+                    mod[va] |= mod[g]
+                    opaque[va] = opaque[va] or opaque[g]
+                if len(mod[va]) != n0 or opaque[va] != o0:
+                    changed = True
+        self.mod = {va: (mod[va], opaque[va]) for va in fns}
+
+    def passes(self, x, reg):
+        """直接 call の callee が reg を書かず (推移的にも)、間接 call を含まないなら、call を跨いで reg は保たれる."""
+        op = x.op_str
+        if x.mnemonic != 'call' or not op.startswith('0x') or int(op, 16) not in self.mod:
+            return False
+        mods, o = self.mod[int(op, 16)]
+        return not o and reg not in mods
+
+    def reach(self, fn, bl, b, hi, reg):
+        out, seen, stack = set(), set(), [(b, hi)]
+        fulls = FULL_NAMES[reg]
+        while stack:
+            blk, top = stack.pop()
+            if (blk, top) in seen:
+                continue
+            seen.add((blk, top))
+            killed = False
+            for j in range(top - 1, bl.starts[blk] - 1, -1):
+                x = fn.ins[j]
+                if x.mnemonic == 'call':
+                    if self.passes(x, reg):
+                        continue
+                    out.add(('clobber', j)); killed = True; break
+                try:
+                    rd, wr = x.regs_access()
+                except capstone.CsError:
+                    out.add(('unknown', j)); killed = True; break
+                hit = [fn.cs.reg_name(r) for r in wr if reg_family(fn.cs, r) == reg]
+                if hit:
+                    out.add(('def' if all(nm in fulls for nm in hit) else 'partial', j)); killed = True; break
+            if killed:
+                continue
+            if bl.indirect:
+                out.add(('unknown',))
+            if blk == 0:
+                out.add(('entry',))
+            if not bl.preds[blk] and blk != 0:
+                out.add(('unknown',))
+            for p in bl.preds[blk]:
+                stack.append((p, bl.ends[p]))
+        return out
+
+    def at(self, va, i, pos, depth, path):
+        bl = self.blocks(va)
+        if bl is None:
+            return set(), {'unknown_pred'}
+        fn = self.F(va)
+        reg = REGS[pos]
+        vals, rs = set(), set()
+        for s in self.reach(fn, bl, bl.blk_of(i), i, reg):
+            if s[0] == 'def':
+                c = const_of(fn, fn.ins[s[1]], reg, self.lb)
+                if c is None:
+                    rs.add('nonconst_def')
+                else:
+                    vals.add((c['kind'], c['val']))
+            elif s[0] == 'entry':
+                v2, r2 = self.entry(va, pos, depth, path)
+                vals |= v2; rs |= r2
+            else:
+                rs.add({'clobber': 'call_clobber', 'partial': 'partial_def', 'unknown': 'unknown_pred'}[s[0]])
+        return vals, rs
+
+    def entry(self, va, pos, depth, path):
+        if (va, pos) in self.memo:
+            return self.memo[(va, pos)]
+        if va in path:
+            self.cuts += 1
+            return set(), set()
+        if depth > MAXD:
+            self.cuts += 1
+            return set(), {'depth'}
+        if self.callers is None:
+            self.build_index()
+        before = self.cuts
+        vals, rs = set(), set()
+        if va in self.taken:
+            rs.add('addr_taken')
+        cl = self.callers.get(va, [])
+        if not cl:
+            rs.add('no_caller')
+        for d, i in cl:
+            v, r = self.at(d, i, pos, depth + 1, path | {va})
+            vals |= v; rs |= r
+        out = (vals, rs)
+        if self.cuts == before:
+            self.memo[(va, pos)] = out
+        return out
+
+    def resolve(self, va, i, pos):
+        if self.callers is None:
+            self.build_index()
+        vals, rs = self.at(va, i, pos, 0, frozenset())
+        if not vals and not rs:
+            rs = {'no_value'}
+        if rs or len(vals) != 1:
+            return None, sorted(rs, key=PRIO.index) if rs else ['conflict']
+        kind, val = next(iter(vals))
+        return {'kind': kind, 'val': val}, []
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('pads')
@@ -260,6 +489,8 @@ def main():
         if va not in fcache:
             fcache[va] = Fn(mach, va)
         return fcache[va]
+
+    dc = Defchain(mach, F, lb)
 
     usecache = {}
     stats = collections.Counter()
@@ -297,8 +528,20 @@ def main():
                         s, c, why = classify_set(cf, ci, pos, lb)
                         if xmm and s == 'set' and c is not None:
                             kind = 'set_const_xmm_callee'; c = None
+                        elif s == 'none' and pos >= 4:
+                            kind = 'stack_inherit'
                         elif s == 'none':
-                            kind = 'inherit' if pos < 4 else 'stack_inherit'
+                            c2, why2 = dc.resolve(cva, ci, pos)
+                            if c2 is not None and xmm:
+                                why2 = ['xmm_callee']
+                            if c2 is not None and not xmm:
+                                kind = 'inherit_const'
+                                fixes.append({'caller': p['caller'], 'callee': p['callee'], 'k': p['k'], 'pos': pos, 'const': c2, 'via': 'defchain'})
+                            else:
+                                kind = 'inherit_unres'
+                                stats['dc:%s' % why2[0]] += 1
+                                stats['dcx:%s:%s' % (why, why2[0])] += 1
+                                rec.setdefault('dc', {})[pos] = why2[0]
                         elif c is not None:
                             kind = 'set_const'
                             fixes.append({'caller': p['caller'], 'callee': p['callee'], 'k': p['k'], 'pos': pos, 'const': c})
@@ -320,7 +563,7 @@ def main():
     # site 単位の最終状態 (全引数が callee_unused / set_const なら「解決」)
     resolved = 0
     for r in sites:
-        r['resolved'] = r['status'] == 'matched' and all(k in ('callee_unused', 'set_const') for k in r['args'].values())
+        r['resolved'] = r['status'] == 'matched' and all(k in ('callee_unused', 'set_const', 'inherit_const') for k in r['args'].values())
         resolved += r['resolved']
     out = {'sites': len(sites), 'resolved_sites': resolved, 'stats': dict(stats), 'fixes': fixes, 'site_detail': sites}
     json.dump(out, open(a.out, 'w'))
