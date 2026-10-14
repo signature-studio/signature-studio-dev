@@ -72,7 +72,7 @@ FA-22〜FA-30 (`REPORT_APPENDIX_FA22.md`・`REPORT_APPENDIX_FA29.md`・`REPORT_A
 - `bash tools/targets/freshair/lift2/fa32_node1.sh` (同 HEAD): §2 の表どおり。G5 は ERR 0/8、C は 8/8・8/8。
 - wall の n≥3 レンジは未取得 (単発値のため `WORKFLOW.md` §5 の min–max は書かない)。
 - 測定 commit からの lift2 差分: `git diff 19766fff HEAD -- tools/targets/freshair/lift2` (本付録の commit は `tools/targets/freshair/REPORT_APPENDIX_FA32.md` と `docs/DOC_MAP.md` のみで、lift2 配下に触れない)。
-- 検証起点: `ws-2306` (worktree, 起点 `origin/main` = `26f90ada`)。素材は `$HOME/artifacts/plugins-freshair.tar.zst` を `$RUNNER_TEMP` に展開し `fetch.sh` で `work/win` を作成。`work/` は gitignore。
+- 検証起点: `ws-2306` (worktree, 起点 `origin/main` = `26f90ada`)。素材は `$ARTIFACTS_DIR` の `plugins-freshair.tar.zst` を `$RUNNER_TEMP` に展開し `fetch.sh` で `work/win` を作成。`work/` は gitignore。
 
 ## 5. 未解決
 
