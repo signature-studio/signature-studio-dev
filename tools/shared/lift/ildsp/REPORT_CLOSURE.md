@@ -140,7 +140,7 @@ IAT 名の内訳 (件数):
 
 ### 7. CreateInstance の native 実行 (#2528 / T-SH-38・部分達成)
 - 測定 commit: `b0aa27b3` (ハーネス `tools/shared/scripts/ildsp_native.c`・照合 `ildsp_native_check.py`)。`git diff b0aa27b3 HEAD -- tools/shared/scripts` は空。
-- 方式: `block24360_PE.bin` を ImageBase 0x180000000 に VA 通りに敷設 (`ott_native.c` と同じ方式、MAP_FIXED_NOREPLACE)。IAT 73 件のうち Win32 の 6 件 (GetProcessHeap・HeapAlloc・HeapFree・GetLastError・SetLastError・RtlPcToFileHeader・RaiseException の 7 件) を ms_abi の C 関数で実装し、残りは名前を記録して 0 を返す thunk。HeapAlloc は 0x50000000 から bump で確保 (0 埋め)。`CreateInstance` は MS x64 の関数ポインタで直接呼ぶ。CRT の DllMain・TLS・SEH は走らせない。
+- 方式: `block24360_PE.bin` を ImageBase 0x180000000 に VA 通りに敷設 (`ott_native.c` と同じ方式、MAP_FIXED_NOREPLACE)。IAT 73 件のうち 7 件 (GetProcessHeap・HeapAlloc・HeapFree・GetLastError・SetLastError・RtlPcToFileHeader・RaiseException) を ms_abi の C 関数で実装し、残りは名前を記録して 0 を返す thunk (実行時に呼ばれた件数を出力)。HeapAlloc は 0x50000000 から bump で確保 (0 埋め)。`CreateInstance` は MS x64 の関数ポインタで直接呼ぶ。CRT の DllMain・TLS・SEH は走らせない。
 - 間接 call 4 件は int3 で捕捉し、呼び先が IAT なら実行、画像内ポインタ (0x268260・0x268268) なら飛ばして到達だけ数える。
 - 実測 (create のみ・`--slot 0 0`): wrapper 0x50000000 → vptr `0x1803dfcf8` (= vtable VA、一致)、内部オブジェクト 0x50000010。`check.py` は ALL OK (rc 0)。
 - ネガティブコントロール (`--neg-lea`: vptr 格納 lea の disp32 を +8 に壊す): vptr `0x1803dfd00`、`check.py --neg` は FAIL (rc 1)。
@@ -150,7 +150,7 @@ IAT 名の内訳 (件数):
 |---|---|---|---|
 | 1 | rdx=0,1,2,0xe (全件実行の 1 回目) | 4 件とも完走。rax は 0x50001620 等 (ヒープ内・rdx ごとに異なる) | 0 |
 | 1 | `--slot 1 0` (単独) | 30 秒以上止まり、timeout (rc 124)。上の全件実行と結果が違う | 未確定 |
-| 2 | rdx=0 | 完走。rax=0。内部オブジェクトの 2 range を変更 | 0 |
+| 2 | rdx=0 | 完走。rax=0。内部オブジェクトの 3 range を変更 | 0 |
 | 2 | rdx=1・2・0xe | 完走。rdx=2 のときだけ rax=2 (edx をそのまま返す経路がある) | 0 |
 | 3 | rdx=0 | 完走。rax は host 側 (0x56…) の値。内部オブジェクトは変化なし | 0 |
 | 3 | rdx=1 | SIGSEGV (rc 139)。rdx を指す値として読んでいる可能性 | 未確定 |
