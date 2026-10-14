@@ -57,3 +57,7 @@ for va in d:
     print(' ', va, cls(b[va]), {k: b[va].get(k) for k in keys}, '->', cls(f[va]), {k: f[va].get(k) for k in keys})
 PY
 fi
+echo "## 6. 後始末: 負の対照の route と wc を base (現 IR) で作り直す (後続の fa_sweep.sh が負の対照の route を拾わないように)"
+bash "$HERE/fa_route_build.sh" > /dev/null 2>&1
+bash "$HERE/diff/fa_wc_build.sh" > /dev/null 2>&1
+echo "[2394] work/fa_route と work/fa_wc を base で作り直した"
