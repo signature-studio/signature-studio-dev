@@ -11,7 +11,7 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T="$HERE/.."
 W="$HERE/work/fa_route"; mkdir -p "$W/tmp"
-SRC="$HERE/work/rt_freshair-core/after.0.restored.ll"
+SRC="${FA_SRC:-$HERE/work/rt_freshair-core/after.0.restored.ll}"
 MAP="$HERE/work/rt_freshair-core/map.json"
 DLL="${FA_CORE:-$T/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64}"
 if [ ! -f "$SRC" ] || [ ! -f "$MAP" ]; then echo "[fa_route] $SRC / $MAP が無い: 素材 work-icall を展開 (tools/icall/work/rt_freshair-core)" >&2; exit 2; fi
