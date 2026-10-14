@@ -3,8 +3,10 @@
 #   それを dlopen する薄い MAIN_MODULE=2 host (side_host.c) を作る。PERF-P8 real の PIC 税測定 (#1201) 用。
 #   env: SIDE_LIFT (既定 tools/ott/work/lift_reloc)  SIDE_OUT (既定 tools/ott/work/side_reloc)  SIDE_VIS (hidden | default, 既定 hidden)
 #   出力: $SIDE_OUT/side.wasm (dlopen される side module) と $SIDE_OUT/host.cjs (+ host.wasm)。
-#   フラグは lift_build.sh の std profile (liftlib/stdbuild.py flags std) と同じ。差分は -fPIC -fvisibility=... と -sSIDE_MODULE=2 と
-#   side_compat.h (診断用 stderr のみ side_stderr() 経由にする。SIDE_MODULE は main の stderr を GOT で受けられないため) だけ。
+#   compile の最適化・FP フラグは lift_build.sh の std profile (liftlib/stdbuild.py flags std) と同じ。compile の差分は
+#   -fPIC -fvisibility=... -sSIDE_MODULE=2 と side_compat.h (診断用 stderr のみ side_stderr() 経由にする。SIDE_MODULE は main の stderr を GOT で受けられないため)。
+#   link は lift_build.sh にある -sGLOBAL_BASE・-Wl,--initial-memory/--max-memory・-sMODULARIZE・-sEXIT_RUNTIME・-sALLOW_MEMORY_GROWTH・-sSTACK_SIZE・-sENVIRONMENT を持たない。
+#   host (side_host.c) は -O2 で別に作り、side の関数は host_run を介して呼ぶ。呼出し経路の差は REPORT_P8.md §9 (b)。
 set -euo pipefail
 OTT="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 source "$OTT/../shared/env.sh"

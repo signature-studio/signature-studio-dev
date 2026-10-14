@@ -192,9 +192,9 @@ Chrome 154.0.8037.97 headless, Dedicated Worker, `AMD EPYC 9V45 96-Core Processo
 
 既知類型との関係: 該当なし (計測のみ。既定 lift・x64c は未変更。相対化モードは #1200 の `OTT_RELOC=1`)。
 測定 commit: `3da6b009` (コードを変えた最後の commit。計測スクリプトと side ビルド定義を追加)。lift・side の全 artifact はこの commit の worktree で再ビルドして測った。
-差分 0 の証跡: `git diff 3da6b009 HEAD -- tools/ott tools/perf/p8/real` の出力は空 (本節の追記は REPORT と `tools/perf/p8/results/` だけ)。
-CPU: **AMD EPYC 7763 64-Core Processor (4 vCPU)**、node v22.23.3。計測時 loadavg 1 分値 0.2〜1.1 (`cpu`・`loadavg_before` 列を `results/real_ott_{reloc,pic}.jsonl` に記録)。
-ビルド: 既定 = `LIFT_OUT=… bash tools/ott/lift/lift_build.sh`、相対化 = 同 + `OTT_RELOC=1` (std profile = `-O3 -flto`)。SIDE = 相対化 lift の C を `tools/ott/lift/side_build.sh` で `-fPIC -fvisibility=hidden -sSIDE_MODULE=2` (同 std フラグ、差分は side_compat.h の stderr 置換のみ) にし、`side_host.c` (MAIN_MODULE=2) が dlopen して `ott_run` を呼ぶ。
+差分の証跡: `git diff 3da6b009 HEAD -- tools/ott tools/perf/p8/real` の差分は `tools/ott/lift/side_build.sh` の冒頭コメント (2 行を書き直し) だけ。コメント以外の変更は 0 (`git diff 3da6b009 HEAD -- tools/ott tools/perf/p8/real | grep '^[-+]' | grep -v '^+++\|^---' | grep -vE '^[-+]\s*#'` の出力が空)。測定 artifact の再ビルドは不要。
+CPU: **AMD EPYC 7763 64-Core Processor (4 vCPU)**、node v22.23.3。計測時 loadavg 1 分値 1.05〜1.25 (reloc 1.05〜1.23・pic 1.23〜1.25。`loadavg_before` 列を `results/real_ott_{reloc,pic}.jsonl` に記録。5 分値は 1.03〜1.05)。
+ビルド: 既定 = `LIFT_OUT=… bash tools/ott/lift/lift_build.sh`、相対化 = 同 + `OTT_RELOC=1` (std profile = `-O3 -flto`)。SIDE = 相対化 lift の C を `tools/ott/lift/side_build.sh` で `-fPIC -fvisibility=hidden -sSIDE_MODULE=2` にし、`side_host.c` (MAIN_MODULE=2、`-O2`) が dlopen して `ott_run` を呼ぶ。compile の最適化・FP フラグは既定と同じ (`stdbuild.py flags std`)。
 素材: `oc_artifacts: fl-win64 toolchain-emsdk analysis-ott-binaries work-m6-ott`。artifact の `tools/ott/work/lift/ottl.wasm` (793 KB) は std 以外の profile の旧産物で、§7 の 110 µs はそれによる。本節の数値とは直接比較しない。
 
 **(a) 相対化の CPU コスト** (`bash tools/perf/p8/real/reloc_cost.sh`、既定と相対化を交互に 3 独立プロセス、各 p50 の中央値 (min–max))
@@ -205,26 +205,29 @@ CPU: **AMD EPYC 7763 64-Core Processor (4 vCPU)**、node v22.23.3。計測時 lo
 | 4 | 91.52 (91.43–91.90) | 94.26 (94.10–94.37) | ×1.030 | 6b1696f0 (6/6) |
 | 16 | 91.91 (91.91–92.01) | 94.62 (94.56–94.71) | ×1.029 | 6b1696f0 (6/6) |
 
-- 相対化の定常コストは既定比 **×1.03**。N=1→16 の増分は相対化 +0.4%・既定 +0.8% で、N によらず平坦。各構成の run 間の幅は ≤0.5% なので、+3% は分解能の外。
-- 比は build に依存して約 0.5% 動く (x64c の差分を含む旧 HEAD `1dfed31a` で作った artifact では N=1 ×1.026 / N=16 ×1.029)。
+- 相対化の定常コストは既定比 **×1.03**。N=1→16 の増分は相対化 +0.4%・既定 +0.8% で、N によらず平坦。各構成の run 間の幅は PR 実測 (上表の min–max、jsonl) で ≤0.5%、検収側の独立再測 (同 head を再ビルド、記録は PR コメントで jsonl なし) で N=4 相対化の run 間幅 1.40% (94.08〜95.40)。+3% はどちらでも分解能の外。独立再測の比は ×1.031 / ×1.029 / ×1.029 で、上表 (N=1 のみ 0.3% 差) と同じ桁。
 
 **(b) SIDE_MODULE の PIC 税** (`RUNS=5 bash tools/perf/p8/real/pic_tax.sh`、静的相対化と SIDE を交互に 5 独立プロセス、N=1)
 
 | 構成 | µs/block p50 中央 (min–max) | 署名 |
 |---|--:|---|
-| 静的 (非 PIC) 相対化 `static_reloc` | 94.16 (94.03–94.80) | 6b1696f0 (5/5) |
-| SIDE_MODULE `-fPIC -fvisibility=hidden` `side_reloc_hidden` | 103.79 (103.67–104.81) | 6b1696f0 (5/5) |
+| 静的 (非 PIC) 相対化 `static_reloc` (`api.mjs` の `load()` 経由・JS から `ott_run` 直呼び) | 94.16 (94.03–94.80) | 6b1696f0 (5/5) |
+| SIDE_MODULE 経由 `side_reloc_hidden` (`-fPIC -fvisibility=hidden`。dlopen・host 中継・link 条件の差を含む) | 103.79 (103.67–104.81) | 6b1696f0 (5/5) |
 
 - **PIC 税 = ×1.102** (中央値の比。対ごとの比は ×1.094–×1.110)。署名は 10/10 プロセスで `6b1696f0` (side module の dlopen 経由でも一致)。
 - ネガティブコントロール: `SIDE_NEG=skip_data_install node tools/perf/p8/real/side_bench.mjs …` (`ott_data_install` を省く) は `Aborted()` で止まる。未敷設は fail-fast で検出される。
 - 合成カーネル (§2.1) の `-fvisibility=hidden` の増分は runner で ≤1.2%、EPYC で ≤2.6%。実 OTT の hidden は ×1.10 で、合成より大きい。合成の結論 (hidden は小さい) を実 OTT に当てはめてはいけない。
-- 機序は**未特定**。候補は (a) `-fPIC` による globals の `__memory_base` 相対化 (R[]/X[] の各アクセスが global を経由する)、(b) データ配置の差 (side は dlopen が確保する領域、静的版は GLOBAL_BASE 側)。両者は分離していない。host の JS→C 中継 (`host_run` 1 回/block) の寄与は**推定**で、§2.2 の呼出分解能 (±26 ns) の桁と見込むが未測定。
+- 機序は**未特定**。静的版と side 版の差は次のすべてで、PIC 税 ×1.10 はこの総和。内訳は分離していない:
+  1. **compile**: side は `-fPIC -fvisibility=hidden -sSIDE_MODULE=2` と `-include side_compat.h` を足す。compile の最適化・FP フラグは同じ (`stdbuild.py flags std`)。候補 (a): globals が `__memory_base` 経由でアクセスされる。
+  2. **link**: 静的版 (`lift_build.sh`) にあって side に無いもの = `-sGLOBAL_BASE=268435456`・`-Wl,--initial-memory/--max-memory=0x36000000`・`-sMODULARIZE`・`-sEXIT_RUNTIME=1`・`-sALLOW_MEMORY_GROWTH=1`・`-sSTACK_SIZE=2MB`・`-sENVIRONMENT=node`。静的版の data は GLOBAL_BASE 側。side 版は `host_set_gbase(0x30000000)` で base を与え、`host_data_install` で敷設する。候補 (b): データ配置の差。
+  3. **呼出し経路**: 静的版は `api.mjs` の `load()` が `_ott_data_install` だけを呼び、JS → `ott_run` を直接呼ぶ。side 版は JS → `host_run` (host wasm、`-O2`、std ではない) → dlopen 先の `ott_run` (関数ポインタ経由) の 1 段の中継が入る。1 block あたりの寄与は**推定**で、§2.2 の呼出分解能 (±26 ns) の桁と見込むが未測定。
+  4. **global の import**: side.wasm は `__stack_pointer` と `__memory_base` を mutable global として import する。静的版の `ottl.wasm` は global の import が 0 件。候補 (c) (スタックポインタ・base の参照コスト)。**未検証**。
 
 **範囲 / 検証**: node のみ (Chrome Worker・AudioWorklet は未測)。N=1 のみ (side module を 1 つ dlopen。同居させるには別バイト列の一意化が要る)。`-fvisibility=default` の実 OTT は未測。署名検査は `check` 系の別アルゴリズムではなく bench と同じ FNV (1000 block) の手順。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| side module の N≥2 (同居・静的同居・別バイト列の複数 dlopen) | 動的リンクの同居時の CPU・起動 (§2.3 の合成値は未確認) | #166 (PERF-P8) にコメント |
-| `-fvisibility=default` の実 OTT 測定 (合成では大きい増分) | PIC 税の上限 | #166 にコメント |
-| PIC 税の機序 (-fPIC の寄与とデータ配置の寄与の分離) | perf gate のしきい値設計 | #166 コメント (PERF-P7 #165 の低負荷再測と統合) |
-| Chrome Worker・AudioWorklet 上の side module | 実運用の可否 | #166 にコメント |
+| side module の N≥2 (同居・静的同居・別バイト列の複数 dlopen) | 動的リンクの同居時の CPU・起動 (§2.3 の合成値は未確認) | 親 #989 (OPEN) への提案 (子 issue 化の要否は PM 判断) |
+| `-fvisibility=default` の実 OTT 測定 (合成では大きい増分) | PIC 税の上限 | 親 #989 (OPEN) への提案 (PM 判断) |
+| PIC 税の機序 (-fPIC の寄与・データ配置・呼出し経路・global import の分離) | perf gate のしきい値設計 | 親 #989 (OPEN) への提案 (PM 判断) |
+| Chrome Worker・AudioWorklet 上の side module | 実運用の可否 | 親 #989 (OPEN) への提案 (PM 判断) |
