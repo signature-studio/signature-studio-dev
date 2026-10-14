@@ -82,6 +82,8 @@ const ADDED_KEYS = [
   "killed_stopped", "killed_issues",
   // VM の状態の取り込み (#2343)
   "launch_blocked", "imported_at",
+  // launch を止めている区間と、15 分以上止まっている (#2795)
+  "launch_halted", "launch_halted_overdue",
   // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
   "hold",
 ];
