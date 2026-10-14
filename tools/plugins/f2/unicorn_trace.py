@@ -7,6 +7,7 @@
 # usage: python3 unicorn_trace.py <block_PE.bin> <entry_hex> [-r reg=hex ...] [-a hex ...]
 #                                 [-w lo:hi ...] [-q hex ...] [-m MAX_INSN]
 import argparse
+import collections
 import struct
 
 import pefile
@@ -65,7 +66,7 @@ def main():
     names = {}
     k = 0
     uc.mem_map(STUB, STUB_SIZE, UC_PROT_ALL)
-    for ent in getattr(pe, 'DIRECTORY_ENTRY_IMPORT', []):
+    for ent in getattr(pe, 'DIRECTORY_ENTRY_IMPORT', []) + getattr(pe, 'DIRECTORY_ENTRY_DELAY_IMPORT', []):
         for imp in ent.imports:
             nm = imp.name.decode() if imp.name else 'ord%d' % imp.ordinal
             sva = STUB + 16 * k
@@ -89,17 +90,20 @@ def main():
     hits = {}
     log = []
 
-    def on_stub(uc_, addr, size, ud):
+    tail = collections.deque(maxlen=12)
+
+    def on_code(uc_, addr, size, ud):
+        tail.append(addr)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
-        uc_.reg_write(UC_X86_REG_RAX, 0)
+            uc_.reg_write(UC_X86_REG_RAX, 0)
 
     def on_write(uc_, access, addr, size, value, ud):
         if len(log) < LOG_LIMIT:
             rip = uc_.reg_read(UC_X86_REG_RIP)
             log.append('  write %#x size=%d val=%#x rip=%#x' % (addr, size, value, rip))
 
-    uc.hook_add(UC_HOOK_CODE, on_stub, begin=STUB, end=STUB + STUB_SIZE - 1)
+    uc.hook_add(UC_HOOK_CODE, on_code)
     for item in a.w:
         lo, hi = item.split(':')
         uc.hook_add(UC_HOOK_MEM_WRITE, on_write, begin=int(lo, 16), end=int(hi, 16) - 1)
@@ -117,6 +121,7 @@ def main():
     if rip != SENT:
         ret = struct.unpack('<Q', uc.mem_read(uc.reg_read(UC_X86_REG_RSP), 8))[0]
         print('fault: [rsp]=%#x (呼出し元の戻り番地。間接 call なら呼出し先が 0 の可能性)' % ret)
+        print('last executed: ' + ' '.join('%#x' % x for x in tail))
     for q in a.q:
         print('after  [%#x] = %#x' % (q, struct.unpack('<Q', uc.mem_read(q, 8))[0]))
     print('stub hits (%d distinct):' % len(hits))
