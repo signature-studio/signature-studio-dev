@@ -2,7 +2,8 @@
 //   DllMain attach (寛容起動) の後、glue 経由で CreateFruityInstance(0xC0, 0xEDE95A, host, &iface) を呼ぶ。
 //   THostInstance (0x38 B) は STARTUP.md §0 の layout (+0 vtable, +8=1, +0xc=flags, +0x18="FL Studio", +0x30=cmdline バッファ) で wasm メモリに作る。
 //   署名検証 (S14) は shim の WinVerifyTrust=0 / CertGetNameStringW="Image Line NV" で通す (shim 側の既存実装)。
-//   node cfi_probe.mjs [--wasm path.cjs] [--out cfi.json] [--flags 0]
+//   node cfi_probe.mjs [--wasm path.cjs] [--out cfi.json] [--flags 0] [--trace-out open_trace.jsonl]
+//   open_trace: CreateFileW の呼出し (WIN-13 #2905・shim/src/file.c の SHIMOPEN 行) を assettrace の trace 形式 v1 で保存する
 import fs from 'fs';
 import path from 'path';
 const HERE = path.dirname(new URL(import.meta.url).pathname);
@@ -44,6 +45,9 @@ try {
 out.iface = '0x' + dv().getBigUint64(iface, true).toString(16);
 mod._gui_reach_dump();
 for (const l of errs) { const m = /GUI-REACH (\d+) (\w+) (\d+) (IMPL|STUB) P(\S+)$/.exec(l); if (m) out.reach.push({ order: +m[1], name: m[2], calls: +m[3], kind: m[4], prio: m[5] }); }
+out.open_trace = errs.filter((s) => s.startsWith('SHIMOPEN ')).map((s) => JSON.parse(s.slice(9)));
+const tr = opt('--trace-out', null);
+if (tr) fs.writeFileSync(tr, out.open_trace.map((o) => JSON.stringify(o)).join('\n') + (out.open_trace.length ? '\n' : ''));
 out.errs_n = errs.length;
 out.errs_tail = errs.slice(-12).map((s) => s.slice(0, 200));
 out.icall_miss = mod._m11_icall_miss();

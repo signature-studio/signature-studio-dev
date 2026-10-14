@@ -79,6 +79,7 @@ expect_fail strict "GetProcAddress(kernel32.dll!NoSuchKernelApi)"
 expect_fail bstrfree "SysFreeString (管理外ポインタ)"
 expect_fail csnull "EnterCriticalSection (NULL/misaligned)"
 expect_fail dwrite "DWriteCreateFactory (DirectWrite 未対応"
+expect_fail shbrowse "SHBrowseForFolder"
 expect_fail deadlock "WaitFor\*Object(INFINITE)"
 rc=0; node "$BUILD/shimx_test_st.cjs" exit > /dev/null 2> "$BUILD/ff_exit.err" || rc=$?
 [ "$rc" -eq 7 ] || die "ExitProcess(7) の終了コードが $rc"
