@@ -52,3 +52,31 @@ bash tools/plugins/framework/fw_stage2.sh                      # exit 0・smoke 
 bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh        # FAIL (Phase B OOB) が期待値
 bash tools/plugins/framework/hostshim/hs_dbg.sh                # trap 直前の到達点 (0x40d6e0 → 0x40e720)
 ```
+
+## 6. 2 回目 run (受入 3: fail-soft 3 件の戻り値の呼出側読解)
+
+- 起点: `origin/main` 6e001233。worktree `ws-1609`・branch `1609-plg-p0b-6-fail-soft-callers`。コード変更なし (本 REPORT の追記のみ)。
+- 素材: `fl-win64`・`work-fw-stage1` を展開。`fw_stage2.sh` は stage-1 再利用で作り直し。
+- 実測 (同一 commit 6e001233 で各 1 回):
+
+| 手順 | 結果 | 所要時間 (real) | load (開始時) |
+|---|---|---|---|
+| `fw_stage2.sh` (`FL_WIN64_DIR` 指定・stage-1 再利用) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 4 分 48 秒 | 0.52 前後 (未計測の開始時) |
+| `hs_e2e.sh --fresh` | exit 1 / Phase A `dispatch=38 ff=0` (回帰 OK) / Phase B `memory access out of bounds` / `status=0xffffffff plug=0x0 rec=7` | 1 分 26.9 秒 | 0.03 / 0.66 / 0.60 |
+
+- 1 回目 (§2) と同じ失敗 (Phase B OOB) を再現。Phase A 回帰は両回とも `dispatch=38 ff=0`。
+
+### 6.1 fail-soft 3 件の呼出側 (`hs_flat3.ll` の IR 読解)
+
+| 関数 | 呼出元 (IR 行) | 戻り値の使われ方 (IR から読めた範囲) | 0 のときの扱い |
+|---|---|---|---|
+| `0x52cf40` (RTL ハッシュ表) | `0x52d230` (625849 行付近) | rax (`[9048192]`) を別の値 `%10` と `icmp eq` で比較して分岐。`%10` の値は未確定 | 0 が「見つからない」かは未確定 (比較先の値の読解が必要) |
+| `0x4e6060` | `0x4e6140` (406491 行) | 戻り値の下位 1 byte が 0 → `dec_label_pc_8f3aa6`、非 0 → `dec_label_pc_8f3a52` (@389/@390 の文字列を設定する経路) | 0 は非エラー側 (`8f3aa6`) に進む。推定 |
+| `0x4181e0` | `0x4070f0` (9072 行) | 戻り値 `%15` をベースポインタとして `+24+(rbx<<?)` の byte を読み、その byte が 0 なら loop 継続 (9085 行付近) | **0 は「該当なし」ではなく、低アドレスの byte を読む経路になる**。fail-soft 0 の意味付けは要再検討 |
+
+- 結論: 受入 3 は **未達**。`0x4e6060` は 0 = 非エラー側と読めたが、`0x52cf40` と `0x4181e0` は 0 の意味が確定していない。`0x4181e0` は「0 = 該当なし」という現行の注釈 (`fw_hostfix.py`) と合わない可能性がある。
+- 次の作業: `0x52d230` の比較先 `%10` の値 (`@442` + offset の field) を読み、`0x4070f0` の rbx ループ条件を読む。
+
+### 6.2 受入 2 (fold deref の解消) について
+
+- 未着手。§4 の残作業 A のとおり `0x40d6e0` の `[0x710040]` の値は FL 本体の export table 由来で、`0x40d820` の引数復元が必要。本 run の時間内では完了しない。
