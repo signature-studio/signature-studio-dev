@@ -192,3 +192,28 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 ## 13. AggCreateInstance の呼び出し元の手がかり
 
 結論: block18797 に lazy 初期化 loader がある。消費側は未特定。測定値は `REPORT_APPENDIX_AGG2D.md` §13。
+
+## 14. vtable の所属クラス (MSVC RTTI の COL)
+
+> 測定 commit: `b77ab6c4` (`agg2d_rtti.py` を追加した commit。以後のコード差分は本ファイルのみ)。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_rtti.py` (依存: `pefile`・`capstone`、0.09 s)。出力は `tools/shared/work/agg2d_rtti.json` (gitignore)。vtable VA は `agg2d_vtable.py` の検出関数を流用。
+
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| vtable VA | `0x1801dbec0` (§5 と一致) | `agg2d_vtable.py` の検出 |
+| COL VA (`vtable[-1]`) | `0x1801e29b8` | x64 COL (signature = 1) |
+| 所属クラス | `.?AVAgg2D@?A0x604ded79@@` (Agg2D、無名名前空間) | COL → TypeDescriptor |
+| 基底クラス | `.?AVAgg2DIntf@@` の 1 個 | ClassHierarchyDescriptor |
+| 同じ COL を指す vtable | **1 個** (本 vtable のみ、slot 130) | `.rdata` 全 qword 走査 |
+| `Agg2DIntf` の COL / 独立 vtable | **0 / 0** | 同上 |
+
+**判明**:
+- 130 slot の vtable は Agg2D 具象クラスの vtable で、DLL 内で COL を指す vtable は 1 個。`AggCreateInstance` が返すオブジェクトの vtable はこれに限られる (vtable を書くのは ctor の 1 か所のみ、§5)。
+- (a) の glue の範囲の上限は、この vtable の **実体 81 slot (unique 78 関数)**。残り 49 slot は同一の `ret 0` (`0x18000c530`、`REPORT_APPENDIX_AGG2D.md` §12)。
+- `Agg2DIntf` は独立 vtable を持たない。FL 側がどのインタフェース型で呼ぶかは、Agg2D vtable の slot 順に依る (単一継承の slot 順は未検証)。
+
+**未判明**:
+- FL 本体がどの slot を実際に呼ぶか。静的には消費側 (vtable の呼び出し箇所) を特定できていない (§13)。
+- 78 関数の役割と、各関数が呼ぶ Blend2D API の名前 (export・シンボル無し)。
+
+**判断への影響**: (a) の既定案 (glue のみ C++ 再実装) の範囲は「FL が呼ぶ slot 集合」と「各 slot の呼び先 Blend2D 内部関数」で決まる。前者は静的測定では決まらず、実行時の vtable 呼び出し記録が要る。その記録は FLEngine の boot が最初のウィンドウに届くことが前提で (`tools/flelift/boot/REPORT.md` §9 は unit 209 で停止)、(b) の画素比較と同じ依存。(a) と (b) は boot の進行に依存し、本 issue 単独では前進しない。
