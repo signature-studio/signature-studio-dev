@@ -9,7 +9,7 @@
 - 入力 IR: `tools/m11/work/boot_final.ll` (`work-m11` 展開物・sha256 `69c774…`・REPORT_N98 と同一)。
   e2e 実行後の `boot_final.ll` の sha256 は `de46cad…` で、e2e 経路の入力 IR の指紋 (`ir_sha256`)。stats 経路は書き換え前の IR (原因は未切り分け)。
 - PE: `fl-win64` の `extracted/block00031_PE.bin` (sha256 `b2c64da4…`)。
-- stats 経路: `bash tools/m11/m11_sigfix_stats.sh` (`FL_WIN64_DIR` 指定・単発 33 秒)。
+- stats 経路: `bash tools/m11/m11_sigfix_stats.sh` (`FL_WIN64_DIR` 指定・単発 33 秒)。e2e は同じ `boot_final.ll` を書き換えるため、stats を回す前に work-m11 から `tools/m11/work/boot_final.ll` を展開し直す (展開直後の sha256 `69c774…`。書き換え後に回すと inherit が 1,185 件になる)。
 - e2e 経路: `work/lift_pe.sha256` を現 PE の指紋で作成 (REPORT_N53 と同じ。RetDec 再 lift を省く) → `M11_SIGFIX_RECOVER=1 bash tools/m11/m11_e2e.sh` (3 分 7 秒)。
 
 ## 2. 方式 (`m11_argrecover.py` の `Defchain`)
