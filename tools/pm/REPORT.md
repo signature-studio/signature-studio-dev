@@ -172,10 +172,12 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 ## 14. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
 
-測定した commit: `aeaaa591` (コードを変えた最後の commit。main `7c072bd0` の取り込みと review 指摘の修正を含む)。取得時刻は UTC (2026-10-14)。`git diff aeaaa591 HEAD -- infra/pm-worker` は 0 行 (以後の commit は `tools/pm` と `docs` だけ)。
+測定した commit: `8e4f299c` (コードを変えた最後の commit。origin/main `3a6fcf81` の取り込みと競合の解消を含む)。取得時刻は UTC (2026-10-14)。`git diff aeaaa591 8e4f299c -- infra/pm-worker` は 995 行 (main 側の取り込み分を含む。PR 自身の差分は `git diff 3a6fcf81 8e4f299c -- infra/pm-worker` の 532 行)。以後の commit は `tools/pm` と `docs` だけで、`git diff 8e4f299c HEAD -- infra/pm-worker` は 0 行。
 
-- 単体テスト: `git archive aeaaa591 infra/pm-worker tools/pm` を作業用の一時 dir に展開し、`cd infra/pm-worker && node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` → **173 pass / 0 fail**、14.9 s、load 0.69 → 0.90 (Node 22.23.3)。
-- Worker 実行環境の vitest: 同じ展開先で `npm ci` (86 packages・4 s) → `npx vitest run --config vitest.config.ts` (`test/runtime/` の 3 件) → **3 pass / 0 fail**、2 s。
+競合の解消: `infra/pm-worker/src/engine.ts` の `status()` で、PR 側の `runCounts(now)` と main 側の自律運転の指標が同じ `const now` を二重に宣言していた (`SyntaxError: Identifier 'now' has already been declared` で 10 ファイルが落ちた)。宣言を 1 つに減らした (同じ `this.d.now()` の値)。`test/status.test.ts` の既存キー一覧は両側のキーを残した。`tools/pm/REPORT.md` の節番号は main 側の §13 (R2 素材投入) を保ち、本節を §14 に振った。
+
+- 単体テスト: `git archive 8e4f299c infra/pm-worker tools/pm` を作業用の一時 dir に展開し、`cd infra/pm-worker && node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` → **194 pass / 0 fail**、14.9 s、load 0.74 → 1.28 (Node 22.23.3)。aeaaa591 の時点は 173 件 (main の取り込みで増えた分を含む)。
+- Worker 実行環境の vitest: 同じ展開先で `npm ci` (86 packages・3 s) → `npx vitest run --config vitest.config.ts` (`test/runtime/` の 3 件) → **3 pass / 0 fail**、1.5 s。
 
 ネガコン (受入条件 6)。対応するテストは `test/target.test.ts`:
 
