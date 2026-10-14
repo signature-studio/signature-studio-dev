@@ -2,7 +2,7 @@
 
 # #2585: pm-worker の Workers Builds install と Workers Logs の測定
 
-測定 commit: `6868e0a1` (`infra/pm-worker/` のコードを変えた最後の commit。`minimumReleaseAgeExclude` を外した commit。`origin/main` (`064af0d8`) を取り込んだ merge `be1ee59d` の後)。PR #2586。環境: pnpm 12.10.1 (root `devEngines` と同じ)・Node v22.23.3 (runner)・wrangler 4.151.0。
+測定 commit: §4 は `6868e0a1` (`infra/pm-worker/` のコードを変えた最後の commit。`minimumReleaseAgeExclude` を外した commit。`origin/main` (`064af0d8`) を取り込んだ merge `be1ee59d` の後)。§6 は `72287ff2` (`origin/main` (`e1e816c2`) を取り込んだ merge。PR #2586 の競合解消)。PR #2586。環境: pnpm 12.10.1 (root `devEngines` と同じ)・Node v22.23.3 (runner)・wrangler 4.151.0。
 
 ## 0. 取得方法
 
@@ -108,3 +108,22 @@ exclude を入れていた時点の測定。PM 判断 (2026-10-14) で採らな�
 ## 5. 未解決
 
 未解決の一覧 (起票先つき) は PR #2586 の本文の未解決表が正本。本書には数値だけを残す。
+
+## 6. merge 後の再測定 (測定 commit `72287ff2`)
+
+`origin/main` (`e1e816c2`) の取り込みで `infra/pm-worker/` のコード (autoclose・engine・テスト) が変わった。§4 の値は今の HEAD の値ではないので、ここで測り直す。
+
+- 競合は `infra/pm-worker/README.md` の 1 箇所 (テストのコマンド)。PR 側の `pnpm` 表記を採り、main 側の注記 `/oc 投稿の観測 (#2342) のネガコン` を `test:unit` の行に足した。他の main 側の変更は自動マージ。
+- 既定設定の install (`CI=true`・`node_modules` を削除してから実行。16:41Z): rc=1。`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` (3 版・§4-1 と同じ)。
+- 診断 (repo の設定・lockfile は変えず、CLI の一時上書きだけ): `pnpm install --frozen-lockfile --config.minimum-release-age=0` rc=0 (`pnpm-lock.yaml` と `git status` の差分 0)。以下はこの install の後の値。この上書きは Workers Builds の install には効かない。
+
+| コマンド (測定 commit `72287ff2`) | 結果 | rc |
+|---|---|---|
+| `pnpm test` (依存なし) | tests 277 / pass 277 / fail 0 (19.1 s) | 0 |
+| `pnpm run test:unit` | 19 / 19 (2 files, 1.06 s) | 0 |
+| `pnpm run test:workers` | 3 / 3 (1 file, 1.54 s) | 0 |
+| `pnpm exec wrangler deploy --dry-run --outdir <repo 外の一時 dir>` | Total Upload 126.97 KiB / gzip 38.81 KiB。bindings は `PM` (`PmDO`) と `[vars]` 10 個 (`REPO` `ORG` `TARGET` `BATCH` `BOT_LOGIN` `PM_LOGINS` `LIVE_LAUNCH` `LIVE_DISPATCH` `NO_PR_COOLDOWN_H` `COMMENT_MAX_PAGES`) | 0 |
+| `wrangler.toml` の `[observability]` | `enabled = true`・`head_sampling_rate = 1` | — |
+
+- `pnpm run` は既定設定の install 前検証を走らせ、`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` を表示して `[WARN] The install that runs before scripts failed` を出す。ただしスクリプトは実行された (`test:workers`・dry-run のログ)。`pnpm run` の rc は 0。
+- 2026-10-15 05:55Z 以降に既定設定の install が通るかは、まだ確認していない (未確認)。
