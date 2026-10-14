@@ -11,7 +11,7 @@
   - 行 19124 `store i64 %1, ptr %13` は任意アドレスへの "emsc" 書込み (`WCV`、BLK 範囲外の `0x104af4d8` 等 8 件)。"emsc" の発生源は行 19124 の `%1` で、これが 19132・19134 の値になる。
 - **値 "emsc" の出所は線形メモリの address 0 (null ページ)**。行 18807–18813 の load chain: `%23 = load [%1+8]` = `0x400000004` → `%25 = load [0x400000004]` = 0 → `%29 = load [0]` = "emsc" (§2)。
 - **emscripten のヌルページ sentinel**: 空の emscripten モジュール (main が 0 を返すだけ) でも address 0 から `65 6d 73 63` が見える。つまり "emsc" は route が敷設したデータではなく emscripten runtime 自身が置く値。
-- **分類 (暫定)**: 書込み命令 (store) は **lift 側** (lift が生成した IR の store)。ただし値は **null ページを指すポインタ chain** を経由する。ポインタ値 `0x400000004` の由来は §6 で i32 2 本の 8B 読みと特定 (残は元の機械語との突合)。route 側 (data 敷設) は否定 (§3)。
+- **分類 (暫定)**: 書込み命令 (store) は **lift 側** (lift が生成した IR の store)。ただし値は **null ページを指すポインタ chain** を経由する。ポインタ値 `0x400000004` の由来は §6 で i32 2 本の 8B 読みと特定。元の機械語との突合は #2394 で完了し、真因は 2 store の IR 脱落 (`REPORT_APPENDIX_2394.md`)。route 側 (data 敷設) は否定 (§3)。
 - **受入条件の充足状況**:
   - [x] BLK+0 への store 命令を IR 行まで特定 (行 19132)。
   - 未達は子 issue へ移した (PM 判断で #1998 の範囲を縮小): wasm オフセット・route/lift の最終分類 → #2310 (ICALL-72)、値 `0x400000004` の生成元 → #2311 (ICALL-73)。
@@ -86,7 +86,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 値 `0x400000004` の生成元は §6 で特定 (i64 store は 0 件。`function_181057b38` の隣接 alloca 2 つに入る `store i32 4` 2 本の 8B 読み)。残: 元の機械語との突合 (SlateCore 未展開)、alloca 配置が RetDec 由来か元の stack frame 由来かの切り分け | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #2311 (ICALL-73) 残件 |
+| 値 `0x400000004` の生成元は §6 で特定 (i64 store は 0 件。`function_181057b38` の隣接 alloca 2 つに入る `store i32 4` 2 本の 8B 読み)。元の機械語との突合と alloca 配置の由来は #2394 (ICALL-75) で解消: 元から 2 本の 4B store で、真因は RetDec が `[rbp-8]`・`[rbp-0x20]` の 2 store を IR から落とすこと (`REPORT_APPENDIX_2394.md`)。残: 脱落 store の復元 pass | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #2427 (ICALL-77) |
 | IR 行 19132 → wasm 命令オフセットの対応・route/lift の最終分類 | 受入条件「wasm オフセットか IR 命令まで」の wasm 側 | #2310 (ICALL-72) |
 | 引数付き lifted 関数の dispatch table 登録規則 | abort 6 件 (1852 付録 §2) | #1897 (ICALL-49) 既存 |
 | 監視の対象外: `llvm.memcpy` / `llvm.memset` 等の intrinsic、`cmpxchg` / `atomicrmw`、C 側 (`oi.*.c`・`rt/*.c`)、emscripten libc の書込み。集成体型 (`[N x T]`・`{...}`) の store は `fa_wc.py` が挿入せず件数を出す (`unhandled`) | 上記の書込みは BLK 窓への書込みを見逃しうる。`fa_wc.py` は `work/fa_route/oi.flat.ll` の 5526 store 中 5526 件を挿入 (未対応 0) で、この集合には該当しない | 本付録 (監視の限界として明記) |
@@ -126,4 +126,4 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 - 読み元: `function_181057a90` (IR 18807–18813) は `%1` = `load [0x36319018]` = `&stack_var_-24` (`0x104af3d8`)。`load [%1+8]` が `0x104af3e0` の 8B を読み、`0x400000004` を得る。`load [0x400000004]` = 0、`load [0]` = "emsc"。
 - つまり "emsc" は address 0 の sentinel を、この 8B 読みの連鎖で指している。
 
-**未確定**: (a) 元の x86 の機械語でも同じ 2 本の 4B store か (`SlateCore.core_64` 未展開のため未突合)、(b) alloca の配置が RetDec 由来か元の stack frame 由来か。(a) の突合は `fetch.sh` 実行後に行う。
+**(a)(b) は #2394 (ICALL-75) で解消** (`REPORT_APPENDIX_2394.md`): (a) 元の x86 の機械語でも `mov [rbp-0x30],eax` / `mov [rbp-0x2c],eax` の 2 本の 4B store。8B で読む命令は元に無い。(b) 配置は元の stack frame ではなく wasm backend の frame layout 由来で、真因は RetDec が `[rbp-8]`・`[rbp-0x20]` の 2 store を IR から落とし、callee の `[r8+8]` が alloca の範囲外を指すこと。

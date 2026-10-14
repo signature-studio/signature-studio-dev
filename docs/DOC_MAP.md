@@ -126,6 +126,7 @@
 | `tools/icall/REPORT_APPENDIX_2231.md` | ~113 | icall #2231 (ICALL-67): fatal RIP 群 B/C/D/E/G/H の引数由来 (D・G は heap 引数の直接使用、B・E・H は未追跡)、群 C の `SLOT_ENC_INIT` 因果、群 I の整列違反 (thunk 呼出し元の `rsp` 不整列)。`slot_trace.sh` の fatal 抽出に `regs`/`heap_args` を含める修正。測定 commit と差分 0 の証跡を §5 に記載 |
 | `tools/icall/REPORT_APPENDIX_2081.md` | ~78 | icall #2081 (ICALL-57): SlateCore encoded slot の静的解析 (`slatecore_fptr_table.py`)。受入条件 1・3 は未達で #2120 へ。受入条件 2 は部分達成 (12 slot は zero-fill 部の参照として確認) |
 | `tools/icall/REPORT_APPENDIX_2262.md` | ~70 | icall #2262 (ICALL-69): site `0x1810553e6` の target `0xb77e88c8000` の由来 (= `ror(cookie,50)` の下位 44 bit。lifted IR が cookie を `load i32` で読むことが原因)。`fa_sweep.sh 8 60` の再測定 (131 関数 artifact・bit 一致 47)。表への包含判定と cookie 幅の修復は子 issue へ移管 |
+| `tools/icall/REPORT_APPENDIX_2394.md` | ~120 | icall #2394 (ICALL-75): `function_181057b38` の値 `0x400000004` は元の機械語に無い。真因は RetDec が frame 上の 2 store を IR から脱落させること (段の特定・回復実験・census・D23 行案は付録)。再現は `tools/icall/frame_slot_2394.sh` |
 | `tools/icall/REPORT_APPENDIX_2310.md` | ~65 | icall #2310 (ICALL-72): BLK+0 (0x36319008) 書込み store の wasm オフセット対応の付録。route/lift 分類は #2311 へ。`fa_sweep.sh 8 60` の実測 (bit 一致 46 / 値の不一致 10) は 1998 §4 の 47 / 9 が正本で、±1 揺れは #2302 で追跡 |
 | `tools/icall/REPORT_APPENDIX_2079.md` | ~62 | icall #2079 (ICALL-56): closure 外 indirect target `0x1810806a0` の扱い (closure root に追加・152 関数)。`fa_sweep.sh` の実測と、`0x1810553d0` の値の不一致が未解消であること (#2120 で追跡) |
 | `tools/icall/REPORT_APPENDIX_1921.md` | ~72 | icall #1921 (ICALL-51): SlateCore の encoded 関数ポインタ表・cookie の特定と、native loader の enc(NULL)=cookie 初期化 (`FA_ENC_INIT=1`)。受入条件 1・2 は部分達成 (wasm 側と api-set 表は #2009・#1922 へ移管)。`fa_sweep.sh 8 60` の件数変化の実測を含む |
@@ -190,12 +191,14 @@
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/qstore/REPORT.md` | ~90 | 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS D17) の検出・修復・idx 87/898/58–63 の帰属・#513 取り込み後の実測 (#516) |
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
+| `tools/m11/trap_triage/REPORT_2212.md` | ~115 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
 | `tools/m11/trap_triage/REPORT_714.md` | ~242 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_1602.md` | ~191 | #1602: C 版内 stderr 計測 (§13)・hook 変種 (§14)・範囲内常時出力版 (§15) の不採用試行と、V8 inspector (`inspect_trap.mjs`、build 不変) による trap 時点の wasm local 採取 (§16、判定不変・304/555/923 の実値) |
 | `tools/m11/trap_triage/REPORT_1352.md` | ~50 | #1352: 計測 build (`M11_INSTR_413060=1`) の OFF は HEAD `1be53b3f` で既定と同じ 870/24/0 (871/23 は再現せず)・`M11_DEST_READ=0` でも 870/24/0。3 点切り分けは未実施・再現 `repro_1352.sh` |
 | `tools/m11/trap_triage/REPORT_882.md` | 212 | #882: M11 survey trap の p-144 再現・40ffe0 入口 probe の本体 (§0 結論・§1〜§11)。§12・§13 は `REPORT_882_APPENDIX.md` に分割移動 (250 行上限) |
 | `tools/m11/trap_triage/REPORT_882_APPENDIX.md` | ~89 | #882 の §12 (7 回目 run: p-144 再現測定) と §13 (8 回目 run: 40ffe0 入口 probe の実測) の全文。REPORT_882.md の 250 行上限のため分割移動 |
 | `tools/m11/trap_triage/REPORT_2373.md` | ~90 | #2373: unit 895 の `60a270` (this=0) の caller は `e3ef60` (9 箇所)。`60a270` の caller 列挙・経路の静的確認・`e3ef60` の 9 箇所の this のフィールド。再現 `callers_of.py` |
+| `tools/m11/trap_triage/REPORT_2408.md` | ~115 | #2408 (親 #2369、REPORT_1676 §14): list B `+8/+16` の書込み主体。全 store 計装が unit 106 で止まる原因 (`m11_sw` の `-O0`)・IR 全関数の計装結果 (`+16` は `function_50a830` の 1 件、`+8` は IR の store 0 件)・欠落 IR (`50a830` の仮想 Grow/Notify、D15 同類型)・DEFECTS 行案。再現 `store_watch_2408.sh` / `reach_2408.py` |
 | `tools/m11/trap_triage/REPORT_1317_APPENDIX.md` | ~241 | #1317 の §10 (#1786 run: 計装の試行) と §12 (8 回目 run: `b36d3b5f..e7c5c062` の 6 ファイル diff 全文)。REPORT_1317.md の 250 行上限のため分割移動 |
 | `tools/m11/trap_triage/REPORT_1542.md` | ~90 | #1542: 計測 build の getmem −4 (既定 2012 / 計測 OFF 2008) は post の 3 点 (probe・改名・宣言) に帰属せず、IR 同一でも残る (C 側の計測 flag が候補)。C 側の切り分けは #1701。A〜D 再現 `repro_1542_split.sh` |
 | `tools/m11/trap_triage/REPORT_1275.md` | ~110 | #1275: `function_535c2e` は `function_535bf0` 内の `ret` (VA 0x535c2e) で、RetDec が call に変えた lift 起因の機械語突合・ClassCreate ON/OFF/転記 ON の 304/555 kind 遷移・再現 `n78_measure.sh` |
@@ -234,6 +237,7 @@
 | `tools/m11/ldfix/REPORT_1169.md` | ~60 | D17 spill 宛 CELL_COLLAPSED 37 site / 22 関数の消費者追跡の部分達成: 現 HEAD の基準値の実測 (store 宛 86→53、spill 宛は修復前後 37)、目視判定 18 行の分類 (TSV 突き合わせ可能な 6 行は全て TRUE_DROP)。修復 pass 未着手。残件は候補 31 site が #1161 (LD-35)、修復 pass と修復後の残数が本 issue の残件 (#1169) |
 | `tools/m11/ldfix/REPORT_2389.md` | ~51 | LD-110 (#2389): cf3790 の spill 宛 3 site (cf3c7a・cf3cbb・cf3d20) の reg2mem 結線 (frame F=472・`stack_var_-(F-disp)`) で TRUE_DROP を確定。ld105 突合表の slot 名 `-(disp+8)` の誤りの訂正とネガコン |
 | `tools/m11/ldfix/REPORT_2316.md` | ~75 | LD-108 (#2316) の部分達成: 41a670 の head 解除 store (D20) の検証用パッチ (`fix_ld108.py`、本番 IR 生成経路には未配線) と wasm 直接呼びの修復前後の実測、`audit_lsf_disp.py` の検出と残 SUSPECT、survey 前後の差。`audit_lsf.py` 統合は #2396、本番配線は #2402 |
+| `tools/m11/ldfix/REPORT_2396.md` | ~120 | LD-111 (#2396): `audit_lsf_disp.py` の変位形を `audit_lsf.py` に統合 (既存 3 判定は byte 不変、SUSPECT_DISP_VAS を並べて出力)。残 SUSPECT 3 件 (6677a0・d237e0・de1da0) を機械語 `movs` の列挙漏れ (誤検出) と確定し、列挙を拡張して 4 → 1 件 (41a670 のみ、修復後 0)。独立算法 `triage_ld111.py` の突合と NC 5 本 |
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 
@@ -414,7 +418,7 @@
 | `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~180 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照)。FA-14 (#907): §7 回帰セットの seed 依存実測・§8 受入の未達と起票先 (#1105)・§9 lift2_e2e 実測 (実測 commit `c531a0cb`) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX_FA4.md` | ~50 | lift2 REPORT §12 全文 (FA-4 #51: チェーン構成 / マクロ→子パラメタ ID 写像)。250 行上限のため無変更で分割移動 |
 | `tools/targets/freshair/lift2/REPORT_FA7.md` | ~70 | FA-7 (#452): macro 子 param ID 0x157/0x158/0x15a の Filter descriptor 同定 (model 層 setter 実測) |
-| `tools/pm/REPORT.md` | ~150 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380)。RETRO・DIRECTIVES の数値の正本 |
+| `tools/pm/REPORT.md` | ~210 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380・`idle_report.sh` の検証 #2354)。RETRO・DIRECTIVES の数値の正本 |
 | `tools/targets/freshair/lift2/REPORT_FA15.md` | ~60 | lift2 FA-15 (#1105): ctrl closure の ymm (AVX2 256bit) lowering (`vpcmpeqw`/`vpxor`/`vpmovmskb` ymm・`vzeroupper`)。`build_ctrl.sh` の `failed` 1→0、`lift2_e2e.sh` ALL PASS の実測 |
 | `tools/targets/freshair/lift2/REPORT_FA13_REACH.md` | ~46 | lift2 FA-13 (#905): rep movsb/stosw の実行到達の再探索。結論: 受入 1 (実行到達 scenario)・2 (ネガコン FAIL) は未達のまま。測定値は本 REPORT のみ |
 | `tools/targets/freshair/lift2/REPORT_FA8.md` | ~60 | FA-8 (#648): Filter setter の native/wasm bit-exact・型別 ID 感度・FA-7 probe 測定バグ修正 |
@@ -438,6 +442,7 @@
 | `docs/pm/RETRO_2026-10-13.md` | Actions 移行後 2 日間のショートレトロ (事実・原因・対策。依頼者指示 121) | 測定値 (正本は `tools/pm/REPORT.md`。本書は結論と link のみ)・指示の逐語原文 (`DIRECTIVES.md` が正本)・repo 外絶対パス |
 | `tools/pm/REPORT.md` | PM 運用の実測の**正本** (PR 件数・PR とチケットの対応・Project V2 Status・Actions run 集計。基準時刻と取得方法を併記) | 技術実装・指示の逐語原文・チケット状態の判断 (`STATUS.md`・Project V2 が正本) |
 | `tools/pm/README.md` | PM が VM 上で実行する運用ツール (`watch_runs.sh`・`launch_issues.py`・`rest_heal.py` ほか) の一覧・前提・環境変数・運用の約束 | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報・状態ファイル (`.gitignore`) |
+| `infra/pm-worker/README.md` | PM Worker (Cloudflare) の構成・デプロイ・**再デプロイ (wrangler の OAuth)**・ロールバック・OAuth 失効時の手順・`[未確認]` のチェックリスト | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報 (token・OAuth の保存ファイルの中身)・repo 外絶対パス |
 | `tools/pm/status_sync.py` (+ `test_status_sync.py`) | `docs/STATUS.md` の自動節 (`status-auto` マーカーの内側) を、直近 24 時間の merge PR を MS / サブシステムに写像した件数と代表 PR 番号で更新する決定的スクリプト (REST のみ)。写像表は `docs/STATUS.md` の `status-map` ブロックが正本。テスト: `python3 -m unittest tools/pm/test_status_sync.py` | 測定値 (自動節にも書かない。正本は各 `REPORT.md`)・自動節の外の編集・認証情報 |
 | `docs/pm/README.md` | `docs/pm/` の索引 (3 ファイルの役割のみ) | DIRECTIVES の内容の繰り返し・分析内容 |
 | `docs/pm/PREDECESSOR_ANALYSIS.md` | 解任された前任 PM セッションの分析 (混乱の原因・証拠・再発防止ルールへの反映) | 指示の逐語原文 (`DIRECTIVES.md` が正本)・状態や未解決事項 (`STATUS.md`・`HANDOFF` が正本)・repo 外絶対パス |

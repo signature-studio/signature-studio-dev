@@ -71,6 +71,12 @@ export class PmApp {
         const a = d.store.get<AppRecord>("meta", "app");
         return a ? `${a.slug}[bot]` : null;
       },
+      // status・ログから取り除く実行時の secret (復号済みの webhook secret・PEM・STORE_KEY と、直近の installation token)。
+      secrets: () => {
+        const pem = this.creds?.pem ?? "";
+        const pemLines = pem.split("\n").filter((l) => l.length >= 20 && !l.startsWith("-----"));
+        return [this.wh, pem, ...pemLines, d.storeKey, this.auth?.current()].filter((x): x is string => !!x);
+      },
     });
   }
 
@@ -98,7 +104,7 @@ export class PmApp {
           if (this.creds) this.creds.installationId = id;
         },
       );
-      this.gh = new Gh(this.d.fetch, () => (this.auth as InstallationAuth).token(), this.d.cfg.repo);
+      this.gh = new Gh(this.d.fetch, () => (this.auth as InstallationAuth).token(), this.d.cfg.repo, (r) => this.engine.recordRate(r));
     }
     return this.gh;
   }

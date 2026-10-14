@@ -36,6 +36,13 @@
 #
 # 宙に浮いた issue (blocked でも着手済みでもない open issue) は、最後に floating-issues=N として数えて出力する (数えるだけ。#1950)。
 #
+# PM Worker の停止検知 (#CI-49): tools/pm/worker_url の URL の /status を `curl -fsS -m 10` で読む (PR の点検の後)。
+#   configured と installed がともに true で、fresh が false または last_tick が 15 分より古ければ、障害 issue (ラベル pm-worker-down、
+#   題名 `[CI-n] PM Worker 停止 (日付)`) を起票する。configured/installed が false (/setup 未了) では起票しない。
+#   open の障害 issue があれば追記のみ (OC_WORKER_NOTE_MIN 分に 1 回まで)。24 時間以内に close した障害 issue は reopen して追記する。
+#   fresh が true で last_tick が 5 分以内なら、open の障害 issue にコメントして close する。
+#   ファイルが無い・取得失敗・JSON 不正は警告だけ出して何もしない (終了コードは変えない)。OC_WORKER_URL_FILE で URL のファイルを差し替えられる (テスト用)。
+#
 # 入力 (env): GH_TOKEN (reviewer App。review の提出・merge・ready・close/reopen に使う), OC_REPO,
 #             RUNS_TOKEN (actions:read。省略時は GH_TOKEN), DRY=1 で操作せず計画だけ表示
 set -uo pipefail
@@ -120,6 +127,166 @@ repair_artifacts() { # repair_artifacts <PR> <head> <PR JSON> <stuck 0|1>: 許�
 mark_stuck() { # mark_stuck <PR>
   gh label create oc:stuck --repo "$R" --color B60205 --description "automatic review/fix recovery exhausted; needs a human decision" --force > /dev/null 2>&1 || true
   gh pr edit "$1" --repo "$R" --add-label oc:stuck > /dev/null 2>&1 || true
+}
+
+# --- PM Worker の停止検知 (#CI-49) ---
+# Worker (infra/pm-worker) の /status を読み、一度でも稼働に入った Worker (configured・installed がともに true) が止まっていたら
+# 障害 issue (ラベル pm-worker-down) を起票する。configured/installed が false の Worker (/setup 未了) では起票しない。
+# 読めない・JSON が不正なときは警告だけ出して何もしない。この検知の失敗は watchdog 全体の終了コードを変えない。
+WORKER_URL_FILE="${OC_WORKER_URL_FILE:-$(dirname "$0")/../../tools/pm/worker_url}"
+WORKER_LABEL=pm-worker-down
+WORKER_STALE_SEC=900   # last_tick がこれより古い (または fresh=false) と停止
+WORKER_RECOVER_SEC=300 # fresh=true かつ last_tick がこれ以内なら回復
+WORKER_REOPEN_SEC=86400
+WORKER_NOTE_MIN="${OC_WORKER_NOTE_MIN:-60}" # 既存の障害 issue への追記の最小間隔 (5 分ごとの点検でコメントを水増ししない)
+WORKER_TITLE_LIMIT=3000 # [CI-n] の採番に読む題名の件数 (gh の既定値では足りない)。これに達したら一覧が欠けうるので起票しない
+worker_line="worker=unknown"
+worker_open_issues() { # open で pm-worker-down ラベルの issue を「番号 作成時刻」で新しい順に出す。一覧が取れなければ失敗 (REST の一覧は PR だけを返す場合があるため gh issue list を使う)
+  local raw
+  raw="$(gh issue list --repo "$R" --state open --label "$WORKER_LABEL" --limit 200 --json number,createdAt,closedAt)" || return 1
+  jq -r 'map(select(.pull_request == null)) | sort_by(.createdAt) | reverse | .[] | "\(.number) \(.createdAt)"' <<< "$raw"
+}
+worker_status_copy() { # worker_status_copy <status json>: /status の写し。秘密を示す名前のキーは念のため除く
+  jq -S 'walk(if type == "object" then with_entries(select(.key | test("token|secret|key|private|password|pem|jwt|credential"; "i") | not)) else . end)' <<< "$1"
+}
+worker_body() { # worker_body <kind: new|note> <理由> <status json>
+  local at
+  at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if [ "$1" = new ]; then
+    printf '%s\n' "PM Worker (\`signature-studio-pm\`) が停止している可能性があります。watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
+    printf '%s\n' "- 判定: $2" "- 条件: \`configured\` と \`installed\` がともに true (一度でも稼働に入った Worker) で、\`fresh\` が false、または \`last_tick\` が 15 分より古い" ""
+  else
+    printf '%s\n' "[watchdog] PM Worker はまだ回復していません (${at})。判定: $2" ""
+  fi
+  printf '%s\n' "## /status の写し (集計のみ。秘密を含まない)" '```json'
+  worker_status_copy "$3"
+  printf '%s\n' '```' ""
+  if [ "$1" = new ]; then
+    printf '%s\n' "確認すること: cron / Durable Object alarm の停止・例外、GitHub App (PM) の失効。回復すると (\`fresh\` が true かつ \`last_tick\` が 5 分以内) watchdog.sh がこの issue にコメントして close します。" "" "@pycabbage" "<!-- oc-worker-down -->"
+  else
+    printf '%s\n' "<!-- oc-worker-down-note -->"
+  fi
+}
+worker_note() { gh issue comment "$1" --repo "$R" --body-file "$2"; } # worker_note <issue> <body file>
+worker_reopen() { gh issue reopen "$1" --repo "$R" && worker_note "$1" "$2"; }
+worker_file() { # worker_file <title> <body file>
+  gh label create "$WORKER_LABEL" --repo "$R" --color B60205 --description "PM Worker (signature-studio-pm) stopped; filed by watchdog.sh" --force > /dev/null 2>&1 || true
+  gh issue create --repo "$R" --title "$1" --body-file "$2" --label "$WORKER_LABEL"
+}
+worker_down() { # worker_down <status json> <理由>
+  local body="$1" reason="$2" open target created cm last closed all allpr maxn f="${RUNNER_TEMP:-/tmp}/oc-worker-down-body.md"
+  if ! open="$(worker_open_issues)"; then
+    echo "::warning::failed to list $WORKER_LABEL issues; no issue is filed or updated"
+    return 0
+  fi
+  target="${open%%$'\n'*}"
+  if [ -n "$target" ]; then
+    # 既存の障害 issue があれば新規に起票せず追記だけする。直近の追記 (または起票) から WORKER_NOTE_MIN 分以内なら追記も見送る。
+    created="${target#* }"
+    target="${target%% *}"
+    if ! cm="$(gh api --paginate "repos/$R/issues/$target/comments")"; then
+      echo "::warning::failed to read comments of #$target; no note is added"
+      return 0
+    fi
+    last="$(jq -s -r --arg who "$REVIEWER_LOGIN" --arg c "$created" \
+      '[.[][] | select(.user.login == $who and .user.type == "Bot" and ((.body // "") | contains("oc-worker-down-note"))) | .created_at] + [$c] | max' <<< "$cm")"
+    if [ "$(age_min "$last")" -lt "$WORKER_NOTE_MIN" ]; then
+      echo "worker: #$target is already reported (last note ${last}); no new note"
+      return 0
+    fi
+    worker_body note "$reason" "$body" > "$f"
+    do_it "add a note to the open $WORKER_LABEL issue #$target" worker_note "$target" "$f"
+    return 0
+  fi
+  if ! closed="$(gh issue list --repo "$R" --state closed --label "$WORKER_LABEL" --limit 200 --json number,createdAt,closedAt)"; then
+    echo "::warning::failed to list closed $WORKER_LABEL issues; no issue is filed"
+    return 0
+  fi
+  target="$(jq -r --argjson sec "$WORKER_REOPEN_SEC" \
+    '[.[] | select(.pull_request == null and .closedAt != null and (.closedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > (now - $sec))] | sort_by(.closedAt) | last | .number // empty' <<< "$closed")"
+  if [ -n "$target" ]; then
+    worker_body note "$reason" "$body" > "$f"
+    do_it "reopen #$target (closed within 24h) and add a note" worker_reopen "$target" "$f"
+    return 0
+  fi
+  if ! all="$(gh issue list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)" ||
+    ! allpr="$(gh pr list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)"; then
+    echo "::warning::failed to count [CI-n] titles; no issue is filed"
+    return 0
+  fi
+  if [ "$(jq length <<< "$all")" -ge "$WORKER_TITLE_LIMIT" ] || [ "$(jq length <<< "$allpr")" -ge "$WORKER_TITLE_LIMIT" ]; then
+    echo "::warning::[CI-n] title list reached the limit ($WORKER_TITLE_LIMIT); no issue is filed"
+    return 0
+  fi
+  maxn="$(jq -s -r '[.[][] | (.title // "") | capture("^\\[CI-(?<n>[0-9]+)[a-z]?\\]") | .n | tonumber] | max // 0' <<< "$all"$'\n'"$allpr")"
+  worker_body new "$reason" "$body" > "$f"
+  do_it "file '[CI-$((maxn + 1))] PM Worker 停止 ($(date -u +%Y-%m-%d))' with label $WORKER_LABEL" \
+    worker_file "[CI-$((maxn + 1))] PM Worker 停止 ($(date -u +%Y-%m-%d))" "$f"
+}
+worker_recovered() { # worker_recovered <last_tick> <age 秒>: open の障害 issue にコメントして close する
+  local open line
+  if ! open="$(worker_open_issues)"; then
+    echo "::warning::failed to list $WORKER_LABEL issues; none is closed"
+    return 0
+  fi
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    do_it "close #${line%% *} (PM Worker recovered)" gh issue close "${line%% *}" --repo "$R" \
+      --comment "[watchdog] PM Worker が回復しました (fresh=true、last_tick=$1、$(($2 / 60)) 分前)。この issue を close します。24 時間以内に再び停止した場合は reopen します。<!-- oc-worker-recovered -->"
+  done <<< "$open"
+}
+worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返す
+  local url body cfg inst fresh tick age="" ts reason=""
+  if [ ! -f "$WORKER_URL_FILE" ]; then
+    echo "::warning::tools/pm/worker_url not found; PM Worker check skipped"
+    worker_line="worker=skipped (no worker_url)"
+    return 0
+  fi
+  url="$(head -n 1 "$WORKER_URL_FILE" | tr -d '[:space:]')"
+  url="${url%/}"
+  if [[ ! "$url" =~ ^https?:// ]]; then
+    echo "::warning::tools/pm/worker_url is not an http(s) URL; PM Worker check skipped"
+    worker_line="worker=skipped (bad worker_url)"
+    return 0
+  fi
+  if ! body="$(curl -fsS -m 10 "$url/status")"; then
+    echo "::warning::could not read $url/status; PM Worker check skipped"
+    worker_line="worker=skipped (status unreachable)"
+    return 0
+  fi
+  if ! jq -e 'type == "object" and (.configured | type) == "boolean" and (.installed | type) == "boolean" and (.fresh | type) == "boolean" and ((.last_tick | type) == "string" or .last_tick == null)' <<< "$body" > /dev/null 2>&1; then
+    echo "::warning::$url/status is not the expected JSON; PM Worker check skipped"
+    worker_line="worker=skipped (bad status json)"
+    return 0
+  fi
+  cfg="$(jq -r .configured <<< "$body")"
+  inst="$(jq -r .installed <<< "$body")"
+  fresh="$(jq -r .fresh <<< "$body")"
+  tick="$(jq -r '.last_tick // ""' <<< "$body")"
+  if [[ "$tick" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?Z$ ]] && ts="$(date -u -d "$tick" +%s 2> /dev/null)"; then
+    age=$(($(date -u +%s) - ts))
+    [ "$age" -lt 0 ] && age=0
+  fi
+  if [ "$fresh" = true ] && [ -n "$age" ] && [ "$age" -le "$WORKER_RECOVER_SEC" ]; then
+    worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
+    worker_recovered "$tick" "$age"
+  elif [ "$cfg" != true ] || [ "$inst" != true ]; then
+    worker_line="worker=not-set-up (configured=$cfg installed=$inst; no issue is filed)"
+  elif [ "$fresh" = false ]; then
+    reason="fresh=false (last_tick=${tick:-null}${age:+、${age} 秒前})"
+    worker_line="worker=down ($reason)"
+    worker_down "$body" "$reason"
+  elif [ -z "$age" ]; then
+    echo "::warning::/status has no readable last_tick; PM Worker check skipped"
+    worker_line="worker=skipped (no last_tick)"
+  elif [ "$age" -gt "$WORKER_STALE_SEC" ]; then
+    reason="last_tick が ${age} 秒前 (> ${WORKER_STALE_SEC} 秒): ${tick}"
+    worker_line="worker=down ($reason)"
+    worker_down "$body" "$reason"
+  else
+    worker_line="worker=ok (fresh=true last_tick=${age}s ago)"
+  fi
+  return 0
 }
 
 # 実行中/待機中の run (pull_requests・タイトル・workflow のファイル)。一覧が取れなければ何も操作しない。
@@ -355,6 +522,9 @@ if [ "${#stuck_ages[@]}" -gt 0 ]; then
 fi
 echo "$stuck_line"
 
+worker_check
+echo "$worker_line"
+
 echo "open=$total covered(REVIEWING/FIXING)=$covered_n idle=$((total - covered_n)) acted=$acted deferred=$deferred"
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   {
@@ -365,6 +535,8 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     echo "$stuck_line"
     echo
     echo "$floating_line"
+    echo
+    echo "$worker_line"
     echo
     printf '%s' "$summary"
   } >> "$GITHUB_STEP_SUMMARY"

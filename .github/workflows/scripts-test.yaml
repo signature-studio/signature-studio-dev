@@ -2,6 +2,9 @@ name: Scripts test
 
 # .github/scripts の分岐 (fix モードの往復上限・verdict 検証・watchdog の判定など) を fake gh で検証する。
 # 失敗すると PR の自動遷移 (差し戻し -> 修正 -> レビュー) が黙って止まるため、変更のたびに走らせる。
+# テストは列挙せず glob で拾う (新しいテストを足しても workflow の登録が要らない):
+#   .github/scripts/tests/test-*.sh  tools/pm/test_*.sh  tools/pm/test_*.py (unittest)
+# 1 本でも失敗したら job が失敗する。拾ったテストの一覧は step summary に出す。
 on:
   pull_request:
     paths:
@@ -9,6 +12,7 @@ on:
       - '.github/actions/**'
       - '.github/workflows/opencode.yaml'
       - '.github/workflows/scripts-test.yaml'
+      - 'tools/pm/**'
 
 permissions:
   contents: read
@@ -21,11 +25,40 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: test-pr-loop.sh
-        run: bash .github/scripts/tests/test-pr-loop.sh
-      - name: test-watchdog.sh
-        run: bash .github/scripts/tests/test-watchdog.sh
-      - name: test-dispatch-context.sh
-        run: bash .github/scripts/tests/test-dispatch-context.sh
-      - name: test-run-outcome.sh
-        run: bash .github/scripts/tests/test-run-outcome.sh
+      - name: Run every test (glob)
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          shells=(.github/scripts/tests/test-*.sh tools/pm/test_*.sh)
+          pys=(tools/pm/test_*.py)
+          if [ "${#shells[@]}" -eq 0 ] || [ "${#pys[@]}" -eq 0 ]; then
+            echo "::error::no test was found by the glob (shell=${#shells[@]}, python=${#pys[@]})"
+            exit 1
+          fi
+          failed=()
+          # テストの中で step summary に書くもの (test-watchdog.sh) が一覧に混ざらないよう、各テストの summary は捨てる。
+          run_test() { # run_test <name> <command...>
+            local name="$1"
+            shift
+            echo "::group::$name"
+            if env GITHUB_STEP_SUMMARY=/dev/null "$@"; then
+              echo "PASS $name"
+              echo "- PASS \`$name\`" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::$name failed"
+              echo "- FAIL \`$name\`" >> "$GITHUB_STEP_SUMMARY"
+              failed+=("$name")
+            fi
+            echo "::endgroup::"
+          }
+          echo "### tests picked up by the glob (shell=${#shells[@]}, python files=${#pys[@]})" >> "$GITHUB_STEP_SUMMARY"
+          for t in "${shells[@]}"; do
+            run_test "$t" bash "$t"
+          done
+          run_test "tools/pm unittest (${pys[*]})" python3 -m unittest discover -s tools/pm -p 'test_*.py'
+          if [ "${#failed[@]}" -gt 0 ]; then
+            echo "::error::${#failed[@]} test(s) failed: ${failed[*]}"
+            exit 1
+          fi
+          echo "all tests passed (shell=${#shells[@]}, python files=${#pys[@]})"
