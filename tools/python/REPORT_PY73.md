@@ -9,6 +9,7 @@
 - **未確定** (1 回目の run 時点。2 回目 (§7) で一部確定): `incEventValue` の戻り値の型と値 (下位関数 `0x1051330` の出力が int か float ビット列か不一致)、`incEventValue` と `midiNoteOn` の副作用 (本体の `0x1051330`・`0x10002a0` の大半が未読)。推測では実装しない方針により、`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs` は変更 0 件。
 - 受入条件は 4 件中 1 件のみ部分達成。PR は `Refs #2547`。
 - 2 回目の run (§7): incEventValue の戻り値の型 (flags bit1 で int / float ビット列に分岐)・範囲外 code (`0x1051330` 本体に例外経路なし)・副作用 (`0x1051330` 本体はスタック書込みのみ) を PE で確定。呼出し先 `0x1046a30` の副作用は未確定 (§7-3)。cur・lo・hi・flags の値源は未確定のため、provider・mock は未実装。
+- 3 回目の run (§8): 事象表 (`0x1050f90` の探索経路) は eventId の初回参照で要素を作る遅延キャッシュと確定 (§7-4 の「初期化元」の未解決を解消。他の挿入経路は未確認)。残りは flags (`0x104d0d0`)・範囲と現在値 (`0x1046a30`)・midiNoteOn の本体と述語。provider・mock は引き続き未実装。
 
 ## 測定
 
@@ -145,3 +146,45 @@
 | midiNoteOn の本体 `0x10002a0`・`0x63a730`・`0x11d1430` (§2・§4 のまま) | midiNoteOn の副作用・ゲート条件が未確定 | #2547 |
 
 provider・mock の実装は、上の値源 (cur/lo/hi/flags) を状態モデルとして決める run の後に行う。推測の初期値では実装しない。
+
+## 8. 3 回目 run: 事象表は遅延キャッシュ・midiNoteOn のゲート参照 (PE 実測)
+
+測定:
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (実測 5.6 秒)。逆アセンブルは `pe_disasm.py`、参照列挙は `pe_xref.py` (本 run で追加)。
+- 測定 commit: `ef2df235` (`analysis/flapi/pe_xref.py` の追加。コードを変えた最後の commit)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_xref.py 15e4868` → 終了 0、命令 5,022,467、hits 9、stores 0、34.0 秒 (load average 0.46、並列 1)。
+- ネガティブコントロール: `15e4869` (1 バイトずらし) → hits 0 (終了 0)。
+- 差分 0 の証跡: `git diff ef2df235 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 PR の commit は REPORT と DOC_MAP のみ)。
+- 表記の訂正: §7-4 の `[0x5938ad]`・`[0x59388e]` は rip 相対の disp 表記。実 VA は両方とも `0x15e4868` (次命令アドレス + disp)。値は §7 と同じ表を指す。
+
+### 8-1. 表の実体 (VA `0x15e4868` = 表ポインタ G1、`.data`)
+
+- G1 の再配置前の初期値は `0x193fc60` (`.bss` の静的オブジェクト P)。P は起動前ゼロ。
+- G1 への rip 相対 store は 0 件。参照 9 件は全て load: `0x1050fb4`・`0x1050fd3` (`0x1050f90` の探索)、`0x10510bc`・`0x10510db`・`0x105112f` (同関数の挿入)、`0x11b35da` (初期化関数 `0x11b3500` 系の中。`0x663d80(..., r8d=0x10)` の確保結果を `[P]` へ書く)、`0x11c8107`・`0x11d3af7`・`0x11d3b0c`。
+- よって表の本体は S = `[P]`。件数 = `[S+0x10]`、要素ポインタ配列 = `[S+8]`。確保直後の件数は未読 (`0x663d80` 未読)。
+
+### 8-2. 事象表は eventId の初回参照で作られる (`0x1050f90` の実測)
+
+- 二分探索 (`0x1050fb4`〜`0x105103c`) で見つかれば `lo = [item+4]`・`hi = [item+8]`・戻り値 = `[item+0xc]` (flags) (`0x1051019`〜`0x1051034`)。
+- 見つからなければ (`0x105103e`〜`0x1051098`):
+  - `flags = 0x104d0d0(eventId)` (`0x1051053`)。
+  - `flags & 2 ≠ 0`: `lo = 0`・`hi = 0x100000` (`0x1051062`〜`0x1051068`)。
+  - `flags & 2 = 0`: `lo = 0x1046a30(eventId, 0, 0x20)` (`0x1051075`〜`0x1051080`)、`hi = max(0x1046a30(eventId, 0x40000000, 0x20), lo + 1)` (`0x1051082`〜`0x10510a8`)。
+- `0x10510aa` で同じ表を再探索し、無ければ `0x664090` で新要素を作って key = eventId・lo・hi・flags を書く (`0x105112f`〜`0x1051151`、`0x664090` の本体は未読)。戻り値は flags (`0x1051161`)。
+- 結論: この探索関数の経路では、表は eventId の初回参照で要素が作られる遅延キャッシュ (他の挿入経路は未確認)。§7-4 の「表の中身と初期化元」は初期化元が「初回参照」と確定した。lo・hi・flags の値そのものは 8-3 の未確定に残る。
+
+### 8-3. 残る未確定 (値源と midiNoteOn)
+
+| 未確定 | 根拠 (VA) | 影響 | 起票先 |
+|---|---|---|---|
+| `0x104d0d0(eventId)` (flags 分類器) | `0x104d000` でオブジェクトを引き、`[+0x64]==2` で分岐。eventId の下位 16 bit と上位ビットで分岐。本体は未読 | 事象の flags (bit1 = float 型か) が決まらない | #2547 |
+| `0x1046a30(eventId, sub, mode)` (汎用の照会) | mode 0x20 で範囲、mode 2 で現在値 (§7-4 と同じ)。0x590 のスタックフレームで本体の大半は未読 | lo・hi・cur が決まらない | #2547 |
+| `0x664090` (挿入) と `[S+0x10]`・`[S+8]` の更新 | 挿入先の書込みは `0x105112f` の戻り先。本体は未読 | 件数・並びの正しさ | #2547 |
+| midiNoteOn の述語 `0x11d1430` | `mov rax,[G3]; mov rax,[rax+8]; mov rcx,rax; mov rax,[rax]; call [rax+0x88]` (1 段の間接呼出し)。G3 = VA `0x15e4790` は 2422 箇所から読まれる広域グローバル (store 0 件)。`0x11d1460` は同形で `+0x90` | -2 ゲートの条件が決まらない | #2547 |
+| midiNoteOn 本体 `0x10002a0`・`0x63a730` | §2・§4 のまま | 副作用が決まらない | #2547 |
+
+### 8-4. 受入条件への影響
+
+- 1 件目 (戻り値・範囲外 code・副作用の REPORT 記録) は部分達成のまま。incEventValue の型・範囲外・本体副作用は §7 で確定。値源 (flags・範囲・現在値) は未確定。
+- 2・3・4 件目 (provider・mock の実装、channels_diff、all_tools 48/48) は未達。値源が決まるまで実装しない。
+- 次 run の提案: `0x1046a30` の mode 0x20 (範囲) 経路と `0x104d0d0` の flags 分類を読む。midiNoteOn は `[G3]+8` の vtable 先の解決が前提。
