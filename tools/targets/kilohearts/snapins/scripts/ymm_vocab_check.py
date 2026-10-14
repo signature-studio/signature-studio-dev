@@ -7,7 +7,8 @@
 2. それを呼ぶ driver (load / call / store, align 1) を IR で書き、ホスト clang で obj 化する。
 3. ホスト AVX2 の _mm256_*_ps と harness/ymm_vocab_harness.c で 32B 全 bit を突合する (NaN payload を含む)。
 ネガコン (規則 41): (a) 語彙定義 (.i256.ll) を外す → リンク失敗 (FAIL) (b) vaddps 定義の fadd を fsub に
-取り替える → 不一致 > 0 (FAIL)。exit 0 = 本検証が全 bit 一致 かつ 両ネガコンが FAIL。
+取り替える → 不一致 > 0 (FAIL) (c) 未対応の i256 宣言 (vfmadd231ps) → abort スタブが出て、呼ぶと abort (FAIL)。
+exit 0 = 本検証が全 bit 一致 かつ 3 本のネガコンが FAIL。
 成果物は snapins/work/ymm_vocab/ (gitignore 対象)。
 """
 import os
@@ -23,6 +24,14 @@ W = os.path.join(SNAP, 'work', 'ymm_vocab')
 # RetDec の宣言形 (suffix の .N / __N は overload 通番で、gen_simd は名前ではなくシグネチャで意味を決める)
 OPS = [('__asm_vaddps', 'vaddps'), ('__asm_vsubps.2', 'vsubps'), ('__asm_vmulps__3', 'vmulps')]
 CLANG = os.environ.get('CLANG', 'clang')
+UNDEF_DECL = 'declare i256 @__asm_vfmadd231ps(i256, i256, i256)\n'
+UNDEF_DRIVER = ('define void @drv_fma(ptr %pa, ptr %pr) {\n'
+                '  %a = load i256, ptr %pa, align 1\n'
+                '  %x = call i256 @__asm_vfmadd231ps(i256 %a, i256 %a, i256 %a)\n'
+                '  store i256 %x, ptr %pr, align 1\n'
+                '  ret void\n}\n')
+UNDEF_MAIN = ('void drv_fma(const void *a, void *r);\n'
+              'int main(void) { unsigned char a[32] = {0}, r[32]; drv_fma(a, r); return 0; }\n')
 
 
 def sh(cmd, check=False):
@@ -114,9 +123,27 @@ def main():
     neg_b = rb != 0 and rows_b.get('vaddps', 0) > 0
     print('  rc=%d vaddps mismatch=%s -> %s' % (rb, rows_b.get('vaddps'), 'FAIL (期待どおり)' if neg_b else 'PASS (想定外)'))
 
-    verdict = ok_main and neg_a and neg_b
-    print('== 判定: 本検証 %s / ネガコン(a) %s / ネガコン(b) %s -> %s' % (
-        'PASS' if ok_main else 'FAIL', 'FAIL' if neg_a else 'PASS', 'FAIL' if neg_b else 'PASS', 'PASS' if verdict else 'FAIL'))
+    # ネガコン (c): 未対応の i256 宣言は黙って通らず、abort スタブになって呼ぶと abort する
+    print('== ネガコン (c) 未対応の i256 宣言 vfmadd231ps (abort スタブ化 + 呼出で abort しなければ FAIL)')
+    gu = sh([sys.executable, GEN, write(os.path.join(W, 'decl_undef.ll'), UNDEF_DECL), os.path.join(W, 'simd_undef.c')], check=True)
+    print('  ' + gu.stdout.strip())
+    undef_ll = os.path.join(W, 'simd_undef.c.i256.ll')
+    txt_u = open(undef_ll).read()
+    stub_ok = 'undefined(abort stub) 1' in gu.stdout and 'define i256 @__asm_vfmadd231ps(' in txt_u and 'call void @abort()' in txt_u
+    drv_u = write(os.path.join(W, 'driver_undef.ll'), UNDEF_DECL + UNDEF_DRIVER)
+    main_u = write(os.path.join(W, 'undef_main.c'), UNDEF_MAIN)
+    for src in (drv_u, undef_ll):
+        sh([CLANG, '-O1', '-mavx2', '-c', src, '-o', src[:-3] + '.o'], check=True)
+    exe_u = os.path.join(W, 'undef_call')
+    sh([CLANG, '-O1', '-mavx2', '-o', exe_u, main_u, drv_u[:-3] + '.o', undef_ll[:-3] + '.o', '-lm'], check=True)
+    ru = sh([exe_u])
+    neg_c = stub_ok and ru.returncode != 0
+    print('  stub=%s call rc=%d -> %s' % ('あり' if stub_ok else 'なし', ru.returncode, 'FAIL (期待どおり)' if neg_c else 'PASS (想定外)'))
+
+    verdict = ok_main and neg_a and neg_b and neg_c
+    print('== 判定: 本検証 %s / ネガコン(a) %s / ネガコン(b) %s / ネガコン(c) %s -> %s' % (
+        'PASS' if ok_main else 'FAIL', 'FAIL' if neg_a else 'PASS', 'FAIL' if neg_b else 'PASS', 'FAIL' if neg_c else 'PASS',
+        'PASS' if verdict else 'FAIL'))
     return 0 if verdict else 1
 
 

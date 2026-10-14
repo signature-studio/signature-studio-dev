@@ -391,6 +391,12 @@ def gen256(name, ret, params):
             '  ret i256 %%o\n}') % (name, V256_OPS[b])
 
 
+def stub256(name, ret, params):
+    """未対応の i256 宣言は abort() スタブ (SSE の未対応と同じ扱い)。呼ばれたら abort する。"""
+    sig = ', '.join('%s %%a%d' % (p.split()[0], i) for i, p in enumerate(params))
+    return 'define %s @%s(%s) {\n  call void @abort()\n  unreachable\n}' % (ret, name, sig)
+
+
 APPROX_TABLE_HELPERS = r'''/* 実機 (AMD Ryzen 9 9950X) の rcpps / rsqrtps 近似表 (extract_approx_tables.py が実機から抽出・検証)。
  * 構造: エントリ = (e=127 基準の mantissa field, 下位 23bit)。rcp = mantissa>>11 の索引、
  *       rsq_odd / rsq_even = rsqrtps の入力 exponent field が奇/偶 (偶は √2 因子で別表)。
@@ -435,9 +441,10 @@ def main():
             ir = gen256(name, ret, ps)
             if ir is None:
                 rep['undefined'].append('%s %s(%s)' % (ret, name, ','.join(p.split()[0] for p in ps)))
+                ir = stub256(name, ret, ps)
             else:
                 rep['generated'].append('%s %s(%s)' % (ret, name, ','.join(p.split()[0] for p in ps)))
-                ll_out.append(ir)
+            ll_out.append(ir)
             continue
         ptys = [p.split()[0] for p in ps]
         sig = '%s %s(%s)' % (CT[ret], name, ', '.join('%s a%d' % (CT[t], i) for i, t in enumerate(ptys)) or 'void')
@@ -468,7 +475,7 @@ def main():
     open(dst, 'w').write('\n'.join(out) + '\n')
     ll_dst = dst + '.i256.ll'
     if ll_out:
-        open(ll_dst, 'w').write('\n'.join(ll_out) + '\n')
+        open(ll_dst, 'w').write('\n'.join(['declare void @abort()'] + ll_out) + '\n')
     elif os.path.exists(ll_dst):
         os.remove(ll_dst)
     if len(sys.argv) > 4 and sys.argv[3] == '--report':
