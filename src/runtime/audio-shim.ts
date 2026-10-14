@@ -31,6 +31,13 @@ export interface FlCaptureSpec {
   ring?: boolean;
 }
 
+/** producer (ASIO bufferSwitch 側の fla_out_wait_fill_le) の起床統計。wake_hist は worklet の notify から producer 起床までの遅延 (ms: <1,<2,<4,<8,<16,>=16) */
+export interface ProducerStats {
+  wake_hist: number[];
+  wake_count: number;
+  wait_timeouts: number;
+}
+
 export interface FlAudioShimOptions {
   workletUrl: string;
   /** OPEN 毎にテスト用ダンプ領域を割り当てる (本番は未指定 = ダンプ無し) */
@@ -340,6 +347,16 @@ export class FlAudioShim {
     Atomics.store(i, this.ix("ref_epoch_ms_bits"), this.i64u[0] | 0);
     Atomics.store(i, this.ix("ref_epoch_ms_bits") + 1, this.i64u[1] | 0);
     Atomics.add(i, this.ix("ref_seq"), 1);
+  }
+
+  /** producer の起床統計 (ctl の wake_hist[6] / wake_count / wait_timeouts) */
+  producerStats(): ProducerStats {
+    const base = this.ix("wake_hist");
+    return {
+      wake_hist: [0, 1, 2, 3, 4, 5].map((k) => Atomics.load(this.i32, base + k) >>> 0),
+      wake_count: this.ld("wake_count") >>> 0,
+      wait_timeouts: this.ld("wait_timeouts") >>> 0,
+    };
   }
 
   /** ctl の統計スナップショット (テスト/診断用) */
