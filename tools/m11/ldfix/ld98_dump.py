@@ -5,11 +5,10 @@ import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-LDFIX = os.path.dirname(HERE)
-sys.path.insert(0, LDFIX)
+sys.path.insert(0, HERE)
 import audit_lsf as A  # noqa: E402
 
-REPO = os.path.abspath(os.path.join(LDFIX, '..', '..', '..'))
+REPO = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
 W = os.path.join(REPO, 'tools/m11/work')
 mach = A.ImageMachine(os.path.join(W, 'm11_image.bin'), os.path.join(W, 'boot*.drc.config.json'))
 IR = open(os.path.join(W, 'boot_final3.ll'), errors='replace').read()
