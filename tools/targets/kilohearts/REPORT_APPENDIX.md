@@ -150,3 +150,22 @@
 - 回帰 (HEAD `81090e96`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7m と一致。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。`mkdir -p` で解消)。
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI (float 引数・short 戻り値) は呼出元 2 件と callee 本体の機械語で確認済み (上記「呼出元・callee の確定」)。native 突合での実行検証は未実施。
+
+#### 10-7p. #1216 (KH-24) run: Stereo / Delay の Ghidra 実ビルド試行 (部分・両者とも emcc 未通過)
+- 測定 commit: `f847e8c6` (`ghidra_route/ghidra_to_c.py` の変更を含む最後の commit)。以後の commit はこの REPORT のみ。
+- 環境: Ghidra 12.1.4 = `Ghidra_12.1.4_build` の zip (sha256 `ddac49f9…d2db` 一致) を [GHIDRA] (`GHIDRA_HOME`) に展開 (素材外のため run ごとに取得が必要)、JDK 21 (temurin-21)、emsdk 6.0.12 ([EMSDK])。素材 `plugins-kilohearts` は Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` を手展開 (`extract_installer.sh` は dmg を要求するため使わず)。
+- 手順 (再現): `DecompEach.java` を snapins.json の lift 集合 (Stereo 8 / Delay 141 = proc + also) で実行 → `ghidra_to_c.py <name> work/gr/<name> <out> <core> --fix bitcast,intload,stackpair,assoc,concat` → `emcc -ferror-limit=0` (`build_cmp.sh` と同じ flags)。
+
+| snap-in | 関数 | decompile (import 込み wall, n=1) | C 化 | emcc (clang エラー行, `-ferror-limit=0`) |
+|---|---|---|---|---|
+| Stereo | 8 | **8/8 OK** (32.8 s) | 891 行・0.07 s | **失敗 39 件** |
+| Delay | 141 | **141/141 OK** (29.0 s) | 7,247 行・2.7 s | **失敗 710 件** (emcc 14.1 s) |
+
+- Stereo の残件 (粗い正規表現分類、件数): 引数数不一致 (引数なし呼出 `param_1` 不足) 10・未宣言の SIMD/Ghidra 疑似関数 9 (`rsqrtps`・`maxps`・`ZEXT416`・`SUB168`・`ABS`・`vpsrldq_avx`)・128bit レーン型 (`V128`/`undefined1[16]`) 9・未宣言の型/識別子 9・未関数化 callee 2。
+- Delay の残件 (件数): 未宣言の型/識別子 350 (`code`・`sbyte`・`undefined` とローカル宣言の欠落 `pcVar1` 等)・引数数不一致 108・演算の型不一致 約 100・128bit レーン型 47・未宣言の Win API 46 (`HeapAlloc`/`HeapFree`/`GetCurrentProcess`/`IsProcessorFeaturePresent`/`TerminateProcess` 等)・未宣言の SIMD 疑似関数 37・`LOCK`/`UNLOCK` 20・未関数化 callee 5。
+- 手作業パッチ (`patches.py` の ASSOC/ABI 表): Stereo / Delay とも 0 件 (規則は未追加)。残件はすべて emcc の clang エラーとして残る。
+- 変更 (`f847e8c6`・`ghidra_to_c.py` 2 行): (1) `SNAPINS` に `delay` を追加 (proc `0x1802ed7f0` + also 140 件)。IAT thunk `0x180fd81e4`・`0x180fd81ec` は THUNK 辞書で stub 化するため also から除外 (入れると署名抽出で停止する)。(2) Ghidra が jmp thunk を `thunk_FUN_<飛び先>` と出す関数 (Delay 4 件: `180f8791c`・`180f87cac`・`180f87d40`・`180fc61dc`) の署名名を `FUN_<va>` に揃える (本体は飛び先と同一の decompile 結果)。修正前は `signature not found` で停止していた。
+- 回帰 (`f847e8c6`, 1000 trial / seed 7, `build_cmp.sh gain`): Gain **1000/1000** bit-exact (calls 4999/4999, wasm 15,161 B)。Haas / Gate は同じ converter 経路のため本 run では未再測定 (件数は §10-7o の値)。
+- 未実施: Stereo / Delay の 1000 trial 突合・ネガコン・第二 oracle の結論 (emcc 未通過のため)。子 issue #3071 [KH-39] (Stereo)・#3072 [KH-40] (Delay)・#3073 [KH-41] (突合・ネガコン・結論) に分割。
+- 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。build_cmp.sh 単体では作られないため `mkdir -p` が要る)。
+- 差分確認 (測定後のコード変更): `git diff f847e8c6 HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行 (本 REPORT の commit は同範囲外)。

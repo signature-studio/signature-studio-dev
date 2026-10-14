@@ -241,3 +241,6 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 #### 10-7g. #1215 (KH-23) 再 run: 呼出名 `func_0x…` の統一 (部分)
 - 結論: `ghidra_to_c.py` の呼出名統一で emcc error 31 → 25 件。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。詳細と実測は付録 `REPORT_APPENDIX.md` §10-7g。
 - #1405 (KH-25) の 1 単位: `rcpps` 代入形の固定と converter ガード、`GetLastError`/`SetLastError` の stub。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact。件数・実測・測定 commit は付録 `REPORT_APPENDIX.md` §10-7o。
+
+#### 10-7p. #1216 (KH-24) run: Stereo / Delay の Ghidra 実ビルド試行 (部分)
+- 結論: Stereo は decompile 8/8 OK・emcc 失敗 (clang エラー 39)、Delay は decompile 141/141 OK・emcc 失敗 (710)。突合・ネガコンは未実施。測定・件数・種類・分割先 (#3071/#3072/#3073) は付録 `REPORT_APPENDIX.md` §10-7p。
