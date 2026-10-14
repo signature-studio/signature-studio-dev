@@ -29,7 +29,8 @@ def s64(v):
 
 def predict(st, cnt):
     p = s64(st * cnt)
-    q = int(p / cnt)  # idiv は 0 方向への切り捨て
+    a = abs(p) // abs(cnt)  # idiv は 0 方向への切り捨て (浮動小数点を使わない)
+    q = -a if (p < 0) != (cnt < 0) else a
     site1 = q != st
     site2 = s64(p + 0x10) < 0
     return site1, site2
@@ -51,12 +52,18 @@ def main():
     out = nat.run_cases(lines, ['%d_%d' % g for g in GRID])
     nat.close()
     print('<!-- 自動生成: python3 tools/liftdiff/tests/trace_417b70_trap.py (LD-62, #1767) -->')
-    print('| stride | count | 予測 site1 (0x417c62) | 予測 site2 (0x417c75) | native status | 0x409730 進入 |')
-    print('|---:|---:|:---:|:---:|---|:---:|')
+    print('| stride | count | 予測 site1 (0x417c62) | 予測 site2 (0x417c75) | native status | 0x409730 進入 | FN 直後が 0x409730 |')
+    print('|---:|---:|:---:|:---:|---|:---:|:---:|')
+    raw = []
     for (st, cnt), r in zip(GRID, out):
-        tr = [int(t[0], 16) for t in r.get('trace', [])]
+        vas = [int(t[0], 16) for t in r.get('trace', [])]
         s1, s2 = predict(st, cnt)
-        print('| %d | %d | %s | %s | %s | %s |' % (st, cnt, s1, s2, r.get('status'), TRAP in tr))
+        direct = any(vas[i] == FN and i + 1 < len(vas) and vas[i + 1] == TRAP for i in range(len(vas)))
+        print('| %d | %d | %s | %s | %s | %s | %s |' % (st, cnt, s1, s2, r.get('status'), TRAP in vas, direct))
+        raw.append('- stride %d count %d: trace[0:8] = %s' % (st, cnt, [t[0] for t in r.get('trace', [])[:8]]))
+    print()
+    print('生の trace 先頭 (t[0] は hex 文字列):')
+    print('\n'.join(raw))
 
 
 if __name__ == '__main__':
