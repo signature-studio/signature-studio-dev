@@ -10,7 +10,7 @@
 ## 0. 結論
 
 - 受入 1 の「KH-19b で確定した closure」はまだ確定していない (手検証 160 との差分判定は #2176 待ち)。本節が lift したのは**未確定の before 160** (直接 call 閉包の下界・機械生成)。確定 closure の lift は未実施 (子 issue #3063)。
-- x64c で **148 関数**を lift した (§2)。before 160 との差 12 件の内訳は §3 (再検証は未了)。
+- x64c で **148 関数**を lift した (§2・測定 commit `196f37ef`)。before 160 との差 12 件 (算術差) の内訳は**未検証** (§3)。
 - 最初の build 失敗点: **`fle_data_gen.py` に直書きされた FLEngine 固有の VA `0x42f670` の窓**。Kilohearts の像の外で負の番地になり、emcc が字句エラーで止まる (§4 の B)。範囲内に限る 1 行で解消。
 - 既定 ImageBase (`0x180000000`) のままでは wasm32 の番地に収まらない (`memory access out of bounds`・D11 同型)。像を `0x2000000` 起点へ shift すると、compile・link が通る (§4 の C)。ただし正しさは未検証 (bit 突合は範囲外)。
 
@@ -49,19 +49,18 @@ python3 tools/targets/kilohearts/scripts/closure_breakdown.py <winpkg/HeartCore.
 | スクリプト全体 (測定時点・判定追加前) | exit 0 | 54.5 s |
 
 - 時間は各 1 回の計測 (n=1)。変動の幅 (min–max レンジ) は未取得で、参考値として扱う。
+- 本 fix (review round 2) では表の段を再実行していない。`plugins-kilohearts`・`toolchain-emsdk` が `$ARTIFACTS_DIR` に無く、x64c・emcc・smoke を走らせられないため (§6)。上の値は `196f37ef` の実測のまま。
 - smoke は**正しさの検証ではない**。入力 spec を与えていないため戻り値の値は意味を持たない。bit 突合は issue の範囲外。
 - smoke の `EXC` 判定 (`lift_closure_x64c.sh` の末尾: `ok` が 3 行・`EXC` が 0 行で成功) は本 PR で追加した。判定を通した実行は kh.wasm を作る run が要るため未実施 (§6)。判定ロジックは合成ログで確認した (`ok` 3 行・`EXC` 0 行で通過、`EXC` 1 件で失敗)。
 - unsup 285 site: 実行到達時は `ott_unsup` で停止する。多い順は `vmovntdq` 30・`vmovsd` 32・`vmovd` 29・`vmulsd` 25・`vaddsd` 23・`vmovq` 17・`vfmadd213sd` 16 (VEX / FMA 系)。
 
 ## 3. 閉包の差分 (x64c 148 vs TSV 160)
 
-- 集合の包含 (x64c の 148 関数が TSV の 160 行に含まれ、逆方向の差は 0) と下記の内訳は、本 PR の作成時に一時スクリプト (未コミット) で確認した値。**本 PR のスクリプトでの再検証は未了** (本 run では plugins-kilohearts が無く HeartCore.core_64 を得られない)。
-- 再検証用: `closure_breakdown.py` (§1)。期待する出力は `TSV 160 行 / lift 済み 148 / TSV 側の未 lift 12 / lift のみ 0`、内訳 `tail jmp 9`・`IAT thunk 2`・`取りこぼし 1`。分類の動作は、合成 TSV 3 行 (`ff 25` の行・`jmp rel` の行・どちらでもない行) を FLEngine の PE に当てて 3 分類がそれぞれ出ることを確認した (本 run)。
-- 内訳 (前回の確認):
-  - **tail `jmp` 9 件** (`0x6500`・`0x4d400`・`0xf87d40`・`0xfd099c`・`0xfd66a0`・`0xfd8d08`・`0xfd8d24`・`0xfe3488`・`0x1327348`): 親の descend で到達し、親の C 本体に取り込まれている。x64c は他関数への `jmp` を `calls` に入れないため、関数としては数えられない (コードは lift 済み)。
-  - **IAT thunk 2 件** (`0xfd81e4`・`0xfd81ec`): `jmp qword ptr [rip+..]` で IAT の `FlsGetValue`・`FlsSetValue` へ飛ぶ thunk。x64c は import 経路 (`imp_*`) として扱い、関数にしない。
-  - **取りこぼし 1 件** (`0xfc7468`、size 42): 親 `0xfd08d0` の call 位置 `0xfd0995` を x64c の descend が辿らない。原因は未調査 (子 issue KH-37)。
-- `unlifted_callees` が 0 件のため、x64c が見た直接 call 先はすべて lift 済みか thunk (前回の確認)。
+- **内訳 (tail jmp・IAT thunk・取りこぼしの件数と番地) は未検証**。HeartCore.core_64 が無く、`closure_breakdown.py` を実 PE に当てて実行できていない。前の確認で得た件数と番地は、未コミットの一時スクリプト由来のため本 REPORT の値として採らない。
+- 差 12 は `gain_before_160.tsv` の 160 行と §2 の lift 済み 148 の算術差。逆方向 (lift のみ) の件数と、x64c の関数集合が TSV に含まれるかは未検証。
+- 再検証: `closure_breakdown.py` (§1)。期待する出力の形は `TSV 160 行 / lift 済み 148 / TSV 側の未 lift 12 / lift のみ <n>` と内訳 3 分類の件数。分類の仕様は同スクリプトの docstring (IAT thunk = 先頭 `ff 25`・tail jmp = 呼出位置の `jmp rel` が関数を指す・それ以外 = 取りこぼし)。
+- 分類の動作は、合成 TSV 3 行 (`ff 25` の行・`jmp rel` の行・どちらでもない行) を FLEngine の PE に当てて 3 分類がそれぞれ出ることを前 fix run で確認した (実 PE の結果ではない)。
+- 原因の調査は子 issue #3064 (KH-37)。
 
 ## 4. build の失敗点の記録 (同じ入力・手順の 3 試行)
 
@@ -74,7 +73,7 @@ python3 tools/targets/kilohearts/scripts/closure_breakdown.py <winpkg/HeartCore.
 - 試行 B の原因箇所: `tools/flelift/fle_data_gen.py` の `for a, n in [(0x42f670, 0x30)]`。本 PR で `IMG <= a < IMG + SizeOfImage` の判定を足した。FLEngine (像内) では従来どおり追加される。
 - 試行 A の補足 (未確認): 直書き窓は VA 版では `IMG + rva` が打ち消し合い `0x42f670` へ書き込む。emcc の静的領域と重なるかは確認していない。
 
-## 5. FLEngine 側の回帰確認 (本 run で再実行・HEAD で確認)
+## 5. FLEngine 側の回帰確認 (HEAD `0f52976e` で実行。以降 `scripts`・`flelift` は未変更)
 
 - `scripts/fle_data_gen_cmp.sh` (素材: `fl-win64` の `block00031_PE.bin`・meta は空の合成値 `{}`):
   - `cmp old/new: 一致 (14820487 B)` — 旧版 (`196f37ef^` の `fle_data_gen.py`) と新版 (HEAD) の出力が一致。
@@ -86,11 +85,19 @@ python3 tools/targets/kilohearts/scripts/closure_breakdown.py <winpkg/HeartCore.
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 確定 closure (手検証 160 との差分 0) の lift と build | 受入 1 の「確定 closure」は未確定。本節は未確定の before 160 | #3063 (KH-36・前提 #2176) |
-| §3 の内訳の再検証 (HeartCore.core_64 が要る) と取りこぼし `0xfc7468` の原因 | 関数数 148 ≠ 160 の説明が未再検証 | #3064 (KH-37) |
+| §3 の内訳 (件数・番地) の再検証 (HeartCore.core_64 が要る)。関数数 148 ≠ 160 の説明 | 内訳は未検証。説明は未確定 | #3064 (KH-37) |
 | unsup 285 site (VEX / FMA 系 48 mnemonic 種) | 実行到達時に `ott_unsup` で停止 | #3065 (KH-38) |
-| smoke の `EXC` 判定の実行 (kh.wasm を作る run で) と、ネガティブコントロール (`_fle_data_install` を飛ばして trap することの確認) | 判定は合成ログのみ確認。build 結果に対する判定は未実行 | #3063 |
+| 素材 `plugins-kilohearts`・`toolchain-emsdk` が本 fix の `$ARTIFACTS_DIR` に無い (`fl-win64` のみ)。x64c・emcc・smoke・`closure_breakdown.py` を再実行できない | 判定を含む lift・build の再測定と §3 の検証が未了。本 PR 本文の `oc_artifacts:` 行で次の run が取得する想定 | 本 PR の未解決表 (起票なし) |
+| smoke の `EXC` 判定 (`lift_closure_x64c.sh` 末尾の +4 行) は `196f37ef` の測定に無く、未再測定。ネガティブコントロール (`_fle_data_install` を飛ばして trap することの確認) も未実施 | 判定は合成ログのみ確認。build 結果に対する判定は未実行 | #3063 |
 | smoke は trap の有無しか見ない。FLEngine の vtable 窓 (#1936/#2005) に当たる Kilohearts 側の窓が無いかは未検討 | 正しさは未確認 | #3063 |
 | FLEngine の全 lift (`fle_lift.sh`) での回帰・`fle_data_gen.py` の FLEngine 固有窓 `0x42f670` の直書き (範囲判定で他 PE への誤用は防止) | §5 は敷設出力の一致のみ。窓の引数化は FLEngine 側の meta 生成に触れる | 親 #850 への提案 (PM 判断) |
 | bit 突合 (native 対照) | 範囲外 (issue 本文) | 起票なし |
 
-- 差分の注記: `git diff 196f37ef HEAD -- tools/targets/kilohearts/scripts tools/flelift` は、`lift_closure_x64c.sh` の末尾 (smoke の判定) と新規 2 件 (`closure_breakdown.py`・`fle_data_gen_cmp.sh`) だけ。`fle_data_gen.py` は変わっていない。lift・build の入力と出力は変わらないが、判定を含む再測定は素材が無く未了 (上の未解決表の 4 行目)。
+- 測定 commit `196f37ef` からの差分 (`git diff --stat 196f37ef HEAD -- tools/targets/kilohearts/scripts tools/flelift`・HEAD `0f52976e` 時点):
+  ```
+   .../kilohearts/scripts/closure_breakdown.py        | 54 ++++++++++++++++++++++
+   .../targets/kilohearts/scripts/fle_data_gen_cmp.sh | 31 +++++++++++++
+   .../kilohearts/scripts/lift_closure_x64c.sh        |  4 ++
+   3 files changed, 89 insertions(+)
+  ```
+  `lift_closure_x64c.sh` の差分は smoke の判定 (末尾の 4 行) だけ。`fle_data_gen.py` と x64c は変わっていない。lift・build の入力と出力は変わらないが、判定を含む再測定は素材が無く未了 (上の未解決表の 3・4 行目)。
