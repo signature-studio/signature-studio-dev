@@ -144,3 +144,35 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 - 全 942 unit の監視版 (`store_watch_1046.sh`、`timeout 1500`): 上限で打ち切り (rc 124、25 分 21 秒)。`unit 106` で停止。`[aw]` 行は **0 件**。§12 の「unit 106 付近まで `[aw]` が記録された」とは一致しない (計装・素材の差が未切り分け)。
 - 打ち切り後、`work/obj/sw682.o`・`boot.o`・`ov.o` を消して `m11_build.sh` で再 build し、survey を再実行: `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` に戻ることを確認 (計装が残っていない)。`timeout` で殺された場合は `store_watch` の EXIT trap が走らないため、手動で復元が要る。
 - 結論: 書込み元 store は未特定。監視版の全 unit 完走には 25 分超が要り、1 run の上限内では完了しない。次回は unit 範囲を分けて (例: 0–105 / 106–941) 実行するか、`[aw]` に unit 境界を出す計装を入れる。受入 2・3・4 は未達のまま。
+
+## 14. 5 回目の再着手 run: unit 単位の値遷移 probe (HEAD `72260b63` = origin/main、コード変更なし)
+
+- 測定 commit: `72260b63` (コード差分 0。計装は本節の probe のみ・survey 本体は不変)。
+- 差分 0 の証跡 (`git diff --stat 72260b63 HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/survey_units.mjs tools/m11/m11_win.c tools/m11/ldfix/` の出力は空。範囲内のコード差分 0):
+- 本 PR の差分は `git diff --stat 72260b63 HEAD -- tools/m11` で `tools/m11/trap_triage/REPORT_1046.md` (+14) と `tools/m11/trap_triage/probe_1046_watch.mjs` (+32) の 2 ファイルのみ。
+- 再現: `m11_gen_ir2.sh` rc 0 (36.2 s、490,733 行) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0: `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
+- 新規 `trap_triage/probe_1046_watch.mjs`: 各 unit 実行の前後で `0x10a9f910` の 8B を読み、値が変わった unit を出す (読取りのみ、IR 不変)。全 942 unit を **13.1 s** で完走 (§12・§13 の全 store 計装は 900〜1500 秒で打ち切り)。
+- 値の遷移 (抜粋・実測):
+  - `unit 477 exc 0x1_1029e5d8 -> 0x1_2`
+  - `unit 484 exc 0x1_2 -> 0x1_3` (**unit 484 は OOB (`function_903e00` 系)**)
+  - `unit 492 exc 0x1_3 -> 0x0` (unit 492 の OOB 入力 `old=0x100000003` は unit 484 が残した値)
+- 要点: issue #1620 の前提「unit 492 の中で `0x100000003` が書かれる」は**誤り**。値は unit 484 で `0x1_3` になり、unit 492 はそれを読んで OOB する。書込み元は unit 477〜484 の範囲に絞れた。
+- 全 store 計装 (`store_watch_1046.sh`、`SV_ONLY=0..484`、`SV_ERR_LOG` 付き) は 800 秒で打ち切り (rc 124)。`[aw]` は unit 95 までの 265 件のみ。打ち切り後に計装を除去し、基準 build (`ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1`) に戻ることを実測で確認。
+- unit 477〜484 だけを `SV_ONLY` で実行した場合 (store 計装版): `[sw]` 0 件、survey は `oob 2 / ok 6` (44 s)。同範囲の値遷移 probe も `0x0` のまま変化しない。**値 `0x1_2`・`0x1_3` は unit 0〜476 が共有ヒープに残した状態に依存し、単独範囲では再現しない**。
+- 結論: 書込み元 store は未特定。0〜484 を通す全件計装は前回 800 秒で打ち切り。#1620 の残りは「0〜484 を通した計装を、時間内に完走させる手段 (unit 境界を出す計装・実行の分割と状態の受け渡し) を作ること」。
+
+## 15. #1288 再着手 run (HEAD `04a7ff1a` 起点): 監視版の全 unit 実行は unit 106 で停止 (結論なし)
+
+- 測定 commit: `04a7ff1a` (コード変更なし。本節の追記のみ)。`tools/m11` 全体の差分は main 取り込みで 7 ファイル (+145 行: `REPORT_N15.md`・`REPORT_1274.md`・`REPORT_1317.md`・`REPORT_1463.md`・`trap_triage/probe_1046_watch.mjs`・`trap_triage/probe_entry.py`・`REPORT_1046.md`) あるが、§15 の実測経路 (`m11_gen_ir2.sh`・`m11_build.sh`・`survey_units.mjs`・`m11_ptrcheck.mjs`・`ldfix/`・`m11_win.c`・`store_watch_1046.sh`・`watch_addr_1046.c`) の差分は 0 (`git diff --quiet 04a7ff1a 6edffd41 -- <上記>` が空)。`probe_1046_watch.mjs`・`probe_entry.py` は §15 の実行に使っていない。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11`・`work-liftdiff` は `tools/m11/work`・`tools/liftdiff/work` に展開済み。retdec・emsdk は `/opt` にあり。
+- 再現 (`04a7ff1a`): `m11_gen_ir2.sh` rc 0 (38.8 s、490,733 行) → `m11_build.sh` rc 0 (18.0 s) → `survey_units.mjs` rc 0 (9.0 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2・§9〜§12 と一致。load average 約 1.0。
+- 全 store 計装版 (`store_watch_1046.sh`、監視番地 `0x10a9f910`) の試行:
+  - `SV_ONLY=0..9`: 34.6 s、`unit 0`〜`unit 9` 完走、`[aw]` 0 件。
+  - 全 942 unit (`full1`): `timeout 1500` で打ち切り (rc 124、25 分 15 秒)。`full1.err` の最後の行は `unit 106` で、その時刻は 03:18 (開始直後)。以後 25 分間 unit 107 以降の行も `[aw]` も出なかった。`[aw]` は 0 件。
+  - 通常 build の survey は同じ 942 unit を 9 秒で完走する。計装版だけが unit 106 付近で進まなくなる (計装 IR の副作用、または unit 106 の実行時間の大幅な増加。切り分け未了)。
+- 記録上の注意 (本 run で判明):
+  - 監視版の `[aw]` 行は `watch_addr_1046.c` の `LOG_MAX 4000` で上限があるが、今回は 0 件のため上限には達していない。§12 では `[aw]` を unit 106 付近まで記録したが、本 run は 0 件で不一致。原因は未切り分け (§13 の注記と同じ)。
+  - `store_watch_1046.sh` は最後の `grep -c "^\[sw\]"` が 0 件で終了コード 1 を返す (`[sw]` ではなく `[aw]` を数えるべき)。survey の結果には影響しない。
+  - `store_watch_682.sh` は生成した `survey_sv.mjs` を `work/probe682/` に置くため、`import ... './m11_ptrcheck.mjs'` が解決できず survey が起動しない (`ERR_MODULE_NOT_FOUND`)。`store_watch_1046.sh` は `tools/m11/` 直下に `survey_sv_1046.mjs` を置くので影響しない。
+- 受入の判定 (本 run): 1 は §10 で達成済み。2 (`0x92492493`) は未着手。3 は未確定 (書込み元 store の特定が未了)。4 は修復未実施で未達。
+- 次の手順: (a) 計装版が unit 106 で止まる原因を切り分ける (unit 106 だけを `SV_ONLY=106` で単独実行し、時間と停止位置を取る)。(b) 止まらない計装 (例: 監視を unit 492 の直前だけ有効にする) で、`0x10a9f910` への最後の書込みを IR 行に戻す。(c) D17 か別類型かを判定する。

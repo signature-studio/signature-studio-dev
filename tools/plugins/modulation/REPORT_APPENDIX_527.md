@@ -54,6 +54,24 @@
 
 - KERNEL32 の import thunk (`jmp qword ptr [rip+…]`) を経由する呼出を列挙。thunk は殻ごとに求め直す (アドレスは殻で異なる)。
 - `LoadLibraryExW` の呼出は 4 本とも 1 箇所 (FS 0x415b7b / HC・VC・VP 0x4158ab)。`LoadLibraryW` は 4 本とも 9 箇所、`LoadLibraryA` は 1 箇所。
-- `GetProcAddress` の呼出は 4 本とも 10 箇所。そのうち `GetLogicalProcessorInformation` / `GetThreadPreferredUILanguages` / `GetLongPathNameW` など 6 箇所は引数の文字列を取れた (エンジン関係ではない)。残り 4 箇所は引数がラッパー関数 (FS 0x41d450 / 0x418350、VC 0x41d1a0 / 0x4180d0 など) 経由で、文字列を静的に取れていない。ラッパーのアドレスは `engine_shell_gpa.py` の出力には含まれず、出典 (手作業の逆アセンブルか否か) は未記録のため、未検証の値として扱う。
+- `GetProcAddress` の呼出は 4 本とも 10 箇所。そのうち `GetLogicalProcessorInformation` / `GetThreadPreferredUILanguages` / `GetLongPathNameW` など 6 箇所は引数の文字列を取れた (エンジン関係ではない)。残り 4 箇所は引数が中継関数 (FS 0x41d450 は KERNEL32 の `GetProcAddress` import thunk、0x418350 など。VC 0x41d1a0 / 0x4180d0 なども同様に中継) 経由で、文字列を静的に取れていない。中継関数のアドレスは `engine_shell_gpa.py` の出力には含まれず、出典 (手作業の逆アセンブルか否か) は未記録のため、未検証の値として扱う。
 - 殻内の engine export 名は UTF-16 で入る (ASCII は無し)。FS: `dispatch` 0x2dda92、HC: `DispatchToEngine` 0x2e9722、VC / VP: `VSTPluginMain` 0x2d9dd8 / 0x2db668。engine 名 `Engine_x64.dll` (FS, 0x1a2b58) / `engine_x64.dll` (HC 0x2e9704, VC 0x2e9da4, VP 0x2ecfc4)。
 - 結論 (推定): 殻は `LoadLibraryExW` を 1 箇所で呼び (スクリプトで確認)、その引数が `engine_x64.dll` であること (推定。LoadLibraryExW 行の引数は未取得)、`GetProcAddress` のラッパー経由で export 名を引く、という構造と推定する。ラッパーに渡る引数の実値 (どの export 名を引くか) と、VST2 engine の `VSTPluginMain` 呼出箇所は未了。受入 5 は未達のまま #527 に残す。
+
+## K. 殻の engine 名参照と呼出経路 (受入 5 の続き、`engine_shell_entry.py`)
+
+測定 commit: `c5627440` (コード差分の最終 commit)。`git diff c5627440 HEAD -- tools/plugins/modulation/ ':(exclude)*.md'` の出力: 空 (コード・データの差分 0)。`*.md` を含めた差分は本付録の文書修正 (76a434aa 以降) のみ。
+用語: 「thunk」= KERNEL32 の import thunk (`jmp [rip+…]`)、「ラッパー」= thunk を呼ぶ関数 (§J と統一)。
+
+測定: `python3 modulation/engine_shell_entry.py <block_PE.bin>` (fl-win64 extracted の殻 4 本、静的のみ)。
+
+| 殻 | engine 名の lea 参照 (VA) | 直後の call 先 (ラッパー) | 所見 |
+|--:|---|---|---|
+| 18978 (FS) | `Engine_x64.dll` 0x6de5b3 → `0x4106d0` / `dispatch` 0x6de5df → `0x41d460` | `0x41d460` (ラッパー) → `0x41d450` (`GetProcAddress` の thunk) | 同一関数内で DLL 名を `0x4106d0` に渡し (呼出先の同定は未了)、続けて `dispatch` を `0x41d460` 経由で解決 |
+| 19144 (HC) | `engine_x64.dll` 0x6ea244 → `0x410400` / `DispatchToEngine` 0x6ea270 → `0x41d1e0` | `0x41d1e0` (ラッパー) → `0x41d1d0` (`GetProcAddress` の thunk) | FS と同型 |
+| 19265 (VC) | `engine_x64.dll` 0x6ea7ff → `0x410400` | 名前 `VSTPluginMain` の lea 参照は本スクリプトでは見つからず | 未確定 |
+| 19267 (VP) | `engine_x64.dll` 0x6eda1f → `0x410400` | 同上 | 未確定 |
+
+- FS・HC は「DLL 名 → ラッパー」の直後に export 名を解決する形で、殻が engine を動的ロードして名前で関数を引く推定と整合する (静的な推定。ラッパーの内部で `GetProcAddress` が実際に呼ばれることは未確認)。
+- VC・VP は `VSTPluginMain` の文字列の直接参照が見つからない。VST 系の名前は別経路 (間接・連結・別の文字列表現) の可能性があり、未解析。
+- 殻の `GetProcAddress` 10 箇所のうち、ラッパー経由の 4 箇所 (今回検証した FS の呼出 `0x41d48e` / `0x41d4b9` を含む) の引数の実値はこれで取れていない。上記の名前参照は、その呼出の一部に対応する。
