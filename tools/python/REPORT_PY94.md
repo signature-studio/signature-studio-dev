@@ -70,7 +70,7 @@ main の取り込みで 5 ファイルが競合した (`docs/DOC_MAP.md`・`host
 - `tests/provider_check.mjs`: `pe94`・`pe119set`・`pe115`・`pe121`・`pe119` の 5 集合を全て判定に残した。期待値は **実装 110 / 未実装 325** (main の 103 に `pe94` の 7 件を足した値。total 435、MCP 静的 60)。
 - `docs/DOC_MAP.md`: 両方の REPORT 行を残した。
 
-環境: runner 4 core。開始時の load average 0.14 / 0.19 / 0.09。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の `extracted/` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に指定した。emsdk は `/opt/emsdk` (`provider/build.sh` が既定で読む)。
+環境: runner 4 core。開始時の load average 0.14 / 0.19 / 0.09。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の `extracted/` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に指定した。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md`) で、`provider/build.sh` が既定の `EMSDK_ENV` で読む。
 
 前提の生成物 (gitignore):
 
