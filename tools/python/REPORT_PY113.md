@@ -16,7 +16,7 @@
 - 解析: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/settrackcolor_facts.py`。実測 real 0.114 s (user 0.101 s / sys 0.015 s)、n=1。実行直後の `uptime` の load average は `0.12 0.16 0.09` (並列 1)。出力は 4 項目 PASS・末尾 2 件の算法一致 (§5)。
 - 対象: `extracted/block00031_PE.bin`。逆アセンブルは `analysis/flapi/pe_disasm.py` と同じ capstone 方式。
 - PyMethodDef の配列の位置: `pymethoddef_scan.py` が出す `start` は**ファイル offset** (VA ではない)。playlist 配列は offset `0x1114ac8` (42 行)、mixer 配列は `0x1116ea8` (72 行)。
-- 測定 commit (コードを最後に変えた commit): `ce1aae29` (`fix(python): store playlist track color in FL byte order (PY-113)`)。この REPORT を含む後続の commit は、コードの範囲 (`provider`・`host`) に差分が無いことを §6 で示す。
+- 測定 commit (コードを最後に変えた commit): `ce1aae29` (`fix(python): store playlist track color in FL byte order (PY-113)`)。この REPORT を含む後続の commit は、コードの範囲 (`provider`・`host`) に差分が無いことを §6 で示す。main 取り込み (merge) 後の測定 commit は `b5381a06` で、§8 に記す。
 
 ## 2. 逆アセンブルの事実 (playlist)
 
@@ -59,7 +59,7 @@
 
 ## 6. 差分の確認
 
-- `git diff ce1aae29 HEAD -- tools/python/provider tools/python/host` (この REPORT の commit 時点): 空 (コードの範囲に差分 0)。
+- `git diff ce1aae29 HEAD -- tools/python/provider tools/python/host` (この REPORT の commit 時点): 空 (コードの範囲に差分 0)。main 取り込み後は非空 (main 側の PY-87 の差分) になるため、§8 の測定 commit から HEAD までの差分を見る。
 
 ## 7. 未解決
 
@@ -67,3 +67,16 @@
 |---|---|---|
 | `tests/playlist_diff.mjs` (#2885 のブランチ) の暫定期待値 `0xff563412` の置換と、C/mock の diff 0 の実測 (emsdk) | 受入条件 3。#2885 の期待値が誤ったまま | #2949 (PY-114)。#2885 の merge 後に着手 |
 | `mixer.setTrackColor` の格納先 (`0x12c17a0` の書込み先・mask) と `mixer.getTrackColor` (0xd5ec60) の取得式。C の mixer setter は素通しのまま | mixer 側の往復が C で食い違う可能性 (未実測) | #2951 (PY-115) |
+
+## 8. main 取り込み後の再測定 (競合解消)
+
+- 経緯: `origin/main` (#2953 まで) との merge で競合したのは `docs/DOC_MAP.md` の表の隣接行だけ (両側の行を残した)。解消 commit は `b5381a06`。コードを最後に変えた commit はこの merge。
+- 取り込みで `tools/python/provider`・`host` に入った main 側の差分は PY-87 (#2738) の 4 関数だけ。`git diff ce1aae29 b5381a06 -- tools/python/provider tools/python/host` は 13 行追加・0 行削除で、`trackcolor` を含む行は 0 件。
+- 検証 (測定 commit `b5381a06`。runner に emsdk が無いため、gcc・node・解析スクリプトで実施):
+  - `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c`: rc 0 (関数 435・ハンドラ 83)。
+  - `gcc -fsyntax-only -Wall -Wextra` (`fl_engine.c`・`fl_dispatch.c`・`gen/fl_table.c`): rc 0 (3 件)。
+  - `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/settrackcolor_facts.py`: PASS 4 件・2 算法一致。real 0.096 s (user 0.070 s / sys 0.026 s)、n=1、load average `0.42 0.29 0.12`。素材 `fl-win64.tar.zst` の展開は real 5.523 s。
+  - native (repo 外・未コミットのハーネス。`fl_engine.c` を `#include` し、`fl_api_call` の fn_id 37 = `playlist.setTrackColor` を呼ぶ): `setTrackColor(3, v)` の格納値 `0x123456`→`0x563412`・`0xabcdef`→`0xefcdab`・`0xff0000ff`→`0xff0000`・`0x000000`→`0x000000` の 4 件 PASS (bad=0)。
+  - 負例 (setter だけを修正前の素通し `p->color = A_INT(1, 0)` に差し替えた複製): 4 件中 3 件が MISMATCH・FAIL (bad=3)。ハーネスが退行を検出することの確認。
+  - mock (`host/fl_mock.mjs`・node・`call("playlist.setTrackColor")` の state 読出し): 4 件 PASS。
+- 未実測 (変わらず): `provider/build.sh` (emcc) と `tests/channels_diff.mjs`。→ #2949。
