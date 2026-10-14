@@ -99,9 +99,6 @@ fs.mkdirSync(new URL("work/", root), { recursive: true });
 fs.writeFileSync(new URL(`work/tool_coverage.${name}.json`, root), J({ summary, tools: cov }, null, 1));
 
 // 比較: tool 別に完全一致 (差 0/48 を assert)。比較元が無い/短いこと自体を失敗にする
-// 既知の差: mock (ilmcp.mjs = FL 実物 rodata 由来の一覧) と C provider (fl_engine.c のスタブ) の result 文字列のみ。
-// status / host_calls / api_calls は引き続き完全一致を要求する。解消は C provider 側の仕様統一 (起票依頼・PR #586 コメント)。
-const KNOWN_MOCK_RESULT_GAP = new Set(["get_highlight_names", "get_browser_names"]);
 const refs = [
   ["SAB+provider (tool_coverage.wasm.json)", "analysis/mcp/tool_coverage.wasm.json"],
   ["mock (tool_coverage.json)", "analysis/mcp/tool_coverage.json"],
@@ -114,8 +111,7 @@ for (const [label, path] of refs) {
   for (const c of cov) {
     const o = ref.tools.find((x) => x.name === c.name);
     if (!o) { diff++; fail(`${label}: ${c.name} が比較元に無い`); continue; }
-    const keys = label.startsWith("mock") && KNOWN_MOCK_RESULT_GAP.has(c.name) ? ["status", "host_calls", "api_calls"] : ["status", "result", "host_calls", "api_calls"];
-    for (const k of keys) {
+    for (const k of ["status", "result", "host_calls", "api_calls"]) {
       if (J(o[k]) !== J(c[k])) { diff++; fail(`${label}: ${c.name}.${k} 静的=${J(c[k]).slice(0, 100)} 比較元=${J(o[k]).slice(0, 100)}`); break; }
     }
   }
