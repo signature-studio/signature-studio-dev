@@ -101,3 +101,18 @@
 - 回帰 (commit `50652246`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7k と一致。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (ディレクトリ未作成が原因。`mkdir -p` 後に解消)。
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`rcpps` 2 引数形・`param_1` ABI・未関数化 callee 閉包・型不一致は未着手。
+
+#### 10-7n. #2087 (KH-33) run: Resonator emcc の param_1 引数 ABI 復元 (部分・Resonator はビルド未通過)
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64 (手展開)。Ghidra 12.1.4 = GitHub release `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 先頭 16 桁 `ddac49f9…` 一致)、JDK 21 (Temurin)、emsdk 6.0.12 ([EMSDK])。測定 commit = `81090e96` (コード変更は `ghidra_route/ghidra_to_c.py`・`ghidra_route/patches.py` のみ)。
+- 呼出元の確定 (Ghidra の C 出力は引数・戻り値を落とすため、呼出元の機械語を capstone で逆アセンブルして確認):
+  - `FUN_180fcf904` = 引数 `float` (xmm0)・戻り値 `short` (ax)。呼出元 2 件: `FUN_180fbc1f4` (xmm0 = `afStackX_8[0]`、入力 float)・`FUN_180fbbfb8` (xmm0 = `param_2`)。`void` 宣言は誤り。
+  - `FUN_180fbdfcc` = 引数 `short*` (rcx)・戻り値 `short`。呼出元 1 件: `FUN_180fbbfb8` (rcx = 入力 `param_1`)。
+  - `FUN_180fbdef4` = 引数 2 個 (rcx, dx)。呼出元 1 件: `FUN_180fbc1f4` (rcx = `&afStackX_10`・dx = 0)。Ghidra の呼出しの 3 個目 (r8) は callee が読まないため落とす。
+- 変更: `patches.py` に `ABI` 表 (resonator 7 規則)、`ghidra_to_c.py` で適用し各規則の件数が 1 でなければ停止 (assert)。gain/haas/gate には適用されない。
+- emcc (resonator, 修復なし, `-ferror-limit=0`, `emcc -c`, rc 1, `grep -c 'error:'`):
+  - 変更前 (HEAD `b7cfd62e` = origin/main 時点の resonator 生成, §10-7m と同じ件数): **8 件**。
+  - 変更後 (HEAD `81090e96`): **4 件**。消えたもの = `param_1` 不足 3 (`FUN_180fcf904` 呼出元 2 件・`FUN_180fbdfcc` 呼出元 1 件) と引数数不一致 1 (`FUN_180fbdef4`)。
+  - 残件 4 件 = 未宣言 callee のみ: `FUN_180fd4f30` 2・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1。閉包は [KH-31] #1989 の範囲 (§10-7j の試行で callee 追加は 13→26 件に悪化するため、本 run では扱わない)。
+- 回帰 (HEAD `81090e96`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7m と一致。
+- 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。`mkdir -p` で解消)。
+- 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI は呼出元 2 件の機械語からの推定で、Resonator 突合で検証する必要がある。
