@@ -38,7 +38,7 @@ IR 側 (lift 済みの `call @function_<VA>(`): `40c660` は 956 件のうち 93
 
 **結論: 投入形は (a)/(b) のどちらでもない (§7)。** 根拠は次の 2 点。
 1. 11 関数のうち 10 関数は、実際には `i128` が引数として使われていない (`40c660` `40c750` `653c80` は IR 型誤り、残りは xmm 値か stack ポインタ)。
-2. 残る `691dd0` は、機械語の入口が 3 引数 (rcx: i64、rdx: i64 の値、r8: 1 byte の flag)。IR の `i128` は下位 64 bit しか使われない (§7.1)。
+2. 残る `691dd0` は、機械語の入口が 3 引数 (rcx: オブジェクトのポインタ、rdx: i64 の値、r8: 1 byte の flag)。IR の `i128` は下位 64 bit しか使われない (§7.1)。
 
 ## 5. 未解決 (起票先)
 
@@ -56,20 +56,20 @@ IR 側 (lift 済みの `call @function_<VA>(`): `40c660` は 956 件のうち 93
 
 ## 7. 投入形の判定 (LD-53 最終判定)
 
-> 測定 commit: `62b35c95` (`tests/ld53_arg_regs.py` を追加した commit)。`26f90ada` (origin/main) から測定 commit までのコード差分は、この測定スクリプトの追加のみ。`ldlib` と `tests` は測定 commit 以降に変更していない。
-> 素材: `fl-win64` の `block00031_PE.bin` (展開先 `$RUNNER_TEMP/fl-win64/extracted/`)、`work-m11` の `boot_final3.ll` (展開先 `$RUNNER_TEMP/work-m11/tools/m11/work/`)。
+> 測定 commit: `85375443` (`tests/ld53_arg_regs.py` に 653c80 の呼出し側と計数の対照を足した commit。追加前の版は `62b35c95`)。`62b35c95` から測定 commit までのコード差分は、この測定スクリプトの追加のみ。`ldlib` は差分 0 行。
+> 素材: `fl-win64` の `block00031_PE.bin` (展開先 `$RUNNER_TEMP/fl-win64/extracted/`)。`work-m11` の `boot_final3.ll` は本 fix run に無く未使用 (§7.5)。
 
 ### 7.1 結論
 
-- **(a) 2 レジスタ分解は `691dd0` について棄却。** 第 3 引数 (1 byte の flag) は r8 から読まれ、r9 は読まれない。(a) なら i128 の高位 (r8) の後ろに第 3 引数が r9 で来るはずで、整合しない。
-- **(b) ポインタ渡しは `691dd0` について棄却。** rdx は値として保存・比較されるだけで、`[rdx]` の参照は 0 件。
-- `691dd0` の機械語の入口は **i64 (rcx) / i64 (rdx の値) / i8 (r8 の flag) の 3 引数**。IR の i128 は下位 64 bit (`trunc i128 %arg2 to i64`) しか使われない。
-- `653c80`: (b) は棄却 (r8 を逆参照しない)。(a) は高位 r9 を読まないので、i64 1 本 (r8) と区別できない。どちらの解釈でも投入するレジスタは同じ (r8 = 値、r9 は未使用)。
+- **(a) 2 レジスタ分解は `691dd0` について棄却。** 第 3 引数 (1 byte の flag) は r8 から読まれ (`691de4` で `[rbp+0x70]` に保存し、`691e65` の `cmp byte ptr [rbp+0x70], 0` で判定)、r9 は本体に現れない。(a) なら i128 の高位 (r8) の後ろに第 3 引数が r9 で来るはずで、整合しない。
+- **(b) ポインタ渡しは `691dd0` について棄却。** rdx は `691de0` で `[rbp+0x68]` に保存された後、`691e0e` `cmp qword ptr [rbp+0x68], 0`・`691e13` `jg` で符号付きの整数として比較され、`691e2b` `cmp rax, qword ptr [rbp+0x40]`・`691e2f` `jle` で上限にクランプされる。クランプ後の値は `691e41` で `[rax+0x94]` に値として格納され、rdx を基底とする参照は無い。(`ld53_arg_regs.py` の `deref_rdx` は本体で 0 件だが、script は `[rbp+0x68]` からの再ロードを追えない。根拠は上の命令列。)
+- `691dd0` の機械語の入口は **ポインタ (rcx) / i64 (rdx の値) / i8 (r8 の flag) の 3 引数**。rcx は本体が `691e01` `mov ecx, dword ptr [rcx+0x78]`・`691e5e` `mov qword ptr [rcx+0x8c], rax` で逆参照するオブジェクトのポインタで、case 生成は有効なオブジェクトのポインタを渡す必要がある。IR の i128 は下位 64 bit (`trunc i128 %arg2 to i64`) しか使われない。
+- `653c80`: (b) は棄却 (本体は r8 を整数として `cmp r8, 0x7fffffff`・`shl r8, 2` で扱い、逆参照しない)。(a) も `691dd0` と同じ理由で棄却: 本体は r9 を読まず (`ref_r9` 無し)、呼出し側 3 件は窓内で r9 を書かない (§7.2)。
 - `40c660` `40c750`: 本体は xmm0 (double) の参照のみで、i128 の参照は 0。IR の i128 は型誤り。
 
 **よって case 生成の投入形は次のとおり。i128 の 2 レジスタ分解もポインタ渡しも採用しない。** `691dd0` は rcx・rdx・r8 の 3 引数、`653c80` は r8 の 1 引数、`40c660` `40c750` は xmm0 の double 1 引数として投入する (IR 型の修正は §7.4)。
 
-### 7.2 実測 (`ld53_arg_regs.py`、rc=0・37.96 秒)
+### 7.2 実測 (`ld53_arg_regs.py`、rc=0 ×3・実時間 32.94〜33.38 秒)
 
 ```
 # LD-53 引数レジスタの読み書き (PE=block00031_PE.bin, .text VA=401000)
@@ -79,11 +79,19 @@ callee 40c750: 本体命令 2 (先頭から最初の ret まで)
   ref_xmm0=1
 callee 691dd0: 本体命令 59 (先頭から最初の ret まで)
   deref_rcx=2, ref_r8=2, ref_rcx=14, ref_rdx=4
+callee 653c80: 本体命令 9 (先頭から最初の ret まで)
+  ref_r8=2
+control mov rax, r9: ref_r9=1 (期待 1)
+control mov rax, [rdx+8]: deref_rdx=1 (期待 1)
 callers 691dd0 (線形走査の E8 一致, 窓 12 命令): call=13, nowrite_r9=13, nowrite_rcx=1, write_r8=13, write_rcx=12, write_rdx=13
+callers 653c80 (線形走査の E8 一致, 窓 12 命令): call=3, nowrite_r9=3, write_r8=3, write_rcx=3, write_rdx=3
 ```
 
-- `691dd0` 本体: r9 の参照 0 件。rdx の値を読むのは先頭の保存 (`mov [rbp+0x68], rdx`) の 1 箇所で、以後は `[rbp+0x68]` から読む。`[rdx]` の基底参照は 0 件 (`deref_rdx` 無し)。r8 は `mov byte ptr [rbp+0x70], r8b` の 1 byte 保存だけで、以後 `cmp byte ptr [rbp+0x70], 0` が flag を判定する。
+- `691dd0` 本体: r9 の参照 0 件。rdx は先頭の保存 (`mov [rbp+0x68], rdx`) 以後、`[rbp+0x68]` の再ロードから読まれる (§7.1)。`[rdx]` の基底参照は 0 件 (`deref_rdx` 無し)。r8 は `mov byte ptr [rbp+0x70], r8b` の 1 byte 保存だけで、以後 `cmp byte ptr [rbp+0x70], 0` が flag を判定する。
 - `691dd0` の呼出し側 13 件 (線形走査、窓 12 命令): r8 を宛先に書く 13/13 (`xor r8, r8` が 10 件、`movzx r8, byte ptr [rbp+0x78]` が 1 件 `690291`、`mov r8b, 1` が 2 件 `a9b8c2` `ff1ad9`)。r9 を宛先に書く 0/13。
+- `653c80` の呼出し側 3 件 (`6833c4`・`69b099`・`c7a451`): r8 を宛先に書く 3/3、r9 を宛先に書く 0/3。本体は r8 のみを読む (`ref_r8=2`、r9・rdx・rcx の参照は無し)。
+- 計数の対照 (`control`): 合成命令 `mov rax, r9` で ref_r9=1、`mov rax, [rdx+8]` で deref_rdx=1 (期待どおり)。上の 0 件が数え漏れでないことの確認に使う。実在の 5 番目引数を持つ関数での対照は未取得 (合成命令のみ)。
+- 実行条件: 逐次 (並列数 1)。計測前の load average (1 分値) は 0.40〜0.80。3 回の出力は同一。
 - 呼出し側と本体の読みが一致する。flag は r8 の 3 引数目として渡され、r9 は使われない。
 
 ### 7.3 受入条件の状態
@@ -91,7 +99,7 @@ callers 691dd0 (線形走査の E8 一致, 窓 12 命令): call=13, nowrite_r9=1
 | 受入条件 | 状態 |
 |---|---|
 | 呼出し側 5021 + 543 + 3 件を機械語で確認し、i128 未準備件数を記す | 達成 (PR #1772、測定 commit `3f330f17`) |
-| 呼び先 6 関数の署名を機械語で確認 | 達成 (§7 旧節と §2・§3) |
+| 呼び先 6 関数の署名を機械語で確認 | 達成 (`REPORT_LD39.md` §7.1 と本付録 §2・§3) |
 | 投入形 (a)/(b) を 1 つに決める (決められなければ理由を記す) | 達成 (§7.1)。(a)/(b) を `691dd0` で棄却し、投入形は機械語の入口どおり |
 | コードは変えない (REPORT のみ) | 達成 (`ldlib` 差分 0。追加は測定スクリプト `tests/ld53_arg_regs.py` 1 本) |
 
@@ -106,7 +114,7 @@ callers 691dd0 (線形走査の E8 一致, 窓 12 命令): call=13, nowrite_r9=1
 
 ### 7.5 検証
 
-- `ld39_abi_dump.py <PE> <boot_final3.ll>` rc=0 (IR 有り・本 run で再実行)。
-- `ld53_arg_regs.py <PE>` rc=0 (37.96 秒、§7.2)。
-- 測定 commit `62b35c95` から HEAD までのコード差分: `git diff 62b35c95 HEAD -- tools/liftdiff/ldlib tools/liftdiff/tests` は 0 行 (REPORT のみの commit が続く)。
+- `ld39_abi_dump.py` は本 fix run で再実行していない。`work-m11` (`boot_final3.ll`) が素材に無く IR 側を読めないため。PR 作成時の記録 (rc=0) のみを引く。次回の再実行用に PR 本文へ `oc_artifacts: fl-win64 work-m11` を追加した。
+- `ld53_arg_regs.py <PE>` は測定 commit `85375443` で 3 回実行。rc=0 が 3/3、3 回の出力は同一。実時間 32.94・33.06・33.38 秒 (min–max 32.94–33.38 秒)。計測前の load average (1 分値) は 0.40〜0.80、逐次 (並列数 1)。
+- 測定 commit `85375443` から HEAD までのコード差分: `git diff 85375443 HEAD -- tools/liftdiff/ldlib tools/liftdiff/tests` は 0 行 (REPORT のみの commit が続く)。
 - 範囲外: e2e (`liftdiff_e2e.sh`) は実行していない。`ldlib` と case 生成を変えていないため、e2e の対象の挙動は変わらない。
