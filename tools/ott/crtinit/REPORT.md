@@ -1,6 +1,7 @@
 # REPORT — OTT-T5 (CAB-138): CRT 初期化の等価置換 + override 4 件の実機械語 lift 置換
 
 親チケット: CAB-7 (Done) / 前提: CAB-137 (entry lift 85/85, In Review) / 関連: CAB-135 (AVX/FMA unsup — 引継 §6)
+既知類型との関係 (DEFECTS.md): 該当なし。§10 の欠陥は lift 欠陥ではなく、手書き CRT 置換 (`ott_crt.c`) の固定読み出し幅 `APISET_N` の誤り。読み出し幅の過小で後続の読みが silent に外れる点は D16 と同型だが、発生箇所と検出信号は別。
 
 ## 0. 結論 (先出し)
 
@@ -9,7 +10,7 @@
   - 既存 entry **85 scenario** を CRT 初期化版 build で全数再突合 = **85/85 PASS** (旧 build では native が crash していた float 経路も含め nat_crash 0)。
   - 既存 DSP e2e **89 scenario・全 cell bit-exact (正本 `tools/ott/REPORT.md`)** の継続 PASS と entry e2e (旧 build 全 85) PASS
     (旧 build — 改変は lifter の mxcsr 1 点のみ, §4)。
-- **ICALL-76 訂正 (§10)**: api-set 表は **34 entry** (0x110 B)。旧記載「32 entry」と `APISET_N 32` は誤りだった。修正後も判定 (crt_e2e PASS・9 本 / 85 件) は不変。
+- **ICALL-76 訂正 (§10)**: api-set 表は **34 entry** (0x110 B)。旧記載「32 entry」と `APISET_N 32` は誤りだった。修正後も判定 (crt_e2e PASS・9 本 / 85 件) は不変。修正後 build の読み戻し (95 run) では init 直後に 34 entry 全てが cookie、実行後に値が変わったのは {5, 6} のみ (§10)。
 - **CRT 初期化は (b) C 等価置換を採用** (DllMain / `_CRT_INIT` / `_initterm*` は実行しない):
   UCRT が `__security_cookie` で encode する関数ポインタ表 (**api-set 表 0x18026c9f0** ほか 4 slot) を
   `enc(NULL) = cookie` に事前初期化 + `__FlsIndex` 設定 + loader 系 import 4 種 (LoadLibraryExW /
@@ -45,9 +46,10 @@
 | `crt_roots.py` | entries.json 生成 (DSP cov + entry cov + CRT cov + roots 55 + override 8) |
 | `crt_scen.py` | 新 scenario 定義 9 本 (entry_scen.py の step 形式を流用) |
 | `crt_nat.py` | native scenario runner (entry_nat.py を runner として再利用, SO 差し替え + CRT init, `OTT_CRTINIT=0` で陰性対照) |
-| `crt_wasm.mjs` | wasm scenario runner (entry_wasm.mjs 由来 + `_ott_crt_init_tables` 呼び出し, `OTT_CRTINIT=0` で陰性対照) |
+| `crt_wasm.mjs` | wasm scenario runner (entry_wasm.mjs 由来 + `_ott_crt_init_tables` 呼び出し, `OTT_CRTINIT=0` で陰性対照, `APISET_READBACK=1` で api-set 表の読み戻しを出力 (§10)) |
 | `lift_crt.sh` | lift → C → emcc。override は **旧 4 件を外し** trampoline 6 + editor_null + am_shim の 8 件 |
 | `run_matrix.py` | オーケストレーション (entry 版と同型, native 側だけ crt_nat.py) |
+| `apiset_readback.py` | ICALL-76 (§10) の api-set 表 34 entry の読み戻し。scenario を 1 本ずつ `crt_wasm.mjs` で実行して集計 |
 
 生成物は `tools/ott/work/crtlift/` (gitignore)。判定は `entry/cmp_entries.py` を再利用 (schema 共通)。
 
@@ -175,7 +177,8 @@ CAB-137 で「wasm も同一 fail-fast」と記録されていた現象の正体
 ```sh
 # 前提: ANALYSIS_DIR に analysis-ott-binaries を展開 (plugins/ott/binaries/OTT_vst2_win64.dll)
 bash tools/ott/native/build.sh                    # 先に libottnative.so を作り直す (古い work/ の .so は ott_enc_slots を持たず [1/6] が落ちる)
-bash tools/ott/crtinit/crt_e2e.sh                 # 全工程 (§10 実測: 2 分 49 秒)
+bash tools/ott/crtinit/crt_e2e.sh                 # 全工程 (§10 実測: 4 分 18 秒)
+python3 tools/ott/crtinit/apiset_readback.py      # §10 の 95 run 読み戻し (crt_e2e.sh の後に実行。実測 7.1 秒)
 CRT_COV_SKIP=1 CRT_LIFT_SKIP=1 bash tools/ott/crtinit/crt_e2e.sh   # 再利用
 OTT_CRTINIT=0 python3 tools/ott/crtinit/crt_nat.py --out /tmp/n.json --scen tools/ott/work/crtlift/scen_crt.json --only flt_disp_def   # 陰性対照 (native)
 OTT_CRTINIT=0 MOD=$PWD/tools/ott/work/crtlift/ottl_crt.cjs SCEN=$PWD/tools/ott/work/crtlift/scen_crt.json NAME=flt_disp_def OUT=/tmp/w.json node tools/ott/crtinit/crt_wasm.mjs  # 陰性対照 (wasm)
@@ -186,28 +189,31 @@ bash tools/ott/entry/entry_e2e.sh --quick          # entry 85 (旧 build, 無改
 
 ## 10. ICALL-76 訂正: api-set 表は 34 entry (APISET_N 32 → 34)
 
-- **根拠**: CRT 初期化 0x1801c43a4 の `rep stosq` 個数 (`and ecx, 0x22`) = 34。表は 0x18026c9f0〜0x18026cb00 (0x110 B)。
-  `python3 tools/icall/diff/dispatcher_ids.py <OTT_vst2_win64.dll> 0x1801c38c8 0x18026c950 0x18026c9f0 0x18021e500` の
-  T2 function_id 即値の最大は 29 (call site 30 件・distinct 21)。
-- **修正**: `ott_crt.c` と `crt_native.c` の `APISET_N` を 34 に。native 基準側も同じ 32 だったため両方直した (片側だけだと両側の初期状態が食い違う)。
-- **index 32・33 は実行されない (直接確認)**: 解決 (§2.1) は解決時に表 entry へ encode 値を書き戻す。よって実行された entry は初期値 enc(NULL)=cookie から変わる。修正後 build (`7eaf9d46`) で scenario を 1 本ずつ実行し、各実行後に guest メモリの表 0..33 を読んだ (読み出しは `crt_wasm.mjs` に末尾で足した作業用コピーで、コミットしていない)。
-  - 実行: crt 新 9 本 + `entrylift/scen.json` 86 本 = **95 run・全 run 成功** (scen.json は name 重複が 1 件あり、一意な scenario は 85 件 = matrix85 と同数)。
-  - 結果: 初期値から変わった index は **{5, 6} のみ** (§2.1 の FlsGetValue / FlsSetValue wrapper に対応し、dispatcher 静的解析の call site id 5・6 と一致)。**32・33 は 95/95 で cookie のまま = いずれの scenario でも解決されていない。**
-  - 補助 (静的): call site が渡す function id の最大は 29 (32・33 を渡す直接 call は無い)。
-  - 修正前の帰結: 修正前は両側とも 32・33 が生値 0 だった。生値 0 は decode すると 0xae64b77e88c8000 (非 0) になり、解決済みとして CFG dispatch され fail-fast する (§2.2)。修正前の 94 scenario が全 PASS だったことも、32・33 の未 decode と整合する。
-  - 限界: 観測は上記 95 scenario の範囲。将来 32・33 を解決する経路が実行されれば、表への書き戻しとして同じ方法で検知できる。
-- **初回 run の FAIL (環境起因)**: `tools/ott/work/` の snapshot にあった `libottnative.so` は古く `ott_enc_slots` を持たない。[1/6] が落ちて native 側が古い coverage のまま動き、94 件が FAIL した。`bash tools/ott/native/build.sh` で作り直すと PASS (§9)。
-- **測定** (`crt_e2e.sh` 全工程):
+- **根拠 (静的)**: CRT 初期化 0x1801c43a4 の `rep stosq` 個数 (`and ecx, 0x22`) = 34。表は 0x18026c9f0〜0x18026cb00 (0x110 B)。
+  `python3 tools/icall/diff/dispatcher_ids.py <OTT_vst2_win64.dll> 0x1801c38c8 0x18026c950 0x18026c9f0 0x18021e500` の T2 function_id 即値の最大は 29 (call site 30 件・distinct 21)。
+- **修正**: `ott_crt.c` と `crt_native.c` の `APISET_N` を 34 に (片側だけだと両側の初期状態が食い違う)。`acc_crt_table.py` の N も 34 にそろえた (`74d4ddaa`)。
+- **init の確認 (実測)**: 修正後 build で init 直後の表 34 entry が全て enc(NULL)=cookie (`00002b992ddfa232`) = 95/95 run。修正前は init が 32 entry しか書かないため、32・33 は静的値 0 のままだったと推論する (静的推論。修正前 build での読み戻しは未実施)。
+- **index 32・33 の観測 (読み戻し)**: `apiset_readback.py` が scenario を 1 本ずつ別プロセスで実行し、実行後に表 0..33 を読む。crt 新 9 本 + `entrylift/scen.json` 86 entry (一意 85 + 重複 `op12` 1) = **95 run・全 run 成功**。変化した index は **{5, 6} のみ** (各 7 run)。§2.1 の FlsGetValue / FlsSetValue wrapper と、dispatcher 静的解析の call site id 5・6 に対応する。**32・33 は 95/95 で変わらなかった**。陽性対照として 5・6 の変化は検出されている。
+- **手法 (受入の代替, m1)**: issue の受入 (coverage か陰性対照) ではなく読み戻しを採った。coverage は解決コード 0x1801c38c8 が全 index で共有されるため、index 32・33 と 5・6 を区別できない。
+- **限界 (m2)**: 読み戻しで言えるのは「その scenario の中で解決時の書き戻しが無かった」まで。解決が NULL を返すと encode(0)=cookie で値が変わらず、この方法では区別できない。本 REPORT の「未解決」は、この意味で使う。
+- **既知類型**: 該当なし (冒頭の 1 行)。
 
-| 項目 | 修正前 `54bacdc0` | 修正後 `7eaf9d46` (測定 commit) |
+| 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `crt_e2e.sh` 総合 | PASS (2 分 55 秒, 14:36:55〜14:39:50) | PASS (2 分 49 秒, 14:41:53〜14:44:42) |
-| 新 scenario 9 本 | PASS 9 / FAIL 0 | PASS 9 / FAIL 0 |
-| 既存 entry 85 再突合 | PASS 85 / FAIL 0 | PASS 85 / FAIL 0 |
-| 陰性対照 native SIGSEGV / wasm ott_unlifted | OK / OK | OK / OK |
-| `ott_e2e.sh` (DSP) / `entry_e2e.sh --quick` | PASS / PASS | PASS / PASS |
-| lift 集合 (x64c) | 260 関数 / 16,378 命令 | 260 関数 / 16,378 命令 |
+| `rep stosq` の fill 値 `mov rax,[0x1802610e0]` (静的 0xffffffff00000001) が enc(NULL)=cookie と一致しない。実行時値は未確認 | 本置換は fill を使わず判定に影響しない。実 CRT 経路を使うときは要確認 | #2412 へのコメント |
+| `ACCEPTANCE_CAB137_CAB138.md` §4.3 (111 行) の「32 entry・非ゼロ 32/32」 | 静的値の誤記 (実値は 0/34。`acc_crt_table.py` で確認) | #2412 へのコメント (issue 対象外の文書) |
 
-- load average (1 分): 修正後 run は開始 0.24 / 終了 1.44 (4 コア)。修正前 run は未採取。
-- **測定 commit から HEAD までのコード差分**: `git diff 7eaf9d46 HEAD -- tools/ott/crtinit/*.c tools/ott/crtinit/*.py tools/ott/crtinit/*.sh tools/ott/crtinit/*.mjs` は 0 行 (測定後にコードは変えていない。以降の変更は本 REPORT のみ)。
-- **未解決 (本 PR 外)**: `tools/ott/accept/acc_crt_table.py` の `N = 32` (検収用の読み取りスクリプト) と `tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 は PM 判断のため未修正。
+- **測定** (コード変更の最後の commit: `2629fa88` = probe・crt_wasm 差分, `74d4ddaa` = acc_crt_table.py):
+
+| 項目 | 結果 |
+|---|---|
+| `crt_e2e.sh` 全工程 (`2629fa88`, native 再ビルド後・crtlift 作り直し) | PASS (4 分 18 秒, 15:01:18〜15:05:36, 開始 load 0.21) |
+| lift 集合 (x64c) | 260 関数 / 16,378 命令 / unsup 0 |
+| 新 scenario 9 本 / 既存 entry 85 再突合 | 9/9 PASS / 85/85 PASS |
+| 陰性対照 native SIGSEGV / wasm ott_unlifted | OK / OK |
+| `ott_e2e.sh` / `entry_e2e.sh --quick` | PASS / PASS (`ott_e2e` の旧 RetDec census は素材なしで INFO スキップ・判定対象外) |
+| 読み戻し 95 run (`2629fa88`) | 95/95 成功・7.1 秒 (開始 load 1.60) / 変化 {5, 6} / init 95/95 |
+| `acc_crt_table.py` (`74d4ddaa`) | 34 entry・静的非ゼロ 0/34・decode(0) の 4 方式一致 True |
+
+- **測定後のコード差分** (0 行が正): `git diff 2629fa88 HEAD -- tools/ott/crtinit/*.c tools/ott/crtinit/*.py tools/ott/crtinit/*.sh tools/ott/crtinit/*.mjs` = 0 行 (以降の変更は REPORT.md のみ)。`git diff 74d4ddaa HEAD -- tools/ott/accept` = 0 行。
+- 前 round の全工程 run の FAIL (94 件) は古い `libottnative.so` 起因。§9 の `build.sh` で解消し、今回の測定は build.sh の後に行った。
