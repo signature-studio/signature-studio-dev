@@ -1,17 +1,17 @@
-# KH-35 (#2176): 対照 Gain の before 160 関数の人手判定 (付録)
+# KH-35 (#2176): 対照 Gain の before 160 関数の AI 判定 (付録)
 
-- 親: #2155 (KH-34)。本付録は `REPORT_KH19.md` §11 の KH-35 節の詳細 (本体の行数上限のため分割)。
-- 測定 commit (コードと TSV を変えた最後の commit): `c4240c54`。以降の commit は本付録と REPORT の追記のみ。
-  `git diff c4240c54 HEAD -- tools/targets/kilohearts/scripts` の出力は空 (0 行)。
+- 親: #2155 (KH-34)。本付録は `REPORT_KH19.md` §9 に追記した #2176 の 1 行の詳細 (本体の行数上限のため分割)。
+- 測定 commit (挙動を変えた最後の commit): `c4240c54`。以降の commit は TSV の `verified` 列を `auto` に戻すこと・
+  `gain_before_list.py` の docstring 追記 (挙動差なし)・本付録と REPORT の文言修正のみ。
+- 本付録の判定は **人手検証ではない**。`verified` 列は 160 行とも `auto` のまま。人手確認は子 issue #3254 ([KH-48]) で行う。
 
 ## 0. 結論
 
-- `gain_before_160.tsv` の 160 行すべてを `verified=manual` にした (列の変更は本 PR)。
-- **判定者の注記**: 判定は実装エージェント (AI) が `gain_manual_dump.py` の出力と RTTI 出力を読んで行った。
-  独立した人の検証ではない。検収では同じ dump を独立に読み直すこと (§7 未解決)。
-- 受入 1 (各行の呼び出し元と call 位置を確認): **達成** (判定者の注記つき)。
-- 受入 2 (手検証集合と before 集合の差分): **差分 0 行** (160 と 160。§4)。
-- 受入 3 (機械照合・ダンプを手検証と書かない): 達成。検算スクリプト (§6) の結果は「検算」と書き、手検証とは分けた。
+- AI (実装 agent) が `gain_manual_dump.py` の出力と RTTI の値を読み、§2 の機械規則を当てはめた判定 (AI 判定) を §3 に残した。
+  判定者は人ではなく、人が読んで確認したものではない。
+- 機械規則の検算 `gain_manual_check.py` は 160 行すべて OK (§6)。検算は手検証ではない。
+- #2176 の受入 1 (人が読んで `manual` にする) と受入 2 (手検証集合と before 集合の差分) は未実施。子 issue #3254 に移した。
+- 受入 3 (機械照合・ダンプを手検証済みと書かない) は満たす。本付録と REPORT_KH19 §9 は AI 判定を「手検証」と書かない。
 - 機械照合 (`gain_mech_check.py`・`verify_gain_tsv.py`) の結果は REPORT_KH19 §8 の値のまま (再実行していない)。
 
 ## 1. 測定条件
@@ -34,7 +34,7 @@
 
 ## 3. 判定結果
 
-| 種別 | 行数 | 判定 | 根拠 |
+| 種別 | 行数 | AI 判定 (人手検証ではない) | 根拠 |
 |---|--:|---|---|
 | ROOT (vtable 入口) | 27 | 27 OK | §3.1 の slot 番号 |
 | 非 ROOT・direct call | 122 | 122 OK | ダンプの `>>` 行が `call 0x18xxxxxxx` (遷移先 = func_rva) |
@@ -76,11 +76,12 @@
 | 45 | 0x4b0380 | GainDsp | 0x1817d9c88 | 14 |
 | 46 | 0x4b05f0 | GainDsp | 0x1817d9c88 | 0 |
 
-## 4. 集合の差分 (受入 2)
+## 4. AI 判定の対象と before 集合 (受入 2 ではない)
 
-- 手検証集合 (`verified=manual` の行の func_rva): 160。
-- before 集合: `gain_before_list.py` の再生成 (本測定の `callgraph.pkl` から) 160。TSV 160。
-- 差分: 手検証 vs 再生成 **0 行**。TSV vs 再生成 **0 行**。
+- AI 判定の対象: TSV の全 160 行 (func_rva の集合)。
+- before 集合: `gain_before_list.py` の再生成 (測定時の `callgraph.pkl` から) 160。
+- 件数 160 と 160、func_rva の一致を確認した。これは対象の取り違えが無いことの確認であり、受入 2 (手検証集合と before 集合の差分) の達成ではない。
+  受入 2 は人手確認の集合が要るため、子 issue #3254 で行う。
 - `vtable_closure.py` は件数のみ出力する (集合は出さない)。件数は 160 で一致。集合の比較は `gain_before_list.py` 側で行った。
 
 ## 5. 再現コマンド
@@ -106,16 +107,19 @@ python3 scripts/gain_manual_check.py $W/dump.txt gain_before_160.tsv $W/rtti.jso
   `{"rows": 160, "roots": 27, "root_slot_ok": 27, "nonroot": 133, "edge_ok": 133, "bad": []}`。
 - ネガティブコントロール: dump の 1 行 (`#2` の `call 0x180005c50`) を `call 0x180005c51` に改ざんした写し →
   `"edge_ok": 132, "bad": [2]` (FAIL して行番号を返す)。
-- `gain_before_list.py` の保持規則 (本 PR で追加。既存 TSV の `verified` を、`(func_rva, parent_rva, call_site_rva)` が一致する行に限って残す):
+- `gain_before_list.py` の保持規則 (c4240c54 で追加。既存 TSV の `verified` を、`(func_rva, parent_rva, call_site_rva)` が一致する行に限って残す。測定はこの commit で実施):
   - 初回生成 (既存 TSV なし): 160 行 `auto` (従来どおり)。
   - 既存 manual の TSV で再生成: 160 行 `manual`、列 1〜6 の差分 0 行。
   - 既存 TSV の 1 行 (0x5c50) の親だけを `0x4cf21` に変えて再生成: 当該行は `auto` に戻り、他 159 行は `manual` のまま (親の食い違いで保持されないことの確認)。
+  - 限界: `size` と `root_class` は照合しない。同一バイナリでの再生成が前提で、docstring に明記した。別バイナリでは古い manual が残り得る。
+  - 本 fix で TSV を `auto` に戻したため、現在の TSV では保持規則は発動しない (列 1〜5 は `origin/main` と差分 0)。
 
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 判定者が実装エージェント (AI) で、独立した人手検証ではない | 「人手検証済み」の強さが弱い。検収で dump を独立に読み直す必要がある | 本 PR の検収 (reviewer)。必要なら #2155 にコメント |
+| 受入 1 (人が読んで確認し、確認できた行だけ `manual`)。本付録の判定は AI 判定で、人手検証ではない | `verified=manual` は 0 行。人手検証済みとは言えない | #3254 ([KH-48]) |
+| 受入 2 (手検証集合と before 集合の差分)。人手検証の集合が無いため未実施 | 差分の結果は REPORT_KH19 に未記載 | #3254 ([KH-48]) |
 | 判定は静的な call 辺の存在まで。実行時に到達するか・this 型が実際にその vtable を使うかは未判定 | after 1,995 の過大評価は残る (REPORT_KH19 §5) | #848 (型追跡) |
-| ROOT 27 行の vtable 所属は RTTI 出力の値で確認。生バイトを手で読んでいない | 同上 (RTTI 自体は `rtti_walk.py` の結果に依存) | — |
-| 親 #2155 は本 PR では閉じない (親の受入 2 件は本 issue の範囲外) | 親は open のまま | PM が判断 |
+| ROOT 27 行の vtable 所属は RTTI 出力の値で確認。生バイトを手で読んでいない | RTTI 自体は `rtti_walk.py` の結果に依存 | — |
+| 保持規則は同一バイナリでの再生成が前提 (`size`・`root_class` は照合しない) | 別バイナリで再生成すると古い manual が残り得る | docstring に明記 (本 PR)。別バイナリでの再生成は予定していない |

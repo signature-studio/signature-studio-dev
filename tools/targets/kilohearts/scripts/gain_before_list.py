@@ -4,6 +4,9 @@
 各関数について、閉包に入る根拠 (root からの呼び出し鎖の親と call 位置) を付ける。
 出力は機械生成であり、人手検証の結果ではない (列 verified は既定 auto)。
 out.tsv が既にあるときは、(func_rva, parent_rva, call_site_rva) が一致する行の verified 値を残す (#2176)。
+保持の前提は同一バイナリでの再生成。size と root_class は照合しないため、別バイナリで再生成すると
+同じ RVA・親・call 位置の古い manual が残り得る。別バイナリの再生成では、manual を付け直す前に
+gain_manual_dump.py と gain_manual_check.py で照合し直すこと。
 usage: gain_before_list.py <HeartCore.core_64> <work/callgraph.pkl> <work/rtti_vtables.json> <ns> <out.tsv>
 """
 import sys, json, pickle, re, collections, csv, os
