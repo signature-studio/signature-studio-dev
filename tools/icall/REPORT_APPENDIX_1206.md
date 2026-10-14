@@ -17,7 +17,16 @@
 |---|--:|--:|---|---|---|
 | FLEngine 0x40d253 | 1 | 0 | `jmp [mem]` | 対象外 | before = after |
 | Balance | 0 | — | — | — | 監査のみ |
-| Fresh Air | 2 (`sites_after.json`) / 1 (`audit_fa.json`) | 不一致・原因未確定 | `jmp r9` | 対象 | 未再実行 |
+| Fresh Air | 2 (`sites_after.json`) / 1 (`audit_fa.json`) | 不一致・原因は #1403 で確定 | `jmp r9` | 対象 | 再実行済 (下記) |
 | OTT F | 8 | 8 | `jmp reg` | 対象 | 未再実行 |
 
-未解決: (1) メモリ形 `jmp [r10+rdx*8+d]` への `jt` 展開対応と FLEngine の効果測定 → #1402 (ICALL-26)。(2) Fresh Air の jt_dropped を素材付きで再実行し、2 件 (`sites_after.json`) と 1 件 (`audit_fa.json`) の不一致の原因を確定する → #1403 (ICALL-27)。不一致は原因未確定のまま、どちらの件数が正しいかは本 run では判定していない。
+### #1403 (ICALL-27) の追記: Fresh Air の件数不一致の原因
+
+- 再実行: `roundtrip.sh` を `plugins-freshair` の SlateCore.core_64 に対して実行 (rc=0、38 秒、`work/rt_freshair-rerun/`)。
+- サイト単位の before 判定 (`sites_before.json`): `jmp r9` @0x1810304bb = `jt_present` (16 target)、`jmp r9` @0x181030c6b = `jt_dropped` (17 target)。
+- after 判定 (`sites_after.json`): 2 件とも `jt_dropped`。
+- 件数不一致の原因: `audit_fa.json` は before 側の集計 (before の 2 件のうち 1 件が `jt_present`、1 件が `jt_dropped`) で、`sites_after.json` は after 側の集計 (2 件とも `jt_dropped`)。食い違いは集計の段階が違うことによる。
+- 未解析: before で `jt_present` だった 0x1810304bb が after で `jt_dropped` になった機構 (rewrite 側か restore 側か) は本 run では切り分けていない。
+- 結論: `jt_dropped` は before 1 件 / after 2 件。after の 2 件は rewrite 由来の可能性があるため、別途切り分けが必要。
+
+未解決: (1) メモリ形 `jmp [r10+rdx*8+d]` への `jt` 展開対応と FLEngine の効果測定 → #1402 (ICALL-26)。(2) OTT F の jt_dropped 8 件の展開後残件数の実測 → #1573 (ICALL-31・素材 `analysis-ott-binaries` が必要で本 run では未取得)。
