@@ -164,3 +164,31 @@ test("分類 (#2651): oc:hold の issue は hold 行に置き、launch の行 (r
   assert.ok(after.ready.includes(81), "ラベルを外すと ready に戻る");
   assert.deepEqual(after.hold, []);
 });
+
+test("分類 (#2758): 素材の再投入の基準は本文の oc_artifacts 行 (無ければ推定)", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const at = new Date(now - 5 * 3_600_000).toISOString();
+  const head = "素材不足: plugins-serum2 が無い";
+  const snap = (artLine?: string): Snapshot => ({
+    issues: [{ number: 90, title: "[CI-90] t90", labels: [], body: "", deps: null, ...(artLine ? { artLine } : {}) }],
+    prs: [],
+    runs: [],
+    bot_last: { "90": { at, head, art: null } },
+    bot_report: { "90": { at, head, art: null } },
+    pm_art: {},
+  });
+  const input: ClassifyInput = {
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "90": head },
+    reportBody: { "90": head },
+    outcomeReason: { "90": "artifact" },
+  };
+  const withBody = classify(snap("oc_artifacts: fl-win64 work-m11"), input).rows;
+  assert.deepEqual(withBody.relaunch, [[90, "oc_artifacts: fl-win64 work-m11 plugins-serum2"]]);
+  const inferred = classify(snap(), input).rows;
+  assert.deepEqual(inferred.relaunch, [[90, "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2"]], "対照: 本文の行が無ければ推定値が基準");
+});

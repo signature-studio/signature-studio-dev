@@ -389,6 +389,52 @@ test("artifact の再投入: 報告が停止報告 (STOP_RE) でなければ、�
   assert.equal(pickArt(p, 85), undefined);
 });
 
+// 素材行の既定 (#2758): PM の行 → 本文の oc_artifacts 行 → 推定。
+test("launch (#2758): PM の行が無いとき、本文の oc_artifacts 行を素材行にする (推定とは違う行)", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 31, { body: "説明\noc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff\n" });
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 31), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff");
+});
+
+test("launch (#2758): 本文の悪い素材名は落ち、残りの行を使う (allowlist 外だけで全滅なら推定)", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 32, { body: "oc_artifacts: fl-win64 evil-thing work-m11" });
+  await seed(ctx, 33, { body: "oc_artifacts: evil-thing" });
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.equal(pickArt(p, 32), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(pickArt(p, 33), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk");
+});
+
+test("launch (#2758): PM の行は本文の行より優先する", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 34, { body: "oc_artifacts: fl-win64 work-m11" });
+  await send(ctx.app, "issue_comment", commentPayload(34, "pycabbage", "oc_artifacts: fl-win64 plugins-ott"));
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 34), "oc_artifacts: fl-win64 plugins-ott");
+});
+
+test("launch (#2758): 本文に素材行が無い・自然文なら推定 (従来どおり)", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 35, { body: "必要なし (実機採取のため ...)" });
+  await seed(ctx, 36);
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  for (const n of [35, 36]) assert.equal(pickArt(p, n), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk");
+});
+
+test("launch (#2758): 本文を編集すると素材行の既定も取り直す。行が消えたら推定に戻る", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 37, { body: "oc_artifacts: fl-win64 work-m11" });
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 37), "oc_artifacts: fl-win64 work-m11");
+  assert.equal((await send(ctx.app, "issues", issuePayload(37, { body: "oc_artifacts: fl-win64 plugins-ott", at: "2026-10-14T11:30:00Z" }))).status, 202);
+  assert.equal(pickArt(ctx.app.engine.plan(), 37), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal((await send(ctx.app, "issues", issuePayload(37, { body: "必要なし", at: "2026-10-14T11:45:00Z" }))).status, 202);
+  assert.equal(pickArt(ctx.app.engine.plan(), 37), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk");
+});
+
 // blocked の再着手 (#2650)。blocker が open の間は blocked の行に置き、0 になった報告につき 1 回だけ再着手する。
 const blockedOutcome = (run: number) => `<!-- oc-run-outcome: no-pr reason=blocked run=${run} -->\n[run-outcome] 依存が未解決のため、PR も push も出さずに終了しました。`;
 const isoAt = (ms: number) => new Date(ms).toISOString();

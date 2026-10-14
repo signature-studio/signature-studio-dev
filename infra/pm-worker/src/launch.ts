@@ -43,6 +43,36 @@ export function inferArtifacts(title: string, labels: string[]): string {
   return ART_PREFIX + " " + a.join(" ");
 }
 
+// issue 本文の素材行を読む先頭の字数 (#2758)。これより後ろの行は見ない。
+export const BODY_ART_CHARS = 4000;
+const BODY_ART_RE = /^\s*`?(oc_artifacts:[^`]*)`?\s*$/;
+
+// issue 本文の先頭 BODY_ART_CHARS 字の、最後の oc_artifacts: 行を検証済みの 1 行にする。
+// allowlist 外の名前は落とし、残りが 1 つ以上ならその行を返す。残りが 0 なら null (呼び出し側は推定に戻る)。
+// `oc_artifacts: none` は単独の行のときだけ有効 (validateArtLine と同じ)。最後の行だけを見る (前の行には戻らない)。
+export function bodyArtLine(body: string): string | null {
+  const head = Array.from(body ?? "").slice(0, BODY_ART_CHARS).join("");
+  let last: string | null = null;
+  for (const l of head.split(/\r\n|\r|\n/)) {
+    const m = BODY_ART_RE.exec(l);
+    if (m) last = m[1];
+  }
+  if (last === null) return null;
+  const names = last.slice(ART_PREFIX.length).trim().split(/\s+/).filter(Boolean);
+  if (names.length === 1 && names[0] === "none") return ART_PREFIX + " none";
+  const keep = names.filter((a) => ALLOW_ARTS.includes(a));
+  if (keep.length === 0) return null;
+  const line = ART_PREFIX + " " + keep.join(" ");
+  return validateArtLine(line) ? line : null;
+}
+
+// launch の素材行の既定: PM が明示した行 (検証済み) → issue 本文の行 (検証済み) → 題名・ラベルからの推定。
+export function defaultArtLine(pmLine: string | null | undefined, bodyLine: string | null | undefined, title: string, labels: string[]): string {
+  if (pmLine && validateArtLine(pmLine)) return pmLine;
+  if (bodyLine && validateArtLine(bodyLine)) return bodyLine;
+  return inferArtifacts(title, labels);
+}
+
 const BODY_LINES = [
   "/oc oc_actions_allow_write",
   "{art}",

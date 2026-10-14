@@ -6,7 +6,7 @@ import { countOpencodeRuns, type ActiveCount } from "./active.ts";
 import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
+import { buildLaunchBody, checkRelaunchIntent, defaultArtLine, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
@@ -663,7 +663,7 @@ export class Engine {
     const s = this.s;
     const issues = Object.values(s.issues)
       .filter((i) => i.state === "open")
-      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount } }));
+      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount }, ...(i.artLine ? { artLine: i.artLine } : {}) }));
     const prs = (Object.values(s.prs) as PrState[]).map((p) => ({ number: p.number, state: p.state, ref: p.ref, body: p.body }));
     const runs = (Object.values(s.runs) as RunState[])
       .filter((r) => r.status !== "completed")
@@ -771,11 +771,9 @@ export class Engine {
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
     const failed = (n: number): boolean => input.launchState?.[String(n)] === "failed";
-    // 既定の素材行 (PM の oc_artifacts 行。無ければ題名とラベルからの推定)。picks の既定と同じ。
-    const baseArt = (n: number): string => {
-      const b = this.s.pmArt[String(n)]?.line;
-      return b && validateArtLine(b) ? b : inferArtifacts(title.get(n) ?? "", labels.get(n) ?? []);
-    };
+    // 既定の素材行 (PM の行 → 本文の行 → 推定)。picks の既定と同じ。
+    const artOf = new Map(snap.issues.map((i) => [i.number, i.artLine] as const));
+    const baseArt = (n: number): string => defaultArtLine(this.s.pmArt[String(n)]?.line, artOf.get(n), title.get(n) ?? "", labels.get(n) ?? []);
 
     const moveTo = (n: number, from: keyof Rows, to: () => void) => {
       (rows as any)[from] = (rows as any)[from].filter((x: any) => (Array.isArray(x) ? x[0] : x) !== n);
@@ -889,9 +887,10 @@ export class Engine {
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
       const np = npPick.get(n);
-      const cand = relMap.get(n) ?? np?.art ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
-      // 本文由来 (PM コメント・bot 報告) の行は、allowlist を通ったものだけを使う。通らなければ推定値に落とす。
-      const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
+      const dflt = defaultArtLine(base, i.artLine, i.title, i.labels);
+      const cand = relMap.get(n) ?? np?.art ?? dflt;
+      // 素材行は allowlist を通ったものだけを使う。通らなければ既定 (PM の行 → 本文の行 → 推定) に落とす。
+      const art = validateArtLine(cand) ? cand : dflt;
       picks.push({ n, art, relaunch: relMap.has(n), np: np?.np, reportAt: np?.reportAt });
     }
     const plan: Plan = {
