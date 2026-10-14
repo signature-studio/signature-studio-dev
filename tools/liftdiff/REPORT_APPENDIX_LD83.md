@@ -2,6 +2,15 @@
 
 親 issue #1907 (LD-68)。前提は `REPORT_APPENDIX_LD68.md` §4・§5、`REPORT_APPENDIX_LD57.md` §3、`REPORT_APPENDIX_LD67.md` (計装の方式)。
 
+既知類型との関係: 該当なし (本付録の対象は IR への観測 store の計装で、lift 出力の意味誤りを指す `docs/DEFECTS.md` の D1a〜D23 のいずれにも当たらない)。
+
+## 修正 (レビュー round 1 への対応・測定の鮮度)
+
+- 修正 commit `607f4e0c`: `irtool.py` の関数先頭行の site 漏れ (blocking 1)、`define` ごとの `cur_va` 初期化 (minor a)。関数先頭が `dec_label_pc_` で始まらない block の site は VA が無いため記録せず、件数を stderr に出す。
+- **§3・§4 の数値は修正前の commit `0913730a` の測定で、現 HEAD では無効** (先頭の call・br の site が増えるため site 数が変わる)。修正後の再測定は本 run では未実施 (素材が `fl-win64` のみ。§6 の未解決)。
+- 合成 IR の検証 (実測・この run): `python3 tools/liftdiff/tests/test_irtool_sites.py` 8 件 PASS。修正前の `irtool.py` (`14ec6239`) に同じテストを当てると 4 件 FAIL (先頭 call・先頭 br・site 数 `3 != 5`・stderr の件数)。
+- decode スクリプト (blocking 3): `tools/liftdiff/results/ld83/decode_sites.py`。合成の blk 列で B/J/C 分解と ord 連番を検査 (テストは同じ 8 件に含む)。ネガコン (1 件抜く) で sites 3 → 2 かつ ord が NG になることを確認。
+
 ## 結論
 
 - 受入条件 1 (方式の決定と実装) は**部分達成**。方式は「IR 側の site 記録」: block 内の conditional br と import call の直前に volatile store を入れ、block VA・種別・block 内の順番・br の条件値を記録する。
@@ -19,6 +28,9 @@
 - build: `python3 ldlib/build_wasm.py targets/ott_old_site.json --force` (rc 0・5.9 s・`sig_mismatch` 0・`undefined` 0)。
 - run: `python3 liftdiff.py run targets/ott_old_site.json --fn 0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc --pattern vm0,u16 --nobuild --notrace --json <out>`。既定版は `targets/ott_old.json` で同じ引数 (各 5.5 s)。
 - 比較: `python3 results/ld67/compare_blk.py work/ld83/head_def_r<k>.json work/ld83/head_site_r<k>.json` (`k`=1,2)。両方 `cases=12 diff=0`。
+- 内訳 (blocks / J / C / sites): `python3 tools/liftdiff/results/ld83/decode_sites.py work/ld83/head_site_r<k>.json --seq 15` (`--seq` の列は §4 の B・J・C 列)。ord 欄が `ok` でないと記録の欠落。
+- 単体テスト (PE 不要): `python3 tools/liftdiff/tests/test_irtool_sites.py`。
+- 再測定の手順 (未実施・次 run): `build_wasm.py targets/ott_old_site.json --force` の stderr に `sites skipped` が出るかを確認し、上の比較と内訳を取り直す。
 
 ## 2. 方式 (site trace)
 
@@ -35,7 +47,11 @@
 
 方式の判断: RetDec 由来の IR に命令の VA が無いため、命令単位の VA を残すには RetDec 側の変更が要る (D5 の RetDec 路線で新規作業になる)。その代わり、native の `je` は IR の conditional br、native の `call [IAT]` は IR の import call に 1 対 1 で対応する。本付録の対応は、この**構造上の対応**による (IR の block 1c0b6c は `icmp eq %arg1, 0` と `br` で、native の `test rcx,rcx` と `je 1c0ba8` に対応する。block 1c0b71 は HeapFree の call を 1 つだけ持ち、native の `1c0b71`〜`1c0b8c` の範囲にある `call [IAT]` (`1c0b82`) に対応する)。
 
-## 3. 測定結果 (HEAD = `0913730a`・r1 と r2 の blk 列は全 case で一致)
+vm0 の cond と je の向き (レビュー minor b): IR の `br i1 %c` の true 側が je の分岐先 (`dec_label_pc_1c0ba8`) であることに依存する。1c0b6c は `%c = icmp eq %arg1, 0` なので、true (cond=1) は `rcx == 0` で、native の `je` が成立するのと同じ条件になる。`dec_label_pc_1c0ba8` を true 側に持つことは **ott.ll 未確認** (素材が無く、この run では読めない)。次の再測定で `grep -n -A3 'dec_label_pc_1c0b6c:' tools/ott/work/ott.ll` の br 行を読んで確認する。
+
+## 3. 測定結果 (修正前の commit `0913730a` の値。現 HEAD では無効・再測定待ち)
+
+以下は修正 `607f4e0c` の前の測定。修正で関数先頭の br・call の site が増えるため、site 数は変わる見込み (未測定)。r1 と r2 の blk 列は全 case で一致。
 
 | 関数 | pattern | 既定 outcome | 計装 outcome | 判定 | blocks | sites | 計 |
 |---|---|---|---|---|---|---|---|
@@ -51,6 +67,15 @@
 | 1c69cc | u16 | wasm_trap | wasm_trap | SAME | 10 | 7 | 17 |
 
 `cases=12 diff=0`。blocks の列は LD-67 §4 の値と一致し、block 記録は変わっていない。
+
+ネガティブコントロール (修正後の再測定ではなく、合成 IR と合成 blk 列での検査・この run の実測):
+
+| 検査 | 正 | 壊した版 | 結果 |
+|---|---|---|---|
+| 合成 IR の site store 数 (`test_irtool_sites`) | 5 (`607f4e0c`) | 3 (`14ec6239` = 修正前) | 修正前は FAIL (4 件)・修正後は PASS |
+| 合成 blk 列の sites (decode) | 3 | 1 件抜く → 2 | sites 減少・ord 欄が NG |
+
+いずれも合成データの件数で、実 IR の件数ではない (実 IR の件数は再測定で取る)。
 
 ## 4. 1c0b6f (je) と 1c0b82 (HeapFree) の wasm 側の位置 (1801c5e84)
 
@@ -79,8 +104,10 @@
 | 命令単位の完全な trace (RetDec IR に命令の VA が無い。方式は RetDec 側の変更か x64c の別経路かの PM 判断が要る) | site 単位でしか native 命令と対応しない。受入 1 の残り | #2801 (LD-131) |
 | shim の `block_ok` が範囲外ポインタで trap する件 (u16 の trap 後の後続 block が取れない) | u16 の 1c0b71 以降の対応が未取得。受入 3 の残り | #2802 (LD-132) |
 | 残り 5 関数の native 対応 | 受入の範囲外 | #2193 (LD-84) |
+| 修正 `607f4e0c` 後の再測定 (§3・§4 の site 数・compare_blk 12 case・内訳と列の取り直し・ott.ll の br 行の確認) | 現 HEAD の site 数が未測定。§3・§4 は修正前の値 | この PR の次 run (PR 本文の `oc_artifacts` で `work-m6-ott`・`work-liftdiff`・`plugins-ott`・`analysis-ott-binaries`・`toolchain-emsdk` を取得して実施) |
 
 ## 7. 測定 commit と差分
 
-- 測定 commit: `0913730a`。
-- `git diff 0913730a HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/targets tools/liftdiff/results tools/shim tools/ott/rt tools/m6` の出力は 0 件 (本付録を含む以後の commit は REPORT と `docs/DOC_MAP.md` のみ)。
+- 測定 commit: `0913730a` (§3・§4 の値)。修正 `607f4e0c` でコード差分が出た。
+- `git diff 0913730a HEAD --stat -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/targets tools/liftdiff/results tools/shim tools/ott/rt tools/m6` の出力 (`c0a52c0d` 時点): `tools/liftdiff/ldlib/irtool.py` (41 行・計装の変更)・`tools/liftdiff/results/ld83/decode_sites.py` (新規 86 行)。差分 0 ではないため §3・§4 は再測定が必要 (上の未解決表)。
+- テスト: `tools/liftdiff/tests/test_irtool_sites.py` は修正後の HEAD で 8 件 PASS (上の実測)。
