@@ -178,7 +178,7 @@
 
 ### 測定条件
 
-- 測定 commit: `69530065` (`analysis/py99_slot_paths.py` の最後のコード commit。`--lea-write` の追加を含む)。`41a6d7af` で測った 171 読みの結果は、`69530065` で再測定して一致した。前段の測定 commit は `7e6c748a` (py88_writes.py・py64_check_expr.py の最後の変更)。`git diff 7e6c748a HEAD -- tools/python/analysis/py88_writes.py tools/python/analysis/py64_check_expr.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py64_branch_regions.py tools/python/analysis/py60_objdump_check.py` の出力は 0 行。`git diff 69530065 HEAD -- tools/python/analysis` の出力は 0 行。
+- 測定 commit: `69530065` (`analysis/py99_slot_paths.py` の最後のコード commit。`--lea-write` の追加を含む)。`41a6d7af` で測った 171 読みの結果は、`69530065` で再測定して一致した。前段の測定 commit は `7e6c748a` (py88_writes.py・py64_check_expr.py の最後の変更)。`git diff 7e6c748a HEAD -- tools/python/analysis/py88_writes.py tools/python/analysis/py64_check_expr.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py64_branch_regions.py tools/python/analysis/py60_objdump_check.py` の出力は 0 行。`git diff 69530065 HEAD -- tools/python/analysis/py99_slot_paths.py tools/python/analysis/py88_writes.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py60_objdump_check.py` の出力は 0 行 (main 取り込み後の `analysis/` の差分は他 PR の新規ファイルで、本節の測定は読まない)。
 - 素材: `oc_artifacts: fl-win64`。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'` は 1.58 秒 (展開前後で一致)。
 - 逆アセンブル: 既存の `work/py53/fn.txt` (fn=4664)。
 - 実行: `python3 analysis/py99_slot_paths.py work/py53/fn.txt --lea-write > work/py99/paths.txt 2> work/py99/summary.txt` (exit 0・`time` の real 0.53 秒)。load average (1 分値): 0.21 (22:08:55)。

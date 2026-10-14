@@ -43,7 +43,7 @@
 
 ## 検証
 
-- 測定 commit: `69530065` (`analysis/py99_call10469f0.py`・`analysis/py99_slot_paths.py` の最後のコード commit)。`git diff 69530065 HEAD -- tools/python/analysis` は 0 行 (後続の commit は REPORT と DOC_MAP のみ)。
+- 測定 commit: `69530065` (`analysis/py99_call10469f0.py`・`analysis/py99_slot_paths.py` の最後のコード commit)。`git diff 69530065 HEAD -- tools/python/analysis/py99_call10469f0.py tools/python/analysis/py99_slot_paths.py tools/python/analysis/py88_writes.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py60_objdump_check.py` は 0 行。main 取り込み (merge `9ebf246f`) で `analysis/` に入った他 PR の新規 4 件 (`flapi/pe_cstr.py`・`flapi/pe_ui_ops_probe.py`・`py159_check_hand.py`・`py159_table.py`) は本節のスクリプトから読まれない。
 - `cd tools/python && python3 analysis/py99_call10469f0.py work/py64/extracted/block00031_PE.bin` → 14 命令の期待列・K=2^-30・rint=`cvtsd2si` の 3 項目すべて一致、`PASS`、exit 0。
 - 同 `--negctl` (期待列の 1 命令を `sub ebx, eax` に変更) → `FAIL`、exit 1 (検出力あり)。
 - `python3 analysis/py99_slot_paths.py work/py53/fn.txt 0x1047706 0x1047956 0x1047d82 0x1049b1d 0x104a47a 0x104b2f2 0x104b7f9` → 7 件すべて `store 0x1046d6b ... : d_in`、`forward cross-check: n=7 mismatch=0`、exit 0。
