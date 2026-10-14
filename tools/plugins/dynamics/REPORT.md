@@ -142,6 +142,11 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 - VEX helper 未実装 (`vaddsd` / `vfmadd*` / `vcvt*` 等、distinct 宣言数) は、CPUID 分岐で SSE 路に固定できるかが未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と plugins/REPORT.md §4.3 に記録あり)。
   Transient engine の f80 1 関数は #197 の `f80_lower.py` の適用対象。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
+- #1408 (スカラー FMA3 の実装。方式は `docs/DECISIONS.md` D14)。 `m11_simd2.py` に `vf[n]m{add,sub}{132,213,231}sd` の 3 引数形を追加 (`msimd11_core.h` の `_fma*sd` 系へ委譲)。 測定 commit は本 PR の最後のコード commit (下の表の commit hash)。
+  - 実機照合: AMD EPYC 7763 (FMA3) で FMA3 sd の 10 形を inline asm で直接実行し、`_fma*sd` 系と低位 double が 20,000 乱数ケースで全件一致 (mismatch 0)。 未検証は残件に出ない `vfnmsub132sd` の 1 形。
+  - `engine_lift.sh` 単独実行 (変更後): 19252 Transient unimpl 12 → 5 (`emcc_c_rc` 0、24.6 s)、19048 Multiband unimpl 6 → 1 (`emcc_c_rc` 1 → fixcmp 後 0、62 s)。 残件は 19252 が `movntps`・`vmovsd` store・`vcomisd`・`vucomisd`・`vucomiss`、19048 が `movntps`。
+  - 生成 helper C (`simdchk<B>/m11_simd.c`) の `emcc -c -msimd128 -w -O0`: 19252 rc 0、19048 rc 0。
+  - 残件 (子 issue に分割): movntps・vmovsd store (宛先復元) / ucomis・comis (flag 反映)。 #1408 は受入条件「未実装 helper 宣言 0」を未達として部分達成 (`Refs #1408`)。
 
 ## 5. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner・同時に走らせたのは本検証の 1 プロセス列のみ)
 

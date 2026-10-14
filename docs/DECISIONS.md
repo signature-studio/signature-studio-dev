@@ -134,3 +134,11 @@
 - **比較した方式**: (a) 既定を hybrid に切替 (InitUnits が実際に走り、空振り一致が 0 件になる)、(b) units のまま据え置き (採用・保留)。
 - **理由**: hybrid にすると sample:800 の判定が変わる (件数は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1・§3)。どちらが正しいかは関数ごとの差分根拠が無いと決まらないため、根拠無しに基準値を動かさない。units の InitUnits 空振り一致は `check_initunits.py` で検出済み (LD-25) で、この検出は hybrid 側でのみ成立する。
 - **影響**: 既定 batch の一致数は「InitUnits が呼ばれない状態での一致」である (件数の測定値は `tools/liftdiff/REPORT_APPENDIX_LD42.md` §1)。この数値を外部へ「実行初期化済みの一致」として出さない。
+
+## D14 — スカラー FMA3 (vfmadd/vfmsub/vfnmadd/vfnmsub の sd 形) は ヘッダの式 + IR 引数順で実装する
+
+- **状態**: 採用 (2026-10-14, issue #1408 [PLG-F3-8])
+- **決定**: `vf[n]m{add,sub}{132,213,231}sd` の 3 引数形を `m11_simd2.py` で `msimd11_core.h` の `_[f|fn]m{a|s}{132|213|231}sd(a, b, c)` へ委譲する。第 3 引数は i64 なら `asd(c)`、i128 なら `lane0_d(c)` で double に変換する。`a` = dst (第 1 引数)。
+- **比較した方式**: (a) ヘッダの式をそのまま使う (採用)、(b) IR 側の引数順を並べ替えて 132 形に統一する。
+- **根拠**: 実機 (AMD EPYC 7763・FMA3) で FMA3 sd の 10 形 (132/213/231 の fma・fms・fnm の各種) を inline asm で直接実行し、`_fma*sd` 系と低位 double が 20,000 乱数ケースで全件一致。未検証は `vfnmsub132sd` の 1 形のみ (残件に出ていない)。
+- **影響**: 両 engine の FMA 残件 (19252 で 7 宣言、19048 で 5 宣言 = distinct 計 12) は unimpl から消えた。movntps・vmovsd store・ucomis/comis の flag は未対応で、子 issue に分割した。
