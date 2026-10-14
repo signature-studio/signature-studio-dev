@@ -126,7 +126,7 @@ load average は測定中 0.73 前後。`check_682.py` は HEAD では未実行�
 
 結論: build を変えずに、node の inspector (`Debugger.setPauseOnExceptions` all) で RuntimeError が投げられた瞬間の wasm local を読めた。判定は不変 (unit 別ラベル JSON が通常 survey とバイト一致)。304・555 は `function_535bf2` の `obj = 0`、923 は `function_410b10` の `*(obj) = 0` (vptr が NULL) が OOB の直接原因。
 
-測定 commit `2ae50140` (コードを変えた最後の commit。`9e5ef3af` は同ファイルのコメントのみ、HEAD は `9e5ef3af`)。作業ベース `14150b46` (origin/main)。素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 0.17。node v22.23.3。
+測定 commit `2ae50140` (`inspect_trap.mjs` を追加した commit。コードを変えた最後の commit)。上の測定は、その 1 つ後の `9e5ef3af` (同ファイルのヘッダのコメント 5 行だけを追加) で実行した。`git diff 2ae50140 HEAD -- tools ':!*.md'` の出力は `inspect_trap.mjs` の `+//` コメント 5 行のみ (`M11_INSPECT_PEEK`・`DUMP`・`FRAMES` の説明と 1 行の要約)。コード差分は 0。作業ベース `14150b46` (origin/main)。素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 0.17。node v22.23.3。
 
 | 工程 | 結果 | 所要 |
 |---|---|---|
