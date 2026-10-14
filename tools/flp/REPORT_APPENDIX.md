@@ -85,7 +85,7 @@
 
 所要 (`time`、n=1、並列数 1、wineprefix 新規作成を含む): S1 probe 全体 (インストール木の組立 + 起動 120 s) real 7 m 42 s (user 1 m 21 s / sys 4 m 20 s)。load average (1 / 5 / 15 分): 開始 0.36 / 0.25 / 0.11、終了 1.02 / 0.90 / 0.50。
 
-**S2 (部分)**: `bash tools/flp/s2_render_probe.sh Autogun.flp 3` (`Data/System/Render tests/Autogun.flp`、render 2.0 s の 1 本) を commit `8be0756f` で、S1 と同じ wineprefix 上で連続 3 回実行。各 run の前に block から FL64.exe / FLEngine_x64.dll を取り直し、G03 パッチを当てる。
+**S2 (部分)**: `bash tools/flp/s2_render_probe.sh Autogun.flp 3` (`Data/System/Render tests/Autogun.flp`、render 2.0 s の 1 本) を commit `8be0756f` で、S1 と同じ wineprefix 上で連続 3 回実行。`8be0756f` の script は WFBox を書かず既定は 16-bit だった。現行 HEAD で同じ条件にするには `S2_WFBOX=0 bash tools/flp/s2_render_probe.sh Autogun.flp 3` と前置する (現行の既定 `WFBox`=2 では 32-bit。§17.4)。各 run の前に block から FL64.exe / FLEngine_x64.dll を取り直し、G03 パッチを当てる。
 
 | run | rc | 所要 | 形式 | data バイト | data SHA-256 (64 桁) |
 |--:|--:|--:|---|--:|---|
@@ -172,7 +172,7 @@ P6: S2_WFBOX=0 S2_PATCH=$'67240d|c644242800|c644242802' bash tools/flp/s2_render
 
 **16.4 解釈と次の一手**: 本測定から言えるのは次まで。(1) `General\Render` を単一の相対名で開く記録は無い (16.2)。(2) P1〜P6 と S2_REG の 4 試行 (16.1 前段) では出力は変わらなかった (すべて 16-bit)。(3) 出力が変わることを確かめる正の対照は無い。よって「保存された書式は使われない」「即値は通らない」とは結論しない。次は `/R` のコマンドライン処理から書出し関数までを追う (#3052)。
 
-**差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff aafd1c76 HEAD -- tools/flp/s2_render_probe.sh tools/flp/s2_imm_patch.py tools/startup tools/assets` の出力は空 (0 行)。本節を含む REPORT の commit (`tools/flp/REPORT.md`・`tools/flp/REPORT_APPENDIX.md`) だけが HEAD の差分。
+**差分の証跡** (`docs/WORKFLOW.md` §6): `git diff aafd1c76 HEAD -- tools/flp/s2_imm_patch.py tools/startup tools/assets` の出力は空 (0 行)。`tools/flp/s2_render_probe.sh` だけは `0fb80be1` で既定の WFBox 書込みが入ったため空ではない (§17.5)。16-bit の対照 (`S2_WFBOX=0`) は §17.4 で同じ SHA (`13d61a05`) を再確認した。
 
 **未解決**
 
