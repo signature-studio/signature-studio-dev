@@ -19,7 +19,7 @@
 | 測定環境 (§5・§6 の 9V74 の再確認) | `599f793c` で再測定した runner (AMD EPYC 9V74 80-Core、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。単一プロセス。sweep は 74.0 s (単独) |
 | 測定環境 (§5・§6・§10.4 の本 fix の再測定) | AMD EPYC 7763 64-Core (前回の fix の runner・4 vCPU)、`7e23750a` (測定経路は `0960c8be` と同一)。単一プロセス。load は `uptime` の 1 分平均で、fa_cmp の前 0.88、sweep 前 0.75・sweep 後 1.39。sweep は 73.8 s (単独)。追補 (§5・§6・§10.4、`9edd60a5`): Intel Xeon 6973P-C (本 runner・4 vCPU・Ubuntu 24.04・gcc 13.3.0・glibc 2.39)、sweep 71.3 s (単独)、sweep 後 load 0.88 |
 | 素材 | `work-icall` のみ (`tools/icall/work/` へ `tar --zstd -xf` で展開、実測 18.5 s)。`FA_CORE` は `tools/icall/work/rt_freshair-core/rw.dll` (未指定だと既定で `SlateCore.core_64` を探し、素材 plugins-freshair が要る) |
-| emsdk | 9V45 (`a2c2c126`) と本 run (`9edd60a5`) の素材に `toolchain-emsdk` は無かった (R2 は `work-icall.tar.zst` のみ)。上流の emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12`。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。runner 上では `/opt/emsdk` へ symlink した (`fa_route_build.sh` の `source /opt/emsdk/emsdk_env.sh` に合わせる。リポジトリには含まない)。9V74 (`599f793c`) の run は `toolchain-emsdk` 素材を使った。上流からの再取得経路は `[未確認]` (`docs/REFERENCES.md` §4)。PR 本文の `oc_artifacts` は `work-icall` のまま |
+| emsdk | 9V45 (`a2c2c126`) と本 run (`9edd60a5`) の素材に `toolchain-emsdk` は無かった (R2 は `work-icall.tar.zst` のみ)。上流の emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12`。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。runner 上では [EMSDK] の所在へ symlink した (`fa_route_build.sh` が `source` する `emsdk_env.sh` の位置に合わせる。リポジトリには含まない)。9V74 (`599f793c`) の run は `toolchain-emsdk` 素材を使った。上流からの再取得経路は `[未確認]` (`docs/REFERENCES.md` §4)。PR 本文の `oc_artifacts` は `work-icall` のまま |
 | libottnative | `bash tools/ott/native/build.sh` で本 run に作り直した (`tools/ott/work/libottnative.so`。tarball には無い) |
 | fixed route 生成 | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh`: 5.6 s (単独実行) |
 | 単発 fa_cmp | n=8 で 0.2 s 前後 |
@@ -155,7 +155,7 @@ harness 状態別の結果 (n=8、先頭 1 点。wasm は全環境・全 8 点�
 
 ```sh
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C .            # tools/icall/work/ へ (実測 18.5 s)
-# toolchain-emsdk は本 run の素材に無い (R2 は work-icall のみ)。上流 emsdk 6.0.12 で測った: git clone で emsdk を取得し ./emsdk install 6.0.12 && ./emsdk activate 6.0.12 の後、/opt/emsdk に置く (上流からの再取得経路は [未確認]・docs/REFERENCES.md §4)
+# toolchain-emsdk は本 run の素材に無い (R2 は work-icall のみ)。上流 emsdk 6.0.12 で測った: git clone で emsdk を取得し ./emsdk install 6.0.12 && ./emsdk activate 6.0.12 の後、その展開先を [EMSDK] とする (上流からの再取得経路は [未確認]・docs/REFERENCES.md §4)
 bash tools/ott/native/build.sh                                     # libottnative.so
 export FA_CORE="$PWD/tools/icall/work/rt_freshair-core/rw.dll"
 FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh                 # fixed route (単独 5.6 s)
