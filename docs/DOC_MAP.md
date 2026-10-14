@@ -383,6 +383,7 @@
 | `tools/audio/REPORT_MIDI.md` | ~65 | AU-3 (#188) Web MIDI shim の検証全文 (REPORT.md §13 から分割) |
 | `tools/audio/REPORT_AU10.md` | ~215 | AU-10 (#191) 30 分ソーク (`--soak30`) の検証全文 (REPORT.md §16 から分割)。§16.5〜§16.7 は `REPORT_APPENDIX_1570.md` に分割移動 |
 | `tools/audio/REPORT_APPENDIX_1570.md` | ~63 | AU-21 (#1570) 切り分け 1〜3 (REPORT_AU10.md §16.5〜§16.7) の全文 (250 行上限のため分割移動) |
+| `tools/audio/REPORT_AU29.md` | ~104 | AU-29 (#3115) clock_jump_log への ct・cb 追加と 30 分ソークの jump 4 件 (位置・cb・ct の対応)。performance.now() は worklet に無く未取得 (子 #3157) |
 | `tools/audio/REPORT_AU6.md` | ~38 | AU-6 (#190) 遅延ポリシー: T の減衰の全文 (REPORT.md §17 から分割)。減衰テスト・quick 全体の実測値の正本 (§2) |
 | `tools/audio/REPORT_AU2_CI.md` | ~195 | AU-2 (#187) CI 代理指標: Chrome 行列 (2 回目 run・null-sink 接続確認済み・NC・再採取 n=1 の FAIL 1 件・§8 の clock_jump 差分)、Firefox 行列 (WebDriver BiDi, §9・AU-23 #2540)、未解決 (§4・§6)。1 回目 run の記録は §1 (§5 で解消)。quick ベースライン 43/44。実機分は [AU-22] (#2366) |
 | `tools/audio/REPORT_APPENDIX_863.md` | ~20 | AU-15 (#863) 現 HEAD (`2f235a0a`) での再試行 15 run 全 PASS の全文 (REPORT.md §20 から分割移動。250 行上限のため)。§19 (旧 HEAD の失敗 1 件) は REPORT.md 本体 |
@@ -436,6 +437,7 @@
 | `tools/python/REPORT_PY73_APPENDIX_2547.md` | ~65 | PY-73 (#2547・5 回目 run・縮小後の受入 1 の付録): `0x1046a30` (lo・hi・cur の共通 getter) の eventId 種別振り分け表 (`0x1047424` の compare チェーン 7 分岐先・根拠 VA 付き)、mode `0x240` の直行条件、`0x10476f9` 系の mode 0x20 経路。RetDec の `return` 誤読の注意。値源は #2887 (PY-103)。測定は `analysis/flapi/pe_disasm.py`・`analysis/flapi/pe_retdec.sh` で再現 |
 | `tools/python/REPORT_PY74.md` | ~50 | PY-1 ilmcp 意味論の整合 (#74, PR #763): getBrowserNames 木・getHighlightNames 21 件・addChannel/addEffect/storePRScript 検証の実測表、`tests/ilmcp_diff.mjs` の結果、NC (addEffect 検証を外して 2 件差分)、非 ASCII 空白の未解決。REPORT.md §7b-3 の実測表の全文 |
 | `tools/python/REPORT_PY8.md` | ~45 | PY-8 (#80): MIDI 1 イベント flapi 呼出し数・所要時間と遅いモード切り分け (REPORT.md の分割ではなく新規。250 行上限とは無関係) |
+| `tools/python/REPORT_PY101.md` | 102 | PY-101 (#2878): channels.isGridBitAssigned・getGridBitWithLoop の PE 経路 (grid `+0x7ac` の生成元 `0xff63f0`・読出し `0x12d3e20`・loop 分岐の読めた範囲) と実装。getGridBit の position<0 を 4 から 0 に直した照合結果。loop の G1・G2 と行テーブルは未確定 (子 #2932) |
 | `tools/python/REPORT_PY100.md` | ~150 | PY-100 (#2879): channels.getStepParam・getCurrentStepParam の PE 確定 (書式 `iiii\|i`/`iii\|i`・kwlist・padsStride 既定 16・`[global]` = patternNumber と同じ slot・param 0〜8 の写像・-1/-3/-4 の経路) と C provider・mock の実装、`channels_diff` diffs 0 (実測は REPORT_PY100 §11)。構造体 (note) の生成経路と既定値は未確定 (子 issue) |
 | `tools/python/REPORT_PY84.md` | ~183 | PY-84 (#2663): fl-win64 の DATA block から chord progression の pyscript 2 本 (cpt / stack) と drum_patterns.json を抽出する同定規則 (内容一致・件数 fail-closed)。e2e 41/41 PASS (3 回)・NC・所要/load。run_all 全体は fl-win64 と toolchain-emsdk だけで rc=0 (`41d9c3b9` で実測、mac 側 step は SKIP) |
 | `tools/python/REPORT_PY102.md` | ~220 | PY-102 (#2883): playlist.muteTrackLock の value を実装 (binary `0xd56510`・表の個数 1→2)。取り込み前の flapi 表の個数と binary 書式の不一致 24 件の根拠 (分類と stub 宣言)・実害 3 関数。不一致は main の #2927 (PR #2956) で 0 件。残件は #2950 (PY-115)・#2952 (PY-116)・#2959 (PY-117) |
@@ -454,6 +456,7 @@
 | `tools/python/REPORT_PY87.md` | ~61 | PY-87 (#2738): general の状態読出しゲッター 4 件 (getChangedFlag / getUseMetronome / getPrecount / getRecPPQ) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 146 件は #2830・#2831・#2832 |
 | `tools/python/REPORT_PY94.md` | ~115 | PY-94 (#2830): general 保留 25 件の PE 逆アセンブル。状態読出し 7 件 (undo 履歴 3・safeToEdit・project 文字列 3) を確定して mock/C 実装 (差分 0・値は仮置き)。残り 10 件は #2978・#3002・#3003 (#2977・#2979・#3001 は closed) |
 | `tools/python/REPORT_PY96.md` | ~100 | PY-96 (#2832): arrangement の選択範囲読出し 4 件 (selectionStart / selectionEnd / liveSelectionStart / selectionIsActive) の PE 根拠 (変換スロット 0x15e4280 は PY-87 と同じ)・mock/C 差分 0・値は未実測の仮置き。残りは親 #2832 の子 #2984・#3027・#3029・#3030・#3021・#3022・#3025・#3041 |
+| `tools/python/REPORT_PY166.md` | 72 | PY-166 (#3176): `flrack.Rack` 属性表の PE 確定 (PyMemberDef 前提で `loop_starter_config` は T_OBJECT_EX・書込み可。全行 offset 0 の理由は未確定)。probe は `analysis/flapi/pe_flrack_rack_probe.py`。`flr` の型と e2e 再測定は子 #3181・#3182 |
 | `tools/python/REPORT_PY152.md` | ~203 | PY-152 (#2983): arrangement 8 件のうち 6 件 (currentTime / addAutoTimeMarker / jumpToMarker / liveSelection / selectionClear / selectionSet) の PE 根拠・mock/C 差分 0・値と副作用は未確定。jumpToMarker の必須個数は PE (1) と表 (2) が不一致で PM 判断待ち。変換スロット 0x15e4280 = PyLong_FromLong を同定。残りは子 #3041 (PY-143)・#3043 (PY-144) |
 | `tools/python/REPORT_PY120.md` | 120 | PY-120 (#2981): ui の操作・キー・ジョグ・編集 27 関数の PE 呼出し契約 (書式・既定値・op code・経路)。PE 確定 0 件 (作用先・戻り値の値が未確定) で保留。0xd81740 は関数ではなく型記述子、0x15e1e58 は PyArg_ParseTuple スロットと訂正。mock/C 差分 0 (実装なし) |
 | `tools/python/REPORT_PY119.md` | ~87 | PY-119 (#2980): ui の状態・フォーカス・文字列ゲッター 6 件 (getFocused / getFocusedFormID / getFocusedFormCaption / getFocusedPluginName / getHintMsg / isInPopupMenu) の PE 根拠・mock/C 差分 0・値は仮置き。保留 12 件は #3005・#3006・#3007 |
@@ -523,7 +526,7 @@
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
 | `tools/shared/elastique/REPORT.md` | ~140 | élastique 2.2.15 (win x64) の静的 IPP 入口 197 件の API 同定 (T-SH-40 / #2613): 線形走査の入口再現・dsp_ippv2 の本体照合 (一意名 8・族候補 26・未同定 163)・tools/ipp の stub 名 28 (stub のみ 18・混在 16 入口。#2613 受入 2)・間接経路の静的確認。対応表は `data/entries.csv` |
 | `tools/shared/REPORT_APPENDIX.md` | ~110 | shared REPORT の分割移動節の全文: §A win freetype.dll の版判定 (#145, 上流 VER-2-4-{10,11,12} 照合の実測)・§10 ライブラリのビルド詳細 (libFLAC/LAME/WavPack/FFmpeg/ILSvg)・§12 検収記録 (2026-10-11)。250 行上限のため無変更で分割移動 |
-| `tools/shared/elastique/REPORT_152.md` | ~155 | élastique 2.2.15 (win `elastique_x64.dll`) の静的 IPP 入口と dispatch 層 (thunk・表の飛び先) の実測と lift 前提 (D20 の side module 方針)。測定値は本 REPORT §0。T-SH-10 (#152)。同定は子 T-SH-43 (#2667)、lift 本体は子 T-SH-41 (#2614) |
+| `tools/shared/elastique/REPORT_152.md` | ~215 | élastique 2.2.15 (win `elastique_x64.dll`) の静的 IPP 入口と dispatch 層 (thunk・表の飛び先) の実測と lift 前提 (D20 の side module 方針)。測定値は本 REPORT §0。T-SH-10 (#152)。dispatch 飛び先の IPP 同定は T-SH-43 (#2667・§8)、lift 本体は子 T-SH-41 (#2614) |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 | `tools/shared/oss/ilsvg/REPORT.md` | ~50 | ILSvg の版の組 probe (#877): svgdom 0.4.7 は emcc 26/26 cpp OK、svgren 0.6.3 / 0.5.9 は svgdom 0.4.7 と enum 名不一致で版の組は未確定 (未解決 #927) |
 | `tools/shared/oss/blend2d/REPORT_SIMD.md` | ~60 | Blend2D wasm `-msimd128` 試験 (T-SH-02, #146) の実測詳細・ネガティブコントロール・前版の実測・未解決の起票先 (`tools/shared/REPORT.md` §3.3 から分割移動) |
@@ -564,7 +567,8 @@
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
-| `tools/targets/massivex/REPORT_APPENDIX.md` | ~248 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017) |
+| `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |
+| `tools/targets/massivex/REPORT_APPENDIX_3154.md` | ~71 | Massive X §12.2・§12.2a・§12.10 の分割移動全文 (#3154 MX-34・250 行上限のため・内容無変更) |
 | `tools/targets/massivex/REPORT_APPENDIX_2151.md` | ~70 | Massive X §12.12〜§12.14 (#1976・#2108・#2151 MX-31) の分割移動全文。§12.14 の `.pdata` 訂正は未確定 |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
 | `tools/targets/massivex/dsp/REPORT_MX6.md` | ~130 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。測定値の正本 |

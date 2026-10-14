@@ -107,7 +107,12 @@ FL_H(channels, isChannelSelected) { CH(0); return fl_ret_b(c, k->sel); }
 FL_H(channels, isChannelMuted) { CH(0); return fl_ret_b(c, k->mute); }
 FL_H(channels, isChannelSolo) { CH(0); return fl_ret_b(c, k->solo); }
 FL_H(channels, getChannelColor) { CH(0); return fl_ret_i(c, k->color); }
-FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); if (p < 0 || p >= NSTEP) RANGE(); return fl_ret_b(c, k->steps[p]); }
+/* PE 0xd5b420: 0x12d3e20 は position<0 で 0 を返す (エラーにしない)。範囲外は index の -4 のみ。p>=NSTEP の経路は PE 未照合 (REPORT_PY101) */
+FL_H(channels, getGridBit) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
+/* PE 0xd5b360: grid (+0x7ac) は channel 生成 0xff5aa0 が直接 call する 0xff63f0 で作られ非 null。null の経路 (status 0) は直接 call の範囲では到達しない (間接呼出しは未走査・REPORT_PY101) */
+FL_H(channels, isGridBitAssigned) { CH(0); (void)k; (void)A_INT(1, 0); return fl_ret_b(c, 1); }
+/* PE 0xd5bc10 → 0x12d3ff0: loop 記録の分岐は未モデル (mock に loop 記録が無い)。base 0x12d3e20 と同じ読出し */
+FL_H(channels, getGridBitWithLoop) { CH(0); int64_t p = A_INT(1, 0); if (p >= NSTEP) RANGE(); return fl_ret_b(c, p >= 0 && k->steps[p]); }
 /* 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。負の offset は先頭扱い (stub に記述なし・仮置き)。無選択は canBeNone で -1 / 0 */
 FL_H(channels, channelNumber) {
     int64_t none = A_INT(0, 0), off = A_INT(1, 0), n = 0, pick = -1;
