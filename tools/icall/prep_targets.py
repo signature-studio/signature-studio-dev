@@ -13,7 +13,14 @@ import audit_icall as A
 W = os.path.join(HERE, 'work'); os.makedirs(W, exist_ok=True)
 
 
-def ranges_with_ends(img, vas, given=None):
+def chain_end(img, va, end):
+    # .pdata の CHAININFO 断片 (hot/cold 分割) は親の RUNTIME_FUNCTION の直後に並ぶ。その末尾まで伸ばす (#1838)
+    while end in img.pdata_chained and end in img.pdata:
+        end = img.pdata[end]
+    return end
+
+
+def ranges_with_ends(img, vas, given=None, chained=False):
     given = given or {}
     img.set_extra_starts(list(vas))
     dis = A.Disasm(img)
@@ -22,6 +29,8 @@ def ranges_with_ends(img, vas, given=None):
         r = (va, given[va]) if va in given else img.func_range(va)
         if not r:
             continue
+        if chained and va in img.pdata and va not in img.pdata_chained:
+            r = (va, chain_end(img, va, r[1]))
         if va not in img.pdata and va not in given:   # leaf: 到達命令の末尾まで
             seen = dis.scan_function(r[0], r[1], {})
             end = max((a + i.size for a, i in seen.items()), default=r[1])
@@ -40,7 +49,7 @@ open(os.path.join(W, 'bal_ranges.txt'), 'w').write(','.join(ranges_with_ends(img
 # Fresh Air
 fa = json.load(open(os.path.join(T, 'targets/freshair/work/clo_freshair_all.json')))
 img = A.Image(os.path.join(T, 'targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64'))
-open(os.path.join(W, 'fa_ranges.txt'), 'w').write(','.join(ranges_with_ends(img, [int(f['va'], 16) for f in fa['funcs']])))
+open(os.path.join(W, 'fa_ranges.txt'), 'w').write(','.join(ranges_with_ends(img, [int(f['va'], 16) for f in fa['funcs']], chained=True)))
 # Kilohearts
 k = pickle.load(open(os.path.join(T, 'targets/kilohearts/work/closures_sets.pkl'), 'rb'))
 img = A.Image(os.path.join(T, 'targets/kilohearts/work/winpkg/HeartCore.core_64'))
