@@ -12,10 +12,18 @@ typedef unsigned long long u64;
 #ifndef M11_WATCH_HI
 #define M11_WATCH_HI 0xfa5c68u
 #endif
+#ifndef M11_WATCH2_LO
+#define M11_WATCH2_LO 0x11e69b0u
+#endif
+#ifndef M11_WATCH2_HI
+#define M11_WATCH2_HI 0x11e6b98u
+#endif
 static u64 n_hit = 0;
 #define LOG_MAX 20000
 void m11_sw(u32 addr, u32 val, u32 site, u32 width) {
-    if (addr + width <= M11_WATCH_LO || addr >= M11_WATCH_HI) return;
+    int in1 = !(addr + width <= M11_WATCH_LO || addr >= M11_WATCH_HI);
+    int in2 = !(addr + width <= M11_WATCH2_LO || addr >= M11_WATCH2_HI);
+    if (!in1 && !in2) return;
     n_hit++;
     if (n_hit <= LOG_MAX)
         fprintf(stderr, "[rw] site=%u addr=%x val=%x width=%u hit=%llu\n", site, addr, val, width, n_hit);

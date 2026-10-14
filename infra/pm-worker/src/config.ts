@@ -4,6 +4,10 @@ import { DEFAULT_BATCH } from "./launch.ts";
 // 既定の TARGET は 80。GitHub の同時 job 上限 (60) を超えた分は queued になり、常時 60 に張り付くための余裕。
 export const DEFAULT_TARGET_WORKER = 80;
 
+export const MIN_COMMENT_WINDOW_H = 24;
+export const DEFAULT_COMMENT_WINDOW_H = 24;
+export const DEFAULT_COMMENT_MAX_PAGES = 80;
+
 export interface Env {
   PM: { idFromName(n: string): unknown; get(id: unknown): { fetch(r: Request): Promise<Response> } };
   // Worker の secret binding (32 バイトの base64url)。App の private key / webhook secret の暗号化鍵。DO の外にだけある。
@@ -25,6 +29,9 @@ export interface Env {
   WATCHDOG_INTERVAL_S?: string;
   RECONCILE_INTERVAL_S?: string;
   NO_PR_COOLDOWN_H?: string;
+  // 全体同期でコメントを読む窓 (時間。24 未満は 24 に切り上げる) と、コメント一覧のページ上限 (1 ページ 100 件)。
+  COMMENT_WINDOW_H?: string;
+  COMMENT_MAX_PAGES?: string;
   // oc:stuck の open PR がこれを超えたら launch を止める (既定 40)。
   STUCK_HIGH?: string;
 }
@@ -43,6 +50,8 @@ export interface Config {
   watchdogIntervalS: number;
   reconcileIntervalS: number;
   noPrCooldownH: number;
+  commentWindowH: number;
+  commentMaxPages: number;
   stuckHigh: number;
   manualDeps: Record<string, number[]>;
 }
@@ -70,6 +79,9 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     watchdogIntervalS: num(env.WATCHDOG_INTERVAL_S, 300),
     reconcileIntervalS: num(env.RECONCILE_INTERVAL_S, 300),
     noPrCooldownH: num(env.NO_PR_COOLDOWN_H, 3),
+    // classify が見る bot の報告は 24 時間以内。窓がそれより短いと、取りこぼした報告で誤って着手する。
+    commentWindowH: Math.max(MIN_COMMENT_WINDOW_H, num(env.COMMENT_WINDOW_H, DEFAULT_COMMENT_WINDOW_H)),
+    commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),
     stuckHigh: num(env.STUCK_HIGH, 40),
     manualDeps,
   };
