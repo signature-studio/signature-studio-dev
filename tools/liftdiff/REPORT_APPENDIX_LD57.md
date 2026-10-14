@@ -56,8 +56,8 @@
 ## 5. 測定 commit と差分
 
 - 測定 commit: `3ff24dbc`。
-- `git diff 3ff24dbc HEAD -- tools/liftdiff` の出力は、本 PR 作成時点で HEAD = `3ff24dbc` のため 0 件 (本ファイルと `results/ld57/` の追加のみ)。
-- `3ff24dbc` 自体のコード差分: `tools/liftdiff/rt/ld_native.c` (+40 / -1)。`LD_STEP_N` 未設定時は既存動作と同じ (`step_begin` が即 return し、`tr_arm` の経路も変わらない)。
+- コード差分 `git diff 3ff24dbc HEAD -- tools/liftdiff/rt tools/liftdiff/ldlib` は 0 件 (HEAD = `83508f6d`。以降の commit は REPORT と `results/ld57/` の追加のみ)。
+- `3ff24dbc` のコード差分: `tools/liftdiff/rt/ld_native.c` (+40 / -1)。`LD_STEP_N` 未設定時の既存動作との同一性は**未検証** (既存 e2e は未実行)。
 
 ## 6. 未解決
 
