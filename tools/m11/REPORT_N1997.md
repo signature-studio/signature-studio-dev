@@ -55,5 +55,5 @@
 ## 7. 差分
 
 - 測定 commit: `c171b9dc` (本 run は測定していない。コード変更なし)。
-- PR の差分 (main 取り込み後): `git diff origin/main HEAD` = `tools/m11/REPORT_N1997.md` の追加 58 行のみ。
+- PR の差分 (main 取り込み後): `git diff $(git merge-base origin/main HEAD) HEAD -- tools/m11/REPORT_N1997.md` = 追加 59 行・削除 0 行のみ。
 - 注: 同じ HEAD で `git diff c171b9dc HEAD -- tools/m11` には、取り込んだ main 側の他 PR の変更 (9 file) が含まれる。本 PR の変更ではない。
