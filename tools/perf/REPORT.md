@@ -153,21 +153,20 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 
 ## 9. perf 回帰ゲート (PERF-P5 / #164) — bit-exact OTT (x64c) 対象
 
-既知類型との関係: 該当なし (計測ゲートの追加。lift 自体は未変更)。検証起点 commit: `aa4306b` (クリーン detached worktree で実行。数値表は同内容の事前 commit 76fdcad (未 push) での 3 回実測、aa4306b では 1 回再実行し PASS 11/11・36 s・load 0.78〜0.98)。
+既知類型との関係: 該当なし (計測ゲートの追加。lift 自体は未変更)。検証起点 commit: `aa4306b` (クリーン detached worktree で実行。数値表は同内容の事前 commit 76fdcad (未 push) での 3 回実測、aa4306b では 1 回再実行し PASS 11/11・36 s・load 0.78〜0.98)。測定 commit: `2d6c45fe` (コードを変えた最後の commit)。鮮度 (WORKFLOW §6): `git diff --stat 2d6c45fe ecb58b7f` は `tools/perf/REPORT.md` のみ (2 insertions / 1 deletion)。gate が実行するコード (`tools/ott` `tools/shared` `tools/perf/build` `tools/perf/harness` `tools/perf/gate/perf_gate.sh` `tools/perf/gate/judge.mjs`) は `git diff 2d6c45fe HEAD -- <同範囲>` が空で、差分 0。
 
 `bash tools/perf/gate/perf_gate.sh` (1 コマンド。CI 用 workflow は `tools/perf/gate/perf-gate.workflow.yaml.txt`) = `tools/ott/ott_e2e.sh --quick` (native 実機械語との bit-exact; 22 シナリオ・9,620 cell・max_ulp 0) → `ott_x64c_build.sh o0 o2 o3lto` → `ott_x64c_bench.mjs` を 3 反復 (変種を反復内で交互) → `gate/judge.mjs` で判定。
 判定は**相対指標のみ** (絶対 µs は参考表示): 署名 `6b1696f0` 一致・出力非ゼロ 256 cell・o0/o2 p50 比 ≥ 3.0・o2/o3lto p50 比 ∈ [0.9, 2.0]・wasm bytes 上限 (o0 1,200,000 / o2 810,000 / o3lto 780,000)。閾値は env (`GATE_*`) で上書き可。
 
-実測 (GitHub-hosted 相当 runner, node v22.23.3, loadavg 0.45〜1.40, 3 回実行・各 3 反復の中央値。`perf_gate.sh` 全体の所要 36〜38 s, 実測 3 回):
+実測 (GitHub-hosted 相当 runner, node v22.23.3, loadavg 0.45〜1.40, 3 回実行・各 3 反復の中央値。`perf_gate.sh` 全体の所要は n=3 で 36〜38 s。単発 (n=1) の所要は 82 s (測定 commit `2d6c45fe`・PASS 11/11・load 0.27→1.06。同条件の main `580dd294` でも 82 s)・60 s (レビュー側の独立再実行 `ecb58b7f`・PASS 11/11・load 0.82→1.05)。所要の変動の原因は未切り分け。表の括弧内は単発 (n=1) の参考値。素材は agent-setup 展開の `[EMSDK]`・`[ANALYSIS-PLUGINS]`):
 
-| 指標 | 実測 (3 回の min–max) | 閾値 |
+| 指標 | 実測 (n=3 の min–max。括弧内は単発の参考) | 閾値 |
 |---|---|---|
 | 署名 (o0/o2/o3lto 全反復) | `6b1696f0` 一致 | 一致 |
-| o0/o2 p50 比 | 5.68〜5.80 (別途 5 反復の単体測定 5.3〜5.9) | ≥ 3.0 |
+| o0/o2 p50 比 | 5.68〜5.80 (単体 5 反復 5.3〜5.9。参考: 2d6c45fe 7.59・ecb58b7f 再実行 6.73。観測全体 5.3〜7.59) | ≥ 3.0 |
 | o2/o3lto p50 比 | 1.18〜1.20 (単体測定 1.15〜1.29) | 0.9〜2.0 |
-| wasm bytes o0 / o2 / o3lto | 1,030,416 / 707,139 / 680,905 | 上記上限 |
+| wasm bytes o0 / o2 / o3lto | 1,030,416 / 707,139 / 680,905 (2d6c45fe の記録値)。ecb58b7f 再実行は 1,030,428 / 707,156 / 680,905 (o0 +12 B・o2 +17 B。揺れの原因は未切り分け) | 上記上限 (余裕あり) |
 | p50 µs (参考) o0 / o2 / o3lto | 328.65〜335.24 / 57.74〜57.88 / 48.39〜49.12 | 判定に使わない |
-| 測定 commit `2d6c45fe` の全体 (素材は agent-setup 展開の `[EMSDK]`・`[ANALYSIS-PLUGINS]`) | 82 s・load 0.27→1.06・PASS 11/11 (o0/o2 7.59・o2/o3lto 1.18) | 上記 |
 
 ネガティブコントロール (`judge.mjs` へ入力を壊して FAIL を確認; いずれも exit 1): 期待署名を `deadbeef` → 3 件 FAIL (8/11) / o2 bytes 上限 700,000 → FAIL (707,139) / o0/o2 比下限 8 → FAIL (5.52) / o2 の p50 を 3 倍 (o2 退行の模擬) → o0/o2 1.84・o2/o3lto 3.71 で 2 件 FAIL / 1 行だけ署名を `6b1696f1` に改ざん → FAIL。
 
@@ -177,7 +176,7 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| **CI workflow 未設置**: GitHub App に `workflows` 権限が無く `.github/workflows/` への push が拒否された (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`)。テンプレートは `tools/perf/gate/perf-gate.workflow.yaml.txt` (2d6c45fe で pip 段を削除: agent-setup の venv と衝突し EXTERNALLY-MANAGED で失敗するため)。設置後の Actions 実行も未確認 | CI 化 (受入条件) が未達 | #164 (PM が `.github/workflows/perf-gate.yaml` へ移して設置) |
+| **CI workflow 未設置**: GitHub App に `workflows` 権限が無く `.github/workflows/` への push が拒否された (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`)。テンプレートは `tools/perf/gate/perf-gate.workflow.yaml.txt` (pip 段は 2d6c45fe で削除: agent-setup が pefile / capstone / numpy を venv に入れ、`python3` は shim で venv に解決される。残すと `python3 -m pip` は venv に pip が無く `No module named pip` で落ちる (実測))。設置後の Actions 実行も未確認 | CI 化 (受入条件) が未達 | #164 (PM が `.github/workflows/perf-gate.yaml` へ移して設置) |
 | 閾値は 1 台の低負荷 runner の実測 (反復 3〜5) から設定。高負荷時の誤検知率は未測 | flaky 化の可能性 | #164 |
 | `perf.sh` (PERF_QUICK, junk 版 M10 RetDec) は本ゲートに含めない。Chrome・M5 カーネル・巨大 wasm は対象外 | 回帰検知範囲は x64c の node 実行のみ | #164 に分割提案 |
 | ゲートは node のみ (Chrome 計測なし) | Chrome 側回帰は検知できない | PERF-P9 (§7) |
