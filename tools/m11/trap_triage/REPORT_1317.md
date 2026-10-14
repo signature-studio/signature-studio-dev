@@ -194,7 +194,7 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 - 取り込み差分 `git diff e7c5c062 58e0126d -- tools/m11 ':(exclude)*.md'` は 12 ファイル (+369/-7)。build・IR に入るのは `m11_build.sh` (CF 行・`S_NEG`・`ov_instr_40f960` stamp の追加のみ) と `m11_rt.c` (#1547 `M11_DEST_GUARD`、既定 0 で `#if` 内のみ)。`ldfix/ldfix.py`・`m11_gen_ir2.sh` は不変 (IR 生成経路は同一)。`ldfix/` の監査スクリプト・`shimx_link/probe_flag_1985.mjs`・`trap_triage/store_watch_*`・`watch_*` は build に入らない。
 - 既定 0 で build 出力が変わらない根拠 (`git diff --stat b36d3b5f e7c5c062`・6 ファイル 78 行追加 / 11 行削除。全文は `REPORT_1317_APPENDIX.md` §12):
   - `tools/m11/m11_ov.c` +17: #882 `M11_INSTR_40FFE0` 計測。`#if` 内のみ。既定 0 で追加されるコードなし。
-  - `tools/m11/m11_post.py` +7/-1: 同 wrapper。`os.environ.get('M11_INSTR_40FFE0') == '1'` のときだけ PROBES と wrapper を追加。既定 0 では従来と同一。
+  - `tools/m11/m11_post.py` +6/-1: 同 wrapper。`os.environ.get('M11_INSTR_40FFE0') == '1'` のときだけ PROBES と wrapper を追加。既定 0 では従来と同一。
   - `tools/m11/m11_build.sh` 13 行: `M11_INSTR_40FFE0` の CF 追加と stamp 形式 (`0:0`)。既定 0 では CF に `-DM11_INSTR_40FFE0=0` が増えるだけ (ov.o の再生成は stamp 変化時のみ)。`S_NEG` は既定 0 で従来と同一。build 出力の bit 同一性は未検証。
   - `tools/m11/m11_rt.c` +20: #1952 の `M11_RT_*` knob。`#if` 内のみ。
   - `tools/m11/shimx_link/probe_trace_unit.mjs` +24 / `probe_unit23.mjs` 8 行: 独立した shimx 系 probe。`m11_build.sh`・`survey_units.mjs` からは呼ばれない (grep 確認)。`probe_unit23.mjs` は slot アドレス定数を `0x15f10e0` から `0x11f10e0` (LVA) に直したもの。
