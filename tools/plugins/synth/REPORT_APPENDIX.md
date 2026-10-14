@@ -73,6 +73,37 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 - 既定経路の summary は修復前と同一 (`emcc_c_rc`=1、最初のエラーも同一)。`lift_s` のみ測定ごとに変動 (36 → 45 秒)。他 8 本の `emcc_c_rc` は未測定。
 - 注: `e.fh.ll` は llvm-as 18 では 7651 行の `add i64 0, i64 %...` で不正 (RetDec 出力の元からの問題)。clang 18 の `-fsyntax-only` は通る。検証は clang で行う。
 
+## E. E3 残件の修復 (#1509; `function_180056120` の i32 仮引数)
+
+修復前: `e.final.ll:114486` の `'%arg2' defined with type 'i32' but expected 'i64'` (`function_180049450`)。
+`function_180056120(i32 %arg1, …)` の `%arg1` は本体で `inttoptr` されず、`function_180049450` へ渡すだけのため、#1485 の pass 規則 (inttoptr で使われる仮引数のみ) では対象外だった。
+
+修正: `fix_i32_ptr_arg.py` に伝播を追加した。`--func` で指定した呼出元 C の `i32` 仮引数 `%P` は、受け先 (変換済み callee) へ `i64` で渡す場合に限り `i64` 化する (C は `--func` の順序で受け先の後)。定数・trunc 規則は不変。 `cpp_lift.sh` は block 21202 のみ `PLUG_I32PTR_FUNCS="function_180049450 function_180056120"` を既定にする (他の block は従来どおり)。
+
+- 回帰テスト: `TMPDIR=$RUNNER_TEMP bash tools/plugins/lift/passes/test_fix_i32_ptr_arg.sh` → `ALL PASS` (既存 5 ケース + 伝播成功 (clang -fsyntax-only 通過) + 順序逆で失敗・出力無し)。
+- 実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、既定 = 受入コマンドそのまま、測定 commit `dae815ef`、素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-liftlib・work-fw-stage1 を展開):
+
+| 条件 | lift rc | summary.csv | `emcc_c_rc` | 最初のエラー |
+|---|--:|---|--:|---|
+| 修復前 (1e3ee7af) | 0 | `21202,1579,0,1393,0,2,3,0,0,0,57,211,25828,67,23,1391,0` | 1 | `e.final.ll:114486 '%arg2' … i64` |
+| 修復後 (dae815ef、既定) | 0 | `21202,1579,0,1393,0,2,3,0,0,0,57,211,25828,67,23,1391,0` | **0** | — |
+
+- 修復前の既定実行 (1e3ee7af) の所要 58.6 秒、修復後 (dae815ef) 59.3 秒。load は 0.84 → 0.74 (測定前後)。`emcc_c_rc_after_fixcmp` は 0。`P-T2` 分類: const 11 / trunc 11 / param 1。
+- 測定 commit 以降のコード差分: `git diff dae815ef HEAD -- tools/plugins/lift tools/plugins/synth` (本 REPORT の commit は文書のみ)。
+
+### 他 block の emcc_c_rc (受入条件 3) の測定
+
+既定経路 (修復無し) の値。`cpp_lift.sh` の既定変更は 21202 のみ、他 block は `PLUG_I32PTR_FUNCS` 未設定の経路を通るため、既定値は不変 (pass は `cp` のみ)。
+
+| block | summary.csv (dae815ef、既定) | emcc_c_rc |
+|---|---|--:|
+| 23914 | `23914,3194,0,3697,0,34,3,0,0,0,165,2,111,0,503,3695,0` | 0 |
+| 23916 | `23916,3193,0,3694,1,35,3,1,0,1,169,2,111,0,501,3692,0` | 1 |
+| 23944 | `23944,3050,0,3321,0,41,24,0,0,0,448,1,61,0,271,3320,354` | 0 |
+
+- 23916 の `emcc_c_rc=1` は本 run では修復前の比較値を採取していないため、#534 の既存結果との一致は**未確認** (本 run の修復は 21202 以外に効かない設計のため、変化は無いはず、と推定)。残り 5 本 (24159・24163・24167・24216・24298) は未測定。
+- 測定時間の制約 (3 本で 13 分 26 秒) により、残り 5 本は本 run で測定しない。修復は `PLUG_I32PTR_FUNCS` 未設定時 `cp` のみで既定経路に影響しないことをコードで確認した。
+
 ## B. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
