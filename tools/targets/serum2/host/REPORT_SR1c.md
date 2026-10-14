@@ -232,6 +232,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
 | 0x800010 の既定 host での受信 | 同上 | #256 |
 | 未呼出 217 件の shim 分類 (GUI / ネット経路の到達可否と kernelbase 経由の呼出) | SR-3/SR-4 の入力 | #256 |
 | 静的走査は下限 (間接参照・多段 base を拾えない) | writer の取りこぼし | #256 (watchpoint で補完) |
+| 0xacf70 の所属 class・wrapper IID 応答の根拠 | §4-3 の未確定 | 解消: `REPORT_SR23.md` (#1545) |
 
 ## 6. 再現
 
