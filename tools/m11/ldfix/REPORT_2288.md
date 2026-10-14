@@ -95,3 +95,52 @@
 1. 24 site の `[rbp+D]` と IR の stack_var / reg2mem の対応を site 単位で立てる。入口は `results/ld92_machine_evidence.tsv` (後続の読み) と `results/ld104_sites.tsv`。
 2. V の実行時値の出所を追う: `0x418190` と `c21d80` の呼び出し元で、V の参照フィールドに入る値 (object 参照) を確認する。
 3. 1 と 2 が立った site から、`candidate_verdicts_1161.jsonl` と同じ形式で根拠行付きで入れる。
+
+## 8. 3 回目 run: c589b0 の 12 site を到達不能と確定 (NO_CONSUMER)・128f9e0 は次 run (LD-104 継続)
+
+- 測定の基点: origin/main `927cd651`。コード変更は `ld104_reach.py` と results (`ld104_reach.tsv`・`candidate_verdicts_1161.jsonl` の 12 行・`spill178_1161.tsv` の 12 行) の追加だけ。`git diff 927cd651 HEAD -- tools/m11/ldfix` でも同じ。
+- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`。`work-m11.tar.zst` / `work-liftdiff.tar.zst` を worktree のルートで展開 (内部パスが `tools/<area>/work/` のため 1 段移動は不要)。`boot_final3.ll` の sha256 は `010451add…` で前 run と一致。fl-win64 は未使用。
+- 注意: §2〜§7 の集計 (未判定 120 / 確定 51 / 判定不能 7) は 463d8176 時点。main の現状 (927cd651) の `results/spill178_1161.tsv` は 未判定 65 / 確定 97 / 判定不能 16 だった (他 issue の判定が入っている)。以下の増減はこの基点からの差。
+
+### 8-1 IR に 24 site が無い理由 (機械語の CFG で確認)
+
+- c589b0 の IR は `dec_label_pc_c59201` (IR 391009 行) で、c59230 の store (`0x1104dd8`・機械語 `mov byte ptr [rip+..], al` と一致) の直後に `br label %dec_label_pc_c5d220`。機械語は c59236 〜 c5928e (内部分岐 c5924a・c59253・c5925c、store 2 本、c5928e `jne c5d220`) を経由するが、IR に c59236 〜 c5928e の命令は無い。
+- 機械語の rip 相対参照のうち IR 関数本体に現れない LVA は c592b8 以降に集中する (`ld104_reach` 作業中の確認。K = `0x11e0ab0` の 27 件を含む)。
+- 欠落した到達可能な store のうち、2 本は VA `0x1504dd9` (LVA `0x1104dd9`・`mov byte ptr [rip+0x8abb6f], al` c59264) と VA `0x1504dda` (LVA `0x1104dda`・`mov byte ptr [rip+0x8abb69], 1` c5926a)。**これは未検証の候補**: この 2 cell が後続で読まれるか、IR のどこかで別に表現されているかは未確認。読まれるなら silent miscompile の候補 (新規類型の候補・DEFECTS.md 未登録。PM 判断)。
+- 24 site のうち c589b0 の 12 site は、枝刈り (§8-2) を入れると入口から到達できなくなる site。c592c2 は c592ae 系 (c59299 の配下) にある。
+
+### 8-2 到達性 (`ld104_reach.py` → `results/ld104_reach.tsv`)
+
+- 方法: 関数入口から jcc / jmp / call の後続を BFS (命令単位)。定数分岐の枝刈りは c589b0 だけ (`PRUNE_C589B0`): c5927c `je c59299`・c59283 `je c5a7b8` は取られず、c5928e `jne c5d220` は必ず取られる。
+- 根拠 (枝刈りの前提): VA `0x1504dd4` (dword) を rip 相対で指す命令を config 関数区間の全 8227 関数から走査した結果、書込み **1 件** (c59182 `mov dword ptr [rip+..], 8`)、読み 4 件 (c591a9・c591d4・c59208・c59271)。絶対アドレス参照は 0 件。c59271 の読みは値 8 (image 初期値 0x7fffffff も同じ枝)。`sub eax,6/4/1` の後に 0 になるのは v=6・10・11 だけで、v=8 も 0x7fffffff も該当しない。
+- 入口の predecessor: c59299 ← c5927c `je` のみ (fallthrough 無し)。c592a0 ← c59299 のみ。c5a7b8 ← c59283 `je` のみ。c59201 ← c591a0 `jne` のみ。
+
+| fn | 機械語の命令数 (到達) | 枝刈り無し: site 到達 | 枝刈り後: site 到達 | 判定 |
+|---|---|---|---|---|
+| c589b0 | 3477 → 468 | 12 / 12 | 0 / 12 | 12 site とも到達不能 → NO_CONSUMER |
+| 128f9e0 | 3681 → 3681 | 12 / 12 | 12 / 12 (枝刈り無し) | 到達可能。判定は未 (§8-3) |
+
+### 8-3 判定
+
+- c589b0 の 12 site (`c592c2` `c5a6b4` `c5a705` `c5a750` `c5a811` `c5bc03` `c5bc54` `c5bc9f` `c5bd1d` `c5d121` `c5d172` `c5d1bd`): **NO_CONSUMER**。根拠行は `candidate_verdicts_1161.jsonl` の 12 行 (`ld104_reach.tsv` と対応)。意味は「実行経路に消費者なし」(到達不能の死んだ store)。IR に無いのは到達不能の正しい省略であり、drop ではない。→ TRUE_DROP 0 件 (drops_510 の和集合 69 は不変)。
+- 128f9e0 の 12 site: **未判定**。枝刈り無しでも到達する。IR に K (0x11e0ab0) の読みが無いことは §3 のとおりだが、site の到達経路で IR の block 欠落が起きているかは未確認。次 run の入口は §8-4。
+
+### 8-4 次の一手 (後続に渡す)
+
+1. 128f9e0 の 12 site: 到達経路 (BFS の親を記録) を取り、経路上の IR block の欠落 (§8-1 と同型の c5d220 型 `br` の有無) を site ごとに見る。判定は根拠行付きで入れる。
+2. §8-1 の欠落 store 2 本 (LVA `0x1104dd9`・`0x1104dda`) の後続読みを確認する。読みが無ければ「死んだ store」、読みが有れば欠落の類型を DEFECTS.md 形式で起票 (PM 判断)。
+3. §8-2 の枝刈りの前提 (間接書込み無し) は config 関数区間の走査で確認した範囲。区間外のコードは未走査。
+
+### 8-4 未解決 (本 run 時点)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 128f9e0 の 12 site の判定 (到達可能・IR 側の経路未確定) | spill 宛の脱落関数の和集合 69 の残り | #2288 (次 run) |
+| §8-1 の欠落 store 2 本 (LVA `0x1104dd9`・`0x1104dda`) の後続読み | 新規類型の候補の確定 | #2288 (次 run) |
+| 枝刈りの前提 (config 区間外・間接書込み) | c589b0 の NO_CONSUMER の完全性 | #2288 (次 run) |
+
+### 8-5 検証
+
+- `python3 tools/m11/ldfix/ld104_reach.py` → rc=0・1.2 s (CPU 1 core・load average 0.94)。
+- `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`RUNNER_TEMP=/home/runner/work/_temp`): 2m44s・load average 0.94 で 1〜6/7 は完走。7/7 の `cmp` は 12 行差分 (c589b0 の 12 site: 未判定 → 確定) で rc=1 になった。差分は想定どおり (`diff` で 12 行のみ)。`results/spill178_1161.tsv` を新出力で置換し、`cmp` は OK。`drops_510.tsv` は cmp OK (脱落関数の和集合 69 不変)。
+- 集計 (7/7 の出力): 確定 109 / 判定不能 16 / 未判定 53 (基点 927cd651 は 確定 97 / 判定不能 16 / 未判定 65)。
