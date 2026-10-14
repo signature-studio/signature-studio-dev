@@ -120,12 +120,21 @@ jobs:
     # 起動は author_association COLLABORATOR/MEMBER/OWNER に限定する。
     # 本文の oc_actions_allow_write 経由で第三者が write モードを起動する
     # 経路を閉じる。
+    # 例外として、PM 用 GitHub App (repo 変数 OC_PM_BOT_LOGIN のログイン名。例
+    # oc-pm-for-signature-studio[bot]) が投稿した /oc も通す (#1949)。偽装できない理由:
+    # App のログイン (`<slug>[bot]`) は GitHub が App に付与し、第三者は同じログインの
+    # コメントを作れない (`[bot]` 付きのログインは通常のユーザー名に使えない)。user.type が
+    # 'Bot' であることも併せて見る。変数が未設定 (空) のときは `!= ''` で偽になり、何も許可しない。
+    # prepare-event-context.sh が同じ判定を二重に行う (そちらが確定判定)。
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' &&
       (github.event.comment.author_association == 'COLLABORATOR' ||
       github.event.comment.author_association == 'MEMBER' ||
-      github.event.comment.author_association == 'OWNER') &&
+      github.event.comment.author_association == 'OWNER' ||
+      (vars.OC_PM_BOT_LOGIN != '' &&
+      github.event.comment.user.type == 'Bot' &&
+      github.event.comment.user.login == vars.OC_PM_BOT_LOGIN)) &&
       (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))) ||
       (github.event_name == 'pull_request_review' &&
       github.event.review.state == 'changes_requested' &&
@@ -177,12 +186,14 @@ jobs:
       - name: Prepare event context
         id: context
         shell: bash
+        env:
+          OC_PM_BOT_LOGIN: ${{ vars.OC_PM_BOT_LOGIN }}
         run: bash .github/scripts/prepare-event-context.sh
 
       - name: No agent command in this comment
         if: steps.context.outputs.should_run != 'true'
         shell: bash
-        run: echo "::notice::the agent was not started (no /oc or /opencode command on its own line)"
+        run: echo "::notice::the agent was not started (no /oc or /opencode command on its own line, or the commenter is not allowed)"
 
       # 実装 App トークン。read モードでは contents:read のみ要求する
       # (installation が write 権限を未 grant の環境でも read-only 検証が通るため)

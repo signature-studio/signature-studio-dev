@@ -78,7 +78,7 @@ done
 
 # 7. 他のイベントの挙動は変わらない: issue_comment の /oc 判定
 rm -rf "$TMP/rt"; mkdir -p "$TMP/rt"
-printf '{"comment":{"body":"/oc oc_actions_allow_write\\nhello"},"issue":{"number":9}}' > "$TMP/ev.json"
+printf '{"comment":{"body":"/oc oc_actions_allow_write\\nhello","author_association":"MEMBER","user":{"login":"pm","type":"User"}},"issue":{"number":9}}' > "$TMP/ev.json"
 : > "$TMP/out"; : > "$TMP/env"
 GITHUB_EVENT_PATH="$TMP/ev.json" RUNNER_TEMP="$TMP/rt" GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" GITHUB_EVENT_NAME=issue_comment OC_PERMISSION=write \
   bash "$SCRIPT" > "$TMP/log" 2>&1
@@ -125,6 +125,76 @@ expect "pull_request: names from the refreshed body still pass the allowlist (un
 FAKE_GH_BODY="$FRESH" prctx pull_request_review "$STALE" tok
 out_has 'artifacts=fl-win64 toolchain-emsdk work-m11'
 expect "pull_request_review: the body is refreshed too" $?
+
+# 9. issue_comment の投稿者の確認 (#1949): 人は author_association、bot は OC_PM_BOT_LOGIN との完全一致 + Bot 型。
+# icctx <body> <association> <login> <type> [OC_PM_BOT_LOGIN]: 結果は $TMP/{out,env,log}
+icctx() {
+  rm -rf "$TMP/rt"; mkdir -p "$TMP/rt"
+  jq -cn --arg b "$1" --arg a "$2" --arg l "$3" --arg t "$4" \
+    '{comment:{body:$b,author_association:$a,user:{login:$l,type:$t}},issue:{number:9}}' > "$TMP/ev.json"
+  : > "$TMP/out"; : > "$TMP/env"
+  env -u OC_PM_BOT_LOGIN ${5:+OC_PM_BOT_LOGIN="$5"} GITHUB_EVENT_PATH="$TMP/ev.json" RUNNER_TEMP="$TMP/rt" GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" \
+    GITHUB_EVENT_NAME=issue_comment OC_PERMISSION=write GITHUB_REPOSITORY=o/r \
+    bash "$SCRIPT" > "$TMP/log" 2>&1
+}
+PMBOT='oc-pm-for-signature-studio[bot]'
+CMD=$'/oc oc_actions_allow_write\nstart'
+
+icctx "$CMD" NONE "$PMBOT" Bot "$PMBOT"
+out_has 'should_run=true'
+expect "the PM App with OC_PM_BOT_LOGIN set -> should_run" $?
+
+icctx "$CMD" NONE "$PMBOT" Bot ""
+out_has 'should_run=false'
+expect "OC_PM_BOT_LOGIN empty -> the bot is not allowed (empty never matches)" $?
+
+icctx "$CMD" NONE "$PMBOT" Bot
+out_has 'should_run=false'
+expect "OC_PM_BOT_LOGIN unset -> the bot is not allowed" $?
+
+icctx "$CMD" NONE "" Bot ""
+out_has 'should_run=false'
+expect "empty login + empty OC_PM_BOT_LOGIN -> not allowed (no empty == empty match)" $?
+
+icctx "$CMD" NONE "$PMBOT" User "$PMBOT"
+out_has 'should_run=false'
+expect "same login but user.type is not Bot -> not allowed" $?
+
+icctx "$CMD" NONE 'oc-pm-for-signature-studio-evil[bot]' Bot "$PMBOT"
+out_has 'should_run=false'
+expect "look-alike bot login -> not allowed (exact match)" $?
+
+icctx "$CMD" NONE 'someone' User "$PMBOT"
+out_has 'should_run=false'
+expect "a third-party user with an unrelated login -> not allowed" $?
+
+icctx "$CMD" NONE 'opencode-for-signature-studio[bot]' Bot 'opencode-for-signature-studio[bot]'
+out_has 'should_run=false'
+expect "the implementer App is never allowed even if OC_PM_BOT_LOGIN names it (no self-trigger loop)" $?
+
+icctx "$CMD" NONE 'oc-reviewer-for-signature-studio[bot]' Bot 'oc-reviewer-for-signature-studio[bot]'
+out_has 'should_run=false'
+expect "the reviewer App is never allowed even if OC_PM_BOT_LOGIN names it" $?
+
+icctx $'no command here\nhello' NONE "$PMBOT" Bot "$PMBOT"
+out_has 'should_run=false'
+expect "the PM App without a /oc line -> not run (COMMAND_RE unchanged)" $?
+
+icctx $'- /oc in a list item' NONE "$PMBOT" Bot "$PMBOT"
+out_has 'should_run=false'
+expect "the PM App with /oc not at the line start -> not run (COMMAND_RE unchanged)" $?
+
+for a in OWNER MEMBER COLLABORATOR; do
+  icctx "$CMD" "$a" pm User ""
+  out_has 'should_run=true'
+  expect "human $a still runs (unchanged, OC_PM_BOT_LOGIN empty)" $?
+done
+
+for a in NONE CONTRIBUTOR FIRST_TIME_CONTRIBUTOR FIRST_TIMER MANNEQUIN ""; do
+  icctx "$CMD" "$a" outsider User "$PMBOT"
+  out_has 'should_run=false'
+  expect "human with association '$a' is not allowed" $?
+done
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]
