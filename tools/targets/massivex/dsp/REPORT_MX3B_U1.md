@@ -121,15 +121,18 @@ slot 9 = `0x180082400` が process と特定した (根拠は §9)。Ghidra に�
 - 手順: `work/extracted/VST3/Massive X.vst3` を §6 の手順で生成 → 上記 1〜5 のコマンド。
 - 差分証跡: `git diff 5ed14324 HEAD -- tools/targets/massivex/dsp/scripts` は 0 行。
 
-### 9.4 独立確認 (Ghidra 非依存・#266 の残件 1)
+### 9.4 非 Ghidra 確認 (既存スクリプト + 線形逆アセンブル・#266 の残件 1)
 
-Ghidra は未導入のため、§9.2 の「独立の証拠」を既存スクリプトと逆アセンブルで取った。
+Ghidra は未導入のため、§9.2 の参照元確認を既存スクリプト `mx_vtable_xref.py` と線形逆アセンブルで行った。Ghidra 参照解析ではないので「独立確認」とは呼ばない。
 
-- 測定 commit: **5ed14324** (スクリプト差分 0 行を確認済み)。素材 `plugins-massivex` の installer → `work/extracted/VST3/Massive X.vst3` を再生成 (md5-ok 0/125 は既知)。
-- 直接参照 (`mx_vtable_xref.py`・27.4 s): `0x183973108` を指す RIP 相対参照は **1 件** (`0x180009e8a`、`lea rax,[rip+0x3969277]`)。
-- 参照元の文脈 (線形復号。開始 `0x180009e2b` は 0x200 手前から試した候補のうち、`0x180009e8a` まで命令境界が揃った最初の開始点。関数境界としては未検証): `0x180009e2b`〜`0x180009ed0` の一続きで、`[rsi]`・`[rsi+0x10]`・…・`[rsi+0xb8]` へ複数の vtable を書き込み、`0x180009e8a` の直後に `mov [rsi+0xc0], rax`。
-  `rsi` は `call 0x180015dbb` の後に保持された this (`mov rsi, rcx`)。よって `this+0xc0` へ IAudioProcessor サブオブジェクトの vtable を置くコンストラクタであり、§9.1 の COL.offset=0xC0 と一致する。
-- 限界: この確認は「その vtable が this+0xc0 の IAudioProcessor サブオブジェクトである」ことを独立に裏付けるもので、**slot 9 = process の対応 (SDK 宣言順) は未独立**。slot 9 の closure と U2/U5 は #1122 (CLOSED) と本 REPORT の範囲外。
-- 逆アセンブルは `.pdata` を使わず、上記の開始点から線形に復号した (関数 begin とは限らない点に注意)。
+- 測定 commit: **5ed14324** (`git diff 5ed14324 HEAD -- tools/targets/massivex/dsp/scripts` = 0 行を再確認済み)。
+- 再現状況: 本記録の元になった run (前回) では素材 `plugins-massivex` を展開して 27.4 s で実行した。**本 run では素材が無く (`$ARTIFACTS_DIR` は `fl-win64` のみ)、生出力と逆アセンブルは再取得していない**。以下の数値・命令列は前回の記録であり、未再現。
+- 直接参照 (前回記録): `0x183973108` を指す RIP 相対参照は **1 件** (`0x180009e8a`、`lea rax,[rip+0x3969277]`)。
+- 参照元の文脈 (前回の線形復号。開始 `0x180009e2b` は命令境界が `0x180009e8a` まで揃った候補の一つで、関数境界としては未検証): `0x180009e2b`〜`0x180009ed0` の範囲で `[rsi]`・`[rsi+0x10]`・…・`[rsi+0xb8]` へ複数の vtable を書き込み、`0x180009e8a` の直後に `mov [rsi+0xc0], rax` があった。
+  `rsi` が this を保持しているとみなすのは推論 (`call 0x180015dbb` の後の `mov rsi, rcx` から)。関数境界を検証していないため、「コンストラクタ」とは断定しない。この推論が正しければ、§9.1 の COL.offset=0xC0 と整合する。
+- 確認できたのは「`0x183973108` を書き込む参照がこの 1 件である」ことと、その書き込み先が `this+0xc0` と推論されること、までである。**vtable が IAudioProcessor サブオブジェクトであることの確定は、§9.1 の COL 情報に依る**。
+- **未確認**: slot 9 = process の対応 (SDK 宣言順 = vtable 順)。slot 9 の closure と U2/U5 は #1122 (CLOSED) と本 REPORT の範囲外。
+- 逆アセンブルは `.pdata` を使わず線形に復号した (関数 begin とは限らない点に注意)。
+- 再測定の手順: PR 本文の `oc_artifacts: plugins-massivex` で素材を取得 → installer → `work/extracted/VST3/Massive X.vst3` を作り、`mx_vtable_xref.py <pe> 0x183973108` の生出力と `0x180009e2b`〜`0x180009ed0` の逆アセンブルをここに貼る。
 
-§9 の結論 (部分確定) は変えない。残る未確定は「SDK 宣言順 = vtable 順」の独立確認のみ。
+§9 の結論 (部分確定) は変えない。残る未確定は「SDK 宣言順 = vtable 順」の確認と、上記の未再現分の再取得。
