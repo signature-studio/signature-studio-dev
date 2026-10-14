@@ -97,3 +97,22 @@
 - 読み: 今回は underrun が 0 件のため、producer / consumer の切り分けは**未実施**。新フィールドは次回失敗時の判定材料になるが、現 HEAD では実測値は得られていない。
 - 再現頻度 (通算、§19〜§23 の既存集計に今回の 7 run を加算): FAIL 2 件 / 86 run (§19 1/11、§20 0/15、§21 0/27、§22 0/14、§23 1/12、§24 0/7)。母数が少なく条件は未特定。
 - 未解決 (追跡 **#863**): (a) producer 側の出力到達時刻 (fla_test の quantum ごとの時刻) は wasm 側の変更が必要で本 PR の範囲外。(b) 再現条件の特定。
+
+## §25 AU-15 (#863) 再現試行 (32 quantum の充填推移を追加・計 45 run)
+
+- 測定 commit: `4dc3df47` (`src/runtime/audio_app.ts` の `fill_trace_before_first_underrun` と `e2e.mjs` の FAIL 行出力を追加したもの。`origin/main` `b6361886` の上に 1 commit)。コード差分の範囲は `src/runtime` と `tools/audio/integration`。
+- 失敗時の出力に `fill_trace=[...]` (最初の underrun までの 32 quantum の充填量・古い順) を追加した。`fill_min` のみでは、充填が徐々に減った (producer 遅延) か一度に落ちた (consumer 停止) かを区別できないため。
+- 測定: 素材 fl-win64 + toolchain-emsdk 展開、`bash tools/audio/integration/e2e.sh`、foreground、`TMPDIR=$RUNNER_TEMP`。
+
+| 区分 | run 数 | 結果 | wall | load (開始時) |
+|---|---|---|---|---|
+| 旧 HEAD `b6361886` (probe 追加前)・初回 | 1 | **FAIL** (dev:tone / dev:underruns。exit 1) | 36.6 s | 初回 (未計測) |
+| 無負荷 (probe 後) | 8 | 8/8 exit 0・13/13 PASS | 11〜12 s | 1.15〜1.64 |
+| busy loop 6 本 | 6 | 6/6 exit 0・13/13 PASS | 20〜22 s | 4.25〜9.03 |
+| busy loop 4 本 (連続 30 run・負荷下) | 30 | 30/30 exit 0・13/13 PASS | — | 7.14〜10.24 |
+
+- 失敗 run の位置情報 (旧 HEAD・probe 前のため fill 推移は無し): `dev:tone max_err=6.85e-1 zero_runs=1 first_err_frame=56576 first_zero_run_frame=56607 first_underrun_frame=56576 fill_at_first_underrun=0 fill_min_before_first_underrun=0 cb_gap_max_ms=11 cb_gap_over20=0`。dev のみで preview は PASS。
+- 同一フレームの再出現: `first_err_frame = first_underrun_frame = 56576` (quantum 442) は §19 / §23 / 本節の 3 件すべてで一致。負荷量はばらばらで、相関は見えていない。
+- 読み: 失敗 run では `fill_at_first_underrun=0` (underrun の時点でリングは空)。`cb_gap_max_ms=11` / `cb_gap_over20=0` で、audio callback 間隔は 20 ms を超えていない。ただし fill 推移は取れていないため、producer 遅延か consumer 停止かは**未確定**。
+- 通算: 旧 HEAD 含む同一 e2e で FAIL 3 件 / 計 90 run (§19〜§24 の 2 件 / 86 run に、本節の旧 HEAD 初回 FAIL 1 件 / 1 run と、本節の probe 後 44 run の全 PASS を加算。probe 後の 44 run は同一 HEAD で行った 1 セット)。
+- 未解決 (追跡 **#863**): (a) fill 推移を含む失敗 log が未取得 (次回失敗時に `fill_trace` で判定)。(b) 同一フレーム 56576 が 3 回出る理由は未特定 (起動からの相対位置が固定なら、決定的な起動経路の問題の可能性)。(c) producer 側の到達時刻 (wasm 側の変更) は本 PR の範囲外。
