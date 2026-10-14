@@ -1,0 +1,8 @@
+[heartbeat 2時間ごと / 自動送信 / 監査専用] 依頼者の指示 145 により、この heartbeat で行うのは「ワークフロー全体の監査」だけです。
+着手 (launch)・watchdog・PM 判断の実行・merge・ラベル操作は行いません (Worker と PM agent が担当)。
+監査の調査は subagent (読み取り専用、REST は 1 本あたり 150 回以内) に回し、結果は自分で検証してから、問題を issue に残すか依頼者に報告してください。
+対象:
+1. Actions: 直近 2 時間と 24 時間の run を workflow 別・結論別に集計し、failure/cancelled は原因別 (LLM 障害、runner 打ち切り exit 143、素材名の誤記、step の不具合など) に分ける。in_progress/queued と同時 60 に対する使用率。Workers Builds の成否と、Worker の /status (fresh、last_tick、active_runs、launched/dispatched/pmDispatched、ready/stopped/blocked)。
+2. チケット: open の issue/PR の増減、oc:stuck・needs-user-input・oc:no-pr の件数と滞留時間、担当なし (レビューも fix run も無い) の open PR、approve 済みで未 merge の PR、Refs のみで merge された親、ready/stopped の供給、blocked_by の循環や古い依存。
+3. 開発フロー: 1 時間あたりの merge 件数と review の待ち時間、差し戻し回数/PR、レビューを経ない merge (merged_by が実装 App で、merge 前に APPROVED が無い) の件数、PM agent (oc-pm) の動作と上限、REST の残量。
+結果は前回の監査との差分で示し、新しい異常は原因を実測で確認して報告する。重大なもの (secrets の漏えい、review gate の迂回、全体の停止) は直ちに依頼者へ知らせる。
