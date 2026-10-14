@@ -215,3 +215,22 @@ main 取り込み前の `ca3001ce` (M2q 込み IR) でも、既定 (OFF) と ON 
 - 原因の特定 (101/190/291/296): 101/291/296 は現 head では退行していない。旧 IR での機構 (§5-§6) は仮説のまま。190 は #1274 (子 issue) へ移管。
 - 既存類型への分類: `docs/DEFECTS.md` の D20 は別件 (load offset の取り違え)。旧 IR の `dl` 取り違え (引数の値を IR でスタック番地の下位 byte にする) は、D4 (deref 脱落) とは別で、既存の類型では説明しきれない。D21 として登録する (§6 の仮説は未確定と明記)。
 - ON で ok 退行 0: **未達** (OV=1 で 190 の 1 件)。#1274 で解消する。
+
+## 14. 現 main の再測定 (#912 run、測定 commit `5a45be80`)
+
+測定 commit: `5a45be80` (origin/main、`Merge pull request #1580`)。`tools/m11` のコードは変えていない。素材: `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` / `work-m11`。
+
+- `m11_gen_ir2.sh` rc=0 (27.6 s、`ldfix=applied`、errors=0)。load 1.31 → 0.74 (開始時)。
+- `M11_OV_CLASSCREATE=0 m11_build.sh` rc=0 (13.9 s)、`M11_OV_CLASSCREATE=1 m11_build.sh` rc=0 (18.1 s)。各 build 直後に survey を取る順。
+
+| 構成 | build | ok | oob | abort | halt0 | miss | noproc | other |
+|---|---|--:|--:|--:|--:|--:|--:|--:|
+| OFF (既定) | rc=0 | 870 | 16 | 0 | 7 | 47 | 1 | 1 |
+| ON (`M11_OV_CLASSCREATE=1`) | rc=0 | 869 | 15 | 2 | 7 | 47 | 1 | 1 |
+
+- `survey_units.mjs` OFF 6.9 s rc=0 / ON 6.4 s rc=0。
+- `survey_diff.py` OFF→ON: ok 退行 unit = **190 のみ**。遷移は ok→oob 1 (190)、oob→abort 2 (304・555)、他は変化なし。
+- 101 / 291 / 296 は ON・OFF とも ok (§13 と一致)。
+- 結論: 受入条件 3 は未達のまま (190 の 1 件)。#1274 で追跡する。REPORT_1274 §3 の trap 経路 (`407a50`) と整合。
+
+測定 commit から HEAD までの `tools/m11` のコード差分は、本 commit の REPORT 追記のみ。
