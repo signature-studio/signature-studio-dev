@@ -41,7 +41,7 @@
 | f3e050 | f3e0c2 | 未判定 (旧 TRUE_DROP・照合待ち) | f3e10b call [rax+0x38] (rdx=lea [rbp+0x3c] で slot を渡す) | 468265-468278 に call 無し。slot を渡す call は別分岐の 468262 function_a9ece0 のみ (D15) |
 | f67400 | f67560 | OK_LOAD | f67573 call 0x661dc0 (第2引数) | 478296 load → 478306 zext → 478310 call function_661dc0 |
 | 101d180 | 101d2b4 | OK_LOAD | 101d2c3 → call 0x40faa0 (第1引数) | 7458 load → 7460 call function_40faa0 (反復側 7478-7480 も同経路) |
-| 101d180 | 101d423 | OK_LOAD | 101d432 → call 0x40faa0 (第1引数) | 7597 add → 7599 load → 7604 call function_40faa0 |
+| 101d180 | 101d423 | OK_LOAD | 101d432 → call 0x40faa0 (第1引数) | 7599 add → 7601 load → 7602 store 0 → 7604 call function_40faa0 |
 | 1221290 | 1221676 | OK_LOAD | 1221686・1221699 の比較 (12216c2) | 51268-51270 → 51274 icmp ugt → 51276 select → 51320 icmp slt (§4) |
 | 127d420 | 127d881 | OK_LOAD | 127da8f → 127da95 [rsp+0x28] = call 0x6c9d30 の第6引数 | 64754 load → 64764 sext → 64932 trunc → 64933 call function_6c9d30 |
 | 12f9730 | 12f9752 | 未判定 (旧 TRUE_DROP・照合待ち) | 12f975e・12f9842 mov ecx,[rsp+0x50] → cmp (比較) | 96779 `xor i64 0,0` → 96781 trunc で store 元が定数 0 に置換。96871 の比較に 0 が流入 |
