@@ -5,8 +5,9 @@
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
 - 更新責任: merge の事実を反映する更新は agent も PR で行ってよい。自動節 (§5) は `tools/pm/status_sync.py` が更新する (#2361)。方針の変更・MS の定義の改訂は PM。
-- 測定値・実測数値は書かない。各リンク先 (`tools/<area>/REPORT.md`) が単一の正本。
+- 測定値・実測数値は書かない。各リンク先 (`tools/<area>/REPORT.md`) が単一の正本。ただし下の「FL のウィンドウ」1 行は、`[WIN-2]` (#2713) が起動指標を定義するまでの暫定の例外 (#2722)。
 - 引き継ぎ情報は `docs/HANDOFF/2026-10-12.md`。
+- **FL のウィンドウ: 未達 (描画 0 回) / 起動指標: `[WIN-2]` の定義が入るまで暫定で RetDec 路線 (`m11`) 56/942・x64c 209/942 / 次の停止点: x64c 路線の unit 進行 (209) の blocker は `f_653f40` (VCL フォーム登録) の早期 return** (出典: [`tools/flelift/boot/REPORT.md`](../tools/flelift/boot/REPORT.md) §0・[`tools/m11/REPORT.md`](../tools/m11/REPORT.md) 冒頭・[`tools/gui/REPORT.md`](../tools/gui/REPORT.md))
 
 ---
 
@@ -63,9 +64,9 @@
 | `m5` Delphi Mini-PoC | 部分達成 | `tools/m5/REPORT.md` |
 | `m6`〜`m10` OTT (RetDec 路線) | 旧路線 (歴史的記録として保持。新規 lift は x64c / flelift / liftlib) | 各 `REPORT.md` |
 | `ott` OTT bit-exact 参照 | **完走路検証済** | `tools/ott/REPORT.md` |
-| `m11` FLEngine 部分起動 | 部分達成 (到達 stage は REPORT 参照) | `tools/m11/REPORT.md` |
-| `m11/alloca` | 修復実装済 | `tools/m11/alloca/REPORT.md` |
-| `m11/ldfix` | 修復実装済 (常設化) | `tools/m11/ldfix/REPORT.md` |
+| `m11` FLEngine 部分起動 (RetDec 路線・旧) | 部分達成 (到達 stage は REPORT 参照)。新規の作業は `[WIN-3]`〜`[WIN-6]` の範囲に限る | `tools/m11/REPORT.md` |
+| `m11/alloca` | 修復実装済 (RetDec 路線の旧 pass) | `tools/m11/alloca/REPORT.md` |
+| `m11/ldfix` | 修復実装済 (常設化。RetDec 路線の旧 pass) | `tools/m11/ldfix/REPORT.md` |
 | `m11/shimx_link` | 接続実装済 | `tools/m11/shimx_link/REPORT.md` |
 | `flelift` | x64c FLEngine 汎用化 | `tools/flelift/REPORT.md` |
 | `flelift/boot` | boot 連鎖 lift | `tools/flelift/boot/REPORT.md` |
@@ -118,7 +119,7 @@
 
 順序は PM が issue で管理する。ここには現在の優先順だけ置く。
 
-1. **FLEngine 本体の起動突破** — MS5/MS6 の中核。`m11` の残 trap 削減 → `flelift/boot` の起動連鎖完成。
+1. **FLEngine 本体の起動突破** — MS5/MS6 の中核。主力は x64c / flelift / liftlib (`flelift/boot` の起動連鎖完成。`[WIN-8]` #2719 が `CreateFruityInstance` への到達)。RetDec 路線 (`m11` ほか) は、`[WIN-1]` #2712 の epic 配下の `[WIN-3]`〜`[WIN-6]` (最初のウィンドウ) に限る PM 承認済みの作業だけに使い、それ以外の新規作業は始めない (D5: `docs/DECISIONS.md`)。
 2. **lift 品質ハーネス** — 関数単位の native 実行 (wine/unicorn) と wasm の比較で誤 lift を機械検出 (`m11/REPORT.md` §5-1)。
 3. **audio / gui の FLEngine 接続** — MS7/MS8。`tools/audio`・`tools/gui` の設計を runtime へ実装。
 4. **OpenCode Actions 基盤 (GitHub Actions)** — 2026-10-12 main 稼働開始 (PR #282, merge `bec32da`)。残 follow-ups は [CI-1] #284 で管理。

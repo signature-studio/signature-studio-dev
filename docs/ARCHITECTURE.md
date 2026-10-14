@@ -47,10 +47,10 @@
 | ② lift | `tools/flelift`, `tools/ott/lift` (`x64c.py`), `tools/liftlib` | `tools/flelift/REPORT.md`・`tools/ott/REPORT.md`・`tools/liftlib/REPORT.md` | `tools/liftlib/README.md` |
 | ②' OTT 路線 (歴史) | `tools/m5`〜`tools/m10`, `tools/ott` | 各 `REPORT.md`・`tools/ott/REPORT.md` | — |
 | ③ IR pass | `tools/liftlib/liftlib/passes/` | `tools/liftlib/REPORT.md` | — |
-| ③' 修復 pass 群 | `tools/m11/{alloca,ldfix}`, `tools/icall/*`, `tools/startup/{glue,keyfix,pump,vreg}` | 各 `REPORT.md` | — |
+| ③' 修復 pass 群 | `tools/m11/{alloca,ldfix}` (RetDec 路線・旧), `tools/icall/*`, `tools/startup/{glue,keyfix,pump,vreg}` | 各 `REPORT.md` | — |
 | ④ wasm | `tools/m1` (定型フラグ), `tools/m3`/`tools/m5` | `tools/m1/README.md`・`tools/m3/REPORT.md` | `tools/m1/flags.sh` |
 | ⑤ shim | `tools/shim`, `tools/shimx` (+`pathreg`) | 各 `REPORT.md` | `tools/shim/README.md`・`tools/shimx/README.md` |
-| ⑤' 起動 | `tools/startup`, `tools/m11` | 各 `REPORT.md` | `tools/startup/STARTUP.md`・`GATES.md` |
+| ⑤' 起動 | `tools/startup`, `tools/m11` (RetDec 路線・旧) | 各 `REPORT.md` | `tools/startup/STARTUP.md`・`GATES.md` |
 | ⑥ runtime | `tools/runtime` | `tools/runtime/REPORT.md` | `tools/runtime/DESIGN.md` |
 | ⑥ host | `tools/hostbridge` (+`cb`,`h2`,`lowbase`,`nfo`) | 各 `REPORT.md` | `tools/hostbridge/HOSTBRIDGE.md`・`nfo/FORMAT.md` |
 | ⑥ gui | `tools/gui` | `tools/gui/REPORT.md` | `tools/gui/PROTOCOL.md`・`INTEGRATION.md` |
@@ -72,7 +72,7 @@
 |---|---|
 | `m1`,`m2`,`m3`,`m5` | ツールチェイン PoC・FLEngine 解析機械化・中規模/ Delphi lift → wasm |
 | `m6`〜`m10`, `ott` | OTT (Xfer) VST2 DSP の lift → wasm 完走路 ( RetDec 路線 ) |
-| `m11` (+`alloca`,`ldfix`,`shimx_link`) | FLEngine_x64.dll 部分起動 PoC (DllMain → InitUnits → FastMM) |
+| `m11` (+`alloca`,`ldfix`,`shimx_link`) | RetDec 路線・旧: FLEngine_x64.dll 部分起動 PoC (DllMain → InitUnits → FastMM) |
 | `flelift`, `liftlib` | x64c の FLEngine 汎用化・共通 lift 修復基盤 |
 | `icall` (+`disp_size`,`landing`) | 間接 call/jmp 落ち監査・修復・Delphi unwind landing pad |
 | `shim`, `shimx` (+`pathreg`) | Win32/CRT shim コア・拡張・パス写像/レジストリ永続化 |
