@@ -114,7 +114,7 @@ main 取り込み前の run も同じ値だった (ir_sha256 3 種・survey 870 
 
 ## 9. 指摘 round 1 への対応の実測 (測定 commit `3de663ee`)
 
-実行環境: foreground、HEAD `3de663ee`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`EMSDK_ENV=/opt/emsdk/emsdk_env.sh`。
+実行環境: foreground、HEAD `3de663ee`、`FL_WIN64_DIR` は fl-win64 の展開先 ([WIN64])、`EMSDK_ENV` は [EMSDK] の emsdk_env.sh。
 
 | 検査 | rc | 所要 | 結果 |
 |---|---|---|---|
