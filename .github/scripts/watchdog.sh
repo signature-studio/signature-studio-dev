@@ -139,11 +139,12 @@ WORKER_STALE_SEC=900   # last_tick がこれより古い (または fresh=false)
 WORKER_RECOVER_SEC=300 # fresh=true かつ last_tick がこれ以内なら回復
 WORKER_REOPEN_SEC=86400
 WORKER_NOTE_MIN="${OC_WORKER_NOTE_MIN:-60}" # 既存の障害 issue への追記の最小間隔 (5 分ごとの点検でコメントを水増ししない)
+WORKER_TITLE_LIMIT=3000 # [CI-n] の採番に読む題名の件数 (gh の既定値では足りない)。これに達したら一覧が欠けうるので起票しない
 worker_line="worker=unknown"
-worker_open_issues() { # open で pm-worker-down ラベルの issue (PR を除く) を「番号 作成時刻」で新しい順に出す。一覧が取れなければ失敗
+worker_open_issues() { # open で pm-worker-down ラベルの issue を「番号 作成時刻」で新しい順に出す。一覧が取れなければ失敗 (REST の一覧は PR だけを返す場合があるため gh issue list を使う)
   local raw
-  raw="$(gh api --paginate "repos/$R/issues?state=open&labels=$WORKER_LABEL&per_page=100")" || return 1
-  jq -s -r 'add // [] | map(select(.pull_request == null)) | .[] | "\(.number) \(.created_at)"' <<< "$raw"
+  raw="$(gh issue list --repo "$R" --state open --label "$WORKER_LABEL" --limit 200 --json number,createdAt,closedAt)" || return 1
+  jq -r 'map(select(.pull_request == null)) | sort_by(.createdAt) | reverse | .[] | "\(.number) \(.createdAt)"' <<< "$raw"
 }
 worker_status_copy() { # worker_status_copy <status json>: /status の写し。秘密を示す名前のキーは念のため除く
   jq -S 'walk(if type == "object" then with_entries(select(.key | test("token|secret|key|private|password|pem|jwt|credential"; "i") | not)) else . end)' <<< "$1"
@@ -173,7 +174,7 @@ worker_file() { # worker_file <title> <body file>
   gh issue create --repo "$R" --title "$1" --body-file "$2" --label "$WORKER_LABEL"
 }
 worker_down() { # worker_down <status json> <理由>
-  local body="$1" reason="$2" open target created cm last closed all maxn f="${RUNNER_TEMP:-/tmp}/oc-worker-down-body.md"
+  local body="$1" reason="$2" open target created cm last closed all allpr maxn f="${RUNNER_TEMP:-/tmp}/oc-worker-down-body.md"
   if ! open="$(worker_open_issues)"; then
     echo "::warning::failed to list $WORKER_LABEL issues; no issue is filed or updated"
     return 0
@@ -197,22 +198,27 @@ worker_down() { # worker_down <status json> <理由>
     do_it "add a note to the open $WORKER_LABEL issue #$target" worker_note "$target" "$f"
     return 0
   fi
-  if ! closed="$(gh api "repos/$R/issues?state=closed&labels=$WORKER_LABEL&sort=updated&direction=desc&per_page=100")"; then
+  if ! closed="$(gh issue list --repo "$R" --state closed --label "$WORKER_LABEL" --limit 200 --json number,createdAt,closedAt)"; then
     echo "::warning::failed to list closed $WORKER_LABEL issues; no issue is filed"
     return 0
   fi
   target="$(jq -r --argjson sec "$WORKER_REOPEN_SEC" \
-    '[.[] | select(.pull_request == null and .closed_at != null and (.closed_at | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > (now - $sec))] | sort_by(.closed_at) | last | .number // empty' <<< "$closed")"
+    '[.[] | select(.pull_request == null and .closedAt != null and (.closedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > (now - $sec))] | sort_by(.closedAt) | last | .number // empty' <<< "$closed")"
   if [ -n "$target" ]; then
     worker_body note "$reason" "$body" > "$f"
     do_it "reopen #$target (closed within 24h) and add a note" worker_reopen "$target" "$f"
     return 0
   fi
-  if ! all="$(gh api --paginate "repos/$R/issues?state=all&per_page=100")"; then
+  if ! all="$(gh issue list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)" ||
+    ! allpr="$(gh pr list --repo "$R" --state all --limit "$WORKER_TITLE_LIMIT" --json title)"; then
     echo "::warning::failed to count [CI-n] titles; no issue is filed"
     return 0
   fi
-  maxn="$(jq -s -r '[.[][] | (.title // "") | capture("^\\[CI-(?<n>[0-9]+)[a-z]?\\]") | .n | tonumber] | max // 0' <<< "$all")"
+  if [ "$(jq length <<< "$all")" -ge "$WORKER_TITLE_LIMIT" ] || [ "$(jq length <<< "$allpr")" -ge "$WORKER_TITLE_LIMIT" ]; then
+    echo "::warning::[CI-n] title list reached the limit ($WORKER_TITLE_LIMIT); no issue is filed"
+    return 0
+  fi
+  maxn="$(jq -s -r '[.[][] | (.title // "") | capture("^\\[CI-(?<n>[0-9]+)[a-z]?\\]") | .n | tonumber] | max // 0' <<< "$all"$'\n'"$allpr")"
   worker_body new "$reason" "$body" > "$f"
   do_it "file '[CI-$((maxn + 1))] PM Worker 停止 ($(date -u +%Y-%m-%d))' with label $WORKER_LABEL" \
     worker_file "[CI-$((maxn + 1))] PM Worker 停止 ($(date -u +%Y-%m-%d))" "$f"
