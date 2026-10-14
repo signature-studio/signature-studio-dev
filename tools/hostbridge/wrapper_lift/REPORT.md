@@ -229,3 +229,11 @@
 
 - 結論: int/pointer 混在 (`-Wint-conversion`) は修復済み (block19091_0.c で 46 → 0、全 40 ファイルで修復後 0)。emcc exit 0 は 40 ファイル中 1 件のみで受入条件 3 は未達 (残りは goto/break 94 件と引数型不一致 1,245 件)。未達は子 issue #1679 (HB-H35)・#1680 (HB-H36) に分割。
 - 測定表・残り error の内訳 (合計 1,377)・受入条件の判定・再測定手順・未検証項目は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md` (§9 全文の分割移動) を参照。
+
+## 10. #1522: `no_definition` 残り 4 件の原因 (測定 commit: 60932d35 + 判定修正)
+
+- 判定の取りこぼし (3 件): 旧 `DEF_RE` は `function_<VA>` 名だけを定義とみなした。RetDec は関数名を別名で出すことがあり、`0x41c480` は `__dbk_fcall_wrapper`、`0x86ab10` / `0x86a970` は `CreatePlugInstance`、`0x87cdf0` / `0x87cfc0` は `entry_point`。単独 range の RetDec 出力 (exit 0) で定義を確認。判定に `// Address range: 0x<VA> - ...` 直後の関数定義を追加して修正。
+- batch 固有の脱落 (1 件): `0x570b30` は batch (500 関数) 内の出力に定義もヘッダも無い。単独 range・2 件ペアでは `function_570b30` として出る。batch の RetDec 出力が範囲を落とす現象で、原因は未特定。
+- 再計測 (retdec_batch.py、判定修正後): block19091 は 19,816 中 19,815 ok・1 件 `no_definition` (0x570b30)、block23676 は 19,826 中 19,825 ok・1 件 (0x570b30)。RetDec 呼び出し 40 回、全 exit 0。所要 273.95 s / 274.23 s。load average 0.01–0.28。
+- 修正前の値 (旧判定、同じ測定 commit): 19,812 / 19,822 ok、4 件 `no_definition`。
+- 未達 (受入条件 2・3): emcc exit 0 の wasm link と方式比較表は本 run で未実施。REPORT §9 の通り emcc exit 0 は 40 ファイル中 1 件 (#1679・#1680 が未完)。

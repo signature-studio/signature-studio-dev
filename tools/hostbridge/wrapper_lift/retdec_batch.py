@@ -50,8 +50,11 @@ def funcs_of(img):
     return out
 
 
+RANGE_DEF_RE = re.compile(r"^// Address range: 0x([0-9a-f]+) - 0x[0-9a-f]+\n(?:    //[^\n]*\n)*?^[^\s/][^\n;=]*\b\w+\s*\([^\n;{}]*\)\s*\{", re.M)
+
+
 def defined_in(text):
-    return {int(m.group(1), 16) for m in DEF_RE.finditer(text)}
+    return {int(m.group(1), 16) for m in DEF_RE.finditer(text)} | {int(m.group(1), 16) for m in RANGE_DEF_RE.finditer(text)}
 
 
 def last_error(log):
