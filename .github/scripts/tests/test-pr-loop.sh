@@ -346,13 +346,13 @@ fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
 FAKE_FAIL_PATH=repos/o/r/issues/7/comments run_fix record > "$TMP/rec.out" 2>&1; rc=$?
 rf_fail "(c) コメント一覧の取得が失敗"
 { ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "(c) 取得が失敗したら PR にもラベルにも触らない" $?
-rf_cmd "(c) ::error:: の行が失敗したコマンド (コメント一覧の取得) を示す" 'issues/$OC_PR_NUMBER/comments'
+rf_cmd "(c) ::error:: の行が失敗したコマンド (コメント一覧の取得) を示す" "issues/\$OC_PR_NUMBER/comments"
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
 FAKE_FAIL_PATH=repos/o/r/pulls/7/reviews run_fix record > "$TMP/rec.out" 2>&1; rc=$?
 rf_fail "(d) review 一覧の取得が失敗"
-rf_cmd "(d) ::error:: の行が失敗したコマンド (review 一覧の取得) を示す" 'pulls/$OC_PR_NUMBER/reviews'
+rf_cmd "(d) ::error:: の行が失敗したコマンド (review 一覧の取得) を示す" "pulls/\$OC_PR_NUMBER/reviews"
 
 setup aaa '[{"name":"oc:stuck"}]' 0
 FAKE_FAIL_PATH=repos/o/r/issues/7 run_fix record > "$TMP/rec.out" 2>&1; rc=$?
