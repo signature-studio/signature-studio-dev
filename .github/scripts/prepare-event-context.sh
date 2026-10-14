@@ -122,6 +122,32 @@ fi
 if [ "$dispatch_ok" != true ]; then
   should_run=false
 fi
+
+# ---------------------------------------------------------------- 投稿者の確認 (issue_comment)
+# workflow の if: と同じ判定を二重に行う (こちらが確定判定。if: は費用対効果のための前フィルタ)。
+#   - author_association が COLLABORATOR / MEMBER / OWNER の人
+#   - PM 用 GitHub App (OC_PM_BOT_LOGIN と user.login が完全一致し、user.type が Bot)
+# OC_PM_BOT_LOGIN が空・未設定なら bot は一切許可しない。App のログイン (`<slug>[bot]`) は GitHub が付与し、
+# 第三者は同じログインのコメントを作れない。実装 App・reviewer App のログインが設定されても許可しない
+# (agent 自身のコメントが /oc を含むと自己起動のループになるため。設定の誤りを fail-closed にする)。
+if [ "$EVENT_NAME" = issue_comment ]; then
+  c_assoc="$(jq -r '.comment.author_association // ""' "$GITHUB_EVENT_PATH")"
+  c_type="$(jq -r '.comment.user.type // ""' "$GITHUB_EVENT_PATH")"
+  c_login="$(jq -r '.comment.user.login // ""' "$GITHUB_EVENT_PATH")"
+  pm_bot="${OC_PM_BOT_LOGIN:-}"
+  commenter_ok=false
+  case "$c_assoc" in COLLABORATOR | MEMBER | OWNER) commenter_ok=true ;; esac
+  if [ "$commenter_ok" != true ] && [ -n "$pm_bot" ] && [ "$c_type" = Bot ] && [ "$c_login" = "$pm_bot" ] \
+    && [ "$c_login" != "${OC_IMPLEMENTER_LOGIN:-opencode-for-signature-studio[bot]}" ] \
+    && [ "$c_login" != "${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}" ]; then
+    commenter_ok=true
+    log "commenter is the PM App ($c_login)"
+  fi
+  if [ "$commenter_ok" != true ]; then
+    log "::notice::the commenter is not allowed to start the agent (association=${c_assoc:-none}, type=${c_type:-none})"
+    should_run=false
+  fi
+fi
 printf 'should_run=%s\n' "$should_run" >> "${GITHUB_OUTPUT:-/dev/null}"
 
 # ---------------------------------------------------------------- 素材 (R2 artifacts)

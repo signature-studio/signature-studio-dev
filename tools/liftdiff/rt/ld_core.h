@@ -53,6 +53,11 @@ typedef struct { u64 va; u32 np; u64 a[8]; u64 x[4]; } ld_tr_t;
 static ld_tr_t ld_trs[LD_MAX_TR];
 static int ld_ntr, ld_tr_over;
 static int ld_trace_on;
+/* LD-64 (#1854): IR basic block 入口の VA 列 (blk=1 の case のみ記録。compare は読まない)。
+ * static 配列にすると wasm の data 配置が変わり、既存の static (ld_wr 等) と重なって結果が変わるため malloc で持つ。 */
+#define LD_MAX_BLK 65536
+static u64* ld_blks;
+static int ld_nblk, ld_blk_over, ld_blk_on;
 
 /* ---------------- 応答モデル ---------------- */
 static u64 ld_tick, ld_qpc, ld_lasterr, ld_tls_next;
@@ -453,6 +458,12 @@ static u64 ld_stub(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5
   } else ld_calls_over++;
   return r;
 }
+static void ld_blk_rec(u64 va) {
+  if (!ld_blk_on) return;
+  if (ld_nblk >= LD_MAX_BLK) { ld_blk_over++; return; }
+  if (!ld_blks) ld_blks = (u64*)malloc(LD_MAX_BLK * sizeof(u64));
+  ld_blks[ld_nblk++] = va;
+}
 static void ld_trace_rec(u64 va, u32 np, const u64* a, const u64* x) {
   if (!ld_trace_on) return;
   if (ld_ntr >= LD_MAX_TR) { ld_tr_over++; return; }
@@ -527,7 +538,7 @@ typedef struct {
   char blob[24];
   int nargs; char kind[16]; u64 val[16];   /* 位置引数: kind 'i'(int/ptr) 'd'(f64 bits) 'f'(f32 bits) */
   u64 rax;
-  int trace, xfill, stkfill, keep;
+  int trace, xfill, stkfill, keep, blk;
   int npatch; struct { int region; u64 off; u8 data[64]; int len; } patch[16];
   char abi[16];
 } ld_case_t;
@@ -584,6 +595,7 @@ static int ld_parse_case(char* line) {
     else if (!strcmp(t, "trace")) ld_case.trace = atoi(v);
     else if (!strcmp(t, "stkfill")) ld_case.stkfill = (int)strtol(v, NULL, 16);
     else if (!strcmp(t, "keep")) ld_case.keep = atoi(v);
+    else if (!strcmp(t, "blk")) ld_case.blk = atoi(v);
     else if (!strcmp(t, "xfill")) ld_case.xfill = atoi(v);
     else if (!strcmp(t, "args")) {
       char* s2; for (char* a = strtok_r(v, ",", &s2); a && ld_case.nargs < 16; a = strtok_r(NULL, ",", &s2)) {
@@ -618,6 +630,7 @@ static void ld_case_patch_image_pristine(void) {
 static void ld_case_begin(void) {
   if (ld_case.keep) {   /* 状態を引き継ぐ連続実行: 復元・blob 展開をしない */
     ld_ncalls = 0; ld_calls_over = 0; ld_ntr = 0; ld_tr_over = 0; ld_trace_on = ld_case.trace;
+    ld_nblk = 0; ld_blk_over = 0; ld_blk_on = ld_case.blk;
     return;
   }
   ld_restore_all();
@@ -641,6 +654,7 @@ static void ld_case_begin(void) {
   }
   ld_ncalls = 0; ld_calls_over = 0; ld_ntr = 0; ld_tr_over = 0;
   ld_trace_on = ld_case.trace;
+  ld_nblk = 0; ld_blk_over = 0; ld_blk_on = ld_case.blk;
   ld_case_patch_image_pristine();
 }
 /* native ランナが呼出し所要 ms を入れる (wasm ランナは -1 のまま = 出力しない)。liftdiff の「native が長い case」判定用 (LD-11 / #548) */
@@ -676,6 +690,11 @@ static const char* ld_case_end(const char* status, const char* detail, u64 fault
       ld_ob("]");
     }
     ld_ob("],\"trace_over\":%d", ld_tr_over);
+  }
+  if (ld_case.blk) {
+    ld_ob(",\"blk\":[");
+    for (int i = 0; i < ld_nblk; i++) ld_ob("%s\"0x%llx\"", i ? "," : "", (unsigned long long)ld_blks[i]);
+    ld_ob("],\"blk_over\":%d", ld_blk_over);
   }
   /* メモリ差分 */
   ld_ob(",\"mem\":[");

@@ -4,7 +4,7 @@ import type { Config } from "./config.ts";
 import { openText, randomToken, safeEqual, sealText } from "./crypto.ts";
 import { Engine } from "./engine.ts";
 import { Gh, InstallationAuth, type FetchFn } from "./github.ts";
-import type { Store } from "./store.ts";
+import type { Store } from "./kvstore.ts";
 import { WEBHOOK_EVENTS } from "./webhook.ts";
 
 export const APP_NAME = "oc-pm-for-signature-studio";

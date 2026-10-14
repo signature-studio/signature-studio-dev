@@ -230,12 +230,50 @@
 - 結論: int/pointer 混在 (`-Wint-conversion`) は修復済み (block19091_0.c で 46 → 0、全 40 ファイルで修復後 0)。emcc exit 0 は 40 ファイル中 1 件のみで受入条件 3 は未達 (残りは goto/break 94 件と引数型不一致 1,245 件)。未達は子 issue #1679 (HB-H35)・#1680 (HB-H36) に分割。
 - 測定表・残り error の内訳 (合計 1,377)・受入条件の判定・再測定手順・未検証項目は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md` (§9 全文の分割移動) を参照。
 
+## 11. #1680: 引数型不一致 (`incompatible pointer types passing`) の修復 (測定 commit: f6913004)
+
+- 結論: 宣言側 `int16_t *` は正しい (Win32 LPCWSTR・PE 内 UTF-16LE と一致)。呼出側の `L"..."` (wasm32 で 4B) を `(int16_t *)u"..."` に直す (`retdec_repair.py --wide`)。両 block で `incompatible pointer types passing` は 1,245 / 1,251 → 0、error 行は 1,377 / 1,383 → 132、emcc exit 0 は 1 → 11 (40 件中)。
+- 判定の根拠・代表例 3 種・全件の UTF-16LE 裏取り・測定表・再現手順は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1680.md` を参照。
+- 未達: 残り 132 件 (goto/break・label・代入型不一致) → #1679 (HB-H35)。修復後の実行 (bit 一致) と wasm link は未検証。
+
 ## 10. #1522: `no_definition` 残り 4 件の原因 (測定 commit: 05db246f)
 
-- 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。
+- 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。→ #1819 で原因特定・修正済み (§11)。
 - 判定の取りこぼし (3 件): 旧 `DEF_RE` は `function_<VA>` 名だけを定義とみなした。RetDec は関数名を別名で出すことがあり、`0x41c480` は `__dbk_fcall_wrapper`、`0x86ab10` / `0x86a970` は `CreatePlugInstance`、`0x87cdf0` / `0x87cfc0` は `entry_point`。単独 range の RetDec 出力 (exit 0) で定義を確認。判定に `// Address range: 0x<VA> - ...` 直後の関数定義を追加して修正。
 - batch 固有の脱落 (1 件): `0x570b30` は batch (500 関数) 内の出力に定義もヘッダも無い。単独 range・2 件ペアでは `function_570b30` として出る。batch の RetDec 出力が範囲を落とす現象で、原因は未特定。
 - 再計測 (retdec_batch.py、判定修正後): block19091 は 19,816 中 19,815 ok・1 件 `no_definition` (0x570b30)、block23676 は 19,826 中 19,825 ok・1 件 (0x570b30)。RetDec 呼び出し 40 回、全 exit 0。所要 273.95 s / 274.23 s。load average 0.01–0.28。
 - 修正前の値 (旧判定): §8 の表 (a10c1f60 時点) を参照。
 - ネガティブコントロール (範囲ヘッダ経由の定義を 1 行削除して `ok` → `no_definition` に変わることの実測): 本 run は未実施。RetDec (`toolchain-retdec`) が素材に無く、`retdec_batch.py --nc` を実行できなかった。合成入力での確認のみ: `// Address range: 0x1000 - 0x1010` + `int64_t __dbk_fcall_wrapper(...) {` の 2 関数を入力すると `defined_before`=2・対象 0x1000 の削除後 `target_status_after`=`no_definition`。`negative_control()` は範囲ヘッダ経由の VA を選ぶよう修正 (`nc_remove`)。実 RetDec 出力での数値は再実行で埋める。
 - 未達 (受入条件 2・3): emcc exit 0 の wasm link と方式比較表は本 run で未実施。REPORT §9 の通り emcc exit 0 は 40 ファイル中 1 件 (#1679・#1680 が未完)。
+
+## 11. #1819: batch で `0x570b30` が脱落する原因と修正 (測定 commit: 4568c3f3)
+
+- 結論: 原因は RetDec 側の範囲の取り扱い。直前の範囲の終端が対象の開始 VA と**ちょうど隣接**するとき、batch 出力は対象を 1 バイト手前の VA (`0x570b2f`) で `function_570b2f` と出す。定義ヘッダは `0x570b2f` 名になり、`0x570b30` の判定では `no_definition` になる。batch 内の他関数の影響ではない (隣接の有無だけで決まる)。修正は `retdec_batch.py` で定義が出なかった範囲だけを再試行する。block19091 / block23676 とも `no_definition` 0 件。
+- 原因の切り分け (block19091、RetDec v5.0、`--select-decode-only`、いずれも exit 0):
+
+| 入力範囲の組 | `0x570b30` の定義 |
+|---|---|
+| 単独 `0x570b30-0x570bad` | ok |
+| 500 関数 batch 全体 (対象は 83 番目) | 脱落 (`0x570b2f` 名で出力) |
+| batch の先頭 〜 対象 (prefix, 84 件) | 脱落 |
+| 対象 〜 末尾 (suffix, 417 件) | ok |
+| `0x56f5c0-0x570b30` + 対象 | 脱落 |
+| `0x56f5c0-0x570aa1` + 対象 (直前範囲を短縮) | ok |
+| `0x56f5c0-0x570b2f` + 対象 (直前範囲を 1 バイト短縮) | ok |
+| `0x56f180-0x56f5b7` + 対象 など、隣接しない 2 件組 | ok |
+
+- 修正 (`4568c3f3`): `lift_set` で exit 0 のとき定義が出なかった範囲を集め、全件欠落でなければ欠落範囲だけを再帰で再試行する。欠落が全件 (または単独範囲) のときだけ `no_definition` とする。分割は従来通り。再試行は範囲が必ず減るので停止する。
+- 再測定 (commit `4568c3f3`、`retdec_batch.py` を両 block に 1 回ずつ実行):
+
+| 項目 | block19091 | block23676 |
+|---|---|---|
+| 関数数 | 19,816 | 19,826 |
+| lift_ok | 19,816 | 19,826 |
+| lift_fail (`no_definition` 含む) | 0 | 0 |
+| RetDec 呼び出し回数 | 41 | 41 |
+| RetDec 所要 (seconds_all) | 287.67 s | 289.77 s |
+| wall | 287.98 s | 290.08 s |
+| load average (開始→終了) | 0.24→1.00 | 1.00→1.00 |
+
+- 環境: `[RETDEC]` v5.0 (`toolchain-retdec`)、`fl-win64` 26.1.7.5653 の展開先。素材は `tar --zstd -xf` で展開済みを確認。
+- 未実施: ネガティブコントロール (`--nc`) は本 issue の受入条件外のため未実施。

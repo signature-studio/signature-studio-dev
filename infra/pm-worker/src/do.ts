@@ -2,7 +2,7 @@
 // ロジックは app.ts / engine.ts にあり、そちらを Node のテストで検証する。
 import { PmApp } from "./app.ts";
 import { loadConfig, type Env } from "./config.ts";
-import type { Bucket, Store } from "./store.ts";
+import type { Bucket, Store } from "./kvstore.ts";
 
 class SqlStore implements Store {
   private readonly sql: any;

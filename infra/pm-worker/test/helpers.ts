@@ -3,7 +3,7 @@ import { PmApp } from "../src/app.ts";
 import { loadConfig } from "../src/config.ts";
 import { b64u } from "../src/crypto.ts";
 import { signBody } from "../src/hmac.ts";
-import { MemoryStore } from "../src/store.ts";
+import { MemoryStore } from "../src/kvstore.ts";
 
 export const T0 = Date.parse("2026-10-14T12:00:00Z");
 export const STORE_KEY = b64u(new Uint8Array(32).fill(7));

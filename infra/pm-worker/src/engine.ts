@@ -4,7 +4,7 @@ import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classi
 import type { Config } from "./config.ts";
 import { Gh, GhError } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
-import type { Store } from "./store.ts";
+import type { Store } from "./kvstore.ts";
 import {
   applyEvent,
   EMPTY_STATE,

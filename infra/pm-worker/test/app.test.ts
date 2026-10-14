@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PmApp, buildManifest, APP_NAME } from "../src/app.ts";
 import { loadConfig } from "../src/config.ts";
-import { MemoryStore } from "../src/store.ts";
+import { MemoryStore } from "../src/kvstore.ts";
 import { openText, sealText } from "../src/crypto.ts";
 import { signBody } from "../src/hmac.ts";
 import { WEBHOOK_EVENTS } from "../src/webhook.ts";

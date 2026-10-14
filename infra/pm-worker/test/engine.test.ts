@@ -283,7 +283,7 @@ test("認証: installation token は 50 分キャッシュし、JWT は RS256 �
 test("セットアップ前 (App 未作成) の tick は何もせず、落ちない", async () => {
   const { PmApp } = await import("../src/app.ts");
   const { loadConfig } = await import("../src/config.ts");
-  const { MemoryStore } = await import("../src/store.ts");
+  const { MemoryStore } = await import("../src/kvstore.ts");
   const { STORE_KEY } = await import("./helpers.ts");
   const app = new PmApp({ store: new MemoryStore(), cfg: loadConfig({}), storeKey: STORE_KEY, now: () => T0, fetch: async () => j({}, 599), scheduleSoon: async () => {} });
   assert.deepEqual(await app.engine.tick(), { ready: false });

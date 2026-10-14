@@ -8,6 +8,26 @@ issue_comment での `/oc` 起動は `author_association` COLLABORATOR / MEMBER 
 OWNER に限定している。アクセス制御はそのうえで、コメント本文に
 `oc_actions_allow_write` を含めるかどうかで行っている。
 
+### PM 用 GitHub App (bot) の `/oc`
+
+PM Worker など **PM 用 GitHub App** が投稿した `/oc` も implement を起動する (#1949)。条件は repo 変数
+`OC_PM_BOT_LOGIN` (App のログイン名。例 `oc-pm-for-signature-studio[bot]`) との**完全一致**と `user.type == 'Bot'`:
+
+```
+github.event.comment.user.type == 'Bot' && github.event.comment.user.login == vars.OC_PM_BOT_LOGIN
+```
+
+- **偽装できない**: App のログイン (`<slug>[bot]`) は GitHub が App に付与する。第三者は同じログインのコメントを
+  作れない (`[bot]` 付きの名前は通常のユーザーに使えない)。`user.type == 'Bot'` も併せて見る。`author_association`
+  による人の判定は変えていない。
+- **未設定 (空) なら何も許可しない**: workflow の `if:` は `vars.OC_PM_BOT_LOGIN != ''` を併せて見る (未設定の変数は空文字になり、
+  空の login との `==` が真になるのを防ぐ)。`prepare-event-context.sh` が同じ判定を二重に行い (確定判定。
+  テストは `tests/test-dispatch-context.sh`)、空なら bot を通さない。
+- 実装 App (`opencode-for-signature-studio[bot]`) と reviewer App は、変数に設定されても許可しない (agent 自身の
+  コメントに `/oc` が含まれると自己起動のループになるため。設定の誤りを fail-closed にする)。
+- `/oc` 本文の検査 (行頭アンカーの `COMMAND_RE`) は変わらない。
+- **設定 (PM が行う。PR には含まれない)**: `gh variable set OC_PM_BOT_LOGIN --repo <R> --body 'oc-pm-for-signature-studio[bot]'`
+
 `/oc` / `/opencode` は**行頭に 1 コマンドだけ**書いた行で発火する (箇条書き行や
 文中の `/oc`・URL 内の `/oc/` では発火しない)。指示は同じ行か続く行に書くこと。
 
@@ -22,6 +42,7 @@ OWNER に限定している。アクセス制御はそのうえで、コメン�
 | `scripts/prepare-event-context.sh` | untrusted なイベント値をファイルに隔離し、制御変数を `$GITHUB_ENV` へ 1 行ずつ書く |
 | `scripts/assemble-prompt.sh` | イベント文脈を実装エージェント用プロンプトに流し込む |
 | `scripts/assemble-reviewer-prompt.sh` | 同じ方式でレビュワー用プロンプトを組み立てる |
+| `scripts/record-run-outcome.sh` / `review-recover.sh` | implement が PR を出さずに終わった issue への `oc:no-pr` ラベルと `<!-- oc-run-outcome: ... -->` マーカー、review の runner 打ち切りの即時再起動 (上限は review-retry 3 回。#1950)。詳細は `docs/WORKFLOW.md` §11 |
 | `scripts/fix-progress.sh` / `verify-review-verdict.sh` / `reopen-pr.sh` | 差し戻し後の fix の進捗判定・往復の上限、verdict の検証、close -> reopen による review の再起動 (reopen は 3 回まで再試行) |
 | `prompts/implementer.md` | 実装エージェントの行動規範 (スコープ・commit 規約・実測必須・マージ方法・規約への導線) |
 | `prompts/reviewer.md` | レビュワーエージェントの役割 (approve/request-changes・マージ) |
@@ -111,7 +132,7 @@ aws s3 cp s3://signature-studio-artifacts/artifacts/<prefix>.tar.zst "$HOME/arti
 
 ## 設定
 
-**Variables**: `OC_APP_CLIENT_ID` (必須)、`OC_REVIEW_APP_CLIENT_ID` (任意)、
+**Variables**: `OC_APP_CLIENT_ID` (必須)、`OC_REVIEW_APP_CLIENT_ID` (任意)、`OC_PM_BOT_LOGIN` (任意。PM 用 App の `/oc` を許可する。未設定なら許可しない)、
 `OPENCODE_VERSION` / `OPENCODE_RELEASE_VERSION` / `OPENCODE_INSTALL_SOURCE` (任意)
 
 **Secrets**: `OC_APP_PRIVATE_KEY`、`OC_AUTH_EXPORT`、

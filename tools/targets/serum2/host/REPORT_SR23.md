@@ -33,9 +33,9 @@
 ### 1-3. 呼出元 (実行時スタック)
 
 - 書込関数の呼出は vtable 経由の間接呼出のため、静的には呼出元を一意に決められない (REPORT_SR1c §4-3 と同じ)。
-- 実行時 watch の戻り番地候補: `RVA 0x48954d` (関数 `0x4894c0` 内、REPORT_SR1c §4-3)。`sr1c_callers.py 0x4894c0` で、この関数の直接の呼出元は `0x4890fe` の 1 件。
+- 実行時の呼出元は unwind で確定 (§7-1): host `vst3host.exe` の `ctrl->initialize` (IPluginBase slot 3) 呼出 (戻り番地 `0x2bd2a`)。
+- **旧記述は誤り (§7 で訂正)**: 旧版の「戻り番地候補 `RVA 0x48954d`」は、`0x4894c0` 内の stack 残骸であり writer の連鎖ではない (§7-1・§7-2)。「`0x4894c0` の所属と上位連鎖は未追跡」も §7-2 で解決済み (MenuData 系 ctor `0x488fc0` から呼ばれる補助関数)。
 - `RVA 0x1134d60` は `.data` 範囲 (`.data` = RVA `0x1121000`〜) の値で、戻り番地ではない (REPORT_SR1c §4-3 の表記は誤り)。
-- 残り: 関数 `0x4894c0` の所属 class と、上位の呼出連鎖 (controller 生成・initialize の内側か) は frame pointer 省略のため未追跡。
 
 ## 2. wrapper IID に応答する実 host の根拠 (受入 2)
 
@@ -66,8 +66,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 FL Studio が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` に応答するかの実機観測 (§2-3)。`fl-win64` 本体 (`[0]`) は 7z で開けず未確認 | `S2HOST_WRAPPER_QI` の既定化判断 (現状は既定無変更) | #256 (既存の残件。本 issue の受入は SDK 記述で充足) |
-| 書込関数 `0xacf70` の上位呼出連鎖と、関数 `0x4894c0` の所属 class | writer の完全な特定 | #256 (`REPORT_SR1c.md` §5 の残件: 全スレッド・wine watchpoint) |
+| 実 FL Studio が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` に応答するかの実機観測 (§2-3)。`fl-win64` 本体 (`[0]`) は 7z で開けず未確認 | `S2HOST_WRAPPER_QI` の既定化判断 (現状は既定無変更) | #255 (既存の残件。本 issue の受入は SDK 記述で充足) |
+| 書込関数 `0xacf70` の上位呼出連鎖と、関数 `0x4894c0` の所属 class | writer の完全な特定 | #255 (`REPORT_SR1c.md` §5 の残件: 全スレッド・wine watchpoint。旧 #256 は CLOSED のため受け先を #255 とする) |
 
 ## 5. 再現
 
@@ -105,8 +105,8 @@ negative control (copy of block00005_PE.bin with IIDs appended, one order at a t
 
 ### 6-2. 未実施 (受入 2 の残り)
 
-- `0x4894c0` の所属 class と `0xacf70` の上位呼出連鎖は**今 run では未着手** (時間制限)。子 issue (#1836) で扱う。
-- `IPlugInterfaceSupport` 登録箇所の静的確認も**未実施** (#1836 へ移す)。
+- `0x4894c0` の所属 class と `0xacf70` の上位呼出連鎖は **§7-1・§7-2 で実施済み** (本 PR で解決)。
+- `IPlugInterfaceSupport` 登録箇所の静的確認は **§7-5 で実施** (IID 定数の走査に基づく。呼出箇所の直接特定は未実施と明記)。
 
 ### 6-3. e2e 再測定 (受入 3)
 
@@ -126,9 +126,9 @@ negative control (copy of block00005_PE.bin with IIDs appended, one order at a t
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 312 件 (前回記録) と 313 件 (本 run) の差 1 件の出所 | 静的観測の母集団の記録誤り。IID 0 件の結論には影響しない (313 件でも 0 件) | 本 PR で訂正済み。出所の追跡は不要 |
-| `0x4894c0` の所属 class と `0xacf70` の上位呼出連鎖 | #255 受入 #3 の controller 側判定 | #1836 [SR-27] (子) |
-| `IPlugInterfaceSupport` 登録箇所の静的確認 | 一般 host の QI 応答の根拠 | #1836 [SR-27] (子) |
-| 実 FL Studio の wrapper IID 実行時応答 | `S2HOST_WRAPPER_QI` 既定化の最終判断 | #256 (既存) |
+| `0x4894c0` の所属 class と `0xacf70` の上位呼出連鎖 | #255 受入 #3 の controller 側判定 | 解決済み (§7-1・§7-2)。起票なし |
+| `IPlugInterfaceSupport` 登録箇所の静的確認 | 一般 host の QI 応答の根拠 | §7-5 で静的確認 (IID 定数 0 件)。登録呼出箇所の直接特定は未実施 | #255 (実行時観測と併せて。旧 #1759 は CLOSED) |
+| 実 FL Studio の wrapper IID 実行時応答 | `S2HOST_WRAPPER_QI` 既定化の最終判断 | #255 (既存。旧 #256 は CLOSED) |
 | e2e の再測定 (load average・並列数付き) | 本 run の 62/62 は前回 run (899e4249) の記録のみ | 次回の serum2 作業時 (素材 `plugins-serum2` が必要) |
 
 ### 6-6. 再現
@@ -137,3 +137,65 @@ negative control (copy of block00005_PE.bin with IIDs appended, one order at a t
 tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <dir>   # extracted/ を得る
 python3 tools/targets/serum2/host/fl_pe_iid_scan.py <dir>/extracted <dir>/extracted/block00005_PE.bin
 ```
+
+## 7. [SR-27 #1836] 書込関数 0xacf70 の上位呼出連鎖と 0x4894c0 の所属
+
+既知類型との関係 (`docs/DEFECTS.md`): 該当なし (実 DLL の静的・動的観測。lift 前)。
+素材: `plugins-serum2` (`Install_Xfer_Serum2_2.1.5.exe` → `7z x`)。`Serum2_win64.vst3` sha256 `501e7bb3…5283` (§0 と一致)。
+
+- 測定 commit (コードを変えた最後の commit): **`5cb1fa6f`** (`feat(serum2-host): unwind watch call chain via .pdata`)。本節の変更は `host/vst3host.cpp` (opt-in の `S2HOST_WATCH` 内のみ) と `host/sr27_dis.py` (静的補助)。既定経路は無変更。
+- 結論 (先出し):
+  1. **§1-3 の `RVA 0x48954d` を「0xacf70 の呼出元」とした記述は誤り**。`0x48954d` は関数 `0x4894c0` 内の戻り番地ではあるが、呼出連鎖上の frame ではない (下記 7-2)。
+  2. **0xacf70 の実行時の直接呼出元は host (`vst3host.exe`) の `ctrl->initialize` 呼出** (IPluginBase slot 3, `call [rax+0x18]`、戻り番地 `0x2bd2a`)。plugin 側の中間 frame は unwind に現れない。連鎖は `host の run 関数 (0x2ae20, ctrl 生成を含む) → ctrl->initialize (slot 3) → (thunk 0xb4ea0 の tail jump 経由と推定) → 0xacf70`。つまり **controller の initialize の内側**で `+0xdc` へ書かれる。
+  3. **`0x4894c0` は SerumController ではなく `MenuData` 系の ctor (0x488fc0, vtable `0xa85f28` = `.?AVMenuData@@`) から呼ばれる補助関数**。0x4894c0 自体はどの class の vtable にも現れない (非メンバ)。wrapper / gate の書込とは無関係。
+
+### 7-1. 0xacf70 の実行時呼出連鎖 (unwind, .pdata)
+
+- 方法: 旧版の「RSP から 64 語を戻り番地候補として列挙」は frame pointer 省略で誤読を生んだ。`vst3host.cpp` の watch hit 時に `RtlLookupFunctionEntry` / `RtlVirtualUnwind` で .pdata の unwind 情報から連鎖を辿るよう変更 (`5cb1fa6f`)。
+- 実測 (`S2HOST_WATCH=1` 既定 host, 4 blocks, 2 回再現で同一):
+  ```
+  [watch] armed DR0=…(controller iface+0xdc)
+  [watch] hit#1 RIP=00006ffff8af1338 (Serum2_win64.authstub.vst3) value=2
+  [unwind] d=0 RIP=…8af1338 mod=Serum2_win64.authstub.vst3 fn=0xacf70 rva=0xb1338
+  [unwind] d=1 RIP=000000014002bd2a mod=vst3host.exe fn=0x2ae20 rva=0x2bd2a
+  [unwind] d=2 RIP=0000000140001307 mod=vst3host.exe fn=0x1190  rva=0x1307
+  [unwind] d=3 RIP=000000014000142a mod=vst3host.exe fn=0x1410  rva=0x142a
+  [unwind] d=4 RIP=…kernel32.dll fn=0x293c0
+  [unwind] d=5 RIP=…ntdll.dll fn=0x55974
+  [gate] 最終 +0xdc=2 (観測ヒストグラム 2:61)
+  ```
+- 対応: host `0x2bd27` は `call qword ptr [rax+0x18]` (IPluginBase slot 3)、戻り番地 `0x2bd2a`。`vst3host.cpp` の `ctrl->initialize(hostApp)` (`L("controller->initialize(hostApp)…")` の直前) がこの呼出に当たると、逆アセンブルの配置と `[rcx]` vtable 読みから推定 (ソース行との厳密な対応は未照合)。
+- 静的側の整合: `sr1c_callers.py 0xacf70` は thunk `0xb4ea4` (`.text`) の 1 件と vtable `0xa2bf00` の 1 件 (§1-2・§4-3 と同一)。thunk は tail jump のため unwind 上に frame を残さない。
+- 含意: **+0xdc = 2 は controller initialize 中の 2 件の wrapper QI の失敗 (§3-7 / §4-4) で決まる**。既定 host の値 2 は initialize の内側で確定する。
+
+### 7-2. 0x4894c0 の所属 (静的)
+
+- 呼出元は `0x4890fe` の 1 件 (`sr1c_callers.py 0x4894c0`)。`0x4890fe` は関数 `0x488fc0`-`0x48912a` (size 362) 内。
+- `0x488fc0` は ctor 形: 先頭で `[rcx+8]=1`、`[rcx]=vtable`。vtable `0xa85f28` の RTTI は `.?AVMenuData@@`。`0x4894c0` はこの ctor の末尾近く (`0x4890fe`) で呼ばれる。
+- `0x4894c0` (size 180) は MSVC の function-local static guard (`0x1809a8ee0` / `0x1809a8f0c`) と、グローバルなポインタ列への push (`mov [rdx], rsi`; 必要時に `0x18048dd90` で拡張) からなる登録補助。どの vtable からも参照されない (非メンバ)。
+- `RVA 0x48954d` は `0x4894c0` の `call 0x1809a8f0c` (shared-count 解放相当の thunk) の戻り番地。watch で拾った 1 件は stack 上の残骸であり、writer 連鎖の一部ではない (unwind で否定、7-1)。
+
+### 7-3. 受入 3: e2e
+
+- 実行: `bash tools/targets/serum2/host/e2e.sh`、コード commit `5cb1fa6f`、`work/` を削除してから実行。
+- 結果: **62/62 OK, 67.07 s** (`time` real 1m7.070s)、NC1/NC2 とも期待どおり (exit=1, NG=1)、load (1 分値) 0.06 → 0.29、4 core、wine 9.0、逐次。
+- 同じ DLL・同じ host の直前ベースライン (コード変更前の `47ee8a17`) は 62/62 OK, 80.8 s (real 1m20.798s)。所要差は同一 runner 上の揺れで、判定には使わない。
+- 鮮度 (WORKFLOW §6): `git diff 5cb1fa6f HEAD -- tools/targets/serum2/host ':!tools/targets/serum2/host/REPORT_SR23.md'` は 0 バイト (本節の文書以外に差分が無いこと)。
+
+### 7-4. 受入 4: #255 への判定 (controller 側)
+
+- 書込元 0xacf70 は controller の initialize 内、連鎖 host main → ctrl->initialize → thunk → 0xacf70 で確定。
+- gate +0xdc = 2 の由来は initialize 内の wrapper QI 2 件の失敗 (§4-4)。host が 2 IID に応答すると gate は 1 になる (§4-4 の A/B)。
+- 未確定: 実 FL Studio が当該 IID に応答するか (§4 の未解決表・#1759 の静的走査は IID 未検出 = 応答の根拠は無いが、実行時の QI 応答は未観測)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 FL Studio (fl-win64) の host が `IVst3ToAUWrapper` / `IVst3ToAAXWrapper` に応答するかの実行時観測 | controller gate (+0xdc) が 1 に到達する条件。`S2HOST_WRAPPER_QI` の既定化判断 | #255 (旧 SR-26 #1759 は CLOSED のため受け先を #255 とする) |
+| 0x4894c0 (MenuData 系の登録補助) の呼出目的・グローバル配列の用途 | 本 issue の範囲外 (writer 連鎖と無関係と確認済み) | 起票せず (必要なら SR-3 の lift 時に扱う) |
+| thunk `0xb4ea0` 経由の連鎖は静的 (tail jump) 確認のみ。実行時の thunk 経由の厳密な確認は unwind の範囲外 | 連鎖の厳密性 (thunk を経由することは `sr1c_callers.py` の静的結果と一致) | #255 (旧 SR-1c #256 は CLOSED のため受け先を #255 とする) |
+
+### 7-5. IPlugInterfaceSupport 登録箇所の静的確認 (§6-2 の繰り延べの解消)
+
+- 一般 host が wrapper IID に応答するには、`IPlugInterfaceSupport` にその IID を登録する必要がある。登録時は IID の 16 byte 定数を渡すため、定数 (LE / BE) が PE 内に存在することが前提になる。
+- §6-1 の走査で、`fl-win64` の PE 313 件に両 IID の定数は **0 件** (negative control で検索器が LE / BE 両方を検出できることを確認済み)。よって FL 本体に当該 IID を登録する静的な根拠は見つからない。
+- **限界**: 定数を分割・動的生成する実装は静的走査で拾えない。登録呼出箇所そのものは特定していない。実行時の応答は未観測 (上の未解決表の 1 行目。起票先は #255)。

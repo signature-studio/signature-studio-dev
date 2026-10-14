@@ -779,7 +779,13 @@ unsigned long long function_43a3f0(unsigned long long s, unsigned long long valu
  * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
  * → GetMem に巨大サイズが渡り 0 を返して Error(reOutOfMemory) → Halt0 (survey halt0 の 17 unit 直接原因, #130).
  * 逆アセンブル (417b70..417fa2) から転記. 動的配列ヘッダ: hdr = data-16, [hdr+4]=refcnt, [hdr+8]=length. */
+#if M11_ENTRY_PROBE
+extern volatile int m11_fe_417b70;
+#endif
 unsigned long long function_417b70(unsigned long long a, unsigned long long ti, unsigned long long dimcnt, unsigned long long lengths) {
+#if M11_ENTRY_PROBE
+    m11_fe_417b70 = 1;
+#endif
     u64 p = Q(a);
     u64 len = Q(lengths);
     if ((long long)len <= 0) {
@@ -845,6 +851,9 @@ unsigned long long function_417b70(unsigned long long a, unsigned long long ti, 
 #ifndef M11_OV_CLASSCREATE
 #define M11_OV_CLASSCREATE 0
 #endif
+#ifndef M11_NOVCALL
+#define M11_NOVCALL 0
+#endif
 #if M11_OV_CLASSCREATE
 /* function_410360  VA 0x410360  (System.TObject: AfterConstruction 呼出し stub) (#419) — 実験: 既定 OFF (-DM11_OV_CLASSCREATE=1 で有効)。
  * 410320 (ClassCreate) / 40f960 (NewInstance) / 40fb40 (InitInstance) / 40fac0 は main (#474) が既定で転記済みのため本ブロックには持たない。
@@ -857,6 +866,9 @@ static u64 m11_vcall(u32 site, u64 target, u64 self) {
         icall_bump(&g_itgt, 0x410070u, 0);
         return self;
     }
+#if M11_NOVCALL
+    return self;
+#endif
     return ICALL_AT(site, target, self, 0, 0, 0, 0, 0, 0, 0);
 }
 unsigned long long function_410360(unsigned long long inst) {

@@ -40,3 +40,63 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 - int3 の影響: 両 engine の `e.final.ll` の `__asm_int3` は `i64` 戻り値の宣言 (1 件ずつ) のため、旧 void 版の `return 0;` 問題には当たらない。 `void` 版の修正そのものは合成 `.ll` のみで確認 (下記)。
 - int3 修正 (`m11_simd2.py`・本 HEAD): `void` 版は `abort()` のみ、戻り値あり版は `abort(); return 0;` を生成する。 `int3` を含む合成 `.ll` (`declare void @__asm_int3()` と `declare i32 @__asm_int3__1()`) で生成した C を `clang -c -Wall -Werror=return-type` で検査: 修正後 rc 0、修正前 (`f50ca8ad`) は `void function '__asm_int3' should not return a value` で rc 1。 engine 出力での確認は、上の「生成 helper C」の `emcc -c` rc 0 (両 engine、`c0afd85b`) で行った。 合成 `.ll` の検査は `void` 版の分岐を直接見るためのもの。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
+
+## D. #1698: lift_ranges.sh 既定化 (PLUG_NO_STATIC_DETECT=1) の batch 系への影響 (engine_lift 経由)
+
+- 測定 commit: **30a7b5b4** (ws-1698 の起点 = origin/main。本 run はコードを変更していない)。
+  `git diff 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics` の出力は 0 行 (下の検証節を参照)。
+- 環境: fl-win64 (`$RUNNER_TEMP/fl-win64`)・toolchain-retdec (RetDec v5.0)・toolchain-emsdk (emcc 6.0.12)。 `engine_lift.sh <block>` の出力 summary.csv を比較。
+- 実行: `bash dynamics/engine_lift.sh <block> <timeout>` (既定) と `PLUG_NO_STATIC_DETECT=0 bash dynamics/engine_lift.sh <block> <timeout>` (従来)。
+  load は各回の開始時 0.45〜0.91 (1 分平均)。 4 vCPU。
+
+| block | 条件 | lift_rc | defines | unimpl | emcc_c_rc | fixcmp | after_fixcmp | lift_s | missing_define | missing_bytes | missing_ref | function_defines |
+|--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
+| 19048 | 既定 (1) | 0 | 1712 | 5 | 1 | 2 | 0 | 63 | **0** | **0** | **0** | 1710 |
+| 19048 | 既定 (1)・再実行 | 0 | 1712 | 5 | 1 | 2 | 0 | 63 | 0 | 0 | 0 | 1710 |
+| 19048 | 従来 (0) | 0 | 1504 | 1 | 1 | 1 | 0 | 61 | **208** | **22819** | **67** | 1502 |
+| 19252 | 既定 (1) | 0 | 551 | 5 | 0 | 0 | 0 | 16 | 0 | 0 | 0 | 549 |
+| 19252 | 従来 (0) | 0 | 551 | 5 | 0 | 0 | 0 | 16 | 0 | 0 | 0 | 549 |
+
+- 19048 (Multiband Compressor comp_eng): 既定化で `missing_define` 208→0・`missing_bytes` 22819→0・`missing_ref` 67→0、`defines` 1504→1712。 既定の再実行で同一値を再現。 `emcc_c_rc_after_fixcmp` は両条件 0。
+- 19048 の差は、既定で 208 件の「statically linked function」が define されることによる (§A と一致)。 `unimpl` (5 vs 1) と `fixcmp` (2 vs 1) も変わったが、原因は未調査 (下の未解決表)。
+- 19252 (Transient Processor engine): 既定と従来で summary が完全一致。 既定化の影響なし。
+- 判断 (暫定): engine 2 本では既定化を悪化させる欠落は出なかった (19048 は欠落 0、19252 は不変)。 `unimpl` 増加 (19048 の 1→5) の原因が確定するまで、既定化は暫定で維持する。
+- 未実施: `batch_lift.sh` 本体は、素材に無い inventory 成果物 (`work/win_pe_scan.json`・`nsis_blockmap.json`・`winfuncs/`・`block_manifest.json`) を要するため実行できなかった。
+  また `synth/cpp_lift.sh` の 7 本 (従来 (0) の再測定) も本 run では流していない。 `batch_lift.sh` 系の summary 比較は起票先の残件とする。
+
+### D-1. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 19048 の `unimpl` 1→5・`fixcmp` 1→2 の原因 (既定化で増えた define 由来か) | 既定化で未実装 helper が増える。 到達性のみの指標で正しさは未確認 | PM 判断 (切り分けは次の lift 検証 run。本 PR では子 issue を起票しない) |
+| `batch_lift.sh` 本体の既定/従来比較 | `batch_lift.sh` 経由の summary.csv は未測定 (inventory 成果物 `win_pe_scan.json`・`nsis_blockmap.json`・`winfuncs/`・`block_manifest.json` が素材に無い) | PM 判断 (素材の追加要否。許可名に該当する素材が無いため、本 PR では起票しない) |
+
+## E. [PLG-F3-15] #1778: 19252 の残 helper `__asm_vmovsd(i64,i128)` (store 形) の宛先の原因
+
+- 測定 commit: **f9c89955** (origin/main)。 `engine_lift.sh 19252` を単独実行 (`timeout 900`、foreground)。 load average (1 分) 0.08 (実行前後とも低負荷)。
+- 結果 (`summary.csv`): `19252,522,0,551,0,5,0,0,0,17,0,0,0,29,549` (lift_rc 0 / define 551 / f80 0 / unimpl 5 / emcc_c_rc 0 / lift 17 s)。 `emcc -c` は fixcmp の前後とも rc 0。
+- `e.simd.log` の残件 5 行: `__asm_movntps(i128,i128)`・`__asm_vcomisd(i128,i64)`・`__asm_vmovsd(i64,i128)`・`__asm_vucomisd(i128,i64)`・`__asm_vucomiss(i128,i128)`。 `vmovsd` store は受入条件の対象のまま未達。
+
+### E-1. 原因 (実測)
+
+- `e.final.ll` の `__asm_vmovsd(i64 %10, i128 %7)` 等 3 箇所 (`function_180019c20`) の宛先 `%8`・`%9`・`%10` は、`e.drc.ll` (RetDec の直後) では `load i64, i64* %1`。 `%1` は `alloca i64` で、**関数内に一度も store されない** (`store` で `%1` を書く行は 0 件)。
+- `e.lift.ll` 以降では同じ行が `xor i64 0, 0` になる。 これは RetDec ではなく、**自前の B1 (`tools/plugins/lift/passes/ir5_patch.py` の `patch_uninit_alloca`)**。 B1 は「store の無い alloca からの load を 0 に置換する」規則で、`e.ir5.json` の `b1_fixed` は 579 件。
+- 元の機械語は `0x18001a861: vmovsd qword ptr [rsp + 0x20], xmm0` (`0x18001a867` は `[rsp+0x30]`)。 これは**スタック上の spill** で、直後の `0x18001a86d: mov rdx, qword ptr [rsp + 0x20]` で読み戻される。 宛先は定数 0 ではない。
+- つまり issue の「上流 (RetDec の定数畳み込み) で定数 0 になる」は不正確。 RetDec は rsp 相対の spill 領域を、store の無い `alloca` (`%1`) に写している。 その後 B1 が 0 に埋めている。 2 段の組合せで宛先が 0 になる。
+- **同じ `%8`・`%9`・`%10` は store 先だけでなく分岐・演算にも使われる** (`and i64 %10`・`switch i64 %10`・`urem i64 %10`・`icmp eq i64 %10, -9223372036854775808` 等)。 そのため `vmovsd` 復元だけでは直らず、spill 読み戻しの値が 0 になることで、この関数の分岐が無音で誤る可能性がある。 `emcc -c` が通っても正しさは保証されない (到達性のみの指標)。
+
+### E-2. 採らなかった方式
+
+- (a) `lower_asm_store` / `m11_simd2.py` で `vmovsd` を store 化する: 宛先が 0 のままなので address 0 への誤った store になる (issue の記述どおり)。 不採用。
+- (b) B1 の 0 埋めを止める: 共有 lift 鎖 (全 plugin の lift) の挙動が変わるため、本 issue の範囲を超える。 不採用 (影響範囲の測定が要る)。
+- (c) `vmovsd` を no-op や `abort` に委譲して unimpl から消す: 宛先を失ったまま stub を消すと silent miscompile が検出できなくなる (DECISIONS D15 と同じ理由)。 不採用。
+
+### E-3. 起票
+
+- 修正先は RetDec の spill 領域の写像 + B1 の 0 埋めの組合せ。 復元 (spill slot を store として戻す) は共有 lift 鎖の変更を伴うため、子 issue **#2017 ([PLG-F3-18])** として起票した。
+- 本 PR では、残件 (`vmovsd` store) を子へ移し、原因の特定と方式の記録までを完了とする。
+
+### D-2. 検証
+
+- 測定 summary (`work/dynamics/engine<B>/summary.csv`) は `work/` (gitignore 対象) にあり commit しない。
+- コード差分 (§D の「出力は 0 行」の根拠・`docs/WORKFLOW.md` §6): `git diff 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics ':!*.md' | wc -l` → **0**。 `:!*.md` を外した形は文書 (`REPORT.md`・`REPORT_APPENDIX.md`) の差分だけが出る (`git diff --stat 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics` の対象は この 2 件のみ)。 測定 commit `30a7b5b4` は HEAD の祖先。

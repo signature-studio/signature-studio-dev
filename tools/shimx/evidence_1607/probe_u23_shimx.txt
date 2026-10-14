@@ -1,0 +1,10 @@
+PRE|unit 20 slot 0x0 gp GetModuleHandleW=6 GetProcAddress=6
+PRE|unit 21 slot 0x0 gp GetModuleHandleW=6 GetProcAddress=6
+PRE|unit 22 slot 0x0 gp GetModuleHandleW=7 GetProcAddress=6
+SLOT_BEFORE_UNIT|0x0
+unit 23 lva 0x67f00
+SLOT_AT_UNIT|0x0
+ret=2
+MISS_UNIQ 2 MISS_TOTAL 3
+MISS_AT|0 4476d0
+MISS_AT|1 457860
