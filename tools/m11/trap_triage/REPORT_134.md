@@ -19,8 +19,9 @@
 |---|---|
 | 測定 commit (probe コード) | `a380b7c4` (`m11_survey.mjs` の env-gated probe と `probe_134.sh`。この commit が最後のコード変更。`46c92356..a380b7c4` は 1 commit) |
 | 基準 survey 数値 | `46c92356` (a380b7c4 の直前。probe 無し) で測定。下 §2 |
-| 検証 HEAD | 本 commit (訂正版)。コードの差分は `m11_survey.mjs` と `probe_134.sh` の**コメントのみ** (挙動不変)。文書の差分は REPORT_134.md と DOC_MAP の 1 行 |
-| 差分の証跡 | `git diff a380b7c4 HEAD -- tools/m11/m11_survey.mjs tools/m11/trap_triage/probe_134.sh` は、コメント行の差分のみ。`git diff --stat a380b7c4 HEAD -- tools/m11` は REPORT_134.md のみ (実行結果は PR 本文の検証節) |
+| 検証 HEAD | `c58a7a34` (訂正版)。コードの差分は `m11_survey.mjs` と `probe_134.sh` の**コメントのみ** (挙動不変)。文書の差分は REPORT_134.md と DOC_MAP の 1 行 |
+| 差分の証跡 (コード) | `git diff a380b7c4 HEAD -- tools/m11/m11_survey.mjs tools/m11/trap_triage/probe_134.sh` の出力 (変更行のみ): `-// #134 probe (既定 off): unit 56 の fail-fast 辺で読まれる object …` → `+// #134 probe (既定 off): unit 56 が 8c5eb0 へ渡す this (VMT。…) … guard の入力 R ではない (REPORT_134 §4)`。`-# #134: unit 56 (VA 0x16fde0) の fail-fast 辺 …` → `+# #134: unit 56 (VA 0x16fde0) が 8c5eb0 へ渡す this (VMT) の状態を …` (2 行ずつ、コメントのみ) |
+| 差分の証跡 (範囲) | `git diff --stat a380b7c4 HEAD -- tools/m11`: `m11_survey.mjs` 2 行・`probe_134.sh` 2 行・`REPORT_134.md` (文書)。`docs/DOC_MAP.md` の差分は 1 行 (索引) |
 | PE | `fl-win64` の `extracted/block00031_PE.bin`、sha256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` (本 run で `sha256sum` と一致を確認) |
 | 素材 (前回 run) | `work-m11.tar.zst` を `tools/m11/work/` へ展開して測定した。本 run では再測定していない |
 | `work/lift_pe.sha256` | 手で作成。内容は PE の sha256 hex 1 行 (パス無し)。`m11_e2e.sh` の 62 行 `echo "$PE_SHA" > work/lift_pe.sha256` と同じ書式。展開物に無く、全再生成は `m2/work/ghidra_dll` 欠落で `m11_bounds.py` が失敗するため手で作った |
@@ -64,7 +65,7 @@
 | `8c5ef6`〜`8c5f0c` | `rcx = [rbp+0x80]` (R); `call 8c67a0`; `[rbp+0x58] = rax` (list); `ebx = [list+0x14]` | 件数 = `[list+0x14]`、list = `8c67a0(R)` |
 | `8c608d` | fail-fast 辺: `410360([rbp+0x80])` | receiver は R |
 | `410360` | `rbx = [rax]` (R の先頭 qword); `call [rbx-0x50]` | 機械語では R の vtable を呼ぶ。**IR では `ret i64 %arg1` で脱落** (下の未解決 #2) |
-| `56fde0`〜`5702be` (1 関数。途中に ret 無し) | `570291`〜`570296`: `rcx = [0x566ca0]` (= 0x566d68); `dl = 1`; `xor r8, r8`; `call 8c5eb0`。`5702a2`〜`5702ae`: `rcx = [0x566de8]` (= 0x566eb0); `dl = 1`; `xor r8, r8`; `call 8c5eb0` | 2 呼出しとも `dl = 1` (bit 7 が立たない)。よって `410320` は `[this-0x30]` を呼ぶ |
+| `56fde0`〜`5702be` (1 関数。途中に ret 無し) | `57028a`〜`570296`: `rcx = [0x566ca0]` (= 0x566d68); `dl = 1`; `xor r8, r8`; `call 8c5eb0`。`5702a2`〜`5702ae`: `rcx = [0x566de8]` (= 0x566eb0); `dl = 1`; `xor r8, r8`; `call 8c5eb0` | 2 呼出しとも `dl = 1` (bit 7 が立たない)。よって `410320` は `[this-0x30]` を呼ぶ |
 | `[0x566d38]` = `[0x566e80]` | `0x40f960` | 2 つの VMT の `-0x30` スロットは同じ関数 |
 
 - 以上から、`function_56fde0` が unit 56 で `8c5eb0` を呼ぶとき、guard が読む件数は `0x40f960(this)` の戻り値 R の list の +0x14 である。probe が読んだ `this` (VMT) の件数ではない。
