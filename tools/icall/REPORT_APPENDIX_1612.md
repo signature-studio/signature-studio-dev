@@ -5,16 +5,17 @@
 ## 0. 結論 (本 run の到達点)
 
 - 受入条件は一部達成。`lost 0` は未達 (修復はしていない)。
-- **確定**: 残落ち 6 件の間接 call は、RetDec の **LLVM IR 化 (decode 段 = pass "Input binary to LLVM IR decoding")** で既に call 命令として存在しない。`.dsm` (逆アセンブル) には 6 件すべてある。
+- **報告 (本 run で再確認できず)**: 残落ち 6 件の間接 call は、RetDec の **LLVM IR 化 (decode 段 = pass "Input binary to LLVM IR decoding")** で既に call 命令として存在しない。`.dsm` (逆アセンブル) には 6 件すべてある。根拠の stderr ログ・`.dsm` は本 run の環境に無く、§1 の抜粋は貼れない (後述)。
 - **確定**: 前任の「decode 直後の dump に間接 call が無い」は、decoder 段の欠落そのものの観察だった (前任の付録 §4 の解釈を訂正)。
 - **未確定**: decoder 内部のどの処理が call を消すか (pass 名まで未特定)。`0x180c97aa0` の `*(var12) = -1` 警告 5 件との対応も未確認。
 - 段の切り分けは「decode 段で消える」まで。以降の段 (pass 143 以降は `!insn.addr` 追跡に切り替わる) での生存は連続判定できていない。
 
 ## 1. 計測 (実測)
 
-素材: `plugins-freshair` (`Fresh Air.Win.zip` → `SlateCore.core_64`)、`work-icall` (`rt_freshair-core`)、RetDec v5.0 (`/opt/retdec`)。
+素材: `plugins-freshair` (`Fresh Air.Win.zip` → `SlateCore.core_64`)、`work-icall` (`rt_freshair-core`)、RetDec v5.0 ([RETDEC])。
 
-- 基準 `python3 tools/icall/diff/fa_residual.py tools/icall/work/rt_freshair-core` は `lost 6` を再現 (前任と一致)。
+- **本 run の環境の状況 (実測)**: `[RETDEC]` は無く、`work-icall`・`plugins-freshair` は未取得 (`$HOME/artifacts` は `fl-win64` のみ)。以下の数値・表は前 run の計測報告で、本 run では再実行していない。stderr ログと `.dsm` も本 run の環境に残っていないため、`fa_call_trace.py` の出力抜粋 (`dumps` 行・6 件の `alive/GONE/n/a` 行) と `.dsm` の該当行は貼れない。
+- 基準 `python3 tools/icall/diff/fa_residual.py tools/icall/work/rt_freshair-core` は `lost 6` を再現 (前任と一致)。 ※前 run の報告値
 - RetDec 単独実行 (`--select-decode-only --backend-no-opts --output-llvmir --print-after-all`):
   - `0x180c97aa0-0x180c97ee0`: 実行 11 秒、dump 294 段。
   - `0x180da6e60-0x180da73b5`: dump 308 段。
@@ -47,19 +48,22 @@
 
 | 項目 | 状態 | 起票先 |
 |---|---|---|
-| decode 段内で間接 call を消す処理の特定 (pass 名・条件) | 未達 | 子 issue (親 #1454 / 本 #1612 の子として起票) |
+| decode 段内で間接 call を消す処理の特定 (pass 名・条件) | 未達 | PM に起票を依頼 (未起票。親 #1454 / 本 #1612 の子として) |
 | pass 143 以降の `!insn.addr` 追跡の連続判定 | 未達 | 同上 |
 | `0x180c97aa0` の `*(var12) = -1` 警告 5 件との対応 | 未達 | 同上 |
 | `lost 0` (修復 / 段と条件の分類) | 未達 | 同上 |
+| 本 run で未再確認の §1 計測 (素材 `toolchain-retdec plugins-freshair work-icall` が必要) | 未検証 | 同上 (再実行は PR 本文の `oc_artifacts` 行で依頼) |
 
 ## 4. 再現手順
+
+`$RETDEC` は `docs/REFERENCES.md` の `[RETDEC]` の所在 (環境変数で指定)。
 
 ```
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" tools/icall/work/rt_freshair-core   # 素材名は docs/WORKFLOW.md §11
 python3 tools/icall/diff/fa_residual.py tools/icall/work/rt_freshair-core
 mkdir -p "$RUNNER_TEMP/plugins-freshair" && tar --zstd -xf "$ARTIFACTS_DIR/plugins-freshair.tar.zst" -C "$RUNNER_TEMP/plugins-freshair"
 unzip -q -o "$RUNNER_TEMP/plugins-freshair/Fresh Air.Win.zip" '*SlateCore.core_64' -d "$W"
-/opt/retdec/bin/retdec-decompiler SlateCore.core_64 -o f.c --select-ranges 0x180c97aa0-0x180c97ee0 --select-decode-only --backend-no-opts --output-llvmir f.ll --print-after-all 2> stderr.log
+"$RETDEC/bin/retdec-decompiler" SlateCore.core_64 -o f.c --select-ranges 0x180c97aa0-0x180c97ee0 --select-decode-only --backend-no-opts --output-llvmir f.ll --print-after-all 2> stderr.log
 python3 tools/icall/diff/fa_call_trace.py stderr.log
 ```
 

@@ -20,7 +20,6 @@ TARGETS = OrderedDict([
     (0x180da7261, 'da6e60 call[rax+30]'),
     (0x180da72fc, 'da6e60 call[rax+30]#2'),
 ])
-INDIRECT_CALL = re.compile(r'\bcall\b(?!.*@llvm\.)(?!.*\bfunction_)(?!.*@)')
 
 
 def split_dumps(path):
@@ -41,6 +40,7 @@ def split_dumps(path):
 
 def decode_alive(text, va):
     """decode 直後: `; 0xVA` の直後ブロックに call 行があるか (llvm.ctpop 等は除外)."""
+    # 同じ VA の `; 0xVA` コメントが複数あっても、判定は最初の出現だけ (後続は見ない)。
     m = re.search(r'; 0x%x\n' % va, text)
     if not m:
         return None  # VA コメントが無い段 (decode 前) は判定しない
