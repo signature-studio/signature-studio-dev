@@ -119,8 +119,8 @@ IAT 名の内訳 (件数):
 - #2528・#2529 は親 #2483 (T-SH-36) の子。残り 8 instance は子を順次起票する (#161 に残す)。
 
 ### 6. 測定 commit と差分の証跡
-- 測定 commit: `fdd82f2c` (`tools/shared/scripts` の最後のコード変更。`ildsp_closure_check.py` に末尾 jmp の `[tail]` 行を追加した)。§4.1 の `ildsp_closure.py` の実測と §4.2 の表は `fa5eb8a8` 以降 `ildsp_closure.py` に変更が無い (`fa5eb8a8` の内容で測定した値)。§4.4 の末尾 jmp の表と検算結果は `fdd82f2c` の内容で測定した。
-- 本 REPORT の commit 以降の `git diff fdd82f2c HEAD -- tools/shared/scripts` は空 (差分 0)。HEAD での再実行結果は PR 本文に記載する。
+- 測定 commit: `a409596f` (main との merge commit。`ildsp_closure.py`・`ildsp_closure_check.py` は、`fdd82f2c` の `ildsp_vtable.py`・`ildsp_vtable_check.py` を名前だけ変えたもの。出力は改名前と cmp 一致)。§4.1 の実測と §4.2 の表は `fa5eb8a8` 以降 closure の計算に変更が無い。§4.4 の末尾 jmp の表と検算は `fdd82f2c` 以降の `[tail]` 行で測定した。
+- 本 REPORT の commit 以降の `git diff a409596f HEAD -- tools/shared/scripts` は空 (差分 0)。HEAD での再実行結果は PR 本文に記載する。
 
 ### 検証範囲 / 範囲外
 - 範囲: 静的な vtable 解析・逆アセンブルによる計数 (capstone と objdump)。
@@ -135,4 +135,5 @@ IAT 名の内訳 (件数):
 | vcall の先 (Transmitter 60 件・WaveformColouring `0x1a9e2b`) | Transmitter の lift 規模、WaveformColouring の lift | [T-SH-37] #2484 (`0x1a9e2b`)。Transmitter は未起票 → #161 |
 | `.pdata` の無い先の範囲の近似 (次の `.pdata` 先頭まで) | 命令数は上限側に偏りうる | #161 |
 | 残り 8 instance の lift | #161 後半 | #161 (子を順次起票) |
+| GPS CreateInstance 単体の命令数: 本節 961 命令 (closure の和集合)、`REPORT.md` §4-5 は 924 命令 (同じ 36 関数)。計算規則の差の有無は未確認 | §4.2 と §4-5 のどちらを正にするか | #161 (PM 判断) |
 | REPORT.md §1 の SIMD 比 30.7% の出典 | 旧 REPORT 値の再現 | #161 |
