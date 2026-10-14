@@ -39,6 +39,7 @@ static double pvals[3];
 static int changed_flag, use_metronome, precount, rec_ppq;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
+static int scr_blanked, scr_unblank, scr_active;
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -68,6 +69,7 @@ void fl_engine_reset(void) {
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
+    scr_blanked = 0; scr_unblank = 0; scr_active = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -181,7 +183,8 @@ FL_H(channels, getStepParam) {
 
 /* ---- mixer (19) ---- */
 /* 色の R/B 入替え (PY-115 / REPORT_PY115.md §2)。格納は入替え + alpha 0xff、取得は入替えを再度通して alpha 0xff。 */
-#define MIX_DEFAULT_COLOR 0x5A6B7Cu
+/* 既定色 (フラグ無し track) は FL の .bss 0x15f6774 の初期値 (init 0x770ba6・REPORT_PY118) */
+#define MIX_DEFAULT_COLOR 0xff636c71u
 static uint32_t fl_swap_rb(uint32_t v) { return ((v & 0xff) << 16) | (v & 0xff00) | ((v >> 16) & 0xff); }
 FL_H(mixer, trackCount) { return fl_ret_i(c, NMIX); }
 FL_H(mixer, getTrackName) { MX(0); return fl_ret_s(c, t->name); }
@@ -245,6 +248,13 @@ FL_H(playlist, setTrackColor) { PL(0); uint32_t u = (uint32_t)A_INT(1, 0); p->co
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
 FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
+/* PY-119 (#2980): PE 0xd6cd80 / 0xd6ca80 / 0xd6c9d0 / 0xd6cab0 / 0xd6c4c0 / 0xd6d6b0 は呼出し経路を確定 (REPORT_PY119)。値は未実測の仮置き */
+FL_H(ui, getFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
+FL_H(ui, getFocusedFormID) { NARGS(0, 0); return fl_ret_i(c, 0); }
+FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
+FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
+FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
+FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
@@ -262,6 +272,13 @@ FL_H(general, safeToEdit) { NARGS(0, 0); return fl_ret_b(c, safe_edit); }
 FL_H(general, getProjectTitle) { NARGS(0, 0); return fl_ret_s(c, proj_title); }
 FL_H(general, getProjectAuthor) { NARGS(0, 0); return fl_ret_s(c, proj_author); }
 FL_H(general, getProjectGenre) { NARGS(0, 0); return fl_ret_s(c, proj_genre); }
+
+/* ---- screen (5) ---- PY-121 (#2985): PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740 (REPORT_PY121_2985)。値は未実測の仮置き */
+FL_H(screen, isBlanked) { NARGS(0, 0); return fl_ret_b(c, scr_blanked); }
+FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
+FL_H(screen, getScreenActiveCounter) { NARGS(0, 0); return fl_ret_i(c, scr_active); }
+FL_H(screen, setScreenActiveCounter) { NARGS(1, 1); scr_active = (int)((unsigned)scr_active + (unsigned)A_INT(0, 0)); return fl_ret_none(c); }
+FL_H(screen, unBlank) { NARGS(1, 1); scr_unblank = A_INT(0, 0) == 1; return fl_ret_none(c); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }

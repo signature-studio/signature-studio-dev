@@ -8,7 +8,7 @@
   simd gen <ll...> -o out.c [--canon]   __asm_* 宣言から C helper 生成
   simd test                             生成 helper を実機 inline asm と bit 突合 (KH census 205 mnemonic の全 form)
   simd report                           KH mnemonic census の被覆 before/after
-  ott [--auto f7|p1|f7,p1|none]         OTT を liftlib 側だけで再現 (m10_e2e 相当)。--auto 既定 = f7,p1 (CAB-238)。
+  ott [--auto f2|f7|p1|f2,f7,p1|none]   OTT を liftlib 側だけで再現 (m10_e2e 相当)。--auto 既定 = f2,f7,p1 (CAB-238・LIFTLIB-3)。
   inject-eval                           パターン注入による検出器の検出力/偽陽性評価
   specgen <image> <func_va>             機械語から harness spec の雛形を生成 (ポインタ/フィールド推定)
   regress                               OTT / FA Gain / KH Gain の回帰 (liftlib_e2e.sh から呼ぶ)
@@ -128,7 +128,7 @@ def simd_report():
 # してから f7/p1 を流すと, p1 の dropped 領域で `bind xmm0/xmm1` が成功するようになり
 # 残留 21 → 15 / bind xmm0 6 → 1 に減る (census・checks・SHA は不変)。
 OTT_AUTO_DEFAULT = "f2,f7,p1"
-# CAB-238 検収②: auto f7,p1 の census[0x248]=0 junkHi 実測値 (m10 参照 175 から改善)。悪化 (超過) は FAIL。
+# CAB-238 検収②: auto f7,p1 で census[0x248]=0 junkHi を 175 → 104 に改善 (既定 f2,f7,p1 でも 104)。悪化 (超過) は FAIL。
 OTT_AUTO_JUNKHI_MAX = 104
 
 
