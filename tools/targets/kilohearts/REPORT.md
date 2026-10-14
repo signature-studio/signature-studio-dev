@@ -243,4 +243,4 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - #1405 (KH-25) の 1 単位: `rcpps` 代入形の固定と converter ガード、`GetLastError`/`SetLastError` の stub。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact。件数・実測・測定 commit は付録 `REPORT_APPENDIX.md` §10-7o。
 
 #### 10-7q. #3072 (KH-40) run: Delay の Ghidra 変換 (型名・LOCK・Win API stub・thunk 正規化) (部分)
-- 結論: Delay 141/141 decompile OK。emcc clang 診断 **736 → 526** (測定 commit `dfe3592e`)。LOCK/UNLOCK は no-op (単一スレッド)、Win API 21 件は fail-fast stub。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。残件 526 件の内訳と起票先は付録 `REPORT_APPENDIX.md` §10-7q。
+- 結論: Delay の lift 141 関数 decompile OK。thunk 正規化を列 0 の定義行だけに限定 (本体の自己呼出しを解消、旧版は 1 関数で発生)。emcc clang 診断 **601 件** (測定 commit `7d1d0e2e`。旧記載の 526 は再現せず)。LOCK/UNLOCK は no-op (単一スレッド)、Win API 21 件は fail-fast stub。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。残件 601 件の内訳と起票先は付録 `REPORT_APPENDIX.md` §10-7q。
