@@ -13,7 +13,7 @@
 
 ## 2. 測定
 
-測定 commit: `1c3dca8f` (本付録の最終 HEAD。コードを変えた最後の commit は main の `2626e445`)。
+測定 commit: `1c3dca8f` (sweep を実行した commit。以後 HEAD までのコード差分は 0。詳細は下の「コード差分」)。
 
 | 項目 | 値 |
 |---|---|
@@ -27,7 +27,7 @@
 
 前回 (測定 commit `2626e445`) も同値 (41 / 66 / 15 / 9)。9 件の集合は `0x1803de190` `0x180829c20` `0x180c98240` `0x180c99430` `0x180da4030` `0x181055400` `0x181056a4c` `0x181056aa0` `0x18105d9fc` で、1451 の §3 と一致する。main の `REPORT_APPENDIX_1606.md` は 40 / 66 / 15 / 10 (1 関数差) と記録しているが、本 run の HEAD では再現しなかった。差の 1 関数は未特定で、#1606 側の記録に残る。
 
-コード差分: `git diff 2626e445 1c3dca8f -- tools/icall tools/ott tools/liftlib` は `REPORT_APPENDIX_1606.md`・`REPORT_APPENDIX_1632.md`・`REPORT_APPENDIX_1633.md`・`fa_ranges_1633.txt` の追加と付録の修正のみ (実行コードの差分 0)。本 PR で変えたのは付録だけ。
+コード差分: 測定 commit `1c3dca8f` から HEAD までの `git diff 1c3dca8f HEAD -- tools/icall tools/ott tools/liftlib tools/m11 tools/targets/freshair` は本付録の文言修正のみ (実行コードの差分 0)。`1c3dca8f` は main の merge を含み、その中には `tools/m11/m11_build.sh`・`trap_triage/probe_entry.sh`・`trap_triage/scan_1588_slot.py` の実コード変更がある。sweep はその merge の後に実行したので、測定値はこれらを含む状態のもの。本 PR で変えたのは付録だけ。
 
 ## 3. 切り分け
 
