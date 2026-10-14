@@ -115,7 +115,7 @@
 
 ### 16.6 AU-21 (#1570) 追加切り分け 2: head `5229fe5f` (main, コード変更なし)
 
-測定 commit: `5229fe5f` (origin/main 起点、本 run は `tools/audio/REPORT_AU10.md` のみ変更)。環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後 (emcc 6.0.12, [EMSDK] 既存)。生ログは `tools/audio/work/` 側・JSON は `tools/audio/results/soak_10.json` / `soak_1800.json` (gitignore 対象の生成物)。
+測定 commit: `5229fe5f` (origin/main 起点、本 run は `tools/audio/REPORT_AU10.md` のみ変更)。環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後 (emcc 6.0.12, [EMSDK] 既存)。JSON は `tools/audio/results/soak_10.json` / `soak_1800.json` (本 run の上書き分は未コミット。内容は上表の実測値と一致)。
 
 | 試行 | 結果 | 所要 / load (start → end) |
 |---|---|---|
