@@ -113,7 +113,11 @@
 
 ### 5-5. 安全係数の実測 (AU-24 #2541・係数は 125 のまま維持)
 
-- 測定 commit = `a2ca18f4` (`FLA_BURST_PCT` 導入。既定 125 は変更前と同値)。以後のコード差分は `git diff --stat a2ca18f4 HEAD -- tools/audio/src` の 0 行 (この節を含む commit は REPORT のみ)。
+- 測定 commit = `a2ca18f4` (`FLA_BURST_PCT` 導入。既定 125 は変更前と同値)。以後のコード差分は `git diff a2ca18f4 90d144e9 -- tools/audio/src` の 1 置換 (レビュー m2・型幅の揃え。下の diff)。値域内 (burst × PCT が uint32 に収まる約 3436 万フレーム未満) では演算結果は変わらない。sweep 表は a2ca18f4 で測定し、HEAD `90d144e9` での再測定は未実施 (§5-5 範囲外)。
+  ```diff
+  -        uint32_t need = (burst * FLA_BURST_PCT / 100 + A.B + A.B - 1) / A.B * A.B;
+  +        uint32_t need = (uint32_t)(((uint64_t)burst * FLA_BURST_PCT / 100 + A.B + A.B - 1) / A.B * A.B);
+  ```
 - 対象: null-sink (PulseAudio `ci_null`) の `asio_sine_b256_96k` (B=256・96k・sine・10 s) を各係数で n=3。係数は `FLA_DEFS="-DFLA_BURST_PCT=<値>" bash tools/audio/build.sh` で変え、`node tools/audio/harness/run.mjs --only asio_sine_b256_96k --out <json>` を PulseAudio 起動中に実行。各 rep の sink-input に `Google Chrome` が現れ、`ci_null` へ接続していることを `*_sinkinputs.txt` で確認。
 - 環境: ubuntu runner (4 vCPU)・google-chrome 154.0.8037.97・PulseAudio 16.1 (apt 導入)。
 
@@ -124,10 +128,12 @@
 | 150 | 5376 ×3 | 5632 | 1 / 1 / 1 | 0 / 0 / 0 | 3456 ×3 | PASS・grows あり・T +1024 |
 
 - **結論**: 係数を上げても grows は 0 にならず、最終 T が 256〜1024 フレーム (96k で 2.7〜10.7 ms) 増える。係数は 125 のまま維持する (PM 判断の材料)。
-- **grows が残る原因**: OPEN 較正の初期 T0 (phase 1 の `res[0]` から導く) は run ごとに 3328 相当と 4608 の間で揺れ、run 中 burst 3456 の要求値 (125 で 4608) と 1 段 (256 フレーム) ずれる場合がある。係数を変えると 256 フレームの境界が移るだけで、grows は消えない。§5-3 の旧測定 (run 中 burst 4480) は本測定では再現せず、その場合の要求値 (130: 6144 / 150: 7168) は初期 T0 を上回るため grows は残る。→ 子 issue **[AU-28]** #3051。
-- **underrun**: 6 run (130・150 含む) すべて 0。
-- **e2e 回帰**: `node tools/audio/harness/run.mjs --quick --out <json>` は 44/44 PASS (wall 251.9 s・開始時 load avg (1 分) 0.18)。`inventory.sh`・`tsc --noEmit`・`asio/e2e.sh` (COM 経路) は本測定では未実施。
-- **範囲外 (未実施)**: `au2_matrix.sh 3` 全体 (fake 側・48k 行列) は時間内に収まらず未実施。本節は null 96k のみ。DirectSound 側 `flds.c:258` の 1.25 は未変更 (§6・[AU-28])。
+- **grows が残る原因**: 要求値は `need = (burst×PCT/100 + 2B−1)/B·B` (B=256)。run 中 burst 3456 では 125 → 4608 / 130 → 4864 / 150 → 5632。125 は OPEN 較正の T0 (4608) と要求値が一致するため grows 0。130 と 150 は T0 が要求値を下回り、run 中に拡張される: 130 の run 1 は T0 3328 から 2 回拡張 (grows 2)、run 2・3 は T0 4608 から 1 回 (grows 1)、150 は T0 5376 から 1 回 (要求 5632・grows 1)。OPEN 較正の burst は記録していない (`res[0]` 未記録) ので、「較正 burst が run 中より小さい」は T0 からの逆算による推定。係数を変えると 256 フレームの境界が移るだけで、grows は消えない。§5-3 の旧測定 (run 中 burst 4480) は本測定では再現せず、その場合の要求値 (130: 6144 / 150: 7168) は初期 T0 を上回るため grows は残る。→ 子 issue **[AU-28]** #3051。
+- **underrun**: 9 run (125・130・150 × n=3) すべて 0。
+- **e2e 回帰 (`bash tools/audio/e2e.sh --quick`・HEAD `90d144e9`)**: 全 4 段 (inventory → tsc → build → harness → asio COM) を順に実行し exit 0。harness **44/44 PASS** (wall 251.6 s・load avg (1 分) 0.51 → 0.43)。ASIO COM 段は node check 126/126・COM 3/3 PASS。e2e 全体の wall は 5 分 51 秒。
+- **同じ e2e の 1 回目 (HEAD `a8aaa39a`・m2 の前)**: harness 43/44 で exit 1。FAIL は `asio_ramp_b128_d2` (underrun 1・silence 384・ramp 不一致 164480/192896)。同シナリオは §2・REPORT_AU5・REPORT_DS で同じ症状の FAIL が記録された既知の断続 FAIL (追跡 #187)。同 HEAD で単独再実行 `node tools/audio/harness/run.mjs --only asio_ramp_b128_d2` は 1/1 PASS (underrun 0・不一致 0/961024・73.5 s・load 0.37 → 0.11)。1 回目は harness 段で止まったため ASIO 段を `a8aaa39a` で別途実行 (node check 126/126・COM 3/3 PASS・76.7 s)。その後 `90d144e9` で全 4 段を再実行し、上記の PASS を得た。
+- **FAIL の扱い**: 本 PR の差分 (既定 125) は旧コードと数値的に同一。1 回目の FAIL の原因は未切り分け (#187)。PR の変更に起因するとは判断していない (根拠: 単独再実行 PASS・既知の同症状)。
+- **範囲外 (未実施)**: 本節は null 96k のみ。`au2_matrix.sh 3` 全体 (fake 側・48k 行列) は時間内に収まらず未実施 (→ [AU-28] #3051)。DirectSound 側 `flds.c:258` の 1.25 は未変更 (→ [AU-28])。HEAD `90d144e9` での sweep (125/130/150) の再測定も未実施 (→ [AU-28])。
 
 ## 6. 未解決 (実測ではなく実装が必要なものは子 issue)
 
