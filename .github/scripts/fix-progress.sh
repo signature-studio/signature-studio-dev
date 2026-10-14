@@ -147,7 +147,12 @@ case "${1:-}" in
     ;;
   check)
     : "${OC_HEAD_BEFORE:?}" "${OC_START_TS:?}"
-    if [ "$(pr_head)" != "$OC_HEAD_BEFORE" ]; then
+    # head が読めなければ result を出さずに失敗する。空文字を比べると pushed と誤判定され、retry も reopen も走らない無音終了になる (#2899)。
+    if ! head_after="$(pr_head)" || [ -z "$head_after" ]; then
+      echo "::error::could not read the head of PR #$OC_PR_NUMBER: no fix progress result is written" >&2
+      exit 1
+    fi
+    if [ "$head_after" != "$OC_HEAD_BEFORE" ]; then
       result=pushed
     else
       n="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" \

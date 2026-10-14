@@ -13,6 +13,7 @@ export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 GITHUB_EVE
 # fake gh: `gh api [--paginate] [-X M] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
 # `gh pr comment|close|reopen` と POST は $LOG に記録するだけ。
 # FAKE_REOPEN_FAILS=N なら、最初の N 回の `gh pr reopen` を失敗させる。FAKE_CLOSE_FAILS=1 なら `gh pr close` を失敗させる。
+# FAKE_FAIL_PATH=<path> なら、その path の読み取り (`gh api`) を失敗させる。
 # fixture <名前>.2 があれば、2 回目以降の同じ path の読み取りはそちらを返す (close の間に PR の状態が変わった競合の再現)。
 FIX="$TMP/fixtures"
 LOG="$TMP/gh.log"
@@ -42,6 +43,10 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ "$method" = POST ] && exit 0
+if [ -n "${FAKE_FAIL_PATH:-}" ] && [ "$path" = "$FAKE_FAIL_PATH" ]; then
+  echo "fake gh: read failed for $path" >&2
+  exit 1
+fi
 f="$FAKE_FIX/${path//\//_}"
 [ -f "$f" ] || { echo "fake gh: no fixture for $path" >&2; exit 1; }
 if [ -f "$f.2" ]; then
@@ -322,6 +327,18 @@ setup aaa '[]' 1
 fx repos/o/r/issues/7/comments '[{"created_at":"2025-12-31T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"}},{"created_at":"2026-01-02T00:00:00Z","user":{"login":"someone"}}]'
 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
 grep -qx 'result=none' "$TMP/out"; expect "起動前の bot コメント・他人のコメントは数えない -> none" $?
+
+echo "== fix-progress.sh check (PR head を読めない -> result を出さず失敗 #2899)"
+setup aaa '[]' 1
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-01-02T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"}}]'
+FAKE_FAIL_PATH=repos/o/r/pulls/7 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > "$TMP/v.out" 2>&1; rc=$?
+{ [ "$rc" != 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "head の読み取りが失敗 -> 非 0 で終わり result を出さない (pushed と判定しない)" $?
+grep -q 'could not read the head' "$TMP/v.out"; expect "head の読み取りが失敗 -> 失敗理由を error として出す" $?
+
+setup aaa '[]' 1
+fx repos/o/r/pulls/7 '{"state":"open","head":{"sha":""}}'
+OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > "$TMP/v.out" 2>&1; rc=$?
+{ [ "$rc" != 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "head が空文字で返った -> 非 0 で終わり result を出さない" $?
 
 echo "== reopen-pr.sh (close -> reopen。reopen は 3 回まで再試行)"
 reset
