@@ -38,6 +38,8 @@
 
 ## 4. F4 件数の再確認 (`repro_2143.sh f4`)
 
+注: 本節の数値は b25edd16 測定時の作者実測で、レビュー run (ae27423d 以降) では未再実行。`work-m11` 素材が無く `BOOT_FINAL` を作れないため。単位は `ldf4_` を含む**行数** (`grep -c`)。関数別は `re.findall` による**出現数**で、1 site が pre の 3 行と load (または zext) の行に現れるため両者は一致しない。
+
 - `ldf4 on=51 off=0` (`ldf4_` 行数)。`xor i64 0, 0 on=3886 off=3886` (xor は両方 3,886 で、F4 は xor を消さず別の read を足す。REPORT_2143 §4 と一致)。
 - 関数別 F4 件数 (on / off): 10 関数とも on 8〜9、off 0。`ldfix.py` の標準出力は `F4(frame-read)=10` (F4 有) / `=0` (F4 無)。
 
@@ -45,7 +47,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `uselistorder` 行による `scan_text` の alloca 除外 (scan records +2,339) | norm0 監査の site が実際より少ない。本 issue の named 監査は `scan_text` を使わないため直接の影響は無い | #2143 の範囲 (#2205 の未解決表。#2201 の本文の範囲外。`scan_text` 側の変更は本 PR では行わない) |
+| `uselistorder` 行による `scan_text` の alloca 除外 (scan records +2,339) | norm0 監査の site が実際より少ない。本 issue の named 監査は `scan_text` を使わないため直接の影響は無い | #2143 (親) に残す。新規起票はしない。本 PR では `scan_text` を変えないため未着手 |
 | 69c360 型 (read-modify-write を挟んだ writer chain の先を辿らない) | REGLIVE の偽陰性が残る | #2202 [LD-86] (既存) |
 | 旧監査 sites・ldfix 再生成 IR での数値 | 本 REPORT は素材の norm0 / pre IR での実測。REPORT_1866 の値と直接比べられない | #2144 [LD-80] (既存) |
 
