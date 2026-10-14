@@ -1,10 +1,10 @@
 target_va,level,section,pdata,direct_calls,ipp_callees,ipp_callee_names,final_va,thunk_hops,match,class,label,names,impl,dsp_rva,dsp_depth,tokens,body_end
 0x180001e00,1,.text,pdata外,1,,,6442458624,0,none,unidentified_no_exact,未同定,,,,,6,0x180001e20
 0x180001e20,1,.text,pdata外,1,,,6445089056,1,exact_final,trivial_body,未同定,ippFree,impl,0x73c600,0,5,0x180001e40
-0x180001e40,1,.text,pdata先頭,3,0x1802f8db0|0x1802f8f10|0x1802f9000,ippsRealToCplx_32f,6442458688,0,exact_final,family_candidates,族候補:ippsRealToCplx_16s|ippsRealToCplx_32f,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x180001ec0
-0x180001ec0,1,.text,pdata先頭,3,0x1802f9bc0|0x1802f9d20|0x1802f9e10,ippsRealToCplx_32f,6442458816,0,exact_final,family_candidates,族候補:ippsRealToCplx_16s|ippsRealToCplx_32f,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac3a0|0xcac6a0,0,13,0x180001f40
-0x180001f40,1,.text,pdata先頭,3,0x1802fa9d0|0x1802fab30|0x1802fac20,ippsRealToCplx_32f,6442458944,0,exact_final,family_candidates,族候補:ippsRealToCplx_16s|ippsRealToCplx_32f,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x180001fc0
-0x180001fc0,1,.text,pdata先頭,3,0x1802fb6e0|0x1802fb840|0x1802fb940,ippsRealToCplx_32f,6442459072,0,exact_final,family_candidates,族候補:ippsRealToCplx_16s|ippsRealToCplx_32f,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x180002040
+0x180001e40,1,.text,pdata先頭,3,0x1802f8db0|0x1802f8f10|0x1802f9000,ippsRealToCplx_32f,6442458688,0,exact_final,shape_only,未同定,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x180001ec0
+0x180001ec0,1,.text,pdata先頭,3,0x1802f9bc0|0x1802f9d20|0x1802f9e10,ippsRealToCplx_32f,6442458816,0,exact_final,shape_only,未同定,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac3a0|0xcac6a0,0,13,0x180001f40
+0x180001f40,1,.text,pdata先頭,3,0x1802fa9d0|0x1802fab30|0x1802fac20,ippsRealToCplx_32f,6442458944,0,exact_final,shape_only,未同定,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x180001fc0
+0x180001fc0,1,.text,pdata先頭,3,0x1802fb6e0|0x1802fb840|0x1802fb940,ippsRealToCplx_32f,6442459072,0,exact_final,shape_only,未同定,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x180002040
 0x180002040,1,.text,pdata先頭,3,,,6442459200,0,exact_final,shape_only,未同定,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x1800020c0
 0x1800020c0,1,.text,pdata先頭,3,,,6442459328,0,exact_final,shape_only,未同定,ippsRealToCplx_16s|ippsRealToCplx_32f,stub_only,0xcac320|0xcac420,0,13,0x180002140
 0x180002140,1,.text,pdata先頭,2,0x1802f8b10|0x1802f8c60,,6442459456,0,exact_final,shape_only,未同定,ippsCplxToReal_16sc|ippsCplxToReal_32fc|ippsCplxToReal_64fc|ippsPhase_32f|ippsPhase_32fc,stub_only,0xc51340|0xc514c0,0,21,0x1800021c0

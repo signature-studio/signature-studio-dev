@@ -90,6 +90,16 @@ def body_calls(img, md, lo, hi):
     return out
 
 
+def guard(c, calls, ipp_lo, ipp_hi, entries):
+    """呼出しガード (REPORT_152 §8.1)。全呼出先が IPPCODE で、各呼出先が #2613 で名付けられ、その名前が照合の名前と 1 つ以上重なる場合だけ名付けを残す。
+    返り値は (class, IPPCODE 直接 call 先, 呼出先の名前の和集合)。"""
+    ipp_c = sorted(t for t in calls if ipp_lo <= t < ipp_hi)
+    callee = {t: set(filter(None, entries.get(hex(t), {}).get('names', '').split('|'))) for t in ipp_c}
+    ok = not calls or (set(ipp_c) == calls and all(callee[t] & set(c['names']) for t in ipp_c))
+    cls = c['class'] if ok or c['class'] not in ('identified', 'family_candidates') else 'shape_only'
+    return cls, ipp_c, set().union(*callee.values())
+
+
 def main():
     md = Cs(CS_ARCH_X86, CS_MODE_64)
     md.detail = True
@@ -108,12 +118,7 @@ def main():
             va = int(va_s, 16)
             c = classify(elq, md, index, va - base)
             calls = set(body_calls(elq, md, va, rec['end']))
-            ipp_c = sorted(t for t in calls if ipp_lo <= t < ipp_hi)
-            callee_names = set()
-            for t in ipp_c:
-                callee_names |= set(filter(None, entries.get(hex(t), {}).get('names', '').split('|')))
-            guard_ok = not calls or (set(ipp_c) == calls and bool(set(c['names']) & callee_names))
-            cls = c['class'] if guard_ok or c['class'] not in ('identified', 'family_candidates') else 'shape_only'
+            cls, ipp_c, callee_names = guard(c, calls, ipp_lo, ipp_hi, entries)
             c['class'] = cls
             impl = ''
             if c['names']:
@@ -161,10 +166,15 @@ def main():
 
     # 初期化スタブ・索引書込み関数 (説明対象。根拠は同じ照合)
     pos = classify(elq, md, index, 0x1802F8DB0 - base)
-    print('陽性対照 0x1802f8db0 (#2613 の一意名):', pos['class'], pos['names'])
+    pos_end = next(ins.address + ins.size for ins in md.disasm(elq['mem'][0x1802F8DB0 - base:], 0x1802F8DB0)
+                   if ins.mnemonic == 'ret')
+    pos_calls = set(body_calls(elq, md, 0x1802F8DB0, pos_end))
+    print('陽性対照 0x1802f8db0 (#2613 の一意名):', pos['class'], pos['names'], 'ガード後', guard(pos, pos_calls, ipp_lo, ipp_hi, entries)[0])
     for name, va, size in (('stub 0x1803e71b0', STUB, 0x40), ('idx writer 0x1800010a0', IDX_WRITER, 0x80)):
         c = classify(elq, md, index, va - base)
-        callees = [hex(t) for t in sorted(set(body_calls(elq, md, va, va + size)))]
+        calls = set(body_calls(elq, md, va, va + size))
+        c['class'] = guard(c, calls, ipp_lo, ipp_hi, entries)[0]
+        callees = [hex(t) for t in sorted(calls)]
         print(name, c['class'], c['names'], c['match'], 'callees', callees)
 
     outward = d['linear_out_list']
