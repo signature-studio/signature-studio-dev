@@ -5,7 +5,7 @@
 #       → 出力 sample rate を 48000 に設定 → `/R` で書き出し → data チャンクの SHA-256 を REPEAT 回求める。
 # 使い方: bash tools/flp/s2_render_probe.sh <Render tests の .flp 名> [REPEAT=3]
 # 追加試行: S2_REG に 1 行 1 件 `<HKCU 下のキー>|<値名>|<REG_SZ の値>` を入れる (値は WINEPREFIX に残る)。
-#   例 (#113 の 16-bit 試行): S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|4' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+#   例 (#113 の 16-bit 試行、既定 WFBox=2 のため S2_WFBOX=0 を付ける): S2_WFBOX=0 S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|4' bash tools/flp/s2_render_probe.sh Autogun.flp 1
 # 検証用の即値パッチ: S2_PATCH に 1 行 1 件 `<VA hex>|<期待バイト hex>|<新バイト hex>` を入れる (oracle ローカルコピーの FLEngine_x64.dll のみ)。
 # レジストリ・トレース: S2_TRACE_REG=1 で WINEDEBUG=+reg にし、開かれたキーを $WORKDIR/s2_reg_keys_<n>.txt に出す。
 # WAV 形式: WAVRenderForm\WFBox = ${S2_WFBOX:-2} (0 = 16-bit / 1 = 24-bit / 2 = 32-bit float、#3052 で実測)、WAVRenderForm\DitherBox = 0 (dither off)。16-bit に戻すには S2_WFBOX=0。
