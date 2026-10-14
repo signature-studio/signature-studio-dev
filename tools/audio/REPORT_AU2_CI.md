@@ -234,10 +234,10 @@
 - 変更: Firefox 経路の既定出力判定を OS 別にした (Linux = ci_null の sink-input / Windows = `CABLE Input` / macOS = `BlackHole 2ch`)。シナリオを Chrome 行列と同じ 3 本にした。`bidi.mjs` の既定 Firefox を OS 別にした。
 - ubuntu 再現 (Firefox 157.0・PulseAudio null-sink・n=3): **9/9 PASS** (3 シナリオ × 3 rep。underrun 0・既定 sink 接続 9/9)。48k は burst 1024・T 1536、96k は burst 1920・T 2816 (§9-1 の範囲と一致)。wall 41.0 / 40.5 / 40.6 s、load (1 分) 0.18〜0.36。
 - ネガティブコントロール (n=1): 期待外れ sink → 0/3 PASS (`on_expected=false`)。強制 underrun → 0/3 PASS。
-- **Safari**: 経路は未作成。理由: Linux runner では Safari を起動・測定できず、既存 harness は Chrome CDP と Firefox BiDi の 2 経路のみ。代替: macOS の `safaridriver` 経路 (未着手。#3168 で追跡)。
+- **Safari**: 経路は未作成。理由: Linux runner では Safari を起動・測定できず、既存 harness は Chrome CDP と Firefox BiDi の 2 経路のみ。代替: macOS の `safaridriver` 経路 (未着手。#3193 [AU-35] で追跡)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| Windows / macOS の Firefox 行は #3169 (yaml) の merge 後に PM が適用。dispatch 結果は未取得 | 受入 1 の Win/mac 未達 | #3168 |
-| `win32`・`darwin` の判定分岐は Linux runner で未実行 | 判定の実機確認なし | #3168 |
-| Safari の P1〜P4 (経路未作成) | Safari 未測定 | #3168 |
+| Windows / macOS の Firefox 行は #3169 (yaml) の merge 後に PM が適用。dispatch 結果は未取得 | 受入 1 の Win/mac 未達 | #3192 [AU-34] |
+| `win32`・`darwin` の判定分岐は Linux runner で未実行 | 判定の実機確認なし | #3192 [AU-34] |
+| Safari の P1〜P4 (経路未作成) | Safari 未測定 | #3193 [AU-35] |

@@ -44,14 +44,14 @@
 ## E. Safari (macOS) と Windows / macOS (未検証)
 
 - **Safari**: 経路を作っていない。理由: (1) この runner は Linux で Safari を起動できず、P1〜P4 を実測できない。(2) 既存の harness は Chrome CDP (`chrome.mjs`) と Firefox WebDriver BiDi (`bidi.mjs`) の 2 経路のみで、Safari 用の経路が無い。(3) Safari が WebDriver BiDi に対応するかは本 run で未確認 `[未確認]`。
-- **代替案 (未着手)**: macOS runner で `safaridriver` (WebDriver classic) から `au2.mjs` 相当を駆動する経路。`safaridriver --enable` と Safari の remote automation 許可が要る `[未確認: 手順は macOS 実機で確認]`。既定出力の判定は darwin 分岐 (`BlackHole 2ch`) を使う。起票先: #3168 (未着手のまま追跡)。
+- **代替案 (未着手)**: macOS runner で `safaridriver` (WebDriver classic) から `au2.mjs` 相当を駆動する経路。`safaridriver --enable` と Safari の remote automation 許可が要る `[未確認: 手順は macOS 実機で確認]`。既定出力の判定は darwin 分岐 (`BlackHole 2ch`) を使う。起票先: #3193 [AU-35] (未着手のまま追跡)。
 - **Windows / macOS の Firefox 行**: `audio-matrix.yaml` は PR #3169 (branch `3164-au32-win-mac-audio-matrix`) にのみ在り、main には無い。Firefox 行の追加は #3169 の merge 後に PM が行う。追加する内容: matrix に `os: windows-latest / browser: firefox / firefox: 'C:\Program Files\Mozilla Firefox\firefox.exe'` と `os: macos-latest / browser: firefox / firefox: '/Applications/Firefox.app/Contents/MacOS/firefox'` を足し、`measure` の step で `browser == firefox` の行は `node tools/audio/harness/au2.mjs --rep $rep --out audio-results/...` を呼ぶ (`FIREFOX` env を渡す)。Chrome 行は従来どおり `run.mjs`。
-- **未検証**: `win32`・`darwin` の判定分岐 (PowerShell の `Get-AudioDevice`・`SwitchAudioSource`) は Linux runner では実行していない。`node --check` 通過のみ。dispatch 結果は適用後に記録する (起票先 #3168)。
+- **未検証**: `win32`・`darwin` の判定分岐 (PowerShell の `Get-AudioDevice`・`SwitchAudioSource`) は Linux runner では実行していない。`node --check` 通過のみ。dispatch 結果は適用後に記録する (起票先 #3192 [AU-34])。
 
 ## F. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| Windows / macOS の Firefox 行 (yaml) は #3169 未 merge のため未適用。Win/mac の dispatch 結果なし | 受入 1 の Win/mac は未達 | #3168 (#3169 merge 後に PM が適用・dispatch し、§10 に記録) |
-| `win32`・`darwin` の判定分岐は未実行 | 判定の実機確認が無い | #3168 (dispatch の結果で確かめる) |
-| Safari (macOS) の P1〜P4 | 未測定。経路は未着手 | #3168 (代替案 E) |
+| Windows / macOS の Firefox 行 (yaml) は #3169 未 merge のため未適用。Win/mac の dispatch 結果なし | 受入 1 の Win/mac は未達 | #3192 [AU-34] (#3169 merge 後に PM が適用・dispatch し、§10 に記録) |
+| `win32`・`darwin` の判定分岐は未実行 | 判定の実機確認が無い | #3192 [AU-34] (dispatch の結果で確かめる) |
+| Safari (macOS) の P1〜P4 | 未測定。経路は未着手 | #3193 [AU-35] (代替案 E) |
