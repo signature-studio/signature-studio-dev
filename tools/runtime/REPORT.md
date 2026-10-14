@@ -57,8 +57,8 @@
 **RT-9 Firefox 機能マトリクス (#127)** — 検証起点 HEAD `5984d46` (コミット済み内容で実行)。Firefox 157.0 headless (geckodriver 0.37.1) と Chromium 154.0.8037.0 headless を同一 runner (4 コア、load average 0.95〜1.03) で `features.html` に流した実測。**Safari は未測定** (runner は Linux でプローブ可能な WebKit が無い: Playwright WebKit は gtk4/gstreamer 等のホスト依存ライブラリ欠落で導入不可)。再現: `node tools/runtime/probe/run_features_firefox.mjs` (→ `work/features_result_firefox.json`、1 回 59.7〜63.1 s、3 回実行)。
 - **Firefox と Chromium で同値**: wasm 機能 validate は simd / relaxed_simd / threads_atomics / bulk_memory / reference_types / multivalue / tail_call / extended_const / **memory64** / multi_memory / eh_legacy / eh_exnref / gc / shared_everything がともに true。`WebAssembly.promising` / `Suspending` (JSPI) は function、`Memory({address:"i64"})` 生成可、`Memory.toResizableBuffer` あり、`JSTag` あり。crossOriginIsolated=true、SAB・`Atomics.waitAsync` あり、メインスレッド `Atomics.wait` は TypeError、Worker 内は timed-out (=許可)。nested Worker・OffscreenCanvas 2D・worker rAF・OPFS sync handle・Worker 内 IDB 可。4 worker×1M atomic add=4,000,000 一致 (Firefox 86.5〜96 ms / Chromium 146 ms)。`WebAssembly.Module` の IDB 保存は両者とも DataCloneError、`structuredClone` と Cache API は可。shared wasm32 4GiB・非 shared memory64 8GiB grow・shared memory64 max 16GiB 可。
 - **差分**: Firefox は WebGPU・File System Access・WebHID が undefined。wide_arithmetic は Firefox のみ true。`ArrayBuffer(8GiB)` は Firefox 可・Chromium 失敗。cross-worker `memory.atomic.wait` の戻り値は Firefox 1 / Chromium 0 (テストが notify をポーリングする構造上、wait が先に入るか値不一致で即返るかの差と推測。原因は未検証。Chromium 側の `woken:0` も `woken:1` も `wait` からの復帰ではある)。
-- **Firefox の注意**: 非 shared memory64 を 256MiB 刻みで 8GiB まで grow する処理が **35.0〜37.6 s** (Chromium 0.5 ms)。shared memory64 の同処理は 38〜166 ms (3 回でばらつきあり)。原因は未調査 (ページ commit/zero-fill 方式の差と推測するが未検証)。
-- **headless では判定不能**: `AudioContext` 経路 (`resume()` と AudioWorklet) が Firefox headless で 20 s 内に完了せず (step timeout)、Worker 内 WebGL2 は null。runner に音声デバイス・GPU が無い影響の可能性が高く、**Firefox の AudioWorklet / WebGL2 可否は未確定** (実機が必要)。
+- **Firefox の注意**: 非 shared memory64 を 256MiB 刻みで 8GiB まで grow する処理が **35.0〜37.6 s** (headless。Xvfb 非 headless では 24.3〜24.6 s (`243a0f2b`、3 回)。Chromium 0.5 ms)。shared memory64 の同処理は 38〜166 ms (3 回でばらつきあり)。原因は未調査 (ページ commit/zero-fill 方式の差と推測するが未検証)。
+- **headless では判定不能 → Xvfb で WebGL2 のみ解消**: `AudioContext` 経路 (`resume()` と AudioWorklet) が Firefox headless で 20 s 内に完了せず (step timeout)、Worker 内 WebGL2 は null。非 headless を Xvfb 上で動かす (`FIREFOX_HEADLESS=0 xvfb-run -a node tools/runtime/probe/run_features_firefox.mjs`) と、Worker 内 WebGL2 は `WebGL 2.0` (llvmpipe) で判定できた (検証起点 `243a0f2b`、3 回実測、各 50.6〜52.1 s、exit 0、load 0.27〜1.39)。AudioContext は 3 回とも 20 s hang のまま。`FIREFOX_PREFS` で `media.cubeb.force_null_context` / `media.cubeb.backend`=`null` を入れても、ALSA の null PCM (`ALSA_CONFIG_PATH`) を与えても `resume()` は解決しなかった。音声デバイス無しが原因かは未特定。**Firefox の AudioWorklet 可否は未確定** (実音声出力のある環境が必要)。
 - **変更**: `features.js` に各 step 20 s の hang ガードと `window.__partial/__step` を追加 (旧版は 1 step の hang で `__result` が出ず全体が止まる)。Chrome 結果への影響なし (`run_features.mjs` で Chromium 完走を確認)。
 
 **RT-10 実 FLEngine lift の起動時間・tier-up・soak (#128)** — 実 x64c lift (boot 連鎖) の wasm を Chrome Worker で計測 (サイズ・圧縮・起動・帯域・tier-up・boot ループ soak)。**初回フレームと実 FL の soak は未測** (boot が unit 209/942 で停止)。数値・再現: [`rt10/REPORT.md`](rt10/REPORT.md)。
@@ -73,7 +73,7 @@
 
 ## 未解決・ブロッカー
 0. **RT-3 (#121)**: (a) 実 FLEngine / `tools/gui/e2e.sh` (emsdk+RetDec 要) 経由の実 shim での入力往復は未実施 (本 run は素材・emsdk 無し)。(b) **入力経路が 2 本** (GuiShared 入力リング `gui.ts` と PumpRing): どちらを正とするかは GUI-3 #174 / GUI-11 #32 で決定 (DESIGN §2.6)。(c) index.html の `#screen` は `setupCanvas` が 2d context 取得済みで `transferControlToOffscreen` 不可 → FL 結合時に寄せる。(d) Firefox/Safari の OffscreenCanvas commit 挙動は未測定 (RT-9)。
-1. **Safari 未測定** (Firefox 157 headless は #127 で測定済み)。Safari 実機で `window.__result` の共有が必要 (起票先: #127)。Firefox の AudioWorklet / Worker WebGL2 も headless では判定不能 (実機が必要)。
+1. **Safari 未測定** (Firefox 157 headless は #127 で測定済み)。Safari 実機で `window.__result` の共有が必要 (起票先: #127)。Firefox の AudioWorklet は headless・Xvfb (null 音声) とも判定不能 (実機が必要。Worker WebGL2 は Xvfb で判定可、上記 RT-9 節)。
 2. **実 FL サイズ wasm**: x64c boot 連鎖で実測済み (RT-10 #128, 数値は `rt10/REPORT.md`)。残: boot が初回フレームに届いた後の総時間と実 FL の soak (起票先: #541 [RT-12])。
 3. 本番 pthread ビルドの boot e2e は **shim MT 自己テスト main で実証済み (#120)**。残: 実 FLEngine lift を同フラグでビルドした boot (起票先: #227 ICALL-1 / RT-10)。
 3b. この run は `work-m11` 無しで M1/M6/M10/M11 の既存 e2e が skip された。`oc_artifacts: fl-win64 work-m11` で再実行し、本変更後も 4 本が ALL OK のままか確認 (起票先: #120 に再検証コメント / PM 判断)。
@@ -107,7 +107,7 @@
 pnpm runtime:e2e                       # 1 コマンド e2e (stage → vite → headless Chrome → 参照突合 → pump 自己検証)
 pnpm runtime:e2e:prod                  # 本番バンドル版
 node tools/runtime/probe/run_features.mjs && node tools/runtime/probe/run_memcount.mjs
-node tools/runtime/probe/run_features_firefox.mjs   # RT-9 (FIREFOX_BIN / GECKODRIVER_BIN で上書き可、CHROME_BIN=chromium で Chrome 側)
+node tools/runtime/probe/run_features_firefox.mjs   # RT-9 (FIREFOX_BIN / GECKODRIVER_BIN で上書き可、CHROME_BIN=chromium で Chrome 側。非 headless: FIREFOX_HEADLESS=0 xvfb-run -a …、prefs 追加: FIREFOX_PREFS='{"k":v}')
 bash tools/runtime/bench/build_ott_variants.sh && bash tools/runtime/bench/build_membench.sh && node tools/runtime/bench/run_bench.mjs
 bash tools/runtime/bench/build_asyncify.sh && node tools/runtime/bench/asyncify_cost.mjs
 bash tools/runtime/spike/build_pump_spike.sh && node tools/runtime/spike/run_pump_spike.mjs
