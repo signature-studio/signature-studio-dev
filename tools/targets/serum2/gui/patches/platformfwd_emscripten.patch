@@ -1,0 +1,13 @@
+diff --git a/vstgui/lib/platform/platformfwd.h b/vstgui/lib/platform/platformfwd.h
+index ad12a74..e185adc 100644
+--- a/vstgui/lib/platform/platformfwd.h
++++ b/vstgui/lib/platform/platformfwd.h
+@@ -30,7 +30,7 @@ class Win32Factory;
+ using PlatformInstanceHandle = HINSTANCE;
+ #elif MAC
+ using PlatformInstanceHandle = CFBundleRef;
+-#elif LINUX
++#elif LINUX || WASM
+ using PlatformInstanceHandle = void*;
+ #else
+ static_assert (false, "unknown platform");

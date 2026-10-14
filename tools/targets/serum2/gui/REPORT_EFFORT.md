@@ -209,7 +209,7 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 |---|---|
 | canvas 側の純粋仮想 103 関数 (6 files) の wasm 実装 (受入条件 1 の残り) | #2064 ([SR-35]) |
 | `CTextLabel` 系 + `XferOnOffButton` 1 view の canvas 描画 (受入条件 2 の残り) | #2065 ([SR-36])・前提 #2064 |
-| `XferOnOffButton` の .text 対応付けと本体バイト数 (受入条件 3 の残り) | #2066 ([SR-37]) → §14 で完了 |
+| `XferOnOffButton` の .text 対応付けと本体バイト数 (受入条件 3 の残り) | #2066 ([SR-37]) → §15 で完了 |
 
 - 親 #2029 ([SR-31]) は、上記 3 件へ未達の受入条件を移したうえで範囲を縮めた。
 - 測定 commit: 本 §10 と `vtable_measure.py`・`check_wasm_syntax.sh` を追加した commit (PR 本文参照)。
@@ -245,5 +245,10 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 - 結論: font 7 + graphicsdevice 31 (計 38 関数) を wasm 実装。構文検査は測定 commit `89495465` で 5/5 rc=0、具象性検査 (`check_concrete.cpp`) rc=0。リンク・閉包確定・描画は未実施 (#2065)。
 - 詳細・実測・測定 commit と差分: 付録 `REPORT_EFFORT_APPENDIX_2107.md` (本節の全文)。
 
-## 14. 2026-10-14 run (#2066 / SR-37): XferOnOffButton の .text 対応付けと本体バイト数
+## 14. 2026-10-14 run (#2139 / SR-42): canvas platformfactory (wasm)
+
+- 結論: factory 20 関数 (`IPlatformFactory`) を wasm 実装。`check_canvas_syntax.sh` 6 files・`check_wasm_syntax.sh`・`check_concrete.cpp` すべて rc=0 errors=0 (測定 commit `e5ba8809`)。リンク・描画は未実施 (#2065)。
+- 詳細・実測・前提の解決 (`platformfwd_emscripten.patch` と `VSTGUI_OPENGL_SUPPORT 0`): 付録 `REPORT_EFFORT_APPENDIX_2139.md` (本節の全文)。
+
+## 15. 2026-10-14 run (#2066 / SR-37): XferOnOffButton の .text 対応付けと本体バイト数
 - 詳細・実測・測定スクリプト: 付録 `REPORT_EFFORT_APPENDIX_2066.md` (本節の全文)。

@@ -52,7 +52,7 @@ try {
       // 3 秒分以上ダンプされるまで待って照合
       await page.waitForExpr(`(window.__audio?.verify()?.covered_frames ?? 0) > 48000 * 3`, 30000);
       const v = await page.evaluate("window.__audio.verify()");
-      const loc = `first_err_frame=${v.first_err_frame} first_zero_run_frame=${v.first_zero_run_frame} underrun_cap=${v.underrun_count} first_underrun_frame=${v.first_underrun_frame} last_underrun_frame=${v.last_underrun_frame} fill_at_first_underrun=${v.fill_at_first_underrun} fill_min_before_first_underrun=${v.fill_min_before_first_underrun} cb_gap_max_ms=${v.cb_gap_max_ms} cb_gap_over20=${v.cb_gap_over20_count}`;
+      const loc = `first_err_frame=${v.first_err_frame} first_zero_run_frame=${v.first_zero_run_frame} underrun_cap=${v.underrun_count} first_underrun_frame=${v.first_underrun_frame} last_underrun_frame=${v.last_underrun_frame} fill_at_first_underrun=${v.fill_at_first_underrun} fill_min_before_first_underrun=${v.fill_min_before_first_underrun} cb_gap_max_ms=${v.cb_gap_max_ms} cb_gap_over20=${v.cb_gap_over20_count}${v.underrun_count ? ` fill_trace=[${v.fill_trace_before_first_underrun.join(",")}]` : ""}`;
       rec(tag("tone"), v.max_abs_err < 1e-5 && Math.abs(v.rms - 0.5 / Math.SQRT2) < 0.005 && v.zero_runs_ge16 === 0,
         `frames=${v.covered_frames} sr=${v.sampleRate} max_err=${v.max_abs_err.toExponential(2)} rms=${v.rms.toFixed(4)} (理論 0.3536) zero_runs=${v.zero_runs_ge16} peak=${v.peak.toFixed(3)} ${loc}`);
       rec(tag("underruns"), v.underruns === 0, `underruns=${v.underruns} ${loc}`);
