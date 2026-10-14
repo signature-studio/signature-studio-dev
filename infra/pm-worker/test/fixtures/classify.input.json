@@ -1,0 +1,67 @@
+{
+  "now": "2026-10-14T12:00:00Z",
+  "snapshot": {
+    "issues": [
+      {"number": 1, "title": "[CI-1] base", "labels": [], "body": "", "deps": null},
+      {"number": 2, "title": "[CI-2] needs input", "labels": ["needs-user-input"], "body": "", "deps": null},
+      {"number": 3, "title": "[CI-3] blocked by text", "labels": [], "body": "依存: #1", "deps": null},
+      {"number": 4, "title": "[CI-4] started by PR", "labels": [], "body": "", "deps": null},
+      {"number": 5, "title": "[CI-5] blocked by manual deps", "labels": [], "body": "", "deps": null},
+      {"number": 6, "title": "[CI-6] ready via manual", "labels": [], "body": "", "deps": null},
+      {"number": 7, "title": "[CI-7] parent", "labels": [], "body": "", "deps": null},
+      {"number": 8, "title": "[CI-8] child of 7", "labels": [], "body": "親: #7\n依存: #7", "deps": null},
+      {"number": 9, "title": "[CI-9] live blocked", "labels": [], "body": "", "deps": {"total_blocked_by": 1}},
+      {"number": 10, "title": "[CI-10] live blocker", "labels": [], "body": "", "deps": null},
+      {"number": 11, "title": "[CI-11] launched recently", "labels": [], "body": "", "deps": null},
+      {"number": 12, "title": "[CI-12] stop report needs extra", "labels": [], "body": "", "deps": null},
+      {"number": 13, "title": "[CI-13] stop without fix", "labels": [], "body": "", "deps": null},
+      {"number": 14, "title": "[CI-14] bot comment recent", "labels": [], "body": "", "deps": null},
+      {"number": 15, "title": "[CI-15] closed PR does not start", "labels": [], "body": "", "deps": null},
+      {"number": 16, "title": "[CI-16] run title", "labels": [], "body": "", "deps": null},
+      {"number": 17, "title": "[CI-17] relaunch exhausted", "labels": [], "body": "", "deps": null},
+      {"number": 18, "title": "[CI-18] base of 19", "labels": [], "body": "", "deps": null},
+      {"number": 19, "title": "[CI-19] blocked by 18", "labels": [], "body": "依存: #18", "deps": null},
+      {"number": 20, "title": "[CI-20] pm art line", "labels": [], "body": "", "deps": null},
+      {"number": 21, "title": "[CI-21] bot art line", "labels": [], "body": "", "deps": null}
+    ],
+    "prs": [
+      {"number": 900, "state": "open", "merged": false, "draft": false, "ref": "4-started", "title": "x", "body": ""},
+      {"number": 901, "state": "open", "merged": false, "draft": false, "ref": "zzz", "title": "y", "body": "Closes #4"},
+      {"number": 902, "state": "closed", "merged": false, "draft": false, "ref": "15-closed", "title": "z", "body": ""}
+    ],
+    "bot_last": {
+      "12": {"at": "2026-10-14T10:00:00Z", "head": "素材不足: work-m11 が無いため着手できません。", "art": null},
+      "13": {"at": "2026-10-14T10:00:00Z", "head": "停止します。判断を求めます。", "art": null},
+      "14": {"at": "2026-10-14T11:00:00Z", "head": "進捗を報告します。", "art": null},
+      "17": {"at": "2026-10-14T10:00:00Z", "head": "素材不足: work-m11 が無い", "art": null},
+      "21": {"at": "2026-10-14T10:00:00Z", "head": "停止します", "art": "oc_artifacts: fl-win64 work-m11"}
+    },
+    "pm_art": {
+      "20": {"at": "2026-10-13T00:00:00Z", "line": "oc_artifacts: fl-win64 plugins-ott"}
+    },
+    "runs": [
+      {"id": 555, "event": "issue_comment", "title": "[CI-16] run title"}
+    ]
+  },
+  "launched": {
+    "11": "2026-10-14T11:00:00Z",
+    "12": "2026-10-14T07:00:00Z",
+    "13": "2026-10-14T07:00:00Z",
+    "17": "2026-10-14T07:00:00Z"
+  },
+  "relaunch": {
+    "17": {"count": 2, "art": null}
+  },
+  "manualDeps": {
+    "5": [6]
+  },
+  "liveBlockers": {
+    "9": [10]
+  },
+  "fullBotBody": {
+    "12": "素材不足: work-m11 が無いため着手できません。",
+    "13": "停止します。判断を求めます。",
+    "17": "素材不足: work-m11 が無い",
+    "21": "停止します"
+  }
+}
