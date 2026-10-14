@@ -60,6 +60,9 @@ EM_JS(void, m11_stk_restore, (unsigned sp), {
 #else
 #define M11_TRACE(...) fprintf(stderr, __VA_ARGS__)
 #endif
+#ifndef M11_INSTR_K12
+#define M11_INSTR_K12 0   /* 1 = _CopyArray kind 12 (416720) の到達を stderr に出す計測専用 probe. 既定 0 は build 出力に影響しない */
+#endif
 
 static int g_trace = 0;
 static u64 g_icall_ok = 0, g_icall_miss = 0, g_icall_viaVA = 0;
@@ -1148,12 +1151,18 @@ unsigned long long function_416db0(unsigned long long dest, unsigned long long s
     if (!count) return 0;
     u32 kind = B(ti);
     u64 r = (kind == 13 || kind == 14 || kind == 22) ? TI_REC(ti) : 0;
+#if M11_INSTR_K12
+    M11_TRACE("[CA_KIND] kind=%u count=%llu dest=0x%llx src=0x%llx\n", kind, count, dest, src);
+#endif
     do {
         u64 step = 8;
         switch (kind) {
         case 10: function_413540(dest, Q(src)); break;
         case 11: function_4134e0(dest, Q(src)); break;
         case 12: /* 416720: Q(RVA 0xfa5028) が 0 なら Error(0x10), 非 0 なら間接 call (RetDec は落とす, D15 型) */
+#if M11_INSTR_K12
+            M11_TRACE("[K12HIT] fn=0x%llx slot=0x%llx dest=0x%llx src=0x%llx count=%llu\n", (u64)0x416720, Q(R(0xfa5028)), dest, src, count);
+#endif
             if (Q(R(0xfa5028)) == 0) function_409730(0x10);
             else m11_icall(Q(R(0xfa5028)), dest, src, 0, 0, 0, 0, 0, 0);
             step = 0x18; break;

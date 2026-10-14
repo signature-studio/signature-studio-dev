@@ -51,3 +51,23 @@
 - ログ出力先 `tools/audio/work/e2e_last.log` は gitignore 対象の生成物で、運用ルールでは生成物を `work/` に置く。よって e2e.sh は変えていない。
 - 失敗は 0 件。producer (wasm 出力遅延) / consumer (worklet rebuffer) の切り分けは未実施。旧失敗 (§19) の条件は引き続き未特定。
 - 未解決: (a) CI に e2e を組み込んでいない (`.github` に参照なし) ため、失敗ログを CI artifact として残す経路は無い。(b) 失敗の再現条件の特定。追跡は **#863**。
+
+## 23. AU-15 (#863) 再現試行と位置情報の読み (測定 commit 1e3ee7af = origin/main、コード差分 0)
+
+- 測定: `bash tools/audio/integration/e2e.sh` (素材 fl-win64 + toolchain-emsdk 展開、`TMPDIR=$RUNNER_TEMP`、foreground)。
+- 結果 (計 12 run・失敗 1):
+
+| 区分 | run 数 | 結果 | wall | load (開始時) |
+|---|---|---|---|---|
+| 無負荷 (1 回目) | 1 | **FAIL** (dev:tone / dev:underruns。exit 1) | 10.5 s | 1.35 |
+| 無負荷 (2〜6 回目) | 5 | 5/5 PASS (13/13) | 12 s | 1.35〜2.03 |
+| busy loop 6 本 | 6 | 6/6 PASS (13/13) | 21〜22 s | 3.38〜9.79 |
+
+- 失敗 run の位置情報 (`tools/audio/work/e2e_last.log`・dev のみ、preview は PASS):
+  `dev:tone max_err=6.53e-1 rms=0.3510 zero_runs=1 first_err_frame=56576 first_zero_run_frame=56607 underrun_cap=1 first_underrun_frame=56576 last_underrun_frame=56576`。
+- 旧失敗 (§19) と同じ `first_err_frame` / `first_underrun_frame` = 56576 (quantum 442)。zero run は 31 frame 後の 56607 から始まる。
+- 切り分けの読み: underrun 計数は worklet 側 (`capture hdr[6]`) で取られ、その時点で出力が既に誤っている。よって「consumer (worklet 側のリング枯渇) で観測された」ことまでは言える。producer (wasm の出力到達時刻) 側の時刻は取っていないため、producer 遅延が原因かは**未確定**。
+- 再現条件 (本節の 12 run 内の内訳): 無負荷 1/6・busy loop 6 本 0/6。負荷との相関は見えていない。
+- 節ごとの FAIL 件数 (HEAD が節によって異なるため、合計は参考値): §19 (旧 HEAD `bb912951`) 1/11、§20 0/15、§21 0/27、§22 0/14 (改修前 1 + 改修後 13)、§23 1/12。計 **2 件 / 79 run** (11 + 15 + 27 + 14 + 12)。
+- `shim_port.not_implemented_yet` の console.error は全 12 run (PASS 含む) に出ている。失敗とは無関係。
+- 未解決 (追跡 **#863**): (a) producer 側の到達時刻 (fla_test の出力 quantum ごとの時刻) を capture に追加しないと切り分けられない。(b) 再現頻度は本節の個別 run 数で書く (無負荷 1/6・busy loop 6 本 0/6)。母数が少なく条件は未特定。
