@@ -153,3 +153,25 @@ index ab3ba4c0..4a9d4642 100644
 1. `scen.txt` の step 1 入力 (`self` / `P` / `L` / `R` / xmm0〜15 / flags) を native 側の trace (`liftlib/work/kh_gain/diff/native_runner`) と突き合わせ、step 1 の入力が一致するかを先に確定する。入力が違うなら、比較対象は step 間の状態持ち越しの扱い。
 2. 入力が一致する場合のみ、step 1 で `self+108` を書く命令を `rt_kilohearts-gain/after.0.restored.ll` の `!insn.addr` から特定する。
 3. `ir_flatten` の `--table` (dispatch 表 164) 経由の呼び出しで、戻り値の float 扱い (`ott_xmm0`) を確認する。
+
+## runner 修正と xmm0 欄の訂正 (2026-10-14 06:04〜06:25 UTC)
+
+測定 commit: 本 commit (`tools/icall/kh_route_run.sh` を変えた最後の commit)。素材は main の checkout の `work/` を symlink で参照。
+
+- 訂正: 前節までの「xmm0 欄の不一致 (native `0x3e315071`・wasm `0`)」は lift の差ではなく runner の表示上の差だった。`kh_route_run.sh` が複製する `wasm_runner.mjs` は R 行の xmm0 を常に `0` で出力していた。本 commit で `M._ott_xmm0()` を読むよう修正 (native_runner の `xmm0_out[0]` と同じ意味)。
+- 修正後の実測 (HEAD 本 commit・再現コマンド `bash tools/icall/kh_route_build.sh && bash tools/icall/kh_route_run.sh`):
+
+| 項目 | 実測 |
+|---|---|
+| `kh_route_build.sh` | rc 0 / real 1m13s (`kh_route.wasm` 50,762,457 B) |
+| `kh_route_run.sh` | rc 0 / real 0.33 s / scenarios 61 / steps 366 / wasm_trap 0 |
+| 全バッファ bit 一致 steps | 61/366 (step 0 は全 61 シナリオ一致) |
+| xmm0 一致 steps | 73/366 (step 1 は 11/61) |
+| 不一致バッファ (step 数) | self 305・P 293・L 291・R 290 |
+| rax 一致 | 173/366 だが参考値。rax は wasm / native で address space が異なるポインタを含むため判定に使わない |
+
+- step 1 (シナリオ 0) の `self` 不一致は 9 bytes: offset 106・107・110・136〜138・152〜154。`self+104` は native `0x0000803c` (0x3c800000 = 0.015625)・wasm `0x0000` 。
+- 0x3c800000 (0.015625) はイメージ内の `.rdata` 範囲 (0x13a1000〜) 以外にも複数箇所に現れ、`data_gen.py` の敷設対象 (`.rdata`/`.data`/`_RDATA`) で値が出るかは未確認。`.text` 側の即値・`.pdata`・`.rsrc` 由来の可能性を含めて未切り分け。
+- step 0 で全バッファ一致しているため、step 1 で初めて現れる入力 (step 0 の出力で更新された状態、もしくは `ott_run` の引数 ABI) が疑わしい。`ms_ctx` は native 側で毎回 `memset` されており、状態の持ち越しは native に無い。wasm 側の持ち越しは未確認。
+
+判定: 受入 1・2 は引き続き未達。受入 3 (再現 1 本) は build + run で実行まで通ることを確認済み。
