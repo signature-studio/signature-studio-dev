@@ -9,12 +9,13 @@
   "f2": false,
   "iargs": true,
   "leafabi": {"ret_xmm0": ["function_18011e5a0"]},
-  "gdata": "all"
+  "gdata": "all",
+  "shift": {"base": "0x180000000", "newbase": "0x30000000", "add_forms": true}
  },
  "funcs": ["function_18011e5a0"],
  "exports": ["function_18011e5a0"],
  "leaf_specs": ["specs/ott_getparam_idx.json"],
- "emcc": {"opt": "-O1"},
+ "emcc": {"opt": "-O1", "lb_layout": {"newbase": "0x30000000"}},
  "regress": {"expect_match": "all"},
  "stub_externals": true,
  "gdata_pad": true
