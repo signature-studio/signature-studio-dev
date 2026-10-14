@@ -22,6 +22,8 @@ export const DIGEST_ROLLING_RE = /^\[[A-Za-z]+-\d+\] 自律運転ダイジェス
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
+// Worker の自動着手を見送る印 (#2651)。付いた open な issue は classify の hold 行に置き、着手 (picks) も relaunch の意図も投稿しない。
+export const OC_HOLD_LABEL = "oc:hold";
 // PM の判断待ちの印 (/status の集計だけに使う。検出の対象ではない)。
 export const NEEDS_PM_LABEL = "needs-pm";
 // 実装 agent が着手しても PR を出さない/出せない issue (pm-apply は PM が PAT で適用する workflow 変更、needs-user-input は依頼者待ち)。
