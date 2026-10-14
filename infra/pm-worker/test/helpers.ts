@@ -47,10 +47,10 @@ export function mockFetch(handlers: Handler[]) {
 }
 
 // App 作成済み・Install 済みの状態を、本物の manifest flow で作る。
-export async function configuredApp(opts: { live?: boolean; now?: { t: number }; handlers?: Handler[]; env?: Record<string, string> } = {}) {
+export async function configuredApp(opts: { live?: boolean; now?: { t: number }; handlers?: Handler[]; env?: Record<string, string>; store?: MemoryStore } = {}) {
   const clock = opts.now ?? { t: T0 };
   const pems = rsaPems();
-  const store = new MemoryStore();
+  const store = opts.store ?? new MemoryStore();
   const m = mockFetch([
     (c) => (c.url.includes("/app-manifests/") ? j({ id: 4242, slug: "oc-pm-for-signature-studio", pem: pems.pkcs1, webhook_secret: WH_SECRET, owner: { login: "signature-studio" } }, 201) : undefined),
     (c) => (c.url.endsWith("/app/installations?per_page=100") ? j([{ id: 77 }]) : undefined),
