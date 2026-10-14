@@ -285,7 +285,7 @@ class Defchain:
     """窓の外の live-in (inherit) を呼出元まで追跡して値を決める (M11-N87 / #1373).
     at(f, i, pos): 関数 f の命令 i 直前で reg(pos) の到達定義を後ろ向きに集める (基本ブロック単位・全経路の和).
     entry(f, pos): f 入口の値 = 直接 call / tail jmp の呼出元で at() を取った値の集合 (f のアドレスが取られていれば不明).
-    結果は (値の集合 {(kind, val)}, 復元不能の理由の集合)。値が 1 つで理由が空のときだけ実値化する。"""
+    結果は (値の集合 {(kind, val)}, 復元不能の理由の集合)。値が 1 つで理由が空のときは候補 (unsound_cand) として件数だけ残し、fix には載せない。"""
 
     def __init__(self, mach, F, lb):
         self.m, self.F, self.lb = mach, F, lb
@@ -373,11 +373,11 @@ class Defchain:
                     changed = True
         self.mod = {va: (mod[va], opaque[va]) for va in fns}
 
-    def clob_kind(self, x, reg):
+    def clob_kind(self, x):
         op = x.op_str
         if not op.startswith('0x') or int(op, 16) not in self.mod:
             return 'indirect'
-        mods, o = self.mod[int(op, 16)]
+        _, o = self.mod[int(op, 16)]
         return 'opaque' if o else 'writes'
 
     def passes(self, x, reg):
@@ -402,10 +402,10 @@ class Defchain:
                 if x.mnemonic == 'call':
                     if self.passes(x, reg):
                         continue
-                    self.clob[self.clob_kind(x, reg)] += 1
+                    self.clob[self.clob_kind(x)] += 1
                     out.add(('clobber', j)); killed = True; break
                 try:
-                    rd, wr = x.regs_access()
+                    _, wr = x.regs_access()
                 except capstone.CsError:
                     out.add(('unknown', j)); killed = True; break
                 hit = [fn.cs.reg_name(r) for r in wr if reg_family(fn.cs, r) == reg]
@@ -543,14 +543,12 @@ def main():
                             c2, why2 = dc.resolve(cva, ci, pos)
                             if c2 is not None and xmm:
                                 why2 = ['xmm_callee']
-                            if c2 is not None and not xmm:
-                                kind = 'inherit_const'
-                                fixes.append({'caller': p['caller'], 'callee': p['callee'], 'k': p['k'], 'pos': pos, 'const': c2, 'via': 'defchain'})
-                            else:
-                                kind = 'inherit_unres'
-                                stats['dc:%s' % why2[0]] += 1
-                                stats['dcx:%s:%s' % (why, why2[0])] += 1
-                                rec.setdefault('dc', {})[pos] = why2[0]
+                            elif c2 is not None:
+                                why2 = ['unsound_cand']  # 1 値に決まっても fix にしない (defchain の穴。REPORT_N87 §6)
+                            kind = 'inherit_unres'
+                            stats['dc:%s' % why2[0]] += 1
+                            stats['dcx:%s:%s' % (why, why2[0])] += 1
+                            rec.setdefault('dc', {})[pos] = why2[0]
                         elif c is not None:
                             kind = 'set_const'
                             fixes.append({'caller': p['caller'], 'callee': p['callee'], 'k': p['k'], 'pos': pos, 'const': c})
@@ -574,7 +572,7 @@ def main():
     # site 単位の最終状態 (全引数が callee_unused / set_const なら「解決」)
     resolved = 0
     for r in sites:
-        r['resolved'] = r['status'] == 'matched' and all(k in ('callee_unused', 'set_const', 'inherit_const') for k in r['args'].values())
+        r['resolved'] = r['status'] == 'matched' and all(k in ('callee_unused', 'set_const') for k in r['args'].values())
         resolved += r['resolved']
     out = {'sites': len(sites), 'resolved_sites': resolved, 'stats': dict(stats), 'fixes': fixes, 'site_detail': sites}
     json.dump(out, open(a.out, 'w'))
