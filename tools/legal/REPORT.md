@@ -4,6 +4,7 @@
 (§7) と台帳 (`[NI-EULA]`・`[SLATE-ToS]` 行) が参照する実測値の正本。
 
 測定 commit: `89e2dad6` (Massive X の読み取りツール `tools/legal/inno_probe/` を追加した commit)。以後 `tools/legal/inno_probe` は変更なし (`git diff 89e2dad6 HEAD -- tools/legal/inno_probe` は 0 行)。Fresh Air と Xfer は素材と外部 URL の実測で、コードに依存しない。
+本 PR の run (§2-1・§6 の実測) の測定 commit: `064af0d8` (origin/main。`tools/legal` のコードは `89e2dad6` 以降変更なし)。
 差分 0 の証跡 (本 PR が導入するコード差分。docs と本 REPORT を除く範囲。出力は 0 行):
 `git diff origin/main...HEAD --stat -- . ':(exclude)docs' ':(exclude)tools/legal/REPORT.md'`
 
@@ -12,9 +13,9 @@
 | 対象 | 結論 | 検証状態 |
 |---|---|---|
 | Native Instruments Massive X の同梱 EULA | **同梱なし** (復号した setup-0 ヘッダに文書名・本文なし。`.dmg` の HFS 内にも文書候補 0 件)。インストーラの CRC 3 種は 6.4.2 の定義と一致せず、完全性は未確認 | LGL-10 (#2498) で実測 (§1-2・§1-3)。fix round 3 の run で再確認 (§1-5・§1-6)。CRC 不一致の原因は未確定 (§1-4) |
-| Slate Digital Fresh Air の同梱 EULA | **ファイル名判定では無し** (win zip・pkg のファイル名に `licen\|eula\|agree\|terms` 無し。文書拡張子の通常ファイルは User Guide PDF を含め数件で、PDF 本文は未検索) | 2026-10-14 再測定 (fix round 3 の run、素材 `plugins-freshair`)。§2 の全コマンドを実行。件数: zip 30 エントリ・pkg の Payload 427 ファイル (作業ディレクトリ全体 446 ファイル。定義は §2) |
+| Slate Digital Fresh Air の同梱 EULA | **同梱 EULA は無し** (win zip・pkg のファイル名に `licen\|eula\|agree\|terms` 無し。User Guide PDF 本文 (11 p.) にも EULA・使用許諾の語は無く、`licen` は iLok ライセンスの記述のみ) | 2026-10-14 (本 PR の run、素材 `plugins-freshair`)。§2 の全コマンドと §2-1 の PDF 検索を実行。件数: zip 30 エントリ・pkg の Payload 427 ファイル (作業ディレクトリ全体 446 ファイル。定義は §2) |
 | Xfer 公式利用規約ページ | **公式ページなし** (候補 URL 12 件 404、トップ・freeware・Serum 2 ページに規約リンク無し) | 2026-10-14 再取得 (fix round 3 の run。§3 の 16 URL と `/license`) |
-| Image-Line 承諾版 | 依頼者の記録事項。確認不可 | — |
+| Image-Line 承諾版 | 依頼者の記録事項。確認不可 (公開 ToU/EULA は台帳 3 版で保持。公開 FAQ hub は規約文 0 件) | 公開 FAQ: 2026-10-14 取得 (§6)。承諾版は未確認 |
 
 ## 1. Massive X (`plugins-massivex`) — LGL-10 (#2498)
 
@@ -124,7 +125,24 @@ mkdir -p "$RUNNER_TEMP/plugins-freshair" && cd "$RUNNER_TEMP/plugins-freshair" &
 - `Fresh Air.Win.zip` (33,932,552 B、sha256 `5a370f02bc84512b896fb38ee38146f1cca0d30319c35ac18430ddda08fb34c8`): 30 エントリ (ディレクトリ 13 + 通常ファイル 17)。文書拡張子 (`pdf|txt|rtf|html`) の通常ファイルは 2 件 (User Guide PDF と `USER Presets/dummy.txt`)。名前判定 (`licen|eula|agree|terms`) は 0 件。
 - `Fresh Air.pkg` (36,871,956 B、sha256 `d176b3cf0600169a1333102a5cf4c6d072c6af01f238bfcdb99737dc8c30be5c`): `Distribution` の `<license>` は 0 件。xar 直下に 4 つの子 pkg (`1_-_AU` / `2_-_VST3` / `3_-_APP,_Uninstaller` / `4_-_Content`)。各 `Payload` (gzip cpio) を展開したファイル数は **427**。名前判定は 0 件。文書拡張子の通常ファイルは 3 件 (User Guide PDF、`SlateCore.core/Contents/Resources/tags.txt`、`USER Presets/dummy.txt`)。
 - 件数の定義 (WORKFLOW §5): 「427」は **4 つの `Payload` の展開先 (`Payload.d`) にある通常ファイル数** (`find … -path '*Payload.d/*' -type f`。シンボリックリンク 0)。「446」は作業ディレクトリ全体の通常ファイル数 (`find … -type f`) で、427 + xar 直下のメタデータ 19 件 (`[TOC].xml`・`Distribution`・`Resources/en.lproj/Localizable.strings`、子 pkg ごとの `Bom`・`PackageInfo`・`Scripts`・`Payload` の 4 種 × 4) に一致する。Payload の件数としては 427 を正とする。
-- 結論: ファイル名判定では同梱 EULA は無い (PDF 本文は未検索)。適用される規約は `[SLATE-ToS]` (オンライン版) のみで、版・適用範囲は未確認 (§7 の「入手元と保有ライセンス」は依頼者の記録事項として残す)。
+- 結論: ファイル名判定と User Guide PDF 本文の検索 (§2-1) で同梱 EULA は無い。適用される規約は `[SLATE-ToS]` (オンライン版) のみで、版・適用範囲は未確認 (§7 の「入手元と保有ライセンス」は依頼者の記録事項として残す)。
+
+### 2-1 User Guide PDF の本文検索 (本 PR の run)
+
+- 対象: `Fresh Air.Win.zip` 内 `Fresh Air/C__ProgramData_Slate Digital/Fresh Air/Slate Digital Fresh Air - User Guide.pdf` (12,349,754 B、sha256 `8cd40bcee6a2194354595b4cc629b256ddfa9580c684884484a430fb1cd571d0`、11 ページ)。
+- テキスト抽出 (`tools/legal/terms-watch/pdf_text.py`、pypdf 5.9.0): 10 ページで文字を取得。p.1 は文字 0 字・画像 1 点で、画像の中身は未確認。
+- 検索 (`eula|agreement|terms|warrant|liab|end user|copyright`、大小無視): 一致 0 件。`licen` の一致 4 件はすべて iLok ライセンスの記述 (p.5 の 1 件、p.11 の 3 件)。使用許諾の本文は無い。
+
+再現 (本 PR の run で実行):
+
+```sh
+unzip -o -q "$RUNNER_TEMP/plugins-freshair/Fresh Air.Win.zip" "Fresh Air/C__ProgramData_Slate Digital/Fresh Air/Slate Digital Fresh Air - User Guide.pdf" -d "$RUNNER_TEMP/fa-guide"
+G="$RUNNER_TEMP/fa-guide/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/Slate Digital Fresh Air - User Guide.pdf"
+sha256sum "$G"
+uv run --with pypdf==5.9.0 python tools/legal/terms-watch/pdf_text.py "$G" > "$RUNNER_TEMP/fa-guide.txt"
+grep -c -i -E 'eula|agreement|terms|warrant|liab|end user|copyright' "$RUNNER_TEMP/fa-guide.txt"   # 期待 0
+grep -o -i -E '.{0,30}licen.{0,30}' "$RUNNER_TEMP/fa-guide.txt" | wc -l                          # 期待 4 (iLok)
+```
 
 再現 (fix round 3 の run で実行):
 
@@ -170,13 +188,29 @@ curl -s -o /dev/null -m 20 -w '%{http_code} -> %{redirect_url}\n' https://xferre
 
 ## 4. 台帳
 
-本回の run で新たに全文を取得できた規約は無い。台帳 (`docs/LEGAL_TERMS_LEDGER.json`) は変更なし。
+本回の run で新たに全文を取得できた規約は無い。台帳 (`docs/LEGAL_TERMS_LEDGER.json`) は変更なし。本 PR で取得した User Guide PDF (§2-1) と公開 FAQ hub (§6) は規約本文ではないため台帳の対象外とし、SHA-256 は各節に記録する。
 
 ## 5. 再測定の条件
 
 - fix round 3 (2026-10-14、本版) の run では `$ARTIFACTS_DIR` に `fl-win64`・`plugins-massivex`・`plugins-freshair`・`plugins-ott` が実在した。`plugins-massivex` と `plugins-freshair` を `$RUNNER_TEMP/` に展開し、§1-5・§1-6・§2・§3 の全コマンドを本 run で実行した。
 - 本 run で再実行していないもの: 調査用 innoextract (master `6e9e34ed` + 版表 6.4.2 のパッチ版) の結果 (commit `31068167` の記録)。`.dmg` の `osx-*.dat` の解読 (未実施)。
 - `plugins-ott` は本 PR で測定していない (OTT の mac pkg・win の記述は既存の記録のまま)。
+- 本 PR の run では `plugins-freshair` を展開して §2・§2-1 を実行し、公開 FAQ を §6 で取得した。`plugins-massivex` は本 run で再測定していない (§1-5 の記録のまま)。
 - Massive X は `python3 tools/legal/inno_probe/inno_probe.py <展開した exe> [header.bin]` で再測定する (展開先は repo 外)。CRC 不一致の原因は未確定 (§1-4)。
 - 再測定の結果が前回と異なる場合は、本ファイルを更新して LEGAL.md 側に影響があるか確認する。
-- 同じ値は、§1-5・§1-6・§2・§3 の再現コマンドを同じ素材で実行すれば再確認できる。
+- 同じ値は、§1-5・§1-6・§2・§2-1・§3 の再現コマンドを同じ素材で実行すれば再確認できる。
+
+## 6. Image-Line 公開 FAQ (本 PR の run)
+
+- 取得: `https://www.image-line.com/support/faq/` は `https://www.image-line.com/fl-studio-support/faq` へ転送され HTTP 200。207,804 B。sha256 は取得ごとに変わった (本 run の 3 回で `b75ae40e…`・`fe1d38d4…`・`43648656…`。大きさは同じで、差の中身は未確認)。動的な値を含むため基準線にせず、台帳の対象外とする。
+- 規約文の語 (`eula|terms of use|end user license|license agreement|reverse engineer|cracked`) の一致は 0 件。`licen` の一致 8 件はすべてナビゲーションの `My licenses` (`profile/licenses`)。
+- 個別の FAQ 記事は静的 HTML に本文として現れない (分類見出しと「Browse common questions」のみ)。記事の内容は未確認。
+- 結論: 公開 FAQ hub に規約文は無い。FAQ 記事は未確認 (LEGAL.md §7)。
+
+再現 (本 PR の run で実行):
+
+```sh
+curl -sL -m 60 -w 'HTTP=%{http_code} final=%{url_effective}\n' https://www.image-line.com/support/faq/ -o "$RUNNER_TEMP/il-faq.html"   # 期待 HTTP=200 final=…/fl-studio-support/faq
+stat -c %s "$RUNNER_TEMP/il-faq.html"                                                    # 期待 207804 (sha256 は取得ごとに変わるため基準にしない)
+grep -o -i -E 'eula|terms of use|end user license|license agreement|reverse engineer|cracked' "$RUNNER_TEMP/il-faq.html" | wc -l   # 期待 0
+```
