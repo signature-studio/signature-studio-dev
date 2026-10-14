@@ -154,3 +154,51 @@ git diff c4fba12a HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_851.md'   #
 | `function_128c320()` edge が D で捨てられる段階の特定 | 呼出元 `0x128f9e0` からの call edge 欠落 | 子 issue ICALL-30 (同上) |
 | 366 site 落ちとの因果 | 1 バイト化とは別の lift 欠落 | 子 issue ICALL-30 (同上) |
 
+
+## #1456 (ICALL-30): 警告 10 件は CFG 構築の edge 破棄 (RetDec 上流 TODO 経路)。phase は確定、IR 命令・183 突合は未了
+
+素材: `fl-win64` (`block00031_PE.bin`)・`toolchain-retdec` (RetDec v5.0 `retdec-decompiler`)。
+測定 commit = `cb3a89a6` (origin/main 時点)。`tools/icall` は本節で変更していないため、コード差分は本文書の追記のみ。
+差分証跡 (HEAD = 本節の commit、測定 commit との差分):
+
+```
+git diff cb3a89a6 HEAD -- tools/icall                                          # 本文書の追記のみ
+git diff cb3a89a6 HEAD -- tools/icall ':!tools/icall/REPORT_APPENDIX_851.md'   # 0 行
+```
+
+再現: `FL_WIN64_DIR=<展開先> RETDEC=<展開先>/retdec/bin/retdec-decompiler bash tools/icall/fn_boundary_repro.sh <outdir>` (foreground・1 回)。
+集計: `grep -c NonRecursiveCFGBuilder <log>`・`grep -c 'function_128c320()' <log>`。runner 上 foreground、開始時 load 0.92。
+
+| run | 範囲 | rc | sec | 警告 | 内訳 |
+|---|---|--:|--:|--:|---|
+| A | `0x128c280-0x128c2e1` + 本体 | 0 | 9 | 10 | `# empty statement` 3・`rax_1_reload = rax_1_reg2mem` 5・`var514`/`var512` 系 2 |
+| B | A + `0x128c2f0-0x128c313` | 0 | 10 | 10 | A と同一 |
+| C | `0xc589b0-0xc5d667` + `0x128f9e0-0x1294ab8` | 0 | 6 | 5 | `function_128c320(var3)` 5 件 |
+| D | C + 本体 `0x128c320-0x128dc44` | 0 | 10 | 15 | C の 5 件 (`function_128c320()`) + A 相当 10 件 |
+
+- 警告は全て「`there is no node for an edge to <stmt> -> skipping this edge`」。発生 phase は 2 箇所:
+  (1) "removing code that is not reachable in a CFG" (BIR 段の CFG 構築)、(2) その後の copy-propagation 系 optimizer
+  (`SimpleCopyPropagationOptimizer`・`CopyPropagationOptimizer`)。同じ edge 群が optimizer で再度警告される (D.log 行 60–104)。
+- 警告を出す経路は RetDec 上流 `src/llvmir2hll/graphs/cfg/cfg_builders/non_recursive_cfg_builder.cpp` の `addEdgeFromVector()`。
+  edge の先 statement の node が無い (`targetNode` が null) とき、ソース内の TODO どおり Warning を出して edge を捨てる。
+  TODO は「edge の先に対応する job が作られない」ことを既知の未解決として記す。
+- `function_128c320()` への call 命令は D の `.drc.ll` (行 5523・`function_128f9e0` 内) と `.drc.c` (行 2948・`// 0x1290312` の直後) に**残る**。
+  よって「edge 破棄 = call 消失」ではない。捨てられるのは CFG 上の edge で、出力の call 文は別経路で残る。
+- 既知類型か: 上流 TODO と一致する。`docs/DEFECTS.md` の D1a〜D20 には該当が無い。行案は未確定 (仮名 `RNC-edge-drop`)。
+
+### 受入条件の達成状況
+
+| 受入条件 | 状態 | 根拠 |
+|---|---|---|
+| 警告 10 件を生む phase と IR 命令の特定 | phase は部分達成 | phase は上記 2 箇所まで確定。IR 命令は未特定 (警告の `rax_1_reload` 等は RetDec 内部の reg2mem 名で、出力 IR に同名は残らない。出所の特定は phase 中間ダンプが要る) |
+| `function_128c320()` への edge が D で捨てられる段階 | 段階は確定、因果は未確定 | BIR 段 (CFG 構築) で捨てられる。D の出力では call が残る。捨てた edge が後段の出力差に効くかは未検証 |
+| 366 site 落ちとの因果 (183 site 単位の突合) | **未達** | `roundtrip.sh` 経由の条件 (書換え後) は未実行。前節 (3) の before 側 IR 監査では、本体の有無は `0xc589b0`/`0x128f9e0` の site 落ちを変えない (`status change C->D: []`) |
+| 既知類型なら `DEFECTS.md` 行案 | 行案は未確定 | 上流 TODO と一致するが、DEFECTS の類型としては BIR 段の因果確定後に判断 |
+
+### 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 警告 10 件の IR 命令 (`rax_1_reload` 等) の特定 (phase 中間ダンプ) | 本体 `0x128c320` の一部 edge の由来が未確定 | 子 issue (本 run で起票・番号は PR 本文と issue コメント参照) |
+| `roundtrip.sh` 条件での 183 site 突合・edge 破棄と 366 落ちの因果 | 366 落ちの原因の一部が未特定 | 同上 |
+| `DEFECTS.md` 行案 (`RNC-edge-drop`) の確定 | 類型の正本化 | 同上 |
