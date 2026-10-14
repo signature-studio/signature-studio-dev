@@ -167,7 +167,7 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 | `XferOnOffButton` (Xfer 固有) | 1 | 4 | 85 / 74、2 / 2、3 / 3、3 / 2 |
 
 - 解釈: 数値は継承込みの上限値であり、置換側の実数は未確定。upstream 宣言ありの `CTextLabel` (置換対象ではない) も同じ方法で 90 関数と数えられており、継承分が大半を占めることを示す。`XferOnOffButton` の 74 は「継承元との差分で override のみを数えた値」ではない。vtable 間の和集合は未算出 (vtable ごとの値のみ記録)。本体サイズは未測定。
-- 次の測定: 継承元 vtable (RTTI の base class array) との差分を取り、override された関数だけを数える (未着手。#1920 の範囲)。
+- 次の測定: 継承元 vtable との差分 (override のみの数) は §10 で実測済み。
 
 ### 9-3. 受入条件 2: 最小 PoC の canvas 描画の試行
 
@@ -180,3 +180,31 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 
 - 測定 commit: `31927856` (本 §9 と `gui/vtable_measure.py` を追加した commit。コードを変えた最後の commit)。PR の head は後続の docs 修正で進むため、測定 commit とは別物。REPORT 自身の hash は本文に書けないため、PR 本文には「測定 commit = `31927856`」と書き、head は PR の検証節で別に示す。以後この commit までのコード差分は 0 (`git diff 31927856 HEAD -- tools/targets/serum2/gui/*.py` が空であること)。
 - 再現: `work/venv/bin/python vtable_measure.py work/Serum2_win64.vst3 XferOnOffButton CTextLabel@VSTGUI`。
+
+## 10. 2026-10-14 run (#1920): 継承差分の実測と wasm 分岐
+
+### 10-1. 継承差分 (override / 新規のみ) の実測
+
+- 方法: `vtable_measure.py` に、COL → CHD → BaseClassArray で継承元 TypeDescriptor を辿る処理を追加した。vtable の各スロットを、継承元 vtable の同じインデックスと比較し、値が同じなら継承、違えば override または新規とみなす。継承元 vtable が PE 内に無い場合は全スロットを override とみなすため、上限値になる。
+- 結果 (出力 `gui/work/vtable_measure.txt`、同一入力の 2 回実行で一致):
+
+| クラス | vtable 数 | 主 vtable: スロット / 継承 / override・新規 | 全 vtable の override・新規 (.text アドレスの和集合) |
+|---|---|---|---|
+| `XferOnOffButton` | 4 | 85 / 80 / 5 | **8** |
+| `CTextLabel` (upstream 宣言あり) | 3 | 105 / 95 / 10 | **13** |
+
+- 解釈: §9-2 の「継承込みの 74 / 90」は、継承分を含む上限値だった。置換側の実数の上限は `XferOnOffButton` で 8 関数、`CTextLabel` で 13 関数。本体サイズ (B) は未測定 (Ghidra が要る)。`CTextLabel` は upstream 宣言があるため置換対象ではないが、同じ方法で比較のために測った。
+- 限界: 差分は、RTTI の base class array に並ぶ継承元の vtable と、同じインデックスで比べた結果。`XferOnOffButton` の主 vtable の継承元は `COnOffButton` (先頭の base)。副次 vtable (スロット数 2 と 3 の 3 件) は、スロット数 2 の 1 件が全 2 スロット override、他の 2 件は継承を含む。副次 vtable の継承元の対応は未検証。和集合 (8 / 13) は .text アドレスの重複を除いた値で、副次 vtable の override も含む。
+
+### 10-2. `vstguibase.h` の wasm 分岐
+
+- 再現 (補正なし): `em++ -std=c++17 -fsyntax-only -Iwork/vstgui4 work/seed6.cpp` → `vstguibase.h:139: #error unsupported system/compiler` (rc=1)。
+- 対策: `vstguibase.h` に `#elif defined(__EMSCRIPTEN__)` 分岐を追加 (`WASM 1` を定義)。patch は `gui/patches/vstguibase_emscripten.patch`。
+- 検証: `gui/check_wasm_syntax.sh` が patch を適用してから seed 6 を `em++ -fsyntax-only` で通す。`-D__linux__=1` は付けない。結果は rc=0、error 0 (clean upstream の `vstgui4_14_3` = `b1e82355` から再現)。
+- 注意: Emscripten の定義は `__EMSCRIPTEN__ 1`・`__unix__ 1`。`__linux__` は未定義。分岐は `__linux__` の後に置くため、Linux 判定に影響しない。
+
+### 10-3. 未達 (本 run の範囲外)
+
+- canvas 側の純粋仮想 159 関数 (16 files) の wasm 実装、リンク、描画、`XferOnOffButton` の .text 対応付け (Ghidra が要る)。
+- 起票先: #2029 ([SR-31])。
+- 測定 commit: 本 §10 と `vtable_measure.py`・`check_wasm_syntax.sh` を追加した commit (PR 本文参照)。
