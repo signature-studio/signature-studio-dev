@@ -3,7 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_consts.py <VA(16進)> [命令数]
 
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import os
 import re
