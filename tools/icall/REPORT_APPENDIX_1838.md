@@ -15,7 +15,7 @@ REPORT §15 から参照。修正の本体は `tools/icall/prep_targets.py` の 
 
 ## 3. 実測の状態
 
-測定 commit (本修正のコード変更の最後の commit) は `77be6b71`。`git diff 77be6b71 HEAD -- tools/icall/prep_targets.py tools/icall/chain_ranges_diff.py tools/icall/tests tools/icall/REPORT_APPENDIX_1838.md` の出力は 0 行 (差分 0)。
+測定 commit (本修正のコード変更の最後の commit) は `77be6b71`。`git diff 77be6b71 HEAD -- tools/icall/prep_targets.py tools/icall/chain_ranges_diff.py tools/icall/tests` の出力は 0 行 (コード差分 0)。付録自体は測定後の記録追記のみ (本節) で、コードに影響しない。
 
 | 項目 | 状態 |
 |---|---|
