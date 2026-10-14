@@ -5,12 +5,12 @@
 ## 0. 結論
 
 - 対照 Gain の before 160 関数 closure (`gain_before_160.tsv`・root 27) を flelift `x64c` で lift すると、**unsup 48 種 / 285 箇所** が残っていた (origin/main `718e90fb`)。
-- 測定 commit `33cb62fe` で **0 種 / 0 箇所** に減った。関数数 158・命令数 9,513 は before / after で同じ。修正後の HEAD で再測定した値である (§2)。
+- 測定 commit `f67be015` で **0 種 / 0 箇所** に減った。関数数 158・命令数 9,513 は before / after で同じ。修正後の HEAD で再測定した値である (§2)。
 - 差し戻し後の修正で `i_rcr` を実機の rcr に合わせた (§4)。実機 rcr との照合は 4004/4004 一致 (64bit レジスタ全体を比較)、差分テストは 35/35 PASS。
 
 ## 1. 測定条件
 
-- 測定 commit: `33cb62fe` (コードを変えた最後の commit。rcr の docstring と実機照合の修正)。以降の commit は本 REPORT と PR 本文だけ。
+- 測定 commit: `f67be015` (コードを変えた最後の commit。直前の `33cb62fe` からは `i_rcr` の docstring の 1 行だけ変えた)。以降の commit は本 REPORT と PR 本文だけ。
 - 環境: AMD EPYC 7763 (4 vCPU)、gcc 13.3.0、各 1 回。
 - 素材: `plugins-kilohearts.tar.zst` の先頭メンバー `Kilohearts Offline Installer.zip` を `tar --zstd --occurrence=1 -xf` で取り出し → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B)。作業は repo 外の一時 dir (`$RUNNER_TEMP`)。REPORT_KH19 §9 と同じ手順で、mac 側は不要。
 - 入力: `gain_before_160.tsv` の 160 行 (roots 27)。`func_rva` を calltgt、`root_class` が空でない行を roots とする。lift 対象は thunk (`jmp [IAT]`) の 2 行を除く 158 関数。
@@ -19,13 +19,13 @@
 - 測定 commit から本 REPORT を含む HEAD までの差分 (測定入力のパス):
 
 ```
-$ git diff --stat ac58a874 33cb62fe -- tools/flelift tools/targets/kilohearts/scripts/lift_closure_x64c.sh tools/targets/kilohearts/gain_before_160.tsv
+$ git diff --stat ac58a874 f67be015 -- tools/flelift tools/targets/kilohearts/scripts/lift_closure_x64c.sh tools/targets/kilohearts/gain_before_160.tsv
  tools/flelift/tests/rcr_native_check.py | 92 +++++++++++++++++++++++++++++++++
  tools/flelift/tests/x64c_vex_diff.py    | 85 ++++++++++++++++++++++++------
  tools/flelift/x64c.py                   | 15 ++++--
  3 files changed, 170 insertions(+), 22 deletions(-)
 
-$ git diff --stat 33cb62fe HEAD -- tools/flelift tools/targets/kilohearts/scripts/lift_closure_x64c.sh tools/targets/kilohearts/gain_before_160.tsv
+$ git diff --stat f67be015 HEAD -- tools/flelift tools/targets/kilohearts/scripts/lift_closure_x64c.sh tools/targets/kilohearts/gain_before_160.tsv
 (出力 0 行)
 ```
 
@@ -36,10 +36,10 @@ $ git diff --stat 33cb62fe HEAD -- tools/flelift tools/targets/kilohearts/script
 | 版 | unsup 種 | unsup 箇所 | 関数 | 命令 |
 |---|--:|--:|--:|--:|
 | before (origin/main `718e90fb`・同一の x64c.py は `213a310f` にも) | 48 | 285 | 158 | 9,513 |
-| after (`33cb62fe`・修正後の x64c.py) | 0 | 0 | 158 | 9,513 |
+| after (`f67be015`・修正後の x64c.py) | 0 | 0 | 158 | 9,513 |
 
 - `int 0x29` の 3 箇所 (fail-fast) は件数の外 (§3)。after の表の 0 はこの 3 箇所を含まない。生成 C には `int 0x29 (fail-fast)` が 3 件出ている。
-- after の生成 C `fle_lifted.c` (1,107,081 B) は `gcc -std=gnu11 -c -I tools/flelift/rt` で rc 0 (`33cb62fe`)。
+- after の生成 C `fle_lifted.c` (1,107,081 B) は `gcc -std=gnu11 -c -I tools/flelift/rt` で rc 0 (`f67be015`)。
 
 before の内訳 (箇所数の多い順・種名 件数):
 
@@ -59,7 +59,7 @@ vmovsd 32 · vmovntdq 30 · vmovd 29 · vmulsd 25 · vaddsd 23 · vmovq 17 · vf
 
 ## 4. 検証 (実施・未実施)
 
-### 実施 (測定 commit `33cb62fe`)
+### 実施 (測定 commit `f67be015`)
 
 1. 生成 C (`fle_lifted.c`) を `gcc -std=gnu11 -c` で rc 0 (§2)。
 2. 差分テスト `tools/flelift/tests/x64c_vex_diff.py` **35/35 PASS**。GNU as で機械語にし、x64c の FnLift で C に落として runtime と共に実行し、参照値と全 X/YL/R/フラグを比較。初期フラグは乱数 (従来は全 0 で「保存」と「0 に設定」を区別できなかった)。
@@ -86,7 +86,7 @@ vmovsd 32 · vmovntdq 30 · vmovd 29 · vmulsd 25 · vaddsd 23 · vmovq 17 · vf
 ```sh
 # 素材を展開し HeartCore.core_64 を得る (REPORT_KH19.md §9。tar --zstd --occurrence=1 で先頭の zip だけ取り出す)
 X64C=<origin/main の x64c.py> bash tools/targets/kilohearts/scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>   # before: 285 site
-bash tools/targets/kilohearts/scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>                               # after: 0 site (33cb62fe)
+bash tools/targets/kilohearts/scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>                               # after: 0 site (f67be015)
 python3 tools/flelift/tests/x64c_vex_diff.py                                                                       # 35/35
 python3 tools/flelift/tests/rcr_native_check.py                                                                    # rcr vs 実機 4004/4004 (x86-64)
 ```
