@@ -64,7 +64,7 @@ undefined / duplicate は全件 0。修正前の値は旧 build.sh を一時コ�
 ### 12.6 SHX-T32 (#2877): fail-closed の復元と HEAD の再測定
 
 - 測定 commit: `c4a575ce` (fail-closed 復元。変更は `sx_handle_norm.py` と `test_sx_handle_norm.py` のみ)。以後の差分は本節の文書のみで、下の `git diff` で確認する。
-- 入力: `tools/m11/work/` は `work-m11` の archive と size・mtime が一致し、`boot_final3.ll` の sha256 も一致 (`010451add514…`)。展開し直さず既存の同一内容を使った。emcc は `/opt/emsdk` (6.0.12 = `tools/m1/flags.sh` の pin)。
+- 入力: `tools/m11/work/` は `work-m11` の archive と size・mtime が一致し、`boot_final3.ll` の sha256 も一致 (`010451add514…`)。展開し直さず既存の同一内容を使った。emcc は `[EMSDK]` (6.0.12 = `tools/m1/flags.sh` の pin)。
 - 正規化の同一性: 実 IR の正規化結果は `e0e35f9a` 版と `c4a575ce` 版で `cmp` 一致。`[sx_handle_norm] midiOutShortMsg: decl=1 call=1` (`handle_norm_fix.json`: `decl_changed` 1・`calls_truncated` 1)。fail-closed の検査は実 IR では止まらない。
 - 単体テスト: `test_sx_handle_norm.py` は 8 ケース (strict・冪等・属性付き宣言・宣言無し・宣言 i32 の残 i64 呼出し・invoke・関数ポインタ参照・無関係な関数) で `cases=8 fail=0`。
 
