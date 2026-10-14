@@ -509,6 +509,7 @@
 | `tools/plugins/sampler/REPORT_APPENDIX.md` | ~60 | sampler REPORT §6 の旧版 (§A 検証起点 53c2eb6、§B 82a99ac/7de96e0、§C 7ffab50) と §D (RetDec C 出力段の経緯) の全文 (250 行上限のため分割移動) |
 | `tools/plugins/sampler/REPORT_UNREACHED_APPENDIX.md` | ~37 | sampler REPORT_UNREACHED の分割移動節: §A (§2d-7 の改訂前 b36fef5 系の NC 表)・§B (§2g #879 別案: NC2a/NC2b 合成入力の全文)。 250 行上限のため無変更で分割移動 |
 | `tools/plugins/sampler/REPORT_INDIRECT.md` | ~80 | sampler REPORT §2b の付録: #537 推移閉包 (間接呼出の到達先) の算出・lift・ネガコン |
+| `tools/plugins/sampler/REPORT_APPENDIX_GATE.md` | ~25 | sampler REPORT §6 の gate 設計 (judge の判定条件) と ネガティブコントロール NC1〜NC7 の表の全文 (250 行上限のため分割移動) |
 | `tools/plugins/sampler/REPORT_APPENDIX_1774.md` | ~60 | sampler REPORT §7c: VEX comis/ucomis の flag 反映 (#1774 [PLG-F3-14]) の実測。 同一ブロック内の flag 反映 pass の結果 (19252 1 箇所・19048 0 箇所)、機械語の消費命令と IR の参照の対応、icall 別案 (`PLUG_ICALL=1`) の不採用理由、未解決 (子 [PLG-F3-33]・[PLG-F3-34])。 方式の決定は DECISIONS D15 |
 | `tools/plugins/sampler/REPORT_APPENDIX_1582.md` | ~12 | sampler REPORT §7b の分割移動節の全文 ([PLG-F3-12] #1582: engine_lift の実測 19252/19048・19048 の `emcc -c` 回帰の疑い・VEX comis/ucomis の flag 方式の検討 2 案)。 方式の決定は DECISIONS D15 |
 | `tools/plugins/sampler/REPORT_ENGINE_LINK.md` | ~55 | sampler REPORT §5 の付録: Fruity Slicer 2 殻 (23663) と engine (23664) の結線。 `engine_x64.dll` のロード経路・`DispatchToEngine` の case 表 (#540 受入条件 4 の部分達成) |
