@@ -240,3 +240,4 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 受入 4 (0x411a80 到達) **未達**: 停止点 `0x50138cf0`→`0x50138d06` (pool)。`0x5da06d` (`mov rax,[rax]`) は 1 回実行され、そのときの rcx (this) は 0。停止と this の対応は未確定。`0x407520` が `[blk+0]` を `0x867200`→`0x8c02c0` に書換える (`0x407553`) ことも確認。
 - 受入 5 (0x411bb8 の記録) **未達** (受入 4 が前提)。残件は子 issue に分割 (PR 本文の未解決表)。
 - 再現 (8eda24a9): `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000` (C)。
+- 続き (#2468): 停止点 `0x5da070` の間接 call 先と NULL this の連鎖は `REPORT_APPENDIX_2468.md` (測定 commit ccb6af73)。受入 4 (0x411a80 到達) は未達のまま。
