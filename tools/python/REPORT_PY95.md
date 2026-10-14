@@ -46,32 +46,32 @@
 
 ## 4. 検証
 
-測定 commit: `3fc85489` (`origin/main` (`4b81e78a`) の取り込み merge。コードを変えた最後の commit)。その前の `20a5bc6b` (`213a310f` の取り込み) の後に main が `provider/fl_engine.c`・`host/fl_mock.mjs`・`host/fl_provider.mjs`・`provider/build.sh` (`_fl_engine_display_time` の export)・`tests/provider_check.mjs` を変え、`tests/ui_display_diff.mjs` を追加した (PY-121 (#2982) の ui 6 件)。その取り込みで `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` が競合し、両側を残して解消した。`provider_check.mjs` の期待値は、main 側の 115/320 に `pe95` の 9 件を足して 124/311 とした (435 は不変)。
+測定 commit: `04011a2a` (`origin/main` (`79d5e7c8`) の取り込み merge。コードを変えた最後の commit)。`3fc85489` (`4b81e78a` の取り込み) の後に main が `analysis/py99_*.py` (テストから呼ばれない新規の分析スクリプト) と `REPORT_PY99_APPENDIX.md` を追加したため、取り込み後に全テストを再実行した。その前の `20a5bc6b` (`213a310f` の取り込み) の後に main が `provider/fl_engine.c`・`host/fl_mock.mjs`・`host/fl_provider.mjs`・`provider/build.sh` (`_fl_engine_display_time` の export)・`tests/provider_check.mjs` を変え、`tests/ui_display_diff.mjs` を追加した (PY-121 (#2982) の ui 6 件)。その取り込みで `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` が競合し、両側を残して解消した。`provider_check.mjs` の期待値は、main 側の 115/320 に `pe95` の 9 件を足して 124/311 とした (435 は不変)。
 
-測定は `3fc85489` の内容で行った。環境: runner 4 core。測定開始直前の load average 0.03 (`uptime`、22:36:13)。
+測定は `04011a2a` の内容で行った。環境: runner 4 core。
 
-再ビルド: `provider/build.sh` を `3fc85489` の内容で再実行した (rc 0、handlers 124、1.4 秒)。`build.sh` の export 行が main で変わったため。`build_flpy.sh`・`build_cpython_wasm.sh` の入力 (`src/`・`analysis/flapi/`・`gen/`・各ビルドスクリプト) は `20a5bc6b` 以降変わっていないため、再ビルドは行わず、`20a5bc6b` の測定時の dist を使った。素材の展開 (`fl-win64.tar.zst` の 5 件、`tar --zstd -xf --wildcards`、2.9 秒) と `[EMSDK]` (6.0.12) は前回の手順のまま。
+再ビルド: `provider/build.sh` を `3fc85489` の内容で再実行した (`provider/`・`host/`・`tests/`・`gen/` は `04011a2a` まで変更なし) (rc 0、handlers 124、1.4 秒)。`build.sh` の export 行が main で変わったため。`build_flpy.sh`・`build_cpython_wasm.sh` の入力 (`src/`・`analysis/flapi/`・`gen/`・各ビルドスクリプト) は `20a5bc6b` 以降変わっていないため、再ビルドは行わず、`20a5bc6b` の測定時の dist を使った。素材の展開 (`fl-win64.tar.zst` の 5 件、`tar --zstd -xf --wildcards`、2.9 秒) と `[EMSDK]` (6.0.12) は前回の手順のまま。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/provider_check.mjs` | PASS (435 / 実装 124 / 未実装 311 / MCP 静的 60) | 344 ms |
-| `node tests/ui_state_diff.mjs` | calls 33、diffs 0、PASS | 55 ms |
-| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 51 ms |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 52 ms |
-| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 54 ms |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 124 / 未実装 311 / MCP 静的 60) | 348 ms |
+| `node tests/ui_state_diff.mjs` | calls 33、diffs 0、PASS | 49 ms |
+| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 53 ms |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 51 ms |
+| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 56 ms |
 | `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 51 ms |
 | `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 55 ms |
-| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 53 ms |
-| `node tests/ui_display_diff.mjs` | ok_calls 12・bad_calls 11、diffs 0、PASS | 51 ms |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1626 ms |
+| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 55 ms |
+| `node tests/ui_display_diff.mjs` | ok_calls 12・bad_calls 11、diffs 0、PASS | 49 ms |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1735 ms |
 
-同じ mock を読む `device_diff` (calls 8・diffs 0)・`ilmcp_diff` (calls 32・diffs 0)・`midi_path_diff` (cases 30・diffs 0)・`transport_diff` (calls 7・diffs 0)・`midi_bundled_device` (checks 9・failed 0)・`midi_script` (checks 29・failed 0) も rc 0 で PASS (wall 51・66・53・51・353・812 ms)。
+同じ mock を読む `device_diff` (calls 8・diffs 0)・`ilmcp_diff` (calls 32・diffs 0)・`midi_path_diff` (cases 30・diffs 0)・`transport_diff` (calls 7・diffs 0)・`midi_bundled_device` (checks 9・failed 0)・`midi_script` (checks 29・failed 0) も rc 0 で PASS (wall 49・65・55・55・350・811 ms)。
 
 ネガティブコントロール: 本 commit では再測定していない (`db86f35b` の測定で、`uiClosing` を `true` にすると `ui_state_diff.mjs` が rc 1 で FAIL することを確認済み。既定値は `false` のまま)。
 
 C の警告: `gcc -fsyntax-only -Wall -Wextra provider/fl_engine.c` は 3 件 (`fl_engine.c:92` の `unused variable 'k'`。`CH` マクロ由来の既存の警告)。`origin/main` の同じファイルも 3 件で同数のため、本 PR が増やした警告は 0 件。
 
-コード差分 (測定 commit から本 REPORT 更新 commit まで、`tools/python` の .md 以外): `git diff 3fc85489 HEAD -- tools/python ':!*.md'` は 0 行。
+コード差分 (測定 commit から本 REPORT 更新 commit まで、`tools/python` の .md 以外): `git diff 04011a2a HEAD -- tools/python ':!*.md'` は 0 行。
 
 ## 5. 保留 (残り 48 件・子 issue へ)
 
