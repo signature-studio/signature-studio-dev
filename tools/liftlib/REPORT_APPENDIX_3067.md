@@ -62,7 +62,7 @@ T1 ok / T2 ok (修正前参照との差は repmap 18 行のみ・inserts=18 shif
 | ott_auto_none | **FAIL** |
 
 - IR 不一致 6 件の内訳: 修正前参照との差 (repmap 18 行) と、既存の `%pc` 行番号差 (#2863 の既知事象)。gate 側の比較は `canon_tags` で改名を無視する (T26 で確認)。repmap 18 行は改名では消えないため、参照再投入まで不一致になる。
-- **SHA 突合は未判定**。1 回の run で 2 モジュール × 42 組合せ (約 7 分/モジュール・PR 本文の実測) を走らせる必要があり、残り時間に収まらなかった。加えて、`node tools/liftlib/recipes/ott_outhash.mjs` の出力が JSON でなく失敗した (`outhash 実行失敗: Expecting value`・原因は未切り分け)。参照 `tools/m10/work/ott_m10.cjs` は `work-m6-ott` 素材から展開して用意した (`.wasm` は未展開)。
+- **SHA 突合は未判定** (起票先: #3145)。1 回の run で 2 モジュール × 42 組合せ (約 7 分/モジュール・PR 本文の実測) を走らせる必要があり、残り時間に収まらなかった。加えて、`node tools/liftlib/recipes/ott_outhash.mjs` の出力が JSON でなく失敗した (`outhash 実行失敗: Expecting value`・原因は未切り分け)。参照 `tools/m10/work/ott_m10.cjs` は `work-m6-ott` 素材から展開して用意した (`.wasm` は未展開)。
 - 参考 (前回測定・`81adaffa`・PR 本文の表): 修正前 `718e90fb` は SHA 42/42 (f0 21/21)、修正後 `81adaffa` は 3/21 (f0)。`c8316dc7` では再測定していない。修正後の値が正しいかは native 実機と未照合 (§6)。
 - 全体 3 分 28 秒 (総計・unit 込み)。regress 部分は 46.5 秒 (初回) / 22.0 秒 (キャッシュ後の再実行)。
 
@@ -90,6 +90,6 @@ bash liftlib_e2e.sh --quick                           # 約 3.5 分 (unit 込み
 |---|---|---|
 | 参照 IR (`ir7e_p1/p2/p3.ll`) と m10 SHA 基準 (42/42) は修正前の P1 出力。R2 `work-m6-ott` を再投入するまで、T2・T26 は repmap 18 行の差を許容し、ott_auto_none の IR 一致 O2a〜O4 は不一致のまま | 参照は work/ のみで commit 不可。再投入後に `==` へ戻す | PM / 依頼者 (`docs/WORKFLOW.md` §11 の R2 再投入) |
 | 残留分岐 (`br_other` 17 / `no_branch` 49) の D1a 同型判定と対策 | 修正対象外。件数は §4 | #3137 (`[LIFTLIB-22]`・子) |
-| SHA 突合 (outhash) が `c8316dc7` で未判定 (node の JSON 出力の失敗・1 回約 14 分) | 修正後 OTT 出力の SHA gate が未判定 | PM 判断 (#3067 の完了コメント) |
+| SHA 突合 (outhash) が `c8316dc7` で未判定 (node の JSON 出力の失敗・1 回約 14 分) | 修正後 OTT 出力の SHA gate が未判定 | #3145 (`[LIFTLIB-23]`・子。親 #3067 の受入条件から外した) |
 | 修正後の OTT 出力 (SHA 3/21 f0 @ `81adaffa`) の正しさは native 実機と未照合 | SHA gate の基準を新しい出力へ置き換える判断が必要 | PM 判断 (基準差し替えは既定で行わない) |
 | `tools/m6/ir6_pass.py` (vendored) に同じ repmap の欠陥。RetDec 路線 (D5 凍結) | m6 路線の出力は修正前と同じ | PM (D5 凍結の判断・新規作業なし) |
