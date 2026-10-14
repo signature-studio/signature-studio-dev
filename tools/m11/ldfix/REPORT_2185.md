@@ -24,6 +24,7 @@
   - `DROP`: 全経路が STORE。機械語上は store があるのに IR の読みが undef (脱落候補)。
   - `LIVE-IN`: 全経路が ENTRY。
   - `UNDETERMINED`: それ以外。理由コード `BARRIER` / `ONLY_ENTRY_AFTER_CALL` / `MIXED_OR_UNREACHABLE` / `IJMP` で区別。
+- 限界 (近似): `escaped` は `lea` と `mov reg, rbp|rsp` だけを見る。`mov [mem], rbp` のように frame アドレスをメモリへ書き出すケースは見ていない。今回の DROP / LIVE-IN は straight-line の判断で、この限界で結論は変わらないと確認した (指摘 4)。
 - 関数内に関数外・不明な飛び先への jump があると CFG 不完全として `IJMP` で全 site を未判定にする (本測定では該当 0 件)。
 
 ## 3. 結果
@@ -39,6 +40,54 @@
 
 - UNDETERMINED 44 関数の内訳 (関数単位): `ONLY_ENTRY_AFTER_CALL` 25 関数 (call を越えて ENTRY に達するだけ)、`BARRIER` 19 関数 (ポインタ経由 store・部分重なりで打ち切り)。
 - 関数単位の判定は、site が全て DROP なら DROP、全て LIVE-IN なら LIVE-IN、それ以外は UNDETERMINED。
+- 未判定 44 関数の一覧 (関数 / 判定 / 理由コード / 読み site)。理由コードは関数内の site から取った主因 (`BARRIER` を優先)。site 単位の理由は `results/frame_store_verdict_2185.json` の `sites[*].why` が正本。
+
+| 関数 | 判定 | 理由コード (主) | 読み site |
+|---|---|---|---|
+| 1006ec0 | UNDETERMINED | BARRIER | 1006fb6, 1007021 |
+| 103aa50 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 103ab59 |
+| 11e6e20 | UNDETERMINED | BARRIER | 11e6fdb |
+| 129df10 | UNDETERMINED | BARRIER | 129e1d6 |
+| 12cb2e0 | UNDETERMINED | BARRIER | 12cb416 |
+| 1354630 | UNDETERMINED | BARRIER | 1354784 |
+| 4078c0 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 40792b, 40791e |
+| 418b40 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 418b57 |
+| 441730 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 44178f |
+| 4488f0 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 44892d |
+| 454090 | UNDETERMINED | BARRIER | 454637 |
+| 45c170 | UNDETERMINED | BARRIER | 45c1b5 |
+| 45cda0 | UNDETERMINED | BARRIER | 45cdd9 |
+| 45d8b0 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 45da5b |
+| 45db40 | UNDETERMINED | BARRIER | 45db85 |
+| 45dc20 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 45dc69 |
+| 5c4dc0 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 5c4e43 |
+| 5cb210 | UNDETERMINED | BARRIER | 5cb4aa |
+| 639c70 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 639c83 |
+| 694c80 | UNDETERMINED | BARRIER | 6951c8 |
+| 695640 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 6956f9 |
+| 6c01a0 | UNDETERMINED | BARRIER | 6c0207 |
+| 6c7610 | UNDETERMINED | BARRIER | 6c7665 |
+| 6c7ca0 | UNDETERMINED | BARRIER | 6c7ccc |
+| 6ca580 | UNDETERMINED | BARRIER | 6ca5c2 |
+| 6ca6c0 | UNDETERMINED | BARRIER | 6ca702 |
+| 6ced00 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 6ced14 |
+| 7e45e0 | UNDETERMINED | BARRIER | 7e48d6, 7e47b6 (NOSLOT) |
+| 808930 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 80896d |
+| 808c80 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 808ca4 |
+| 81bfd0 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 81bff3 |
+| 81c0d0 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 81c118 |
+| 820d60 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 820dba |
+| 824020 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 824069 |
+| 864f80 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 864f94 |
+| 867220 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 867245 |
+| 92ea90 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | 92eaaf |
+| bf8b40 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | bf8b68 |
+| c3b340 | UNDETERMINED | BARRIER | c3b46f |
+| c9cf70 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | c9cf8f |
+| da5400 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | da541f |
+| da5510 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | da552f |
+| e8fba0 | UNDETERMINED | ONLY_ENTRY_AFTER_CALL | e8fc08 |
+| f61710 | UNDETERMINED | BARRIER | f61ce6 |
 
 DROP (全経路で store が到達。読みと全経路の store を機械語で示す):
 
@@ -59,9 +108,23 @@ LIVE-IN:
 - DROP 3 関数と LIVE-IN 1 関数は上表の read / store を 1 site 以上示した。
 - UNDETERMINED の各 site の read・経路の barrier 機械語 addr は `results/frame_store_verdict_2185.json` の `sites[*]` (`addr` / `slot` / `outcomes` / `barrier_addrs`) に残した。
 
-### 3.3 受入条件 4: コード差分
+### 3.3 ネガティブコントロール (WORKFLOW §5)
 
-- 測定 commit `a511e0c7` から HEAD までの `tools/m11/ldfix` の差分は、この REPORT と結果 JSON の追加のみ。`.py` の差分は 0 行。
+判定器本体 `audit_frame_store_verdict.py` は変更せず、`negctl_frame_store_2185.py` が `effect()` を 1 命令だけ差し替えて `main()` を再実行する。結果は `results/negctl_frame_store_2185.json`。PE・入力は本文 §1 と同じ。0.29 秒、rc 0。
+
+| 条件 | 差し替え | 10628a0 | 412160 | 13105d0 | c38bd0 | 関数 DROP / LIVE-IN / UNDET |
+|---|---|---|---|---|---|---|
+| ctrl | なし | DROP | LIVE-IN | DROP | DROP | 3 / 1 / 44 |
+| 壊す 1 | 10628a0 の store `10628bc` を無効化 | **UNDETERMINED** (`ONLY_ENTRY_AFTER_CALL`) | LIVE-IN | DROP | DROP | 2 / 1 / 45 |
+| 壊す 2 | 412160 の読み `41217d` の直前 `412176` (`lea r13, ...`) を DEF 扱い | DROP | **DROP** (`ALL_PATHS_STORE`) | DROP | DROP | 4 / 0 / 44 |
+
+- 壊す 1 で 10628a0 の DROP が消えること、壊す 2 で 412160 の LIVE-IN が DROP に変わることを確認した。DROP / LIVE-IN の判定は store 1 件の有無に依存する。
+- 再現: `python3 tools/m11/ldfix/negctl_frame_store_2185.py <PE> results/audit_undefload_564_full.json results/f4_564_post.json <out>`。
+
+### 3.4 受入条件 4: コード差分
+
+- 測定 commit `a511e0c7` から HEAD までの `tools/m11/ldfix` の差分は、この REPORT と結果 JSON・negctl の追加のみ。判定器 `.py` の差分は 0 行 (`audit_frame_store_verdict.py`)。
+- 差分出力は下記 §3.5 を参照 (測定 commit から HEAD までの `git diff --stat` と `.py` 差分の出力)。
 
 ## 4. 旧版 (REPORT_2144) との差
 
