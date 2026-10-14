@@ -203,7 +203,7 @@ bash tools/ott/entry/entry_e2e.sh --quick          # entry 85 (旧 build, 無改
 | `rep stosq` の fill 値 `mov rax,[0x1802610e0]` (静的 0xffffffff00000001) が enc(NULL)=cookie と一致しない。実行時値は未確認 | 本置換は fill を使わず判定に影響しない。実 CRT 経路を使うときは要確認 | #2412 へのコメント |
 | `ACCEPTANCE_CAB137_CAB138.md` §4.3 (111 行) の「32 entry・非ゼロ 32/32」 | 静的値の誤記 (実値は 0/34。`acc_crt_table.py` で確認) | #2412 へのコメント (issue 対象外の文書) |
 
-- **測定** (コード変更の最後の commit: `2629fa88` = probe・crt_wasm 差分, `74d4ddaa` = acc_crt_table.py):
+- **測定** (コード変更の最後の commit: `crt_e2e` は `2629fa88` = probe・crt_wasm 差分 / 読み戻しは `a64803bb` = node を PATH から取る / `acc_crt_table.py` は `74d4ddaa`):
 
 | 項目 | 結果 |
 |---|---|
@@ -212,8 +212,8 @@ bash tools/ott/entry/entry_e2e.sh --quick          # entry 85 (旧 build, 無改
 | 新 scenario 9 本 / 既存 entry 85 再突合 | 9/9 PASS / 85/85 PASS |
 | 陰性対照 native SIGSEGV / wasm ott_unlifted | OK / OK |
 | `ott_e2e.sh` / `entry_e2e.sh --quick` | PASS / PASS (`ott_e2e` の旧 RetDec census は素材なしで INFO スキップ・判定対象外) |
-| 読み戻し 95 run (`2629fa88`) | 95/95 成功・7.1 秒 (開始 load 1.60) / 変化 {5, 6} / init 95/95 |
+| 読み戻し 95 run (`a64803bb`, node v22.23.3) | 95/95 成功・8.6 秒 (終了時 load 0.41) / 変化 {5, 6} (各 7 run) / init 95/95 / 32・33 は 95/95 で不変 |
 | `acc_crt_table.py` (`74d4ddaa`) | 34 entry・静的非ゼロ 0/34・decode(0) の 4 方式一致 True |
 
-- **測定後のコード差分** (0 行が正): `git diff 2629fa88 HEAD -- tools/ott/crtinit/*.c tools/ott/crtinit/*.py tools/ott/crtinit/*.sh tools/ott/crtinit/*.mjs` = 0 行 (以降の変更は REPORT.md のみ)。`git diff 74d4ddaa HEAD -- tools/ott/accept` = 0 行。
+- **測定後のコード差分** (0 行が正): `git diff 2629fa88 HEAD -- tools/ott/crtinit/*.c tools/ott/crtinit/crt_*.py tools/ott/crtinit/*.sh tools/ott/crtinit/*.mjs` = 0 行 (crt_e2e の対象。`apiset_readback.py` は crt_e2e の対象外)。`git diff a64803bb HEAD -- tools/ott/crtinit/apiset_readback.py` = 0 行 (以降の変更は REPORT.md のみ)。`git diff 74d4ddaa HEAD -- tools/ott/accept` = 0 行。
 - 前 round の全工程 run の FAIL (94 件) は古い `libottnative.so` 起因。§9 の `build.sh` で解消し、今回の測定は build.sh の後に行った。
