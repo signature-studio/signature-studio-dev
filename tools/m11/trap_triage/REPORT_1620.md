@@ -123,7 +123,7 @@ index 799cc5cd..c171bab2 100644
 
 ## 10. #1620 run (HEAD `d6176933` = origin/main): 前提が現 HEAD で再現しない・§19 の埋め実験は W を上書きしていた
 
-測定 commit: `b1d4c328` (`probe_1620_fill.mjs` の修正。以後この範囲は変えていない)。素材 (`fl-win64`・`work-m11`・`work-liftdiff`) は $HOME/artifacts から展開。toolchain は `/opt/emsdk`・`/opt/retdec`。
+測定 commit: `b1d4c328` (`probe_1620_fill.mjs` の修正。以後この範囲は変えていない)。素材 (`fl-win64`・`work-m11`・`work-liftdiff`) は `oc_artifacts` の取得物を展開。toolchain は `[EMSDK]`・`[RETDEC]`。
 
 ### 10.1 現 HEAD の基準は §2 と一致しない
 
