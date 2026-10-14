@@ -145,7 +145,7 @@
 - **実測 (測定 commit `0af3030c`。load average 0.38 → 0.56、4 CPU、並列 1)**:
   - `bash tools/hostbridge/hostbridge.sh`: rc=0、7.57 s、`[hostbridge] ALL PASS`。OK 92 / FAIL 0。
   - 内訳: [1] E1〜E20 OK、[2] `build_plugin_ott.sh` OK (`ott_hb.cjs.wasm` 848,251 B) と `build_host.sh` OK (`host_vst2.wasm` 3,734 B)、[3b] `checks 13 / broken 0`、[3c] `[shim] ALL PASS` ・ネガコン 7/7 caught、[4] `[run_poc] checks 28 / broken 0`。
-  - 素材: `work-m6-ott` を `tar --zstd -xf` で展開 (`tools/m6,m8,m9,m10,ott/work/`)。toolchain は既存の `/opt/emsdk`・`/opt/retdec` を使用。
+  - 素材: `work-m6-ott` を `tar --zstd -xf` で展開 (`tools/m6,m8,m9,m10,ott/work/`)。toolchain は既存の [EMSDK]・[RETDEC] (`docs/REFERENCES.md` §4) を使用。
 - **測定後のコード差分**: `git diff 0af3030c HEAD -- tools/hostbridge/poc tools/runtime/memload` の出力は 0 行 (差分 0)。
 - **未実測**: `pnpm runtime:memload:real` (RT-15 受入 1)。lowbase ビルドが OTT DLL (`analysis-ott-binaries`) 無しで停止 (`FileNotFoundError: .../ott/binaries/OTT_vst2_win64.dll`)。
 
