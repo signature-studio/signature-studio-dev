@@ -18,7 +18,7 @@
 | 項目 | 値 |
 |---|---|
 | 測定 commit | `3127f774` (作業ツリー = HEAD で測定。測定経路の差分は §8) |
-| 素材 | `work-icall` (`tools/icall/work/`・`tar --zstd -xf` 25.7 s)。`toolchain-retdec` (`/opt/retdec`)・`toolchain-emsdk` (`/opt/emsdk`) は agent-setup 展開済み。`fl-win64` は未使用 (解析は dsm・IR のみ)。`plugins-freshair` は無いので `FA_CORE=rw.dll` |
+| 素材 | `work-icall` (`tools/icall/work/`・`tar --zstd -xf` 25.7 s)。`toolchain-retdec` ([RETDEC])・`toolchain-emsdk` ([EMSDK]) は agent-setup 展開済み。`fl-win64` は未使用 (解析は dsm・IR のみ)。`plugins-freshair` は無いので `FA_CORE=rw.dll` |
 | route | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh` (fixed)。build 所要 約 6 s (実測) |
 | sweep | `bash tools/icall/diff/fa_sweep.sh 8 60` (131 関数・1 並列)。新オラクル 69.8 s、旧オラクル 69.5 s (`FA_PTR_NORM=0`)。load (1 分平均) は 4 core 機で sweep 後 0.88 / 0.72 |
 | 比較 | `fa_cmp.py` の判定 (xmm0 の 64bit、同一入力 8 点、seed 3)。ptr 正規化は §3 |
