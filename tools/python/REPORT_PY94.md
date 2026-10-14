@@ -67,7 +67,7 @@ main の取り込みで `docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_en
 期待値は、PR の `pe94` 7 件と main の `pe121` 5 件・`pe119` 6 件を合算して **実装 104 / 未実装 331** (total 435、MCP 静的 60)。
 前回 (`bdd66a55`・`932c3dbc`) の測定値は PR の履歴に残り、本節には載せない。
 
-環境: runner 4 core。開始時の load average 1.85 / 1.16 / 0.55。`FL_WIN64_DIR` は `fl-win64` の展開先 (`extracted/`)。emsdk は runner の `/opt/emsdk` (`toolchain-emsdk` は `$RUNNER_TEMP` に展開して `EMSDK_ENV` で指定し、provider のビルドに使った)。
+環境: runner 4 core。開始時の load average 1.85 / 1.16 / 0.55。`FL_WIN64_DIR` は `fl-win64` の展開先 (`extracted/`)。emsdk は runner の `[EMSDK]` (`toolchain-emsdk` は `$RUNNER_TEMP` に展開して `EMSDK_ENV` で指定し、provider のビルドに使った)。
 
 前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・164 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0・4 秒)・`build_flpy_static.sh` (rc 0・4 秒)。
 
