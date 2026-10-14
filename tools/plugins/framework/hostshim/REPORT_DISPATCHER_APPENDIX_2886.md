@@ -114,3 +114,14 @@ emulator は未実行の callee を戻り値 0 で代替する。その仮定が
 | 未実行格納のうち分岐条件が未解析の 24 件 (§3.4) | 受入 1・3 | [PLG-P0b-28] |
 | Phase B の OOB (本 run 変更前後で同一) | Phase B の PASS | #2911 (既存) |
 | stage-2 smoke `fw_smoke_check` の `init_reach=16` | Phase A の判定 (dispatch=38 は PASS) | #2510 (既存) |
+
+## 6. main 取り込み後の再測定 (測定 commit `e1515204`・競合解消の merge)
+
+main (`3d37a190`) の取り込みで、本付録と同名の `REPORT_DISPATCHER_APPENDIX.md` (#2782 の付録) が衝突したため、本付録を `REPORT_DISPATCHER_APPENDIX_2886.md` へ改名した。`hs_disp_emu.py` は main 側の `HS_DISP_STACK_FILL`・`slot_writes`・`rbp_ok` (#2782) と本 PR の `HS_DISP_PATH`・`callout_at`・`one` を両方残した。以下は merge 後の実測 (n=1)。
+
+- 既定・全 256 ID: exit 0・71.7 秒。`distinct (rax, path) = 109`・unmapped 61 ID / 5,340 件 / 200 組 / 197 ページ (§1 と一致)。取り込み前 `97b9aee7` の既定 run との比較: rax・stop・steps・callouts・path_hash・trail・unmapped・unmapped_pages・hit の差は 256 ID で 0 件。
+- `HS_DISP_PATH=1` の基準と `HS_DISP_RET_SPEC=0x40fe90:one` (各 exit 0)、`hs_store_cov.py`: 静的 69・基準の実行被覆 30・未実行 39・変更で新規 4・失う 3・応答 0 の 202 件 (leave 0x17 / enter 0x0a)。§3.4 と一致。
+- `hs_resp_src.py 0x01 0x07 0x0e 0x18`: 格納 VA は §2 と一致 (0x1318e46・0x13192eb・0x1319561・0x131a268)。
+- Phase A (`hs_e2e.sh`) は再実行していない。素材は `fl-win64` のみで `work-fw-stage1` が無い。`hostshim.c` は取り込み前の差分がコメント 1 行 (参照名) のみで、コードは変わらない。
+- 測定 commit `e1515204` 以降、本節を含む commit で変わるのは `REPORT_DISPATCHER_APPENDIX_2886.md` と `docs/DOC_MAP.md` のみ (コード `*.py`・`*.c`・`*.sh` の差分 0 行)。
+- 取り込み前後のコード差分 (`git diff --numstat 97b9aee7 e1515204 -- tools/plugins/framework/hostshim/`): `hs_disp_emu.py` 31+/6−・`hostshim.c` 1+/1− (コメント)・`REPORT_DISPATCHER.md` 17+/2−・`REPORT_DISPATCHER_APPENDIX_2886.md` 新規 116 行。
