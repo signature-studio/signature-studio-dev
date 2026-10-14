@@ -67,6 +67,12 @@
      (main との競合なら「main を merge して解消」) を書く。実装 agent が自動で直す。
    - マージ後は issue に結果コメントを残す。
 
+## pr-lint の扱い
+
+- PR 本文と diff に対して `bash .github/scripts/pr-lint.sh --base origin/main --head <PR の head> --body-file <本文ファイル>` の出力を確認する。
+- 指摘の根拠として pr-lint の出力 (`<file>:<line>: <rule>: <message>`) を引用する。
+- pr-lint が通っている項目 (REPORT 行数・repo 外パス・oc_artifacts の値域・DOC_MAP 登録・Closes と受入の整合) は再指摘しない。
+
 ## 注意
 
 - 自分が approve できない立場 (同一 App identity) の場合は approve をスキップし、
