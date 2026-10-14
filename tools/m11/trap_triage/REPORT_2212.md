@@ -93,4 +93,4 @@ git diff 7d3e5cad 8b00eecd --stat -- tools/m11/m11_rt.c tools/m11/m11_build.sh
 
 前回の `7d3e5cad` の測定値 (旧 §2) は、`8b00eecd` の再測定で全行一致した。
 
-測定 commit `8b00eecd` から現 HEAD までの `tools/m11` (trap_triage を除く) の差分は、この commit のあとも 0 行 (`git diff 8b00eecd HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は空)。後続の commit は `trap_triage/` 配下の文書のみを変える。
+測定 commit `8b00eecd` から現 HEAD までの `tools/m11` (trap_triage を除く) の差分は、この commit のあとも 0 行 (`git diff 8b00eecd HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は空)。後続の commit は REPORT・索引 (`docs/DOC_MAP.md`) の文書のみを変え、測定 build の入力 (`tools/m11` の trap_triage 以外) は変えていない。
