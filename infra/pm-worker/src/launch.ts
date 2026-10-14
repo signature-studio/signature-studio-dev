@@ -80,13 +80,16 @@ export interface LaunchInput {
   batch?: number;
 }
 
-// launch_issues.py cmd_launch と同じ式: room = TARGET - active, n = min(room, BATCH, ready)
-// picks = (relaunch + ready)[: max(n, len(relaunch))]
+// 1 tick の枠: room = TARGET - active、枠 = min(room, BATCH, relaunch + ready)。relaunch も枠に入り、残りを ready が使う。
+// relaunch は枠 (room・BATCH) を超えても全件出す。枠を ready の件数で頭打ちにする launch_issues.py の式とは、
+// relaunch がある tick で最大 relaunch 件だけ差が出る。
+// picks = (relaunch + ready)[: max(枠, len(relaunch))]
 export function planLaunch(input: LaunchInput): { room: number; picks: number[] } {
   const target = input.target ?? DEFAULT_TARGET;
   const batch = input.batch ?? DEFAULT_BATCH;
   const room = Math.max(0, target - input.active);
-  const nLaunch = Math.min(room, batch, input.ready.length);
+  const relaunch = input.relaunch.length;
+  const frame = Math.min(room, batch, relaunch + input.ready.length);
   const order = [...input.relaunch, ...sortReady(input.ready).map((r) => r.n)];
-  return { room, picks: order.slice(0, Math.max(nLaunch, input.relaunch.length)) };
+  return { room, picks: order.slice(0, Math.max(frame, relaunch)) };
 }

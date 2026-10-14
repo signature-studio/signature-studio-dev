@@ -416,24 +416,26 @@ test("ネガコン (g): pm-apply / needs-user-input が付いた oc:no-pr の is
     handlers: [(c) => (c.method === "POST" && (c.url.endsWith("/dispatches") || /\/issues\/\d+\/comments$/.test(c.url)) ? j({}, 201) : undefined)],
   });
   const seed: Array<[string, unknown]> = [];
-  for (const [n, labels] of [
-    [91, ["oc:no-pr", "pm-apply"]],
-    [92, ["oc:no-pr", "needs-user-input"]],
-    [93, ["oc:no-pr"]],
-  ] as Array<[number, string[]]>) {
+  // 91・92 は unknown (再投入の条件を満たす)。93 は split (検出の対照)。94 はラベル無しの unknown (再投入の対照)。
+  for (const [n, labels, reason] of [
+    [91, ["oc:no-pr", "pm-apply"], "unknown"],
+    [92, ["oc:no-pr", "needs-user-input"], "unknown"],
+    [93, ["oc:no-pr"], "split"],
+    [94, ["oc:no-pr"], "unknown"],
+  ] as Array<[number, string[], string]>) {
     seed.push(["issues", issueEv(n, { labels })]);
-    seed.push(["issue_comment", commentEv(n, { login: IMPL }, outcomeBody("split"), at(10))]);
+    seed.push(["issue_comment", commentEv(n, { login: IMPL }, outcomeBody(reason), at(10))]);
   }
   await sendAll(ctx, seed);
   await markFresh(ctx);
-  assert.deepEqual(targets(ctx), ["no_pr#93"], "対照: ラベルの無い 93 だけが対象");
+  assert.deepEqual(targets(ctx), ["no_pr#93"], "対照: ラベルの無い split の 93 だけが対象");
   const { picks, rows } = ctx.app.engine.plan();
-  assert.deepEqual(picks.map((p) => p.n), [], "split は再投入せず PM agent に回す (reason ごとの再着手は engine.test.ts)");
+  assert.deepEqual(picks.map((p) => p.n), [94], "対照: ラベルの無い unknown の 94 だけが再投入される (91・92 は hold で除外)");
   assert.ok(rows.user.some(([n]) => n === 91) && rows.user.some(([n]) => n === 92));
   await ctx.app.engine.launch(await (ctx.app.engine as any).d.gh());
   await ctx.app.engine.pmDispatch(await (ctx.app.engine as any).d.gh());
   const oc = ctx.m.calls.filter((c) => c.method === "POST" && /\/issues\/\d+\/comments$/.test(c.url));
-  assert.deepEqual(oc.map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), []);
+  assert.deepEqual(oc.map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["94"]);
   assert.deepEqual(pmCalls(ctx.m.calls).map((c) => c.body.client_payload), [{ kind: "no_pr", ref: 93 }]);
 });
 

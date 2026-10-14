@@ -5,6 +5,7 @@ import { classify, neededArts, type ClassifyInput, type Rows, type Snapshot } fr
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
+import { advanceLaunch, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
@@ -97,7 +98,7 @@ interface Meta {
 
 export interface Log {
   at: string;
-  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "would-pm-dispatch" | "pm-dispatch" | "error" | "skip" | "truncated" | "recovered";
+  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "would-pm-dispatch" | "pm-dispatch" | "error" | "skip" | "truncated" | "recovered" | "unobserved" | "observed";
   n?: number;
   art?: string;
   note?: string;
@@ -500,9 +501,11 @@ export class Engine {
     }
     const relaunch: ClassifyInput["relaunch"] = {};
     for (const [k, v] of this.d.store.all<{ count: number; art: string | null }>("relaunch")) relaunch[k] = v;
+    const launchState: Record<string, LaunchState> = {};
+    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) launchState[k] = v.state;
     return {
       snap: { issues, prs, runs, bot_last, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody },
       unknown,
     };
   }
@@ -538,6 +541,7 @@ export class Engine {
     const hasLabel = (n: number, l: string) => (labels.get(n) ?? []).includes(l);
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
+    const failed = (n: number): boolean => input.launchState?.[String(n)] === "failed";
     // 既定の素材行 (PM の oc_artifacts 行。無ければ題名とラベルからの推定)。picks の既定と同じ。
     const baseArt = (n: number): string => {
       const b = this.s.pmArt[String(n)]?.line;
@@ -600,7 +604,10 @@ export class Engine {
     }
     // 親 (open な子を持つ) で、分類上 started / stopped / recent に入っているものは、そのままにする (着手対象ではないため)。
     for (const [n] of [...rows.stopped]) {
-      if (hasLabel(n, "oc:no-pr") && !held(n) && !(children[String(n)] ?? []).length && !hasLabel(n, "oc:stuck") && !unknown.has(n)) noPr(n, "stopped");
+      if (!hasLabel(n, "oc:no-pr") || (children[String(n)] ?? []).length || unknown.has(n)) continue;
+      // hold のラベルは再投入せず user に置く (ready に戻して下の hold の処理で移す)。観測できなかった投稿 (failed) は再投稿しない。
+      if (held(n)) moveTo(n, "stopped", () => rows.ready.push(n));
+      else if (!hasLabel(n, "oc:stuck") && !failed(n)) noPr(n, "stopped");
     }
 
     // 着手しても PR を出さない/出せない issue (pm-apply・needs-user-input) は、着手も再投入もしない。
@@ -664,7 +671,24 @@ export class Engine {
     return this.d.store.get<PhaseState>("meta", "phase") ?? { review_only: true };
   }
 
+  // 投稿した /oc の観測を進める (launchObs)。書くのは状態が変わったときだけ。失敗の判定は同期が新しいときだけ。
+  // dry-run は投稿しないので launchObs を作らず、ここでは何もしない。
+  private observeLaunches(): void {
+    const fresh = this.fresh();
+    const now = this.d.now();
+    const runs = Object.values(this.s.runs);
+    for (const [k, obs] of this.d.store.all<LaunchObs>("launchObs")) {
+      const title = this.s.issues[k]?.title;
+      if (title === undefined) continue;
+      const next = advanceLaunch(obs, now, observedBy(runs, title, Date.parse(obs.at)), fresh);
+      if (!next) continue;
+      this.d.store.put("launchObs", k, next);
+      this.pushLog({ kind: next.state === "failed" ? "unobserved" : "observed", n: Number(k), note: next.state === "failed" ? "launch not observed in 5 min" : undefined });
+    }
+  }
+
   async launch(gh: Gh | null): Promise<Plan> {
+    this.observeLaunches();
     const { plan, picks } = this.plan();
     this.meta.lastPlan = plan;
     this.meta.counters = this.meta.counters ?? this.zero();
@@ -710,6 +734,7 @@ export class Engine {
       const at = iso(this.d.now());
       this.d.store.put("launchedAt", String(p.n), at);
       this.s = { ...this.s, launchedAt: { ...this.s.launchedAt, [String(p.n)]: at } };
+      this.d.store.put("launchObs", String(p.n), { state: "launched", at, changedAt: at } satisfies LaunchObs);
       if (p.relaunch) {
         const prev = this.d.store.get<{ count: number; art: string | null }>("relaunch", String(p.n)) ?? { count: 0, art: null };
         this.d.store.put("relaunch", String(p.n), { count: prev.count + 1, art: p.art });
@@ -862,6 +887,14 @@ export class Engine {
   }
 
   // ---------------------------------------------------------------- 観測
+  private launchUnobserved(): number[] {
+    return this.d.store
+      .all<LaunchObs>("launchObs")
+      .filter(([, v]) => v.state === "failed")
+      .map(([k]) => Number(k))
+      .sort((a, b) => a - b);
+  }
+
   // 集計だけを返す (本文・タイトルは含めない。issue 番号は公開 repo の情報)。
   status(extra: Record<string, unknown> = {}): Record<string, unknown> {
     const { rows, plan } = this.plan();
@@ -915,6 +948,8 @@ export class Engine {
       last_webhook_at: this.meta.lastWebhookAt ? iso(this.meta.lastWebhookAt) : null,
       last_dispatch_at: this.meta.lastDispatchAt ? iso(this.meta.lastDispatchAt) : null,
       running,
+      // 投稿したが 5 分たっても run が現れなかった issue。自動では再投稿しない (人が見る)。
+      launch_unobserved: this.launchUnobserved(),
       // dry-run のために投稿しなかった GitHub への書き込み (/oc 投稿 + repository_dispatch) の累計。
       dry_run_skipped_posts: counters.wouldLaunch + counters.wouldDispatch,
       reconcile_diff: this.meta.reconcileDiff ?? { last: 0, total: 0 },

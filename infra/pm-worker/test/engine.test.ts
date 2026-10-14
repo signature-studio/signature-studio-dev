@@ -165,6 +165,7 @@ test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら reason=unk
   assert.equal(p.picks[0].np, "unknown");
   const gh = await (ctx.app.engine as any).d.gh();
   await ctx.app.engine.launch(gh);
+  // 再投稿の run は現れない (観測できない)。5 分で failed になり、stopped のまま再投稿しない。
   for (let i = 0; i < 3; i++) {
     clock.t += 4 * 3_600_000;
     await markFresh(ctx);
@@ -204,6 +205,20 @@ test("launch: oc:no-pr の本文に『素材不足』があっても、run-outco
   await markFresh(ctx);
   p = ctx.app.engine.plan();
   assert.deepEqual(p.picks.map((x) => x.n), [65]);
+});
+
+test("launch: pm-apply と oc:no-pr の issue は、停止報告 (stopped) に入っても cooldown の後に再着手せず user に置く", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
+  await seed(ctx, 66, { labels: ["oc:no-pr", "pm-apply"] });
+  await send(ctx.app, "issue_comment", commentPayload(66, BOT, "判断を求めるため停止します", new Date(T0 - 30 * 60_000).toISOString()));
+  await markFresh(ctx);
+  clock.t += 4 * 3_600_000;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.stopped, [], "停止報告のままにしない");
+  assert.deepEqual(p.rows.user, [[66, "pm-apply"]]);
+  assert.deepEqual(p.picks.map((x) => x.n), []);
 });
 
 test("launch: 状態が古い (reconcile が 15 分以上止まっている) 間は投稿しない", async () => {
