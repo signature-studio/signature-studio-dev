@@ -188,3 +188,20 @@
 |---|---|---|
 | 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 窓に絞った計装の再測定 (コミット済み script) が未実施 (本節) | 子 issue (親 #2217) |
 | 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 上記子 issue |
+
+## 13. #2270 の実測: 窓内の関数に絞った store 計装 (未達・陽性対照 0 件)
+
+- 測定 commit: `de28bcca` (本節のコード差分は `trap_triage/store_watch_2270.sh`・`watch_store_682.py` (`--fns` 追加)・`watch_addr_2099.c` (`M11_WATCH_ADDR_OVR` 追加) のみ)。`git diff de28bcca HEAD -- tools/m11` の出力は 0 行 (本節の追記は REPORT のみ)。
+- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`)・`work-m11`・`work-liftdiff` を worktree `ws-2270` に展開。`toolchain-emsdk`・`toolchain-retdec` は `/opt/emsdk`・`/opt/retdec` の既設を使った (展開は未実施)。`work/lift_pe.sha256` を PE 指紋で手記録 (§6 と同じ)。
+- e2e `m11_e2e.sh` (非 `--full`・foreground・rc=0・wall 166 s・user 160 s・uptime load 1.11): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§8〜§11 と一致)。
+- baseline probe `probe1676_watch.mjs` (n=1・0.5 s): `unit 114 halt0`、`after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -->0x0, cnt -->1` (§8〜§11 と一致)。
+- 全 store 計装 `store_watch_2217.sh` (54,342 store): `w114` 10 分 45 秒で rc=124、`[aw]` 0 件、`unit 106` で停止 (§10・§11 と一致)。`diag` でも unit 0〜105 は 0〜1 ms で完走し、unit 106 だけが 10 分以上戻らなかった。
+- 窓に絞った計装 `store_watch_2270.sh` (`WATCH_FNS=function_8651a0,function_40f9e0,function_410320,function_410360,function_409410`・31 store): rc=0・45 秒で unit 114 まで完走。`[win] ON` 4 回・`OFF` 3〜4 回。`[aw]` は list B `0x10bd4c20` で 0 件。
+- 陽性対照 (`WATCH_ADDR=0x11f7254` = `[B+188]` の格納先、`function_8651a0` の IR 333629 行 = site 12 の store `store i64 %26, ptr %28` が `L` を格納する): `[aw]` 0 件。**計装が書込みを捉えることは示せていない** (陽性対照が不成立)。
+- 未確定の理由: `watch_store_682.py` の `site` 番号と IR 行の対応は `sites.json` で確認済み (site 12 = IR 333629)。`sw-all`・`[cnt]` の出力診断は、C 側の差し替えと `emcc` の順序の不備で 2 回とも出力に現れず、呼出し件数は未取得。計装 build が `m11_sw` を実際に呼んでいるかは本節で確定していない。
+
+| 未達 (#2270 受入条件) | 状況 | 起票先 |
+|---|---|---|
+| 計装の陽性対照 (既知の書込みが `[aw]` に出る) | 0 件。計装の健全性は未確認 | 本 issue を子に分割して継続 |
+| 窓内で実行される全関数の網羅と list B `+8/+16` の書込み命令の確定 | 全 store 計装は unit 106 で停止。窓内 5 関数 (31 store) の計装では 0 件 (陽性対照も 0 件のため無効) | 同上 |
+| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体が未確定のため未着手 | 同上 |
