@@ -167,7 +167,7 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | `p0c2_e2e.sh` | 0 | 50 s | 7.86 → 3.98 |
 
 k80 lift 単体 (`PLUG_CANON_ALLOCA=1`) の所要時間: **未測定 (条件不明)**。測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が残っておらず、単独の時間値は採用しない。
-- 再測定不可: 修正時点の runner には `toolchain-retdec` ([RETDEC]・`/opt/retdec`) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
+- 再測定不可: 修正時点の runner には `toolchain-retdec` ([RETDEC]) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
 - 一致判定 (受入条件 2・3) は lift の sha256 と `p0c2_sweep.csv` の `cmp` で行い、所要時間には依存しない。
 
 ### 検証の注記
