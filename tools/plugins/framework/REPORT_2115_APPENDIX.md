@@ -36,7 +36,7 @@
 
 ### 10.4 再測定の扱い (この fix run)
 
-- 対照の `--fresh` 再測定と load average の補完は**未実施**。この run では `/opt/emsdk`・`/opt/retdec`・`tools/plugins/work/fw/` が無く、`fw_stage2.sh` / `hs_e2e.sh` を実行できない (`ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。
+- 対照の `--fresh` 再測定と load average の補完は**未実施**。この run では emsdk・RetDec (`[EMSDK]`・`[RETDEC]`) の実体と `tools/plugins/work/fw/` が無く、`fw_stage2.sh` / `hs_e2e.sh` を実行できない (`ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。
 - 次 run の素材要請: `oc_artifacts: fl-win64 work-fw-stage1 toolchain-emsdk toolchain-retdec` (`docs/WORKFLOW.md` §11 の許可名)。対照と置換版をそれぞれ n≥3 で測り min–max を書く (WORKFLOW §5)。`hs_hostfix.json` の 0x4181e0 注入記録も添える。
 - 再測定まで、本節の数値は n=1 の観測としてのみ扱う。
 
