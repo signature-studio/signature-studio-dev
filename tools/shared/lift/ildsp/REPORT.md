@@ -84,7 +84,7 @@ closure = export entry の関数 (`.pdata` 境界) から、直接 call と直�
 ### 結論
 - §2 の closure (`.pdata` 基準・CreateInstance の直接 call/jmp 先) は、**深さ 1 では 10/10 で vtable の slot 先を含まない**。CreateInstance は wrapper の vtable を置くだけで、slot 先を直接呼ばない。
 - 推移閉包 (`.pdata` の無い先を含む) では、**3 件で slot 先と重なる**: LowFreqEnhancer (slot 先 0x17bdd0)・Limiter (0x169150)・Transmitter (0x1a6a30・0x1a7990)。
-- vtable 経由で数えると 10 export 全てで実体に届く。最小は **GeneralPitchShifter** (45 関数・1,347 命令)、次点 WaveformColouring (70 関数・2,757 命令・SIMD 23.8%)。instance の lift 単位は「CreateInstance + vtable slot 先の到達集合」とする。
+- vtable 経由で数えると 10 export 全てで実体に届く。最小は **GeneralPitchShifter** (45 関数・1,347 命令)。次点は Transmitter (55 関数・2,315 命令) だが、closure 内の vcall 形 `call [reg+disp]` が 60 件あり dispatch 先が未確定のまま残るため、子の対象にしない。vcall 1 件の **WaveformColouring** (70 関数・2,757 命令・SIMD 23.8%) を子 #2484 とする。instance の lift 単位は「CreateInstance + vtable slot 先の到達集合」とする。
 - 誤差の向き: 間接 call の先は含まない (下限側)。`.pdata` の無い先の範囲は近似 (§4.1 手順 4) で、上限側に偏りうる。
 
 ### 1. 再現と手順
@@ -117,7 +117,7 @@ FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_vtable_check.py tool
 | Transmitter | 0x3e0150 | 11 | 5 | 55 (20) | 2,315 | 5.1% | 70 | 21.6% | 1,747 |
 | WaveformColouring | 0x3e01b0 | 6 | 0 | 70 (22) | 2,757 | 23.8% | 19 | 11.1% | 2,145 |
 
-- 命令数・関数数は CreateInstance の closure と slot 先 closure の和集合 (重複は 1 回)。「CreateInstance 単体」は同じ規則で CreateInstance だけから辿った値で、§2 の値 (`.pdata` のみ) とは規則が違う。
+- 命令数・関数数は CreateInstance の closure と slot 先 closure の和集合 (重複は 1 回)。「CreateInstance 単体」は同じ規則で CreateInstance だけから辿った値で、§2 の値 (`.pdata` のみ) とは規則が違う。GeneralPitchShifter の CreateInstance 単体は 36 関数・961 命令 (JSON の `entry_only`)。
 - 前版 (測定 commit b8f8a0f7・`.pdata` の無い先を捨てていた版) の値 (例: GPS 15 関数・473 命令) は下限で、本表で置き換える。
 - 指摘の試算との差: 間接 call 数は 4 export とも一致。関数数は GeneralPitchShifter・WaveformColouring・Transmitter が一致し、LowFreqEnhancer だけ試算 249 に対し 219。試算の命令数は、重なる範囲を二重計上していた分だけ大きい (GPS 1,364 → 1,347、WC 2,803 → 2,757、Transmitter 2,362 → 2,315)。LowFreqEnhancer は `.pdata` の無い範囲内の内部 jmp 先 30 件を、試算が関数として数えていたため (本版は数えない)。
 
@@ -130,22 +130,40 @@ FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_vtable_check.py tool
   - objdump は `0x191c28` を `(bad)` として 3 byte を 1 行で消費し、`0x191c29` を命令として出さない。
   - `ildsp_vtable_check.py` の `KNOWN_DATA_IN_CODE` はこの RVA との完全一致のみを許す。件数の比較だけでは相殺する差を見逃すため使わない。
 - 旧版の説明 (「`int 0x10` 等として 1 件数え、objdump は数えない」) は誤りだった。
+- 末尾 jmp の内訳 (§4.4 の表) は、同じ関数集合を objdump で走査して数えた値を `[tail]` 行に出す。判定には使わない (参考値)。
 
 ### 4. 間接 call の内訳 (lift の障害)
-- 定義: **間接 call** = 即値でない `call` (`call [mem]`・`call reg`)。`call [rip+X]` で X が IAT (import) なら「IAT」、IAT 外の画像内ポインタなら「画像内関数ポインタ」。`call [reg+disp]` は vcall。末尾の `jmp [mem]`・`jmp reg` (tail call) は数えず、参考列に件数を示す。
+- 定義: **間接 call** = 即値でない `call` (`call [mem]`・`call reg`)。`call [rip+X]` で X が IAT (import) なら「IAT」、IAT 外の画像内ポインタなら「画像内関数ポインタ」。`call [reg+disp]` は vcall。末尾 jmp は間接 call に数えない (下の表 (参考))。
+- 末尾 jmp (即値でない `jmp`) の分類: `jmp [rip+X]` は IAT か画像内ポインタ、`jmp reg` は reg、`jmp [reg+disp]` は vcall 形 (tail call)、`jmp [base+idx*8]` は switch 表の間接 jmp (tail call ではない) で、別の列にする。
+- 件数の出典: 間接 call の件数は capstone と objdump の一致 (§4.3)。末尾 jmp の件数は `ildsp_vtable_check.py` の `[tail]` 行 (objdump の出力から数えた値)。例 (RVA。objdump の `# 0x180268140` は ImageBase 0x180000000 を足した絶対アドレス): GeneralPitchShifter の 0x1b932c `jmp QWORD PTR [rip+0xaee0d]` (参照先 RVA 0x268140 = IAT)、LimiterLite の 0x1aaba7 `jmp QWORD PTR [rax+0x10]` (vcall 形)、PSOLA の 0x101e `jmp QWORD PTR [r10+rax*8]` (switch 形)。
 
-| export | 間接 call 計 | IAT | 画像内関数ポインタ | vcall | call reg | (参考) 末尾 jmp: IAT / reg / vcall |
-|---|---:|---:|---:|---:|---:|---|
-| GeneralPitchShifter | 10 | 8 | 2 | 0 | 0 | 4 / 1 / 0 |
-| LimiterLite | 24 | 16 | 2 | 5 | 1 | 6 / 3 / 2 |
-| Limiter | 20 | 16 | 2 | 1 | 1 | 6 / 1 / 2 |
-| LowFreqEnhancer | 82 | 68 | 8 | 4 | 2 | 14 / 7 / 2 |
-| PSOLA | 18 | 16 | 2 | 0 | 0 | 6 / 2 / 5 |
-| Shimmer | 57 | 45 | 8 | 0 | 4 | 8 / 1 / 0 |
-| StereoEnhancer | 82 | 68 | 8 | 4 | 2 | 14 / 5 / 2 |
-| TransientLooper | 83 | 68 | 8 | 5 | 2 | 14 / 7 / 1 |
-| Transmitter | 70 | 8 | 2 | 60 | 0 | 4 / 1 / 0 |
-| WaveformColouring | 19 | 16 | 2 | 1 | 0 | 6 / 1 / 0 |
+| export | 間接 call 計 | IAT | 画像内関数ポインタ | vcall | call reg |
+|---|---:|---:|---:|---:|---:|
+| GeneralPitchShifter | 10 | 8 | 2 | 0 | 0 |
+| LimiterLite | 24 | 16 | 2 | 5 | 1 |
+| Limiter | 20 | 16 | 2 | 1 | 1 |
+| LowFreqEnhancer | 82 | 68 | 8 | 4 | 2 |
+| PSOLA | 18 | 16 | 2 | 0 | 0 |
+| Shimmer | 57 | 45 | 8 | 0 | 4 |
+| StereoEnhancer | 82 | 68 | 8 | 4 | 2 |
+| TransientLooper | 83 | 68 | 8 | 5 | 2 |
+| Transmitter | 70 | 8 | 2 | 60 | 0 |
+| WaveformColouring | 19 | 16 | 2 | 1 | 0 |
+
+(参考) 末尾 jmp の件数 (`[tail]` 行と同じ):
+
+| export | 末尾 jmp: IAT | 画像内ポインタ | reg | vcall 形 `[reg+disp]` | switch 形 `[base+idx*8]` |
+|---|---:|---:|---:|---:|---:|
+| GeneralPitchShifter | 4 | 0 | 1 | 0 | 0 |
+| LimiterLite | 5 | 1 | 3 | 2 | 0 |
+| Limiter | 5 | 1 | 1 | 2 | 0 |
+| LowFreqEnhancer | 12 | 2 | 7 | 2 | 0 |
+| PSOLA | 5 | 1 | 2 | 0 | 5 |
+| Shimmer | 6 | 2 | 1 | 0 | 0 |
+| StereoEnhancer | 12 | 2 | 5 | 2 | 0 |
+| TransientLooper | 12 | 2 | 7 | 1 | 0 |
+| Transmitter | 4 | 0 | 1 | 0 | 0 |
+| WaveformColouring | 5 | 1 | 1 | 0 | 0 |
 
 IAT 名の内訳 (件数):
 - GeneralPitchShifter (8): GetLastError 2・HeapAlloc 2・HeapFree 1・RaiseException 1・RtlPcToFileHeader 1・SetLastError 1
@@ -169,12 +187,15 @@ IAT 名の内訳 (件数):
 |---|---|---|
 | [T-SH-36] #2483 | GeneralPitchShifter_CreateInstance の instance lift | 45 関数・1,347 命令・間接 10 (IAT 8・画像内関数ポインタ 2) |
 | [T-SH-37] #2484 | WaveformColouring_CreateInstance の instance lift | 70 関数・2,757 命令・SIMD 23.8%・間接 19 (IAT 16・画像内関数ポインタ 2・vcall 1) |
+| [T-SH-38] #2528 | GeneralPitchShifter の CreateInstance vtable の native 確定と間接 call の到達実測 | 間接 call 4 件 (helper 0x1aedc0 の 3 件・0x1b6f4c の 1 件)。slot 役割は本 REPORT に未記載 |
+| [T-SH-39] #2529 | GeneralPitchShifter の CreateInstance closure の lift と native 差分テスト | CreateInstance 単体 961 命令・vtable 込み 45 関数・1,347 命令 (§4.2 の GPS 行) |
 
-残り 8 instance は子を順次起票する (#161 に残す)。
+- 子 issue は 4 件で、`docs/WORKFLOW.md` §3 の上限 (1 PR あたり 3 件) を 1 件超える。#2528 と #2529 のどちらを残すかは **PM の判断待ち**。
+- #2528・#2529 は親 #2483 (T-SH-36) の子。残り 8 instance は子を順次起票する (#161 に残す)。
 
 ### 6. 測定 commit と差分の証跡
-- 測定 commit: `fa5eb8a8` (`tools/shared/scripts` の最後のコード変更)。上記 §1・§2・§3 の実測はこの commit の内容で行った。
-- 本 REPORT の commit 以降の `git diff fa5eb8a8 HEAD -- tools/shared/scripts` は空 (差分 0)。よって再測定は不要。
+- 測定 commit: `fdd82f2c` (`tools/shared/scripts` の最後のコード変更。`ildsp_vtable_check.py` に末尾 jmp の `[tail]` 行を追加した)。§4.1 の `ildsp_vtable.py` の実測と §4.2 の表は `fa5eb8a8` 以降 `ildsp_vtable.py` に変更が無い (`fa5eb8a8` の内容で測定した値)。§4.4 の末尾 jmp の表と検算結果は `fdd82f2c` の内容で測定した。
+- 本 REPORT の commit 以降の `git diff fdd82f2c HEAD -- tools/shared/scripts` は空 (差分 0)。HEAD での再実行結果は PR 本文に記載する。
 
 ### 検証範囲 / 範囲外
 - 範囲: 静的な vtable 解析・逆アセンブルによる計数 (capstone と objdump)。

@@ -376,7 +376,7 @@
 | `tools/shared/oss/blend2d/REPORT_SIMD.md` | ~60 | Blend2D wasm `-msimd128` 試験 (T-SH-02, #146) の実測詳細・ネガティブコントロール・前版の実測・未解決の起票先 (`tools/shared/REPORT.md` §3.3 から分割移動) |
 | `tools/shared/oss/blend2d/REPORT_AGG2D.md` | ~45 | Agg2D glue 棚卸し (T-SH-02/#146): FL Blend2D.dll (block24339) の export 1 本・RTTI 44 個 (Agg2D 2)・import 実測と未解決の起票先 |
 | `tools/shared/lift/libreverb/REPORT.md` | ~60 | libreverb (win `Reverb.dll`) lift + 差分テスト (T-SH-15 #161 部分達成)。ildsp は §6 で一行参照のみ |
-| `tools/shared/lift/ildsp/REPORT.md` | ~190 | ildsp (`block24360_PE.bin`) 規模調査: 命令数・call 数・export closure 表 (§2・`.pdata` 基準の下限)・SIMD 比の未解決 (T-SH-19 #791)。§4 は vtable 経由の実体 closure (`.pdata` の無い先を含む)・間接 call の内訳・objdump 検算 (T-SH-15 #161)。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT.md` | ~215 | ildsp (`block24360_PE.bin`) 規模調査: 命令数・call 数・export closure 表 (§2・`.pdata` 基準の下限)・SIMD 比の未解決 (T-SH-19 #791)。§4 は vtable 経由の実体 closure (`.pdata` の無い先を含む)・間接 call の内訳・objdump 検算 (T-SH-15 #161)。測定値の正本 |
 
 ### IPP
 
