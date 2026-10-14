@@ -13,7 +13,7 @@ for (const f of fs.readdirSync(dir).filter((x) => /^(fake|null)_r\d+\.json$/.tes
   for (const x of JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")).results) {
     const r = x.result, s = r?.stats ?? {}, ctx = r?.ctx ?? {};
     const B = r?.cfg?.buf ?? 0, burst = s.burst_obs ?? 0;
-    const key = `${cond} | ${r?.sr ?? "-"} Hz | ${x.name}`;
+    const key = `${cond} | ${r?.sr ?? "-"} | ${x.name}`;
     if (!rows.has(key)) rows.set(key, []);
     rows.get(key).push({
       ok: x.ok, underruns: s.underruns ?? -1, silence: s.silence_frames ?? -1, burst, T: s.T ?? 0, B,
@@ -23,6 +23,8 @@ for (const f of fs.readdirSync(dir).filter((x) => /^(fake|null)_r\d+\.json$/.tes
   }
 }
 const f1 = (v) => v.toFixed(1);
+// 最小〜最大 (n=3 のセル内レンジ)。min と max が同じなら単一値
+const rng = (lo, hi, fmt = String) => (lo === hi ? fmt(lo) : `${fmt(lo)}〜${fmt(hi)}`);
 console.log("| 条件 | sr | シナリオ | n | PASS | underrun (合計) | burst max (f) | 実 T (f) | T_req (f) | T≥T_req | baseLatency (ms) | outputLatency (ms) | clock (Hz, 平均) |");
 console.log("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
 for (const [key, xs] of rows) {
@@ -32,6 +34,7 @@ for (const [key, xs] of rows) {
   const avg = (k) => xs.reduce((a, x) => a + x[k], 0) / xs.length;
   const pass = xs.filter((x) => x.ok).length;
   const ur = xs.reduce((a, x) => a + x.underruns, 0);
+  // T≥T_req は run ごとの判定 (表の脚注参照)。セル最大 burst 基準の判定は REPORT 側に書く
   const tOk = xs.every((x) => x.T >= x.Treq);
-  console.log(`| ${cond} | ${sr} | ${name} | ${xs.length} | ${pass}/${xs.length} | ${ur} | ${mn("burst")}〜${mx("burst")} | ${mn("T")}〜${mx("T")} | ${mx("Treq")} | ${tOk ? "OK" : "NG"} | ${f1(mn("base"))}〜${f1(mx("base"))} | ${f1(mn("out"))}〜${f1(mx("out"))} | ${f1(avg("clock"))} |`);
+  console.log(`| ${cond} | ${sr} | ${name} | ${xs.length} | ${pass}/${xs.length} | ${ur} | ${rng(mn("burst"), mx("burst"))} | ${rng(mn("T"), mx("T"))} | ${mx("Treq")} | ${tOk ? "OK" : "NG"} | ${rng(mn("base"), mx("base"), f1)} | ${rng(mn("out"), mx("out"), f1)} | ${f1(avg("clock"))} |`);
 }
