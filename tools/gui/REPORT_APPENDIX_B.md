@@ -106,6 +106,6 @@
 | 10 | 0 | 208 s | 3.01 | ALL PASS | 0 |
 
 - 判定: 受入条件 2 (n≥10 連続 rc 0) は **達成** (10/10)。ただし前回 head `f2370c95` の run4 (rc 1, CDP timeout) は今回 0/10 で再現せず。
-- 受入条件 1 (CDP timeout 原因の特定) は **未達**。今回の 10 run では再現しなかったため原因は未切り分け。CLI (agent-browser linux-x64) の既定 action timeout は `AGENT_BROWSER_DEFAULT_TIMEOUT` = 25000 ms。stress.mjs の watchdog は 20 分で、今回の失敗メッセージ (`CDP command timed out: Runtime.evaluate`) は CLI 側の 25 s 待ちから来ている。
+- 受入条件 1 (CDP timeout 原因の特定) は **未達**。今回の 10 run では再現しなかったため原因は未切り分け。CLI (agent-browser linux-x64) の既定 action timeout は `AGENT_BROWSER_DEFAULT_TIMEOUT` = 25000 ms。stress.mjs の watchdog は 20 分で、失敗メッセージ (`CDP command timed out: Runtime.evaluate`) が CLI の既定値由来かは未検証 (推定)。
 - 受入条件 3 (#740 の修正前 ASan 再現ログ) は **未達** (未取得)。
 - 未解決の起票先: AC1・AC3 は子 issue に切り出し (下記 Issue 番号を最終回答に記載)。
