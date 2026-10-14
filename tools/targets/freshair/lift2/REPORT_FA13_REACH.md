@@ -44,7 +44,9 @@
 - 実行: `TMPDIR=$RUNNER_TEMP FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/targets/freshair/lift2/lift2_e2e.sh` (foreground, rc=0)。
 - 実測: `RESULT: lift2_e2e ALL PASS`, rc=0, real 1m14.228s, user 1m9.847s, load 0.38→0.98 (nproc 4)。
 - 結果: comp 400/400 BIT-EXACT (non-grow 206/206・grow 194/194)・filter 400/400・fuzz 4 系統 mismatch 0 (各 1200, ERR 0/0)・ABI violations 0・ctrl 15/15 (fma0/fma1 とも `ERR native/wasm 1/1 同一 scenario: yes`)・ablation 5 種すべて検出 (comis_noflags 200/200, xmm_args_drop 200/200, xmm_ret_drop 200/200, icall_drop 80/200, cmov_drop 172/200)。
-- 測定 commit: `ec58d54b`。`8bc34ed9..ec58d54b` の lift2 コード差分は 218 行 (`git diff 8bc34ed9 ec58d54b -- tools/targets/freshair/lift2/ ':!*REPORT*'`)。今回の実測はその後の HEAD で行った。
+- 測定 commit: `ec58d54b` (コードを変えた最後の commit)。`8bc34ed9..ec58d54b` の lift2 コード差分は 218 行 (`git diff 8bc34ed9 ec58d54b -- tools/targets/freshair/lift2/ ':!*REPORT*'`)。
+- 測定 commit から現 head までの鮮度 (WORKFLOW §6): `git diff ec58d54b HEAD -- tools/targets/freshair/lift2/ ':!*REPORT*'` の出力は 0 行 (差分 0)。`ec58d54b` 以降の変更は、lift2 配下が本ファイル (追記) のみ、リポジトリ全体では `docs/DOC_MAP.md` の索引 1 行。実行コードは不変。このため現 head で再測定はしていない。
+- 素材の実在 (現 head での再測定を試みた run): `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ。`toolchain-retdec` / `toolchain-emsdk` / `plugins-freshair` は無く、`/opt/retdec` も無いため、現 head での `lift2_e2e.sh` 再実行はできなかった。
 
 ## 次の作業 (起票先 #692 FA-11 に併記, 子 issue は起票しない)
 
