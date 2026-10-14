@@ -149,7 +149,7 @@ test("launch: blocked_by (issue_dependencies) は blocker が close するまで
   assert.ok(!p.picks.some((x) => x.n === 52));
 });
 
-test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら再着手する (本文は解析しない)。上限で止める", async () => {
+test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら reason=unknown の 1 回だけ再着手する (本文は解析しない)", async () => {
   const clock = { t: T0 };
   const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
   await seed(ctx, 60, { labels: ["oc:no-pr"] });
@@ -162,15 +162,63 @@ test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら再着手�
   await markFresh(ctx);
   p = ctx.app.engine.plan();
   assert.deepEqual(p.picks.map((x) => x.n), [60]);
+  assert.equal(p.picks[0].np, "unknown");
   const gh = await (ctx.app.engine as any).d.gh();
+  await ctx.app.engine.launch(gh);
+  // 再投稿の run は現れない (観測できない)。5 分で failed になり、stopped のまま再投稿しない。
   for (let i = 0; i < 3; i++) {
-    await ctx.app.engine.launch(gh);
     clock.t += 4 * 3_600_000;
     await markFresh(ctx);
+    await ctx.app.engine.launch(gh);
   }
-  assert.equal(comments(ctx.m.calls).filter((c) => c.url.includes("/issues/60/")).length, 3);
-  assert.ok(!ctx.app.engine.plan().picks.some((x) => x.n === 60), "3 回で止める");
-  assert.deepEqual(ctx.app.engine.plan().rows.stopped.map(([n]) => n), [60]);
+  assert.equal(comments(ctx.m.calls).filter((c) => c.url.includes("/issues/60/")).length, 1, "unknown は 1 回だけ");
+  p = ctx.app.engine.plan();
+  assert.ok(!p.picks.some((x) => x.n === 60));
+  assert.deepEqual(p.rows.stopped.map(([n]) => n), [60]);
+});
+
+test("launch: oc:no-pr の stop・split・blocked・新しい素材の無い artifact は cooldown の後も再着手しない", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
+  for (const [n, reason] of [[61, "stop"], [62, "split"], [63, "blocked"], [64, "artifact"]] as const) {
+    await seed(ctx, n, { labels: ["oc:no-pr"] });
+    await send(ctx.app, "issue_comment", commentPayload(n, BOT, `<!-- oc-run-outcome: no-pr reason=${reason} run=1 -->\n完了`, new Date(T0 - 30 * 60_000).toISOString()));
+  }
+  clock.t += 30 * 3_600_000;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.picks.map((x) => x.n), []);
+  assert.deepEqual(p.rows.blocked.map(([n]) => n), [63]);
+  assert.deepEqual(p.rows.stopped.map(([n]) => n).sort(), [61, 62, 64]);
+});
+
+test("launch: oc:no-pr の本文に『素材不足』があっても、run-outcome は停止報告にしない (cooldown の後は unknown として 1 回再着手)", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
+  await seed(ctx, 65, { labels: ["oc:no-pr"] });
+  await send(ctx.app, "issue_comment", commentPayload(65, BOT, "理由の分類: artifact=素材不足\n<!-- oc-run-outcome: no-pr reason=unknown run=1 -->", new Date(T0 - 30 * 60_000).toISOString()));
+  await markFresh(ctx);
+  let p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.stopped.map(([n]) => n), [], "停止報告にしない");
+  assert.deepEqual(p.rows.recent.map(([n]) => n), [65]);
+  clock.t += 4 * 3_600_000;
+  await markFresh(ctx);
+  p = ctx.app.engine.plan();
+  assert.deepEqual(p.picks.map((x) => x.n), [65]);
+});
+
+test("launch: pm-apply と oc:no-pr の issue は、停止報告 (stopped) に入っても cooldown の後に再着手せず user に置く", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
+  await seed(ctx, 66, { labels: ["oc:no-pr", "pm-apply"] });
+  await send(ctx.app, "issue_comment", commentPayload(66, BOT, "判断を求めるため停止します", new Date(T0 - 30 * 60_000).toISOString()));
+  await markFresh(ctx);
+  clock.t += 4 * 3_600_000;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.stopped, [], "停止報告のままにしない");
+  assert.deepEqual(p.rows.user, [[66, "pm-apply"]]);
+  assert.deepEqual(p.picks.map((x) => x.n), []);
 });
 
 test("launch: 状態が古い (reconcile が 15 分以上止まっている) 間は投稿しない", async () => {

@@ -26,6 +26,12 @@ if [ "${FA_FIX_COOKIE:-0}" = "1" ]; then
 else
   SRC_FIX="$SRC"
 fi
+# ICALL-77 (#2427): 機械語の脱落 frame slot store を IR に戻し、隣接 slot を 1 alloca にまとめる (frame_slot_restore.py)。既定 OFF。FA_FRAME_SLOT=1 で有効化
+if [ "${FA_FRAME_SLOT:-0}" = "1" ]; then
+  RTD="$HERE/work/rt_freshair-core"
+  python3 "$HERE/frame_slot_restore.py" --ir "$SRC_FIX" --dsm "$RTD/before.0.drc.dsm" --before-ll "$RTD/before.0.drc.ll" --ranges "$RTD/F.ranges" --out "$W/frame_slot.ll" --report "$W/frame_slot.json"
+  SRC_FIX="$W/frame_slot.ll"
+fi
 python3 "$HERE/ir_fix_mask.py" "$SRC_FIX" "$W/oi.restored.ll" > "$W/fix_mask.json"
 python3 "$HERE/ir_fix_vstore.py" "$W/oi.restored.ll" "$W/oi.restored1.ll" > "$W/fix_vstore.json"; mv "$W/oi.restored1.ll" "$W/oi.restored.ll"
 # 2. normalize / ir5_patch → flatten (画像全域を shift)

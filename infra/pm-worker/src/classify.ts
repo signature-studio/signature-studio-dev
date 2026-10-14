@@ -2,6 +2,7 @@
 // GitHub・現在時刻・ローカルファイルは読まず、呼び出し側が ClassifyInput で渡す。
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
 import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
+import type { LaunchState } from "./launchobs.ts";
 
 export interface SnapIssue {
   number: number;
@@ -40,6 +41,8 @@ export interface RelaunchState {
 export interface ClassifyInput {
   nowMs: number;
   launched: Record<string, string>;
+  // 投稿の観測状態 (launchobs.ts)。無い issue は観測記録の無い古い launch (従来の 3 時間判定)。
+  launchState?: Record<string, LaunchState>;
   relaunch: Record<string, RelaunchState>;
   // manual_deps.json (キーは issue 番号の文字列)。
   manualDeps: Record<string, number[]>;
@@ -60,6 +63,8 @@ export interface Rows {
 
 const NEED_RE = /不足|無い|無く|無かった|ない|存在しな|必要|依頼|欠|足りな|未配置|未展開|入っていな|のみ|だけ|揃っ/;
 const STOP_RE = /着手不可|着手できません|着手に必要|素材不足|停止します|停止報告|ブロック|PM に.*依頼|判断を/;
+// run-outcome (record-run-outcome.sh の定型文) と PM の応答は、停止報告ではない (VM 版と同じ規則)。
+const OUTCOME_OR_PM_RE = /<!-- oc-run-outcome:|<!-- oc-pm-/;
 const WORD = "\\p{L}\\p{N}_\\-";
 
 function wordBounded(a: string): RegExp {
@@ -166,7 +171,7 @@ function startedMap(d: Snapshot, iss: Map<number, SnapIssue>): Map<number, strin
   return st;
 }
 
-function neededArts(n: number, input: ClassifyInput): string[] {
+export function neededArts(n: number, input: ClassifyInput): string[] {
   const out: string[] = [];
   for (const line of lines(input.fullBotBody[String(n)] ?? "")) {
     if (!NEED_RE.test(line)) continue;
@@ -211,8 +216,14 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
       rows.started.push([n, st.get(n) ?? []]);
     } else {
       const reported = !!bl && (!isLaunched || ageH(bl.at) < ageH(launchedAt));
-      const stopHit = !!bl && STOP_RE.test(bl.head);
-      if (isLaunched && ageH(launchedAt) < 3 && !reported) {
+      const stopHit = !!bl && STOP_RE.test(bl.head) && !OUTCOME_OR_PM_RE.test(input.fullBotBody[k] ?? "");
+      const ls = input.launchState?.[k];
+      // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
+      if (ls === "failed") {
+        rows.stopped.push([n, "launch-unobserved"]);
+      } else if (isLaunched && ls === "launched" && !reported) {
+        rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
+      } else if (isLaunched && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
         rows.recent.push([n, `launched ${fmt1(ageH(launchedAt))}h ago`]);
       } else if (bl && reported && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
