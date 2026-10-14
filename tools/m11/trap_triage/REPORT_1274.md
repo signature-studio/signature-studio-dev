@@ -129,13 +129,7 @@ index 39480f0a..5a9c1929 100644
 - 未確定: ON で 1 ノードずれる書込元、既存 DEFECTS 類型への分類 (受入条件 2)、ON の ok 退行 0 (受入条件 3・4)。いずれも次 run の作業 (起票先 #1642)。
 - 注意: probe を入れた build は通常 build と結果が一致しない (§5b の 866/20 対 869/15 と同じ理由)。§5c の値は probe 版の結果。
 
-## 6. 差分 (測定 commit から本 PR の HEAD まで)
-
-測定 commit `1e3ee7af` から本 PR の HEAD までの `tools/m11` のコード差分は `probe_entry.py` の 1 行のみ (`(?:__lifted)?`。§5b の diff 参照)。`git diff 1e3ee7af HEAD -- tools/m11 ':(exclude)*.md'` は上記 1 hunk のみ。
-- `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。
-- `find tools/m11/trap_triage -type f -size +20M`: 0 件 (20MiB 超の blob なし)。
-
-## 5d. 修正 probe の ON/OFF 再測定 (#1642・測定 commit `7e665077` = origin/main)
+## 5e. 修正 probe の ON/OFF 再測定 (#1642・測定 commit `7e665077` = origin/main)
 
 - 素材: fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (F1=902、errors=0)。build `M11_OV_CLASSCREATE=1`・`=0` とも rc=0 (signature mismatch 0・undefined 0)。
 - probe: `probe_entry.sh <tag> 407a50` (修正済み `[raw407]`: `rd64` 版。範囲外は `0xdead`)。ON・OFF とも全 942 unit の probe 版 survey。
@@ -147,3 +141,9 @@ index 39480f0a..5a9c1929 100644
 - `[raw407]` の `[arg-8]` 値は全入口で `dead` (参照先が image 範囲外)。§5c の範囲外読みによる値は採らない。
 - watch 版 (`PROBE_WATCH=fa5310:18 probe_entry.sh onw all`): 全関数入口の probe。ok 839 / oob 47 と通常 build から大きく変わるため、書込元の判定には使えない (watch build は挙動を変える)。`[chg]` 22 件は未解析。
 - 未達 (受入条件 2〜4): ON で 1 ノードずれる書込元の特定、既存類型 (DEFECTS) への分類、ON の ok 退行 0。起票先: #1642 (次 run)。
+
+## 6. 差分 (測定 commit から本 PR の HEAD まで)
+
+測定 commit `1e3ee7af` から本 PR の HEAD までの `tools/m11` のコード差分は `probe_entry.py` の 1 行のみ (`(?:__lifted)?`。§5b の diff 参照)。`git diff 1e3ee7af HEAD -- tools/m11 ':(exclude)*.md'` は上記 1 hunk のみ。
+- `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。
+- `find tools/m11/trap_triage -type f -size +20M`: 0 件 (20MiB 超の blob なし)。
