@@ -4,9 +4,11 @@
 
 ## 1. 測定
 
-- 測定 commit: 016cc403 (run 開始時の main)。worktree branch `2265-ld98-spill-consumer-c2`。
-- ベースライン: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (rc=0・所要 2m30s・7/7 完了・load average 1.00)。
+- 測定 commit: 5aa8dbb8 (TSV・REPORT 修正後の HEAD のうち、コードを変えた最後の commit)。worktree branch `2265-ld98-spill-consumer-c2`。
+- 測定: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (rc=0・所要 2m25.9s・7/7 完了・開始時 load average 0.76)。
   `spill178_1161.tsv` と `drops_510.tsv` は results/ と一致 (cmp OK)。
+  初回実行は `work-liftdiff` 未展開のため step 5/7 の `drops_510.tsv` 生成が失敗し、cmp が No such file で落ちたが、スクリプトは rc=0 で進んでいた。素材を展開して再実行し、上記の結果を得た。
+- `ld98_dump.py` の再生成は 5aa8dbb8 で commit 済み TSV と cmp 一致 (rc=0)。
 - 集計 (step 7/7): spill 宛 unk site 178 / 71 関数。status 未判定 120 / 確定 51 / 判定不能 7。脱落関数の和集合 69 (変更無し)。
 
 ## 2. 対象 23 site の機械語側列挙
