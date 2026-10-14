@@ -103,7 +103,7 @@ v5.0 (REPORT_911 §6c・§6e) との比較: 値の変化 (`load *rax` → `load 
 
 ## 7. 測定の記録
 
-- 測定 commit (コードを変えた最後の commit): `c810b847`。以降の自分の変更は REPORT_2405.md と DOC_MAP の追加だけで、`git diff c810b847 HEAD -- tools/m11/ldfix/retdec2019_gv_2405.sh tools/m11/ldfix/retdec_constants_trace_2405.patch tools/m11/ldfix/retdec_stage_1091.py` の出力は 0 行。
+- 測定 commit (コードを変えた最後の commit): `c810b847`。以降のスクリプトの変更は 1 行のコメント修正 (repo 外の絶対パスの除去。pr-lint の指摘) だけで、`git diff c810b847 HEAD -- tools/m11/ldfix/retdec2019_gv_2405.sh tools/m11/ldfix/retdec_constants_trace_2405.patch tools/m11/ldfix/retdec_stage_1091.py` は 1 行の置換 (コメント) だけ。パッチと `retdec_stage_1091.py` は 0 行。
 - 範囲 (§4)・変種 B・段別 IR (§5) は `c810b847` のスクリプトで、2 つのビルドの両方に実行した。ビルドの 1 回目は同じコマンドの手実行、2 回目は `ad9d6adb` 版のスクリプトの `all` (build・install は最終版と同一)。
 - 所要: `stages` は 1 回目のビルドで real 14.4 s、2 回目で 18.6 s (n=1)。範囲の real は §4。
-- main 取り込み (`264030a7`) 後も、測定したスクリプト・パッチ・`retdec_stage_1091.py` は `c810b847` から変わらない (上の `git diff` が 0 行)。取り込みで入った `tools/m11/ldfix/` の差分は他 issue の追加だけで、測定経路に入らない。
+- main 取り込み (`264030a7`) で入った `tools/m11/ldfix/` の差分は他 issue の追加だけで、測定経路 (上の 3 ファイル) には入らない。
