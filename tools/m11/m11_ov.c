@@ -408,6 +408,7 @@ unsigned long long function_412770(void* ctx) {
     return 0;
 }
 
+#ifndef M11_OV_NO_450560
 /* function_450560  VA 0x450560  (SysUtils: 文字列の LCMapStringW 変換; dest := src; dest を一意化し src→dest へ LCMapString)
  * RetDec は `mov [rsp+0x60],rcx ... mov rax,[rsp+0x60]; mov rdx,[rax]` (スピルしたポインタ経由の 2 段 deref) の
  * 1 段を落とし, UStrAsg(dest, dest) / 引数に dest を渡す形に誤 lift した (stack アドレスが文字列値として流れ OOB の根因). */
@@ -425,6 +426,7 @@ unsigned long long function_450560(unsigned long long src, unsigned long long de
     }
     return dest;
 }
+#endif /* M11_OV_NO_450560 (#2502: ldfix/fix_450560.py の IR 修復版で代替するとき -DM11_OV_NO_450560) */
 
 /* function_40fac0  VA 0x40fac0  (TObject.InitInstance の入れ子手続き: 親チェーンの tkMRecord InitTable を再帰処理)
  * 逆アセンブル転記. 引数 rcx = 親フレーム (未使用), rdx = クラス, r8 = インスタンス.
