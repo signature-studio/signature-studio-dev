@@ -2,7 +2,7 @@
 
 既知類型との関係: 該当なし (ランタイム shim の計測追加。`docs/DEFECTS.md` の類型には当たらない)。親: #1570 (AU-21)、REPORT は `REPORT_AU10.md` §16.10 の続き。
 
-測定 commit: `7c5ee224` (コード変更の最後の commit)。REPORT 追記の commit までの差分は下記 (`git diff 7c5ee224 HEAD -- tools/audio public/worklets src/runtime` は本ファイルと DOC_MAP のみ)。
+測定 commit: `7c5ee224` (§2 の soak30 の測定時点でのコード変更の最後の commit)。main 取込み後の差分と再測定は §6 のとおり。
 
 ## 1. 変更
 
@@ -12,7 +12,7 @@
 - SAB のレイアウトは**変えていない** (cb は既存の ctl `cb_count`、jump ログは port 経由の JS 配列)。よって C 表 (`flaudio.c`)・TS 表 (`audio-layout.ts`) は無変更で、`verifyLayout` は既存の検査がそのまま通る (attach ログ `layout 66 fields OK`)。
 - 検査 `tools/audio/test/worklet_jump_check.mjs` (新規): worklet の `run()` を `vm` で駆動し、`currentFrame` を飛ばして 3 件の jump の `d`・`frame`・`cb`・`ct`・`pn` を検査する。`performance` あり・なしの 2 経路。
   - 正の対照: 4/4 PASS (`node tools/audio/test/worklet_jump_check.mjs`)。
-  - ネガティブコントロール: `cb: 0` に置換した版 (`tools/audio/work/nc/nc_cb0.js`) では cb の検査 2 件が FAIL (`cb=0`)。
+  - ネガティブコントロール: `cb: 0` に置換した版では cb の検査 2 件が FAIL (`cb=0`)。版は gitignore 対象で repo に無いため、次の 2 行で作る (`$TMPDIR` は作業用の一時ディレクトリ)。`mkdir -p "$TMPDIR/nc"` の後に `sed 's/cb: Atomics.load(i, x.cb_count) });/cb: 0 });/' public/worklets/fl-audio-worklet.js > "$TMPDIR/nc/nc_cb0.js"` を実行し、`node tools/audio/test/worklet_jump_check.mjs "$TMPDIR/nc/nc_cb0.js"` が FAIL 2 件・exit 1 になることを確認する (2026-10-14 の HEAD `725690fd` で再現済み)。
 
 ## 2. 実測
 
@@ -38,8 +38,8 @@ soak10 の初回 FAIL は、`REPORT_AU10.md` §16.5 と同じ形 (T=1024・dev_f
 読み取り (2 組の対応):
 - 各組は隣接 (q と q+1)、同じ frame の process() が 2 回 (dup) の後に +256 進む (skip)。符号付き合計は各組 0。§16.10 の 3 組と同じ形。
 - **cb は各組の両端で同じ値** (32,859・88,781)。つまり dup と skip の間に producer の bufferSwitch は 1 回も無い。producer のコールバックが遅れた・跳んだ、という形では説明できない。
-- cb と ct の対応: `ct − cb × 256 / 48000` は 2 組とも **0.280 s** (cb 1 回 = 256 frame = 5.333 ms)。cb 総数 337,543 は 1800 × 48000 / 256 = 337,500 とほぼ一致 (+43)。cb の時刻そのものは記録していないので、この対応は cb 番号からの換算である (cb 0 の時刻 ct=0 を仮定すると ct ≈ cb × 256/48000 + 0.280 s)。
-- `ms` (Date.now) と `ct` は、2 組の間隔 (298,250 ms と 298.251 s) で 1 ms 以内に一致。絶対時刻 (壁時計) と AudioContext 時刻の対応は取れている。
+- cb と ct の対応: `ct − cb × 256 / 48000` は dup 行 (q65718・q177562) で **0.280 s**、skip 行 (q65719・q177563) で **0.285 s** (cb 1 回 = 256 frame = 5.333 ms。skip 行は dup 行の 256 frame 先の値で、ct も表示上 0.005 s 大きい)。cb 総数 337,543 は 1800 × 48000 / 256 = 337,500 とほぼ一致 (+43)。cb の時刻そのものは記録していないので、この対応は cb 番号からの換算である (cb 0 の時刻 ct=0 を仮定すると ct ≈ cb × 256/48000 + 0.280〜0.285 s)。
+- `ms` (Date.now) と `ct` は、2 組の間隔が一致する (ms の差 298,250 ms、ct の差 298.251 s)。進み方 (傾き) が一致することしか確認できず、2 つの時計のオフセットは未確認。
 - `pn` は全件 −1。**worklet の `performance` は未定義** (Chrome 154 headless)。performance.now() の値は取れない → 2 の未解決へ。
 
 ## 3. 判定
@@ -88,6 +88,7 @@ PR が main と競合したため main (`b34d93fe`) を取り込んだ (merge `c
 - 音声経路 (`public/worklets/fl-audio-worklet.js`・`src/runtime/audio-shim.ts`・`tools/audio/src`・`tools/audio/test`・`tools/audio/build.sh`・`tools/audio/flags.sh`・`tools/audio/harness/chrome.mjs`) の差分は 0 行。soak30 の §2 測定は、測定対象コードそのものである。
 - `tools/audio/harness/run.mjs` (+12 −3) は main 側の `--busy` (負荷下ソーク) 追加。既定 (`--busy` なし) では `soakTag` が空文字・spawn は 0 本で、シナリオ名と結果ファイル名は変わらない。
 - `src/runtime/gui_hostcall.ts` は GUI 側の変更。`tools/audio` の build・harness と `audio-shim.ts`・`audio-input.ts` からは参照されない (grep 0 件)。
+- 測定 commit `c2cbf806` から、本ファイルの指摘対応 commit までの音声経路差分は 0 行 (`git diff c2cbf806 HEAD -- public/worklets src/runtime/audio-shim.ts tools/audio/src tools/audio/test tools/audio/build.sh tools/audio/flags.sh tools/audio/harness/chrome.mjs` の出力は空)。対応 commit は REPORT と DOC_MAP の文言のみで、コードを変えていないため再測定は不要。
 
 実測 (HEAD `c2cbf806`): build は `EMSDK_ENV=<emsdk 6.0.12 の emsdk_env.sh> bash tools/audio/build.sh` で `build OK` (emcc 6.0.12、2.3 s)。emsdk は `[EMSDK]` の展開が素材に無かったため上流 (`emscripten-core/emsdk`) から `./emsdk install 6.0.12` で取得した。
 
