@@ -126,61 +126,8 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ## 11. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
 
-既知類型との関係: 該当なし (lift の欠陥ではなく PM 運用ツール)。使い方と数え方の定義は [`README.md`](README.md) の `idle_report.sh` の節。
-
-- 測定 commit: `95b501b2` (コードを変えた最後の commit)。それ以降の `tools/pm/idle_report.sh` `tools/pm/test_idle_report.sh` の差分: `git diff 95b501b2 HEAD -- tools/pm/idle_report.sh tools/pm/test_idle_report.sh` の出力は 0 行。`f10dfd36` から `95b501b2` までの変更は説明文 (コメント・README) だけ (`git diff f10dfd36 95b501b2 -- tools/pm/idle_report.sh tools/pm/test_idle_report.sh` の非コメント行は 0 行)。
-- 環境: runner (4 コア)。load average は各測定の直後の `/proc/loadavg` の 1 分値。
-
-### 11-1. fake gh のテスト (`bash tools/pm/test_idle_report.sh`)
-
-| 項目 | 結果 |
-|---|---|
-| 判定数 | 41 件中 41 PASS・0 FAIL (3 回とも同じ) |
-| 所要 (n=3、95b501b2) | 7.3〜7.6 秒 (load 0.24〜0.28) |
-| (a) idle=0 が 10 標本 | 0 回 |
-| (b) idle>0 が 14 分 (ネガコン) | 0 回 (区間 14 分)。`--threshold-min 14` なら 1 回 |
-| (b2) idle>0 がちょうど 15 分 | 1 回 (境界は数える) |
-| (c) idle>0 が 16 分 | 1 回 (区間 16 分・標本 9 件・最大 idle=3) |
-| (d) idle=0 を挟む | 16 分 + 0 + 16 分 → 2 回。10 分 + 0 + 10 分 → 0 回 (区間 2 つ、合算しない) |
-| (e) `X-Ratelimit-Remaining` | 1,499 → 終了コード 3・標準エラーに `X-Ratelimit-Remaining=1499`・JSON は出さない。1,500 → 続行。jobs 応答だけ 1,499 でも中断 |
-| 全ページ・窓の分割 | `per_page=2`・窓 1 時間で、窓の境界をまたぐ 20 分の区間を 1 回・標本 6 件 (欠落・重複なし)・`page=2` を取得 |
-| 窓の上限 | `total_count` が 1,000 超 → 終了コード 4 |
-| REST のみ | gh の呼び出しは全て `api <path>`。graphql の呼び出し 0 件 (fake gh は graphql を exit 99 にする) |
-
-ネガコン (実装を 1 行壊して FAIL を確認。コピーに対して `f10dfd36` のコードで実施。以後の変更は説明文だけで、判定のロジックは同じ):
-
-| 壊し方 | FAIL した判定 |
-|---|---|
-| 区間の判定 `>=` を `>` に | 3 件 (b の閾値 14 分・b2・ANSI 付き 15 分) |
-| 残量の検査を無効化 | 4 件 (e の全部) |
-| idle=0 で区間を閉じない | 3 件 (d の全部) |
-
-### 11-2. 実データの確認 (`signature-studio/signature-studio-dev` の REST)
-
-2026-10-14T13:04Z に取得 (測定 commit `95b501b2`)。`--since 2026-10-14T10:00:00Z --until 2026-10-14T12:30:00Z`・`--bucket` 既定 (day)・`--events` 既定 (3 event)。期間は run の作成時刻で切る。標本の時刻は `--until` を数分越えうる (例: run `38564218200` は作成 12:29:44Z で期間内、その標本は 12:30:26Z)。
-
-| 項目 | 値 |
-|---|---|
-| run 一覧 (3 event・重複除去後) | 155 件 (うち oc-fix 19・watchdog job が cancelled でログ無し 12) |
-| 標本 | 124 件 (idle>0: 112 件・最大 idle=19・最長の標本間隔 4.97 分・15 分超の間隔 0 回) |
-| idle>0 が 15 分以上続いた回数 | 1 回 (10:00:33Z〜12:07:40Z の 127.12 分) |
-| 同 (`excluding_stuck_labelled`: STUCK_LABELLED の行数を引いた idle) | 2 回 (11:10:04Z〜11:25:52Z の 15.8 分と 11:34:59Z〜12:07:40Z の 32.68 分) |
-| 所要・API | 144 秒 (load 0.21)・276 回・`X-Ratelimit-Remaining` の最小 4,155 |
-| `--cache` 付きの 2 回目 | 8 秒・API 4 回 (cache_hits 136) |
-
-- 別算法の検算: 同じ測定の JSONL (124 標本) を Python で集計し直した (時刻順に idle>0 を畳む。ツールの jq とは別の実装)。
-  通常の idle は 1 回 (127.12 分)・stuck 除外は 2 回 (15.8 分・32.68 分) で一致した。
-- この期間は oc:stuck の PR が残っており、通常の idle は 127 分連続で 0 にならなかった。stuck 除外の値で soak を判定する理由は README に書いた。
-
-### 11-3. 検証範囲・未解決
-
-確認範囲: `schedule` の run は実リポジトリで 5 件 (`actions/workflows/opencode.yaml/runs?event=schedule`: 2026-10-13 18:23Z・23:00Z、2026-10-14 01:48Z・06:47Z (cancelled)・12:29:44Z)。うち 12:29:44Z の run `38564218200` は実測期間に入り (作成 10:00〜12:30Z)、その watchdog job (`115852677230`) のログの idle 行 (12:30:26.96Z・`idle=1`) を読めた (標本 124 件に含む)。この標本は 12:27:49Z〜12:30:26Z の区間 (5 標本・2.62 分・不計数) の末尾。他の 4 件は実測期間の外で、ログは未確認。
-レート制限の中断と 1,000 件上限は fake gh でだけ確認した (実 API で残量を 1,500 未満にはしていない)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| `schedule` の run のうち実測期間の外の 4 件 (cancelled 1 件を含む) のログは未確認。cron は約 18 時間に 5 件と疎 | 今後の発火ぶんの標本が読めるかは未確認 (読めなければ `runs.skipped.no_idle_line` に数えるので気づける) | #2355 (timer 停止の手順書) の soak 開始時の確認項目 (訂正コメント済み) |
-| soak の合格ライン (何日・何回までを許すか) は未決 | ツールは回数を出すだけで、判定はしない | #2355 にコメント (判定は PM) |
+- 結論: fake gh の判定テストと、実データの検算は一致した。数え方 (区間・閾値・残量の扱い) は [`README.md`](README.md) の `idle_report.sh` の節。
+- 全文 (測定値・ネガコン・未解決): [`REPORT_APPENDIX_2354.md`](REPORT_APPENDIX_2354.md) (§11 の分割移動)。
 
 ## 12. PM Worker の live 切替前の突き合わせ (#2443)
 
@@ -243,3 +190,34 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - ネガコンの確認: 間隔を 0 にした一時複製では c1・c2・f2 が、上限と fresh 判定を壊した複製では d2・d3・g2 が FAIL (いずれも 17 passed, 3 failed)。
 - live (読み取りのみの `GET /status`、15:18Z): `needs_pm`・`stuck`・`stuck_age_max_min` が返らない。`pm_wake.sh` は `result=status-failed reason=parse`・exit 2 で、送信は 0 件。本番 Worker は #2335 の変更を含まない版と見られる `[未確認: デプロイ版]`。再デプロイ後に needs_pm 経路が有効になる。
 - 差分 (測定 commit から HEAD まで・コード範囲): `git diff edb3ab39 HEAD -- tools/pm/pm_wake.sh tools/pm/test_pm_wake.sh tools/pm/systemd` の出力は空 (差分 0)。
+
+## 15. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
+
+測定した commit: `131d3daa` (コードを変えた最後の commit。origin/main `81799351` の取り込みと競合の解消を含む)。取得時刻は UTC (2026-10-14)。`git diff d662b04e 131d3daa -- infra/pm-worker` は 302 行 (main 側の取り込み分。PR 自身の差分は `git diff origin/main 131d3daa -- infra/pm-worker` の 533 行)。以後の commit は `tools/pm` と `docs` だけで、`git diff 131d3daa HEAD -- infra/pm-worker` は 0 行。前回の測定 commit は `d662b04e` (main `5a2b7f41` の取り込みまで)。
+
+競合の解消 (origin/main の取り込みは 3 回。1 回目は `3a6fcf81`、2 回目は `5a2b7f41`、3 回目は `131d3daa`):
+
+- `src/engine.ts` の `status()`: PR 側の `const now` と `cnt` (`runCounts(now)`) を残し、main 側の `now` の重複宣言は 1 つにした (残さないと `SyntaxError: Identifier 'now' has already been declared` で 10 ファイルが落ちる)。counters は main 側 (#2339 の `{ ...this.zero(), ...counters }`) を採用。
+- `src/config.ts`: `DEFAULT_QUEUE_MARGIN`・`DEFAULT_TARGET_MIN` (PR) と `DEFAULT_REPO` (main) を両方残した。`test/status.test.ts` の既存キー一覧は両側のキーを残した。
+- `README.md`: 本機能の節と #2339 の再送の節を両方残した。
+- `tools/pm/REPORT.md`: 本節は main の §13 (R2 素材投入) と §14 (`pm_wake`・#2347) と番号が衝突するため、末尾の §15 に移した。
+- 3 回目 (origin/main `81799351`・競合 2 件): `infra/pm-worker/README.md` の `/status` 表は、main の `last_digest_at` 行と PR の `running` の定義行・`target_eff` ほかの行を両方残した。`test/status.test.ts` の `ADDED_KEYS` は `last_digest_at` と `target_eff` ほかを両方入れた。`src/pm.ts`・`src/classify.ts`・`src/engine.ts` は競合なしで自動マージされ、main の digest の変更と PR の変更が両方入っている (手で触っていない)。
+
+- 単体テスト (`131d3daa`): `git archive 131d3daa infra/pm-worker tools/pm` を作業用の一時 dir に展開し、`cd infra/pm-worker && node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` → **201 pass / 0 fail**、17.4 s、load 0.84 → 1.63 (Node 22.23.3)。増分 7 件は main 側の `test/digest.test.ts`。前回 (`d662b04e`) は 194 pass / 0 fail (15.3 s)。main `5a2b7f41` の `test(` 行は 181 件で、本 PR の `test/target.test.ts` の 13 件を足すと 194 件。
+- Worker 実行環境の vitest (`131d3daa`): 同じ展開先で `npm ci` (86 packages・4 s) → `npx vitest run --config vitest.config.ts` (`test/runtime/` の 3 件) → **3 pass / 0 fail**、1.5 s。
+
+ネガコン (受入条件 6)。対応するテストは `test/target.test.ts`:
+
+| 条件 | テスト |
+|---|---|
+| 正例: running=60・queued=20 が 30 分 → 70 (29 分では 80) | 「(正例) running=60・queued=20」 |
+| 正例: running=20・queued=15 が 30 分 → 30 | 「(正例) running=20・queued=15」 |
+| (a) queued=0 → TARGET / (d) cap 100 でも 80 を超えない | 「(a) running=40・queued=0」 |
+| (b) queued>0 が 29 分だけ → 変えない / (f) dry-run で POST 0 | 「(正例) running=60・queued=20」 |
+| (c) cap_est=5 → target_eff ≥ 30 | 「(c) cap_est=5」 |
+| (e) 24 時間後に TARGET へ戻る | 「(e) 24 時間の窓」 |
+| (g) TARGET=40 → target_eff ≤ 40 | 「(g) TARGET を env で 40」 |
+| 上限の引き上げ・古い peak で押し上げ直さない・room=0 | 「上限が上がったら」「上限を 60 → 20」「room は target_eff」 |
+| 純関数: 30 分の streak・観測の空きをまたがない・観測の保持 | 「saturatedRunning」「nextCap / capValue」「観測の保持」 |
+
+review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
