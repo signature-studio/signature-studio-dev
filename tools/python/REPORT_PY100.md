@@ -129,7 +129,7 @@
   - `tools/python/tests/channels_diff.mjs`: 呼出し列を両方残した (本 PR 側 + main 側 15 件。呼出し 145 → 160)。
   - `tools/python/tests/provider_check.mjs`: 期待集合 `pe100` (本 PR) と `stub89` (main) を両方入れ、期待値を実装 79 → 81・未実装 356 → 354 に直した。
   - `tools/python/provider/fl_engine.c` は自動マージ。両方の関数が残り、重複は無い。
-- 入力: fl-win64 の PE と DATA 4 本を `$RUNNER_TEMP/fl-win64` に展開し、`fetch_inputs.sh` で `work/` に配置した。CPython wasm は `build_cpython_wasm.sh` (`/opt/emsdk`、emcc 6.0.12)。
+- 入力: fl-win64 の PE と DATA 4 本を `$RUNNER_TEMP/fl-win64` に展開し、`fetch_inputs.sh` で `work/` に配置した。CPython wasm は `build_cpython_wasm.sh` ([EMSDK]、emcc 6.0.12)。
 
 | 検査 | コマンド (`tools/python` で実行) | 結果 | 所要 |
 |---|---|---|---|
