@@ -33,8 +33,113 @@ COMMENT_FILE="$RUNNER_TEMP/opencode-comment.txt"
 PR_TITLE_FILE="$RUNNER_TEMP/opencode-pr-title.txt"
 PR_BODY_FILE="$RUNNER_TEMP/opencode-pr-body.txt"
 MAX_CHARS="${OC_COMMENT_MAX_CHARS:-20000}"
+PM_TARGET_FILE="$RUNNER_TEMP/opencode-pm-target.txt"
 
 log() { printf '%s\n' "$*"; }
+
+# ---------------------------------------------------------------- oc-pm (PM agent。#2327)
+# repository_dispatch (action oc-pm) は payload の kind (列挙 9 値) と ref (数字) だけを読む。
+# 他のフィールドは読まず、指示文にも env にも入れない。対象 (issue/PR) の本文・ラベル・review・
+# コメントは API で取り、$PM_TARGET_FILE に隔離する (指示文は assemble-prompt.sh が fence で囲む)。
+# 成功時だけ pm_kind / pm_ref を設定する。失敗は return 1 (呼び出し側が dispatch_ok=false にする)。
+oc_pm_prepare() {
+  local keys kind ref ref_n n reviews comments issue_json author_login author_type author_assoc author_ok
+  keys="$(jq -c '.client_payload | keys' "$GITHUB_EVENT_PATH" 2>/dev/null || true)"
+  if [ "$keys" != '["kind","ref"]' ]; then
+    printf '::error::oc-pm: client_payload must have exactly kind and ref\n'
+    return 1
+  fi
+  kind="$(jq -r '(.client_payload.kind // "") | tostring' "$GITHUB_EVENT_PATH")"
+  ref="$(jq -r '(.client_payload.ref // "") | tostring' "$GITHUB_EVENT_PATH")"
+  case "$kind" in
+    stuck | no_pr | refs_orphan | needs_decision | stopped_report | user_answered | supply | digest | retro) ;;
+    *)
+      printf '::error::oc-pm: client_payload.kind is not in the allowed list\n'
+      return 1
+      ;;
+  esac
+  if ! [[ "$ref" =~ ^[0-9]{1,7}$ ]]; then
+    printf '::error::oc-pm: client_payload.ref must be 1 to 7 digits\n'
+    return 1
+  fi
+  ref_n=$((10#$ref))
+  case "$kind" in
+    supply | digest | retro)
+      # 対象を持たない kind。ref は 0 でもよい。
+      : > "$PM_TARGET_FILE"
+      chmod 600 "$PM_TARGET_FILE"
+      pm_kind="$kind"
+      pm_ref="$ref_n"
+      return 0
+      ;;
+  esac
+  if [ "$ref_n" -eq 0 ]; then
+    printf '::error::oc-pm: ref 0 is only allowed for supply, digest, retro\n'
+    return 1
+  fi
+  if [ -z "${GH_TOKEN:-}" ]; then
+    printf '::error::oc-pm: GH_TOKEN is needed to read the target\n'
+    return 1
+  fi
+  issue_json="$(gh api "repos/${GITHUB_REPOSITORY:-}/issues/$ref_n" 2>/dev/null)" || {
+    printf '::error::oc-pm: could not read the target #%s\n' "$ref_n"
+    return 1
+  }
+  # 対象の起票者は、許可 bot (実装・reviewer の App) か、OWNER/MEMBER/COLLABORATOR だけ。
+  author_login="$(printf '%s' "$issue_json" | jq -r '.user.login // ""')"
+  author_type="$(printf '%s' "$issue_json" | jq -r '.user.type // ""')"
+  author_assoc="$(printf '%s' "$issue_json" | jq -r '.author_association // ""')"
+  author_ok=false
+  case "$author_assoc" in OWNER | MEMBER | COLLABORATOR) author_ok=true ;; esac
+  if [ "$author_type" = Bot ]; then
+    case "$author_login" in
+      'opencode-for-signature-studio[bot]' | 'oc-reviewer-for-signature-studio[bot]') author_ok=true ;;
+    esac
+  fi
+  if [ "$author_ok" != true ]; then
+    printf '::notice::oc-pm: the target author is not allowed (association=%s, type=%s)\n' "${author_assoc:-none}" "${author_type:-none}"
+    return 1
+  fi
+  reviews=""
+  case "$kind" in
+    stuck | needs_decision)
+      reviews="$(gh api --paginate "repos/${GITHUB_REPOSITORY:-}/pulls/$ref_n/reviews?per_page=100" 2>/dev/null | jq -s 'add // []')" || {
+        printf '::error::oc-pm: could not read the reviews of #%s\n' "$ref_n"
+        return 1
+      }
+      ;;
+  esac
+  comments="$(gh api --paginate "repos/${GITHUB_REPOSITORY:-}/issues/$ref_n/comments?per_page=100" 2>/dev/null | jq -s 'add // []')" || {
+    printf '::error::oc-pm: could not read the comments of #%s\n' "$ref_n"
+    return 1
+  }
+  n=5
+  if [ "$kind" = no_pr ]; then n=1; fi
+  {
+    printf '### 本文\n'
+    printf '%s' "$issue_json" | jq -r --argjson max "$MAX_CHARS" '(.body // "") | .[0:$max]'
+    printf '\n\n### ラベル\n'
+    printf '%s' "$issue_json" | jq -r '[.labels[]?.name] | join(" ")'
+    if [ -n "$reviews" ]; then
+      printf '\n\n### review (直近 5 件)\n'
+      printf '%s' "$reviews" | jq -r '[.[] | (.body // "")] | .[length - 5:] | map(.[0:4000]) | join("\n\n---\n\n")'
+    fi
+    printf '\n\n### コメント (%s)\n' "$kind"
+    printf '%s' "$comments" | jq -r --arg kind "$kind" --argjson n "$n" '
+      [ .[] | select(
+          if $kind == "stuck" then (.user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-limit -->")))
+          elif $kind == "no_pr" then (.user.type == "Bot" and ((.body // "") | contains("<!-- oc-run-outcome:")))
+          elif $kind == "user_answered" then true
+          else (.user.type == "Bot") end) ]
+      | .[length - $n:]
+      | map("### comment (" + (.user.login // "") + ")\n" + ((.body // "") | .[0:4000]))
+      | join("\n\n")'
+  } > "$PM_TARGET_FILE"
+  chmod 600 "$PM_TARGET_FILE"
+  pm_kind="$kind"
+  pm_ref="$ref_n"
+  return 0
+}
 
 # ---------------------------------------------------------------- untrusted 本文
 # 本文は env 経由でしか受け取らない。${{ }} 展開は actionlint が untrusted として
@@ -45,7 +150,20 @@ log() { printf '%s\n' "$*"; }
 dispatch_pr=""
 dispatch_artifacts=""
 dispatch_ok=true
+pm_kind=""
+pm_ref=""
+dispatch_action=""
 if [ "$EVENT_NAME" = repository_dispatch ]; then
+  dispatch_action="$(jq -r '(.action // "") | tostring' "$GITHUB_EVENT_PATH")"
+fi
+if [ "$dispatch_action" = oc-pm ]; then
+  comment_body=""
+  oc_pm_prepare || dispatch_ok=false
+elif [ "$EVENT_NAME" = repository_dispatch ] && [ "$dispatch_action" != oc-fix ]; then
+  printf '::error::repository_dispatch: unknown action "%s"\n' "$(printf '%s' "$dispatch_action" | tr -cd 'a-z0-9-' | head -c 40)"
+  dispatch_ok=false
+  comment_body=""
+elif [ "$EVENT_NAME" = repository_dispatch ]; then
   dispatch_pr="$(jq -r '(.client_payload.pr // "") | tostring' "$GITHUB_EVENT_PATH")"
   dispatch_reason="$(jq -r '(.client_payload.reason // "") | tostring' "$GITHUB_EVENT_PATH")"
   dispatch_artifacts="$(jq -r '(.client_payload.artifacts // "") | tostring | .[0:300]' "$GITHUB_EVENT_PATH")"
@@ -205,6 +323,7 @@ esac
 issue_number="$(jq -r '.issue.number // empty' "$GITHUB_EVENT_PATH")"
 pr_number="$(jq -r '.issue.number // .pull_request.number // empty' "$GITHUB_EVENT_PATH")"
 [ "$EVENT_NAME" = repository_dispatch ] && [ "$dispatch_ok" = true ] && pr_number="$dispatch_pr"
+[ "$dispatch_action" = oc-pm ] && [ "$dispatch_ok" = true ] && pr_number="$pm_ref"
 
 # ------------------------------------------------------- $GITHUB_ENV への書き込み
 # ここから下は「1 行の値」しか書かない。複数行・heredoc・untrusted 本文は書かない。
@@ -217,6 +336,9 @@ pr_number="$(jq -r '.issue.number // .pull_request.number // empty' "$GITHUB_EVE
   printf 'OC_ISSUE_NUMBER=%s\n' "$issue_number"
   printf 'OC_PR_NUMBER=%s\n' "$pr_number"
   printf 'OC_REPO=%s\n' "${GITHUB_REPOSITORY:-}"
+  printf 'OC_PM_KIND=%s\n' "$pm_kind"
+  printf 'OC_PM_REF=%s\n' "$pm_ref"
+  printf 'OC_PM_TARGET_FILE=%s\n' "$PM_TARGET_FILE"
 } >> "$GITHUB_ENV"
 
 log "event=$EVENT_NAME permission=$permission issue=${issue_number:-none} pr=${pr_number:-none}"
