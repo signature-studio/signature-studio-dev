@@ -2,7 +2,7 @@
 """SR-3d #867 (受入 2): 窓外 muParser 6 関数の VA を指す参照を、形式別に全 PE 走査する (静的)。
 
 形式: (a) 8 バイト絶対ポインタ (ImageBase+RVA, LE) / (b) 4 バイト RVA (LE) / (c) RIP 相対オペランド (.text の線形走査)。
-出力: 形式ごとの所属セクション・件数・ヒット位置 (RVA)。
+出力: 形式ごとの所属セクション・件数・ヒット位置 (RVA)。(c) の線形走査はセクションごとに被覆率 (c0) を出す (無効バイトで止まらないよう再開する)。
 usage: python3 scripts/sr3d_fnptr_scan.py work/Serum2_win64.vst3
 """
 import os
@@ -26,6 +26,24 @@ def sec_of_rva(pe, rva):
         if s.VirtualAddress <= rva < s.VirtualAddress + max(s.Misc_VirtualSize, s.SizeOfRawData):
             return s.Name.rstrip(b"\0").decode(errors="replace")
     return "(none)"
+
+
+def sweep(md, code, va):
+    """線形走査。capstone は無効バイトに当たると出力を止めるため、止まった次の 1 バイトから再開する。
+    返り値: (命令列, デコード済みバイト数, 再開回数)。"""
+    insns = []
+    off = 0
+    resumes = 0
+    while off < len(code):
+        pos = off
+        for ins in md.disasm(memoryview(code)[off:], va + off):
+            insns.append(ins)
+            pos = ins.address - va + ins.size
+        if pos >= len(code):
+            break
+        off = pos + 1
+        resumes += 1
+    return insns, sum(i.size for i in insns), resumes
 
 
 def main(path):
@@ -56,12 +74,16 @@ def main(path):
     tset = set(TARGETS + NAMES)
     rip_hits = {t: [] for t in TARGETS + NAMES}
     n_rip = 0
+    cov = []
     for s in pe.sections:
         if not (s.Characteristics & 0x20000000):
             continue
         code = s.get_data()
         va = base + s.VirtualAddress
-        for ins in md.disasm(code, va):
+        insns, dec, resumes = sweep(md, code, va)
+        if code:
+            cov.append((s.Name.rstrip(b"\0").decode(errors="replace"), len(code), dec, resumes))
+        for ins in insns:
             for op in ins.operands:
                 if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
                     n_rip += 1
@@ -70,6 +92,12 @@ def main(path):
                         rip_hits[tgt].append((ins.address, ins.mnemonic))
                 if op.type == capstone.x86.X86_OP_IMM and op.imm in tset:
                     rip_hits[op.imm].append((ins.address, "imm:" + ins.mnemonic))
+    print("\n(c0) 線形走査の被覆率 (実行可能セクション。デコード済みバイト / セクション長、再開 = 無効バイトからの再開回数)")
+    for name, n, dec, resumes in cov:
+        print(f"  {name:<8} {dec}/{n} B = {100 * dec / n:.2f}% 再開 {resumes} 回")
+    tot_n = sum(n for _, n, _, _ in cov)
+    tot_dec = sum(dec for _, _, dec, _ in cov)
+    print(f"  合計 {tot_dec}/{tot_n} B = {100 * tot_dec / tot_n:.2f}%")
     print(f"\n(c) .text RIP-relative operands scanned: {n_rip}")
     for t in TARGETS + NAMES:
         h = rip_hits[t]
@@ -81,14 +109,17 @@ def main(path):
         for line in f:
             va, nbytes, lib, _tag = line.rstrip("\n").split("\t")
             cut.append((int(va, 16), int(nbytes), lib))
-    print("\n(d) 6 関数の直接呼出元の所属 (cut 表 = 区分済みの OSS 境界 1,510 関数)")
+    print("\n(d) 6 関数の直接呼出元の所属 (cut 表 = 区分済みの OSS 境界 1,510 関数)。call/jmp と jcc (条件分岐) を分けて数える")
     for t in TARGETS:
-        callers = [a for a, _m in rip_hits[t]]
+        calls = [a for a, m in rip_hits[t] if m in ("imm:call", "imm:jmp")]
+        jccs = [(a, m) for a, m in rip_hits[t] if m.startswith("imm:j") and m != "imm:jmp"]
         libs = {}
-        for c in callers:
+        for c in calls:
             lib = next((lb for v, n, lb in cut if v <= c < v + n), "(cut 外)")
             libs[lib] = libs.get(lib, 0) + 1
-        print(f"  0x{t:x}: 呼出元 {len(callers)} 件 → " + ", ".join(f"{k} {v}" for k, v in sorted(libs.items())))
+        jcc_txt = " ".join(f"0x{a:x}({m[4:]})" for a, m in jccs)
+        print(f"  0x{t:x}: call/jmp {len(calls)} 件 → " + ", ".join(f"{k} {v}" for k, v in sorted(libs.items()))
+              + f" / jcc {len(jccs)} 件 {jcc_txt}".rstrip())
 
 
 if __name__ == "__main__":
