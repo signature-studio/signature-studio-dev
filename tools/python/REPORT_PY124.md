@@ -7,7 +7,7 @@
 - **引数を確定**: 書式 `si|i`・kwlist `undoName` / `flags` / `updateHistory`・`updateHistory` の既定値 1。`undoName` と `flags` は必須、`updateHistory` は任意 (§1)。
 - **戻り値は None**。準備不可のときは status -2 (「Operation unsafe at current time」)。引数の型違い・必須欠落は CPython の ParseTuple が立てた例外をそのまま返す (§3)。
 - **核 `0xd69860` の受け渡しを確定**: `flags` と `updateHistory == 1` (真は値 1 のみ) を job 経由で `0x1017ad0` へ渡し、そこで履歴 record を作る。`[obj+8]` が有れば `0x1019b70` で末尾に追加、無ければ `0x1019dd0` で record の要素を後始末する (解放と推定、§4)。
-- **未確定**: record の中身 (`0x101b780` 本体・`flags` のビットの意味・`r9b` の読み方)。ここが決まらないと、履歴の実体を再現できない。**provider・host・tests は変更しない** (mock にも C にも saveUndo は無く、未実装 code 2 のまま)。no-op の成功は返さない。残りは子 issue `[PY-131]` へ移す (§5)。
+- **未確定**: record の中身 (`0x101b780` 本体・`flags` のビットの意味・`r9b` の読み方)。ここが決まらないと、履歴の実体を再現できない。**provider・host・tests は変更しない** (mock にも C にも saveUndo は無く、未実装 code 2 のまま)。no-op の成功は返さない。残りは子 issue `[PY-137]` (#3026) へ移す (§5)。
 
 ## 0. 素材と前提
 
@@ -68,20 +68,20 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x101b780` 本体 (record の書込み項目・flags の意味・r9b/r9d の読み方) | 履歴 record の構造が決まらない。実装できない | 子 `[PY-131]` (#2999 の残り) |
-| `0x1016ca0` の生成分岐・`0x1019e30`・`0x1019da0`・`0x417fc0`・`0x40faa0` | record の生成・伸長・解放の実体 | 子 `[PY-131]` |
-| `0x41c6e0` (char* → name object の所有権・寿命) | name の寿命と解放時期 | 子 `[PY-131]` |
-| mock / C の undo 履歴モデル (`getUndoHistoryCount` 等・PY-70 の getter との整合) | 実装の状態を決める根拠 | 子 `[PY-131]` |
+| `0x101b780` 本体 (record の書込み項目・flags の意味・r9b/r9d の読み方) | 履歴 record の構造が決まらない。実装できない | 子 `[PY-137]` (#3026) |
+| `0x1016ca0` の生成分岐・`0x1019e30`・`0x1019da0`・`0x417fc0`・`0x40faa0` | record の生成・伸長・解放の実体 | 子 `[PY-137]` (#3026) |
+| `0x41c6e0` (char* → name object の所有権・寿命) | name の寿命と解放時期 | 子 `[PY-137]` (#3026) |
+| mock / C の undo 履歴モデル (`getUndoHistoryCount` 等・PY-70 の getter との整合) | 実装の状態を決める根拠 | 子 `[PY-137]` (#3026) |
 | 保留例外の Python 例外型 (`0xd82c20` の `[rip]` 先) | 引数不正時の例外型 | `REPORT_PY61.md` §4-2 の未確定。親 #2978 へ提案 (本 PR では扱わない) |
 
 ## 6. 検証
 
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/py124_saveundo.py` → `PASS` (実測 0.06 秒。uptime 時点の load average 0.02 / 0.22 / 0.15)。出力: `fmt='si|i' kwlist=['undoName', 'flags', 'updateHistory'] default_updateHistory=1 core_ready_check=call[vtbl+0x98] update_eq_1=sete_r9b`。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/py124_saveundo.py` → `PASS` (実測 0.06 秒。load average 0.02 / 0.22 / 0.15 は uptime の実測)。出力: `fmt='si|i' kwlist=['undoName', 'flags', 'updateHistory'] default_updateHistory=1 core_ready_check=call[vtbl+0x98] update_eq_1=sete_r9b`。
 - ネガティブコントロール: 期待書式を `si|ii` に変えたコピー → `AssertionError: si|i` で停止 (実測。検査が書式を見ていることの確認)。
 - 逆アセンブル補助 (1 コマンドで再現): `python3 analysis/py41_disasm.py <block00031_PE.bin> d69900 d69860 d843d0 1017ad0` (`py41_disasm.py` は最初の `ret`/`int3` で止まる)。
 - **範囲外**: 実機の FL で saveUndo を呼んだ結果 (履歴の見え方・例外の型) は未実測。`provider/`・`host/`・`tests/` は変更していない。`tests/general_diff.mjs`・`provider_check.mjs`・`all_tools.mjs` は本 PR のコード変更が無いので未実行 (provider の wasm build も行っていない)。
-- コード差分: 測定 commit (`analysis/py124_saveundo.py` を追加した commit) から HEAD までの `analysis`・`provider`・`host`・`tests` の差分は、本 REPORT と DOC_MAP の commit だけ (文書のみ)。実行: `git diff <測定 commit> HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 PR 作成時に確認)。
+- 測定 commit: `3a53c9f9` (`analysis/py124_saveundo.py` を追加した commit。コードを変えた最後の commit)。`git diff 3a53c9f9 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 REPORT の commit 前後で実行して確認)。HEAD との差分は REPORT と DOC_MAP だけ。
 
 ## 7. 子 issue
 
-- `[PY-131]` (親 #2999): `0x101b780`・`0x1016ca0` の本体を確定し、mock と C provider へ `general.saveUndo` を実装する。受入条件は #2999 から移した 3 件 (general_diff 差分 0・provider_check 期待値・all_tools 48/48)。
+- `[PY-137]` (#3026, 親 #2999): `0x101b780`・`0x1016ca0` の本体を確定し、mock と C provider へ `general.saveUndo` を実装する。受入条件は #2999 から移した 4 件 (REPORT §4 の確定・general_diff 差分 0・provider_check 期待値・all_tools 48/48)。
