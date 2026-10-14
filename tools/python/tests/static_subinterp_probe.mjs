@@ -147,6 +147,13 @@ const bi = `import sys, importlib\nbad = {}\nnames = sorted(sys.builtin_module_n
   check("150 回 (50×3) の作成/実行/破棄が 3 系列 (isolated json+re / isolated+_flhost / legacy+_flhost) とも全て成功し、各系列で wasm メモリが増えない",
     [base, withHost, legacyHost].every((x) => x.allOk && x.mem_after === x.mem_before), { base, withHost, legacyHost });
 }
+// 情報 (check 無し): 同一 instance で 20 回ずつ 8 区間 (160 回) の wasm メモリ推移。増加の時期 (一度きりか線形か) を見る
+{
+  const { M, sub } = await fresh();
+  const mem = [M.HEAPU8.length];
+  for (let b = 0; b < 8; b++) { for (let i = 0; i < 20; i++) sub("import json, re\nresult = '1'", 0); mem.push(M.HEAPU8.length); }
+  detail.heap_bytes_after_each_20_isolated_json_re = mem;
+}
 
 const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
 const NEG_KEY = "isolated: 拒否される builtin は {_elementtree,_lsprof,faulthandler,pyexpat} の 4/66 (全て 'does not support loading in subinterpreters')";
