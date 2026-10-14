@@ -51,7 +51,7 @@
 
 ## 4. 測定
 
-環境: `nproc` = 4。load average は `uptime` の 1 分平均 (開始 → 終了)。所要秒は `date +%s` の差。ログは repo 外の `$ARTIFACTS_DIR` (測定出力置き場) に置いた。
+環境: `nproc` = 4。load average は `uptime` の 1 分平均 (開始 → 終了)。所要秒は `date +%s` の差。測定ログは作業用の一時ディレクトリ (repo 外・commit 対象外) に置いた。
 
 ### 4.1 基点 (ステップ 1、変更前 `940c0d6a`)
 
@@ -94,7 +94,7 @@
 
 - 測定 commit: `8fdaee48f6cf8c47794a9379f2b855dbac8a2960` (`fix(shimx): HeapFree の範囲外ポインタを M4 契約に揃え blk_ok に範囲検査を入れる (SHX-T35, #3023)`)。
 - `git diff 8fdaee48 HEAD -- tools/shimx/src` の出力: **0 行** (測定 commit 時点で HEAD = `8fdaee48`)。
-- `git diff --stat 8fdaee48 HEAD -- tools/shimx` の出力: **0 行** (この REPORT の commit の後は `tools/shimx/REPORT_SHX-T35.md` の追加 1 件のみになる。PR 本文に後の stat を添える)。
+- `git diff --stat 8fdaee48 HEAD -- tools/shimx`: 測定 commit 時点では 0 行。この後の差分は本 REPORT の追加 1 件 (`tools/shimx/REPORT_SHX-T35.md`・118 行) のみ。
 
 ## 5. 検証範囲 / 範囲外
 
