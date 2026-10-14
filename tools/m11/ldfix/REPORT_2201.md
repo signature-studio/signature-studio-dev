@@ -38,10 +38,18 @@
 
 ## 4. F4 件数の再確認 (`repro_2143.sh f4`)
 
-注: 本節の数値は b25edd16 測定時の作者実測で、レビュー run (ae27423d 以降) では未再実行。`work-m11` 素材が無く `BOOT_FINAL` を作れないため。単位は `ldf4_` を含む**行数** (`grep -c`)。関数別は `re.findall` による**出現数**で、1 site が pre の 3 行と load (または zext) の行に現れるため両者は一致しない。
+注: 本節は b25edd16 測定時の値。素材で再実行した値 (§7) も同一。単位は次の表のとおり、`ldf4_` の行数 (`grep -c`) と関数別の出現数 (`re.findall`) は別の数え方。
 
-- `ldf4 on=51 off=0` (`ldf4_` 行数)。`xor i64 0, 0 on=3886 off=3886` (xor は両方 3,886 で、F4 は xor を消さず別の read を足す。REPORT_2143 §4 と一致)。
-- 関数別 F4 件数 (on / off): 10 関数とも on 8〜9、off 0。`ldfix.py` の標準出力は `F4(frame-read)=10` (F4 有) / `=0` (F4 無)。
+| 単位 | 数え方 | on | off |
+|---|---|---|---|
+| `ldf4_` の行数 (全体) | `grep -c 'ldf4_'` | 51 | 0 |
+| `ldf4_` の出現数 (全体) | `grep -o 'ldf4_' \| wc -l` | 81 | 0 |
+| 関数別 行数 (10 関数の合計) | 関数ごとに `ldf4_` を含む行を数える | 51 | 0 |
+| 関数別 出現数 (10 関数の合計) | `re.findall('ldf4_')` を関数ごとに数える | 81 | 0 |
+
+- 行数 51 = 出現数 81 の差は、1 site が pre の 3 行と load (または zext) の行に現れ、1 行に複数回 `ldf4_` が出るため。
+- 関数別 (出現数): 10 関数とも on 8〜9、off 0 (内訳は §7)。`ldfix.py` の標準出力は `F4(frame-read)=10` (F4 有) / `=0` (F4 無)。
+- `xor i64 0, 0 on=3886 off=3886` (xor は両方 3,886 で、F4 は xor を消さず別の read を足す。REPORT_2143 §4 と一致)。
 
 ## 5. 未解決 (起票先)
 
@@ -58,3 +66,62 @@
 ```
 (出力 0 行。本 REPORT のみが後続 commit)
 ```
+
+## 7. 素材での再実行 (fix run・HEAD 013a14ff 相当のコード)
+
+- 素材: `fl-win64` `extracted/block00031_PE.bin` (22,227,016 B)、`work-m11` (`tools/m11/work/`: `boot_final.ll` 19,787,837 B、`boot0..4.norm0.ll`)。両 tarball を `$ARTIFACTS_DIR` で確認した。
+- コード: `tools/m11/ldfix/*.py` `*.sh` は測定 commit b25edd16 と同一 (§6 で 0 行)。
+- 実行: `PE=... NORM0=tools/m11/work BOOT_FINAL=tools/m11/work/boot_final.ll bash tools/m11/ldfix/repro_2143.sh f4` / `... named`。
+- 実行環境: 4 vCPU・load average 1.55 (開始時)。
+- 所要時間 (実測): `named` の 2 本: real 6.495 s + 6.283 s。`f4` は出力の tail のみ取得し時間は未計測 (§1 の b25edd16 測定では real 1m20.9s)。
+
+### 7.1 `repro_2143.sh f4`
+
+```
+ldf4 on=51 off=0
+xor i64 0,0 on=3886 off=3886
+F4 function_132e8e0 on 8 off 0
+F4 function_41ca30 on 8 off 0
+F4 function_44d1c0 on 8 off 0
+F4 function_52a7f0 on 8 off 0
+F4 function_666c30 on 8 off 0
+F4 function_69c360 on 8 off 0
+F4 function_71dd80 on 8 off 0
+F4 function_864f60 on 8 off 0
+F4 function_865020 on 9 off 0
+F4 function_977e40 on 8 off 0
+```
+
+`ldfix.py` 標準出力: `F4(frame-read)=10` (F4 有) / `=0` (F4 無)。
+
+### 7.2 `repro_2143.sh named`
+
+```
+named sites 3170 functions 720   (named_f4on.json)
+named sites 3160 functions 710   (named_f4off.json)
+named on 3170 off 3160 diff(on-off) 10 diff(off-on) 0
+named 132e8e0 on 1 off 0
+named 44d1c0 on 1 off 0
+named 69c360 on 1 off 0
+named 977e40 on 1 off 0
+named 865020 on 1 off 0
+named diff functions ['132e8e0', '41ca30', '44d1c0', '52a7f0', '666c30', '69c360', '71dd80', '864f60', '865020', '977e40']
+```
+
+JSON の `functions` 比較 (`named_f4on.json` と `named_f4off.json` の `functions` 集合):
+- off ⊆ on: True (710 ⊆ 720)
+- on − off の集合 = 10 関数 = F4 修復の 10 関数 (`{132e8e0, 41ca30, 44d1c0, 52a7f0, 666c30, 69c360, 71dd80, 864f60, 865020, 977e40}`)、一致: True
+
+### 7.3 §4 の件数 (行数と出現数を同じ表で)
+
+| 関数 | 行数 | 出現数 |
+|---|---|---|
+| 132e8e0 / 41ca30 / 44d1c0 / 52a7f0 / 666c30 / 69c360 / 71dd80 / 864f60 / 977e40 (各) | 5 | 8 |
+| 865020 | 6 | 9 |
+| 合計 (10 関数) | 51 | 81 |
+
+全体の `grep -c` (行数) は 51、`grep -o | wc -l` (出現数) は 81 で、関数別の合計と一致する。
+
+### 7.4 数値の対応
+
+§1 の測定 (b25edd16) と §7 の再実行は、`ldf4` 51 / 81、`named` 3170 / 3160 / 差 10、関数集合で一致した。
