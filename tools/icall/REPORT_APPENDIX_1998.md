@@ -41,7 +41,7 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `a350632c` (本 run の起点・コード変更は本 PR の新規ファイルのみ) |
+| 測定 commit | `a350632c` (fa_sweep 測定時点。その後の `fa_wc.py` 修正 `5533c9d9` は `fa_sweep` の経路に含まれない。`git diff a350632c HEAD -- tools/icall` は本付録 2 ファイルと `fa_wc.py` のみ) |
 | 素材 | `fl-win64`・`plugins-freshair` (fetch.sh: win 17 files, factory .epf 8)・`toolchain-retdec`・`toolchain-emsdk`・`work-icall`・`work-liftlib` |
 | `tools/ott/native/build.sh` | OK |
 | `tools/icall/fa_route_build.sh` | OK、5.2 s |
