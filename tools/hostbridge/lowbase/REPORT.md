@@ -127,7 +127,7 @@ python3 tools/hostbridge/lowbase/audit_va.py <dll> 0x10000
 
 ## 9. HB-H24 (#974): ブラウザ実機検証の受入条件の対応 (2026-10-14 再測定)
 
-- 測定 commit: `85e27fe2` (コードを変えた最後の commit。`lowbase_e2e.sh` の変更)。`git diff 85e27fe2 HEAD -- tools/hostbridge/lowbase` の出力は空 (測定後のコード差分 0)。
+- 測定 commit: `85e27fe2` (コードを変えた最後の commit。`lowbase_e2e.sh` の変更)。`git diff 85e27fe2 HEAD -- tools/hostbridge/lowbase ':!tools/hostbridge/lowbase/REPORT.md'` の出力は空 (測定後のコード差分 0)。
 - 検証: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS** (PASS 29 / FAIL 0)、所要 **92.7 秒** (全ビルド・Chrome 155 込み)。load average 0.70 (開始時)。
 - 素材: `fl-win64` → `[WIN64]`、`plugins-ott` → `[ANALYSIS-PLUGINS]`、`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib` (展開先は `docs/REFERENCES.md` 参照)。前提の `ott_hb.cjs` は `hostbridge.sh` (ALL PASS)、`k.final.ll` は `t0_e2e.sh` (357/357 × seed 3 種) で当 run に生成。
 
