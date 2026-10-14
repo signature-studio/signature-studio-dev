@@ -6,13 +6,14 @@
 
 ## 1. 測定
 
-- 測定 commit: `55ed65a2` (`origin/main` の `3d37a190` を取り込んだ merge。コードを変えた最後の commit)。取り込み前の PR 測定は `ff010340` (基点 `71bf0957`)
+- 測定 commit: `be5f4697` (`origin/main` の `e87eb52a` を取り込んだ merge。ldfix のコードは `55ed65a2` から変えていない)。直前の測定 commit は `55ed65a2` (`origin/main` の `3d37a190` を取り込んだ merge)。取り込み前の PR 測定は `ff010340` (基点 `71bf0957`)
+- main 取り込み (`be5f4697`): `origin/main` (`e87eb52a`) を merge。競合なし (auto-merge)。main 側の変更は `docs/DOC_MAP.md` (REPORT_1620 行) と `tools/m11/trap_triage/` のみで、ldfix のコードと results は変わらない
 - 素材: `work-m11` / `work-liftdiff` は repo 外に展開し、`M11_WORK` / `LD_WORK` で指定した (repo の `tools/**/work/` には置かない)。実行は `git archive` で repo 外に書き出した HEAD で行った
-- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground)。`55ed65a2` で rc=0・real 159s・load average 0.10 → 1.10・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)
+- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground)。`be5f4697` で rc=0・real 122s・load average 0.89 → 1.13・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)。`55ed65a2` では rc=0・real 159s・load average 0.10 → 1.10・7/7 完了
 - 取り込み前の測定 (`ff010340`): rc=0・real 154s・load average 0.93・7/7 完了・cmp OK
-- 集計 (7/7、`55ed65a2`): spill 宛 unk site 178 / 71 関数。status 確定 127 (前 124) / 判定不能 29 (前 30) / 未判定 22 (前 24)。「前」は `origin/main` (`3d37a190`) の `spill_classify_1161.py` を同じ `ssa.json` に当てた実測 (`results/spill178_1161.tsv` と一致)
+- 集計 (7/7、`be5f4697`。`55ed65a2` と同値): spill 宛 unk site 178 / 71 関数。status 確定 127 (前 124) / 判定不能 29 (前 30) / 未判定 22 (前 24)。「前」は `origin/main` (`3d37a190`) の `spill_classify_1161.py` を同じ `ssa.json` に当てた実測 (`results/spill178_1161.tsv` と一致)
 - 脱落関数の和集合: spill 宛の確定 TRUE_DROP 関数 25 (前 24)。増分は `12cb680`。A ∪ B ∪ C = 69 + 7 = **76** (前 75)
-- 測定後の差分: `git diff 55ed65a2 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)
+- 測定後の差分: `git diff be5f4697 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)。`git diff 55ed65a2 be5f4697 -- (同範囲)` も出力なし
 - 差し戻し後の修正 (文書のみ): REPORT の文言と PR 本文だけを変えた。コードと results は変えていない
 - 差し戻し後の e2e 再実行 (取り込み前の `bd643abf`): rc=0・real 157s・load average 0.48 → 0.96・7/7 完了・cmp 一致。集計は確定 123 / 判定不能 29 / 未判定 26 (取り込み前の値)
 
