@@ -15,7 +15,7 @@
 | fake シンク (既定) | 48000 | 0.011625 s | 0.036 s | 47969.0 | 1152 | 1792 | PASS |
 | PulseAudio null-sink 起動中 | 48000 | 0.011625 s | 0.036 s | 47971.0 | 1152 | 1792 | PASS |
 
-**結論**: Chrome の `baseLatency` / `outputLatency` / `burst` / `T` は PulseAudio 起動の有無で変わらず、`clock` も 2 Hz の差に留まった (各条件 n=1)。ただし Chrome の sink-input が `ci_null` に接続したかは **未確認** (`pactl list sink-inputs` は未取得)。そのため「null-sink は代理にならない」とは結論できず、「fake と同一の値に留まった。接続先は未検証」とだけ書く。よって P1〜P4 を null-sink の代理として扱う前提は未検証のままである。Firefox は `tools/audio/harness` が Chrome CDP 専用のため、同じ方法では測れない。
+**結論**: Chrome の `baseLatency` / `outputLatency` / `burst` / `T` は PulseAudio 起動の有無で変わらず、`clock` も 2 Hz の差に留まった (各条件 n=1)。ただし Chrome の sink-input が `ci_null` に接続したかは **未確認** (`pactl list sink-inputs` は未取得)。そのため「null-sink は代理にならない」とは結論できず、「fake と同一の値に留まった。接続先は未検証」とだけ書く。よって P1〜P4 を null-sink の代理として扱う前提は、この時点では未検証のままだった (接続は §5 で確認済み)。Firefox は `tools/audio/harness` が Chrome CDP 専用のため、同じ方法では測れない。
 **この結論は §5 で置き換えた**: §5 で sink-input の接続 (`ci_null`) を確認した。接続を確認した 2 回目 run の比較では、報告値・burst が fake と一致せず、null-sink の 96k では fake と異なる値になった (§5-1)。
 
 ## 2. ベースライン `e2e.sh --quick` (main `1ddc8512`, 測定 commit = `1ddc8512`)
@@ -78,10 +78,12 @@
 
 ### 5-3. T 下限と安全係数 (P4) の再評価
 
-- **所見 1 (係数不足)**: null-sink の 96k では起動時の較正 T0 が実行中の burst を下回った。B=256 の 96k run では T0=4608 (較正 burst 3456 相当) に対し、run 中の burst は 3456〜4480 (r1・r2 は 3456、r3 のみ 4480 = 3456 の 1.30 倍)。r3 の揺れ (4480) に対し、現行の安全係数 1.25 は覆えない (r1・r2 は T=4608 のまま終わり T_req 5888 に満たない。r3 は grows 2 回で 5888 へ拡張)。
+- **所見 1 (係数不足)**: null-sink の 96k では起動時の較正 T0 が実行中の burst を下回った。B=256 の 96k run では T0=4608 に対し、run 中の burst (`burst_obs`) は 3456〜4480 (r1・r2 は 3456、r3 のみ 4480 = 3456 の 1.30 倍)。r3 の揺れ (4480) に対し、現行の安全係数 1.25 は覆えない (r1・r2 は T=4608 のまま終わり T_req 5888 に満たない。r3 は grows 2 回で 5888 へ拡張)。
+  - **推定 (T0 からの逆算)**: T0=4608 の open 時の較正 burst は **推定 3328 または 3456** (128 の倍数)。`flaudio.c` の `depth = (b + b/4 + 2B−1)/B` を T0/B=18 について解いた (`g_burst_floor` は既定 0)。実体は `fla_open` の phase 1 が得る `res[0]` を 128 に切り上げた値で、JSON には残っていない。この値は run 中の `burst_obs` とは別の量である。
   - B=512 96k は T0=5120 から実行中に `grows` 1〜2 回で 6144 へ拡張。B=256 96k は 1 run (r3) で `grows` 2 回で 5888 へ拡張。
   - **underrun は全 run で 0**。ただし拡張は実行中に行われるため、初回の揺れで underrun の余裕が少ない (実機で揺れがさらに大きい場合は未検証)。
 - **所見 2 (fake の代理性)**: fake の burst 512 (48k)・1024 (96k) は、null-sink の 1152・3456〜4480 を代表しない。fake の値で T を決めると、96k で T が不足する。
+  - fake 96k・B=256 の T0=2816 からは、同じ逆算で open 時の較正 burst を **推定 1920 または 2048** と読める。これは run 中の最大 `burst_obs` (1024) とは別の量で、表の `burst max` と同一視しない。
 - **係数の候補 (計算値, 未適用)**: 96k・B=256・burst 4480 → 係数 1.25 で T=5888 / 1.30 で 6144 / 1.50 で 7168。B=512 → 1.25 で 6144 / 1.50 で 7680。48k・B=256・burst 1152 → 1.25 で 1792 / 1.50 で 2048。
   係数の値は遅延とのトレードオフのため、PM 判断。係数は `tools/audio/src/flasio.c:225` の `need = (burst + burst/4 + 2B−1)/B·B` (実行中の拡張式。`grows` はこの式で増える) にある。本 PR では変更しない → 子 issue **[AU-24]** で実装する。
 
@@ -122,12 +124,11 @@
 - 範囲: ubuntu runner の Chrome 154 (fake / PulseAudio null-sink) の 48k・96k。null-sink は PulseAudio の出力経路で、実デバイス (実 IF の outputLatency) を代表しない (AU-22 #2366)。
 - 範囲外: Firefox・Safari・Windows/macOS・実機の総往復遅延。
 
-## 8. コード差分 (測定 commit `54bacdc0` → 確認 commit `2181abc0`)
+## 8. コード差分 (測定 commit `54bacdc0` → 最終 head)
 
-測定に使ったコード (`tools/audio/{src,harness,test}`・`public/worklets`) の差分は 0。確認に使った commit は `2181abc0` (PR の旧 head。再採取 §5-4 も同じコードで実行)。
+測定に使ったコード (`tools/audio/{src,harness,test}`・`public/worklets`) の差分は 0。再採取 §5-4 も同じコードで実行した。
 
-- 実行: `git diff 54bacdc0 2181abc0 -- tools/audio/src tools/audio/harness tools/audio/test public/worklets`
-- 出力: 空 (0 行)
+- 実行: `git diff 54bacdc0 HEAD -- tools/audio/src tools/audio/harness tools/audio/test public/worklets`
+- 出力: 空 (0 行) — 最終 head で実行。HEAD は本 REPORT を含む PR の最終 commit (hash は PR 本文の `検証` 節)。前回 head `10badcc3` と旧 head `2181abc0` でも同じ出力 (空) を確認した。
 
-この fix commit (本節を含む) も上記パスを変えていない。最終 head での同じコマンドの出力は PR コメントに記載する。
-変更したのは測定スクリプト `tools/audio/au2_matrix.sh`・`tools/audio/au2_summary.mjs`、本 REPORT、結果 `results/au2/` と `results/au2_recheck/` のみ。
+本 REPORT の commit は測定コードを変えない (`docs/WORKFLOW.md` §6)。変更したのは測定スクリプト `tools/audio/au2_matrix.sh`・`tools/audio/au2_summary.mjs`、本 REPORT、結果 `results/au2/` と `results/au2_recheck/` のみ。
