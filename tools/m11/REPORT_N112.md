@@ -10,7 +10,7 @@
 - 入力 IR: `tools/m11/work/boot_final.ll` (`work-m11` 展開物・sha256 `69c774ded8aaf717…`・REPORT_N98 §1 と一致)。
 - PE: `$FL_WIN64_DIR/extracted/block00031_PE.bin` (`fl-win64`)。
 - 素材: `work-m11` を repo root に `tar --zstd -xf` で展開 (tar 内の path は `tools/m11/work/...`)。
-- 実行 (コミット済み HEAD `d24cbe51`):
+- 実行 (測定 commit `fe266be7`。§7):
   1. `bash tools/m11/m11_sigfix_stats.sh` → 0 詰め site 1049 / 引数 1963・set_other 系 410 (378 + 32)・`stack_imm_fix 15`・`const 復元可能 fixes 33`。その後 `m11_argrecover_verify.py` が `KeyError: 4` で停止 (§4)。
   2. `python3 m11_setother_ledger_verify.py work/sigfix_stats/fixes.json --pe PE` → `match 410`・exit 0。
   3. `python3 m11_setother_imm_class.py work/sigfix_stats/fixes.json work/sigfix_stats/final3_base.ll --pe PE` → `full_const 6 / partial_write 35 / stack_partial 9 / arith 11 / no_write 0`・exit 0。
@@ -49,7 +49,7 @@
 
 ## 5. 受入 3 (survey) が測れない理由
 
-- `ir_conditions.json` は作れる。`FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/m11_gen_ir2.sh` (WORKFLOW §11) を HEAD `1688a113` で実行し、rc 0・`[gen_ir2] OK` を確認した (`ldfix=applied`・`qstore=not-applied`・`ir_sha256` `08c7b646…`)。
+- `ir_conditions.json` は作れる。`FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/m11_gen_ir2.sh` (WORKFLOW §11) を測定 commit `fe266be7` で実行し、rc 0・`[gen_ir2] OK` を確認した (`ldfix=applied`・`qstore=not-applied`・`ir_sha256` `08c7b646…`)。
   ただしこの生成 IR は `work-m11` の `69c774…` と別物 (`08c7b646…`)。`69c774…` の測定入力は展開物を戻して使った。
 - 残るブロッカーは 2 つ。(a) `work/lift_pe.sha256` が無いため `m11_e2e.sh` は全再生成 (`m11_scan` → `m11_bounds` → RetDec) に入る。(b) `m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を読めず停止する (`FL_WIN64_DIR` を指定した実測で `FileNotFoundError`・rc 1)。`functions_dll.csv` は素材に無い Ghidra 中間物で、REPORT_N86 §6・§9 と同じ。
 - `lift_pe.sha256` を手で書いて差分経路に入れる方法は、lift の出自を検証しない迂回になるため採らない (REPORT_N86 §6)。
@@ -65,5 +65,12 @@
 
 ## 7. 測定 commit と差分
 
-- 測定 commit: `d24cbe51` (コード変更の最後の commit。`tools/m11/m11_setother_ssa_value.py`)。
-- 測定 commit から HEAD までのコード差分: 本 REPORT (md のみ) を含む commit 以降は `git diff d24cbe51 HEAD -- tools/m11 ':(exclude)*.md'` で確認する (コミット後に実行して結果を PR 本文に貼る)。
+- 測定 commit: `fe266be7` (§1 の全測定と §5 の `m11_gen_ir2.sh` を実行した HEAD。`origin/main` 取り込み後の commit)。
+- 測定 commit から、本 REPORT を含む commit までのコード差分:
+  `git diff --stat fe266be7 HEAD -- tools/m11 ':(exclude)*.md'` は **0 行** (md のみの差分)。
+- `d24cbe51` から `fe266be7` への `tools/m11` のコード差分 (main 取り込み由来・4 files 48+/3-) の理由:
+  - `m11_build.sh`: `M11_TRACE_ISOLATE` を CF に渡す行と stamp 行を追加。既定値 1 は `m11_ov.c` の `#define` 既定 1 と同じで、既定 build の挙動は変わらない。
+  - `trap_triage/probe_entry.sh`: `M11_KEEP_BOOT_O=1` で `m11_build.sh` を呼ぶ (差し替えた probe 版 `boot.o` を残す)。
+  - `ldfix/results/candidate_verdicts_1161.jsonl` (新規 31 行)・`ldfix/results/f4_liftdiff_1646.tsv` (新規 11 行): 判定・監査の記録。
+  - 確認方法 (`fe266be7` 時点): (a) リポジトリ全体 (`work/`・`extracted/` 除外) で 4 ファイルの basename を grep。`candidate_verdicts_1161.jsonl` は参照なし、`f4_liftdiff_1646.tsv` は `ldfix/REPORT_564.md` の記述のみ。(b) 測定経路の `m11_sigfix_stats.sh`・`m11_argrecover*.py`・`m11_setother_*.py`・`m11_gen_ir2.sh`・`ldfix/ldfix.py`・`m11_bounds.py` に、`m11_build` / `probe_entry` / `results/` の実行・読込が無い (`m11_gen_ir2.sh` の `m11_build.sh` は行末コメントのみ)。`m11_build.sh` を呼ぶのは `trap_triage/negctl_*`・`repro_*` などの build 系スクリプト。
+  - よって §1 の数値は、このコード差分の影響を受けない経路で得たもの。
