@@ -49,7 +49,8 @@
 - 新 = `5b6d03c2` (本 PR 取り込み後)。比較先 = `origin/main` の `tools/m11` を `git archive` で別ディレクトリに展開して実行。
 - `cmp head.ll main.ll` → **IDENTICAL** (21,772,659 bytes)。
 - `F1=0 / F1v=0 / F2=0 / F3a=2 / F3b=0 / F3c(store-arg)=33 / F4(frame-read)=10 (errors=0)`。
-- 本 PR の効果だけは §5.2 の ablation で見る。main 側に入った別 PR の F4 差 (`F4=10`) を含むため、8483b900 との `cmp` (DIFFER) は本 PR の判定根拠に使わない。
+- 本 PR の効果だけを IR で見るため、`bumps = {}` (argv 無効) 版でも同じ入力を出力した: `cmp abl.ll head.ll` → **IDENTICAL**、`cmp abl.ll main.ll` → **IDENTICAL**。この入力では argv 由来の deref は IR を変えない (分類だけが変わる)。
+- 8483b900 との `cmp` は main 側に入った別 PR の F4 差 (`F4=10`) を含むため、本 PR の判定根拠に使わない。
 
 ### 5.2 分類表 (`python3 ldfix/use_residual_509.py work/boot_final3.ll work/m11_image.bin 'work/boot*.drc.config.json' ldfix/results/audit_509_pre.json all`)
 
