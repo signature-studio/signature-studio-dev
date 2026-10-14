@@ -190,13 +190,13 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 
 - 取り込み: `origin/main` (`f0c00334`) を PR ブランチへ merge (merge commit `c46fdf72`)。衝突は `tests/provider_check.mjs` の 1 箇所だけ。解消: main 側の `pe100` (`channels.getStepParam`・`channels.getCurrentStepParam`) を残し、本 PR の `pe102` (`playlist.muteTrackLock`) を併記。件数は main の `impl 86・unimpl 349` に muteTrackLock の +1 で `impl 87・unimpl 348` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`flapi_table.json`・`flapi_table.py`・`fl_table.c` は自動マージで衝突なし (両側の変更が残ることを diff で確認)。
 - 測定 commit: `c46fdf72` (コードを変えた最後の commit)。`git diff c46fdf72 HEAD -- tools/python ':!tools/python/REPORT_PY102.md'` は 0 行 (本節の追記だけが差分)。main に対する PR の差分は従来どおり 10 ファイル (`git diff --stat origin/main c46fdf72`: 348 insertions(+), 11 deletions(-))。
-- 検証 (`c46fdf72` で実行)。emsdk は上流 `emsdk install 6.0.12` を `$RUNNER_TEMP/emsdk-src` に導入し、`build_cpython_wasm.sh` の直書きパスに合わせて `/opt/emsdk` へ symlink (リポジトリ外)。素材は `fl-win64` の 5 block を `$RUNNER_TEMP/fl-win64/extracted/` へ展開 (2.932 s)。`fetch_inputs.sh` で `work/` を作成。
+- 検証 (`c46fdf72` で実行)。emsdk は上流 `emsdk install 6.0.12` の導入先を [EMSDK] の既定位置へ symlink して使った (リポジトリ外。`build_cpython_wasm.sh` が既定位置を直書きするため)。素材は `fl-win64` の 5 block を `FL_WIN64_DIR` 配下の `extracted/` へ展開 (2.932 s)。`fetch_inputs.sh` で `work/` を作成。
 
 | 検証 | 実行 | 結果 | 所要 |
 |---|---|---|---|
 | CPython wasm | `bash build_cpython_wasm.sh` | exit 0 | 4m30.556s |
-| provider wasm | `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash provider/build.sh` | flprov.wasm 58,029 B。fl_table.c 435 関数・ハンドラ 87 | - |
-| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… EMSDK_DIR=/opt/emsdk bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 (`git status` が空) | 7.262 s |
+| provider wasm | `EMSDK_ENV=… bash provider/build.sh` | flprov.wasm 58,029 B。fl_table.c 435 関数・ハンドラ 87 | - |
+| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… EMSDK_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 (`git status` が空) | 7.262 s |
 | provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 87・unimplemented 348・mcp_static 60・PASS | 0.385 s |
 | playlist 差分 | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段・PASS | 0.064 s |
 | mixer 差分 | `node tests/mixer_diff.mjs` | calls 57・diffs 0・PASS | 0.088 s |
