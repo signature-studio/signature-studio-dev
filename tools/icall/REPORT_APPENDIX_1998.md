@@ -55,7 +55,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 値 `0x400000004` を作る store (null ページを指すポインタの生成元) の特定 (`-DWVAL` 絞り込みの再実行では WCV 0 件で未取得) | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #1998 (本 PR は Refs。残りは同 issue で継続) |
+| 値 `0x400000004` を作る store (null ページを指すポインタの生成元) の特定 (行 19124 の `%1` が "emsc" を運ぶ。`%1` の起点は未特定) | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #1998 (本 PR は Refs。残りは同 issue で継続) |
 | IR 行 19132 → wasm 命令オフセットの対応 | 受入条件「wasm オフセットか IR 命令まで」の wasm 側 | 同上 |
 | 引数付き lifted 関数の dispatch table 登録規則 | abort 6 件 (1852 付録 §2) | #1897 (ICALL-49) 既存 |
 | 監視の対象外: `llvm.memcpy` / `llvm.memset` 等の intrinsic、`cmpxchg` / `atomicrmw`、C 側 (`oi.*.c`・`rt/*.c`)、emscripten libc の書込み。集成体型 (`[N x T]`・`{...}`) の store は `fa_wc.py` が挿入せず件数を出す (`unhandled`) | 上記の書込みは BLK 窓への書込みを見逃しうる。`fa_wc.py` は 5526 件中 5526 件を挿入 (未対応 0) で、この集合には該当しない | 本付録 (監視の限界として明記) |
