@@ -5,8 +5,8 @@ REPORT_944.md §9.3 の付録。測定 commit: **`e5e3c7c2`** (origin/main。本
 
 ```
  tools/m11/trap_triage/REPORT_944.md          |  1 +
- tools/m11/trap_triage/REPORT_APPENDIX_944.md | 47 ++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
+ tools/m11/trap_triage/REPORT_APPENDIX_944.md | 55 ++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
 ```
 
 文書以外を除いた差分 `git diff e5e3c7c2 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_944.md' ':!tools/m11/trap_triage/REPORT_APPENDIX_944.md'` は 0 行。
