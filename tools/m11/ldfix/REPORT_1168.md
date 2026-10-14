@@ -146,3 +146,28 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 `ff63f0` / `128f9e0` / `d0cee0` のように 1 ブロックに IR load が多い例は、ブロック内の順序を機械語の値の流れで追う必要があり、本 pass の範囲外。
 
 残作業 (未解決): 結べない 140 load (K 組 32 のうち 9 組だけが一部結べた)。ブロック内に IR load が複数ある場合の順序対応は、機械語の `rD` の後続使用先まで追う拡張が要る。子 issue 起票先は PR 本文の未解決表。
+
+## 7. #1923 (LD-69) 同一ブロック複数 load の使用種類による対応付け (試したが採用しない)
+
+結果: 使用種類 (最初の使用命令の種類) で同一ブロックの複数 load を 1 対 1 に結ぶ規則を試した。結べた数は増えず (`by_use_kind` = 0)、
+推定で結ぶ経路は誤結合 (silent miscompile) の危険があるため**規則は採用しない**。`link_d17.py` からは削除した (commit `a37e757f`、`5a654b99` の revert)。
+
+採用しない理由:
+- IR 側は同一ブロックの load の最初の使用種類が揃う例が多い (`ff63f0` は 11 本中 10 本が `add`、`100a3d0` は全 5 本が `sext`)。種類では一意にならない。
+- 機械側は chain の多くが `dst_unused` (rD の使用先が後続 8 命令の外) か `base_clobbered` (rA が途中で壊れる)。窓を広げると誤結合のおそれがあるため広げていない。
+- 使用種類の一致は値の流れの証明ではない。`[rD]` のメモリ基底としての使用も数えていないため、種類付けが誤るおそれもある。
+
+測定値 (HEAD `01e62e01`、`bash tools/m11/ldfix/link_d17_e2e.sh`、素材 `work-m11` + `toolchain-emsdk`、45.6 秒、emcc rc=0):
+
+測定 commit: `543e7320` (`tools/m11/ldfix/link_d17.py` を最後に変えた commit。以降のコード差分は 0)。
+差分の証跡: `git diff 543e7320 HEAD -- tools/m11/ldfix/link_d17.py tools/m11/ldfix/link_d17_e2e.sh tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf_ssa.py` の出力は空 (0 行)。
+
+| 段 | store_CC_site | store_CC_fn | store_CELL_DEEP |
+|---|---|---|---|
+| ssa_base (修復前) | 86 | 49 | 19 |
+| ssa_neg (fix_d17 のみ = ネガコン) | 53 | 28 | 52 |
+| ssa_link (fix_d17 + link_d17) | 47 | 26 | 58 |
+
+`ir_loads_in_multi_groups=151 linked=11`。ネガコン成立 (link を外すと store 宛 CC_site 47 → 53)。上の値は `543e7320` の §6 の値と一致する。
+
+結べない load 数 (関数・K 単位) は §6 の表が正。`ff63f0` / `128f9e0` / `d0cee0` のように 1 ブロックに IR load が多い例は、ブロック内の順序を機械語の値の流れで追う必要があり、子 #1980 の範囲。受入条件のうち「値の流れで順序を決める」「store 宛 CELL_COLLAPSED の減少」は未達。
