@@ -371,6 +371,7 @@
 | `tools/targets/serum2/host/REPORT.md` | ~240 | Serum 2 最小 VST3 host |
 | `tools/targets/serum2/host/REPORT_SR1c.md` | ~222 | SR-1c (#256) 付録: controller ゲート (+0x10c / +0xdc) の静的 writer 走査と API 突合 (import 327 / 呼出 110 / 未呼出 217)。API 名一覧は `host/sr1c_api_surface.tsv` |
 | `tools/targets/serum2/host/REPORT_SR23.md` | ~78 | SR-23 (#1545) 付録: 書込元 `0x1800acf70` の所属 class (`SerumController`・vtable slot 3) と、wrapper IID (`IVst3ToAUWrapper`/`AAX`) に応答する host 根拠 (SDK 参照 host は応答しない) |
+| `tools/targets/serum2/host/REPORT_SR5.md` | ~50 | SR-5 (#73): 参照音源 (wine64 上の実 Serum2 DLL) の WAV 生成と dB 誤差ハーネス。決定性 (file SHA-256 一致)・ネガコン・再測定の未実施と測定 commit の対応 |
 | `tools/targets/serum2/license/REPORT.md` | ~160 | Serum2 認可機構の呼出点マップ |
 | `tools/targets/serum2/license/authstub/REPORT.md` | ~232 | authorization stub 設計・実装。§13b・§14 の詳細は付録 `REPORT_APPENDIX.md` §13b・§14b (250 行上限のため分割移動) |
 | `tools/targets/serum2/license/authstub/REPORT_APPENDIX.md` | ~95 | authstub REPORT の分割移動節: §13b (L1 脱落条件の突合・census の数え方) と §14b (L1 復元 pass の census・ネガコン・e2e 実測、LF 束縛の詳細) |
