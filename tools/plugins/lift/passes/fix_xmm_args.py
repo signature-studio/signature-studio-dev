@@ -84,6 +84,21 @@ def close_paren(s, i):
     return -1
 
 
+def count_args(s):
+    """call の引数列 (括弧の外で区切る) の個数。"""
+    if not s.strip():
+        return 0
+    depth = n = 0
+    for c in s:
+        if c in '([{<':
+            depth += 1
+        elif c in ')]}>':
+            depth -= 1
+        elif c == ',' and depth == 0:
+            n += 1
+    return n + 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('src')
@@ -109,6 +124,15 @@ def main():
             callers[m.group(1)] = callers.get(m.group(1), 0) + 1
         for m in re.finditer(r'@(function_[0-9a-f]+)(?![\w.$-])(?!\()', ln):
             noncall[m.group(1)] = noncall.get(m.group(1), 0) + 1
+    # 呼出し側の引数個数 (#954): 個数が callee の既存 IR 引数数と違う call site があれば、末尾への xmm 0 追加は位置が合わないので適用しない
+    arity = {}
+    for ln in text.split('\n'):
+        if ln.startswith('define '):
+            continue
+        for m in re.finditer(r'call [^@\n]*@(function_[0-9a-f]+)\(', ln):
+            e = close_paren(ln, m.end())
+            if e >= 0:
+                arity.setdefault(m.group(1), set()).add(count_args(ln[m.end():e]))
     rep = {'fixed': {}, 'skipped': {}, 'movd_sites': {}, 'movd_fixed': 0, 'orphan_float_fixed': 0,
            'orphan_gpr_fixed': 0, 'helper_xmm_fixed': 0, 'struct_copy_fixed': 0}
     out = [head]
@@ -131,6 +155,9 @@ def main():
                         rep['skipped'][fname] = 'slot_occupied(%s, IR params=%d)' % (','.join(occ), len(plist))
                     elif noncall.get(fname):
                         rep['skipped'][fname] = 'non_call_ref(%d)' % noncall[fname]
+                    elif any(c != len(plist) for c in arity.get(fname, ())):
+                        rep['skipped'][fname] = 'call_arity_mismatch(sites=%s, params=%d)' % (
+                            ','.join(str(c) for c in sorted(arity[fname])), len(plist))
                     else:
                         snap = copy.deepcopy({k: v for k, v in rep.items() if k not in ('fixed', 'skipped')})
                         h2, b2, c1 = KA.fix_movd_from_zero(header, body, habi, rep, fname)
