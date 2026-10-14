@@ -78,6 +78,10 @@
 ## 4c. 件ごとの判定 (#1653・部分達成: 判定 0 件・ダンプまで)
 
 - 対象: `strict_evidence.tsv` のデータ行 4〜98 (ヘッダ除く 1 始まり・95 件)。
+- 測定 commit (実行経路ごとに分けて記載。`tools/m11` 全体の差分ではなく、各実行物の差分を見る):
+  - `scan_guard.py` / `guard699/`: 測定 commit `e9bca3b6`。`git diff e9bca3b6 HEAD -- tools/m11/guard699/` = 0 行。
+  - `strict_evidence.py` (TSV 生成) と `scan_guard.py`: 最終変更 commit `e4f16b6e`。`git diff e4f16b6e HEAD -- tools/m11/trap_triage/strict_evidence.py tools/m11/guard699/scan_guard.py` = 0 行。`e9bca3b6..HEAD` では `strict_evidence.py` に 94 行の差分があるが、その変更 (`088d9eaf`・`e4f16b6e`) は現 HEAD の祖先に入っている。TSV の生成 commit は記録されていない。本 run では `work-m11` が無く再生成していないため、TSV 288 行が `e4f16b6e` 以降のコードで出たかは未実測 (PR 作成者の run の記録に依る)。
+  - `judge_dump.py` (本 PR で追加): 作成 commit `b483689e`。参照する列はいずれも `strict_evidence.py` の出力ヘッダと一致 (構文チェック OK)。
 - 入力の実測 (この run): `work-m11` の `boot_final.ll` sha256 `69c774de…a43` (§4a と一致)。`scan_guard.py --report` で strict 288 を再実行し、`strict_evidence.py` で TSV 288 行を生成 (件数 288 は §3 の現 HEAD 行と一致)。
 - 判定ダンプ: `tools/m11/trap_triage/judge_dump.py <IR.ll> <evidence.tsv> <lo> <hi>` (判定はしない)。データ行 4〜98 の 95 件を出力し、loop_head ブロックの欠落は 0 件。
 - 判定件数 (母数): **0 件**。偽陽性件数: **未判定**。偽陽性率は書かない。
