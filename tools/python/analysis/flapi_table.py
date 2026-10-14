@@ -76,6 +76,13 @@ def stub_sigs(mod):
     return sigs
 
 
+# 公開 stub に無い引数の補正 (PY-102 #2883)。binary の書式 (kwsig) が正。キーは "<module>.<name>"。
+# playlist.muteTrackLock: stub は index のみ。binary は index:int, value:int=-1 (書式 'i|i'、REPORT_PY61 §3・0xd56510)
+EXTRA_PARAMS = {
+    "playlist.muteTrackLock": [{"name": "value", "type": "int", "default": "-1"}],
+}
+
+
 mcp_used = {}
 for t in mcp["tools"]:
     for api in t["api_calls_transitive"]:
@@ -97,9 +104,12 @@ for m, blocks in raw["modules"].items():
     ent = {}
     for n, d in sorted(funcs.items()):
         win = bool(d) and (b"\x00" + n.encode() + b"\x00" + d.encode() + b"\x00") in pe
+        sig = sigs.get(n)
+        if sig and f"{m}.{n}" in EXTRA_PARAMS:
+            sig = {"params": sig["params"] + EXTRA_PARAMS[f"{m}.{n}"], "returns": sig["returns"], "arity_from": "kwsig"}
         ent[n] = {
             "doc": d,
-            "sig": sigs.get(n),
+            "sig": sig,
             "new_vs_stubs": n not in stubs_json.get(m, {}),
             "win_pair_verified": win if d else None,
             "arm64_same": n in arm,
