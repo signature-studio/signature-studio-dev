@@ -148,3 +148,61 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 | 旧 REPORT 値 (362,277 / 129,188 / 10,305) の出典 | 現 script では再現しない (決定的な出力は 362,280 / 129,192 / 10,307)。旧値は別の版・別の script 状態の産物と推定するが未確認 | #161 継続 (旧値の出典確認) |
 | closure の間接 call 先の解決 | 表の命令数は下限 | 起票案 (PSOLA lift) で扱う |
 | ildsp の lift 本体 | #161 後半未達 | #161 継続 |
+
+## 5. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
+
+既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 に VEX 未対応・jump table 未到達の記述は無い。差分は CreateInstance と slot 0 の範囲で 0 件)。
+測定 commit: `d631564c` (コードを変えた最後の commit)。以降の差分は本節のみ (§5-8)。検証起点: `bea685f7` (origin/main)。
+
+### 5-1 結論 (1 行)
+closure の入口 70 関数は x64c で C に lift し wasm (138,754 B) にした (C 本体 60 + label 8 + IAT thunk 2)。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致。残りは slot 1–5 の host 前提 (native が null 参照で落ちる) と、VEX 3 命令の未対応 (unsup 3 site)。
+
+### 5-2 再現
+```
+FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<toolchain-emsdk 展開先>/emsdk/emsdk_env.sh bash tools/shared/lift/ildsp/lift_wc.sh [ok|neg-cmp|all]
+```
+- 入力: `extracted/block24360_PE.bin` (sha256 `f4b23b0f…`)。素材は `tar --zstd -xf fl-win64.tar.zst extracted/block24360_PE.bin` で取る。
+- 段: `x64c.py` (root = CreateInstance `0x1ac470` と vtable `0x3e01b0` の slot 先 `0x1a9cf0`・`0x1a9f10`・`0x1a9e10`・`0x1a9de0`・`0x1aa0b0`・`0x1ac460`、`--closure 99`) → `wc_image.py` (DIR64 補正・IAT pseudo-VA) → `wc_cases.py` (case 64 = 元の `.data` と数バイト書換え 63) → emcc 6.0.12 `-O1` → `native_ref.c` (gcc・ms_abi 直接実行) → `run_wasm.mjs` (node 22) → `diff_test.py`。
+- vcall `0x1a9e2b` (`call [rax+0x18]` = slot 3 = `0x1a9de0`) は静的に束縛せず、x64c の `ott_dispatch` が実行時に vtable を読んで解決する。前提は instance の vptr が `0x3e01b0` (CreateInstance が `[rcx]` に置く)。
+- runtime `fle_cpu.c` の既定 `imp_HeapAlloc` は host `malloc` を使い、native とポインタが一致しない。`lift_wc.sh` は `wc_glue.c` が定義する `imp_*` だけ `-D` で改名して除外し、決定的 bump heap の定義を使う。
+
+### 5-3 実測 (測定 commit `d631564c`・HEAD で 3 回)
+| 項目 | 値 |
+|---|---:|
+| x64c の lift 関数 (C 本体) | 60 (`unlifted callees` 0・imports 18) |
+| closure 入口 70 のうち C に現れる | 70 (60 は `f_` 関数、8 は呼出元の関数内 label、2 は IAT thunk `jmp [rip+IAT]` = `imp_` 呼出 `0x1b932c`・`0x1b9334`) |
+| closure の命令数 (`ildsp_closure.py` の定義・70 範囲の線形走査) | 2,757 |
+| x64c が C に出した命令数 (`/* addr: */` 注釈で数えた) | 2,656 |
+| closure にあって C に無い命令 | 109 = int3 77 + nop 14 + 非 padding 18 (うち IAT thunk 2) (§5-4) |
+| C にあって closure に無い命令 | 8 (`0x1aef40`–`0x1aef4f`。x64c が辿るが JSON の closure 定義は辿らない) |
+| unsup (`ott_unsup`) | 3 site: `0x1ca277` vcvtss2sd・`0x1ca33f` vpmovsxdq・`0x1ca34c` vshufps (いずれも closure 内。CreateInstance の実行経路には無い) |
+| wasm | 138,754 B (`emcc` 6.0.12) |
+| 差分 `ok` (CreateInstance → slot 0) | cases 64 / PASS 64 / FAIL 0 / native 落ち除外 0 / wasm trap 0 |
+| 差分の観測値 | 戻り値の合成値 `0x5d9b00001` (= 返り値 `0x30500000`·31 + slot 0 の返り値 1) が両側で一致。import 呼出 1 回 (HeapAlloc 0x228 B) |
+| ネガティブコントロール `neg-cmp` (wasm 結果の heap 先頭 1 bit 反転) | FAIL 64/64 (`arena@+0x0`)・rc 1 → 期待通り |
+| 所要 `ok` (lift 無し・emcc 込みの 1 回) | 実測 1 s・1 s・1 s (load 開始 0.04–0.11・4 core)。ただし emcc の sysroot キャッシュ作成時は 9 s |
+
+### 5-4 closure と lift の差 (未確定)
+- 直接分岐の先になっていない非 padding 命令 16 件: `0x1ac9b8` (`0x1ac9b0` の後続)・`0x1b8eb1`–`0x1b8ec8` (`call 0x1be130` を含む 6 命令)・`0x1bd4b0`–`0x1bd4b7`・`0x1be14e`–`0x1be16c` (`ucomisd`・`cvtsd2si`・`ret` 等)。直接分岐の照合 (closure 内の jcc/jmp/call の先) は 0 件。間接 jump (jump table) の先か、到達不能のどちらか。x64c は認識した jump table しか辿らないため、ここでは確定しない。
+- 到達した場合の挙動: 直接 call で届けば x64c が必ず lift する。`call reg` 経由で未 lift の先に届けば `ott_unlifted` で止まる (fail-fast。silent ではない)。
+
+### 5-5 slot 1–5 の観測 (未確定)
+- slot 0 (`0x1a9cf0`): CreateInstance 直後に `this` = instance で呼べる (import 0 回)。差分 64 case に含めた。
+- slot 1 (`0x1a9f10`): `[this+0x20]` (CreateInstance が 0 にしたまま) を読み、その値を後続で使うため、native が `addr 0x0` で SIGSEGV (probe: 呼出元の一時コピーで確認・未コミット)。CreateInstance → slot 0–5 の全呼出を入れた版では 64/64 case が native で落ちた。
+- したがって slot 1–5 は、host が事前に `this` の内部フィールドを設定する前提が要る。その前提は未確定 (子 #T-SH-57)。
+
+### 5-6 検証範囲 / 範囲外
+- 範囲: CreateInstance (1 呼出) → slot 0 (1 呼出)。引数は `rcx` = instance・`rdx` = arena+0x8000・`r8`・`r9` = 0。`.data` の事前状態 64 種。比較は rax (合成値)・import 呼出回数・heap 領域 64 KiB・`.data` 全体。
+- 範囲外: slot 1–5 と closure 70 関数の全体差分 (子)、VEX 3 命令 (子)、stack・TEB・TLS の比較 (比較していない)、import 戻り値の実 Windows との一致 (両側で同じ手書き規約。lift の正しさだけを見る)。
+- `issue #3216` 本文が参照する「REPORT.md §5-5 の未解決 (WC 以外の vptr 格納 3 件・helper `0x1aedc0`/`0x1b6f4c`)」は、現 HEAD の REPORT に記載が無い。`REPORT_CLOSURE.md` §4.6 の表が対応する。これは未実施 (子)。
+
+### 5-7 未解決 (起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| slot 1–5 の host 前提の確定と、closure 70 関数の native 対 wasm 全バイト差分 | 受入 (2) の残り・gate の範囲 | 子 [T-SH-57] |
+| VEX 3 命令 (vcvtss2sd・vpmovsxdq・vshufps) の x64c 対応 (unsup 3 site) | 受入 (1) の残り。実行到達時は trap | 子 [T-SH-58] |
+| REPORT_CLOSURE.md §4.6 の未解決 (WC 以外の vptr 格納 3 件・helper `0x1aedc0`/`0x1b6f4c` の正常系到達) の native 確定 | 受入 (3) | 子 [T-SH-59] |
+| 非 padding 16 件の到達性 (§5-4) | closure の完全性 | [T-SH-57] の受入に含める |
+
+### 5-8 測定後のコード差分 (差分 0 の証跡)
+`git diff d631564c HEAD -- tools/shared/lift/ildsp ':!*.md'` の出力は空 (本節は `.md` のみ)。
