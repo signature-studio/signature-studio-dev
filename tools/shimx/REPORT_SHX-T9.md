@@ -127,7 +127,7 @@
 | 22 | `GetProcAddress` | 呼ばれていない (unit 22 の GetProcAddress 増分 0) |
 | 23 | shimx 呼出し | 0 件 (`CALL` 行なし)。`ret=2`・icall miss 2 件 (`0x4476d0`・`0x457860`) |
 
-- `function_457c70` (IR: `boot_final3.ll` L160490 付近) は先頭で `GetModuleHandleW(L"oleaut32.dll")` を呼ぶ。unit 22 の上の呼出しがこれに一致する。IR 上、`GetModuleHandleW` の戻り値 (`%0`) は `function_457c70` 内で一度も使われない。`function_457c40` は第 1 引数 (`stack_var_-56` の alloca) の `+40` を読み、0 なら fallback (`arg3`) を返す。実測では unit 22〜23 に `GetProcAddress("VarBstrFromBool")` の呼出しが無く、slot は 0 のまま残った。「`+40` が 0 だから fallback する」は IR からの推測で、`+40` の実行時値は未測定。
+- `function_457c70` (IR: `boot_final3.ll` L160490 付近) は先頭で `GetModuleHandleW(L"oleaut32.dll")` を呼ぶ。unit 22 の上の呼出しがこれに一致する (引数の一致による**推定**)。wrapper は呼出し元アドレスを記録していないため、この呼出しが `function_457c70` 由来であることは**未確定** (記録には wrapper への呼出し元 PC 追加が要る)。IR 上、`GetModuleHandleW` の戻り値 (`%0`) は `function_457c70` 内で一度も使われない。`function_457c40` は第 1 引数 (`stack_var_-56` の alloca) の `+40` を読み、0 なら fallback (`arg3`) を返す。実測では unit 22〜23 に `GetProcAddress("VarBstrFromBool")` の呼出しが無く、slot は 0 のまま残った。「`+40` が 0 だから fallback する」は IR からの推測で、`+40` の実行時値は未測定。
 - 上の経路の是正は受入条件外。今回の実測は「`GetModuleHandleW(oleaut32)` は非 NULL を返すが、戻り値が GetProcAddress に渡らない」まで。
 - baseline (`m11_boot.cjs`・sxt 無し): unit 23 は `halt0` のまま。戻り値ログは取れない (wrapper 無し)。`0xf960` 以降の分岐条件は未特定 → 子 issue へ。
 - 証跡: `tools/shimx/evidence_1985/probe_u23_shimx_ret.txt` / `probe_u23_baseline.txt`。
