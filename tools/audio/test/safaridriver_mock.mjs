@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // AU-35 (#3193): safaridriver の代役 (WebDriver classic の最小応答)。Linux 上で harness/safari.mjs の HTTP 手順だけを確かめる用。
 // 使い方: SAFARIDRIVER=tools/audio/test/safaridriver_mock.mjs node tools/audio/test/safari_mock_test.mjs
-// ブラウザは動かさない。execute/async は script に "__fail" を含むと javascript error を返し、それ以外は JSON 文字列を返す。
+// ブラウザは動かさない。execute/async は script に "__fail" を含むとページ側の例外 (__exc・HTTP 200)、"__http" を含むと HTTP 500 (javascript error) を返し、それ以外は JSON 文字列を返す。
 import http from "node:http";
 
 const port = +process.argv[process.argv.indexOf("-p") + 1];
@@ -29,7 +29,8 @@ http.createServer(async (req, res) => {
   if (req.method === "POST" && sub === "/url") { s.urls.push(b.url); return send(res, 200, null); }
   if (req.method === "POST" && sub === "/execute/async") {
     if (!Array.isArray(b.args) || typeof b.script !== "string" || !b.script.includes("arguments[arguments.length - 1]")) return send(res, 400, { error: "invalid argument", message: "script" });
-    if (b.script.includes("__fail")) return send(res, 500, { error: "javascript error", message: "mock page exception" });
+    if (b.script.includes("__fail")) return send(res, 200, { __exc: "Error: mock page exception" });
+    if (b.script.includes("__http")) return send(res, 500, { error: "javascript error", message: "mock http error" });
     return send(res, 200, JSON.stringify({ ok: true, urls: s.urls, timeouts: s.timeouts }));
   }
   return send(res, 404, { error: "unknown command", message: p });

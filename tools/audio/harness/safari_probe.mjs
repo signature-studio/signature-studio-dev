@@ -3,15 +3,15 @@
 // 使い方 (macOS): node harness/safari_probe.mjs    終了コード 0 = webSocketUrl あり / 1 = なし・エラー
 import { startSafaridriver } from "./safari.mjs";
 
-const sd = await startSafaridriver();
-let caps = null, sid = null, err = null;
+let sd = null, caps = null, sid = null, err = null;
 try {
+  sd = await startSafaridriver();
   const v = await sd.req("POST", "/session", { capabilities: { alwaysMatch: { browserName: "Safari", webSocketUrl: true } } });
   sid = v.sessionId;
   caps = v.capabilities;
 } catch (e) { err = String(e); } finally {
   if (sid) await sd.req("DELETE", `/session/${sid}`).catch(() => {});
-  sd.close();
+  sd?.close();
 }
 const bidi = typeof caps?.webSocketUrl === "string";
 console.log(JSON.stringify({ browserName: caps?.browserName ?? null, browserVersion: caps?.browserVersion ?? null, webSocketUrl: caps?.webSocketUrl ?? null, bidi, error: err }));

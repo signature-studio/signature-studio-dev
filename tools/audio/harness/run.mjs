@@ -171,7 +171,7 @@ if (soakSecs > 0) {
 }
 const sel = scenarios.filter((s) => !only || only.includes(s.name));
 const outDev = defaultOutput();
-if (process.platform === "darwin" && outDev !== "BlackHole 2ch") { console.error(`既定出力が BlackHole 2ch ではない (${outDev})。SwitchAudioSource -s "BlackHole 2ch" で切り替えてから実行してください`); process.exit(2); }
+if (browser === "safari" && process.platform === "darwin" && outDev !== "BlackHole 2ch") { console.error(`既定出力が BlackHole 2ch ではない (${outDev})。SwitchAudioSource -s "BlackHole 2ch" で切り替えてから実行してください`); process.exit(2); }
 const loadStart = os.loadavg(), tStart = Date.now();
 const results = [];
 let failed = 0;
@@ -210,6 +210,6 @@ if (only && fs.existsSync(outFile)) {   // 部分再実行: 既存結果へ名�
 for (const x of results) x.ran_at = new Date().toISOString();
 const hostInfo = { load_start: loadStart, load_end: os.loadavg(), wall_s: (Date.now() - tStart) / 1000, nproc: os.cpus().length };
 console.log(`host: load avg start=${loadStart.map((v) => v.toFixed(2))} end=${hostInfo.load_end.map((v) => v.toFixed(2))} wall=${hostInfo.wall_s.toFixed(1)}s nproc=${hostInfo.nproc}`);
-fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, browser, chrome: browser === "safari" ? null : "headless google-chrome 154", default_output: outDev, note: "ran_at は部分再実行時のシナリオ単位時刻", host: hostInfo, results: merged }, null, 1));
+fs.writeFileSync(outFile, JSON.stringify({ date: new Date().toISOString(), quick, browser, chrome: browser === "chrome" ? "headless google-chrome 154" : null, default_output: outDev, note: "ran_at は部分再実行時のシナリオ単位時刻", host: hostInfo, results: merged }, null, 1));
 console.log(`\n${results.length - failed}/${results.length} PASS -> ${outFile}${only ? " (部分実行: 既存結果へマージ)" : ""}`);
 process.exit(failed ? 1 : 0);

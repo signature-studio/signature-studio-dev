@@ -19,12 +19,14 @@ export async function startSafaridriver() {
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const cp = spawn(process.env.SAFARIDRIVER ?? "safaridriver", ["-p", String(port)], { stdio: ["ignore", "pipe", "pipe"] });
-  let errbuf = "";
+  let errbuf = "", spawnErr = null;
+  cp.on("error", (e) => (spawnErr = e));
   cp.stdout.on("data", (d) => (errbuf += d));
   cp.stderr.on("data", (d) => (errbuf += d));
   const t0 = Date.now();
   for (;;) {
     try { await fetch(`${base}/status`); break; } catch {
+      if (spawnErr) throw new Error(`safaridriver を起動できない (${spawnErr.message})。Safari の実行は macOS の GUI セッションと \`sudo safaridriver --enable\` が要る`);
       if (cp.exitCode !== null) throw new Error(`safaridriver exit ${cp.exitCode}\n${errbuf.slice(-2000)}`);
       if (Date.now() - t0 > 60000) { cp.kill("SIGTERM"); throw new Error(`safaridriver 待受けタイムアウト\n${errbuf.slice(-2000)}`); }
       await sleep(200);

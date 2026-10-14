@@ -16,6 +16,9 @@ check(got?.timeouts?.script === 600000, "script timeout が 600000 ms に延長�
 
 let threw = null;
 try { await withSafari({ root, page: "index.html" }, async (sf) => sf.eval("window.__fail")); } catch (e) { threw = String(e); }
-check(threw !== null && threw.includes("javascript error"), `ページ側の例外が呼び出し側へ伝わる (${threw})`);
+check(threw !== null && threw.includes("page exception: Error: mock page exception"), `ページ側の例外 (ページの try/catch → __exc) が呼び出し側へ伝わる (${threw})`);
+threw = null;
+try { await withSafari({ root, page: "index.html" }, async (sf) => sf.eval("window.__http")); } catch (e) { threw = String(e); }
+check(threw !== null && threw.includes("javascript error"), `HTTP エラー応答 (500) が呼び出し側へ伝わる (${threw})`);
 
 process.exit(process.exitCode ?? 0);
