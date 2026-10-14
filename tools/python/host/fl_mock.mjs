@@ -15,6 +15,7 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    selStart: -1, selEnd: -1,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -167,6 +168,12 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-96 (#2832): 選択範囲の読出し 4 件。PE 0xd786e0/0xd78700/0xd78500 は obj+0xd74 (start)・obj+0xd78 (end) を読み、
+    // 0xd78720 は 0xe43e80 (start>=0 かつ end>=0) を bool で返す。未選択は負値。初期値 -1 は未実測の仮置き (provider/fl_engine.c と同じ)
+    "arrangement.selectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionEnd": (...a) => { arity(a, 0, 0); return st.selEnd; },
+    "arrangement.liveSelectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionIsActive": (...a) => { arity(a, 0, 0); return st.selStart >= 0 && st.selEnd >= 0; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },

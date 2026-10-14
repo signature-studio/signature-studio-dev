@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int sel_start, sel_end;
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -64,6 +65,7 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    sel_start = -1; sel_end = -1;
     dev_port = 0; midi_out_n = 0; sel_chan = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -216,6 +218,12 @@ FL_H(general, getChangedFlag) { NARGS(0, 0); return fl_ret_i(c, changed_flag); }
 FL_H(general, getUseMetronome) { NARGS(0, 0); return fl_ret_b(c, use_metronome); }
 FL_H(general, getPrecount) { NARGS(0, 0); return fl_ret_b(c, precount); }
 FL_H(general, getRecPPQ) { NARGS(0, 0); return fl_ret_i(c, rec_ppq); }
+
+/* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
+FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
+FL_H(arrangement, selectionEnd) { NARGS(0, 0); return fl_ret_i(c, sel_end); }
+FL_H(arrangement, liveSelectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
+FL_H(arrangement, selectionIsActive) { NARGS(0, 0); return fl_ret_b(c, sel_start >= 0 && sel_end >= 0); }
 
 /* ---- device (5, MIDI scripting 用の最小面) ---- mock と同じ: forwardMIDICC / midiOutMsg は呼出しを数える */
 FL_H(device, getPortNumber) { return fl_ret_i(c, dev_port); }
