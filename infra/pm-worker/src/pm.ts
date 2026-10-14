@@ -1,5 +1,5 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
-// 検出に LLM も本文の解析も使わない: ラベル・マーカー・正規表現 (needs.ts) だけ。issue / PR の自由文は payload に入れない。
+// 検出に LLM は使わない。自由文は解析しない: ラベル・マーカー・番号の正規表現だけ (needs.ts・refs.ts)。issue / PR の自由文は payload に入れない。
 import { parentNumbers } from "./refs.ts";
 import { NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 

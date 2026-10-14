@@ -148,6 +148,23 @@ test("ネガコン (g): dry-run では fetch の POST が 0 回。/status の wo
   assert.equal(s.pm_detected.refs_orphan, 1);
 });
 
+test("REST (全体同期) の closed + merged の項目でも refsOnly が立つ。closed で merge されていない項目は立たない", async () => {
+  const rest = (c: Call) => {
+    const u = new URL(c.url);
+    if (u.pathname.endsWith("/pulls")) {
+      return j(u.searchParams.get("state") === "closed" ? [merged(10, "## 概要\n\nRefs #100\n").pull_request, { ...merged(11, "Refs #101").pull_request, merged_at: null }] : []);
+    }
+    if (u.pathname.endsWith("/issues")) return j(u.searchParams.get("state") === "open" ? [parent(100).issue] : []);
+    if (u.pathname.endsWith("/actions/runs")) return j({ workflow_runs: [] });
+    return j([]);
+  };
+  const ctx = await configuredApp({ handlers: [rest] });
+  await ctx.app.engine.fullSync(await (ctx.app.engine as any).d.gh());
+  assert.deepEqual(ctx.app.engine.s.prs["10"].refsOnly, [100]);
+  assert.equal(ctx.app.engine.s.prs["11"].refsOnly, undefined, "merge されていない closed は本文を残さない");
+  assert.deepEqual(targets(ctx), ["refs_orphan#100"]);
+});
+
 test("解析: Refs の番号は閉じキーワードの無い本文だけ。親は行頭の『親:』の番号", () => {
   assert.deepEqual(refsOnlyNumbers("Refs #1, Refs #2\n関連 #3"), [1, 2]);
   assert.deepEqual(refsOnlyNumbers("refs: #7"), [7]);
