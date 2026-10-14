@@ -189,28 +189,35 @@ bash tools/flelift/fle_e2e.sh                # 親チケットの回帰 (PASS)
 前提: tools/flelift/fle_lift.sh と同一 (python3 capstone/pefile, emsdk 6.0.12, node)。
 PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は git に入れない。
 
-## 9. 再現検証 (CI runner, 2026-10-12, 検証起点 3ae2d0d = main HEAD)
+## 9. FLE-8 (#2698): fa0ecaad の取込と clang の RSS 上限 (2026-10-14)
 
-GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` を素の状態から実行した実測。
-`FLE_PE` = `fl-win64.tar.zst` 内 `extracted/block00031_PE.bin`、emsdk 6.0.12、capstone/pefile は venv。
+- **結論**: lift は runner 内で完走する (ピーク RSS **609MB**・**63〜64 s**)。単一 TU の `emcc -c fle_lifted.c` は **cap 11000MB 超で打ち切られる** (11261〜11436MB・97〜98 s)。cap の下で runner は生存し、本節まで到達した。**boot 未到達** (clang 段で停止、残作業は #2700)。#918 で runner を落としたのは lift ではなく clang の単一 TU (旧 lift は 13.8GB 超で kill、付録 §C)。
+- 測定 commit: `a3639395` (コードを変えた最後の commit。取込元 `c4895395` = `fa0ecaad`)。検証起点: `origin/main` `aaa3763e`。
+- 差分 0 の証跡: `git diff --stat a3639395 HEAD -- tools/flelift/x64c.py tools/flelift/boot/rss_cap.py tools/flelift/boot/build.sh tools/flelift/boot/boot_e2e.sh` は空 (本節の commit は REPORT のみ)。
+- 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/flelift/boot/fle6_measure.sh` (gen-A → lift → build plain。clang 段の cap 超過で rc=1)。素材 `oc_artifacts: fl-win64 toolchain-emsdk` (emsdk は `/opt/emsdk`)。
 
-| 工程 | 実測 |
-|---|---|
-| lift (x64c, closure 2) | 227 s、関数 29,907 / 命令 1,557,882 (§2 FLE-5 列と一致) |
-| `fle_lifted.c` の clang -O0 (1 variant) | 約 6.5 分 (RSS 最大 14.8GB。RAM 16GB では swap 必須) |
-| link plain | mismatch 0 / undefined 0 / duplicate 0、wasm 126,995,230 B |
-| boot 実行 plain (`--boot-only`) | 5.87 s (load average 1.70)、units_run 209 / units_total 942、`boot_threw=unlifted`、getmem 1,890 / freemem 776、exit 0 |
+### 9-1. 工程の実測 (コミット済み HEAD で 2 回)
 
-- boot 実測は FLE-5 末の記載 (209 dispatch、GetMem 1,890 / FreeMem 776) と**完全一致**し、再現性を確認した。
-- strict / nosx / chk の link・実行および survey (942 unit) は本 run では未実施 (clang 1 本 6.5 分 × variant 数 + 60 分のジョブ上限)。
-  FLE-5 末の値 (§4-1, §4) は据え置き。
-- ネガティブコントロール: 未実施 (本 run はコード変更なし。REPORT 分割のみ)。
+| 工程 | run1 (17:15 UTC・同一コード) | run2 (17:21 UTC・クリーン `a3639395`) |
+|---|---|---|
+| gen-A | 7 s | 6 s |
+| lift (x64c closure 2・`FLE_EXTRA_ROOTS=0x6a7b70`・cap 13800MB) | rc 0・64 s・peak 609MB | rc 0・63 s・peak 609MB |
+| clang `emcc -c fle_lifted.c` (-O0・1 TU・cap 11000MB) | **KILLED(cap)** 98 s・peak 11261MB | **KILLED(cap)** 97 s・peak 11436MB |
+| link / boot | 未到達 | 未到達 |
+
+- lift 結果 (両 run): functions 29,908・insns 1,557,903・unlifted callees 1,681・imports 680。issue 想定の 29,907 / 1,557,882 との差 1 関数・21 命令は、`FLE_EXTRA_ROOTS=0x6a7b70` が 1 関数として加わるため。root 無し (`FLE_EXTRA_ROOTS=` 空・roots 21,311) の 1 回では **29,907 / 1,557,882・610MB・61 s** で §2 と一致。
+- clang の RSS (run2、`rss_cap.py` が 1 s ごとに採取): 13 s 1,356MB / 28 s 2,896MB / 43 s 4,477MB / 89 s 6,907MB / 97 s 11,436MB (打ち切り)。memavail 14.1GB → 3.3GB。1 s 採取のため上限を約 0.4GB 超えて止まる。
+- 打ち切りの出力: `[build] clang RSS cap 超過: .../fle_lifted.c peak=11436MB (cap 11000MB, ...)` と exit 1。打ち切り時の kill 対象は PID 1 個 (`kill pids=[4839]`。emcc が clang を exec したかは未確認)。
+
+### 9-2. 検証 (同一性・負例対照)
+
+- **出力同一性**: roots 先頭 400 件・`--closure 2` で旧 `x64c.py` (origin/main) と新の `fle_lifted.c` (1,434,084 B)・`lift_meta.json` が `cmp` 一致 (386 関数・13,293 insn)。
+- **子孫 kill**: 子が孫 (300MB 確保) を起こし上限 100MB で打ち切る小テスト。旧 `rss_cap.py` は直接の子だけに SIGTERM し、**孫 318MB が PPID=1 の孤児として残存** (`ps` で確認)。新版は `kill pids=[3901, 3902]` で両方止まり、残存 0。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `f_43c5e0` → `f_414ec0` (UStr copy) が out=0 を返す理由 (付録 §B 3-5) | unit 進行 209 で停止、`0x15F34A0` 未登録 | 本 issue (#253) に継続 |
-| survey 非 ok 3 (unit 280/659 `0x6a7b70`、895 `0x976da0`) | survey 完全 ok 未達 | 本 issue (#253) に継続 |
-| lifted C コンパイルが 14.8GB 使う | CI (RAM 16GB) では swap なしで不可 | CI 整備 issue (#284) へ提案 |
+| 単一 TU の lifted C が clang -O0 で 11GB 超 (cap で打ち切り) | boot・link の実測が無い (#918 の boot 到達は未達) | 既存 #2700 [FLE-9] (TU 分割) |
+| cap 11000MB は打ち切り 2 回のみから決めた値 | cap が低すぎて通る TU を落とす可能性 | #2700 の分割後に再測定 |
 
 ## 10. FLE-6: dsp_ippv2 shim と 0x6a7b70 root (#672, PR #681)
 
@@ -224,7 +231,7 @@ GitHub Actions runner (4 vCPU / RAM 16GB + swap 16GB 追加) で `boot_e2e.sh` �
 
 | 項目 | 状態 |
 |---|---|
-| lift/boot の到達 (分割 lift で boot まで到達) | **未達 (#918)**。lift が cap 13800MB 超で kill (§10.x 実測 3・4)。boot 未到達 |
+| lift/boot の到達 (分割 lift で boot まで到達) | **lift は到達 (#2698, §9-1: 609MB)**。boot は未達 (clang 段が cap 11000MB で打ち切り、§9)。旧 lift の kill は §10.x 実測 3・4 |
 | shim 有 / ネガコン (`0x15F34A0` 判定) の再採取 | **未取得 (#918)**。boot 未到達のため `FLEBOOT_IPP_CHECK` は出ていない |
 | units_run の前進・次の停止点 | **未取得 (#918)**。前 run の値 (209) は #672 08:07 コメントに残るが、本 PR では比較していない |
 | `ipp.called` 全件・`stopped_at` | **未取得 (#918)** |
