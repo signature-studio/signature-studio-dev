@@ -3,6 +3,7 @@
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
 import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
 import type { LaunchState } from "./launchobs.ts";
+import { DIGEST_ROLLING_RE } from "./pm.ts";
 
 export interface SnapIssue {
   number: number;
@@ -203,6 +204,8 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
   const rlOf = (n: number): RelaunchState => input.relaunch[String(n)] ?? { count: 0, art: null };
 
   for (const [n, i] of [...iss].sort((a, b) => a[0] - b[0])) {
+    // 日次 digest の rolling issue (CI-70) は PM agent が本文を更新するだけ。どの行にも入れず、着手も再投入もしない。
+    if (DIGEST_ROLLING_RE.test(i.title)) continue;
     const k = String(n);
     const launchedAt = input.launched[k];
     const isLaunched = Object.hasOwn(input.launched, k);

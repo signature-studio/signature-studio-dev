@@ -217,6 +217,8 @@ ALLOW_ARTS = ["fl-win64", "plugins-ott", "plugins-freshair", "plugins-serum2", "
               "toolchain-retdec", "toolchain-emsdk", "work-m11", "work-liftdiff", "work-m6-ott", "work-liftlib-targets",
               "work-liftlib", "work-icall", "work-fw-stage1", "analysis-ott-binaries", "analysis-mac-shared", "apt-mingw"]
 NEED_RE = re.compile(r"不足|無い|無く|無かった|ない|存在しな|必要|依頼|欠|足りな|未配置|未展開|入っていな|のみ|だけ|揃っ")
+# 日次 digest の rolling issue (pm.md の digest 節・Worker の DIGEST_ROLLING_RE と同じ題名)。本文だけを更新する issue なので着手しない。
+DIGEST_ROLLING_RE = re.compile(r"\[[A-Za-z]+-\d+\] 自律運転ダイジェスト \(rolling\)")
 _full_cache = {}
 
 
@@ -251,6 +253,8 @@ def classify(d):
         for b in bs:
             blocks_count[b] += 1
     for n, i in sorted(iss.items()):
+        if DIGEST_ROLLING_RE.fullmatch(i["title"]):
+            continue
         if "needs-user-input" in i["labels"]:
             rows["user"].append((n, ""))
         elif blockers.get(n):
