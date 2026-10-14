@@ -91,7 +91,15 @@ bash host/e2e.sh   # 62/62, 71.9 s (測定 commit 83e6ff76)
 - **実測**: MZ 先頭のファイル 313 件、うち PE 判定を満たすもの **313 件** (不合格 0)。内訳は x64 (0x8664) **258 件**、x86 (0x14C) **55 件**。サイズは x64 25,368〜47,050,240 B、x86 6,656〜201,742,544 B (20 MiB 超は 7 件)。
 - 以前の記録 (312 件・全て x64) は**誤り**。313 件と 312 件の差 (1 件) の出所は、本 run の素材・判定では特定できなかった。前回 run の抽出手順 (LZMA ストリームの手動展開) は残っていないため、再現できない。
 - **IID 走査** (`python3 host/fl_pe_iid_scan.py <extracted_dir> <negative_control_pe>`): 313 PE に対し LE / BE 両順序で検索した結果、`IVst3ToAUWrapper` (`C5C6B8A3 95C08846 B0916F0B B697AA44`) と `IVst3ToAAXWrapper` (`C69D316D C5604262 B32C951B 93BEF4C6`) は **LE=0 / BE=0** (いずれの PE にも無い)。
-- **Negative control**: 検索器が検出できることを確認するため、`extracted/block00005_PE.bin` (x64 の実 PE、949,976 B) の末尾に両 IID を LE / BE で書き足した複製を作ると、LE・BE のいずれでも各 IID が **hits=1** となる (スクリプト出力、§6-1 末尾)。よって検索器は両順序を検出でき、0 件は「検索器が見落とした」結果ではない。
+- **Negative control**: 検索器が検出できることを確認するため、`extracted/block00005_PE.bin` (x64 の実 PE、949,976 B) の末尾に両 IID を LE / BE で書き足した複製を作ると、LE・BE のいずれでも各 IID が **hits=1** となる。よって検索器は両順序を検出でき、0 件は「検索器が見落とした」結果ではない。`fl_pe_iid_scan.py` の出力 (head `296c3015` で再実行・逐字):
+
+```
+negative control (copy of block00005_PE.bin with IIDs appended, one order at a time):
+  wrote LE, IVst3ToAUWrapper: hits=1
+  wrote LE, IVst3ToAAXWrapper: hits=1
+  wrote BE, IVst3ToAUWrapper: hits=1
+  wrote BE, IVst3ToAAXWrapper: hits=1
+```
 - 解釈: FL Studio の PE に wrapper IID の定数が無い。よって FL 本体が `IPlugInterfaceSupport` 経由でこの 2 IID を返す実装を持つ根拠は、静的には見当たらない。これは「応答しない」の**強い示唆**であり、実行時の QI 応答そのものは未観測 (静的のみ)。
 - 注意: 検索は 16 byte の LE / BE 列のみ。IID を文字列化・動的生成・分割定数で扱う実装は静的検索では拾えない。
 
