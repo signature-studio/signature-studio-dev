@@ -11,7 +11,12 @@ const SITES = ["function_418190", "function_4133f0", "function_409c80", "functio
 const m2 = await import(M11 + '/m11_boot.cjs');
 const mod = await m2.default({ printErr: () => {} });
 mod.HEAPU8.set(fs.readFileSync(process.env.S4_IMAGE || (M11 + '/m11_image.bin')), 0);
-const clr = () => mod.HEAPU8.fill(0, PROBE_BASE, PROBE_BASE + 512);
+const clr = () => mod.HEAPU8.fill(0, PROBE_BASE, PROBE_BASE + 0x440);
+const readC = () => [[0x11FFF400, 'C function_4133f0', ['dest', 'src']], [0x11FFF420, 'C function_418190', ['dest', 'old']]].map(([b, nm, ks]) => {
+  const dv = new DataView(mod.HEAPU8.buffer, b, 32);
+  const hits = Number(dv.getBigUint64(0, true));
+  return hits ? { site: nm, hits, [ks[0]]: '0x' + dv.getBigUint64(8, true).toString(16), [ks[1]]: '0x' + dv.getBigUint64(16, true).toString(16) } : null;
+}).filter(Boolean);
 const read = () => SITES.map((nm, k) => {
   const b = PROBE_BASE + k * SLOT;
   const dv = new DataView(mod.HEAPU8.buffer, b, SLOT);
@@ -30,7 +35,7 @@ for (let i = 0; i < 942; i++) {
   clr();
   try { mod._m11_call_unit(i); } catch (e) {
     if (!(e && e.m11_dllmain_done !== undefined)) {
-      out.push({ i, va: "0x" + Number(mod._m11_unit_va(i)).toString(16), kind: ((e && e.message) || String(e)).split("\n")[0], sp: "0x" + mod._emscripten_stack_get_current().toString(16), probe: read() });
+      out.push({ i, va: "0x" + Number(mod._m11_unit_va(i)).toString(16), kind: ((e && e.message) || String(e)).split("\n")[0], sp: "0x" + mod._emscripten_stack_get_current().toString(16), probe: read(), cprobe: readC() });
     }
     mod.__emscripten_stack_restore(sp0);
   }

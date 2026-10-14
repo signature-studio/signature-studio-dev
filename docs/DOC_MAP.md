@@ -251,7 +251,7 @@
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/ldfix/REPORT_942.md` | 248 | #942 (CI-22) stage4 の memory access out of bounds の切り分け (部分達成)。trap 9 件の unit 別最上位 frame・boot threw の入口・bin 表の観測 (§9)・サイズ→bin 表 (§10 は要約)。§8-3 の全表と §10 の詳細は付録 |
 | `tools/m11/ldfix/REPORT_942_APPENDIX.md` | 209 | #942 REPORT の付録。§8-3 (trap 最上位 frame 表)・§10〜§14 (bin 表・通常 boot の trap 位置・lift 誤り候補) の全文 (250 行上限のため分割移動) |
-| `tools/m11/ldfix/REPORT_942_TRAPSITE.md` | 96 | #942 (CI-22) stage4 survey の trap 9 件の unit 別発生箇所 (最内 frame の IR 関数・wasm 位置・命令形・呼び出し chain)。OOB 8 件は 6 箇所 (418190@0x350ea4 が 3 unit 共通)。不正 pointer の値は未特定 (次 run) |
+| `tools/m11/ldfix/REPORT_942_TRAPSITE.md` | 102 | #942 (CI-22) stage4 survey の trap 9 件の unit 別発生箇所 (最内 frame の IR 関数・wasm 位置・命令形・呼び出し chain)。OOB 8 件は 6 箇所 (418190@0x350ea4 が 3 unit 共通)。引き金 (`*dest` の上位 32bit 値・UTF-16 の中身が値として渡る) は probe で実測。上流の書込み元は未特定 (次 run) |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
 
 ### shim / 起動
