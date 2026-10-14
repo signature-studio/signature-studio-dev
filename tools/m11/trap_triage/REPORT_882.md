@@ -197,5 +197,6 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 
 ### 11.5 検証 (測定 commit と差分)
 
-- 測定 commit: 本 run の HEAD (commit 後に §11.2 を再測定した。下の `git diff` 参照)。
-- 既定 build の差分確認: `git diff 31cb5831 HEAD -- tools/m11` の変更は `m11_build.sh` / `m11_ov.c` / `m11_post.py` の probe 追加 (既定 0 で無効) と本 REPORT の追記のみ。
+- 測定の対象コード: コード変更の commit `19b21178` (§11.1 の 3 ファイル)。§11.2 の 3 build はこの内容 (作業ツリー) で測った。commit 後にコードは変えていない。
+- 既定 build (probe OFF) は §11.2 の `870 / 16` で前回値と一致 (= 既定の挙動は変わらない)。
+- 差分確認: `git diff 31cb5831 19b21178 -- tools/m11` は `m11_build.sh` / `m11_ov.c` / `m11_post.py` の probe 追加のみ (既定 0 で無効)。
