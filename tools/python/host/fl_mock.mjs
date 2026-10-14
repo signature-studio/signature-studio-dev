@@ -109,6 +109,9 @@ export function createMockEngine() {
       if (idx < 0 || idx >= st.channels.length) throw RANGE();
       return stepParam(st.channels[idx], step - q * pads + st0, prm);
     },
+    // PY-89 (#2805): C と同一。identity (全 channel が 1 グループ)・既定 -2 (未割当)
+    "channels.getChannelIndex": (...a) => { arity(a, 1, 1); const i = ix(a[0]); ch(i); return i; },
+    "channels.getChannelMidiInPort": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return -2; },
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
     // PE 0xd5afc0 → 0x11e84a0: 対象だけ選択し他は解除 (useGlobalIndex は未モデル・C と同じ)
