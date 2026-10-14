@@ -52,3 +52,16 @@
 - [ ] `provider/fl_engine.c` に実装し `tests/provider_check.mjs` の実装数を更新 — **未達** (意味論未確定のため未実装。根拠の無い推測実装は避けた)。
 - [ ] mock と C の diffs 0 — **未達** (実装 0 件のため対象なし)。
 - [ ] `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 — **未実行** (コード差分 0 のため再測定の対象外)。
+
+## 追加解析 (2 回目 run): selectAll の委譲チェーン
+
+- 測定: `FL_WIN64_DIR=tools/python/work/fl python3 analysis/flapi/pe_handler_probe.py selectAll` (`work/` は gitignore)。展開は `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'`。
+- channels 側 `selectAll` (fn `0xd5b150`) は `0xd5e620` を経由し、そこで関数ポインタを `call qword ptr [rax]` で呼ぶ薄い委譲 (実処理ではない)。
+- `0xd5e620` の間接先は、同じ PE 内の `0xd5e640` 周辺で `0xc38a10` (文字列/名前 lookup) と `0x40feb0` を使う小関数で、`0xd5e620` を再帰的に呼ぶ。ここまでは委譲と確認したが、channel 配列そのものの参照はまだ見えていない。
+- 件の `0xd843d0` は、`[rbx+0x50]` の既存オブジェクトを確認し、`0xd841e0` で新規オブジェクトを作って `0x4133f0` に渡す汎用の投入処理に見える (引数 6 個 + フラグ 1 個を構造体に格納)。channel 固有の処理ではない可能性が高い。
+- `0xd82c20` は引数 `index` を取り、`index == 0` の分岐で別経路、`index < 0` で固定の負値 (-4 等) を switch し、`index >= 0` は `0xc38bc0` を呼ぶ。channel index → 要素の解決の候補だが、`0xc38bc0` と戻り値の型は未読。
+- 結論: selectAll の戻り値・範囲外 code は引き続き未確定。実処理の関数 (channel 要素の選択状態を書き換える箇所) は未特定。
+
+## 受入条件 (#1527) の状態 (2 回目 run 時点)
+
+- 未達のまま。次に読む対象: `0xc38bc0` (index → channel 要素の解決)、`0xd841e0`・`0x4133f0` (投入処理が channel 操作か汎用か)。
