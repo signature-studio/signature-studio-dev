@@ -12,8 +12,9 @@
 ## 2. 修正
 
 - `tools/plugins/sampler/fix_arg_width.py` (新規): `i32 %argN` 仮引数のうち、本体の使用が `icmp ... i32 %argN` と `inttoptr i64 %argN to ptr` だけのものを i64 に揃える。 他の使用があれば何もしない (fail-closed)。 定義・本体の icmp・call site (`trunc i64 W` は W を直接渡す / `0` は `i64 0` / それ以外は zext) を書き換える。
-  - 後段で、宣言・定義の引数型が `ptr` の関数へ i64 を渡す call と、本体の `ptr %X` オペランドで X が i64 の値のものを `inttoptr` で揃える (`FreeEnvironmentStringsW` の `%penv` 類型)。
+- `tools/plugins/sampler/test_fix_arg_width.py` (回帰テスト 5 件): 定義・icmp の i64 化 / 他の使用がある時の skip (fail-closed) / call site の `trunc` 剥がし / `0` → `i64 0` / それ以外の `zext`。
 - `tools/plugins/sampler/engine_lift.sh`: fixcmp の前に `fix_arg_width.py` を挟む (`e.final.ll` → `e.argw.ll` → `e.fixcmp.ll`)。
+- 当初は ptr 仮引数への i64 値を `inttoptr` で揃える 3 段目 (`FreeEnvironmentStringsW` の `%penv` 類型を想定) も入れていたが、19048 / 19252 / 23677 のいずれでも発火せず未検証だったため削除した (reviewer 指摘 #1a)。 `%penv` 類型は本 PR の対象外で、再現入力が得られた時に別 issue で扱う。
 
 ## 3. 測定 (engine_lift.sh)
 
