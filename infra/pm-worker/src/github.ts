@@ -105,6 +105,11 @@ export class Gh {
   dispatch(eventType: string) {
     return this.req("POST", `/repos/${this.repo}/dispatches`, { event_type: eventType });
   }
+
+  // PM agent の起動 (oc-pm)。payload は kind と ref の 2 つだけ。呼び出し側 (engine) が値域を検証した値だけを渡す。
+  dispatchPm(kind: string, ref: number) {
+    return this.req("POST", `/repos/${this.repo}/dispatches`, { event_type: "oc-pm", client_payload: { kind, ref } });
+  }
 }
 
 // installation token をメモリにキャッシュ (有効 60 分のうち 50 分使う)。

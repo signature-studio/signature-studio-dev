@@ -204,7 +204,7 @@ export class PmApp {
     // App の bot ログイン (公開情報)。Actions 側の vars.OC_PM_BOT_LOGIN にはこの値を設定する。
     const s = this.engine.status({ configured: !!rec, installed: !!rec?.installationId, pm_bot_login: rec ? `${rec.slug}[bot]` : null });
     if (!detail) {
-      for (const k of ["log", "would_launch_now", "last_error"]) delete s[k];
+      for (const k of ["log", "would_launch_now", "would_dispatch_pm", "last_error"]) delete s[k];
       return json(s);
     }
     if (!(await this.callerCanPush(req.headers.get("authorization")))) return json({ error: "unauthorized" }, 401);

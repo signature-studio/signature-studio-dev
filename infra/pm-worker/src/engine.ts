@@ -6,9 +6,13 @@ import { Gh, GhError } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
+import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, type HistoryEntry, type PmTarget } from "./pm.ts";
 import {
   applyEvent,
   EMPTY_STATE,
+  NEEDS_USER_LABEL,
+  reviewSignal,
+  setSig,
   type IssueState,
   type PmState,
   type PrState,
@@ -51,18 +55,26 @@ interface Meta {
   installationId?: number | null;
   lastPlan?: Plan;
   lastError?: { at: string; what: string };
-  counters?: { launched: number; dispatched: number; wouldLaunch: number; wouldDispatch: number; reconciles: number };
+  counters?: {
+    launched: number;
+    dispatched: number;
+    wouldLaunch: number;
+    wouldDispatch: number;
+    reconciles: number;
+    pmDispatched?: number;
+    wouldDispatchPm?: number;
+  };
 }
 
 export interface Log {
   at: string;
-  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "error" | "skip";
+  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "would-pm-dispatch" | "pm-dispatch" | "error" | "skip";
   n?: number;
   art?: string;
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "blockedBy", "launchedAt"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -136,6 +148,7 @@ export class Engine {
       body,
       botLogin: this.d.cfg.botLogin,
       pmLogins: this.pmLogins(),
+      reviewerLogin: this.d.cfg.reviewerLogin,
       repo: this.d.cfg.repo,
     });
     if (r.status === 202 && r.reason === "applied" && r.state !== this.s) {
@@ -148,7 +161,7 @@ export class Engine {
 
   // ---------------------------------------------------------------- 同期
   private applyAll(event: (typeof WEBHOOK_EVENTS)[number], payload: unknown): void {
-    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins());
+    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin);
     if (next !== this.s) {
       persistDiff(this.s, next, this.d.store);
       this.s = next;
@@ -176,6 +189,7 @@ export class Engine {
     await this.syncRuns(gh);
     await this.syncComments(gh, this.d.now() - 48 * 3_600_000);
     await this.syncBlockers(gh, 80);
+    await this.syncSignals(gh);
     this.meta.fullSyncAt = this.meta.reconcileAt = this.d.now();
     this.saveMeta();
   }
@@ -226,6 +240,47 @@ export class Engine {
     }
   }
 
+  // oc-pm の検出に要る手がかりのうち、webhook だけでは埋まらないものを REST で補う (best effort: 失敗しても同期は続ける)。
+  //  - open PR の reviewer verdict (一度だけ。以後は pull_request_review の配送で更新)
+  //  - needs-user-input が付いた時刻 (issue events の labeled)
+  private async syncSignals(gh: Gh): Promise<void> {
+    const R = this.d.cfg.repo;
+    const reviewer = this.d.cfg.reviewerLogin;
+    const commit = (next: PmState): void => {
+      if (next === this.s) return;
+      persistDiff(this.s, next, this.d.store);
+      this.s = next;
+    };
+    let left = 30;
+    for (const p of Object.values(this.s.prs)) {
+      if (left <= 0) break;
+      if (p.state !== "open" || this.s.sig[String(p.number)]?.revChecked) continue;
+      left--;
+      try {
+        const rs = await gh.list<any>(`/repos/${R}/pulls/${p.number}/reviews`, 3);
+        let next = this.s;
+        for (const r of rs) next = reviewSignal(next, p.number, r, reviewer);
+        commit(setSig(next, String(p.number), { revChecked: true }));
+      } catch (e) {
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+      }
+    }
+    left = 20;
+    for (const i of Object.values(this.s.issues)) {
+      if (left <= 0) break;
+      if (i.state !== "open" || !i.labels.includes(NEEDS_USER_LABEL) || this.s.sig[String(i.number)]?.labelAt) continue;
+      left--;
+      try {
+        const evs = await gh.list<any>(`/repos/${R}/issues/${i.number}/events`, 3);
+        const last = evs.filter((e) => e?.event === "labeled" && e?.label?.name === NEEDS_USER_LABEL).pop();
+        // events に無いときは、最後の更新時刻を起点にする (回答の見落としより、誤検出を避ける側に倒す)
+        commit(setSig(this.s, String(i.number), { labelAt: typeof last?.created_at === "string" ? last.created_at : i.updatedAt }));
+      } catch (e) {
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+      }
+    }
+  }
+
   // webhook 欠落への備え: run の全件・直近更新の issue / PR / コメントだけを REST で突き合わせる。
   async reconcile(gh: Gh): Promise<void> {
     const R = this.d.cfg.repo;
@@ -237,6 +292,7 @@ export class Engine {
     for (const p of prs) this.applyAll("pull_request", { pull_request: p });
     await this.syncComments(gh, since);
     await this.syncBlockers(gh, 30);
+    await this.syncSignals(gh);
     this.prune();
     this.meta.reconcileAt = this.d.now();
     this.meta.counters = { ...(this.meta.counters ?? this.zero()), reconciles: (this.meta.counters?.reconciles ?? 0) + 1 };
@@ -244,7 +300,7 @@ export class Engine {
   }
 
   private zero() {
-    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0 };
+    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0 };
   }
 
   // 完了して 1 時間たった run は捨てる (順不同配送の判定に使う期間だけ持つ)。
@@ -255,6 +311,16 @@ export class Engine {
         this.d.store.del("runs", k);
         const { [k]: _, ...rest } = this.s.runs;
         this.s = { ...this.s, runs: rest };
+      }
+    }
+    // 閉じた issue / PR の手がかりは使わない
+    for (const k of Object.keys(this.s.sig)) {
+      const i = this.s.issues[k];
+      const p = this.s.prs[k];
+      if ((i || p) && i?.state !== "open" && p?.state !== "open") {
+        this.d.store.del("sig", k);
+        const { [k]: _, ...rest } = this.s.sig;
+        this.s = { ...this.s, sig: rest };
       }
     }
   }
@@ -477,6 +543,62 @@ export class Engine {
     return "dispatched";
   }
 
+  // ---------------------------------------------------------------- oc-pm
+  // PM の判断が要る終端状態を決定的に検出する (本文は解析しない)。
+  detectPmTargets(): PmTarget[] {
+    return detectPm(this.s, {
+      bots: this.d.cfg.pmTargetBots,
+      npCount: (n) => this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0,
+    });
+  }
+
+  // 履歴は live と dry-run で分ける (dry-run の記録が、live に切り替えた直後の送信を抑止しないように)。
+  private pmHistoryKey(): string {
+    return this.d.cfg.live ? "pmDispatch" : "pmWould";
+  }
+  private pmHistory(): HistoryEntry[] {
+    return pruneHistory(this.d.now(), this.d.store.get<HistoryEntry[]>("meta", this.pmHistoryKey()) ?? []);
+  }
+
+  // 検出した対象を oc-pm で送る。payload は kind (列挙) と ref (数字) だけ。LIVE=1 のときだけ送る。
+  // 同期が古い間は送らない (誤った対象を起こさない)。
+  async pmDispatch(gh: Gh | null): Promise<{ sent: PmTarget[]; would: PmTarget[] }> {
+    const out = { sent: [] as PmTarget[], would: [] as PmTarget[] };
+    if (!this.fresh()) return out;
+    const live = !!(this.d.cfg.live && gh);
+    const now = this.d.now();
+    const hist = this.pmHistory();
+    const { send } = selectDispatch(now, this.detectPmTargets(), hist);
+    this.meta.counters = this.meta.counters ?? this.zero();
+    for (const tg of send) {
+      if (!validPayload(tg.kind, tg.ref)) continue;
+      if (!live) {
+        hist.push({ kind: tg.kind, ref: tg.ref, at: now });
+        this.meta.counters.wouldDispatchPm = (this.meta.counters.wouldDispatchPm ?? 0) + 1;
+        this.pushLog({ kind: "would-pm-dispatch", n: tg.ref, note: tg.kind });
+        out.would.push(tg);
+        continue;
+      }
+      // 失敗した試行も履歴に数える (同じ対象を毎分叩かない。上限はそのまま効く)
+      hist.push({ kind: tg.kind, ref: tg.ref, at: now });
+      try {
+        await gh!.dispatchPm(tg.kind, tg.ref);
+      } catch (e) {
+        this.pushLog({ kind: "error", n: tg.ref, note: e instanceof GhError ? `oc-pm ${tg.kind}: ${e.message}` : `oc-pm ${tg.kind}: dispatch failed` });
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+        continue;
+      }
+      this.meta.counters.pmDispatched = (this.meta.counters.pmDispatched ?? 0) + 1;
+      this.pushLog({ kind: "pm-dispatch", n: tg.ref, note: tg.kind });
+      out.sent.push(tg);
+    }
+    if (send.length > 0) {
+      this.d.store.put("meta", this.pmHistoryKey(), hist);
+      this.saveMeta();
+    }
+    return out;
+  }
+
   // 1 回の点検。alarm (毎分・webhook 後 2 秒) と cron (毎分) の両方から呼ばれる。
   async tick(): Promise<{ ready: boolean }> {
     // cron と alarm が重なっても、同時に 2 回は走らせない (二重投稿の防止)。
@@ -508,6 +630,7 @@ export class Engine {
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
       await this.watchdog(gh);
       await this.launch(gh);
+      await this.pmDispatch(gh);
       this.meta.lastError = undefined;
     } catch (e) {
       this.meta.lastError = { at: iso(now), what: e instanceof GhError ? e.message : "tick failed" };
@@ -528,6 +651,9 @@ export class Engine {
     const { rows, plan } = this.plan();
     const c = (k: keyof Rows) => rows[k].length;
     const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
+    const detected = this.detectPmTargets();
+    const pmDetected: Record<string, number> = Object.fromEntries(DETECTED_KINDS.map((k) => [k, 0]));
+    for (const d of detected) pmDetected[d.kind]++;
     return {
       mode: this.d.cfg.live ? "live" : "dry-run",
       active_runs: plan.active,
@@ -547,6 +673,9 @@ export class Engine {
       stopped: c("stopped"),
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
+      pm_detected: pmDetected,
+      // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE では空。
+      would_dispatch_pm: this.d.cfg.live ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
       last_full_sync: this.meta.fullSyncAt ? iso(this.meta.fullSyncAt) : null,
       last_reconcile: this.meta.reconcileAt ? iso(this.meta.reconcileAt) : null,
       last_watchdog: this.meta.watchdogAt ? iso(this.meta.watchdogAt) : null,
