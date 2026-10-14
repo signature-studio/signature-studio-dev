@@ -74,10 +74,10 @@ LIVE-IN:
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| UNDETERMINED 44 関数 (ONLY_ENTRY_AFTER_CALL 25・BARRIER 19) の DROP / LIVE-IN 確定。7e45e0 の NOSLOT 1 site を含む | 脱落か live-in か未確定 | 子 issue (本 run で起票・番号は §6) |
+| UNDETERMINED 44 関数 (ONLY_ENTRY_AFTER_CALL 25・BARRIER 19) の DROP / LIVE-IN 確定。7e45e0 の NOSLOT 1 site を含む | 脱落か live-in か未確定 | #2211 [LD-87] |
 | DROP 3 関数 (10628a0 / 13105d0 / c38bd0) の IR 側確認 | 機械語上の DROP 候補が IR で本当に undef か未確認 | #2186 [LD-82] |
 | 入力 IR を `m11_gen_ir2.sh` で再生成して sites 2,737 と突き合わせる | 2,731 と 2,737 の差の原因未確認 | #2186 [LD-82] |
 
 ## 6. 子 issue
 
-- 起票番号: (作成後に記入)
+- #2211 [LD-87] FRAME_IN_ESCAPED 未判定 44 関数の call 越え・ポインタ store の別名解析 (#2185 残件)
