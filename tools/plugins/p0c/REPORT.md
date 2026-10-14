@@ -166,13 +166,18 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | `p0c_e2e.sh` (lift 込み・k80 80 kernel) | 0 | 514 s | 0.70 → 7.86 |
 | `p0c2_e2e.sh` | 0 | 50 s | 7.86 → 3.98 |
 
-k80 lift 単体の旧所要時間は**記録しない**。測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が無く、条件不明の数値は判定に使えないため。現 head の所要時間は下記の reviewer 実測を正とする。
-- **再測定 (reviewer の実測・HEAD `b38ff403`・測定 commit 以降の差分分)**: 条件は `PLUG_CANON_ALLOCA=1` のみ。`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`・`PLUG_REUSE_DRC` は未設定 (RetDec を実行)。素材は `fl-win64` と `toolchain-retdec` を展開して使用。入力は `kernel_table.json` から生成した k80 ranges (80 kernel。`tools/plugins/lift/kernel_ranges_balance.txt` と一致)。一時ディレクトリで実行。
-  - rc = 0 / RetDec を含む lift の wall time 4 s。
-  - `k80.lift.ll` sha256 = `628fa71edeca59318c75e48287cc09e108b09894240b12b34393d64b80ac3b6f` (**一致**。全長)
-  - `k80.final.ll` sha256 = `5a5aee3c…` (一致。先頭 8 桁のみ確認。全長は reviewer の review 本文に無い)
-  - 参考: `k80.drc.ll` sha256 = `aa52403e…` (先頭 8 桁のみ確認。受入 2' は未達のまま。#1560)
-  - 注: 本 run (fix モード) では再測定していない (PM 指示)。上記は reviewer の実測の転記。
+k80 lift 単体の測定commit時点の旧所要時間は**記録しない**。測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が無く、条件不明の数値は判定に使えないため。`b38ff403` 以降の所要時間は下記の 3 run を記録する。
+- **再測定 (PM run と reviewer の実測・測定 commit 以降の差分分)**: 条件は `PLUG_CANON_ALLOCA=1` のみ。`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`・`PLUG_REUSE_DRC` は未設定 (RetDec を実行)。素材は `fl-win64` と `toolchain-retdec` を展開して使用。入力は `kernel_table.json` から生成した k80 ranges (80 kernel。`tools/plugins/lift/kernel_ranges_balance.txt` と一致)。一時ディレクトリで実行。
+  - 「所要」の定義: `lift_ranges.sh` 1 回の実行の lift 全体 wall (RetDec 段を含む)。「最終 `cleanup`」は `k80.retdec.log` 最後の phase の時間で、RetDec 段の内訳の 1 つ。
+  - 測定 run は 3 回 (rc は記録のある run すべて 0):
+    - PM run (HEAD `b38ff403`): 所要 2 s (秒精度)・最終 `cleanup` 1.76 s・`k80.drc.ll` = `b760d51a…`
+    - reviewer 1 回目 (HEAD `b38ff403`): 所要は記録なし (旧記載の「4 s」は条件・定義が確認できないため採用しない)・`k80.drc.ll` = `aa52403e…`
+    - reviewer 2 回目 (HEAD `1ad307fd`): 所要 4.4 s・最終 `cleanup` 2.93 s・`k80.drc.ll` = `097478ab…`
+    - 所要の min–max: 2 s〜4.4 s (記録のある 2 run)
+  - `k80.lift.ll` sha256 = `628fa71edeca59318c75e48287cc09e108b09894240b12b34393d64b80ac3b6f` (**一致**。PM run と reviewer 2 回目の 2 run で確認。全長)
+  - `k80.final.ll` sha256 = `5a5aee3c…` (一致。先頭 8 桁のみ確認。全長は review 本文に無い)
+  - `k80.drc.ll` sha256 は実行ごとに揺れる (受入 2' 未達の根拠。#1560 に紐づけ): `b760d51a…` (PM run) / `aa52403e…` (reviewer 1 回目) / `097478ab…` (reviewer 2 回目)。単独の値は参考にしない。
+  - 注: 本 run (fix モード) では再測定していない (PM 指示)。上記は PM run と reviewer の実測の転記。
 - 再測定不可 (履歴。HEAD `9d943df3` 時点の記録): 修正時点の runner には `toolchain-retdec` ([RETDEC]) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
 - 再試行 (fix モード, HEAD `9d943df3`): `$ARTIFACTS_DIR` は `fl-win64` のみ。`[RETDEC]` の実体が無いため RetDec 段を実行できず、k80 lift を再実行していない (rc・所要・load・sha256 は未取得)。`oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に追記した。この時点の再測定は未実施 (後続の HEAD `b38ff403` 再測定で実施済み。上記「再測定」行)。
 - 一致判定 (受入条件 2・3) は lift の sha256 と `p0c2_sweep.csv` の `cmp` で行い、所要時間には依存しない。
