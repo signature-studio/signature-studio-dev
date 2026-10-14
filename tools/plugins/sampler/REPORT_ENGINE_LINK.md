@@ -155,7 +155,7 @@
 
 - 測定 commit: **`5880a9f6`** (下表の実測はこの commit のコードで行った。 `6769c2c7` の時点で記録された系列)。
 - 解析 HEAD (§9 の逆アセンブル・参照走査): `ba4babca`。 `git diff --stat ba4babca HEAD -- tools/plugins/sampler ':!*.md'` は空 (0 行)。
-- 測定 commit から現 head `8a7f32ba` までの測定経路の差分 (`git diff --stat 5880a9f6 8a7f32ba -- tools/plugins/lift tools/plugins/sampler ':!*.md'` の要点):
+- 測定 commit から現 head `c2155cc2` までの測定経路の差分 (`git diff --stat 5880a9f6 HEAD -- tools/plugins/lift tools/plugins/sampler ':!*.md'` = 16 files / 1072 insertions / 30 deletions。 内訳の要点):
   - `tools/plugins/lift/lift_ranges.sh` (31 行追加・2 行削除) は測定経路に入る (上の訂正参照)。 RetDec 呼出の既定が変わるため、表は HEAD の既定では未測定。
   - `tools/plugins/sampler/` の 6 ファイルは別経路 (下の訂正参照)。 sampler 側の stat:
 
@@ -187,12 +187,13 @@
 | 素材展開 `fl-win64.tar.zst` → `$RUNNER_TEMP/fl-win64` | 8.0 s、`block23663_PE.bin` / `block23664_PE.bin` 存在を確認 |
 | 殻の `ff /2` disp32=0x1c0 候補 (block23663) | 24 件 (§2a)。 9 件の selector (2,3,4,5,10,11,12,13,14) は §4 のとおり |
 | 殻の結線 0x843790〜0x84386a | 逆アセンブル成功 (`disasm_range.py`)、`[obj+0x1c0]` 保存・`[obj+0x1b8]` engine 保存を確認 |
-| 検証 HEAD (本 run) | main `cb3a89a6` の worktree `../ws-540` (ブランチ `540-engine-verify`)。 コード変更なし |
+| 検証 HEAD (記録) | `cb3a89a6` と記載 (§7 冒頭の `5880a9f6` との不整合は下の注記)。 コード変更なし |
 | `sampler_engines.sh` (受入条件 1) | **exit 0・4:59.15 (299 s)**・Maximum RSS 3.52 GB (`/usr/bin/time -v`、2 engine 並列)・終了直後の load average 1.18 (1 分平均)。 `judge engines: PASS 2/2`。 23664: pdata 5,160 / lift_rc 0 / define 5,993 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 23677: pdata 2,355 / lift_rc 0 / define 2,525 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 (23677 は `emcc_c_rc` = 1、`emcc_c_rc_after_fixcmp` = 1、f80 処理後の `emcc_c_rc_after_f80` = 0 で判定を通る。 23664 は `emcc_c_rc` = 0。) ログに `do not know how to soften fp_extend` (final.ll / fixcmp.ll、計 2 件) が出るが、判定は PASS。 原因は未調査 |
 | `sampler_e2e.sh` (受入条件 2、既存 T0/T1 の emcc 退行確認) | **exit 0・14:13.43 (853 s)**・load average 4.80 (5 分平均、run 中盤)。 `judge shells: PASS 7/7` (lift_rc / emcc_c_rc / f80 全 0)。 batch 7 本すべて `rc=0 emcc_c=0 f80=0`。 `ids_crosscheck: 7/7` |
 
 - 注記: 上の数値は本 run の 1 回の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
 - 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と本 run の値は同じ判定結果 (PASS 2/2)。 本 run は main cb3a89a6 での再現である。
+- **測定 commit の記録の不整合 (未解決)**: 本書は測定 commit を §7 冒頭・表の見出しでは `5880a9f6`、上の表の行と §1 では `cb3a89a6` と記す。 どちらが表の実測を行った commit かは、本書の記録からは確定できない。 両 commit とも既定 (`PLUG_NO_STATIC_DETECT` 未設定) の RetDec argv に `--disable-static-code-detection` を含まない (`cb3a89a6` は `${PLUG_NO_STATIC_DETECT:+...}` で未設定時は空、`5880a9f6` は該当行なし) ため、表の argv 条件は両方に当てはまる。 確定には実測 commit の記録を正す再実行が要る (起票先: #540)。
 
 ## 8. selector ごとの引数の意味 (受入条件 4 の続き)
 
