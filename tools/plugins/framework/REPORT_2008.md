@@ -7,7 +7,7 @@
 
 ## 1. 実測
 
-素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`・`FL_WIN64_DIR` に設定)、`work-fw-stage1` / `work-liftlib` は repo ルートに展開。`toolchain-*` は既存の `/opt/emsdk` `/opt/retdec` を使用。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`・`FL_WIN64_DIR` に設定)、`work-fw-stage1` / `work-liftlib` は repo ルートに展開。`toolchain-*` は既存の `[EMSDK]`・`[RETDEC]` を使用。
 
 | 手順 | 結果 | 所要時間 (real) | load (開始 → 終了) |
 |---|---|---|---|
