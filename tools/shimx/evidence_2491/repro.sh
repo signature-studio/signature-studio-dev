@@ -3,7 +3,8 @@
 # 前提: tools/m11/work/ (work-m11 の展開) がある。
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
-rm -rf tools/m11/work/shimx_link
+W=tools/m11/work/shimx_link
+rm -rf "$W/obj" "$W/gen_fix" "$W/boot_fixed.ll" "$W/fix_report.json" "$W/link_trace_soft_fix.log" "$W"/m11_sx_trace_soft_fix.*
 bash tools/m11/shimx_link/build.sh --trace --soft --fix
 SHIMX_TRACE=1 node tools/m11/shimx_link/probe_unit23.mjs tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs > tools/m11/work/shimx_link/probe_u23.txt 2>&1
 diff tools/shimx/evidence_2491/probe_u23_shimx_site.txt tools/m11/work/shimx_link/probe_u23.txt && echo "probe: SAME"
