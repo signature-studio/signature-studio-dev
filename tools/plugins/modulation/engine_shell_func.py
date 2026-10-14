@@ -14,7 +14,8 @@ import pefile
 def main(path, va_hex, dump):
     va = int(va_hex, 16)
     pe = pefile.PE(path, fast_load=True)
-    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"],
+                                          pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"]])
     data = open(path, "rb").read()
     base = pe.OPTIONAL_HEADER.ImageBase
     secs = []
@@ -30,9 +31,16 @@ def main(path, va_hex, dump):
             start, end = b, e
             break
     if start is None:
-        print("no .pdata range for", hex(va))
-        return
-    print("function", hex(start), "..", hex(end), "size", hex(end - start))
+        start, end = va, va + 0x20
+        print("no .pdata range for", hex(va), "-> 先頭 0x20 バイトを扱う (thunk 等)")
+    else:
+        print("function", hex(start), "..", hex(end), "size", hex(end - start))
+    iat = {}
+    if hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
+        for ent in pe.DIRECTORY_ENTRY_IMPORT:
+            for imp in ent.imports:
+                if imp.name:
+                    iat[imp.address] = imp.name.decode()
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.detail = True
     for name, sva, vsz, rpa, rsz, ch in secs:
@@ -65,7 +73,13 @@ def main(path, va_hex, dump):
             if sva <= start < sva + rsz:
                 code = data[rpa + (start - sva):rpa + (end - sva)]
                 for ins in md.disasm(code, start):
-                    print("  ", hex(ins.address), ins.mnemonic, ins.op_str)
+                    imp = ""
+                    for op in ins.operands:
+                        if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
+                            slot = ins.address + ins.size + op.mem.disp
+                            if slot in iat:
+                                imp = "  -> IAT " + iat[slot]
+                    print("  ", hex(ins.address), ins.mnemonic, ins.op_str + imp)
                 break
 
 
