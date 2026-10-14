@@ -12,8 +12,8 @@
 
 ## 1. 測定
 
-- commit `3525c2c4` (`tools/m11/ldfix/qstore_ab_942.sh` 追加。既存の ldfix.py・fix_ld108.py・qstore・stage4.sh・survey_stage4.mjs を呼ぶのみ)。
-- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/qstore_ab_942.sh` → **111.7 秒・rc 0** (load 0.47 / 0.54 / 0.30 → 1.08 / 0.73 / 0.40)。n=1。
+- commit `3e435401` (測定 commit。`tools/m11/ldfix/qstore_ab_942.sh` は `3525c2c4` で追加し、`3e435401` で PATH 行を除いた。既存の ldfix.py・fix_ld108.py・qstore・stage4.sh・survey_stage4.mjs を呼ぶのみ)。
+- 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/qstore_ab_942.sh` → **99.6 秒・rc 0** (load 0.09 / 0.45 / 0.34 → 0.83 / 0.61 / 0.41)。n=2 (`3525c2c4` での初回は 111.7 秒・rc 0。4 variant の値は 2 回とも同じ)。
 - 素材: fl-win64・work-m11 (snapshot `boot_final3.ll`・`m11_image.bin`)・work-liftdiff。toolchain-emsdk は [EMSDK] (`docs/REFERENCES.md` §4) を使用。
 
 | variant | IR の作り方 | stage4 threw (units_run) | survey ok | miss | trap | OOB | halt0 | raw から消えた trap |
@@ -64,8 +64,9 @@
 
 ## 6. 差分 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit: `3525c2c4` (`qstore_ab_942.sh` を追加した commit。測定はこの commit で実施)。
-- e2e の測定 commit: `c98d2c99`。
+- 測定 commit: `3e435401` (コードを変えた最後の commit。測定はこの commit で実施)。
+- 差分 (測定 commit 以降の code 経路): `git diff 3e435401 HEAD -- tools/m11/ldfix/ ':!tools/m11/ldfix/REPORT_942_QSTORE.md' tools/m11/qstore tools/m11/m11_ov.c | wc -l` → 0 (HEAD で REPORT と DOC_MAP のみ変更)。
+- e2e の測定 commit: `c98d2c99` (作業開始時の main)。
 - 差分 (e2e 経路): `git diff c98d2c99 HEAD -- tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_450560.py tools/m11/ldfix/fix_ld108.py tools/m11/qstore tools/m11/m11_ov.c | wc -l` → 0。
 
 ## 7. 再現
