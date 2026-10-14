@@ -151,3 +151,4 @@ DEFECTS.md 行案 (編集は PM 判断):
 ### 23.14 残作業 (起票先)
 - 整数 flag の復元 (機械語 `0x1801baa3a`〜`0x1801bab26` の `shr cl` / `bsr` / `adc` / `cmp rcx,0` の CF/ZF/SF を p1 に追加し、RetDec raw で畳まれた 4 分岐を `icmp` で再結線する) → #1948 (LIFTLIB-20・親 #1709)。
 - 受入条件 (tanf wide 40/40・SVF `--n 40` 再測定・`liftlib_e2e.sh` ALL PASS) → #1948 で扱う。
+- 親 #1709 は #1948 完了まで open のまま (本 PR は `Refs #1709` のみ。`Closes` は付けない)。
