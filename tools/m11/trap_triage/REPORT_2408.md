@@ -15,7 +15,7 @@
 - 基準の e2e (`m11_e2e.sh` 非 `--full`、起点 `fec12353` = main、foreground): rc=0、wall 2m47s、user 2m40s、load average 1.57/0.94/0.40 (1/5/15 分)。reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (REPORT_1676 §6〜§13 と一致)。
 - baseline `probe1676_watch.mjs` (n=1): unit 114 `halt0`、`after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20 base -->0x0 cnt -->1` (REPORT_1676 §8 と一致)。
 - 測定 commit: `877bd23f` (§2・§3 の全計装 run。本 PR のコード差分は `trap_triage/` の 4 ファイルのみ: `store_watch_2408.sh`・`watch_addr_2408.c`・`reach_2408.py` の追加と `watch_store_682.py` の `--fns-file` 追加)。`git diff fec12353 877bd23f --stat -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行 (e2e の測定対象コードと同じ)。
-- 測定 commit から HEAD までのコード差分: `git diff 877bd23f HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_1676.md' ':!tools/m11/trap_triage/REPORT_2408.md'` の出力は 0 行 (HEAD は REPORT・DOC_MAP の追記のみを足した commit。再測定は不要)。
+- 測定 commit から HEAD までのコード差分: `git diff 877bd23f HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_1676.md' ':!tools/m11/trap_triage/REPORT_2408.md'` は `store_watch_2408.sh` の 1 行 (`source` の emsdk の置き場を `EMSDK_HOME` の既定値にした。既定値は従来と同じ。commit `1ac2952d`)。この commit で §3 の E を再実行した: rc=0、wall 46 s、load 0.53、`[aw]` 1 件 (`function_50a830` IR 185786 行、addr `10bd4c30` val 1)、unit 114 `halt0` (E と同じ)。他の run (B・F・G・H・I) は `877bd23f` の測定のまま。
 - 各計装 run の終了時に `m11_build.sh` で clean な wasm へ復元。復元後 `boot_final3.ll` の `m11_sw` は 0 件、wasm 6,043,394 byte (e2e 直後と同じ)、`probe1676_watch.mjs` の出力は baseline と同じ。
 
 ## 2. 「unit 106 で停止」の原因切り分け (計装の分割は不要)
