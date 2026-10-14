@@ -138,7 +138,7 @@ DEFECTS.md 行案 (編集は PM 判断):
 ### 23.13 LIFTLIB-19 (#1709) — 再現と原因の切り分け (コード未変更)
 - **測定 commit**: `09723d9e` (origin/main 時点)。`git diff 09723d9e HEAD -- tools/liftlib` は本 PR の REPORT 追記のみ。
 - **素材**: `work-m6-ott` / `work-liftlib` / `analysis-ott-binaries` / `toolchain-*` を展開。`tools/*/work` は gitignore のため、検証 worktree には本体からコピーして使用 (本体の work は未変更)。
-- **再現 (leafspec `--n 40`、約 13 s)**:
+- **再現 (leafspec `--n 40`、real 13.996 s = 1 回目の実測)**:
   - tanf wide (`mix` 第 1 枝のみ `unif[-1e12,1e12]`): **match 15 / mismatch 25 / native_crash 0 / wasm_trap 0** → §23.12 と一致 (ベースライン再現)。
   - 既定 spec `ott_leaf_tanf`: **match 40 / mismatch 0** (不変)。
   - 注: `gen` 全体を `unif[-1e12,1e12]` に置換すると 0/40 になる。mix の |x| 小域 (既定 spec の 40% 近傍) が落ち、比較対象が無くなるため。第 1 枝だけを広げること。
