@@ -45,8 +45,9 @@ export const FULL_SYNC_EVERY_MS = 6 * 3_600_000;
 // reconcile がこれ以上止まっていたら、状態が古いとみなして launch しない (誤った着手を避ける)。
 export const STALE_AFTER_MS = 15 * 60_000;
 const NO_PR_MAX_RELAUNCH = 3;
-// 停止報告 (stopped) のうち、再投入の意図でも着手させないもの (親の子待ち・未観測の launch)。他の stopped は PM の判断待ちなので、意図で扱ってよい。
-const INTENT_HARD_STOP = ["parent/stuck", "launch-unobserved"];
+// 停止報告 (stopped) のうち、再投入の意図でも着手させないもの (未観測の launch)。他の stopped は PM の判断待ちなので、意図で扱ってよい。
+// 親 (open な子を持つ issue) は理由の文字列ではなく子の有無で見る (intentGate)。
+const INTENT_HARD_STOP = ["launch-unobserved"];
 // oc-watchdog の最短送信間隔は WATCHDOG_INTERVAL_S (既定 300 秒 = VM の pm_watchdog_ping.sh と同じ 5 分) から、この分だけ短い。
 // tick は毎分 (cron と alarm) で、わずかに早い tick を弾くと次の送信が 1 分遅れ、周期が 6 分になるため。
 export const WATCHDOG_JITTER_MS = 30_000;
@@ -619,7 +620,7 @@ export class Engine {
   //  2. open な子を持つ親 issue は着手対象から外す。
   //  3. ラベル oc:no-pr の issue は『PR を出さずに終わった』run の後。cooldown が過ぎるまで recent、過ぎたら再着手してよい
   //     (上限 NO_PR_MAX_RELAUNCH 回。超えたら stopped で人の判断に回す)。oc:stuck は user (人の判断待ち) に置く。
-  plan(): { rows: Rows; plan: Plan; picks: Planned[]; unknown: Set<number> } {
+  plan(): { rows: Rows; plan: Plan; picks: Planned[]; unknown: Set<number>; children: Record<string, number[]> } {
     const { snap, input, unknown } = this.snapshot();
     const { rows, children } = classify(snap, input);
     const labels = new Map(snap.issues.map((i) => [i.number, i.labels] as const));
@@ -745,7 +746,7 @@ export class Engine {
       stuck_prs: pr.stuck,
       stop,
     };
-    return { rows, plan, picks, unknown };
+    return { rows, plan, picks, unknown, children };
   }
 
   // ---------------------------------------------------------------- 実行
@@ -787,7 +788,7 @@ export class Engine {
 
   async launch(gh: Gh | null): Promise<Plan> {
     this.observeLaunches();
-    const { plan, picks, rows, unknown } = this.plan();
+    const { plan, picks, rows, unknown, children } = this.plan();
     this.meta.lastPlan = plan;
     this.meta.counters = this.meta.counters ?? this.zero();
     if (!this.fresh()) {
@@ -806,7 +807,7 @@ export class Engine {
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     // 再投入の意図は picks より先に処理する。picks が先に投稿すると、同じ issue の意図は『投稿の後に出た意図』として focus なしで処理済みになるため。
     // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard) は picks も空なので、意図も処理しない。
-    const intent = plan.phase.review_only || plan.stop ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown });
+    const intent = plan.phase.review_only || plan.stop ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children });
     for (const p of intent.halted ? [] : picks) {
       if (intent.handled.has(p.n)) continue;
       let body: string;
@@ -872,14 +873,21 @@ export class Engine {
     gh: Gh | null,
     live: boolean,
     planned: Record<string, number>,
-    ctx: { rows: Rows; unknown: Set<number> },
+    ctx: { rows: Rows; unknown: Set<number>; children: Record<string, number[]> },
   ): Promise<{ halted: boolean; handled: Set<number> }> {
     const nowMs = this.d.now();
     const handled = new Set<number>();
-    const placed = new Map<number, { row: keyof Rows; why: string }>();
+    const placed = new Map<number, { row: keyof Rows; why: string; openPr: boolean }>();
     for (const row of Object.keys(ctx.rows) as Array<keyof Rows>) {
       for (const x of ctx.rows[row] as unknown[]) {
-        placed.set(Array.isArray(x) ? (x[0] as number) : (x as number), { row, why: Array.isArray(x) && typeof x[1] === "string" ? x[1] : "" });
+        const n = Array.isArray(x) ? (x[0] as number) : (x as number);
+        const why: unknown = Array.isArray(x) ? x[1] : undefined;
+        // started の理由は PR#・run の一覧。open な PR が 1 つでもあれば拒否し、実行中の run だけなら待つ (intentGate)。
+        placed.set(n, {
+          row,
+          why: typeof why === "string" ? why : "",
+          openPr: Array.isArray(why) && why.some((w) => typeof w === "string" && w.startsWith("PR#")),
+        });
       }
     }
     const c = (this.meta.counters ??= this.zero());
@@ -909,7 +917,7 @@ export class Engine {
         reject(v.reason);
         continue;
       }
-      const gate = this.intentGate(n, placed.get(n), ctx.unknown, nowMs);
+      const gate = this.intentGate(n, placed.get(n), ctx, nowMs);
       if (gate.kind === "wait") continue;
       if (gate.kind === "reject") {
         reject(gate.reason);
@@ -949,18 +957,22 @@ export class Engine {
 
   // 意図の投稿先の判定。wait は次の tick に回す (処理済みにしない)。reject は処理済みにして理由を数える。
   // 行は plan の rows (picks と同じ分類)。oc:stuck・pm-apply・needs-user-input と、oc:no-pr の cooldown・上限は picks の再着手と同じに見る。
+  // 子 issue (open) を持つ親は、停止報告の内容に依らず投稿しない (plan は ready・relaunch の親を blocked・stopped に移すが、停止報告だけの親は stopped のまま残るため)。
   private intentGate(
     n: number,
-    at: { row: keyof Rows; why: string } | undefined,
-    unknown: Set<number>,
+    at: { row: keyof Rows; why: string; openPr: boolean } | undefined,
+    ctx: { unknown: Set<number>; children: Record<string, number[]> },
     nowMs: number,
   ): { kind: "post" } | { kind: "wait" } | { kind: "reject"; reason: string } {
     if (!at) return { kind: "wait" };
     // blocked_by が未同期 (unknown) の間は、ready でも blocked の行に移っているので、先に待つ (確定してから拒否・投稿を決める)。
-    if (at.row === "recent" || unknown.has(n)) return { kind: "wait" };
-    if (at.row === "user" || at.row === "blocked" || at.row === "started") return { kind: "reject", reason: at.row };
+    if (at.row === "recent" || ctx.unknown.has(n)) return { kind: "wait" };
+    if (at.row === "user" || at.row === "blocked") return { kind: "reject", reason: at.row };
+    // 実行中の run だけで started のときは、run の完了後に分類し直すまで待つ (run の途中で意図を受け取っても捨てない)。open な PR があれば拒否する。
+    if (at.row === "started") return at.openPr ? { kind: "reject", reason: "started" } : { kind: "wait" };
     const labels = this.s.issues[String(n)]?.labels ?? [];
     if (labels.includes("oc:stuck") || HOLD_LABELS.some((l) => labels.includes(l))) return { kind: "reject", reason: "user" };
+    if ((ctx.children[String(n)] ?? []).length) return { kind: "reject", reason: "stopped" };
     if (labels.includes("oc:no-pr")) {
       if (nowMs - this.lastAct(n) < this.d.cfg.noPrCooldownH * 3_600_000) return { kind: "wait" };
       if (this.noPrState(n).count >= NO_PR_MAX_RELAUNCH) return { kind: "reject", reason: "stopped" };

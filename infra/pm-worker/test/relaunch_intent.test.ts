@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildLaunchBody, checkRelaunchIntent, RELAUNCH_MAX_PER_WINDOW } from "../src/launch.ts";
 import { parseRelaunchIntent } from "../src/webhook.ts";
-import { configuredApp, issuePayload, j, markFresh, send, T0, type Call, type Handler } from "./helpers.ts";
+import { configuredApp, issuePayload, j, markFresh, runPayload, send, T0, type Call, type Handler } from "./helpers.ts";
 import { commentEv, HUMAN, IMPL_BOT, REVIEWER, at, prEv, type Ctx } from "./pm_helpers.ts";
 
 // PM の再投入の意図 (oc-pm-intent: relaunch) は、検査を全て通し、分類で投稿してよい行のときだけ /oc として投稿する。
@@ -264,18 +264,41 @@ test("統合 (unknown): blocked_by が未同期の ready な issue の意図は�
   assert.equal(focusPosts(ctx).length, 1, "依存が無いと確定した後の tick で投稿される");
 });
 
-// 子を持つ親 (parent/stuck) は、意図でも着手させない (INTENT_HARD_STOP のネガコン。指摘 M2)。子を外すと停止報告の行は stopped のままで、投稿の条件は同じ。
-test("ネガコン (M2): 子 issue を持つ親 (parent/stuck) は意図で /oc を投稿せず、stopped として数える", async () => {
-  const ctx = await configuredApp({ env: { LIVE_LAUNCH: "1" }, handlers: writeHandlers });
-  assert.equal((await send(ctx.app, "issues", issuePayload(21))).status, 202);
-  assert.equal((await send(ctx.app, "issues", issuePayload(22, { body: "親: #21" }))).status, 202);
-  const pr = prEv(91);
-  assert.equal((await send(ctx.app, "pull_request", { ...pr, pull_request: { ...pr.pull_request, head: { ref: "21-x" }, state: "closed" } })).status, 202);
-  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, "停止します。判断を求めます。\noc_artifacts: fl-win64", at(0)))).status, 202);
+// 子 issue を持つ親は、意図でも着手させない (ネガコン。指摘 M2・round 3 B1)。停止報告に素材行があるかどうかに依らず、PR の有無で分類 (stopped / blocked) した行で拒否する。
+const PARENT_CASES: Array<[string, string, boolean, string]> = [
+  ["停止報告に素材行あり・PR あり (closed)", `${REPORT}\noc_artifacts: fl-win64`, true, "stopped"],
+  ["停止報告に素材行なし・PR あり (closed)", REPORT, true, "stopped"],
+  ["停止報告に素材行なし・PR なし", REPORT, false, "blocked"],
+];
+for (const [name, report, withPr, reason] of PARENT_CASES) {
+  test(`ネガコン (M2・B1): 子 issue を持つ親 (${name}) は意図で /oc を投稿せず、${reason} として数える`, async () => {
+    const ctx = await configuredApp({ env: { LIVE_LAUNCH: "1" }, handlers: writeHandlers });
+    assert.equal((await send(ctx.app, "issues", issuePayload(21))).status, 202);
+    assert.equal((await send(ctx.app, "issues", issuePayload(22, { body: "親: #21" }))).status, 202);
+    if (withPr) {
+      const pr = prEv(91);
+      assert.equal((await send(ctx.app, "pull_request", { ...pr, pull_request: { ...pr.pull_request, head: { ref: "21-x" }, state: "closed" } })).status, 202);
+    }
+    assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, report, at(0)))).status, 202);
+    assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+    await tickNow(ctx);
+    assert.equal(postsTo(ctx, 21).length, 0, name);
+    assert.equal((ctx.app.engine.status() as any).counters.intentRejected?.[reason], 1, name);
+  });
+}
+
+// 実行中の run だけで started の issue は、意図を捨てずに待つ (指摘 m1 round 3)。run が完了して停止報告の行に入ったら投稿する。
+test("統合 (m1): 実行中の run だけで started の issue の意図は待つ。run が完了して停止報告の行に入ったら投稿する", async () => {
+  const ctx = await stopped({ LIVE_LAUNCH: "1" });
+  assert.equal((await send(ctx.app, "workflow_run", runPayload(31, "in_progress", { event: "issue_comment", title: "[CI-21] t21" }))).status, 202);
   assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
   await tickNow(ctx);
   assert.equal(postsTo(ctx, 21).length, 0);
-  assert.equal((ctx.app.engine.status() as any).counters.intentRejected?.stopped, 1);
+  assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "待ちは拒否として数えない");
+  assert.equal(ctx.store.get<{ seen?: string }>("relaunch", "it:21")?.seen, undefined, "待ちは処理済みにしない");
+  assert.equal((await send(ctx.app, "workflow_run", runPayload(31, "completed", { event: "issue_comment", title: "[CI-21] t21", at: "2026-10-14T13:00:00Z" }))).status, 202);
+  await tickNow(ctx);
+  assert.equal(focusPosts(ctx).length, 1, "run の完了後の tick で投稿される");
 });
 
 // 第三者の意図を先に処理した後で、created_at の古い実装 App の意図が遅れて届いても、捨てずに投稿する (指摘 M3 round 2)。

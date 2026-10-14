@@ -33,8 +33,9 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 再投入の意図 (`<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->`、#2475): issue ごとに最新の意図マーカーを保持する。実装 App の意図は第三者の意図より優先する。意図のコメントは bot の投稿でも `botLast` (停止報告の窓) を動かさない。次を**全て**通ったときだけ `/oc` を投稿する。
   - 検査 (`src/launch.ts` の `checkRelaunchIntent`): 書き手は実装 App・`issue=` がコメントの issue と一致・`arts` が `ALLOW_ARTS` の部分集合・`focus` は 1〜9 (任意)・同じ issue に 24 時間で 3 回まで。
-  - 分類 (`plan()` の rows): 投稿してよいのは picks と同じ `ready`・`relaunch`・`stopped` (PM の判断待ち) だけ。`user`・`blocked`・`started` は投稿しない。`recent` (着手直後の待ち) と `blocked_by` が未同期 (unknown) の issue は処理済みにせず、次の tick に回す。`oc:stuck`・`pm-apply`・`needs-user-input` は投稿しない。`oc:no-pr` は picks の再着手と同じ cooldown (`NO_PR_COOLDOWN_H`) と上限 (3 回) を見る。`stopped` のうち親の子待ち (`parent/stuck`) と未観測の launch (`launch-unobserved`) は投稿しない。
+  - 分類 (`plan()` の rows): 投稿してよいのは picks と同じ `ready`・`relaunch`・`stopped` (PM の判断待ち) だけ。`user`・`blocked` は投稿しない。`started` は open な PR があれば投稿しない (理由 `started`)。実行中の run だけで started のときは、run の完了後に分類し直すまで待つ (処理済みにしない)。`recent` (着手直後の待ち) と `blocked_by` が未同期 (unknown) の issue も、処理済みにせず次の tick に回す。`oc:stuck`・`pm-apply`・`needs-user-input` は投稿しない。`oc:no-pr` は picks の再着手と同じ cooldown (`NO_PR_COOLDOWN_H`) と上限 (3 回) を見る。子 issue (open) を持つ親は、停止報告の行 (`stopped`) でも投稿しない (停止報告に素材行があるかどうかに依らない)。未観測の launch (`launch-unobserved`) も投稿しない。
   - 順序: 意図は picks より先に処理し、意図で扱った issue は picks から外す (picks が先だと、同じ issue の意図が focus なしで処理済みになるため)。403/429 や REST の残量で止まったら、同じ tick の picks も止める。
+  - 枠: 意図の投稿は `room`・`BATCH` の枠に入らず、条件を通ったものは全件出す (picks の relaunch と同じ)。一斉に意図が届くと、同時に走る run の数 (`TARGET`) を超え得る。
   - 最後の `/oc` より前に出た意図 (PM の手動の `/oc` を含む) は捨てる。停止中 (review-only・stuck 上限・REST の残量不足) は処理しない (意図も残し、停止が明けたら判定する)。
   - 拒否は理由ごとに `counters.intentRejected` へ数え (語彙: `author` `issue` `arts` `focus` `limit` `user` `blocked` `started` `stopped`)、その意図は処理済みにする。
   - 投稿の可否は `LIVE_LAUNCH` に従う (コードの既定は dry-run。dry-run では `counters.intentWouldLaunch` と `log` に記録し、処理済みにしない)。
