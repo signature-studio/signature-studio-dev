@@ -90,7 +90,7 @@ interface Meta {
   lastError?: { at: string; what: string };
   // 降格 (#2340)。値があると launch と dispatch は dry-run になる。解除は手動 (POST /demote/reset)。
   demoted?: { at: string; reason: string };
-  // 降格の判定を始めた時刻 (コードが最初に動いた時刻)。これより前の /oc の組では降格しない (過去の二重投稿で止めない)。
+  // 降格の判定を始めた時刻 (コードが最初に動いた時刻・解除した時刻)。これより前の /oc は判定の対象にしない (過去の二重投稿で止めない・解除前の組を再降格させない)。
   ocWatchFrom?: number;
   // 一覧を上限ページで打ち切った対象 (名前ごとに、同じ一覧を次に読んだ結果で上書きする)。1 件でもあれば fresh=false。
   syncTruncated?: Record<string, { pages: number; at: string }>;
@@ -259,7 +259,8 @@ export class Engine {
     if (p?.action !== "created" || !Number.isInteger(n) || !Number.isInteger(id) || !Number.isFinite(at)) return;
     if (!login || typeof c.body !== "string" || !this.pmLogins().includes(login) || !OC_RE.test(c.body)) return;
     if (this.ocPosts.some((x) => x.id === id)) return;
-    if (at >= (this.meta.ocWatchFrom ?? 0) && this.ocPosts.some((x) => x.n === n && Math.abs(x.at - at) <= OC_DOUBLE_MS)) this.demote(`double-oc #${n}`);
+    const from = this.meta.ocWatchFrom ?? 0;
+    if (at >= from && this.ocPosts.some((x) => x.at >= from && x.n === n && Math.abs(x.at - at) <= OC_DOUBLE_MS)) this.demote(`double-oc #${n}`);
     const now = this.d.now();
     this.ocPosts = [...this.ocPosts.filter((x) => x.at >= now - OC_KEEP_MS), { n, id, at, vm: this.d.cfg.pmLogins.includes(login) }];
     this.d.store.put("meta", "ocPosts", this.ocPosts);
@@ -275,9 +276,11 @@ export class Engine {
   }
 
   // 降格の解除。自動では戻さない (呼び出し側が repo の push 権限を確認してから呼ぶ)。
+  // 判定の起点を解除の時刻に移す。解除前の /oc の組は、full sync が読み直しても再判定しない。
   resetDemote(): boolean {
     if (!this.meta.demoted) return false;
     this.meta.demoted = undefined;
+    this.meta.ocWatchFrom = this.d.now();
     this.meta.counters = this.meta.counters ?? this.zero();
     this.meta.counters.restored = (this.meta.counters.restored ?? 0) + 1;
     this.pushLog({ kind: "restore", note: "manual" });

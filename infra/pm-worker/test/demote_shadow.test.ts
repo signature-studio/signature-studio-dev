@@ -96,6 +96,59 @@ test("降格の解除は手動だけ: 認証なしは 401、push 権限ありで
   assert.equal(comments(ctx.m.calls).length, 1, "解除後は 12 だけ投稿する (11 は投稿済み)");
 });
 
+// 解除の後の full sync (6 時間ごと) は、解除前の /oc を created_at 降順で読み直す。そこで再降格してはならない。
+test("解除は full sync で取り消されない: 解除前の /oc の組は、読み直しても再降格しない (コメントは API と同じ降順)", async () => {
+  const listed: any[] = [];
+  const read = (c: Call) => {
+    if (c.method !== "GET") return undefined;
+    const p = new URL(c.url).pathname;
+    if (p.endsWith("/issues/comments")) return j([...listed].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)));
+    if (p.endsWith("/issues")) return j([issuePayload(11).issue, issuePayload(12).issue]);
+    if (p.endsWith("/actions/runs")) return j({ workflow_runs: [] });
+    if (p.endsWith("/pulls")) return j([]);
+    if (/\/dependencies\/blocked_by$/.test(p)) return j([]);
+    return undefined;
+  };
+  const ctx = await configuredApp({ live: true, handlers: [...writeHandlers, read] });
+  const oc = async (n: number, id: number, login: string, at: number) => {
+    listed.push({ id, issue_url: `https://api.github.com${R}/issues/${n}`, user: { login }, body: "/oc\noc_artifacts: fl-win64", created_at: new Date(at).toISOString(), updated_at: new Date(at).toISOString() });
+    ctx.clock.t = at;
+    return send(ctx.app, "issue_comment", ocEv(n, id, login, at));
+  };
+  for (const n of [11, 12]) await send(ctx.app, "issues", issuePayload(n));
+  await oc(11, 1, VM, T0 + 1 * MIN);
+  await oc(11, 2, PM_BOT, T0 + 10 * MIN);
+  assert.equal((await status(ctx)).demoted_reason, "double-oc #11");
+  ctx.clock.t = T0 + 20 * MIN;
+  const reset = await ctx.app.handle(new Request("https://pm.example/demote/reset", { method: "POST", headers: { authorization: PUSH } }));
+  assert.deepEqual(await reset.json(), { ok: true, reset: true });
+  await oc(12, 3, PM_BOT, T0 + 3 * 60 * MIN);
+  ctx.clock.t = T0 + 6 * 60 * MIN;
+  await ctx.app.engine.fullSync((await (ctx.app.engine as any).d.gh()) as any);
+  const s = await status(ctx);
+  assert.equal(s.demoted_reason, null, "解除が full sync で取り消されない");
+  assert.equal(s.mode_launch, "live");
+  assert.equal(s.counters.demoted, 1);
+  assert.equal(s.counters.restored, 1);
+});
+
+// 解除の後は、解除前の /oc を相手にしない (解除の時刻より前の投稿とは組にしない)。
+test("解除の後: 解除前の /oc から 30 分以内の新しい /oc では再降格しない", async () => {
+  const ctx = await configuredApp({ live: true, handlers: writeHandlers });
+  await send(ctx.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
+  await send(ctx.app, "issue_comment", ocEv(11, 2, PM_BOT, T0 + 2 * MIN));
+  assert.equal((await status(ctx)).demoted_reason, "double-oc #11");
+  ctx.clock.t = T0 + 5 * MIN;
+  const reset = await ctx.app.handle(new Request("https://pm.example/demote/reset", { method: "POST", headers: { authorization: PUSH } }));
+  assert.equal(reset.status, 200);
+  ctx.clock.t = T0 + 8 * MIN;
+  await send(ctx.app, "issue_comment", ocEv(11, 3, PM_BOT, T0 + 8 * MIN));
+  assert.equal((await status(ctx)).demoted_reason, null);
+  // 解除の後の 2 件目は、解除の後の /oc どうしで判定する。
+  await send(ctx.app, "issue_comment", ocEv(11, 4, VM, T0 + 9 * MIN));
+  assert.equal((await status(ctx)).demoted_reason, "double-oc #11");
+});
+
 test("shadow: would_launch と VM の /oc を 15 分の窓で突き合わせ、issue 番号だけを出す (recall・precision・vm_only・worker_only)", async () => {
   const ctx = await configuredApp({ handlers: writeHandlers });
   for (const n of [11, 12, 13]) await send(ctx.app, "issues", issuePayload(n));
