@@ -56,7 +56,7 @@
 
 測定 commit: `2f4564fe` (コードを変えた最後の commit。origin/main 取り込みの merge。`tests/provider_check.mjs` の期待値を main 側 `pe115` と合算: 実装 90 / 未実装 345)。測定は同 commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を再実行してから行った。
 
-環境: runner 4 core、測定時の load average 2.36 (`uptime`、21:17:17)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`) の既定位置 `/opt/emsdk` を使った。前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、21:13:42〜21:16:50 の 188 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+環境: runner 4 core、測定時の load average 2.36 (`uptime`、21:17:17)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64` の `block00031_PE.bin`・`block24429/24430/25159/24618_DATA.bin` を展開)。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md`) の既定位置を使った。前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、21:13:42〜21:16:50 の 188 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
