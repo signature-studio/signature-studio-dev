@@ -79,3 +79,52 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | wasm でのサブインタプリタ (`Py_NewInterpreterFromConfig`) 動作 | FL がサブインタプリタ運用なら MIDI/piano roll の分離に影響 | #76 (PY-6、REPORT §9 の T6) |
 | pthread 版での複数スレッド + GIL | MIDI スレッド分離の可否 | #76 (PY-6、REPORT §9 の T6) |
 | `build_flpy.sh` が追跡中の `flapi_table.json` / `FLAPI.md` を書き換える (runner に win PE / mac dylib が無いため) | 本 PR では再生成物をコミットしていない | 既存 (§10 の未解決と同一。env 化は別 issue で提案済み) |
+
+## 7e. 再検証 (main 322f81b6) と #83 の受入条件の判定
+
+- 理由: 7d の実測は `e872dbb` 時点。その後 `tools/python/provider/fl_engine.c` が 124 行追加・40 行削除され、テスト類も変わったため、7d の値は現 main の証跡にならない。現 HEAD で全工程を再実行した。
+- 測定 commit: `322f81b6` (origin/main)。本節の PR はコードを変えない (`git diff 322f81b6 HEAD -- tools/python/provider tools/python/host tools/python/src tools/python/tests` は 0 行)。
+- 手順: 素材 `fl-win64` ([WIN64]) を展開して `FL_WIN64_DIR` に設定、emsdk は [EMSDK] (`EMSDK_ENV`)。`tools/python` 直下で実行。
+
+| 手順 | 結果 |
+|---|---|
+| `fetch_inputs.sh` | MCPTools.pyc 100,674B・midi.py・utils.py を `work/` に配置 |
+| `build_cpython_wasm.sh` | 4 分 05 秒、rc=0 |
+| `build_flpy.sh` / `provider/build.sh` / `build_flpy_static.sh` | 全て rc=0。`flpy_static.wasm` 5,966,942B |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` (SAB + provider) | 48/48 ok、host_calls 37,425、rc=0 |
+| `node tests/static_check.mjs` | `STATIC CHECK OK`、rc=0。48/48 ok、callback 往復 true、wasm の flhost import 0 件。SAB 版と 0/48 差、mock と 0/48 差 |
+| `node tests/provider_check.mjs` | `PASS:true` (435 関数、実装 70、未実装 365、MCP 静的 60)、rc=0 |
+| `analysis/pybind_extract.py --check` (`--pe` は FL の block00031_PE.bin、`--lib` は build-wasm の libpython) | `PYBIND CHECK OK`、rc=0。110 件、lib 内 109、許容 1 (`_PyInterpreterState_GetRefTotal`) |
+
+往復コスト (`tests/static_bench.mjs 5`、µs/呼出し、5 trial の median (min–max)、同一 run・load 1.14):
+
+| 経路 | median (min–max) |
+|---|---|
+| 静的: C から `fl_api_call` のみ | 0.018 (0.013–0.025) |
+| 静的: Python `_flhost.call` 直 | 0.291 (0.288–0.601) |
+| 静的: Python `channels.channelCount()` (fl_api ラッパ経由) | 0.569 (0.509–0.843) |
+| 静的: 戻り str | 0.422 (0.418–0.604) |
+| 参考: 空の Python 関数呼出し | 0.108 (0.102–0.232) |
+| Worker + SAB (同一 provider、`channelCount()`) | 42.7 (38.587–45.076) |
+
+同一 run の median 比は 42.7 ÷ 0.569 = 75.0 倍。7d の過去値 (0.34µs / 21.5〜25.7µs) より両経路とも大きいのは runner の負荷差による。比較は本 run 内の値だけで行う。<1µs は 5 trial の max 0.843µs まで満たす。
+
+ネガコン: 静的版だけ `channels.channelCount` の戻り値を +1 に改変 (`provider/fl_engine.c` 1 行。SAB 版 (`provider/build.sh` の出力) は再ビルドしていない) → `build_flpy_static.sh` のみ再リンク → `static_check.mjs` は FAIL (rc=1)。mock 比較で 19/48 差、summary の ok は 47/48、host_calls 37,461 (期待 37,425)。改変を戻して再リンク → `STATIC CHECK OK` (rc=0)。
+
+#83 本文の受入条件の判定:
+
+| 受入条件 | 判定 | 根拠 |
+|---|---|---|
+| Worker+SAB と同一の tools/call 結果 (48 tool、class A 38 を含む) | 満たす | 48/48 ok、SAB 版と 0/48 差 |
+| 往復コストの再計測と記録 (<1µs 目標) | 満たす | 上の表。Python 込み median 0.569µs、5 trial の max 0.843µs |
+| スレッド / GIL 方針の文書化 | 満たす | `BRIDGE.md` §7 |
+| メモリモデル (#25) への依存の明記 | 満たす | #25 は CLOSED (wasm32 決定)。Memory64 でのリンクは未検証 (下表) |
+
+「FLEngine wasm」は本節では provider (#74 の flapi provider = FLEngine wasm 側の実装) を指す。実 FLEngine への `fl_api_call` 接続は受入条件に無く、`BRIDGE.md` §5 B が「FLEngine lift 後に移行」としているため未解決に残す。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実 FLEngine wasm への `fl_api_call` 接続 | 本節の実測は provider の最小エンジン状態。実 FLEngine は `fl_api_call` を持たない | #35 (OPEN)。FLEngine 起動 (MS5) 完了後に PY-2b を PM が起票 |
+| mock と C provider の result 文字列差 2 件 (`get_highlight_names` / `get_browser_names`) | `static_check` が 2 件のみ mock 比較の result を除外 (`KNOWN_MOCK_RESULT_GAP`) | #82 (OPEN) |
+| サブインタプリタ・pthread+GIL・Memory64 での静的版の検証、`_PyInterpreterState_GetRefTotal` を FL が使うか | 未検証 | #35 配下で再起票が必要 (#76 は CLOSED) |
+| headless Chrome / Worker 内の静的版、`run_all.sh` 全体 | 未実施 | #35 |
