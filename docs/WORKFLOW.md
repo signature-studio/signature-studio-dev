@@ -424,6 +424,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (一度でも稼働に入った Worker) で、`fresh` が false または `last_tick` が 15 分より古ければ、題名 `[CI-n] PM Worker 停止 (<日付>)`・ラベル `pm-worker-down` の issue を起票する
     (本文は `/status` の写しと `@pycabbage`。`needs-user-input` は付けない)。**`configured:false` / `installed:false` (`/setup` 未了) では起票しない。**
     重複排除: ラベル付きの open issue があれば追記のみ (1 時間に 1 回まで)、24 時間以内に close した issue は reopen して追記する。
+  - **PM Worker の率制限 alert** (`watchdog.sh`、#CI-142): `fresh` が true の `/status` で、`rate_limit_alert` が true (Worker が 30 分の窓で 5 件以上かつ 30% 以上を 2 回連続と判定。`ratealert.ts`) または `rest_remaining` が 1500 未満 (`ratelimit.ts`) なら、ラベル `oc:rate-limit` の open issue があれば追記のみ (60 分に 1 回まで)、無ければ題名 `[CI-n] PM Worker 率制限 alert (<日付>)` を起票する (本文は `@pycabbage`・rate-guard の説明・率制限の項目の写し)。
+    ラベルは `notify-rate-limit.sh` (run 側) と共有するので、同じ率制限を二重の issue にしない。`fresh` が false の間の値は使わない (停止は `pm-worker-down` が扱う)。回復時の close は自動ではない。
     回復 (`fresh` が true かつ `last_tick` が 5 分以内) で、open の障害 issue にコメントして close する。ファイルが無い・取得失敗・JSON 不正は警告だけで何もしない (終了コードは変えない)。
   - **bot の `/oc`** (#1949): PM 用 GitHub App の `/oc` は `vars.OC_PM_BOT_LOGIN` との完全一致 + `user.type == 'Bot'` で許可する (`.github/README.md`)。
 
