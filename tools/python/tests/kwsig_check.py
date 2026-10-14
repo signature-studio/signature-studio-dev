@@ -175,11 +175,12 @@ for m, fs in t["modules"].items():
                 else:
                     known.add(f"{m}.{n}")
 print(f"legacy bind が通った kw 呼出し {n_cmp} 件のうち新も同結果 {n_same}、差 {sorted(known)}")
-assert known == {"channels.getChannelVolume", "channels.getStepParam", "channels.setChannelPitch", "channels.soloChannel",
-                 "device.forwardMIDICC", "general.saveUndo", "mixer.automateEvent", "mixer.getEventIDName",
-                 "mixer.getTrackVolume", "plugins.getColor", "plugins.getParamValueString"}, known
+assert known == {"channels.getChannelVolume", "channels.setChannelPitch", "device.forwardMIDICC", "general.saveUndo",
+                 "mixer.automateEvent", "mixer.getEventIDName", "mixer.getTrackVolume"}, known
 # PY-70 (#2500): stub の positional-only 引数 (`/`) を table に反映したため、署名を得た 15 関数が比較対象に入った (+5 件、全て同結果・差は増えない)
-assert (n_cmp, n_same) == (229, 213), (n_cmp, n_same)
+# PY-102 (#2927): sig を PE の個数へ正規化したため、旧比較の基準 (table の sig) と PE の書式が一致する 4 関数 (channels.getStepParam・
+# channels.soloChannel・plugins.getColor・plugins.getParamValueString) は差が出なくなった。残る差は kwlist の既定値の引き継ぎ (a) の 7 関数
+assert (n_cmp, n_same) == (231, 223), (n_cmp, n_same)
 
 # (9) kwlist の重複名 (arrangement.selectionSet は ['selStart','selStart','selectNotes',...]; バイナリ由来)
 #     最初の出現だけを kw で束縛し、2 つ目以降は位置専用 (kw では埋まらない)
@@ -195,10 +196,10 @@ expect(TypeError, arr.selectionSet, 1, 2, selStart=5)
 # (10) stubs 既定値の評価器 (_default_value)。eval は使わず許可した式だけを評価する。midi.* の値は利用者の midi から実行時に取る。
 EXPECTED_NAMES = {"midi.PIM_None", "midi.GT_All", "midi.LB_Status_Default", "midi.EKRes", "midi.MaxInt",
                   "midi.ST_Int", "midi.PME_System", "midi.REC_None", "midi.GC_BackgroundColor", "midi.FPN_Param"}
-# (a) 全数列挙: sig の既定値のうち midi. を含むもの = 20 関数・21 引数・名前 10 種 (固定値)
+# (a) 全数列挙: sig の既定値のうち midi. を含むもの = 19 関数・20 引数・名前 10 種 (固定値。PY-102 で plugins.getParamValueString の PIM_None が消えた)
 midi_args = [(m, n, p["name"], p["default"]) for m, fs in t["modules"].items() for n, e in fs.items() if e.get("sig")
              for p in e["sig"]["params"] if p["default"] is not None and "midi." in p["default"]]
-assert len(midi_args) == 21 and len({(m, n) for m, n, _, _ in midi_args}) == 20, midi_args
+assert len(midi_args) == 20 and len({(m, n) for m, n, _, _ in midi_args}) == 19, midi_args
 assert {d for _, _, _, d in midi_args} == EXPECTED_NAMES, {d for _, _, _, d in midi_args}
 # (b) 正の検証: 偽の midi (値は任意) を sys.modules に入れると、既定値がその値で host へ渡る
 FAKE = {nm.split(".")[1]: 9000 + i for i, nm in enumerate(sorted(EXPECTED_NAMES))}
@@ -223,7 +224,8 @@ assert last() == (1, FAKE["MaxInt"], 1), last()
 for fs in t["modules"].values():
     for e in fs.values():
         for p in e["sig"]["params"] if e.get("sig") else []:
-            if p["default"] is not None and "midi." not in p["default"]:
+            # PE_OPTIONAL は PE が省略可能とするが既定値不明の印 (analysis/flapi_table.py pe_arity)。式ではないので対象外
+            if p["default"] is not None and "midi." not in p["default"] and p["default"] != "PE_OPTIONAL":
                 a, b = fl_api._default_value(p["default"]), eval(p["default"], {})
                 assert type(a) is type(b) and a == b, (p["default"], a, b)
 # (c) 参考 (repo のコードは通らない。Python の eval の挙動の確認のみ): midi を渡さない eval は NameError。PR #463 の bind が落ちた原因
