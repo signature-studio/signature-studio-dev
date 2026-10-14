@@ -413,6 +413,12 @@ notify
   && [ "$(grep -c 'api -X POST repos/o/r/issues -f' "$LOG")" = 1 ]; }
 expect "5 runs (threshold, incl. this run) of 10 completed, no open issue -> one [CI] issue with oc:rate-limit" $?
 
+# n1b. 正例 (仕様の例): 30 分に 10 run 中 6 件 (他 5 件 + この run) が rate_limit -> 起票 1 件
+reset; cm30 "$(mk_list 101 102 103 104 105)"; runs_total 10; open_issues '[]'; last_issues '[]'
+notify
+{ [ $RC = 0 ] && logged 'api -X POST repos/o/r/issues -f title=\[CI\] 率制限: 30 分で 6 件の run が失敗' && [ "$(grep -c 'api -X POST repos/o/r/issues -f' "$LOG")" = 1 ]; }
+expect "6 of 10 completed runs rate-limited in 30 min -> one [CI] issue" $?
+
 # n2. 起票の中身: @pycabbage・run id のリスト・OC_MODEL_ID を変えない旨。needs-user-input を付けない・repo 変数 API と GraphQL を呼ばない。行頭の /oc が無い
 nt_base
 notify

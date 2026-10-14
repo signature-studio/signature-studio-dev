@@ -6,7 +6,9 @@
 #       無ければ `[CI] 率制限: 30 分で <N> 件の run が失敗 (<日付>)` を起票してラベルを付ける (6 時間に 1 件まで)。
 # OC_MODEL_ID は変更しない: repo 変数の API は呼ばない。切替は指示 126 の範囲で PM がログを確認して行う。
 # 観測用なので、失敗しても run を失敗させない (終了コード 0)。
-# 入力 (env): GH_TOKEN (issues:write の App token)・OC_REPO・GITHUB_RUN_ID・GITHUB_SERVER_URL。テスト用: OC_NOW (現在時刻の epoch 秒)。
+# 入力 (env): GH_TOKEN (issues:write の App token)・OC_REPO・GITHUB_RUN_ID・GITHUB_SERVER_URL。
+#             RUNS_TOKEN (actions:read。完了 run の件数だけに使う。省略時は GH_TOKEN。実装 App は actions:read を持たない)。
+#             テスト用: OC_NOW (現在時刻の epoch 秒)。
 # コメント・起票本文に agent を起動する語 (行頭の slash + oc 等) を入れない。
 set -uo pipefail
 export LC_ALL=C.UTF-8
@@ -40,7 +42,8 @@ if [ "$n" -lt 5 ]; then
   exit 0
 fi
 
-total="$(gh api "repos/$R/actions/workflows/opencode.yaml/runs?created=%3E%3D$w30&status=completed&per_page=1" --jq '.total_count' 2> /dev/null)" || total=""
+RUNS_TOKEN="${RUNS_TOKEN:-$GH_TOKEN}"
+total="$(GH_TOKEN="$RUNS_TOKEN" gh api "repos/$R/actions/workflows/opencode.yaml/runs?created=%3E%3D$w30&status=completed&per_page=1" --jq '.total_count' 2> /dev/null)" || total=""
 case "$total" in '' | *[!0-9]*)
   echo "::warning::could not count the completed runs: the rate-limit notice is skipped"
   exit 0
