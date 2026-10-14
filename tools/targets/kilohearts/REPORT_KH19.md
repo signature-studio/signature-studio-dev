@@ -210,3 +210,12 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 受入 1 (人手で呼び出し元と call 位置を確認し `manual` にする): **未達**。
 - 受入 2 (手検証集合と before 集合の差分 0 を書く): **未達** (手検証集合が空)。
 - 受入 3 (自動生成分を手検証済みと書かない): **達成** (本節と `verified` 列で明示)。
+
+## 9. #2155 (KH-34) 人手検証用ダンプの生成 (人手検証は未実施)
+
+- 基点 main: `6444b186`。本節の追加で変えたコードは `scripts/gain_manual_dump.py` (新規) のみ。既存 scripts は変えていない。
+- 素材: `plugins-kilohearts` を `tar --zstd -xf` で展開し、Windows 側 (`payload.dat` → `windows.zip/*` → `HeartCore.core_64` 76,642,304 B) だけを手で取り出した (mac 側は不要)。
+- 再生成: `rtti_walk.py` → `callgraph.py` (120,856 関数) → `gain_before_list.py <core> work/ms/callgraph.pkl work/ms/rtti_vtables.json gain <out>`。before_funcs = 160、roots = 27。列 1〜5 は正本 `gain_before_160.tsv` と全行一致。
+- 実測 (4 vCPU・1 回・load average 0.31): `gain_manual_dump.py` 0.09 s。出力は 160 行すべて (ROOT 27 行は関数先頭 3 命令、非 root 133 行は親の call_site 前後の命令)。call_site が命令境界に乗らない行は 0 件。
+- 判定: ダンプは人手検証の**材料**であり、検証結果ではない。`verified` 列は 160 行すべて `auto` のまま。手検証集合は空のため、受入 1・2 は未達。
+- 未達の追跡: 160 行の人手確認 (受入 1) と、手検証集合と before 集合の差分 (受入 2) は子 issue に切り出す。
