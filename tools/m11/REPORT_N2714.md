@@ -6,17 +6,17 @@
 ## 0. 結論
 
 - **寛容起動 (`tools/m11/m11_tolerant.mjs`) で 942 unit を全て試行した**。ok 874 / noproc 1 / skipped 67 (miss 46・halt0 7・oob 13・unreachable 1)。試行 942 = ok + noproc + skipped の和で、集計は合う。clobber 0。
-- **DllMain は戻り値 1 (TRUE) で後段まで戻った** (`boot_rc=1`)。ただし終端は survey (InitUnits 抑止) と同じ Halt0→longjmp で (§6)、戻り値 1 は unit 状態の証拠にならない。
+- **DllMain の後段まで戻った**。終端の Halt0→longjmp が TRUE で戻った (`boot_rc=1`)。この終端は survey (InitUnits 抑止) と同じで (§6)、unit 状態の証拠にならない。
   **`CreateFruityInstance` を呼べるかは未検証**。呼出しは WIN-4 の範囲で、本 run は呼んでいない。欠落 67 unit がその経路に効くかも未検証。
 - **ただし 67 unit (7.1%) が欠落している**。うち 46 unit は Init ポインタが `0xfa9390` (関数の先頭ではない値) で、Init が**一度も実行されていない**。
   残り 21 unit は途中で trap し、書いた状態が残っている。下の §4-2 の順位が、状態欠落による silent miscompile のリスク評価。正しさの証明ではない。
-- **既存経路は不変**: 変更前 (origin/main `46c92356`) を同じ環境で走らせた値と、HEAD の値が一致した (§1)。strict は units_run 53 + skipped 3 = 56 完了で停止、survey は ok 872。
+- **既存経路の判定値は不変**: 変更前 (origin/main `46c92356`) を同じ環境で走らせた値と、HEAD の値が一致した (§1)。strict は units_run 53 + skipped 3 = 56 完了で停止、survey は ok 872。
   回帰ゲート (`m11_tolerant_gate.py`) はこの 2 つを完全一致で見る。survey の FastMM 通算 GetMem だけ 4 件減った (§1 注。原因は未切り分け)。
 - stage 5/6 は未達のまま (judge 判定)。stage 6 は Halt0 を含むため、寛容起動の終端 (Halt0→longjmp) は stage 6 の定義に当たらない (§6)。
 
 ## 1. 測定 (測定 commit `cf64d9c8`)
 
-- 測定 commit: `cf64d9c8` (コードを変えた最後の commit)。base は origin/main `46c92356` (PR の base)。
+- 測定 commit: `cf64d9c8` (e2e を実行した HEAD)。e2e が実行するコードを最後に変えたのは `ed20a0ea` で、`cf64d9c8` 以降は e2e が呼ばない script のみ (§7)。base は origin/main `46c92356` (PR の base)。
 - 環境: runner 4 vCPU・Node v22.23.3・emsdk は [EMSDK]・RetDec は [RETDEC] (いずれも `docs/REFERENCES.md`・runner に既存)。
   素材 work-m11 を両方の worktree に展開し、`m11_e2e.sh` が `m11_gen_ir2.sh` を実行して IR を作った (ldfix=applied・qstore=applied・ld108=applied・ir_sha256 `de46cada…`)。
   PE は `fl-win64` の `extracted/block00031_PE.bin` (sha256 `b2c64da4…`)。
@@ -35,7 +35,7 @@
 - 注 (survey の GetMem): survey の JSON 全キーを突き合わせると、差は `getmem`・`fastmm_getmem_impl` と `top_frame_idx` (wasm 関数番号の付け替え。追加した export の分だけずれた) の 3 系列のみ。
   ok・trap・miss・noproc・clobber・VA の値と unit 単位の kind は一致。GetMem の 4 件減の原因は**未切り分け**。判定 (ok 872) には入らないので、本 PR の受入の外に置く。
 - 注 (停止種別): 変更前 (base) の A の停止は `unreachable` (REPORT.md §14 の Halt0 とは違う)。本環境では変更前後とも同じ unit `i=56` (VA 0x16fde0) で止まる。
-- 所要時間 (一括 e2e `bash tools/m11/m11_e2e.sh`、n=1): 変更前 2 分 36 秒 (gen_ir2・build を含む)・HEAD 2 分 56 秒 (同)・HEAD 増分 1 分 07 秒 (IR・build は前回の生成物を再利用)。
+- 所要時間 (一括 e2e `bash tools/m11/m11_e2e.sh`、n=1 の参考値。n≥3 は素材 (work-m11・emsdk・RetDec) が取れず未測定・§8): 変更前 2 分 36 秒 (gen_ir2・build を含む)・HEAD 2 分 56 秒 (同)・HEAD 増分 1 分 07 秒 (IR・build は前回の生成物を再利用)。
   寛容起動単体 (`node tools/m11/m11_tolerant.mjs`、n=3): 20.13 / 20.43 / 20.20 秒。
 - C の詳細: GetMem 2028 / FreeMem 169 (寛容起動は別経路なので survey の 2030・2034 とは比べない)。VirtualAlloc 36 回・1,412.4 MB (survey と同値)・VA 上限 256 MB/unit (`M11_VA_UNIT_BUDGET_MB`、survey と同じ) で OOM 0。
   clobber (InitTable 先頭・末尾の VA 変化) 0。`longjmp_hit=8` = unit 内の Halt0 が 7 + 後段の終端 1。icall ok 2120・miss 46 (uniq 1 = `0xfa9390`)。
@@ -44,7 +44,7 @@
 
 - **C (`tools/m11/m11_ov.c`)**: `g_tolerant=1` (`m11_set_tolerant`) のとき `function_4120c0` (System.InitUnits) は InitTable の `units` と `count` を 1 度だけ読み、JS の `Module.m11_tolerant_run` を呼んで返る。
   1 unit の呼出しは `m11_call_unit_at(units, i)`: strict の InitUnits ループ 1 周と同じ (`InitCount = i+1`・proc NULL なら 0・`ICALL_AT` の site `0x412126`)。
-  既定 (`g_tolerant=0`) の経路 (strict・survey) は変えていない。
+  既定 (`g_tolerant=0`) では strict・survey の分岐に入らない。survey の判定値 (ok・kind・VA) は変わらない (FastMM 通算 GetMem の差は §1 注)。
 - **JS (`tools/m11/m11_tolerant.mjs`)**: 942 unit を try/catch で隔離し、trap 後は shadow stack を復元して次へ進む。
   survey と違い **image を戻さない** (状態は unit 間で持ち越す = 逐次起動の再現)。VA 予算は survey と同じ 256 MB/unit。
   InitTable 先頭・末尾の VA が変わったら `clobber` を数える。clobber の unit は kind を `clobber` として skip に入れる (ok・noproc でも同じ)。
@@ -126,7 +126,7 @@ trap 21 unit の修復と miss 46 の `0xfa9390` の出所特定は、次の作�
 
 - InitUnits (reason=1) は `m11_InitLib` から直接 return する (`return function_4120c0()`)。その後段は `entry_point` 側に残り、本 run でも実行された。
 - 終端の Halt0→longjmp (`function_412770`) は 1 回。**survey (InitUnits 抑止) でも同じ終端が起きる** (`DllMain done=True`)。
-  つまり unit 由来ではなく、DllMain の後段の終端である。C のコメント (`function_412770`) は「実機では setjmp 点で TRUE が返る」としている。`boot_rc=1` はこれと一致する。
+  つまり unit 由来ではなく、DllMain の後段の終端である。`boot_rc=1` は unit 後段の計算結果ではなく、終端の longjmp が setjmp 点で TRUE として戻った値。C のコメント (`function_412770`) も「実機では setjmp 点で TRUE が返る」としている。
   したがって `boot_rc=1` は「unit 状態が正しい」の証拠ではない。`CreateFruityInstance` を呼べる状態かは WIN-4 で確かめる。
 - ただし `m11_judge.py` の stage 6 は「Halt0 無し・skip 0」を要求するため、寛容起動の結果は stage 6 に当たらない (skip 67 のため未達)。
   終端の扱いを judge の定義に入れるかは PM 判断。
@@ -137,8 +137,13 @@ trap 21 unit の修復と miss 46 の `0xfa9390` の出所特定は、次の作�
   寛容起動だけなら `M11_TOLERANT_OUT=work/tolerant_units.json node tools/m11/m11_tolerant.mjs`。
 - 判定: `python3 tools/m11/m11_tolerant_gate.py --strict-done 56 --survey-ok 872` (exit 0)、`--negctl --strict-done 56 --survey-ok 872` (NEGCTL_OK ×3)。
 - 区間内訳: `python3 tools/m11/m11_tolerant_sections.py <PE> --md` (§4-2 の表はこの出力)。
-- 測定 commit `cf64d9c8` から HEAD (`3722021f`) までのコード差分: `git diff cf64d9c8 HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` は `m11_tolerant_sections.py` の 1 ファイル (5 行追加・3 行削除) のみで、PE の既定パスを環境変数・引数から取る変更。
-  e2e (`m11_e2e.sh`) はこのスクリプトを呼ばないため、測定値は変わらない。§4-2 の表は変更後のスクリプトで再生成し、変更前と同一 (diff 0) を確認した。
+- コード差分 (測定 commit `cf64d9c8` → HEAD): `git diff cf64d9c8 HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` は 25 files (1416 行追加・32 行削除)。内訳は次のとおり。
+  - PR の script: `m11_tolerant_sections.py` (§4-2 の区間内訳)。
+  - main 取り込み (`7a97f430`) で入った分: `ldfix/` の診断 script と結果 (`trap_units.mjs`・`trap_probe_942.mjs`・`probe_*.py`・`ld104_reach.py`・`ld120_*.py`・`ir_reach_2660.py`・`results/*`)・`shimx_link/build.sh` (`--midi` 追加と `sxt_*` の export を `--trace` 時だけに変更)・`trap_triage/`・各 REPORT。
+- **e2e が実行するコードに差分は 0 件**: `m11_e2e.sh` の呼出し先 (`m11_gen_ir2.sh` → `ldfix/ldfix.py`・`ldfix/fix_ld108.py`・`qstore/m11_qstore.py`・`m11_passes.py` ほか、`m11_lift.sh`、`m11_build.sh`・`m11_ov.c`、`m11_run.mjs`・`m11_survey.mjs`・`m11_tolerant.mjs`・`m11_judge.py`・`m11_tolerant_gate.py`) のどれも、上の 25 files に含まれない。上の変更ファイルは、フルパス (`ldfix/trap_units.mjs` 等) で検索すると e2e の呼出し元から参照が無いことを確認した。
+  よって §1 の測定値 (`cf64d9c8` の e2e 結果) は HEAD にそのまま当たり、再測定は要らない。
+- e2e の実行コードを最後に変えた commit は `ed20a0ea`。`cf64d9c8` は `m11_tolerant_sections.py` の追加のみ (`git diff --stat ed20a0ea cf64d9c8 -- tools/m11 ':!tools/m11/REPORT*.md'`: 76 行追加)、`3722021f` は同 script の PE 引数の変更のみ。
+  §4-2 の表は変更後の script で再生成し、変更前と同一 (diff 0) を確認した。
 
 ## 8. 未解決
 
@@ -147,9 +152,9 @@ trap 21 unit の修復と miss 46 の `0xfa9390` の出所特定は、次の作�
 | miss 46 unit の Init ポインタ `0xfa9390` (関数先頭ではない値・closure 外)。出所未確認 | 46 unit (4.9%) の初期化が丸ごと実行されない | PM 判断 (#132 の系統か、新規の子) |
 | trap 21 unit の修復 (順位 1 の `.text` 書換え 9 B を含む) | skip 67 のため stage 5/6 未達 | #132 (範囲外として残す) |
 | 失敗 unit の heap 範囲は未計測 | 状態欠落のリスクが image の失敗 unit に限られる | 子 #2768 (移管済み) |
-| 成功 874 unit の書込み範囲は未計測 | 成功 unit 側の状態欠落は見ていない | 未起票 (#2768 の範囲外。PR 本文の未解決表) |
+| 成功 874 unit の書込み範囲は未計測 | 成功 unit 側の状態欠落は見ていない | PR 本文の未解決表に留める (起票しない。#2768 の範囲外) |
 | survey の FastMM 通算 GetMem -4 (fastmm_getmem_impl -5)。原因未切り分け | 判定には入らない (ok・trap は一致) | 本 PR の未解決表 (再測定の子は起票しない) |
 | 寛容起動の終端 (Halt0→longjmp, boot_rc=1) を stage 6 に含めるか | judge の定義と食い違う | PM 判断 (judge の定義) |
-| `CreateFruityInstance` の呼出しと、その経路の状態 (欠落 67 unit の影響) | 「呼べる状態」は未検証 | WIN-4 |
+| `CreateFruityInstance` の呼出しと、その経路の状態 (欠落 67 unit の影響) | 「呼べる状態」は未検証 | WIN-4 (#2715) |
 | 巨大 VA 要求 (i=114 の 131 MB・i=280 の 121 MB・i=659 の 21 MB) | 同型の既知 (REPORT.md §12) | #132 |
 | 素材 work-m11 に `lift_pe.sha256` が無い (手で書いた) | 再現時に同じ手順が要る | 依頼者 (素材の再梱包) |
