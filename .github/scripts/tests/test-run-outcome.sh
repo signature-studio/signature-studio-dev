@@ -386,5 +386,124 @@ DRY=1 recover
 { [ $RC = 0 ] && not_logged 'pr ' && grep -q 'DRY: verify-review-verdict' "$TMP/out"; }
 expect "DRY=1 plans without acting" $?
 
+# ------------------------------------------------------------------ notify-rate-limit.sh (#2346)
+echo "== notify-rate-limit.sh"
+NT_NOW="$(date -u -d '2026-10-14T12:00:00Z' +%s)"
+NT_W30="$(date -u -d "@$((NT_NOW - 1800))" +%Y-%m-%dT%H:%M:%SZ)"
+NT_W60="$(date -u -d "@$((NT_NOW - 3600))" +%Y-%m-%dT%H:%M:%SZ)"
+NT_AGO() { date -u -d "@$((NT_NOW - $1))" +%Y-%m-%dT%H:%M:%SZ; }
+mark() { printf '{"user":{"type":"Bot"},"body":"[rate-limit] x\\n<!-- oc-run-outcome: no-pr reason=unknown cause=rate_limit run=%s -->"}' "$1"; }
+noise() { printf '{"user":{"type":"Bot"},"body":"%s"}' "$1"; }
+mk_list() { # mk_list <run id>... : 本文に cause=rate_limit のマーカーを持つ bot のコメント
+  local s="" i
+  for i in "$@"; do s="$s${s:+,}$(mark "$i")"; done
+  printf '%s' "$s"
+}
+cm30() { fx "repos/o/r/issues/comments?since=$NT_W30&per_page=100" "[$1]"; }
+runs_total() { fx "repos/o/r/actions/workflows/opencode.yaml/runs?created=%3E%3D$NT_W30&status=completed&per_page=1" "{\"total_count\":$1,\"workflow_runs\":[]}"; }
+open_issues() { fx 'repos/o/r/issues?labels=oc%3Arate-limit&state=open&per_page=100' "$1"; }
+last_issues() { fx 'repos/o/r/issues?labels=oc%3Arate-limit&state=all&sort=created&direction=desc&per_page=10' "$1"; }
+notify() { OC_NOW="$NT_NOW" bash "$SCRIPTS/notify-rate-limit.sh" > "$TMP/nt" 2>&1; RC=$?; }
+nt_base() { reset; cm30 "$(mk_list 101 102 103 104)"; runs_total 10; open_issues '[]'; last_issues '[]'; } # この run (555) を含めて 5 件・完了 10 件
+
+# n1. 正例 (閾値ちょうど): 5 件 (他 4 件 + この run)・完了 10 件 (50%)・open な issue 無し -> [CI] 率制限 の起票 1 件 (labels[]=oc:rate-limit)
+nt_base
+notify
+{ [ $RC = 0 ] && logged 'api -X POST repos/o/r/issues -f title=\[CI\] 率制限: 30 分で 5 件の run が失敗' && logged 'labels\[\]=oc:rate-limit' \
+  && [ "$(grep -c 'api -X POST repos/o/r/issues -f' "$LOG")" = 1 ]; }
+expect "5 runs (threshold, incl. this run) of 10 completed, no open issue -> one [CI] issue with oc:rate-limit" $?
+
+# n2. 起票の中身: @pycabbage・run id のリスト・OC_MODEL_ID を変えない旨。needs-user-input を付けない・repo 変数 API と GraphQL を呼ばない。行頭の /oc が無い
+nt_base
+notify
+{ [ $RC = 0 ] && logged '@pycabbage' && logged 'run id: 101, 102, 103, 104, 555' && logged 'OC_MODEL_ID` は自動では変更されません' \
+  && not_logged needs-user-input && not_logged 'actions/variables' && not_logged graphql \
+  && ! grep -qE '^/(oc|opencode)([[:space:]]|$)' "$LOG"; }
+expect "issue body: @pycabbage, run ids, OC_MODEL_ID unchanged note; no needs-user-input, no variables/graphql call, no /oc line" $?
+
+# n3. ネガコン (件数): 3 件 (他 2 件 + この run、5 件未満) -> 何もしない
+reset; cm30 "$(mk_list 101 102)"; runs_total 10; open_issues '[]'; last_issues '[]'
+notify
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'rate-limit runs in 30 min: 3 (< 5)' "$TMP/nt"; }
+expect "3 runs (< 5) -> no notice (negative control)" $?
+
+# n4. ネガコン (割合): 6 件 / 完了 30 件 = 20% (< 30%) -> 何もしない。境界: 6 件 / 20 件 = 30% -> 起票
+reset; cm30 "$(mk_list 101 102 103 104 105)"; runs_total 30; open_issues '[]'; last_issues '[]'
+notify
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'rate-limit runs: 6 of 30' "$TMP/nt"; }
+expect "6 runs of 30 completed (20%, < 30%) -> no notice (negative control)" $?
+reset; cm30 "$(mk_list 101 102 103 104 105)"; runs_total 20; open_issues '[]'; last_issues '[]'
+notify
+{ [ $RC = 0 ] && logged 'api -X POST repos/o/r/issues -f title=' ; }
+expect "6 runs of 20 completed (30%, boundary) -> one issue" $?
+
+# n5. ネガコン (原因): Argument list too long・Prepare PR context の失敗 12 件はマーカーを持たないので数えない (2 件 + この run = 3)
+ns=""
+for i in $(seq 6); do ns="$ns$(noise 'Argument list too long'),$(noise 'Prepare PR context failed'),"; done
+reset; cm30 "$ns$(mk_list 101 102)"; runs_total 10; open_issues '[]'; last_issues '[]'
+notify
+{ [ $RC = 0 ] && grep -q 'rate-limit runs in 30 min: 3 (< 5)' "$TMP/nt" && not_logged 'api -X POST'; }
+expect "12 failures without a rate_limit marker are not counted (negative control)" $?
+
+# n6. open な oc:rate-limit の issue がある (60 分以内の通知なし) -> そこにコメントだけ。新規の起票は 0 件
+reset; cm30 "$(mk_list 101 102 103 104)"; runs_total 10
+open_issues '[{"number":77,"state":"open","labels":[{"name":"oc:rate-limit"}]}]'
+fx "repos/o/r/issues/77/comments?since=$NT_W60&per_page=100" '[]'
+notify
+{ [ $RC = 0 ] && logged 'api -X POST repos/o/r/issues/77/comments' && logged 'run id: 101, 102, 103, 104, 555' \
+  && logged '<!-- oc-rate-limit-notify -->' && [ "$(grep -c 'api -X POST repos/o/r/issues -f' "$LOG")" = 0 ] && not_logged 'repos/o/r/labels'; }
+expect "open oc:rate-limit issue -> comment only (run ids + count), no new issue" $?
+
+# n7. ネガコン (60 分): 60 分以内に通知コメントが既にある -> 何も投稿しない
+reset; cm30 "$(mk_list 101 102 103 104)"; runs_total 10
+open_issues '[{"number":77,"state":"open","labels":[{"name":"oc:rate-limit"}]}]'
+fx "repos/o/r/issues/77/comments?since=$NT_W60&per_page=100" '[{"user":{"type":"Bot"},"body":"x\n<!-- oc-rate-limit-notify -->"}]'
+notify
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'has a notice within 60 min' "$TMP/nt"; }
+expect "a notice within 60 min already on the open issue -> nothing posted (negative control)" $?
+
+# n8. ネガコン (6 時間): 直近の oc:rate-limit の起票が 1 時間前 (open は無い) -> 起票 0 件。7 時間前なら起票 1 件
+reset; cm30 "$(mk_list 101 102 103 104)"; runs_total 10; open_issues '[]'
+last_issues "[{\"number\":70,\"state\":\"closed\",\"created_at\":\"$(NT_AGO 3600)\",\"pull_request\":null}]"
+notify
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'opened within 6 hours' "$TMP/nt"; }
+expect "last oc:rate-limit issue opened 1 hour ago -> nothing opened (negative control)" $?
+reset; cm30 "$(mk_list 101 102 103 104)"; runs_total 10; open_issues '[]'
+last_issues "[{\"number\":70,\"state\":\"closed\",\"created_at\":\"$(NT_AGO 25200)\",\"pull_request\":null}]"
+notify
+{ [ $RC = 0 ] && logged 'api -X POST repos/o/r/issues -f title=' && [ "$(grep -c 'api -X POST repos/o/r/issues -f' "$LOG")" = 1 ]; }
+expect "last oc:rate-limit issue opened 7 hours ago -> one issue opened" $?
+
+# n9. 読めない (comments の取得に失敗・run 数の取得に失敗) -> 0 で終わり、何も投稿しない
+reset; cm30 "$(mk_list 101 102 103 104)"; runs_total 10; open_issues '[]'; last_issues '[]'
+export FAKE_FAIL='issues/comments'; notify; unset FAKE_FAIL
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'could not read the issue comments' "$TMP/nt"; }
+expect "comments unreadable -> exit 0, nothing posted" $?
+reset; cm30 "$(mk_list 101 102 103 104)"; open_issues '[]'; last_issues '[]'
+export FAKE_FAIL='actions/workflows'; notify; unset FAKE_FAIL
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'could not count the completed runs' "$TMP/nt"; }
+expect "completed-run count unreadable -> exit 0, nothing posted" $?
+
+# n10. repo も token も無い -> 0 で終わり、gh を呼ばない
+reset
+OC_NOW="$NT_NOW" GH_TOKEN= bash "$SCRIPTS/notify-rate-limit.sh" > "$TMP/nt" 2>&1; RC=$?
+{ [ $RC = 0 ] && [ ! -s "$LOG" ]; }
+expect "no token -> exit 0, no gh call" $?
+
+# n11. 配線: detect-rate-limit.sh が率制限を検知すると通知まで行う (番号なし = implement の経路)。ただし 429 以外 (Argument list too long) では通知の処理を呼ばない
+reset; cp "$FX_429" "$TMP/oc.jsonl"; cm30 "$(mk_list 101 102 103 104)"; runs_total 10; open_issues '[]'; last_issues '[]'
+OC_NOW="$NT_NOW" OC_OUTPUT_FILE="$TMP/oc.jsonl" bash "$SCRIPTS/detect-rate-limit.sh" > "$TMP/det" 2>&1; RC=$?
+{ [ $RC = 0 ] && grep -qx 'cause=rate_limit' "$TMP/det" && logged 'api -X POST repos/o/r/issues -f title=' && logged 'labels\[\]=oc:rate-limit'; }
+expect "detect-rate-limit.sh (429) -> notify-rate-limit.sh is called and opens the issue" $?
+reset; printf '%s\n' '{"type":"error","timestamp":1,"sessionID":"ses_x","error":{"type":"unknown","message":"Argument list too long"}}' > "$TMP/oc.jsonl"
+OC_NOW="$NT_NOW" OC_OUTPUT_FILE="$TMP/oc.jsonl" bash "$SCRIPTS/detect-rate-limit.sh" 42 > "$TMP/det" 2>&1; RC=$?
+{ [ $RC = 0 ] && [ ! -s "$TMP/det" ] && not_logged 'issues/comments'; }
+expect "not a rate limit -> notify-rate-limit.sh is not called (negative control)" $?
+
+# n12. 静的: OC_MODEL_ID の repo 変数 API (actions/variables) を書かない・gh issue/pr のサブコマンド (GraphQL) を使わない・needs-user-input を書かない
+{ ! grep -q 'actions/variables' "$SCRIPTS/notify-rate-limit.sh" && ! grep -qE 'gh (issue|pr) ' "$SCRIPTS/notify-rate-limit.sh" \
+  && ! grep -q 'needs-user-input' "$SCRIPTS/notify-rate-limit.sh"; }
+expect "static: no repo-variable API, no gh issue/pr subcommand (GraphQL), no needs-user-input" $?
+
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]

@@ -9,6 +9,7 @@
 # 標準出力: 率制限のとき annotation (::error title=oc-rate-limit::...) と `cause=rate_limit` の 1 行。違うとき何も出さない。
 # 番号を渡したとき: 対象に <!-- oc-run-outcome: cause=rate_limit run=<run id> --> を 1 回だけ付ける (同じマーカーが既にあれば付けない)。
 # 番号を渡さない (implement は record-run-outcome.sh から呼ぶ。そちらの no-pr マーカーに cause= を入れる) ときは、コメントを付けない。
+# 率制限のときは notify-rate-limit.sh を呼ぶ (#2346。直近 30 分の件数が閾値を超えたときだけ issue に通知する)。
 #
 # この script は run を失敗させない (観測用)。読めなかったら警告して 0 で終わる。出力ファイルが無ければ何もしない。
 # 入力 (env): OC_OUTPUT_FILE (既定 $RUNNER_TEMP/oc-output.jsonl), GITHUB_RUN_ID, GITHUB_SERVER_URL,
@@ -33,6 +34,7 @@ case "$hits" in '' | 0) exit 0 ;; esac
 
 echo "::error title=oc-rate-limit::opencode の error 行に率制限 (rate_limit_error / HTTP 429) を検出しました (run $run)"
 echo "cause=rate_limit"
+bash "$(dirname "$0")/notify-rate-limit.sh"
 
 case "$N" in '' | *[!0-9]*) exit 0 ;; esac
 R="${OC_REPO:-}"
