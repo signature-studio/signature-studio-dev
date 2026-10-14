@@ -170,13 +170,14 @@ k80 lift 単体の測定commit時点の旧所要時間は**記録しない**。�
 - **再測定 (PM run と reviewer の実測・測定 commit 以降の差分分)**: 条件は `PLUG_CANON_ALLOCA=1` のみ。`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`・`PLUG_REUSE_DRC` は未設定 (RetDec を実行)。素材は `fl-win64` と `toolchain-retdec` を展開して使用。入力は `kernel_table.json` から生成した k80 ranges (80 kernel。`tools/plugins/lift/kernel_ranges_balance.txt` と一致)。一時ディレクトリで実行。
   - 「所要」の定義: `lift_ranges.sh` 1 回の実行の lift 全体 wall (RetDec 段を含む)。「最終 `cleanup`」は `k80.retdec.log` 最後の phase の時間で、RetDec 段の内訳の 1 つ。
   - 測定 run は 3 回 (rc は記録のある run すべて 0):
-    - PM run (HEAD `b38ff403`): 所要 2 s (秒精度)・最終 `cleanup` 1.76 s・`k80.drc.ll` = `b760d51a…`
+    - PM run (HEAD `b38ff403`): rc = 0 / 所要 2 s (秒精度)・load (1 分値) 0.52 → 0.52 (開始・終了時)・最終 `cleanup` 1.76 s・`k80.drc.ll` = `b760d51a94f6fa7496b211360b1415576bdc8e12f397345b42d32a11d49e9c52` (全長)
+      - RetDec 実行の確認: `PLUG_REUSE_DRC` 未設定。`k80.retdec.log` に phase 出力 (最終 `cleanup` 1.76 s)。所要 2 s は RetDec を 80 range・`--select-decode-only` で走らせた実時間。
     - reviewer 1 回目 (HEAD `b38ff403`): 所要は記録なし (旧記載の「4 s」は条件・定義が確認できないため採用しない)・`k80.drc.ll` = `aa52403e…`
     - reviewer 2 回目 (HEAD `1ad307fd`): 所要 4.4 s・最終 `cleanup` 2.93 s・`k80.drc.ll` = `097478ab…`
     - 所要の min–max: 2 s〜4.4 s (記録のある 2 run)
   - `k80.lift.ll` sha256 = `628fa71edeca59318c75e48287cc09e108b09894240b12b34393d64b80ac3b6f` (**一致**。PM run と reviewer 2 回目の 2 run で確認。全長)
   - `k80.final.ll` sha256 = `5a5aee3c…` (一致。先頭 8 桁のみ確認。全長は review 本文に無い)
-  - `k80.drc.ll` sha256 は実行ごとに揺れる (受入 2' 未達の根拠。#1560 に紐づけ): `b760d51a…` (PM run) / `aa52403e…` (reviewer 1 回目) / `097478ab…` (reviewer 2 回目)。単独の値は参考にしない。
+  - `k80.drc.ll` sha256 は実行ごとに揺れる (受入 2' 未達の根拠。#1560 に紐づけ): `b760d51a94f6fa7496b211360b1415576bdc8e12f397345b42d32a11d49e9c52` (PM run, 全長) / `aa52403e…` (reviewer 1 回目, 先頭 8 桁のみ) / `097478ab…` (reviewer 2 回目, 先頭 8 桁のみ)。単独の値は参考にしない。
   - 注: 本 run (fix モード) では再測定していない (PM 指示)。上記は PM run と reviewer の実測の転記。
 - 再測定不可 (履歴。HEAD `9d943df3` 時点の記録): 修正時点の runner には `toolchain-retdec` ([RETDEC]) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
 - 再試行 (fix モード, HEAD `9d943df3`): `$ARTIFACTS_DIR` は `fl-win64` のみ。`[RETDEC]` の実体が無いため RetDec 段を実行できず、k80 lift を再実行していない (rc・所要・load・sha256 は未取得)。`oc_artifacts: fl-win64 toolchain-retdec` を PR 本文に追記した。この時点の再測定は未実施 (後続の HEAD `b38ff403` 再測定で実施済み。上記「再測定」行)。
