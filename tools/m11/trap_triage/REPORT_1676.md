@@ -12,7 +12,7 @@
 
 ## 1. 実測の基準
 
-- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`)、`toolchain-retdec` (`/opt/retdec`)、`toolchain-emsdk` (`/opt/emsdk`)、`work-m11`。
+- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`)、`toolchain-retdec` ([RETDEC])、`toolchain-emsdk` ([EMSDK])、`work-m11`。
 - `work/lift_pe.sha256` は手作業で PE 指紋を記録 (REPORT_881 §10.2 と同じ手順)。
 - 全再生成は実行: `m11_e2e.sh` (foreground、rc=0、165 s、load 約 1.0)。reached_stage 4、survey_ok 872、IR sha256 `6909f85d…` (REPORT_881 §10 と一致)。
 - 注意: 展開直後の `work-m11` の wasm (`m11_boot.cjs`) は `_m11_icall_cnt_n` を持たず、survey が `TypeError` で落ちた。e2e の再ビルドで解消。
@@ -109,14 +109,16 @@
 ## 8. #2021 の実測: list B 生成点の窓 (未確定の残件あり)
 
 - 測定 commit: `2782ce9e` (origin/main)。素材: `fl-win64` (sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。`work/lift_pe.sha256` を PE 指紋で手記録し `m11_e2e.sh` (非 `--full`) を foreground 実行: rc=0、wall 167 s (08:26:11〜08:28:58)、load 1.00 (uptime)、reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6 と一致)。
+- 数値の出所 (各 n=1): wall・load・reached_stage・survey・IR sha256 は `cd tools/m11 && bash m11_e2e.sh` の結果。icall 列は `cd tools/m11 && node trap_triage/probe1676_u114.mjs` の stderr (unit 114 のみ `_m11_set_trace(1)`)。生成窓は `cd tools/m11 && node trap_triage/probe1676_watch.mjs` の出力。
+- 測定対象コードの不変性: `git diff 2782ce9e HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行 (差分 0)。
 - `--full` は `m2/work/ghidra_dll/functions_dll.csv` が素材に無く `m11_bounds.py` で落ちた (§6 と同じ)。
 - `probe1676_listB_writes.mjs` n=2 (08:29): 両回とも unit 114 で `L=0x10bd4c20`・`base=0`・`cnt=1` の生成、unit 275 で trap、unit 830 で L 消失。§2 と一致。
 - `probe1676_u114.mjs` (unit 114 だけ `_m11_set_trace(1)` で icall トレース): stderr 84 行。icall 列の要点は `0x223840`→`0xf960`×…→`0x85df70`→`0xf960`×…→`0x1c0e70`/`0x1c04a0` の交互→`0xf960`×8→`0x1c160`→`0xf960`×2→Halt0。
   - `icall` の値は LVA 相対 (`tkey = target + 0x400000`)。`0xf960`=VA `0x40f960` (`TObject.NewInstance`、m11_ov.c 482 行)、`0x1c04a0`=VA `0x5c04a0` (`ret` 1 命令の既定実体 tr_ret0)、`0x1c0e70`=VA `0x5c0e70` (function_5c0e70)。
-- `probe1676_watch.mjs` (icall 行ごとに list B `[G2+188]` の L/base/cnt を比較): n=1 で次の 1 件のみ変化。
+- `probe1676_watch.mjs` (icall 行ごとに list B `[G2+188]` の L/base/cnt を比較): n=1 (再実行なし) で次の 1 件のみ変化。
   - `after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -(未生成)->0x0, cnt -(未生成)->1`
-  - **list B は `icall 0x5c04a0` の直後〜次の `icall 0xf960` (`TObject.NewInstance`) の間に生成され、生成時点で base=0**。`40f960`/`40fb40` は `memset` で 0 初期化するため、base=0 は NewInstance 由来の既定値で、そこで値が書かれたのではない。
-  - よって base=0 の設定元は「list を生成した側」(`40f9e0`→`410320` の vtable 間接 call を含む窓) にある。窓内の IR は未特定。
+  - **list B は `icall 0x5c04a0` の直後〜次の `icall 0xf960` (`TObject.NewInstance`) の間に生成され、生成時点で base=0**。
+  - 生成窓までは確定。base=0 の書込み主体は未確定: `40f960`/`40fb40` が base を 0 に初期化するかは未確認 (`40fb40` は §7.2 のとおり list を走査して 8 byte 書き込む関数で、memset とは記録していない)。窓内で base を 0 のまま残す命令も本 run では未特定。
 - IR 突合: `function_8651a0` が `function_40f9e0(obj, 1)` を 6 回呼び、`+188` に list を格納する (boot0.lift.ll)。ただし `function_40f9e0` の窓内の実際の呼出し経路 (`410320`→`40f960` か) は本 run で未確認。
 - `function_47a3e0` (TList Grow) の IR は `[rax-8]` の cap を読む。cap=0 の初期 grow 経路が base 相当を埋めるかは未確認。
 
