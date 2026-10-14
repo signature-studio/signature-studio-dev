@@ -79,6 +79,6 @@ SLOT_STUB_VA=1810806a0 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh   # s
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| T1 (`0x181307100`)・T2 (`0x1813071a0`) の終点と entry 数の確定。OTT api-set 表 `0x18026c9f0` との形式比較 | 受入条件 1・2・4 | 子 issue (本 run で起票) |
-| fatal RIP 群 (`0x18103d494`・`0x180c8b9c0`・命令境界外の RIP・host 側 `0x..95f`) の原因切り分け | 受入条件 3 | 子 issue (本 run で起票) |
+| T1 (`0x181307100`)・T2 (`0x1813071a0`) の終点と entry 数の確定。OTT api-set 表 `0x18026c9f0` との形式比較 | 受入条件 1・2・4 | #2197 (ICALL-62) |
+| fatal RIP 群 (`0x18103d494`・`0x180c8b9c0`・命令境界外の RIP・host 側 `0x..95f`) の原因切り分け | 受入条件 3 | #2198 (ICALL-63) |
 | closure 外 indirect target `0x1810806a0` の本解決 (7 件の fault のみ) | 本 PR は迂回のみ | #2079 (ICALL-56) |
