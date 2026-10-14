@@ -42,6 +42,7 @@
   レビュー subagent → PM がマージ**。全作業は subagent 委任、1 チケット = 1 subagent。
 - **理由**: 共有ワークツリーで `git reset` により他セッションのコミットが失われる実事故が 2 件発生したため。
 - **影響**: `docs/WORKFLOW.md`・`AGENTS.md`。
+- **改訂 (2026-10-14, #2600)**: 上の「PM がマージ」は改める。merge の担い手は検収 (approve と同じ run)。PM は merge しない。本文は 2026-10-12 の記録として残す。
 
 ## D5 — x64c 主役化・RetDec の位置づけ
 
