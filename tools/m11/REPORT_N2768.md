@@ -21,8 +21,8 @@
   - `c_static` = [268435456, 271188784) (C の静的領域)。
   - `stack` = [271188784, 279577392)。
   - `heap` = [279577392, メモリ末端) (malloc 領域。VirtualAlloc の確保を含む)。
-  - `gap` = なし (image の末端 22515781 B と C 静的の間に隙間は無い)。
-- **決定性**: 1 回目 (寛容起動の記録) と 2 回目 (heap 測定) の skip 72 unit の kind と区間が一致した (`match: true`・区間の比較も一致)。
+  - `gap` = [img_len, gb) = [22515781, 268435456) (image の末端と C 静的の間)。この区間は存在し、そこへの書込みは 0 B。
+- **決定性 (kind のみ)**: 2 回目 (heap 測定) の skip 72 unit は、1 回目 (寛容起動の記録) と kind が一致した (`match: true`)。`match` は kind だけを比べる (`m11_tolerant.mjs` の `p1.get(r.i) === r.kind`)。1 回目の記録には heap の区間が無いため、区間の一致は確認していない (§7 の未解決)。
 - **集計**: `python3 tools/m11/m11_tolerant_heap.py work/tolerant_heap.json` (表の生成元。`--top N` で区間の先頭も出る)。
 
 ## 2. 環境 (PR #2752 の数値との差)
@@ -39,16 +39,20 @@
 | skip の種類 | miss 46・halt0 7・oob 13・unreachable 1 | miss 46・halt0 7・**oob 17**・unreachable 1・**oom 1** |
 | clobber | 0 | 0 |
 
-- 差は 5 unit: **i=101** (oom: 2,137,929 回の GetMem と 267,714,560 B の VA 要求で、単位予算 256 MB を超えて NULL → oom)・**i=291・296・304・555** (oob)。PR では 4 unit が ok だった (`REPORT_N2714.md` §3 の 304・555 を含む)。
+- 差は 5 unit: **i=101** (oom)・**i=291・296・304・555** (oob)。
+  - i=101: unit 内で成功した確保の累計 (`_m11_va_used` の差分 `va_bytes`) が 267,714,560 B に達した後、次の要求が単位予算 256 MiB (268,435,456 B) を超え、`m11_rt.c` が加算前に NULL を返した (GetMem 2,137,929 回)。
+  - PR の逐次の記録 (`REPORT_N2714.md` §3) では 304・555 が ok だった。291・296・101 の PR 側の unit 単位の記録は無く、kind 件数 (oob 13→17・oom 0→1) からの推定。
 - survey (unit を 1 本ずつ隔離) も 874 で、逐次の状態だけの差ではない。
 - **原因は未特定**。確認した候補: (a) image は素材と同一 (差なし)。(b) wasm は再ビルド版で測ったが、PR 側の wasm が同じ版かは未確認 (ビルドの emsdk 版・data.c の生成版の切り分けは未実施)。(c) node は PR と同じ v22.23.3。
+- (d) 素材 `work-m11` の版: `docs/WORKFLOW.md` §11 は、この素材を #516 qstore 以前の生成と記し、survey の基準には使わないとしている (#680)。展開先 `tools/m11/work/` に `qstore_report.json`・`ir_conditions.json` が無いことを確認した。pin (872・67) を立てた測定がどの素材で行われたかは未確認。現行の生成手順 (`m11_gen_ir2.sh`・`--full`) で作り直した素材での再測定は未実施 (`--full` は約 633 秒 + Ghidra の前提があり、本 run の時間内に収まらないと判断した)。
+- e2e FAIL の原因候補は素材版の差 (推定。切り分けは未実施)。pin を変えるかの判断は §7 の PM 判断待ち。
 
 ## 3. heap 書換えの一覧 (72 unit・測定 commit f69ddc5d)
 
 - `順位` は heap + c_static の合計の降順。`区間数` は heap と c_static の区間の合計。最後の列は最大の 2 区間 (領域・絶対アドレス・長さ B)。
 - 列「VA」は unit の関数 VA (`0xfa9390` は関数の先頭ではない値 = Init 未実行の miss 群)。`GetMem`・`VA` の値は `REPORT_N2714.md` §4-2 と本書 §4 を参照。
 
-| 順位 | i | VA | 種類 | c_static B | heap B | gap B | 区間数 (heap+c_static) | 最大の 2 区間 (領域 絶対アドレス +長さ B) |
+| 順位 | i | VA | 種類 | c_static B | heap B | gap B | 区間数 (heap+c_static) | 最大の 2 区間 (領域・先頭の絶対アドレス・長さ B) |
 |---:|---:|---|---|---:|---:|---:|---:|---|
 | 1 | 830 | 0xcd50d0 | oob | 95 | 23733431 | 0 | 2181961 | heap 0x10be1a38 +11658, heap 0x41613834 +4992 |
 | 2 | 101 | 0x1de960 | oom | 169 | 23467023 | 0 | 2142871 | heap 0x10bf373a +1673, heap 0x10bb9398 +67 |
@@ -128,14 +132,14 @@
 
 ## 4. リスク評価 (上位を個別に・推定)
 
-heap の範囲と、`REPORT_N2714.md` §4-2 の image 差分を併せて見る。「参照されうる」は全て推定で、参照の追跡はしていない。
+heap の範囲と、`REPORT_N2714.md` §4-2 の image 差分を併せて見る。「参照されうる」は全て推定で、参照の追跡はしていない。`VA N B` は unit 内で成功した VirtualAlloc の累計 (`_m11_va_used` の差分。予算超過で NULL になった要求は含まない)。
 
 1. **i=830** (oob・heap 23,733,431 B・2,181,961 区間・GetMem 3・VA 0): 最優先。新規確保が無いのに既存 heap へ約 218 万か所・長さ 10〜11 B の書換え (アドレス範囲 `0x10aa0334`〜`0x4f144fdd`)。既存の大きな構造 (表・リスト) を走査しながら書き換え、途中で trap した型と推定。image 差分は `.data` 8 B・`.bss` 5 B (`REPORT_N2714.md` 順位 12)。後続 unit や `CreateFruityInstance` が同じ構造を読めば、例外無しで誤った値を読む恐れがある (推定)。
-2. **i=101** (oom・heap 23,467,023 B・2,142,871 区間・GetMem 2,137,929・VA 267,714,560 B): この環境でのみ skip (PR では ok)。確保の暴走 (GetMem が 214 万回) の途中で単位予算を超えて NULL を返した。書換えの型は i=830 と同じ (10〜11 B 断片)。確保の途中で止まった構造は後続が参照しうる (推定)。
+2. **i=101** (oom・heap 23,467,023 B・2,142,871 区間・GetMem 2,137,929・VA 267,714,560 B (成功分の累計)): PR の記録では oom は 0 件 (§2)。確保の暴走 (GetMem が 214 万回) の途中で、単位予算 256 MiB を超える要求を NULL にした。書換えの型は i=830 と同じ (10〜11 B 断片)。確保の途中で止まった構造は後続が参照しうる (推定)。
 3. **i=280** (oob・heap 199,169 B・37,869 区間・VA 120,782,848 B): image 差分の順位 1 (`.text` 9 B 書換え。`REPORT_N2714.md` §4-3 の 1)。heap にも 199 KB の書換え。`.text` 書換えと heap 書換えの両方に当たる unit で、リスクは最も高い。
 4. **i=114** (halt0・heap 6,474 B・c_static 401 B・VA 132,775,936 B): 初期化の途中で Halt。VA 要求が大きく、確保後に離脱した型 (推定)。
 5. **i=56** (unreachable・heap 5,031 B・c_static 55 B): strict の停止点。寛容起動でも失敗のまま。後続 unit が依存するかは未確認。
-6. **i=745** (oob・heap 2,147 B)・**i=314** (halt0・heap 1,510 B・c_static 247 B)・**i=880** (oob・heap 332 B) ほか: 1 unit あたり 2 KB 以下。
+6. **順位 6〜24 の 19 unit** (oob 14 件・halt0 5 件。i=745・314・880・509・492・659 など): heap 書換えは 0〜2,147 B (最大は i=745)、c_static は 40〜247 B。各 unit の区間は §3 の表の該当行を参照 (ここは分類の要約のみ)。
 7. **miss 46 unit** (`0xfa9390` の Init 未実行): heap の書換えは 0 B。c_static に 1〜3 B だけ書いている (区間 2〜3 個。推定: `m11_icall` の miss 計数。未確認)。image 差分は `InitCount` の 1 B のみ (`REPORT_N2714.md` §4-1)。Init 本体が一度も走らないことが、欠落の本体 (`REPORT_N2714.md` 順位 6)。
 
 ## 5. 限界
@@ -149,25 +153,33 @@ heap の範囲と、`REPORT_N2714.md` §4-2 の image 差分を併せて見る�
 
 ## 6. 検証
 
-- 測定 commit: **f69ddc5d** (`m11_tolerant.mjs` と `m11_tolerant_heap.py` を変えた最後の commit)。以降の commit は本 REPORT と `docs/DOC_MAP.md` のみ。
+- 測定 commit: **f69ddc5d** (`m11_tolerant.mjs` を変えた最後の commit。node の測定はこの commit で行った)。後続の `a1e4f428` は `m11_tolerant_heap.py` の見出し文言だけを変えた (集計の計算は変えていない。入力の JSON が手元に無いため表は再生成せず、§3 の列見出しを合わせた)。以降の commit は本 REPORT と `docs/DOC_MAP.md` のみ。
 - e2e (`bash tools/m11/m11_e2e.sh`・f69ddc5d・n=1・1 分 12 秒。生成物は再利用): **FAIL (rc=1)**。
   - 実行 A (strict): 56 完了で停止 (ゲート PASS)。
   - 実行 B (survey): ok 874 ≠ 期待 872 (`TOLERANT_GATE_FAILED`)。
   - 実行 C (寛容): 942 試行・ok 869・skip 72 (ゲートの試行数と集計は PASS)。
   - ネガコン 3 本: `NEGCTL_OK` ×3 (退行を検出)。
   - この FAIL は本 PR の前の HEAD (`26f90ada`) でも同じ数値で出た (§2)。
-- 寛容起動の heap 測定 (pass 2・f69ddc5d・47.7 秒): `match: true`・72 unit。
+- 寛容起動の heap 測定 (pass 2・f69ddc5d・47.7 秒): `match: true` (kind のみの比較。§1)・72 unit。
 - コード差分 (測定 commit f69ddc5d → HEAD、`tools/m11` 配下。REPORT を除く): 下の出力のとおり 0 件。
 
-`git diff --stat f69ddc5d HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` の出力は 0 行 (空)。コード差分は無い。
+`git diff --stat f69ddc5d HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` の出力 (`a1e4f428` の 1 行):
+
+```
+ tools/m11/m11_tolerant_heap.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+```
+
+測定に使った `m11_tolerant.mjs` には差分が無い (`git diff --stat f69ddc5d HEAD -- tools/m11/m11_tolerant.mjs` の出力は 0 行)。
 
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| PR #2752 の 872・67 を再現できない (差の原因未特定。wasm・data.c の生成版の切り分けは未実施) | e2e の判定ゲートが FAIL (変更前の HEAD と同じ) | PM 判断 (環境の切り分け・pin の扱い。子は起票しない) |
+| PR #2752 の 872・67 を再現できない (原因未特定。素材 `work-m11` の版 (§2 (d))・wasm・data.c の生成版の切り分けは未実施) | e2e の判定ゲート (`e2e_expect.env` の pin) が FAIL (変更前の HEAD と同じ) | PM agent の判断待ち: e2e の pin (872・67) を据え置くか、この環境の値 (874・72) に改めるか・既定案: pin は据え置き、本 PR では pin を変えない (環境差として §2 に記録のみ) |
+| 寛容起動の heap 区間の決定性 (kind のみ一致を確認。区間は未比較) | 区間が run ごとに揺れるかは未確認。§3 の区間は 1 回分の測定 | 本表のまま (再測定には素材の wasm 再ビルドが要る。子は起票しない) |
 | i=830・101 の heap 書換え (約 218 万区間・約 23 MB) の構造と読み手 | 最大のリスク。どの構造かは未特定 | PM 判断 (解析の追跡。子は起票しない) |
 | miss 46 unit の c_static 1〜3 B の正体 | 小 (推定: icall の miss 計数) | 本表の未解決のまま |
 | 後続 unit と `CreateFruityInstance` が heap 範囲を読むか | 参照の有無は未追跡 | WIN-4 (#2715) |
-| 寛容起動の 101 (この環境のみ oom・GetMem 214 万回) | 環境差の一部 | §2 の原因と合わせて PM 判断 |
-| 成功 unit (874) の heap 書込みは未計測 | 成功 unit 側の欠落は見ていない | PR 本文の未解決表に留める (`REPORT_N2714.md` 未解決) |
+| 寛容起動の 101 (oom・GetMem 214 万回。PR の記録では oom 0 件) | 環境差の一部 | §2 の原因と合わせて PM 判断 |
+| 成功 unit (869) の heap 書込みは未計測 | 成功 unit 側の欠落は見ていない | PR 本文の未解決表に留める (`REPORT_N2714.md` 未解決) |
