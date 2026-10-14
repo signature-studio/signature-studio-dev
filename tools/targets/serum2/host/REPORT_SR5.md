@@ -23,7 +23,7 @@
 | ref メトリクス | peak 0.790915 / rms 0.310052 / 非ゼロ 16,380/16,384 cell |
 | `ref_harness.sh` (測定 commit `dcafb442`) | NG=0, 13.6 s, load 0.33 (開始時 1 分値) |
 | 既存 `e2e.sh` (測定 commit `dcafb442`) | 62/62 OK, 67.3 s, load 0.12 (開始時 1 分値), NC1/NC2 とも期待どおり |
-| `84e411e7` 上の再測定 (ref_harness / e2e) | 未実施 (素材 `plugins-serum2`・`apt-mingw` が本 run に無い)。§2 参照 |
+| コード最終変更 commit `92f88190` 上の再測定 (ref_harness / e2e) | **未実施** (素材 `plugins-serum2` が実 DLL を含み、本 fix run の `$ARTIFACTS_DIR` に無い)。§2・§3 参照 |
 
 ## 2. 既存 e2e への影響 (測定 commit 以降のコード差分)
 
@@ -38,6 +38,18 @@ git diff dcafb442 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
 
 この差分は実行経路を変えるため、`92f88190` 上での再測定が必要。ただし本 run では `wine64` と `plugins-serum2` (実 DLL) が無く、`ref_harness.sh` と `e2e.sh` を再実行できなかった。上の表の数値は `dcafb442` 時点の実測であり、`92f88190` の実測ではない。`bash -n` による構文確認のみ `92f88190` で実施 (OK)。再測定は素材 `plugins-serum2` を依頼に追加して行う (未解決 #3)。
 
+### 2.1 実 DLL なしの補助確認 (stub wine64。再測定ではない)
+
+再現: `bash tools/targets/serum2/host/ref_stub_check.sh` (実 DLL・実 wine64 の代わりに、決定的な合成 WAV (f32 2ch 48 kHz・8192 frame・ノート依存周波数) を書く偽 `wine64` を PATH に置き、差分が触る制御経路だけを実行する)。実行 commit `f188d7ae` (`ref_stub_check.sh` を足した commit)、結果 FAIL=0, 0.4 s, load 0.34 (開始時 1 分値)。`92f88190` から `f188d7ae` への host 配下のコード差分は `ref_stub_check.sh` の追加のみ (e2e は使わない)。
+
+| 確認 | 結果 |
+|---|---|
+| `ref_render.sh` で wine が rc=3 を返す (新) | `wine exit=3 ...` を表示して exit 3 (WAV 有無の検査まで到達) |
+| 同条件で `dcafb442` 版 `ref_render.sh` (手動: `git show dcafb442:…/ref_render.sh` を同じ stub で実行。`ref_stub_check.sh` には含めない) | `wine exit=` を表示せず exit 3 (`set -e` で `RC=$?` に届かない)。差分の意図どおり |
+| `ref_harness.sh` 全体 (stub WAV) | [1] 3 回の file SHA-256 一致 OK・[2] self-test OK・[3] 別ノート FAIL 判定 OK・[4] 1 サンプル改変 FAIL 判定 OK。[1] の ref_manifest.json との照合のみ NG (stub の WAV は実 DLL の出力ではないため。pin 照合が効く確認) → NG=1, 0.3 s |
+
+これは実 DLL の測定値ではない。§1 の表の数値の代わりにはならず、再測定の必須は変わらない。
+
 `S2HOST_PITCH` 未設定時は従来どおり pitch 60、WAV は追加出力のみで既存の summary・ログは変えない。
 
 ## 3. 未解決
@@ -47,4 +59,4 @@ git diff dcafb442 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
 | wasm 候補 (SR-4 の WAV) との比較 | 受入 4。入力口は `ref_harness.sh <candidate.wav> <class>` で用意済み | #2383 [SR-45] (親: #73) |
 | 参照は既定 Init state のみ (ファクトリ preset 未使用) | 「固定 state (preset 1〜数本)」の受入に届かない。Init 合成は preset 未取得時の許容 | #2384 [SR-46] (親: #73) |
 | C/D 許容閾値は暫定 (ORACLE §7) | ネイティブ FL の golden 待ち。Serum 2 の閾値は本件で再校正していない | ORACLE §7 (既存) |
-| `92f88190` 上の再測定 (ref_harness / e2e) | 測定 commit `dcafb442` 以降に実行経路を変える差分あり。本 run では素材 `plugins-serum2` が無く未実施 | 本 PR で `oc_artifacts: fl-win64 plugins-serum2` を付けて再起動 (起票先: PR #2385) |
+| `92f88190` 上の再測定 (ref_harness / e2e) | 測定 commit `dcafb442` 以降に実行経路を変える差分あり。本 fix run に素材 `plugins-serum2` (実 DLL) が無く未実施。再測定する run は `oc_artifacts: fl-win64 plugins-serum2 apt-mingw` が要り、wine64 は run 内で apt 導入する | PR #2385 本文の `oc_artifacts` 行 (次の fix run / 再起動で実施) |
