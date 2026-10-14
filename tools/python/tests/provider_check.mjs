@@ -20,7 +20,7 @@ const direct = (name, ...a) => { try { return { ok: engine.call(name, a) }; } ca
 const dev = new Set(["device.getPortNumber", "device.isAssigned", "device.setHasMeters", "device.forwardMIDICC", "device.midiOutMsg"]);
 // 実装 = mock (host/fl_mock.mjs・host/ilmcp.mjs) が持つ MIDI 経路の 5 関数 (PY-20)
 const mig = new Set(["channels.selectedChannel", "channels.fillEachNSteps", "general.getVersion", "transport.isPlaying", "ilmcp.forwardTutorialEvent"]);
-// PE 解析で意味論を確定した関数 (REPORT_PY39・PY-69 #2499)。channels.setChannelPitch は未確定のため含めない
+// PE 解析で意味論を確定した関数 (REPORT_PY69・PY-69 #2499)。channels.setChannelPitch は未確定のため含めない
 const pe39 = new Set(["channels.selectOneChannel"]);
 let impl = 0, unimpl = 0;
 for (const id of ids) {

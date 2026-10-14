@@ -13,6 +13,7 @@ export const FLA_LAYOUT = {
   dev_events: 60, dev_frames: 64, dev_ctx_time_bits: 72, out_read: 80, in_write: 84, underruns: 88,
   silence_frames: 92, quanta: 96, in_overruns: 100, wl_state: 104, clock_seq: 108, play_start_frame: 112, clock_jumps: 120, clock_jump_frames: 124,
   out_write: 128, in_read: 132, wake_target: 136, gen: 140, go: 144, in_wake_target: 148, tick_target: 152, notify_ms: 156, burst_obs: 160,
+  clock_skip_frames: 164, clock_dup_frames: 168, clock_jump_max: 172, clock_jump_max_q: 176,
   ref_ctx_time_bits: 192, ref_epoch_ms_bits: 200, ref_seq: 208, out_latency_us: 212, base_latency_us: 216,
   cmd_seq: 256, cmd_op: 260, cmd_arg: 264, ack_seq: 280, ack_status: 284, ack_res: 288, ctrl_ready: 304,
   cb_count: 320, cb_late: 324, cb_max_us: 328, cb_sum_us_lo: 332, wake_count: 336, wait_timeouts: 340,
