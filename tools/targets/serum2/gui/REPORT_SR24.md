@@ -18,7 +18,8 @@
 ### 0-1. 測定 commit と差分 (WORKFLOW §6)
 
 - 測定 commit: `6af8b94a` (コードを変えた最後の commit。`xref_rva.py` はこの commit で作成)。
-- `git diff 6af8b94a HEAD -- tools/targets/serum2/gui` の出力は **0 行** (差分 0。コード・スクリプトの変更なし。本 commit は文書のみ)。
+- `git diff 6af8b94a HEAD -- 'tools/targets/serum2/gui/*.py'` の出力は **0 行** (スクリプトの差分 0)。
+- `git diff --stat 6af8b94a HEAD -- tools/targets/serum2/gui` の実出力: `REPORT_SR24.md | 31 +++++++++++++++++++++----------` (21 insertions, 10 deletions)。本 commit 群は REPORT の文言修正のみで、測定対象のコードは変わっていない。
 - 本 run の環境: runner 上で `Serum2_win64.vst3` を作れず、上記の実測は再現していない (§1・§4 参照)。
 
 ## 1. 再現手順
@@ -36,6 +37,12 @@ work/venv/bin/python gui/xref_rva.py work/Serum2_win64.vst3 fc55b4 1195f14      
 - 所要 (前 run の値・real, 逐次, n=1): `xref_rva.py` 8.87 s (`.text` 全走査)。**load average は未記録** (前 run で `uptime` を取っていない)。
 - **本 run (再測定) の状況**: 素材 `plugins-serum2` が runner 上に無く (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ。その中身にも Serum2 は無い)、入力 `Serum2_win64.vst3` を作れなかった。よって `xref_rva.py` の再測定・`extract_uidesc.py` の再測定は**未実施**。上記 8.87 s と 2,093,822 B は前 run の値で、本 run では再現していない。
 - `extract_uidesc.py`: **未計測** (理由: 入力 `Serum2_win64.vst3` が本 run で作れないため)。
+- **負例・検算 (別バイナリでの動作確認。Serum2 の判定の検算ではない)**: runner 同梱の `jlinenative.dll` (`/usr/share/apache-maven-3.10.0/lib/jline-native/Windows/x86_64/`) の `.text` を対象に `xref_rva.py` を実行。
+  - 正の対照: file `0x4800` (VA `0x2e76f6000`, `.rdata`) → `xref_rva.py` は 1 件 (`0x2e76f13b1: lea rdx, [rip + 0x4c48] -> 0x2e76f6000`)。
+  - 検算: `objdump -d -M intel` で `# 2e76f6000` を含む rip 参照を数えると 1 件 (同じ `0x2e76f13b1`)。一致。
+  - 負の対照: file `0x4801` (VA `0x2e76f6001`, 参照なし) → `xref_rva.py` 0 件、objdump 0 件。一致。
+  - 時間計測は本 run では未実施 (所要・load は未記録)。
+- 未検算のまま残す項目: `0x1804a22a1` の 1 件 (Serum2 本体は runner に無い)、`0x1804a1950` の vtable スロット 11 (`0x180a86be0`)、`0x1800501c0` の 5 呼出元と上流 2 関数の直接呼出 0 件。いずれも未解決 (6) で追跡。
 - 再測定の条件 (未解決 (6) で追跡): `plugins-serum2` を依頼に `oc_artifacts:` で指定して取得し、`uptime` を実行前後に記録、逐次で n≥3 の min–max を取る。
 
 ## 2. 分岐の探索結果 (実測)
