@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -64,6 +65,7 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     dev_port = 0; midi_out_n = 0; sel_chan = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
@@ -192,7 +194,7 @@ FL_H(mixer, setCurrentTempo) {
     return fl_ret_none(c);
 }
 
-/* ---- transport (2) / playlist (4) / ui (3) ---- */
+/* ---- transport (2) / playlist (4) / ui (3 + PY-95 の 9) ---- */
 FL_H(transport, start) { playing = 1; return fl_ret_none(c); }
 FL_H(transport, stop) { playing = 0; return fl_ret_none(c); }
 FL_H(transport, isPlaying) { return fl_ret_b(c, playing); }
@@ -208,6 +210,17 @@ FL_H(playlist, setTrackColor) { PL(0); p->color = A_INT(1, 0); return fl_ret_non
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
 FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
+/* PY-95 (#2831): PE で状態を読んで返すだけの ui ゲッター 9 件 (REPORT_PY95)。値は未実測の仮置き。
+   isMetronomeEnabled / isPrecountEnabled は general.getUseMetronome / getPrecount と同じ状態 */
+FL_H(ui, isClosing) { NARGS(0, 0); return fl_ret_b(c, ui_closing); }
+FL_H(ui, getTimeDispMin) { NARGS(0, 0); return fl_ret_b(c, ui_time_disp_min); }
+FL_H(ui, isMetronomeEnabled) { NARGS(0, 0); return fl_ret_b(c, use_metronome); }
+FL_H(ui, isPrecountEnabled) { NARGS(0, 0); return fl_ret_b(c, precount); }
+FL_H(ui, isStartOnInputEnabled) { NARGS(0, 0); return fl_ret_b(c, ui_start_on_input); }
+FL_H(ui, isLoopRecEnabled) { NARGS(0, 0); return fl_ret_b(c, ui_loop_rec); }
+FL_H(ui, getStepEditMode) { NARGS(0, 0); return fl_ret_b(c, ui_step_edit); }
+FL_H(ui, isBrowserAutoHide) { NARGS(0, 0); return fl_ret_b(c, ui_browser_auto_hide); }
+FL_H(ui, getSnapMode) { NARGS(0, 0); return fl_ret_i(c, ui_snap_mode); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
