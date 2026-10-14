@@ -2,14 +2,16 @@
 
 親 #2258 (LD-96)・前段 `REPORT_APPENDIX_LD96.md` §8、`REPORT_APPENDIX_LD58.md` §7。
 
+既知類型との関係: 該当なし。`docs/DEFECTS.md` の D12 (ours harness) は比較範囲の不足 (出力バッファだけ比較して callee-saved 破損が見えない) で、本件とは別機構。本件は同一 runner で先行する関数が残す wasm 側の状態 (runner 状態の持ち越し) で、機構は未特定 (§5)。
+
 ## 結論
 
 - 0x959a40 の全体 run 限定 diff の出所は、**同じ runner で 0x959a40 より前に流れる 0x50abe0 の case 列**。
   0x50abe0 を直前に 1 本だけ置いた `[0x50abe0, 0x959a40]` で、単独では match の 0x959a40 が mismatch になる (§4 A)。
-- 出所は関数・case の単位まで特定した。0x50abe0 の case 列は「q0 より前の case (z〜pall2)」と「q0」の両方が要る (§4 E1・E2・E4)。
+- 出所は 0x50abe0 の case 列 (pattern 単位) まで。**q0 を含む区間が要る**: fvm 経路が走る条件で、z〜pall2 だけ前置すると match、q0 を加えると mismatch (§4 E1・E4)。**z〜pall2 が要るかは未切り分け**: E2 (q0 のみ) は fvm が走らず、E4 と比べると fvm の有無が交絡する (§4 注)。
 - 直前の 0x43a3f0 は出所ではない (`[0x43a3f0, 0x959a40]` は match: §4 S27)。
 - 出所は runner の内部状態。fresh な runner を挟むと消える (§4 F)。どの wasm 側状態が残るか (機構) は未特定。
-- 受入 (b): 出所の REPORT 記載は達成。機構の確定と、全体 run 間の揺れの説明は未解決 (§5・#2258 残作業)。
+- 受入 (b): 出所の REPORT 記載は達成。機構の確定、z〜pall2 の必要性、全体 run 間の揺れの説明は未解決 (§5・#2681)。
 
 ## 1. 測定条件
 
@@ -21,10 +23,20 @@
 ## 2. 再現
 
 ```sh
-export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"      # 素材展開後 (REPORT_APPENDIX_LD96 §8.7 と同じ手順)
-cd "$(git rev-parse --show-toplevel)/tools/liftdiff"
+# 素材 (REPORT_APPENDIX_LD96 §8.7 と同じ展開)。fl-win64 は $ARTIFACTS_DIR に置かれている前提
+export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"
+cd "$(git rev-parse --show-toplevel)"
+tar --zstd -xf "$ARTIFACTS_DIR/work-liftdiff.tar.zst" tools/liftdiff/work/m11   # 素材版 simd.c・boot_state.json (--state auto)・sigs.json
+tar --zstd -xf "$ARTIFACTS_DIR/work-m11.tar.zst"                                # tools/m11/work
+mkdir -p "$RUNNER_TEMP/fl-win64"
+tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" extracted/block00031_PE.bin
+sha256sum tools/liftdiff/work/m11/simd.c | cut -c1-16   # d82e27592c03a316 でなければ停止
+cd tools/liftdiff
+gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
+# wasm が無いときだけ実行する (ld122_origin.py は build=False で既存 wasm を読む。[EMSDK] が必要。force なし)
+python3 -c "from ldlib import build_wasm as b; b.build(b.load_target('targets/m11.json'))"
 python3 liftdiff.py batch targets/m11.json --set sample:800 --shards 12 --nobuild --state auto --out work/m11/batch_final_r1.jsonl
-python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # 約 100 s
+python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # wall は stderr の `# <実験名> <N>s` 行
 ```
 
 ## 3. 全体 run での 0x959a40
@@ -32,7 +44,12 @@ python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # 約 100 s
 - `batch --set sample:800 --shards 12` (測定 commit `4efe8c5b`・wall 1m54s): 0x959a40 は `mismatch` (`callee_divergence`)。
   - p1・pall: `ret` が違う (native `0xffffd4e8`・wasm `0x2206ec00`) かつ trace の index 2 に `wasm_extra_entry` 0x956550 (native_len 2・wasm_len 3)。
   - qall: `ret` のみ (native `0xfffefb20`・wasm `0x2206a5c0`)。
-- 0x959a40 は chunk 1 (`vas[400:800]`) の shard 4 (`[4::12]`・33 関数) に入り、その 29 番目 (前置 28 関数)。前置列は `ld122_origin.py` の `SHARD` に置いた。
+- 0x959a40 は chunk 1 (`vas[400:800]`) の shard 4 (`[4::12]`・33 関数) に入り、その 29 番目 (前置 28 関数)。
+- **SHARD (`ld122_origin.py`) の導出**: `liftdiff.py` の `cmd_batch` は chunk ごとに `run_functions(part)` を呼び、shard k は `part[k::12]` (`ldlib/session.py`)。jsonl は part の順 (chunk 内の sort 順) に書かれるので、jsonl の 401〜800 行の `[4::12]` が shard 4 になる。次の 1 コマンドで先頭の 29 件を出し、driver の `SHARD` (29 件目が 0x959a40) と一致することを確かめる。
+  ```sh
+  sed -n '401,800p' work/m11/batch_final_r1.jsonl | python3 -c "import sys,json; rs=[json.loads(l)['va'] for l in sys.stdin]; print(' '.join(rs[4::12][:29]))"
+  ```
+  - 本 REPORT の作成 run では jsonl と `work/m11/sigs.json` が素材に無く、このコマンドは**実行していない** (動かしていない)。`SHARD` の値は driver に手で置いたもので、この照合は未実施。
 - 同じ runner で前置列を流し直した replay (`R_shard4_replay`) も `mismatch` (§4)。全体 run の 0x959a40 の結果は、この runner の状態で決まる。
 
 ## 4. 切り分け (`results/ld122_959a40_origin.tsv`・測定 commit `4efe8c5b`)
@@ -57,14 +74,19 @@ python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # 約 100 s
 - A・C・D・E4・R が mismatch、solo・B・S27・F・E1・E2・E5 が match。
 - W (0x5bfff0) だけを前に置く場合は match (B)。X を含むことが必要。
 - F で runner を作り直すと消える。残存は runner の内部状態にある。
+- **fvm の注意**: `_fvm_cases` は前の case で `'s'` の fault が出たときだけ走る。E2 の X 側は `q0=both_fault` のみで、first_outcomes に fvm 行が無い (走らない)。E4 の X 側は fvm 行がある。よって E2 対 E4 は fvm の有無と前置の内容が交絡し、z〜pall2 の要不要は言えない。fvm が走る条件同士の対比は E1 (match) 対 E4 (mismatch) だけで、q0 の要否はこれで言う。
+- tail (qall・vm0・u16) は必要ではない: E4 は tail を含まないのに mismatch (A と同じ判定)。E5 (tail のみ) は match。
+- E4 は 1 回のみ測定 (反復なし)。E1 は ×2 反復で match。
+- TSV の `Y_tags` 列は driver が `make_record(sess, rec, {})` (IR 特徴なし) で作るため、batch の tags と同じとは限らない。本表の判定は verdict と outcome で行い、tags は参考。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x50abe0 の z〜pall2 と q0 が残す wasm 側の状態の機構 (どの領域・どの書込み)。heap 残存は未計測 (LD-96 §8 の監査は 0x50abe0 の先頭 case z のみ、残存 0) | 受入 (b) の原因の確定 | #2258 (残作業) |
-| 全体 run 間の揺れの説明。LD58 の shard 12 は r1 のみ match (`REPORT_APPENDIX_LD58.md` §7)。本 run の全体 run は 2 回 (`5d88dda2`・`4efe8c5b`) とも mismatch。replay は反復で安定 | 件数の揺れ | #2258 (残作業) |
-| 0x50abe0 の q0 の outcome が run で違う (前回の全体 run は `hang` (wasm timeout)・測定 commit `4efe8c5b` の全体 run と replay は `both_fault`)。timeout 判定の負荷依存が揺れの候補 (未検証) | 揺れの説明 | #2258 (残作業) |
+| 0x50abe0 の q0 (と z〜pall2 の要否) が残す wasm 側の状態の機構 (どの領域・どの書込み)。heap 残存は未計測 (LD-96 §8 の監査は 0x50abe0 の先頭 case z のみ、残存 0) | 受入 (b) の原因の確定 | #2681 |
+| z〜pall2 の要否。fvm を揃えた対照 (例: `[s, q0]` を前置) は未測定 (本 run の素材に `toolchain-emsdk`・`work-liftdiff`・`work-m11` が無かった) | 結論の範囲 (§結論) | #2681 |
+| 全体 run 間の揺れの説明。LD58 の shard 12 は r1 のみ match (`REPORT_APPENDIX_LD58.md` §7)。本 run の全体 run は 2 回 (`5d88dda2`・`4efe8c5b`) とも mismatch。replay は反復で安定 | 件数の揺れ | #2681 |
+| 0x50abe0 の q0 の outcome が run で違う (前回の全体 run は `hang` (wasm timeout)・測定 commit `4efe8c5b` の全体 run と replay は `both_fault`)。timeout 判定の負荷依存が揺れの候補 (未検証) | 揺れの説明 | #2681 |
 
 ## 6. 差分
 
