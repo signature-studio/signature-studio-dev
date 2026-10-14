@@ -79,3 +79,18 @@ bash trap_triage/store_watch_1783.sh run1   # 全 unit 完走まで要時間 (ru
 - 本 PR 自身の差分 (`8ba5017d..e124f367`、`store_watch_1783.sh` のみ) は上記 diff の `store_watch_1783.sh` 行。`git diff 8ba5017d e124f367 -- tools/m11/trap_triage/store_watch_1783.sh` で再現できる。
 - 修正 commit: `e124f367` (`store_watch_1783.sh` の `[aw]` 経路・dead code 削除)。`2c0c8f4d` は REPORT のみ。`eb55aef7` は main (`3624a5fc`) の取り込み merge。
 - `git diff 6e001233 8ba5017d -- tools/m11` は追加 2 ファイル (REPORT_1783.md・store_watch_1783.sh) のみ。`tools/m11` の既存コードは変更なし。
+
+## 7. #1869 追記: 全 942 unit の値判定と計装版の停止点 (2026-10-14)
+
+- 測定 commit: `a10edf01` (`survey_units.mjs` に `SV_SLOT` を追加。以降 `tools/m11` のコードは同一)。
+- 素材: work-m11・toolchain-emsdk・fl-win64 を `$HOME/artifacts` から展開 (fl-win64 は `$RUNNER_TEMP`)。`m11_gen_ir2.sh` rc 0 (45.7 s)、`m11_build.sh` rc 0 (21.6 s)。
+- (a) 計装なし build・全 942 unit (`SV_SLOT=0x1ac308`): rc 0・11.4 s。boot_enter 後の `0x1ac308` の値は `0xf960`。**値が変わった unit は 0 件** (`work/probe1869/slot.json` に `slot` 付きの unit 無し)。値が同じままの書込みは、この方法では見えない。
+- (b) 計装版 `store_watch_1783.sh run1` (計装 54,041 store・`timeout 1500`): rc 124・25 分 19 秒。進捗行 `unit N` は unit N の**開始**を示す。完走は unit 0〜144 (145 unit)、`[aw]` は 0 件。**unit 145 が 25 分以上完走せず** (`run1.err` の最終行 `unit 145`)。計装なし版は同じ unit を含めて 11.4 s で完走する。
+- 前節 §2 の run2 の「unit 0〜145 (146 unit) を完走」は、進捗行を完走と読み違えた記述。完走は 0〜144 が正しい。
+- 受入条件の判定: 1 (全 942 unit の `[aw]` 採取) は未達 (計装版が unit 145 で停止)。2 (native 側の `0x5ac308` 捕捉) は未着手。3 (REPORT_1783 への実測記録) は本節で部分達成。
+- 未解決 (起票先):
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 計装版の unit 145 の停止原因と、停止を避けた全 942 unit の `[aw]` 採取 | wasm 側の書込み元が未確定 | 子 issue (本 PR 本文の表) |
+| native 側 `0x5ac308` の store 捕捉 (ld_native に監視が無い) | 両側の比較ができない | 子 issue (本 PR 本文の表) |
