@@ -406,6 +406,8 @@ print(f"candidates (disp 0x30/0x38/0x88): {len(rows_s)}")
 print("== strict (分岐越えの定義は未解決) ==")
 for k, n in cs.most_common():
     print(f"{n:5d}  {k}")
+ind = sum(1 for r in rows_s if r[4].endswith("NODOM") and fns[r[1]].indirect)
+print(f"strict NODOM のうち間接 jmp を含む関数: {ind} 件")
 print("== loose (分岐を無視・参考) ==")
 for k, n in cl.most_common(12):
     print(f"{n:5d}  {k}")
