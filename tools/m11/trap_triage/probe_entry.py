@@ -44,7 +44,7 @@ static u64 rd8(u64 x) { return in_img(x) ? *(volatile unsigned char*)(uintptr_t)
 void m11_pe(u64 fn, u64 a1, u64 a2, u64 a3, u64 a4) {
     u64 l = q(a1 + 8);
     fprintf(stderr, "[pe] %llx a=%llx %llx %llx %llx | [a1]=%llx [a1+8]=%llx [[a1+8]+8]=%llx [[a1+8]+0x10]=%llx\n", fn, a1, a2, a3, a4, q(a1), l, q(l + 8), q(l + 0x10));
-    if (fn == 0x407a50ULL) { u64 p = a1 - 8; fprintf(stderr, "[raw407] a1=%llx p=%llx v=%llx\n", a1, p, p < 0x1500000ULL ? *(volatile u64*)(uintptr_t)p : 0xdeadULL);
+    if (fn == 0x407a50ULL) { u64 p = a1 - 8; fprintf(stderr, "[raw407] a1=%llx p=%llx v=%llx\n", a1, p, rd64(p));
         if (a1 < 2601) { u64 b = rd8(18770492ULL + (a1 + 7) / 8); u64 rb = 16404744ULL + 16 * b; u64 n = rd64(rb + 8); u64 m = rd64(n + 24); fprintf(stderr, "[chain407] b=%llx rbx=%llx n=%llx m=%llx m-8=%llx\n", b, rb, n, m, m - 8); } }
 }
 ''')
