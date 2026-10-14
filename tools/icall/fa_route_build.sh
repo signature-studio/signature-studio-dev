@@ -36,6 +36,20 @@ python3 "$HERE/vex_gen.py" "$W/oi.flat.ll" "$W/oi.vex.c" > "$W/vex_gen.json"
 python3 "$HERE/simd_merge.py" "$W/oi.simd0.c" "$W/oi.simd.c" "$HERE/rt/icall_simd_extra.c" "$W/oi.vex.c" --report "$W/simd_merge.json" >/dev/null
 # 4. data 敷設 (.rdata/.data/_RDATA, DIR64 補正済み)
 python3 "$T/ott/lift/data_gen.py" "$DLL" "$W/fa_data.c" > /dev/null
+# ICALL-55: native の FA_ENC_INIT=1 と同じ encoded slot 初期化 (enc(NULL)=cookie) を data install の末尾に足す
+if [ "${FA_ENC_INIT:-0}" = "1" ]; then
+python3 - "$W/fa_data.c" <<'PY'
+import sys
+COOKIE = 0x18125eaa8 - 0x180000000 + 0x30000000
+SLOTS = [0x1813068d0, 0x1813068f8, 0x181306900, 0x181306908, 0x181306910, 0x1813072b0,
+         0x1813073f0, 0x1813073f8, 0x181307400, 0x181307408, 0x181307410, 0x181307418]
+p = sys.argv[1]
+src = open(p).read().rstrip()
+assert src.endswith('}')
+add = ''.join('  *(uint64_t*)0x%xu = *(uint64_t*)0x%xu;\n' % (s - 0x180000000 + 0x30000000, COOKIE) for s in SLOTS)
+open(p, 'w').write(src[:-1] + add + '}\n')
+PY
+fi
 # 5. build (BLK = $BLK_SHIFTED, memory 0x3c000000)
 emcc "$W/oi.flat.ll" "$W/oi.simd.c" "$W/oi.vex.c" "$W/oi.table.c" "$W/fa_data.c" "$HERE/rt/icall_rt.c" "$HERE/rt/icall_ovr.c" "$HERE/rt/icall_simd_extra.c" \
   -DICALL_BLK=$BLK_SHIFTED -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB -sGLOBAL_BASE=268435456 \

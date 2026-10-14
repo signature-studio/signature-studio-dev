@@ -202,3 +202,24 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 ### 次の手順 (#1620 へ)
 1. unit 106 で計装版が止まる原因を、計装版 IR の unit 105 → 106 の間の挙動で切り分ける (`[aw]` でなく、unit 106 直前の `[m11]` trace の有無で確認)。計装 `m11_sw` の呼び出しを、必要な unit 範囲だけ IR 内で分岐させる形 (`if (watch_on)` を IR 側に入れる) へ変えると、計装の副作用が減るか試す。
 2. 計装版が完走したら、`[aw]` の unit 境界 (`unit N` 行) と sites.json で fn・IR 行に戻す。
+
+## 18. #1620 run (HEAD `c171b9dc` = origin/main、コード変更なし): 計装版の停止を「計装 IR 固有」まで切り分け (結論なし)
+
+- 測定 commit: `c171b9dc` (コード差分 0。本節の追記のみ)。素材: `fl-win64` を展開し `[WIN64]` の `extracted/block00031_PE.bin` を確認。`work-m11`・`work-liftdiff` は worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。ツールチェーンは `[EMSDK]`・`[RETDEC]` を使用。
+- 再現 (素の build): `m11_gen_ir2.sh` rc 0 (50.5 s、490,733 行) → `m11_build.sh` rc 0 (25.1 s) → `survey_units.mjs` rc 0 (13.4 s): `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
+- 計装版の停止 (`store_watch_1046b.sh 0 110 t110 0 110`): unit 106 で停止 (timeout 400 s、rc 124、CPU 42 s)。
+- 切り分け (計装版 build を手で作り、survey を通さない素の実行ループ `run_plain` で確認):
+  - 素の build で unit 0〜941 を 12.9 s で完走 (rc 0)。survey と同じ戻り値 (104: ok、105: miss、106: ok)。
+  - 計装版 build (`boot.o` を計装 IR に差し替え) で unit 0〜106: 120 s の timeout で rc 124 (CPU 120 s、計算の暴走)。`unit 106` の後で止まる。
+  - 計装版で unit 106 単独 (前段なし) は 0.4 s で `ret 1`。前段の影響。
+  - 開始 unit を変えると: `from 0`・`from 1` は停止、`from 2` 以降は完走。**unit 1 単独 (`0..1`) は計装版でも完走**。`1..106` は停止。したがって unit 1 の実行後の状態が 106 を壊す。
+  - unit 1 の後の `0x10a9f910` の 8B: 素の build は `00 00 00 00 00 00 00 00` のまま、計装版は `04 00 00 00 29 32 00 00` (unit 1 が書く)。素の build では unit 1 はこの番地に書かない。
+  - `m11_sw` / `m11_watch_on` を空関数 (nop) に差し替えた計装版でも、`0..106` は停止 (timeout 60 s、rc 124)。**停止は C 側の監視関数ではなく、計装 IR (`watch_store_682.py` の出力) 側の性質**。
+  - 計装 IR の検査: `wsa_`/`wsv_`/`call void @m11_sw` 行を除いた後の `boot_sw.ll` と `boot_final3.ll` の全行 diff は `declare` 1 行のみ。したがって元の SSA 値・分岐は変えていない、と読める。ただし差分 0 件でも挙動が変わる原因 (最適化・未定義挙動・ヒープ配置) は未切り分け。
+- 素の build の値遷移 (読取りのみ): `unit 477 → 0x1_2`、`unit 484 → 0x1_3`、`unit 492 → 0`。§14 と一致。
+- 計装版の survey 結果の基準 (計装有無で同一になるべき条件): 素の build に戻した後、`0..106` と `0..941` の素の実行が完走することを確認 (rebuild rc 0)。`git status` は既存ファイルに差分 0 (work/ は gitignore)。
+
+### 結論 (本 run)
+- 受入 1 (書込み元 store の IR site 特定): **未達**。計装 IR では unit 106 が止まり、全 store 計装で unit 0〜484 を通せない。
+- 停止の性質: 「`m11_sw` の C 実装」ではなく「計装 IR そのもの」が、前段 unit 1 の挙動 (`0x10a9f910` への書込み) を変えている。原因は未切り分け。
+- 次の手順 (子 issue に移す): (a) 計装 IR の差分 (`declare` 以外の追加行) を、`wsa_`/`wsv_` を消さずに 1 種類ずつ外して、unit 1 の書込みが消える最小の変更を探す。(b) 最小変更で unit 0〜484 が完走する計装版を作り、`[aw]` の unit 境界で `0x10a9f910` への書込み site を取る。(c) D17 か別類型かを判定する。
