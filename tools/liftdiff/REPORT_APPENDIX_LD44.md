@@ -53,9 +53,12 @@
   -                if c['outcome'] in ('diff', 'wasm_trap') and not refined and c.get('wasm_status') != 'timeout':
   +                if c['outcome'] in ('diff', 'wasm_trap') and not refined and c.get('wasm_status') != 'timeout' and c['pattern'] in patterns:
   ```
-  この差分は `ae802a4c` (fvm pattern の refine を除外する修正) に由来する。batch は `patterns=None` で `PATTERN_NAMES` (fvm を含まない) を渡すため、batch の case 集合は変わらない見込みだが、**未検証**。
-- 差分の集計 (`git diff --stat 92a145a5 HEAD -- tools/liftdiff tools/m8 tools/ott tools/m11`): 24 files changed, 646 insertions(+), 41 deletions(-)。
-- 再測定 (差分の反映) は未実施。素材 `work-m11` と `toolchain-emsdk` が本 run に無いため (`targets/m11.json` が `tools/m11/work/` を要求)。次の run で `oc_artifacts: fl-win64 work-m11 toolchain-emsdk work-liftdiff` を指定して再測定する (子 issue 起票先は §6)。
+  この差分は `ae802a4c` (fvm pattern の refine を除外する修正) に由来する。
+- 差分が結果を変える条件: 新条件は `c['pattern'] in patterns` が偽の case (fvm 由来) を refine から外す。旧コードでは、fvm 由来の case が refine の最初の対象 (`outcome` が diff / wasm_trap) になると `patterns.index('fvm')` が ValueError を出し、batch 全体が落ちる (`ae802a4c` の commit message の事例)。`_fvm_cases` は全 pattern が equal/diff/wasm_trap になかった関数でのみ呼ばれるため、fvm case が最初の diff/wasm_trap になるのは「fvm case のどれかが diff/wasm_trap」の場合に限られる。
+- 92a145a5 の測定 6 本 (`ld44_e2e_r1-3`・`ld44_r1-3` の `.log`) は、いずれも `[batch] done` まで完走し (800/800)、Traceback・ValueError は 0 件。旧コードでこの経路に入っていれば crash していたので、6 本の測定では fvm 由来の diff/wasm_trap は発生しておらず、新条件は全 case で旧コードと同じ分岐を取った (出力は変わらない)。
+- ただし、これは 92a145a5 の log からの論理的な推定であり、HEAD での再測定ではない。件数・verdict・case outcome の実測の一致は未確認 (下記)。
+- 差分の集計 (`git diff --stat 92a145a5 HEAD -- tools/liftdiff tools/m8 tools/ott tools/m11`): 24 files changed, 657 insertions(+), 41 deletions(-)。
+- 再測定 (差分の反映) は未実施。素材 `work-m11`・`toolchain-emsdk`・`work-liftdiff` が本 run に無いため (`targets/m11.json` が `tools/m11/work/` を要求)。次の run で `oc_artifacts: fl-win64 work-m11 toolchain-emsdk work-liftdiff` を指定し、HEAD で sample:800 batch を 3 回測る (子 issue 起票先は §6)。
 
 - 最初に `--shards 4` (`--state` なし) で測った値 (352 / 170 / 278) を e2e 条件と取り違えないこと。e2e の [4/4] は `--shards 12 --state auto` で、こちらが基準。
 - `ld44_*` の `.log` は batch の stdout のみで、ケース単位の `native_status`・`wasm_status` は含まれない。`case outcome` の hang の内訳 (native か wasm の timeout か) は依然として未確定。
