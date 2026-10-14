@@ -2,7 +2,7 @@
 
 - 担当 issue: #1890 `[PLG-P0b-8]` (親 #1848)。受入 1 (0x710030 / 0x710040 の値確定と 0x40d6e0 経路の遮断)・受入 2 (`hs_e2e.sh --fresh` Phase B の `plug != 0`) は **未達**。受入 3 (Phase A 回帰 `dispatch=38 ff=0`) は **達成**。
 - 起点: `origin/main` 576c4976。worktree `ws-1890`・branch `1890-plg-p0b-8-fold-deref`。コード変更なし (本 REPORT の追加のみ)。
-- 素材: `work-fw-stage1` (repo ルート展開 → `tools/plugins/work/fw`・12 件)・`fl-win64` (`$RUNNER_TEMP/fl-win64` は未展開。fw_stage2 は `FL_WIN64_DIR` 指定で動作)・`toolchain-emsdk`・`toolchain-retdec` は `/opt/emsdk`・`/opt/retdec` で確認済み。
+- 素材: `work-fw-stage1` (repo ルート展開 → `tools/plugins/work/fw`・12 件)・`fl-win64` (`$RUNNER_TEMP/fl-win64` は未展開。fw_stage2 は `FL_WIN64_DIR` 指定で動作)・ツールチェーンは [EMSDK]・[RETDEC] で確認済み。
 
 ## 1. 実測
 
@@ -10,11 +10,12 @@
 
 | 手順 | 結果 | 所要時間 (real) | load (開始 / 終了) |
 |---|---|---|---|
-| `fw_stage2.sh --fresh` (stage-1 再利用・`r2`/`r3` 既存) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 9 分 28 秒 (n=1) | 0.08 / 0.31 / 0.18 → 2.59 / 1.81 / 0.93 |
-| `hs_e2e.sh --fresh` | exit 1。`[hs_irfix] 置換数不一致 (0 != 2)` で停止 (Phase A・B に到達せず) | 0.22 秒 (n=1) | 2.19 / 1.75 / 0.92 |
+| `fw_stage2.sh --fresh` (stage-1 再利用・`r2`/`r3` 既存) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 9 分 28 秒 (**実測 n=1**) | 0.08 / 0.31 / 0.18 → 2.59 / 1.81 / 0.93 |
+| `hs_e2e.sh --fresh` | exit 1。`[hs_irfix] 置換数不一致 (0 != 2)` で停止 (Phase A・B に到達せず) | 0.22 秒 (**実測 n=1**) | 2.19 / 1.75 / 0.92 |
 
 - Phase A の回帰 `dispatch=38 ff=0` は stage-2 smoke で確認 (PASS)。Phase B の実測 (`plug`・`rec`) は取得できず。
-- n=1。レンジは未取得。
+- **n=1 の限界**: 上記は n=1 のため min–max レンジは未取得 (`docs/WORKFLOW.md` §5 の n≥3 に未達)。fw_stage2 1 回が約 9.5 分で、n=3 は本 run の上限に収まらなかった。再測定は #1935 で行う (§5)。
+- 停止位置の再現 (1 本): `bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh 2>&1 | grep -F '[hs_irfix] 置換数不一致'` が `0 != 2` を出力すれば同じ停止位置。
 
 ## 2. 現行 IR で判明したこと (`fw_flat4_canon3.ll`)
 
@@ -36,7 +37,7 @@
 
 ```sh
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 ANALYSIS_DIR=$RUNNER_TEMP/analysis
-tar --zstd -xf $HOME/artifacts/work-fw-stage1.tar.zst              # repo ルートで展開
+tar --zstd -xf $ARTIFACTS_DIR/work-fw-stage1.tar.zst               # repo ルートで展開
 bash tools/plugins/framework/fw_stage2.sh --fresh                  # exit 0・SMOKE PASS (約 9.5 分)
 bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh            # 現状は hs_irfix で停止 (置換数不一致)
 ```
@@ -47,4 +48,5 @@ bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh            # 現状は h
 |---|---|---|
 | `hs_irfix.py` の定数前提 (`@688`/`@689`) が現行 lift と不一致。`hs_e2e.sh --fresh` が Phase B に到達しない | Phase B の `plug != 0` 実測ができない | #1890 (本 issue 継続) |
 | `0x710030` / `0x710040` の正しい値 (FL 本体 export table からの確定) | `0x40d6e0` の `[0x710040] == 0` 経路を塞げない (受入 1) | #1890 (本 issue 継続) |
-| fail-soft 3 件の戻り値の確定 | `0x52cf40` / `0x4e6060` / `0x4181e0` の 0 の意味が未確定 | #1891 `[PLG-P0b-9]` (既存) |
+| fail-soft 3 件の戻り値の確定 | `0x52cf40` / `0x4e6060` / `0x4181e0` の 0 の意味が未確定 | `0x4181e0` は #1933 `[PLG-P0b-10]` (open)。`0x52cf40` / `0x4e6060` は #1891 が CLOSED (2026-10-14) のため起票先なし → PM に新規起票を依頼 |
+| 測定が n=1 (変動値のレンジ未取得) | 所要時間・load の揺れ幅が不明。`fw_stage2.sh` 1 回 約 9.5 分で本 run 内に n=3 が収まらない | #1935 `[PLG-P0b-10]` (次回の検証で n≥3 のレンジを取得) |
