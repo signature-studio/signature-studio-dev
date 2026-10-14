@@ -51,7 +51,7 @@ E3 では stage4 の boot が `threw: null`・`dllmain_done: true` になり、�
 ## 5. 測定と再現の状態
 
 - **初版の測定 (commit `5fe8dbe0`) は無効**。base は qstore 前の IR で、所要秒 (n=1) は比較の根拠にしない。
-- **再測定は未実施**。必要なこと: (a) 素材 `work-m11` (`tools/m11/work/boot_final3.ll`・`m11_image.bin`)・work-liftdiff・emsdk・RetDec を揃える、(b) `python3 tools/m11/m11_cond.py --get qstore` が `applied` の IR で base (`m11_ov.c` = main) を測る、(c) pe の指紋 (`sha256sum block00031_PE.bin`) と qstore 状態を REPORT に書く。この run では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` だけがあり、`tools/m11/work`・`/opt/emsdk`・`/opt/retdec` が無いため、(a)〜(c) は実行できなかった。
+- **再測定は未実施**。必要なこと: (a) 素材 `work-m11` (`tools/m11/work/boot_final3.ll`・`m11_image.bin`)・work-liftdiff・emsdk `[EMSDK]`・RetDec `[RETDEC]` を揃える、(b) `python3 tools/m11/m11_cond.py --get qstore` が `applied` の IR で base (`m11_ov.c` = main) を測る、(c) pe の指紋 (`sha256sum block00031_PE.bin`) と qstore 状態を REPORT に書く。この run では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` だけがあり、`tools/m11/work`・`[EMSDK]`・`[RETDEC]` が無いため、(a)〜(c) は実行できなかった。
 - コード差分 (WORKFLOW §6): e2e の経路 (`m11_ov.c`・`ldfix_e2e.sh`・`stage4.sh`・`survey_stage4.mjs`・`ldfix.py`・`fix_450560.py`) は main (`bbb07d80`) に対して差分 0。
 
 ```sh
