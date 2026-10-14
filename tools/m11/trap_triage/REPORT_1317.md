@@ -122,7 +122,7 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 ## 7. 追補 (2026-10-14・#1317 4 回目 run): 再現の再測定
 
 - 測定 commit: `04a7ff1a` (origin/main)。本追補のみが差分 (コード差分 0)。
-- 素材: fl-win64・toolchain-retdec・toolchain-emsdk (runner の `/opt/emsdk`)・work-m11・work-liftdiff を展開。`m11_gen_ir2.sh` 42 s rc=0 / `m11_build.sh` 27 s rc=0 (`M11_M2P=1`、`wasm-ld signature mismatch: 0`)。load 0.8〜1.3。
+- 素材: fl-win64・toolchain-retdec・toolchain-emsdk ([EMSDK])・work-m11・work-liftdiff を展開。`m11_gen_ir2.sh` 42 s rc=0 / `m11_build.sh` 27 s rc=0 (`M11_M2P=1`、`wasm-ld signature mismatch: 0`)。load 0.8〜1.3。
 - 再現 (`SV_ONLY` + `survey_units.mjs`、上限 60 s、各 2 回):
 
 | 条件 | run | rc | 所要 | 結果 |
