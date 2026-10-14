@@ -1,0 +1,123 @@
+# PY-100 (#2879): channels.getStepParam / getCurrentStepParam の PE 確定と実装
+
+親: #2808 (PY-90)。前段: `REPORT_PY41_1514.md` (本件を #2808 へ分割した根拠)、`REPORT_PY39_2548.md` (setStepParameterByIndex 側の共通経路 0xd5b930)。
+本ファイルは PY-100 の run の実測のみ。全体の要約は `REPORT.md`。
+
+## 結論
+
+1. 2 関数の PyArg 書式・kwlist・既定値・エラー経路を PE で確定した (getStepParam = 5 引数、getCurrentStepParam = 4 引数)。stub (6 引数 / useGlobalIndex) とは binary が違う。
+2. 共通読出し 0xd5b930 の param → 構造体 offset の写像 (0〜8) を確定した。範囲外と構造体無しは -1。
+3. `[global]` (getStepParam の pat / getCurrentStepParam の pat) は **現在のパターン番号**。`patternNumber()` (0xd64d20) と同じ slot を読むことを PE で確認した。
+4. C provider と mock に実装した。構造体 = grid bit が 1 の step とみなし、既定値は stub 順。`channels_diff` 145 呼出し diffs 0、provider 実装 77 → 79、`all_tools` (wasm) 48/48。
+5. **未確定**: 構造体の生成経路 (note をどこで作るか) と既定値 (60/100/64/120/64/64/64/0) の PE 確認、param 8 (+0x11) の既定値。子 #2929 ([PY-111]) に分けた (§8)。
+
+## 1. 書式と引数 (PE 実測。再現: `analysis/flapi/pe_step_param.py`)
+
+| 関数 | VA | PyArg 書式 | kwlist (PE の文字列) | 既定値 | stub (REPORT_PY32) との差 |
+|---|---|---|---|---|---|
+| getStepParam | 0xd5ba00 | `iiii\|i` | step, param, offset, startPos, padsStride | padsStride = 16 (`mov [rbp+0x5c],0x10` @0xd5ba09) | stub の 3 番目 `index` が binary では `offset`。stub の 6 番目 `useGlobalIndex` は binary に無い |
+| getCurrentStepParam | 0xd5bb30 | `iii\|i` | index, step, param, useGlobalIndex | useGlobalIndex = 0 (`mov [rbp+0x48],0` @0xd5bb38) | stub と一致 |
+
+- `provider/gen/fl_table.c` の行 61 (getStepParam) は stub 由来の np=6 のまま。handler で `NARGS(4, 5)` とし、6 引数は binary と同じく TypeError (code 5)。表の再生成は `gen_provider.py` の別作業 (§8)。
+
+## 2. 呼出し経路 (PE 実測)
+
+**getStepParam (0xd5ba00)**
+1. 引数解析に失敗したら 0 を返す経路 (例外)。
+2. `padsStride == 0` → status -3 (`Range error`、FL code 4)。(0xd5ba66〜0xd5ba71)
+3. `q = step / padsStride` (idiv・切り捨て)、`idx = q + offset`。`idx` が `[0, 件数-1]` の外なら status -4 (`Index out of range`)。件数は `[[0x15e0128]+0x10]`。(0xd5ba7b〜0xd5baae)
+4. `chanId = [list[idx] + 0x794]`。
+5. `0xd5b930(chanId, [slot], pos = step - q*padsStride + startPos, param)`。
+
+**getCurrentStepParam (0xd5bb30)**
+1. 引数解析。
+2. `0x1005730(index, useGlobalIndex > 0, &obj)` が偽なら status -4。(0xd5bb96〜0xd5bb9d)
+3. `chanId = [obj + 0x794]`、`0xd5b930(chanId, [slot], step, param)`。
+
+値の返し方: `0xd5b930` が -1 を返せば Python 側には -1 が値として返る (例外ではない。0xd5b93d〜0xd5b942 の `or eax,-1`)。status -3 / -4 は例外経路 (`0xd82c20`)。
+
+## 3. 共通読出し 0xd5b930 の param 写像 (PE 実測)
+
+| param | 構造体 field | 型 (読出し) | 既定値 (stub 順) | 書込み側の clamp (REPORT_PY39_2548 の PE) | 状態 |
+|---|---|---|---|---|---|
+| 0 | +0xc | word・符号付き | 60 | (未読) | 既定値は stub 由来。PE 未確認 |
+| 1 | +0x15 | byte | 100 | (未読) | 同上 |
+| 2 | +0x12 | byte | 64 | (未読) | 同上 |
+| 3 | +0x10 | byte | 120 | [0, 0xf0] | 同上 |
+| 4 | +0x14 | byte | 64 | [0, 0x80] | 同上 |
+| 5 | +0x16 | byte | 64 | [0, 0xff] | 同上 |
+| 6 | +0x17 | byte | 64 | [0, 0xff] | 同上 |
+| 7 | +0x0 | dword | 0 | (clamp 無し) | 同上 |
+| 8 | +0x11 | byte | (未確定) | (書込み `low8(value)`・REPORT_PY39_2548) | **未モデル。本実装は -1** |
+| その他 | — | — | — | — | -1 (PE: `or eax,-1`) |
+
+0xd5b930 の先頭で `0x130f1e0` が NULL を返すと -1 (0xd5b93d〜0xd5b942)。構造体が無い step も -1。
+
+## 4. 構造体 (note) の検索 (PE 実測。生成経路は未読)
+
+- `0x130f1e0(chanId, pat, pos)` は `pos * A` を作って `0x130f060(chanId, pat, pos*A)` を呼ぶ薄い wrapper。`A` は slot `0x15e25f8` が指す dword。`0x130f1e0`・`0x130f060` 内の乗除・加算 (5 箇所) はすべて同じ slot を読む。`A` の実行時値は静的に読めない (ヒープ上の値と推定)。
+- `0x130f060` の流れ:
+  1. チャンネル列 (slot `0x15e2218`) を走査し `+0x794 == chanId` の添字 `r14` を求める (無ければ件数)。
+  2. `r14` が `[0, 件数-1]`、`pat` が `[0, 998]` (`0x3e6`)、パターン表 (要素 24 バイト・slot `0x15e2aa0`) の `pat` の要素の `+0x28` が非 NULL。どれかに反すると NULL。
+  3. `0x12df320(container, &cursor, tick + A)` を反復。`0x12df320` は「開始位置 (dword +0) が `tick + A` 未満の要素を順に返す」反復子 (0x12df320〜0x12df34a)。
+  4. 要素の `+6` (word) が `chanId` と一致し、`tick` が `[snap(start), max(f(要素), snap + A - 1)]` に入ると採用。`snap(start) = floor(start / A) * A`、`f = 0x105f2e0` (未読)。
+- 対応: 「構造体 = そのチャンネルの、step セルに掛かる note」。mock の grid bit (1 step の note とみなす) は、note 長が 1 step の場合だけ一致する。note 長 (`f`) と `A` の値は未確認。
+
+## 4b. 参照先の一致 (`[global]` = 現在のパターン番号)
+
+| 参照元 | 読む slot (計算値) | 備考 |
+|---|---|---|
+| getStepParam (0xd5bace の RIP 相対) | 0x15e4018 | `mov edx,[*slot]` を 0xd5b930 の第 2 引数へ |
+| getCurrentStepParam (0xd5bbb0) | 0x15e4018 | 同上 |
+| patternNumber() (0xd64d20 が読む slot) | 0x15e4018 | `int` を返す。PY-42 の「グローバル変数の int」 |
+
+- 3 参照が同一 slot なので、`[global]` は `patternNumber()` と同じ値 (現在のパターン番号)。`0x130f060` が `[0, 998]` を検査し、パターン表の添字に使うのと整合する。
+- 注 (未確認): getStepParam の件数付き列 (slot `0x15e0128`) は要素の `+0x794` を chanId とみなすが、`0x130f060` が走査する列 (`0x15e2218`) と別 slot。同一配列かは未確認。
+- 計算の根拠: RIP 相対 `next_ip + disp` (`pe_step_param.py`)。
+
+## 5. 実装 (C provider と mock)
+
+- `provider/fl_engine.c`: `step_param` (構造体 = `steps[pos]` が 1、param 0〜7 は既定値、それ以外 -1) と 2 handler。
+- `host/fl_mock.mjs`: `stepParam` と 2 impl。C と同じ検査順 (引数解析 → padsStride 0 → index)。
+- 未モデル (両方に共通):
+  - pattern 次元: mock は単一パターン。`pat` (`[global]`) は見ない。
+  - `useGlobalIndex` (0x1005730 の group 配列 A/B): group 無し (既存関数と同じ扱い)。
+  - param 8: 既定値未確定のため -1。
+  - 構造体の生成条件: grid bit が 1 の step を構造体ありとみなす (推定。生成経路は未読)。
+  - 既定値 (60/100/64/120/64/64/64/0): stub 由来。PE の生成経路で確認するまで実装の根拠は stub のみ。
+
+## 6. 検証 (HEAD `ff2d288f`。コードを変えた最後の commit)
+
+| 検査 | コマンド (`tools/python` で実行) | 結果 | 所要 |
+|---|---|---|---|
+| provider の build | `bash provider/build.sh` | rc 0 (emcc キャッシュ済み) | 0.92 秒 |
+| 件数・ABI | `node tests/provider_check.mjs` | PASS (functions 435・implemented 79・unimplemented 356) | 0.353 秒 |
+| C と mock の差分 | `node tests/channels_diff.mjs` | PASS (calls 145・diffs 0) | 0.049 秒 |
+| 48 tool (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok (soft_error 0・raised 0・host_calls 37425) | 2.064 秒 |
+
+- 作業用の素材と wasm (gitignore): `fl-win64` の PE と DATA 4 本 (`block24429`・`block24430`・`block25159`・`block24618`) を `$RUNNER_TEMP/fl-win64` に展開 (2.8 秒)。`toolchain-emsdk` を展開 (3.4 秒)。`fetch_inputs.sh` は 0.27 秒。CPython wasm は `build_cpython_wasm.sh` で 4 分 8.6 秒 (rc 0)、`FLPY_SKIP_TABLE=1 build_flpy.sh` は 6.3 秒 (rc 0)。
+- 負荷: 計測直前 `uptime` で load average 0.27 / 1.18 / 0.81 (nproc 4)。
+- 追加の PE 再現: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_step_param.py` は assert 通過 (書式・kwlist・slot 3 件の同一性)。
+- ネガティブコントロール: mock の `STEP_DEF[3]` を 120 → 121 に変えると `channels_diff` は差分 1 件で rc 1 (FAIL)。戻すと PASS (145 呼出し・diffs 0)。
+- 差分 0 の証跡: `git diff ff2d288f HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0` (測定 commit 以降のコードは無変更。以後の commit は `tools/python/REPORT_PY100.md` と `docs/DOC_MAP.md` のみ)。
+- 検証範囲: 実 FLEngine (wasm) の戻り値との比較はしていない。C provider と mock の一致、PE 実測の書式・経路・slot の一致のみ。範囲外: 実機での既定値・note 生成・pattern 別の値。
+
+## 7. 受入条件の状態 (#2879)
+
+- [x] 書式・kwlist・既定値・エラー経路を PE で確定し、ABI を決めた (§1・§2)。
+- [x] `[global]` が現在のパターン番号であることの確認 (§4b。slot 同一)。
+- [△] `0x130f1e0` の構造体の**生成条件**と既定値の PE 確定: 検索条件 (note の chanId・pattern・step セル) は確定 (§4)。生成経路と既定値 (stub 値との照合) は未確定 → 子 issue。
+- [x] 決めた ABI で `provider/fl_engine.c` と `host/fl_mock.mjs` に実装、`channels_diff` diffs 0 (§6)。
+- [x] `provider_check` の件数更新 (77 → 79)。
+- [x] `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 ok (§6)。
+
+## 8. 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 構造体 (note) の生成経路 (setGridBit・fillEachNSteps 等がどの関数で note を作るか) と既定値 60/100/64/120/64/64/64/0 の PE 照合 | 既定値が stub 由来のまま。grid bit モデルの根拠が推定 | 子 #2929 ([PY-111]) |
+| param 8 (+0x11) の既定値と意味 | param 8 は -1 固定 | #2929 ([PY-111]) |
+| `f = 0x105f2e0` (note の終端) と `A` (tick / step) の値 | note 長 1 step 以外の検索結果が未確定 | #2929 ([PY-111]) |
+| pattern 次元 (pat 別の note 保持) | mock は単一パターン | #2808 (PY-90) 系の pattern 作業 |
+| `fl_table.c` 行 61 の np=6 (stub 由来) | handler の NARGS で吸収。表の再生成は `gen_provider.py` の作業 | 子 #2929 ([PY-111]) |
+| useGlobalIndex (group 配列 A/B) | group 無しでは未モデル | #2805 (PY-89) |
