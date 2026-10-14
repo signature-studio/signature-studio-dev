@@ -1030,6 +1030,32 @@ static u64 tr_9b4b00(u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u64 a6, u64
 
 #endif /* M11_OV_CLASSCREATE */
 
+/* #2203 計測専用 (M11_PRINT_DEST_2118=1 のときだけ有効・読取りのみ): j=12 の function_412c20 呼出し前後に、
+ * 2 区間 (0xfa5108-0xfa5c68・0x11e69b0-0x11e6b98) の FNV-1a 指紋と 0x11e6a2c の 4B 値を stderr に出す。
+ * ON (下の function_413060) と OFF (lift 版; trap_triage/dest_2203.py が IR に同名の呼出しを入れる) で同じ書式を使う。 */
+#if M11_PRINT_DEST_2118
+static u64 fnv_range_2203(u64 lo, u64 hi) {
+    u64 h = 0xcbf29ce484222325ull;
+    for (u64 a = lo; a < hi; a++) { h ^= *(volatile unsigned char*)(uintptr_t)a; h *= 0x100000001b3ull; }
+    return h;
+}
+void m11_pd2118_in(unsigned long long dest, unsigned long long len) {
+    fprintf(stderr, "[d413060] dest=%llx len=%llu A=%016llx B=%016llx w=%08x\n", dest, len,
+            fnv_range_2203(0xfa5108ull, 0xfa5c68ull), fnv_range_2203(0x11e69b0ull, 0x11e6b98ull),
+            *(volatile unsigned int*)(uintptr_t)0x11e6a2cull);
+}
+void m11_pd2118_pre(unsigned long long len) {
+    fprintf(stderr, "[r2118] pre len=%llu A=%016llx B=%016llx w=%08x\n", len,
+            fnv_range_2203(0xfa5108ull, 0xfa5c68ull), fnv_range_2203(0x11e69b0ull, 0x11e6b98ull),
+            *(volatile unsigned int*)(uintptr_t)0x11e6a2cull);
+}
+void m11_pd2118_post(void) {
+    fprintf(stderr, "[r2118] post A=%016llx B=%016llx w=%08x\n",
+            fnv_range_2203(0xfa5108ull, 0xfa5c68ull), fnv_range_2203(0x11e69b0ull, 0x11e6b98ull),
+            *(volatile unsigned int*)(uintptr_t)0x11e6a2cull);
+}
+#endif
+
 #ifndef M11_OV_413060
 #define M11_OV_413060 0
 #endif
@@ -1052,7 +1078,7 @@ void m11_dest_obs(unsigned long long dest);
 #endif
 unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
 #if M11_PRINT_DEST_2118
-    fprintf(stderr, "[d413060] dest=%llx len=%llu\n", dest, len);
+    m11_pd2118_in(dest, len);
 #endif
 #if M11_INSTR_413060
     m11_probe(8);
@@ -1060,7 +1086,13 @@ unsigned long long function_413060(unsigned long long dest, void* src, unsigned 
     u64 old = Q(dest);
     int n = (int)len;
     if (n > 0) {
+#if M11_PRINT_DEST_2118
+        m11_pd2118_pre(len & 0xffffffffull);
+#endif
         u64 p = function_412c20(len & 0xffffffffull);
+#if M11_PRINT_DEST_2118
+        m11_pd2118_post();
+#endif
         Q(dest) = p;
         if (src) function_409c80((u64)(uintptr_t)src, p, (u64)(long long)(int)((unsigned)n * 2u));
     } else {

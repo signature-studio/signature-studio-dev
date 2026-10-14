@@ -181,14 +181,14 @@ provider・mock の実装は、上の値源 (cur/lo/hi/flags) を状態モデル
 | `0x104d0d0(eventId)` (flags 分類器) | `0x104d000` でオブジェクトを引き、`[+0x64]==2` で分岐。eventId の下位 16 bit と上位ビットで分岐。本体は未読 | 事象の flags (bit1 = float 型か) が決まらない | #2816 |
 | `0x1046a30(eventId, sub, mode)` (汎用の照会) | mode 0x20 で範囲、mode 2 で現在値 (§7-4 と同じ)。0x590 のスタックフレームで本体の大半は未読 | lo・hi・cur が決まらない | #2816 |
 | `0x664090` (挿入) と `[S+0x10]`・`[S+8]` の更新 | 挿入先の書込みは `0x105112f` の戻り先。本体は未読 | 件数・並びの正しさ | #2816 |
-| midiNoteOn の述語 `0x11d1430` | `mov rax,[G3]; mov rax,[rax]; mov rax,[rax+8]; mov rcx,rax; mov rax,[rax]; call [rax+0x88]` (this = `[[G3]+8]`、vtable 経由の 1 段の間接呼出し)。G3 = VA `0x15e4790` は 2422 箇所から読まれる広域グローバル (store 0 件)。`0x11d1460` は同形で `+0x90` | -2 ゲートの条件が決まらない | #2817 |
-| midiNoteOn 本体 `0x10002a0`・`0x63a730` | §2・§4 のまま | 副作用が決まらない | #2817 |
+| midiNoteOn の述語 `0x11d1430` | `mov rax,[G3]; mov rax,[rax]; mov rax,[rax+8]; mov rcx,rax; mov rax,[rax]; call [rax+0x88]` (this = `[[G3]+8]`、vtable 経由の 1 段の間接呼出し)。G3 = VA `0x15e4790` は 2422 箇所から読まれる広域グローバル (store 0 件)。`0x11d1460` は同形で `+0x90` | -2 ゲートの条件が決まらない | #2926 |
+| midiNoteOn 本体 `0x10002a0`・`0x63a730` | §2・§4 のまま | 副作用が決まらない | #2926 |
 
 ### 8-4. 受入条件への影響
 
 - 1 件目 (戻り値・範囲外 code・副作用の REPORT 記録) は部分達成のまま。incEventValue の型・範囲外・本体副作用は §7 で確定。値源 (flags・範囲・現在値) は未確定。
 - 2・3・4 件目 (provider・mock の実装、channels_diff、all_tools 48/48) は未達。値源が決まるまで実装しない。
-- 残りは子 issue に分けた: incEventValue の値源 (`0x104d0d0`・`0x1046a30`・`0x664090`) は #2816、midiNoteOn の述語と本体 (`0x11d1430`・`0x10002a0`) は #2817。midiNoteOn は `[G3]+8` の vtable 先の解決が前提。
+- 残りは子 issue に分けた: incEventValue の値源 (`0x104d0d0`・`0x1046a30`・`0x664090`) は #2816、midiNoteOn の述語と本体 (`0x11d1430`・`0x10002a0`) は #2817 から子 #2926 に移した (詳細は付録 `REPORT_PY73_APPENDIX_2817.md`)。midiNoteOn は `[G3]+8` の vtable 先の解決が前提。
 
 ## 9. 4 回目 run (#2816 を縮小): 事象 flags 分類器 0x104d0d0 の PE 確定
 
