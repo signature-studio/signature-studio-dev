@@ -1,5 +1,7 @@
 # m11/rtl REPORT — Delphi RTL の範囲確定と lifter 別 liftdiff 採点 (#129)
 
+> **付録 (250 行上限の分割移動・内容は削除していない)**: §7-4 → `REPORT_APPENDIX_129.md`・§9-4 → `REPORT_APPENDIX_1721.md`・§9-5 → `REPORT_APPENDIX_1936.md`。
+
 **判定: 部分達成 (受入条件は未達 → Refs)**。RTL 範囲の確定と、RetDec route (m11) / x64c route (flelift) の RTL 帯 1,172 関数の
 同一条件採点までを実測した。「RTL 関数が native と一致」「m11_ov.c の RTL 手転記を撤去」は未達 (§4)。
 OSS 差替え案 (b) は toolchain 選定の判断が要るため未着手 (§5)。
@@ -158,19 +160,8 @@ m11 側の集計 (494/529/149) は不変。書換え 1 件が集計に 1 件ぶ�
 
 ### 7-4. レビュー指摘対応 (`ff28834`) の検証 (batch は再実行していない)
 
-採点値を変える変更ではないため batch (m11 / flelift) は再実行せず、後処理だけをコミット済み `ff28834` で検証した
-(初回 batch の jsonl は commit されていないので、`results/rtl_verdicts.tsv` の `va` + 各 route の verdict から `function.va` / `verdict` だけの jsonl を復元して入力にした。
-`rtl_compare.py` が読むのはこの 2 項目だけ)。GitHub Actions runner, 所要は `time`、load は終了時の 1 分平均 0.47:
+* 結論: 後処理 (`rtl_range.py` / `rtl_compare.py`) のみを `ff28834` で検証した。採点値 (`results/rtl_verdicts.tsv`) は変えない。検証表・ネガコン・ImageBase 化の注記は付録 `REPORT_APPENDIX_129.md`。
 
-| 検証 | 結果 |
-|---|---|
-| `rtl_range.py` (`B = pe.OPTIONAL_HEADER.ImageBase`; この PE は `0x400000`), 0.13 秒 | 2,958 クラス / 527 unit。`results/rtl_units.json` と `cmp` 一致、stdout も修正前と一致 (PASS) |
-| `rtl_compare.py` を復元 jsonl (1,172 VA) で再生成, 0.03 秒 | `results/rtl_verdicts.tsv` は `cmp` 一致 (PASS)。`results/rtl_compare.md` は先頭 1 行 (`自動生成: <cmd>`) の追加のみで、本体は修正前と一致。再実行しても `cmp` 一致 |
-| 帯フィルタ: 帯外を含む実 batch (snapshot の `batch_closure.jsonl` 7,421 関数 × 2 route) | 修正前は 7,421 関数をそのまま採点 (計 m11 2273/2892/2256・x64c 4182/741/2498)。修正後は帯外 6,249 を除外して 1,172 関数 (この snapshot の run での計 m11 574/427/171・x64c 540/116/516。§2 の表とは別 run の値で、比較には使わない) |
-| 帯フィルタのネガコン: 復元 jsonl に `0x400fff` / `0x456e97` / `0x456e98` / `0x545a90` / `0x1000000` を追加 | 両 route 採点あり 1,177 → 1,173 (帯内は `0x456e97` のみ。上端 `0x456e98` は排他)。TSV の差分は `0x456e97` の 1 行だけ |
-| `negctl.sh` (復元 jsonl): `_UStrAsg 0x4133f0` の x64c を mismatch に書換え | x64c 535/125/512 → 534/126/512、TSV 差分 1 行 (PASS) |
-
-VA/RVA 変換の ImageBase 化は、`ImageBase` が `0x400000` の PE では出力が変わらないことの確認までで、別 ImageBase の PE での動作は確認していない (該当 PE が無い)。
 
 ## 8. x64c 側 lift 集合外 359 関数の分類 (#410 受入 1 つ目)
 
@@ -250,21 +241,8 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 
 ### 9-4. `0x44a4d8` の wasm 実測 (#1721; 仮説の一部を棄却)
 
-wasm 側で `0x44a4d8` 周辺の値を probe で実測した (`0x44a4b0` 入口 → `0x44a4db` dispatch 直前)。検証 commit: `main` (576c4976) 上の `tools/liftdiff/work/flelift/` (work-liftdiff 同梱) から派生。
+* 結論: `[rax]` は 0 ではなく (`0x42f698`)、dispatch 先の vtable `0x42f670..0x42f6a0` が実行時に全て 0 で `ott_dispatch(0)` に落ちる。probe の方法・実測表・受入対応は付録 `REPORT_APPENDIX_1721.md`。
 
-* probe の方法: `fle_lifted_tr.c` のコピーに `ld_fle_probe(tag, v)` を挿入し、`fle_ldbridge.c` のコピーに同関数 (`ld_trace_rec` で `va=0xBEEF..|tag` として記録) を足して `lifted.o`・`bridge.o` だけ再コンパイルした。リンクは `clift.py` と同じフラグ。出力は `tools/liftdiff/work/flelift_probe/` (gitignore、commit しない)。素材の `ld_wasm.cjs` は変更していない。
-* 実行: `liftdiff.py run <flelift_probe target> --fn 0x44a590 --pattern p0 --nobuild` (1 case 約 6 秒)。
+### 9-5. vtable `0x42f670` の native/wasm 実測 (#1936・分割移動先 `REPORT_APPENDIX_1936.md`)
 
-| probe | 実測値 (wasm) | 意味 |
-|---|---|---|
-| `[0x15ec5d0]` (ガード) | `0x1e519c0` | 非 0。`je 0x44a4e9` を取らず `0x44a4d8` の分岐に入る |
-| `rax` (= `[0x15ec5d0]`) | `0x1e519c0` | |
-| `rbx` = `[rax]` (vtable ポインタ) | `0x42f698` | **0 ではない**。仮説「`[rax]` が 0」は棄却 |
-| `[rbx-0x28]` (dispatch 先) | `0x0` | `ott_dispatch(0)` → `ott_unlifted` (ret 0) |
-| vtable `[0x42f670..0x42f6a0]` (6 slot) | **すべて 0** | PE 上の初期値は `0x449380`・`0x4493a0` 等の有効値 (PE 静的読み) |
-
-* 結論 (wasm 実測): 分岐は「`[rax]` = 0」ではなく、「vtable 本体 (`0x42f670` 付近) が実行時に 0」で `ott_dispatch(0)` に落ちる。原因は vtable の書込み欠落の疑い。
-* 根拠の補足: `work/flelift/boot_state.json` の image 書込み run (60 本) に `0x42f670..0x42f6b0` を覆うものは無い。つまり hybrid boot の image 状態では、この vtable は PE の初期値に戻っていない (未書込み扱いで 0)。
-* 未確定 (次の着手点): (1) native 側で同じ VA が PE 初期値 (`0x449380`) のままか。native は同じ入口で `0x415c30` に入るので、native の実行時メモリでは vtable が有効なはず。(2) 0 になる原因 (boot の image 書込み経路・heap/image の復元・`ld_w_fix` 等のどれか) の特定。(3) 退行 5 件のうち、同じ vtable 欠落で説明できるものの列挙 (未実施)。
-
-受入条件との対応 (#1721): (1) 読み値の実測 = 達成 (上表)。(2) 仮説の成否 = 部分 (`[rax]` 仮説は棄却、vtable 0 は確定、原因は未特定)。(3) 退行 5 件の列挙 = 未実施。(4) 修復 = 範囲外。
+* 結論: native は hybrid boot 後も vtable が PE 初期値 (`0x449380` 等)。wasm は fresh・boot_state 適用後とも 0。`fle_data_install` は呼ばれている (`--init=`)。敷設窓の直接確認 (生成済み `fle_data.c`) は未了。詳細は付録。
