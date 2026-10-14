@@ -152,7 +152,7 @@
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI (float 引数・short 戻り値) は呼出元 2 件と callee 本体の機械語で確認済み (上記「呼出元・callee の確定」)。native 突合での実行検証は未実施。
 
 #### 10-7p. #1216 (KH-24) run: Stereo / Delay の Ghidra 実ビルド試行 (部分・両者とも emcc 未通過)
-- 測定 commit: `f847e8c6` (`ghidra_route/ghidra_to_c.py` の変更を含む最後の commit)。以後の commit はこの REPORT のみ。
+- 測定 commit: `f847e8c6` (`ghidra_route/ghidra_to_c.py` の変更を含む最後の commit)。**この節の件数は f847e8c6 の旧 converter (本体の `thunk_FUN_*` 呼出も全置換する版) の値で、誤変換を含むため無効** (差し戻し対応の B1 で確認。下記 10-7p-2)。`f847e8c6..c2003a0c` の `ghidra_route` 差分は 159 行 (+) / 1 行 (−) (B1 修正・検証スクリプト)。
 - 環境: Ghidra 12.1.4 = `Ghidra_12.1.4_build` の zip (sha256 `ddac49f9…d2db` 一致) を [GHIDRA] (`GHIDRA_HOME`) に展開 (素材外のため run ごとに取得が必要)、JDK 21 (temurin-21)、emsdk 6.0.12 ([EMSDK])。素材 `plugins-kilohearts` は Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` を手展開 (`extract_installer.sh` は dmg を要求するため使わず)。
 - 手順 (再現): `DecompEach.java` を snapins.json の lift 集合 (Stereo 8 / Delay 141 = proc + also) で実行 → `ghidra_to_c.py <name> work/gr/<name> <out> <core> --fix bitcast,intload,stackpair,assoc,concat` → `emcc -ferror-limit=0` (`build_cmp.sh` と同じ flags)。
 
@@ -161,11 +161,31 @@
 | Stereo | 8 | **8/8 OK** (32.8 s) | 891 行・0.07 s | **失敗 39 件** |
 | Delay | 141 | **141/141 OK** (29.0 s) | 7,247 行・2.7 s | **失敗 710 件** (emcc 14.1 s) |
 
-- Stereo の残件 (粗い正規表現分類、件数): 引数数不一致 (引数なし呼出 `param_1` 不足) 10・未宣言の SIMD/Ghidra 疑似関数 9 (`rsqrtps`・`maxps`・`ZEXT416`・`SUB168`・`ABS`・`vpsrldq_avx`)・128bit レーン型 (`V128`/`undefined1[16]`) 9・未宣言の型/識別子 9・未関数化 callee 2。
-- Delay の残件 (件数): 未宣言の型/識別子 350 (`code`・`sbyte`・`undefined` とローカル宣言の欠落 `pcVar1` 等)・引数数不一致 108・演算の型不一致 約 100・128bit レーン型 47・未宣言の Win API 46 (`HeapAlloc`/`HeapFree`/`GetCurrentProcess`/`IsProcessorFeaturePresent`/`TerminateProcess` 等)・未宣言の SIMD 疑似関数 37・`LOCK`/`UNLOCK` 20・未関数化 callee 5。
+- [無効: f847e8c6 の旧 converter] Stereo の残件 (粗い正規表現分類、件数): 引数数不一致 (引数なし呼出 `param_1` 不足) 10・未宣言の SIMD/Ghidra 疑似関数 9 (`rsqrtps`・`maxps`・`ZEXT416`・`SUB168`・`ABS`・`vpsrldq_avx`)・128bit レーン型 (`V128`/`undefined1[16]`) 9・未宣言の型/識別子 9・未関数化 callee 2。
+- [無効: f847e8c6 の旧 converter] Delay の残件 (件数): 未宣言の型/識別子 350 (`code`・`sbyte`・`undefined` とローカル宣言の欠落 `pcVar1` 等)・引数数不一致 108・演算の型不一致 (実数未取得。旧記録の「約 100」は約表記のため撤回)・128bit レーン型 47・未宣言の Win API 46 (`HeapAlloc`/`HeapFree`/`GetCurrentProcess`/`IsProcessorFeaturePresent`/`TerminateProcess` 等)・未宣言の SIMD 疑似関数 37・`LOCK`/`UNLOCK` 20・未関数化 callee 5。旧内訳の合計 713 は総数 710 と合わない (分類が重複。ad hoc 正規表現で、再現するスクリプトが無かった)。排他的な内訳は `emcc_census.py` で再測定して出す (10-7p-2)。
 - 手作業パッチ (`patches.py` の ASSOC/ABI 表): Stereo / Delay とも 0 件 (規則は未追加)。残件はすべて emcc の clang エラーとして残る。
-- 変更 (`f847e8c6`・`ghidra_to_c.py` 2 行): (1) `SNAPINS` に `delay` を追加 (proc `0x1802ed7f0` + also 140 件)。IAT thunk `0x180fd81e4`・`0x180fd81ec` は THUNK 辞書で stub 化するため also から除外 (入れると署名抽出で停止する)。(2) Ghidra が jmp thunk を `thunk_FUN_<飛び先>` と出す関数 (Delay 4 件: `180f8791c`・`180f87cac`・`180f87d40`・`180fc61dc`) の署名名を `FUN_<va>` に揃える (本体は飛び先と同一の decompile 結果)。修正前は `signature not found` で停止していた。
+- 変更 (`f847e8c6`・`ghidra_to_c.py` 2 行): (1) `SNAPINS` に `delay` を追加 (proc `0x1802ed7f0` + also 140 件)。IAT thunk `0x180fd81e4`・`0x180fd81ec` は THUNK 辞書で stub 化するため also から除外 (入れると署名抽出で停止する)。(2) Ghidra が jmp thunk を `thunk_FUN_<飛び先>` と出す関数 (Delay 4 件: `180f8791c`・`180f87cac`・`180f87d40`・`180fc61dc`) の署名名を `FUN_<va>` に揃える (本体の同一性は未検証)。修正前は `signature not found` で停止していた。この変更は旧版で誤りだった (本体の呼出 `thunk_FUN_*` まで自関数の VA に置換していた)。c2003a0c で修正 (10-7p-2)。
 - 回帰 (`f847e8c6`, 1000 trial / seed 7, `build_cmp.sh gain`): Gain **1000/1000** bit-exact (calls 4999/4999, wasm 15,161 B)。Haas / Gate は同じ converter 経路のため本 run では未再測定 (件数は §10-7o の値)。
 - 未実施: Stereo / Delay の 1000 trial 突合・ネガコン・第二 oracle の結論 (emcc 未通過のため)。子 issue #3071 [KH-39] (Stereo)・#3072 [KH-40] (Delay)・#3073 [KH-41] (突合・ネガコン・結論) に分割。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。build_cmp.sh 単体では作られないため `mkdir -p` が要る)。
-- 差分確認 (測定後のコード変更): `git diff f847e8c6 HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行 (本 REPORT の commit は同範囲外)。
+- 差分確認 (測定後のコード変更): `git diff f847e8c6 HEAD -- tools/targets/kilohearts/ghidra_route` = 159 行 (+) / 1 行 (−) (c2003a0c の B1 修正。10-7p-2)。したがって上の 10-7p の数値は再測定まで有効ではない。
+
+#### 10-7p-2. #1216 差し戻し対応: thunk 呼出の写し先の修正 (c2003a0c・再測定は未実施)
+
+- 誤変換 (B1): f847e8c6 の `ghidra_to_c.py` は `thunk_FUN_[0-9a-f]+` を関数本体の**全て**で `FUN_<自分の va>` に置換していた。本体の呼出 `thunk_FUN_<飛び先>(...)` が自己再帰になる。合成入力 (呼出元 `FUN_1802ed3b0` の本体に `thunk_FUN_1802ed7f0(param_1,0);` を 2 件) の旧実装の結果は、2 件とも `FUN_1802ed3b0(...)` (自己再帰 2 件)。
+- 修正 (c2003a0c): 定義ヘッダの `thunk_FUN_<X>` だけを `FUN_<va>` にする (`THUNK_HDR`)。本体の呼出 `thunk_FUN_<X>` は、X を飛び先に持つ thunk (定義ヘッダが `thunk_FUN_X` の関数) が**一意に 1 つ**あるときだけ `FUN_<その thunk の VA>` に写す。0 件・2 件以上は停止 (`SystemExit`、fail-closed)。
+- ネガコン (合成入力・repo 内で再現): `python3 tools/targets/kilohearts/ghidra_route/thunk_map_check.py` → **RESULT 9/9** (rc 0)。正例 4 (呼出 2 件が `FUN_180f8791c` に写る・呼出元の自己再帰 0 件・呼出元ヘッダ不変・thunk 自身のヘッダが `FUN_180f8791c`)、負例 3 (写し先 thunk 0 本・2 本・別 X の呼出は停止)、定義ヘッダだけを見る 1、対照 1 (旧実装で正例2 が失敗すること = 本テストが旧バグを検出する)。
+- `main()` 経路の確認 (一時ドライバ・repo 外。core は実在 PE の `NuGet.Frameworks.dll` を pefile で読む): 合成 3 関数 (呼出元・thunk・飛び先) で `ghidra_to_c.py` の `main()` を実行 → 生成 C は `FUN_180f8791c(param_1,0);`・`FUN_180f8791c(param_1,param_2);` の 2 件、残存 `thunk_FUN_` 0 件、自己再帰 0 件。thunk を集合から外すと `thunk_FUN_1802ed7f0 の呼出 (in FUN_1802ed3b0) の写し先が一意に決まらない: 候補 0 件 (停止)` で止まる。
+- 件数の再現 (B4): `python3 tools/targets/kilohearts/ghidra_route/emcc_census.py <outdir>/emcc.log` は emcc の clang error 行を排他的に分類し、分類の合計 = error 行数 (`合計` 行) を出す。分類の順序は RULES (先頭一致)。合成 8 行 (分類 7 種) で `合計 8` を確認。**実ログの件数は未取得** (下記)。
+- **未実施 (B2・B3・M3)**: Stereo / Delay / Gain / Haas / Gate の再測定 (decompile 件数・emcc 件数・分類・1000 trial bit-exact・n≥3 の所要) は、この run で行えない。理由: (a) `$ARTIFACTS_DIR` (`/home/runner/artifacts`) には `fl-win64.tar.zst` だけがあり、`plugins-kilohearts` と `toolchain-emsdk` が無い (確認済み)。(b) Ghidra 12.1.4・JDK・`/opt/emsdk` が runner に無い (`GHIDRA_HOME` 未設定・`/opt` に emsdk 無し)。PR 本文に `oc_artifacts: plugins-kilohearts toolchain-emsdk` を追加し、素材付きの run で再測定する。
+- 再測定の手順 (素材付き run。展開先は素材の中身で確認してから使う):
+  ```
+  tar --zstd -xf "$ARTIFACTS_DIR/plugins-kilohearts.tar.zst" -C "$RUNNER_TEMP/kh_src"   # Installer zip の在処を ls で確認
+  K=tools/targets/kilohearts; mkdir -p $K/work/win $K/work/blobs $K/work/winpkg
+  unzip -q -o "$RUNNER_TEMP/kh_src/<Kilohearts Offline Installer.zip>" -d $K/work/win     # → payload.dat
+  unzip -q -o $K/work/win/payload.dat 'windows.zip/*' -d $K/work/blobs
+  unzip -q -o $K/work/blobs/windows.zip/1ccb1df8c8f10745 -d $K/work/winpkg               # → HeartCore.core_64 (76,642,304 B)
+  ```
+  decompile は `scripts/ghidra/DecompEach.java` を snapins.json の lift 集合 (Stereo 8 / Delay 141) で `analyzeHeadless` に渡す (`ghidra_route/run_all.sh` の 1 行目以降と同じ)。C 化は `python3 $K/ghidra_route/ghidra_to_c.py <name> $K/work/gr/<name> $K/work/ghidra/out $K/work/winpkg/HeartCore.core_64 --fix bitcast,intload,stackpair,assoc,concat`、emcc は `build_cmp.sh` と同じフラグ、件数は `emcc_census.py $K/work/gr/<name>/emcc.log`。
+  突合 (Gain/Haas/Gate の回帰と Stereo/Delay の 1000 trial) は `build_cmp.sh <name> 1000 7 bitcast,intload,stackpair,assoc,concat`。所要は n≥3 で min–max・load average・並列数を併記する (M3)。
+- 旧記録の扱い: 上の 10-7p の件数 (Stereo 39・Delay 710・内訳) は f847e8c6 の旧 converter の値で、B1 の誤変換を含むため使わない。残件の内訳は再測定の `emcc_census.py` の出力で置き換える。
