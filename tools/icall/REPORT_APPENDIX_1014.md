@@ -8,7 +8,7 @@
 - 落ちた 366 site は**全て消失**。別関数の段に現れた落ち site は 0 (`moved 0`)。
 - 段の流れ (段番号は `--print-after-all` の dump 全体での段番号):
   1. GVN 段: `function_1cc0000` は段 401 (`Global Value Numbering`)、`function_1cc9b70` は段 402。stub 呼出しを含むブロックは 114 / 121。
-  2. SCCP 段: 段 405 / 406 (`Sparse Conditional Constant Propagation`)。stub 呼出しは 183 → 0 / 192 → 9。ブロック数は変わらない (303 → 303、316 → 316)。
+  2. SCCP 段: 段 405 / 406 (`Sparse Conditional Constant Propagation`)。stub 呼出しはこの段で減る (段ごとの数の正本は `REPORT_APPENDIX.md` §12.1。本付録 §2 の再実行で一致)。ブロック数はこの段では変わらない。
   3. 最初にブロック数が減る段 (Jump Threading): 段 413 / 414。ブロック数は 303 → 29、316 → 42。落ちた site のブロック 114 + 114 がここで消える。
 - `function_1cc9b70` の kept 8 site (6 ブロック) は SCCP 段と Jump Threading 段の後も残る。SCCP 段の stub 9 本は、kept 8 本と comis 1 本の内訳 (§3)。
 
@@ -20,20 +20,23 @@
 - 所要 (各 1 回。min–max レンジは未取得):
   - `measure_flengine_split.sh`: real 132.9 s (user 133.1 s、sys 55.9 s、終了時の 1 分 load 1.53、4 core)。base 366 / c2 366 (基準どおり)。site 374 (0xc589b0 側 183 / 0x128f9e0 側 191)。段 dump 709 段。
   - `sites_block_classify.py` (`RETDEC_BIN` 指定、段 dump を RetDec で取り直す): real 68.2 s (user 21.0 s、sys 47.2 s、終了時の 1 分 load 0.67)。
+- fix round 2 の再実行 (コードは `f15f25b4` と同じ。作業ツリーは md のみ変更): `measure_flengine_split.sh` real 117.3 s (base 366 / c2 366、段 709)、`sites_block_classify.py` (RetDec 取り直し) real 60.7 s。`summary.txt` の全数値は本節・§3・§4 と一致 (タグ段候補の段 81〜87 は各段とも 12)。
 - 段 dump を再利用する実行 (引数 `DUMP`) の `summary.txt` と `site_block.tsv` は、RetDec を取り直した実行と `cmp` で一致。
+- 段ごとの stub 呼出し数 (GVN 段・SCCP 段の値) は、この再実行の `summary.txt` が `REPORT_APPENDIX.md` §12.1 の値と一致することを確認した。
 
 ## 3. 結果 (`summary.txt` の出力)
 
-| 関数 (lift 名) | 元 VA | site | 落ち | kept | GVN 段 | SCCP 段 | JT 段 | stub を含むブロック (GVN) | stub 呼出し (GVN → SCCP) | ブロック数 (GVN → SCCP → JT) |
-|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| `function_1cc0000` | 0xc589b0 | 183 | 183 | 0 | 401 | 405 | 413 | 114 | 183 → 0 | 303 → 303 → 29 |
-| `function_1cc9b70` | 0x128f9e0 | 191 | 183 | 8 | 402 | 406 | 414 | 121 (site 120 + comis 1) | 192 → 9 (kept 8 + comis 1) | 316 → 316 → 42 |
+| 関数 (lift 名) | 元 VA | site | 落ち | kept | GVN 段 | SCCP 段 | JT 段 | stub を含むブロック (GVN) | ブロック数 (GVN → JT) |
+|---|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| `function_1cc0000` | 0xc589b0 | 183 | 183 | 0 | 401 | 405 | 413 | 114 | 303 → 29 |
+| `function_1cc9b70` | 0x128f9e0 | 191 | 183 | 8 | 402 | 406 | 414 | 121 (site 120 + comis 1) | 316 → 42 |
 
+- stub 呼出し数 (段ごと、SCCP 段で減る値) は本表に書かない。正本は `REPORT_APPENDIX.md` §12.1 (一致は §2)。
 - site ブロック: 234 (114 + 120)。落ち 228 (114 + 114)、kept 6 (`function_1cc9b70`)。
 - 1 対 1 検証: GVN 段の stub 合計 375 = site ブロックの stub 合計 374 + 非 site 1 (comis)。234 ブロックで「ブロックの site 数 = GVN 段の stub 数」の不一致は 0。
 - 消失: 落ちた 366 site は全て Jump Threading 段で label が消える (`label_gone_at=413` 183 件、`label_gone_at=414` 183 件)。
 - VA の対応: stub の `!insn.addr` と `sites[].new` の差は +78 が 367 件、+81 が 7 件。対応 374、未対応 1 (VA `0x1cca430`、`function_1cc9b70` の comis stub)、同一 site への重複 0。
-- タグ段は段 100 (`Global Variable Optimizer`、stub VA 375)。段 81 〜 87 を基準にすると、所属 label が変わる site は 12 (`summary.txt` のタグ段候補)。段 445 以降は stub VA が 9 件のみで、基準と 366 site の所属が変わるため使えない。
+- タグ段の基準は段 100 (`Global Variable Optimizer`、stub VA 375)。段 81〜87 の各段をタグ段にすると、基準と所属 label が違う site は各段とも 12 (`summary.txt` のタグ段候補の列)。段 445 以降は stub VA が 9 件のみで、基準と 366 site の所属が変わるため使えない。
 
 ## 4. ネガティブコントロール (WORKFLOW §5)
 
@@ -62,7 +65,7 @@
 - `docs/DEFECTS.md` への行案 (直接編集せず PM が反映する。番号は PM が割り当てる。列は DEFECTS.md の表に合わせた):
 
 ```
-| D24 (番号は仮) | fe→opt | **新規** (#1014 / PR #2836) | vtable 呼出し (`call qword ptr [reg+N]`) が最終 IR から消える。症状は D15 と同型 | 未確定。SCCP (段 405) で stub が消え、Jump Threading (段 413) で分岐先ブロックが dead code になる。D1b と機構が近い | FLEngine 0xc589b0 / 0x128f9e0 の落ち 366 site (本付録 §3) | 段 dump の stub 数が SCCP 段で 0 になる (本付録 §3) | 未修復 (動的検証待ち) |
+| D-1014 (番号は仮) | fe→opt | **新規** (#1014 / PR #2836) | vtable 呼出し (`call qword ptr [reg+N]`) が最終 IR から消える。症状は D15 と同型 | 未確定。SCCP (段 405) で stub が消え、Jump Threading (段 413) で分岐先ブロックが dead code になる。D1b と機構が近い | FLEngine 0xc589b0 / 0x128f9e0 の落ち 366 site (本付録 §3) | 段 dump の stub 数が SCCP 段で 0 になる (本付録 §3) | 未修復 (動的検証待ち) |
 ```
 
 ## 7. 検証
@@ -72,6 +75,7 @@
   2. `RETDEC_BIN=<retdec-decompiler> python3 tools/icall/sites_block_classify.py <outdir>/base/rw.dll <outdir>/base/after.ranges <outdir>/base/map.json <outdir>/base/sites_after.json <outdir2>`
   3. 段 dump を再利用する場合は、2 の後ろに段 dump のパス `<outdir2>/print_after_all.txt` を付ける (RetDec を呼ばない)。
 - 測定経路の差分: `git diff --stat 26f90ada f15f25b4 -- tools/icall/measure_flengine_split.sh tools/icall/roundtrip.sh tools/icall/audit_icall.py tools/icall/icall_rewrite.py tools/icall/ir_icall_restore.py tools/icall/passes_stub_count.py tools/icall/sccp_stub_drop.py` は 0 行。
+- 測定 commit 以降のコード差分 (WORKFLOW §6): `git diff f15f25b4 HEAD -- tools/icall ':!*.md'` の出力は 0 行 (`c4b6506d` 時点で確認。以後の commit は md のみ)。
 - 範囲外: native での動的検証 (受入条件 3) は未実施。段 dump は RetDec v5.0 の出力に依存する。
 
 ## 8. 前版の履歴 (`REPORT_APPENDIX.md` §12.4.1・§12.4.2 から分割移動)
