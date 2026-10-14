@@ -3,7 +3,7 @@
 # 同じ IR (C = M11_PROBE_VARIANT=noren 系で A と IR 同一) を土台に、rt.o / ov.o / リンク時 EXPORTS の計測 flag を 1 つずつ既定 (OFF) に戻す。
 #   A_default : 計測 OFF (既定)
 #   C_noren   : 計測 ON・IR を既定と同一 (REPORT_1542 の C。基準 2008)
-#   R0_rtOFF  : C + rt.o だけ計測 OFF
+#   R0_rtOFF  : C + rt.o を計測 OFF。rt.o の m11_dest_obs_* が無くなるので EXPORTS も外す (外さないと emcc が未定義 export で失敗する)
 #   O0_ovOFF  : C + ov.o だけ計測 OFF
 #   L0_lnkOFF : C + リンク時 EXPORTS (_m11_dest_obs_* 等) だけ外す
 #   R1_rtON   : A + rt.o だけ計測 ON (post は既定のまま)
@@ -43,7 +43,7 @@ TABLE="$OUT/table.tsv"
 for rep in $(seq 1 "$N"); do
   measure "$rep" A_default -u M11_INSTR_413060 -u M11_PROBE_VARIANT >> "$TABLE"
   measure "$rep" C_noren M11_INSTR_413060=1 M11_PROBE_VARIANT=noren M11_DEST_READ=1 >> "$TABLE"
-  measure "$rep" R0_rtOFF M11_INSTR_413060=1 M11_PROBE_VARIANT=noren M11_DEST_READ=1 M11_RT_INSTR=0 >> "$TABLE"
+  measure "$rep" R0_rtOFF M11_INSTR_413060=1 M11_PROBE_VARIANT=noren M11_DEST_READ=1 M11_RT_INSTR=0 M11_LINK_INSTR=0 >> "$TABLE"
   measure "$rep" O0_ovOFF M11_INSTR_413060=1 M11_PROBE_VARIANT=noren M11_DEST_READ=1 M11_OV_INSTR=0 >> "$TABLE"
   measure "$rep" L0_lnkOFF M11_INSTR_413060=1 M11_PROBE_VARIANT=noren M11_DEST_READ=1 M11_LINK_INSTR=0 >> "$TABLE"
   measure "$rep" R1_rtON -u M11_INSTR_413060 -u M11_PROBE_VARIANT M11_RT_INSTR=1 >> "$TABLE"
