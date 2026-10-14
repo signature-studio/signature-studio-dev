@@ -14,6 +14,7 @@ export function createMockEngine() {
   const st = {
     tempo: 130,
     playing: false,
+    changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -161,6 +162,11 @@ export function createMockEngine() {
     // MIDI scripting (PY-6): device script が使う device.* の最小模擬。forwardMIDICC / midiOutMsg は呼出しを st.midiOut に記録する
     // general.getVersion = MIDI scripting API バージョン (int)。実機値は未実測のため固定のモック値 (同梱 script は print するだけ)
     "general.getVersion": (...a) => { arity(a, 0, 0); return st.scriptingVersion ?? 1; },
+    // PY-87 (#2738): 状態 1 つを返すだけの 4 関数。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "general.getChangedFlag": (...a) => { arity(a, 0, 0); return st.changedFlag; },
+    "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
+    "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
+    "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
