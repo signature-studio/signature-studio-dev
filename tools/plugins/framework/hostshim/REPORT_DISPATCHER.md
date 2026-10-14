@@ -223,3 +223,16 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 - Phase B の `memory access out of bounds` (`status=0xffffffff plug=0x0 rec=7`) は REPORT_1229 §1 の既知ベースライン (2b2faf52 で同症状) と同一。本 run はコード無変更のため、今回の変更による回帰ではない。起票先は既存の #1229 (`[PLG-P0b-4]`)。
 - 受入 3 の未了: `hostshim.c` の応答表を実測に合わせる作業は未実施 (受入 2 の未収載 ID 応答が未確定のため。#1222 に残す)。
 - 作業ツリー: `ws-1222` (branch `1222-plg-p0b-3-phaseA`)。生成物 (`tools/plugins/work/fw/`・`work/`) は gitignore 対象。
+
+## 10. #2782 応答スロット `[rbp+0x11a0]` の格納元と未収載 ID (測定 commit 0bb93345)
+
+詳細表は `REPORT_DISPATCHER_APPENDIX.md` (§A 格納箇所 28・§B 出口・§C 未収載 7 件・§D 感度試験・§E 再現手順)。
+
+- 応答は末尾 `0x1328a38` の `mov rax,[rbp+0x11a0]` (共通読み出し)。格納は case 本体と、分岐木より前の共通初期化 `0x131873f` (`mov [rbp+0x11a0],0`)。全 256 ID で最初の書き込みは `0x131873f` (機械語で確定)。
+- 感度試験 (`HS_DISP_STACK_FILL=0xa5`): rax・経路・外部呼出し・書き込み列が 256 ID 全件で一致 (差 0)。応答は初期スタック内容に依存しない。
+- 内訳: 読み出しに到達し case 格納なし **202 件** (応答 0 を確定) / case 格納あり **27 件** (格納元は call 戻り値・オブジェクト内アドレス・フィールド等。定数 1 は 1 件、0 の分岐は 7 件、残り **19 件は未確定**) / 読み出し前に別の出口 (仮想呼出し) **27 件** (未確定)。
+- 未収載 ID (受入 2): 25 (0x19)・54 (0x36)・64 (0x40)・88 (0x58)・128 (0x80) は **0 を確定**。96 (0x60) は **未確定** (出口 `0x13228eb` の `call [rbx+0xb8]` の先が未モデル)。101 (0x65) は **未確定** (`0x1322b47` が `[obj+0x2e4]` の float ビット列を格納)。
+- 注意: 「0 を確定」は callee 戻り値 0 の仮定上の経路。§8.2 の 3 callee A/B で rax が変わったのは case 格納の 7 ID のみで、上記 202 件は不変。
+- 未確定の残り (格納元 19 件・出口 27 件) と、受入 3 (hostshim.c 応答表の実測化・Phase A 回帰) は子 issue へ移した (PR 本文の未解決表)。hostshim.c と hs_e2e.sh は本節で変更していない。
+- 測定: `0bb93345` で 0 埋め 72.44 秒 (load 0.06→0.74)・0xa5 埋め 73.64 秒 (load 0.68→0.91)。distinct (rax, path) 109・unmapped 61 ID / 5,340 件は §1・§3.3 と一致。
+- 差分: `git diff 0bb93345 HEAD -- tools/plugins/framework/hostshim/hs_disp_emu.py` は 0 行 (本節の追記のみ)。
