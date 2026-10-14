@@ -2,7 +2,7 @@
 # M11 sigfix 0 詰め site 数の二分探索 1 段 (#2045): 指定 commit の IR を RetDec から再生成し (m11_e2e.sh --full の IR 段まで)、
 # m11_sigfix_stats.sh の終端行を出す。build と node 実行は省く (0 詰め数は work/boot_final.ll から出るため)。1 段 約 6.5 分 (REPORT_N2045.md)。
 # 前提: FL_WIN64_DIR (extracted/block00031_PE.bin 入り)、M11_BISECT_GHIDRA_CSV (Ghidra 12.1.4 + JDK 21 で作る functions_dll.csv。
-#       作り方は tools/m2/README.md「重い解析」)、python3 (capstone・pefile 入り)、/opt/retdec。
+#       作り方は tools/m2/README.md「重い解析」)、python3 (capstone・pefile 入り)、RetDec ([RETDEC]・docs/REFERENCES.md §1)。
 # 使い方: bash tools/m11/m11_bisect_step.sh <commit>   (作業は $M11_BISECT_WORK/w-<commit>、既定 $RUNNER_TEMP/m11b)
 set -euo pipefail
 SHA="${1:?usage: m11_bisect_step.sh <commit>}"
