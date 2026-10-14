@@ -128,3 +128,40 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 
 - 受入条件のうち「`vmovsd` store が unimpl から消える」「B1 の方式を選び、共有鎖への影響を測定する」は**未達**。 本 run では実装しない (共有鎖の測定が 1 run に収まらない)。
 - 受入条件 4 (19252 の `function_180019c20` の分岐が spill 読み戻し値と一致) は、F-1 の経路が確定した時点で確認できる。 その確認は子 issue に含める。
+
+## F2. [PLG-F3-11] #1581: movntps (非テンポラル store) の宛先復元 (D17)
+
+- 測定 commit: **f941654a** (HEAD、コード変更は `2e2f1dfe`)。 `engine_lift.sh 19048` / `19252` を単独実行 (`TMPDIR=$RUNNER_TEMP`、foreground)。
+- 変更前 (`2e2f1dfe` の直前の main、`engine_lift.sh` 単独実行): 19048 `unimpl 5` (`movntps`・`vcomisd`・`vcomisd__22`・`vucomisd`・`vucomiss`)、19252 `unimpl 5` (`movntps`・`vcomisd`・`vmovsd` store・`vucomisd`・`vucomiss`)。
+- 変更後 (f941654a): 19048 `unimpl 4` (`vcomisd`・`vcomisd__22`・`vucomisd`・`vucomiss`) / `emcc_c_rc 1 → fixcmp 後 0` / lift 50 s。 19252 `unimpl 4` (`vcomisd`・`vmovsd` store・`vucomisd`・`vucomiss`) / `emcc_c_rc 0` / lift 13 s。
+- 生成 helper C (`engine<B>/e_simd.c`) の `emcc -c -msimd128 -w -O0`: 19048 rc 0、19252 rc 0。
+- `movntps` 呼び出しの残数 (`e.final.ll`・`e.fixcmp.ll`・`e.lift.ll`): 両 engine とも 0 件。 `e.norm0.ll` (ir5_patch 前) は 19048 で 8 件。
+- 受入条件の判定: (1) `movntps` が unimpl に出ない → 達成。 (2) `emcc -c` rc 0 → 達成。 (3) 復元方式を DECISIONS に記録 → 達成 (D17)。
+- 残件 (本 issue 外): `vcomisd`・`vucomisd`・`vucomiss` は #1774 / #1582 (flag 反映)、`vmovsd` store は #2017。
+- 共有鎖の経路: `ir5_patch.py` を import するのは `lift/lift_ranges.sh` (および `m11_lift.sh` / `m6_lift.sh` 等の旧 lift) 経由の plugin 群。 liftlib (OTT) は `tools/liftlib/liftlib/passes/base.py` の独自 `lower_asm_store` を使い、`ir5_patch.py` を import しない。 したがって本変更は liftlib の出力に効かず、liftlib e2e (`work-liftlib` / `plugins-ott`) は必須条件から外す。 `ott_lift.ll` に `__asm_movntps` の呼出が 8 件 (すべて `function_1801a30d0`) 残る (`work-liftlib` 実測。`grep` の 9 行は呼出 8 件と宣言 1 行) のは既存の挙動で、本 PR の変更とは無関係。
+- **回帰測定 (plugin 経路, 本 run)**: RetDec は本 run に無い (`/opt/retdec` 不在・`toolchain-retdec` 未取得) ため `lift_ranges.sh` は回せない。 代わりに、`work-liftlib` の RetDec 由来中間 IR `tools/liftlib/work/ott_lb10000/ott_shift3b.ll` (movntps 呼出 8 件、すべて `function_1801a30d0` 内。`function_1801d212c` に呼出は無い) を入力に、`ir_normalize.py` → `ir5_patch.py` を変更前 (`2e2f1dfe^`) と変更後 (`2e2f1dfe`) で同一条件に流した。
+  - `call void @__asm_movntps(` 呼出: before 8 件 → after 0 件。 残るのはファイル末尾の `declare void @__asm_movntps(i128, i128)` 1 行のみ (呼出が無いため宣言だけ残る)。 `grep -c '__asm_movntps'` は宣言行を含むため 9 を返す (呼出は 8 件)。
+  - 変化: `function_1801a30d0` の `call void @__asm_movntps(i128 %x, i128 %5)` 8 件 (すべて同一関数内) が `store i128 %5, ptr %<x の宛先>` に置き換わる。 宛先 (`inttoptr` の結果) は直前の `load i128` と同じアドレスで、ループ内の 16 バイト単位 (`+0, +16, … +112`) の書き戻しとして読める。 `store i128` 総数は before 180 → after 188 (+8)、`diff` は 32 行 (8 組の `call` → `store`)。 変化は `function_1801a30d0` の 8 件に限られる。
+  - 入力の正規化: `ir_normalize.py` は `ott_shift3b.ll` から `in.norm0.ll` を生成 (rc 0)。 `ir5_patch.py` の report: before `s1_stores 0`、after `s1_stores 8`。
+- 差分 0 の証跡 (`docs/WORKFLOW.md` §6): 測定 commit `f941654a` → 現 HEAD の `git diff f941654a HEAD -- tools/plugins/lift tools/plugins/dynamics ':!*.md'` は `tools/plugins/dynamics/b1_measure.py` (+21 行) のみ (`2 files` ではなく 1 file、`lift/` 配下は 0 行)。 `b1_measure.py` を呼ぶ `.sh` は `tools/` 全体で 0 件 (`grep -rln b1_measure tools --include=*.sh` → 0)。 よって `engine_lift.sh` の測定値 (19048 / 19252) は現 HEAD でも有効。
+
+## G. [PLG-F3-19] #2047: B1 の 0 埋め内訳と方式選定 (測定 HEAD: b073ffa3)
+
+- 測定: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/plugins/dynamics/engine_lift.sh 19252 900` を HEAD `b073ffa3` で foreground 実行。 結果 `19252,522,0,551,0,5,0,0,0,17,0,0,0,29,549` (lift_rc 0 / define 551 / unimpl 5 / emcc_c_rc 0 / fixcmp 後 emcc rc 0)。 所要 21.6 s (`time` 実測)、load average (1 分) 0.87 → 0.90。
+- 残件 (`e.simd.log`): `__asm_movntps`・`__asm_vcomisd`・`__asm_vmovsd(i64,i128)`・`__asm_vucomisd`・`__asm_vucomiss` の 5 件。 `vmovsd` store 形は本 run でも unimpl のまま (受入条件 1 は未達)。
+- **B1 の 0 埋め 322 件の内訳** (`e.lift.ll` の `= xor i64 0, 0` 行、再現: `python3 dynamics/b1_measure.py work/dynamics/engine19252`):
+  - 関数数 187、合計 322 (grep 検算 322 と一致)。
+  - 上位: `function_180010e10` 8・`function_18000499e` 8・`function_1800078a0` 7・`function_18001392e` 6・`function_18001373b` 6。
+  - `function_180019c20` は 4 件 (`%1` 由来の load は 3 件。 4 件目の出所は未確認)。
+- `function_180019c20` の検証 (e.drc.ll): `alloca i64 %1` への `store` は 0 件、`%1` 由来の load は 3 件、関数内の `__asm_vmovsd` 呼出は 28 件。 RetDec が rsp 相対の spill を store の無い `%1` に併合している、という §F の結論を再確認した。
+- **方式選定**: 候補 B (RetDec 出力の spill 併合 `%1` を、機械語の rsp オフセット (0x20・0x30) ごとの slot に分けて store/load を復元する pass を、`function_180019c20` 系の rsp 併合に限定して追加) を採用する。 理由: 候補 A (B1 の 0 埋めを条件付きで止める) は、判定に rsp オフセット情報が要り、結局 B と同じ解析が要る上、共有 lift 鎖 (全 plugin) の差分測定が前提になる。 B は B1 の挙動を変えないため、共有鎖への影響は pass が発火する関数に限られる。 **実装は未着手** (#2017 の範囲)。
+- 共有鎖への影響 (B1 を変えた場合の全 plugin 差分) は**未測定**。 候補 A を採らないため、本 run では測らない。 (未解決・起票先: #2017)
+
+### G-1. 判定 (本 run)
+
+- 採用: 方式 B を選定 (上記)。 実装と「`vmovsd` store が unimpl から消える」「`emcc -c` rc 0 のまま」「分岐値の一致確認」は #2017 に残す。
+- 受入条件 (issue #2047 本文) の対応:
+  1. `vmovsd` store が unimpl から消える → **未達** (#2017)。
+  2. `emcc -c` rc 0 → 現 HEAD で rc 0 (維持)。 ただし変更は無いので本 run の寄与ではない。
+  3. 方式の選定と B1 内訳の測定 → **達成** (本節)。 共有鎖への影響の測定 → **未達** (#2017)。
+  4. `function_180019c20` の分岐値 = spill 読み戻し値の IR 確認 → **未達** (#2017)。

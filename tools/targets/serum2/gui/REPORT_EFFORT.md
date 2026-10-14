@@ -209,12 +209,44 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 |---|---|
 | canvas 側の純粋仮想 103 関数 (6 files) の wasm 実装 (受入条件 1 の残り) | #2064 ([SR-35]) |
 | `CTextLabel` 系 + `XferOnOffButton` 1 view の canvas 描画 (受入条件 2 の残り) | #2065 ([SR-36])・前提 #2064 |
-| `XferOnOffButton` の .text 対応付けと本体バイト数 (受入条件 3 の残り) | #2066 ([SR-37]) → §11 で完了 |
+| `XferOnOffButton` の .text 対応付けと本体バイト数 (受入条件 3 の残り) | #2066 ([SR-37]) → §14 で完了 |
 
 - 親 #2029 ([SR-31]) は、上記 3 件へ未達の受入条件を移したうえで範囲を縮めた。
 - 測定 commit: 本 §10 と `vtable_measure.py`・`check_wasm_syntax.sh` を追加した commit (PR 本文参照)。
 
-## 11. 2026-10-14 run (#2066): XferOnOffButton の .text 対応付けと本体バイト数
+## 11. 2026-10-14 run (#2064 / SR-35): canvas platform の wasm 実装 (部分)
+
+- 範囲: §6 の 103 関数 (6 files) のうち、依存が閉じる 2 files (bitmap 7・graphicspath 13 = 20 関数) を実装。残り 4 files (font 7・graphicsdevice 31・frame 25・factory 20 = 83 関数) は子 issue へ分割。
+- 実装: `gui/canvas/canvas_bitmap.{h,cpp}`・`gui/canvas/canvas_graphicspath.{h,cpp}`。bitmap は RGBA8 の連続メモリ、graphicspath は頂点列保持。楕円・円弧・テキスト輪郭は PoC の近似 (正確な曲線・文字輪郭は未実装)。
+- 検証: `gui/canvas/check_canvas_syntax.sh` (em++ `-fsyntax-only`、`-D__linux__` 補正なし)。bitmap rc=0 errors=0、graphicspath rc=0 errors=0。`check_wasm_syntax.sh` (seed 6) rc=0 errors=0 を維持。
+- 未検証: リンク・実行・描画 (受入条件 2 の範囲外、#2065)。閉包が実際に要求する関数はリンク時に確定させる (§6 の注記どおり)。
+- 測定 commit: `38072d4a` (コードを変えた最後の commit)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| canvas 側 font 7・graphicsdevice 31・frame 25・factory 20 (計 83 関数) の wasm 実装 | 描画の閉包が完結しない | 子 issue (親 #2064) |
+
+## 12. 2026-10-14 run (#2109 / SR-40): canvas の frame 実装 (factory は子 #2139 へ)
+
+- 範囲: §11 の残り 4 files のうち、frame (IPlatformFrame) を実装。font 7・graphicsdevice 31 は #2107 (SR-39)、factory 20 は #2139 (SR-42) へ移した。
+- 実装: `canvas/canvas_frame.{h,cpp}`。ネイティブのウィンドウを持たないため、サイズだけ保持し、マウス・修飾キー・カーソル・tooltip・drag・text edit・option menu・view layer は `false` / `nullptr` を返す。
+- 検証 (`canvas/check_canvas_syntax.sh`、`-D__linux__` 補正なし):
+  - `canvas_bitmap.cpp`: rc=0 errors=0
+  - `canvas_graphicspath.cpp`: rc=0 errors=0
+  - `canvas_frame.cpp`: rc=0 errors=0
+  - `check_wasm_syntax.sh` (seed 6): rc=0 errors=0
+- 初回 (include 不足) の失敗: `canvas_frame.cpp` は `IPlatformTextEdit` / `IPlatformOptionMenu` / `IPlatformViewLayer` が不完全型のまま `SharedPointer` を返すため error 3 件。対策は 3 つの `iplatformXXX.h` の include 追加。これで abstract 化の error も消えた。
+- factory 未実装の原因: `platformfactory.h` → `platformfwd.h:36` が `static_assert (false, "unknown platform")` で止まる。`vstguibase_emscripten.patch` は `WASM 1` のみで `LINUX` を立てないため。factory の 20 関数はこの分岐が決まるまで実装・検証できない (#2139)。
+- 未検証: リンク・実行・描画 (#2065 の範囲)。
+- 測定 commit: `c9a7329a` (コードを変えた最後の commit。本節の REPORT 修正は含まない)。
+
+## 13. 2026-10-14 run (#2107 / SR-39): canvas platform の font・graphicsdevice (wasm)
+
+- 結論: font 7 + graphicsdevice 31 (計 38 関数) を wasm 実装。構文検査は測定 commit `89495465` で 5/5 rc=0、具象性検査 (`check_concrete.cpp`) rc=0。リンク・閉包確定・描画は未実施 (#2065)。
+- 詳細・実測・測定 commit と差分: 付録 `REPORT_EFFORT_APPENDIX_2107.md` (本節の全文)。
+
+## 14. 2026-10-14 run (#2066 / SR-37): XferOnOffButton の .text 対応付けと本体バイト数
 
 - 結論: vtable 由来の override・新規 8 関数 (`XferOnOffButton`) は全件 Ghidra の関数先頭に対応付いた (未対応 0 件)。本体バイト数の合計は **507 B** (8 関数、thunk 2 件を含む。呼び出し先の閉包は未測定)。人日は出さない。
 - 詳細 (表・再現手順・限界): `gui/REPORT_SR37.md`。測定スクリプト `gui/vtable_fn_addrs.py`・`gui/ghidra_fn_size.java`。
+

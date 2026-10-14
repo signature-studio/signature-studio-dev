@@ -245,3 +245,50 @@
 - DLL 参考走査 (`mx_indirect_refs.scan_data` を DLL の全セクションに適用): `.vst3` の読み手 VA (0x180f95e20 等) を対象にした。DLL の関数は別の VA にあるため、これは参照の判定ではなく参考値。結果は `.pdata`・`.xdata` の rva4 各 1 件のみ (関数範囲表の登録で呼び出し元ではない)。DLL の読み手関数は未特定。
 - 判定: 受入条件 1 (呼び出し元確定) は未達。受入条件 2 (差し替え点) は未達。`mx_lic_stub.py` の RULES は変更しない (根拠なしの br_force / store は silent miscompile になる)。受入条件 3 (差し替え後の機械検証) は差し替え点が無いため未着手。
 - 残件の起票先: DLL 側の読み手と呼び出し元の確定 → 子 issue (本 PR 本文の未解決表を参照)。文字列 index 経由の走査と差し替え点の決定、`acpt_verify_mx2.py` 拡張 → 子 issue。
+
+### 12.12 DLL (`Native Instruments/Massive X.dll`) の読み手・呼び出し元の走査 (#1976・測定 commit `28e39ee1`)
+
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key`。`work/key/extracted/Native Instruments/Massive X.dll` = 95,249,816 B。checksum 不一致 125/125 は既知事象。
+- 走査器 (新規・`license/scripts/`): `mx_dll_readers.py` (文字列 blob の読み手・線形逆アセンブル)、`mx_dll_callers.py` (関数単位の直接 call/jmp・即値)、`mx_dll_table_refs.py` (既存 `mx_table_refs.py` を DLL の VA で実行。既存スクリプトは無変更)。
+- 検出器の健全性: 同じ `mx_dll_readers.py` を `.vst3` に実行すると、既知の N6-1 読み手 `0x180f95e20` (movups 4 件) を再現した (§12.2a と一致)。`mx_indirect_refs.py --selftest` / `mx_table_refs.py --selftest` は PASS (rc 0)。
+- NUL 区切り blob (DLL): N6 文字列 `[0x184fe83b7,0x184fe8fa0)` 付近の 11 blob。N5 は `demoExpired`/`demoExpiredChanged` が `[0x184862d19,…)`、`subscriptionExpired` が `[0x184862e7a,…)`。`MXDemoPopup.qml` は UTF-16LE のみ (VA `0x18414cd91`)。
+
+| 項目 | 結果 |
+|---|---|
+| 線形逆アセンブル | 15,200,102 insn・bad-resync 34,698・`.text` 60,154,368 B 全域 |
+| 文字列 blob を参照する `.text` 命令 | 16 件 (RIP 相対 lea 10・movups 4・他 2) |
+| 読み手関数 (文字列を読む関数) | 8 件: `0x180167a70` / `0x180f84920` / `0x181130b20` / `0x181130d30` / `0x181131000` / `0x1811325c0` / `0x181132f30` / `0x181133db0` |
+| 読み手 8 件への直接 call/jmp・即値 | 0 件 (関数単位の再逆アセンブル: 関数 186,730・部分 decode 4,391) |
+| 読み手 8 件への絶対 8B / RVA 4B / 自己相対 4B | `.pdata`・`.xdata` の関数範囲表 (各 1 件・呼び出し元ではない) と、`0x181133db0` への自己相対 1 件 (`.rdata` `0x18470e211`) のみ。後者は 4B 値が表の一部か偶然か未判定 |
+| 文字列 blob への絶対 8B / RVA 4B | 0 件 |
+| 文字列 blob への自己相対 4B | `0x184fe7870` (`.text` `0x181733070`)・`0x184fe83b7` (`.rdata` `0x184f98a2d`)・`0x184fe83fc` (`.rdata` `0x184f94349`) の 3 件 |
+| テーブル基準 (E・`mx_dll_table_refs.py`) | base 候補 177,324 件 → hit 4 件。全件が同一 base `0x183b27dda` の差分 `-0x29f402a` (→ `0x181133db0`) で、idx 236・244・249 の 3 件と base 参照元 `0x1831c9e45` (どの関数にも属さない)。`0x184021d48` の 1 件 (参照元 `0x1838565d3`・関数外) を含む |
+| N5 UTF-16 `MXDemoPopup.qml` (VA `0x18414cd91`) | RIP 相対・即値 0 件 |
+
+- 判定: **N6 読み手 8 関数は確定** (文字列 blob 参照の実命令で確認)。**呼び出し元は未確定**: 直接・即値・絶対・RVA の 4 系統で 0 件。テーブル基準の 4 件は同一差分の 1 組で、base 参照元が関数外のため候補止まり。N5 の読み手は ASCII・UTF-16 とも未特定。
+- `mx_lic_stub.py` の RULES は変更しない (呼び出し元が未確定のため、差し替え点を決めると silent miscompile になる)。
+- 残件 (起票先は PR 本文の未解決表): (1) テーブル基準候補 `0x183b27dda` 系の base 参照元の逆引き (関数外のため、呼び出し経路の確定が必要)、(2) N5 読み手の特定 (ASCII / UTF-16 とも `.text` 直接参照 0 件のため、文字列 index 経由・関数ポインタ埋め込みを疑う)、(3) `acpt_verify_mx2.py` の DLL 対応。
+
+### 12.13 DLL の N5 読み手・テーブル基準候補の確認 (#2108 [MX-30]・測定 commit `637b70de`・2026-10-14)
+
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key`。`work/key/extracted/Native Instruments/Massive X.dll` = 95,249,816 B (§12.12 と一致)。md5 `9b3f9107a7b2d7ccd9146622bb39eefb`。checksum 不一致 125/125 は既知事象。
+- 実行 (`tools/targets/massivex` 直下・いずれも rc 0):
+  - `python3 license/scripts/mx_dll_readers.py` (2 min 34 s・load 1.53 開始)。§12.12 の読み手 8 関数と blob 一覧を再現。
+  - `python3 license/scripts/mx_dll_table_refs.py` (2 min 18 s)。§12.12 の hit 4 件を再現。
+  - 調査用の追加確認 (`work/` のみ・commit しない): 参照元の逆引き・セクション表・call 先の内容。
+- 結果:
+
+| 項目 | 結果 |
+|---|---|
+| N5 blob (`demoExpired`×2 `0x184862d19`/`0x184862e67`・`subscriptionExpired` `0x184862e7a`) の読み手 | 関数 0 件 (blob 参照の命令は N6 のみ。直接 call/jmp・即値も 0 件) |
+| N5 UTF-16 `MXDemoPopup.qml` (`0x18414cd91`) の読み手 | RIP 相対・即値 0 件 |
+| テーブル基準候補 base `0x183b27dda` の参照元 `0x1831c9e45` | pdata 範囲外 (関数外)。`call 0x183b27dda` の命令。**その call 先 `0x183b27dda` は `.rdata` (chars `0x40000040`・実行不可)** |
+| テーブル基準候補 base `0x184021d48` の参照元 `0x1838565d3` | pdata 範囲外 (関数外)。`call 0x184021d48` の命令。**call 先 `0x184021d48` も `.rdata`** |
+| base `0x183b27dda` の表 (idx 236/244/249) | いずれも `0x181133db0` (N6-8 読み手) を指す。他 idx の target は散らばり、表として一貫しない |
+| base `0x184021d48` の表 (idx 239) | `0x184fe84b3` (N6 文字列) を指す。idx 236/244/249 の target は散らばる |
+
+- 判定:
+  - **受入条件 1 (N5 読み手の特定): 未達**。N5 の 4 文字列は直接参照・即値の走査で 0 件。文字列 index 経由・関数ポインタ埋め込み (§12.10 の残件) は未走査。
+  - **受入条件 2 (候補の判定): 判定保留**。参照元 2 箇所は pdata 範囲外で、前後の命令は `.text` 内で連続している。`call` 先の候補アドレスは `.rdata` にあり、実行可能な call 先としては不自然なので、偶然一致の可能性が高い。ただし参照元の領域が非コード (データ) の誤デコードである可能性も残り、関数としての特定はできていない。idx 236/244/249 の `0x181133db0` 一致は 3 件とも同一差分 `-0x29f402a` の繰り返しで、表全体の一貫性は確認できない。**N6 読み手の呼び出し元は依然として未確定**。
+  - 差し替え点は未確定のため `license/scripts/mx_lic_stub.py` の RULES は変更しない。
+  - e2e は本 run でコードを変えていないため未実行 (§12.6・§12.10 が正本)。
