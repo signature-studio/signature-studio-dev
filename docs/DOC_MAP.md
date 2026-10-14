@@ -217,6 +217,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_1602.md` | ~191 | #1602: C 版内 stderr 計測 (§13)・hook 変種 (§14)・範囲内常時出力版 (§15) の不採用試行と、V8 inspector (`inspect_trap.mjs`、build 不変) による trap 時点の wasm local 採取 (§16、判定不変・304/555/923 の実値) |
 | `tools/m11/trap_triage/REPORT_1352.md` | ~50 | #1352: 計測 build (`M11_INSTR_413060=1`) の OFF は HEAD `1be53b3f` で既定と同じ 870/24/0 (871/23 は再現せず)・`M11_DEST_READ=0` でも 870/24/0。3 点切り分けは未実施・再現 `repro_1352.sh` |
 | `tools/m11/trap_triage/REPORT_2672.md` | 125 | #2672: unit 477 の `0x10a9f910` 下位 4B 書込みの主体 (C 版 `function_4133f0` の shadow stack 局所、`m11_ov.c:340`)。wasm 側 store 計装 (`watch_store_2672.mjs`・`store_sites_2672.py`) の陰性対照 (942 unit の kind 差分 0)・陽性対照 (OLD=0 で unit 1 hit)・類型案 (管理型局所のゼロ初期化欠落、仮説) |
+| `tools/m11/trap_triage/REPORT_2780.md` | 114 | #2780: unit 492 OOB の `4473f0` 乗算 (`0x92492493`) の戻り値を実測 (原因ではない)・OOB 入力 `dest=0x10aa1160` の旧値 `0x1_00000003` の値遷移 (unit 432・477・484)・gated probe (`M11_PROBE_2780=1`) |
 | `tools/m11/trap_triage/REPORT_882.md` | 212 | #882: M11 survey trap の p-144 再現・40ffe0 入口 probe の本体 (§0 結論・§1〜§11)。§12・§13 は `REPORT_882_APPENDIX.md` に分割移動 (250 行上限) |
 | `tools/m11/trap_triage/REPORT_882_APPENDIX.md` | ~89 | #882 の §12 (7 回目 run: p-144 再現測定) と §13 (8 回目 run: 40ffe0 入口 probe の実測) の全文。REPORT_882.md の 250 行上限のため分割移動 |
 | `tools/m11/trap_triage/REPORT_2373.md` | ~90 | #2373: unit 895 の `60a270` (this=0) の caller は `e3ef60` (9 箇所)。`60a270` の caller 列挙・経路の静的確認・`e3ef60` の 9 箇所の this のフィールド。再現 `callers_of.py` |
