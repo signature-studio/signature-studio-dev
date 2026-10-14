@@ -45,7 +45,7 @@ def regs_of(cs, ids):
     return out
 
 
-READS_DEST_EXTRA = ('cmp', 'test', 'xchg', 'bswap', 'bt', 'bts', 'btr', 'btc', 'shld', 'shrd', 'xadd', 'cmpxchg')
+READS_DEST_EXTRA = ('cmp', 'test', 'xchg', 'bswap', 'bt', 'bts', 'btr', 'btc', 'shld', 'shrd', 'xadd', 'cmpxchg', 'rcl', 'rcr')
 
 
 def reads_dest(mn):
