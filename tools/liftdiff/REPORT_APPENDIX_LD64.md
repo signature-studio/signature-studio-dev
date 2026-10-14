@@ -35,9 +35,11 @@
 
 既定 target (`ott_old`) の build の IR・wasm は変更前と同一の経路を通る (`block_trace` が無いため `blocks=False`)。
 
-## 3. block trace の結果 (native との対応)
+## 3. block trace の結果 (未検証の参考値・結論に使わない)
 
-`blk_all.json` の block 入口列 (`verdict` は計装版の判定。§4 の注意つき)。**この表の数値と、下の block 対応は、本 PR に入力も出力も commit していないため未検証**。再現するには `blk_all.json` (6 関数 × vm0/u16 の raw)、IR `ott.ll` (`tools/ott/work/` 配下。`work-m6-ott` 素材で展開)、`block_coverage.py` の出力を揃える必要がある (子 #1906・#1907 で扱う)。
+**この節の表と下の block 対応は、本 PR に入力も出力も commit していないため未検証である。結論・判定の根拠にしない。** 再現するには `blk_all.json` (6 関数 × vm0/u16 の raw)、IR `ott.ll` (`tools/ott/work/` 配下。`work-m6-ott` 素材で展開)、`block_coverage.py` の出力を揃える必要がある (子 #1907 で扱う)。
+
+`blk_all.json` の block 入口列 (`verdict` は計装版の判定。§4 の注意つき)。
 
 | 関数 | pattern | outcome | block 入口数 | 異なり数 | 末尾 block |
 |---|---|---|---|---|---|
@@ -53,9 +55,9 @@
 | 1801c69cc | u16 | wasm_trap | 10 | 10 | 1c0b71 |
 
 - (未検証) native `1c0b6f` (je) が IR block `1c0b6c` の末尾 (`icmp eq %arg1, 0` の `br`) にあたる、という主張は、上記の入力を揃えて確認するまで採らない。
-- (未検証) wasm の `1c5e84` u16 trace が `1c0b6c` → `1c0b71` に入り、`HeapFree` 経路で trap する、という主張も同様に未確認。LD-57 の「u16 は HeapFree 経路」とは、本 PR では照合していない。
+- (未検証・結論に使わない) wasm の `1c5e84` u16 の trace の block 列と、`HeapFree` 経路での trap との関係は、本 PR では照合していない。LD-57 の「u16 は HeapFree 経路」との一致も確認していない。
 - native `1c0b82` (HeapFree の call) が IR block `1c0b71` の中にある、という主張も未確認 (上と同じ入力が要る)。
-- vm0 の `1c0b6c` → `1c0ba8` (早期 return) は、wasm の block 列にも現れる (`1c5e84` vm0 の列に `1c0b6c`, `1c0ba8` が繰り返し出る)。ただし vm0 の計装版の戻り値は §4 のとおり変わっている。
+- (未検証) vm0 の `1c0b6c` → `1c0ba8` が早期 return に当たる、という読みは採らない。wasm の block 列に両 block が現れることは表の転記にとどまり、§4 のとおり vm0 の計装版の戻り値は変わっている。
 - **`1801c621c` の vm0 は 287 block、`1801c69cc` の vm0 は 304 block**。残り 4 関数の分岐点 (受入条件 3) は、block 列の比較までは示せたが、native 側 (`insn_*.txt`) の対応付けは未了。
 
 `tools/liftdiff/results/ld64/block_coverage.py` は native の rva が IR block label と一致する割合を数える (入力: IR `ott.ll` と `results/ld57/insn_*.txt`)。本 PR では、この出力 (一致率) を commit していない。以前の記述の 9.5〜25.5% は、再現可能な出力として本 PR に残っていない。**命令単位の対応付けには使えない** (block 入口にしか当たらないため)。
