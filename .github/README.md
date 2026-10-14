@@ -161,6 +161,17 @@ allow_rebase_merge: false
 **実装者は自分の PR を merge しない** (`gh pr merge`・`--auto`・REST `pulls/N/merge`・`enablePullRequestAutoMerge` を実行しない)。
 Auto Merge は承認なしで即時 merge され、独立した review を迂回するため、実装プロンプトから外した (#2600)。
 
+## main の Ruleset (承認必須)
+
+main への merge には承認 (APPROVED) 1 件以上が要る (Ruleset `main-require-review`、id `25094342`、2026-10-14 16:03Z 作成)。
+仕様・緊急 merge・無効化の手順は `docs/WORKFLOW.md` §2 の「merge の担い手と main の Ruleset」節が正本。
+
+- **reviewer token の取得失敗時 (未検証)**: `OC_REVIEW_APP_PRIVATE_KEY` が未設定、または installation の権限が足りないと、
+  reviewer は実装 App と同じ identity になり approve できない。承認が無いので直接 merge も失敗し、PR は承認されないまま止まる見込み。
+  この挙動は実 run で確かめていない。
+- **Auto Merge (`--auto`) の挙動 (未検証)**: Auto Merge を有効化した PR が、承認の後に自動で merge されるかは確かめていない。
+  承認が無い間は merge されず残る見込み。
+
 ## 規約
 
 エージェントが従う規約の正本はリポジトリ内にある。

@@ -255,3 +255,16 @@
 - **比較した方式**: (a) 現実装: PM のログイン同士の組を全て数える、(b) Worker と Worker 以外の組だけを数える (採用)、(c) 降格をやめて shadow だけにする、(d) (a) のまま relaunch の経路だけ除く。
 - **理由**: 降格の目的は、Worker が live の間に、別の投稿者 (VM・PM の手動) と同じ issue を二重に起動する事故を止めることである。(a) は、停止報告の後に素材を足して再投入する Worker 自身の正当な `/oc` (この経路に待ち時間は無い) を二重と数え、最初の再投入で自己降格する。降格すると launch と dispatch が止まり、解除は手動だけなので、依頼者の不在 (最大 2 日。`docs/WORKFLOW.md` §11) の間、自律運転が止まる。個人アカウント同士の組は Worker の挙動と無関係で、降格しても原因を止められない。Worker 自身の投稿頻度は別の上限 (#2475 の同じ issue 24 時間 3 回など) で抑える。(c) は受入条件 4 の安全網を失う。(d) は経路ごとの例外が増えて、新しい経路が足されるたびに漏れる。
 - **影響**: PR #2469 に、組の条件の変更と、ネガコン (Worker 同士は降格しない、個人同士は降格しない) を含む回帰テストの追加を依頼する。この変更が入る前の版は、`wrangler.toml` が live のままなので再デプロイしない。昇格 (受入条件 2・3、`LIVE=auto`) は未実装のままで、#2340 に残る。
+
+## D27 — main の merge は承認 1 件以上を必須とし (Ruleset `main-require-review`)、通常の merge は reviewer App が行う
+
+- **状態**: 採用 (2026-10-14, issue #2648 [DOCS-27]。親 #2319。Ruleset は API の作成時刻 2026-10-14 16:03Z に適用済み)
+- **決定**: main への merge に APPROVED の承認を 1 件以上必須とする GitHub Ruleset `main-require-review` (id `25094342`、merge commit のみ) を正とする。通常の承認と merge は reviewer App が行い、実装 App の PR は承認が無ければ merge されない。PM の緊急 merge は `docs/WORKFLOW.md` §2 の手順による。
+- **比較した方式**: (a) Ruleset で承認 1 件以上を必須にする (採用)、(b) 据え置く (実装 agent の Auto Merge が承認要件なしで通る)、(c) 人の承認を必須にする。
+- **理由**: (b) では実装 App の merge が承認なしに main へ入っていた (実測は `tools/pm/REPORT_2648.md`)。規約 (`docs/WORKFLOW.md` §2・§3) は「検収 → merge」だが、守らせるのは workflow と prompt の書き方だけで、GitHub 側では強制されていなかった。Ruleset は GitHub が強制するので、prompt や workflow の書き方に依存しない。(c) は、依頼者の不在 (最大 2 日。`docs/WORKFLOW.md` §11) の間に merge を止めるため採らない。元の設計意図は `docs/pm/DIRECTIVES.md` の 596 行付近 (「1人以上のApproveを必要とするRulesetによってマージはブロックされていますが」) である。
+- **影響**:
+  - reviewer token が取れないと、実装 App は承認できず、PR が承認されないまま止まる見込み (未検証)。
+  - 承認の後の Auto Merge の挙動は未検証。
+  - 緊急 merge の Admin bypass の設定の有無は変わりうるため、本書には書かない (確認の手順は `docs/WORKFLOW.md` §2)。PM が設定を確かめるまで bypass は使えないものとして書く。
+  - ロールバックは `enforcement` を `disabled` にする (`docs/WORKFLOW.md` §2)。
+  - 測定値は `tools/pm/REPORT_2648.md` が正本。

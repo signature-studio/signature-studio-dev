@@ -1,7 +1,7 @@
 #!/bin/bash
 # test-no-self-merge.sh — 実装者が自分の PR を merge する指示 (Auto Merge を含む) が prompt / 文書に戻っていないことを検査する (#2600)。
 # implementer.md 規範 9 が `gh pr merge --auto --merge` を指示していた間、実装 App が PR を作成した直後に自己 merge し、
-# 独立した review を迂回していた (実測は tools/pm/REPORT.md §19)。規範 9 は「実装者は自分の PR を merge しない」の禁止だけを書き、merge の指示は
+# 独立した review を迂回していた (実測は tools/pm/REPORT_APPENDIX_2600.md)。規範 9 は「実装者は自分の PR を merge しない」の禁止だけを書き、merge の指示は
 # どこにも置かない。旧版の文面と、指示を足した改変版 (ネガティブコントロール) が落ちることも確かめる。
 # 実行: bash .github/scripts/tests/test-no-self-merge.sh
 set -uo pipefail

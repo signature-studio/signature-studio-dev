@@ -1,8 +1,8 @@
-# tools/pm 付録: REPORT §19 の全文 (実装 App の自己 merge の実測 #2600・PR #2624)
+# tools/pm 付録: 実装 App の自己 merge の実測 (#2600・PR #2624)
 
-> **REPORT の付録**: `tools/pm/REPORT.md` §19 の全文 (250 行上限のため分割移動)。測定値の正本はこの付録。
+> **tools/pm の付録**: 実装 App の自己 merge の実測の全文。`tools/pm/REPORT.md` は 250 行上限のため本節を持たない (main の §19 は #2648 の節)。測定値の正本はこの付録。
 
-## 19. 実装 App の自己 merge の実測 (#2600・PR #2624)
+## 実装 App の自己 merge の実測 (#2600・PR #2624)
 
 - **測定の基準**: 基準時刻 2026-10-14T16:36:11Z (UTC)。集計窓は mergedAt が 2026-10-13T16:36:11Z〜2026-10-14T16:36:11Z の 24 時間。取得: `gh pr list --repo signature-studio/signature-studio-dev --state merged --search "merged:2026-10-13T16:36:11Z..2026-10-14T16:36:11Z" --limit 1000 --json number,createdAt,mergedAt,mergedBy` (件数 980 は上限 1000 未満で、窓の全件)。PR #2624 の fix run で取得。
 - **件数と割合**: 980 件のうち merged_by が実装 App (`app/opencode-for-signature-studio`) の自己 merge は **119 件 (12.14%)**。内訳は reviewer App 859 件・人 2 件。全件の数え上げのため信頼区間は付けない。
