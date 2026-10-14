@@ -134,3 +134,63 @@ callback の VA: `closeGraphEditor` → 0xd5ca50 / `updateGraphEditor` → 0xd5c
 §6 の 3 項目はいずれも**静的 PE 解析では確定できない** (実行時の状態に依存する)。よって §6 の「決まった範囲で C 実装」に該当する確定事項は現時点で増えていない。C 実装・mock 追加は今回も行わない (推測実装の禁止)。
 
 必要なのは FL 実機 (または動的トレース) での観測。起票先: #1529 (継続)。
+
+## 8. 追補 (run 7): 引数書式と index 範囲の C 実装 (PY-40 #1529)
+
+### 8.1 §7.2 の訂正 (run 6 で確定)
+
+述語の参照鎖は `P=*(G)` (G = `0x15e4790`)、`Q=*(P)`、`O=*(Q+8)`、`call [O+0x98]` の 3 段。§7.2 の「`[slot]→[+8]→obj`」は段数を一つ省いた書き方だった。同じ鎖は selectOneChannel (PY-69, `0xd5af58`) と setChannelPitch の guard (PY-72) と共有する。
+
+### 8.2 実装した範囲 (確定した部分だけ)
+
+| 関数 | 引数 (PyArg 順に全部読む) | index の検査 (範囲外は code 4) | 戻り値 |
+|---|---|---|---|
+| closeGraphEditor | 1 個 (型検査のみ。callback は `[obj+0x18]==1` の判定に使う) | なし (§3 の記述に範囲検査の呼出しは無い) | None |
+| updateGraphEditor | なし | なし | None |
+| showGraphEditor | 5 個 (`temporary, param, step, index, useGlobalIndex=True`) | index: `0..件数-1` (`0x1005730`) | None |
+| showCSForm | 3 個 (`index, state=1, useGlobalIndex=False`) | index: `0..件数-1` | None |
+| focusEditor | 2 個 (`index, useGlobalIndex=False`) | index: `0..件数-1` | None |
+
+C (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) は同じ順序で引数を読み、型違いは code 5、件数違いは code 5、index 範囲外は code 4 を返す。
+
+### 8.3 未モデル (実装に入れていない・推測で決めていない)
+
+1. **述語 `[O+0x98]` (5 関数共通)**: C と mock は真と仮定する。偽のとき callback は `[obj+0x60]=-4` の失敗経路に入るが、その判定条件は未確定 (#2576 と共通)。
+2. **範囲上限の出所**: `0x1005730` が引く配列 (`useGlobalIndex≠0` は `[0x5dcad3]`、`=0` は `[0x5da9a8]`) は `.bss` で実行時に初期化される。C と mock は件数 = チャンネル数と仮定する (selectOneChannel の PY-69 と同じ扱い)。`useGlobalIndex` は値を読むだけで、経路の違いは見ていない。
+3. **`-4` の文言**: `0xd82c20` の `-4` → "Index out of range" の出し分けは `0xd82c6a` の別ゲートに依る (#2642 PY-82 の対象)。ゲートが偽のときは例外にならない可能性があり、C は真と仮定して code 4 を返す。
+4. **成功時の戻り値**: `0xc38bc0` 経路の戻り値は未読。None と推定 (PY-69 と同じ扱い)。
+5. **UI 副作用・分岐**: `0x13076e0` / `0x1307760` / `0x1307490` / `0x737640` / `0x1330c70` の中身、`showCSForm` の `state` 分岐、`closeGraphEditor` の `[+0xa9]` 分岐は未モデル。mock に観測できる状態は無い。
+
+### 8.4 受入条件 (run 7 時点)
+
+- [ ] 1. 5 関数の引数・戻り値・範囲外 code を PE 解析箇所つきで記録 — **部分達成**。引数書式・index 範囲外の経路は §1・§5.1・§8.2 で確定。戻り値 (§8.3-4)・述語 (§8.3-1) は未確定。
+- [x] 2. `provider/fl_engine.c` に実装し、`tests/provider_check.mjs` の実装数を更新 — 実装 5 関数。実装数 121 → 126 (commit `ecaa7658`)。
+- [x] 3. mock と C の差分検査で diffs 0 — `tests/channels_diff.mjs` 192 呼出し、diffs 0。
+- [x] 4. `FL_ENGINE=wasm node tests/all_tools.mjs` が 48/48 ok — 実測 48/48 (下表)。
+
+### 8.5 検証 (測定 commit `ecaa7658`)
+
+- 測定 commit: `ecaa7658` (コードを変えた最後の commit。対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`)。
+- 差分確認: `git diff ecaa7658 HEAD -- tools/python/provider tools/python/host tools/python/tests` は REPORT 更新 commit 以降 0 行 (REPORT のみの変更)。再測定は不要。
+- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf <archive> -C <dir> extracted/...`)。CPython 3.12.1 wasm は `build_cpython_wasm.sh` で作成 (rc 0・約 3.5 分)。`FLPY_SKIP_TABLE=1 build_flpy.sh` で flpy を作成 (rc 0)。
+
+| 検証 | 結果 (実測) |
+|---|---|
+| `bash provider/build.sh` | rc 0。`gen_provider.py --check-handlers` の handler 126。`dist/flprov.wasm` 60,417 B |
+| `node tests/channels_diff.mjs` | calls 192・diffs 0・PASS |
+| ネガティブコントロール (mock の focusEditor の index 範囲検査を外す) | diffs 2 件 (`focusEditor [3]`・`focusEditor [-1,false]`)・exit 1。元に戻すと PASS |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (1.3 秒) |
+| `node tests/provider_check.mjs` | functions 435・implemented 126・unimplemented 309・mcp_static 60・PASS |
+
+- 起動・GUI の KPI (FLEngine 起動の dispatch 数・通過 unit 数・最初のウィンドウ) は**動かしていない** (flapi の引数検査だけの変更で、FLEngine の boot は実行していない)。
+- 解析手段: 静的 (`analysis/flapi/pe_disasm.py` 系)。素材の `block00031_PE.bin` を使う再解析は run 7 では行っていない (§8.3 の未確定点は run 2〜6 の記録のとおり)。
+
+### 8.6 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 述語 `[O+0x98]` の真偽条件と `-4` の失敗経路 | C・mock は述語を真と仮定するため、偽になる実機の失敗経路は成功扱いになる | #2576 (PY-77・同じ O の解析) |
+| `0xd82c6a` ゲート (`-4` の文言の出し分け) | range error が Python 例外にならない可能性 | #2642 (PY-82) |
+| 成功時の戻り値 (`0xc38bc0` 経路) | None 以外の戻り値の可能性 | #1529 (継続) |
+| 範囲上限の配列 (`[0x5dcad3]`・`[0x5da9a8]`) の要素数の出所 | useGlobalIndex=0 時の範囲が件数と違う可能性 | #1529 (継続) |
+| UI 副作用・`showCSForm` の state 分岐・`closeGraphEditor` の `[+0xa9]` 分岐 | 表示状態は観測できないため mock 上は差が出ない | #1529 (観測手段が無いため継続。FLEngine boot の前進 #672・#3060 が前提) |
