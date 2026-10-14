@@ -184,3 +184,9 @@ FL_WIN64_DIR=... PY=... bash tools/m11/trap_triage/liftdiff68_683.sh
   - callee (`boot1.drc.c` 41206 ff.): 第 3 引数は `(int64_t)a3` と `(char)v1` としてのみ使われ、ポインタとしては読まれない。よって ptr 化は誤りと読める。
   - `boot_final3.ll` (現 IR 系) でも 318822 行に `ptr nonnull %stack_var_-255` が残る。
   - 未確認のまま: 即値 1 を alloca に置き換えた pass・段 (RetDec の型推定か後段か)、修復、survey 942 unit の再測定、因果。これらは子 issue `[M11-N93]` に分割して起票する。
+- **再確認 (#1448 run、HEAD `cb3a89a6`、素材 `work-m11` = #516/#680 以前の生成物、`ir_conditions.json` 無し)**:
+  - 機械語 (`boot1.drc.dsm`): `0x8158f5: 41 b0 01` (`mov r8b, 1`) → `0x8158f8: call 0x6cefb0`。
+  - RetDec 出力 (`boot1.drc.c` 63944-63945): `int64_t v69; // bp-255` → `function_6cefb0(v68, v68, &v69)`。`boot1.drc.ll` 126348 行: `call i64 @function_6cefb0(i64 %250, i64 %250, i64* nonnull %stack_var_-255)`。
+  - 後段 (`m11_gen_ir2.sh` の lift 段): `boot1.lift.ll` 118467 行も同じ `ptr nonnull %stack_var_-255`。`m2/ir_normalize.py` と `m5/ir5_patch.py` の該当 call 引数は変えていない (lift 段でも既に alloca)。よって置換は RetDec 段 (`drc`) までに起きていると読め (RetDec 内の pass は未特定)、`m2`/`m5` は除外する。
+  - 同じ callee の他 2 call (`0x8208e1` / `0x826406`) は `NULL` を渡す (`drc.ll` 129687 / 134183)。`0x8158f8` だけが alloca アドレスになる。
+  - 未確認のまま: RetDec 内のどの型推定 (引数型の推定か、`r8b` の型付けか) が置換を行ったか。修復と 942 unit survey 再測定、因果。これらは親 #1293 (`[M11-N80]`) で扱う (#1081・#878 とも同じ chain を追跡中のため、本 run では新規 issue を起票しない)。

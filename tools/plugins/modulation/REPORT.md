@@ -171,7 +171,7 @@ define = `p.final.ll` の `^define` 数。f80 = `x86_fp80` を含む define 数�
 - VST 系名は `VSTPluginMain` のほか大文字小文字違い 8 種 (計 9 種、`vstpluginmain` は 2 箇所。殻 19265 で確認)。
 - engine の export: 18977 = `dispatch`、19143 = `DispatchToEngine`、19266 / 19268 = `VSTPluginMain` / `main`。19268 の import は KERNEL32 の `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary`。
 - 結論 (推定): 殻が `LoadLibraryExW(engine_x64.dll)` → `GetProcAddress(<export>)` で engine を動的ロードする (§1 の dynload 2 と一致)。
-- 未解析: 殻内の `GetProcAddress` 呼出箇所と引数の実値 (#527 に残す)、engine の `DllMain` の扱い。範囲外: bit-exact・wasm リンク方式 (#202 / #197)。
+- 呼出箇所は `REPORT_APPENDIX_527.md` §J (殻 4 本、thunk 経由で LoadLibrary 1 箇所・GetProcAddress 10 箇所を特定)。未解析: `GetProcAddress` ラッパーに渡る引数の実値 (#527 に残す)、engine の `DllMain` の扱い。範囲外: bit-exact・wasm リンク方式 (#202 / #197)。
 
 ## 5. 判定 (gate) の設計と PR #506 の reviewer 指摘への対応
 

@@ -1,5 +1,7 @@
 # tools/plugins/dynamics/REPORT.md — PLG-F3 (#200) dynamics 7 本: lift 前提の実測
 
+> **正本**: `tools/plugins/dynamics/REPORT.md`。詳細は §4 / 付録 `tools/plugins/dynamics/REPORT_APPENDIX.md` §A。
+
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/dynamics/` のみ / 検証起点 commit: **b2094ba** (判定を gate にした `judge.py` 新設 + `dynamics_e2e.sh`・`dynamics_nega.sh` 修正後。 §5 の実測はすべてこの HEAD の detached worktree)
 - 旧 HEAD (18b1cb3 / 2ba3978) の「exit 0」は、当時の判定が不合格でも exit 0 になる実装だったため合格の根拠から外し、b2094ba の実測に置き換えた (旧値は 16b79f0 の本書)
 - 再現: `bash tools/plugins/dynamics/dynamics_e2e.sh` (判定 + 実測。 不合格・行欠落は exit 1) / `bash tools/plugins/dynamics/dynamics_nega.sh` (ネガティブコントロール NC1〜NC3)
@@ -132,18 +134,28 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 - 既知の限界: `ucomis`/`comis` の SSE 形は従来どおり `(void)a; (void)b;` で flag を反映しない (`m6 ir6 [P1]` 相当は未移植)。 本 PR はこれを変えていない。 `movntps`・`vmovsd` store・FMA の意味は未確定で stub のまま。
 
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 19048 は 210 件のうち 67 件が call 先として `declare` だけ残り、link 時に未解決になる。
-  19252 の 2 件は参照なし。 原因 (RetDec の関数境界統合 / 復号失敗) は未調査。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
+  19252 の 2 件は参照なし。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
+- **脱落の原因 (#1412、測定 commit と差分証跡は §5)**: 既定の RetDec の静的検出が、19048 の欠落 210 件のうち 208 件を除去していた (`statically linked function`)。 静的検出を切ると `missing_define` 210 → 2、`define` 1,504 → 1,712。 詳細と切替後の `emcc -c` rc 1 の内訳は付録 `REPORT_APPENDIX.md` §A。
 - 失敗の連鎖と修正 (clang は最初の型エラーで止まるため 1 件ずつ露見。 修正は engine 局所の `dynamics/engine_fixcmp.py`、共有鎖には未組込):
   1. 両 engine: `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → 修正済み (19252 は該当 0 件、19048 は 1 件)。
   2. 19048: `inttoptr i64 %arg2` で `%arg2` が i32 → 修正済み (`zext i32 → i64` を挿入。 `function_18004f7f8` の 1 件)。 修正後の `emcc -c` rc 0。
   3. 19252: 旧記載の `zext` 定数式 (`__asm_rep_stosq_memset`) は今回の HEAD では露見せず。 代わりに f80 (`fpext`/`frem`/`fp_round` on x86_fp80) が `emcc -c` を落としていた → `PLUG_F80_LOWER=1` (既存の `p0c/f80_lower.py`) で解消。 `engine_lift.sh` の既定を `1` にした。
-- 残り (本 issue の範囲外として子 issue へ): 未実装 helper 宣言 (VEX 含む) の 59 / 34、 `.pdata` 関数の define 脱落 (19252 2 件 / 19048 210 件、うち 19048 の 67 件は call 先) の原因。 脱落の原因は本 run では未調査。
+- 残り (本 issue の範囲外として子 issue へ): 未実装 helper 宣言 (VEX 含む) の 59 / 34、 `.pdata` 関数の define 脱落 (19252 2 件 / 19048 210 件、うち 19048 の 67 件は call 先) の原因 → 19048 は §4 の通り静的検出が原因 (208 件)。 19252 の 2 件は未特定 (子 issue)。
 - VEX 形の委譲の前提 (未検証を含む): (a) 委譲は `gen_body` で SSE 形を呼ぶため、SSE 分岐の条件 (`n == 2` 等) を満たす 2 引数 VEX 形 (`__asm_vaddsd(i128,i128)`・`__asm_vaddsd__21(i128,i64)`) だけが実装される。 合成 `.ll` で確認: 3 引数 `__asm_vaddsd__30(i128,i128,i128)` と `__asm_vfmadd213sd(i128,i128,i64)` は委譲後も未実装のまま。 (b) 残件に 3 引数形は出る (FMA の `i128,i128,i128` 形が 19252 で 3 行、19048 で 1 行。 `c0afd85b` の `e.simd.log` で実測)。 前段の「2 引数形だけ実装」の説明は、3 引数 FMA が残件に残ることで裏付けられる。 (c) VEX.128 は dst の上位 128bit をゼロにするが、委譲は SSE 形と同じく src1 由来で保持する。 ymm 系は i256 trap で止まるため現状の到達には影響しない前提 (未検証)。
 - VEX helper 未実装 (`vaddsd` / `vfmadd*` / `vcvt*` 等、distinct 宣言数) は、CPUID 分岐で SSE 路に固定できるかが未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と plugins/REPORT.md §4.3 に記録あり)。
   Transient engine の f80 1 関数は #197 の `f80_lower.py` の適用対象。
 - 以上は到達性の実測で、engine の正しさは何も示していない。
+- #1408 (スカラー FMA3 の実装。方式は `docs/DECISIONS.md` D14)。 `m11_simd2.py` に `vf[n]m{add,sub}{132,213,231}sd` の 3 引数形を追加 (`msimd11_core.h` の `_fma*sd` 系へ委譲)。 engine_lift 実測の測定 commit は `45a59279` (lift コードの変更はこの commit のみ。以降の `git diff 45a59279 HEAD -- tools/plugins/lift/passes/ tools/plugins/dynamics/` は REPORT と検証用 `fma12_check.c` の追加だけ)。
+  - 実機照合 (`tools/plugins/dynamics/fma12_check.c`、測定 commit `e0165b38`、Intel Xeon 8573C・FMA3・20,000 乱数・gcc -O0): 12 形 (3 順序 × 4 演算) すべてで lane0 の値が一致 (tol-mismatch 0)。 bit 完全一致は fma/fms の 6 形。 fnm/fnms の 6 形 (`vfnmadd*`・`vfnmsub*`) は ±0 と NaN の符号が実機と異なる (strict-bit-mismatch: 132 fnm 184・fnms 180、213 fnm 179・fnms 209、231 fnm 198・fnms 206 / 20,000)。 未解決: 符号差の修正は本 PR の範囲外 (起票先は未定、PM 判断)。
+  - `engine_lift.sh` 単独実行 (変更後): 19252 Transient unimpl 12 → 5 (`emcc_c_rc` 0、24.6 s)、19048 Multiband unimpl 6 → 1 (`emcc_c_rc` 1 → fixcmp 後 0、62 s)。 残件は 19252 が `movntps`・`vmovsd` store・`vcomisd`・`vucomisd`・`vucomiss`、19048 が `movntps`。
+  - 生成 helper C (`simdchk<B>/m11_simd.c`) の `emcc -c -msimd128 -w -O0`: 19252 rc 0、19048 rc 0。
+  - 残件 (子 issue に分割): movntps・vmovsd store (宛先復元) / ucomis・comis (flag 反映)。 #1408 は受入条件「未実装 helper 宣言 0」を未達として部分達成 (`Refs #1408`)。
 
 ## 5. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner・同時に走らせたのは本検証の 1 プロセス列のみ)
+
+- 測定 commit: **cb3a89a6** (origin/main)。 この後の差分は文書のみ (REPORT.md の分割移動・REPORT_APPENDIX.md 新設・DOC_MAP 索引 1 行)。
+  `git diff cb3a89a6 HEAD -- tools/plugins/dynamics ':!*.md'` の出力は空 (コード差分 0 の証跡)。 文書差分の概要は `git diff cb3a89a6 HEAD -- tools/plugins/dynamics --stat` で REPORT.md のみ。 `docs/WORKFLOW.md` §6 に従い現 HEAD での e2e 再測定は不要 (下の `engine_lift.sh` 再測定は HEAD で実施)。
+- §4 の数値を HEAD で再測定 (`engine_lift.sh 19048`・`PLUG_NO_STATIC_DETECT` 無し / 有り): `define` 1,504 / `missing_define` 210 (67 call 先) → 切替後 `define` 1,712 / `missing_define` 2 / `missing_ref` 0。 `statically linked function` の開始 VA 一致 208 / 210 (残り 2 件は `CreateEngine` / `entry_point`)。 一致判定は `ranges.txt` と dsm の突き合わせによる実測。
 
 | 項目 | 実測 |
 |---|---|

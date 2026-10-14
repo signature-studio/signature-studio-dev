@@ -768,7 +768,34 @@ def t23():
     print("T23 ok (canon_alloca_order: 行順 3 通り・struct tie・配列型名で canon 出力一致, slot は %3..%7 昇順)")
 
 
+def t24():
+    """[#1269] icall.blk_global_text: BLK 範囲内の inttoptr 定数だけ @__icall_blk への GEP に張り替え、宣言を最初の declare/define の前へ入れる。"""
+    from liftlib.passes import icall
+    blk = 0x184308000
+    src = "\n".join(["target datalayout = \"e-p:32:32\"", "declare i64 @function_1000()", "define i64 @function_1001() {", "entry:",
+                     "  %%a = load i64, ptr inttoptr i64 %d to ptr" % blk,
+                     "  %%b = load i64, ptr inttoptr i64 %d to ptr" % (blk + 8),
+                     "  %%c = load i64, ptr inttoptr i64 %d to ptr" % (blk + 0x1FF),
+                     "  %%d = load i64, ptr inttoptr i64 %d to ptr" % (blk + 0x200),
+                     "  %%e = load i64, ptr inttoptr i64 %d to ptr" % (blk - 1),
+                     "  ret i64 %a", "}", ""])
+    out, n = icall.blk_global_text(src, blk)
+    assert n == 3, n
+    for off in (0, 8, 0x1FF):
+        assert "getelementptr inbounds i8, ptr @__icall_blk, i64 %d" % off in out, off
+    for v in (blk + 0x200, blk - 1):
+        assert "inttoptr i64 %d to ptr" % v in out, v
+    decl = "@__icall_blk = internal global [512 x i8] zeroinitializer, align 16"
+    assert out.count(decl) == 1
+    assert out.index(decl) < out.index("declare i64 @function_1000"), out
+    far = "\n".join(["define i64 @function_1001() {", "entry:",
+                     "  %%a = load i64, ptr inttoptr i64 %d to ptr" % (blk + 0x1000), "  ret i64 %a", "}", ""])
+    untouched, n0 = icall.blk_global_text(far, blk)
+    assert n0 == 0 and untouched == far, untouched
+    print("T24 ok (blk_global_text: 範囲内 3 件を GEP へ, 範囲外 2 件は不変, 宣言は declare 前, 置換 0 件は無変更)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24):
         f()
     print("ALL UNIT TESTS PASS")
