@@ -16,7 +16,7 @@
   以後の commit は REPORT_APPENDIX の文書のみ。
 - P2 の全 20 件で `L ∈ direct_calls(F)` が成立 (同一 PE・同一入力で 20/20 を確認)。
 - 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
-- **0x417b70 (LD-28 受入条件 1・静的確認のみ、動的未確認)**: 食い違い 32 件の次 entry は native 側 0x409470 (18)・0x409410 (11)・0x418190 (3)、wasm 側 0x409730 (17)・0x409410 (15)。
+- **0x417b70 (LD-28 受入条件 1・静的確認のみ、動的未確認)**: 食い違いの次 entry 組の件数は `results/m11_unreachable_diverge.md` の表を正本とする (ここには再掲しない)。
   L の機械語は `417c56: idiv qword ptr [rbp+0x60]` (符号付き除算、直前の `cqo` で符号拡張)。機械語は `block00031_PE.bin` (RVA `0x17c56`, ImageBase `0x400000`) で確認。
   IR は `%29 = udiv i64 %28, %arg4` (符号なし) と前回 run で記録したが、**`boot_final3.ll` の行番号は未確認** (素材 `work-m11` が無く、本 fix run では再照合していない)。
   その直後の `icmp eq %29, %27` が偽のとき `call 0x409730; unreachable` へ進む。stride×count が負で count ≥ 2 なら、符号付き除算は stride を返すが符号なし除算は一致しない。count = 1 では一致する (下記)。
