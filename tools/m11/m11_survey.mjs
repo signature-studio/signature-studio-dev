@@ -39,7 +39,7 @@ const hex = (i) => '0x' + mod._m11_unit_va(i).toString(16);
 const unitVa0 = [mod._m11_unit_va(0), mod._m11_unit_va(941)];
 const snap = new Uint8Array(img.length);
 const tableIntact = () => mod._m11_unit_va(0) === unitVa0[0] && mod._m11_unit_va(941) === unitVa0[1];
-// #134 probe (既定 off): unit 56 の fail-fast 辺で読まれる object (linear = VA-0x400000) の状態 (件数 +0x14, vtable, vtable[-0x50])
+// #134 probe (既定 off): unit 56 が 8c5eb0 へ渡す this (VMT。linear = VA-0x400000) の状態 (件数 +0x14, vtable, vtable[-0x50])。guard の入力 R ではない (REPORT_134 §4)
 const P134 = process.env.M11_PROBE_134 === '1';
 const P134_OBJS = (process.env.M11_PROBE_134_OBJS || '1469800,1470128').split(',').map(Number);
 const P134_UNIT = Number(process.env.M11_PROBE_134_UNIT || '56');

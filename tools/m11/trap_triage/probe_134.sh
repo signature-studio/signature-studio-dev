@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# #134: unit 56 (VA 0x16fde0) の fail-fast 辺 (8c5eb0 の件数<=0 ガード) で読まれる object の状態を survey 中に採取する.
+# #134: unit 56 (VA 0x16fde0) が 8c5eb0 へ渡す this (VMT) の状態を survey 中に採取する. guard の入力 R (件数は R の list から読まれる) ではない (REPORT_134 §4).
 # 既定 off の挙動は不変 (M11_PROBE_134 未設定の survey は従来どおり). 前提: m11_e2e.sh 済み (work/m11_boot.cjs・work/m11_image.bin).
 # 出力: work/v134/ (n1〜n3 = 同一条件の再現, nc_shift1 = 読み取り先を 1 byte ずらしたネガコン).
 set -u
