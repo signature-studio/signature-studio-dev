@@ -91,11 +91,46 @@ static int wchar_path_to_utf8(LPCWSTR w, char* out, size_t outSize) {
 }
 
 /* ---------------------------------------------------------------
+ * open 系トレース (WIN-13 #2905・wasm のみ)。CreateFileW の 1 呼出し = printErr の 1 行
+ * "SHIMOPEN {json}"。caller は JS スタックの最初の function_<VA> (lift 関数名)。native では何もしない。
+ * --------------------------------------------------------------- */
+#ifdef __EMSCRIPTEN__
+EM_JS(void, shim_open_trace_js, (const char* fields), {
+  var caller = '', frames = [];
+  var st = (new Error().stack || '').split('\n');
+  for (var i = 1; i < st.length; i++) {
+    var name = st[i].replace(/^[ ]*at[ ]+/, '').split(' ')[0];
+    if (!name || name === 'Error') continue;
+    if (frames.length < 8) frames.push(name);
+    if (!caller && /^function_[0-9a-fA-F]+$/.test(name)) caller = name;
+  }
+  err('SHIMOPEN ' + UTF8ToString(fields) + ',"caller":"' + caller + '","frames":' + JSON.stringify(frames) + '}');
+});
+static void open_trace(LPCWSTR fileName, DWORD access, DWORD disp, HANDLE h) {
+    char path[1024], esc[2400], buf[2800];
+    size_t n = 0;
+    if (wchar_path_to_utf8(fileName, path, sizeof(path)) < 0) return;
+    for (const char* p = path; *p && n + 2 < sizeof(esc); p++) {
+        if (*p == '"' || *p == '\\') esc[n++] = '\\';
+        esc[n++] = *p;
+    }
+    esc[n] = '\0';
+    int ok = (h != INVALID_HANDLE_VALUE);
+    int wr = (access & GENERIC_WRITE) != 0 || disp == CREATE_NEW || disp == CREATE_ALWAYS
+          || disp == OPEN_ALWAYS || disp == TRUNCATE_EXISTING;
+    snprintf(buf, sizeof(buf), "{\"op\":\"open\",\"path\":\"%s\",\"ok\":%s,\"w\":%s,\"err\":%u,\"access\":\"0x%08x\",\"disp\":%u",
+             esc, ok ? "true" : "false", wr ? "true" : "false", (unsigned)(ok ? 0 : GetLastError()),
+             (unsigned)access, (unsigned)disp);
+    shim_open_trace_js(buf);
+}
+#endif
+
+/* ---------------------------------------------------------------
  * CreateFileW → open()
  * --------------------------------------------------------------- */
-HANDLE CreateFileW(LPCWSTR fileName, DWORD desiredAccess, DWORD shareMode,
-                   LPSECURITY_ATTRIBUTES sa, DWORD creationDisposition,
-                   DWORD flagsAndAttributes, HANDLE hTemplateFile) {
+static HANDLE create_file_w(LPCWSTR fileName, DWORD desiredAccess, DWORD shareMode,
+                            LPSECURITY_ATTRIBUTES sa, DWORD creationDisposition,
+                            DWORD flagsAndAttributes, HANDLE hTemplateFile) {
     (void)sa; (void)shareMode; (void)flagsAndAttributes; (void)hTemplateFile;
     char path[1024];
     if (!fileName || wchar_path_to_utf8(fileName, path, sizeof(path)) < 0) {
@@ -130,6 +165,16 @@ HANDLE CreateFileW(LPCWSTR fileName, DWORD desiredAccess, DWORD shareMode,
     s->fd = fd;
     SetLastError(ERROR_SUCCESS);
     return (HANDLE)(1 + (size_t)(s - g_slots));
+}
+
+HANDLE CreateFileW(LPCWSTR fileName, DWORD desiredAccess, DWORD shareMode,
+                   LPSECURITY_ATTRIBUTES sa, DWORD creationDisposition,
+                   DWORD flagsAndAttributes, HANDLE hTemplateFile) {
+    HANDLE h = create_file_w(fileName, desiredAccess, shareMode, sa, creationDisposition, flagsAndAttributes, hTemplateFile);
+#ifdef __EMSCRIPTEN__
+    if (fileName) open_trace(fileName, desiredAccess, creationDisposition, h);
+#endif
+    return h;
 }
 
 /* ---------------------------------------------------------------
