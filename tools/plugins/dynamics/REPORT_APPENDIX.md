@@ -68,8 +68,8 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 19048 の `unimpl` 1→5・`fixcmp` 1→2 の原因 (既定化で増えた define 由来か) | 既定化で未実装 helper が増える。 到達性のみの指標で正しさは未確認 | 未起票 (本 PR 未解決表。次の lift 検証 run で切り分け) |
-| `batch_lift.sh` 本体の既定/従来比較 | `batch_lift.sh` 経由の summary.csv は未測定 (inventory 成果物が素材に無い) | 起票先: #1698 の残件 (素材 `work-inventory` 追加の要否は PM 判断) |
+| 19048 の `unimpl` 1→5・`fixcmp` 1→2 の原因 (既定化で増えた define 由来か) | 既定化で未実装 helper が増える。 到達性のみの指標で正しさは未確認 | PM 判断 (切り分けは次の lift 検証 run。本 PR では子 issue を起票しない) |
+| `batch_lift.sh` 本体の既定/従来比較 | `batch_lift.sh` 経由の summary.csv は未測定 (inventory 成果物 `win_pe_scan.json`・`nsis_blockmap.json`・`winfuncs/`・`block_manifest.json` が素材に無い) | PM 判断 (素材の追加要否。許可名に該当する素材が無いため、本 PR では起票しない) |
 
 ### D-2. 検証
 
