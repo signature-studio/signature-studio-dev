@@ -166,6 +166,7 @@
 - 推定 (未確認): `--fix` 有りの shimx 版が `0xf960` に進む機構。`function_467f00` (IR `boot_final3.ll` L174409 付近) は flag==0 のとき `function_40f9e0(arg, (arg2&~0xff)|1)` を呼ぶ。`function_40f9e0` が `function_410320` (`_ClassCreate`) を経由し `ICALL_AT(Q(self-0x30))` = `0xf960` に至る経路は、`tools/liftdiff/REPORT.md` §9 と `REPORT_APPENDIX.md` §9 では `function_410320` の lift 後 IR に VMT 間接 call が無い (`ret %arg1` のみ) と記録されており、矛盾する。この `--fix` IR 上の該当 call は本 PR の素材 (`work-m11` 未展開) では確認できていない。`0xf960` 進入そのものは trace で実測 (上表) だが、その IR 経路は未確認のため、「IR の構造どおり」とは書かない。
 - 未確定: baseline が `0x67f00` の直後に `FormatMessageW` へ進む理由。`m11_boot.cjs` は `--fix` 無しの別 IR 由来で、`0x67f00` の入口 `arg2` (icall 時の引数) と `m11_icall` の dispatch 先の比較は未実測。残りの差はここにある (起票先: #1985 に残す)。
 - 注記: `probe_flag_shimx_fix.txt` は先頭 80 行のみ保存 (`[m11][UStrAsg]` の繰り返しを省略)。全行は再現コマンドで得られる。
+- 訂正 (#2489): 上表の baseline 行 (`halt0`) は旧 snapshot の `m11_boot.cjs` の値。現行 IR から再生成した baseline は `ret=2` で、shimx 版と同じ経路になる (`REPORT_SHX-T9h.md` §3.3.7)。
 - 【訂正】本節の「推定」「未確定 (baseline の FormatMessageW)」は §3.3.4 で解決した (`0xf960` の機構は `m11_ov.c` の C 転記。baseline は古い成果物)。
 
 #### 3.3.4 訂正と unit 23 の経路 (SHX-T9f #1985 続き)
