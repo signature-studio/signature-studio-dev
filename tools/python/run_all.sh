@@ -60,6 +60,6 @@ node tests/subinterp_probe.mjs --neg | cut -c1-120 || [ $? -eq 1 ]
 bash tests/subinterp_negcontrol_old.sh | tail -2                     # ネガコン: 修正前 flpy.c (PY-12 #587) で probe が FAIL すること
 step "14. MIDI scripting を アプリ UI / devtools に公開 (Vite + headless Chrome, PY-6 #76)"; (cd "$HERE/../.." && node tools/python/tests/midi_ui_check.mjs 2>&1 | grep -v shim_port | cut -c1-300)
 step "15. Chord progression 41 本 (pyc 39 + pyscript 2) の import / 実行 (PY-7 #78, mock 条件つき)"
-FL_WIN64_DIR="$FL_WIN64_DIR/extracted" "$PY312" analysis/extract_pyc_blocks.py work/fl_extract | tail -1
+rm -rf work/fl_extract; FL_WIN64_DIR="$FL_WIN64_DIR/extracted" "$PY312" analysis/extract_pyc_blocks.py work/fl_extract | tail -1
 node tests/chord_progression_e2e.mjs | tail -1
 step "ALL OK"

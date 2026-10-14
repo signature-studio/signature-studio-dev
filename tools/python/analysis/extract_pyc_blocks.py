@@ -96,7 +96,7 @@ def main() -> int:
         json.dump(manifest, w, ensure_ascii=False, indent=1)
     print(json.dumps({"pyc": len(manifest["pyc"]), "text_candidates": len(manifest["text"]),
                       "skipped": len(manifest["skipped"]), "pyscript": len(manifest["pyscript"]),
-                      "drum_patterns": 1}))
+                      "drum_patterns": 1 if "drum_patterns" in manifest else 0}))
     return 0
 
 
