@@ -7,7 +7,7 @@
 - 7 関数 (selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn / incEventValue / processRECEvent) の**ハンドラ位置と引数書式は PE から確定**した。
 - **意味論 (戻り値・範囲外 code・副作用) は未確定**。各ハンドラは下位関数へ薄く委譲しており、実処理の所在まで追えていない。推測では実装しない。
 - 1〜6 回目は解析のみ (コード変更 0 件)。**7 回目 run で `selectAll` の経路を RetDec 逆コンパイルで確定した (経路は確定・選択値とゲートは未確定)**。選択値 (`ffac20`) の判定に依存するため、C provider と mock への実装は見送った (`c6485d55` の実装は `481bcd62` で戻した。下の「7 回目 run」節)。残り 6 関数は未実装のまま子 issue に分離した。受入条件は未達 (`Refs #1527`)。
-- PY-69 (#2499): `selectOneChannel` の意味論を PE で確定し、C provider と mock に実装した (末尾の PY-69 節)。`setChannelPitch` は PE 意味論を PY-72 (`REPORT_PY72.md`・#2542 の子) で確定し、残りは #2562・#2563 に分けた。
+- PY-69 (#2499): `selectOneChannel` の意味論を PE で確定し、C provider と mock に実装した (末尾の PY-69 節)。`setChannelPitch` は PE 意味論を PY-72 (`REPORT_PY72.md`・#2542 の子) で確定し、残りは #2576・#2563 に分けた。
 
 ## 測定
 

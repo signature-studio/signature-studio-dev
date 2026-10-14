@@ -81,6 +81,11 @@
 - 差分 0 の証跡: `git diff 96de54b9 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (HEAD `0ef43b21`)。
 - load average: `uptime` 16:18:12 時点で `1.81 / 1.68 / 0.83` (ビルド直後。テスト単体の値は採取していない)。
 
+### 差し戻し round 3 (main 取り込み後の証跡)
+
+- main (`f4fa48f9`) を merge `ff992168` で取り込んだ。main は merge-base `f3102162` 以降 `tools/python/provider`・`host`・`tests` を変更していない。
+- 差分 0 の証跡: `git diff 96de54b9 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (`ff992168` 以降の docs のみの commit でも 0 行)。測定は round 2 (`0ef43b21`) の実測をそのまま使う (WORKFLOW §6)。
+
 ### 検証範囲 / 範囲外
 
 - 範囲内: 範囲外判定と排他選択。検証した呼出しの `useGlobalIndex` は省略か `false` (`dl=0` 相当) のみ。C provider・mock の呼出し列 69 件 (2 番目引数の型違い 3 件を含む)。
@@ -96,7 +101,7 @@
 | 選択 gating `0xffac20` (偽なら対象は選ばれず他は解除) | 選択不可の channel で結果が変わる可能性。C 側は未モデル | [PY-82] #2642 |
 | `+0x32c` への byte 書込み 9 箇所 (`0x6e9f4d`・`0x82bbf4`・`0x82bcb5`・`0x82bce0`・`0xfe96ed`・`0x11f8889`・`0x11f88e9`・`0x11f8981`・`0x11f8a43`) | 構造体の型が未確定。channel item への書込みかは未確定 | [PY-82] #2642 |
 | `item+0x32d` の前置と後段 UI 分岐 (`+0xd34`・`+0x160`) | UI 状態のみ。C provider に UI 状態は無い | 追跡のみ (子は起票しない) |
-| `setChannelPitch` の効果関数・guard の PE (意味論の残り。確定済み部分は `REPORT_PY72.md`) と C provider / mock 実装 | 未実装 | #2562 (PY-75)・#2563 (PY-76) |
+| `setChannelPitch` の効果関数・guard の PE (意味論の残り。確定済み部分は `REPORT_PY72.md`) と C provider / mock 実装 | 未実装 | #2576 (PY-77)・#2563 (PY-76) |
 
 ### 次の提案 (起票先 [PY-82] #2642)
 
