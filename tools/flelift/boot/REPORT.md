@@ -2,7 +2,7 @@
 
 > 正本: `tools/flelift/boot/REPORT.md`。boot 連鎖 (FLE-2〜FLE-5) の測定値・成果物・引継ぎ。
 > 行数上限 (250 行, `docs/DOC_MAP.md` §1) 超過のため、ラウンド別の経緯と停止原因の逆引きは
-> `REPORT_APPENDIX.md` に**分割移動**した (内容は削除していない)。
+> `REPORT_APPENDIX.md` に**分割移動**した (内容は削除していない)。#2719 (x64c 寛容起動・942 unit 逐次試行・CreateFruityInstance 観測): 942 試行、CFI は未到達 (oob 即時) → `REPORT_APPENDIX_2719.md`。
 
 ## 0. 結論 (先出し)
 
