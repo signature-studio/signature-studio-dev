@@ -353,6 +353,90 @@ jobs:
           OC_JOB_STATUS: ${{ job.status }}
         run: bash .github/scripts/record-run-outcome.sh
 
+      # ---------------------------------------------------------------------
+      # pr-lint.sh (CI-43): agent が出した (直した) PR を、差し戻しの上位原因 (REPORT 行数・repo 外パス・Closes/Refs と
+      # 受入の整合・oc_artifacts の値域・DOC_MAP 登録) で決定的に検査し、結果を step summary に書く。
+      # PR は agent の step の中で作られる (workflow に PR 作成 step は無い) ので、agent の step が全て終わった後に、
+      # その PR を探して検査する。agent 自身も PR を出す前に同じ検査を走らせる (prompt)。
+      # job の最後 (Record the run outcome より後) に置く: job の上限 (60 分) に当たったとき、#1950 の不変条件を守る Record
+      # (always()) が lint に時間を取られて走らないことが無いように。lint は !cancelled() なので、上限での打ち切りの後には走らない。
+      # 既定は警告のみ: continue-on-error で job を落とさず、OC_LINT_STRICT は repo 変数 (未設定なら警告のまま)。
+      # script は origin/main の版を取り出して使う (agent が作業ツリーを PR ブランチに移していても、PR 側のコードを実行しない)。
+      # 検査する PR: fix モード (pull_request_review / repository_dispatch oc-fix) と PR 上の /oc は OC_PR_NUMBER、
+      # issue 上の /oc はその issue を指す open PR (ブランチ名 <N>-... か本文の Closes/Refs/Fixes/Resolves #N。record-run-outcome.sh と同じ判定)。
+      # workflow_dispatch と、PR が無い run は何もしない。
+      # ---------------------------------------------------------------------
+      - name: Lint the PR (pr-lint.sh)
+        id: pr-lint
+        if: ${{ !cancelled() && steps.context.outputs.should_run == 'true' && env.OC_PERMISSION == 'write' && steps.fixrec.outputs.stop != 'true' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OC_LINT_STRICT: ${{ vars.OC_LINT_STRICT }}
+        run: |
+          set -uo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "::notice::no token: pr-lint is skipped"; exit 0; }
+          prs=""
+          case "$OC_EVENT_NAME" in
+            pull_request_review) prs="$OC_PR_NUMBER" ;;
+            repository_dispatch)
+              [ "$(jq -r '.action // ""' "$GITHUB_EVENT_PATH")" = oc-fix ] && prs="$OC_PR_NUMBER" ;;
+            issue_comment)
+              if [ -n "$(jq -r '.issue.pull_request // empty' "$GITHUB_EVENT_PATH")" ]; then
+                prs="$OC_PR_NUMBER"
+              else
+                case "$OC_ISSUE_NUMBER" in
+                  '' | *[!0-9]*) ;;
+                  *)
+                    prs="$(gh api --paginate "repos/$OC_REPO/pulls?state=open&per_page=100" \
+                      | jq -rs --argjson n "$OC_ISSUE_NUMBER" '[.[][] | select(((.head.ref // "") | test("^" + ($n | tostring) + "-")) or ((.body // "") | test("(Closes|Refs|Fixes|Resolves) #" + ($n | tostring) + "([^0-9]|$)"; "i"))) | .number] | .[0:3] | join(" ")')" \
+                      || prs=""
+                    ;;
+                esac
+              fi ;;
+          esac
+          case "$prs" in *[!0-9\ ]*) echo "::warning::unexpected PR list: pr-lint is skipped"; exit 0 ;; esac
+          [ -n "$prs" ] || { echo "::notice::no PR to lint (event=$OC_EVENT_NAME)"; exit 0; }
+          trusted="$RUNNER_TEMP/oc-lint-scripts"
+          rm -rf "$trusted" && mkdir -p "$trusted"
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main' \
+            || { echo "::warning::could not fetch main for pr-lint"; exit 1; }
+          git archive origin/main .github/scripts/pr-lint.sh .github/scripts/watchdog.sh | tar -x -C "$trusted" \
+            || { echo "::warning::could not extract pr-lint.sh from origin/main"; exit 1; }
+          rc=0
+          for pr in $prs; do
+            meta="$(gh api "repos/$OC_REPO/pulls/$pr")" || { echo "::warning::could not read PR #$pr"; rc=1; continue; }
+            git fetch --no-tags origin "+refs/pull/$pr/head:refs/oc-lint/pr-$pr" \
+              || { echo "::warning::could not fetch the head of PR #$pr"; rc=1; continue; }
+            body="$RUNNER_TEMP/pr-lint-body-$pr.md"
+            out="$RUNNER_TEMP/pr-lint-$pr.out"
+            jq -r '.body // ""' <<< "$meta" > "$body"
+            # pr-lint.sh の出力の行頭は PR のファイル名で、『::』で始まる名前は workflow command として runner に解釈される。
+            # pr-lint.sh は OC_LINT_STRICT が 1 でないと違反ごとに『::warning::<ファイル名>...』を出すので、常に OC_LINT_STRICT=1 で
+            # 走らせて (違反があれば終了 1。::warning:: は出ない)、job ログに流す行は全行に固定の接頭辞を付ける
+            # (空白を除いた行頭が『::』なら command になる。空白の種類に依らず、全行を例外なく無効化する)。
+            # 警告のみか strict かは、repo 変数 (この step の env の OC_LINT_STRICT) をここで見て決める。
+            OC_LINT_STRICT=1 bash "$trusted/.github/scripts/pr-lint.sh" --base origin/main --head "refs/oc-lint/pr-$pr" \
+              --body-file "$body" --title "$(jq -r '.title // ""' <<< "$meta")" 2>&1 \
+              | tee "$out" | sed 's/^/pr-lint> /'
+            r=${PIPESTATUS[0]}
+            if [ "$r" -eq 1 ] && [ "${OC_LINT_STRICT:-}" != 1 ]; then
+              echo "::warning::pr-lint found violations in PR #$pr (warn-only; see the step summary)"
+              r=0
+            fi
+            [ "$r" -eq 0 ] || rc=$r
+            # 出力の全行を字下げして載せる (字下げのコードブロックはファイル名の ``` で閉じられない)。
+            {
+              echo "### pr-lint (PR #$pr, implement)"
+              echo
+              sed 's/^/    /' "$out"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit "$rc"
+
   review:
     # レビュワーエージェント: PR opened / synchronize / reopened / ready_for_review で起動し、
     # approve/request-changes を出したうえで必要ならマージまで行う。
@@ -448,6 +532,46 @@ jobs:
           git config --global user.name "${SLUG}[bot]"
           git config --global user.email "${USER_ID}+${SLUG}[bot]@users.noreply.github.com"
           gh auth setup-git
+
+      # pr-lint.sh (CI-43): 差し戻しの上位原因 (REPORT 行数・repo 外パス・Closes/Refs と受入の整合・oc_artifacts の値域・
+      # DOC_MAP 登録) を決定的に検査し、結果を step summary に書く。素材の取得 (Setup Agent Environment) の前に走らせる。
+      # 既定は警告のみ: continue-on-error で job を落とさず、OC_LINT_STRICT は repo 変数 (未設定なら警告のまま)。
+      # script は上で checkout 済みの base (main の正本)。PR head は refs/pull/N/head を fetch して diff の対象にするだけで、実行しない。
+      - name: Lint the PR (pr-lint.sh)
+        id: pr-lint
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.reviewer-token.outputs.token || steps.app-token.outputs.token }}
+          OC_LINT_STRICT: ${{ vars.OC_LINT_STRICT }}
+        run: |
+          set -uo pipefail
+          : "${OC_PR_NUMBER:?}" "${OC_PR_BODY_FILE:?}" "${OC_PR_TITLE_FILE:?}"
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main' "+refs/pull/${OC_PR_NUMBER}/head:refs/oc-lint/pr-${OC_PR_NUMBER}" \
+            || { echo "::warning::could not fetch main and the PR head for pr-lint"; exit 1; }
+          out="$RUNNER_TEMP/pr-lint.out"
+          # pr-lint.sh の出力の行頭は PR のファイル名で、『::』で始まる名前は workflow command として runner に解釈される。
+          # pr-lint.sh は OC_LINT_STRICT が 1 でないと違反ごとに『::warning::<ファイル名>...』を出すので、常に OC_LINT_STRICT=1 で
+          # 走らせて (違反があれば終了 1。::warning:: は出ない)、job ログに流す行は全行に固定の接頭辞を付ける
+          # (空白を除いた行頭が『::』なら command になる。空白の種類に依らず、全行を例外なく無効化する)。
+          # 警告のみか strict かは、repo 変数 (この step の env の OC_LINT_STRICT) をここで見て決める。
+          OC_LINT_STRICT=1 bash .github/scripts/pr-lint.sh --base origin/main --head "refs/oc-lint/pr-${OC_PR_NUMBER}" \
+            --body-file "$OC_PR_BODY_FILE" --title "$(cat "$OC_PR_TITLE_FILE")" 2>&1 \
+            | tee "$out" | sed 's/^/pr-lint> /'
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 1 ] && [ "${OC_LINT_STRICT:-}" != 1 ]; then
+            echo "::warning::pr-lint found violations in PR #${OC_PR_NUMBER} (warn-only; see the step summary)"
+            rc=0
+          fi
+          # 出力の全行を字下げして載せる (字下げのコードブロックはファイル名の ``` で閉じられない)。
+          {
+            echo "### pr-lint (PR #${OC_PR_NUMBER}, review)"
+            echo
+            sed 's/^/    /' "$out"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
 
       - name: Setup Agent Environment
         uses: ./.github/actions/agent-setup
