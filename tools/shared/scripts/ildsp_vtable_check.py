@@ -13,6 +13,8 @@ usage: ildsp_vtable_check.py <vtable.json> [PE]
     `(bad)` 行と `.byte` 行は命令として数えない。
   - 集合の差は KNOWN_DATA_IN_CODE の RVA と完全一致する場合のみ許す。それ以外の差は非 0 で終了する。
   - JSON の命令数・SIMD 比・間接 call 数は、上の capstone 集合から再計算した値と一致しなければならない。
+  - 参考値として、同じ関数集合の末尾 jmp (即値でない jmp) を objdump の出力から分類し `[tail]` 行に出す
+    (IAT / 画像内ポインタ / reg / vcall 形 `[reg+disp]` / switch 形 `[base+idx*8]`)。判定には使わない。
 不一致が 1 件でもあれば非 0 で終了する。"""
 import sys, os, re, json, struct, subprocess, argparse, bisect
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +33,8 @@ SIMD_RE = re.compile(r"\b(xmm|ymm|zmm)\d")
 # capstone は 1 byte 飛ばして 0x191c29 から `adc dword ptr [rcx], ebx` を 1 件数える。objdump は 0x191c28 を
 # `(bad)` として 3 byte を 1 行で消費し、0x191c29 を命令として出さない。
 KNOWN_DATA_IN_CODE = {"TransientLooper_CreateInstance": {0x191c29}}
+JMP_RE = re.compile(r"^(?:\S+ )*?jmp\s+([^#]*?)\s*(?:#\s*0x([0-9a-f]+).*)?$")
+DIRECT_JMP_RE = re.compile(r"^0x[0-9a-f]+$")
 
 
 def main():
@@ -59,7 +63,24 @@ def main():
         i = bisect.bisect_right(fn_sorted, b)
         return fn_sorted[i] if i < len(fn_sorted) else t_hi
 
-    cap_cache, obj_cache = {}, {}
+    iat = pe.OPTIONAL_HEADER.DATA_DIRECTORY[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IAT"]]
+    iat_lo, iat_hi = iat.VirtualAddress, iat.VirtualAddress + iat.Size
+
+    def jmp_kind(m):
+        # 末尾 jmp の分類 (即値の jmp は None)。rip 相対は objdump の `# 0x...` (絶対アドレス) で参照先を見る
+        g = re.sub(r"<.*>", "", m.group(1)).strip()
+        if DIRECT_JMP_RE.match(g):
+            return None
+        if "[rip+" in g:
+            if m.group(2) is None:
+                return "imgptr"
+            t = int(m.group(2), 16) - ib
+            return "IAT" if iat_lo <= t < iat_hi else "imgptr"
+        if "[" in g:
+            return "switch" if "*" in g else "vcall"
+        return "reg"
+
+    cap_cache, obj_cache, jmp_cache = {}, {}, {}
 
     def capstone_range(b):
         # RVA -> (simd, indirect call)
@@ -75,7 +96,7 @@ def main():
             out = subprocess.run(["objdump", "-d", "-M", "intel", "--no-show-raw-insn",
                                   f"--start-address=0x{ib + b:x}", f"--stop-address=0x{ib + e:x}", a.pe],
                                  capture_output=True, text=True, check=True, timeout=120).stdout
-            insns = {}
+            insns, jmps = {}, {}
             for line in out.splitlines():
                 m = LINE_RE.match(line)
                 if not m:
@@ -83,9 +104,15 @@ def main():
                 body = m.group(2).strip()
                 if not body or body.startswith("(bad)") or body.startswith(".byte"):
                     continue
-                insns[int(m.group(1), 16) - ib] = (bool(SIMD_RE.search(body)),
-                                                  body.startswith("call") and not DIRECT_CALL_RE.match(body))
+                addr = int(m.group(1), 16) - ib
+                insns[addr] = (bool(SIMD_RE.search(body)),
+                               body.startswith("call") and not DIRECT_CALL_RE.match(body))
+                jm = JMP_RE.match(body)
+                kind = jmp_kind(jm) if jm else None
+                if kind is not None:
+                    jmps[addr] = kind
             obj_cache[b] = insns
+            jmp_cache[b] = jmps
         return obj_cache[b]
 
     ok = True
@@ -117,6 +144,14 @@ def main():
               f"only_capstone={fmt(only_cap)} only_objdump={fmt(only_obj)} flags={'same' if flags_ok else 'DIFF'} | "
               f"indirect capstone={ind_cap} objdump={ind_obj} | simd capstone={simd_ratio} json={v['simd_ratio']} "
               f"-> {'OK' if match else 'MISMATCH'}")
+        tails = {}
+        for fh in v["function_rvas"]:
+            objdump_range(int(fh, 16))
+            for addr, k in jmp_cache[int(fh, 16)].items():
+                tails.setdefault(addr, k)
+        tc = {k: sum(1 for x in tails.values() if x == k) for k in ("IAT", "imgptr", "reg", "vcall", "switch")}
+        print(f"[tail] {row['export']}: IAT={tc['IAT']} imgptr={tc['imgptr']} reg={tc['reg']} "
+              f"vcall={tc['vcall']} switch={tc['switch']}")
     print("[check] ALL OK" if ok else "[check] MISMATCH")
     sys.exit(0 if ok else 1)
 
