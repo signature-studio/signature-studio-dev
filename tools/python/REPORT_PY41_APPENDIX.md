@@ -214,7 +214,7 @@
 - 0x104b843 (call 0x10469f0 @0x104b83e) の引数 (SLOT 依存の 2 件のうち 1 件):
   - ecx = [rbp+0x5b8]@0x104b7f9 = {0x1046d6b} → edx_in。
   - j = [rbp+0x570]@0x104b814・0x104b833 = {0x104aa97} = (ecx_in & 0xffff) + 0x70000000 (`[rbp+0x5b0]`@0x104aa87 = {0x1046d65} = ecx_in)。
-  - edx = dword[0x1539eb4 + 8k]、r8d = dword[0x1539eb8 + 8k]、k = ecx_in & 0xffff。0xfffffffc7fff0200 (movabs) と rip 相対の和を mod 2^64 で計算すると、j·8 の 0x380000000 と打ち消して VA 0x1539eb4 になる。テーブルは .data 内。raw 値は解釈していない。
+  - edx = dword[0x1539eb4 + 8k]、r8d = dword[0x1539eb8 + 8k]、k = ecx_in & 0xffff (k=0xffff で 0x15b9eac・0x15b9eb0)。計算 (mod 2^64): edx 側 = movabs 0xfffffffc7fff0200 + rip 基準 0x104b810 + 0x4fe4a4 (= 0x1549cb4) + 8j (j = k + 0x70000000、8j = 8k + 0x380000000) ≡ 0x1539eb4 + 8k。r8d 側 = movabs 0xfffffffc7fff0204 + (0x104b82f + 0x4fe485 = 0x1549cb4) + 8j ≡ 0x1539eb8 + 8k。objdump の rip 注釈 (`# 0x1549cb4`) と一致。テーブル範囲は .data (VA 0x13a5000〜0x15e5008) 内。raw 値は解釈していない。
   - py88 の式 `edx=M32[&SLOT[rbp+0x5c0]?@0x104a8a9 …]` は誤り (§5)。
 - 0x104a48f (call 0x10469f0 @0x104a48f): ecx = [rbp+0x5b8]@0x104a47a = {0x1046d6b} → edx_in。edx = −T[i]、r8d = T[i]。T[i] = dword[*(0x15e44c8) + 4i]、i = sext([rbp+0x56c]) = {0x104a3f1} = ((([rbp+0x564]@0x104a3d7 = {0x104756f}) − 0x1000) >>> 8)。0x15e44c8 は .data 内の qword で、その値は実行時に決まる (raw 値では確定しない)。
 
@@ -240,4 +240,5 @@
 | 0x7a0c20 の vtbl[+0x28]・vtbl[+0x18]・0x729d20・[this+0x548] の解決 | r8d (0x1049b2c) | #3101 (PY-161) |
 | 0x104a48f の T の runtime ポインタ (0x15e44c8)・[rbp+0x564] の式 | 0x104a48f の edx・r8d | #3101 (PY-161) |
 | py88 の movabs 未対応 | 65 件の式表 (0x104b843 で確認) | #3101 (PY-161) |
-| 間接書込みの戻り値 (0x104cc65) への反映 | PY-52 の戻り値式 | #1911 (PY-53) |
+| 間接書込みの戻り値 (0x104cc65) への反映 | PY-52 の戻り値式 | #3101 (PY-161) |
+| 間接書込みが届く 0x104a945 の `mov r8d,[rbp+0x5b8]` の r8d の使い道と値 | 0x104a945 以降の r8d (呼出し引数の候補) | #3101 (PY-161) |
