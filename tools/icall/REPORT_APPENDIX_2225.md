@@ -15,14 +15,27 @@
 ### 2.1 測定条件
 
 - 測定 commit: `7d15ceab` (`slot_trace.sh`・`slot_trace.c` と OTT 側の入力を測定した時点の HEAD)。PR 本文の `6883fa10` は本 REPORT を追加した commit で、測定 commit ではない。
-- 測定 commit から HEAD までの差分 (`docs/WORKFLOW.md` §6):
-  - 最終のコード commit は `5d711ec7`。`git diff 7d15ceab 5d711ec7 -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott` → 出力 0 行 (測定対象は無変更)。
-  - `git diff 7d15ceab 5d711ec7 --stat -- tools/icall/diff tools/ott` → `tools/icall/diff/ott_apiset_cmp.py | 79 ++++` (新規 1 件のみ)。この新規ファイルは測定の入力ではない (slot_trace の測定対象外)。
-  - `5d711ec7` の後の commit は本 REPORT と PR 本文のみ。`git diff 5d711ec7 HEAD -- tools/icall/diff tools/ott` は 0 行。
+- 測定 commit から、コード head `7b785cd9` (main 取り込みを含む) までの差分 (`docs/WORKFLOW.md` §6)。実出力:
+  - `git diff 7d15ceab 7b785cd9 --stat -- tools/icall/diff tools/ott`
+    ```
+    tools/icall/diff/fa_wc.py            | 145 +++++++++++++++++++++++++++++++++++
+    tools/icall/diff/fa_wc_build.sh      |  18 +++++
+    tools/icall/diff/fa_wc_drv.cjs       |  13 ++++
+    tools/icall/diff/fa_wc_rt.c          |  16 ++++
+    tools/icall/diff/ott_apiset_cmp.py   |  79 +++++++++++++++++++
+    tools/icall/diff/slot_table_reach.py |  31 ++++++++
+    tools/icall/diff/slot_trace.c        |   8 +-
+    tools/icall/diff/slot_trace.sh       |   2 +-
+    8 files changed, 310 insertions(+), 2 deletions(-)
+    ```
+  - 測定対象 (`slot_trace.sh`・`slot_trace.c`) は main 取り込みで変わった。`git diff 7d15ceab 7b785cd9 -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c` は 46 行 (ヘッダ含む)。変更点: `slot_trace.c` は fatal 時に stderr へ `regs`・`heap_args` 行を出す処理と `g_gpr` の保存を追加 (stdout の `ACC` 行・終了 rc の経路は変更なし)。`slot_trace.sh` は `ERR_OUT` の grep 対象に `regs|heap_args` を追加。
+  - **したがって §2.2 の数値は測定 commit `7d15ceab` 時点の実測であり、main 取り込み後の `slot_trace.c/sh` 差分は未測定**。素材 `plugins-freshair`・`work-icall` が無く本 run では再実行できない (§4 の未解決)。
+  - `ott_apiset_cmp.py` (新規) は測定の入力ではない (slot_trace の測定対象外)。
+  - `7b785cd9` 以降の commit は本 REPORT の文言修正のみ (測定対象・`tools/ott` は変更しない)。PR 本文に HEAD 時点の `git diff 7b785cd9 HEAD --stat -- tools/icall/diff tools/ott` 実出力を載せる。
 - 再現: `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (既定条件)。
 - 所要: real 13.191 s / user 11.032 s / sys 1.916 s。load average 1.18 (測定直前 10:26:33)。
 - 素材: 測定時は `plugins-freshair` (`FA_DL` に展開) と `work-icall` (`tools/icall/work/`) を使用。OTT の生値は `analysis-ott-binaries` の `OTT_vst2_win64.dll` を PE 直読み。
-- **再測定の状態**: slot_trace は測定 commit からコード差分 0 のため、本 HEAD では再実行していない (§2.2 の数値は前 run の実測)。`ott_apiset_cmp.py` は本 HEAD で実 DLL に対して実行した (§2.3 の出力)。
+- **再測定の状態**: slot_trace は本 HEAD (`7b785cd9`) では再実行していない (素材なし。§2.2 の数値は測定 commit `7d15ceab` の実測)。`ott_apiset_cmp.py` は `7b785cd9` の状態で実 DLL に対して実行した (§2.3 の出力)。
 
 ### 2.2 slot_trace 集計 (既定条件・再現)
 
@@ -45,7 +58,7 @@
 - 「encoded 表 = zero-fill に enc(NULL)=cookie を敷いて初期化」という形式は、両者で同じ。OTT は `ott_crt_init_tables` が、SlateCore は harness の `SLOT_ENC_INIT=1` が同じ書込みを行う。
 - OTT の `enc(NULL)` は `rol(0,14) ^ cookie` で `cookie` に等しい (`crtinit/REPORT.md` と一致)。
 
-#### 実 DLL の出力 (`ott_apiset_cmp.py`・本 HEAD で実行。素材 `analysis-ott-binaries` の `OTT_vst2_win64.dll`)
+#### 実 DLL の出力 (`ott_apiset_cmp.py`・`7b785cd9` の状態で実行。素材 `analysis-ott-binaries` の `OTT_vst2_win64.dll`)
 
 ```
 cookie VA 0x180260ce0 = 0x2b992ddfa232 (rot 50) [raw] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc
@@ -94,7 +107,7 @@ entry[31] VA 0x18026cae8 [zero-fill (ファイル外・0 固定。読取りで�
 `tools/icall/diff/ott_apiset_cmp.py` は、entry ごとに VA の区分 (`raw` / `一部 zero-fill` / `zero-fill` / `セクション外`)・セクション名・raw 範囲・virt 範囲を表示する。`zero-fill` と `セクション外` は decode せず、0 固定の値として扱わない。集計行は出さない。
 以前の REPORT・検収文書にあった「非ゼロ 32/32」が、どの読み方に由来するかは未確認 (前 run の読出し手順は残っていない)。`tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の訂正は、本節のセクションヘッダとの比較を根拠とする。
 
-注: 上記 §2.3 の出力は、本 HEAD で実 DLL に対して実行した結果である。セクション範囲・VA 区分は、この出力と §2.4 のセクションヘッダの値が一致する。
+注: 上記 §2.3 の出力は、`7b785cd9` の状態で実 DLL に対して実行した結果である (出力 33 行、ブロックは実出力と一致を確認済み)。セクション範囲・VA 区分は、この出力と §2.4 のセクションヘッダの値が一致する。
 
 ## 3. 再現
 
@@ -106,7 +119,7 @@ python3 tools/icall/diff/ott_apiset_cmp.py <OTT_vst2_win64.dll>   # <OTT_vst2_wi
 
 - OTT の DLL の所在は `docs/REFERENCES.md` の `[ANALYSIS-PLUGINS]` (`ott/binaries/`)。Actions では `oc_artifacts: analysis-ott-binaries` で取得する (`docs/WORKFLOW.md` §11)。
 - `tools/icall/diff/ott_apiset_cmp.py` は cookie `0x180260ce0`・api-set 表 `0x18026c9f0` (32 × u64) を読み、`ror(entry ^ cookie, cookie & 0x3f)` で decode して出力する。zero-fill は 0 とする (§2.4)。
-- 実 DLL の出力は §2.3 に貼った (本 HEAD で実行)。
+- 実 DLL の出力は §2.3 に貼った (`7b785cd9` の状態で実行。素材 `analysis-ott-binaries` の `OTT_vst2_win64.dll`)。
 
 
 
