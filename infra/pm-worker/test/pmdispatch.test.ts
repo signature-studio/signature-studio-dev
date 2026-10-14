@@ -415,7 +415,7 @@ test("ネガコン (f): dry-run では fetch の POST が 0 回。/status の wo
   assert.deepEqual(s.would_dispatch_pm.map((x: any) => `${x.kind}#${x.ref}`), ["stuck#10", "stuck#11", "no_pr#20"]);
   assert.equal(s.counters.wouldDispatchPm, 3);
   assert.equal(s.counters.pmDispatched, 0);
-  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 2, no_pr: 1 });
+  assert.deepEqual(s.pm_detected, { user_answered: 0, needs_decision: 0, stuck: 2, no_pr: 1, refs_orphan: 0 });
   // dry-run でも抑止は効く (同じ記録を毎分増やさない)
   await ctx.app.engine.pmDispatch(gh);
   assert.equal((ctx.app.engine.status() as any).counters.wouldDispatchPm, 3);
@@ -469,7 +469,7 @@ test("closed になった PR / issue の手がかりは reconcile の prune で�
 
 // ---------------------------------------------------------------- pm-apply / needs-user-input (依頼者・PM 適用の待ち) は対象外
 test("ネガコン (g): pm-apply / needs-user-input が付いた oc:no-pr の issue は、検出も oc-pm の送信も /oc の再投入も 0 回", async () => {
-  const clock = { t: T0 + 4 * 3_600_000 };
+  const clock = { t: T0 + 7 * 3_600_000 };
   const ctx = await configuredApp({
     live: true,
     now: clock,

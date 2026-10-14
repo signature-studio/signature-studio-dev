@@ -135,7 +135,8 @@ OBJS+=("${_multi[@]}")
 [ $MIDI = 1 ] && read -ra _midi <<< "$MIDIOBJ" && OBJS+=("${_midi[@]}")
 WSEXP=""; [ $WS = 1 ] && WSEXP=_sx_ws_probe_cpuid,_sx_ws_probe_g03,_sx_ws_probe_g12,_sx_ws_stat,_sx_ws_loadlib_miss,_winstubs_stats,_winstubs_loadlib_miss,_winstubs_cpuid,
 [ $MIDI = 1 ] && WSEXP="${WSEXP}_sx_midi_probe_numdevs,_flm_init,"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_GetLastError,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_GetLastError,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_site,_sxt_site_name,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
+EXPORTS="$EXPORTS,_sxt_set_print,_sxt_set_stack"   # SHX-T9k #2593: 呼出し直前の GetLastError と呼出し元 wasm スタックの計装
 OUT="$W/m11_sx_$TAG"
 emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
@@ -144,7 +145,7 @@ emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \
   --no-entry -Wl,--export-all \
   -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction,ENV,ccall,FS \
   -sEXPORTED_FUNCTIONS=$EXPORTS \
-  -Wl,--initial-memory="$((0x13000000))" -Wl,--max-memory="$((0x72000000))" $WRAP $WSLINK 2> "$W/link_$TAG.log" || { tail -30 "$W/link_$TAG.log"; echo "[sxlink] リンク失敗 ($TAG)"; exit 1; }
+  -Wl,--initial-memory="$((0x13000000))" -Wl,--max-memory="$((0x72000000))" -Wl,-Map,"$OUT.map" $WRAP $WSLINK 2> "$W/link_$TAG.log" || { tail -30 "$W/link_$TAG.log"; echo "[sxlink] リンク失敗 ($TAG)"; exit 1; }
 mv "$OUT.cjs.tmp" "$OUT.cjs"
 python3 "$M11/m11_postjs.py" "$OUT.cjs" 2>/dev/null || true
 echo "[sxlink] OK $TAG: signature mismatch=$(grep -c 'signature mismatch' "$W/link_$TAG.log" || true) undefined symbol=$(grep -c 'undefined symbol' "$W/link_$TAG.log" || true) duplicate=$(grep -c 'duplicate symbol' "$W/link_$TAG.log" || true)  -> $OUT.cjs"

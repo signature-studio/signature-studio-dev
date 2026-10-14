@@ -239,7 +239,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
-    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `$HOME/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れ、その bin を PATH 先頭に置く (#893)。venv 無しで動かす場合は同じ venv を手で作る。
+    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `~/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れる (#893)。版と hash は `.github/actions/agent-setup/requirements-py.txt` で固定し、`--require-hashes` で入れる (#2621)。venv の bin は PATH に載せず、`python` / `python3` を venv の python へ委譲するラッパーの dir (`~/.local/agent-py-shim`) を PATH 先頭に置く。venv 無しで動かす場合は同じ venv を手で作る。
     `ir_conditions.json` は生成時の PE の絶対パスを記録し、`m11_build.sh` は現在の PE と一致しないと build を拒否するため、別の環境で作った json を素材に同梱しても使えない。
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
@@ -311,6 +311,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
     確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
     close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
+    先に PR の状態を読み、merge 済み・close 済み (未 merge) なら再 review する対象が無いので notice を残して成功で終わる (fix run が merge 済みの PR を close しようとして `could not close PR` で落ちない。#2597)。状態を読めない・open のまま close できないのは失敗にする。
     reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
     必ず走らせられる。この変更は App に `workflows` 権限が無く
     agent は push できないため、PM が `.github/workflows/` を直接 push して適用した (現行の運用は下の「workflow 変更の運用」)。
@@ -318,7 +319,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (Copilot の review は来ないことがあり、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
     review が担当するので検証は免除する。
-  - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
+  - **fix**: 起動前に `fix-progress.sh record` が、merge 済み・close 済み (未 merge) の PR と、差し戻しの元の review の commit が現在の head と違う (古い head への差し戻し) の場合は、agent を起動せず notice のみを残して終える (`stop=true`。`oc:stuck` は付けない。#2601)。agent を起動した後は、run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
     review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
     判定・再試行・reopen・失敗の各 step は `!cancelled()` なので、agent step が失敗しても走る。run の cancel では走らない
     (step の timeout 後に走るかは未実測。merge 後の実 run で確認する)。
@@ -367,7 +368,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   PR を出さずに終わっていた (着手報告のみ・停止報告・1 run に収まらない・素材不足)。
 
   - **implement の終了時** (`record-run-outcome.sh`、`opencode.yaml` の最終 step。`always()` で、agent の失敗・cancel の後も走る。job は失敗させない):
-    issue の `/oc` run が、open PR も、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
+    issue の `/oc` run が、open PR も (run の開始以降に作成・merge された PR を含む。#2590)、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
     issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> run=<run id> -->` を残す。
     PM Worker はコメント本文を解析せず、**ラベルとマーカー**で扱う。`oc:no-pr` は、次の run が PR を出す (または issue が close・明示的な状態になる) と、この script が外す。
     `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ。優先順 artifact > blocked > split > stop):
@@ -425,5 +426,10 @@ PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次�
   依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
 - **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
   PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
+- **PR 起点の判断待ち (`needs_decision`)**: 対象は `needs-user-input` の issue でなく PR (ref は PR 番号)。reviewer の最新の差し戻し
+  (`CHANGES_REQUESTED`) の本文が PM の判断・起票を求めているとき (`review.needs`) に Worker が送る。条件は `infra/pm-worker/src/pm.ts` の `detectPm`。
+- **質問の前の状態確認**: 質問・`needs-user-input` を出す前に、対象 issue が closed でないこと、PR が merge 済みでないこと、
+  post-merge review の有無を確かめる。当たれば質問せず `rule=skip` で終える。closed の issue に残った `needs-user-input` は外す。
+  手順は `.github/prompts/pm.md` の「質問・`needs-user-input` の前に対象の状態を確認する」。
 - **不在中の自動判断**: PM agent が行った判断は `<!-- oc-pm-decision: rule=Rn reversible=yes/no -->` マーカーで残る。
-  事後の確認はダイジェスト ([CI-70]) で行う。
+  対象なしで終えた run は判断でなく `rule=skip` のマーカーを残す。事後の確認はダイジェスト ([CI-70]) で行う。

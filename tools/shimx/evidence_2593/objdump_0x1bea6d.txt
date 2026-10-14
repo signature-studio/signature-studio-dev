@@ -1,0 +1,34 @@
+
+m11_sx_trace_soft_fix.cjs.wasm:	file format wasm
+
+Disassembly of section CODE:
+
+001bea34 <function_457970>:
+
+  1bea3f:      	i64.rem_s
+  1bea40:      	i64.div_u
+  1bea41:      	unreachable
+  1bea42:      	return
+  1bea43:      	end
+
+001bea44 <function_457c40>:
+        .local i64, i32, i64, i32, i32
+  1bea4e:      	local.get	0
+  1bea50:      	i64.extend_i32_u
+  1bea51:      	i64.const	40
+  1bea53:      	i64.add 
+  1bea54:      	i32.wrap_i64
+  1bea55:      	i64.load	0
+  1bea58:      	local.set	3
+  1bea5a:      	block   	
+  1bea5c:      	local.get	3
+  1bea5e:      	i64.const	0
+  1bea60:      	i64.eq  
+  1bea61:      	i32.const	1
+  1bea63:      	i32.and 
+  1bea64:      	br_if   	0                       # 0: down to label0
+  1bea66:      	local.get	3
+  1bea68:      	i32.wrap_i64
+  1bea69:      	local.get	1
+  1bea6b:      	i32.const	21
+  1bea6d:      	call	16650

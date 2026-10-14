@@ -24,6 +24,8 @@ test("分類: 固定 JSON で TS の classify が期待どおりの行に振り�
     manualDeps: fx.manualDeps,
     liveBlockers: fx.liveBlockers,
     fullBotBody: fx.fullBotBody,
+    reportBody: fx.reportBody,
+    outcomeReason: fx.outcomeReason,
   };
   const { rows } = classify(fx.snapshot, input);
   assert.deepEqual(rows.user, [[2, ""]]);
@@ -54,6 +56,22 @@ test("分類: 固定 JSON で TS の classify が期待どおりの行に振り�
   assert.deepEqual(rows.ready, [1, 6, 8, 10, 18, 15, 20]);
 });
 
+test("分類 (ネガコン): 最後の run-outcome が artifact でなければ、停止報告に素材が挙がっていても再投入しない", () => {
+  const input: ClassifyInput = {
+    nowMs: Date.parse(fx.now),
+    launched: fx.launched,
+    relaunch: fx.relaunch,
+    manualDeps: fx.manualDeps,
+    liveBlockers: fx.liveBlockers,
+    fullBotBody: fx.fullBotBody,
+    reportBody: fx.reportBody,
+    outcomeReason: { ...fx.outcomeReason, "12": "split", "21": "unknown" },
+  };
+  const { rows } = classify(fx.snapshot, input);
+  assert.deepEqual(rows.relaunch, []);
+  assert.deepEqual(rows.stopped.map(([n]) => n), [12, 13, 17, 21]);
+});
+
 test("分類: TS と Python (tools/pm/launch_issues.py の classify) が同じ rows を返す", () => {
   const input: ClassifyInput = {
     nowMs: Date.parse(fx.now),
@@ -62,8 +80,12 @@ test("分類: TS と Python (tools/pm/launch_issues.py の classify) が同じ r
     manualDeps: fx.manualDeps,
     liveBlockers: fx.liveBlockers,
     fullBotBody: fx.fullBotBody,
+    reportBody: fx.reportBody,
+    outcomeReason: fx.outcomeReason,
   };
-  const ts = classify(fx.snapshot, input).rows;
+  // hold (oc:hold) は launch_issues.py に無い Worker 版の区分。fixture に oc:hold は無いので空であることを確かめ、残りを突き合わせる。
+  const { hold, ...ts } = classify(fx.snapshot, input).rows;
+  assert.deepEqual(hold, []);
   const py = JSON.parse(execFileSync("python3", [crosscheck, fixturePath], { encoding: "utf8" }));
   assert.deepEqual(ts, py);
 });
@@ -77,6 +99,7 @@ test("分類: STOP_RE の判定から run-outcome と PM マーカーの本文�
     prs: [],
     runs: [],
     bot_last: { "70": { at, head: body.slice(0, 400), art: null } },
+    bot_report: {},
     pm_art: {},
   });
   const input = (body: string): ClassifyInput => ({
@@ -86,10 +109,58 @@ test("分類: STOP_RE の判定から run-outcome と PM マーカーの本文�
     manualDeps: {},
     liveBlockers: {},
     fullBotBody: { "70": body },
+    reportBody: {},
+    outcomeReason: {},
   });
   const plain = classify(snap("素材不足のため停止します"), input("素材不足のため停止します")).rows;
   assert.deepEqual(plain.stopped.map(([n]) => n), [70], "対照: マーカーの無い停止報告は stopped");
   const marked = classify(snap(outcome), input(outcome)).rows;
   assert.deepEqual(marked.stopped, [], "run-outcome は stopped にしない");
   assert.deepEqual(marked.recent.map(([n]) => n), [70]);
+});
+
+test("分類 (#2651): oc:hold の issue は hold 行に置き、launch の行 (ready・relaunch・stopped・recent) に入れない。ラベルを外すと ready に戻る", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const issue = (n: number, labels: string[], body = "") => ({ number: n, title: `[X-${n}] t`, labels, body, deps: null });
+  const snap: Snapshot = {
+    issues: [
+      issue(80, []),
+      issue(81, ["oc:hold"]),
+      issue(82, ["oc:hold", "needs-user-input"]),
+      issue(83, ["oc:hold"], "依存: #80"),
+      // 停止報告 + 素材の追加で relaunch 候補になる issue。oc:hold が無ければ relaunch に入る (対照)。
+      issue(84, ["oc:hold", "oc:no-pr"]),
+      // 似た名前のラベルは oc:hold ではない (判定を広げると落ちる)。
+      issue(85, ["hold"]),
+      issue(86, ["oc:holdx"]),
+      issue(87, ["oc:hold-old"]),
+    ],
+    prs: [],
+    runs: [],
+    bot_last: { "84": { at: new Date(now - 5 * 3_600_000).toISOString(), head: "素材不足のため停止します", art: "oc_artifacts: fl-win64 work-m11" } },
+    bot_report: { "84": { at: new Date(now - 5 * 3_600_000).toISOString(), head: "素材不足のため停止します", art: "oc_artifacts: fl-win64 work-m11" } },
+    pm_art: {},
+  };
+  const input: ClassifyInput = {
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "84": "素材不足のため停止します" },
+    reportBody: { "84": "素材不足のため停止します" },
+    outcomeReason: { "84": "artifact" },
+  };
+  const { rows } = classify(snap, input);
+  assert.deepEqual(rows.hold, [[81, ""], [83, ""], [84, ""]], "oc:hold は hold 行 (needs-user-input が付くものは user 行が先)");
+  assert.deepEqual(rows.user, [[82, ""]]);
+  assert.deepEqual(rows.blocked, [], "hold が blocked より先");
+  assert.deepEqual(rows.relaunch, [], "oc:hold の 84 は relaunch に入らない");
+  assert.deepEqual(rows.ready, [80, 85, 86, 87], "似た名前のラベルは launch の対象のまま");
+  const unhold = (ns: number[]) => ({ ...snap, issues: snap.issues.map((i) => (ns.includes(i.number) ? { ...i, labels: i.labels.filter((l) => l !== "oc:hold") } : i)) });
+  const control = classify(unhold([84]), input).rows;
+  assert.deepEqual(control.relaunch.map(([n]) => n), [84], "対照: oc:hold を外すと 84 は relaunch に入る");
+  const after = classify(unhold([81, 83, 84]), input).rows;
+  assert.ok(after.ready.includes(81), "ラベルを外すと ready に戻る");
+  assert.deepEqual(after.hold, []);
 });
