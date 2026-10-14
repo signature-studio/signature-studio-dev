@@ -226,3 +226,12 @@ index 39480f0a..5a9c1929 100644
 - 結論の範囲: 作り直した単発の NOVCALL (869/16/2/6) では unit 190 が oob のまま。ここから言えるのは「vcall 経路を外しても 190 の oob は消えなかった (1 回・未再現)」まで。410360 の vcall 経路が原因でないとは断定しない。NOVCALL は未再現のため、再測定が必要。
 - 未確定: §5d の `9b4b00` 書込みマスク測定は define 差し替えで、ov.o の stamp 対象外のため、stale の可能性が残る。再測定は未実施 (次 run: `m11_ov.c` の書込みマスクを `ov.o` 作り直しで測る)。
 - 未達 (受入条件): 1 (ON で 1 ノードずれる書込元の特定)・2 (DEFECTS 類型への分類)・3 (ON の ok 退行 0 の unit 単位確認: 190 が残る)。起票先: #1642。
+
+## 5h. 9b4b00・9b5450 の書込みマスク再測定 (ov.o 作り直し・#2085、測定 commit `6a88bf35` = origin/main)
+
+- 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11 を展開 (`work-m11` の tar は `tools/m11/work/` を内包)。`m11_gen_ir2.sh` rc=0 (51 s、F1=902、errors=0)。
+- 測定方法: `trap_triage/mask9b_measure.py` が `m11_ov.c` の `9b4b00` の 8 文と `9b5450` の本体を `M11_9B_MASK` ビットで囲み、変種ごとに `work/obj/ov.o` を消してから build・全 942 unit survey (`SV_RAW=1`)。測定後に `m11_ov.c` を元に戻す (git 差分 0)。
+- 結果 (全変種 ON・`M11_OV_CLASSCREATE=1`): 基準 `ok 869 / oob 15 / abort 2 / halt0 7 / miss 47 / noproc 1 / other 1`。mask `0x1ff` (全部 on)・各 1 文ずつ外す (8 通り)・`0x0ff` (9b5450 本体のみ外す)・`0x0` (全部外す) の 11 変種すべてで集計は同一で、**unit 190 は全変種で oob**。
+- 変種間の差は unit ごとの `frames`・`raw` のみ (18 unit、kind は全 unit 不変。ok 退行 0)。書込み命令を外したことが実行経路に効いていることは確認した。
+- 読み: `9b4b00`・`9b5450` の書込み (`[rbx+0x54]`・`[rbx+0x34]`・`[rcx+0x5c]` ほか) は unit 190 の oob の原因ではない (ov.o を作り直した測定で否定)。§5d の「1 文ずつ外す」結果は stale ではなかったことになる。
+- 未確定: 残る callee (`481790`・`412d60`・`4133f0`) の書込みは未切り分け。`407a50` の `[arg-8]` 参照先を変える書込元は未特定 (受入条件 2 は未達、#2085 から子 issue へ移送)。
