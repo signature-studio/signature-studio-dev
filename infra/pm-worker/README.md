@@ -50,13 +50,14 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 Worker の自動着手 (`/oc` の投稿) を見送らせる印。PM の subagent が自分で実装する issue に付け、Worker が同じ issue に着手コメントを重ねて重複 PR を作るのを防ぐ。
 
-- **判定**: `src/classify.ts` が、`oc:hold` の付いた open な issue を `hold` 行に置く。launch (picks) と再投入の意図 (`oc-pm-intent`) の対象から外れる (意図は `counters.intentRejected.hold` に数える)。`/status` の `hold` はこの行の件数。`needs-user-input` (`user` 行) と違い、`/status` の `needs_user` には数えない。
+- **判定**: `src/classify.ts` が、`oc:hold` の付いた open な issue を `hold` 行に置く。launch (picks) と再投入の意図 (`oc-pm-intent`) の対象から外れる (意図は `counters.intentRejected.hold` に数える)。`/status` の `hold` はこの行の件数。`needs_user` (`needs-user-input` のラベル数) には含まれない。hold の間に届いた再投入の意図は拒否として処理済みになるので、ラベルを外しても古い意図では投稿されない (ready の issue は通常の着手で拾われる)。
 - **付ける (推奨)**: 起票時に `labels` を指定する。ラベルは issue の作成と同時に付くので、Worker が最初に受け取る `issues` 配送から見えており、着手と競合しない (作成 API の仕様からの推論。実測は未検証)。
   `gh api repos/signature-studio/signature-studio-dev/issues -f title='[AREA-n] ...' -f body='...' -f 'labels[]=oc:hold'`
   起票後に `gh issue edit <N> --add-label oc:hold` で付けると、付与の前に次の tick が着手する窓が残るため、避ける。
 - **外す**: `gh issue edit <N> --remove-label oc:hold`。`issues` 配送で labels が更新され、次の tick (webhook の 2 秒後) から通常の分類に戻る。ready なら着手対象になる。
 - **ラベルが無いとき (初回のみ)**: `gh api repos/signature-studio/signature-studio-dev/labels -f name=oc:hold -f color=ededed -f description='Worker の自動着手を見送る (#2651)'`。作成の前に、存在しないラベル名を起票時に指定した場合の挙動は**未検証** (実測していない)。起票の前に作成しておく。
-- 対象は launch だけ。`oc-pm` の検出 (`no_pr` など) は `oc:hold` を見ない。
+- 対象は launch だけ。`oc-pm` の検出 (`no_pr` など) は `oc:hold` を見ない (`oc:hold` と `oc:no-pr` が両方付くと PM agent を起こし得る)。
+- VM 版の `tools/pm/launch_issues.py` は `oc:hold` を見ない。VM の timer は停止したままにする (再開すると、この印を素通しで着手する)。
 
 ## oc-pm: PM agent を起こす終端状態の検出と送信 (#2333)
 
