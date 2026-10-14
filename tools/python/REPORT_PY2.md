@@ -66,7 +66,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 
 - **HEAD 再現 (`e872dbb`。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` に設定、`toolchain-emsdk` は `/opt/emsdk`。`build_cpython_wasm.sh` は 3 分 17 秒 rc=0。load 2.07)**: `build_flpy.sh` / `provider/build.sh` / `build_flpy_static.sh` 全て rc=0 (static 4.9 秒)。`provider_check` `"PASS":true`、`pybind_extract --check` PYBIND CHECK OK (110 件、lib 内 109、許容 1)、SAB+provider `all_tools` 48/48・host_calls 37,425、`static_check` **STATIC CHECK OK** (48/48 ok、host_calls 37,425、callback 往復 true。SAB+provider 版と 0/48、mock 基準と 0/48)、`ilmcp_e2e` rc=0 (0.32 秒)。
 - **往復コスト (`e872dbb`、`static_bench.mjs 5`、5 trial の min / median / max、µs/呼出し、load 2.07)**: 静的 C `fl_api_call` のみ 0.013 (0.010 / 0.015)、Python `_flhost.call(fn,())` 直 0.225 (0.221 / 0.278)、Python `channels.channelCount()` (fl_api ラッパ経由) 0.410 (0.392 / 0.438)、戻り str 0.297 (0.283 / 0.320)、空の Python 呼出し 0.077 (0.075 / 0.097)、Worker + SAB (同一 provider、`channelCount()`) 26.206 (25.066 / 27.260)。median 同士で SAB 版の約 64 倍。上の表の f6352cd 行より load が高い run のため、数値は本行を正とする。
-- **mock 基準との既知の差 (2 件、本 PR では除外)**: `get_highlight_names` と `get_browser_names` は、mock (`host/ilmcp.mjs`、main の PY-3 #82 由来) と C provider (`provider/fl_engine.c` の最小スタブ) で **result 文字列だけ**が違う。mock は FL 実物 rodata 由来の 21 件 / 木構造、C は固定 4 件 / `[object Object]` 相当。`tests/static_check.mjs` の `KNOWN_MOCK_RESULT_GAP` で、この 2 件のみ mock 比較の result を除外し、status・host_calls・api_calls は従来どおり完全一致で比較する。解消 (C 側の仕様統一) は未着手。起票先は #82 (OPEN。2026-10-14 にコメントで差分と解消条件を追記)。
+- **mock 基準との差 (解消、`2789390f` で実測)**: 旧記録の `get_highlight_names` / `get_browser_names` の result 2 件差 (C 側が固定 4 件・`[object Object]` 相当、と 2026-10-14 16:04 の issue #82 コメントに記載) は、現 main の C provider (`gen/ilmcp_data.h` の 21 件・木) では**発生していない**。`static_check.mjs` の `KNOWN_MOCK_RESULT_GAP` (除外) を撤去し、result を含む全件で mock と突き合わせる。全文 (160 字切りなし) の一致は 3 経路 (mock / SAB+provider / 静的リンク) の 48 tool で差 0 (検証用 probe はリポジトリ外)。
 - 旧記録 (f6352cd、main 取り込み前の HEAD): `static_check` STATIC CHECK OK (差 0/48 ×2)、SAB 48/48・37,425、`tool_coverage.json` を 37,425 に再生成 (`plugins.getParamValueString/4` を反映)。mock 側の `get_highlight_names` は当時 main 未取り込みのため差が出なかった。
 - 旧記録 (5a0b3c3、クリーン worktree): `pybind_extract --check` OK、SAB+provider `all_tools` 48/48・37,424、`static_check` 3 回とも STATIC CHECK OK、0.29 / 0.30 / 0.28 秒 (load 1.10)。main 取り込み前の値で、現 head では使わない。
 - 範囲: node (メインスレッド) での静的版 48 tool と対応表。入力 (MCPTools.pyc 100,674B / midi.py / utils.py / `block00031_PE.bin`) は `fl-win64` 素材から配置 (`fetch_inputs.sh` が `work/fl-stubs` を clone する)。
@@ -92,7 +92,8 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | `build_cpython_wasm.sh` | 4 分 05 秒、rc=0 |
 | `build_flpy.sh` / `provider/build.sh` / `build_flpy_static.sh` | 全て rc=0。`flpy_static.wasm` 5,966,942B |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` (SAB + provider) | 48/48 ok、host_calls 37,425、rc=0 |
-| `node tests/static_check.mjs` | `STATIC CHECK OK`、rc=0。48/48 ok、callback 往復 true、wasm の flhost import 0 件。SAB 版と 0/48 差、mock と 0/48 差 (分母 48。result 2 件 (`get_highlight_names`・`get_browser_names`) は `KNOWN_MOCK_RESULT_GAP` で mock 比較から除外、#82。status・host_calls・api_calls は除外なし) |
+| `node tests/static_check.mjs` | `STATIC CHECK OK`、rc=0、wall 0.39 秒 (2 回、`2789390f`)。48/48 ok、callback 往復 true、wasm の flhost import 0 件。SAB 版と 0/48 差、mock と 0/48 差 (除外なし。result を含む全件比較)
+| ネガコン (`2789390f` 上で C を改変して静的リンク): M1 = highlight 一覧を 1 件に縮小 → FAIL 7 件 (`get_highlight_names.result` 2/48 差、`show_highlight` soft-error、host_calls 37,423)。M2 = `getBrowserNames` で `recursive` を無視 → **PASS (生存)**: tool 経路は `fullRecursive: 0` のみを検査するため、`recursive=1` 分岐は未検査 |
 | `node tests/provider_check.mjs` | `PASS:true` (435 関数、実装 70、未実装 365、MCP 静的 60)、rc=0 |
 | `analysis/pybind_extract.py --check` (`--pe` は FL の block00031_PE.bin、`--lib` は build-wasm の libpython) | `PYBIND CHECK OK`、rc=0。110 件、lib 内 109、許容 1 (`_PyInterpreterState_GetRefTotal`) |
 
@@ -125,7 +126,8 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実 FLEngine wasm への `fl_api_call` 接続 | 本節の実測は provider の最小エンジン状態。実 FLEngine は `fl_api_call` を持たない | 子 #2631 (PY-79)。FLEngine 起動 (MS5) が前提 |
-| mock と C provider の result 文字列差 2 件 (`get_highlight_names` / `get_browser_names`) | `static_check` が 2 件のみ mock 比較の result を除外 (`KNOWN_MOCK_RESULT_GAP`) | #82 (OPEN。差分の内容と解消条件をコメントで追記済み) |
+| (解消) mock と C provider の result 文字列差 2 件 (`get_highlight_names` / `get_browser_names`) | 2026-10-14 実測で全文差 0。除外 `KNOWN_MOCK_RESULT_GAP` は `2789390f` で撤去 | (解消) |
+| C `getBrowserNames` の `recursive=1` 分岐 (`flat1`) | tool 経路は `fullRecursive: 0` のみ。ネガコン M2 が生存 | #82 (Refs。次の実装 run で recursive=1 の全文比較を追加) |
 | サブインタプリタ・pthread+GIL・Memory64 での静的版の検証、`_PyInterpreterState_GetRefTotal` を FL が使うか | 未検証 | 子 #2633 (PY-80)。旧 #76 (CLOSED) の検証項目を移管 |
 | headless Chrome / Worker 内の静的版、`run_all.sh` 全体 | 未実施 | 子 #2634 (PY-81) |
 | #115 (ST-T7、OPEN) の Py_* 動的束縛 | §7d の対応表で 110 件の解決を実測済み。#115 の範囲はこの節で処理 (§7d) | #115 にクローズ提案のコメントを投稿済み (閉じるかは PM 判断) |
