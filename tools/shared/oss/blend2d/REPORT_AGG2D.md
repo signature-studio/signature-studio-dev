@@ -212,7 +212,7 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 
 **判明**:
 - 130 slot の vtable は Agg2D 具象クラスの vtable で、DLL 内で COL を指す vtable は 1 個。`AggCreateInstance` が返すオブジェクトの vtable はこれに限られる。vtable を書くのは **2 か所** (ctor `0x1800568b2`、`0x180056ad0` の関数)で、どちらも同じ vtable `0x1801dbec0` を書く (RIP 相対 lea の走査による。絶対アドレスによる書き込みは本測定の対象外で、未検証)。
-- `0x180056ad0` は先頭で `[rcx]` に vtable を書いた後、`[rcx+0x160]` へ `lock xadd` を行う。デストラクタ等の可能性があるが、役割は未検証。
+- `0x180056ad0` (先頭命令 `mov [rsp+8],rbx` から関数の先頭と見なした) は、先頭で `[rcx]` に vtable を書き、続けて `mov rcx,[rcx+0x160]` の後に `lock xadd [rcx-0x10]` を行う。デストラクタ等の可能性があるが、役割は未検証。
 - (a) の glue の範囲の上限は、この vtable の **実体 81 slot (unique 78 関数)**。残り 49 slot は同一の `ret 0` (`0x18000c530`、`REPORT_APPENDIX_AGG2D.md` §12)。
 - `Agg2DIntf` は独立 vtable を持たない。FL 側がどのインタフェース型で呼ぶかは、Agg2D vtable の slot 順に依る (単一継承の slot 順は未検証)。
 
