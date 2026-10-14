@@ -215,13 +215,13 @@ CPU: **AMD EPYC 7763 64-Core Processor (4 vCPU)**、node v22.23.3。計測時 lo
 | SIDE_MODULE 経由 `side_reloc_hidden` (`-fPIC -fvisibility=hidden`。dlopen・host 中継・link 条件の差を含む) | 103.79 (103.67–104.81) | 6b1696f0 (5/5) |
 
 - **PIC 税 = ×1.102** (中央値の比。対ごとの比は ×1.094–×1.110)。署名は 10/10 プロセスで `6b1696f0` (side module の dlopen 経由でも一致)。
-- ネガティブコントロール: `SIDE_NEG=skip_data_install node tools/perf/p8/real/side_bench.mjs …` (`ott_data_install` を省く) は `Aborted()` で止まる。未敷設は fail-fast で検出される。
+- ネガティブコントロール: `SIDE_NEG=skip_data_install node tools/perf/p8/real/side_bench.mjs tools/ott/work/side_reloc 1000 1` (`ott_data_install` を省く) は **rc=1**。stderr の先頭行は `[ott] call to UNLIFTED function 0 (shifted VA; RVA 0xffffffffd0000000) ret=0x301a03d5`、続けて `Aborted()`。stdout は空で、署名行は出ない。未敷設は fail-fast で検出される (HEAD `43eacb0f` で実測。同じ HEAD で通常実行は署名 `6b1696f0`)。
 - 合成カーネル (§2.1) の `-fvisibility=hidden` の増分は runner で ≤1.2%、EPYC で ≤2.6%。実 OTT の hidden は ×1.10 で、合成より大きい。合成の結論 (hidden は小さい) を実 OTT に当てはめてはいけない。
 - 機序は**未特定**。静的版と side 版の差は次のすべてで、PIC 税 ×1.10 はこの総和。内訳は分離していない:
   1. **compile**: side は `-fPIC -fvisibility=hidden -sSIDE_MODULE=2` と `-include side_compat.h` を足す。compile の最適化・FP フラグは同じ (`stdbuild.py flags std`)。候補 (a): globals が `__memory_base` 経由でアクセスされる。
   2. **link**: 静的版 (`lift_build.sh`) にあって side に無いもの = `-sGLOBAL_BASE=268435456`・`-Wl,--initial-memory/--max-memory=0x36000000`・`-sMODULARIZE`・`-sEXIT_RUNTIME=1`・`-sALLOW_MEMORY_GROWTH=1`・`-sSTACK_SIZE=2MB`・`-sENVIRONMENT=node`。静的版の data は GLOBAL_BASE 側。side 版は `host_set_gbase(0x30000000)` で base を与え、`host_data_install` で敷設する。候補 (b): データ配置の差。
   3. **呼出し経路**: 静的版は `api.mjs` の `load()` が `_ott_data_install` だけを呼び、JS → `ott_run` を直接呼ぶ。side 版は JS → `host_run` (host wasm、`-O2`、std ではない) → dlopen 先の `ott_run` (関数ポインタ経由) の 1 段の中継が入る。1 block あたりの寄与は**推定**で、§2.2 の呼出分解能 (±26 ns) の桁と見込むが未測定。
-  4. **global の import**: side.wasm は `__stack_pointer` と `__memory_base` を mutable global として import する。静的版の `ottl.wasm` は global の import が 0 件。候補 (c) (スタックポインタ・base の参照コスト)。**未検証**。
+  4. **global の import**: side.wasm は `__stack_pointer` (mutable) と `__memory_base` (immutable、mut=0) を global として import し、`env.memory` も import する。静的版の `ottl.wasm` は global の import も memory の import も 0 件 (HEAD で再ビルドした import section を解析して確認)。候補 (c): `__stack_pointer` の可変 global 参照のコスト。**機序は未検証** (分離の測定は未実施)。
 
 **範囲 / 検証**: node のみ (Chrome Worker・AudioWorklet は未測)。N=1 のみ (side module を 1 つ dlopen。同居させるには別バイト列の一意化が要る)。`-fvisibility=default` の実 OTT は未測。署名検査は `check` 系の別アルゴリズムではなく bench と同じ FNV (1000 block) の手順。
 
