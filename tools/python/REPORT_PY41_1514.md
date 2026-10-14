@@ -26,7 +26,7 @@
 
 ## 測定
 
-測定 commit: `aee3cdd4` (コードを変えた最後の commit)。素材は `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` で取得し、`fl-win64` の DATA block 4 本と PE を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 2.9 秒)。`toolchain-emsdk` は `/opt/emsdk` (`EMSDK_ENV` 既定) を使用。
+測定 commit: `aee3cdd4` (コードを変えた最後の commit)。素材は `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` で取得し、`fl-win64` の DATA block 4 本と PE を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 2.9 秒)。`toolchain-emsdk` は `[EMSDK]` (`EMSDK_ENV` 既定) を使用。
 
 | 検査 | コマンド | 結果 (実時間) |
 |---|---|---|
