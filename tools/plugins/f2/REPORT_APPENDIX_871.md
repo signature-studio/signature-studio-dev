@@ -200,3 +200,27 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 - 一致 17 の記録 (§10.12) との差は、この 2 件のみ。
 - 回帰 0x5de250 の機序 (§10.7) は本 run では未確認 (wasm 側の読み値比較は未実施)。
 - 未実施: `nc_leaf.py` (ネガコン)・30 関数 (317 箇所) の影響表・非 leaf 7 関数の liftdiff。
+
+## 10.14 (#871 run) HEAD `ec58d54b` (origin/main) での再測定と新規不一致 2 件の切り分け
+
+- 測定 commit: `ec58d54b` (origin/main)。前節 `ae802a4c` からのコード差分は `tools/liftdiff/ldlib/session.py` の LD-23 fvm 追加 (`_fvm_cases`) と refine 条件 1 行のみ。`git diff ae802a4c ec58d54b -- tools/liftdiff/ldlib tools/plugins/f2/mk_targets.py tools/plugins/f2/leaf_diff.sh` の範囲で `callee_divergence` 判定 (`classify.py`) と `compare.py` は未変更。
+- 素材: `fl-win64` (`extracted/*_PE.bin` 313 本を `$RUNNER_TEMP/fl-win64` に展開)。`toolchain-retdec`・`toolchain-emsdk` は `/opt/retdec`・`/opt/emsdk` で実在を確認。
+- `f2_step1.sh`: rc 0、`DIFF count = 0`、IR leaf 55 / うち機械語でも間接 call 無し 23。
+- `leaf_diff.sh`: rc 0、144 s、load 1.07。**最終判定 一致 15 / 不一致 8 / 実行不能 0**。集合一致 EQ。
+
+### 新規不一致 2 件 (0x73fa70 / 0x6ec2f0)
+- 同一コード (`18979:0x73fa70 = 19059:0x6ec2f0`)。`3b38f81d` では match 7/7 だったが、本測定では 5 pattern 系が `native_fault` / `hang` で、`fvm 2` case だけが `diff` になり、その結果 verdict が `mismatch` (`callee_divergence`) になった。
+- `fvm 2` の差分の中身: `mem` 差分 3001 件。先頭は `arena+0x1000` で native `0x10001` / wasm `unchanged(0x22023000)` (0x0 から 0x10001 へ書かれた値が wasm 側では無変化)、続いて `heap` 側で wasm のみ書込み。native 側は this 疑似オブジェクトへの書込みがほぼ無く、wasm 側は関数本体を走っている。
+- `callee_divergence` のタグ自体は `trace` の `entry_arg` (`arg2 native=0x22022000 wasm=0x1000`) 由来。`compare.Ctx.n2w` の窓は `origin`・arena・heap の 3 つで、native の arena 位置 (0x22022000 付近) が wasm arena base (0x1000) と対応づけられていない。
+- **切り分けの結論 (未確定)**: 主因は「fvm 疑似 this の arena 引数に対する native/wasm の配置差」と見るのが妥当。ただし native の arena 配置を実測していないため、確定は未了。`fvm` case が equal/diff に入る設計そのものが LD-23 の未達 (`REPORT_APPENDIX.md` §12.1) と同じ範囲。
+- 起票先: 既存の [LD-48] (#1398: fvm の VMT slot 仮 proc と equal/diff 化) と [LD-40] (#1199: fvm の VMT slot 解決) で扱う。新規 issue は起票しない。
+- 0x73fa70 の native 側は `rip 0x73fa9e` で segv (`pattern` z/s/p0 ほか)。wasm 側は `ok`。これは fvm 以前の既存 pattern の結果で、LD-23 の変更ではない。
+
+### 残 mismatch 6 (修正前からの未解決)
+- 0x6bfec0・0x6c9b60・0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0。本 run では切り分けを進めていない。起票先: #923 (PLG-F2-7、絶対 VA 定数 / 残 5 関数) と #613。
+
+### 受入条件の状況 (本 run)
+- 6 関数の最終判定一致: 未達 (mismatch 6 は不変)。
+- 回帰 (一致 17 の維持): 未達 (15。新規 2 件は上記 fvm 由来)。
+- 各関数の原因 1 行特定: 0x73fa70 / 0x6ec2f0 は本節で「fvm 疑似 this の配置差 (未確定)」。残 6 は未切り分け。
+- 0x6f1650 の切り分け: §10.2 で完了。
