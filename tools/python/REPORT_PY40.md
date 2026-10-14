@@ -173,7 +173,7 @@ C (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) は同じ順序で引�
 - 測定 commit: `7ff61a39` (main 取り込みの merge。コードを変えた最後の commit。前回の測定は `ecaa7658`。PY-40 の対象は `provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`)。
 - 差分確認: `git diff 7ff61a39 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (REPORT のみの変更)。再測定は不要。
 - HEAD `454b1cc1` (その後の main 取り込み merge) で下表の検証を再実行し、同じ結果を再現した (provider build・provider_check・channels_diff・all_tools・tests/*_diff.mjs 14 本)。
-- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf <archive> -C <dir> extracted/...`)。CPython 3.12.1 wasm は `build_cpython_wasm.sh` で作成 (rc 0・実測 4 分 28 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` で flpy を作成 (rc 0)。emsdk 6.0.12 は本 run で `/opt/emsdk` に導入。`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) で `work/midi.py`・`work/utils.py` 等を配置 (rc 0)。
+- 環境: 4 コア。素材 fl-win64 から `extracted/block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` の 4 件を展開 (`tar --zstd -xf <archive> -C <dir> extracted/...`)。CPython 3.12.1 wasm は `build_cpython_wasm.sh` で作成 (rc 0・実測 4 分 28 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` で flpy を作成 (rc 0)。emsdk 6.0.12 は本 run で `[EMSDK]` に導入。`fetch_inputs.sh` (`FL_WIN64_DIR` 指定) で `work/midi.py`・`work/utils.py` 等を配置 (rc 0)。
 
 | 検証 | 結果 (実測) |
 |---|---|
