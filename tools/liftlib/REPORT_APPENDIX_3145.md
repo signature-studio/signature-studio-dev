@@ -1,7 +1,7 @@
 # liftlib #3145 — `ott_outhash` の JSON 失敗の切り分け (部分達成)
 
 - 親: #3067 (元の症状は `REPORT_APPENDIX_3067.md` §3.2)。担当 dir: `tools/liftlib/`。
-- 基点: `origin/main` `6cfa2e8a`。#3098 (#3067 の repmap 修正) は merge 済みで、`eb4ce08f` で取り込んだ (`p1_legacy.py` と `test_unit.py` の `__main__` の競合は解消)。本件の変更は `p1_legacy.py` に触れない。
+- 基点: `origin/main` `6cfa2e8a`。#3098 (#3067 の repmap 修正) は merge 済みで、`eb4ce08f` で取り込んだ (`test_unit.py` の `__main__` の競合は解消。`p1_legacy.py` は自動マージ)。本件の変更は `p1_legacy.py` に触れない。
 - **測定 commit (コードを変えた最後の commit)**: `eb4ce08f` (`Merge remote-tracking branch 'origin/main' into 3145-liftlib-outhash-diag`)。main 取り込みで `tools/liftlib` のコードが変わったため、旧測定 commit `5f426e03` から測り直した。
   差分 0 行の確認: `git diff eb4ce08f HEAD -- tools/liftlib/liftlib tools/liftlib/tests` (本 PR で以後 code は変えていない)。
 
