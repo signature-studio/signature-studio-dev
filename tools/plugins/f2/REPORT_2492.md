@@ -67,7 +67,7 @@ $PY tools/plugins/f2/rawref_scan.py $PE 0x407a20 0x407a00
 
 - 依存 (REPORT_1305 §14 と同じ): `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone` (unicorn 2.1.4・pefile 2024.8.26・capstone 5.0.9)。
 - `git status --porcelain=v1 -- tools/plugins/f2` (検証 HEAD 36c6eef2): 空。
-- `git diff 5c25928b 36c6eef2 -- 'tools/plugins/f2/*.py'` = 0 行 (道具は測定 commit 以降不変。後続の文書のみの commit は `.md` だけ)。
+- `git diff 5c25928b HEAD -- tools/plugins/f2/fptr_callers.py tools/plugins/f2/rawref_scan.py` = 0 行 (道具 2 本は測定 commit 以降変更なし。以降の commit は文書のみ)。`write_origin.py` (main の #2493) は本測定の対象外。
 - `git diff aa30a245 5c25928b -- tools/plugins/f2`: `fptr_callers.py` (+14 −4) と `rawref_scan.py` (新規 +41) のみ。
 - `git diff 5c25928b 30dd79d0 -- 'tools/plugins/f2/*.py'` = `unicorn_trace.py` のみ (main 取り込みで入った a70461d6 版)。`fptr_callers.py`・`rawref_scan.py` は 5c25928b から不変。unicorn 経路は取り込み後に再測定した (§3)。
 - 20 MiB 超 blob: `find tools/plugins/f2 -type f -size +20M -not -path '*/work/*'` = 0 件。
