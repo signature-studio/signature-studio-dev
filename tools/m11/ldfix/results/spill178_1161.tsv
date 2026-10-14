@@ -52,18 +52,18 @@ fn	site	source	verdict	status	oracle	text
 8261a0	8265a2	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa8], rax
 c343f0	c3460e	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0xa4], eax
 c57a00	c57e24	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x5c], ecx
-c589b0	c592c2	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x510], rax
-c589b0	c5a6b4	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x470], rax
-c589b0	c5a705	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x468], rax
-c589b0	c5a750	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x460], rax
-c589b0	c5a811	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x448], rax
-c589b0	c5bc03	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x3a8], rax
-c589b0	c5bc54	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x3a0], rax
-c589b0	c5bc9f	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x398], rax
-c589b0	c5bd1d	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x380], rax
-c589b0	c5d121	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x2e0], rax
-c589b0	c5d172	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x2d8], rax
-c589b0	c5d1bd	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x2d0], rax
+c589b0	c592c2	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x510], rax
+c589b0	c5a6b4	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x470], rax
+c589b0	c5a705	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x468], rax
+c589b0	c5a750	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x460], rax
+c589b0	c5a811	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x448], rax
+c589b0	c5bc03	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x3a8], rax
+c589b0	c5bc54	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x3a0], rax
+c589b0	c5bc9f	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x398], rax
+c589b0	c5bd1d	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x380], rax
+c589b0	c5d121	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x2e0], rax
+c589b0	c5d172	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x2d8], rax
+c589b0	c5d1bd	cand	NO_CONSUMER	確定	CELL_DEEP	mov qword ptr [rbp + 0x2d0], rax
 c589b0	c5d2df	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x48], eax
 c589b0	c5d343	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x48], eax
 cf3790	cf387f	manual	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x138], rax

@@ -6,6 +6,7 @@ import { openText, randomToken, safeEqual, sealText } from "./crypto.ts";
 import { Engine } from "./engine.ts";
 import { appJwt, Gh, InstallationAuth, type FetchFn } from "./github.ts";
 import type { Store } from "./kvstore.ts";
+import { MAX_IMPORT_BYTES, parseVmState } from "./vmstate.ts";
 import { WEBHOOK_EVENTS } from "./webhook.ts";
 
 export const APP_NAME = "oc-pm-for-signature-studio";
@@ -142,14 +143,21 @@ export class PmApp {
       return json({ ok: true, ready: r.ready });
     }
     if (p === "/admin/resync" && req.method === "POST") return this.resync(req);
+    if (p === "/admin/import" && req.method === "POST") return this.importVm(req, u);
+    if (p === "/admin/export" && req.method === "GET") return this.exportVm(req);
     return json({ error: "not found" }, 404);
+  }
+
+  // 管理用の認証 (#2339 と同じ方式: 呼び出し側の GitHub token が repo の push 権限を示せること)。入口 (index.ts) と同じ確認をここでもする。
+  private async adminAllowed(req: Request): Promise<boolean> {
+    const token = bearerToken(req.headers.get("authorization"));
+    return !!token && (await canPushRepo(token, this.d.cfg.repo, this.d.fetch));
   }
 
   // ---------------------------------------------------------------- /admin/resync (#2339)
   // 認証は入口 (index.ts) でも行い、通らなければ DO を呼ばない。ここでも同じ確認をする (未認証は 404 で状態を変えない)。
   private async resync(req: Request): Promise<Response> {
-    const token = bearerToken(req.headers.get("authorization"));
-    if (!token || !(await canPushRepo(token, this.d.cfg.repo, this.d.fetch))) return json({ error: "not found" }, 404);
+    if (!(await this.adminAllowed(req))) return json({ error: "not found" }, 404);
     const gh = await this.getGh();
     if (!gh) return json({ error: "not configured" }, 503);
     let r: Awaited<ReturnType<Engine["resync"]>>;
@@ -161,6 +169,36 @@ export class PmApp {
     if (r.status === "limited") return json({ error: "rate limited", retry_after_s: r.retryAfterS }, 429, { "retry-after": String(r.retryAfterS) });
     if (r.status === "busy") return json({ error: "busy" }, 409);
     return json({ ok: true, resynced: true });
+  }
+
+  // ---------------------------------------------------------------- /admin/import /admin/export (#2343)
+  // 取り込みは既定で検証のみ (結果を返すだけ)。?apply=1 のときだけ保存する。検証に 1 つでも落ちたら何も保存しない。
+  private async importVm(req: Request, u: URL): Promise<Response> {
+    if (!(await this.adminAllowed(req))) return json({ error: "not found" }, 404);
+    if (Number(req.headers.get("content-length") ?? 0) > MAX_IMPORT_BYTES) return json({ error: "too large" }, 413);
+    const text = await req.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_IMPORT_BYTES) return json({ error: "too large" }, 413);
+    let body: unknown;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      return json({ error: "invalid json" }, 400);
+    }
+    const r = parseVmState(body, this.d.now());
+    if (!r.ok) return json({ error: "invalid", problems: r.problems }, 400);
+    const apply = u.searchParams.get("apply") === "1";
+    this.engine.importVm(r.value, apply);
+    return json({
+      ok: true,
+      applied: apply,
+      counts: { launched: Object.keys(r.value.launched).length, relaunch: Object.keys(r.value.relaunch).length, pm_art: Object.keys(r.value.pm_art).length },
+      phase: r.value.phase,
+    });
+  }
+
+  private async exportVm(req: Request): Promise<Response> {
+    if (!(await this.adminAllowed(req))) return json({ error: "not found" }, 404);
+    return json(this.engine.exportVm());
   }
 
   // ---------------------------------------------------------------- /webhook
