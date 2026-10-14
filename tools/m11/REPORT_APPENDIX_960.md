@@ -38,6 +38,7 @@
 - **結論 (ASLR)**: ASLR を無効にすると 2 回とも `7eae26d1` で一致した。並びの揺れは実行ごとのアドレス (ポインタ) の割り当てに由来する可能性が高い。ただし ASLR を無効にしたときの `lift.ll` 段は未計測で、この結論は「可能性が高い」止まり。
 - **受入 2 (固定化)**: A7 (`tools/m5/ir5_patch.py` の `uselistorder` 行除去) を通した `lift.ll` は、上記の 5 本の drc.ll (md5 4 種類) すべてで `23c8ea5b` に収束した。`tools/liftlib/liftlib/passes/base.py` の `normalize()` (A7) も同じ正規表現で除去し、P1・N1・N2 の 3 本の出力が `94a8363c` で一致した (Z1 は lift 段が未計測のため対象外)。新しい正規化は不要と判断する。**§19 で覆った: 新しい正規化 (A7 の空行ごと除去) が必要 (旧 A7 は先頭の空行を残すため `boot_final.ll` が揺れた)。**
 - **未解決**: (a) `--passes` 相当の段の切り分けは `--print-after-all` で代替した。LLVM writer 段で並びが変わる仕組みそのものは未確認。(b) ASLR 無効時の `lift.ll` 段は未計測。(c) `@global_var_*` 行位置差 (§14) は今回の 150 range では再現せず、未切り分け (`--full` 全 range で要確認)。
+- **§19 での扱い (PR #2442)**: 受入 1 は未達のため #1664 の範囲から外し、子 issue #2456 (原文の受入 1) に移した。上の「#1664 に残す」は、この移管で読み替える。
 - 再現: `RETDEC=<[RETDEC]>/bin/retdec-decompiler`・PE `block00031_PE.bin` で `retdec-decompiler <PE> -o x.drc.c --select-ranges "$(cat r150.txt)" --select-decode-only --print-after-all 2> x.pass.log` を 2 回。`drc.ll` の md5 と `uselistorder` 行を比較。ASLR 無効は `setarch x86_64 -R` を前置。
 
 ## 15. #960 追補: HEAD `58b7e990` (origin/main) で `--full` を 2 回実行 (N3・N4)
@@ -139,14 +140,38 @@
 - **結論**: 同一 HEAD・同一 PE・同一素材で `--full` の `ir_sha256` が 3 回とも一致した。F1・F2・F3 の `boot_final.ll` は `cmp` で bytes 一致。`M11_SUMMARY` の `units_run_full` 53 / `units_total` 942 / `stop_reason` も一致。
 - **一致の強さ**: 修正前は同条件で一致 (§17 Q1=Q2) と不一致 (§14 N1≠N2・§15 N3≠N4) が混在したため、修正前後を同一 n で比べてはいない。修正後は原因 (空行) を直したうえでの n=3 で、RetDec 単体の再現 (上表) でも一致を確認した。`--full` の F1 と F3 では boot0〜boot5 の lift.ll も全て bytes 一致した (RetDec 単体の再現で出た chunk 3 の globals の順差は、この 2 回では出なかった)。
 - F2・F3 の前に `work/ir_conditions.json`・`boot*.lift.ll`・`boot*.drc.*`・`boot_final.ll`・`lift_pe.sha256` を削除してから全再生成した。
-- **検証範囲 / 範囲外**: 範囲内は `m11_e2e.sh --full` (F1〜F3)・`tools/m11/test_a7_uselistorder.py`・素材 `work-m11` の drc.ll boot0〜3 の directive 残り。範囲外は `tools/liftlib/tests/test_unit.py` T1 (下表 1 行目)。
-- **T1 (本 run)**: `python3 tools/liftlib/tests/test_unit.py` は rc 1 (`FileNotFoundError: tools/m6/work/ott.drc.ll`)。本 run の素材は fl-win64・toolchain-emsdk・toolchain-retdec・work-liftdiff・work-m11 の 5 本で、`work-m6-ott` が無かった。PR 本文の oc_artifacts に `work-m6-ott` を追加した (次の review run で取得)。T1 の 2 本目の loop が読む `targets/*/work/**/lift_gain`・`poc_gain/work` は許可名の対象外 (docs/WORKFLOW.md §11 に無い) で、無いと `os.path.exists` で skip される。次の run で T1 が ok でも、証拠は OTT (1 本目) だけになる。
+- **検証範囲 / 範囲外**: 範囲内は `m11_e2e.sh --full` (F1〜F3)・`tools/m11/test_a7_uselistorder.py`・素材 `work-m11` の drc.ll boot0〜3 の directive 残り。範囲外は `tools/liftlib/tests/test_unit.py` (T1〜T25。下の T1 節の表)。
+- **`test_unit.py` (HEAD `7b996184`・本 run の実測)**: `work-m6-ott` を `tar --zstd -xf` で `tools/m6/work/`・`tools/ott/work/`・`tools/m8/work/`・`tools/m9/work/`・`tools/m10/work/` に展開して実行した (前回の round の run では素材が無く rc 1)。`python3 tools/liftlib/tests/test_unit.py` は **rc 1**: T1 ok の後、T2 で `OTT_DLL` (`analysis-ott-binaries` の `OTT_vst2_win64.dll`) が無く `FileNotFoundError` で止まる (`__main__` は 1 件目で停止する)。そこで T1〜T25 を 1 件ずつ呼んで結果を取った。本 run の素材は fl-win64・toolchain-emsdk・toolchain-retdec・work-liftdiff・work-m11・work-m6-ott。`analysis-ott-binaries`・`work-liftlib`・`work-liftlib-targets` は本 run に無い。
+
+| 結果 | テスト | 理由 |
+|---|---|---|
+| ok | T3・T5・T8・T9・T16b・T18・T20・T21・T22・T23・T24・T25 | 素材不要 |
+| ok (一部 skip) | T1・T17・T19 | T1: OTT (1 本目) のみ比較。FA・KH の 2 本目は素材無しで skip。T17: T17b は `LL_XRET_*` 未設定で skip。T19: `add_func` は Serum2 PE 無しで skip |
+| skip | T11 | `OTT_DLL` 無し (`ott.drc.ll` は有り) |
+| FAIL | T2・T7・T10・T12・T13・T14・T15・T16 | `OTT_DLL` 無し (FileNotFoundError) |
+| FAIL | T4・T6 | FA 素材 (`liftlib/work/fa_gain`・`targets/freshair/work/win/`) 無し。base.py を通らない |
+
+- **base.py を通ったテスト**: `base.run_base` を呼ぶテストのうち、本 run で通ったのは T1 だけ。T10・T12〜T16 は `OTT_DLL` 無しで未実行、T11 は skip、T17b は `LL_XRET_*` 無しで skip。
+
+### base.py の空行差の実測 (レビュー minor 対応・本 run)
+
+- 方法: 変更前 (`git archive 52ad0ce1^ tools/liftlib` の `base.py`・A7 の 3 行無し) と現在 (`7b996184`) で `base.run_base(ott.drc.ll, base.make_args())` → `IR.Module.parse(text).dump(strip=True)` を出し、`wc -lc` と非空行を比べた。
+
+| 版 | 行数 | bytes | 非空行 (空白のみの行を除く) |
+|---|---|---|---|
+| 変更前 | 24,971 | 1,032,343 | 22,699 |
+| 変更後 | 24,816 | 1,032,188 | 22,699 |
+
+- 差は空行 155 行・155 B で、`ott.drc.ll` の directive ブロック数 (155) と一致する。非空行は両版で完全一致 (`diff` 0 行)。残留の `uselistorder` は両版とも 0 行。
+- T1 は `nb()` で空行を除いてから比べるため、この差は検出しない。T1 ok が示すのは非空行の一致だけ。
 - **代替の実測 (T1 ではない)**: `work-m11` の `boot0〜3.drc.ll` (RetDec の実出力) に `tools/m5/ir5_patch.py` と `base.py` の `normalize` を当てると、残留の `; uselistorder directives` と `uselistorder ` はどちらも 0 件。ただし 2 つの全体出力は一致しない (`!insn.addr` 等の metadata 行の扱いの差で、A7 と無関係。PR 前から)。A7 の一致の証拠にはしない。
 - **限界**: `uselistorder_bb` (基本ブロック用 directive) は A7 の正規表現 (`uselistorder ` の空白あり) に一致せず除去されない。素材の drc.ll boot0〜3 では 0 件 (`grep -c uselistorder_bb` で実測)。回帰テストには含まれない。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `test_unit.py` T1 (`base.run_base` の OTT golden 比較) が未実行。素材 `work-m6-ott` が本 run に無い | `base.py` の A7 変更が OTT の lift 出力を変えないことの実測が無い | 既存 issue #1664 にコメント (次の review run で実測し、結果を書いてから merge) |
+| T2・T7・T10・T12〜T16 (`OTT_DLL` 系) と T4・T6 (FA 素材) が本 run で未実行 | base.run_base を通る T10・T12〜T16 の A7 変更の影響を、本 run では見ていない | 親 #960 へ提案 (本 PR の `oc_artifacts` に `analysis-ott-binaries` を追加済み。取得できた run で `test_unit.py` を再実行し、結果を #960 に書く) |
+| base.py の A7 変更で OTT の lift 出力の空行が 155 行減る (非空行は同一・上表) | 空行数に依存する下流の sha 固定 (golden) への影響は未測定 | 親 #960 へ提案 |
+| RetDec 段の `uselistorder` 並びの差の起点 (`--passes` 相当の段・LLVM writer 段の仕組み) | 受入 1 の残り。RetDec 側の決定化の採否 (§19 で保留) の根拠 | 子 issue #2456 |
 | `@global_var_*` の出力順が実行ごとに変わる仕組み (RetDec / LLVM writer 段) | lift.ll 単体の比較にだけ出る。`boot_final.ll` は merge の `sorted()` で一致 | 親 #960 へ提案 (観測のみ。順序の由来は §18 の writer 段まで) |
 | `ir5_patch.py` の複製 (`tools/plugins/lift/passes/`・`tools/m3/ir_patch.py`・`tools/targets/*/`) の同じ空行残り | m11 の `--full` が使わない複製で未測定。A7 は変更していない | 親 #960 へ提案 |
 | `uselistorder_bb` (基本ブロック用 directive) が A7 で除去されない | 素材 drc.ll boot0〜3 では 0 件。回帰テストの対象外 | 親 #960 へ提案 |
