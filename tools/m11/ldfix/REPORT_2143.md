@@ -91,6 +91,6 @@ F4 (`ldfix/ldfix.py` `fix_f4`) の修復は、`xor i64 0, 0` 残骸を **escape 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `uselistorder` 行で `scan_text` が alloca を除外する (site +2,339) | 監査の site が実際より少ない。F4 系以外の脱落も見えない | #2141 [LD-78] (監査の置換・和集合の作業に含める) |
-| 監査が名前付き `stack_var_*` の read を見ない (F4 が対象とする型) | F4 のネガコンが監査で成立しない | 子 issue 起票 (本 PR の子 1) |
-| 69c360 型 (read-modify-write を挟んだ writer chain の先を辿らない) | REGLIVE の偽陰性が残る | 子 issue 起票 (本 PR の子 2) |
+| 監査が名前付き `stack_var_*` の read を見ない (F4 が対象とする型) | F4 のネガコンが監査で成立しない | #2201 [LD-85] |
+| 69c360 型 (read-modify-write を挟んだ writer chain の先を辿らない) | REGLIVE の偽陰性が残る | #2202 [LD-86] |
 | 旧監査 sites・ldfix 再生成 IR (`ir_conditions.json` 付き) での数値 | 本 REPORT は素材 norm0 での実測。REPORT_1866 の 2,737 と直接比べられない | #2144 [LD-80] |
