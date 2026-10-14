@@ -150,3 +150,24 @@
 - 回帰 (HEAD `81090e96`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7m と一致。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。`mkdir -p` で解消)。
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI (float 引数・short 戻り値) は呼出元 2 件と callee 本体の機械語で確認済み (上記「呼出元・callee の確定」)。native 突合での実行検証は未実施。
+
+#### 10-7q. #3072 (KH-40) run: Delay の Ghidra 変換の型名・LOCK・Win API stub (部分・emcc は未通過)
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip (`1ccb1df8…`) → `HeartCore.core_64` (手展開)。Ghidra 12.1.4 = `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 先頭 16 桁 `ddac49f9…` 一致, runner の一時領域に展開)、JDK 21 (`temurin-21`)、emsdk 6.0.12 (`[EMSDK]`)。
+- **測定 commit = `dfe3592e`** (コード変更は `ghidra_route/ghidra_to_c.py`・`ghidra_route/ghidra_shim.h`)。`git diff dfe3592e HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は 0 行 (本節の数値はこの commit で実測)。
+- decompile: Delay の lift 集合 141 関数 (`snapins.json` の lift 値の一意アドレス) → **141/141 OK** (`summary.tsv`, `analyzeHeadless` wall 30.4 s, decompile 合計 1.81 s, n=1)。
+- converter の変更 (2 点):
+  1. `thunk_FUN_<飛び先>` (jmp thunk 4 件: `180f8791c`・`180f87cac`・`180f87d40`・`180fc61dc`) は定義行を `FUN_<va>` に、呼出しを飛び先の `FUN_<飛び先>` に正規化 (同じ動作)。
+  2. IAT thunk `180fd81e4` (FlsGetValue)・`180fd81ec` (FlsSetValue) は関数集合から外し、既存の `THUNK` 表 (fail-fast) に任せる。
+- emcc (`emcc -c -ferror-limit=0`, clang 診断行 `grep -c error:`):
+  - 変更前 (thunk 正規化後・shim 変更前): **736 件** (issue 本文の 710 件は thunk 正規化前の数)。
+  - 変更後 (`dfe3592e`): **526 件** (−210)。
+- shim の変更 (`ghidra_shim.h`):
+  - 型名 `code` (`void`)・`undefined`・`sbyte` を typedef (宣言欠落による `pcVar1`・`sVar9` 等の未宣言 57+9 件が消える)。
+  - **LOCK()/UNLOCK() = no-op** (`((void)0)` マクロ)。規則: x86 の lock 接頭辞が付いた RMW の範囲を Ghidra が `LOCK();`…`UNLOCK();` で印字する。wasm と native harness は単一スレッドで、範囲内の原子性は観測できない。Delay の呼出し 23 組 (7 関数: `180fd08d0`・`180fd2c10`・`180fd7d94`・`180fe3284`・`180fe3488`・`180fe34e8`・`180fe3510`)。**未検証**: 単一スレッド仮定の突合は #3073 [KH-41] の範囲。
+  - Win API 21 件 (`HeapAlloc` `HeapFree` `GetCurrentProcess` `IsProcessorFeaturePresent` `TerminateProcess` `ExitProcess` `UnhandledExceptionFilter` `SetUnhandledExceptionFilter` `RtlVirtualUnwind` `RtlLookupFunctionEntry` `RtlCaptureContext` `RtlPcToFileHeader` `RaiseException` `GetProcAddress` `GetModuleHandleW` `GetModuleHandleExW` `LoadLibraryExW` `FreeLibrary` `IsDebuggerPresent` `EnterCriticalSection` `LeaveCriticalSection`): **fail-fast マクロ** (`#define NAME(...) ((T)kh_api_fail())`、`kh_api_fail` は `abort()`)。引数は評価しない (abort で実行が止まり副作用は観測されない)。意味は実装しない。C23 既定の emcc では `static inline f(...)` が通らないため、マクロ形を採った。
+- 残件 526 件 (`emcc.log`、種類別。`work/gr/delay_final/emcc.log` は gitignore 対象):
+  - レーン参照 (`undefined1 auVarN[64]`・`[16]` のメンバ参照 "member reference base type"): **138 件** (`[64]` 106・`[16]` 32)。AVX のレーン型を未定義。→ 子 issue #3094 [KH-42]。
+  - SIMD / AVX 疑似関数の未宣言: 約 40 件 (`ABS` 10・`SUB168` 5・`SUB84` 3・`ZEXT416` 2・`ZEXT816` 2・`maxps` 2・`minps` 1・`vcvtdq2pd_avx` 3・`vshufps_avx` 2・`vpor_avx` 2・`vpmovsxdq_avx` 2・`vpsubq_avx`・`vpsubd_avx`・`vpsrlq_avx`・`vpsrldq_avx`・`vpand_avx`・`vcvtpd2dq_avx` 各 1)。`swi(3)` (x86 int 3・未定義) 21 件。→ 子 issue #3095 [KH-43]。
+  - 未関数化 callee・未宣言 identifier・引数の過不足: 未関数化 `func_0x000180fbdef4` 2・`func_0x000180fbdd78` 1・`FUN_180fe5c74` 1・`FUN_180fe2508` 1、`DAT_`/`uRam`/`LAB_` 未定義 17 件、引数不足 "too few arguments" 84・引数過多 24、`code` 関数ポインタの間接呼出し 21 (`code` を `void` にしたため `(*p)(...)` が invalid)、型不一致 "invalid operands" 91・"assigning to" 38・ポインタ型 27。→ 子 issue #3096 [KH-44]。
+- 回帰 (測定 commit と同一内容の worktree・`build_cmp.sh` の fix 全部 = `bitcast,intload,stackpair,assoc,concat`, `native_ref` 1000 trial / seed 7): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B, emcc 0.3 s)・Haas **1000/1000** (calls 5500/5500, wasm 16,878 B)・Gate **1000/1000** (calls 4999/4999, wasm 17,367 B)。wasm サイズは §10-7n と一致。
+- 未実施: Delay の native 突合 (emcc 未通過のため。#3073 [KH-41] の範囲)、`swi(3)` と SIMD 疑似関数の意味付け (#3095 [KH-43])。
