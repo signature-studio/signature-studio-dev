@@ -1,6 +1,6 @@
 # REPORT_APPENDIX_2152 — unit 158 の後続経路と ON 書換えの 2 区間計装 (#2152, 親 #2118)
 
-REPORT_944.md §11 の付録。測定 commit: **`28db3b3a`** (コードを変えた最後の commit。実測はこの commit の内容で行った)。
+REPORT_944.md §11 の付録。測定 commit: **`ed20d891`** (コードを変えた最後の commit。実測はこの commit の状態で行った)。
 
 ## 1. 結論 (受入条件 1〜4)
 
@@ -50,15 +50,16 @@ j=12 (0 始まりで 13 行目) は `dest=0x10a9e0b8 len=1`。`n>0` 経路で `f
 
 ## 4. 決定性・所要・load (受入 4)
 
+測定 commit `ed20d891` の状態での実測。
+
 | 測定 | 内容 | 結果 | elapsed | load (開始) |
 |---|---|---|--:|--:|
-| watch OFF | `watch_2118.sh off` | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 72 s | 0.83 |
-| watch ON | `watch_2118.sh on` | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 66 s | 0.92 |
-| watch ON 再実行 | 同上 | `[rw]` 集合は前回と一致 | 67 s | 0.77 |
-| dest ON | `M11_PRINT_DEST_2118=1` (`INSTR=0` のため `[rw]` は出ない) | 0,1,158 = ok/ok/ok・dest 28 件 | 84 s | — |
-| dest OFF | 同上 (OFF) | 0,1,158 = ok/ok/ok・`[d413060]` は出ない (OFF 側の dest 値は未記録・§6) | 85 s | 0.91 |
+| 既定 survey | `env -u M11_INSTR_413060 node m11_survey.mjs` | ok 870 / trap 24 / miss 47 / noproc 1 / units 942 | 16.3 s | 0.92 |
+| watch OFF | `watch_2118.sh off` (clean・dest・watch の 3 build と実行を含む) | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 87 s | 0.93 |
+| watch ON | `watch_2118.sh on` (同上) | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 87 s | 0.91 |
+| watch ON 再実行 | 同上 | `[rw]` 集合は前回と一致 (OFF/ON の集合も一致) | 86 s | 0.76 |
 
-| 既定 survey | `env -u M11_INSTR_413060 node m11_survey.mjs` | ok 870 / trap 24 / miss 47 / noproc 1 / units 942 | 16.0 s | 0.60 |
+dest 段 (`M11_PRINT_DEST_2118=1`) は `watch_2118.sh` の中で実行される。ON は `[d413060]` 28 件・0,1,158 = ok/ok/ok、OFF は `[d413060]` 0 件・0,1,158 = ok/ok/ok。dest 段の所要は個別には計っておらず、watch 行の elapsed に含まれる。
 
 dest 段で確認したのは `[d413060]` の dest 値 (ON のみ) と ok/trap だけ。dest 段の build は `[rw]` を出さないので、rw 集合の一致はこの段からは言えない (rw 集合の根拠は watch build の表 §2 のみ)。
 
@@ -68,7 +69,8 @@ watch 系の 2 回の ON で `[rw]` 集合が一致 (決定的)。
 ## 5. 実行環境
 
 - 素材: `fl-win64`・`work-m11`・`toolchain-emsdk` (`$HOME/artifacts` から展開)。`m11_gen_ir2.sh` で `ir_conditions.json` 生成 (ldfix F1=902 F3c=36 errors=0)。
-- `m11_gen_ir2.sh` 所要 51 s。
+- `m11_gen_ir2.sh` 所要 57 s (測定 commit で再生成し、ldfix F1=902 F3c=36 errors=0 を確認)。
+- `work-m11` 付属の `work/m11_boot.cjs` のままでは survey が `_m11_set_va_unit_budget` 未定義で落ちたため、`m11_gen_ir2.sh` → `m11_build.sh` で作り直してから測定した。
 - IR の unit 名は `function_<VA>` で、VA `0x26d1a0` は `function_66d1a0` (base `0x400000`)。REPORT_944 §10 の `function_41ce10` (VA `0x1ce10`) と同じ規則。
 
 ## 6. 未解決 (起票先)
