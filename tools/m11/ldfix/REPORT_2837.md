@@ -52,3 +52,11 @@ tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst
 tar --zstd -xf $ARTIFACTS_DIR/work-liftdiff.tar.zst
 bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh
 ```
+
+## 8. main 取り込み後 (競合解消 merge `b20470b0`)
+
+- 競合は `spill_classify_1161.py` の読込行だけ。main 側 (#2838) は `candidate_verdicts_2838.jsonl` の `cand.update` を、本 PR は `candidate_verdicts_2837.jsonl` の `cand.update` を追加していた。両方を残し、docstring の入力列挙も両方書いた。`spill178_1161.tsv` は自動 merge で衝突せず、判定 JSONL との照合で全行一致 (手動 510・候補 2837・2838 の全 key が TSV の判定と一致)。
+- e2e (`audit_lsf_ssa_e2e.sh`) は再実行していない。本 run の素材は `fl-win64` のみで、`work-m11`・`work-liftdiff` が無い (IR の入力が無いため step 2 以降は走らない)。
+- 代替として step 7 だけを実行: ssa.json は IR から作れないため、TSV の行 (site・オラクル・text) から ssa.json を組んで `spill_classify_1161.py` を実行した。rc 0。出力 TSV は merge 後の `results/spill178_1161.tsv` と `cmp` 一致。これは読込と集計の検査であり、ssa.json 由来の分類そのものは検査していない。
+- 解消後の件数 (step 7 の [2]・[5]・[6]): 確定 132 / 判定不能 30 / 未判定 16 (§1 の 129 / 19 は a31084db 時点。#2838 が 466af0 の 3 site を決着)。脱落関数の和集合 = 69 + 6 = **75** (main 74 + 10c7cd0)。未判定 16 site は 11 関数 (和集合外 10)。
+- 以降の §5・§6 の「未判定 19」「和集合 74」は a31084db 時点の値として読む。
