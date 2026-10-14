@@ -120,3 +120,52 @@ index 799cc5cd..c171bab2 100644
   3. `M11_KEEP_BOOT_O=1 bash m11_build.sh`
   4. `SV_RAW=1 SV_ONLY=0,1,...,477 node trap_triage/survey_units.mjs work/probe1620/trap.json`
   5. 復元: `rm -f work/obj/sw682.o work/obj/boot.o work/obj/ov.o; touch work/boot_final3.ll; bash m11_build.sh`
+
+## 10. #1620 run (HEAD `d6176933` = origin/main): 前提が現 HEAD で再現しない・§19 の埋め実験は W を上書きしていた
+
+測定 commit: `b1d4c328` (`probe_1620_fill.mjs` の修正。以後この範囲は変えていない)。素材 (`fl-win64`・`work-m11`・`work-liftdiff`) は $HOME/artifacts から展開。toolchain は `/opt/emsdk`・`/opt/retdec`。
+
+### 10.1 現 HEAD の基準は §2 と一致しない
+
+- 測定: `m11_gen_ir2.sh` rc 0 (35.5 s、490,735 行) → `m11_build.sh` rc 0 (20.6 s) → `survey_units.mjs` rc 0 (6.9 s): **`ok 872 / oob 14 / halt0 7 / miss 47 / other 1 / noproc 1`**。§2 の `870 / 16` とは違う。
+- 同じ runner で 7d15ceab (本 issue の前提の測定 commit) を別 worktree で再構築すると `ok 870 / oob 16` (§2 と一致)。差は runner 側ではなく、7d15ceab 以降のコード変更による。
+- HEAD の unit 477・484・492 は、なお `oob` (`memory access out of bounds`)。ただし 492 の trap 位置は `function_4133f0` ← `function_4473f0` ← `function_446400` ← `function_446ad0` ← `function_ad5700` (`survey_units.mjs` の frames)。§2 の unit 492 の入力 (`0x100000003` の書込み) とは別の経路。
+
+### 10.2 `0x10a9f910` への書込みは build の静的データ配置 (初期 SP の位置) で消える
+
+`probe_1620_fill.mjs` (埋めなし、`FILL=-1`) で、各 build の初期 SP と W の関係、W への書込みを測った。W は初期 SP より下に位置する (W − SP の値を表に示す)。
+
+| build | 内容 | 初期 SP | W − SP | W への書込み (unit 477・484・492) | survey |
+|---|---|---|---|---|---|
+| A | 7d15ceab (IR・C とも旧) | `0x10a9fa10` | −256 | あり (`1_2` → `1_3` → `0`) | 870 / 16 |
+| B | 新 IR + 旧 C | `0x10a9fa10` | −256 | あり (A と同じ) | 870 / 16 |
+| C | 新 IR + 新 `m11_ov.c` + 旧 `m11_rt.c` | `0x10a9fa40` | −304 | なし (unit 496 の 1 件のみ変化) | 872 / 14 |
+| D | 新 IR + 新 C (= HEAD) | `0x10aa1260` | −6480 | なし | 872 / 14 |
+| E | B + `static unsigned char g_pad_1620[6176]` (C 側の静的データを増やしただけ) | `0x10aa1230` | −6432 | なし | 872 / 14 |
+
+- A と B は IR が違う (7d15ceab と新 IR。差は `boot_final.ll` の 6 行、`fix_ld108` の IR 差分) が、結果は同じ。IR の差は、この現象の原因ではない。
+- B と E は IR が同じで、差は C 側の静的データ量だけ (pad)。pad で初期 SP が 0x10a9fa10 → 0x10aa1230 に動くと、W への書込みが消える。
+- 5 つの build (A〜E) のうち、W への書込みが観測されたのは初期 SP が 0x10a9fa10 の A と B だけ。SP の一致が書込みの十分条件かは未確認だが、配置が結果を変えることは E の対照で示された。
+- 含意: 「特定の IR store が `0x10a9f910` に `0x100000003` を書く」という #1620 の前提は、固定 site を持たない。W は初期 SP からの相対位置 (−256) で見えており、SP を動かすと別の番地に当たる。書込み元の IR site を特定しても、HEAD では再現しない。
+
+### 10.3 §19・§20 の埋め実験の訂正
+
+- 旧 `probe_1620_fill.mjs` の埋め範囲 `[sp−64 KiB, sp)` は W を含む (sp − W は 256 (A) / 6480 (D))。埋めは各 unit の前に行われるため、W は埋め値で上書きされていた。§19 の「上位 dword が埋め値のまま残る」は、埋めた値が W に残った結果であり、W の値が未初期化 stack 読みに由来するという証拠ではない。§19 の「W の値が埋め値に依存する」は取り消す。ただし、埋めた範囲の残りが unit の挙動を変えること (下記、unit 492) は、修正後も残る。
+- `survey_units.mjs` の `SV_STK_FILL` (`[sp−8 KiB, sp)`) も W を含む。§20 の埋め値依存 (unit 134 を含む) は、同じ理由で検証できていない。本 PR では `SV_STK_FILL` を変えない (未検証と扱う)。
+- 修正 (commit `b1d4c328`): 埋めの前に W の 8 B を退避し、埋めの後に戻す。修正後の実測 (D = HEAD):
+  - 埋め −1 (なし)・0・0xAA・0xCC の 4 回で、W の遷移は 0 件 (end `0x0`)。埋め値に依存しない。
+  - 修正後の A (旧 build) の埋め −1: unit 477 `0x1_1029e5d8 → 0x1_2`、unit 484 `→ 0x1_3`、unit 492 `→ 0x0` (§14 と一致)。埋め 0xAA: unit 477・484 の遷移は同じだが、unit 492 の `0x1_3 → 0` は出ず、unit 496 の値も変わる (`0x10bd5b30`、埋め −1 は `0x10bd5d70`)。W の上書きは除いてあるので、この差は埋めた範囲の残りが unit の実行を変えたことを示す。未初期化 stack 読みの候補は未特定 (§19 の次の手順 (a))。
+
+### 10.4 受入条件の判定
+
+| # | 条件 | 判定 |
+|---|---|---|
+| 1 | 書込み元 store の IR site (fn・行) の特定 | 未達。HEAD (D) では W への書込みが起きない。旧 build (A・B) の書込みは IR site に紐づかず、C 側の静的データ配置で消える (§10.2) |
+| 2 | D17 か別類型かの判定 | 未達。前提の store が現 HEAD に無いため判定の対象が無い |
+| 3 | 修復後の回帰 (ok→非 ok 0 件) | 未達 (修復は未実施) |
+
+### 10.5 次の手順 (PM 判断)
+
+- #1620 の前提 (HEAD で `0x10a9f910` に `0x100000003` を書く store) は現 HEAD に存在しない。受入 1〜3 はこのままでは達成できない。範囲の再定義 (例: HEAD の unit 492 OOB `function_4133f0` の入力出自へ置換) か、前提の終結かを PM が判断する。
+- 本 run は子 issue を起票していない (残りは再測定と追跡だけになるため)。
+- 埋め実験 (`SV_STK_FILL`・`probe_1620_fill.mjs`) の結果は、埋め範囲が観測対象を含まないことを確かめてから使うこと (`probe_1620_fill.mjs` は修正済み)。
