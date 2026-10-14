@@ -75,6 +75,5 @@ python3 tools/m11/ldfix/audit_lsf.py tools/m11/work/boot_final3.ll tools/m11/wor
 
 - 測定 commit: `25d2cdc0` (e2e・§3 の audit はこの tree で実行)。
 - 測定 commit から HEAD までの差分 (`git diff 25d2cdc0 HEAD -- tools/m11/ldfix`) は本 REPORT の追加のみ。判定ファイル (`candidate_verdicts_1161.jsonl`・`results/spill178_1161.tsv`) の差分は 0。
-- 差分の出力 (`git diff 25d2cdc0 HEAD -- tools/m11/ldfix`) は下記。
-
+- 差分の範囲は `tools/m11/ldfix/REPORT_2264.md` のみ (docs 追加)。REPORT は自身の commit hash を内部に書けないため、最終 HEAD での `git diff --stat 25d2cdc0 HEAD -- tools/m11/ldfix` の出力は PR コメントに載せる。
 
