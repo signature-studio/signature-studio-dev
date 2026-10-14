@@ -244,3 +244,13 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 試行: `also` に `FUN_180fd4f30`・`FUN_180fd51cc`・`FUN_180fd2d38` を追加 → decompile 20 件 OK (error 件数は未集計)。さらに `FUN_180fd2c90`・`FUN_180fd2c10`・`FUN_180fd1ac4`・`func_0x…e5c6c`・`func_0x…b6c0c` を追加 → decompile 25 件 OK、error 38 件 (`grep -c error:`)。新たに未解決 `func_0x…1f84`・`1f30`・`FUN_180fd2f20`・`FUN_180fd1b00`・`LOCK`/`UNLOCK`・`HeapAlloc`/`HeapFree` が出現。閉包は収束しなかったため、converter の変更は破棄 (コミットなし)。
 - 逆アセンブル (capstone, IAT 判定): `func_0x…81e4`・`81ec` は `jmp [rip+…]` の IAT thunk (Win API 経由)。`func_0x…bdfcc`・`648c`・`662c`・`bdef4` は通常の関数先頭。`func_0x…1f84`・`1f30` は `movsxd` で始まる通常関数。thunk は関数名の書換えでなく Win API stub として扱う必要がある。
 - 結論: callee を Ghidra 出力どおり `also` に足す方式は閉包が広がるだけで、emcc は改善しない。次 run は (a) IAT thunk を stub 化する規則、(b) `LOCK`/`UNLOCK`・`MXCSR` の意味付け、の 2 点を先に決める。
+
+#### 10-7g. #1215 (KH-23) 再 run: 呼出名 `func_0x…` の統一 (部分・converter 1 箇所)
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64 (手展開)。Ghidra 12.1.4 = zip (sha256 `ddac49f9…d2db` 一致)、JDK 21、emsdk 6.0.12 (`/opt/emsdk`)。
+- 原因の特定: 10-7e の残件 `func_0x000180fd648c`・`6498`・`662c`・`bdfcc`・`bdef4`・`81e4`・`81ec` は、Ghidra が未命名 callee を `func_0x<va>` で呼ぶ名前であり、`also` で同じ va を `FUN_<va>` と定義していた。`ghidra_to_c.py` に呼出名の統一がなかったため未解決として残っていた (10-7e の「未確認」を解消)。`81e4`・`81ec` は IAT thunk (10-7f) で、`also` に入っていないため不一致のまま。
+- 変更: `ghidra_to_c.py` に `func_0x000180f…` → `FUN_180f…` の書換えを 4 行追加 (定義済み va のみ)。
+- decompile (`also` 17 + 4 件・同 HEAD 相当の集合): 20 関数すべて OK (summary.tsv, n=1, import 込み 36.4 s wall)。
+- emcc (resonator, 修復なし, `-ferror-limit=0`): **31 → 25 件** (`grep -c error:`)。消えたもの: `func_0x…648c/6498/662c/bdfcc/bdef4` と `FUN_180fe5f40`・`FUN_180fd3144` 由来の呼出エラー。
+- 残件 (emcc 25 件): `MXCSR` 8・`param_1` 不足 3 (引数なし呼出)・`FUN_180fd4f30` 2・`func_0x…81e4`/`81ec` 1 件ずつ (IAT thunk)・`GetLastError`/`SetLastError` 各 1・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1・`rcpps` 2 引数形 1・引数型不一致 3 (`undefined4[8]`→`short*`・`uint*`→`ushort*`・`float*`→`uint*`)・`too many arguments` 1・`V128` への int 代入 1。Resonator のビルドは**依然失敗**。
+- 回帰確認 (同一 HEAD・同一 shim, `build_cmp.sh` の fix 全部): Gain 1000/1000 bit-exact (wasm 15,161 B, emcc 0.3 s)・Haas 1000/1000 (16,878 B, 0.3 s)・Gate 1000/1000 (17,367 B, 0.3 s)。wasm サイズは §10-3 と一致。
+- 未実施: Resonator の native 突合 (emcc 未通過のため)。
