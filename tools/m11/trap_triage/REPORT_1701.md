@@ -4,13 +4,13 @@
 
 - 測定 commit: **`fb3c40c3`** (コードを変えた最後の commit。以降は本 REPORT のみ)。
 - −4 は **rt.o の計測 flag** に帰属した。`rt.o` だけ計測 OFF (既定) に戻すと getmem は 2008 → **2012 (既定と一致)**。`rt.o` だけ計測 ON にすると既定 IR のままでも 2008。
-- `ov.o` を計測 OFF に戻しても 2008 のまま (寄与なし)。リンク時 EXPORTS (`_m11_dest_obs_*`) を外しても 2008 のまま (寄与なし)。
+- `ov.o` の計測 flag (O0) は本切り分けでは検証対象外。`m11_ov.c` の計測本体は `M11_OV_413060=0`・`M11_OV_CLASSCREATE=0` の条件で未コンパイルのため、`M11_OV_INSTR` を変えても ov.o の object は C と同一で、O0 の 2008 は構造上の必然 (寄与の有無は判定していない)。ov.o の寄与を測るには `M11_OV_413060=1` 側の比較が必要 (IR 挙動を変えるため別 issue)。リンク時 EXPORTS (`_m11_dest_obs_*`) を外しても 2008 のまま (寄与なし)。
 - survey 判定 (ok/trap/clobber) は全構成で 870/24/0。既定の基準 (870/24/0) は変えていない。
 - 未解決: rt.o のどの部分が −4 を生むか (機序) は未特定。n=1 のみ (決定性は未確認)。→ §3 の子 issue。
 
 ## 1. 測定 (測定 commit `fb3c40c3`・直列・単発・n=1・foreground)
 
-**実行環境**: 4 vCPU・load 0.4〜1.2。素材 `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` → `tools/m11/work/` (展開後 `m11_gen_ir2.sh` で作り直し)、`toolchain-emsdk` → [EMSDK]。`toolchain-retdec` は展開せず、`/opt/retdec` の既存を使用 (本測定は lift を走らせない)。
+**実行環境**: 4 vCPU・load 0.4〜1.2。素材 `fl-win64` → `$RUNNER_TEMP/fl-win64`、`work-m11` → `tools/m11/work/` (展開後 `m11_gen_ir2.sh` で作り直し)、`toolchain-emsdk` → [EMSDK]。`toolchain-retdec` は展開せず、[RETDEC] の既存を使用 (本測定は lift を走らせない)。
 IR 生成: `ldfix=applied`・F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0 (REPORT_1542 と一致)。
 
 **切り分けの定義** (`tools/m11/trap_triage/repro_1701_rt_ov.sh`。基準は REPORT_1542 の C = `M11_PROBE_VARIANT=noren`・計測 ON で IR を既定と同一に戻した build):
@@ -20,7 +20,7 @@ IR 生成: `ldfix=applied`・F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0 (REP
 | A_default | 計測 OFF (既定) | `baa100ff` | 0 | 870 | 24 | 0 | **2012** | 2096 |
 | C_noren | 計測 ON・IR 既定同一 (基準) | `baa100ff` | 0 | 870 | 24 | 0 | **2008** | 2091 |
 | R0_rtOFF | C + rt.o のみ計測 OFF (EXPORTS も外す) | `baa100ff` | 0 | 870 | 24 | 0 | **2012** | 2096 |
-| O0_ovOFF | C + ov.o のみ計測 OFF | `baa100ff` | 0 | 870 | 24 | 0 | **2008** | 2091 |
+| O0_ovOFF | C + ov.o のみ計測 OFF (**同一 object・検証対象外**: 計測ブロックが未コンパイル) | `baa100ff` | 0 | 870 | 24 | 0 | **2008** | 2091 |
 | L0_lnkOFF | C + リンク時 EXPORTS のみ外す | `baa100ff` | 0 | 870 | 24 | 0 | **2008** | 2091 |
 | R1_rtON | A + rt.o のみ計測 ON | `baa100ff` | 0 | 870 | 24 | 0 | **2008** | 2091 |
 
@@ -32,7 +32,7 @@ IR 生成: `ldfix=applied`・F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0 (REP
 ## 2. 解釈
 
 - **帰属**: −4 は rt.o の計測 flag。R0 (rt.o 計測 OFF) で既定 2012 に戻り、R1 (rt.o 計測 ON のみ) で 2008 に落ちる。
-- **ov.o は寄与なし**: O0 (ov.o のみ OFF) は C と同じ 2008。`m11_ov.c` の計測本体 (`function_413060` の probe 呼出し) は `M11_OV_413060=0` の条件でコンパイルされない (REPORT_1542 §2 の推定と整合)。
+- **ov.o は検証対象外**: 本切り分けでは ov.o の計測 flag は無効 (計測コードが未コンパイル) のため、O0 (ov.o のみ OFF) は C と同一 object で 2008 になる。ov.o の寄与は本 REPORT では判定しない。`m11_ov.c` の `function_413060` 計測本体 (`m11_probe(8)`・`m11_dest_obs`) は `#if M11_OV_CLASSCREATE || M11_OV_413060` の内側 (REPORT_1542 §2 の推定と整合)。
 - **リンク時 EXPORTS は寄与なし**: L0 は C と同じ 2008。
 - **機序 (推定・未検証)**: noren 構成では IR から `m11_dest_obs` を呼ぶ wrapper が無い (`M11_PROBE_VARIANT=noren` は 413060 を wrapper 化しない)。したがって計測 ON の rt.o で**実行されるコードは同じ**。違うのは rt.o 内の静的データ (`g_dest_h`・`g_rec_st/len/rc/h`) と関数の有無によるリンク後の配置 (BSS/text のアドレス) のみ。−4 はアドレス依存の値 (ポインタ由来の判定・ハッシュ・配置) である可能性が高い。ただし配置が原因であることは**未確認** (配置だけを変える対照は未実施)。
 
