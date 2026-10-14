@@ -6,19 +6,18 @@
 
 ## 1. 測定
 
-- 測定 commit: `1d454773` (コードを変えた最後の commit)。`c7e0f161` は同じ判定を先に入れた中間 commit。
-  以後の差分は本 REPORT と `docs/DOC_MAP.md` の 1 行のみ (`git diff 1d454773 HEAD -- tools/m11/ldfix` は本 REPORT だけ)。
-- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` → rc=0・所要 2m34s・7/7 完了。
-  `drops_510.tsv`・`spill178_1161.tsv` は results/ と cmp 一致 (`c7e0f161` でも 2m33s・一致)。
+- 測定 commit: `b28401d5` (main `08138a06` を取り込んだ merge commit。コードを変えた最後の commit)。
+  `1d454773` は取り込み前の測定 commit で、その時点の数値は下の「取り込み前」の行に残す。`git diff b28401d5 HEAD -- tools/m11/ldfix` は本 REPORT だけ (docs)。
+- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`b28401d5`) → 7/7 完了・所要 1m31.8s。`drops_510.tsv`・`spill178_1161.tsv` は results/ と cmp 一致。
 - 追加の実行: `python3 tools/m11/ldfix/ld120_frame_128f9e0.py --verdicts` (TSV と UNDETERMINED 行を生成)。
-- 素材: `work-m11` (`boot_final3.ll` の sha256 `010451add5147d37cd06d8d0043255fcb2e65a536c4eadeff17e7ce43de7cb9e`・#2288 と同一)、
-  `work-liftdiff`。tarball 内が `tools/m11/work/...` の相対パスのため、repo 直下へ `tar --zstd -xf` で展開した。
-- 変更前の spill 宛 status (5d88dda2 の HEAD): 確定 97 / 判定不能 16 / 未判定 65。
-- 変更後 (`1d454773`): 確定 97 / 判定不能 28 / 未判定 53。`128f9e0` の未判定 12 → 0 (判定不能 13 = 新規 12 + 既存 `12900c4`)。
-  脱落関数の和集合 69 は不変 (UNDETERMINED は和集合に入らない)。
-- review round 1 の対応 (本 fix): 素材 `work-m11`・`work-liftdiff` が本 run に無いため (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)、
-  IR・RetDec・config・機械語の再実行は行っていない。以下の数値は `1d454773` の測定のまま。
-  本 fix の変更は本 REPORT と `docs/DOC_MAP.md` の行だけ (コードの差分 0)。
+- 素材: `work-m11` (`boot_final3.ll` の sha256 `010451add5147d37cd06d8d0043255fcb2e65a536c4eadeff17e7ce43de7cb9e`・#2288 と同一)、`work-liftdiff`。
+  tarball 内が `tools/m11/work/...` の相対パスのため、repo 直下へ `tar --zstd -xf` で展開した (gitignore 対象・commit しない)。
+- spill 宛 status (main `08138a06` → PR HEAD): 確定 109 → 109 / 判定不能 16 → 28 / 未判定 53 → 41。`128f9e0` の未判定 12 → 0 (判定不能 13 = 新規 12 + 既存 `12900c4`)。
+  main 側の `c589b0` 12 site は #2659 で確定 (NO_CONSUMER) 済みで、本 PR はそこに触れない。
+  脱落関数の和集合 69 は不変 (UNDETERMINED は和集合に入らない。audit の [5] で確認)。
+- 取り込み前 (`1d454773`・5d88dda2 基準): 確定 97 / 判定不能 16 → 28 / 未判定 65 → 53。
+- review round 1 の対応 (前 fix): 素材が取得されていなかったため IR・RetDec・config・機械語の再実行は行わなかった。
+  main 取り込み後の run では素材が取得できたが、陽性対照と F 候補照合は本 PR の範囲外のため未実施のまま (§5)。
 
 ## 2. 結論
 
@@ -42,7 +41,7 @@
 ### 3-2 IR 本体 (`boot_final3.ll` の `function_128f9e0`・76541〜77198 行)
 
 - alloca は 42 本 (`stack_var_-1400`〜`-2032`・d = 56〜688 相当)。12 slot の alloca・言及は 0 件。K の load は 0 件。
-- **未対照**: 上の 0 件に対する陽性対照 (既知の alloca 1 本と K の load を持つ関数で、同じ検索が 1 以上になること) は未実施。素材 `work-m11` が本 run に無く再実行できない。
+- **未対照**: 上の 0 件に対する陽性対照 (既知の alloca 1 本と K の load を持つ関数で、同じ検索が 1 以上になること) は未実施 (#2705 の受入条件)。
 
 ### 3-3 RetDec 出力 (lift・drc)
 
