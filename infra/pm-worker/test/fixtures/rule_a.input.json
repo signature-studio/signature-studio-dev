@@ -1,0 +1,283 @@
+{
+  "issues": [
+    {
+      "number": 100,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 101,
+      "body": "親: #100",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 110,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 111,
+      "body": "本文\n親: #110\n",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 115,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 116,
+      "body": "親: #115",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 120,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 125,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 126,
+      "body": "親: #125",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 130,
+      "body": "",
+      "labels": [
+        "needs-user-input"
+      ],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 131,
+      "body": "親: #130",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 140,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 141,
+      "body": "親: #140",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 150,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 151,
+      "body": "親: #150",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 152,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 160,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 161,
+      "body": "親: #160",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 170,
+      "body": "",
+      "labels": [],
+      "state": "closed",
+      "blockedByCount": 0
+    },
+    {
+      "number": 171,
+      "body": "親: #170",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 180,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 181,
+      "body": "親: #180",
+      "labels": [],
+      "state": "closed",
+      "blockedByCount": 0
+    },
+    {
+      "number": 190,
+      "body": "",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    },
+    {
+      "number": 191,
+      "body": "親: #190",
+      "labels": [],
+      "state": "open",
+      "blockedByCount": 0
+    }
+  ],
+  "prs": [
+    {
+      "number": 200,
+      "title": "pr 200",
+      "body": "Closes #100",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 210,
+      "title": "pr 210",
+      "body": "Fixes #110",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 215,
+      "title": "pr 215",
+      "body": "Refs #115\n\n本文 (#999 は別件)",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 225,
+      "title": "pr 225",
+      "body": "see #125 only",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 240,
+      "title": "pr 240",
+      "body": "follow-up of #140",
+      "state": "open",
+      "merged": false,
+      "labels": []
+    },
+    {
+      "number": 242,
+      "title": "pr 242",
+      "body": "Closes #140",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 250,
+      "title": "pr 250",
+      "body": "Closes #150",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 260,
+      "title": "pr 260",
+      "body": "Closes #160",
+      "state": "closed",
+      "merged": false,
+      "labels": []
+    },
+    {
+      "number": 270,
+      "title": "pr 270",
+      "body": "Closes #170",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 280,
+      "title": "pr 280",
+      "body": "Closes #180",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 290,
+      "title": "pr 290",
+      "body": "Closes #190",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    },
+    {
+      "number": 295,
+      "title": "pr 295",
+      "body": "Closes #195",
+      "state": "closed",
+      "merged": true,
+      "labels": []
+    }
+  ],
+  "blockedBy": {
+    "152": [
+      150
+    ],
+    "101": [
+      100
+    ],
+    "191": [
+      190
+    ]
+  }
+}

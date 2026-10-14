@@ -237,13 +237,13 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 - 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。
 
-## 18. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
+## 18. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
+- 測定 commit `17eb4e16` (main `13329492` を取り込んだ merge。測定は取り込み後の HEAD で実施)、測定時刻 2026-10-14T16:29Z。偽の opencode (`OPENCODE_BIN`)・`timeout` で打ち切り (リポジトリ外の検証スクリプト)。
+- 結果: 文面ファイルあり (`heartbeat_msg_audit.txt`・間隔 1 秒・timeout 4) 送信 3 回 (監査 3・既定 0)、初回 1.02 秒後。未設定 (間隔 1 秒・timeout 4) 送信 3 回 (既定 3)、初回 1.01 秒後。文面ファイルあり・間隔 2 秒・timeout 4 は送信 1 回 (初回 2.02 秒後。2 回目は 4 秒の打ち切り後)。存在しない・空・空白のみの文面ファイルは終了 1・送信 0 (標準エラー `PM_HEARTBEAT_MSG_FILE is missing or empty`)。`PM_SESSION_ID` 無しは終了 1・送信 0。`bash -n tools/pm/heartbeat.sh` OK。`bash tools/pm/test_pm_wake.sh` 20 passed, 0 failed。
+- 差分 (コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行 (本節を commit した後の HEAD でも同じ)。`git diff 83f93e44 HEAD -- ...` (同じパス) も 0 行。
+- 注: 節番号は §18 (§17 は main の #2342 の節が使っているため)。前回 (`5573e550`) の記載の「間隔 2 秒で送信 2 回」は、本測定 (timeout 4) では 1 回だった。2 回目は初回 (2.02 秒) + 間隔 2 秒で timeout 4 秒を過ぎるため。
+- 取り込みと再測定 (round 4): main `e1e816c2` を merge commit `384e2cbe` で取り込んだ (競合なし。`heartbeat.sh` は PR 側の版のまま)。README の VM 記述 (commit `517bbb13`) を直した後の HEAD で同じ測定を再実行した。送信回数・終了コード・初回送信の遅延 (1.01 秒・2.01 秒) は上の結果と同じ。
+- 差分 (round 4): `git diff 17eb4e16 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行。
 
-- 測定 commit: `13329492` (origin/main)。API と `gh pr list`・`gh api search/issues` の読み取りだけで、Ruleset は変更していない。
-- 設定 (API、取得 2026-10-14 16:26Z): id `25094342`・enforcement `active`・承認 1 以上・merge のみ・作成 16:03:11Z。`bypass_actors` は**未設定**・`current_user_can_bypass=never` (issue 本文の Admin (actor_id 5) bypass と不一致)。
-- 24 時間窓 `merged:2026-10-13T16:03:11Z..2026-10-14T16:03:11Z` (取得 2026-10-14 16:40Z): 984 件 = reviewer App 862 件・実装 App (`app/opencode-for-signature-studio`) 120 件 (12.2%)・人 2 件。実装 App の 120 件は、merge 前の APPROVED が 0 件 (APPROVED が付いた 22 件は、いずれも merge の後)。PM 記録 (121 件・約 12%) は取得時刻・コマンドが無いので照合に使わない。
-- 取得方法: `gh pr list --repo signature-studio/signature-studio-dev --state merged --search 'merged:<窓>' --limit 1000 --json number,mergedAt,mergedBy,reviews` (件数 984 は 1000 未満で切れていない)。件数の照合は `gh api -X GET search/issues -f q='repo:signature-studio/signature-studio-dev is:pr is:merged merged:<窓>' --jq .total_count`。merge 前の承認は `reviews` のうち `state=="APPROVED"` かつ `submittedAt <= mergedAt` の件数 (jq)。旧方法 (`--state merged --limit 1000`) は作成日時の新しい順のため窓の merge を取りこぼす (2026-10-14 の検収時に 970 件と再現)。
-- 適用後 `merged:2026-10-14T16:03:11Z..2026-10-14T16:26:38Z` (取得 2026-10-14 16:40Z): 21 件、全て reviewer App。実装 App は 0 件。
-- PM 記録・未再測定: canary (承認前は 405・reviewer の APPROVED で通る・Admin bypass で通る)。approve の 7〜8 秒後に merge が通った。bypass 未設定のため、bypass の部分は現状では再現できない。
-- コード差分: `git diff 13329492 HEAD -- .github/scripts .github/workflows` の出力は 0 行 (文書のみの変更)。
-- 未解決 (PM 判断。追跡は #2648 のコメント): bypass の設定、reviewer token 失敗時の挙動、`gh pr merge --auto` の挙動。
+## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
+- 測定値の正本: [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)。

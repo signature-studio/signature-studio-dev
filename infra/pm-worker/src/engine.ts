@@ -1,8 +1,9 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
+import { AUTO_CLOSE_MAX, AUTO_CLOSE_RETRY_MS, AUTO_CLOSE_WOULD_MS, closeComment, detectRuleA, type CloseTarget } from "./autoclose.ts";
 import { countOpencodeRuns, type ActiveCount } from "./active.ts";
-import { classify, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
+import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
@@ -148,6 +149,8 @@ interface Meta {
     reconciles: number;
     pmDispatched?: number;
     wouldDispatchPm?: number;
+    closed?: number;
+    wouldClose?: number;
     // 再投入の意図 (oc-pm-intent: relaunch)。投稿した数・dry-run で記録した数・検査で拒否した数 (理由ごと)。
     intentLaunched?: number;
     intentWouldLaunch?: number;
@@ -166,6 +169,8 @@ export interface Log {
     | "dispatch"
     | "would-pm-dispatch"
     | "pm-dispatch"
+    | "would-close"
+    | "close"
     | "error"
     | "skip"
     | "truncated"
@@ -180,7 +185,7 @@ export interface Log {
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -203,6 +208,11 @@ export function persistDiff(prev: PmState, next: PmState, store: Store): void {
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 const ART_LINE_RE = /^\s*`?(oc_artifacts:[^\n`]*)`?\s*$/m;
+// 分類に渡す bot 報告の要約 (先頭 400 字と oc_artifacts 行)。
+const digestBot = (b: { at: string; body: string }): Snapshot["bot_last"][string] => {
+  const am = ART_LINE_RE.exec(b.body);
+  return { at: b.at, head: b.body.slice(0, 400), art: am ? am[1].trim() : null };
+};
 
 export interface EngineDeps {
   store: Store;
@@ -461,7 +471,7 @@ export class Engine {
     return diff;
   }
 
-  // blocked_by の一覧が不明な issue (件数 > 0 だが一覧が無い) を REST で取る。1 回の上限 max 件。
+  // blocked_by の一覧が不明な issue (件数が一覧の件数より多い: 無いか、件数だけ更新されて古い) を REST で取る。1 回の上限 max 件。
   private async syncBlockers(gh: Gh, max: number): Promise<void> {
     const R = this.d.cfg.repo;
     let left = max;
@@ -470,7 +480,7 @@ export class Engine {
     let pages = 0;
     for (const [k, v] of Object.entries(this.s.issues)) {
       if (left <= 0) break;
-      if (v.state !== "open" || v.blockedByCount <= 0 || k in this.s.blockedBy) continue;
+      if (v.state !== "open" || v.blockedByCount <= (this.s.blockedBy[k]?.length ?? 0)) continue;
       left--;
       read++;
       const j = await gh.list<any>(`/repos/${R}/issues/${k}/dependencies/blocked_by`, 3);
@@ -553,7 +563,7 @@ export class Engine {
   }
 
   private zero(): NonNullable<Meta["counters"]> {
-    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, redelivered: 0, wouldRedeliver: 0 };
+    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0 };
   }
 
   // 完了して 1 時間たった run は捨てる (順不同配送の判定に使う期間だけ持つ)。
@@ -589,12 +599,17 @@ export class Engine {
       .filter((r) => r.status !== "completed")
       .map((r) => ({ id: r.id, event: r.event, title: r.title }));
     const bot_last: Snapshot["bot_last"] = {};
+    for (const [k, b] of Object.entries(s.botLast)) bot_last[k] = digestBot(b);
+    const bot_report: Snapshot["bot_report"] = {};
+    for (const [k, b] of Object.entries(s.botReport)) bot_report[k] = digestBot(b);
+    // 停止判定 (run-outcome を除く) は botLast の本文で見る。素材名は直前の報告 (botReport) から読む。無い (古い保存値) issue は空 = 新しい素材なし。
     const fullBotBody: Record<string, string> = {};
-    for (const [k, b] of Object.entries(s.botLast)) {
-      const am = ART_LINE_RE.exec(b.body);
-      bot_last[k] = { at: b.at, head: b.body.slice(0, 400), art: am ? am[1].trim() : null };
-      fullBotBody[k] = b.body;
-    }
+    for (const [k, b] of Object.entries(s.botLast)) fullBotBody[k] = b.body;
+    const reportBody: Record<string, string> = {};
+    for (const [k, b] of Object.entries(s.botReport)) reportBody[k] = b.body;
+    // 最後の run-outcome の reason (webhook が sig に保存する)。
+    const outcomeReason: Record<string, string> = {};
+    for (const [k, g] of Object.entries(s.sig)) if (g.outcome) outcomeReason[k] = g.outcome.reason;
     const liveBlockers: Record<string, number[]> = {};
     const unknown = new Set<number>();
     for (const i of issues) {
@@ -612,8 +627,8 @@ export class Engine {
     const launchState: Record<string, LaunchState> = {};
     for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) launchState[k] = v.state;
     return {
-      snap: { issues, prs, runs, bot_last, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody },
+      snap: { issues, prs, runs, bot_last, bot_report, pm_art: s.pmArt },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
       unknown,
     };
   }
@@ -706,9 +721,12 @@ export class Engine {
       } else if (reason === "unknown" && c.unknown === 0) {
         pick = { art: baseArt(n), np: "unknown" };
       } else if (reason === "artifact" && c.artifact === 0) {
-        const extra = neededArts(n, input).filter((a) => !prevNames.includes(a));
+        // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。報告が無い (古い保存値) は新しい素材なし。
+        const rep = snap.bot_report[String(n)];
+        const stop = isStopReport(rep?.head ?? "");
+        const extra = stop ? neededArts(n, input).filter((a) => !prevNames.includes(a)) : [];
         if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
-        else note = "artifact: 新しい素材なし";
+        else note = !rep || stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
       } else {
         note = `oc:no-pr ${reason} 再投入済み`;
       }
@@ -1118,6 +1136,58 @@ export class Engine {
     return out;
   }
 
+  // ---------------------------------------------------------------- 自動 close (規則 A)
+  // merged PR を持つ親 issue を閉じる (判定は autoclose.ts の detectRuleA)。LIVE_CLOSE="1" のときだけ書く。既定は記録のみ (counters.wouldClose)。
+  // 1 tick に最大 AUTO_CLOSE_MAX 件。同じ issue は書き込みの試行から 24 時間は再試行しない (閉じた後の配送遅延で二重にコメントしない)。
+  // 同期が古い間は閉じない (一覧の取りこぼしで、参照の無いものを閉じないため)。
+  async autoClose(gh: Gh | null): Promise<{ closed: CloseTarget[]; would: CloseTarget[] }> {
+    const out = { closed: [] as CloseTarget[], would: [] as CloseTarget[] };
+    if (!this.fresh()) return out;
+    const live = !!(this.d.cfg.liveClose && gh);
+    const now = this.d.now();
+    const key = live ? "autoClose" : "autoCloseWould";
+    const hold = live ? AUTO_CLOSE_RETRY_MS : AUTO_CLOSE_WOULD_MS;
+    const seen: Record<string, number> = {};
+    for (const [k, at] of Object.entries(this.d.store.get<Record<string, number>>("meta", key) ?? {})) if (now - at < hold) seen[k] = at;
+    const picks = detectRuleA(this.s)
+      .filter((t) => !(String(t.n) in seen))
+      .slice(0, AUTO_CLOSE_MAX);
+    if (picks.length === 0) return out;
+    this.meta.counters = this.meta.counters ?? this.zero();
+    for (const t of picks) {
+      if (!live) {
+        seen[String(t.n)] = now;
+        this.meta.counters.wouldClose = (this.meta.counters.wouldClose ?? 0) + 1;
+        this.pushLog({ kind: "would-close", n: t.n, note: `rule A merged #${t.mergedPr} child #${t.child}` });
+        out.would.push(t);
+        continue;
+      }
+      // レート制限の守りに当たったら、まだ試していない候補は記録しない (次の tick で改めて試す)。
+      if (restGuardOn(this.meta.rest?.remaining)) break;
+      seen[String(t.n)] = now;
+      try {
+        await gh!.comment(t.n, closeComment(t));
+        await gh!.closeIssue(t.n);
+      } catch (e) {
+        this.pushLog({ kind: "error", n: t.n, note: e instanceof GhError ? `auto-close: ${e.message}` : "auto-close failed" });
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+        continue;
+      }
+      const cur = this.s.issues[String(t.n)];
+      if (cur) {
+        const next: IssueState = { ...cur, state: "closed", labels: [], body: "", updatedAt: iso(now) };
+        this.d.store.put("issues", String(t.n), next);
+        this.s = { ...this.s, issues: { ...this.s.issues, [String(t.n)]: next } };
+      }
+      this.meta.counters.closed = (this.meta.counters.closed ?? 0) + 1;
+      this.pushLog({ kind: "close", n: t.n, note: `rule A merged #${t.mergedPr}` });
+      out.closed.push(t);
+    }
+    this.d.store.put("meta", key, seen);
+    this.saveMeta();
+    return out;
+  }
+
   // 日次のダイジェスト (oc-pm kind=digest ref=0)。時刻だけで送り、集計は PM agent が pm.md の digest 節で行う。
   // 初回の tick は起点を置くだけ (初めて動いた直後に起こさない)。以後 24 時間に 1 回。送信に失敗した試行も 1 回と数え、毎分叩き直さない。
   // 対象を指さないので、同期の新旧は問わない。
@@ -1251,6 +1321,7 @@ export class Engine {
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
+      await this.autoClose(gh);
       await this.digest(gh);
       // 配送の回収は launch と独立に行い、失敗しても他の処理と lastError を止めない。
       try {
@@ -1325,11 +1396,16 @@ export class Engine {
     let base: OpenSample | undefined;
     for (const h of this.d.store.get<OpenSample[]>("meta", "openHist") ?? []) if (h.at <= now - DAY_MS && (!base || h.at > base.at)) base = h;
     return {
+      // デプロイした commit (--var BUILD_COMMIT)。渡していなければ null。反映の確認に使う (README『再デプロイ』手順 5)。
+      build: this.d.cfg.build,
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
       mode: this.d.cfg.liveLaunch && this.d.cfg.liveDispatch ? "live" : this.d.cfg.liveLaunch || this.d.cfg.liveDispatch ? "partial" : "dry-run",
       mode_launch: this.d.cfg.liveLaunch ? "live" : "dry-run",
       mode_dispatch: this.d.cfg.liveDispatch ? "live" : "dry-run",
+      mode_close: this.d.cfg.liveClose ? "live" : "dry-run",
+      // 規則 A の候補数 (issue 番号は出さない。記録は counters.wouldClose と log の would-close)。
+      auto_close_detected: detectRuleA(this.s).length,
       // TARGET に数える run の総数 (opencode.yaml の in_progress + queued など。実装・review・fix・oc-pm・watchdog の全て)。active_all と同じ値。
       active_runs: plan.active,
       active_all: plan.active,
@@ -1353,6 +1429,8 @@ export class Engine {
       relaunch: c("relaunch"),
       user: c("user"),
       stopped: c("stopped"),
+      // 最後の run-outcome が artifact で止まり、新しい素材が無く再投入しないもの (PM の判断待ち)。
+      no_pr_needs_pm: rows.stopped.filter(([n]) => (this.s.issues[String(n)]?.labels ?? []).includes("oc:no-pr") && this.s.sig[String(n)]?.outcome?.reason === "artifact").length,
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
       pm_detected: pmDetected,

@@ -21,11 +21,12 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
 3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 3 時間) の間は着手しない。cooldown の後は次のとおり。
    - `unknown`: 1 回だけ再着手する。
-   - `artifact`: 前回の `oc_artifacts` に無い allowlist 内の素材が本文から増えるときだけ 1 回再着手する (増えなければ再投入しない)。
+   - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) が停止報告 (`STOP_RE`) で、その報告に前回の `oc_artifacts` に無い allowlist 内の素材があるときだけ 1 回再着手する (増えなければ再投入しない)。
    - `stop`・`split`: 再投入せず、PM agent (`oc-pm`・下の oc-pm 節) に回す。
    - `blocked`: blocker が close されるまで再投入しない。
    - 再投入の計数は `unknown` と `artifact` の再投入だけ (上限 3 回)。`launch-unobserved` (投稿の run が 5 分で現れなかった) は再投稿せず stopped に残す。
    `oc:stuck` は人の判断待ち。`pm-apply`・`needs-user-input` は下の oc-pm 節のとおり、再着手せず `user` 行に置く。
+   `/status` の `no_pr_needs_pm` は、最後の run-outcome が `artifact` で stopped に残った `oc:no-pr` の件数 (PM の判断待ち)。
 4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
 5. relaunch (`oc:no-pr` の再投入・素材の追加) も 1 tick の枠 `min(room, BATCH, relaunch + ready)` に入り、残りの枠を ready が使う (`src/launch.ts` の `planLaunch`)。relaunch は room や BATCH を超えても全件出す。枠を `ready` の件数だけで頭打ちにする VM の `launch_issues.py` の式とは、relaunch がある tick で最大 relaunch の件数だけ差が出る (VM の式は変えていない)。relaunch は classify が issue ごとに 2 回までに絞る。
 6. **room の基準は opencode.yaml の全 run の総数**: `room = max(0, target_eff - active_all)` (`target_eff` は上の『同時実行の上限の推定』で決まり、推定が無ければ `TARGET`)。`active_all` は `workflow_run.path` が `opencode.yaml` の未完了の run (in_progress・queued・pending・waiting・requested) を **event を問わず** 全て数える (`src/active.ts`)。VM 版の `active_runs` は実装・fix の run (`issue_comment` `workflow_dispatch` `pull_request_review` と題名が `oc-fix` の `repository_dispatch`) だけを数え、review (`pull_request`)・oc-pm・watchdog を数えなかった。同時実行の上限 (Team プランで 60) はこれらを含む opencode.yaml の全 run が共有するので、旧い数え方では `room` が過大になり、上限を超えて queued が出た (実測は #2625)。別 workflow (`scripts-test.yaml` `terms-watch.yaml`) の run は別枠で数えない。`path` を持たない run (この版より前の保存値) は opencode.yaml として数える (過大に数える側)。reconcile (5 分ごと) が REST の `path` で埋める。TARGET の既定は **58** (上限 60 から 2 を残す)。推定の観測 (`running` / `queued`) は従来どおり workflow を問わない (同時実行の上限は repo の全 workflow の job が共有するため)。
@@ -66,6 +67,30 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 - 検出するのは上の 5 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
 - `digest` (#2349・CI-70) は状態ではなく時刻で送る: `ref` は 0 だけ。初回の tick は起点を置くだけで、以後 24 時間に 1 回 (`meta/digestAt`)。送信に失敗した試行も 1 回と数え、毎分叩き直さない。dry-run は `would_dispatch_pm` に `digest#0` を記録するだけ。PM agent 側の集計は `.github/prompts/pm.md` の digest 節。
 
+## 自動 close: 規則 A (#2336)
+
+merged PR を持つ親 issue を閉じる (`src/autoclose.ts`)。判定は保存状態だけで行い REST は呼ばない。tick の最後 (`autoClose`) で動く。
+全てを満たす open issue N を閉じる:
+
+1. N を Closes / Fixes / Resolves / Refs で参照する merged PR がある (参照は PR 本文の全文から取り `PrState.closes` に持つ)
+2. N を親 (『親: #N』) とする open の子 issue が 1 つ以上ある
+3. N に `needs-user-input` が付いていない
+4. N の番号を題名・本文に含む open PR がない (`PrState.mentions`)
+5. N を blocker にしている open issue が、N の子以外にない
+
+- **保存の範囲**: merged PR の参照は、Worker が見たものだけ (webhook、または全体同期の窓 24 時間)。窓より前に merge された PR は見ていないので、その親は閉じない (保守的な側に倒す)。
+- **抜けは閉じないほうに倒す**: `mentions` の無い open PR (保存形式の移行前) が 1 件でもあれば全体で閉じない。blocked_by の一覧が件数に足りない open issue (件数 `total_blocked_by` > 一覧の件数) があれば、子でない限り全体で閉じない。この状態は同期 (`syncBlockers`) が REST から一覧を取り直して直す。同期が古い間 (`fresh=false`) も閉じない。
+- 1 tick で最大 5 件。同じ issue は書き込みを試してから 24 時間は再試行しない (閉じ損ねた後のコメントの二重投稿を防ぐ)。
+- **書き込みは `LIVE_CLOSE="1"` のときだけ** (`LIVE` や `LIVE_LAUNCH` / `LIVE_DISPATCH` では動かない)。既定は記録のみ: `/status` の `counters.wouldClose` と log の `would-close`。`mode_close` が `live` / `dry-run` を示す。
+- live の順序: コメント (`[auto-close] 規則 A: merged PR #<x>、残りは #<c> が追跡 <!-- oc-auto-close: rule=A -->`) → `PATCH` で `state=closed`・`state_reason=completed` (PM App の token、issues:write)。閉じた後の状態は Worker の手元でも closed にする。
+
+### 誤って閉じたとき
+
+1. 対象の一覧: `gh api -X GET search/issues -f q='repo:signature-studio/signature-studio-dev "oc-auto-close: rule=A" in:comments' --jq '.items[]|"#\(.number) \(.title)"'`
+2. 再開: `gh issue reopen <N>`。
+3. **再開だけでは、次の tick で閉じ直さない**。閉じ直すのは、最後の書き込みの試行 (`meta.autoClose`) から 24 時間 (`AUTO_CLOSE_RETRY_MS`) を過ぎた tick だけ。それより前に止めたいときは `needs-user-input` を付ける (条件 3 で候補から外れる)。条件が揃っていれば閉じ直されるので、残す条件 (子・merged PR・open PR の言及) も直す。
+4. 規則 A を止める: `LIVE_CLOSE` を `"0"` (または外す) にして再デプロイする。`/status` の `mode_close` が `dry-run` になる。
+
 ## /status の観測 (#2338)
 
 Worker の健全性を外から判断するための集計。既存のキーは変えず、次を足した (個票・自由文は出さない)。
@@ -82,6 +107,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `active_by_event` | `active_all` の event 別の件数。`repository_dispatch` は run-name の先頭で `repository_dispatch:oc-fix` `:oc-pm` `:watchdog` に分ける |
 | `dry_run_skipped_posts` | dry-run のために投稿しなかった書き込み (`/oc` 投稿 + `repository_dispatch`) の累計 (`counters.wouldLaunch + wouldDispatch`) |
 | `reconcile_diff` | `{last, total}`: reconcile が REST を適用して DO の内容が変わった entity (issue・PR・run・bot/PM のコメント) の件数と累計。webhook の欠落の指標。`updatedAt` だけの違い (コメント追加で進む) と full sync は数えない。配送遅延の最中の差も数えるので、1 回の小さな値は欠落とは限らない |
+| `build` | デプロイした commit hash (`wrangler deploy --var BUILD_COMMIT:<hash>` で渡した値)。渡していない・小文字 hex の 7〜40 字でないときは `null`。方式と理由は下の『再デプロイ』手順 4 |
 | `rest_remaining` / `rest_used` / `rest_reset_at` | Worker の GitHub REST クライアント (installation token) の全応答の `x-ratelimit-remaining` / `-used` / `-reset` (ヘッダが正。`gh api rate_limit` の本文は食い違う)。失敗応答も含む。ヘッダの無い応答・数値でない値では更新しない。一度も観測していなければ `null` (0 ではない)。JWT で叩く `/app/*` と、`/status?detail=1` の呼び出し側の token は別枠なので記録しない |
 
 自律運転の指標 (#2335)。件数と時間だけを返す (題名・本文・login は出さない。issue / PR 番号は可)。
@@ -92,6 +118,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `stuck_age_max_min` | 上の PR の経過分の最大。起点は最新の停止コメント (無ければ PR の更新時刻)。該当が無ければ `null` |
 | `needs_pm` | open な issue と PR のうち `needs-pm` の付いた数 (合計) |
 | `needs_user` | open な issue と PR のうち `needs-user-input` の付いた数 (合計) |
+| `no_pr_needs_pm` | 最後の run-outcome が `artifact` で stopped に残った open な `oc:no-pr` の件数 (新しい素材が無い・停止報告でない・再投入済み・上限に達したものを含む。PM の判断待ち)。`split`・`stop`・`blocked`・`unknown` は数えない |
 | `no_pr_by_reason` | `{split, artifact, unknown, blocked, stop}`: open な `oc:no-pr` の issue を、最新の outcome の理由別に数えた値。outcome の無いものは数えない |
 | `refs_only_merge_rate_24h` | `{merged, refs_only, rate}`: 直近 24 時間に merge された PR の件数 (`merged`) と、そのうち本文が `Refs #N` のみ (`Closes` / `Fixes` / `Resolves` が 1 つでもあれば数えない) の件数 (`refs_only`) と率。0 件なら `rate` は `null`。merge 済み PR の『Refs のみ』は merge 時点の本文から取った真偽値だけを持つ (本文は保存しない)。導入前に merge された PR は、次の全体同期 (6 時間以内) で埋まる |
 | `open_issues_delta_24h` | 現在の open issue 数から、24 時間前以前で最も新しい 1 時間ごとの点 (`meta/openHist`、最大 48 点) の数を引いた差。点が無い (履歴が 24 時間分に満たない) ときは `null`。同期が古い間と一覧を打ち切った間は点を残さない |
@@ -141,7 +168,7 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
   (上限ちょうどで読み尽くしたときは、次の 1 ページを読んで空 (または窓の外だけ) なら `false`)。
 - コメントは `sort=created&direction=desc` で**新しい順**に読み、`created_at` が窓より古いコメントに達したら止める。窓は全体同期で `COMMENT_WINDOW_H` 時間 (既定 24。24 未満は 24)、
   reconcile は `reconcileAt - 2 分`。ページ上限は `COMMENT_MAX_PAGES` (既定 80 = 8,000 件。`wrangler.toml` の値は実測に合わせて引き上げてある)。
-  状態に使うコメント (bot と PM) 以外は本文を持たない。`botLast` / `pmArt` / `launchedAt` は適用の順序に依らず `created_at` (同時刻は comment id) が最新のものになる。
+  状態に使うコメント (bot と PM) 以外は本文を持たない。`botLast` / `botReport` / `pmArt` / `launchedAt` は適用の順序に依らず `created_at` (同時刻は comment id) が最新のものになる。`botReport` は bot の投稿のうち run-outcome と PM のマーカーを含まないものの最新 (停止報告の素材名の入力。`botLast` は run-outcome で上書きされるので別に持つ。古い保存値には無い)。
 - PR は全体同期で open を全件・closed を `sort=updated&direction=desc` で窓の中だけ読む (`state=all` の全件は PR の増加で上限を超える)。reconcile も起点より古い更新で止める。
 - 打ち切った一覧は `meta.syncTruncated` (対象名・読んだページ数・時刻。本文・題名は入れない) に残し、1 件でもあれば `fresh=false`。同じ一覧を次に読んで打ち切りが無ければ自動で消える。
   打ち切ったときは『一覧に無い』ことを根拠にした close / completed 扱い (issue・PR・run) をしない。`/status` は `sync_truncated` と `last_full_sync_rest_calls` (全体同期の REST 回数。うちコメントは `last_full_sync_comment_rest_calls`) を出す。
@@ -236,6 +263,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `LIVE_LAUNCH` | launch の `/oc` コメント投稿 (`POST /repos/{o}/{r}/issues/{n}/comments`) | `"1"` (2026-10-14〜。コードの既定は dry-run) |
 | `LIVE_DISPATCH` | `repository_dispatch` の送信 (`POST /repos/{o}/{r}/dispatches`)。`oc-watchdog` と、oc-pm 節の `oc-pm` (PM agent の起動) の両方。別スイッチは無い | `"1"` (同上) |
 | `LIVE` (旧) | 上の 2 つのうち、未設定のほうにだけ効く (両方の既定値) | (置かない) |
+| `LIVE_CLOSE` | 規則 A の自動 close (コメント + `state=closed`)。`"1"` のときだけ書く。`LIVE` では動かない | 未設定 (dry-run)。`wrangler.toml` には置かない |
 | `TARGET` | 同時に走らせる **opencode.yaml の run の総数** の上限 (room = target_eff − active_all。`active_all` は実装・review・fix・oc-pm・watchdog の全て。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"58"` (上限 60 から 2 を残す。以前の暫定 `"50"` と、80 に戻す案 #2458 は置き換えた) |
 | `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
 | `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
@@ -289,21 +317,23 @@ Workers Builds の接続状態は後述の『Workers Builds の接続状態と p
    `authType` が `OAuth Token` でないときは、環境変数の token が OAuth より優先されている。止めて原因を調べる (この VM に token の環境変数を置かない。指示 4・9)。失敗したら後述の「OAuth が失効したとき」。
    OAuth の保存先 `~/.config/.wrangler/config/default.toml` は平文で token を含む。中身を表示・commit・コメントに貼らない。
 2. 戻し先の記録。デプロイ前に `wrangler deployments status` を実行し、稼働中の version id を控える (ロールバックの戻し先)。あわせて `curl -fsS "$PM_WORKER_URL/status"` の `mode` `mode_launch` `mode_dispatch` `fresh` `last_tick` を控える (`PM_WORKER_URL` は `tools/pm/README.md` の `pm_gate.sh` と同じ)。
-3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]`) が出る。migration の有無はここでは分からない。
-4. デプロイ: `wrangler deploy --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。
+3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir> --var BUILD_COMMIT:<commit hash>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]` と `BUILD_COMMIT`) が出る (`BUILD_COMMIT` の値は `(hidden)` で表示される)。migration の有無はここでは分からない。
+4. デプロイ: 作業する commit は main に merge 済みの HEAD (`git rev-parse HEAD` の全 40 字) にして、次のように渡す。`wrangler deploy --var BUILD_COMMIT:<commit hash 全体> --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。`--var` の値は `/status` の `build` に出る (手順 5)。
+   - **`BUILD_COMMIT` の渡し方 (#2416)。** `--var` を選んだ理由: (a) Worker のコードを書き換えない。(b) `wrangler.toml` の `[vars]` には置かず、deploy のたびに CLI から渡す。`--keep-vars` なし (既定) では前回の deploy の値を残さない指定にあたるので、渡し忘れた deploy の `build` は古い hash ではなく `null` になると読んだ (実機の確認は末尾の `[未確認]`)。(c) CLI の `--var` は `[vars]` の同名キーより優先される (wrangler 4.151.0 のソース `cli.js` で、CLI の値を config の binding の後に入れることを確認。dry-run で `--var TARGET:999` を付けると `TARGET` が `58` (`wrangler.toml`) から `(hidden)` に変わることも確認)。`--define` は採らない。`--define BUILD_COMMIT:<hash>` (引用符なし) は、hash が数字で始まると `Invalid define value` で build が失敗する (英字で始まると通るが、hash は bundle に入らない)。`--define 'BUILD_COMMIT:"<hash>"'` (引用符付き) は build が通るが、`env.BUILD_COMMIT` の参照は定数置換されず、hash は bundle に入らない (dry-run で確認。測定は `tools/pm/REPORT_2416.md` §3)。
    - **`[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。** `--keep-vars` なしの既定では、dashboard 等で変えた var は消える (`wrangler deploy --help` の説明)。特に `LIVE_LAUNCH` / `LIVE_DISPATCH`: dashboard 等で変えても、再デプロイすると `wrangler.toml` の値 (2026-10-14 以降は `"1"`) で置き換わる。切替の手順は「切替」節 (A・B) が正本で、値を変えるときも `wrangler.toml` を変えて merge してから deploy する (正本はリポジトリ)。デプロイ前に手順 2 の `mode` `mode_launch` `mode_dispatch` を見て、意図しない `live` → `dry-run` の変化が出ないことを確かめる。
    - secret (`STORE_KEY`) は deploy で消えない (ソースで `keepSecrets: true`、`--help` に『secrets are never deleted by deployments』)。`STORE_KEY` を作り直さない (App の鍵が復号できなくなる)。
    - Durable Object のコードを変えるだけなら migration は要らない (公式: <https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/>)。migration は適用済みの tag を飛ばして、新しい tag の分だけが deploy 時に適用される。現在の `wrangler.toml` は `v1` (`new_sqlite_classes = ["PmDO"]`) だけ。`[[migrations]]` を足す変更は、ロールバックできなくなる境界を作る (後述)。単独の PR・単独のデプロイにする。
 5. 反映の確認。
    - `wrangler deployments status` に、手順 4 の `--tag` と `--message` を持つ version が 100% で出る。出力の項目 (version id・Created・Tag・Message) はソースで確認した。実 Worker での表示は未確認 (末尾のチェックリスト)。
    - `curl -fsS "$PM_WORKER_URL/status"` が応答し、`fresh` が `true`、`last_tick` が deploy 後の時刻に進む。
-   - **現状の `/status` には、デプロイされた commit を識別する key が無い** (`src/engine.ts` の `status()`、main 0ca7f8c5)。そのため `/status` だけでは『新しい commit が反映された』と断定できない。上の `deployments status` の Tag / Message と、その commit で `/status` に足した・変えた key が応答に出ることを併せて見る。恒久策は [CI-84] #2416 (`/status` に `build` を載せる)。
+   - `curl -fsS "$PM_WORKER_URL/status"` の `build` が、手順 4 で `--var BUILD_COMMIT:` に渡した commit hash (全体) と一致すること。`null` のままなら、その deploy は `--var` を付けずに出ている (反映とは判断しない。手順 4 をやり直す)。`build` は公開の `/status` にも出る (集計の一部で、秘密ではない)。
+   - 反映の判定は `/status` の `build` で行う (外から見られる。watchdog や他の agent も同じ確認ができる)。`wrangler deployments status` の Tag / Message は、wrangler にログインした VM で 100% の version を確かめる補助に使う。
 
 ## ロールバック
 
 1. 戻し先を決める。`wrangler versions list` (直近 10 件) または `wrangler deployments status` で、手順 4 の Tag / Message から選ぶ。
 2. `wrangler rollback <version-id> --message "<理由>"`。`--message` を付けると確認の prompt が省かれる。version id を省くと『最新の 1 つ前に upload された version』に戻る (公式: <https://developers.cloudflare.com/workers/wrangler/commands/workers/#rollback>)。戻すと新しい deployment ができ、全 route で即座に有効になる。
-3. 「再デプロイ」の手順 5 と同じ確認をする。戻した理由と戻し先の version id を、起点の issue に書く。**main に問題の commit が残ったままだと、次の再デプロイで同じ版がまた出る。** revert の PR を出すか、修正を merge してから再デプロイする。
+3. 戻し先の `build` を見る。`curl -fsS "$PM_WORKER_URL/status"` の `build` が、戻し先の version を deploy したときに `--var BUILD_COMMIT:` へ渡した commit hash (全体) と一致すること。戻し先が `--var` なしの version なら `build` は `null`。`fresh`・`last_tick` の確認は「再デプロイ」の手順 5 と同じ。戻し先の `BUILD_COMMIT` が戻るかは末尾の `[未確認]` の項目。戻した理由と戻し先の version id を、起点の issue に書く。**main に問題の commit が残ったままだと、次の再デプロイで同じ版がまた出る。** revert の PR を出すか、修正を merge してから再デプロイする。
 
 制約 (公式: <https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/>):
 
@@ -332,7 +362,7 @@ Workers Builds の接続状態は後述の『Workers Builds の接続状態と p
 
 ## Workers Builds を接続しない理由
 
-> **注意 (#2585)**: 下の判断 (接続しない) は、2026-10-14 の実測で Workers Builds のビルド記録が見えた事実と食い違う。接続の有無と判断の見直しは PM (#2357) が決める。接続の状態と pnpm 経路の注意は次の節を見る。
+> **注意 (#2585)**: 下の判断 (接続しない) は、2026-10-14 の実測で Workers Builds のビルド記録が見えた事実と食い違う。接続の有無と判断の見直しは PM (#2357) が決める。接続の状態と pnpm 経路の注意は次の節を見る。接続した場合、Workers Builds の deploy には `--var BUILD_COMMIT` が付かないので、その版の `/status` の `build` は `null` になる (推定。未確認)。
 
 Workers Builds (Cloudflare 側に repo を接続し、main への merge で自動ビルド・デプロイする機能) は、既定ではビルド用の API token を Cloudflare がアカウントに**自動で発行**する (公式: <https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token>)。依頼者の指示 4・9 (無断で token を作らない・secrets を平文で保存しない) の趣旨に反しうるため、PM 判断 (2026-10-14、#2357 [CI-78]) で接続しないと決めた。代わりに、上の手順で PM が VM の OAuth を使って再デプロイする。引き換えに、merge から反映までは PM の操作を待ち、OAuth が失効している間は反映できない (稼働中の Worker は止まらない)。依頼者が判断を変えたら、#2357 を再開して判断する。
 
@@ -354,5 +384,6 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
 - [ ] `[未確認]` refresh token の有効期間と失効の条件。公式 docs に記載を見つけられなかった (確認した範囲: `wrangler login` のページ、`wrangler auth token` の『automatically refreshed if expired』)。wrangler のソースでは、refresh の応答に新しい refresh token があればそれを保存し、無ければ従来のものを使い続ける。ただし有効期間が固定か、使うたびに延びるか、使わない期間が長いと失効するか、パスワード変更・ロール剥奪・ユーザーによる取り消しで失効するか、`--device` で得た token が通常の `wrangler login` と同じ寿命かは不明。確認の方法: 失効が起きたときの日時と、直前の `wrangler` 実行の日時を issue に記録して比べる。
 - [ ] `[未確認]` 稼働中の script の `migration_tag` が `v1` か。wrangler は deploy 時にこの tag を取得して、`wrangler.toml` の最後の tag と同じなら migration を送らない (ソースで確認)。初回デプロイを REST (`scripts/metadata.mjs`) と `wrangler deploy` のどちらでしたかの記録が無く、tag が付いていなければ wrangler は `v1` を再送する。その場合に、既存の DO namespace に対して Cloudflare がどう応答するかは不明。確認の方法: 最初の再デプロイの出力に migration の適用が出ないこと。出たら止めて、依頼者に報告する。
 - [ ] `[未確認]` `wrangler rollback` を本 Worker (migration は `v1` の 1 件のみ) で実行したときの成否。公式の制約は『lifecycle 変更を跨ぐと不可』で、本 Worker の `v1` 同士なら可と読めるが、実機では未実行。確認の方法: `LIVE_LAUNCH` / `LIVE_DISPATCH` を `"1"` にする前に、最初の再デプロイで 2 つ目の version ができた後、`wrangler rollback <旧 version> --message "rollback test"` で戻し、もう一度 deploy する。
-- [ ] `[未確認]` rollback で `[vars]` (特に `LIVE_LAUNCH` / `LIVE_DISPATCH`) と Cron の schedule が戻し先の version の値に戻るか。公式は『binding の先は変わらない』とだけ書き、`[vars]` と schedule の扱いは書いていない。`LIVE_LAUNCH` または `LIVE_DISPATCH` が `"1"` の運用中に rollback すると、戻し先の値が `"0"` ならその経路が dry-run に戻る (投稿・dispatch が止まる) 恐れがある。確認の方法: 上のテストの後に `GET /status` の `mode_launch` / `mode_dispatch` (と `mode`)、dashboard の Triggers の cron が残っていることを見る。
+- [ ] `[未確認]` rollback で `[vars]` (特に `LIVE_LAUNCH` / `LIVE_DISPATCH`) と Cron の schedule が戻し先の version の値に戻るか。公式は『binding の先は変わらない』とだけ書き、`[vars]` と schedule の扱いは書いていない。`LIVE_LAUNCH` または `LIVE_DISPATCH` が `"1"` の運用中に rollback すると、戻し先の値が `"0"` ならその経路が dry-run に戻る (投稿・dispatch が止まる) 恐れがある。`--var` で渡した `BUILD_COMMIT` (binding) も戻るかは未確認で、戻らないときに `build` が何になるか (戻す前の hash のままか、`null` か) も分からない。確認の方法: 上のテストの後に `GET /status` の `mode_launch` / `mode_dispatch` (と `mode`)・`build`、dashboard の Triggers の cron が残っていることを見る。
 - [ ] `[未確認]` `wrangler deployments status` と `wrangler versions list` の実際の出力 (Tag / Message の表示を含む)。項目名はソースで確認した。実 Worker での表示は未確認。
+- [ ] `[未確認]` `--var BUILD_COMMIT:<hash>` の値が、実 Worker の `/status` の `build` に出ること。`--var` を付けない deploy で `build` が `null` に戻ること (`--keep-vars` なしの既定。wrangler の help の説明どおりと読んだが、実機では未確認)。確認の方法: 次の再デプロイで手順 4 の hash を渡し、手順 5 の `build` が一致すること。`null` に戻る挙動は、`--var` を付けない deploy が次に行われたときに見る (テストのためだけの deploy はしない)。ローカルでは `wrangler deploy --dry-run` と vitest (node と workerd) で確認済み。
