@@ -152,7 +152,7 @@ $ git diff a0b6f97f HEAD -- tools/python/host tools/python/provider tools/python
 
 main (`1b37410c`) を取り込んだ merge `38927307` の競合は 2 ファイル 2 箇所。`host/fl_mock.mjs` は本件の `launchMapPages.length` と main の PY-125 (`general.clearLog`・`general.dumpScoreLog`) を両方残した。`tests/provider_check.mjs` は判定集合に `pe120` と `pe125` の両方を入れ、期待値を main の 121/314 から 122/313 (本件の 1 件を加算) に直した。`provider/fl_engine.c` は自動マージ (`lm_pages`・PY-125 の関数が 1 回ずつ残ることを grep で確認)。
 
-測定 commit: `38927307` (コードを変えた最後の commit。merge)。環境: runner (4 core)。素材: `fl-win64` から DATA block 4 件と PE 本体 (`block00031_PE.bin`) を展開。emsdk は `/opt/emsdk` (6.0.12・runner 同梱。`toolchain-emsdk` の tarball は展開していない)。ブラウザ系は本体 checkout の `node_modules` を symlink して実行した (コミットしない)。
+測定 commit: `38927307` (コードを変えた最後の commit。merge)。環境: runner (4 core)。素材: `fl-win64` から DATA block 4 件と PE 本体 (`block00031_PE.bin`) を展開。emsdk は [EMSDK] (6.0.12・runner 同梱。`toolchain-emsdk` の tarball は展開していない)。ブラウザ系は本体 checkout の `node_modules` を symlink して実行した (コミットしない)。
 
 | コマンド | 結果 | wall (s) |
 |---|---|---|
