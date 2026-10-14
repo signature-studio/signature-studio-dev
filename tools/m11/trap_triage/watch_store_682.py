@@ -15,6 +15,8 @@ HERE = os.path.dirname(os.path.abspath(__file__)); M11 = os.path.join(HERE, '..'
 src_path = opt('--src', os.path.join(M11, 'work', 'boot_final3.ll'))
 out = opt('--out', os.path.join(M11, 'work', 'probe682'))
 only = set(opt('--fns', '').split(',')) - {''}   # #2270: 指定時はこの関数の store だけ計装する (他は素通し)
+if '--fns-file' in args:   # #2408: 関数名 1 行 1 件のファイル (14,881 関数の名前は引数長の上限 128 KiB を超える)
+    only |= set(open(opt('--fns-file', '')).read().split()) - {''}
 os.makedirs(out, exist_ok=True)
 
 STORE = re.compile(r'^(\s*)store (.*), ptr (nonnull )?(%[-a-zA-Z$._0-9]+|@[-a-zA-Z$._0-9"]+|inttoptr \(i64 (-?\d+) to ptr\)|null)(, align \d+)?\s*$')

@@ -356,6 +356,11 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     annotation が読めないときは何もしない (watchdog が拾う)。
   - **watchdog の集計** (`watchdog.sh`): open issue で、blocked でなく、open PR が無く、実行中の implement run も無く、`oc:no-pr`・`needs-user-input`・`oc:stuck` も無い
     issue を `floating-issues=N` として出力する (step summary にも出る)。**数えるだけで何もしない** (launch は PM Worker の責務)。本文の『依存: #N』『親: #N』による待ちは見ないため、上限値の目安である。
+  - **PM Worker の停止検知** (`watchdog.sh`、#2328): `tools/pm/worker_url` の URL の `/status` を `curl -fsS -m 10` で読む。`configured` と `installed` がともに true
+    (一度でも稼働に入った Worker) で、`fresh` が false または `last_tick` が 15 分より古ければ、題名 `[CI-n] PM Worker 停止 (<日付>)`・ラベル `pm-worker-down` の issue を起票する
+    (本文は `/status` の写しと `@pycabbage`。`needs-user-input` は付けない)。**`configured:false` / `installed:false` (`/setup` 未了) では起票しない。**
+    重複排除: ラベル付きの open issue があれば追記のみ (1 時間に 1 回まで)、24 時間以内に close した issue は reopen して追記する。
+    回復 (`fresh` が true かつ `last_tick` が 5 分以内) で、open の障害 issue にコメントして close する。ファイルが無い・取得失敗・JSON 不正は警告だけで何もしない (終了コードは変えない)。
   - **bot の `/oc`** (#1949): PM 用 GitHub App の `/oc` は `vars.OC_PM_BOT_LOGIN` との完全一致 + `user.type == 'Bot'` で許可する (`.github/README.md`)。
 
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、

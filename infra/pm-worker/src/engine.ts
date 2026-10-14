@@ -8,6 +8,8 @@ import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
+import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
+import { redact } from "./redact.ts";
 import {
   applyEvent,
   EMPTY_STATE,
@@ -47,7 +49,7 @@ export interface Plan {
   phase: PhaseState;
   open_prs_excl_stuck: number;
   stuck_prs: number;
-  // launch を止める理由 (stuck-ceiling)。止めないなら undefined。
+  // launch を止める理由 (stuck-ceiling / rate-guard)。止めないなら undefined。
   stop?: string;
 }
 
@@ -56,6 +58,14 @@ interface Meta {
   reconcileAt?: number;
   watchdogAt?: number;
   tickAt?: number;
+  // 署名を検証できた webhook の最後の受信 / repository_dispatch (oc-watchdog) に成功した最後の時刻
+  lastWebhookAt?: number;
+  lastDispatchAt?: number;
+  // GitHub REST の x-ratelimit-* (ヘッダのあった値だけ更新する)。reset は epoch 秒。
+  rest?: RateInfo;
+  // 直近の reconcile で DO と REST が食い違った件数と、その累計
+  reconcileDiff?: { last: number; total: number };
+  rateGuardOn?: boolean;
   installationId?: number | null;
   lastPlan?: Plan;
   lastError?: { at: string; what: string };
@@ -115,6 +125,28 @@ export interface EngineDeps {
   gh: () => Promise<Gh | null>;
   // この App の bot ログイン (slug + "[bot]")。PM のコメントとして扱う。
   pmBotLogin: () => string | null;
+  // status・ログから取り除く実行時の secret (webhook secret・PEM・token など)。
+  secrets?: () => string[];
+}
+
+const COUNTED_BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "launchedAt"] as const;
+
+// updatedAt だけが違う更新は食い違いに数えない (コメントの追加などで REST の updated_at は webhook 無しでも進む)。
+const sameIgnoringUpdatedAt = (a: unknown, b: unknown): boolean => {
+  const strip = (v: unknown) => (v && typeof v === "object" ? { ...(v as object), updatedAt: undefined } : v);
+  return JSON.stringify(strip(a)) === JSON.stringify(strip(b));
+};
+
+// REST を適用した結果、DO の内容が実際に変わった entity の数。
+function countChanged(prev: PmState, next: PmState): number {
+  let n = 0;
+  for (const b of COUNTED_BUCKETS) {
+    const p = prev[b] as Record<string, unknown>;
+    const q = next[b] as Record<string, unknown>;
+    if (p === q) continue;
+    for (const k of Object.keys(q)) if (p[k] !== q[k] && !sameIgnoringUpdatedAt(p[k], q[k])) n++;
+  }
+  return n;
 }
 
 export class Engine {
@@ -136,11 +168,23 @@ export class Engine {
   private saveMeta(): void {
     this.d.store.put("meta", "main", this.meta);
   }
+  // 自由文は secret・token・PEM を取り除いてから、status とログに出す。
+  private clean(s: string): string {
+    return redact(s, this.d.secrets?.() ?? []);
+  }
   private pushLog(l: Omit<Log, "at">): void {
-    this.log.push({ at: iso(this.d.now()), ...l });
+    const entry = { at: iso(this.d.now()), ...l, ...(l.note === undefined ? {} : { note: this.clean(l.note) }) };
+    this.log.push(entry);
     if (this.log.length > 60) this.log = this.log.slice(-60);
     this.d.store.put("meta", "log", this.log);
-    console.log(JSON.stringify({ pm: l.kind, n: l.n, art: l.art, note: l.note }));
+    console.log(JSON.stringify({ pm: entry.kind, n: entry.n, art: entry.art, note: entry.note }));
+  }
+  private setError(at: number, what: string): void {
+    this.meta.lastError = { at: iso(at), what: this.clean(what) };
+  }
+  // Gh の全応答から呼ばれる。ヘッダのあった値だけ更新する (保存は次の saveMeta)。
+  recordRate(r: RateInfo): void {
+    this.meta.rest = { ...(this.meta.rest ?? {}), ...r };
   }
   private pmLogins(): string[] {
     const b = this.d.pmBotLogin();
@@ -160,6 +204,7 @@ export class Engine {
       reviewerLogin: this.d.cfg.reviewerLogin,
       repo: this.d.cfg.repo,
     });
+    if (r.status === 202) this.meta.lastWebhookAt = this.d.now();
     if (r.status === 202 && r.reason === "applied" && r.state !== this.s) {
       persistDiff(this.s, r.state, this.d.store);
       this.s = r.state;
@@ -169,12 +214,14 @@ export class Engine {
   }
 
   // ---------------------------------------------------------------- 同期
-  private applyAll(event: (typeof WEBHOOK_EVENTS)[number], payload: unknown): void {
+  // 戻り値は、DO の内容が実際に変わった entity の数 (reconcile の食い違いの計数に使う)。
+  private applyAll(event: (typeof WEBHOOK_EVENTS)[number], payload: unknown): number {
     const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin);
-    if (next !== this.s) {
-      persistDiff(this.s, next, this.d.store);
-      this.s = next;
-    }
+    if (next === this.s) return 0;
+    const changed = countChanged(this.s, next);
+    persistDiff(this.s, next, this.d.store);
+    this.s = next;
+    return changed;
   }
 
   // 一覧の結果を記録する。打ち切りは対象名ごとに meta へ残し (本文・題名は入れない)、同じ一覧を次に読んで打ち切りが無ければ消す。
@@ -244,8 +291,9 @@ export class Engine {
     this.saveMeta();
   }
 
-  private async syncRuns(gh: Gh): Promise<void> {
+  private async syncRuns(gh: Gh): Promise<number> {
     const R = this.d.cfg.repo;
+    let diff = 0;
     const seen = new Set<string>();
     let truncated = false;
     for (const st of ["requested", "in_progress", "queued", "pending", "waiting"]) {
@@ -253,24 +301,27 @@ export class Engine {
       truncated ||= runs.truncated;
       for (const w of runs.items) {
         seen.add(String(w.id));
-        this.applyAll("workflow_run", { workflow_run: w });
+        diff += this.applyAll("workflow_run", { workflow_run: w });
       }
     }
     // 完了を取りこぼした run (webhook 欠落) は、一覧に無ければ completed とみなす。打ち切ったときは一覧に無いことが証拠にならない。
-    if (truncated) return;
+    if (truncated) return diff;
     for (const [k, v] of Object.entries(this.s.runs)) {
       if (v.status !== "completed" && !seen.has(k)) {
         const next: RunState = { ...v, status: "completed", conclusion: v.conclusion ?? "unknown" };
         this.d.store.put("runs", k, next);
         this.s = { ...this.s, runs: { ...this.s.runs, [k]: next } };
+        diff++;
       }
     }
+    return diff;
   }
 
   // コメントは新しい順に読み、created_at が窓より古いコメントに達したら止める (読む量は窓内の件数で決まる)。
   // 上限ページで窓の端に届かなかったら打ち切りとして記録する (fresh=false)。適用は created_at の最新が残るので順序に依らない。
-  private async syncComments(gh: Gh, sinceMs: number): Promise<void> {
+  private async syncComments(gh: Gh, sinceMs: number): Promise<number> {
     const R = this.d.cfg.repo;
+    let diff = 0;
     // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
     const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
     const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, body: mine.has(c.user?.login) ? c.body : "" });
@@ -286,8 +337,9 @@ export class Engine {
     for (const c of cs.items) {
       const n = Number(String(c.issue_url).split("/").pop());
       if (!Number.isInteger(n)) continue;
-      this.applyAll("issue_comment", { action: "created", comment: c, issue: { number: n } });
+      diff += this.applyAll("issue_comment", { action: "created", comment: c, issue: { number: n } });
     }
+    return diff;
   }
 
   // blocked_by の一覧が不明な issue (件数 > 0 だが一覧が無い) を REST で取る。1 回の上限 max 件。
@@ -362,18 +414,20 @@ export class Engine {
   async reconcile(gh: Gh): Promise<void> {
     const R = this.d.cfg.repo;
     const since = (this.meta.reconcileAt ?? this.d.now() - 3_600_000) - 120_000;
-    await this.syncRuns(gh);
+    // 食い違い = REST を適用して DO の内容が変わった entity (webhook の欠落・遅延の指標。個票は残さず件数だけ)。
+    let diff = await this.syncRuns(gh);
     const issues = this.note("issues_updated", await gh.list<any>(`/repos/${R}/issues?state=all&since=${encodeURIComponent(iso(since))}&sort=updated`, 5));
-    for (const i of issues.items) if (!i.pull_request) this.applyAll("issues", { issue: i });
+    for (const i of issues.items) if (!i.pull_request) diff += this.applyAll("issues", { issue: i });
     const prs = this.note(
       "pulls_updated",
       await gh.list<any>(`/repos/${R}/pulls?state=all&sort=updated&direction=desc`, 5, undefined, (p) => Date.parse(p.updated_at) < since),
     );
-    for (const p of prs.items) this.applyAll("pull_request", { pull_request: p });
-    await this.syncComments(gh, since);
+    for (const p of prs.items) diff += this.applyAll("pull_request", { pull_request: p });
+    diff += await this.syncComments(gh, since);
     await this.syncBlockers(gh, 30);
     await this.syncSignals(gh);
     this.prune();
+    this.meta.reconcileDiff = { last: diff, total: (this.meta.reconcileDiff?.total ?? 0) + diff };
     this.meta.reconcileAt = this.d.now();
     this.meta.counters = { ...(this.meta.counters ?? this.zero()), reconciles: (this.meta.counters?.reconciles ?? 0) + 1 };
     this.saveMeta();
@@ -517,7 +571,8 @@ export class Engine {
     const prev = this.phase();
     const phase: PhaseState = { review_only: nextReviewOnly(prev.review_only, pr.openExclStuck), open_prs: pr.openExclStuck };
     phase.since = phase.review_only !== prev.review_only || !prev.since ? iso(nowMs) : prev.since;
-    const stop = pr.stuck > this.d.cfg.stuckHigh ? "stuck-ceiling" : undefined;
+    // launch を止める理由。stuck-ceiling (既存) を先に見る。rate-guard は REST の残量が 1,500 未満の間 (reconcile の読み取りは続く)。
+    const stop = pr.stuck > this.d.cfg.stuckHigh ? "stuck-ceiling" : restGuardOn(this.meta.rest?.remaining) ? RATE_GUARD : undefined;
     const gated = phase.review_only || !!stop;
     for (const n of gated ? [] : sel.picks) {
       const i = issueOf.get(n);
@@ -563,6 +618,12 @@ export class Engine {
       return plan;
     }
     this.d.store.put("meta", "phase", plan.phase);
+    // 遷移したときだけ記録する (毎 tick 書かない)。
+    const guarded = restGuardOn(this.meta.rest?.remaining);
+    if (guarded !== !!this.meta.rateGuardOn) {
+      this.meta.rateGuardOn = guarded;
+      this.pushLog({ kind: "skip", note: `${RATE_GUARD} ${guarded ? "on" : "off"} remaining=${this.meta.rest?.remaining ?? "?"}` });
+    }
     const live = this.d.cfg.liveLaunch && gh;
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     for (const p of picks) {
@@ -581,6 +642,8 @@ export class Engine {
         this.pushLog({ kind: "would-launch", n: p.n, art: p.art, note: p.relaunch ? "relaunch" : undefined });
         continue;
       }
+      // 投稿の応答で残量が下がるので、1 件ごとに見直す。
+      if (restGuardOn(this.meta.rest?.remaining)) break;
       try {
         await gh!.comment(p.n, body);
       } catch (e) {
@@ -627,7 +690,7 @@ export class Engine {
       this.pushLog({ kind: "error", note: e instanceof GhError ? e.message : "dispatch failed" });
       return "skipped";
     }
-    this.meta.watchdogAt = this.d.now();
+    this.meta.watchdogAt = this.meta.lastDispatchAt = this.d.now();
     this.meta.counters.dispatched++;
     this.saveMeta();
     this.pushLog({ kind: "dispatch", note: "oc-watchdog" });
@@ -710,7 +773,7 @@ export class Engine {
     try {
       gh = await this.d.gh();
     } catch (e) {
-      this.meta.lastError = { at: iso(now), what: e instanceof GhError ? e.message : "auth failed" };
+      this.setError(now, e instanceof GhError ? e.message : "auth failed");
     }
     if (!gh) {
       this.saveMeta();
@@ -724,8 +787,8 @@ export class Engine {
       await this.pmDispatch(gh);
       this.meta.lastError = undefined;
     } catch (e) {
-      this.meta.lastError = { at: iso(now), what: e instanceof GhError ? e.message : "tick failed" };
-      this.pushLog({ kind: "error", note: this.meta.lastError.what });
+      this.setError(now, e instanceof GhError ? e.message : "tick failed");
+      this.pushLog({ kind: "error", note: this.meta.lastError?.what });
     }
     this.saveMeta();
     return { ready: true };
@@ -745,6 +808,16 @@ export class Engine {
     const detected = this.detectPmTargets();
     const pmDetected: Record<string, number> = Object.fromEntries(DETECTED_KINDS.map((k) => [k, 0]));
     for (const d of detected) pmDetected[d.kind]++;
+    // 稼働中の run を状態別に数える (event は問わない。TARGET に数える active_runs とは別の集計)。
+    const running = { in_progress: 0, queued: 0, pending: 0 };
+    for (const r of Object.values(this.s.runs)) {
+      if (r.status === "in_progress") running.in_progress++;
+      else if (r.status === "queued") running.queued++;
+      else if (r.status === "pending") running.pending++;
+    }
+    const counters = this.meta.counters ?? this.zero();
+    const rest = this.meta.rest;
+    const lastError = this.meta.lastError ? { ...this.meta.lastError, what: this.clean(this.meta.lastError.what) } : null;
     return {
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
@@ -776,14 +849,23 @@ export class Engine {
       last_watchdog: this.meta.watchdogAt ? iso(this.meta.watchdogAt) : null,
       last_tick: this.meta.tickAt ? iso(this.meta.tickAt) : null,
       fresh: this.fresh(),
+      counters,
+      last_webhook_at: this.meta.lastWebhookAt ? iso(this.meta.lastWebhookAt) : null,
+      last_dispatch_at: this.meta.lastDispatchAt ? iso(this.meta.lastDispatchAt) : null,
+      running,
+      // dry-run のために投稿しなかった GitHub への書き込み (/oc 投稿 + repository_dispatch) の累計。
+      dry_run_skipped_posts: counters.wouldLaunch + counters.wouldDispatch,
+      reconcile_diff: this.meta.reconcileDiff ?? { last: 0, total: 0 },
+      rest_remaining: rest?.remaining ?? null,
+      rest_used: rest?.used ?? null,
+      rest_reset_at: rest?.reset !== undefined ? iso(rest.reset * 1000) : null,
       sync_truncated: Object.entries(this.meta.syncTruncated ?? {}).map(([name, v]) => ({ name, pages: v.pages, at: v.at })),
       last_full_sync_rest_calls: this.meta.fullSyncCalls ?? null,
       last_full_sync_comment_rest_calls: this.meta.fullSyncCommentCalls ?? null,
       comment_window_h: this.d.cfg.commentWindowH,
       comment_max_pages: this.d.cfg.commentMaxPages,
-      counters: this.meta.counters ?? this.zero(),
-      last_error: this.meta.lastError ?? null,
-      log: this.log.slice(-20),
+      last_error: lastError,
+      log: this.log.slice(-20).map((l) => (l.note === undefined ? l : { ...l, note: this.clean(l.note) })),
       ...extra,
     };
   }
