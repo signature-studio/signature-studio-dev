@@ -219,6 +219,8 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 
 **結論**: 閉包リンクは現 main で再びリンクできる (修正前は exit 1)。ただし現 IR の boot は unit 17 で `rc=1` により停止し、FL の自然経路で LoadLibrary が 1 回も呼ばれない。`winstubs_loadlib_miss` の lift 実機取得 (受入) は未達。`LOADLIB_MISS ["WebView2Loader.dll"]` は引き続き probe 由来。
 
+**mismatch 1 の根因 (#2839)**: `midiOutShortMsg` の HMIDIOUT が IR で `i64` になるのは、RetDec 署名 DB の `unknown` 型による (x64 の 8 バイト幅に忠実)。修正方針は正規化 pass の恒久化 (b)。測定値と突合は `REPORT_APPENDIX_2839.md`。
+
 **差分確認 (測定 commit から HEAD まで・コード範囲)**: `git diff e7491b4f HEAD -- tools/m11/shimx_link/build.sh tools/m11/shimx_link/*.c tools/m11/shimx_link/*.py` の出力は 0 行 (本節は REPORT のみ変更)。
 
 ## 11. 旧 main の link 失敗の修正と `--midi` の winstubs 結線 (#179 SHX-T6)
