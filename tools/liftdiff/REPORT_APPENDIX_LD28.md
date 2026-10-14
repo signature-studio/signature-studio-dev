@@ -1,6 +1,8 @@
 # 付録: liftdiff LD-28 (#1035) — 型 C・D の原因候補・0x417b70 の idiv/udiv 仮説
 
 > **正本**: `tools/liftdiff/REPORT.md` (結論・§7 未解決)。本書は LD-28 (#1035) の節を `REPORT_APPENDIX.md` §9 から分割移動したもの (250 行上限のため)。`REPORT_APPENDIX.md` §9 には参照 1 行のみ残す。
+>
+> **追跡状態 (2026-10-14 時点)**: #1035 は CLOSED。本書の「#1035 に残す」「#1035 で追跡」は、PM が reopen するか後継 issue を立てるまで未割当の残件を指す。受入条件 3 (`trace_diverge_418be0.py` の除外 1 件の説明) は未達で、チェックしていない。
 
 #### 型 C・D の原因候補 (LD-28 / #1035)
 集計 = `tests/trace_diverge_cd.py` → `results/m11_unreachable_cd.md` (件数の正本)。型 A・B (#864 の D15 候補・leaf) を除いた型 C・D の食い違いを対象にする。
