@@ -10,7 +10,7 @@
 [m11build] cc m11_ov.c
 [m11build] OK: work/m11_boot.cjs(+.wasm)  wasm-ld signature mismatch: 0, undefined symbol: 0
 
-real	0m18.201s
-user	0m16.339s
-sys	0m1.713s
+real	0m18.884s
+user	0m16.974s
+sys	0m1.861s
 [sha256 after m11_build] f199b896d756478fffa245204a91d9d76da87eacbdbb0288d0690334da40be22  work/boot_final.ll

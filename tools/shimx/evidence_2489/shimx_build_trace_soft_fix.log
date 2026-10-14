@@ -38,8 +38,8 @@
 [sxlink] cc boot_trace.ll
 [sxlink] cc trace_wrap.c
 [sxlink] cc trace_rt.c
-[sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> /home/runner/work/signature-studio-dev/ws-2489/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs
+[sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> <repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs
 
-real	0m10.437s
-user	0m8.771s
-sys	0m1.584s
+real	0m10.595s
+user	0m9.035s
+sys	0m1.631s

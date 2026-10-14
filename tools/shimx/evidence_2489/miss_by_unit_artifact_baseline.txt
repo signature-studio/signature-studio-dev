@@ -1,6 +1,6 @@
 MISS_AFTER|unit 1 total=0 uniq=
 MISS_FINAL| total=0 uniq=
 
-real	0m0.291s
-user	0m0.308s
-sys	0m0.091s
+real	0m0.356s
+user	0m0.298s
+sys	0m0.153s

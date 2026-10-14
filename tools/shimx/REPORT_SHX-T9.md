@@ -191,7 +191,7 @@
 
 #### 3.3.5 現行 m11_ov.c で baseline を再生成して unit 23 を比較 (SHX-T9h #2489)
 
-- 結論: 素材 `work-m11` の `m11_boot.cjs`・`obj/ov.o` は現行 main と一致しない旧 snapshot だった。現行 IR から再生成した baseline は unit 23 で shimx 版と同じ経路 (`ret=2`・`0xf960` 進入) を通る。測定値・表・再現手順は `REPORT_SHX-T9h.md` へ分割移動 (測定 commit `3f7b7a63`)。
+- 結論: 素材 `work-m11` の `m11_boot.cjs`・`obj/ov.o` は現行 main と一致しない旧 snapshot だった。現行 IR から再生成した baseline は unit 23 で shimx 版と同じ経路 (`ret=2`・`0xf960` 進入) を通る。測定値・表・再現手順は `REPORT_SHX-T9h.md` へ分割移動 (測定 commit `4cca6c28`)。
 
 ### 3.4 検証の commit と差分 (WORKFLOW §6)
 

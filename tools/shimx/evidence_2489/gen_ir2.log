@@ -25,7 +25,7 @@
 [fix_ld108] function_41a670: 41a69c ブロックの head/rax store を [arg1+0] の load に置換
 [gen_ir2] OK: work/boot_final.ll (490735 行)
 
-real	0m33.905s
-user	0m32.337s
-sys	0m1.210s
+real	0m34.288s
+user	0m32.668s
+sys	0m1.225s
 [sha256 after gen_ir2] 7c653b0f217d28427d63c375f26303b1a7e2ea55a4f25f48248b609d8ca4244e  work/boot_final.ll
