@@ -106,7 +106,7 @@ def writes(mnem, ops):
         return ["rax", "rbx", "rcx", "rdx"]
     if mnem == "cmpxchg":
         return ["rax"] + ([canon(ops[0])] if ops and canon(ops[0]) else [])
-    if mnem.startswith("stos") or mnem.startswith("movs"):
+    if mnem == "movs" or mnem.startswith("stos"):
         return ["rdi", "rsi", "rcx"]
     if mnem == "syscall":
         return ["rax", "rcx", "r11"]
