@@ -4,7 +4,8 @@
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/playlist_core_facts.py
 
 出力: (1) 操作系コアの呼び出し先と status 書込み (2) inc 系 helper の更新式 (3) getLive 系の状態表
-(4) 書式文字列 (5) mode 分岐の呼び出し先。値は逆アセンブルの事実のみ。意味づけは REPORT_PY91.md を見ること。
+(4) 書式文字列 (5) mode 分岐の呼び出し先 (6) 写像表の規則の検算とネガティブコントロール。
+値は逆アセンブルの事実のみ。意味づけは REPORT_PY91.md を見ること。
 """
 import os
 import re
@@ -103,6 +104,26 @@ def main():
         print(f"{name:18s} {va:#x} direct_calls={calls}")
     x = next(i for i in body(0xD5764A, 2) if i.mnemonic == "mov")
     print(f"-4 sink 0xd5764a: {x.op_str}")
+
+    print("-- (6) 写像表の規則 (節は優先順。m=0..7 の表と照合)・不一致件数・1 節を外したときの不一致件数")
+    rules = {
+        "tbl1 0x1545394": (0x1545394, [(lambda m: m & 4, 2), (lambda m: m & 2, 3), (lambda m: m & 1, 1)]),
+        "tbl2 0x15453b4": (0x15453B4, [(lambda m: m & 6, 2), (lambda m: m & 1, 1)]),
+        "tbl3 0x15453d4": (0x15453D4, [(lambda m: (m & 3) == 3, 1), (lambda m: (m & 5) == 5, 3), (lambda m: m & 1, 2)]),
+    }
+    for name, (t, clauses) in rules.items():
+        table = [dword_at(t, i) for i in range(8)]
+        mis = sum(predict(clauses, m) != table[m] for m in range(8))
+        drops = [sum(predict(clauses[:i] + clauses[i + 1:], m) != table[m] for m in range(8))
+                 for i in range(len(clauses))]
+        print(f"{name} mismatch={mis} drop_one_clause={drops}")
+
+
+def predict(clauses, m):
+    for pred, val in clauses:
+        if pred(m):
+            return val
+    return 0
 
 
 if __name__ == "__main__":
