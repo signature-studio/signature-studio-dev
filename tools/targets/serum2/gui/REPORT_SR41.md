@@ -27,7 +27,7 @@ tar --zstd -xf "$ARTIFACTS_DIR/plugins-serum2.tar.zst" --wildcards '*Install_Xfe
 cp -f 'exe_extract/$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3' Serum2_win64.vst3
 uv venv -q venv --python 3.14 && uv pip install -q -p venv/bin/python pefile capstone zstandard
 venv/bin/python $P/serum_controller_recv.py Serum2_win64.vst3 0x180a2bf58 6 7 17
-venv/bin/python $P/receiver_origin.py Serum2_win64.vst3 --top 12
+venv/bin/python $P/receiver_origin.py Serum2_win64.vst3 --top 100
 venv/bin/python $P/splice_chain.py Serum2_win64.vst3 0x1800c2b50 0x1800c6090 0x1800c9680 0x180498090
 venv/bin/python $P/splice_demo_bit.py Serum2_win64.vst3 0x1800c2b50 0x1800c6090 0x1800c9680
 ```
@@ -36,7 +36,7 @@ venv/bin/python $P/splice_demo_bit.py Serum2_win64.vst3 0x1800c2b50 0x1800c6090 
 - 実測 (n=1, 逐次, runner 上。`uptime` の load average は実行前後の 1 分値):
   - 展開: `tar --zstd` 1.8 s (real, 1 entry)。`7z x` の実測は省略。
   - `serum_controller_recv.py` (3 slot): real 24.13 s / user 23.01 s, load 1.04 → 0.55 (実行前後の 1 分値は直前 uptime)。
-  - `receiver_origin.py` (`--top 12`): real 25.03 s / user 23.98 s, load 0.58 → 0.73。
+  - `receiver_origin.py` (`--top 100`・全 44 クラス): real 19.23 s / user 18.18 s, load 0.85 → 1.03。同じ入力を `--top 1000` で流した run (real 18.76 s / user 17.70 s, 開始時 load 1.00) も同じ 44 クラス・合計 1052 件を出力した。
   - `splice_chain.py` / `splice_demo_bit.py`: 実行は 1 回のみ。時間は未計測。
 - 検証: `sha256sum` は SR-38 と一致。候補件数 1052 は SR-38 と一致。`serum_controller_recv.py` の S=1 / K=1 / U=1050 も SR-38 と一致。
 
@@ -59,6 +59,14 @@ venv/bin/python $P/splice_demo_bit.py Serum2_win64.vst3 0x1800c2b50 0x1800c6090 
 | `arith-add` | 7 |
 | `other-mov` | 5 |
 | `arith-pop` | 5 |
+| `copy(rcx)` 以外の copy (`rdx`・`r13`・`rdi`・`rbx`、各 1) | 4 |
+| `load[rdx+0x0]` | 3 |
+| `load[rax+0x18]` | 2 |
+| `load[rbp+0x0]` | 2 |
+| 単発の `load[...]` (`rsi` 18 種・その他 7 種、各 1 件) | 25 |
+| **合計** | **1052** |
+
+- 表は `--top 100` の出力 (44 クラス) を集約したもの。上の 12 行の合計は 1016、下の 5 行の合計は 36。
 
 - 1 件あたりの逆解析 (base の定義元を辿って `this` まで遡る) は必要で、`load[rcx]`/`load[rbx]` の 772 件で大半を占める。1 run に収まらないため子 issue に移す。
 - 候補 1052 のうち、SR-38 の S/K 分類で確認済みの 2 件は、いずれも受信が子オブジェクトの vtable 呼出 (`[rsi+0x10]` / `[rcx+0x40]`) だった (`REPORT_SR38.md` §2)。
