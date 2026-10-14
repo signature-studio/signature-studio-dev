@@ -144,3 +144,19 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 - 全 942 unit の監視版 (`store_watch_1046.sh`、`timeout 1500`): 上限で打ち切り (rc 124、25 分 21 秒)。`unit 106` で停止。`[aw]` 行は **0 件**。§12 の「unit 106 付近まで `[aw]` が記録された」とは一致しない (計装・素材の差が未切り分け)。
 - 打ち切り後、`work/obj/sw682.o`・`boot.o`・`ov.o` を消して `m11_build.sh` で再 build し、survey を再実行: `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` に戻ることを確認 (計装が残っていない)。`timeout` で殺された場合は `store_watch` の EXIT trap が走らないため、手動で復元が要る。
 - 結論: 書込み元 store は未特定。監視版の全 unit 完走には 25 分超が要り、1 run の上限内では完了しない。次回は unit 範囲を分けて (例: 0–105 / 106–941) 実行するか、`[aw]` に unit 境界を出す計装を入れる。受入 2・3・4 は未達のまま。
+
+## 14. 5 回目の再着手 run: unit 単位の値遷移 probe (HEAD `72260b63` = origin/main、コード変更なし)
+
+- 測定 commit: `72260b63` (コード差分 0。計装は本節の probe のみ・survey 本体は不変)。
+- 差分 0 の証跡 (`git diff --stat 72260b63 HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/trap_triage/survey_units.mjs tools/m11/m11_win.c tools/m11/ldfix/` の出力は空。範囲内のコード差分 0):
+- 本 PR の差分は `git diff --stat 72260b63 HEAD -- tools/m11` で `tools/m11/trap_triage/REPORT_1046.md` (+14) と `tools/m11/trap_triage/probe_1046_watch.mjs` (+32) の 2 ファイルのみ。
+- 再現: `m11_gen_ir2.sh` rc 0 (36.2 s、490,733 行) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0: `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
+- 新規 `trap_triage/probe_1046_watch.mjs`: 各 unit 実行の前後で `0x10a9f910` の 8B を読み、値が変わった unit を出す (読取りのみ、IR 不変)。全 942 unit を **13.1 s** で完走 (§12・§13 の全 store 計装は 900〜1500 秒で打ち切り)。
+- 値の遷移 (抜粋・実測):
+  - `unit 477 exc 0x1_1029e5d8 -> 0x1_2`
+  - `unit 484 exc 0x1_2 -> 0x1_3` (**unit 484 は OOB (`function_903e00` 系)**)
+  - `unit 492 exc 0x1_3 -> 0x0` (unit 492 の OOB 入力 `old=0x100000003` は unit 484 が残した値)
+- 要点: issue #1620 の前提「unit 492 の中で `0x100000003` が書かれる」は**誤り**。値は unit 484 で `0x1_3` になり、unit 492 はそれを読んで OOB する。書込み元は unit 477〜484 の範囲に絞れた。
+- 全 store 計装 (`store_watch_1046.sh`、`SV_ONLY=0..484`、`SV_ERR_LOG` 付き) は 800 秒で打ち切り (rc 124)。`[aw]` は unit 95 までの 265 件のみ。打ち切り後に計装を除去し、基準 build (`ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1`) に戻ることを実測で確認。
+- unit 477〜484 だけを `SV_ONLY` で実行した場合 (store 計装版): `[sw]` 0 件、survey は `oob 2 / ok 6` (44 s)。同範囲の値遷移 probe も `0x0` のまま変化しない。**値 `0x1_2`・`0x1_3` は unit 0〜476 が共有ヒープに残した状態に依存し、単独範囲では再現しない**。
+- 結論: 書込み元 store は未特定。0〜484 を通す全件計装は前回 800 秒で打ち切り。#1620 の残りは「0〜484 を通した計装を、時間内に完走させる手段 (unit 境界を出す計装・実行の分割と状態の受け渡し) を作ること」。
