@@ -147,3 +147,15 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 判定 (受入条件): 1 (`0x41bf30` 呼出し後の `[0x86b188]` の確定) **達成** (`0x41bf30` のまま、書換えなし)。2 (レジスタ経由の書込みの実行時トレース) **部分達成** (T1 は関数単位で書込み 0 件。プログラム全体の実行は未実施)。3 (`[rbx]` → `0x8c3ca8` の確定) **未達** (`0x4113f2` で `0x41bf30` が入るが、`0x41196b` が後で 0 を書く)。4 (REPORT §9 への記録) **達成** (本節と §9 の注記)。waiver は変更しない。
 - 静的側の照合 (issue 検証方法): `python3 tools/plugins/f2/slot_write_scan.py <block19148_PE.bin> 0x86b180 0x86b190` = `relocs overlapping: 1`・`direct accesses (rip/abs disp), excluding lea: 0` (wall 24.29 秒、load 0.12 → 0.42)。実行可能セクションは `.text` のみ。
 - 再現: `python3 tools/plugins/f2/unicorn_trace.py <block19148_PE.bin> 0x41bf30 -q 0x86b188 -q 0x8c3ca8 -w 0x86b188:0x86b190 -m 100000` と `python3 tools/plugins/f2/unicorn_trace.py <block19148_PE.bin> 0x411330 -r rcx=0x40000000 -r rdx=0x40000100 -r r8=0x86b128 -r r9=0x86b188 -a 0 -a 0x40000200 -a 1 -a 0 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 200000`。
+
+## 11. PLG-F3-24 (#2272): CreatePlugInstance (0x83efb0) の実引数による到達 (部分、測定 commit 114843e2)
+
+- 道具の追加 (114843e2): `unicorn_trace.py` に `-d addr=val` (実行前の qword 書込み。ホスト構造体の合成用) と `-t hex` (番地に入るたびに rcx/rdx/r8/r9 を出す) を追加。既存の `-r`/`-w`/`-q` の挙動は不変。
+- 入力: `block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block19148_PE.bin`、`TMPDIR=$RUNNER_TEMP` 下に展開)。fl-win64 には実行時のメモリダンプが無く、host の実データは PE から得られない。
+- 静的確認: `0x83efb0` は `call 0x777290` (r8=0x9876、r9=`0x8bbc04`) の結果が真なら `0x83cb50` → `0x8402b0` の経路。`0x777290` は第 1 引数 `[rcx]` を vtable として `call qword ptr [rbx]` (0x7772be) を行う。Issue の `UC_ERR_READ_UNMAPPED` (rip=0x7772be) はこの `[rcx]` が未マップだったため。
+- 実測 (負荷 load 1 分 0.13、逐次。各実行 wall 数秒):
+  - 試行 1: rcx=`0x40000000` (中身 0)、`[rcx]` は未マップ → `0x7772be` で `UC_ERR_READ_UNMAPPED` (Issue と同じ)。
+  - 試行 2: `[rcx]`=vtable `0x40000200`、`vtable[0]`=ret stub `0x100ffff0`。`0x777290` は通過するが `0x83cad7` (`call qword ptr [rax+0x30]`) で、vtable 項目 `+0x30` が未マップ → `UC_ERR_READ_UNMAPPED`。
+  - 試行 3: 32 項目の vtable を作り、各項目を「`rax=U` を返すコード」に向けた。`0x83efb0` → `0x777290` → `0x83cb50` → `0x83ca90`・`0x83cca0` (trace で rcx/rdx 確認) → `0x407a20` まで進むが、`0x407a5e` (`and rcx, [rax-8]`) で `UC_ERR_READ_UNMAPPED` (rax=0)。このとき `0x407a20` の引数は rcx=0x48・rdx=0x9 (ヒープ風の内部構造の一部)。`0x411bb8`・`0x411940` には届かず、`0x8c3ca8` の書込みは 0 件。
+- 判定 (受入条件): 1 (実引数で `0x411a80` に届く) **未達**。`[rcx]` の vtable と、その先の host 構造体 (`0x407a20` 系のヒープ/リンク構造) を PE 内の静的情報から合成する必要がある。2 (`0x411bb8` の `[0x8c3c80]`・`[[rcx]+0x28]` の確定) **未達**。3 (`0x83efb0` 起点の `-w 0x8c3ca8:0x8c3cb0`) **未達** (受入 1 が前提)。REPORT の結論 (§9・§10) は変更しない。waiver は変更しない。
+- 残件 (子 issue で追跡): host 構造体の合成を `0x407a20` 系まで行い、`0x411a80` に届かせる。届いた後に `0x411bb8`・`0x411940` の trace と `0x8c3ca8` の最終値を確定する。
