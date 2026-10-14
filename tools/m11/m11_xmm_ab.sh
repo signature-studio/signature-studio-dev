@@ -2,6 +2,7 @@
 # #1479 (M11-2): xmm 引数の callee 署名復元 (fix_xmm_args.py, M11_XMM_ARGS=1, #954) の unit 別 A/B.
 # 同一 IR・同一 PE で既定 (M11_XMM_ARGS=0) と opt-in (=1) の survey を取り、unit 別 (942 本) に ok→非 ok の退行を判定する。
 # 判定: ok 喪失 (ok→非 ok) が 1 件以上、または unit 838/882/885 が ok でなければ終了 1。negative control で判定器自体を検査する。
+# 両 arm の boot_final3.ll が同一 (opt-in が IR を変えていない) なら A/B は空振りとして終了 2。
 # 前提: work/boot_final.ll と work/ir_conditions.json (m11_build.sh と同じ)、FL_WIN64_DIR、emsdk ([EMSDK]・docs/REFERENCES.md)、node。出力は work/xmm_ab/ (gitignore)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -10,8 +11,15 @@ OUT=work/xmm_ab
 mkdir -p "$OUT"
 for x in 0 1; do
   M11_XMM_ARGS=$x bash m11_build.sh > "$OUT/build_$x.log" 2>&1
+  sha256sum work/boot_final3.ll > "$OUT/ir_sha256_$x.txt"
   M11_SURVEY_UNITS="$OUT/survey_$x.json" node m11_survey.mjs > "$OUT/survey_$x.out" 2>&1
+  sha256sum "$OUT/survey_$x.json" > "$OUT/survey_sha256_$x.txt"
 done
+cat "$OUT"/ir_sha256_0.txt "$OUT"/ir_sha256_1.txt "$OUT"/survey_sha256_0.txt "$OUT"/survey_sha256_1.txt
+if cmp -s "$OUT/ir_sha256_0.txt" "$OUT/ir_sha256_1.txt"; then
+  echo "[ab] IR 不変: 両 arm の boot_final3.ll が同一 (opt-in が IR を変えていない)。A/B は空振り" >&2
+  exit 2
+fi
 if [ -f work/xmm_args_report.json ]; then
   python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); print("[xmm] fixed=%d skipped=%d callsite_zero_args=%d" % (len(r["fixed"]), len(r["skipped"]), r["callsite_zero_args"]))' work/xmm_args_report.json
 fi
