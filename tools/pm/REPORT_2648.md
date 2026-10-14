@@ -5,7 +5,7 @@
 
 ## 1. 測定の条件
 
-- 測定 commit: `d35279ab` (origin/main)。Ruleset は API の読み取りだけで、変更していない。
+- 測定 commit: `7f6ab0d0` (origin/main を取り込んだ commit)。Ruleset は API の読み取りだけで、変更していない。
 - 取得: 2026-10-14 16:50Z (UTC)。設定と件数は同じ作業の中で取得。
 
 ## 2. 設定 (API・読み取りのみ)
@@ -44,5 +44,5 @@ jq '[.[] | select(.mergedBy.login=="app/opencode-for-signature-studio") | select
 
 ## 6. 差分・未解決
 
-- コード差分: `git diff d35279ab HEAD -- .github/scripts .github/workflows` の出力は 0 行 (本節を commit した後の HEAD でも同じ。文書のみの変更)。
+- コード差分: `git diff 7f6ab0d0 HEAD -- .github/scripts .github/workflows` の出力は 0 行 (本節を commit した後の HEAD でも同じ。文書のみの変更)。
 - 未解決 (PM 判断。追跡は #2648 のコメント): bypass の設定、reviewer token 失敗時の挙動、`gh pr merge --auto` の挙動。
