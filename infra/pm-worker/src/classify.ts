@@ -3,6 +3,7 @@
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
 import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
 import type { LaunchState } from "./launchobs.ts";
+import { parentOf } from "./refs.ts";
 import { DIGEST_ROLLING_RE } from "./pm.ts";
 
 export interface SnapIssue {
@@ -97,12 +98,8 @@ function graph(d: Snapshot, input: ClassifyInput) {
 
   const children = new Map<number, number[]>();
   for (const [n, i] of iss) {
-    const m = /^親\s*[:：]\s*(.+)$/m.exec(i.body);
-    if (!m) continue;
-    const first = /#(\d+)/.exec(m[1]);
-    if (!first) continue;
-    const pn = Number(first[1]);
-    if (nums.has(pn) && pn !== n) {
+    const pn = parentOf(i.body);
+    if (pn !== null && nums.has(pn) && pn !== n) {
       const c = children.get(pn) ?? [];
       c.push(n);
       children.set(pn, c);

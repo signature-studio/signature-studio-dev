@@ -130,6 +130,7 @@
 | `tools/icall/REPORT_APPENDIX_2262.md` | ~70 | icall #2262 (ICALL-69): site `0x1810553e6` の target `0xb77e88c8000` の由来 (= `ror(cookie,50)` の下位 44 bit。lifted IR が cookie を `load i32` で読むことが原因)。`fa_sweep.sh 8 60` の再測定 (131 関数 artifact・bit 一致 47)。表への包含判定と cookie 幅の修復は子 issue へ移管 |
 | `tools/icall/REPORT_APPENDIX_2394.md` | ~120 | icall #2394 (ICALL-75): `function_181057b38` の値 `0x400000004` は元の機械語に無い。真因は RetDec が frame 上の 2 store を IR から脱落させること (段の特定・回復実験・census・D24 行案は付録)。再現は `tools/icall/frame_slot_2394.sh` |
 | `tools/icall/REPORT_APPENDIX_2427.md` | ~120 | icall #2427 (ICALL-77): 脱落 frame slot store を IR に戻す pass `frame_slot_restore.py` (機械語の census 定義で検出し、値を lea から解決して alloca を 16B に結合) と、`fa_route_build.sh` の `FA_FRAME_SLOT=1` 組込み (既定 OFF)。181057b38 の 8 入力 TRAP 8→0・BLK+0 emsc 8→0、fa_sweep は同関数の wasm_err 8→0 の 1 件のみ変化。残件は ICALL-78 (#2508) |
+| `tools/icall/REPORT_APPENDIX_2508.md` | ~150 | icall #2508 (ICALL-78): 0x181057b38 の不一致は harness 由来 (xmm0 の出力スロット BLK+0x88 未初期化)。`fa_cmp.py` で修正。sweep の数値と残件は付録 §3.4・§6 が正本。0x180da6e60 の候補は部分分類。受入 3 (plugins-freshair)・受入 4 (merge 規則の他関数での検証) は未実施 |
 | `tools/icall/REPORT_APPENDIX_2565.md` | ~110 | icall #2565 (PLG-P0b-20): BLK (0x8A1000) を再配置範囲の外へ。BLK の VA は据え置き、`icall_rewrite.py` の `place()` が関数・stub を BLK 域 `[blk, blk+0x280)` の後ろへ送る。成果物の交差 1 件 → 修正後 0 件・PE の BLK 域 0 埋め。検算は `check_blk_domain.py`、F.ranges は `mk_franges.py` |
 | `tools/icall/REPORT_APPENDIX_2310.md` | ~180 | icall #2310 (ICALL-72): BLK+0 (0x36319008) 書込み store の wasm オフセット対応の付録。route/lift 分類は §6 で完了 (受入条件 2)。脱落 store の修復は #2427 → #2514 (merge 済み)、残件は #2508。`fa_sweep.sh 8 60` の実測 (bit 一致 46 / 値の不一致 10) は 1998 §4 の 47 / 9 が正本で、±1 揺れは #2302 で追跡 |
 | `tools/icall/REPORT_APPENDIX_2079.md` | ~62 | icall #2079 (ICALL-56): closure 外 indirect target `0x1810806a0` の扱い (closure root に追加・152 関数)。`fa_sweep.sh` の実測と、`0x1810553d0` の値の不一致が未解消であること (#2120 で追跡) |
@@ -266,6 +267,7 @@
 | `tools/shimx/REPORT_SHX-T9h.md` | ~49 | SHX-T9h (#2489): 現行 `m11_ov.c` から baseline を再生成して unit 23 を shimx 版と比較。測定値の正本。REPORT_SHX-T9.md の旧 §3.3.5 から分割移動 (250 行上限のため) |
 | `tools/shimx/REPORT_SHX-T9i.md` | ~45 | SHX-T9i (#2491): unit 23 の GetModuleHandleW/GetProcAddress の呼出し元 site と戻り値の実測 (§3.3.5)・survey 942 unit の回帰確認 (§3.3.6)。REPORT_SHX-T9.md §3.3.5・§3.3.6 から分割 (250 行上限) |
 | `tools/shimx/REPORT_SHX-T9j.md` | ~80 | SHX-T9j (#2533): unit 23 の GetLastError を再生成 baseline と shimx `--trace --soft --fix` の両版で実測 (REPORT_SHX-T9.md §3.3.4 の追補) |
+| `tools/shimx/REPORT_SHX-T9k.md` | ~76 | SHX-T9k (#2593): unit 22 の GetLastError=126 の発生元 (GetProcAddress の 1 回目) と、IR 行番号 ↔ wasm バイトオフセットの対応 (REPORT_SHX-T9j.md §2.4 の後続) |
 | `tools/shimx/BACKLOG.md` | ~540 | shimx の未解決一覧 |
 | `tools/shimx/pathreg/REPORT.md` | ~200 | パス写影/レジストリ永続化の shimx 側インタフェース接続 |
 | `tools/shimx/pathreg/REPORT_CAB-271.md` | ~230 | CAB-271: default mount table の遅延ロード |
@@ -451,6 +453,7 @@
 | `tools/pm/REPORT.md` | ~222 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380 (全文は付録)・`idle_report.sh` の検証 #2354 (全文は付録)・PM Worker の live 切替前の突き合わせ #2443・R2 素材投入の頻度 #2434・`pm_wake.sh` の判定テストと live 確認 #2347・PM Worker の同時実行の上限の推定 #2381)。RETRO・DIRECTIVES の数値の正本 |
 | `tools/pm/REPORT_APPENDIX_2380.md` | ~32 | tools/pm REPORT §10 (PM Worker のコメント同期 #2380) の全文。250 行上限のため REPORT.md から分割移動 (#2434) |
 | `tools/pm/REPORT_2416.md` | ~140 | PM Worker の build 表示 (#2416、PR #2477 の差し戻し round 1・5): `npm test`・`npm run test:unit`・`npm run test:workers` の n=3 実測 (測定 commit と件数は本付録が正本。wall と vitest Duration を分けて記録)、wrangler `--define` / `--var` の dry-run 結果 (README『再デプロイ』手順 4 の根拠)。`REPORT.md` は無変更 |
+| `tools/pm/REPORT_2336.md` | ~98 | PM Worker の規則 A (merged PR を持つ親 issue の自動 close・#2336) の実データ dry-run の実測 (Worker の判定と別実装の再計算の照合・候補の内訳・ネガコン・判定条件を外したときの FAIL)。運用の正本は `infra/pm-worker/README.md` |
 | `tools/pm/REPORT_APPENDIX_2354.md` | ~62 | tools/pm REPORT §11 (`idle_report.sh` の検証 #2354) の全文。250 行上限のため REPORT.md から分割移動 (#2381 の PR のレビュー指摘への対応)。fake gh の判定 41 件・実データの検算・未解決 (soak の合格ライン) |
 | `tools/pm/REPORT_APPENDIX_2337.md` | ~60 | tools/pm REPORT §16 の全文 (oc-pm の refs_orphan 検出 #2337・PR #2478: 測定・ネガコン・Refs のみ判定の差)。250 行上限のため REPORT.md から分割移動。測定値の正本は本付録 |
 | `tools/targets/freshair/lift2/REPORT_FA15.md` | ~60 | lift2 FA-15 (#1105): ctrl closure の ymm (AVX2 256bit) lowering (`vpcmpeqw`/`vpxor`/`vpmovmskb` ymm・`vzeroupper`)。`build_ctrl.sh` の `failed` 1→0、`lift2_e2e.sh` ALL PASS の実測 |

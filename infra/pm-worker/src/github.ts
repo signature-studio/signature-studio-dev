@@ -137,6 +137,11 @@ export class Gh {
     return this.req("POST", `/repos/${this.repo}/issues/${n}/comments`, { body });
   }
 
+  // 規則 A の自動 close (autoclose.ts)。完了として閉じる。PM App の issues:write を使う。
+  closeIssue(n: number) {
+    return this.req("PATCH", `/repos/${this.repo}/issues/${n}`, { state: "closed", state_reason: "completed" });
+  }
+
   // Worker が送る repository_dispatch は 2 種類だけ: oc-watchdog (この dispatch。payload は event_type のみ) と oc-pm (dispatchPm。payload は kind と ref のみ)。
   // oc-fix は PR 番号・理由・素材名の client_payload が要り、検証と送信は Actions の watchdog.sh が行う (Worker は送らない)。
   dispatch(eventType: DispatchType) {
