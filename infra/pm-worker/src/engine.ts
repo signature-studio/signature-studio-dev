@@ -26,6 +26,7 @@ import {
   type HistoryEntry,
   type PmTarget,
 } from "./pm.ts";
+import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, rateHit } from "./ratealert.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
 import type { VmState } from "./vmstate.ts";
@@ -33,6 +34,7 @@ import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type
 import {
   applyEvent,
   EMPTY_STATE,
+  isOpencodeRun,
   KILLED_STOP_AT,
   NEEDS_USER_LABEL,
   reviewSignal,
@@ -166,6 +168,8 @@ interface Meta {
   redeliverAt?: number;
   // 直近の走査で見た status != OK の配送の件数
   redeliverFailed?: number;
+  // 率制限の判定 (#2345) の直近の評価。count / total は窓 (30 分) の件数、streak は条件を満たした評価の連続回数、alert は streak が RATE_STREAK 以上。
+  rateAlert?: { at: number; count: number; total: number; streak: number; alert: boolean };
   counters?: {
     launched: number;
     dispatched: number;
@@ -205,13 +209,14 @@ export interface Log {
     | "resync"
     | "would-redeliver"
     | "redeliver"
+    | "rate-alert"
     | "import";
   n?: number;
   art?: string;
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig", "rateRuns"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -645,6 +650,14 @@ export class Engine {
         this.d.store.del("runs", k);
         const { [k]: _, ...rest } = this.s.runs;
         this.s = { ...this.s, runs: rest };
+      }
+    }
+    // 率制限のマーカーは run と同じ 1 時間で捨てる (判定の窓は 30 分)。
+    for (const [k, v] of Object.entries(this.s.rateRuns)) {
+      if (Date.parse(v.at) < cut) {
+        this.d.store.del("rateRuns", k);
+        const { [k]: _, ...rest } = this.s.rateRuns;
+        this.s = { ...this.s, rateRuns: rest };
       }
     }
     // 閉じた issue / PR の手がかりは使わない。数えた run の id (killRun) だけは残す (reopen の後に古い run の配送が届いても数え直さない)。
@@ -1449,7 +1462,10 @@ export class Engine {
       if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS || stale) await this.fullSync(gh);
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
       // 同期が古い・打ち切り中は run 一覧が不完全なので観測しない (launch と同じ条件)。偽の飽和を作らないため。
-      if (this.fresh()) this.observe(now);
+      if (this.fresh()) {
+        this.observe(now);
+        this.rateAlert();
+      }
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
@@ -1474,6 +1490,28 @@ export class Engine {
   // 次の alarm までの待ち (ms)。dirty (webhook 直後) は 2 秒、それ以外は 60 秒。
   nextDelayMs(): number {
     return this.dirty ? 2000 : 60_000;
+  }
+
+  // 率制限の判定 (#2345・CI-66)。直近 30 分に完了した opencode.yaml の run のうち、cause=rate_limit のマーカーがあるものを数える。
+  // 件数と割合の条件を RATE_STREAK 回連続で満たしたら alert。alert は通知しない (起票は CI-67)。REST は呼ばない。
+  // 評価は tick ごとだが、alarm と cron が重なった分は数えない (RATE_EVAL_GAP_MS 以内は評価しない)。
+  rateAlert(): void {
+    const now = this.d.now();
+    const prev = this.meta.rateAlert;
+    if (prev && now - prev.at < RATE_EVAL_GAP_MS) return;
+    let count = 0;
+    let total = 0;
+    for (const r of Object.values(this.s.runs)) {
+      if (r.status !== "completed" || !isOpencodeRun(r)) continue;
+      const t = Date.parse(r.updatedAt);
+      if (!(t > now - RATE_WINDOW_MS && t <= now)) continue;
+      total++;
+      if (this.s.rateRuns[String(r.id)]) count++;
+    }
+    const streak = rateHit(count, total) ? (prev && now - prev.at <= RATE_EVAL_MAX_GAP_MS ? prev.streak : 0) + 1 : 0;
+    const alert = streak >= RATE_STREAK;
+    if (alert !== (prev?.alert ?? false)) this.pushLog({ kind: "rate-alert", note: alert ? "on" : "off" });
+    this.meta.rateAlert = { at: now, count, total, streak, alert };
   }
 
   // ---------------------------------------------------------------- 観測
@@ -1614,6 +1652,17 @@ export class Engine {
       // dry-run のために投稿しなかった GitHub への書き込み (/oc 投稿 + repository_dispatch) の累計。
       dry_run_skipped_posts: counters.wouldLaunch + counters.wouldDispatch,
       reconcile_diff: this.meta.reconcileDiff ?? { last: 0, total: 0 },
+      // 率制限の判定 (#2345)。alert は 2 回連続で条件を満たしたとき true。rate_limit_30m は直近の評価の窓 (30 分) の件数と割合 (評価が無ければ null)。通知はしない。
+      rate_limit_alert: this.meta.rateAlert?.alert === true,
+      rate_limit_30m: this.meta.rateAlert
+        ? {
+            count: this.meta.rateAlert.count,
+            total: this.meta.rateAlert.total,
+            rate: this.meta.rateAlert.total ? this.meta.rateAlert.count / this.meta.rateAlert.total : null,
+            streak: this.meta.rateAlert.streak,
+            at: iso(this.meta.rateAlert.at),
+          }
+        : null,
       rest_remaining: rest?.remaining ?? null,
       rest_used: rest?.used ?? null,
       rest_reset_at: rest?.reset !== undefined ? iso(rest.reset * 1000) : null,
