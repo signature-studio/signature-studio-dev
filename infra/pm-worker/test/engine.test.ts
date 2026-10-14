@@ -634,3 +634,51 @@ function syncHandlers(o: { issues?: any[]; blockers?: Record<number, any[]>; com
     },
   ];
 }
+
+const postOk = (c: Call) => (/\/issues\/\d+\/comments$/.test(c.url) && c.method === "POST" ? j({ html_url: "x" }, 201) : undefined);
+
+test("launch (prio:low の上限 #2721): critical が launch 可能な間は、未完了の low の run を数えて LOW_CAP までしか low を出さない。実行中の run は止めない", async () => {
+  const ctx = await configuredApp({ live: true, env: { TARGET: "50", BATCH: "25", LOW_CAP: "2" }, handlers: [postOk] });
+  await seed(ctx, 80, { labels: ["prio:low"], title: "[CI-80] low running" });
+  await send(ctx.app, "workflow_run", runPayload(1, "in_progress", { event: "issue_comment", title: "[CI-80] low running" }));
+  await seed(ctx, 81, { labels: ["prio:low"] });
+  await seed(ctx, 82, { labels: ["prio:low"] });
+  await seed(ctx, 83, { labels: ["prio:critical"] });
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  const plan = await ctx.app.engine.launch(gh);
+  assert.deepEqual(plan.picks.map((p) => p.n), [83, 81], "cap 2 - 実行中の low 1 = 1 件。82 は次の tick に回る");
+  assert.deepEqual(plan.low_cap, { cap: 2, running: 1, applied: true });
+  assert.deepEqual(comments(ctx.m.calls).map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["83", "81"]);
+  assert.equal(ctx.m.calls.filter((c) => c.url.endsWith("/cancel")).length, 0, "実行中の run は止めない");
+  // 投稿の後の状態: 83 は launch 済み (recent) になり、applied は偽になる。cap と running は投稿の前と同じ。
+  const s = ctx.app.engine.status() as any;
+  assert.deepEqual(s.active_by_prio, { critical: 0, normal: 0, low: 1 });
+  assert.deepEqual(s.low_cap, { cap: 2, running: 1, applied: false });
+});
+
+test("launch (prio:low の上限 #2721): critical が無ければ上限は効かず、blocked の critical は数えない", async () => {
+  const ctx = await configuredApp({ live: true, env: { TARGET: "50", BATCH: "25", LOW_CAP: "1" }, handlers: [postOk] });
+  await seed(ctx, 80, { labels: ["prio:low"], title: "[CI-80] low running" });
+  await send(ctx.app, "workflow_run", runPayload(1, "in_progress", { event: "issue_comment", title: "[CI-80] low running" }));
+  await seed(ctx, 81, { labels: ["prio:low"] });
+  await seed(ctx, 82, { labels: ["prio:low"] });
+  await seed(ctx, 85, { labels: ["prio:critical"], body: "blockedBy: #86" });
+  await seed(ctx, 86, {});
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  const plan = await ctx.app.engine.launch(gh);
+  assert.equal(plan.low_cap.applied, false, "blocked の critical は launch 可能ではない");
+  assert.deepEqual(plan.picks.map((p) => p.n), [86, 81, 82], "上限が効かないので low は両方出す (86 は 85 の blocker)");
+});
+
+test("launch (prio:low の上限 #2721): 着手済み (started) の critical も上限を効かせる", async () => {
+  const ctx = await configuredApp({ env: { TARGET: "50", BATCH: "25", LOW_CAP: "0" } });
+  await seed(ctx, 84, { labels: ["prio:critical"], title: "[CI-84] critical started" });
+  await send(ctx.app, "workflow_run", runPayload(2, "in_progress", { event: "issue_comment", title: "[CI-84] critical started" }));
+  await seed(ctx, 81, { labels: ["prio:low"] });
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.equal(p.plan.low_cap.applied, true);
+  assert.deepEqual(p.picks.map((x) => x.n), [], "LOW_CAP 0 かつ 84 は started なので、low (81) は出ない");
+});

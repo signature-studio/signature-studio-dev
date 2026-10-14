@@ -7,9 +7,9 @@
 
 入力リストは `tests/extract_414ad0_27.py` で batch jsonl から生成する (`work/m11_414ad0_27/list.txt`、gitignore)。
 `tests/rerun_414ad0_27.sh` で 27 件を `trace_head=200` (`-v`) で単体再走 → `tests/oob_414ad0_27.py` → `results/m11_oob_414ad0_27.md`。
-**25 / 27 件が wasm trace に 0x414ad0 を含み、最上位 frame も全 25 件が function_414ad0** (= 到達)。
-残り 2 件: 0x6525b0 は最上位 frame が function_4133f0 (414ad0 無し)、0x66ea90 は both_fault (native segv・wasm OOB trap)。
-> **#1588 訂正**: 0x66ea90 を「再走で trap せず」としたのは `oob_414ad0_27.py` の `NO_TRAP:` 表示の誤読。#1588 の再走 2 回と batch 記録は、いずれも wasm OOB trap (最上位 `function_414ad0`) を再現した。詳細は `tools/m11/trap_triage/REPORT_1588.md` §2。
+**26 / 27 件が wasm trace に 0x414ad0 を含み、最上位 frame も全 26 件が function_414ad0** (= 到達)。
+残り 1 件: 0x6525b0 は最上位 frame が function_4133f0 (414ad0 無し)。
+> **#1588 訂正**: 0x66ea90 を「再走で trap せず」としたのは `oob_414ad0_27.py` が `both_fault` (native fault かつ wasm trap) を `NO_TRAP:` と表示した誤読。生成元で `both_fault` も trap として集計するよう直し、0x66ea90 は再走で wasm OOB trap (最上位 `function_414ad0`) を再現する。詳細は `tools/m11/trap_triage/REPORT_1588.md` §2・§6。
 
 ### OOB 他の最上位 frame 集計 (LD-18、`tests/oob_top_frames.py` → `results/m11_oob_top_frames.md`)
 

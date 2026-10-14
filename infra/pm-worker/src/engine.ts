@@ -2,11 +2,11 @@
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { AUTO_CLOSE_MAX, AUTO_CLOSE_RETRY_MS, AUTO_CLOSE_WOULD_MS, closeComment, detectRuleA, type CloseTarget } from "./autoclose.ts";
-import { countOpencodeRuns, type ActiveCount } from "./active.ts";
+import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.ts";
 import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
+import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
@@ -122,6 +122,10 @@ export interface Plan {
   stop?: string;
   // 新規・再投入の picks を空にしている理由 (no-import)。止めないなら undefined。
   blocked?: typeof NO_IMPORT;
+  // 未完了の run を優先の区分別に数えた値 (active_all と合計が一致する。対応の取れない run は normal)。
+  active_by_prio: Record<Prio, number>;
+  // prio:low の上限 (LOW_CAP)。applied は prio:critical が着手済みか launch 可能な間だけ真。
+  low_cap: LowCap;
 }
 
 interface Meta {
@@ -870,7 +874,13 @@ export class Engine {
     // 推定の上限が無ければ TARGET のまま (変えない)。推定があれば、上限 + 余裕 (下限 TARGET_MIN、上限 TARGET)。
     const capEst = capValue(this.meta.cap, nowMs);
     const teff = targetEff(capEst, this.d.cfg.target, this.d.cfg.queueMargin, this.d.cfg.targetMin);
-    const sel = planLaunch({ ready, relaunch: rows.relaunch.map(([n]) => n), active, target: teff, batch: this.d.cfg.batch });
+    // prio:low の上限 (LOW_CAP)。着手済み (started)・launch 可能 (ready・relaunch) で blocked でない prio:critical が 1 件以上ある間だけ効く。
+    // 数えるのは未完了の run (実行中と待ち)。実行中の run は止めず、新しい low の launch だけを抑える。
+    const activeByPrio = countRunsByPrio(Object.values(this.s.runs), Object.values(this.s.issues));
+    const criticalOpen = [...rows.started.map(([n]) => n), ...rows.ready, ...rows.relaunch.map(([n]) => n)].some((n) => prioOf(labels.get(n) ?? []) === "critical");
+    const lowCap: LowCap = { cap: this.d.cfg.lowCap, running: activeByPrio.low, applied: criticalOpen };
+    const isLow = (n: number) => prioOf(labels.get(n) ?? []) === "low";
+    const sel = planLaunch({ ready, relaunch: rows.relaunch.map(([n]) => n), active, target: teff, batch: this.d.cfg.batch, low: { ...lowCap, isLow } });
     const relMap = new Map(rows.relaunch);
     const picks: Planned[] = [];
     const issueOf = new Map(snap.issues.map((i) => [i.number, i] as const));
@@ -909,6 +919,8 @@ export class Engine {
       stuck_prs: pr.stuck,
       stop,
       blocked,
+      active_by_prio: activeByPrio,
+      low_cap: lowCap,
     };
     return { rows, plan, picks, unknown, children };
   }
@@ -972,7 +984,9 @@ export class Engine {
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     // 再投入の意図は picks より先に処理する。picks が先に投稿すると、同じ issue の意図は『投稿の後に出た意図』として focus なしで処理済みになるため。
     // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard・取り込み前の no-import) は picks も空なので、意図も処理しない (処理済みにせず次の tick に回す)。
-    const intent = plan.phase.review_only || plan.stop || plan.blocked ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children });
+    // prio:low の枠 (LOW_CAP) は、意図の投稿と picks で共有する。意図が先に枠を使えば、picks の low はその分を除く。
+    const lowGate = { left: lowAllowance(plan.low_cap) };
+    const intent = plan.phase.review_only || plan.stop || plan.blocked ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children }, lowGate);
     for (const p of intent.halted ? [] : picks) {
       if (intent.handled.has(p.n)) continue;
       let body: string;
@@ -981,6 +995,10 @@ export class Engine {
       } catch {
         this.pushLog({ kind: "skip", n: p.n, note: "invalid artifacts line" });
         continue;
+      }
+      if (this.isLowIssue(p.n)) {
+        if (lowGate.left <= 0) continue;
+        lowGate.left--;
       }
       if (!live) {
         // dry-run: 同じ issue を 3 時間は再掲しない (計画の変化だけを残す)。投稿はしない。
@@ -1041,6 +1059,7 @@ export class Engine {
     live: boolean,
     planned: Record<string, number>,
     ctx: { rows: Rows; unknown: Set<number>; children: Record<string, number[]> },
+    lowGate: { left: number },
   ): Promise<{ halted: boolean; handled: Set<number> }> {
     const nowMs = this.d.now();
     const handled = new Set<number>();
@@ -1089,6 +1108,11 @@ export class Engine {
       if (gate.kind === "reject") {
         reject(gate.reason);
         continue;
+      }
+      // prio:low の上限に達していれば、処理済みにせず次の tick に回す (picks と同じ枠)。
+      if (this.isLowIssue(n)) {
+        if (lowGate.left <= 0) continue;
+        lowGate.left--;
       }
       handled.add(n);
       if (!live) {
@@ -1151,6 +1175,11 @@ export class Engine {
   // oc:no-pr の cooldown の起点: /oc の投稿か bot のコメントの遅い方 (ms)。
   private lastAct(n: number): number {
     return Math.max(Date.parse(this.s.launchedAt[String(n)] ?? "") || 0, Date.parse(this.s.botLast[String(n)]?.at ?? "") || 0);
+  }
+
+  // prio:low の issue か (LOW_CAP の対象)。
+  private isLowIssue(n: number): boolean {
+    return prioOf(this.s.issues[String(n)]?.labels ?? []) === "low";
   }
 
   async watchdog(gh: Gh | null): Promise<"dispatched" | "would" | "skipped"> {
@@ -1537,6 +1566,9 @@ export class Engine {
       ready: c("ready"),
       // ready の区分別の件数 (prio:critical / prio:low のラベル。無ければ normal)。合計は ready と一致する。
       ready_by_prio: readyByPrio,
+      // 未完了の run を区分別に数えた値 (合計は active_all と一致)。prio:low の上限 (low_cap) は applied (prio:critical が着手済みか launch 可能) のときだけ効く。
+      active_by_prio: plan.active_by_prio,
+      low_cap: plan.low_cap,
       relaunch: c("relaunch"),
       user: c("user"),
       hold: c("hold"),
