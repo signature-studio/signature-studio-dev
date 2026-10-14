@@ -91,15 +91,17 @@ Windows 側の抽出は成功、macOS 側は `llvm-lipo` が無く rc=127 (本�
 
 round 6 の失敗の扱い: `kh656_closure.py` は `dropped_i256` に `1813846e0` を載せたが、`n1.ll` に `1813846e0` の定義は無く (確認済み)、i256 による除外の根拠は無い。`1813846e0` は memset で、module F の shims に未登録だったため閉包に入った。shim 登録 (module F shims に `1813846e0: memset`) を加えると 313 集合で build が通る。round 6 の失敗原因 (`dropped_i256` の判定経路) は未特定。
 
-### 7.2 測定値 (コミット HEAD の state で実行)
+### 7.2 測定値 (HEAD 行はコミット HEAD の state、166・313 行は未コミットの `lic_config` 一時変更で実行)
+
+166 行と 313 行は、閉包展開スクリプトが書き換えた未コミットの `lic_config` で測定した (測定後に HEAD へ戻した)。313 行は未コミットの `lic_config` 一時変更。
 
 | 集合 | lift | wasm B | undefined import | 入口 `function_180ef7fc0` |
 |---|---|---|---|---|
-| HEAD (main) | 8 | 54,394 (sha `7ba79e65…`・REPORT §3 と一致) | 0 | `unlifted callee 0x180112a30` (ok=17 ng=0) |
-| round 4 集合 | 166 | 876,174 | 0 | `unlifted callee 0x180138a30` (ok=16 ng=1) |
-| round 5 集合 (+shim memset) | 313 | 1,543,853 | 0 | **`memory access out of bounds` (再現)** |
+| HEAD (main) | 8 | §3 参照 | 0 | `unlifted callee 0x180112a30` (ok=17 ng=0) |
+| round 5 集合 (§7.1 の round 5 = lift 166) | 166 | 876,174 | 0 | `unlifted callee 0x180138a30` (ok=16 ng=1) |
+| round 6 相当 (+shim memset・313 行は未コミットの `lic_config` 一時変更) | 313 | 1,543,853 | 0 | **`memory access out of bounds` (再現)** |
 
-313 集合の wasm は REPORT 上の `1,543,901 B` と 48 B 異なる (emcc 環境差)。入口の症状は一致。
+313 集合は §7.1 の round 6 (build 失敗 `1813846e0`) に memset shim を登録して再 build した集合。round 6 の失敗そのものはこの表には載せていない。313 集合の wasm は REPORT 上の `1,543,901 B` と 48 B 異なる (emcc 環境差)。入口の症状は一致。
 
 ### 7.3 OOB の発生 VA (wasm 関数名: `-g` 版で特定)
 
