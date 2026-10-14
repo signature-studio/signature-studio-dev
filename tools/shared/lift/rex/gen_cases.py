@@ -4,8 +4,10 @@
 case 形式 (little endian, native_ref.c と run_wasm.mjs が同じ規約で読む):
   u32 N (ヘッダ) / 各 case: u32 fn (0=REXGetCreatorInfo, 1=REXGetInfo), u32 0, u64 a0 a1 a2 a3, u64 ctx, arena[ARENA_SZ]
   ctx : REX の ctx 大域 (RVA 0x49e08) に入れる値。0 (NULL) か arena 内の構造体。
+  a0  : arena 内ポインタ、または 32 / 64 bit の奇数乱数 (arena 外の値を含む)。
+  a1  : 0 / 1 / 0x100-0x7ff の整数。a2 : arena 内ポインタか 0。a3 : 0 か arena 内ポインタ。
   arena: qword 単位で {0, arena 内ポインタ} だけを入れる。整数値は入れない (REX が値を pointer として deref しても
-         native 側で SIGSEGV せず、wasm 側でも線形メモリ内の別データを読まないため)。a0/a2/a3 も同じ規則 (0 か arena 内)。
+         native 側で SIGSEGV せず、wasm 側でも線形メモリ内の別データを読まないため)。
 usage: gen_cases.py OUT [N]
 """
 import random, struct, sys

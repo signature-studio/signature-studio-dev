@@ -23,8 +23,8 @@ static uint64_t __attribute__((ms_abi)) st_raise(uint64_t c, uint64_t f, uint64_
 typedef uint64_t (__attribute__((ms_abi)) *FN)(uint64_t, uint64_t, uint64_t, uint64_t);
 #include <setjmp.h>
 static sigjmp_buf jb;
-static volatile sig_atomic_t in_case;
-static void on_fault(int sig) { (void)sig; if (in_case) siglongjmp(jb, 1); _exit(4); }
+static volatile sig_atomic_t in_case, n_segv, n_alrm;
+static void on_fault(int sig) { if (in_case) { if (sig == SIGALRM) n_alrm++; else n_segv++; siglongjmp(jb, 1); } _exit(4); }
 #define CRASH_MARK 0xC2A5C2A5C2A5C2A5ULL
 #define DIE(...) do { fprintf(stderr, __VA_ARGS__); return 2; } while (0)
 
@@ -82,5 +82,6 @@ int main(int argc, char **argv) {
         fwrite(img + REX_DATA_RVA, 1, REX_DATA_SZ, fo);
     }
     fclose(fo);
+    fprintf(stderr, "[native] excluded: SIGSEGV/SIGBUS=%d SIGALRM(300ms)=%d\n", (int)n_segv, (int)n_alrm);
     return 0;
 }

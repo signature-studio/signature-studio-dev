@@ -23,27 +23,46 @@ if MUTATE:
 
 cases = open(W + '/cases.bin', 'rb').read()
 fns = []
+a0s = []
+arenas = []
 ctxnull = 0
 p = 4
 for _ in range(n):
     fn = struct.unpack_from('<I', cases, p)[0]
     ctx = struct.unpack_from('<Q', cases, p + 8 + 32)[0]
     fns.append(fn)
+    a0s.append(struct.unpack_from('<Q', cases, p + 8)[0])
+    arenas.append(cases[p + 48:p + 48 + ARENA_SZ])
     ctxnull += (ctx == 0)
     p += 8 + 32 + 8 + ARENA_SZ
+
+# 書込の有無: 入力 arena・初期 .data と比べて変化した case 数。ctx 大域 (.data 内) は各 case で書き換えるので除く。
+ARENA_LO = L['arena']
+d0 = open(W + '/image_native.bin', 'rb').read()[L['data_rva']:L['data_rva'] + DATA_SZ]
+CTX_OFF = L['ctx_rva'] - L['data_rva']
+def data_wo_ctx(d):
+    return d[:CTX_OFF] + d[CTX_OFF + 8:]
 
 bad = []
 rax_hist = collections.Counter()
 hit_cases = 0
 crashed = []
+crash_a0_ext = 0
+w_arena = w_data = w_any = 0
 for i in range(n):
     a = nat[i * REC:(i + 1) * REC]
     b = bytes(was[i * REC:(i + 1) * REC])
     if struct.unpack_from('<Q', a, 0)[0] == CRASH:
         crashed.append(i)
+        crash_a0_ext += not (ARENA_LO <= a0s[i] < ARENA_LO + ARENA_SZ)
         continue
     rax_hist[struct.unpack_from('<Q', a, 0)[0]] += 1
     hit_cases += struct.unpack_from('<Q', a, 8)[0] > 0
+    wa = a[16:16 + ARENA_SZ] != arenas[i]
+    wd = data_wo_ctx(a[16 + ARENA_SZ:]) != data_wo_ctx(d0)
+    w_arena += wa
+    w_data += wd
+    w_any += (wa or wd)
     if a != b:
         off = next(k for k in range(REC) if a[k] != b[k])
         bad.append((i, off))
@@ -55,6 +74,8 @@ cov_ok = (compared >= n // 2 and cov['distinct_rax'] >= 2 and cov['import_cases'
           and cov['fn0'] >= 1 and cov['fn1'] >= 1)
 print('[diff] cases=%d compared=%d match=%d mismatch=%d native_crash_excluded=%d' % (n, compared, compared - len(bad), len(bad), len(crashed)))
 print('[diff] first mismatches (case, byte offset in record): %s' % bad[:5])
+print('[diff] writes (入力 arena・初期 .data から変化した case, ctx 除く): any=%d arena=%d data=%d / compared=%d' % (w_any, w_arena, w_data, compared))
+print('[diff] native crash のうち a0 が arena 外: %d / %d' % (crash_a0_ext, len(crashed)))
 print('[diff] coverage %s ok=%s' % (cov, cov_ok))
 print('[diff] rax top: %s' % [('%#x' % k, v) for k, v in rax_hist.most_common(4)])
 ok = not bad and cov_ok
