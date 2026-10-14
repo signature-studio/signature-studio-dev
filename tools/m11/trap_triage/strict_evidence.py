@@ -80,8 +80,11 @@ def main():
             'mach_prev2': ' ; '.join(prev), 'ir_block_term': blocks[bname]['term'].strip(),
             'ir_block_cond': int(cond_ir_B), 'ir_loop_head_icmp': icmp_L,
         })
+    fields = list(rows[0].keys()) if rows else [
+        'fn', 'jcc', 'mnemonic', 'target', 'loop_head', 'block',
+        'mach_prev2', 'ir_block_term', 'ir_block_cond', 'ir_loop_head_icmp']
     with open(a.out, 'w', newline='') as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()), delimiter='\t')
+        w = csv.DictWriter(f, fieldnames=fields, delimiter='\t')
         w.writeheader()
         w.writerows(rows)
     print('[strict_evidence] rows=%d -> %s' % (len(rows), a.out))
