@@ -34,7 +34,7 @@
 ## 3. 生成経路 (IR と機械語の突合)
 
 - `function_867510` は `8674a0` (list を走査) の後 `EnumDisplayMonitors(… [G2+188])` を呼ぶ。`8674a0` は `50aa70` と `40faa0` を呼ぶ。
-- list の生成元は `function_8651a0` (object 構築)。`[obj+188]` は `40f9e0(obj, 1)` の戻り値 (引数の訂正は §7.1 で訂正: `0xC9A40` は誤りで、正しくは obj=`0xc9bc0`)。
+- list の生成元は `function_8651a0` (object 構築)。`[obj+188]` は `40f9e0(obj, 1)` の戻り値 (§7.1 で訂正: 引数 `0xC9A40` は誤りで、正しくは obj=`0xc9bc0`)。
 - `40f9e0` → `410320` (alloc 相当) / `410360` (固定サイズ helper)。IR はどちらも `ret arg1`。
 - 機械語 (`disasm_img.py`):
   - `410320`: `test dl,dl; ...; call qword ptr [rax-0x30]` (**vtable 間接 call**)。
