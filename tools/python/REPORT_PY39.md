@@ -214,3 +214,7 @@
 ## PY-69 (#2499): selectOneChannel の意味論を確定
 
 - 結論・処理経路・排他選択・未解決は [REPORT_PY69.md](REPORT_PY69.md) (250 行上限のため分割移動)。`selectOneChannel` は C provider と mock に実装済み (測定 commit は REPORT_PY69.md の検証節)。
+
+## 追加解析 (#2548 の run): setStepParameterByIndex の呼出し経路・status・副作用
+
+本文は `REPORT_PY39_2548.md` に分割移動した (250 行上限のため)。結論: 呼出し経路・status 表・範囲外 `-4`・param 3〜8 の副作用を PE で確定。param 0〜2・item 列挙・述語の型は未確定で、子 issue #2581 (`[PY-78]`) に移した。

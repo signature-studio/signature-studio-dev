@@ -4,30 +4,30 @@ fn	site	source	verdict	status	oracle	text
 410b10	410b5c	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0x28], rax
 4120c0	4120da	cand	TRUE_DROP	確定	CELL_DEEP	mov dword ptr [rbp + 0x4c], ecx
 412ee0	412ef6	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x28], rax
-415610	415751	-		未判定	-	mov qword ptr [rbp + 0x40], rax
-415c30	415d43	-		未判定	-	mov qword ptr [rbp + 0x60], rax
-415c30	415d87	-		未判定	-	mov qword ptr [rbp + 0x60], rax
+415610	415751	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x40], rax
+415c30	415d43	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x60], rax
+415c30	415d87	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x60], rax
 417310	417355	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x68], rax
-417b70	417c35	-		未判定	-	mov qword ptr [rbp + 0x68], rax
+417b70	417c35	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x68], rax
 41a5d0	41a5fa	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x30], rax
 41a5d0	41a618	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x38], rax
 41a670	41a6e2	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x38], rax
 41ba50	41ba8a	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp], rax
 41bfa0	41bfb7	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 8], rax
 41bfa0	41bfd1	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp + 8], rax
-41e490	41e513	-		未判定	CELL_DEEP	mov qword ptr [rbp], rsi
+41e490	41e513	cand	UNDETERMINED	判定不能	CELL_DEEP	mov qword ptr [rbp], rsi
 43e240	43e7f4	manual	OK_LOAD	確定	-	mov dword ptr [rbp + 0x164], eax
 43e240	43e921	manual	OK_LOAD	確定	-	mov dword ptr [rbp + 0x16c], eax
 44f440	44f50a	cand	OK_LOAD	確定	-	mov qword ptr [rsp + 0x20], rax
-45a2a0	45a577	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x48], rax
-45b170	45b1bf	-		未判定	-	mov qword ptr [rbp + 0x38], rax
-45c290	45c6dd	-		未判定	-	mov dword ptr [rbp + 0x3c], eax
-45d0a0	45d570	-		未判定	-	mov qword ptr [rbp + 0x38], rax
-45d0a0	45d581	-		未判定	-	mov qword ptr [rbp + 0x38], rax
-45d610	45d754	-		未判定	-	mov qword ptr [rbp + 0x38], rax
+45a2a0	45a577	cand	OK_LOAD	確定	CELL_DEEP	mov qword ptr [rbp + 0x48], rax
+45b170	45b1bf	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp + 0x38], rax
+45c290	45c6dd	cand	UNDETERMINED	判定不能	-	mov dword ptr [rbp + 0x3c], eax
+45d0a0	45d570	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp + 0x38], rax
+45d0a0	45d581	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp + 0x38], rax
+45d610	45d754	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp + 0x38], rax
 45e3c0	45e7a8	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0x28], rax
 45e3c0	45e7d3	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0x28], rax
-45f560	45f938	-		未判定	-	mov qword ptr [rbp + 0x28], rax
+45f560	45f938	cand	UNDETERMINED	判定不能	-	mov qword ptr [rbp + 0x28], rax
 466af0	466bca	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
 466af0	466d9b	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
 466af0	466e03	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x38], rax
