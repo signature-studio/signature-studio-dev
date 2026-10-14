@@ -74,8 +74,8 @@ static MS void* k_GetProcAddress(void* hmod, const char* name) {
  * → 本 equivalent init は各 encoded slot に cookie 値を書くだけ。DllMain/_initterm は不要。
  */
 #define COOKIE_ADDR 0x180260ce0ULL
-#define APISET_TABLE 0x18026c9f0ULL     /* UCRT api-set 関数ポインタ表 (idx 0..31) */
-#define APISET_N 32
+#define APISET_TABLE 0x18026c9f0ULL     /* UCRT api-set 関数ポインタ表 (idx 0..33, 34 entry) */
+#define APISET_N 34                     /* ott_crt.c と同一 (rep stosq 個数 0x22 由来) */
 /* そのほかの encoded slot (実測: cookie xor + ror 逆解析) */
 static const uint64_t ENCODED_SLOTS[] = {
     0x18026c028, 0x18026c388, 0x18026cb40, 0x18026cb88,  /* matherr user hook = cb88 */
