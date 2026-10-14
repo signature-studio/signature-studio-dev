@@ -47,6 +47,7 @@
 | `docs/LEGAL_TERMS_LEDGER.md` | `pnpm terms-watch` (正本は同 `.json`) |
 | `tools/startup/license_obs/results/{FLAG_SITES,CASES}.md` | `scan_consumers.py`・`run_cases.py` (license_obs) |
 | `tools/python/analysis/{flapi/FLAPI,mcp/MCP_TOOLS}.md` | 抽出 driver (repo 内 `tools/python/analysis/`) |
+| `tools/python/analysis/py99_merge_sets.md` | `analysis/py99_merge_sets.py --md` (PY-99 (#3085) の読みごとの先行辺 p の S_p 全件表。先頭行 `自動生成:`) |
 
 ## 3. REPORT.md 索引
 
@@ -388,6 +389,7 @@
 | `tools/python/REPORT.md` | ~250 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§7c (ilmcp, PY-3 #82)・§9 (下流チケット案 T1〜T9) は要約のみで全文は `REPORT_APPENDIX.md` に、§PY-12 (#587) は要約のみで全文は `REPORT_PY12.md` に、§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元)・§14 (#79 Piano roll) は要約のみで全文は `REPORT_APPENDIX.md` に、§15 (#654 PY-16) は要約のみで全文は `REPORT_PY16.md`、§16 (#653 PY-15 省略引数) は要約のみで全文は `REPORT_PY15.md` に分割 |
 | `tools/python/REPORT_CHROME.md` | ~55 | python REPORT §14b: Piano roll scripts の Chrome (headless, agent-browser) 上の実行と node との出力一致 (#466 PY-11)。250 行上限のため分離 |
 | `tools/python/REPORT_PY41_APPENDIX.md` | ~240 | PY-41 REPORT の付録。`REPORT_PY41.md` の PY-49 (#1828)・PY-52 (#1875)・PY-64 (#2033)・PY-88 (#2788) の節の全文・PY-160 (#3087) の節 (CFG 到達定義) (250 行上限のため分割移動) |
+| `tools/python/REPORT_PY99_3085.md` | 81 | PY-99 (#3085) 付録: SLOT? 49 件の先行辺 p ごとの store 集合 S_p・算法 A/B の検算とネガティブコントロール・未解決。S_p の全件表は `analysis/py99_merge_sets.md` (自動生成)。PY-41 付録から分割移動 (250 行上限のため) |
 | `tools/python/REPORT_PY99_APPENDIX.md` | ~127 | PY-99 (#2874) 付録: `call 0x10469f0` の本体式 `edx + rint(2^-30·ecx·(r8d−edx))` と、その 7 件の戻り値式 (ecx は入口 edx)。後ろ向き CFG 経路列挙の節 (`[rbp+X]` 読み 171 件の到達 store)。`REPORT_PY41_APPENDIX.md` の 250 行上限のため別置き |
 | `tools/python/REPORT_PY159.md` | 134 | PY-159 (#3086): PY-88 の 65 件の `[rbp+0x5b8]` 書込みの全件表 (VA・式・未確定印)。手計算突合 (SLOT 非依存の 7 件) とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。残りの SLOT 依存 55 件と ACC 合流は #2874 (PY-99) |
 | `tools/python/REPORT_PY56.md` | ~70 | PY-56 (#1934): playlist 38 関数のうち `selectTool` (書式 `i`)・`scrollTo` (書式 `iiii`) の引数確定。残り 36 関数は子 #1971 (PY-57) |
