@@ -241,3 +241,4 @@
 
 - **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出すようになった。null-sink は全 run PASS (underrun 0)。fake 48k は 1 件 FAIL (未解決・#187)。Firefox の p99 は未配線。
 - 測定 commit・行列・再現手順・未解決の全文は `REPORT_APPENDIX_3151.md` (250 行上限のため分割移動)。
+- main 取り込み後の HEAD (`d55d2c45`) の部分再測定: null-sink 48k 3/3・96k 1/1、PulseAudio 無し 48k・96k 各 1/1 PASS (underrun 0)。全文は付録 §10-2。
