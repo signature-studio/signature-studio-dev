@@ -54,3 +54,39 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 - `native/ctrl_harness.mjs` に `FA_ALT9=1` (C+0x328 を C+0x2d0 と不一致にし静的分岐を強制) を追加。`run_fa9.sh` の判定ゲートに `(b-wasm)` を追加。
 - 実測 (`run_fa9.sh`, 同 commit): (a) base ERR=0・ca1480=72・path=map・found=0・da6c00=0 / (b) native alt ERR=8/8 path=static / (b-wasm) wasm alt ERR=8/8 / GATE: PASS / run_ctrl BIT-EXACT 15/15。
 - 非空 map (受入 1〜3) は未着手。found=0・da6c00=0 のまま (§4)。
+
+## 7. FA-21 (#1535): 1 ノードの非空 controller map (native / wasm 同時変更)
+
+- 変更 (測定 commit `0cf238bb`): `native/native_ctrl.c` と `native/ctrl_harness.mjs` に同一の 1 ノードを追加 (`C+0x21b8` の head に接続、key u16=1、value=Z、blk=RB0)。
+  key=1 は静的読み §1 の `[C+0x328]` 比較の後の探索 key (`keycnt`、`0x180ca1499` の `edx`) に合わせた。key=0 では found=0 のまま (実測)。
+- 修正 (commit `ad1f4768`): 1 ノード追加を `FA_NODE1=1` の裏に置いた (既定 OFF)。既定 OFF では旧 baseline (found=0・ERR=0) を維持し、ゲート (a) は既存の期待値のまま。found=1 は `FA_NODE1=1` 専用の別行として下記に残す。
+- 実測 (HEAD `ad1f4768`, `bash run_fa9.sh`, 既定 OFF): `(a) base: scenarios=8 ERR=0 ca1480=72 path=['map'] eq=['1'] found=['0'] da6c00=0` / `(b) alt: ERR=8/8 ca1480=8 path=['static']` / `(b-wasm) alt: wasm ERR=8/8` / `(c) pert: 状態ダンプ差分トークン=395 / L/R 同一 40 呼出 / 差分 0 呼出` / **GATE: PASS** / `run_ctrl 2 5` **BIT-EXACT 15/15** (wall 3 s)。
+- 実測 (HEAD `ad1f4768`, `FA_NODE1=1` で手動 probe, 専用行・ゲート外): native `scen 8 ERR 8 ca1480 8 found=['1'] eq=['1'] path=['map']` / wasm (`FA_NODE1=1 ctrl_harness.mjs`) ERR 8/8。既知の失敗 (setter `0x180c9d74c` の `addr=0x50` SIGSEGV、#1182 の範囲)。
+- 実測 (`bash run_fa9.sh`, `0cf238bb`, clean build, load 0.18→0.55, wall 35.98 s):
+  - (a) base: scenarios=8, ERR=8/8, ca1480=72, path=map, **found=1 (72/72)**, da6c00=0 (旧 baseline は found=0)。
+  - 失敗原因: found=1 の後、setter (`0x180c9d74c`) が `addr=0x50` で SIGSEGV (`out[0]+0x10` の vtable が未構築)。受入 2 後半 (0x180da6c00 到達) は範囲外 (#1182)。
+  - (b) alt: native ERR=8/8 path=static / wasm ERR=8/8 (変化なし)。
+  - (c) pert: 差分トークン 0 (ERR のため状態ダンプに届かない)。
+  - GATE: **FAIL** — (a) の期待値 (found=0・ERR=0) が旧 baseline のままのため。ゲートは緩めていない。
+- 実測 (`bash run_ctrl.sh 2 5`, `0cf238bb`, wall 0 s): **BIT-EXACT 15/15** (fma0/fma1, 両側 ERR 14/14 同一 scenario)。※ `0cf238bb` 版の値。現 HEAD の値は §8 を参照。
+
+## 8. FA-21 (#1535): 受入 1・2 の判定 (HEAD `9480d5ed`、測定 commit `ad1f4768` と lift2 差分 0)
+
+- 既定 OFF (`bash run_fa9.sh`, HEAD, wall 41 s, load 0.36→0.53): (a) base ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン / **GATE: PASS** / `run_ctrl 2 5` **BIT-EXACT 15/15** (wall 4 s)。
+  → 既定ビルドでは 1 ノードは入らない。受入 1 (native/wasm の 1 ノード構築) と受入 2 (found>=1) は**既定では未達**。
+- 測定 commit の整理: lift2 のコードは `ad1f4768` 以降 HEAD まで変更なし (`git diff ad1f4768 HEAD -- tools/targets/freshair/lift2` = 0 行)。`0cf238bb` の値 (§7 の旧行) は HEAD の根拠にしない。
+- 実測 (HEAD `01c78f64`, 既定 OFF, 再測定): `bash run_ctrl.sh 2 5` **BIT-EXACT 15/15** (wall 3 s, load 0.74) / `bash run_fa9.sh` **GATE PASS** (wall 3 s, load 0.70; (a) ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン)。
+- `FA_NODE1=1` 専用 (ゲート外, HEAD, `FA_PROBE9=1`):
+  - native: 8/8 scenario で `found=1` (`FA9CA` 行 8/8)。ERR 8/8 (setter `0x180c9d74c` の `addr=0x50` SIGSEGV、#1182 の範囲)。
+  - wasm: found は**未観測** (`ctrl_harness.mjs` に FA9CA 相当の観測点が無い)。ERR 8/8 (`RuntimeError: unreachable` at wasm-function[1102], native とは別の失敗形)。wasm 側で 1 ノードが found=1 になったかは本測定では判定できない。
+- 判定: issue #1535 の受入 1・2 は未達。判定基準 (a) の期待値 (found=0・ERR=0) は変更していない。found=1 の既定化と wasm 側の観測点・ERR 形の解消は #1182 で扱う。
+
+## 9. 未解決表 (PM 改訂 (A) 分割に合わせる)
+
+| 項目 | 状態 | 起票先 |
+|---|---|---|
+| 既定 OFF での 1 ノード成立 (map 非空の既定化) | 未達 | #1182 (FA-16) |
+| `run_fa9.sh` (a) の `found>=1` (期待値は変更しない) | 未達 | #1182 (FA-16) |
+| native ERR=8/8: setter `0x180c9d74c` の `addr=0x50` SIGSEGV の原因特定 | 未解決 | #1578 (FA-22) |
+| wasm の found 観測点と ERR 形 (`RuntimeError: unreachable`) | 未解決 | #1578 (FA-22) (観測点は #1182 の範囲) |
+| 0x180da6c00 到達と Filter 出力比較 | 未着手 | #1182 (FA-16) |
