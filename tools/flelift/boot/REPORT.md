@@ -221,7 +221,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | unit 209 の後の `MessageBoxA` → `exit(0)` の原因 | 次の blocker (最初のウィンドウ未達) | 既存 #2702 (同上) |
 | 既定経路 (root 0x6a7b70 無し) の boot 未測定 | 209 据え置きの確認が未了 | 既存 #2702 作業 1 |
 
-## 10. FLE-10 (#2702): dsp_ippv2 shim では units が前進しない (測定 commit `56e515e1`)
+## 10. FLE-10 (#2702): dsp_ippv2 shim では units が前進しない (測定 commit `a0f659bf`)
 
 - **既知類型との関係: 該当なし** (DEFECTS.md D1a〜D23 を照合。IPP stub の fail-soft は類型に無い)。FLE-6 (#672) の旧 §10 全文は `REPORT_APPENDIX_2702.md` §E。
 - **結論**: shim 有 (`FLE_IPP=1`) も `FLE_IPP=2` も units_run は **209** (ネガコンと同じ)。boot 209 までに呼ばれた IPP は `ippsZero_8u` の 2 回だけで、他は 0 件。fail-soft 依存の前進は**観測されない** (前進 0 unit)。
@@ -238,7 +238,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 - **機構** (lift 行の実測 + 推定): `ippsZero_8u` の呼出点 0x67264d は `mov rax,[0x15e0a48]; call [rax]`。既定経路の終了時は `[0x15e0a48]=0x15F34A0` で、呼出先は 0x15F34A0 経由と**推定** (呼出時の値は未採取)。root 有の終了時は `[0x15e0a48]=0`・`0x15F34A0=0`。登録は呼出時には効いていたが終了前に消えると**推定** (書換え元は未特定)。よって `FLEBOOT_IPP_CHECK` (終了時の 0x15F34A0 を見る) の NG は呼出しの不発を示さない。
 - **#141 (IPP-4 実呼出の採取) / #38 (IPP-10 代替実装)**: boot 209 までの対象は `ippsZero_8u` 1 件のみ。
 
-測定は route ごと n=1 (変動の min–max は未測定)。測定 commit の後に HEAD で boot を再実行し、結果 JSON に差分 0 (`git status -- tools/flelift/boot` 空)。工程秒・RSS・再現コマンドは `REPORT_APPENDIX_2702.md` §A・§B。
+測定は route ごと n=1 (変動の min–max は未測定)。測定 commit `a0f659bf` は `56e515e1` の後に main (`3e8c8d25`) を取り込んだ commit。取り込みで `fle_boot.mjs` に PY-123 の `undo_probe` 出力が入り、結果 JSON に `undo_probe` 項目が増えた (units・GetMem/FreeMem・停止点は不変)。コード差分 `git diff a0f659bf HEAD -- tools/flelift/x64c.py tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` は空。工程秒・RSS・再現コマンドは `REPORT_APPENDIX_2702.md` §A・§B。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|

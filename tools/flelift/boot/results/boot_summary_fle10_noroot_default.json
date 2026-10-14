@@ -27,6 +27,16 @@
    "realloc": "0x408040",
    "slot3": "0x4083b0"
   },
+  "undo_probe": {
+   "slot_0x15e1c78": "0x16bb068",
+   "pos_0x20": 0,
+   "count_0x24": 0,
+   "ret_singleton_0x16b82e0": "0x0",
+   "slot_0x15e4790": "0x141d6b8",
+   "safe_obj": "0x0",
+   "safe_obj_0x98": null,
+   "safe_obj_0x88": null
+  },
   "ipp_ptr_15F34A0": "0x0",
   "ipp_ptr_15F40E8": "0x0",
   "ipp_total": 0,
