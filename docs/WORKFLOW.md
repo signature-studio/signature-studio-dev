@@ -239,7 +239,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
-    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `$HOME/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れ、その bin を PATH 先頭に置く (#893)。venv 無しで動かす場合は同じ venv を手で作る。
+    Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `~/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れる (#893)。版と hash は `.github/actions/agent-setup/requirements-py.txt` で固定し、`--require-hashes` で入れる (#2621)。venv の bin は PATH に載せず、`python` / `python3` を venv の python へ委譲するラッパーの dir (`~/.local/agent-py-shim`) を PATH 先頭に置く。venv 無しで動かす場合は同じ venv を手で作る。
     `ir_conditions.json` は生成時の PE の絶対パスを記録し、`m11_build.sh` は現在の PE と一致しないと build を拒否するため、別の環境で作った json を素材に同梱しても使えない。
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
