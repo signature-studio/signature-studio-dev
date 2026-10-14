@@ -8,7 +8,7 @@
 #   出力: work/probe2408/<tag>.err (`[aw]` 行). 終了時に m11_build.sh で clean な wasm に復元する (trap で必ず復元).
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
-source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+source "${EMSDK_HOME:-/opt/emsdk}/emsdk_env.sh" > /dev/null 2>&1   # [EMSDK] (docs/REFERENCES.md)
 tag=${1:?tag}
 mode=${2:-w114}
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0} -DM11_OV_CLASSCREATE=${M11_OV_CLASSCREATE:-0} -I."
