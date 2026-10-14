@@ -15,23 +15,23 @@
   `analysis-mac-shared` に SGv2_x64.dylib が含まれるかは未確認 (`tools/shared/REPORT.md` の mac Shared 素材範囲に入る想定)。
   本 run の素材は `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` のみで、突合は未実施。
 
-## 1. 実測 (`identify_win.py`、測定 commit `d40bd24e`)
+## 1. 実測 (`identify_win.py`、測定 commit `afb3e957`)
 
 | 項目 | 値 |
 |---|---|
 | 内部名 `FruityPlug_x64.dll` の PE (fl-win64 `extracted/block*_PE.bin`) | **133 本** |
 | `CreatePlugInstance` を持つ | 133 / 133 |
 | export 組が 3 本 (`CreatePlugInstance` + `__dbk_fcall_wrapper` + `dbkFCallWrapperAddr`) と一致 | 131 / 133 |
-| 他 2 本の export 組 | ZGE (ZGameEditor) 系 (多数の export) / DecodeAudioFile 系 (5 本) |
-| VERSIONINFO なし | 79 / 133 (ProductName の種類は 42) |
+| 他 2 本の export 組 | block19304 (export 29 個・`Zge*` 等の ZGameEditor 系) / block23663 (export 5 個・`DecodeAudioFile`・`FinishAudioFile` を含む) |
+| VERSIONINFO なし | 79 / 133 (ProductName の種類は 41。空の ProductName を除く) |
 | 同サイズ 5,892,096 B の PE | block24353 のみ |
 | block24353 の VERSIONINFO | ProductName = InternalName = `Maximus` / FileDescription = `Sytrus Synthesizer` |
 | 別版の Maximus | block19148 (5,904,384 B、ProductName = InternalName = `Maximus`) |
 | win PE 内の `FPC 3.2.3` 文字列 | 0 件 (win は Delphi。FPC 3.2.3 は mac 側のみ) |
 
 - 実行: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/fruityplug/identify_win.py` (pefile 必要)。
-  実行時間 1.2 s、実行後 load 0.17 0.29 0.16、nproc 4。作業 TSV は `tools/fruityplug/work/identify.tsv` (gitignore)。
-- 測定 commit `d40bd24e` から HEAD までの `tools/fruityplug` の差分は本 REPORT の追加のみ (`git diff d40bd24e HEAD -- tools/fruityplug/*.py` は空)。
+  実行時間 1.07–1.07 s (n=3、wall、python 起動を含む)、実行直後の load (1/5/15 分) 0.37–0.42 / 0.49–0.50 / 0.24、nproc 4。作業 TSV は `tools/fruityplug/work/identify.tsv` (gitignore)。
+- 測定 commit `afb3e957` は `identify_win.py` を変えた最後の commit (前の `d40bd24e` の ProductName 種類 42 は `(none)` を 1 種に数えた誤り)。`git diff afb3e957 HEAD -- tools/fruityplug/*.py` の出力は空 (差分 0)。以後の HEAD の差分は本 REPORT の文言修正のみ。
 
 ## 2. 既存記述の訂正 (注記のみ・分類データは未変更)
 
