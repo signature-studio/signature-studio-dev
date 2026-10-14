@@ -112,6 +112,7 @@ def main():
         if cs and (cs[0].get('wasm_detail') or '').startswith('unreachable') and cs[0].get('wasm_status') != 'badjson':
             un.append((r, cs[0]))
     cnt = collections.Counter()
+    pair = collections.Counter()
     by_key = collections.defaultdict(collections.Counter)
     ex = {}
     for r, c in un:
@@ -139,6 +140,8 @@ def main():
         cnt[key] += 1
         by_key[key][site] += 1
         ex.setdefault(key, (int(r['function']['va'], 16), L, site))
+        if L == 0x417b70:
+            pair[(nn, ww)] += 1
 
     n_all = sum(cnt.values())
     f = lambda v: '-' if v is None else '0x%x' % v
@@ -155,6 +158,13 @@ def main():
         top = ', '.join('%s (%d)' % (f(s), m) for s, m in by_key[key].most_common(3))
         e = ex[key]
         print('| %s | %s | %d | %s | %s / %s / %s |' % (key[0], key[1], cnt[key], top, f(e[0]), f(e[1]), f(e[2])))
+    print('')
+    print('## 0x417b70 の食い違いの次 entry 組 (native, wasm) 別件数')
+    print('')
+    print('| native 次 entry | wasm 次 entry | 件数 |')
+    print('|---|---|---:|')
+    for (nn, ww), m in sorted(pair.items(), key=lambda kv: -kv[1]):
+        print('| %s | %s | %d |' % (f(nn), f(ww), m))
 
 
 if __name__ == '__main__':
