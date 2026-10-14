@@ -33,22 +33,36 @@ def ir_labels(fn):
 
 
 out = sys.stdout
-out.write('fn\tsite\tstore_text\tlater_reads (機械語・同一 frame slot の後続 memop 件数と先頭 3 件)\n')
+out.write('fn\tsite\tstore_text\t後続読み出し件数\t後続書き込み件数\tlea件数\t先頭3件 (後続の同一 frame slot memop・全種別)\n')
 for fn, site in SITES:
     labels, _ = ir_labels(fn)
     ins = A.descend(mach, int(fn, 16), labels)
     sva = int(site, 16)
     st = [i for i in (ins or []) if i.address == sva]
     if not st:
-        out.write('%s\t%s\t-\tNO_MACHINE_SITE\n' % (fn, site))
+        out.write('%s\t%s\t-\t-\t-\t-\tNO_MACHINE_SITE\n' % (fn, site))
         continue
     st = st[0]
     text = '%s %s' % (st.mnemonic, st.op_str)
     m = re.search(r'\[(rbp|rsp) ?\+ ?(0x[0-9a-f]+|\d+)\]', st.op_str)
     if not m:
-        out.write('%s\t%s\t%s\tNO_FRAME_OPERAND\n' % (fn, site, text))
+        out.write('%s\t%s\t%s\t-\t-\t-\tNO_FRAME_OPERAND\n' % (fn, site, text))
         continue
     base, disp = m.group(1), int(m.group(2), 0)
     pat = re.compile(r'\[%s ?\+ ?0x%x\]' % (base, disp))
-    hits = ['%x %s %s' % (i.address, i.mnemonic, i.op_str) for i in ins if i.address > sva and pat.search(i.op_str)]
-    out.write('%s\t%s\t%s\t%d件; %s\n' % (fn, site, text, len(hits), ' | '.join(hits[:3]) or '-'))
+    reads, writes, leas, hits = 0, 0, 0, []
+    for i in ins:
+        if i.address <= sva or not pat.search(i.op_str):
+            continue
+        hits.append('%x %s %s' % (i.address, i.mnemonic, i.op_str))
+        dst = i.op_str.split(', ', 1)[0]
+        if i.mnemonic == 'lea':
+            leas += 1
+        elif i.mnemonic == 'mov' and pat.search(dst):
+            writes += 1
+        elif pat.search(dst) and i.mnemonic not in ('cmp', 'test'):
+            reads += 1
+            writes += 1
+        else:
+            reads += 1
+    out.write('%s\t%s\t%s\t%d\t%d\t%d\t%s\n' % (fn, site, text, reads, writes, leas, ' | '.join(hits[:3]) or '-'))
