@@ -63,7 +63,7 @@
 |---|---|
 | コードを変えた最後の commit | `7273b6ac` |
 | 測定に使った HEAD | `1fff0e4f` (REPORT 文言のみの差。`git diff 7273b6ac 1fff0e4f -- tools/icall` は本付録 `REPORT_APPENDIX_1998.md` のみ (+40 / −12)。コード差分 0) |
-| 素材 | `fl-win64`・`plugins-freshair` (fetch.sh: win 17 files, factory .epf 8)・`work-icall`・`toolchain-emsdk` (`/opt/emsdk`)。`toolchain-retdec` は `fa_route_build.sh`・`fa_sweep.sh` では未使用 |
+| 素材 | `fl-win64`・`plugins-freshair` (fetch.sh: win 17 files, factory .epf 8)・`work-icall`・`toolchain-emsdk` ([EMSDK])。`toolchain-retdec` は `fa_route_build.sh`・`fa_sweep.sh` では未使用 |
 | `tools/ott/native/build.sh` | OK (`work/libottnative.so`) |
 | `tools/icall/fa_route_build.sh` | OK、12.3 s |
 | `tools/icall/diff/fa_sweep.sh 8 60` (1 回目) | 131 関数、70.8 s、load (1 分平均) 0.98 → 1.21 (`uptime`、開始 1.55)。`bit一致 47 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 9` |
