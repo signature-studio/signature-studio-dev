@@ -6,7 +6,8 @@
 #   candidate.wav  wasm 側の WAV (SR-4 出力の差し込み口)。省略時は参照同士の self-test とネガコンのみ。
 #   class          A-exact | B-ulp | C-statistical | D-spectral (既定 D-spectral: 参照は実 DSP の出力で bit 一致を要求しない)
 # 判定結果は work/harness/ (gitignore) に出し、ここでは 1 行ずつ [OK]/[NG] を表示する。
-# 参照 WAV は content dir (ref_render.sh の S2REF_CONTENT。既定は専用の空 dir) で変わる。pin は条件ごと (REPORT_SR5 §1)。
+# 参照 WAV は content dir (ref_render.sh の S2REF_CONTENT。既定は installer 全展開 = ref_content.sh) で変わる。
+# pin は条件ごと: 全展開 = ref_manifest.json の主エントリ (main)、空 dir = content_empty (REPORT_SR5 §1・§4)。
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FLP="$(cd "$HERE/../../../flp" && pwd)"
@@ -38,8 +39,8 @@ fi
 REF="$H/ref_1/render_f32.wav"
 CONTENT_LINE="$(grep -m1 '^content=' "$H/ref_1.log" 2>/dev/null || echo 'content=? tables=?')"
 case "$CONTENT_LINE" in
-  *" tables=yes") PIN_KEY=content_full ;;
-  *)              PIN_KEY=main ;;
+  *" tables=yes") PIN_KEY=main ;;
+  *)              PIN_KEY=content_empty ;;
 esac
 echo "  content 条件: ${CONTENT_LINE##*/} (pin = ref_manifest.json の $PIN_KEY)"
 PIN=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print((d if sys.argv[2]=='main' else d[sys.argv[2]])['sha256_file'])" "$HERE/ref_manifest.json" "$PIN_KEY")
