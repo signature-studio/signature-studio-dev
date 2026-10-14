@@ -18,7 +18,7 @@
 | 項目 | 値 |
 |---|---|
 | runner | Intel Xeon 6973P-C (4 vCPU・Ubuntu 24.04・gcc 13.3.0・glibc 2.39)。sweep 前 load 0.17・sweep 後 0.74 |
-| 素材 | `work-icall` のみ展開 (`tools/icall/work/`・`tar --zstd -xf` で 19.8 s)。`FA_CORE` = `tools/icall/work/rt_freshair-core/rw.dll`。emsdk は runner 既存の `/opt/emsdk` を使用 |
+| 素材 | `work-icall` のみ展開 (`tools/icall/work/`・`tar --zstd -xf` で 19.8 s)。`FA_CORE` = `tools/icall/work/rt_freshair-core/rw.dll`。emsdk は runner 既存の `[EMSDK]` (Emscripten 6.0.12 pin) を使用 |
 | libottnative | `bash tools/ott/native/build.sh` で作成 |
 | fixed route | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh`: OK (6.9 s) |
 
