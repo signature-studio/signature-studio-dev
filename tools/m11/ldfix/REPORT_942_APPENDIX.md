@@ -171,6 +171,8 @@ k236 P=0xa027 値 0x40a027: なし
 
 ## 14. 通常 boot の trap 位置と lift 誤り候補 (#942 受入 1・2・run 10)
 
+既知類型との関係: 該当なし (docs/DEFECTS.md の既存 ID と機械語・IR の形が一致しない。近縁は D4。14-3 で比較)。
+
 測定 commit: `54bacdc0` (origin/main・本 PR の基点。e2e の実行経路はこの commit と同一)。素材 fl-win64 / work-m11 / work-liftdiff を展開 (toolchain-emsdk は `[EMSDK]` が runner に既存のため展開せず)。
 `FL_WIN64_DIR=$RUNNER_TEMP TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` は 71.5 秒 (real)・rc 0・judge PASS・load 0.96 / 0.67 / 0.31 (終了後)。stage4 units 17/942・icall 24・threw `memory access out of bounds` (base = fix)。survey ok 136 / trap 9 (base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
 
@@ -187,9 +189,11 @@ k236 P=0xa027 値 0x40a027: なし
 
 ### 14-3 lift 誤り候補 (PE 機械語と IR の照合)
 - PE の `function_450560` (VA 0x450560。`python3 tools/m11/ldfix/pe_disasm_va.py <block00031_PE.bin> 0x450560`): `mov rcx,[rsp+0x68]` (2 番目引数 = &s) → `mov rax,[rsp+0x60]` (1 番目引数) → `mov rdx,[rax]` (**1 番目引数が指す値**) → `call 0x4133f0` → `cmp qword [rax],0`。つまり `_LStrAsg(&s, *arg1)` 相当。
+- **D4 との比較 (判定)**: 1 段目の機械語 (`mov rdx,[rax]`・disp=0 の 1 段 deref) は D4 と形が同じだが、IR の代入元は deref 元のアドレス (rax = 1 番目引数 `arg1`) ではなく `%arg2` で、D4 の「rD := r8 (deref 元のアドレス)」とは一致しない。よって D4 と同型とはせず、「引数の取り違えを含む deref 脱落」の**別類型候補**とする (類型名は割り当てない。docs/DEFECTS.md への追記は PM 判断)。
 - base IR (`tools/m11/work/boot_final3.ll`・ldfix 前) の同関数: `%0 = call function_4133f0(i64 %arg2, i64 %arg2)` と `%1 = icmp eq i64 %arg2, 0`。2 番目の引数 (`rdx = [rax]`) が **アドレス (arg2) に置き換わり**、逆参照が 1 段落ちている。ldfix の修復対象ではなく、lift 段階に既存。
-- 同類型は libkio の `[T-SH-27]` (#1282・第 2 引数 deref 落ち・KIO_ARGREG で個別対応) にある。M11 側は未対応。`DEFECTS.md` の既存類型 (D7・D8 等) とは一致しないため、類型名は割り当てず候補とする。
-- trap 直前の文字列 `stack_var_-112` は `function_447e30` → `function_450540` → `function_450560` を経由する。`GetLocaleInfoW` スタブ (常に 0 を返す) の影響も確認した。scratch (repo 外) でスタブを「NUL 1 文字・戻り 1」に差し替えて再リンクしても、trap 位置は同一 (`function_4133f0` @0x350d1b・init 18・units 17)。GetLocaleInfoW の戻り値は原因ではない。
+- **2 段目 (同関数・比較の site)**: PE `0x45058d: cmp qword ptr [rax], 0` (rax = `[rsp+0x68]` = 2 番目引数 `arg2`)。base IR は `%1 = icmp eq i64 %arg2, 0`。比較オペランドの deref が落ち、arg2 (アドレス) そのものを比較している。D4 の「disp=0 の deref 脱落 → 当該 reg の値として扱う」と同型 (比較の消費者形)。修正対象は 1 段目と同じ子 #2502 の受入に含める。
+- 同類型は libkio の `[T-SH-27]` (#1282・第 2 引数 deref 落ち・KIO_ARGREG で個別対応) にある。M11 側は未対応。D7 (スタック引数のずれ) と D8 (rax 戻り値の消失) は今回の形ではない。
+- trap 直前の文字列 `stack_var_-112` は `function_447e30` → `function_450540` → `function_450560` を経由する。`GetLocaleInfoW` スタブ (常に 0 を返す) の影響も確認した。scratch (repo 外) でスタブを「NUL 1 文字・戻り 1」に差し替えて再リンクしても、trap 位置は同一 (`function_4133f0` @0x350d1b・init 18・units 17)。この再リンクは repo 外 scratch で行い、再現手段はリポジトリに無い (未再現)。よって GetLocaleInfoW の戻り値が原因でないとは確定しない (結論の強さは弱い)。
 
 ### 14-4 bin 表と size 表 (通常 boot・trap 後の状態)
 - サイズ→bin 表 (0x11e6a3c・326 バイト): 相異なる値 44 種・最大 172・184 以上の参照 0 件 (値は 4·i)。よって k184〜186・k236 (PE 静的データ由来の非 self-loop) は size < 2601 の GetMem 経路から到達しない。
@@ -199,7 +203,7 @@ k236 P=0xa027 値 0x40a027: なし
 
 ### 14-5 受入への反映
 - 受入 1 (trap 9 件の原因): 部分。通常 boot の trap (InitUnits 18 番目) の位置は確定。他 8 件は未確認。
-- 受入 2 (boot threw の原因): 部分。ldfix 起因ではない (base IR に既存)。入口は `function_450560` の第 2 引数の逆参照落ち (14-3・lift 誤り候補)。trap 時点の値への伝播経路は未追跡。
+- 受入 2 (boot threw の原因): 部分。ldfix 起因ではない (base IR に既存)。入口は `function_450560` の第 2 引数の逆参照落ち (14-3 の 1 段目) と、同関数の比較の逆参照落ち (14-3 の 2 段目)。trap 時点の値への伝播経路は未追跡。
 - 受入 3: #1469 の判定 (§8) を維持。本 run で分かったこと: 修復対象 `function_4133f0` の trap は、修復 (F3a: ヘッダ読みの順序) では消えない入力 (14-3) を読んでいる。帰属は未確定。
 
-未解決 (起票先): `function_450560` 系の第 2 引数逆参照落ち (M11 lift・#1282 と同類型) → 子 issue。他 8 件の trap の原因と、trap 時点の文字列値の伝播経路 → #942 (次 run)。
+未解決 (起票先): `function_450560` の 1 段目・2 段目の逆参照落ち (M11 lift・#1282 と同類型) → 子 #2502。他 8 件の trap の原因と、trap 時点の文字列値の伝播経路 → #942 (次 run)。
