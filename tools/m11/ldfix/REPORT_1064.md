@@ -6,7 +6,7 @@
 
 - 測定 commit: `cb3a89a6` (origin/main。本 run のコード変更は 0。追加は本 REPORT のみ)。
   `git diff cb3a89a6 HEAD -- tools/m11 tools/liftdiff` = 0 行 (本 REPORT のコミット前後で実行コードに差分なし)。
-- 素材: fl-win64 (`block00031_PE.bin`)・toolchain-emsdk (`/home/runner/work/_temp/emsdk`)・work-m11 (`tools/m11/work/`)・work-liftdiff (`tools/liftdiff/work/`)。toolchain-retdec は未使用。
+- 素材: fl-win64 (`block00031_PE.bin`)・toolchain-emsdk ([EMSDK])・work-m11 (`tools/m11/work/`)・work-liftdiff (`tools/liftdiff/work/`)。toolchain-retdec は未使用。
 - 比較の両側 (同一 HEAD・同一 PE・同一 image):
   - 旧版 = `ldfix.py` 009e823 の出力 (`prev.ll`)。12 関数の誤修復を含む。
   - 新版 = HEAD の `ldfix.py` の出力 (`new.ll`)。12 関数の修復を門で外した版。
