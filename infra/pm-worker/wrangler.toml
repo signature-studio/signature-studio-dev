@@ -36,4 +36,10 @@ new_sqlite_classes = ["PmDO"]
 [triggers]
 crons = ["* * * * *"]
 
+# Workers Logs。wrangler deploy は、ここに observability が無いと Worker 側の設定を enabled=false にする (config が正)。
+# 2026-10-14 の VM からの再デプロイがこれで Logs を無効にした (#2585)。削らないこと。
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 # secret (wrangler secret put / API の secret_text): STORE_KEY = 32 バイトの base64url。リポジトリには置かない。

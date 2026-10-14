@@ -128,7 +128,7 @@ cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd �
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 
-`npm ci` が要る (`test:unit` と `test:workers` は devDependencies の vitest を使う)。
+`pnpm install --frozen-lockfile` が要る (`test:unit` と `test:workers` は devDependencies の vitest を使う)。lockfile は `pnpm-lock.yaml` (このディレクトリ。`package-lock.json` は 2026-10-14 に廃止。理由は『Workers Builds』節)。
 
 `npm run build` は bun、デプロイは wrangler を使う。wrangler は `login --device` がある版 (公式 docs の例は 4.119.0 の出力。VM は 4.151.0 で `--device` の存在を `wrangler login --help` で確認済み)。VM では root 不要で `$HOME/.local/bin` に置く
 (`npm install --prefix $HOME/.local/wrangler wrangler@<版>`、bun は npm の `bun` パッケージ)。
@@ -239,7 +239,7 @@ Worker が送る type は `oc-watchdog` と `oc-pm` の 2 つだけ。`oc-watchd
 ## 再デプロイ (PM。VM に残した wrangler の OAuth)
 
 Worker のコード (`src/`・`wrangler.toml`) を変更して main に merge したら、PM が VM から再デプロイする。認証は初回デプロイで保存された OAuth を使う (wrangler が refresh token で access token を自動更新する)。
-Workers Builds は接続しない (後述)。デプロイするのは **main に merge 済みの commit だけ**。以下のコマンドは wrangler 4.151.0 で、`--help` とソース、認証なしで実行できるものは実行して確認した。実 Worker への実行は未確認の項目として最後に列挙する。
+Workers Builds は 2026-10-14 に接続された (『Workers Builds』節)。ただし install が通ると確認できるまで (#2585)、反映は引き続きこの手順で行う。デプロイするのは **main に merge 済みの commit だけ**。以下のコマンドは wrangler 4.151.0 で、`--help` とソース、認証なしで実行できるものは実行して確認した。実 Worker への実行は未確認の項目として最後に列挙する。
 
 1. 認証の確認 (token の値は表示しない・書かない)。
 
@@ -255,6 +255,7 @@ Workers Builds は接続しない (後述)。デプロイするのは **main に
 3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]`) が出る。migration の有無はここでは分からない。
 4. デプロイ: `wrangler deploy --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。
    - **`[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。** `--keep-vars` なしの既定では、dashboard 等で変えた var は消える (`wrangler deploy --help` の説明)。特に `LIVE_LAUNCH` / `LIVE_DISPATCH`: dashboard 等で変えても、再デプロイすると `wrangler.toml` の値 (2026-10-14 以降は `"1"`) で置き換わる。切替の手順は「切替」節 (A・B) が正本で、値を変えるときも `wrangler.toml` を変えて merge してから deploy する (正本はリポジトリ)。デプロイ前に手順 2 の `mode` `mode_launch` `mode_dispatch` を見て、意図しない `live` → `dry-run` の変化が出ないことを確かめる。
+   - **Workers Logs は `wrangler.toml` の `[observability]` で決まる。** 無いと wrangler 4.151.0 は deploy のたびに `observability: { enabled: false }` を送って無効にする (2026-10-14 の VM からの再デプロイで実測。件数は #2585)。deploy 後に `GET /accounts/{id}/workers/scripts/signature-studio-pm/settings` の `observability.enabled` が `true` であることを見る。
    - secret (`STORE_KEY`) は deploy で消えない (ソースで `keepSecrets: true`、`--help` に『secrets are never deleted by deployments』)。`STORE_KEY` を作り直さない (App の鍵が復号できなくなる)。
    - Durable Object のコードを変えるだけなら migration は要らない (公式: <https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/>)。migration は適用済みの tag を飛ばして、新しい tag の分だけが deploy 時に適用される。現在の `wrangler.toml` は `v1` (`new_sqlite_classes = ["PmDO"]`) だけ。`[[migrations]]` を足す変更は、ロールバックできなくなる境界を作る (後述)。単独の PR・単独のデプロイにする。
 5. 反映の確認。
@@ -293,7 +294,19 @@ Workers Builds は接続しない (後述)。デプロイするのは **main に
 2. 実行後に `wrangler whoami --json` が通ることを確認し、保留していた再デプロイをする。
 3. 依頼者が不在のときは待たない。`needs-user-input` の issue に積む (既定案: 『再認証まで反映を遅らせる』。他の作業は止めない。`docs/WORKFLOW.md` §12)。
 
-## Workers Builds を接続しない理由
+## Workers Builds
+
+### 現状 (2026-10-14。Cloudflare API の読み取りで確認)
+
+依頼者の許可で接続された (下の『接続しないと決めた理由』は、その前の判断)。設定: repo `signature-studio/signature-studio-dev`・branch `main`・root directory `infra/pm-worker`・watch paths include `infra/pm-worker/*`・preview ビルド無効・build command 空・deploy command `npx wrangler deploy`。build token は Cloudflare が自動作成した `Workers Builds - 2026-10-14 22:04`。
+
+- **install は pnpm で走る。** Workers Builds は、`infra/pm-worker/package.json` が npm を宣言していても、`infra/pm-worker` で `pnpm install --frozen-lockfile` を実行する (ビルドログで実測)。pnpm が選ばれる理由は、リポジトリ直下の `package.json` の `packageManager: pnpm@12.10.1` と推定している (未確認。ビルドログの `Detected the following tools` に `pnpm@12.10.1` が出る)。そのため `infra/pm-worker` には `pnpm-lock.yaml` が要る。`package.json` に `packageManager: npm@...` を書いても pnpm 12 が実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。lockfile が無いと `ERR_PNPM_NO_LOCKFILE` で落ちる (#2454 → #2585 の経緯)。
+- `pnpm-workspace.yaml` の `allowBuilds` は、pnpm 12 の `strictDepBuilds` (既定) で esbuild と workerd の postinstall を許すためのもの。依存を足して postinstall を持つものが入ったら、ここに足す (足さないと `ERR_PNPM_IGNORED_BUILDS`)。
+- **deploy は `wrangler.toml` が正。** `[observability]` を削ると、次の deploy (VM でも Workers Builds でも) が Workers Logs を無効にする。`[vars]` も同じ (上の再デプロイの手順 4)。
+- watch paths を `infra/pm-worker/*` にしても、`infra/pm-worker` を触らない merge でビルドが走ることがある (2026-10-14 に実測。件数は #2585)。公式は『push event の変更ファイルが 0 件ならパス判定を飛ばして build する』と書く。原因は未確認。無関係な merge でも deploy が走りうる。
+- ビルドの状態は `GET /accounts/{id}/builds/workers/{script_tag}/builds`、ログは `GET /accounts/{id}/builds/builds/{uuid}/logs` で読める。
+
+### 接続しないと決めた理由 (2026-10-14 の最初の判断)
 
 Workers Builds (Cloudflare 側に repo を接続し、main への merge で自動ビルド・デプロイする機能) は、既定ではビルド用の API token を Cloudflare がアカウントに**自動で発行**する (公式: <https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token>)。依頼者の指示 4・9 (無断で token を作らない・secrets を平文で保存しない) の趣旨に反しうるため、PM 判断 (2026-10-14、#2357 [CI-78]) で接続しないと決めた。代わりに、上の手順で PM が VM の OAuth を使って再デプロイする。引き換えに、merge から反映までは PM の操作を待ち、OAuth が失効している間は反映できない (稼働中の Worker は止まらない)。依頼者が判断を変えたら、#2357 を再開して判断する。
 
