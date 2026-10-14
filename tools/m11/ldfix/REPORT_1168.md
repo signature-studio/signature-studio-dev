@@ -175,9 +175,10 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 ## 8. #1980 (LD-73) 窓の拡張による 1:1 対応の再調査 (部分達成・規則は未採用)
 
 測定 commit: `543e7320` (`link_d17.py` / `link_d17_e2e.sh` / `fix_d17.py` / `fix_d17_e2e.sh` / `audit_lsf_ssa.py` を最後に変えた commit)。
-差分の証跡: `git diff 543e7320 dcc609a9 -- <上記 5 files>` は空。HEAD (本 PR) でも同じ 5 files に差分なし。素材 `work-m11` と `toolchain-emsdk` を展開 (`tools/m11/work/`、`/opt/emsdk` emcc 6.0.12)。
+差分の証跡: `git diff 543e7320 HEAD -- tools/m11/ldfix/link_d17.py tools/m11/ldfix/link_d17_e2e.sh tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf_ssa.py` の出力は空 (0 行)。
+素材: `work-m11` (`tools/m11/work/`) と `toolchain-emsdk` ([EMSDK]) が必要。
 
-再測定: `bash tools/m11/ldfix/link_d17_e2e.sh` (foreground、46.3 秒、emcc rc=0)。値は §6 と一致。
+再測定: `bash tools/m11/ldfix/link_d17_e2e.sh` (foreground、前回 run で 46.3 秒、emcc rc=0)。値は §6 と一致 (上記の差分 0 のため)。
 
 | 段 | store_CC_site | store_CC_fn | store_CELL_DEEP |
 |---|--:|--:|--:|
@@ -185,7 +186,10 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 | ssa_neg (fix_d17 のみ) | 53 | 28 | 52 |
 | ssa_link (fix_d17 + link_d17) | 47 | 26 | 58 |
 
-窓の拡張の診断 (一時スクリプト・コミットせず。`mach_chains` の rD 使用の走査窓 8 / 16 / 32 / 64 命令):
+窓の拡張の診断 (`mach_chains` の rD 使用の走査窓 8 / 16 / 32 / 64 命令)。表の数値は前回 run の一時スクリプト (コミットせず) の出力。
+同じ集計を再現するコミット版は `tools/m11/ldfix/window_survey_1980.py` (引数: IR・AUDIT・IMAGE・CFG、`--windows 8,16,32,64`)。
+実行: `python3 tools/m11/ldfix/window_survey_1980.py tools/m11/work/boot_d17.ll <ssa_base.json> tools/m11/work/m11_image.bin 'tools/m11/work/boot*.drc.config.json'`
+(`boot_d17.ll` は `link_d17_e2e.sh` の 2/6 出力。コミット版の再実行結果は本節の表と照合していない)。
 
 | 窓 | 1:1 で結べた load | 結べない理由 (IR 1 本・chain 1 本のブロック) |
 |--:|--:|---|
@@ -197,6 +201,13 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 - 窓を広げても結べ数・理由の内訳とも変わらない。`dst_unused` は rD の使用先が 64 命令以内に無い (= 窓の問題ではない) ことを示す。
 - 同一ブロックに IR load が 2 本以上ある組は 50 ブロック。そのうち IR 本数と chain 本数が一致したのは 17 (`ff63f0` 11 本・`128f9e0` 系など)、一致し幅の順序まで揃ったのは 2 だけ。
 - 順序・本数・幅のどれでも一意に決まらないため、規則は採用しない (§7 と同じ判断)。
+- 本節の「結べない 47 件」(IR 1 本・chain 1 本のブロックの理由別内訳 18+18+11) と、上の「結べない load 140 件」(§6 の残作業) は別集合。前者は IR 1 本・chain 1 本のブロックに限った数、後者は K 組全体の未結合 load 数。
 
-結論: 受入条件 1 (値の流れによる 1:1 規則) と 3 (ネガコン) は未達。受入条件 2 (store 宛 CELL_COLLAPSED の減少) は §6 の 47 site のまま。
-受入条件 4 (emcc 構文検証) は現 HEAD の修復 IR で通過。残作業: 同一ブロック複数 load の順序を、機械語の rD の値の流れ (store 先・後続 load の基底) まで追う別方式の設計。子 issue の起票先は PR 本文の未解決表。
+結論 (#1980 の受入条件の現行番号に対応):
+- 1. 窓拡張の実測: 達成。窓 8/16/32/64 で結べ数は 11 のまま変わらない (上の表)。
+- 2. 結べた load の修復: 達成。既存の 11 件のみ。store 宛 CELL_COLLAPSED は 86 → 47 site (§6)。
+- 3. ネガコン維持: 達成。ssa_neg 53/28 (修復を外すと 86/49 に戻る)。
+- 4. emcc 構文検証: 達成。`link_d17_e2e.sh` の emcc rc=0。
+- 5. REPORT 記録: 達成 (本節)。
+- 未達 (#2072 [LD-76] へ移管): 値の流れによる 1:1 規則 (同一ブロック複数 IR load の順序を機械語の rD の値の流れで決める方式)、結べない load 数の関数・K 単位の表更新。
+残作業の設計は #2072 で行う。
