@@ -182,12 +182,20 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - R2 への投入の記録: repo 内にあるのは 2026-10-12 の全素材の再投入 1 回 (依頼者操作。`docs/pm/RETRO_2026-10-13.md`)。PM が VM で記録したとされる昇格ログは 1 件 (2026-10-13T14:16:50Z) だが、本 run では VM のログを確認していない `[未確認]`。
 - 未解決: open の #874 ([CI-18] mac pkg 素材の R2 化) の投入状況は本 run で未確認 (R2 の一覧は認証情報を使わずに取得していない)。起票先: 既存の #874 (新規起票なし)。
 
-## 14. oc-pm の refs_orphan 検出 (#2337・PR #2478)
+## 14. `pm_wake.sh` の判定テストと live の確認 (#2347)
 
-- 測定 commit: `22e36902` (main `5745f0c9` の取り込み merge。競合解消は 14-3)。取得時刻は UTC (2026-10-14)。環境: runner・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
+既知類型との関係: 該当なし (PM 運用の記録)。測定 commit `edb3ab39` (コードを変えた最後の commit)、測定時刻 2026-10-14T15:19Z (`date -u`)。
+- テスト `bash tools/pm/test_pm_wake.sh`: **20 passed, 0 failed**、所要 **0.70 s** (fake curl・fake opencode。ネットワーク不使用。ネガコン 10 件を含む)。
+- ネガコンの確認: 間隔を 0 にした一時複製では c1・c2・f2 が、上限と fresh 判定を壊した複製では d2・d3・g2 が FAIL (いずれも 17 passed, 3 failed)。
+- live (読み取りのみの `GET /status`、15:18Z): `needs_pm`・`stuck`・`stuck_age_max_min` が返らない。`pm_wake.sh` は `result=status-failed reason=parse`・exit 2 で、送信は 0 件。本番 Worker は #2335 の変更を含まない版と見られる `[未確認: デプロイ版]`。再デプロイ後に needs_pm 経路が有効になる。
+- 差分 (測定 commit から HEAD まで・コード範囲): `git diff edb3ab39 HEAD -- tools/pm/pm_wake.sh tools/pm/test_pm_wake.sh tools/pm/systemd` の出力は空 (差分 0)。
+
+## 15. oc-pm の refs_orphan 検出 (#2337・PR #2478)
+
+- 測定 commit: `22e36902` (main `5745f0c9` の取り込み merge。競合解消は 15-3)。取得時刻は UTC (2026-10-14)。環境: runner・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
 - 差分の証跡: `git diff 22e36902 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 
-### 14-1. 測定
+### 15-1. 測定
 
 | 項目 | 結果 |
 |---|---|
@@ -198,7 +206,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | `bun build src/index.ts --target=browser --format=esm --external 'node:*'` | 91.99 KB (91,991 bytes)。`--minify` を付けると 60.57 KB (60,574 bytes) |
 | 前回 (取り込み前・測定 commit `20fcb6e1`) | `npm test` 172 件 PASS。取り込み後の件数の差は main 側の追加テスト |
 
-### 14-2. ネガコン (1 件を壊して FAIL を確認・測定 commit `22e36902` で再実施)
+### 15-2. ネガコン (1 件を壊して FAIL を確認・測定 commit `22e36902` で再実施)
 
 `infra/pm-worker` を scratch に複写し、テストが参照する repo の他の部分は symlink した。scratch の baseline は 193 件 PASS。worktree は変えていない。
 
@@ -208,13 +216,13 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | `src/webhook.ts`: `pr.state === "closed" && pr.merged_at ?` の `pr.merged_at` を外す | FAIL 1 (PASS 192) | REST 経路 (merge されていない項目に `refsOnlyNums` が立つ)。検出の結果は変わらない (`detectPm` が `p.merged` で先に弾く) |
 | `src/pm.ts`: `refs_orphan` の `dayMax` 10 を 1000 に | FAIL 1 (PASS 192) | ネガコン (d) (1 日 11 件目の上限) |
 
-### 14-3. 競合解消 (main `5745f0c9` の取り込み)
+### 15-3. 競合解消 (main `5745f0c9` の取り込み)
 
 - `refsOnly` の同名衝突: main は `boolean` (refs-only merge 率の指標・#2335)、PR は Refs 番号の一覧 (refs_orphan)。PR 側を `refsOnlyNums` に改名した (`src/webhook.ts`・`src/pm.ts`・`test/refsorphan.test.ts`)。main の `refsOnly`・`mergedAt`・`ASSOC_OK` の export・`user_answered` のコメント者制限 (#2461) は残した。
 - `docs/DOC_MAP.md`・`infra/pm-worker/README.md` は両側の行を残した。`tools/pm/REPORT.md` の行数は 213 (上限 250 以内)。
 - 未解決: refs-only の判定が 2 つある (`webhook.ts` の `refsOnlyBody` と `refs.ts` の `refsOnlyNumbers`)。`Closes owner/repo#5` と `Refs #3` の併記では、前者は false、後者は `[3]` を返す (`refs.ts` の閉じ語が他リポジトリ参照を拾わない)。影響は refs_orphan の候補が 1 件多く出ること (既定は dry-run)。判定を 1 つに揃えるのは別作業。
 
-### 14-4. 検証範囲
+### 15-4. 検証範囲
 
 - 検証は fetch のモック (node:test と vitest) まで。実 GitHub API・Cloudflare 上の Worker・live の送信は未実行。
 - `LIVE_*` のスイッチの値は変更していない (`wrangler.toml` は comment の参照先だけ直した)。

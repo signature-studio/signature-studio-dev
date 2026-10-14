@@ -7,10 +7,18 @@ import { ASSOC_OK, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 export const PM_KINDS = ["stuck", "no_pr", "refs_orphan", "needs_decision", "stopped_report", "user_answered", "supply", "digest", "retro"] as const;
 export type PmKind = (typeof PM_KINDS)[number];
 
-// この Worker が検出する kind。着手の優先順 (人の回答待ち・PM 判断待ちを先に送る)。
-// supply / digest は [CI-71] / [CI-70] が担当する。
+// この Worker が状態から検出する kind。着手の優先順 (人の回答待ち・PM 判断待ちを先に送る)。
+// refs_orphan は [CI-58]、supply は [CI-71] が担当する。
 export const DETECTED_KINDS = ["user_answered", "needs_decision", "stuck", "no_pr", "refs_orphan"] as const;
 export type DetectedKind = (typeof DETECTED_KINDS)[number];
+
+// 日次のダイジェスト (CI-70)。状態ではなく時刻で送る。ref は常に 0。内容は PM agent が pm.md の digest 節で集計する。
+export const DIGEST_KIND = "digest";
+export const DIGEST_REF = 0;
+export const DIGEST_EVERY_MS = 24 * 3_600_000;
+// rolling issue (題名 `[CI-n] 自律運転ダイジェスト (rolling)`) は本文だけを更新する issue。launch・再投入の対象から外す (classify)。
+// tools/pm/launch_issues.py の DIGEST_ROLLING_RE と同じ形にする (test-dispatch-context.sh が題名の一致を検査する)。
+export const DIGEST_ROLLING_RE = /^\[[A-Za-z]+-\d+\] 自律運転ダイジェスト \(rolling\)$/;
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
