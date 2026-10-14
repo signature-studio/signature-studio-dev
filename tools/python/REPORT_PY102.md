@@ -194,7 +194,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 
 - 取り込み。`origin/main` `4b81e78a` を merge (`e3b67424`)。競合は `tests/provider_check.mjs` の 1 箇所だけ。main 側は PY-121 (#2982) の `pe121_2982` (ui 表示・メニュー 6 関数) を追加した。両方を集合に入れ、件数は main の `impl 115・unimpl 320` に `pe102` の +1 を加えて `impl 116・unimpl 319` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`provider/build.sh` は自動マージで衝突なし。
 - 前回の測定 (`3aa3a256`・`origin/main` `c98d2c99` の取り込み後) の全文は `REPORT_PY102_APPENDIX_2883.md` へ分割移動した (250 行上限)。
-- 測定 commit: `e3b67424` (コードを変えた最後の commit)。`git diff e3b67424 HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` は 0 行 (本節の追記だけが差分)。
+- 測定 commit: `e3b67424` (コードを変えた最後の commit)。`git diff e3b67424 HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` の範囲は、`origin/main` `79d5e7c8` を取り込んだ merge `201f70a1` の分 (main 由来の追加 3 件: `analysis/py99_*.py` 2 本と `REPORT_PY99_APPENDIX.md`・#2874) だけ。検証範囲 (`git diff e3b67424 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis/flapi tools/python/analysis/flapi_table.py`) は 0 行。
 - 素材・emsdk・CPython: `fl-win64` の 5 block を `$RUNNER_TEMP/fl-win64/extracted/` に展開 (`FL_WIN64_DIR`)。emsdk 6.0.12 は [EMSDK] の既定位置へ symlink した。CPython wasm は `3aa3a256` の run で作成した出力 (`work/`・gitignore) を使った。`c98d2c99`→`4b81e78a` の間に `tools/python/src`・`build_cpython_wasm.sh`・`fetch_inputs.sh` の変更は 0 件 (`git diff --stat`)。
 - 環境: GitHub Actions runner (4 コア)。`uptime` の load average は 22:36:17 に `0.39 0.76 0.61`、22:36:33 に `0.78 0.83 0.64`。
 
