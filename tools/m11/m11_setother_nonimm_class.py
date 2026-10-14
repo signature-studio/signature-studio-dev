@@ -54,7 +54,10 @@ EXT = ('movzx', 'movsx', 'movsxd', 'cdqe', 'cwde', 'cbw')
 MOVS = ('mov', 'movabs', 'movaps', 'movapd', 'movups', 'movdqa', 'movdqu', 'movss', 'movsd', 'movq', 'movd')
 COPY_XMM = ('movaps', 'movapd', 'movups', 'movdqa', 'movdqu')
 ZERO = ('xor', 'pxor', 'xorps', 'xorpd')
-NOWRITE_PREFIX = ('j', 'cmp', 'test', 'push', 'ucomis', 'comis', 'bt', 'nop', 'ret', 'jmp')
+# 完全一致 (jcc は 'j' 前方一致)。前方一致だと btr/bts/btc・cmpxchg・SSE の cmpeq*sd を「書かない命令」と誤る。
+NOWRITE = {'cmp', 'test', 'push', 'ucomiss', 'ucomisd', 'comiss', 'comisd', 'nop', 'nopw', 'nopl', 'ret'}
+# capstone の regs_access は cmpxchg の rax 書込みを返さないため、暗黙の書込み先を明示する。
+CMPX_W = {'cmpxchg': ('rax',), 'cmpxchg8b': ('rax', 'rdx'), 'cmpxchg16b': ('rax', 'rdx')}
 
 
 def fn(va):
@@ -115,11 +118,12 @@ class Ctx:
                 continue
             if x.mnemonic in ('ret', 'jmp'):
                 return ('未決', 'branch', None, hex(x.address))
-            if x.mnemonic.startswith(NOWRITE_PREFIX):
+            if x.mnemonic.startswith('j') or x.mnemonic in NOWRITE:
                 k -= 1
                 continue
             dst, src = split_ops(x.op_str)
-            if fam in self.cf.rw(x)[1] or (reg_of(dst) and reg_of(dst)[0] == fam):
+            if fam in self.cf.rw(x)[1] or fam in CMPX_W.get(x.mnemonic.split()[-1], ()) or (
+                    reg_of(dst) and reg_of(dst)[0] == fam):
                 return self.def_reg(fam, x, dst, src, k, depth)
             k -= 1
         return ('未決', 'entry', None, None)
@@ -189,6 +193,8 @@ class Ctx:
                     m['write'] and m['base'] == 'rsp' and m['disp'] == disp for m in ldmach.memops_of(self.cf.cs, x)):
                 dst, src = split_ops(x.op_str)
                 at = hex(x.address)
+                if x.mnemonic not in MOVS:
+                    return ('未決', 'stack_other:' + x.mnemonic, None, at)
                 parts = dst.split()
                 size = SIZE.get(parts[0]) if parts else None
                 if size == 64 and IMM.match(src):
