@@ -1,6 +1,7 @@
 // unit 1..idx を順に実行し、各 unit の後の icall-miss の累計 (総数・一意 target) を出す。どの unit で miss が増えたかを見る (SHX-T9h #2489)。
 //   node probe_miss_units_2489.mjs <m11_sx_*.cjs | m11_boot.cjs 絶対パス> [unit_index 既定 22]
-//   素材: tools/m11/work/ (work-m11 と再生成した work/m11_image.bin)
+//   素材: tools/m11/work/m11_image.bin (work-m11 同梱。m11_image_gen.py の再生成と byte 一致を確認済み)。
+//         cjs 側の m11_data.c は m11_data_gen.py で作り直した版がリンクされる (この probe は m11_data.c を直接読まない)。
 import fs from 'fs';
 import path from 'path';
 
@@ -9,8 +10,7 @@ const cjs = path.resolve(process.argv[2]);
 const idx = Number(process.argv[3] ?? 22);
 const m2 = await import(cjs);
 const image = fs.readFileSync(M11 + '/work/m11_image.bin');
-const errs = [];
-const mod = await (m2.default || m2)({ printErr: (s) => { errs.push(String(s)); } });
+const mod = await (m2.default || m2)({ printErr: () => {} });
 mod.HEAPU8.set(image, 0);
 mod._m11_set_survey(1);
 const sp = mod._emscripten_stack_get_current();
@@ -25,4 +25,3 @@ for (let i = 0; i < idx; i++) {
   prev = cur;
 }
 console.log('MISS_FINAL|', prev);
-for (const l of errs.slice(0, 0)) console.log(l);
