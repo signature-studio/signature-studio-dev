@@ -78,9 +78,9 @@ else
   ok "1 サンプル改変を A-exact で FAIL: $(verdict "$H/neg_sample.json" | cut -c1-80)"
 fi
 
-echo "== [5] factory preset 参照 (LD - Analog Crispy Cotton) — 決定性・pin・self-test・ネガコン (SR-46 #2384) =="
+echo "== [5] factory preset 参照 (SY - Action Hero) — 決定性・pin・self-test・ネガコン (SR-46 #2384) =="
 PRE_ROOT="$HERE/../work/content_full/Presets/Factory"
-PRE_MAIN="$PRE_ROOT/Lead/LD - Analog Crispy Cotton.SerumPreset"
+PRE_MAIN="$PRE_ROOT/Synth/SY - Action Hero.SerumPreset"
 PRE_NEG="$PRE_ROOT/Pad/PD - 1970s String Machine.SerumPreset"
 if [ "$PIN_KEY" != main ]; then
   echo "  [skip] preset 参照は全展開 content のみ (現在の条件: $PIN_KEY)"
@@ -95,9 +95,9 @@ else
   if [ "${#PSHA[@]}" -eq 3 ] && [ "${PSHA[0]}" = "${PSHA[1]}" ] && [ "${PSHA[1]}" = "${PSHA[2]}" ]; then
     ok "preset 3 回の file SHA-256 が一致 (${PSHA[0]:0:16}…)"
   else
-    ng "preset の SHA-256 が不一致 (${PSHA[*]})"
+    ng "preset の SHA-256 が不一致 (${PSHA[*]})。preset 描画の非決定 (REPORT_SR5 §5)"
   fi
-  PPIN="$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(d['presets'][sys.argv[2]]['sha256_file'])" "$HERE/ref_manifest.json" "LD - Analog Crispy Cotton" 2>/dev/null || echo none)"
+  PPIN="$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(d['presets'][sys.argv[2]]['sha256_file'])" "$HERE/ref_manifest.json" "SY - Action Hero" 2>/dev/null || echo none)"
   if [ "${PSHA[0]:-}" = "$PPIN" ]; then ok "preset sha256 が ref_manifest.json (presets) と一致"; else ng "preset sha256 が pin と不一致 (${PSHA[0]:0:16} vs ${PPIN:0:16})"; fi
   PREF="$H/pre_1/render_f32.wav"
   judge "$PREF" "$H/pre_2/render_f32.wav" A-exact "$H/pre_self.json" && ok "preset self-test (pre_1 vs pre_2): $(verdict "$H/pre_self.json" | cut -c1-80)" || ng "preset self-test が FAIL: $(verdict "$H/pre_self.json")"
