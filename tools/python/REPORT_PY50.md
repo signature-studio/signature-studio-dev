@@ -14,7 +14,8 @@
 
 - 素材: `fl-win64.tar.zst` → `flstudio_win64_26.1.7.5653.exe/extracted/block00031_PE.bin` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`、展開 3.0 秒・実測)。展開先は `tools/python/work/py50/` (gitignore)。
 - 逆アセンブル: `python3 tools/python/analysis/py41_disasm.py <PE> <VA>` (capstone・pefile)。`ret` で止まるため、`finish` 分岐は全域を逆アセンブルして確認した。
-- 測定 commit: 本 PR の doc commit (コード差分 0)。
+- 測定 commit: `d3fe5a00` (コードを変えた最後の commit)。
+- 鮮度の証跡: `git diff d3fe5a00 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (実測・HEAD で再確認)。provider / host / tests は未変更のため再測定は不要 (`docs/WORKFLOW.md` §6)。
 
 ## 1. `chan` のフィールド (PE 解析箇所)
 
@@ -65,6 +66,6 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `+0x794`・`+0x79c` の意味 (名前・書込幅の不一致の解消) | 受入条件 1 が未達。rerollLoopStarter* の chan 対応付けが確定しない | [PY-50] の残り (子 issue として起票予定) |
+| `+0x794`・`+0x79c` の意味 (名前・書込幅の不一致の解消) | 受入条件 1 が未達。rerollLoopStarter* の chan 対応付けが確定しない | #1871 ([PY-51]) |
 | `0x1046a30` の本体 (`setSwing` / `getSwing`) | `REPORT_PY41` の未確定 | [PY-41] (#1514 系) |
 | C 実装・mock 差分 0・`all_tools.mjs` 48/48 | 受入条件は本 issue の範囲外 | [PY-41] |
