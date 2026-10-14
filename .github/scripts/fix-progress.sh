@@ -51,7 +51,7 @@ REPEAT_JACCARD="${OC_REPEAT_JACCARD:-0.6}"
 # classes マーカーの欠落・不正は unknown。conflict と merge-failed の差し戻しは計数しない。
 JQ_DEFS='
 def allowed: ["doc","remeasure","artifact","closes","path","input","conflict","code","pm-decision","user-decision"];
-def cls: ((try (.body | capture("oc-review:[^>]*classes=(?<c>[^ >]*)") | .c | split(",")) catch []) as $c
+def cls: (([(.body // "") | capture("oc-review:[^>]*classes=(?<c>[^ >]*)") | .c | split(",")] | first // []) as $c
   | if ($c | length) == 0 or (($c - allowed) | length) > 0 then ["unknown"] else $c end);
 def counted: (cls | any(. == "conflict") | not) and ((.body // "") | contains("[merge-failed]") | not);
 def grams: explode as $e | [range(0; ($e | length) - 1) | [$e[.], $e[. + 1]] | implode] | unique;
