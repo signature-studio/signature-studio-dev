@@ -10,17 +10,17 @@
 |---|---|
 | 19 関数・23 site の未判定 site を機械語・IR の両面で追跡し 4 種のいずれかに分類 | **部分達成**。確定 14 (OK_LOAD 13・TRUE_DROP 1) / 未判定 9 (IR・機械語の照合待ち、§4)。NO_CONSUMER 0 / UNDETERMINED 0 |
 | 判定の根拠 (機械語・IR の行) を `candidate_verdicts_1161.jsonl` と同じ形式で残す | **部分達成**。確定 14 行を残す (既存 31 行は不変)。照合待ちの 9 行は `results/held_verdicts_2265.jsonl` に根拠の原文のまま退避 (台帳には入れない) |
-| 分類表を再生成し範囲の未判定を 0 件にし、`audit_lsf_ssa_e2e.sh` の 7/7 で確認 | **未達**。範囲の未判定は 9 (23 → 9)。head の e2e は未実施 (`work-m11`・`work-liftdiff` の素材が無い、§6)。分類表は commit 済みの入力から再生成して確認 (§6) |
-| 脱落関数の和集合の更新を報告 | **達成 (head の再集計・e2e 外)**。69 → 72 (+3。内訳は §3) |
+| 分類表を再生成し範囲の未判定を 0 件にし、`audit_lsf_ssa_e2e.sh` の 7/7 で確認 | **未達** (範囲の未判定は 9・23 → 9)。e2e は測定 commit `a9c2e538` で rc=0・7/7 (§6)。分類表 (`spill178_1161.tsv`) は step 7 の出力と cmp 一致 |
+| 脱落関数の和集合の更新を報告 | **達成 (e2e step 7 [6] の出力)**。69 → 72 (+3。内訳は §3) |
 
-- 判定の根拠は、本 run で IR (`boot_final3.ll`) も機械語像 (`m11_image.bin`) も照合できなかった。確定 14 行の IR 行は前 run の subagent の引用のままで、親が再確認したのは `6c3700:6c3a63` の 1 件だけ (§2・§4)。
-- 測定 commit (e2e の実測): **`482ec43d`**。その後の `results/` の変更 (main 取込と判定の撤回) は e2e で再測定していない。
+- 判定の根拠: 本 run で `boot_final3.ll` が揃ったため、確定 14 行の IR 引用行を全て照合した (§2)。照合待ちの 9 件は判定から外したままで、照合は #2583 に残す (§4)。
+- 測定 commit (e2e の実測): **`a9c2e538`** (本 PR のコード・結果の最後の commit。m1 の修正を含む)。旧実測 `482ec43d` の値は §6 の実行 3 に残す。
 
 ## 2. 対象 23 site の分類
 
-判定は subagent 6 本 (関数単位・並列・読み取りのみ) が機械語 (`ld98_dump.py` と同じ `audit_lsf.descend` で降下) と IR (`tools/m11/work/boot_final3.ll` の `function_<fn>` 本体) を突き合わせて出した。前 run で親は、判定の根拠行を `candidate_verdicts_1161.jsonl` に追記する前に、D15 同型の代表 1 件 (6c3700:6c3a63 の IR 267283-267294 のループ) を直接確認した。本 run では `boot_final3.ll` が無いため IR の照合は 1 件も再実施していない (表の IR 列は前 run の引用のまま)。照合できなかった 9 件は判定から外した (§4)。
+判定は subagent 6 本 (関数単位・並列・読み取りのみ) が機械語 (`ld98_dump.py` と同じ `audit_lsf.descend` で降下) と IR (`tools/m11/work/boot_final3.ll` の `function_<fn>` 本体) を突き合わせて出した。前 run で親は、判定の根拠行を `candidate_verdicts_1161.jsonl` に追記する前に、D15 同型の代表 1 件 (6c3700:6c3a63 の IR 267283-267294 のループ) を直接確認した。本 run (測定 commit `a9c2e538`) では `boot_final3.ll` を用いて、確定 14 site の IR 列の行番号と内容を全て照合した。行番号のずれは 101d423 の 2 行だけで、修正済み (m1)。機械語側は、表の各行とは個別に照合していない。`ld98_dump.py` の再実行 (§6) で TSV と cmp 一致したことだけを確認した。照合できなかった 9 件は判定から外した (§4)。
 
-| fn | site | 判定 | 機械語の消費者 | IR 側の対応 (boot_final3.ll 行・前 run の引用) |
+| fn | site | 判定 | 機械語の消費者 | IR 側の対応 (boot_final3.ll 行) |
 |---|---|---|---|---|
 | 4fa3d0 | 4fa681 | OK_LOAD | 4fa690 → 4fa694 call 0x40faa0 (第1引数) | 181133 load → 181135 call function_40faa0 |
 | 4fa3d0 | 4fa7aa | OK_LOAD | 4fa7b9 → 4fa7bd call 0x40faa0 (第1引数) | 181198 load → 181200 call function_40faa0 |
@@ -32,7 +32,7 @@
 | 775340 | 77545c | 未判定 (旧 TRUE_DROP・照合待ち) | 775657 → 775678 call 0x7747c0 (rcx を読む) | 290821 call function_7747c0() は引数 0 個。被呼出側 290584 の alloca に store 無し → 290589 load が undef |
 | 775340 | 77593b | 未判定 (旧 OK_LOAD・照合待ち) | 7759f6・775a29 → float store (P 経由) | 291006 load P → 291069・291092 store (§4) |
 | 815050 | 815220 | 未判定 (旧 TRUE_DROP・照合待ち) | 815227 cmp・815231 → 815238 mov rax,[rax-8] | 318485 load G (一段のみ) → 318486・318491・318493 が一段目の値を使う (二段目の deref 欠落) |
-| 6c3700 | 6c3a63 | **TRUE_DROP** (親が前 run で直接確認) | 6c3a6b call [rdi+0x128] (第5引数) | 267283-267294 の内側ループはカウンタ加算のみ。間接 call 無し (D15) |
+| 6c3700 | 6c3a63 | **TRUE_DROP** (親が前 run で直接確認・本 run で再照合) | 6c3a6b call [rdi+0x128] (第5引数) | 267283-267294 の内側ループは加算と reg2mem の load・store のみ。間接 call 無し (D15) |
 | 6c3700 | 6c3c78 | 未判定 (旧 TRUE_DROP・照合待ち) | 6c3c80 call [r13+0x128] (第5引数) | 267396-267407 のループはカウンタ更新のみ。間接 call 無し (D15) |
 | 6c3d20 | 6c44bd | 未判定 (旧 TRUE_DROP・照合待ち) | 6c44c5 call [rsi+0x128] (第5引数) | 267830-267841 のループはカウンタ更新と減算のみ。間接 call 無し (D15) |
 | 6c5930 | 6c6125 | 未判定 (旧 TRUE_DROP・照合待ち) | 6c612d call [rbx+0x128] (第5引数) | 対応ブロック無し (267973-268105)。根拠が IR の不在のみ (§4) |
@@ -51,7 +51,7 @@
 
 ## 3. 分類表と脱落関数の和集合
 
-| 項目 | 前 (b665b667・分類前) | 482ec43d (e2e 実測・旧) | head 1da6d153 + 本 commit (commit 済み入力から再生成・e2e 外) |
+| 項目 | 前 (b665b667・分類前) | 482ec43d (e2e 実測・旧) | a9c2e538 (e2e 実測・本 run) |
 |---|---|---|---|
 | spill 宛 unk site | 178 / 71 関数 | 178 / 71 関数 | 178 / 71 関数 |
 | status 未判定 / 確定 / 判定不能 | 120 / 51 / 7 | 97 / 74 / 7 | **77 / 92 / 9** |
@@ -61,16 +61,16 @@
 - 和集合の増分 3 の内訳: `6c3700` (本 PR の確定 TRUE_DROP)・`4120c0`・`41a5d0` (main 取込の候補行 74・78 行目由来)。`spill_classify_1161.py` の [6] 行が出力した値。
 - 482ec43d の 77 は本 PR の 8 新規関数 (`6c3700` `6c3d20` `6c5930` `775340` `815050` `f3e050` `1042d20` `12f9730`) の判定由来。照合待ちで判定を外したため、その 7 関数は和集合から外れた。
 - 和集合は確定した TRUE_DROP (目視・候補) だけから作る。候補の未判定は含めない (`spill_classify_1161.py` の定義どおり)。
-- `drops_510.tsv` (#510 の目視・動的の集計) は変更していない。`results/` の差分は `candidate_verdicts_1161.jsonl` (9 行削除) と `spill178_1161.tsv` (9 行の status 更新) と `held_verdicts_2265.jsonl` (新規・9 行) のみ。
+- `drops_510.tsv` (#510 の目視・動的の集計) は変更していない。本 PR で `results/` に加えた変更は §6 の差分の表のとおり。
 
 ## 4. 判定の強さ (照合待ちの判定と弱い根拠)
 
 - **判定から外した 9 件** (`results/held_verdicts_2265.jsonl` に根拠の原文を残した。台帳には入れていない。`spill_classify_1161.py` の入力は台帳なので未判定として扱われる):
-  - 775340:77545c・815050:815220・6c3700:6c3c78・6c3d20:6c44bd・6c5930:6c6125・1042d20:1043e2d・f3e050:f3e0c2・12f9730:12f9752 (旧 TRUE_DROP 8 件): IR の `boot_final3.ll` が無く、引用行を照合できない。`6c5930:6c6125` は IR 対応ブロックが無いことだけが根拠で、もとから弱い。
-  - 775340:77593b (旧 OK_LOAD): 機械語のループ内の間接 call `7759bb` の副作用 (`*X` の書き換え) が未確認。その callee の機械語を確認するには `m11_image.bin` が要るが、本 run に無い。確認できなければ未判定のまま残す (指摘 4 の扱い)。
-- **照合待ちの判定を外す基準**: 指摘 3・4 の「確認できない site は判定を外す」。この run で照合できたのは 0 件。
-- **残した TRUE_DROP 1 件 (6c3700:6c3a63)**: 前 run で親が IR 267283-267294 を直接確認した記録に基づく。本 run では再照合していない。
-- **確定 14 件の IR 行**: 前 run の subagent の引用のまま。本 run で再照合できていない。
+  - 775340:77545c・815050:815220・6c3700:6c3c78・6c3d20:6c44bd・6c5930:6c6125・1042d20:1043e2d・f3e050:f3e0c2・12f9730:12f9752 (旧 TRUE_DROP 8 件): IR は本 run で揃ったが、この 8 件の対応行の照合は本 PR の範囲外 (#2583)。`6c5930:6c6125` は IR 対応ブロックが無いことだけが根拠で、もとから弱い。
+  - 775340:77593b (旧 OK_LOAD): 機械語のループ内の間接 call `7759bb` の副作用 (`*X` の書き換え) が未確認。その確認は #2583 に残す (指摘 4 の扱い)。
+- **照合待ちの判定を外す基準**: 指摘 3・4 の「確認できない site は判定を外す」。本 PR では判定から外した 9 件を照合していない (照合は #2583)。
+- **残した TRUE_DROP 1 件 (6c3700:6c3a63)**: 本 run で `boot_final3.ll` の 267283-267294 を再照合した。ループは加算と reg2mem の load・store のみで、間接 call も配列要素の load も無い (D15)。
+- **確定 14 件の IR 行**: 本 run で `boot_final3.ll` と照合した (§2)。機械語側の個別照合は未実施 (§2)。
 - **76e720:76e74f** (OK_LOAD): IR では site の値が定数 `store i64 -1` に置き換わっている。機械語の値 (`[rbp],[rbp+4]` の dword 0xffffffff から組んだ qword -1) と一致するため OK_LOAD とした。定数化を別扱いにする方針なら再判定。
 - **1221290:1221676** (OK_LOAD): 値の経路は一致する。判定外の付記として、機械語の比較は符号付き (jg) だが IR は `icmp ugt` と `zext → icmp slt` で符号扱いが一致しない (§5 の候補)。
 - **ld98_dump.py の修正**: 76e720 の後続読み出し 0 件は、capstone が小さい変位を 10 進 (`[rbp + 8]`) で出すのに、照合が `0x8` 形式しか見ていなかったための取りこぼし。`(0x%x|%d)` に直し、TSV を再生成した (`ld98_consumers_2265.tsv` の 76e74f 行: 読み 0 → 1 (76e778)・書き 1 (76e774))。他の 22 行は変わらない。
@@ -95,20 +95,27 @@
 
 ## 6. 検証
 
-- **e2e の実測 (`482ec43d`・最終測定)**: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`ws-2265` worktree・branch `2265-ld98-spill-consumer-c2`・素材 `work-m11` と `work-liftdiff` を worktree 内に展開)。rc=0・real 2m23.3s・user 2m22.0s・load average 0.21 (開始) → 0.93 (終了)・7/7。`drops_510.tsv` と `spill178_1161.tsv` は results/ と一致 (cmp OK)。この実測は本 PR の旧 HEAD のもの。
+- **e2e の実測 (測定 commit `a9c2e538`・本 run)**: `TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`ws-2265` worktree・素材 `work-m11` と `work-liftdiff` を worktree 内に展開)。rc=0・real 94.0 s・load average 0.88 0.53 0.22 (開始) → 1.01 0.68 0.31 (終了)・7/7 完了。`drops_510.tsv` と `spill178_1161.tsv` は results/ と cmp 一致。
+  - step 1: lsf 90 / 解決不能 370 site / 169 関数。step 5: DROP 89 site / 51 関数 (UNDETERMINED 2 site)。step 6: ネガティブコントロール NC0〜NC7 完走。
+  - step 7: spill 宛 178 site / 71 関数。status 確定 92 / 未判定 77 / 判定不能 9。脱落関数の和集合 72 (drops_510 の 69 関数に 4120c0・41a5d0・6c3700 を加えた)。
+  - 範囲 23 site (19 関数) は `spill178_1161.tsv` から集計: 確定 14 (OK_LOAD 13・TRUE_DROP 1) / 未判定 9 / 判定不能 0。
+  - 機械語側: `python3 tools/m11/ldfix/ld98_dump.py` (同 commit) の出力が `results/ld98_consumers_2265.tsv` と cmp 一致 (24 行)。
+- 実行履歴:
   - 実行 1 (`b665b667`・分類前): rc=0・real 2m23.9s・7/7・未判定 120。
   - 実行 2 (分類の追記後・結果ファイル更新前): rc=1。step 7 の `cmp` が `spill178_1161.tsv` の 23 行 (未判定 → 確定) で旧 TSV と不一致。結果ファイルを $OUT の生成物で更新して実行 3 で再測定した。
-- **head `1da6d153` と本 commit の e2e は未実施**: 本 run の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` しか無く、`tools/m11/work/` (boot_final3.ll・m11_image.bin・boot*.drc.config.json) と `tools/liftdiff/work/` が無い。`audit_lsf_ssa_e2e.sh` は起動できない。
-- **e2e 外の再生成確認 (IR 不要)**: `python3 tools/m11/ldfix/spill_classify_1161.py tools/m11/ldfix/results/audit_510_ssa.json` は、head の commit 版 `spill178_1161.tsv` と一致した (cmp OK・判定の撤回前)。撤回後は同じコマンドで TSV を再生成した (§3 の数値はその出力)。step 7 の入力 `ssa.json` は head で IR から生成されるため、これは step 7 の代替ではなく、分類表の再生成が commit 済み入力だけで決まることの確認。
-- **差分の証跡 (測定 commit から HEAD まで・測定対象)**: 前版の「`git diff --stat 482ec43d HEAD -- ... results` → 空」は誤りだった (取り消す)。実測の `git diff --stat 482ec43d HEAD -- tools/m11/ldfix/ld98_dump.py tools/m11/ldfix/results` は 7 files changed, 507 insertions(+), 47 deletions(-)。内訳: `audit_undefload_dest_2202.json` (+210)・`audit_undefload_dest_2202_head.json` (+201)・`ld105_reg2mem_map.tsv` (+16)・`ld110_reg2mem_link.tsv` (+4) は main 取込 (`1da6d153`) 由来。`candidate_verdicts_1161.jsonl` は main 由来の 29 行追記と本 commit の 9 行削除。`spill178_1161.tsv` は 76 行の差し替え (main 由来の候補判定 29 行の反映と、本 commit の 9 行の判定撤回)。`held_verdicts_2265.jsonl` は本 commit の新規 9 行。`ld98_dump.py` は差分 0。WORKFLOW §6 により、この差分の分だけ e2e の再測定が要る (未解決表)。
+  - 実行 3 (`482ec43d`・旧): rc=0・real 2m23.3s・user 2m22.0s・load average 0.21 (開始) → 0.93 (終了)・7/7。step 7 は 未判定 97 / 確定 74 / 判定不能 7、和集合 77。この旧 HEAD の値は §3 の列に残す。
+- **差分の証跡 (測定 commit までの e2e 入力の変化)**:
+  - `git diff --stat 482ec43d a9c2e538 -- tools/m11/ldfix/audit_lsf.py tools/liftdiff` = 10 files changed, 344 insertions(+), 17 deletions(-) (`audit_lsf.py` 41 行・`tools/liftdiff/` 9 files)。
+  - e2e が読む 11 ファイルに絞った形 (`audit_lsf.py`・`audit_lsf_ssa.py`・`window_recount.py`・`dyn_xcheck.py`・`tally_510.py`・`negctl_510.sh`・`spill_classify_1161.py` と results の 4 ファイル): `git diff --stat 482ec43d a9c2e538 -- <同じ範囲>` = 3 files changed, 107 insertions(+), 50 deletions(-) (`audit_lsf.py` 41・`candidate_verdicts_1161.jsonl` 40・`spill178_1161.tsv` 76)。
+  - 測定 commit から HEAD まで (同じ範囲): `git diff --stat a9c2e538 HEAD -- <同じ範囲>` は空 (出力 0 行)。この REPORT を含む後続 commit は e2e の入力に触れないため、再測定は要らない (WORKFLOW §6)。
+  - 前版の「`git diff --stat 482ec43d HEAD -- ld98_dump.py results` は空」は誤りで取り消す。e2e の入力範囲を見ていなかった。
+- IR の照合 (確定 14 site): §2 の IR 列を `boot_final3.ll` の行番号と内容で照合した (m1 の 101d423 のみ修正・commit `a9c2e538`)。
 - 検査: `find tools/m11/ldfix -type f -size +20M` は 0 件。
 
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| HEAD の e2e 再測定 (`audit_lsf_ssa_e2e.sh` の rc・real・load・7/7・step 5/7 と 7/7 の `cmp`) と §3・§6 の数値・測定 commit の head への更新 | 測定 commit `482ec43d` 以降の差分あり (§6)。e2e は未実施 | 本 PR の次回 run (PR 本文の `oc_artifacts: fl-win64 work-m11 work-liftdiff` で素材を要求) |
-| 照合待ち 9 件 (`results/held_verdicts_2265.jsonl`) の IR・機械語の照合 (`boot_final3.ll`・`m11_image.bin` が要る) | 範囲の未判定 9 件・脱落集合 (72) の確度 | 同上。照合後に台帳へ戻す |
-| 確定 14 件の IR 行の再照合 (親は 6c3700:6c3a63 のみ直接確認) | 確定判定の確度 | 同上 |
+| 照合待ち 9 件 (`results/held_verdicts_2265.jsonl`) の IR・機械語の照合 (`boot_final3.ll`・`m11_image.bin` は本 run で揃った) | 範囲の未判定 9 件・脱落集合 (72) の確度 | #2583 (LD-118)。照合後に台帳へ戻す |
 | 1221290:1221676 の比較の符号扱い不一致 (機械語 jg / IR ugt・slt) | 判定外の別欠陥候補 | 親 #2246 へ報告 (DEFECTS 行案は §5) |
 | ld98_dump 以外 (audit_lsf 系) の 10 進変位の取りこぼしの有無 | 未確認。あれば脱落集合が変わり得る | 親 #2246 へ報告 |
