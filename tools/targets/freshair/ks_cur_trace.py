@@ -148,7 +148,35 @@ def main():
         key = ("L_same" if Lsame else "L_differs") + "_cur_" + ("same" if csame else "differs")
         table[grp][key] = table[grp].get(key, 0) + 1
 
+    cf_all = {"first0_cases": 0, "kh_form_on_sc_inputs_eq_probe_cur": 0, "kh_form_on_sc_inputs_eq_default_L": 0,
+              "sc_form_eq_kh_form": 0}
+    for idx in sorted(D_sc):
+        s, k = D_sc[idx], D_kh[idx]
+        if s["n"] == 0 or s["first"] != 0:
+            continue
+        cf_all["first0_cases"] += 1
+        e = E_sc[idx]
+        coef, A, B = f(e["coef"]), f(e["A"]), f(e["B"])
+        cf = ramp_kh(s["n"], coef, A, B)
+        Lin = np.frombuffer(E_sc[idx]["I"], dtype="<f4").copy()
+        cf_all["kh_form_on_sc_inputs_eq_probe_cur"] += bool(np.array_equal(cf.view(np.uint32), P_kh[idx]["L"].view(np.uint32)))
+        cf_all["kh_form_on_sc_inputs_eq_default_L"] += bool(np.array_equal((Lin * cf).view(np.uint32), k["L"].view(np.uint32)))
+        cf_all["sc_form_eq_kh_form"] += bool(np.array_equal(ramp_sc(s["n"], coef, A, B).view(np.uint32), cf.view(np.uint32)))
+
+    # 負例: case 3 の SC cur の 1 ulp を下げると KH 形と一致し、未変更の SC 形は一致しない (判定の感度)
+    neg = {}
+    e3 = E_sc[3]
+    c3, A3, B3 = f(e3["coef"]), f(e3["A"]), f(e3["B"])
+    rs3 = ramp_sc(81, c3, A3, B3)
+    rk3 = ramp_kh(81, c3, A3, B3)
+    lowered = rs3.copy().view(np.uint32)
+    lowered[2] -= 1
+    neg["unperturbed_sc_eq_kh_all"] = bool(np.array_equal(rs3.view(np.uint32), rk3.view(np.uint32)))
+    neg["sc_minus_1ulp_at_sample2_eq_kh"] = bool(lowered[2] == rk3[2:3].view(np.uint32)[0])
+
     summary = {
+        "negative_control": neg,
+        "first0_counterfactual": cf_all,
         "cur_L_table": table,
         "L_diff_cases": len(cases),
         "first0_cases": sum(1 for c in cases if c["first"] == 0),
