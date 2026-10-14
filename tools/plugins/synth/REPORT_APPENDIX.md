@@ -213,17 +213,20 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 - 既定化: `lift/lift_ranges.sh` で `PLUG_NO_STATIC_DETECT` の既定を 1 にした (未設定 = `--disable-static-code-detection` あり)。`PLUG_NO_STATIC_DETECT=0` で従来 (静的検出あり) に戻る。 測定 commit: **0d51d876** (コードを変えた最後の commit)。
 - 素材: `fl-win64` / `plugins-ott` を `$HOME/artifacts` から `$RUNNER_TEMP` に展開して使用 (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)。
-- 測定 HEAD の差分: `git diff 0d51d876 HEAD -- tools/plugins/lift tools/plugins/synth` (本節の追記以外は 0 行)。
+- 測定 commit 以降のコード差分 (main 取り込み後の HEAD 02104d49 時点): `git diff 0d51d876 02104d49 -- tools/plugins/lift tools/plugins/synth` は 6 files, +265 / -27。内訳は `lift_ranges.sh` (+4、`PLUG_NAME_DEFS` opt-in)・`passes/fix_i32_ptr_arg.py` (#1509 伝播)・`passes/name_defs_to_va.py` (新規、#1537 opt-in)・`passes/test_fix_i32_ptr_arg.sh` (+35)・`REPORT_APPENDIX.md` (+87)・`synth/cpp_lift.sh` (+2)。
+- **21202 の経路は差分で変わっている**: `cpp_lift.sh` は B=21202 のとき `PLUG_I32PTR_FUNCS` を既定で立てる。よって下記 F-1 の数値 (0d51d876 の既定経路) は現 HEAD の値ではない。F-1 / F-2 は下記の注のとおり「測定 commit 時点の値」として読むこと。
 
-### F-1. BooBass_Eng (21202) の受入
+### F-1. BooBass_Eng (21202) の受入 (測定 commit 0d51d876。現 HEAD では未再測定)
 
-`bash tools/plugins/synth/cpp_lift.sh 21202 1500` (既定, 0d51d876)、所要 49.0 s (real)、load `0.73 0.95 0.86` → `0.86 0.96 0.87`:
+> 注 (2026-10-14): この節の数値は 0d51d876 で測った。現 HEAD 02104d49 では 21202 の経路が変わっており (上記)、この数値は現 HEAD の受入を示さない。再測定は素材 (`fl-win64 toolchain-retdec toolchain-emsdk work-liftlib work-fw-stage1 plugins-ott`) が揃う run で行う。素材不足の run で HEAD 02104d49 の `cpp_lift.sh 21202 1500` を試行したが、summary が `21202,1579,127,-1,-1,…` (-1 の行) となり、測定として成立しなかった。
+
+`bash tools/plugins/synth/cpp_lift.sh 21202 1500` (0d51d876 の既定経路)、所要 49.0 s (real)、load `0.73 0.95 0.86` → `0.86 0.96 0.87`:
 
 `summary.csv` = `21202,1579,0,1602,0,12,3,1,0,1,48,2,417,0,23,1600,0`
 
 `missing_define` = **2** (欠落 417 B / 参照欠落 0)。 `missing_define_classify.py` の内訳は `symbol_named` 2 件 (`CreatePlugInstance` / `entry_point`)、`static_linked` 0 件。 受入 (`missing_define` <= 2) を満たす。 `emcc_c_rc` は 1 (E3 `'%arg2' defined with type 'i32' but expected 'i64'`、既存と同一)。
 
-### F-2. 他の C++ DLL への影響 (同一 HEAD、既定 vs `PLUG_NO_STATIC_DETECT=0`)
+### F-2. 他の C++ DLL への影響 (既定 vs `PLUG_NO_STATIC_DETECT=0`、測定 commit 0d51d876 時点。現 HEAD では未再測定)
 
 `cpp_lift.sh <block> 240` を 7 本ずつ、既定 (1) と従来 (0) の両方で流した。`summary.csv` の列を比較 (`lift_s` 列を除く):
 
@@ -239,7 +242,7 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 - 7 本とも `defines`・欠落 define・欠落 bytes・参照欠落・`emcc_c_rc`・`emcc_c_rc_after_fixcmp`・未実装 helper・i256 trap・f80 が既定と従来で一致。 `lift_s` は 45〜135 s の範囲で揺れた。
 - 差は `lift_s` の 4 本 (23914・23916・24167・24298) のみ。 `.ll` 本体のバイト比較はしていない。 summary の列一致は「欠落・emcc 結果が変わらない」ことの確認であり、出力の完全同一を示すものではない。
-- 測定した既定版 7 本は、コミット `0d51d876` の直前の作業ツリー (lift コードは同一内容) で流した。 0d51d876 の HEAD で 7 本を再測定はしていない。
+- 測定した既定版 7 本は、コミット `0d51d876` の直前の作業ツリーで流した。コミット HEAD からの再現は未実施 (未コミット WIP に依存した数値であり、現 HEAD の値ではない)。現 HEAD 02104d49 での 7 本の再測定は素材が揃う run で行う (差分 6 files が F-2 の 7 本の経路に影響しうる)。
 
 ### F-3. 未解決
 
