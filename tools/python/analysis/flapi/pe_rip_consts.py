@@ -60,6 +60,10 @@ def main():
                 q = struct.unpack("<Q", data)[0]
                 f = struct.unpack("<f", data[:4])[0]
                 line += "  -> %s qword=%s float=%r" % (hex(target), hex(q), f)
+                p = read(q, 8)
+                if p is not None:
+                    line += " *ptr=%r (double=%r)" % (
+                        struct.unpack("<f", p[:4])[0], struct.unpack("<d", p)[0])
         print(line)
 
 
