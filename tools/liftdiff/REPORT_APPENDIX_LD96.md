@@ -120,7 +120,7 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 | 残存 (wasm) の出現元の確定と、wasm ランナ再起動による消去の検証 | 受入 (a) | #2258 (残作業) |
 | `entry_arg` の表示差 (native 絶対 / wasm 相対) が比較の正規化の問題か | 比較結果の妥当性 | #2258 (残作業) |
 | `liftdiff.py build` の simd.c 再生成と素材版の差 | 再現性 | #2258 (残作業・観察) |
-| wasm の `hang` 4 case (`0x4bf600`・`0xb77200`) で heap_left が出ない | 監査の対象外 | #2258 (残作業) |
+| wasm の `hang` で heap_left が欠測した監査 case は、コミット済み測定で 4 件 (`0x4bf600`・`0xb77200`)。全 case の hang (再実行の raw で p0 101・p1 153 件) は TSV に入らない | 監査の対象外・欠測 | #2258 (残作業) |
 | wasm の `hang` は run ごとに揺れる (§8.7 の再実行で `0xa9ece0` の先頭 case が hang し、残存が欠測) | 残存集計の再現性 | #2258 (残作業) |
 | `0x7850d0` (chunk1) の mem 差分 1 ブロックの位置 (`r`・`o`) と、先頭 case の残存 11 B との関係 | 受入 (b) | #2258 (残作業) |
 
