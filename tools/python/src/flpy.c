@@ -351,7 +351,9 @@ EMSCRIPTEN_KEEPALIVE double flpy_bench_c(int fn_id, int n) {
  * 戻り値は各スレッドの call_json 結果を並べた JSON 配列 ([{"ok":..}|{"err":..}, ...])。flpy_free で解放。 */
 #include <pthread.h>
 #define FLPY_MT_MAX 8
+#define FLPY_MT_NORESULT "{\"err\":\"thread result missing\"}"
 typedef struct { PyInterpreterState *interp; const char *target; const char *args; char *out; } flpy_mt_job;
+static const char *flpy_mt_out(const flpy_mt_job *j) { return j->out ? j->out : FLPY_MT_NORESULT; }
 
 static void *flpy_mt_worker(void *p) {
     flpy_mt_job *j = (flpy_mt_job *)p;
@@ -374,18 +376,24 @@ EMSCRIPTEN_KEEPALIVE char *flpy_mt_call(int nthreads, const char *target, const 
     for (int i = 0; i < nthreads; i++) {
         jobs[i] = (flpy_mt_job){interp, target, args, NULL};
         started[i] = pthread_create(&th[i], NULL, flpy_mt_worker, &jobs[i]) == 0;
-        if (!started[i]) jobs[i].out = strdup("{\"err\":\"pthread_create failed\"}");
     }
     for (int i = 0; i < nthreads; i++) if (started[i]) pthread_join(th[i], NULL);
     PyEval_RestoreThread(main_ts);
+    /* out が NULL のスレッドは未開始 (pthread_create 失敗) か strdup 失敗。代用 JSON を並べ、解放は確保できた分だけ */
     size_t len = 3;
-    for (int i = 0; i < nthreads; i++) len += strlen(jobs[i].out) + 1;
-    char *buf = malloc(len), *w = buf;
+    for (int i = 0; i < nthreads; i++) len += strlen(flpy_mt_out(&jobs[i])) + 1;
+    char *buf = malloc(len);
+    if (!buf) {
+        for (int i = 0; i < nthreads; i++) free(jobs[i].out);
+        return NULL;
+    }
+    char *w = buf;
     *w++ = '[';
     for (int i = 0; i < nthreads; i++) {
         if (i) *w++ = ',';
-        size_t n = strlen(jobs[i].out);
-        memcpy(w, jobs[i].out, n);
+        const char *s = flpy_mt_out(&jobs[i]);
+        size_t n = strlen(s);
+        memcpy(w, s, n);
         w += n;
         free(jobs[i].out);
     }

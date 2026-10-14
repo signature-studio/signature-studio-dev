@@ -7,6 +7,7 @@
 //   前提: CPY_PTHREADS=1 bash build_cpython_wasm.sh && CPY_PTHREADS=1 bash build_flpy_static.sh
 //         node tests/static_check.mjs (stock 静的版の記録 work/tool_coverage.flpy_static.json を作る)
 //   node tests/static_mt_check.mjs        STATIC_WASM=<name> で別ビルド (既定 flpy_static_pthread)
+//   node tests/static_mt_check.mjs <tool> REPORT_PY80.md §4 の再現 (reset → 同じ tool を逐次 2 回の host_calls)
 import fs from "node:fs";
 import { A } from "./tool_args.mjs";
 
@@ -29,14 +30,24 @@ if (typeof M._flpy_mt_call !== "function") { console.log(`${name} に flpy_mt_ca
 M._fl_engine_reset();
 const run = (code) => { const rc = withStr(code, (c) => withStr("<static_mt>", (f) => M._flpy_run(c, f))); if (rc !== 0) throw new Error(M.UTF8ToString(M._flpy_last_error())); };
 const callRaw = (target, args) => withStr(target, (t) => withStr(args == null ? "" : J(args), (a) => { const p = M._flpy_call_json(t, a); const s = M.UTF8ToString(p); M._flpy_free(p); return JSON.parse(s); }));
-const mtCall = (n, target, args) => withStr(target, (t) => withStr(args == null ? "" : J(args), (a) => { const p = M._flpy_mt_call(n, t, a); const s = M.UTF8ToString(p); M._flpy_free(p); return JSON.parse(s); }));
+const mtCall = (n, target, args) => withStr(target, (t) => withStr(args == null ? "" : J(args), (a) => { const p = M._flpy_mt_call(n, t, a); if (!p) throw new Error("flpy_mt_call が NULL を返した (malloc 失敗)"); const s = M.UTF8ToString(p); M._flpy_free(p); return JSON.parse(s); }));
 const textOf = (r) => (r.err ? r.err : String(r.ok));
-const norm = (r) => ({ raised: !!r.err, text: textOf(r).slice(0, 160) });
+const full = (r) => ({ raised: !!r.err, text: textOf(r) });
+const norm = (r) => ({ raised: !!r.err, text: textOf(r).slice(0, 160) }); // stock 記録 (static_check.mjs) と同じ先頭 160 字
 
 run(`import fl_rt; fl_rt.install_flapi(); fl_rt.load_pyc("/fl/Tools/MCPTools.pyc", "__main__")`);
 const tools = JSON.parse(callRaw("__main__:get_mcp_tools_json", {}).ok);
 const names = tools.map((t) => t.name).filter((n) => A[n] !== undefined);
 if (names.length !== 48) fail(`tool 数 ${names.length} != 48`);
+
+// §4 の再現: `node tests/static_mt_check.mjs <tool>` は reset → 同じ tool を逐次 2 回呼び、各回の status・host_calls を出して終了する
+if (process.argv[2]) {
+  if (!names.includes(process.argv[2])) { console.log(`未知の tool: ${process.argv[2]}`); process.exit(1); }
+  M._fl_engine_reset();
+  const calls = [1, 2].map(() => { M._flpy_trace_reset(0); const from = Number(M._flpy_host_calls()); const r = norm(callRaw(`__main__:${process.argv[2]}`, A[process.argv[2]])); return { ...r, host_calls: Number(M._flpy_host_calls()) - from }; });
+  console.log(J({ tool: process.argv[2], calls }));
+  process.exit(0);
+}
 
 // (1) 単一スレッド列 (static_check.mjs と同じ: reset なし・同順)
 M._flpy_trace_reset(0);
@@ -69,7 +80,7 @@ for (const n of names) {
     M._fl_engine_reset();
     M._flpy_trace_reset(0);
     let from = Number(M._flpy_host_calls());
-    const ref = norm(callRaw(`__main__:${n}`, A[n]));
+    const ref = full(callRaw(`__main__:${n}`, A[n]));
     const refCalls = Number(M._flpy_host_calls()) - from;
     // 同じ初期状態から逐次に T 回呼んだ合計が基準。状態を変える tool (例: piano roll を開く) は 2 回目以降の回数が変わるため、T × 基準ではなく逐次合計と比べる
     M._fl_engine_reset();
@@ -83,11 +94,11 @@ for (const n of names) {
     const outs = mtCall(T, `__main__:${n}`, A[n]);
     const mtCalls = Number(M._flpy_host_calls()) - from;
     if (!Array.isArray(outs) || outs.length !== T) { fail(`${n} T=${T}: 結果数が一致しない ${J(outs).slice(0, 120)}`); continue; }
-    const same = outs.map((o) => { const x = norm(o); return x.raised === ref.raised && x.text === ref.text; });
+    const same = outs.map((o) => { const x = full(o); return x.raised === ref.raised && x.text === ref.text; }); // 比較は全文 (記録だけ 160 字)
     const bad = same.filter((x) => !x).length;
-    if (bad) { mtDiff += bad; fail(`${n} T=${T}: スレッド結果が基準と不一致 ${bad}/${T} (基準=${J(ref).slice(0, 100)} 先頭=${J(norm(outs[0])).slice(0, 100)})`); }
+    if (bad) { mtDiff += bad; fail(`${n} T=${T}: スレッド結果が基準と不一致 ${bad}/${T} (基準=${J(ref).slice(0, 100)} 先頭=${J(full(outs[0])).slice(0, 100)})`); }
     if (mtCalls !== seqCalls) { fail(`${n} T=${T}: host_calls 合計 ${mtCalls} != 逐次 ${seqCalls}`); }
-    rows.push({ name: n, threads: T, ref_raised: ref.raised, ref_text: ref.text, ref_host_calls: refCalls, seq_host_calls: seqCalls, mt_host_calls: mtCalls, thread_match: same.filter(Boolean).length });
+    rows.push({ name: n, threads: T, ref_raised: ref.raised, ref_text: ref.text.slice(0, 160), ref_host_calls: refCalls, seq_host_calls: seqCalls, mt_host_calls: mtCalls, thread_match: same.filter(Boolean).length });
   }
 }
 const wallMs = Math.round(performance.now() - t0);
