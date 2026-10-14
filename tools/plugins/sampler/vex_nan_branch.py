@@ -103,7 +103,9 @@ check([i.mnemonic for i in seq] == ['mov', 'and', 'cmp', 'cmove', 'mov', 'and', 
 x1, x2, y = rip_target(seq[0]), rip_target(seq[2]), rip_target(seq[4])
 check(seq[1].op_str == 'r10, r8' and seq[3].op_str == 'rax, r8' and seq[5].op_str == 'r10, rax',
       'オペランドが r8 の選択と rax との AND を表す')
-check(x1 is not None and x1 == x2, f'X の 2 参照が同一 ({x1:#x})')
+if bad:
+    sys.exit(1)
+check(x1 is not None and x1 == x2, f'X の 2 参照が同一 ({x1})')
 X, Y = read_u64(x1), read_u64(y)
 check(X == 0x7FF0000000000000 and Y == 0x000FFFFFFFFFFFFF,
       f'定数 X={X:#018x} Y={Y:#018x} (倍精度の指数部全 1 と仮数マスク)')
