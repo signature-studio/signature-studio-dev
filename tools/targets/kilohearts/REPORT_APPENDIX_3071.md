@@ -3,8 +3,8 @@
 #### 10-7r. #3071 (KH-39) 1 単位: Stereo の emcc 残件の機械修復 (部分・emcc 39 → 10 件・Stereo はビルド未通過)
 - **既知類型との関係 (DEFECTS.md)**: `in_XMM3` の参照は D5 に該当しない (下記「in_XMM の live-in 判定」: 全読出しが先行書込みに支配される、または dst で未使用)。xmm1 の `0.0` 仮置き (規則 9) は入口 live-in の置換で D5 に該当 (未解決 3)。
 - **結論**: Stereo の emcc は 39 → **10 件** に減った (未達)。引数なし呼出・引数数不一致・型・SIMD 近似 (rsqrtps)・ABS/ZEXT416 は解消。Gain/Haas/Gate は 1000/1000 bit-exact を維持し、生成 C は修復前と diff 0 行。ただし Stereo は**数値未検証**: callee の戻り値 (xmm0/xmm1) を C 化していないため、emcc が通っても数値は正しくない (未解決 2・3)。`in_XMM3` の入口 live-in は無い (下記)。xmm1 は規則 9 の `0.0` 仮置き (未解決 3)。emcc 通過は値の正しさを示さない。
-- 測定 commit: `50661465` (`test(kh)`: rsqrt 突合 C の追加)。converter / shim / patches の最終変更は `44230a54` (`feat(kh)`)。`git diff 44230a54 50661465 -- ghidra_route/ghidra_to_c.py ghidra_shim.h patches.py` = **0 行** (測定値は 44230a54 のコードで取得。50661465 は突合 C の追加のみ)。main 取り込み (`710cdac9`) 後の `git diff 50661465 HEAD -- tools/targets/kilohearts/ghidra_route` は 4 ファイル・61 行追加・3 行削除 (main 側: shim の `code`/`undefined`/`sbyte` typedef・LOCK/Win API stub、`ghidra_to_c.py` の thunk 正規化と delay 登録、`selfcall_check.py` 新規。patches.py は本節のラベル・コメント)。**この HEAD での stereo 件数・decompile・回帰は未再測定** (未解決 5)。
-- 素材: `work/` の既存展開物 (HeartCore.core_64 76,642,304 B) を流用。Ghidra 12.1.4 の sha256 は本 run で未照合。decompile は gain/haas/gate 閉包 10 関数 + stereo 8 関数 = 18 関数を `DecompEach.java` で再実行 → **18/18 OK** (`work/ghidra/out` を union で再生成。stereo 8 関数の出力は退避版と cmp 一致)。
+- 測定 commit: `50661465` (`test(kh)`: rsqrt 突合 C の追加)。converter / shim / patches の最終変更は `44230a54` (`feat(kh)`)。`git diff 44230a54 50661465 -- ghidra_route/ghidra_to_c.py ghidra_shim.h patches.py` = **0 行** (測定値は 44230a54 のコードで取得。50661465 は突合 C の追加のみ)。main 取り込み (`710cdac9`) 後の `git diff 50661465 HEAD -- tools/targets/kilohearts/ghidra_route` は 4 ファイル・61 行追加・3 行削除 (main 側: shim の `code`/`undefined`/`sbyte` typedef・LOCK/Win API stub、`ghidra_to_c.py` の thunk 正規化と delay 登録、`selfcall_check.py` 新規。patches.py は本節のラベル・コメント)。**HEAD の再測定は round 3 review run が測定 HEAD `8043dfcb` で実施済み** (decompile 18/18 OK・stereo emcc 10・生成 C の gain/haas/gate/stereo の 4 関数が `44230a54` と diff 0 行・回帰 Gain/Haas/Gate 各 1000/1000。未解決 5)。本 commit は文書のみで、`git diff 8043dfcb HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行。
+- 素材: `work/` の既存展開物 (HeartCore.core_64 76,642,304 B) を流用。Ghidra 12.1.4 の sha256 先頭 16 桁は round 3 review run で `ddac49f903da9d5b` と一致を確認。decompile は gain/haas/gate 閉包 10 関数 + stereo 8 関数 = 18 関数を `DecompEach.java` で再実行 → **18/18 OK** (`work/ghidra/out` を union で再生成。stereo 8 関数の出力は退避版と cmp 一致)。
 - 修復前の基準: `ghidra_to_c.py stereo` (fix なし) → `emcc -c -w -O1 -ferror-limit=0 -Wno-error=int-conversion` → **39 件** (`grep -c error:`、rc 1、再現一致)。注: §10-7h の実測 (`grep -c 'error:'` = 40 = clang 診断 39 + ドライバ行 1) と 1 件ずれる。ずれの原因は未確認 (数え方の差か)。件数の比較は本節の 39 → 10 同士で行う。
 
 **emcc 件数の内訳 (39 → 10、照合済み: 残り 2+6+2 = 10)**
@@ -13,7 +13,7 @@
 |---|---|---|---|
 | 引数不足 (引数なし呼出) | 8 | 0 | ABI 規則 (下表) |
 | 引数数不一致 (expected 2, have 1) | 2 | 0 | ABI 規則 (placeholder 0.0 ・下表) |
-| `undefined1[16]` メンバ参照 (`in_XMM3._0_8_`) | 6 | 0 | `in_XMMn` を V128 化・`_0_8_d` (double 視点)。入口 live-in は無い (下記 in_XMM 節) |
+| `undefined1[16]` メンバ参照 (`in_XMM3._0_8_` 4 + `in_XMM3._8_8_` 2) | 6 | 0 | `in_XMMn` を V128 化・`_0_8_d` (double 視点)。入口 live-in は無い (下記 in_XMM 節) |
 | `undefined1[16]` 代入不可 (`in_XMM3 = ZEXT416`) | 1 | 0 | V128 化 (同上。emcc 通過は値の正しさを示さない) |
 | 未宣言 `ZEXT416` | 1 | 0 | shim `ZEXT416` |
 | 未宣言 `rsqrtps` (+ V128 への int 代入) | 1 (+1) | 0 | converter の `rsqrtps` helper |
@@ -30,6 +30,8 @@
 
 **ABI 規則 (stereo, `patches.py` の `ABI['stereo']`、11 規則・各規則の件数 = 1 を assert で確認)**
 - 呼出元の機械語 (capstone, `snapins/scripts/pe_dis.py` 相当) で、呼出し直前に xmm0 へ入る値の源を経路ごとに確定。callee は入力を xmm0 のビット列で読む (`vmovq r11,xmm0` / `movsd [rsp+0x60],xmm0`) ため、引数は `d2u(...)` (double のビット列) で渡す。
+
+- 行番号の基準 (本ファイル全体): 特記しない限り、rsqrtps helper (23 行) を入れる前の生成 C (`stereo.c`) の行。現 HEAD の `stereo.c` では +23 (例: 185→208・186→209・567→590)。
 
 | # | 修復前行 (呼出元) | callee | 引数 (xmm0 の源) | 機械語の根拠 (呼出元) |
 |---|---|---|---|---|
@@ -80,6 +82,6 @@
 2. **[KH-46] callee の多値戻り (xmm0 / xmm1) の未モデル (最重要・emcc で見えない silent 誤り)**: `FUN_180fdc470`・`FUN_180fdfdb0`・`FUN_180fdc660` 系は rax に四分象限のみ C 化され、reduce 後の値 (xmm0、dfdb0 は xmm1 も) は C 本体に出ない。呼出元の `extraout_XMM0_Qa*` の読み 6 箇所が未代入 (未初期化)。stereo の数値は native vec (`snapins/work/stereo/vec_1000_7.bin`) との突合でのみ判定可能で、本 run では未実施 (emcc 未通過)。
 3. **[KH-46] 引数 2 個目 (xmm1) の 2 件 (規則 9・10) は 0.0 仮置き**: 呼出元で未設定の入力のため、実値の特定 (FUN_18080d4d0 の呼出元の解析) が要る。規則 9 は入口 live-in の置換で D5 に該当、規則 10 は規則 9 の callee の戻り xmm1 (多値戻り・未解決 2) (上記「in_XMM の live-in 判定」)。
 4. **[KH-46] stereo の bit 型修復 (fix 未適用)**: `bitcast`・`intload`・`assoc` などの `--fix` 群を stereo に適用していない (例: 行 223 の `(float)((uint)(fVar13-fVar18) & _DAT_1813d6fc0)`)。突合で検出する。
-5. **[再測定] main 取り込み後 (`710cdac9`) の HEAD での stereo emcc 件数・decompile・Gain/Haas/Gate 回帰は未実施**: 本 run では Ghidra (`[GHIDRA]`) と JDK 21 が無く、素材の展開から再現できなかった。測定値は測定 commit `50661465` のコードのもの。review run で HEAD を再測定する (main 側の thunk 正規化・shim の typedef が stereo の件数を変えないかを確認する)。
+5. **[再測定] 解消 (round 3 review run・測定 HEAD `8043dfcb`)**: decompile 18/18 OK・stereo emcc 10 (`grep -c error:`)・生成 C の gain/haas/gate/stereo 4 関数が `44230a54` と diff 0 行・回帰 Gain/Haas/Gate 各 1000/1000。main 側の thunk 正規化・shim の typedef は stereo の件数と生成 C を変えていない。以降の HEAD が `8043dfcb` から変わる場合は、`git diff 8043dfcb HEAD -- tools/targets/kilohearts/ghidra_route` の差分の分だけ再測定する (`docs/WORKFLOW.md` §6)。
 - 未実施: Stereo の native 突合・ablation・ネガコン (emcc 未通過のため)。
 - 注: REPORT.md 本体への導線 1 行は、commit 範囲 (ghidra_route + REPORT_APPENDIX) の指示どおり未追加。§10-7p は本ファイル群に存在しないため、本節は REPORT_APPENDIX.md の §10-7q (#3072) の後に置いてあったものを分割移動した。
