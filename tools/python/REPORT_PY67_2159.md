@@ -45,7 +45,9 @@
 
 ## 3. 間接参照の確認 (受入 3 の限界)
 
-- `.text`・`.data` の絶対 8 バイト値の一致 (`0xec53b0` = G2、`0x8ecbc0` = G1、`0x16baaf0` = X): 結果は測定節に記す。
+- 絶対 8 バイト値の一致 (`py67_qword.py ... find`): G2 `0xec53b0` は 0 件、G1 `0x8ecbc0` は 0 件 (G2・G1 は direct 呼出しのみ)。X `0x16baaf0` は 1 件 (file offset `0x11e00f8` = `.data` VA `0x15e16f8`)。X を指す `.data` のポインタがあるため、X への間接書込みの経路はある。
+- ただし G2 の直前の `0xebf546: call 0x11c8950` で X は再設定され、`0xebf558` まで呼出しは無い (直線的な命令列)。よって G2 の Self (`0xebf558`) は、この call が格納した値 = `TPlugListForm` のインスタンス。間接書込みが X を別の値で上書きする経路は、この区間には無い。
+- 未確認: `0x86a470` の `*out = P` が全分岐で実行されるか (前段 `REPORT_PY67.md` §4 の範囲外)。
 
 ## 4. 未解決
 
@@ -59,4 +61,29 @@
 - 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 バイト)。`tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` で展開 (2.9 秒)。`tools/**/work/` は使わない。
 - 追加したコード: `tools/python/analysis/py67_qword.py` (VA の 8 バイト値を読む。`py71_vmt.py` と同じ `.text`/`.data` の扱い)。
 
-（測定 commit・再現コマンド・実測時間は下節に追記する）
+- 測定 commit: `38f903c4` (`py67_qword.py` 追加・本 REPORT。解析コードはこの commit で初めて作った)。基点 `origin/main` (`580dd294`)。
+- 差分 0 の証跡 (測定 commit から本節を書いた HEAD まで):
+
+  ```
+  $ git diff 38f903c4 HEAD -- tools/python/analysis tools/python/src
+  (出力 0 行)
+  ```
+
+- 実測 (wall・逐次・n=1):
+  - `py67_qword.py $P 0xebee90,0xebef28,0x1306300`: 0.1 秒 以内 (`0xebef58`・`0x40f960`・`0x13063c8`)。
+  - `py67_qword.py $P 0x16baaf0,0xec53b0,0x8ecbc0 find`: 0.1 秒 以内 (上記の一致件数)。
+  - `py59_func.py $P 0xec60ae dump`: `[rbp+0x120]` への store は 1 件 (`0xec540d`)。
+  - `py71_vmt.py $P 0xebef58 0x30`・`py71_chain.py $P 0xebef58`: 上記の VMT・親鎖。
+  - `py66_riprefs.py $P 0x16baaf0`: 80.7 秒 (`decoded 5022467 insns`。RIP 相対参照の一覧は §1)。
+  - `py67_callers.py $P 0x8ecbc0,0xec53b0`: 本 run の 1 回目は完了 (§2 の表)。2 回目 (同じ引数) は tool 上限 (120 秒) を超えて打ち切り、所要時間は未計測。
+- 再現 (`tools/python` で実行):
+
+  ```
+  P=$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin
+  python3 analysis/py67_qword.py "$P" 0xebee90,0xebef28
+  python3 analysis/py67_qword.py "$P" 0x16baaf0,0xec53b0,0x8ecbc0 find
+  python3 analysis/py59_func.py "$P" 0xec60ae dump
+  python3 analysis/py71_vmt.py "$P" 0xebef58 0x30
+  python3 analysis/py66_riprefs.py "$P" 0x16baaf0
+  python3 analysis/py67_callers.py "$P" 0x8ecbc0,0xec53b0
+  ```
