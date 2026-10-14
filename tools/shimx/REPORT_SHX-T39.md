@@ -24,7 +24,7 @@
 
 ### 2.1 IR とビルド (HEAD 再生成・本 run)
 
-- emsdk: [EMSDK] (`/opt/emsdk`。runner イメージ同梱)。`emcc --version` = `emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.12 (5488e0871d46d19a3209988190fa6a653126256f)`。この install の出所 (URL・tag) は本 run で未確認。`$ARTIFACTS_DIR` の `toolchain-emsdk` 素材 (532 MB) は展開していない (`oc_artifacts` に入れない)。
+- emsdk: [EMSDK] (runner イメージ同梱)。`emcc --version` = `emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.12 (5488e0871d46d19a3209988190fa6a653126256f)`。この install の出所 (URL・tag) は本 run で未確認。`$ARTIFACTS_DIR` の `toolchain-emsdk` 素材 (532 MB) は展開していない (`oc_artifacts` に入れない)。
 - `m11_gen_ir2.sh` (`FL_WIN64_DIR` は `fl-win64` の `extracted/block00031_PE.bin` だけを展開) → `boot_final.ll` 490735 行、sha256 `7c653b0f…` (50 秒)。0bdd046d も同じ sha (同一環境で再生成)。`REPORT_SHX-T9h.md` §3.3.7 の記録とも一致。
 - `m11_build.sh` (23 秒・rc 0) → HEAD の `boot_final3.ll` 529579 行 sha `8d0fe6ce…`。0bdd046d の再生成は 529576 行 sha `d24dddd8…`。差は §2.3 の 1 hunk (5 行)。
 - `m11_boot.cjs` (HEAD): 5,772,457 B、sha `0d3bb64f…`。0bdd046d の再ビルド: 5,766,813 B、sha `49e6cce2…`。記録 (`evidence_2533/cjs_sha256.txt` の `49e6cce219f84655`) と一致した。
