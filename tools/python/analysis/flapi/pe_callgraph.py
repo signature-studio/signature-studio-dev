@@ -10,7 +10,7 @@
   閉包内の間接 call 箇所数も出力する (静的に解決できない枝の大きさ)。
 - around: 区間内の命令を逆アセンブルする。
 
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import bisect
 import collections
