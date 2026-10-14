@@ -65,8 +65,9 @@
 
 - gate の確認: D は `llvm-nm work/obj/ov.o` で `function_467c40` の定義が消えたことを確認。E/F は `win.o` で該当シンボルの定義が 0 件になったことを確認。
 - 方式: 一時 gate (`#if !M11_ABL_*`) を `m11_ov.c` / `m11_win.c` に入れ、`m11_build.sh` の CF に `${M11_ABL_CF:-}` を一時的に足して 1 つずつ測定。測定後に `git restore` で全て戻し、`tools/m11` の差分は 0。
-- 読み取り: 4c3baa4 の 467c40 間接 call 復元 (`function_467c40` override) が units_run 53 を支えている。これを外すと 22 unit で Halt0 に落ちる。faee5b6 の BSTR 系 (`SysReAllocStringLen`・`SysStringLen`) は単独では units_run に影響しない (53 のまま)。
-- 注意: 今回の D は 467c40 override を外す単独の変化。boot5 (25 関数の lift 追加) と 467c40 の組み合わせ分解はしていない。ov.o は gate 変更でキャッシュ無効化され再コンパイル済み。faee5b6 の `_DynArraySetLength`・`_ReallocMem` (前回 run 2 の A/B) と合わせると、faee5b6 の寄与は override の 3 点のうち 417b70・409470 が退行を抑え、BSTR 系は影響無し、と読める。
+- 読み取り: 4c3baa4 の 467c40 間接 call 復元 (`function_467c40` override) が units_run 53 を支えている。これを外すと 22 unit で Halt0 に落ちる。
+- faee5b6 の override のうち units_run に効くのは 3 点: `function_417b70` (run 2 A: 単独無効化で 50)・`function_409470` (run 2 B: 22)・`SysAllocStringLen` (run 2 C: 22)。`SysReAllocStringLen`・`SysStringLen` は単独では units_run 53 のまま (run 3 E/F で影響なし)。
+- 注意: これらはいずれも「外すと lift 版 (RetDec・既知の D7 型欠陥) に戻って壊れる」結果であり、faee5b6 が退行を起こしたことの実証ではない。今回の D は 467c40 override を外す単独の変化。boot5 (25 関数の lift 追加) と 467c40 の組み合わせ分解はしていない。ov.o は gate 変更でキャッシュ無効化され再コンパイル済み。
 - 受入 2 (`_CopyArray` kind 12) は今 run では未実施 (子 issue #1511 で扱う)。
 
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 本体 REPORT.md から移動)
