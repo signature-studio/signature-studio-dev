@@ -27,6 +27,17 @@ for l in src:
             out.append('%s%s = zext i32 %s to i64' % (re.match(r'^(\s*)', l).group(1), z, v))
             l = l.replace('inttoptr i64 %s to ptr' % v, 'inttoptr i64 %s to ptr' % z)
             n += 1
+    if re.search(r'\bcall\b', l):
+        ind = re.match(r'^(\s*)', l).group(1)
+        for pm in list(re.finditer(r'(ptr (?:nonnull )?(?:null )?)(%[\w.$]+)(?=[,)])', l))[::-1]:
+            v = pm.group(2)
+            if v not in i64:
+                continue
+            uid += 1
+            t = '%s.ip%d' % (v, uid)
+            out.append('%s%s = inttoptr i64 %s to ptr' % (ind, t, v))
+            l = l[:pm.start(2)] + t + l[pm.end(2):]
+            n += 1
     c = re.match(r'^(\s*)(%[\w.$]+) = icmp (\w+) ptr (\S+), (\S+)$', l)
     if c:
         ind, dst, pred, a, b = c.groups()
