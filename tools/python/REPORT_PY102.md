@@ -188,43 +188,31 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 
 ## 9. 取り込み後の再測定の履歴
 
-- 測定 commit `0e42e1ea` (旧 §9)・`14802840`・`3aa3a256`・`e3b67424` (旧 §10) の全文は `REPORT_PY102_APPENDIX_2883.md` へ分割移動した (250 行上限。内容は削除していない)。値の正本は §10。
+- 測定 commit `0e42e1ea` (旧 §9)・`14802840`・`3aa3a256`・`e3b67424`・`8ceec7c9` (旧 §10) の全文は `REPORT_PY102_APPENDIX_2883.md` へ分割移動した (250 行上限。内容は削除していない)。値の正本は §10。
 
-## 10. main 取り込み後の再測定 (測定 commit `8ceec7c9`)
+## 10. main 取り込み後の再測定 (測定 commit `ac73210e`)
 
-- 取り込み。`origin/main` `91610209` を merge (`8ceec7c9`)。競合は `tests/provider_check.mjs` の 1 箇所だけ。main 側は PY-96 (#2832) の `pe96` (arrangement の選択範囲 4 関数) を追加した。両方を集合に入れ、件数は main の `impl 119・unimpl 316` に `pe102` の +1 を加えて `impl 120・unimpl 315` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`flapi_table.py`・`gen/fl_table.c` は自動マージで衝突なし。
-- 測定 commit: `8ceec7c9` (コードを変えた最後の commit)。本節の追記だけを後続の commit で加える。`git diff 8ceec7c9 HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` は 0 行。
-- 前回の測定 (`e3b67424`) の全文は `REPORT_PY102_APPENDIX_2883.md` へ移した。
-- 素材: `fl-win64` の 5 block (`block00031_PE`・`block24429_DATA`・`block24430_DATA`・`block25159_DATA`・`block24618_DATA`) を `$RUNNER_TEMP/fl-win64/extracted/` へ展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/<上の 5 件>`)。`FL_WIN64_DIR` でこれを指した。`fetch_inputs.sh` で `work/` を作成。emsdk は上流 `emsdk install 6.0.12` を [EMSDK] の既定位置に導入して `activate` した (`toolchain-emsdk` 素材は本 run に無い)。
-- CPython wasm: `build_cpython_wasm.sh` で作成 (exit 0・4m24.633s。本 run で作成。CPython 側のソースは変えていない)。
-- 環境: GitHub Actions runner (4 コア)。開始時の `uptime` の load average は `0.21 0.20 0.09` (22:52)、検証後は `0.71 1.33 0.77` (22:59)。並列 1 本。
+- 取り込み。`origin/main` `1b37410c` を merge (`ac73210e`)。競合は `tests/provider_check.mjs` の 1 箇所だけ (判定条件・件数 assert・内訳コメントを含む 1 ブロック)。main 側は PY-125 (#3001) の `pe125` (`general.clearLog`・`general.dumpScoreLog` の 2 件) を追加した。両方を集合に入れ、件数は main の `impl 121・unimpl 314` に `pe102` の +1 を加えて `impl 122・unimpl 313` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`gen/fl_table.c`・`flapi_table.json` は自動マージで衝突なし (両側の変更は別の関数・別のフィールド。`Pl` 構造体の `lock` と main の 2 関数)。
+- 測定 commit: `ac73210e` (コードを変えた最後の commit)。本節の追記だけを後続の commit で加える。`git diff ac73210e HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` は 0 行。
+- 前回の測定 (`8ceec7c9`) の全文は `REPORT_PY102_APPENDIX_2883.md` へ移した (250 行上限)。
+- 素材・emsdk: 本検証は `fl-win64` を展開しない (provider の build と JS の差分検査は素材を読まない)。emsdk は上流 `emsdk install 6.0.12` を `/opt/emsdk` に導入して `activate` した (`emcc` 6.0.12)。`toolchain-emsdk` 素材は本 run に無い。
+- 未実行 (理由): `build_flpy.sh`・`provider_check.mjs` の §3・`tests/all_tools.mjs` は flpy (CPython wasm と `work/`) を使うため実行していない。`build_flpy.sh` と `host/flpython.mjs` は `fl_engine.c`・`fl_table.c` を参照せず、本 merge で変わったのは provider と mock 側だけ。
+- 環境: GitHub Actions runner (4 コア)。検証開始時の `uptime` の load average は `0.13 0.24 0.13` (23:18:51)。
 
 | 検証 | 実行 | 結果 | 所要 |
 |---|---|---|---|
-| provider wasm | `bash provider/build.sh` | flprov.wasm 60,001 B。fl_table.c 435 関数・ハンドラ 120 | 1.318 s |
-| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… EMSDK_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 (`git status` が空) | 7.059 s |
-| flpy static (fulltext 用) | `bash build_flpy_static.sh` | flpy_static.wasm 5,972,552 B | 6.539 s |
-| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 120・unimplemented 315・mcp_static 60・PASS | - |
-| playlist 差分 | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段・PASS | - |
-| mixer 差分 | `node tests/mixer_diff.mjs` | calls 59・diffs 0・PASS | - |
-| channels 差分 | `node tests/channels_diff.mjs` | calls 161・diffs 0・PASS | - |
-| device 差分 | `node tests/device_diff.mjs` | calls 8・diffs 0 (rejects 4・midi_out 5)・PASS | - |
-| general 差分 (main 由来) | `node tests/general_diff.mjs` | calls 25・diffs 0・PASS | - |
-| arrangement 差分 (main 由来) | `node tests/arrangement_diff.mjs` | calls 25・diffs 0・PASS | - |
-| arrangement 選択範囲 (main 由来・#2832) | `node tests/arrangement_selection_diff.mjs` | calls 8・diffs 0・PASS | - |
-| screen 差分 (main 由来) | `node tests/screen_diff.mjs` | calls 32・diffs 0・PASS | - |
-| ui 状態 / 表示・メニュー (main 由来) | `node tests/ui_state_diff.mjs`・`node tests/ui_display_diff.mjs` | calls 12・diffs 0・PASS / ok_calls 12・bad_calls 11・diffs 0・PASS | - |
-| transport / ui / ilmcp / midi path | `node tests/transport_diff.mjs`・`ui_diff.mjs`・`ilmcp_diff.mjs`・`midi_path_diff.mjs` | calls 7・diffs 0 / calls 17・diffs 0 / calls 32・diffs 0 / cases 30・diffs 0 | - |
-| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425 | - |
-| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | - |
-| 静的経路 | `node tests/static_check.mjs` | tool 別差 0/48・STATIC CHECK OK | - |
-| 全文 3 経路 | `node tests/fulltext_parity.mjs` | FULLTEXT PARITY OK (ネガコン: 全文比較が検出・先頭 160 字ゲートは非検出) | - |
-| 表の再生成・ネガコン | `FL_WIN64_DIR=… bash tests/flapi_table_check.sh` | 正常系の差分 0/3・fail 0 | - |
-| kwsig 照合 | `python3 tests/kwsig_check.py` | OK | - |
-| kwsig 束縛 | `python3 tests/kwsig_bind_check.py` | PASS | - |
-| 引数個数 (before = `origin/main` `91610209` の表 / after = `analysis/flapi/flapi_table.json`) | `python3 analysis/flapi/sig_arity_check.py <main の表> analysis/flapi/flapi_table.json` | before 対象 274・一致 274・不一致 0 / after 対象 274・一致 274・不一致 0。引数個数が変わった関数 0 件 | - |
-| 実害の実測 (§3-2) | `node tests/sig_arity_probe.mjs` | kwsig_targets 24・fails 0・PASS | - |
+| provider wasm | `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash provider/build.sh` | flprov.wasm 60,108 B。fl_table.c 435 関数・ハンドラ 122 | 1.047 s |
+| provider ABI §1・§2 | `node tests/provider_check.mjs` | §1 (表の整合・MCP 静的 60・impl 122・unimpl 313) と §2 (エラー code・ilmcp.getBrowserNames) の assert は PASS (AssertionError 0)。§3 は `work/midi.py` が無く ENOENT で停止 (rc 1)。PASS 行は出ていない | - |
+| playlist 差分 | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段・PASS | 0.053 s |
+| general 差分 (main 由来) | `node tests/general_diff.mjs` | calls 32・diffs 0・PASS | 0.056 s |
+| arrangement 差分 | `node tests/arrangement_diff.mjs`・`arrangement_selection_diff.mjs` | calls 25・diffs 0・PASS / calls 8・diffs 0・PASS | 0.057 s / 0.053 s |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 161・diffs 0・PASS | 0.059 s |
+| device 差分 | `node tests/device_diff.mjs` | calls 8・diffs 0 (rejects 4・midi_out 5)・PASS | 0.053 s |
+| ilmcp / midi path 差分 | `node tests/ilmcp_diff.mjs`・`midi_path_diff.mjs` | calls 32・state_checks 9・diffs 0・PASS / cases 30・diffs 0・lit_steps 160・PASS | 0.065 s / 0.058 s |
+| mixer 差分 | `node tests/mixer_diff.mjs` | calls 59・diffs 0・PASS | 0.055 s |
+| screen 差分 (main 由来) | `node tests/screen_diff.mjs` | calls 32・diffs 0・PASS | 0.058 s |
+| transport / ui 差分 | `node tests/transport_diff.mjs`・`ui_diff.mjs` | calls 7・diffs 0・PASS / calls 17・diffs 0・outOfRangeKnownDiffs 3・PASS | 0.055 s / 0.055 s |
+| ui 状態 / 表示・メニュー (main 由来) | `node tests/ui_state_diff.mjs`・`ui_display_diff.mjs` | calls 12・diffs 0・PASS / ok_calls 12・bad_calls 11・diffs 0・PASS | 0.056 s / 0.057 s |
 
-- 件数の差: handler 116 (`e3b67424`) → 120 は main の PY-96 `pe96` (4 件) の取り込み分。`pe102` (1 件) は前回と今回の両方に含まれる。
+- 件数の差: handler 120 (`8ceec7c9`) → 122 は main の PY-125 `pe125` (2 件) の取り込み分。`pe102` (1 件) は前回と今回の両方に含まれる。
 - 未解決 (§5) は不変: 準備判定 (#2959)・追加引数の意味論 (#2950)・kwlist 無しの名前と書式 (#2952)。
-
