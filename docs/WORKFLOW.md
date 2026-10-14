@@ -366,8 +366,10 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     ラベルを外すと再開し、次の差し戻しから数え直す (停止前の件数を持ち越さない)。停止コメントの無いラベル (手動付与・reopen 失敗) は
     数える起点が無く全期間を数えるため、外すと即座に再停止しうる (扱いは #719 で決める)。
   - **起動主体は完全一致**: fix を起動する reviewer (`oc-reviewer-for-signature-studio[bot]`、`user.type == 'Bot'`) と、
-    停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
+    完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
     (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
+    停止コメント (`oc-fix-limit`) の作者は job の GITHUB_TOKEN = `github-actions[bot]` だけ (型 `Bot` も見る。#2622・#2639)。
+    PM Worker (`infra/pm-worker` の `MARK_LOGIN`) と oc-pm の文脈 (`prepare-event-context.sh`) も同じ作者で見る。
   - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
     と `test-dispatch-context.sh` (dispatch・投稿者の入力検証) と `test-run-outcome.sh` (implement 終了時の記録・review の打ち切りの再起動) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
     変更ごとに実行する。

@@ -210,6 +210,9 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-125 (#3001): PE 0xd6a1f0 (clearLog) と 0xd6a060 (dumpScoreLog) は、成功経路 (述語 P 真・gate 真) で dispatch 0xd843d0 を経て None を返す (REPORT_PY125 §4)。効果は API から観測できないため状態を持たない
+    "general.clearLog": (...a) => { arity(a, 0, 0); return undefined; },
+    "general.dumpScoreLog": (...a) => { arity(a, 1, 2); argI(a, 0, 0); argI(a, 1, 0); return undefined; },
     // PY-96 (#2832): 選択範囲の読出し 4 件。PE 0xd786e0/0xd78700/0xd78500 は obj+0xd74 (start)・obj+0xd78 (end) を読み、
     // 0xd78720 は 0xe43e80 (start>=0 かつ end>=0) を bool で返す。未選択は負値。初期値 -1 は未実測の仮置き (provider/fl_engine.c と同じ)
     "arrangement.selectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
