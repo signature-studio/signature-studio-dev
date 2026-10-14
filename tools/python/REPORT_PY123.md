@@ -51,6 +51,7 @@ time timeout 900 bash tools/flelift/boot/fle6_measure.sh
 
 - 所要: 実測 real 2 分 13.8 秒 (user 3 分 12.6 秒・sys 19.7 秒)。工程: gen-A 5 s・lift 51 s (x64c・closure 2・8 shard)・clang-plain 48 s (8 shard・peak RSS 2.2〜2.7 GB/本)・boot 15 s・negctl 14 s。
 - load average: 開始時 `0.22 0.59 0.37`、clang 中 `1.61 0.94 0.52`、boot 中 `1.54 0.96 0.53`。並列 1 本 (1 回のみ)。
+- n=2。コミット済み HEAD での測定 (上) と、同じコードを未コミットの作業ツリーで回した 1 回目 (2 分 20.8 秒) の値が一致した。(この 1 行は main 側の REPORT にあり、commit `190695eb` で削除されたため復元した。)
 
 | 実行 | units_run / total | boot_threw | slot `0x15e1c78` | pos `+0x20` / count `+0x24` | slot `0x15e4790` | `[0x16b82e0]` | IPP 判定 |
 |---|---|---|---|---|---|---|---|
@@ -92,12 +93,13 @@ FLE_BOOT_VARIANT=plain node tools/flelift/boot/undo_probe_check.mjs "$PWD/tools/
 - MessageBoxW (site 5・`QuickFontCache DLL not found!`・stderr 8117 行) では変化なし (この時点の slot は非 0)。この MessageBoxW の unit 番号は events に出ない (変化点でないため)。
 - unit 209 の GetMem(0x74) 呼出し直前 (site 8・GETMEM seq 2312) で 0。GetMem の戻り値は 0 (§2-4)。
 - 終了 (site 4, `ExitProcess`, call site `0x412a12`) では既に 0。
-- 戻り番地の連鎖 (`exit-stack`): `0x412a12` → `0x409433` (`fle_ov_getmem` の失敗経路 → `Error`) → `0x412a4f` (GetMem 呼出し元) … → `0x410380`。
+- 戻り番地の列 (`exit-stack`): `0x412a12` → `0x409433` → `0x412a4f` → … → `0x410380`。`fle_boot.c` の `imp_ExitProcess` は rsp 以上の 40 語から `.text` 範囲の値を拾って出すだけで、呼出し連鎖として確定したものではない。PE で見ると、`0x409433` は `0x40942e: call 0x409730` (Error) の戻り番地。`0x412a4f` は GetMem の呼出し元ではなく、`0x412a4a: call 0x4128b0` (MessageBoxA → ExitProcess の経路) の戻り番地 (§2-3)。GetMem 呼出しの戻り番地 `0x412cc3` は `0x412cbe: call 0x409410` の戻り番地。ログの `<-0x410380` は、それを含む関数を呼ぶ `0x41037d: call qword ptr [rbx-0x50]` (間接 call) の戻り番地と一致する。
 
-### 2-3. 0 化の位置の逆アセンブル (unit 209 の GetMem 呼出し元)
+### 2-3. 0 化の位置の逆アセンブル (GetMem 呼出しを含む関数 `f_412c90`)
 
-`pe_disasm.py 0x412960 120` (GetMem 呼出し元 `0x412a4f` の直前まで)。直接の 0 書込み `mov qword ptr [rip+0x11d82bf], 0` (VA `0x4129be`) はあるが、書込み先は `0x15eac88` で対象外 (命令長 11 で計算)。対象 slot (`0x15e1c78`・`0x15e4790`・`0x16b82e0`) を指す RIP 相対の書込みは、この 120 命令の窓には無い。
-窓の外 (呼出し先 `0x4128b0`・`0x406fc0` など) は未確認。書込み命令は未特定で、「間接書込み」は推定にとどまる。
+GetMem 呼出し `0x412cbe: call 0x409410` を含む関数は `0x412c90` から始まる (直前は `ret` と `int3` の詰め物)。`pe_disasm.py 0x412c90 40` で `0x412d05 ret` まで。この関数内の RIP 相対参照は `0x412cd9` の読出し 1 件 (`movzx rsi, word ptr [rip+0x11d3d47]`・対象 `0x15e6a28`) だけで、監視 slot (`0x15e1c78`・`0x15e4790`・`0x16b82e0`) への参照と書込みは無い。直接 call `0x412c90` の呼出元は 6 件 (`0x413127`・`0x41356c`・`0x413729`・`0x413cab`・`0x413e2b`・`0x4141a5`)。
+前版の窓 `pe_disasm.py 0x412960 120` (`0x412a4f` の直前まで) は GetMem 呼出しを含まない Error/exit 側の窓。直接の 0 書込み `mov qword ptr [rip+0x11d82bf], 0` (VA `0x4129be`) はあるが、書込み先は `0x15eac88` で対象外 (命令長 11 で計算)。この窓にも対象 slot を指す RIP 相対の書込みは無い。
+窓の外 (呼出し先 `0x4128b0`・`0x406fc0` など、および `f_412c90` の間接呼出元) は未確認。書込み命令は未特定で、「間接書込み」は推定にとどまる。
 
 ### 2-4. 停止点の確定 (再測定・HEAD `f57b7dff`・GitHub Actions run `38653934214`)
 
@@ -115,7 +117,7 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 
 - 停止の機構 (`tools/flelift/boot/fle_boot.c` `fle_ov_getmem`): `ott_dispatch` の戻り番地が `0x409424`。戻り値 `R[0]` が 0 なら `if (!p)` の経路で戻り番地 `0x409433` を積み `f_409730()` (= Error) を呼ぶ。Error の先で `MessageBoxA ''` → `exit(0)` になる。
 - 既存の記録との関係: `REPORT.md` §9-2・§10、`REPORT_APPENDIX_2702.md` §D の「`MessageBoxA` (text 空) → `exit(0)` (0x412a12)」は本 run で再現した。既存の記録は正しく、変更しない。
-- 前版 (本 PR の初版) の「`MessageBoxW` (QuickFontCache) → GetMem(0x74) 失敗 → exit」は誤り。MessageBoxW は途中の呼出しで、停止の順序は `GETMEM seq 2312 → icall-miss (ret 0) → Error → MessageBoxA '' → exit(0)`。#3060 [FLE-11] の前提 (MessageBoxA の text 源と呼出元) は有効のまま。
+- 前版 (本 PR の初版) の「`MessageBoxW` (QuickFontCache) → GetMem(0x74) 失敗 → exit」は誤り。MessageBoxW は途中の呼出しで、停止の順序は `GETMEM seq 2312 → icall-miss (ret 0) → Error → MessageBoxA '' → exit(0)`。#3060 [FLE-11] (2026-10-14 21:56Z) は、呼出元 (`f_4127d0` の `0x412886`・呼出元 `f_4128b0`) と lpText の源 (`.data` のテンプレート `Runtime error     at 0000000000000000`。`f_6a7b70` の広域ゼロ埋めで消失) を確定した。残り (ゼロ埋めの呼出元と幅) は子 #3090 [FLE-12] に分けられている (§5)。
 - 0 化 (site 8) と icall-miss (`dispatch(0)` の ret 0) の因果は未確認。
 
 ## 3. 解釈 (今回の範囲)
@@ -142,10 +144,10 @@ negctl: 4733 行 (`MessageBoxW` QuickFontCache、途中)・1056140 行 `MessageB
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| unit 209 の停止直前の GetMem(0x74): FastMM への dispatch が icall-miss (`dispatch(0)` ret 0) で NULL になる経路 | 停止 (Error → exit) の原因。lift 由来の silent miscompile か、実機でも起きるかが不明。0 化との因果も未確認 | #3060 [FLE-11] (受入条件に追加) |
-| slot `0x15e1c78`・`0x15e4790` を 0 にする命令 (間接書込み) の特定 | 0 化の原因が不明。窓の外 (呼出し先 `0x4128b0`・`0x406fc0` など) は未確認 | #3028 に残す (次 run。unit 209 の GetMem(0x74) 直前区間の窓の外を逆アセンブルする) |
+| unit 209 の停止直前の GetMem(0x74): FastMM への dispatch が icall-miss (`dispatch(0)` ret 0) で NULL になる経路 | 停止 (Error → exit) の原因。lift 由来の silent miscompile か、実機でも起きるかが不明。0 化との因果も未確認 | #3060 にコメントで記録 (受入条件は未追記) |
+| slot `0x15e1c78`・`0x15e4790` を 0 にする命令 (間接書込み) の特定 | 0 化の原因が不明。`f_412c90` の中には書込みが無く、呼出元 (§2-3 の 6 件と間接 call `0x41037d`) は未確認 | #3028 に残す (次 run。`f_412c90` の呼出元の窓を逆アセンブルし、slot への間接書込みを探す) |
 | 安全判定述語の VA・singleton の中身 | `restoreUndoLevel` の分岐・戻り値の判定ができない | #3028 (上の 2 件が解消した後に測る) |
-| boot が unit 209 で止まる (`MessageBoxA` text 源と呼出元) | 起動直後の状態に届かない | #3060 [FLE-11] (open) |
+| boot が unit 209 で止まる。停止点の呼出元と text 源は #3060 FLE-11 で確定済み。残りはゼロ埋めの呼出元と幅 | 起動直後の状態に届かない | #3090 [FLE-12] (親 #3060) |
 | shim 有の IPP 判定 NG (`ok:false`) | 本測定の shim 有の判定が通らない (変更前から) | #3060 (呼出時の `[0x15e0a48]`・`0x15F34A0` の登録経路。`REPORT_APPENDIX_2702.md` の未解決表から移送。#2702 は CLOSED) |
 
 ## 6. 検証範囲
@@ -165,7 +167,8 @@ FLE_BOOT_VARIANT=plain node tools/flelift/boot/undo_probe_check.mjs "$PWD/tools/
 python3 tools/python/analysis/flapi/pe_xref.py 15e1c78           # §1 (FL_WIN64_DIR 必須)
 python3 tools/python/analysis/flapi/pe_slot_writers.py 15e1c78   # §1
 python3 tools/python/analysis/flapi/pe_disasm.py 0xf69840 70     # §1
-python3 tools/python/analysis/flapi/pe_disasm.py 0x412960 120    # §2-3
+python3 tools/python/analysis/flapi/pe_disasm.py 0x412c90 40     # §2-3 (GetMem 呼出しを含む関数)
+python3 tools/python/analysis/flapi/pe_disasm.py 0x412960 120    # §2-3 (Error/exit 側の窓)
 ```
 
 - 生成物は `tools/flelift/work/boot/` (gitignore)。結果 JSON は `tools/flelift/boot/results/` にコミット済み。
