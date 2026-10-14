@@ -20,10 +20,10 @@
 | 23 | shimx 呼出し 0 件 | — | — | ret=2 (icall miss `0x4476d0`・`0x457860`) |
 
 - **GetModuleHandleW("oleaut32.dll") は unit 22 に 1 回だけ、`function_457c70` から呼ばれる** (本体 §3.3.1 の引数一致による推定が確定)。戻り値 0x11443000 は非 NULL。
-- **GetProcAddress は unit 1〜23 で 0 回。`VarBstrFromBool` の呼出しは無い**。`function_457c40` 内の GetProcAddress (`@L160478`) は 1 回も記録されない。
+- **`function_457c40` 経由の GetProcAddress は 0 回**。unit 1〜23 の GetProcAddress は 6 回 (unit 2 が 4 回・unit 18 が 2 回、いずれも `function_457c40` 以外の呼出し元)。`VarBstrFromBool` の呼出しは無い。`function_457c40` 内の GetProcAddress (`@L160478`) は 1 回も記録されない。
 - IR 上 `function_457c70` は `function_457c40` を 22 回呼ぶ。`function_457c40` が GetProcAddress に到達するのは `*(arg1+40) != 0` の分岐のみなので、22 回すべてこの分岐を取らず fallback (arg3) を返したと推論する (`+40` の実行時値は未測定)。
 - `0x11F10E0` (VarBstrFromBool の slot) への store は `function_457c70` の L160537 (22 番目の呼出し、値は fallback `0x457860`)。`PRE|unit 22 slot 0x457860` (unit 22 の後で slot が 0 から変わる) と一致。**slot は GetProcAddress の結果ではなく fallback で埋まる**。name は素材イメージ offset 360446 の `VarBstrFromBool\0` で確認。
-- 原因の推定 (未検証): `function_457c70` の alloca `%stack_var_-56` には store が一度も無く、`GetModuleHandleW` の戻り値 `%0` は未使用。HMODULE が `arg1+40` に入らないため GetProcAddress 経路に入らない。lift で HMODULE の store が脱落した疑いがあり、既知類型では D3 (メモリ宛 store 脱落) が近い。元 x86 との照合は未実施 (起票先: #1985)。
+- 原因の推定 (未検証): `function_457c70` の alloca `%stack_var_-56` には store が一度も無く、`GetModuleHandleW` の戻り値 `%0` は未使用。HMODULE が `arg1+40` に入らないため GetProcAddress 経路に入らない。lift で HMODULE の store が脱落した疑いがあり、既知類型では D3 (メモリ宛 store 脱落) が近い。元 x86 との照合は未実施 (起票先: #1607 `[SHX-T9e]`。slot 解決経路が対象)。
 - **本体 §2.1 の訂正 (kernel32 `#39682`)**: 序数ではない。第 2 引数 0x9b02 は LVA の文字列 `GetLogicalProcessorInformation` を指す (素材イメージで確認)。shimx は Win32 規則 (< 0x10000 は序数) で序数扱いし miss にする。同じ API は unit 18 では 0x10602 で解決される (r=0x25a)。LVA が 0x10000 未満に載ることが原因で、R1 (敷設 ≥0x10000) と同根。
 - ntdll (unit 18) の GetProcAddress は引数 0x13fdc の先頭が 0 で name 空。引数の意味は未追跡。
 - 整合: RET 行数はカウンタと一致 (GetProcAddress 6 行 = 計数 6、GetModuleHandleW 7 行 = 計数 7)。unit 23 の wrapper 呼出しは 0 件。wrapper 追加の前後で unit 23 の結果 (ret=2・icall miss 2 件) は同じ (`evidence_2491/probe_u23_shimx_before_site.txt`)。
@@ -34,12 +34,12 @@
 - 結果: ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 (本体 §3.1 と一致)。
 - 独立検算: `evidence_2491/check_survey_vs_1255.py` で 942 unit の kind と shim_calls を `evidence_1255/shimx_trace_soft_fix.survey.json` と unit 番号で突き合わせ → kind 差分 0・shim_calls 差分 0。ネガティブコントロール (unit 1 の kind を 1 件書き換えた複製) では kind 差分 1 件で FAIL することを確認。
 - 再現: `bash tools/shimx/evidence_2491/repro.sh` (clean rebuild → probe → diff。HEAD `5d261806` 系で `probe: SAME`)。
-- 測定後のコード差分: `git diff 5d261806 HEAD -- tools/m11/shimx_link tools/shimx/src` は出力 0 行 (本節の追記は REPORT と `evidence_2491/` のみ)。
+- 測定後のコード差分: `git diff 5d261806 88c69b0a --stat -- tools/m11/shimx_link tools/shimx/src` は 2 件。`probe_lasterr_1985.mjs` の追加 (main #1985 の probe。build の入力・`survey_trace.mjs`・`probe_unit23.mjs` には含まれず、実行経路の差分は 0)、`build.sh` の EXPORTS 1 行 (main #2533 の `_GetLastError`。build の入力に含まれる)。後者があるため §3.3.7 で再測定した。
 
 ## 3.3.7 main 取り込み後の再測定 (PR #2550 の競合解消)
 
-- 測定 commit: `c068783c` (`origin/main` `3ef67b40` を merge した commit。コードを変えた最後の commit)。初回測定 `5d261806` からのコード差分: `git diff 5d261806 c068783c -- tools/m11/shimx_link tools/shimx/src` は `probe_lasterr_1985.mjs` の 1 ファイル 42 行追加のみ (main #1985 の probe。build.sh・gen_link.py・trace_rt.c は無変更で、build の入力に含まれない)。
-- clean rebuild: `bash tools/shimx/evidence_2491/repro.sh` の build → `[sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0`。`m11_sx_trace_soft_fix.cjs.wasm` の sha256 先頭 `11c74a05…` (初回と同一)。`repro.sh` 全体 (build と probe) の所要 11 秒。
+- 測定 commit: `88c69b0a` (`origin/main` `5745f0c9` を merge した commit。コードを変えた最後の commit)。前回の測定 `c068783c` (main `3ef67b40` の merge) からのコード差分: `git diff c068783c 88c69b0a -- tools/m11/shimx_link tools/shimx/src` は `build.sh` の EXPORTS 1 行 (main #2533 の `_GetLastError` 追加) の 1 件。build の入力が変わったため、以下は再測定の値。`probe_lasterr_1985.mjs` (main #1985) は初回からの差分で、build の入力には含まれない。
+- clean rebuild: `bash tools/shimx/evidence_2491/repro.sh` (`obj/`・`gen_fix/`・`boot_fixed.ll`・`fix_report.json`・`link_trace_soft_fix.log`・`m11_sx_trace_soft_fix.*` を削除してから build。他の variant の成果物は消さない) → `[sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0`。`m11_sx_trace_soft_fix.cjs.wasm` の sha256 先頭 `11c74a05…` (初回・`c068783c` と同一)。`.cjs` には `_GetLastError` の export 行が入る。`repro.sh` 全体 (build と probe) の所要 13.6 秒。
 - probe unit 1〜23: `probe: SAME` (保存出力 `evidence_2491/probe_u23_shimx_site.txt` と diff 0 行)。
-- survey 942 unit: ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 (初回と同一)。所要 2 分 25 秒 (開始時 load 0.64、4 CPU)。`check_survey_vs_1255.py` で `evidence_1255` と kind 差分 0・shim_calls 差分 0。
+- survey 942 unit: `SHIMX_TRACE=1 node tools/m11/shimx_link/survey_trace.mjs tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs --out DIR`。ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 (初回と同一)。所要 4 分 2 秒 (開始時 load 0.55、4 CPU)。`summary` と `per_unit` は `evidence_2491/survey_shimx_trace_soft_fix.survey.json` と完全一致 (Python の `==` で True)。`check_survey_vs_1255.py` で `evidence_1255` と kind 差分 0・shim_calls 差分 0。
 - 素材: `work-m11`・`work-liftdiff` を `$ARTIFACTS_DIR` から展開 (実在確認済み)。EMSDK は [EMSDK] (`docs/REFERENCES.md`) の環境を使用。

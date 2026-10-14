@@ -26,7 +26,7 @@
 
 | 対象 | 件数 | 初回 unit | 区分 | 扱い |
 |---|---|---|---|---|
-| kernel32 `#39682` (序数と記録) | 1 | 2 | 序数扱い (実体は文字列ポインタ。`REPORT_SHX-T9i.md` §3.3.5 で訂正) | R1 (`shimx_set_intptr_limit` 等 / 敷設 ≥0x10000) |
+| kernel32 `#39682` (序数扱い) | 1 | 2 | 序数扱いの誤判定 (実体は文字列ポインタ。`REPORT_SHX-T9i.md` §3.3.5 で訂正) | R1 (`shimx_set_intptr_limit` 等 / 敷設 ≥0x10000) |
 | kernel32 | 11 | 36 | 非 GUI | 未調査 |
 | ntdll.dll | 1 | 18 | 非 GUI | 未調査 |
 | ole32 | 6 | 107 | 非 GUI | 未調査 |
@@ -186,12 +186,12 @@
   2. `function_40f9e0(6712, arg2|1)` は低バイトが 1 のため `function_410320(6712, 1)` を呼ぶ。IR 上の `function_410320` は `ret %arg1` だが、現行 `m11_ov.c` の C 転記 (#418) が上書きし、`ICALL_AT(0x41032e, Q(self-0x30))` (vmtNewInstance) を呼ぶ。これが `icall 0xf960` (`function_40f960` = GetMem + InitInstance)。
   3. `function_467c40` (`m11_ov.c` 転記): `slot = Q(R(0x11e3af0)) = 0x11f10e0`、`Q(slot) = 0x457860` (§3.3.2 の fallback) ≠ 0 なので VarBstrFromBool 呼出しに入る。`ICALL_AT(0x467cc9)` と `ICALL_AT(0x467d5d)` が閉じた closure 外の `0x457860` を踏み、icall-miss (ret 0) になる。trace の `UStrAsg dest=0x11f1120`・`0x11f1128`・`0x11f1138`… は転記の書込み先 `R(0x11f1120)` 等と一致する。
   4. 含意: slot が fallback の `0x457860` のまま非 0 だと、ゲートを通って VarBstrFromBool 呼出し (icall-miss) に入る。slot が本物の `VarBstrFromBool` で埋まった場合の経路は未測定 (#1607 の範囲)。
-- **未達 (受入条件 1・2・3 の残り)**: (a) `function_457c70` の呼出し元 PC は未記録 (wrapper 未拡張)。起票: #2491 (`[SHX-T9i]`)。(b) baseline の比較は、現行 `m11_ov.c` で `m11_boot.cjs` を再生成して初めて成立する。再生成には `m11_gen_ir2.sh` (`ir_conditions.json`・fl-win64・pefile/capstone) が要り、本 run では完了していない。起票: #2489 (`[SHX-T9h]`)。
+- **未達 (受入条件 1・2・3 の残り)**: (a) `function_457c70` の呼出し元の wasm PC は未記録 (IR site で代替。#2491 で site ID を追加)。起票: #2593 (`[SHX-T9k]`)。(b) baseline の比較は、現行 `m11_ov.c` で `m11_boot.cjs` を再生成して初めて成立する。再生成には `m11_gen_ir2.sh` (`ir_conditions.json`・fl-win64・pefile/capstone) が要り、本 run では完了していない。起票: #2489 (`[SHX-T9h]`)。
 - 追補 (SHX-T9j #2533): 現行 `m11_ov.c` で再生成した baseline と shimx `--trace --soft --fix` の unit 23 GetLastError を実測。経路は両版とも `ret=2`・icall-miss `0x457860`。GetLastError は baseline 0 / shimx 126。詳細と旧値との差は `tools/shimx/REPORT_SHX-T9j.md`。
 
 #### 3.3.5 呼出し元 site と戻り値の実測 (SHX-T9i #2491)
 
-- 結論: `GetModuleHandleW("oleaut32.dll")` は unit 22 に 1 回だけ `function_457c70@L160493` から呼ばれる (戻り値 0x11443000)。`GetProcAddress` は unit 1〜23 で 0 回。slot 0x11f10e0 は GetProcAddress の結果ではなく fallback `0x457860` で埋まる。呼出し元は機械語 PC ではなく IR site で記録。
+- 結論: `GetModuleHandleW("oleaut32.dll")` は unit 22 に 1 回だけ `function_457c70@L160493` から呼ばれる (戻り値 0x11443000)。`function_457c40` 経由の GetProcAddress は 0 回 (unit 1〜23 の GetProcAddress は 6 回で、unit 2・18 の別の呼出し元)。slot 0x11f10e0 は GetProcAddress の結果ではなく fallback `0x457860` で埋まる。呼出し元は機械語 PC ではなく IR site で記録。
 - 表・原因推定・訂正 (kernel32 `#39682`) の全文は `REPORT_SHX-T9i.md` §3.3.5 (分割移動)。
 
 #### 3.3.6 survey 全 942 unit の回帰確認 (SHX-T9i #2491)
@@ -234,8 +234,9 @@
 | survey unit 160 以降の range 連鎖 | 解消 (harness 修正) | #773 |
 | survey の unit 単位差分: unit 115 の fail-fast 差 | 差の機構を推定 (§3.1)。CS ポインタ一致は未比較 | #1255 (`[SHX-T9c]`) |
 | survey の unit 単位差分: unit 23 の分岐・oob 増 57 件の内訳 | 未説明 | #1465 (`[SHX-T9d]`) |
-| slot 0x11f10e0 の埋まり経路: `function_457c70` は unit 22 に 1 回・全 fallback (`REPORT_SHX-T9i.md` §3.3.5 で実測)。現行経路は §3.3.4 で確定。残: alloca `+40` が 0 になる原因 (HMODULE store 脱落の疑い、未検証)、呼出し元の機械語 PC | 一部実測 (残は未説明) | #1985 (`[SHX-T9f]`) |
-| baseline (`m11_boot.cjs`) の unit 23 比較 | 古い成果物のため無効。現行 `m11_ov.c` で再ビルドが要る | #2489 (`[SHX-T9h]`) |
+| slot 0x11f10e0 の埋まり経路: `function_457c70` は unit 22 に 1 回・全 fallback (`REPORT_SHX-T9i.md` §3.3.5 で実測)。現行経路は §3.3.4 で確定。残: alloca `+40` が 0 になる原因 (HMODULE store 脱落の疑い、未検証) | 一部実測 (残は未説明) | #1607 (`[SHX-T9e]`) |
+| 呼出し元の wasm PC への対応・unit 22 の GetLastError=126 の発生元 | 呼出し元は IR site で代替。126 は未特定 | #2593 (`[SHX-T9k]`) |
+| baseline (`m11_boot.cjs`) の unit 23 比較 | 再生成 baseline の unit 23 は shimx と同じ経路 (§3.3.4 追補・#2533)。残: 旧 IR と再生成 IR で unit 18・22 の結果が変わった原因 | #2489 (`[SHX-T9h]`) |
 | oob 増 57 件の unit 単位 frame 分類 | 未説明 | #1986 (`[SHX-T9g]`) |
 
 ## 5. 再現性
