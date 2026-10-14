@@ -511,7 +511,7 @@
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
 | `tools/shared/elastique/REPORT.md` | ~140 | élastique 2.2.15 (win x64) の静的 IPP 入口 197 件の API 同定 (T-SH-40 / #2613): 線形走査の入口再現・dsp_ippv2 の本体照合 (一意名 8・族候補 26・未同定 163)・tools/ipp の stub 名 28 (stub のみ 18・混在 16 入口。#2613 受入 2)・間接経路の静的確認。対応表は `data/entries.csv` |
 | `tools/shared/REPORT_APPENDIX.md` | ~110 | shared REPORT の分割移動節の全文: §A win freetype.dll の版判定 (#145, 上流 VER-2-4-{10,11,12} 照合の実測)・§10 ライブラリのビルド詳細 (libFLAC/LAME/WavPack/FFmpeg/ILSvg)・§12 検収記録 (2026-10-11)。250 行上限のため無変更で分割移動 |
-| `tools/shared/elastique/REPORT_152.md` | ~155 | élastique 2.2.15 (win `elastique_x64.dll`) の静的 IPP 入口と dispatch 層 (thunk・表の飛び先) の実測と lift 前提 (D20 の side module 方針)。測定値は本 REPORT §0。T-SH-10 (#152)。同定は子 T-SH-43 (#2667)、lift 本体は子 T-SH-41 (#2614) |
+| `tools/shared/elastique/REPORT_152.md` | ~210 | élastique 2.2.15 (win `elastique_x64.dll`) の静的 IPP 入口と dispatch 層 (thunk・表の飛び先) の実測と lift 前提 (D20 の side module 方針)。測定値は本 REPORT §0。T-SH-10 (#152)。dispatch 飛び先の IPP 同定は T-SH-43 (#2667・§8)、lift 本体は子 T-SH-41 (#2614) |
 | `tools/shared/oss/sidemod/REPORT.md` | ~60 | FFmpeg/LAME を差し替え可能な side module として再ビルド + GPL 混入検出 (LGL-4) |
 | `tools/shared/oss/ilsvg/REPORT.md` | ~50 | ILSvg の版の組 probe (#877): svgdom 0.4.7 は emcc 26/26 cpp OK、svgren 0.6.3 / 0.5.9 は svgdom 0.4.7 と enum 名不一致で版の組は未確定 (未解決 #927) |
 | `tools/shared/oss/blend2d/REPORT_SIMD.md` | ~60 | Blend2D wasm `-msimd128` 試験 (T-SH-02, #146) の実測詳細・ネガティブコントロール・前版の実測・未解決の起票先 (`tools/shared/REPORT.md` §3.3 から分割移動) |
