@@ -383,6 +383,7 @@
 | `tools/audio/REPORT_MIDI.md` | ~65 | AU-3 (#188) Web MIDI shim の検証全文 (REPORT.md §13 から分割) |
 | `tools/audio/REPORT_AU10.md` | ~215 | AU-10 (#191) 30 分ソーク (`--soak30`) の検証全文 (REPORT.md §16 から分割)。§16.5〜§16.7 は `REPORT_APPENDIX_1570.md` に分割移動 |
 | `tools/audio/REPORT_APPENDIX_1570.md` | ~63 | AU-21 (#1570) 切り分け 1〜3 (REPORT_AU10.md §16.5〜§16.7) の全文 (250 行上限のため分割移動) |
+| `tools/audio/REPORT_AU29.md` | ~104 | AU-29 (#3115) clock_jump_log への ct・cb 追加と 30 分ソークの jump 4 件 (位置・cb・ct の対応)。performance.now() は worklet に無く未取得 (子 #3157) |
 | `tools/audio/REPORT_AU6.md` | ~38 | AU-6 (#190) 遅延ポリシー: T の減衰の全文 (REPORT.md §17 から分割)。減衰テスト・quick 全体の実測値の正本 (§2) |
 | `tools/audio/REPORT_AU2_CI.md` | ~195 | AU-2 (#187) CI 代理指標: Chrome 行列 (2 回目 run・null-sink 接続確認済み・NC・再採取 n=1 の FAIL 1 件・§8 の clock_jump 差分)、Firefox 行列 (WebDriver BiDi, §9・AU-23 #2540)、未解決 (§4・§6)。1 回目 run の記録は §1 (§5 で解消)。quick ベースライン 43/44。実機分は [AU-22] (#2366) |
 | `tools/audio/REPORT_APPENDIX_863.md` | ~20 | AU-15 (#863) 現 HEAD (`2f235a0a`) での再試行 15 run 全 PASS の全文 (REPORT.md §20 から分割移動。250 行上限のため)。§19 (旧 HEAD の失敗 1 件) は REPORT.md 本体 |
