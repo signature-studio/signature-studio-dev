@@ -36,7 +36,7 @@
 | `tsc --noEmit` (`tsconfig.json`) | rc 0 | — |
 
 - 初回の `shimx/test.sh --quick` は `sigs.json が shimx ソースと不一致` で FAIL した (新公開関数の未再生成)。`python3 scripts/gen_sigs.py` で再生成して解消。quick 実行は OTT 素材が無いため `BACKLOG.md`・`inventory.*`・`coverage.json` も書き換えるが、これは本 PR に含めず HEAD の版へ戻した (§5 と同じ方針)。
-- 差分確認: `git diff 59c74ab5 HEAD -- src tools/gui tools/shimx/src tools/shimx/data tools/shimx/exports.txt` の出力は 0 行 (測定後のコード差分なし)。
+- 差分確認: `git diff 59c74ab5 HEAD -- src tools/gui/src tools/gui/include tools/gui/shimx_coexist/coexist.sh tools/gui/shimx_coexist/run.mjs tools/gui/shimx_coexist/t_main.c tools/shimx/src tools/shimx/data tools/shimx/exports.txt` の出力は 0 行 (測定後のコード差分なし。後続の commit は REPORT と DOC_MAP のみ)。
 
 ## 4. 限界 (検証範囲)
 
