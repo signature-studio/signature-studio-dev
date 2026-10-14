@@ -164,68 +164,81 @@
 | 0x104caae の r9d 引数 (`call 0x12df2a0`) の式の照合 | 受入 2 の一部 | #2874 (PY-99)。未追記 (#2874 本文に項目なし) |
 | 0x104a924 の間接書込み (0xc61250 経由) を ACC に反映 | ACC の定義 | #2874 (PY-99) |
 
-## PY-99 (#2874): 後ろ向き CFG 経路列挙で `[rbp+X]` の読みの到達 store を出す (受入 1・3 は #3085・#3086 へ移管。範囲縮小後の `Closes #2874`)
+## PY-160 (#3087): 間接書込み 0x104a924・r9d 引数 (0x104caae)・call 0x7a0c20 本体 (CFG 到達定義による実測)
 
-親: #2788 (PY-88)。前段: 上節 PY-88 (線形の後ろ向きスライス) と PY-64 (式照合)。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
+親: #2874 (PY-99)。前段: 上節 PY-88 (ACC 30 件・合流の印)。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
 
-### 結論
+### 測定
 
-- 経路列挙を実装し、印つきの `[rbp+X]` 読み 116 件 (SLOT? 86・ACC?⚠ 30) すべてに適用した (`analysis/py99_slot_paths.py`)。到達 store を分岐先つきで出した。入口 (IN) まで届く読みは 0 件。
-- 値の確定は未達。格納値が閉じた式になった読みは 0 件で、残りは別の読みへの依存 (63 件) か入口レジスタ (32 件)。
-- 突合: 線形で一意な読み (印なし) 55 件は、到達 store が線形の直前 store 1 件で式も一致 (mismatch 0)。前向きの検算 (store から前向きに届く読みを列挙) も 171 件すべてで後ろ向きと一致 (mismatch 0)。
-- py88 の合流印は保守的だった。ACC (`[rbp+0x5b8]`) の 30 件は、経路上では全件 0x1046d6b (入口 edx) の 1 store にだけ届く。SLOT? 86 件のうち 85 件は線形 store が到達集合に入り、1 件 (0x104b7ec) は入らない (下記)。
-- issue の「79 読み」は書込み単位の件数 (直接式 SLOT? 49 と ACC?⚠ 30 の和。うち 20 件は両方に入る) で、読み単位ではない。読み単位 (読み位置 × スロット、重複除去) は T 116 件 + U 55 件 = 171 件。
+- 測定 commit: `04f04b9b` (解析スクリプト `analysis/py160_reach.py`・`analysis/py160_dis.py` を入れた commit)。測定に使った script の差分 `git diff 04f04b9b HEAD -- tools/python/analysis/py160_reach.py tools/python/analysis/py160_dis.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py88_writes.py` の出力は 0 行 (検証時点の HEAD)。`tools/python/analysis` 全体では main 取り込みで別 script 4 件が増えたが、本測定では使っていない。
+- 素材: `oc_artifacts: fl-win64`。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/py64 --wildcards '*block00031_PE.bin'` (2.9 秒)。`work/` は gitignore。
+- 逆アセンブル: `python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` (`fn=4664`)。補助: `python3 analysis/py160_dis.py <PE> <lo> <hi>`。
+- 到達定義: `python3 analysis/py160_reach.py work/py53/fn.txt` (fn.txt の全 jcc/jmp 辺から CFG を作る。799 ブロック・間接ジャンプ 0 件)。kill は `dword ptr [rbp + 0x5b8]` への直接 store (74 命令)。部分幅の書込みは 0 件。`[rbp+0x5b8]` のアドレスを取る `lea` は 0x104a924 の 1 箇所のみで、その `call 0xc61250` (0x104a92b) を may-gen (kill なし) として入れる。
 
-### 測定条件
+### 1. 間接書込みは ACC の到達 store 集合を変えるか → 変えない
 
-- 測定 commit: `69530065` (`analysis/py99_slot_paths.py` の最後のコード commit。`--lea-write` の追加を含む)。`41a6d7af` で測った 171 読みの結果は、`69530065` で再測定して一致した。前段の測定 commit は `7e6c748a` (py88_writes.py・py64_check_expr.py の最後の変更)。`git diff 7e6c748a HEAD -- tools/python/analysis/py88_writes.py tools/python/analysis/py64_check_expr.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py64_branch_regions.py tools/python/analysis/py60_objdump_check.py` の出力は 0 行。`git diff 69530065 HEAD -- tools/python/analysis/py99_slot_paths.py tools/python/analysis/py88_writes.py tools/python/analysis/py53_dispatch.py tools/python/analysis/py60_objdump_check.py` の出力は 0 行 (main 取り込み後の `analysis/` の差分は他 PR の新規ファイルで、本節の測定は読まない)。
-- 素材: `oc_artifacts: fl-win64`。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'` は 1.58 秒 (展開前後で一致)。
-- 逆アセンブル: 既存の `work/py53/fn.txt` (fn=4664)。
-- 実行: `python3 analysis/py99_slot_paths.py work/py53/fn.txt --lea-write > work/py99/paths.txt 2> work/py99/summary.txt` (exit 0・`time` の real 0.53 秒)。load average (1 分値): 0.21 (22:08:55)。
-- CFG: 関数内の jcc/jmp の辺 614・間接 jmp 0 件。`python3 analysis/py60_objdump_check.py work/py64/extracted/block00031_PE.bin work/py53/fn.txt` は objdump 614 辺・agree 614・disagree 0 (exit 0)。
+- 0xc61250 の書込みは 0xc6129a `mov dword ptr [rdi], eax` の 1 箇所。`sil` (0xc62db0 の戻り値の下位バイト = `setge` = 0xc62630 の戻り値 ≥ 0) が非 0 のときだけ実行される。書く値は 0xc62db0 が `[r8]` (= 0xc61250 の `[rbp+0x28]`) に書く qword の上位 dword。
+- 到達定義 (`py160_reach.py` の ACC 行。py88 の ACC?⚠合流 30 件と一致):
+  - 30 件すべて {0x1046d6b} (入口の store のみ)。
+  - 間接書込みが届く読みは 3 件だけ: 0x104a945 (`mov r8d,[rbp+0x5b8]`)・0x104caec (r9d、§2)・0x104cc65 (戻り値 `[rbp+0x584]` へ入る読み)。
+- 判定: PY-99 の「ACC 30 件は入口の store のみに届く」は成立。間接書込みは ACC 30 件の到達集合を変えない。ただし戻り値の読み 0x104cc65 に届くため、戻り値の式 (PY-52) は間接書込みを含めて書き直す必要がある (§6)。
+- 過大評価: CFG は path-insensitive。0x104a930 の `al` 条件 (書いた経路だけ) は使っていない。届く集合は安全側の上限。
 
-### 結果 (読み 171 件。65 書込みの式の評価に現れた `[rbp+X]` の読みを (読み位置, X) で重複除去)
+### 2. 0x104caae の r9d 引数 (call 0x12df2a0 @0x104caf3)
 
-| 区分 | 件数 | 内訳・注 |
-|---|---|---|
-| T: py88 が印つき (SLOT? / ACC?⚠) | 116 | SLOT? 86・ACC?⚠ 30 (30 件はすべて `[rbp+0x5b8]`) |
-| T・到達 store 1 件・格納値が閉じている | 0 | |
-| T・到達 store 1 件・値は入口レジスタ | 32 | ACC 30 件 (0x1046d6b の edx) と他 2 件 |
-| T・到達 store 1 件・値に別の読みが残る | 63 | 格納値に SLOT[...] 等が残る (限界の行を参照) |
-| T・到達 store 1 件・非 mov (kill) | 3 | `and`/`add` 等で同アドレスを書く。値は `OP:<命令>` |
-| T・分岐 (到達 store 複数) | 18 | 2 件が 17・3 件が 1。各 store に届いた分岐先 VA を出力 |
-| T・入口 (IN) まで届く | 0 | |
-| T・到達 store 0 件 | 0 | |
-| T・addr-taken (lea で取られた X) | 30 | X = 0x5b8 のみ (`lea r8, [rbp + 0x5b8]` @0x104a924) |
-| U: py88 の線形結果が一意 (印なし) | 55 | 突合で match 55・mismatch 0 |
+- 0x104caec `mov r9d, dword ptr [rbp+0x5b8]` の到達集合は、0x104caae に入る 38 本の辺 (jcc/jmp 37 本と 0x104caa9 の call の fall-through) ごとに決まる (`python3 analysis/py160_reach.py work/py53/fn.txt edges 0x104caae`)。値は分岐で決まり、1 式にはならない。
 
-### 突合 (独立算法の検算)
+| 群 | 入口辺 (VA・本数) | 到達集合 (store VA。0x1046d6b は入口の store = edx) | 値の式 |
+|---|---|---|---|
+| G1 | 0x104745f・0x104748c・0x104aafc・0x104ab2d・0x104b2bf (5) | {0x1046d6b} | edx (入口値) |
+| G2 | 0x104ad3f・0x104ad50・0x104ae38 (3) | + 0x104aba9・0x104ad2e | py88 式 (F 型・M8 型) |
+| G3 | 0x104b188・0x104b19d・0x104b1f8 (3) | + 0x104af7f・0x104b093 | py88 式 (F 型・M32 型) |
+| G4 | 0x104b668・0x104b67d・0x104b734 (3) | + 0x104b305・0x104b5aa | py88 式 (CALL 型・M32 型) |
+| G5 | 0x104bbab・0x104bc54・0x104bc84・0x104bcb8・0x104bd1d (5) | + 0x104b843・0x104b94e | §3 (0x104b843)・py88 式 |
+| G6 | 0x104c077・0x104c08c・0x104c0ad・0x104c0ce・0x104c159・0x104c1ea・0x104c263 (7) | + 0x104bebf・0x104bffa | py88 式 (F 型・M32 型) |
+| G7 | 0x104c49a・0x104c4aa (2) | + 0x104c311・0x104c3f0 | PY-64 照合済 |
+| G8 | 0x104c5ab・0x104c64a (2) | + 0x104c51a・0x104c56d | 0x104c56d = dword[*(0x15e3290)] (PY-52)。0x104c51a は py88 式 |
+| G9 | 0x104c8a6・0x104c914 (2) | + 0x104c6ba・0x104c769 | PY-64 照合済 |
+| G10 | 0x104ca3f・0x104caa9 (2) | + 0x104c984・0x104c9e6 | PY-64 照合済 |
+| G11 | 0x104aa21・0x104aa2e・0x104aa59・0x104aa82 (4) | 55 件 (間接書込み 0x104a92b を含む) | 未確定 (§6) |
 
-- 線形で一意な U 55 件: 経路列挙の到達 store が py88 の線形 store 1 件に一致し、式も一致。**一致 55・不一致 0**。
-- 前向きの検算 (各 store から前向きに届く読みを列挙し、後ろ向きの結果と比べる): 171 件。**不一致 0**。
-- SLOT? 86 件の線形 store (@VA) は、到達集合に 85 件で入る。例外は 0x104b7ec (`[rbp+0x5c0]`)。線形 store は 0x104a8a9 の `and dword ptr [rbp+0x5c0], 0xffffffdf` (非 mov) だが、経路はこれを通らず 0x1046d71 (`mov [rbp+0x5c0], r8d`・入口 r8) に届く。
-- ACC?⚠ 30 件は、経路上では全件 0x1046d6b の 1 store のみ。線形の合流印が付いても、到達 store は一意なことがある。
+- 全体の到達集合は 73 件 (入口の store・G11 の 55 件・間接書込み)。
+- py88 式は `python3 analysis/py88_writes.py work/py53/fn.txt <VA>` の出力。movabs を含む式の誤りは §5。
 
-### ネガティブコントロール
+### 3. call 0x7a0c20 本体と SLOT 依存の引数
 
-- (a) 分岐辺を全部落とした CFG (`--negctl fallthrough`): 171 読みのうち **115 件** で到達 store 集合・IN・到達不能が変わった (T では 114 件が到達 store 0 件)。検出力あり。exit 0 (診断モード)。
-- (b) U の先頭 1 件の期待式を書き換える (`--negctl expect`): 突合は match 54・**mismatch 1**。exit 1 (期待どおり)。
+- call 0x7a0c20 (0x1049b18・逆アセンブル `py160_dis.py ... 0x7a0c20 0x7a0c53`): 戻り値 = N − W。N = `[[this+0x4f8]]` の vtbl[+0x28]() の戻り値。W = call 0x7a0b50(this, 0x7fffffff)。
+- call 0x7a0b50 (this, n): lim = min(n, N−1)。i ∈ [0, lim] について、`byte[this+0x548] == 0` かつ `call 0x729d20(vtbl[+0x18](obj, &tmp, i)) > 0` のとき cnt++。戻り値 cnt。
+- 整理: 戻り値 = #{i ∈ [0, N) : 述語 P(i) が偽} (`[this+0x548]≠0` のときは W = 0)。N の 2 回の呼出しが同値か・副作用は未確認。
+- 0x1049b1d〜0x1049b2c: ecx = [rbp+0x5b8] = {0x1046d6b} → edx_in。edx = 0。r8d = 戻り値 − 1。よって call 0x10469f0 の引数は (edx_in, 0, N − W − 1)。
+- 0x104b843 (call 0x10469f0 @0x104b83e) の引数 (SLOT 依存の 2 件のうち 1 件):
+  - ecx = [rbp+0x5b8]@0x104b7f9 = {0x1046d6b} → edx_in。
+  - j = [rbp+0x570]@0x104b814・0x104b833 = {0x104aa97} = (ecx_in & 0xffff) + 0x70000000 (`[rbp+0x5b0]`@0x104aa87 = {0x1046d65} = ecx_in)。
+  - edx = dword[0x1539eb4 + 8k]、r8d = dword[0x1539eb8 + 8k]、k = ecx_in & 0xffff (k=0xffff で 0x15b9eac・0x15b9eb0)。計算 (mod 2^64): edx 側 = movabs 0xfffffffc7fff0200 + rip 基準 0x104b810 + 0x4fe4a4 (= 0x1549cb4) + 8j (j = k + 0x70000000、8j = 8k + 0x380000000) ≡ 0x1539eb4 + 8k。r8d 側 = movabs 0xfffffffc7fff0204 + (0x104b82f + 0x4fe485 = 0x1549cb4) + 8j ≡ 0x1539eb8 + 8k。objdump の rip 注釈 (`# 0x1549cb4`) と一致。テーブル範囲は .data (VA 0x13a5000〜0x15e5008) 内。raw 値は解釈していない。
+  - py88 の式 `edx=M32[&SLOT[rbp+0x5c0]?@0x104a8a9 …]` は誤り (§5)。
+- 0x104a48f (call 0x10469f0 @0x104a48f): ecx = [rbp+0x5b8]@0x104a47a = {0x1046d6b} → edx_in。edx = −T[i]、r8d = T[i]。T[i] = dword[*(0x15e44c8) + 4i]、i = sext([rbp+0x56c]) = {0x104a3f1} = ((([rbp+0x564]@0x104a3d7 = {0x104756f}) − 0x1000) >>> 8)。0x15e44c8 は .data 内の qword で、その値は実行時に決まる (raw 値では確定しない)。
 
-### 限界
+### 4. 受入条件
 
-- 格納値が別の読み (SLOT[...] 等) に依存する 63 件と、入口レジスタに帰着する 32 件は値を閉じていない。経路列挙は store までで、格納レジスタの値の合流は越えていない。
-- `[rbp+0x5b8]` (ACC) は lea で取られている。間接書込み (0xc61250 経由) は lea を may-write とみなして検査した (`--lea-write`): lea から直接 store を経ずに届く ACC 読みは 0 件 (lea から届く節点 155 件)。よって ACC 30 件の結論は変わらない。ただし書込み幅は 0x5b8 の 1 スロットと仮定しており、0xc61250 本体は未読。
-- 対象は py88 と同じく dword/qword の `[rbp+X]` 書込みのみ (byte/word の部分書込みは見ない)。call は `[rbp+X]` を書かないと仮定 (addr-taken の X を除く)。
-- 0x104caae の r9d 引数 (`call 0x12df2a0`) は対象外。
+| 受入 | 判定 |
+|---|---|
+| 1 間接書込みの到達集合への影響と PY-99 結論の成否 | 確定。変えない。ACC 30 件 = {入口 store}。届くのは 0x104a945・r9d・戻り値読み 0x104cc65 |
+| 2 r9d 引数の式 (VA つき) | 部分達成。38 本の入口辺ごとの到達集合を VA で確定 (§2 表)。G1・G7・G9・G10 は確定式あり。G2〜G6・G8 は py88 式 (未照合)。G11 (55 件) は未確定 |
+| 3 call 0x7a0c20 本体と 2 件の引数 | 部分達成。本体は N − W の形まで (vtbl 呼出し先と 0x729d20 が未確定)。0x104b843 の引数は VA 0x1539eb4 の表式で確定。0x104a48f は runtime ポインタと index 連鎖が未確定 |
 
-### 未解決
+### 5. 限界・既知の欠陥
+
+- py88_writes.py は movabs を解釈しない (0x104b843 の edx/r8d で誤りを確認)。65 件の式表のうち movabs を含む件数は未計測。
+- `lea rcx, [rbp+0x510]` (多数) の対象が 0x5b8 に及ぶかは未検証 (受け側の型が未確定)。
+- 間接書込みの値 (0xc62630 の戻り値と 0xc62db0 が書く qword) は式の形だけ。値は未確定。
+
+### 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 格納値が別の読みに依存する 63 件 (T) の閉じた式 | 受入 1 の残り | #3085 (PY-158) |
-| 入口レジスタに帰着する 32 件 (ACC 30 件を含む) の引数の意味・全件の式表 | 受入 3 | #3086 (PY-159) |
-| 0xc61250 本体の書込み幅 (0x5b8 の 1 スロット超への書込み)。lea 経由で届く ACC 読みは 0 件と検査済み | 0x5b8 以外のスロットの読みの到達 | #3087 (PY-160) |
-| 0x104caae の r9d 引数 (`call 0x12df2a0`) | 受入 2 の一部 | #3087 (PY-160) |
-| 0x104b7ec の SLOT? 印の線形 store が真の到達 store でない例 (1 件) | py88 の印の解釈 | #3085 (PY-158) |
-
-call 0x10469f0 の本体式と 7 件の戻り値式は `REPORT_PY99_APPENDIX.md` に記録 (受入 2 の完了分)。
+| G11 (55 件) の値式と、G2〜G6・G8 の py88 式の照合 | r9d の値 (0x1047497 領域) | #3101 (PY-161) |
+| 0x7a0c20 の vtbl[+0x28]・vtbl[+0x18]・0x729d20・[this+0x548] の解決 | r8d (0x1049b2c) | #3101 (PY-161) |
+| 0x104a48f の T の runtime ポインタ (0x15e44c8)・[rbp+0x564] の式 | 0x104a48f の edx・r8d | #3101 (PY-161) |
+| py88 の movabs 未対応 | 65 件の式表 (0x104b843 で確認) | #3101 (PY-161) |
+| 間接書込みの戻り値 (0x104cc65) への反映 | PY-52 の戻り値式 | #3101 (PY-161) |
+| 間接書込みが届く 0x104a945 の `mov r8d,[rbp+0x5b8]` の r8d の使い道と値 | 0x104a945 以降の r8d (呼出し引数の候補) | #3101 (PY-161) |
