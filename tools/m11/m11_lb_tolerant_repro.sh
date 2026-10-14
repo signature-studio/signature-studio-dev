@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # M11 寛容起動 (m11_tolerant.mjs) の LB 別再現 (#3160): IR 生成 → 画像 → 静的検査 → build → 寛容起動 (942 unit) を 1 LB ぶん実行する.
-#   使い方: bash tools/m11/m11_lb_tolerant_repro.sh <LB> <出力ディレクトリ>   (例: 0 work/lb0 / 0x10000 work/lb10000)
+#   使い方: bash tools/m11/m11_lb_tolerant_repro.sh <LB> <出力ディレクトリ>   (例: 0 work/lb0 / 0x10000 work/lb10000。出力先は tools/m11 基準の相対パス)
 #   前提: fl-win64 を FL_WIN64_DIR に展開済み・work-m11 を tools/m11/work に展開済み・/opt/emsdk・python の pefile と capstone.
 #   m11_e2e.sh の全再生成は使わない (work-m11 に work/lift_pe.sha256 が無く全再生成に入るため)。lift 成果物 (boot*.lift.ll) から後段だけを実行する.
 #   注意: work/boot_final.ll・work/m11_boot.cjs・work/m11_image.bin を上書きする (LB ごとに作り直す)。
