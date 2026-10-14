@@ -7,6 +7,7 @@
 - 7 関数 (selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn / incEventValue / processRECEvent) の**ハンドラ位置と引数書式は PE から確定**した。
 - **意味論 (戻り値・範囲外 code・副作用) は未確定**。各ハンドラは下位関数へ薄く委譲しており、実処理の所在まで追えていない。推測では実装しない。
 - コード変更は `provider/` `host/` `tests/` で 0 件。本 PR は解析補助スクリプトと本 REPORT のみ。受入条件は未達 (`Refs #1527`)。
+- 7 回目 run (#2499): `selectOneChannel` の意味論を PE で確定し、C provider と mock に実装した (末尾の節)。`setChannelPitch` は未確定のため子 #2542 に分けた。
 
 ## 測定
 
@@ -110,3 +111,79 @@
 - `0x40fe90` / `0x40feb0`: `0x40feb0` は引数が非 0 かつ `0x40fe90` の検査に通らないとき、code `0xa` で `0x4096d0` を呼ぶ。`0x4096d0` は code の下位 7bit を受けて通知する。**0xa が範囲外 code かは未確定**。
 - 結論: 選択フラグの setter (`0xff8a90`)・全解除 (`0x11e8720`)・検索 (`0x11e8280`) の所在は確定。**selectAll / selectOneChannel がこれらを呼ぶかは未確認**のため、7 関数の戻り値・範囲外 code は引き続き未確定。`fl_engine.c` 実装は行わない。
 - 未読 (次に読む対象): `0x11e8670` の `0xfe8bb0` 以降 (呼び出し後の戻り規約)、`0xff8a90` の `0xfdee80`、`0xffac20`、`0x410010`、`0x4096b0`。selectAll・selectOneChannel 本体 (`0xd5b150` → `0xd843d0` 以降) が `0x11e8720`・`0x11e8280` を呼ぶかの確認。
+
+## 追加解析 (7 回目 run, PY-69 #2499): selectOneChannel の意味論を確定
+
+- 既知類型との関係: 該当なし (lift 作業ではない。PE 逆アセンブルによる意味論の確定)。
+- 測定 commit: `683aef61` (コード変更の最後の commit。`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`)。
+- 逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'`、実測 2.9 秒)。
+
+### 結論
+
+- `selectOneChannel(index, useGlobalIndex=False)`: index が範囲外なら status `-4` → Python 例外 "Index out of range" (C provider の code 4 と同じ)。範囲内なら対象の選択フラグ `+0x32c` を 1 にし、**他の全 channel の同フラグを 0 にする (排他選択)**。
+- 排他選択の所在は `0xd5af30` ではなく `0x11e84a0` (全件ループ)。フラグの書込みは setter `0xff8a90` の 1 箇所。
+
+### stack 引数の出所
+
+- `0xd5afc0`: PyArg 解析 `i|i` (fmt は `0xd5b0f4`、`call [IAT 0x889571]`) の出力。index → `[rbp+0x9c]`、useGlobalIndex → `[rbp+0x98]`。
+- `0xd5b041`〜`0xd5b096`: `0xd843d0(container, out=[rbp+0x80], cb=0xd5af30, ctx=0, a5=index, a6=useGlobal, a7..a10=0, a11=1)` を呼ぶ。
+- `0xd843d0`: a5 → task `+0x18`、a6 → task `+0x20`、cb → task `+0x58`。out の初期値は -2 (`0xd843e9`)、task の status `+0x60` は cb の先頭で -2 (`0xd5af3c`)。thunk `0xd84290` (`call [task+0x58]`) を `0x526190` に渡し、その後 `[out] = [task+0x60]` (`0xd844d7`)。`0x526190` が同期実行か後段未読のため、同期実行は推定。
+
+### 処理経路 (selectOneChannel)
+
+| 段 | VA | 内容 |
+|---|---|---|
+| 検査 | `0xd5af30`〜`0xd5af71` → `0x1005730` | useGlobal≠0 は `[rip+0x5dcad3]` の表、=0 は `[rip+0x5da9a8]` の表。範囲は `0..count-1` |
+| 範囲外 | `0xd5af9c` | `[task+0x60] = -4` |
+| 選択 | `0xd5af7a` → `0x11e84a0(item+0x794)` | 排他選択 (次節) |
+| 表示 | `0xd5af95` → `0xffaf80(item)` | `item+0x7b4` の表示矩形の調整 (UI 副作用。意味は未確定) |
+| 戻り値 | `0xd82c20(status)` | `-4` → `0xd82d3c` が文字列 "Index out of range" (`0xd82e8c`) を設定。`0` は `[0x860485]` の関数 (PyErr_Occurred 相当と推定) が偽のとき成功経路 `0xc38bc0` (None 相当と推定。未読) |
+
+### 排他選択 `0x11e84a0(id)`
+
+1. 対象 `item = fe8bb0(table, id)`。`item+0x32d != 0` なら何もしない (`0x11e84e2`)。
+2. 全 `j` in `0..count-1` について `want = (j == id)`。`item_j+0x32c != want` のときだけ `0xff8a90(item_j, want)` を呼ぶ (`0x11e8522`〜`0x11e8532`)。
+3. 後段 (`0x11e8542`〜): 対象の `+0xd34`・`+0x160` を見る分岐。UI 系と推定 (未読・未モデル)。
+
+`0xff8a90(item, v)` (選択フラグの setter):
+- `v != 0` のとき `0xffac20(item)` が真なら `+0x32c = 1`、偽なら `0` (`0xff8aa7`〜`0xff8abe`)。**選択の gating**。`0xffac20` は未読。
+- その後 `[+0x7c4]` の vtable `[+0x200]` (通知) と `0xfdee80`。新たに選択されたときは `0xfdf020(id, 4)` (UI 通知と推定)。
+
+### 実装
+
+- `provider/fl_engine.c` `FL_H(channels, selectOneChannel)`: `CH(0)` で範囲外を code 4、`useGlobalIndex` は `(void)A_INT(1, 0)` で未モデル、`ch[i].sel = (i == _i)`。
+- `host/fl_mock.mjs`: `arity(a, 1, 2)`、`ch(a[0])`、`c.sel = c === k`。
+
+### 検証 (コミット済み HEAD `683aef61` で実行)
+
+| 検証 | 結果 |
+|---|---|
+| `node tests/channels_diff.mjs` (C provider と mock) | 66 呼出し、diffs 0、PASS |
+| ネガティブコントロール: mock を `c.sel = c === k \|\| c.sel` (他を解除しない) に壊す | diffs 1 件 (`channels.isChannelSelected [0]`: mock true / C false)、exit 1。元に戻すと PASS |
+| `node tests/provider_check.mjs` | functions 435、implemented 71 (+1)、unimplemented 364 (-1)、PASS |
+| `node tests/all_tools.mjs` (mock) | 48/48 ok、host_calls 37425 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37425、callback_roundtrip true |
+
+- 所要 (実測): `build_cpython_wasm.sh` 4 分 18 秒、`build_flpy.sh` 6.3 秒、`provider/build.sh` 1.5 秒、`provider_check` 0.39 秒、`all_tools` 2.1 秒 (mock) / 2.3 秒 (wasm)。
+- load average: nproc 4、`uptime` の値は 14:59:39 時点で `0.46 / 1.28 / 0.75` (1・5・15 分平均)。ビルド中の値は採取していない。
+- 差分 0 の証跡: `git diff 683aef61 HEAD -- tools/python/provider tools/python/host tools/python/tests` (本節の commit は docs のみのため出力 0 行)。
+
+### 検証範囲 / 範囲外
+
+- 範囲内: rack 表 (`useGlobalIndex=0`) の範囲外判定と排他選択。C provider・mock の呼出し列 66 件。
+- 範囲外 (未モデル): `useGlobalIndex=1` の表、選択 gating `0xffac20`、`item+0x32d` の前置、UI 副作用 (`0xffaf80`・`0xfdf020`・後段 `+0xd34`/`+0x160`)。実機 FL の UI は検証していない。
+
+### 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `useGlobalIndex=1` の表 (`0x1005730` の dl≠0 分岐 `[rip+0x5dcad3]`) | 1 の経路を C 側で rack 扱いにしている | #2542 (受入 2) |
+| 選択 gating `0xffac20` | 選択不可の channel で結果が変わる可能性 | #2542 (受入 2) |
+| `item+0x32d` の前置と後段 UI 分岐 (`+0xd34`・`+0x160`) | UI 状態のみ。C provider に UI 状態は無い | 追跡のみ (子は起票しない) |
+| `setChannelPitch` の意味論と実装 | 未実装 | #2542 |
+
+### 次の提案 (#2542)
+
+- `0x1005730` の global 表 (`[rip+0x5dcad3]`) の対応を解決し、rack と global の違いを REPORT に残す。
+- `0xffac20` を読み、選択 gating の条件を確定する。
+- `setChannelPitch` は `0x477180`・`0x40c660`・`0xf81ce0` を読んでから実装する。
