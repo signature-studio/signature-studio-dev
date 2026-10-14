@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """ui の操作・キー・ジョグ系ハンドラ (PY-120 / #2981) の呼出し契約を PE から抜く解析補助。
 
-関数先頭から ret までを逆アセンブルし、PyArg 書式文字列・既定値 (mov dword [rbp+...], 1)・
+関数の範囲は .pdata (RUNTIME_FUNCTION) の終端で決める。最初の ret で止めると、途中の ret より後の
+命令を読み落とすため使わない。.pdata に無い fn はエラーにする (黙って範囲を縮めない)。
+関数先頭から終端までを逆アセンブルし、PyArg 書式文字列・既定値 (mov dword [rbp+...], 1)・
 型記述子への RIP 相対参照 (mov rdx, [rip+X] の X 解決先)・ディスパッチ呼出し (call 0xd84680 / 0xd843d0)
 の直前の r8/r9 を出す。 entry・fn・flags は pe_handler_probe.py で引く。
 
@@ -21,7 +23,9 @@ DISPATCH = {0xD84680: "d84680", 0xD843D0: "d843d0"}
 def main():
     raw = open(PE, "rb").read()
     pe = pefile.PE(data=raw, fast_load=True)
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_EXCEPTION"]])
     base = pe.OPTIONAL_HEADER.ImageBase
+    ends = {e.struct.BeginAddress: e.struct.EndAddress for e in pe.DIRECTORY_ENTRY_EXCEPTION}
     secs = [(s.VirtualAddress, s.Misc_VirtualSize, s.PointerToRawData, s.SizeOfRawData)
             for s in pe.sections]
 
@@ -41,13 +45,13 @@ def main():
     for arg in sys.argv[1:]:
         name, fn = arg.split(":")
         va = int(fn, 16)
+        end_rva = ends.get(va - base)
+        if end_rva is None:
+            sys.exit(f"{name}: fn {va:#x} は .pdata に無い")
         fo = v2o(va)
-        ins = []
-        for i in md.disasm(raw[fo:fo + 4096], va):
-            ins.append(i)
-            if i.mnemonic == "ret":
-                break
-        print(f"[{name}] fn={va:#x} instructions={len(ins)}")
+        ins = list(md.disasm(raw[fo:fo + (base + end_rva - va)], va))
+        rets = sum(1 for i in ins if i.mnemonic == "ret")
+        print(f"[{name}] fn={va:#x} instructions={len(ins)} ret={rets}")
         r8 = r9 = None
         for i in ins:
             s = i.op_str
@@ -61,11 +65,12 @@ def main():
                 print(f"  {i.address:#x} lea {s.split(',')[0]} -> {tgt:#x}")
             if i.mnemonic == "mov" and m and s.startswith("rdx"):
                 print(f"  {i.address:#x} mov rdx <- [{tgt:#x}] (型記述子)")
-            if re.match(r"(mov|xor)\s", i.mnemonic + " ") and re.match(r"(r8|r9)", s):
-                if s.startswith("r8"):
-                    r8 = s.split(",", 1)[1].strip()
-                else:
-                    r9 = s.split(",", 1)[1].strip()
+            if i.mnemonic in ("mov", "xor"):
+                dst, _, src = s.partition(",")
+                if dst in ("r8", "r8d"):
+                    r8 = src.strip()
+                elif dst in ("r9", "r9d"):
+                    r9 = src.strip()
             if i.mnemonic == "mov" and s == "dword ptr [rbp + 0x6c], 1":
                 print(f"  {i.address:#x} 既定値 [rbp+0x6c] = 1")
             if i.mnemonic == "call":
