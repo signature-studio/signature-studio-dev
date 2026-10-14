@@ -1,11 +1,11 @@
 # REPORT_APPENDIX_2880 (WIN-11 #2880)
 
-REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動・内容は無変更)。測定 commit `ae963e28`。
+REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動)。外部絶対パスのみ ID 参照 (`[EMSDK]`・`[RETDEC]`) に直した (AGENTS §4-1)。測定 commit `ae963e28`。
 
 ## 9. WIN-11 (#2880): EnterCriticalSection の失敗 CS と初期化経路 (部分達成)
 
 既知類型との関係: 該当 DEFECTS 行なし。原因は未確定 (lift 欠陥か init 列の扱いか) のため、類型は追加しない。
-測定 commit: `ae963e28` (コードを変えた最後の commit。shim の診断 1 行のみ)。後続の commit は本節と REPORT.md の 1 行だけ。
+測定 commit: `ae963e28` (コードを変えた最後の commit。shim の診断 1 行のみ)。後続の commit は docs のみ (本節・REPORT_APPENDIX の要約・DOC_MAP)。REPORT.md は変えていない。
 差分の証跡 (WORKFLOW §6): `git diff ae963e28 HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` の出力は 0 行。
 
 ### 9-1. 受入条件の状態 (#2880 の 3 項目)
@@ -72,7 +72,9 @@ REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動・内容は
 | ネガコン N1〜N9 | 9 件すべて期待どおり FAIL |
 | selftest / pe_image | 506 passed 0 failed / PASS |
 
-WIN-13 (`37cc1097`) の記録は 13/14 (S1 `870/1/47/24/0` で FAIL)。今回は 14/14 (S1 = base)。IR 入力の指紋は `results/ir_sha256.txt` の material 行と一致しており、IR 入力の差ではない。差の原因は未切り分け (§9-7)。
+WIN-13 (`37cc1097`) の記録は 13/14 (S1 `870/1/47/24/0` で FAIL)。今回は 14/14 (S1 = base)。IR 入力が同じかは **未確認** (下記)。差の原因は未切り分け (§9-7)。
+
+IR 指紋 (fix で追記。e2e は再実行していない): 素材展開直後の `tools/m11/work/` (`work-m11` の tar を展開) の sha256 は、`boot_final.ll` `69c774ded8aaf717c66d765925ff7435c65771ba63db952243daf5c5a7932a43`・`boot_final3.ll` `010451add5147d37cd06d8d0043255fcb2e65a536c4eadeff17e7ce43de7cb9e`。展開直後の `boot_final3.ll` には `CreateFruityInstance` の定義が無い (boot7 取込前)。この 2 値は main の素材 raw の記録 (`REPORT_APPENDIX.md` §7-7 の `69c774…`・`010451…`) と一致する。一方、`results/ir_sha256.txt` の material 行 (`7bf7a29a…`・`c763f8b9…`) とは一致しない。§7-7 によれば、この material 行は boot7 なし run で `m11_gen_ir2.sh` により再生成された後に残った値で、素材 raw ではない。よって『IR 入力の差ではない』とは言えない。e2e の build 入力 (gen_ir2 後の IR) の sha256 はこの fix では取得していないため、一致は未確認。
 
 ### 9-7. shim の検査と未解決
 
