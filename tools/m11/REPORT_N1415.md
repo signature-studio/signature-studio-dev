@@ -5,7 +5,7 @@
 ## 1. 結論
 - (c) の段の切り分け: **部分達成**。snapshot IR (`69c774de…`) と ldfix0 再生成 IR (`25e931f2…`) の差は、`m11_gen_ir2.sh` の **ldfix 段** (`ldfxr`・`ldfxc`) と、`alloca [N x i64]` の出所 (§4) の 2 段で生じる。`boot_all.ll`・`boot_allfx.ll` (merge・numfix・asmfix) までは snapshot と sha256 が完全一致する。両者は同じ `boot{0..4}.lift.ll` を入力にしているため、lift 段の差は本測定の範囲に無い。RetDec を再実行した lift 段の再現 (`--full`) は未実施。snapshot の ldfix 版と現 ldfix 版の `ldfxc` 差 (54 件) は未切り分け (§6)。
 - `alloca [N x i64]` の 54 件 (snapshot) と 0 件 (ldfix0 再生成) の差: **`159d9fc0` (alloca pass R8 の追加) で生じる**。R8 導入前の `m11_alloca.py` (`159d9fc0~1`) を ldfix1 再生成 IR に当てると `alloca [N x i64]` は **54 件** で snapshot と一致する (§4)。現 HEAD の `m11_alloca.py` は 2,408 件を生む。
-- (b) ok 818 → 868 (+50) の二分探索: **未着手** (commit 727 件が対象。本 run の残り時間では不可)。子 issue に切り出す (§6)。
+- (b) ok 861 → 868 (+7) の二分探索: **部分達成**。862→866 は `f39a9e3b` 付近、866→868 は単調でなく `3bdae05d` 付近まで絞った候補区間 (§8)。単一の原因 commit は未確定。残りは子 issue に切り出す (§6)。
 - (d) `m11_e2e.sh` 既定経路の再通し: **未達**。`functions_dll.csv` は素材に無く、Ghidra 12.1.4 (`[GHIDRA]` 無し) の取得と headless 実行 (約 10 分) を本 run で行う時間が無かった。子 issue に切り出す (§6)。
 
 受入条件の充足: (a)(c) は達成、(b)(d) は未達。issue は `Refs #1415`。
@@ -56,16 +56,29 @@
 | ldfix1 と snapshot の `ldfxc` 差 54 件 (snapshot 66・ldfix1 12) の切り分け | (c) の ldfix 段の完全な特定 | #1415 に残す (本 PR で部分達成) |
 | `159d9fc0` (R8) が snapshot IR の alloca 54 件 → 2,408 件を生む件の survey 影響の実測 (ok/trap が変わるか) | R8 の採否 | #132 (R8 の起票元) |
 
-## 8. (b) 二分探索の結果 (#1597・部分達成)
+## 7. 再現
+```sh
+# work-m11 を repo ルートで展開 (アーカイブ内のパスは tools/m11/work/ を含む)
+tar --zstd -xf work-m11.tar.zst -C .
+# fl-win64 の PE 1 member
+tar --zstd -xf fl-win64.tar.zst -C "$FL_WIN64_DIR" extracted/block00031_PE.bin
+cd tools/m11
+mkdir -p work/snap && cp -p work/boot_all.ll work/boot_allfx.ll work/boot_final.ll work/snap/
+FL_WIN64_DIR=<FL_WIN64_DIR の展開先> M11_LDFIX=0 bash m11_gen_ir2.sh    # ldfix0 → 25e931f2…
+FL_WIN64_DIR=<FL_WIN64_DIR の展開先> bash m11_gen_ir2.sh                # ldfix1 → 2c68ceae…
+python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408 件
+```
+
+## 8. (b) 二分探索の結果 (#1597・部分達成・候補区間)
 - 測定 commit: 各行の commit ごとに `git archive <commit> tools/m11 tools/shim tools/shared` を展開し、work-m11 の lift 成果物から IR を再生成 (`m11_gen_ir2.sh`, `M11_LDFIX=1`, `M11_QSTORE=0`) → `m11_build.sh` → `m11_survey.mjs`。PE は fl-win64 の `block00031_PE.bin` (sha256 `b2c64da4…`)。n=1。4 vCPU。load 0.8〜1.3。
 - 対象列: `git rev-list --first-parent d6a17b64..origin/main -- tools/m11 tools/shim tools/shared` の 221 件 (`4c3f7458` 時点の main 上)。
-- 実測 (survey の ok/miss/trap):
+- 実測 (survey の ok/miss/trap) は下表の **個別測定 18 commit** のみ。未測定の commit は表に含めない (下記の注意 4)。
 
 | commit | ok | miss | trap | 備考 |
 |---|---|---|---|---|
 | `d6a17b64` | 861 | 46 | 34 | 旧 base。ldfix 適用済みで再生成 |
 | `035274be` | 861 | 46 | 34 | PR #700 直前 |
-| `c2936605` | 856 | 46 | 38 | PE パス修正 (#134)。`035274be` では ldfix が skip されていた (PE が `/home/ubuntu` 固定) |
+| `c2936605` | 856 | 46 | 38 | PE パス修正 (#134)。`035274be` では ldfix が skip されていた (PE の固定パスが旧 ubuntu 環境のもの) |
 | `8afdc9e1` | 856 | 46 | 39 | boot5 (#132) |
 | `5ee72b93` | 862 | 47 | 32 | 414ad0・43a3f0 の転記 (#134) |
 | `51d64326` | 862 | 47 | 32 | |
@@ -79,24 +92,16 @@
 | `2c77e8b0` | 867 | 47 | 27 | 同上 (`e07cc83f`=866 の直後) |
 | `e07cc83f` | 866 | 47 | 28 | 同上 |
 | `35c3425b` | 867 | 47 | 27 | |
-| `3bdae05d` | 868 | 47 | 26 | PR #1316 merge (ok 868 の最初の列上の commit) |
-| `be764c40` `2b99366a` `c6f70c98` `490f4313` `ec7ee3f2` `0a626c64` | 868 | 47 | 26 | 868 の範囲内 |
+| `3bdae05d` | 868 | 47 | 26 | PR #1316 merge (個別測定で ok 868 が初めて出る commit) |
 | `4c3f7458` | 868 | 47 | 26 | issue の HEAD 値と一致 |
 
+- 件数: 個別測定 18 commit。加えて `be764c40` `2b99366a` `c6f70c98` `490f4313` `ec7ee3f2` `0a626c64` の 6 commit は **未測定** (両端 `3bdae05d`・`4c3f7458` が 868 のため、この範囲にあることだけは列順から言える。値は推定で、実測値ではない)。
 - 注意 1: issue 本文の 818 と前回コメントの 856 は、本 run の測定と一致しない。本 run の `d6a17b64` は 861 (ldfix 有り)。基準は 861 とする。
-- 注意 2: 列は path 絞りの rev-list で線形ではなく、ok は単調に変化しない (例: `d34a89e3` 866 → `b6e4eb42` 867 → `8bc34ed9` 866 → `902f1132` 867)。二分探索の結果は「その commit の前後で値が変わる」点の候補であり、単一の原因 commit とは言えない。
-- 注意 3: `035274be` (861) と `c2936605` (856) の差は ldfix の有無 (PE パス) と数えた。測定条件が途中で変わるため、ここを 1 段と数えない。`d6a17b64` 基準 861 は ldfix 有りで再生成した値 (issue 本文の 818 と前回コメントの 856 は再現しなかった)。
-- 結論 (実測の範囲): 866 → 867 の変化点が `2c77e8b0` 付近 (`e07cc83f`〜`2c77e8b0` の列上)、867 → 868 の変化点が `3bdae05d` (PR #1316 merge) 付近。`f39a9e3b` (#682 の `47b260` 転記) で 862 → 866 が立つ。原因 commit の特定と差分添付は未完了 (子 issue)。
-
-## 7. 再現
-```sh
-# work-m11 を repo ルートで展開 (アーカイブ内のパスは tools/m11/work/ を含む)
-tar --zstd -xf work-m11.tar.zst -C .
-# fl-win64 の PE 1 member
-tar --zstd -xf fl-win64.tar.zst -C "$FL_WIN64_DIR" extracted/block00031_PE.bin
-cd tools/m11
-mkdir -p work/snap && cp -p work/boot_all.ll work/boot_allfx.ll work/boot_final.ll work/snap/
-FL_WIN64_DIR=<FL_WIN64_DIR の展開先> M11_LDFIX=0 bash m11_gen_ir2.sh    # ldfix0 → 25e931f2…
-FL_WIN64_DIR=<FL_WIN64_DIR の展開先> bash m11_gen_ir2.sh                # ldfix1 → 2c68ceae…
-python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408 件
-```
+- 注意 2: 列は path 絞りの rev-list で線形ではなく、ok は単調に変化しない (例: `d34a89e3` 866 → `b6e4eb42` 867 → `8bc34ed9` 866 → `902f1132` 867)。各値は n=1 で、この往復を再現性のある差と区別できていない。したがって以下は **候補区間** であり、単一の原因 commit ではない。
+- 注意 3: `035274be` (861) と `c2936605` (856) の差は ldfix の有無 (PE パス) と数えた。測定条件が途中で変わるため、ここを 1 段と数えない。
+- 注意 4: 未測定の 6 commit は個別の測定記録が無い。実測列には入れない。
+- 結論 (候補区間, n=1 の実測の範囲):
+  - 861 → 862 → 866 の上昇は `f39a9e3b` (#682 の `47b260` 転記) を含む区間で最初に現れる (候補)。
+  - 866 → 867 の揺れは `e07cc83f`〜`2c77e8b0` の区間にあり、ノイズとの区別は未達 (n≥2 の再測定が必要)。
+  - 867 → 868 は `3bdae05d` (PR #1316 merge) を含む区間で現れる (候補)。
+  - 原因 commit の特定と差分添付は未完了 (子 issue #2163)。
