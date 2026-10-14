@@ -2,6 +2,7 @@
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
 import { needsPmDecision } from "./needs.ts";
+import { refsOnlyNumbers } from "./refs.ts";
 
 export const DEFAULT_REVIEWER_LOGIN = "oc-reviewer-for-signature-studio[bot]";
 export const NEEDS_USER_LABEL = "needs-user-input";
@@ -44,6 +45,8 @@ export interface PrState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // merge 済み (closed) の PR の本文から読んだ Refs #N の番号 (閉じキーワードが無いときだけ。oc-pm の refs_orphan)。番号だけで、本文は持たない。
+  refsOnly?: number[];
 }
 // issue / PR ごとの終端状態の手がかり (oc-pm の検出に使う)。値は時刻・列挙値・真偽だけで、本文は持たない。
 export interface Signal {
@@ -317,6 +320,8 @@ function applyPr(s: PmState, p: Json): PmState {
     author: pr.user?.login ?? s.prs[k]?.author,
     authorType: pr.user?.type ?? s.prs[k]?.authorType,
     assoc: pr.author_association ?? s.prs[k]?.assoc,
+    // 本文は closed で捨てるので、merge 時点の本文から Refs の番号だけを残す (REST の一覧・webhook のどちらでも同じ)。
+    ...(pr.state === "closed" && pr.merged_at ? { refsOnly: refsOnlyNumbers(pr.body ?? "") } : {}),
   };
   return { ...s, prs: { ...s.prs, [k]: next } };
 }
