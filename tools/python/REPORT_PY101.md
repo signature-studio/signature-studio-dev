@@ -5,39 +5,29 @@
 ## 結論
 
 - `channels.isGridBitAssigned` と `channels.getGridBitWithLoop` を C provider (`provider/fl_engine.c`) と mock (`host/fl_mock.mjs`) に実装した。`tests/channels_diff.mjs` は diffs 0。
-- `+0x7ac` (channel の grid 構造体ポインタ) の生成元と null 経路を PE で確定した。通常の channel は生成時に grid を作るため、null 経路 (status 0) は到達しない。
+- `+0x7ac` (channel の grid 構造体ポインタ) の生成元を PE で読んだ。直接 call の範囲では grid は生成時に作られ、null 経路 (status 0) には到達しない (間接呼出しは未走査)。
 - `getGridBit` の position < 0 は PE で 0 を返す (エラーにならない)。mock/C の code 4 を 0 に直した (本 PR の照合の結果)。
-- **未確定**: `getGridBitWithLoop` の loop 分岐 (loop 行テーブルの参照条件・loop 長) は条件式の形まで読めたが、グローバル G1・G2 と行テーブルの意味が決まらない。mock に loop 記録が無いため、この分岐は未モデル。子 issue #2932 (`[PY-112]`) に分けた。
+- **未確定**: `getGridBitWithLoop` の loop 分岐 (loop 行テーブルの参照条件・loop 長) は条件式の形まで読めたが、グローバル G1・G2 と行テーブルの意味が決まらない。mock に loop 記録が無いため、この分岐は未モデル (到達条件は未確定)。子 issue #2932 (`[PY-112]`) に分けた。
 
 ## 測定
 
-- 測定 commit: `06df07f5` (コードを変えた最後の commit)。
-- コード範囲 `tools/python/{host,provider,tests}` と `tools/python/analysis/flapi/pe_grid_writers.py` の `git diff 06df07f5 HEAD -- <範囲>` の出力は 0 行 (本 REPORT の commit は範囲外)。
-- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で全展開 (約 6 秒)。`toolchain-emsdk` (emsdk 6.0.12) を展開 (約 3.5 秒)。CPython wasm は `build_cpython_wasm.sh` で 4 分 0 秒 (rc 0)。`build_flpy.sh` 6.2 秒 (rc 0)。
-- 環境: runner 4 core、node v22.23.3。load average (測定時) 0.01 / 0.59 / 0.66。
+- 測定 commit: `09f6668b` (コードを変えた最後の commit。コメント 2 行の変更のみで、動作の変更は無い)。
+- コード範囲 `tools/python/{host,provider,tests}` の `git diff 09f6668b HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
+- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に全展開 (7.5 秒)。`toolchain-emsdk` は `/opt/emsdk` (`$ARTIFACTS_DIR` で実在を確認)。`fetch_inputs.sh` rc 0。`build_cpython_wasm.sh` rc 0 (2 分 44 秒)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (3.8 秒)。追跡ファイルの変更は 0 件。
+- 環境: runner 4 core、node v22.23.3。load average (測定時) 2.33 / 1.37 / 0.58。
+- 旧測定 (`06df07f5`・main 取り込み前の表) は根拠にしない。Git 履歴に残る (`git show 30b77bc0:tools/python/REPORT_PY101.md`)。main (`f82768d9`) の取り込みは `44defabf` (merge)。競合は `tests/provider_check.mjs` の集合定義と件数だけ。
 
-| 検査 (06df07f5) | コマンド | 結果 | 所要 (3 回) |
+| 検査 (09f6668b) | コマンド | 結果 | 所要 |
 |---|---|---|---|
-| provider ビルド | `bash tools/python/provider/build.sh` | rc 0。`gen_provider.py --check-handlers` 通過 | 0.87 秒 (増分) |
-| channels 差分 | `node tests/channels_diff.mjs` | calls 116・diffs 0・PASS (変更前は calls 107) | 0.04〜0.05 秒 |
-| 実装数 | `node tests/provider_check.mjs` | functions 435・implemented 79 (前 77)・unimplemented 356 (前 358)・PASS | 0.34 秒 |
-| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・PASS | 2.10 秒 |
-| PE 書込み元の列挙 | `python3 analysis/flapi/pe_grid_writers.py` | +0x7ac 書込み 21 件 (うち qword 1 件) | 30.3 秒 |
+| provider ビルド | `bash tools/python/provider/build.sh` | rc 0・関数 435・ハンドラ 86 | 1.26 秒 |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 132・diffs 0・PASS | 0.035 秒 |
+| general 差分 | `node tests/general_diff.mjs` | calls 9・diffs 0・PASS | 0.036 秒 |
+| device 差分 | `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS | 0.033 秒 |
+| 実装数 | `node tests/provider_check.mjs` (第 3 節の flpy を含む全体) | functions 435・implemented 86・unimplemented 349・mcp_static 60・PASS | 0.23 秒 |
+| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37425・callback_roundtrip true・PASS | 1.13 秒 |
+| PE 書込み元の列挙 | `python3 analysis/flapi/pe_grid_writers.py` | +0x7ac 書込み 21 件 (mnemonic `mov` のみ走査)・`0xff63f0` の直接 call 元 `0xff5b42`・`0xff5aa0` の直接 call 元 `0x1003c05` | 16.6 秒 |
 
-- ネガティブコントロール: mock の `channels.isGridBitAssigned` を `return false` に変えると `channels_diff` は `channels/playlist 差分 2 件` で FAIL (rc 1)。`return true` に戻して PASS を確認した。
-- 統合後の再測定: main (`f82768d9`) を取り込んだ merge commit `44defabf` で再測定した (競合は `tests/provider_check.mjs` の集合定義と件数だけ)。`git diff 44defabf HEAD -- tools/python/{host,provider,tests}` は 0 行 (本行の commit は範囲外)。素材 `fl-win64`・`toolchain-emsdk` は `$ARTIFACTS_DIR` で実在を確認した。
-
-| 検査 (44defabf) | コマンド | 結果 | 所要 |
-|---|---|---|---|
-| provider ビルド | `bash tools/python/provider/build.sh` | rc 0・ハンドラ 86・`gen/` 再生成の差分 0 | 1.48 秒 |
-| channels 差分 | `node tests/channels_diff.mjs` | calls 132・diffs 0・PASS | 0.12 秒 |
-| general 差分 | `node tests/general_diff.mjs` | calls 9・diffs 0・PASS | — |
-| device 差分 | `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS | — |
-| 実装数 | `node tests/provider_check.mjs` (第 3 節の flpy を含む全体) | functions 435・implemented 86・unimplemented 349・mcp_static 60・PASS | 0.39 秒 |
-| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・callback_roundtrip true・PASS | 2.06 秒 |
-
-- flpy の用意 (同じ測定 commit で): `fl-win64` を `tar --zstd -xf` で展開 (5.6 秒)。`build_cpython_wasm.sh` rc 0 (4 分 15 秒)。`fetch_inputs.sh` rc 0。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (6.3 秒。`analysis/flapi` は再生成しない)。追跡ファイルの変更は 0 件。
-
+- ネガティブコントロール: mock の `channels.isGridBitAssigned` を `return false` に変えると `channels_diff` は `channels/playlist 差分 2 件` の AssertionError で rc 1 (FAIL)。元に戻すと PASS (calls 132・diffs 0)。
 - KPI: 起動・GUI に関わらない PR のため対象外。
 
 ## PE 解析 (FL_WIN64_DIR の `extracted/block00031_PE.bin`)
@@ -56,11 +46,11 @@
 
 ### `+0x7ac` の書込み元 (`pe_grid_writers.py` の実測)
 
-- 書込みは 21 件。qword の書込みは `0xff647c` の 1 件だけ (`mov qword ptr [rcx+0x7ac], rax`、`0xff63f0` の内側)。
+- 書込みは 21 件 (`pe_grid_writers.py` が mnemonic `mov` だけを走査した件数。add・and・movups 等の書込みは未走査)。qword の書込みは `0xff647c` の 1 件だけ (`mov qword ptr [rcx+0x7ac], rax`、`0xff63f0` の内側)。
 - `0xff63f0` の直接 call 元は `0xff5b42` の 1 件 (`0xff5aa0` の内側)。`0xff5aa0` の直接 call 元は `0x1003c05` の 1 件。
 - byte 書込み 12 件 (`0xa03b3c`・`0xa084e0`・`0xdd195c` 〜 `0xdd22e2`・`0xec85ce`) と dword 書込み 8 件 (`0xbd11c5`・`0xbd2d03`・`0xbd2d46`・`0x10016cb`・`0x1003376`・`0x1003503`・`0x100356f`・`0x130f7db`) は別の構造体と見られる。同一 object かは未確認。
 
-判断: 解決表 (`0x1005730`) が返す channel は生成時に grid を持つ、と読める。直接 call の走査だけで確かめた範囲で、間接呼出し (vtable・関数ポインタ) の有無は未走査。このため「null 経路は到達しない」は**直接 call の範囲での結論**とする。
+判断: 解決表 (`0x1005730`) が返す channel は生成時に grid を持つ、と読める。直接 call の走査だけで確かめた範囲で、間接呼出し (vtable・関数ポインタ) の有無は未走査。このため「null 経路は到達しない」は**直接 call の範囲での結論**とし、到達しないとは断定しない。
 
 ### loop 分岐の読めた範囲 (`0x12d3ff0`)
 
@@ -71,7 +61,7 @@
 5. 採った `L > 0` のとき: position < L なら `base(position)`。position ≥ L なら `base(position mod L) == 1 ? 2 : 0`。`L <= 0` または採らなかったときは `base(position)`。
 6. 戻り値は callback に渡る。getGridBitWithLoop の table 型は `bool` のため、2 は True に写る。callback の実型は未確認。
 
-未確定: G1 と G2 が何の設定値か、行テーブル `obj` の意味、`0x15e14a0` 経由 flag の意味。このため loop 分岐の**値**は決められず、mock/C は loop 記録を持たない (分岐は未到達) 扱いにした。
+未確定: G1 と G2 が何の設定値か、行テーブル `obj` の意味、`0x15e14a0` 経由 flag の意味。このため loop 分岐の**値**は決められず、mock/C は loop 分岐を未モデル (到達条件は未確定・#2932) として扱った。
 
 ## 実装の内容
 
@@ -97,7 +87,8 @@
 
 ## 再現
 
-- 素材展開: `tar --zstd -xf <fl-win64>.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'` (`FL_WIN64_DIR=<展開先>`)。
-- PE 書込み元の列挙: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_grid_writers.py` (約 30 秒)。
+- 素材展開: `tar --zstd -xf <fl-win64>.tar.zst -C <展開先>` (`FL_WIN64_DIR=<展開先>`)。PE は `extracted/block00031_PE.bin`。
+- PE 書込み元の列挙: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_grid_writers.py` (約 17 秒)。
 - 逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py d5bc10 60` ほか、`12d3ff0`・`12d3e20`・`d5b360`・`d5b420`・`ff63f0`・`ff5aa0`。
+- flpy の前提: `fetch_inputs.sh` → `build_cpython_wasm.sh` → `FLPY_SKIP_TABLE=1 build_flpy.sh` (`EMSDK_DIR=/opt/emsdk`)。
 - 検査: `node tests/channels_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (前提: `provider/build.sh` 済み)。
