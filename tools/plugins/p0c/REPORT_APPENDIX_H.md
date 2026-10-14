@@ -14,7 +14,7 @@
 ### 18.2 測定
 
 - 測定 HEAD: `6444b186` (origin/main 起点の branch `197-p0c-census`、`tools/plugins/p0c` / `lift` は無変更)。
-- 素材: `fl-win64` (`extracted/block18983_PE.bin`、展開先 `$RUNNER_TEMP/fl-win64`)、`llvm-as` は `/usr/lib/llvm-18/bin` (PATH 先頭)。
+- 素材: `fl-win64` (`extracted/block18983_PE.bin`、展開先 `$RUNNER_TEMP/fl-win64`)、`llvm-as` は PATH 上の llvm-18 のものを使用。
 - 同一 HEAD での実行結果:
 
 | 検証 | rc | 所要 | 結果 |
@@ -74,14 +74,14 @@
 
 - **80 本全て bit-exact は未達**。判定に使える数は次のとおり:
   - 非 ext 鎖の census: 67 測定中 buf_diff=0 が 49。18 は未達。残り 13 は ABI 非 ok で未測定。
-  - ext 鎖: 測定した 14 は全て buf_diff=0 (f80 系 4 kernel を含む)。ただし ext 鎖の対象は f80 kernel の一部に限られ、non-ext census の 18 件全体はカバーしない。
+  - ext 鎖: 測定した 14 は全て buf_diff=0。ただし ext 鎖の対象は non-ext census の 18 件全体をカバーしない (交差は 18.3 の 3 件のみ)。
 - Group B 12 本 (Delphi RTL / x87 helper 外部呼出) は付録 A §3 のとおり数値差分の対象外。本出口条件の扱いは PM 判断 (下表)。
 
 ## 18.6 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 非 ext 鎖 census の buf_diff≠0 が 18 kernel (18.3 表) | 80 本 bit-exact の未達の本体。ext 鎖では 4 件が解消済み | 子 issue (本 PR で起票) |
+| 非 ext 鎖 census の buf_diff≠0 が 18 kernel (18.3 表) | 80 本 bit-exact の未達の本体。ext 鎖では 3 件 (0x5dfbe0・0x5dfc90・0x5dfdb0) が buf_diff=0 になる | #2182 [P0c-17] (既存・新規起票なし) |
 | 未測定 13 kernel (ABI 非 ok で CSV 対象外: 0x5de410 0x5de4b0 0x5de540 0x5de6a0 0x5de870 0x5deaa0 0x5df460 0x5df5a0 0x5dfa70 0x5e0380 0x5e11a0 0x5e12b0 0x5e1870) | 80 本の完全な判定ができない。0x5e12b0 は既存 #938 が担当。内訳 (Group B / abi-mismatch 等) は本測定では未分類 | 残りの分類は PM 判断 (#197 本文の更新時に付録 A/C の status と突き合わせる) |
 | Group B 12 本を出口条件に含めるか | 判定基準そのもの | PM 判断 (#197 本文の更新) |
 | harness の `maxulp` が 10^8 台を返す | 精度指標としては使えない (buf_diff のみで判定) | harness 修正は本 issue 外 |
