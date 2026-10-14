@@ -16,7 +16,7 @@
 # env:
 #   WORK         作業先 (既定 ${RUNNER_TEMP:-/tmp}/rd2019)
 #   PE_BIN       block00031_PE.bin (ranges で必須。fl-win64 の extracted/ 配下)
-#   RETDEC_ROOT  [RETDEC] (v5.0) の root。代用 share の元 (既定 /opt/retdec。docs/REFERENCES.md §4)
+#   RETDEC_ROOT  [RETDEC] (v5.0) の root。代用 share の元 (既定は m11_lift.sh と同じ。docs/REFERENCES.md §4)
 #   JOBS         make -j (既定 4)
 # 前提: cmake・make・gcc/g++・flex・bison・python3、apt の libfl-dev (FlexLexer.h)。
 set -euo pipefail
