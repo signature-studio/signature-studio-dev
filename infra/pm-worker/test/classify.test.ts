@@ -67,3 +67,29 @@ test("分類: TS と Python (tools/pm/launch_issues.py の classify) が同じ r
   const py = JSON.parse(execFileSync("python3", [crosscheck, fixturePath], { encoding: "utf8" }));
   assert.deepEqual(ts, py);
 });
+
+test("分類: STOP_RE の判定から run-outcome と PM マーカーの本文を除く (素材不足の定型文を停止報告にしない)", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const at = new Date(now - 30 * 60_000).toISOString();
+  const outcome = "理由の分類: artifact=素材不足\n<!-- oc-run-outcome: no-pr reason=artifact run=1 -->";
+  const snap = (body: string): Snapshot => ({
+    issues: [{ number: 70, title: "[X-1] t", labels: ["oc:no-pr"], body: "", deps: null }],
+    prs: [],
+    runs: [],
+    bot_last: { "70": { at, head: body.slice(0, 400), art: null } },
+    pm_art: {},
+  });
+  const input = (body: string): ClassifyInput => ({
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "70": body },
+  });
+  const plain = classify(snap("素材不足のため停止します"), input("素材不足のため停止します")).rows;
+  assert.deepEqual(plain.stopped.map(([n]) => n), [70], "対照: マーカーの無い停止報告は stopped");
+  const marked = classify(snap(outcome), input(outcome)).rows;
+  assert.deepEqual(marked.stopped, [], "run-outcome は stopped にしない");
+  assert.deepEqual(marked.recent.map(([n]) => n), [70]);
+});
