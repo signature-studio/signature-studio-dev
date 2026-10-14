@@ -192,38 +192,47 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 ## 15. oc-pm の refs_orphan 検出 (#2337・PR #2478)
 
-- 測定 commit: `c0f37669` (main `d460d139` の取り込み merge。競合解消は 15-3)。取得時刻は UTC (2026-10-14)。環境: runner・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
-- 差分の証跡: `git diff c0f37669 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 測定 commit: `ebfd0a41` (閉じキーワードの `owner/repo#N` と親行の規則の修正)。main は `80d02d77` まで取り込み済み (pm-worker に main 側の変更は無い)。取得時刻は UTC (2026-10-14)。環境: runner・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
+- 差分の証跡: `git diff ebfd0a41 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 
 ### 15-1. 測定
 
 | 項目 | 結果 |
 |---|---|
-| `cd infra/pm-worker && npm test` (n=3) | 200 件 PASS / 0 FAIL。16.09・16.57・16.48 s。load 0.55・0.93・1.46 |
-| 内訳 | `test/refsorphan.test.ts` 12 件 (本 PR) + `test/digest.test.ts` 7 件 (main #2349) + 他 181 件 |
-| `npm run test:unit` (vitest・fetch モック) | 10 件 PASS / 0 FAIL。0.997 s。load 1.78 |
-| `npm run test:workers` (vitest + workerd) | 3 件 PASS / 0 FAIL。1.45 s。load 1.78 |
-| `bun build src/index.ts --target=browser --format=esm --external 'node:*'` | 93.65 KB (93,645 bytes)。`--minify` を付けると 61.66 KB (61,663 bytes) |
-| 前回の測定 | `22e36902` (main `5745f0c9` の取り込み後) は `npm test` 193 件 PASS。`20fcb6e1` (取り込み前) は 172 件 PASS |
+| `cd infra/pm-worker && npm test` (n=3) | 200 件 PASS / 0 FAIL。9.13・9.13・9.23 s。load 0.18・0.60・0.95 (件数は前回と同じ。既存の検査に assert を足した) |
+| `npm run test:unit` (vitest) | 10 件 PASS / 0 FAIL。511 ms。load 0.71 |
+| `npm run test:workers` (vitest + workerd) | 3 件 PASS / 0 FAIL。879 ms。load 0.71 |
+| `bun build src/index.ts --target=browser --format=esm --external 'node:*'` | 93.60 KB (93,603 bytes)。`--minify` を付けると 61.63 KB (61,632 bytes) |
 
-### 15-2. ネガコン (1 件を壊して FAIL を確認・測定 commit `c0f37669` で再実施)
+### 15-2. ネガコン (1 件を壊して FAIL を確認・測定 commit `ebfd0a41`)
 
-`infra/pm-worker` を scratch に複写し、テストが参照する repo の他の部分は symlink した。scratch の baseline は 200 件 PASS。worktree は変えていない。
+`infra/pm-worker` を scratch に複写し (`tools/` は symlink)、baseline は 200 件 PASS。worktree は変えていない。
 
 | 壊し方 | 結果 (全 200 件) | FAIL した項目 |
 |---|---|---|
-| `src/webhook.ts`: `refsOnlyNumbers(pr.body ?? "")` を `[]` に | FAIL 10 (PASS 190) | 検出・(b)(c)(f)(h)・送信・(d)(e)(g)・REST 経路 |
-| `src/webhook.ts`: `pr.state === "closed" && pr.merged_at ?` の `pr.merged_at` を外す | FAIL 1 (PASS 199) | REST 経路 (merge されていない項目に `refsOnlyNums` が立つ)。検出の結果は変わらない (`detectPm` が `p.merged` で先に弾く) |
-| `src/pm.ts`: `refs_orphan` の `dayMax` 10 を 1000 に | FAIL 1 (PASS 199) | ネガコン (d) (1 日 11 件目の上限) |
+| `src/refs.ts`: CLOSE_RE の `(?:[\w.-]+\/[\w.-]+)?` を外す | FAIL 2 (PASS 198) | ネガコン (a)・解析 |
+| `src/refs.ts`: 親行を `^親[:：]` (空白を許さない) に戻す | FAIL 1 (PASS 199) | 解析 (`親 : #2319`) |
+| `src/webhook.ts`: `refsOnlyNums` を `[]` に | FAIL 10 (PASS 190) | 検出・(b)(c)(f)・送信・(d)(e)(g)・REST 経路 |
+| `src/webhook.ts`: `pr.merged_at` の条件を外す | FAIL 1 (PASS 199) | REST 経路 |
+| `src/pm.ts`: `refs_orphan` の `dayMax` 10 を 1000 に | FAIL 1 (PASS 199) | ネガコン (d) |
 
-### 15-3. 競合解消 (main の取り込み 2 回)
+### 15-3. Refs のみの判定の差 (指標と refs_orphan・未統一)
 
-- 1 回目 (main `5745f0c9`・merge `22e36902`): `refsOnly` の同名衝突。main は `boolean` (refs-only merge 率の指標・#2335)、PR は Refs 番号の一覧 (refs_orphan)。PR 側を `refsOnlyNums` に改名した (`src/webhook.ts`・`src/pm.ts`・`test/refsorphan.test.ts`)。main の `refsOnly`・`mergedAt`・`ASSOC_OK` の export・`user_answered` のコメント者制限 (#2461) は残した。
-- 2 回目 (main `d460d139`・merge `c0f37669`): `tools/pm/REPORT.md` の §14 (main の `pm_wake` #2347) を残し、本件の節を §15 に改番した (番号の衝突の解消)。`DETECTED_KINDS` に `refs_orphan` を足し、main の digest (#2349・`DIGEST_*`) と両立させた。`docs/DOC_MAP.md`・`infra/pm-worker/README.md` は両側の行を残した。
-- `tools/pm/REPORT.md` の行数は 229 行 (上限 250 以内)。
-- 未解決: refs-only の判定が 2 つある (`webhook.ts` の `refsOnlyBody` と `refs.ts` の `refsOnlyNumbers`)。`Closes owner/repo#5` と `Refs #3` の併記では、前者は false、後者は `[3]` を返す。判定を 1 つに揃えるのは別作業 (本件の範囲外・未起票)。
+同じ本文に 2 つの判定を当てた結果。`refsOnlyBody` は指標 `refs_only_merge_rate_24h` (`src/webhook.ts`・#2335)、`refsOnlyNumbers` は refs_orphan (`src/refs.ts`)。指標の値を変えるかは PM 判断のため、本 PR では統一しない。追跡は #2623 ([CI-115])。
+
+| 入力 | 指標 (`refsOnlyBody`) | refs_orphan (`refsOnlyNumbers`) |
+|---|---|---|
+| `Closes:#6 Refs #5` | true (指標が閉じキーワードを取りこぼす) | false (正) |
+| `Refs owner/repo#5` | true (別リポの番号を Refs と数える) | false (同じリポの親ではない) |
+| `Refs:#5` | false | true |
+| `Refs #12345678` | true | false (番号は 7 桁まで) |
+
+両者が一致する例: `Closes owner/repo#6 Refs #5`・`Fixes owner/repo#6` + `Refs #5`・`Closes #6` + `Refs #5` (両方 false)、`Refs #5` (両方 true)。
+
+親行は `src/classify.ts`・`tools/pm/launch_issues.py` と同じ規則に揃えた (最初の `親:` 行の最初の `#N` だけ。`親 : #N` の空白を許す)。`親: #10` と `親: #11` の併記は 10 だけを親とする。
 
 ### 15-4. 検証範囲
 
 - 検証は fetch のモック (node:test と vitest) まで。実 GitHub API・Cloudflare 上の Worker・live の送信は未実行。
-- `LIVE_*` のスイッチの値は変更していない (`wrangler.toml` は comment の参照先だけ直した)。
+- `LIVE_*` のスイッチの値は変更していない。
+- 取り込みの経緯: main `5745f0c9`・`d460d139`・`322f81b6` (競合解消は各 merge の commit message)、main `80d02d77` (競合なし)。
