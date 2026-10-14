@@ -562,6 +562,7 @@
 | `tools/pm/REPORT_2799.md` | 73 | PM Worker の VM 状態の取り込み手順の是正 (#2799・CI-134): 補助スクリプト `infra/pm-worker/scripts/build_import.mjs` の検証 (素材行の正規化・200 KiB の上限・Worker の `parseVmState` を通ること)、整形出力と `jq -c` と補助スクリプトの比較 (合成データ)、`npm run test:unit` / `npm test` の実測と negative control。REPORT.md が 250 行上限のため別置き |
 | `tools/pm/REPORT_3047.md` | ~50 | PM Worker の率制限 alert を watchdog から `oc:rate-limit` の issue に出す (#3047・CI-142): 判定 (fresh・`rate_limit_alert`・`rest_remaining` < 1500)、追記の 60 分の間隔、採番の共有、テスト 40a〜40t と変異 M1・M3・M5・M6・M7 (閉じた issue の確認を外す) の FAIL、本番 `/status` の読み取り。REPORT.md が 250 行上限のため別置き |
 | `tools/pm/REPORT_3050.md` | 59 | PM Worker の launch の素材行の和集合 (#3050・CI-143): PM の行と本文の行の素材名を足す規則の実測。node:test・vitest unit・workers・変異テストの件数、測定 commit と差分、排他実装に戻したときの FAIL (negative control)、issue 本文の実例 (#2716・#2880) の再計算。REPORT.md が 250 行上限のため別置き |
+| `tools/pm/REPORT_2639.md` | 84 | PM Worker の停止印 (oc-fix-limit) の作者を github-actions[bot] (型 Bot) に限る (#2639・CI-122): 停止印の信頼・reconcile の取り込み・oc-pm の stuck 文脈の変異 5 件の FAIL、node:test 395 件・vitest・scripts-test の件数、本番の open oc:stuck 4 件の停止印の作者の実測、旧印 #2819 の扱い。REPORT.md が 250 行上限のため別置き |
 | `tools/pm/REPORT_2336.md` | ~98 | PM Worker の規則 A (merged PR を持つ親 issue の自動 close・#2336) の実データ dry-run の実測 (Worker の判定と別実装の再計算の照合・候補の内訳・ネガコン・判定条件を外したときの FAIL)。運用の正本は `infra/pm-worker/README.md` |
 | `tools/pm/REPORT_2648.md` | ~50 | main の Ruleset `main-require-review` (#2648・ADR D27) の実測: 設定 (API)・merge の窓の件数・実装 App の merge 前承認の件数 (数値は付録 §3)・取得コマンドと jq 式。REPORT.md §19 から分割移動 (250 行上限) |
 | `tools/pm/REPORT_APPENDIX_2354.md` | ~62 | tools/pm REPORT §11 (`idle_report.sh` の検証 #2354) の全文。250 行上限のため REPORT.md から分割移動 (#2381 の PR のレビュー指摘への対応)。fake gh の判定 41 件・実データの検算・未解決 (soak の合格ライン) |
@@ -594,6 +595,7 @@
 | `tools/pm/REPORT_2648.md` | main の Ruleset `main-require-review` (#2648・ADR D27) の測定値の**正本** (付録。設定の API 値・merge の窓の件数・取得コマンドと jq 式) | 方式の決定 (DECISIONS.md D27 が正本)・手順 (WORKFLOW.md §2 が正本)・bypass の値を手順書に複製すること |
 | `tools/pm/REPORT_2795.md` | launch の停止と通知 (#2795) の測定値の**正本** (付録。テスト件数・変異テスト・測定 commit と差分・本番 `/status` の観測時刻) | 停止の規則と運用 (`infra/pm-worker/README.md` が正本)・deploy の判断 (PM)・未解決の表 (PR 本文が正本) |
 | `tools/pm/REPORT_3050.md` | launch の素材行の和集合 (#3050) の測定値の**正本** (付録。テスト件数・測定 commit と差分・negative control・実例の再計算) | 素材行の規則 (`infra/pm-worker/README.md` が正本)・deploy の判断 (PM)・未解決の表 (PR 本文が正本) |
+| `tools/pm/REPORT_2639.md` | 停止印 (oc-fix-limit) の作者の限定 (#2639) の測定値の**正本** (付録。テスト件数・測定 commit と差分・変異テスト・本番の停止印の作者の実測) | 停止印の規則 (`infra/pm-worker/README.md` と `docs/WORKFLOW.md` の起動主体の節が正本)・deploy の判断 (PM)・未解決の表 (PR 本文が正本) |
 | `tools/pm/REPORT_APPENDIX_2380.md`・`tools/pm/REPORT_APPENDIX_2354.md` | REPORT §10・§11 の分割移動先 (無変更の全文)。測定値の正本は付録側 | 本体 `REPORT.md` へ戻す追記・同じ節の要約の重複 (本体は要約とリンクだけ) |
 | `tools/pm/README.md` | PM 運用ツールの一覧・『VM 退役後の扱い』(全ファイルの後継・廃止の表)・VM の状態ファイルの扱いの決定 (取り込み or 破棄と影響)・前提・環境変数・運用の約束 | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報・状態ファイルの中身や件数 (決定と影響だけを書く) |
 | `infra/pm-worker/README.md` | PM Worker (Cloudflare) の構成・デプロイ・**再デプロイ (wrangler の OAuth)**・ロールバック・OAuth 失効時の手順・`[未確認]` のチェックリスト | 測定値 (`tools/pm/REPORT.md`・付録 `tools/pm/REPORT_2416.md` が正本)・認証情報 (token・OAuth の保存ファイルの中身)・repo 外絶対パス |
