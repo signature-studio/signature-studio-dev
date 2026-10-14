@@ -239,14 +239,6 @@
 
 ## 11. Windows / macOS 行列への Firefox・Safari 追加 (AU-33 #3168・部分達成)
 
-- 測定 commit: `9aa9239b` (コード最終)。`git diff 9aa9239b HEAD -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の出力は 0 行。詳細は `REPORT_APPENDIX_3168.md` §A〜§F。
-- 変更: Firefox 経路の既定出力判定を OS 別にした (Linux = ci_null の sink-input / Windows = `CABLE Input` / macOS = `BlackHole 2ch`)。シナリオを Chrome 行列と同じ 3 本にした。`bidi.mjs` の既定 Firefox を OS 別にした。
-- ubuntu 再現 (Firefox 157.0・PulseAudio null-sink・n=3): **9/9 PASS** (3 シナリオ × 3 rep。underrun 0・既定 sink 接続 9/9)。48k は burst 1024・T 1536、96k は burst 1920・T 2816 (§9-1 の範囲と一致)。wall 41.0 / 40.5 / 40.6 s、load (1 分) 0.18〜0.36。
-- ネガティブコントロール (n=1): 期待外れ sink → 0/3 PASS (`on_expected=false`)。強制 underrun → 0/3 PASS。
-- **Safari**: 経路は未作成。理由: Linux runner では Safari を起動・測定できず、既存 harness は Chrome CDP と Firefox BiDi の 2 経路のみ。代替: macOS の `safaridriver` 経路 (未着手。#3193 [AU-35] で追跡)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| Windows / macOS の Firefox 行は #3169 (yaml) の merge 後に PM が適用。dispatch 結果は未取得 | 受入 1 の Win/mac 未達 | #3192 [AU-34] |
-| `win32`・`darwin` の判定分岐は Linux runner で未実行 | 判定の実機確認なし | #3192 [AU-34] |
-| Safari の P1〜P4 (経路未作成) | Safari 未測定 | #3193 [AU-35] |
+- 測定 commit: `9aa9239b` (コード最終)。`git diff 9aa9239b HEAD -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の出力は 0 行。
+- 結論: Firefox 157.0 (ubuntu・PulseAudio null-sink・n=3) で 9/9 PASS。既定出力の判定を OS 別にした。Safari は経路未作成 (#3193 [AU-35])、Windows / macOS の Firefox 行は未適用・未実行 (#3192 [AU-34])。
+- 変更・再現・NC・Safari の理由・未解決表の全文は `REPORT_APPENDIX_3168.md` §B〜§F (250 行上限のため分割移動)。
