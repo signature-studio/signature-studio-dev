@@ -1,4 +1,4 @@
-# tools/python REPORT: PY-120 launchMapPages 12 件の PE 確定 — `launchMapPages.length` 1 件のみ確定 (#2984, 親 #2832)
+# tools/python REPORT: PY-120 launchMapPages 12 件の PE 確定 — `launchMapPages.length` 1 件のみ確定 (#2984・題名 [PY-153]・親 #2832)
 
 > 正本: `tools/python/REPORT_PY87.md` (PE 確定の手順・4 件の確定)。本付録は PY-120 の実測のみ。
 
@@ -8,6 +8,7 @@
 
 - 12 件のうち **1 件 (`launchMapPages.length`) だけ** を PE の根拠で確定し、mock と C provider に実装した。mock と C の差分は 0 (`tests/launchmap_diff.mjs` 3 呼出し)。
 - `length` の戻り値は「`obj.+0x50` の配列の件数」を int で返す (VA 0xd791b0)。件数そのものは実行時の状態で、PE からは決まらない。mock・C の初期値 0 は**仮置き**。
+- `provider_check` の「実装」に数える 1 件 (`launchMapPages.length`) は、PE の例外経路 (`obj.+0x50 == 0` で code -7) を持たない**仮置きの値** (mock・C とも常に 0 を返す)。確定したのは呼出し経路と戻り型までで、値そのものは確定していない。
 - 残り **11 件は未確定**。読んだ範囲・確定に必要な情報・未確定の理由を下の表 (§保留) に書き、子 issue 3 件に分けた (#3027・#3029・#3030)。
 - issue の範囲を縮めた (受入条件のうち 1 件分を完了単位とし、残りは子へ移した。`Closes #2984`)。
 
@@ -39,7 +40,7 @@
 
 12 件とも flags は flapi の kwsig と一致し、docstring は flapi の doc と一致する。PyArg 書式を読んだ 4 件 (init `sii`・updateMap `i`・getMapItemColor `ii`・getMapCount `i`) は flapi の kwsig.fmt と一致する。
 
-## 確定: `launchMapPages.length` (VA 0xd791b0, NOARGS, 戻り int)
+## PE 根拠の確定: `launchMapPages.length` (VA 0xd791b0, NOARGS, 戻り int・戻り値の意味は推定)
 
 逆アセンブル (`--disasm` の出力):
 
@@ -98,7 +99,7 @@
 | createOverlayMap | 0xd7a130 | 未読 (引数 offColor・onColor・width・height) | 描画の意味、副作用 | 未読 |
 | setMapItemTarget | 0xd7a3a0 | 未読 (引数 index・itemIndex・target、戻り int) | 戻り値の意味 | 未読 |
 
-子 issue の分け方: 索引付き読出し 4 件 (getMapCount・getMapItemColor・getMapItemChannel・getMapItemAftertouch) は #3027 (PY-137)。init・状態変更 4 件と `length` の未確定 2 点は #3029 (PY-138)。イベント処理 3 件 (processMapItem・releaseMapItem・checkMapForHiddenItem) は #3030 (PY-139)。`0xd843d0` は #3029・#3030 と #3001 (PY-125) に共通して現れる (同一関数かは未確認)。
+子 issue の分け方: 索引付き読出し 4 件 (getMapCount・getMapItemColor・getMapItemChannel・getMapItemAftertouch) は #3027 (PY-156)。init・状態変更 4 件と `length` の未確定 2 点は #3029 (PY-138)。イベント処理 3 件 (processMapItem・releaseMapItem・checkMapForHiddenItem) は #3030 (PY-139)。`0xd843d0` は #3029・#3030 と #3001 (PY-125) に共通して現れる (同一関数かは未確認)。
 
 ## 実装
 
@@ -109,6 +110,8 @@
 - `analysis/flapi/pe_launchmap_entries.py` (新規): 12 件の PyMethodDef の抽出と flags 照合・`--disasm`。
 
 ## 検証
+
+### 初回測定 (測定 commit `eba7e821`・main 取り込み前)
 
 測定 commit: `eba7e821` (コードを変えた最後の commit。`feat(flapi): confirm launchMapPages.length from PE 0xd791b0 (PY-120, #2984)`)。ベース `eec639a3` (main 取り込み済み)。
 
@@ -133,37 +136,46 @@ $ git diff eba7e821 HEAD -- tools/python/host tools/python/provider tools/python
 
   この REPORT と解析スクリプト (`analysis/flapi/pe_launchmap_entries.py`) は測定 commit の後に加えた。どちらもテスト・provider のビルドに入らない。
 
-### main 取り込み後の再測定 (merge `5a95319a`)
+### main 取り込み後の再測定 (merge `53835669`・main `00ca9f1b`)
 
-main (`0064cfbc`) を取り込んだ merge で、競合は `tests/provider_check.mjs` の集合定義 (main の `pe115` と本件の `pe120`) だけだった。両方を残して解消し、期待値は実装 87 / 未実装 348 (main の 86 / 349 に本件の 1 件を加えた値)。
+main (`00ca9f1b`) を取り込んだ merge `53835669` で、競合は 2 件だった。(1) `tests/provider_check.mjs` の集合定義と条件式: main の `pe119` (ui ゲッター 6 件) と本件の `pe120` の両方を残した。(2) `docs/DOC_MAP.md` の表末尾: main の `REPORT_PY119.md` 行と本件の `REPORT_PY120.md` 行の両方を残した。期待値は実装 93 / 未実装 342 (main の 92 / 343 に本件の 1 件を加えた値)。
 
-測定 commit: `5a95319a` (コードを変えた最後の commit)。環境は runner。`FL_WIN64_DIR` は fl-win64 から DATA block 4 件だけ展開した先、emsdk は `[EMSDK]` (docs/REFERENCES.md)。
+測定 commit: `53835669` (コードを変えた最後の commit)。環境: runner (load average 0.4〜3.0)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` は fl-win64 から DATA block 4 件 (block24429・block24430・block25159・block24618) だけを展開した先。emsdk は `[EMSDK]` (docs/REFERENCES.md)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/provider_check.mjs` | PASS (435 / 実装 87 / 未実装 348 / MCP 静的 60) | 0.35 秒 |
+| `bash provider/build.sh` | rc 0 (fl_table.c: 435 関数・ハンドラ 93) | 1.5 秒 |
+| `bash build_cpython_wasm.sh` | rc 0 (前提。CPython 3.12.1 wasm) | 249 秒 |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` | rc 0 | 6 秒 |
+| `FLPY_SKIP_TABLE=1 build_flpy_static.sh` | rc 0 | 6 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 93 / 未実装 342 / MCP 静的 60) | 0.36 秒 |
 | `node tests/launchmap_diff.mjs` | calls 3、diffs 0、PASS | 0.05 秒 |
-| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 | 1.6 秒 |
-| `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS | ループ実行 (個別未計測) |
-| `node tests/browser_check.mjs` | BROWSER OK (tools 48) | ループ実行 (個別未計測) |
-| `build_flpy_static.sh` 後の `node tests/static_check.mjs` | STATIC CHECK OK (tool 別差 0/48) | 0.35 秒 |
-| `node tests/static_browser_check.mjs` | STATIC BROWSER OK (SAB 48/48・static 48/48・diff 0) | 2.7 秒 |
-| `CPY_PTHREADS=1` の CPython・static 後の `node tests/static_mt_check.mjs` | STATIC MT CHECK OK (single_vs_stock diff 0、thread_mismatch 0、runs 50、wall_ms 378) | 0.8 秒 |
-| `node tests/mcp_ui_check.mjs` / `node tests/midi_ui_check.mjs` | MCP UI OK / MIDI UI OK | 2.0 秒 / 2.4 秒 |
+| `node tests/general_diff.mjs` (回帰) | calls 9、diffs 0、PASS | 0.05 秒 |
+| `node tests/ui_state_diff.mjs` (回帰・pe119) | calls 12、diffs 0、PASS | 0.05 秒 |
+| `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS (calls 161 / 8 / 32 / 30 cases / 59 / 7 / 17) | 各 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback_roundtrip true | 2.1 秒 |
+| `node tests/browser_check.mjs` | BROWSER OK (tools 48) | 8.9 秒 |
+| `node tests/mcp_ui_check.mjs` / `node tests/midi_ui_check.mjs` | MCP UI OK / MIDI UI OK | 2.2 秒 / 2.8 秒 |
+| `node tests/static_check.mjs` | STATIC CHECK OK | 0.4 秒 |
+| `node tests/static_browser_check.mjs` | STATIC BROWSER OK (sab_host_calls 37,425・static_host_calls 37,425・static_in_worker true) | 4.5 秒 |
+| `node tests/static_mt_check.mjs` | **未再測定**。pthread 版 (`CPY_PTHREADS=1` の CPython wasm) の再ビルドが要り、この run の時間枠に入らなかった。`236a8106` 時点の結果は本 HEAD の値ではない | — |
+| `python3 analysis/flapi/pe_launchmap_entries.py` | **未再実行**。`block00031_PE.bin` (PE 本体) を展開していない。`tools/python/analysis/flapi` は main 取り込みで変わっていない (下の diff) | — |
 
-コード差分 (測定 commit から HEAD まで、テスト・mock・C に効く範囲):
+- 前提の順序: `provider_check` は `dist/flpy.js` (CPython wasm) と `work/midi.py` 等 (`fetch_inputs.sh`) を要するため、上の build を先に行った。
+- コード差分 (測定 commit から HEAD まで、テスト・mock・C に効く範囲):
 
 ```
-$ git diff 5a95319a HEAD -- tools/python/host tools/python/provider tools/python/tests
+$ git diff 53835669 HEAD -- tools/python/host tools/python/provider tools/python/tests
 (空)
 ```
+
+- 測定 commit 以前の main 側差分 (参考): `git diff --stat 236a8106 53835669 -- tools/python/analysis/flapi` は空。`tools/python/host`・`provider`・`tests` は取り込みで 8 files 変わった (main の `pe119`・`ui_state_diff` と、競合解消の `provider_check.mjs` を含む)。
 
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 残り 11 件の PE 確定 (索引付き読出し 4・状態変更 4・イベント処理 3) | `launchMapPages` の 11/12 が未実装 (provider の未実装扱い) | #3027 (PY-137)・#3029 (PY-138)・#3030 (PY-139) |
+| 残り 11 件の PE 確定 (索引付き読出し 4・状態変更 4・イベント処理 3) | `launchMapPages` の 11/12 が未実装 (provider の未実装扱い) | #3027 (PY-156)・#3029 (PY-138)・#3030 (PY-139) |
 | `length` の件数ヘッダ `[arr-8]` の意味と、未初期化経路 (code -7 の例外化の述語) | 件数の意味は推定。未初期化時の挙動は未モデル | #3029 (PY-138) |
 | `length` の件数の実行時初期値 (0 は仮置き) | mock・C の値が実機と違う可能性 | #3029 (PY-138) |
 | 0xd843d0 の同一性 (本件と #3001 PY-125 の dispatch) | 共通の下位関数の確定が二重になる可能性 | #3029・#3030 の本文で確認 (未確認) |
