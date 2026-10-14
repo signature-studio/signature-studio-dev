@@ -4,6 +4,7 @@
 #   1/4 既存判定への影響: 統合前 (BASE の audit_lsf.py) と統合後 (--no-disp) の出力が byte 一致、既定 (変位形あり) は既存 3 行が一致
 #   2/4 変位形 SUSPECT_DISP_VAS: 文字列転送 (movs) の列挙あり / なし (--no-strmov = #2316 時点) × boot_final.ll / boot_final3.ll
 #   2b/4 fix_ld108.py (#2316 の検証用パッチ) 適用後の boot_final.ll の全関数監査 (既存判定と変位形)
+#   2c/4 ldfix (ldfix_img.py) 適用後の boot_final.ll の全関数監査 (修復後 IR で変位形だけが 41a670 を拾うか)
 #   3/4 残 SUSPECT 3 件 (6677a0 / d237e0 / de1da0) と 41a670 を機械語から突合 (triage_ld111.py。audit とは別算法)
 #   4/4 ネガティブコントロール (NC1〜NC5。1 件ずつ壊して判定が動くことを示す)
 # 使い方: bash tools/m11/ldfix/ld111_e2e.sh      環境変数: M11_WORK (既定 tools/m11/work) / PY (capstone+pefile 入り python)
@@ -67,6 +68,11 @@ step "2b/4 修復後 IR (fix_ld108.py = #2316 の検証用パッチを boot_fina
 "$PY" "$HERE/audit_lsf.py" "$OUT/boot_final.fix108.ll" "$IMG" "$CFG" > "$OUT/fix108.new.txt"
 echo "[boot_final+fix_ld108] $(grep '^SUSPECT_VAS' "$OUT/fix108.new.txt" | cut -c1-80) / SUSPECT_USE_VAS $(grep '^SUSPECT_USE_VAS' "$OUT/fix108.new.txt" | awk '{print NF-1}') 関数 (41a670 を含む: $(grep '^SUSPECT_USE_VAS' "$OUT/fix108.new.txt" | grep -c ' 41a670')) / $(grep '^SUSPECT_DISP_VAS' "$OUT/fix108.new.txt")"
 "$PY" "$HERE/audit_lsf.py" "$OUT/boot_final.fix108.ll" "$IMG" "$CFG" --no-strmov | grep '^SUSPECT_DISP_VAS' | sed 's/^/[boot_final+fix_ld108 --no-strmov] /'
+
+step "2c/4 ldfix (F3c ほか。ldfix_img.py = PE 無し版) 適用後の boot_final.ll の全関数監査: 修復後の IR で既存判定と変位形がどう出るか"
+"$PY" "$HERE/ldfix_img.py" "$W/boot_final.ll" "$OUT/boot_final.ldfix.ll" "$IMG" "$CFG" --report "$OUT/ldfix.report.json" 2>&1 | tail -1 | cut -c1-200
+"$PY" "$HERE/audit_lsf.py" "$OUT/boot_final.ldfix.ll" "$IMG" "$CFG" > "$OUT/ldfix.new.txt"
+echo "[boot_final+ldfix] SUSPECT_VAS $(grep '^SUSPECT_VAS' "$OUT/ldfix.new.txt" | awk '{print NF-1}') 関数 / SUSPECT_USE_VAS $(grep '^SUSPECT_USE_VAS' "$OUT/ldfix.new.txt" | awk '{print NF-1}') 関数 / $(grep '^SUSPECT_DISP_VAS' "$OUT/ldfix.new.txt") / $(grep '^SUSPECT_DISP_ONLY_VAS' "$OUT/ldfix.new.txt" | cut -d' ' -f1-2)"
 
 step "3/4 機械語との突合 (VA:argN:c)。LSF = 列挙漏れ (誤検出) / READ・NONE = wrong-value"
 "$PY" "$HERE/triage_ld111.py" "$IMG" "$CFG" 41a670:1:8 6677a0:2:36 d237e0:2:36 de1da0:1:244
