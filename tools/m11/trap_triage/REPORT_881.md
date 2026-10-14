@@ -1,7 +1,7 @@
 # #881 unit 275: function_864fe0 の this 不正の出所 (80e040 項目列・monitor 列挙 stub 仮説)
 
 親: #684 (受入条件の残り・275 側)。元の議論: `tools/m11/trap_triage/REPORT_684.md` §2・§4。
-検証起点: `origin/main` (b2a1e114)。素材: fl-win64 (`$RUNNER_TEMP/fl-win64`) + work-m11 + toolchain (`/opt/emsdk`・`/opt/retdec`)。
+検証起点: `origin/main` (b2a1e114)。素材: fl-win64 (`$RUNNER_TEMP/fl-win64`) + work-m11 + toolchain ([EMSDK]・[RETDEC]、`docs/REFERENCES.md` §4)。
 
 ## 0. 結論
 
@@ -47,7 +47,7 @@
 
 - 測定条件: 変更前 (base1096_before) は `c4e93550` のコード、(a) と (a)+(b) は `6f979463` のコード。
 - e2e (`m11_e2e.sh`、incremental、foreground、n=1、測定 commit `6f979463`): rc=0、47.5 s、load 0.47、reached_stage 4、survey_ok 872。本 HEAD `11b51bc9` では未再測定 (上記理由)。
-- **本 fix run では再測定していない** (未検証): `/opt/emsdk` (EMSDK 6.0.12) と `/opt/retdec` (RetDec v5.0) が runner に無く、全再生成 (RetDec lift) が fix run の上限 (40 分) に収まらないため。下表の数値は #1096 作成時の記録 (n=1) で、本 HEAD での再現は未確認。再測定は子 issue (§5) で行う。
+- **本 fix run では再測定していない** (未検証): [EMSDK] (EMSDK 6.0.12) と [RETDEC] (RetDec v5.0) が runner に無く、全再生成 (RetDec lift) が fix run の上限 (40 分) に収まらないため。下表の数値は #1096 作成時の記録 (n=1) で、本 HEAD での再現は未確認。再測定は子 issue (§5) で行う。
 - 既知の不整合: 同じ base の survey 値が §1 (ok 870) と本表 (ok 871) で 1 ずれている。原因は未切り分け (作成時の別 run の値の可能性)。
 
 - 変更 (a): callback VA `0x85df70` (56 B) を `m11_extra_ranges5.txt` に追加し boot5 として lift → IR に `function_85df70` (i64 4 引数) が入る。
@@ -118,30 +118,61 @@ node trap_triage/probe881_watch.mjs                   # 全 942 unit で list �
 - probe `probe881_watch.mjs`: 942 unit で list 変化 0 件 (n=1)。
 - ネガコン: 実施済み (§4.1、n=1)。ただし本 fix run では再測定しておらず、§4.1 の数値は作成時の記録。
 
+## 9. 変更点と範囲
+
+- 新規: `trap_triage/REPORT_881.md` (本書)、`trap_triage/probe881_275b.mjs`、`trap_triage/probe881_watch.mjs`、`trap_triage/probe1507_listB.mjs` (いずれも診断用、既定の survey には影響しない)。
+- `DEFECTS.md` / `REPORT_684.md` / `survey_units.mjs` は未変更。
+- 測定 commit `1e3ee7af` 以降の差分 (`tools/m11`): 本 REPORT と `probe1507_listB.mjs` のみ。survey・e2e の実行経路 (`m11_*.sh`・`m11_win.c`・`survey_units.mjs`) は差分 0 (§10.4)。
+
 ## 10. #1507 の実測 (測定 commit `1e3ee7af` = origin/main。以後コード差分 0)
 
-素材: fl-win64 + toolchain-emsdk/retdec (`/opt/`) + work-m11。`work/lift_pe.sha256` を手で作成し、`m11_gen_ir2.sh` で `boot_final.ll` を再生成 (sha256 `6909f85d…`) してから実行。
+既知類型との関係: 該当なし (未確定)。list B の base=0 は lift 由来の生成経路 (`8674a0` / `40faa0`) に関わる可能性があるが、原因は未確定。DEFECTS.md の D17 (64bit slot の 4B 縮退) とは現時点で対応を確認できていない (§10.1 の子 issue で確定)。
+
+素材: fl-win64 + toolchain-emsdk/retdec ([EMSDK]・[RETDEC] `docs/REFERENCES.md` §4) + work-m11。`work/lift_pe.sha256` は §10.2 の手順で作成し、`m11_gen_ir2.sh` で `boot_final.ll` を再生成 (sha256 `6909f85d…`) してから実行。
 
 - e2e `m11_e2e.sh` (foreground、rc=0、142 s、load 1.05): reached_stage 4、survey_ok 872、units_run_full 53/942。
 - survey n=2 (HEAD、rc 0、11.4 s / 12.2 s): 両回 `{"ok":872,"miss":46,"other":1,"halt0":7,"oob":15,"noproc":1}`。unit 275 は両回 oob。
 - **base 値の切り分け (§1 ok 870 / §4.1 ok 871 / HEAD ok 872)**: 本 HEAD の再現で 872 (HEAD) と 871 (callback 無効のネガコン) が出た。870 は本 run では再現せず (HEAD 2 回と base 1 回とも 872)、切り分けは未完 (原因未確定。作成時の別コード状態の可能性)。
-- **ネガコン (callback 無効化)**: `m11_win.c` の `EnumDisplayMonitors` の `m11_icall` 直前に `return 0` を入れ、e2e (rc 0、46 s) と survey n=2 (各 11 s): 両回 `{"ok":871,"oob":16,"halt0":7}`。HEAD との差分 unit は **144 のみ** (`ok`→`oob` 方向の遷移は 0 件、144 は oob→ok で HEAD が ok)。275 は両条件で oob。`m11_win.c` は元に戻し、`git diff` は 0。
+- **ネガコン (callback 無効化)**: `m11_win.c` の `EnumDisplayMonitors` の `m11_icall` 直前に `return 0` を入れ、e2e (rc 0、46 s) と survey n=2 (各 11 s): 両回 `{"ok":871,"oob":16,"halt0":7}`。HEAD→ネガコンの遷移は **unit 144 の ok→oob の 1 件のみ** (ok 872→871、oob 15→16 と整合)。275 は両条件で oob。`m11_win.c` は元に戻し、`git diff` は 0。
 - icall trace (`SV_TRACE=1`、rc 0): `target:0x85df70` の hit unit は **[114, 275]** (再現)。
 - **`867510` の引数経路 (x64 逆アセンブル `disasm_fn.py`)**: `867510` は `G2 = *(i32*)[rip+0xd8fc6d]` (VA **0x15f7198**、IR の 0x11f7198 と対応) を読み、`list = [G2+188]` を `EnumDisplayMonitors` の dwData に渡す。callback `85df70` の `arg4 = list`。
-- **2 つの list の区別 (新規)**: §2 の `80e040` が読む list **A** (`obj=[0x11e4c80]`、`[obj+188]`) と、`867510` の callback が書く list **B** (`[G2+188]`) は**別物**。`probe1507_listB.mjs` (`trap_triage/`) の実測:
+- **2 つの list の区別 (新規)**: §2 の `80e040` が読む list **A** (`obj=[0x11e4c80]`、`[obj+188]`) と、`867510` の callback が書く list **B** (`[G2+188]`) は**別物**。`probe1507_listB.mjs` (`trap_triage/`) の実測 (**n=1**、一度だけの実行):
   - unit 114 の後: `G2`=0x10b58160 (初めて非 0)、`list B`=0x10bd4c20、`cnt(+16)`=1、**`base(+8)`=0**。
   - unit 114 の callback 内 `50a830` は `[list B +8]=base` を読み `[base+8*cnt]` に書く。base=0 なので `mem[0]` (=0x10bd4c80) に書く (実測 `mem[0]` 一致)。
   - unit 275 の直前: `cnt`=1、`mem[8]`=0x2fa360 (A の `base` の `[0+8]` と同一番地)。unit 275 の実行後: `cnt`=2、**`mem[8]`=0x10bd5280** (= `[0+8]` を書き換え)。
   - つまり 275 の callback は address 8 (= list A が `[0+8]` として読む base) に書いて、A の base を壊す。A の list=0 (§2) と合わせると、A の項目列が NULL 近傍の書込みで壊れている可能性が高い。
-- **判定**: 「275 の OOB の原因」は、callback が base=0 の list B に書く (= list A の `[0+8]` を壊す) ことが実測で確認できた。ただし (1) list B の base が 0 のまま生成される理由 (`8674a0` / `40faa0` / lift 経路) は未確定、(2) 一度だけの実行プローブで、n≥2 の同一条件再現は未実施 (survey は再現)。DEFECTS 行の確定は (1) を終えてから。
+- **判定**: 「275 の OOB の原因」は、callback が base=0 の list B に書く (= list A の `[0+8]` を壊す) ことが実測 (n=1) で確認できた。ただし (1) list B の base が 0 のまま生成される理由 (`8674a0` / `40faa0` / lift 経路) は未確定、(2) n≥2 の同一条件再現は未実施 (survey の OOB は n=2 で再現)。DEFECTS 行の確定は (1) を終えてから。
 
 ### 10.1 未達と起票先
 
 | 未達 | 起票先 |
 |---|---|
-| 受入条件 3・4: list B の base=0 の生成原因 (`8674a0` / `40faa0` / `50a830` の lift 検証) と DEFECTS 行の確定 | 子 issue (本 PR の完了後に起票) |
+| 受入条件 3・4: list B の base=0 の生成原因 (`8674a0` / `40faa0` / `50a830` の lift 検証) と DEFECTS 行の確定 | 子 issue として起票が必要 (本 run では未起票。親 #1331 配下) |
+| 「base 値の切り分け」(870 の再現条件) | 同上 (本 run では未起票) |
 
-## 9. 変更点と範囲
+### 10.2 provenance (`work/lift_pe.sha256`)
 
-- 新規: `trap_triage/REPORT_881.md` (本書)、`trap_triage/probe881_275b.mjs`、`trap_triage/probe881_watch.mjs` (いずれも診断用、既定の survey には影響しない)。
-- `DEFECTS.md` / `REPORT_684.md` / `survey_units.mjs` は未変更。
+- 手作業で書いたことを明記する。元の run が書いた `work/lift_pe.sha256` の中身は REPORT にも work/ にも残っておらず、再確認できない。
+- 本 fix run で確認できたのは現在の素材の PE 指紋だけ: `fl-win64` の `extracted/block00031_PE.bin` の `sha256sum` は `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` (`tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で展開して計算)。元 run が書いた `lift_pe.sha256` の値とは照合できていない (記録が無い)。
+- 書込み手順 (正規の生成経路ではない): `sha256sum "$FL_WIN64_DIR/extracted/block00031_PE.bin" | cut -d' ' -f1 > work/lift_pe.sha256`。
+- 限界: この指紋は `m11_e2e.sh` の全再生成 (`--full`、Ghidra `functions_dll.csv` が要る) の代替ではない。lift 成果物の出自 (どの PE・どの lifter から作られたか) は検証していない (`tools/m11/REPORT_N86.md` と同じ制約)。正規の再生成 (`--full`) は toolchain と Ghidra が要るため本 run では未実施。
+
+### 10.3 survey 再現コマンド (1 行)
+
+`SV_RAW=1 node trap_triage/survey_units.mjs work/trap_triage/base.json` (`tools/m11/` で実行。出力の `SURVEY_UNITS` 行が `{"ok":…}`)。
+
+### 10.4 差分 0 の証跡 (`git diff 1e3ee7af HEAD -- tools/m11`)
+
+測定 commit `1e3ee7af` 以降の `tools/m11` の差分 (本 PR で確定した範囲):
+
+```
+git diff --name-status 1e3ee7af HEAD -- tools/m11
+M	tools/m11/trap_triage/REPORT_881.md
+A	tools/m11/trap_triage/probe1507_listB.mjs
+```
+
+コード (実行経路) の差分は 0。`git diff --stat` は `REPORT_881.md` 23 行追加・`probe1507_listB.mjs` 32 行追加。
+
+### 10.5 n=1 の明示
+
+上記の list B の実測 (base=0・callback による `mem[8]` 書換え) は **n=1** のプローブ結果。survey の OOB (unit 275) は n=2 で再現。
