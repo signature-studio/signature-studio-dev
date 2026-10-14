@@ -307,7 +307,7 @@
 | `tools/audio/REPORT_MIDI.md` | ~65 | AU-3 (#188) Web MIDI shim の検証全文 (REPORT.md §13 から分割) |
 | `tools/audio/REPORT_AU10.md` | ~30 | AU-10 (#191) 30 分ソーク (`--soak30`) の検証全文 (REPORT.md §16 から分割) |
 | `tools/audio/REPORT_AU6.md` | ~38 | AU-6 (#190) 遅延ポリシー: T の減衰の全文 (REPORT.md §17 から分割)。減衰テスト・quick 全体の実測値の正本 (§2) |
-| `tools/audio/REPORT_AU2_CI.md` | ~134 | AU-2 (#187) CI 代理指標: 2 回目 run の行列実測 (null-sink 接続確認済み・NC・再採取 n=1 の FAIL 1 件)・未解決。1 回目 run の記録は §1 (§5 で解消)。quick ベースライン 43/44。実機分は [AU-22] (#2366) |
+| `tools/audio/REPORT_AU2_CI.md` | ~195 | AU-2 (#187) CI 代理指標: Chrome 行列 (2 回目 run・null-sink 接続確認済み・NC・再採取 n=1 の FAIL 1 件・§8 の clock_jump 差分)、Firefox 行列 (WebDriver BiDi, §9・AU-23 #2540)、未解決 (§4・§6)。1 回目 run の記録は §1 (§5 で解消)。quick ベースライン 43/44。実機分は [AU-22] (#2366) |
 | `tools/audio/REPORT_APPENDIX_863.md` | ~20 | AU-15 (#863) 現 HEAD (`2f235a0a`) での再試行 15 run 全 PASS の全文 (REPORT.md §20 から分割移動。250 行上限のため)。§19 (旧 HEAD の失敗 1 件) は REPORT.md 本体 |
 | `tools/audio/asio/REPORT.md` | ~200 | IASIO COM アダプタ + 120s soak |
 | `tools/audio/asio/REPORT_APPENDIX_998.md` | ~23 | asio REPORT §12-2 全文 (#998 負荷下の再現試験 L1〜L3)。250 行上限のため無変更で分割移動 |
@@ -448,6 +448,7 @@
 | `tools/pm/REPORT.md` | ~222 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380 (全文は付録)・`idle_report.sh` の検証 #2354 (全文は付録)・PM Worker の live 切替前の突き合わせ #2443・R2 素材投入の頻度 #2434・`pm_wake.sh` の判定テストと live 確認 #2347・PM Worker の同時実行の上限の推定 #2381)。RETRO・DIRECTIVES の数値の正本 |
 | `tools/pm/REPORT_APPENDIX_2380.md` | ~32 | tools/pm REPORT §10 (PM Worker のコメント同期 #2380) の全文。250 行上限のため REPORT.md から分割移動 (#2434) |
 | `tools/pm/REPORT_APPENDIX_2354.md` | ~62 | tools/pm REPORT §11 (`idle_report.sh` の検証 #2354) の全文。250 行上限のため REPORT.md から分割移動 (#2381 の PR のレビュー指摘への対応)。fake gh の判定 41 件・実データの検算・未解決 (soak の合格ライン) |
+| `tools/pm/REPORT_APPENDIX_2337.md` | ~60 | tools/pm REPORT §16 の全文 (oc-pm の refs_orphan 検出 #2337・PR #2478: 測定・ネガコン・Refs のみ判定の差)。250 行上限のため REPORT.md から分割移動。測定値の正本は本付録 |
 | `tools/targets/freshair/lift2/REPORT_FA15.md` | ~60 | lift2 FA-15 (#1105): ctrl closure の ymm (AVX2 256bit) lowering (`vpcmpeqw`/`vpxor`/`vpmovmskb` ymm・`vzeroupper`)。`build_ctrl.sh` の `failed` 1→0、`lift2_e2e.sh` ALL PASS の実測 |
 | `tools/targets/freshair/lift2/REPORT_FA13_REACH.md` | ~46 | lift2 FA-13 (#905): rep movsb/stosw の実行到達の再探索。結論: 受入 1 (実行到達 scenario)・2 (ネガコン FAIL) は未達のまま。測定値は本 REPORT のみ |
 | `tools/targets/freshair/lift2/REPORT_FA8.md` | ~60 | FA-8 (#648): Filter setter の native/wasm bit-exact・型別 ID 感度・FA-7 probe 測定バグ修正 |
@@ -470,6 +471,7 @@
 | `docs/pm/DIRECTIVES.md` | 依頼者 (user) 指示の**逐語原文**と PM の解釈・反映先 | 原文の改変 (追記のみ)・測定値 |
 | `docs/pm/RETRO_2026-10-13.md` | Actions 移行後 2 日間のショートレトロ (事実・原因・対策。依頼者指示 121) | 測定値 (正本は `tools/pm/REPORT.md`。本書は結論と link のみ)・指示の逐語原文 (`DIRECTIVES.md` が正本)・repo 外絶対パス |
 | `tools/pm/REPORT.md` | PM 運用の実測の**正本** (PR 件数・PR とチケットの対応・Project V2 Status (参考値)・Actions run 集計。基準時刻と取得方法を併記) | 技術実装・指示の逐語原文・チケット状態の判断 (`STATUS.md`・issue/PR の状態 (`docs/WORKFLOW.md` §3) が正本) |
+| `tools/pm/REPORT_APPENDIX_2380.md`・`tools/pm/REPORT_APPENDIX_2354.md` | REPORT §10・§11 の分割移動先 (無変更の全文)。測定値の正本は付録側 | 本体 `REPORT.md` へ戻す追記・同じ節の要約の重複 (本体は要約とリンクだけ) |
 | `tools/pm/README.md` | PM 運用ツールの一覧・『VM 退役後の扱い』(全ファイルの後継・廃止の表)・VM の状態ファイルの扱いの決定 (取り込み or 破棄と影響)・前提・環境変数・運用の約束 | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報・状態ファイルの中身や件数 (決定と影響だけを書く) |
 | `infra/pm-worker/README.md` | PM Worker (Cloudflare) の構成・デプロイ・**再デプロイ (wrangler の OAuth)**・ロールバック・OAuth 失効時の手順・`[未確認]` のチェックリスト | 測定値 (`tools/pm/REPORT.md` が正本)・認証情報 (token・OAuth の保存ファイルの中身)・repo 外絶対パス |
 | `tools/pm/status_sync.py` (+ `test_status_sync.py`) | `docs/STATUS.md` の自動節 (`status-auto` マーカーの内側) を、直近 24 時間の merge PR を MS / サブシステムに写像した件数と代表 PR 番号で更新する決定的スクリプト (REST のみ)。写像表は `docs/STATUS.md` の `status-map` ブロックが正本。テスト: `python3 -m unittest tools/pm/test_status_sync.py` | 測定値 (自動節にも書かない。正本は各 `REPORT.md`)・自動節の外の編集・認証情報 |
