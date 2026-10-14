@@ -126,4 +126,3 @@ bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                  # 期待: bit�
 | data 区分に実コードを持つ他の closure 関数の有無 | 同型の脱落の範囲が未確認 | #2696 (ICALL-82) |
 | 新類型 D24 (案) の `docs/DEFECTS.md` 追記 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
 | 2508 の残件 (受入 3 の sha256 照合は #2675、受入 4 の merge 規則、lift の ABI 仮想化 `BLK+0x88 := BLK+0x28` の欠落) | — | #2508・#2675 |
-| 付録 2508 §4.3 の SIGSEGV 説明の訂正 (本付録 §1 で訂正済み) | 誤った前提で次の作業が進むのを防ぐ | 本 PR で訂正 (2508 付録は変更しない) |
