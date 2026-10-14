@@ -21,8 +21,42 @@
 | fork | `retdec-build/retdec-support`・`classicvalues/retdec-support` は tag のみで release 0 件。`mehrdad-shokri/retdec-support` は 2017 年の tag のみ |
 | 検索 | GitHub code 検索で `retdec-support_2019-03-03` と期待 sha256 `7a5b06ec…` は各 0 件。archive.org の `retdec` 検索 10 件は retdec 本体リポジトリの 2017-12〜2018-01 の snapshot と awesome-* の一覧で、support パッケージは無い |
 | 隣の版 2019-03-08 | asset は有るが sha256 `62935160…` で、`6edcaaea` の `install-share.py` が期待する `7a5b06ec…` と一致しない (`make install` は検証で失敗する) |
+| avast/retdec v3.3 (2019-03-18) のバイナリ release 同梱の share (`retdec-v3.3-ubuntu-64b.zip`、sha256 `83b8e45b…`) | 2026-10-14 確認。`share/retdec/support/version.txt` は**有り**、内容は `2019-03-08` (11 バイト)。2019-03-03 でないことの直接の根拠。`share/retdec/support/{x86,arm}/ords` の配置は 6edcaaea の `retdec-config.py` と一致。`generic/types/*.json` 5 本と ords (x86 1365・arm 28 ファイル) は v5.0 の share と**バイト一致**。v5.0 の types は 2019-03-08 の archive と一致する (§2)。static-code は 2019-03-08 が `.yara` 原文 (pe 70 件)、v3.3 が `.yarac` (pe 70 件)。拡張子を除けば相対パス 70/70 一致。拡張子が違うため完全なファイル名の一致は 0 件で、形式も違うのでバイト比較はできない。以上から 2019-03-03 とは確認できない |
+| タグ v3.3 (`ae298572`) のソース | `support/install-share.py` は有り。`version = '2019-03-08'`・`sha256hash_ref = 62935160…` を指す。`cmake/install-share.py` は無い (`301f4e64` で `support/install-share.py` へ renamed) |
+| retdec-support `master` の commit 履歴 (2019-02-01〜03-20) | 1 件 (`2cbfd5c7`、2019-03-08、README のみ)。README の手順 `tar cvJf retdec-support_YYYY-MM-DD.tar.xz *` が示すとおり、repo に data は無く、archive は手元の data から作られる。repo からの再生成はできない |
 
-経緯: `install-share.py` は `3edc8d0f` (2019-03-03) で 2019-03-03 を指し、`4782b5b8` (03-05) で sha256 を更新した。`301f4e64` (2019-03-18、v3.3) で削除され、support は repo 内の `support/` と 2019-03-08 に移った。つまり `6edcaaea` (03-09) 〜 03-17 だけが 2019-03-03 を要する版で、その asset は GitHub から消えている。パッケージの内容は retdec-support の README によると ordinal 表・型 DB・static-code の YARA・暗号定数の YARA で、元データは repo に無く、source からの再生成はできない。
+経緯: `install-share.py` は `3edc8d0f` (2019-03-03) で 2019-03-03 を指し、`4782b5b8` (03-05) で sha256 を更新した。`301f4e64` (2019-03-18、v3.3) で `cmake/install-share.py` が `support/install-share.py` へ移動した (git 上は renamed。同じ commit で `scripts/retdec-config.py` は modified)。support は repo 内の `support/` と 2019-03-08 に移った。つまり `6edcaaea` (03-09) 〜 03-17 だけが 2019-03-03 を要する版で、その asset は GitHub から消えている。パッケージの内容は retdec-support の README によると ordinal 表・型 DB・static-code の YARA・暗号定数の YARA で、元データは repo に無く、source からの再生成はできない。
+
+再現: `RETDEC_ROOT` に [RETDEC] (v5.0) の root を指定して `bash tools/m11/ldfix/share_check_2405.sh all` (`zip`・`archive`・`tag` の個別実行も可)。`share_check_2405.sh` は commit `46ebf26c` で追加し、`0ae2b7d8` で `RETDEC_ROOT` の既定値を外した。取得物は sha256 を検証してから使う。下は `0ae2b7d8` で実行した出力 (`WORK` の絶対パスは `$WORK` に置換。出力は `46ebf26c` で実行したものと同一)。所要は `46ebf26c` の実行で real 23.3 s (4 コア)。
+
+```
+$WORK/v33.zip: OK
+v3.3 version.txt: 2019-03-08
+types/cstdlib.json: v5.0 と一致
+types/windows.json: v5.0 と一致
+types/linux.json: v5.0 と一致
+types/arm.json: v5.0 と一致
+types/windrivers.json: v5.0 と一致
+ords/x86: 1365 件、v5.0 ordinals/x86 との diff 行数: 0
+ords/arm: 28 件、v5.0 ordinals/arm との diff 行数: 0
+$WORK/support_2019-03-08.tar.xz: OK
+archive version.txt: 2019-03-08
+types/cstdlib.json: v5.0 と一致
+types/windows.json: v5.0 と一致
+types/linux.json: v5.0 と一致
+types/arm.json: v5.0 と一致
+types/windrivers.json: v5.0 と一致
+static-code pe: v3.3 .yarac 70 件、2019-03-08 .yara 70 件
+  完全なファイル名 (拡張子込み) の一致: 0 件
+  拡張子を除いた相対パスの一致: 70 件
+tag v3.3: ae298572cbbd9f863bb0d2e73464e15d2fa1d51b
+support/install-share.py (ae298572): sha256hash_ref = '629351609bca0f4b8edbd4e53789192305256aeb908e953f5546e121a911d54e' version = '2019-03-08'
+cmake/install-share.py (ae298572): 無し
+301f4e64: renamed from cmake/install-share.py
+retdec-support の commit (2019-02-01〜03-20): 1 件
+```
+
+ネガティブコントロール (手元の一時ファイルのみ): `cstdlib.json` に 1 バイト追記すると `cmp` は差ありになる (rc=1)。v3.3 の pe 名から 1 件を除くと、拡張子を除いた一致は 69 件になる (70 → 69)。完全なファイル名の一致 0 件は、拡張子を除いた 70 件との対比で「拡張子だけが違う」ことの確認になる。
 
 ## 2. 代用 share
 
@@ -113,3 +147,5 @@ v5.0 (REPORT_911 §6c・§6e) との比較: 値の変化 (`load *rax` → `load 
 - 範囲 (§4)・変種 B・段別 IR (§5) は `c810b847` のスクリプトで、2 つのビルドの両方に実行した。ビルドの 1 回目は同じコマンドの手実行、2 回目は `ad9d6adb` 版のスクリプトの `all` (build・install は最終版と同一)。
 - 所要: `stages` は 1 回目のビルドで real 14.4 s、2 回目で 18.6 s (n=1)。範囲の real は §4。
 - main 取り込み (`264030a7`) で入った `tools/m11/ldfix/` の差分は他 issue の追加だけで、測定経路 (上の 3 ファイル) には入らない。
+- `git diff c810b847 HEAD -- tools/m11/ldfix/retdec2019_gv_2405.sh tools/m11/ldfix/retdec_constants_trace_2405.patch tools/m11/ldfix/retdec_stage_1091.py` の出力は、`26b98f8f` の 1 行 (`retdec2019_gv_2405.sh` のコメント。既定値の説明を repo 外パスから repo 内の参照に置換) だけ。パッチと `retdec_stage_1091.py` は 0 行。
+- `share_check_2405.sh` (§1) は `46ebf26c` で新規追加 (`0ae2b7d8` で `RETDEC_ROOT` の既定値を外した)。上の 3 ファイルには入らず、§1 の照合 (share・tag・履歴) だけに使う。gv 分岐の測定は変えていない。

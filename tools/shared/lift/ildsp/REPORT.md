@@ -61,6 +61,7 @@ closure = export entry の関数 (`.pdata` 境界) から、直接 call と直�
 - closure は間接 call を辿らないため、実到達はこの表より大きい可能性がある。
 - 注意: `.pdata` 先頭でない entry は `owner()` で含む関数の先頭に正規化してから辿る。export の 10 件はすべて `.pdata` 先頭に一致した。
 - 正本の関係: 本表の関数数・命令数は chained `.pdata` と `.pdata` に無い葉を辿らない下限。GeneralPitchShifter_CreateInstance の closure の正本は §4-5 (単独 36 関数・924 命令)。
+- vtable 経由の実体 closure (`.pdata` の無い先を含む・10 export・検算 `ildsp_closure_check.py`) は `REPORT_CLOSURE.md` (T-SH-15 #161)。
 
 ## 3. 次の子 issue の起票案 (PM が起票)
 
