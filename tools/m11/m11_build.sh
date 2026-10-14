@@ -173,7 +173,7 @@ echo "$M11_OV_414AD0" > work/ov_414ad0.stamp
 if [ "$(cat work/ov_652500.stamp 2>/dev/null || echo none)" != "$M11_FIX_652500" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_FIX_652500" > work/ov_652500.stamp
 # M11_OV_413060 が変わったら ov.o だけ無効化 (#944)
-S413="$M11_OV_413060-$M11_NEG_413060-$M11_INSTR_413060-ov$M11_OV_INSTR"
+S413="$M11_OV_413060-$M11_NEG_413060-$M11_INSTR_413060-ov$M11_OV_INSTR-pd${M11_PRINT_DEST_2118:-0}"
 if [ "$(cat work/ov_413060.stamp 2>/dev/null || echo none)" != "$S413" ]; then rm -f work/obj/ov.o; fi
 echo "$S413" > work/ov_413060.stamp
 # M11_FIX_535BF2 が変わったら ov.o だけ無効化 (#714)
