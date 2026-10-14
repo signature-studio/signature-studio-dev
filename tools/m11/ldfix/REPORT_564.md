@@ -70,3 +70,50 @@ REGLIVE 2,509 (関数入口 live-in 等で脱落でない) / **FRAME_IN_ESCAPED 
 | 自然起動での `RegisterClass*` 到達 | 受入の「自然到達」は未 | #134 / #490 |
 | `TLightweightLayeredControl` の WNDPROC 0x31dd10 が closure 外 (71dd80 は F4 で登録分岐は直ったが CreateWindowExW は NULL のまま) | その class の窓生成 | #563 REPORT §7 の seed 自動生成 |
 | #518 (ldfix.py) との conflict | 後 merge 側が rebase | PM |
+
+## 6. F4 修復 10 関数の liftdiff 動的差分 (#1646)
+
+測定 commit: `80f82923` (main)。コード変更は無し (本 PR は target JSON 2 本と結果 TSV のみ)。HEAD までのコード差分は下記。
+
+- 素材: `work-m11` (`tools/m11/work/boot_final.ll` = F4 適用前の snapshot、`ldf4_` 0 件) と `work-liftdiff`。F4 は `ldfix/ldfix.py boot_final.ll --passes f4` で重ね、pre (F4 無し) / post (F4 適用・`ldf4_` 51 箇所 / `F4(frame-read)=10`) の IR を作った。`ldfix_report.json` は work-m11 の旧 snapshot 由来で f4 キー無し。
+- target: `tools/liftdiff/targets/m11_f4_{pre,post}.json` (IR のみ差し替え)。build は両方 OK (sig_mismatch 0)。
+- boot 状態: `--mode hybrid` (928/942 到達・precondition ok=True)。`units` mode は InitTable=0 で precondition 不成立のため不採用。
+- 比較: `batch --set file:work/f4_10.txt --shards 4` (10 関数)。pre 26 s / post 26 s。rc 0。load 0.24〜0.32。
+
+| 関数 | pre | post | 変化 |
+|---|---|---|---|
+| 132e8e0 | match | match | 無 |
+| 41ca30 | mismatch `ret_only` | mismatch `zero_init_drop` (high) | **有 (§6.1)** |
+| 44d1c0 | unexec `hang` | unexec `hang` | 無 |
+| 52a7f0 | mismatch `import_call_seq` | mismatch `memory_semantics` | 有 (タグのみ。依然 mismatch) |
+| 666c30 | mismatch `memory_semantics` | 同 | 無 |
+| 69c360 | mismatch `memory_semantics` | 同 | 無 |
+| 71dd80 | mismatch `import_call_seq` | **match** | 有 (改善) |
+| 864f60 | match | mismatch `ret_only` | **有 (§6.2)** |
+| 865020 | match | match | 無 |
+| 977e40 | match | match | 無 |
+
+全件: `tools/m11/ldfix/results/f4_liftdiff_1646.tsv`。
+
+**判定**: 誤修復は**確定していない**。F4 の読み位置は 3 関数とも機械語と一致した (41ca30: `call GetSystemInfo` 後の `[rsp+0x40]` = 出力 `+0x20`、864f60: `call` 後の `[rbp+0x24]`)。F4 の変化が見えた箇所は次の 2 件。
+
+### 6.1 41ca30 (`zero_init_drop`)
+- pre は `xor` で 0 を返し、native (rax=0x8 = `GetSystemInfo` の dwNumberOfProcessors) と不一致。post は F4 が出力 `+0x20` を読むが、wasm 側の `GetSystemInfo` stub が書き込めず wasm rax=0 (`wasm_uninit_dependent: true`、未初期化スタックの 0x00/0xa5 で結果が変わる)。
+- 原因の候補: `rt/ld_core.h` の `ld_dst_ok` は image / arena / heap / 0x7f0000000000 以上 (native スタック) しか許さない。wasm 側の guest stack `0x22c2bc88` がこの範囲に入るかは**未確認**。入らなければ harness の書き込み拒否で、F4 の誤修復ではない。
+- 修正方針 (未実施・別 PR): `ld_dst_ok` の許可範囲に wasm guest stack を加えるか、stub の書き込み先を確認する。その後に 41ca30 を再測定する。
+
+### 6.2 864f60 (`ret_only`)
+- F4 が読むのは `call 864fa0` の出力 `+4` で、機械語どおり。post の wasm rax=0x20000、native rax=0。
+- 呼び出し先 `864fa0` は pre/post とも `memory_semantics` mismatch (`arena 0x5100`: native 0x0 / wasm unchanged)。864f60 の差は callee 側の書き込み差が戻り値に出たものと推定する。pre の match は xor の 0 がたまたま native と一致したためで、F4 が誤っていた証拠ではない。
+- 修正方針 (未実施): 864fa0 の memory_semantics を先に切り分ける。
+
+### 6.3 残件
+- 52a7f0 は依然 mismatch (`memory_semantics`: heap `0xc70f98`)。F4 の対象 (`stack_var_-96+8`) とは別の書き込み差の可能性が高いが未確認。
+- 44d1c0 は pre/post とも `hang` で判定不能。
+- 71dd80 の改善 (`import_call_seq` → match) は F4 の効果として記録する。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 41ca30: wasm の `GetSystemInfo` 書き込みが wasm guest stack で拒否されるか (`ld_dst_ok`) | 本件 F4 の判定が harness 起因かどうか未確定 | PM 採番 (未起票) |
+| 864fa0 の `memory_semantics` (864f60 の戻り差の原因) | 864f60 の判定 | PM 採番 (未起票) |
+| 52a7f0 / 666c30 / 69c360 の `memory_semantics`・44d1c0 の hang | 動的確認は不一致のまま | PM 採番 (未起票) |
