@@ -221,3 +221,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | 純関数: 30 分の streak・観測の空きをまたがない・観測の保持 | 「saturatedRunning」「nextCap / capValue」「観測の保持」 |
 
 review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
+
+## 16. PM Worker の降格 (#2340・PR #2469) の測定
+
+測定 commit `e78527db` (コードを変えた最後の commit。main `f3102162` (#2485) の取り込みと、降格のネガコンの組み直しを含む)。`git diff e78527db HEAD -- infra/pm-worker` の出力は空 (差分 0)。測定値・ネガコン (変異 a〜e) は `tools/pm/REPORT_APPENDIX_2469.md` (250 行上限のため分割)。
