@@ -171,3 +171,32 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 `ir_loads_in_multi_groups=151 linked=11`。ネガコン成立 (link を外すと store 宛 CC_site 47 → 53)。上の値は `543e7320` の §6 の値と一致する。
 
 結べない load 数 (関数・K 単位) は §6 の表が正。`ff63f0` / `128f9e0` / `d0cee0` のように 1 ブロックに IR load が多い例は、ブロック内の順序を機械語の値の流れで追う必要があり、子 #1980 の範囲。受入条件のうち「値の流れで順序を決める」「store 宛 CELL_COLLAPSED の減少」は未達。
+
+## 8. #1980 (LD-73) 窓の拡張による 1:1 対応の再調査 (部分達成・規則は未採用)
+
+測定 commit: `543e7320` (`link_d17.py` / `link_d17_e2e.sh` / `fix_d17.py` / `fix_d17_e2e.sh` / `audit_lsf_ssa.py` を最後に変えた commit)。
+差分の証跡: `git diff 543e7320 dcc609a9 -- <上記 5 files>` は空。HEAD (本 PR) でも同じ 5 files に差分なし。素材 `work-m11` と `toolchain-emsdk` を展開 (`tools/m11/work/`、`/opt/emsdk` emcc 6.0.12)。
+
+再測定: `bash tools/m11/ldfix/link_d17_e2e.sh` (foreground、46.3 秒、emcc rc=0)。値は §6 と一致。
+
+| 段 | store_CC_site | store_CC_fn | store_CELL_DEEP |
+|---|--:|--:|--:|
+| ssa_base (修復前) | 86 | 49 | 19 |
+| ssa_neg (fix_d17 のみ) | 53 | 28 | 52 |
+| ssa_link (fix_d17 + link_d17) | 47 | 26 | 58 |
+
+窓の拡張の診断 (一時スクリプト・コミットせず。`mach_chains` の rD 使用の走査窓 8 / 16 / 32 / 64 命令):
+
+| 窓 | 1:1 で結べた load | 結べない理由 (IR 1 本・chain 1 本のブロック) |
+|--:|--:|---|
+| 8 | 11 | no_deref 18 / dst_unused 18 / base_clobbered 11 |
+| 16 | 11 | 同上 |
+| 32 | 11 | 同上 |
+| 64 | 11 | 同上 |
+
+- 窓を広げても結べ数・理由の内訳とも変わらない。`dst_unused` は rD の使用先が 64 命令以内に無い (= 窓の問題ではない) ことを示す。
+- 同一ブロックに IR load が 2 本以上ある組は 50 ブロック。そのうち IR 本数と chain 本数が一致したのは 17 (`ff63f0` 11 本・`128f9e0` 系など)、一致し幅の順序まで揃ったのは 2 だけ。
+- 順序・本数・幅のどれでも一意に決まらないため、規則は採用しない (§7 と同じ判断)。
+
+結論: 受入条件 1 (値の流れによる 1:1 規則) と 3 (ネガコン) は未達。受入条件 2 (store 宛 CELL_COLLAPSED の減少) は §6 の 47 site のまま。
+受入条件 4 (emcc 構文検証) は現 HEAD の修復 IR で通過。残作業: 同一ブロック複数 load の順序を、機械語の rD の値の流れ (store 先・後続 load の基底) まで追う別方式の設計。子 issue の起票先は PR 本文の未解決表。
