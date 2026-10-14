@@ -83,16 +83,15 @@
 
 **unit 115 の差 (受入条件 1)**: 同じ前処理 (unit 1〜114 を順に実行) で、baseline は `m11_boot.cjs` 単独でも `EnterCriticalSection (未初期化/未登録)` で abort する (`tools/shim/src/sync.c`: CS を表に登録した後の mutex 写影で、表に無い CS を fail-fast)。shimx 版は同じ unit で `EnterCriticalSection` 18 回・`LeaveCriticalSection` 18 回が対で通り、halt0 (正常停止) になる (`tools/shimx/src/locks.c` は ゼロ初期化の CS を未ロック扱いし、NULL/非整列のみ fail-fast)。差は「未登録 CS を abort するか、未ロックとして扱うか」の実装差が差の直接の機構と推定する。shimx 版の halt0 は、この実装差により fail-fast に当たらず到達したものと読む。CS ポインタの具体値 (両者の一致) は未比較のため、両者が同一の CS を見ているかは未確認。
 
-**unit 23 の分岐 (#1465 受入条件 1・実測)**: 測定 commit `cb3a89a6` (main)。素材 `work-m11` の `m11_boot.cjs` と、`tools/m11/shimx_link/build.sh` で clean build した `m11_sx_plain_soft.cjs` / `m11_sx_trace_soft.cjs` / `m11_sx_trace_soft_fix.cjs` を用いる。同一インスタンスで unit 1〜23 を順に実行 (survey と同じ手順) して unit 23 の icall miss を取った。
+**unit 23 の分岐 (#1465 受入条件 1)**: 実測の確定事項は survey JSON (`evidence_1255/*.survey.json`) の kind のみ。unit 23 (LVA 0x67f00) は baseline `halt0` → shimx 版 `closure_outside` で、両者とも `shim_calls` は空。unit 30 (LVA 0xfa9390) は両 variant とも `closure_outside`・`shim_calls` 空。
 
-- shimx 版 (3 variant とも同じ結果): unit 23 (LVA 0x67f00) は `closure_outside`。icall miss 2 件、target は `0x457860` (2 回)。`--trace` / `--fix` の有無に依らない。
-- baseline: unit 23 は icall miss 0 件で `halt0` (`FormatMessageW` stub 後に Halt0)。`0x457860` は呼ばれない。
-- 機構 (コード根拠): unit 23 (`function_467c40`) は `.bss` 0x15f10e0 の関数ポインタ slot を `call` する。この slot は `function_457c70` が `GetProcAddress(oleaut32, "VarBstrFromBool")` で埋める。`function_457c40` は解決失敗時の fallback として `0x457860` を返す (`tools/m11/m11_ov.c:1173-1175` の注釈と lift 出力 `work/boot0.drc.c`)。shimx 版ではこの `0x457860` が dispatch 表 (`m11_disp_tab`, 7399 件) に無く icall miss になる。`0x457860` は IR 上の関数ではなく、表に載せる対象が無い。
+- 未再現: 以前の記述にあった「unit 23 の icall miss 2 件 (target `0x457860`)」「unit 30 の `0x457860` miss」の実測は、この commit からは再現できない。根拠の probe (`tools/m11/work/probe_unit23.mjs`) は作業域のみに置かれ commit されておらず、survey JSON にも icall 情報が無い。よってこの数値は本 REPORT の結論に使わない。
+- 機構の仮説 (未検証・コード根拠のみ): unit 23 (`function_467c40`) は `.bss` 0x15f10e0 の関数ポインタ slot を `call` する。この slot は `function_457c70` が `GetProcAddress(oleaut32, "VarBstrFromBool")` で埋める。`function_457c40` は解決失敗時の fallback として `0x457860` を返す (`tools/m11/m11_ov.c:1173-1175` の注釈)。shimx 版でこの `0x457860` が dispatch 表に無ければ icall miss になる、という説明は未確認の仮説である。
 - baseline の `m11_win.c:90` は `GetProcAddress` が常に 0 を返す。baseline の unit 23 がこの slot 経路に入らない理由 (`0xf960` 以降の分岐) は未確定。
-- 未確定 (受入条件 1 の残り): shimx 版で `function_457c70` が呼ばれる unit と `GetModuleHandleW(oleaut32)` の戻り値は、unit 2〜23 の逐次ログでは未確認。よって「shimx の GetProcAddress が NULL を返すから」と断定はしていない。`0xf960` 以降の分岐条件の特定も未了 (起票先: #1607 `[SHX-T9e]`)。
-- 同じ `0x457860` の miss は unit 30 でも起きる (`closure_outside`, 両 variant 共通の unit)。
+- 未確定 (受入条件 1 の残り): shimx 版で `function_457c70` が呼ばれる unit と `GetModuleHandleW(oleaut32)` の戻り値は未確認。「shimx の GetProcAddress が NULL を返すから」とは断定しない。`0xf960` 以降の分岐条件の特定も未了 (起票先: #1607 `[SHX-T9e]`)。
+- unit 23 の icall miss の再現手順 (hook・入力・実行コマンド) は未確定。再現させる場合は、probe を追跡対象パスに commit してから本節に実行コマンドを書く。
 
-**oob 増 (受入条件 2)**: oob 増 57 件 (ok→oob 31 / halt0→oob 26) と減 12 件 (oob→ok 10 / oob→halt0 1 / oob→clobber 1)。shimx 版の oob 95 件のうち shim 呼出しを伴うものは 12 件、baseline の oob は 0 件 (`evidence_1255/*.survey.json` の `shim_calls`)。増分 57 件の unit 単位の frame 分類は未完 (起票先: 子 issue #1607 `[SHX-T9e]`)。`evidence_1255/unit_diff_out.txt` が unit 別の遷移一覧。
+**oob 増 (受入条件 2)**: oob 増 57 件 (ok→oob 31 / halt0→oob 26) と減 12 件 (oob→ok 10 / oob→halt0 1 / oob→clobber 1)。shimx 版の oob 95 件のうち shim 呼出しを伴うものは 12 件、baseline の oob 50 件のうち shim 呼出しを伴うものは 0 件 (`evidence_1255/baseline_m11_boot.survey.json` の `per_unit`・`shim_calls`)。増分 57 件の unit 単位の frame 分類は未完 (起票先: 子 issue #1607 `[SHX-T9e]`)。`evidence_1255/unit_diff_out.txt` が unit 別の遷移一覧。
 
 再現: `python3 tools/shimx/evidence_1255/unit_diff.py <baseline.survey.json> <shimx.survey.json>` (per-unit JSON は `evidence_1255/` に保存)。
 
