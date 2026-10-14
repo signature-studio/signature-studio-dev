@@ -12,8 +12,9 @@ workers_dev = true
 [vars]
 REPO = "signature-studio/signature-studio-dev"
 ORG = "signature-studio"
-# 暫定: live の最初の 1 時間は 50 で様子を見る (80 に戻す PR は別)。
-TARGET = "50"
+# 同時に走らせる opencode.yaml の run の総数の目標 (実装・review・fix・oc-pm・watchdog の全て。数え方は src/active.ts)。
+# 同時実行の上限 60 (Team プラン) から 2 を残す (oc-pm・watchdog と、投稿直後でまだ run が現れていない分の余裕)。
+TARGET = "58"
 BATCH = "25"
 BOT_LOGIN = "opencode-for-signature-studio[bot]"
 PM_LOGINS = "pycabbage"

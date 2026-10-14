@@ -1,6 +1,7 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
 //   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
+import { countOpencodeRuns, type ActiveCount } from "./active.ts";
 import { classify, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
@@ -83,7 +84,11 @@ interface NoPrCount {
 
 export interface Plan {
   at: string;
+  // opencode.yaml の未完了の run の総数 (実装・review・fix・oc-pm・watchdog)。room = max(0, target - active)。
   active: number;
+  active_impl: number;
+  active_other: number;
+  queued: number;
   target: number;
   room: number;
   picks: Planned[];
@@ -598,14 +603,13 @@ export class Engine {
     return { count: 0, unknown: 0, artifact: 0, art: null, ...this.d.store.get<NoPrCount>("relaunch", `np:${n}`) };
   }
 
+  // opencode.yaml の未完了の run の計数 (active.ts)。room の基準は all。
+  activeRuns(): ActiveCount {
+    return countOpencodeRuns(Object.values(this.s.runs));
+  }
+
   countActive(): number {
-    let n = 0;
-    for (const r of Object.values(this.s.runs)) {
-      if (r.status === "completed") continue;
-      if (r.event === "issue_comment" || r.event === "workflow_dispatch" || r.event === "pull_request_review") n++;
-      else if (r.event === "repository_dispatch" && r.title.startsWith("oc-fix")) n++;
-    }
-    return n;
+    return this.activeRuns().all;
   }
 
   // 規則は launch_issues.py の classify に、次の 3 点だけ足す (どれも本文を解析しない)。
@@ -707,7 +711,8 @@ export class Engine {
     const cls = classify(snap, input);
     for (const [k, v] of Object.entries(cls.blocksCount)) blocksCount.set(Number(k), v);
     const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0 }));
-    const active = this.countActive();
+    const act = this.activeRuns();
+    const active = act.all;
     const sel = planLaunch({ ready, relaunch: rows.relaunch.map(([n]) => n), active, target: this.d.cfg.target, batch: this.d.cfg.batch });
     const relMap = new Map(rows.relaunch);
     const picks: Planned[] = [];
@@ -733,6 +738,9 @@ export class Engine {
     const plan: Plan = {
       at: iso(nowMs),
       active,
+      active_impl: act.impl,
+      active_other: act.other,
+      queued: act.queued,
       target: this.d.cfg.target,
       room: sel.room,
       picks,
@@ -1104,7 +1112,7 @@ export class Engine {
     const detected = this.detectPmTargets();
     const pmDetected: Record<string, number> = Object.fromEntries(DETECTED_KINDS.map((k) => [k, 0]));
     for (const d of detected) pmDetected[d.kind]++;
-    // 稼働中の run を状態別に数える (event は問わない。TARGET に数える active_runs とは別の集計)。
+    // 稼働中の run を状態別に数える (event も workflow も問わない。TARGET に数える active_runs とは別の集計)。
     const running = { in_progress: 0, queued: 0, pending: 0 };
     for (const r of Object.values(this.s.runs)) {
       if (r.status === "in_progress") running.in_progress++;
@@ -1143,7 +1151,13 @@ export class Engine {
       mode: this.d.cfg.liveLaunch && this.d.cfg.liveDispatch ? "live" : this.d.cfg.liveLaunch || this.d.cfg.liveDispatch ? "partial" : "dry-run",
       mode_launch: this.d.cfg.liveLaunch ? "live" : "dry-run",
       mode_dispatch: this.d.cfg.liveDispatch ? "live" : "dry-run",
+      // TARGET に数える run の総数 (opencode.yaml の in_progress + queued など。実装・review・fix・oc-pm・watchdog の全て)。active_all と同じ値。
       active_runs: plan.active,
+      active_all: plan.active,
+      active_impl: plan.active_impl,
+      active_other: plan.active_other,
+      queued: plan.queued,
+      active_by_event: this.activeRuns().byEvent,
       target: plan.target,
       room: plan.room,
       open_issues: open,
