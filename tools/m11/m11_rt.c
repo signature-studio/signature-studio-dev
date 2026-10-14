@@ -246,9 +246,26 @@ EMSCRIPTEN_KEEPALIVE double m11_probe_count(int i) { return (i >= 0 && i < PROBE
 #define M11_INSTR_413060 0
 #endif
 #if M11_INSTR_413060
+/* #1952 対照用 (既定 0 = 無効): PADPRE は g_dest_h より前の静的領域 (配置と量が変わる)・PADPOST は後ろ (量だけ変わる)。
+ * EMPTY=1 は m11_dest_obs の本体だけ空にする (関数と静的データは残す)。 */
+#ifndef M11_RT_PADPRE
+#define M11_RT_PADPRE 0
+#endif
+#ifndef M11_RT_PADPOST
+#define M11_RT_PADPOST 0
+#endif
+#ifndef M11_RT_EMPTY
+#define M11_RT_EMPTY 0
+#endif
+#if M11_RT_PADPRE
+static unsigned char g_pad_pre[M11_RT_PADPRE] __attribute__((used));
+#endif
 static unsigned long long g_dest_h = 1469598103934665603ULL, g_dest_n;
 #define M11_DEST_REC_MAX 512
 static unsigned long long g_rec_st[M11_DEST_REC_MAX], g_rec_len[M11_DEST_REC_MAX], g_rec_rc[M11_DEST_REC_MAX], g_rec_h[M11_DEST_REC_MAX];
+#if M11_RT_PADPOST
+static unsigned char g_pad_post[M11_RT_PADPOST] __attribute__((used));
+#endif
 #ifndef M11_NEG_413060
 #define M11_NEG_413060 0
 #endif
@@ -259,6 +276,9 @@ static unsigned long long g_rec_st[M11_DEST_REC_MAX], g_rec_len[M11_DEST_REC_MAX
 #define M11_DEST_GUARD 0
 #endif
 void m11_dest_obs(unsigned long long dest) {
+#if M11_RT_EMPTY
+    (void)dest; return;
+#endif
 #if M11_NEG_413060
     *(volatile unsigned long long*)(uintptr_t)dest += 0x40;
 #endif

@@ -193,49 +193,39 @@
 
 ## 8. #1339: RetDec 分割 lift 出力 C の修復 (測定 commit: a10c1f60、2026-10-13 run)
 
-測定 commit: a10c1f60 (`DEF_RE` を直した commit。以降のコード変更は §10 の判定修正)。環境: `[RETDEC]` v5.0・`[EMSDK]` 6.0.12 (emcc)・clang 同梱、`fl-win64`、`work-*` 系は未使用。
-
-**判定の修正**: `DEF_RE` の `[^;=]*` が改行をまたぎ、定義行を見落としていた。`[^\n;=]*` / `[^\n;{}]*` に直した。残った `no_definition` 件数と原因は §10 を正本とする (本節の表は a10c1f60 時点の値)。
-
-**修復なしの emcc `-c` (関数単位・修正後 DEF_RE、`emcc_per_function.py`)**:
-
-| 項目 | block19091 | block23676 |
-|---|---|---|
-| 関数数 (pdata 併合後) | 19,816 | 19,826 |
-| RetDec 定義あり | 19,812 | 19,822 |
-| emcc `-c` 通過 (修復なし) | 16,815 | 16,821 |
-| emcc exit | 40 ファイル全て 1 | 40 ファイル全て 1 |
-| error 行 | 11,432 | 11,475 |
-| emcc 所要 (合計) | 9.72 s | 9.63 s |
-
-**helper 宣言の補修 (`retdec_repair.py`) 後**:
-
-| 項目 | block19091 | block23676 |
-|---|---|---|
-| 補った宣言 | 919 | 922 |
-| emcc `-c` 通過 | 17,758 | 17,769 |
-| error 行 | 3,433 | 3,432 |
-| emcc 所要 (合計) | 8.67 s | 8.83 s |
-
-- 補修内容: 本体で呼ばれるが宣言の無い helper (`__asm_*`・`llvm_*`・`__read*` 等) を `int64_t NAME();` で宣言する。非破壊 (入力は変えない)。
-- **未修復 (残り error の内訳, block19091 `0_` 単一ファイル例)**: int/pointer 混在 (`int64_t v7 = &v3` 等、`-Wint-conversion` 系 約 50 件)、goto 由来の `break` / `statement not in loop` (約 15 件)、`use of undeclared label` (3 件)、残りの未宣言 helper (約 60 件)。goto/break は C の制御構造を変えるため機械的修復は行わない (silent miscompile の危険)。
-- 通過数は `emcc_exit` が全て 1 のため、通過はファイル内の帰属で数えた値。`unattributed_error_lines` は 1 件 (fail-closed で 1 ファイルを失敗扱い)。
-
-**wasm link・採用方式 (受入条件 2・3)**: 未実施。修復済みでも 40 ファイル全てが `emcc -c` で exit 1 のため、link に進めない。wasm link の所要・サイズは未測定。採用方式は未決定 (§7 の暫定 x64c 候補は変更なし)。
-
-**本 run で未達のもの → 子 issue**: goto/break・int/pointer 混在の修復と emcc exit 0 化 → #1521 (HB-H31)。`no_definition` 残り 4 件の原因、wasm link の所要・サイズ、方式比較表の完成 → #1522 (HB-H32)。
+- 結論: 分割 lift の出力 C は helper 宣言の補修と判定修正で emcc `-c` 通過数が増えたが、wasm link・方式比較は本節では未達。測定表・内訳・未修復の分類は付録 `REPORT_APPENDIX_1339.md` を参照 (全文は分割移動)。
 
 ## 9. #1521: int/pointer・frontend helper の修復と emcc 通過数 (測定 commit: bb076c69)
 
 - 結論: int/pointer 混在 (`-Wint-conversion`) は修復済み (block19091_0.c で 46 → 0、全 40 ファイルで修復後 0)。emcc exit 0 は 40 ファイル中 1 件のみで受入条件 3 は未達 (残りは goto/break 94 件と引数型不一致 1,245 件)。未達は子 issue #1679 (HB-H35)・#1680 (HB-H36) に分割。
 - 測定表・残り error の内訳 (合計 1,377)・受入条件の判定・再測定手順・未検証項目は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md` (§9 全文の分割移動) を参照。
 
+## 11. #1680: 引数型不一致 (`incompatible pointer types passing`) の修復 (測定 commit: f6913004)
+
+- 結論: 宣言側 `int16_t *` は正しい (Win32 LPCWSTR・PE 内 UTF-16LE と一致)。呼出側の `L"..."` (wasm32 で 4B) を `(int16_t *)u"..."` に直す (`retdec_repair.py --wide`)。両 block で `incompatible pointer types passing` は 1,245 / 1,251 → 0、error 行は 1,377 / 1,383 → 132、emcc exit 0 は 1 → 11 (40 件中)。
+- 判定の根拠・代表例 3 種・全件の UTF-16LE 裏取り・測定表・再現手順は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1680.md` を参照。
+- 未達: 残り 132 件 (goto/break・label・代入型不一致) → #1679 (HB-H35)。修復後の実行 (bit 一致) と wasm link は未検証。
+
 ## 10. #1522: `no_definition` 残り 4 件の原因 (測定 commit: 05db246f)
 
-- 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。
+- 結論: 4 件のうち 3 件は判定の取りこぼしで修正済み。残る 1 件 (0x570b30) は原因未特定 (#1819)。→ #1819 で原因特定・修正済み (§11・全文は `REPORT_APPENDIX_1819.md`)。
 - 判定の取りこぼし (3 件): 旧 `DEF_RE` は `function_<VA>` 名だけを定義とみなした。RetDec は関数名を別名で出すことがあり、`0x41c480` は `__dbk_fcall_wrapper`、`0x86ab10` / `0x86a970` は `CreatePlugInstance`、`0x87cdf0` / `0x87cfc0` は `entry_point`。単独 range の RetDec 出力 (exit 0) で定義を確認。判定に `// Address range: 0x<VA> - ...` 直後の関数定義を追加して修正。
 - batch 固有の脱落 (1 件): `0x570b30` は batch (500 関数) 内の出力に定義もヘッダも無い。単独 range・2 件ペアでは `function_570b30` として出る。batch の RetDec 出力が範囲を落とす現象で、原因は未特定。
 - 再計測 (retdec_batch.py、判定修正後): block19091 は 19,816 中 19,815 ok・1 件 `no_definition` (0x570b30)、block23676 は 19,826 中 19,825 ok・1 件 (0x570b30)。RetDec 呼び出し 40 回、全 exit 0。所要 273.95 s / 274.23 s。load average 0.01–0.28。
-- 修正前の値 (旧判定): §8 の表 (a10c1f60 時点) を参照。
+- 修正前の値 (旧判定): 付録 `REPORT_APPENDIX_1339.md` の表 (a10c1f60 時点) を参照。
 - ネガティブコントロール (範囲ヘッダ経由の定義を 1 行削除して `ok` → `no_definition` に変わることの実測): 本 run は未実施。RetDec (`toolchain-retdec`) が素材に無く、`retdec_batch.py --nc` を実行できなかった。合成入力での確認のみ: `// Address range: 0x1000 - 0x1010` + `int64_t __dbk_fcall_wrapper(...) {` の 2 関数を入力すると `defined_before`=2・対象 0x1000 の削除後 `target_status_after`=`no_definition`。`negative_control()` は範囲ヘッダ経由の VA を選ぶよう修正 (`nc_remove`)。実 RetDec 出力での数値は再実行で埋める。
 - 未達 (受入条件 2・3): emcc exit 0 の wasm link と方式比較表は本 run で未実施。REPORT §9 の通り emcc exit 0 は 40 ファイル中 1 件 (#1679・#1680 が未完)。
+
+## 11. #1819: batch で `0x570b30` が脱落する原因と修正 (測定 commit: 4568c3f3)
+
+- 結論: 脱落は RetDec の隣接範囲の取り扱いが原因。`retdec_batch.py` で定義が出なかった範囲だけを再試行して修正。切り分けと測定は `REPORT_APPENDIX_1819.md`。
+
+## 12. #1679: loop 外 break・undeclared label の制御構造復元 (測定 commit: 98c5f8ca)
+
+- 結論: loop 外の `break -> 0x<VA>` は、飛び先の注釈 `// 0x<VA>` が同じ関数内にあるものだけ `goto lab_0x<VA>` に直す (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
+- 測定値 (emcc exit 0 件数・error 行数)・方式の根拠・未検証項目は付録 `REPORT_APPENDIX_1679.md` にのみ置く。残りは子 issue #1954 (HB-H41) と #2071 (HB-H42)。
+
+## 13. #1822: exit 0 ファイルの wasm link と採用方式 (測定 commit: 7d15ceab)
+
+- 結論: **採用方式は x64c (`x64c_wrapper.py`)**。RetDec 経路は batch 間でグローバル名 `g*` が衝突し wasm link できない。測定値・手順・未検証項目の正本は付録 `REPORT_APPENDIX_1822.md`。
+- 未検証: wasm の実行 (bit 一致)・CreatePlugInstance 到達 (#829)。

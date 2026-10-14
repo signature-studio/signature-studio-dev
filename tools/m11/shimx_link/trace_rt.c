@@ -30,6 +30,27 @@ void sxt_enter(int idx) {
     if (g_print) fprintf(stderr, "[sxt] #%llu unit=%u %s%s\n", (unsigned long long)g_seq, unit, sxt_names[idx], sxt_is_gui[idx] ? " (GUI/audio stub)" : "");
 }
 
+#define RETCAP 256
+static uint32_t g_ret_n;
+static uint32_t g_ret_unit[RETCAP];
+static uint32_t g_ret_idx[RETCAP];
+static uint64_t g_ret_a[RETCAP], g_ret_b[RETCAP], g_ret_r[RETCAP];
+
+void sxt_ret(int idx, unsigned long long a, unsigned long long b, unsigned long long r) {
+    if (g_ret_n >= RETCAP) return;
+    uint32_t k = g_ret_n++;
+    g_ret_unit[k] = *(volatile uint32_t*)(uintptr_t)(0x11eac98u + M11_LB_BASE);
+    g_ret_idx[k] = (uint32_t)idx;
+    g_ret_a[k] = a; g_ret_b[k] = b; g_ret_r[k] = r;
+}
+
+EMSCRIPTEN_KEEPALIVE uint32_t sxt_ret_n(void) { return g_ret_n; }
+EMSCRIPTEN_KEEPALIVE uint32_t sxt_ret_unit(uint32_t k) { return g_ret_unit[k]; }
+EMSCRIPTEN_KEEPALIVE uint32_t sxt_ret_idx(uint32_t k) { return g_ret_idx[k]; }
+EMSCRIPTEN_KEEPALIVE double sxt_ret_a(uint32_t k) { return (double)g_ret_a[k]; }
+EMSCRIPTEN_KEEPALIVE double sxt_ret_b(uint32_t k) { return (double)g_ret_b[k]; }
+EMSCRIPTEN_KEEPALIVE double sxt_ret_r(uint32_t k) { return (double)g_ret_r[k]; }
+
 EMSCRIPTEN_KEEPALIVE void sxt_set_print(int v) { g_print = v; }
 EMSCRIPTEN_KEEPALIVE int sxt_n(void) { return sxt_n_names; }
 EMSCRIPTEN_KEEPALIVE const char* sxt_name(int i) { return sxt_names[i]; }

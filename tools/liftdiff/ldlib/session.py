@@ -150,7 +150,8 @@ class Session:
         if self.lifted is not None and va not in self.lifted:
             rec['verdict'] = 'unexec'; rec['reason'] = 'no_wasm_definition'   # clift: lift 集合外
             return rec
-        lines = [cases.case_line(va, name, p, sig, trace=self.trace) for p in patterns]
+        extra = 'blk=1' if self.t.get('block_trace') else ''
+        lines = [cases.case_line(va, name, p, sig, trace=self.trace, extra=extra) for p in patterns]
         ids = ['%x:%s' % (va, p) for p in patterns]
         rn = nat.run_cases(lines, ids)
         keep = [i for i, n in enumerate(rn) if n.get('status') not in ('timeout', 'hang', 'crash')]

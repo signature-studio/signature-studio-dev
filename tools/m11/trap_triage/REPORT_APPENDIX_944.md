@@ -1,0 +1,93 @@
+# REPORT_APPENDIX_944 — unit 158・j=12 の dest 値差の後続経路 (#1945・#1864 の残り)
+
+REPORT_944.md §9.3 の付録。測定 commit: **`e5e3c7c2`** (origin/main。本節の作業ではコードを変えていない)。
+コード差分 0 (文書のみ)。確認コマンド: `git diff --stat e5e3c7c2 HEAD -- tools/m11`。出力:
+
+```
+ tools/m11/trap_triage/REPORT_944.md          |  1 +
+ tools/m11/trap_triage/REPORT_APPENDIX_944.md | 55 ++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+```
+
+文書以外を除いた差分 `git diff e5e3c7c2 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_944.md' ':!tools/m11/trap_triage/REPORT_APPENDIX_944.md'` は 0 行。
+
+## 1. 再現 (受入条件 3・同一 build 内の決定性)
+
+コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 PATH=$HOME/.local/agent-py/bin:$PATH bash tools/m11/trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON・直列・単発)。判定 `PASS`。全体 1 分 49 秒 (`time` の real・load 開始 0.93 / 1.03 / 1.01)。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・work-m11 (gitignore 対象の作業領域)・`toolchain-emsdk` ([EMSDK]・`releases-6e9f6885`)。`m11_gen_ir2.sh` を 50 秒で実行 (ldfix F1=902 F3c=36 errors=0)。
+
+| 構成 | 記録 (呼出し数) | 比較の結果 | survey elapsed |
+|---|--:|---|--:|
+| OFF | 227 | — | 16.243 s |
+| OFF 再実行 | 227 | OFF と完全一致 (差 0) | 16.065 s |
+| ON (`M11_OV_413060=1`・読出しあり) | 216 | unit・順番で揃った 216 件中、差 1 件: unit `0x26d1a0` j=12 (`st` `len` `rc` `h` の 4 フィールド) | 16.149 s |
+
+差分の中身 (`cmp_1389.py` の出力): OFF `{st 0, len 0, rc 0}` / ON `{st 1, len 1, rc 1}`。ON 側の 11 件は片側のみ (ON は 216 件のため `k` の対応が 11 件分外れる)。
+
+## 2. unit 158 の呼出し列 (OFF/ON・記録より)
+
+unit `0x26d1a0` の f413060 呼出しは OFF 28 回・ON 17 回 (`cost_<label>.json`)。全体の k は 136〜163 (OFF)。
+j=0〜11 は OFF/ON で一致 (`st` は j=1,3,6 のみ 1 (len 59)、他は len 0)。j=12 (k=148) で ON だけ `st=1 len=1` (OFF は `len 0`)。
+j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの unit の呼出しが j=16 までしか無い (17 回)。
+
+## 3. ON の trap (unit 158)
+
+- ON の survey: unit 158 は `memory access out of bounds` で trap (`detail` の `trap` 種別)。OFF は ok。
+- 同一 build (`M11_INSTR_413060=1 M11_OV_413060=1 M11_DEST_READ=1`・記録あり) の再実行で同じ trap (証跡は gitignore 対象の作業領域。repo には含まれない)。
+- 最上位 frame は未取得 (detail は種別のみ。`top_frame_idx` は全体集計で unit 158 に紐付かない)。REPORT_684 の `414bb0` ←`652500` 系 (unit 158 は REPORT.md §最上位 frame 表の `414bb0` 群) と関係する可能性はあるが、**未検証**。
+- **読出しのみの ON (`M11_DEST_READ=0`・記録なし) の再測定**: unit 158 は **ok** (survey 870/24、REPORT_944 §9.2 と一致)。呼出し 28・getmem 140 (OFF は 139)・freemem 94 (OFF は 92)。`m11_build.sh` の stamp (`M11_DEST_READ` を含む `work/neg_413060.stamp`) で build を切り替えて測定した。**実際に使った環境変数の組と実行手順は記録に残っておらず、repo にもこの測定を再現するスクリプトは無い** (`repro_1389.sh` は OFF/OFF/ON の 3 点のみで `M11_DEST_READ=0` を含まない)。下記は build 切替の仕組みからの再構成で、未検証: `M11_INSTR_413060=1 M11_OV_413060=1 M11_DEST_READ=0 bash m11_build.sh` → `M11_INSTR_413060=1 M11_SURVEY_COST=<out> node m11_survey.mjs`。証跡 (build ログ・survey 出力) は gitignore 対象の作業領域にあり repo には含まれない。本 PR の検証では再実行していない。
+- 記録あり ON (`M11_DEST_READ=1`) の unit 158 は trap で、呼出し 17 で止まり getmem 23・freemem 16 (OFF 139/92 と大きく違う)。
+- 以上から、観測を入れた ON で unit 158 が trap し、観測を止めた ON では ok になる。これは **記録側の読出し/書込みが unit 158 の実行を変えている**ことを示す。
+- ただし `DEST_READ=0` では j=12 の値を観測していないため、「ON の値差 (`len 0→1`) が後続の結果に効かない」とは言えない。値差が後続の呼出し・読出しを変えるかは、IR で unit 158 の後続経路を追うまで未確定 (受入条件 1)。
+
+## 4. 受入条件の判定 (#1945)
+
+1. **値差が結果に効くか (後続の呼出し・読出し)**: **未達**。j=12 の値差後に ON で呼出しが 28→17 に減り trap するが、「値差が原因で後続が変わる」か「記録の副作用で trap する」かの切り分けは未了。後続経路の IR 突き合わせ (呼出し元・後続の読出し) は未着手。
+2. **§9.3 追記・§4 (a) 更新**: 本付録へのリンクを §9.3 に追記。結論は「未確定」のまま。
+3. **決定的な測定と実測値**: **達成**。§1 の OFF 2 回一致・所要・load を記録。
+
+## 5. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 158・j=12 の値差の後続経路 (呼出し元・後続の読出し) の IR 突き合わせと、ON trap の最上位 frame の取得 | 値差が結果に効くかの確定 (受入条件 1) | #2003 ([M11-N132]) |
+| 記録なしの ON (読出し 1 回のみ) の再測定 (build の切替が要る) | §9.2 の結論の再確認 | #2003 に含める |
+| issue 本文の `M11_DEST_GUARD=1` は repo に存在しない | 検証方法の記述が無効 | PM 判断 (issue 本文の修正) |
+
+## 6. #2056: unit 158 の ok/trap を分ける先行 unit の状態 (受入条件 1 の一部)
+
+測定 commit: 本節の作業で `m11` のコードは変えていない (`trap_triage/state_158.mjs` を追加のみ)。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11`・`toolchain-emsdk`。`m11_gen_ir2.sh` を 46 s で再実行 (ldfix F1=902 F3c=36 errors=0)。
+既定 build: `env -u M11_INSTR_413060 M11_OV_413060=0 M11_NEG_413060=0 bash m11_build.sh` (21 s・`boot_final3.ll` md5 `baa100ff…`)。
+
+### 6.1 結果 (実測)
+
+| 構成 | unit 158 | 全体 (ok/trap) | 備考 |
+|---|---|---|---|
+| 既定・全 942 unit | ok | 870/24 | §0 の基準と一致 |
+| 単独 `SV_ONLY=158` | oob (`function_407a50__lifted`) | — | 先行 unit なし |
+| 先行 `0..n-1` + 158 (n=0〜157) | n=0,1 のみ oob・n=2〜157 は全て ok | — | 全 158 点で 1 分 07.8 s (直列・単発) |
+| `SV_SKIP=1` (unit 1 だけ除外) | oob | 763/122 (oob) | unit 1 が必要 |
+| `[0,158]` / `[1,158]` / `[0,1,158]` | oob / ok / ok | — | 先行は unit 1 で足りる |
+
+- unit 1 (`0x1ce10`) は `getmem`・`freemem` が 0 で、heap は確保せず、**メモリ状態だけを残す**。
+- boot+unit 0 の後と boot+unit 0+unit 1 の後の HEAPU8 を比較 (差分 2,421 dword)。差分は heap (`0x11e6xxx`)・globals (`0xfa5xxx`)・shadow stack 残骸 (`0x10a9f7xx`/`0x1029xxxx`) の 3 領域。
+- 差分を連続区間にまとめると 18 区間 (20 KB)。全区間の重ね書きで unit 158 は ok。区間を 1 つずつ外す試験で、外すと trap に戻るのは 2 区間のみ:
+  - `0xfa5108`〜`0xfa5c64` (2,908 B): 0x40 stride の list 状構造 (自己参照ポインタ・`0x73300b30` の sentinel)
+  - `0x11e69b0`〜`0x11e6b94` (484 B): 4 バイト単位の ASCII 片 (`0x6c65746e`・`0x49656e69` の繰返し。リトルエンディアンで `"ntel"`・`"ineI"`。定数表か文字列片かは未確認)
+- 最小集合は上の 2 区間の**両方**。片方だけでは trap。全域 (boot+0+1 の全域) の重ね書きで ok。
+- 再現スクリプト: `trap_triage/state_158.mjs` (`dump <pre> <out.bin>` / `overlay <lo-hi,...> <dump.bin>`)。
+  `node state_158.mjs dump 0,1 mem.bin` → `node state_158.mjs overlay fa5108-fa5c64,11e69b0-11e6b94 mem.bin` = `ok`、`overlay none` = `trap`。
+
+### 6.2 未確定 (次の run へ)
+
+1. **2 区間を書く関数の特定 (受入条件 1 の残り)**: `work/scan_index.json` の riprefs は wasm 相対オフセットで、VA との対応を未確認 (本節では対応付けを行っていない)。`0xfa5108` を参照する候補は `0x7a50`・`0x8970`・`0x90e0`・`0x9230`。
+2. **unit 158 が 2 区間を読む経路 (受入条件 2)**: 未着手。j=12 の dest との関係も未確定。
+3. **§9.2・§9.3 の訂正**: 「記録の副作用が trap を作る」と「値差が効く」のどちらが正かは未決。上の結果は、unit 158 が**先行 unit の残す 2 区間の状態に依存する**ことを示す。ON の記録 (`M11_DEST_READ=1`) が同じ 2 区間を書換えるかは未確認。書換えるなら、観測副作用は「heap/global の割付を変え、2 区間の状態を壊す」経路になる。
+4. 既定 build (`M11_OV_413060=0`) は unit 158 が ok で、先行 unit 1 の状態に依存する。ON 版の trap 条件 (記録あり) の再現 (`repro_1389.sh` PASS・OFF 2 回一致・dest 差 1 件) は §8 のとおり。
+
+### 6.3 決定性・所要 (受入条件 4・本 run で再実測)
+
+`bash trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON・直列・単発): 全体 1 分 43.0 s (`time` の real)・判定 `PASS`。survey elapsed は OFF 15.176 s / OFF 再実行 15.000 s / ON 15.349 s、load 開始 1.52 / 1.29 / 1.17。
+`cmp_1389.py`: OFF と OFF 再実行は記録 227 件が完全一致 (差 0)。OFF と ON は 216 件の突合で差 1 件 (`0x26d1a0` j=12、`st`・`len`・`rc`・`h` の 4 フィールド)。注: 本 run では `repro_1389.sh` の後に既定 build (`M11_OV_413060=0`) を再ビルドして §6.1 を測った。したがって §6.1 の 2 区間の結果は既定 build 上の値で、§8 の計測 build (`M11_INSTR_413060=1`) の値とは別物。
+注: 既定 build の `boot_final3.ll` md5 は `baa100ff…` で、§0 の `4fd74f…` と一致しない。`m11_gen_ir2.sh` を本 run で再実行した IR から作ったため (§7 の `7304232a…` と同じ種類の差。原因は未切り分け)。計数 870/24 は §0 と一致。

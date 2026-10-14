@@ -1,5 +1,7 @@
 # #882 unit 95 / 895 の出所調査: 現行 main での再測定
 
+> **正本**: `tools/m11/trap_triage/REPORT_882.md`。詳細は §12・§13 / 付録 `REPORT_882_APPENDIX.md`。
+
 親: #684 (REPORT_684.md §4・§5)。子の依頼元: #684 の受入条件の残り。
 検証起点: main `7736a5c5` (PR #1057 取込み後)。素材: fl-win64 / work-m11 / toolchain-emsdk / toolchain-retdec (`$ARTIFACTS_DIR`)。
 
@@ -203,3 +205,8 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 - §11.2 の 3 build は作業ツリーで測った。測定時の `git status --porcelain` は記録していない。`19b21178` と同一であることは、本 run では**確認できていない**。再測定 (`git worktree add --detach ... 19b21178`) は、`work-m11` 素材が本 run の `$ARTIFACTS_DIR` に無く (`fl-win64` のみ) 未実施。そのため §11.2 の数値は「作業ツリー測定・未再現」の値として扱い、基準には使わない。
 - 既定 build (probe OFF) は §11.2 の `870 / 16` で前回値 (§8・§9) と一致 (= 既定の挙動は変わらない)。
 - 差分確認: `git diff 31cb5831 19b21178 -- tools/m11` は `m11_build.sh` / `m11_ov.c` / `m11_post.py` の probe 追加のみ (既定 0 で無効)。
+
+## 12・13. 移動した節 (結論と参照)
+
+- §12 (7 回目の run・HEAD `edef8fa0`): `[m11][p144]` の `p-144=0x9078558948704d89` が `work-m11` 由来 IR の probe ON 2 回で再現。受入条件 2 は部分達成。全文は付録 `REPORT_882_APPENDIX.md` §12。
+- §13 (8 回目の run・測定 commit `b559594b`): `40ffe0` の入口 probe で `arg1=0` (null)・`[0]=0xc343f0` が `40ff70` に渡ることを実測 (HEAD `31bbe1a2` までコード差分 0)。受入条件 2 は部分達成。全文は付録 `REPORT_882_APPENDIX.md` §13。

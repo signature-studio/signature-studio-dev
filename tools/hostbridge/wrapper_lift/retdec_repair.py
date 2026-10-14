@@ -12,6 +12,11 @@
   - --int-ptr: emcc が `-Wint-conversion` (整数型への `&x` 代入) と報告した行だけ、
     その行の `&` を `(int64_t)&` に包む。番地を 64bit 整数として保持する意図の代入で、
     値は変わらない。診断行の列を見るので、型を推測せず、コンパイラの判定に従う。
+  - --wide: emcc が `incompatible pointer types passing 'int[N]' to parameter of type 'int16_t *'` と
+    報告した引数だけ、`L"..."` を `(int16_t *)u"..."` に直す。Win64 の wchar_t は 2B で、PE 内の文字列は
+    UTF-16LE (REPORT §9)。宣言側の `int16_t *` は Win32 の LPCWSTR と一致するので残し、呼出側だけを直す。
+    `L"..."` は wasm32 で 4B 単位になり、同じ宣言に渡すとバイト列が変わる。全コードポイントが 1 単位 (BMP・非代理) の
+    literal だけ直し、それ以外は触らない。
   - 対象外: goto/break・label は触らない。`break -> 0x...` は RetDec の制御フロー復元で、
     機械的に C の制御構造を変えると silent miscompile になる (docs/DEFECTS.md D19 型)。
 """
@@ -23,6 +28,12 @@ import sys
 CALL_RE = re.compile(r"\b(__asm_\w+|llvm_\w+|__read\w+|__write\w+|__cpuid\w*|__\w+_intrinsic|__frontend_\w+)\s*\(")
 DECL_MARK = "// ------------------- Function Prototypes --------------------"
 INT_CONV_RE = re.compile(r"^(?P<file>[^:\n]+):(?P<line>\d+):(?P<col>\d+): error: .*-Wint-conversion\]", re.M)
+WIDE_RE = re.compile(
+    r"^(?P<file>[^:\n]+):(?P<line>\d+):(?P<col>\d+): error: incompatible pointer types passing "
+    r"'int\[\d+\]' to parameter of type 'int16_t \*'",
+    re.M,
+)
+ESC = {"n": 10, "r": 13, "t": 9, "\\": 92, '"': 34, "'": 39, "0": 0}
 
 
 def declared_names(text):
@@ -67,14 +78,61 @@ def wrap_amp(text, lines):
     return "\n".join(out), n
 
 
+def wide_positions(path, cc="emcc"):
+    p = subprocess.run(
+        [cc, "-c", "-fsyntax-only", "-w", "-ferror-limit=0", path],
+        capture_output=True, text=True,
+    )
+    pos = set()
+    for m in WIDE_RE.finditer(p.stderr + p.stdout):
+        if os.path.basename(m.group("file")) == os.path.basename(path):
+            pos.add((int(m.group("line")), int(m.group("col"))))
+    return pos
+
+
+def wide_to_utf16(line, col):
+    if line[col - 1:col + 1] != 'L"':
+        return None
+    j = col + 1
+    while j < len(line) and line[j] != '"':
+        if line[j] == "\\":
+            if j + 1 >= len(line) or line[j + 1] not in ESC:
+                return None
+            j += 2
+        elif ord(line[j]) >= 0x80 or line[j] < " ":
+            return None
+        else:
+            j += 1
+    if j >= len(line):
+        return None
+    return line[:col - 1] + "(int16_t *)u" + line[col:j + 1] + line[j + 1:]
+
+
+def wrap_wide(text, pos):
+    out = text.split("\n")
+    n = 0
+    skipped = 0
+    for ln, col in sorted(pos, reverse=True):
+        new = wide_to_utf16(out[ln - 1], col)
+        if new is None:
+            skipped += 1
+            continue
+        out[ln - 1] = new
+        n += 1
+    return "\n".join(out), n, skipped
+
+
 def main():
     args = sys.argv[1:]
     int_ptr = "--int-ptr" in args
-    args = [a for a in args if a != "--int-ptr"]
+    wide = "--wide" in args
+    args = [a for a in args if a not in ("--int-ptr", "--wide")]
     src, dst = args[0], args[1]
     os.makedirs(dst, exist_ok=True)
     total = 0
     wrapped = 0
+    widened = 0
+    widen_skipped = 0
     for f in sorted(os.listdir(src)):
         if not f.endswith(".c"):
             continue
@@ -83,6 +141,13 @@ def main():
             text = fh.read()
         out, missing = repair_decls(text)
         total += len(missing)
+        if wide:
+            tmp = os.path.join(dst, f)
+            with open(tmp, "w") as fh:
+                fh.write(out)
+            out, n, sk = wrap_wide(out, wide_positions(tmp))
+            widened += n
+            widen_skipped += sk
         if int_ptr:
             tmp = os.path.join(dst, f)
             with open(tmp, "w") as fh:
@@ -95,6 +160,8 @@ def main():
     print("declared_helpers", total)
     if int_ptr:
         print("int_ptr_wrapped", wrapped)
+    if wide:
+        print("wide_widened", widened, "wide_skipped", widen_skipped)
 
 
 if __name__ == "__main__":

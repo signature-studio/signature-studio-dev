@@ -1,0 +1,8 @@
+run	mismatch_of_19	match_of_19
+s1_full	19	0
+pre100+19	0	19
+pre200+19	0	19
+oA390+19	0	19
+oB391+19	9	10
+oB1 195+19	1	18
+others781+19	19	0

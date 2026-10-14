@@ -100,8 +100,10 @@ def _decl_size(rest, min_size):
     return min_size
 
 
-def shift_va(text, base=0x180000000, newbase=0x30000000, maxv=0x1803FFFFF):
-    """ir6_shift.py 互換: @global_var_ 名と i64 VA 直値を平行移動。返値 (text, n_numeric)"""
+def shift_va(text, base=0x180000000, newbase=0x30000000, maxv=0x1803FFFFF, add_forms=False):
+    """ir6_shift.py 互換: @global_var_ 名と i64 VA 直値を平行移動。返値 (text, n_numeric)
+    add_forms: `add [nuw] [nsw] i64 %x, <VA>` の右オペランド (加算形の画像 VA) も平行移動する。
+    既定 False は ott recipe の出力 (IR 完全一致) を保つため。"""
     shift = base - newbase
 
     def rename_sym(m):
@@ -121,6 +123,14 @@ def shift_va(text, base=0x180000000, newbase=0x30000000, maxv=0x1803FFFFF):
             return "i64 " + str(v - shift)
         return m.group(0)
     text = re.sub(r"i64 (0x1[0-9a-fA-F]{8,12}|[0-9]{9,11})", rep_num, text)
+    if add_forms:
+        def rep_add(m):
+            v = int(m.group(2), 0)
+            if base <= v <= maxv:
+                n[0] += 1
+                return m.group(1) + str(v - shift)
+            return m.group(0)
+        text = re.sub(r"(\badd (?:nuw |nsw )*i64 %[\w.]+, )(0x1[0-9a-fA-F]{8,12}|[0-9]{9,11})\b", rep_add, text)
     return text, n[0]
 
 

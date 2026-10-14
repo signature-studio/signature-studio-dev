@@ -220,3 +220,29 @@
 
 - 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`、`toolchain-retdec` → `$RUNNER_TEMP/rd/retdec`、`toolchain-emsdk` → `$RUNNER_TEMP/em/emsdk`。`parse_setup_headers.py` / `extract_massivex.py` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致)。`work/extracted` は同ディレクトリへの symlink。
 - 注意: 検証途中、`-O1` と `-O2` を並列実行して `license/work/mx_fixed.vst3` を競合させ、`-O2` が PE 修復 assert で rc=1 になった。並列実行の誤りで、スクリプトの不具合ではない。上表は逐次実行・同一 commit での再測定値。
+
+### 12.10 MX-17 (#1857) 着手時の確認と e2e 基準値 (2026-10-14・測定 commit `8ea5d402`)
+
+- 結論: 受入条件 1〜3 は未達 (呼び出し元・差し替え点は未確定)。本 run は受入条件 4 の基準値取得のみ行った。未走査経路の走査は本 run では実施していない。RULES は変更しない。
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`、`parse_setup_headers.py` → `extract_massivex.py <exe> work/key key` で `Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致。extract の checksum 不一致 125/125 は既知事象)。`toolchain-retdec` → `$RUNNER_TEMP/rd/retdec`、`toolchain-emsdk` → `$RUNNER_TEMP/em/emsdk`。
+- selftest: `mx_table_refs.py --selftest` rc 0、`mx_indirect_refs.py --selftest` rc 0。
+
+| MX_OPT | 所要 (wall) | load (開始) | harness | 結果 | 備考 |
+|---|--:|--:|--:|---|---|
+| `-O0` | 56.8 s | 0.86 | 11/11 | PASS (exit 0) | `license/work` 冷間 (lift 再生成) |
+| `-O1` | 10 s | 1.07 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
+| `-O2` | 4 s | 1.30 | 11/11 | PASS (exit 0) | lift キャッシュ流用 (温間) |
+
+- 逐次実行 (`-O0` → `-O1` → `-O2`)。`-O0` の 56.8 s は作業 VM の 4 vCPU・load 0.86 時点の実測。
+- 残件 (受入条件 1〜3): 未走査の「文字列 index 経由の間接参照」と「関数ポインタを埋め込む構造体の `.data` 走査」。`acpt_verify_mx2.py` の N5/N6 機械検証 (受入条件 3) は未着手。残件は子 issue #1900 [MX-24] に分離して追跡する (#1857 は受入 4 のみに範囲を縮めて `Closes #1857`)。
+
+### 12.11 MX-24 (#1900) 残件の確認 (2026-10-14・基点 `46faf265`)
+
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx`。`parse_setup_headers.py` → `extract_massivex.py <exe> work/key key` で `work/key/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…` 一致)。extract の checksum 不一致 125/125 は既知事象。
+- selftest: `mx_table_refs.py --selftest` PASS、`mx_indirect_refs.py --selftest` PASS (いずれも rc 0)。
+- **新規事実 (DLL の存在)**: 同じ素材の `work/key/extracted/Native Instruments/Massive X.dll` (95,249,816 B) にも N5/N6 文字列がある (`Native Access to re-activate.` 6 件・`demoExpired` 2 件・`subscriptionExpired` 1 件)。ImageBase は `.vst3` と同じ `0x180000000` だが、`.text` の md5 が `.vst3` と異なる別バイナリで、文字列の RVA も一致しない (`.vst3` 0x4ffcf93 / DLL 0x4fe83de)。§12.2〜12.9 の走査は `.vst3` だけが対象で、DLL は未走査だった。
+- DLL の文字列 VA: `Native Access to re-activate.` 0x184fe83de / 0x184fe843e / 0x184fe8495 / 0x184fe84e8 / 0x184fe852c、`Native Access to activate.` 0x184fe8587。`MXDemoPopup.qml` は DLL に ASCII 0 件・UTF-16 1 件。
+- DLL 参考走査 (`mx_indirect_refs.scan_data` を DLL の全セクションに適用): `.vst3` の読み手 VA (0x180f95e20 等) を対象にした。DLL の関数は別の VA にあるため、これは参照の判定ではなく参考値。結果は `.pdata`・`.xdata` の rva4 各 1 件のみ (関数範囲表の登録で呼び出し元ではない)。DLL の読み手関数は未特定。
+- 判定: 受入条件 1 (呼び出し元確定) は未達。受入条件 2 (差し替え点) は未達。`mx_lic_stub.py` の RULES は変更しない (根拠なしの br_force / store は silent miscompile になる)。受入条件 3 (差し替え後の機械検証) は差し替え点が無いため未着手。
+- 残件の起票先: DLL 側の読み手と呼び出し元の確定 → 子 issue (本 PR 本文の未解決表を参照)。文字列 index 経由の走査と差し替え点の決定、`acpt_verify_mx2.py` 拡張 → 子 issue。
+- 12.12〜12.14 (#1976・#2108・#2151) の全文は [REPORT_APPENDIX_2151.md](REPORT_APPENDIX_2151.md) (分割移動)。§12.13 の「pdata 範囲外」は §12.14 の注記どおり未確定。

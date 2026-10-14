@@ -65,7 +65,22 @@
 | 180c8b280・181057b38 | memory access out of bounds (shift 後の memory 外参照) | 2 |
 | 180f9e540 | `GetCurrentThreadId` 未実装 (import) | 1 |
 
-これらは closure 外 callee 起因ではない。子 issue で切り分ける: abort 6 件・out of bounds 2 件は #1852 (ICALL-44)、`GetCurrentThreadId` 1 件は #1853 (ICALL-45)。
+これらは closure 外 callee 起因ではない。子 issue で切り分ける: abort 6 件・out of bounds 2 件は #1852 (ICALL-44)。`GetCurrentThreadId` 1 件は #1853 (ICALL-45) で解消 (§4.2)。
+
+### 4.2 #1853 (ICALL-45): GetCurrentThreadId shim
+
+- 原因: `tools/icall/rt/icall_rt.c` に `GetCurrentThreadId` の実装が無く、wasm 側で `missing function` になっていた。
+- 対応: 戻り値 `1` の実関数を追加 (native 参照 `tools/ott/native/ott_native.c` の `k_GetCurrentThreadId` と同値)。
+- 測定 commit: `927089fb` (コード変更はこの commit のみ)。`fa_sweep.sh 8 60` を HEAD で再実行。
+
+| 項目 | 値 |
+|---|---|
+| `180f9e540` (`fa_cmp.py --n 8`) | bit 一致 8/8、wasm_err 0 (修正前 wasm_err 8) |
+| `fa_sweep.sh 8 60` (141 関数) | real 1m11.185s、load 0.64 (実測) |
+| 区分 | bit 一致 55 / native crash・timeout 73 / wasm のみ err 8 / 値の不一致 5 (合計 141) |
+
+§4 (`28f99759`) との比較: wasm のみ err 9 → 8、bit 一致 53 → 55、値の不一致 6 → 5 (`180f9e540` が bit 一致に変わった)。
+残りの wasm のみ err 8 件は abort 6 件・out of bounds 2 件で、#1852 (ICALL-44) の範囲。
 
 ## 5. 再現
 

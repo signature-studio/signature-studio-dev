@@ -19,6 +19,7 @@ for f in fx[:a.corrupt]:
     f['const'] = dict(f['const'], val=f['const']['val'] + 1)
 m = ldmach.Machine(a.pe)
 ALIAS = {0: ('ecx', 'rcx', 'cx', 'cl'), 1: ('edx', 'rdx', 'dx', 'dl'), 2: ('r8d', 'r8', 'r8w', 'r8b'), 3: ('r9d', 'r9', 'r9w', 'r9b')}
+WIDTH = {'byte': 8, 'word': 16, 'dword': 32, 'qword': 64}
 ok = bad = 0
 bad_list = []
 for f in fx:
@@ -28,12 +29,28 @@ for f in fx:
     good = False
     if f['k'] < len(idx):
         j = idx[f['k']] - 1
-        names = ALIAS[f['pos']]
+        names = ALIAS.get(f['pos'])
+        slot = 0x20 + 8 * (f['pos'] - 4)
         while j >= 0:
             x = ins[j]
             if x.mnemonic in ('call', 'ret', 'jmp') or x.mnemonic.startswith('j'):
                 break
             dst = x.op_str.split(',')[0].strip()
+            if names is None:
+                if f'[rsp + 0x{slot:x}]' in dst:
+                    parts = x.op_str.split(', ')
+                    if x.mnemonic == 'mov' and len(parts) == 2 and dst.split()[0] in WIDTH:
+                        try:
+                            v = int(parts[1], 0)
+                        except ValueError:
+                            v = None
+                        if v is not None:
+                            bits = WIDTH[dst.split()[0]]
+                            got = ('int', v & ((1 << bits) - 1))
+                            good = got == (f['const']['kind'], f['const']['val']) and bits == f.get('bits', bits)
+                    break
+                j -= 1
+                continue
             if dst in names:
                 if x.mnemonic == 'xor' and dst in names[:2] and x.op_str.split(', ')[1] == dst:
                     got = ('int', 0)

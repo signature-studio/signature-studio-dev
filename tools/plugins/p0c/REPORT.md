@@ -142,6 +142,7 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | §15.4 | #360: 追加素材での full e2e before/after (main で #378 後に追記) | `REPORT_APPENDIX_E.md` |
 | §15.6 | #346 受入 2: 現 HEAD (4b3616e5) での置換前後 e2e 一致 | `REPORT_APPENDIX_F.md` |
 | §16 | P0c-8 (#311): ext IR の wasm32 検証 + framework 統合 | `REPORT_APPENDIX_F.md` |
+| §18 | #197: 80 kernel の最終センサス (測定 HEAD `6444b186`・非 ext 鎖 67 測定 / buf_diff=0 は 49) | `REPORT_APPENDIX_H.md` |
 
 ## 17. #1366 (CI-26): lift 段の alloca 並び正規化と before/after 一致
 

@@ -32,6 +32,7 @@ PM が VM 上で実行・常駐させる、PR / Issue / Actions run の運用ツ
 | `heartbeat.sh` | 30 分ごとに PM のセッションへ作業継続のプロンプトを送る (指示 102・116・120)。`systemd/pm-heartbeat.service` |
 | `pm_watchdog_ping.sh` | 5 分ごとに `repository_dispatch` (`oc-watchdog`) を送り、Actions の watchdog を起こす (GitHub の schedule が発火しないため)。`systemd/pm-watchdog.*` |
 | `launch_issues.py` | 指示 130〜132 の自動着手。`plan` (仕分け) / `blocked` (blocked_by を GitHub に同期) / `launch` (`/oc` コメントで着手)。`systemd/pm-launch.*` が 10 分おきに `launch` を実行 |
+| `../../infra/pm-worker/` | `launch_issues.py` の launch と `pm_watchdog_ping.sh` の代替 (Cloudflare Worker。webhook + Cron/alarm 駆動)。現在は dry-run のみで、`pm-launch.timer` / `pm-watchdog.timer` は引き続きこちらが正本。切替手順は `infra/pm-worker/README.md` |
 | `issue_snapshot.py` | open の issue / PR / run / 最新の bot コメントを `issues_state.json` に保存する (`launch_issues.py` が呼ぶ) |
 | `manual_deps.json` | 停止報告に根拠のある依存 (子 → [依存先])。**追跡する設定ファイル** (他の json は状態で、`.gitignore`) |
 | `rest_heal.py` | open PR を CONFLICT / FIX / NOREVIEW / DRAFT / APPROVED / COVERED / STUCK_LABELLED に分類し、足りない次の一手を `/oc` コメントか close→reopen で補う。watchdog (`.github/scripts/watchdog.sh`) の補助 |

@@ -23,6 +23,7 @@ CT = {'i1': 'int', 'i8': 'int', 'i16': 'int', 'i32': 'int', 'i64': 'long long', 
       'ptr': 'void*', 'void': 'void'}
 AUDIO_DLLS = {'dsound.dll'}
 SOFT_COMPAT = {'LoadStringW', 'MessageBoxA', 'MessageBoxW'}   # gui_compat.c が --soft で定義する (soft スタブからは除外)
+RET_LOG = {'GetModuleHandleW', 'GetProcAddress'}   # 戻り値も sxt_ret で記録する (SHX-T9f #1985)
 
 
 def nm_defined(path):
@@ -131,12 +132,16 @@ def main():
     wrap = [n for n in names['shimx'] + stub_names if sig(n) is not None]
     skipped = [n for n in names['shimx'] + stub_names if sig(n) is None]
     wc = ['/* 自動生成 gen_link.py: shimx/GUI 呼出の計数ラッパ。IR 内の @NAME を @__sxt_NAME に改名して挟む */',
-          'extern void sxt_enter(int idx);']
+          '#include <stdint.h>', 'extern void sxt_enter(int idx);', 'extern void sxt_ret(int idx, unsigned long long a, unsigned long long b, unsigned long long r);']
     for i, n in enumerate(wrap):
         rt, ps = sig(n)
         pl = ', '.join('%s a%d' % (t, k) for k, t in enumerate(ps)) or 'void'
         al = ', '.join('a%d' % k for k in range(len(ps)))
         wc.append('extern %s %s(%s);' % (rt, n, ', '.join(ps) or 'void'))
+        if n in RET_LOG:
+            a1 = 'a1' if len(ps) > 1 else '0'
+            wc.append('%s __sxt_%s(%s) { sxt_enter(%d); %s r = %s(%s); sxt_ret(%d, (unsigned long long)(uintptr_t)a0, (unsigned long long)(uintptr_t)%s, (unsigned long long)(uintptr_t)r); return r; }' % (rt, n, pl, i, rt, n, al, i, a1))
+            continue
         wc.append('%s __sxt_%s(%s) { sxt_enter(%d); %s%s(%s); }' % (rt, n, pl, i, '' if rt == 'void' else 'return ', n, al))
     wc.append('const int sxt_n_names = %d;' % len(wrap))
     wc.append('const char* const sxt_names[] = {%s};' % ','.join('"%s"' % n for n in wrap))

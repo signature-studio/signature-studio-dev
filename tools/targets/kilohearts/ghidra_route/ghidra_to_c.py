@@ -36,6 +36,39 @@ STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ル
     0x1813846e0: 'void* FUN_1813846e0(void* d, int c, ulonglong n) { return memset(d, c, (size_t)n); }',
     0x18004cf20: 'longlong FUN_18004cf20(void* a, void* b, void* c) { abort(); return 0; }',
 }
+# IAT thunk (jmp [rip+disp] → KERNEL32 の import) → fail-fast stub。Ghidra は thunk の引数を落として `func_0x000<va>(...)` と呼ぶ。
+# 引数無しの定義 (`()`) は呼出の arity を問わない。Win API の意味は実装しない (到達時に abort し、突合で検出する)。
+THUNK = {
+    0x180fd81e4: 'longlong func_0x000180fd81e4() { abort(); return 0; } /* KERNEL32!FlsGetValue */',
+    0x180fd81ec: 'longlong func_0x000180fd81ec() { abort(); return 0; } /* KERNEL32!FlsSetValue */',
+}
+
+
+RCPPS_HELPER = r'''/* rcpps 2 引数形 rcpps(dest, src): 実機 (AMD Ryzen 9 9950X) の近似表 (snapins/lift/gen_simd.py と同一表・同一指数則)。 */
+static const uint32_t kh_at_rcp[4096] = %s;
+static inline uint32_t kh_rcp_exact(uint32_t x) {
+    uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
+    if (e == 0) return s | 0x7f800000u;
+    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : s;
+    int t = 253 - (int)e;
+    return t <= 0 ? s : (s | ((uint32_t)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);
+}
+static inline V128 rcpps(undefined1 dst[16], V128 src) {
+    V128 r; (void)dst;
+    for (int i = 0; i < 4; i++) {
+        uint32_t w = kh_rcp_exact(*(uint32_t *)(src.b + 4 * i));
+        memcpy(r.b + 4 * i, &w, 4);
+    }
+    return r;
+}
+'''
+
+
+def approx_rcp_table():
+    """snapins/scripts/approx_tables.b64 の rcp 表 (4096 entry) を C 配列リテラルで返す。"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'lift'))
+    import gen_simd
+    return gen_simd.load_approx_tables()['rcp']
 
 
 def pe_bytes(pe, va, n):
@@ -77,6 +110,8 @@ def main():
         ts = infer_type(ls, '%s_%x' % (kind, va))
         gtypes[va] = ('uint' if kind == '_UNK' or 'uint' in ts else ('double' if 'double' in ts else 'float'), kind, sorted(ts))
     out = ['#include "ghidra_shim.h"', '/* 自動生成: ghidra_to_c.py %s (fix=%s) */' % (name, ','.join(sorted(f for f in fixes if f)) or 'none')]
+    if 'rcpps(' in alltxt:
+        out.append(RCPPS_HELPER % approx_rcp_table())
     for va, (ty, kind, _) in sorted(gtypes.items()):
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
@@ -127,6 +162,7 @@ def main():
             protos.append(s.split('{')[0].strip() + ';')
     out += protos
     out += [STUB[v] for v in STUB if ('FUN_%x' % v) in alltxt]
+    out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt]
     # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
     defined = set(vas)
     bodies = [re.sub(r'\bfunc_0x000(180f[0-9a-f]{5})\b', lambda m: 'FUN_' + m.group(1)

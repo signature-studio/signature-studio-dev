@@ -114,11 +114,25 @@ def lift_set(path, rngs, tag, stats):
     rc, text, err = run_ranges(path, rngs, tag, stats)
     if rc == 0:
         defined = defined_in(text)
+        missing = []
         for (b, e) in rngs:
             if b in defined:
                 stats["ok"] += 1
             else:
-                record_fail(stats, b, e, "no_definition")
+                missing.append((b, e))
+        if not missing:
+            return
+        if len(rngs) == 1:
+            record_fail(stats, rngs[0][0], rngs[0][1], "no_definition")
+            return
+        # 直前範囲の終端が対象の開始と隣接すると、RetDec は対象を 1 バイト手前の VA 名で出すことがある (REPORT §10)。
+        # 定義が出なかった範囲だけを再試行する (単独なら正しく出る)。
+        if len(missing) < len(rngs):
+            lift_set(path, missing, tag + "m", stats)
+            return
+        mid = len(rngs) // 2
+        lift_set(path, rngs[:mid], tag + "a", stats)
+        lift_set(path, rngs[mid:], tag + "b", stats)
         return
     if len(rngs) == 1:
         b, e = rngs[0]

@@ -63,7 +63,7 @@
 
 ## 4b. 件ごとの判定の続き (#1498・保留)
 
-- 数値の出所: §4c と同じ (前版の記録。本 run では再測定していない)。`git diff 088d9eaf HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py` は 0 行。
+- 数値の出所: §4c (#1654 節) と同じ (前版の記録。本 run では再測定していない)。`git diff 088d9eaf HEAD -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py` は 0 行。
 - 入力: `boot_final.ll` (`work-m11`) はこの run に無く、`scan_guard.py` の再実行も `strict_evidence.py` の実行もしていない。したがって本節は件数の再現も、TSV の生成もしていない。§3 の 288 は前版の記録として扱う。
 - 証拠表: `tools/m11/trap_triage/strict_evidence.py` は strict 候補ごとに機械語 (jcc 直前 2 命令) と IR (帰属ブロックの終端・loop_head の icmp 本数) を TSV に書くスクリプトで、判定はしない。TSV はコミットしない (`work/` 配下に生成する)。
 - 判定: 3 件 (`10039be`・`1003a66`・`1003b10`) とも**保留**。前版の「真陽性」判定 (IR の `dec_label_pc_*` を根拠にしたもの) は、IR を見ずに書かれていたため撤回する。
@@ -73,6 +73,47 @@
 ## 6b. 残りの分割 (#1498)
 
 - (a'') strict 288 件の件ごと判定 (保留の 3 件を含む) → 子 issue `[M11-N109]`〜`[M11-N111]` (#1653〜#1655)。分割は `strict_evidence.py` の出力 TSV のデータ行 1〜98・99〜193・194〜288 (ヘッダ除く 1 始まり)。TSV は再生成が必要 (`oc_artifacts: fl-win64 work-m11`)。
+
+## 4d. 件ごとの判定 (#1653・部分達成: 判定 0 件・ダンプまで)
+
+- 対象: `strict_evidence.tsv` のデータ行 4〜98 (ヘッダ除く 1 始まり・95 件)。
+- 測定 commit (実行経路ごとに分けて記載。`tools/m11` 全体の差分ではなく、各実行物の差分を見る):
+  - `scan_guard.py` / `guard699/`: 測定 commit `e9bca3b6`。`git diff e9bca3b6 HEAD -- tools/m11/guard699/` = 0 行。
+  - `strict_evidence.py` (TSV 生成) と `scan_guard.py`: 最終変更 commit `e4f16b6e`。`git diff e4f16b6e HEAD -- tools/m11/trap_triage/strict_evidence.py tools/m11/guard699/scan_guard.py` = 0 行。`e9bca3b6..HEAD` では `strict_evidence.py` に 94 行の差分があるが、その変更 (`088d9eaf`・`e4f16b6e`) は現 HEAD の祖先に入っている。
+  - 実行 HEAD: 記録なし。`judge_dump.py` が `b483689e` で追加されたため、実行は `b483689e` 以降と推定する。`strict_evidence.py`・`scan_guard.py` は `e4f16b6e` 以降で差分 0 行のため、`b483689e` 以降のどの commit でも同一コードである。ただし TSV 288 行が実際にその時点のコードで生成されたことは、記録がないため確認できていない。
+  - `judge_dump.py` (本 PR で追加): 作成 commit `b483689e`。参照する列はいずれも `strict_evidence.py` の出力ヘッダと一致 (構文チェック OK)。
+- 入力の実測 (PR 作成者の run。本 fix run では再実行していない): `work-m11` の `boot_final.ll` sha256 `69c774de…a43` (§4a と一致)。`scan_guard.py --report` で strict 288、`strict_evidence.py` で TSV 288 行 (件数 288 は §3 の現 HEAD 行と一致)。
+- 判定ダンプ: `tools/m11/trap_triage/judge_dump.py <IR.ll> <evidence.tsv> <lo> <hi>` (判定はしない)。PR 作成者の run でデータ行 4〜98 の 95 件を出力し、loop_head ブロックの欠落は 0 件。本 fix run では IR・TSV が無く未実行 (構文チェックのみ)。
+- 判定件数 (母数): **0 件**。偽陽性件数: **未判定**。偽陽性率は書かない。
+- 判定方法 (件ごと・残りの作業): 機械語 (`MACH`: jcc 直前 2 命令の cmp 被演算子) を、IR 側 (`LH-icmp`・`BLK-term`) の icmp を SSA 追跡で同じ値に結ぶ。真陽性 = IR に入口判定が無く jcc が脱出先を指す。偽陽性 = IR 側に同等の判定がある。
+- 観察 (判定前の所見・確定ではない): 例えば `function_1017ca0` (データ行 5) は機械語の `cmp ebx, r13d` に対し IR の loop_head に入口 icmp が無く、末尾の `%46 = icmp eq (r13−1), 0` のカウンタ判定だけがある。ただし判定は別途 SSA を遡って行うまで保留。
+- 再現: `python3 tools/m11/guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json` → `python3 tools/m11/trap_triage/strict_evidence.py ... --out strict_evidence.tsv` → `python3 tools/m11/trap_triage/judge_dump.py <boot_final.ll> strict_evidence.tsv 4 98`。
+- 残り (未解決): データ行 4〜98 の 95 件の件ごとの判定。起票先: #1653 (本 issue、Refs)。
+
+## 4f. 件ごとの判定 (#1653・run 2: 確定判定 0 件・保留 95 件)
+
+- 測定 commit: `6a88bf35` (origin/main)。`git diff 6a88bf35 HEAD -- tools/m11/guard699/ tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_dump.py` = 0 行 (本 run はコード変更なし。REPORT のみ)。
+- 入力の実測 (本 run): `work-m11` の `boot_final.ll` (19,787,837 B・sha256 `69c774de…`、§4a・§4d と一致)、`fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)。
+- 実行: `scan_guard.py --report` (4.6 s) で strict 288。`strict_evidence.py --out` (14.9 s) で TSV 288 行。`judge_dump.py <IR> <TSV> 4 98` で 95 件をダンプ (`tools/m11/work/judge_1653_dump.txt`・gitignore・未コミット)。
+- 対象: データ行 4〜98 の 95 件。**判定件数 (母数のうち確定した件数): 0 / 95**。確定した真陽性 0 件、確定した偽陽性 0 件、**保留 95 件**。偽陽性率は書かない。
+- 判定方法 (件ごと。SSA 追跡で行う): 機械語 (`MACH`: jcc 直前 2 命令の cmp 被演算子) の値が、帰属ブロック・ループ先頭 (`LH-icmp`) の icmp の被演算子と同じ SSA 値かを、reg2mem の alloca 経由で追う。レジスタ名の一致だけでは根拠にしない。真陽性 = 同じ値の入口判定が IR に無く、jcc の脱出先に相当する経路が IR に無い。偽陽性 = 同じ値の同等判定が IR 側にある。
+- 本 run で付けた候補判定は、確認で撤回した (保留に戻した):
+  - 行 76 (`function_12df9d0`・jcc `12df9f7`): 「飛び先 `12dfa18` へ直接抜ける経路が無い」は誤り。`12dfa00` のカウンタ判定 (counter == 0) の脱出先として `12dfa18` が存在する。機械語の被演算子 `ecx` の対応は未確定のため保留。
+  - 行 11・12 (`function_1050f90`): 偽陽性とした根拠は同種の `icmp` の存在だけで、被演算子の同一性 (SSA) を確認していない。保留。
+- 保留の主な型 (件ごとの判定が付かなかった理由): (i) ループ先頭の icmp がカウンタ・null 判定だけで、機械語の被演算子に対応する値が追えない (行 4〜10, 13〜27 等)。(ii) 機械語の被演算子が IR の入口で定義されない (行 86・87 の `r9d` 等)。(iii) 機械語の被演算子が stack 変数経由で運ばれ、store/load を追えていない (行 83・84・91 等)。
+- 作業の中間結果 (subagent 4 本の出力): `tools/m11/work/judge_1653_chunk_{4_27,28_51,52_75,76_98}.txt` (gitignore・未コミット)。上記の撤回 2 件は、これらの出力をそのまま採用しなかった結果である。
+- 残作業 (未解決): 95 件の SSA 追跡による件ごとの判定 (受入 1・2)。起票先: #1653 (本 issue、Refs)。子 issue は新規に起票しない。
+
+## 4e. 証拠表の行 194〜288 (#1655・部分達成: 判定 0 件・ダンプまで)
+
+- 測定 commit: `b7a2a9d9` (origin/main)。`tools/m11/guard699/scan_guard.py`・`tools/m11/trap_triage/strict_evidence.py`・`judge_dump.py` はこの commit で変更されていない。
+- 入力: `tools/m11/work/boot_final.ll` (19,787,837 B・`work-m11`) と `extracted/block00031_PE.bin` (22,227,016 B・`fl-win64`)。
+- 実測: `scan_guard.py --report` で strict 288。`strict_evidence.py` で TSV 288 行を `tools/m11/work/strict_evidence_1655.tsv` に生成 (gitignore 対象・未コミット)。
+- ダンプ: `judge_dump.py <IR> <TSV> 194 288` で 95 行を `tools/m11/work/judge_1655_dump.txt` に出力 (判定はしない)。
+- 判定件数 (母数): **0 / 95**。偽陽性件数: **未判定**。偽陽性率は書かない。
+- ダンプから機械的に言える事実 (判定ではない): loop_head に入口 icmp が 1 本も無いのは行 207・211・234・239・285 の 5 件。これは「真陽性の候補」ではあるが、IR 側に別名の判定がないことの確認 (SSA 追跡) は未実施。
+- 判定方法 (件ごと・未実施): 機械語は jcc 直前の cmp/test の被演算子 (`MACH`) を取る。IR は `LH-icmp` と `BLK-term` の被演算子を SSA (`%<reg>.N.*`・`reg2mem` の alloca 経由) まで遡り、機械語の被演算子と同じ値に結べるかを見る。レジスタ名の一致だけでは根拠にならない。
+- 残作業: 95 件の件ごとの判定 (受入 1・2)。本 issue (#1655) の範囲として未解決のまま残す。
 
 ## 4c. 証拠表の行 99〜193 (#1654・部分達成: 判定 0 件)
 

@@ -1,0 +1,28 @@
+name = "signature-studio-pm"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# 既定は dry-run (LIVE を "1" にしない限り GitHub へ書き込まない)。切替は PM の判断 (README)。
+[vars]
+REPO = "signature-studio/signature-studio-dev"
+ORG = "signature-studio"
+TARGET = "80"
+BATCH = "25"
+BOT_LOGIN = "opencode-for-signature-studio[bot]"
+PM_LOGINS = "pycabbage"
+LIVE = "0"
+
+[[durable_objects.bindings]]
+name = "PM"
+class_name = "PmDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PmDO"]
+
+[triggers]
+crons = ["* * * * *"]
+
+# secret (wrangler secret put / API の secret_text): STORE_KEY = 32 バイトの base64url。リポジトリには置かない。
