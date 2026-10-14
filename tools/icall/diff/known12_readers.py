@@ -3,7 +3,9 @@
 #   (1) RIP 相対で直接指す命令 (読出し・書込みの種別と、含む関数の VA)。
 #   (2) 添字付き参照 [base+idx*scale+disp] のうち disp が .data の表候補 (0x125c000〜0x13068d0) にあるもの。
 #       base が r14・r15 の場合は image base 0x180000000 と仮定し、その添字 n で各 slot に届くかを出す。
+#   列挙しない形: disp が無い [base+idx*scale]・disp が範囲外の添字参照・非 slot 基底を lea で作る形 (REPORT_APPENDIX_2224.md §1)。
 #   入力: work/core64_dis.txt (objdump -d -M intel の出力)・SlateCore.core_64 (.pdata の関数境界)。
+#   依存: python3 -m pip install pefile==2024.8.26
 #   用法: python3 tools/icall/diff/known12_readers.py work/core64_dis.txt "<SlateCore.core_64>"
 import bisect
 import re
