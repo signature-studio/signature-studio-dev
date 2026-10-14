@@ -176,7 +176,7 @@
 - 採用 (merge `ad3c5235`): main 側 (`7d1d0e2e`) の写し先 = 飛び先 `FUN_<X>` を採る。jmp thunk の呼出は飛び先の呼出と同じ動作で、写し先は X で一意に決まる。定義ヘッダは `THUNK_HDR` (`{` で終わるヘッダだけ) で `FUN_<va>`。`thunk_targets`・`thunk_call_target` は削除。reviewer の B1 の指定 (thunk VA への写し・一意性で停止) からは外れるため、再判断を依頼する。
 - 注記: round 2 の「raw の本体 thunk 呼出 0 件」は、本 run の lift 順の raw では再現しなかった (3 件)。§10-7q ① の注記 (decompile の順序で出力が変わる) と整合する。converter は本 run の入力で停止せず写す。
 - 測定 commit: `ad3c5235` (merge。コードを変えた最後の commit)。`git diff ad3c5235 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は 0 行 (本節を載せた docs commit 以降はコード差分なし)。
-- 環境: 素材 `plugins-kilohearts` (`Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B、手展開) と `toolchain-emsdk` (`/opt/emsdk`)。Ghidra 12.1.4 (`ghidra_12.1.4_PUBLIC_20260921.zip`、sha256 `ddac49f9…d2db` 一致)、JDK 21 (temurin-21)。作業は repo 外。n=1。
+- 環境: 素材 `plugins-kilohearts` (`Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B、手展開) と `toolchain-emsdk` (`[EMSDK]`)。Ghidra 12.1.4 (`ghidra_12.1.4_PUBLIC_20260921.zip`、sha256 `ddac49f9…d2db` 一致)、JDK 21 (temurin-21)。作業は repo 外。n=1。
 
 | 項目 | 結果 |
 |---|---|
