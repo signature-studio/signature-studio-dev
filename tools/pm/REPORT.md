@@ -232,3 +232,4 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 ## 16. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
 - 測定 commit `55b21686` (コードを変えた最後の commit)、測定時刻 2026-10-14T16:14Z。偽の opencode・間隔 1 秒・`timeout 4`: 文面ファイルあり 送信 3 回 (監査 3・既定 0)、未設定 送信 3 回 (既定 3)、存在しない・空・空白のみ・PM_SESSION_ID 無しは終了 1・送信 0。初回送信は間隔 2 秒で 2.01 秒後。`bash tools/pm/test_pm_wake.sh` 20 passed。
 - 差分 (測定 commit から HEAD まで・コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は空 (差分 0)。
+- main 取り込み後の再測定 (main `eb9fd703` を merge commit `a7d33197` で取り込み。自動 merge で競合なし): 上と同じ 7 シナリオを fake opencode で再実行し、結果は上の数値と一致。`git diff 83f93e44 HEAD -- tools/pm docs/pm` の出力は空 (取り込みで pm 配下は変わらない)。`bash tools/pm/test_pm_wake.sh` 20 passed (同 merge)。
