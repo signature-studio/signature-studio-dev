@@ -2,7 +2,13 @@
 # fix-progress.sh — reviewer の差し戻しを受けた fix モードの進捗を検証する (#719)。
 # 指示 122/123: 差し戻された PR が「修正もレビューもされていない」状態に戻らないようにする。
 #
-#   record        起動時点の PR head と時刻を $GITHUB_ENV に記録し、上限判定をする (#2323)。
+#   gate          窓の判定と印の投稿 (#2873)。agent を実行しない fixgate job で走る。$GITHUB_ENV は書かない。
+#                 結果は $GITHUB_OUTPUT に stop=true/false と reason を出す (reason: none / reset / ceiling / code /
+#                 pm-decision / user-decision / repeat / unknown / stuck-label / not-open / stale-head)。
+#                 途中で失敗したら stop=true と reason=record-failed を出して非 0 で終わる (下の record と同じ)。
+#   snapshot      agent の起動直前の PR head と時刻を $GITHUB_ENV に記録する (#2873)。implement job で走る。
+#                 OC_GATE_STOP (gate の stop) が false のときだけ OC_RECORD_OK=1 を残す。それ以外は失敗する (fail-closed)。
+#   record        gate と snapshot を続けて行う旧経路 (移行中の互換。#2323・#2622・#2869)。
 #                 窓 = 直近の oc-fix-limit / oc-fix-reset コメント以降の差し戻し (印は MARK_LOGIN の投稿だけを数える。#2622)。窓が MAX 件に達したら、
 #                 直近 3 件が機械的な類型のみ・繰り返し無し・合計が天井未満なら次の窓へ進める (oc-fix-reset)。
 #                 それ以外は oc:stuck を付けて止め、PM agent 用の oc-pm-intent マーカーを残す。
@@ -22,13 +28,15 @@
 #   retry-prompt  none だったときの再試行用プロンプトを作る
 #   reopen        reopen-pr.sh に委譲する (close -> reopen。旧 workflow との互換)
 #
-# 入力 (env): GH_TOKEN, OC_REPO, OC_PR_NUMBER, RUNNER_TEMP, GITHUB_ENV, GITHUB_OUTPUT
+# 入力 (env): GH_TOKEN, OC_REPO, OC_PR_NUMBER (数字のみ), RUNNER_TEMP, GITHUB_ENV, GITHUB_OUTPUT
 # 任意 (env): OC_MAX_FIX_REVIEWS (窓の件数, 既定 5)・OC_MAX_FIX_TOTAL (合計の天井, 既定 15)・
 #             OC_MAX_RESETS_PER_HOUR (repo 全体の自動再開上限, 既定 6)・OC_REPEAT_JACCARD (繰り返しのしきい値, 既定 0.6)
+#             snapshot だけ: OC_GATE_STOP (gate の stop 出力。false のときだけ通す)
 # 実装 App は PR の comment を投稿する時 user.login が opencode-for-signature-studio[bot] になる。
-set -euo pipefail
+set -Eeuo pipefail
 
-# record が途中で終わったら (入力検査・gh の失敗など)、stop=true と reason=record-failed を出して非 0 で終わる (#2869)。
+OC_SUBCMD="${1:-}"
+# record・gate・snapshot が途中で終わったら (入力検査・gh の失敗など)、stop=true と reason=record-failed を出して非 0 で終わる (#2869)。
 # 入力検査より前に置く (#2638 B3・m3)。agent と retry は走らせない。PR にはコメントしない (コメントも失敗しうる)。trap の中では gh を呼ばない。
 OC_RECORD_DONE=0
 record_abort() {
@@ -36,17 +44,23 @@ record_abort() {
   trap - ERR EXIT
   if [ "$OC_RECORD_DONE" != 1 ]; then
     cmd="${cmd//$'\n'/ }"
-    echo "::error::fix-progress record failed (exit $rc, line ${OC_FAIL_LINE:-?}, command: ${cmd:0:120}): the fix run is skipped (reason=record-failed)"
+    echo "::error::fix-progress ${OC_SUBCMD:-record} failed (exit $rc, line ${OC_FAIL_LINE:-?}, command: ${cmd:0:120}): the fix run is skipped (reason=record-failed)"
     printf 'stop=true\nreason=record-failed\n' >> "${GITHUB_OUTPUT:-/dev/null}"
     exit 1
   fi
 }
-if [ "${1:-}" = record ]; then
-  trap 'OC_FAIL_LINE=$LINENO; OC_FAIL_CMD=$BASH_COMMAND' ERR
-  trap record_abort EXIT
-fi
+case "$OC_SUBCMD" in
+  record | gate | snapshot)
+    trap 'OC_FAIL_LINE=$LINENO; OC_FAIL_CMD=$BASH_COMMAND' ERR
+    trap record_abort EXIT
+    ;;
+esac
 
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
+if ! grep -qE '^[0-9]{1,7}$' <<< "$OC_PR_NUMBER"; then
+  echo "::error::OC_PR_NUMBER must be digits only: the fix-progress step is skipped" >&2
+  exit 1
+fi
 pr_head() { gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER" --jq .head.sha; }
 STUCK_LABEL="${OC_STUCK_LABEL:-oc:stuck}"
 # 起動主体は完全一致で見る (前方一致だと意図しないアカウント名でも通り、write 権限の fix が起動しうる)。
@@ -101,75 +115,108 @@ DECIDE='
 | {decision: $d, n: $n, total: $total, k: ($rs + 1)}
 '
 
+# gate_run <pr_json>: 窓の判定と印の投稿 (record と gate が呼ぶ)。結果は stop (true/false) と reason に入れる。
+# $GITHUB_ENV と $GITHUB_OUTPUT は書かない (呼び出し側が書く)。
+gate_run() {
+  local pr_json="$1" head_now pr_state review_commit labels cm rv dec decision n total k hour_ago recent
+  head_now="$(jq -r .head.sha <<< "$pr_json")"
+  pr_state="$(jq -r .state <<< "$pr_json")"
+  # 差し戻しの元になった review の commit (pull_request_review の event payload にだけある。repository_dispatch では空)
+  review_commit="$(jq -r '.review.commit_id // empty' "${GITHUB_EVENT_PATH:-/dev/null}" 2> /dev/null || true)"
+  # 上限ガード: ラベルが付いている PR は fix を起動しない。
+  # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
+  stop=false
+  # 取得の失敗で止まる (set -e)。pipefail 付きの if では API の失敗が『ラベル無し』と判定されてしまうため分ける (#2638 m2)。
+  labels="$(gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name')"
+  if grep -qx "$STUCK_LABEL" <<< "$labels"; then
+    stop=true
+    reason=stuck-label
+    echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
+  elif [ "$pr_state" != open ]; then
+    stop=true
+    reason=not-open
+    echo "::notice::PR #$OC_PR_NUMBER is $pr_state (not open): the fix run is skipped"
+  elif [ -n "$review_commit" ] && [ "$review_commit" != "$head_now" ]; then
+    stop=true
+    reason=stale-head
+    echo "::notice::the CHANGES_REQUESTED review is for ${review_commit:0:7}, but the PR head is now ${head_now:0:7}: the fix run is skipped"
+  else
+    cm="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" | jq -s '[.[][]]')"
+    rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
+      | jq -s --arg l "$REVIEWER_LOGIN" '[.[][] | select(.user.login == $l and .state == "CHANGES_REQUESTED")]')"
+    dec="$(jq -c -n --argjson cm "$cm" --argjson rv "$rv" --arg ml "$MARK_LOGIN" \
+      --argjson max "$MAX_FIX_REVIEWS" --argjson maxtotal "$MAX_FIX_TOTAL" --argjson t "$REPEAT_JACCARD" \
+      "$JQ_DEFS $DECIDE")"
+    decision="$(jq -r .decision <<< "$dec")"
+    n="$(jq -r .n <<< "$dec")"
+    total="$(jq -r .total <<< "$dec")"
+    k="$(jq -r .k <<< "$dec")"
+    echo "oc-reviewer CHANGES_REQUESTED on PR #$OC_PR_NUMBER: window=$n total=$total (limit $MAX_FIX_REVIEWS, ceiling $MAX_FIX_TOTAL) -> $decision"
+    # 窓を閉じる印は MARK_TOKEN でしか投稿できない。無ければ信じられる印を残せないので、窓を閉じずに止める。
+    if [ "$decision" = reset ] && [ -z "$MARK_TOKEN" ]; then
+      decision=ceiling
+      echo "OC_MARK_TOKEN is not set: the window marker cannot be trusted, so the window stays open: stop"
+    fi
+    # 自動再開は repo 全体で 1 時間 MAX_RESETS_PER_HOUR 件まで (暴走防止)。数えられなければ止める。
+    if [ "$decision" = reset ]; then
+      hour_ago="$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)"
+      if ! recent="$(gh api --paginate -X GET "repos/$OC_REPO/issues/comments" -f since="$hour_ago" \
+        | jq -s --arg t "$hour_ago" --arg ml "$MARK_LOGIN" \
+          '[.[][] | select(.user.login == $ml and .user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-reset")) and .created_at >= $t)] | length')"; then
+        recent="$MAX_RESETS_PER_HOUR"
+      fi
+      if [ "$recent" -ge "$MAX_RESETS_PER_HOUR" ]; then
+        decision=ceiling
+        echo "automatic resets in the last hour: $recent (limit $MAX_RESETS_PER_HOUR): stop"
+      fi
+    fi
+    if [ "$decision" = reset ]; then
+      GH_TOKEN="$MARK_TOKEN" gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
+        --body "reviewer の差し戻し ${n} 件 (合計 ${total}) を計数し、直近 3 件が機械的な類型のみ・繰り返し無しのため、窓 ${k}/3 を閉じて次の窓へ進めます。<!-- oc-fix-reset n=${k} -->"
+    elif [ "$decision" != none ]; then
+      stop=true
+      gh api -X POST "repos/$OC_REPO/labels" -f name="$STUCK_LABEL" -f color=B60205 \
+        -f description="automation gave up: needs a human/PM decision" > /dev/null 2>&1 || true
+      gh api -X POST "repos/$OC_REPO/issues/$OC_PR_NUMBER/labels" -f "labels[]=$STUCK_LABEL" > /dev/null
+      GH_TOKEN="${MARK_TOKEN:-${GH_TOKEN:-}}" gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
+        --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS}、合計 ${total}、停止理由 ${decision})。自動復旧を試みます。PM agent が処理します。ラベル \`${STUCK_LABEL}\` を外すと再開できます (再開後は、この停止コメント以降の差し戻しだけを数えます)。${STOP_MARK} <!-- oc-pm-intent: stuck pr=${OC_PR_NUMBER} reason=${decision} -->"
+    fi
+    reason="$decision"
+  fi
+}
+
 case "${1:-}" in
   record)
     pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
     head_now="$(jq -r .head.sha <<< "$pr_json")"
-    pr_state="$(jq -r .state <<< "$pr_json")"
-    # 差し戻しの元になった review の commit (pull_request_review の event payload にだけある。repository_dispatch では空)
-    review_commit="$(jq -r '.review.commit_id // empty' "${GITHUB_EVENT_PATH:-/dev/null}" 2> /dev/null || true)"
     {
       printf 'OC_HEAD_BEFORE=%s\n' "$head_now"
       printf 'OC_START_TS=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     } >> "$GITHUB_ENV"
-    # 上限ガード: ラベルが付いている PR は fix を起動しない。
-    # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
-    stop=false
-    # 取得の失敗で止まる (set -e)。pipefail 付きの if では API の失敗が『ラベル無し』と判定されてしまうため分ける (#2638 m2)。
-    labels="$(gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name')"
-    if grep -qx "$STUCK_LABEL" <<< "$labels"; then
-      stop=true
-      echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
-    elif [ "$pr_state" != open ]; then
-      stop=true
-      echo "::notice::PR #$OC_PR_NUMBER is $pr_state (not open): the fix run is skipped"
-    elif [ -n "$review_commit" ] && [ "$review_commit" != "$head_now" ]; then
-      stop=true
-      echo "::notice::the CHANGES_REQUESTED review is for ${review_commit:0:7}, but the PR head is now ${head_now:0:7}: the fix run is skipped"
-    else
-      cm="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" | jq -s '[.[][]]')"
-      rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
-        | jq -s --arg l "$REVIEWER_LOGIN" '[.[][] | select(.user.login == $l and .state == "CHANGES_REQUESTED")]')"
-      dec="$(jq -c -n --argjson cm "$cm" --argjson rv "$rv" --arg ml "$MARK_LOGIN" \
-        --argjson max "$MAX_FIX_REVIEWS" --argjson maxtotal "$MAX_FIX_TOTAL" --argjson t "$REPEAT_JACCARD" \
-        "$JQ_DEFS $DECIDE")"
-      decision="$(jq -r .decision <<< "$dec")"
-      n="$(jq -r .n <<< "$dec")"
-      total="$(jq -r .total <<< "$dec")"
-      k="$(jq -r .k <<< "$dec")"
-      echo "oc-reviewer CHANGES_REQUESTED on PR #$OC_PR_NUMBER: window=$n total=$total (limit $MAX_FIX_REVIEWS, ceiling $MAX_FIX_TOTAL) -> $decision"
-      # 窓を閉じる印は MARK_TOKEN でしか投稿できない。無ければ信じられる印を残せないので、窓を閉じずに止める。
-      if [ "$decision" = reset ] && [ -z "$MARK_TOKEN" ]; then
-        decision=ceiling
-        echo "OC_MARK_TOKEN is not set: the window marker cannot be trusted, so the window stays open: stop"
-      fi
-      # 自動再開は repo 全体で 1 時間 MAX_RESETS_PER_HOUR 件まで (暴走防止)。数えられなければ止める。
-      if [ "$decision" = reset ]; then
-        hour_ago="$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)"
-        if ! recent="$(gh api --paginate -X GET "repos/$OC_REPO/issues/comments" -f since="$hour_ago" \
-          | jq -s --arg t "$hour_ago" --arg ml "$MARK_LOGIN" \
-            '[.[][] | select(.user.login == $ml and .user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-reset")) and .created_at >= $t)] | length')"; then
-          recent="$MAX_RESETS_PER_HOUR"
-        fi
-        if [ "$recent" -ge "$MAX_RESETS_PER_HOUR" ]; then
-          decision=ceiling
-          echo "automatic resets in the last hour: $recent (limit $MAX_RESETS_PER_HOUR): stop"
-        fi
-      fi
-      if [ "$decision" = reset ]; then
-        GH_TOKEN="$MARK_TOKEN" gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
-          --body "reviewer の差し戻し ${n} 件 (合計 ${total}) を計数し、直近 3 件が機械的な類型のみで繰り返しが無いため、窓 ${k}/3 を閉じて次の窓へ進めます。<!-- oc-fix-reset n=${k} -->"
-      elif [ "$decision" != none ]; then
-        stop=true
-        gh api -X POST "repos/$OC_REPO/labels" -f name="$STUCK_LABEL" -f color=B60205 \
-          -f description="automation gave up: needs a human/PM decision" > /dev/null 2>&1 || true
-        gh api -X POST "repos/$OC_REPO/issues/$OC_PR_NUMBER/labels" -f "labels[]=$STUCK_LABEL" > /dev/null
-        GH_TOKEN="${MARK_TOKEN:-${GH_TOKEN:-}}" gh pr comment "$OC_PR_NUMBER" --repo "$OC_REPO" \
-          --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS}、合計 ${total}、停止理由 ${decision})。自動復旧を試みます。PM agent が処理します。ラベル \`${STUCK_LABEL}\` を外すと再開できます (再開後は、この停止コメント以降の差し戻しだけを数えます)。${STOP_MARK} <!-- oc-pm-intent: stuck pr=${OC_PR_NUMBER} reason=${decision} -->"
-      fi
-    fi
+    gate_run "$pr_json"
     if [ "$stop" = false ]; then printf 'OC_RECORD_OK=1\n' >> "$GITHUB_ENV"; fi
-    echo "stop=$stop" >> "$GITHUB_OUTPUT"
+    printf 'stop=%s\nreason=%s\n' "$stop" "$reason" >> "$GITHUB_OUTPUT"
+    OC_RECORD_DONE=1
+    ;;
+  gate)
+    pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
+    gate_run "$pr_json"
+    printf 'stop=%s\nreason=%s\n' "$stop" "$reason" >> "$GITHUB_OUTPUT"
+    OC_RECORD_DONE=1
+    ;;
+  snapshot)
+    # gate の結果 (OC_GATE_STOP) が false のときだけ通す。true・空・未設定は fail-closed で止める。
+    if [ "${OC_GATE_STOP:-}" != false ]; then
+      echo "::error::fix-progress snapshot: the window gate did not pass (OC_GATE_STOP=${OC_GATE_STOP:-unset})" >&2
+      exit 1
+    fi
+    head_now="$(pr_head)"
+    [ -n "$head_now" ] || exit 1
+    {
+      printf 'OC_HEAD_BEFORE=%s\n' "$head_now"
+      printf 'OC_START_TS=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      printf 'OC_RECORD_OK=1\n'
+    } >> "$GITHUB_ENV"
     OC_RECORD_DONE=1
     ;;
   check)
@@ -212,7 +259,7 @@ case "${1:-}" in
     exec bash "$(dirname "$0")/reopen-pr.sh"
     ;;
   *)
-    echo "usage: $0 record|check|retry-prompt|reopen" >&2
+    echo "usage: $0 record|gate|snapshot|check|retry-prompt|reopen" >&2
     exit 2
     ;;
 esac
