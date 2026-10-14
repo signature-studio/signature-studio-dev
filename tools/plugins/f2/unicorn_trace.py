@@ -6,7 +6,8 @@
 # 依存: pefile・unicorn (pip install unicorn)。未解決の間接 call で止まる場合は fault 行に戻り番地を出す。
 # usage: python3 unicorn_trace.py <block_PE.bin> <entry_hex> [-r reg=hex ...] [-a hex ...]
 #                                 [-w lo:hi ...] [-q hex ...] [-m MAX_INSN]
-#                                 [-d addr=val ...] [-t hex ...]
+#                                 [-d addr=val ...] [-t hex ...] [-p hex ...] [-H] [-V]
+#   -p: 本体の前に同じメモリ上で順に実行する関数 (arena 初期化)。-V: VirtualAlloc を合成メモリで返す。
 #   -d: 実行前に qword を書く (ホスト構造体の合成用)。-t: 番地に入るたびに rcx/rdx/r8/r9 を出す。
 import argparse
 import collections
@@ -27,6 +28,8 @@ STACK_SIZE = 0x100000
 SENT = 0x20000000
 SCRATCH = 0x40000000
 SCRATCH_SIZE = 0x100000
+POOL = 0x50000000
+POOL_SIZE = 0x8000000
 LOG_LIMIT = 200
 
 
@@ -52,6 +55,10 @@ def main():
     ap.add_argument('-d', action='append', default=[], help='実行前に書く qword addr=val (hex)')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
                     help='この VA に入ったとき rcx/rdx の値と [rcx]・[rcx+0x28] を出す (最初の 20 回)')
+    ap.add_argument('-p', action='append', default=[], type=lambda s: int(s, 0),
+                    help='本体の前に同じメモリ上で順に実行する関数 (arena 初期化等。rcx/rdx は -H の host)')
+    ap.add_argument('-V', action='store_true',
+                    help='kernel32!VirtualAlloc が 64KB 境界で POOL (0x50000000〜) の領域を返す (dwSize=rdx)')
     ap.add_argument('-H', action='store_true',
                     help='合成 host: rcx を SCRATCH+0x10000 の host に向け、[host]=vtable (0x40 スロット、全て ret stub)')
     a = ap.parse_args()
@@ -92,14 +99,12 @@ def main():
         ad, val = item.split('=')
         uc.mem_write(int(ad, 0), struct.pack('<Q', int(val, 0)))
     uc.mem_map(SENT & ~(PAGE - 1), PAGE, UC_PROT_READ)
-    rsp = STACK_TOP - 0x208
-    uc.mem_write(rsp, struct.pack('<Q', SENT))
-    for i, v in enumerate(a.a):
-        uc.mem_write(rsp + 0x28 + 8 * i, struct.pack('<Q', v))
-    uc.reg_write(UC_X86_REG_RSP, rsp)
+    pool = [POOL]
+    if a.V:
+        uc.mem_map(POOL, POOL_SIZE, UC_PROT_ALL)
+    host = SCRATCH + 0x10000
     rets = {}
     if a.H:
-        host = SCRATCH + 0x10000
         vtab = SCRATCH + 0x11000
         obj = SCRATCH + 0x12000
         otab = SCRATCH + 0x13000
@@ -113,11 +118,6 @@ def main():
                 uc.mem_write(tab + 8 * i, struct.pack('<Q', sva))
                 if nm == 'host' and i == 0:
                     rets[sva] = obj
-        uc.reg_write(UC_X86_REG_RCX, host)
-        uc.reg_write(UC_X86_REG_RDX, host)
-    for item in a.r:
-        name, val = item.split('=')
-        uc.reg_write(reg_id(name), int(val, 0))
 
     hits = {}
     log = []
@@ -141,7 +141,12 @@ def main():
             print(info)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
-            uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
+            if a.V and names[addr] == 'kernel32.dll!VirtualAlloc':
+                size = uc_.reg_read(UC_X86_REG_RDX)
+                uc_.reg_write(UC_X86_REG_RAX, pool[0])
+                pool[0] += (size + 0xffff) & ~0xffff
+            else:
+                uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 
     def on_write(uc_, access, addr, size, value, ud):
         if len(log) < LOG_LIMIT:
@@ -156,11 +161,32 @@ def main():
     for q in a.q:
         print('before [%#x] = %#x' % (q, struct.unpack('<Q', uc.mem_read(q, 8))[0]))
 
-    status = 'returned to sentinel'
-    try:
-        uc.emu_start(a.entry, SENT, count=a.m)
-    except UcError as e:
-        status = 'UcError %s' % e
+    def enter(fn, final):
+        rsp = STACK_TOP - 0x208
+        uc.mem_write(rsp, struct.pack('<Q', SENT))
+        if final:
+            for i, v in enumerate(a.a):
+                uc.mem_write(rsp + 0x28 + 8 * i, struct.pack('<Q', v))
+        uc.reg_write(UC_X86_REG_RSP, rsp)
+        if a.H:
+            uc.reg_write(UC_X86_REG_RCX, host)
+            uc.reg_write(UC_X86_REG_RDX, host)
+        if final:
+            for item in a.r:
+                name, val = item.split('=')
+                uc.reg_write(reg_id(name), int(val, 0))
+        st = 'returned to sentinel'
+        try:
+            uc.emu_start(fn, SENT, count=a.m)
+        except UcError as e:
+            st = 'UcError %s' % e
+        return st
+
+    for p in a.p:
+        st = enter(p, False)
+        print('prelude %#x: %s rip=%#x rax=%#x' % (p, st, uc.reg_read(UC_X86_REG_RIP),
+                                                  uc.reg_read(UC_X86_REG_RAX)))
+    status = enter(a.entry, True)
     rip = uc.reg_read(UC_X86_REG_RIP)
     print('status: %s rip=%#x rax=%#x' % (status, rip, uc.reg_read(UC_X86_REG_RAX)))
     if rip != SENT:
