@@ -189,7 +189,7 @@
 | `tools/m11/alloca/REPORT.md` | ~150 | alloca 縮退修正 (CAB-129) |
 | `tools/m11/qstore/REPORT.md` | ~90 | 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS D17) の検出・修復・idx 87/898/58–63 の帰属・#513 取り込み後の実測 (#516) |
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
-| `tools/m11/trap_triage/REPORT_2212.md` | ~96 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
+| `tools/m11/trap_triage/REPORT_2212.md` | ~112 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
 | `tools/m11/trap_triage/REPORT_1352.md` | ~50 | #1352: 計測 build (`M11_INSTR_413060=1`) の OFF は HEAD `1be53b3f` で既定と同じ 870/24/0 (871/23 は再現せず)・`M11_DEST_READ=0` でも 870/24/0。3 点切り分けは未実施・再現 `repro_1352.sh` |
 | `tools/m11/trap_triage/REPORT_882.md` | 212 | #882: M11 survey trap の p-144 再現・40ffe0 入口 probe の本体 (§0 結論・§1〜§11)。§12・§13 は `REPORT_882_APPENDIX.md` に分割移動 (250 行上限) |
 | `tools/m11/trap_triage/REPORT_882_APPENDIX.md` | ~89 | #882 の §12 (7 回目 run: p-144 再現測定) と §13 (8 回目 run: 40ffe0 入口 probe の実測) の全文。REPORT_882.md の 250 行上限のため分割移動 |
