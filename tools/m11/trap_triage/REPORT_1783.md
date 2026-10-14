@@ -155,49 +155,53 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 
 ## 8. #2770 (LD-129): native 側 0x5ac308 の書込み監視 (ld_native)
 
-**判定**: 受入 1 は実装済み (`rt/ld_native.c` の `LD_WATCH_ADDR`・測定 commit `12982d74`)。受入 2 は部分的: 監視付き F の run では `0x5ac308` への書込みの記録は 0 件だった。ただし (a) 「監視が実行結果を変えない」は未確認 (§8.4)、(b) 942 unit のうち 14 unit は走っていない (§8.3)、(c) 生の出力を repo に残していないため、B・B2 の値と C の測定 commit は再検算できない (§8.2)。書込み元は未特定。
+**判定**: 受入 1 は実装済み (`rt/ld_native.c` の `LD_WATCH_ADDR`)。受入 2 は部分的: 監視付き F の 3 run で `0x5ac308` への書込みの記録は 0 件。ただし (a) 非摂動性は未確認 (§8.4)、(b) 942 unit のうち 14 unit は走っていない (§8.3)、(c) 書込み元は未特定。
 
 ### 8.1 測定条件
 
-- 測定 commit: `12982d74` (`tools/liftdiff/rt/ld_native.c` のみ変更)。`git diff 12982d74 104d6a0c -- tools/liftdiff` の出力は 0 byte。本 PR の fix で `rt/ld_native.c` を変えた。その後の HEAD では測定していない (§8.6)。
-- 素材 (測定時): `fl-win64` を `FL_WIN64_DIR` に展開、`work-m11`・`work-liftdiff` を `tools/*/work/` に展開。`toolchain-emsdk` は native 側の測定に不要。
-- 監視の仕組み: `LD_WATCH_ADDR=<VA hex>` と `LD_WATCH_OUT=<path>` (両方指定時のみ有効)。監視 page を `PROT_READ|PROT_EXEC` にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。TF で書込み 1 命令だけ実行してから新しい値を読み、page を戻す。書込みは通常どおり行われ、値は変えない。記録は書込み先の開始アドレスが va-15〜va+7 にあるもの (重ならない書込みを含む superset。取りこぼしは無い)。
-- 行形式: `wp case=... rip_rva=... old=... new=... chg=... ins=...`。正常終了時の末尾に `wpsum faults=N timeouts=M` (watch fault 数・SIGALRM で打ち切った call 数)。`wpsum` は測定 commit `12982d74` には無い (§8.6)。
-- 実行: `tools/liftdiff` で `FL_WIN64_DIR=... LD_WATCH_ADDR=5ac308 LD_WATCH_OUT=... python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild` (wall 21 s)。VA = ImageBase `0x400000` + RVA。`0x5ac308` は wasm の `0x1ac308` に対応する。
+- 測定 commit: `8db3c10c` (コードを変えた最後の commit。SIGALRM マスクの保存と `alrm_def` を入れた後に測定)。`git diff 8db3c10c HEAD -- tools/liftdiff` は 0 行。
+- ビルド: `tools/liftdiff` で `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`。警告 3 件はすべて既存の `rt/ld_core.h` 由来 (`ld_native.c` は 0 件)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)、`work-m11`・`work-liftdiff` を `tools/*/work/` に展開。`--nobuild` のため `toolchain-emsdk` は不要。
+- 実行: 直列 (並列 1)。1 run 8.0〜8.6 s (python 起動込み)。1 分 load average は 0.26〜0.90。
+- 監視: `LD_WATCH_ADDR`・`LD_WATCH_OUT` の両方がある時だけ有効。監視 page を read/exec にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。TF で 1 命令実行してから page を戻す。書込みは通常どおり行われる。記録は書込み先の開始アドレスが va-15〜va+7 のもの (superset)。
+- 行形式 `wp case=... rip_rva=... old=... new=... chg=...`。末尾に `wpsum faults=N timeouts=M alrm_def=K` (faults = 監視 fault 数、timeouts = SIGALRM で打ち切った call 数、alrm_def = TF 待ち中に SIGALRM が保留された回数)。VA = ImageBase `0x400000` + RVA。
 
 ### 8.2 実測と定義
 
-定義 (`tools/liftdiff/ldlib/boot.py` の `build_state` と `liftdiff.py bootstate` の出力):
+定義 (`ldlib/boot.py` の `build_state` と `liftdiff.py bootstate` の出力):
+- entry: `ep` case の status と、その時の `System.InitCount` (`0x11eac98`) = k。
+- 単位フェーズ ok+N = status ok の件数 (`detail.units_ok` − k)。fail M = 非 ok の件数。最初 P = 非 ok の最初の InitTable 添字。
+- 分母 = InitTable の全件 942。units_run = k + ok+N (boot.py の `covered`)。未走 = 942 − units_run。
+- img_runs = STATE JSON の `img` の要素数。wp 件数 = `grep -c '^wp '`。
 
-- entry: `ep` case の status。k = entry 後の `System.InitCount` (`0x11eac98`)。
-- 単位フェーズ: 対象は InitTable の添字 `start`〜`end` のうち `units[i]≠0` かつ `*proc≠0` の unit。ok+N = status ok の件数、fail M = 非 ok の件数、最初 P = 非 ok の最初の InitTable 添字。
-- units_run = `k + ok+N` (boot.py の `covered`)。分母は InitTable の全件 942。
-- img_runs = `len(st['img'])` (`bootstate` の STATE JSON の `img` 配列の要素数)。
-- wp 件数 = `grep -c '^wp ' <LD_WATCH_OUT>`。
+| run | 監視 | n (run 名) | entry | 単位フェーズ | units_run | img_runs | wp 件数 | wpsum faults/timeouts/alrm_def |
+|---|---|---|---|---|---|---|---|---|
+| F | `LD_WATCH_ADDR=5ac308` | 3 (F, r2F, F3) | segv (rva `0x26833d`)・k=246 | ok+682 / fail 3 / 最初 830 | 928/942 | 215 | 0 (3 本とも) | 0/0/0 |
+| C (陽性対照) | `15eac98` (= `System.InitCount`) | 3 (C, r2C, C3) | 同左 | 同左 | 928/942 | 215 | 248 (3 本とも) | 726/0/0 |
+| B (対照) | 無し | 6 (B, B2, B3, B4, r2B, r2B2) | 同左 | 同左 | 928/942 | 215 | — | — |
 
-| run | 測定 commit | 監視 | entry | 単位フェーズ | units_run | img_runs | wp 件数 |
-|---|---|---|---|---|---|---|---|
-| F | `12982d74` | `5ac308` | segv (rva `0x26833d`)・k=246 | ok+682 / fail 3 / 最初 830 | 928/942 | 216 | 0 |
-| C (陽性対照) | 未記録 (作業ツリーの run。`12982d74` と同一 code かは未確認) | `15eac98` (= `System.InitCount`) | 未記録 | 未記録 | 未記録 | 未記録 | 248 |
-| B・B2 (対照) | 未記録 | 無し | 未記録 | 未記録 | 未記録 | 未記録 | — |
+- 全 15 run で entry・k・単位フェーズ・units_run は同一。img_runs は 215。旧 F 行の 216 は再現しなかった (旧生データ未保存のため原因は未確認)。本表で置き換える。
+- SIGALRM 窓 (TF 待ち中の timeout): 監視付き 6 run は timeouts 0・alrm_def 0。窓は踏まなかった。ただし alrm_def の検出経路は、窓を実際に踏ませる負の対照を取っていないため未検証。
+- 環境変数・arm の対照 (指標は全て §8.2 の表と同一): `X0`・`X0b` (`LD_WATCH_ADDR=0`、範囲外で arm されない)、`E2` (`LD_WATCH_OUT` のみ)、`X6` (`LD_WATCH_ADDR=000000`・F と同じ OUT パス。arm されず、環境変数の長さは F と同じ)。
 
-- 先行の作業ツリー run (A) は F と同じ値を記録したが、code の同一性を記録していないため表には入れない。
-- B・B2 は生の出力を保存していない。値は再測定まで記録できない (§8.6 の未解決表)。
+### 8.2b img の比較 (STATE JSON の img、全 run 48,484 byte)
+
+- 監視なし B 系 6 run: 差は `0x11e69bf` の 1 byte (値 01/02/03) のみ。
+- `LD_WATCH_*` を渡した run は、B 系と比べてポインタ領域 (`0x11eac80`〜`0x11ead01` と `0x11f9450` の計 15〜16 byte) が異なる。arm されない X0・E2・X6 でも同じ場所が変わるため、arm ではなく環境変数の長さで決まる (スタック位置の値と推定。未確認)。
+- 同じ環境変数の長さで arm の有無だけが異なる組: X6 と F3・C3 は 0 byte 差。F と X6 は 1 byte 差 (`0x11e69bf`)。
 
 ### 8.3 解釈
 
-- 検出器が働いたことは、C の wp 行 248 件で記録されている。ただし C の測定 commit と出力は未保存のため、この数は再検算していない。
-- F の記録 0 件は「この監視付き run で `0x5ac308` への書込みが記録されなかった」ことだけを示す。「native boot では書かれない」とは書かない (§8.4 の非摂動性が未確認のため)。
-- 走らなかった unit: `units_run` 928 は 942 の一部。残り 14 件のうち fail 3 件 (最初 830) を除く 11 件は、呼ばれなかった unit (`units[i]==0` または `*proc==0`) と `start=k+1` で飛ばした分の内訳を分解していない。記録 0 件の範囲は、実際に走った 928 unit に限られる。
-- wasm 側の 0 件の根拠は §2 run2 の `.aw` の `grep -c '\[aw\] '` = 0 だけ (`[aw]` 検出経路は確認済み)。これは grep 経路の確認であり、wasm 側の監視そのものの陽性対照ではない。survey の完走は unit 0〜144 (§7 で訂正)。§7.3 の「値変化 0 件」は unit 境界の比較で、書込みの証拠ではない。§7.5 の `[aw]` 0 件は run1 (`SV_ERR_LOG` 未指定) で、根拠にしない。
-- 書込み元は未特定。wasm 側は #2769、native 側は #2770 で扱う。
+- C の wp 248 件 (3 本とも同じ) で、検出器が働くことは確認した。
+- F の記録 0 件は「監視付き F の 3 run で `0x5ac308` への書込みが記録されなかった」ことだけを示す。「native boot では書かれない」とは書かない (§8.4)。
+- 未走 14 unit (942 − 928): 単位フェーズの fail 3 件 (最初 830)、添字 246 (`start = k+1` で飛ばす) 1 件、残り 10 件は `units[i]==0` または `*proc==0` で飛ばした unit (InitTable 全体の `units[i]==0` は 1 件。2 種の内訳は未分解)。記録 0 件の範囲は実際に走った 928 unit に限られる。
+- wasm 側の 0 件の根拠は §2 run2 の `.aw` の `grep -c '\[aw\] '` = 0 だけ (`[aw]` 検出経路は確認済み。wasm 側の陽性対照ではない)。§7.3 は unit 境界の値比較で書込みの証拠ではない。§7.5 は `SV_ERR_LOG` 未指定の run1 のため根拠にしない。
+- 書込み元は未特定。wasm 側は #2769、native 側は #2770。
 
-### 8.4 未確認 (非摂動性)
+### 8.4 未確認 (非摂動性・受入 1)
 
-- 「監視が実行結果を変えない」は**未確認**。
-- 記録上の差 (生データ未保存のため再検算不可。本 REPORT の記述のみ): 監視なし B と B2 で img run 66 の 1 byte が異なった。監視付き A と監視なし B の差も 1 byte と記録されている。監視付き F と B2 の差は run 境界 (img_runs 216 と 215) と heap。原因は切り分けていない。
-- 監視による分岐変化の候補: 各 call の時限 (`setitimer` 1.5 s) に対する時限切れの増加。`wpsum timeouts` で run ごとに数え、B・B2 と比べる (§8.6)。
-- 次の再測定: `work-m11`・`work-liftdiff` を使う run で、B・B2 と F を §8.2 の指標で取り直し、`wpsum` を記録する。
+- 「監視が実行結果を変えない」は**未確認**。unit ごとの status と件数は全 run で同一だが、trace (呼出し列) は比較していない。img の比較は arm の有無だけが異なる X6 と F3・C3 (0 byte 差) の 1 組のみ。
+- 旧 REPORT の「B と B2 の 1 byte 差」は、今回 B 系で `0x11e69bf` として再現した。「A と B の 1 byte 差」「F と B2 の run 境界・heap」は今回の値では確認できない (旧生データ無し)。
 
 ### 8.5 再現
 
@@ -205,20 +209,21 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 export FL_WIN64_DIR=<fl-win64 の展開先>   # [WIN64] (docs/REFERENCES.md §4)
 cd tools/liftdiff
 gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
-LD_WATCH_ADDR=5ac308 LD_WATCH_OUT=<出力ファイル> python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild
-grep -c '^wp ' <出力ファイル>; tail -1 <出力ファイル>   # wp 件数・wpsum
+rm -f work/wp_F.txt
+LD_WATCH_ADDR=5ac308 LD_WATCH_OUT=$PWD/work/wp_F.txt python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild
+grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
 # 陽性対照: LD_WATCH_ADDR=15eac98 (System.InitCount)
+# arm 無し・環境長を揃える対照: LD_WATCH_ADDR=000000 (OUT は F と同じ長さのパス)
+# 監視なし: 環境変数を付けない。実行ごとに work/m11/boot_state_hybrid.json を別名に退避してから次を回す
 ```
 
-### 8.6 本 fix での変更と未解決 (測定は未実施)
+### 8.6 本 fix での変更と未解決
 
-- SIGALRM: TF 待ち (`g_wp_pend`) の間は SIGALRM を block する (`wp_fault` で `sigprocmask` と `uc_sigmask` を変え、`wp_finish` で `uc_sigmask` から外す)。timeout の `siglongjmp` で抜ける経路でも、pend が残っていれば page を戻す。
-- コメントを実装に合わせた (記録条件は superset)。`wpsum` 集計行を追加した。
-- 差分: `git diff 12982d74 5b077740 -- tools/liftdiff` の出力は `rt/ld_native.c` のみ (16 行追加・6 行削除)。
-- 検証: `gcc -O1 -g -Wall` で `ld_native.c` の警告 0 件。SIGALRM の窓は読解のみで、e2e では確認していない (この fix run では `work-m11`・`work-liftdiff` が展開されていない)。
+- commit `8db3c10c` (fix): `wp_fault` で SIGALRM の元のマスクを保存し、`wp_finish` は元から block されていなかった時だけ解除する。TF 待ち中に保留された SIGALRM の回数を `alrm_def` に出す (`rt/ld_native.c` 単独、+5/−3)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 修正後の HEAD で F・C・B・B2 を §8.2 の指標と `wpsum` 付きで取り直す | 非摂動性と 0 件の判定の根拠が未確定 | #2770 (本 issue に残す・再測定) |
-| 残り 14 件のうち fail 3 件以外の 11 件の内訳 | 走らなかった範囲が未確定 | #2770 (再測定の出力で引用) |
-| 全 942 unit と boot 後の書込み元の切り分け | 書込み元が未確定 | #2769 |
+| trace (呼出し列) を含む非摂動性の比較。arm の有無の比較は img の 1 組だけ | 受入 1 が未確定 | #2770 (本 issue に残す) |
+| 未走 14 unit の内訳 (skip 10 件の `units[i]==0` と `*proc==0` の分解) | 未走範囲の確定 | #2770 |
+| alrm_def の検出経路の負の対照 (窓を踏ませる run) | 窓の 0 件の信頼性 | #2770 |
+| 全 942 unit の wasm 側 `[aw]` 採取と、書込み元の特定 | 書込み元が未確定 | #2769 |
