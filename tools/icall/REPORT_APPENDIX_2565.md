@@ -7,10 +7,10 @@
 ## 0. 検証起点と測定 commit
 
 - 検証起点: `origin/main` `acb7d6d4`。worktree `../ws-2565`・branch `2565-icall-blk-placement`。
-- **測定 commit (コードを変えた最後の commit): `f4be6900`** (`tools/icall/icall_rewrite.py`・`tools/icall/check_blk_domain.py`)。
+- **測定 commit (コードを変えた最後の commit): `66629a9e`**。修正本体は `f4be6900` (`tools/icall/icall_rewrite.py`・`tools/icall/check_blk_domain.py`)、`66629a9e` で再現用の `tools/icall/mk_franges.py` を足した。測定は `66629a9e` で取り直し、`f4be6900` の DLL と `cmp` で一致 (§3)。
 - 差分の確認 (本書の commit より後も、コード範囲は変わらない):
   ```
-  git diff f4be6900 HEAD -- tools/icall ':!*.md'     # 出力は空 (差分 0)
+  git diff 66629a9e HEAD -- tools/icall ':!*.md'     # 出力は空 (差分 0)
   ```
 - 素材: `work-fw-stage1` を repo ルートで展開 (tar 内の path が `tools/plugins/work/fw/` を含む)。`fl-win64` は `extracted/block18983_PE.bin` のみ `$RUNNER_TEMP/fl-win64/` へ展開 (`FL_WIN64_DIR` 相当)。他の素材は使わない。
 - F.ranges は `tools/icall/mk_franges.py` で作った (fw_prep.py は `work/fw_hash_counts.json` を要するため使わず。規約は同じ。11,736 件 = 成果物 `fw_map.json` の `nfuncs`)。
@@ -63,6 +63,7 @@ issue の受入 1 は「`sect_end` 以降へ置く」か「BLK 専用の書込�
 |---|---|---|---|---|
 | 旧コードで同入力の再生成 | `acb7d6d4` | rc 0 (`section +5924109 B`・交差 4) | 22 s (15:17:06→15:17:28) | 1 / 終了後 0.20 |
 | 修正版で同入力の再生成 | `f4be6900` | rc 0 (`section +5924861 B`・交差 0) | 23 s (15:19:04→15:19:27) | 1 / 終了後 0.20 |
+| **測定 (HEAD)**: F.ranges を `mk_franges.py` で再生成 → `icall_rewrite.py` → `check_blk_domain.py` | `66629a9e` | rc 0 (交差 0・非重複違反 0・BLK 域の非ゼロ 0)。DLL は `f4be6900` の出力と `cmp` 一致 | 23 s (15:25:27→15:25:50) | 1 / 終了後 0.20 |
 | `check_blk_domain.py` (4 入力: 成果物・同入力旧版・修正版・強制 `--blk-va`) | `f4be6900` | rc 1・rc 1・rc 0・rc 0 | 各 1 s 未満 | — |
 
 ## 4. 変更ファイル
