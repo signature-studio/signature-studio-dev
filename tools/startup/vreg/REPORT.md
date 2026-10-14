@@ -166,7 +166,7 @@ CSV の key 数は startup REPORT の 46 (31/5/10) に対し本集計は 47 (33/
 
 | 項目 | 結果 |
 |---|---|
-| 実行 | `RUNTIME_TMP=/home/runner/work/_temp/opencode bash tools/startup/vreg/vreg.sh` |
+| 実行 | `RUNTIME_TMP=<一時ディレクトリ> bash tools/startup/vreg/vreg.sh` |
 | 所要 / exit / load (実行前 1 分平均) | 12.03 s / 0 / 0.31 |
 | C 単体 (`test_vreg.c`) | ALL PASS |
 | shimx 既存テスト (st / mt / M4) | ALL PASS × 3 |
