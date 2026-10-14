@@ -8,6 +8,7 @@
 |---|---:|
 | thunk 除去後も trace_head 内で食い違う | 16 |
 | trace_head (最大 12 件) の上限で判定不能 | 4 |
+| trace_head に解析不能要素があり丸ごと除外したケース (N/W いずれか) | 0 |
 
 | 直前の共通 entry (L2) | native 次 entry | wasm 次 entry | 件数 |
 |---|---|---|---:|

@@ -8,18 +8,40 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS="$HERE/.."
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-export OC_REPO=o/r RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 OC_MERGEABLE_WAIT=0 GH_TOKEN=x
+export OC_REPO=o/r RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 OC_MERGEABLE_WAIT=0 GH_TOKEN=x OC_WORKER_URL_FILE="$TMP/no-worker-url"
 
 # fake gh: `gh api [--paginate] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
-# `gh pr|label ...` は $LOG に記録するだけ (FAKE_MERGE_FAILS=1 なら `gh pr merge` は失敗する)。
-# FAKE_FAIL=<部分文字列> を設定すると、path にその文字列を含む `gh api` は失敗する (読み取り失敗の再現)。
+# `gh pr|label|issue ...` は $LOG に記録するだけ (FAKE_MERGE_FAILS=1 なら `gh pr merge` は失敗する)。
+# `gh issue list` / `gh pr list` は擬似 path (issue-list?state=S&label=L / pr-list?state=S) の fixture を返す (--limit は $LOG に残る)。
+# fake curl は引数を $FAKE_CURL_LOG に記録し、$FAKE_STATUS の内容を返す (FAKE_CURL_FAIL=<終了コード> で失敗。28 は timeout)。
+# FAKE_FAIL=<部分文字列> を設定すると、path (擬似 path を含む) にその文字列を含む読み取りは失敗する (読み取り失敗の再現)。
 FIX="$TMP/fixtures"
 LOG="$TMP/gh.log"
 mkdir -p "$FIX" "$TMP/bin"
 cat > "$TMP/bin/gh" << 'EOF'
 #!/bin/bash
 echo "gh $*" >> "$FAKE_LOG"
-if [ "$1" = pr ] || [ "$1" = label ]; then
+if { [ "$1" = issue ] || [ "$1" = pr ]; } && [ "$2" = list ]; then
+  kind="$1" state="" label=""
+  shift 2
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --state) state="$2"; shift ;;
+      --label) label="$2"; shift ;;
+    esac
+    shift
+  done
+  key="$kind-list?state=$state${label:+&label=$label}"
+  if [ -n "${FAKE_FAIL:-}" ] && [[ "$key" == *"$FAKE_FAIL"* ]]; then
+    echo "fake gh: injected failure for $key" >&2
+    exit 1
+  fi
+  f="$FAKE_FIX/${key//\//_}"
+  [ -f "$f" ] || { echo "fake gh: no fixture for $key" >&2; exit 1; }
+  cat "$f"
+  exit 0
+fi
+if [ "$1" = pr ] || [ "$1" = label ] || [ "$1" = issue ]; then
   if [ "$1 $2" = "pr merge" ] && [ -n "${FAKE_MERGE_FAILS:-}" ]; then
     echo "Pull request is not mergeable" >&2
     exit 1
@@ -47,7 +69,17 @@ f="$FAKE_FIX/${path//\//_}"
 if [ -n "$jq_expr" ]; then jq -r "$jq_expr" < "$f"; else cat "$f"; fi
 EOF
 chmod +x "$TMP/bin/gh"
-export PATH="$TMP/bin:$PATH" FAKE_LOG="$LOG" FAKE_FIX="$FIX"
+cat > "$TMP/bin/curl" << 'EOF'
+#!/bin/bash
+echo "curl $*" >> "$FAKE_CURL_LOG"
+if [ -n "${FAKE_CURL_FAIL:-}" ]; then
+  echo "curl: ($FAKE_CURL_FAIL) fake curl failure" >&2
+  exit "$FAKE_CURL_FAIL"
+fi
+cat "$FAKE_STATUS"
+EOF
+chmod +x "$TMP/bin/curl"
+export PATH="$TMP/bin:$PATH" FAKE_LOG="$LOG" FAKE_FIX="$FIX" FAKE_CURL_LOG="$TMP/curl.log" FAKE_STATUS="$TMP/status.json"
 
 pass=0 fail=0
 ok() { pass=$((pass + 1)); printf 'ok   %s\n' "$1"; }
@@ -59,7 +91,7 @@ not_logged() { ! grep -q -- "$1" "$LOG"; }
 OLD="2020-01-01T00:00:00Z"
 REVIEWER="oc-reviewer-for-signature-studio[bot]"
 
-reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; unset FAKE_MERGE_FAILS FAKE_FAIL; }
+reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; : > "$TMP/out"; : > "$FAKE_CURL_LOG"; unset FAKE_MERGE_FAILS FAKE_FAIL FAKE_CURL_FAIL; export OC_WORKER_URL_FILE="$TMP/no-worker-url"; }
 fx() { printf '%s' "$2" > "$FIX/${1//\//_}"; } # fx <path> <json>
 # runs / PR 一覧は全ケース共通の形。active_runs は workflow_runs の JSON (既定は空)。
 base() { # base <prs json> [active runs json]
@@ -378,7 +410,7 @@ wd
 floating | grep -q '^floating-issues=2 ' && floating | grep -q 'first: #101 #109'
 expect "floating issues are counted (blocked / PR / oc:no-pr / needs-user-input / oc:stuck / pull requests excluded)" $?
 # 集計は GET を 1 回呼ぶだけ。issue への書き込み・ラベル操作・dispatch は無い (PR 30 の点検による pr comment/close/reopen は別)。
-! grep -E '^gh (api -X|label|issue)' "$LOG" | grep -q . && not_logged 'repos/o/r/issues/10' && not_logged 'repos/o/r/dispatches' && [ "$(grep -c 'issues?state=open' "$LOG")" = 1 ]
+! grep -E '^gh (api -X|label|issue (create|close|comment|reopen|edit))' "$LOG" | grep -q . && not_logged 'repos/o/r/issues/10' && not_logged 'repos/o/r/dispatches' && [ "$(grep -c 'issues?state=open' "$LOG")" = 1 ]
 expect "counting floating issues makes no write (one GET of the open issues, no issue/label/dispatch call)" $?
 
 # 24b. 実行中の implement run (issue_comment でタイトルが issue と一致) がある issue は着手済み
@@ -420,6 +452,373 @@ issues "$(iss 113 'floating' '[]')"
 GITHUB_STEP_SUMMARY="$TMP/summary.md" wd
 grep -q 'floating-issues=1' "$TMP/summary.md"
 expect "floating-issues is written to the step summary" $?
+
+# 25. 許可されない素材名 (fetchsh) を含む本文で review が打ち切られた PR -> 名前を除いて本文を直し、コメントして review を再起動する (#CI-45)
+reset
+base "[$(pr 40 a40abc false "$OLD" '[]' $'oc_artifacts: fl-win64 fetchsh\n本文')]"
+detail 40 true
+wd
+logged 'pr edit 40 .*--body-file' && grep -q '^oc_artifacts: fl-win64$' "$TMP/oc-artifacts-40.md" && logged 'pr comment 40 .*oc-artifacts-fixed:a40abc' && logged 'pr close 40' && logged 'pr reopen 40'
+expect "bad oc_artifacts name -> body repaired, marker comment, review restarted" $?
+
+# 26. ネガコン: 許可名のみの本文は補正しない (通常の review 再起動だけ)
+reset
+base "[$(pr 41 b41bcd false "$OLD" '[]' $'oc_artifacts: fl-win64 toolchain-emsdk\n本文')]"
+detail 41 true
+wd
+logged 'pr reopen 41' && not_logged 'body-file' && not_logged 'oc-artifacts-fixed'
+expect "allowlisted names only -> no repair" $?
+
+# 27. ネガコン: 補正済みマーカーがある head の 2 回目は、本文を再度書き換えず oc:stuck で止める (同じ head は 1 回まで)
+reset
+base "[$(pr 42 c42cde false "$OLD" '[]' $'oc_artifacts: fetchsh\n本文')]"
+detail 42 true "[]" "[$(printf '{"user":{"login":"%s","type":"Bot"},"body":"x <!-- oc-artifacts-fixed:c42cde -->"}' "$REVIEWER")]"
+wd
+not_logged 'body-file' && not_logged 'pr reopen 42' && logged 'pr edit 42 .*--add-label oc:stuck'
+expect "second repair on the same head -> no rewrite, oc:stuck" $?
+
+# 28. ネガコン: fork の PR は本文を書き換えない
+reset
+base "[$(pr 43 d43def false "$OLD" '[]' $'oc_artifacts: fetchsh\n本文' fork-user/signature-studio-dev)]"
+detail 43 true
+wd
+not_logged 'body-file' && not_logged 'pr reopen 43' && grep -q 'fork からの PR' "$TMP/out"
+expect "fork PR with a bad name -> not touched" $?
+
+# 29. 差し戻し上限で oc:stuck になった PR (oc-pm-intent: stuck) は、入力不正があっても補正しない (ネガコン)
+reset
+base "[$(pr 44 e44efa false "$OLD" '[{"name":"oc:stuck"}]' $'oc_artifacts: fetchsh\n本文')]"
+detail 44 true "[]" "[$(printf '{"user":{"login":"%s","type":"Bot"},"body":"stop <!-- oc-pm-intent: stuck pr=44 reason=reset -->"}' "$REVIEWER")]"
+wd
+not_logged 'body-file' && not_logged 'remove-label' && not_logged 'pr reopen 44' && grep -q 'STUCK_LABELLED' "$TMP/out"
+expect "review-limit oc:stuck PR is not repaired (negative control)" $?
+
+# 30. oc:stuck が review 打ち切り (入力不正) で付いた PR は、補正して oc:stuck を外し review を再起動する
+reset
+base "[$(pr 45 f45fab false "$OLD" '[{"name":"oc:stuck"}]' $'oc_artifacts: plugins-ott fetchsh\n本文')]"
+detail 45 true
+wd
+logged 'pr edit 45 .*--remove-label oc:stuck' && logged 'pr reopen 45' && grep -q '^oc_artifacts: plugins-ott$' "$TMP/oc-artifacts-45.md"
+expect "stuck by input error -> repaired, label removed, review restarted" $?
+
+# 31. stuck の滞留時間: events の labeled (oc:stuck) から max / p50 を出す (固定の events。p50 は下側中央値)
+reset
+base "[$(pr 50 g50aa0 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 51 g51aa1 false "$OLD" '[{"name":"oc:stuck"}]'),$(pr 52 g52aa2 false "$OLD" '[{"name":"oc:stuck"}]')]"
+fx 'repos/o/r/issues/50/events' '[{"event":"labeled","label":{"name":"oc:stuck"},"created_at":"2020-01-01T00:00:00Z"}]'
+fx 'repos/o/r/issues/51/events' '[{"event":"labeled","label":{"name":"oc:stuck"},"created_at":"2020-01-02T00:00:00Z"}]'
+fx 'repos/o/r/issues/52/events' '[{"event":"unlabeled","label":{"name":"oc:stuck"},"created_at":"2019-12-31T00:00:00Z"},{"event":"labeled","label":{"name":"oc:stuck"},"created_at":"2020-01-03T00:00:00Z"}]'
+wd
+grep -q '^stuck=3 ' "$TMP/out" && a="$(sed -n 's/.*stuck-age-max=\([0-9]*\) .*/\1/p' "$TMP/out")" && p="$(sed -n 's/.*stuck-age-p50=\([0-9]*\).*/\1/p' "$TMP/out")" && [ $((a - p)) = 1440 ] && [ "$p" -gt 0 ]
+expect "stuck age: stuck=3, max - p50 = 1440 min (labeled from events, latest labeled used)" $?
+
+# 32. 本文の補正は DRY=1 では何もしない
+reset
+base "[$(pr 46 h46bc0 false "$OLD" '[]' $'oc_artifacts: fetchsh\n本文')]"
+detail 46 true
+DRY=1 wd
+not_logged 'body-file' && not_logged 'pr reopen 46' && grep -q 'DRY: repair oc_artifacts' "$TMP/out"
+expect "DRY=1 plans the repair without acting" $?
+
+# 33〜. PM Worker の停止検知 (#CI-49)。fake curl が /status を返し、fake gh が障害 issue の一覧・起票を記録する。
+ago() { date -u -d "$1 minutes ago" +%Y-%m-%dT%H:%M:%S.123Z; } # ago <分前>: Worker の last_tick の形 (ミリ秒付き)
+agoz() { date -u -d "$1 minutes ago" +%Y-%m-%dT%H:%M:%SZ; }    # agoz <分前>: GitHub API の時刻の形
+# worker <configured> <installed> <fresh> <last_tick または null> [追加のキー json 片]: fake /status と URL ファイルを用意する
+worker() {
+  local tick="$4"
+  [ "$tick" = null ] || tick="\"$tick\""
+  printf '{"mode":"dry-run","active_runs":3,"configured":%s,"installed":%s,"fresh":%s,"last_tick":%s,"pm_bot_login":"pm[bot]"%s}' "$1" "$2" "$3" "$tick" "${5:+,$5}" > "$FAKE_STATUS"
+  printf 'https://pm.example.test\n' > "$TMP/worker_url"
+  export OC_WORKER_URL_FILE="$TMP/worker_url"
+}
+# open_down / closed_down: gh issue list (ラベル pm-worker-down の open / closed。複数は , 区切り)。
+# ci_titles: [CI-n] の採番に読む gh issue list (state=all) と gh pr list (state=all)。
+# 実 repo の REST 一覧 (repos/.../issues?state=...) は PR だけを返すので、REST の fixture は既定では置かない (使われないことを下で確かめる)。
+open_down() { fx 'issue-list?state=open&label=pm-worker-down' "[$1]"; }
+closed_down() { fx 'issue-list?state=closed&label=pm-worker-down' "[$1]"; }
+ci_titles() {
+  fx 'issue-list?state=all' '[{"number":2324,"title":"[CI-45] a"},{"number":2328,"title":"[CI-49] b"},{"number":2400,"title":"[CI-5] c"},{"number":2401,"title":"[DOCS-99] d"},{"number":2402,"title":"[CI-12b] e"}]'
+  fx 'pr-list?state=all' '[{"number":2403,"title":"[CI-61] a pull request"}]'
+}
+note() { printf '{"user":{"login":"%s","type":"%s"},"created_at":"%s","body":"[watchdog] note <!-- oc-worker-down-note -->"}' "${2:-$REVIEWER}" "${3:-Bot}" "$(agoz "$1")"; } # note <分前> [login] [type]
+TODAY="$(date -u +%Y-%m-%d)"
+BODY="$TMP/oc-worker-down-body.md"
+no_worker_writes() { ! grep -qE 'gh (issue (create|close|comment|reopen|edit)|label) ' "$LOG"; } # 読み取り (issue list) は数えない
+worker_setup() { reset; base '[]'; open_down ''; closed_down ''; ci_titles; }
+
+# 33a. configured:false (現在の本番の状態) -> 起票しない。ネガコン (fake curl は呼ばれており、gh の issue/label 操作は 0 件)
+worker_setup
+worker false false false null
+wd; rc=$?
+[ "$rc" = 0 ] && grep -q -- '-fsS -m 10 https://pm.example.test/status' "$FAKE_CURL_LOG" && no_worker_writes && grep -q '^worker=not-set-up' "$TMP/out"
+expect "configured:false installed:false (production state) -> no issue, status was read" $?
+
+# 33a2. configured / installed の片方だけが false でも起票しない
+worker_setup
+worker true false false "$(ago 60)"
+wd
+no_worker_writes
+expect "configured:true installed:false -> no issue" $?
+worker_setup
+worker false true false "$(ago 60)"
+wd
+no_worker_writes
+expect "configured:false installed:true -> no issue" $?
+
+# 33b. configured:true + installed:true + fresh:false -> ラベルを作って、題名 [CI-<最大+1>] の障害 issue を起票する
+worker_setup
+worker true true false "$(ago 3)"
+wd; rc=$?
+[ "$rc" = 0 ] && logged 'label create pm-worker-down' && logged "issue create --repo o/r --title \[CI-62\] PM Worker 停止 ($TODAY) --body-file .* --label pm-worker-down" && not_logged 'needs-user-input' && not_logged 'issue comment' && not_logged 'issue reopen'
+expect "fresh:false on a live worker -> issue [CI-62] (max CI-61 incl. PR titles, +1) with label pm-worker-down" $?
+grep -q '@pycabbage' "$BODY" && grep -q '"fresh": false' "$BODY" && grep -q '"configured": true' "$BODY"
+expect "the issue body has @pycabbage and a copy of /status" $?
+
+# 33b2. fresh:true でも last_tick が 15 分より古い (16 分前) -> 起票する
+worker_setup
+worker true true true "$(ago 16)"
+wd
+logged 'issue create .*--label pm-worker-down' && grep -q '^worker=down' "$TMP/out"
+expect "fresh:true but last_tick 16 min old -> issue" $?
+
+# 33b3. 起票の本文に秘密を示す名前のキーは写さない (トップレベルも入れ子も)
+worker_setup
+worker true true false "$(ago 20)" '"webhook_secret":"s3cr3t-value","nested":{"private_key":"pk-value","runs":2}'
+wd
+logged 'issue create' && ! grep -qE 's3cr3t-value|pk-value' "$BODY" && grep -q '"runs": 2' "$BODY"
+expect "secret-looking keys are not copied into the issue body" $?
+
+# 33b4. 一覧が取れない (dedup の根拠が無い) ときは起票しない
+worker_setup
+worker true true false "$(ago 20)"
+FAKE_FAIL='label=pm-worker-down' wd
+not_logged 'issue create' && grep -q 'failed to list' "$TMP/out"
+expect "open-issue list fails -> nothing is filed (fail-closed)" $?
+worker_setup
+worker true true false "$(ago 20)"
+FAKE_FAIL='issue-list?state=all' wd
+not_logged 'issue create' && grep -q 'failed to count' "$TMP/out"
+expect "CI title list (gh issue list) fails -> nothing is filed (fail-closed)" $?
+worker_setup
+worker true true false "$(ago 20)"
+FAKE_FAIL='pr-list?state=all' wd
+not_logged 'issue create' && grep -q 'failed to count' "$TMP/out"
+expect "CI title list (gh pr list) fails -> nothing is filed (fail-closed)" $?
+
+# 33b5. DRY=1 は起票の計画だけを出す
+worker_setup
+worker true true false "$(ago 20)"
+DRY=1 wd
+not_logged 'issue create' && not_logged 'label create' && grep -q "DRY: file '\[CI-62\] PM Worker 停止 ($TODAY)'" "$TMP/out"
+expect "DRY=1 plans the issue without filing" $?
+
+# 33b6. 実 repo の REST 一覧 (repos/.../issues?state=...) は PR だけを返す。採番と dedup はそれを読まず gh issue list / gh pr list を読む
+worker_setup
+fx 'repos/o/r/issues?state=all&per_page=100' '[{"number":2403,"title":"[CI-99] a pull request","pull_request":{"url":"u"}}]'
+fx 'repos/o/r/issues?state=open&labels=pm-worker-down&per_page=100' '[{"number":2404,"title":"x","created_at":"2020-01-01T00:00:00Z","pull_request":{"url":"u"}}]'
+worker true true false "$(ago 20)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+logged 'issue comment 77' && not_logged 'issue create' && not_logged 'issues?state=all' && not_logged 'labels=pm-worker-down'
+expect "REST lists return only pull requests -> the open outage issue (from gh issue list) gets the note, no new issue" $?
+worker_setup
+fx 'repos/o/r/issues?state=all&per_page=100' '[{"number":2403,"title":"[CI-99] a pull request","pull_request":{"url":"u"}}]'
+worker true true false "$(ago 20)"
+wd
+logged "issue create --repo o/r --title \[CI-62\] PM Worker 停止" && not_logged 'issues?state=all'
+expect "REST PR-only list (CI-99) does not count: number from gh issue/pr lists -> [CI-62]" $?
+
+# 33b7. gh issue list / gh pr list は --limit を明示する (既定値では足りない)
+worker_setup
+worker true true false "$(ago 20)"
+wd
+logged 'issue list --repo o/r --state all --limit 3000' && logged 'pr list --repo o/r --state all --limit 3000' && logged 'issue list --repo o/r --state open --label pm-worker-down --limit 200' && logged 'issue list --repo o/r --state closed --label pm-worker-down --limit 200'
+expect "gh lists pass an explicit --limit (3000 titles, 200 labelled issues)" $?
+
+# 33b8. PR の題名の最大が issue より大きければ、その +1 (採番は issue と PR の両方)
+worker_setup
+fx 'pr-list?state=all' '[{"number":2500,"title":"[CI-70] a pull request"}]'
+worker true true false "$(ago 20)"
+wd
+logged "issue create --repo o/r --title \[CI-71\] PM Worker 停止" && not_logged 'issue reopen'
+expect "a PR title [CI-70] is counted -> [CI-71]" $?
+
+# 33b9. 題名の一覧が上限 (3000 件) に達したら、欠けているかもしれないので起票しない (fail-closed)
+worker_setup
+fx 'issue-list?state=all' "$(jq -n '[range(3000) | {title: "[DOCS-1] x"}]')"
+worker true true false "$(ago 20)"
+wd
+not_logged 'issue create' && grep -q 'reached the limit' "$TMP/out"
+expect "title list at the 3000 limit -> nothing is filed (may be truncated)" $?
+
+# 33c. open の障害 issue がある -> 追記のみ。新規 0 件 (ネガコン)
+worker_setup
+worker true true false "$(ago 20)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+logged 'issue comment 77 .*--body-file' && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && not_logged 'label create' && not_logged 'issue reopen' && grep -q 'oc-worker-down-note' "$BODY"
+expect "open pm-worker-down issue -> note only, 0 new issues" $?
+
+# 33c2. 直近 (10 分前) に reviewer が追記済みなら、追記も見送る (5 分ごとの点検でコメントを水増ししない)
+worker_setup
+worker true true false "$(ago 20)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' "[$(note 10)]"
+wd
+not_logged 'issue comment' && not_logged 'issue create'
+expect "a note 10 min ago -> no further note (throttled), no new issue" $?
+
+# 33c3. 60 分より前の追記なら、また追記する
+worker_setup
+worker true true false "$(ago 20)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' "[$(note 61)]"
+wd
+logged 'issue comment 77' && not_logged 'issue create'
+expect "a note 61 min ago -> another note" $?
+
+# 33c4. ネガコン: 別アカウントが偽装したマーカーは数えない
+worker_setup
+worker true true false "$(ago 20)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' "[$(note 1 someone-else User)]"
+wd
+logged 'issue comment 77' && not_logged 'issue create'
+expect "a spoofed note marker from another account does not throttle" $?
+
+# 33c5. 起票して間もない (10 分前) issue は、追記マーカーが無くても追記しない
+worker_setup
+worker true true false "$(ago 20)"
+open_down "{\"number\":77,\"createdAt\":\"$(agoz 10)\"}"
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+not_logged 'issue comment' && not_logged 'issue create'
+expect "an issue filed 10 min ago -> no note yet" $?
+
+# 33c6. PR (pull_request を持つ項目) はラベルが付いていても障害 issue とみなさない
+worker_setup
+worker true true false "$(ago 20)"
+open_down '{"number":78,"createdAt":"2020-01-01T00:00:00Z","pull_request":{"url":"u"}}'
+wd
+logged 'issue create' && not_logged 'issue comment'
+expect "a labelled pull request is not an outage issue" $?
+
+# 33c7. 24 時間以内に close された同ラベルの issue -> reopen して追記 (新規 0 件)
+worker_setup
+worker true true false "$(ago 20)"
+closed_down "{\"number\":88,\"closedAt\":\"$(agoz 120)\"}"
+wd
+logged 'issue reopen 88' && logged 'issue comment 88' && not_logged 'issue create' && grep -q 'oc-worker-down-note' "$BODY"
+expect "issue closed 2h ago -> reopened with a note, 0 new issues" $?
+
+# 33c8. 25 時間前に close された issue は reopen せず、新規に起票する。PR は対象外
+worker_setup
+worker true true false "$(ago 20)"
+closed_down "{\"number\":88,\"closedAt\":\"$(agoz 1500)\"},{\"number\":89,\"closedAt\":\"$(agoz 5)\",\"pull_request\":{\"url\":\"u\"}}"
+wd
+not_logged 'issue reopen' && logged 'issue create'
+expect "closed 25h ago (and a closed PR) -> not reopened, a new issue" $?
+
+# 33d. 回復 (fresh:true + last_tick 1 分前) -> open の障害 issue にコメントして close する
+worker_setup
+worker true true true "$(ago 1)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"},{"number":76,"createdAt":"2019-01-01T00:00:00Z"}'
+wd
+logged 'issue close 77 .*--comment .*回復.*oc-worker-recovered' && logged 'issue close 76' && not_logged 'issue create'
+expect "recovered (fresh:true, last_tick 1 min) -> comment + close on every open outage issue" $?
+
+# 33d2. ネガコン: fresh:true でも last_tick が 10 分前 (5 分より古い) なら close しない。起票もしない (中間域)
+worker_setup
+worker true true true "$(ago 10)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+not_logged 'issue close' && not_logged 'issue create' && not_logged 'issue comment'
+expect "fresh:true but last_tick 10 min old -> neither closed nor filed (hysteresis)" $?
+
+# 33d3. ネガコン: fresh:false なら last_tick が新しくても close しない
+worker_setup
+worker true true false "$(ago 1)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+fx 'repos/o/r/issues/77/comments' '[]'
+wd
+not_logged 'issue close'
+expect "fresh:false -> an open outage issue is not closed" $?
+
+# 33d4. 障害 issue が無ければ、健全な Worker では gh の issue / label 操作は無い
+worker_setup
+worker true true true "$(ago 1)"
+wd
+no_worker_writes
+expect "healthy worker without outage issue -> no write" $?
+
+# 33d5. 回復時の DRY=1 は close の計画だけを出す
+worker_setup
+worker true true true "$(ago 1)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+DRY=1 wd
+not_logged 'issue close' && grep -q 'DRY: close #77' "$TMP/out"
+expect "DRY=1 plans the close without acting" $?
+
+# 33e. curl の timeout -> 何もしない (ネガコン)。終了コードも変えない
+worker_setup
+worker true true false "$(ago 60)"
+open_down '{"number":77,"createdAt":"2020-01-01T00:00:00Z"}'
+FAKE_CURL_FAIL=28 wd; rc=$?
+[ "$rc" = 0 ] && no_worker_writes && grep -q 'could not read' "$TMP/out" && grep -q 'curl -fsS -m 10' "$FAKE_CURL_LOG"
+expect "curl timeout -> warning only, no issue/label/comment, exit 0" $?
+
+# 33e2. URL のファイルが無い -> 警告だけ
+worker_setup
+wd; rc=$?
+[ "$rc" = 0 ] && no_worker_writes && [ ! -s "$FAKE_CURL_LOG" ] && grep -q 'worker_url not found' "$TMP/out"
+expect "no worker_url file -> warning only, curl not called" $?
+
+# 33e3. JSON 不正 (HTML・必須キー欠落・型違い・配列) -> 警告だけ
+for bad in '<html>502</html>' '{"configured":true,"installed":true,"last_tick":null}' '{"configured":"true","installed":true,"fresh":false,"last_tick":null}' '[]'; do
+  worker_setup
+  worker true true false null
+  printf '%s' "$bad" > "$FAKE_STATUS"
+  wd; rc=$?
+  [ "$rc" = 0 ] && no_worker_writes && grep -q 'not the expected JSON' "$TMP/out"
+  expect "bad /status JSON ($bad) -> warning only" $?
+done
+
+# 33e4. fresh:true で last_tick が読めない (null / 日時でない) -> 判定できないので何もしない
+for t in null tomorrow; do
+  worker_setup
+  worker true true true "$t"
+  wd
+  no_worker_writes
+  expect "fresh:true with unreadable last_tick ($t) -> nothing" $?
+done
+
+# 33f. last_tick が 14 分前 (fresh:true) -> 起票しない (境界。15 分より古くない)
+worker_setup
+worker true true true "$(ago 14)"
+wd
+no_worker_writes && grep -q '^worker=ok' "$TMP/out"
+expect "last_tick 14 min ago -> no issue (boundary)" $?
+
+# 33g. 既定の URL は tools/pm/worker_url (リポジトリ内の 1 行)。watchdog.sh はそのファイルの URL の /status を読む
+reset
+base '[]'
+printf '{"configured":false,"installed":false,"fresh":false,"last_tick":null}' > "$FAKE_STATUS"
+unset OC_WORKER_URL_FILE
+wd
+grep -q -- '-fsS -m 10 https://signature-studio-pm.pycabbage.workers.dev/status$' "$FAKE_CURL_LOG"
+expect "default URL file is tools/pm/worker_url (curl -fsS -m 10 <url>/status)" $?
+[ "$(cat "$SCRIPTS/../../tools/pm/worker_url")" = https://signature-studio-pm.pycabbage.workers.dev ] && [ "$(wc -l < "$SCRIPTS/../../tools/pm/worker_url")" = 1 ]
+expect "tools/pm/worker_url is one line with no trailing slash" $?
+export OC_WORKER_URL_FILE="$TMP/no-worker-url"
+
+# 33h. 結果は step summary に出る
+worker_setup
+worker true true true "$(ago 1)"
+GITHUB_STEP_SUMMARY="$TMP/summary-w.md" wd
+grep -q '^worker=ok' "$TMP/summary-w.md"
+expect "worker status is written to the step summary" $?
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]

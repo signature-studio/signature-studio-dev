@@ -60,6 +60,9 @@ EM_JS(void, m11_stk_restore, (unsigned sp), {
 #else
 #define M11_TRACE(...) fprintf(stderr, __VA_ARGS__)
 #endif
+#ifndef M11_INSTR_40F960
+#define M11_INSTR_40F960 0   /* 1 = function_40f960 の確保サイズと function_40fb40 の入口・連鎖長を stderr に出す計測専用 (#1317). 既定 0 は build 出力に影響しない */
+#endif
 #ifndef M11_INSTR_K12
 #define M11_INSTR_K12 0   /* 1 = _CopyArray kind 12 (416720) の到達を stderr に出す計測専用 probe. 既定 0 は build 出力に影響しない */
 #endif
@@ -459,7 +462,14 @@ u64 function_40fb40(u64 self, u64 inst) {
     u64 cls = self;
     memset((void*)(uintptr_t)inst, 0, (size_t)(long long)(int)D(self - 0x80));
     Q(inst) = self;
+#if M11_INSTR_40F960
+    int chain_n = 0;
+    fprintf(stderr, "[m11][40fb40] self=0x%llx inst=0x%llx size=%d\n", (unsigned long long)self, (unsigned long long)inst, (int)D(self - 0x80));
+#endif
     do {
+#if M11_INSTR_40F960
+        if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 self=0x%llx cls=0x%llx\n", (unsigned long long)self, (unsigned long long)cls); abort(); }
+#endif
         u64 it = Q(cls - 0xc0);
         if (it) {
             int cnt = (int)D(it);
@@ -475,11 +485,17 @@ u64 function_40fb40(u64 self, u64 inst) {
         if (cls) cls = Q(cls);
     } while (cls);
     if (flag) ov_initinst_nested(self, inst);
+#if M11_INSTR_40F960
+    fprintf(stderr, "[m11][40fb40] chain_len=%d self=0x%llx\n", chain_n, (unsigned long long)self);
+#endif
     return inst;
 }
 
 /* function_40f960  VA 0x40f960  (System.TObject.NewInstance = vmtNewInstance 既定実体): GetMem(InstanceSize) → InitInstance */
 u64 function_40f960(u64 self) {
+#if M11_INSTR_40F960
+    fprintf(stderr, "[m11][40f960] self=0x%llx size=%d\n", (unsigned long long)self, (int)D(self - 0x80));
+#endif
     u64 obj = function_409410((unsigned)(int)D(self - 0x80));
     return function_40fb40(self, obj);
 }
@@ -935,6 +951,9 @@ void m11_probe(int i);
 void m11_dest_obs(unsigned long long dest);
 #endif
 unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
+#if M11_PRINT_DEST_2118
+    fprintf(stderr, "[d413060] dest=%llx len=%llu\n", dest, len);
+#endif
 #if M11_INSTR_413060
     m11_probe(8);
 #endif
@@ -986,6 +1005,23 @@ void m11_ffe0_obs(unsigned long long a) {
     if (v >= 0x90 && v - 0x90 + 8 <= heap) p144 = *(volatile unsigned long long*)(uintptr_t)(v - 0x90);
     if (g_ffe0_n++ < 16)
         fprintf(stderr, "[m11][ffe0] #%d arg1=0x%llx v=[arg1]=0x%llx p-144=0x%llx\n", g_ffe0_n, a, v, p144);
+}
+#endif
+
+/* #882 計測専用 (M11_INSTR_60A270=1 のときだけ有効): function_60a270 の入口で this (rcx) と [this] / [this+0xa9] を
+ * stderr に出す。40ffe0 へ this を渡す唯一の経路 (60a270 の 0x60a28d) の caller 側。線形メモリ外は読まない。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_60A270
+#define M11_INSTR_60A270 0
+#endif
+#if M11_INSTR_60A270
+static int g_a270_n;
+void m11_a270_obs(unsigned long long a) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long w0 = 0, f = 0;
+    if (a + 8 <= heap) w0 = *(volatile unsigned long long*)(uintptr_t)a;
+    if (a + 0xaa <= heap) f = *(volatile unsigned char*)(uintptr_t)(a + 0xa9);
+    if (g_a270_n++ < 16)
+        fprintf(stderr, "[m11][a270] #%d this=0x%llx [this]=0x%llx [this+a9]=%llu\n", g_a270_n, a, w0, f);
 }
 #endif
 

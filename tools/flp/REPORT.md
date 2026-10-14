@@ -92,7 +92,7 @@
 | 20 | Pitcher | 18 | 20 | 4 |
 
 - 137 種中、projects で使われず preset のみに現れるのは 32 種 (Kepler Exo 192, VFX Script 99, VFX Key Mapper 42, Transmitter 39, FL Studio Mobile Rack FX 36, Multiband Delay 22 …)。
-- **第三者 VST は本コーパスに存在しない** (wrapper 経由は Fruity Mute 2 / Phase Inverter の 2 件のみ)。VST2/VST3 の chunk 解析 (`parseWrapperData`) は合成データでのみ検証。Serum 2 / OTT 等を含む FLP は素材待ち (§7)。
+- **第三者 VST は本コーパスに存在しない** (wrapper 経由は Fruity Mute 2 / Phase Inverter の 2 件のみ)。`parseWrapperData` は実データで検証 (#110: 実機 OTT.fst + 上記 2 件の chunk が往復 byte 一致、`test/wrapper_real.test.ts`)。Serum 2 / OTT 等を含む FLP は素材待ち (§7)。
 - tools/plugins への示唆: 実効影響は **ミキサ insert の EQ/Limiter/Reverb/Delay/Maximus/WaveShaper/PanOMatic** (instance 数) と **ジェネレータ 3x Osc / Sytrus / Harmless / Harmor**。Render tests が各々単体検証の足場になる。
 
 ## 6. コーパス manifest (`corpus/manifest.json`) の概況
@@ -214,3 +214,24 @@
 ## 12. L-3 (#104): 上位 5 plugin の state (event 213) デコーダ + DSP クラス静的所見
 
 - 詳細・実測・未解決 (起票先付き) は **`REPORT_APPENDIX.md` §12**。Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 の state(213) デコーダ (`src/plugstate.ts`) を実装し、コーパス 2,090 件の往復が byte-exact。**受入条件 (クラス A/B 判定表) は未達** (X/L/W 3 者比較は未実施。静的走査による推定のみ)。
+
+- #113 S1 (wine64 での FL 26.1.7 起動) は **未達**。WinVerifyTrust (G03) で停止し FLEngine_x64.dll に未到達。詳細・trace 根拠は **`REPORT_APPENDIX.md` §14**。測定 commit `155382c8`、`git diff 155382c8 HEAD -- tools/flp/s1_wine_probe.sh tools/startup tools/assets` = 空 (差分 0)。
+
+## 13. Wrapper chunk (event 213) の実データ検証 (#110 / L-7)
+
+`parseWrapperData` を Fruity Wrapper reader (h10 REPORT §2) に合わせた修正 (version 5–12 受理・id 50 任意・57/58 対応) の検証。`parseWrapperChunk` は tools/flp 側で末尾余剰・切詰め record・record 0 件を拒否する (h10 §2 reader より厳格、意図的)。
+
+- 未対応: h10 §2 の `id == 0` (header をもう 1 つ読む分岐) は `parseWrapperChunk` が扱わない。実データ (OTT.fst・corpus 2 件・生成 DB 5 件) には現れない。
+- 実データ: 実機 OTT.fst (VST3, version 8)・`Fruity Mute 2.flp` (sha256 `15f83301…`)・`Fruity Phase Inverter.flp` (sha256 `08debe63…`) (corpus 2 件は `fl-win64` の `block18625_DATA.bin` / `block18629_DATA.bin`、名前を付けて `WRAPPER_FLP_DIR` に置く)。
+
+測定 commit: **`ab2e79a1`** (doc コメント修正 commit。コードは `1cba8790` から不変)。PR 検証起点 commit は `1cba8790`。
+
+| 実行 (`tools/flp`、`node --test`) | 結果 |
+|---|---|
+| `test/wrapper_real.test.ts` (`WRAPPER_FLP_DIR` 指定) | tests 5 / pass 5 / fail 0 / skipped 0 (0.32 s) |
+| `test/*.test.ts` (`WRAPPER_FLP_DIR` 指定) | tests 43 / pass **40** / fail 0 / skipped 3 |
+| `test/*.test.ts` (`WRAPPER_FLP_DIR` 未指定) | tests 43 / pass **38** / fail 0 / skipped 5 |
+| `tools/hostbridge/nfo` `test/*.test.ts` | tests 40 / pass 36 / fail 0 / skipped 4 |
+| `tools/hostbridge/h10/test/wrapper_reader.test.ts` | tests 10 / pass 10 / fail 0 |
+
+差分 (測定 commit 以降のコード): `git diff ab2e79a1 HEAD -- tools/flp/src tools/flp/test tools/hostbridge` は **0 行** (本節の REPORT 追記のみが `tools/flp/REPORT.md` に入る)。PR 起点 `1cba8790` からの差分は doc コメント 1 行 (`tools/flp/src/summary.ts`) のみ。

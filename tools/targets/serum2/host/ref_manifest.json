@@ -1,0 +1,38 @@
+{
+  "file": "render_f32.wav (本体は work/ で gitignore・commit しない)",
+  "sha256_data": "7adcbc28546ec3a0f411e822a26b4ca5a2514e836d562d4bc59f4af658c81fce",
+  "sha256_file": "672007a06d1482ada6f846ec8f5e8a763a2586e032dbabe5fb5432332bd332c1",
+  "format": {
+    "tag": "IEEE float",
+    "bits": 32,
+    "channels": 2,
+    "sample_rate": 48000
+  },
+  "frames": 8192,
+  "metrics": {
+    "peak": 0.790915,
+    "rms": 0.310052,
+    "nonzero_samples": 16380,
+    "total_samples": 16384
+  },
+  "render": {
+    "content": "work/ref_content (専用の空 dir・Tables 無し)。env S2REF_CONTENT で変更可",
+    "dll": "work/Serum2_win64.vst3 (実 DLL, 無改変 unpatched, sha256 501e7bb3…5283)",
+    "state": "plugin 既定 (Init, setState なし)",
+    "midi": "NoteOn pitch=60 (S2HOST_PITCH 既定) block 0 / NoteOff block 24",
+    "blocks": 64,
+    "block_frames": 128,
+    "sample_rate": 48000,
+    "runner": "wine64 (apt wine 9.0), Actions runner",
+    "command": "bash tools/targets/serum2/host/ref_render.sh <outdir> 60"
+  },
+  "content_full": {
+    "content": "installer 全展開 (7z x、7,370 files、Tables あり) を S2REF_CONTENT に指定",
+    "sha256_data": "87fb714922017800212c5562c1ecc3fad579c6838a4e9b0f226ada92e02058ef",
+    "sha256_file": "b4fd6d642b2d0a8f8e4b075b91b029ca4c6fc95ed3688c3e9397cf03ea416420",
+    "metrics": {
+      "peak": 0.691102,
+      "rms": 0.269762
+    }
+  }
+}

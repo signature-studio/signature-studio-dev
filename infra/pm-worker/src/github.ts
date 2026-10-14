@@ -1,5 +1,6 @@
 // GitHub REST クライアント (App の installation token を使う)。fetch は注入できる (テストでモックする)。
 import { b64u, fromB64u } from "./crypto.ts";
+import { parseRateHeaders, type RateInfo } from "./ratelimit.ts";
 
 export type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -44,9 +45,18 @@ export async function appJwt(appId: number | string, pem: string, nowSec: number
 
 export { fromB64u };
 
+export const DISPATCH_TYPES = ["oc-watchdog"] as const;
+export type DispatchType = (typeof DISPATCH_TYPES)[number];
+
 export interface GhResponse<T = any> {
   status: number;
   json: T;
+}
+
+export interface ListResult<T> {
+  items: T[];
+  truncated: boolean;
+  pages: number;
 }
 
 export class Gh {
@@ -54,11 +64,13 @@ export class Gh {
   calls = 0;
   private readonly f: FetchFn;
   private readonly token: () => Promise<string>;
+  private readonly onRate?: (r: RateInfo) => void;
   readonly repo: string;
-  constructor(f: FetchFn, token: () => Promise<string>, repo: string) {
+  constructor(f: FetchFn, token: () => Promise<string>, repo: string, onRate?: (r: RateInfo) => void) {
     this.f = f;
     this.token = token;
     this.repo = repo;
+    this.onRate = onRate;
   }
 
   async req<T = any>(method: string, path: string, body?: unknown, okStatuses: number[] = []): Promise<GhResponse<T>> {
@@ -75,8 +87,12 @@ export class Gh {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     this.calls++;
-    const rem = r.headers.get("x-ratelimit-remaining");
-    if (rem !== null) this.remaining = Number(rem);
+    // 成功・失敗を問わず全応答のヘッダを見る。ヘッダの無い応答では何も更新しない。
+    const rate = parseRateHeaders(r.headers);
+    if (rate) {
+      if (rate.remaining !== undefined) this.remaining = rate.remaining;
+      this.onRate?.(rate);
+    }
     if (!r.ok && !okStatuses.includes(r.status)) {
       void r.body?.cancel();
       throw new GhError(method, path, r.status);
@@ -86,24 +102,52 @@ export class Gh {
   }
 
   // per_page=100 を page で辿る。maxPages で打ち切る (呼び出し側が上限を決める)。
-  async list<T = any>(path: string, maxPages: number, pick: (j: any) => T[] = (j) => j): Promise<T[]> {
+  // stop は『この項目以降は窓の外』の判定 (一覧が窓の外へ向かって並んでいるときだけ使う)。最初に当たった項目より後ろは捨てて、そこで終える。
+  // truncated は『上限で止めたが、まだ続きがある』。上限ちょうどで読み尽くしたときに誤判定しないよう、次の 1 ページを読んで確かめる。
+  // pages は結果に使ったページ数 (確認のために読んだ次の 1 ページは数えない)。
+  async list<T = any>(
+    path: string,
+    maxPages: number,
+    pick: (j: any) => T[] = (j) => j,
+    stop?: (item: T) => boolean,
+  ): Promise<ListResult<T>> {
+    const sep = path.includes("?") ? "&" : "?";
+    const read = async (page: number): Promise<{ items: T[]; last: boolean }> => {
+      const { json } = await this.req("GET", `${path}${sep}per_page=100&page=${page}`);
+      let items = pick(json) ?? [];
+      let last = items.length < 100;
+      const at = stop ? items.findIndex(stop) : -1;
+      if (at >= 0) {
+        items = items.slice(0, at);
+        last = true;
+      }
+      return { items, last };
+    };
     const out: T[] = [];
     for (let page = 1; page <= maxPages; page++) {
-      const sep = path.includes("?") ? "&" : "?";
-      const { json } = await this.req("GET", `${path}${sep}per_page=100&page=${page}`);
-      const items = pick(json) ?? [];
-      out.push(...items);
-      if (items.length < 100) break;
+      const r = await read(page);
+      out.push(...r.items);
+      if (r.last) return { items: out, truncated: false, pages: page };
     }
-    return out;
+    const next = await read(maxPages + 1);
+    return { items: out, truncated: next.items.length > 0, pages: maxPages };
   }
 
   comment(n: number, body: string) {
     return this.req("POST", `/repos/${this.repo}/issues/${n}/comments`, { body });
   }
 
-  dispatch(eventType: string) {
+  // Worker が送る repository_dispatch は 2 種類だけ: oc-watchdog (この dispatch。payload は event_type のみ) と oc-pm (dispatchPm。payload は kind と ref のみ)。
+  // oc-fix は PR 番号・理由・素材名の client_payload が要り、検証と送信は Actions の watchdog.sh が行う (Worker は送らない)。
+  dispatch(eventType: DispatchType) {
+    if (!DISPATCH_TYPES.includes(eventType)) throw new Error("dispatch type not allowed");
     return this.req("POST", `/repos/${this.repo}/dispatches`, { event_type: eventType });
+  }
+
+  // PM agent の起動 (oc-pm)。DISPATCH_TYPES の許可リストは通らず、oc-pm を送るのはこの関数だけ。
+  // payload は kind と ref の 2 つだけ。呼び出し側 (engine) が validPayload で値域を検証した値だけを渡す。
+  dispatchPm(kind: string, ref: number) {
+    return this.req("POST", `/repos/${this.repo}/dispatches`, { event_type: "oc-pm", client_payload: { kind, ref } });
   }
 }
 
@@ -124,6 +168,11 @@ export class InstallationAuth {
     this.creds = creds;
     this.now = now;
     this.onInstallation = onInstallation;
+  }
+
+  // 直近に発行した token (ログ・status から取り除く対象を知るため)。期限切れでも返す。無ければ null。
+  current(): string | null {
+    return this.tok?.v ?? null;
   }
 
   async token(): Promise<string> {

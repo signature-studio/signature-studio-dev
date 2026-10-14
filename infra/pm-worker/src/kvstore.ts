@@ -7,7 +7,9 @@ export type Bucket =
   | "pmArt"
   | "blockedBy"
   | "launchedAt"
+  | "sig"
   | "relaunch"
+  | "launchObs"
   | "meta";
 
 export interface Store {

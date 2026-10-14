@@ -257,6 +257,16 @@ EMSCRIPTEN_KEEPALIVE double m11_probe_count(int i) { return (i >= 0 && i < PROBE
 #ifndef M11_RT_EMPTY
 #define M11_RT_EMPTY 0
 #endif
+#ifndef M11_RT_NODATA
+#define M11_RT_NODATA 0
+#endif
+#if M11_RT_NODATA
+void m11_dest_obs(unsigned long long dest) { (void)*(volatile unsigned long long*)(uintptr_t)dest; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) { (void)k; (void)field; return -1.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hlo(void) { return 0.0; }
+#else
 #if M11_RT_PADPRE
 static unsigned char g_pad_pre[M11_RT_PADPRE] __attribute__((used));
 #endif
@@ -272,6 +282,9 @@ static unsigned char g_pad_post[M11_RT_PADPOST] __attribute__((used));
 #ifndef M11_DEST_READ
 #define M11_DEST_READ 1
 #endif
+#ifndef M11_DEST_GUARD
+#define M11_DEST_GUARD 0
+#endif
 void m11_dest_obs(unsigned long long dest) {
 #if M11_RT_EMPTY
     (void)dest; return;
@@ -282,8 +295,17 @@ void m11_dest_obs(unsigned long long dest) {
 #if !M11_DEST_READ
     return;
 #endif
-    unsigned long long v = *(volatile unsigned long long*)(uintptr_t)dest;
     unsigned long long k = g_dest_n;
+#if M11_DEST_GUARD
+    /* #1547 (M11_DEST_GUARD=1 のときだけ): dest 自体が線形メモリ外なら読まない (st=3)。読出し値は変えない */
+    unsigned long long heap0 = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    if (dest < 8 || dest + 8 > heap0) {
+        g_dest_h = (g_dest_h ^ 0xdeadULL) * 1099511628211ULL; g_dest_n++;
+        if (k < M11_DEST_REC_MAX) { g_rec_st[k] = 3; g_rec_len[k] = 0; g_rec_rc[k] = 0; g_rec_h[k] = 0; }
+        return;
+    }
+#endif
+    unsigned long long v = *(volatile unsigned long long*)(uintptr_t)dest;
     g_dest_h = (g_dest_h ^ v) * 1099511628211ULL; g_dest_n++;
     if (k < M11_DEST_REC_MAX) {
         /* #1389: 呼出し k の dest の値 (文字列の内容) を記録する。ポインタ値はヒープ配置で変わるため指紋に使わない。
@@ -318,4 +340,5 @@ EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) {
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return (double)g_dest_n; }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return (double)(unsigned)(g_dest_h >> 32); }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hlo(void) { return (double)(unsigned)(g_dest_h & 0xffffffffu); }
+#endif
 #endif

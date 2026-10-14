@@ -71,6 +71,12 @@ export class PmApp {
         const a = d.store.get<AppRecord>("meta", "app");
         return a ? `${a.slug}[bot]` : null;
       },
+      // status・ログから取り除く実行時の secret (復号済みの webhook secret・PEM・STORE_KEY と、直近の installation token)。
+      secrets: () => {
+        const pem = this.creds?.pem ?? "";
+        const pemLines = pem.split("\n").filter((l) => l.length >= 20 && !l.startsWith("-----"));
+        return [this.wh, pem, ...pemLines, d.storeKey, this.auth?.current()].filter((x): x is string => !!x);
+      },
     });
   }
 
@@ -98,7 +104,7 @@ export class PmApp {
           if (this.creds) this.creds.installationId = id;
         },
       );
-      this.gh = new Gh(this.d.fetch, () => (this.auth as InstallationAuth).token(), this.d.cfg.repo);
+      this.gh = new Gh(this.d.fetch, () => (this.auth as InstallationAuth).token(), this.d.cfg.repo, (r) => this.engine.recordRate(r));
     }
     return this.gh;
   }
@@ -204,7 +210,7 @@ export class PmApp {
     // App の bot ログイン (公開情報)。Actions 側の vars.OC_PM_BOT_LOGIN にはこの値を設定する。
     const s = this.engine.status({ configured: !!rec, installed: !!rec?.installationId, pm_bot_login: rec ? `${rec.slug}[bot]` : null });
     if (!detail) {
-      for (const k of ["log", "would_launch_now", "last_error"]) delete s[k];
+      for (const k of ["log", "would_launch_now", "would_dispatch_pm", "last_error"]) delete s[k];
       return json(s);
     }
     if (!(await this.callerCanPush(req.headers.get("authorization")))) return json({ error: "unauthorized" }, 401);

@@ -29,4 +29,4 @@
 - 未解析: before で `jt_present` だった 0x1810304bb が after で `jt_dropped` になった機構 (rewrite 側か restore 側か) は本 run では切り分けていない。
 - 結論: `jt_dropped` は before 1 件 / after 2 件。after の 2 件は rewrite 由来の可能性があるため、別途切り分けが必要。
 
-未解決: (1) メモリ形 `jmp [r10+rdx*8+d]` への `jt` 展開対応と FLEngine の効果測定 → #1402 (ICALL-26)。(2) OTT F の jt_dropped 8 件の展開後残件数の実測 → #1573 (ICALL-31・素材 `analysis-ott-binaries` が必要で本 run では未取得)。
+未解決: (1) メモリ形 `jmp [r10+rdx*8+d]` への `jt` 展開対応と FLEngine の効果測定 → #1402 (ICALL-26)。(2) OTT F の jt_dropped 8 件の展開後残件数 → #1573 (ICALL-31) で実測済み。結果と数値は `REPORT_APPENDIX_1573.md`。

@@ -28,10 +28,94 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from ldmach import Machine, memops_of  # noqa: E402
 from ldframe import is_write_only, frame_model, escaped_stack_vars  # noqa: E402
-from audit_undefload import scan_text, META_RE  # noqa: E402
+from audit_undefload import scan_text, META_RE, DEF_RE, INSN_RE  # noqa: E402
 
 STOP_MN = ('call', 'ret', 'jmp')
+RMW_REG_MN = ('add', 'sub', 'and', 'or', 'xor', 'not', 'neg', 'inc', 'dec', 'shl', 'shr', 'sar',
+              'rol', 'ror', 'adc', 'sbb', 'imul')
 BACK_MAX = 16
+LOAD_RE = re.compile(r'^  (%[\w.$-]+) = load (i\d+), ptr (%[\w.$-]+)(?![\w.$-])')
+
+
+def named_stack_reads(body, svars):
+    """escape 済み名前付き stack_var の load (直接、または ptrtoint/add/inttoptr 経由 = ldfix F4 の形) を返す。
+    戻り値: [(load 名, ty, stack_var 番号, 先頭からの offset, load 行)]。"""
+    ptr, num = {}, {}
+    for n, e in svars.items():
+        if e:
+            ptr['%%stack_var_-%d' % n] = (n, 0)
+    lines = body.split('\n')
+    for _ in range(2):
+        for l in lines:
+            m = re.match(r'^\s*(%[\w.$-]+) = (.*)$', l)
+            if not m:
+                continue
+            d, rhs = m.groups()
+            mm = re.match(r'bitcast ptr (%[\w.$-]+) to ptr$', rhs)
+            if mm and mm.group(1) in ptr:
+                ptr[d] = ptr[mm.group(1)]
+                continue
+            mm = re.match(r'ptrtoint ptr (%[\w.$-]+) to i64$', rhs)
+            if mm and mm.group(1) in ptr:
+                num[d] = ptr[mm.group(1)]
+                continue
+            mm = re.match(r'add i64 (%[\w.$-]+), (-?\d+)$', rhs)
+            if mm and mm.group(1) in num:
+                b, o = num[mm.group(1)]
+                num[d] = (b, o + int(mm.group(2)))
+                continue
+            mm = re.match(r'inttoptr i64 (%[\w.$-]+) to ptr$', rhs)
+            if mm and mm.group(1) in num:
+                ptr[d] = num[mm.group(1)]
+    out = []
+    for l in lines:
+        lm = LOAD_RE.match(l)
+        if lm and lm.group(3) in ptr:
+            n, off = ptr[lm.group(3)]
+            out.append((lm.group(1), lm.group(2), n, off, l))
+    return out
+
+
+def scan_named_text(text, meta):
+    """escape 済み名前付き stack_var の load 1 件ごとに consumer (!insn.addr) を集める (F4 相当の site 抽出)。"""
+    for m in DEF_RE.finditer(text):
+        end = text.index('\n}', m.end()) + 2
+        body = text[m.start():end]
+        if '%stack_var_-' not in body:
+            continue
+        svars = escaped_stack_vars(body)
+        lines = body.split('\n')
+        for (v, ty, n, off, _l) in named_stack_reads(body, svars):
+            cons = []
+            for j, l2 in enumerate(lines):
+                if not re.search(re.escape(v) + r'(?![\w.$-])', l2) or re.match(r'^  %s = ' % re.escape(v), l2):
+                    continue
+                im = INSN_RE.search(l2)
+                cons.append((l2.strip()[:120], meta.get(int(im.group(1))) if im else None))
+            yield dict(fn=m.group(1), va=int(m.group(2), 16), load=v, ty=ty, sv=n, off=off, cons=cons)
+
+
+def run_named(pe, out, paths):
+    mach = Machine(pe)
+    sites = []
+    for path in paths:
+        text = open(path, errors='replace').read()
+        meta = {int(a): int(b) for a, b in META_RE.findall(text)}
+        for rec in scan_named_text(text, meta):
+            mins = mach.disasm_fn(rec['va']) or []
+            cons = []
+            for (txt, addr) in rec['cons']:
+                ins = next((i for i in mins if i.address == addr), None) if addr is not None else None
+                cons.append(dict(ir=txt, addr=('%x' % addr) if addr is not None else None,
+                                 mn=('%s %s' % (ins.mnemonic, ins.op_str)) if ins is not None else None))
+            if not cons:
+                continue
+            sites.append(dict(fn='%x' % rec['va'], load=rec['load'], ty=rec['ty'], sv='stack_var_-%d' % rec['sv'],
+                              off=rec['off'], cons=cons[:3], file=os.path.basename(path)))
+    fns = sorted(set(s['fn'] for s in sites))
+    res = dict(sites_total=len(sites), functions=fns, sites=sorted(sites, key=lambda s: s['fn']))
+    json.dump(res, open(out, 'w'), indent=1)
+    print('named sites', len(sites), 'functions', len(fns), ' '.join(fns))
 
 
 def regs_of(cs, ids):
@@ -43,13 +127,21 @@ def regs_of(cs, ids):
     return out
 
 
+READS_DEST_EXTRA = ('cmp', 'test', 'xchg', 'bswap', 'bt', 'bts', 'btr', 'btc', 'shld', 'shrd', 'xadd', 'cmpxchg', 'rcl', 'rcr')
+
+
+def reads_dest(mn):
+    """第 1 オペランド (dest) を読む命令か。cvttsd2si rax,xmm0 等の純粋な def は false (旧 reads_of は dest を常に read 扱いしていた)。"""
+    return mn in RMW_REG_MN or mn in READS_DEST_EXTRA or mn.startswith('cmov')
+
+
 def reads_of(cs, ins):
     """命令が値を読むレジスタ (memory オペランドの base/index を含む。dest のみの mov 先は除く)。"""
     import capstone
     out = set(regs_of(cs, ins.regs_read))
     ops = ins.operands
     for i, op in enumerate(ops):
-        if op.type == capstone.CS_OP_REG and i > 0 or (op.type == capstone.CS_OP_REG and i == 0 and ins.mnemonic not in ('mov', 'movzx', 'movsx', 'movsxd', 'lea')):
+        if op.type == capstone.CS_OP_REG and i > 0 or (op.type == capstone.CS_OP_REG and i == 0 and reads_dest(ins.mnemonic)):
             n = cs.reg_name(op.reg)
             if n:
                 out.add(n.lower())
@@ -64,7 +156,12 @@ def reads_of(cs, ins):
 
 def norm_reg64(name):
     from ldmach import _REG_ALIAS
+    if name in _LOW8_CL:
+        return _LOW8_CL[name]
     return _REG_ALIAS.get(name)
+
+
+_LOW8_CL = {'cl': 'rcx'}  # shl/shr/sar/rol/ror の可変シフト量。ldmach の _REG_ALIAS には無い (本監査内だけで補う)
 
 
 def mem_read_of(cs, ins):
@@ -74,8 +171,24 @@ def mem_read_of(cs, ins):
     return reads[0] if reads else None
 
 
+def is_reg_rmw(cs, w):
+    """dest レジスタを読んで書き戻すだけの命令 (メモリ無し)。`sub eax,1` 等。`xor eax,eax` 等の自己ゼロ化は純粋な def なので除く。"""
+    import capstone
+    if w.mnemonic not in RMW_REG_MN or not w.operands or w.operands[0].type != capstone.CS_OP_REG:
+        return False
+    if any(op.type == capstone.CS_OP_MEM for op in w.operands):
+        return False
+    if w.mnemonic == 'imul' and len(w.operands) != 2:
+        return False
+    if w.mnemonic in ('xor', 'sub', 'sbb') and len(w.operands) == 2 and w.operands[1].type == capstone.CS_OP_REG \
+            and w.operands[1].reg == w.operands[0].reg:
+        return False
+    return True
+
+
 def trace_dest(mach, va, addr, cs_ins):
-    """consumer (addr) が読むレジスタを直前に書いた命令を辿り、その memory read を返す。(mo, writer_ins) or (None, None)"""
+    """consumer (addr) が読むレジスタを直前に書いた命令を辿り、その memory read を返す。(mo, writer_ins) or (None, None)
+    reg-only RMW writer (is_reg_rmw) は値の元ではなく途中経過なので飛ばし、同じレジスタを書いた次の writer まで遡る。"""
     cs = mach.cs
     seq = mach.disasm_fn(va) or []
     idx = next((i for i, x in enumerate(seq) if x.address == addr), None)
@@ -92,6 +205,10 @@ def trace_dest(mach, va, addr, cs_ins):
         if w.operands and w.operands[0].type == 1 and w.mnemonic not in ('cmp', 'test'):
             wr.add(norm_reg64(cs.reg_name(w.operands[0].reg)))
         if want & wr:
+            if is_reg_rmw(cs, w):
+                # 途中経過は飛ばすが、その命令の第 2 オペランドレジスタ (add eax,ecx の ecx / shl eax,cl の cl) は値の元なので追跡に加える
+                want |= {norm_reg64(cs.reg_name(op.reg)) for op in w.operands[1:] if op.type == 1} - {None}
+                continue
             mo = mem_read_of(cs, w)
             return mo, w
     return None, None
@@ -135,6 +252,8 @@ def classify_dest(mach, va, addr, cs_ins, fm, svars):
 
 
 def main():
+    if sys.argv[1] == '--named':
+        return run_named(sys.argv[2], sys.argv[3], sys.argv[4:])
     pe, out = sys.argv[1], sys.argv[2]
     mach = Machine(pe)
     sites = []
@@ -174,7 +293,8 @@ def main():
         fns[s['cls']].add(s['fn'])
     res = dict(sites_total=len(sites), by_class=dict(tally), fns_by_class={k: len(v) for k, v in fns.items()},
                dest_frame_in_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_IN_ESCAPED'], key=lambda s: s['fn']),
-               dest_frame_ptr_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_PTR_ESCAPED'], key=lambda s: s['fn']))
+               dest_frame_ptr_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_PTR_ESCAPED'], key=lambda s: s['fn']),
+               dest_riprip=sorted([s for s in sites if s['cls'] == 'DEST_RIPREAD'], key=lambda s: s['fn']))
     json.dump(res, open(out, 'w'), indent=1)
     print('sites', len(sites), dict(tally), {k: len(v) for k, v in fns.items()})
 

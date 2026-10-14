@@ -163,11 +163,15 @@ test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら再着手�
   p = ctx.app.engine.plan();
   assert.deepEqual(p.picks.map((x) => x.n), [60]);
   const gh = await (ctx.app.engine as any).d.gh();
+  // 投稿のたびに、その run が現れた状態にする (現れない投稿は 5 分で failed になり、再投稿しない)。
   for (let i = 0; i < 3; i++) {
     await ctx.app.engine.launch(gh);
+    await send(ctx.app, "workflow_run", runPayload(100 + i, "completed", { event: "issue_comment", title: "[CI-60] t60", created: new Date(clock.t + 30_000).toISOString() }));
     clock.t += 4 * 3_600_000;
     await markFresh(ctx);
   }
+  assert.equal(comments(ctx.m.calls).filter((c) => c.url.includes("/issues/60/")).length, 3);
+  await ctx.app.engine.launch(gh); // tick と同じく、最後の投稿の観測を進める
   assert.equal(comments(ctx.m.calls).filter((c) => c.url.includes("/issues/60/")).length, 3);
   assert.ok(!ctx.app.engine.plan().picks.some((x) => x.n === 60), "3 回で止める");
   assert.deepEqual(ctx.app.engine.plan().rows.stopped.map(([n]) => n), [60]);
@@ -197,7 +201,7 @@ test("alarm/cron: tick は repository_dispatch (oc-watchdog) を送る。cron �
   assert.ok(d[0].url.endsWith("/repos/signature-studio/signature-studio-dev/dispatches"));
   clock.t += 30_000; // cron が alarm の直後に来た
   await ctx.app.engine.tick();
-  assert.equal(dispatches(ctx.m.calls).length, 1, "周期の半分以内は再送しない");
+  assert.equal(dispatches(ctx.m.calls).length, 1, "前回の送信から周期 (5 分) 未満は再送しない");
   clock.t += 5 * 60_000;
   await ctx.app.engine.tick();
   assert.equal(dispatches(ctx.m.calls).length, 2, "5 分後に再送");

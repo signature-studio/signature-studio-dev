@@ -38,7 +38,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                ├ push -u origin <N>-<slug>        │
    │                                ├ gh pr create --base main         │
    │                                ├ gh issue comment N (進捗・実測)   │
-   │                                └ Status → In review を依頼 ────────┤
+   │                                └ ready PR を出して依頼 ───────────┤
    │                                                                   ├ 自分の worktree で
    │                                                                   │  PR branch を checkout
    │                                                                   ├ e2e 独立再実行 + 別算法検算
@@ -49,7 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
-- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度・Status は PM が確定する)。
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度は PM が確定する。Project の Status は参考で、§3)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
@@ -62,9 +62,9 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 役割 | 着手時 | 完了時 | 禁止 |
 |---|---|---|---|
-| 実装 subagent | In progress | **In review** (自分を Done にしない) | Done への変更・他チケットの Status 変更 |
-| 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定 | merge・方針変更・是正 | — |
+| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更 |
+| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge・方針変更・是正 | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
@@ -82,23 +82,39 @@ PM (main)                      subagent (実装)                  subagent (検�
   `gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`
   起票の直前にもう一度、`gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -cF '[<AREA>-<n>]'`
   が 0 になることを確認する (番号の重複を作らない)。② 本文に `親: #N`・受入条件・
-  必要な `oc_artifacts:` 行を書く。③ milestone・優先度・Project の Status は PM が確定する (subagent は触らない)。
+  必要な `oc_artifacts:` 行を書く。③ milestone・優先度は PM が確定する (subagent は触らない。Project の Status は参考のため触らない)。
   ④ 起票した番号を、最終回答と issue コメントに書く。
-- **チケット状態の唯一の正は Project V2 の Status フィールド + issue の open/closed**
-  (技術進捗の正本は `docs/STATUS.md`)。不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
+- **チケット状態の正は issue の open/closed + ラベル + PR の状態** (技術進捗の正本は `docs/STATUS.md`)。
+  open な issue は次の表のどれかに分類する。語は `/status` (PM Worker) と `tools/pm/launch_issues.py plan` が出すもので、新しい語は作らない。
+  上から順に判定し、最初に当たったものが分類になる。
+
+| 分類 | 判定 (GitHub の事実) | 意味・次の一手 |
+|---|---|---|
+| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 依頼者の回答・適用待ち。自動着手しない |
+| `blocked` | open な blocked_by (issue dependencies) がある、本文の依存行 (`依存:`・`blockedBy:` など) が open な issue を指す、`tools/pm/manual_deps.json` の依存 (停止報告に根拠のあるもの) が open、または子 issue を持つ親で PR が無い | blocker が close されるまで着手しない |
+| `started` (着手済み) | open PR が `N-<slug>` ブランチか `Closes/Refs/Fixes #N` で紐づく、または実装 run が稼働中 | 実装・レビュー・修正の途中。二重に着手しない |
+| `stopped` | 直近 24 時間以内の bot の最後のコメントが停止報告で、再投入の素材が無い、または再投入の上限 (2 回) に達した | PM の判断待ち |
+| `ready` | 上のどれにも当たらない (未着手・非ブロック) | 次の `launch` の対象 |
+
+- 停止報告の窓は **24 時間**。24 時間を過ぎた停止報告は `stopped` にならず、`ready` 扱いで次の `launch` の対象になる (`classify` の窓は `launch_issues.py` と Worker で同じ)。
+- `pm-apply` の issue は、Worker の `plan()` が着手も再投入もせず `user` 行に置く (`oc:no-pr` の有無に依らない)。
+- `recent` (`/oc` の投稿から 3 時間以内で報告がまだ無い、または bot のコメントから 1.5 時間以内) は着手直後の待ちとして `started` と同様に扱う。
+  `relaunch` (停止報告の素材名で再投入する候補) は `plan` の一時分類。`oc:stuck` の PR は着手数の律速に数えない。
+- **Project V2 の Status は参考**。VM の `tools/pm/sync_status.py` が動いている間だけ同期し、VM 退役後は更新されない。
+  判断の根拠にしない (根拠: #2353 の PM 判断)。
 - **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
 - **1 状態遷移 = 1 コメント**。コメントなしの状態変更は禁止。
-- **Status を変えるのは PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
-- **中断・ブロックで終了する場合**: Status は In progress のまま、中断コメント (到達点・WIP 所在・再開手順) を残し、
-  最終回答の冒頭に「未完・In Progress のまま」と明記。
+- **分類を変えるラベル (`needs-user-input`・`pm-apply`・`oc:stuck`・`oc:no-pr`) と milestone の変更は PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
+- **中断・ブロックで終了する場合**: issue は open のまま (分類は `started` か `stopped`)。中断コメント (到達点・WIP 所在・再開手順) を残し、
+  最終回答の冒頭に「未完・open のまま」と明記。
 
 ## 4. 着手前の確認 (毎回・省略不可)
 
 1. `gh issue view <N>` でスコープ・受入条件・親 issue・検証方法を確認。
-2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
+2. 同一チケット / 同一 dir に open PR (`started`) か稼働中の実装 run があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
-   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D22 と `tools/icall/REPORT.md` §4 の D1〜D13 は
+   **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D23 と `tools/icall/REPORT.md` §4 の D1〜D13 は
    **別体系**。参照時は `(DEFECTS.md)` / `(icall §4)` を必ず併記。
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
@@ -219,7 +235,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-m11` → `tools/m11/work/`、`work-liftdiff` → `tools/liftdiff/work/` に展開される
     (gitignore 対象の検証スナップショット。commit しない)。`work-m11` は #516 qstore 以前の生成
     (`qstore_report.json`・`ir_conditions.json` 無し) で現 main の生成手順と一致しない (#680)。survey の基準には使わない。
-    IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §12・#728)。ただし reached_stage は 4 で trap が残り、IR の sha256 は実行ごとに変わる (未切り分け)。
+    IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §12・#728)。ただし reached_stage は 4 で trap が残る。IR の sha256 は A7 の空行除去 (#1664) より前は実行ごとに変わった (原因と修正後の一致は `tools/m11/REPORT_APPENDIX_960.md` §19)。
     `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
@@ -228,8 +244,16 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
     作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可)。
-    R2 への投入は PM が行う (S3 multipart、R2 から再ダウンロードした sha256 と梱包元の一致を確認する)。
+    R2 への投入の手順は下の「R2 への投入 (VM 非依存の手順)」。現状は PM が VM 上で行い、VM 退役後の担い手は依頼者とする。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
+- **R2 への投入 (VM 非依存の手順・#2434)**: 担い手は依頼者 (現状の PM は VM 上で行う。VM 退役後は依頼者が行う)。
+  素材の原本の所在は `docs/REFERENCES.md` の「素材の原本と R2 bundle の対応」、投入の頻度は `tools/pm/REPORT.md` §13 が正本。
+  1. **権限を昇格**: Cloudflare で R2 の API token の権限を、バケット `signature-studio-artifacts` に限り「Workers R2 Storage Bucket Item Read」から「Read + Write」へ変える。画面上の操作名は `[未確認]`。昇格中は、この token を使う全ての経路が書ける (Actions の `CF_R2_*` が同じ token かは `[未確認]`)。投入は短時間で終える。
+  2. **投入**: 梱包した `<name>.tar.zst` を S3 互換 API で置く。大きい object は aws cli が multipart で送る (`tools/plugins/framework/fw_pack_stage1.sh` の注記と同じ形): `aws s3 cp <name>.tar.zst s3://signature-studio-artifacts/artifacts/<name>.tar.zst --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`。S3 のキーは環境変数で渡し、値を repo・ログ・issue に書かない。
+  3. **照合**: R2 から同じ object を取り直し、梱包元と sha256 が一致することを確認する。不一致なら 2 からやり直す。
+  4. **権限を戻す**: 手順 1 の逆 (Read のみ)。戻したことを確認する方法は `[未確認]`。
+  5. **許可名を足す場合**: 同じ PR で `.github/scripts/prepare-event-context.sh` と `.github/scripts/watchdog.sh` の `ARTIFACT_RE` と、本節の許可名一覧を更新する。`pr-lint.sh` は watchdog.sh の値を読むため、`grep -n '^ARTIFACT_RE=' .github/scripts/*.sh` で両者の一致を確認する。
+  - **Actions から投入しない理由**: (1) Actions の R2 認証 (`CF_ACCOUNT_ID`・`CF_R2_ACCESS_KEY_ID`・`CF_R2_SECRET_ACCESS_KEY`) は素材の取得に使う。`tools/pm/README.md` の運用の約束は、投入を「R2 への投入は既存 token の一時昇格だけで行い、終わったら必ず Read のみへ戻す」と定める。Write 可能な token を repo secret に置くと、`/oc` を書ける人の run (実装 agent を含む) がバケットに書ける。(2) 原本の一部は VM のディスクにしか無い (`docs/REFERENCES.md` の原本表)。run からは `~/ダウンロード/` や mac pkg の展開物を再作成できない。
 - **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
   (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
   tools/ のスクリプトは `tools/shared/env.sh` (bash)・`paths.py`・`paths.mjs` 経由でこの変数を読む
@@ -264,6 +288,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
+- **PM は依頼者の不在 (最大 2 日) を前提とする (依頼者指示 144)**: 依頼者は一度指示すると最低 2 時間、最大 2 日間は不在になり、
+  依頼者の指示がないと進行できない状態はそのまま遅延になる。依頼者の操作が必要な項目は非ブロッキングにする
+  (`needs-user-input` で積み、それを待たずに他の作業を進める)。依頼者の応答を、他の作業の前提条件にしない。
 - **open PR は 2 状態のみ (依頼者指示 119・120・122・123)**: 実装が始まったチケットは merge まで止めない。
   open PR は常に次の **どちらか** であり、「レビューも修正もされていない状態」(IDLE) を 1 秒も作らない。
 
@@ -286,7 +313,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
     reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
     必ず走らせられる。この変更は App に `workflows` 権限が無く
-    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した。
+    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した (現行の運用は下の「workflow 変更の運用」)。
     COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
     (Copilot の review は来ないことがあり、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
@@ -353,9 +380,50 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     annotation が読めないときは何もしない (watchdog が拾う)。
   - **watchdog の集計** (`watchdog.sh`): open issue で、blocked でなく、open PR が無く、実行中の implement run も無く、`oc:no-pr`・`needs-user-input`・`oc:stuck` も無い
     issue を `floating-issues=N` として出力する (step summary にも出る)。**数えるだけで何もしない** (launch は PM Worker の責務)。本文の『依存: #N』『親: #N』による待ちは見ないため、上限値の目安である。
+  - **PM Worker の停止検知** (`watchdog.sh`、#2328): `tools/pm/worker_url` の URL の `/status` を `curl -fsS -m 10` で読む。`configured` と `installed` がともに true
+    (一度でも稼働に入った Worker) で、`fresh` が false または `last_tick` が 15 分より古ければ、題名 `[CI-n] PM Worker 停止 (<日付>)`・ラベル `pm-worker-down` の issue を起票する
+    (本文は `/status` の写しと `@pycabbage`。`needs-user-input` は付けない)。**`configured:false` / `installed:false` (`/setup` 未了) では起票しない。**
+    重複排除: ラベル付きの open issue があれば追記のみ (1 時間に 1 回まで)、24 時間以内に close した issue は reopen して追記する。
+    回復 (`fresh` が true かつ `last_tick` が 5 分以内) で、open の障害 issue にコメントして close する。ファイルが無い・取得失敗・JSON 不正は警告だけで何もしない (終了コードは変えない)。
   - **bot の `/oc`** (#1949): PM 用 GitHub App の `/oc` は `vars.OC_PM_BOT_LOGIN` との完全一致 + `user.type == 'Bot'` で許可する (`.github/README.md`)。
 
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
   IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
   着手報告だけで終わった実装 run は `find_silent_runs.sh` で検出する。
 
+### workflow 変更の運用 (VM 退役後の凍結・`pm-apply`)
+
+実装 App には `workflows` 権限が無く、agent は `.github/workflows/` を push できない。これまでは PM の PAT で
+PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次の運用に置き換える (判断: 2026-10-14、#2319。運用の正本はこの節)。
+
+- **(a) 凍結**: VM 退役後は `.github/workflows/` の変更を凍結する。ロジックは `.github/scripts/`・`.github/prompts/` に寄せ、workflow は薄い配線に保つ。
+- **(b) 依頼**: 変更が必要になったら、issue に `pm-apply` と `needs-user-input` を付け、`git apply` できる unified diff をコメントに書いて止まる。diff は `.github/workflows/` の変更だけにする。PM agent は `pm-apply` を付けられない (許可ラベル外。`.github/prompts/pm.md`)。その場合は `needs-user-input` だけを付けて依頼者へ渡し、依頼者が `pm-apply` を付ける。
+- **(c) 適用 (依頼者が手元で行う)**: 依頼者は diff の内容 (特に `permissions:` と `secrets.*` の参照) を確かめてから、コメントの diff を `diff.patch` に保存し、次を実行する。merge は reviewer App が行うため、PAT は要らない。
+
+  ```sh
+  git fetch origin main && git switch -c <N>-workflow origin/main && git apply diff.patch
+  git add .github/workflows && git commit -m "ci: <要旨>" -- .github/workflows
+  git push -u origin HEAD
+  gh pr create --base main --title "ci: <要旨>" --body "Closes #<N>"
+  ```
+
+- **(d) App に `workflows` 権限を足さない理由**: 足すと、検査 (review) を通らない workflow 変更を agent が作れ、`OC_APP_PRIVATE_KEY`・`OC_REVIEW_APP_PRIVATE_KEY`・`OC_AUTH_EXPORT`・`CF_R2_*` などの secrets を読む workflow を書けてしまう。検査を迂回する経路が 1 つでもあれば、secrets の持ち出しに直結する。足す場合の条件は、org owner の承認と、workflow 変更を機械的に検査してから適用する設計の両方が揃うこと。経緯は #2352 (staged-apply、不採用)。
+- **退役の条件**: VM の timer・PAT・keyring を止める前に、open の `pm-apply` の issue が 0 件であること (確認: `gh api "repos/<R>/issues?labels=pm-apply&state=open" --jq length`)。
+
+
+## 12. 依頼者不在時の運用 (needs-user-input・assume-and-proceed)
+
+依頼者は指示後、最低 2 時間・最大 2 日間不在になりうる。依頼者の判断が要る事項は `needs-user-input` で積み、
+他の作業を止めない。規則 R1〜R9 と境界 U1〜U8 の**正本は `.github/prompts/pm.md`** である (本節に複製しない)。
+
+- **書式**: `needs-user-input` を付けた issue の本文先頭に、次の 4 項目を順に書く。
+  1. 質問
+  2. 既定案 (依頼者の回答が無いときに採る案)
+  3. 既定で進むと何が起きるか
+  4. 答えを変えたときの戻し方
+- **依存 issue は既定案で進める (assume-and-proceed)**。依存 issue を `blocked_by` にしない。
+  依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
+- **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
+  PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
+- **不在中の自動判断**: PM agent が行った判断は `<!-- oc-pm-decision: rule=Rn reversible=yes/no -->` マーカーで残る。
+  事後の確認はダイジェスト ([CI-70]) で行う。

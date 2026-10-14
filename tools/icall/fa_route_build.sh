@@ -11,7 +11,7 @@ set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T="$HERE/.."
 W="$HERE/work/fa_route"; mkdir -p "$W/tmp"
-SRC="$HERE/work/rt_freshair-core/after.0.restored.ll"
+SRC="${FA_SRC:-$HERE/work/rt_freshair-core/after.0.restored.ll}"
 MAP="$HERE/work/rt_freshair-core/map.json"
 DLL="${FA_CORE:-$T/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64}"
 if [ ! -f "$SRC" ] || [ ! -f "$MAP" ]; then echo "[fa_route] $SRC / $MAP が無い: 素材 work-icall を展開 (tools/icall/work/rt_freshair-core)" >&2; exit 2; fi
@@ -19,7 +19,20 @@ if [ ! -f "$DLL" ]; then echo "[fa_route] $DLL が無い: 素材 plugins-freshai
 BLK_SHIFTED="$(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(hex(m['blk']-0x180000000+0x30000000))" "$MAP")"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 # 1. 復元後 IR の後処理
-python3 "$HERE/ir_fix_mask.py" "$SRC" "$W/oi.restored.ll" > "$W/fix_mask.json"
+# ICALL-70: cookie global (0x18125eaa8) の load 幅 i32 → i64 (RetDec の global 型決定段が i32 と型付け、#2262 付録 §3)
+# 既定 OFF: 初期値 COOKIE_INIT の出所が未確認のため (REPORT_APPENDIX_2280 §3)。検証する run だけ FA_FIX_COOKIE=1 で有効化する
+if [ "${FA_FIX_COOKIE:-0}" = "1" ]; then
+  python3 "$HERE/ir_fix_cookie.py" "$SRC" "$W/cookie_fixed.ll" > "$W/fix_cookie.json"; SRC_FIX="$W/cookie_fixed.ll"
+else
+  SRC_FIX="$SRC"
+fi
+# ICALL-77 (#2427): 機械語の脱落 frame slot store を IR に戻し、隣接 slot を 1 alloca にまとめる (frame_slot_restore.py)。既定 OFF。FA_FRAME_SLOT=1 で有効化
+if [ "${FA_FRAME_SLOT:-0}" = "1" ]; then
+  RTD="$HERE/work/rt_freshair-core"
+  python3 "$HERE/frame_slot_restore.py" --ir "$SRC_FIX" --dsm "$RTD/before.0.drc.dsm" --before-ll "$RTD/before.0.drc.ll" --ranges "$RTD/F.ranges" --out "$W/frame_slot.ll" --report "$W/frame_slot.json"
+  SRC_FIX="$W/frame_slot.ll"
+fi
+python3 "$HERE/ir_fix_mask.py" "$SRC_FIX" "$W/oi.restored.ll" > "$W/fix_mask.json"
 python3 "$HERE/ir_fix_vstore.py" "$W/oi.restored.ll" "$W/oi.restored1.ll" > "$W/fix_vstore.json"; mv "$W/oi.restored1.ll" "$W/oi.restored.ll"
 # 2. normalize / ir5_patch → flatten (画像全域を shift)
 python3 "$T/m2/ir_normalize.py" "$W/oi.restored.ll" "$W/oi.norm0.ll" >/dev/null

@@ -1,10 +1,10 @@
 # STATUS — 技術進捗の正本
 
-本ファイルが**技術進捗**に関する唯一の正本である (チケット状態の正本は Project V2 の Status
-フィールド + issue の open/closed。`docs/WORKFLOW.md` §3)。
+本ファイルが**技術進捗**に関する唯一の正本である (チケット状態の正本は issue の open/closed + ラベル + PR の状態。
+分類の表は `docs/WORKFLOW.md` §3。Project V2 の Status は参考)。
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
-- 更新責任: **PM (main) のみ**。subagent は REPORT で報告し、PM がここを更新する。
+- 更新責任: merge の事実を反映する更新は agent も PR で行ってよい。自動節 (§5) は `tools/pm/status_sync.py` が更新する (#2361)。方針の変更・MS の定義の改訂は PM。
 - 測定値・実測数値は書かない。各リンク先 (`tools/<area>/REPORT.md`) が単一の正本。
 - 引き継ぎ情報は `docs/HANDOFF/2026-10-12.md`。
 
@@ -46,7 +46,7 @@
 | MS8 | オーディオパス (AudioWorklet + SAB ring) | 設計・PoC あり (`tools/audio/`) |
 | MS9 | プロジェクト入出力 + FL 純正プラグイン in-process | 部分 (`tools/flp`, `tools/plugins/`) |
 | MS10 | 性能・安定性チューニング | 計測基盤あり (`tools/perf/`) |
-| MS11 | E2E 統合 + FL 追従 + EULA/非再配布運用固定化 | 未達。FL 新版取り込み手順は素材ありで `pnpm terms-watch` (FL 同梱 2 文書 + Xfer) を呼ぶこと (週次 workflow `terms-watch.yaml` は Web 4 文書のみ (配置待ち)。`tools/legal/terms-watch/REPORT.md`) |
+| MS11 | E2E 統合 + FL 追従 + EULA/非再配布運用固定化 | 未達。FL 新版取り込み手順は素材ありで `pnpm terms-watch` (FL 同梱 2 文書 + Xfer) を呼ぶこと (週次 workflow `terms-watch.yaml` は Web 4 文書のみ・配置済み。`tools/legal/terms-watch/REPORT.md`) |
 | MS12 | ホストデプロイ + `agent-browser` E2E 検証 | **部分達成** (デプロイ実績あり・FLEngine 起動は未達) |
 
 状態の判断基準: 「完了」= 各段の検証条件が満たされたこと。「部分達成」= 一部の検証項目のみクリア。
@@ -85,15 +85,15 @@
 | `hostbridge` | 設計+mini VST2 host PoC | `tools/hostbridge/REPORT.md` |
 | `hostbridge/{cb,h2,lowbase,nfo}` | 各実装済 | 各 `REPORT.md` |
 | `hostbridge/h10` | Wrapper chunk reader 静的解析済 (実行検証は #267) | `tools/hostbridge/h10/REPORT.md` |
-| `gui` | 設計+PoC | `tools/gui/REPORT.md` |
-| `audio` | 設計+PoC (e2e で既知 FAIL 1 件あり・詳細は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
+| `gui` | 設計+PoC。e2e は agent-browser / puppeteer 駆動が main 入り。FL の窓種別に依存する部分は未達 | `tools/gui/REPORT.md` |
+| `audio` | 設計+PoC。DirectSound shim・Web MIDI shim・FlAudioShim の本体適用が main 入り。dev 経路の断続 FAIL の再現・切り分け (AU-15) は未了。ソークは AU-10 で一部達成 (残件は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
 | `audio/asio` | COM アダプタ+soak | `tools/audio/asio/REPORT.md` |
 | `assets` | chunk ローダ+二段キャッシュ | `tools/assets/REPORT.md` |
 | `assets/wvfs` | 書込可能 VFS | `tools/assets/wvfs/REPORT.md` |
-| `python` | CPython wasm+ブリッジ設計 | `tools/python/REPORT.md` |
+| `python` | CPython wasm+ブリッジ。flapi provider の静的リンクと per-module state が main 入り。FLEngine 実機上の動作は未達 | `tools/python/REPORT.md` |
 | `flp` | FLP/FST パーサ設計 | `tools/flp/REPORT.md` |
 | `plugins` | 141 種マップ (カウントの正本: `tools/plugins/REPORT.md`) | `tools/plugins/REPORT.md` |
-| `plugins/framework` | TFruityHost shim | `tools/plugins/framework/REPORT.md` |
+| `plugins/framework` | TFruityHost shim。fw stage-2 は runner で再構築可能 (PLG-P0a)。framework smoke PASS・hs_e2e Phase B は未達 (memory access out of bounds。#985) | `tools/plugins/framework/REPORT.md` |
 | `plugins/p0c` | kernel 表検証+f80 | `tools/plugins/p0c/REPORT.md` |
 | `shared` | 分類+OSS 再ビルド+プロプラ lift PoC | `tools/shared/REPORT.md` |
 | `ipp` | 評価・PoC・優先 stub 充填まで完了 | `tools/ipp/REPORT.md` |
@@ -124,3 +124,77 @@
 4. **OpenCode Actions 基盤 (GitHub Actions)** — 2026-10-12 main 稼働開始 (PR #282, merge `bec32da`)。残 follow-ups は [CI-1] #284 で管理。
 5. **Issue/PR の整理** — `[AREA-n]` prefix 統一・`state:*` ラベル不使用 (PM 担当)。
 
+
+## 5. 直近の merge の要約 (自動)
+
+下の節 (`status-auto` マーカーの内側だけ) は `tools/pm/status_sync.py` が更新する。**手で編集しない**。
+直近 24 時間に main へ merge された PR を、MS またはサブシステムに写像した件数と代表 PR の番号だけを書く
+(測定値は書かない。正本は `tools/<area>/REPORT.md`)。写像できない PR は「その他」に件数だけ数える。
+
+<!-- status-auto:begin -->
+- 期間: (未実行)
+- merge 件数: (未実行)
+- updated: (未実行)
+<!-- status-auto:end -->
+
+## 6. 写像表 (`status_sync.py` が読む)
+
+PR → 対象の優先順: 紐づく issue (`Closes`/`Refs`/`Fixes #N`) の題名 `[AREA-n]` → PR 題名の AREA → ラベル →
+題名の `MS<数字>` → PR 題名の scope (`type(scope):`) → 本文の `MS<数字>` → その他。
+AREA は題名の `[...]` の先頭から最長一致で引く。`subsystems` は §3 の行名 (`scopes` の既定の照合先)。
+AREA 別の対応は `CI` `DOCS` `LGL` `E2E` を「その他 (CI/DOCS)」とする (#2360 の対応表を引き継ぐ)。
+
+<!-- status-map
+{
+  "ms": ["MS1", "MS2", "MS3", "MS4", "MS5", "MS6", "MS7", "MS8", "MS9", "MS10", "MS11", "MS12"],
+  "subsystems": [
+    "m1", "m2", "m3", "m5", "m11", "m11/alloca",
+    "m11/ldfix", "m11/shimx_link", "ott", "flelift", "flelift/boot", "liftlib",
+    "liftdiff", "icall", "icall/disp_size", "icall/landing", "shim", "shimx",
+    "shimx/pathreg", "startup", "startup/glue", "startup/keyfix", "startup/pump", "startup/vreg",
+    "startup/winstubs", "startup/helpviewer", "startup/loadpaths", "runtime", "hostbridge", "hostbridge/cb",
+    "hostbridge/h2", "hostbridge/lowbase", "hostbridge/nfo", "hostbridge/h10", "gui", "audio",
+    "audio/asio", "assets", "assets/wvfs", "python", "flp", "plugins",
+    "plugins/framework", "plugins/p0c", "shared", "ipp", "ipp/shim", "ipp/shim/fft",
+    "targets/serum2", "targets/serum2/license", "targets/massivex", "targets/massivex/dsp", "targets/kilohearts", "targets/kilohearts/license",
+    "targets/kilohearts/snapins", "targets/freshair", "targets/freshair/lift2", "e2e", "hosting", "legal/notices",
+    "deploy", "perf"
+  ],
+  "areas": {
+    "M11": "m11", "FLE": "flelift/boot", "LD": "liftdiff",
+    "ICALL": "icall", "LIFTLIB": "liftlib", "P0c": "plugins/p0c",
+    "PLG": "plugins", "PLG-F": "plugins/framework", "PLG-P0a": "plugins/framework",
+    "PLG-P0b": "plugins/framework", "SR": "targets/serum2", "FA": "targets/freshair",
+    "KH": "targets/kilohearts", "MX": "targets/massivex", "AU": "audio",
+    "GUI": "gui", "PY": "python", "T-SH": "shared",
+    "IPP": "ipp", "RT": "runtime", "HB": "hostbridge",
+    "SHX": "shimx", "ST": "startup", "PERF": "perf",
+    "OTT": "ott", "L": "flp", "H": "hosting",
+    "CI": "その他", "DOCS": "その他", "LGL": "その他",
+    "E2E": "その他"
+  },
+  "labels": {
+    "area:audio": "audio", "area:e2e": "その他", "area:flp": "flp",
+    "area:freshair": "targets/freshair", "area:fruity": "plugins", "area:gui": "gui",
+    "area:hostbridge": "hostbridge", "area:hosting": "hosting", "area:icall": "icall",
+    "area:ipp": "ipp", "area:kilohearts": "targets/kilohearts", "area:legal": "その他",
+    "area:liftdiff": "liftdiff", "area:liftlib": "liftlib", "area:m11": "m11",
+    "area:massivex": "targets/massivex", "area:ott": "ott", "area:perf": "perf",
+    "area:plugin": "plugins", "area:python": "python", "area:runtime": "runtime",
+    "area:serum": "targets/serum2", "area:sharedlib": "shared", "area:shimx": "shimx",
+    "area:startup": "startup", "area:vfs": "assets/wvfs"
+  },
+  "scopes": {
+    "ldfix": "m11/ldfix", "m11-ldfix": "m11/ldfix", "serum2": "targets/serum2",
+    "serum2-host": "targets/serum2", "freshair": "targets/freshair", "massivex": "targets/massivex",
+    "kilohearts": "targets/kilohearts", "kh": "targets/kilohearts", "p0c": "plugins/p0c",
+    "asio": "audio/asio", "nfo": "hostbridge/nfo", "hostbridge-nfo": "hostbridge/nfo",
+    "vreg": "startup/vreg", "actions": "その他", "workflow": "その他",
+    "ci": "その他", "pm": "その他", "pm-worker": "その他",
+    "watchdog": "その他", "docs": "その他"
+  }
+}
+-->
+
+
+更新 2026-10-14T11:53Z (基準 commit `9ea012b6` / origin/main)。対象期間 2026-10-13T06:13Z 以降の merge PR 1015 件 (REST `pulls?state=closed&base=main` の `merged_at`)。
