@@ -107,6 +107,7 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
 
 集計 = `tests/trace_diverge_unreachable.py` → `results/m11_unreachable_diverge.md`、`tests/oob_414ad0.py` → `results/m11_oob_414ad0.md` (数値・表はそちらが正本)。
 入力は §8 と同じ既存 batch jsonl (再走なし) と PE (`LD_M11_PE` または `--pe`)。
+- LD-41 (#1238): 型 C・D の P3 の 0x417b70 の静的確認 (idiv/udiv 対応・次 entry 組) は `REPORT_APPENDIX_LD41.md` に分割移動 (動的確認は未達)。
 
 - **unreachable (最初の trap が unreachable の 220 関数)**: うち trace_head 内で native/wasm の食い違いを観測した 212 件を対象に、
   最初に食い違う直前の関数 L を数える。trace_head が両側で完全一致し食い違い未観測の 8 件 (trace_head は最大 12 件で打切り) は分岐点集計から除外した。
