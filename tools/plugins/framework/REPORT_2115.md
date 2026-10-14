@@ -205,14 +205,15 @@ for m in re.finditer(b"\xe8", d):
 | `rcx` 書換えの有無による呼出元の分類 | 本 REPORT では採用せず (戻り値に影響しないため判断は不要) | 未実施のまま (定義を決めてから再測定) |
 | REPORT_2069 §3.1 の解析対象の誤り (`block00031` を使用) | 前提の誤伝播 | 本 PR で §1 に訂正を記載 |
 | r3 系の引数付き呼出 (8 件) と 0 引数定義の不一致 | 引数規約の不整合 | #2115 (同上) |
-| fold deref (`0x40d6e0` / `[0x710040]`) と `plug != 0` | Phase B OOB | #1890 / #2008 (既存) |
+| fold deref (`0x40d6e0` / `[0x710040]`) と `plug != 0` | Phase B OOB | #2534 (`[PLG-P0b-19]`・OPEN。#1890 → #1935 → #2008 → #2426 → #2534 の移管先) |
 | 対照 (既定と同一コード) と stand-in 版 (未採用) の各 n=1 (`--fresh`・load 記録済み。付録 §10.3)。n≥3 の min–max は未実施 | 失敗位置 (`0x4e5fa6` の target 0 / `0x1712`) の解釈。stand-in 版を採用する判断の前提 | #2115 (継続。採用を検討する場合は n≥3) |
 | 同一の実行コードで §8 と付録 §10.3 の結果が食い違う。失敗位置の変化は n=1 で変動未評価 | Phase B 結果の解釈 | #2115 (継続) |
 | `hostshim/hs_e2e.sh` の増分判定 (49 行目) が `fw_hostfix.py` の変更を見ない (`--fresh` の測定には影響しない) | plain 実行で古い `hs_flat3.ll` が混入する余地 | #2115 (継続。測定ハーネスの修正は再測定を伴うため本 PR では未変更) |
 | main 側で 3b581236 以降に framework 8 ファイル (`fw_rt.c`・`fw_boot.c`・`hostshim/hs_preinit.mjs` 等) が変わった。merge 後の挙動は未測定。本 PR はコード差分 0 (docs のみ) のため、この merge 結果は本 PR の判定対象外 | merge 後の Phase A 回帰 (`dispatch=38 ff=0` の確認)。merge 時に確認 | #2115 (継続) |
 | Phase B (`hs_e2e_run`) は framework 初期化 (`_StartLib`・TLS 初期化) を通らない。TLS 値を正しくしても OOB は残る (付録 §11.5 E3) | 受入 2 (Phase B の変化) | #2571 (子) |
 | `0x418120` の実行経路の訂正: `_InitLib` の hooks 表 (`0x6d6ef8`・reason=1 → `[+8]`) からの間接 call で実行される (§10.1 の「呼ばれない」は誤り) | 前提の訂正 | 付録 §11.1 で訂正済み |
-| lift の fold 欠陥: `function_4180a0` の引数 `ecx` が `ptrtoint @683` に化け、`function_4180d0` の戻り値が 1 になる | TLS block が正しく作られない | #1890 / #2008 (fold 系・既存)・付録 §11.3 |
+| lift の fold 欠陥: `function_4180a0` の引数 `ecx` が `ptrtoint @683` に化け、`function_4180d0` の戻り値が 1 になる | TLS block が正しく作られない | #2510 (`[PLG-P0b-18]`・OPEN。同じ類型の別インスタンスとしてコメントで追記)・付録 §11.3 |
+| fix round 6 の `fw_rt.c` 表示カウンタ分離 (commit `058c2049`) は実行コードの差分。WORKFLOW §6 の再測定が必要 | merge 前の e2e 再測定が未実施 (表示のみで戻り値は不変。付録 §11.4 に差分全文) | #2115 (継続。素材 `work-fw-stage1` と emsdk を用意して再測定) |
 
 ## 10. TLS index 未設定の確認と stand-in 版の実験 (未採用・測定 commit 91308efd)
 

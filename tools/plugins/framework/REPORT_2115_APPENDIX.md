@@ -58,7 +58,7 @@
 
 - `_InitLib` (native 0x40db20) は `reason ∈ {1,2}` で `call qword ptr [rbx + rsi*8]` (0x40dbfe・`rbx` = hooks 表・`rsi` = reason) を行う。`reason==3` も同形 (0x40dc2d)。
 - hooks 表 `0x6d6ef8`: `[+0]=0x4181b0`・`[+8]=0x418120`・`[+0x10]=0x4180d0`・`[+0x18]=0x418160` (`block18983` の .data)。reason=1 の `[+8]` が `0x418120` (TLS 初期化)。E8 走査 (68 件) に現れないのは、間接 call のため。
-- 実行の確認 (Phase A・`fw_boot.c` の診断行): `[fw][ov] hooks[1]=0x418120` → `TlsAlloc -> 1` → `hooks[1] done: tls_idx=1`。TLS idx は設定されている。
+- 実行の確認 (Phase A・`fw_boot.c` の診断行): `[fw][ov] hooks[1]=0x418120` → `TlsAlloc -> 1` → `hooks[1] done: tls_idx=1`。TLS idx は設定されている。出典: 測定 commit 4c00ec24 の §11.4 の実行 (`fw_stage2.sh` と `hs_e2e.sh --fresh`・15:09–15:11) の stderr。log ファイルは保存していない (本 run の環境に無い)。再現は同じ実行で `grep '\[fw\]\[ov\]\|\[fw\]\[tls\]'` する。
 
 ### 11.2 native の意味 (逆アセンブル・block18983)
 
@@ -66,9 +66,10 @@
 |---|---|
 | `0x418120` (hooks[1]) | `[0x6d6e70] = TlsAlloc()`。`0x4180d0()`。`[0x7162d0] = TlsGetValue([0x6d6e70])` |
 | `0x4180d0` | `ebx = 0x4180c0()` (= 0x288 固定・`lea rax,[0x288]; ret`)。`blk = LocalAlloc(0x40, ebx)`。`blk != 0` なら `TlsSetValue(idx, blk)` |
-| `0x4181e0` (TLS getter・引数なし) | `[0x7162d8] != 0` なら `TlsGetValue(idx)`。0 なら `0x4180d0` を呼んで再取得し、なお 0 なら `[0x7162d0]`。`[0x7162d8] == 0` なら `gs:[0x58][idx*8]` (idx = -1 で範囲外) |
+| `0x4181e0` (TLS getter・引数なし) | 分岐は `[0x7162d8]` (1 バイトの flag) で決まる。idx は `[0x6d6e70]`。`[0x7162d8] == 0` なら `gs:[0x58][idx*8]` を返す (idx = -1 なら範囲外)。`[0x7162d8] != 0` なら `TlsGetValue(idx)` を呼ぶ: 0 でなければ返す。0 なら `0x4180d0` を呼んでから `TlsGetValue(idx)` を再度呼び、0 でなければ返す。なお 0 なら `[0x7162d0]` を返す |
 | `0x4189c0` (_StartLib) | `reason==1` で `[0x716290]=1`・`[0x7162d8]=1` 等 (fw_boot.c の既存実装と一致) |
 
+- 上の分岐は `block18983_PE.bin` の逆アセンブル (capstone) で確認した。`0x418030`・`0x418010`・`0x418040` は IAT 名で `TlsGetValue`・`TlsAlloc`・`TlsSetValue` に対応する。`0x4180a0` は `LocalAlloc(0x40, ecx)` (`0x417ff0` = `LocalAlloc`)。idx の `[0x6d6e70]` は、分岐の 3 箇所の rip 相対参照で確認した。
 - したがって getter の正しい戻り値は、per-thread block (0x288 byte・`LocalAlloc` のゼロ初期化) のポインタ。caller はその `+568` を deref する (§8・§10)。
 - `return 0` 注釈は、この block の代わりに 0 を返す。
 
@@ -78,8 +79,9 @@
 - `function_4180a0` の lift は引数 `ecx` (= 0x288) を `ptrtoint @683` に fold する。`LocalAlloc(0x40, 0x10000880)` になり、wasm の定数アドレスが size に入る。
 - `function_4180d0` の lift では、`TlsSetValue(1, 0x1)` の値が LocalAlloc の戻り (`0x118b60a8`) ではなく `1` になる。この戻り値の受け渡しも lift 側の欠陥と判断した (原因の IR 行は未特定)。
 - その結果 `[0x7162d0] = 1`。TLS 値の不正は、TLS の意味論ではなく lift の fold 由来。
+- 起票先: `#2510` (生成側で定数の `ptrtoint` が値に fold される欠陥。同じ類型の別インスタンスとして `#2510` にコメントで追記する)。`docs/DEFECTS.md` D21 と同型の可能性はあるが未確認。`#1890`・`#2008` は close 済みのため使わない。
 
-### 11.4 実測 (測定 commit 4c00ec24・framework コードは origin/main と同一 + 表示行のみ)
+### 11.4 実測 (測定 commit 4c00ec24)
 
 | 手順 | 結果 | 所要 (real) | load (開始 → 終了) |
 |---|---|---|---|
@@ -88,16 +90,46 @@
 
 - 対照 (§10.3 の 3b581236) と同じ失敗形 (Phase B OOB・rec=7・1 項目)。1 回測定 (n=1)。
 - 表示行 (`[fw][ov] hooks[...]`・`[fw][tls] ...`) の追加は dispatch 数を変えない (smoke の dispatch=38 は維持)。
+- 測定 commit `4c00ec24` の framework コードは、表示行を入れた `86b6bdc2` の親 `9f403c97` に対して表示行のみ (`git diff 9f403c97 4c00ec24 -- tools/plugins/framework ':!*.md'`: `fw_boot.c` +3 と `fw_rt.c` の trace 行)。現在の `origin/main` (`3a6fcf81`) とは framework で 65 行の差がある (main が先に進んだため。merge 後の挙動は未測定・REPORT_2115.md §9)。
+- 測定後の実行コード差分 (fix round 6・commit `058c2049`・`fw_rt.c` の表示カウンタを分離): `git diff 4c00ec24 058c2049 -- tools/plugins/framework ':!*.md'` の出力は次の 23 行。LocalAlloc の trace は `g_local_trace`、TLS 関数の trace は `g_tls_trace` で数える。戻り値と分岐は変わらない (表示のみ)。
+
+```diff
+diff --git a/tools/plugins/framework/fw_rt.c b/tools/plugins/framework/fw_rt.c
+index 1ae5159c..641239e2 100644
+--- a/tools/plugins/framework/fw_rt.c
++++ b/tools/plugins/framework/fw_rt.c
+@@ -103,8 +103,8 @@ long long fw_call_cur(uint32_t va) {
+ #include "fw_rt.h"
+ 
+ /* ---- Local 系, Global 系メモリ API (RetDec が IAT thunk を名前解決して直接 call する) ---- */
+-static int g_tls_trace = 0;
+-void *LocalAlloc(unsigned flags, unsigned bytes) { void *r = HeapAlloc(0, flags, bytes); if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] LocalAlloc(0x%x, 0x%x) -> 0x%llx\n", flags, bytes, (unsigned long long)(uintptr_t)r); return r; }
++static int g_local_trace = 0;
++void *LocalAlloc(unsigned flags, unsigned bytes) { void *r = HeapAlloc(0, flags, bytes); if (g_local_trace++ < 16) fprintf(stderr, "[fw][tls] LocalAlloc(0x%x, 0x%x) -> 0x%llx\n", flags, bytes, (unsigned long long)(uintptr_t)r); return r; }
+ void *LocalReAlloc(void *p, unsigned bytes, unsigned flags) { (void)flags; return HeapReAlloc(0, 0, p, bytes); }
+ void *LocalFree(void *p) { HeapFree(0, 0, p); return p; }
+ void *LocalLock(void *p) { return p; }
+@@ -184,6 +184,7 @@ __attribute__((used)) void __frontend_reg_store_fpr(uint32_t idx, double v) { fw
+ /* ---- TLS (gs:[0x58] = ThreadLocalStoragePointer) ---- */
+ static uint64_t g_tls_slots[128];
+ static uint32_t g_tls_next = 1;
++static int g_tls_trace = 0;
+ int TlsAlloc(void) { int r = (int)(g_tls_next++); if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] TlsAlloc -> %d\n", r); return r; }
+ int TlsFree(int i) { (void)i; return 1; }
+ void *TlsGetValue(int i) { void *r = (i >= 0 && i < 128) ? (void *)(uintptr_t)g_tls_slots[i] : 0; if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] TlsGetValue(%d) -> 0x%llx\n", i, (unsigned long long)(uintptr_t)r); return r; }
+```
+
+- この差分は実行コードのため、WORKFLOW §6 の再測定の対象。**未実施**: `work-fw-stage1` と emsdk が本 run の環境に無い (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。構文は `clang -fsyntax-only` (`emscripten.h` を空スタブ) で修正前後ともエラー 0。merge 前の再測定は REPORT_2115.md §9 の未解決。
 
 ### 11.5 注入実験 (未採用)
 
 | 条件 | commit | Phase A | Phase B |
 |---|---|---|---|
-| E1: `0x4180d0` を native の意味に注釈 (`0x4181e0` の `return 0` は残す) | 未コミット | (fw_route は注釈を含まないため対象外) | `rec=7`・1 項目・OOB。`hs_hostfix.json` で置換を確認。Phase B は TLS 初期化を通さないため、この注釈は実行されない |
+| E1: `0x4180d0` を native の意味に注釈 (`0x4181e0` の `return 0` は残す) | 未コミット (未採用・本 PR に含めない) | — | 数値は報告しない (未コミットの WIP のため WORKFLOW §6 により判定に使わない)。採用する場合はコミットして HEAD 上で再測定する |
 | E3: Phase B の `hs_e2e_run` の先頭で `fw_call_cur(0x418120)` を 1 回呼ぶ + `0x4180d0` 注釈 + `0x4181e0` 注釈の削除 | `f850508a` (revert `4c00ec24` で戻し) | `dispatch=38 ff=0` | `rec=7`・1 項目・OOB。TLS は `TlsAlloc → 1`・`TlsSetValue(1, 0x118b6628)`・`TlsGetValue(1) → 0x118b6628` (正しい block)。失敗位置は変化: `0x40d807` の soft-miss (target 0) は消え、`0x4e5fa6` の間接 target が文字列バイト列 `0x6572432000000000` になる |
 
 ### 11.6 結論
 
 - 受入 2 は未達。戻り値の内容は次の形で確定した: getter は、`[0x7162d8]` が 1 なら `TlsGetValue(idx)`、0 なら `g_tls_slots[idx]` を返し、どちらも `0x4180d0` が確保した 0x288 byte の per-thread block を指す。`return 0` 注釈は、この block の代わりに 0 を返す。
 - Phase B は framework 初期化を通らない (`hs_plug.c` `hs_e2e_run` → `CreatePlugInstance`)。TLS 値を正しくしても OOB は消えず、block の内容 (`+568`) の native 初期化元が次の壁。これは子 issue #2571 に分割する。
-- 注釈の変更 (E1・E3) は、いずれも Phase B の失敗形を変えるだけで、E2E は PASS にならない。採用はしない。
+- 注釈の変更 (E3) は Phase B の失敗形を変えるだけで、E2E は PASS にならない (E3 の実測は §11.5)。E1 は未コミットのため判定に使わない。採用はしない。
