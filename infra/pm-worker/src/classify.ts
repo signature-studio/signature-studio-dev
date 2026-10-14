@@ -263,7 +263,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     }
   }
 
-  const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0 }));
+  const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0, labels: iss.get(n)?.labels ?? [] }));
   rows.ready = sortReady(ready).map((r) => r.n);
   return {
     rows,
