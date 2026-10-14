@@ -45,8 +45,8 @@ WATCH = {0x131bb5c, 0x13281af, 0x1320dd9, 0x1322b53, 0x131b8dd, 0x1320840}
 # HS_DISP_RET_ARG=1 のとき、機械語で rax=第1引数 と確定した callee は rcx を返す (#1222 §7)
 RET_ARG = os.environ.get('HS_DISP_RET_ARG') == '1'
 RET_ARG_VA = {0x412d60, 0x416230}
-# HS_DISP_RET_SPEC="VA:rcx,VA:host,..." で callee ごとの戻り値を指定する (#1222 §8)。
-# rcx = 第1引数を返す / host = HOST 領域 (有効ポインタ) を返す。未指定の callee は従来どおり 0。
+# HS_DISP_RET_SPEC="VA:rcx,VA:host,VA:one,..." で callee ごとの戻り値を指定する (#1222 §8・#2782 §10)。
+# rcx = 第1引数を返す / host = HOST 領域 (有効ポインタ) を返す / one = 整数 1 を返す。未指定の callee は従来どおり 0。
 RET_SPEC = {}
 for _item in filter(None, os.environ.get('HS_DISP_RET_SPEC', '').split(',')):
     _va, _mode = _item.split(':')
@@ -106,7 +106,7 @@ def run_one(ident, image, base, size, pe_data_sections):
             if RET_ARG and addr in RET_ARG_VA:
                 ret_rax = uc_.reg_read(UC_X86_REG_RCX)
             if addr in RET_SPEC:
-                ret_rax = uc_.reg_read(UC_X86_REG_RCX) if RET_SPEC[addr] == 'rcx' else HOST
+                ret_rax = {'rcx': uc_.reg_read(UC_X86_REG_RCX), 'host': HOST, 'one': 1}[RET_SPEC[addr]]
             uc_.reg_write(UC_X86_REG_RAX, ret_rax)
             uc_.reg_write(UC_X86_REG_RSP, sp + 8)
             uc_.reg_write(UC_X86_REG_RIP, ret)
