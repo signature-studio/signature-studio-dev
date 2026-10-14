@@ -8,10 +8,10 @@
 
 - state 2・8 の harness で、件数 >0 の経路を native で実行できた。A の vtable を image 内の ret 系機械語で作り、要素ごとに state と pair を置く (§3)。**6 件の候補 (No 1・2・6・7・9・10) の store がすべて 1 hit 以上で実行された** (§4)。前報の「0 hit (未実行)」は解消した。
 - **判定は依然 0 件**。候補 store の後段は、仮想 callee がその値を読むかで決まる。その callee は stub (`ret`) で、実物ではない。実物の vtable (A1 = `[this+0x370]`・A2 = `[this+0x480]`) は起動後の object graph の中にあり、静的には確定できない (§5)。
-- 受入 1 (SIGSEGV の解消): 前報のまま部分。state 1・2・3・7・8 も stub で戻るようになった (件数 1 の各 state・件数 3 の複合)。ただし callee は stub。
+- 受入 1 (SIGSEGV の解消): 部分。件数 0・state 2・8・8n (件数 1)・`2,8,8n` (件数 3) は stub で戻るようになった。state 1・3・7 は件数 1 で単独に SIGSEGV する (exit 95。§4・§9)。ただし戻った経路の callee は stub。
 - 受入 3 (0x1803dee20): 測定 (Intel Xeon 6973P-C) では 8/8 (入力素通し)。関数本体は xmm0 を書かず、出力は呼び出し先が残した xmm0 だった (§6)。0/8 と 8/8 の差の条件は未特定。
 
-受入の状況: 受入 1 = 部分 (件数 0・1・3 の trace は実行。callee は stub) / 受入 2 = 部分 (6 件すべて実行を確認。判定は 0 件で、判定できない理由は §5) / 受入 3 = 部分 (xmm0 の出所は関数本体の外と説明できた。0/8 と 8/8 の差は §9 の未解決)。
+受入の状況: 受入 1 = 部分 (件数 0・state 2・8・8n・`2,8,8n` の trace は実行。state 1・3・7 は SIGSEGV のまま。callee は stub) / 受入 2 = 部分 (6 件すべて実行を確認。判定は 0 件で、判定できない理由は §5) / 受入 3 = 部分 (xmm0 の出所は関数本体の外と説明できた。0/8 と 8/8 の差は §9 の未解決)。
 
 ## 2. 測定条件
 
@@ -59,9 +59,10 @@
 | `0x180da41a0` 41a0 (state 0 の呼び出し) | 0 | 1 | 1 | 1 | 3 |
 | trace records | 3 | 6 | 10 | 8 | 16 |
 
-- 全 spec で xmm0 は入力 `3ff8000000000000` (1.5) の素通しで、関数は戻った (SIGSEGV なし)。
+- 表の 5 条件では xmm0 は入力 `3ff8000000000000` (1.5) の素通しで、関数は戻った (SIGSEGV なし)。state 1・3・7 は次の項。
 - 件数 0 の経路は前報と同じ。候補 store は No 1 の 1 件だけが実行され、inc 点・出口も各 1 hit。
 - `06c46b21` で 5 条件 (件数 0・spec `2`・`8`・`8n`・`2,8,8n`) を再実行し、上の表の全 VA の hit 数と trace records が一致した (xmm0 は `3ff8000000000000`)。
+- state 1・3・7 は件数 1 で SIGSEGV する (exit 95)。`04c5c2ba` で再実行した (runner: AMD EPYC 9V74・4 vCPU・load 0.48)。spec `1` は `rip=0x180da7084`、spec `3` は `rip=0x180c8be3c` (関数の外)、spec `7` は `rip=0x180da71b8`。`1,3,7` (件数 3) は spec `1` と同じ `0x180da7084` で落ちる。
 - No 2・6・7・9・10 は、前報 (0 hit) から 1 hit 以上へ変わった。No 6・7 は state 8 (pair あり)、No 9・10 は state 8 (pair なし) の分岐にある。
 
 ## 5. 判定に必要な残件 (実物の仮想 callee)
@@ -79,7 +80,7 @@
 
 ## 6. 0x1803dee20 (受入 3) の再測定
 
-- 関数本体 (`0x1803dee20`–`0x1803def2a`) は、`rax = this` (rdi) を返す初期化関数である。xmm0 を書く命令は本体に無い。呼び出し先 (`0x180ca3260`・`0x18100c760` の 2 回) が残した xmm0 が、native の出力になる。
+- 関数本体 (`0x1803dee20`–`0x1803def2a`) は、`rax = this` (rdi) を返す初期化関数である。xmm0 を書く命令は本体に無い。呼び出し先 (`0x180ca3260` の 1 回と `0x18100c760` の 2 回、計 3 回。`objdump -d` の call は `0x1803dee3a`・`0x1803dee67`・`0x1803dee8b`) が残した xmm0 が、native の出力になる。
 - 測定 (6973P-C・`43b8a780`): 既定 8/8 (入力素通し)、`FA_HEAP_FILL=0xcc` 8/8。`GLIBC_TUNABLES=glibc.cpu.hwcaps=-AVX2_Usable,-AVX512F_Usable,-AVX512VL_Usable,-AVX512BW_Usable,-ERMS,-AVX_Fast_Unaligned_Load` でも 8/8 (libc の ifunc 選択の仮説は支持されなかった)。
 - 0/8 (native `0000…`) になった環境 (7763・9V74、前報) の条件は未特定。heap の埋め値が出力に入る経路 (どの load が xmm0 に残るか) も未確認。
 - この関数の xmm0 比較は機能の検査にならない (戻り値は rax)。受入 3 の「揺れ」は、残り値の揺れとして扱うのが妥当。harness の変更で消えるかは未確認。
@@ -96,7 +97,27 @@
 
 差分確認 (コード差分の出力):
 
-- wasm 系の測定 commit `43b8a780` から native trace の測定 commit `06c46b21` まで。`hit_180da6e60` を参照するのは `hit_180da6e60.py` と付録だけ (`grep -rln hit_180da6e60 tools docs .github`)。`fa_cmp.py`・`fa_sweep.sh`・`fa_route_build.sh` は読まないため、wasm 系の値は `43b8a780` のまま有効。
+wasm 系の値 (上の表) の鮮度は、wasm 経路の依存範囲の差分で判断した。依存範囲は、`fa_route_build.sh` が読む `tools/icall` と `tools/m2/ir_normalize.py`・`tools/m5/ir5_patch.py`・`tools/m11/m11_simd2.py`・`tools/m11/msimd11_core.h`・`tools/ott/lift/data_gen.py`・`tools/targets/freshair`、`fa_cmp.py` が `tools/ott/native/ottnat.py` 経由で読む `tools/shared/paths.py` を含む。範囲は `tools/icall tools/m2 tools/m5 tools/m11 tools/ott tools/shared tools/targets/freshair` とし、次の 3 件を除く。
+
+- `tools/icall/REPORT_APPENDIX_2695B.md`: 本付録。wasm 経路は読まない。
+- `tools/icall/diff/hit_180da6e60.py`: native 専用の harness。`grep -rln hit_180da6e60 tools docs .github` の参照は本付録・付録 2695・`hit_180da6e60.py` だけで、`fa_cmp.py`・`fa_sweep.sh`・`fa_route_build.sh` は読まない。
+- `tools/m11/ldfix/`: 依存に入らない。`tools/icall` の `*.py`・`*.sh`・`*.c`・`*.h`・`*.js`・`*.cjs`・`*.json` と上の依存ファイルに `ldfix` の参照は無い (`grep -rl ldfix`)。
+
+差分の出力 (HEAD `04c5c2ba` で実行。本付録の修正 commit は本付録だけを変えるため、同じ範囲の差分は 0 のまま):
+
+```
+$ git diff --name-only 43b8a780 04c5c2ba -- tools/icall tools/m2 tools/m5 tools/m11 tools/ott tools/shared tools/targets/freshair
+tools/icall/REPORT_APPENDIX_2695B.md
+tools/icall/diff/hit_180da6e60.py
+tools/m11/ldfix/REPORT_2923.md
+tools/m11/ldfix/results/candidate_verdicts_2923.jsonl
+tools/m11/ldfix/results/spill178_1161.tsv
+tools/m11/ldfix/spill_classify_1161.py
+$ git diff --stat 43b8a780 04c5c2ba -- tools/icall tools/m2 tools/m5 tools/m11 tools/ott tools/shared tools/targets/freshair ':!tools/icall/REPORT_APPENDIX_2695B.md' ':!tools/icall/diff/hit_180da6e60.py' ':!tools/m11/ldfix'
+(出力 0 行)
+```
+
+- native trace の測定 commit `06c46b21` から HEAD までの差分: `git diff 06c46b21 HEAD -- tools/icall/diff tools/icall/fa_route_build.sh tools/ott/native` は 0 行 (`04c5c2ba` で確認)。
 
 ```diff
 diff --git a/tools/icall/diff/hit_180da6e60.py b/tools/icall/diff/hit_180da6e60.py
@@ -169,4 +190,5 @@ bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1
 | 0x180da6e60 の 6 件 (No 1・2・6・7・9・10) の判定: 仮想 callee (S1・S2 それぞれの A の vtable と state 2・8 の callee の実体、S2 の条件値) が runtime の object graph に依存する | 判定 0 件。実行は確認済み (§4) | #2695 (分析と harness の残件のため子 issue は起票しない) |
 | No 1 (cookie store) の検査が wasm で通る理由 | 前報から継続 | #2695 |
 | 0x1803dee20: native の出力が 0/8 になる環境の条件 (残り xmm0 の出所) | 受入 3 の残件。測定 (6973P-C) は 8/8 | #2695 |
+| state 1・3・7 (件数 1 の単独実行) の SIGSEGV: `0x180da7084` (state 1)・`0x180c8be3c` (state 3・関数の外)・`0x180da71b8` (state 7)、exit 95。state 2・8・8n と件数 3 の `2,8,8n` は戻る | 受入 1 の残件。各 state が読む構造体の領域は未特定 | #2695 |
 | sweep の値の不一致 1 件の VA (本 run の sweep は件数のみ記録し、VA は特定していない。前報追補 `9edd60a5` の内訳は 0x180da4030) | 本 issue の範囲外 | #2708 (ICALL-83・0x180da4030 の xmm0 脱落) |
