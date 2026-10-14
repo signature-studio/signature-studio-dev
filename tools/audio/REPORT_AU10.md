@@ -112,3 +112,27 @@
 - 30 分ソーク (無負荷 1 回) では ms 級 spike は未再現 (cb_max 475 µs)。10 秒ソーク FAIL 試行では cb_max 174 ms を記録しており、FAIL との関係は未調査。
 - `clock_jumps` は 30 分で 2 件 (試行ごとに 2 / 4 / 14 と変動)。`clock_jump_frames` は通算 0 のまま。ramp は全フレーム bit-exact のため実スキップの証拠は無い。発生源 (worklet `currentFrame` の非連続が実スキップか計測タイミングか) は未特定。
 - 未解決: 10 秒 FAIL の原因、clock_jumps の発生源、10 秒 FAIL 試行の cb_max 174 ms と FAIL との関係。
+
+### 16.6 AU-21 (#1570) 追加切り分け 2: head `5229fe5f` (main, コード変更なし)
+
+測定 commit: `5229fe5f` (origin/main 起点、本 run は `tools/audio/REPORT_AU10.md` のみ変更)。環境: GitHub runner 4 core / 15 GiB, headless google-chrome, `bash tools/audio/build.sh` 直後 (emcc 6.0.12, [EMSDK] 既存)。JSON は `tools/audio/results/soak_10.json` / `soak_1800.json` (本 run の上書き分は未コミット)。コミット済みの同名 JSON は 2026-10-13 の旧 run のもので、本 run の値とは比較していない。
+
+鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `5229fe5f` → HEAD `fcb1e0a9` の `git diff --stat -- tools/audio`:
+
+```
+ tools/audio/REPORT_AU10.md | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+```
+
+`git diff --stat 5229fe5f HEAD -- tools/audio ':!tools/audio/REPORT_AU10.md'` の出力は 0 行 (REPORT 以外の差分 0)。よって現 head での再測定は不要。
+
+| 試行 | 結果 | 所要 / load (start → end) |
+|---|---|---|
+| `--soak 10` 1〜5 回目 | 5/5 PASS: underruns 0, silence 0, ramp 0 / 480,512〜481,024 f (全 5 回), workletErrors 0, lat_changes 0, clock_jumps 0 (全 5 回)。cb_max 100 / 64 / 864 / 74 / 94 µs。dev_fill min 256 (1 回目, T=1024) / 1024 (2〜5 回目, T=1536) | 各 61〜73 s / 0.49 → 0.04 |
+| `--soak30` (1800 s, 無負荷) 1 回目 | PASS (exit 1 完了): underruns 0, silence 0, ramp 0 / 86,403,968 f, workletErrors 0, cb 337,513 回 late 0, **cb_max 344 µs**, T=1536, dev_fill 1024/1308/1536, **clock_jumps 8 / clock_jump_frames 0**, lat_changes 0, secs_wall 1800.07 | 1802 s / 0.01 → 0.00 |
+
+判定:
+- 10 秒ソーク FAIL は今回 0/5 回。通算 (head `57519ca`〜`5229fe5f`) で 2/26。原因は**未特定**。FAIL 試行の採取データは §16.5 の 1 回のみ。
+- 30 分ソーク (無負荷) の ms 級 spike は今回も未再現 (cb_max 344 µs)。無負荷 30 分の通算は 4 回 (`d7d91d2`・`12586095`・`60932d35`・`5229fe5f`) で、cb_max は 184 / 169 / 475 / 344 µs (いずれも 1 ms 未満)。
+- `clock_jumps` は 30 分で 8 件 (通算 2 / 4 / 14 / 8 件と変動)、`clock_jump_frames` は通算 0 のまま。ramp は全フレーム bit-exact で実スキップの証拠は無い。発生源は未特定。
+- 負荷下の 30 分ソークは本 run では未実施 (§16.2 が最新)。
