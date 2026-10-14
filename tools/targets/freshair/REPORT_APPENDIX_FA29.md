@@ -47,9 +47,9 @@ FA-28 (#2097) まで未解決だった「probe 下 `out[0]=0` / probe 無し `ou
 - ERR 8 行は guard に依らず残る (rip 等は未解析)。本追補では原因を判定しない。
 - 判定基準 (`run_fa9.sh` (a)) は変更していない。既定ゲートは `FA_P9GUARD` を使わないため、従来どおり 1 回目のみを見る。
 
-### 6.1 測定 commit と実測値 (転記)
+### 6.1 測定 commit と実測値 (PR 本文からの転記・未再検証)
 
-- 測定 commit: `962de2fb` (コード変更の最後の commit)。以下の数値は実装側が `962de2fb` で実行したログからの転記。レビュー run では素材 (plugins-freshair) が無く再実行していない。
+- 測定 commit: `962de2fb` (コード変更の最後の commit)。以下の数値は PR 本文 (実装側が `962de2fb` で報告した値) からの転記。本 fix のレビュー run では素材 (plugins-freshair) が無く再実行しておらず、これらの値は本セッションでは未検証。
 - 差分 0 の証跡: `git diff 962de2fb HEAD -- tools/targets/freshair/lift2` は、転記時点 (HEAD = `962de2fb`) で 0 行。その後の `native_ctrl.c` のコメント修正 (1 行) は下記 6.2 の commit に含まれ、この差分は 0 行ではない。
 - `bash tools/targets/freshair/lift2/run_fa9.sh` (転記): rc=0, **GATE PASS**
   - (a) base: ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0
