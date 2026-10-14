@@ -4,7 +4,7 @@
 
 **判定: 達成 (issue の範囲を縮めた)**。配線・ir_conditions / IR diff・通常 build の wasm での実測・survey 突合・`%arg1` assert・DEFECTS 更新は達成。受入条件 4 の ok 絶対値は、869 と 870 の差を IR の出所 (同梱 IR と再生成 IR の差) まで特定した。**ただし 5872 行のどの変更が差を生むかは未特定で、136 は本 run で再現せず原因は未特定**。「136 の原因特定」と「869/870 差の変更の特定」は issue の受入条件から外した (§5・§8)。
 
-測定 commit: `28d10d58` (origin/main `5c7bc303` を取り込んだ merge commit。コードを変えた最後の commit)。以後の commit は本 REPORT だけで、`git diff 28d10d58 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行 (§7)。取り込み前の `16447b9b` でも同じ値だった (§7)。
+測定 commit: `3de663ee` (コードを変えた最後の commit。`ldfix_509_e2e.sh`・`ld108_e2e.sh` を同じ commit で実測。§9)。`git diff 3de663ee HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行。以前の測定 commit `28d10d58` の値は §7 に残す (main 取り込み後の値。取り込み前の `16447b9b` でも同じ値だった)。
 
 ## 1. 受入条件
 
@@ -111,3 +111,16 @@ main 取り込み前の run も同じ値だった (ir_sha256 3 種・survey 870 
 | survey の差が 0 (survey が 41a670 の head 解除の分岐を通るかは未確認)。効果の証拠は wasm 直接呼びだけ | 実機経路での効果は未確認 | 本表のみ (survey の経路確認は再測定にあたる) |
 | `audit_lsf_disp.py` の `audit_lsf.py` 統合、残 SUSPECT 3 件の突合 | REPORT_2316 §5 のとおり | #2396 (LD-111) |
 | `666a60` のループ内 store (`store i64 %29`) の修復 | 同型の誤りが残る (REPORT_735 §1.2・REPORT_509 §1) | #2447 (LD-115。親: #2402)。#1091 は CLOSED のため付け替えた。#2316 は 41a670 の修復が受入条件で範囲外 |
+
+## 9. 指摘 round 1 への対応の実測 (測定 commit `3de663ee`)
+
+実行環境: foreground、HEAD `3de663ee`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`EMSDK_ENV=/opt/emsdk/emsdk_env.sh`。
+
+| 検査 | rc | 所要 | 結果 |
+|---|---|---|---|
+| `bash tools/m11/ldfix/ldfix_509_e2e.sh` | 0 | real 5 分 20.894 秒 | 6/7 build 成功。修復前 = `ldfix=disabled` + `M11_ALLOW_LDFIX_DISABLED=1`、修復後 = `ldfix=applied` + `ld108=disabled` + `M11_ALLOW_LD108_DISABLED=1`。survey: 修復前 ok 868 / oob 17 / halt0 8 / miss 47 / other 1 / noproc 1、修復後 ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1、ok 退行 0。reach: 26 関数を計装し `reach.json` を出力。7/7 `DYN_SUMMARY after_fail=0/5`、5 関数すべて修復前 FAIL → 修復後 PASS |
+| `bash tools/m11/ldfix/ld108_e2e.sh` | 0 | real 3 分 23.637 秒 | `LD108_E2E_SUMMARY fail=0`。PASS 検査の内訳は §7 と同じ。新規の検査「修復前 wasm の head は 0x3333 で FAIL」も PASS |
+
+- **6/7 の ld108 の扱い (指摘 blocking 1)**: `ldfix_509_e2e.sh` は `fix_ld108.py` を適用しない。REPORT_1290 の測定条件 (ldfix のみ) を保つため、修復後経路で `ld108=disabled` を明示し、build に `M11_ALLOW_LD108_DISABLED=1` を付けた (スクリプト冒頭の説明も同じ)。
+- **reach の rc (指摘の付随)**: `9b74f4c2` の `ldfix_509_e2e.sh` は `EMSDK_ENV` が無いと 6/7 の reach だけが失敗し、スクリプトは rc 0 のままだった。`3de663ee` で `EMSDK_ENV` を必須にし、`reach_509.sh` の失敗を `FAIL=1` に反映した。上の rc 0 は reach 成功後の値。
+- 測定後のコード差分 (`git diff 3de663ee HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'`) は 0 行。
