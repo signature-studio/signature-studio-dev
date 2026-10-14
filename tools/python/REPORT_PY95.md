@@ -12,7 +12,7 @@
 
 ## 1. 手段
 
-- 素材: `fl-win64.tar.zst` から `extracted/block00031_PE.bin` (関数探索) と DATA block 4 件 (`block25159`・`block24429`・`block24430`・`block24618`、`fetch_inputs.sh` 用) を `$RUNNER_TEMP/fl-win64/extracted/` に展開。emsdk は runner に無かったため、`tools/m1/flags.sh` の pin (6.0.12) を `emsdk install 6.0.12` と `activate 6.0.12` で入れ、`/opt/emsdk` へ symlink して使った (`docs/REFERENCES.md` の `[EMSDK]` の既定位置。§4)。
+- 素材: `fl-win64.tar.zst` から `extracted/block00031_PE.bin` (関数探索) と DATA block 4 件 (`block25159`・`block24429`・`block24430`・`block24618`、`fetch_inputs.sh` 用) を `$RUNNER_TEMP/fl-win64/extracted/` に展開。emsdk は runner に無かったため、`tools/m1/flags.sh` の pin (6.0.12) を `emsdk install 6.0.12` と `activate 6.0.12` で入れ、`[EMSDK]` (`docs/REFERENCES.md`) の既定位置へ symlink して使った (§4)。
 - ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>`。PyMethodDef の entry VA と関数先頭 VA (`fn`) を得て、先頭 40 命令を出す。
 - 参照の同定: 各命令の `[rip + disp]` は「次命令の VA + disp」で絶対 VA にした。変換 slot は `call qword ptr [rax]` の直前の `mov rax, [rip+...]` の絶対 VA。
 - 戻り型: 公開 stub (`analysis/flapi/flapi_table.json` の `sig.returns`)。
