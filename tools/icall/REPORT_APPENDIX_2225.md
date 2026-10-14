@@ -15,7 +15,9 @@
 ### 2.1 測定条件
 
 - 測定 commit: `7d15ceab` (`slot_trace.sh`・`slot_trace.c` と OTT 側の入力を測定した時点の HEAD)。PR 本文の `6883fa10` は本 REPORT を追加した commit で、測定 commit ではない。
-- 測定 commit から HEAD までの差分: `tools/icall/diff/slot_trace.sh`・`slot_trace.c` と `tools/ott` は差分 0 (fix commit で確認)。ただし fix で新規スクリプト `tools/icall/diff/ott_apiset_cmp.py` を追加したため、`git diff 7d15ceab HEAD -- tools/icall/diff` は 0 行ではない。この新規ファイルは測定の入力ではない (未実行・py_compile のみ)。
+- 測定 commit から HEAD までの差分 (`docs/WORKFLOW.md` §6):
+  - `git diff 7d15ceab 67a913fb -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott` → 出力 0 行 (測定対象は無変更)。
+  - `git diff 7d15ceab 67a913fb --stat -- tools/icall/diff tools/ott` → `tools/icall/diff/ott_apiset_cmp.py | 59 ++++` (新規 1 件のみ)。この新規ファイルは測定の入力ではない (未実行・py_compile のみ)。
 - 再現: `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (既定条件)。
 - 所要: real 13.191 s / user 11.032 s / sys 1.916 s。load average 1.18 (測定直前 10:26:33)。
 - 素材: 測定時は `plugins-freshair` (`FA_DL` に展開) と `work-icall` (`tools/icall/work/`) を使用。OTT の生値は `analysis-ott-binaries` の `OTT_vst2_win64.dll` を PE 直読み。
