@@ -13,15 +13,17 @@
 
 ## 2. 測定
 
-測定 commit: `7e665077` (main 取り込み後の HEAD。作業ブランチ `1606-fa-crt-init` の起点)。
-コード差分は本 PR の付録追加のみで、`tools/icall` 配下のコード範囲に変更はない (§2.1)。
+測定 commit: `2f685180` (`origin/main`。作業ブランチ `1606-fa-crt-init` の起点)。HEAD (`821f9383`) で同じ sweep を再実行し、同値を確認した (§2.2)。
 
 ### 2.1 鮮度の確認
 
 ```
-$ git diff --stat 7e665077 HEAD -- tools/icall/diff tools/icall/*.sh tools/icall/*.py tools/icall/rt tools/ott/lift tools/ott/native tools/m2 tools/m5 tools/m11
+$ git diff --stat 2f685180 HEAD -- tools/icall/diff tools/icall/*.sh tools/icall/*.py tools/icall/rt tools/ott/lift tools/ott/native tools/m2 tools/m5 tools/m11
 (出力なし: コード範囲の差分 0 件)
 ```
+
+(参考) 前回 `7e665077` からの差分には `tools/m11/m11_build.sh`・`tools/m11/trap_triage/` が含まれるが、
+`tools/icall` の fa route・sweep からは参照されない (`grep` で 0 件) ため、測定値には影響しない。
 
 ### 2.2 sweep (`bash tools/icall/diff/fa_sweep.sh 8 60`)
 
