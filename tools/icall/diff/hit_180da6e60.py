@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""cov_180da6e60.py [FN_VA] — native 1 回実行で、候補命令 (CANDS) が実行されたかを int3 トレース (ott_trace_install) で記録して表示する。
+"""hit_180da6e60.py [FN_VA] — native 1 回実行で、候補命令 (CANDS) が実行されたかを int3 トレース (ott_trace_install) で記録して表示する。
 初期化は fa_cmp.init_native (件数は FA_LOOP_N)。判定は候補 VA の hit の有無のみ (値は見ない)。
 ott_call_cov の単歩 coverage は窓 (IMG_BASE + 0x308000) 外の VA を記録しないため使わない。
-用法: FA_CORE=... FA_LOOP_N=0 python3 tools/icall/diff/cov_180da6e60.py [180da6e60]"""
+用法: FA_CORE=... FA_LOOP_N=0 python3 tools/icall/diff/hit_180da6e60.py [180da6e60]"""
 import sys, os, ctypes, struct
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
