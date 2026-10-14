@@ -104,10 +104,11 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 ## F. [PLG-F3-18] #2017: vmovsd store 宛先の経路 (実測・HEAD c171b9dc)
 
 - 測定 HEAD: **c171b9dc** (origin/main)。 `timeout 1000 bash tools/plugins/dynamics/engine_lift.sh 19252 900` を foreground で単独実行。 load average (1 分) 0.99 (実行時)。
-- 結果 (`summary.csv`): `19252,522,0,551,0,5,0,0,0,17,0,0,0,29,549` (lift_rc 0 / define 551 / unimpl 5 / emcc_c_rc 0 / lift 17 s)。 E 節 (f9c89955) と同じ。 残件 5 件も同じ。
+- 結果 (`summary.csv`) と残件は §E の結果を参照 (測定値の正本は §E)。 本節の HEAD では §E と同一の値を得た。
 
 ### F-1. 経路 (IR と機械語の照合)
 
+- 注: 本節の `fn.drc.ll` の store 先と `e.lift.ll` の `xor i64 0, 0` の件数 (322 件) は `work/` の成果物からの観察で、本 PR には添付していない。 数値の確定は子 #2047 の REPORT で実測値として行う。
 - `function_180019c20` の `%1 = alloca i64` からの load は 3 件 (`%8`・`%9`・`%10`、いずれも entry block)。 **この関数内で `%1` への store は 0 件**。
 - 機械語の spill 書込は `0x180019c50` (`[rsp+0x20]`・`[rsp+0x30]`) と `0x18001a861` (`vmovsd [rsp+0x20], xmm0`・`[rsp+0x30], xmm1`)。 RetDec の IR には、これらに対応する `store` が無い (`fn.drc.ll` の store 先は `%stack_var_*.reg2mem` と `%rax.0.reg2mem` 等のみ)。
 - したがって `%8`・`%9`・`%10` は、RetDec が rsp 相対の spill 領域を **1 本の未 store `alloca i64`** に併合した結果。 併合の位置は RetDec 側 (`e.drc.ll`) で既にそうなっている。
