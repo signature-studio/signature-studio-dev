@@ -23,7 +23,7 @@
 - `0x1803b3fc0`: 先頭で `call 0x1803b3d10` (vtable と構造体を書くだけの初期化)、続けて `call 0x18102f728` (`int3` で終端する C++ 後始末) を呼ぶ。`0x18102f728` 以降の IAT 呼び出しが thunk に入る。
 - `0x1803b5b60`: 同型 (IAT call は 38 命令内に無い)。
 - thunk (`ott_native.c` の `make_thunk`) は `mov ecx, idx; mov rax, missing_import; call rax` の 3 命令。`missing_import` は `movaps` (16 バイト整列を要求) を使うが、thunk の `call` で stack が整列されず落ちる。
-- `g_impname[idx]` の名前は `ott_load` の import 表 (`IMPL` に無い名前を登録) から引く。idx 64 は `RtlPcToFileHeader` (`work/icall2083/imp_names.py` で PE の import 表から復元)。
+- `g_impname[idx]` の名前は `ott_load` の import 表 (`IMPL` に無い名前を登録) から引く。idx 64 は `KERNEL32!RtlPcToFileHeader` (`tools/icall/diff/fa_import_names.py` が PE の import 表から復元。commit 済みで、§4 の期待出力を持つ)。
 - 注: 最初の probe は `missing_import` から `MS` (ms_abi) を外したため引数 idx が読めず `?` と出た。`MS` を保って再実行すると上記の名前が出た。
 - `0x1803b9ff0`: `rcx` と `rdx` を stack に退避して `push` 群へ進む。`rip=0x1803ba718` は `mov %eax,(%rcx)` で、`rcx=0xa0001440` が書き先。
 
@@ -34,9 +34,10 @@ bash tools/ott/native/build.sh
 python3 tools/icall/diff/fa_cmp.py 1803b3fc0 --n 8   # SIGSEGV (addr=nil)
 python3 tools/icall/diff/fa_cmp.py 1803b5b60 --n 8   # SIGSEGV (addr=nil)
 python3 tools/icall/diff/fa_cmp.py 1803b9ff0 --n 8   # SIGSEGV (addr=0xa0001440)
+python3 tools/icall/diff/fa_import_names.py          # 期待: implemented 28 missing 226 / idx 64 = KERNEL32 の RtlPcToFileHeader
 ```
 
-素材: `work-icall` (`tools/icall/work/`)・`plugins-freshair` (`fetch.sh` 後の `tools/targets/freshair/work/win/`)。
+素材: `work-icall` (`tools/icall/work/`)・`plugins-freshair` (`fetch.sh` 後の `tools/targets/freshair/work/win/`)。`fa_import_names.py` は `plugins-freshair` の `SlateCore.core_64` だけを読む (素材が無いと `FileNotFoundError` で止まる)。
 
 ## 5. 未解決
 
