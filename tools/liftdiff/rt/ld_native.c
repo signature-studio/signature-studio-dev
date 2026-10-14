@@ -162,8 +162,10 @@ static void step_end(void) {
 /* LD-129 (#2770): VA への書込み監視。env LD_WATCH_ADDR=<VA hex>・LD_WATCH_OUT=<path> で有効 (既定は無効)。
  * 監視 page を PROT_READ|PROT_EXEC にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。
  * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行われ、結果は変わらない)。
- * 記録は書込み先が監視 8 バイトに重なるもの (書込み幅 16 以下を想定) だけ。LD_STEP_N・trace と同時には使わない。 */
-static u64 g_wp_va, g_wp_page, g_wp_rip, g_wp_addr, g_wp_old, g_wp_rsp, g_wp_rax, g_wp_rcx;
+ * 記録は書込み先の開始アドレスが va-15..va+7 にあるもの (書込み幅 16 以下を想定)。重ならない書込みも含む superset で、取りこぼしは無い。
+ * TF の待ち (g_wp_pend) の間は SIGALRM を block する (timeout で page が RWX のまま残るのを防ぐ)。
+ * LD_STEP_N・trace と同時には使わない。 */
+static u64 g_wp_va, g_wp_page, g_wp_rip, g_wp_addr, g_wp_old, g_wp_rsp, g_wp_rax, g_wp_rcx, g_wp_nflt, g_tmo_n;
 static u8 g_wp_ins[16]; static int g_wp_call, g_wp_hit; static volatile int g_wp_pend; static FILE* g_wp_fp;
 static void wp_prot(int rw) { mprotect((void*)(uintptr_t)g_wp_page, 4096, rw ? PROT_READ | PROT_WRITE | PROT_EXEC : PROT_READ | PROT_EXEC); }
 static void wp_arm(void) {
@@ -174,15 +176,20 @@ static void wp_arm(void) {
   g_wp_fp = fopen(o, "a"); if (!g_wp_fp) return;
   g_wp_va = va; g_wp_page = va & ~0xfffull; wp_prot(0);
 }
-static void wp_fault(greg_t* g, u64 addr) {
+static void wp_fault(ucontext_t* uc, u64 addr) {
+  greg_t* g = uc->uc_mcontext.gregs; sigset_t blk; sigemptyset(&blk); sigaddset(&blk, SIGALRM);
+  sigprocmask(SIG_BLOCK, &blk, NULL); sigaddset(&uc->uc_sigmask, SIGALRM);
+  g_wp_nflt++;
   g_wp_addr = addr; g_wp_rip = (u64)g[REG_RIP]; g_wp_rsp = (u64)g[REG_RSP]; g_wp_rax = (u64)g[REG_RAX]; g_wp_rcx = (u64)g[REG_RCX];
   g_wp_call = g_in_call; g_wp_hit = addr + 16 > g_wp_va && addr < g_wp_va + 8;
   memcpy(&g_wp_old, (void*)(uintptr_t)g_wp_va, 8); memcpy(g_wp_ins, (void*)(uintptr_t)g_wp_rip, 16);
   wp_prot(1); g[REG_EFL] |= 0x100; g_wp_pend = 1;
 }
-static void wp_finish(greg_t* g) {
+static void wp_finish(ucontext_t* uc) {
+  greg_t* g = uc->uc_mcontext.gregs;
   u64 nw; memcpy(&nw, (void*)(uintptr_t)g_wp_va, 8);
   wp_prot(0); g[REG_EFL] &= ~0x100; g_wp_pend = 0;
+  sigdelset(&uc->uc_sigmask, SIGALRM);
   if (g_wp_hit) {
     fprintf(g_wp_fp, "wp case=%s call=%d rip_rva=%#llx rip=%#llx addr=%#llx old=%016llx new=%016llx chg=%d rsp=%#llx rax=%#llx rcx=%#llx ins=",
             ld_case.id, g_wp_call, (unsigned long long)(g_wp_rip - g_imgbase), (unsigned long long)g_wp_rip, (unsigned long long)g_wp_addr,
@@ -195,10 +202,10 @@ static void wp_finish(greg_t* g) {
 
 static void on_sig(int sig, siginfo_t* si, void* ucv) {
   ucontext_t* uc = (ucontext_t*)ucv; greg_t* g = uc->uc_mcontext.gregs;
-  if (g_wp_va && sig == SIGTRAP && g_wp_pend) { wp_finish(g); return; }
+  if (g_wp_va && sig == SIGTRAP && g_wp_pend) { wp_finish(uc); return; }
   if (g_wp_va && (sig == SIGSEGV || sig == SIGBUS)) {
     u64 fa = (u64)(uintptr_t)si->si_addr;
-    if (fa >= g_wp_page && fa < g_wp_page + 4096) { wp_fault(g, fa); return; }
+    if (fa >= g_wp_page && fa < g_wp_page + 4096) { wp_fault(uc, fa); return; }
   }
   if (sig == SIGTRAP && g_step_on) { step_rec(g); return; }
   if (sig == SIGTRAP && g_in_call && g_step_armed && (u64)g[REG_RIP] - 1 == g_step_entry) {
@@ -226,7 +233,9 @@ static void on_sig(int sig, siginfo_t* si, void* ucv) {
       for (int j = 0; j < 8; j++) g_fault_g[j] = (u64)g[rg[j]]; }
     u64* sp = (u64*)g_fault_rsp;
     for (int j = 0; j < 64; j++) g_fault_stk[j] = sp[j];   /* デバッグ用: fault 時の stack 上位語 */
+    if (sig == SIGALRM) g_tmo_n++;
     g[REG_EFL] &= ~0x100;
+    if (g_wp_pend) { wp_prot(0); g_wp_pend = 0; }
     siglongjmp(g_jb, 1);
   }
   _exit(98);
@@ -372,5 +381,6 @@ int main(int argc, char** argv) {
       ld_state_cmd(l, a ? a : "", b ? b : "");
     } else if (!strcmp(l, "QUIT")) break;
   }
+  if (g_wp_fp) { fprintf(g_wp_fp, "wpsum faults=%llu timeouts=%llu\n", (unsigned long long)g_wp_nflt, (unsigned long long)g_tmo_n); fclose(g_wp_fp); }
   return 0;
 }
