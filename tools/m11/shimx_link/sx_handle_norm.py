@@ -20,13 +20,17 @@ FN = ('midiOutShortMsg',)   # 第 1 引数が HANDLE (wasm32 = i32) の shimx �
 def norm(lines, name):
     decl_re = re.compile(r'^declare (\S+) @%s\((i64|i32)(, [^)]*)?\)' % re.escape(name))
     call_re = re.compile(r'(\bcall\b[^@\n]*@%s\()i64 ([^,()\s]+), ' % re.escape(name))
-    decl_idx = [i for i, l in enumerate(lines) if decl_re.match(l)]
-    ref_all = sum(l.count('@' + name + '(') for l in lines)
-    if not decl_idx:
+    ref_all = sum(len(re.findall(r'@%s(?![\w.$-])' % re.escape(name), l)) for l in lines)
+    if ref_all == 0:
         return 0, 0
+    decl_idx = [i for i, l in enumerate(lines) if decl_re.match(l)]
+    if not decl_idx:
+        raise SystemExit('sx_handle_norm: %s の参照 %d 件があるが素の declare が無い (fail-closed)' % (name, ref_all))
     if len(decl_idx) != 1:
         raise SystemExit('sx_handle_norm: %s の宣言が %d 件 (1 件を想定)' % (name, len(decl_idx)))
     if decl_re.match(lines[decl_idx[0]]).group(2) != 'i64':
+        if any(call_re.search(l) for l in lines):
+            raise SystemExit('sx_handle_norm: %s は宣言が i32 だが i64 の呼出しが残る (fail-closed)' % name)
         return 0, 0
     out, n_call = [], 0
     for i, l in enumerate(lines):

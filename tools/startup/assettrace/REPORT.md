@@ -53,7 +53,7 @@ other = persist 2・tmp 1・unmapped 1。`diffTiers`: promote 1 (`Thumbnails/a.p
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| shimx に構造化 file trace (trace 形式 v1: 成功 open / stat / FindFirstFile / `w` フラグ) の出力口が無い | 実 trace を採る手段がない | 新規子チケットを PM が起票 (本 issue #105 にコメント済み) |
+| shimx に構造化 file trace (trace 形式 v1: 成功 open / stat / FindFirstFile / `w` フラグ) の出力口が無い (m11 wasm の CreateFileW だけは #2905 で trace 済み: `tools/gui/flengine/REPORT_APPENDIX.md` §8) | shimx 経路の実 trace を採る手段がない | 新規子チケットを PM が起票 (本 issue #105 にコメント済み) |
 | 実 FL boot の trace 取得 (`CreateFruityInstance` 到達が前提) | 最小 manifest の実数値が出ない。#105 の Closes 条件 | #105 (T1 待ち・Backlog 維持) / 依存: `[FLE]`・`[ICALL-1]` #227 |
 | 実 inventory での実行・`tiers-out` を `pack.ts` に渡した 1 chunk 範囲 (groups.T0) の実測 | tier 昇格による boot chunk 総量の変化が未測定 | 同上 (実 trace 取得後) |
 | #39 (言語/スキン/Help 経路) への入力 | 実 trace 待ち | #39 に本 REPORT へのリンクを提案 (PM 判断) |

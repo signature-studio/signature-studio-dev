@@ -61,9 +61,11 @@ def build(t, force=False):
     sigs = json.load(open(sigs_p))
     defined = {k for k, v in sigs.items() if v['defined']}
     ir2 = W + '/ir_instr.ll'
+    if t.get('site_trace') and not t.get('block_trace'):
+        raise SystemExit('[build] site_trace には block_trace が必要 (site の VA は block 入口の記録で決まる): %s' % t.get('name'))
     if force or newer(ir, ir2):
         t0 = time.time()
-        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'), blocks=bool(t.get('block_trace')))
+        n = irtool.instrument(ir, ir2, t.get('fn_prefix', 'function_'), blocks=bool(t.get('block_trace')), sites=bool(t.get('site_trace')))
         print('[build] instrumented %d functions (%.1fs)' % (n, time.time() - t0))
     extra_objs = []
     extra_defined = set()

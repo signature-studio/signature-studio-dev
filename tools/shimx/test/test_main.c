@@ -10,6 +10,7 @@
  *   node x.cjs csnull     : 既定モードで EnterCriticalSection(NULL) → fail-fast (R7)
  *   node x.cjs exit       : ExitProcess(7) → exit hook + 終了コード 7
  *   node x.cjs deadlock   : ST ビルドで INFINITE 待ちが起こり得る場合 fail-fast
+ *   node x.cjs shbrowse   : SHBrowseForFolderW の GetProcAddress → 未対応として fail-fast (SHX-T22 #1179)
  */
 #include "test_common.h"
 
@@ -39,6 +40,10 @@ int main(int argc, char** argv) {
     }
     if (!strcmp(mode, "dwrite")) {                                         /* KH-20: DirectWrite は未対応 = 名前を出して fail-fast */
         GetProcAddress(GetModuleHandleW(W("dwrite.dll")), "DWriteCreateFactory");
+        return 0;
+    }
+    if (!strcmp(mode, "shbrowse")) {                                       /* SHX-T22 #1179: フォルダ選択は未対応 = 名前を出して fail-fast */
+        GetProcAddress(GetModuleHandleW(W("shell32.dll")), "SHBrowseForFolderW");
         return 0;
     }
     if (!strcmp(mode, "exit")) { shimx_set_exit_hook(exit_hook); ExitProcess(7); return 0; }

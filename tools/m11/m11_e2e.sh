@@ -93,9 +93,9 @@ if [ ! -f work/m11_boot.cjs.wasm ]; then
 fi
 
 step "実行 A: 通常起動 (DllMain attach → InitUnits ループ)"
-M11_TRACE=$TRACE timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1 || true
+M11_TRACE=$TRACE M11_PTRCHECK_MAX_NEW="${M11_EXPECT_PTR_NEW_MAX:-}" timeout 300 node m11_run.mjs > work/e2e_full.out 2>&1; rc_run=$?
 step "実行 B: unit survey (942 unit を try/catch 隔離)"
-timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1 || true
+M11_PTRCHECK_SURVEY_MAX_NEW="${M11_EXPECT_PTR_SURVEY_NEW_MAX:-}" timeout 600 node m11_survey.mjs > work/e2e_survey.out 2>&1; rc_survey=$?
 step "実行 C: 寛容起動 (InitUnits を逐次 942 unit・失敗 unit は skipped として続行; #2714)"
 M11_TOLERANT_OUT=work/tolerant_units.json timeout 600 node m11_tolerant.mjs > work/e2e_tolerant.out 2>&1 || true
 
@@ -105,5 +105,7 @@ python3 m11_judge.py --require-stage "$M11_EXPECT_STAGE" --min-survey-ok "$M11_E
 python3 m11_tolerant_gate.py --strict-done "$M11_EXPECT_STRICT_DONE" --survey-ok "$M11_EXPECT_SURVEY_OK_EXACT"; rct=$?
 python3 m11_tolerant_gate.py --negctl --strict-done "$M11_EXPECT_STRICT_DONE" --survey-ok "$M11_EXPECT_SURVEY_OK_EXACT"; rcn=$?
 [ "$rct" = 0 ] && [ "$rcn" = 0 ] || rc=1
+# #2778: 実行 A・B の終了コード (ptrcheck ゲート不合格は非 0。基準 M11_EXPECT_PTR_*_NEW_MAX が未設定なら常に 0)
+[ "$rc_run" = 0 ] && [ "$rc_survey" = 0 ] || rc=1
 python3 m11_icall_audit.py 2>/dev/null | tail -1 || true
 exit $rc
