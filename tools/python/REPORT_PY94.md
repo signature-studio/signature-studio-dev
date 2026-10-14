@@ -8,13 +8,17 @@
 - 保留 25 件のうち **7 件** の読み元を PE で確定し、mock と C provider に実装した (mock と C の差分 0)。
   内訳: int 3 件 (`getUndoHistoryPos` / `getUndoHistoryCount` / `getUndoHistoryLast`)、bool 1 件 (`safeToEdit`)、str 3 件 (`getProjectTitle` / `getProjectAuthor` / `getProjectGenre`)。
 - **値は未確定**。7 件とも仮置き (int `0` / bool `true` / str `""`)。実機の値は未実測で、mock の値を正として扱わないこと。
-- 残り **18 件** は子 issue 3 件に分けた (下の表)。確定に至らなかった理由は、setter の status と Python 例外 code の対応 (`0xd82c20`)、undo 系の共通処理 (`0xd6a8e0`・`0xd84680`)、`getRecPPB` の状態切替 (`0xd68d90`) が未同定のため。
+- 残り **18 件** は子 issue 5 件に分けた (下の表)。確定に至らなかった理由は、setter の status と Python 例外 code の対応 (`0xd82c20`)、undo 系の共通処理 (`0xd6a8e0`・`0xd84680`)、`getRecPPB` の状態切替 (`0xd68d90`) が未同定のため。
 
-| 子 issue | 対象 | 件数 |
-|---|---|---|
-| #2977 (PY-119) | setNumerator・setDenominator・setRecPPQ・setUndoHistoryPos・setUndoHistoryCount・setUndoHistoryLast | 6 |
-| #2978 (PY-120) | undo・undoUp・undoDown・undoUpDown・restoreUndo・restoreUndoLevel・saveUndo・getUndoLevelHint | 8 |
-| #2979 (PY-121) | clearLog・dumpScoreLog・processRECEvent・getRecPPB | 4 |
+| 子 issue | 対象 | 件数 | 状態 |
+|---|---|---|---|
+| #2977 (PY-119) | setNumerator・setDenominator・setRecPPQ・setUndoHistoryPos・setUndoHistoryCount・setUndoHistoryLast | 6 | open |
+| #2978 (PY-120) | undo・undoUp・undoDown・undoUpDown・restoreUndo・restoreUndoLevel・saveUndo・getUndoLevelHint | 8 | open |
+| #3001 (PY-125) | clearLog・dumpScoreLog | 2 | open |
+| #3002 (PY-126) | processRECEvent | 1 | open |
+| #3003 (PY-127) | getRecPPB | 1 | open |
+
+#2979 (PY-121) は closed。log・rec 系 4 件の PE 根拠は main の `tools/python/REPORT_PY121.md` (#3004) にあり、残りの実装は #3001〜#3003 が追跡する。
 
 ## 手段
 
@@ -47,49 +51,24 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 
 - setter 6 件 (#2977): 6 件とも引数を `i` で読み、dispatch `0xd843d0` に値・kind・コールバックを渡す。`setRecPPQ` のコールバック `0xd69350` は、ゲート偽なら status `-2` (`0xfffffffffffffffe`)、値が `24..960` (`0x18..0x3c0`) の外なら status `-3`、通過時のみ `0x1362c60` を呼ぶ。`setNumerator` / `setDenominator` / `setRecPPQ` は kind `0`、`setUndoHistoryPos` / `Count` / `Last` は kind `0` / `1` / `2`。status の Python 例外 code への対応 (`0xd82c20`) は未同定。
 - undo 系 8 件 (#2978): `undo` / `undoUp` / `undoDown` / `undoUpDown` は対象オブジェクト取得 `0xd6a8e0`・bool 取得 `0xfdd270`・dispatch `0xd84680` を使い、コマンド id は `undo` `0x14`・`undoUp` `0x15`・`undoDown` `0x16` (`undoUpDown` は同じ `0x16` で第 4 引数が引数の値)。`restoreUndoLevel` は `0xd843d0` とコールバック `0xd690f0`。`saveUndo` は書式 `si|i` を読むが、その後は未解析。`getUndoLevelHint` は `0x1016e60` の結果から文字列を得るが、由来は未同定。
-- log・rec 系 4 件 (#2979): `clearLog` は引数なしで `0xd843d0` を呼び、コールバック `0xd6a1a0`。`dumpScoreLog` は書式 `i|i`。`processRECEvent` (general) は `0xd84740` に int 3 個を渡す。`getRecPPB` は `0xd68d90` の戻り値の dword `+0xb20` を読む。`0xd68d90` は `F = [0x15e4558]` とし、`[F] != 0` なら `[F]`、`[F] == 0` なら `[[0x15e35c8]]` を返す。どちらが正かは未同定。
+- log・rec 系 4 件 (#3001〜#3003): `clearLog` は引数なしで `0xd843d0` を呼び、コールバック `0xd6a1a0`。`dumpScoreLog` は書式 `i|i`。`processRECEvent` (general) は `0xd84740` に int 3 個を渡す。`getRecPPB` は `0xd68d90` の戻り値の dword `+0xb20` を読む。`0xd68d90` は `F = [0x15e4558]` とし、`[F] != 0` なら `[F]`、`[F] == 0` なら `[[0x15e35c8]]` を返す。どちらが正かは未同定。
 
 ## 実装
 
 - `host/fl_mock.mjs`: 状態 `undoPos` / `undoCount` / `undoLast` / `safeEdit` / `projTitle` / `projAuthor` / `projGenre` と、7 件の getter (NOARGS)。
 - `provider/fl_engine.c`: 同名の static 状態と `FL_H(general, ...)` 7 件。`fl_engine_reset` で初期化。`fl_ret_i` / `fl_ret_b` / `fl_ret_s`。
 - `tests/general_diff.mjs`: 呼出し 7 件を追加 (calls 9 → 18)。引数個数違い 2 件 (`safeToEdit [1]`・`getProjectTitle [0]`) を追加。
-- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。実装 83 → 90、未実装 352 → 345。
+- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。main 取り込み後の期待値 (実装 93 / 未実装 342) は下の `## 検証` 節。
 
 ## 検証
 
-測定 commit: `9bba63c7` (コードを変えた最後の commit。`feat(python): general state getters ...`)。main は `8a2c6370` を base にした `2830-general-state-getters` で、`tools/python` 以外の変更は無い。
-測定は `9bba63c7` の作業ツリー (`git status --porcelain -- tools/python` が空) で、`provider/build.sh` を再実行してから行った。
-環境: runner 4 core、測定時の load average 0.53 (`uptime`)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64` 全体を展開)。`EMSDK_ENV` は `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を `$RUNNER_TEMP` に展開したもの (emsdk 6.0.12)。
-
-前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、3 分 36 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.6 秒)。
-
-| コマンド | 結果 | wall |
-|---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 90 (初回ビルド 11.6 秒) | 0.7 秒 (再ビルド) |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 90 / 未実装 345 / MCP 静的 60) | 0.30 秒 |
-| `node tests/general_diff.mjs` | calls 18、diffs 0、PASS | 0.04 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
-| `node tests/channels_diff.mjs` | calls 123、diffs 0、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.62 秒 |
-
-- 件数の変化: PY-87 時点の実装 83 / 未実装 352 から、7 件を加えて 90 / 345。total は 435 のまま (main 取り込み後の現在値は 93 / 342。上の再測定)。`channels_diff` の calls は main の取り込みで 122 → 123。
-- ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `undoPos` 既定値を `0` から `1` にすると、`node tests/general_diff.mjs` は `AssertionError` で rc 1 (FAIL)。元に戻すと calls 18・diffs 0・PASS (rc 0)。比較は同じ作業ツリーで行った。
-
-コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
-
-```
-$ git diff 9bba63c7 HEAD -- tools/python ':!*.md'
-(空)
-```
-
-本 REPORT を含む md のみの commit を後から足しても、この差分は 0 行のまま。
-
-### 再測定 (main 取り込み後)
-
+測定 commit: `bdd66a55` (main 取り込みの merge。`tools/python` の .md 以外で最後にコードを変えた commit)。
 main (`4baa12af`) の取り込みで `tests/provider_check.mjs` が競合した。解消は、PR の `pe94` 集合と main の `pe100`・`pe115` 集合を両方残し、期待値を 93 / 342 にした。`provider/fl_engine.c`・`host/fl_mock.mjs` は自動マージで競合なし。
+9bba63c7 時点 (PY-94 初版) の測定値は `git show 9bba63c7:tools/python/REPORT_PY94.md` の `## 検証` 節に残る。本節は bdd66a55 の値だけを載せる。
 
-測定 commit: `bdd66a55` (main 取り込みの merge。`tools/python` の .md 以外で最後にコードを変えた commit)。測定は `bdd66a55` の作業ツリー (`git status --porcelain` が空) で行った。
+環境: runner 4 core。`FL_WIN64_DIR` は `fl-win64` の DATA block を展開した先 (`extracted/`)。`EMSDK_ENV` は `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を展開したもの (emsdk 6.0.12)。
+
+前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・incremental)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
@@ -101,7 +80,9 @@ main (`4baa12af`) の取り込みで `tests/provider_check.mjs` が競合した�
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 | 2.1 秒 |
 | `bash build_flpy_static.sh` → `node tests/static_check.mjs` | rc 0、48/48 ok、`STATIC CHECK OK` | 6.5 秒 (build) |
 
-前提の生成物: `build_cpython_wasm.sh` (rc 0・incremental)、`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+- 件数: 実装 93 / 未実装 342 (total 435、MCP 静的 60)。
+- ネガティブコントロール (`docs/WORKFLOW.md` §5): bdd66a55 の detached worktree で、`host/fl_mock.mjs` の `undoPos` 既定値 (24 行目) を 0 から 1 にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 18・diffs 0・PASS (rc 0)。
+- 最終 HEAD での再現: `932c3dbc` で上の全コマンドを再実行し、同じ結果を得た (`mixer_diff` は calls 57・diffs 0・PASS、static_check は `STATIC CHECK OK`、ネガティブコントロールは rc 1 → 戻すと PASS)。bdd66a55 から HEAD までの `tools/python` のコード (.md 以外) は同一なので、この再現は測定値と同じコードに対するもの。
 
 コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
 
@@ -110,11 +91,13 @@ $ git diff bdd66a55 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
+本 REPORT の commit は .md のみのため、この式の出力は 0 行のまま。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 7 関数の値 (`0` / `true` / `""`) は仮置き・未実測 | mock と C は揃うが、実機の値と一致する保証は無い。値の実測には FLEngine の起動が要る | 親 #2738 へ提案 (実測の単独 issue は、起動の前提が揃ってから起票) |
-| 残り 18 関数 | 未実装 | #2977 (PY-119)・#2978 (PY-120)・#2979 (PY-121) |
+| 残り 18 関数 | 未実装 | #2977 (PY-119)・#2978 (PY-120)・#3001 (PY-125)・#3002 (PY-126)・#3003 (PY-127) |
 | `0xd6a8e0`・`0xd84680`・`0xd843d0`・`0xd82c20` の意味 (共通処理) | setter・undo の範囲 code と status 対応が未確定 | #2977・#2978 (受入条件に含む) |
 | `getProjectTitle` / `Author` / `Genre` の vtbl スロットの意味 (`+0x20`・`+0x28`・`+0x30`) | 関数名からの対応で、スロットの同定は未了 | 親 #2738 へ提案 (単独の子 issue にするほどではない) |
