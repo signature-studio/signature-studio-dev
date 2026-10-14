@@ -3,7 +3,7 @@
 
 入力は repo 内のみ: tools/gui/include/gui_proto.h と tools/targets/serum2/gui/canvas/canvas_frame.{h,cpp}・canvas_bitmap.cpp。
 出力: CanvasFrame の各 method の本体 (実装 / stub) と、対応する M7 プロトコル記号・判定の表。
-記号が gui_proto.h に無ければ exit 1 (対応表の誤記を検出する)。
+記号が gui_proto.h のコード部 (コメントを除く・単語境界で一致) に無ければ exit 1 (対応表の誤記・宣言の欠落を検出する)。
 """
 import re
 import sys
@@ -20,7 +20,7 @@ MAP = {
     "getSize": (["GuiSurface"], "接続可"),
     "getCurrentMousePosition": (["cursor_x"], "接続可"),
     "getCurrentMouseButtons": (["buttons"], "接続可"),
-    "getCurrentModifiers": (["GUI_MOD_SHIFT"], "接続可"),
+    "getCurrentModifiers": (["GUI_MOD_SHIFT", "GUI_MOD_CTRL", "GUI_MOD_ALT", "GUI_MOD_META"], "接続可"),
     "setMouseCursor": (["GUI_CMD_SET_CURSOR"], "接続可"),
     "invalidRect": (["GUI_CMD_PRESENT", "GUI_CMD_FRAME_END"], "接続可"),
     "scrollRect": (["GUI_CMD_PRESENT"], "代替可"),
@@ -67,6 +67,10 @@ def method_bodies(text):
     return out
 
 
+def has_symbol(code, s):
+    return re.search(r"\b" + re.escape(s) + r"\b", code) is not None
+
+
 def is_stub(body):
     stmts = [s.strip() for s in re.split(r";", body) if s.strip()]
     rest = [s + ";" for s in stmts if not STUB_STMT.match(s + ";") and not STUB_RET.match(s + ";")]
@@ -77,6 +81,7 @@ def is_stub(body):
 
 def main():
     proto = PROTO.read_text(encoding="utf-8")
+    proto_code = strip_comments(proto)
     cpp = strip_comments((CANVAS / "canvas_frame.cpp").read_text(encoding="utf-8"))
     bitmap = strip_comments((CANVAS / "canvas_bitmap.cpp").read_text(encoding="utf-8"))
 
@@ -84,7 +89,7 @@ def main():
     rows = []
     for name, body in method_bodies(cpp):
         symbols, verdict = MAP[name]
-        missing = [s for s in symbols if s not in proto]
+        missing = [s for s in symbols if not has_symbol(proto_code, s)]
         if missing:
             rc = 1
         stub = is_stub(strip_comments(body))
@@ -105,7 +110,8 @@ def main():
         print("{}: {}".format(v, sum(1 for r in rows if r[3] == v)))
 
     canvas_fmt = "RGBA" if re.search(r"IPlatformBitmapPixelAccess::kRGBA", bitmap) else "不明"
-    m7_fmt = "BGRA32" if "BGRA32" in proto else "不明"
+    # 画素形式は宣言行のコメントにしか無いので、コメントを除かず pixels 宣言行で見る
+    m7_fmt = "BGRA32" if re.search(r"uint32_t\s+pixels;[^\n]*BGRA32", proto) else "不明"
     print("画素形式: canvas bitmap = {} / M7 surface = {} / 不一致 = {}".format(
         canvas_fmt, m7_fmt, canvas_fmt != m7_fmt))
     return rc
