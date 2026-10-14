@@ -183,6 +183,27 @@ def emit_stubs(mod, defined_extra=(), externals=False):
     return "\n".join(lines) + "\n", n
 
 
+def icall_table_c(mod):
+    """#2128: 引数無し i64 define の VA→関数 表 (icall_tbl_va/fn/n) と cfg 表を C で出す。
+    __icall_dispatch (tools/icall/rt/icall_rt.c) が参照する。返値 (C 文字列, 登録数)。"""
+    ents = []
+    for f in mod.funcs():
+        m = re.match(r"function_([0-9a-f]+)$", f.name)
+        if m and not f.params() and f.ret_type() == "i64":
+            ents.append((int(m.group(1), 16), f.name))
+    ents.sort()
+    lines = ["/* liftlib icall table (#2128): 引数無し i64 関数のみ。BLK 経由の引数付き関数は対象外 */",
+             "#include <stdint.h>"]
+    for _, nm in ents:
+        lines.append("extern long long %s(void);" % nm)
+    lines.append("const uint32_t icall_tbl_va[] = {%s};" % ",".join(["0x%xu" % va for va, _ in ents] or ["0"]))
+    lines.append("long long (*const icall_tbl_fn[])(void) = {%s};" % ",".join([nm for _, nm in ents] or ["0"]))
+    lines.append("const unsigned icall_tbl_n = %d;" % len(ents))
+    lines.append("const uint32_t icall_cfg_va[] = {0};")
+    lines.append("const unsigned icall_cfg_n = 0;")
+    return "\n".join(lines) + "\n", len(ents)
+
+
 def prepare(cfg, mod, workdir, stats):
     """修復済み Module → 正規名 IR + SIMD helper C + stub C を書く (変種に依らず 1 回)。返値 (ll_path, h_path, s_path)"""
     name = cfg["name"]
@@ -197,7 +218,13 @@ def prepare(cfg, mod, workdir, stats):
     stats["simd"] = {"helpers": len(rep["generated"]), "unsupported": [u[0] for u in rep["unsupported"]], "approx": rep["approx"]}
     mod2 = IR.Module.parse(text)
     ex = set(cfg.get("stub_skip", []))
+    if (cfg.get("passes", {}).get("icall") or {}).get("blk_global"):
+        ex |= {"__icall_dispatch", "__icall_comis"}   # #2128: runtime (icall_rt.c) が定義する
     stub_c, nstub = emit_stubs(mod2, ex, externals=bool(cfg.get("stub_externals")))
+    if (cfg.get("passes", {}).get("icall") or {}).get("blk_global"):
+        tbl_c, ntbl = icall_table_c(mod2)
+        stub_c += tbl_c
+        stats["icall_tbl"] = ntbl
     s_path = os.path.join(workdir, name + "_stubs.c")
     open(s_path, "w").write(stub_c)
     stats["stubs"] = nstub

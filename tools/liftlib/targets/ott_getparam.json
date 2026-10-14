@@ -3,7 +3,7 @@
  "image": "${OTT_DLL}",
  "retdec": {"ranges": "0x18011e5a0-0x18011e6ff", "timeout": 1200},
  "passes": {
-  "icall": {"funcs": "tools/liftlib/work/ott_getparam/F.txt", "jtchain": true, "blk_global": false},
+  "icall": {"funcs": "tools/liftlib/work/ott_getparam/F.txt", "jtchain": true, "blk_global": true},
   "p1": false,
   "f7": false,
   "f2": false,
@@ -15,7 +15,7 @@
  "funcs": ["function_18011e5a0"],
  "exports": ["function_18011e5a0"],
  "leaf_specs": ["specs/ott_getparam_idx.json"],
- "emcc": {"opt": "-O1", "lb_layout": {"newbase": "0x30000000"}},
+ "emcc": {"opt": "-O1", "lb_layout": {"newbase": "0x30000000"}, "sources": ["tools/icall/rt/icall_rt.c"], "extra": ["-DICALL_BLK_GLOBAL"]},
  "regress": {"expect_match": "all"},
  "stub_externals": true,
  "gdata_pad": true
