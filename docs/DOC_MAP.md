@@ -421,6 +421,7 @@
 | `tools/python/REPORT_PY87.md` | ~61 | PY-87 (#2738): general の状態読出しゲッター 4 件 (getChangedFlag / getUseMetronome / getPrecount / getRecPPQ) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 146 件は #2830・#2831・#2832 |
 | `tools/python/REPORT_PY119.md` | ~87 | PY-119 (#2980): ui の状態・フォーカス・文字列ゲッター 6 件 (getFocused / getFocusedFormID / getFocusedFormCaption / getFocusedPluginName / getHintMsg / isInPopupMenu) の PE 根拠・mock/C 差分 0・値は仮置き。保留 12 件は #3005・#3006・#3007 |
 | `tools/python/REPORT_PY121.md` | 72 | PY-121 (#2979): general の log・rec 系 4 件 (clearLog・dumpScoreLog・processRECEvent・getRecPPB) の PE 根拠 (entry・fn VA・書式・呼出し鎖)。戻り値の意味は未確定で実装なし。残りは #3001・#3002・#3003 |
+| `tools/python/REPORT_PY121_2985.md` | 89 | PY-121 (#2985): screen 状態の 5 関数 (isBlanked / isUnBlank / getScreenActiveCounter / setScreenActiveCounter / unBlank) の PE 根拠・mock/C 差分 0 (int・bool・float・str の入力まで)・値は未実測の仮置き。残り 23 件は子 #3021 (PY-134)・#3022 (PY-135)・#3025 (PY-136) |
 | `tools/python/REPORT_PY23.md` | ~85 | PY-23 (#1054): `enveditor` (Edison API・仕様は block24447) の実装と Audio scripts 12 本の import/実行検証。数値 oracle 6 本・NEG-d・未解決 |
 | `tools/python/REPORT_PY19.md` | ~57 | PY-19 (#792): `Score.loadScoreFromFile` (仮想 FS・JSON) と `ScriptDialog.DialogParams` (MOCK)・数え方の定義 (母集団 64) と再計算・実測・未解決 |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
