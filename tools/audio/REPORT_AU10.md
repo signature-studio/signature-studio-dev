@@ -244,3 +244,26 @@
 | 同一 frame の process() が 2 回呼ばれる条件 (ブラウザ内部の起床・再描画) | clock_jumps の発生源 (無害と判定するための根拠が sample 照合のみ) | #1570 (30 分試行の追加で件数と時刻・cb 時刻の相関を取る) |
 | cb_max 1,055 µs (q550,685) の原因 | 単発の 1 ms 超。原因不明 | #1570 |
 | 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock・spike は未計測 | #1570 |
+
+### 16.11 AU-21 (#1570) 切り分け 7: head `306ecc9b` (負荷並走 30 分ソーク `--busy N`)
+
+測定 commit: `306ecc9b` (origin/main `e64cfc70` 起点の worktree `ws-1570`、ブランチ `1570-au21-load-soak`)。コード変更は harness のみ: `harness/run.mjs` に `--busy <N>` を追加 (soak 指定時のみ。busy ループ N 本を `sh -c "while :; do :; done"` で並走させ、終了後に各子プロセスを `kill()` で PID 指定停止)。結果は `soak_<秒>_busy<N>.json` に出し、無負荷の結果は上書きしない。worklet・shim・C 側は不変。環境: GitHub runner 4 core / 15 GiB, headless google-chrome 154, `pnpm install --frozen-lockfile` 後 `bash tools/audio/build.sh` OK (emcc 6.0.12, [EMSDK] 既存)。結果 JSON は `tools/audio/results/` (未コミット)。
+
+| 試行 | 結果 | 所要 / load (開始→終了) |
+|---|---|---|
+| `--soak 10 --busy 14` (動作確認, 21:33 UTC) | PASS: underruns 0, silence 0, ramp 0 / 480,896 f, workletErrors 0, cb_max 80 µs, T=1536, clock_jumps 0 | 78.5 s / 0.34 → 12.84 |
+| **`--soak30 --busy 14`** (1800 s, busy 14 本並走, 21:35〜22:05 UTC) | **PASS (exit 1 完了)**: underruns 0, silence 0, ramp **0 / 86,394,752 f**, workletErrors 0, cb 337,478 回 late 0, **cb_max 400 µs** (cb_max_q 24,640 ≈ 65.7 s), T=1536 固定 (lat_changes 0), dev_fill 512/1311/1536, **clock_jumps 2 件** (dup −128 f @ q631980 → skip +128 f @ q631981, 符号付き合計 0), secs_wall 1800.107 | 1803.8 s / 9.99 → 終了時 (busy 停止直後) 1 分/5 分/15 分平均 16.86 / 16.59 / 14.48 |
+
+判定:
+- 負荷下 (busy 14 本、load avg 10〜17) の 30 分ソークを現 head で初めて実施し、PASS。ramp は全フレーム bit-exact、underrun 0。cb_max 400 µs で ms 級 spike は未再現。旧 head の §16.2 (busy 14, cb_max 450 µs) とも同程度。
+- clock_jumps は 2 件で、§16.10 と同じ「dup −128 の直後に skip +128」の隣接ペア 1 組。負荷下で件数が増えたかは n=1 のため判断できない。同一 frame の process() が 2 回呼ばれる条件は**未特定**。
+- 10 秒ソーク FAIL: 本 run では反復せず、動作確認の 1 回 (負荷下) が PASS のみ。通算 2/45 (分母 +1)。原因は**未特定**。
+
+鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `306ecc9b` → 本 REPORT commit の `git diff --stat 306ecc9b HEAD -- tools/audio public/worklets src/runtime` は REPORT_AU10.md のみ (PR 作成時点で確認)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 10 秒ソーク FAIL の原因 (通算 2/45) | 30 分実測の信頼性 | #1570 (FAIL 時は cb_max_q・dev_fill・underrun・clock_jump_log を採取) |
+| clock_jumps の発生源 (隣接ペアで同一 frame の process() が 2 回呼ばれる条件) | 無害判定の根拠は sample 照合のみ | #1570 |
+| cb_max 1,055 µs (§16.9) の原因 | 単発の 1 ms 超。原因不明 | #1570 |
+| 負荷の強さを変えた 30 分ソークの反復 (現在 n=1) | 負荷と clock_jumps・cb_max の関係は未確定 | #1570 |
