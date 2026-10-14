@@ -149,6 +149,41 @@
 | `--no-memory-limit` の n=1 測定の扱い (§5 参照) | 本 #540 (継続、受入条件 3 は判断まで完了) |
 | VEX helper の SSE 固定の動的確認 (直接 call 鎖では guard 無し。間接 call は未追跡) | #527 にコメント予定 (既存・重複起票せず) |
 
+## 7. 検証 (測定 commit 5880a9f6)
+
+鮮度の証跡 (WORKFLOW §6):
+
+- 測定 commit: **`5880a9f6`** (下表の実測はこの commit のコードで行った。 `6769c2c7` の時点で記録された系列)。
+- 解析 HEAD (§9 の逆アセンブル・参照走査): `ba4babca`。 `git diff --stat ba4babca HEAD -- tools/plugins/sampler ':!*.md'` は空 (0 行)。
+- 測定 commit から現 head `8ea7a78b` までの sampler コード差分 (`git diff --stat 5880a9f6 8ea7a78b -- tools/plugins/sampler ':!*.md'`):
+
+```
+ closure_unreached.py | 65 +++++++++++++++++----
+ f80_split.py         | 67 ++++++++++++++++++++++
+ lea_lift.sh          | 23 ++++----
+ nc2_imm_synth.py     | 92 ++++++++++++++++++++++++++++++
+ unr_nega.sh          | 10 +++-
+ x87_check.py         | 29 ++++++++++
+ 6 files changed, 258 insertions(+), 28 deletions(-)
+```
+
+  全文の patch は 250 行上限 (`docs/DOC_MAP.md` §1) を超えるため載せない。 上の stat と同じ範囲で `git diff 5880a9f6 HEAD -- tools/plugins/sampler ':!*.md'` を実行すれば再現できる。
+
+- **差分は測定した経路に入らない**: 測定対象の `sampler_engines.sh` (受入条件 1) と `sampler_e2e.sh` (受入条件 2) の経路は、`engine_lift.sh`・`lift_from_ll.sh`・`lift/batch_lift.sh`・`judge.py`・`closure_facts.py`・`matrix_check.py`・`ids_crosscheck.py`・`unreached_unique.py`・`targets.py`・`env.sh`。 このうち `sampler_engines.sh`・`sampler_e2e.sh`・`engine_lift.sh`・`lift_from_ll.sh`・`judge.py`・`lift/batch_lift.sh`・`closure_facts.py`・`env.sh`・`targets.py` は `git diff --stat 5880a9f6 8ea7a78b -- <それぞれ>` が空 (0 行)。 上の 6 ファイルを呼ぶのは `lea_e2e.sh` / `unr_e2e.sh` / `unr_nega.sh` / `unr_lift.sh` (別経路の e2e) だけで、`git grep` で確認した。
+- したがって表の測定結果は現 head の測定経路にも当てはまる。 再測定は行わない。 6 ファイルの変更 (f80 計数・U6・NC2a/b) は lea・unreached 系の検証の範囲で、本 REPORT の測定対象外。
+
+| 項目 | 結果 (実測) |
+|---|---|
+| 素材展開 `fl-win64.tar.zst` → `$RUNNER_TEMP/fl-win64` | 8.0 s、`block23663_PE.bin` / `block23664_PE.bin` 存在を確認 |
+| 殻の `ff /2` disp32=0x1c0 候補 (block23663) | 24 件 (§2a)。 9 件の selector (2,3,4,5,10,11,12,13,14) は §4 のとおり |
+| 殻の結線 0x843790〜0x84386a | 逆アセンブル成功 (`disasm_range.py`)、`[obj+0x1c0]` 保存・`[obj+0x1b8]` engine 保存を確認 |
+| 検証 HEAD (本 run) | main `cb3a89a6` の worktree `../ws-540` (ブランチ `540-engine-verify`)。 コード変更なし |
+| `sampler_engines.sh` (受入条件 1) | **exit 0・4:59.15 (299 s)**・Maximum RSS 3.52 GB (`/usr/bin/time -v`、2 engine 並列)・終了直後の load average 1.18 (1 分平均)。 `judge engines: PASS 2/2`。 23664: pdata 5,160 / lift_rc 0 / define 5,993 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 23677: pdata 2,355 / lift_rc 0 / define 2,525 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 (23677 は `emcc_c_rc` = 1、`emcc_c_rc_after_fixcmp` = 1、f80 処理後の `emcc_c_rc_after_f80` = 0 で判定を通る。 23664 は `emcc_c_rc` = 0。) ログに `do not know how to soften fp_extend` (final.ll / fixcmp.ll、計 2 件) が出るが、判定は PASS。 原因は未調査 |
+| `sampler_e2e.sh` (受入条件 2、既存 T0/T1 の emcc 退行確認) | **exit 0・14:13.43 (853 s)**・load average 4.80 (5 分平均、run 中盤)。 `judge shells: PASS 7/7` (lift_rc / emcc_c_rc / f80 全 0)。 batch 7 本すべて `rc=0 emcc_c=0 f80=0`。 `ids_crosscheck: 7/7` |
+
+- 注記: 上の数値は本 run の 1 回の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
+- 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と本 run の値は同じ判定結果 (PASS 2/2)。 本 run は main cb3a89a6 での再現である。
+
 ## 8. selector ごとの引数の意味 (受入条件 4 の続き)
 
 測定: `disasm_range.py` (capstone) で engine 23664 の `DispatchToEngine` 0x180147bc0〜、殻 23663 の呼出し wrapper を逆アセンブル。 jump table は `.text` 上の rip 相対 int32 表を直接読んで解いた (case VA は §3 と一致)。
@@ -179,19 +214,3 @@
 - **(b) sel 10 の `[rbp+0x4f]` の書込み元**: wrapper 0x8439a0 は関数 0x843930 (`.pdata` 上の関数範囲は 0x843930〜0x843a20。 §4 の 0x8439a0 は関数途中の位置) の内部。 0x84398c〜0x84399a で `[rbp+0x4f]` に `0x55d0a0(rcx=&[rbp+0x4f], rdx=[rbp+0x38], r8=0x200)` の結果を書く。 `[rbp+0x38]` は `0x41b450(rcx=&[rbp+0x38], rdx=[rbp+0x278])` で作られ、 `[rbp+0x278]` は関数 0x843930 の第 2 引数。 `0x55d010` は入力の c_str を最大 0x200 バイトまでコピーして末尾に NUL を置く。 **確定した入力**: sel 10 の `r8` は、関数 0x843930 の第 2 引数 (C 文字列) のコピー。 0x843930 の呼出し元は (a) と同じく直接参照 0 件のため未確定。
 - **(c) 戻り値**: sel 2・4 の wrapper は `DispatchToEngine` の戻り値 `rax` をそのまま返す (`call [rax+0x1c0]` の後に `add rsp`・`ret`、 rax 加工なし)。 よって戻り値型は engine 側 `DispatchToEngine` の case 依存で、 sel 2 は `[rcx+0x1b0]` の外部呼出し結果、 sel 4 は表 0x14838c の結果。 いずれも case 内の戻り値型は未読解。
 - 結論: 受入条件 4 の残り (a)(b)(c) は、(b) の入力源 (第 2 引数) まで確定。 (a) と (c) は未確定。
-
-## 7. 検証 (測定 HEAD 5880a9f6、af86748b と sampler コード同一)
-
-測定 HEAD の扱い: 下表の測定の HEAD は `5880a9f6` (`6769c2c7` の時点で記録された系列) である。 PR の検証 HEAD は `af86748b`。 `5880a9f6` から `af86748b` までに sampler の実行コードは変わっていない (`git diff --stat 5880a9f6 af86748b -- tools/plugins/sampler ':!*.md'` は空)。 そのため表の結果は `af86748b` の sampler コードにも当てはまる。 `af86748b` そのものでの再実行は、この表では行ったと主張しない。
-
-| 項目 | 結果 (実測) |
-|---|---|
-| 素材展開 `fl-win64.tar.zst` → `$RUNNER_TEMP/fl-win64` | 8.0 s、`block23663_PE.bin` / `block23664_PE.bin` 存在を確認 |
-| 殻の `ff /2` disp32=0x1c0 候補 (block23663) | 24 件 (§2a)。 9 件の selector (2,3,4,5,10,11,12,13,14) は §4 のとおり |
-| 殻の結線 0x843790〜0x84386a | 逆アセンブル成功 (`disasm_range.py`)、`[obj+0x1c0]` 保存・`[obj+0x1b8]` engine 保存を確認 |
-| 検証 HEAD (本 run) | main `cb3a89a6` の worktree `../ws-540` (ブランチ `540-engine-verify`)。 コード変更なし |
-| `sampler_engines.sh` (受入条件 1) | **exit 0・4:59.15 (299 s)**・Maximum RSS 3.52 GB (`/usr/bin/time -v`、2 engine 並列)・終了直後の load average 1.18 (1 分平均)。 `judge engines: PASS 2/2`。 23664: pdata 5,160 / lift_rc 0 / define 5,993 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 23677: pdata 2,355 / lift_rc 0 / define 2,525 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 (23677 は `emcc_c_rc` = 1、`emcc_c_rc_after_fixcmp` = 1、f80 処理後の `emcc_c_rc_after_f80` = 0 で判定を通る。 23664 は `emcc_c_rc` = 0。) ログに `do not know how to soften fp_extend` (final.ll / fixcmp.ll、計 2 件) が出るが、判定は PASS。 原因は未調査 |
-| `sampler_e2e.sh` (受入条件 2、既存 T0/T1 の emcc 退行確認) | **exit 0・14:13.43 (853 s)**・load average 4.80 (5 分平均、run 中盤)。 `judge shells: PASS 7/7` (lift_rc / emcc_c_rc / f80 全 0)。 batch 7 本すべて `rc=0 emcc_c=0 f80=0`。 `ids_crosscheck: 7/7` |
-
-- 注記: 上の数値は本 run の 1 回の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
-- 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と本 run の値は同じ判定結果 (PASS 2/2)。 本 run は main cb3a89a6 での再現である。
