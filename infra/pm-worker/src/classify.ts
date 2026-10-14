@@ -183,6 +183,8 @@ export interface Classified {
   blocksCount: Record<string, number>;
   // 親 (open) -> open な子の番号。
   children: Record<string, number[]>;
+  // 停止報告を読んで素材を足そうとしたが、増えなかった (前回の oc_artifacts と同じ) issue。
+  noNewArt: number[];
 }
 
 export function classify(d: Snapshot, input: ClassifyInput): Classified {
@@ -196,6 +198,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
 
   const artifactsFor = (n: number, i: SnapIssue): string => d.pm_art[String(n)]?.line ?? inferArtifacts(i.title, i.labels);
   const rlOf = (n: number): RelaunchState => input.relaunch[String(n)] ?? { count: 0, art: null };
+  const noNewArt: number[] = [];
 
   for (const [n, i] of [...iss].sort((a, b) => a[0] - b[0])) {
     const k = String(n);
@@ -222,7 +225,10 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         let cand: string | null = extra.length ? "oc_artifacts: " + [...base, ...extra].join(" ") : null;
         if (!cand && bl.art && bl.art !== baseLine) cand = bl.art;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
-        else rows.stopped.push([n, head90(bl.head)]);
+        else {
+          rows.stopped.push([n, head90(bl.head)]);
+          if (!cand || cand === rl.art) noNewArt.push(n);
+        }
       } else if (bl && ageH(bl.at) < 1.5) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
       } else if (bl && ageH(bl.at) < 24 && stopHit) {
@@ -241,5 +247,6 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     rows,
     blocksCount: Object.fromEntries(blocksCount),
     children: Object.fromEntries([...children].map(([k, v]) => [String(k), [...v]])),
+    noNewArt,
   };
 }

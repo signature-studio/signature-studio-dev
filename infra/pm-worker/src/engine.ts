@@ -93,7 +93,7 @@ export interface Log {
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -470,12 +470,13 @@ export class Engine {
       .filter((r) => r.status !== "completed")
       .map((r) => ({ id: r.id, event: r.event, title: r.title }));
     const bot_last: Snapshot["bot_last"] = {};
-    const fullBotBody: Record<string, string> = {};
     for (const [k, b] of Object.entries(s.botLast)) {
       const am = ART_LINE_RE.exec(b.body);
       bot_last[k] = { at: b.at, head: b.body.slice(0, 400), art: am ? am[1].trim() : null };
-      fullBotBody[k] = b.body;
     }
+    // 素材名は直前の報告 (botReport) から読む。無い (古い保存値) issue は空 = 新しい素材なし。
+    const fullBotBody: Record<string, string> = {};
+    for (const [k, b] of Object.entries(s.botReport)) fullBotBody[k] = b.body;
     const liveBlockers: Record<string, number[]> = {};
     const unknown = new Set<number>();
     for (const i of issues) {
@@ -512,7 +513,7 @@ export class Engine {
   //  2. open な子を持つ親 issue は着手対象から外す。
   //  3. ラベル oc:no-pr の issue は『PR を出さずに終わった』run の後。cooldown が過ぎるまで recent、過ぎたら再着手してよい
   //     (上限 NO_PR_MAX_RELAUNCH 回。超えたら stopped で人の判断に回す)。oc:stuck は user (人の判断待ち) に置く。
-  plan(): { rows: Rows; plan: Plan; picks: Planned[] } {
+  plan(): { rows: Rows; plan: Plan; picks: Planned[]; noNewArt: number[] } {
     const { snap, input, unknown } = this.snapshot();
     const { rows, children } = classify(snap, input);
     const labels = new Map(snap.issues.map((i) => [i.number, i.labels] as const));
@@ -594,7 +595,9 @@ export class Engine {
       stuck_prs: pr.stuck,
       stop,
     };
-    return { rows, plan, picks };
+    // 素材が増えず止まった oc:no-pr の件数 (cooldown 後に再着手へ回ったものは含めない)。
+    const noNewArt = cls.noNewArt.filter((n) => hasLabel(n, "oc:no-pr") && rows.stopped.some(([x]) => x === n));
+    return { rows, plan, picks, noNewArt };
   }
 
   // ---------------------------------------------------------------- 実行
@@ -802,7 +805,7 @@ export class Engine {
   // ---------------------------------------------------------------- 観測
   // 集計だけを返す (本文・タイトルは含めない。issue 番号は公開 repo の情報)。
   status(extra: Record<string, unknown> = {}): Record<string, unknown> {
-    const { rows, plan } = this.plan();
+    const { rows, plan, noNewArt } = this.plan();
     const c = (k: keyof Rows) => rows[k].length;
     const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
     const detected = this.detectPmTargets();
@@ -839,6 +842,8 @@ export class Engine {
       relaunch: c("relaunch"),
       user: c("user"),
       stopped: c("stopped"),
+      // oc:no-pr で止まったもののうち、停止報告に新しい素材が無く再投入しないもの (PM の判断待ち)。
+      no_pr_needs_pm: noNewArt.length,
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
       pm_detected: pmDetected,

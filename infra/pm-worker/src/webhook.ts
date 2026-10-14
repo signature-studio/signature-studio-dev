@@ -83,6 +83,8 @@ export interface PmState {
   runs: Record<string, RunState>;
   // issue ごとの最後の bot コメント (分類の bot_last に相当)
   botLast: Record<string, BotComment>;
+  // issue ごとの最後の bot の報告 (run-outcome・PM のマーカーを含むコメントを除く)。停止報告の素材名 (neededArts) の入力。botLast は run-outcome で上書きされるため別に持つ。
+  botReport: Record<string, BotComment>;
   // PM のコメントに書かれた最後の `oc_artifacts:` 行 (分類の pm_art に相当)
   pmArt: Record<string, { at: string; line: string; id?: number }>;
   // issue dependencies (blocked_by) の blocker 番号 (open/closed 問わず。分類側で open だけに絞る)
@@ -93,7 +95,7 @@ export interface PmState {
   sig: Record<string, Signal>;
 }
 
-export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {} };
+export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, botReport: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {} };
 
 export interface WebhookInput {
   secret: string;
@@ -186,6 +188,10 @@ function notOlder(prev: { at: string; id?: number }, c: Json): boolean {
   return typeof c.id === "number" && typeof prev.id === "number" ? c.id >= prev.id : true;
 }
 
+// run-outcome (実装 run の終了記録) と PM のマーカーを含むコメントは、停止報告ではない (tools/pm/issue_snapshot.py の bot_last_of と同じ)。
+const NON_REPORT_MARKS = ["<!-- oc-run-outcome:", "<!-- oc-pm-"];
+const isReportBody = (body: string): boolean => !NON_REPORT_MARKS.some((m) => body.includes(m));
+
 function applyBotComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = []): PmState {
   const c = p.comment;
   const i = p.issue;
@@ -211,6 +217,10 @@ function applyBotComment(s: PmState, p: Json, botLogin: string, pmLogins: string
     const prev = s.botLast[k];
     if (!prev || notOlder(prev, c)) {
       next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000), ...id } } };
+    }
+    const prevR = s.botReport[k];
+    if (isReportBody(c.body ?? "") && (!prevR || notOlder(prevR, c))) {
+      next = { ...next, botReport: { ...next.botReport, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000), ...id } } };
     }
   }
   return next;
