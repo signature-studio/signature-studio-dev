@@ -228,6 +228,30 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 - 受入 2 (923 の `function_410b10` 入口の `obj` 実測): **未達**。
 - 受入 3 (回帰 0): **確認**。通常 build の survey は ok 870 / trap 24 (§10 と一致)、check_682 は 2/5 のまま。
 
+## 13. C 版内の stderr 計測 (#1602, 2026-10-14, n=1)
+
+測定 commit `4c3f7458` (origin/main, 本 PR の作業ベース)。素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602`、`RETDEC_ROOT=$RUNNER_TEMP/ws1602/retdec`。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490733 行) | 50.5 秒 |
+| `m11_build.sh` (計測 OFF) | rc=0 | 16.6 秒 |
+| `m11_survey.mjs` (計測 OFF) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 16.6 秒 |
+| `check_682.py` (計測 OFF) | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | - |
+
+**計測の試行 (不採用・patch のみ残す)**: 計測を `M11_INSTR_1602=1` で入れた build は、survey が ok 872 / trap 22、check_682 が 4/5 (304=ok 555=ok 923=trap) になった。`[1602]` 行は 0 件 (範囲外の読みは起きていない)。計測 OFF に戻すと 870 / 24 に戻る。空関数 (中身なし) の対照でも 870 / 24 だった。
+
+- 解釈: 計測コードの中身 (`__builtin_wasm_memory_size` を含む読取り) が、判定を変える。範囲外アクセスの出力が無いのに判定が変わるため、計測器の影響として扱い、本 REPORT の判定には使わない。
+- 計測コードは `trap_triage/ov_1602_probe.patch` (`git apply` 可) に退避。本体には入れていない。
+- `M11_FIX_535BF2=1` 側の 304・555 計測は、この ON 測定では効いていない (FIX 既定 0 のため `function_535bf2` は lift 版)。未検証。
+
+**判定 (本 run)**: 受入 1・2 は**未達のまま**。受入 3 は計測 OFF で確認 (870 / 24、check_682 2/5)。実値採取は、計測器の影響を消す方式が要る (未解決の表に記載)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 計測コードの中身が判定を変える (`ov_1602_probe.patch`)。空関数では変わらない。影響の機構が未特定 | 受入 1・2 が未達 | #1426 (継続) |
+| `M11_FIX_535BF2=1` での 304・555 の `function_535bf2` 計測は未検証 | 受入 1 が未達 | #1426 (継続) |
+
 ### 未解決 (次の一手)
 
 | 未解決 | 影響 | 起票先 |
