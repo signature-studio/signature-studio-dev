@@ -1,5 +1,6 @@
 # tools/python REPORT: PY-121 ui の表示・メニュー 15 関数のうち 6 件の PE 確定と C provider 実装 (#2982, 親 #2831)
 
+> 同じ PY 番号の別 issue (#2979) の報告 `tools/python/REPORT_PY121.md` と衝突したため、本ファイルは `REPORT_PY121_2982.md` に置く (`REPORT_PY39_2548.md` と同じ命名)。
 > 正本: `tools/python/REPORT_PY87.md` (PY-87 の付録様式)。親 #2831 と本 issue が参照する `REPORT_PY95.md` は、本 run の checkout と全 ref に存在しなかったため、本付録の表を一次資料とする。PE の一次データは `tools/python/analysis/flapi/pe_handler_probe.py` の出力。
 
 ## 結論
@@ -53,26 +54,27 @@ PE: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前
 
 ## 検証
 
-測定 commit: `7f7572f4` (main 取り込みの merge commit。コードを変えた最後の commit)。`git diff 7f7572f4 HEAD -- tools/python ':!*.md'` は空 (本節の追加は md のみ)。取り込み前の測定は `fcfb290c` (PR 実装 commit)。
-環境: runner 4 core、再測定時の `uptime` は `load average: 0.80, 1.31, 0.73` (21:21:38)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を全展開)。emsdk は上流 `emscripten-core/emsdk` から 6.0.12 を `$RUNNER_TEMP/tc/emsdk` に入れ、scripts の既定位置 `[EMSDK]` へ symlink した。
+測定 commit: `0a3542fc` (main 取り込みの merge commit。コードを変えた最後の commit)。`git diff 0a3542fc HEAD -- tools/python ':!*.md'` は空 (本節の追加は md のみ)。取り込み前の測定は `fcfb290c` (PR 実装 commit)。
+環境: runner 4 core、再測定時の `uptime` は `load average: 0.44, 0.65, 0.59` (21:26:32)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を全展開)。emsdk は上流 `emscripten-core/emsdk` から 6.0.12 を `$RUNNER_TEMP/tc/emsdk` に入れ、scripts の既定位置 `[EMSDK]` へ symlink した。
 
 前提の生成物 (gitignore・取り込み後に再生成): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、2 分 42 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.2 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0 (`dist/flprov.wasm` 57,922 B・ハンドラ 90) | 0.966 秒 |
-| `node tests/ui_display_diff.mjs` | PASS (正常 12・異常 11・diffs 0・displayTime 2000) | 0.049 秒 |
+| `bash provider/build.sh` | rc 0 (`dist/flprov.wasm` 58,550 B・ハンドラ 92) | 0.939 秒 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 (`flpy.wasm` 5,924,680 B) | 5.999 秒 |
+| `node tests/ui_display_diff.mjs` | PASS (正常 12・異常 11・diffs 0・displayTime 2000) | 0.046 秒 |
 | `node tests/ui_diff.mjs` | PASS (calls 17・diffs 0・範囲外既知差分 3) | 0.048 秒 |
-| `node tests/general_diff.mjs` | PASS (calls 9・diffs 0) | 0.049 秒 |
-| `node tests/device_diff.mjs` | PASS (calls 8・diffs 0) | 0.048 秒 |
-| `node tests/provider_check.mjs` | PASS (functions 435 / 実装 90 / 未実装 345 / MCP 静的 60) | 0.369 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.327 秒 |
+| `node tests/general_diff.mjs` | PASS (calls 9・diffs 0) | 0.048 秒 |
+| `node tests/device_diff.mjs` | PASS (calls 8・diffs 0) | 0.046 秒 |
+| `node tests/provider_check.mjs` | PASS (functions 435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.355 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.269 秒 |
 
-取り込み後に追加で通した main 側変更の回帰 (wall 未計測): `mixer_diff.mjs` PASS (calls 57・diffs 0)・`channels_diff.mjs` PASS (calls 123・diffs 0)・`transport_diff.mjs` PASS (calls 7・diffs 0)・`midi_path_diff.mjs` PASS (cases 30・diffs 0)・`ilmcp_diff.mjs` PASS (calls 32・diffs 0)・`kwsig_check.py` OK。
+main 側変更の回帰 (同じ HEAD・wall は未計測): `mixer_diff.mjs` PASS (calls 57・diffs 0)・`channels_diff.mjs` PASS (calls 161・diffs 0。PY-100 の `getStepParam` を含む)・`transport_diff.mjs` PASS (calls 7・diffs 0)・`midi_path_diff.mjs` PASS (cases 30・diffs 0)・`ilmcp_diff.mjs` PASS (calls 32・diffs 0)・`kwsig_check.py` OK。
 
-件数の変化: 取り込み前 (`fcfb290c`) は 実装 83 → 89 (+6・PR)、未実装 352 → 346。取り込み後は main の PY-115 (`mixer.getTrackColor`・+1) を足して 実装 90 / 未実装 345。`provider_check.mjs` の期待値は両方を足した値に更新した (競合解消)。
+件数の変化: 取り込み前 (`fcfb290c`) は 実装 83 → 89 (+6・PR)、未実装 352 → 346。取り込み後は main の PY-115 (`mixer.getTrackColor`・+1) と PY-100 (`channels.getStepParam`・`getCurrentStepParam`・+2) を足して 実装 92 / 未実装 343。`provider_check.mjs` の期待値は 3 系統の集合をすべて入れた値に更新した (競合解消)。
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の時間引数の頭打ち値を `0x7d0` から `0x7cf` にすると、`node tests/ui_display_diff.mjs` は `ui 表示 差分 19 件` で rc 1 (FAIL)。元に戻すと PASS (rc 0)。比較は測定 commit `7f7572f4` で行った。
+ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の時間引数の頭打ち値を `0x7d0` から `0x7cf` にすると、`node tests/ui_display_diff.mjs` は `ui 表示 差分 19 件` で rc 1 (FAIL)。元に戻すと PASS (rc 0)。比較は測定 commit `0a3542fc` で行った。
 
 ## 製品 KPI (起動・GUI に関わる PR の記載)
 
