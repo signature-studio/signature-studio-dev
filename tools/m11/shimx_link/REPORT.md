@@ -1,6 +1,7 @@
 # M11 × shimx リンク REPORT (CAB-166 / SHX-T1) — 担当 T1
 
 - 日付: 2026-10-10 / 環境: emcc 6.0.12, node v26.10.0 / 再現: `bash tools/m11/m11_e2e.sh` (前提; lift 成果物生成) → **`bash tools/m11/shimx_link/e2e.sh`** (約 40 秒, 常に exit 0)
+- 既知類型との関係: 該当なし。D11 (絶対 VA の i64 定数の切り捨て) と D17 (8B store の 4B 縮小) は wasm32 の幅差を含むが機構は別。本件は外部関数 (shimx) との宣言の型幅の不一致 (詳細は付録 §12)。
 - 書込: `tools/m11/shimx_link/` のみ。`tools/shimx` / `tools/m11` 既存ファイル / `tools/startup` は **読取のみ (差分 0 行)**。一時物は `tools/m11/work/shimx_link/` (gitignore 済)
 - **tools/m11 既存ビルド/実行スクリプトへの差分: なし** (build.sh は M11 のソース `m11_rt.c` `m11_ov.c` と work/ の生成物を無改変で再利用する別系統ビルド)
 
@@ -219,9 +220,17 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 
 **結論**: 閉包リンクは現 main で再びリンクできる (修正前は exit 1)。ただし現 IR の boot は unit 17 で `rc=1` により停止し、FL の自然経路で LoadLibrary が 1 回も呼ばれない。`winstubs_loadlib_miss` の lift 実機取得 (受入) は未達。`LOADLIB_MISS ["WebView2Loader.dll"]` は引き続き probe 由来。
 
+**mismatch 1 の根因 (#2839)**: `midiOutShortMsg` の HMIDIOUT が IR で `i64` になるのは、RetDec 署名 DB の `unknown` 型による (x64 の 8 バイト幅に忠実)。修正方針は正規化 pass の恒久化 (b)。測定値と突合は `REPORT_APPENDIX_2839.md`。
+
 **差分確認 (測定 commit から HEAD まで・コード範囲)**: `git diff e7491b4f HEAD -- tools/m11/shimx_link/build.sh tools/m11/shimx_link/*.c tools/m11/shimx_link/*.py` の出力は 0 行 (本節は REPORT のみ変更)。
 
 ## 11. 旧 main の link 失敗の修正と `--midi` の winstubs 結線 (#179 SHX-T6)
 
 - 結論: 旧 main (`46c92356`) で実測した 4 variant (既定・`--ws`・`--midi`・`--ws --midi`) は全て `undefined exported symbol: "_sxt_count"` で rc 1 だった。`sxt_*` を `--trace` 限定にする修正は #2732 (`e7491b4f`、§10.3) で main に入り済み。`--midi` の e2e と `--ws --midi` の boot 基準は測定 commit `397c4161` で確認 (`midi_e2e.mjs` 3/3 PASS、`ws_e2e.mjs` PASS 19 / BOOT init 18 / units 17/942)。
 - 修正前後の表・e2e 実測・起動 KPI・残件: `tools/m11/shimx_link/REPORT_APPENDIX_179.md` (§11.1〜§11.4)。
+
+## 12. midiOutShortMsg の HANDLE 幅 (#1628 SHX-T25): IR 側の正規化 (要約)
+
+- 結論: IR 側の宣言と呼出しを i32 に揃える正規化 (`sx_handle_norm.py`、`build.sh` 2c) で、plain / trace の `signature mismatch` 1 → 0 (測定 commit `e0e35f9a`)。切り詰めは HMIDIOUT の値を変えない。
+- 測定値・修正前の出典と IR 同一性の限界・e2e の範囲: 付録 `REPORT_APPENDIX_1628.md` §12 が正本。fail-closed 化 (`763a599d`) は `c4a575ce` で復元し、HEAD で再測定した (付録 §12.6・#2877 `[SHX-T32]`)。
+- 未解決: IR 生成側の根本 → #2839 `[SHX-T31]`。ws_e2e の旧基準 (init 18 / PASS 19) が本環境で再現しない → 付録 §12.5 (本 PR の未解決表)。

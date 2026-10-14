@@ -6,9 +6,9 @@
 ## 0. 結論
 
 - 修正のコード (版による全体同期と再試行・テスト 4 件) は、pm-worker の全テスト・vitest (unit・workers) で PASS (§2)。ネガコンで 1・2・4 が FAIL、修正のままは 4/4 PASS (§3)。
-- **根因は未特定。** 子 #2757 ([CI-131]・`親: #2652`) に移した。この PR の初版の根因 (6 時間周期の補完待ち) は取り下げ済み。
-- 本番の `/status` (17:55Z 台) の `no_pr_by_reason` と `pm_detected.no_pr` は、同時刻の 4.1 時間窓の census と一致し、24 時間窓の census とは一致しない (§5)。その機構は未確認。
-- 版の補完が本番の件数を直すかは**未確認**。この PR は deploy していない。
+- 本番の `/status` (17:55Z 台) の `no_pr_by_reason` と `pm_detected.no_pr` は、同時刻の 4.1 時間窓の census と一致し、24 時間窓の census とは一致しなかった (§5)。
+- **根因を特定した** (子 #2757 [CI-131]・§9)。保存値 (issue の `assoc`・`authorType`、コメント由来の `sig.outcome`) を作るコードは PR #2423 で main に入り (13:56:28Z merge)、13:17:10Z の全体同期はそれより前のコードで走った。以後の補完は、次の周期 (19:17Z 予定) を待つか、版の補完 (#2671) の全体同期を待つしかなかった。
+- 版の補完の効果は確認済み (§9): 18:11:15Z の全体同期の後、`pm_detected.no_pr` は 24 時間窓の census と一致する (19:33Z の `/status` と 19:37Z の census で 33 = 33)。
 
 ## 1. 測定の対象
 
@@ -72,11 +72,11 @@
 | 17:55Z 台 (本番 `/status`・§4) | 保存値 | - | - | 79 件 (20 / 42 / 0 / 15 / 2) | - | 7 |
 
 - 対比: 本番 (17:55Z 台) と 4.1 時間窓 (17:55:10Z) は、outcome の内訳 (20 / 42 / 0 / 15 / 2) と検出 (7) が一致する。24 時間窓 (205 件・検出 48) とは一致しない。本番の `unknown` は 0 件で、24 時間窓の open oc:no-pr には `unknown` が 22 件ある。例: #2306 は 24 時間窓の `unknown` に入る (census の examples) が、本番の `unknown` は 0 件。
-- 機構は未確認。なぜ保存値が 4.1 時間窓の結果と一致するのか (窓の起点が 13:49Z になる理由を含む) は、子 #2757 で確かめる。
+- 機構は §9 (#2757) で確認した。4.1 時間窓の起点 13:49Z は #2423 の merge (13:56:28Z) の約 7 分前。一致は『保存値が merge 以降の webhook で入った』ことと整合する (13:49〜13:56 の扱いは未確認)。
 - 同じ census の前回 (17:18:51Z 24 時間・17:20:10Z 4.1 時間) の値は、24 時間 9,828 件・open oc:no-pr 228 件・検出 50、4.1 時間 1,226 件・outcome 50 件・検出 1 件だった。窓内のコメントと open issue が時間とともに変わるため、今回の値とは一致しない。比較は同時刻の値で行う。
 - 注 1: 24 時間窓で `unknown` の検出は census では数えない。`pm.ts` の `detectPm` は `unknown` を『再投入後の run が終わった』場合 (`npCount ≥ 1` かつ outcome が最新の launch より後) だけ検出する。
 - 注 2: census は `npCount` を 0 に固定する (本番は DO の `relaunch/np:<n>` を読む)。そのため census の検出は、本番の検出より少ない側に偏る可能性がある。`unknown` の 22 件のうち再投入済みの件数は未計測。
-- 版の補完の効果: deploy すると、版の変更で全体同期が 1 回走る。その結果が 24 時間窓の値 (205・48) に近づくかは、deploy 後の `/status` (`no_pr_by_reason`・`pm_detected`) で測るまで未確認。
+- 版の補完の効果: 確認済み (§9)。18:11:15Z の全体同期の後、`/status` (19:33Z) は 24 時間窓の census (19:37Z) と一致する (`pm_detected.no_pr` 33 = 33)。
 
 ## 6. vitest (`test:unit`・`test:workers`) の結果
 
@@ -87,10 +87,10 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 根因: 保存 outcome が 24 時間窓の内側のコメントを反映しない原因 (§5) | `no_pr` の検出が 24 時間窓の census より少ない (本番 7・24 時間窓 48)。根因は未特定 | 子 #2757 [CI-131] (`親: #2652`・PM が起票。#2652 の受入 1 を原文のまま移した) |
-| 版の補完が本番の件数を直すかは未確認 (deploy していない) | deploy 後の PM 起動の増加量は未測定 | PM agent の判断待ち: deploy の時期。既定案 = `LIVE_LAUNCH` / `LIVE_DISPATCH` の状態を確認してから。deploy 後に §4・§5 で確かめる |
+| 根因 (保存値が導入前の分を補完されない) | 解決 (§9)。`no_pr` の検出は 24 時間窓の census と一致 (33 = 33) | 子 #2757 [CI-131] (`親: #2652`)。根因の特定は同 issue の PR (§9) |
+| deploy の時刻 (`wrangler versions`) は CI から確認できない。18:11:15Z と #2671 の merge (18:08:30Z) の一致は推定 | 根因の時刻の精度のみ | 記録の範囲外 (本付録 §9 に『未確認』と明記) |
 | 補完の窓は 24 時間 (`commentWindowH`)。窓より古い outcome は保存値に入らない | 古い outcome の `oc:no-pr` は検出されない | PM agent の判断待ち: 窓を広げるか。既定案 = 24 時間のまま |
-| 人間起票の `oc:no-pr` は `author_association` が CONTRIBUTOR のため対象外 (`src/pm.ts` の `authorAllowed`) | 人間起票の `no_pr` は検出されない | PM agent の判断待ち: 対象に含めるか。既定案 = 対象外のまま |
+| 人間起票の `oc:no-pr` は `author_association` が CONTRIBUTOR のため対象外 (`src/pm.ts` の `authorAllowed`)。19:37Z の census で 48 件 (§9) | 人間起票の `no_pr` は検出されない | PM agent の判断待ち: 対象に含めるか。既定案 = 対象外のまま |
 | census の `npCount` = 0 (§5 注 2)・`unknown` の再投入済み件数 | census の内訳の精度 | 本付録の範囲外 (根因の切り分け #2757 で扱う) |
 
 ## 8. 再現
@@ -108,3 +108,51 @@ git diff 63e2e584 HEAD -- infra/pm-worker/src infra/pm-worker/test
 - `git diff 63e2e584 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (この付録を含む commit の時点)。
 - ネガコン (§3) の再現: `src/engine.ts` の `const stale = …` の行を `const stale = false;` に変えて `node --experimental-strip-types --no-warnings --test test/no_pr_backfill.test.ts` を実行し、元に戻す。
 - `no_pr_census.ts` は `gh` の読み取り (GET) だけを使う。
+
+## 9. 根因 (子 #2757): 保存値が導入前のコメントを補完されない
+
+- 測定 commit: `3b866a61` (作業ツリーの HEAD。読み取りのみ・コードは変えていない)。`git diff --stat 3b866a61 bae12679 -- infra/pm-worker/src infra/pm-worker/test` は 0 行 (origin/main `bae12679` と同一)。
+
+**時刻 (UTC)。merge は `git log --first-parent` の時刻、全体同期と /status は本番の値**
+
+| 時刻 | 出来事 |
+|---|---|
+| 13:17:10.427Z | 全体同期 (`last_full_sync`)。この時点の main に、保存値を作るコードは無い |
+| 13:56:28Z | PR #2423 (`803d5164`・実装 `891e33ca`・`feat(pm-worker): 終端状態 ... (#2333)`) が main に merge。`issue.assoc`・`issue.authorType` (webhook.ts:213-214)・`sig.outcome` (webhook.ts:322-325) を初めて作る |
+| 18:08:30Z | PR #2671 が main に merge (版 `SIGNAL_VER` = 2。engine.ts:52) |
+| 18:11:15.877Z | 全体同期 (`last_full_sync`)。版の補完の条件 `stale` (engine.ts:1418-1420) が成り立つ (`meta.signalVer` が未記録) ので、一致すると推定 |
+| 19:17Z 頃 | 周期 (`FULL_SYNC_EVERY_MS` = 6 時間・engine.ts:49) の次回。18:11:15Z が無ければ、ここまで全体同期は走らない |
+
+- 13:17:10Z の全体同期は、`assoc`・`authorType`・`sig.outcome` を作れないコードで走った。よって、それより前に保存された issue の `assoc` と、導入前のコメントの outcome は、補完されないまま残った。`infra/pm-worker/README.md` の再デプロイ手順 4 は deploy を main の merge の後と定めるので、13:56:28Z より前に #2423 のコードが動いたとは考えにくい (deploy 時刻は GitHub に記録が無く、未確認)。
+- 導入後、新しいコードで全体同期が走ったのは 18:11:15Z が最初。周期の次回は 19:17Z (13:17:10Z の 6 時間後) だった。版が無かったので、導入で補完を起こす仕組みは無かった。
+- 初版 (#2671 の最初の根因: 6 時間周期の補完待ち) を取り下げた理由 (『13:17:10Z の同期が補完したはず』) は誤りだった。13:17:10Z の同期は導入前のコードで走ったので補完できない。周期の補完待ちという初版の見方は、結果として正しかった。
+
+**保存値の件数 (`/status` と census。census は REST だけで `applyEvent`・`detectPm` に通す。`npCount` = 0 (注 2))**
+
+| 計測 | 時刻 | `no_pr_by_reason` (split / artifact / unknown / blocked / stop) | `pm_detected.no_pr` |
+|---|---|---|---:|
+| `/status` (§4 と同じ URL) | 19:33Z 台 (`last_tick` 19:33:03.802Z・`last_full_sync` 18:11:15.877Z・`comment_window_h` 24・`comment_max_pages` 150) | 63 / 88 / 13 / 29 / 7 (合計 200) | 33 |
+| census 24 時間窓 | 19:37:16Z (コメント 9,151 件・打ち切り無し・open issue 442・open `oc:no-pr` 199) | 63 / 88 / 12 / 29 / 7 (合計 199) | 33 |
+
+- 1 件の差 (`unknown` 13 と 12) は 19:33Z と 19:37Z の間の変化として扱う (未確認)。`pm_detected.no_pr` は 33 で一致する。
+- 18:11:15Z の前の値は §4 (16:58Z: 43 件・検出 1) と §5 (17:55Z 台: 79 件・検出 7) の通り。17:55Z から 19:33Z までに 79 から 200 へ増えた。その大半が 18:11:15Z の全体同期によると読む (17:55〜19:33 の webhook の分は切り分けていない・未確認)。
+
+**検出 0 の issue の読み取り (census 19:37Z。検出の条件は `pm.ts` の `detectPm`)**
+
+| 内訳 (open `oc:no-pr` 199 件) | 件数 | 落ちる条件 |
+|---|---:|---|
+| 検出 (`no_pr`) | 33 | - |
+| `authorAllowed` で落ちる | 48 | 起票者が `pycabbage` (`User`・`author_association` = CONTRIBUTOR)。`pm.ts:55` の `authorAllowed` は `ASSOC_OK` (`webhook.ts:194`: MEMBER / OWNER / COLLABORATOR) にも、許可 bot にも当たらない |
+| `HOLD_LABELS` (`pm-apply` / `needs-user-input`) | 12 | `pm.ts` の `HOLD_LABELS` |
+| `answeredAfter` (PM の応答が後) | 4 | `pm.ts` の `answeredAfter` |
+| outcome の reason が検出の対象外 | 102 | artifact 74・blocked 20・unknown 8 (unknown は注 2 の `npCount` = 0 の影響を受ける) |
+
+- 例 (b): #2457 (`pycabbage`・User・CONTRIBUTOR・`oc:no-pr`) は `authorAllowed` で落ちる。#2405 (`opencode-for-signature-studio[bot]`・Bot) は検出される。
+- open `oc:no-pr` 199 件の起票者の内訳 (`gh api` GET): bot 151 件 (許可) と `pycabbage` の 48 件 (除外)。48 件は census の `authorAllowed` の 48 件と一致する。
+
+**結論と未解決**
+
+- 根因: 保存値 (issue の `assoc`・`authorType`、コメントの `sig.outcome`) は PR #2423 (13:56:28Z merge) で導入された。導入後に新しいコードで全体同期が走ったのは 18:11:15Z が最初で、それまでの間 (13:57〜18:11) は導入前の分が補完されず、`/status` は 24 時間窓の census と一致しなかった。版が無かったため、導入で補完を起こす仕組みも無かった (版の補完 #2671 がその仕組み)。
+- 版の補完 (18:11:15Z の全体同期) の後、`/status` は 24 時間窓の census と一致した (33 = 33)。
+- 残り: 人間 (CONTRIBUTOR) 起票の 48 件は設計上の対象外 (上の §7 の行)。deploy の時刻は未確認 (CI に Cloudflare の認証が無く、`wrangler versions list` を読めない)。
+- 再現: `curl -sS https://signature-studio-pm.pycabbage.workers.dev/status`・`node --experimental-strip-types --no-warnings tools/pm/no_pr_census.ts 24`・`gh api --paginate -X GET "repos/signature-studio/signature-studio-dev/issues?state=open&labels=oc:no-pr&per_page=100"` (起票者の内訳)・`git log -S'assoc: i.author_association' --format='%h %aI %s' -- infra/pm-worker/src/webhook.ts`。

@@ -7,7 +7,7 @@
 //   前提: CPY_PTHREADS=1 bash build_cpython_wasm.sh && CPY_PTHREADS=1 bash build_flpy_static.sh
 //         node tests/static_check.mjs (stock 静的版の記録 work/tool_coverage.flpy_static.json を作る)
 //   node tests/static_mt_check.mjs        STATIC_WASM=<name> で別ビルド (既定 flpy_static_pthread)
-//   node tests/static_mt_check.mjs <tool> REPORT_PY80.md §4 の再現 (reset → 同じ tool を逐次 2 回の host_calls)
+//   node tests/static_mt_check.mjs <tool> REPORT_PY97.md §4 の再現 (reset → 同じ tool を逐次 2 回の host_calls)
 import fs from "node:fs";
 import { A } from "./tool_args.mjs";
 

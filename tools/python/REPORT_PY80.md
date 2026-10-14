@@ -1,101 +1,93 @@
-# python 付録: PY-80 の残件 pthread + GIL (PY-97, #2856 / 親 #2633)
+# python 付録: PY-80 静的版のサブインタプリタ・Memory64・`_PyInterpreterState_GetRefTotal` の検証 (#2633)
 
-上流の `tools/python/REPORT_PY80.md` §4 は repo に存在しなかった (#2633 の PY-80 記録は `REPORT_PY2.md` §7d の未解決表だけ)。本ファイルを新設して #2856 の結果を置く。
+既知類型との関係: 該当なし (lift / 逆アセの欠陥類型ではない。PE は束縛 slot の参照走査と束縛関数の逆アセのみ)。
+親: #83 (PY-2)。`REPORT_PY2.md` §7d・§7e・§7f の未解決を移管 (旧 #76 の T6)。
 
-既知類型との関係: 該当なし (lift / 逆アセの欠陥類型ではない。検証は wasm の結果比較)。
+## 結論
 
-測定 commit: **`a2926d53`** (§3 の数値を測った最後の commit)。以降の commit で `src/flpy.c` と `tests/static_mt_check.mjs` を変えた (§8)。このため §3 の数値は現 HEAD のものではない (未再測定。理由は §8)。
-
-## 1. 結論
-
-- pthread 版 CPython (`--enable-wasm-pthreads`) を別 build dir に作り、静的版 `flpy_static_pthread` を `-pthread` でリンク: **rc 0** (`a2926d53` で再現)。
-- 単一スレッドの 48 tool 列は stock 静的版と **tool 別 0/48 差** (status・result・host_calls 合計 37,424 が一致)。
-- 2 本のスレッド (48 tool 全て) と 4 本のスレッド (`get_session_context`・`get_mixer_routing`) から同時に tool を呼び、**全 104 本のスレッド結果の status・result が単一スレッドの基準と一致** (不一致 0)。
-- 残件 (サブインタプリタ・`_PyInterpreterState_GetRefTotal`・Memory64・実 FLEngine 上の MT・C 側の負のコントロール) は §7 の未解決表。
-
-## 2. 方式
-
-| 項目 | 内容 |
-|---|---|
-| CPython | `CPY_PTHREADS=1 bash build_cpython_wasm.sh` → `work/build-wasm-pthread`。configure に `--enable-wasm-pthreads` (`CFLAGS -pthread`・`LDFLAGS -sUSE_PTHREADS`・`LINKFORSHARED -sPROXY_TO_PTHREAD`)。stock の `work/build-wasm` と LGL 記録 (`tools/legal/notices/records/cpython-3.12.1.json`) は変えない (pthread 版は記録を書かない) |
-| 静的 wasm | `CPY_PTHREADS=1 bash build_flpy_static.sh` → `dist/flpy_static_pthread.{js,wasm,data}`。`flpy.c`・`pybind_resolve.c` を `-pthread -DFLPY_PTHREAD` でコンパイルし、リンクに `-pthread -sPTHREAD_POOL_SIZE=8`、export に `_flpy_mt_call` を追加 |
-| 別スレッドからの実行 | `flpy.c` の `flpy_mt_call(n, target, args)` (`FLPY_STATIC && FLPY_PTHREAD` の時だけ有効)。main が `PyEval_SaveThread` で GIL を手放す → n 本の pthread が各自 `PyThreadState_New(interp)` → `PyEval_RestoreThread` → `flpy_call_json` → `PyThreadState_Clear` → `PyThreadState_DeleteCurrent` (GIL を返す) → main が `pthread_join` → `PyEval_RestoreThread`。戻り値は各スレッドの `call_json` 結果を並べた JSON 配列 |
-| FL の束縛との関係 | `PyEval_SaveThread`・`PyEval_RestoreThread`・`PyThreadState_New` は FL が束縛する (`REPORT_PY2.md` §7d)。`PyThreadState_Swap` は本経路では直接使わない (RestoreThread が内部で行う) |
-| テスト | `tests/static_mt_check.mjs` (新規)。(1) 単一スレッド 48 tool 列 (`static_check.mjs` と同順) を stock 静的版の記録 (`work/tool_coverage.flpy_static.json`) と突き合わせる。(2) tool ごとに `_fl_engine_reset` → 基準を 1 回 → reset → T 本同時。T=2 は 48 tool 全て、T=4 は重い 2 tool |
-
-## 3. 実測 (測定 commit `a2926d53`。現 HEAD では未再測定)
-
-| 手順 | 結果 | 所要 | load (1 分平均、開始 → 終了) |
+| # | 項目 | 判定 | 節 |
 |---|---|---|---|
-| `CPY_PTHREADS=1 bash build_cpython_wasm.sh` (`work/build-wasm-pthread` を `rm -rf` してから。native は既存を再利用) | rc 0 | 2 分 10 秒 | 0.54 → 2.64 |
-| `bash build_cpython_wasm.sh` (stock、native 込みの初回) | rc 0 | 4 分 11 秒 | 0.73 → 3.17 |
-| `CPY_PTHREADS=1 bash build_flpy_static.sh` | rc 0。警告 1 件 `-Wpthreads-mem-growth` (下の §6) | 6.5 秒 | 2.23 |
-| `bash build_flpy_static.sh` (stock、再リンク) | rc 0 | 6.0 秒 | 2.66 |
-| `node tests/static_check.mjs` (stock 静的版) | `STATIC CHECK OK` (48/48、SAB 版と 0/48、mock と 0/48) | 0.395 秒 | 2.66 |
-| `node tests/static_mt_check.mjs` (pthread 版) × 3 | `STATIC MT CHECK OK` × 3 | 1.073 / 1.080 / 1.057 秒 (プロセス全体)、MT 部 wall 518 / 527 / 531 ms | 2.25 |
+| 1 | サブインタプリタ (静的版 wasm32) | **達成**。12/12 PASS | §1 |
+| 2 | pthread + GIL | **未実施**。子 #2856 (PY-97) に分割 | §4 |
+| 3 | Memory64 | **部分**。`MEMORY64=1` はリンクまで成功。headless Chrome 154 では validate 可、node 22.23 では validate 不可 (エンジン依存)。`MEMORY64=2` は node で実行でき 11/12 PASS (heap 増加 1 件 FAIL)。`MEMORY64=1` の実行検証は子 #2858 (PY-98) | §3 |
+| 4 | `_PyInterpreterState_GetRefTotal` | **FL PE は呼んでいない**。参照は束縛時の store 1 件のみ。束縛失敗は無言 | §2 |
 
-結果の内訳 (`work/mt_check.flpy_static_pthread.json`):
+測定 commit (WORKFLOW §6 の定義: コード差分の最終 commit): `2a85bd96`。以降の差分は本節を含む文書のみで、`git diff 2a85bd96 HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行 (fix の HEAD で確認)。probe の実行 commit: `7e34fa2b` (probe の値は、この commit を再ビルドした dist で測定)。`7e34fa2b` → `2a85bd96` の差分は Chrome の validate 確認ページ (`tests/memory64_validate_chrome.html`) 1 件だけで、probe の測定経路には入らない。`7e34fa2b` は、それより前の commit `37164f82` (同じ測定) から `build_cpython_wasm64.sh` の emsdk の指定だけを変えたもの ([EMSDK] の lint 対応)。
 
-| 項目 | 値 |
+環境: GitHub Actions runner (4 core)、node v22.23.3、emcc 6.0.12 ([EMSDK])。load は各 run 直前の `/proc/loadavg` 1 分値。
+
+## 0. 素材と再ビルド (測定 commit で実行)
+
+- 素材 fl-win64 ([WIN64]) の `extracted/` を `tar --zstd -xf ... --wildcards 'extracted/*'` で `$RUNNER_TEMP/fl-win64/extracted` に展開 (4.7 秒)。
+- `bash build_cpython_wasm.sh` (wasm32): 3 分 59.8 秒、rc 0。
+- `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash build_cpython_wasm64.sh` (`MEMORY64_LEVEL=1` 既定。`--host=wasm64-unknown-emscripten` で configure が `-sMEMORY64=1` を CFLAGS / LDFLAGS に付与): 2 分 39 秒、rc 0。
+- `MEMORY64_LEVEL=2 EMSDK_ENV=... bash build_cpython_wasm64.sh` (`CFLAGS/LDFLAGS=-sMEMORY64=2`): 2 分 18 秒、rc 0。
+- `FL_WIN64_DIR=... bash build_flpy_static.sh` (wasm32): `dist/flpy_static.wasm` 5,969,111 B。
+- `FLPY_MEMORY64=1 CPY_BUILD=$PWD/work/build-wasm64 STATIC_OUT=flpy_static64 bash build_flpy_static.sh`: 6,375,065 B。
+- `FLPY_MEMORY64=2 CPY_BUILD=$PWD/work/build-wasm64l STATIC_OUT=flpy_static64l bash build_flpy_static.sh`: 6,548,115 B。
+- 3 リンクとも rc 0。`emcc` は `MEMORY64 is deprecated` の警告を出す (`-m64` / `--target=wasm64` を推奨)。
+
+## 1. サブインタプリタ (静的版) — 達成
+
+`node tests/static_subinterp_probe.mjs` (新規)。SAB 版 `tests/subinterp_probe.mjs` (`REPORT.md` §11・`REPORT_PY12.md`) と同じ観点。違い: `_flhost` は JS コールバックではなく静的版 provider (`channels.channelCount`) に直結するため、サブ内の `_flhost.call` が main と同じ値 (3) を返すことを検査する。
+
+| 検査 | 結果 (probe 実行 commit `7e34fa2b`) |
 |---|---|
-| (1) 単一スレッド列 vs stock 記録 | 48 tool、tool 別差 0/48、host_calls 合計 37,424 (`static_check` の tool 合計 `host_calls_tools_sum` と一致) |
-| (2) 2 スレッド | 48 tool × 2 本 = 96 呼出し。不一致 0 |
-| (2) 4 スレッド | `get_session_context` (基準 18,056) と `get_mixer_routing` (基準 16,381) 各 4 本。不一致 0。host_calls 合計は 72,224 (= 18,056 × 4) と 65,524 (= 16,381 × 4) で、同じ初期状態から逐次に 4 回呼んだ合計と一致 |
-| 行数 | 50 行 (48 + 重い 2 件の T=4)。スレッド結果 104 本中 104 本一致 |
+| 3 構成 (isolated OWN_GIL / isolated SHARED_GIL / legacy) で作成→実行→破棄、main 継続 | 3/3 PASS |
+| FL 同梱 stdlib 22 module を isolated で import | PASS |
+| builtin 66 本: isolated で拒否は 4 本 (`_elementtree _lsprof faulthandler pyexpat`。SAB 版と同一集合)、legacy は 0 本 | PASS |
+| isolated は main の `__main__`・`sys.modules` を見ない | PASS |
+| サブ内 `_flhost.call` (provider) が main と一致 (3 構成) | PASS |
+| サブ内の例外は ok:false / stage:exec で報告され、main は継続 | PASS |
+| 150 回 (50×3) の作成/実行/破棄の 3 系列で wasm メモリが増えない | PASS |
+| **合計** | **12/12 PASS** (`STATIC SUBINTERP OK`、rc 0) |
 
-比較元の SAB 版は `FL_ENGINE=wasm node tests/all_tools.mjs` で 48/48・host_calls 37,425 (rc 0、2.02 秒、`a2926d53` より前の同じ入力での実測。`flpy.wasm` は本 commit で変わっていない)。tool 別合計 37,424 との 1 件差は、`static_check.mjs` が tool 集計の後に highlight callback を 1 回往復させ、その 1 件を `hostCallsAfterTools` (summary) 側だけで数えるため。
+- 所要 (wall): run 1 21.96 秒 (load 0.88)、run 2 22.13 秒 (load 0.84)。
+- 1 インタプリタの作成〜破棄 (50 回平均、ms、run 1 の 3 trial): isolated json+re 33.55〜35.10、isolated+_flhost 33.39〜33.69、legacy+_flhost 33.28〜33.67。
+- ネガティブコントロール `node tests/static_subinterp_probe.mjs --neg` (期待 1 件を欠く): `NEG-CONTROL DETECTED`、rc 1 (wall 22.15 秒、load 0.97)。
+- wasm メモリの推移 (同一 instance、20 回ずつ 8 区間 = 160 回): 33,554,432 B で不変。
 
-## 4. 失敗から得た知見 (host_calls の期待値)
+## 2. `_PyInterpreterState_GetRefTotal` — FL PE は呼んでいない
 
-最初の実行では `open_piano_roll_for_channel` (T=2) の host_calls 合計が 31 で、期待値 `2 × 15 = 30` と FAIL した。reset 後に逐次 2 回呼んで確かめると、**1 回目は 15、2 回目は 16** (既に開いた piano roll をもう一度開く分岐)。並行実行の取りこぼしではなく、tool の状態依存だった。結果文字列と status は全スレッドで一致していた。
+- 対応表 `analysis/pybind/pybind_map.json`: 束縛関数 `0xc395a0` の `lea` (0xc39e09) → resolver `0x4235f0` → slot `0x16b84e0`。release build の CPython には定義が無い (許容 1 件)。
+- 入力の展開 (`tools/python` で実行、gitignore の `work/` に置く): `mkdir -p work/py80 && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py80 --wildcards '*block00031_PE.bin'` ([WIN64]・`$ARTIFACTS_DIR` は素材の置き場) → `work/py80/extracted/block00031_PE.bin` (22,227,016 B、展開 2.9 秒)。
+- 参照走査 `python3 analysis/pybind/slot_refs.py --pe work/py80/extracted/block00031_PE.bin --slot 0x16b84e0` (新規): rip 相対の参照は **1 件** (0xc39e18 の `mov [rip],rax`。束縛時の store)。呼出し・読出しは **0 件**。絶対 64bit / 32bit の参照 (値 `0x16b84e0` のバイト列の出現。ファイル全体で数えた) も 0 件。出力は `0x16b84e0 disp_va=0xc39e18 opcode=mov [rip],reg` の 1 行 (6.4 秒。fix の作業ツリー HEAD `43846de0` で再実行し一致。`slot_refs.py` は変更していない。走査は rip 相対の disp32 だけで、絶対参照は含まない)。
+- 走査の対照 (呼出しを拾えることの確認): `Py_NewInterpreterFromConfig` の slot `0x16b8250` は store (0xc395f8) と `call [rip]` (0xc3b46b)。
+- 束縛関数の逆アセ (`llvm-objdump -d`、0xc395a0〜0xc3a120): resolver `0x4235f0` の呼出し 110 件は全て、直後が `movq %rax, slot(%rip)` (格納)。戻り値の検査 (test / cmp / 分岐) は無い。よって束縛が NULL を返しても、読み込み時には止まらず、slot に無言で格納される。
+- 結論: FLEngine PE は GetRefTotal を呼ばない。「FL が使う場合の束縛失敗時の挙動」は、この PE では発生しない。
+- 注意 (`PyInterpreterState_Get`、slot `0x16b8568`): rip 相対の束縛 store は 1 件 (0xc3a06e、束縛関数内)、rip 相対の呼出し・読出しは 0 件。ただし絶対 64bit のポインタが `.data` の VA `0x15e1238` に 1 件あり (値 `0x16b8568` = slot 自体の番地)、この cell を rip 相対で読む命令が 2 件 (0xd90114・0xd972ed) ある。いずれも直後が `call *(%rax)` (`objdump -D -b binary -mi386:x86-64` で確認)。よって FL PE は `PyInterpreterState_Get` を間接呼出しする。旧版の「FL は呼ばない」は誤り。この結論は GetRefTotal にだけ当たる。python312.dll 側や他 DLL での利用は調べていない。
 
-テストの期待値を「同じ初期状態から逐次に T 回呼んだ合計」に直した (修正後: 31 = 31)。修正前の式は `T × 基準` で、この失敗は commit 前の作業中に出たもの (commit 済みのテストは修正後の式)。
+## 3. Memory64 — リンクは成功、実行は node 22.23 で一部
 
-再現 (fix で追加した引数モード。先に `CPY_PTHREADS=1 bash build_cpython_wasm.sh && CPY_PTHREADS=1 bash build_flpy_static.sh` を済ませておく):
+- `build_cpython_wasm64.sh`: wasm64 の configure は config.site に sizeof の固定値を持たないため、ポインタ幅は CFLAGS の `-sMEMORY64=1` に従う。
+- `-sMEMORY64=1` (wasm64 libpython + 静的版): リンク 6,375,065 B。
+  - node 22.23.3 で `WebAssembly.validate` は **false** (`--experimental-wasm-memory64` を付けても false)。instantiate は `invalid table elements limits flags` で失敗する (table64 の形式)。
+  - 再現 (`tools/python` で実行。`dist/flpy_static64.wasm` は `FLPY_MEMORY64=1 CPY_BUILD=$PWD/work/build-wasm64 STATIC_OUT=flpy_static64 bash build_flpy_static.sh` で作る): `node -e 'const b=require("fs").readFileSync("dist/flpy_static64.wasm");console.log(WebAssembly.validate(b))'` → `false`。上の数値は測定 commit `2a85bd96` の dist による。fix の run では emsdk が無く dist を再ビルドしていない (再実行していない・測定時の値)。この 1 行の書式は、空の wasm (`\0asm` + version) で `true`、壊れたファイルで `false` を確認した。
+  - instantiate の失敗 (測定時の文言 `invalid table elements limits flags`) の再現: `node -e 'new WebAssembly.Module(require("fs").readFileSync("dist/flpy_static64.wasm"))'` → 同じ compile 段の `CompileError` (測定時は instantiate 側で同じ文言)。この run では dist を作れず、このコマンドは未実行。代わりに、同じ文言の系統を次で確認した (node v22.23.3、本 run): table64 の limits (flags `0x04`) だけを持つ最小 wasm `new Uint8Array([0,97,115,109,1,0,0,0,4,4,1,112,4,1])` を `new WebAssembly.Module` に渡すと `CompileError: WebAssembly.Module(): invalid table elements limits flags @+12`。
+  - headless Chrome 154 では `validate=true` (wasm32 の `flpy_static.wasm` も true)。table64 はブラウザでは受理される。再現コマンド (html 冒頭と同じ。測定時の実フラグの記録は無いため、この 1 形式に統一): `google-chrome --headless=new --no-sandbox --disable-gpu --allow-file-access-from-files --virtual-time-budget=15000 --dump-dom file://$PWD/tests/memory64_validate_chrome.html`。本 run では dist が無いため、3 件とも `Failed to fetch` の RESULT 行が出る (rc 0。コマンドの形の確認のみ、validate の値は測定時のもの)。instantiate と probe の実行は未実施 (子 #2858)。
+- `-sMEMORY64=2` (binaryen の memory64/table64 lowering): リンク 6,548,115 B。`validate` は **true**。
+  - `STATIC_WASM=flpy_static64l STATIC_MEM64=2 node tests/static_subinterp_probe.mjs` は `STATIC SUBINTERP FAIL` (rc 2)。**11/12 PASS**。失敗は wasm メモリ不変の 1 件だけ。3 系列とも 33,554,432 → 48,365,568 B (+14,811,136 B)。wall 23.53 秒 (load 0.98)。
+  - 同一 instance の推移 (20 回区間): 33,554,432 (0〜100 回) → 40,304,640 (120 回) → 40,304,640 (140 回) → 48,365,568 (160 回)。32bit 版は同じ 160 回で増えない (§1)。
+  - 1 インタプリタの作成〜破棄 (50 回平均、ms、run 1 の 3 trial): isolated json+re 36.39〜37.76。
+  - 原因は未切り分け (lowering の影響、アロケータの経路差、Python 側の保持のいずれか)。
+- table64 に対応するエンジン (headless Chrome など) での `MEMORY64=1` の実行は未検証 → 子 #2858 (PY-98)。
 
-```
-node tests/static_mt_check.mjs open_piano_roll_for_channel
-```
+## 4. pthread + GIL — 未実施
 
-reset → 同じ tool を逐次 2 回 → 各回の status・host_calls を JSON で出す。期待値は `calls[0].host_calls` = 15、`calls[1].host_calls` = 16。**本 fix 時点では未実行** (toolchain-emsdk 素材が本 run に無く wasm を作れない。§8)。
+- 静的版の複数スレッド版 (`--enable-wasm-pthreads` で libpython を再ビルド、`-pthread` でリンク) は未実施。この run の残り時間で完結しないと判断し、子 #2856 (PY-97) に分割した。
+- 既存の前提 (`REPORT_PY2.md` §7d): FL は `PyEval_SaveThread` / `PyEval_RestoreThread` と `PyThreadState_New` / `PyThreadState_Swap` を束縛し、`PyGILState_*` は束縛しない。
 
-## 5. 負のコントロール
-
-- 比較ロジックが実際に失敗を出すか: `tests/static_mt_check.mjs` の基準 (`ref.text`) に `"!"` を足した一時コピーを実行 → `STATIC MT CHECK FAIL (50)`、rc 1 (50 行すべてが不一致として検出)。`a2926d53` 時点の実測。一時ファイルは削除済み。
-  - 再現 (1 行): `sed 's/const ref = full(\(.*\));$/const ref = ((r) => ({ ...r, text: r.text + "!" }))(full(\1));/' tests/static_mt_check.mjs > tests/_neg_mt.mjs && node tests/_neg_mt.mjs; rm -f tests/_neg_mt.mjs`
-  - 制限: この control は基準を全行で壊すため、比較が行われ不一致が数えられることの確認 (配線) にはなるが、「1 行だけ壊して 1 行だけ FAIL」は確認していない。1 行だけ壊す control は未実施 (§7)。上の再現コマンドは fix 後に未実行。
-- 未実施: C 側の変異 (スレッド側で `PyEval_RestoreThread` を外す等)。GIL の取り損ねが検出されるかは未確認 (§7)。
-
-## 6. 検証範囲 / 範囲外
-
-- 範囲: node の main スレッドと pthread worker 上の静的 pthread 版。FL 本体・実 FLEngine・AudioWorklet は対象外 (AudioWorklet からは呼ばない方針は `BRIDGE.md` §7)。
-- 比較の範囲: (2) の並行呼出しは基準と**全文**で比べる (fix で変更。`a2926d53` は先頭 160 字だった)。(1) は stock 記録 (`static_check.mjs` が先頭 160 字で保存する形式) と同じ 160 字で比べる。
-- GIL の交互実行 (実際に切り替わった回数) は未計測。結果一致は「どの順で動いても同じ結果」を示すが、切替の頻度は示さない。
-- `ALLOW_MEMORY_GROWTH` と pthread の組合せで `-Wpthreads-mem-growth` (「非 wasm コードが遅くなり得る」) の警告が出る。性能への影響は未計測。`-sGROWABLE_ARRAYBUFFERS` は試していない。
-
-## 7. 未解決
+## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| サブインタプリタ (`Py_NewInterpreterFromConfig`) の静的 pthread 版での動作 | FL がサブインタプリタ運用なら MIDI・piano roll の分離に影響 | 親 #2633 に残す (PY-80 の残件) |
-| `_PyInterpreterState_GetRefTotal` を FL が使うか | 使うなら release build で束縛が失敗 (FL 側の挙動は未確認) | 親 #2633 に残す |
-| Memory64 でのリンク (pthread 版を含む) | wasm32 決定 (#25) の退避路。未検証 | 親 #2633 に残す (`BRIDGE.md` §7) |
-| 実 FLEngine wasm 上の MT 呼出し | 本節は provider の最小エンジン状態での結果 | 子 #2631 (PY-79) |
-| C 側の負のコントロール (GIL 取り損ねの検出) と GIL 切替の計測 | 並行性の証拠の強さ (現状は結果一致のみ) | 親 #2633 に残す |
-| 1 行だけ壊す負のコントロール (§5 の制限) | 「1 件だけ FAIL」の確認なし | 親 #2633 に残す |
-| `-Wpthreads-mem-growth` の性能影響 | 性能のみ (未計測) | 親 #2633 に残す |
-| fix (§8) 後の再測定 (§3・§4・§5 の再実行) | 数値は `a2926d53` のもの | 次の review run で独立再実行 (PR #2901 の差し戻し対応) |
+| pthread + GIL の静的版のビルドと複数スレッドからの実行 | MIDI スレッド分離の可否 | 子 #2856 (PY-97) |
+| `MEMORY64=1` の instantiate と probe 実行 (node 22.23 は validate 不可、Chrome 154 は validate 可) | Memory64 の実行可否が未確認 | 子 #2858 (PY-98) |
+| `MEMORY64=2` の heap 増加 (160 回で +14.8 MB、32bit 版は 0) の原因 | Memory64 (lowered) 版で長い作成/破棄を繰り返すと増える可能性 | 子 #2858 (PY-98) |
+| `_PyInterpreterState_GetRefTotal` の結論は FLEngine PE の rip 相対・絶対参照の走査に限る | python312.dll や他 DLL での利用は未調査 | 追加起票なし (結論の範囲の注記) |
+| FLEngine PE が `PyInterpreterState_Get` を間接呼出しする 2 箇所 (0xd90114・0xd972ed) の呼出し先での挙動 | 静的版の probe (単体) は FL の呼出し文脈を含まない | 追加起票なし (注記) |
 
-## 8. fix (PR #2901 の差し戻し対応)
+## 検証範囲 / 範囲外
 
-- `src/flpy.c` `flpy_mt_call`: `strdup` と `malloc` の戻り値を検査していなかった。修正後は、`pthread_create` 失敗と `strdup` 失敗 (out が NULL) のスレッドには代用の `{"err":"thread result missing"}` を並べる (`strdup` の代わりに定数を使う)。`buf` の `malloc` が NULL なら確保済みの out を解放して NULL を返す。JS 側 `mtCall` は NULL を例外にする。
-- `tests/static_mt_check.mjs`: (2) の比較を全文 (`full`) に変えた。引数 `<tool>` で §4 の再現モード (reset → 逐次 2 回) を追加。
-- 検証 (本 run): 手元の gcc (`-std=gnu11 -Wall -Wextra`、Python 3.12 の system headers、`EMSCRIPTEN_KEEPALIVE` だけ空定義の stub) で `src/flpy.c` の構文チェック rc 0 (修正前後とも、警告 0)。`node --check tests/static_mt_check.mjs` rc 0。
-- 未実施: `build_cpython_wasm.sh`・`build_flpy_static.sh` の再ビルドと、`static_check.mjs`・`static_mt_check.mjs` の再実行。本 run には `toolchain-emsdk` ([EMSDK]) の素材が無く、wasm を作れなかった。次の review run で `oc_artifacts: fl-win64 toolchain-emsdk` により独立に再実行する。
-- 測定 commit `a2926d53` から fix commit までのコード差分 (`git diff --stat a2926d53 HEAD -- tools/python ':(exclude)*.md'`):
-
-```
- tools/python/src/flpy.c                | 18 +++++++++++++-----
- tools/python/tests/static_mt_check.mjs | 22 ++++++++++++++++------
- 2 files changed, 29 insertions(+), 11 deletions(-)
-```
+- 範囲: Linux・node 22.23.3・静的版 wasm32 と Memory64 の 2 種 (level 1 はリンクのみ、level 2 は実行)。
+- 範囲外: pthread、headless Chrome / Firefox / Safari での wasm64、実 FLEngine wasm への接続 (子 #2631 PY-79)。

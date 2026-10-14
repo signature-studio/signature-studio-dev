@@ -206,3 +206,41 @@
 | clock_jumps 6 件のうち中間 4 件の位置 (隣接性) と発生源 | 実スキップか計測由来かの切り分けが未完 | #1570 (全件の位置記録は次の実装) |
 | cb_max 1,055 µs (q550,685) の原因 | 単発の 1 ms 超。原因不明 | #1570 |
 | 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock・spike は未計測 | #1570 |
+
+### 16.10 AU-21 (#1570) 切り分け 6: head `c62dd783` (clock_jump の全件位置を記録)
+
+測定 commit: `c62dd783` (origin/main `26f90ada` 起点の worktree `ws-1570`、ブランチ `1570-au21-soak-triage-5`)。コード変更は計測の追加のみ: worklet が clock_jump 1 件ごとに `port` で `{q, d, frame, prev, ms}` を通知 (上限 256 件)、shim が `clockJumpLog` に積み、`test/page.mjs` の result と harness 表示 (`clock_jump_log=`) に出す。SAB の Atomics 配列 (layout) は不変。`q` は process() の通し番号 (計上時点の値)、`d` = `frame - prev - 128` (+ = 描画されなかった frame、− = 同一 frame の重複)、`frame` = worklet の currentFrame。環境: GitHub runner 4 core / 15 GiB, headless google-chrome 154, `pnpm install --frozen-lockfile` 後 `bash tools/audio/build.sh` OK (1.95 s, emcc 6.0.12, [EMSDK] 既存)。生ログは repo 外の作業ディレクトリ、結果 JSON は `tools/audio/results/soak_10.json` / `soak_1800.json` (未コミット)。
+
+| 試行 | 結果 | 所要 / load (開始→終了, 1 分平均) |
+|---|---|---|
+| `--soak 10` 初回 (build 直後, 19:21 UTC) | PASS: underruns 0, ramp 0 / 480,512 f, T=1024, cb_max 74 µs, clock_jump_log なし | 70.2 s / 0.38 → 0.20 |
+| `--soak 10` 1〜5 回目 (19:53〜19:58 UTC) | **5/5 PASS**: underruns 0, silence 0, ramp 0 / 480,512 f (全 5 回), workletErrors 0, clock_jump_log なし (全 5 回)。cb_max 395 / 44 / 64 / 34 / 369 µs, T=1536, dev_fill min 1024 | 各 63.3〜63.4 s / 0.06→0.02, 0.02→0.00, 0.00→0.00, 0.00→0.00, 0.00→0.03 |
+| **`--soak30` (1800 s, 無負荷)** (19:22:54〜19:52:55 UTC) | **PASS**: underruns 0, silence 0, ramp **0 / 86,407,296 f**, workletErrors 0, cb 337,526 回 late 0, **cb_max 340 µs** (cb_max_q 11,938 ≈ 31.8 s), T=1024 固定 (lat_changes 0), dev_fill 512/786/1024, **clock_jumps 6 件** (skip 384 f / dup 384 f / 符号付き合計 0), secs_wall 1800.139 | 1801.3 s / 0.20 → 0.08 |
+
+30 分試行の jump 全 6 件 (`clock_jump_log`):
+
+| q (process 通し番号) | d (frames) | frame (currentFrame) | 時刻 (frame ÷ 48000) |
+|---|---|---|---|
+| 22314 | −128 (重複) | 2,869,632 | 59.78 s |
+| 22315 | +128 (描画されなかった frame) | 2,869,888 | 59.79 s |
+| 60187 | −128 | 7,717,376 | 160.78 s |
+| 60188 | +128 | 7,717,632 | 160.78 s |
+| 383062 | −128 | 49,045,376 | 1,021.78 s |
+| 383063 | +128 | 49,045,632 | 1,021.78 s |
+
+判定:
+- **発生パターンの確定**: 6 件は 3 組の隣接ペア (q と q+1)。各組は「同じ currentFrame P の process() が 2 回 (P, P)、続けて P+256 (2 quantum 分進む)」の並びで、dup 側の `prev` は同じ frame を指す。符号付き合計は各組 0 (§16.8 の「±組」仮説と、§16.9 の「単一の隣接ペアではない」は、この 30 分では 3 組それぞれ隣接で一致)。
+- **発生源の切り分け**: `currentFrame` はブラウザの音声スレッドの frame カウンタで、shim・harness の計測は値を書かない。よって「計測タイミングの誤差」ではなく、ブラウザの render thread が process() を同一 frame で 2 回呼んだ結果と判定する。`skip` (+128) 単独では実スキップに見えるが、直前の重複 (−128) と対になり、出力 sample は ramp 照合で 86,407,296 f 全て一致 (6 件の前後も含む)。よって音声の欠落・重複の証拠は無い。ただし「なぜ同一 frame の process() が 2 回呼ばれるか」(ブラウザ内部の起床・再描画の条件) は**未特定**。
+- 30 分ソーク (無負荷) の通算は 8 回。cb_max は 184 / 169 / 475 / 344 / 385 / 155 / 1,055 / 340 µs。ms 級 spike は今回も未再現。1,055 µs (q550,685) の原因は未特定 (今回の jump の位置 q22314 等とは一致しない)。
+- 10 秒ソーク FAIL: 本 head で 0/6 回 (初回 1 + 反復 5)。通算 (head `57519ca`〜`c62dd783`) で **2/44**。原因は**未特定**、FAIL 時の採取データは §16.5 の 1 回のみ。
+- 負荷下の 30 分ソークは本 run では未実施 (§16.2 が最新)。
+- 検証範囲: 30 分は無負荷 n=1。jump は 1 試行 (6 件) のみで、件数・位置の再現性は未確認。
+
+鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `c62dd783` → 本 REPORT commit の `git diff --stat c62dd783 HEAD -- tools/audio public/worklets src/runtime` は REPORT_AU10.md のみ (PR 作成時点で確認)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 10 秒ソーク FAIL の原因 (通算 2/44) | 30 分実測の信頼性 | #1570 (再現待ち。FAIL 時は cb_max_q・dev_fill・underrun・clock_jump_log を採取) |
+| 同一 frame の process() が 2 回呼ばれる条件 (ブラウザ内部の起床・再描画) | clock_jumps の発生源 (無害と判定するための根拠が sample 照合のみ) | #1570 (30 分試行の追加で件数と時刻・cb 時刻の相関を取る) |
+| cb_max 1,055 µs (q550,685) の原因 | 単発の 1 ms 超。原因不明 | #1570 |
+| 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock・spike は未計測 | #1570 |

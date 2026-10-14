@@ -28,13 +28,15 @@ const seq = [
   ["device.forwardMIDICC", [0xB0]],
   ["device.midiOutMsg", [0x90, 0, 60, 100]],
   ["device.midiOutMsg", [0xB0]],
+  ["device.midiOutMsg", [0xB0, 2, 1, 127, 9]],
 ];
 
 // mock は引数の個数・型を検査しない (既知の差)。C 側は署名どおりに拒否する (code 5) ことだけを wasm 単独で確認。
+// midiOutMsg は FLEngine の書式 (i|iiii) で 5 個まで受理する (PY-102 / #2927)。6 個目から拒否する。
 const rejects = [
   ["device.forwardMIDICC", []],
   ["device.forwardMIDICC", [1, "x"]],
-  ["device.midiOutMsg", [0xB0, 2, 1, 127, 9]],
+  ["device.midiOutMsg", [0xB0, 2, 1, 127, 9, 9]],
   ["device.midiOutMsg", [0xB0, "x"]],
 ];
 const rejectDiffs = rejects.map(([name, args]) => ({ name, args, wasm: run(wasm, name, args) }))

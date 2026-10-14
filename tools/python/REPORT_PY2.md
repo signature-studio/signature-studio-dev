@@ -77,7 +77,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | 実 FLEngine wasm へのリンク (`fl_api_call` を FLEngine の内部 API に繋ぐ) | 本節は provider のモック状態で実測しており、実エンジンの意味差は未検証 | 子 #2631 (PY-79)。FLEngine 起動 (MS5) が前提 |
 | `_PyInterpreterState_GetRefTotal` を FL が実際に使うか | 使うなら upstream release build では束縛が失敗する (FL 側の失敗時挙動は未確認) | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
 | wasm でのサブインタプリタ (`Py_NewInterpreterFromConfig`) 動作 | FL がサブインタプリタ運用なら MIDI/piano roll の分離に影響 | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
-| pthread 版での複数スレッド + GIL | MIDI スレッド分離の可否 | 静的 pthread 版の 2/4 スレッド実測は #2856 (PY-97、`REPORT_PY80.md`)。残件 (サブインタプリタ・負のコントロール) は子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
+| pthread 版での複数スレッド + GIL | MIDI スレッド分離の可否 | 静的 pthread 版の 2/4 スレッド実測は #2856 (PY-97、`REPORT_PY97.md`)。残件 (サブインタプリタ・負のコントロール) は子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
 
 ## 7e. 再検証 (測定 commit 322f81b6) と #83 の受入条件の判定
 
