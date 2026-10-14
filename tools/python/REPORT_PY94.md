@@ -67,7 +67,7 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 
 測定 commit: `a9328f26` (main `b34d93fe` の取り込みの merge。`tools/python` のコードを変えた最後の commit)。以降の commit は `.md` だけを変える。
 
-環境: 検証開始直前の load average 0.40 / 0.45 / 0.20 (`uptime`)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の実在を `ls` で確認し、`tar --zstd -xf` で必要な DATA block と PE (`block00031_PE.bin`・`block24429`・`block24430`・`block25159`・`block24618`) だけを `$RUNNER_TEMP/fl-win64/extracted` に展開した (2.8 秒)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。emsdk は `/opt/emsdk` (`docs/REFERENCES.md` §4)。`toolchain-emsdk` は使っていない。
+環境: 検証開始直前の load average 0.40 / 0.45 / 0.20 (`uptime`)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の実在を `ls` で確認し、`tar --zstd -xf` で必要な DATA block と PE (`block00031_PE.bin`・`block24429`・`block24430`・`block25159`・`block24618`) だけを `$RUNNER_TEMP/fl-win64/extracted` に展開した (2.8 秒)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md` §4)。`toolchain-emsdk` は使っていない。
 
 前提の生成物 (gitignore。worktree を新規に作ったため `work/` は再利用せず、すべて新規に生成した):
 
