@@ -103,3 +103,9 @@ e2e 内訳: `midi_all` 54/54 (2,801 ms) / `negctl_drop_one_short_msg` 62,500 ms 
 
 - 残件: この closure は M11 の検査用 wasm で、本番の FL 経路 (`tools/startup`・実 FL・headless Chrome の `midiOutGetNumDevs` 結線) は未配線・未検証。`Closes #179` の条件は未達。起票先 #37 (AU-14)。
 - `midiOutShortMsg` の signature mismatch (i64 呼出 vs i32 定義) は本変更で解消していない。shimx の `outShortMsg` 引数幅の確認が必要 (起票先 #37)。
+
+### 19.10 winstubs 結線 closure への配線 (#179 run #15)
+
+- `build.sh --ws --midi` (tools/startup/winstubs 結線あり) でも `flmidi_shimx_install()` が constructor で走り、`midi_e2e.mjs` 3/3 PASS。`ws_e2e.mjs` の BOOT 基準 (init 18 / units 17) と G03/G05/G12 は `--midi` の有無で不変。
+- 実測と修正 (旧 main の全 variant が `undefined exported symbol: _sxt_count` で link 失敗していた件を含む) は `tools/m11/shimx_link/REPORT.md` §11。
+- 残件 (未達): 本番 FL 経路・headless Chrome での `midiOutGetNumDevs` 結線、`midiOutShortMsg` の引数幅 → #37 (AU-14)。
