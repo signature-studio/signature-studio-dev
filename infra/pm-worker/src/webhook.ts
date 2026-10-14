@@ -44,6 +44,9 @@ export interface PrState {
   author?: string;
   authorType?: string;
   assoc?: string;
+  // merge の時刻と、本文が Refs #N のみ (Closes/Fixes なし) か。merge 済みの PR だけが持つ (本文そのものは持たない)。
+  mergedAt?: string;
+  refsOnly?: boolean;
 }
 // issue / PR ごとの終端状態の手がかり (oc-pm の検出に使う)。値は時刻・列挙値・真偽だけで、本文は持たない。
 export interface Signal {
@@ -301,15 +304,23 @@ function applyDependencies(s: PmState, p: Json): PmState {
   return { ...s, blockedBy, issues };
 }
 
+// 本文が『Refs #N のみ』か (issue を閉じない merge の判定)。Closes / Fixes / Resolves の語が 1 つでもあれば false。大文字小文字は区別しない。
+const REFS_RE = /\bRefs:?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
+const CLOSE_RE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+(?:[\w.-]+\/[\w.-]+)?#\d+/i;
+export function refsOnlyBody(body: string): boolean {
+  return REFS_RE.test(body) && !CLOSE_RE.test(body);
+}
+
 function applyPr(s: PmState, p: Json): PmState {
   const pr = p.pull_request;
   if (!pr) return s;
   const k = String(pr.number);
   if (!newer(s.prs[k], pr.updated_at)) return s;
+  const merged = !!pr.merged_at;
   const next: PrState = {
     number: pr.number,
     state: pr.state === "closed" ? "closed" : "open",
-    merged: !!pr.merged_at,
+    merged,
     draft: !!pr.draft,
     ref: pr.head?.ref ?? "",
     title: pr.title ?? "",
@@ -319,6 +330,8 @@ function applyPr(s: PmState, p: Json): PmState {
     author: pr.user?.login ?? s.prs[k]?.author,
     authorType: pr.user?.type ?? s.prs[k]?.authorType,
     assoc: pr.author_association ?? s.prs[k]?.assoc,
+    // 切り詰める前の完全な本文から真偽だけを取る (本文は保存しない)。
+    ...(merged ? { mergedAt: String(pr.merged_at), refsOnly: refsOnlyBody(pr.body ?? "") } : {}),
   };
   return { ...s, prs: { ...s.prs, [k]: next } };
 }
