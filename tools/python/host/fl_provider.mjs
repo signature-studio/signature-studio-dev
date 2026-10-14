@@ -82,5 +82,6 @@ export async function createWasmEngine({ flprovUrl, ids }) {
     channelCount: () => M._fl_engine_channel_count(),
     midiOutCount: () => M._fl_engine_midi_out_count(),
     gridBit: (c, p) => M._fl_engine_grid_bit(c, p),
+    displayTime: () => Number(M._fl_engine_display_time()),
   };
 }

@@ -1,364 +1,255 @@
 #!/usr/bin/env python3
-"""PY-99 (#3085・親 #2874): SLOT? の読みごとに、合流の先行辺ごとの store 集合を出し、別算法と突合する (実機不要)。
+"""PY-99 (#2874): [rbp+X] の読みごとに、CFG を後ろ向きに辿って届く store と格納値の式を列挙する (実機不要)。
 
-  python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]
+  python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [<VA> ...] [--negctl {fallthrough,expect}] [--lea-write]
 
-  <work/py53/fn.txt> は analysis/py53_dispatch.py の出力 (作業用ファイル)。
-  --md: 読みごとの先行辺 p の S_p 全件を markdown 表で書き出す (先頭行 `自動生成:`・--negctl と併用しない)。
-対象は analysis/py88_writes.py の既定 65 件のうち、直接式で SLOT[ を含む 49 件。
-読み = py88 の式に現れる SLOT[rbp+X]?@j の葉 (読む命令 r と X の組)。
-
-算法 B (後ろ向き): r から CFG の逆辺を BFS で遡り、[rbp+X] への dword/qword store で止める。
-  線形に遡って最初に現れる合流 J (先行辺 2 本以上) と、J の先行辺 p ごとの S_p を出す。
-算法 A (前向き): 同じ X について reaching-definitions の固定点計算 (gen = store・kill = 同 X の store)。
-  読み r の IN(r) と B の到達 store 集合を 1 件ずつ比べ、mismatch 件数を出す。
---negctl drop-pred: 算法 B だけで、読みを VA 順に見て、合流 J の先行辺 p0 を 1 本外す。
-  p0 は「S_p0 の store のうち、他の先行辺の S_q に無いものがある最初の (読み, p)」。
-  他の辺と寄与が完全に重なる辺を外しても mismatch にならないため、その辺は選ばない。
-
-store の式は py88 の Slicer.def_value で作る。閉じた式 = ⚠合流・SLOT? ほか未確定の葉 (ACC・IN・_in・clob・VCALL・CALL[・<・…・⚠addr-taken) を含まないもの。
-exit: mismatch == 0 なら 0、それ以外は 1。
+- 対象は py88_writes の 65 書込みの式を評価する過程で現れる [rbp+X] の読み (Slicer.mem_read を記録する)。
+- T: py88 の結果が SLOT[...]? または ACC?⚠ で始まる読み (印つき)。U: それ以外 (py88 の線形結果が一意)。
+- U は py88 の線形遡りとの突合に使う。届く store が線形の直前 store 1 件で、式が py88 の式と一致すること。
+- 辺: fall-through と jcc/jmp の target (関数内のみ)。store は py88 と同じ dword/qword ptr [rbp+X] への書込み。
+- --negctl fallthrough: 分岐辺を全部落として列挙する (変わる読みの件数で検出力を見る)。
+- --negctl expect: U の先頭 1 件の期待式を書き換える (不一致 1 で exit 1 になるはず)。
+- --lea-write: lea [rbp+X] を間接書込み (may-write) とみなし、そこから直接の store を経ずに届く [rbp+X] の読みを数える (診断のみ・exit に影響しない)。
+- 突合の不一致が 1 件以上なら exit 1。経路の列挙結果は stdout、集計は stderr に出す。
 """
 import os
 import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import py88_writes as p88  # noqa: E402
+import py88_writes as w  # noqa: E402
 
-ENTRY = -1
-SLOT_RE = re.compile(r"^(dword|qword) ptr \[rbp \+ (0x[0-9a-f]+)\]$")
-SIZED_RE = re.compile(r"^(byte|word|dword|qword) ptr \[rbp \+ (0x[0-9a-f]+)\]$")
-SIZES = {"byte": 1, "word": 2, "dword": 4, "qword": 8}
-READ_RE = re.compile(r"^SLOT\[rbp\+(0x[0-9a-f]+)\]\?@")
-UNCLOSED = ("⚠合流", "SLOT[", "ACC", "IN[", "_in", "clob@", "VCALL", "CALL[", "<", "…", "⚠addr-taken")
+SIZES = ("dword ptr [rbp + ", "qword ptr [rbp + ")
+UNRESOLVED = ("SLOT[", "ACC", "IN[", "⚠", "_in", "clob@", "…", "OP:")
+LEA = {"on": False}
 
 
-def closed(e):
-    return not any(k in e for k in UNCLOSED)
+def store_slot(ins, a):
+    m, o = ins[a]
+    ops = w.parse_ops(o)
+    if LEA["on"] and m == "lea" and len(ops) == 2 and ops[1].startswith("[rbp + "):
+        return int(ops[1].split("+ ")[1].rstrip("]"), 16)
+    if m not in w.STORE or not ops or not ops[0].startswith(SIZES):
+        return None
+    return int(ops[0].split("+ ")[1].rstrip("]"), 16)
 
 
-class Cfg:
-    def __init__(self, ins, order):
-        self.ins = ins
-        self.order = order
-        self.idx = {a: i for i, a in enumerate(order)}
-        self.pred = {a: [] for a in order}
-        for i, a in enumerate(order):
-            m, o = ins[a]
-            nxt = order[i + 1] if i + 1 < len(order) else None
-            if m == "ret":
-                out = []
-            elif m.startswith("j"):
-                if not p88.TARGET_RE.fullmatch(o.strip()) or int(o, 16) not in self.idx:
-                    raise SystemExit(f"unsupported branch at {a:#x}: {m} {o}")
-                tgt = int(o, 16)
-                out = [tgt] if m == "jmp" else [tgt, nxt]
-            else:
-                out = [nxt]
-            for s in out:
-                if s is not None and a not in self.pred[s]:
-                    self.pred[s].append(a)
-
-    def preds(self, a):
-        p = list(self.pred[a])
-        if a == self.order[0]:
-            p.append(None)
-        return p
-
-    def store(self, a, x):
-        m, o = self.ins[a]
-        if m not in p88.STORE:
-            return False
-        ops = p88.parse_ops(o)
-        mm = SLOT_RE.match(ops[0]) if ops else None
-        return mm is not None and int(mm.group(2), 16) == x
+def store_value(sl, a):
+    m, o = sl.ins[a]
+    ops = w.parse_ops(o)
+    if m in w.MOVLIKE and len(ops) == 2:
+        return sl.ev(ops[1], sl.idx[a], 0)
+    return f"OP:{m} {o}"
 
 
-def reach_before(cfg, c, x, cut=None):
-    out, seen, stack = set(), set(), [c]
-    while stack:
-        n = stack.pop()
-        if n in seen:
-            continue
-        seen.add(n)
-        for p in cfg.preds(n):
-            if cut and (p, n) == cut:
-                continue
-            if p is None:
-                out.add(ENTRY)
-            elif cfg.store(p, x):
-                out.add(p)
-            else:
-                stack.append(p)
-    return out
-
-
-def reach_after(cfg, p, x, cut=None):
-    if p is None:
-        return {ENTRY}
-    if cfg.store(p, x):
-        return {p}
-    return reach_before(cfg, p, x, cut)
-
-
-def first_merge(cfg, r, x):
-    cur, seen = r, set()
-    while True:
-        ps = cfg.preds(cur)
-        if len(ps) >= 2:
-            return cur
-        if not ps or ps[0] is None or cfg.store(ps[0], x) or cur in seen:
-            return None
-        seen.add(cur)
-        cur = ps[0]
-
-
-def forward_in(cfg, x):
-    pr = {a: cfg.preds(a) for a in cfg.order}
-    inn = {a: set() for a in cfg.order}
-    out = {a: set() for a in cfg.order}
-    changed = True
-    while changed:
-        changed = False
-        for a in cfg.order:
-            new_in = set()
-            for p in pr[a]:
-                new_in |= {ENTRY} if p is None else out[p]
-            new_out = {a} if cfg.store(a, x) else set(new_in)
-            inn[a] = new_in
-            if new_out != out[a]:
-                out[a] = new_out
-                changed = True
-    return inn
-
-
-class Rec(p88.Slicer):
-    def __init__(self, ins, order):
-        super().__init__(ins, order)
-        self.reads = set()
-
-    def mem_read(self, addr, size, pos, depth):
-        v = super().mem_read(addr, size, pos, depth)
-        mm = READ_RE.match(v)
-        if mm:
-            self.reads.add((self.order[pos], int(mm.group(1), 16)))
-        return v
-
-
-def fmt(s):
-    return "{" + ", ".join("IN" if v == ENTRY else f"{v:#x}" for v in sorted(s)) + "}"
-
-
-def write_md(path, cmd, edges, nomerge, stores, nkeys):
-    def cell(s):
-        return s.replace("|", "\\|")
-
-    def wr(ws):
-        return ", ".join(f"{w:#x}" for w in ws)
-
-    def mark(ok):
-        return "閉" if ok else "未閉"
-
-    lines = [
-        f"自動生成: cd tools/python && python3 {cmd}",
-        "# PY-99 (#3085): SLOT? 読みごとの合流先行辺 p の S_p (store の VA 集合)",
-        "",
-        f"- 読み {nkeys} 件 (異なり)・合流 J を持つ読み {len({(e[0], e[1]) for e in edges})} 件 (先行辺 {len(edges)} 本)・"
-        f"合流なし {len(nomerge)} 件。",
-        "- 閉: その集合の全 store の式が閉じている (未閉の葉・⚠合流・入口 IN を含まない。`closed()` の規則)。",
-        "- S_p は算法 B (後ろ向き BFS) の値。",
-        "",
-        "## 合流を持つ読み (先行辺ごと)",
-        "",
-        "| 読み (VA) | X | 書込み (VA) | 合流 J | 先行辺 p | S_p (store VA) | 閉 |",
-        "|---|---|---|---|---|---|---|",
-    ]
-    for r, x, ws, j, pl, sp, ok in edges:
-        lines.append(f"| {r:#x} | {x:#x} | {wr(ws)} | {j:#x} | {pl} | {fmt(sp)} | {mark(ok)} |")
-    lines += ["", "## 合流を持たない読み (B の到達 store)", "",
-              "| 読み (VA) | X | 書込み (VA) | 到達 store | 閉 |", "|---|---|---|---|---|"]
-    for r, x, ws, reach, ok in nomerge:
-        lines.append(f"| {r:#x} | {x:#x} | {wr(ws)} | {fmt(reach)} | {mark(ok)} |")
-    lines += ["", "## store の式 (上の表に現れるもの)", "", "| store (VA) | 閉 | 式 |", "|---|---|---|"]
-    for s in sorted(stores):
-        e = stores[s]
-        lines.append(f"| {s:#x} | {mark(closed(e))} | `{cell(e)}` |")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-
-
-def main(argv):
-    cmd = " ".join(["analysis/py99_slot_paths.py"] + list(argv[1:]))
-    args = list(argv[1:])
-    negctl = None
-    if "--negctl" in args:
-        k = args.index("--negctl")
-        negctl = args[k + 1] if k + 1 < len(args) else ""
-        del args[k:k + 2]
-        if negctl != "drop-pred":
-            sys.exit("usage: --negctl drop-pred")
-    md_out = None
-    if "--md" in args:
-        k = args.index("--md")
-        md_out = args[k + 1] if k + 1 < len(args) else ""
-        del args[k:k + 2]
-        if not md_out or negctl:
-            sys.exit("usage: --md <out.md> (--negctl と併用しない)")
-    if len(args) != 1:
-        sys.exit("usage: python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]")
-    path = args[0]
-    ins, order = p88.load(path)
-    cfg = Cfg(ins, order)
-    shared = Rec(ins, order)
-
-    writes, reads_by_write = [], {}
-    for a in p88.default_targets(path):
-        rec = Rec(ins, order)
-        m, o = ins[a]
-        val = rec.ev(p88.parse_ops(o)[1], cfg.idx[a], 0)
-        cat = p88.category(val)
-        if cat.startswith("直接式") and "SLOT?" in cat:
-            writes.append(a)
-            reads_by_write[a] = sorted(rec.reads)
-    print(f"# 対象の書込み: {len(writes)} 件 (py88 既定 65 件のうち直接式で SLOT? のもの)")
-
-    reads = {}
-    for a in writes:
-        for key in reads_by_write[a]:
-            reads.setdefault(key, []).append(a)
-    keys = sorted(reads)
-    fwd = {}
-    for r, x in keys:
-        if x not in fwd:
-            fwd[x] = forward_in(cfg, x)
-
-    cut = None
-    neg_note = ""
-    if negctl:
-        for r, x in keys:
-            j = first_merge(cfg, r, x)
-            if j is None:
-                continue
-            sets = {p: reach_after(cfg, p, x) for p in cfg.preds(j)}
-            for p in cfg.preds(j):
-                others = set().union(*[sets[q] for q in sets if q != p])
-                if sets[p] - others:
-                    cut = (p, j)
-                    neg_note = f"read {r:#x} [rbp+{x:#x}]"
-                    break
-            if cut:
-                break
-        if not cut:
-            sys.exit("negctl: 寄与を持つ先行辺が無い")
-        p0 = "IN" if cut[0] is None else f"{cut[0]:#x}"
-        print(f"# negctl drop-pred: 辺 {p0} -> {cut[1]:#x} を外す ({neg_note})")
-
-    exprs, printed = {}, set()
-
-    def expr_of(s):
-        if s == ENTRY:
-            return "IN"
-        if s not in exprs:
-            exprs[s] = shared.def_value(cfg.idx[s], 0)
-        return exprs[s]
-
-    mismatch = 0
-    stat = {a: {"reads": 0, "merge": 0, "edges": 0, "closed": 1} for a in writes}
-    n_merge = n_edges = n_entry = pairs_closed = pairs_open = 0
-    edge_hist = {}
-    body = []
-    md_edges, md_nomerge, md_stores = [], [], {}
-    for r, x in keys:
-        j = first_merge(cfg, r, x)
-        reach = reach_before(cfg, r, x, cut)
-        if reach != fwd[x][r]:
-            mismatch += 1
-            body.append(f"MISMATCH read {r:#x} [rbp+{x:#x}]: B={fmt(reach)} A={fmt(fwd[x][r])}")
-        ok = bool(reach) and ENTRY not in reach and all(closed(expr_of(s)) for s in reach)
-        wl = ", ".join(f"{w:#x}" for w in reads[(r, x)])
-        body.append(f"read {r:#x} [rbp+{x:#x}] 書込み: {wl}")
-        if j is None:
-            body.append(f"  合流なし (線形に遡って最初の store または入口) reach={fmt(reach)}")
-            md_nomerge.append((r, x, reads[(r, x)], reach, ok))
-            md_stores.update({s: expr_of(s) for s in reach if s != ENTRY})
-        else:
-            n_merge += 1
-            n_edges += len(cfg.preds(j))
-            body.append(f"  J={j:#x} 先行辺={len(cfg.preds(j))}")
-            for p in cfg.preds(j):
-                sp = reach_after(cfg, p, x, cut)
-                ok_p = ENTRY not in sp and all(closed(expr_of(s)) for s in sp)
-                hist = edge_hist.setdefault(len(sp), [0, 0])
-                hist[0 if ok_p else 1] += 1
-                tag = "  (negctl: 外した辺・B の到達集合からは除外)" if cut == (p, j) else ""
-                pl = "IN" if p is None else f"{p:#x}"
-                body.append(f"    p={pl} S_p={fmt(sp)}{tag}")
-                md_edges.append((r, x, reads[(r, x)], j, pl, sp, ok_p))
-                md_stores.update({s: expr_of(s) for s in sp if s != ENTRY})
-                for s in sorted(sp):
-                    if s == ENTRY:
-                        continue
-                    e = expr_of(s)
-                    mark = "閉" if closed(e) else "未閉"
-                    if s in printed:
-                        body.append(f"      store {s:#x}: [{mark}] (上と同じ式)")
-                    else:
-                        printed.add(s)
-                        body.append(f"      store {s:#x}: [{mark}] {e}")
-        if ENTRY in reach:
-            n_entry += 1
-        for s in reach:
-            if s != ENTRY and closed(expr_of(s)):
-                pairs_closed += 1
-            else:
-                pairs_open += 1
-        for a in reads[(r, x)]:
-            st = stat[a]
-            st["reads"] += 1
-            if j is not None:
-                st["merge"] += 1
-                st["edges"] += len(cfg.preds(j))
-            if not ok:
-                st["closed"] = 0
-    print("\n".join(body))
-
-    print("# 書込み別 (reads = 読み数 / merge = 合流を持つ読み / edges = その合流の先行辺数 / closed = 1 なら全読みが閉)")
-    for a in writes:
-        st = stat[a]
-        print(f"# {a:#x} reads={st['reads']} merge={st['merge']} edges={st['edges']} closed={st['closed']}")
-    tot = {k: sum(stat[a][k] for a in writes) for k in ("reads", "merge", "edges", "closed")}
-    print(f"# 集計: 書込み {len(writes)} 件・読み (書込み単位の和) {tot['reads']}・異なり {len(keys)}・"
-          f"合流を持つ異なり読み {n_merge}・先行辺の和 (異なり読み) {n_edges}・IN に届く読み {n_entry}")
-    print(f"# 集計: 閉じた (読み,store) 対 {pairs_closed}・未閉 {pairs_open}・閉じた書込み {tot['closed']}/{len(writes)}")
-    for k in sorted(edge_hist):
-        c, u = edge_hist[k]
-        print(f"# 先行辺 (合流 J の p) の S_p: |S_p|={k} の辺 閉 {c} 件・未閉 {u} 件")
-    print(f"# 算法 A (前向き固定点) と B (後ろ向き BFS) の比較: 対象 {len(keys)} 件・mismatch {mismatch} 件")
-
-    xs = sorted({x for _, x in keys})
-    taken = sum(1 for x in xs if x in shared.addr_taken)
-    overlap = 0
-    nonconst = 0
+def build(ins, order, branches=True):
+    nxt = {a: (order[i + 1] if i + 1 < len(order) else None) for i, a in enumerate(order)}
+    pred = {a: [] for a in order}
+    brs = set()
     for a in order:
         m, o = ins[a]
-        ops = p88.parse_ops(o)
-        if m not in p88.STORE or not ops or "[rbp" not in ops[0]:
+        if m == "ret":
             continue
-        mm = SIZED_RE.match(ops[0])
-        if mm is None:
-            nonconst += 1
+        if m.startswith("j"):
+            tgt = int(o, 16) if w.TARGET_RE.fullmatch(o.strip()) else None
+            if tgt is not None and tgt in ins and branches:
+                pred[tgt].append(a)
+                if m == "jmp" or tgt != nxt[a]:
+                    brs.add((a, tgt))
+            if m != "jmp" and nxt[a] is not None:
+                pred[nxt[a]].append(a)
+        elif nxt[a] is not None:
+            pred[nxt[a]].append(a)
+    return pred, brs
+
+
+def lab_s(lab):
+    return "直線" if lab is None else f"{lab:#x}"
+
+
+def reach(sl, cfg, p, X, entry):
+    pred, brs = cfg
+    stores, inn, unreach, seen = {}, set(), 0, set()
+    st = [(p, None, True)]
+    while st:
+        n, lab, first = st.pop()
+        if not first:
+            if (n, lab) in seen:
+                continue
+            seen.add((n, lab))
+            if store_slot(sl.ins, n) == X:
+                stores.setdefault(n, set()).add(lab_s(lab))
+                continue
+        if not pred[n]:
+            if n == entry:
+                inn.add(lab_s(lab))
+            else:
+                unreach += 1
             continue
-        off, sz = int(mm.group(2), 16), SIZES[mm.group(1)]
-        if any(off != x and off < x + 4 and x < off + sz for x in xs):
-            overlap += 1
-    print(f"# 限界情報: 解析した X {len(xs)} 種のうち lea で取られるもの {taken}・"
-          f"X と重なる別オフセットの frame store (byte/word/dword/qword 定数) {overlap} 件・"
-          f"frame の非定数オフセット store {nonconst} 件")
-    if md_out:
-        write_md(md_out, cmd, md_edges, md_nomerge, md_stores, len(keys))
-    return 0 if mismatch == 0 else 1
+        for m in pred[n]:
+            st.append((m, n if lab is None and (m, n) in brs else lab, False))
+    return stores, inn, unreach
+
+
+def forward(sl, pred, X, entry):
+    succ = {a: [] for a in sl.order}
+    for n in sl.order:
+        for m in pred[n]:
+            succ[m].append(n)
+    res = {}
+    starts = [(s, s) for s in sl.order if store_slot(sl.ins, s) == X] + [(entry, "IN")]
+    for s, tag in starts:
+        seen, st = set(), (list(succ[s]) if tag != "IN" else [entry])
+        while st:
+            n = st.pop()
+            if n in seen:
+                continue
+            seen.add(n)
+            if store_slot(sl.ins, n) == X:
+                continue
+            st.extend(succ[n])
+        for n in seen:
+            res.setdefault(n, set()).add(tag)
+    return res
+
+
+def lin_store(sl, p, X):
+    for j in range(sl.idx[p] - 1, -1, -1):
+        if store_slot(sl.ins, sl.order[j]) == X:
+            return sl.order[j]
+    return None
+
+
+def classify(sl, stores):
+    if not stores:
+        return "store 0 件"
+    if len(stores) >= 2:
+        return "分岐 (store 複数)"
+    (s,) = stores
+    v = store_value(sl, s)
+    if v.startswith("OP:"):
+        return "store 1 件 (kill: 非 mov)"
+    if any(t in v for t in UNRESOLVED if t != "_in"):
+        return "store 1 件・値に未確定印"
+    if "_in" in v:
+        return "store 1 件・値は入口レジスタに帰着"
+    return "store 1 件で確定"
+
+
+def main():
+    args = sys.argv[1:]
+    lea_chk = "--lea-write" in args
+    args = [a for a in args if a != "--lea-write"]
+    neg = None
+    if "--negctl" in args:
+        k = args.index("--negctl")
+        neg = args[k + 1]
+        del args[k:k + 2]
+    path = args[0]
+    ins, order = w.load(path)
+    sl = w.Slicer(ins, order)
+    entry = order[0]
+    targets = [int(x, 16) for x in args[1:]] or w.default_targets(path)
+
+    rec = {}
+    orig = sl.mem_read
+
+    def rec_read(addr, size, pos, depth):
+        r = orig(addr, size, pos, depth)
+        mm = re.fullmatch(r"rbp \+(0x[0-9a-f]+)", addr)
+        if mm:
+            rec.setdefault((pos, int(mm.group(1), 16)), r)
+        return r
+
+    sl.mem_read = rec_read
+    for a in targets:
+        sl.ev(w.parse_ops(ins[a][1])[1], sl.idx[a], 0)
+
+    full = build(ins, order, True)
+    ft = build(ins, order, False)
+    cfg = ft if neg == "fallthrough" else full
+
+    indirect = sum(1 for a in order if ins[a][0].startswith("j") and not w.TARGET_RE.fullmatch(ins[a][1].strip()))
+    print(f"# fn={len(order)} branch_edges={len(full[1])} indirect_jmp={indirect} targets={len(targets)} reads={len(rec)}")
+
+    ordered = sorted(rec.items(), key=lambda kv: (order[kv[0][0]], kv[0][1]))
+    T = [(order[pos], X, r) for (pos, X), r in ordered if r.startswith(("SLOT[", "ACC?⚠"))]
+    U = [(order[pos], X, r) for (pos, X), r in ordered if not r.startswith(("SLOT[", "ACC?⚠"))]
+
+    cls_cnt, in_cnt, at_cnt, unr_cnt, dist = {}, 0, 0, 0, {}
+    for p, X, r in T:
+        stores, inn, unreach = reach(sl, cfg, p, X, entry)
+        c = classify(sl, stores)
+        cls_cnt[c] = cls_cnt.get(c, 0) + 1
+        dist[len(stores)] = dist.get(len(stores), 0) + 1
+        in_cnt += bool(inn)
+        at_cnt += X in sl.addr_taken
+        unr_cnt += bool(unreach)
+        print(f"T {p:#x} [rbp+{X:#x}] {c} stores={len(stores)} IN={'yes' if inn else 'no'} "
+              f"addr-taken={'yes' if X in sl.addr_taken else 'no'} unreach={unreach}  py88: {r[:120]}")
+        for s in sorted(stores):
+            print(f"    store {s:#x} via {sorted(stores[s])}: {store_value(sl, s)}")
+
+    match = mismatch = u_addr = 0
+    first_u = True
+    for p, X, r in U:
+        stores, inn, unreach = reach(sl, cfg, p, X, entry)
+        j = lin_store(sl, p, X)
+        exp = r
+        if neg == "expect" and first_u and j is not None:
+            exp = r + " ⟂negctl"
+        first_u = False
+        if j is None:
+            ok = not stores and bool(inn) and not unreach
+            u_addr += "addr-taken" in r
+        else:
+            ok = (set(stores) == {j} and not inn and not unreach and store_value(sl, j) == exp)
+        if ok:
+            match += 1
+        else:
+            mismatch += 1
+            print(f"MISMATCH U {p:#x} [rbp+{X:#x}] py88={exp[:160]} linear={j and hex(j)} "
+                  f"reach={ {hex(k): sorted(v) for k, v in stores.items()} } IN={bool(inn)} unreach={unreach}")
+    print(f"# U check: n={len(U)} match={match} mismatch={mismatch} (addr-taken={u_addr})")
+
+    fcache, fmis = {}, 0
+    for p, X, _ in T + U:
+        if X not in fcache:
+            fcache[X] = forward(sl, cfg[0], X, entry)
+        fw = fcache[X].get(p, set())
+        bw = reach(sl, cfg, p, X, entry)
+        if {t for t in fw if t != "IN"} != set(bw[0]) or ("IN" in fw) != bool(bw[1]):
+            fmis += 1
+            print(f"MISMATCH FWD {p:#x} [rbp+{X:#x}] fwd={sorted(fw)} bwd={sorted(bw[0])} IN={bool(bw[1])}")
+    print(f"# forward cross-check: n={len(T) + len(U)} mismatch={fmis}")
+
+    diff = 0
+    for p, X, _ in T + U:
+        a = reach(sl, full, p, X, entry)
+        b = reach(sl, ft, p, X, entry)
+        if (set(a[0]), bool(a[1]), a[2]) != (set(b[0]), bool(b[1]), b[2]):
+            diff += 1
+    print(f"# fallthrough-only CFG: 変わった読み {diff} / {len(T) + len(U)}", file=sys.stderr)
+
+    print(f"# T n={len(T)} (addr-taken={at_cnt}, IN reached={in_cnt}, unreach={unr_cnt}); store count dist={dict(sorted(dist.items()))}",
+          file=sys.stderr)
+    for k, v in sorted(cls_cnt.items(), key=lambda kv: -kv[1]):
+        print(f"# {v:3d}  {k}", file=sys.stderr)
+    print(f"# U n={len(U)} match={match} mismatch={mismatch}; forward n={len(T) + len(U)} mismatch={fmis}",
+          file=sys.stderr)
+
+    if lea_chk:
+        LEA["on"] = True
+        lv = [a for a in order if ins[a][0] == "lea" and store_slot(ins, a) == 0x5B8]
+        fw = forward(sl, cfg[0], 0x5B8, entry)
+        acc = [p for p, X, _ in T + U if X == 0x5B8]
+        hit = [p for p in acc if fw.get(p, set()) & set(lv)]
+        nodes = sum(1 for t in fw.values() if t & set(lv))
+        LEA["on"] = False
+        print(f"# lea-write: lea {[hex(a) for a in lv]} から直接 store を経ずに届く節点 {nodes}、"
+              f"[rbp+0x5b8] の読み {len(hit)} / {len(acc)} (hit={[hex(p) for p in hit]})", file=sys.stderr)
+    return 0 if mismatch == 0 and fmis == 0 else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main())
