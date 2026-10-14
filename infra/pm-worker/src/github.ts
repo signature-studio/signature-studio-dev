@@ -105,14 +105,15 @@ export class Gh {
     return this.req("POST", `/repos/${this.repo}/issues/${n}/comments`, { body });
   }
 
-  // Worker が送る repository_dispatch は oc-watchdog だけ。payload は event_type のみで、client_payload (自由な値) は付けない。
-  // oc-fix は PR 番号・理由・素材名の client_payload が要り、検証と送信は Actions の watchdog.sh が行う。
+  // Worker が送る repository_dispatch は 2 種類だけ: oc-watchdog (この dispatch。payload は event_type のみ) と oc-pm (dispatchPm。payload は kind と ref のみ)。
+  // oc-fix は PR 番号・理由・素材名の client_payload が要り、検証と送信は Actions の watchdog.sh が行う (Worker は送らない)。
   dispatch(eventType: DispatchType) {
     if (!DISPATCH_TYPES.includes(eventType)) throw new Error("dispatch type not allowed");
     return this.req("POST", `/repos/${this.repo}/dispatches`, { event_type: eventType });
   }
 
-  // PM agent の起動 (oc-pm)。payload は kind と ref の 2 つだけ。呼び出し側 (engine) が値域を検証した値だけを渡す。
+  // PM agent の起動 (oc-pm)。DISPATCH_TYPES の許可リストは通らず、oc-pm を送るのはこの関数だけ。
+  // payload は kind と ref の 2 つだけ。呼び出し側 (engine) が validPayload で値域を検証した値だけを渡す。
   dispatchPm(kind: string, ref: number) {
     return this.req("POST", `/repos/${this.repo}/dispatches`, { event_type: "oc-pm", client_payload: { kind, ref } });
   }

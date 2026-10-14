@@ -39,7 +39,7 @@ export interface Config {
   batch: number;
   // launch の /oc コメント投稿を実行するか。
   liveLaunch: boolean;
-  // repository_dispatch (oc-watchdog) の送信を実行するか。
+  // repository_dispatch (oc-watchdog と oc-pm) の送信を実行するか。
   liveDispatch: boolean;
   botLogin: string;
   pmLogins: string[];

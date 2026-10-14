@@ -6,7 +6,7 @@ workers_dev = true
 
 # 既定は dry-run (経路ごとのスイッチを "1" にしない限り GitHub へ書き込まない)。切替は PM の判断 (README)。
 #   LIVE_LAUNCH   = launch の /oc コメント投稿
-#   LIVE_DISPATCH = repository_dispatch (oc-watchdog) の送信
+#   LIVE_DISPATCH = repository_dispatch (oc-watchdog と oc-pm) の送信
 # 旧スイッチ LIVE ("1" で両方) は、LIVE_LAUNCH / LIVE_DISPATCH が未設定のときだけ効く。値は秘密ではない。
 [vars]
 REPO = "signature-studio/signature-studio-dev"

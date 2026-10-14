@@ -1,6 +1,6 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
-//   launch (/oc コメント) = LIVE_LAUNCH、dispatch (repository_dispatch の oc-watchdog) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
+//   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError } from "./github.ts";
@@ -567,18 +567,18 @@ export class Engine {
 
   // 履歴は live と dry-run で分ける (dry-run の記録が、live に切り替えた直後の送信を抑止しないように)。
   private pmHistoryKey(): string {
-    return this.d.cfg.live ? "pmDispatch" : "pmWould";
+    return this.d.cfg.liveDispatch ? "pmDispatch" : "pmWould";
   }
   private pmHistory(): HistoryEntry[] {
     return pruneHistory(this.d.now(), this.d.store.get<HistoryEntry[]>("meta", this.pmHistoryKey()) ?? []);
   }
 
-  // 検出した対象を oc-pm で送る。payload は kind (列挙) と ref (数字) だけ。LIVE=1 のときだけ送る。
+  // 検出した対象を oc-pm で送る。payload は kind (列挙) と ref (数字) だけ。LIVE_DISPATCH=1 のときだけ送る (oc-watchdog と同じスイッチ)。
   // 同期が古い間は送らない (誤った対象を起こさない)。
   async pmDispatch(gh: Gh | null): Promise<{ sent: PmTarget[]; would: PmTarget[] }> {
     const out = { sent: [] as PmTarget[], would: [] as PmTarget[] };
     if (!this.fresh()) return out;
-    const live = !!(this.d.cfg.live && gh);
+    const live = !!(this.d.cfg.liveDispatch && gh);
     const now = this.d.now();
     const hist = this.pmHistory();
     const { send } = selectDispatch(now, this.detectPmTargets(), hist);
@@ -691,8 +691,8 @@ export class Engine {
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
       pm_detected: pmDetected,
-      // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE では空。
-      would_dispatch_pm: this.d.cfg.live ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
+      // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE_DISPATCH では空。
+      would_dispatch_pm: this.d.cfg.liveDispatch ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
       last_full_sync: this.meta.fullSyncAt ? iso(this.meta.fullSyncAt) : null,
       last_reconcile: this.meta.reconcileAt ? iso(this.meta.reconcileAt) : null,
       last_watchdog: this.meta.watchdogAt ? iso(this.meta.watchdogAt) : null,
