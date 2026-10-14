@@ -153,10 +153,7 @@ def main():
             return min(known[i], cap)
         return cap
 
-    tinfo = {}
-    for _, _, T in variant_pairs:
-        if T in tinfo:
-            continue
+    def body_info(T):
         lo, hi = T, body_end(T)
         ipp_calls, text_calls = set(), set()
         for ins in md.disasm(bytes(image[lo - base:hi - base]), lo):
@@ -166,8 +163,18 @@ def main():
                     ipp_calls.add(tg)
                 elif inside(tg, txt):
                     text_calls.add(tg)
-        tinfo[T] = {"section": sect_of(T), "pdata": pdstatus(T), "end": hi,
-                    "ipp_direct_targets": len(ipp_calls), "text_direct_targets": sorted(hex(x) for x in text_calls)}
+        return {"section": sect_of(T), "pdata": pdstatus(T), "end": hi,
+                "ipp_direct_targets": len(ipp_calls), "text_direct_targets": sorted(text_calls)}
+
+    tinfo = {}
+    for _, _, T in variant_pairs:
+        if T not in tinfo:
+            tinfo[T] = body_info(T)
+    hop2 = {}
+    for ti in list(tinfo.values()):
+        for T in ti["text_direct_targets"]:
+            if T not in hop2 and T not in tinfo:
+                hop2[T] = body_info(T)
 
     # 呼出し元: 枠 (.data の関数ポインタ) と thunk 頭への参照 (線形走査)
     slot_refs = collections.Counter()
@@ -253,6 +260,10 @@ def main():
             "reach_variant_slots": len(variant_pairs),
             "reach_variant_distinct_targets": len(tinfo),
             "reach_variant_targets_by_section_pdata_ipp": {" | ".join(k): v for k, v in tgt_summary.items()},
+            "hop2_distinct_targets": len(hop2),
+            "hop2_by_section_pdata_ipp": {" | ".join(k): v for k, v in collections.Counter(
+                (h["section"], h["pdata"], "IPPCODEへ直接分岐あり" if h["ipp_direct_targets"] else "なし")
+                for h in hop2.values()).items()},
         },
         "B_ipp_linear": {
             "linear_out_total": len(lin_out),
@@ -266,7 +277,10 @@ def main():
     }
     out = {"file": os.path.basename(dll), "summary": summary, "linear_out_list": lin_out,
            "records": {k: [hex(x) if x else "0" for x in v] for k, v in recs.items()},
-           "variant_targets": tinfo}
+           "variant_targets": {hex(k): dict(v, text_direct_targets=[hex(x) for x in v["text_direct_targets"]])
+                               for k, v in tinfo.items()},
+           "hop2_targets": {hex(k): dict(v, text_direct_targets=[hex(x) for x in v["text_direct_targets"]])
+                            for k, v in hop2.items()}}
     os.makedirs(OUT_DIR, exist_ok=True)
     with open(os.path.join(OUT_DIR, "dispatch.json"), "w") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
@@ -277,7 +291,9 @@ def main():
             if v and j in index_domain:
                 ti = tinfo[v]
                 print("  j=%d %s %s %s ipp_direct=%d text_direct=%s" % (
-                    j, hex(v), ti["section"], ti["pdata"], ti["ipp_direct_targets"], ti["text_direct_targets"]))
+                    j, hex(v), ti["section"], ti["pdata"], ti["ipp_direct_targets"],
+                    [(hex(x), hop2[x]["section"], hop2[x]["pdata"], hop2[x]["ipp_direct_targets"])
+                     for x in ti["text_direct_targets"]]))
 
 
 if __name__ == "__main__":
