@@ -107,6 +107,6 @@ e2e 内訳: `midi_all` 54/54 (2,801 ms) / `negctl_drop_one_short_msg` 62,500 ms 
 ### 19.10 winstubs 結線 closure への配線 (#179 run #15)
 
 - `build.sh --ws --midi` (tools/startup/winstubs 結線あり) でも `flmidi_shimx_install()` が constructor で走り、`midi_e2e.mjs` 3/3 PASS。`ws_e2e.mjs` の BOOT 基準 (init 18 / units 17) と G03/G05/G12 は `--midi` の有無で不変。
-- 実測と修正 (旧 main の全 variant が `undefined exported symbol: _sxt_count` で link 失敗していた件を含む) は `tools/m11/shimx_link/REPORT.md` §11。
+- 実測と修正 (旧 main の全 variant が `undefined exported symbol: _sxt_count` で link 失敗していた件を含む) は `tools/m11/shimx_link/REPORT_APPENDIX_179.md` (REPORT §11 から分割移動)。
 - 残件 (未達): 本番 FL 経路・headless Chrome での `midiOutGetNumDevs` 結線、`midiOutShortMsg` の引数幅 → #37 (AU-14)。
 - #179 の範囲縮小: #179 本文の「作業」を達成範囲 (midi* 強定義・timeBeginPeriod の no-op 方針 = §19.4) に縮め、本 PR は `Closes #179`。§19.9 の「`Closes #179` の条件は未達」は縮小前 (run #6) の記録として残す。
