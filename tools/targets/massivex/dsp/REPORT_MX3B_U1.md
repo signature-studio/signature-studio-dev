@@ -23,15 +23,15 @@ RTTI の COL 走査で探すこと (§4)。
 
 | 項目 | 結果 | 実行 |
 |---|---|---|
-| RTTI 0x1839761b8 (副, COL.offset=0x80) | type `.?AVMassiveXAudioClass@@`・numBaseClasses=5: base[0] MassiveXAudioClass (numContained=4, mdisp=0) / base[1] `.?AVIInstrument@AB@NI@@` (mdisp=0) / base[2] `.?AVMXInstance@MX@Lechtal@@` (numContained=1, mdisp=128) / base[3] `.?AVIMXInstance@MX@Lechtal@@` (mdisp=128) / base[4] `.?AVEventTarget@UIA@NI@@` (mdisp=4483264=0x4468c0) | `dsp/scripts/mx_vtable_rtti.py` |
-| RTTI 0x183976038 (主, COL.offset=0) | 上と同一の COL (cd=0x183976258)。基底 5 件・同一 | `dsp/scripts/mx_vtable_rtti.py` |
-| RTTI 生バイト照合 | ClassHierarchyDescriptor の numBaseClasses = `cd+8` = 5、BaseClassArray = `cd+12`。各 BaseClassDescriptor の生値が上表と一致 | 同上 (読み直し確認) |
-| xref 0x1839761b8 (副) | 2 件: `0x18000e58e` (`lea rax,[rip+0x3967c23]`、直後 `mov [rcx+0x80],rax`) / `0x18000e924` (`lea rax,[rip+0x396788d]`) | `dsp/scripts/mx_vtable_xref.py` (69 s) |
-| xref 0x183976038 (主) | 2 件: `0x18000e580` (`lea rax,[rip+0x3967ab1]`、直後 `mov [rcx],rax`) / `0x18000e91a` (`lea rax,[rip+0x3967717]`、直後 `mov [rcx],rax`) | `dsp/scripts/mx_vtable_xref.py` (同上) |
-| 0x18000e560〜0x18000e595 の逆アセンブル | `[rbp-8]` (=引数 this) に対し、`call 0x180213570` で `this+0x4468c0` を構築 (= RTTI base[4] EventTarget の mdisp)、続けて `[this]`=主 vtable、`[this+0x80]`=副 vtable を書く。MassiveXAudioClass の構築部と読める | `capstone` (本 run の一時スクリプト) |
-| 0x18000e900〜0x18000e92b の逆アセンブル | 同じ 2 vtable を `[rcx]`・`[rcx+0x80]` に書く別関数。関数としての同定 (ctor か否か) は未了 | 同上 |
-| 主 vtable 0x183976038 の slot 0〜11 | 0x180017f60 / 0x18002a6c0 / 0x1800dd0e0 / 0x1800de4a0 / 0x180011450 / 0x1800114e0 / 0x180011830 / 0x1800118f0 / 0x1800119a0 / 0x1800119c0 / 0x180011980 ほか | `dsp/scripts/mx_slot_probe.py` (前 run・本 run 未再測定) |
-| 各 slot 本体の `[rdx+disp]` 集計 (max 400 insn) | 0 件 (slot 0,1,2,3,4,6,8,9,10)。slot 5・7 で `[rdx+0x70]` が 1 件 (`lea` 直後の関数 post 処理) | `dsp/scripts/mx_slot_body.py` (前 run・本 run 未再測定) |
+| RTTI 0x1839761b8 (副, COL=0x1839763d0, COL.offset=0x80) | type `.?AVMassiveXAudioClass@@`・cd=0x183976258・numBaseClasses=5: base[0] MassiveXAudioClass (numContained=4, mdisp=0) / base[1] `.?AVIInstrument@AB@NI@@` (mdisp=0) / base[2] `.?AVMXInstance@MX@Lechtal@@` (numContained=1, mdisp=128) / base[3] `.?AVIMXInstance@MX@Lechtal@@` (mdisp=128) / base[4] `.?AVEventTarget@UIA@NI@@` (mdisp=4483264=0x4468c0) | `dsp/scripts/mx_vtable_rtti.py` |
+| RTTI 0x183976038 (主, COL=0x183976240, COL.offset=0) | type・基底 5 件は副と同一 (COL は別)。cd=0x183976258 は副と共有 | `dsp/scripts/mx_vtable_rtti.py` |
+| cd 共有の確認 | 両 COL の `cdOffset+16` が指す ClassHierarchyDescriptor は同一 (0x183976258)、numBaseClasses = `cd+8` = 5 | 一時の python 読み出し (本 run) |
+| xref 0x1839761b8 (副) | 2 件: `0x18000e58e` (`lea rax,[rip+0x3967c23]`) / `0x18000e924` (`lea rax,[rip+0x396788d]`) | `dsp/scripts/mx_vtable_xref.py` (本 run) |
+| xref 0x183976038 (主) | 2 件: `0x18000e580` (`lea rax,[rip+0x3967ab1]`) / `0x18000e91a` (`lea rax,[rip+0x3967717]`) | `dsp/scripts/mx_vtable_xref.py` (本 run) |
+| 0x18000e560〜0x18000e595・0x18000e900〜0x18000e92b の逆アセンブル | 未検証。リポジトリ内スクリプトでは再現していない (前 run の一時 `capstone` 出力のみ)。どの関数の ctor か・`this+0x4468c0` の構築の有無は未了のため、本 REPORT では結論に使わない | — |
+| 主 vtable 0x183976038 の slot 0〜11 | 0x180017f10 / 0x18000eb30 / 0x18017a630 / 0x18000efe0 / 0x180005680 / 0x180005680 / 0x18000fad0 / 0x18000fb00 / 0x180005680 / 0x180005680 / 0x180005680 / 0x18000fa90 | `dsp/scripts/mx_slot_probe.py` (本 run) |
+| 副 vtable 0x1839761b8 の slot 0〜11 | 0x180017f60 / 0x18002a6c0 / 0x1800dd0e0 / 0x1800de4a0 / 0x180011450 / 0x1800114e0 / 0x180011830 / 0x1800118f0 / 0x1800119a0 / 0x1800119c0 / 0x180011980 / 0x1839763f0 (slot 11 は .rdata) | `dsp/scripts/mx_slot_probe.py` (本 run) |
+| 各 slot 本体の `[rdx+disp]` 集計 (max 400 insn) | 前 run の値 (副 vtable 0x1839761b8 の slot 0,1,2,3,4,6,8,9,10 で 0 件、slot 5・7 で `[rdx+0x70]` 1 件) のみ。本 run 未再測定 | `dsp/scripts/mx_slot_body.py` (前 run) |
 
 ## 3. 前 run の誤りの原因
 
@@ -60,11 +60,14 @@ RTTI の COL 走査で探すこと (§4)。
 
 ## 6. 本 run の測定と差分証跡
 
-- 測定 commit: `6264ca83`。`mx_vtable_rtti.py` / `mx_vtable_xref.py` はこの commit で最後に変更された。
-  測定 (§2) はこの版のスクリプトで行った。
+- 測定 commit: `706f5355` (HEAD)。`mx_vtable_rtti.py` / `mx_vtable_xref.py` / `mx_slot_probe.py` の最後のコード変更は `6264ca83`。
+  §2 の RTTI・xref・slot 値はこの HEAD のスクリプトで実測した。
 - 差分証跡: `git diff 6264ca83 HEAD -- tools/targets/massivex/dsp/scripts` は 0 行 (スクリプトは測定版と同一)。
   `dsp` 全体の差分は本 REPORT の更新のみ (測定結果には影響しない)。
-- 環境: `plugins-massivex` を `$ARTIFACTS_DIR` から展開 (3.4 GB の tar.zst)。展開時の load は 0.5 前後。
+- 環境: `plugins-massivex` を `$ARTIFACTS_DIR` から展開 (3.4 GB の tar.zst) し、`Native Instruments Massive X v1.7.1.exe` (installer) を
+  `parse_setup_headers.py` → `extract_massivex.py` (select=key) で `$RUNNER_TEMP/mxwork/extracted/VST3/Massive X.vst3` (95,356,824 B) に生成。
+  リポジトリ外に置いたため `work/` は使っていない。測定時の load は 0.5〜1.1。
+- §2 の値はレビュワーの 706f5355 実測 (RTTI 基底 5 件・xref 各 2 件) と一致。
 
 ## 7. 再測定の手順 (次 run)
 
