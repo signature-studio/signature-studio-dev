@@ -139,7 +139,7 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 - (a) 代表 `0x180002bf0-0x180002c1a` (len 43, 参照なし):
   `RetDec` を単独 range で実行すると `; statically linked function: ??_G?$codecvt@DDU_Mbstatet@@@std@@MEAAPEAXI@Z at 0x180002bf0` と出て `define` が無い。
-  再現: `/opt/retdec/bin/retdec-decompiler $RUNNER_TEMP/fl-win64/extracted/block21202_PE.bin -o x.c --select-ranges 0x180002bf0-0x180002c1a --select-decode-only` → `grep -c ^define x.ll` = 0。
+  再現: `$RETDEC_ROOT/bin/retdec-decompiler`（`[RETDEC]`）$RUNNER_TEMP/fl-win64/extracted/block21202_PE.bin -o x.c --select-ranges 0x180002bf0-0x180002c1a --select-decode-only` → `grep -c ^define x.ll` = 0。
   同じ range に `--disable-static-code-detection` を付けると `define i64 @function_180002bf0(i64, i64)` が出る。
   参照ありの代表 `0x180005a98-0x180005acb` (len 52) も同じ経路 (`__raise_securityfailure`)。
 - (b) 代表 `0x1800029a0-0x180002b03` (`CreatePlugInstance`, len 356):
