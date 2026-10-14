@@ -225,3 +225,26 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 
 - 結論: 旧 main (`46c92356`) で実測した 4 variant (既定・`--ws`・`--midi`・`--ws --midi`) は全て `undefined exported symbol: "_sxt_count"` で rc 1 だった。`sxt_*` を `--trace` 限定にする修正は #2732 (`e7491b4f`、§10.3) で main に入り済み。`--midi` の e2e と `--ws --midi` の boot 基準は測定 commit `397c4161` で確認 (`midi_e2e.mjs` 3/3 PASS、`ws_e2e.mjs` PASS 19 / BOOT init 18 / units 17/942)。
 - 修正前後の表・e2e 実測・起動 KPI・残件: `tools/m11/shimx_link/REPORT_APPENDIX_179.md` (§11.1〜§11.4)。
+
+## 12. midiOutShortMsg の HANDLE 幅 (#1628 SHX-T25): IR 側の正規化
+
+測定 commit `e0e35f9a`。`git diff e0e35f9a HEAD -- tools/m11/shimx_link/*.py tools/m11/shimx_link/*.sh tools/m11/shimx_link/*.c` = 0 行 (本節のみ変更)。
+
+- 原因: IR (`boot_final3.ll`) は `declare i32 @midiOutShortMsg(i64, i32)` と `i64 %hmo` で呼ぶ。shimx 定義 (`midi_conv.c:163`) は wasm32 の HANDLE = i32。`signature mismatch` は trace では `trace_wrap.o` (gen_link.py が IR の型を写す)、plain では IR の import 型そのものから出る。
+- 方式: 受入条件 1 の後者 (IR 側の正規化)。plain と trace の両方を直せ、gen_link.py が正規化後の IR から trace_wrap.c を作るため。`trunc i64→i32` は値を変えない (HMIDIOUT は wasm32 のハンドルで i32 に収まる)。
+- 実装: `sx_handle_norm.py` (宣言 1 件・呼出 1 件を変換。想定外の参照が残れば fail-closed)。`build.sh` の 2c (`--fix` の後・gen_link の前、全 variant)。
+
+| variant (gui=soft) | 修正前 (`26f90ada`) | 修正後 (`e0e35f9a`, クリーン build) |
+|---|---|---|
+| plain / `--fix` / `--fix --ws` / `--fix --midi` | mismatch 1 (×4) | 0 (×4) |
+| trace / `--trace --fix` | 1 / 未測定 | 0 / 0 |
+
+undefined / duplicate は全件 0。修正前の値は旧 build.sh を一時コピーして同じ IR で実行した (ネガティブコントロール)。
+
+- trace `--fix` の実 boot: `boot_stage 1 / init_count 18 / units_run 17/942 / icall_ok 24 / icall_miss 1 / threw OOB / total_calls 97 / distinct 28`。§6 と同値。`midiOutShortMsg` は boot 中 0 件。
+- `ws_e2e.mjs` (`--fix --ws`) PASS 19 / FAIL 0 (0.40 s)。`midi_e2e.mjs` (`--fix --midi`) ALL PASS (0.29 s)。`m11_judge.py --require-stage 4 --min-survey-ok 800` rc 0 (`survey_ok` 812。入力は M11 本体の出力で、shimx_link は入力にならない)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 942 unit survey (`survey_trace.mjs`) の再測定と plain の boot 到達点 | 本 run で未実施。midi 呼出は boot 中 0 件 | 本 PR の未解決表 (再測定だけの子は起票しない) |
+| IR 生成側 (RetDec) が HMIDIOUT を i64 と推定する根本 | 本 PR は link 時の正規化で対処。IR 生成は未修正 | PM 判断 (#1628 本文へ追記) |
