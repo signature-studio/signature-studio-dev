@@ -47,7 +47,7 @@ VA は `REPORT_PY61.md` §2。範囲外 index は両者とも code 4 (`Index out
 ## 5. 測定
 
 - 測定 commit (コードを最後に変えた commit): `1d71dd27` (`feat(python): implement playlist functions confirmed in PY-61 (#2027)`)。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` で実測 real 7.135 s)。emsdk は runner 同梱の `/opt/emsdk` を使い、`toolchain-emsdk` の展開はしていない。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` で実測 real 7.135 s)。emsdk は runner 同梱の `[EMSDK]` を使い、`toolchain-emsdk` の展開はしていない。
 - 前段の wasm 生成 (同じ worktree・測定 commit より前のコード): `fetch_inputs.sh` で `work/` を配置、`build_cpython_wasm.sh` real 2 分 49.8 秒、`FLPY_SKIP_TABLE=1 build_flpy.sh` real 4.134 秒。
 - 測定 commit での検証 (実行直前の load average 0.10、`/proc/loadavg`、並列 1、n=1):
 
