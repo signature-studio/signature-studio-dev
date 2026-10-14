@@ -63,8 +63,8 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `.gitignore` | 残す | 状態ファイル (`launched.json` など) を追跡しないための除外。退役後も誤コミット防止に残す | なし | - |
 | `README.md` | 残す | 本書 (運用ツールの地図と退役の表) | なし | #2436 |
 | `REPORT.md` | 残す | 測定値の正本 | なし | - |
-| `dismiss_spam.py` | 廃止 | 旧 watchdog の『(watchdog)』の request-changes の取り下げ (#731) の一回限りの後始末。現行の `watchdog.sh` が出すのは FIX_IDLE と merge 失敗の 2 経路だけ | `DRY=1` で対象 0 件を確認してから削除 | #2355 |
-| `find_silent_runs.sh` | 廃止 (後継: `record-run-outcome.sh`) | implement の run の末尾 (`if: always()`) で `record-run-outcome.sh` が、PR も push も無い終了 (success を含む) に `oc:no-pr` と理由マーカーを残す。報告の無い success は、この経路で `oc:no-pr` として見える | 削除のみ | #2355 |
+| `dismiss_spam.py` | 廃止 | 旧 watchdog が『(watchdog)』を付けて出した request-changes の取り下げ (#731) の一回限りの後始末。ただし現行の `watchdog.sh` の FIX_IDLE も本文の末尾に同じ `(watchdog)` を付けて reviewer の token で出すため、このスクリプトは現行の FIX_IDLE も取り下げ対象にする | 退役前に、FIX_IDLE の本文から marker を外す (または判定を変える) 変更を main に入れてから、`DRY=1` で対象 0 件を確認して削除する。それまで watchdog の稼働中には実行しない | #2355 |
+| `find_silent_runs.sh` | 廃止 (後継: `record-run-outcome.sh`。App token が発行された run でだけ動く。token が無ければ何もしない (`.github/workflows/opencode.yaml` の `Record the run outcome` step)) | implement の run の末尾 (`if: always()`) で `record-run-outcome.sh` が、PR も push も無い終了 (success を含む) に `oc:no-pr` と理由マーカーを残す。報告の無い success は、この経路で `oc:no-pr` として見える | 削除のみ | #2355 |
 | `find_unreviewed.sh` | `watchdog.sh` | verdict の無い現在 head の PR (NOREVIEW) を `watchdog.sh` が点検ごとに戻す | 削除のみ | #2355 |
 | `heartbeat.sh` | PM agent | PM セッションへの定期プロンプトは、`pm` job (`oc-pm`) と Worker の `oc-pm` 送信が担う。`pm-heartbeat.service` は無効化済み | `pm` job の実 run が `oc-pm-decision` を残すことを確認してから削除 (親 #2319 の A4) | #2347 (置換案。取り下げ提案中) |
 | `idle_report.sh` | 残す | REST のみで VM に依存しない。watchdog の担当なし時間の計測として残す (VM 停止の判定用の役は終わった) | なし | #2354 |
@@ -77,9 +77,9 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `pr_gaps.py` | `watchdog.sh` | 『レビュー中・修正中・担当なし』の分類は `watchdog.sh` が点検ごとに出す (`open=… covered=… idle=…`) | 削除のみ | - |
 | `rerun_review.sh` | `watchdog.sh` | review の再起動 (close→reopen) は、`watchdog.sh` の NOREVIEW が `reopen-pr.sh` で行う | 削除のみ | #2355 |
 | `rest_heal.py` | `watchdog.sh` | 冒頭に『watchdog.sh が main に入るまでの橋渡し』と書かれた役。`watchdog.sh` が同じ分類で戻す | 削除のみ | #2355 |
-| `restart_failed.sh` | Worker | 失敗した実装 run の再投入は、`oc:no-pr` の再着手 (`NO_PR_COOLDOWN_H`) に置き換わる。即時の再投入は無くなり、再着手は cooldown の後になる。レート制限の判定は #2344 | 遅れを許容する判断を PR 本文に書いてから削除。理由別の再着手は #2334 | #2334・#2344 |
+| `restart_failed.sh` | 実装 run: Worker (`oc:no-pr` の再着手)。review 側: `watchdog.sh` (NOREVIEW → `reopen-pr.sh`) | 失敗した実装 run の再投入は、`oc:no-pr` の再着手 (`NO_PR_COOLDOWN_H`) に置き換わる。即時の再投入は無くなり、再着手は cooldown の後になる。review 側は watchdog の点検 (NOREVIEW) で戻るため、即時の再起動は無くなる。レート制限の判定は #2344 | 遅れを許容する判断を PR 本文に書いてから削除。理由別の再着手は #2334 | #2334・#2344 |
 | `status_sync.py` | Actions (`status-sync.yaml`) | `docs/STATUS.md` の自動節を更新する後継の workflow が未配線 (pm-apply) | 後継が main に入るまで残す。入らない間は STATUS の自動節が古いままになる | #2362 |
-| `sync_status.py` | 廃止 | Project V2 の Status 同期を退役と同時にやめる (PM 判断 2026-10-14、#2356 not_planned)。Status は参考扱い | `docs/` の『Status が唯一の正』の文言を外してから削除 | #2435 |
+| `sync_status.py` | 廃止 | Project V2 の Status 同期を退役と同時にやめる (PM 判断 2026-10-14)。根拠は #2356 (PM App に Projects の書き込み権限を追加するかの依頼者への質問。既定は『追加しない』で not_planned で閉じた)。このため App の token では Project V2 の Status を更新できず、Status は参考扱い | `docs/` の『Status が唯一の正』の文言を外してから削除 | #2435 |
 | `systemd/pm-heartbeat.service` | 廃止 (後継は `pm` job) | 無効化済み | 削除のみ (systemd の変更は PM が行う) | #2355 |
 | `systemd/pm-launch.service` | Worker | `/oc` の投稿は Worker (`LIVE_LAUNCH`)。timer は 2026-10-14 に停止し、再開しない | 停止済み。ファイルの削除は退役の最後 | #2355 |
 | `systemd/pm-launch.timer` | Worker | 同上 | 停止済み | #2355 |
@@ -88,7 +88,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `test_idle_report.sh` | 残す | `idle_report.sh` と同じ | なし | #2354 |
 | `test_launch_issues.py` | 廃止 | `launch_issues.py` と同時。Worker の規則は `infra/pm-worker/test/` (vitest と `*_crosscheck.py`) で確かめる | `launch_issues.py` と同時に削除 | #2355 |
 | `test_pm_gate.sh` | 廃止 | `pm_gate.sh` と同時 | 同上 | #2355 |
-| `test_status_sync.py` | 残す | `status_sync.py` と同時。後継の workflow (#2362) が入るまで | 同上 | #2362 |
+| `test_status_sync.py` | Actions (`status-sync.yaml`。`status_sync.py` と同じ) | `status_sync.py` の検証。後継の workflow が入るまで残す | `status_sync.py` と同時に削除 (後継 #2362 が main に入るまで残す) | #2362 |
 | `watch_runs.notes.md` | 廃止 | `watch_runs.sh` の注記。測定値は `REPORT.md` §8 に移送済み | `watch_runs.sh` と同時に削除 | #2355 |
 | `watch_runs.sh` | Worker・`watchdog.sh` | PM が run の完了を待つための監視。完了は Worker が `workflow_run` の webhook で受け、点検は `watchdog.sh` が行う。PM は oc-pm で起動されるので待つ必要が無い | 削除のみ | #2355 |
 | `worker_url` | 残す | `watchdog.sh` が Worker の `/status` を読む先。VM に依存しない | なし | - |
@@ -152,18 +152,19 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
 ## 状態ファイル (`PM_DIR` に作られる。コミットしない)
 
 `issues_state.json` (snapshot) / `phase.json` (LAUNCH か Review-Only) / `launched.json` (3 時間の重複防止) /
-`relaunch.json` (素材を足した再投入の履歴、最大 2 回) / `*.log`。
+`relaunch.json` (素材を足した再投入の履歴、最大 2 回) / `stop_deps_candidates.json`・`wave2_cat.json` (書き手は無い) / `*.log`。
 
-**VM 退役時の扱い: 3 ファイルとも Worker に取り込まず、破棄する** (取り込み口 `/admin/import` は [#2343](https://github.com/signature-studio/signature-studio-dev/issues/2343) で未実装)。
+**VM 退役時の扱い: 下表の状態ファイルは Worker に取り込まず、破棄する** (取り込み口 `/admin/import` は [#2343](https://github.com/signature-studio/signature-studio-dev/issues/2343) で未実装)。
 件数と内訳は [`REPORT.md`](REPORT.md) §12 が正本。
 
 | 状態 | 後継 | 扱い | 影響 |
 |---|---|---|---|
-| `launched.json` | Worker の `launchedAt`。`PM_LOGINS` (PM 名義) の `/oc` コメントから再構成する (同期窓 24 時間、#2380) | 破棄 | 最後の書き込みは 2026-10-14 21:34 JST。Worker は同じ情報を GitHub から読むので、窓内の二重化は起きない。**VM を戻すときは空から始まる**ため、戻す前に Worker を dry-run にする (両方が live だと二重投稿になる) |
+| `launched.json` | Worker の `launchedAt`。`PM_LOGINS` (PM 名義) の `/oc` コメントから再構成する (同期窓 24 時間、#2380) | 破棄 | 切替 (VM の timer 停止) 以後は書き込まれない。Worker は同じ情報を GitHub から読むので、窓内の二重化は起きない。**VM を戻すときは空から始まる**ため、戻す前に Worker を dry-run にする (両方が live だと二重投稿になる) |
 | `relaunch.json` | Worker の DO `relaunch` (切替後の再投入だけを記録) | 破棄 (取り込みは #2343) | 履歴の無い issue は、直近 24 時間に停止報告が来た場合に限り、最大 2 回余分に再投入され得る (同じ素材行を含む) |
 | `phase.json` | Worker の DO `meta/phase` (`phase.ts`。open PR (stuck を除く) が 80 を超えたら Review-Only、10 未満で解除、間は直前の値) | 破棄。切替時に VM の値 (`review_only=false`) を一度だけ保存済み (REPORT §12-5) | 保存が無い状態 (新しいデプロイ先・DO の再作成) は Review-Only で始まり、open PR が 10 以上の間は新規着手しない (安全側の停滞) |
 | `issues_state.json` | Worker の DO (`issues`・`pmArt`・`botLast`)。snapshot は持たない | 破棄 | PM の `oc_artifacts:` 行は、同期窓 (24 時間) より古いコメントからは新たに読まれない。DO に取り込み済みの古い行が残るかは未確認。必要な issue は PM が行を書き直す (#2343) |
-| `*.log` | - | 退役時に破棄 | 判断の根拠は issue コメントと `REPORT.md` に残る |
+| `*.log`・`*.log.err`・`*.log.tmp` | - | 退役時に破棄 | 判断の根拠は issue コメントと `REPORT.md` に残る |
+| `stop_deps_candidates.json`・`wave2_cat.json` | - | 実行時の状態。`tools/pm/.gitignore` の 2 行にだけ残り、リポジトリに書き手も読み手も無い | 破棄 | なし (Worker は参照しない) |
 
 ## 運用の約束
 
