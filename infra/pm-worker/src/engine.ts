@@ -827,10 +827,11 @@ export class Engine {
     }
     const all: any[] = Array.isArray(list) ? list.filter((d) => !!d && typeof d === "object") : [];
     const okGuids = new Set(all.filter((d) => d.status === "OK").map((d) => String(d.guid ?? d.id)));
-    // 同じ guid は 1 回だけ扱う (再配送の配送は guid が同じで、元の配送と並んで一覧に出る)。古い順 (一覧は新しい順)。
+    // 同じ guid は 1 回だけ扱う。古い順 (一覧は新しい順)。再送された配送 (redelivery) は再送しない: 再送の失敗を再送すると連鎖し、
+    // guid が変わる実装では guid の上限で止まらないため。元の配送 (redelivery=false) の上限 (3 回) だけで止める。
     const byGuid = new Map<string, any>();
     for (const d of [...all].reverse()) {
-      if (d.status === "OK" || !Number.isInteger(d.id)) continue;
+      if (d.status === "OK" || d.redelivery === true || !Number.isInteger(d.id)) continue;
       const guid = String(d.guid ?? d.id);
       if (okGuids.has(guid) || byGuid.has(guid)) continue;
       byGuid.set(guid, d);

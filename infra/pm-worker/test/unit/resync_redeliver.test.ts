@@ -97,6 +97,18 @@ describe("失敗した webhook 配送の回収 (#2339)", () => {
     expect(posted.slice(10, 12).sort((a, b) => a - b)).toEqual([111, 112]);
   });
 
+  it("(f) 再送された配送 (redelivery: true) が失敗しても、それを再送しない (連鎖させない)。元の配送だけが上限まで再送される", async () => {
+    const posted: number[] = [];
+    const list: Delivery[] = [
+      { id: 9, guid: "x9", status: "Failure", redelivery: true },
+      { id: 2, guid: "g2", status: "Failure" },
+    ];
+    const ctx = await configuredApp({ env: { LIVE_REDELIVER: "1" }, handlers: [repoAuth, repoLists(), hook(() => list, posted)] });
+    await markFresh(ctx);
+    await scanAfter(ctx);
+    expect(posted).toEqual([2]);
+  });
+
   it("既定 (LIVE_REDELIVER 未設定) は POST しない。一覧を読んで送るはずだった件数だけ数え、同じ guid は 1 回だけ数える", async () => {
     const posted: number[] = [];
     const ctx = await configuredApp({ handlers: [repoAuth, repoLists(), hook(() => failing([2, 5]), posted)] });
