@@ -1,0 +1,24 @@
+fn	site	store_text	later_reads (機械語・同一 frame slot の後続 memop 件数と先頭 3 件)
+4fa3d0	4fa681	mov qword ptr [rbp + 0x58], rax	1件; 4fa690 mov rcx, qword ptr [rbp + 0x58]
+4fa3d0	4fa7aa	mov qword ptr [rbp + 0x40], rax	1件; 4fa7b9 mov rcx, qword ptr [rbp + 0x40]
+4fad10	4faf0b	mov qword ptr [rbp + 0x38], rax	1件; 4faf1a mov rcx, qword ptr [rbp + 0x38]
+4fb780	4fb7d9	mov qword ptr [rbp + 0x38], rax	1件; 4fb7dd mov rax, qword ptr [rbp + 0x38]
+5c00e0	5c013f	mov qword ptr [rbp + 0x50], rax	10件; 5c0143 cmp qword ptr [rbp + 0x50], 0 | 5c014a mov rax, qword ptr [rbp + 0x50] | 5c0156 mov rax, qword ptr [rbp + 0x50]
+5c0270	5c030d	mov qword ptr [rbp + 0x50], rax	2件; 5c0311 mov rax, qword ptr [rbp + 0x50] | 5c0321 mov rax, qword ptr [rbp + 0x50]
+6c3700	6c3a63	mov dword ptr [rsp + 0x20], eax	1件; 6c3c78 mov dword ptr [rsp + 0x20], eax
+6c3700	6c3c78	mov dword ptr [rsp + 0x20], eax	0件; -
+6c3d20	6c44bd	mov dword ptr [rsp + 0x20], eax	0件; -
+6c5930	6c6125	mov dword ptr [rsp + 0x20], ebx	0件; -
+76e720	76e74f	mov qword ptr [rbp + 8], rax	0件; -
+775340	77545c	mov qword ptr [rbp + 0x90], rax	15件; 775657 mov r8, qword ptr [rbp + 0x90] | 7756ca mov qword ptr [rbp + 0x90], rax | 775707 mov rdx, qword ptr [rbp + 0x90]
+775340	77593b	mov qword ptr [rbp + 0x70], rax	2件; 7759f6 mov rcx, qword ptr [rbp + 0x70] | 775a29 mov rcx, qword ptr [rbp + 0x70]
+815050	815220	mov qword ptr [rbp + 0x128], rax	4件; 815227 cmp qword ptr [rbp + 0x128], 0 | 815231 mov rax, qword ptr [rbp + 0x128] | 81523c mov qword ptr [rbp + 0x128], rax
+c57a00	c57e24	mov dword ptr [rbp + 0x5c], ecx	2件; c57e84 mov ebx, dword ptr [rbp + 0x5c] | c57f6f mov ebx, dword ptr [rbp + 0x5c]
+f3e050	f3e0c2	mov dword ptr [rbp + 0x3c], eax	2件; f3e0e5 lea rdx, [rbp + 0x3c] | f3e0fe lea rdx, [rbp + 0x3c]
+f67400	f67560	mov dword ptr [rbp + 0xb4], eax	3件; f6756d mov edx, dword ptr [rbp + 0xb4] | f67578 add dword ptr [rbp + 0xb4], 0x4b0 | f67589 mov edx, dword ptr [rbp + 0xb4]
+101d180	101d2b4	mov qword ptr [rbp + 0x70], rax	1件; 101d2c3 mov rcx, qword ptr [rbp + 0x70]
+101d180	101d423	mov qword ptr [rbp + 0x40], rax	1件; 101d432 mov rcx, qword ptr [rbp + 0x40]
+1042d20	1043e2d	mov dword ptr [rsp + 0x20], eax	2件; 1043f95 mov dword ptr [rsp + 0x20], r10d | 1044096 mov dword ptr [rsp + 0x20], eax
+1221290	1221676	mov dword ptr [rbp + 0x4c], eax	3件; 1221686 mov eax, dword ptr [rbp + 0x4c] | 122168b mov dword ptr [rbp + 0x4c], eax | 1221699 mov ebx, dword ptr [rbp + 0x4c]
+127d420	127d881	mov dword ptr [rbp + 0x8c], eax	1件; 127da8f mov eax, dword ptr [rbp + 0x8c]
+12f9730	12f9752	mov dword ptr [rsp + 0x50], eax	2件; 12f975e mov ecx, dword ptr [rsp + 0x50] | 12f9842 mov ecx, dword ptr [rsp + 0x50]
