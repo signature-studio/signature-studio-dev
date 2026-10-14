@@ -111,3 +111,77 @@ LB_BASE は 0 (既定)。IR の lift 段 (`boot0..4.lift.ll`) は work-m11 ス�
 - (追跡先は #739、§5) unit 101 の `4fa210` の走査条件 (リスト終端判定) と `47a250`・`448d40` の例外 object 解放経路を逆アセンブルで見る。
   解放経路の間接 call が D15 型で落ちていないかを確認する (仮説。未検証)。
 - 周回数の実測: `4fa210` の入口を数える probe を入れて、1 周回あたり object 数 (1 のはず) を確かめる。
+
+## 9. 現 HEAD での再測と、halt0 が消えた commit の特定 (#2773, 親 #739)
+
+既知類型との関係: 該当 ID なし (暴走の機構は未確定。本節は測定事実と差し替え実験の結果のみ)。
+
+### 9-1. 結論 (先出し)
+
+1. **測定 commit `bae12679` (origin/main 当時) の ON (`M11_OV_CLASSCREATE=1`) では unit 101 の halt0 (暴走) は再現しない。** unit 101 は **oob** (0x41037d 1 hit)。halt0 は 7 unit。OFF (既定) の unit 101 の値は本 PR では**未測定** (本 script は ON のみを build する。#739 の既存記録は未検証のため根拠にしない)。oob の frame は本 script の出力に含めないため、本節では扱わない。
+2. **検証起点 `8d883c3` では §2 の値が再現する**: unit 101 halt0、0x41037d 23,053,622、0x41032e 23,053,623、halt0 54 unit (§2-2 の (c) ON と一致)。
+3. **二分探索**: `tools/m11`・`tools/shared` を変える first-parent commit 388 件から、9 回で境界を特定した。`035274be` (PR #700) は halt0 53 unit・unit 101 halt0 (bad)、**`04fafae6` (PR #701 の merge) は halt0 8 unit・unit 101 oob (good)**。測った標本 6 commit (`503d1915` ほか、§9-2) も halt0 7〜8 unit で、減少は #701 で起きた (標本の外の commit は未確認)。
+4. **差し替え実験**: `04fafae6` のツリーで 1 ファイルだけ、または 1 部分だけ `035274be` の版に戻した (下表)。ON, unit 101 の値。
+5. **結論の範囲**: 暴走の消失 (halt0 → oob) は、`m11_win.c` の trace 用の 3 行 (`extern int m11_trace_flag;`・`EM_JS(m11_js_stack)`・MessageBoxA の `m11_js_stack()` 呼出し) に依る。BSTR 実装 (SysAllocStringLen 等) ではない。機構 (なぜ JS import の追加で 4fa210 の周回が止まるか) は**未確定**。
+
+| 構成 (`04fafae6` ベース・ON。ただし最終行のみ `035274be` ベース) | unit 101 kind | 0x41037d hit | halt0 unit |
+|---|---|--:|--:|
+| そのまま (= #701 merge) | oob | 1 | 8 |
+| `m11_ov.c` だけ `035274be` 版 (B) | oob | 1 | 8 |
+| `m11_win.c` だけ `035274be` 版 (A) | **halt0** | **23,053,163** | 55 |
+| `m11_win.c` から BSTR 3 関数だけ除去 | oob | 1 | 8 |
+| `m11_win.c` から trace 用 3 行だけ除去 | **halt0** | **23,053,163** | 55 |
+| ネガコン: `035274be` の `m11_win.c` 末尾に無害な関数を 1 つ追加 (`035274be` ベース) | halt0 | 23,053,622 | 53 |
+
+- 行 3 と行 5 は同じ値 (23,053,163)。行 4 (BSTR を除去) は oob のまま。
+- 行 6 (`035274be` に無害な関数を追加) は halt0 のまま。単に `m11_win.c` に定義を足したことでは消えない。
+- **仮説 (未検証)**: `EM_JS` は wasm の import を 1 つ増やす。import が増えると defined function の wasm index が全体にずれる。index を値として使う箇所 (icall の解決・関数ポインタの格納) が別の関数を指すと、周回が止まらなくなる可能性がある。行 6 は defined function を末尾に足すだけで index がずれないため、この仮説と整合する。検証には、import を増やさずに index だけずらす変更、または icall の解決先の確認が要る。
+
+### 9-2. bisect の全点 (`halt0` unit 数・unit 101 の kind、ON)
+
+| commit | 区分 | halt0 unit | unit 101 |
+|---|---|--:|---|
+| `8d883c3` (#446、検証起点) | bad | 54 | halt0 (0x41037d 23,053,622) |
+| `035274be` (#700) | bad | 53 | halt0 |
+| `04fafae6` (#701 merge) | good | 8 | oob (1 hit) |
+| `503d1915` / `9957996e` / `0760e367` / `28dbfb32` / `6d77c635` / `5cf3dd6a` | good | 7〜8 | halt0 以外 (kind は未記録。判定は halt0 の有無のみ) |
+| `bae12679` (測定 commit = origin/main 当時) | good | 7 | oob (1 hit) |
+
+- `8d883c3`・`035274be` の halt0 数の差 (54 → 53) は、unit 101 以外の halt0 unit が 1 件変わったことによる。
+- 9 回の探索で、`035274be` と `04fafae6` が隣接することを確認した (二分探索の範囲 idx 2→3)。monotone を仮定しているため、途中に反転があれば見落とす。
+
+### 9-3. 再現手順 (1 コマンド)
+
+```sh
+export FL_WIN64_DIR=<fl-win64 の展開先>          # 例: $RUNNER_TEMP/fl-win64 (tar --zstd -xf fl-win64.tar.zst)
+bash tools/m11/trap_triage/unit101_2773.sh bae12679                                   # bae12679 の ON
+bash tools/m11/trap_triage/unit101_2773.sh 04fafae6 tools/m11/m11_win.c 035274be    # 表の行 3 (A)
+```
+
+`git archive <commit>` で `tools/m11`・`tools/shared` を `$RUNNER_TEMP/unit101_2773/` に展開し、`work-m11` の lift 出力から IR を作り直す。作業ツリーは変えない。
+所要は n=1 (1 回の実行) の値で、min–max は未測定: 50〜60 秒 (4 コア、load 0.5〜1)。
+
+### 9-4. 検証範囲と限界
+
+- 素材: fl-win64 `block00031_PE.bin` の sha256 は `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d`。確認コマンド: `tar --zstd -xOf fl-win64.tar.zst extracted/block00031_PE.bin | sha256sum` (2026-10-14 に実行して一致)。work-m11 の lift 出力 (`boot0`〜`boot4.lift.ll`) を入力にし、各 commit の m11 pass で IR を作った。lift 出力の生成元 PE は本節では未確認。
+- 各構成は n=1。ただし `8d883c3` の値は §2 の n=3 と完全に一致する (決定的に再現する)。
+- 範囲外: 差 2,663 の切り分け (親 #739)・機構の確定 (#2773 に残す)。
+
+### 9-5. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 暴走の機構: trace 用 3 行 (JS import 追加) で 4fa210 の周回が止まる理由。index ずれの仮説の検証 | 受入 1 (根本原因) が未達。既知類型への対応も未確定 | #2773 (open のまま) |
+| 差 2,663 (GetMem 23,056,285 と AfterConstruction 23,053,622) | 未切り分け | #739 (親) |
+| 既定 (OFF) の unit 101 の値が未測定 (本 script は ON のみ build する)。ON の結果だけで既定ビルドの挙動は断定できない | 既定ビルドの暴走の有無が未確定 | #2773 (open のまま。再測定だけの子は起票しない) |
+| 数値の取得元未記録 (REPORT_739 §5) | 本節の値で置き換えない。REPORT_739 の未検証値は根拠にしない | #739 |
+
+### 9-6. 測定以降のコード差分 (WORKFLOW §6)
+
+測定 commit は `bae12679`。既存の `tools/m11`・`tools/shared` のコードに測定以降の差分が無いことの証跡:
+
+```sh
+git diff bae12679 HEAD -- tools/m11 tools/shared ':(exclude)tools/m11/trap_triage/unit101_2773.sh' ':(exclude)tools/m11/trap_triage/REPORT_679.md'
+```
+
+- 出力: 0 行 (確認時の HEAD は本 commit の親 `295c2c0b`)。本 commit が変えるのは、除外した 2 ファイル (`unit101_2773.sh`・本 REPORT) だけ。

@@ -84,7 +84,9 @@ if (!quick) {
     } });
 }
 
-const sel = scenarios.filter((s) => !only || only.includes(s.name));
+// --probe0: 診断用。burst 探査 (fl-burst-probe) を無効化して全シナリオを実行する (既定は探査あり)
+const probe0 = args.includes("--probe0");
+const sel = scenarios.filter((s) => !only || only.includes(s.name)).map((s) => (probe0 ? { ...s, q: `${s.q}&probe0=1` } : s));
 const results = [];
 let failed = 0;
 await withChrome({ root: path.join(here, "../work/web"), page: "index_com.html?" + sel[0].q, log: () => {} }, async (cdp) => {
