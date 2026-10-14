@@ -20,7 +20,9 @@ MODE (第 4 引数・既定 linear):
            fall-through・直接 jmp/jcc (関数内は追う)・直接 call (callee)・tail jmp。間接 jmp
            (jump table) の先は追わず、テーブル窓は decode しない (未解決件数 indirect_unres)。
 
-usage: mx_closure.py <pe> <rtti_vtables.json> <out_prefix> [linear|flow]
+ENTRY (第 5 引数・既定 any): any = 新入口を制限しない (従来)。pdata = 新入口を .pdata begin に限る (MX-25)。
+
+usage: mx_closure.py <pe> <rtti_vtables.json> <out_prefix> [linear|flow] [any|pdata]
 """
 import sys, json, pickle, bisect, re, collections, struct
 import pefile, capstone
@@ -117,6 +119,9 @@ def main(path, vtp, outp):
         return cs, nb, ni, un
 
     # ---- recursive descent over entry points only
+    def admit(tg):
+        # ENTRY=pdata: 新入口は .pdata 関数先頭 (begin) に限る。any: 従来どおり (既定)。
+        return ENTRY != 'pdata' or tg in fsz
     entries = set(seeds)
     callees = {}
     rounds = 0
@@ -154,7 +159,7 @@ def main(path, vtp, outp):
                 st['insn'] += ni
                 st['unres'] += un
                 callees[e] = sorted(cs)
-                new |= {tg for tg in cs if tg not in entries}
+                new |= {tg for tg in cs if tg not in entries and admit(tg)}
                 continue
             cs = set()
             try:
@@ -165,7 +170,7 @@ def main(path, vtp, outp):
                             continue
                         if t_lo <= tg < t_hi:
                             cs.add(tg)
-                            if tg not in entries:
+                            if tg not in entries and admit(tg):
                                 new.add(tg)
             except capstone.CsError:
                 pass
@@ -224,5 +229,7 @@ def main(path, vtp, outp):
 
 if __name__ == '__main__':
     MODE = sys.argv[4] if len(sys.argv) > 4 else 'linear'
+    ENTRY = sys.argv[5] if len(sys.argv) > 5 else 'any'
     assert MODE in ('linear', 'flow'), MODE
+    assert ENTRY in ('any', 'pdata'), ENTRY
     main(sys.argv[1], sys.argv[2], sys.argv[3])
