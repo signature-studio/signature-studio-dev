@@ -102,6 +102,7 @@ void* HeapAlloc(void* h, int flags, int size) {
     return p;
 }
 int HeapFree(void* h, int flags, void* p) { (void)h; (void)flags; (void)p; return 1; }
+unsigned GetCurrentThreadId(void) { return 1; }  /* native 参照 (tools/ott/native/ott_native.c k_GetCurrentThreadId) と同値 */
 int GetLastError(void) { return 0; }
 void SetLastError(int e) { (void)e; }
 void EnterCriticalSection(void* cs) { (void)cs; }
