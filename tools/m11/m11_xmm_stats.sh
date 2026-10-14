@@ -52,9 +52,10 @@ print('[arity] 検査なしで復元される arity skip 件数 (= 49 - 34 の�
 rows = fx['site_detail']
 args = [(r['callee'], v) for r in rows for v in r['args'].values() if v == 'set_const_xmm_callee']
 print('[0詰め48] set_const_xmm_callee 引数 = %d (callee %d 件)' % (len(args), len(set(c for c, _ in args))))
-g = collections.defaultdict(lambda: [0, set()])
+g = {k: [0, set()] for k in ('fixed', 'call_arity_mismatch', 'slot_occupied')}
 for c, _ in args:
     k = why(wr, c)
+    g.setdefault(k, [0, set()])
     g[k][0] += 1
     g[k][1].add(c)
 for k, (n, cs) in sorted(g.items(), key=lambda x: -x[1][0]):
