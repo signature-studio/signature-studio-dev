@@ -139,8 +139,8 @@ def main():
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
-        # jmp thunk: 定義行 `thunk_FUN_<飛び先>(` は FUN_<va>、呼出しは飛び先の FUN_<飛び先> (同じ動作)
-        t = re.sub(r'^([\w \*]+?)\s+thunk_FUN_[0-9a-f]+\(', lambda m: '%s FUN_%x(' % (m.group(1).strip(), va), t, count=1, flags=re.M)
+        # jmp thunk: 列 0 の定義行 `thunk_FUN_<飛び先>(` は FUN_<va>、呼出しは飛び先の FUN_<飛び先> (同じ動作)。列 0 に限る (本体はインデント付き)
+        t = re.sub(r'^(\w[\w \*]*?)[ \t]+thunk_FUN_[0-9a-f]+\(', lambda m: '%s FUN_%x(' % (m.group(1).strip(), va), t, count=1, flags=re.M)
         t = t.replace('thunk_FUN_', 'FUN_')
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         if tbase is not None:
