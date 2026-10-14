@@ -171,6 +171,15 @@
 - 未確定 (本 HEAD): (a) sel 2・4 の wrapper 呼出し元 (`[obj+0x1c0]` を経由しない間接経由の呼出し元) の inner id の値。 `E8 rel32` と絶対ポインタの走査 (wrapper 8 関数) は 0 件で終わった。 走査方法の正しさは未検証のため、呼出し元は本 HEAD では確定しない。 (b) sel 10 の `[rbp+0x4f]` の書込み元。 (c) 戻り値の型の完全な一覧 (sel 2・4 の戻り値は未確認)。
 - 受入条件 4 の残り: (a)〜(c) を次の run で確定する。
 
+## 9. 未確定 3 点の追跡 (受入条件 4 の続き、main ba4babca)
+
+測定: `disasm_range.py` (capstone) と、直接参照の走査 (call/jmp の即値、RIP 相対 lea、絶対 8 バイト、4 バイト RVA) を殻 23663 全体に対して実施。
+
+- **(a) sel 2・4 の wrapper 呼出し元**: wrapper 0x846a80 (sel 2)・0x846ac0 (sel 4) の VA を、殻の `.text` 全体で `call`/`jmp` 即値・RIP 相対 `lea`・即値 VA の形で走査 → 0 件。 4 バイト RVA (0x446a80・0x446ac0) は `.pdata` の unwind 項目 (0x52a3fc・0x52a408) のみ。 よって呼出し元は直接参照では見つからず、間接呼出し (関数ポインタ・vtable) と推定されるが未確認。 inner id の値は**未確定**。
+- **(b) sel 10 の `[rbp+0x4f]` の書込み元**: wrapper 0x8439a0 は関数 0x843930 (`.pdata` 上の関数範囲は 0x843930〜0x843a20。 §4 の 0x8439a0 は関数途中の位置) の内部。 0x84398c〜0x84399a で `[rbp+0x4f]` に `0x55d0a0(rcx=&[rbp+0x4f], rdx=[rbp+0x38], r8=0x200)` の結果を書く。 `[rbp+0x38]` は `0x41b450(rcx=&[rbp+0x38], rdx=[rbp+0x278])` で作られ、 `[rbp+0x278]` は関数 0x843930 の第 2 引数。 `0x55d010` は入力の c_str を最大 0x200 バイトまでコピーして末尾に NUL を置く。 **確定した入力**: sel 10 の `r8` は、関数 0x843930 の第 2 引数 (C 文字列) のコピー。 0x843930 の呼出し元は (a) と同じく直接参照 0 件のため未確定。
+- **(c) 戻り値**: sel 2・4 の wrapper は `DispatchToEngine` の戻り値 `rax` をそのまま返す (`call [rax+0x1c0]` の後に `add rsp`・`ret`、 rax 加工なし)。 よって戻り値型は engine 側 `DispatchToEngine` の case 依存で、 sel 2 は `[rcx+0x1b0]` の外部呼出し結果、 sel 4 は表 0x14838c の結果。 いずれも case 内の戻り値型は未読解。
+- 結論: 受入条件 4 の残り (a)(b)(c) は、(b) の入力源 (第 2 引数) まで確定。 (a) と (c) は未確定。
+
 ## 7. 検証 (測定 HEAD 5880a9f6、af86748b と sampler コード同一)
 
 測定 HEAD の扱い: 下表の測定の HEAD は `5880a9f6` (`6769c2c7` の時点で記録された系列) である。 PR の検証 HEAD は `af86748b`。 `5880a9f6` から `af86748b` までに sampler の実行コードは変わっていない (`git diff --stat 5880a9f6 af86748b -- tools/plugins/sampler ':!*.md'` は空)。 そのため表の結果は `af86748b` の sampler コードにも当てはまる。 `af86748b` そのものでの再実行は、この表では行ったと主張しない。
