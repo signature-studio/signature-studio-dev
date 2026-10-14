@@ -2,7 +2,7 @@
 # lowbase_e2e.sh — CAB-90 (HB-H1) 1 コマンド再現: lift 済み OTT の VA 敷設 base を低位へ再配置し、initial memory 864MiB → 数十 MiB で全試験が通ることを示す.
 #   bash tools/hostbridge/lowbase/lowbase_e2e.sh [--no-chrome] [--quick]
 #   前提 (全て既存成果物; 無ければ指示を出して終了): tools/m10/work/ott_m10.ll (bash tools/m10/m10_e2e.sh), tools/hostbridge/work/ott_hb.cjs (bash tools/hostbridge/hostbridge.sh; 「再配置前」基準),
-#         tools/plugins/work/balance/{k.final.ll,k_simd.c} (bash tools/plugins/lift/t0_balance/t0_e2e.sh), tools/ott/work/libottnative.so (bash tools/ott/native/build.sh), python: capstone pefile
+#         tools/plugins/work/balance/{k.final.ll,k_simd.c} (bash tools/plugins/lift/t0_balance/t0_e2e.sh), python: capstone pefile (libottnative.so は毎回 build.sh で作り直す。素材 work-m6-ott 同梱の版は ott_enc_slots を欠く)
 #   所要: ビルド/試験すべて合わせて約 1〜2 分 (キャッシュ不要; 全ビルドは数秒)。tools/m6..m10, ott, plugins, shim, hostbridge の既存ファイルは読取のみ (生成物は lowbase/work).
 set -uo pipefail
 LB="$(cd -- "$(dirname -- "$0")" && pwd)"; T="$LB/../.."; HB="$LB/.."
@@ -13,6 +13,7 @@ CHROME=1; QUICK=""; for a in "$@"; do [ "$a" = "--no-chrome" ] && CHROME=0; [ "$
 source "$T/shared/env.sh"
 DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 W="$LB/work"; mkdir -p "$W"; : > "$W/e2e.log"
+bash "$T/ott/native/build.sh" > "$W/build_native.log" 2>&1 || { echo "[lowbase_e2e] libottnative.so のビルド失敗: $W/build_native.log" >&2; exit 2; }
 need() { [ -e "$1" ] || { echo "[lowbase_e2e] 前提無し: $1  → $2" >&2; exit 2; }; }
 need "$DLL" "素材"; need "$T/m10/work/ott_m10.ll" "bash tools/m10/m10_e2e.sh"; need "$HB/work/ott_hb.cjs" "bash tools/hostbridge/hostbridge.sh"
 need "$T/plugins/work/balance/k.final.ll" "bash tools/plugins/lift/t0_balance/t0_e2e.sh"; need "$T/ott/work/libottnative.so" "bash tools/ott/native/build.sh"
