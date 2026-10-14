@@ -49,7 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
-- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない作業の残りと未解決の起票先として子 issue を起票してよい (§3 の #835 の規定。milestone・優先度・Status は PM が確定する)。
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度・Status は PM が確定する)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
@@ -66,8 +66,17 @@ PM (main)                      subagent (実装)                  subagent (検�
 | 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
 | PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定 | merge・方針変更・是正 | — |
 
-- **子 issue の起票**: PM のほか、実装 subagent も、**1 run に収まらない作業の残り**と**未解決の起票先**として子 issue を起票してよい
-  (2026-10-14 PM 判断。PM の処理待ちで止まるのを避けるため。#833)。条件: ① 題名は `[AREA-n]` 形式。`<AREA>` は
+- **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
+  (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
+  受入条件を全て満たせないときは、満たした範囲を完了単位として **issue 自体の範囲を縮め** (未達の受入条件を子 issue に移し、
+  元の issue の本文から外す)、縮めた issue を `Closes #N` で閉じる。`Refs #N` を使うのは、その PR が issue の受入条件を
+  1 つも満たさず (調査の中間記録など)、かつ issue の範囲を縮める余地も無い場合だけで、理由を PR 本文の先頭に 1 行書く。
+- **子 issue の起票**: PM のほか、実装 subagent も、**1 run に収まらない実装・修復の作業の残り**を子 issue として起票してよい
+  (2026-10-14 PM 判断。PM の処理待ちで止まるのを避けるため。#833)。起票してよいのは **実装・修復の作業に限る**
+  (原因特定は、実装に直結するものだけ)。**再測定・REPORT の文言修正・「未解決の追跡」だけの子は起票せず**、PR 本文の未解決表
+  (`| 未解決 | 影響 | 起票先 |`) に書く。**1 PR あたりの子は最大 3 件**。親 issue が子の完了待ちのときは、**`blocked_by` を付けない**
+  (親を blocker にしない。子を親の blocker にもしない)。子の本文に `親: #N` を書くだけにする。
+  条件: ① 題名は `[AREA-n]` 形式。`<AREA>` は
   親 issue の AREA に置き換える (未置換の `<AREA>` のまま実行しない)。既存の最大の n を次のコマンドで調べ、
   その値 +1 を使う (欠番があっても最大値 +1 とする。`"[AREA-"` のような GitHub 検索は `[` `]` を区切りとして扱うため使わない):
   `gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`
@@ -250,7 +259,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   入力の先頭 200 文字・cost) が出る。repo が public のため、**tool の出力と生 JSONL はログに出さない**
   (認証情報・FL 由来物の漏洩防止。secret マスクは登録値との完全一致でしか効かない)。
   issue へのコメントは agent が `gh issue comment` で行う。
-- **上限**: job は 60 分。収まらない作業は中間 commit + **ready PR (`Refs #N` + 未解決の起票)** で区切る (draft は禁止: REVIEWING でも FIXING でもない状態になる)。
+- **上限**: job は 60 分。収まらない作業は中間 commit + **ready PR** で区切る (満たした範囲に issue の範囲を縮めて `Closes #N`、残りは子 issue か PR 本文の未解決表。§3) (draft は禁止: REVIEWING でも FIXING でもない状態になる)。
 - 稼働本数は「走っている Actions run 数」で数える (`gh run list --status in_progress`)。
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
@@ -304,7 +313,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
     未レビューの commit を巻き込まない。
   - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
-    未完でも ready で出して `Refs #N` と未解決を書く。前提 PR が未 merge の作業は着手しない。
+    未完でも ready で出す。満たした範囲に issue の範囲を縮めて `Closes #N` とし、未解決は子 issue か PR 本文の未解決表に書く (§3)。前提 PR が未 merge の作業は着手しない。
 
   **watchdog** (`.github/scripts/watchdog.sh`、`opencode.yaml` の `watchdog` job): `push` to main と 5 分おきの
   `schedule` で、REVIEWING でも FIXING でもない PR (IDLE) を機械的に元の 2 状態へ戻す。実行中の run と PR を突き合わせ、
