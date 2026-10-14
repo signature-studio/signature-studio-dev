@@ -33,6 +33,8 @@
 
 ## 4. 未解決
 
+起票先の #187 は PR #3148 で close。子を起票しない未解決は、この表で追跡する。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | ~~Chrome が null-sink に接続したか未確認~~ → 解消 (§5-4: `results/au2_recheck/null_r1_sinkinputs.txt` に ci_null 接続を保存。報告値・burst は fake と異なる) | — | — |
@@ -40,9 +42,9 @@
 | Chrome 行列 (§5) の再測定。測定 commit `54bacdc0` の後に main に入った clock_jump の差分 26 行 (§8) が未適用 | §5 の数値は clock_jump 前のコードで測った値。burst・T・underrun への影響は未確認 | #187 |
 | Firefox 48k の rep 1 の burst・T の差 (§9-4) | 行列の burst・T の範囲に影響。PASS (underrun・sine・sink 接続) には影響しない | #187 |
 | sink の規格固定と PulseAudio の再サンプルの有無 (Chrome・Firefox 共通) | 96k の clock が sink 経路で変わるかは未確定 (§5・§9-4) | #187 |
-| Firefox 他版・Safari・30 分ソーク・負荷下 | Firefox は 157.0・10 s・無負荷のみ。版差・長時間・負荷下は未確認 | #187 / [AU-22] (#2366) |
+| Firefox の 30 分ソーク・Firefox 他版・Safari・負荷下 | Firefox は 157.0・10 s・無負荷のみ。Firefox の 30 分ソーク・版差・負荷下は未確認 (Chrome の 30 分ソークは §5-2 で完了) | #187 / [AU-22] (#2366) |
 | `asio_ramp_b128_d2` の FAIL (quick, 負荷起因の疑い) | 回帰判定の不安定さ | #187 (要切り分け) |
-| 30 分ソーク (AU-10 null-sink 版) | 長時間の underrun 0 が未確認 | #187 |
+| ~~30 分ソーク (AU-10 null-sink 版)~~ → 解消 (§5-2: 30 分 PASS・underrun 0) | — | — |
 | 実機の outputLatency・総往復遅延・Safari | CI で測れない | [AU-22] (#2366) |
 
 ## 5. 行列の実測 (2 回目 run, 2026-10-14) — §1 の未確認事項を解消
@@ -72,13 +74,22 @@
 - 元の 18 シナリオ実行 (n=3) はすべて PASS (underrun 0・ramp/sine 誤差 1.49e-8)。load avg は各 run 開始 0.0〜0.6。**ただし同 HEAD の再採取 (n=1, §5-4) では fake_r1 の `asio_sine_b256_d2` が underrun 1 で FAIL した**。元の n=3 と合わせても再現性は確定していない。
 - P2 の p99 は §10 で計測した (AU-30 #3151)。この節の表は p99 列の無い旧測定。
 
-### 5-2. 30 分ソーク (P1) — 10 分のみ実施
+### 5-2. 30 分ソーク (P1) — 10 分 (2 回目 run) と 30 分 (3 回目 run)
 
 | 条件 | シナリオ | 結果 |
 |---|---|---|
-| Chrome null-sink 48k B=256 ramp | `asio_ramp_b256_soak600` (`--soak 600`) | **PASS**: underrun 0・silence 0・ramp mismatch 0/28,803,328 f・wall 600.01 s。T=1792 (fixed), burst 1152 |
+| Chrome null-sink 48k B=256 ramp (2 回目 run) | `asio_ramp_b256_soak600` (`--soak 600`) | PASS: underrun 0・silence 0・ramp mismatch 0/28,803,328 f・wall 600.01 s。T=1792 (fixed), burst 1152 |
+| **Chrome null-sink 48k B=256 ramp (3 回目 run)** | `asio_ramp_b256_soak1800` (`--soak30`) | **PASS**: underrun 0・silence 0・ramp mismatch 0/86,408,192 f・secs_wall 1800.218 s (run 全体 wall 1803.4 s) |
 
-30 分 (1800 s) のソークは時間内に収まらなかったため未実施 (§6 未解決)。
+- 測定 commit = `eeca4ded` (origin/main)。コードは変えていない。`git diff eeca4ded HEAD -- tools/audio/src tools/audio/harness tools/audio/test tools/audio/build.sh public/worklets src/runtime` の出力は空 (0 行)。
+- 再現: `EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh bash tools/audio/build.sh` → PulseAudio 起動・`pactl load-module module-null-sink sink_name=ci_null` と `pactl set-default-sink ci_null` → `node tools/audio/harness/run.mjs --soak30 --out tools/audio/results/au2/null_soak1800.json`。出力は fake 版の `results/soak_1800.json` (AU-10・#191) と分けた。
+- 環境: ubuntu runner (4 vCPU)・`google-chrome 154.0.8037.97`・PulseAudio 16.1。load avg 開始 0.21 → 終了 0.10。接続の根拠: 30 分 run の sink-input 採取の出力ファイルは**未保存**。実装 run `38646551070` (implement ジョブ・22:17〜22:54 UTC) の実装者の記述 (開始 8 s の `pactl list sink-inputs` で Google Chrome が `Sink: 1` (`ci_null`) に接続) はあるが、同 run のログには採取出力が残っていない (ログに `application.name`・`Sink: 1` は 0 件。入力コマンドの先頭のみ)。よって「30 分 run で Chrome が ci_null に接続した」は未保存・run ログ未記載の主張として扱う。傍証として、報告値の outputLatency 36 ms は fake (30 ms) と異なり null-sink 48k (§5-1) と一致する。本番の前に同じ設定で 15 s の確認 (`--soak 15`) を 1 回行い PASS (underrun 0・mismatch 0/720,896 f) と実装者は記述したが、この確認も保存ファイル無し (同 run の記述のみ)。
+- 所見 (30 分):
+  - T は 1792 で固定 (T0 = T_max = T・grows 0・shrinks 0)。run 中の `burst_obs` = 1152。`min_fill` 512 f・`avg_fill` 1370 f。
+  - `cb_late` 0・`cb_max` 165 µs・`wait_timeouts` 0・`workletErrors` 0。
+  - clock_jump は 8 件 (各 ±128 f。負 4・正 4、skip 512 f・dup 512 f)。underrun とは別計上。clock_jump があっても underrun 0 で、ramp の全フレーム照合の不一致は 0。
+  - 報告値: baseLatency 0.011625 s・outputLatency 0.036 s・clock 48003.9 Hz。null-sink 48k (§5-1) と同程度 (11.6 ms・36.0 ms・48008.5 Hz)。fake (10.0 ms / 30.0 ms / 48000.0 Hz) とは一致しない。実機の outputLatency は [AU-22]。
+  - 結論: P1 (null-sink・48k・B=256・30 分) は underrun 0。T=1792 は 30 分の間に拡張不要だった。
 
 ### 5-3. T 下限と安全係数 (P4) の再評価
 
@@ -134,19 +145,21 @@
 
 ## 6. 未解決 (実測ではなく実装が必要なものは子 issue)
 
+起票先の #187 は PR #3148 で close。子を起票しない未解決は、この表で追跡する。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | ~~Firefox 行列 (PulseAudio null-sink × 48k/96k)~~ | ~~`tools/audio/harness` が Chrome CDP 専用~~ → 解消 (§9・AU-23 #2540) | — |
 | OPEN 較正 burst と run 中 burst のずれで grows が残る (係数は 125 維持・§5-5) | 96k null で grows 0〜3 回・underrun 0 (§5-5 の再測定)。係数の変更では解消しない | **[AU-28]** #3051 |
-| 30 分ソーク (null-sink, 48k B=256) | 10 分 PASS のみ。30 分の underrun 0 は未確認 | #187 (測定のみのため子にせず残す) |
+| ~~30 分ソーク (null-sink, 48k B=256)~~ | ~~10 分 PASS のみ~~ → 解消 (§5-2 の 30 分 PASS) | — |
 | ~~P2 burst の p99~~ | ~~worklet が最大値しか公開しない~~ → 解消 (§10・AU-30 #3151: `burst_hist` を公開し結果 JSON に `burst_p99`)。Firefox 側は未配線 | #187 (Firefox の p99) |
-| Windows / macOS runner (任意) | 未着手 (受入 4) | #187 |
+| Windows / macOS runner (任意) | 未着手 (受入 4) | [AU-32] #3164 |
 | `asio_ramp_b128_d2` quick FAIL (§2) | 本 run では再実行していない。原因未切り分け | #187 |
 | fake の `asio_sine_b256_d2` の underrun 1 (再採取 n=1 で FAIL, §5-4) | 行列の再現性が未確定。原因未切り分け (`asio_ramp_b128_d2` と同種の疑い) | #187 (測定の追跡) |
 
 ## 7. 検証範囲 / 範囲外
 
-- 範囲: ubuntu runner の Chrome 154 (fake / PulseAudio null-sink) の 48k・96k。null-sink は PulseAudio の出力経路で、実デバイス (実 IF の outputLatency) を代表しない (AU-22 #2366)。
+- 範囲: ubuntu runner の Chrome 154 (fake / PulseAudio null-sink) の 48k・96k (30 分ソークは null-sink 48k のみ)。null-sink は PulseAudio の出力経路で、実デバイス (実 IF の outputLatency) を代表しない (AU-22 #2366)。
 - 範囲外: Safari・Windows/macOS・実機の総往復遅延。Firefox は §9 (157.0・headless・Linux のみ)。
 
 ## 8. コード差分 (Chrome 行列の測定 commit `54bacdc0` → 最終 head)
@@ -217,23 +230,5 @@
 
 ## 10. P2 の p99 (AU-30 #3151)
 
-- **測定 commit**: `e403fd7a` (コードを変えた最後の commit。worklet・ctl・ハーネス・集計)。`git diff --stat e403fd7a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は 0 行 (測定後に増えたのはこの REPORT と結果 JSON だけ)。
-- **方式**: worklet は連続 `process()` の run (Date.now 差 ≤1 ms) が終わるたびに `burst_hist[floor(len/512)]` (ctl @384、`FLA_CTL_SIZE` 384→512) を +1 する。末尾 bin は ≥15872 f。`run.mjs` は p99 を該当 bin の上端で出す (512 f 刻み。真の p99 はこの値以下) → 結果 JSON の `stats.burst_p99`・`stats.burst_runs`。run には待機中の 128 f 単独 run も入る (fake 48k の bin 0 は 1499 run 中 364。発生源は未切り分け)。
-- **再現**: `bash tools/audio/build.sh` → `AU2_OUT=tools/audio/results/au30_p99 bash tools/audio/au2_matrix.sh 3` → `node tools/audio/au2_summary.mjs tools/audio/results/au30_p99`。環境: ubuntu runner (4 vCPU), google-chrome 154.0.8037.97, PulseAudio 16.1 (apt 導入)。生結果: `results/au30_p99/`。
-
-### 10-1 行列 (n=3, 測定 commit `e403fd7a`)
-
-| 条件 | sr | シナリオ | n | PASS | underrun (合計) | burst max (f) | burst p99 (f, bin 上端) | 実 T (f) | T_req (f) | T≥T_req | baseLatency (ms) | outputLatency (ms) | clock (Hz, 平均) |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Chrome fake シンク | 48000 | asio_sine_b256_d2 | 3 | 2/3 | 1 | 512 | 1024 | 1024〜1536 | 1024 | OK | 10.0 | 30.0 | 48000.0 |
-| Chrome fake シンク | 96000 | asio_sine_b256_96k | 3 | 3/3 | 0 | 1024 | 1536 | 2816 | 1536 | OK | 10.0 | 30.0 | 95999.7 |
-| Chrome fake シンク | 96000 | asio_sine_b512_96k | 3 | 3/3 | 0 | 1024 | 1536 | 3072 | 2048 | OK | 10.0 | 30.0 | 96000.0 |
-| Chrome PulseAudio null-sink | 48000 | asio_sine_b256_d2 | 3 | 3/3 | 0 | 1152 | 1536 | 1792 | 1792 | OK | 11.6 | 31.0〜36.0 | 48017.9 |
-| Chrome PulseAudio null-sink | 96000 | asio_sine_b256_96k | 3 | 3/3 | 0 | 3456 | 3584 | 4608 | 4608 | OK | 11.6 | 81.0〜83.0 | 96008.8 |
-| Chrome PulseAudio null-sink | 96000 | asio_sine_b512_96k | 3 | 3/3 | 0 | 4480〜5504 | 3584 | 6144〜7680 | 7680 | OK | 11.6 | 68.0〜71.0 | 95989.8 |
-
-- **受入 3 (null 48k の PASS 判定)**: `asio_sine_b256_d2` の null-sink は 3/3 PASS (underrun 0・silence 0・sine maxErr 1.49e-8)。
-- **p99 と最大値**: 最大値は 1 run の外れ値になりうる。例: null 96k・B=512 は 393〜394 run。最大 5504 f は r1・r2 で各 1 run、4480 f は r3 で 1 run。p99 はいずれも 3584 (bin 3072〜3584)。
-- **FAIL 1 件 (未解決)**: fake_r1 の `asio_sine_b256_d2` で underrun 1・silence 128・sine maxErr 6.85e-1 (fake 48k は 2/3 PASS)。症状は §5-4 の fake_r1 (underrun 1) と同じ。今回は 1 回のみで、原因は未切り分け (#187)。null 48k では出ていない。
-- **NC**: `nc_soak15_negctl` は FAIL (exit 1・underrun 7・silence 3712・ramp mismatch 669952/720896)。§5-4 の NC と同値で、期待どおり。
-- **未実施**: Firefox の p99 (`harness/au2.mjs` は `burst_obs` のみ)・30 分ソークの p99 (#187)。
+- **結論**: worklet が連続 `process()` の burst 分布 (`burst_hist`) を公開し、結果 JSON に `burst_p99` を出すようになった。null-sink は全 run PASS (underrun 0)。fake 48k は 1 件 FAIL (未解決・#187)。Firefox の p99 は未配線。
+- 測定 commit・行列・再現手順・未解決の全文は `REPORT_APPENDIX_3151.md` (250 行上限のため分割移動)。
