@@ -136,7 +136,7 @@ const ff = {};
 for (const l of errs) { const m = /unresolved function call: (\S+)/.exec(l); if (m) ff[m[1]] = (ff[m[1]] || 0) + 1; }
 const stubs = [];
 for (let i = 0; i < (mod._m11_stub_uniq() || 0); i++) stubs.push(mod.UTF8ToString(mod._m11_stub_name(i)) + ':' + mod._m11_stub_count(i));
-const ptrcheck = ptrCheck(mod, ptrPreSet);
+const ptrcheck = ptrCheck(mod, ptrPreSet, 'M11_PTRCHECK_SURVEY_MAX_NEW');   // #2778: survey の基準は run と別 (unit 実行後の件数)
 console.log('M11_SURVEY ' + JSON.stringify({
   ptrcheck,
   dllmain_done: done, boot_threw: bootThrew, units: 942, ...res, trap_oom: trapOom, trap_other: res.trap - trapOom, ok_with_oom: okWithOom,
@@ -157,3 +157,7 @@ console.log('M11_SURVEY ' + JSON.stringify({
   icall_miss: mod._m11_icall_miss(), icall_miss_uniq: mod._m11_icall_miss_uniq(),
   stub_total: mod._m11_stub_total(), stub_uniq: mod._m11_stub_uniq(), stub_hits: stubs,
 }));
+if (!ptrcheck.gate.pass) {   // #2778: ptrcheck ゲート不合格 (M11_PTRCHECK_SURVEY_MAX_NEW). JSON は出した後に非 0
+  console.error('FAIL: survey ptrcheck image_va_words_new=' + ptrcheck.image_va_words_new + ' > max=' + ptrcheck.gate.max + ' (' + ptrcheck.gate.env + ')');
+  process.exitCode = 1;
+}

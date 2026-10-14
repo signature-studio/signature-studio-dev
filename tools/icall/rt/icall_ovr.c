@@ -7,10 +7,16 @@
 #include <stdint.h>
 #include <math.h>
 #include <string.h>
+#ifdef ICALL_BLK_GLOBAL   /* #2865: IR の @__icall_blk (icall_rt.c が定義) と同じ global を使う */
+extern unsigned char __icall_blk[0x200];
+#define BLK_ADDR ((uintptr_t)__icall_blk)
+#else
 #ifndef ICALL_BLK
 #define ICALL_BLK 0x34308000u
 #endif
-#define BLKQ(off) (*(volatile uint64_t*)(uintptr_t)(ICALL_BLK + (off)))
+#define BLK_ADDR ((uintptr_t)ICALL_BLK)
+#endif
+#define BLKQ(off) (*(volatile uint64_t*)(BLK_ADDR + (off)))
 
 /* _handle_error(double): 返り値 xmm0 = 呼出側が渡した retval (xmm1) */
 long long function_1801c8c00(long long arg1) { (void)arg1; BLKQ(0x88) = BLKQ(0x30); return 0; }

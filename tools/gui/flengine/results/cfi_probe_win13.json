@@ -1,0 +1,52 @@
+{
+ "wasm": "m11_gui.cjs",
+ "boot": {
+  "ok": false,
+  "err": "unreachable"
+ },
+ "host": {
+  "ptr": "0x21357908",
+  "version": 1,
+  "flags": 0,
+  "name_ptr": "0x2134f8e8",
+  "cmd_ptr": "0x2134f900",
+  "iface_out": "0x21357948"
+ },
+ "call": {
+  "returned": false,
+  "err": "Aborted(native code called abort())",
+  "failfast": false,
+  "ms": 1
+ },
+ "reach": [
+  {
+   "order": 1,
+   "name": "LoadStringW",
+   "calls": 3,
+   "kind": "IMPL",
+   "prio": "1"
+  }
+ ],
+ "errs_tail": [
+  "[m11][VA-big] #1 size=131399680 (125.3 MB) live=1.3MB",
+  "[m11][VA] #2 addr=0 size=131399680 (0x7d50000) type=0x101000 prot=0x4",
+  "[m11][VA-big] #2 size=131399680 (125.3 MB) live=132.7MB",
+  "[m11][VA] #3 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #4 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #5 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #6 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[m11][VA] #7 addr=0 size=720896 (0xb0000) type=0x101000 prot=0x4",
+  "[shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)",
+  "Aborted(native code called abort())",
+  "[gui] GUI-REACH 1 LoadStringW 3 IMPL P1",
+  "[gui] GUI-REACH-SUMMARY reached=1 impl=1 stub=0"
+ ],
+ "iface": "0x0",
+ "open_trace": [],
+ "errs_n": 18,
+ "icall_miss": 5,
+ "icall_miss_targets": [
+  "0x457860",
+  "0xfa9390"
+ ]
+}
