@@ -9,12 +9,14 @@ import { Gh, GhError, type ListResult } from "./github.ts";
 import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
+import { haltNotifyDue, haltOverdue, haltReasons, nextHalt, type Halt } from "./halt.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import {
   detectPm,
   DIGEST_EVERY_MS,
   DIGEST_KIND,
   DIGEST_REF,
+  PM_LIMITS,
   pruneHistory,
   selectDispatch,
   validPayload,
@@ -168,8 +170,10 @@ interface Meta {
   // 直近の reconcile で DO と REST が食い違った件数と、その累計
   reconcileDiff?: { last: number; total: number };
   rateGuardOn?: boolean;
-  // VM の状態 (launched・relaunch・phase・pm_art) を取り込んだ時刻。無いあいだは launch しない (IMPORT_REQUIRED=0 を除く)。
+  // VM の状態 (launched・relaunch・phase・pm_art) を取り込んだ時刻。IMPORT_REQUIRED=1 のときは、無いあいだ launch しない。
   importedAt?: string;
+  // launch を止めている区間 (#2795)。止まっていない間は無い。/status.launch_halted と PM への通知に使う。
+  halt?: Halt;
   // 同時実行の上限の推定 (saturation.ts)。観測の履歴は meta/obs に別に持つ。
   cap?: Cap;
   installationId?: number | null;
@@ -1088,11 +1092,18 @@ export class Engine {
     }
   }
 
+  // launch を止めている条件 (haltReasons) の区間を進める。止まり続けている間は起点 (since) を残し、解消したら消す (#2795)。
+  private updateHalt(plan: Plan): void {
+    const reasons = haltReasons({ noImport: !!plan.blocked, stop: plan.stop, reviewOnly: plan.phase.review_only, stale: !this.fresh() });
+    this.meta.halt = nextHalt(this.meta.halt, reasons, iso(this.d.now()));
+  }
+
   async launch(gh: Gh | null): Promise<Plan> {
     this.observeLaunches();
     const { plan, picks, rows, unknown, children } = this.plan();
     this.meta.lastPlan = plan;
     this.meta.counters = this.meta.counters ?? this.zero();
+    this.updateHalt(plan);
     if (!this.fresh()) {
       this.meta.lastError = { at: plan.at, what: "state not fresh: launch skipped" };
       this.saveMeta();
@@ -1482,6 +1493,47 @@ export class Engine {
     return sent ? "sent" : "skipped";
   }
 
+  // launch の停止が 30 分続いたら、PM agent に 1 回だけ知らせる (#2795)。新しい kind は作らず、digest (ref 0) を送る。
+  // 同じ停止区間では 1 回だけ (失敗した試行も数える)。上限は pmHistory (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 12 件) に従う。
+  // 同期が古いときも送る (止まったまま古くなる場合こそ知らせる必要があるため)。LIVE_DISPATCH のときだけ送り、dry-run は would に記録する。
+  // 降格中 (dispatch を止めている間) は送らず、区間の 1 回も使わずに保留する。解除の後に送る。
+  async haltNotify(gh: Gh | null): Promise<"sent" | "would" | "skipped"> {
+    const now = this.d.now();
+    const halt = this.meta.halt;
+    if (!halt || !haltNotifyDue(halt, now)) return "skipped";
+    const hist = this.pmHistory();
+    const within = (ms: number) => hist.filter((h) => now - h.at < ms);
+    if (within(PM_LIMITS.dupMs).some((h) => h.kind === DIGEST_KIND && h.ref === DIGEST_REF)) return "skipped";
+    if (within(PM_LIMITS.hourMs).length >= PM_LIMITS.hourMax) return "skipped";
+    const reason = halt.reasons[0] ?? "";
+    const live = this.dispatchLive() && !!gh;
+    const held = this.d.cfg.liveDispatch && !this.dispatchLive();
+    if (!held) this.meta.halt = { ...halt, notifiedAt: iso(now) };
+    this.meta.counters = this.meta.counters ?? this.zero();
+    hist.push({ kind: DIGEST_KIND, ref: DIGEST_REF, at: now });
+    if (!live) {
+      this.meta.counters.wouldDispatchPm = (this.meta.counters.wouldDispatchPm ?? 0) + 1;
+      this.d.store.put("meta", this.pmHistoryKey(), hist);
+      this.pushLog({ kind: "would-pm-dispatch", n: DIGEST_REF, note: `launch-halt ${reason}` });
+      this.saveMeta();
+      return "would";
+    }
+    let sent = true;
+    try {
+      await gh.dispatchPm(DIGEST_KIND, DIGEST_REF);
+    } catch (e) {
+      sent = false;
+      this.pushLog({ kind: "error", note: e instanceof GhError ? `oc-pm ${DIGEST_KIND} (launch-halt): ${e.message}` : `oc-pm ${DIGEST_KIND} (launch-halt): dispatch failed` });
+    }
+    this.d.store.put("meta", this.pmHistoryKey(), hist);
+    if (sent) {
+      this.meta.counters.pmDispatched = (this.meta.counters.pmDispatched ?? 0) + 1;
+      this.pushLog({ kind: "pm-dispatch", n: DIGEST_REF, note: `launch-halt ${reason}` });
+    }
+    this.saveMeta();
+    return sent ? "sent" : "skipped";
+  }
+
   // 失敗した webhook 配送の回収 (#2339)。GitHub は失敗した配送を自動で再送しないので、App の配送一覧 (JWT) から
   // status != OK のものを古い順に選ぶ。同じ guid に OK の配送が 1 つでもあれば回収済みとみなす。
   // POST は LIVE_REDELIVER=1 かつ rate-guard が無いときだけ。dry-run は guid ごとに 1 回だけ数える (counters.wouldRedeliver)。
@@ -1584,6 +1636,7 @@ export class Engine {
       }
       await this.watchdog(gh);
       await this.launch(gh);
+      await this.haltNotify(gh);
       await this.pmDispatch(gh);
       await this.autoClose(gh);
       await this.digest(gh);
@@ -1684,9 +1737,15 @@ export class Engine {
     // 24 時間前以前の点のうち最も新しいもの。無ければ (履歴が 24 時間分に満たない) null。
     let base: OpenSample | undefined;
     for (const h of this.d.store.get<OpenSample[]>("meta", "openHist") ?? []) if (h.at <= now - DAY_MS && (!base || h.at > base.at)) base = h;
+    // launch を止めている条件 (#2795)。止めていなければ launch_halted は null。since は保存した区間の起点 (無ければ今)。
+    const haltedReasons = haltReasons({ noImport: !!plan.blocked, stop: plan.stop, reviewOnly: plan.phase.review_only, stale: !this.fresh() });
+    const haltedSince = haltedReasons.length ? (this.meta.halt?.since ?? iso(now)) : undefined;
     return {
       // デプロイした commit (--var BUILD_COMMIT)。渡していなければ null。反映の確認に使う (README『再デプロイ』手順 5)。
       build: this.d.cfg.build,
+      // 止まっている理由 (先頭が主な理由) と止まり始めた時刻。15 分以上止まり、着手待ち (ready) と空き枠 (room) がある間は launch_halted_overdue が true。
+      launch_halted: haltedSince ? { reason: haltedReasons[0], since: haltedSince } : null,
+      launch_halted_overdue: haltOverdue(haltedSince, now, c("ready"), plan.room),
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
       mode: this.launchLive() && this.dispatchLive() ? "live" : this.launchLive() || this.dispatchLive() ? "partial" : "dry-run",
@@ -1715,7 +1774,7 @@ export class Engine {
       open_prs_excl_stuck: plan.open_prs_excl_stuck,
       stuck_prs: plan.stuck_prs,
       launch_stop: plan.stop ?? null,
-      // VM の状態を取り込む前は "no-import" (launch しない)。取り込んだ時刻は imported_at (#2343)。
+      // IMPORT_REQUIRED=1 のとき、VM の状態を取り込む前は "no-import" (launch しない)。取り込んだ時刻は imported_at (#2343)。
       launch_blocked: plan.blocked ?? null,
       imported_at: this.meta.importedAt ?? null,
       blocked: c("blocked"),

@@ -24,6 +24,7 @@ const seq = [
   ["mixer.trackCount", []],
   ["mixer.getTrackName", [0]],
   ["mixer.getTrackName", [1]],
+  ["mixer.getTrackName", [1, 16]],
   ["mixer.getTrackName", [126]],
   ["mixer.setTrackName", [1, "Bus A"]],
   ["mixer.getTrackName", [1]],
