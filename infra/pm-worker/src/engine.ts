@@ -378,6 +378,7 @@ export class Engine {
       botLogin: this.d.cfg.botLogin,
       pmLogins: this.pmLogins(),
       reviewerLogin: this.d.cfg.reviewerLogin,
+      markLogin: this.d.cfg.markLogin,
       repo: this.d.cfg.repo,
     });
     if (r.status === 202) this.meta.lastWebhookAt = this.d.now();
@@ -470,7 +471,7 @@ export class Engine {
   // 戻り値は、DO の内容が実際に変わった entity の数 (reconcile の食い違いの計数に使う)。
   private applyAll(event: (typeof WEBHOOK_EVENTS)[number], payload: unknown): number {
     if (event === "issue_comment") this.noteOc(payload);
-    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin);
+    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin, this.d.cfg.markLogin);
     if (next === this.s) return 0;
     const changed = countChanged(this.s, next);
     persistDiff(this.s, next, this.d.store);
@@ -644,10 +645,11 @@ export class Engine {
     const R = this.d.cfg.repo;
     let diff = 0;
     // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
+    // 停止印の作者 (markLogin) も同じ理由で含める。型 (user.type) は webhook 経路と同じ判定 (停止印は型 Bot を要る) のため残す (#2639)。
     // 人の /oc は本文で『着手であって応答ではない』と判定する (webhook.ts の answered) ので、/oc で始まる本文だけは残す。
-    const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
+    const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, this.d.cfg.markLogin, ...this.pmLogins()]);
     const keepBody = (c: any) => mine.has(c.user?.login) || /^\/oc\b/m.test(c.body ?? "");
-    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: keepBody(c) ? c.body : "" });
+    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login, type: c.user?.type }, author_association: c.author_association, body: keepBody(c) ? c.body : "" });
     const cs = this.note(
       "comments",
       await gh.list<any>(
