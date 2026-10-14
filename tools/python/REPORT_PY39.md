@@ -114,9 +114,9 @@
 ## 追加解析 (7 回目 run, #2548): setStepParameterByIndex の呼出し経路・status・副作用
 
 - 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (各 1 回・終了 0)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (実測 2.9 秒)。
-- 測定 commit: `1bb996f0` (origin/main 取り込み後の HEAD。コード変更なし・本 run は REPORT のみ)。
-- 差分 0 の証跡: `git diff 1bb996f0 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0` (0 行)。範囲に解析補助 `tools/python/analysis` (`pe_disasm.py` を含む) を入れている。
-- 差し戻し対応での再測定 (コード変更なし): 上の逆アセンブルを `0xd5cec0` (260 命令)・`0xd843d0` (160)・`0xd841e0` (40)・`0xd82c20` (130)・`0xd84290` (30) で再実行し、いずれも終了 0。下表の追記はこの結果による。
+- 測定 commit: `3bdaae7f` (origin/main 取り込みの merge commit。`analysis/flapi/pe_disasm.py` は `1bb996f0` から変更なし (`git diff 1bb996f0 HEAD -- tools/python/analysis/flapi/pe_disasm.py` の出力 0 行))。
+- 差分 0 の証跡: `git diff 3bdaae7f HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0` (0 行・測定 commit から後は REPORT と docs/DOC_MAP.md のみ変更)。範囲に解析補助 `tools/python/analysis` (`pe_disasm.py` を含む) を入れている。
+- 差し戻し対応での再測定 (測定 commit `3bdaae7f` で実行): `pe_disasm.py` の出力行数 (`wc -l`) は `0xd5cec0` 85 行・`0xd843d0` 153 行・`0xd841e0` 40 行・`0xd82c20` 130 行・`0xd84290` 30 行 (いずれも終了 0)。修正前の HEAD (`c1c73a65`・`pe_disasm.py` は同一) で取った `0xd5cec0`・`0xd843d0`・`0xd82c20` の出力と `cmp` で一致。下表の追記はこの結果による。
 
 ### 呼出し経路 (PE 実測)
 
