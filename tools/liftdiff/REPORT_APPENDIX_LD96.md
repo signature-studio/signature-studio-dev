@@ -32,7 +32,8 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 | H | G の前半 195 件 + 19 関数 | **1** | 18 |
 
 - run A の件数: 342 / 248 / 210 (REPORT_APPENDIX_LD58 §7 の shard 1 と一致)。
-- `wall` (実測): A 6m38.6s (`time` 出力)。B 25s (`done 25s`)。C・D・F・G・H は `--shards 1` の `[batch] done` 行を参照 (測定ログ `work/ld58/*.log`)。E は `work/ld58/others781_add19.log`。load は A 開始時点 (11:03) の `uptime` 0.94 のみ記録。
+- `wall` (実測): A 6m38.6s (`time` 出力)。B 25s (`done 25s`)。**C・D・E・F・G・H の wall は未記録** (`[batch] done` の値を本節に転記していない)。load は A 開始時点 (11:03) の `uptime` 0.94 のみ記録。
+- ログの所在: 生ログ `work/ld58/*.log` は gitignore 対象 (`**/work/`) のためローカル保存のみ。repo 外で再現不可。
 - 注: run E は 781 件 (run A から 19 関数を除いた順) の後ろに 19 関数を足したもの。run A と完全に同じ並びではない (19 関数が run A では途中に挟まる)。
 
 ## 3. 読み取り
@@ -51,6 +52,6 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| heap 残り (`ld_model_reset` の hw 範囲外) が原因かの確定 (case 後に heap 全域を pristine と比較する計測) | 件数 360/361 の揺れの説明 | 未起票 (本 PR 対象外・未実施)。下記の chunk 固定と合わせて #2258 の残作業 |
-| chunk 境界を固定した二分 (run H の 1 件の特定) | 揺れの個別特定 | 未起票 (#2258 の残作業) |
+| heap 残り (`ld_model_reset` の hw 範囲外) が原因かの確定 (case 後に heap 全域を pristine と比較する計測) | 件数 360/361 の揺れの説明 | #2258 (残作業) |
+| chunk 境界を固定した二分 (run H の 1 件の特定) | 揺れの個別特定 | #2258 (残作業) |
 | 受入 (b) の原因分類 | LD-96 の完了条件 | #2258 を `Refs` のまま残す |
