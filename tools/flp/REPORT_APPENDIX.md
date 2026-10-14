@@ -117,7 +117,7 @@
 - **未達**: 目標の **32-bit float** が出ない。`WAV bit depth`=2・3、`Export WAV`=2 でも 16-bit のまま。`/E`・`/O` を付けても WAV は出るが 16-bit、`/F` を付けると WAV は出ない。ビット深度を決める経路は未特定。
 - 再現の注意: `wine64 reg add` の直後に FL64.exe を起動すると rc 231 で即終了する。`wineserver -k` で止めると正常に戻る (`s2_render_probe.sh` に反映済み)。
 
-**差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff 8be0756f HEAD -- tools/flp/s1_g03_patch.py tools/flp/s2_render_probe.sh tools/flp/s1_wine_probe.sh tools/startup tools/assets` の出力は空 (0 行)。本節を含む REPORT_APPENDIX.md の commit だけが HEAD の差分。
+**差分の証跡** (`docs/WORKFLOW.md` §6): `git diff 8be0756f HEAD -- tools/flp/s1_g03_patch.py tools/flp/s1_wine_probe.sh` の出力は空 (0 行)。元の指定 (`tools/flp/s2_render_probe.sh`・`tools/startup`・`tools/assets` を含む) は HEAD では空ではない。前者は `0fb80be1` の WFBox 既定行 (§17.5)、後者は 8be0756f 以降に 8 commit の変更があるため。
 
 **未解決**
 
