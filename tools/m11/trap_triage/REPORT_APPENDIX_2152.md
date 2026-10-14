@@ -55,8 +55,10 @@ j=12 (0 始まりで 13 行目) は `dest=0x10a9e0b8 len=1`。`n>0` 経路で `f
 | watch OFF | `watch_2118.sh off` | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 72 s | 0.83 |
 | watch ON | `watch_2118.sh on` | 0,1,158 = ok/ok/ok (clean)・`[rw]` 738 | 66 s | 0.92 |
 | watch ON 再実行 | 同上 | `[rw]` 集合は前回と一致 | 67 s | 0.77 |
-| dest ON | `M11_PRINT_DEST_2118=1` | 0,1,158 = ok/ok/ok・dest 28 件 | 84 s | — |
-| dest OFF | 同上 (OFF) | 0,1,158 = ok/ok/ok・rw 集合は ON と一致 | 85 s | 0.91 |
+| dest ON | `M11_PRINT_DEST_2118=1` (`INSTR=0` のため `[rw]` は出ない) | 0,1,158 = ok/ok/ok・dest 28 件 | 84 s | — |
+| dest OFF | 同上 (OFF) | 0,1,158 = ok/ok/ok・`[d413060]` は出ない (OFF 側の dest 値は未記録・§6) | 85 s | 0.91 |
+
+dest 段で確認したのは `[d413060]` の dest 値 (ON のみ) と ok/trap だけ。dest 段の build は `[rw]` を出さないので、rw 集合の一致はこの段からは言えない (rw 集合の根拠は watch build の表 §2 のみ)。
 | 既定 survey | `env -u M11_INSTR_413060 node m11_survey.mjs` | ok 870 / trap 24 / miss 47 / noproc 1 / units 942 | 16.0 s | 0.60 |
 
 既定 survey の 870/24 は REPORT_944 §6.1 (870/24) と一致。既定 build の `boot_final3.ll` md5 は `baa100ff37a790dc1103c26a2e648d12` (§10 と一致)。
