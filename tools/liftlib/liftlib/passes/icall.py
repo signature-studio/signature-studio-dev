@@ -66,7 +66,7 @@ def blk_global_text(text, blk):
         return m.group(0)
     text = re.sub(r"inttoptr i64 (\d+) to ptr", sub, text)
     if n[0]:
-        decl = "%s = internal global [%d x i8] zeroinitializer, align 16\n\n" % (BLK_GLOBAL, BLK_GLOBAL_SIZE)
+        decl = "%s = external global [%d x i8], align 16\n\n" % (BLK_GLOBAL, BLK_GLOBAL_SIZE)
         m = re.search(r"^(define|declare) ", text, flags=re.M)
         text = text[:m.start()] + decl + text[m.start():] if m else text + "\n" + decl
     return text, n[0]
