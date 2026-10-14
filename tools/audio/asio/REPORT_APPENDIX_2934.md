@@ -23,6 +23,8 @@
 
 DirectSound (`flds.c`)・WASAPI (`flwasapi.c`) はフラグを渡さないので挙動は変わらない。
 
+floor は動的調整の下限にもなる。`flasio.c` の thread_fn は `Tn = max(need, T0) + esc` (T0 = open 時の T。floor 後の値) で T を決めるため、増分は初期だけでなくセッション中ずっと残る。run 中に burst が縮んでも T は T0 を下回らない。
+
 増分の式 (式からの計算。測定値とは分けて読む):
 
 - 増分 (frames) = `max(0, D − max(depth 引数, need)) × B`。D = ceil(1536 / B)。
@@ -61,10 +63,13 @@ DirectSound (`flds.c`)・WASAPI (`flwasapi.c`) はフラグを渡さないので
 - 判断者は依頼者。reviewer・PM は代行しない。`needs-user-input` は #2934 に付いている (質問文は #2934 の本文先頭)。
 - 採用 = 本 PR を merge。不採用 = 本 PR を閉じる (または `flasio.c` の `FLA_F_T_FLOOR` 指定 1 行を戻す)。
 - 既定案 (PM): 変えない (不採用で保留)。merge せず・閉じず open のまま残す。
-- 判断材料 (増分の最大は depth 引数 2 の場合。式からの計算。§2):
-  - B=128: 最大 +1152 frames (24.0 ms、need 3)。測定した増分は +128 (基点 T 1408 → PR T 1536、§6-5)。
-  - B=256: 最大 +1024 frames (21.3 ms、need 2)。測定した増分は +512 (depth 4 → 6)。
-  - B=512: 最大 +512 frames (10.7 ms)。B=1024: 0。
+- 判断材料 (depth 引数 2 の場合。増分は式からの計算。§2):
+  - 典型値 (burst 512 と 1024 の 2 条件。REPORT_AU2_CI.md では 48 kHz の burst は 512f が大半):
+    - B=128: burst 512 (need 6) で +768 frames (16.0 ms)、burst 1024 (need 11) で +128 frames (2.7 ms)。
+    - B=256: burst 512 (need 4) で +512 frames (10.7 ms)、burst 1024 (need 6) で 0。
+  - 最大: B=128 +1152 frames (24.0 ms、need 3)、B=256 +1024 frames (21.3 ms、need 2)。どちらも burst 128 の条件で、記録上の典型ではない。B=512 は burst 128〜384 の条件でのみ +512 (need 2)、それ以上は 0。B=1024: 常に 0。
+  - 測定した増分: B=256 は +512 (depth 4 → 6、§3-1)。B=128 は +128 (基点 T 1408 → PR T 1536、§6-5)。
+- **open 時 depth は run ごとに変わる (未確定の点あり)**: 基点 B=128 の T 1408 は stats から直接読める (`latency_changes` 0 のため T は run 中に変わらず、T = open 時の depth × B = 11 × 128)。ただし open 時の burst 値 (`fla_cmd` OPEN の `res[0]`) は未記録のため、「depth 11 = burst 1024」は式からの解釈で未確認。run 中の `burst_obs` (512) は open 時の値ではない。同じ B=128 でも、同日の main 実行 (`tools/audio/results/results.json`・2026-10-13) では `asio_ramp_b128_d2` が depth 6 (T 768)、`asio_loop_noise_b128` が depth 11 (T 1408) で、どちらも `burst_obs` 512・`latency_changes` 0。したがって B=128 の増分は +128 (depth 11 の run) 〜 +768 (depth 6 の run) の幅で、run ごとに決まる。open 時 burst を 1 回ログに出せば確定できる (未実施)。
 - B=128 の FAIL 切り分け (§5) が出るまで、B=128 を含めた影響の判断は保留になる。
 
 ## 5. 未解決
@@ -72,7 +77,7 @@ DirectSound (`flds.c`)・WASAPI (`flwasapi.c`) はフラグを渡さないので
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 増える遅延 (lat_out) の採否 (U1)。§4 | merge の可否。既定案は不採用で保留 | 依頼者判断 U1 (#2934 needs-user-input) |
-| B=128 の `asio_ramp_b128_d2` FAIL の、本 PR 由来か否か。PR HEAD と同じコードで 7 回中 2 回 FAIL (underrun 1)、基点 `3d37a190` は 5 回 0 FAIL (§6-5)。母数が少なく有意差は言えず、本 PR 由来を否定できない | 親 e2e の受入条件 3 (rc 0) は未達のまま。PR は B=128 の初期 T を 1408 → 1536 に変える | #187 |
+| B=128 の `asio_ramp_b128_d2` FAIL の、本 PR 由来か否か。PR HEAD と同じコードで 7 回中 2 回 FAIL (underrun 1)、基点 `3d37a190` は 5 回 0 FAIL (§6-5)。母数が少なく有意差は言えず、本 PR 由来を否定できない。main 側にも同シナリオの「1 回目 FAIL・再実行 PASS」の記録が複数ある: `tools/audio/REPORT_DS.md` (1 回目 FAIL・再実行 PASS・一過性の負荷揺れ扱い)、`tools/audio/REPORT_AU5.md` (`b66c676` 回 2 FAIL・回 2' 単独 PASS)、`tools/audio/REPORT_AU2_CI.md` (quick FAIL・負荷起因の疑い、未確認)。原因は main 側でも未切り分け | 親 e2e の受入条件 3 (rc 0) は未達のまま。PR は B=128 の初期 T を 1408 → 1536 に変える | #187 |
 | B=128 に下限を適用するか (範囲の選択。B≥256 に限れば B=128 の経路は基点と同じ)。本付録では変更していない | B=128 の FAIL 切り分けと、§4 の増分 (最大 +1152) に効く | PM (範囲の判断) |
 | producer が約 19 ms 書き込みを止める直接経路は未特定 (#2777 §3-1 と同じ) | 本対処は初期 T の固定で症状を抑えるもので、原因の特定ではない | #2777 |
 | B=512・1024 の実測と実オーディオデバイスでの測定 | §2 の増分は式からの計算のみ | #2777 |
@@ -95,7 +100,7 @@ main `3d37a190` を取り込んだ。競合は `docs/DOC_MAP.md` と `tools/audi
 ### 6-3. 測定 commit と差分
 
 - 測定 commit: `69280d57` (コードを変えた最後の commit。main 取り込みの merge)。
-- `git diff 69280d57 HEAD -- tools/audio/src tools/audio/asio` の出力: 空 (HEAD は本付録の追記 commit のみ)。
+- `git diff 69280d57 HEAD -- tools/audio/src tools/audio/asio ':!*.md'` の出力: 空。HEAD の後続 commit は付録と DOC_MAP の md のみで、`:!*.md` で除外しても差分は 0 行 (md を除かないと付録の追記が出るため、除外を付ける)。
 
 ### 6-4. 判定
 
@@ -116,6 +121,6 @@ main `3d37a190` を取り込んだ。競合は `docs/DOC_MAP.md` と `tools/audi
 | 基点 r1〜r5 | `3d37a190` | PASS ×5 | 0 | 0 | 0/192896 | 1408 (3457) | 0 | 1024 |
 
 - PR 側の同一コードの記録: 69280d57 の親 e2e 1 回目 FAIL (§6-1。underrun 1・silence 6656) と、その単独再実行 PASS (§6-1)。ad8c1353 の 5 回 (上表) と合わせて、PR 側は 7 回中 2 回 FAIL。
-- 基点 T 1408 は depth 11 (`max(depth 引数 2, need)` の結果と解釈)。ただしログ表示の `burst=512` とは対応を確認していない。
+- 基点 T 1408 は depth 11。stats の T と `latency_changes` 0 から、open 時の depth × B = 1408 と読める (run 中に T は変わっていない)。open 時の burst 値 (`res[0]`) は未記録のため、depth 11 ↔ burst 1024 (式からの逆算) は未確認。ログの `burst=512` は run 中の `burst_obs` で、open 時の値ではない (§4 の run ごとの幅を参照)。
 - 判定: 基点 0/5 と PR 2/7 は母数が少なく有意差は言えない。FAIL run の機構 (ring の残量が 0 まで枯渇・lat_changes が 2) は未特定。
 - **結論: 本 PR 由来かは切り分けられていない**。PR の変更で B=128 の初期 T が 1408 → 1536 になり、FAIL は変更後の経路で起きている。本 PR 由来を否定できない。親 e2e の受入条件 (rc 0) は未達のまま (§5)。
