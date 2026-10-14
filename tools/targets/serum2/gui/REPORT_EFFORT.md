@@ -225,3 +225,21 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | canvas 側 font 7・graphicsdevice 31・frame 25・factory 20 (計 83 関数) の wasm 実装 | 描画の閉包が完結しない | 子 issue (親 #2064) |
+
+## 12. 2026-10-14 run (#2107 / SR-39): canvas platform の font・graphicsdevice (wasm)
+
+- 範囲: §6 の純粋仮想のうち、font 7 関数 (`iplatformfont.h`) と graphicsdevice 31 関数 (`iplatformgraphicsdevice.h`) の wasm 実装。計 38 関数。人日は出さない (§7)。
+- 実装: `gui/canvas/canvas_font.{h,cpp}` (`IPlatformFont` 1 + `IFontPainter` 1)、`gui/canvas/canvas_graphicsdevice.{h,cpp}` (factory 1・device 1・context 1 が `IPlatformGraphicsDeviceContextBitmapExt` を兼ねる)。
+- 関数数の照合: `grep -cE '=\s*0\s*;'` は font 7 (`iplatformfont.h`)・graphicsdevice 31 (`iplatformgraphicsdevice.h`)。新規 2 ファイルの `override` は font 7・graphicsdevice 31 で、純粋仮想と 1 対 1 に対応する。
+- 意味論は PoC の最小: 描画命令 (`draw*` `fill*` `clearRect`) はラスタライザが無いため `false` を返して描画しない。`setXxx` は値だけ保持。文字の描画と幅は空 (幅 0)。メトリクス (ascent 等) は upstream の「未対応」値 `-1`。描画の確認は #2065 (SR-36) の範囲。
+- 検証 (実測、load は各 run 前後で 0.47 → 0.47):
+  - `gui/canvas/check_canvas_syntax.sh` (em++ `-fsyntax-only`、`-D__linux__` 補正なし): `canvas_bitmap.cpp` rc=0 errors=0、`canvas_graphicspath.cpp` rc=0 errors=0、`canvas_font.cpp` rc=0 errors=0、`canvas_graphicsdevice.cpp` rc=0 errors=0。所要 2.14 s real。
+  - `gui/check_wasm_syntax.sh` (seed 6): rc=0 errors=0。
+  - 具象性の確認 (`work/concrete_check.cpp`、gitignore・生成物): 新規 5 クラス (`CanvasFontPainter` `CanvasFont` `CanvasGraphicsDeviceFactory` `CanvasGraphicsDevice` `CanvasGraphicsDeviceContext`) が `static_assert(!std::is_abstract)` を満たし、`CanvasFont` の生成と `getPainter()` がコンパイルできる。rc=0。
+- 修正した既存スクリプト: `check_canvas_syntax.sh` と `check_wasm_syntax.sh` の PATH が `work/emsdk/emsdk/upstream` を指していた。`toolchain-emsdk` の実配置は `work/emsdk/upstream/emscripten` (`em++` 6.0.12 で確認)。旧パスでは `em++` が見つからず rc=127 になり、0 error に見えていた。修正後に実行して rc=0 を確認した。
+- 未検証: リンク・実行・描画 (閉包が実際に要求する関数はリンク時に確定させる、§6 の注記どおり。リンクは本 run で行っていない)。
+
+### 12-1. 測定 commit と差分
+
+- 測定 commit: `22e33688` (コードを変えた最後の commit。canvas 4 ファイル・2 スクリプト)。
+- `git diff 22e33688 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/check_wasm_syntax.sh` の出力: 空 (差分 0)。本節は REPORT のみの commit のため、測定対象のコードは変えない。
