@@ -229,7 +229,15 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 - 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
 
-## 16. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
+## 17. /oc 投稿の観測のネガコン (#2342・#2473 の vitest 化)
+
+- 測定 commit: `dd9931bf` (`test/launchobs.test.ts` を `test/unit/launchobs.test.ts` に移して vitest 化。README の 1 行)。worktree で `pnpm install --frozen-lockfile --config.minimum-release-age=0` (診断用。既定設定は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`)。
+- 結論: `test:unit` (vitest) **19 件 PASS** (うち観測 9 件)・2.1 s。`test:workers` **3 件 PASS**・1.5 s。`npm test` (node:test) **204 件 PASS / 0 FAIL**・17.7 s。load 0.33 (Node 22.23.3)。
+- ネガコン: `src/launchobs.ts` を 1 行ずつ壊して FAIL を確認。(b) の題名一致を外す → (b) と純関数の 2 件 FAIL。5 分の境界 `>` を `>=` → (a) と純関数の 2 件 FAIL。元に戻した後 `git diff -- src` は 0 行。
+- 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。
+
+## 18. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
 - 測定 commit `55b21686` (コードを変えた最後の commit)、測定時刻 2026-10-14T16:14Z。偽の opencode・間隔 1 秒・`timeout 4`: 文面ファイルあり 送信 3 回 (監査 3・既定 0)、未設定 送信 3 回 (既定 3)、存在しない・空・空白のみ・PM_SESSION_ID 無しは終了 1・送信 0。初回送信は間隔 2 秒で 2.01 秒後。`bash tools/pm/test_pm_wake.sh` 20 passed。
 - 差分 (測定 commit から HEAD まで・コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は空 (差分 0)。
 - main 取り込み後の再測定 (main `eb9fd703` を merge commit `a7d33197` で取り込み。自動 merge で競合なし): 上と同じ 7 シナリオを fake opencode で再実行し、結果は上の数値と一致。`git diff 83f93e44 HEAD -- tools/pm docs/pm` の出力は空 (取り込みで pm 配下は変わらない)。`bash tools/pm/test_pm_wake.sh` 20 passed (同 merge)。
