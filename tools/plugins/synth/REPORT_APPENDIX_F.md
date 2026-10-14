@@ -1,4 +1,4 @@
-> 本書は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) の §F を分割移動したもの (250 行上限のため。内容は無変更で移動のみ)。
+> 本書は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) の §F を分割移動したもの (250 行上限のため。移動に加え、repo 外パスの置換 (素材行) と存在しない `--stat` 添付文の削除のみ行った)。
 > 測定の結論は [REPORT.md](REPORT.md) を見る。他の節 (§A〜§E) は REPORT_APPENDIX.md。
 
 ## F. #1536: PLUG_NO_STATIC_DETECT の既定化 (1)
