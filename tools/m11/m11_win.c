@@ -126,18 +126,19 @@ unsigned MultiByteToWideChar(unsigned cp, unsigned fl, const char* s, int ns, un
 int IsValidLocale(unsigned lcid, unsigned fl) { (void)lcid; (void)fl; return 1; }
 
 /* EnumDisplayMonitors / GetMonitorInfoW (#1096 仮実装): monitor 1 件 (MON=0x10001, 1920x1080 primary) を
- * callback (lpfnEnum = IR 上の lift 済 function_85df70) に 1 回渡す。callback が GetMonitorInfoW で情報を取る。 */
+ * callback (lpfnEnum = IR 上の lift 済 function_85df70) に 1 回渡す。callback が GetMonitorInfoW で情報を取る。
+ * weak: GUI 側の本実装があれば優先される (#577)。 */
 #define M11_MON 0x10001u
 extern uint64_t m11_icall(uint64_t target, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, uint64_t a5, uint64_t a6, uint64_t a7);
 /* 注意: dwData は本来 LPARAM (64bit) だが int で受けて (uint32_t) で 0 拡張している。上位 32bit は失われる。
  * 上位 32bit に値が来る呼出しで callback が参照するなら誤る (未検証)。直すと測定が変わるため、直す場合は再測定が要る。 */
-int EnumDisplayMonitors(void* hdc, void* lprc, void* lpfn, int dwData) {
+__attribute__((weak)) int EnumDisplayMonitors(void* hdc, void* lprc, void* lpfn, int dwData) {
     (void)lprc;
     if (!lpfn) return 0;
     m11_icall((uint64_t)(uintptr_t)lpfn, (uint64_t)M11_MON, (uint64_t)(uintptr_t)hdc, 0, (uint64_t)(uint32_t)dwData, 0, 0, 0, 0);
     return 1;
 }
-int GetMonitorInfoW(long long hMon, void* lpmi) {
+__attribute__((weak)) int GetMonitorInfoW(long long hMon, void* lpmi) {
     if (!lpmi || (unsigned)hMon != M11_MON) return 0;
     unsigned* p = (unsigned*)lpmi;
     p[0] = 40;

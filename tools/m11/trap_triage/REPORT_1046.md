@@ -105,3 +105,13 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 1. `0x10a9f910` に `0x100000003` を書いた store の特定 (`watch_store_682` 方式で `addr == 0x10a9f910` の書込み元 IR site を取る)。
 2. その store が D17 (qword → i32 縮退) か別類型かの判定。
 3. `4473f0` の `0x92492493` 配列長計算は未検証 (受入 2)。
+
+## 11. #1288 再着手 run (HEAD `243c9060` 起点、コード変更なし)
+
+- 素材: `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開 (`work-m11` は `tools/m11/work/`、`work-liftdiff` は `tools/liftdiff/work/`)。
+- 再現: `m11_gen_ir2.sh` rc 0 (27.8 s、490,693 行) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0 (6.8 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2・§9・§10 と一致。
+- 計装 (一時、`tools/m11/work/probe1288/` のみ・commit なし): `boot_final3.ll` の全 store (54,041 site) に `m11_sw` を入れ、`addr` が `0x10a9f910` の 8B を覆う書込みを出した。
+  - 結果は**採用できない**: 計装版の survey は `ok 872 / oob 14` と本番 (`870 / 16`) から変わった。`[sw]` 行は 3,204,589 件で、unit 境界が無いため unit 492 の範囲に絞れていない。
+  - 計装を外して再 build し、`ok 870 / oob 16` に戻ることを確認 (作業ツリーに差分なし)。
+- 受入の判定 (本 run): 2 (`0x92492493` 配列長) は未着手。3 (DEFECTS 類型) は §10 の D17 同型の疑いのまま未確定。4 (修復後の kind) は修復を行っていないため未達。
+- 未解決 (起票先 #1288): (a) unit 492 の範囲に限定した `0x10a9f910` 書込みの store 特定 (unit 境界の出力を計装側に入れる必要あり)、(b) D17 か別類型かの判定、(c) `4473f0` `0x92492493` の検証。

@@ -57,6 +57,12 @@ if [ "${PLUG_ICALL:-0}" = "1" ]; then
 fi
 python3 "$P/ir_normalize.py" "$DRC_LL" "$OUT/$NAME.norm0.ll"
 python3 "$P/ir5_patch.py" "$OUT/$NAME.norm0.ll" "$OUT/$NAME.lift.ll" --report "$OUT/$NAME.ir5.json" 2>&1 | tail -3
+# opt-in (PLUG_CANON_ALLOCA=1; p0c_e2e.sh が立てる): RetDec の alloca 並び非決定を正規化 (LIFTLIB-11 / #887)。
+# 既定 0 のため他の lift の出力は変わらない。uselistorder は ir5_patch (A7) で除去済みの後に掛ける。
+if [ "${PLUG_CANON_ALLOCA:-0}" = "1" ]; then
+  python3 "$P/canon_alloca.py" "$OUT/$NAME.lift.ll" "$OUT/$NAME.ca.ll"
+  mv "$OUT/$NAME.ca.ll" "$OUT/$NAME.lift.ll"
+fi
 python3 "$P/fix_regparam_alloca.py" "$OUT/$NAME.lift.ll" "$OUT/$NAME.rp.ll" --report "$OUT/$NAME.rp.json"
 python3 "$P/fix_asm_stores.py" "$OUT/$NAME.rp.ll" "$OUT/$NAME.st.ll"
 # opt-in: 差分試験で検出した RetDec or.cond XNOR 化の修復 (PLUG_ORCOND_FUNCS="function_5dee90 ...")
