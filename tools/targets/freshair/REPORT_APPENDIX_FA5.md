@@ -182,9 +182,11 @@
 | RVA テーブルと判定された組 | **0** |
 | 整数定数と判定された組 | 72 (指す先の 8 B: 一致 0・不一致 72) |
 
-- 感度の確認 (陽性対照・同じ分類器): KH の `.rdata` を 32 B 境界で走査すると、`run = 0` 599,263 ブロック・`run = 1` 49,084・`run >= 2` 33,479 ブロック。つまり分類器は RVA 列を検出できる (0 件は検出不能の結果ではない)。
-  - 再現: `python3 ks_rdata_rva_table.py --sensitivity <HeartCore.core_64>` (`ks_rdata_rva_table.py` の `sensitivity()`。`rva_run` と同じ判定で `.rdata` を 32 B 境界ごとに 3 区分する)。素材は `plugins-kilohearts` (`HeartCore.core_64`)。
-  - 注記: 上記 3 区分の数値は測定 commit `590206da` の実測値。`--sensitivity` は本 commit で追加したため、KH 素材での HEAD 再実行はこの run では未実施 (`plugins-kilohearts` が `$ARTIFACTS_DIR` に無い)。fl-win64 の exe での動作確認のみ (`blocks` 196 ブロック・EXIT=0)。
+- 感度の確認 (陽性対照・同じ分類器): HEAD (`fa810810`) の `--sensitivity` を fl-win64 の installer exe (`flstudio_win64_26.1.7.5653.exe`、`$ARTIFACTS_DIR/fl-win64.tar.zst` から展開) に対して実行した実出力:
+  `{"blocks": 196, "path": "flstudio_win64_26.1.7.5653.exe", "run0": 148, "run1": 7, "run>=2": 41}` (EXIT=0、0.26 s real、load 0.87)。`run>=2` が 0 でないので、分類器は RVA 列を検出できる (0 件は検出不能の結果ではない)。
+  - 再現: `python3 ks_rdata_rva_table.py --sensitivity <PE>` (`sensitivity()` は `rva_run` と同じ判定で `.rdata` を 32 B 境界ごとに 3 区分する)。
+  - 注記: この陽性対照は installer exe の `.rdata` (196 ブロック) に対するもので、plugin の `HeartCore.core_64` ではない。対象が小さいため検出力の上限の目安にはならない。
+  - 未再現: 測定 commit `590206da` には `sensitivity()` が無く、その時点で KH `.rdata` を 3 区分した手段は記録されていない。過去の数値 (`run = 0` 599,263・`run = 1` 49,084・`run >= 2` 33,479 ブロック) は出所不明の ad hoc 計測として扱い、HEAD で再現していない (`plugins-kilohearts` が `$ARTIFACTS_DIR` に無い)。判定の根拠には用いない。
 - 関数別 (value 17 件): `rva_pair` を持つ関数は 7 件 (`0x18100ca28` 15・`0x18100cc50` 12・`0x18103d218` 23・`0x18103d47c` 12・`0x180f9e540` 2・`0x18105aec8` 4・`0x18105bb90` 4 の合計 72)。残り 10 件は `rva_pair` が 0。
 - 併せて §A5-2 の語単位結果と突き合わせると、72 組の SC 側 16 B は全て KH の `.rdata` 内に存在しない (`rva_off_absent` 72)。
 
