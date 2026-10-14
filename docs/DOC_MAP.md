@@ -384,6 +384,7 @@
 | `tools/audio/REPORT_AU10.md` | ~215 | AU-10 (#191) 30 分ソーク (`--soak30`) の検証全文 (REPORT.md §16 から分割)。§16.5〜§16.7 は `REPORT_APPENDIX_1570.md` に分割移動 |
 | `tools/audio/REPORT_APPENDIX_1570.md` | ~63 | AU-21 (#1570) 切り分け 1〜3 (REPORT_AU10.md §16.5〜§16.7) の全文 (250 行上限のため分割移動) |
 | `tools/audio/REPORT_AU6.md` | ~38 | AU-6 (#190) 遅延ポリシー: T の減衰の全文 (REPORT.md §17 から分割)。減衰テスト・quick 全体の実測値の正本 (§2) |
+| `tools/audio/REPORT_APPENDIX_3193.md` | ~70 | AU-35 (#3193) Safari の経路: safaridriver (WebDriver classic) の harness 設計、macOS の既定出力 (BlackHole 2ch) の判定、BiDi 対応の確認手順 (未確定)、mock と Chrome の回帰検証、macOS 実測の未解決 (子 AU-36)。要約は REPORT_AU2_CI.md §10 |
 | `tools/audio/REPORT_AU2_CI.md` | ~195 | AU-2 (#187) CI 代理指標: Chrome 行列 (2 回目 run・null-sink 接続確認済み・NC・再採取 n=1 の FAIL 1 件・§8 の clock_jump 差分)、Firefox 行列 (WebDriver BiDi, §9・AU-23 #2540)、未解決 (§4・§6)。1 回目 run の記録は §1 (§5 で解消)。quick ベースライン 43/44。実機分は [AU-22] (#2366) |
 | `tools/audio/REPORT_APPENDIX_863.md` | ~20 | AU-15 (#863) 現 HEAD (`2f235a0a`) での再試行 15 run 全 PASS の全文 (REPORT.md §20 から分割移動。250 行上限のため)。§19 (旧 HEAD の失敗 1 件) は REPORT.md 本体 |
 | `tools/audio/asio/REPORT.md` | ~200 | IASIO COM アダプタ + 120s soak |

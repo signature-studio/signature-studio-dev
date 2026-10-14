@@ -154,6 +154,7 @@
 | ~~30 分ソーク (null-sink, 48k B=256)~~ | ~~10 分 PASS のみ~~ → 解消 (§5-2 の 30 分 PASS) | — |
 | P2 burst の p99 | worklet が最大値しか公開しない。分布は未計測 | [AU-30] #3151 (worklet 拡張が要る) |
 | Windows / macOS runner (任意・受入 4) の P1〜P4 の実測 | workflow は差分化のみ (§10。適用も初回 dispatch も未実施)。Windows / macOS の値は無い | [AU-32] #3164 (本 PR で close。適用は PM が PR 本文の差分で行う) |
+| Safari の P1〜P4 の実測と WebDriver BiDi 対応 | 経路は追加済み (§10)。macOS 実測と BiDi 判定は未実施 | [AU-36] (子 #3193) |
 | `asio_ramp_b128_d2` quick FAIL (§2) | 本 run では再実行していない。原因未切り分け | #187 |
 | fake の `asio_sine_b256_d2` の underrun 1 (再採取 n=1 で FAIL, §5-4) | 行列の再現性が未確定。原因未切り分け (`asio_ramp_b128_d2` と同種の疑い) | #187 (測定の追跡) |
 
@@ -235,4 +236,5 @@
 - **仮想オーディオ**: Windows は VB-CABLE (choco パッケージ `vb-cable` の存在を確認)、macOS は BlackHole 2ch (cask `blackhole-2ch` の存在を確認)。cask の表示は「インストール後に再起動が必要」。runner は再起動できないため、`coreaudiod` の再起動で足りるかは初回 dispatch で確かめる。
 - **検証 (ubuntu 上)**: `actionlint` (`uvx --from actionlint-py actionlint tools/audio/ci/audio-matrix.yaml`) は rc 0。`au2_summary.mjs` は、既存の `results/au2` と `results/au2_recheck` の出力が旧版と行単位で一致 (diff 0 行)。`<os>-latest_<browser>_r<rep>.json` の名前も読める (一時コピーで確認)。
 - **未検証 (範囲外)**: Windows / macOS での実行そのもの、仮想デバイスの導入と既定出力への切替、Edge の `CHROME` 指定。Safari は未対応 (ハーネスは Chrome CDP のみ)。Firefox は `au2.mjs`・`bidi.mjs` が pactl に依存するため、この行列には流用しない。
-- **P1〜P4 の値**: 未測定。初回の dispatch 結果はこの節に記録する (記録は PM)。
+- **P1〜P4 の値**: 未測定 (Windows・macOS とも)。初回の dispatch 結果はこの節に記録する (記録は PM)。
+- **Safari (AU-35 #3193)**: `harness/safari.mjs` (safaridriver の WebDriver classic) と `run.mjs --browser safari` を追加した。Safari の P1〜P4 は未測定。WebDriver BiDi 対応は未確定。詳細・検証・未解決は `REPORT_APPENDIX_3193.md` (正本)。Safari 行の yaml は草案 (未適用)。
