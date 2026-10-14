@@ -186,30 +186,33 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 - NC1 (差分検査): `host/fl_mock.mjs` の `playlist.muteTrackLock` を `arity(a, 1, 1)` に戻すと、`tests/playlist_diff.mjs` は `playlist 差分 12 件` で FAIL (AssertionError)。元に戻すと PASS (calls 23・diffs 0)。
 - 製品 KPI: 起動・GUI・ウィンドウに関わらないため、KPI の前後は書かない。
 
-## 9. main 取り込み (`f0c00334`) 後の再測定 (測定 commit `c46fdf72`)
+## 9. main 取り込み後の再測定 (測定 commit `0e42e1ea`)
 
-- 取り込み: `origin/main` (`f0c00334`) を PR ブランチへ merge (merge commit `c46fdf72`)。衝突は `tests/provider_check.mjs` の 1 箇所だけ。解消: main 側の `pe100` (`channels.getStepParam`・`channels.getCurrentStepParam`) を残し、本 PR の `pe102` (`playlist.muteTrackLock`) を併記。件数は main の `impl 86・unimpl 349` に muteTrackLock の +1 で `impl 87・unimpl 348` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`flapi_table.json`・`flapi_table.py`・`fl_table.c` は自動マージで衝突なし (両側の変更が残ることを diff で確認)。
-- 測定 commit: `c46fdf72` (コードを変えた最後の commit)。`git diff c46fdf72 HEAD -- tools/python ':!tools/python/REPORT_PY102.md'` は 0 行 (本節の追記だけが差分)。main に対する PR の差分は従来どおり 10 ファイル (`git diff --stat origin/main c46fdf72`: 348 insertions(+), 11 deletions(-))。
-- 検証 (`c46fdf72` で実行)。emsdk は上流 `emsdk install 6.0.12` の導入先を [EMSDK] の既定位置へ symlink して使った (リポジトリ外。`build_cpython_wasm.sh` が既定位置を直書きするため)。素材は `fl-win64` の 5 block を `FL_WIN64_DIR` 配下の `extracted/` へ展開 (2.932 s)。`fetch_inputs.sh` で `work/` を作成。
+- 取り込み (2 回)。(1) `origin/main` (`f0c00334`) を merge (`c46fdf72`)。(2) その後 `origin/main` が `875eba29` へ進んだため、再度 merge (`0e42e1ea`)。どちらも競合は `tests/provider_check.mjs` の 1 箇所だけ。
+  - (1): main の `pe100` (`channels.getStepParam`・`channels.getCurrentStepParam`) と本 PR の `pe102` (`playlist.muteTrackLock`) を両方の集合に入れた。件数は main の `impl 86・unimpl 349` に +1 で `impl 87・unimpl 348`。
+  - (2): main の `pe119` (PY-119・6 関数) と本 PR の `pe102` を両方の集合に入れた。件数は main の `impl 92・unimpl 343` に +1 で `impl 93・unimpl 342` (合計 435 は不変)。
+  - `fl_engine.c`・`fl_mock.mjs`・`flapi_table.json`・`flapi_table.py`・`fl_table.c` は自動マージで衝突なし (両側の変更が残ることを diff で確認)。
+- 測定 commit: `0e42e1ea` (コードを変えた最後の commit)。`git diff 0e42e1ea HEAD -- tools/python ':!tools/python/REPORT_PY102.md'` は 0 行 (本節の追記だけが差分)。
+- CPython wasm は `c46fdf72` で作成 (exit 0・4m30.556s)。`c46fdf72` から `0e42e1ea` までに `build_cpython_wasm.sh`・`build_flpy.sh`・`src/`・`analysis/flapi_table.py` は変わっていない (`git diff --stat c46fdf72 0e42e1ea -- <同範囲>` は 0 件)。そのため出力 (`work/`、gitignore) を流用した。
+- 検証 (`0e42e1ea`)。emsdk は上流 `emsdk install 6.0.12` を [EMSDK] の既定位置へ symlink して使った (リポジトリ外。`build_cpython_wasm.sh` が既定位置を直書きするため)。素材は `fl-win64` の 5 block を `FL_WIN64_DIR` 配下の `extracted/` へ展開 (2.932 s)。`fetch_inputs.sh` で `work/` を作成。
 
 | 検証 | 実行 | 結果 | 所要 |
 |---|---|---|---|
-| CPython wasm | `bash build_cpython_wasm.sh` | exit 0 | 4m30.556s |
-| provider wasm | `EMSDK_ENV=… bash provider/build.sh` | flprov.wasm 58,029 B。fl_table.c 435 関数・ハンドラ 87 | - |
-| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… EMSDK_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 (`git status` が空) | 7.262 s |
-| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 87・unimplemented 348・mcp_static 60・PASS | 0.385 s |
-| playlist 差分 | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段・PASS | 0.064 s |
-| mixer 差分 | `node tests/mixer_diff.mjs` | calls 57・diffs 0・PASS | 0.088 s |
-| channels 差分 | `node tests/channels_diff.mjs` | calls 161・diffs 0・PASS (main の取り込みで件数増) | 0.084 s |
-| device 差分 | `node tests/device_diff.mjs` | calls 8・diffs 0 (rejects 4・midi_out 5)・PASS | 0.084 s |
-| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425 | 1.813 s |
-| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | 1.632 s |
-| 表の再生成・ネガコン | `FL_WIN64_DIR=… bash tests/flapi_table_check.sh` | 正常系の差分 0/3・win_pair 照合 388・ネガコン 6/6 PASS・fail 0 | 2.783 s |
+| provider wasm | `EMSDK_ENV=… bash provider/build.sh` | flprov.wasm 58,154 B。fl_table.c 435 関数・ハンドラ 93 | 0.980 s |
+| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… EMSDK_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 (`git status` が空) | 6.870 s |
+| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 93・unimplemented 342・mcp_static 60・PASS | - |
+| playlist 差分 | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段・PASS | - |
+| mixer 差分 | `node tests/mixer_diff.mjs` | calls 59・diffs 0・PASS | - |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 161・diffs 0・PASS | - |
+| device 差分 | `node tests/device_diff.mjs` | calls 8・diffs 0 (rejects 4・midi_out 5)・PASS | - |
+| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425 | - |
+| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true | - |
+| 表の再生成・ネガコン | `FL_WIN64_DIR=… bash tests/flapi_table_check.sh` | 正常系の差分 0/3・win_pair 照合 388・ネガコン 6/6 PASS・fail 0 | - |
 | kwsig 照合 | `python3 tests/kwsig_check.py` | OK | - |
-| kwsig 束縛 | `python3 tests/kwsig_bind_check.py` | exit 0 (成功時は出力なし) | 0.146 s |
-| 引数個数 (before = `origin/main` の表) | `python3 analysis/flapi/sig_arity_check.py <main の表> analysis/flapi/flapi_table.json` | 対象 274・一致 274・不一致 0・引数個数が変わった関数 0 | - |
-| 実害の実測 (§3-2) | `node tests/sig_arity_probe.mjs` | kwsig_targets 24・implemented 6・unimplemented 18・fails 0・PASS | 0.080 s |
+| kwsig 束縛 | `python3 tests/kwsig_bind_check.py` | exit 0 (成功時は出力なし) | - |
+| 引数個数 (before = `origin/main` (`875eba29`) の表 / after = 本 PR の表) | `python3 analysis/flapi/sig_arity_check.py <main の表> analysis/flapi/flapi_table.json` | 両方とも 対象 274・一致 274・不一致 0 | - |
+| 実害の実測 (§3-2) | `node tests/sig_arity_probe.mjs` | kwsig_targets 24・implemented 6・unimplemented 18・fails 0・PASS | - |
 
 - NC1 (差分検査): `host/fl_mock.mjs` の `playlist.muteTrackLock` を `arity(a, 1, 1)` に戻すと、`tests/playlist_diff.mjs` は `playlist 差分 12 件` で FAIL (exit 1)。`git show HEAD:` で復元すると PASS (calls 23・diffs 0)。
-- 環境: GitHub Actions runner (4 コア)。`provider_check` 実行時の load average は `1.92 1.64 0.79`。
+- 環境: GitHub Actions runner (4 コア)。`uptime` の load average (21:42:58) は `0.86 0.92 0.68`。
 - 本節の値が正本。§8 の表は測定 commit `4f621cad` の値 (履歴として残す)。
