@@ -7,9 +7,10 @@ base = json.load(open(sys.argv[1]))
 watch = json.load(open(sys.argv[2]))
 bk = {r['unit']: r['kind'] for r in base}
 wk = {r['unit']: r['kind'] for r in watch['per']}
-diff = sorted(u for u in set(bk) | set(wk) if bk.get(u) != wk.get(u))
-print('units base=%d watch=%d kind_diff=%d %s' % (len(bk), len(wk), len(diff), diff[:10]))
-for name, m in (('base', bk), ('watch', wk)):
+units = sorted(wk)
+diff = [u for u in units if bk.get(u) != wk[u]]
+print('compared_units=%d kind_diff=%d %s' % (len(units), len(diff), diff[:10]))
+for name, m in (('base', {u: bk[u] for u in units}), ('watch', wk)):
     c = collections.Counter(k for u, k in m.items() if u <= 477)
     print('0-477 %s: %s' % (name, ' '.join('%s %d' % kv for kv in sorted(c.items()))))
 print('hitN=%d' % watch['hitN'])
