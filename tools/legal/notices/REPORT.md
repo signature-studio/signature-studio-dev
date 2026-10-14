@@ -110,7 +110,7 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 
 - registry に `kind: "font-asset"` を追加し `open-sans` (3.003) / `barlow` (1.408) を `bundled=true` で登録。NOTICES に版・著作権表示・upstream の repo と **commit (40hex 固定)**・ファイルの URL / size / sha256・OFL 1.1 本文 (upstream の `OFL.txt` を sha256 付きで埋込) を出す。取得元は `tools/gui/test/fetch_fonts.sh` (`coveredBy`)。
 - 取得物はどちらも Reserved Font Name 指定なし (`OFL.txt` に指定行なし)・無改変。FL 同梱の同名フォント (`fonts.json` の origin-unverified) とは**別バイト列** (FL の Barlow-Regular 98,812 B / OpenSans-Regular 217,360 B に対し、代替は 104,068 B / 147,528 B)。
-- `check` は font-asset を検査する: commit/URL の固定・本文 sha256・`fetch_fonts.sh` の検証値との一致 (registry だけ更新して取得物が変わる事故の検出)・release-guard allow-list への登録。成果物走査は**ファイル全体の sha256** (size で絞る) で代替フォントを検出し、`bundled=false` なら失敗する。
+- `check` は font-asset を検査する: commit/URL の固定・本文 sha256・`coveredBy` の取得スクリプト・検証値台帳 (`fetch_fonts.sh`・`fonts.tsv`) の検証値との一致 (registry だけ更新して取得物が変わる事故の検出)・release-guard allow-list への登録。成果物走査は**ファイル全体の sha256** (size で絞る) で代替フォントを検出し、`bundled=false` なら失敗する。
 - **release guard との矛盾を実測で発見**: allow-list 無しだと代替フォントは FL 同梱の旧版と窓を共有し **exit 6** (Barlow 48 窓・OpenSans 10 窓)。公開物に載せられないので `release-guard/allowlist.json` に 2 件を `kinds:["window"]` + sha256 で追加した (file / chunk 一致は許容しない)。
 
 ### 実測 (`3ec58b5`。n=3)
@@ -139,6 +139,17 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 - 同じ変更で、main 時点で既に `check` が失敗していた件 (`tools/startup/license_obs/license_obs.sh` が未登録のライセンス名ファイルとして検出。`920f837` 由来) を `ignoreLicensePaths` に登録した。本ファイルは OSS のライセンス文ではなくスクリプト (名前が `license_*` に一致するだけ)。登録しないと `notices:check` が通らず本 PR の検証ができなかった。
 
 範囲外 (主張しない): 他のウェイト (Bold / Light 等) は fetch していないため未登録 (alias 表が要求した時点で追加)。実フォントを公開物へ載せる結線 (VFS #22 からの配布) はまだ無く、`bundled=true` は**載せる前提の保守的登録**。改変・subset 化した版は sha256 が変わるため成果物走査では検出されない (その版を載せるなら registry の追加が要る)。upstream (GitHub raw) の可用性に依存する。
+
+### 回帰の修正 (#935。検証起点: コミット `f673876e`・ws-935-ledger・fl-win64 展開済・node_modules は main checkout のものを symlink)
+
+- 回帰: #615 (`4890d607`) で `fetch_fonts.sh` の sha256 を台帳 `tools/gui/test/fonts.tsv` へ移したのに、検査は `coveredBy` の先頭ファイル (`fetch_fonts.sh`) 本文だけを見ていたため、`8d632b57` では `notices.test.mjs` 4 件 FAIL (`#1`・`#36`・`#37`・`#53`) と `cli.mjs check` exit 1 (`open-sans`・`barlow` の sha256 が「取得スクリプトの検証値に無い」)。registry と台帳の値は一致しており、取得物の食い違いではない。
+- 修正: `validateFontAsset` は `coveredBy` の存在するファイルを全て連結して検証値を探す。font-asset の `coveredBy` に `tools/gui/test/fonts.tsv` を追加。
+
+| 項目 (`f673876e`・n=1) | 実測 |
+|---|---|
+| `node --test tools/legal/notices/notices.test.mjs` | 51 pass / 0 fail / 3 skipped (修正前 `8d632b57` は 47 pass / 4 fail / 3 skipped) |
+| `node tools/legal/notices/cli.mjs check` | PASS components=22 (bundled 20) records=12 fonts=129 artifacts=0 (修正前 exit 1) |
+| `FL_WIN64_DIR=<fl-win64> TMPDIR=$RUNNER_TEMP bash tools/legal/notices/e2e.sh` | ALL PASS・PASS 27 / FAIL 0・31.9 s (load average 0.85) |
 
 ## 範囲 / 範囲外
 
