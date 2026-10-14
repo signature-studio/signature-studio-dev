@@ -18,7 +18,7 @@
 - 生成の unsup は 81 種・3,629 件 (両 block 同値)。未解決 callee 47・import 570 (`lift_meta.json`)。
 - block19091 の wasm link は emscripten の sysroot (system library) の初回生成を含む。block23676 の link は生成済みキャッシュを使う。
 - AC1 の link は rt (`tools/ott/rt/ott_cpu.c`・`ott_glue.c`・`ott_ovr.c`) を含まない。wasm の import は全 14 件で、そのうち `ott_*` が 3 件 (`ott_missing_import`・`ott_unsup`・`ott_unlifted`)。build 段の exit 0 は「未解決 import を許容したリンク成功」の値。
-- 所要秒は各段 n=1。差し戻し対応 run で x64c 生成を 1 回再実行すると 61 s (`ott_lifted.c` は 66,774,883 B で同じ)。変動の min–max (WORKFLOW §5 の n≥3) は未実施。
+- 所要秒は各段 n=1。差し戻し対応 run で x64c 生成を 2 回再実行した (61 s・60 s。いずれも `ott_lifted.c` は 66,774,883 B で同じ)。変動の min–max (WORKFLOW §5 の n≥3) は未実施。
 
 ## 2. CreatePlugInstance 入場 (受入条件 2、block19091)
 
@@ -27,7 +27,7 @@
 - `cpi_reach.sh`: (1) `cpi_image.py` で PE の mapped image (`pefile.get_memory_mapped_image`) を取り出す。ImageBase = `0x400000`。image.bin は **6,093,824 B** (最後のセクション末端 RVA `0x5CFC00` まで)。PE の SizeOfImage は `0x5D0000` (6,094,848 B) で、image.bin のサイズとは別の値。(2) 生成 C の複製に probe を入れる。`f_86ab10` 先頭に `cpi_enter(0x86ab10)`、各命令コメント行 (`/* 86ab10: push rbp */`) の後に `cpi_at(VA)`。直近 256 件を wasm メモリの ring に残す。(3) `emcc -c` → `ott_cpu.c`・`ott_glue.c`・`ott_ovr.c` と共に node 用 MODULARIZE で link (`-sGLOBAL_BASE=268435456`・initial/max memory `0x36000000`)。
 - `cpi_reach.mjs`: image を `HEAPU8` の ImageBase に敷き、`_ott_run(0x86ab10, a0, a1, 0, 0, 0,0,0,0)` を呼ぶ。a0 = RCX (host)、a1 = RDX (tag)。`entered` = stderr に `[cpi] enter 0x86ab10` が出たか。trap 後は ring を読み、直近命令 VA を出す。
 - 呼出経路 (実測のバイト列と C ソース): VA `0x86ab59` の命令は `e8 52 50 f1 ff` (call rel32) で、転送先は `0x77fbb0` (`f_77fbb0`)。戻り先 `0x86ab5e` は、C で `ST64(R[RSP], 0x86ab5eULL); f_77fbb0();` として push される値。
-- 所要: `cpi_reach.sh` 全体 58 s wall (probe 複製の `emcc -c`・link・node 1 回を含む。段ごとは未計測)。load 0.22 → 0.69。
+- 所要: `cpi_reach.sh` 全体 58 s wall (測定時・n=1。probe 複製の `emcc -c`・link・node 1 回を含む。段ごとは未計測。再実行の値は §2.2)。load 0.22 → 0.69。
 
 ### 2.2 結果
 
@@ -42,7 +42,7 @@
 - **理由 (推定)**: host 引数 (RCX) が実体の object を指していない。NULL と zero 領域のどちらでも vtable 相当の値が得られず、間接 call 先が不正になる。この推定は「host object を与えると先へ進む」ことを確かめていないため未検証。
 - 命令数 49 は `cpi_at` の総件数 (ring は直近 256 件を保持するので全件保持)。
 - `0x63736d65` の正体: wasm の address 0 に入る emscripten のマーカー ("emsc"・リトルエンディアン)。`cpi.cjs` の起動時初期化が `HEAPU32[0] = 1668509029` (= `0x63736d65`) を書き、stack cookie 検査 (`checkStackCookie`) が同じ値を確かめる (`cpi.cjs` の 374・394 行)。wasm の data segment は 2 件で、いずれも address 0 を覆わない。NULL 経路では host 自体が 0 なので、`mov rax,[rax]` が address 0 の `0x63736d65` を読み、`call [rax]` がその値を番地として読んで OOB になる。`0x30000000` 経路では `[0x30000000]` が 0 なので、`call [rax]` は address 0 の `0x63736d65` を call 先として読み、UNLIFTED function として abort する。
-- 差し戻し対応 run の再実行 (2026-10-14、検証 HEAD で `cpi_reach.sh` を再実行、x64c 生成は §1 の手順): 結果: TBD
+- 差し戻し対応 run の再実行 (2026-10-14、検証 HEAD `47ecd893`、x64c 生成から `cpi_reach.sh` まで §4 の手順・いずれも n=1): NULL は entered=true・49 命令・最後 `0x77fbf3`・OOB、`0x30000000` は entered=true・49 命令・最後 `0x77fbf3`・`0x63736d65` の abort、NC `0x86abc0` は entered=false・7 命令。上表と一致。所要: x64c 生成 59.7 s、`cpi_reach.sh` 全体 41.0 s (load 0.15 → 0.84)。
 
 ### 2.3 ネガティブコントロール (弱い)
 
@@ -83,6 +83,11 @@ node tools/hostbridge/wrapper_lift/cpi_reach.mjs $RUNNER_TEMP/r829/cpi19091/cpi.
 
 ## 6. 測定 commit からの差分
 
-`git diff a55fd489 <検証 HEAD> -- tools/hostbridge/wrapper_lift` の出力 (差し戻し対応で追加した差分):
+`git diff a55fd489 47ecd893 -- tools/hostbridge/wrapper_lift/*.py tools/hostbridge/wrapper_lift/*.sh tools/hostbridge/wrapper_lift/*.mjs tools/hostbridge/wrapper_lift/*.c` の出力 (コード差分。REPORT・付録の差分は除く)。`cpi_reach.mjs` のヘッダコメント 1 行のみで、判定ロジックと測定に使った経路は変わらない:
 
-TBD
+```diff
+-// 判定は JSON 1 行で出す: entered = 入場ログ "[cpi] enter <entry VA>" を受けたか。false なら err の末尾が最初に失敗した地点。
++// 判定は JSON で出す (null, 1 で整形するため複数行): entered = 入場ログ "[cpi] enter <entry VA>" を受けたか。false なら err_tail の末尾が最初に失敗した地点。
+```
+
+検証 HEAD `47ecd893` の再実行 (§2.2) は、このコード状態で行った。以降の commit は文書のみ。
