@@ -198,14 +198,8 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 ### 11.5 検証 (測定 commit と差分)
 
 - 測定 commit: `19b21178` (コード変更の最後の commit。§11.1 の 3 ファイル)。
-- 測定 commit から HEAD までの差分 (`git diff 19b21178 6f731251 -- tools/m11`):
-
-```
-diff --git a/tools/m11/trap_triage/REPORT_882.md b/tools/m11/trap_triage/REPORT_882.md
-@@ -197,5 +197,6 @@ (§11.5 の 3 行の文言修正のみ)
-```
-
-  つまり `tools/m11` のコード差分は 0 (変わったのは本 REPORT の文書のみ)。コードの再測定は不要。
+- 測定 commit から HEAD までの差分 (`git diff 19b21178 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_882.md'`): 出力 0 byte (コード差分 0)。
+- 同 `--stat` (REPORT のみ): `tools/m11/trap_triage/REPORT_882.md | 18 ++++++++++++++----` (14 insertions, 4 deletions)。変わったのは本 REPORT の文書のみ。コードの再測定は不要。
 - §11.2 の 3 build は作業ツリーで測った。測定時の `git status --porcelain` は記録していない。`19b21178` と同一であることは、本 run では**確認できていない**。再測定 (`git worktree add --detach ... 19b21178`) は、`work-m11` 素材が本 run の `$ARTIFACTS_DIR` に無く (`fl-win64` のみ) 未実施。そのため §11.2 の数値は「作業ツリー測定・未再現」の値として扱い、基準には使わない。
 - 既定 build (probe OFF) は §11.2 の `870 / 16` で前回値 (§8・§9) と一致 (= 既定の挙動は変わらない)。
 - 差分確認: `git diff 31cb5831 19b21178 -- tools/m11` は `m11_build.sh` / `m11_ov.c` / `m11_post.py` の probe 追加のみ (既定 0 で無効)。
