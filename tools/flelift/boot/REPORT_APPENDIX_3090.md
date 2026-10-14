@@ -1,7 +1,7 @@
 # tools/flelift/boot — REPORT 付録 (FLE-12 (#3090): 0x6a7b70 の呼出元と幅の源)
 
-> `REPORT.md` §0 の 1 行から参照する付録。親は #3060 → #2702。本節の数値は HEAD `a409cd6f` で採取した
-> (診断 probe を入れた最後のコード commit `0307d592` と測定対象コードは差分 0。`0307d592` の run のログは保存されていないため再採取した)。
+> `REPORT.md` §0 の 1 行から参照する付録。親は #3060 → #2702。本節の数値は HEAD `cdf68f45` (main `4b81e78a` を取り込んだ後) で採取した。
+> 修正前は `origin/main` `4b81e78a` を同じ手順で採取した。`0307d592` の run のログは保存されていないため再採取した。
 
 ## 結論 (先出し)
 
@@ -19,31 +19,36 @@
 - **0x15F34A0 の書込み元 (受入 3)**: 未了。lift C の `0x15f34a0` の参照は `s2:94092` (`0x6542eb` の `lea rdx,[0x15f34a0]`、
   `f_653f40` の登録ループで `f_653dd0` に渡す引数) の 1 箇所。直接の store は無く、終了前に 0 へ戻す箇所は特定していない。
 
-## 1. 計測 (HEAD `a409cd6f` で再採取、`bash tools/flelift/boot/fle6_measure.sh`、素材 `fl-win64` + `toolchain-emsdk`)
+## 1. 計測 (HEAD `cdf68f45` で採取・修正前は `origin/main` `4b81e78a` を同手順で採取。`bash tools/flelift/boot/fle6_measure.sh`、素材 `fl-win64` + `toolchain-emsdk`)
 
-- 再採取の理由: `0307d592` の run のログは保存されていない。`0307d592` → HEAD で測定対象コード (`x64c.py` / `build.sh` / `fle6_measure.sh` / `fle_boot.c` / `rt` / `gen_boot.py`) の差分は空 (`git diff --stat 0307d592 HEAD -- ...` が空)。よって HEAD の値を `0307d592` の run の再現値とする。前版の秒数・RSS 表は出典を確認できないため、本再採取の値に置き換えた。
+- 採取の経緯: `0307d592` の run のログは保存されていない。`a409cd6f` で再採取した後、main (`4b81e78a`) を取り込んだ (`cdf68f45`)。取り込みで測定対象の `fle_boot.c`・`fle6_measure.sh`・`build.sh`・`fle_boot.mjs` が変わったため、取り込み後の HEAD で採取し直した。前版の秒数・RSS 表は出典を確認できないため置き換えた。
+- 修正前との差は `fle_boot.c` の診断行 20 行追加のみ (`git diff --stat origin/main HEAD -- tools/flelift/x64c.py tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh tools/flelift/boot/fle_boot.c tools/flelift/rt tools/flelift/boot/gen_boot.py tools/flelift/boot/fle_boot.mjs` の結果)。
 
 | 工程 | 結果 | 秒 | ピーク RSS | load (開始 → 終了) |
 |---|---|---|---|---|
-| gen-A | rc 0 | 7 | - | 0.40 → 0.45 |
-| lift (x64c closure 2・`FLE_EXTRA_ROOTS=0x6a7b70`・cap 13800MB) | rc 0・29,908 関数・1,557,903 insn | 81 | 609MB | 0.45 → 1.20 |
-| clang shard ×8 (-O0・P3・cap 5000MB) | 8/8 OK・cap 超過 0 件 | 103 | 2,182〜2,668MB | 1.20 → 2.04 |
-| boot shim (`FLE_IPP=1`) | units 209・stopped 209・IPP 判定 NG (`ptr_15F34A0=0x0`) | 25 | - | 2.04 → 1.87 |
-| boot ネガコン (`FLE_IPP=0`) | units 209・stopped 209・IPP 判定 OK | 23 | - | 1.87 → 1.69 |
+| gen-A | rc 0 | 7 | - | 0.03 → 0.11 |
+| lift (x64c closure 2・`FLE_EXTRA_ROOTS=0x6a7b70`・cap 13800MB) | rc 0・29,908 関数・1,557,903 insn | 82 | 609MB | 0.11 → 0.79 |
+| clang shard ×8 (-O0・P3・cap 5000MB) | 8/8 OK・cap 超過 0 件 | 86 | 2,204〜2,668MB | 0.79 → 1.82 |
+| boot shim (`FLE_IPP=1`) | units 209・stopped 209・IPP 判定 NG (`ptr_15F34A0=0x0`) | 24 | - | 1.82 → 1.66 |
+| boot ネガコン (`FLE_IPP=0`) | units 209・stopped 209・IPP 判定 OK | 25 | - | 1.66 → 1.55 |
+| boot ipp2 (`FLE_IPP=2`) | units 209・stopped 209・IPP 判定 NG (`ptr_15F34A0=0x0`) | 24 | - | 1.55 → 1.48 |
 
-- 全体 3 分 59 秒 (`real 3m59.268s`)。`nproc` 4・MemAvailable 14,783,096 kB。
-- link: mismatch 0 / undefined 0 / duplicate 0 (`fleboot_plain.cjs` 127,079,654 B)。
-- 計数 (units・GetMem / FreeMem)。修正前 (`a5fb0d2d`・診断なし) も本 PR で再測定した:
+- 全体 4 分 08 秒 (`fle6_measure.sh` のログ時刻 22:37:44 → 22:41:52)。`nproc` 4。
+- link: mismatch 0 / undefined 0 / duplicate 0 (`fleboot_plain.cjs` 127,080,085 B。修正前 `4b81e78a` は 127,079,315 B)。
+- 計数 (units・GetMem / FreeMem):
 
 | 測定 | commit | units | GetMem | FreeMem | IPP 判定 |
 |---|---|---|---|---|---|
-| shim 有 (`FLE_IPP=1`) | `a409cd6f` (HEAD・診断あり) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
-| ネガコン (`FLE_IPP=0`) | `a409cd6f` (HEAD・診断あり) | 209 | 1,891 | 776 | OK |
-| shim 有 | `a5fb0d2d` (修正前・診断なし) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
-| ネガコン | `a5fb0d2d` (修正前・診断なし) | 209 | 1,891 | 776 | OK |
+| shim 有 (`FLE_IPP=1`) | `cdf68f45` (HEAD・診断あり) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
+| ネガコン (`FLE_IPP=0`) | `cdf68f45` (HEAD・診断あり) | 209 | 1,891 | 776 | OK |
+| ipp2 (`FLE_IPP=2`) | `cdf68f45` (HEAD・診断あり) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
+| shim 有 | `4b81e78a` (修正前 = origin/main・診断なし) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
+| ネガコン | `4b81e78a` (修正前・診断なし) | 209 | 1,891 | 776 | OK |
+| ipp2 | `4b81e78a` (修正前・診断なし) | 209 | 2,314 | 1,199 | NG (`ptr_15F34A0=0x0`) |
 
-- 基準 (`REPORT.md` §9-2 の shim 有 2,314 / 1,199、ネガコン 1,891 / 776) は測定 commit `a741a0ca` (FLE-9) の値。上表の `a5fb0d2d` 行で同値を再確認した。`a741a0ca` → `a5fb0d2d` で測定対象ファイル (上記 6 件) の差は `fle_boot.mjs` の undo probe 出力の追加 (読み取りのみ) だけ。
-- 診断 probe (`fle_boot.c`・`fle_boot.mjs` の出力) は出力のみで、実行経路と計数を変えない (上表で `a409cd6f` と `a5fb0d2d` が同値)。
+- 基準 (`REPORT.md` §9-2 の shim 有 2,314 / 1,199、ネガコン 1,891 / 776) は測定 commit `a741a0ca` (FLE-9) の値で、上表の修正前 `4b81e78a` と同値。merge 前の修正前 `a5fb0d2d` でも同値を再測定済み。
+- 診断 probe (`fle_boot.c` の診断行) は出力のみで、計数と boot の経路を変えない (上表で HEAD と修正前が同値)。
+- rc 3 は shim 有 (`FLE_IPP=1`) と ipp2 (`FLE_IPP=2`) の IPP 判定が NG (`ptr_15F34A0=0x0`) のため。`fle6_measure.sh` の仕様どおり (ネガコンは OK)。
 - **KPI (前後)**: FLEngine 起動の unit 通過 209 → **209 (変化なし)**。最初のウィンドウ: 未到達 (unit 209 の後の `MessageBoxA` → `exit(0)` のまま)。
 
 ### 1-1. 0x6a7b70 への dispatch の実測 (`fle_boot.c` の `[fill6a7b70]` 行、shim 有・ネガコンで同一)
@@ -53,7 +58,7 @@
 | 0 | 0x6c7923 | 0x0 | 0x0 | 0x100000 | 0x12d6a090 | (0,0,1048576,1048576) |
 | 1〜5 | 0x6c7923 | 0x400000 〜 0x1400000 (+0x400000 ずつ) | 0x0 | 0x100000 | 同上 | 同上 |
 
-- `caller=0x815920` (6 件とも)。初回の呼出元フレーム: `callerRbp=0x1158b318`、`w=1048576`、`h=1048576`、
+- `caller=0x815920` (6 件とも)。初回の呼出元フレーム: `callerRbp=0x1158b328`、`w=1048576`、`h=1048576`、
   `spi_left=0` (`[rbp+0x1c8]`・`SystemParametersInfoW` の soft stub は out を書かない)、`sm13=0`、`sm14=0` (`GetSystemMetrics` の soft stub)。
 - 6 回で止まる理由は未特定 (`f_6c7610` の行ループの上限の源は未確認)。
 
