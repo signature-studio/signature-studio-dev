@@ -50,8 +50,9 @@
 ## 6. 未解決 (起票先)
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (b) 旧 build (`d6a17b64`) → HEAD で ok 818 → 868 (+50) の二分探索 (commit 727 件が対象) | 過去数値の解釈 | 子 issue (本 run で起票) |
-| (d) `m11_e2e.sh` 既定経路の再通し: `functions_dll.csv` (Ghidra 12.1.4 headless・約 10 分) の作成と、e2e 全体の実測 | 受入 (e2e 検証) | 子 issue (本 run で起票) |
+| (b) 旧 build (`d6a17b64`) → HEAD で ok 818 → 868 (+50) の二分探索 (commit 727 件が対象) | 過去数値の解釈 | #1597 ([M11-N103]) |
+| (d) `m11_e2e.sh` 既定経路の再通し: `functions_dll.csv` (Ghidra 12.1.4 headless・約 10 分) の作成と、e2e 全体の実測 | 受入 (e2e 検証) | #1598 ([M11-N104]) |
+| ldfix1 と snapshot の `ldfxc` 差 54 件 (snapshot 66・ldfix1 12) の切り分け | (c) の ldfix 段の完全な特定 | #1415 に残す (本 PR で部分達成) |
 | `159d9fc0` (R8) が snapshot IR の alloca 54 件 → 2,408 件を生む件の survey 影響の実測 (ok/trap が変わるか) | R8 の採否 | #132 (R8 の起票元) |
 
 ## 7. 再現
