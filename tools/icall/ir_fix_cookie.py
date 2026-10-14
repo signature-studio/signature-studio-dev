@@ -10,7 +10,7 @@
        %v.q = load i64, i64* @cookie
        %v   = trunc i64 %v.q to i32        ; 既存の i32 利用 (下位 bit: urem 64 等) は従来どおり
    に置換し、`%w = sext i32 %v to i64` は `%w = add i64 %v.q, 0` (64bit 値そのもの) に置換する。
-   global の宣言型は i64 とし、初期値は native の 8byte 値 0x2b992ddfa232 とする。
+   global の宣言型は i64 とし、初期値は仮値 0x2b992ddfa232 とする (出所未確認・PE 読み取り未実施、#2302 で確定。REPORT_APPENDIX_2280 §3)。
    出力: JSON 1 行 {"cookie_global": N, "loads_fixed": M, "sext_fixed": K}。
 """
 import json, re, sys
@@ -54,7 +54,6 @@ def main(src, dst):
     lines = open(src).read().split('\n')
     res, nd, nl, ns = [], 0, 0, 0
     body = []
-    fn_start = None
     for ln in lines:
         if ln.startswith('define '):
             if body:

@@ -85,7 +85,7 @@ $ git diff 52bd5e41 HEAD -- tools/icall/fa_route_build.sh tools/icall/ir_fix_coo
 ```
 
 差分の中身 (`git diff 52bd5e41 HEAD -- tools/icall/fa_route_build.sh`): `FA_FIX_COOKIE` の既定 `1→0` と注記の追加のみ。`ir_fix_cookie.py` は差分 0。
-§2 の数値は `FA_FIX_COOKIE=1` を明示した build (=測定時の既定) の記録値であり、現在の既定 (OFF) の build は未測定。
+§2 の数値は `FA_FIX_COOKIE=1` を明示した build (=測定時の既定) の記録値であり、現在の既定 (OFF) の build は未測定。既定 (`FA_FIX_COOKIE` 未指定) は `fa_route_build.sh` の分岐上 `FA_FIX_COOKIE=0` と同一経路 (`SRC_FIX=SRC`) なので、§2 の OFF 列 (`FA_FIX_COOKIE=0`・測定 commit `52bd5e41`) はその経路の記録値として扱える。ただし既定指定での再測定は未実施。
 
 基点 main からのコード差分 (本 run のコード変更の全量):
 
