@@ -1,7 +1,7 @@
 # PY-84 (#2663): chord progression の pyscript 2 本と drum patterns を fl-win64 から抽出する
 
 - 対象: `tools/python/analysis/extract_pyc_blocks.py` (抽出器) と `tools/python/run_all.sh` の step 15。
-- 測定 commit: `a623fec6` (抽出器と step 15 を変えた最後のコード commit)。
+- 測定 commit: `0b6417df` (抽出器と step 15 を変えた最後のコード commit)。
 
 ## 1. 結論
 
@@ -17,7 +17,7 @@ fl-win64 の DATA block だけから、抽出器が `drum_patterns.json` と `py
 
 | 条件 | 結果 | 根拠 |
 |---|---|---|
-| (1) run_all の step 15 が fl-win64 だけで SKIP されず動く | **run_all 全体は未達** (前提チェックで rc=2)。step 15 の 2 行は単独で実行して PASS | §6 (step 15 単独)、§8 |
+| (1) run_all の step 15 が fl-win64 だけで SKIP されず動く | **run_all 全体は未達** (前提チェックで rc=2)。step 15 の抽出と e2e は単独で実行して PASS | §6 (step 15 の抽出・e2e)、§8 |
 | (2) `chord_progression_e2e.mjs` が PASS | 達成: 41/41 PASS × 3 回 | §6 |
 | (3) drum_patterns.json と pyscript の同定経路を書く | 達成 | §4.2 |
 | (4) 所要・load average・PASS/FAIL を書く | 達成 | §6 |
@@ -52,7 +52,7 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 | block24797_DATA.bin | 191356 | 1dd818c3 | `drum_patterns.json` | `{` 始まりの UTF-8 JSON で、dict が `compatible_from` と `genres` を持つ | 1 |
 
 - 各規則がちょうど 1 block に当たったときだけ書く。0 件・2 件以上は stderr に理由を出し exit 3。何も書かない (§6.1 の抽出器 NC で確認)。
-- 旧規則 `ScriptDialog\(|def createDialog` は どの block にも当たらず未使用だったため削除した。
+- 旧版 (`a623fec6^`) の `PYSCRIPT_RULES["cpt"]` `ScriptDialog\(|def createDialog` は、非 pyc の **106 block** に当たる (`re.search` で再現)。例: `block07944_DATA.bin` は ARPEGGIATOR の VFX スクリプトの `def createDialog():`。汎用の dialog 定義を含むため同定に使えない。旧版では定義されるだけで参照されていなかったので削除した。
 - 既存の text 候補 (`manifest.json` の `text`、18 件) の抽出条件は変えていない。
 
 ### 4.3 出力の一致
@@ -70,30 +70,32 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 
 - 同定を 2 段にした。第 1 段で全 block を分類し、件数を検証する。第 2 段で書き出す。検証に失敗したら何も書かない。
 - 出力: `<out>/pyscript/{cpt,stack}.pyscript`・`<out>/drum_patterns.json` (いずれもバイト列をそのまま書く)・`manifest.json` の `pyscript` と `drum_patterns` キー。`pyc`・`text`・`skipped` は変えていない。
-- 要約 JSON に `pyscript` と `drum_patterns` の件数を追加。
+- 要約 JSON に `pyscript` と `drum_patterns` の件数を追加 (`drum_patterns` は manifest から数える)。
 - `FL_WIN64_DIR` は `extracted/` を指す契約のまま。
-- `run_all.sh` step 15 は、抽出を毎回実行し (古い出力の再利用をやめた)、`$PY312` と `FL_WIN64_DIR/extracted` を使う。
+- `run_all.sh` step 15 は、実行前に `work/fl_extract` を `rm -rf` してから抽出する (古い出力の残骸を残さない。§6 で確認)。`$PY312` と `FL_WIN64_DIR/extracted` を使う。
 
 ## 6. 実測
 
-測定 commit `a623fec6`。手順の時刻は UTC。
+測定 commit `0b6417df`。手順の時刻は UTC。
 
 | 工程 | 回 | wall | load avg (1 分, 開始時 uptime) | 結果 |
 |---|---|---|---|---|
-| `build_cpython_wasm.sh` (timeout 900) | 1 | 4 分 12 秒 | — | rc=0 |
-| `FLPY_SKIP_TABLE=1 build_flpy.sh` (timeout 300) | 1 | 23.5 秒 | — | rc=0 |
-| 抽出器 (PY312、出力 dir 削除後) | 1 | 4.35 秒 | 2.50 (16:52:09) | rc=0 |
-| `chord_progression_e2e.mjs` | 1 | 0.575 秒 | 2.28 (16:52:17) | 41 PASS / 0 FAIL、rc=0 |
-| `chord_progression_e2e.mjs` | 2 | 0.57 秒 | 2.10 (16:52:23) | 41 PASS / 0 FAIL、rc=0 |
-| `chord_progression_e2e.mjs` | 3 | 0.56 秒 | 2.10 (16:52:23) | 41 PASS / 0 FAIL、rc=0 |
+| `build_cpython_wasm.sh` (timeout 900) | 1 | 3 分 56 秒 | — (終了時 2.93、17:21:25) | rc=0 |
+| `FLPY_SKIP_TABLE=1 build_flpy.sh` (timeout 300) | 1 | 22 秒 | — | rc=0 |
+| step 15 の抽出 (`rm -rf work/fl_extract` の後、PY312) | 1 | 4.31 秒 | 2.59 (17:22:00) | rc=0 |
+| `chord_progression_e2e.mjs` | 1 | 0.605 秒 | 2.08 | 41 PASS / 0 FAIL、rc=0 |
+| `chord_progression_e2e.mjs` | 2 | 0.553 秒 | 2.08 | 41 PASS / 0 FAIL、rc=0 |
+| `chord_progression_e2e.mjs` | 3 | 0.552 秒 | 2.08 | 41 PASS / 0 FAIL、rc=0 |
 
-- load average: e2e の 3 回で 1 分平均は 2.10–2.28 (nproc = 4)。
-- e2e の末尾 JSON は 3 回とも `{"total":41,"pass":41,"fail":0,"mock":true,"sec":"0.5"}`。
-- step 15 の 2 行を単独実行 (`PY312` と `FL_WIN64_DIR` は run_all と同じ値。`set -euo pipefail` 下): wall 4.9 秒、rc=0。抽出の出力 `{"pyc": 40, "text_candidates": 18, "skipped": 0, "pyscript": 2, "drum_patterns": 1}`、e2e の出力 `{"total":41,"pass":41,"fail":0,"mock":true,"sec":"0.5"}`。
-- 測定後の差分: `git diff a623fec6 HEAD -- tools/python/analysis tools/python/run_all.sh | wc -l` の出力は `0` (差分 0 行)。HEAD 側に増えるのは REPORT と DOC_MAP の commit だけ。
-- 独立再実行 (実装 run とは別の確認。同じ `a623fec6` の worktree、1 分 load 0.21): 抽出器 4.33 秒 rc=0・出力 `{"pyc": 40, "text_candidates": 18, "skipped": 0, "pyscript": 2, "drum_patterns": 1}`、`cmp` で 3 件 SAME、e2e `{"total":41,"pass":41,"fail":0,...}` 0.61 秒 rc=0。
+- load average: e2e の 3 回で 1 分平均は 2.08 (nproc = 4)。
+- e2e の末尾 JSON は 3 回とも `"total":41,"pass":41,"fail":0`。
+- step 15 の抽出 (`PY312` と `FL_WIN64_DIR` は run_all と同じ値): rc=0、出力 `{"pyc": 40, "text_candidates": 18, "skipped": 0, "pyscript": 2, "drum_patterns": 1}`。`cmp` で SAME_drum・SAME_cpt・SAME_stack (§4.3 と同じ)。
+- 残骸の確認: 抽出前に `work/fl_extract/stale/old_test.pyc` を置いてから step 15 (`rm -rf` + 抽出) を実行 → 残骸は消えていた (`stale_exists=no`)。
+- 前回測定 (`a623fec6`) から変えたのは、step 15 の `rm -rf` と要約行の `drum_patterns` 件数 (manifest から数える) の 2 点。抽出 3 ファイルの出力は前回と同一。
+- PR の base (`main`) は測定後に進んだ。`git merge-tree` で HEAD と現 main は競合なし (rc=0) のため取り込んでいない。
+- 測定後の差分: `git diff 0b6417df HEAD -- tools/python ':!tools/python/REPORT_PY84.md' | wc -l` の出力は `0`。範囲は `tools/python` 全体 (tests/・host/・src/・analysis/・build スクリプトを含む)。HEAD 側に増えるのは REPORT_PY84.md の commit だけ。
 
-### 6.1 ネガティブコントロール (測定 commit `a623fec6`)
+### 6.1 ネガティブコントロール (測定 commit `0b6417df`)
 
 | 対象 | 操作 | 結果 |
 |---|---|---|
@@ -110,7 +112,7 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 
 ## 8. run_all 全体の前提チェック
 
-`bash run_all.sh` (HEAD `a623fec6`、`FL_MAC_DIR` は既定値 = `env.sh` の値のまま): rc=2。`ERROR: 前提不足で停止: …FLEngine_x64.dylib が無い`。step 1 より前で止まり、何も生成しない。mac pkg の `pkg_extract` が無いため。#2649 の範囲なので直していない。
+`bash run_all.sh` (HEAD `0b6417df`、`FL_MAC_DIR` は既定値 = `env.sh` の値のまま): rc=2。`ERROR: 前提不足で停止: …FLEngine_x64.dylib が無い`。step 1 より前で止まり、何も生成しない。mac pkg の `pkg_extract` が無いため。#2649 の範囲なので直していない。
 
 ## 9. e2e の mock 条件
 
@@ -131,12 +133,13 @@ magic `cb0d0d0a` の pyc block (40 件) は従来どおり pyc として扱う�
 
 ```bash
 export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64" EMSDK_DIR="$RUNNER_TEMP/emsdk"
+mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
 mkdir -p "$RUNNER_TEMP" && tar --zstd -xf "$ARTIFACTS_DIR/toolchain-emsdk.tar.zst" -C "$RUNNER_TEMP"
 bash fetch_inputs.sh
 timeout 900 bash build_cpython_wasm.sh | tail -4
 FLPY_SKIP_TABLE=1 timeout 300 bash build_flpy.sh | tail -4
 PY312=work/build-native/install/bin/python3.12
-FL_WIN64_DIR="$FL_WIN64_DIR/extracted" "$PY312" analysis/extract_pyc_blocks.py work/fl_extract | tail -1
+rm -rf work/fl_extract; FL_WIN64_DIR="$FL_WIN64_DIR/extracted" "$PY312" analysis/extract_pyc_blocks.py work/fl_extract | tail -1
 node tests/chord_progression_e2e.mjs | tail -1
 node tests/chord_progression_e2e.mjs --neg; echo rc=$?
 cmp work/fl_extract/drum_patterns.json "$FL_WIN64_DIR/extracted/block24797_DATA.bin" && echo SAME_drum
