@@ -103,7 +103,7 @@ M11_TOLERANT_OUT=work/tolerant_units.json timeout 600 node m11_tolerant.mjs > wo
 python3 m11_judge.py --require-stage "$M11_EXPECT_STAGE" --min-survey-ok "$M11_EXPECT_SURVEY_OK"; rc=$?
 # #2714: 寛容起動のゲート (942 unit 試行・集計の整合) と strict・survey の完全一致の回帰, およびネガコン (退行入力を検出できること)
 python3 m11_tolerant_gate.py --strict-done "$M11_EXPECT_STRICT_DONE" --survey-ok "$M11_EXPECT_SURVEY_OK_EXACT"; rct=$?
-python3 m11_tolerant_gate.py --negctl; rcn=$?
+python3 m11_tolerant_gate.py --negctl --strict-done "$M11_EXPECT_STRICT_DONE" --survey-ok "$M11_EXPECT_SURVEY_OK_EXACT"; rcn=$?
 [ "$rct" = 0 ] && [ "$rcn" = 0 ] || rc=1
 python3 m11_icall_audit.py 2>/dev/null | tail -1 || true
 exit $rc

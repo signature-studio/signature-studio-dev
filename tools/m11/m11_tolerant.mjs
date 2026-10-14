@@ -18,7 +18,7 @@ const snap = new Uint8Array(img.length);
 const units = [];                  // 全 unit: [i, va, kind, va_bytes, getmem, freemem, oom, clobber]
 const skipped = [];                // 失敗 unit (skip): 種類・メッセージ・image 差分の範囲
 const kinds = {};
-const SKIP = new Set(['halt0', 'oob', 'unreachable', 'abort', 'other', 'oom', 'miss']);
+const SKIP = new Set(['halt0', 'oob', 'unreachable', 'abort', 'other', 'oom', 'miss', 'clobber']);
 let hookRan = false, started = 0, clobber = 0, okWithOom = 0, sp0 = 0;
 const diffRanges = () => {   // 直前 unit の前後で image 範囲 (0..img.length) が変わった区間 (16B 以内の隙間は同じ区間)
   const cur = mod.HEAPU8, n = img.length, out = [];
@@ -62,9 +62,10 @@ mod.m11_tolerant_run = () => {   // C の function_4120c0 (g_tolerant) から呼
     } else if (r === 2) kind = 'miss';
     else if (r === 0) kind = 'noproc';
     else { kind = 'ok'; if (oom) okWithOom++; }
+    if (clob && !SKIP.has(kind)) kind = 'clobber';   // ok/noproc でも InitTable を壊したら skip. 種類別の和と skipped を合わせる (m1)
     const vaHex = '0x' + va.toString(16);
     const vaBytes = Number(mod._m11_va_used()) - vaUsed0, gmD = Number(mod._m11_probe_count(0)) - gm0, fmD = Number(mod._m11_probe_count(1)) - fm0;
-    if (SKIP.has(kind) || clob) skipped.push({ i, va: vaHex, kind, raw, msg, frame, clobber: clob, va_bytes: vaBytes, getmem: gmD, freemem: fmD, oom, img_ranges: diffRanges() });
+    if (SKIP.has(kind)) skipped.push({ i, va: vaHex, kind, raw, msg, frame, clobber: clob, va_bytes: vaBytes, getmem: gmD, freemem: fmD, oom, img_ranges: diffRanges() });
     kinds[kind] = (kinds[kind] || 0) + 1;
     units.push([i, vaHex, kind, vaBytes, gmD, fmD, oom ? 1 : 0, clob ? 1 : 0]);
   }

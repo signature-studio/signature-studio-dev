@@ -3,7 +3,7 @@
   - 寛容起動: work/e2e_tolerant.out の M11_TOLERANT 行で, 試行 unit 数 = 期待値 (既定 942), ok + noproc + skipped = 試行, JS へ InitUnits が渡った, を見る.
   - 回帰 (strict・survey): work/e2e_full.out の M11_RESULT で units_run + units_skipped = --strict-done (通常起動の完了数),
     work/e2e_survey.out の M11_SURVEY で ok = --survey-ok. 外れたら exit 1.
-  --negctl: 試行 unit を 1 つ減らした合成入力を判定し, ゲートが非 0 で止めることを確かめる (ネガコン). 止めなければ exit 1.
+  --negctl: 退行の合成入力 3 本 (試行 1 減・strict 完了数 1 減・survey ok 1 減) を判定し, どれも非 0 で止まることを確かめる (ネガコン). 1 本でも止まらなければ exit 1.
 M11_JUDGE_WORK で work/ を変えられる (ネガコン・検証用)."""
 import argparse, copy, json, os, re, sys
 
@@ -61,17 +61,32 @@ def main():
     a = ap.parse_args()
     t = jline(os.path.join(W, 'e2e_tolerant.out'), 'M11_TOLERANT')
     if a.negctl:
-        if t is None:
-            print('NEGCTL: 寛容起動の出力が無いためネガコンを作れない')
+        full = jline(os.path.join(W, 'e2e_full.out'), 'M11_RESULT')
+        survey = jline(os.path.join(W, 'e2e_survey.out'), 'M11_SURVEY')
+        if t is None or full is None or survey is None:
+            print('NEGCTL: 寛容起動・通常起動・survey のいずれかの出力が無いためネガコンを作れない')
             return 1
+        if a.strict_done is None or a.survey_ok is None:
+            print('NEGCTL: --strict-done と --survey-ok が要る (回帰の期待値が無いとネガコンを作れない)')
+            return 1
+        cases = []
         bad = copy.deepcopy(t)
         bad['attempted'] = a.expect_attempted - 1   # 退行: 1 unit 試行されずに止まった想定
-        errs = check_tolerant(bad, a.expect_attempted)
-        if not errs:
-            print('NEGCTL_FAILED: 試行 %d の退行入力を検出できなかった (ゲートが効いていない)' % bad['attempted'])
-            return 1
-        print('NEGCTL_OK: 退行入力を検出 (%s)' % errs[0])
-        return 0
+        cases.append(('attempted-1', check_tolerant(bad, a.expect_attempted)))
+        bad_full = copy.deepcopy(full)
+        bad_full['units_run'] = (bad_full.get('units_run') or 0) - 1   # 退行: strict の完了数が 1 減った想定
+        cases.append(('strict_done-1', check_regression(bad_full, survey, a.strict_done, a.survey_ok)))
+        bad_survey = copy.deepcopy(survey)
+        bad_survey['ok'] = (bad_survey.get('ok') or 0) - 1   # 退行: survey の ok が 1 減った想定
+        cases.append(('survey_ok-1', check_regression(full, bad_survey, a.strict_done, a.survey_ok)))
+        rc = 0
+        for name, errs in cases:
+            if errs:
+                print('NEGCTL_OK[%s]: 退行入力を検出 (%s)' % (name, errs[0]))
+            else:
+                print('NEGCTL_FAILED[%s]: 退行入力を検出できなかった (ゲートが効いていない)' % name)
+                rc = 1
+        return rc
     errs = check_tolerant(t, a.expect_attempted)
     errs += check_regression(jline(os.path.join(W, 'e2e_full.out'), 'M11_RESULT'),
                              jline(os.path.join(W, 'e2e_survey.out'), 'M11_SURVEY'), a.strict_done, a.survey_ok)
