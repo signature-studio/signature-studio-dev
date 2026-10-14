@@ -49,11 +49,11 @@ PM の許可ラベルに `pm-apply` は無いため、PM が付けるのは `nee
 <!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->
 ```
 
-例: `<!-- oc-pm-intent: relaunch issue=778 arts="fl-win64 plugins-ott" focus=778 -->`
+例: `<!-- oc-pm-intent: relaunch issue=778 arts="fl-win64 plugins-ott" focus=2 -->`
 
 - `issue=N`: 再投入する issue 番号 (数字のみ)。
 - `arts="..."`: R2 の allowlist に入る素材名だけを空白区切りで入れる。allowlist 外の名前は入れない。
-- `focus=K`: 再投入で焦点を当てる issue 番号 (数字のみ)。
+- `focus=K`: 再投入する issue の受入条件の番号 (1〜9 の整数・任意)。範囲外は Worker が拒否する。
 
 ## 判断の記録 (decision マーカー)
 
