@@ -11,24 +11,32 @@
 - 素材: `work-m11` は `tools/m11/work/`、`work-liftdiff` は `tools/liftdiff/work/` に展開 (tarball 内が `tools/m11/work/...` の相対パスのため、展開後に 1 段移動した)。
 - 再現用の素材名: `oc_artifacts: fl-win64 work-m11` (`work-liftdiff` は `audit_lsf_ssa_e2e.sh` の 4/7・5/7 で使うため併せて指定する場合は `work-liftdiff` を足す)。
 
-## 2. 機械語側の確認 (24 site)
+## 2. 機械語側の主張 (未再現・未確認)
 
-- 対象 24 site は `spill178_1161.tsv` の status=未判定 (`c589b0` 12 / `128f9e0` 12) と一致。
-- 全 24 site で、store 元 (`mov qword ptr [rbp+X], rax`) の直前に `mov rax,[rip+X]` → `mov rax,[rax]` (二段参照) があり、一段目の参照先が **LVA `0x11e0ab0` (10 進 18746032)** である。
-- 同 slot は両関数の機械語から計 27 回参照される (`c589b0`・`128f9e0` とも rip 参照 44 セルのうち最多)。
+- 対象 24 site は `spill178_1161.tsv` の status=未判定 (`c589b0` 12 / `128f9e0` 12) と一致 (§1 の集計で確認)。
+- 以下は**未再現・未確認の主張**として扱う。当時の逆アセンブル出力・走査スクリプトは残っておらず、本 run でも fl-win64 の逆アセンブルは行っていない。
+  - 全 24 site で、store 元 (`mov qword ptr [rbp+X], rax`) の直前に `mov rax,[rip+X]` → `mov rax,[rax]` (二段参照) があり、一段目の参照先が LVA `0x11e0ab0` (10 進 18746032) である。
+  - 同 slot は両関数の機械語から計 27 回参照される。
+- 再検証は §3-a の手順 3 (fl-win64 の逆アセンブル走査・生成元を `results/` に残す) で行う。
 
 ## 3. IR 側の確認 (不一致)
 
 - IR 本体は `function_c589b0` (390809〜391214) と `function_128f9e0` (76541〜77198) で、issue 記載と一致。
-- **両関数の IR に、slot `0x11e0ab0` (定数 `18746032`) を読む命令は 1 件もない** (IR_refs=0)。
-- `boot_final3.ll` 全体でも `18746032` は 8 件で、いずれも別関数 (`cf3790` 側などの inttoptr load)。
+- **両関数の IR に、slot `0x11e0ab0` (定数 `18746032`) を読む命令は 1 件もない** (IR_refs=0)。本 run で再実行して一致 (下記)。
+- `boot_final3.ll` 全体では `18746032` は 8 件で、**すべて `function_10c7cd0`** (define 行 32557 の関数内) にある。hit の行は 34472, 35307, 35314, 35325, 35426, 36276, 36283, 36294 (いずれも `inttoptr (i64 18746032 to ptr)` の load)。`function_cf3790` (定義行 401631) には無い。
 - 一方、既判定の TRUE_DROP 候補 `c5d2df`・`c5d343` が読む定数は `18751296` (LVA `0x11e1f40`) で、`0x11e0ab0` とは別セル。
 - REPORT_2266 の「slot `0x11e0ab0` の 1 段 deref」という記述は、IR 側では確認できない。IR に読みが無いため、「deref が落ちている」か「値が別経路で作られる」かを site ごとに区別できない。
 
 ### 3-a. 再現の状況 (未再現・記録の欠落)
 
-- **§2・§3 の数値は本 REPORT 作成後に再実行していない。** 当時の grep コマンド・逆アセンブル出力・生成元スクリプトは記録が残っていない。よって「IR_refs=0」「boot_final3.ll 全体で 8 件」「二段参照 24 site」「計 27 回」は**未再現の主張**として扱う。
-- 当時使った IR の sha256 は未記録。`boot_final3.ll` は実行ごとに sha256 が変わる (`docs/WORKFLOW.md` §11・#680)。再現には当時と同一の IR ファイルが要るため、次の手順では sha256 を必ず記録する。
+- **IR 側 (§3) は本 run で再実行して一致した**。対象 IR は `oc_artifacts: work-m11` で展開した `tools/m11/work/boot_final3.ll` (展開元 `work-m11.tar.zst`・gitignore 対象)。
+  - sha256: `010451add5147d37cd06d8d0043255fcb2e65a536c4eadeff17e7ce43de7cb9e` (本 run 実測)
+  - `grep -n '18746032' boot_final3.ll` → 8 件 (全件 `function_10c7cd0` 内。§3 の行番号)
+  - `sed -n '390809,391214p' boot_final3.ll | grep -c 18746032` → 0 件 (`function_c589b0`)
+  - `sed -n '76541,77198p' boot_final3.ll | grep -c 18746032` → 0 件 (`function_128f9e0`)
+  - `grep -ci '11e0ab0' boot_final3.ll` → 0 件 (16 進表記)
+- **§2 (機械語側) は未再現**。当時の逆アセンブル出力・生成元スクリプトは記録が無く、本 run では検証していない。「二段参照 24 site」「計 27 回」は未確認の主張。
+- `boot_final3.ll` は実行ごとに sha256 が変わり得る (`docs/WORKFLOW.md` §11・#680)。再現には上記 sha256 の IR が要るため、次の手順でも sha256 を必ず記録する。
 - 再現手順 (次 run・未実行。素材 `oc_artifacts: fl-win64 work-m11` が前提):
   1. `tools/m11/work/boot_final3.ll` の sha256 を記録する (`sha256sum`)。
   2. IR 側: `grep -c '18746032'` を全体と `function_c589b0` (390809〜391214 行) / `function_128f9e0` (76541〜77198 行) の範囲で数える。範囲の抜き出しは `sed -n 'A,Bp'`。
@@ -53,3 +61,4 @@
 | `c589b0` の未判定 12 site の IR 突合 (判定 0 件) | spill 宛の脱落関数の和集合 69 が未確定 | #2288 (本 PR は部分達成・Refs) |
 | `128f9e0` の未判定 12 site の IR 突合 (判定 0 件) | 同上 | #2288 |
 | slot `0x11e0ab0` の値の出自 (§5-1) | 上記 24 site の判定根拠が立たない | #2288 (次 run) |
+| §2 (機械語側: 二段参照 24 site・計 27 回) が未再現 | 機械語側の入口が未確定。§3-a 手順 3 で再検証する | #2288 (次 run) |
