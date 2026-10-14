@@ -12,12 +12,13 @@
 ## 1. 測定
 
 - 素材: `mkdir -p $RUNNER_TEMP/fl-win64 && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64`。real 6.078 s (user 3.958 s / sys 7.781 s)。`toolchain-emsdk` は `$RUNNER_TEMP/opt` に展開 real 3.917 s。
-- 解析: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/mixer_settrackcolor_facts.py`。real 0.120 s (user 0.086 s / sys 0.030 s)、n=1。実行直前の load average `0.28 0.41 0.22`。
-- build (emsdk): `EMSDK_ENV=$RUNNER_TEMP/opt/emsdk/emsdk_env.sh bash tools/python/provider/build.sh`。rc 0。`fl_table.c: 435 関数, ハンドラ 80`。real 0.906 s (sysroot のライブラリはキャッシュ済み。初回は real 14.555 s で、そのうち約 13 s は sysroot の生成)。load `0.36 0.44 0.23`。
-- mixer 差分: `node tests/mixer_diff.mjs` → `{"calls":56,"diffs":0,"PASS":true}`、real 0.058 s。
-- channels 差分 (playlist 側の回帰なし): `node tests/channels_diff.mjs` → `{"calls":122,"diffs":0,"PASS":true}`、real 0.053 s。
-- provider 集合検査: `node tests/provider_check.mjs` の §1〜§2b (実装集合 80 / 未実装 355、エラー code) は PASS、real 0.089 s。§3 以降は `dist/flpy.js` と `work/midi.py` (CPython wasm 側の生成物) が無いため**未実行** (§7)。
-- 測定 commit (コードを最後に変えた commit): `2893e78b` (`fix(python): store mixer track color in FL byte order and add getTrackColor (PY-115)`)。
+- 解析: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/mixer_settrackcolor_facts.py`。real 0.103 s (user 0.077 s / sys 0.027 s)、n=1。実行直前の load average `0.08 0.28 0.21`。
+- build (emsdk): `EMSDK_ENV=$RUNNER_TEMP/opt/emsdk/emsdk_env.sh bash tools/python/provider/build.sh`。rc 0。`fl_table.c: 435 関数, ハンドラ 84`。real 0.958 s (sysroot のライブラリはキャッシュ済み。同じ emsdk の初回は real 14.555 s で、大半は sysroot の生成)。load `0.09 0.29 0.21`。
+- mixer 差分: `node tests/mixer_diff.mjs` → `{"calls":57,"diffs":0,"PASS":true}`、real 0.075 s。
+- channels 差分 (playlist 側の回帰なし): `node tests/channels_diff.mjs` → `{"calls":123,"diffs":0,"PASS":true}`、real 0.068 s。
+- general 差分 (main 取り込みで追加された検査・回帰なし): `node tests/general_diff.mjs` → `{"calls":9,"diffs":0,"PASS":true}`、real 0.056 s。
+- provider 集合検査: `node tests/provider_check.mjs` の §1〜§2b (実装集合 84 / 未実装 351、エラー code) は PASS、real 0.097 s。§3 以降は `dist/flpy.js` と `work/midi.py` (CPython wasm 側の生成物) が無いため**未実行** (§7)。
+- 測定 commit (コードを最後に変えた commit): `a8b68172` (main を取り込んだ merge。mixer の変更は `2893e78b`、`eda853f2` は REPORT のみ)。
 
 ## 2. 逆アセンブルの事実 (mixer)
 
@@ -54,13 +55,13 @@
 
 - `provider/fl_engine.c`: `Mix` に `color_set` を追加。`setTrackColor` を格納式に、`getTrackColor` を追加。初期化の `color = 0x5A6B7C` を外し (既定経路は `MIX_DEFAULT_COLOR`)。
 - `host/fl_mock.mjs`: `swapRb` と同じ式で `setTrackColor`・`getTrackColor` を実装。mixer の初期 `color` を 0・`colorSet: false` に。
-- `tests/mixer_diff.mjs`: `getTrackColor` を 7 件 (往復 3 組・既定・範囲外 2 件) 追加。`setTrackColor(1,0x123456)` → `getTrackColor(1) === 0xff123456` を mock と wasm の両方で assert。ヘッダの関数数を 19 件・未定義 56 件に更新。
-- `tests/provider_check.mjs`: 実装集合に `pe115` (`mixer.getTrackColor`) を追加。実装 79→80、未実装 356→355。
+- `tests/mixer_diff.mjs`: 8 呼出しを追加 (`setTrackColor` 2・`getTrackColor` 6: set→get の往復 2 組・既定 1・範囲外 2)。`setTrackColor(1,0x123456)` → `getTrackColor(1) === 0xff123456` を mock と wasm の両方で assert。ヘッダの関数数を 19 件・未定義 56 件に更新。
+- `tests/provider_check.mjs`: 実装集合に `pe115` (`mixer.getTrackColor`) を追加。main の `pe87` (general 4 件) と合わせて実装 83→84、未実装 352→351。
 - playlist 側 (`ce1aae29`・`#2943` ブランチ) には触れていない。本 PR は main 基準で、mixer の行だけを変更する (playlist の setter 行とは重ならない)。
 
 ## 6. 差分の確認
 
-- `git diff 2893e78b HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis`: 本 REPORT を commit した後も、コードの範囲の差分は 0 (下の確認は PR 作成時に実行)。
+- `git diff a8b68172 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis`: 本 REPORT の commit 後も、コードの範囲の差分は 0 (測定 commit 以降は REPORT のみ)。
 
 ## 7. 未解決
 
