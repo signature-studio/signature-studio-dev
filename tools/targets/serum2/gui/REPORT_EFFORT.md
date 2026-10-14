@@ -260,4 +260,5 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 ### 13-1. 測定 commit と差分
 
 - 測定 commit: `22e33688` (コードを変えた最後の commit。canvas 4 ファイル・2 スクリプト)。
-- `git diff 22e33688 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/check_wasm_syntax.sh` の出力: 空 (差分 0)。本節は REPORT のみの commit のため、測定対象のコードは変えない。
+- 測定 commit `22e33688` から HEAD までのコード差分 (`git diff 22e33688 HEAD -- tools/targets/serum2/gui/canvas tools/targets/serum2/gui/check_wasm_syntax.sh`) は空ではない。内訳: `canvas_graphicsdevice.h` (コメントのみ)、`check_canvas_syntax.sh` (main 由来の `canvas_frame.cpp` の対象追加)、`check_concrete.cpp` (新規)、main 由来の `canvas_frame.{h,cpp}` (#2109)。`canvas_font.{h,cpp}`・`canvas_graphicsdevice.cpp`・`check_wasm_syntax.sh` は差分 0。
+- 差分の扱い: main 由来の `canvas_frame.*` と `check_canvas_syntax.sh` の対象追加は、本節の実測対象 (4 ファイル) に含まれない。HEAD の `check_canvas_syntax.sh` (5 ファイル) と `check_concrete.cpp` は本 fix run では未実測で、em++ 環境での再測定が必要。
