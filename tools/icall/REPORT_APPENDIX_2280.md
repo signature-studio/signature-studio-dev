@@ -62,7 +62,11 @@ FA_FIX_COOKIE=0 FA_ENC_INIT=1 bash tools/icall/fa_route_build.sh     # OFF 比�
 
 ## 6. 測定コードの鮮度
 
+測定 commit は `52bd5e41` (コード変更を含む最後の commit。測定は commit 前の同一内容の作業ツリーで実施)。
+
 ```
-$ git diff 44b68224 HEAD -- tools/icall
-(測定後のコード変更は本 commit のみ。測定は本 commit の内容で行った)
+$ git diff 44b68224 52bd5e41 -- tools/icall/fa_route_build.sh tools/icall/ir_fix_cookie.py   # 基点 main からの差分 (本 run のコード変更の全量)
+ tools/icall/fa_route_build.sh |  8 ++++++-
+ tools/icall/ir_fix_cookie.py  | 90 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 97 insertions(+), 1 deletion(-)
 ```
