@@ -201,6 +201,19 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 
 受入条件 2・3 は未達。次 run の入力: `oc_artifacts: fl-win64 toolchain-retdec`。
 
+#### 12.4.2 段 dump の構造の確定 (HEAD `1017f349`、測定は `measure_flengine_split.sh` を再実行)
+
+測定値: `measure_flengine_split.sh` 119.9 s (real, 4 core, load 1.70)。base 366 / c2 366 (基準どおり)。`passes_stub.txt` 709 段。`passes_stub_count.py` の段 dump は 2,692,856 行 (119 MB)。
+
+段 dump (`retdec-decompiler --print-after-all` の stderr) について、次を実物で確認した。突合 (受入条件 2) の前提になる構造である。
+
+- **ヘッダ 1 個 = 段 1 本ではない**。同じ段名 (例 `Global Value Numbering`) のヘッダが段内で複数回出る。`function_1cc0000` の `define` は段 `GVN` の 3 本のヘッダのうち 1 本 (2476420 側の後ろ) にしか出ず、先頭の 2460095 側の本文は `__decompiler_undefined_function_*` の宣言だけの空関数だった。段の単位をヘッダで切ると関数と段の対応がずれる。
+- **`!N` の META 定義はヘッダの直前の段に属する**。例: `!8632` の定義は 1468692 行にあり、その直前のヘッダは `Assembly mapping instruction removal` (1430666)。META は次のヘッダ (`C++ class hierarchy optimization` 1470748) の直前にまとめて出る。したがって `!N → VA` は段本文ではなく、META が並ぶ位置で解決する。
+- 同じ `!8632` が段ごとに別の値を持つ (1468692 では `30212733`、1627480 では `30213838`)。`!N` を最終 `.ll` の番号と照合してはならない (前回の不一致の原因)。
+- `block_map.py` (作業用・PR 外) で段ヘッダ単位に切ると、`function_1cc0000` の基本ブロックが 1 個にしか見えず、stub 呼出しを含むブロックの VA 集合が取れなかった。上の構造 (同名ヘッダの複数化) を反映して切り直すのが次の作業。
+
+受入条件 2・3 は引き続き未達。受入条件 2 の突合は「段の単位 (同名ヘッダを束ねる規則) の確定」から再開する。修正 (受入条件 3) は未着手。
+
 ## 14. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
 結論: **OTT では stack 引数の値一致を動的に検証できない** (stack 引数あり site が実行経路に無い)。達成は未了で、残りは #854 / #229 が追跡する。
