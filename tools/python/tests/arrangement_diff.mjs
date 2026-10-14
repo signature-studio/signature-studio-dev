@@ -24,7 +24,8 @@ const calls = [
   ["arrangement.selectionStart", []], ["arrangement.selectionEnd", []],
   ["arrangement.liveSelectionStart", []], ["arrangement.selectionIsActive", []],
 ];
-// 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)
+// 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)。
+// liveSelectionStart は VARARGS で、provider は引数付きを code 5 にする仮定 (REPORT_PY96 の未解決表)
 const arity = [
   ["arrangement.selectionStart", [1]], ["arrangement.selectionEnd", [0]],
   ["arrangement.liveSelectionStart", [1]], ["arrangement.selectionIsActive", [0]],
