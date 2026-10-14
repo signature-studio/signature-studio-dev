@@ -174,3 +174,16 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
   - `0x407a5e` の `and rcx, [rax-8]` で `UC_ERR_READ_UNMAPPED` (rip=0x407a5e・rax=0)。直前の `0x407a20` は `[rbx+8]`・`[rdx+0x18]`・`[rax-8]` を読むアロケータ状の処理。
 - 判定: 受入 1 (`0x411a80` 到達) **未達**。受入 2 (`0x411bb8` 呼出し時の記録) と受入 3 (`-w` によるプログラム全体の書込み追跡) は受入 1 が前提のため未実施。waiver は変更しない。
 - 残件 (子 issue に移す): `0x407a20` が読むブロック構造 (`[rax-8]` のヘッダ形式、`[rbx]`・`[rbx+8]`・`[rdx+0x18]` の初期化) を PE 内の初期化コードから復元し、合成 host/obj に入れる。
+
+## 13. PLG-F3-24 (#2272): CreatePlugInstance (0x83efb0) の実引数による到達 (部分、測定 commit cdfa8bda)
+
+- 道具の追加 (114843e2): `unicorn_trace.py` に `-d addr=val` (実行前の qword 書込み。ホスト構造体の合成用) と `-t hex` (番地に入るたびに rcx/rdx/r8/r9 を出す) を追加。既存の `-r`/`-w`/`-q` の挙動は不変。
+- 入力: `block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block19148_PE.bin`、`TMPDIR=$RUNNER_TEMP` 下に展開)。fl-win64 には実行時のメモリダンプが無く、host の実データは PE から得られない。
+- 静的確認: `0x83efb0` は `call 0x777290` (r8=0x9876、r9=`0x8bbc04`) の結果が真なら `0x83cb50` → `0x8402b0` の経路。`0x777290` は第 1 引数 `[rcx]` を vtable として `call qword ptr [rbx]` (0x7772be) を行う。
+- 実測 (head cdfa8bda、block19148、逐次、uptime load 1 分 0.53、各実行 wall 数秒):
+  - 試行 1 (`-r rcx=0x40000000`): `UC_ERR_FETCH_PROT` rip=0x0・rax=0x40000000。`0x7772be` の `call [rbx]` が 0 を呼ぶ (呼出し元の戻り番地 `[rsp]=0x7772c0`)。Issue の `UC_ERR_READ_UNMAPPED` (rip=0x7772be) は**再現しない**。
+  - 試行 1' (`-r rcx=0x400000`): `UC_ERR_READ_UNMAPPED` rip=0x7772be・rax=0x400000。Issue と一致するのはこちら。
+  - 試行 2 (`-r rcx=0x40000000 -d 0x40000000=0x40000200 -d 0x40000200=0x100ffff0`): `0x777290` は通過し、`0x83cad7` (`call qword ptr [rax+0x30]`) で `UC_ERR_READ_UNMAPPED` rip=0x83cad7・rax=0x100ffff0 (vtable 項目 `+0x30` が未マップ)。
+  - 試行 3 (`-H`、合成 host・vtable の全 slot は ret stub): `0x777290` → `0x83cb50` → `0x83cca0` → `0x407a20` (rcx=0x48・rdx=0x9) を経て、`0x407a5e` (`and rcx, [rax-8]`) で `UC_ERR_READ_UNMAPPED` rip=0x407a5e・rax=0x0。stub hits は host.vtable[0x0] 2 回・obj.vtable[0x30] 1 回。`0x411bb8`・`0x411940` には届かず、`[0x8c3ca8]` の書込みは 0 件。
+- 判定 (受入条件): 1 (実引数で `0x411a80` に届く) **未達**。`0x407a20` 系が読むヒープ/リンク構造を PE 内の静的情報から合成する必要がある。2 (`0x411bb8` の `[0x8c3c80]`・`[[rcx]+0x28]` の確定) **未達**。3 (`0x83efb0` 起点の `-w 0x8c3ca8:0x8c3cb0`) **未達** (受入 1 が前提)。REPORT の結論 (§9・§10) は変更しない。waiver は変更しない。
+- 残件 (#2272 で追跡): host 構造体の合成を `0x407a20` 系まで行い、`0x411a80` に届かせる。届いた後に `0x411bb8`・`0x411940` の trace と `0x8c3ca8` の最終値を確定する。
