@@ -11,6 +11,7 @@
 - `block18983_PE.bin` に TLS directory は無く、TLS index 変数 `0x6d6e70` の初期値は `0xFFFFFFFF` (`.data`)。
 - `[0x7162d8]` は `.bss` で 0 のため、`function_4181e0` は TLS 経路を通る。`idx = -1` は `zext` 後に線形メモリ外のアドレスになる (canon3 `dec_label_pc_7d8a61`)。
 - `[0x6d6e70]` を設定するのは `function_418120` (`TlsAlloc` → store) のみ。canon3 と hs_flat3 に直接 call は 0 件、hs_e2e の dispatch ログにも `0x418120` は 0 件 (注釈版・stand-in 版とも)。
+- **訂正 (§11.1)**: 「headless chain で `0x418120` は呼ばれない」は誤り。`0x418120` は E8 では呼ばれず、`_InitLib` の hooks 表からの間接 call で実行される。dispatch ログは `fw_call_cur` 経由を記録しないため、0 件は不在の根拠にならない。
 - 呼出元は戻り値を `[BLK+0x80]` から読み `+568` を deref する (§8 の注釈記述・hs_dbg 実測)。
 
 ### 10.2 未採用の実験: stand-in 版 (`fw_hostfix.py` 0x4181e0)
@@ -50,3 +51,53 @@
 - 受入 3 は n=1 の実測と対照で部分達成。変動 (n≥3) と §8 との食い違いは未評価。
 - 既定の値は対照 (3b581236・`--fresh`・§10.3) の実測をそのまま引用する。HEAD は対照と同一コードのため、追加の再測定は行わない (WORKFLOW §6)。
 - 未解決の一覧は `REPORT_2115.md` §9 に置く (本節では重複させない)。
+
+## 11. TLS 経路の確定と注入実験 (fix round 5・測定 commit 4c00ec24)
+
+### 11.1 `0x418120` の実行経路 (訂正)
+
+- `_InitLib` (native 0x40db20) は `reason ∈ {1,2}` で `call qword ptr [rbx + rsi*8]` (0x40dbfe・`rbx` = hooks 表・`rsi` = reason) を行う。`reason==3` も同形 (0x40dc2d)。
+- hooks 表 `0x6d6ef8`: `[+0]=0x4181b0`・`[+8]=0x418120`・`[+0x10]=0x4180d0`・`[+0x18]=0x418160` (`block18983` の .data)。reason=1 の `[+8]` が `0x418120` (TLS 初期化)。E8 走査 (68 件) に現れないのは、間接 call のため。
+- 実行の確認 (Phase A・`fw_boot.c` の診断行): `[fw][ov] hooks[1]=0x418120` → `TlsAlloc -> 1` → `hooks[1] done: tls_idx=1`。TLS idx は設定されている。
+
+### 11.2 native の意味 (逆アセンブル・block18983)
+
+| 関数 | 意味 |
+|---|---|
+| `0x418120` (hooks[1]) | `[0x6d6e70] = TlsAlloc()`。`0x4180d0()`。`[0x7162d0] = TlsGetValue([0x6d6e70])` |
+| `0x4180d0` | `ebx = 0x4180c0()` (= 0x288 固定・`lea rax,[0x288]; ret`)。`blk = LocalAlloc(0x40, ebx)`。`blk != 0` なら `TlsSetValue(idx, blk)` |
+| `0x4181e0` (TLS getter・引数なし) | `[0x7162d8] != 0` なら `TlsGetValue(idx)`。0 なら `0x4180d0` を呼んで再取得し、なお 0 なら `[0x7162d0]`。`[0x7162d8] == 0` なら `gs:[0x58][idx*8]` (idx = -1 で範囲外) |
+| `0x4189c0` (_StartLib) | `reason==1` で `[0x716290]=1`・`[0x7162d8]=1` 等 (fw_boot.c の既存実装と一致) |
+
+- したがって getter の正しい戻り値は、per-thread block (0x288 byte・`LocalAlloc` のゼロ初期化) のポインタ。caller はその `+568` を deref する (§8・§10)。
+- `return 0` 注釈は、この block の代わりに 0 を返す。
+
+### 11.3 lift の欠陥 (実測)
+
+- `function_4180c0` の lift は `ret i64 648` で正しい。
+- `function_4180a0` の lift は引数 `ecx` (= 0x288) を `ptrtoint @683` に fold する。`LocalAlloc(0x40, 0x10000880)` になり、wasm の定数アドレスが size に入る。
+- `function_4180d0` の lift では、`TlsSetValue(1, 0x1)` の値が LocalAlloc の戻り (`0x118b60a8`) ではなく `1` になる。この戻り値の受け渡しも lift 側の欠陥と判断した (原因の IR 行は未特定)。
+- その結果 `[0x7162d0] = 1`。TLS 値の不正は、TLS の意味論ではなく lift の fold 由来。
+
+### 11.4 実測 (測定 commit 4c00ec24・framework コードは origin/main と同一 + 表示行のみ)
+
+| 手順 | 結果 | 所要 (real) | load (開始 → 終了) |
+|---|---|---|---|
+| `fw_stage2.sh` (増分・emcc 再ビルド) | rc 0・`SMOKE PASS` (dispatch=38 units_done=0 ff=0) | 18.5 秒 | 0.41 / 0.64 / 0.63 (15:09:24) → 0.91 / 0.76 / 0.67 (15:11:15) |
+| `hs_e2e.sh --fresh` | Phase A `dispatch=38 ff=0` / Phase B `memory access out of bounds` / `rec=7` / `E2E FAIL: 1 項目` | 92.6 秒 | (上と同じ区間) |
+
+- 対照 (§10.3 の 3b581236) と同じ失敗形 (Phase B OOB・rec=7・1 項目)。1 回測定 (n=1)。
+- 表示行 (`[fw][ov] hooks[...]`・`[fw][tls] ...`) の追加は dispatch 数を変えない (smoke の dispatch=38 は維持)。
+
+### 11.5 注入実験 (未採用)
+
+| 条件 | commit | Phase A | Phase B |
+|---|---|---|---|
+| E1: `0x4180d0` を native の意味に注釈 (`0x4181e0` の `return 0` は残す) | 未コミット | (fw_route は注釈を含まないため対象外) | `rec=7`・1 項目・OOB。`hs_hostfix.json` で置換を確認。Phase B は TLS 初期化を通さないため、この注釈は実行されない |
+| E3: Phase B の `hs_e2e_run` の先頭で `fw_call_cur(0x418120)` を 1 回呼ぶ + `0x4180d0` 注釈 + `0x4181e0` 注釈の削除 | `f850508a` (revert `4c00ec24` で戻し) | `dispatch=38 ff=0` | `rec=7`・1 項目・OOB。TLS は `TlsAlloc → 1`・`TlsSetValue(1, 0x118b6628)`・`TlsGetValue(1) → 0x118b6628` (正しい block)。失敗位置は変化: `0x40d807` の soft-miss (target 0) は消え、`0x4e5fa6` の間接 target が文字列バイト列 `0x6572432000000000` になる |
+
+### 11.6 結論
+
+- 受入 2 は未達。戻り値の内容は次の形で確定した: getter は、`[0x7162d8]` が 1 なら `TlsGetValue(idx)`、0 なら `g_tls_slots[idx]` を返し、どちらも `0x4180d0` が確保した 0x288 byte の per-thread block を指す。`return 0` 注釈は、この block の代わりに 0 を返す。
+- Phase B は framework 初期化を通らない (`hs_plug.c` `hs_e2e_run` → `CreatePlugInstance`)。TLS 値を正しくしても OOB は消えず、block の内容 (`+568`) の native 初期化元が次の壁。これは子 issue #2571 に分割する。
+- 注釈の変更 (E1・E3) は、いずれも Phase B の失敗形を変えるだけで、E2E は PASS にならない。採用はしない。

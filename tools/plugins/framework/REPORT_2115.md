@@ -210,6 +210,9 @@ for m in re.finditer(b"\xe8", d):
 | 同一の実行コードで §8 と付録 §10.3 の結果が食い違う。失敗位置の変化は n=1 で変動未評価 | Phase B 結果の解釈 | #2115 (継続) |
 | `hostshim/hs_e2e.sh` の増分判定 (49 行目) が `fw_hostfix.py` の変更を見ない (`--fresh` の測定には影響しない) | plain 実行で古い `hs_flat3.ll` が混入する余地 | #2115 (継続。測定ハーネスの修正は再測定を伴うため本 PR では未変更) |
 | main 側で 3b581236 以降に framework 8 ファイル (`fw_rt.c`・`fw_boot.c`・`hostshim/hs_preinit.mjs` 等) が変わった。merge 後の挙動は未測定。本 PR はコード差分 0 (docs のみ) のため、この merge 結果は本 PR の判定対象外 | merge 後の Phase A 回帰 (`dispatch=38 ff=0` の確認)。merge 時に確認 | #2115 (継続) |
+| Phase B (`hs_e2e_run`) は framework 初期化 (`_StartLib`・TLS 初期化) を通らない。TLS 値を正しくしても OOB は残る (付録 §11.5 E3) | 受入 2 (Phase B の変化) | #2571 (子) |
+| `0x418120` の実行経路の訂正: `_InitLib` の hooks 表 (`0x6d6ef8`・reason=1 → `[+8]`) からの間接 call で実行される (§10.1 の「呼ばれない」は誤り) | 前提の訂正 | 付録 §11.1 で訂正済み |
+| lift の fold 欠陥: `function_4180a0` の引数 `ecx` が `ptrtoint @683` に化け、`function_4180d0` の戻り値が 1 になる | TLS block が正しく作られない | #1890 / #2008 (fold 系・既存)・付録 §11.3 |
 
 ## 10. TLS index 未設定の確認と stand-in 版の実験 (未採用・測定 commit 91308efd)
 
