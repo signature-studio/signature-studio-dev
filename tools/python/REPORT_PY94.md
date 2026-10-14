@@ -58,36 +58,40 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 - `host/fl_mock.mjs`: 状態 `undoPos` / `undoCount` / `undoLast` / `safeEdit` / `projTitle` / `projAuthor` / `projGenre` と、7 件の getter (NOARGS)。
 - `provider/fl_engine.c`: 同名の static 状態と `FL_H(general, ...)` 7 件。`fl_engine_reset` で初期化。`fl_ret_i` / `fl_ret_b` / `fl_ret_s`。
 - `tests/general_diff.mjs`: 呼出し 7 件を追加 (calls 9 → 18)。引数個数違い 2 件 (`safeToEdit [1]`・`getProjectTitle [0]`) を追加。
-- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。main 取り込み後の期待値 (実装 93 / 未実装 342) は下の `## 検証` 節。
+- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。main 取り込み後の期待値 (実装 104 / 未実装 331) は下の `## 検証` 節。
 
 ## 検証
 
-測定 commit: `bdd66a55` (main 取り込みの merge。`tools/python` の .md 以外で最後にコードを変えた commit)。
-main (`4baa12af`) の取り込みで `tests/provider_check.mjs` が競合した。解消は、PR の `pe94` 集合と main の `pe100`・`pe115` 集合を両方残し、期待値を 93 / 342 にした。`provider/fl_engine.c`・`host/fl_mock.mjs` は自動マージで競合なし。
-9bba63c7 時点 (PY-94 初版) の測定値は `git show 9bba63c7:tools/python/REPORT_PY94.md` の `## 検証` 節に残る。本節は bdd66a55 の値だけを載せる。
+測定 commit: `219d9688` (main (`3e8c8d25`) の取り込みの merge。`tools/python` の .md 以外で最後にコードを変えた commit。検証 HEAD も同じ commit)。
+main の取り込みで `docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` が競合した。解消は両側を残した (PR コメントに方針)。
+期待値は、PR の `pe94` 7 件と main の `pe121` 5 件・`pe119` 6 件を合算して **実装 104 / 未実装 331** (total 435、MCP 静的 60)。
+前回 (`bdd66a55`・`932c3dbc`) の測定値は PR の履歴に残り、本節には載せない。
 
-環境: runner 4 core。`FL_WIN64_DIR` は `fl-win64` の DATA block を展開した先 (`extracted/`)。`EMSDK_ENV` は `$ARTIFACTS_DIR/toolchain-emsdk.tar.zst` を展開したもの (emsdk 6.0.12)。
+環境: runner 4 core。開始時の load average 1.85 / 1.16 / 0.55。`FL_WIN64_DIR` は `fl-win64` の展開先 (`extracted/`)。emsdk は runner の `/opt/emsdk` (`toolchain-emsdk` は `$RUNNER_TEMP` に展開して `EMSDK_ENV` で指定し、provider のビルドに使った)。
 
-前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・incremental)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0)。
+前提の生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0・164 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0・4 秒)・`build_flpy_static.sh` (rc 0・4 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 93 | 1.3 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 93 / 未実装 342 / MCP 静的 60) | 0.37 秒 |
-| `node tests/general_diff.mjs` | calls 18、diffs 0、PASS | 0.05 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.05 秒 |
-| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 | 2.1 秒 |
-| `bash build_flpy_static.sh` → `node tests/static_check.mjs` | rc 0、48/48 ok、`STATIC CHECK OK` | 6.5 秒 (build) |
+| `bash provider/build.sh` | rc 0 | 1 秒未満 (実測 `date` の差 0 秒) |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 104 / 未実装 331 / MCP 静的 60) | 1 秒未満 |
+| `node tests/general_diff.mjs` | calls 18、diffs 0、PASS | 1 秒未満 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 1 秒未満 |
+| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 1 秒未満 |
+| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 1 秒未満 |
+| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 1 秒未満 |
+| `node tests/ui_state_diff.mjs` | calls 12、diffs 0、PASS | 1 秒未満 |
+| `node tests/device_diff.mjs` | calls 8、rejects 4、midi_out 5、diffs 0、PASS | 1 秒未満 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 | 1 秒 |
+| `node tests/static_check.mjs` | rc 0、`STATIC CHECK OK` | 1 秒未満 |
 
-- 件数: 実装 93 / 未実装 342 (total 435、MCP 静的 60)。
-- ネガティブコントロール (`docs/WORKFLOW.md` §5): bdd66a55 の detached worktree で、`host/fl_mock.mjs` の `undoPos` 既定値 (24 行目) を 0 から 1 にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 18・diffs 0・PASS (rc 0)。
-- 最終 HEAD での再現: `932c3dbc` で上の全コマンドを再実行し、同じ結果を得た (`mixer_diff` は calls 57・diffs 0・PASS、static_check は `STATIC CHECK OK`、ネガティブコントロールは rc 1 → 戻すと PASS)。bdd66a55 から HEAD までの `tools/python` のコード (.md 以外) は同一なので、この再現は測定値と同じコードに対するもの。
+- 件数: 実装 104 / 未実装 331 (total 435、MCP 静的 60)。`provider_check` の期待値 (104 / 331) と一致。
+- ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `undoPos` 既定値 (24 行目) を 0 から 1 にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1 (FAIL)。元に戻す (cmp で一致を確認) と calls 18・diffs 0・PASS (rc 0)。
 
-コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
+コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外): 測定 commit = HEAD のため 0 行。
 
 ```
-$ git diff bdd66a55 HEAD -- tools/python ':!*.md'
+$ git diff 219d9688 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
