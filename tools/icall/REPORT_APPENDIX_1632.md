@@ -13,19 +13,21 @@
 
 ## 2. 測定
 
-測定 commit: `2626e445` (main。本 run は main 基点の `1632-icall-xmm0-mismatch` worktree で実行。コード変更なし)。
+測定 commit: `ff78a960` (main `000c6143` を取り込んだ `1632-icall-xmm0-mismatch` の HEAD。コード変更なし)。
 
 | 項目 | 値 |
 |---|---|
 | 素材 | `fl-win64`・`plugins-freshair`・`toolchain-retdec`・`toolchain-emsdk`・`work-icall`・`work-liftlib` を `$HOME/artifacts` から展開 (実在確認済み) |
 | plugins-freshair | `fetch.sh` rc 0 (win 17 files / factory .epf 8)。mac は pkg・xar 無しで skip |
 | native | `tools/ott/native/build.sh` OK。出力は `tools/ott/work/libottnative.so` (build.sh の `../work` 解決) |
-| `fa_route_build.sh` | OK、8.1 s、開始 load 0.83 |
+| `fa_route_build.sh` | OK、5.5 s (real)、開始 load 2.05 |
 | `fa_sweep.sh 8 60` | 131 関数、69.2 s (`real 1m9.194s`)、開始 load 1.81・終了 1.28 (4 vCPU) |
 | 内訳 | **bit 一致 41 / native crash・timeout 66 / wasm のみ err 15 / 値の不一致 9** (REPORT_APPENDIX_1451 §3 と一致) |
 | 注記 | main の `REPORT_APPENDIX_1606.md` §2.2 は同じ sweep を 40 / 66 / 15 / 10 と記録。本 run の実測は 41 / 9 で、1606 の記録とは 1 関数ずれる。差の 1 関数は未特定 (1606 は関数別の出力を残していない) |
 
-コード差分: 測定 commit から HEAD まで 0 (本 PR はコードを変えない。付録のみ)。
+前回 (測定 commit `2626e445`) も同値 (41 / 66 / 15 / 9)。9 件の集合は `0x1803de190` `0x180829c20` `0x180c98240` `0x180c99430` `0x180da4030` `0x181055400` `0x181056a4c` `0x181056aa0` `0x18105d9fc` で、1451 の §3 と一致する。main の `REPORT_APPENDIX_1606.md` は 40 / 66 / 15 / 10 (1 関数差) と記録しているが、本 run の HEAD では再現しなかった。差の 1 関数は未特定で、#1606 側の記録に残る。
+
+コード差分: `git diff 2626e445 ff78a960 -- tools/icall` は `REPORT_APPENDIX_1606.md` の追加のみ (+92 行、コード無し)。本 PR で変えたのは付録だけなので、測定 commit からのコード差分は 0。
 
 ## 3. 切り分け
 
