@@ -1,4 +1,4 @@
-[ld104_reach] c589b0: site 12 / 枝刈り無し到達 12 / 枝刈り後到達 0 / 枝刈り後 DEAD 12 (CFG 到達命令 3477 -> 468, jmp reg 0 -> 0)
+[ld104_reach] c589b0: site 12 / 枝刈り無し到達 12 / 枝刈り後到達 0 / 枝刈り後 DEAD 12 (CFG 到達命令 3470 -> 461, jmp reg 0 -> 0)
 [ld104_reach] 128f9e0: site 12 / 枝刈り無し到達 12 / 枝刈り後到達 12 / 枝刈り後 DEAD 0 (CFG 到達命令 3681 -> 3681, jmp reg 0 -> 0)
 [ld104_reach] c589b0 の読み値 v ごとの枝刈り (c59271 の読み値 v に対する分岐の成否・site 到達):
   none                           prune=[] REACH 12/12 c592c2 c5a6b4 c5a705 c5a750 c5a811 c5bc03 c5bc54 c5bc9f c5bd1d c5d121 c5d172 c5d1bd
@@ -11,6 +11,7 @@
 [ld104_reach] (a) 支配: c59271 到達 Y -> c59182 を除くと N / c5918c 到達 Y -> N
 [ld104_reach] (b) c5918c〜c59271 の call: 0 件 []
 [ld104_reach] (c) config 関数 8227 本: 直接分岐・call 61325 件 / 間接 4250 件。c5918c〜c59277 の外から内への直接分岐 0 件 []
+[ld104_reach] (d) 外から c589b0 本体 (c589b0〜0xc5d649) への直接分岐・call: 入口 c589b0 への呼出し 1 件 / 入口以外の本体への分岐・call 0 件 125338d:call 0xc589b0
 [ld104_reach] VA 0x1504dd4 を rip 相対で指す命令 (config 関数区間): 書込み 1 / 読み 4 / アドレス取得 lea 0
   c59182 mov dword ptr [rip + 0x8abc48], 8 (W) fn c589b0 -> 1504dd4
   c591a9 movsxd rcx, dword ptr [rip + 0x8abc24] (R) fn c589b0 -> 1504dd4

@@ -8,6 +8,8 @@ IR に site の block が無い理由 (REPORT_2288 §8) を機械語の CFG で�
   3. 支配・書込み走査 (config の関数区間 boot*.drc.config.json の全命令):
      (a) 入口から c59182 を除くと c59271 に届かない、(b) c5918c〜c59271 に call が無い、
      (c) config 全関数で c5918c〜c59277 の外から内への直接分岐が 0 件 (config 外の image は未走査)。
+     (d) config 全関数で c589b0 本体 (c589b0〜endAddr) への外からの直接分岐・call: 入口 c589b0 への呼出し・入口以外の本体への分岐・call の件数。
+     到達の探索は config の endAddr を上限にする (関数区間の外へは出ない)。
      FLAG を rip 相対で指す命令の数 (書込み W・読み R・アドレス取得 A)。欠落 store 2 本の rip 参照も数える。
 使い方: python3 ld104_reach.py [OUT.tsv]      環境変数: M11_WORK (既定 tools/m11/work)
 出力: OUT.tsv (site の到達) と、同じ dir の ld104_checks.txt (枝刈り表・支配・走査)
@@ -43,7 +45,6 @@ SITES = {
 ENTRY = {'c589b0': 0xc589b0, '128f9e0': 0x128f9e0}
 # (分岐命令, 比較する値の差分 k, je 系なら True / jne 系なら False)。読み値 v に対し eax は v-6, v-10, v-11 になる
 FLAG_BRANCHES = ((0xc5927c, 6, True), (0xc59283, 10, True), (0xc5928e, 11, False))
-SPAN = 0x8000
 RIP = re.compile(r'\[rip ([+-]) (0x[0-9a-f]+)\]')
 DIRECT = re.compile(r'0x[0-9a-f]+$')
 
@@ -57,11 +58,11 @@ def prune_for_v(v):
     return prune
 
 
-def reach(mach, cs, entry, prune, block=frozenset()):
+def reach(mach, cs, entry, end, prune, block=frozenset()):
     seen, q, unknown = set(), deque([entry]), 0
     while q:
         a = q.popleft()
-        if a in seen or a in block or not (entry <= a < entry + SPAN):
+        if a in seen or a in block or not (entry <= a < end):
             continue
         seen.add(a)
         ins = next(cs.disasm(mach.read(a - mach.base, 16), a, 1), None)
@@ -149,6 +150,7 @@ def main():
     mach = ImageMachine(os.path.join(W, 'm11_image.bin'), os.path.join(W, 'boot*.drc.config.json'))
     cs = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     data = open(os.path.join(W, 'm11_image.bin'), 'rb').read()
+    funcs = config_funcs(mach.base)
     rows = ['fn\tsite\treach_none\treach_pruned\tunknown_jmp_none\tverdict_reach']
     checks = []
 
@@ -158,9 +160,10 @@ def main():
 
     for fn, sites in SITES.items():
         e = ENTRY[fn]
+        hi = funcs[e]
         prune = prune_for_v(8) if fn == 'c589b0' else set()
-        r_none, u_none = reach(mach, cs, e, set())
-        r_pr, u_pr = reach(mach, cs, e, prune)
+        r_none, u_none = reach(mach, cs, e, hi, set())
+        r_pr, u_pr = reach(mach, cs, e, hi, prune)
         cnt = {'reach': 0, 'dead': 0}
         for s in sites:
             a = int(s, 16)
@@ -174,28 +177,33 @@ def main():
             len(r_none), len(r_pr), u_none, u_pr))
 
     e = ENTRY['c589b0']
+    hi = funcs[e]
     sites = [int(s, 16) for s in SITES['c589b0']]
     log('[ld104_reach] c589b0 の読み値 v ごとの枝刈り (c59271 の読み値 v に対する分岐の成否・site 到達):')
     scen = [('none', set()), ('NC: c5927c の fall のみ枝刈り', {(0xc5927c, 'F')})]
     scen += [('v=%s' % hex(v), prune_for_v(v)) for v in (6, 8, 10, 11, 0x7fffffff)]
     for name, p in scen:
-        r, _ = reach(mach, cs, e, p)
+        r, _ = reach(mach, cs, e, hi, p)
         got = [('%x' % a) for a in sites if a in r]
         pl = ' '.join('%x%s' % (a, m) for a, m in sorted(p))
         log('  %-30s prune=[%s] REACH %2d/12 %s' % (name, pl, len(got), ' '.join(got)))
 
-    r_cut, _ = reach(mach, cs, e, set(), block={FLAG_WRITE})
-    r_full, _ = reach(mach, cs, e, set())
+    r_cut, _ = reach(mach, cs, e, hi, set(), block={FLAG_WRITE})
+    r_full, _ = reach(mach, cs, e, hi, set())
     log('[ld104_reach] (a) 支配: c59271 到達 %s -> c59182 を除くと %s / c5918c 到達 %s -> %s' % (
         'Y' if FLAG_READ in r_full else 'N', 'Y' if FLAG_READ in r_cut else 'N',
         'Y' if FLAG_RANGE[0] in r_full else 'N', 'Y' if FLAG_RANGE[0] in r_cut else 'N'))
     cl = calls_in(mach, cs, FLAG_RANGE[0], FLAG_READ)
     log('[ld104_reach] (b) c5918c〜c59271 の call: %d 件 %s' % (len(cl), cl))
 
-    funcs = config_funcs(mach.base)
     into, indirect, direct = branches_into(data, mach.base, funcs, FLAG_RANGE[0], FLAG_RANGE[1])
     log('[ld104_reach] (c) config 関数 %d 本: 直接分岐・call %d 件 / 間接 %d 件。c5918c〜c59277 の外から内への直接分岐 %d 件 %s' % (
         len(funcs), direct, indirect, len(into), into))
+    into_b, _, _ = branches_into(data, mach.base, funcs, ENTRY['c589b0'], hi)
+    fmt = ' '.join('%x:%s %s' % (a, m, o) for a, m, o in into_b)
+    ent = [x for x in into_b if int(x[2], 16) == ENTRY['c589b0']]
+    log('[ld104_reach] (d) 外から c589b0 本体 (c589b0〜0x%x) への直接分岐・call: 入口 c589b0 への呼出し %d 件 / 入口以外の本体への分岐・call %d 件 %s' % (
+        hi, len(ent), len(into_b) - len(ent), fmt))
 
     hits = rip_hits(data, mach.base, funcs, {FLAG})
     kinds = {k: sum(1 for h in hits if h[3] == k) for k in 'WRA'}
