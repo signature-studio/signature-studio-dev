@@ -120,13 +120,7 @@ case 単位分類 (完全再現) を基準にすること。「実行不能 2,49
   410320 の call 脱落からその経路に入るまでの因果は trace_head (最大 12 件) に収まらず**直接確認していない** (推定)。
 - **分岐の型 (LD-17 / #864)**: 残りを排他的に型 B (L が ret まで call 無し・tail jump 無し) / C (L の直接 call 先で分岐) / D (直接 call 先に無い) に分類した。件数は `results/m11_unreachable_diverge.md` §2 が正本。
   型 B は「L の内部では食い違わず、L の戻り後の呼出元で次 entry が現れる」と読める (推定)。根拠は B に入る L の機械語を ret まで読んで jmp 先 (tail jump) が無いことを確認した点のみ (`tail_jmps`)。戻り後の実際の呼出元は未確認。個別原因は未特定 → 子 issue #1034 (型 B)・#1035 (型 C・D)。
-- **型 B の再検証 (LD-27 / #1034・未実測)**: `tests/trace_fullcompare_typeb.py` は、型 B 候補の case を完全 trace (xfill 既定 1 と 0) で取り直し、full-trace の L を型 B 判定 (`typeB_full`) し直す。
-  - **未実測**: 本ブランチは手元の run で再実行していない。`work-m11` (batch jsonl) と `work-liftdiff` が素材に無く、m11 の IR は RetDec 生成物で、`fl-win64` だけでは build できないため。以下の件数・値は再実測するまで確定値ではない。
-  - 件数の定義・表 (xfill 別の分岐残存数 / full-trace L と trace_head L の一致数 / L が変わった件数 / 0x40a380 の件数 / rax 値) は、再実測後に本節へ追記する。それまで受入条件は未チェック。
-  - **trace_head 基準の型 B 候補 34 件** は、`batch` の trace_head (最大 12 件) で求めた L が leaf のもの。full-trace で L が変わる件は、型 B の定義 (L が ret まで call 無し) を満たすか full-trace 側で再判定が要る。満たさない件は型 B から外す。
-  - **xfill 仮説 (推定)**: 型 B の root entry で x0 が食い違うのは、xfill=1 が署名外 xmm に 1.25+i を入れるためと `rt/ld_native.c` の読みから推定している。xfill=0 の x0 値で裏を取るまで、実測で確かめた内容ではない。
-  - **再現手順 (`TARGET.json`)**: `tools/liftdiff/targets/m11.json` は既に `"pe": "${FL_WIN64_DIR}/extracted/block00031_PE.bin"` を指すので、複製は不要。`FL_WIN64_DIR` を `fl-win64` の展開先に設定し、`python3 tools/liftdiff/tests/trace_fullcompare_typeb.py tools/liftdiff/targets/m11.json <batch.jsonl>` を実行する。事前に `bash tools/m11/m11_gen_ir2.sh` で `ir_conditions.json` を作り、`work-m11` 相当の IR と image を用意する。
-  - 個別原因・類型 (D15 / ldfix / その他) の分類は未完 → #1034 は Refs。
+- **型 B の完全 trace 再検証 (LD-27 / #1034・部分達成)**: 節全文は [`REPORT_APPENDIX_LD27.md`](REPORT_APPENDIX_LD27.md)、件数の正本は `results/m11_typeb_cause.md` §1。34 件は X (xmm0 入力の脱落・既存 #547 の範囲)・M (MXCSR 戻り値 0・#417 系) の 2 類型を呼出元と戻り後の分岐まで特定した。R は未特定。xfill 仮説は棄却 (xfill=0 でも X が残る)。rax は trace から導出 (直接計測は未達)。未完は #1034 に残す (Refs)。
 - **OOB function_414ad0 系 (68 件)**: 機械語は入口 rcx (var 文字列のアドレス) の 1 段 deref `mov r,[rbx]` が 4 箇所 (0x414af3/0x414b49/0x414b64/0x414b78)。
   lift 後 IR には `%arg1` を ptr とする load が 0 件で、`%arg1` を値のまま `icmp`/`add` に使っている (ldfix F3a/F3b 型の値↔アドレス取り違え)。
   68 件は全て最上位 trap frame が `function_414ad0` (= wasm は 414ad0 に到達している)。wasm trace_head に 414ad0 が現れるのは 41 件で、
