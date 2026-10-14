@@ -119,6 +119,14 @@ class LaunchIssuesTest(unittest.TestCase):
         self.assertIn(12, rows["ready"])
         self.assertEqual(rows["stopped"], [])
 
+    # 日次 digest の rolling issue (CI-70) は着手対象に入れない (ネガコン)。通常の issue は従来どおり ready
+    def test_digest_rolling_issue_is_not_ready(self):
+        d = snapshot([13, 14])
+        d["issues"][0]["title"] = "[CI-70] 自律運転ダイジェスト (rolling)"
+        _, _, _, rows = lj.classify(d)
+        self.assertEqual(rows["ready"], [14])
+        self.assertEqual(rows["user"] + rows["stopped"] + rows["relaunch"] + rows["recent"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

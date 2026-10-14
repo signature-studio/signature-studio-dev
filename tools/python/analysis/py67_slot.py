@@ -1,171 +1,203 @@
 #!/usr/bin/env python3
-"""PY-71 (#2501): スロット (RIP 相対で指す .data/.bss の値) の参照を列挙し、値の流れを近似で追う (実機不要)。
+"""PY-67 (#2159): .data の slot を経由する間接参照を追う (実機不要)。
 
-  python3 analysis/py67_slot.py <PE.bin> <slot VA hex>[,...] [fwd_insns] [back_insns]
+  python3 analysis/py67_slot.py <PE.bin> <slot VA hex> <global VA hex> [window]
 
-1. .text を 1 回だけ線形走査し、RIP 相対の disp が slot と一致する命令を出す (load / store / lea)。
-   fn= は関数先頭の近似 (int3 パディングの直後の命令)。
-2. 各参照の前後 0x100 バイトを逆アセンブルした窓の中で:
-   - load (mov reg, [slot]) / lea (lea reg, [slot]): reg に slot (またはその値のアドレス) が入ったとみなし、
-     後続 fwd_insns 命令で reg の伝播を追う。reg 経由の STORE (書込み先 [slot値+d])・
-     間接 call (call [reg+d])・直接 call の引数レジスタ (rcx/rdx/r8/r9) への受け渡しを出す。
-   - store (mov [slot], reg): reg を最後に書いた命令を直前 back_insns 命令から探す (値の出所)。
-制限: 窓外・メモリ経由の別名・ポインタの再読込みは追わない。call で caller-saved を捨てる近似。
-窓の先頭が命令境界とずれた場合は alignment miss と出す。
+前提: slot の中身が global の絶対値 (&global) である。コードは `mov reg,[rip+slot]` で
+&global (depth 1) を得て、続けて `mov reg,[reg]` で *global (depth 2) を得る。
+- depth 1 の基底への store: global 自体 (g) への書込み。
+- depth 2 の基底への store: g が指すオブジェクト P への書込み。
+
+1. .text を 1 回線形走査する。
+2. slot 由来のレジスタを追跡する (mov 複写・基底 0 の mov 逆参照で depth を増やす。
+   それ以外の書込みで追跡を止める)。call で caller-saved を破棄し、ret/jmp で全破棄。
+3. depth 別の mov store、slot/global への RIP 相対参照、global の即値を出す。
+4. slot 由来 (depth 1/2) を引数に取る direct call の先頭 40 命令で、その引数レジスタへの書込みを出す。
+採用前に py58_context.py で命令境界を確認すること。
 """
+import re
+import struct
 import sys
 
 import capstone
 import pefile
 
-X = capstone.x86
 path = sys.argv[1]
-slots = [int(v, 0) for v in sys.argv[2].split(",")]
-fwd = int(sys.argv[3], 0) if len(sys.argv) > 3 else 16
-back = int(sys.argv[4], 0) if len(sys.argv) > 4 else 16
-PRE = POST = 0x100
-ARG = ("rcx", "rdx", "r8", "r9")
-CALLER_SAVED = ("rax", "rcx", "rdx", "r8", "r9", "r10", "r11")
-MOV = ("mov", "movzx", "movsx", "movsxd", "movd", "movq")
-S32 = {"eax": "rax", "ebx": "rbx", "ecx": "rcx", "edx": "rdx", "esi": "rsi",
-       "edi": "rdi", "ebp": "rbp", "esp": "rsp"}
+slot = int(sys.argv[2], 0)
+glob = int(sys.argv[3], 0)
+window = int(sys.argv[4], 0) if len(sys.argv) > 4 else 60
 
 pe = pefile.PE(path, fast_load=True)
 data = open(path, "rb").read()
 text = next(s for s in pe.sections if s.Name.startswith(b".text"))
-tdata = data[text.PointerToRawData:text.PointerToRawData + text.SizeOfRawData]
+toff = text.PointerToRawData
+tsize = text.SizeOfRawData
 tbase = pe.OPTIONAL_HEADER.ImageBase + text.VirtualAddress
+tdata = data[toff:toff + tsize]
+
 md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 md.detail = True
+X = capstone.x86
+WRITE = capstone.CS_AC_WRITE
+ARG_REGS = ("rcx", "rdx", "r8", "r9")
+CALLER_SAVED = ("rax", "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11")
+NO_WRITE = {"cmp", "test", "push", "bt", "ucomiss", "ucomisd", "comiss", "comisd", "jmp", "call"}
 
 
 def canon(name):
-    if name in S32:
-        return S32[name]
-    if name.startswith("r") and name[-1] in "dwb" and name[1:-1].isdigit():
-        return name[:-1]
+    if not name:
+        return ""
+    m = re.fullmatch(r"r(\d+)[dwbl]?", name)
+    if m:
+        return f"r{m.group(1)}"
+    if name in ("rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp"):
+        return name
+    m = re.fullmatch(r"e(ax|bx|cx|dx|si|di|bp|sp)|(ax|bx|cx|dx|si|di|bp|sp)", name)
+    if m:
+        return "r" + (m.group(1) or m.group(2))
+    m = re.fullmatch(r"([abcd])[lh]", name)
+    if m:
+        return "r" + m.group(1) + "x"
+    if name in ("sil", "dil", "bpl", "spl"):
+        return "r" + name[:2]
     return name
 
 
-def rname(reg):
-    return canon(md.reg_name(reg))
+def reg_of(md_, op):
+    return canon(md_.reg_name(op.reg))
 
 
-def fmt(ins):
-    return f"{ins.address:#x}: {ins.mnemonic} {ins.op_str}"
+tracked = {}
+stores = []
+calls = []
+slot_loads = 0
+slot_refs = []
+glob_refs = []
+imms = []
 
+off = 0
+idx = 0
+while off < len(tdata):
+    ins = next(md.disasm(tdata[off:off + 15], tbase + off, 1), None)
+    if ins is None:
+        off += 1
+        continue
+    off += ins.size
+    idx += 1
+    ops = ins.operands
+    mn = ins.mnemonic
 
-def sweep():
-    refs = []
-    fn = None
-    pad = True
-    off = 0
-    while off < len(tdata):
-        ins = next(md.disasm(tdata[off:off + 15], tbase + off, 1), None)
-        if ins is None:
-            off += 1
-            pad = True
-            continue
-        off += ins.size
-        if ins.mnemonic == "int3":
-            pad = True
-            continue
-        if pad:
-            fn = ins.address
-            pad = False
-        for op in ins.operands:
-            if op.type != X.X86_OP_MEM or op.mem.base != X.X86_REG_RIP:
-                continue
+    for r in [r for r, v in tracked.items() if idx - v[0] > window]:
+        del tracked[r]
+    if mn == "ret" or mn.startswith("ret") or mn in ("jmp", "int3"):
+        tracked.clear()
+    if mn == "call":
+        callee = ops[0].imm if ops and ops[0].type == X.X86_OP_IMM else None
+        for r in ARG_REGS:
+            if r in tracked:
+                calls.append((ins.address, r, tracked[r][2], callee, tracked[r][1]))
+
+    for op in ops:
+        if op.type == X.X86_OP_MEM and op.mem.base != 0:
+            base = canon(md.reg_name(op.mem.base))
+            if base in tracked and op.access & WRITE and mn == "mov" and ops[0] is op:
+                stores.append((ins.address, ins.op_str, tracked[base][2], tracked[base][1], idx - tracked[base][0]))
+        if op.type == X.X86_OP_MEM and op.mem.base == X.X86_REG_RIP:
             tgt = ins.address + ins.size + op.mem.disp
-            if tgt not in slots:
+            kind = "lea" if mn == "lea" else ("STORE" if op.access & WRITE else "load")
+            if tgt == slot:
+                slot_refs.append(f"{ins.address:#x}: {mn} {ins.op_str}  -> {tgt:#x}  [{kind}]")
+            if tgt == glob:
+                glob_refs.append(f"{ins.address:#x}: {mn} {ins.op_str}  -> {tgt:#x}  [{kind}]")
+        if op.type == X.X86_OP_IMM and op.imm in (glob, slot):
+            imms.append(f"{ins.address:#x}: {mn} {ins.op_str}")
+
+    if mn == "call":
+        for r in CALLER_SAVED:
+            tracked.pop(r, None)
+        continue
+
+    dst = reg_of(md, ops[0]) if ops and ops[0].type == X.X86_OP_REG else None
+    if dst is not None and mn in NO_WRITE:
+        dst = None
+    if mn == "mov" and len(ops) == 2 and dst is not None:
+        src = ops[1]
+        if src.type == X.X86_OP_MEM and src.mem.base == X.X86_REG_RIP and ins.address + ins.size + src.mem.disp == slot:
+            tracked[dst] = (idx, ins.address, 1)
+            slot_loads += 1
+            continue
+        if src.type == X.X86_OP_MEM and src.mem.base != 0 and src.mem.index == 0 and src.mem.disp == 0:
+            sb = canon(md.reg_name(src.mem.base))
+            if sb in tracked and tracked[sb][2] < 2:
+                _, origin, depth = tracked[sb]
+                tracked[dst] = (idx, origin, depth + 1)
                 continue
-            if ins.mnemonic == "lea":
-                kind = "lea"
-            elif op.access & capstone.CS_AC_WRITE:
-                kind = "store"
-            else:
-                kind = "load"
-            refs.append((ins.address, tgt, kind, fn))
-    return refs
+        if src.type == X.X86_OP_REG and canon(md.reg_name(src.reg)) in tracked:
+            tracked[dst] = tracked[canon(md.reg_name(src.reg))]
+            continue
+    if dst is not None:
+        tracked.pop(dst, None)
+
+for t, val in (("slot", slot), ("global", glob)):
+    for width, fmt in ((8, "<Q"), (4, "<I")):
+        needle = struct.pack(fmt, val)
+        hits = []
+        pos = data.find(needle)
+        while pos != -1:
+            hits.append(pos)
+            pos = data.find(needle, pos + 1)
+        print(f"# [{t} {val:#x}] absolute {width}-byte value: {len(hits)} hit(s)")
+        for h in hits[:20]:
+            sec = next((s.Name.rstrip(b"\0").decode() for s in pe.sections
+                        if s.PointerToRawData <= h < s.PointerToRawData + s.SizeOfRawData), "?")
+            print(f"#   file offset {h:#x} section={sec}")
+
+print(f"# slot loads (mov reg,[rip+slot]): {slot_loads}, window {window}, call/ret cut")
+print(f"# RIP refs to slot {slot:#x}: {len(slot_refs)}")
+print(f"# RIP refs to global {glob:#x}: {len(glob_refs)}")
+for line in glob_refs:
+    if "[load]" not in line:
+        print(f"  {line}")
+print(f"# immediates equal to slot/global: {len(imms)}")
+for line in imms:
+    print(f"  {line}")
+d1 = [s for s in stores if s[2] == 1]
+d2 = [s for s in stores if s[2] == 2]
+print(f"# mov-stores via &global (depth 1): {len(d1)}")
+for a, op, d, origin, dist in d1:
+    print(f"  {a:#x}: mov {op}  [slot-load {origin:#x}, +{dist} ins]")
+print(f"# mov-stores via *global (depth 2, object P): {len(d2)}")
+offs = {}
+for a, op, d, origin, dist in d2:
+    offs.setdefault(op.split("[", 1)[1].split("]", 1)[0] if "[" in op else op, []).append(a)
+for k in sorted(offs):
+    print(f"  [{k}] x{len(offs[k])} e.g. {offs[k][0]:#x}")
+print(f"# direct calls with a slot-derived arg reg (rcx/rdx/r8/r9): {len(calls)}")
+for site, reg, depth, callee, origin in calls:
+    tag = "&global" if depth == 1 else "*global"
+    print(f"  call {site:#x} {reg}={tag} from slot-load {origin:#x} -> {('%#x' % callee) if callee is not None else 'indirect'}")
 
 
-def window(ref):
-    start = max(tbase, ref - PRE)
-    off = start - tbase
-    chunk = tdata[off:off + PRE + POST + 15]
-    insns = list(md.disasm(chunk, start))
-    k = next((i for i, ins in enumerate(insns) if ins.address == ref), None)
-    return insns, k
-
-
-def forward(insns, k, taint, slot):
-    for ins in insns[k + 1:k + 1 + fwd]:
-        ops = ins.operands
-        if ins.mnemonic == "ret":
+def callee_writes(va, reg, depth=40):
+    lo = va - tbase
+    if not (0 <= lo < tsize):
+        return []
+    out = []
+    for c in md.disasm(tdata[lo:lo + 15 * depth], va, depth):
+        for op in c.operands:
+            if op.type == X.X86_OP_MEM and op.mem.base != 0 and canon(md.reg_name(op.mem.base)) == reg and op.access & WRITE:
+                out.append(f"{c.address:#x}: {c.mnemonic} {c.op_str}")
+        if c.mnemonic.startswith("ret"):
             break
-        if ins.mnemonic in ("call", "jmp"):
-            if ops and ops[0].type == X.X86_OP_MEM and ops[0].mem.base and rname(ops[0].mem.base) in taint:
-                print(f"      {fmt(ins)}   <== indirect call via [{taint[rname(ops[0].mem.base)]}]+{ops[0].mem.disp:#x}")
-            elif ins.mnemonic == "call" and ops and ops[0].type == X.X86_OP_IMM:
-                args = [r for r in ARG if r in taint]
-                if args:
-                    desc = ", ".join(f"{r}={taint[r]}" for r in args)
-                    print(f"      {fmt(ins)}   <== direct call, args: {desc}")
-            if ins.mnemonic == "call":
-                for r in CALLER_SAVED:
-                    taint.pop(r, None)
-            continue
-        for op in ops:
-            if op.type == X.X86_OP_MEM and op.mem.base and op.access & capstone.CS_AC_WRITE:
-                b = rname(op.mem.base)
-                if b in taint:
-                    print(f"      {fmt(ins)}   <== STORE [{taint[b]}]+{op.mem.disp:#x}")
-        if ops and ops[0].type == X.X86_OP_REG and ops[0].access & capstone.CS_AC_WRITE:
-            dst = rname(ops[0].reg)
-            chain = None
-            if len(ops) > 1 and ins.mnemonic in MOV + ("lea",):
-                s = ops[1]
-                if s.type == X.X86_OP_MEM and s.mem.base and rname(s.mem.base) in taint:
-                    base = taint[rname(s.mem.base)]
-                    if ins.mnemonic == "lea":
-                        chain = f"({base})+{s.mem.disp:#x}"
-                    else:
-                        chain = f"[({base})+{s.mem.disp:#x}]"
-                elif s.type == X.X86_OP_REG and rname(s.reg) in taint:
-                    chain = taint[rname(s.reg)]
-            if chain:
-                taint[dst] = chain
-            else:
-                taint.pop(dst, None)
+        if any(canon(md.reg_name(w)) == reg for w in c.regs_write):
+            break
+    return out
 
 
-def provenance(insns, k, reg):
-    for ins in reversed(insns[max(0, k - back):k]):
-        ops = ins.operands
-        if ops and ops[0].type == X.X86_OP_REG and rname(ops[0].reg) == reg and ops[0].access & capstone.CS_AC_WRITE:
-            print(f"      back: {fmt(ins)}")
-            return
-        if ins.mnemonic == "call" and reg in CALLER_SAVED:
-            print(f"      back: {fmt(ins)}  (call boundary: {reg} は戻り値の可能性)")
-            return
-    print(f"      back: (no writer of {reg} within {back} insns)")
-
-
-refs = sweep()
-for slot in slots:
-    mine = [r for r in refs if r[1] == slot]
-    print(f"===== slot {slot:#x}: {len(mine)} RIP-relative ref(s) =====")
-    for ref, _, kind, fn in mine:
-        insns, k = window(ref)
-        print(f"[{kind}] {ref:#x} fn={fn:#x}")
-        if k is None:
-            print("      alignment miss (window が命令境界とずれた)")
-            continue
-        ins = insns[k]
-        print(f"      {fmt(ins)}")
-        ops = ins.operands
-        if kind in ("load", "lea") and ops and ops[0].type == X.X86_OP_REG:
-            taint = {rname(ops[0].reg): f"{'&' if kind == 'lea' else ''}slot {slot:#x}"}
-            forward(insns, k, taint, slot)
-        elif kind == "store" and len(ops) > 1 and ops[1].type == X.X86_OP_REG:
-            provenance(insns, k, rname(ops[1].reg))
+for callee in sorted({c[3] for c in calls if c[3] is not None}):
+    regs = {c[1] for c in calls if c[3] == callee}
+    for reg in sorted(regs):
+        hits = callee_writes(callee, reg)
+        print(f"# callee {callee:#x} via {reg}: writes in first 40 ins through {reg}: {len(hits)}")
+        for h in hits:
+            print(f"    {h}")
