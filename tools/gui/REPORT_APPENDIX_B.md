@@ -90,7 +90,7 @@
 
 ## GUI-20 追補 (#1217 run: origin/main 連続 10 回 rc 0)
 
-測定 commit `61ce9782` (origin/main、コード変更なし)。`git diff f2370c95 61ce9782 -- tools/gui ':!*.md'` と `tools/e2e` の差分は 0 行 (前回 head との差は REPORT のみ)。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で同一 worktree (`ws-1217`) に連続 10 回実行。素材: fl-win64 / toolchain-emsdk / toolchain-retdec を `$ARTIFACTS_DIR` で実在確認、`/opt/emsdk`・`/opt/retdec`・`/usr/bin/x86_64-w64-mingw32-gcc` を利用。前処理: `pnpm install --frozen-lockfile`、`tools/e2e` の `npm ci` (e2e.sh の自動導入)。
+測定 commit `61ce9782` (origin/main、コード変更なし)。`git diff f2370c95 61ce9782 -- tools/gui ':!*.md'` と `tools/e2e` の差分は 0 行 (前回 head との差は REPORT のみ)。`TMPDIR=$RUNNER_TEMP`、`bash tools/gui/e2e.sh` を foreground で同一 worktree (`ws-1217`) に連続 10 回実行。素材: fl-win64 / toolchain-emsdk / toolchain-retdec を `$ARTIFACTS_DIR` で実在確認、`[EMSDK]`・`[RETDEC]` を利用、C コンパイラは MinGW-w64 gcc (PATH 上)。前処理: `pnpm install --frozen-lockfile`、`tools/e2e` の `npm ci` (e2e.sh の自動導入)。
 
 | run | rc | 実時間 | 開始時 load (1 分値) | 結果 | step 6h CDP timeout |
 |---|---|---|---|---|---|
@@ -108,4 +108,4 @@
 - 判定: 受入条件 2 (n≥10 連続 rc 0) は **達成** (10/10)。ただし前回 head `f2370c95` の run4 (rc 1, CDP timeout) は今回 0/10 で再現せず。
 - 受入条件 1 (CDP timeout 原因の特定) は **未達**。今回の 10 run では再現しなかったため原因は未切り分け。CLI (agent-browser linux-x64) の既定 action timeout は `AGENT_BROWSER_DEFAULT_TIMEOUT` = 25000 ms。stress.mjs の watchdog は 20 分で、失敗メッセージ (`CDP command timed out: Runtime.evaluate`) が CLI の既定値由来かは未検証 (推定)。
 - 受入条件 3 (#740 の修正前 ASan 再現ログ) は **未達** (未取得)。
-- 未解決の起票先: AC1・AC3 は子 issue に切り出し (下記 Issue 番号を最終回答に記載)。
+- 未解決の起票先: AC1 (CDP timeout 原因の特定) は #1665 (GUI-23)、AC3 (#740 の ASan 修正前ログ) は #1666 (GUI-24)。
