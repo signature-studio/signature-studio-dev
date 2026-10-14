@@ -6,36 +6,36 @@
 ## 1. 結論
 
 - 規則 A (merged PR を持つ親 issue を閉じる) を `infra/pm-worker/src/autoclose.ts` に実装した。**既定は記録のみ** (`counters.wouldClose`)。GitHub へ書くのは `LIVE_CLOSE="1"` のときだけ。
-- 実データ (REST の生 JSON・取得 2026-10-14 14:47Z 前後) で、Worker の判定と**別実装 (Python・本文の正規表現だけ)** の再計算が一致した (差分 0)。候補は全履歴 27 件・24 時間窓 22 件。
+- 実データ (REST の生 JSON・取得 2026-10-14 14:51Z) で、Worker の判定と**別実装 (Python・本文の正規表現だけ)** の再計算が一致した (差分 0)。候補は全履歴 26 件・24 時間窓 21 件。
 - 判定条件 (a)〜(g) のネガコンは単体テストで効くことを確かめた。各条件を外すと対応テストが FAIL する (§4)。実データでも、各除外理由が 0 件ではない (§3)。
 
 ## 2. 測定の対象と再現
 
-- 検証起点 (測定した commit): **`0bf3aa8f`** (コードを変えた最後の commit。`9a478217` 実装・`c7d5e4b6` 照合テスト・`0bf3aa8f` 実データ照合スクリプト)。
-- 差分の確認 (測定後の HEAD との差。本書を含む commit の後に実行): `git diff 0bf3aa8f HEAD -- infra/pm-worker tools/pm/rule_a_realcheck.py tools/pm/rule_a_realcheck.sh` が空であること (本書と DOC_MAP の追記は差分の範囲外)。
+- 検証起点 (測定した commit): **`fb250d54`** (main 取り込みの merge。規則 A のコードは実装 `9a478217`・照合テスト `c7d5e4b6`・実データ照合スクリプト `0bf3aa8f` から変えていない。main 側の変更は launch 観測 (`launchobs`) と run の作成時刻で、規則 A の判定経路には触れない)。
+- 規則 A の実装 (`src/autoclose.ts`・`src/refs.ts`・テスト・フィクスチャ) の差分: `git diff 0bf3aa8f HEAD -- infra/pm-worker/src/autoclose.ts infra/pm-worker/src/refs.ts infra/pm-worker/test/autoclose.test.ts infra/pm-worker/test/fixtures/rule_a.input.json infra/pm-worker/test/rule_a_crosscheck.py` が空であること。
 - 再現:
   - 実データ照合 (読み取りのみ): `bash tools/pm/rule_a_realcheck.sh` (gh の認証が要る。大物は `${RUNNER_TEMP}` 配下の一時ディレクトリに置く)。
   - 単体: `cd infra/pm-worker && npm test` (node `--test`・依存パッケージ無し)。
   - 固定 fixture の照合: `python3 infra/pm-worker/test/rule_a_crosscheck.py infra/pm-worker/test/fixtures/rule_a.input.json` と TS 側の `test/autoclose.test.ts` の 1 件 (Python と同じ候補)。
 
-## 3. 実データ dry-run (取得 2026-10-14 14:47Z 前後)
+## 3. 実データ dry-run (取得 2026-10-14 14:51Z)
 
-取得: open issue 413 (PR を除く)・open PR 13・closed PR 1,244 (全履歴)・blocked_by を持つ open issue 73 件。
+取得: open issue (PR を除く)・open PR・closed PR (全履歴)・blocked_by の REST 応答 (`tools/pm/rule_a_realcheck.sh` が取る。生データは一時ディレクトリに置き、リポジトリには含めない)。
 Worker の経路 (`applyEvent` で REST の payload を保存し、`detectRuleA` で判定) と、独立した再計算 (`tools/pm/rule_a_realcheck.py`) を比べた。
 
 | 窓 | Worker | 独立 | 差分 (Worker のみ / 独立のみ) | 子を持つ親 (open) | 除外: 子以外が blocking | 除外: open PR が参照 | 除外: needs-user-input | 除外: merged PR 無し |
 |---|---:|---:|---|---:|---:|---:|---:|---:|
-| 全履歴 | 27 | 27 | 0 / 0 | 58 | 6 | 6 | 1 | 18 |
-| 24 時間窓 (updated_at) | 22 | 22 | 0 / 0 | 58 | 4 | 5 | 1 | 26 |
+| 全履歴 | 26 | 26 | 0 / 0 | 62 | 6 | 9 | 1 | 20 |
+| 24 時間窓 (updated_at) | 21 | 21 | 0 / 0 | 62 | 4 | 8 | 1 | 28 |
 
 - 窓の定義: Worker の全体同期と同じ (closed PR を `updated_at` の新しい順に、24 時間より前まで読む)。窓を外れた merged PR は保存されないので、その親は閉じない (保守的)。
-- 除外の数: 子を持つ親 58 = 候補 + 除外 (全履歴: 27 + 6 + 6 + 1 + 18 = 58。窓: 22 + 4 + 5 + 1 + 26 = 58)。
-- 注意: リポジトリの issue / PR は他の作業で動く。同日 14:41Z の取得 (全履歴 28・窓 23) からの差は、その間の更新による。数値は取得時点の値。Worker と独立の一致 (差分 0) は取得のたびに確かめる。
-- 観測: 14:41Z 取得の全履歴 28 件は、すべて `Refs #N` で merge された PR を持っていた (`Closes` は 0 件)。規則 A の定義 (Closes / Refs / Fixes) に従う結果で、既存の『Refs のみで merge』運用 (issue #2336 の背景) と同じ形。
+- 除外の数: 子を持つ親 62 = 候補 + 除外 (全履歴: 26 + 6 + 9 + 1 + 20 = 62。窓: 21 + 4 + 8 + 1 + 28 = 62)。
+- 注意: リポジトリの issue / PR は他の作業で動く。同日の取得は 14:41Z に全履歴 28・窓 23、14:47Z に 27・22、14:51Z に 26・21 (その間の issue / PR の更新による)。数値は取得時点の値。Worker と独立の一致 (差分 0) は取得のたびに確かめる。
+- 観測: 14:41Z 取得の全履歴 28 件は、すべて `Refs #N` で merge された PR を持っていた (`Closes` は 0 件。14:51Z の 26 件は未集計)。規則 A の定義 (Closes / Refs / Fixes) に従う結果で、既存の『Refs のみで merge』運用 (issue #2336 の背景) と同じ形。
 
 ## 4. ネガコンと単体テスト
 
-`infra/pm-worker/test/autoclose.test.ts` (24 件。うち Python との照合 1 件。`npm test` は全 171 件 PASS)。
+`infra/pm-worker/test/autoclose.test.ts` (24 件。うち Python との照合 1 件。`npm test` は全 184 件 PASS。184 = 規則 A 以外の main 側の 13 件を含む)。
 
 判定の条件を 1 つずつ外すと (`src/autoclose.ts` を一時的に書き換えて実行)、対応するテストが FAIL することを確かめた:
 
@@ -64,8 +64,8 @@ Worker の経路 (`applyEvent` で REST の payload を保存し、`detectRuleA`
 
 ## 6. 検証
 
-- `npm test` (node --test・HEAD `0bf3aa8f`): 171 件 PASS / 0 FAIL (実行 13.7 秒)。
-- 型チェック: `tsc --noEmit --ignoreConfig --lib es2022,dom --types "" src/*.ts` で、エラーは main と同じ 6 件 (`crypto.ts`・`github.ts`・`hmac.ts` の既存の型の差)。今回の変更による新規エラーは 0。
+- `npm test` (node --test・HEAD `fb250d54`): 184 件 PASS / 0 FAIL。
+- 型チェック: `tsc --noEmit --ignoreConfig --lib es2022,dom --types "" src/*.ts` で、エラーは main と同じ 6 件 (`crypto.ts`・`github.ts`・`hmac.ts` の既存の型の差)。今回の変更による新規エラーは 0 (HEAD `fb250d54`)。
 - バンドル: `bun build src/index.ts --target=browser --format=esm --external 'node:*' --minify` が成功 (19 モジュール)。
 - 範囲外・未実行: `test:workers` (vitest + workerd) は依存 (`node_modules`) が無く未実行。Cloudflare への反映・`wrangler.toml` の変更・secret は範囲外 (依頼者 / PM)。`LIVE_CLOSE` は未設定のまま。
 
