@@ -11,6 +11,10 @@ import ottnat as N
 
 FA = os.environ.get('FA_CORE', os.path.join(T, 'targets', 'freshair', 'work', 'win', 'Fresh Air', 'C__ProgramData_Slate Digital', 'Fresh Air', 'SlateCore.core_64'))
 MOD = os.path.join(T, 'icall', 'work', 'fa_route', 'fa_route.cjs')
+# ICALL-51: SlateCore の security cookie (VA) と、UCRT が enc(NULL)=cookie で埋める encoded slot (.data の zero-fill 部)。
+COOKIE_VA = 0x18125eaa8
+ENC_SLOTS = [0x1813068d0, 0x1813068f8, 0x181306900, 0x181306908, 0x181306910, 0x1813072b0,
+             0x1813073f0, 0x1813073f8, 0x181307400, 0x181307408, 0x181307410, 0x181307418]
 
 
 def arg(name, default):
@@ -49,6 +53,8 @@ def main():
     random.seed(seed)
     xs = [random.uniform(-4.0, 4.0) for _ in range(n)]
     N.load(FA)
+    if os.environ.get('FA_ENC_INIT') == '1':
+        N.enc_slots(COOKIE_VA, ENC_SLOTS)
     nat = {}
     for va in vas:
         nat[va] = []
