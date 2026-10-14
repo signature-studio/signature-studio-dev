@@ -24,4 +24,4 @@ mod._m11_set_trace(1);
 const r = run(target);
 mod._m11_set_trace(0);
 console.log('unit', target, r, JSON.stringify(state(), (k, v) => typeof v === 'bigint' ? hex(v) : v));
-console.log('stderr lines', errs.length);
+console.log("stderr lines", errs.length); for (const e of errs) console.log("E " + e);

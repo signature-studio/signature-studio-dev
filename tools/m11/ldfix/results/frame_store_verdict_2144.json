@@ -1,0 +1,416 @@
+{
+ "functions": 48,
+ "by_verdict": {
+  "UNDETERMINED": 46,
+  "STORE_IN_BLOCK_FN": 2
+ },
+ "verdict": {
+  "1006ec0": "UNDETERMINED",
+  "103aa50": "UNDETERMINED",
+  "10628a0": "STORE_IN_BLOCK_FN",
+  "11e6e20": "UNDETERMINED",
+  "129df10": "UNDETERMINED",
+  "12cb2e0": "UNDETERMINED",
+  "13105d0": "UNDETERMINED",
+  "1354630": "UNDETERMINED",
+  "4078c0": "UNDETERMINED",
+  "412160": "UNDETERMINED",
+  "418b40": "UNDETERMINED",
+  "441730": "UNDETERMINED",
+  "4488f0": "UNDETERMINED",
+  "454090": "UNDETERMINED",
+  "45c170": "UNDETERMINED",
+  "45cda0": "UNDETERMINED",
+  "45d8b0": "UNDETERMINED",
+  "45db40": "UNDETERMINED",
+  "45dc20": "UNDETERMINED",
+  "5c4dc0": "UNDETERMINED",
+  "5cb210": "UNDETERMINED",
+  "639c70": "UNDETERMINED",
+  "694c80": "UNDETERMINED",
+  "695640": "UNDETERMINED",
+  "6c01a0": "UNDETERMINED",
+  "6c7610": "UNDETERMINED",
+  "6c7ca0": "UNDETERMINED",
+  "6ca580": "UNDETERMINED",
+  "6ca6c0": "UNDETERMINED",
+  "6ced00": "UNDETERMINED",
+  "7e45e0": "UNDETERMINED",
+  "808930": "UNDETERMINED",
+  "808c80": "UNDETERMINED",
+  "81bfd0": "UNDETERMINED",
+  "81c0d0": "UNDETERMINED",
+  "820d60": "UNDETERMINED",
+  "824020": "UNDETERMINED",
+  "864f80": "UNDETERMINED",
+  "867220": "UNDETERMINED",
+  "92ea90": "UNDETERMINED",
+  "bf8b40": "UNDETERMINED",
+  "c38bd0": "STORE_IN_BLOCK_FN",
+  "c3b340": "UNDETERMINED",
+  "c9cf70": "UNDETERMINED",
+  "da5400": "UNDETERMINED",
+  "da5510": "UNDETERMINED",
+  "e8fba0": "UNDETERMINED",
+  "f61710": "UNDETERMINED"
+ },
+ "sites": [
+  {
+   "fn": "1006ec0",
+   "ty": "i32",
+   "addr": "1006fb6",
+   "mnem": "cmp dword ptr [rbp + 0x2c], 1",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "1006ec0",
+   "ty": "i8",
+   "addr": "1007021",
+   "mnem": "cmp byte ptr [rbp + 0x2b], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "103aa50",
+   "ty": "i32",
+   "addr": "103ab59",
+   "mnem": "add r14d, dword ptr [rbp + 0x38]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "10628a0",
+   "ty": "i16",
+   "addr": "10628c0",
+   "mnem": "movzx rax, word ptr [rbp + 0x4e]",
+   "verdict": "STORE_IN_BLOCK"
+  },
+  {
+   "fn": "11e6e20",
+   "ty": "i32",
+   "addr": "11e6fdb",
+   "mnem": "movss xmm0, dword ptr [rbp + 0x108]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "129df10",
+   "ty": "i32",
+   "addr": "129e1d6",
+   "mnem": "sub esi, dword ptr [rbp + 0x88]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "12cb2e0",
+   "ty": "i32",
+   "addr": "12cb416",
+   "mnem": "mov r8d, dword ptr [rsp + 0x28]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "13105d0",
+   "ty": "i32",
+   "addr": "1310837",
+   "mnem": "add eax, dword ptr [rbp + 0x48]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "1354630",
+   "ty": "i16",
+   "addr": "1354784",
+   "mnem": "cmp word ptr [rbp + 0x1d2], 1",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i64",
+   "addr": "40792b",
+   "mnem": "and qword ptr [rbp + 0x38], 0xffffffffffff0000",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "4078c0",
+   "ty": "i32",
+   "addr": "40791e",
+   "mnem": "cmp dword ptr [rbp + 0x40], 0x10000",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "412160",
+   "ty": "i32",
+   "addr": "41217d",
+   "mnem": "cmp dword ptr [rbp + 0x170], 2",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "418b40",
+   "ty": "i32",
+   "addr": "418b57",
+   "mnem": "cmp dword ptr [rbp + 0x40], 0x1000",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "441730",
+   "ty": "i16",
+   "addr": "44178f",
+   "mnem": "cmp word ptr [rbp + 0x6e], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "4488f0",
+   "ty": "i32",
+   "addr": "44892d",
+   "mnem": "cmp dword ptr [rbp + 0xd8], 0x1000",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "454090",
+   "ty": "i8",
+   "addr": "454637",
+   "mnem": "cmp byte ptr [rbp + 0x16e], 1",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "45c170",
+   "ty": "i32",
+   "addr": "45c1b5",
+   "mnem": "mov eax, dword ptr [rbp + 0x40]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "45cda0",
+   "ty": "i32",
+   "addr": "45cdd9",
+   "mnem": "movsxd rax, dword ptr [rbp + 0x40]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "45d8b0",
+   "ty": "i16",
+   "addr": "45da5b",
+   "mnem": "cmp word ptr [rbp + 0x3e], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "45db40",
+   "ty": "i16",
+   "addr": "45db85",
+   "mnem": "cmp word ptr [rbp + 0x40], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "45dc20",
+   "ty": "i16",
+   "addr": "45dc69",
+   "mnem": "cmp word ptr [rbp + 0x28], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "5c4dc0",
+   "ty": "i32",
+   "addr": "5c4e43",
+   "mnem": "cmp dword ptr [rbp + 0x58], 0xc0c0c0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "5cb210",
+   "ty": "i64",
+   "addr": "5cb4aa",
+   "mnem": "cmp qword ptr [rbp + 0xc0], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "639c70",
+   "ty": "i32",
+   "addr": "639c83",
+   "mnem": "mov eax, dword ptr [rsp + 0x2c]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "694c80",
+   "ty": "i64",
+   "addr": "6951c8",
+   "mnem": "movsd xmm1, qword ptr [rbp + 0xe8]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "695640",
+   "ty": "i64",
+   "addr": "6956f9",
+   "mnem": "cmp qword ptr [rbp + 0x38], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "6c01a0",
+   "ty": "i128",
+   "addr": "6c0207",
+   "mnem": "mov r9d, dword ptr [rbp + 0x44]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "6c7610",
+   "ty": "i128",
+   "addr": "6c7665",
+   "mnem": "mov ecx, dword ptr [rbp + 0x44]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "6c7ca0",
+   "ty": "i128",
+   "addr": "6c7ccc",
+   "mnem": "mov edx, dword ptr [rbp + 0x84]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "6ca580",
+   "ty": "i128",
+   "addr": "6ca5c2",
+   "mnem": "add dword ptr [rbp + 0x64], eax",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "6ca6c0",
+   "ty": "i128",
+   "addr": "6ca702",
+   "mnem": "add dword ptr [rbp + 0x64], eax",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "6ced00",
+   "ty": "i32",
+   "addr": "6ced14",
+   "mnem": "mov eax, dword ptr [rbp + 0x28]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "addr": "7e48d6",
+   "mnem": "cvtsi2ss xmm0, dword ptr [rbp + 0x6c]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "7e45e0",
+   "ty": "i32",
+   "addr": "7e47b6",
+   "mnem": "sub eax, dword ptr [rcx + 0x4dc]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "808930",
+   "ty": "i32",
+   "addr": "80896d",
+   "mnem": "cmp dword ptr [rbp + 0x5c], 3",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "808c80",
+   "ty": "i32",
+   "addr": "808ca4",
+   "mnem": "cmp dword ptr [rbp + 0x2c], 3",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "81bfd0",
+   "ty": "i32",
+   "addr": "81bff3",
+   "mnem": "mov eax, dword ptr [rsp + 0x2c]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "81c0d0",
+   "ty": "i32",
+   "addr": "81c118",
+   "mnem": "mov eax, dword ptr [rbp + 0x2c]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "820d60",
+   "ty": "i32",
+   "addr": "820dba",
+   "mnem": "add dword ptr [rbp + 0x30], ecx",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "824020",
+   "ty": "i32",
+   "addr": "824069",
+   "mnem": "add dword ptr [rbp + 0x30], eax",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "864f80",
+   "ty": "i32",
+   "addr": "864f94",
+   "mnem": "sub eax, dword ptr [rbp + 0x20]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "867220",
+   "ty": "i32",
+   "addr": "867245",
+   "mnem": "cmp dword ptr [rsp + 0x2c], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "92ea90",
+   "ty": "i64",
+   "addr": "92eaaf",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "bf8b40",
+   "ty": "i32",
+   "addr": "bf8b68",
+   "mnem": "mov eax, dword ptr [rbp + 0xac]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "c38bd0",
+   "ty": "i64",
+   "addr": "c38c08",
+   "mnem": "cmp qword ptr [rbp + 0x78], 0",
+   "verdict": "STORE_IN_BLOCK"
+  },
+  {
+   "fn": "c3b340",
+   "ty": "i32",
+   "addr": "c3b46f",
+   "mnem": "cmp dword ptr [rbp + 0x60], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "c9cf70",
+   "ty": "i64",
+   "addr": "c9cf8f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "da5400",
+   "ty": "i64",
+   "addr": "da541f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "da5510",
+   "ty": "i64",
+   "addr": "da552f",
+   "mnem": "cmp qword ptr [rsp + 0x48], 0",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "e8fba0",
+   "ty": "i32",
+   "addr": "e8fc08",
+   "mnem": "sub dword ptr [rbp + 0x48], ecx",
+   "verdict": "NO_STORE_IN_BLOCK"
+  },
+  {
+   "fn": "f61710",
+   "ty": "i32",
+   "addr": "f61ce6",
+   "mnem": "mov r8d, dword ptr [rbp + 0x94]",
+   "verdict": "NO_STORE_IN_BLOCK"
+  }
+ ]
+}

@@ -67,3 +67,14 @@
 - **訂正**: §4 以前の「`0x40` slot 非 0 → oob」の前提は、この trap 経路と一致しない。受入条件 1 の「`&slot` を受ける callee」は、この build では `407a50` の free-list ノードへの書込み (`407aae` 周辺の `mov [rax-8], rdx` / `mov [rdx+0x18], rcx`) に置き換わる可能性が高い。未確定。
 - 未確定点: trap 直前に `[rdx+0x18]` へ入る値 (境界外の値) は未採取。入口値 `0xdead` はこの値そのものではない。
 - 次の手順: (a) `407aae` の `rax` (= `[rdx+0x18]`) を trap 直前で採取する (`probe_entry.sh` 相当の内側 watch)、(b) その値を書いた store (free-list 更新の `407ab2` / `407ae1` / `407ae4` など) を特定、(c) 修復 → n≥3 survey → ネガコン。
+
+## 8. 再々々々々着手 (2026-10-14 run, 6 回目): free-list 先頭の採取と書込元 watch (未特定)
+
+- 測定 base: `origin/main` `6444b186`、worktree `ws-1463` (ブランチ `1463-unit149-oob`)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下に展開。`m11_gen_ir2.sh` rc=0 (51.3 s, 490733 行)。`M11_FIX_652500=0 m11_build.sh` rc=0 (25.3 s)。
+- ベースライン (n=1, `SV_ONLY=149`): `oob`、trap は `wasm-function[1874]:0x13ce55` (§7 と一致)。
+- `probe_entry.sh p407 407a50 149` (rc=0, 44.5 s): `[pe] 407a50 a=16 0 0 0 | [a1]=dead ...` 1 行。`[chain407] b=0 rbx=fa5108 n=0 m=dead` (実 slot `0xfa5108` の `[+8]` が 0)。
+- イメージ確認 (`work/m11_image.bin`): 線形 `0xfa5108` = `0x100000`、`0xfa5110` = `0`、`0xfa5118` = `0`。空リストの自己リンク (`rdx==rbx`) ではなく、`[rbx+8]` が 0 のまま trap 経路 (`[0+0x18]`→`[-8]`) に入る。
+- `PROBE_WATCH=fa5110 probe_entry.sh pw2 all 149` (rc=0, 14m40s): `[chg]` は 1 行のみ (`ffffffffffffffff -> 0`, 初期化時)。全関数入口で値は変わらず、**`fa5110` を書く関数は入口単位の watch では検出されない** (書込は入口間の関数内で起きない、または watch 対象アドレスがずれている)。
+- 注意: `PROBE_WATCH` の値は「1 段の線形アドレス」として解釈される (`fa5110` は 1 段)。`pw` (`fa5110:0`) は 2 段目が 0 を指し常に `dead` になるため無効 (本 run で誤設定を確認)。
+- **未確定**: 受入条件 1 (0x40 slot / free-list 非 0 の書込元) は未特定。受入条件 2・3 は未着手。
+- 本 run の知見: 入口時点で trap に使われる free-list 先頭は未初期化 (0)。`407a50` の pool 初期化 (`fa5108` 周辺) が、このビルドで実行されているかが次の確認点。

@@ -156,3 +156,18 @@
 |---|---|---|
 | 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 全 store 計装は unit 106 で停止。窓内の関数に絞った計装が未実施 | 子 issue (親 #2099) |
 | 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 上記子 issue |
+
+## 11. #2165 の実測: unit 114 だけの store 計装 (未達・unit 106 で停止)
+
+- 測定 commit: `6444b186` (main)。本節のコード差分は `trap_triage/probe1676_u114.mjs` の stderr 出力 1 行 (`errs` の表示) のみ。`git diff 6444b186 HEAD -- tools/m11` で確認する。
+- 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)・`work-m11`・`work-liftdiff`。toolchain は `/opt/emsdk`・`/opt/retdec` に既設。`work/lift_pe.sha256` は PE 指紋で手記録 (§6 と同じ)。
+- e2e `m11_e2e.sh` (非 `--full`、foreground、rc=0、wall 140 s、user 128 s、load 1.23): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6・§8・§9・§10 と一致)。
+- probe `probe1676_watch.mjs` (再生成後の clean wasm、n=1): unit 114 `halt0`、`after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -->0x0, cnt -->1` (§8・§9・§10 と一致)。
+- icall トレース (`probe1676_u114.mjs`、n=1、84 行): 最後の `icall 0x1c04a0` の直後に `icall 0xf960` が続く (交互列の末尾。§8 と一致)。
+- 計装 (`store_watch_2099.sh 0 114 u114w 114 114`、n=2): 2 回とも `unit 106` で停止、`[aw]` 0 件。1 回目は `timeout 600` の外側で切れ、node が孤児として残ったため PID を指定して停止した。2 回目は script 内の `timeout 900` で rc=124。どちらも終了後に `m11_build.sh` で clean な wasm に復元し、`probe1676_watch.mjs` で baseline が再現することを確認した。
+- 結論: 全 store 計装は窓の手前の unit 106 で止まり、unit 114 に届かない。書込み主体 (関数・命令) は未確定。次段は store 計装を窓内の関数だけに絞る (子 issue #2217)。
+
+| 未達 (#2165 受入条件) | 状況 | 起票先 |
+|---|---|---|
+| 窓内で list B `+8/+16` を書く命令 (関数 VA・命令) の確定 | 全 store 計装は unit 106 で停止。窓内の関数だけの計装が必要 | 子 issue #2217 (親 #2165) |
+| 欠落 IR 箇所と DEFECTS 行案 | 書込み主体の確定後 | 子 issue #2217 |
