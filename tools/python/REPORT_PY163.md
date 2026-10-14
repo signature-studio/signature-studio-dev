@@ -6,7 +6,7 @@
 
 - 受入 1 (呼出し先 vtbl[+0x30] の関数 VA): **確定できない** (不足情報は §4)。3 件は同じ `O2 = [rbp+0x410]` の vtbl[+0x30] を呼ぶ (O2 の到達定義は 3 件とも 0x104a7ab の 1 件)。O2 は `O1` の vtbl[+0x20] の戻り値で、O1 は関数 0x1331340 が `[rbp+0x118]` へ書く値。O1 の型は `.data` の実行時の配列要素で決まるため、機械語からは VA が出ない。
 - 受入 2 (引数の式・VA つき): **達成**。§3 の表。edx は 2 経路の式、r8d は入口 edx (`d`) とその rint・呼出し A の戻り値・0xc61250 の out の集合、r9d は定数 `0x20`・`2`・入口 r8d (`r8_in`)。
-- 受入 3 (戻り値式と突合): **達成**。戻り値式は §3 の 3 行。手計算との突合 **n=12・mismatch=0** (ネガティブコントロール mismatch=1・exit 1)。別算法 (命令単位 BFS の到達定義) の突合も n=12・mismatch=0。
+- 受入 3 (戻り値式と突合): **達成**。戻り値式は §3 の 3 行。手計算との突合 **n=12・mismatch=0** (ネガティブコントロール mismatch=1・exit 1)。到達判定の別算法 (命令単位 BFS の到達定義。事象の定義は共有) の突合も n=12・mismatch=0。
 - 訂正 (PY-88 節): py88 の `ACC?⚠合流@0x104a5b6` (0x104a876 の rint の入力) は線形近似の誤り。CFG 上では 0x104a861 の `[rbp+0x5b8]` の読みに届く定義は入口の edx だけ (BFS でも確認)。0x104a984 の読みも同じ。
 
 ## 2. 測定条件
@@ -15,15 +15,16 @@
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py163/extracted/block00031_PE.bin work/py163/py53` → `fn=4664 dispatch=13 r8d_tests=174` (0.10 秒)。入力は `work/py163/py53/fn.txt`。
 - 測定: `python3 analysis/py163_vcall.py work/py163/py53/fn.txt --check` → `# bfs-check n=12 mismatch=0`・`# n=12 mismatch=0`・exit 0。実時間 0.37 秒 (user 0.37 秒)・load average 0.28 (run 中の `uptime`)。
 - 測定 commit: `aa61c729` (`analysis/py163_vcall.py` の最後のコード commit)。`git diff aa61c729 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT・DOC_MAP・付録のみ)。
+- 検証範囲: callee の書込みは `OUT_KILL`/`OUT_GEN` の 2 件 (0x1331340・0xc61250) のみをモデル化した。`lea` で渡された他のアドレス (`[rbp+0x510]` 7 件・`[rbp+0x588]` 2 件) は、対象スロット (0x410・0x548・0x5b8) と重ならないと仮定した。渡すオブジェクトの大きさは未確認 (範囲外)。
 - e2e: 対象外 (解析スクリプトだけの変更で wasm 出力に影響しない)。製品 KPI: 対象外 (起動・GUI に関わらない)。
 
 ## 3. 3 呼出しの戻り値式と引数
 
-| 呼出し | 書込み | r9d の設定 | 戻り値式 (= 書く値) |
-|---|---|---|---|
-| A | `0x104a8a0` | `0x104a890 mov r9d, 0x20` | `T(ecx=O2, edx=E, r8d=R_A, r9d=0x20)@0x104a8a0` (書込み 0x104a8a3) |
-| B | `0x104a95c` | `0x104a94c mov r9d, 2` | `T(ecx=O2, edx=E, r8d=R_B, r9d=2)@0x104a95c` (書込み 0x104a95f) |
-| C | `0x104a9c4` | `0x104a9b3 mov r9d, [rbp+0x5c0]` ← {0x1046d71} | `T(ecx=O2, edx=E, r8d=R_C, r9d=r8_in)@0x104a9c4` (書込み 0x104a9c7) |
+| 呼出し | 呼出し VA | 書込み VA | r9d の設定 | 戻り値式 (= 書く値) |
+|---|---|---|---|---|
+| A | `0x104a8a0` | `0x104a8a3` | `0x104a890 mov r9d, 0x20` | `T(ecx=O2, edx=E, r8d=R_A, r9d=0x20)@0x104a8a0` |
+| B | `0x104a95c` | `0x104a95f` | `0x104a94c mov r9d, 2` | `T(ecx=O2, edx=E, r8d=R_B, r9d=2)@0x104a95c` |
+| C | `0x104a9c4` | `0x104a9c7` | `0x104a9b3 mov r9d, [rbp+0x5c0]` ← {0x1046d71} | `T(ecx=O2, edx=E, r8d=R_C, r9d=r8_in)@0x104a9c4` |
 
 記号 (機械側の出力そのまま。`d` は入口 edx・`c` は入口 ecx・`r8_in` は入口 r8d):
 
@@ -73,15 +74,15 @@ chain (VA つき):
 
 - 測定: `python3 analysis/py163_vcall.py work/py163/py53/fn.txt --check` → `# n=12 mismatch=0`・exit 0。
 - ネガティブコントロール: `--check --negctl r9c` (r9d C の手計算を `0x20` にする) → `r9d C 不一致 hand=['0x20'] mach=['r8_in']`・`# n=12 mismatch=1`・exit 1。
-- 別算法: `bfs_defs` (命令単位の BFS。kill は命令単位・0xc61250 は gen) で 12 読みの到達定義集合を求め、ブロック単位の固定点と突合: `# bfs-check n=12 mismatch=0`。
+- 到達判定の別算法 (事象の定義は共有): `bfs_defs` (命令単位の BFS。kill は命令単位・0xc61250 は gen) で 12 読みの到達定義集合を求め、ブロック単位の固定点と突合: `# bfs-check n=12 mismatch=0`。`is_write` と OUT モデルは両者で共有するため、その定義の誤りは検出しない (範囲外)。
 - 用法の誤り: `--negctl foo` は usage を出して exit 2 (測定済み)。
 
 ## 6. 限界・未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `T` = vtbl(O2)[+0x30] の関数 VA (§4 の (a)〜(d) の実行時データ) | 受入 1 (3 呼出しの呼出し先)。戻り値の関数部分 | #3101 (PY-161)。PY-161 の vtbl 解決の項に含める (PM 判断) |
-| 戻り値の数値 (`d`・`c`・`K` = `*(0x104cd00)` の値) | 書く値の数値。式は確定 | 同上 (実行時の入力依存) |
+| `T` = vtbl(O2)[+0x30] の関数 VA (§4 の (a)〜(d) の実行時データ) | 受入 1 (3 呼出しの呼出し先)。戻り値の関数部分 | #3101 の PY-163 追記コメント (issue コメント。本文の項目には無い) |
+| 戻り値の数値 (`d`・`c`・`K` = `*(0x104cd00)` の値) | 書く値の数値。式は確定 | 同上 |
 | 0x104c29a の表 (`G[0x15e06a0]`・[rbp+0x574]/[0x578] の SLOT? 印) | [rbp+0x548] の 2 件目の定義の式 | 同上 |
 
 ## 7. 再現
