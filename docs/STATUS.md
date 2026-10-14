@@ -1,8 +1,8 @@
 # STATUS — 技術進捗の正本
 
-**FL のウィンドウ: 未達 / 最終到達ステップ: S09 (DllMain 内の unit 初期化まで。CreateFruityInstance 未到達) / 起動指標: [tools/startup/boot_metric.json](tools/startup/boot_metric.json) (数え方と結論は [tools/startup/REPORT.md](tools/startup/REPORT.md) §8)**
+**FL のウィンドウ: 未達 / 最終到達ステップ: S09 (測定 commit 時点の値。DllMain 内の unit 初期化まで。CreateFruityInstance 未到達) / 起動指標: [tools/startup/boot_metric.json](tools/startup/boot_metric.json) (数え方と結論は [tools/startup/REPORT.md](tools/startup/REPORT.md) §8)**
 
-本ファイルが**技術進捗に関する唯一の正本である (チケット状態の正本は issue の open/closed + ラベル + PR の状態。
+本ファイルが**技術進捗**に関する唯一の正本である (チケット状態の正本は issue の open/closed + ラベル + PR の状態。
 分類の表は `docs/WORKFLOW.md` §3。Project V2 の Status は参考)。
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
