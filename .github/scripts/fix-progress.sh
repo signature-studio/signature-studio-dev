@@ -51,7 +51,7 @@ REPEAT_JACCARD="${OC_REPEAT_JACCARD:-0.6}"
 # classes マーカーの欠落・不正は unknown。conflict と merge-failed の差し戻しは計数しない。
 JQ_DEFS='
 def allowed: ["doc","remeasure","artifact","closes","path","input","conflict","code","pm-decision","user-decision"];
-def cls: ((try (.body | capture("oc-review:[^>]*classes=(?<c>[^ >]*)") | .c | split(",")) catch []) as $c
+def cls: (([(.body // "") | capture("oc-review:[^>]*classes=(?<c>[^ >]*)") | .c | split(",")] | first // []) as $c
   | if ($c | length) == 0 or (($c - allowed) | length) > 0 then ["unknown"] else $c end);
 def counted: (cls | any(. == "conflict") | not) and ((.body // "") | contains("[merge-failed]") | not);
 def grams: explode as $e | [range(0; ($e | length) - 1) | [$e[.], $e[. + 1]] | implode] | unique;
@@ -172,7 +172,12 @@ case "${1:-}" in
       echo "::error::fix-progress check: record did not finish the window check (OC_RECORD_OK is unset): no result is given" >&2
       exit 1
     fi
-    if [ "$(pr_head)" != "$OC_HEAD_BEFORE" ]; then
+    # head が読めなければ result を出さずに失敗する。空文字を比べると pushed と誤判定され、retry も reopen も走らない無音終了になる (#2899)。
+    if ! head_after="$(pr_head)" || [ -z "$head_after" ]; then
+      echo "::error::could not read the head of PR #$OC_PR_NUMBER: no fix progress result is written" >&2
+      exit 1
+    fi
+    if [ "$head_after" != "$OC_HEAD_BEFORE" ]; then
       result=pushed
     else
       n="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" \
