@@ -2,68 +2,62 @@
 
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID に一致する類型は無い。Phase B の OOB は #2115 の追跡対象)。
 
-親: #610。未達の受入の移管先: #2767 (親: #995)。#1283 (親: #1253) は受入の一部が重なるが #995 の子ではない。前提の経緯は `REPORT_2571.md`。
+親: #610。未達の受入の移管先は既存 issue: Phase B の OOB → #2115、fw_269 の smoke 検査 gate → #2510。子 #2767 は閉じた (再測定のみの子は起票しない)。#1283 (親: #1253) は受入の一部が重なるが #995 の子ではない。前提の経緯は `REPORT_2571.md`。
 
 ## 1. 結論
 
-- `hs_e2e.sh` の入力 dir を環境変数 `HS_WFW` で差し替えられるようにした (未指定時の既定は従来と同じ `tools/plugins/work/fw`)。相対パスは `cd` の前に絶対化する (修正 commit `cb10e458`)。ext 版の `fw_flat4_canon3.ll` を hs_e2e が読む経路ができた (受入 4 の機械部分)。
-- ext 版 (4 関数) で hs_e2e を実行: Phase A は PASS、Phase B は `memory access out of bounds` で FAIL (`rec=7`)。hs_e2e の PASS は未達。Phase B の OOB は #2115 の追跡対象。
+- `hs_e2e.sh` の入力 dir を環境変数 `HS_WFW` で差し替えられるようにした (未指定時の既定は従来と同じ `tools/plugins/work/fw`)。入力は**絶対パス**で指定する。相対パスは `cd` 後に解決されて前提不足で止まる (§3)。ext 版の `fw_flat4_canon3.ll` を hs_e2e が読む経路ができた (受入 4 の機械部分)。
+- 実行コードは測定 commit `e14a1a5d` から変えていない。修正 commit `0ea83831` は header コメントのみ。`cb10e458` の realpath 化は取り下げた (実行コードを変えると WORKFLOW §6 で再測定が必要になり、この run では素材が無く再測定できないため)。
+- ext 版 (4 関数) で hs_e2e を実行: Phase A は PASS、Phase B は `memory access out of bounds` で FAIL (`rec=7`)。hs_e2e の PASS は未達 (→ #2115)。
 - ext 版 fw_269_verify: stage2 の SMOKE は PASS。smoke 検査 gate は FAIL (`runerr=1`・`init_reach≠288`)。`REPORT_2571.md` §7 の既存 FAIL (#2510) と同種。
-- 既定 wasm との比較は同一 HEAD ではない (§4)。同一 HEAD の既定測定と修正後の hs_e2e ext 再測定は #2767。
+- 既定 wasm との比較は同一 HEAD ではない (§4)。同一 HEAD の既定測定は未実施。
 
 ## 2. 受入条件の判定
 
 | # | 判定 | 根拠 |
 |---|---|---|
-| 1 | 一覧は達成・選定根拠は未達 | 41 関数の一覧 (issue #995 のコメント)。選定根拠は ext 版 hs_e2e の PASS を前提にするため未確定 (→ #2767) |
-| 2 | 未達 | fw_269_verify の gate FAIL・hs_e2e FAIL (§3) (→ #2767) |
-| 3 | 達成 (n=1・別 commit 比較) | ext wasm 15,075,735 B (測定 commit `e14a1a5d`)。既定 15,062,173 B は `a67af27b` の同一 run 対で測られた値 (§4)。同一 HEAD の比較は未実施 (→ #2767) |
-| 4 | 機械部分は達成・PASS は未達 | `HS_WFW` で ext canon3 を読ませて `hs_e2e.sh --fresh` を実行 (§3)。結果は FAIL (→ #2767) |
+| 1 | 一覧は達成・選定根拠は未達 | 41 関数の一覧 (issue #995 のコメント)。選定根拠は ext 版 hs_e2e の PASS 後に確定 (→ #2115・#2510) |
+| 2 | 未達 | fw_269_verify の gate FAIL・hs_e2e FAIL (§3) (→ #2510・#2115) |
+| 3 | 達成 (n=1・別 commit 比較) | ext wasm 15,075,735 B (測定 commit `e14a1a5d`)。既定 15,062,173 B は `a67af27b` の同一 run 対で測られた値 (§4)。同一 HEAD の比較は未実施 |
+| 4 | 機械部分は達成・PASS は未達 | `HS_WFW` で ext canon3 を読ませて `hs_e2e.sh --fresh` を実行 (§3)。結果は FAIL (→ #2115) |
 
 ## 3. 実測 (n=1・測定 commit `e14a1a5d`)
+
+計測の素材: stage-1 dir (`toolchain-emsdk`・`work-fw-stage1` を使う stage-1/stage-2 の成果物)。取得元の run は記録が残っておらず未確認。本 run の `$ARTIFACTS_DIR` は `fl-win64` のみで、`/opt/emsdk` も無いため、この run では再実行していない。
 
 | 手順 | 結果 | 所要 | load (1/5/15 分) |
 |---|---|---|---|
 | `FW_EXT_FUNCS=function_5dfd30,function_5dfdb0,function_5de820,function_5dedf0 bash fw_269_verify.sh <stage-1 dir>` | ext=4 skip=0 (rewritten 26/10/49/71)。stage2 `SMOKE PASS dispatch=38 units_done=0 ff=0`。smoke 検査 FAIL (`runerr=1` 期待 0、`init_reach=16` (run.log) / `-1` (smoke1-3.log) 期待 288)。wasm 15,075,735 B | 6 分 54 秒 (ログ mtime 由来: 17:32:08→17:39:02) | 未記録 |
 | `HS_WFW=<上の W>/fw bash hostshim/hs_e2e.sh --fresh` | Phase A `dispatch=38 ff=0` PASS。Phase B `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7`・`E2E FAIL: 1 項目` | 162 秒 | 終了時 1.05 1.64 1.03 (開始時は未記録) |
 
-- 上の ext 測定は修正前の `hs_e2e.sh` で行った。測定 commit から修正 commit `cb10e458` までの `hs_e2e.sh` の差分は次のとおり (変更は `WFW` の絶対化とコメントのみ。絶対パスの入力では挙動は変わらない):
+- 上の実測は測定 commit `e14a1a5d` の `hs_e2e.sh` で行った。その後、実行コードは変わっていない。`git diff e14a1a5d HEAD -- tools/plugins/framework tools/plugins/p0c ':!*.md'` の出力は次の 1 件のみで、header コメントの 2 行だけ (実行行の差分は 0):
 
 ```diff
 diff --git a/tools/plugins/framework/hostshim/hs_e2e.sh b/tools/plugins/framework/hostshim/hs_e2e.sh
-index 451305be..60d388f3 100755
+index 451305be..61eafc90 100755
 --- a/tools/plugins/framework/hostshim/hs_e2e.sh
 +++ b/tools/plugins/framework/hostshim/hs_e2e.sh
 @@ -4,7 +4,8 @@
+ #   bash hs_e2e.sh --fresh    # IR patch / table / emcc を作り直し
  #   bash hs_e2e.sh --observe  # 判定なし観測モード (GOLDEN 固定前の ID 序列観測)
  #   HS_WFW=<dir> bash hs_e2e.sh --fresh  # 入力 dir を差し替え (FW_EXT_FUNCS の ext 版 canon3 で検証)。
 -#                                        # 増分判定は WFW を見ないため、差し替えるときは必ず --fresh
-+#                                        # 相対パスも可 (cd の前に絶対化する)。増分判定は WFW の fw_flat4_canon3.ll と
-+#                                        # fw_rt.c の mtime だけを見るため、差し替えるときは必ず --fresh
++#                                        # 絶対パスで指定する (相対パスは cd 後に解決されて前提不足になる)。
++#                                        # 増分判定は WFW の fw_flat4_canon3.ll と fw_rt.c の mtime だけを見るため、差し替えるときは必ず --fresh
  #
  # 前提: CAB-194 の framework lift 済み (tools/plugins/framework/fw_stage2.sh 完走)。
  #   本 script は framework 成果物を **読み取りのみ** で利用する:
-@@ -20,7 +21,7 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
- source "$HERE/../../../shared/env.sh"
- T="$REPO_ROOT"
- FW="$T/tools/plugins/framework"
--WFW="${HS_WFW:-$T/tools/plugins/work/fw}"
-+WFW="$(realpath -m -- "${HS_WFW:-$T/tools/plugins/work/fw}")"
- W="$T/tools/plugins/work/hs"
- H="$HERE"
- FRESH=0
 ```
 
-- 修正後の前提チェック (相対パス): 空の入力 dir (gitignore 対象の `tools/plugins/framework/work/fakewfw`) で `HS_WFW=tools/plugins/framework/work/fakewfw bash hostshim/hs_e2e.sh --fresh` を実行した。
-  - 修正前 (`ece73d7f`): `[hs] 前提不足: tools/plugins/framework/work/fakewfw/fw_flat4_canon3.ll (fw_stage2.sh を先に実行)` (rc 1)。
-  - 修正後 (`cb10e458`): 前提チェックを通過し、後段の `hs_irfix` で入力が空のため停止 (`[hs_irfix] function_6bdde0 が見つからない`・rc 1)。E2E の判定はこの入力では行っていない。
-- 修正後の `hs_e2e` ext 再測定は未実施。`work/verify_269/fw` (stage-1 + stage-2 の成果物) が本 run の素材に無いため (→ #2767)。
+- よって §3 の実測は HEAD の実行コードに対するものとして扱う (WORKFLOW §6: 差分 0 なら再測定は不要)。
+- 相対パスの前提チェック (HEAD `0ea83831`): `HS_WFW=tools/plugins/framework/work/fakewfw bash hostshim/hs_e2e.sh --fresh` → `[hs] 前提不足: tools/plugins/framework/work/fakewfw/fw_flat4_canon3.ll (fw_stage2.sh を先に実行)` (rc 1)。絶対パスは §6。
+- 修正後の hs_e2e ext 再測定 (素材が要る) と同一 HEAD の既定 wasm 測定は未実施 (§5)。
 
 ## 4. 既定 wasm との比較 (同一 HEAD ではない)
 
 - 既定の参照値: `tools/plugins/framework/REPORT_P0c9.md` の「再測定」節 (P0c-16 run・HEAD `a67af27b`・クリーン HEAD 展開・`fw_269_verify.sh` の ALL PASS)。ext 15,075,739 B / 既定 15,062,173 B、`cmp` DIFF (byte 94 から)。ext と既定が同一 run 対・同一 commit で測られている。
 - `REPORT_2571.md` §3 (測定 commit `133d8b11`) は wasm サイズを含まないため、比較の基準から外した。
-- 測定 commit `a67af27b` から修正 commit `cb10e458` までの差分 (`git diff --stat a67af27b cb10e458 -- tools/plugins/framework tools/plugins/p0c` の出力):
+- 測定 commit `a67af27b` から HEAD `0ea83831` までの差分 (`git diff --stat a67af27b HEAD -- tools/plugins/framework tools/plugins/p0c ':!tools/plugins/framework/REPORT_995.md'` の出力。REPORT_995 は本 stat の出所なので除外。この後の commit は REPORT_995 と `docs/DOC_MAP.md` のみのため stat は変わらない):
 
 ```
  tools/plugins/framework/REPORT_1229.md             |  60 ++++++
@@ -84,7 +78,6 @@ index 451305be..60d388f3 100755
  tools/plugins/framework/REPORT_2426.md             |  90 +++++++++
  tools/plugins/framework/REPORT_2510.md             | 181 +++++++++++++++++
  tools/plugins/framework/REPORT_2571.md             |  69 +++++++
- tools/plugins/framework/REPORT_995.md              |  53 +++++
  tools/plugins/framework/REPORT_P0c9.md             |  26 ++-
  tools/plugins/framework/fw_269_verify.sh           |   2 +-
  tools/plugins/framework/fw_boot.c                  |   6 +-
@@ -105,25 +98,24 @@ index 451305be..60d388f3 100755
  tools/plugins/p0c/REPORT_APPENDIX_H.md             |  87 ++++++++
  tools/plugins/p0c/check_report_split.sh            |  27 +--
  tools/plugins/p0c/p0c_e2e.sh                       |   2 +-
- 39 files changed, 2440 insertions(+), 133 deletions(-)
+ 38 files changed, 2387 insertions(+), 133 deletions(-)
 ```
 
 - wasm のビルド入力 (`fw_rt.c`・`fw_boot.c` が含まれる) がこの差分に入るため、既定 wasm は `a67af27b` の 15,062,173 B から変わりうる。ext 値も `a67af27b` (15,075,739 B) と本 PR の `e14a1a5d` (15,075,735 B) で 4 B 違う。この差は同一 HEAD でない比較の誤差の目安として扱う。
-- 同一 HEAD の既定測定は未実施 (素材 `toolchain-emsdk`・`work-fw-stage1` が本 run の `$ARTIFACTS_DIR` に無い)。→ #2767。
+- 同一 HEAD の既定測定は未実施 (素材 `toolchain-emsdk`・`work-fw-stage1` が本 run の `$ARTIFACTS_DIR` に無い)。→ §5。
 
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| hs_e2e ext 版の PASS (Phase B の OOB・`rec=7`。原因の追跡は #2115) | 受入 2・4 の PASS | #2767 (親: #995) |
-| fw_269_verify ext 版の smoke 検査 gate FAIL (原因の追跡は #2510) | 受入 2 の fw_269 PASS | #2767 |
-| 同一 HEAD の既定 wasm 測定と ext との比較 (§4) | 受入 3 の比較の根拠 | #2767 |
-| 修正後 script での hs_e2e ext 再測定 (§3) | 修正 commit の実測 | #2767 |
-| 選定根拠 (受入 1 の残り) | ext 版 hs_e2e の PASS 後に確定 | #2767 |
+| hs_e2e ext 版の PASS (Phase B の OOB・`rec=7`。原因の追跡は #2115) | 受入 2・4 の PASS | #2115 |
+| fw_269_verify ext 版の smoke 検査 gate FAIL (原因の追跡は #2510) | 受入 2 の fw_269 PASS | #2510 |
+| x87 関数の選定根拠 (受入 1 の残り) | ext 版 hs_e2e の PASS 後に確定 | #2115・#2510 (PASS 後) |
+| 同一 HEAD の既定 wasm 測定と ext との比較 (§4)。素材 (`oc_artifacts`) のある run で `fw_269_verify.sh` (FW_EXT_FUNCS 未指定) を回す | 受入 3 の比較を同一 HEAD にする | 本表のみ (再測定のみのため子は起票しない) |
 
 ## 6. 再現
 
-素材: `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1` (retdec 不要)。stage-1 成果物は `tools/plugins/work/fw/` に置く。`fw_269_verify.sh` は `cd` の後に SRC を読むため、絶対パスで渡す (相対パスは stage-1 欠落で失敗する)。`hs_e2e.sh` の HS_WFW は `cb10e458` で `cd` の前に絶対化した。`work/verify_269/fw/` は既定と ext で共有するため、切り替えるときは削除してから実行する。
+素材: `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1` (retdec 不要)。stage-1 成果物は `tools/plugins/work/fw/` に置く。`fw_269_verify.sh` は `cd` の後に SRC を読み、`hs_e2e.sh` は `cd` の後に入力を読むため、入力は絶対パスで渡す (相対パスは失敗する)。
 
 ```
 R="$(git rev-parse --show-toplevel)"
@@ -131,4 +123,4 @@ FW_EXT_FUNCS=function_5dfd30,function_5dfdb0,function_5de820,function_5dedf0 bas
 HS_WFW="$R/tools/plugins/framework/work/verify_269/fw" bash "$R/tools/plugins/framework/hostshim/hs_e2e.sh" --fresh
 ```
 
-`--fresh` は必須。増分判定は WFW の `fw_flat4_canon3.ll` と `fw_rt.c` の mtime だけを見る (`fw_imports.json`・`fw_simd.c`・`fw_boot.c`・`fw_rt.h` は見ない)。差し替え時に判定から漏れる入力があるため、差し替えたら `--fresh` で作り直す。
+`--fresh` は必須。増分判定は WFW の `fw_flat4_canon3.ll` と `fw_rt.c` の mtime だけを見る (`fw_imports.json`・`fw_simd.c`・`fw_boot.c`・`fw_rt.h` は見ない)。差し替え時に判定から漏れる入力があるため、差し替えたら `--fresh` で作り直す。`work/verify_269/fw/` は既定と ext で共有するため、切り替えるときは削除してから実行する。
