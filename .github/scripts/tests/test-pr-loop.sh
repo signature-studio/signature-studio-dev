@@ -319,36 +319,45 @@ rf_fail() {
   local crc
   { [ "$rc" -ne 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=record-failed' "$TMP/out" && grep -q '::error::fix-progress record failed' "$TMP/rec.out"; }
   expect "$1 -> 非 0・stop=true・reason=record-failed" $?
+  { [ "$(grep -c '^::error::' "$TMP/rec.out")" = 1 ] && grep '^::error::' "$TMP/rec.out" | grep -qF 'the fix run is skipped (reason=record-failed)'; }
+  expect "$1 -> ::error:: は 1 行で、理由を含む (コマンドに改行があっても行が割れない)" $?
   rf_check; crc=$?
   { [ "$crc" -ne 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "$1 -> 後続の check は none を出さず失敗する" $?
 }
+# rf_cmd <name> <text>: ::error:: の行が、失敗したコマンド (<text> を含む) を示すこと (#2869 受入条件 (5))
+rf_cmd() { grep '^::error::' "$TMP/rec.out" | grep -qF -- "$2"; expect "$1" $?; }
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
 FAKE_COMMENT_FAILS=1 run_fix record > "$TMP/rec.out" 2>&1; rc=$?
 rf_fail "(a) 窓を閉じる oc-fix-reset の投稿が失敗"
 { [ "$(grep -c 'pr comment' "$LOG")" = 1 ] && ! logged 'issues/7/labels'; }; expect "(a) 失敗の後に追加の gh pr comment を呼ばない (1 回だけ) ・ラベルも付けない" $?
+rf_cmd "(a) ::error:: の行が失敗したコマンド (gh pr comment) を示す" 'gh pr comment'
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv code 5 1)"
 FAKE_COMMENT_FAILS=1 run_fix record > "$TMP/rec.out" 2>&1; rc=$?
 rf_fail "(b) 停止のコメントが失敗 (ラベルは成功)"
 { logged 'issues/7/labels' && [ "$(grep -c 'pr comment' "$LOG")" = 1 ]; }; expect "(b) ラベルは付いた上で、コメントは 1 回だけ試みて止まる" $?
+rf_cmd "(b) ::error:: の行が失敗したコマンド (gh pr comment) を示す" 'gh pr comment'
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
 FAKE_FAIL_PATH=repos/o/r/issues/7/comments run_fix record > "$TMP/rec.out" 2>&1; rc=$?
 rf_fail "(c) コメント一覧の取得が失敗"
 { ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "(c) 取得が失敗したら PR にもラベルにも触らない" $?
+rf_cmd "(c) ::error:: の行が失敗したコマンド (コメント一覧の取得) を示す" 'issues/$OC_PR_NUMBER/comments'
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
 FAKE_FAIL_PATH=repos/o/r/pulls/7/reviews run_fix record > "$TMP/rec.out" 2>&1; rc=$?
 rf_fail "(d) review 一覧の取得が失敗"
+rf_cmd "(d) ::error:: の行が失敗したコマンド (review 一覧の取得) を示す" 'pulls/$OC_PR_NUMBER/reviews'
 
 setup aaa '[{"name":"oc:stuck"}]' 0
 FAKE_FAIL_PATH=repos/o/r/issues/7 run_fix record > "$TMP/rec.out" 2>&1; rc=$?
 rf_fail "(e) ラベルの読み取りが失敗 (旧版はこれを『ラベル無し』と読んで fail open した)"
+rf_cmd "(e) ::error:: の行が失敗したコマンド (ラベルの読み取り) を示す" "labels[].name"
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"

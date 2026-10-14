@@ -87,15 +87,16 @@ case "${1:-}" in
     # agent と retry は走らせない。PR にはコメントしない (コメントも失敗しうる)。trap の中では gh を呼ばない。
     OC_RECORD_DONE=0
     record_abort() {
-      local rc=$?
+      local rc=$? cmd="${OC_FAIL_CMD:-?}"
       trap - ERR EXIT
       if [ "$OC_RECORD_DONE" != 1 ]; then
-        echo "::error::fix-progress record failed (exit $rc, line ${OC_FAIL_LINE:-?}): the fix run is skipped (reason=record-failed)"
+        cmd="${cmd//$'\n'/ }"
+        echo "::error::fix-progress record failed (exit $rc, line ${OC_FAIL_LINE:-?}, command: ${cmd:0:120}): the fix run is skipped (reason=record-failed)"
         printf 'stop=true\nreason=record-failed\n' >> "${GITHUB_OUTPUT:-/dev/null}"
         exit 1
       fi
     }
-    trap 'OC_FAIL_LINE=$LINENO' ERR
+    trap 'OC_FAIL_LINE=$LINENO; OC_FAIL_CMD=$BASH_COMMAND' ERR
     trap record_abort EXIT
     pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
     head_now="$(jq -r .head.sha <<< "$pr_json")"
