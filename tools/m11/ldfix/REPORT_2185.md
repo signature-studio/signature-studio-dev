@@ -24,7 +24,7 @@
   - `DROP`: 全経路が STORE。機械語上は store があるのに IR の読みが undef (脱落候補)。
   - `LIVE-IN`: 全経路が ENTRY。
   - `UNDETERMINED`: それ以外。理由コード `BARRIER` / `ONLY_ENTRY_AFTER_CALL` / `MIXED_OR_UNREACHABLE` / `IJMP` で区別。
-- 限界 (近似): `escaped` は `lea` と `mov reg, rbp|rsp` だけを見る。`mov [mem], rbp` のように frame アドレスをメモリへ書き出すケースは見ていない。今回の DROP / LIVE-IN は straight-line の判断で、この限界で結論は変わらないと確認した (指摘 4)。
+- 限界 (近似): `escaped` は `lea` と `mov reg, rbp|rsp` だけを見る。`mov [mem], rbp` のように frame アドレスをメモリへ書き出すケースは見ていない。今回の DROP / LIVE-IN の site は straight-line 区間内の store に依存する。この限界で結論は変わらないと確認した (指摘 4)。
 - 関数内に関数外・不明な飛び先への jump があると CFG 不完全として `IJMP` で全 site を未判定にする (本測定では該当 0 件)。
 
 ## 3. 結果
@@ -128,7 +128,7 @@ LIVE-IN:
 
 ### 3.5 差分の出力 (WORKFLOW §6)
 
-コマンド: `git diff --stat a511e0c7 HEAD -- tools/m11/ldfix`、`git diff --name-status a511e0c7 HEAD -- tools/m11/ldfix`、`git diff a511e0c7 HEAD -- tools/m11/ldfix/audit_frame_store_verdict.py | wc -l`。測定 HEAD は `183b2957` (negctl・未判定一覧・差分証跡を含む commit)。この表の後に続く REPORT 文言の commit は本節の数値を変えない (`.py` の差分は 0 のまま)。最新 HEAD の差分は PR 本文の検証結果に載せる。
+コマンド: `git diff --stat a511e0c7 HEAD -- tools/m11/ldfix`、`git diff --name-status a511e0c7 HEAD -- tools/m11/ldfix`、`git diff a511e0c7 HEAD -- tools/m11/ldfix/audit_frame_store_verdict.py | wc -l`。測定 HEAD は `957215f1` (この節の出力を取った commit)。この後の commit で変わるのは `REPORT_2185.md` のみで、結果 JSON・negctl・判定器 `.py` は変わらない。最新 HEAD の差分は PR 本文の検証結果に載せる。
 
 ```
  tools/m11/ldfix/REPORT_2185.md                     |  165 +++
@@ -157,9 +157,9 @@ A	tools/m11/ldfix/results/negctl_frame_store_2185.json
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | UNDETERMINED 44 関数 (ONLY_ENTRY_AFTER_CALL 25・BARRIER 19) の DROP / LIVE-IN 確定。7e45e0 の NOSLOT 1 site を含む | 脱落か live-in か未確定 | #2211 [LD-87] |
-| DROP 3 関数 (10628a0 / 13105d0 / c38bd0) の IR 側確認 | 機械語上の DROP 候補が IR で本当に undef か未確認 | #2186 [LD-82] |
-| 入力 IR を `m11_gen_ir2.sh` で再生成して sites 2,737 と突き合わせる | 2,731 と 2,737 の差の原因未確認 | #2186 [LD-82] |
+| DROP 3 関数のうち 13105d0 の IR 側確認 (10628a0 / c38bd0 は #2214 [LD-82] で確認済み: REPORT_2186 §2.1) | 機械語上の DROP 候補 13105d0 が IR で本当に undef か未確認 | #2235 [LD-90] |
 
 ## 6. 子 issue
 
 - #2211 [LD-87] FRAME_IN_ESCAPED 未判定 44 関数の call 越え・ポインタ store の別名解析 (#2185 残件)
+- #2235 [LD-90] DROP 候補 13105d0 の IR 側確認 (#2185 残件。10628a0 / c38bd0 は #2214 で確認済み)
