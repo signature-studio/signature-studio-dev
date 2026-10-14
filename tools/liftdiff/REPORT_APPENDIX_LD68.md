@@ -4,25 +4,26 @@
 
 ## 結論
 
-- 受入条件は**部分達成**。本 PR で達成したのは「計装版の block trace を既定 build と照合して判定に使える状態にする」と「wasm の block 列を実測で示す」まで。
-- **命令単位の wasm trace (受入条件 1) は未達**。IR に元の VA が無いため、lifter 側の変更が要る。本 run では着手できず、子 issue に切り出す (§5)。
-- 1801c5e84 vm0 の block 対応 (受入条件 2): native `1c0b6c`・`1c0b6f` は IR block `1c0b6c`、native `1c0b82` (HeapFree の call) は IR block `1c0b71` の範囲に入る。wasm の vm0 の block 列には `1c0b6c` → `1c0b71` → `1c0b8c` → `1c0ba8` が順に現れる。ただし「範囲に入る」は IR label の address 順による推定で、命令単位の一致は示していない。u16 は wasm が trap するため、block 列は `1c0b6c` → `1c0b71` で止まる。
-- 残り 5 関数 (受入条件 3): 計装版 block 列は取れた (§3) が、native 命令との対応は未了。
-- 測定結果 (計装版と既定版の 12 case 比較) は差 0。計装 build の block trace は判定に使ってよい状態 (LD-67 の結論を再確認)。
+- 受入条件は**部分達成**。本 PR で達成したのは「計装版の block trace を既定 build と照合して判定に使える状態にする」まで。
+- **命令単位の wasm trace (受入条件 1) は未達**。IR に元の VA が無いため、lifter 側の変更が要る。子 #2192 (LD-83) に切り出す (§5)。
+- native `1c0b6f` (je) と `1c0b82` (HeapFree の call) の並びは `results/ld57/insn_1801c5e84_u16.txt` で確認した (§4)。IR block との対応は IR 無しのため本 run で再検証しておらず、未検証。
+- 残り 5 関数 (受入条件 3): 計装版 block 列は測定時に取れた (§3) が、native 命令との対応は未了。子 #2193 (LD-84)。
+- 測定結果 (計装版と既定版の 12 case 比較) は差 0 (測定時の記録。§2)。
 
 ## 1. 測定条件
 
 - 測定 commit: `0e5b184c` (`fix(liftdiff): record IR block trace by store, not call`。コード差分の最終 commit。`main` の `98c5f8ca` に含まれる)。
 - 測定 runner: 4 vCPU・メモリ 15 GiB。load average (測定時) 0.71 / 0.51 / 0.23 (`uptime` 09:47:59Z)。
-- 素材: `work-m6-ott`・`work-liftdiff`・`plugins-ott`・`analysis-ott-binaries` を worktree (`ws-1907`) に展開。`fl-win64` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` に展開。`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12)。`work-liftlib`・`work-m11`・`toolchain-retdec` は本 run では使っていない。
+- 素材 (測定時): `work-m6-ott`・`work-liftdiff`・`plugins-ott`・`analysis-ott-binaries` を worktree (`ws-1907`) に展開。`fl-win64` は `FL_WIN64_DIR` ([WIN64]) に展開。`toolchain-emsdk` は [EMSDK] (emcc 6.0.12)。`work-liftlib`・`work-m11`・`toolchain-retdec` は測定時には使っていない。
 - build: `ott_old_blk` は `work/ott_old_blk/` が素材に無かったため、`liftdiff.py run targets/ott_old_blk.json` (build あり) で再 build。`ott_old` は素材の `work/ott_old/` をそのまま使用 (`--nobuild`)。
-- 実行コマンド:
+- 実行コマンド (測定時):
   - 計装版: `python3 liftdiff.py run targets/ott_old_blk.json --fn 0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc --pattern vm0,u16 --nobuild --notrace --json work/ld68/blk_all.json`
   - 既定版: 同上、`targets/ott_old.json`・`work/ld68/def_all.json`
   - 比較: `python3 results/ld67/compare_blk.py work/ld68/def_all.json work/ld68/blk_all.json`
 - 所要 (n=1・結論には使わない): 計装版 `--nobuild --notrace` の run は 09:47:17 → 09:47:23 UTC (6 s 程度・秒単位の計測)。既定版の所要は未計測。
+- **fix モード (本 run) での再測定: 不可**。`tools/ott/work/ott.ll` と `work-m6-ott` 素材が本 run の runner に無く、`work/ld68/*.json` も gitignore 対象で commit していない。よって §2・§3 の数値は測定時の記録で、本 run では再検証していない。
 
-## 2. 既定版と計装版の比較
+## 2. 既定版と計装版の比較 (測定時の記録・本 run では未再検証)
 
 `compare_blk.py` の出力 (12 case):
 
@@ -46,45 +47,34 @@
 
 注: `diff` / `wasm_trap` は既定版でも同じで、これは native との比較結果であり、計装の影響ではない (計装の影響は差 0 で否定)。
 
-## 3. wasm の block 列 (1801c5e84 vm0)
+## 3. wasm の block 列 (1801c5e84 vm0・測定時の記録)
 
 `blk` (計装版の記録) の先頭 16 件 (1801c5e84 vm0・27 件):
 
 `1c5e84 → 1c5eb8 → 1c0b6c → 1c0b71 → 1c0b8c → 1bafb0 → 1c20c8 → 1c2109 → 1c3dc8 → 1c38c8 → 1c3a81 → 1c3e00 → 1c3e0e → 1c0ba8 → 1c5eb8 → 1c0b6c …`
 
-- `1c0b6c` → `1c0b71` → `1c0b8c` → `1c0ba8` が vm0 で反復して現れる (`1c0b6c` は 1c0b6f の je を含む block)。
+- `1c0b6c` → `1c0b71` → `1c0b8c` → `1c0ba8` が vm0 で反復して現れる。
 - u16 の block 列は `1c5e84 → 1c5eb8 → 1c0b6c → 1c0b71` で trap する (`wasm_trap`)。
 
-## 4. native と IR block の対応 (block 単位)
+## 4. native 命令と IR block の対応 (未検証)
 
-`results/ld64/block_coverage.py` (入力: `tools/ott/work/ott.ll`・`results/ld57/insn_*.txt`) の出力は LD-64 と同じ値を再現した。
-
-| 関数 | pattern | 命令 | distinct rva | block label 一致 | 一致率 |
-|---|---|---|---|---|---|
-| 1ab1d0 | vm0 | 40 | 35 | 4 | 11.4% |
-| 1ab258 | vm0 | 41 | 36 | 4 | 11.1% |
-| 1c5e84 | vm0 | 74 | 38 | 6 | 15.8% |
-| 1c621c | vm0 | 998 | 95 | 9 | 9.5% |
-| 1c682c | vm0 | 112 | 52 | 13 | 25.0% |
-| 1c69cc | vm0 | 1028 | 112 | 14 | 12.5% |
-
-(u16 も同じ傾向。LD-64 の「9.5〜25.5%」の範囲と一致。)
-
-native `1c0b6f` (je) と `1c0b82` (HeapFree の call) の位置:
-- IR に `dec_label_pc_1801c0b6c:` (ott.ll 11881 行) と `dec_label_pc_1801c0b71:` (11886 行)、次の label `1c0b8c` (11897 行) がある。
-- `1c0b6f` は block `1c0b6c` の範囲 (label `1c0b6c` と `1c0b71` の間)。
-- `1c0b82` は block `1c0b71` の範囲 (label `1c0b71` と `1c0b8c` の間)。
-- 対応は **IR label の address 順による推定**。命令単位の wasm trace が無いので、block 内のどの命令かは示していない (受入条件 2 の残り)。
+- native 側の事実 (本 run で確認): `results/ld57/insn_1801c5e84_u16.txt` で `1c0b6f` は je、`1c0b82` は HeapFree の call で、この順に並ぶ。
+- IR block との対応 (`1c0b6f` を block `1c0b6c`、`1c0b82` を block `1c0b71` の範囲に入るとする推定) は IR label の address 順による推定であり、**本 run では IR (`tools/ott/work/ott.ll`) が無いため再検証していない。結論・判定の根拠にしない**。
+- `results/ld64/block_coverage.py` による native rva と IR block label の一致率は、本 PR では再現していない。`REPORT_APPENDIX_LD64.md` §4 の注記 (再現可能な出力として残っていない) を引き継ぐ。一致率の表は本 PR から外した。
+- 再現に必要なもの: `blk_all.json` (6 関数 × vm0/u16 の raw)・IR `ott.ll` (`work-m6-ott` 素材で展開)・`block_coverage.py` の出力。子 #2192 (LD-83) で扱う。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 命令単位の wasm trace (IR に元の VA を残す lifter 側の変更、または rva 対応表) | native `1c0b6f`・`1c0b82` の wasm 側の位置を命令単位で示せない (受入条件 1・2 の残り) | 子 issue (本 PR で起票) |
-| 残り 5 関数 (1ab1d0・1ab258・1c621c・1c682c・1c69cc) の native 命令との対応 | block 列は取れたが分岐点の特定は未了 (受入条件 3) | 子 issue (同上) |
-| u16 の trap (`wasm_trap`) の block 列 | u16 は `1c0b71` で止まるため、後続の block 対応が取れない | LD-64 既存の未解決 (子 issue に含める) |
+| 命令単位の wasm trace (IR に元の VA を残す lifter 側の変更、または rva 対応表) | native `1c0b6f`・`1c0b82` の wasm 側の位置を命令単位で示せない (受入条件 1・2 の残り) | #2192 (LD-83) |
+| 残り 5 関数 (1ab1d0・1ab258・1c621c・1c682c・1c69cc) の native 命令との対応 | block 列は取れたが分岐点の特定は未了 (受入条件 3) | #2193 (LD-84) |
+| u16 の trap (`wasm_trap`) の block 列 | u16 は `1c0b71` で止まるため、後続の block 対応が取れない | #2192 (LD-83)。vm0/u16 の受入条件に含める |
+| §2・§3・§4 の IR 由来の検証 (`ott.ll` 無し) | 本 run で再検証不可 | 素材 `work-m6-ott` のある run で再測定 (#2192 の受入で実施) |
 
 ## 6. 測定 commit と差分
 
 - 測定 commit: `0e5b184c`。
-- `git diff 0e5b184c HEAD -- tools/liftdiff/rt tools/liftdiff/ldlib` は **0 件** (本 PR は REPORT のみ変更)。
+- 測定ビルドの入力・計測コードの差分 (本 run で確認):
+  `git diff 0e5b184c HEAD -- tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt tools/liftdiff/ldlib tools/liftdiff/results/ld67/compare_blk.py tools/ott/rt tools/m6 tools/m8 tools/m9 tools/shim` は **0 件** (出力なし)。
+- 本 PR の変更は `tools/liftdiff/REPORT_APPENDIX_LD68.md` と `docs/` のみ。
