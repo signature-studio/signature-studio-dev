@@ -1,8 +1,8 @@
 # M11 × shimx: midiOutShortMsg の HMIDIOUT が IR で i64 と推定される根本 (SHX-T31 / #2839)
 
 - 親: #1628 (SHX-T25)。残件の根因を特定し、修正方針を決める (受入 3 点)。
-- 測定 commit: `0adc58e7` (`tools/m11/shimx_link/hmo_rootcause.py` を最後に変更した commit)。HEAD は本 PR の head。
-- 再現: `FL_WIN64_DIR=<fl-win64 の展開先> RETDEC_ROOT=<toolchain-retdec の retdec/> python3 tools/m11/shimx_link/hmo_rootcause.py --dll winmm.dll --name midiOutShortMsg` (実測 47 秒)。対照: `--dll kernel32.dll --name CloseHandle` (48 秒)。
+- 測定 commit: `97908347` (`tools/m11/shimx_link/hmo_rootcause.py` を最後に変更した commit)。HEAD は本 PR の head。
+- 再現: `FL_WIN64_DIR=<fl-win64 の展開先> RETDEC_ROOT=<toolchain-retdec の retdec/> python3 tools/m11/shimx_link/hmo_rootcause.py --dll winmm.dll --name midiOutShortMsg` (実測 49.8 秒、rc 0)。対照: `--dll kernel32.dll --name CloseHandle` (rc 0)。
 - 素材: `fl-win64` の `extracted/block00031_PE.bin` (sha256 先頭 16 桁 `b2c64da40921cf26`、x64・ImageBase `0x400000`)。`toolchain-retdec` は RetDec v5.0 (commit `53e55b4b`)。
 - 本件は静的解析 (機械語 + RetDec の該当関数 lift + 署名 DB)。全 lift の再生成 (boot_final3) と e2e は本 run で行っていない。
 
@@ -52,13 +52,13 @@
 
 ## 5. 検証 (HEAD で再現)
 
-- `python3 tools/m11/shimx_link/hmo_rootcause.py --dll winmm.dll --name midiOutShortMsg`: rc 0。出力 (抜粋):
+- 測定 commit `97908347` で実行 (HEAD も同じ script)。`python3 tools/m11/shimx_link/hmo_rootcause.py --dll winmm.dll --name midiOutShortMsg`: rc 0。出力 (抜粋):
   - `IAT winmm.dll!midiOutShortMsg = VA 0x1971cd0` / `thunk (jmp [IAT]) 1 件: 0x663430` / `呼出し元 1 件`
   - `declare i32 @midiOutShortMsg(i64, i32)`
   - `[db]   param hmo  type_id=14037  chain=HMIDIOUT -> unknown`
   - `[db]   param dwMsg  type_id=4862  chain=DWORD -> unsigned long`
 - `python3 tools/m11/shimx_link/hmo_rootcause.py --dll kernel32.dll --name CloseHandle`: rc 0。`declare i1 @CloseHandle(i64*)`、`chain=HANDLE -> PVOID -> pointer`。
-- 測定 commit から HEAD までのコード差分: `git diff 0adc58e7 HEAD -- tools/m11/shimx_link/hmo_rootcause.py` の出力は **0 行** (本 PR で変えたのは REPORT 系と DOC_MAP のみ)。
+- 測定 commit から HEAD までのコード差分: `git diff 97908347 HEAD -- tools/m11/shimx_link/hmo_rootcause.py` の出力は **0 行** (測定 commit の後に変えたのは REPORT 系と DOC_MAP のみ)。
 
 ## 6. 未解決
 
