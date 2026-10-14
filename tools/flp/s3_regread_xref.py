@@ -2,9 +2,11 @@
 # #3052: FLEngine_x64.dll 内の `WFBox`・`DitherBox`・レジストリ読取り API の参照を静的に数える (受入 1 の経路調査)。
 # 使い方: uv run --with pefile --with capstone python3 tools/flp/s3_regread_xref.py <block00031_PE.bin>
 #   (素材 $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin。repo には書かない)
-# 出力は REPORT_APPENDIX.md §18 の数値の根拠。関数境界は .pdata、逆アセンブルは capstone (関数単位)。
+# 出力は REPORT_APPENDIX_3052.md §18 の数値の根拠。関数境界は .pdata、逆アセンブルは capstone (関数単位)。
+# 陰性対照: 環境変数 S3_DROP_CALL=<call 命令の VA> を与えると、その 1 件を数えない (件数が 1 減ることを確かめる)。
 import bisect
 import collections
+import os
 import struct
 import sys
 
@@ -12,6 +14,7 @@ import capstone
 import pefile
 
 P = sys.argv[1]
+DROP = int(os.environ.get("S3_DROP_CALL", "0"), 16)
 pe = pefile.PE(P, fast_load=False)
 pe.parse_data_directories()
 base = pe.OPTIONAL_HEADER.ImageBase
@@ -21,8 +24,17 @@ tva = base + text.VirtualAddress
 tdata = text.get_data()
 data = pe.__data__
 
-# 1) 文字列参照: ASCII (DFM / RTTI) と UTF-16 (Delphi の文字列リテラル)
+
+def va_of(off):
+    for s in pe.sections:
+        if s.PointerToRawData <= off < s.PointerToRawData + s.SizeOfRawData:
+            return s.Name.rstrip(b"\0").decode(), base + s.VirtualAddress + off - s.PointerToRawData
+    return "-", 0
+
+
+# 1) 文字列参照: ASCII (DFM / RTTI) と UTF-16 (Delphi の文字列リテラル)。ヒットは VA (セクション内) と前後のバイトを出す
 ascii_names = [b"WFBox", b"DitherBox", b"QualityBox", b"FormatBox", b"WAVRenderForm"]
+listed = {b"WFBox", b"DitherBox", b"WAVRenderForm"}
 for nm in ascii_names:
     hits = []
     i = data.find(nm)
@@ -31,8 +43,10 @@ for nm in ascii_names:
         i = data.find(nm, i + 1)
     u16 = data.find(nm.decode().encode("utf-16-le"))
     print(f"string {nm.decode():14s} ascii_hits={len(hits)} utf16_hits={0 if u16 == -1 else 1}")
-wf = data.find(b"WFBox")
-print("WFBox ascii context:", data[wf - 3:wf + 26])
+    if nm in listed:
+        for off in hits:
+            sname, va = va_of(off)
+            print(f"  hit {nm.decode():13s} va={hex(va)} sec={sname} off={hex(off)} pre={data[off - 4:off]!r} post={data[off + len(nm):off + len(nm) + 24]!r}")
 
 # 2) レジストリ API の IAT スロットと、それを jmp/call で呼ぶ thunk
 reg_slots = {}
@@ -82,6 +96,8 @@ for fs, fe in funcs:
         continue
     for ins in md.disasm(tdata[o1:o2], fs):
         ninsn += 1
+        if ins.address == DROP:
+            continue
         if ins.mnemonic in ("call", "jmp") and ins.op_str.startswith("0x"):
             calls[int(ins.op_str, 16)].append(ins.address)
         elif ins.mnemonic == "lea" and "rip" in ins.op_str:
@@ -95,9 +111,9 @@ sites = [(t, c) for t in rq for c in calls.get(t, [])]
 direct = collections.defaultdict(list)
 for t, c in sites:
     direct[fn_of(c)].append(c)
-print(f"direct call sites to Reg{{Query,Open}} thunks={len(sites)} functions={len(direct)}")
+print(f"direct call sites to Reg{{Query,Open}} thunks={len(sites)} functions={len(direct)} dropped={hex(DROP) if DROP else 'none'}")
 for f in sorted(direct, key=lambda x: x or 0):
-    print(f"  fn {hex(f)} sites={len(direct[f])}")
+    print(f"  fn {hex(f)} sites={len(direct[f])} at={[hex(c) for c in direct[f]]}")
 
 # 5) RegQueryValueExW を直接呼ぶ関数 (読取り層) と、その呼出し元の数
 q_thunks = {va for va, nm in thunk.items() if nm == "RegQueryValueExW"}
