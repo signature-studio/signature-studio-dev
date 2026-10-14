@@ -6,7 +6,7 @@ const S4 = new URL('./', import.meta.url).pathname.replace(/\/$/, '');
 const M11 = S4 + '/work/stage4/' + (process.env.S4_NAME || 'fix');
 const m2 = await import(M11 + '/m11_boot.cjs');
 const mod = await m2.default({ printErr: () => {} });
-mod.HEAPU8.set(fs.readFileSync(process.env.S4_IMAGE || (M11 + '/m11_image.bin')), 0);
+mod.HEAPU8.set(fs.readFileSync(process.env.S4_IMAGE || (S4 + '/../work/m11_image.bin')), 0);
 const BASE = 16404744;
 const MEM = BigInt(mod.HEAPU8.length);
 const dump = (tag) => {
@@ -14,8 +14,8 @@ const dump = (tag) => {
   const out = [];
   for (const k of [184, 185, 186, 215, 236]) {
     const P = d.getBigUint64(BASE + 16 * k + 8, true);
-    const F = P + 32n < MEM ? d.getBigUint64(Number(P) + 24, true) : -1n;
-    out.push(`k${k} P=0x${P.toString(16)} F=0x${F.toString(16)}`);
+    const Fs = P + 32n < MEM ? '0x' + d.getBigUint64(Number(P) + 24, true).toString(16) : 'n/a (P+32 >= MEM)';
+    out.push(`k${k} P=0x${P.toString(16)} F=${Fs}`);
   }
   console.log(tag + '\n' + out.join('\n'));
 };

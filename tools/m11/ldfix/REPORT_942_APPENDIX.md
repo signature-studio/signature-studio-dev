@@ -101,10 +101,40 @@
 
 測定 commit: `e082c4f1` (origin/main)。素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を展開 (toolchain-retdec は未使用)。
 `bash tools/m11/ldfix/ldfix_e2e.sh` は 66.8 秒・rc 0・judge PASS (units 17/942・icall 24・threw `memory access out of bounds`・survey ok 136 / trap 9、base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
+本 fix run では e2e を再実行していない (`tools/m11/work/` 無し・`$ARTIFACTS_DIR` は fl-win64 のみ)。上記は測定 commit `e082c4f1` での値の引用。
 
-- 実測 (`bin_post_probe.mjs`・`trap_bins.mjs`): k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k236 P=0xa027 は、イメージ読込直後・boot 後・unit 17 の trap 前後のいずれも同じ値。F (P+24) は 0xf9d6981d8d4801 / 0x48000000b2850f07 / 0x247d00001ffe3881 / 0x8b4820ec83485500 で、機械語のバイト列に見える。
+鮮度 (WORKFLOW §6): `git diff e082c4f1 HEAD -- tools/m11/ldfix/` の出力 (本 fix run 時点):
+
+```
+ tools/m11/ldfix/REPORT_942_APPENDIX.md | 12 ++++++++++++
+ tools/m11/ldfix/bin_post_probe.mjs     | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+```
+
+実行経路 (`ldfix_e2e.sh` が呼ぶ `stage4.sh` / `run_stage4.mjs` / `survey_stage4.mjs` / `judge_e2e.py` / `ldfix.py` / `ldfix_img.py` / `ldframe.py` / `ldmach.py` / `tools/shared/env.sh`) の `git diff e082c4f1 HEAD` は空 (出力 0 行)。`bin_post_probe.mjs` と `pe_bin_source_check.py` は、どのスクリプトからも呼ばれない単独ツール。よって `ldfix_e2e.sh` の 66.8 秒の測定は HEAD でも有効。
+
+実測 (`bin_post_probe.mjs`・`trap_bins.mjs`) の前回値: k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k236 P=0xa027 は、イメージ読込直後・boot 後・unit 17 の trap 前後のいずれも同じ値。F (P+24) は 0xf9d6981d8d4801 / 0x48000000b2850f07 / 0x247d00001ffe3881 / 0x8b4820ec83485500 で、機械語のバイト列に見える。
+**本 fix run では未再現** (`tools/m11/work/m11_image.bin` が無く `bin_post_probe.mjs` を実行できない)。PRE-BOOT / POST-BOOT の出力行は本 run に無いため貼れない。
 - 監視 (`oob684_probe.mjs 17 <P 256 本> watch`): unit 0〜16 の実行で bin 表の P 値が変わったのは unit 1 の 1 回のみ。この 1 回で変化したのは 92 スロットで、k 番号は 0〜181 の範囲。k184・185・186・215・236 は変化していない (positive control: 変化を検出できている)。
-- PE 照合 (`pefile`): k184〜186 の P フィールドの RVA は `0xfa5c90` / `0xfa5ca0` / `0xfa5cb0` で、PE の生値は `0x407a50` / `0x408040` / `0x408870`。いずれも `.reloc` の DIR64 対象で、VA→LVA 補正 (−0x400000) で `m11_image.bin` の値になる。k215 (0xee) と k236 (0xa027) は `.reloc` 対象外の PE 値。
+- PE 照合 (`pefile` 2024.8.26・`tools/m11/ldfix/pe_bin_source_check.py`、PE は `fl-win64` の `block00031_PE.bin`、ImageBase 0x400000): 再実行コマンド `tools/m11/ldfix/work/venv/bin/python tools/m11/ldfix/pe_bin_source_check.py tools/m11/ldfix/work/fl/extracted/block00031_PE.bin` の出力 (rc 0・本 fix run の実測):
+
+```
+ImageBase: 0x400000
+k184 P=0x7a50 値 0x7a50: なし
+k184 P=0x7a50 値 0x407a50: raw=0xfa4690 sec=.data rva=0xfa5c90 reloc_dir64=True
+k185 P=0x8040 値 0x8040: なし
+k185 P=0x8040 値 0x408040: raw=0xfa46a0 sec=.data rva=0xfa5ca0 reloc_dir64=True
+k186 P=0x8870 値 0x8870: なし
+k186 P=0x8870 値 0x408870: raw=0xfa46b0 sec=.data rva=0xfa5cb0 reloc_dir64=True
+k215 P=0xee 値 0xee: raw=0xaeec12 sec=.text rva=0xaef812 reloc_dir64=False; (以下 .text 内 3 件)
+k215 P=0xee 値 0x4000ee: なし
+k236 P=0xa027 値 0xa027: raw=0xfa49d0 sec=.data rva=0xfa5fd0 reloc_dir64=False
+k236 P=0xa027 値 0x40a027: なし
+```
+
+- 結論: k184〜186 の P の生値 (`0x407a50` / `0x408040` / `0x408870`) は PE `.data` の RVA `0xfa5c90` / `0xfa5ca0` / `0xfa5cb0` に入っており、いずれも `.reloc` DIR64 対象。VA→LVA 補正 (−0x400000) で `m11_image.bin` の値になる。
+- k236 (0xa027) は `.data` (RVA 0xfa5fd0) に入るが `.reloc` 対象外。
+- k215 (0xee) は 8 バイト一致が `.text` 内の機械語にしか出ず、`.data` に生値は無い。PE 由来とは言えない (前版の「PE 由来」の書き方は撤回)。
 - 結論: k184・185・186・236 の不正値は **boot 中・unit 0〜16 で書き込まれたものではなく、PE 静的データ (`.data`) の初期値として入っている**。これで「書き込み元」の候補のうち「boot・unit 0〜16 の実行」は除外。ただし PE 側の値がなぜ bin 表 (16 バイト stride) の中に入っているか (表の長さ・構造体の重なり) は未確認。
 - 未確認 (次の入口): (a) unit 17 の trap がこの 4 スロットの F を実際に読むか (`trap_bins.mjs` は状態だけで、読み取り命令の特定は未実施)。(b) bin 表 k≥184 が FastMM の bin 表の一部か (PE の `.data` が同じ領域に別の配列を持つ可能性)。(c) 0x407a50 の `.text` 関数 (`function_407a50__lifted` = FastMM_GetMem の実体) と P の関係。
 - 未解決 (起票先): unit 17 の trap 命令の特定と、bin 表 k≥184 の構造 → #942 (次 run)。
