@@ -60,3 +60,20 @@
 |---|---|---|
 | boot が unit 17〜18 付近で `memory access out of bounds` により停止する問題の解消 | 停止より後の UI 経路 (フォルダ選択の呼出位置) に到達できず、呼出有無が確定しない | #1050 (既存、`REPORT_N1050.md` §4) |
 | `SHBrowseForFolder*` / `GetOpenFileNameW` 等の IR 宣言が無いことの原因 (lift の import 解決範囲) | IR 上の宣言だけでは呼出を判定できない | #1179 で継続 (lift 側の確認が必要な場合は子 issue) |
+
+## 6. 静的 call 箇所の再確認 (run 2026-10-14、コード差分 0)
+
+検証起点: `origin/main` `3d21715b` (worktree `ws-1179`)。素材 `fl-win64` を `$RUNNER_TEMP/fl1179` に展開 (25,166 ファイル)。PE の IAT と `.text` の `call` / `jmp` を Python で直接走査した (IR を使わない独立確認)。
+
+| 対象 PE | import 解決 | 静的 call 箇所 |
+|---|---|---|
+| `block00005_PE.bin` (FL 本体 EXE, PE32) | `SHBrowseForFolderA` = IAT `0x407154`、`CoCreateInstance` = IAT `0x407284` | `call [0x407154]` が `0x40432a` (SHBrowseForFolderA)、`call [0x407284]` が `0x402073` (CoCreateInstance)。いずれも 32bit 絶対 `FF 15 disp32` |
+| `block00031_PE.bin` (FLEngine_x64.dll, PE32+) | `SHBrowseForFolder*` は**無し**。`GetOpenFileNameW` / `GetSaveFileNameW` / `CoCreateInstance` / `ShellExecute*` / `SHGetPathFromIDListW` 等は有り | RIP 相対 `FF 25` (jmp thunk) のうち、3 API (`CoCreateInstance` / `GetOpenFileNameW` / `GetSaveFileNameW`) を指すものは **3 箇所** (`0x4690c0` CoCreateInstance、`0x5937e0` GetOpenFileNameW、`0x5937f0` GetSaveFileNameW)。`SHBrowseForFolder*` を指す thunk は 0 箇所 |
+
+走査条件 (`block00031_PE.bin`): `.text` (VA `0x1000`・raw サイズ `min(VirtualSize, SizeOfRawData)`) を先頭から 1 バイトずつ走査し、`FF 25 disp32` の 6 バイトを RIP 相対 (`VA + 6 + disp`) で解決して IAT (import directory) と照合。`FF 25` の総数は 1031 件、うち飛び先が IAT に解決できたものは 832 件 (IAT を指す thunk の総数は 832 件。前版の「9」は誤りで、3 API に限定した数は 3 件)。
+
+判定:
+- **フォルダ選択 (`SHBrowseForFolder*`) の静的 call は FL 本体 EXE の `0x40432a` 1 箇所**。その関数は IR の定義範囲 (`function_` は `0x406e60` 以降のみ) より前にあり、**lift closure の外**。IR に宣言が無いのはこのため。
+- FLEngine 側の IR に `GetOpenFileNameW` 等の宣言が無いのは、`jmp` thunk 経由の呼出が lift で解決されていないことを示す (`REPORT_N1050.md` / `REPORT.md` §1 の間接 call 脱落と同根)。
+- 呼出の**実行時の有無**は依然として未確定。closure 外の関数で、unit 17 の trap (#1050) より後に到達するため、実 boot の trace では判定できない。
+- 受入条件 1 は**未達のまま**。方針決定 (受入条件 2) と gui mock 検査 (受入条件 3) も未着手。
