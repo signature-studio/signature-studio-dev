@@ -7,19 +7,19 @@
 
 - **cookie と decode 規則は一致**: SlateCore `0x18125eaa8` と OTT `0x180260ce0` の cookie はどちらも静的既定 `0x2b992ddfa232` (rot = cookie & 0x3f = 50)。decode は両者とも `ror(entry ^ cookie, cookie & 0x3f)`。
 - **配置も一致 (静的状態)**: OTT api-set 表 (32 entry = 256 B) も SlateCore の既知 12 slot・T1 `0x181307100`・T2 `0x1813071a0` も、すべて `.data` の **zero-fill 域** にあり、ファイル上の生値は 0。
-- **entry 数は比較できない**: OTT 側は 32 entry と確定。SlateCore 側は T1/T2 の終点が未確定 (#2226)。
-  **仮定 (issue #2225 本文の指定どおり明記)**: SlateCore 側の entry 数は未確定のため、「一致」とも「相違」とも判定しない。
-  entry 数が 32 と一致するかは #2226 の結論待ち。形式 (cookie・decode 式・zero-fill 配置) の一致だけを本 appendix の判定とする。
+- **受入条件「entry 数の比較」は未達**: OTT 側は 32 entry と確定。SlateCore 側は T1/T2 の終点が未確定のため、仮定を置いても一致・相違のどちらとも判定しない。確定は #2226 (ICALL-66)。本 appendix の判定は形式 (cookie・decode 式・zero-fill 配置) の一致のみ。
 - **訂正**: `tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の「api-set 表 0x18026c9f0 のファイル生値は非ゼロ 32/32」は誤り。実測は 0/32 (§2.3)。`tools/ott/crtinit/REPORT.md` §3 の「全 0」が正しい。本 PR では ACCEPTANCE 文書を書き換えず、未解決表に残す。
 
 ## 2. 実測
 
 ### 2.1 測定条件
 
-- 測定 commit: `7d15ceab` (`origin/main`・本 PR は tools/ の変更なし。`git diff 7d15ceab HEAD -- tools/icall/diff tools/ott` は空)。
+- 測定 commit: `7d15ceab` (`slot_trace.sh`・`slot_trace.c` と OTT 側の入力を測定した時点の HEAD)。PR 本文の `6883fa10` は本 REPORT を追加した commit で、測定 commit ではない。
+- 測定 commit から HEAD までの差分: `tools/icall/diff/slot_trace.sh`・`slot_trace.c` と `tools/ott` は差分 0 (fix commit で確認)。ただし fix で新規スクリプト `tools/icall/diff/ott_apiset_cmp.py` を追加したため、`git diff 7d15ceab HEAD -- tools/icall/diff` は 0 行ではない。この新規ファイルは測定の入力ではない (未実行・py_compile のみ)。
 - 再現: `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (既定条件)。
 - 所要: real 13.191 s / user 11.032 s / sys 1.916 s。load average 1.18 (測定直前 10:26:33)。
-- 素材: `plugins-freshair` (`FA_DL` に展開) と `work-icall` (`tools/icall/work/`)。OTT の生値は `plugins-ott` の `OTT_vst2_win64.dll` を PE 直読み。
+- 素材: 測定時は `plugins-freshair` (`FA_DL` に展開) と `work-icall` (`tools/icall/work/`) を使用。OTT の生値は `analysis-ott-binaries` の `OTT_vst2_win64.dll` を PE 直読み。
+- **再検証の状態**: fix run (2026-10-14) の ARTIFACTS_DIR には `fl-win64` のみで、上記素材は無い。よって §2.2・§2.3 の数値は前 run の実測で、本 HEAD での再実行・`ott_apiset_cmp.py` との照合は**未実施**。
 
 ### 2.2 slot_trace 集計 (既定条件・再現)
 
@@ -44,18 +44,21 @@
 
 ### 2.4 注意: 直読みの取り違え
 
-最初の試行では `.data` の raw 末尾 (`0x180269000`) より後ろの VA を `get_offset_from_rva` で読んだため、ファイル内の別位置を読んで「非ゼロ」と誤判定した。zero-fill を明示的に 0 とする読み直し (`cmp3_2225.py` 相当) で 0/32 に確定した。`ACCEPTANCE_CAB137_CAB138.md` §4.3 の「非ゼロ 32/32」は同じ誤りと見られる (因果は未確認)。
+最初の試行では `.data` の raw 末尾 (`0x180269000`) より後ろの VA を `get_offset_from_rva` で読んだため、ファイル内の別位置を読んで「非ゼロ」と誤判定した。zero-fill を明示的に 0 とする読み直しで 0/32 に確定した。その読み直しは追跡対象の `tools/icall/diff/ott_apiset_cmp.py` (raw 末尾より後の VA は 0) に移した。`ACCEPTANCE_CAB137_CAB138.md` §4.3 の「非ゼロ 32/32」は同じ誤りと見られる (因果は未確認)。
 
 ## 3. 再現
 
 ```
 bash tools/targets/freshair/fetch.sh     # FA_DL=$RUNNER_TEMP/plugins-freshair を指定して展開
 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh
-# OTT 側: $HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll の .data zero-fill を 0 として
-#   0x18026c9f0 から 32 × u64 を読み、cookie 0x180260ce0 と decode する (pefile・§2.3)
+python3 tools/icall/diff/ott_apiset_cmp.py <OTT_vst2_win64.dll>   # <OTT_vst2_win64.dll> = [ANALYSIS-PLUGINS] の ott/binaries/OTT_vst2_win64.dll
 ```
 
-- 比較スクリプト (`tools/icall/work/cmp3_2225.py`) は gitignore 対象の作業物で、commit しない。
+- OTT の DLL の所在は `docs/REFERENCES.md` の `[ANALYSIS-PLUGINS]` (`ott/binaries/`)。Actions では `oc_artifacts: analysis-ott-binaries` で取得する (`docs/WORKFLOW.md` §11)。
+- `tools/icall/diff/ott_apiset_cmp.py` は cookie `0x180260ce0`・api-set 表 `0x18026c9f0` (32 × u64) を読み、`ror(entry ^ cookie, cookie & 0x3f)` で decode して出力する。zero-fill は 0 とする (§2.4)。
+- 本 fix run では `ott_apiset_cmp.py` を OTT の DLL に対して**実行していない** (素材なし)。py_compile の確認のみ。
+
+
 
 ## 4. 未解決
 
