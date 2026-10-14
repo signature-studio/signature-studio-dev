@@ -5,7 +5,7 @@
   - 指摘 1: PE 上の 69c381 (not eax) が trace_dest で 69c378 (mov eax,[rip+...]) の DEST_RIPREAD に辿れること
   - 指摘 2: RMW の第 2 オペランド (add eax,ecx / shl eax,cl) の元を追跡すること。
             元が reg 即値・reg 定義 (memory 無し) なら、RIP 読みへ帰属させず REGLIVE に落ちること
-  - 指摘 3: bt / xadd / cmpxchg を consumer としたとき、dest の元 mov に到達すること
+  - 指摘 3: bt / xadd / cmpxchg / rcl / rcr を consumer としたとき、dest の元 mov に到達すること
 合成機械語は下記 code*。期待値は trace_dest の実際の規則 (最初に見つかった writer を返す) に合わせている。
 """
 import os
@@ -79,6 +79,11 @@ def main():
     # 指摘 3c: mov ecx,[rip+0xfa] ; cmpxchg ecx,edx  (dest=ecx)
     code3c = bytes.fromhex('8b0dfa000000' '0fb1d1')
     results.append(check_synthetic('3c cmpxchg ecx,edx', code3c, 1, 0, True))
+    # 指摘 3 (回帰): mov eax,[rip+0xfa] ; rcl eax,cl / rcr eax,1  (consumer は rcl/rcr)
+    code3d = bytes.fromhex('8b05fa000000' 'd3d0')
+    results.append(check_synthetic('3d rcl eax,cl', code3d, 1, 0, True))
+    code3e = bytes.fromhex('8b05fa000000' 'd1d8')
+    results.append(check_synthetic('3e rcr eax,1', code3e, 1, 0, True))
     print('ALL OK' if all(results) else 'FAIL')
     return 0 if all(results) else 1
 
