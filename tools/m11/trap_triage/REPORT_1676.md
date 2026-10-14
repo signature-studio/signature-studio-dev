@@ -105,3 +105,23 @@
 
 - list B の base (+8) を 0 のまま生成する原因の**設定元**は未確定。`40fb40` の走査が base を書かないため、base は `40f9e0` 以外の経路 (list 生成直後の `[L+8]` 未初期化) の可能性が高いが、本 run では未確認。
 - DEFECTS 行案 (D15 同類型か) は設定元の確定後。
+
+## 8. #2021 の実測: list B 生成点の窓 (未確定の残件あり)
+
+- 測定 commit: `2782ce9e` (origin/main)。素材: `fl-win64` (sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`・`work-liftdiff` を展開。`work/lift_pe.sha256` を PE 指紋で手記録し `m11_e2e.sh` (非 `--full`) を foreground 実行: rc=0、wall 167 s (08:26:11〜08:28:58)、load 1.00 (uptime)、reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6 と一致)。
+- `--full` は `m2/work/ghidra_dll/functions_dll.csv` が素材に無く `m11_bounds.py` で落ちた (§6 と同じ)。
+- `probe1676_listB_writes.mjs` n=2 (08:29): 両回とも unit 114 で `L=0x10bd4c20`・`base=0`・`cnt=1` の生成、unit 275 で trap、unit 830 で L 消失。§2 と一致。
+- `probe1676_u114.mjs` (unit 114 だけ `_m11_set_trace(1)` で icall トレース): stderr 84 行。icall 列の要点は `0x223840`→`0xf960`×…→`0x85df70`→`0xf960`×…→`0x1c0e70`/`0x1c04a0` の交互→`0xf960`×8→`0x1c160`→`0xf960`×2→Halt0。
+  - `icall` の値は LVA 相対 (`tkey = target + 0x400000`)。`0xf960`=VA `0x40f960` (`TObject.NewInstance`、m11_ov.c 482 行)、`0x1c04a0`=VA `0x5c04a0` (`ret` 1 命令の既定実体 tr_ret0)、`0x1c0e70`=VA `0x5c0e70` (function_5c0e70)。
+- `probe1676_watch.mjs` (icall 行ごとに list B `[G2+188]` の L/base/cnt を比較): n=1 で次の 1 件のみ変化。
+  - `after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -(未生成)->0x0, cnt -(未生成)->1`
+  - **list B は `icall 0x5c04a0` の直後〜次の `icall 0xf960` (`TObject.NewInstance`) の間に生成され、生成時点で base=0**。`40f960`/`40fb40` は `memset` で 0 初期化するため、base=0 は NewInstance 由来の既定値で、そこで値が書かれたのではない。
+  - よって base=0 の設定元は「list を生成した側」(`40f9e0`→`410320` の vtable 間接 call を含む窓) にある。窓内の IR は未特定。
+- IR 突合: `function_8651a0` が `function_40f9e0(obj, 1)` を 6 回呼び、`+188` に list を格納する (boot0.lift.ll)。ただし `function_40f9e0` の窓内の実際の呼出し経路 (`410320`→`40f960` か) は本 run で未確認。
+- `function_47a3e0` (TList Grow) の IR は `[rax-8]` の cap を読む。cap=0 の初期 grow 経路が base 相当を埋めるかは未確認。
+
+| 未達 (#2021 受入条件) | 状況 | 起票先 |
+|---|---|---|
+| base(+8)=0 の設定元 (関数・命令) の確定 | 生成窓 (icall 0x5c04a0 直後〜0xf960 の間) まで確定。窓内の命令は未特定 | 子 issue (親 #2021) |
+| 欠落 IR 箇所と DEFECTS 行案 | 設定元の確定後 | 上記子 issue |
+| REPORT §7 続きへの実測記録 | 本節 (§8) で記録済み | 完了 |
