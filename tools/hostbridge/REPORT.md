@@ -125,6 +125,20 @@
   - 前提の補足: `analysis/check_pe_stub.py` は `pefile` を要する。runner に未導入だと [3a] で `ModuleNotFoundError` により停止する (`pip install --user pefile` で解消)。`hostbridge.sh` 自体は依存を入れない。
 - **注意**: bridged 強制は `ModuleTable.register` 経由の全 descriptor に効くが、現行 descriptor に `bridge` 欄は無く実効値は常に 0。Wrapper 側 `this+0x761` の本物の制御 (Wrapper を lift した後) は H4 本体の範囲。
 
+## 5-c. HMODULE 採番の解放後衝突 (RT-14, #2520)
+
+- **既知類型との関係**: 該当なし (DEFECTS.md の lift 類型ではなく、hostbridge ハーネス内の採番不具合)。検証起点 = origin/main `6505235b`。
+- **原因 (実測で再現)**: `LoadLibraryW` の採番 `HMODULE_BASE + (loaded.size + 1) * 0x10000` は、`FreeLibrary` で `loaded` が縮むと生存中の handle と一致する。
+- **再現 (修正前 = hb_bridge.mjs を未修正のまま S9 のみ追加)**: `test_shim.mjs` S9a FAIL。A・B・C をロード → A を解放 → A を再ロード で `hA2 = hC = 0x7ff6a0030000`、`byHandle=2 loaded=3` (B の handle が C に上書きされる)。S9b FAIL: 9 回の解放・再ロードのうち `clash=9` (全回で衝突)。
+- **修正**: 採番を単調増加カウンタ `allocHandle()` (`++this.hseq`) に変更。修正後は S9a `hA2=0x7ff6a0040000 byHandle=3 loaded=3` PASS、S9b `clash=0` PASS。
+- **ネガコン**: 採番を旧式 (`loaded.size` 基準) に戻す mutant `SizeHandle` → 2 FAIL (期待 FAIL)。ネガコン計 7/7 caught。
+- **実測 (測定 commit `8d6fbf0e`。load average 0.01 / 0.11 / 0.07、4 CPU、並列 1)**:
+  - `node tools/hostbridge/poc/test_shim.mjs`: rc=0、0.036 s。real 20 件 OK / FAIL 0、`[shim] ALL PASS`、ネガコン 7/7。
+  - `node tools/hostbridge/poc/test_marshal.mjs`: rc=0、0.031 s。`checks 13 / broken 0` (`work/host_vst2.wasm` を `build_host.sh` で作ってから実行)。
+  - `bash tools/hostbridge/hostbridge.sh`: [1] E1〜E20 OK の後、[2] `build_plugin_ott.sh` が `tools/m10/work/ott_m10.ll 無し` で rc=1 停止。**[2] build と [4] `run_poc` (28 checks) は未実施**。素材 `work-m6-ott` が未取得のため (m6/m8/m9/m10/ott の work が無い)。直前の正常実行は §5' (素材取得時、`[run_poc] checks 28 / broken 0`)。`run_poc` は handle の数値を assert しない (T5a は同一 module の refcount 比較) ので影響は想定されるが、未実測。→ [RT-15] で検証。
+- **数え方**: real = 試験 S1〜S9 の check 行 (OK/FAIL) の件数。ネガコン = mutant 7 種のうち、対応 check が 1 件以上 FAIL した数 (期待 7/7)。
+- **再計算**: `node tools/hostbridge/poc/test_shim.mjs` (OTT 非依存) と `node tools/hostbridge/poc/test_marshal.mjs`。
+
 ## 6'. 規約遵守メモ
 
 - 書込は `tools/hostbridge/` のみ。`tools/m2,m6..m10` は読取 (Ghidra project は `work/` へコピー、`ott_m10.ll` も `work/` へコピー)。README/docs/・ルート package.json 無改変。
