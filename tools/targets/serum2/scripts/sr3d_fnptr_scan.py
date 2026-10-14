@@ -5,6 +5,7 @@
 出力: 形式ごとの所属セクション・件数・ヒット位置 (RVA)。
 usage: python3 scripts/sr3d_fnptr_scan.py work/Serum2_win64.vst3
 """
+import os
 import sys
 import pefile
 import capstone
@@ -74,7 +75,8 @@ def main(path):
         h = rip_hits[t]
         print(f"  0x{t:x}: {len(h)} " + " ".join(f"0x{a:x}({m})" for a, m in h[:10]))
     cut = []
-    with open("out/sr3_cut_table.tsv") as f:
+    cut_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "out", "sr3_cut_table.tsv")
+    with open(cut_path) as f:
         next(f)
         for line in f:
             va, nbytes, lib, _tag = line.rstrip("\n").split("\t")
