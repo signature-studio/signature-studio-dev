@@ -51,10 +51,13 @@ fx() { printf '%s' "$2" > "$FIX/${1//\//_}"; }
 reset() { rm -rf "$FIX"; mkdir -p "$FIX"; : > "$LOG"; unset FAKE_FAIL; }
 # issue <state> <labels json> [blocked_by]
 issue() { fx repos/o/r/issues/42 "{\"state\":\"$1\",\"labels\":$2,\"issue_dependencies_summary\":{\"blocked_by\":${3:-0}}}"; }
-prs() { fx 'repos/o/r/pulls?state=open&per_page=100' "$1"; }
+RECENT_BASE='repos/o/r/pulls?state=all&sort=updated&direction=desc&per_page=100&page='
+prs() { fx 'repos/o/r/pulls?state=open&per_page=100' "$1"; fx "${RECENT_BASE}1" "$1"; } # open の PR は all の一覧にも出る
+recent() { fx "${RECENT_BASE}1" "$1"; } # run 中に open→merge まで済んだ PR を含む一覧 (state=all, updated 順, 1 ページ目)
 # agent の最終回答 (opencode の JSONL。最後の text が回答)
 answer() { printf '{"type":"text","part":{"text":"途中経過"}}\n{"type":"step_finish","part":{}}\n' > "$TMP/oc.jsonl"; jq -cn --arg t "$1" '{type:"text",part:{text:$t}}' >> "$TMP/oc.jsonl"; }
-ev_issue() { printf '{"issue":{"number":42},"comment":{"body":"x"}}' > "$TMP/ev.json"; }
+ev_issue() { printf '{"issue":{"number":42},"comment":{"body":"x","created_at":"2026-10-14T14:00:00Z"}}' > "$TMP/ev.json"; }
+ev_nostart() { printf '{"issue":{"number":42},"comment":{"body":"x"}}' > "$TMP/ev.json"; } # 起動コメントの created_at が無い (run の run_started_at で代用)
 ev_pr() { printf '{"issue":{"number":42,"pull_request":{"url":"u"}},"comment":{"body":"x"}}' > "$TMP/ev.json"; }
 outcome() { # outcome [env...]: 結果は $TMP/out と $RC
   GITHUB_EVENT_NAME="${EVENT:-issue_comment}" GITHUB_EVENT_PATH="$TMP/ev.json" OC_ISSUE_NUMBER="${NUM-42}" OC_OUTPUT_FILE="$TMP/oc.jsonl" OC_JOB_STATUS=success \
@@ -110,6 +113,52 @@ reset; ev_issue; issue open '[]'; prs '[{"head":{"ref":"421-y"},"body":"Closes #
 outcome
 { [ $RC = 0 ] && reason_is unknown; }
 expect "PR for #421 does not cover #42 (no prefix match)" $?
+
+# 4c. run 中に open→merge まで済んだ PR (open の一覧には出ない。12 秒) -> 着手済み。残っていた oc:no-pr は外す
+RUN_PR='{"head":{"ref":"x"},"body":"Refs #42","state":"closed","created_at":"2026-10-14T14:00:05Z","merged_at":"2026-10-14T14:00:17Z","updated_at":"2026-10-14T14:00:17Z"}'
+reset; ev_issue; issue open '[]'; prs '[]'; recent "[$RUN_PR]"; answer '着手報告のみ'
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'opened or merged during this run' "$TMP/out"; }
+expect "PR opened and merged during the run (open->merge 12 s, Refs #42) -> started, nothing recorded" $?
+reset; ev_issue; issue open '[{"name":"oc:no-pr"}]'; prs '[]'; recent "[$RUN_PR]"; answer '着手報告のみ'
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && logged 'api -X DELETE repos/o/r/issues/42/labels/oc%3Ano-pr'; }
+expect "... and a stale oc:no-pr label is removed" $?
+reset; ev_nostart; issue open '[]'; prs '[]'; recent "[$RUN_PR]"; fx repos/o/r/actions/runs/555 '{"run_started_at":"2026-10-14T14:00:00Z"}'; answer '着手報告のみ'
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST'; }
+expect "no created_at on the comment -> run start from run_started_at, PR counted" $?
+reset; ev_nostart; issue open '[]'; prs '[]'; recent "[$RUN_PR]"; answer '着手報告のみ'
+FAKE_FAIL='actions/runs/555' outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'could not read the run start' "$TMP/out"; }
+expect "run start unreadable (no created_at, run API fails) -> no write, exit 0" $?
+
+# 4d. 別 issue の PR・run の開始より前に merge 済みの PR は『着手済み』に数えない
+reset; ev_issue; issue open '[]'; prs '[]'; recent '[{"head":{"ref":"421-y"},"body":"Closes #421","state":"closed","created_at":"2026-10-14T14:00:05Z","merged_at":"2026-10-14T14:00:17Z"}]'; answer '着手報告のみ'
+outcome
+{ [ $RC = 0 ] && reason_is unknown && logged 'labels\[\]=oc:no-pr'; }
+expect "PR for another issue (#421) merged during the run -> not counted (no-PR marker)" $?
+reset; ev_issue; issue open '[]'; prs '[]'; recent '[{"head":{"ref":"42-old"},"body":"Refs #42","state":"closed","created_at":"2026-10-14T13:00:00Z","merged_at":"2026-10-14T13:30:00Z"}]'; answer '着手報告のみ'
+outcome
+{ [ $RC = 0 ] && reason_is unknown && logged 'labels\[\]=oc:no-pr'; }
+expect "PR for #42 merged before the run started (13:30 < 14:00) -> not counted (no-PR marker)" $?
+
+# 4e. 一覧 (state=all) の読み取りに失敗したら何も書かない
+reset; ev_issue; issue open '[]'; prs '[]'
+FAKE_FAIL='state=all' outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && not_logged 'api -X DELETE'; }
+expect "recent PR list fails -> no write, exit 0" $?
+
+# 4f. 一覧の 1 ページ目が全部 run の開始より後に更新された -> 次のページも読む。上限 (10 ページ) まで止まらなければ何も書かない
+FULL="$(jq -cn '[range(100) | {head:{ref:"o\(.)"},body:"",created_at:"2026-10-14T14:30:00Z",merged_at:null,updated_at:"2026-10-14T14:30:00Z"}]')"
+reset; ev_issue; issue open '[]'; prs '[]'; recent "$FULL"; fx "${RECENT_BASE}2" "[$RUN_PR]"; answer '着手報告のみ'
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && logged "pulls?state=all&sort=updated&direction=desc&per_page=100&page=2"; }
+expect "100 PRs updated after the run start on page 1 -> page 2 read, PR found -> started" $?
+reset; ev_issue; issue open '[]'; prs '[]'; for i in 1 2 3 4 5 6 7 8 9 10; do fx "${RECENT_BASE}$i" "$FULL"; done; answer '着手報告のみ'
+outcome
+{ [ $RC = 0 ] && not_logged 'api -X POST' && grep -q 'more than 1000 PRs' "$TMP/out" && not_logged "page=11"; }
+expect "no page reaches the run start within 10 pages -> warn, no write, exit 0" $?
 
 # 5. 明示的な終了状態 (oc:stuck / needs-user-input / blocked ラベル、open な依存) -> 何もしない
 for lab in oc:stuck needs-user-input blocked; do

@@ -26,6 +26,7 @@ import {
 } from "./pm.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
+import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type Sample } from "./saturation.ts";
 import {
   applyEvent,
   EMPTY_STATE,
@@ -84,7 +85,11 @@ interface NoPrCount {
 export interface Plan {
   at: string;
   active: number;
+  // 設定の上限 (TARGET)。room は下の targetEff から計算する。
   target: number;
+  // 観測から推定した同時実行の上限を足した目標 (TARGET を超えない)。推定が無ければ target と同じ。
+  targetEff: number;
+  capEst?: number;
   room: number;
   picks: Planned[];
   // Review-Only (指示 130)。true の間は picks を空にする。
@@ -110,6 +115,8 @@ interface Meta {
   // 直近の reconcile で DO と REST が食い違った件数と、その累計
   reconcileDiff?: { last: number; total: number };
   rateGuardOn?: boolean;
+  // 同時実行の上限の推定 (saturation.ts)。観測の履歴は meta/obs に別に持つ。
+  cap?: Cap;
   installationId?: number | null;
   lastPlan?: Plan;
   lastError?: { at: string; what: string };
@@ -220,10 +227,15 @@ function countChanged(prev: PmState, next: PmState): number {
   return n;
 }
 
+// queued として数える run の状態 (in_progress が running)。
+const QUEUED_STATUSES = ["queued", "pending", "waiting"];
+
 export class Engine {
   s: PmState;
   meta: Meta;
   log: Log[] = [];
+  // tick ごとの run 数の観測 (24 時間)。上限の推定と /status の peak_running に使う。
+  obs: Sample[];
   dirty = false;
   private busy = false;
 
@@ -234,6 +246,7 @@ export class Engine {
     this.s = loadState(d.store);
     this.meta = d.store.get<Meta>("meta", "main") ?? {};
     this.log = d.store.get<Log[]>("meta", "log") ?? [];
+    this.obs = d.store.get<Sample[]>("meta", "obs") ?? [];
   }
 
   private saveMeta(): void {
@@ -608,6 +621,31 @@ export class Engine {
     return n;
   }
 
+  // 全 event の run を状態別に数える (running = in_progress、queued = queued・pending・waiting)。
+  // oldestMin は最も古い queued の経過分 (queued に入った時刻の近似として updatedAt を使う)。queued が無ければ null。
+  runCounts(now: number): { running: number; queued: number; oldestMin: number | null } {
+    let running = 0;
+    let queued = 0;
+    let oldest = Infinity;
+    for (const r of Object.values(this.s.runs)) {
+      if (r.status === "in_progress") running++;
+      else if (QUEUED_STATUSES.includes(r.status)) {
+        queued++;
+        const t = Date.parse(r.updatedAt);
+        if (Number.isFinite(t) && t < oldest) oldest = t;
+      }
+    }
+    return { running, queued, oldestMin: queued && Number.isFinite(oldest) ? Math.max(0, Math.floor((now - oldest) / 60_000)) : null };
+  }
+
+  // 1 回の観測 (tick ごと)。run 数を 1 分単位で記録し、同時実行の上限の推定を更新する。副作用は DO の保存だけ (GitHub へは書かない)。
+  observe(now: number): void {
+    const { running, queued } = this.runCounts(now);
+    this.obs = appendSample(this.obs, { t: now, r: running, q: queued }, now);
+    this.d.store.put("meta", "obs", this.obs);
+    this.meta.cap = nextCap(this.meta.cap, this.obs, now);
+  }
+
   // 規則は launch_issues.py の classify に、次の 3 点だけ足す (どれも本文を解析しない)。
   //  1. blocked_by の一覧が不明な issue は着手しない (誤着手より遅れを選ぶ)。
   //  2. open な子を持つ親 issue は着手対象から外す。
@@ -708,7 +746,10 @@ export class Engine {
     for (const [k, v] of Object.entries(cls.blocksCount)) blocksCount.set(Number(k), v);
     const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0 }));
     const active = this.countActive();
-    const sel = planLaunch({ ready, relaunch: rows.relaunch.map(([n]) => n), active, target: this.d.cfg.target, batch: this.d.cfg.batch });
+    // 推定の上限が無ければ TARGET のまま (変えない)。推定があれば、上限 + 余裕 (下限 TARGET_MIN、上限 TARGET)。
+    const capEst = capValue(this.meta.cap, nowMs);
+    const teff = targetEff(capEst, this.d.cfg.target, this.d.cfg.queueMargin, this.d.cfg.targetMin);
+    const sel = planLaunch({ ready, relaunch: rows.relaunch.map(([n]) => n), active, target: teff, batch: this.d.cfg.batch });
     const relMap = new Map(rows.relaunch);
     const picks: Planned[] = [];
     const issueOf = new Map(snap.issues.map((i) => [i.number, i] as const));
@@ -734,6 +775,8 @@ export class Engine {
       at: iso(nowMs),
       active,
       target: this.d.cfg.target,
+      targetEff: teff,
+      capEst,
       room: sel.room,
       picks,
       phase,
@@ -1062,6 +1105,8 @@ export class Engine {
     try {
       if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS) await this.fullSync(gh);
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
+      // 同期が古い・打ち切り中は run 一覧が不完全なので観測しない (launch と同じ条件)。偽の飽和を作らないため。
+      if (this.fresh()) this.observe(now);
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
@@ -1111,12 +1156,13 @@ export class Engine {
       else if (r.status === "queued") running.queued++;
       else if (r.status === "pending") running.pending++;
     }
+    const now = this.d.now();
+    const cnt = this.runCounts(now);
     // 既存の counters に無いキー (#2339 の redelivered・wouldRedeliver など) は 0 として出す。
     const counters = { ...this.zero(), ...(this.meta.counters ?? {}) };
     const rest = this.meta.rest;
     const lastError = this.meta.lastError ? { ...this.meta.lastError, what: this.clean(this.meta.lastError.what) } : null;
     // 自律運転の指標。件数と時間だけで、題名・本文・login は出さない (issue / PR 番号は可)。
-    const now = this.d.now();
     const openIssues = Object.values(this.s.issues).filter((i) => i.state === "open");
     const openPrs = Object.values(this.s.prs).filter((p) => p.state === "open");
     const withLabel = (l: string) => (x: { labels?: string[] }) => (x.labels ?? []).includes(l);
@@ -1147,6 +1193,9 @@ export class Engine {
       mode_dispatch: this.d.cfg.liveDispatch ? "live" : "dry-run",
       active_runs: plan.active,
       target: plan.target,
+      // 観測から推定した上限を足した目標 (TARGET を超えない)。cap_est は 24 時間以内の推定、無ければ null。
+      target_eff: plan.targetEff,
+      cap_est: plan.capEst ?? null,
       room: plan.room,
       open_issues: open,
       open_prs: Object.values(this.s.prs).filter((p) => p.state === "open").length,
@@ -1186,6 +1235,11 @@ export class Engine {
       last_redeliver_scan: this.meta.redeliverAt ? iso(this.meta.redeliverAt) : null,
       hook_failed_last_scan: this.meta.redeliverFailed ?? null,
       running,
+      // 全 event の queued・pending・waiting の数と、最も古い queued の経過分 (queued が無ければ null)。
+      queued: cnt.queued,
+      oldest_queued_age_min: cnt.oldestMin,
+      // 直近 24 時間の tick ごとの in_progress の最大値 (観測が無ければ null)。
+      peak_running: peakRunning(this.obs, now) ?? null,
       // 投稿したが 5 分たっても run が現れなかった issue。自動では再投稿しない (人が見る)。
       launch_unobserved: this.launchUnobserved(),
       // dry-run のために投稿しなかった GitHub への書き込み (/oc 投稿 + repository_dispatch) の累計。
