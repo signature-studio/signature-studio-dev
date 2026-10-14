@@ -104,8 +104,70 @@ def main():
         if g in rest:
             print('[hs_irfix] %s が body に残存' % g); sys.exit(1)
     lines[lo:hi + 1] = body
+    fix_414390(lines)
     open(dst, 'w').write('\n'.join(lines))
     print('[hs_irfix] function_6bdde0 patched: %d 置換 (Host=%s Tag=%s; signature+2x(Host,Tag)+Tag_r8+Host_r9+Tag_rdx素) -> %s' % (n[0], H, T, dst))
+
+
+def fix_414390(lines):
+    # #2426: native 0x414390 は wcsncpy 相当 (rcx=dst, edx=count, r8=src) で入力を読む。
+    # lift 版は rcx/rdx/r8 を読まず RetDec の定数 ptrtoint @G に畳んでいるため、count が
+    # 定数のアドレス値になり src を終端まで読んで wasm 境界外へ出る (REPORT_2426 §2)。
+    # 入力を caller が積む BLK+0x08 (rcx) / +0x10 (rdx) / +0x18 (r8) から読むように直す。
+    lo = hi = None
+    for i, l in enumerate(lines):
+        if l.startswith('define ') and '@function_414390(' in l:
+            lo = i
+        elif lo is not None and l == '}':
+            hi = i
+            break
+    if lo is None:
+        print('[hs_irfix] function_414390 が見つからない (skip)'); return
+    body = lines[lo:hi + 1]
+    names = re.findall(r'%ce4n11_function_414390 = ptrtoint ptr (@\d+) to i32', '\n'.join(body))
+    if len(names) != 1:
+        print('[hs_irfix] function_414390 の定数名を特定できない: %d 件' % len(names)); sys.exit(1)
+    RCX = re.search(r'%ce5n11_function_414390 = ptrtoint ptr (@\d+) to i64', '\n'.join(body))
+    RDX = re.search(r'%ce7n11_function_414390 = ptrtoint ptr (@\d+) to i64', '\n'.join(body))
+    R8 = re.search(r'%ce8n11_function_414390 = ptrtoint ptr (@\d+) to i64', '\n'.join(body))
+    if not (RCX and RDX and R8):
+        print('[hs_irfix] function_414390 の入力定数を特定できない'); sys.exit(1)
+    rcx, rdx, r8 = RCX.group(1), RDX.group(1), R8.group(1)
+    rules = [
+        ('%%ce4n11_function_414390 = ptrtoint ptr %s to i32' % rdx,
+         '%ce4n11_function_414390 = load i32, ptr inttoptr (i64 9048080 to ptr), align 8'),
+        ('%%ce0n12_function_414390 = ptrtoint ptr %s to i32' % rdx,
+         '%ce0n12_function_414390 = load i32, ptr inttoptr (i64 9048080 to ptr), align 8'),
+        ('%%ce11n11_function_414390 = ptrtoint ptr %s to i32' % rdx,
+         '%ce11n11_function_414390 = load i32, ptr inttoptr (i64 9048080 to ptr), align 8'),
+        ('%%ce5n11_function_414390 = ptrtoint ptr %s to i64' % rcx,
+         '%ce5n11_function_414390 = load i64, ptr inttoptr (i64 9048072 to ptr), align 8'),
+        ('%%ce6n11_function_414390 = ptrtoint ptr %s to i64' % rcx,
+         '%ce6n11_function_414390 = load i64, ptr inttoptr (i64 9048072 to ptr), align 8'),
+        ('%%ce9n11_function_414390 = ptrtoint ptr %s to i64' % rcx,
+         '%ce9n11_function_414390 = load i64, ptr inttoptr (i64 9048072 to ptr), align 8'),
+        ('%%ce7n11_function_414390 = ptrtoint ptr %s to i64' % rdx,
+         '%ce7n11_function_414390 = load i64, ptr inttoptr (i64 9048080 to ptr), align 8'),
+        ('%%ce10n11_function_414390 = ptrtoint ptr %s to i64' % rdx,
+         '%ce10n11_function_414390 = load i64, ptr inttoptr (i64 9048080 to ptr), align 8'),
+        ('%%ce8n11_function_414390 = ptrtoint ptr %s to i64' % r8,
+         '%ce8n11_function_414390 = load i64, ptr inttoptr (i64 9048088 to ptr), align 8'),
+        ('store i16 0, ptr %s, align 8' % rcx,
+         'store i16 0, ptr inttoptr (i64 9048072 to ptr), align 8'),
+    ]
+    for old, new in rules:
+        cnt = 0
+        for i in range(lo, hi + 1):
+            if old in lines[i]:
+                lines[i] = lines[i].replace(old, new)
+                cnt += 1
+        if cnt != 1:
+            print('[hs_irfix] function_414390 置換数不一致 (%d != 1): %s' % (cnt, old[:80])); sys.exit(1)
+    rest = '\n'.join(lines[lo:hi + 1])
+    for g in (names[0], rcx, rdx, r8):
+        if g in rest:
+            print('[hs_irfix] function_414390 に %s が残存' % g); sys.exit(1)
+    print('[hs_irfix] function_414390 patched: 入力 rcx=%s rdx=%s r8=%s を BLK+0x08/+0x10/+0x18 から読む' % (rcx, rdx, r8))
 
 
 if __name__ == '__main__':
