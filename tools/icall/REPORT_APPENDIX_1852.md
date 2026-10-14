@@ -20,8 +20,8 @@
 | 180da3f80 | 8 | abort: `unknown entry` (直接確認) | wasm route 側 | 引数付き関数 (`%arg1`) で table 未登録。 |
 | 18103fd60 | 8 | abort: `unknown entry 0x3103fd60` | wasm route 側 | 引数付き関数 (`%arg1`) で table 未登録。 |
 | 18106a3ba | 8 | abort: `unknown entry` (直接確認) | wasm route 側 | 引数付き関数 (`%arg1`) で table 未登録。 |
-| 180c8b280 | 2 | memory access out of bounds (入力 #3) | 未確定 (route 側の疑い) | 引数無し・table 登録済み。`__icall_dispatch` 経由で引数付きの 180c8b310 を呼ぶ分岐に入る可能性があるが未検証。 |
-| 181057b38 | 8 | memory access out of bounds | 未確定 (route 側の疑い) | 引数無し・table 登録済み。定数アドレス `0x31057B00` 付近と BLK (`0x36319008`) を参照するが、trap 位置は未取得。 |
+| 180c8b280 | 2 | memory access out of bounds (入力 #3) | trap 位置確定 (#1899)・分類は未確定 (#1998) | 引数無し・table 登録済み。trap は引数付きの 180c8b310 (wasm 0x14475) で起きる。詳細は `REPORT_APPENDIX_1899.md`。 |
+| 181057b38 | 8 | memory access out of bounds | trap 位置確定 (#1899)・分類は未確定 (#1998) | 引数無し・table 登録済み。trap は `18106632c` (wasm 0x2700e) で、BLK (`0x36319008`) が `"emsc"` に書き換えられた後に読む。書き込み元は未特定 (#1998)。 |
 
 ### 2.1 根拠
 

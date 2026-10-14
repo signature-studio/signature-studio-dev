@@ -178,6 +178,11 @@ int ott_load(const char* path) {
     return 0;
 }
 
+/* 汎用の encoded slot 初期化: 各 slot に enc(NULL) = cookie を書く (ICALL-51)。cookie は cookie_va の現在値。 */
+void ott_enc_slots(uint64_t cookie_va, const uint64_t* slots, int n) {
+    uint64_t c; memcpy(&c, (void*)cookie_va, 8);
+    for (int i = 0; i < n; i++) memcpy((void*)slots[i], &c, 8);
+}
 uint64_t ott_call(uint64_t fn, const uint64_t* gpr4, const uint64_t* xmm4, const uint64_t* stk, long nstk, uint64_t* out2) {
     return ott_ms_call((void*)fn, gpr4, xmm4, stk, nstk, out2);
 }

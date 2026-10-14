@@ -197,16 +197,37 @@ python3 tools/m11/ldfix/retdec_negctl_1091.py <DIR>/dump.err 41a670 41a670 41a6f
 
 ### 6d. #1091 (LD-33): 段 16 の変換規則の特定 (RetDec ソース照合)
 
-RetDec のソースは公開リポジトリ (avast/retdec) から取得して照合した。素材の toolchain-retdec は版日付 `2019-03-08` (`share/retdec/support/version.txt`) のため、履歴で版を揃えて確認した。
+RetDec のソースは公開リポジトリ (avast/retdec) から取得して照合した。素材の toolchain-retdec の実バイナリは **v5.0** (`retdec-decompiler --version`: commit `53e55b4b`、build 2022-12-08)。`2019-03-08` は `share/retdec/support/version.txt` の日付であり版ではない。
 
-- 段 16 の `Constants optimization` は `src/bin2llvmir/optimizations/constants/constants.cpp` の `ConstantsAnalysis` (登録名 `retdec-constants`、L37〜42)。
-- 規則の該当箇所: `checkForGlobalInInstruction` の末尾 (L164〜171)。`isa<LoadInst>(inst) && gv && root.ops.size() <= 1` のとき、load の pointer operand を `gv` (裸の GlobalVariable) に置き換える。`root` は `SymbolicTree::PrecomputedRda` で作った pointer operand の記号木 (`simplifyNode` 済み)。
-- 版の確認: 同じ分岐は 2019-03-09 時点の版 (`6edcaaea`、L164〜171 相当) にもある。最後の変更 `24b50de5` (2019-05-27) は別の条件 (`getActiveBits() <= 64`) の追加のみで、この分岐は触っていない。
+- 段 16 の `Constants optimization` は `src/bin2llvmir/optimizations/constants/constants.cpp` の `ConstantsAnalysis` (登録名 `retdec-constants`、L37〜42 (v5.0 でも同じ行に登録))。
+- 規則の該当箇所: `checkForGlobalInInstruction` の末尾。行番号は版で異なる: v5.0 (`53e55b4b`) は L165〜170、2019-03-09 時点 (`6edcaaea`) は L163〜168。`isa<LoadInst>(inst) && gv && root.ops.size() <= 1` のとき、load の pointer operand を `gv` (裸の GlobalVariable) に置き換える。`root` は `SymbolicTree::PrecomputedRda` で作った pointer operand の記号木 (`simplifyNode` 済み)。
+- 版の確認: 同じ条件式 `isa<LoadInst>(inst) && gv && root.ops.size() <= 1` は 2019-03-09 時点の版 (`6edcaaea`) と v5.0 (`53e55b4b`、測定に使った実バイナリの版) の両方にある。最後の変更 `24b50de5` (2019-05-27) は別の条件 (`getActiveBits() <= 64`) の追加のみで、この分岐は触っていない。
+- 版差: v5.0 では分岐内に `_toRemove.insert(val);` が追加されている (2019 版には無い)。この差が 41a6a0 / 666b10 の結果に効くかは**未確認**。
 - 観測との対応: `41a6a0` の `load *rax` が `load @rcx` になるのは、記号木が `inttoptr(load @rax)` の pointer を gv `@rcx` まで簡約し、この分岐で deref の 1 段を落として gv を直接 load する形と整合する (§6c の段 1→16 の IR と一致)。
 
 **未確認 (ここで止める)**: 分岐が実際に 41a6a0 で発火することの実行による確認 (RetDec をビルドしてログを出す作業は本 run に収まらない)。上記は「ソース上の唯一の該当分岐」であり、発火の証明ではない。
 
 判定: 受入 1 後半 (変換規則の特定) は **ソース上の該当分岐までで達成**。発火の実行確認は子 issue に残す。
+
+## 6e. #1432 (LD-49): 受入 2 — 666b10 の段 17 判定 (ビルド不要)
+
+測定 commit: `209d5df9` (`tools/m11` のコード変更は `00083cdb` 以降なし)。素材: `toolchain-retdec` の実バイナリ **v5.0** (commit `53e55b4b`、build 2022-12-08) と `fl-win64` の `block00031_PE.bin`。
+
+```
+RETDEC=<retdec-decompiler> PE=<block00031_PE.bin> python3 tools/m11/ldfix/retdec_stage_1091.py 666a60 666a60 666b20 666b10 --out <DIR>
+```
+
+- 所要 9.458 秒 (real、n=1)。load average 実行前 1.10 / 実行後 1.16 (`00083cdb` 上の測定)。
+- 再測定 (v5.0、本 run、`209d5df9`、n=1): real 6.347 秒、load average (1 分値) 実行前 0.69 / 実行後 0.74。出力は上表と一致 (段 1 `load @r8`→`inttoptr`→`load`、段 17 `load @rcx`→`store @r8`、段 19 は 17 と同じ)。
+- 出力 (`666b10` の `mov r8,[r8]`):
+
+| 段 | 段名 | IR |
+|---|---|---|
+| 1 | Input binary to LLVM IR decoding | `load @r8` → `inttoptr` → `load` → `store @r8` |
+| 17 | Constants optimization | `load @rcx` → `store @r8` (誤。`rcx` = slot 先頭) |
+| 19 | LLVM instruction optimization using RDA | 17 と同じ |
+
+判定: 666b10 の変化は **段 17 の Constants optimization** で起き、41a6a0 (段 16) と同じ「ポインタ経由の load が gv の直接 load に畳まれる」形である。段 1 は RetDec の decoder 段で、ldfix 段ではない。**同一機構とまでは未確定**。分岐 (v5.0 L165〜170) への到達は発火確認 (子 #1967) に依存する。
 
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
 

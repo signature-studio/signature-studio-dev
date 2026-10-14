@@ -27,3 +27,5 @@ jobs:
         run: bash .github/scripts/tests/test-watchdog.sh
       - name: test-dispatch-context.sh
         run: bash .github/scripts/tests/test-dispatch-context.sh
+      - name: test-run-outcome.sh
+        run: bash .github/scripts/tests/test-run-outcome.sh

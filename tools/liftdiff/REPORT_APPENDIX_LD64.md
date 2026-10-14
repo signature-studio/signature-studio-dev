@@ -79,6 +79,8 @@
 
 このため計装版の block trace は、**判定や戻り値の根拠にしない**。§3 の block 列は「どの block に入ったか」の参考にとどめる。
 
+> **追記 (LD-67 / #1906)**: 差の原因は `ld_blk` の call 命令の挿入そのもの (空定義でも同じ差・stack fill に非依存) と切り分けた。call を volatile store に替えると既定 build と 12 case 差 0。詳細は [`REPORT_APPENDIX_LD67.md`](REPORT_APPENDIX_LD67.md)。上の「推定」は否定された。
+
 ## 5. 既定経路への影響 (ネガティブコントロール相当)
 
 - `ott_old` を HEAD (`ab190bbd`) で `build_wasm.py --force` して再 build し、6 関数 × vm0/u16 を run した。
