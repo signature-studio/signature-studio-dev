@@ -60,7 +60,9 @@ static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key)
     uint64_t a2d0, a328, ctl, h[3]; memcpy(&a2d0, (char*)C + 0x2d0, 8); memcpy(&a328, (char*)C + 0x328, 8); memcpy(&ctl, (char*)C + 0x318, 8);
     uint32_t kc = 0xffffffffu, k0 = 0xffffffffu; if (key) { memcpy(&kc, key, 4); memcpy(&k0, (char*)key + 4, 4); }
     const char* pth = !key || kc == 0 ? "nokey" : a2d0 == a328 ? "map" : kc != 1 ? "zero" : k0 == 0 ? "static" : "map";
-    memcpy(h, (char*)ctl + 0xa8, 24);
+    /* FA-29 (#2145): FA_P9GUARD=1 は ctl が poison (a5a5…) のとき +0xa8 を読まない (2 回目の呼出 C=Z で SEGV していた)。既定 OFF */
+    if (getenv("FA_P9GUARD") && ctl == 0xa5a5a5a5a5a5a5a5ULL) memset(h, 0, 24);
+    else memcpy(h, (char*)ctl + 0xa8, 24);
     { unsigned char tmp[12]; memcpy(tmp, g_sv_ca, 12); memcpy(g_p_ca, tmp, 12); }
     void* r = ((ca1480_t)(g_p_ca))(C, out, key);
     patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca);

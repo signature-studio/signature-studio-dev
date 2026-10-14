@@ -37,6 +37,16 @@ FA-28 (#2097) まで未解決だった「probe 下 `out[0]=0` / probe 無し `ou
 - 観測 (1 回): `FA_P9MIN` 呼出 16・out0≠0 8 / full probe 呼出 8・out0≠0 0
 - 測定 commit から HEAD までの lift2 差分: `git diff a9a9311d HEAD -- tools/targets/freshair/lift2` (本付録のコミットは docs のみ)
 
+## 6. 2 回目呼出の観測 (FA-29 追補・ガード付き full probe)
+
+- 追加: `FA_P9GUARD=1` (既定 OFF)。`ctl` (`[C+0x318]`) が poison `a5a5…` のときは `+0xa8` を読まない。既定の probe 挙動は不変。
+- 実測 (`FA_PROBE9=1 FA_NODE1=1`, 8 epf 本):
+  - guard 無し: FA9CA 8 行 (1 回目のみ)、ERR 8 行 (`S900..S907 |ERR`)。
+  - guard 有り (`FA_P9GUARD=1`): FA9CA **16 行** (2 回目 `path=nokey` まで観測)、ERR 8 行 (同じ)。
+- 2 回目 (`kc=0 k0=1 path=nokey`) の `out[0]` は 8/8 で `FA9OBJ out0_is_Z=0` (`out[0]` は node Z の値オブジェクトそのものではない)。この実行は `C` を出力していないため、`out[0]=Z+0x2b0` との一致は本追補では再確認していない (§2 の `FA_CHAIN9` 観測による)。
+- ERR 8 行は guard に依らず残る (rip 等は未解析)。本追補では原因を判定しない。
+- 判定基準 (`run_fa9.sh` (a)) は変更していない。既定ゲートは `FA_P9GUARD` を使わないため、従来どおり 1 回目のみを見る。
+
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
