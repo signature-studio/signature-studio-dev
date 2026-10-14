@@ -36,6 +36,10 @@ issue・PR の状態を見て、本書の規則に従って追跡・範囲縮小
 - `.github/` 配下の変更。
 - `OC_MODEL_ID` の変更 (依頼者の管轄。指示 126 の 2 コマンド以外は U4)。
 
+`.github/workflows/` の変更が要る判断は PM agent では行わない。判断は `pm-apply` + `needs-user-input` の issue にして終える。
+PM の許可ラベルに `pm-apply` は無いため、PM が付けるのは `needs-user-input` だけで、`pm-apply` は依頼者が付ける (許可を広げるのは U8)。
+本文には質問と既定案「変更しない (凍結)」を書く。手順は `docs/WORKFLOW.md` §11 の「workflow 変更の運用」。
+
 ## 特権の要る副作用 (意図マーカー)
 
 `/oc` の投稿・素材付きの再投入は PM が直接行わない。判断の結果として次の意図マーカーを
