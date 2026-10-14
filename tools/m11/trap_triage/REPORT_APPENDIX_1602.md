@@ -14,6 +14,18 @@
 | `m11_survey.mjs` (計測 OFF) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 16.6 秒 |
 | `check_682.py` (計測 OFF) | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | - |
 
+### HEAD 再測定 (`50ad69da`・既定値・計測 OFF)
+
+測定 commit `4c3f7458` → HEAD `50ad69da` のコード差分は `tools/m11/m11_build.sh` (+7/-2 行) と `tools/m11/trap_triage/probe_entry.sh` (1 行) だけ。既定値 (`M11_TRACE_ISOLATE=1`・`M11_KEEP_BOOT_O` 未設定) で同じ survey 結果になることを、HEAD で確認した。素材は上と同じ 5 点。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` (HEAD) | rc=0 (`boot_final.ll` 490733 行、`F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0`) | 50.8 秒 |
+| `m11_build.sh` (HEAD、既定値) | rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`) | 24.6 秒 |
+| `m11_survey.mjs` (HEAD、既定値) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 16.4 秒 |
+
+load average は測定中 0.73 前後。`check_682.py` は HEAD では未実行。
+
 **計測の試行 (不採用・patch のみ残す)**: 計測を `M11_INSTR_1602=1` で入れた build は、survey が ok 872 / trap 22、check_682 が 4/5 (304=ok 555=ok 923=trap) になった。`[1602]` 行は 0 件 (範囲外の読みは起きていない)。計測 OFF に戻すと 870 / 24 に戻る。空関数 (中身なし) の対照でも 870 / 24 だった。
 
 ### 計測 patch の適用範囲 (2026-10-14 コード確認)
