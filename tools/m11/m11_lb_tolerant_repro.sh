@@ -8,7 +8,6 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 source ../shared/env.sh
-export PATH="$HOME/.local/share/pnpm/bin:$PATH"
 LB="${1:?LB 0|0x10000}"
 OUT="${2:?出力先 (例 work/repro_lb0)}"
 export M11_LB_BASE="$LB"
