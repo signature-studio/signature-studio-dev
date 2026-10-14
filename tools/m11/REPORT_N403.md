@@ -166,8 +166,8 @@ LB=0 の出力は不変: 修正前 (23:30 の実行) と修正後 (23:36・workt
 
 | 条件 | units | ok | noproc | miss | skipped (oob / halt0 / unreachable / abort) | repro 所要 (wall) |
 |---|---|---|---|---|---|---|
-| LB=0 | 942 | 867 | 1 | 47 | 74 (19 / 7 / 1 / 0) | 70 s (1 回目 70.3 s・worktree 再測 約 70 s) |
-| LB=0x10000 | 942 | 867 | 1 | 47 | 74 (16 / 8 / 1 / 2) | 72 s (worktree 再測 約 70 s) |
+| LB=0 | 942 | 867 | 1 | 47 | 74 (19 / 7 / 1 / 0) | 70.3 s (main 側 23:36 の実行。worktree 側の 2 本合計は 143 s) |
+| LB=0x10000 | 942 | 867 | 1 | 47 | 74 (16 / 8 / 1 / 2) | 71.9 s (main 側 23:35 の実行) |
 
 - 突合 (`m11_lb_unit_diff.py`): **kind 差 8 件** = unit 40 (ok → halt0)・153 (ok → oob)・158 (ok → oob)・291 (oob → ok)・296 (oob → ok)・304 (oob → abort)・555 (oob → abort)・745 (oob → ok)。issue 本文の 8 件と一致。
 - ネガティブコントロール (決定性): LB=0 の 2 回 (main 側 23:36 と worktree 側 23:41) の突合は kind 差 0。差 8 件は実行の揺れではない。
@@ -186,5 +186,5 @@ LB=0 の出力は不変: 修正前 (23:30 の実行) と修正後 (23:36・workt
 
 - 範囲: 寛容起動 (`m11_tolerant.mjs`) の unit 別結果のみ。strict (`m11_run.mjs`)・survey・`m11_e2e.sh` の gate は未実行 (指紋検査を迂回しないため)。
 - LB=0 の既存 gate (`e2e_expect.env`) への影響は未確認。修正は LB=0 の文字列を変えない (`VA_TO_LVA = 0` で同じ定数) が、gate の再実行は未了。
-- n=1 per LB (同一 HEAD の 2 回目 (worktree) は LB=0 のみ・LB=0x10000 は 1 回)。
+- 回数: 修正後の実行は LB=0 が 2 回 (main 側 23:36・worktree 23:41)、LB=0x10000 が 3 回 (main 側 23:35・23:38、worktree 23:42)。突合の kind 差は全て 8 件・同じ unit。
 - 未解決 (起票先は PR 本文の表): 8 件の原因特定 (上 §6-4 の未特定) → 子 issue。memcpy 源 NULL の lift 欠陥 (§6-4) → 同じ子 issue。
