@@ -311,8 +311,9 @@ flelift closure (fle_lift.sh 生成物 tools/flelift/work/lift/* が素材に無
 
 ### 12.1.1 LD-48 (#1398): VMT slot への仮 proc 番地配置 (部分達成)
 
-- 実装: `rt/ld_core.h` `ld_fakeproc_vmt` が snapshot 前に `?vmslot0..7` を index 0..7 で両ランナ同順に登録。`ldlib/cases.py` `make_blob_vm` は VMT slot k (arena+0x2000+8k) に `0x50010000+k*32` を書く。
-- 測定 commit: 作業 branch `1398-ld48-fvm-vmt` の実装 commit (base = origin/main 025bdd8a)。`liftdiff_e2e.sh --m11-only` は rc 0・`LIFTDIFF_E2E PASS` (3 分 12 秒・4 vCPU・load 0.99→6.18)。
+- 実装 (review 1744 対応後): `rt/ld_core.h` の VMT 用仮 proc は静的 index 域 `LD_VMT_IDX0 (256)..263` (`?vmslot0..7`) に置く。`ld_nfakeproc` は増やさない (GetProcAddress 側の index 0..255 は不変)。`ld_fakeproc_valid` / `ld_fakeproc_name` が域を判定し、`fle_ldbridge.c` の `ott_dispatch` は両域を解決する。`ld_snapshot` 前の `ld_fakeproc_vmt_init` が番地式 `LD_FAKEPROC_BASE+i*SZ` の不一致を abort で検出する。仮 proc 上限超過も abort (旧: 0x50010000 を無言で返し proc 0 と衝突)。`ldlib/cases.py` `make_blob_vm` は VMT slot k に `0x50010000+(256+k)*32` を書く。
+- **未測定**: 修正後の base/新 sample:800 と `tests/fvm_transitions.py` は、この run で素材 (`work-m11`・`work-m6-ott`・`work-liftdiff`) が取得できず未実施。`$ARTIFACTS_DIR` には `fl-win64` のみ。既存 pattern の増減 0 は未確認。
+- 以下の実測値 (sample:800・fvm 件数・既存 pattern の遷移) は **修正前** の commit `8ac5b169` のもの (base = origin/main 025bdd8a)。現コードの値ではない。`liftdiff_e2e.sh --m11-only` は `8ac5b169` で rc 0・`LIFTDIFF_E2E PASS` (3 分 12 秒・4 vCPU・load 0.99→6.18)。
 - sample:800 (同一 worktree で base / 新を連続実測・`--shards 12 --state auto`): base 361 / 229 / 210、新 361 / 232 / 207。
 - fvm の件数: 427 件 = native_fault 182 / both_fault 244 / hang 1。**equal / diff / wasm_trap は 0 件** (受入条件 (2) 未達)。native は `rip=0xb` で segv し、VMT slot の仮 proc まで到達していない (引数値を関数ポインタとして呼ぶ経路)。
 - 既存 pattern の遷移 (base → 新): `vm0` native_fault→diff 3・both_fault→wasm_trap 1・both_fault→hang 1、`p0` hang→native_fault 1、`pall`/`qall` both_fault→hang 各 1。登録 8 件で nfakeproc がずれ、GetProcAddress 応答の index も変わるため、この差は登録の副作用。受入条件 (3) は未達 (理由は上記、登録を VMT 専用の index 域へ分ける案が次の作業)。

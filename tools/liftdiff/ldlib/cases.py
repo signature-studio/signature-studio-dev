@@ -30,16 +30,17 @@ BLOBS = {'r1': (101, 0.30), 'r2': (202, 0.30), 'r3': (303, 0.30), 'r4': (404, 0.
 
 
 VMT_SLOTS = 8
+LD_VMT_IDX0 = 256  # rt/ld_core.h LD_VMT_IDX0 (GetProcAddress の index 0..255 と別域)
 LD_FAKEPROC_BASE = 0x50010000
 LD_FAKEPROC_SZ = 32
 
 
 def make_blob_vm(size=BLOB_SIZE):
-    """this 疑似オブジェクト: arena+0x1000 に VMT (arena+0x2000) への fixup ptr。VMT slot k (arena+0x2000+8k) は仮 proc 番地 LD_FAKEPROC_BASE+k*SZ (rt/ld_core.h ld_fakeproc_vmt が index k で登録。native/wasm 同一解決)。"""
+    """this 疑似オブジェクト: arena+0x1000 に VMT (arena+0x2000) への fixup ptr。VMT slot k (arena+0x2000+8k) は仮 proc 番地 LD_FAKEPROC_BASE+(LD_VMT_IDX0+k)*SZ (rt/ld_core.h の静的 index 域。native/wasm 同一解決)。"""
     buf = bytearray(size)
     buf[0x1000:0x1008] = (0x2000).to_bytes(8, 'little')
     for k in range(VMT_SLOTS):
-        buf[0x2000 + 8 * k:0x2000 + 8 * k + 8] = (LD_FAKEPROC_BASE + k * LD_FAKEPROC_SZ).to_bytes(8, 'little')
+        buf[0x2000 + 8 * k:0x2000 + 8 * k + 8] = (LD_FAKEPROC_BASE + (LD_VMT_IDX0 + k) * LD_FAKEPROC_SZ).to_bytes(8, 'little')
     return bytes(buf), [0x1000]
 
 

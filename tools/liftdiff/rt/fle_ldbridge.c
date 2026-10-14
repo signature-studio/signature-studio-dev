@@ -143,10 +143,10 @@ void ott_dispatch(u64 t) {
     ld_gstack_ovf++;
     __builtin_trap();   /* wasm unreachable → JS で捕まる (case は trap 扱い) */
   }
-  if (t >= LD_FAKEPROC_BASE && t < LD_FAKEPROC_BASE + LD_FAKEPROC_SZ * 256u &&
+  if (t >= LD_FAKEPROC_BASE && t < LD_FAKEPROC_BASE + LD_FAKEPROC_SZ * (LD_VMT_IDX0 + LD_VMT_SLOTS) &&
       (t - LD_FAKEPROC_BASE) % LD_FAKEPROC_SZ == 0) {
     u64 idx = (t - LD_FAKEPROC_BASE) / LD_FAKEPROC_SZ;
-    if (idx < (u64)ld_nfakeproc) {
+    if (ld_fakeproc_valid(idx)) {
       R[0] = ld_stub(ld_fakeproc_name(idx), R[1], R[2], R[8], R[9], LD64(R[4] + 0x28), LD64(R[4] + 0x30));
       R[4] += 8;   /* thunk は callee 側 ret (native ld_stub_common と同一) */
       return;
