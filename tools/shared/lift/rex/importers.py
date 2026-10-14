@@ -66,6 +66,14 @@ def is_gpa_call(ins, gpa_slots):
         and ins.operands[0].mem.base == X86_REG_RIP and rip_target(ins, ins.operands[0]) in gpa_slots
 
 
+def overwrites_rax(ins):
+    """rax (GetProcAddress の戻り値) を上書きしうる命令: call/jmp/ret、または rax 系レジスタへの書込み (cmp/test を除く)。"""
+    if ins.mnemonic in ('call', 'jmp', 'ret'):
+        return True
+    return ins.mnemonic not in ('cmp', 'test') and bool(ins.operands) and ins.operands[0].type == X86_OP_REG \
+        and ins.reg_name(ins.operands[0].reg) in ('rax', 'eax', 'ax', 'al')
+
+
 def helper_calls_gpa(md, secs, va, gpa_slots, depth=HELPER_DEPTH, _cache={}):
     """直接 call 先 (ヘルパ) の先頭 HELPER_LOOK 命令に GetProcAddress の IAT 呼出があるか。
     直接 call を depth 段まで辿る (ヘルパ → ヘルパ → GetProcAddress)。"""
@@ -99,7 +107,8 @@ def analyze(path):
                 slots[s.address] = s.name.decode()
     gpa_slots = {k for k, v in slots.items() if v == 'GetProcAddress'}
     res = {'file': os.path.basename(path), 'strings': sorted(set(strs.values())), 'gpa_slots': len(gpa_slots),
-           'name_refs': 0, 'gpa_calls_named': 0, 'bound': {}, 'unbound_sites': 0, 'calls': {}, 'loads_only': 0}
+           'name_refs': 0, 'gpa_calls_named': 0, 'bound': {}, 'unbound_sites': 0, 'calls': {}, 'loads_only': 0,
+           'loads_only_names': {}, 'unbound_names': {}}
     if not strs or not gpa_slots:
         res['note'] = 'string or GetProcAddress missing'
         return res
@@ -136,8 +145,11 @@ def analyze(path):
                     and i2.reg_name(i2.operands[1].reg) == 'rax':
                 slot = rip_target(i2, i2.operands[0])
                 break
+            if overwrites_rax(i2):
+                break
         if slot is None:
             res['unbound_sites'] += 1
+            res['unbound_names'][name] = res['unbound_names'].get(name, 0) + 1
             continue
         stores.setdefault(slot, set()).add(name)
     res['bound'] = {n: sorted(hex(k) for k, v in stores.items() if n in v) for n in sorted({n for v in stores.values() for n in v})}
@@ -155,6 +167,8 @@ def analyze(path):
                         res['calls'][n] = res['calls'].get(n, 0) + 1
                 else:
                     res['loads_only'] += 1
+                    for n in names:
+                        res['loads_only_names'][n] = res['loads_only_names'].get(n, 0) + 1
     return res
 
 
