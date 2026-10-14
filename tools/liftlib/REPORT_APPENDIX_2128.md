@@ -1,7 +1,7 @@
 # liftlib #2128 (部分達成) — ott_getparam leaf への icall runtime 配線 (付録)
 
 親: [`REPORT.md`](REPORT.md) §11 (leafspec) と [`REPORT_APPENDIX_883.md`](REPORT_APPENDIX_883.md) (BLK 配線の追跡)。
-PR: #2162 (`2128-ott-getparam-icall-leaf`)。受入の扱い: 受入 2・3・4 を達成 (受入 2 の FAIL-FAST 発火の確認は子 #2161)、受入 1 は配線のみ達成で表の充足は子 #2161 へ分離 (本 PR では未達)。
+PR: #2162 (`2128-ott-getparam-icall-leaf`、`Closes #2128`)。受入の扱い: 受入 2・3・4 を達成 (受入 2 の FAIL-FAST 発火の確認は子 #2161)。受入 1 は配線のみ達成で表の充足は子 #2161 へ分離し、#2128 の本文から外した (本 PR では未達)。
 
 ## 測定 config
 
