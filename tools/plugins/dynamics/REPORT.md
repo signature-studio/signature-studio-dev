@@ -1,5 +1,7 @@
 # tools/plugins/dynamics/REPORT.md — PLG-F3 (#200) dynamics 7 本: lift 前提の実測
 
+> **正本**: `tools/plugins/dynamics/REPORT.md`。詳細は §4 / 付録 `tools/plugins/dynamics/REPORT_APPENDIX.md` §A。
+
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/dynamics/` のみ / 検証起点 commit: **b2094ba** (判定を gate にした `judge.py` 新設 + `dynamics_e2e.sh`・`dynamics_nega.sh` 修正後。 §5 の実測はすべてこの HEAD の detached worktree)
 - 旧 HEAD (18b1cb3 / 2ba3978) の「exit 0」は、当時の判定が不合格でも exit 0 になる実装だったため合格の根拠から外し、b2094ba の実測に置き換えた (旧値は 16b79f0 の本書)
 - 再現: `bash tools/plugins/dynamics/dynamics_e2e.sh` (判定 + 実測。 不合格・行欠落は exit 1) / `bash tools/plugins/dynamics/dynamics_nega.sh` (ネガティブコントロール NC1〜NC3)
@@ -133,14 +135,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 19048 は 210 件のうち 67 件が call 先として `declare` だけ残り、link 時に未解決になる。
   19252 の 2 件は参照なし。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
-- **脱落の原因 (#1412、検証 commit は本節末尾)**: 既定の RetDec 呼出し (`--disable-static-code-detection` 無し) が、定数 libc 系の関数を
-  「statically linked function」として除去する (`e.retdec.log` の `Running phase: removing functions from standard libraries`)。
-  19048 の欠落 210 件のうち **208 件** は dsm の `statically linked function` 行の開始 VA と一致 (`e.drc.dsm`)。 残る 2 件は
-  `CreateEngine` (0x18000b1a0) / `entry_point` (0x18000bb98) で、RetDec は名前付きの `function:` として出力しており、
-  `define @CreateEngine` / `define @entry_point` は final.ll に存在する。 `engine_defs.py` は `function_<VA>` 形式しか見ないため、この 2 件は偽陽性。
-  ネガティブ/切替の実測: `PLUG_NO_STATIC_DETECT=1 bash tools/plugins/dynamics/engine_lift.sh 19048` で `missing_define` 210 → **2** (97 B)、`missing_ref` 67 → **0**、`define` 1,504 → 1,712。
-  19252 は切替前後とも 2 件 (165 B) で不変 (静的検出の対象外。 原因は未特定のまま)。
-  ただし切替後の 19048 は `emcc -c` rc 1 (fixcmp 後も rc 1): `e.final.ll` の `%arg2` i32/i64 不整合 (既存の修正対象) の後に、`e.fixcmp.ll` で `%penv` の i64/ptr 不整合が露見 (未修正)。 既定の切替は `lift_ranges.sh` の既定値 (#1486) に関わるため、既定の変更は本 run では行わない。
+- **脱落の原因 (#1412、測定 commit と差分証跡は §5)**: 既定の RetDec の静的検出が、19048 の欠落 210 件のうち 208 件を除去していた (`statically linked function`)。 静的検出を切ると `missing_define` 210 → 2、`define` 1,504 → 1,712。 詳細と切替後の `emcc -c` rc 1 の内訳は付録 `REPORT_APPENDIX.md` §A。
 - 失敗の連鎖と修正 (clang は最初の型エラーで止まるため 1 件ずつ露見。 修正は engine 局所の `dynamics/engine_fixcmp.py`、共有鎖には未組込):
   1. 両 engine: `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → 修正済み (19252 は該当 0 件、19048 は 1 件)。
   2. 19048: `inttoptr i64 %arg2` で `%arg2` が i32 → 修正済み (`zext i32 → i64` を挿入。 `function_18004f7f8` の 1 件)。 修正後の `emcc -c` rc 0。
@@ -152,6 +147,10 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 - 以上は到達性の実測で、engine の正しさは何も示していない。
 
 ## 5. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner・同時に走らせたのは本検証の 1 プロセス列のみ)
+
+- 測定 commit: **cb3a89a6** (origin/main)。 この後の差分は文書のみ (REPORT.md の分割移動・REPORT_APPENDIX.md 新設・DOC_MAP 索引 1 行)。
+  `git diff cb3a89a6 HEAD -- tools/plugins/dynamics ':!*.md'` の出力は空 (コード差分 0 の証跡)。 文書差分の概要は `git diff cb3a89a6 HEAD -- tools/plugins/dynamics --stat` で REPORT.md のみ。 `docs/WORKFLOW.md` §6 に従い現 HEAD での e2e 再測定は不要 (下の `engine_lift.sh` 再測定は HEAD で実施)。
+- §4 の数値を HEAD で再測定 (`engine_lift.sh 19048`・`PLUG_NO_STATIC_DETECT` 無し / 有り): `define` 1,504 / `missing_define` 210 (67 call 先) → 切替後 `define` 1,712 / `missing_define` 2 / `missing_ref` 0。 `statically linked function` の開始 VA 一致 208 / 210 (残り 2 件は `CreateEngine` / `entry_point`)。 一致判定は `ranges.txt` と dsm の突き合わせによる実測。
 
 | 項目 | 実測 |
 |---|---|
