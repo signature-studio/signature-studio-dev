@@ -1,6 +1,9 @@
 # #2780: unit 492 OOB の `4473f0` 配列長計算 (`0x92492493` 乗算) の戻り値の実測
 
 親: #1046 (経緯は `REPORT_1046.md` §10〜§19)。測定 commit: `9b8f133f` (コードを変えた最後の commit。gated probe の追加)。
+
+既知類型との関係: D17 (DEFECTS.md) に似るが未確定 (§6)。
+
 本節の REPORT は、測定 commit から HEAD までの差分を §8 に示す。
 
 ## 0. 結論
@@ -13,7 +16,7 @@
 
 ## 1. 素材と再現 (HEAD `9b8f133f`)
 
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`toolchain-*` は `/opt`、`work-m11`・`work-liftdiff` は worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`toolchain-retdec` は `[RETDEC]`、`toolchain-emsdk` は `[EMSDK]` (`docs/REFERENCES.md` §4) に展開。`work-m11`・`work-liftdiff` は worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。
 - 既定 build: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_gen_ir2.sh` rc 0 (30.5 s、490,735 行、ldfix applied) → `bash tools/m11/m11_build.sh` rc 0 → `node tools/m11/trap_triage/survey_units.mjs <out>.json`。
 - 計装 build: `M11_PROBE_2780=1 bash tools/m11/m11_build.sh` (IR 側 `trap_triage/probe2780_ir.py`・C 側 `m11_rt.c` の `m11_p2780_put`)。読出し: `node tools/m11/trap_triage/probe_2780_units.mjs <out>.json`。
 - 読取りのみ: `SV_WATCH=0x10aa1160 node tools/m11/trap_triage/probe_2780_watch.mjs 0 941` (既定 build で走らせる)。
@@ -39,6 +42,20 @@
 
 - unit 492 は i=2 の途中 (2 回目の `4133f0` 呼出し) で trap するため i=3 以降の記録は無い。i=1,2 の値は unit 17 と一致。
 - `esi` の流れ: `4473f0` → `447df0` (r8 を素通し) → `446370` の `r8d` → `423560` の ID 引数 (検索)。検索が当たると slot に値が入るが、本 unit では slot1・slot2 とも 0 (実測 tag 3・4) で、この経路には入らなかった。`447df0` の表参照の添字は `r9d = i-1` で乗算と独立。OOB の入力 (dest2 の旧値) は、乗算の結果とは無関係に §5 の書込みで決まる。
+- ネガティブコントロール: 正常系の unit 17 は i=1..7 の 7 件すべてが期待値と一致する。表の期待値 `(i+5)%7` の検算 (ビルド不要・`python3` のみ) で、式の定数の 1 bit を反転すると i=2 の 1 件が不一致になることを確かめた (下の出力の 2 行目。反転は `M ^ (1<<4)`)。`n = i+5`、`M` は IR の定数 `-1840700269` (`0x92492493`)。
+
+```
+python3 -c "
+def rem7(n, M):
+    s = ((n*M) >> 32) + n
+    return n - 7*(s >> 2)
+M = -1840700269
+print([rem7(n, M) for n in range(6, 13)])
+print([rem7(n, M ^ (1<<4)) for n in range(6, 13)])
+"
+# [6, 0, 1, 2, 3, 4, 5]   (期待値と一致)
+# [6, 7, 1, 2, 3, 4, 5]   (反転: n=7 (i=2) の 1 件が不一致 → FAIL)
+```
 
 ## 4. OOB の入力 (probe build 実測)
 
@@ -68,7 +85,7 @@ unit 492 exc 0x1_3 -> 0x0               ← 旧値 0x1_00000003 を読んだ後�
 ```
 
 - 上位 dword の `1` は unit 432 の 8B 書込み由来、下位 dword は unit 477 と 484 の 4B 書込み由来。`0x1_00000003` は、どの単一の書込みにもない混在値。
-- unit 477・484 の遷移は REPORT_1046 §14 の `0x10a9f910` の遷移 (`0x1_2 → 0x1_3`) と同じ形。REPORT_2672 は `0x10a9f910` の unit 477 の下位 4B 書込みの主体を C 版 `function_4133f0` の shadow stack 局所 (`u32 len`, `m11_ov.c:345`) と特定している。`0x10aa1160` の書込み主体は未確認。
+- unit 477・484 の遷移は REPORT_1046 §14 の `0x10a9f910` の遷移 (`0x1_2 → 0x1_3`) と同じ形。REPORT_2672 は `0x10a9f910` の unit 477 の下位 4B 書込みの主体を C 版 `function_4133f0` の shadow stack 局所 (`u32 len`) と特定している。その行は REPORT_2672 (208b4ef9 時点) では `m11_ov.c:345` だったが、その後 3c0019a6 (#2714) で `m11_ov.c` が変わり、現 head `a3d90382` では `tools/m11/m11_ov.c` L373 (`u32 len = D(s - 4);`。`function_4133f0` は L368 から)。`0x10aa1160` の書込み主体は未確認。
 
 ## 6. 解釈 (仮説を含む)
 
@@ -79,11 +96,19 @@ unit 492 exc 0x1_3 -> 0x0               ← 旧値 0x1_00000003 を読んだ後�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x10aa1160` の下位 4B 書込み (unit 477・484) と 8B 書込み (unit 432) の主体 (IR site・C 関数) | OOB 入力の出自が未確定 | 子 issue (本 PR の後に起票。番号は PR 本文・issue コメントに記載) |
-| `arg2` の 8 要素配列 (`+0x100..+0x170`) を native で誰が初期化するか、lift で欠けるか | 修復 (初期化の復元) の方針が未確定 | 同上 |
-| 類型 (D17 / 別類型) の判定 | DEFECTS の登録が未確定 | 同上 |
+| `0x10aa1160` の下位 4B 書込み (unit 477・484) と 8B 書込み (unit 432) の主体 (IR site・C 関数) | OOB 入力の出自が未確定 | #2891 |
+| `arg2` の 8 要素配列 (`+0x100..+0x170`) を native で誰が初期化するか、lift で欠けるか | 修復 (初期化の復元) の方針が未確定 | #2891 |
+| 類型 (D17 / 別類型) の判定 | DEFECTS の登録が未確定 | #2891 |
 
 ## 8. 差分 0 の証跡
 
-- 測定 commit: `9b8f133f`。以後の差分は本 REPORT と `docs/DOC_MAP.md` のみ (下記コマンドで確認)。
-- `git diff --stat 9b8f133f HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs tools/m11/trap_triage/probe2780_ir.py tools/m11/trap_triage/probe_2780_units.mjs tools/m11/trap_triage/probe_2780_watch.mjs`: 空 (コード差分 0)。
+- 測定 commit: `9b8f133f`。以後の差分は本 REPORT・`docs/DOC_MAP.md`・`probe2780_ir.py` の完了メッセージ 1 行だけ。
+- `git diff --stat 9b8f133f HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs tools/m11/trap_triage/probe2780_ir.py tools/m11/trap_triage/probe_2780_units.mjs tools/m11/trap_triage/probe_2780_watch.mjs`:
+  `probe2780_ir.py` の 1 行 (print 文字列 L61) だけ。`git diff 9b8f133f HEAD -- tools/m11/trap_triage/probe2780_ir.py` の変更は print の文字列のみで、IR を書き換える処理 (`patch` の anchor と挿入文) は変わらない。この print は `M11_PROBE_2780=1` のときだけ動く。
+- 検収 (`a3d90382`) 後の差分は上の 1 行の修正だけ。e2e は再実行していない (§9)。
+
+## 9. 検証範囲・範囲外・所要
+
+- **検証範囲**: `4473f0` の乗算の剰余 `esi` の比較 (unit 17 は i=1..7、unit 492 は trap までの i=1,2)。`0x10aa1160` の値遷移 (unit 415〜492 の抜粋)。既定 build の survey (`ok 872 / miss 47 / other 1 / halt0 7 / oob 14 / noproc 1`) と計装版の unit 別 kind 一致。上の数値はすべて測定 commit `9b8f133f` の実装 run の記録。
+- **範囲外**: unit 492 以外の OOB 13 件。`0x10aa1160` の書込み主体 (unit 432・477・484 の IR site・C 関数)。`arg2` 配列の native 初期化経路と lift の欠落。類型の確定と修復。これらは #2891 が追う。
+- **所要・load average・並列数**: 実装 run は `m11_gen_ir2.sh` の所要 (30.5 s) だけを記録し、load average と並列数は取っていない。本 fix では e2e を再実行していない。数値は実装 run の記録をそのまま使い、load average・並列数は未記録として PR 本文の未解決表に書く (再測定の子は起票しない)。

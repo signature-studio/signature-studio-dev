@@ -58,4 +58,4 @@ m, body = patch('function_4473f0', [
 s = s[:m.start()] + body + s[m.end():]
 s = s.rstrip('\n') + '\ndeclare void @m11_p2780_put(i32, i64)\n'
 open(src, 'w').write(s)
-print('[probe2780_ir] patched function_4473f0 / function_4133f0: ' + src)
+print('[probe2780_ir] patched function_4473f0: ' + src)
