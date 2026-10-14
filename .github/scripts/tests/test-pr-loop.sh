@@ -13,7 +13,7 @@ export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 GITHUB_EVE
 # fake gh: `gh api [--paginate] [-X M] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
 # `gh pr comment|close|reopen` と POST は $LOG に記録するだけ。
 # FAKE_REOPEN_FAILS=N なら、最初の N 回の `gh pr reopen` を失敗させる。FAKE_CLOSE_FAILS=1 なら `gh pr close` を失敗させる。
-# FAKE_FAIL_PATH=<path> なら、その path の読み取り (`gh api`) を失敗させる。
+# FAKE_COMMENT_FAILS=1 なら `gh pr comment` を失敗させる (呼び出しは $LOG に残る)。FAKE_FAIL_PATH=<path> なら、その path の読み取りを失敗させる。
 # fixture <名前>.2 があれば、2 回目以降の同じ path の読み取りはそちらを返す (close の間に PR の状態が変わった競合の再現)。
 FIX="$TMP/fixtures"
 LOG="$TMP/gh.log"
@@ -23,6 +23,7 @@ cat > "$TMP/bin/gh" << 'EOF'
 echo "gh $* [GH_TOKEN=${GH_TOKEN:-}]" >> "$FAKE_LOG"
 if [ "$1" = pr ]; then
   [ "$2" = close ] && [ -n "${FAKE_CLOSE_FAILS:-}" ] && exit 1
+  [ "$2" = comment ] && [ -n "${FAKE_COMMENT_FAILS:-}" ] && exit 1
   if [ "$2" = reopen ] && [ -n "${FAKE_REOPEN_FAILS:-}" ]; then
     n=$(($(cat "$FAKE_FIX/reopen_calls" 2> /dev/null || echo 0) + 1))
     echo "$n" > "$FAKE_FIX/reopen_calls"
@@ -43,10 +44,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 [ "$method" = POST ] && exit 0
-if [ -n "${FAKE_FAIL_PATH:-}" ] && [ "$path" = "$FAKE_FAIL_PATH" ]; then
-  echo "fake gh: read failed for $path" >&2
-  exit 1
-fi
+[ -n "${FAKE_FAIL_PATH:-}" ] && [ "$path" = "$FAKE_FAIL_PATH" ] && exit 1
 f="$FAKE_FIX/${path//\//_}"
 [ -f "$f" ] || { echo "fake gh: no fixture for $path" >&2; exit 1; }
 if [ -f "$f.2" ]; then
@@ -313,32 +311,93 @@ fx repos/o/r/pulls/7/reviews "$(seq_rv code 5 1)"
 OC_MARK_TOKEN=mark-tok run_fix record > /dev/null
 logged 'oc-pm-intent: stuck pr=7 reason=code.*GH_TOKEN=mark-tok'; expect "停止印は OC_MARK_TOKEN で投稿する (PM intent の読み手と同じ作者)" $?
 
+echo "== fix-progress.sh record (gh の失敗で止まる: stop=true・reason=record-failed・PR にコメントしない #2869)"
+# rf_check: record の失敗の後に check を走らせる (workflow と同じく GITHUB_ENV を読む)。result を出さずに失敗しなければならない
+rf_check() { ( while IFS='=' read -r k v; do export "$k=$v"; done < "$TMP/env"; run_fix check ) > /dev/null 2>&1; }
+# rf_fail <name>: record が非 0 で終わり、stop=true と reason=record-failed を出し、後続の check が result を出さないこと
+rf_fail() {
+  local crc
+  { [ "$rc" -ne 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=record-failed' "$TMP/out" && grep -q '::error::fix-progress record failed' "$TMP/rec.out"; }
+  expect "$1 -> 非 0・stop=true・reason=record-failed" $?
+  { [ "$(grep -c '^::error::' "$TMP/rec.out")" = 1 ] && grep '^::error::' "$TMP/rec.out" | grep -qF 'the fix run is skipped (reason=record-failed)'; }
+  expect "$1 -> ::error:: は 1 行で、理由を含む (コマンドに改行があっても行が割れない)" $?
+  rf_check; crc=$?
+  { [ "$crc" -ne 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "$1 -> 後続の check は none を出さず失敗する" $?
+}
+# rf_cmd <name> <text>: ::error:: の行が、失敗したコマンド (<text> を含む) を示すこと (#2869 受入条件 (5))
+rf_cmd() { grep '^::error::' "$TMP/rec.out" | grep -qF -- "$2"; expect "$1" $?; }
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
+FAKE_COMMENT_FAILS=1 run_fix record > "$TMP/rec.out" 2>&1; rc=$?
+rf_fail "(a) 窓を閉じる oc-fix-reset の投稿が失敗"
+{ [ "$(grep -c 'pr comment' "$LOG")" = 1 ] && ! logged 'issues/7/labels'; }; expect "(a) 失敗の後に追加の gh pr comment を呼ばない (1 回だけ) ・ラベルも付けない" $?
+rf_cmd "(a) ::error:: の行が失敗したコマンド (gh pr comment) を示す" 'gh pr comment'
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv code 5 1)"
+FAKE_COMMENT_FAILS=1 run_fix record > "$TMP/rec.out" 2>&1; rc=$?
+rf_fail "(b) 停止のコメントが失敗 (ラベルは成功)"
+{ logged 'issues/7/labels' && [ "$(grep -c 'pr comment' "$LOG")" = 1 ]; }; expect "(b) ラベルは付いた上で、コメントは 1 回だけ試みて止まる" $?
+rf_cmd "(b) ::error:: の行が失敗したコマンド (gh pr comment) を示す" 'gh pr comment'
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+FAKE_FAIL_PATH=repos/o/r/issues/7/comments run_fix record > "$TMP/rec.out" 2>&1; rc=$?
+rf_fail "(c) コメント一覧の取得が失敗"
+{ ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "(c) 取得が失敗したら PR にもラベルにも触らない" $?
+rf_cmd "(c) ::error:: の行が失敗したコマンド (コメント一覧の取得) を示す" "issues/\$OC_PR_NUMBER/comments"
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+FAKE_FAIL_PATH=repos/o/r/pulls/7/reviews run_fix record > "$TMP/rec.out" 2>&1; rc=$?
+rf_fail "(d) review 一覧の取得が失敗"
+rf_cmd "(d) ::error:: の行が失敗したコマンド (review 一覧の取得) を示す" "pulls/\$OC_PR_NUMBER/reviews"
+
+setup aaa '[{"name":"oc:stuck"}]' 0
+FAKE_FAIL_PATH=repos/o/r/issues/7 run_fix record > "$TMP/rec.out" 2>&1; rc=$?
+rf_fail "(e) ラベルの読み取りが失敗 (旧版はこれを『ラベル無し』と読んで fail open した)"
+rf_cmd "(e) ::error:: の行が失敗したコマンド (ラベルの読み取り) を示す" "labels[].name"
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+run_fix record > /dev/null 2>&1; rc=$?
+{ [ "$rc" -eq 0 ] && grep -qx 'OC_RECORD_OK=1' "$TMP/env" && grep -qx 'stop=false' "$TMP/out"; }; expect "正例: record が窓の判定まで終えた -> OC_RECORD_OK=1 を残し stop=false" $?
+
+setup aaa '[{"name":"oc:stuck"}]' 0
+run_fix record > /dev/null 2>&1
+{ grep -qx 'stop=true' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! grep -q 'reason=record-failed' "$TMP/out"; }; expect "停止の判定で終わった (stop=true) なら OC_RECORD_OK を残さず、record-failed とも出さない" $?
+
 echo "== fix-progress.sh check (pushed / answered / none)"
 setup bbb '[]' 1
-OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
+OC_RECORD_OK=1 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
 grep -qx 'result=pushed' "$TMP/out"; expect "head が進んだ -> pushed" $?
 
 setup aaa '[]' 1
 fx repos/o/r/issues/7/comments '[{"created_at":"2026-01-02T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"}}]'
-OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
+OC_RECORD_OK=1 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
 grep -qx 'result=answered' "$TMP/out"; expect "push 無し + bot のコメント -> answered" $?
 
 setup aaa '[]' 1
 fx repos/o/r/issues/7/comments '[{"created_at":"2025-12-31T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"}},{"created_at":"2026-01-02T00:00:00Z","user":{"login":"someone"}}]'
-OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
+OC_RECORD_OK=1 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null
 grep -qx 'result=none' "$TMP/out"; expect "起動前の bot コメント・他人のコメントは数えない -> none" $?
 
 echo "== fix-progress.sh check (PR head を読めない -> result を出さず失敗 #2899)"
 setup aaa '[]' 1
 fx repos/o/r/issues/7/comments '[{"created_at":"2026-01-02T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"}}]'
-FAKE_FAIL_PATH=repos/o/r/pulls/7 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > "$TMP/v.out" 2>&1; rc=$?
+OC_RECORD_OK=1 FAKE_FAIL_PATH=repos/o/r/pulls/7 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > "$TMP/v.out" 2>&1; rc=$?
 { [ "$rc" != 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "head の読み取りが失敗 -> 非 0 で終わり result を出さない (pushed と判定しない)" $?
 grep -q 'could not read the head' "$TMP/v.out"; expect "head の読み取りが失敗 -> 失敗理由を error として出す" $?
 
 setup aaa '[]' 1
 fx repos/o/r/pulls/7 '{"state":"open","head":{"sha":""}}'
-OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > "$TMP/v.out" 2>&1; rc=$?
+OC_RECORD_OK=1 OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > "$TMP/v.out" 2>&1; rc=$?
 { [ "$rc" != 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "head が空文字で返った -> 非 0 で終わり result を出さない" $?
+
+setup aaa '[]' 1
+OC_HEAD_BEFORE=aaa OC_START_TS=2026-01-01T00:00:00Z run_fix check > /dev/null 2>&1; rc=$?
+{ [ "$rc" -ne 0 ] && ! grep -q '^result=' "$TMP/out"; }; expect "record が窓の判定まで終えていない (OC_RECORD_OK 無し) -> none を出さず失敗する" $?
 
 echo "== reopen-pr.sh (close -> reopen。reopen は 3 回まで再試行)"
 reset
