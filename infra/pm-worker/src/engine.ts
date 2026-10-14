@@ -453,8 +453,10 @@ export class Engine {
     const R = this.d.cfg.repo;
     let diff = 0;
     // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
+    // 人の /oc は本文で『着手であって応答ではない』と判定する (webhook.ts の answered) ので、/oc で始まる本文だけは残す。
     const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
-    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: mine.has(c.user?.login) ? c.body : "" });
+    const keepBody = (c: any) => mine.has(c.user?.login) || /^\/oc\b/m.test(c.body ?? "");
+    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: keepBody(c) ? c.body : "" });
     const cs = this.note(
       "comments",
       await gh.list<any>(
@@ -577,15 +579,18 @@ export class Engine {
         this.s = { ...this.s, runs: rest };
       }
     }
-    // 閉じた issue / PR の手がかりは使わない
+    // 閉じた issue / PR の手がかりは使わない。数えた run の id (killRun) だけは残す (reopen の後に古い run の配送が届いても数え直さない)。
     for (const k of Object.keys(this.s.sig)) {
       const i = this.s.issues[k];
       const p = this.s.prs[k];
-      if ((i || p) && i?.state !== "open" && p?.state !== "open") {
-        this.d.store.del("sig", k);
-        const { [k]: _, ...rest } = this.s.sig;
-        this.s = { ...this.s, sig: rest };
-      }
+      if (!((i || p) && i?.state !== "open" && p?.state !== "open")) continue;
+      const killRun = this.s.sig[k].killRun;
+      const keep = killRun === undefined ? undefined : { killRun };
+      if (JSON.stringify(keep) === JSON.stringify(this.s.sig[k])) continue;
+      if (keep) this.d.store.put("sig", k, keep);
+      else this.d.store.del("sig", k);
+      const { [k]: _, ...rest } = this.s.sig;
+      this.s = { ...this.s, sig: keep ? { ...rest, [k]: keep } : rest };
     }
   }
 

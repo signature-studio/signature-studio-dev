@@ -1,17 +1,35 @@
 // 実装 run の打ち切りの連続: PR も出さずに cancelled / failure / timed_out で終わった run を issue ごとに数え、連続 KILLED_STOP_AT (2) 回で自動の再着手を止める。
 // record-run-outcome.sh の always() step は runner の shutdown (exit 143) では走らず oc:no-pr が付かないので、Worker は workflow_run の conclusion で数える。
-// 実測 (2026-10-12〜14): opencode.yaml の issue_comment で cancelled の run 100 件中、同じ題名 (issue) の run が FLE-7 10 件・SHX-T20 8 件・KH-13 6 件・KH-28 5 件。
+// 実測の経緯は #2626。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { detectPm } from "../src/pm.ts";
 import { KILLED_STOP_AT } from "../src/webhook.ts";
-import { configuredApp, j, markFresh, runPayload, T0, type Call } from "./helpers.ts";
+import { configuredApp, j, markFresh, REPO, runPayload, T0, type Call, type Handler } from "./helpers.ts";
 import { COLLAB_USER, commentEv, HUMAN, IMPL, IMPL_BOT, iso, issueEv, MEMBER_USER, OUTSIDER, outcomeBody, prEv, send, type Ctx } from "./pm_helpers.ts";
 
 const PM_BOT = "oc-pm-for-signature-studio[bot]";
 const comments = (calls: Call[], n?: number) => calls.filter((c) => c.method === "POST" && new RegExp(`/issues/${n ?? "\\d+"}/comments$`).test(c.url));
 const title = (n: number) => `[CI-${n}] t`;
 const sig = (ctx: Ctx, n: number) => ctx.app.engine.s.sig[String(n)]?.kill;
+const killRun = (ctx: Ctx, n: number) => ctx.app.engine.s.sig[String(n)]?.killRun;
+// reconcile の REST 一覧 (syncComments が読む形)。他の読み取りは空で答える。
+const restComments = (list: unknown[]): Handler => (c) => {
+  if (c.method !== "GET") return undefined;
+  const p = new URL(c.url).pathname;
+  if (p.endsWith("/issues/comments")) return j(list);
+  if (p.endsWith("/actions/runs")) return j({ workflow_runs: [] });
+  if (p.endsWith("/issues") || p.endsWith("/pulls")) return j([]);
+  return undefined;
+};
+const restComment = (n: number, login: string, assoc: string, body: string, at: string, id: number) => ({
+  id,
+  issue_url: `https://api.github.com/repos/${REPO.full_name}/issues/${n}`,
+  created_at: at,
+  user: { login },
+  author_association: assoc,
+  body,
+});
 
 async function seed(ctx: Ctx, n: number, o: Parameters<typeof issueEv>[1] = {}) {
   assert.equal((await send(ctx.app, "issues", issueEv(n, o))).status, 202);
@@ -34,12 +52,14 @@ test("2 回連続で打ち切られた issue は stopped (killed x2) に置き�
   await seed(ctx, 301);
   await markFresh(ctx);
   await kill(ctx, 300, 1001, "2026-10-14T11:10:00Z");
-  assert.deepEqual(sig(ctx, 300), { count: 1, at: "2026-10-14T11:10:00Z", run: 1001 });
+  assert.deepEqual(sig(ctx, 300), { count: 1, at: "2026-10-14T11:10:00Z" });
+  assert.equal(killRun(ctx, 300), 1001);
   assert.equal(KILLED_STOP_AT, 2);
   assert.deepEqual(ctx.app.engine.killedIssues(), [], "1 回目では止めない");
   assert.ok(ctx.app.engine.plan().picks.some((p) => p.n === 300));
   await kill(ctx, 300, 1002, "2026-10-14T11:40:00Z", "failure");
-  assert.deepEqual(sig(ctx, 300), { count: 2, at: "2026-10-14T11:40:00Z", run: 1002 });
+  assert.deepEqual(sig(ctx, 300), { count: 2, at: "2026-10-14T11:40:00Z" });
+  assert.equal(killRun(ctx, 300), 1002);
   const p = ctx.app.engine.plan();
   assert.deepEqual(p.picks.map((x) => x.n), [301], "他の issue は着手する");
   assert.deepEqual(p.rows.stopped, [[300, "killed x2"]]);
@@ -156,6 +176,16 @@ test("PR を出していた run は数えない。PR が出たら連続を消す
   assert.equal(sig(ctx, 353)?.count, 1, "closed の PR は着手済みにしない");
 });
 
+test("着手の判定の語は record-run-outcome.sh と同じ (Closes / Refs / Fixes / Resolves #N)。Closed など他の語の PR では着手しない", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 357);
+  await kill(ctx, 357, 6401, "2026-10-14T11:00:00Z");
+  await send(ctx.app, "pull_request", prEv(904, { body: "Closed #357", at: "2026-10-14T11:30:00Z" }));
+  assert.equal(sig(ctx, 357)?.count, 1, "Closed は着手の証拠にしない");
+  await send(ctx.app, "pull_request", prEv(905, { body: "Resolves #357", at: "2026-10-14T11:40:00Z" }));
+  assert.equal(sig(ctx, 357), undefined, "Resolves は着手の証拠");
+});
+
 test("run の開始以降に merge された PR (open の一覧に出ない) も着手の証拠にする。開始より前に merge された PR は証拠にしない", async () => {
   const ctx = await configuredApp();
   await seed(ctx, 354);
@@ -222,7 +252,8 @@ test("再配送・順不同: 同じ完了の配送を重ねても 1 回。古い
   assert.equal(sig(ctx, 380)?.count, 2);
   await send(ctx.app, "workflow_run", started(9003, title(380), "2026-10-14T11:10:00Z"));
   await send(ctx.app, "workflow_run", finished(9003, "cancelled", title(380), "2026-10-14T11:15:00Z"));
-  assert.deepEqual(sig(ctx, 380), { count: 2, at: "2026-10-14T11:20:00Z", run: 9005 }, "古い run (id が小さい) の遅れた配送は数えない");
+  assert.deepEqual(sig(ctx, 380), { count: 2, at: "2026-10-14T11:20:00Z" }, "古い run (id が小さい) の遅れた配送は数えない");
+  assert.equal(killRun(ctx, 380), 9005);
   // reconcile が『一覧に無い』ことから completed / unknown にした後に、本当の完了が届く
   await seed(ctx, 381);
   await send(ctx.app, "workflow_run", started(9101, title(381), "2026-10-14T11:00:00Z"));
@@ -247,7 +278,54 @@ test("再配送・順不同 (2): 連続が解けた後の同じ完了の再配�
   delete (ctx.app.engine.s.runs as Record<string, unknown>)["9305"];
   await send(ctx.app, "workflow_run", started(9303, title(383), "2026-10-14T11:10:00Z"));
   await send(ctx.app, "workflow_run", finished(9303, "cancelled", title(383), "2026-10-14T11:15:00Z"));
-  assert.deepEqual(sig(ctx, 383), { count: 1, at: "2026-10-14T11:20:00Z", run: 9305 });
+  assert.deepEqual(sig(ctx, 383), { count: 1, at: "2026-10-14T11:20:00Z" });
+  assert.equal(killRun(ctx, 383), 9305);
+});
+
+test("再配送・順不同 (3): 数えた run は、成功で連続が解けて run の記録が prune された後に、同じ完了の配送が届いても数え直さない", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 440);
+  await kill(ctx, 440, 9401, "2026-10-14T11:00:00Z");
+  assert.equal(sig(ctx, 440)?.count, 1);
+  await kill(ctx, 440, 9402, "2026-10-14T11:10:00Z", "success");
+  assert.equal(sig(ctx, 440), undefined, "成功で解除");
+  // 両方の run が prune された後 (後続の run があるという判定にも頼らない)
+  delete (ctx.app.engine.s.runs as Record<string, unknown>)["9401"];
+  delete (ctx.app.engine.s.runs as Record<string, unknown>)["9402"];
+  await send(ctx.app, "workflow_run", finished(9401, "cancelled", title(440), "2026-10-14T11:00:00Z"));
+  assert.equal(sig(ctx, 440), undefined, "解除の後の同じ完了の配送では数えない");
+  await kill(ctx, 440, 9403, "2026-10-14T11:20:00Z");
+  assert.equal(sig(ctx, 440)?.count, 1, "新しい run は 1 から数える");
+});
+
+test("閉じて prune された issue が reopen されても、数えた run の配送は数え直さない (killRun は閉じた後も残す)", async () => {
+  const ctx = await configuredApp();
+  await seed(ctx, 361);
+  await kill(ctx, 361, 7201, "2026-10-14T11:00:00Z");
+  await send(ctx.app, "issues", issueEv(361, { state: "closed", action: "closed", at: "2026-10-14T11:30:00Z" }));
+  (ctx.app.engine as any).prune();
+  assert.deepEqual(ctx.app.engine.s.sig["361"], { killRun: 7201 });
+  await send(ctx.app, "issues", issueEv(361, { action: "reopened", at: "2026-10-14T11:40:00Z" }));
+  delete (ctx.app.engine.s.runs as Record<string, unknown>)["7201"];
+  await send(ctx.app, "workflow_run", finished(7201, "cancelled", title(361), "2026-10-14T11:00:00Z"));
+  assert.equal(sig(ctx, 361), undefined, "同じ完了の配送では数えない");
+});
+
+test("REST 再同期: 本文を持たない一覧で届いても、人の /oc は連続を解かない。人の通常のコメントは解く", async () => {
+  const list: unknown[] = [];
+  const ctx = await configuredApp({ handlers: [restComments(list)] });
+  await seed(ctx, 430);
+  await seed(ctx, 431);
+  await kill(ctx, 430, 9501, "2026-10-14T11:10:00Z");
+  await kill(ctx, 430, 9502, "2026-10-14T11:30:00Z");
+  await kill(ctx, 431, 9511, "2026-10-14T11:10:00Z");
+  await kill(ctx, 431, 9512, "2026-10-14T11:30:00Z");
+  // PM のログイン (pycabbage) のコメントは slim が本文を残すので、PM 以外の人で見る
+  list.push(restComment(430, MEMBER_USER.login, MEMBER_USER.assoc, "/oc oc_actions_allow_write", "2026-10-14T11:50:00Z", 1), restComment(431, COLLAB_USER.login, COLLAB_USER.assoc, "様子を見ます", "2026-10-14T11:50:00Z", 2));
+  await ctx.app.engine.reconcile(await (ctx.app.engine as any).d.gh());
+  assert.equal(sig(ctx, 430)?.count, 2, "REST 経路の人の /oc は解除しない (webhook 経路と同じ)");
+  assert.deepEqual(ctx.app.engine.killedIssues(), [[430, 2]]);
+  assert.equal(sig(ctx, 431), undefined, "対照: REST 経路でも人の通常のコメントは解除する");
 });
 
 test("人の /oc (PM の手動の再着手) は解除ではないが、oc-pm の no_pr は送らない (PM が応答済み)。その run がまた打ち切られれば再び検出する", async () => {

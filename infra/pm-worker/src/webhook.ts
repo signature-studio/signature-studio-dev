@@ -73,8 +73,10 @@ export interface Signal {
   // reviews を REST で一度取得した
   revChecked?: boolean;
   // 実装 run (issue_comment) が PR も出さずに打ち切られた (cancelled / failure / timed_out) 連続回数。KILLED_STOP_AT 回で自動の再着手を止める。
-  // run は最後に数えた run の id (再配送・順不同の配送で二重に数えない)、at はその完了時刻。PR・close・PM/人のコメント・成功した run で消す。
-  kill?: { count: number; at: string; run: number };
+  // at はその run の完了時刻。PR・close・PM/人のコメント・成功した run で消す。
+  kill?: { count: number; at: string };
+  // 最後に数えた run の id。kill とは別に持ち、連続を消しても残す (完了済みの run の配送が再送・順不同で届いても、同じ run を数え直さない)。
+  killRun?: number;
   // 最新の oc-pm-intent: relaunch (issue コメント)。書き手が実装 App かどうか (bot) と、マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
   relaunch?: { at: string; id?: number; bot: boolean; issue: string; arts: string; focus: string | null };
 }
@@ -82,7 +84,7 @@ export interface Signal {
 // 打ち切られた run を連続でこの回数数えた issue は、自動で再着手しない (oc:no-pr の reason=killed 相当)。PM agent (oc-pm の no_pr) の判断に回す。
 export const KILLED_STOP_AT = 2;
 const KILL_CONCLUSIONS = ["cancelled", "failure", "timed_out"];
-// record-run-outcome.sh と同じ『明示的な終了状態』(着手しても PR を出さない/出せない issue)。打ち切りを数えない。
+// record-run-outcome.sh の『明示的な終了状態』(oc:stuck / needs-user-input / blocked) に、Worker の pm-apply (#2423 で user に置く issue) を足したもの。打ち切りを数えない。
 const EXPLICIT_LABELS = ["oc:stuck", "needs-user-input", "blocked", "pm-apply"];
 export interface RunState {
   id: number;
@@ -446,8 +448,8 @@ function applyRun(s: PmState, p: Json): PmState {
   return { ...s, runs: { ...s.runs, [k]: next } };
 }
 
-// issue n を指す open PR があるか (ブランチ名 <n>-... か本文の Closes / Refs / Fixes / Resolves #n。record-run-outcome.sh と同じ判定)。
-const PR_MENTION_RE = /\b(?:closes?|closed|refs?|fix(?:es|ed)?|resolves?|resolved):?\s+#(\d+)/gi;
+// issue n を指す open PR があるか (ブランチ名 <n>-... か本文の Closes / Refs / Fixes / Resolves #n。record-run-outcome.sh と同じ判定・同じ語の集合)。
+const PR_MENTION_RE = /\b(?:closes|refs|fixes|resolves) #(\d+)/gi;
 function prIssues(pr: { ref?: string; body?: string }): number[] {
   const out = new Set<number>();
   const m = /^(\d+)-/.exec(pr.ref ?? "");
@@ -480,7 +482,7 @@ function clearKillByPr(s: PmState, pr: Json | undefined): PmState {
 //  - 数える: conclusion が cancelled / failure / timed_out。題名が一意な open issue に当たり、PR (open か run の開始以降に merge) も明示的な終了状態も無い。
 //  - 数えない: 後続の run がある (concurrency で置換された待機中の run。コメントで起きて skipped になった run は後続に数えない)。
 //  - 成功した run は連続を断つ。skipped などの run は断たない (agent 自身のコメントでも issue_comment の run が起きる)。
-// 同じ run の再配送と順不同の配送は、最後に数えた run の id (単調増加) より大きい run だけを数えて重ねない。
+// 同じ run の再配送と順不同の配送は、最後に数えた run の id (killRun。連続の解除では消さない) より大きい run だけを数えて重ねない。
 function applyKill(prev: PmState, next: PmState, w: Json | undefined): PmState {
   if (next === prev || !w) return next;
   const run = next.runs[String(w.id)];
@@ -496,12 +498,13 @@ function applyKill(prev: PmState, next: PmState, w: Json | undefined): PmState {
   const issue = hits[0];
   const k = String(issue.number);
   const cur = next.sig[k]?.kill;
-  if (cur && run.id <= cur.run) return next;
+  const counted = next.sig[k]?.killRun;
+  if (counted !== undefined && run.id <= counted) return next;
   if (conclusion === "success") return cur ? setSig(next, k, { kill: undefined }) : next;
   if (Object.values(next.runs).some((r) => r.id > run.id && r.event === "issue_comment" && r.title.trim() === title && !(r.status === "completed" && r.conclusion === "skipped"))) return next;
   if (issue.labels.some((l) => EXPLICIT_LABELS.includes(l)) || issue.blockedByCount > 0) return next;
   if (hasPrSince(next, issue.number, run.createdAt)) return cur ? setSig(next, k, { kill: undefined }) : next;
-  return setSig(next, k, { kill: { count: (cur?.count ?? 0) + 1, at: run.updatedAt, run: run.id } });
+  return setSig(next, k, { kill: { count: (cur?.count ?? 0) + 1, at: run.updatedAt }, killRun: run.id });
 }
 
 export function applyEvent(
