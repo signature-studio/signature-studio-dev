@@ -2,8 +2,9 @@
 
 # #2461: user_answered の回答を MEMBER / OWNER / COLLABORATOR のコメントに限る
 
-測定した commit: `836e71a8` (`fix(pm-worker): count user_answered only from MEMBER/OWNER/COLLABORATOR comments (#2461)`)。検証起点は origin/main `54bacdc0`。
-本書を入れる commit は docs のみで、`git diff 836e71a8 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (差分 0)。
+測定した commit: `d9d35ff5` (origin/main `6505235b` を取り込んだ merge。コードを変えた最後の commit)。PR の変更 commit は `836e71a8` (`fix(pm-worker): count user_answered only from MEMBER/OWNER/COLLABORATOR comments (#2461)`)。
+取り込みで pm-worker に main 側の 11 ファイルの変更 (別 PR 由来) が入ったため、§2・§4 の数値は取り込み後の HEAD で取り直した。取り込み前の測定 (`836e71a8`・基点 `54bacdc0`) は §4 に旧値として残す。
+本書を入れる commit は docs のみで、`git diff d9d35ff5 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (差分 0)。
 既知類型との関係: 該当なし (lift の欠陥ではなく PM 運用ツール)。
 
 ## 1. 問題と変更
@@ -19,7 +20,7 @@
 
 | 数えるもの | 値 | 定義・根拠 |
 |---|---:|---|
-| `npm test` の件数 (変更前 → 後) | 147 → 150 | TAP の `# tests` |
+| `npm test` の件数 (基点 main `6505235b` → PR HEAD `d9d35ff5`) | 160 → 163 | TAP の `# tests` (取り込み前は 147 → 150) |
 | 追加テスト | 3 | §3 の a・b・c |
 | 第三者の区分 (ネガコン) | NONE・CONTRIBUTOR | `OUTSIDER` (NONE) と `CONTRIB_USER` (CONTRIBUTOR) |
 | 回答の区分 (正例) | OWNER・MEMBER・COLLABORATOR | `HUMAN` (OWNER)・`MEMBER_USER`・`COLLAB_USER` |
@@ -30,24 +31,25 @@
 - b. `検出 user_answered (ネガコン): コメント者が NONE / CONTRIBUTOR の第三者なら起こさない。MEMBER・COLLABORATOR の回答は起こす` (検出のみ。後から来た第三者のコメントで判定時刻が動かない)
 - c. `REST: 同期で読んだコメントも author_association で絞る (第三者の REST のコメントでは起こさない)` (`syncComments` の経路)
 
-## 4. 測定 (HEAD = `836e71a8` の clean 作業ツリー)
+## 4. 測定 (HEAD = `d9d35ff5` の clean 作業ツリー。取り込み後の再測定)
 
-コマンド: `cd infra/pm-worker && npm test` / `npm run test:workers`。環境: Node v22.23.3・4 コア・並列 1。負荷 (`uptime`): 測定中の load average 0.37〜1.52。
+コマンド: `cd infra/pm-worker && npm test` / `npm run test:workers`。環境: Node v22.23.3・4 コア・並列 1。負荷 (`uptime`): 測定中の load average 0.97〜1.57。
 
 | 検査 | 回数 | 結果 | 所要 (wall) |
 |---|---:|---|---|
-| `npm test` (node --test) | 3 | 150 pass / 0 fail (各回) | 11.31〜11.54 s |
-| `npm run test:workers` (vitest・workerd) | 3 | 3 pass / 0 fail (各回) | 2.16〜2.20 s (vitest の Duration 1.26〜1.29 s) |
-| 変更前 `54bacdc0` の `npm test` | 1 | 147 pass / 0 fail | TAP の duration_ms 11.83 s |
+| `npm test` (node --test) | 3 | 163 pass / 0 fail (各回) | 13.59〜14.13 s |
+| `npm run test:workers` (vitest・workerd) | 3 | 3 pass / 0 fail (各回) | 2.45〜2.49 s (vitest の Duration 1.44〜1.45 s) |
+| 基点 main `6505235b` の `npm test` (PR なし) | 1 | 160 pass / 0 fail | 14.35 s |
+| (旧・取り込み前 `836e71a8`) `npm test` | 3 | 150 pass / 0 fail (各回) | 11.31〜11.54 s |
 
-ネガティブコントロール (判定を 1 か所だけ外して FAIL を確認。測定後に元へ戻し、`git status` が 0 行であることを確認):
+ネガティブコントロール (判定を 1 か所だけ外して FAIL を確認。測定後に元へ戻し、`git diff --quiet` で当該ファイルの差分 0 を確認):
 
-| 控え | 外した箇所 | 結果 |
+| 控え | 外した箇所 | 結果 (`d9d35ff5`) |
 |---|---|---|
-| A | `webhook.ts` `applySignalComment` の `ASSOC_OK.includes(c.author_association)` | 150 件中 3 FAIL: a (送信)・b (検出)・c (REST。webhook 側も通るため落ちる) |
-| B | `engine.ts` `slim` の `author_association` | 150 件中 1 FAIL: c (REST) |
+| A | `webhook.ts` `applySignalComment` の `ASSOC_OK.includes(c.author_association)` | 163 件中 3 FAIL: a (#95 送信)・b (#96 検出)・c (#97 REST。webhook 側も通るため落ちる) |
+| B | `engine.ts` `slim` の `author_association` | 163 件中 1 FAIL: c (#97 REST) |
 
-その他の検査 (測定 commit の HEAD で実行): `find infra/pm-worker -type f -size +20M -not -path '*/node_modules/*' -not -path '*/dist/*'` は 0 件。`npm run build` (bun) は成功。
+その他の検査 (測定 commit `d9d35ff5` で実行): `find infra/pm-worker -type f -size +20M -not -path '*/node_modules/*' -not -path '*/dist/*'` は 0 件。`npm run build` (bun) は成功 (exit 0)。`git diff 6505235b HEAD -- infra/pm-worker/src infra/pm-worker/test` は 5 ファイル (webhook.ts・pm.ts・engine.ts・pm_helpers.ts・pmdispatch.test.ts。77 行追加・8 行削除。本 PR 自身の差分)。
 
 ## 5. 検証範囲 / 範囲外
 
