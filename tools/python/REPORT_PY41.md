@@ -217,3 +217,32 @@
 - **setter の役割 (実測の範囲)**: `0x1311030` は `ecx` を cell `0x196ec34` に格納し、(`[rip+0x2c7988]` の値 × cell) `>> 8` を `0x196ec30` に格納するだけの 0x1d バイト関数。何の値を表すかは、呼出し元の意味が未確定のため決められない。
 - **結論 (getSwing の戻り値)**: 戻り値の式 (`dword [*(0x15e3290)]`) は確定。読み先の cell `0x196ec34` は `.text` 上で `0x1311030` の setter だけが書く。getSwing の数値はこの setter の入力 (呼出し元が渡す `ecx`) に依存し、**静的には決まらない**。`.bss` 初期値 (ゼロ初期化か否か) も実行時の値であり、静的解析では確定しない。
 - **未解決**: setter `0x1311030` の入力を決める呼出し元 3 件 (`0xf4f9e5`・`0xf47726`・`0x13112a1`) の条件分岐の意味。`0x1310fb0` 付近は線形走査の同期が崩れるデータ領域のため、命令列の確認は `.pdata` 経由で行った。
+
+## 追補 (#1514・実装): 公開 stub の戻り型で決めた 5 関数
+
+- 結論: 18 関数のうち **5 関数** (`isChannelMuted`・`isChannelSolo`・`getChannelColor`・`getGridBit`・`channelNumber`) を `provider/fl_engine.c` と `host/fl_mock.mjs` に実装した。残り 13 関数は未実装 (PR 本文の未解決表。#1514 に残す)。
+- 意味論の根拠: 公開 API stub (IL-Group/FL-Studio-API-Stubs・commit `9b4c7fa`・`tools/python/work/fl-stubs` に `git clone --depth 1`)。`src/midi_controller_scripting/channels/__properties.py` (`channelNumber` :59・`getChannelColor` :157・`isChannelMuted` :209・`isChannelSolo` :258) と `__sequencer.py` (`getGridBit` :41) の `## Returns` と説明に従う。fn_va は前節の表のとおり。**PE による意味論の確認は本追補では行っていない。**
+
+| 関数 | fn_va | 戻り型 (stub) | 実装 (C と mock 同一) |
+|---|---|---|---|
+| isChannelMuted | 0xd59790 | bool | `mute` を返す |
+| isChannelSolo | 0xd59a80 | bool | `solo` を返す |
+| getChannelColor | 0xd594b0 | int | `color` をそのまま返す (stub: 0x--BBGGRR) |
+| getGridBit | 0xd5b420 | bool | `steps[position]` を返す (0..63 外は code 4) |
+| channelNumber | 0xd58f80 | int | 選択の並びで offset 番目 (0 = 先頭)、超えたら最後の選択。無選択は canBeNone で -1 / 0 |
+
+- 範囲外 code: 4 関数 (isChannelMuted・isChannelSolo・getChannelColor・getGridBit) は channels 共通の `CH` 検査 (code 4 "Index out of range")。PE で `-4` を確認したのは `selectOneChannel` のみ (REPORT_PY69)。この 4 関数は PE 未確認。`channelNumber` は index 引数が無いため範囲外 code を持たず、offset 超過は最後の選択を返す。
+- 仮置き (stub に記述なし): `getGridBit` の position 範囲は `setGridBit` と同じ 0..63。`channelNumber` の負の offset は先頭扱い。useGlobalIndex は未モデル (グループ無し・既存関数と同じ扱い)。
+- PM agent の判断待ち: getGridBit の position は必須か (PE fmt `i|ii` は任意、stub と生成表は必須)・既定案: stub 準拠 (現実装)。
+
+### 測定 (測定 commit `fde09f94`・コード変更の最後の commit)
+
+| 検査 | コマンド | 結果 |
+|---|---|---|
+| C provider の build | `bash tools/python/provider/build.sh` (emsdk) | 成功・1.3 s。`FL_H` 76 |
+| 件数・ABI | `node tests/provider_check.mjs` (wasm) | PASS (functions 435・implemented 76・unimplemented 359・mcp_static 60)、0.30 s |
+| mock と C の差分 | `node tests/channels_diff.mjs` | PASS (calls 98・diffs 0)、0.04 s |
+| 48 tool (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok (soft_error 0・raised 0)、1.33 s |
+
+- 作業用ビルド (`dist/`・`work/` は gitignore): `build_cpython_wasm.sh` 3 分 41 秒 (4 core)、`FLPY_SKIP_TABLE=1 build_flpy.sh` 5.2 s。load average は測定時 1.4〜1.5。
+- コード差分: `git diff fde09f94 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (測定後の commit は本 REPORT のみ)。

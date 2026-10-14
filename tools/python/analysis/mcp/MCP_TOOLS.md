@@ -1,8 +1,5 @@
-# 自動生成: `tools/python/analysis/mcp/` 抽出 driver
-
-> **人手編集禁止** (生成元を直す)。本ファイルは測定・抽出結果の**単一の正本**。
-
 # MCPTools.pyc (FL 26.1.7 System/Tools/MCP) 48 tools — 分類と FL API 呼出面
+
 A local-flapi **38** / B local-ilmcp **8** / U local-ui(Gopher 付随) **2** / X 対象外(外部通信) **0**
 
 wasm 実行: 全 tool を wasm CPython(Worker)+モック FLEngine 上で実行 → 48/48 ok

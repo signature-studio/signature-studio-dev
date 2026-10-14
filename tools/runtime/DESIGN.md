@@ -158,13 +158,13 @@ e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome →
 | 実行可否 (必須) | `crossOriginIsolated && typeof SharedArrayBuffer` と shared Memory 生成 | pthread/ring 経路が成立しないため起動せず、非対応メッセージを表示 (退避なし) |
 | memory64 | `WebAssembly.validate` (features.json の `memory64`) と `new Memory({address:"i64"})` | §1 の決定どおり wasm32 が既定で、memory64 は退避トリガ時のみ使う。**検出結果で wasm32↔wasm64 を切替える実装は不要** (配信ビルドは wasm32 のみ) |
 | JSPI | `typeof WebAssembly.promising` と `Suspending` | §2 の決定どおり JSPI は副次手段。無ければ ring (`Atomics.wait`) 経路のみ。async→sync 橋渡しが必要な VFS は補助 Worker sync-RPC へ |
-| OffscreenCanvas | Worker 内 `getContext("webgl2")` 成功 | 失敗時はメインスレッド canvas + 描画コマンド転送 (RT-3 で設計)。headless では判定できないので実機判定が必要 |
+| OffscreenCanvas | Worker 内 `getContext("webgl2")` 成功 | 失敗時はメインスレッド canvas + 描画コマンド転送 (RT-3 で設計)。headless では判定できない (Firefox の Worker 内 WebGL2 は Xvfb 非 headless で判定可、REPORT.md RT-9)。実機判定は Safari 等で必要 |
 | AudioWorklet | `ctx.audioWorklet.addModule` の成否 | 無音で起動せず明示エラー (音声は sample clock マスター: RT-4) |
 | Module 永続化 | IDB 保存は Chrome/Firefox とも不可 | HTTP キャッシュ + hash 名 immutable のみ (§3 の決定どおり) |
 検出は起動時に 1 回、結果を `window.__webstudio` 契約側へ公開する想定 (契約は未実装)。Firefox 固有の注意: 非 shared memory64 の大域 grow が遅い (REPORT.md の RT-9 節) ため、memory64 を使う場合は shared かつ事前確保を優先する。
 
 ## 5. 未解決・要確認
-1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Firefox の AudioWorklet / Worker WebGL2 は headless で判定不能。
+1. **Safari は未測定**。Firefox 157 は headless で実測済み (REPORT.md)。Firefox の AudioWorklet / Worker WebGL2 は headless で判定不能 (Worker WebGL2 は Xvfb 非 headless で判定できた。REPORT.md RT-9)。
 2. 実 FL サイズ (22MiB PE × lift 膨張) の wasm は RT-10 (#128) で実測済み (x64c boot 連鎖。数値は [`rt10/REPORT.md`](rt10/REPORT.md))。合成からの外挿との差もそちら。
 3. 本番 FL ビルドを pthread 化した boot e2e: shim MT 自己テストでは実証済み (RT-2 #120, 実測は REPORT.md)。実 FLEngine lift での確認は未実施。
 4. ヘッドレス WebGL2 は SwiftShader。実 GPU での OffscreenCanvas 性能は未測定。

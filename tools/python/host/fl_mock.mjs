@@ -71,6 +71,25 @@ export function createMockEngine() {
     "channels.getChannelName": (i) => ch(i).name,
     "channels.setChannelName": (i, n) => { ch(i).name = str(n); },
     "channels.isChannelSelected": (i) => ch(i).sel,
+    // PY-41 (#1514): 公開 stub の戻り型と説明で決めた 5 関数 (C provider と同一)。useGlobalIndex は未モデル
+    "channels.isChannelMuted": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).mute; },
+    "channels.isChannelSolo": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).solo; },
+    "channels.getChannelColor": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).color; },
+    "channels.getGridBit": (...a) => {
+      arity(a, 2, 3);
+      ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
+      const k = ch(a[0]);
+      if (p < 0 || p >= 64) throw RANGE();
+      return !!k.steps[p];
+    },
+    // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
+    "channels.channelNumber": (...a) => {
+      arity(a, 0, 2);
+      const none = argI(a, 0, 0), off = Math.max(0, argI(a, 1, 0));
+      const sel = st.channels.flatMap((c, i) => (c.sel ? [i] : []));
+      if (!sel.length) return none ? -1 : 0;
+      return sel[Math.min(off, sel.length - 1)];
+    },
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
     // PE 0xd5afc0 → 0x11e84a0: 対象だけ選択し他は解除 (useGlobalIndex は未モデル・C と同じ)

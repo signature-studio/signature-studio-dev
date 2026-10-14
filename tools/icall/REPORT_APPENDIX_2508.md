@@ -108,7 +108,7 @@ PR 初版でこの 1 件が一致した理由は特定できていない。1 関
 ### 4.3 判定できない理由と限界
 
 - 6 件の「誤り疑い」は、O1〜O3 を受け取る仮想 callee が**その offset を読むかどうか**に依存する。callee は実行時に決まり、静的には特定できない。値 0 の 2 件 (9・10) も、読まれれば wasm はスタックの残り値を読む。
-- native 実行は起動直後に SIGSEGV (`rip=0x180da6e99`、`[rax+8]` の仮想呼出しで rax=0。harness が初期化しない global 参照)。native との比較で動的に判定できない。
+- native 実行は起動直後に SIGSEGV (`rip=0x180da6e99`、`inc dword ptr [rax+0x19a4]` で rax=0。`rax = [rcx+0x10] = 0` で、rcx は harness が渡す heap 領域)。引数の構造体を harness が用意していないことが原因で、global 参照ではない (訂正: 付録 2674 §1)。native との比較で動的に判定できない。
 - 2427 の候補検出 (before IR 比較) は本件で 2/10 の誤検出を出した。`frame_slot_restore.py` の restore 対象 (値を解決できたもの) は本件では 0 件なので、route の挙動は変わらない。候補の定義を after IR 基準にする改善は未実施 (§6)。
 
 ## 5. 再現

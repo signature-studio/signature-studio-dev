@@ -195,6 +195,32 @@ test("launch: oc:no-pr は cooldown 中は着手せず、過ぎたら reason=unk
   assert.deepEqual(p.rows.stopped.map(([n]) => n), [60]);
 });
 
+test("launch (prio:critical): room が限られたら critical を先に、low を最後に選ぶ。区分の件数は /status の ready_by_prio に出る", async () => {
+  const ctx = await configuredApp({ env: { TARGET: "3", BATCH: "2" } });
+  await seed(ctx, 80, { labels: ["prio:low"] });
+  await seed(ctx, 81);
+  await seed(ctx, 82, { labels: ["prio:critical"] });
+  await markFresh(ctx);
+  assert.deepEqual(ctx.app.engine.plan().picks.map((p) => p.n), [82, 81]);
+  const s = ctx.app.engine.status() as any;
+  assert.deepEqual(s.ready_by_prio, { critical: 1, normal: 1, low: 1 });
+  assert.equal(s.ready, 3);
+});
+
+test("launch (prio:critical): oc:no-pr の cooldown は critical だけ半分 (3 時間)。通常は 6 時間のまま", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });
+  await seed(ctx, 61, { labels: ["oc:no-pr", "prio:critical"] });
+  await seed(ctx, 62, { labels: ["oc:no-pr"] });
+  for (const n of [61, 62]) {
+    await send(ctx.app, "issue_comment", commentPayload(n, BOT, "<!-- oc-run-outcome: no-pr reason=unknown run=1 -->\n完了", new Date(T0 - 4 * 3_600_000).toISOString()));
+  }
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.picks.map((x) => x.n), [61], "報告から 4 時間: critical は再着手する");
+  assert.deepEqual(p.rows.recent.map(([n]) => n), [62], "報告から 4 時間: 通常は 6 時間まで待つ");
+});
+
 test("launch: oc:no-pr の stop・split・新しい素材の無い artifact は cooldown の後も再着手しない", async () => {
   const clock = { t: T0 };
   const ctx = await configuredApp({ now: clock, handlers: [(c) => (/\/comments$/.test(c.url) ? j({}, 201) : undefined)], live: true });

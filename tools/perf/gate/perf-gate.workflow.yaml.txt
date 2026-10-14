@@ -28,6 +28,8 @@ jobs:
       - uses: actions/checkout@v4
 
       # 素材: toolchain-emsdk → /opt/emsdk, analysis-ott-binaries → $HOME/analysis (ANALYSIS_DIR)
+      # python 依存 (pefile / capstone / numpy) も agent-setup が専用 venv に入れ、python3 は venv に解決される。
+      # venv には pip が無いため、ここで pip を入れる step は置かない (残すと No module named pip で落ちる)
       - name: Setup toolchain and artifacts
         uses: ./.github/actions/agent-setup
         with:
@@ -35,9 +37,6 @@ jobs:
           cf-account-id: ${{ secrets.CF_ACCOUNT_ID }}
           cf-r2-access-key-id: ${{ secrets.CF_R2_ACCESS_KEY_ID }}
           cf-r2-secret-access-key: ${{ secrets.CF_R2_SECRET_ACCESS_KEY }}
-
-      - name: Install python deps
-        run: python3 -m pip install capstone pefile
 
       - name: Run perf gate
         run: bash tools/perf/gate/perf_gate.sh 2>&1 | tee "$RUNNER_TEMP/perf_gate.log"
