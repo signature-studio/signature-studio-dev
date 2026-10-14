@@ -43,7 +43,7 @@ fix round 1 (reviewer 指摘 1: emcc が無く test.sh を独立に再実行で�
 
 | 再実行 (HEAD `577fae4a`・ワークツリー clean・`emcc --version` = 6.0.12) | 結果 |
 |---|---|
-| `EMSDK_ENV=$HOME/emsdk/emsdk_env.sh bash tools/shim/test.sh` | rc=0・所要 3.29 s (wall)・load average 0.62 / 0.44 / 0.20 (19:51 UTC)。MT `ALL PASS`・ST `ALL PASS`・fail-fast PASS (exit=1・stderr に関数名) |
+| `EMSDK_ENV=<上流 emsdk の emsdk_env.sh> bash tools/shim/test.sh` | rc=0・所要 3.29 s (wall)・load average 0.62 / 0.44 / 0.20 (19:51 UTC)。MT `ALL PASS`・ST `ALL PASS`・fail-fast PASS (exit=1・stderr に関数名) |
 | ネガティブコントロール: 旧 `heap.c` (`a4a620a9^`) + 新 `test_main.c` を `tools/shim` の一時コピーで ST ビルド | rc=1・stdout 0 行・stderr `RuntimeError: memory access out of bounds` |
 
 ## 4. 製品 KPI (`docs/WORKFLOW.md` §7)
