@@ -187,7 +187,7 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 | ssa_link (fix_d17 + link_d17) | 47 | 26 | 58 |
 
 窓の拡張の診断 (`mach_chains` の rD 使用の走査窓 8 / 16 / 32 / 64 命令)。表の数値はコミット版 `window_survey_1980.py` の実測 (下の JSON 出力) と一致する。
-実行: `python3 tools/m11/ldfix/window_survey_1980.py tools/m11/work/boot_d17.ll "$RUNNER_TEMP/link_d17_e2e/ssa_base.json" tools/m11/work/m11_image.bin 'tools/m11/work/boot*.drc.config.json' --windows 8,16,32,64`
+実行: `python3 tools/m11/ldfix/window_survey_1980.py "$RUNNER_TEMP/link_d17_e2e/boot_d17.ll" "$RUNNER_TEMP/link_d17_e2e/ssa_base.json" tools/m11/work/m11_image.bin 'tools/m11/work/boot*.drc.config.json' --windows 8,16,32,64`
 (`boot_d17.ll` と `ssa_base.json` は `link_d17_e2e.sh` の 2/6・1/6 の出力 `$RUNNER_TEMP/link_d17_e2e/`。上の再測定と同じ HEAD で実行。)
 
 ```
