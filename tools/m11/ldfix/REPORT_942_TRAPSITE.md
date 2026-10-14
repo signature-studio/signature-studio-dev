@@ -65,8 +65,8 @@
 
 ```sh
 cd <worktree>                      # branch 942-trap-unit-attrib
-tar --zstd -xf $HOME/artifacts/work-m11.tar.zst -C .
-tar --zstd -xf $HOME/artifacts/work-liftdiff.tar.zst -C .
+tar --zstd -xf <素材>/work-m11.tar.zst -C .        # <素材> = 素材の置き場 (ARTIFACTS_DIR)
+tar --zstd -xf <素材>/work-liftdiff.tar.zst -C .
 FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh
 S4_NAME=base S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap_units.mjs
 python3 tools/m11/m11_wasmnames.py tools/m11/ldfix/work/stage4/base/m11_boot.cjs.wasm 14871 14873 5263 1875 75 725
