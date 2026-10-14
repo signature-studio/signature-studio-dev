@@ -35,12 +35,14 @@ def split(ranges, secs):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('pe', nargs='?', default=os.environ.get('M11_PE') or os.path.join(
-        os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64', 'extracted', 'block00031_PE.bin'))
+    ap.add_argument('pe', nargs='?')
     ap.add_argument('--json', default=os.path.join(HERE, 'work', 'tolerant_units.json'))
     ap.add_argument('--md', action='store_true')
     a = ap.parse_args()
-    secs = sections(a.pe)
+    pe = a.pe or os.environ.get('M11_PE') or (os.path.join(os.environ['FL_WIN64_DIR'], 'extracted', 'block00031_PE.bin') if os.environ.get('FL_WIN64_DIR') else None)
+    if not pe:
+        ap.error('PE を指定する (引数・M11_PE・FL_WIN64_DIR のいずれか)')
+    secs = sections(pe)
     d = json.load(open(a.json))
     rows, miss, miss_sec = [], {'n': 0, 'B': 0, 'ranges': 0}, {}
     for s in d['skipped']:
