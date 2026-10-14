@@ -109,10 +109,29 @@ index 39480f0a..5a9c1929 100644
 
 - 測定 commit: `8cd50a1d` (base は origin/main `984ff34f`)。下表の値はこの commit の probe の結果で、**撤回済み** (下記の訂正を参照)。素材は fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (35.8 s、ldfix=applied、F1=902、errors=0)、build ON rc=0 (18.3 s)。
 - probe: `probe_entry.py` の `407a50` 入口に読み取り専用の 2 行を追加 (`[raw407]`: `[arg-8]` の値、`[chain407]`: `arg1 < 2601` の表引き (`18770492 + (arg+7)/8`) から `rbx` (`16404744 + 16*b`) → `[rbx+8]` → `[[rbx+8]+24]` の chain)。`rd64`/`rd8` は image 範囲 (`0x10000`〜`0x20000000`) のみ読み、範囲外は `0xdead` を返す。
-- 訂正 (レビュー指摘 1): 旧 `[raw407]` 行は上限 `0x1500000` だけを判定し、下限 `0x10000` の判定が無かった。そのため `arg1-8` が image 範囲外 (表の入口 1〜6 では 0x3fc・0x20・0xe・0x1a・0x80) でも低位アドレスを直接 deref していた。表の `[arg-8]` 値 (`0`・`0x10bd4e00`・`0x10bd4da00000`・`0x4e000000000010bd` 等) はこの範囲外読みを含むため、文書 (範囲外は `0xdead`) と一致しない。`[raw407]` は `rd64(p)` に直した (修正は commit `470cb820`)。修正後の値は未測定。
+- 訂正 (レビュー指摘 1): 旧 `[raw407]` 行は上限 `0x1500000` だけを判定し、下限 `0x10000` の判定が無かった。そのため `arg1-8` が image 範囲外 (表の入口 1〜6 では 0x3fc・0x20・0xe・0x1a・0x80) でも低位アドレスを直接 deref していた。表の `[arg-8]` 値 (`0`・`0x10bd4e00`・`0x10bd4da00000`・`0x4e000000000010bd` 等) はこの範囲外読みを含むため、文書 (範囲外は `0xdead`) と一致しない。`[raw407]` は `rd64(p)` に直した (修正は commit `470cb820`)。修正後の値は下の「再測定」を参照。
 - 撤回: 下表の `[arg-8]` 列は採らない。`[chain407]` 列は `arg1 < 2601` の枝でだけ `rd8`/`rd64` を使うが、旧 probe の値を根拠にした ON/OFF の差 (入口 5 以降の `m`) も確定扱いしない。
-- 未実施 (本 run): 修正 probe での ON/OFF 再測定。`toolchain-retdec` / `toolchain-emsdk` / `work-m11` が本 run の `$ARTIFACTS_DIR` に無く、PR 本文にも `oc_artifacts:` 行が無いため (`docs/WORKFLOW.md` §11)。再測定には `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` を本文に書いて再起動が要る。
-- ON・OFF とも全 942 unit の probe 版 survey (`SV_ERR_LOG` で unit 番号付きの全 stderr を採取)。unit 190 の `407a50` 入口を順に並べた:
+- 再測定 (修正版 probe。測定 commit `0f8de9a8` = コードを変えた最後の commit。`git diff 0f8de9a8 HEAD -- tools/m11 ':(exclude)*.md'` は空):
+  - IR: `m11_gen_ir2.sh` rc=0 (ldfix=applied、F1=902、errors=0)。素材は `FL_WIN64_DIR` に fl-win64 の展開先を直接指定、`RETDEC_ROOT`・`EMSDK` は toolchain の展開先。
+  - build: 通常 build は `m11_post.py` が `boot_final3.ll` を作り直し probe 版 `boot.o` を上書きするため、`probe_entry.py` → `m11_build.sh` → probe 版 `boot.o`/`probe.o` のコンパイル → `m11_build.sh` 再実行 (`probe.o` をリンク) の順で作った。probe 版 build 自体は ON/OFF とも rc=0・signature mismatch 0・undefined 0。
+  - survey: 全 942 unit (`SV_PROG=1 SV_RAW=1`)。ON: `ok 869 / miss 47 / other 1 / halt0 10 / oob 14 / noproc 1`、OFF: `ok 870 / miss 47 / other 1 / halt0 10 / oob 13 / noproc 1`。ON 測定の所要 56.5 s、OFF 56.4 s、load は 0.9 以下。
+  - unit 190: ON `oob` (trap は `407a50` 入口 6 件目の後)、OFF `ok`。`407a50` 入口は ON 6 件・OFF 17 件。
+  - `[raw407]` は全入口で `v=dead` (範囲外。修正版で期待どおり)。下表の値を採った旧 probe の `[arg-8]` 列は撤回のまま。
+- 修正版の `[chain407]` (unit 190 の `407a50` 入口。ON / OFF。`b` = `[18770492+(arg+7)/8]`、`m` = `[[rbx+8]+24]`):
+
+| 順 | 入口 arg1 | `b` | `rbx` | ON `m` | OFF `m` |
+|--:|--:|--:|--:|--:|--:|
+| 1 | 0x404 | 0x84 | fa5948 | 1 | 1 |
+| 2 | 0x28 | 0x8 | fa5188 | 10bd4e90 | 10bd4e90 |
+| 3 | 0x16 | 0x4 | fa5148 | 10be5240 | 10be5240 |
+| 4 | 0x22 | 0x8 | fa5188 | 10bd4ec0 | 10bd4ec0 |
+| 5 | 0x88 | 0x20 | fa5308 | **10bbe510** | **10bbe5a0** (差 0x90) |
+| 6 | 0x88 | 0x20 | fa5308 | 10bbe510 | 10bbe5a0 |
+
+  - 読み取り: 入口 1〜4 は ON/OFF で一致する。差は入口 5 件目 (0x88) で初めて出る。ON の `m` は OFF より 1 ノード (0x90) 手前を指す。ON は 6 件目の後で trap し、OFF は入口 17 件まで進む。`[chain407]` の `n` は入口 6 件目で ON が `10bbd9a0`、OFF も `10bbd9a0` (一致)。
+  - OFF の入口 7〜17 の `m` 値 (`10bbe5a0`・`10be94c0`・`10bc5000`・`10be5240`・`10bd4ec0`・`10bd4ef0`・`10bd4f20`・`10bd4f50`・`10be5240`・`10be9510`) は ON では実行されない (ON は 6 件目で trap)。
+  - 未確定: ON で 1 ノード (0x90) ずれる書込元、既存 DEFECTS 類型への分類、ON の ok 退行 0 の解消 (受入条件 2〜4、#1642)。
+- 旧 probe (撤回済み) の全 942 unit の survey (`SV_ERR_LOG` で unit 番号付きの全 stderr を採取)。unit 190 の `407a50` 入口を順に並べた (`[arg-8]` 列は範囲外読みを含み採らない):
 
 | 順 | 入口 arg1 | `[raw407]` の `[arg-8]` | `[chain407]` (ON / OFF) |
 |--:|--:|--:|---|
