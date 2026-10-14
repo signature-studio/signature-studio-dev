@@ -10,7 +10,10 @@
 #                 ただし次の場合は agent を起動せず stop=true にするだけ (notice を残す。oc:stuck は付けない。#2601):
 #                 PR が open でない (merge・close 済み)、または差し戻しの元の review (pull_request_review の event) の commit が
 #                 現在の head と違う (古い head への差し戻し。その後に push された head の review が判定を担う)
+#                 record が gh の失敗などで途中で終わったら stop=true と reason=record-failed を出して非 0 で終わる。
+#                 PR にはコメントしない (#2869)。窓の判定まで終えたときだけ $GITHUB_ENV に OC_RECORD_OK=1 を書く
 #   check         head が進んだか / 根拠コメントを投稿したかを判定し、result を $GITHUB_OUTPUT に出す
+#                 (OC_RECORD_OK が無ければ result を出さずに失敗する。record が終わっていないのに none と判定しない #2869)
 #                   pushed   : head が進んだ (push が synchronize を起こし、review が再起動する)
 #                   answered : push せず PR にコメントした (review は起動しないので reopen で起こす)
 #                   none     : どちらもしていない
@@ -80,6 +83,20 @@ DECIDE='
 
 case "${1:-}" in
   record)
+    # record が途中で終わったら (gh の失敗など)、stop=true と reason=record-failed を出して非 0 で終わる (#2869)。
+    # agent と retry は走らせない。PR にはコメントしない (コメントも失敗しうる)。trap の中では gh を呼ばない。
+    OC_RECORD_DONE=0
+    record_abort() {
+      local rc=$?
+      trap - ERR EXIT
+      if [ "$OC_RECORD_DONE" != 1 ]; then
+        echo "::error::fix-progress record failed (exit $rc, line ${OC_FAIL_LINE:-?}): the fix run is skipped (reason=record-failed)"
+        printf 'stop=true\nreason=record-failed\n' >> "${GITHUB_OUTPUT:-/dev/null}"
+        exit 1
+      fi
+    }
+    trap 'OC_FAIL_LINE=$LINENO' ERR
+    trap record_abort EXIT
     pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
     head_now="$(jq -r .head.sha <<< "$pr_json")"
     pr_state="$(jq -r .state <<< "$pr_json")"
@@ -92,7 +109,8 @@ case "${1:-}" in
     # 上限ガード: ラベルが付いている PR は fix を起動しない。
     # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
     stop=false
-    if gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name' | grep -qx "$STUCK_LABEL"; then
+    labels="$(gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name')"
+    if grep -qx "$STUCK_LABEL" <<< "$labels"; then
       stop=true
       echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
     elif [ "$pr_state" != open ]; then
@@ -143,10 +161,16 @@ case "${1:-}" in
           --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS}、合計 ${total}、停止理由 ${decision})。自動復旧を試みます。PM agent が処理します。ラベル \`${STUCK_LABEL}\` を外すと再開できます (再開後は、この停止コメント以降の差し戻しだけを数えます)。${STOP_MARK} <!-- oc-pm-intent: stuck pr=${OC_PR_NUMBER} reason=${decision} -->"
       fi
     fi
+    if [ "$stop" = false ]; then printf 'OC_RECORD_OK=1\n' >> "$GITHUB_ENV"; fi
     echo "stop=$stop" >> "$GITHUB_OUTPUT"
+    OC_RECORD_DONE=1
     ;;
   check)
     : "${OC_HEAD_BEFORE:?}" "${OC_START_TS:?}"
+    if [ "${OC_RECORD_OK:-}" != 1 ]; then
+      echo "::error::fix-progress check: record did not finish the window check (OC_RECORD_OK is unset): no result is given" >&2
+      exit 1
+    fi
     if [ "$(pr_head)" != "$OC_HEAD_BEFORE" ]; then
       result=pushed
     else
