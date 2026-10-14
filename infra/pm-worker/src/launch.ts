@@ -84,11 +84,18 @@ export function addArts(line: string, extra: string[]): string | null {
   return validateArtLine(out) ? out : null;
 }
 
-// launch の素材行の既定: PM が明示した行 (検証済み) → issue 本文の行 (検証済み) → 題名・ラベルからの推定。
+const artNames = (line: string): string[] => line.slice(ART_PREFIX.length).trim().split(/\s+/).filter((a) => a && a !== "none");
+
+// launch の素材行の既定: PM の行 (検証済み) と issue 本文の行 (検証済み) の素材名の和集合 → 題名・ラベルからの推定。
+// 名前を持つ行が 1 つだけならその行をそのまま返す。両方が名前を持つときは PM の行の名前の後に本文の行の名前を並べ、fl-win64 を先頭に補う。
+// none は名前を持たない側とみなす (両方 none なら none)。pm_art の保存値は書き換えず、読み出し側でだけ和集合を作る (#3050)。
 export function defaultArtLine(pmLine: string | null | undefined, bodyLine: string | null | undefined, title: string, labels: string[]): string {
-  if (pmLine && validateArtLine(pmLine)) return pmLine;
-  if (bodyLine && validateArtLine(bodyLine)) return bodyLine;
-  return inferArtifacts(title, labels);
+  const lines = [pmLine, bodyLine].filter((l): l is string => !!l && validateArtLine(l));
+  if (lines.length === 0) return inferArtifacts(title, labels);
+  const named = lines.filter((l) => artNames(l).length > 0);
+  if (named.length === 0) return ART_PREFIX + " none";
+  if (named.length === 1) return named[0];
+  return ART_PREFIX + " " + withFlWin64([...new Set(named.flatMap((l) => artNames(l)))]).join(" ");
 }
 
 const BODY_LINES = [

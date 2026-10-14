@@ -245,6 +245,6 @@ provider・mock の実装は、上の値源 (cur/lo/hi/flags) を状態モデル
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | A 経路の getter (`0x1331340`・`ref.vt[+0x20]`・`sub.vt[+8](0x1a)`) | A 経路の事象の bit1 (float 型か) が未確定 | #2887 (PY-103) |
-| `0x1046a30` の mode 0x20 (lo・hi)・mode 2 (cur) | incEventValue の lo・hi・cur が未確定 | #2887 (PY-103) |
+| `0x1046a30` の mode 0x20 (lo・hi)・mode 2 (cur) | incEventValue の lo・hi・cur が未確定。振り分け表は `REPORT_PY73_APPENDIX_2547.md` | #2887 (PY-103) |
 | `0x664090` と O の初期化元 | 表の件数・並びの正しさが未確認 | #2887 (PY-103) |
 | 0x104d2a8・0x104d2a9 が機械語の一部である由来 | 0x00 / 0x04 が実行時の値と一致するかは未確認 | PM agent の判断待ち: 0x104d2a8・0x104d2a9 の値を実行時の値として扱ってよいか・既定案: 確認できるまで実装に使わない (本 PR は使っていない) |
