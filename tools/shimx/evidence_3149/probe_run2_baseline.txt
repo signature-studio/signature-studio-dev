@@ -1,0 +1,37 @@
+boot lasterr=0
+unit 1 ret=1 lasterr=0
+unit 2 ret=1 lasterr=0
+unit 3 ret=1 lasterr=0
+unit 4 ret=1 lasterr=0
+unit 5 ret=1 lasterr=0
+unit 6 ret=1 lasterr=0
+unit 7 ret=1 lasterr=0
+unit 8 ret=1 lasterr=0
+unit 9 ret=1 lasterr=0
+unit 10 ret=1 lasterr=0
+unit 11 ret=1 lasterr=0
+unit 12 ret=1 lasterr=0
+unit 13 ret=1 lasterr=0
+unit 14 ret=1 lasterr=0
+unit 15 ret=1 lasterr=0
+unit 16 ret=1 lasterr=0
+unit 17 ret=1 lasterr=0
+unit 18 ret=1 lasterr=0
+unit 19 ret=1 lasterr=0
+unit 20 ret=1 lasterr=0
+unit 21 ret=1 lasterr=0
+unit 22 ret=1 lasterr=0
+before unit 23: gate P=0x11f10e0 slot=0x457860 flag=0
+unit 23 (trace) ret=2 lasterr=0
+  [m11][icall] 0x67f00
+  [m11][icall] 0xf960
+  [m11][icall-miss] target=0x457860 (closure 外; skip, ret 0)
+  [m11][UStrAsg] dest=0x11f1120 src=0x0 old=0x0
+  [m11][UStrAsg] dest=0x11f1128 src=0x0 old=0x0
+  [m11][icall-miss] target=0x457860 (closure 外; skip, ret 0)
+  [m11][UStrAsg] dest=0x11f1138 src=0x0 old=0x0
+  [m11][UStrAsg] dest=0x11f1140 src=0x0 old=0x0
+  [m11][UStrAsg] dest=0x11f1148 src=0x10bd3370 old=0x0
+  [m11][UStrAsg] dest=0x11f1150 src=0x10bd33a0 old=0x0
+  [m11][UStrAsg] dest=0x11f1158 src=0x10bd33d0 old=0x0
+  [m11][UStrAsg] dest=0x11f1160 src=0x10bd3400 old=0x0
