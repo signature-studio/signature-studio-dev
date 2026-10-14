@@ -56,8 +56,8 @@ FA_FIX_COOKIE=0 FA_ENC_INIT=1 bash tools/icall/fa_route_build.sh     # OFF 比�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x1810553d0` の wasm 戻り値 (ON=0x0) と native (0xc000c5300342457c) の不一致。call skip 経路の戻り値の仕様と、`enc_slots` 後の native 戻り値の扱いの確認 | 受入条件 (値の一致) 未達 | 子 issue (ICALL-70 の続き) |
-| `fa_sweep` の bit一致が実行ごとに ±1 揺れる原因 | sweep 件数の判定精度 | 子 issue |
+| `0x1810553d0` の wasm 戻り値 (ON=0x0) と native (0xc000c5300342457c) の不一致。call skip 経路の戻り値の仕様と、`enc_slots` 後の native 戻り値の扱いの確認 | 受入条件 (値の一致) 未達 | #2302 (ICALL-71) |
+| `fa_sweep` の bit一致が実行ごとに ±1 揺れる原因 | sweep 件数の判定精度 | #2302 (ICALL-71) |
 | 0x1813068f8 の表への包含判定 | 受入条件 (表への包含判定) | #2224 (ICALL-64)・#2226 (ICALL-66) |
 
 ## 6. 測定コードの鮮度
