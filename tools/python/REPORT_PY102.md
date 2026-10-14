@@ -195,13 +195,13 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 - 取り込み。`origin/main` `1b37410c` を merge (`ac73210e`)。競合は `tests/provider_check.mjs` の 1 箇所だけ (判定条件・件数 assert・内訳コメントを含む 1 ブロック)。main 側は PY-125 (#3001) の `pe125` (`general.clearLog`・`general.dumpScoreLog` の 2 件) を追加した。両方を集合に入れ、件数は main の `impl 121・unimpl 314` に `pe102` の +1 を加えて `impl 122・unimpl 313` (合計 435 は不変)。`fl_engine.c`・`fl_mock.mjs`・`gen/fl_table.c`・`flapi_table.json` は自動マージで衝突なし (両側の変更は別の関数・別のフィールド。`Pl` 構造体の `lock` と main の 2 関数)。
 - 測定 commit: `ac73210e` (コードを変えた最後の commit)。本節の追記だけを後続の commit で加える。`git diff ac73210e HEAD -- tools/python ':!tools/python/REPORT_PY102.md' ':!tools/python/REPORT_PY102_APPENDIX_2883.md'` は 0 行。
 - 前回の測定 (`8ceec7c9`) の全文は `REPORT_PY102_APPENDIX_2883.md` へ移した (250 行上限)。
-- 素材・emsdk: 本検証は `fl-win64` を展開しない (provider の build と JS の差分検査は素材を読まない)。emsdk は上流 `emsdk install 6.0.12` を `/opt/emsdk` に導入して `activate` した (`emcc` 6.0.12)。`toolchain-emsdk` 素材は本 run に無い。
+- 素材・emsdk: 本検証は `fl-win64` を展開しない (provider の build と JS の差分検査は素材を読まない)。emsdk は上流 `emsdk install 6.0.12` を [EMSDK] の既定位置に導入して `activate` した (`emcc` 6.0.12)。`toolchain-emsdk` 素材は本 run に無い。
 - 未実行 (理由): `build_flpy.sh`・`provider_check.mjs` の §3・`tests/all_tools.mjs` は flpy (CPython wasm と `work/`) を使うため実行していない。`build_flpy.sh` と `host/flpython.mjs` は `fl_engine.c`・`fl_table.c` を参照しない。前回測定 (`8ceec7c9`) からの変更は `git diff --stat 8ceec7c9 ac73210e -- tools/python` の範囲で、main 由来の `pe125` (provider・mock・`general_diff.mjs`) と、build・test から参照されない `analysis/py99_*`・REPORT だけ。flapi 表と生成器 (`analysis/flapi*`) は 0 行差分 (`git diff 8ceec7c9 HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/analysis/flapi/flapi_table.json` は 0 行)。表の再生成 `flapi_table_check.sh`・`static_check.mjs`・`fulltext_parity.mjs` も本 run では未実行。
 - 環境: GitHub Actions runner (4 コア)。検証開始時の `uptime` の load average は `0.13 0.24 0.13` (23:18:51)。
 
 | 検証 | 実行 | 結果 | 所要 |
 |---|---|---|---|
-| provider wasm | `EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash provider/build.sh` | flprov.wasm 60,108 B。fl_table.c 435 関数・ハンドラ 122 | 1.047 s |
+| provider wasm | `EMSDK_ENV=… bash provider/build.sh` | flprov.wasm 60,108 B。fl_table.c 435 関数・ハンドラ 122 | 1.047 s |
 | provider ABI §1・§2 | `node tests/provider_check.mjs` | §1 (表の整合・MCP 静的 60・impl 122・unimpl 313) と §2 (エラー code・ilmcp.getBrowserNames) の assert は PASS (AssertionError 0)。§3 は `work/midi.py` が無く ENOENT で停止 (rc 1)。PASS 行は出ていない | - |
 | playlist 差分 | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段・PASS | 0.053 s |
 | general 差分 (main 由来) | `node tests/general_diff.mjs` | calls 32・diffs 0・PASS | 0.056 s |
