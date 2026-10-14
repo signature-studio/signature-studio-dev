@@ -73,6 +73,12 @@ export function createMockEngine() {
     "channels.isChannelSelected": (i) => ch(i).sel,
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
+    // PE 0xd5afc0 → 0x11e84a0: 対象だけ選択し他は解除 (useGlobalIndex は未モデル・C と同じ)
+    "channels.selectOneChannel": (...a) => {
+      arity(a, 1, 2);
+      const k = ch(a[0]);
+      st.channels.forEach((c) => (c.sel = c === k));
+    },
     "channels.muteChannel": (i, v) => { ch(i).mute = tog(ch(i).mute, v); },
     "channels.soloChannel": (i) => { ch(i).solo = !ch(i).solo; },
     "channels.getChannelVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(ch(i).vol, 1e-6) / 0.78125) : ch(i).vol),
