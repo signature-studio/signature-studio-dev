@@ -46,28 +46,29 @@
 
 ## 4. 検証
 
-測定 commit: `07ff6f89` (コードを変えた最後の commit。`feat(python): ui state getters 9 functions PE-confirmed (#2831)`)。base は `origin/main` (`2899945e`)。測定は同 commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから行った (`git status --porcelain` は空)。
+測定 commit: `b0a8a46d` (コードを変えた最後の commit。`origin/main` (`314e2e94`) を取り込んだ merge。衝突は無し。本 PR のコード commit は `07ff6f89`)。測定は同 commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから行った (`git status --porcelain` は空)。
 
-環境: runner 4 core、再測定開始時の load average 0.60 (1 分平均)、終了時 0.95。
+環境: runner 4 core、測定開始時の load average 0.31 (1 分平均)、終了時 0.44。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` (再ビルド) | rc 0・ハンドラ 92 | 0.94 s |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.37 s |
+| `bash provider/build.sh` (再ビルド) | rc 0・ハンドラ 92 | — |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` (再ビルド) | rc 0 | — |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.36 s |
 | `node tests/general_diff.mjs` | calls 9、diffs 0、PASS (PY-87 の回帰) | 0.05 s |
 | `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS (既存) | 0.05 s |
 | `node tests/ui_state_diff.mjs` | calls 18、diffs 0、PASS | 0.05 s |
-| `node tests/channels_diff.mjs` | calls 122、diffs 0、PASS (回帰) | 0.06 s |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.36 s |
+| `node tests/channels_diff.mjs` | calls 123、diffs 0、PASS (回帰。main 取り込みで呼出しが 1 件増えた) | 0.06 s |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.32 s |
 
-前提の生成物 (測定前に作成・gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 08 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.3 秒)。
+前提の生成物 (測定前に作成・gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 08 秒、`07ff6f89` の測定時)。
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `uiClosing` の既定値を `false` から `true` にすると、`node tests/ui_state_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 状態ゲッター差分 1 件` で rc 1 (FAIL)。元に戻すと calls 18・diffs 0・PASS (rc 0)。
 
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 07ff6f89 HEAD -- tools/python ':!*.md'
+$ git diff b0a8a46d HEAD -- tools/python ':!*.md'
 (空)
 ```
 
