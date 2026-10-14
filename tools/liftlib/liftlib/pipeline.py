@@ -208,10 +208,10 @@ def prepare(cfg, mod, workdir, stats):
     """修復済み Module → 正規名 IR + SIMD helper C + stub C を書く (変種に依らず 1 回)。返値 (ll_path, h_path, s_path)"""
     name = cfg["name"]
     text = mod.dump()
+    decls = SG.scan_decls(text)           # 正規化前の宣言から取る (正規化後に読むと ptr 引数の名前が二重に正規化される)
     text, mp = SG.canonicalize(text)
     ll_path = os.path.join(workdir, name + "_fixed.ll")
     open(ll_path, "w").write(text)
-    decls = SG.scan_decls(text)
     c, rep = SG.emit_c(decls, use_names="canon")
     h_path = os.path.join(workdir, name + "_simd.c")
     open(h_path, "w").write(c)
