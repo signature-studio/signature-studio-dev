@@ -1,6 +1,6 @@
 # liftdiff LD-27 (#1034): m11 型 B 候補 34 件の完全 trace 再検証と戻り後の分岐
 
-本体 [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9 の LD-27 節から分割移動した全文。件数・per-case の正本は [`results/m11_typeb_cause.md`](results/m11_typeb_cause.md)。
+LD-27 (#1034) の結果の全文。件数・per-case の正本は [`results/m11_typeb_cause.md`](results/m11_typeb_cause.md)。本体 [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9 の LD-27 bullet は旧版 (未実測) のままで、差し替えは同ファイルの 250 行超過 (main 時点 385 行) の分割整理と併せて行う。
 
 ## 測定条件
 
