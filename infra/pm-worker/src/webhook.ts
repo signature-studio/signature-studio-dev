@@ -79,7 +79,22 @@ export interface RunState {
   updatedAt: string;
   // run の作成時刻 (launch の観測に使う)。古い state には無い。
   createdAt?: string;
+  // run を起こした workflow のファイル名 (`.github/workflows/opencode.yaml` なら `opencode.yaml`)。古い state には無い。
+  wf?: string;
 }
+
+// 同時実行の上限 (60) を食う opencode.yaml の run だけを TARGET に数える。他の workflow (scripts-test.yaml など) は別枠。
+export const OPENCODE_WORKFLOW = "opencode.yaml";
+
+// workflow_run.path (REST は `.github/workflows/x.yaml`、ref 付きの形 `...@refs/heads/main` もあり得る) からファイル名を取る。
+export function workflowFile(path: unknown): string | undefined {
+  if (typeof path !== "string" || path === "") return undefined;
+  const file = path.split("@")[0].split("/").pop() ?? "";
+  return file === "" ? undefined : file;
+}
+
+// path を持たない run (古い保存値、path の無い配送) は opencode.yaml として数える。数え漏らして上限を超えるより、過大に数えるほうを選ぶ。
+export const isOpencodeRun = (r: RunState): boolean => r.wf === undefined || r.wf === OPENCODE_WORKFLOW;
 export interface BotComment {
   issueNumber: number;
   at: string;
@@ -394,6 +409,8 @@ function applyRun(s: PmState, p: Json): PmState {
   if (!w) return s;
   const k = String(w.id);
   if (!newer(s.runs[k], w.updated_at)) return s;
+  // path は run 自身 (REST・webhook とも) か、webhook の workflow オブジェクトにある。配送に無いときは既知の値を残す。
+  const wf = workflowFile(w.path ?? p.workflow?.path) ?? s.runs[k]?.wf;
   const next: RunState = {
     id: w.id,
     event: w.event,
@@ -402,6 +419,7 @@ function applyRun(s: PmState, p: Json): PmState {
     conclusion: w.conclusion ?? null,
     updatedAt: w.updated_at,
     ...(typeof w.created_at === "string" ? { createdAt: w.created_at } : {}),
+    ...(wf ? { wf } : {}),
   };
   return { ...s, runs: { ...s.runs, [k]: next } };
 }
