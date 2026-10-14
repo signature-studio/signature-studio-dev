@@ -15,7 +15,7 @@ T="${RUNNER_TEMP:-/tmp}/negctl_484"; mkdir -p "$T"
 CFG="$W/boot*.drc.config.json"
 IR="$W/boot_final3.ll"
 IMG="$W/m11_image.bin"
-run() { "$PY" "$HERE/audit_lsf.py" "$1" "${2:-$IMG}" "$CFG" --json "$T/$3.json" 2>&1 | tail -2 | head -1; }
+run() { "$PY" "$HERE/audit_lsf.py" "$1" "${2:-$IMG}" "$CFG" --no-disp --json "$T/$3.json" 2>&1 | tail -2 | head -1; }
 vas() { "$PY" -c "import json,sys; d=json.load(open(sys.argv[1]))['suspects']; print(' '.join(sorted(d, key=lambda x:int(x,16))))" "$T/$1.json"; }
 
 echo "[NC0] 無改変"; run "$IR" "$IMG" nc0; echo "  suspects: $(vas nc0)"
