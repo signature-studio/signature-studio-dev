@@ -22,6 +22,7 @@ export function createMockEngine() {
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
     launchPages: 0,
+    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -198,6 +199,12 @@ export function createMockEngine() {
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
     // PY-120 (#2984): PE 0xd791b0 は obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は実行時の状態のため仮置き 0 (REPORT_PY120)
     "launchMapPages.length": (...a) => { arity(a, 0, 0); return st.launchPages; },
+    // PY-121 (#2985): screen 状態の 5 関数 (PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "screen.isBlanked": (...a) => { arity(a, 0, 0); return st.screenBlanked; },
+    "screen.isUnBlank": (...a) => { arity(a, 0, 0); return st.screenUnBlank; },
+    "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
+    "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
+    "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
