@@ -26,9 +26,9 @@
 |---|---|---|
 | 1 Worker が 24 時間ごとに `oc-pm kind=digest ref=0` を送る | `engine.ts` `digest()` を `tickInner` が毎 tick 呼ぶ。初回は起点のみ (`meta.digestAt`)。payload は `{kind:"digest", ref:0}` | `digest.test.ts` 初回・(a) |
 | 1 dry-run は記録のみ | `would_dispatch_pm` に `digest#0`、`counters.wouldDispatchPm` (POST 0 回) | `digest.test.ts` dry-run |
-| 1 pm.md の digest 節 (件数・rolling issue の本文更新・緊急は 1 日 1 件) | `.github/prompts/pm.md` `### digest`。緊急は stuck の天井だけ (投稿先: rolling issue、観測元: `oc:stuck` の open PR 件数) | `test-dispatch-context.sh` 10b |
+| 1 pm.md の digest 節 (件数・rolling issue の本文更新・緊急は 1 日 1 件) | `.github/prompts/pm.md` `### digest`。緊急は stuck の天井だけ (投稿先: rolling issue、観測元: `oc:stuck` の open PR 件数)。※ #2539 で変更: 緊急は 2 項目 (率制限の alert を足した。節 9) | `test-dispatch-context.sh` 10b |
 | 1 rolling issue は launch の対象外 | `classify.ts` と `launch_issues.py` が題名 `DIGEST_ROLLING_RE` で除く (`pm.ts` と同じ形) | `digest.test.ts` (e)・`test_launch_issues.py`・`test-dispatch-context.sh` (題名の一致) |
-| 1 緊急の Worker 停止・率制限の alert | 未実装 (PM agent からは観測できない)。pm.md の緊急の一覧から外した | 子 issue #2539 (`[CI-102]`) へ移した。#2349 の本文からも外した |
+| 1 緊急の Worker 停止・率制限の alert | 未実装 (PM agent からは観測できない)。pm.md の緊急の一覧から外した。※ #2539 で変更: 率制限の alert は `/status` を PM run が読めるので pm.md の緊急に足した (節 9)。Worker 停止は PM run の入力に無いまま、`watchdog.sh` (CI-49) の側に残す | 子 issue #2539 (`[CI-102]`) へ移した。#2349 の本文からも外した |
 | 2 pm.md の user_answered 節 (反映・除去・確定コメント・曖昧なら聞き直し) | `.github/prompts/pm.md` `### user_answered` | `test-dispatch-context.sh` 10b |
 | 4 (a) 24 時間以内の 2 回目は送らない | `digest.test.ts` (a) | PASS・mutation で FAIL を確認 |
 | 4 (b) digest の送信は 1 日 1 件 (毎分の tick が 3 日続く) | `digest.test.ts` (b) は **Worker の送信回数** (24 時間に 1 件) を検査する | PASS。コメント数の上限 (1 日 1 件) は検査していない。pm.md の文言 (`1 日 1 件まで`) を `test-dispatch-context.sh` が grep するだけ |
@@ -46,6 +46,7 @@
 - 反映 (`wrangler deploy` や Workers Builds) は範囲外。merge 後、Worker が次の tick で起点を置き、24 時間後に最初の digest を送る。
 - rolling issue の初回起票と本文更新は PM agent (pm.md の digest 節) の実行で行う。Worker のテストの対象外。最初の digest で実機確認する。
 - 緊急の Worker 停止・率制限の alert は PM agent の入力に無い。観測元の設計を含めて子 issue #2539 (`[CI-102]`) に移した。
+  - ※ #2539 で変更: 率制限の alert は `/status` を PM run が読んで判定するので、緊急に足した (節 9)。Worker 停止は PM run の入力に無いまま。
 - `oc-auto-close` の印は pm.md で定義した。既存の close (R5) は次の PM 実行から印が付く。過去分は数えない。
 
 ## 6. main 取り込み後の再実行 (#2481 の競合解消)
@@ -111,3 +112,19 @@
 | pm.md と dispatch 文脈の検査 | `bash .github/scripts/tests/test-dispatch-context.sh` | 135 passed・0 failed | 6.2 s |
 | launch 判定の Python テスト | `python3 -m unittest test_launch_issues` (`tools/pm`) | 8 / 8 OK | 0.13 s |
 | Worker の bundle | `bun build src/index.ts --target=browser --format=esm --external 'node:*'` (出力は作業ディレクトリの外) | 18 modules・exit 0 | 9 ms |
+
+## 9. #2539 (CI-102) の率制限 alert (digest の緊急に足した・PR #3031 の差し戻し対応)
+
+- 測定 commit: `88711d17` (コードを変えた最後の commit)。実装 `7aece32c` に `origin/main` (`f59db604`) を merge した (競合は無し)。main 側の変更は 38 files (`tools/audio`・`tools/python`・`tools/shimx` など。`docs/DOC_MAP.md` を含む) で、`infra/pm-worker`・`.github`・`tools/pm` には入っていない (`git diff --name-only 7aece32c 88711d17 -- infra/pm-worker .github tools/pm` は 0 行)。
+- 範囲の差分: `git diff 7aece32c 88711d17 -- .github/prompts/pm.md .github/scripts/tests/` は 0 行。測定した pm.md と dispatch 文脈のテストは、実装の `7aece32c` と同じ内容。
+- 判定の値: pm.md の率制限の条件 (5 件・30%・2 回連続・`rest_remaining` 1500) は `infra/pm-worker/src/ratealert.ts` (`RATE_MIN_COUNT = 5`・`RATE_MIN_PERCENT = 30`・`RATE_STREAK = 2`) と `ratelimit.ts` (`REST_REMAINING_MIN = 1500`) と一致する。
+- load average: 1 分値 (`/proc/loadavg`) の前後で測った。
+
+| 検証 | コマンド | 結果 | 所要 (wall) | load average (前 → 後) |
+|---|---|---|---:|---|
+| pm.md と dispatch 文脈の検査 (率制限の 8 項目を含む) | `bash .github/scripts/tests/test-dispatch-context.sh` | 154 passed・0 failed | 4.35 s | 0.25 → 0.31 |
+| pm.md を読む別テスト | `bash .github/scripts/tests/test-no-self-merge.sh` | 11 passed・0 failed | 0.14 s | 0.25 → 0.25 |
+
+- ネガコン: なし。率制限の項目は文言の検査 (`test-dispatch-context.sh` の 8 件) だけで、PM run の判定を実行して確かめるものは無い。
+- 本番への影響: `infra/pm-worker/` の挙動は変えない (README の記述だけ)。launch は止まらない。pm.md の digest 節は次回の digest run (24 時間周期) から効く。
+- 未解決: 率制限の検知は digest の周期 (24 時間) でしか出ない。即時の通知は子 #3047 (`[CI-142]`・`watchdog.sh` に同型の alert を足す) で扱う。
