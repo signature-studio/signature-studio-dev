@@ -22,6 +22,13 @@ s = s.replace(b, "ret = M['_ott_run'](%d, ...call, ...Array(8 - call.length).fil
 x = "toString(16).padStart(16, '0')} ${'0'.padStart(16, '0')}`);"
 assert s.count(x) == 1, "wasm_runner.mjs の R 行の形が変わった"
 s = s.replace(x, "toString(16).padStart(16, '0')} ${(crashed ? 0n : BigInt.asUintN(64, M._ott_xmm0())).toString(16).padStart(16, '0')}`);")
+# .rdata/.data/_RDATA を線形メモリへ敷設する (未呼出しだと絶対値マスク等が 0 のまま走る。fa_cmp.py と同じ)。module 再生成 (mk) の後も必要。
+y = "let M = await require(path.resolve(modPath))();"
+assert s.count(y) == 1, "wasm_runner.mjs の初期化行が変わった"
+s = s.replace(y, y + " M._ott_data_install();")
+z = "const mk = async () => { M = await require(path.resolve(modPath))(); };"
+assert s.count(z) == 1, "wasm_runner.mjs の mk 行が変わった"
+s = s.replace(z, "const mk = async () => { M = await require(path.resolve(modPath))(); M._ott_data_install(); };")
 open(dst, 'w').write(s)
 EOF
 cp "$NAT/scen.txt" "$W/scen.txt"
