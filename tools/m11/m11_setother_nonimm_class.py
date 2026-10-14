@@ -55,7 +55,8 @@ MOVS = ('mov', 'movabs', 'movaps', 'movapd', 'movups', 'movdqa', 'movdqu', 'movs
 COPY_XMM = ('movaps', 'movapd', 'movups', 'movdqa', 'movdqu')
 ZERO = ('xor', 'pxor', 'xorps', 'xorpd')
 # 完全一致 (jcc は 'j' 前方一致)。前方一致だと btr/bts/btc・cmpxchg・SSE の cmpeq*sd を「書かない命令」と誤る。
-NOWRITE = {'cmp', 'test', 'push', 'ucomiss', 'ucomisd', 'comiss', 'comisd', 'nop', 'nopw', 'nopl', 'ret'}
+# bt は CF だけを書き、宛先は書かない。
+NOWRITE = {'bt', 'cmp', 'test', 'push', 'ucomiss', 'ucomisd', 'comiss', 'comisd', 'nop', 'nopw', 'nopl', 'ret'}
 # capstone の regs_access は cmpxchg の rax 書込みを返さないため、暗黙の書込み先を明示する。
 CMPX_W = {'cmpxchg': ('rax',), 'cmpxchg8b': ('rax', 'rdx'), 'cmpxchg16b': ('rax', 'rdx')}
 
