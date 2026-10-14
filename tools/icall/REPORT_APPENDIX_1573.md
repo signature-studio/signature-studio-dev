@@ -1,7 +1,7 @@
 # 付録: icall #1573 — OTT F の jt_dropped 8 件の展開後残件数 (ICALL-31)
 
 測定 commit `d16d7f5d` (icall 関連コードは HEAD `ecf6d6e5` まで無変更)。素材 `analysis-ott-binaries` (`OTT_vst2_win64.dll`)・`toolchain-retdec`・`work-icall` (`ott_F.txt`)。
-再現: `tools/icall/roundtrip.sh ~/analysis/plugins/ott/binaries/OTT_vst2_win64.dll work/ott_F.txt ott-F-1573 work/rt_ott-F-1573`。
+再現: `tools/icall/roundtrip.sh <analysis-ott-binaries>/OTT_vst2_win64.dll work/ott_F.txt ott-F-1573 work/rt_ott-F-1573`。
 foreground、rc 0、所要 32.7 s (`time` 実測)、開始時 load 0.87。関数集合は 282 関数 (`F.ranges`、`ott_F.txt` 由来)。
 
 ## 結果
@@ -34,3 +34,10 @@ foreground、rc 0、所要 32.7 s (`time` 実測)、開始時 load 0.87。関数
 - 件数の結論: `jt_dropped` は before 1 件 / after 8 件。展開 pass が OTT F の 8 site に掛かった後も、監査上の `jt_dropped` は 8 件のまま。
 
 未解決: `jt_present → jt_dropped` 遷移の機構の切り分け → #1763 (ICALL-38・親 #1573)。
+
+## 鮮度の証跡 (`docs/WORKFLOW.md` §6)
+
+- 測定 commit: `d16d7f5d`。レビュー head: `2809b86b` (本付録の追加前)。
+- `git diff d16d7f5d 2809b86b -- tools/icall ':(exclude)*.md'` の出力: 空 (コード差分 0)。
+- 除外なしの `git diff d16d7f5d 2809b86b -- tools/icall --stat` は docs のみ: `REPORT_APPENDIX_1206.md` 1 行・`REPORT_APPENDIX_1573.md` 新規。
+- よって測定値は現 head でも有効。再測定は不要。
