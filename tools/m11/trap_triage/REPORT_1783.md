@@ -152,3 +152,46 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 | boot 後の `0xf960` と静的 `0x40f960` の由来 | スロットの初期値の出所が未確定 | #2769 |
 | 7.4 の原本 (`SURVEY_UNITS` 行・`SLOT_BOOT` 行・`run1.err` 最終行) | repo 内の出力では 942 unit の完走を示せない | #2769 (同じ build・survey の再実行で引用) |
 | merge 後の main での再測定 | 測定対象が main と一致しない | 本 PR 本文の未解決表 (再測定のみのため子は起票しない) |
+
+## 8. #2770 (LD-129): native 側 0x5ac308 の書込み監視 (ld_native)
+
+**判定**: 受入 1 は実装済み (`rt/ld_native.c` の `LD_WATCH_ADDR`・commit `12982d74`)。受入 2 は実測を記録した。監視下の native boot で `0x5ac308` への書込みは **0 件**。ただし「監視が実行結果を変えない」(受入 1 の条件) は **未確認** (§8.4)。
+
+### 8.1 測定条件
+
+- 測定 commit: `12982d74` (`tools/liftdiff/rt/ld_native.c` のみ変更)。`git diff 12982d74 HEAD -- tools/liftdiff` の出力は 0 byte (本節の作成時点)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`) に展開、`work-m11`・`work-liftdiff` を worktree の `tools/*/work/` に展開。`toolchain-emsdk` は native 側の測定に不要のため未展開。
+- 監視の仕組み: `LD_WATCH_ADDR=<VA hex>` と `LD_WATCH_OUT=<path>` (両方指定時のみ有効)。監視 page を `PROT_READ|PROT_EXEC` にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。TF で書込み 1 命令だけ実行してから新しい値を読み、page を戻す。記録は書込み先が監視 8 バイトに重なるものだけ (`wp case=... rip_rva=... old=... new=... chg=...`)。
+- 実行: `tools/liftdiff` で `FL_WIN64_DIR=... LD_WATCH_ADDR=5ac308 LD_WATCH_OUT=<file> python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild` (wall 21 s)。VA は ImageBase `0x400000` + RVA。`0x5ac308` は VA で、wasm の `0x1ac308` に対応する。
+
+### 8.2 実測
+
+| run | 監視 | 結果 |
+|---|---|---|
+| A (作業ツリー) | `5ac308` | entry は rva `0x26833d` で segv (InitCount 246)。unit 単位は ok+682 / fail 3 (最初 830)、`units_run` 928/942。記録 0 件 (`wp` ファイル 0 byte) |
+| F (commit `12982d74`) | `5ac308` | A と同じ結果。記録 0 件。`img_runs` 216 |
+| C (陽性対照) | `15eac98` (VA = RVA `0x11eac98` = `System.InitCount`) | 248 件 (`ep` case の増分書込みは `chg=1`) |
+| B・B2 (対照) | 無し (`000000` は範囲外のため装着されない) | 2 run の state が一致しない (img run 66 の 1 byte)。非決定と判定 |
+
+### 8.3 解釈
+
+- 検出器は働く: C で `System.InitCount` の 248 件 (entry 246 件 + unit 単位の増分) を捕まえた。よって A/F の 0 件は「書込みが無かった」と読める。
+- `0x5ac308` は m11 の native boot (entry + unit 単位 928 件) の中では書かれない。wasm 側は unit 0〜144 で 0 件 (§7)。書込み元は boot の後の実行 (unit survey 相当) にある可能性があるが、未確定。
+- 起票先: 全 942 unit と boot 後の書込みの切り分けは #2769 (受入 1 の残り)。
+
+### 8.4 未確認 (非摂動性)
+
+- 監視なし B と B2 は同じ条件で 2 回走らせても、img run 66 の 1 byte が異なる (非決定)。
+- 監視付き A と監視なし B の差は、この 1 byte だけだった。
+- 監視付き F (commit `12982d74`) と B2 の差は、run 境界 (`img_runs` 216 と 215) と heap に及ぶ。原因は切り分けていない。
+- よって「監視は実行結果を変えない」は**未確認**。次は B・B2 の非決定の原因 (時刻・乱数・stack 位置の差) を切り分け、F と B の差を run 単位で比べる。
+
+### 8.5 再現
+
+```sh
+export FL_WIN64_DIR=<fl-win64 の展開先>   # [WIN64] (docs/REFERENCES.md §4)
+cd tools/liftdiff
+gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm
+LD_WATCH_ADDR=5ac308 LD_WATCH_OUT=<出力ファイル> python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild
+# 陽性対照: LD_WATCH_ADDR=15eac98 (System.InitCount)
+```
