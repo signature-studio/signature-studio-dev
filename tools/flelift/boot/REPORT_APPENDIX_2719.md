@@ -14,7 +14,7 @@
 
 ## 1. 測定条件
 
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`/opt/emsdk` 既存。4 core・RAM 15.6GB。
+- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。`[EMSDK]` (`docs/REFERENCES.md` §4) は既存。4 core・RAM 15.6GB。
 - 実行: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FLE_BOOT_RUNS="tol tol2" FLE_EXTRA_ROOTS=0x6a7b70,0x1375990 bash tools/flelift/boot/fle6_measure.sh` (lift → clang 8 shard → link → boot)。既定経路は `FLE_BOOT_RUNS=default FLE_EXTRA_ROOTS=`。
 - 寛容 mode 1 = `FLE_IPP=1` + `FLE_TOLERANT=1`、mode 2 = `FLE_IPP=1` + `FLE_TOLERANT=2`。shim 有は #3062 の shim 行 (209 / 2,314 / 1,199) と同じ条件。
 
