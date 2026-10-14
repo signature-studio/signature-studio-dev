@@ -7,6 +7,9 @@
 #                 直近 3 件が機械的な類型のみ・繰り返し無し・合計が天井未満なら次の窓へ進める (oc-fix-reset)。
 #                 それ以外は oc:stuck を付けて止め、PM agent 用の oc-pm-intent マーカーを残す。
 #                 結果は $GITHUB_OUTPUT に stop=true/false で出す (stop=true なら oc:stuck ラベルを付けて PR にコメントする)
+#                 ただし次の場合は agent を起動せず stop=true にするだけ (notice を残す。oc:stuck は付けない。#2601):
+#                 PR が open でない (merge・close 済み)、または差し戻しの元の review (pull_request_review の event) の commit が
+#                 現在の head と違う (古い head への差し戻し。その後に push された head の review が判定を担う)
 #   check         head が進んだか / 根拠コメントを投稿したかを判定し、result を $GITHUB_OUTPUT に出す
 #                   pushed   : head が進んだ (push が synchronize を起こし、review が再起動する)
 #                   answered : push せず PR にコメントした (review は起動しないので reopen で起こす)
@@ -72,8 +75,13 @@ DECIDE='
 
 case "${1:-}" in
   record)
+    pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
+    head_now="$(jq -r .head.sha <<< "$pr_json")"
+    pr_state="$(jq -r .state <<< "$pr_json")"
+    # 差し戻しの元になった review の commit (pull_request_review の event payload にだけある。repository_dispatch では空)
+    review_commit="$(jq -r '.review.commit_id // empty' "${GITHUB_EVENT_PATH:-/dev/null}" 2> /dev/null || true)"
     {
-      printf 'OC_HEAD_BEFORE=%s\n' "$(pr_head)"
+      printf 'OC_HEAD_BEFORE=%s\n' "$head_now"
       printf 'OC_START_TS=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     } >> "$GITHUB_ENV"
     # 上限ガード: ラベルが付いている PR は fix を起動しない。
@@ -82,6 +90,12 @@ case "${1:-}" in
     if gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name' | grep -qx "$STUCK_LABEL"; then
       stop=true
       echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
+    elif [ "$pr_state" != open ]; then
+      stop=true
+      echo "::notice::PR #$OC_PR_NUMBER is $pr_state (not open): the fix run is skipped"
+    elif [ -n "$review_commit" ] && [ "$review_commit" != "$head_now" ]; then
+      stop=true
+      echo "::notice::the CHANGES_REQUESTED review is for ${review_commit:0:7}, but the PR head is now ${head_now:0:7}: the fix run is skipped"
     else
       cm="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" | jq -s '[.[][]]')"
       rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \

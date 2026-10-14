@@ -8,7 +8,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS="$HERE/.."
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0
+export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 GITHUB_EVENT_PATH=/dev/null
 
 # fake gh: `gh api [--paginate] [-X M] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
 # `gh pr comment|close|reopen` と POST は $LOG に記録するだけ。
@@ -204,6 +204,40 @@ setup aaa '[{"name":"oc:stuck"}]' 0
 run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ラベル済みなら stop=true" $?
 ! logged 'pr comment'; expect "ラベル済みなら再コメントしない" $?
+
+echo "== fix-progress.sh record (merge 済み・古い head への差し戻しは agent を起動しない #2601)"
+# review_event <review の commit_id>: pull_request_review の event payload (差し戻しの元になった review) を書く
+review_event() { jq -nc --arg c "$1" '{action:"submitted",review:{state:"changes_requested",commit_id:$c}}' > "$TMP/event.json"; }
+setup aaa '[]' 1
+fx repos/o/r/pulls/7 '{"state":"closed","merged":true,"head":{"sha":"aaa"}}'
+review_event aaa
+GITHUB_EVENT_PATH="$TMP/event.json" run_fix record > "$TMP/rec.out"
+grep -qx 'stop=true' "$TMP/out"; expect "merge 済みの PR への差し戻し -> stop=true (agent を起動しない)" $?
+grep -q '^::notice::' "$TMP/rec.out"; expect "merge 済みの PR は notice を残す" $?
+! logged 'issues/7/labels' && ! logged 'pr comment'; expect "merge 済みの PR は oc:stuck も PR コメントも付けない" $?
+
+setup aaa '[]' 1
+fx repos/o/r/pulls/7 '{"state":"closed","merged":false,"head":{"sha":"aaa"}}'
+review_event aaa
+GITHUB_EVENT_PATH="$TMP/event.json" run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "close 済み (未 merge) の PR への差し戻し -> stop=true" $?
+
+setup aaa '[]' 1
+review_event aaa
+GITHUB_EVENT_PATH="$TMP/event.json" run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "ネガコン: open の PR で review の commit = head -> stop=false (agent を起動する)" $?
+
+setup aaa '[]' 1
+review_event old000
+GITHUB_EVENT_PATH="$TMP/event.json" run_fix record > "$TMP/rec.out"
+grep -qx 'stop=true' "$TMP/out"; expect "古い head (review=old000, head=aaa) への差し戻し -> stop=true" $?
+grep -q '^::notice::' "$TMP/rec.out"; expect "古い head への差し戻しは notice を残す" $?
+! logged 'issues/7/labels' && ! logged 'pr comment'; expect "古い head への差し戻しは oc:stuck も PR コメントも付けない" $?
+
+setup aaa '[]' 1
+jq -nc '{action:"oc-fix",client_payload:{pr:7,reason:"conflict"}}' > "$TMP/event.json"
+GITHUB_EVENT_PATH="$TMP/event.json" run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "repository_dispatch (競合の fix) は差し戻し review を持たないので古い head と見なさない -> stop=false" $?
 
 echo "== fix-progress.sh record (窓は直前の停止コメント以降の差し戻しを数える)"
 setup aaa '[]' 0

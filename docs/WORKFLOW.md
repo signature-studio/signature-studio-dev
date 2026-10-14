@@ -319,7 +319,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (Copilot の review は来ないことがあり、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
     review が担当するので検証は免除する。
-  - **fix**: run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
+  - **fix**: 起動前に `fix-progress.sh record` が、merge 済み・close 済み (未 merge) の PR と、差し戻しの元の review の commit が現在の head と違う (古い head への差し戻し) の場合は、agent を起動せず notice のみを残して終える (`stop=true`。`oc:stuck` は付けない。#2601)。agent を起動した後は、run の最後に `fix-progress.sh` が「head が進んだ (pushed)」「push せずコメントした (answered: close -> reopen で
     review を起動)」「どちらもしていない (none: 1 回再試行し、なお none なら job を失敗させる)」を判定する。
     判定・再試行・reopen・失敗の各 step は `!cancelled()` なので、agent step が失敗しても走る。run の cancel では走らない
     (step の timeout 後に走るかは未実測。merge 後の実 run で確認する)。
