@@ -66,7 +66,7 @@
 - 素材: `plugins-kilohearts` (Installer zip) → `extract_installer.sh` (KH_SRC 指定) で `work/winpkg/HeartCore.core_64`。Ghidra 12.1.4 = GitHub release `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 `ddac49f9…d2db` 一致)、JDK 21 (Temurin 21)、emsdk は `/opt/emsdk` (6.0.12)。`extract_installer.sh` は mac 側の `llvm-lipo` が無く末尾で失敗するが、win 側 (`HeartCore.core_64`) は抽出済み。
 - 変更 (`ghidra_route/` のみ): (1) `ghidra_shim.h` に `GetLastError`/`SetLastError` を `g_last_error` の状態変数で定義 (Win API の最終エラー値。wasm に OS 状態は無い)。(2) `ghidra_to_c.py`: `rcpps(dst, src)` の 2 引数形を生成する `RCPPS_HELPER` を追加。実機 (AMD Ryzen 9 9950X) の rcp 近似表 `snapins/scripts/approx_tables.b64` を読み、`gen_simd.py` の `kh_rcp_exact` と同一の指数則で 4 lane を計算する。`rcpps(` を含む出力のときだけ埋め込む。(3) `undefined1 in_XMM\d+ [16]` も `V128` に変換 (入力レジスタ宣言の型不一致を解消)。
 - Ghidra decompile (Resonator 17 関数): **17/17 OK** (`summary.tsv`, `analyzeHeadless` wall 24.6 s, n=1)。
-- **測定 commit**: `b856fd37` (コードを変えた最後の commit)。これ以降の HEAD のコード差分は次節で示す。
+- **測定 commit**: `b856fd37` (コードを変えた最後の commit)。以降の HEAD `5bbfa3d2` (docs と main 取り込みのみ) はコード差分 0 (`git diff b856fd37 HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` = 0 行)。回帰・emcc・突合は HEAD `5bbfa3d2` でも再実行して一致を確認済み (下記の数値)。
 - **rcpps の decompile 確認 (実測)**: `plugins-kilohearts` → Installer zip → payload.dat → windows.zip → `HeartCore.core_64` を手展開、Ghidra 12.1.4 (zip sha256 `ddac49f9…d2db` 一致)・JDK 21 で `DecompEach.java` (`0x180743390` と Resonator の callee 20 件・計 21 関数) を実行 → 21/21 OK (summary.tsv)。`0x180743390.c` (`FUN_180743390`) の `rcpps` 行 (`180743390.c:63`・前後 3 行):
   ```c
   auVar26._8_8_ = 0;
@@ -82,7 +82,8 @@
 - **converter の対応 (本 commit)**: `ghidra_to_c.py` は `auVarD = rcpps(in_XMMk, auVarS);` だけを `rcpps_w(&auVarD, auVarS);` に変換する (dst 書戻しを生成側で保証)。それ以外の `rcpps(` の出現は `SystemExit` で停止する。helper は `void rcpps_w(V128 *dst, V128 src)` で `*dst` に書く。実 decompile に対して `auVar30 = rcpps(...)` → `rcpps_w(&auVar30, auVar26)` の 1 件が変換された。
 - **rcpps 突合 (dst 書戻し後の値)**: `snapins/scripts/rcpps_helper_check.c` は `dst` を `0xA5` で埋めてから `rcpps_w(&d, s)` を呼び、書き戻された `d` を `_mm_rcp_ps` と比べる (書き戻しが無ければ不一致になる)。乱数 2,000,000 × 4 lane = **8,000,000 lane、不一致 0** (commit `b856fd37`、`./rcpps_helper_check`、0.14 s、seed 7、AMD EPYC 7763)。
 - **emcc (Resonator, 修復なし, `-ferror-limit=0`・`-Wno-error=` は build_cmp.sh と同じ, commit `b856fd37`)**: error **10 件** (`grep -c error:`)。`rcpps` 由来の診断は 0 件。残件: `param_1` 引数不足 3 (`resonator.c:513,565,566`)・引数数不一致 1 (`:528`, `FUN_180fbdef4(…,0,0)` 3 引数)・`func_0x…81e4`/`81ec` 各 1 (IAT thunk)・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1・`FUN_180fd4f30` 2。REPORT.md 10-7d 節 (件数は参照のみ) から本節を参照する。
-- **回帰 (commit `b856fd37`, `native_ref` 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`)**: Gain **1000/1000** bit-exact (wasm 15,161 B, emcc 0.8 s)・Haas **1000/1000** (16,878 B, 0.7 s)・Gate **1000/1000** (17,367 B, 0.7 s)。wasm サイズは §10-3 と一致。
+- **回帰 (`native_ref` 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, 測定 HEAD `5bbfa3d2`・emsdk 6.0.12 (`/opt/emsdk` は本 run に無く、`git clone emsdk` + `emsdk install 6.0.12` で導入))**: Gain **1000/1000** bit-exact (wasm 15,161 B, emcc 0.3 s)・Haas **1000/1000** (16,878 B, 0.3 s)・Gate **1000/1000** (17,367 B, 0.3 s)。wasm サイズは §10-3 と一致。
+- **測定時の負荷**: 測定 HEAD の実行時 load average 0.01〜0.22 (`uptime`)。
 - 生成 C の不変性: Gain/Haas/Gate は `6930d82d` の converter と `b856fd37` の converter で生成 C がバイト一致 (rcpps を含まないため)。
 - 件数表記: 残件の内訳と件数は**本節の 1 箇所**に置く (REPORT.md 10-7d・10-7f 等は参照のみ)。
 - 未実施: Resonator 全体の native 突合 (1000 trial)・ablation・ネガコン (emcc 未通過のため。残件 10 件)。残件は次の単位に分ける: (a) `param_1` 引数 ABI 推定 + 引数数不一致 (`FUN_180fbdef4`)、(b) IAT thunk (`81e4`/`81ec`) の stub 規則、(c) 未関数化 callee 閉包 (`FUN_180fd4f30`・`51cc`・`2d38`)。起票先 #1405 (子 issue 起票は PM 判断)。
