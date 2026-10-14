@@ -15,7 +15,8 @@
 #define GUI_HC_OUT     4096
 
 enum { GUI_HC_OPEN_URL = 1, GUI_HC_OPEN_FILE = 2, GUI_HC_SAVE_FILE = 3, GUI_HC_OPEN_HELP = 4 /* in = FL の Help パス (UTF-8, NUL 終端) → host の flHelp.shellExecute (#554) */,
-       GUI_HC_FETCH_FONT = 5 /* in = face 名 (UTF-8, NUL 終端) → host が取得・sha256 検証して wasm heap へ置き、out = ptr(u32 LE), size(u32 LE) (GUI-13 #615; gui_ft_wasm.c)。result 1 = ok / 0 = 無し・検証失敗 */ };
+       GUI_HC_FETCH_FONT = 5 /* in = face 名 (UTF-8, NUL 終端) → host が取得・sha256 検証して wasm heap へ置き、out = ptr(u32 LE), size(u32 LE) (GUI-13 #615; gui_ft_wasm.c)。result 1 = ok / 0 = 無し・検証失敗 */,
+       GUI_HC_FILE_CLOSED = 6 /* in = 書込み用に閉じた file の POSIX path (UTF-8, NUL 終端; stage 配下のみ送る)。host は保存待ちの先なら実体へ反映 (#958)。result 1 = 反映 / 0 = 対象外 */ };
 
 /* result: >0 成功 / 0 キャンセル・拒否 / <=-16 host 側エラー (gui_hostcall.ts HC_ERR)。ライブラリ側の失敗は gui_hostcall() の戻りで -1 (未接続) / -2 (timeout) / -3 (溢れ) */
 typedef struct {

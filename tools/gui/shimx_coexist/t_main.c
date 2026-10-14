@@ -147,8 +147,11 @@ static void test_dialog(void) {
   /* save */
   file[0] = 's'; file[1] = 0; ofn_init(&o, file, 260, ft, 64, g_filter, 0x00080000 | 2 /* OFN_OVERWRITEPROMPT */);
   CHK(gui_impl_GetSaveFileNameW((int64_t)(uintptr_t)&o) == 1 && weq(file, "C:\\Users\\webstudio\\Documents\\WebImport\\song.flp"), "GetSaveFileNameW");
-  { char path[600]; snprintf(path, sizeof path, "%s/song.flp", gui_stage_dir_posix()); FILE *fp = fopen(path, "wb"); CHK(fp != NULL, "stage 先へ書ける: %s", path);
-    if (fp) { fwrite("FLP-DATA", 1, 8, fp); fclose(fp); } printf("STAGE %s\n", gui_stage_dir_posix()); }
+  { /* FL の保存: 返された Win パスへ CreateFileW → WriteFile → CloseHandle。閉じた時点で host へ反映される (#958) */
+    DWORD nw = 0; HANDLE hf = CreateFileW(file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    CHK(hf != INVALID_HANDLE_VALUE, "save 先を CreateFileW で開ける");
+    if (hf != INVALID_HANDLE_VALUE) { CHK(WriteFile(hf, "FLP-DATA", 8, &nw, NULL) && nw == 8, "save へ書ける"); CloseHandle(hf); }
+    printf("STAGE %s\n", gui_stage_dir_posix()); }
   { OFN bad; memset(&bad, 0, sizeof bad); *(uint32_t *)bad.b = 20; CHK(gui_impl_GetOpenFileNameW((int64_t)(uintptr_t)&bad) == 0 && gui_impl_CommDlgExtendedError() == 1, "lStructSize 不正 → CDERR_STRUCTSIZE"); }
 }
 
@@ -249,7 +252,7 @@ int main(void) {
   setvbuf(stdout, NULL, _IONBF, 0);
   gui_headless_attach(800, 600);
   int att = gui_shimx_attach();
-  CHK(att == 7, "gui_shimx_attach bits=%d", att);
+  CHK(att == 15, "gui_shimx_attach bits=%d", att);
   test_char(); test_msgwait(); test_shell(); test_dialog(); test_drop(); test_idt();
   printf("RESULT pass=%d fail=%d\n", g_pass, g_fail);
   return g_fail ? 1 : 0;
