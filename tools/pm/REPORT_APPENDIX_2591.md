@@ -17,15 +17,15 @@
 
 ## 2. 測定
 
-- 測定 commit: `5c836bf9` (origin/main `ccdb03bc` を取り込んだ merge。`.github`・`infra/pm-worker` は main と同一)。
-- 環境: GitHub Actions の runner。測定時の load average `0.10 0.30 0.17`。
+- 測定 commit: `cd414208` (origin/main `588c0457` を取り込んだ merge。`.github` は origin/main と同一)。
+- 環境: GitHub Actions の runner。測定時の load average `0.02 0.19 0.16`。
 
 | 測定 | 結果 | 所要 |
 |---|---|---:|
 | `bash .github/scripts/tests/test-dispatch-context.sh` | 143 passed, 0 failed | 3.5 s |
 | ネガコン: pm.md から `<!-- oc-pm-decision: rule=skip reversible=yes -->` の行を削除 (測定用の detached worktree で行い、本 PR の作業ツリーは変えない) | 142 passed, 1 failed (FAIL: `pm.md: rule=skip for no target (R9 is not reused)`) | — |
 
-他のテスト (測定 commit `5c836bf9`):
+他のテスト (測定 commit `cd414208`):
 
 - `.github/scripts/tests/test-*.sh` の残り 7 本は rc 0: `no-pr-outcome` (18 passed)・`opencode-stdin` (rc 0)・`pr-lint` (pass=22 fail=0)・`pr-loop` (72 passed)・`run-outcome` (49 passed)・`watchdog` (116 passed)・`workflow-pm-job` (40 passed)。
 - `python3 -m unittest discover -s tools/pm -p 'test_*.py'`: `Ran 42 tests` で OK。
@@ -41,7 +41,7 @@
 | 3 | `/oc` を含む文字列を書かない・投稿前に件数を検査・言い換え | 達成 | pm.md 行 33〜36 (書いてはいけない操作)・行 146 (不変条件)・行 224〜225 (完了時) |
 | 4 | 質問の前に対象の closed・merge 済み・post-merge review を確かめる | 達成 | pm.md 行 132〜138 |
 | 5 | closed の issue から `needs-user-input` を外す | 達成 | pm.md 行 140〜141 |
-| 6 | marker 仕様・`infra/pm-worker/`・`.github/workflows/` は変えない | 達成 | `e6bff4e1` の変更は pm.md・テスト・WORKFLOW の 3 ファイルのみ。`git diff 870c381e~1 5c836bf9 -- infra/pm-worker .github/workflows` は 0 行 |
+| 6 | marker 仕様・`infra/pm-worker/`・`.github/workflows/` は変えない | 達成 | `git show --stat e6bff4e1` の変更は pm.md・テスト・WORKFLOW の 3 ファイルのみ (`infra/pm-worker/`・`.github/workflows/` は含まない)。`infra/pm-worker/` は後続の main (#2592) で変わったが、#2591 の変更ではない |
 | 7 | WORKFLOW §12 は pm.md を参照する範囲だけ | 達成 | `docs/WORKFLOW.md` 行 429〜436 |
 | 8 | `test-dispatch-context.sh` の pm.md 節が通る | 達成 | 143 passed, 0 failed (§2) |
 
@@ -49,7 +49,7 @@
 
 ## 4. 測定後のコード差分
 
-`git diff 5c836bf9 HEAD -- .github infra/pm-worker` の出力: 0 行。本付録を含む docs-only の commit は、この範囲の外だけを変える。
+`git diff cd414208 HEAD -- .github infra/pm-worker` の出力: 0 行。本付録を含む docs-only の commit は、この範囲の外だけを変える。
 
 ## 5. 未解決 (追跡のみ・子は起票しない: `docs/WORKFLOW.md` §3)
 
