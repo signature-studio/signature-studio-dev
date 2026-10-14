@@ -136,3 +136,11 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 1. 監視版を全 unit 実行で完走させる (`store_watch_1046.sh` を `timeout` の上限を延ばして実行。900 秒では不足)。
 2. 最後の `[aw]` 書込み (`val=0x100000003` 相当の store) の `site` を `sites.json` で IR 行に戻す。
 3. その store が D17 (qword → i32 縮退) か別類型かを判定する。
+
+## 13. 4 回目の再着手 run (HEAD `1017f349` = origin/main、コード変更なし)
+
+- 測定 commit: `1017f349` (コード差分 0)。素材: `work-m11`・`work-liftdiff` を `ws-1046` の `tools/m11/work/`・`tools/liftdiff/work/` に展開、`fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR`)。
+- 再現: `m11_gen_ir2.sh` rc 0 (50.5 s、490,733 行) → `m11_build.sh` rc 0 (24.4 s、wasm-ld signature mismatch 0・undefined 0) → `survey_units.mjs` rc 0 (13.2 s): `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1`。
+- 全 942 unit の監視版 (`store_watch_1046.sh`、`timeout 1500`): 上限で打ち切り (rc 124、25 分 21 秒)。`unit 106` で停止。`[aw]` 行は **0 件**。§12 の「unit 106 付近まで `[aw]` が記録された」とは一致しない (計装・素材の差が未切り分け)。
+- 打ち切り後、`work/obj/sw682.o`・`boot.o`・`ov.o` を消して `m11_build.sh` で再 build し、survey を再実行: `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` に戻ることを確認 (計装が残っていない)。`timeout` で殺された場合は `store_watch` の EXIT trap が走らないため、手動で復元が要る。
+- 結論: 書込み元 store は未特定。監視版の全 unit 完走には 25 分超が要り、1 run の上限内では完了しない。次回は unit 範囲を分けて (例: 0–105 / 106–941) 実行するか、`[aw]` に unit 境界を出す計装を入れる。受入 2・3・4 は未達のまま。
