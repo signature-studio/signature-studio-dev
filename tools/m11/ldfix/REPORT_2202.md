@@ -59,15 +59,36 @@ python3 audit_undefload_dest.py <fl-win64 extracted/block00031_PE.bin> out.json 
 
 結果 JSON: `results/audit_undefload_dest_2202_head.json` (HEAD)・`results/audit_undefload_dest_2202.json` (測定 commit)。
 
-## 測定 commit から HEAD までの差分
-
-`git diff d7998dca HEAD -- tools/m11/ldfix` (測定後の追加は本 REPORT と結果 JSON のみ):
+## 測定 commit から PR head までの差分 (`git diff --stat d7998dca 255d5a53 -- tools/m11/ldfix` の実出力)
 
 ```
- tools/m11/ldfix/REPORT_2202.md                     | 64 +++
- tools/m11/ldfix/results/audit_undefload_dest_2202.json | 190 +++
- tools/m11/ldfix/results/audit_undefload_dest_2202_head.json | 190 +++
+ tools/m11/ldfix/REPORT_2202.md                              |  73 ++++++++
+ tools/m11/ldfix/results/audit_undefload_dest_2202.json      | 190 +++++++++++++++++++++
+ tools/m11/ldfix/results/audit_undefload_dest_2202_head.json | 190 +++++++++++++++++++++
 ```
 
-`git diff d7998dca HEAD -- tools/m11/ldfix/audit_undefload_dest.py` の出力は 0 行 (コード差分なし)。
-したがって測定 commit の数値はそのまま HEAD の数値である。
+`d7998dca` → `255d5a53` では `audit_undefload_dest.py` の差分は 0 行で、表の数値はこの範囲のコードで測った値。
+
+## review 対応 (fix モード)
+
+PR head `255d5a53` の review (request-changes) への対応。**この節以降の変更で、測定 commit のコードは変わった。**
+新コードの 5 入力実測は未了 (下表)。
+
+| # | 指摘 | 対応 | 検証 |
+|---|---|---|---|
+| 1 | DEST_RIPREAD の詳細が JSON に無い | `main()` に `dest_riprip` (fn・file・detail) を追加。**JSON は未再生成** (入力 IR 無し、下記未解決) | `trace_dest` 単体で 69c381 → 69c378 `mov eax,[rip+0xf58576]` を再確認 (PE: `fl-win64` の `block00031_PE.bin`) |
+| 2 | `is_reg_rmw` が第 2 オペランドを追跡しない | RMW writer を飛ばす際、その第 2 オペランドの reg (`cl` は `rcx` に正規化) を `want` に加える | 合成機械語: `add eax,ecx` / `shl eax,cl` の源を RIP 読み `mov` まで辿れることを確認 |
+| 3 | `reads_dest` が `bt*`・`shld/shrd`・`xadd`・`cmpxchg` を落とす | 上記 mnemonic を `reads_dest` に追加 | 合成機械語: `bt eax,ecx` / `xadd eax,ecx` を consumer とした時、eax の元 `mov` を辿れることを確認 (修正前は REGLIVE) |
+| 4 | REPORT の stat が実物と不一致 | 上の実出力で置換 (64 → 73 / 190 / 190) | `git diff --stat` の実出力 |
+
+### 既存 18 件 (DEST_FRAME_IN_ESCAPED 15 / PTR_ESCAPED 3) の再判定
+
+既存 JSON の各 site について、detail の先頭 1 件 (consumer) を新コードで `trace_dest` し直した。
+writer は 18 件すべて旧と同一 (`fl-win64` の PE から disasm)。ただし見たのは detail の先頭 1 件だけで、
+残りの consumer や REGLIVE 側の変化は測っていない。
+
+### 未測定 (新コードで JSON を再生成していない)
+
+- 5 入力 (`boot{0..4}.norm0.ll`) の site 数・分類件数は **d7998dca の値のまま**。新規則 (指摘 2・3) が件数をどう変えるかは未測定。
+- 入力 IR が `$HOME/artifacts` (fl-win64 のみ) と `tools/m11/work/` に無く、`oc_artifacts: work-m11` も本 PR 本文に無いため再生成できない。
+- 次回 `oc_artifacts: fl-win64 work-m11` で再測定し、`dest_riprip` を含む JSON で REPORT の表を更新する (未解決の表を参照)。

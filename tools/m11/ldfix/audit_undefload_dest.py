@@ -45,9 +45,12 @@ def regs_of(cs, ids):
     return out
 
 
+READS_DEST_EXTRA = ('cmp', 'test', 'xchg', 'bswap', 'bt', 'bts', 'btr', 'btc', 'shld', 'shrd', 'xadd', 'cmpxchg')
+
+
 def reads_dest(mn):
     """第 1 オペランド (dest) を読む命令か。cvttsd2si rax,xmm0 等の純粋な def は false (旧 reads_of は dest を常に read 扱いしていた)。"""
-    return mn in RMW_REG_MN or mn in ('cmp', 'test', 'xchg', 'bswap') or mn.startswith('cmov')
+    return mn in RMW_REG_MN or mn in READS_DEST_EXTRA or mn.startswith('cmov')
 
 
 def reads_of(cs, ins):
@@ -71,7 +74,12 @@ def reads_of(cs, ins):
 
 def norm_reg64(name):
     from ldmach import _REG_ALIAS
+    if name in _LOW8_CL:
+        return _LOW8_CL[name]
     return _REG_ALIAS.get(name)
+
+
+_LOW8_CL = {'cl': 'rcx'}  # shl/shr/sar/rol/ror の可変シフト量。ldmach の _REG_ALIAS には無い (本監査内だけで補う)
 
 
 def mem_read_of(cs, ins):
@@ -116,6 +124,8 @@ def trace_dest(mach, va, addr, cs_ins):
             wr.add(norm_reg64(cs.reg_name(w.operands[0].reg)))
         if want & wr:
             if is_reg_rmw(cs, w):
+                # 途中経過は飛ばすが、その命令の第 2 オペランドレジスタ (add eax,ecx の ecx / shl eax,cl の cl) は値の元なので追跡に加える
+                want |= {norm_reg64(cs.reg_name(op.reg)) for op in w.operands[1:] if op.type == 1} - {None}
                 continue
             mo = mem_read_of(cs, w)
             return mo, w
@@ -199,7 +209,8 @@ def main():
         fns[s['cls']].add(s['fn'])
     res = dict(sites_total=len(sites), by_class=dict(tally), fns_by_class={k: len(v) for k, v in fns.items()},
                dest_frame_in_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_IN_ESCAPED'], key=lambda s: s['fn']),
-               dest_frame_ptr_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_PTR_ESCAPED'], key=lambda s: s['fn']))
+               dest_frame_ptr_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_PTR_ESCAPED'], key=lambda s: s['fn']),
+               dest_riprip=sorted([s for s in sites if s['cls'] == 'DEST_RIPREAD'], key=lambda s: s['fn']))
     json.dump(res, open(out, 'w'), indent=1)
     print('sites', len(sites), dict(tally), {k: len(v) for k, v in fns.items()})
 
