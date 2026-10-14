@@ -177,6 +177,15 @@ wd
 not_logged 'repos/o/r/dispatches' && not_logged 'add-label oc:stuck'
 expect "conflict PR without head.repo -> treated as fork, no dispatch" $?
 
+# 1i. fork からの差し戻し PR (FIX_IDLE) も dispatch しない (write 権限の run を第三者の入力で動かさない)。oc:stuck も付けず、一覧に出して次へ進む
+reset
+base "[$(pr 1 aaa111 false "$OLD" '[]' '' fork-user/signature-studio-dev),$(pr 2 bbb222 true "$OLD")]"
+detail 1 true "[$(review "$REVIEWER" aaa111 CHANGES_REQUESTED)]"
+detail 2 true
+wd
+not_logged 'repos/o/r/dispatches' && not_logged 'oc-dispatch' && not_logged 'add-label oc:stuck' && logged 'pr ready 2' && grep -q 'fork からの PR' "$TMP/out"
+expect "fork changes_requested PR -> no dispatch, no oc:stuck, listed and skipped" $?
+
 # 1d. マーカーを偽装した他アカウントのコメントは数えない
 reset
 base "[$(pr 1 aaa111 false "$OLD")]"

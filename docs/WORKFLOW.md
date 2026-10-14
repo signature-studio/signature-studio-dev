@@ -390,7 +390,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   | main と競合している | `repository_dispatch` (type `oc-fix`) で fix モードの実装 run を起動する。競合 PR は `pull_request`・`pull_request_review` でワークフローが起動せず、差し戻しでは動かせない (往復回数を消費するだけ)。dispatch は競合に左右されない。同じ head への dispatch は 3 回までで、超えたら `oc:stuck`。fork からの PR (`head.repo` が本リポジトリでない) は dispatch しない (write 権限の run を第三者の入力で動かさないため)。`oc:stuck` も付けず、一覧に出して人が判断する |
   | draft | ready にする |
   | 現在の head に verdict が無い | close -> reopen で review を再起動する |
-  | 差し戻し済みだが fix が動いていない | `repository_dispatch` (type `oc-fix`、理由 `changes-requested`) で fix モードの実装 run を起動する。差し戻しの再提出は使わない (approve 後に main が進んで merge できなくなった差し戻しは、review の run が作られない例が 2026-10-14 に 6 件あった)。同じ head への dispatch の上限は競合と同じ 3 回で、超えたら `oc:stuck` |
+  | 差し戻し済みだが fix が動いていない | `repository_dispatch` (type `oc-fix`、理由 `changes-requested`) で fix モードの実装 run を起動する。差し戻しの再提出は使わない (approve 後に main が進んで merge できなくなった差し戻しは、review の run が作られないことがあるため。経緯は #719)。同じ head への dispatch の上限は競合と同じ 3 回で、超えたら `oc:stuck`。fork からの PR (`head.repo` が本リポジトリでない) は dispatch しない (競合と同じく `oc:stuck` も付けず、一覧に出して人が判断する) |
   | approve 済みで未 merge | `gh pr merge --merge --match-head-commit <head>`。失敗したら `[merge-failed]` の request-changes |
 
   **repository_dispatch (oc-fix)**: 送れるのは `contents: write` を持つトークンだけ。payload は PR 番号 (数字のみ)・理由 (`conflict` / `changes-requested`)・
