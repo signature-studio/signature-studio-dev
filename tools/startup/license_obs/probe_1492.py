@@ -164,7 +164,8 @@ class Az:
         self.inprog = set()
         self.depth = 0
         self.lims = set()
-        self.unreach = set()
+        self.unreach = {}
+        self.stat = {'join_edges': 0, 'join_disagree': 0, 'join_new': 0}
 
     def fn(self, lo):
         if lo not in self.dis:
@@ -225,8 +226,15 @@ class Az:
             for x in ins[s:e]:
                 transfer(st, x, None, self)
             for t in succ[b]:
-                new = join(st_in.get(t), st)
-                if new != st_in.get(t):
+                pre = st_in.get(t)
+                new = join(pre, st)
+                if pre is not None:
+                    self.stat['join_edges'] += 1
+                    if st != pre:
+                        self.stat['join_disagree'] += 1
+                    if new != pre and new != st:
+                        self.stat['join_new'] += 1
+                if new != pre:
                     st_in[t] = new
                     work.append(t)
         return ins, bl, st_in
@@ -237,7 +245,7 @@ class Az:
         rax = EMPTY
         for b, (s, e) in enumerate(bl):
             if b not in st_in:
-                self.unreach.add((lo, s))
+                self.unreach[(lo, s)] = e - s
                 continue
             st = copy_state(st_in[b])
             loc = []
@@ -312,8 +320,11 @@ def main(use_slot, use_callee):
     roots = [lo for lo in az.hi if az.has_gs(lo)]
     new_keys, new_direct, new_via, fns = {}, set(), set(), {}
     untr = {}
+    rec_roots = 0
     for lo in roots:
         evs, _ = az.analyze(lo, {})
+        if any(e['ev'] == 'untraced' and e['why'] == 'recursive' for e in evs):
+            rec_roots += 1
         for e in evs:
             if e['ev'] == 'untraced':
                 untr[e['why']] = untr.get(e['why'], 0) + 1
@@ -345,6 +356,10 @@ def main(use_slot, use_callee):
         'lin_not_in_cfg': len(only_lin),
         'cfg_not_in_lin': len(only_new),
         'unreachable_blocks': len(az.unreach),
+        'unreachable_insns': sum(az.unreach.values()),
+        'join': dict(az.stat),
+        'callee_tagged_pairs': sum(1 for (_, ent) in az.memo if ent),
+        'roots_reaching_recursive': rec_roots,
         'limits': {w: sum(1 for why, _ in az.lims if why == w) for w in sorted({w for w, _ in az.lims})},
         'untraced_events': untr,
         'elapsed_s': round(t_new, 2),

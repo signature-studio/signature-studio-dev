@@ -18,6 +18,14 @@
   "lin_not_in_cfg": 0,
   "cfg_not_in_lin": 0,
   "unreachable_blocks": 234,
+  "unreachable_insns": 1436,
+  "join": {
+   "join_edges": 25336,
+   "join_disagree": 3735,
+   "join_new": 61
+  },
+  "callee_tagged_pairs": 77,
+  "roots_reaching_recursive": 59,
   "limits": {
    "indirect-call": 10431
   },
@@ -25,8 +33,8 @@
    "indirect-call-with-tag": 899,
    "recursive": 597
   },
-  "elapsed_s": 15.97,
-  "elapsed_total_s": 17.22
+  "elapsed_s": 15.81,
+  "elapsed_total_s": 17.03
  },
  "only_linear": [],
  "only_cfg": [],
