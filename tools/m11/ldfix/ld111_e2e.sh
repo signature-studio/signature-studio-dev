@@ -3,6 +3,7 @@
 #   work/{boot_final.ll, boot_final3.ll, boot*.drc.config.json, m11_image.bin} だけで走る。
 #   1/4 既存判定への影響: 統合前 (BASE の audit_lsf.py) と統合後 (--no-disp) の出力が byte 一致、既定 (変位形あり) は既存 3 行が一致
 #   2/4 変位形 SUSPECT_DISP_VAS: 文字列転送 (movs) の列挙あり / なし (--no-strmov = #2316 時点) × boot_final.ll / boot_final3.ll
+#   2b/4 fix_ld108.py (#2316 の検証用パッチ) 適用後の boot_final.ll の全関数監査 (既存判定と変位形)
 #   3/4 残 SUSPECT 3 件 (6677a0 / d237e0 / de1da0) と 41a670 を機械語から突合 (triage_ld111.py。audit とは別算法)
 #   4/4 ネガティブコントロール (NC1〜NC5。1 件ずつ壊して判定が動くことを示す)
 # 使い方: bash tools/m11/ldfix/ld111_e2e.sh      環境変数: M11_WORK (既定 tools/m11/work) / PY (capstone+pefile 入り python)
@@ -61,6 +62,12 @@ print('[$ir ${opt:-既定}] disp_mach_fns=%d suspect_disp_fns=%d / %s' % (j['dis
   done
 done
 
+step "2b/4 修復後 IR (fix_ld108.py = #2316 の検証用パッチを boot_final.ll に適用) の全関数監査: 既存判定と変位形"
+"$PY" "$HERE/fix_ld108.py" "$W/boot_final.ll" "$OUT/boot_final.fix108.ll" > /dev/null || exit 1
+"$PY" "$HERE/audit_lsf.py" "$OUT/boot_final.fix108.ll" "$IMG" "$CFG" > "$OUT/fix108.new.txt"
+echo "[boot_final+fix_ld108] $(grep '^SUSPECT_VAS' "$OUT/fix108.new.txt" | cut -c1-80) / SUSPECT_USE_VAS $(grep '^SUSPECT_USE_VAS' "$OUT/fix108.new.txt" | awk '{print NF-1}') 関数 (41a670 を含む: $(grep '^SUSPECT_USE_VAS' "$OUT/fix108.new.txt" | grep -c ' 41a670')) / $(grep '^SUSPECT_DISP_VAS' "$OUT/fix108.new.txt")"
+"$PY" "$HERE/audit_lsf.py" "$OUT/boot_final.fix108.ll" "$IMG" "$CFG" --no-strmov | grep '^SUSPECT_DISP_VAS' | sed 's/^/[boot_final+fix_ld108 --no-strmov] /'
+
 step "3/4 機械語との突合 (VA:argN:c)。LSF = 列挙漏れ (誤検出) / READ・NONE = wrong-value"
 "$PY" "$HERE/triage_ld111.py" "$IMG" "$CFG" 41a670:1:8 6677a0:2:36 d237e0:2:36 de1da0:1:244
 
@@ -88,18 +95,8 @@ assert n == 1, n
 open(sys.argv[2], 'w').write(t[:m.start()] + b2 + t[e:])
 EOF
 nc "$OUT/nc3.ll"
-echo "[NC4] 41a670 の head 解除 store を [arg1+0] の load にした IR   期待: 検出なし"
-"$PY" - "$W/boot_final.ll" "$OUT/nc4.ll" <<'EOF'
-import re, sys
-t = open(sys.argv[1], errors='replace').read()
-m = re.search(r'^define [^@]*@function_41a670\(', t, re.M); e = t.index('\n}', m.end())
-b = t[m.start():e]
-st = 'store i64 %2, ptr inttoptr (i64 16404608 to ptr), align 8'
-assert b.count(st) == 1
-b2 = b.replace(st, '%nc4p = inttoptr i64 %arg1 to ptr\n  %nc4v = load i64, ptr %nc4p, align 8\n  store i64 %nc4v, ptr inttoptr (i64 16404608 to ptr), align 8')
-open(sys.argv[2], 'w').write(t[:m.start()] + b2 + t[e:])
-EOF
-nc "$OUT/nc4.ll"
+echo "[NC4] 41a670 を fix_ld108.py で修復した IR (head 解除 store = [arg1+0] の load)   期待: 検出なし"
+nc "$OUT/boot_final.fix108.ll"
 echo "[NC5] 41a670 の machine code の arg1 zero-disp load 2 site (41a69c..41a6aa と 41a6d3..41a6d6) を nop   期待: 検出なし (IR だけでは判定しない)"
 "$PY" - "$IMG" "$OUT/nc5.bin" <<'EOF'
 import sys
