@@ -22,11 +22,14 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
   - Delphi 形 jump table: `lea rB,[rip+d]` / `mov rB,imm` + `jmp [rB+idx*scale+disp]` (8B 絶対 VA 表,
     index は前後両方向へ解決) と MSVC 形 (4B RVA 表 + add) の両方
   - lift 時の Python 例外 (AttributeError 等) を unsup に記録して継続 (CRASH-XXX として計上)
+  - VEX.128 (xmm) を legacy SSE handler へ落とす (vex_leg: 3-op は d=s1 コピー後に legacy (d,s2)、上位 YL を 0 化)、
+    VEX FMA (vfmadd/fmsub/fnmadd/fnmsub × 132/213/231 × sd/ss)、vinsertf128・vmovntdq (ymm)、rcr、int (fail-fast)、
+    movsldup/movshdup/cmpXXps (KH-38 #3065。before 160 closure の unsup 285 site → 0。差分テスト tests/x64c_vex_diff.py)
   - dispatch に IAT pseudo-VA 経路を追加: data 側で IAT slot に IMP_VA_BASE+idx を敷設し,
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
 usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME]
-               [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000]
+               [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000] [--cfg-rax]
 """
 import sys, json, struct, argparse, bisect, collections, os, shutil, contextlib
 import pefile
@@ -89,6 +92,12 @@ class PEInfo:
             for imp in ent.imports:
                 nm = imp.name.decode() if imp.name else 'ord%d' % imp.ordinal
                 self.iat[imp.address] = nm
+        # MSVC CFG: call/jmp [GuardCFDispatchFunctionPointer] の先は jmp rax の thunk で、宛先は rax に入っている
+        self.cfg_slots = set()
+        lc = getattr(pe, 'DIRECTORY_ENTRY_LOAD_CONFIG', None)
+        if lc is not None and getattr(lc.struct, 'GuardCFDispatchFunctionPointer', 0):
+            self.cfg_slots.add(lc.struct.GuardCFDispatchFunctionPointer)
+        self.cfg_rax = False
         self.pdata = []
         for s in pe.sections:
             if s.Name.startswith(b'.pdata'):
@@ -489,6 +498,10 @@ class FnLift:
             return L('if (CC_%s) goto %s;' % (cc, self.label(t)))
         if m.startswith('cmp') and m.endswith(('ss', 'sd')) and m not in ('cmpss', 'cmpsd'):
             return self.cmpfp(ins, ops, m)
+        if m.startswith('vf') and m[-2:] in ('sd', 'ss') and len(ops) == 3:
+            return self.vfma_dispatch(ins, ops, m)
+        if m.startswith('v'):
+            return self.vex_leg(ins, ops, m)
         raise Unsup(m)
 
     def locked(self, ins, m2):
@@ -786,6 +799,8 @@ class FnLift:
             slot = ins.address + ins.size + op.mem.disp
             if slot in self.pe.iat:
                 return self.L('imp_%s(); return;' % self.pe.iat[slot])
+            if self.pe.cfg_rax and slot in self.pe.cfg_slots:
+                return self.L('ott_dispatch(R[RAX]); return;')
         # 間接 tail jmp (CFG dispatch / longjmp 形 / IAT 経由等): target を値として dispatch
         return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, 8))
 
@@ -812,6 +827,8 @@ class FnLift:
             slot = ins.address + ins.size + op.mem.disp
             if slot in self.pe.iat:
                 return self.L(self.call_stmt(ins, 'imp_%s();' % self.pe.iat[slot]))
+            if self.pe.cfg_rax and slot in self.pe.cfg_slots:
+                return self.L(self.call_stmt(ins, 'ott_dispatch(R[RAX]);'))
         self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, 8) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
 
     def i_ret(self, ins, ops):
@@ -950,6 +967,121 @@ class FnLift:
 
     def i_vzeroupper(self, ins, ops):
         self.L('for (int k_ = 0; k_ < 16; k_++) memset(&YL[k_], 0, 16);')
+
+    i_vmovntdq = i_movntdq = i_movntps = i_vmovntps
+
+    def i_vinsertf128(self, ins, ops):
+        d, s1, s2, im = ops
+        di = self.xd(ins, d); a = self.xd(ins, s1); k = im.imm & 1
+        src = self.xs(ins, s2, 'x128')
+        if k:
+            self.L('{ X128 lo_ = X[%d]; X128 t_ = %s; X[%d] = lo_; YL[%d] = t_; }' % (a, src, di, di))
+        else:
+            self.L('{ X128 t_ = %s; X128 hi_ = YL[%d]; X[%d] = t_; YL[%d] = hi_; }' % (src, a, di, di))
+
+    # VEX.128 → legacy SSE handler (値 = (legacy 名, 可換か))。3-op (d, s1, s2|imm) は d=s1 を
+    # コピーして legacy (d, s2) を適用する。VEX2 は 2-op (+imm)。VEXF は flags のみ更新 (上位は触らない)。
+    VEX3 = {'vaddsd': ('addsd', True), 'vsubsd': ('subsd', False), 'vmulsd': ('mulsd', True), 'vdivsd': ('divsd', False),
+            'vaddss': ('addss', True), 'vsubss': ('subss', False), 'vmulss': ('mulss', True), 'vdivss': ('divss', False),
+            'vaddpd': ('addpd', True), 'vmulpd': ('mulpd', True),
+            'vpxor': ('pxor', True), 'vpand': ('pand', True), 'vpor': ('por', True),
+            'vxorpd': ('xorpd', True), 'vorpd': ('orpd', True), 'vandpd': ('andpd', True), 'vorps': ('orps', True),
+            'vpaddq': ('paddq', True), 'vpaddd': ('paddd', True), 'vpsubq': ('psubq', False), 'vpsubd': ('psubd', False),
+            'vunpcklpd': ('unpcklpd', False), 'vpunpckldq': ('punpckldq', False),
+            'vpsrlq': ('psrlq', False), 'vpsllq': ('psllq', False), 'vpsrad': ('psrad', False),
+            'vmovsd': ('movsd', False), 'vmovss': ('movss', False),
+            'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False)}
+    VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
+            'vcvtpd2dq': 'cvtpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
+    VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
+
+    def vex_leg(self, ins, ops, m):
+        if any(o.type == X86_OP_REG and self.isymm(ins, o.reg) for o in ops):
+            raise Unsup('ymm ' + m)
+        if m in self.VEX3:
+            leg, comm = self.VEX3[m]
+            if len(ops) == 3:
+                return self.vex3(ins, ops, leg, comm)
+            return self.vex2(ins, ops, leg, True)
+        if m in self.VEX2:
+            return self.vex2(ins, ops, self.VEX2[m], True)
+        if m in self.VEXF:
+            return self.vex2(ins, ops, self.VEXF[m], False)
+        raise Unsup(m)
+
+    def vex2(self, ins, ops, leg, zero):
+        getattr(self, 'i_' + leg)(ins, list(ops))
+        if zero and self.isx(ins, ops[0]):
+            self.L('memset(&YL[%d], 0, 16);' % self.xd(ins, ops[0]))
+
+    def vex3(self, ins, ops, leg, comm):
+        d, s1, s2 = ops[0], ops[1], ops[2]
+        if not self.isx(ins, s1):
+            raise Unsup('vex s1 ' + ins.mnemonic)
+        di = self.xd(ins, d)
+        if self.isx(ins, s2) and self.xd(ins, s2) == di and self.xd(ins, s1) != di:
+            if not comm:
+                raise Unsup('vex d==s2 ' + ins.mnemonic)
+            getattr(self, 'i_' + leg)(ins, [d, s1])
+            if leg[-2:] in ('sd', 'ss'):
+                w = 8 if leg[-2:] == 'sd' else 4
+                self.L('memcpy((uint8_t*)&X[%d] + %d, (uint8_t*)&X[%d] + %d, %d);' % (di, w, self.xd(ins, s1), w, 16 - w))
+            self.L('memset(&YL[%d], 0, 16);' % di)
+            return
+        if self.xd(ins, s1) != di:
+            self.L('X[%d] = X[%d];' % (di, self.xd(ins, s1)))
+        getattr(self, 'i_' + leg)(ins, [d, s2])
+        self.L('memset(&YL[%d], 0, 16);' % di)
+
+    FMA_BASE = ('fmadd', 'fmsub', 'fnmadd', 'fnmsub')
+
+    def vfma_dispatch(self, ins, ops, m):
+        if any(o.type == X86_OP_REG and self.isymm(ins, o.reg) for o in ops) or not self.isx(ins, ops[1]):
+            raise Unsup('ymm ' + m)
+        base = m[1:-2]
+        for b in self.FMA_BASE:
+            if base.startswith(b) and base[len(b):] in ('132', '213', '231'):
+                return self.vfma(ins, ops, b, base[len(b):], 'f32' if m.endswith('ss') else 'f64')
+        raise Unsup(m)
+
+    def vfma(self, ins, ops, base, form, ty):
+        """vfmadd/fmsub/fnmadd/fnmsub (132/213/231)。d = fma(x, y, z) の 1 回丸め (OTT の ott_fma_d/s と同式)。
+        132: d*s2 + s1 / 213: s1*d + s2 / 231: s1*s2 + d (Intel 規約)。"""
+        di = self.xd(ins, ops[0])
+        f = 'f' if ty == 'f32' else 'df'
+        T = 'float' if ty == 'f32' else 'double'
+        FM = 'ott_fma_s' if ty == 'f32' else 'ott_fma_d'
+        c_old = 'X[%d].%s[0]' % (di, f)
+        p1 = self.xs(ins, ops[1], ty)
+        p2 = self.xs(ins, ops[2], ty)
+        if form == '132': x, y, z = c_old, p2, p1
+        elif form == '213': x, y, z = p1, c_old, p2
+        else: x, y, z = p1, p2, c_old
+        sx = '-(%s)' % x if base in ('fnmadd', 'fnmsub') else x
+        sz = '-(%s)' % z if base in ('fmsub', 'fnmsub') else z
+        self.L('{ %s r_ = %s(%s, %s, %s); X[%d].%s[0] = r_; memset(&YL[%d], 0, 16); }' % (T, FM, sx, y, sz, di, f, di))
+
+    def dup_lanes(self, ins, ops, a, b):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; X[%d].d[0] = X[%d].d[1] = b_.d[%d]; X[%d].d[2] = X[%d].d[3] = b_.d[%d]; }' % (
+            self.xs(ins, ops[1], 'x128'), di, di, a, di, di, b))
+
+    def i_movsldup(self, ins, ops): self.dup_lanes(ins, ops, 0, 2)
+    def i_movshdup(self, ins, ops): self.dup_lanes(ins, ops, 1, 3)
+
+    def cmpps_pred(self, ins, ops, p):
+        di = self.xd(ins, ops[0])
+        self.L('{ X128 b_ = %s; for (int k_ = 0; k_ < 4; k_++) X[%d].d[k_] = cmp_pred_f(%d, X[%d].f[k_], b_.f[k_]) ? 0xffffffffU : 0U; }' % (
+            self.xs(ins, ops[1], 'x128'), di, p, di))
+
+    def i_cmpeqps(self, ins, ops): self.cmpps_pred(ins, ops, 0)
+    def i_cmpltps(self, ins, ops): self.cmpps_pred(ins, ops, 1)
+    def i_cmpleps(self, ins, ops): self.cmpps_pred(ins, ops, 2)
+    def i_cmpunordps(self, ins, ops): self.cmpps_pred(ins, ops, 3)
+    def i_cmpneqps(self, ins, ops): self.cmpps_pred(ins, ops, 4)
+    def i_cmpnltps(self, ins, ops): self.cmpps_pred(ins, ops, 5)
+    def i_cmpnleps(self, ins, ops): self.cmpps_pred(ins, ops, 6)
+    def i_cmpordps(self, ins, ops): self.cmpps_pred(ins, ops, 7)
 
     def i_movlpd(self, ins, ops):
         d, s = ops
@@ -1531,6 +1663,24 @@ class FnLift:
     def i_fninit(self, ins, ops): self.L('x87_cw = 0x037f; x87_sw = 0;')
     def i_emms(self, ins, ops): pass
 
+    def i_rcr(self, ins, ops):
+        """rcr: CF を含む (W+1)bit 環を右回転。count は &0x1F (64bit は &0x3F)、8/16bit は続けて MOD 9/17。
+        マスク後の count が 0 なら flags は不変、それ以外は CF と OF (= MSB ^ MSB-1) だけ更新 (実機 rcr と照合済み: tests/rcr_native_check.py)。
+        32bit の書き込みは count 0 でも上位をゼロ拡張する (実機。同ファイルの照合で 64bit レジスタ全体を比較)。"""
+        sz = ops[0].size; W = sz * 8; T = 'uint%d_t' % W
+        cnt = self.rd(ins, ops[1], 1) if len(ops) > 1 else '1'
+        cm = 63 if sz == 8 else 31
+        n = '(c_ %% %d)' % (W + 1) if sz < 4 else 'c_'
+        self.L('{ %s a_ = %s; %s r_ = a_; unsigned c_ = (unsigned)(%s) & %d; '
+               'if (c_) { unsigned __int128 v_ = ((unsigned __int128)fCF << %d) | a_; unsigned n_ = %s; '
+               'while (n_--) v_ = (v_ >> 1) | ((v_ & 1) << %d); '
+               'fCF = (uint8_t)((v_ >> %d) & 1); r_ = (%s)v_; fOF = ((r_ >> %d) ^ (r_ >> %d)) & 1; } %s }' % (
+                   T, self.rd(ins, ops[0], sz), T, cnt, cm, W, n, W, W, T, W - 1, W - 2, self.wr(ins, ops[0], 'r_', sz)))
+
+    def i_int(self, ins, ops):
+        # int 0x29 = __fastfail (CRT 異常終了経路) — guest では fail-fast が同じ意味 (OTT と同じ扱い)
+        self.L('ott_unsup(%s, "int 0x%x (fail-fast)");' % (hx(ins.address), ops[0].imm if ops else 0))
+
 
 def main():
     global IMG, SHIFT, IMG_SIZE
@@ -1544,11 +1694,13 @@ def main():
     ap.add_argument('--shift', type=lambda x: int(x, 0), default=0)
     ap.add_argument('--img-size', type=lambda x: int(x, 0), default=0x18c0000)
     ap.add_argument('--impbase', type=lambda x: int(x, 0), default=0x1D80000, help='IAT slot に敷設する pseudo-VA 基準 (dispatch が imp 呼出に解決)')
+    ap.add_argument('--cfg-rax', action='store_true', help='MSVC CFG の call/jmp [GuardCFDispatch] の宛先を rax から取る (既定 OFF = 従来どおり LD64(slot) を dispatch)')
     ap.add_argument('--shards', type=int, default=1, help='N>1 で fle_lifted.c を fle_lifted_s<k>.c (k<N) の N 本に分ける (関数は i%%N、ott_dispatch・weak imp・imp_tab は shard 0 のみ。1 は従来の単一ファイル)')
     a = ap.parse_args()
     IMG = a.img; SHIFT = a.shift; IMG_SIZE = a.img_size
     overrides = {int(x.split('=')[0], 16): x.split('=')[1] for x in a.override}
     pe = PEInfo(a.pe)
+    pe.cfg_rax = a.cfg_rax
     cfg = json.load(open(a.entries))
     entries = set(IMG + r for r in cfg.get('calltgt', [])) | set(cfg.get('roots', []))
     md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True

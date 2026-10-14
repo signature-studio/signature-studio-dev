@@ -22,6 +22,7 @@ export function createMockEngine() {
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
     uiClosing: false, uiTimeDispMin: false, uiStartOnInput: false, uiLoopRec: false, uiStepEdit: false, uiBrowserAutoHide: false, uiSnapMode: 0,
+    selStart: -1, selEnd: -1,
     arrTime: 0,
     numerator: 4, denominator: 4, undoHistoryPos: 0, undoHistoryCount: 0, undoHistoryLast: 0,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
@@ -219,6 +220,12 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-96 (#2832): 選択範囲の読出し 4 件。PE 0xd786e0/0xd78700/0xd78500 は obj+0xd74 (start)・obj+0xd78 (end) を読み、
+    // 0xd78720 は 0xe43e80 (start>=0 かつ end>=0) を bool で返す。未選択は負値。初期値 -1 は未実測の仮置き (provider/fl_engine.c と同じ)
+    "arrangement.selectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionEnd": (...a) => { arity(a, 0, 0); return st.selEnd; },
+    "arrangement.liveSelectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionIsActive": (...a) => { arity(a, 0, 0); return st.selStart >= 0 && st.selEnd >= 0; },
     // PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i')。個数は fl_table (必須 2) に合わせた暫定で、jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。
     // 選択・マーカーの 5 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
