@@ -20,7 +20,7 @@
 
 typedef struct { char name[NAME], plugin[NAME]; double vol, pan; int mute, solo, sel, fx; int64_t color; uint8_t steps[NSTEP]; } Chan;
 typedef struct { char name[NAME]; double vol, pan; int mute, solo, sel; int64_t color; char slots[NSLOT][NAME]; int act[NMIX]; double lvl[NMIX]; } Mix;
-typedef struct { char name[NAME]; int64_t color; } Pl;
+typedef struct { char name[NAME]; int64_t color; uint8_t lock; double act; int loop, trig_mode, pos_snap, trig_snap; } Pl;
 
 static Chan ch[NCH_MAX];
 static int nch;
@@ -57,7 +57,7 @@ void fl_engine_reset(void) {
         mx[i].vol = 0.8; mx[i].color = 0x5A6B7C; mx[i].sel = (i == 0);
         if (i) { mx[i].act[0] = 1; mx[i].lvl[0] = 1.0; }
     }
-    for (int i = 0; i < NPL; i++) { snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
+    for (int i = 0; i < NPL; i++) { memset(&pl[i], 0, sizeof pl[i]); snprintf(pl[i].name, NAME, "Track %d", i + 1); pl[i].color = 0x485156; }
     memset(win, 0, sizeof win);
     win[0] = win[2] = win[4] = 1;
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
@@ -199,6 +199,18 @@ FL_H(playlist, getTrackName) {
 }
 FL_H(playlist, setTrackName) { PL(0); const char *s = A_STR(1); set_name(p->name, s); return fl_ret_none(c); }
 FL_H(playlist, setTrackColor) { PL(0); p->color = A_INT(1, 0); return fl_ret_none(c); }
+/* PY-62 (#2027): REPORT_PY61 §2 で型・範囲 code (index 1..500 外は -4) を確定した 8 関数。
+ * 既定値 (lock 0・act 0・各 live mode 0) は実機未測定の仮置き。getTrackColor は格納 byte 順が未確定の setTrackColor と違う (REPORT_PY62) */
+FL_H(playlist, getTrackColor) { PL(0); uint32_t u = (uint32_t)p->color; return fl_ret_i(c, (int64_t)(((u & 0xff) << 16) | (u & 0xff00) | ((u >> 16) & 0xff) | 0xff000000u)); }
+FL_H(playlist, isTrackMuteLock) { PL(0); return fl_ret_b(c, p->lock != 0); }
+FL_H(playlist, getTrackActivityLevelVis) { PL(0); return fl_ret_d(c, p->act); }
+FL_H(playlist, getLiveLoopMode) { PL(0); return fl_ret_i(c, p->loop); }
+FL_H(playlist, getLiveTriggerMode) { PL(0); return fl_ret_i(c, p->trig_mode); }
+FL_H(playlist, getLivePosSnap) { PL(0); return fl_ret_i(c, p->pos_snap); }
+FL_H(playlist, getLiveTrigSnap) { PL(0); return fl_ret_i(c, p->trig_snap); }
+/* 表 (gen/fl_table.c) の引数数は 1 (sig)。binary の value 引数 ('i|i'・REPORT_PY61 §3) は表に無く dispatch が 2 個目を拒否するため、
+ * 到達するのは value=-1 (反転) の経路だけ。準備判定 (-2) は未モデル (常に準備済み) */
+FL_H(playlist, muteTrackLock) { PL(0); p->lock = !p->lock; return fl_ret_none(c); }
 #define WN(a) int64_t _w = A_INT((a), 0); if (_w < 0 || _w >= NWIN) RANGE()
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }

@@ -24,7 +24,7 @@ export function createMockEngine() {
       name: i === 0 ? "Master" : i === 125 ? "Current" : `Insert ${i}`, vol: 0.8, pan: 0, mute: false, solo: false,
       color: 0x5A6B7C, sel: i === 0, slots: [], routes: i === 0 ? {} : { 0: 1.0 },
     })),
-    playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156 })),
+    playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156, lock: 0, act: 0, loop: 0, trigMode: 0, posSnap: 0, trigSnap: 0 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
@@ -145,6 +145,16 @@ export function createMockEngine() {
     "playlist.getTrackName": (i) => { i = ix(i); return st.playlist[i - 1]?.name ?? ""; }, // 範囲外は空文字 (C と同じ)
     "playlist.setTrackName": (i, n) => { pl(i).name = str(n); },
     "playlist.setTrackColor": (i, c) => { pl(i).color = c; },
+    // PY-62 (#2027): REPORT_PY61 §2 で確定した 8 関数 (C provider と同一)。既定値は 0 の仮置き。引数検査は C の dispatch と同じ順 (型 → 範囲)
+    "playlist.getTrackColor": (...a) => { arity(a, 1, 1); const u = pl(a[0]).color >>> 0; return (((u & 0xff) << 16) | (u & 0xff00) | ((u >>> 16) & 0xff) | 0xff000000) >>> 0; },
+    "playlist.isTrackMuteLock": (...a) => { arity(a, 1, 1); return !!pl(a[0]).lock; },
+    "playlist.getTrackActivityLevelVis": (...a) => { arity(a, 1, 1); return F(pl(a[0]).act); },
+    "playlist.getLiveLoopMode": (...a) => { arity(a, 1, 1); return pl(a[0]).loop; },
+    "playlist.getLiveTriggerMode": (...a) => { arity(a, 1, 1); return pl(a[0]).trigMode; },
+    "playlist.getLivePosSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).posSnap; },
+    "playlist.getLiveTrigSnap": (...a) => { arity(a, 1, 1); return pl(a[0]).trigSnap; },
+    // 表の引数数は 1 (C と同一・value 引数は表に無く 2 個目は code 5)。反転のみ。準備判定 (-2) は未モデル
+    "playlist.muteTrackLock": (...a) => { arity(a, 1, 1); const t = pl(a[0]); t.lock = t.lock ? 0 : 1; },
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
