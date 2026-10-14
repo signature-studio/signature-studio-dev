@@ -79,7 +79,8 @@ LPVOID HeapReAlloc(HEAP_HANDLE heap, DWORD flags, LPVOID p, SIZE_T bytes) {
 BOOL HeapFree(HEAP_HANDLE heap, DWORD flags, LPVOID p) {
     (void)heap; (void)flags;
     if (!p) return TRUE;
-    if (!blk_ok(p)) { SetLastError(ERROR_INVALID_FUNCTION); return FALSE; }
+    /* 割当てのない p (範囲外 / magic 不一致) は解放せず TRUE。tools/shim/src/heap.c と同じ応答 (native 参照 #2821 / #3049) */
+    if (!blk_ok(p)) { SetLastError(ERROR_SUCCESS); return TRUE; }
     Hdr16* h = (Hdr16*)raw_of(p);
     h->magic = HEAP_FREED;
     free(h);
