@@ -33,7 +33,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 ## oc-pm: PM agent を起こす終端状態の検出と送信 (#2333)
 
-PM の判断が要る終端状態を **決定的に** (ラベル・マーカー・正規表現だけ。LLM も本文の解析も使わない) 検出し、`repository_dispatch` の `oc-pm` を送る。入口側は `.github/scripts/prepare-event-context.sh` (#2327)。
+PM の判断が要る終端状態を **決定的に** (ラベル・マーカー・正規表現だけ。LLM は使わず、自由文は解析しない。番号の正規表現だけ読む: `src/refs.ts`) 検出し、`repository_dispatch` の `oc-pm` を送る。入口側は `.github/scripts/prepare-event-context.sh` (#2327)。
 
 | kind | 検出 (すべて open の対象。起票者は後述の絞り込みを通ったものだけ) |
 |---|---|

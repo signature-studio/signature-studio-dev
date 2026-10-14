@@ -37,8 +37,9 @@ test("ネガコン (a): 閉じキーワード (Closes / Fixes / Resolves) があ
     ["pull_request", merged(12, "Refs #102\n\nCloses #103")],
     ["pull_request", merged(13, "Refs #103\nFixes #104")],
     ["pull_request", merged(14, "Refs #102\nresolves: #105")],
+    ["pull_request", merged(15, "Refs #103\nCloses owner/repo#101")],
   ]);
-  assert.deepEqual(targets(ctx), []);
+  assert.deepEqual(targets(ctx), [], "同じリポジトリの番号を指す Closes owner/repo#N も閉じキーワード");
 });
 
 test("ネガコン (b): N が closed なら検出しない。merge されていない closed の PR や open の PR も対象外", async () => {
@@ -171,7 +172,13 @@ test("解析: Refs の番号は閉じキーワードの無い本文だけ。親�
   assert.deepEqual(refsOnlyNumbers("prefs #8 Refs #12345678"), []);
   assert.deepEqual(refsOnlyNumbers("Refs #5\nCloses #6"), []);
   assert.deepEqual(refsOnlyNumbers("closes #6 Refs #5"), []);
+  assert.deepEqual(refsOnlyNumbers("Closes owner/repo#6 Refs #5"), []);
+  assert.deepEqual(refsOnlyNumbers("Fixes owner/repo#6\nRefs #5"), []);
+  assert.deepEqual(refsOnlyNumbers("Closes:#6 Refs #5"), []);
+  assert.deepEqual(refsOnlyNumbers("Refs owner/repo#5"), [], "別リポの番号は Refs と数えない (本文の Refs #N の正規表現に合わない)");
   assert.deepEqual(parentNumbers("親: #2319\n\n本文 #5"), [2319]);
-  assert.deepEqual(parentNumbers("本文\r\n親: #10、#11\r\n"), [10, 11]);
+  assert.deepEqual(parentNumbers("親 : #2319"), [2319], "classify と同じく空白を許す");
+  assert.deepEqual(parentNumbers("本文\r\n親: #10、#11\r\n"), [10], "最初の親: 行の最初の #N だけ (classify と同じ)");
+  assert.deepEqual(parentNumbers("親: #10\n親: #11"), [10], "最初の親: 行だけ見る (classify と同じ)");
   assert.deepEqual(parentNumbers("親 #30\n親: なし"), []);
 });
