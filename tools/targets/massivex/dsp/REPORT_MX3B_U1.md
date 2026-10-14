@@ -4,7 +4,7 @@
 - 測定素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` を `work/` に展開し、
   `parse_setup_headers.py` → `extract_massivex.py` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B) を生成。
   md5-ok 0/125 (既知・#798 REPORT §11.1)。`work/` は gitignore。
-- 測定 commit: `6264ca83` (`mx_vtable_rtti.py` / `mx_vtable_xref.py` を最後に変更した commit。本 run の測定はこの版のスクリプトで実施)。
+- 測定 commit: `43661d6d` (`mx_vtable_rtti.py` を最後に変更した commit。本 run の測定はこの版のスクリプトで実施)。
 
 ## 1. 結論
 
@@ -19,13 +19,13 @@
 **U1 (process slot 同定) は未達のまま。** 正しい入口は「`IAudioProcessor` を基底に持つ具体クラスの vtable」を
 RTTI の COL 走査で探すこと (§4)。
 
-## 2. 測定 (測定 commit 6264ca83)
+## 2. 測定 (測定 commit 43661d6d)
 
 | 項目 | 結果 | 実行 |
 |---|---|---|
 | RTTI 0x1839761b8 (副, COL=0x1839763d0, COL.offset=0x80) | type `.?AVMassiveXAudioClass@@`・cd=0x183976258・numBaseClasses=5: base[0] MassiveXAudioClass (numContained=4, mdisp=0) / base[1] `.?AVIInstrument@AB@NI@@` (mdisp=0) / base[2] `.?AVMXInstance@MX@Lechtal@@` (numContained=1, mdisp=128) / base[3] `.?AVIMXInstance@MX@Lechtal@@` (mdisp=128) / base[4] `.?AVEventTarget@UIA@NI@@` (mdisp=4483264=0x4468c0) | `dsp/scripts/mx_vtable_rtti.py` |
 | RTTI 0x183976038 (主, COL=0x183976240, COL.offset=0) | type・基底 5 件は副と同一 (COL は別)。cd=0x183976258 は副と共有 | `dsp/scripts/mx_vtable_rtti.py` |
-| cd 共有の確認 | 両 COL の `cdOffset+16` が指す ClassHierarchyDescriptor は同一 (0x183976258)、numBaseClasses = `cd+8` = 5 | 一時の python 読み出し (本 run) |
+| cd 共有の確認 | 両 COL が指す ClassHierarchyDescriptor は同一 (cd=0x183976258)、numBaseClasses = `cd+8` = 5。`cd` の出力は 43661d6d で追加 | `dsp/scripts/mx_vtable_rtti.py` (本 run) |
 | xref 0x1839761b8 (副) | 2 件: `0x18000e58e` (`lea rax,[rip+0x3967c23]`) / `0x18000e924` (`lea rax,[rip+0x396788d]`) | `dsp/scripts/mx_vtable_xref.py` (本 run) |
 | xref 0x183976038 (主) | 2 件: `0x18000e580` (`lea rax,[rip+0x3967ab1]`) / `0x18000e91a` (`lea rax,[rip+0x3967717]`) | `dsp/scripts/mx_vtable_xref.py` (本 run) |
 | 0x18000e560〜0x18000e595・0x18000e900〜0x18000e92b の逆アセンブル | 未検証。リポジトリ内スクリプトでは再現していない (前 run の一時 `capstone` 出力のみ)。どの関数の ctor か・`this+0x4468c0` の構築の有無は未了のため、本 REPORT では結論に使わない | — |
@@ -60,14 +60,13 @@ RTTI の COL 走査で探すこと (§4)。
 
 ## 6. 本 run の測定と差分証跡
 
-- 測定 commit: `706f5355` (HEAD)。`mx_vtable_rtti.py` / `mx_vtable_xref.py` / `mx_slot_probe.py` の最後のコード変更は `6264ca83`。
-  §2 の RTTI・xref・slot 値はこの HEAD のスクリプトで実測した。
-- 差分証跡: `git diff 6264ca83 HEAD -- tools/targets/massivex/dsp/scripts` は 0 行 (スクリプトは測定版と同一)。
+- 測定 commit: `43661d6d` (`mx_vtable_rtti.py` の最後のコード変更。`cd` アドレスの出力を追加)。
+  §2 の RTTI・xref・slot 値はこの commit のスクリプトで実測した。`mx_vtable_xref.py` / `mx_slot_probe.py` は 6264ca83 から変更なし。
+- 差分証跡: `git diff 43661d6d HEAD -- tools/targets/massivex/dsp/scripts` は 0 行 (本 REPORT の commit 以降、スクリプトは変えていない)。
   `dsp` 全体の差分は本 REPORT の更新のみ (測定結果には影響しない)。
 - 環境: `plugins-massivex` を `$ARTIFACTS_DIR` から展開 (3.4 GB の tar.zst) し、`Native Instruments Massive X v1.7.1.exe` (installer) を
-  `parse_setup_headers.py` → `extract_massivex.py` (select=key) で `$RUNNER_TEMP/mxwork/extracted/VST3/Massive X.vst3` (95,356,824 B) に生成。
-  リポジトリ外に置いたため `work/` は使っていない。測定時の load は 0.5〜1.1。
-- §2 の値はレビュワーの 706f5355 実測 (RTTI 基底 5 件・xref 各 2 件) と一致。
+  `parse_setup_headers.py` → `extract_massivex.py <exe> work key` で `$RUNNER_TEMP/mx/work/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e7…`) に生成。
+  リポジトリ外に置いたため `work/` は使っていない。抽出は `md5-ok 0/125` (既知・#798 REPORT §11.1)。測定時の load は 0.8 (測定開始時)。
 
 ## 7. 再測定の手順 (次 run)
 
