@@ -145,7 +145,7 @@
 - 計測直前 `uptime` の load average 1.19 / 1.44 / 0.79 (nproc 4)。検証範囲は §6 と同じ (実 FLEngine の値とは比較していない)。
 - 差分: `git diff 9d49d429 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。本 commit は `tools/python/REPORT_PY100.md` だけを変える。
 
-## 10. main 再取り込み後の再測定 (測定 commit `bf653917`)
+## 10. main 再取り込み後の再測定 (測定 commit `bf653917`・旧。最新は §11)
 
 - 経緯: main が `eec639a3` (#2971 ほか) へ進み、PR ブランチ HEAD `48b950c1` と再び競合した。`git merge origin/main` で解消した (rebase なし)。
   - `tools/python/tests/provider_check.mjs` のみ競合 (2 箇所)。期待集合 `pe100` (本 PR) と `pe87` (main・PY-87 #2738 の general ゲッター 4 件) を両方残し、期待値を実装 81 → 85・未実装 354 → 350 に直した (`functions` 435 は不変)。
@@ -167,4 +167,28 @@
 
 - 計測直前 `uptime` の load average 2.59 / 1.89 / 0.89 (nproc 4)。build 開始時は 0.57 / 0.38 / 0.16。
 - 差分: `git diff bf653917 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。本 commit は `tools/python/REPORT_PY100.md` だけを変える。
+- 検証は実 FLEngine との比較ではない (§6 と同じ範囲)。
+
+## 11. main 再々取り込み後の再測定 (測定 commit `4c60dace`)
+
+- 経緯: main が `798bbb67` (#2962 ほか) へ進み、PR ブランチ HEAD `b3833446` と再び競合した。`git merge origin/main` で解消した (rebase なし)。
+  - `tools/python/tests/provider_check.mjs` のみ競合 (1 箇所)。main 側は PY-115 (#2951) の `pe115` (`mixer.getTrackColor`) を追加していた。期待集合 `pe100` (本 PR)・`pe87` (PY-87)・`pe115` (PY-115) の 3 つを残し、期待値を実装 85 → 86・未実装 350 → 349 に直した (`functions` 435 は不変)。
+  - `fl_engine.c`・`fl_mock.mjs` は自動マージ。
+- 入力: §10 と同じ fl-win64 の展開 (PE と DATA 4 本)。emsdk は `[EMSDK]`。`build_cpython_wasm.sh` は既存の `work/` ビルドを再利用した増分 (0.949 秒。初回の 4 分 14.958 秒は §10)。
+
+| 検査 | コマンド (`tools/python` で実行) | 結果 | 所要 |
+|---|---|---|---|
+| provider build | `bash provider/build.sh` | rc 0 | 0.931 秒 |
+| CPython wasm | `bash build_cpython_wasm.sh` | rc 0 (増分) | 0.949 秒 |
+| flpy link | `FLPY_SKIP_TABLE=1 FL_WIN64_DIR=<展開先> bash build_flpy.sh` | rc 0 | 6.095 秒 |
+| 件数・ABI | `node tests/provider_check.mjs` | PASS (functions 435・implemented 86・unimplemented 349・mcp_static 60) | 0.370 秒 |
+| C と mock の差分 | `node tests/channels_diff.mjs` | PASS (calls 161・diffs 0) | 0.054 秒 |
+| general 照合 (PY-87) | `node tests/general_diff.mjs` | PASS (calls 9・diffs 0) | 0.049 秒 |
+| mixer 照合 | `node tests/mixer_diff.mjs` | PASS (calls 57・diffs 0) | 0.051 秒 |
+| 48 tool (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok (soft_error 0・raised 0・host_calls 37425) | 2.153 秒 |
+| 48 tool (mock) | `node tests/all_tools.mjs` | 48/48 ok (host_calls 37425) | 2.156 秒 |
+| MIDI device 照合 | `node tests/device_diff.mjs` | PASS (calls 8・rejects 4・midi_out 5・diffs 0) | 0.050 秒 |
+
+- 計測直前 `uptime` の load average 0.67 / 1.21 / 0.79 (nproc 4)。
+- 差分: `git diff 4c60dace HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。本 commit は `tools/python/REPORT_PY100.md` だけを変える。
 - 検証は実 FLEngine との比較ではない (§6 と同じ範囲)。
