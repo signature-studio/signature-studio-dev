@@ -157,8 +157,17 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 - 機械側は chain の多くが `dst_unused` (rD の使用先が後続 8 命令の外) か `base_clobbered` (rA が途中で壊れる)。窓を広げると誤結合のおそれがあるため広げていない。
 - 使用種類の一致は値の流れの証明ではない。`[rD]` のメモリ基底としての使用も数えていないため、種類付けが誤るおそれもある。
 
-測定値: 削除後の HEAD の値は本 run では**未測定** (素材 `work-m11` が展開されず、e2e が実行できなかった)。
-`5a654b99` 時点の値 (修復前 site 86 / 関数 49、fix_d17 のみ 53 / 28、fix_d17 + link_d17 47 / 26) は規則を含む状態の記録で、削除後の HEAD では再測定していない。
-再測定は `work-m11` を展開して `bash tools/m11/ldfix/link_d17_e2e.sh` を実行すること。`tools/m11/work/` は本 run に存在しなかった (`ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。
+測定値 (HEAD `01e62e01`、`bash tools/m11/ldfix/link_d17_e2e.sh`、素材 `work-m11` + `toolchain-emsdk`、45.6 秒、emcc rc=0):
+
+測定 commit: `543e7320` (`tools/m11/ldfix/link_d17.py` を最後に変えた commit。以降のコード差分は 0)。
+差分の証跡: `git diff 543e7320 HEAD -- tools/m11/ldfix/link_d17.py tools/m11/ldfix/link_d17_e2e.sh tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf_ssa.py` の出力は空 (0 行)。
+
+| 段 | store_CC_site | store_CC_fn | store_CELL_DEEP |
+|---|---|---|---|
+| ssa_base (修復前) | 86 | 49 | 19 |
+| ssa_neg (fix_d17 のみ = ネガコン) | 53 | 28 | 52 |
+| ssa_link (fix_d17 + link_d17) | 47 | 26 | 58 |
+
+`ir_loads_in_multi_groups=151 linked=11`。ネガコン成立 (link を外すと store 宛 CC_site 47 → 53)。上の値は `543e7320` の §6 の値と一致する。
 
 結べない load 数 (関数・K 単位) は §6 の表が正。`ff63f0` / `128f9e0` / `d0cee0` のように 1 ブロックに IR load が多い例は、ブロック内の順序を機械語の値の流れで追う必要があり、子 #1980 の範囲。受入条件のうち「値の流れで順序を決める」「store 宛 CELL_COLLAPSED の減少」は未達。
