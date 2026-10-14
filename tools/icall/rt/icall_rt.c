@@ -10,7 +10,13 @@
 #ifndef ICALL_BLK
 #define ICALL_BLK 0x34308000u
 #endif
-#define BLKQ(off) (*(volatile uint64_t*)(uintptr_t)(ICALL_BLK + (off)))
+#ifdef ICALL_BLK_GLOBAL   /* #2128: BLK を wasm 内 global (IR の @__icall_blk と同一シンボル) に置く。固定 VA を使わない */
+unsigned char __icall_blk[0x200] __attribute__((aligned(16)));
+#define BLK_ADDR ((uintptr_t)__icall_blk)
+#else
+#define BLK_ADDR ((uintptr_t)ICALL_BLK)
+#endif
+#define BLKQ(off) (*(volatile uint64_t*)(BLK_ADDR + (off)))
 #define SHIFT_NEW 0x30000000ull
 
 extern const uint32_t icall_tbl_va[];
@@ -46,13 +52,13 @@ unsigned long long icall_stk_ptr_bad(void) { return g_stk_ptr_bad; }
 #endif
 
 void __icall_dispatch(uint64_t site) {
-    BLKQ(BLK_STK_OFF) = ICALL_BLK + BLK_STKBUF_OFF;
+    BLKQ(BLK_STK_OFF) = BLK_ADDR + BLK_STKBUF_OFF;
 #ifdef ICALL_IPP_SHIM
-    if (ipp_shim_dispatch((void*)(uintptr_t)ICALL_BLK)) return;
+    if (ipp_shim_dispatch((void*)BLK_ADDR)) return;
 #endif
-#ifdef ICALL_CHECK_STK   /* BLK+0x48 の pointer が ICALL_BLK+0x100 と一致 / 8 byte 整列 / STKBUF 全体 (12 語) が線形メモリ内か。外れは g_stk_ptr_bad */
+#ifdef ICALL_CHECK_STK   /* BLK+0x48 の pointer が BLK+0x100 と一致 / 8 byte 整列 / STKBUF 全体 (12 語) が線形メモリ内か。外れは g_stk_ptr_bad */
     { uint64_t p = BLKQ(BLK_STK_OFF);
-      if (p != ICALL_BLK + BLK_STKBUF_OFF || (p & 7) || p + 8 * 12 > (uint64_t)__builtin_wasm_memory_size(0) * 65536) g_stk_ptr_bad++; }
+      if (p != BLK_ADDR + BLK_STKBUF_OFF || (p & 7) || p + 8 * 12 > (uint64_t)__builtin_wasm_memory_size(0) * 65536) g_stk_ptr_bad++; }
 #endif
 #ifdef ICALL_CHECK_STK   /* 統計: 呼出し点ごとの stack コピー 12 語のうち非 0 の語数 (全 0 の site は stack 引数なし or 未配線) */
     { g_stk_n++; for (int k = 0; k < 12; k++) if (BLKQ(BLK_STKBUF_OFF + 8 * k)) { g_stk_bad++; break; } }
