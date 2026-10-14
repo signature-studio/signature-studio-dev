@@ -105,7 +105,14 @@ unit 隔離実行 (§4-E) と、新 IR の survey (`survey_trace.mjs`・942 unit
 
 ## 8. 検証の鮮度
 
-- 測定 commit: `e4be81ff030538ab524e2fd7a6adbc6de901f07c`。そこから HEAD までのコード差分: `git diff e4be81ff HEAD --stat -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T27.md'` の出力は **空** (差分 0。REPORT と `docs/` の文言変更のみが後続)。
+- 測定 commit: `e4be81ff030538ab524e2fd7a6adbc6de901f07c`。そこから HEAD までのコード差分は 1 ファイルだけ。`git diff e4be81ff HEAD --stat -- tools/m11 tools/shimx ':!tools/m11/REPORT_SHX-T27.md'` の出力:
+
+```
+ tools/m11/shimx_link/experiments/t27_relink.sh | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+```
+
+- この差分は `t27_relink.sh` が `emsdk_env.sh` の場所を `build.sh` から取る変更 (repo 外パスの直書きを避ける lint 対応)で、挙動は不変。変更後の版で §4-D (`locale0`) を再実行し、同じ結果 (`units_run=53`・`unreachable`・ftrace 0 行・4.0 s) を得た。
 - 再現: §2 の手順で IR を作り直し、§4 の各コマンドを実行する。`experiments/t27_nc_swap.py` の stale 側 IR は `work-m11.tar.zst` から `tools/m11/work/boot_final3.ll` だけを別 dir に展開して使う。
 
 ---
