@@ -166,7 +166,7 @@ main (`00ca9f1b`) を取り込んだ merge `53835669` で、競合は 2 件だ�
 
 測定 commit: `a2a56bf8` (コードを変えた最後の commit。merge)。測定時の HEAD: `0549e22b` (差し戻し対応の測定。以後の commit は本 REPORT と PR 本文のみ)。環境: runner (4 core)。`FL_WIN64_DIR` は fl-win64 から DATA block 4 件と PE 本体 (`block00031_PE.bin`) だけを展開した先。emsdk は [EMSDK] (6.0.12)。vite は本体 checkout の `node_modules` を symlink して解決した (コミットしない)。
 
-CPython wasm は HEAD で再ビルドした (流用なし): `fetch_inputs.sh` → `build_cpython_wasm.sh` (rc 0)、`build_cpython_wasm64.sh` (rc 0。`EMSDK_ENV=/opt/emsdk/emsdk_env.sh` の指定が要る。未指定では rc 1)、`CPY_PTHREADS=1 build_cpython_wasm.sh` (rc 0)。
+CPython wasm は HEAD で再ビルドした (流用なし): `fetch_inputs.sh` → `build_cpython_wasm.sh` (rc 0)、`build_cpython_wasm64.sh` (rc 0。`EMSDK_ENV` に [EMSDK] の `emsdk_env.sh` を指定する。未指定では rc 1)、`CPY_PTHREADS=1 build_cpython_wasm.sh` (rc 0)。
 
 | コマンド | 結果 | wall (s) |
 |---|---|---|
