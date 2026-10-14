@@ -57,51 +57,51 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 - `host/fl_mock.mjs`: 状態 `undoPos` / `undoCount` / `undoLast` / `safeEdit` / `projTitle` / `projAuthor` / `projGenre` と、7 件の getter (NOARGS)。
 - `provider/fl_engine.c`: 同名の static 状態と `FL_H(general, ...)` 7 件。`fl_engine_reset` で初期化。`fl_ret_i` / `fl_ret_b` / `fl_ret_s`。
 - `tests/general_diff.mjs`: 呼出し 7 件を追加。引数個数違い 2 件 (`safeToEdit [1]`・`getProjectTitle [0]`) を追加。main の setter 16 件 (引数個数違い) と両方を残した。件数は下の `## 検証` 節。
-- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。期待値 (実装 110 / 未実装 325) は下の `## 検証` 節。
+- `tests/provider_check.mjs`: `pe94` 集合 7 件を追加。期待値 (実装 116 / 未実装 319) は下の `## 検証` 節。
 - main 取り込み (`3e76267f`) での解消: main の undo setter 3 件は別名の状態 (`undoHistoryPos` 等) に書いていたため、getter と同じ `undoPos`・`undoCount`・`undoLast` (C は `undo_pos`・`undo_count`・`undo_last`) に統一した。C 側の `static` 再宣言は重複するため削除した。
 
 ## 検証
 
-測定 commit: `e01fe720` (main `3e76267f` の取り込みの merge。`tools/python` のコードを変えた最後の commit)。以降の commit は `.md` だけを変える。
+測定 commit: `c623912b` (main `351c9888` の取り込みの merge。`tools/python` のコードを変えた最後の commit)。以降の commit は `.md` だけを変える。
 
-main の取り込みで 5 ファイルが競合した (`docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/general_diff.mjs`・`tests/provider_check.mjs`)。解消方針:
-- `host/fl_mock.mjs`・`provider/fl_engine.c`: 両側の項目を残した。undo setter 3 件は `undoPos`・`undoCount`・`undoLast` (C は `undo_pos`・`undo_count`・`undo_last`) に統一した。C の `static int undo_pos, undo_count, undo_last;` の再宣言は重複するため削除した。
-- `tests/general_diff.mjs`: 引数個数違いの配列に、PR の 2 件 (`safeToEdit`・`getProjectTitle`) と main の setter 16 件を両方残した。
-- `tests/provider_check.mjs`: `pe94`・`pe119set`・`pe115`・`pe121`・`pe119` の 5 集合を全て判定に残した。期待値は **実装 110 / 未実装 325** (main の 103 に `pe94` の 7 件を足した値。total 435、MCP 静的 60)。
-- `docs/DOC_MAP.md`: 両方の REPORT 行を残した。
+main の取り込みで 4 ファイルが競合した (`docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`)。解消方針:
+- `host/fl_mock.mjs`・`provider/fl_engine.c`・`docs/DOC_MAP.md`: 両側の項目を残した。main の arrangement 状態 (`arrTime`・`arr_time`) も残した。
+- `host/fl_mock.mjs`・`provider/fl_engine.c`: undo setter 3 件は `undoPos`・`undoCount`・`undoLast` (C は `undo_pos`・`undo_count`・`undo_last`) に統一済み (前の取り込みで統一)。main 側の `undoHistory*` の状態行は採らなかった。
+- `tests/provider_check.mjs`: `pe94`・`pe119set`・`pe115`・`pe121`・`pe119`・`pe152` の 6 集合を全て判定に残した。期待値は **実装 116 / 未実装 319** (main の 109 (pe152 の 6 件を含む) に pe94 の 7 件を足した値。total 435、MCP 静的 60)。
 
-環境: runner 4 core。開始時の load average 0.14 / 0.19 / 0.09。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の `extracted/` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に指定した。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md`) で、`provider/build.sh` が既定の `EMSDK_ENV` で読む。
+環境: runner 4 core。開始時の load average 0.81 / 0.83 / 0.62 (測定 commit の直前)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の `extracted/` を `$RUNNER_TEMP/fl-win64` に展開して `FL_WIN64_DIR` に指定した。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md`) で、`provider/build.sh` が既定の `EMSDK_ENV` で読む。
 
 前提の生成物 (gitignore):
 
 | コマンド | 結果 |
 |---|---|
-| `bash fetch_inputs.sh` | rc 0 |
-| `bash build_cpython_wasm.sh` | rc 0 (実測 4 分 6 秒) |
+| `bash fetch_inputs.sh` | 初回 rc 0。取り込み後は再実行せず、`work/` の生成物を再利用 |
+| `bash build_cpython_wasm.sh` | 初回 rc 0 (実測 4 分 6 秒)。取り込み後は再実行せず、`work/` の生成物を再利用 (CPython 本体は `tools/python` の PR コードに依存しない) |
 | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 |
 | `bash build_flpy_static.sh` | rc 0 |
 
-テスト (測定 commit `e01fe720`):
+テスト (測定 commit `c623912b`):
 
 | コマンド | 結果 |
 |---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 110 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 110 / 未実装 325 / MCP 静的 60) |
-| `node tests/general_diff.mjs` | calls 34、diffs 0、PASS |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS |
-| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS |
-| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS |
-| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS |
-| `node tests/ui_state_diff.mjs` | calls 12、diffs 0、PASS |
-| `node tests/device_diff.mjs` | calls 8、rejects 4、midi_out 5、diffs 0、PASS |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback_roundtrip true |
-| `node tests/static_check.mjs` | tool 別差 0/48、`STATIC CHECK OK` |
+| `bash provider/build.sh` | rc 0・ハンドラ 116 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 116 / 未実装 319 / MCP 静的 60) |
+| `node tests/general_diff.mjs` | calls 34・diffs 0・PASS |
+| `node tests/ui_diff.mjs` | calls 17・diffs 0・範囲外既知差分 3・PASS |
+| `node tests/channels_diff.mjs` | calls 161・diffs 0・PASS |
+| `node tests/mixer_diff.mjs` | calls 59・diffs 0・PASS |
+| `node tests/screen_diff.mjs` | calls 32・diffs 0・PASS |
+| `node tests/ui_state_diff.mjs` | calls 12・diffs 0・PASS |
+| `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS |
+| `node tests/arrangement_diff.mjs` (main 由来) | calls 25・diffs 0・PASS |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・host_calls 37,425・callback_roundtrip true |
+| `node tests/static_check.mjs` | `STATIC CHECK OK` |
 
 - ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `undoPos` 既定値 (24 行目) を 0 から 1 にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1 (FAIL)。元に戻す (cmp で一致を確認) と calls 34・diffs 0・PASS (rc 0)。
 - コード差分 (測定 commit から HEAD まで。`tools/python` の .md 以外):
 
 ```
-$ git diff e01fe720 HEAD -- tools/python ':!*.md'
+$ git diff c623912b HEAD -- tools/python ':!*.md'
 (空)
 ```
 
@@ -109,7 +109,7 @@ $ git diff e01fe720 HEAD -- tools/python ':!*.md'
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 7 関数の値 (`0` / `true` / `""`) は仮置き・未実測 | mock と C は揃うが、実機の値と一致する保証は無い。値の実測には FLEngine の起動が要る | 親 #2738 へ提案 (実測の単独 issue は、起動の前提が揃ってから起票) |
+| 7 関数の値 (`0` / `true` / `""`) は仮置き・未実測 | mock と C は揃うが、実機の値との一致は未確認。実測には FLEngine の起動が要る | 親 #2738 へ提案 (実測の単独 issue は、起動の前提が揃ってから起票) |
 | 残り 12 関数 | 未実装 | #2978 (PY-120)・#3001 (PY-125)・#3002 (PY-126)・#3003 (PY-127) |
 | `0xd6a8e0`・`0xd84680`・`0xd843d0`・`0xd82c20` の意味 (共通処理) | undo の範囲 code と status 対応が未確定。setter の未確定点は `tools/python/REPORT_PY119_2977.md` の未解決表 (#2977 は closed) | #2978 (受入条件に含む) |
 | `getProjectTitle` / `Author` / `Genre` の vtbl スロットの意味 (`+0x20`・`+0x28`・`+0x30`) | 関数名からの対応で、スロットの同定は未了 | 親 #2738 へ提案 (単独の子 issue にするほどではない) |
