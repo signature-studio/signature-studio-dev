@@ -4,15 +4,16 @@
 
 ## 9. #1547 追記: unit 158 の観測副作用の切り分け (受入条件 2・3。受入条件 1 は #1864 へ移管)
 
-測定 commit (コードを変えた最後の commit): **`aa56c459`** (main 取り込み merge。`m11_build.sh` の競合解消を含む)。§9 の本文の数値は `9fc311b2` (main 取り込み merge) での実測 (`M11_DEST_GUARD` を入れた `49f5dd63`・`1f6c107b` の時点で取得)。`aa56c459` では既定 build の survey のみ再測定した (件数は同じ 870/24/0)。
-検証 HEAD: **`aa56c459`** (解消後の merge)。既定 build の survey を解消後 HEAD で再実行し、`870/24/0` と一致した (PR 本文)。§9.1 の表は測定 commit `1f6c107b` 時点の実測。`git diff 1f6c107b 589f742b -- tools/m11` の差分は main 由来 (`m11_build.sh` の `M11_TRACE_ISOLATE`・`M11_KEEP_BOOT_O`、`probe_entry.sh`) で、既定値 (`M11_TRACE_ISOLATE=1` は C 側の `#define` 既定と同じ・`M11_KEEP_BOOT_O=0` は従来どおり `boot.o` を作る) では生成物が変わらない。
+測定 commit (コードを変えた最後の commit): **`e2c0814c`**。本節の数値はすべて `e2c0814c` で再実行した実測 (`m11_gen_ir2.sh` → `m11_build.sh` → `m11_survey.mjs` / `repro_1389.sh`)。§9.1 の表だけは過去の測定 (`1f6c107b` 時点) の値で、上の本文と一致する。
+コード差分: `git diff 1f6c107b e2c0814c -- tools/m11 ':!*.md'` は main 取り込み由来のみ (`m11_ov.c`・`m11_rt.c`・`m11_build.sh`・`probe_entry.sh` を含む 82 ファイル)。build 経路のうち `aa56c459..e2c0814c` の差分は `tools/m11/ldfix/` の 6 ファイル (`audit_undefload_dest.py`・`verify_dest_2202.py`・結果 JSON/TSV) のみで、`ldfix.py`・`ldmach.py` は差分 0。`m11_ov.c`・`m11_rt.c`・`m11_build.sh`・`m11_gen_ir2.sh` は `aa56c459` から変わっていない。既定値 (`M11_DEST_GUARD=0`・`M11_INSTR_413060` 未設定) の生成物は、下の既定 build の survey が基準 `870/24/0` と一致したことで確認した (バイト比較はしていない)。
 
-`9fc311b2` での再検証 (直列・単発・foreground・各 timeout 付き・素材 fl-win64 / work-m11 / toolchain-emsdk・`m11_gen_ir2.sh` で `ir_conditions.json` 再生成 F1=902 F3c=36 errors=0)。`589f742b` も同じコードのため、この値は `589f742b` の値でもある:
-- `repro_1389.sh`: **PASS** (全体 1 分 50.1 秒)。OFF 16.207 s (load 0.84) / OFF 再実行 16.136 s (load 0.97) / ON 16.289 s (load 0.98)。OFF/OFF 再実行 227 件一致、ON は 0x26d1a0 j=12 の 1 件差。
-- 既定 build の survey: `units 942, ok 870, noproc 1, miss 47, trap 24, clobber 0` (16.298 s、終了時 load 0.87)。基準 870/24/0 と一致。
-- `M11_DEST_GUARD=1` の survey: `ok 870 / trap 24 / clobber 0`、dest 記録 227 件、記録の st は 0 が 199・1 が 28、**st=3 は 0 件** (16.266 s)。
+`e2c0814c` での実測 (直列・単発・foreground・各 timeout 付き・素材 fl-win64 / work-m11 / toolchain-emsdk・`m11_gen_ir2.sh` で `ir_conditions.json` 再生成 F1=902 F3c=36 errors=0):
+- `repro_1389.sh`: **PASS** (全体 1 分 27.3 秒)。OFF 12.621 s (load 1.14) / OFF 再実行 12.742 s (load 1.08) / ON 12.672 s (load 1.05)。OFF/OFF 再実行 227 件一致 (差分 0)、ON は 0x26d1a0 j=12 の 1 件差 (`st` `len` `rc` `h` の 4 フィールド)。
+- 既定 build の survey: `units 942, ok 870, noproc 1, miss 47, trap 24, clobber 0` (12.976 s、load 1.32)。基準 870/24/0 と一致。
+- `M11_DEST_GUARD=1` (ON ゲート `M11_OV_413060=1` 併用) の build + survey: `ok 870 / trap 24 / clobber 0`、dest 指紋 `ac2d2efb758d4bb1`、dest 記録 227 件、記録の st は 0 が 198・1 が 29、**st=3 は 0 件**。同一 build の 2 回目も記録 227 件が完全一致 (所要 12.751 s / 12.373 s、開始 load 0.59 / 0.75)。
+- 注: `M11_OV_413060` を付けずに `M11_DEST_GUARD=1` だけで build した survey (ゲート OFF 相当) は `dest_obs_hash acb2345ddb678281` で、OFF と同じ値になった。ON の比較には `M11_OV_413060=1` が要る。
 
-§9.1 の表の値 (`1f6c107b`) は上の値と一致する。
+§9.1 の表は測定 commit `1f6c107b` 時点の値 (下の表)。`e2c0814c` の値は上の本文と一致する。
 
 ### 9.1 測定 (実測・直列・単発)
 
