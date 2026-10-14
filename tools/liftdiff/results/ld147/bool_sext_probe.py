@@ -86,34 +86,37 @@ def cmd_enum(a):
     print('call i1 の結果を直接 sext i1→i64 する行: %d 件 %s' % (len(st), sorted(st.items())))
 
 
-def write_variant(lines, out_lines, path):
+def write_variant(out_lines, path):
     with open(path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(out_lines))
 
 
 def cmd_variants(a):
     os.makedirs(a.out, exist_ok=True)
-    sha = hashlib.sha256(open(a.ir, 'rb').read()).hexdigest()
+    with open(a.ir, 'rb') as f:
+        sha = hashlib.sha256(f.read()).hexdigest()
     print('source %s sha256=%s' % (a.ir, sha))
     lines = read_ir(a.ir)
     calls = enum_calls(lines)
     st = sext_targets(lines, calls)
     sets = {'orig': {}, 'hf_zext': {k: v for k, v in st.items() if v == 'HeapFree'}, 'all_zext': st}
-    base = json.load(open(TARGET_BASE))
+    with open(TARGET_BASE, encoding='utf-8') as f:
+        base = json.load(f)
     for v in VARIANTS:
         ir_out = os.path.join(a.out, 'ott_%s.ll' % v)
         new = list(lines)
         for ln in sets[v]:
             m = SEXT_RE.match(new[ln - 1])
             new[ln - 1] = m.group(1) + 'zext i1 ' + m.group(2) + ' to i64' + m.group(3)
-        write_variant(lines, new, ir_out)
+        write_variant(new, ir_out)
         changed = [d for d in difflib.unified_diff(lines, new, lineterm='', n=0) if d[:1] in '+-' and d[:3] not in ('+++', '---')]
         print('variant %-9s 変更行 %d 件 (%s) -> %s' % (v, len(changed) // 2, ', '.join('%d:%s' % (k, sets[v][k]) for k in sorted(sets[v])) or '-', ir_out))
         t = dict(base)
         t['name'] = 'ld147_%s' % v
         t['desc'] = 'LD-147 (#3180) 実測用の複製。ott_old と同一の lift・stub。ir のみ複製 (variant=%s)' % v
         t['ir'] = ir_out
-        json.dump(t, open(os.path.join(a.out, 'target_%s.json' % v), 'w'), indent=2, ensure_ascii=False)
+        with open(os.path.join(a.out, 'target_%s.json' % v), 'w', encoding='utf-8') as f:
+            json.dump(t, f, indent=2, ensure_ascii=False)
     print('tools/ott/work/ott.ll は書き換えていない (sha256 は上記)')
 
 
@@ -132,7 +135,8 @@ def cmd_run(a):
 def cmd_rax(a):
     rows = []
     for v in VARIANTS:
-        data = json.load(open(os.path.join(a.out, 'res_%s.json' % v)))
+        with open(os.path.join(a.out, 'res_%s.json' % v), encoding='utf-8') as f:
+            data = json.load(f)
         for f in data:
             for c in f['cases']:
                 raw = c.get('raw') or {}

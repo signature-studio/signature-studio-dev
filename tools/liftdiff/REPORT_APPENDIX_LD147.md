@@ -1,8 +1,8 @@
 # liftdiff REPORT 付録: LD-147 (#3180) BOOL 戻り値の import を `i1` で受けて `sext` する型決定 (D25 候補) の実測と修復経路
 
 親: #2821 (LD-133)。前提: `REPORT_APPENDIX_LD84.md` §4 (最初の分岐は `1c0b71` の HeapFree 戻り値)。
-LD-133 付録 (`REPORT_APPENDIX_LD133.md`) は main に無い (branch `2821-ld84-remeasure` の未 merge commit `321721b5` のみ。§7)。
-既知類型との関係: 新類型候補 **D25** (`docs/DEFECTS.md` 未登録。登録は PM 判断)。D1a〜D23 の該当は無い。LD-84 の HeapFree 応答差 (D24 行案) は PR #3049 で解消済み (`tools/shim/REPORT.md` §6)。
+LD-133 付録 (`REPORT_APPENDIX_LD133.md`) は main に取り込み済み (本ブランチは main `33a9430c` を merge 済み。§7)。
+既知類型との関係: 新類型 **D25** (`docs/DEFECTS.md` に行を追加。PM 判断 (#3180 コメント) の条件「受入 1 で rax 差が確認できたら追加」は §2 で満たした)。D1a〜D23 の該当は無い。LD-84 の HeapFree 応答差 (D24 行案) は PR #3049 で解消済み (`tools/shim/REPORT.md` §6)。
 
 ## 結論
 
@@ -88,9 +88,16 @@ python3 tools/liftdiff/results/ld147/bool_sext_probe.py rax --out $RUNNER_TEMP/l
 | 候補 | 内容 | 判定 |
 |---|---|---|
 | A | RetDec 産の `ott.ll` の `sext` 3 行を `zext` にする (pass 化を含む) | 行わない。`ott.ll` は旧 RetDec chain (`tools/ott/ott_build.sh`・m6〜m10) の産物で、そこへの新規修正は D5 (`docs/DECISIONS.md`) により禁止。`tools/**/work/` の書換えも禁止 (AGENTS 4-4) |
-| B | x64c・flelift・liftlib 側で同じ型決定を直す | 同じ型決定が見当たらない。x64c の import は IR の `i1` を経由せず、runtime が RAX を直接書く: `tools/ott/rt/ott_cpu.c:67` `void imp_HeapFree(void) { R[RAX] = 1; IMP_RET(); }`、`tools/flelift/rt/fle_cpu.c:119` も同じ。`tools/liftlib` に BOOL の戻り値幅の規則は無い (`br i1` の書換えのみ) |
+| B | x64c・flelift・liftlib 側で同じ型決定を直す | 同じ型決定が見当たらない。x64c の import は IR の `i1` を経由せず、runtime が RAX を直接書く: `tools/ott/rt/ott_cpu.c:67` `void imp_HeapFree(void) { R[RAX] = 1; IMP_RET(); }`、`tools/flelift/rt/fle_cpu.c:119` も同じ。`tools/liftlib` には import の戻り値幅を決める規則が無い。`i1`→`i64` の zext は `passes/p1.py` の 3 箇所だけ: `_setcc_value` (662〜700 行・`SETCC_I1`・LIFTLIB-5。`setcc` の結果を r 全体の値にする)、1225 行 (setcc の結果を i8 へ)、1336 行 (rcl/rcr の CF を i{bits} へ)。いずれも `call i1` の結果は対象外 (§5.1) | 
 
-**判断**: 候補 B では直す対象が無く、候補 A は D5 の対象。受入 2 の「x64c/flelift/liftlib 側で直せない場合は PM に判断を上げて止める」に当たるため、ここで止める。修復は入れていない。
+**判断**: 候補 A は D5 の対象。候補 B は x64c・flelift で直す対象が無く、liftlib では (ii) の pass 群に規則を足せる見込みだが、素材が無く未測定 (§5.1)。受入 2 の「x64c/flelift/liftlib 側で直せない場合は PM に判断を上げて止める」に当たるため、ここで止める。修復は入れていない。
+
+### 5.1 liftlib で BOOL の戻り値を直せるかの評価 (受入 2 (b))
+
+- **liftlib の OTT は 2 系統ある**。(i) 測定対象の `tools/ott/work/ott.ll` は `tools/ott/ott_build.sh` の鎖 (m6 lift 産物 → m8 pass → m9 pass → `OTT_PASSES` の `tools/ott/passes/*.py` → emcc) の出力で、liftlib を通らない (`tools/ott/*.sh`・`tools/m8`・`tools/m9` の script に liftlib の呼出しは無い)。(ii) liftlib 自前の OTT (`python3 -m liftlib ott`・`tools/liftlib/liftlib/recipes/ott.py`) は RetDec raw の `tools/m6/work/ott.drc.ll` を入力にし、liftlib の作業 dir に別の IR を作る。(ii) の出力は (i) と別物なので、(ii) で直しても (i) を使う 12 case の測定 (受入 3) には入らない。
+- **構造上の判断**: liftlib で直せる見込みはある。`SETCC_I1` と同型に、`call i1 @F` の結果を `sext i1 → i64` している行を `zext` にする leaf 規則を (ii) の pass 群に足せる。ただし、(ii) の入力に同じ `sext` があるかは未確認 (素材なし)。対象は BOOL を返す API に絞る必要があり、その一覧は §4 の 18 件の列挙から作れる。
+- **測定できないため未実装**: 修復を入れて受入 3 (修復後の 12 case 差 0) を測るには、`work-m6-ott` (`ott.drc.ll`・`ott_memfix1.ll`)・`toolchain-emsdk` (emcc)・`analysis-ott-binaries` (実機 DLL) が要る。本 run の `$ARTIFACTS_DIR` には `fl-win64` しか無い (`ls` で確認)。素材なしで pass を入れると未測定のコードが liftlib に入るため、入れていない (AGENTS 規範 6)。
+- **必要な素材**: `oc_artifacts: toolchain-emsdk analysis-ott-binaries work-m6-ott`。受入 3 の再測定はこの素材が揃った run で行う。
 
 PM への選択肢 (案):
 
@@ -108,9 +115,7 @@ PM への選択肢 (案):
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 修復経路の決定 (§5 の A/B・選択肢 1〜3)。受入 3 (修復後の 12 case 差 0) は未達 | D25 の修復が止まる | PM 判断 (#3180 のコメント) |
-| D25 を `docs/DEFECTS.md` に登録するか (行案は LD-133 付録 §4 と本付録 §5) | 類型の正本に未登録 | PM 判断 (`docs/DEFECTS.md` は PM が編集) |
-| 1c621c の rax 差 (2 case・別件 (c)) | 2 case の rax が一致しない | LD-84 (#2193) の追跡 |
-| outcome の残り (計装上の import 記録の差・§2 (a)) | 8 case が `diff` のまま | LD-83 (#2192) 系の PM 判断 |
-| `REPORT_APPENDIX_LD133.md` が main に無い (branch `2821-ld84-remeasure` の未 merge commit `321721b5` のみ。#3180 本文の参照が切れている) | LD-133 の根拠の所在 | PM 判断 (取り込み先。本 PR では取り込まない) |
-| 直接 `sext` しない 15 件の BOOL 結果の rax への到達 | 影響の有無が未検証 | 修復経路の決定後に PM が判断 |
+| 修復経路の決定 (§5 の A/B・選択肢 1〜3)。受入 3 (修復後の 12 case 差 0) は未達。再測定には `oc_artifacts: toolchain-emsdk analysis-ott-binaries work-m6-ott` が要る (本 run には無い) | D25 の修復が止まる | PM 判断 (#3180 のコメント) |
+| 1c621c の rax 差 (2 case・別件 (c)) | 2 case の rax が一致しない | #3180 (PM 判断。LD-84 の #2193 は CLOSED・後継 open issue 無し) |
+| outcome の残り (計装上の import 記録の差・§2 (a)) | 8 case が `diff` のまま | #3180 (PM 判断。LD-83 の #2192 は CLOSED・後継 open issue 無し) |
+| 直接 `sext` しない 15 件の BOOL 結果の rax への到達 | 影響の有無が未検証 | 修復経路の決定後に PM が判断 (#3180) |
