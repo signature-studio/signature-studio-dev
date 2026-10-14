@@ -30,7 +30,7 @@ python3 vtable_fn_addrs.py ../work/Serum2_win64.vst3 XferOnOffButton | tee ../wo
 #   total distinct = 8 (vtable_measure.py の union 8 と一致)
 
 # 2) Ghidra 12.1.4 headless で関数境界と本体バイト数
-export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-amd64 PATH=$JAVA_HOME/bin:$PATH
+export JAVA_HOME=<JDK 21 のインストール先> PATH=$JAVA_HOME/bin:$PATH
 export FN_ADDRS_TSV=$PWD/../work/xferonoff_fns.tsv
 cd ../work && mkdir -p ghproj
 /path/to/ghidra_12.1.4_PUBLIC/support/analyzeHeadless ghproj xo \
