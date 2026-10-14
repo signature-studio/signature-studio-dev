@@ -56,7 +56,9 @@ static inline uint32_t kh_rcp_exact(uint32_t x) {
 static inline V128 rcpps(undefined1 dst[16], V128 src) {
     V128 r; (void)dst;
     for (int i = 0; i < 4; i++) {
-        uint32_t w = kh_rcp_exact(*(uint32_t *)(src.b + 4 * i));
+        uint32_t x, w;
+        memcpy(&x, src.b + 4 * i, 4);
+        w = kh_rcp_exact(x);
         memcpy(r.b + 4 * i, &w, 4);
     }
     return r;
