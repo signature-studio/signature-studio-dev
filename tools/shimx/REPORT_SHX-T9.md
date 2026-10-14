@@ -95,6 +95,8 @@
 
 再現: `python3 tools/shimx/evidence_1255/unit_diff.py <baseline.survey.json> <shimx.survey.json>` (per-unit JSON は `evidence_1255/` に保存)。
 
+再現 (§3.5): `node tools/m11/shimx_link/survey_frames.mjs <cjs> --out DIR [--only 88,161,...] [--iso]` (`--iso` は 1 unit ずつ新インスタンス)。増分 57 unit は `tools/shimx/evidence_1986/gain57_units.txt`、結果は `gain57_frames.tsv`。
+
 ### 3.2 検証の commit と差分 (WORKFLOW §6)
 
 - 測定 commit: `604e900f` (origin/main)。本 PR の変更は `tools/shimx/REPORT_SHX-T9.md` と `tools/shimx/evidence_1255/` のみで、測定対象のコード (`tools/m11/shimx_link/`・`tools/shimx/src`) には差分が無い。
@@ -116,10 +118,43 @@
 - baseline 側は sxt 計数が無く (`m11_boot.cjs` に `_sxt_*` 無し)、GetProcAddress 呼出しの有無は未取得。baseline の unit 23 が `0xf960` 以降どの分岐に入るかも未特定。起票先: #1985 (`[SHX-T9f]`)。
 - oob 増 57 件の unit 単位 frame 分類は未着手。起票先: #1986 (`[SHX-T9g]`)。
 
+#### 3.3.1 戻り値の実測 (SHX-T9f #1985)
+
+- 測定 commit: `7e9940ac` (戻り値記録を追加したコード。clean rebuild `build.sh --trace --soft --fix` → `[sxlink] OK`)。実行は `probe_unit23.mjs` (unit 1〜22 の後に unit 23 を 1 回)。load 0.33 (4 CPU)。出力は `tools/shimx/evidence_1985/probe_u23_shimx_ret.txt`。
+- 戻り値は `gen_link.py` が生成する trace wrapper を経由して `GetModuleHandleW` / `GetProcAddress` だけ記録する (`RET_LOG`・`trace_rt.c` の `sxt_ret`)。他の shimx 呼出しは従来どおり回数のみ。
+
+| unit | 呼出し | 引数・戻り値 (実測) |
+|---|---|---|
+| 22 | `GetModuleHandleW` | `"oleaut32.dll"` → `0x11443000` (非 NULL) |
+| 22 | `GetProcAddress` | 呼ばれていない (unit 22 の GetProcAddress 増分 0) |
+| 23 | shimx 呼出し | 0 件 (`CALL` 行なし)。`ret=2`・icall miss 2 件 (`0x4476d0`・`0x457860`) |
+
+- `function_457c70` (IR: `boot_final3.ll` L160490 付近) は先頭で `GetModuleHandleW(L"oleaut32.dll")` を呼ぶ。unit 22 の上の呼出しがこれに一致する (引数の一致による**推定**)。wrapper は呼出し元アドレスを記録していないため、この呼出しが `function_457c70` 由来であることは**未確定** (記録には wrapper への呼出し元 PC 追加が要る)。IR 上、`GetModuleHandleW` の戻り値 (`%0`) は `function_457c70` 内で一度も使われない。`function_457c40` は第 1 引数 (`stack_var_-56` の alloca) の `+40` を読み、0 なら fallback (`arg3`) を返す。実測では unit 22〜23 に `GetProcAddress("VarBstrFromBool")` の呼出しが無く、slot は 0 のまま残った。「`+40` が 0 だから fallback する」は IR からの推測で、`+40` の実行時値は未測定。
+- 上の経路の是正は受入条件外。今回の実測は「`GetModuleHandleW(oleaut32)` は非 NULL を返すが、戻り値が GetProcAddress に渡らない」まで。
+- baseline (`m11_boot.cjs`・sxt 無し): unit 23 は `halt0` のまま。戻り値ログは取れない (wrapper 無し)。`0xf960` 以降の分岐条件は未特定 → 子 issue へ。
+- 証跡: `tools/shimx/evidence_1985/probe_u23_shimx_ret.txt` / `probe_u23_baseline.txt`。
+
 ### 3.4 検証の commit と差分 (WORKFLOW §6)
 
 - 測定の基底: `522da441` (origin/main)。測定に使った probe は本 PR で `tools/m11/shimx_link/probe_unit23.mjs` として追加 (測定対象の shimx・m11 のコードは未変更)。
 - `git diff 522da441 HEAD -- tools/m11/shimx_link tools/shimx/src` の差分は probe 1 本の追加のみ。
+
+### 3.5 oob 増 57 件の unit 単位 trap frame 分類 (#1986 SHX-T9g の実測)
+
+- 測定: `tools/m11/shimx_link/survey_frames.mjs` (新規・survey_trace と同じ unit 隔離順で wasm trap frame を残す)。shimx 版は `build.sh --trace --soft --fix` の clean rebuild (sha256 `c6461194…`)、baseline は `work-m11` の `m11_boot.cjs`。
+- 再現実測 (順次 = survey と同じ harness): shimx ok 789 / oob 95 / halt0 9 / closure_outside 47 / clobber 1 / noproc 1。baseline ok 800 / oob 50 / halt0 44 / closure_outside 46 / abort 1 / noproc 1。`evidence_1255` の値と一致。
+- 単独実測 (`--iso`: 増 57 unit を毎回新インスタンスで 1 unit ずつ実行。前 unit の状態を持ち越さない): shimx 57/57 が oob。baseline は 37 ok / 18 halt0 / 2 oob。
+- trap site (top wasm frame): shimx の 57 件のうち **56 件が `function_407a50__lifted`** (単独実測でも 57 件同じ)。残り 1 件 (unit 88) が `function_418190`。
+- 既存との関係: baseline の oob 50 件のうち 32 件も同じ関数 `function_407a50__lifted` で trap している (baseline の offset は 0x13ccb9、shimx は 0x17ffe3 で、offset はビルド間で比べられない)。増分 57 件はこの既存 oob 関数への到達が増えたもの。
+- shim 呼出しの有無: 57 件のうち順次 shim 呼出しを伴うのは 6 件 (`evidence_1986/gain57_frames.tsv`)。trap frame の上位に shim 関数は無い (`__wrap_m11_icall` / `m11_icall` は呼出経路の下位にだけ現れる)。
+- 対照実験 (`--fix` の有無だけ変えた shimx 版を単独実行): `m11_sx_trace_soft.cjs` (`--fix` 無し) では同じ 57 unit が ok 35 / halt0 20 / oob 2。`--fix` 有り (`m11_sx_trace_soft_fix.cjs`) は 57/57 oob。よって増分 57 件の oob は shimx の import 差ではなく、`build.sh --fix` の alloca 拡幅 (`fix_alloca.py`) が IR を変えたことによる。
+- 分類 (受入条件 1): 増分 57 件は「`--fix` IR で `function_407a50__lifted` の oob に到達するようになった」もの。shim の差分ではない。`--fix` の拡幅が `function_407a50` の到達経路 (呼出し元の stack 配置) を変えたと推定するが、機構は未特定。`fix_report.json` は 407a50 に触れていない。
+- 単独実行で再現するため、前 unit の状態持ち越しではない。baseline の oob 50 件のうち 32 件も同じ関数で trap する (既存の oob 要因)。
+
+### 3.6 検証の commit と差分 (WORKFLOW §6)
+
+- 測定に使ったコード: 既存の測定対象 (`tools/m11/shimx_link/` の既存ファイル・`tools/shimx/src`) は origin/main `5229fe5f` と同一 (`git diff --stat 5229fe5f HEAD -- tools/m11/shimx_link tools/shimx/src` は `survey_frames.mjs` の追加のみ)。shimx 版は同じ build.sh で clean rebuild (sha256 `c6461194…`)、baseline は `work-m11` の `m11_boot.cjs`。
+- 本 PR の差分: 追加 `tools/m11/shimx_link/survey_frames.mjs`・`tools/shimx/evidence_1986/`、更新 `tools/shimx/REPORT_SHX-T9.md`。既存の測定コードは変更していない。
 
 ## 4. 残一覧 (BACKLOG 反映用の要約)
 

@@ -178,8 +178,15 @@ function neededArts(n: number, input: ClassifyInput): string[] {
 const head90 = (s: string): string => Array.from(s).slice(0, 90).join("").replaceAll("\n", " ");
 const fmt1 = (x: number): string => x.toFixed(1);
 
-export function classify(d: Snapshot, input: ClassifyInput): { rows: Rows } {
-  const { iss, blockers } = graph(d, input);
+export interface Classified {
+  rows: Rows;
+  blocksCount: Record<string, number>;
+  // 親 (open) -> open な子の番号。
+  children: Record<string, number[]>;
+}
+
+export function classify(d: Snapshot, input: ClassifyInput): Classified {
+  const { iss, blockers, children } = graph(d, input);
   const st = startedMap(d, iss);
   const ageH = (ts: string) => (input.nowMs - Date.parse(ts)) / 3_600_000;
   const rows: Rows = { blocked: [], started: [], user: [], stopped: [], recent: [], relaunch: [], ready: [] };
@@ -230,5 +237,9 @@ export function classify(d: Snapshot, input: ClassifyInput): { rows: Rows } {
 
   const ready = rows.ready.map((n) => ({ n, title: iss.get(n)?.title ?? "", blocksCount: blocksCount.get(n) ?? 0 }));
   rows.ready = sortReady(ready).map((r) => r.n);
-  return { rows };
+  return {
+    rows,
+    blocksCount: Object.fromEntries(blocksCount),
+    children: Object.fromEntries([...children].map(([k, v]) => [String(k), [...v]])),
+  };
 }

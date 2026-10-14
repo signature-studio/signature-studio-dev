@@ -2,7 +2,14 @@
 // 永続化 (Durable Object / SQLite) は呼び出し側の責務。ここは state を受け取り、次の state を返すだけ。
 import { verifySignature } from "./hmac.ts";
 
-export const WEBHOOK_EVENTS = ["issues", "issue_comment", "pull_request", "pull_request_review", "workflow_run"] as const;
+export const WEBHOOK_EVENTS = [
+  "issues",
+  "issue_comment",
+  "issue_dependencies",
+  "pull_request",
+  "pull_request_review",
+  "workflow_run",
+] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 
 export interface IssueState {
@@ -12,6 +19,8 @@ export interface IssueState {
   body: string;
   state: "open" | "closed";
   updatedAt: string;
+  // issue_dependencies_summary.total_blocked_by (blocker の一覧は PmState.blockedBy)
+  blockedByCount: number;
 }
 export interface PrState {
   number: number;
@@ -42,9 +51,15 @@ export interface PmState {
   runs: Record<string, RunState>;
   // issue ごとの最後の bot コメント (分類の bot_last に相当)
   botLast: Record<string, BotComment>;
+  // PM のコメントに書かれた最後の `oc_artifacts:` 行 (分類の pm_art に相当)
+  pmArt: Record<string, { at: string; line: string }>;
+  // issue dependencies (blocked_by) の blocker 番号 (open/closed 問わず。分類側で open だけに絞る)
+  blockedBy: Record<string, number[]>;
+  // PM (人間の PAT / PM App) が `/oc` コメントで着手を依頼した最後の時刻 (分類の launched に相当)
+  launchedAt: Record<string, string>;
 }
 
-export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {} };
+export const EMPTY_STATE: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, pmArt: {}, blockedBy: {}, launchedAt: {} };
 
 export interface WebhookInput {
   secret: string;
@@ -52,6 +67,10 @@ export interface WebhookInput {
   signature: string | null | undefined;
   body: string;
   botLogin: string;
+  // PM のログイン名 (人間の PAT と PM App の bot)。`oc_artifacts:` 行の取得に使う。省略時は取得しない。
+  pmLogins?: string[];
+  // 指定すると、payload.repository.full_name が一致しない配送は無視する (別 repo の配送を状態に混ぜない)。
+  repo?: string;
 }
 
 export type WebhookResult =
@@ -74,31 +93,73 @@ function applyIssue(s: PmState, p: Json): PmState {
   if (!i || "pull_request" in i) return s;
   const k = String(i.number);
   if (!newer(s.issues[k], i.updated_at)) return s;
+  const closed = i.state === "closed";
+  const summary = i.issue_dependencies_summary?.total_blocked_by;
   const next: IssueState = {
     number: i.number,
     title: i.title,
-    labels: (i.labels ?? []).map((l: Json) => l.name),
-    body: i.body ?? "",
-    state: i.state === "closed" ? "closed" : "open",
+    // closed の issue は分類に使わない。番号・状態・更新時刻だけ残す (順不同配送の判定用)。
+    labels: closed ? [] : (i.labels ?? []).map((l: Json) => l.name),
+    body: closed ? "" : i.body ?? "",
+    state: closed ? "closed" : "open",
     updatedAt: i.updated_at,
+    blockedByCount: Number.isInteger(summary) ? summary : (s.issues[k]?.blockedByCount ?? 0),
   };
   return { ...s, issues: { ...s.issues, [k]: next } };
 }
 
-function applyIssueComment(s: PmState, p: Json, botLogin: string): PmState {
+const ART_LINE_RE = /^oc_artifacts:[^\n]*$/m;
+
+function applyIssueComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = []): PmState {
   const c = p.comment;
   const i = p.issue;
-  if (!c || !i) return s;
+  if (!c || !i || p.action !== "created" || "pull_request" in i) return s;
   const k = String(i.number);
   const isBot = c.user?.login === botLogin;
   let next: PmState = s;
+  if (pmLogins.includes(c.user?.login) && /^\/oc\b/m.test(c.body ?? "")) {
+    const prevL = s.launchedAt[k];
+    if (!prevL || Date.parse(c.created_at) >= Date.parse(prevL)) {
+      next = { ...next, launchedAt: { ...next.launchedAt, [k]: c.created_at } };
+    }
+  }
+  if (pmLogins.includes(c.user?.login)) {
+    const m = ART_LINE_RE.exec(c.body ?? "");
+    const prev = s.pmArt[k];
+    if (m && (!prev || Date.parse(c.created_at) >= Date.parse(prev.at))) {
+      next = { ...next, pmArt: { ...next.pmArt, [k]: { at: c.created_at, line: m[0] } } };
+    }
+  }
   if (isBot) {
     const prev = s.botLast[k];
     if (!prev || Date.parse(c.created_at) >= Date.parse(prev.at)) {
-      next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: c.body ?? "" } } };
+      next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000) } } };
     }
   }
   return next;
+}
+
+// issue_dependencies: blocked_by の追加・削除。blocked 側の issue 番号と blocker 番号だけを使う。
+function applyDependencies(s: PmState, p: Json): PmState {
+  const blocked = p.blocked_issue?.number;
+  const blocker = p.blocking_issue?.number;
+  if (!Number.isInteger(blocked) || !Number.isInteger(blocker)) return s;
+  if (p.action !== "blocked_by_added" && p.action !== "blocked_by_removed" && p.action !== "blocking_added" && p.action !== "blocking_removed") return s;
+  const k = String(blocked);
+  const cur = s.blockedBy[k] ?? [];
+  const adding = p.action === "blocked_by_added" || p.action === "blocking_added";
+  const has = cur.includes(blocker);
+  if (adding === has) return s;
+  const known = k in s.blockedBy || !adding;
+  const nextList = adding ? [...cur, blocker].sort((a: number, b: number) => a - b) : cur.filter((x) => x !== blocker);
+  const summary = p.blocked_issue?.issue_dependencies_summary?.total_blocked_by;
+  const blockedBy = { ...s.blockedBy, [k]: nextList };
+  // 件数が合わない (一覧を取りこぼしている) 間は『不明』にして、reconcile が REST で取り直す。
+  if (Number.isInteger(summary) && summary !== nextList.length) delete blockedBy[k];
+  const cur0 = s.issues[k];
+  const issues =
+    cur0 && Number.isInteger(summary) ? { ...s.issues, [k]: { ...cur0, blockedByCount: summary } } : s.issues;
+  return { ...s, blockedBy, issues };
 }
 
 function applyPr(s: PmState, p: Json): PmState {
@@ -113,7 +174,7 @@ function applyPr(s: PmState, p: Json): PmState {
     draft: !!pr.draft,
     ref: pr.head?.ref ?? "",
     title: pr.title ?? "",
-    body: (pr.body ?? "").slice(0, 3000),
+    body: pr.state === "closed" ? "" : (pr.body ?? "").slice(0, 3000),
     updatedAt: pr.updated_at,
   };
   return { ...s, prs: { ...s.prs, [k]: next } };
@@ -140,12 +201,14 @@ function applyRun(s: PmState, p: Json): PmState {
   return { ...s, runs: { ...s.runs, [k]: next } };
 }
 
-export function applyEvent(s: PmState, event: WebhookEvent, payload: Json, botLogin: string): PmState {
+export function applyEvent(s: PmState, event: WebhookEvent, payload: Json, botLogin: string, pmLogins?: string[]): PmState {
   switch (event) {
     case "issues":
       return applyIssue(s, payload);
     case "issue_comment":
-      return applyIssueComment(s, payload, botLogin);
+      return applyIssueComment(s, payload, botLogin, pmLogins);
+    case "issue_dependencies":
+      return applyDependencies(s, payload);
     case "pull_request":
       return applyPr(s, payload);
     case "pull_request_review":
@@ -168,5 +231,6 @@ export function handleWebhook(s: PmState, input: WebhookInput): WebhookResult {
   } catch {
     return { status: 202, state: s, reason: "ignored" };
   }
-  return { status: 202, state: applyEvent(s, input.event, payload, input.botLogin), reason: "applied" };
+  if (input.repo && payload?.repository?.full_name !== input.repo) return { status: 202, state: s, reason: "ignored" };
+  return { status: 202, state: applyEvent(s, input.event, payload, input.botLogin, input.pmLogins), reason: "applied" };
 }

@@ -1,9 +1,12 @@
-"""SR-25 #1738: Xfer 固有 view / upstream view の vtable 由来の関数数を PE から実測する。
+"""SR-25 #1738 / SR-29 #1920: Xfer 固有 view / upstream view の vtable 由来の関数数を PE から実測する。
 
 入力: Serum2_win64.vst3 (PE, x64 MSVC)。
 方法: MSVC RTTI の TypeDescriptor 名 (.?AV<cls>@@) → COL (Complete Object Locator) → vtable[-1] の順に辿り、
       vtable の各スロットのうち .text 内を指すものを仮想関数とみなす。
-限界: 継承元の vtable は別に存在しうる。関数の本体サイズ (B) は本スクリプトでは測らない (Ghidra が要る)。
+      継承元 (COL → CHD → BaseClassArray → BaseClassDescriptor → TypeDescriptor) の vtable と同じ
+      インデックスで同じ値を持つスロットは継承とみなし、残りを override / 新規の仮想関数として数える。
+限界: 継承元の vtable が PE 内に無い場合は全スロットを override とみなす (上限値)。
+      関数の本体サイズ (B) は本スクリプトでは測らない (Ghidra が要る)。
 usage: vtable_measure.py <pe> <class>[@<namespace>] [...]  (例: CTextLabel@VSTGUI)
 """
 import struct, sys
@@ -36,6 +39,74 @@ def rva_to_off(rva):
     return None if s is None else rva - s.VirtualAddress + s.PointerToRawData
 
 
+def off_to_rva(off):
+    for s in pe.sections:
+        if s.PointerToRawData <= off < s.PointerToRawData + s.SizeOfRawData:
+            return off - s.PointerToRawData + s.VirtualAddress
+    return None
+
+
+def td_name(td_rva):
+    o = rva_to_off(td_rva + 0x10)
+    if o is None:
+        return None
+    e = data.find(b"\x00", o)
+    return data[o:e].decode(errors="replace")
+
+
+def col_rvas_of_td(td_rva):
+    """TypeDescriptor の RVA を指す COL の RVA 一覧 (COL の pTypeDescriptor は rva32)。"""
+    out = []
+    tdv = struct.pack("<I", td_rva)
+    p = data.find(tdv)
+    while p != -1:
+        col_off = p - 12  # COL: signature(4) offset(4) cdOffset(4) pTypeDescriptor(4) pClassDescriptor(4) pSelf(4)
+        if col_off >= 0 and struct.unpack_from("<I", data, col_off)[0] == 1:
+            col_rva = off_to_rva(col_off)
+            if col_rva is not None:
+                out.append(col_rva)
+        p = data.find(tdv, p + 1)
+    return out
+
+
+def vtables_of_col(col_rva):
+    """COL を指す vtable[-1] 位置の後ろから、.text を指すスロット列を vtable ごとに返す。"""
+    res = []
+    col_abs = struct.pack("<Q", base + col_rva)
+    q = data.find(col_abs)
+    while q != -1:
+        vt_off = q + 8  # vtable[0] はこの直後
+        slots = []
+        k = 0
+        while True:
+            o = vt_off + 8 * k
+            if o + 8 > len(data):
+                break
+            v = struct.unpack_from("<Q", data, o)[0]
+            if not (t_lo <= v < t_hi):
+                break
+            slots.append(v)
+            k += 1
+        if slots:
+            res.append(slots)
+        q = data.find(col_abs, q + 1)
+    return res
+
+
+def base_td_rvas(col_rva):
+    """COL → CHD → BaseClassArray の TypeDescriptor RVA 一覧 (自分自身を含む)。"""
+    co = rva_to_off(col_rva)
+    chd_rva = struct.unpack_from("<I", data, co + 0x10)[0]
+    chd = rva_to_off(chd_rva)
+    n = struct.unpack_from("<I", data, chd + 8)[0]
+    bca = rva_to_off(struct.unpack_from("<I", data, chd + 0xC)[0])
+    out = []
+    for i in range(n):
+        bcd_rva = struct.unpack_from("<I", data, bca + 4 * i)[0]
+        out.append(struct.unpack_from("<I", data, rva_to_off(bcd_rva))[0])
+    return out
+
+
 for arg in sys.argv[2:]:
     parts = arg.split("@")
     needle = (".?AV" + "@".join(parts) + "@@").encode() + b"\x00"
@@ -44,49 +115,29 @@ for arg in sys.argv[2:]:
     while i != -1:
         hits.append(i)
         i = data.find(needle, i + 1)
-    results = []
+    tds = []
     for off in hits:
-        td_rva = None
-        for s in pe.sections:
-            if s.PointerToRawData <= off < s.PointerToRawData + s.SizeOfRawData:
-                td_rva = off - s.PointerToRawData + s.VirtualAddress
-        if td_rva is None:
-            continue
-        td_rva -= 0x10  # TypeDescriptor: vfptr(8) spare(8) name(...) -> 名前の前 16 B
-        # COL の pTypeDescriptor (rva32) は TypeDescriptor の RVA を指す
-        tdv = struct.pack("<I", td_rva)
-        p = data.find(tdv)
-        cols = []
-        while p != -1:
-            col_off = p - 12  # COL: signature(4) offset(4) cdOffset(4) pTypeDescriptor(4)
-            if col_off >= 0 and struct.unpack_from("<I", data, col_off)[0] == 1:
-                cols.append(col_off)
-            p = data.find(tdv, p + 1)
-        for col_off in cols:
-            col_rva = None
-            for s in pe.sections:
-                if s.PointerToRawData <= col_off < s.PointerToRawData + s.SizeOfRawData:
-                    col_rva = col_off - s.PointerToRawData + s.VirtualAddress
-            if col_rva is None:
-                continue
-            col_abs = struct.pack("<Q", base + col_rva)
-            q = data.find(col_abs)
-            while q != -1:
-                vt_off = q + 8  # vtable[0] はこの直後
-                slots = []
-                k = 0
-                while True:
-                    o = vt_off + 8 * k
-                    if o + 8 > len(data):
-                        break
-                    v = struct.unpack_from("<Q", data, o)[0]
-                    if not (t_lo <= v < t_hi):
-                        break
-                    slots.append(v)
-                    k += 1
-                if slots:
-                    results.append((0, len(slots), sorted(set(slots))))
-                q = data.find(col_abs, q + 1)
-    print(f"{arg}: TypeDescriptor hits={len(hits)} vtables={len(results)}")
-    for _, n, fns in results:
-        print(f"  vtable slots(.text)={n} distinct_fns={len(fns)}")
+        td_rva = off_to_rva(off)
+        if td_rva is not None:
+            tds.append(td_rva - 0x10)  # TypeDescriptor: vfptr(8) spare(8) name(...) -> 名前の前 16 B
+    print(f"{arg}: TypeDescriptor hits={len(hits)}")
+    all_ovr = set()
+    for td_rva in tds:
+        for col_rva in col_rvas_of_td(td_rva):
+            vts = vtables_of_col(col_rva)
+            base_vts = []
+            for btd in base_td_rvas(col_rva):
+                if btd == td_rva:
+                    continue
+                for bcol in col_rvas_of_td(btd):
+                    base_vts.extend(vtables_of_col(bcol))
+            print(f"  COL rva=0x{col_rva:x} base={[td_name(b) for b in base_td_rvas(col_rva)[1:]]}")
+            for slots in vts:
+                distinct = len(set(slots))
+                ovr = [
+                    i for i, v in enumerate(slots)
+                    if not any(i < len(bv) and bv[i] == v for bv in base_vts)
+                ]
+                all_ovr.update(slots[i] for i in ovr)
+                print(f"    vtable slots(.text)={len(slots)} distinct_fns={distinct} override_or_new={len(ovr)} inherited={len(slots) - len(ovr)}")
+    print(f"  union override_or_new (distinct .text addr, all vtables of {arg}) = {len(all_ovr)}")

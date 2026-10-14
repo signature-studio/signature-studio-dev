@@ -141,3 +141,28 @@
 |---|---|---|
 | SC の ramp 式 `(1-t)*a+t*b` を、ソースと照らして意図する式かを確認する | 「SC が誤り」と断定はしていない。どちらが正しい式かは未確定 | #1264 (FA-18 の bit 一致化判定) |
 | 200/200 bit 一致 (§A3-2 の未達) | Gain の意味同一性の判定 | #1264 |
+
+### §A5-2. value 17 件の位置対応・再配置・指す先の切り分け (#2024, 実測)
+
+- 測定 commit: `2ca41218` (追加した 3 本のスクリプトを含む commit。`git diff 2ca41218 HEAD -- tools/targets/freshair` は 0 行)。
+- 再現: `ks_identity.sh` → `ks_rdata_class.py` → `ks_rdata_value.py` (§A5 と同じ入力)。追加で `ks_rdata_value_pos.py` (位置対応)・`ks_rdata_reloc_check.py` (DIR64 再配置)・`ks_rdata_rva_target.py` (RVA 候補の指す先)。素材は `plugins-kilohearts` (Windows installer の `windows.zip` から `HeartCore.core_64`) と `plugins-freshair` (`fetch.sh` で `SlateCore.core_64`)。
+- 入力の再現: `ks_rdata_value.py` は §A5 と同一の `{"abs_vs_const": 8, "dbl": 13, "fn_value_differs": 17, "int": 23, "rva_off_absent": 72, "text": 23}` を再現した (EXIT=0、0.77 s real)。
+- 位置対応 (`ks_rdata_value_pos.py`、value 17 関数の 32 B × 対。8 B 語 736 組): `same` 597・`rva_pair` 72・`dbl_pair` 14・`other` 29・`text` 24。
+  - `dbl_pair` 14 組は全て同符号で、ulp 差が **16 以上** (丸め差ではない)。関数別は `0x181040d20` 2・`0x181049d40` 4・`0x18104a270` 8。一致は 0 件。
+  - `rva_pair` 72 組の RVA delta (`sc_off - kh_off`) は 27 種類に散る。最頻は `-0x133640e` の 18 件で、単一の配置ずれでは説明できない。
+- 再配置 (`ks_rdata_reloc_check.py`、DIR64 対象の RVA 集合。SC 32,376 件・KH 380,327 件): 参照スロット 736 語のうち SC 再配置対象 **3 語**・KH **5 語**。RVA 候補は、絶対ポインタとして再配置されていない。
+  - ただし DIR64 でない 32 bit の RVA テーブルは、この検査では区別できない。RVA か整数定数かは未判定。
+- RVA 候補の指す先 (`ks_rdata_rva_target.py`、先頭 8 B): `rva_pair` 72 組は **72 / 72 で不一致** (`target8_ne`)。うち差が 256 未満の組は 27 件 (整数の近い値)。
+- 判定 (受入 4 件に対応):
+  - 受入 1 (RVA か定数か): **部分達成**。絶対ポインタではない (再配置 3+5 語のみ) ことは示したが、RVA テーブルと整数定数の区別は未了。
+  - 受入 2 (dbl の位置対応・件数): **達成**。同位置の dbl 対 14 件、全て不一致 (ulp 16 以上)。
+  - 受入 3 (REPORT 追記): 本節で達成。
+  - 受入 4 (定数値の差か配置差か): **定数値の差が支持される**。配置差なら指す先の 8 B が揃うはずだが 72 / 72 で不一致、dbl も同位置で一致しない。ただし指す先の 8 B しか見ておらず、さらにポインタを辿る先は未追跡。「意味が違う」の根拠ではない (§A5 の読みを維持)。
+
+#### 未解決 (#2024 の範囲外・残件)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| RVA 候補 72 組が RVA テーブルか整数定数か | 受入 1 の残り。配置差の補正 (RVA 差分正規化) ができない | #52 (残件) |
+| 指す先の 8 B 以降・さらに先のポインタの追跡 | 受入 4 の「定数値の差」判定の下限 | #52 (残件) |
+| `other` 29 組の中身 (abs と RVA の混在など) | 件数の内訳が未確定 | #52 (残件) |

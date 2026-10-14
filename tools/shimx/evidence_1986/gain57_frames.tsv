@@ -1,0 +1,58 @@
+unit	lva	base_seq	shimx_seq	base_iso	shimx_iso	shimx_seq_top_site	shimx_iso_top_site	shimx_seq_shim_calls	nofix_iso
+88	0x19f9a0	halt0	oob	halt0	oob	function_418190@0x94810	function_407a50__lifted@0x17ffe3	{"QueryPerformanceCounter": 1}	halt0
+161	0x26e010	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+221	0x2d7640	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+234	0x2fd0a0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+238	0x30f910	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+239	0x3121e0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{"GetProcAddress": 9, "LoadLibraryW": 1}	ok
+240	0x31d1a0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+246	0x333090	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+273	0x3f5350	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+277	0x40f980	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{"GetModuleHandleW": 1, "GetProcAddress": 5, "WideCharToMultiByte": 5, "GetSystemMetrics": 5}	ok
+280	0x4136d0	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+303	0x46d240	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{"GetModuleHandleW": 1, "GetProcAddress": 1, "WideCharToMultiByte": 1, "RegisterWindowMessageW": 2}	ok
+308	0x4b2080	halt0	oob	oob	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	oob
+309	0x4b43f0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+312	0x4cb690	halt0	oob	oob	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	oob
+314	0x4d8840	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+329	0x502960	halt0	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+366	0x577100	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+369	0x5810f0	halt0	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+370	0x581550	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+416	0x5b6180	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+422	0x5cefd0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+425	0x5d95f0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+430	0x5df8a0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+433	0x631210	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+493	0x6d5700	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+494	0x6d9ba0	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+504	0x6ee5a0	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{"TlsGetValue": 3}	halt0
+509	0x722ae0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+510	0x739ca0	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+520	0x776a70	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+586	0x8217b0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+598	0x82eff0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+605	0x844460	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{"TlsGetValue": 3}	halt0
+616	0x8620b0	halt0	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+648	0x897ac0	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+650	0x89c620	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+653	0x8aa5b0	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+662	0x8f06e0	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+667	0x90eee0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+670	0x933480	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+720	0x9db790	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+767	0xb55b10	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+771	0xb8cba0	halt0	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+807	0xc2b010	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+830	0xcc3210	halt0	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+851	0xd02fb0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+865	0xd562a0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+866	0xd573e0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+874	0xe51210	halt0	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+877	0xe53c20	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+881	0xe63540	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+891	0xebf9b0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+899	0xf06110	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
+908	0xf314e0	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+918	0xf4c760	ok	oob	ok	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	ok
+936	0xf74350	halt0	oob	halt0	oob	function_407a50__lifted@0x17ffe3	function_407a50__lifted@0x17ffe3	{}	halt0
