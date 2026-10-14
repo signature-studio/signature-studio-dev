@@ -34,25 +34,28 @@
 
 ## 検証
 
-測定 commit: `f2e03058` (コードを変えた最後の commit。main (`b2b052ce`) を取り込んだ merge。衝突は `tools/python/tests/provider_check.mjs` の定数表と件数だけ)。測定は同 commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから行った。
-環境: runner 4 core、測定開始時の load average 1.45 (`uptime`)。`FL_WIN64_DIR` は [WIN64] の展開先 (runner の一時領域)。素材 `toolchain-emsdk` は取得されていなかったため、[EMSDK] を `emsdk install 6.0.12` で取得し、docs の規定位置に symlink した。
+測定 commit: `239cf962` (コードを変えた最後の commit。main (`88cdda96`) を取り込んだ merge。衝突は `tools/python/tests/provider_check.mjs` の定数表と件数だけで、両側の集合 (stub41・stub89・pe87) を残して解消した)。測定は同 commit のクリーンな作業ツリー (`git status` 空) で、`provider/build.sh` を再実行してから行った。
+環境: runner 4 core、測定開始時の load average 1.80 (`uptime`)。`FL_WIN64_DIR` は [WIN64] の展開先 (`$RUNNER_TEMP/fl-win64`、`fl-win64` を展開)。素材 `toolchain-emsdk` は `$ARTIFACTS_DIR` に無かったため、[EMSDK] (`docs/REFERENCES.md`) の規定位置に upstream から `git clone` + `emsdk install 6.0.12` で取得し、`emsdk activate 6.0.12` した。
+
+前提の生成物 (測定前に作成・gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 14 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | exit 0・ハンドラ 81 | 0.75 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 81 / 未実装 354 / MCP 静的 60) | 0.30 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 83 | — |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 83 / 未実装 352 / MCP 静的 60) | 0.28 秒 |
 | `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.04 秒 |
 | `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.30 秒 |
+| `node tests/channels_diff.mjs` | calls 122、diffs 0、PASS (main 由来の stub89 を含む) | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.51 秒 |
 
-件数の変化: main の取り込みで `channels.getChannelType` が公開 stub 確定 (REPORT_PY41_1514) として加わったため、本 PR 単独の測定 (実装 80 / 未実装 355) から実装 81 / 未実装 354 に変わった。上の表は取り込み後の値。
+件数の変化: 本 PR 単独 (base `bae12679`) は実装 80 / 未実装 355 だった。main の取り込みで公開 stub 確定が増えた: `channels.getChannelType` (REPORT_PY41_1514、main `88b0f1c3` で加わった) → 実装 81 / 未実装 354。さらに main `88cdda96` が `channels.getChannelIndex`・`channels.getChannelMidiInPort` (REPORT_PY41_1514 追補・PY-89) を stub 確定として加えたため、実装 83 / 未実装 352 になった。内訳: MCP 60 + device 5 + mig 5 + pe39 1 + stub41 6 + stub89 2 + pe87 4 = 83 (total 435)。上の表は取り込み後の値。
 
-前提の生成物 (測定前に作成・gitignore): `bash fetch_inputs.sh`・`bash build_cpython_wasm.sh` (2 分 12 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh`。
+ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `changedFlag` 既定値 (17 行目) を `0` から `1` にすると、`node tests/general_diff.mjs` は `AssertionError: general 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 9・diffs 0・PASS (rc 0)。比較は同じ commit で行った。
 
-コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
+コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外。本 REPORT を含む md のみの commit を後から足しても 0 行のまま):
 
 ```
-$ git diff f2e03058 HEAD -- tools/python ':!*.md'
+$ git diff 239cf962 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
