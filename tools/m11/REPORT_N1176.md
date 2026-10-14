@@ -62,7 +62,7 @@
 ## 6. HEAD での再確認 (run 1176・測定 commit `ebad5b80`)
 
 - 測定 commit: `ebad5b80` (origin/main。worktree `1176-m11-build-recheck`)。runner: 4 vCPU・16 GiB。
-- 素材: fl-win64・toolchain-emsdk (`/opt/emsdk`)・toolchain-retdec・work-m11 (`tools/m11/work/`)・work-liftdiff を展開。
+- 素材: fl-win64・toolchain-emsdk ([EMSDK])・toolchain-retdec・work-m11 (`tools/m11/work/`)・work-liftdiff を展開。
 - `functions_dll.csv`: Ghidra 12.1.4 (sha256 `ddac49f9…` 一致・JDK 21・`DumpFunctions.java`) で再生成。rc 0・521 s・2,087,706 bytes。
   - 注: `analyzeHeadless` の JVM ヒープは `-Xmx` 引数ではなく環境変数 `MAXMEM=12G` で渡す (`-Xmx16G` は InvalidInputException)。
 - 手順と実測:
