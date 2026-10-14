@@ -6,9 +6,9 @@
 
 ## 1. 測定
 
-- 測定 commit: 本 REPORT を含む commit (コミット後の HEAD。`git diff <測定 commit> HEAD -- tools/m11/ldfix` の出力は空)
-- 基準 (着手直後の origin/main e53d845b): `audit_lsf_ssa_e2e.sh` rc=0・所要 113 s・7/7 完了 (`M11_WORK` / `LD_WORK` は main の `tools/m11/work`・`tools/liftdiff/work` を指定)。status 未判定 120 / 確定 51 / 判定不能 7。
-- 変更後 (本 commit): 同じ audit rc=0・所要 約 113 s・7/7 完了。status 未判定 **117** / 確定 **54** / 判定不能 7。増分は判定 3 件 (cf3c7a・cf3cbb・cf3d20) のみ。
+- 測定 commit (コードを変えた最後の commit): `d96d4a97` (判定 3 件とスペル TSV の更新)。後続の `0b5edbd9` は REPORT の表の 1 行だけで、`git diff d96d4a97 HEAD -- tools/m11/ldfix` は REPORT_2287.md の表記のみ (コード・判定・TSV は差分 0)。
+- 基準 (origin/main e53d845b・判定変更前): `audit_lsf_ssa_e2e.sh` の step 7 で status 未判定 120 / 確定 51 / 判定不能 7 (`results/spill178_1161.tsv` 元の集計)。
+- 測定 (d96d4a97): `M11_WORK=<main の tools/m11/work> LD_WORK=<main の tools/liftdiff/work> bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` rc=0・所要 112 s (11:38:28〜11:40:20 実測)・7/7 完了・load average 0.91・`results/` と cmp 一致。status 未判定 **117** / 確定 **54** / 判定不能 7。増分は判定 3 件 (cf3c7a・cf3cbb・cf3d20) のみ。
 - step 6 ネガティブコントロール (negctl_510.sh) は両回とも完了し、rc=0 (NC1〜NC7)。
 - step 7 の `results/spill178_1161.tsv` は再生成して cmp 一致 (差分は 3 行の status 変化だけ)。
 
