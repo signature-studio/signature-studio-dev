@@ -24,11 +24,16 @@ const calls = [
   ["general.getChangedFlag", []], ["general.getUseMetronome", []],
   ["general.getPrecount", []], ["general.getRecPPQ", []],
   ["general.getVersion", []],
+  // PY-125 (#3001): 戻り値 None。dumpScoreLog は time (必須 int) と silent (任意 int)
+  ["general.clearLog", []], ["general.dumpScoreLog", [0]], ["general.dumpScoreLog", [-7, 1]],
 ];
 // 引数個数違い (NOARGS の関数に引数を渡す): mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
   ["general.getChangedFlag", [1]], ["general.getUseMetronome", [0]],
   ["general.getPrecount", [1]], ["general.getRecPPQ", [0]],
+  // PY-125: 個数違い・型違い (code 5)
+  ["general.clearLog", [1]], ["general.dumpScoreLog", []], ["general.dumpScoreLog", [0, 1, 2]],
+  ["general.dumpScoreLog", ["x"]],
 ];
 
 const diffs = [];
