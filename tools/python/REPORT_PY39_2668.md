@@ -32,13 +32,13 @@
 
 ### 測定
 
-- 測定 commit: `9172cfc9` (コード変更の最後の commit。`tools/python/analysis/flapi/pe_callgraph.py` を追加)。`git diff 9172cfc9 HEAD -- tools/python/provider tools/python/host tools/python/tests` は本 REPORT の commit 時点で 0 行 (本 PR はこれらのコードを変えない)。
+- 測定 commit: `64d751bd` (コード変更の最後の commit。`tools/python/analysis/flapi/pe_callgraph.py` を `9172cfc9` で追加し、`64d751bd` で usage の素材パスを `$ARTIFACTS_DIR` に直した)。`git diff 64d751bd HEAD -- tools/python/provider tools/python/host tools/python/tests` は本 REPORT の commit 時点で 0 行 (本 PR はこれらのコードを変えない)。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` から `block00031_PE.bin` のみ展開 (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`・2.9 秒)。展開先は `tools/python/work/fl` (gitignore)。
 - 再現 (`FL_WIN64_DIR=<展開先>` で実行):
   - 所属関数: `python3 analysis/flapi/pe_callgraph.py func 0x103b781 0x103b9ec 0x103be3a 0x103c01c`
   - 前進閉包: `python3 analysis/flapi/pe_callgraph.py fwd 0xd5b150,0xd843d0,0xd5b100,0x11e8670,0xff8a90,0xffac20 0x103b710,0x103b950,0x103ba10,0x103bd60,0x103bec0 60`
   - 段 6: `python3 analysis/flapi/pe_disasm.py 0xd82c20 70` と、各 `lea rdx, [rip+…]` 先の文字列 (下表)
-- 実測: `fwd` 終了 0・36.0 秒・閉包 566 関数・間接 call 命令 191 箇所・標的 hit 0。測定直後の load average (1 分値) 0.31 (4 core)・並列数 1。
+- 実測: `fwd` 終了 0・閉包 566 関数・間接 call 命令 191 箇所・標的 hit 0 (`9172cfc9` で 36.0 秒。`64d751bd` での再実行は同じ結果)。測定直後の load average (1 分値) 0.55 (4 core)・並列数 1。
 
 ### `*p` の書込み元の所属関数と直接 call
 
