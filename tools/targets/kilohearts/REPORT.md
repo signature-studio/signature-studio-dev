@@ -215,7 +215,7 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 - 環境: Ghidra 12.1.4 = GitHub release `Ghidra_12.1.4_build` の zip (sha256 `ddac49f9…d2db` 一致)、JDK 21。素材は `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64。emsdk は `[EMSDK]` (6.0.12)。
 - 変更: `ghidra_shim.h` の `V128` に `_0_8_`・`_8_8_` (uint64) と `_4_12_` (12 byte) のレーンを追加 (commit は本 PR)。
 - emcc (resonator, 修復なし, `-ferror-limit=0`, 同一条件): 旧 shim 22 行 (`_8_8_`/`_4_12_`/`_0_8_` 由来 8 件) → 新 shim 18 行 (そのレーン由来 0 件)。
-- 残件 (emcc): (a) テーブル `UNK_182280000`・`UNK_182280020` が未定義 (`pe_bytes` は 1 グローバル 16 byte しか読まない)、(b) 未関数化 callee `func_0x000180fd648c`・`func_0x000180fd6498`・`func_0x000180fd662c`・`func_0x000180fbdfcc`・`func_0x000180fbdef4`・`FUN_180fe5f40`・`FUN_180fd3144`、(c) `rcpps` の 2 引数形 (戻り値形の helper を生成。突合は REPORT_APPENDIX §10-7o)、(d) 引数なし呼出の `param_1` 不足 (本節の件数は run 時点の記録。残件の件数は REPORT_APPENDIX §10-7o 以降の該当節を参照)。
+- 残件 (emcc): (a) テーブル `UNK_182280000`・`UNK_182280020` が未定義 (`pe_bytes` は 1 グローバル 16 byte しか読まない)、(b) 未関数化 callee `func_0x000180fd648c`・`func_0x000180fd6498`・`func_0x000180fd662c`・`func_0x000180fbdfcc`・`func_0x000180fbdef4`・`FUN_180fe5f40`・`FUN_180fd3144`、(c) `rcpps` の 2 引数形 (戻り値形の helper を生成。突合は REPORT_APPENDIX §10-7o)、(d) 引数なし呼出の `param_1` 不足 (件数の正本は REPORT_APPENDIX §10-7o を参照)。
 - Resonator のビルドは**依然失敗**。突合・ablation・ネガコンは未実施。
 - 回帰確認 (新 shim・同一 HEAD): Gain 1000/1000 (wasm 15,161 B)・Haas 1000/1000 (16,878 B)・Gate 1000/1000 (17,367 B)。wasm サイズは §10-3 の値と一致。Ghidra decompile は 10 関数すべて OK。突合の実測秒は未計測 (emcc 0.2〜0.3 s)。
 
@@ -240,4 +240,4 @@ VEX-256 は 344 関数 189,611 B 中 **closure 内は 6 関数のみ** (Convolve
 
 #### 10-7g. #1215 (KH-23) 再 run: 呼出名 `func_0x…` の統一 (部分)
 - 結論: `ghidra_to_c.py` の呼出名統一で emcc error 31 → 25 件。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。詳細と実測は付録 `REPORT_APPENDIX.md` §10-7g。
-- #1405 (KH-25) の 1 単位: `rcpps` 2 引数形 (dst 書戻し形) と `GetLastError`/`SetLastError`。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact。件数・実測・測定 commit は付録 `REPORT_APPENDIX.md` §10-7k。
+- #1405 (KH-25) の 1 単位: `rcpps` 代入形の固定と converter ガード、`GetLastError`/`SetLastError` の stub。Resonator は依然未通過。Gain/Haas/Gate 1000/1000 bit-exact。件数・実測・測定 commit は付録 `REPORT_APPENDIX.md` §10-7o。
