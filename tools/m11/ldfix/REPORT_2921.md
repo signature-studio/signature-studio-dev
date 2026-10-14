@@ -35,7 +35,7 @@ git diff 5e0177c7 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ld
 | `ddff5a` → `[rbp+0xa0]` (← `[rbp+0xb8]`) | 複写 (2 段のまま) | `429862` `store %26 → stack_var_-280`: 1 段 | `ddf766`→`ddf776` `[rax+0x14]`、`ddf7c6` call `0x12df210` の this / IR `429101`・`429132`・`429187` | TRUE_DROP |
 | `de0bfe` → `[rbp+0xc0]` (← `[rbp+0x80]`) | 複写 (2 段のまま) | `430849` `store %25 → storemerge23`: 1 段 | `de023d` `[rax+0x14]`、`de0266` → call `0x40fe90` の this / IR `430128`・`430139`・`430185`・`430250` (de022d ブロック以降) | TRUE_DROP |
 
-- 機械語の対応 (2 段参照・複写・消費者) は `python3 tools/m11/ldfix/ld138_ddf630_dis.py` で再現する (出力に上表の行が全て出る)。
+- 機械語の対応 (2 段参照・複写・消費者) は `python3 tools/m11/ldfix/ld138_ddf630_dis.py` で再現する。出力は主要行のみ (4 site の範囲の命令・`[rbp+0x80/0xa0/0xb8/0xc0]` を読む mov/lea・`want` の IR 11 行)。上表の次の行は出力されない: 機械語 `ddf776`・`de023d` (`cmp dword [rax+0x14],0`)、`ddfffa`・`ddf7c6` (call)、IR `429101`・`429132`・`429187`。全行の根拠は下記の JSONL。
 - 根拠の全文は `tools/m11/ldfix/results/candidate_verdicts_2921.jsonl` (4 行)。
 
 **spill 宛 178 site の集計 (`spill178_1161.tsv`) の変化**
@@ -64,8 +64,8 @@ git diff 5e0177c7 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ld
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `ddf630` の TRUE_DROP 4 site の IR 修復 pass (1 段 load に 2 段目の deref を補う) | 脱落関数の和集合 75 件の 1 件として残る。修復は本 issue の受入条件の外 | 親 #2838 へ提案 (修復の子 issue の起票は PM 判断) |
-| `[C]` の実値と消費者内部の値の読み方の検証 (動的検証) | TRUE_DROP の確度 (限界の節) | 親 #2838 へ提案 (`REPORT_2838.md` §3 の限界と同じ扱い) |
+| `ddf630` の TRUE_DROP 4 site の IR 修復 pass (1 段 load に 2 段目の deref を補う) | 脱落関数の和集合 75 件の 1 件として残る。修復は本 issue の受入条件の外 | [LD-143] #2987 (親 #2838) |
+| `[C]` の実値と消費者内部の値の読み方の検証 (動的検証) | TRUE_DROP の確度 (限界の節) | PM 判断・未起票 (`REPORT_2838.md` §3 の限界と同じ扱い) |
 
 ## 6. 再現
 
@@ -73,5 +73,5 @@ git diff 5e0177c7 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ld
 tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst
 tar --zstd -xf $ARTIFACTS_DIR/work-liftdiff.tar.zst
 bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh     # 7/7 (約 2m40s)
-python3 tools/m11/ldfix/ld138_ddf630_dis.py   # 4 site の機械語・消費者・IR 行
+python3 tools/m11/ldfix/ld138_ddf630_dis.py   # 4 site の機械語・消費者・IR の主要行 (全行は results/candidate_verdicts_2921.jsonl)
 ```
