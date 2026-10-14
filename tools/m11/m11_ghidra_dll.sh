@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # functions_dll.csv (FLEngine の関数表 = Ghidra 12.1.4 headless + DumpFunctions.java の出力) を作る (#3172)。
 # m11_bounds.py / m11_tail.py の入力で、素材 (R2) には含まれない。既に有れば何もしない。
-# Ghidra は GHIDRA_HOME → /opt/ghidra の順に探し、無ければ公式 release を取得して sha256 を検査する (fail-closed)。
+# Ghidra は GHIDRA_HOME (docs/REFERENCES.md の [GHIDRA] の install 先) で指定できる。未指定なら公式 release を取得して sha256 を検査する (fail-closed)。
 # JDK は JAVA_HOME_21 (既定 /usr/lib/jvm/temurin-21-jdk-amd64)。PE は M11_PE / FL_WIN64_DIR で指定する。
 # 使い方: bash tools/m11/m11_ghidra_dll.sh
 set -euo pipefail
@@ -23,7 +23,6 @@ JDK="${JAVA_HOME_21:-/usr/lib/jvm/temurin-21-jdk-amd64}"
   || { echo "[ghidra_dll] JDK 21 無し: $JDK (JAVA_HOME_21 で指定; fail-closed)" >&2; exit 1; }
 export JAVA_HOME="$JDK" PATH="$JDK/bin:$PATH" MAXMEM="${MAXMEM:-8G}"
 GH="${GHIDRA_HOME:-}"
-if [ -z "$GH" ] && [ -x /opt/ghidra/support/analyzeHeadless ]; then GH=/opt/ghidra; fi
 if [ -z "$GH" ]; then
   GH="$CACHE/ghidra_${GHIDRA_VER}_PUBLIC"
   if [ ! -x "$GH/support/analyzeHeadless" ]; then
