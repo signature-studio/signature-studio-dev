@@ -17,7 +17,7 @@
 |---|---|
 | 測定環境 | runner (Linux x86_64)。並列 1 (単一プロセス)。load は `uptime` の 1 分平均で、sweep 終了直後 0.83 (sweep 前の値は未採取) |
 | 素材 | `work-icall` のみ (`tools/icall/work/` へ `tar --zstd -xf` で展開、実測 10〜16 s)。`FA_CORE` は `tools/icall/work/rt_freshair-core/rw.dll` |
-| emsdk | 展開せず、runner 既存の `/opt/emsdk` (`[EMSDK]`) を `fa_route_build.sh` が source |
+| emsdk | 展開せず、runner 既存の `[EMSDK]` (`docs/REFERENCES.md` §4) を `fa_route_build.sh` が source |
 | fixed route 生成 | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh`: 10.4 s (単独実行) |
 | 単発 fa_cmp | 0.15 s 前後 (n=8)。件数 0 の 0x180da6e60 は 0.14 s |
 | fa_sweep | `bash tools/icall/diff/fa_sweep.sh 8 60`: 74.5 s (単独) |
