@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# lift_closure_x64c.sh — 対照 Gain の before 160 閉包を x64c で lift し、emcc の compile・link・smoke まで通す (#850 / KH-19d)。
-#   usage: KH_CORE=<HeartCore.core_64 のパス> OUT=<出力先 (repo 外)> [EMSDK=<emsdk のルート>] bash scripts/lift_closure_x64c.sh
+# build_closure_x64c.sh — 対照 Gain の before 160 閉包を x64c で lift し、emcc の compile・link・smoke まで通す (#850 / KH-19d)。
+#   usage: KH_CORE=<HeartCore.core_64 のパス> OUT=<出力先 (repo 外)> [EMSDK=<emsdk のルート>] bash scripts/build_closure_x64c.sh
 #   入力: gain_before_160.tsv の root 行 (root_class が空でない 27 行) を roots とする。
 #   出力: $OUT/lift/ (lift 結果 C・fle_data.c・kh.cjs・kh.wasm)、$OUT/compile.log・link.log・smoke.log。
 #   前提: python3 (pefile, capstone)・emcc (未設定なら EMSDK の emsdk_env.sh を読む)・node。
