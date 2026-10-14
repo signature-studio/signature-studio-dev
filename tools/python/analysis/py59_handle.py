@@ -15,7 +15,8 @@ def main():
     path = sys.argv[1]
     pe = pefile.PE(path, fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
-    data = open(path, "rb").read()
+    with open(path, "rb") as fh:
+        data = fh.read()
 
     def raw(va):
         rva = va - base
