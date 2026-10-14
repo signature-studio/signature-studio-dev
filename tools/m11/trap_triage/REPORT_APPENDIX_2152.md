@@ -5,7 +5,7 @@ REPORT_944.md §11 の付録。測定 commit: **`28db3b3a`** (コードを変え
 ## 1. 結論 (受入条件 1〜4)
 
 - **受入 1 (後続経路の IR 突合・部分)**: unit 158 は IR 上 `function_66d1a0` (VA `0x26d1a0`・IR 行 231236)。直接 call の到達は 303 関数。
-  2 区間の読出しは `function_412c20` (`0x11e6a2c`) 経由で到達する。j=12 の dest (k=148) は ON で `0x10a9e0b8` (len 1) で、2 区間の外。
+  2 区間を直接読む関数は §3 の一覧のとおり (`function_412c20` は `0x11e6a2c` を読む 1 経路)。j=12 の dest (k=148) は ON で `0x10a9e0b8` (len 1) で、2 区間の外。
   **未確定**: 2 区間を読む `412c20` の結果が j=12 の後続の ok/trap を変えるかは、この run では測っていない。
 - **受入 2 (ON の 2 区間への書込み)**: **達成**。OFF と ON の `[rw]` 書込み集合 (site・addr・val・width) は 738 件で完全一致。
   ON の再実行でも一致 (決定性)。
@@ -58,8 +58,9 @@ j=12 (0 始まりで 13 行目) は `dest=0x10a9e0b8 len=1`。`n>0` 経路で `f
 | dest ON | `M11_PRINT_DEST_2118=1` (`INSTR=0` のため `[rw]` は出ない) | 0,1,158 = ok/ok/ok・dest 28 件 | 84 s | — |
 | dest OFF | 同上 (OFF) | 0,1,158 = ok/ok/ok・`[d413060]` は出ない (OFF 側の dest 値は未記録・§6) | 85 s | 0.91 |
 
-dest 段で確認したのは `[d413060]` の dest 値 (ON のみ) と ok/trap だけ。dest 段の build は `[rw]` を出さないので、rw 集合の一致はこの段からは言えない (rw 集合の根拠は watch build の表 §2 のみ)。
 | 既定 survey | `env -u M11_INSTR_413060 node m11_survey.mjs` | ok 870 / trap 24 / miss 47 / noproc 1 / units 942 | 16.0 s | 0.60 |
+
+dest 段で確認したのは `[d413060]` の dest 値 (ON のみ) と ok/trap だけ。dest 段の build は `[rw]` を出さないので、rw 集合の一致はこの段からは言えない (rw 集合の根拠は watch build の表 §2 のみ)。
 
 既定 survey の 870/24 は REPORT_944 §6.1 (870/24) と一致。既定 build の `boot_final3.ll` md5 は `baa100ff37a790dc1103c26a2e648d12` (§10 と一致)。
 watch 系の 2 回の ON で `[rw]` 集合が一致 (決定的)。
@@ -74,5 +75,5 @@ watch 系の 2 回の ON で `[rw]` 集合が一致 (決定的)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `412c20` の結果 (2 区間の読出し) が j=12 の後続の ok/trap を変えるかの確定 (ON で 2 区間を読む経路の値差) | 意味的差か観測副作用かの判定 (REPORT_944 §4 (a)) | 子 issue (本 run で起票) |
-| OFF 側の dest 値の直接記録 (`m11_ov.c` の print は C 版 413060 のみ) | OFF/ON の dest 値の 1 対 1 比較 | 同上 |
+| `412c20` の結果 (2 区間の読出し) が j=12 の後続の ok/trap を変えるかの確定 (ON で 2 区間を読む経路の値差) | 意味的差か観測副作用かの判定 (REPORT_944 §4 (a)) | #2203 |
+| OFF 側の dest 値の直接記録 (`m11_ov.c` の print は C 版 413060 のみ) | OFF/ON の dest 値の 1 対 1 比較 | #2203 |
