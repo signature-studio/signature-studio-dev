@@ -8,9 +8,10 @@
 コード差分: `git diff 1f6c107b e2c0814c -- tools/m11 ':!*.md'` は main 取り込み由来のみ (`m11_ov.c`・`m11_rt.c`・`m11_build.sh`・`probe_entry.sh` を含む 82 ファイル)。build 経路のうち `aa56c459..e2c0814c` の差分は `tools/m11/ldfix/` の 6 ファイル (`audit_undefload_dest.py`・`verify_dest_2202.py`・結果 JSON/TSV) のみで、`ldfix.py`・`ldmach.py` は差分 0。`m11_ov.c`・`m11_rt.c`・`m11_build.sh`・`m11_gen_ir2.sh` は `aa56c459` から変わっていない。既定値 (`M11_DEST_GUARD=0`・`M11_INSTR_413060` 未設定) の生成物は、下の既定 build の survey が基準 `870/24/0` と一致したことで確認した (バイト比較はしていない)。
 
 `e2c0814c` での実測 (直列・単発・foreground・各 timeout 付き・素材 fl-win64 / work-m11 / toolchain-emsdk・`m11_gen_ir2.sh` で `ir_conditions.json` 再生成 F1=902 F3c=36 errors=0):
-- `repro_1389.sh`: **PASS** (全体 1 分 27.3 秒)。OFF 12.621 s (load 1.14) / OFF 再実行 12.742 s (load 1.08) / ON 12.672 s (load 1.05)。OFF/OFF 再実行 227 件一致 (差分 0)、ON は 0x26d1a0 j=12 の 1 件差 (`st` `len` `rc` `h` の 4 フィールド)。
-- 既定 build の survey: `units 942, ok 870, noproc 1, miss 47, trap 24, clobber 0` (12.976 s、load 1.32)。基準 870/24/0 と一致。
-- `M11_DEST_GUARD=1` (ON ゲート `M11_OV_413060=1` 併用) の build + survey: `ok 870 / trap 24 / clobber 0`、dest 指紋 `ac2d2efb758d4bb1`、dest 記録 227 件、記録の st は 0 が 198・1 が 29、**st=3 は 0 件**。同一 build の 2 回目も記録 227 件が完全一致 (所要 12.751 s / 12.373 s、開始 load 0.59 / 0.75)。
+- `repro_1389.sh` (再検証 run・`2aa202ba`・直列・foreground・timeout 付き): **PASS** (全体 1 分 8.4 秒 real)。OFF 8.528 s (load 0.90) / OFF 再実行 8.007 s (load 0.93) / ON 8.187 s (load 0.95)。OFF/OFF 再実行 227 件一致 (差分 0)、ON は 0x26d1a0 j=12 の 1 件差 (`st` `len` `rc` `h` の 4 フィールド)。dest 指紋は OFF `acb2345ddb678281`・OFF 再実行 `acb2345ddb678281`・ON `bdf43798da38f253`。
+- 既定 build の survey (再検証 run): `units 942, ok 870, noproc 1, miss 47, trap 24, clobber 0` (8 s、load 0.99)。基準 870/24/0 と一致。
+- `M11_DEST_GUARD=1` (ON ゲート `M11_OV_413060=1` 併用) の build + survey (再検証 run): `ok 870 / trap 24 / clobber 0` (8 s、load 0.94)、dest 指紋 `ac2d2efb758d4bb1`、dest 記録 227 件、記録の st は 0 が 198・1 が 29、**st=3 は 0 件**。同一 build の 2 回目も (8 s、load 0.83) 記録 227 件が完全一致 (ファイル `cmp` 一致)。
+- `M11_DEST_GUARD=0` の ON (読出しあり) の survey (再検証 run): `ok 869 / trap 25 / clobber 0`。9.1 表の既定 ON 行と一致。
 - 注: `M11_OV_413060` を付けずに `M11_DEST_GUARD=1` だけで build した survey (ゲート OFF 相当) は `dest_obs_hash acb2345ddb678281` で、OFF と同じ値になった。ON の比較には `M11_OV_413060=1` が要る。
 
 §9.1 の表は測定 commit `1f6c107b` 時点の値 (下の表)。`e2c0814c` の値は上の本文と一致する。
@@ -26,7 +27,8 @@
 | ON (`M11_DEST_GUARD=1`) 2 回目 (同一 build) | 870 | 24 | 227 | ok | `ac2d2efb758d4bb1` (記録 227 件完全一致) | 所要は 1 回目と同じ build | 0.67 |
 | ON (`M11_DEST_READ=0`・§8 の既存値・本 run では再測定せず) | 870 | 24 | — | ok | — | — | — |
 
-- 全体 (`repro_1389.sh`・既定 build・3 run + cmp): 105.95 s (`time` の real)・判定 `PASS`。
+- `2aa202ba` (= `e2c0814c` と同コード) での再検証 (上の本文の値): 表は `1f6c107b` 時点のまま残す。本文の再検証値と突き合わせると、件数・指紋・unit 158 の差分は一致する。
+- 全体 (`repro_1389.sh`・既定 build・3 run + cmp): 105.95 s (`time` の real)・判定 `PASS` (`1f6c107b` 時点)。
 - ガード 1 の ON の記録で範囲外の読出し (st=3) は **0 件**。すなわち読出しの範囲外アクセスは起きていない。
 - 値の差: unit 158 の j=12 (呼出し k=148) のみ。OFF は `*dest` が NULL (len 0)、ON は長さ 1 の文字列 (refcount 1)。ガード 0/1 の両方で残る。
 - 決定性: OFF 2 回で記録 227 件が完全一致 (差分 0)。
