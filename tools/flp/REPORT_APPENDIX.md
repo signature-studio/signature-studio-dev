@@ -148,9 +148,19 @@
 | P6 | VA `0x67240d` の書式即値 0 → 2 | 0 | 14 s | 16-bit | `2e067272` |
 
 - 同一入力 3 回 (B) の SHA-256 は一致 (`2e067272…`)。本 run の値は §15 の `13d61a05…` と異なる (run・環境差。§15 の表と同じ扱い)。
-- 前段 (変更前の probe、`S2_REG` で `Software\Image-Line\FL Studio 26\General\Render` に `WAV bit depth`=0/1/2/3・`Export WAV`=1・`Dither`=0 を書いた 4 試行): すべて 16-bit。`user.reg` には値が残る (`"WAV bit depth"="3"`) が、`/R` は読まなかった (16.2)。
+- P1〜P6 の入力行 (`S2_PATCH`): 実行時の行は記録が残っていない (シェル履歴・ログに無い)。下記は表の VA と書換え内容から組み直した行で、**再実行は未実施**。`s2_imm_patch.py` を素材 `block00031_PE.bin` (FLEngine_x64.dll) のコピーに当てると期待バイトが一致し (exit 0)、逆アセンブルは `movzbq 0xe18(%rax),%rcx` → `mov $0x1,%ecx`、`movb $0x0,0x28(%rsp)` → `movb $0x1,…` / `$0x2` になる。
 
-**16.2 トレース** (T、開かれたレジストリキー 759 種): `General\Render` は **0 件**、`WAV bit depth`・`Export WAV` の読出しも 0 件。開かれたのは `General\WAVRenderForm` (30 回) と `General\WAVRenderForm (mixer)` (1 回) など。→ `/R` は `RenderOptions.load` (VA `0xeec630`) を通っていない。
+```
+P1: S2_PATCH=$'ef6d4b|480fb688180e0000|b9010000000f1f00' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P2: S2_PATCH=$'a64b66|c644242800|c644242801' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P3: S2_PATCH=$'6725e1|c644242800|c644242801' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P4: S2_PATCH=$'6725e1|c644242800|c644242802' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P5: S2_PATCH=$'67240d|c644242800|c644242801' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+P6: S2_PATCH=$'67240d|c644242800|c644242802' bash tools/flp/s2_render_probe.sh Autogun.flp 1
+```
+- 前段 (変更前の probe、`S2_REG` で `Software\Image-Line\FL Studio 26\General\Render` に `WAV bit depth`=0/1/2/3・`Export WAV`=1・`Dither`=0 を書いた 4 試行): すべて 16-bit。`user.reg` には値が残る (`"WAV bit depth"="3"`)。`/R` がこの値を読んだかは未測定 (16.2)。
+
+**16.2 トレース** (T、開かれたレジストリキー 759 種。抽出するのは `NtOpenKeyEx` の鍵名だけ): `General\Render` を単一の相対名で開く記録は **0 件**。開かれたのは `General\WAVRenderForm` (30 回) と `General\WAVRenderForm (mixer)` (1 回) など。`Render` 単独・`General` 直下からの open は未確認。`General` を開いてから `Render` を相対名で開く経路は、`General\Render` の文字列検索では見えない。`WAV bit depth`・`Export WAV` の値の読出しは未測定 (probe は値名を抽出しない)。鍵名は末尾の `"` を含む (`sed` が行末の `"` を除かない。件数には影響しない。次の再測定で直す)。このため `RenderOptions.load` (VA `0xeec630`) を `/R` が通るかは、本測定からは判定できない。
 
 **16.3 静的所見** (`FLEngine_x64.dll`、ImageBase `0x400000` 込みの VA。`objdump -d` と目視、未確定の推定を含む)
 - `RenderOptions.load` の `WAV bit depth` (VA `0xeec933`): 読込ヘルパ `0xeec5d0` が `[0,2]` に丸めて `obj+0xe18` (1 byte) に格納。構築側 `0xedff36` の `movb $0x2,0xe18(%rcx)` が既定値 2。
@@ -160,12 +170,16 @@
 - `0x670fd0` の直接の呼出し元: `0x672130` (書式は 6 番目の引数)、`0x672390` (書式 0 の即値は VA `0x67240d` = P5・P6)、`0xa64b6b` (書式 0 の即値は VA `0xa64b66` = P2)。`0x672130` の呼出し元は `0x672580` (書式 = `r8b`。`0xef6e2d` から `0x45` を渡す)、`0x6725c0` (書式 0 の即値は VA `0x6725e1` = P3・P4)、ほか 8 箇所。`0x672390` の呼出し元は wrapper `0x696a60` と `0x11e9704`。
 - 32-bit float (fmt タグ 3) を書くコードは、上記の範囲では確認できなかった。
 
-**16.4 解釈と次の一手**: `/R` は `General\Render` を読まず、保存された書式は使われない。構築側の既定値 2 は効いていない。P1〜P6 のいずれも出力を変えなかったため、採用されている書出し経路はこれら即値を通らない。次は `/R` のコマンドライン処理から書出し関数までを追う (#3052)。
+**16.4 解釈と次の一手**: 本測定から言えるのは次まで。(1) `General\Render` を単一の相対名で開く記録は無い (16.2)。(2) P1〜P6 と S2_REG の 4 試行 (16.1 前段) では出力は変わらなかった (すべて 16-bit)。(3) 出力が変わることを確かめる正の対照は無い。よって「保存された書式は使われない」「即値は通らない」とは結論しない。次は `/R` のコマンドライン処理から書出し関数までを追う (#3052)。
 
-**未解決** (`| 未解決 | 影響 | 起票先 |`)
+**差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff aafd1c76 HEAD -- tools/flp/s2_render_probe.sh tools/flp/s2_imm_patch.py tools/startup tools/assets` の出力は空 (0 行)。本節を含む REPORT の commit (`tools/flp/REPORT.md`・`tools/flp/REPORT_APPENDIX.md`) だけが HEAD の差分。
+
+**未解決**
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `/R` の 32-bit float 経路 (書式を決める値・関数) が未特定 | 受入 1 未達 | #3052 ([L-14]) |
 | Render tests 82 本 + Demo 3 本の全数書き出しと sha256・メトリクス JSON の commit | 未着手。16-bit では受入 2 を満たさない | #3053 ([L-15]、依存は #3052) |
 | `RenderOptions` の保存値を `/R` が読まない理由 (ダイアログ経由の load 経路か) | 設定経由で形式を切り替えられない | #3052 |
-| data SHA-256 が run・環境で変わる (`2e067272` 本 run / `13d61a05` §15) | 決定性は同一 run 内 3 回一致まで | #2546 にコメント |
+| `Render` 単独・`General` 直下からの open と、`WAV bit depth`・`Export WAV` の値の読出しが未測定 (probe は `NtOpenKeyEx` の鍵名だけ抽出) | `RenderOptions.load` を `/R` が通るかを判定できない | #3052 |
+| P1〜P6 の入力行は未記録。§16.1 の行は組み直しで、未再実行 | §16.1 の P1〜P6 の結果は組み直した行では確認していない | #3052 |
+| data SHA-256 が run・環境で変わる (`2e067272` 本 run / `13d61a05` §15) | 決定性は同一 run 内 3 回一致まで | #2546 にコメント済み (issuecomment-6178890982) |
