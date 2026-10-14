@@ -140,8 +140,13 @@ export class PmApp {
   // ---------------------------------------------------------------- manifest flow
   private setup(u: URL): Response {
     if (this.record()) return html("<p>Already configured. Setup is closed.</p>", 409);
-    const state = randomToken(24);
-    this.d.store.put("meta", "setupState", { state, exp: this.d.now() + SETUP_TTL_MS });
+    // /setup は無認証。有効 (期限内) な state があれば上書きせず同じものを返す (第三者が開いても進行中の手順を壊せない。期限は延ばさない)。
+    let saved = this.d.store.get<{ state: string; exp: number }>("meta", "setupState");
+    if (!saved || this.d.now() > saved.exp) {
+      saved = { state: randomToken(24), exp: this.d.now() + SETUP_TTL_MS };
+      this.d.store.put("meta", "setupState", saved);
+    }
+    const state = saved.state;
     const manifest = JSON.stringify(buildManifest(u.origin));
     const org = this.d.cfg.org;
     const action = `https://github.com/organizations/${encodeURIComponent(org)}/settings/apps/new?state=${encodeURIComponent(state)}`;
@@ -156,10 +161,11 @@ export class PmApp {
     const code = u.searchParams.get("code") ?? "";
     const state = u.searchParams.get("state") ?? "";
     const saved = this.d.store.get<{ state: string; exp: number }>("meta", "setupState");
-    // state は /setup で発行したものだけを、1 回・期限内に限り受け付ける (他人が用意した code で上書きされない)。
+    // state は /setup で発行したものだけを、期限内に限り受け付ける (他人が用意した code で上書きされない)。
+    // /setup は同じ state を返すので第三者も state を知り得る。state は org 所有の App への変換に成功したときだけ消費する
+    // (不正な code で callback を叩かれても、進行中の手順の state は失効しない)。
     if (!saved || this.d.now() > saved.exp || !safeEqual(state, saved.state)) return html("<p>Invalid or expired state. Open /setup again.</p>", 400);
     if (!/^[0-9a-f]{20,64}$/i.test(code)) return html("<p>Invalid code.</p>", 400);
-    this.d.store.del("meta", "setupState");
     const r = await this.d.fetch(`https://api.github.com/app-manifests/${code}/conversions`, {
       method: "POST",
       headers: { accept: "application/vnd.github+json", "user-agent": "signature-studio-pm-worker" },
@@ -182,6 +188,7 @@ export class PmApp {
       installationId: null,
     };
     this.d.store.put("meta", "app", rec);
+    this.d.store.del("meta", "setupState");
     return html(
       `<p>Created. 次に <a href="https://github.com/apps/${esc(rec.slug)}/installations/new">Install</a> を押し、signature-studio-dev を選んでください。` +
         `(鍵と secret は暗号化して保管し、ここには表示しません。)</p>`,
