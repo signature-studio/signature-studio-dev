@@ -16,12 +16,20 @@
 // M11_PTRCHECK_INJECT=<offset> を与えると、その offset に M11_PTRCHECK_INJECT_VALUE (既定 0x400000) を書き込む (ネガティブコントロール)。
 // M11_PTRCHECK_DUMP=<path> を与えると、範囲内の新規 word を "offset value" (10 進) の行で書き出す (分類の検証用)。
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 export const IMG_VA_LO = 0x400000;
 export const IMG_VA_SIZE = 0x1ac0000;
 const inRange = (v) => v >= IMG_VA_LO && v < IMG_VA_LO + IMG_VA_SIZE;
 const hex = (n) => '0x' + n.toString(16);
-const M11 = new URL('./', import.meta.url).pathname.replace(/\/$/, '');
-const CLASSES = process.env.M11_PTRCLASS || (M11 + '/work/ptrclass/classes.json');
+const M11 = path.dirname(fileURLToPath(import.meta.url));
+const CLASSES = process.env.M11_PTRCLASS || path.join(M11, 'work', 'ptrclass', 'classes.json');
+
+// 検証用 env (M11_PTRCHECK_INJECT・M11_PTRCHECK_INJECT_VALUE) の整数。非整数は例外にする (黙って 0 番地や NaN を書かない)。
+export function envInt(name, raw) {
+  if (!/^(0x[0-9a-fA-F]+|\d+)$/.test(raw)) throw new Error(`${name}=${raw} は整数ではない (10 進または 0x 付き 16 進)`);
+  return Number(raw);
+}
 
 // 分類の定数集合を読む。ファイルが無い・壊れている場合は available=false (分類は行わず、基準付きなら不合格)。
 export function loadClasses(file = CLASSES) {
@@ -47,8 +55,9 @@ export function ptrPre(mod, n) {
 export function ptrCheck(mod, pre, maxEnv = 'M11_PTRCHECK_MAX_NEW', unremapEnv = 'M11_PTRCHECK_UNREMAP_MAX') {
   const inj = process.env.M11_PTRCHECK_INJECT;
   const w = new Uint32Array(mod.HEAPU8.buffer, 0, mod.HEAPU8.length >>> 2);
-  const injV = process.env.M11_PTRCHECK_INJECT_VALUE ? Number(process.env.M11_PTRCHECK_INJECT_VALUE) : IMG_VA_LO;
-  if (inj !== undefined && inj !== '') w[Number(inj) >>> 2] = injV;
+  const injRaw = process.env.M11_PTRCHECK_INJECT_VALUE;
+  const injV = injRaw ? envInt('M11_PTRCHECK_INJECT_VALUE', injRaw) : IMG_VA_LO;
+  if (inj !== undefined && inj !== '') w[envInt('M11_PTRCHECK_INJECT', inj) >>> 2] = injV;
   const cls = loadClasses();
   const offs = [];
   const boffs = [];

@@ -111,7 +111,8 @@ if a.hits:
     deltas = collections.Counter(o - site_of[v][0] for o, v in hit_d if v in site_of)
     if deltas:
         dl, dn = deltas.most_common(1)[0]
-        print('D: %d words, most common (heap offset - image DIR64 site) = 0x%x for %d words (block copy if equal to count)' % (len(hit_d), dl, dn))
+        dtxt = ('-0x%x' % -dl) if dl < 0 else ('0x%x' % dl)
+        print('D: %d words, most common (heap offset - image DIR64 site) = %s for %d words (block copy if equal to count)' % (len(hit_d), dtxt, dn))
     print('distinct B+D values %d' % len(byv))
     for v in sorted(byv, key=lambda x: -len(byv[x])):
         s = section_of(v)

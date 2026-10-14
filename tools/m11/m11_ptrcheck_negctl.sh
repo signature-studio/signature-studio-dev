@@ -12,6 +12,8 @@
 # 既定 offset は REPORT_N1004.md の実測で使った 22519877 (検出側が >>>2 で word 化する)。
 # 分類の定数集合 work/ptrclass/classes.json は m11_ptrclass.py で作る (無ければ (c)(d) は FAIL)。
 # --survey: 同じ検査を survey (m11_survey.mjs, 基準 M11_PTRCHECK_SURVEY_MAX_NEW・分類 B は M11_PTRCHECK_SURVEY_UNREMAP_MAX) に対して行う (1 回約 16 s)。
+#   未検証: --survey の (a)〜(e) は実行されたことがない (素材 work-m11 が無く survey 用 wasm を作れない・REPORT_N3113.md §5)。
+#   特に分類 B の (c)〜(e) は survey で一度も走っていない。survey の wasm (_m11_set_va_unit_budget を持つもの) は #3129 で作る。
 set -u
 cd "$(dirname "$0")"
 SCRIPT=m11_run.mjs; TAG=M11_RESULT; MAXVAR=M11_PTRCHECK_MAX_NEW; UMAXVAR=M11_PTRCHECK_UNREMAP_MAX
