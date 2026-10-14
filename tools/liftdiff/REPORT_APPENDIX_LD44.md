@@ -11,7 +11,7 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `be017fb1` (コードは `92a145a5` から変えていない。差分は §4 の `session.py` 1 行のみ)。PR head (`f17bd43e`) との差分は `results/` と本 REPORT のみ (§4)。
+- 測定 commit: `be017fb1` (コードは `92a145a5` から変えていない。差分は §4 の `session.py` 1 行のみ)。PR head (`87b51836`) との差分は `results/` と本 REPORT のみ (§4)。
 - 測定 runner: 4 vCPU・メモリ 15 GiB。load は測定中 0.3 → 5.7 の範囲 (`uptime`)。
 - 素材: `fl-win64` (`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)・`work-m11` (`tools/m11/work/`)・`work-liftdiff` (`tools/liftdiff/work/`)・`toolchain-emsdk` (`[EMSDK]`, emscripten 6.0.12) を展開して使用。
 - 生データ:
@@ -54,9 +54,9 @@ e2e 条件 (`liftdiff.py batch targets/m11.json --set sample:800 --shards 12 --n
 - 92a145a5 の 3 回で変化した `0x43a3f0`・`0x50abe0`・`0x959a40` は `be017fb1` の 3 回では変化しなかった。`0x5c5500`・`0x1060950` も pattern の内訳が前回と違う。case outcome の揺れは run 間で続いている。
 - §8.2 の 3 関数 (`0x5c5500`・`0x67e2b0`・`0x903d50`) は `be017fb1` の 3 回で verdict が安定している。`0x5c5500` は case outcome が揺れ (unexec)、`0x67e2b0` は mismatch・`0x903d50` は match で固定。
 
-## 4. 測定経路の差分 (`92a145a5` → `be017fb1` → PR head `f17bd43e`)
+## 4. 測定経路の差分 (`92a145a5` → `be017fb1` → PR head `87b51836`)
 
-- `git diff 92a145a5 HEAD -- tools/liftdiff/ldlib` の出力 (ae802a4c の 1 行。HEAD = PR head `f17bd43e`。`be017fb1` と同じ内容):
+- `git diff 92a145a5 87b51836 -- tools/liftdiff/ldlib` の出力 (ae802a4c の 1 行。PR head `87b51836` と `be017fb1` で同じ内容):
   ```
   diff --git a/tools/liftdiff/ldlib/session.py b/tools/liftdiff/ldlib/session.py
   @@ -174,7 +174,7 @@ class Session:
@@ -69,8 +69,8 @@ e2e 条件 (`liftdiff.py batch targets/m11.json --set sample:800 --shards 12 --n
 - ただし、これは `be017fb1` の測定データからの確認で、旧コード (`92a145a5`) を同じ素材で走らせた比較ではない。92a145a5 の r1 (361) と `be017fb1` の r1 (360) の 1 件差が差分由来かどうかは、この測定では確定しない (run 間の揺れの範囲内に見える)。
 - 差分の集計 (`git diff --stat` の実行結果):
   - `92a145a5` → `be017fb1` (測定 commit): `git diff --stat 92a145a5 be017fb1 -- tools/liftdiff tools/m8 tools/ott tools/m11` = **24 files changed, 660 insertions(+), 41 deletions(-)**
-  - `92a145a5` → PR head `f17bd43e`: `git diff --stat 92a145a5 HEAD -- tools/liftdiff tools/m8 tools/ott tools/m11` = **29 files changed, 765 insertions(+), 41 deletions(-)** (増分は PR 自身の `results/` と本 REPORT)
-- 測定 commit `be017fb1` から PR head `f17bd43e` までのコード差分 (`git diff --stat be017fb1 HEAD -- tools/liftdiff tools/m8 tools/ott tools/m11`、`results/` と本 REPORT を除く): **0 件** (`git diff be017fb1 HEAD -- tools/liftdiff/ldlib` も空)。よって測定値は PR head のコードに対応する。
+  - `92a145a5` → PR head `87b51836`: `git diff --stat 92a145a5 87b51836 -- tools/liftdiff tools/m8 tools/ott tools/m11` = **29 files changed, 770 insertions(+), 41 deletions(-)** (増分は PR 自身の `results/` と本 REPORT、`tools/m11/` の REPORT 類を含む)
+- 測定 commit `be017fb1` から PR head `87b51836` までのコード差分 (`git diff --stat be017fb1 87b51836 -- tools/liftdiff tools/m8 tools/ott tools/m11`、`results/` と本 REPORT を除く): **0 件** (`git diff be017fb1 87b51836 -- tools/liftdiff/ldlib` も空)。よって測定値は PR head のコードに対応する。
 
 ## 5. 未解決
 
