@@ -61,7 +61,7 @@
 
 ```sh
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64      # extracted/block22434_PE.bin を展開済みであること
-source /opt/emsdk/emsdk_env.sh
+source "$EMSDK_ENV"   # [EMSDK] の emsdk_env.sh (docs/REFERENCES.md §4)
 python3 tools/plugins/slayer_engine_ia32/measure.py --dump        # gate C1〜C4
 python3 tools/plugins/slayer_engine_ia32/lift_text.py             # roots → x64c → emcc -c → 被覆
 O=tools/plugins/slayer_engine_ia32/work/lift_text
