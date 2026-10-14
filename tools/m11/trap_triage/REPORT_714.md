@@ -196,3 +196,41 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 **未解決 (変更なし、起票先 #714 / 子 `[M11-N91]` #1426)**: OOB 時の `tbl`・`cnt`・`obj` の実値は未採取。wasm の関数引数 (local) を読む手段が現行ツールに無い (`oob_insn.py` は命令の逆引きのみ)。実値採取には、probe を使わず wasm local を読む計測の追加が要る。これは `[M11-N91]` の範囲。
 
 判定: 受入 1・2 は未達のまま (本 run は再現と計測器の影響の確認まで)。
+
+## 12. 実値採取の再試行 (#1426, 2026-10-14, n=1)
+
+測定 commit `cb3a89a6` (origin/main, 本 PR の作業ベース。コード変更なし)。素材は `$RUNNER_TEMP/fl-win64`・`tools/m11/work/` (work-m11)・`$RUNNER_TEMP/retdec`・`$RUNNER_TEMP/emsdk` に展開 ([EMSDK]・[RETDEC] は既存)。`FL_WIN64_DIR` 指定。`M11_FIX_535BF2` 既定 0 (OFF)。load average は開始時 0.66。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490693 行、§10 と一致) | 39.0 秒 |
+| `m11_build.sh` | rc=0 (`m11_boot.cjs(+.wasm)`) | 23.4 秒 |
+| `m11_survey.mjs` (通常 build) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 14.4 秒 |
+| `check_682.py` | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | - |
+
+**probe 版で実値を採る試行は失敗**。`probe_entry.sh` で入口 dump を入れると、対象 unit が `trap` でなく `halt0` (DllMain 完了後の longjmp) で止まり、`[pe]` 行は 0 件だった。
+
+| 試行 | survey 結果 (`SURVEY_UNITS`) | `[pe]` 行 | 所要 |
+|---|---|---|---|
+| `probe_entry.sh p535 535bf2,410b10 304,923` | `halt0: 2` (304・923 とも起動直後に停止) | 0 | 40.0 秒 |
+| `probe_entry.sh p923 410b10 923` | `halt0: 1` | 0 | 未計測 (所要は記録せず) |
+| probe 後の復元 → 通常 build survey | ok 870 / trap 24 / noproc 1 / miss 47、check_682 2/5 (§10 と一致) | - | 14.4 秒 |
+
+- 復元 (`probe_entry.sh` の trap restore) で通常 build の判定は元に戻った。probe 版の結果は本判定に使わない。
+- 含意: 入口 dump の `call` を挿入すると、304・923 の OOB は trap でなく別経路 (halt0) に変わる。§10 下位節 11 の「probe の挿入が OOB の挙動を変える」は、この unit では trap 自体が消えることを意味する。OOB 直前の値を入口 dump で採る方式は、この 2 unit では使えない。
+- `m11_survey.mjs` は wasm の関数 local を出さないため、trap 時点の `tbl`・`cnt`・`obj` の値はこの手段では読めない (§10 下位節 11 と同じ結論)。
+
+**鮮度の注記 (差し戻し対応 run, 2026-10-14)**: 本 PR の HEAD は main 取り込み後 (`af3b1d7e`)。`git diff cb3a89a6 HEAD -- tools/m11` には本節の追記と他 area の REPORT (md) 追加も含まれ、実行されるコードの差分は main 側の `tools/m11/ldfix/bin_table_pre_boot.mjs` (新規 29 行、#942 の診断用。`m11_gen_ir2.sh`・`m11_build.sh`・`m11_survey.mjs`・`check_682.py` のいずれも参照しない) の 1 件だけ。上の表は測定 commit `cb3a89a6` の数値として残す。差分はパイプライン外だが、`toolchain-retdec`・`work-m11` が `$ARTIFACTS_DIR` に無いため HEAD での再測定はできていない。
+
+### 判定 (本 run)
+
+- 受入 1 (304・555 の OOB 直前の `obj`・`*(obj+8)`・`*(obj+8)+8`・`obj+0x10` の実測): **未達**。実値は未採取。
+- 受入 2 (923 の `function_410b10` 入口の `obj` 実測): **未達**。
+- 受入 3 (回帰 0): **確認**。通常 build の survey は ok 870 / trap 24 (§10 と一致)、check_682 は 2/5 のまま。
+
+### 未解決 (次の一手)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 実値の採取手段。入口 dump は 304・923 を halt0 に変える。wasm local を trap 時点で読む手段が現行ツールに無い | 受入 1・2 が未達 | #1426 (継続) / 親 #714 |
+| 採取手段の候補 (未着手): (a) `m11_ov.c` の C 版 (`M11_FIX_535BF2=1`) の内部で `tbl`・`cnt` を stderr に出す (C 側は wasm local を直接読める)、(b) trap 直前の `i32.load` の address を `m11_survey.mjs` の catch で wasm memory から逆算する | 同上 | #1426 の範囲 (次 run) |
