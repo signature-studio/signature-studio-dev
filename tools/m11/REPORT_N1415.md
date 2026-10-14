@@ -88,11 +88,11 @@ python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408
 ## 8. #1597 (M11-N103) の二分結果: ok 862→866・866→868 の変化点 (#2163)
 - 測定の条件: 各 commit で `git archive <commit> tools/m11 tools/shim tools/shared tools/m6` を展開し、work-m11 の lift 中間物 (`boot0..6.lift.ll`) と `m11_image.bin` だけ外から置く。`M11_LDFIX=1 bash m11_gen_ir2.sh` → `m11_data_gen.py` → `m11_image_gen.py` → `M11_QSTORE=0 bash m11_build.sh` → `node m11_survey.mjs`。`FL_WIN64_DIR` は fl-win64 の PE 1 member。`m11_data.c` と `m11_image.bin` は commit ごとに作り直す (`m11_e2e.sh` と同じ順)。
 - 環境: 4 vCPU。Node v22.23.3。1 commit の測定は gen 18〜83 秒・build 13〜51 秒・survey 8〜31 秒 (2〜4 並列で実行したため、時間は並列数で変わる)。load average は直列測定時 0.66 (`uptime`)、並列時は未記録。
-- 測定 commit (本 PR の起点): `6444b186` (main)。現 head `75016a1c` は未再測定。`75016a1c` で測定範囲にコード差分があるため、`6444b186` の測定値は現 head の値として扱わない。
-- 鮮度の証跡 (検証起点 `6444b186` → 現 head `75016a1c`): `git diff --stat 6444b186 HEAD -- tools/m11 tools/shim tools/shared tools/m6` の出力は空ではなく、次のとおり。
+- 測定 commit (本 PR の起点): `6444b186` (main)。現 head `72bf1144` は未再測定。`6444b186`〜`72bf1144` の間で測定範囲にコード差分があるため、`6444b186` の測定値は `72bf1144` の値として扱わない。
+- 鮮度の証跡 (検証起点 `6444b186` → 検証 commit `72bf1144`。この節の追記を含む fix commit は `72bf1144` の後): `git diff --stat 6444b186 72bf1144 -- tools/m11 tools/shim tools/shared tools/m6` の出力は空ではなく、次のとおり。
   ```
-  $ git diff --stat 6444b186 HEAD -- tools/m11 tools/shim tools/shared tools/m6
-   tools/m11/REPORT_N1415.md                          |   89 +-
+  $ git diff --stat 6444b186 72bf1144 -- tools/m11 tools/shim tools/shared tools/m6
+   tools/m11/REPORT_N1415.md                          |  132 +-
    tools/m11/ldfix/REPORT_2141.md                     |   69 +
    tools/m11/ldfix/REPORT_2143.md                     |  124 ++
    tools/m11/ldfix/REPORT_2144.md                     |   72 +
@@ -127,9 +127,9 @@ python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408
    tools/m11/trap_triage/probe1676_u114.mjs           |    2 +-
    tools/m11/trap_triage/repro_1952_rt_mech.sh        |   65 +
    tools/shared/REPORT_APPENDIX.md                    |    1 +
-   35 files changed, 5502 insertions(+), 72 deletions(-)
+   35 files changed, 5545 insertions(+), 72 deletions(-)
   ```
-  - 測定に効くのは `m11_build.sh`・`m11_ov.c`・`m11_rt.c`・`m11_post.py` の差分 (生成 IR と build に入る)。HEAD の ok 値は、これらを含む commit で再測定するまで未確定。
+  - 内訳の注記: 5502 (旧 head `75016a1c` 時点) から 5545 への +43 は、`75016a1c`→`72bf1144` の REPORT_N1415.md 自身の変更 (+46/-3) による。5545 のうち REPORT_N1415.md の差分は `6444b186`→`72bf1144` で +130/-2 で、いずれも本 REPORT の追記でありコードの差分ではない。測定に効くのは `m11_build.sh`・`m11_ov.c`・`m11_rt.c`・`m11_post.py` の差分 (生成 IR と build に入る)。現 head `72bf1144` の ok 値は、これらを含む commit で再測定するまで未確定。
   - `c613a4ea` (本節の REPORT 追記 commit) は `6444b186` の子孫で、その差分は `tools/m11/REPORT_N1415.md` の +49 行のみ (コードは変えていない)。`75016a1c` は `origin/main` (`f4c37e6a`) の取り込み merge で、`c613a4ea` の子孫。上の差分のコードは main 側の commit 由来。
   - 測定対象の範囲にある差分 0 の測定済み commit は無い (`3bdae05d` からでも 208 files の差分、`4c3f7458` からでも 117 files)。よって §6 の基準 (差分 0 の commit で測り直す) は満たせない。素材 `work-m11` が runner に無く、この run では再測定もできない。
 
@@ -165,7 +165,7 @@ first-parent で `e07cc83f`〜`3bdae05d` を測った (merge 単位、各 n=1)�
 | `b6e4eb42` | Merge PR #1261 (882-m11-oob-95-895-recheck-8bc34ed9) | 867 | 27 | 47 |
 | `35c3425b` | Merge PR #1326 (1134-ldfix-root-cause) | 867 | 27 | 47 |
 | `3bdae05d` | Merge PR #1316 (1096-m11-enumdisplaymonitors-callback) | **868** | 26 | 47 |
-| `6444b186` (測定 commit。現 head `75016a1c` の値ではない) | — | **868** | 26 | 47 |
+| `6444b186` (測定 commit。現 head `72bf1144` の値ではない) | — | **868** | 26 | 47 |
 
 - first-parent 上の code 変更 commit の列: `e07cc83f`(866) → `2c77e8b0`(867) → (途中 14 件は未測定。902f1132・b6e4eb42 は 867 と測定済み) → `35c3425b`(867) → `3bdae05d`(868)。`e07cc83f`→`2c77e8b0` の間に code 変更 commit は無いので、**866→867 の変化点は `2c77e8b0` の merge の差分**。`35c3425b`→`3bdae05d` の間は code 変更 commit が `3bdae05d` の 1 件だけなので、**867→868 の変化点は `3bdae05d`**。
 - `8bc34ed9` (866) は `e07cc83f` (866) の祖先で、`b6e4eb42` (867) の枝にも含まれる。merge 単位の表は祖先関係どおりに並べていないため、時系列の単調性は主張しない。`b6e4eb42` (867) の内部で 867 を起こす commit は未分解。
