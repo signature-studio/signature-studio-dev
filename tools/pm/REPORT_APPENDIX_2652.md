@@ -142,7 +142,7 @@ git diff 63e2e584 HEAD -- infra/pm-worker/src infra/pm-worker/test
 | 内訳 (open `oc:no-pr` 199 件) | 件数 | 落ちる条件 |
 |---|---:|---|
 | 検出 (`no_pr`) | 33 | - |
-| `authorAllowed` で落ちる | 48 | 起票者が `pycabbage` (`User`・`author_association` = CONTRIBUTOR)。`pm.ts:55` の ASSOC_OK (MEMBER / OWNER / COLLABORATOR) にも、許可 bot にも当たらない |
+| `authorAllowed` で落ちる | 48 | 起票者が `pycabbage` (`User`・`author_association` = CONTRIBUTOR)。`pm.ts:55` の `authorAllowed` は `ASSOC_OK` (`webhook.ts:194`: MEMBER / OWNER / COLLABORATOR) にも、許可 bot にも当たらない |
 | `HOLD_LABELS` (`pm-apply` / `needs-user-input`) | 12 | `pm.ts` の `HOLD_LABELS` |
 | `answeredAfter` (PM の応答が後) | 4 | `pm.ts` の `answeredAfter` |
 | outcome の reason が検出の対象外 | 102 | artifact 74・blocked 20・unknown 8 (unknown は注 2 の `npCount` = 0 の影響を受ける) |
