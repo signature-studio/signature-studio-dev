@@ -12,8 +12,9 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
   `CreateEngine` (0x18000b1a0) / `entry_point` (0x18000bb98) で、RetDec は名前付きの `function:` として出力しており、
   `define @CreateEngine` / `define @entry_point` は final.ll に存在する。 `engine_defs.py` は `function_<VA>` 形式しか見ないため、この 2 件は偽陽性。
 - ネガティブ/切替の実測: `PLUG_NO_STATIC_DETECT=1 bash tools/plugins/dynamics/engine_lift.sh 19048` で `missing_define` 210 → **2** (97 B)、`missing_ref` 67 → **0**、`define` 1,504 → 1,712。
-- 19252 は切替前後とも 2 件 (165 B) で不変 (静的検出の対象外。 原因は未特定のまま)。
-- ただし切替後の 19048 は `emcc -c` rc 1 (fixcmp 後も rc 1): `e.final.ll` の `%arg2` i32/i64 不整合 (既存の修正対象) の後に、`e.fixcmp.ll` で `%penv` の i64/ptr 不整合が露見 (未修正)。 既定の切替は `lift_ranges.sh` の既定値 (#1486) に関わるため、既定の変更は本 run では行わない。
+- 残りの 2 件 (19252 の 165 B / 19048 の 97 B) は、いずれも dsm で `function: <名前> at <VA>` として出る `CreateEngine` / `entry_point` で、`final.ll` に `define @CreateEngine` / `define @entry_point` が存在する。 `engine_defs.py` の偽陽性だったため、本 run で名前付き define を計上するように修正した (commit db4fe1f0)。 これで両 engine の実在の欠落は 0 件。
+- 既定値 (`lift_ranges.sh` の `PLUG_NO_STATIC_DETECT:-1`) は commit 0d51d876 (#1536) で切替済み。 本 run は既定のまま測定した。
+- `engine_fixcmp.py` の `%penv` 修正は commit 5457975c (#1163) で入っており、切替後の 19048 は fixcmp 後 `emcc -c` rc 0。 raw の `final.ll` は `%arg2` i32/i64 の型不整合で rc 1 のまま (既存の修正対象。 `engine_fixcmp.py` で吸収)。
 
 ## B. fixcmp の call 引数拡張による 19048 の `emcc -c` 解消 (#1163 run)
 
@@ -30,3 +31,12 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 - 生成 helper C (`tools/plugins/work/dynamics/simdchk<B>/m11_simd.c`、`msimd11_core.h` を親 dir に置いて `emcc -c`): 19252 rc 0 / 19048 rc 0。
 - 未実装 helper の残件は両 engine とも 5 件 (`movntps`・`vmovsd` store・`vcomisd`・`vucomisd`・`vucomiss`。19048 は `vcomisd__22` を含む)。 #1408 の範囲。
 - 共有鎖 (`lift/passes/`・`lift_ranges.sh`) への影響なし (本変更は `dynamics/engine_fixcmp.py` のみ)。
+
+## C. 旧測定 (REPORT §4 から分割移動)
+
+- 測定 commit `c0afd85b` (本 HEAD、`engine_lift.sh` 単独実行、19252 23 s / 19048 61 s)。 `engine_lift.sh` の出力: 19252 `unimpl 12 / emcc_c_rc 0 / missing_define 2`、19048 `unimpl 6 / emcc_c_rc 1 → fixcmp 後 0 / missing_define 210`。 `711d9ece` の値と一致 (表は変更なし)。
+- 生成 helper C (`*_simd.c`) の `emcc -c`: 本 HEAD の `m11_simd2.py` で `tools/plugins/work/dynamics/simdchk<B>/m11_simd.c` を生成 (入力 `work/dynamics/engine<B>/e.final.ll`、`python3 lift/passes/m11_simd2.py <final.ll> > m11_simd.c`)。 `#include "../msimd11_core.h"` を `"msimd11_core.h"` に書換えて `emcc -c -msimd128 -w -O0 m11_simd.c -o o.o`。 結果: 19252 rc 0、19048 rc 0。 両 engine とも `__asm_int3` の宣言は `declare i64 @__asm_int3()` (戻り値あり版) のため、int3 の `void` 版の経路は通らない。
+- 測定 commit `711d9ece` 以降のコード差分: `git diff 711d9ece HEAD -- tools/plugins/lift/passes/m11_simd2.py` は int3 の 1 行のみ (`f2bbad10`)。 `hs_callee_disasm.py` は `engine_lift.sh` の実行経路外 (reviewer 確認)。 この差分を含む `c0afd85b` で再測定し、表の値は一致した。
+- int3 の影響: 両 engine の `e.final.ll` の `__asm_int3` は `i64` 戻り値の宣言 (1 件ずつ) のため、旧 void 版の `return 0;` 問題には当たらない。 `void` 版の修正そのものは合成 `.ll` のみで確認 (下記)。
+- int3 修正 (`m11_simd2.py`・本 HEAD): `void` 版は `abort()` のみ、戻り値あり版は `abort(); return 0;` を生成する。 `int3` を含む合成 `.ll` (`declare void @__asm_int3()` と `declare i32 @__asm_int3__1()`) で生成した C を `clang -c -Wall -Werror=return-type` で検査: 修正後 rc 0、修正前 (`f50ca8ad`) は `void function '__asm_int3' should not return a value` で rc 1。 engine 出力での確認は、上の「生成 helper C」の `emcc -c` rc 0 (両 engine、`c0afd85b`) で行った。 合成 `.ll` の検査は `void` 版の分岐を直接見るためのもの。
+- 以上は到達性の実測で、engine の正しさは何も示していない。
