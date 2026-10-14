@@ -240,3 +240,11 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 受入 4 (0x411a80 到達) **未達**: 停止点 `0x50138cf0`→`0x50138d06` (pool)。`0x5da06d` (`mov rax,[rax]`) は 1 回実行され、そのときの rcx (this) は 0。停止と this の対応は未確定。`0x407520` が `[blk+0]` を `0x867200`→`0x8c02c0` に書換える (`0x407553`) ことも確認。
 - 受入 5 (0x411bb8 の記録) **未達** (受入 4 が前提)。残件は子 issue に分割 (PR 本文の未解決表)。
 - 再現 (8eda24a9): `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000` (C)。
+
+## 17. PLG-F3-29 (#2492): 0x407a20 の間接呼出し元 (`.data` 表 0x867c88 から逆引き、測定 commit b824fd01、block19148)
+
+- 道具: `tools/plugins/f2/fptr_callers.py` (b824fd01)。全セクションで `0x407a20` を指す qword・rip 相対・rel32・即値は 0 件。囲む pdata 関数 `0x407a00` の格納元は `.data` `0x867c88` の 1 件のみ。表は 6 要素 (0x407a00・0x407dd0・0x407ff0・0x408360・0x408820・0x408880)。§15 の「要素 0 = 0x407a00」の 1 件は表の先頭。
+- 要素 0 を呼ぶ間接 call は 3 件: `0x4093ae` (囲む関数 `0x4093a0`)・`0x409455` (`0x409400`)・`0x41b294` (thunk `0x41b290`、呼出し元 `0x41b2cc`)。
+- 実経路 (`-H`、b824fd01 で再測): `0x83efb0 → 0x83cb50 → 0x83cca0 → 0x83cce5 → 0x532f00 → 0x40f4f0 → (0x40f4fe call [rax-0x30]、[0x5bac78]=0x40eb30) → 0x40eb30 → 0x40eb3c (call 0x4093a0) → 0x4093a0 → 0x4093ae (call [0x867c88]) → 0x407a00 → 0x407a20 → 0x407a5e UC_ERR_READ_UNMAPPED`。`0x409455`・`0x41b290` は `-t` で 0 件。
+- 判定 (受入): 間接呼出し元の特定 **達成**。実経路上の間接呼出し元は `0x4093ae` (スロット 0)。残る 2 件は実経路で未到達。未解決 (起票先 #2468): `[0x5bac78]` の表は 0x40eb30 の格納が多数で、この道具では絞れない。
+- 再現: `python3 tools/plugins/f2/fptr_callers.py $PE 0x407a20` (wall 17.4 秒、load 0.21)。経路は `unicorn_trace.py $PE 0x83efb0 -H -t 0x40f4fe -t 0x40eb30 -t 0x4093ae -q 0x8c3ca8 -m 2000000`。鮮度: `git diff b824fd01 HEAD -- 'tools/plugins/f2/*.py'` = 0 行 (測定時 HEAD = b824fd01)。
