@@ -9,8 +9,11 @@
 経路の辿りで最初に当たった事象で分類する (各ノードの効果は経路に依存しない):
   STORE    slot を完全に覆う rbp/rsp 基底の単純 store → その経路の reaching def
   ENTRY    関数先頭まで store に当たらない → 関数内で定義されない (caller 由来 / 未初期化)
+  CALL     slot が関数内でアドレス取得されている (escaped) 場合の call。store 探索は透過して越える
+           (callee が書いても読みの値は定義されている)。ただし call を越えて ENTRY に達した経路は
+           callee がポインタ経由で定義した可能性があるため ENTRY_AFTER_CALL (live-in 不可) とする
   BARRIER  判定を打ち切る事象:
-           - slot が関数内でアドレス取得されている (escaped) 場合の call・ポインタ経由 store
+           - escaped 関数のポインタ経由 store (別名の可能性)
            - 基底が異なる / 部分的に重なる / RMW・indexed の rbp/rsp store
   関数内に間接 jmp (IJMP) がある場合は CFG が不完全なので全 site を未判定とする。
 
@@ -86,10 +89,10 @@ def build_preds(cs, seq, va, size):
 
 
 def effect(cs, esc, ins, slot):
-    """命令 ins が slot (base, disp, size) に対して行うこと: 'BARRIER' / 'DEF' / None (透過)"""
+    """命令 ins が slot (base, disp, size) に対して行うこと: 'BARRIER' / 'DEF' / 'CALL' / None (透過)"""
     m = ins.mnemonic
     if m.startswith('call'):
-        return 'BARRIER' if esc else None
+        return 'CALL' if esc else None
     if m.startswith(READ_ONLY_PREFIX) or m == 'bt':
         return None
     base, sdisp, ssize = slot
@@ -116,17 +119,18 @@ def effect(cs, esc, ins, slot):
 
 
 def walk(cs, seq, preds, esc, ridx, slot):
-    """読み ridx から逆向きに辿る。戻り値: (outcome 集合, store 命令 addr, barrier 命令 addr)"""
+    """読み ridx から逆向きに辿る。戻り値: (outcome 集合, store 命令, barrier 命令)
+    状態は (node, call を越えたか)。call を越えた経路で ENTRY に達したものは ENTRY_AFTER_CALL。"""
     if ridx == 0:
         return {'ENTRY'}, [], []
     outs, stores, barr = set(), [], []
-    stack = list(preds.get(ridx, []))
+    stack = [(p, False) for p in preds.get(ridx, [])]
     seen = set()
     while stack:
-        j = stack.pop()
-        if j in seen:
+        j, crossed = stack.pop()
+        if (j, crossed) in seen:
             continue
-        seen.add(j)
+        seen.add((j, crossed))
         e = effect(cs, esc, seq[j], slot)
         if e == 'DEF':
             outs.add('STORE')
@@ -136,9 +140,11 @@ def walk(cs, seq, preds, esc, ridx, slot):
             outs.add('BARRIER')
             barr.append('%x %s %s' % (seq[j].address, seq[j].mnemonic, seq[j].op_str))
             continue
+        if e == 'CALL':
+            crossed = True
         if j == 0:
-            outs.add('ENTRY')
-        stack.extend(preds.get(j, []))
+            outs.add('ENTRY_AFTER_CALL' if crossed else 'ENTRY')
+        stack.extend((p, crossed) for p in preds.get(j, []))
     return outs, stores, barr
 
 
