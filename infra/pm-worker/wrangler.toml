@@ -36,8 +36,7 @@ new_sqlite_classes = ["PmDO"]
 [triggers]
 crons = ["* * * * *"]
 
-# Workers Logs。wrangler deploy は、ここに observability が無いと Worker 側の設定を enabled=false にする (config が正)。
-# 2026-10-14 の VM からの再デプロイがこれで Logs を無効にした (#2585)。削らないこと。
+# Workers Logs。ここに observability が無いと、wrangler deploy が Worker 側の設定を enabled=false にする (config が正)。削らないこと。
 [observability]
 enabled = true
 head_sampling_rate = 1

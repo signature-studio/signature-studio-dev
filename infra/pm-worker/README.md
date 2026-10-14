@@ -125,9 +125,9 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 ## テスト
 
 ```
-cd infra/pm-worker && npm test      # Node >= 22.6 (--experimental-strip-types)。依存パッケージなし。Python 3 が要る (突き合わせ)
-cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン
-cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
+cd infra/pm-worker && pnpm test      # Node >= 22.6 (--experimental-strip-types)。依存パッケージなし。Python 3 が要る (突き合わせ)
+cd infra/pm-worker && pnpm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン
+cd infra/pm-worker && pnpm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 
 `pnpm install --frozen-lockfile` が要る (`test:unit` と `test:workers` は devDependencies の vitest を使う)。lockfile は `pnpm-lock.yaml` (このディレクトリ。`package-lock.json` は 2026-10-14 に廃止。理由は『Workers Builds』節)。
@@ -257,7 +257,7 @@ Workers Builds は 2026-10-14 に接続された (『Workers Builds』節)。た
 3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]`) が出る。migration の有無はここでは分からない。
 4. デプロイ: `wrangler deploy --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。
    - **`[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。** `--keep-vars` なしの既定では、dashboard 等で変えた var は消える (`wrangler deploy --help` の説明)。特に `LIVE_LAUNCH` / `LIVE_DISPATCH`: dashboard 等で変えても、再デプロイすると `wrangler.toml` の値 (2026-10-14 以降は `"1"`) で置き換わる。切替の手順は「切替」節 (A・B) が正本で、値を変えるときも `wrangler.toml` を変えて merge してから deploy する (正本はリポジトリ)。デプロイ前に手順 2 の `mode` `mode_launch` `mode_dispatch` を見て、意図しない `live` → `dry-run` の変化が出ないことを確かめる。
-   - **Workers Logs は `wrangler.toml` の `[observability]` で決まる。** 無いと wrangler 4.151.0 は deploy のたびに `observability: { enabled: false }` を送って無効にする (2026-10-14 の VM からの再デプロイで実測。件数は #2585)。deploy 後に `GET /accounts/{id}/workers/scripts/signature-studio-pm/settings` の `observability.enabled` が `true` であることを見る。
+   - **Workers Logs は `wrangler.toml` の `[observability]` で決まる。** 無いと wrangler 4.151.0 は deploy のたびに `observability: { enabled: false }` を送って無効にする (実測は [tools/pm/REPORT_APPENDIX_2585.md](../../tools/pm/REPORT_APPENDIX_2585.md))。deploy 後に `GET /accounts/{id}/workers/scripts/signature-studio-pm/settings` の `observability.enabled` が `true` であることを見る。
    - secret (`STORE_KEY`) は deploy で消えない (ソースで `keepSecrets: true`、`--help` に『secrets are never deleted by deployments』)。`STORE_KEY` を作り直さない (App の鍵が復号できなくなる)。
    - Durable Object のコードを変えるだけなら migration は要らない (公式: <https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/>)。migration は適用済みの tag を飛ばして、新しい tag の分だけが deploy 時に適用される。現在の `wrangler.toml` は `v1` (`new_sqlite_classes = ["PmDO"]`) だけ。`[[migrations]]` を足す変更は、ロールバックできなくなる境界を作る (後述)。単独の PR・単独のデプロイにする。
 5. 反映の確認。
@@ -298,15 +298,17 @@ Workers Builds は 2026-10-14 に接続された (『Workers Builds』節)。た
 
 ## Workers Builds
 
-### 現状 (2026-10-14。Cloudflare API の読み取りで確認)
+### 現状
 
-Cloudflare API では接続されている (下の『接続しないと決めた理由』は、その前の判断)。ただし依頼者の承認の記録は repo に無い。#2357 の 2026-10-14 13:00:34Z の PM コメントは、依頼者に接続の操作を求めるだけで、答えは確認できていない。経緯は #2357 で確認中。設定: repo `signature-studio/signature-studio-dev`・branch `main`・root directory `infra/pm-worker`・watch paths include `infra/pm-worker/*`・preview ビルド無効・build command 空・deploy command `npx wrangler deploy`。build token は Cloudflare が自動作成した `Workers Builds - 2026-10-14 22:04`。
+Cloudflare API の読み取りでは接続されている (下の『接続しないと決めた理由』は、その前の判断)。依頼者の承認の記録は repo に無い。経緯は #2357 で確認する。測定値 (ビルドの件数と段・audit log・watch paths の実測・検証結果) は [tools/pm/REPORT_APPENDIX_2585.md](../../tools/pm/REPORT_APPENDIX_2585.md) が正本。
 
-- **install は pnpm で走る。** Workers Builds は、`infra/pm-worker/package.json` が npm を宣言していても、`infra/pm-worker` で `pnpm install --frozen-lockfile` を実行する (ビルドログで実測)。pnpm が選ばれる理由は、リポジトリ直下の `package.json` の `packageManager: pnpm@12.10.1` と推定している (未確認。ビルドログの `Detected the following tools` に `pnpm@12.10.1` が出る)。そのため `infra/pm-worker` には `pnpm-lock.yaml` が要る。`package.json` に `packageManager: npm@...` を書いても pnpm 12 が実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。lockfile が無いと `ERR_PNPM_NO_LOCKFILE` で落ちる (#2454 → #2585 の経緯)。
+設定: repo `signature-studio/signature-studio-dev`・branch `main`・root directory `infra/pm-worker`・watch paths include `infra/pm-worker/*`・preview ビルド無効・build command 空 (テストを通さずに deploy される。gate の採否は #2357)・deploy command `npx wrangler deploy`。
+
+- **install は pnpm で走る。** Workers Builds は、`infra/pm-worker/package.json` が npm を宣言していても、`infra/pm-worker` で `pnpm install --frozen-lockfile` を実行する。pnpm が選ばれる理由は、リポジトリ直下の `package.json` の `packageManager: pnpm@12.10.1` と推定している (未確認)。そのため `infra/pm-worker` には `pnpm-lock.yaml` が要る。`package.json` に `packageManager: npm@...` を書いても pnpm 12 が実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。lockfile が無いと `ERR_PNPM_NO_LOCKFILE` で落ちる (#2454 → #2585 の経緯)。
 - `pnpm-workspace.yaml` の `allowBuilds` は、pnpm 12 の `strictDepBuilds` (既定) で esbuild と workerd の postinstall を許すためのもの。依存を足して postinstall を持つものが入ったら、ここに足す (足さないと `ERR_PNPM_IGNORED_BUILDS`)。
-- `pnpm-workspace.yaml` の `minimumReleaseAgeExclude` (wrangler・@cloudflare/vitest-plugin・miniflare の exact 版 3 件) は、公開後 24 時間以内の版を lockfile install で通すための供給網ポリシーの例外。PM 判断待ち (経緯は #2585)。却下されたら該当行を削除し、2026-10-15T05:53:30Z 以降に install する。版を変えるときは exclude も見直す。
+- `pnpm-workspace.yaml` の `minimumReleaseAgeExclude` (wrangler・@cloudflare/vitest-plugin・miniflare の exact 版 3 件) は、公開後 24 時間以内の版を lockfile install で通すための供給網ポリシーの例外。PM 判断待ち (経緯は #2585)。却下されたら該当行を削除し、2026-10-15T05:55Z 以降に install する (3 版のうち最後の公開は 2026-10-14T05:54:48Z)。版を変えるときは exclude も見直す。
 - **deploy は `wrangler.toml` が正。** `[observability]` を削ると、次の deploy (VM でも Workers Builds でも) が Workers Logs を無効にする。`[vars]` も同じ (上の再デプロイの手順 4)。
-- watch paths を `infra/pm-worker/*` にしても、`infra/pm-worker` を触らない merge でビルドが走ることがある (2026-10-14 に実測。件数は #2585)。公式は『push event の変更ファイルが 0 件ならパス判定を飛ばして build する』と書く。原因は未確認。無関係な merge でも deploy が走りうる。
+- watch paths を `infra/pm-worker/*` にしても、`infra/pm-worker` を触らない merge でビルドが作られることがある (観測の詳細は付録。原因は未確認)。公式は『push event の変更ファイルが 0 件ならパス判定を飛ばして build する』と書く。無関係な merge でも deploy が走りうる。
 - ビルドの状態は `GET /accounts/{id}/builds/workers/{script_tag}/builds`、ログは `GET /accounts/{id}/builds/builds/{uuid}/logs` で読める。
 
 ### 接続しないと決めた理由 (2026-10-14 の最初の判断)
