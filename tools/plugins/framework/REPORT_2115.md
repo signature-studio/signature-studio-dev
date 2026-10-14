@@ -183,7 +183,22 @@ for m in re.finditer(b"\xe8", d):
 - 生の `E8` 走査 (上記) と capstone の線形逆アセンブル (`skipdata=True`) で call site が一致することを確認済み (68 件)。
 - 関数 VA への写像は、上記の `pe.DIRECTORY_ENTRY_EXCEPTION` の範囲判定で行う (§5 の表の関数 VA 列)。
 
-## 8. 未解決 (起票先付き)
+## 8. 本 run の実測 (測定 commit c2f67568 = origin/main・コード差分 0)
+
+前 run の §6 (未実施) を埋める。測定は 637b70de ではなく現行 main (c2f67568) で行った。REPORT_2069 の基準 (0d9b5385) とは commit が異なる。
+
+| 手順 | 結果 | 所要 (real) | load (開始 → 終了) |
+|---|---|---|---|
+| `fw_stage2.sh --fresh` | rc 0・`SMOKE PASS` (dispatch=38 units_done=0 ff=0) | 13 分 54.6 秒 (834.6 秒) | 0.64 / 0.39 / 0.16 (10:46:17) → 2.35 / 2.26 / 1.23 (11:00:12) |
+| `hs_e2e.sh --fresh` (baseline・注釈あり) | rc 1 / Phase A `dispatch=38 ff=0` / Phase B `memory access out of bounds` / `status=0xffffffff plug=0x0 rec=8` / `E2E FAIL: 3 項目` | 2 分 26.7 秒 | 2.35 / 2.26 / 1.23 (11:00:12・stage2 終了時) → 1.11 / 1.76 / 1.18 (11:02:42) |
+| `hs_e2e.sh --fresh` (変種: 0x4181e0 注釈を削除) | rc 1 / Phase A `dispatch=38 ff=0` / Phase B 同一 OOB / `rec=8` / `E2E FAIL: 3 項目` (同一文言) | 2 分 28.5 秒 | 0.67 / 1.59 / 1.14 (11:03:09) → 0.97 / 1.36 / 1.12 (11:05:38) |
+
+- 測定 commit は c2f67568。本 PR のコード変更 (`tools/plugins/framework/fw_hostfix.py`) は変種実験後に元へ戻した (差分 0)。残るのは本節の追加のみ。
+- 1 回測定 (n=1)。変動レンジは未取得。
+- **負のコントロール**: 注釈 (`return 0`) を外しても Phase B の失敗は同一。よって、この注釈が Phase B OOB の原因ではない。REPORT_2069 の `rec=7` (1 項目) と異なり、現 main では `rec=8` / 3 項目で失敗している (注釈・Phase B 以外の変更で変化した可能性。原因は未確定)。
+- 注釈の戻り値の正しい値は、この測定では確定しなかった。lift 本体 (fw0.restored.ll:7185) は `rax` を返すだけで `[BLK+0x80]` に store せず、`[BLK+0x80]` を読むのは呼出元。正しい戻り値は未確定のため、`fw_hostfix.py` は変更していない (REPORT_2069 §4 の理由と同じ)。
+
+## 9. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
