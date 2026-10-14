@@ -184,7 +184,7 @@ export class PmApp {
     } catch {
       return json({ error: "invalid json" }, 400);
     }
-    const r = parseVmState(body);
+    const r = parseVmState(body, this.d.now());
     if (!r.ok) return json({ error: "invalid", problems: r.problems }, 400);
     const apply = u.searchParams.get("apply") === "1";
     this.engine.importVm(r.value, apply);

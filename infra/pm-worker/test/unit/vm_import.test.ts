@@ -118,6 +118,34 @@ describe("VM の状態の取り込み・書き出し (#2343)", () => {
     expect(stateOf(ctx)).toBe(before);
   });
 
+  it("oc_artifacts: none (追加素材なし) は relaunch.art と pm_art.line で通り、書き出して取り込み直しても同じ JSON。none と素材名の混在は 400", async () => {
+    const none = vm({
+      relaunch: { "11": { count: 1, art: "oc_artifacts: none" } },
+      pm_art: { "12": { at: "2026-10-13T10:00:00Z", line: "oc_artifacts: none" } },
+    });
+    const ctx = await configuredApp({ handlers: [repoAuth, lists()] });
+    expect((await post(ctx, none)).status).toBe(200);
+    const out = (await (await getExport(ctx)).json()) as any;
+    expect(out).toEqual(none);
+    const ctx2 = await configuredApp({ handlers: [repoAuth, lists()] });
+    expect((await post(ctx2, out)).status).toBe(200);
+    expect(await (await getExport(ctx2)).json()).toEqual(out);
+    const before = stateOf(ctx);
+    expect((await post(ctx, vm({ pm_art: { "12": { at: "2026-10-13T10:00:00Z", line: "oc_artifacts: none fl-win64" } } }))).status).toBe(400);
+    expect((await post(ctx, vm({ relaunch: { "11": { count: 1, art: "oc_artifacts: none fl-win64" } } }))).status).toBe(400);
+    expect(stateOf(ctx)).toBe(before);
+  });
+
+  it("現在時刻 + 5 分より後の時刻 (launched・pm_art.at) は 400 で何も保存しない。5 分以内の未来は通る", async () => {
+    const ctx = await configuredApp({ handlers: [repoAuth, lists()] });
+    const before = stateOf(ctx);
+    const later = iso(T0 + 5 * 60_000 + 1000);
+    expect((await post(ctx, vm({ launched: { "11": later }, relaunch: {}, pm_art: {} }))).status).toBe(400);
+    expect((await post(ctx, vm({ launched: {}, relaunch: {}, pm_art: { "12": { at: later, line: "oc_artifacts: fl-win64" } } }))).status).toBe(400);
+    expect(stateOf(ctx)).toBe(before);
+    expect((await post(ctx, vm({ launched: { "11": iso(T0 + 4 * 60_000) }, relaunch: {}, pm_art: {} }))).status).toBe(200);
+  });
+
   it("(c) 200 KB を超える JSON は 413 で何も保存しない", async () => {
     const ctx = await configuredApp({ handlers: [repoAuth, lists()] });
     const before = stateOf(ctx);
