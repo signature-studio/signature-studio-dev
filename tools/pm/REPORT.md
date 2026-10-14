@@ -228,3 +228,13 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 結論: `npm test` 213 件 PASS / 0 FAIL (n=3)。`test:unit` 10 件・`test:workers` 3 件 PASS。ネガコン 5 種は各 1 件ずつ壊して FAIL を確認。
 - 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 - 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
+
+## 17. 観測済み launch の 3 時間 recent を、観測した run の完了から数える (#2645)
+
+測定した commit: `cd72e291` (コードを変えた最後の commit。base は origin/main `927cd651`)。測定時刻は UTC 2026-10-14 16:27〜16:28。
+- 結論: 観測済み launch の `recent` の基準を、投稿時刻から、観測した run の完了時刻 (`launchObs.doneAt` = `RunState.updatedAt`) に置き換えた。完了時刻が無い観測済み launch と観測記録の無い古い launch は、従来どおり投稿から 3 時間。
+- 単体 `node --test`: **252 pass / 0 fail**、12.7 s、load 0.76 → 1.08 (増分 1 件は `test/launchobs.test.ts` の (e))。vitest unit (`test/unit`): **19 pass / 0 fail**、0.8 s (増分 9 件は `test/unit/launch_observed.test.ts`: 分類 (a)〜(d) と完了時刻の 2 種)。vitest workers: **3 pass / 0 fail**、1.2 s。
+- ネガコン (各 1 件ずつ壊して FAIL を確認し、元に戻して確認): M1 進行中の run を started にしない → (a) FAIL。M2 完了でなく投稿から 3 時間 → (b)(c) FAIL。M3 完了から 3 時間の上限を外す → (c) FAIL。M4 完了時刻なしの投稿からの窓を 0 → (d1) FAIL。M5 同じ窓を 30 時間 → (d2) FAIL。M6 完了時刻を見ない → (b)(c) FAIL。M7 `doneAtOf` が進行中の run を含める → 2 件 FAIL。M8 完了時刻を前へだけ進めない → advanceLaunch 1 件 FAIL。M9 observed への遷移で完了時刻を残さない → advanceLaunch 1 件 FAIL。M10 engine が完了時刻を渡さない → `launchobs.test.ts` で 1 件 FAIL (9 pass / 1 fail)。
+- 互換: `tools/pm/launch_issues.py`・`test/fixtures/classify.input.json` は変更なし。`test/classify.test.ts` の Python 突き合わせ (`launchState` を渡さない入力) は通る。
+- 差分の証跡: `git diff cd72e291 HEAD -- infra/pm-worker` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: 本番 Worker への反映 (デプロイ) は #2645 の範囲外。反映後の挙動は本番で未確認。
