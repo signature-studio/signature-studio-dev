@@ -92,7 +92,7 @@
 - **RT-3 (GUI)** `transferControlToOffscreen` → fl-runtime Worker 内描画、入力イベントを `PumpRing.push` へ (マウス移動 coalesce は producer 側)。`src/index.ts` の `?runtime=` フックと共存。
 - **RT-4 (audio)** worklet は ring 消費専用 (Atomics.wait 不可)。sample clock マスターと underrun 無音ポリシー、ring ABI 共有。
 - **RT-5 (VFS)** OPFS `createSyncAccessHandle` を第一候補、async 必須経路は JSPI または補助 Worker sync-RPC。
-- **RT-6 (plugin loader)** 同時ロード DLL <100 の予算管理 (遅延ロード/アンロード時の参照解放/小プラグイン統合) と 100+ ロードの負荷試験。**予算 + LRU プール + 負荷試験は実装済み** (下記「RT-6 実測」)。派生 loader への接続は完了 (「RT-6 実 loader 接続」節)。未了: SAB 共有カウンタの既定経路への配線 ([RT-13] #2519)・共有 poc の handle 採番修正 ([RT-14] #2520)・小プラグイン同居 (#96)。
+- **RT-6 (plugin loader)** 同時ロード DLL <100 の予算管理 (遅延ロード/アンロード時の参照解放/小プラグイン統合) と 100+ ロードの負荷試験。**予算 + LRU プール + 負荷試験は実装済み** (下記「RT-6 実測」)。派生 loader への接続は完了 (「RT-6 実 loader 接続」節)。SAB 共有カウンタの既定経路 (Worker) への配線は RT-13 (#2519) で配線・試験済み (「RT-13」節)。未了: 共有 poc の handle 採番修正 ([RT-14] #2520)・小プラグイン同居 (#96)。
 - **RT-7 (deploy / M12)** R2: COOP/COEP/CORP 注入、wasm は同一オリジン、`Content-Encoding: br`、hash 名 immutable、`manifest.json` は no-cache。
 - **RT-8 (CI)** lift 成果物ごとに wasm32/wasm64 両ビルドを回し 4GiB 超仮定を早期検出。**OTT 分は実装済み** (`ci/wasm64_check.sh`、下記「RT-8 実測」)。未了: (a) M11 boot closure 等 OTT 以外の target (`ci/targets/<name>.sh` を足す方式)、(b) GitHub Actions への常設 (素材が R2 の work-* のため workflow 化には素材取得の設計が要る)。
 - **RT-9 (互換)** Firefox/Safari マトリクス取得と JSPI/memory64 の機能検出フォールバック設計。
@@ -156,12 +156,14 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 | Firefox / Safari の Memory 上限測定 | 予算値 96 は Chrome 実測のみに基づく | RT-9 (#127 系) へコメント |
 | 追い出し時の `dispose` で呼ぶプラグイン終了処理 (FL 側 state 保存) の仕様 | pool は dispose フックだけ提供 | #125 へコメント |
 
+注: 上の表の 2 行目 (共有カウンタの既定経路への配線) は RT-13 (#2519) で解決済み (下記 RT-13 節)。表は当時の記録として残す。
+
 ## RT-6 実 loader 接続 (#125 2 回目): 結論のみ (全文は付録)
 - PR #2480 の実測 (pool 試験 PASS 3/3・累計ロード 165・追い出し 69、ネガコン neg_cap130 / neg_nofree は OOM at load 124〜125 で検出)。表・差分・再現手順は `REPORT_APPENDIX_2480.md`。
 - 本節の未解決のうち「`MemoryBudget` の共有カウンタの既定経路 (Worker) 配線」は RT-13 (#2519) で解決 (下記)。
 
 ## RT-13 MemoryBudget の共有カウンタを PluginPool の既定経路 (Worker) に配線 (#2519)
-既知類型との関係 (DEFECTS.md): 該当なし (ランタイム資源管理)。検証起点 commit `56778a14` (main)。測定 commit `b7874178` (コード HEAD。以後の差分は本節の文書のみ。末尾の `git diff` 出力を参照)。
+既知類型との関係 (DEFECTS.md): 該当なし (ランタイム資源管理)。検証起点 commit `56778a14` (main)。測定 commit `b7874178` (コード HEAD。以後の差分は本節の文書のみ。鮮度の証跡は末尾の行)。
 - 実装 (試験側のみ。`src/runtime/memory_budget.ts` は無変更): `run_real.mjs` の main ページが `MemoryBudget.createSharedCounter()` の SAB で `MAIN_HOLD = 40` 本の Memory を `createBudgetedMemory` で予約し、同じ SAB を `real_worker.mjs` (PluginPool の Worker) に `postMessage` で渡す。Worker の `MemoryBudget` はこの SAB で数える (= main + Worker の合算)。main の予約は結果受信後に解放し、解放後の inUse = 0 を判定する。
 - 数の前提: 合算上限 `DEFAULT_PLUGIN_CAPACITY` = 96。Worker pool は合算で 56 本まで。ネイティブ上限 124 (RT-6 実測) に対し、main 40 + pool 56 = 96。host_vst2 の Memory 1 本はカウンタの外 (推定: ネイティブ上限 124 には含まれ、neg の OOM 位置 84〜85 は 124 − 40 と整合)。
 - 実測 (コミット済み HEAD `b7874178` で `pnpm runtime:memload:real` を 3 回。変更前は `56778a14` を同じ worktree で 1 回。Chrome 154.0.8037.97、4 vCPU、1 分 loadavg は各回開始時 0.37 / 1.42 / 2.03 (変更後)、0.14 (変更前)):
@@ -182,7 +184,7 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
   3. 合算カウンタを外すネガコンで上限超過を検出: `neg_nocounter` OOM at load 84〜85。**満たす**。
   - 付随: RT-15 (#2552) の未実測項目 (撤去後の `pnpm runtime:memload:real` の PASS) も上の実測で満たした。
 - 範囲外 / 検証範囲: Chrome 154 のみ。main の Memory は `initial: 1` の最小 Memory の代用 (実 FLEngine の本数・サイズは未測)。OTT lowbase 1 種のみ (同一 DLL の alias)。pthread 共有 Memory・AudioWorklet 内の生成は未検証。
-- 測定後のコード差分 (`git diff b7874178 HEAD -- tools/runtime/memload/real src/runtime`): 本節の commit 時点で出力 0 行。
+- 測定後のコード差分: `git diff b7874178 HEAD -- tools/runtime/memload tools/runtime/lib src/runtime tools/hostbridge/poc tools/hostbridge/lowbase/retdec tools/m6 tools/m8 tools/m9 tools/m10 tools/shim` の出力 0 行 (本節のコミット時点の HEAD まで)。範囲は `run_real.mjs` が stage する実行コード (`memload/real`・`memload/transpile.mjs`・`lib/serve.mjs`・`lib/chrome.mjs`・`src/runtime`・`hostbridge/poc/hb_bridge.mjs`) と、lowbase ビルドの入力 (`lowbase/retdec`・`tools/m6`〜`m10`・`tools/shim`)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
