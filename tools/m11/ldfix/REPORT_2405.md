@@ -21,6 +21,8 @@
 | fork | `retdec-build/retdec-support`・`classicvalues/retdec-support` は tag のみで release 0 件。`mehrdad-shokri/retdec-support` は 2017 年の tag のみ |
 | 検索 | GitHub code 検索で `retdec-support_2019-03-03` と期待 sha256 `7a5b06ec…` は各 0 件。archive.org の `retdec` 検索 10 件は retdec 本体リポジトリの 2017-12〜2018-01 の snapshot と awesome-* の一覧で、support パッケージは無い |
 | 隣の版 2019-03-08 | asset は有るが sha256 `62935160…` で、`6edcaaea` の `install-share.py` が期待する `7a5b06ec…` と一致しない (`make install` は検証で失敗する) |
+| avast/retdec v3.3 (2019-03-18) のバイナリ release 同梱の share (`retdec-v3.3-ubuntu-64b.zip`、sha256 `83b8e45b…`) | 2026-10-14 確認。`share/retdec/support/{x86,arm}/ords` の配置は 6edcaaea の `retdec-config.py` と一致。`version.txt` は無い。`generic/types/*.json` 5 本と ords (x86 1365・arm 28 ファイル) は、v5.0 の share と **バイト一致**。v5.0 の types は 2019-03-08 の archive と一致する (§2)。static-code は 2019-03-08 が `.yara` 原文 (pe 70 件)、v3.3 が `.yarac` (pe 70 件) で名前もバイトも一致しない。よって 2019-03-03 とは確認できない。タグのソースに `install-share.py` は無い |
+| retdec-support `master` の commit 履歴 (2019-02-01〜03-20) | 1 件 (`2cbfd5c7`、2019-03-08、README のみ)。README の手順 `tar cvJf retdec-support_YYYY-MM-DD.tar.xz *` が示すとおり、repo に data は無く、archive は手元の data から作られる。repo からの再生成はできない |
 
 経緯: `install-share.py` は `3edc8d0f` (2019-03-03) で 2019-03-03 を指し、`4782b5b8` (03-05) で sha256 を更新した。`301f4e64` (2019-03-18、v3.3) で削除され、support は repo 内の `support/` と 2019-03-08 に移った。つまり `6edcaaea` (03-09) 〜 03-17 だけが 2019-03-03 を要する版で、その asset は GitHub から消えている。パッケージの内容は retdec-support の README によると ordinal 表・型 DB・static-code の YARA・暗号定数の YARA で、元データは repo に無く、source からの再生成はできない。
 
