@@ -7,7 +7,7 @@
 
 ## 1. 今 run で達成した範囲
 
-- 受入 1 (code/data 区別の再帰降下の実装): **実装済み・収束未確認**。flow モードは入口から制御フローで到達する命令だけを code とし、間接 jmp (jump table) の先とテーブル窓は decode しない。文字列窓の除外は入れていない (テーブル窓は間接 jmp の先としてのみ現れるため、この定義で除外される範囲に限る)。
+- 受入 1 (jump table 窓・文字列テーブルを code から除外する再帰降下): **未達** (文字列窓の明示除外は未実装・間接 jmp の先の到達は未確定)。以下は実装の現状。flow モードは入口から制御フローで到達する命令だけを code とし、間接 jmp (jump table) の先とテーブル窓は decode しない。文字列窓の除外は入れていない (テーブル窓は間接 jmp の先としてのみ現れるため、この定義で除外される範囲に限る)。
 - 受入 2 (round 推移の記録): **部分達成**。round 5 まで記録。round 6 の途中で測定の 20 分上限に達し、収束値は未確定。
 - 受入 3 (e2e PASS・negctl 3 件 FAIL<期待>): **達成** (§3)。
 
@@ -31,11 +31,11 @@
 
 ## 3. 検証
 
-- **測定 commit (コードを変えた最後の commit)**: `96a8bbaf`。
-- **e2e (`bash dsp/e2e.sh`・測定 commit・n=1)**: rc 0 / `OK elapsed=41s` / load 0.13 0.41 0.63 → 0.56 0.49 0.65。
-- **negctl (`bash dsp/negctl.sh`・測定 commit)**: NC1 unsup 67 / NC2 unsup 746 / NC3 insns 31 unsup 0 → 3 件とも FAIL<期待>。
-- **flow 測定**: `python3 dsp/scripts/mx_closure.py "work/extracted/VST3/Massive X.vst3" work/mx13/rtti.json work/mx13/flow flow` → 20 分で打ち切り (rc 124)。
-- **鮮度 (WORKFLOW §6)**: `git diff 96a8bbaf HEAD -- tools/targets/massivex/dsp` は本 REPORT の追加のみ。
+- **測定 commit (コードを変えた最後の commit)**: `96a8bbaf`。**現 head (`c17dadb5` 以降) に対して鮮度 NG**。
+- **鮮度の根拠 (WORKFLOW §6)**: `git diff 96a8bbaf HEAD -- tools/targets/massivex/dsp/scripts/mx_closure.py` は 12 行の変更 (linear 経路の `end` 計算・`begins` 参照の追加・sort のホイスト)。`git diff --stat 96a8bbaf HEAD -- tools/targets/massivex/dsp` は REPORT_MX12/13/14・`mx_unres_*.py` の追加も含む (計 511 行追加・4 行削除)。よって下記 e2e・negctl の数値は **旧コードの測定値** で、現 head の値ではない。
+- **e2e (`bash dsp/e2e.sh`・測定 commit `96a8bbaf`・n=1・並列 1)**: rc 0 / `OK elapsed=41s` / load 0.13 0.41 0.63 → 0.56 0.49 0.65。旧値。n≥3 の min–max は未測定。
+- **negctl (`bash dsp/negctl.sh`・測定 commit `96a8bbaf`)**: NC1 unsup 67 / NC2 unsup 746 / NC3 insns 31 unsup 0 → 3 件とも FAIL<期待>。旧値。
+- **flow 測定**: `python3 dsp/scripts/mx_closure.py "work/extracted/VST3/Massive X.vst3" work/mx13/rtti.json work/mx13/flow flow` → 20 分で打ち切り (rc 124)。旧コードでの測定。
 
 ## 3.1 fix モード (差し戻し対応・2026-10-14) の状況
 
