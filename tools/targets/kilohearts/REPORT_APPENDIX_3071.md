@@ -80,6 +80,6 @@
 2. **[KH-46] callee の多値戻り (xmm0 / xmm1) の未モデル (最重要・emcc で見えない silent 誤り)**: `FUN_180fdc470`・`FUN_180fdfdb0`・`FUN_180fdc660` 系は rax に四分象限のみ C 化され、reduce 後の値 (xmm0、dfdb0 は xmm1 も) は C 本体に出ない。呼出元の `extraout_XMM0_Qa*` の読み 6 箇所が未代入 (未初期化)。stereo の数値は native vec (`snapins/work/stereo/vec_1000_7.bin`) との突合でのみ判定可能で、本 run では未実施 (emcc 未通過)。
 3. **[KH-46] 引数 2 個目 (xmm1) の 2 件 (規則 9・10) は 0.0 仮置き**: 呼出元で未設定の入力のため、実値の特定 (FUN_18080d4d0 の呼出元の解析) が要る。規則 9 は入口 live-in の置換で D5 に該当、規則 10 は規則 9 の callee の戻り xmm1 (多値戻り・未解決 2) (上記「in_XMM の live-in 判定」)。
 4. **[KH-46] stereo の bit 型修復 (fix 未適用)**: `bitcast`・`intload`・`assoc` などの `--fix` 群を stereo に適用していない (例: 行 223 の `(float)((uint)(fVar13-fVar18) & _DAT_1813d6fc0)`)。突合で検出する。
-5. **[再測定] main 取り込み後 (`710cdac9`) の HEAD での stereo emcc 件数・decompile・Gain/Haas/Gate 回帰は未実施**: 本 run では Ghidra (`/opt/ghidra`) と JDK 21 が無く、素材の展開から再現できなかった。測定値は測定 commit `50661465` のコードのもの。review run で HEAD を再測定する (main 側の thunk 正規化・shim の typedef が stereo の件数を変えないかを確認する)。
+5. **[再測定] main 取り込み後 (`710cdac9`) の HEAD での stereo emcc 件数・decompile・Gain/Haas/Gate 回帰は未実施**: 本 run では Ghidra (`[GHIDRA]`) と JDK 21 が無く、素材の展開から再現できなかった。測定値は測定 commit `50661465` のコードのもの。review run で HEAD を再測定する (main 側の thunk 正規化・shim の typedef が stereo の件数を変えないかを確認する)。
 - 未実施: Stereo の native 突合・ablation・ネガコン (emcc 未通過のため)。
 - 注: REPORT.md 本体への導線 1 行は、commit 範囲 (ghidra_route + REPORT_APPENDIX) の指示どおり未追加。§10-7p は本ファイル群に存在しないため、本節は REPORT_APPENDIX.md の §10-7q (#3072) の後に置いてあったものを分割移動した。
