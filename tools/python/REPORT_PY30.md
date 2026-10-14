@@ -9,7 +9,7 @@
 | fl-win64 展開 | `tar --zstd -xf fl-win64.tar.zst` (`$RUNNER_TEMP/fl-win64`) | 成功 (7 s) |
 | FLEngine PE | `extracted/block00031_PE.bin` | 22,227,016 B |
 | CPython wasm | `bash build_cpython_wasm.sh` | exit 0 (2 分 45 秒) |
-| emsdk | runner 同梱 `/opt/emsdk` (emcc 6.0.12) を使用 | toolchain-emsdk artifact は未展開 (不要だった) |
+| emsdk | runner 同梱の emsdk (emcc 6.0.12) を使用 | toolchain-emsdk artifact は未展開 (不要だった) |
 | pyc 抽出 | `analysis/extract_pyc_blocks.py work/fl_extract` | pyc 40 本・pyscript 2 本 |
 | flpy 再リンク | `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | exit 0 (追跡の `flapi_table.json` は不変) |
 
