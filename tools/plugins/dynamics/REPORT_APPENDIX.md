@@ -100,3 +100,30 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 
 - 測定 summary (`work/dynamics/engine<B>/summary.csv`) は `work/` (gitignore 対象) にあり commit しない。
 - コード差分 (§D の「出力は 0 行」の根拠・`docs/WORKFLOW.md` §6): `git diff 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics ':!*.md' | wc -l` → **0**。 `:!*.md` を外した形は文書 (`REPORT.md`・`REPORT_APPENDIX.md`) の差分だけが出る (`git diff --stat 30a7b5b4 HEAD -- tools/plugins/lift tools/plugins/dynamics` の対象は この 2 件のみ)。 測定 commit `30a7b5b4` は HEAD の祖先。
+
+## F. [PLG-F3-18] #2017: vmovsd store 宛先の経路 (実測・HEAD c171b9dc)
+
+- 測定 HEAD: **c171b9dc** (origin/main)。 `timeout 1000 bash tools/plugins/dynamics/engine_lift.sh 19252 900` を foreground で単独実行。 load average (1 分) 0.99 (実行時)。
+- 結果 (`summary.csv`): `19252,522,0,551,0,5,0,0,0,17,0,0,0,29,549` (lift_rc 0 / define 551 / unimpl 5 / emcc_c_rc 0 / lift 17 s)。 E 節 (f9c89955) と同じ。 残件 5 件も同じ。
+
+### F-1. 経路 (IR と機械語の照合)
+
+- `function_180019c20` の `%1 = alloca i64` からの load は 3 件 (`%8`・`%9`・`%10`、いずれも entry block)。 **この関数内で `%1` への store は 0 件**。
+- 機械語の spill 書込は `0x180019c50` (`[rsp+0x20]`・`[rsp+0x30]`) と `0x18001a861` (`vmovsd [rsp+0x20], xmm0`・`[rsp+0x30], xmm1`)。 RetDec の IR には、これらに対応する `store` が無い (`fn.drc.ll` の store 先は `%stack_var_*.reg2mem` と `%rax.0.reg2mem` 等のみ)。
+- したがって `%8`・`%9`・`%10` は、RetDec が rsp 相対の spill 領域を **1 本の未 store `alloca i64`** に併合した結果。 併合の位置は RetDec 側 (`e.drc.ll`) で既にそうなっている。
+- B1 (`ir5_patch.py` `patch_uninit_alloca`) はこの 3 load を `xor i64 0, 0` にする。 `e.lift.ll` 全体では `xor i64 0, 0` が **322 件** (B1 の対象は関数横断。 この 322 件の内訳は未測定)。
+
+### F-2. store 形 `__asm_vmovsd` が復元されない理由 (実測)
+
+- `fix_asm_stores.py` の `PAT` は `movlps|movlpd|movhps|movhpd|movsd|movq` だけを対象にし、**`vmovsd` を含まない**。 そのため `__asm_vmovsd(i64, i128)` (store 形) は store に変換されず `unimplemented` に残る。
+- ただし `vmovsd` を PAT に足すだけでは不十分: 宛先 (`%8`・`%9`・`%10`) は B1 で既に 0 のため、store は address 0 へ書く誤りになる (E-2 (a) と同じ)。 宛先の復元が前提。
+
+### F-3. 方式の候補 (未実装・次の子で選ぶ)
+
+- 候補 A: B1 の 0 埋めを「その alloca が spill 領域の併合であるとき」に限る。 判定条件は RetDec の `%1` の使用箇所 (store 先 = `vmovsd` の宛先と一致させる) で決める。 共有 lift 鎖を変えるため、全 plugin の lift の差分測定が要る (E-2 (b) の懸念)。
+- 候補 B: RetDec 出力の spill 併合 (`%1`) を、機械語の rsp オフセット (`0x20`・`0x30`) ごとの slot に分けて store / load を復元する pass を追加する。 対象は `function_180019c20` 系の rsp 併合に限り、B1 の挙動は変えない。 方式選定は子 issue で行う。
+
+### F-4. 判定 (本 run)
+
+- 受入条件のうち「`vmovsd` store が unimpl から消える」「B1 の方式を選び、共有鎖への影響を測定する」は**未達**。 本 run では実装しない (共有鎖の測定が 1 run に収まらない)。
+- 受入条件 4 (19252 の `function_180019c20` の分岐が spill 読み戻し値と一致) は、F-1 の経路が確定した時点で確認できる。 その確認は子 issue に含める。
