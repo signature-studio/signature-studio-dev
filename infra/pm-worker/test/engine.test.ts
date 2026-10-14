@@ -45,7 +45,7 @@ test("launch (LIVE): room = TARGET - active、BATCH で絞り、固定テンプ�
     env: { TARGET: "5", BATCH: "2" },
     handlers: [(c) => (/\/issues\/\d+\/comments$/.test(c.url) && c.method === "POST" ? j({ html_url: "x" }, 201) : undefined)],
   });
-  // 稼働 run 2 件 (issue_comment と pull_request_review は数える。pull_request は数えない)
+  // 稼働 run 3 件 (opencode.yaml の run は event を問わず全て数える。pull_request = review も数える)
   await send(ctx.app, "workflow_run", runPayload(1, "in_progress", { event: "issue_comment" }));
   await send(ctx.app, "workflow_run", runPayload(2, "queued", { event: "pull_request_review" }));
   await send(ctx.app, "workflow_run", runPayload(3, "in_progress", { event: "pull_request" }));
@@ -53,8 +53,8 @@ test("launch (LIVE): room = TARGET - active、BATCH で絞り、固定テンプ�
   await markFresh(ctx);
   const gh = await (ctx.app.engine as any).d.gh();
   const plan = await ctx.app.engine.launch(gh);
-  assert.equal(plan.active, 2);
-  assert.equal(plan.room, 3);
+  assert.equal(plan.active, 3);
+  assert.equal(plan.room, 2);
   const cs = comments(ctx.m.calls);
   assert.equal(cs.length, 2, "BATCH=2");
   assert.deepEqual(cs.map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["21", "22"]);

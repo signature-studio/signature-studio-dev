@@ -15,7 +15,7 @@ PM の launch / watchdog を、VM のポーリング (systemd timer) から **we
 | `GET /setup` `GET /setup/callback` | GitHub App `oc-pm-for-signature-studio` の manifest flow (org 所有)。`/setup` は無認証だが、期限内 (1 時間) の state があれば上書きせず同じ state を返す。state は org 所有の App への変換に成功したときだけ消費する |
 | `GET /status` | 集計のみ (実行中 run 数・ready/blocked 数・最終 reconcile 時刻・モード・健全性の観測。下の『/status の観測』)。`mode_launch` / `mode_dispatch` が経路ごとのモード (`live` / `dry-run`)。`mode` は両方 `live` のときだけ `live` (片方だけなら `partial`、どちらもなら `dry-run`。`tools/pm/pm_gate.sh` は `mode=live` を『VM の command を止めてよい』と読む)。`?detail=1` は repo の push 権限を持つ GitHub token (Bearer) が必要 |
 
-launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出力 (固定 JSON を Python 版と TS 版の両方で読む突き合わせテスト: `test/classify.test.ts`)。差分は次の 5 点で、いずれも issue 本文を解析しない。
+launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出力 (固定 JSON を Python 版と TS 版の両方で読む突き合わせテスト: `test/classify.test.ts`)。差分は次の 6 点で、いずれも issue 本文を解析しない。
 
 1. blocked_by の一覧が不明な issue は着手しない。
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
@@ -28,8 +28,21 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
    `oc:stuck` は人の判断待ち。`pm-apply`・`needs-user-input` は下の oc-pm 節のとおり、再着手せず `user` 行に置く。
 4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
 5. relaunch (`oc:no-pr` の再投入・素材の追加) も 1 tick の枠 `min(room, BATCH, relaunch + ready)` に入り、残りの枠を ready が使う (`src/launch.ts` の `planLaunch`)。relaunch は room や BATCH を超えても全件出す。枠を `ready` の件数だけで頭打ちにする VM の `launch_issues.py` の式とは、relaunch がある tick で最大 relaunch の件数だけ差が出る (VM の式は変えていない)。relaunch は classify が issue ごとに 2 回までに絞る。
+6. **room の基準は opencode.yaml の全 run の総数**: `room = max(0, target_eff - active_all)` (`target_eff` は上の『同時実行の上限の推定』で決まり、推定が無ければ `TARGET`)。`active_all` は `workflow_run.path` が `opencode.yaml` の未完了の run (in_progress・queued・pending・waiting・requested) を **event を問わず** 全て数える (`src/active.ts`)。VM 版の `active_runs` は実装・fix の run (`issue_comment` `workflow_dispatch` `pull_request_review` と題名が `oc-fix` の `repository_dispatch`) だけを数え、review (`pull_request`)・oc-pm・watchdog を数えなかった。同時実行の上限 (Team プランで 60) はこれらを含む opencode.yaml の全 run が共有するので、旧い数え方では `room` が過大になり、上限を超えて queued が出た (実測は #2625)。別 workflow (`scripts-test.yaml` `terms-watch.yaml`) の run は別枠で数えない。`path` を持たない run (この版より前の保存値) は opencode.yaml として数える (過大に数える側)。reconcile (5 分ごと) が REST の `path` で埋める。TARGET の既定は **58** (上限 60 から 2 を残す)。推定の観測 (`running` / `queued`) は従来どおり workflow を問わない (同時実行の上限は repo の全 workflow の job が共有するため)。
 
-`/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。
+`/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行と、再投入の意図に `focus=K` があるときの受入条件 1 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。
+
+再投入の意図 (`<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->`、#2475): issue ごとに最新の意図マーカーを保持する。実装 App の意図は第三者の意図より優先する。意図のコメントは bot の投稿でも `botLast` (停止報告の窓) を動かさない。次を**全て**通ったときだけ `/oc` を投稿する。
+  - 検査 (`src/launch.ts` の `checkRelaunchIntent`): 書き手は実装 App・`issue=` がコメントの issue と一致・`arts` が `ALLOW_ARTS` の部分集合・`focus` は 1〜9 (任意)・同じ issue に 24 時間で 3 回まで。
+  - 分類 (`plan()` の rows): 投稿してよいのは picks と同じ `ready`・`relaunch`・`stopped` (PM の判断待ち) だけ。`user`・`blocked` は投稿しない。`started` は open な PR があれば投稿しない (理由 `started`)。実行中の run だけで started のときは、run の完了後に分類し直すまで待つ (処理済みにしない)。`recent` (着手直後の待ち) と `blocked_by` が未同期 (unknown) の issue も、処理済みにせず次の tick に回す。`oc:stuck`・`pm-apply`・`needs-user-input` は投稿しない。`oc:no-pr` は picks の再着手と同じ cooldown (`NO_PR_COOLDOWN_H`) と上限 (3 回) を見る。子 issue (open) を持つ親は、停止報告の行 (`stopped`) でも投稿しない (停止報告に素材行があるかどうかに依らない)。未観測の launch (`launch-unobserved`) も投稿しない。
+  - 順序: 意図は picks より先に処理し、意図で扱った issue は picks から外す (picks が先だと、同じ issue の意図が focus なしで処理済みになるため)。403/429 や REST の残量で止まったら、同じ tick の picks も止める。
+  - 枠: 意図の投稿は `room`・`BATCH` の枠に入らず、条件を通ったものは全件出す (picks の relaunch と同じ)。一斉に意図が届くと、同時に走る run の数 (`TARGET`) を超え得る。
+  - 最後の `/oc` より前に出た意図 (PM の手動の `/oc` を含む) は捨てる。停止中 (review-only・stuck 上限・REST の残量不足) は処理しない (意図も残し、停止が明けたら判定する)。
+  - 拒否は理由ごとに `counters.intentRejected` へ数え (語彙: `author` `issue` `arts` `focus` `limit` `user` `blocked` `started` `stopped`)、その意図は処理済みにする。
+  - 投稿の可否は `LIVE_LAUNCH` に従う (コードの既定は dry-run。dry-run では `counters.intentWouldLaunch` と `log` に記録し、処理済みにしない)。
+  - **稼働中の `wrangler.toml` は `LIVE_LAUNCH = "1"` なので、この版をデプロイすると、意図の経路も dry-run を経ずに即 live で `/oc` を投稿する。** 待ち (oc:no-pr の cooldown・blocked_by の未同期) が明けた意図は、その tick で投稿され得る。
+  - `would_launch_now` は picks (launch の計画) だけを出す。保留中の意図 (待ち・処理済みでないもの) は `/status` に出ない。`counters.intentWouldLaunch` は dry-run の期間に記録された件数で、live では増えない。
+  - **PM agent の判断待ち**: deploy 時に、既存の意図を live で処理してよいか。既定案: issue #2475 の受入条件 4 どおり `LIVE_LAUNCH` に従う (現状 `"1"` なので live)。focus の値域は #2575 で決める (pm.md の `focus=K` は issue 番号で、検査は受入条件番号 1〜9)。
 
 ## oc-pm: PM agent を起こす終端状態の検出と送信 (#2333)
 
@@ -62,8 +75,11 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `last_webhook_at` | 署名を検証できた webhook の最後の受信時刻 (401 では進めない)。無ければ `null` |
 | `last_dispatch_at` | `repository_dispatch` (`oc-watchdog`) に成功した最後の時刻。dry-run では `null` のまま (would は既存の `last_watchdog`) |
 | `last_digest_at` | 直近の digest (`oc-pm kind=digest`) を試行した時刻。起点の tick・送信・送信失敗・dry-run の記録を含む (24 時間に 1 回進む)。無ければ `null` |
-| `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event は問わない (TARGET に数える `active_runs` とは別)。`running.queued` は status が `queued` のものだけ (`pending`・`waiting` は数えない)。top-level の `queued` は queued・pending・waiting の合計で、定義が違う |
+| `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event も workflow も問わない (TARGET に数える `active_runs` とは別)。`running.queued` は status が `queued` のものだけ (`pending`・`waiting` は数えない)。top-level の `queued` は queued・pending・waiting の合計で、定義が違う |
 | `target_eff` / `cap_est` / `peak_running` / `queued` / `oldest_queued_age_min` | 同時実行の上限の推定 (#2381)。`target_eff` は launch の目標、`cap_est` は推定の上限 (無ければ `null`)、`peak_running` は直近 24 時間の tick ごとの `in_progress` の最大値。`queued` は queued・pending・waiting の数、`oldest_queued_age_min` は最も古い queued の経過分 (無ければ `null`)。詳細は下の節 |
+| `active_runs` / `active_all` | TARGET に数える run の総数 (opencode.yaml の未完了の run。上の 6)。同じ値。`room = max(0, target_eff - active_all)` (`target_eff` は推定が無ければ `target`) |
+| `active_impl` / `active_other` | `active_all` の内訳。`active_impl` は `/oc` 起点の実装 run (`issue_comment` `workflow_dispatch`)、`active_other` は review (`pull_request`)・fix (`pull_request_review` と `oc-fix`)・oc-pm・watchdog など |
+| `active_by_event` | `active_all` の event 別の件数。`repository_dispatch` は run-name の先頭で `repository_dispatch:oc-fix` `:oc-pm` `:watchdog` に分ける |
 | `dry_run_skipped_posts` | dry-run のために投稿しなかった書き込み (`/oc` 投稿 + `repository_dispatch`) の累計 (`counters.wouldLaunch + wouldDispatch`) |
 | `reconcile_diff` | `{last, total}`: reconcile が REST を適用して DO の内容が変わった entity (issue・PR・run・bot/PM のコメント) の件数と累計。webhook の欠落の指標。`updatedAt` だけの違い (コメント追加で進む) と full sync は数えない。配送遅延の最中の差も数えるので、1 回の小さな値は欠落とは限らない |
 | `rest_remaining` / `rest_used` / `rest_reset_at` | Worker の GitHub REST クライアント (installation token) の全応答の `x-ratelimit-remaining` / `-used` / `-reset` (ヘッダが正。`gh api rate_limit` の本文は食い違う)。失敗応答も含む。ヘッダの無い応答・数値でない値では更新しない。一度も観測していなければ `null` (0 ではない)。JWT で叩く `/app/*` と、`/status?detail=1` の呼び出し側の token は別枠なので記録しない |
@@ -105,10 +121,10 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
   連続する 2 件の観測の間隔が 2 分 (`SAT_GAP_MS`) を超えたら、その間は連続とみなさない (空いた後の streak は空きの後の観測から数える)。
 - 引き上げ: 推定の後の観測 (`cap_est` を決めた時刻以降) の peak が推定を超えたら、その peak に上げる (上限が上がった場合)。古い peak で押し上げ直さないよう、窓は推定を決めた時刻から始まる。
 - 期限: 推定を決めた (更新した) 時刻から 24 時間たって更新が無ければ推定を消す。
-- 目標: `target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))`。推定が無ければ `TARGET` のまま。`room = target_eff − active` (`active` は TARGET と同じ数え方)。
+- 目標: `target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))`。推定が無ければ `TARGET` のまま。`room = target_eff − active_all` (`active_all` は opencode.yaml の未完了の run の総数。上の 6)。
 - env: `QUEUE_MARGIN` (既定 10)、`TARGET_MIN` (既定 30)。`TARGET` は上限のままで、推定はそれを超えない。
 
-現行の `wrangler.toml` は `TARGET="50"` なので、推定が 40 以上のとき `target_eff` は 50 に張り付く (上限 60 でも 50 まで)。`TARGET` を 80 に戻すまでは、この上限が効く。
+現行の `wrangler.toml` は `TARGET="58"` なので、推定が 48 以上のとき `target_eff` は 58 に張り付く (上限 60 でも 58 まで。上限 60 から 2 を残す)。
 
 ## 失敗した webhook 配送の回収と `/admin/resync` (#2339)
 
@@ -133,7 +149,7 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
 ## ファイル構成
 
 - `src/index.ts` Worker の入口 (対象外のイベントは DO を起こさず捨てる)。`src/do.ts` Durable Object `PmDO` (SQLite の `kv` 表 + alarm)。
-- `src/app.ts` HTTP 面 (`/webhook` `/setup` `/setup/callback` `/status` `/tick`)。`src/engine.ts` 同期・分類・launch・watchdog・status。`src/ratelimit.ts` `src/redact.ts` は #2338 の rate limit の解釈と自由文の redact (純関数)。`src/saturation.ts` は #2381 の同時実行の上限の推定 (純関数)。
+- `src/app.ts` HTTP 面 (`/webhook` `/setup` `/setup/callback` `/status` `/tick`)。`src/engine.ts` 同期・分類・launch・watchdog・status。`src/ratelimit.ts` `src/redact.ts` は #2338 の rate limit の解釈と自由文の redact (純関数)。`src/saturation.ts` は #2381 の同時実行の上限の推定 (純関数)。`src/active.ts` は同時実行の計数 (上の 6。純関数)。
 - `src/webhook.ts` `src/classify.ts` `src/launch.ts` `src/hmac.ts` は純関数 (#1751 / #1795)。`src/pm.ts` (oc-pm の検出・抑止) と `src/needs.ts` (PM 判断を求める語彙) も純関数 (#2333)。
 - `src/store.ts` `src/route.ts` は #1882 の entity 単位の SQLite 増分保存 (`receiveWebhook`)。`src/kvstore.ts` は Engine が使う汎用の保管 (bucket/key)。
   Worker の本番経路は `index.ts` → `do.ts` → `app.ts` → `engine.ts` (kvstore)。`store.ts` / `route.ts` は #1882 のテスト (`test/route.test.ts`) で検証される増分保存の実装で、
@@ -203,7 +219,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 
 - 前提 (merged): #2398 (Review-Only と `oc:stuck` の上限)、#2418 (LIVE の分離)、#2420 (#2380 コメントを新しい順に 24 時間分読む)、#2422 (#2338 `/status` の観測・redact・rate-guard。Worker の REST 残量が 1,500 未満の間は launch を止める)。未 merge の #2343 (VM 状態の取り込み)・#2334 (no-pr の理由別再着手)・#2340 (shadow の自己昇格) は前提から外した。VM が止まっているので二重着手の窓が無く、phase は『open PR < 10 で解除』の規則で足りる。
 - merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 12 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 3 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。oc-pm を含めて live にするのは既定案 (#2319 の設計どおり)。PM の判断は PR #2453 の未解決表と PM のコメントに記録した。突き合わせはこの版 (`e88e1890`) で測り直した。
-- 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)、`NO_PR_COOLDOWN_H="24"` (#2334 が入るまで)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
+- 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)、`NO_PR_COOLDOWN_H="24"` (#2334 が入るまで)。`TARGET` は後で『opencode.yaml の全 run の総数の目標』に意味を改め、既定を 58 にした (上の 6。#2458 は置き換え)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
 - 突き合わせ: dry-run の Worker と VM の `launch_issues.py` の差は、open な子を持つ親の除外・`pm-apply` の user 扱い・`oc:no-pr` の cooldown・VM の `relaunch.json` の有無で説明がつく (推定を含む。測定は #2422・#2423 を含む版。内訳と未解決は `tools/pm/REPORT.md` §12)。`NO_PR_COOLDOWN_H` の既定 (3) では `oc:no-pr` の issue が大量に候補へ戻るので、24 にした。
 - 初回のデプロイでだけ、保存状態を整える一時ビルド (全体同期の前倒しと、phase を VM の `phase.json` に合わせる) を使った。リポジトリの差分には無い。理由と結果は `tools/pm/REPORT.md` §12-5。
 
@@ -220,7 +236,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `LIVE_LAUNCH` | launch の `/oc` コメント投稿 (`POST /repos/{o}/{r}/issues/{n}/comments`) | `"1"` (2026-10-14〜。コードの既定は dry-run) |
 | `LIVE_DISPATCH` | `repository_dispatch` の送信 (`POST /repos/{o}/{r}/dispatches`)。`oc-watchdog` と、oc-pm 節の `oc-pm` (PM agent の起動) の両方。別スイッチは無い | `"1"` (同上) |
 | `LIVE` (旧) | 上の 2 つのうち、未設定のほうにだけ効く (両方の既定値) | (置かない) |
-| `TARGET` | 同時に走らせる run の上限 (room = target_eff − active。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"50"` (暫定。80 に戻す作業は #2458) |
+| `TARGET` | 同時に走らせる **opencode.yaml の run の総数** の上限 (room = target_eff − active_all。`active_all` は実装・review・fix・oc-pm・watchdog の全て。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"58"` (上限 60 から 2 を残す。以前の暫定 `"50"` と、80 に戻す案 #2458 は置き換えた) |
 | `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
 | `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
 | `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"24"` (暫定。コードの既定は 3) |

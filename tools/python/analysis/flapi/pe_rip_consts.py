@@ -25,6 +25,8 @@ def main():
         rva = va - base
         for s in pe.sections:
             if s.VirtualAddress <= rva < s.VirtualAddress + max(s.Misc_VirtualSize, s.SizeOfRawData):
+                if rva - s.VirtualAddress >= s.SizeOfRawData:
+                    return None
                 fo = s.PointerToRawData + (rva - s.VirtualAddress)
                 return raw[fo:fo + n]
         return None
@@ -44,7 +46,7 @@ def main():
         line = f"{hex(ins.address)} {ins.mnemonic} {ins.op_str} -> slot {hex(slot)}"
         b = read_va(slot, 8)
         if b is None:
-            print(line + " [section 外]")
+            print(line + " [PE ファイル上に実体なし]")
             continue
         line += f" f32={struct.unpack('<f', b[:4])[0]!r} f64={struct.unpack('<d', b)[0]!r}"
         p = struct.unpack("<Q", b)[0]
