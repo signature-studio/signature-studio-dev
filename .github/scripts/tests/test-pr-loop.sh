@@ -228,6 +228,19 @@ run_fix record > /dev/null
 [ "$?" = 0 ] && grep -qx 'stop=false' "$TMP/out" && ! grep -q 'stop=true' "$TMP/out"
 expect "失敗しなければ stop=false だけを出す (trap は stop=true を足さない)" $?
 
+echo "== fix-progress.sh record (ラベルを取得できないときは止める: 失敗を『ラベル無し』と判定しない #2638 m2)"
+setup aaa '[]' 0
+rm -f "$FIX/repos_o_r_issues_7"
+run_fix record > /dev/null 2>&1
+rc=$?
+[ "$rc" -ne 0 ] && grep -qx 'stop=true' "$TMP/out" && ! logged 'pr comment'
+expect "ラベルの取得に失敗したら rc!=0 かつ stop=true (fix を起動しない)" $?
+setup aaa '[]' 0
+env -u OC_REPO GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" bash "$SCRIPTS/fix-progress.sh" record > /dev/null 2>&1
+rc=$?
+[ "$rc" -ne 0 ] && grep -qx 'stop=true' "$TMP/out"
+expect "入力 (OC_REPO) が無くても rc!=0 かつ stop=true を残す (trap は入力検査より前)" $?
+
 echo "== fix-progress.sh record (merge 済み・古い head への差し戻しは agent を起動しない #2601)"
 # review_event <review の commit_id>: pull_request_review の event payload (差し戻しの元になった review) を書く
 review_event() { jq -nc --arg c "$1" '{action:"submitted",review:{state:"changes_requested",commit_id:$c}}' > "$TMP/event.json"; }

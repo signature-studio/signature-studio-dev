@@ -6,8 +6,9 @@
 #                 窓 = 直近の oc-fix-limit / oc-fix-reset コメント以降の差し戻し (印は MARK_LOGIN の投稿だけを数える。#2622)。窓が MAX 件に達したら、
 #                 直近 3 件が機械的な類型のみ・繰り返し無し・合計が天井未満なら次の窓へ進める (oc-fix-reset)。
 #                 それ以外は oc:stuck を付けて止め、PM agent 用の oc-pm-intent マーカーを残す。
-#                 結果は $GITHUB_OUTPUT に stop=true/false で出す (stop=true なら oc:stuck ラベルを付けて PR にコメントする)
-#                 途中で失敗したときも stop=true を出す (fail-closed。stop が無いと check が none と判定し、write 権限の retry が起動する。#2638 B3)
+#                 結果は $GITHUB_OUTPUT に stop=true/false で出す (上限で止めた stop=true なら oc:stuck ラベルを付けて PR にコメントする)
+#                 途中で失敗したときも stop=true を出す (fail-closed。stop が無いと check が none と判定し、write 権限の retry が起動する。#2638 B3)。
+#                 この失敗による stop=true は oc:stuck を付けず PR にも書かない。job が失敗で赤くなり、原因は run のログで見る。
 #                 ただし次の場合は agent を起動せず stop=true にするだけ (notice を残す。oc:stuck は付けない。#2601):
 #                 PR が open でない (merge・close 済み)、または差し戻しの元の review (pull_request_review の event) の commit が
 #                 現在の head と違う (古い head への差し戻し。その後に push された head の review が判定を担う)
@@ -23,6 +24,14 @@
 #             OC_MAX_RESETS_PER_HOUR (repo 全体の自動再開上限, 既定 6)・OC_REPEAT_JACCARD (繰り返しのしきい値, 既定 0.6)
 # 実装 App は PR の comment を投稿する時 user.login が opencode-for-signature-studio[bot] になる。
 set -euo pipefail
+
+# record の途中失敗 (下の入力検査・API 呼び出しで止まる場合を含む) でも stop=true を残す。入力検査より前に置く (#2638 B3・m3)。
+record_done=false
+record_fail() {
+  local rc=$?
+  if [ "$rc" -ne 0 ] && [ "$record_done" != true ]; then echo "stop=true" >> "$GITHUB_OUTPUT"; fi
+}
+if [ "${1:-}" = record ]; then trap record_fail EXIT; fi
 
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
 pr_head() { gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER" --jq .head.sha; }
@@ -81,12 +90,6 @@ DECIDE='
 
 case "${1:-}" in
   record)
-    record_done=false
-    record_fail() {
-      local rc=$?
-      if [ "$rc" -ne 0 ] && [ "$record_done" != true ]; then echo "stop=true" >> "$GITHUB_OUTPUT"; fi
-    }
-    trap record_fail EXIT
     pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
     head_now="$(jq -r .head.sha <<< "$pr_json")"
     pr_state="$(jq -r .state <<< "$pr_json")"
@@ -99,7 +102,9 @@ case "${1:-}" in
     # 上限ガード: ラベルが付いている PR は fix を起動しない。
     # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
     stop=false
-    if gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name' | grep -qx "$STUCK_LABEL"; then
+    # 取得の失敗で止まる (set -e)。pipefail 付きの if では API の失敗が『ラベル無し』と判定されてしまうため分ける (#2638 m2)。
+    labels="$(gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name')"
+    if grep -qx "$STUCK_LABEL" <<< "$labels"; then
       stop=true
       echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
     elif [ "$pr_state" != open ]; then
