@@ -59,7 +59,7 @@ const get = async (ctx: Ctx, path = "/status", headers: Record<string, string> =
 
 // ---------------------------------------------------------------------------------------------------------------- 受入 5(d)
 const EXISTING_KEYS = [
-  "mode", "active_runs", "target", "room", "open_issues", "open_prs", "phase", "open_prs_excl_stuck", "stuck_prs", "launch_stop",
+  "mode", "mode_launch", "mode_dispatch", "active_runs", "target", "room", "open_issues", "open_prs", "phase", "open_prs_excl_stuck", "stuck_prs", "launch_stop",
   "blocked", "started", "ready", "relaunch", "user", "stopped", "recent", "would_launch_now", "last_full_sync", "last_reconcile",
   "last_watchdog", "last_tick", "fresh", "counters", "last_error", "log", "configured", "installed", "pm_bot_login",
 ];
