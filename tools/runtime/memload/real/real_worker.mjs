@@ -1,7 +1,7 @@
 // RT-6 実 loader 試験 (#125): PluginPool (src/runtime/memory_budget.ts) を hostbridge の loader に接続する Worker。
 // loader = host_vst2.wasm + 共有 hb_bridge.mjs の HostBridge (LoadLibraryW / FreeLibrary)。lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
 // PluginPool 経由で pin / unpin / LRU 追い出しする。判定は run_real.mjs 側。
-import { ModuleTable, HostBridge, EmscriptenGuest, HMODULE_BASE } from "./hb_bridge.mjs";
+import { ModuleTable, HostBridge, EmscriptenGuest } from "./hb_bridge.mjs";
 import { PluginPool, MemoryBudget, DEFAULT_PLUGIN_CAPACITY } from "./memory_budget.js";
 
 globalThis.Buffer = { from: (s) => Uint8Array.from(s, (c) => c.charCodeAt(0)) };
