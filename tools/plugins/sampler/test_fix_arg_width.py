@@ -75,6 +75,35 @@ entry:
         out, _ = run_pass(ll)
         self.assertIn('call i64 @f(i64 0, i64 0)', out)
 
+    def test_ptr_body_use_of_i64_arg_gets_inttoptr(self):
+        ll = """define i1 @p(i64 %penv) {
+entry:
+  %v = load i8, ptr %penv
+  ret i1 true
+}
+define i1 @q() {
+entry:
+  %r = call i1 @p(i64 0)
+  ret i1 %r
+}
+"""
+        out, err = run_pass(ll)
+        self.assertIn('%argp_1 = inttoptr i64 %penv to ptr', out)
+        self.assertIn('load i8, ptr %argp_1', out)
+        self.assertIn('ptr_uses = 1', err)
+
+    def test_ptr_param_call_with_i64_var_gets_inttoptr(self):
+        ll = """declare i1 @d(ptr)
+define i1 @q(i64 %w) {
+entry:
+  %r = call i1 @d(i64 %w)
+  ret i1 %r
+}
+"""
+        out, _ = run_pass(ll)
+        self.assertIn('%argp_1 = inttoptr i64 %w to ptr', out)
+        self.assertIn('call i1 @d(ptr %argp_1)', out)
+
     def test_call_site_other_value_is_zext(self):
         ll = TARGET + """define i64 @h3(i32 %v) {
 entry:
