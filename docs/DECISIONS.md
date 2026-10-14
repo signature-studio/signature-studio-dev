@@ -231,26 +231,26 @@
 - **理由**: 同じ DLL・MIDI・サンプルレートでも content dir の中身で参照の出力が変わる。wasm 本体が読む content は SR-6 の設計で導入後の installer の全展開 (Tables を含む) であり、SR-46 の factory preset も全展開の `Presets/` からしか取れない。比較条件を wasm 側の読み方に揃えるため (a) は採らず、(c) は判定基準を二重にするため採らない。根拠と実測は `tools/targets/serum2/host/REPORT_SR5.md` §4。
 - **影響**: 参照 pin の主エントリが全展開になる。空 dir 条件は `content_empty` として残る。全展開 content を読む wasm 本体への FS shim 接続は未確認で、#2383 の比較時に確認する (`tools/targets/serum2/host/REPORT_SR5.md` §4.4)。
 
-## D24 — `user_answered` の根拠は人のコメントだけとし、許可 bot のコメントは含めない
+## D24 — `user_answered` の根拠は人 (MEMBER / OWNER / COLLABORATOR) のコメントだけとし、許可 bot のコメントは含めない
 
-- **状態**: 採用 (2026-10-15, issue #2524 [CI-101]。#2461 受入 1 の残件。依頼者不在中に PM 補助が既定案で判断)
-- **決定**: `user_answered` (依頼者の回答の検出) の根拠は、`MEMBER` / `OWNER` / `COLLABORATOR` の人のコメントだけとする。許可 bot (実装 App `opencode-for-signature-studio[bot]`・reviewer App `oc-reviewer-for-signature-studio[bot]`) のコメントは根拠に含めない。起票者の判定 (`authorAllowed`) は変えない。
-- **比較した方式**: (a) 人のコメントだけ (採用・既定。現行実装を凍結)、(b) 許可 bot のコメントも含める (#2461 受入 1 の原文)。
-- **理由**: 許可 bot の投稿を根拠にすると、実装 agent 自身の run 結果コメントで `needs-user-input` の issue が `oc-pm` を起動し得る。依頼者の回答は人のコメントとして従来どおり検出されるため、(a) で人の回答への影響は無い。
-- **影響**: #2461 受入 1 の「か許可 bot」の部分は #2524 に原文のまま移した。PR #2490 の差分が本決定の既定を実装している。許可 bot を根拠に含めるには、本 ADR を覆す新しい決定が要る (戻し方は #2524)。
+- **状態**: 採用 (2026-10-15, issue #2524 [CI-101]。親 #2461。PM 補助 subagent が依頼者の不在中に代理で判断)
+- **決定**: `needs-user-input` の issue で依頼者の回答 (`user_answered`) とみなすのは、`author_association` が `MEMBER` / `OWNER` / `COLLABORATOR` の**人**のコメントだけ。許可 bot (実装 App・reviewer App・PM App) のコメントは根拠にしない。PR #2490 の実装 (`infra/pm-worker/src/webhook.ts` の `userAt`) をそのまま凍結し、#2461 の受入 1 の「か許可 bot」は取り下げる。
+- **比較した方式**: (a) 人のコメントだけ (採用)、(b) 実装 App・reviewer App のコメントも含める (#2461 受入 1 の原文)、(c) 人と PM App のコメント。
+- **理由**: `user_answered` は「依頼者が答えた」ことを表す印で、答えを書けるのは人だけである。`docs/WORKFLOW.md` §12 と `.github/prompts/pm.md` の `user_answered` の節は、どちらも「依頼者 (人間) が返したコメント」と定めており、(b)(c) はこの定義と合わない。(b) は、`needs-user-input` の issue に実装 agent が run 結果を書くたびに `oc-pm` が起き、同じ ref への 24 時間 3 回の上限を使い切って、後から来る本物の回答を処理できなくする。PM agent が bot の文面を回答と読み、`needs-user-input` を外す誤りも起こしうる。(c) の PM App は PM 自身の出力で、自分の出力で自分を起こす経路になる。人の回答は `MEMBER` / `OWNER` / `COLLABORATOR` のアカウントから入るため、bot を足さなくても取りこぼさない。
+- **影響**: Worker・文書の変更は無い。#2524 は close。人の回答の検出は従来どおり。許可 bot を含める要件が将来出たら、新しい ADR を起こして #2461 の受入 1 を取り戻す (ループ抑止を超えないことの確認が要る)。
 
-## D25 — 再投入の意図 `focus=K` の K は受入条件の番号 (1〜9) とする
+## D25 — 再投入の意図 `focus=K` の K は受入条件の番号 (1〜9) とし、`pm.md` の記述を実装に合わせる
 
-- **状態**: 採用 (2026-10-15, issue #2575 [CI-105]。親 #2475。依頼者不在中に PM 補助が既定案で判断)
-- **決定**: 再投入の意図 `focus=K` の K は、issue 番号ではなく**受入条件の番号 (1〜9)** とする。検査 (`infra/pm-worker/src/launch.ts` の `checkRelaunchIntent`) は 1〜9 だけを受け入れ、それ以外の focus は拒否する (`counters.intentRejected.focus` に数え、投稿は行わない)。focus の無い意図は従来どおり動く。
-- **比較した方式**: (a) 受入条件の番号 1〜9 (採用。PR #2511 の実装と親 #2475 の受入条件 1・2 の定義)、(b) issue 番号 (`.github/prompts/pm.md` の現在の書き方と例 `focus=778`)。
-- **理由**: focus は issue 内のどの受入条件を見直すかの指定である。issue 番号を入れると `issue=` と同じ値になり (pm.md の例 `issue=778 ... focus=778` は意味が重なる)、指定の役目を果たさない。
-- **影響**: `.github/prompts/pm.md` の focus の説明と例は、現在 issue 番号のままで実装と食い違う。直すのは `.github/` の変更として依頼者が反映する (PM agent は行わない)。反映までは PM は focus を付けない。issue 番号に変える場合は `checkRelaunchIntent` と `buildLaunchBody` を直す実装 PR が要る。
+- **状態**: 採用 (2026-10-15, issue #2575 [CI-105]。親 #2475、PR #2511。PM 補助 subagent が代理で判断)
+- **決定**: `<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->` の `K` は、再投入する issue の**受入条件の番号** (1〜9 の整数・任意) とする。Worker (#2511) は 1〜9 以外を拒否して `counters.intentRejected.focus` に数える。`.github/prompts/pm.md` の「issue 番号」の説明と `focus=778` の例を、受入条件の番号に直す (#2575 の実装 PR)。`infra/pm-worker/` は変えない。
+- **比較した方式**: (a) 受入条件の番号 (採用)、(b) issue 番号。
+- **理由**: 親 #2475 の受入 1・2 と、`buildLaunchBody` の固定文 (「この issue の受入条件 K だけを実装して PR を出してください。他の条件は子 issue にしてください」) が受入条件の番号で定義している。`pm.md` の「issue 番号」は初稿 (#2326) の書き方で、実装の契約とずれていた。(b) は、`issue=N` が再投入先を既に指すため `focus` に issue 番号を取る意味が重ならず、別 issue を指す場合は存在・親子関係・open の検査 (REST) と固定文の書き換えが増えて、注入の面も広がる。(a) の検査は定数 1〜9 で済む。これは `.github/prompts/pm.md` の境界 U6 (`AGENTS.md`・`docs/WORKFLOW.md` §1・`docs/pm/DIRECTIVES.md` の改訂) に当たらない。規則を変えず、マーカーの引数の説明を実装に合わせる訂正であり、`.github/prompts/` は実装 App が変更できる (前例 #2433)。
+- **影響**: 訂正が merge されるまで、PM は `focus` を付けない (付けると検査で拒否される。focus の無い意図は従来どおり動く)。#2511 の merge を待たずに訂正を進められる。
 
-## D26 — 降格は Worker の `/oc` と Worker 以外の PM ログインの `/oc` の組だけを数える
+## D26 — 降格 (二重 `/oc` の検出) は「Worker の投稿」と「Worker 以外の PM ログインの投稿」の組だけを数える
 
-- **状態**: 採用 (2026-10-15, PR #2469 / issue #2340 受入条件 4 の読み。依頼者不在中に PM 補助が既定案で判断)
-- **決定**: 同じ issue に 30 分以内の 2 回目の `/oc` による降格 (dry-run への復帰) は、**Worker が投稿した `/oc` と、Worker 以外の PM ログイン (PM の個人アカウント・VM 側) が投稿した `/oc` の組だけ**を数える。Worker 同士の組と、個人アカウント同士の組は降格の根拠にしない。
-- **比較した方式**: (a) Worker と Worker 以外の PM ログインの組だけ (採用)、(b) PM ログイン (Worker と個人アカウント) の `/oc` であれば組の種類を問わず数える (PR #2469 の head 時点の `noteOc()` の判定)。
-- **理由**: #2340 の表題は「誤投稿での自動 dry-run 復帰」で、受入条件 4 が防ぐのは Worker と手動運用 (VM) が同じ issue に二重に `/oc` を投稿する事故である。Worker 同士・個人アカウント同士の組は、受入条件 4 の対象 (Worker と VM の二重投稿) の外にある。
-- **影響**: PR #2469 (head 時点) の `noteOc()` は、PM ログインの `/oc` を Worker の区別なく、同じ issue の 30 分以内の任意の 2 件で数えるため、本決定と食い違う。#2469 の判定を (a) に合わせるか、本決定を覆す決定を残すかは PM が決める (実装の修正は本 ADR の範囲外)。解除は `POST /demote/reset` のまま変えない。
+- **状態**: 採用 (2026-10-15, PR #2469 [#2340 の降格と shadow の部分実装]。PM 補助 subagent が代理で判断)
+- **決定**: #2340 受入条件 4 の「同じ issue に 30 分以内に 2 回目の `/oc`」の「2 回目」は、Worker (PM App) の `/oc` と、Worker 以外の PM ログイン (個人アカウント。VM と手動の投稿) の `/oc` の組 (先後は問わない) に限る。Worker 同士の組と、個人アカウント同士の組は数えない。受入条件の原文は消さず、読みを #2340 のコメントと PR #2469 に追記する。降格で `oc-watchdog`・`oc-pm` の dispatch も止めること、解除が手動 (`POST /demote/reset`) だけであることは、PM 判断 (R7) のまま変えない。
+- **比較した方式**: (a) 現実装: PM のログイン同士の組を全て数える、(b) Worker と Worker 以外の組だけを数える (採用)、(c) 降格をやめて shadow だけにする、(d) (a) のまま relaunch の経路だけ除く。
+- **理由**: 降格の目的は、Worker が live の間に、別の投稿者 (VM・PM の手動) と同じ issue を二重に起動する事故を止めることである。(a) は、停止報告の後に素材を足して再投入する Worker 自身の正当な `/oc` (この経路に待ち時間は無い) を二重と数え、最初の再投入で自己降格する。降格すると launch と dispatch が止まり、解除は手動だけなので、依頼者の不在 (最大 2 日。`docs/WORKFLOW.md` §11) の間、自律運転が止まる。個人アカウント同士の組は Worker の挙動と無関係で、降格しても原因を止められない。Worker 自身の投稿頻度は別の上限 (#2475 の同じ issue 24 時間 3 回など) で抑える。(c) は受入条件 4 の安全網を失う。(d) は経路ごとの例外が増えて、新しい経路が足されるたびに漏れる。
+- **影響**: PR #2469 に、組の条件の変更と、ネガコン (Worker 同士は降格しない、個人同士は降格しない) を含む回帰テストの追加を依頼する。この変更が入る前の版は、`wrangler.toml` が live のままなので再デプロイしない。昇格 (受入条件 2・3、`LIVE=auto`) は未実装のままで、#2340 に残る。
