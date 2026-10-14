@@ -237,6 +237,7 @@
 | `tools/m11/ldfix/REPORT_1169.md` | ~60 | D17 spill 宛 CELL_COLLAPSED 37 site / 22 関数の消費者追跡の部分達成: 現 HEAD の基準値の実測 (store 宛 86→53、spill 宛は修復前後 37)、目視判定 18 行の分類 (TSV 突き合わせ可能な 6 行は全て TRUE_DROP)。修復 pass 未着手。残件は候補 31 site が #1161 (LD-35)、修復 pass と修復後の残数が本 issue の残件 (#1169) |
 | `tools/m11/ldfix/REPORT_2389.md` | ~51 | LD-110 (#2389): cf3790 の spill 宛 3 site (cf3c7a・cf3cbb・cf3d20) の reg2mem 結線 (frame F=472・`stack_var_-(F-disp)`) で TRUE_DROP を確定。ld105 突合表の slot 名 `-(disp+8)` の誤りの訂正とネガコン |
 | `tools/m11/ldfix/REPORT_2316.md` | ~75 | LD-108 (#2316) の部分達成: 41a670 の head 解除 store (D20) の検証用パッチ (`fix_ld108.py`、本番 IR 生成経路には未配線) と wasm 直接呼びの修復前後の実測、`audit_lsf_disp.py` の検出と残 SUSPECT、survey 前後の差。`audit_lsf.py` 統合は #2396、本番配線は #2402 |
+| `tools/m11/ldfix/REPORT_2405.md` | ~109 | LD-113 (#2405): RetDec 2019-03 版 (`6edcaaea`) の gv 分岐 (constants.cpp L163〜168) の発火実測。2019-03-03 の share (retdec-support) は入手不可と確定し、代用 share で 41a6a0・41a6d3・666b10 の発火を v5.0 と件数・root まで一致で確認。一時ログ付きビルドの所要。再現は `retdec2019_gv_2405.sh` |
 | `tools/m11/ldfix/REPORT_2396.md` | ~120 | LD-111 (#2396): `audit_lsf_disp.py` の変位形を `audit_lsf.py` に統合 (既存 3 判定は byte 不変、SUSPECT_DISP_VAS を並べて出力)。残 SUSPECT 3 件 (6677a0・d237e0・de1da0) を機械語 `movs` の列挙漏れ (誤検出) と確定し、列挙を拡張して 4 → 1 件 (41a670 のみ、修復後 0)。独立算法 `triage_ld111.py` の突合と NC 5 本 |
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/shimx_link/REPORT.md` | ~165 | M11 × shimx リンク |
@@ -449,7 +450,7 @@
 | `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
 | `docs/LEGAL_TERMS_LEDGER.{json,md}` | 各社規約の取得台帳 (取得日・版表記・正規化テキストの SHA-256)。`.json` が正本、`.md` は自動生成 | 規約本文・手編集 (`pnpm terms-watch` が更新) |
 | `docs/DOC_MAP.md` | 本書。REPORT.md 索引・行数上限ルール・自動生成一覧・本章 | 技術内容・測定値 |
-| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D22 (横断正本) | 個別ケースの詳細 (report 側) |
+| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D23 (横断正本) | 個別ケースの詳細 (report 側) |
 | `docs/HANDOFF/<日付>.md` | 引継ぎ要約 (方針・ブロッカー・次の一手)。最新のみ保持 | 状態の正本 (STATUS.md へ)・数値の羅列 |
 | `tools/<area>/REPORT.md` | **測定値・実測数値・検証結果の単一の正本** (日本語/英文を問わず) | なし (ここが正本) |
 | `tools/<area>/README.md` | **ナビゲーションのみ** (何をする dir か・E2E コマンド・関連ファイル) | 測定値・状態表 |
