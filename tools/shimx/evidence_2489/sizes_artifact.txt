@@ -1,0 +1,3 @@
+5754665 <artifact-snapshot>/m11_boot.cjs
+6010853 <artifact-snapshot>/m11_boot.cjs.wasm
+22515781 work/m11_image.bin

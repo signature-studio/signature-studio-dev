@@ -1,0 +1,14 @@
+PRE|unit 20 slot 0x0 gp 
+PRE|unit 21 slot 0x0 gp 
+PRE|unit 22 slot 0x457860 gp 
+SLOT_BEFORE_UNIT|0x457860
+unit 23 lva 0x67f00
+SLOT_AT_UNIT|0x457860
+ret=2
+(sxt 無し: 既存 M11 ビルド)
+MISS_UNIQ 1 MISS_TOTAL 2
+MISS_AT|0 457860
+
+real	0m0.367s
+user	0m0.359s
+sys	0m0.085s

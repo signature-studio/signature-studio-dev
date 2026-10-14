@@ -2,8 +2,10 @@ import manualDepsJson from "../../../tools/pm/manual_deps.json" with { type: "js
 import { DEFAULT_BATCH } from "./launch.ts";
 import { DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 
-// 既定の TARGET は 80。GitHub の同時 job 上限 (60) を超えた分は queued になり、常時 60 に張り付くための余裕。
-export const DEFAULT_TARGET_WORKER = 80;
+// 既定の TARGET は 58: 同時に走らせる opencode.yaml の run の総数 (実装・review・fix・oc-pm・watchdog の全て。active.ts) の上限。
+// GitHub の同時実行の上限 (60) から 2 を残す (oc-pm・watchdog と、投稿直後でまだ run が現れていない分の余裕)。
+// 実際の目標は、観測から推定した上限を足した target_eff (saturation.ts。TARGET を超えない)。
+export const DEFAULT_TARGET_WORKER = 58;
 export const DEFAULT_QUEUE_MARGIN = 10;
 export const DEFAULT_TARGET_MIN = 30;
 export const DEFAULT_REPO = "signature-studio/signature-studio-dev";

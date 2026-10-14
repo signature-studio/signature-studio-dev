@@ -222,7 +222,22 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
 
-## 16. 実装 App の自己 merge の実測 (#2600・PR #2624)
+## 16. oc-pm の refs_orphan 検出 (#2337・PR #2478)
+
+- 測定 commit: `b7fb7a40` (main `b3c699d4` の取り込み merge。修正本体は `ebfd0a41`)。全文 (測定・ネガコン・Refs のみ判定の差): [`REPORT_APPENDIX_2337.md`](REPORT_APPENDIX_2337.md) (§16 の分割移動)。
+- 結論: `npm test` 213 件 PASS / 0 FAIL (n=3)。`test:unit` 10 件・`test:workers` 3 件 PASS。ネガコン 5 種は各 1 件ずつ壊して FAIL を確認。
+- 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
+
+## 17. /oc 投稿の観測のネガコン (#2342・#2473 の vitest 化)
+
+- 測定 commit: `dd9931bf` (`test/launchobs.test.ts` を `test/unit/launchobs.test.ts` に移して vitest 化。README の 1 行)。worktree で `pnpm install --frozen-lockfile --config.minimum-release-age=0` (診断用。既定設定は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`)。
+- 結論: `test:unit` (vitest) **19 件 PASS** (うち観測 9 件)・2.1 s。`test:workers` **3 件 PASS**・1.5 s。`npm test` (node:test) **204 件 PASS / 0 FAIL**・17.7 s。load 0.33 (Node 22.23.3)。
+- ネガコン: `src/launchobs.ts` を 1 行ずつ壊して FAIL を確認。(b) の題名一致を外す → (b) と純関数の 2 件 FAIL。5 分の境界 `>` を `>=` → (a) と純関数の 2 件 FAIL。元に戻した後 `git diff -- src` は 0 行。
+- 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。
+
+## 18. 実装 App の自己 merge の実測 (#2600・PR #2624)
 
 - **測定** (別 subagent の実測。取得時刻・クエリは #2600 本文に記録が無い。PR #2624 の作成者は再測定していない): 直近 24 時間の merged PR 986 件のうち約 119 件 (12%、95% CI 83〜157) が、merged_by = 実装 App (`opencode-for-signature-studio[bot]`) の自己 merge だった。PR 作成の 6〜45 秒後に merge され、merge 前の review は 0 件 (確認できた 19/19)。確認できた 8 件は全てコードを含み、`.github/scripts` と `infra/pm-worker` を含む。
 - **原因**: `.github/prompts/implementer.md` 規範 9 が `gh pr merge --auto --merge` を指示していた (`8e4b343d`、2026-10-12 追加)。main に承認必須の Ruleset が無く (`branches/main/protection` は 404、ruleset 24866584 に `pull_request` ルールは無い)、`allow_auto_merge: true` のため Auto Merge は即時 merge になった。

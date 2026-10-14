@@ -1012,6 +1012,10 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 > - wranglerにログインしました。
 > - 時刻から分かる通り、私は一度指示したら最低でも2時間、最大2日間は画面を離れます。私の指示がないとプロジェクトを進行できない状態はそのまま遅延につながるため、覚えておいてください。
 
+### 指示 145（2026-10-15、heartbeat の再開・監査専用）
+
+> やはり2時間ごとのtimerを入れてください。ただし、執り行うのはワークフロー全体の監査のみです。actionsやチケットの状況を含む開発フローについてのです。
+
 ---
 
 ## 2. PM による解釈・運用への反映
@@ -1053,6 +1057,7 @@ PM を含む全てのセッションは ephemeral で中断・削除される可
 | 指示 133: 恒久指示: PM として、プロダクトの完成まで自走する | 指示 113・116・120・129 と同じ。ユーザーの指示を待たずに、完成まで着手→レビュー→merge を回し続ける。 | PM 運用全体 |
 | 指示 140: Cloudflare Workers・GitHub App・Webhook による構成の提案 (PM の解釈。依頼者の発言ではない) | 指示 140 により、PM の運用のための Cloudflare Workers (alarm / Cron Trigger による repository_dispatch の送信、Webhook の受信) の新設は許可されたと解釈する。**新規 API token の作成・secrets の平文保存は引き続き禁止** (指示 4・9)。 | 本ファイル |
 | 指示 144: wrangler ログイン完了・依頼者は一度指示したら最低 2 時間、最大 2 日間は画面を離れる | 依頼者は 2 時間〜2 日間不在。依頼者の指示・操作を待たずに進む設計を前提にする。依頼者の判断が要る事項は `needs-user-input` で積み、他の作業を止めない。 | `docs/WORKFLOW.md` §11 |
+| 指示 145: 2 時間ごとの timer を入れる。ただし執り行うのは (Actions・チケットを含む開発フローの) ワークフロー全体の監査のみ | 再開するのは `pm-heartbeat.service` だけ (間隔 7200 秒、文面は `tools/pm/heartbeat_msg_audit.txt`)。`pm-launch.timer`・`pm-watchdog.timer` は再開しない (着手と watchdog は Worker が担い、二重になる)。文面は監査の依頼だけで、着手・watchdog・PM 判断の実行・merge・ラベル操作を含まない。 | `tools/pm/README.md`・`tools/pm/heartbeat_msg_audit.txt` |
 
 ---
 
