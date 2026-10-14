@@ -1,90 +1,72 @@
-# tools/python REPORT: PY-121 ui の表示・メニュー 15 関数のうち 6 件の PE 確定と C provider 実装 (#2982, 親 #2831)
+# tools/python REPORT: PY-121 general の log・rec 系 4 件の PE 根拠 (#2979, 親 #2830)
 
-> 正本: `tools/python/REPORT_PY87.md` (PY-87 の付録様式)。親 #2831 と本 issue が参照する `REPORT_PY95.md` は、本 run の checkout と全 ref に存在しなかったため、本付録の表を一次資料とする。PE の一次データは `tools/python/analysis/flapi/pe_handler_probe.py` の出力。
+> 前段: `tools/python/REPORT_PY87.md` (general 状態読出しゲッター 4 件)・`tools/python/REPORT_PY39.md` / `REPORT_PY70.md` (processRECEvent の書式)。
+> issue #2979 が参照する `tools/python/REPORT_PY94.md` は repo に存在しない (main `eec639a3` で確認)。本付録は PY-121 の実測のみ。
+> 既知類型との関係: 該当なし (lift ではなく PE の直接逆アセンブル。docs/DEFECTS.md の類型は対象外)。
 
 ## 結論
 
-- 対象 15 件のうち **6 件** を実装した: 表示矩形 3 件 (`crDisplayRect` / `miDisplayRect` / `miDisplayDockRect`)・通知 1 件 (`showNotification`)・メニューを閉じる 2 件 (`closeAllMenu` / `closeActivePopupMenu`)。mock と C の差分は 0 (`tests/ui_display_diff.mjs`: 正常 12 呼出し・異常 11 呼出し)。
-- **表示矩形 3 件の確定範囲**は PyArg 書式 (引数の個数と型) と、時間引数の頭打ち (`0x7d0` = 2000) だけ。表示の作用先 (UI) は未モデル。Python から観測できるのは引数の検査と、頭打ち後の値 (`fl_engine_display_time`) のみ。
-- 残り **9 件**は確定していない。理由は作用先の逆アセンブル (共通の呼出し口 `0xd843d0`・変換 `0xd82c20` の同定) が未了のため。子 issue 3 件 (PY-131 (#3012)・PY-132 (#3013)・PY-133 (#3014)) に分けた。
-- 題名の `[PY-121]` は #2985 (screen 28 件) と重複している。本 run では新規採番せず、本 issue の番号 (#2982) の題名を変えなかった。整理は PM の判断。
+- 4 関数 (`general.clearLog`・`general.dumpScoreLog`・`general.processRECEvent`・`general.getRecPPB`) の**ハンドラ VA・書式・呼出し鎖**を PE (`block00031_PE.bin`) から確定した。書式と引数個数は flapi 表 (`analysis/flapi/flapi_table.json`) と一致した。
+- **戻り値の意味と副作用は 4 件とも未確定**。clearLog・dumpScoreLog は共通の dispatch `0xd843d0` の先の下位関数 (`0x11eb5f0`・`0x124c020`) の意味が要る。processRECEvent は `0xd84740`、getRecPPB は実行時にどちらの経路が生きているかが要る。
+- 未確定の意味を mock/C に書くと silent miscompile になる。**本 PR は mock・C provider を変えない** (実装数・未実装数の変化 0、`general_diff.mjs` の対象 0)。残りは子 issue #3001・#3002・#3003 に移した。
 
-## PE 根拠 (15 件)
+## PE 根拠 (VA)
 
-PE: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>` (`block00031_PE.bin`)。entry は PyMethodDef のエントリ VA、fn は関数先頭 VA、fmt は `PyArg_ParseTuple` の書式 (関数内の `lea rdx,[rip+X]` が指す文字列)。stub は `analysis/flapi/flapi_table.json` の `sig`。
+| 関数 | PyMethodDef entry | fn (VA) | flags | 書式 (kwlist) | 確定した呼出し鎖 | 未確定 |
+|---|---|---|---|---|---|---|
+| `general.clearLog` | 0x151ac80 | 0xd6a1f0 | 4 (NOARGS) | なし | `0xd6a8e0` で eng 取得 → dispatch `0xd843d0` (out=[rbp+0x78]・callback `0xd6a1a0`・sync=1) → `0xd82c20(code)` で Python 値へ | `0xd6a1a0` 先の `0x11eb5f0(V(0x15e0ff8), 1)` の効果 |
+| `general.dumpScoreLog` | 0x151ac60 | 0xd6a060 | 3 (VARARGS\|KEYWORDS) | `i\|i` (time, silent) | PyArg 解析 → dispatch `0xd843d0` (time・silent を task に複製・callback `0xd69ff0`) → callback が `0x124c020(V(0x15e0ff8), time, silent==1)` | `0x124c020` の効果・time の単位 |
+| `general.processRECEvent` | 0x151ac40 | 0xd69f00 | 1 (VARARGS) | `Iii` (eventId, value, flags) | PyArg 解析 → `0xd84740(eng, &out, eventId, value, flags)` → out の第 1 qword ≠ 0 なら error、0 なら第 2 の dword を `0x15e4280` (int 変換) へ | `0xd84740` の意味・out の型と範囲 code |
+| `general.getRecPPB` | 0x151aa40 | 0xd69310 | 4 (NOARGS) | なし | `0xd68d90` の戻り値 X の `dword [X+0xb20]` を `0x15e4280` へ | X の切替 (下節) |
 
-| 関数 | entry | fn | flags | PyArg 書式 (PE) | stub の引数 | stub の戻り | 状態 |
-|---|---|---|---|---|---|---|---|
-| `ui.showNotification` | 0x151b688 | 0xd6c8b0 | 1 | `i` | notificationId: int | None (null) | **実装** |
-| `ui.launchAudioEditor` | 0x151b828 | 0xd6d540 | 1 | `isiss` | reuse, filename, index, preset, presetGUID | int | 保留 (子 PY-133 (#3014)) |
-| `ui.closeAllMenu` | 0x151b868 | 0xd6d7c0 | 4 | NOARGS | なし | None | **実装** |
-| `ui.closeActivePopupMenu` | 0x151b888 | 0xd6d8e0 | 4 | NOARGS | なし | None | **実装** |
-| `ui.crDisplayRect` | 0x151b928 | 0xd6e860 | 1 | `iiiii\|i` | left, top, right, bottom, duration, flags=0 | None | **実装** |
-| `ui.miDisplayRect` | 0x151b948 | 0xd6ea40 | 1 | `iii\|i` | start, end, duration, flags=0 | None | **実装** |
-| `ui.miDisplayDockRect` | 0x151b968 | 0xd6ebf0 | 1 | `iiii` | start, length, dock_side, time | None | **実装** |
-| `ui.navigateBrowser` | 0x151b988 | 0xd6dad0 | 1 | `ii` | direction, shiftHeld (bool) | str | 保留 (子 PY-131 (#3012)) |
-| `ui.toggleBrowserNode` | 0x151b9a8 | 0xd6dcd0 | 1 | `\|i` | value=-1 | None | 保留 (子 PY-132 (#3013)) |
-| `ui.navigateBrowserTabs` | 0x151b9c8 | 0xd6ded0 | 1 | `i` | direction | str | 保留 (子 PY-131 (#3012)) |
-| `ui.navigateBrowserMenu` | 0x151b9e8 | 0xd6dad0 (navigateBrowser と共有) | 1 | `ii` | direction, shiftHeld (bool) | str | 保留 (子 PY-131 (#3012)) |
-| `ui.selectBrowserMenuItem` | 0x151ba08 | 0xd6e170 | 4 | NOARGS | なし | None | 保留 (子 PY-132 (#3013)) |
-| `ui.previewBrowserMenuItem` | 0x151ba28 | 0xd6e330 | 4 | NOARGS | なし | None | 保留 (子 PY-132 (#3013)) |
-| `ui.openEventEditor` | 0x151bac8 | 0xd6ef80 | 1 | `Ii\|i` | eventId, mode, newWindow=False | int | 保留 (子 PY-133 (#3014)) |
-| `ui.showPicker` | 0x151bb28 | 0xd6f2e0 | 1 | `i\|i` | stub 無し (new_vs_stubs) | 未確定 | 保留 (子 PY-133 (#3014)) |
+- 書式は `pe_handler_probe.py` が引いた文字列 (clearLog は無し、dumpScoreLog は `i|i` 、processRECEvent は `Iii`) と flapi 表の `kwsig` が一致した。
+- `processRECEvent` の channels 版 (entry 0x15171c8・fn 0xd58e00) は同じ `0xd84740` を呼ぶ (REPORT_PY39 の既知点と一致)。
+- 変換スロット `0x15e4280` は REPORT_PY87 の既知点と一致 (getRecPPB・processRECEvent の両方で確認)。
 
-- `navigateBrowser` と `navigateBrowserMenu` は同じ fn 0xd6dad0 を指す (entry は別)。親 issue の手掛かりどおり。
-- `closeAllMenu` と `closeActivePopupMenu` は同形 (fn の先頭から 35 命令程度で、`0xd843d0`・`0xd82c20`・`0x415c30` を呼ぶ)。親 issue の手掛かりどおり。
+## dispatch `0xd843d0` と述語 (clearLog・dumpScoreLog 共通)
 
-## 実装した 6 件の根拠
+- 引数: `rcx=eng`・`rdx=out`・`r8=callback`・`r9=userdata (0)`・5 番目以降はスタック。入口で `*out = -2` (`0xfffffffffffffffe`、0xd843e9)。
+- 5 番目以降の引数を task (`eng` 系の構造) の `+0x18`〜`+0x40` へ複製 (0xd84429〜0xd84467)。callback を `+0x58` に置く (0xd8446b)。11 番目の引数 (`[rbp+0xb0]`) が sync flag (0xd84471)。
+- callback の規約 (両 callback 共通の形): 先頭で `task[+0x60] = -2`。述語 `pred = vtbl(this)[+0x98]()` が真なら `task[+0x60] = 0` を書いて本体を呼ぶ。偽なら -2 のまま。
+  - `this = *(*(*(0x15e4790)) + 8)` (`0xd6a1b0`〜`0xd6a1c1`)。`general.safeToEdit` (0xd6a2c0) と同じ読み方 (REPORT_PY87 の観察と一致)。
+  - 本体の対象 `V(0x15e0ff8)` (`0xd6a1d6`・`0xd6a026` で同じ global)。
+- `0xd843d0` が `task[+0x60]` を `*out` へ写す箇所は**未確認** (推定。写す処理を見ないと、out が -2 のまま返る経路の有無が言えない)。
+- 結果変換 `0xd82c20(code)` (入口で `[rbp+0x24]` = code、戻り値 rax は `[rbp+0x28]`。`pe_disasm.py d82c20` で確認):
+  - (a) `code == 0` (`0xd82c35`〜`0xd82c3a`): `0xd82c3c` で関数ポインタ (`call [rax]`、`[rip+0x860485]` 経由) を呼び、戻り値 rax の null を見る (真偽の述語ではなくポインタ返し)。非 null なら `0xd82c4a` で戻り値を 0 とし、`0xc38bc0` を呼ばずに `0xd82dda` へ戻る。null なら (b) と同じ経路 (`0xd82c55` → `0xd82c5c`)。
+  - (b) `code ≥ 0` (`0xd82c58`〜`0xd82c5a` の `jl` が成立しない。(a) の null を含む): `0xd82c5c` で `0xc38bc0` を呼び、その戻り値を `0xd82c61` で戻り値とする。
+  - (c) `code < 0` (`0xd82c5a` の `jl 0xd82c6a` が成立): `0xd82c6a`〜`0xd82c84` で `this` (`*(*(*(0x15e4790))+8)`) の `vtbl[+0x88]()` を呼ぶ。
+    - 偽なら `0xd82dd0` で引数を設定せず `0xc38bc0` を呼ぶ (rcx は述語呼出し後で未定義。(b) と同じ `0xc38bc0`)。
+    - 真なら `0xd82c8c`〜 の code 別の分岐へ進む。`-1`〜`-3` は `0xd82cce`〜、`-4` は `0xd82d3c`、`-5`〜`-8` は `0xd82d4e`〜`0xd82d84`、`-9` 以下は `0xd82d96`。どの分岐も RIP 相対の文字列を `0x4135e0` で `[rbp+0x38]` に書いたのち `0xd82da6` へ進み、`0x414000` → `call [rbx]` (rcx = `*(*(0x15e1140))`、rdx = 文字列。例外設定の形に見えるが、関数名と引数の意味は未同定) → `0xd82dc8` で戻り値 0 を返す。
+- 戻り値の意味は未確定 (`0xc38bc0` の戻り値は None と推定・推定と明記)。よって、述語偽 (`code < 0` かつ `vtbl[+0x88]` が偽) のときに Python 側が None を返すか例外を投げるかは、`0xc38bc0` の同定まで確定しない。述語真の経路 (c-真) は、code 別のメッセージを設定して 0 を返す形。
 
-1. **PyArg 書式 = 引数の個数と型**: 上の表の fmt。stub の必須・既定値 (`duration` 必須・`flags=0` 既定) と一致する (`crDisplayRect`: 必須 5 + 任意 1 = `iiiii|i`)。C と mock は `NARGS` / `argI` で同じ個数検査をし、型違い (文字列・小数) は code 5 (`WRONG`)。
-2. **時間引数の頭打ち**: 3 関数とも `movsxd rax,[時間引数]; cmp rax,0x7d0; jle …; mov eax,0x7d0` の形。時間引数は PyArg の out ポインタ順で決まる。
-   - `crDisplayRect`: out ポインタは `r8/r9` と `[rsp+0x20..0x38]` の順で arg0..arg5。頭打ちされるのは `[rbp+0x9c]` = arg4 (duration)。`flags` の既定 0 は `mov dword [rbp+0x98],0`。
-   - `miDisplayRect`: 頭打ちされるのは `[rbp+0xa4]` = arg2 (duration)。頭打ち後の値は `mov [rsp+0x30],rax` で作用先の 3 番目の引数へ渡る。
-   - `miDisplayDockRect`: 頭打ちされるのは `[rbp+0xa4]` = arg3 (time)。頭打ち後の値は `mov [rsp+0x38],rax` で 4 番目の引数へ渡る。
-   - 負の値は頭打ちしない (`cmp` の後 `jle` で素通し)。C の `v > DISP_MAX ? DISP_MAX : v` と mock の `Math.min(v, 0x7d0)` は、この素通しの規則を再現する。
-3. **no-op の 3 件** (`showNotification`・`closeAllMenu`・`closeActivePopupMenu`): PE に引数の範囲検査は無い (`showNotification` は PyArg の成否判定 `test rax,rax; jle` のみ)。作用は未モデル。mock と C は個数・型だけ検査し、`None` を返す。
-4. **戻り値 None**: stub の `returns` に従う。PE の末尾は `0xd82c20` (結果 → PyObject と推定、同定は未了) を通る。`returns` の根拠は stub のみ。
+## getRecPPB の切替 (`0xd68d90`)
 
-## 保留 9 件 (未確定の理由)
+- `P = *(0x15e4558)` (`0xd68d90`)。
+- `*(P) != 0` なら `X = *(P)` (`0xd68d97`〜`0xd68da7`)。
+- `*(P) == 0` なら `X = *(*(0x15e35c8))` (`0xd68da9`〜`0xd68db3`)。
+- 戻り値は `dword [X + 0xb20]` (`0xd69319`)。
+- どちらの経路が FLEngine の実行時に生きているかは PE の静的解析では決まらない。`0x15e4558` の値、`*(P)` が 0 になる条件 (プロジェクト・エンジンの状態)、`0x15e35c8` の指す struct の役割の同定が要る。
 
-- `navigateBrowser` / `navigateBrowserMenu` / `navigateBrowserTabs` (子 PY-131 (#3012)): 戻り値が `str` (stub)。0xd6dad0 の本体は `0xd843d0` (作用先の呼出し口) の戻り値を `[rbp+0x88]` で判定して分岐する。作用先の中身 (ブラウザの選択名の取得元) が未同定。
-- `toggleBrowserNode` / `selectBrowserMenuItem` / `previewBrowserMenuItem` (子 PY-132 (#3013)): `toggleBrowserNode` は `\|i` 書式で、値 `-1` (既定) は PE の初期化 `mov dword [rbp+0x9c],0xffffffff` で確認済み。ただし作用先の呼出しが `0xd843d0` の 1 段で、ノードの状態変化の所在が未同定。`selectBrowserMenuItem` / `previewBrowserMenuItem` は `closeAllMenu` と同じ `0xd843d0`・`0xd82c20` の呼出しに加えて、`call [rax+0x98]`・`call [rax+0x100]`・`call [rax+0x70]` を含む別の分岐がある (同形ではない。probe の 260 命令の範囲で確認)。
-- `launchAudioEditor` / `openEventEditor` / `showPicker` (子 PY-133 (#3014)): 戻り値が int (2 件) か未確定 (`showPicker` は stub 無し)。`launchAudioEditor` は 5 引数の書式 `isiss` で、`filename`・`preset`・`presetGUID` は文字列の参照先を伴う。作用先 (エディタの起動経路) が未同定。
+## 手段
+
+- 実行の cwd は全て `tools/python/` (`analysis/flapi/` は `tools/python/analysis/flapi/`)。
+- 展開: `mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` (2.9 秒・`extracted/block00031_PE.bin`)。
+- probe: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_handler_probe.py clearLog dumpScoreLog processRECEvent getRecPPB` (entry と fn が `analysis/flapi/flapi_kwargs.json` の `fn_va` と一致。`flapi_table.json` には `fn_va` が無い)。
+- 逆アセンブル: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_disasm.py <VA 16 進> <命令数>` (本文の VA は全て、このコマンドで読んだもの)。
+- RIP 相対の絶対アドレス = 次命令のアドレス + disp32 で手計算。検算: `0xd68d90`・`0xd68d9d` の 2 命令が同じ `0x15e4558` を指すこと、`0xd6a1b0`・`0xd6a000`・`0xd6a1d6`・`0xd6a026` の指す先が各々 `0x15e4790`・`0x15e0ff8` で一致すること。
 
 ## 検証
 
-測定 commit: `7f7572f4` (main 取り込みの merge commit。コードを変えた最後の commit)。`git diff 7f7572f4 HEAD -- tools/python ':!*.md'` は空 (本節の追加は md のみ)。取り込み前の測定は `fcfb290c` (PR 実装 commit)。
-環境: runner 4 core、再測定時の `uptime` は `load average: 0.80, 1.31, 0.73` (21:21:38)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を全展開)。emsdk は上流 `emscripten-core/emsdk` から 6.0.12 を `$RUNNER_TEMP/tc/emsdk` に入れ、scripts の既定位置 `[EMSDK]` へ symlink した。
-
-前提の生成物 (gitignore・取り込み後に再生成): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、2 分 42 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.2 秒)。
-
-| コマンド | 結果 | wall |
-|---|---|---|
-| `bash provider/build.sh` | rc 0 (`dist/flprov.wasm` 57,922 B・ハンドラ 90) | 0.966 秒 |
-| `node tests/ui_display_diff.mjs` | PASS (正常 12・異常 11・diffs 0・displayTime 2000) | 0.049 秒 |
-| `node tests/ui_diff.mjs` | PASS (calls 17・diffs 0・範囲外既知差分 3) | 0.048 秒 |
-| `node tests/general_diff.mjs` | PASS (calls 9・diffs 0) | 0.049 秒 |
-| `node tests/device_diff.mjs` | PASS (calls 8・diffs 0) | 0.048 秒 |
-| `node tests/provider_check.mjs` | PASS (functions 435 / 実装 90 / 未実装 345 / MCP 静的 60) | 0.369 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.327 秒 |
-
-取り込み後に追加で通した main 側変更の回帰 (wall 未計測): `mixer_diff.mjs` PASS (calls 57・diffs 0)・`channels_diff.mjs` PASS (calls 123・diffs 0)・`transport_diff.mjs` PASS (calls 7・diffs 0)・`midi_path_diff.mjs` PASS (cases 30・diffs 0)・`ilmcp_diff.mjs` PASS (calls 32・diffs 0)・`kwsig_check.py` OK。
-
-件数の変化: 取り込み前 (`fcfb290c`) は 実装 83 → 89 (+6・PR)、未実装 352 → 346。取り込み後は main の PY-115 (`mixer.getTrackColor`・+1) を足して 実装 90 / 未実装 345。`provider_check.mjs` の期待値は両方を足した値に更新した (競合解消)。
-
-ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の時間引数の頭打ち値を `0x7d0` から `0x7cf` にすると、`node tests/ui_display_diff.mjs` は `ui 表示 差分 19 件` で rc 1 (FAIL)。元に戻すと PASS (rc 0)。比較は測定 commit `7f7572f4` で行った。
-
-## 製品 KPI (起動・GUI に関わる PR の記載)
-
-- FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)・最初のウィンドウの有無: **動かしていない**。本 PR は provider の UI 関数 6 件の追加で、起動の経路 (`flelift`・`boot`) は変えていない。KPI は測定していない。
+- コード変更なし。測定の基点は main `eec639a3`。コード差分 (`tools/python` の .md 以外): `git diff eec639a3 HEAD -- tools/python ':!*.md'` の出力は空。
+- e2e (`general_diff.mjs`・`provider_check.mjs`・`all_tools.mjs`) はコードを変えていないため対象外。件数 (実装 / 未実装) は変えていない。
+- ネガティブコントロールは対象外 (RE の記述のみ。実装の検査が無い)。
 
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 保留 3 件 (navigateBrowser・navigateBrowserMenu・navigateBrowserTabs) | 戻り値 `str` の意味が未確定。ブラウザ移動の Python 側の戻り値が未実装 | 子 issue PY-131 (#3012) |
-| 保留 3 件 (toggleBrowserNode・selectBrowserMenuItem・previewBrowserMenuItem) | ブラウザノードの状態変化と、メニュー選択の作用先が未確定 | 子 issue PY-132 (#3013) |
-| 保留 3 件 (launchAudioEditor・openEventEditor・showPicker) | エディタ起動の戻り値 (int) と、showPicker の stub 無し | 子 issue PY-133 (#3014) |
-| 表示矩形 3 件の作用先が未モデル (頭打ち後の値のみ観測) | 表示の副作用 (選択矩形の位置) は Python から観測できない。C の `fl_engine_display_time` は検査用の読出し口で、FL 側の状態ではない | 本 PR の未解決表で扱う (子 issue は起票しない。表示の実測は PM 判断) |
-| `0xd82c20` (結果 → PyObject) と `0xd843d0` (作用先の呼出し口) の同定が未了 | 戻り値 None と no-op の根拠は stub と書式に限られる | 子 issue PY-131 (#3012)・PY-132 (#3013)・PY-133 (#3014) の本文に含める |
-| 題名 `[PY-121]` が #2985 と重複 | 検索・分類の混乱 | PM が Issue 整理時に正規化 (AGENTS.md §3) |
+| clearLog・dumpScoreLog: `0xd843d0` の out の写し方・`0x11eb5f0`・`0x124c020` の効果・述語偽 (-2) の Python 側の挙動 | 2 関数の mock/C 実装ができない | #3001 (PY-125) |
+| processRECEvent: `0xd84740` の意味と out の構造・範囲 code | 1 関数の mock/C 実装ができない。channels 版と共有 | #3002 (PY-126) |
+| getRecPPB: `0xd68d90` の切替条件 (`0x15e4558`・`0x15e35c8` の実行時の値) | 1 関数の値が確定しない | #3003 (PY-127) |
+| issue #2979 が参照する `tools/python/REPORT_PY94.md` が repo に存在しない | 既知点 (PY-94) の出典が確認できない | #2979 のコメント |
+| `[PY-121]` の題名が 3 件ある (#2979・#2982・#2985) | 題名の重複 (番号の衝突) | PM (題名の正規化。実装 subagent はリネームしない) |
