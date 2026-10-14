@@ -32,13 +32,4 @@ k	wasm_block	native_block	match	native_insn_n	native_first_rva	native_last_rva	l
 30	1801c6986	1801c6986	=	7	1c6986	1c699d	jmp 0x1801c0b6c	180261258	1720f2000
 31	1801c0b6c	1801c0b6c	=	2	1c0b6c	1c0b6f	je 0x1801c0ba8	180261258	1720f2000
 32	1801c0b71	1801c0b71	=	8	1c0b71	1c0b8a	jne 0x1801c0ba3	1	0
-33	1801c0b8c	1801c0ba8	!	1	1c0ba8	1c0ba8	ret	1	0
-34	1801bafb0	-	!	0	-	-	-	-	-
-35	1801c20c8	-	!	0	-	-	-	-	-
-36	1801c2109	-	!	0	-	-	-	-	-
-37	1801c3dc8	-	!	0	-	-	-	-	-
-38	1801c38c8	-	!	0	-	-	-	-	-
-39	1801c3a81	-	!	0	-	-	-	-	-
-40	1801c3e00	-	!	0	-	-	-	-	-
-41	1801c3e0e	-	!	0	-	-	-	-	-
-42	1801c0ba8	-	!	0	-	-	-	-	-
+33	1801c0ba8	1801c0ba8	=	1	1c0ba8	1c0ba8	ret	1	0

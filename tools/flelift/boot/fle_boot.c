@@ -66,8 +66,28 @@ static u32 g_survey;
 #define PROBE_RING 128
 static u32 g_ring[PROBE_RING]; static u32 g_ring_n;
 static u32 g_n_dispatch, g_n_disp_getmem, g_n_disp_freemem, g_n_disp_realloc, g_n_disp0;
+/* FLE-12 (#3090): fill コールバック 0x6a7b70 への dispatch を全件記録する (呼出元 VA = 戻りアドレス・
+ * rcx=dst・edx=値・r8=DWORD 個数)。dispatch の冒頭で呼ばれるため、呼出し時点の guest 引数を読める。 */
+#define FILL_LOG_MAX 200
+static u32 g_fill_n;
 static void fle_probe_dispatch(u64 t) {
     g_n_dispatch++;
+    if (t == 0x6a7b70u && g_fill_n < FILL_LOG_MAX) {
+        /* f_6c7610 の frame (rbp=R[5]): push 5 本 + sub rsp,0x50 のため戻りアドレス = [rbp+0x78]、矩形 = [rbp+0x40..0x50) */
+        fprintf(stderr, "[fill6a7b70] #%u ret=0x%llx dst=0x%llx val=0x%llx cnt=0x%llx caller=0x%llx this=0x%llx rect=%d,%d,%d,%d\n",
+                (unsigned)g_fill_n, (unsigned long long)LD64(R[4]), (unsigned long long)R[1],
+                (unsigned long long)(R[2] & 0xffffffffULL), (unsigned long long)R[8],
+                (unsigned long long)LD64(R[5] + 0x78), (unsigned long long)R[3], (int)LD32(R[5] + 0x40),
+                (int)LD32(R[5] + 0x44), (int)LD32(R[5] + 0x48), (int)LD32(R[5] + 0x4c));
+        if (g_fill_n == 0) {
+            /* 呼出元 f_815050 の frame の保存 rbp = [f_6c7610 の rbp + 0x70] */
+            u64 cb = LD64(R[5] + 0x70);
+            fprintf(stderr, "[fill6a7b70-src] callerRbp=0x%llx w=%d h=%d spi_left=%d sm13=%d sm14=%d\n",
+                    (unsigned long long)cb, (int)LD32(cb + 0x214), (int)LD32(cb + 0x218), (int)LD32(cb + 0x1c8),
+                    (int)LD32(0x15f6f60ULL), (int)LD32(0x15f6f64ULL));
+        }
+        g_fill_n++;
+    }
     if (t == 0x407a50u) g_n_disp_getmem++;
     else if (t == 0x407e20u) g_n_disp_freemem++;
     else if (t == 0x408040u) g_n_disp_realloc++;
