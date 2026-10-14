@@ -189,6 +189,13 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-119 (#2980): PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119)。値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "ui.getFocused": (...a) => { arity(a, 1, 1); ix(a[0]); return false; },
+    "ui.getFocusedFormID": (...a) => { arity(a, 0, 0); return 0; },
+    "ui.getFocusedFormCaption": (...a) => { arity(a, 0, 0); return ""; },
+    "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
+    "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
+    "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
