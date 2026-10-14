@@ -100,7 +100,7 @@ bash tools/pm/idle_report.sh --since 2026-10-14T00:00:00Z --until 2026-10-14T12:
   終了コード 3 で中断する (結果の JSON は出さない)。ログ本文は blob へのリダイレクト先から返りヘッダが無いので、直前の jobs 応答の値で見る。
 - `--cache FILE`: 完了した run の読み取り結果 (JSONL) を run ごとに追記し、次回は jobs・ログを取りに行かない。中断しても続きから再開できる。
 - 終了コード: 0 正常 / 2 引数不正 / 3 残量不足で中断 / 4 API 失敗・1 窓の run が多すぎる。
-- 検証: `bash tools/pm/test_idle_report.sh` (fake gh。idle=0 が続く・14 分 (ネガコン)・16 分・idle=0 を挟む・残量 1,499 の中断ほか)。結果は [`REPORT.md`](REPORT.md) §11。
+- 検証: `bash tools/pm/test_idle_report.sh` (fake gh。idle=0 が続く・14 分 (ネガコン)・16 分・idle=0 を挟む・残量 1,499 の中断ほか)。結果は [`REPORT_APPENDIX_2354.md`](REPORT_APPENDIX_2354.md) (REPORT §11 の付録)。
 
 ## 状態ファイル (`PM_DIR` に作られる。コミットしない)
 

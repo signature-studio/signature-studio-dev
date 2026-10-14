@@ -122,91 +122,11 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ## 10. PM Worker のコメント同期 (#2380)
 
-測定した commit: `7e8df56f` (コードを変えた最後の commit。main の #2332・#2418 を取り込んだ merge)。取得時刻は UTC (2026-10-14)。コメント件数の再測定は同期の実装と独立。
-
-コメント件数の再測定 (`GET /repos/<R>/issues/comments?sort=created&direction=desc&per_page=100` を `created_at` が窓の端に届くまで読む。本文は取らない):
-
-| 窓 | 取得時刻 | 窓内の件数 | ページ数 | 取得方法 |
-|---|---|---:|---:|---|
-| 3 時間 | 12:19Z | 1,145 | 12 | 全ページ |
-| 24 時間 | 12:20Z | 10,265 | 103 | 全ページ |
-| 48 時間 | 12:34Z | 12,321 | 124 | 窓の端をまたぐページを二分探索 |
-
-直近 24 時間が 48 時間の 83% を占める (件数が直近に集中して増えている)。PR は全 1,211 件 (12:17Z。`search/issues` の `total_count`)。§1 の 262 件 (2026-10-13 09:20Z) から約 27 時間で約 950 件増えたので、`state=all` の 30 ページ (3,000 件) は数日で上限に届く。
-
-実 API で `Engine.fullSync` を 1 回 (dry-run・メモリ store・GitHub へ書き込まない。認証は実装 App の installation token)。open issue 412〜414・open PR 10〜12:
-
-| `COMMENT_MAX_PAGES` | 所要 | REST 回数 (全体 / うちコメント) | `fresh` | `sync_truncated` |
-|---:|---:|---:|---|---|
-| 80 (コードの既定) | 80.7 s | 181 / 81 | false | `comments` pages=80 |
-| 150 (`wrangler.toml`) | 95.5 s | 202 / 102 | true | なし |
-
-- 既定の 80 ページでは 24 時間の窓に届かない (窓内 102〜103 ページ。窓は時間とともに動くので 1 ページ前後ずれる)。そのため `wrangler.toml` に `COMMENT_MAX_PAGES = "150"` を置いた。窓内の件数が 15,000 件を超えたら打ち切りになり、`/status` の `sync_truncated` に出る。
-- 窓内 10,265 件の読み取りは、最後の 103 ページ目が窓の端をまたぐので 103 回で終わる (「窓内の件数 / 100 の切り上げ」と一致。受入条件 5 の上限は + 1)。
-
-単体テスト (`cd infra/pm-worker && npm test`、Node 22.23、コミット済み `7e8df56f`): 97 件 PASS / 0 FAIL、11.3 s、load average 1.20 (main 側 81 + `test/sync.test.ts` 16)。
-ネガコン (merge 前の `1c33bdd2` で、実装を 1 か所だけ壊して `test/sync.test.ts` が落ちるか。落ちた件数): `fresh()` が打ち切りを見ない 9 / 上限の次の 1 ページを読まない 6 / 同時刻の comment id による比較をやめる 2 / コメントを昇順で読む 6 / watchdog が `fresh()` を見ない 3。元に戻すと 16 件 PASS。
-旧実装相当 (昇順・40 ページ・窓 48 時間) は 48 時間 12,000 件の fixture で古い側の 4,000 件しか読めず、2 時間前の `/oc` と最新の bot 報告が入らない (テスト (a))。
-
-測定 commit から HEAD までのコード差分: `git diff 7e8df56f HEAD -- infra/pm-worker/src infra/pm-worker/test` は出力なし (差分 0)。
+コメントの窓の件数・ページ数・所要の実測、`COMMENT_MAX_PAGES` の根拠、単体テストとネガコン。全文は [`REPORT_APPENDIX_2380.md`](REPORT_APPENDIX_2380.md) (§10 の分割移動)。
 
 ## 11. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
 
-既知類型との関係: 該当なし (lift の欠陥ではなく PM 運用ツール)。使い方と数え方の定義は [`README.md`](README.md) の `idle_report.sh` の節。
-
-- 測定 commit: `95b501b2` (コードを変えた最後の commit)。それ以降の `tools/pm/idle_report.sh` `tools/pm/test_idle_report.sh` の差分: `git diff 95b501b2 HEAD -- tools/pm/idle_report.sh tools/pm/test_idle_report.sh` の出力は 0 行。`f10dfd36` から `95b501b2` までの変更は説明文 (コメント・README) だけ (`git diff f10dfd36 95b501b2 -- tools/pm/idle_report.sh tools/pm/test_idle_report.sh` の非コメント行は 0 行)。
-- 環境: runner (4 コア)。load average は各測定の直後の `/proc/loadavg` の 1 分値。
-
-### 11-1. fake gh のテスト (`bash tools/pm/test_idle_report.sh`)
-
-| 項目 | 結果 |
-|---|---|
-| 判定数 | 41 件中 41 PASS・0 FAIL (3 回とも同じ) |
-| 所要 (n=3、95b501b2) | 7.3〜7.6 秒 (load 0.24〜0.28) |
-| (a) idle=0 が 10 標本 | 0 回 |
-| (b) idle>0 が 14 分 (ネガコン) | 0 回 (区間 14 分)。`--threshold-min 14` なら 1 回 |
-| (b2) idle>0 がちょうど 15 分 | 1 回 (境界は数える) |
-| (c) idle>0 が 16 分 | 1 回 (区間 16 分・標本 9 件・最大 idle=3) |
-| (d) idle=0 を挟む | 16 分 + 0 + 16 分 → 2 回。10 分 + 0 + 10 分 → 0 回 (区間 2 つ、合算しない) |
-| (e) `X-Ratelimit-Remaining` | 1,499 → 終了コード 3・標準エラーに `X-Ratelimit-Remaining=1499`・JSON は出さない。1,500 → 続行。jobs 応答だけ 1,499 でも中断 |
-| 全ページ・窓の分割 | `per_page=2`・窓 1 時間で、窓の境界をまたぐ 20 分の区間を 1 回・標本 6 件 (欠落・重複なし)・`page=2` を取得 |
-| 窓の上限 | `total_count` が 1,000 超 → 終了コード 4 |
-| REST のみ | gh の呼び出しは全て `api <path>`。graphql の呼び出し 0 件 (fake gh は graphql を exit 99 にする) |
-
-ネガコン (実装を 1 行壊して FAIL を確認。コピーに対して `f10dfd36` のコードで実施。以後の変更は説明文だけで、判定のロジックは同じ):
-
-| 壊し方 | FAIL した判定 |
-|---|---|
-| 区間の判定 `>=` を `>` に | 3 件 (b の閾値 14 分・b2・ANSI 付き 15 分) |
-| 残量の検査を無効化 | 4 件 (e の全部) |
-| idle=0 で区間を閉じない | 3 件 (d の全部) |
-
-### 11-2. 実データの確認 (`signature-studio/signature-studio-dev` の REST)
-
-2026-10-14T13:04Z に取得 (測定 commit `95b501b2`)。`--since 2026-10-14T10:00:00Z --until 2026-10-14T12:30:00Z`・`--bucket` 既定 (day)・`--events` 既定 (3 event)。期間は run の作成時刻で切る。標本の時刻は `--until` を数分越えうる (例: run `38564218200` は作成 12:29:44Z で期間内、その標本は 12:30:26Z)。
-
-| 項目 | 値 |
-|---|---|
-| run 一覧 (3 event・重複除去後) | 155 件 (うち oc-fix 19・watchdog job が cancelled でログ無し 12) |
-| 標本 | 124 件 (idle>0: 112 件・最大 idle=19・最長の標本間隔 4.97 分・15 分超の間隔 0 回) |
-| idle>0 が 15 分以上続いた回数 | 1 回 (10:00:33Z〜12:07:40Z の 127.12 分) |
-| 同 (`excluding_stuck_labelled`: STUCK_LABELLED の行数を引いた idle) | 2 回 (11:10:04Z〜11:25:52Z の 15.8 分と 11:34:59Z〜12:07:40Z の 32.68 分) |
-| 所要・API | 144 秒 (load 0.21)・276 回・`X-Ratelimit-Remaining` の最小 4,155 |
-| `--cache` 付きの 2 回目 | 8 秒・API 4 回 (cache_hits 136) |
-
-- 別算法の検算: 同じ測定の JSONL (124 標本) を Python で集計し直した (時刻順に idle>0 を畳む。ツールの jq とは別の実装)。
-  通常の idle は 1 回 (127.12 分)・stuck 除外は 2 回 (15.8 分・32.68 分) で一致した。
-- この期間は oc:stuck の PR が残っており、通常の idle は 127 分連続で 0 にならなかった。stuck 除外の値で soak を判定する理由は README に書いた。
-
-### 11-3. 検証範囲・未解決
-
-確認範囲: `schedule` の run は実リポジトリで 5 件 (`actions/workflows/opencode.yaml/runs?event=schedule`: 2026-10-13 18:23Z・23:00Z、2026-10-14 01:48Z・06:47Z (cancelled)・12:29:44Z)。うち 12:29:44Z の run `38564218200` は実測期間に入り (作成 10:00〜12:30Z)、その watchdog job (`115852677230`) のログの idle 行 (12:30:26.96Z・`idle=1`) を読めた (標本 124 件に含む)。この標本は 12:27:49Z〜12:30:26Z の区間 (5 標本・2.62 分・不計数) の末尾。他の 4 件は実測期間の外で、ログは未確認。
-レート制限の中断と 1,000 件上限は fake gh でだけ確認した (実 API で残量を 1,500 未満にはしていない)。
-
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| `schedule` の run のうち実測期間の外の 4 件 (cancelled 1 件を含む) のログは未確認。cron は約 18 時間に 5 件と疎 | 今後の発火ぶんの標本が読めるかは未確認 (読めなければ `runs.skipped.no_idle_line` に数えるので気づける) | #2355 (timer 停止の手順書) の soak 開始時の確認項目 (訂正コメント済み) |
-| soak の合格ライン (何日・何回までを許すか) は未決 | ツールは回数を出すだけで、判定はしない | #2355 にコメント (判定は PM) |
+fake gh のテスト・ネガコン・実データの検証と、未解決 (schedule の未確認の run・soak の合格ライン)。全文は [`REPORT_APPENDIX_2354.md`](REPORT_APPENDIX_2354.md) (§11 の分割移動)。
 
 ## 12. PM Worker の live 切替前の突き合わせ (#2443)
 
@@ -248,3 +168,32 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 - VM の `relaunch.json` (67 件。count=1 が 60、2 が 7) は Worker に無い。履歴の無い issue を最大 2 回余分に再投入し得る (#2343)。
 - 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343)。rate-guard が launch を止める場面と、live の oc-pm 送信 (PM agent の起動) は未測定 (fake gh のテストだけ)。
+
+## 13. oc-pm の refs_orphan 検出 (#2337・PR #2478)
+
+- 測定 commit: `20fcb6e1` (コードを変えた最後の commit。`src/pm.ts` の説明文と REST 経路のテストを足した。その前に main `c965bb19` を取り込んだ merge `15c4b4be`)。取得時刻は UTC (2026-10-14)。環境: runner (4 コア)・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
+- 差分の証跡: `git diff 20fcb6e1 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+
+### 13-1. 測定
+
+| 項目 | 結果 |
+|---|---|
+| `cd infra/pm-worker && npm test` (n=3) | 172 件 PASS / 0 FAIL。14.61〜14.75 s。load 1.74〜2.12 |
+| 内訳 | `test/refsorphan.test.ts` 12 件 (検出・ネガコン (a)〜(h)・送信・解析・REST 経路) + 既存 160 件 |
+| `npm run test:workers` (vitest + workerd) | 3 件 PASS / 0 FAIL。2.69 s。load 2.09 |
+| `bun build src/index.ts --target=browser --format=esm --external 'node:*'` | 81.37 KB (81,373 bytes)。`--minify` を付けると 53.96 KB (53,956 bytes) |
+
+### 13-2. ネガコン (1 件を壊して FAIL を確認)
+
+`infra/pm-worker` を scratch に複写し (他のリポジトリ部分は symlink)、下の 1 箇所だけを変えて `npm test` を回した。worktree は変えていない。
+
+| 壊し方 | 結果 (全 172 件) | FAIL した項目 |
+|---|---|---|
+| `src/webhook.ts`: `refsOnlyNumbers(pr.body ?? "")` を `[]` に | FAIL 10 (PASS 162) | 検出・(b)(c)(f)(h)・送信・(d)(e)(g)・REST 経路 |
+| `src/webhook.ts`: `pr.state === "closed" && pr.merged_at ?` の `pr.merged_at` を外す | FAIL 1 (PASS 171) | REST 経路 (merge されていない項目に `refsOnly` が立つ)。検出の結果は変わらない (`detectPm` が `p.merged` で先に弾く) |
+| `src/pm.ts`: `refs_orphan` の `dayMax` 10 を 1000 に | FAIL 1 (PASS 171) | ネガコン (d) (1 日 11 件目の上限) |
+
+### 13-3. 検証範囲
+
+- 検証は fetch のモック (node:test と vitest) まで。実 GitHub API・Cloudflare 上の Worker・live の送信は未実行。
+- `LIVE_*` のスイッチの値は変更していない (`wrangler.toml` は comment の参照先だけ直した)。
