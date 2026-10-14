@@ -1,5 +1,6 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
-// 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、LIVE=1 のときだけ GitHub に書く。
+// 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
+//   launch (/oc コメント) = LIVE_LAUNCH、dispatch (repository_dispatch の oc-watchdog) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError } from "./github.ts";
@@ -22,6 +23,9 @@ export const FULL_SYNC_EVERY_MS = 6 * 3_600_000;
 // reconcile がこれ以上止まっていたら、状態が古いとみなして launch しない (誤った着手を避ける)。
 export const STALE_AFTER_MS = 15 * 60_000;
 const NO_PR_MAX_RELAUNCH = 3;
+// oc-watchdog の最短送信間隔は WATCHDOG_INTERVAL_S (既定 300 秒 = VM の pm_watchdog_ping.sh と同じ 5 分) から、この分だけ短い。
+// tick は毎分 (cron と alarm) で、わずかに早い tick を弾くと次の送信が 1 分遅れ、周期が 6 分になるため。
+export const WATCHDOG_JITTER_MS = 30_000;
 
 export interface Planned {
   n: number;
@@ -407,7 +411,7 @@ export class Engine {
       return plan;
     }
     this.d.store.put("meta", "phase", plan.phase);
-    const live = this.d.cfg.live && gh;
+    const live = this.d.cfg.liveLaunch && gh;
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     for (const p of picks) {
       let body: string;
@@ -452,12 +456,12 @@ export class Engine {
   }
 
   async watchdog(gh: Gh | null): Promise<"dispatched" | "would" | "skipped"> {
-    const every = this.d.cfg.watchdogIntervalS * 1000;
+    const minGap = Math.max(0, this.d.cfg.watchdogIntervalS * 1000 - WATCHDOG_JITTER_MS);
     const last = this.meta.watchdogAt ?? 0;
-    // cron と alarm の両方が呼ぶので、周期の半分以内の再送は捨てる。
-    if (this.d.now() - last < every / 2) return "skipped";
+    // cron と alarm の両方が毎分呼ぶ。前回の送信 (dry-run では記録) から周期が過ぎるまでは送らない。送信に失敗したときは記録しないので次の tick で再試行する。
+    if (this.d.now() - last < minGap) return "skipped";
     this.meta.counters = this.meta.counters ?? this.zero();
-    if (!this.d.cfg.live || !gh) {
+    if (!this.d.cfg.liveDispatch || !gh) {
       this.meta.watchdogAt = this.d.now();
       this.meta.counters.wouldDispatch++;
       this.saveMeta();
@@ -529,7 +533,11 @@ export class Engine {
     const c = (k: keyof Rows) => rows[k].length;
     const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
     return {
-      mode: this.d.cfg.live ? "live" : "dry-run",
+      // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
+      // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
+      mode: this.d.cfg.liveLaunch && this.d.cfg.liveDispatch ? "live" : this.d.cfg.liveLaunch || this.d.cfg.liveDispatch ? "partial" : "dry-run",
+      mode_launch: this.d.cfg.liveLaunch ? "live" : "dry-run",
+      mode_dispatch: this.d.cfg.liveDispatch ? "live" : "dry-run",
       active_runs: plan.active,
       target: plan.target,
       room: plan.room,
