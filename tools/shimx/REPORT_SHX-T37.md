@@ -72,7 +72,7 @@ shimx の値は `tools/shimx/evidence_3070/run.sh` (ST ビルド・1 ケース 1
 - 所要の min–max: **6.30–6.35 s** (n=3)。並列数: 直列 1 (emcc は 1 回でビルドし、probe は node を 1 プロセスずつ起動する)。
 - 3 回の表本体 (`tools/shimx/evidence_3070/work/probe.tsv`・34 行) と対照 (`probe_rc.tsv`・注記 1 行 + 4 行) は、それぞれ `cmp` で一致。表本体の TRAP は 0 件、対照の TRAP は 4 件 (§4.3)。
 - 初期の修正: 対照の挿入位置 (旧 `blk_ok` の 1 行) が main の SHX-T35 で消えたため、`run.sh` が `rc=1` で止まった。対照を「範囲検査を外す」向きに直した (`run.sh` の対照部のみ・表本体の probe は変えていない。修正は `5cca7cb4`)。
-- 実行には `EMSDK_ENV` (`docs/REFERENCES.md` の `[EMSDK]` = `/opt/emsdk/emsdk_env.sh`) が要る。本 run は `EMSDK_ENV=/opt/emsdk/emsdk_env.sh` で実行。
+- 実行には `EMSDK_ENV` (`docs/REFERENCES.md` の `[EMSDK]` の `emsdk_env.sh`) が要る。本 run は `[EMSDK]` の `emsdk_env.sh` を `EMSDK_ENV` に指定して実行。
 
 ### 4.3 ネガティブコントロール
 
