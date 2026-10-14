@@ -178,14 +178,14 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
   | ネガコン neg_cap130 (OOM at load) | 125 | 124 | 125 |
   | ネガコン neg_nofree (OOM at load) | 124 | 124 | 125 |
   | ALL PASS / exit / wall | ALL PASS / 0 / 6.51 s | ALL PASS / 0 / 5.79 s | ALL PASS / 0 / 5.55 s |
-- 実測で確定した事項: (a) 本試験で観測した Memory 参照の解放経路は `FreeLibrary` (dispose で呼ばないと bridge が握り続け、pool の追い出しに関係なく 124 で OOM)。他の経路は観測していない。(b) `host_close` は単一の `g_info.hmodule` (最後に load した plugin) を解放するため、任意の plugin の解放には使えない。pool は `bridge.FreeLibrary(handle)` を直接呼ぶ。(c) 採番の衝突 (コードから導出、再現試験は未実施): `hb_bridge.mjs` の `LoadLibraryW` は `handle = HMODULE_BASE + (loaded.size + 1) * 0x10000` で採番するため、解放後の再ロードが既存 handle と一致し得る。本試験は `PoolBridge` (LoadLibraryW を単調採番に置換した派生クラス) で回避し、共有 poc 側は未修正。
+- 実測で確定した事項: (a) 本試験で観測した Memory 参照の解放経路は `FreeLibrary` (dispose で呼ばないと bridge が握り続け、pool の追い出しに関係なく 124 で OOM)。他の経路は観測していない。(b) `host_close` は単一の `g_info.hmodule` (最後に load した plugin) を解放するため、任意の plugin の解放には使えない。pool は `bridge.FreeLibrary(handle)` を直接呼ぶ。(c) 採番の衝突 (コードから導出。再現と共有 poc の修正は #2520 / #2553 で実施し main に反映済み。`tools/hostbridge/REPORT.md` §5-c): `hb_bridge.mjs` の `LoadLibraryW` は `handle = HMODULE_BASE + (loaded.size + 1) * 0x10000` で採番するため、解放後の再ロードが既存 handle と一致し得る。本試験は `PoolBridge` (LoadLibraryW を単調採番に置換した派生クラス) で回避しており、本 PR は共有 poc を変更しない。
 - 範囲外 / 検証範囲: Chrome 154 のみ (Firefox/Safari 未測定)。Worker 1 本のみ (per-thread カウンタ、SAB 共有カウンタは未配線)。異なる DLL の同時ロードは未実施 (plugins-ott は OTT のみ)。cold 照合の基準は node 参照ではなく同ページの最初の cold ロード (node との bit 突合は lowbase e2e 側で 500 block 実施済み)。warm pin は OTT が block 間で DSP 状態を持つため出力を照合しない。
 - 再現: `bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh` (前提: `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll`、`tools/m10/work/ott_m10.ll`) → `bash tools/hostbridge/lowbase/retdec/build_host_lb.sh` → `pnpm runtime:memload:real` (`--pos-only` / `--neg-only` 可)。`c531cf69` の実測は `git archive` で一時展開した先に `work-m6-ott` を展開し、その中で上の 3 コマンドを実行した (共有 checkout の `work/` は使わない)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `MemoryBudget` の SharedArrayBuffer カウンタを `PluginPool` の既定経路 (Worker) に配線し、main+Worker 合算の 124 を pool 経路で試験 | 本試験は per-thread カウンタ。実運用の上限は未検証 | [RT-13] #2519 |
-| `hb_bridge.mjs` `LoadLibraryW` の handle 採番 (`loaded.size + 1`) の解放後衝突を再現し、共有 poc 側を修正 | 本試験は派生クラス `PoolBridge` で回避。共有 poc は未修正 (導出のみ・再現は未実施) | [RT-14] #2520 |
+| `PoolBridge` を外し、共有 `hb_bridge.mjs` の `LoadLibraryW` で本試験を通す | 本 PR は派生クラス `PoolBridge` で回避している。共有版での本試験は未実施。採番の解放後衝突は #2520 (#2553 で再現・修正し main に反映済み) | [RT-15] #2552 (#2480 merge 後に着手) |
 | dispose 時の FL 側 state 保存仕様 (保存の要否・形式) | 設計判断。pool は dispose フックだけ提供 | #125 へコメント (未決として記載済み) |
 | 1 wasm に常駐 Memory が 124 超を載せる場合 (Kilohearts 47 stub 等の同居) | 追い出し対象外の常駐は回避できず OOM になる。回避策は未実装 | #96 (HB-H7) |
 | Chrome 以外の Memory 上限 (Firefox / Safari) | 予算値 96 は Chrome 154 の実測のみに基づく | #127 (RT-9) |
