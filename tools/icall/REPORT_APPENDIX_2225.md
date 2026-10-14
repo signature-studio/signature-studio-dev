@@ -17,12 +17,12 @@
 - 測定 commit: `7d15ceab` (`slot_trace.sh`・`slot_trace.c` と OTT 側の入力を測定した時点の HEAD)。PR 本文の `6883fa10` は本 REPORT を追加した commit で、測定 commit ではない。
 - 測定 commit から HEAD までの差分 (`docs/WORKFLOW.md` §6):
   - 最終のコード commit は `5d711ec7`。`git diff 7d15ceab 5d711ec7 -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott` → 出力 0 行 (測定対象は無変更)。
-  - `git diff 7d15ceab 5d711ec7 --stat -- tools/icall/diff tools/ott` → `tools/icall/diff/ott_apiset_cmp.py | 79 ++++` (新規 1 件のみ)。この新規ファイルは測定の入力ではない (実 DLL 未実行・py_compile と合成 PE での確認のみ)。
+  - `git diff 7d15ceab 5d711ec7 --stat -- tools/icall/diff tools/ott` → `tools/icall/diff/ott_apiset_cmp.py | 79 ++++` (新規 1 件のみ)。この新規ファイルは測定の入力ではない (slot_trace の測定対象外)。
   - `5d711ec7` の後の commit は本 REPORT と PR 本文のみ。`git diff 5d711ec7 HEAD -- tools/icall/diff tools/ott` は 0 行。
 - 再現: `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (既定条件)。
 - 所要: real 13.191 s / user 11.032 s / sys 1.916 s。load average 1.18 (測定直前 10:26:33)。
 - 素材: 測定時は `plugins-freshair` (`FA_DL` に展開) と `work-icall` (`tools/icall/work/`) を使用。OTT の生値は `analysis-ott-binaries` の `OTT_vst2_win64.dll` を PE 直読み。
-- **再検証の状態**: fix run (2026-10-14) の ARTIFACTS_DIR には `fl-win64` のみで、上記素材は無い。よって §2.2・§2.3 の数値は前 run の実測で、本 HEAD での再実行・`ott_apiset_cmp.py` との照合は**未実施**。
+- **再測定の状態**: slot_trace は測定 commit からコード差分 0 のため、本 HEAD では再実行していない (§2.2 の数値は前 run の実測)。`ott_apiset_cmp.py` は本 HEAD で実 DLL に対して実行した (§2.3 の出力)。
 
 ### 2.2 slot_trace 集計 (既定条件・再現)
 
@@ -45,6 +45,44 @@
 - 「encoded 表 = zero-fill に enc(NULL)=cookie を敷いて初期化」という形式は、両者で同じ。OTT は `ott_crt_init_tables` が、SlateCore は harness の `SLOT_ENC_INIT=1` が同じ書込みを行う。
 - OTT の `enc(NULL)` は `rol(0,14) ^ cookie` で `cookie` に等しい (`crtinit/REPORT.md` と一致)。
 
+#### 実 DLL の出力 (`ott_apiset_cmp.py`・本 HEAD で実行。素材 `analysis-ott-binaries` の `OTT_vst2_win64.dll`)
+
+```
+cookie VA 0x180260ce0 = 0x2b992ddfa232 (rot 50) [raw] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc
+entry[ 0] VA 0x18026c9f0 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 1] VA 0x18026c9f8 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 2] VA 0x18026ca00 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 3] VA 0x18026ca08 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 4] VA 0x18026ca10 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 5] VA 0x18026ca18 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 6] VA 0x18026ca20 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 7] VA 0x18026ca28 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 8] VA 0x18026ca30 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[ 9] VA 0x18026ca38 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[10] VA 0x18026ca40 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[11] VA 0x18026ca48 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[12] VA 0x18026ca50 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[13] VA 0x18026ca58 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[14] VA 0x18026ca60 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[15] VA 0x18026ca68 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[16] VA 0x18026ca70 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[17] VA 0x18026ca78 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[18] VA 0x18026ca80 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[19] VA 0x18026ca88 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[20] VA 0x18026ca90 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[21] VA 0x18026ca98 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[22] VA 0x18026caa0 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[23] VA 0x18026caa8 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[24] VA 0x18026cab0 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[25] VA 0x18026cab8 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[26] VA 0x18026cac0 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[27] VA 0x18026cac8 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[28] VA 0x18026cad0 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[29] VA 0x18026cad8 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[30] VA 0x18026cae0 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+entry[31] VA 0x18026cae8 [zero-fill (ファイル外・0 固定。読取りではない)] セクション .data: raw 0x18025f000-0x180269000, virt 0x18025f000-0x18026cbcc → decode 対象外
+```
+
 ### 2.4 事実の根拠: セクションヘッダの raw end と表の VA
 
 「api-set 表は zero-fill 域にあり、ファイル上の生値は 0」の根拠は、次の PE セクションヘッダの値との比較である (実測値の出力ではない)。
@@ -56,7 +94,7 @@
 `tools/icall/diff/ott_apiset_cmp.py` は、entry ごとに VA の区分 (`raw` / `一部 zero-fill` / `zero-fill` / `セクション外`)・セクション名・raw 範囲・virt 範囲を表示する。`zero-fill` と `セクション外` は decode せず、0 固定の値として扱わない。集計行は出さない。
 以前の REPORT・検収文書にあった「非ゼロ 32/32」が、どの読み方に由来するかは未確認 (前 run の読出し手順は残っていない)。`tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の訂正は、本節のセクションヘッダとの比較を根拠とする。
 
-注: 本 HEAD では `ott_apiset_cmp.py` を実 DLL で実行していない (§2.1)。上記は section ヘッダの比較で、スクリプトの出力を根拠にしない。スクリプトの 4 分岐 (raw・一部 zero-fill・zero-fill・セクション外) は合成 PE (repo 外の一時ファイル) で確認した (py_compile 通過)。
+注: 上記 §2.3 の出力は、本 HEAD で実 DLL に対して実行した結果である。セクション範囲・VA 区分は、この出力と §2.4 のセクションヘッダの値が一致する。
 
 ## 3. 再現
 
@@ -68,7 +106,7 @@ python3 tools/icall/diff/ott_apiset_cmp.py <OTT_vst2_win64.dll>   # <OTT_vst2_wi
 
 - OTT の DLL の所在は `docs/REFERENCES.md` の `[ANALYSIS-PLUGINS]` (`ott/binaries/`)。Actions では `oc_artifacts: analysis-ott-binaries` で取得する (`docs/WORKFLOW.md` §11)。
 - `tools/icall/diff/ott_apiset_cmp.py` は cookie `0x180260ce0`・api-set 表 `0x18026c9f0` (32 × u64) を読み、`ror(entry ^ cookie, cookie & 0x3f)` で decode して出力する。zero-fill は 0 とする (§2.4)。
-- 本 fix run では `ott_apiset_cmp.py` を OTT の DLL に対して**実行していない** (素材なし)。py_compile と、合成 PE での 4 分岐 (raw・一部 zero-fill・zero-fill・セクション外) の確認のみ。実 DLL の出力は未取得 (`analysis-ott-binaries` 付きの再 run で取得し、ここに貼る)。
+- 実 DLL の出力は §2.3 に貼った (本 HEAD で実行)。
 
 
 
