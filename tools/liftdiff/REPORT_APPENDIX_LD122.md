@@ -11,7 +11,7 @@
 - 出所は 0x50abe0 の case 列 (pattern 単位) まで。**q0 を含む区間が要る**: fvm 経路が走る条件で、z〜pall2 だけ前置すると match、q0 を加えると mismatch (§4 E1・E4)。**z〜pall2 が要るかは未切り分け**: E2 (q0 のみ) は fvm が走らず、E4 と比べると fvm の有無が交絡する (§4 注)。
 - 直前の 0x43a3f0 は出所ではない (`[0x43a3f0, 0x959a40]` は match: §4 S27)。
 - 出所は runner の内部状態。fresh な runner を挟むと消える (§4 F)。どの wasm 側状態が残るか (機構) は未特定。
-- 受入 (b): 出所の REPORT 記載は達成。機構の確定、z〜pall2 の必要性、全体 run 間の揺れの説明は未解決 (§5・#2681)。
+- 受入 (b): 出所の REPORT 記載は達成。機構の確定、z〜pall2 の必要性、全体 run 間の揺れの説明は未解決 (§5。機構は #2723 へ移管、他は PM agent の判断待ち)。
 
 ## 1. 測定条件
 
@@ -81,7 +81,7 @@ python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # wall は stderr �
 
 - A・C・D・E4・R が mismatch、solo・B・S27・F・E1・E2・E5 が match。
 - W (0x5bfff0) だけを前に置く場合は match (B)。X を含むことが必要。
-- F で runner を作り直すと消える。残存は runner の内部状態にある。
+- F で runner を作り直すと消える。残存は runner の内部状態にある。同じ型の現象 (runner の作り直しで消える) は `REPORT_APPENDIX_LD121.md` §3 にある。
 - **fvm の注意**: `_fvm_cases` (`ldlib/session.py`) は、その関数の case に equal・diff・wasm_trap が 1 つも無いときだけ走り、`'s'` の native fault アドレスから候補を作る。E2 の X 側は `q0` のみで `'s'` が無いため候補 0 となり、fvm 行が出ない (first_outcomes に fvm 行なし)。E4 の X 側は `'s'` を含み fvm 行が出る。よって E2 対 E4 は fvm の有無と前置の内容が交絡し、z〜pall2 の要不要は言えない。fvm が走る条件同士の対比は E1 (match) 対 E4 (mismatch) だけで、q0 の要否はこれで言う。
 - tail (qall・vm0・u16) は必要ではない: E4 は tail を含まないのに mismatch (A と同じ判定)。E5 (tail のみ) は match。
 - E4 は 1 回のみ測定 (反復なし)。E1 は ×2 反復で match。
@@ -92,10 +92,10 @@ python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # wall は stderr �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x50abe0 の q0 (と z〜pall2 の要否) が残す wasm 側の状態の機構 (どの領域・どの書込み)。heap 残存は未計測 (LD-96 §8 の監査は 0x50abe0 の先頭 case z のみ、残存 0) | 受入 (b) の原因の確定 | #2681 |
-| z〜pall2 の要否。fvm を揃えた対照 (例: `[s, q0]` を前置) は未測定 (本 run の素材に `toolchain-emsdk`・`work-liftdiff`・`work-m11` が無かった) | 結論の範囲 (§結論) | #2681 |
-| 全体 run 間の揺れの説明。0x959a40 の全体 run は 4 記録で mismatch 3・match 1 (§3 表)。LD58 の shard 12 は r1 のみ match (`REPORT_APPENDIX_LD58.md` §7)。R (shard 4 の replay) は 3 回の別 run とも mismatch で、全体 run の match と一致しない | 件数の揺れ | #2681 |
-| X の q0 の outcome と全体 run の判定の対応。hang の記録は 2 件 (5d88dda2 の全体 run: mismatch、レビュー run: match)。both_fault の記録は mismatch (4efe8c5b・fix run) と match (素材同梱の過去 jsonl のうち作成時期と版が本測定と別の run) の両方にある。よって X の q0 の outcome だけでは判定を決められない。timeout 判定の負荷依存は未検証 (fix run も開始時 load 4.50 で both_fault・mismatch) | 揺れの説明 | #2681 |
+| 0x50abe0 の q0 (と z〜pall2 の要否) が残す wasm 側の状態の機構 (どの領域・どの書込み)。heap 残存は未計測 (LD-96 §8 の監査は 0x50abe0 の先頭 case z のみ、残存 0) | 受入 (b) の原因の確定 | #2723 (コメントで移管)。0x959a40 は #2723 の範囲 (shard 1 の 19 関数) の外のため、範囲を広げるかは PM agent の判断待ち |
+| z〜pall2 の要否。fvm を揃えた対照 (例: `[s, q0]` を前置) は未測定 (差し戻し対応の run は素材を展開できたが、この対照は測定していない) | 結論の範囲 (§結論) | PM agent の判断待ち: この対照の測定を追跡として残すか、結論を (a) の範囲のまま閉じるか |
+| 全体 run 間の揺れの説明。0x959a40 の全体 run は 4 記録で mismatch 3・match 1 (§3 表)。LD58 の shard 12 は r1 のみ match (`REPORT_APPENDIX_LD58.md` §7)。R (shard 4 の replay) は 3 回の別 run とも mismatch で、全体 run の match と一致しない | 件数の揺れ | PM agent の判断待ち: 追跡先 (親 #2258 は CLOSED。#2723 の範囲外) |
+| X の q0 の outcome と全体 run の判定の対応。hang の記録は 2 件 (5d88dda2 の全体 run: mismatch、レビュー run: match)。both_fault の記録は mismatch (4efe8c5b・fix run) と match (素材同梱の過去 jsonl のうち作成時期と版が本測定と別の run) の両方にある。よって X の q0 の outcome だけでは判定を決められない。timeout 判定の負荷依存は未検証 (fix run も開始時 load 4.50 で both_fault・mismatch) | 揺れの説明 | PM agent の判断待ち: 上の全体 run の揺れと同じ追跡先 |
 
 ## 6. 差分
 
