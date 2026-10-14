@@ -4,7 +4,7 @@
 
 ## 追加解析 (PY-75 / #2562): setChannelPitch の callback と効果関数の PE 確定
 
-既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセ解析)。親: #2542 (PY-72)。PR #2559 (PY-72 の節) は open で本節と末尾が衝突し得るが、本節は PE バイナリだけに依存する。
+既知類型との関係: 該当なし (lift 作業ではない。PE の逆アセ解析)。親: #2542 (PY-72)。PR #2559 (PY-72 の節) は main に merge 済み。本節は PE バイナリだけに依存する。
 
 ### 結論
 
@@ -16,11 +16,11 @@
 
 ### 測定
 
-- 測定 commit: `c8cafaf9` (コード変更の最後。`pe_rip_consts.py` の `.bss` 修正)。`pe_rip_consts.py` は本節で新規に追加 (issue 本文が参照する名前。`pe_disasm.py` と同じ方式)。前回の測定 (`dc8b76bd` 時点) は、`.bss` を指す参照の先の値が偽の版だった。
+- 測定 commit: `60530e14` (コード変更の最後。`pe_rip_consts.py` は main の版 (#2559 由来) を使い、`.bss` 修正を加えた)。前回の測定 (`a605aaa0` までの版) は、`.bss` を指す参照の先の値が偽だった。
 - 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/fl extracted/block00031_PE.bin`。`--wildcards '*block00031_PE.bin'` 形式は本 run の環境で 0 件展開になったため、メンバー名を直接指定した。`tools/python/work/` は gitignore 対象。
-- 実行: `FL_WIN64_DIR=<絶対パス>/tools/python/work/fl python3 analysis/flapi/pe_disasm.py <VA> <N>` と `pe_rip_consts.py <VA> <N>`。8 回の実行 (VA `d5aa30 83`・`d5a720 152`・`1051d20 700`・`d843d0 80` × 2 ツール) は全て終了 0・Traceback 0 件、合計 0.72 秒、load average 0.13 (1 分値)。
-- 差分の証跡: `git diff c8cafaf9 HEAD -- tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_rip_consts.py` の出力は 0 行 (測定 commit より後の commit はこの節の docs だけ)。`tools/python/analysis/flapi` 全体には main 側の別ファイルの変更が入っているが、測定対象外。
-- 修正前 (`a605aaa0`、`.bss` 修正前) との比較: 同じ 4 VA の `pe_rip_consts.py` 出力 980 行のうち変わったのは 53 行だけ。`*ptr` の番地が `.bss` にある 48 件の値を削除 (file 上の別バイトだった偽の値)、`.bss` を直接参照する 5 件を「PE ファイル上に実体なし」に変更。`.data`・`.text` 内の値 (本節の引用値を含む) と `pe_disasm.py` の出力は変わらない。
+- 実行: `FL_WIN64_DIR=<絶対パス>/tools/python/work/fl python3 analysis/flapi/pe_disasm.py <VA> <N>` と `pe_rip_consts.py <VA> <N>`。8 回の実行 (VA `d5aa30 83`・`d5a720 152`・`1051d20 700`・`d843d0 80` × 2 ツール) は全て終了 0・Traceback 0 件、合計 1.05 秒、load average 0.03 (1 分値)。
+- 差分の証跡: `git diff 60530e14 HEAD -- tools/python/analysis/flapi/pe_disasm.py tools/python/analysis/flapi/pe_rip_consts.py` の出力は 0 行 (測定 commit より後の commit はこの節の docs だけ)。`tools/python/analysis/flapi` 全体には main 側の別ファイルの変更が入っているが、測定対象外。
+- 修正前 (main の版 `ad4c27b3` の `pe_rip_consts.py`) との比較: 同じ 4 VA の RIP 参照命令の行 103 行のうち変わったのは 53 行だけ。`*ptr` の番地が `.bss` にある 48 件の値を削除 (file 上の別バイトだった偽の値)、`.bss` を直接参照する 5 件を「PE ファイル上に実体なし」に変更。`.data`・`.text` 内の値 (本節の引用値を含む) と `pe_disasm.py` の出力は変わらない。
 
 ### 1. 呼び出し連鎖 (`0xd5aa30`、`pe_disasm.py d5aa30 83`)
 
