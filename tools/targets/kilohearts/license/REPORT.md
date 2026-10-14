@@ -211,3 +211,19 @@ DSP 固有 closure (42 効果) にはライセンス/ネット系参照が無く
 - 結果: **rc=0**・`undefined_imports: []`。宣言補完を外しても module F は失敗しなかった。
 - 解釈: module F は `used_names` が空 (§12.2) で、そもそも named import を呼ばない。よって本 4 module は宣言補完のネガコンに不適。#710 の本来の失敗 (閉包展開での `@GetCurrentThreadId` 宣言欠落) は、その名前を呼ぶ閉包を含む入力でしか再現しない。
 - 未実施・起票先: 閉包展開で named import を呼ぶ入力でのネガコン (#656)。本 run では測定できていないため、受入条件のこの項目は未達のまま。
+
+### 12.6 閉包入力でのネガコン・HeapAlloc 実行 (#1171 実測)
+
+- 対象 HEAD `39ac1852` (`scripts/kh1171_negctrl.py` / `kh1171_heap_exec.sh` / `kh1171_heap_run.mjs`)。素材 `plugins-kilohearts` → Installer zip → payload.dat (`windows.zip/1ccb1df8c8f10745`) → `work/winpkg/HeartCore.core_64` (76,642,304 B)。`KH_EM_CACHE` は `$RUNNER_TEMP/emcache`。
+- 入力: `0x180049c40` (288 B・IAT 経由で `GetCurrentThreadId` を呼ぶ・閉包 0)。HeapAlloc 経路: `0x180156e50` (`HeapAlloc` を IAT 経由で呼ぶ)。
+- 実測 (`python3 scripts/kh1171_negctrl.py <tag> pos|neg <VA>`):
+
+| 測定 | 結果 |
+|---|---|
+| POS: 宣言補完あり・`0x180049c40` | rc=0・`undefined_imports` 空・wasm 18,886 B・sha `4cac190e…f174` |
+| NEG: 宣言補完なし・`0x180049c40` | **emcc 失敗** (`use of undefined value '@GetCurrentThreadId'`・rc≠0) |
+| POS: 宣言補完あり・`0x180156e50` | rc=0・`undefined_imports` 空・`stubs 4` (HeapAlloc/GetProcessHeap shim 生成) |
+| HeapAlloc wasm 実行 (`kh1171_heap_run.mjs`) | p1=0x5000010・p2=0x5000080 (16B 整列・HEAP 域内)・100 B 上書き後も保持・2MB 要求=0・0xFFFF..F0 要求=0・0xF0000 初回=非 0・2 回目=0 |
+| `kh710_check.py` | RESULT PASS |
+
+- 制約: HeapAlloc の実行は `test_heap(n)` ラッパーから `r8` に引数を入れて呼ぶ (export 経由の直接呼出しは不可)。module 全体 (`function_180156e50`) は未 lift callee `0x180156f40`/`0x180106440` を含むため wasm 上で丸ごと実行しない。
