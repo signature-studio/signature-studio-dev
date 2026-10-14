@@ -236,7 +236,13 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 判定: ダンプは人手検証の**材料**であり、検証結果ではない。`verified` 列は 160 行すべて `auto` のまま。手検証集合は空のため、受入 1・2 は未達。
 - 未達の追跡: 160 行の人手確認 (受入 1) と、手検証集合と before 集合の差分 (受入 2) は #2176 (KH-35) に残す。再測定は本節で完了済み (#2176 には含めない)。
 
-## 10. KH-38 (#3065) 対照 Gain closure の unsup 被覆 (結論のみ)
+## 10. #3064 (KH-37) x64c 閉包 148 と TSV 160 行の数え方
+
+- 結論: x64c 閉包 148 と TSV 160 行の差 12 件は、数え方で説明できる (`iat_thunk` 2・`tail_absorbed` 9・SEH 着地点 1。未説明 0)。`0xfd0995` は `0xfd08d0` の `__except` 着地点で、CFG の辺では到達しない。`x64c.py` は変更しない。
+- 測定・内訳・判定: `REPORT_APPENDIX_3064.md` (測定 commit `a89f92b2`)。
+
+## 11. KH-38 (#3065) 対照 Gain closure の unsup 被覆 (結論のみ)
 
 - 対照 Gain の before 160 closure で残っていた unsup (VEX/FMA 系ほか) を flelift x64c で被覆した。before / after の数値・内訳・未解決は [REPORT_APPENDIX_3065.md](REPORT_APPENDIX_3065.md)。
 - 再測定スクリプト: `scripts/lift_closure_x64c.sh`。差分テスト: `tools/flelift/tests/x64c_vex_diff.py`。
+
