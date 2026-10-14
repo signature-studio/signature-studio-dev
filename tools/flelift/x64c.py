@@ -1655,8 +1655,8 @@ class FnLift:
 
     def i_rcr(self, ins, ops):
         """rcr: CF を含む (W+1)bit 環を右回転。count は &0x1F (64bit は &0x3F)、8/16bit は続けて MOD 9/17。
-        マスク後の count が 0 なら flags は不変、それ以外は CF と OF (= MSB ^ MSB-1) だけ更新 (実機 rcr 約 1.2 万件と一致)。
-        32bit の書き込みは count 0 でも上位をゼロ拡張する (実機)。"""
+        マスク後の count が 0 なら flags は不変、それ以外は CF と OF (= MSB ^ MSB-1) だけ更新 (実機 rcr 4000 件と一致: tests/rcr_native_check.py)。
+        32bit の書き込みは count 0 でも上位をゼロ拡張する (実機。同ファイルの照合で 64bit レジスタ全体を比較)。"""
         sz = ops[0].size; W = sz * 8; T = 'uint%d_t' % W
         cnt = self.rd(ins, ops[1], 1) if len(ops) > 1 else '1'
         cm = 63 if sz == 8 else 31
