@@ -1,6 +1,7 @@
 import { bearerToken, canPushRepo } from "./admin.ts";
 import { DEFAULT_REPO, type Env } from "./config.ts";
 import { PmDO } from "./do.ts";
+import { guiResponse } from "./gui.ts";
 
 export { PmDO };
 
@@ -23,6 +24,8 @@ export default {
       if (!ok) return new Response("not found", { status: 404 });
       return stub(env).fetch(req);
     }
+    // 状態の簡易 GUI (#2658)。静的な HTML だけで、DO は呼ばない (値は同じ Worker の GET /status から読む)。
+    if (u.pathname === "/") return guiResponse(req.method);
     if (!PUBLIC_PATHS.has(u.pathname)) return new Response("not found", { status: 404 });
     if (u.pathname === "/webhook") {
       if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
