@@ -32,7 +32,7 @@
 
 `fa_wc.py instr` の出力: `store total=5526 instrumented=5526 unhandled=0`。`fa_wc_build.sh` の出力の `__wchk` 挿入は 5527 行 (宣言 1 行を含む)。
 
-**WC 行 (HEAD `e1655883`・`fa_wc_drv.cjs` の stderr)**: 168 行 (21 IR 行 × 8 入力)。BLK 窓 (`0x36319000`–`0x36319020`) への書込みは 21 IR 行。"emsc" (`63736d65`) を含む WC 行:
+**WC 行 (HEAD `9b1b94e0` で 2026-10-14 に再実行・`fa_wc_drv.cjs` の stderr)**: 168 行 (21 IR 行 × 8 入力)。BLK 窓 (`0x36319000`–`0x36319020`) への書込みは 21 IR 行 (`0x36319008` 56 件・`0x36319010` 56 件・`0x36319018` 56 件)。入力 `work/fa_route/oi.flat.ll` は 25805 行・store 5526・`function_181057d20` 参照 88 で、`fa_wc.py instr` は `store total=5526 instrumented=5526 unhandled=0`。"emsc" (`63736d65`) を含む WC 行:
 
 | IR 行 | 関数 (`fn.json`) | 書込み先 | 値 | 件数 |
 |---|---|---|---|---|
