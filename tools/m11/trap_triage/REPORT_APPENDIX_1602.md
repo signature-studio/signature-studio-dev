@@ -16,7 +16,7 @@
 
 ### HEAD 再測定 (`50ad69da`・既定値・計測 OFF)
 
-測定 commit `4c3f7458` → HEAD `50ad69da` のコード差分は `tools/m11/m11_build.sh` (+7/-2 行) と `tools/m11/trap_triage/probe_entry.sh` (1 行) だけ。既定値 (`M11_TRACE_ISOLATE=1`・`M11_KEEP_BOOT_O` 未設定) で同じ survey 結果になることを、HEAD で確認した。素材は上と同じ 5 点。
+測定 commit `4c3f7458` → HEAD `50ad69da` のコード差分は `tools/m11/m11_build.sh` (+5/-2 行) と `tools/m11/trap_triage/probe_entry.sh` (1 行) だけ。既定値 (`M11_TRACE_ISOLATE=1`・`M11_KEEP_BOOT_O` 未設定) で同じ survey 結果になることを、HEAD で確認した。素材は上と同じ 5 点。
 
 | 工程 | 結果 | 所要 |
 |---|---|---|
