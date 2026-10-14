@@ -2,7 +2,7 @@
 # #2839 (SHX-T31): import 呼出しの引数幅が IR で i64 になる根本の突合。
 # 機械語 (PE の IAT → thunk → 呼出し元) ・ RetDec の lift (該当関数 + thunk だけ) ・ RetDec 署名 DB を並べる。
 # 使い方: python3 tools/m11/shimx_link/hmo_rootcause.py [--dll winmm.dll --name midiOutShortMsg]
-# 素材: FL_WIN64_DIR (既定 block00031_PE.bin) / RETDEC_ROOT (既定 /opt/retdec)。出力は work/shimx_link/rootcause/ (gitignore)。
+# 素材: FL_WIN64_DIR (既定 block00031_PE.bin) / RETDEC_ROOT (必須。docs/REFERENCES.md の [RETDEC])。出力は work/shimx_link/rootcause/ (gitignore)。
 import argparse
 import json
 import os
@@ -127,7 +127,9 @@ def main():
     args = ap.parse_args()
     fl = Path(os.environ.get("FL_WIN64_DIR", "")) / "extracted/block00031_PE.bin"
     fl = Path(os.environ.get("M11_PE", fl))
-    retdec_root = Path(os.environ.get("RETDEC_ROOT", "/opt/retdec"))
+    if not os.environ.get("RETDEC_ROOT"):
+        sys.exit("RETDEC_ROOT が必要 (docs/REFERENCES.md の [RETDEC] の展開先)")
+    retdec_root = Path(os.environ["RETDEC_ROOT"])
     retdec_bin = os.environ.get("RETDEC") or str(retdec_root / "bin/retdec-decompiler")
     print("[pe] %s" % fl)
     pe = load_pe(str(fl))
