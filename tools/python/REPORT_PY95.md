@@ -46,31 +46,31 @@
 
 ## 4. 検証
 
-測定 commit: `0555b22d` (`origin/main` (`c98d2c99`) の取り込み merge。コードを変えた最後の commit)。前回の測定 commit `db86f35b` の後に main が `tools/python` のコードを変えた (`3e8c8d25`→`c98d2c99`: `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`・`tests/general_diff.mjs`・新規の `tests/arrangement_diff.mjs`・`tests/static_subinterp_browser.mjs` など)。その取り込みで `docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` が競合し、両側を残して解消した。`provider_check.mjs` の期待値は、main 側の 109/326 に `pe95` の 9 件を足して 118/317 とした。
+測定 commit: `20a5bc6b` (`origin/main` (`213a310f`) の取り込み merge。コードを変えた最後の commit)。その前の `0555b22d` (`origin/main` (`c98d2c99`) の取り込み merge) の後に main が `tools/python/analysis/py160_dis.py`・`py160_reach.py` (テストから呼ばれない新規の分析スクリプト) を追加したため、取り込み後に全テストを再実行した。`docs/DOC_MAP.md` と `tools/python/REPORT_PY41_APPENDIX.md` も main 側で変わった (md のみ)。`provider/`・`host/`・`tests/`・`gen/` は `0555b22d` から変更なし。`c98d2c99` の取り込みで `docs/DOC_MAP.md`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` が競合し、両側を残して解消した。`provider_check.mjs` の期待値は、main 側の 109/326 に `pe95` の 9 件を足して 118/317 とした。
 
-測定は `0555b22d` の内容で行った。環境: runner 4 core。測定開始直前の load average 1.87 (`uptime`、22:31:33)。
+測定は `20a5bc6b` の内容で行った。環境: runner 4 core。測定開始直前の load average 0.30 (`uptime`、22:33:25)。
 
-再ビルド (`0555b22d` の内容から): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.9 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 118、1.4 秒)・`build_cpython_wasm.sh` (rc 0、4 分 6 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒)。emsdk は `/opt/emsdk` (6.0.12) を使った。
+再ビルド (`0555b22d` の内容から、provider は `20a5bc6b` まで変更なし): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.9 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 118、1.4 秒)・`build_cpython_wasm.sh` (rc 0、4 分 6 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒)。emsdk は `/opt/emsdk` (6.0.12) を使った。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/provider_check.mjs` | PASS (435 / 実装 118 / 未実装 317 / MCP 静的 60) | 439 ms |
-| `node tests/ui_state_diff.mjs` | calls 33、diffs 0、PASS | 51 ms |
-| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 53 ms |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 52 ms |
-| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 52 ms |
-| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 51 ms |
-| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 54 ms |
-| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 51 ms |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1650 ms |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 118 / 未実装 317 / MCP 静的 60) | 374 ms |
+| `node tests/ui_state_diff.mjs` | calls 33、diffs 0、PASS | 50 ms |
+| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 54 ms |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 50 ms |
+| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 61 ms |
+| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 52 ms |
+| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 56 ms |
+| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 54 ms |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1659 ms |
 
-同じ mock を読む `device_diff` (calls 8・diffs 0)・`ilmcp_diff` (calls 32・diffs 0)・`midi_path_diff` (cases 30・diffs 0)・`transport_diff` (calls 7・diffs 0)・`midi_bundled_device` (checks 9・failed 0)・`midi_script` (checks 29・failed 0) も rc 0 で PASS (wall 52・63・61・51・347・781 ms)。
+同じ mock を読む `device_diff` (calls 8・diffs 0)・`ilmcp_diff` (calls 32・diffs 0)・`midi_path_diff` (cases 30・diffs 0)・`transport_diff` (calls 7・diffs 0)・`midi_bundled_device` (checks 9・failed 0)・`midi_script` (checks 29・failed 0) も rc 0 で PASS (wall 55・64・56・52・366・800 ms)。`0555b22d` の測定でも同じ件数で PASS を確認済み。
 
 ネガティブコントロール: 本 commit では再測定していない。`host/fl_mock.mjs` の `uiClosing` の既定値は取り込み後も `false` のまま (`db86f35b` の測定で、`true` にすると `ui_state_diff.mjs` が rc 1 で FAIL することを確認済み)。
 
 C の警告: `gcc -fsyntax-only -Wall -Wextra provider/fl_engine.c` は 3 件 (`fl_engine.c:89` の `unused variable 'k'`。`CH` マクロ由来の既存の警告)。`origin/main` の同じファイルも 3 件で同数のため、本 PR が増やした警告は 0 件。`provider/build.sh` は `-Wno-unused-variable` を付けている。
 
-コード差分 (本 REPORT 更新 commit まで): `git diff 0555b22d HEAD -- tools/python ':!*.md'` は 0 行 (測定 commit から先は `.md` のみ)。取り込み後の main は `c98d2c99` 時点の内容で測定済み。
+コード差分 (測定 commit から本 REPORT 更新 commit まで、`tools/python` の .md 以外): `git diff 20a5bc6b HEAD -- tools/python ':!*.md'` は 0 行。
 
 
 ## 5. 保留 (残り 54 件・子 issue へ)
