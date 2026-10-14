@@ -35,3 +35,11 @@
 - 独立検算: `evidence_2491/check_survey_vs_1255.py` で 942 unit の kind と shim_calls を `evidence_1255/shimx_trace_soft_fix.survey.json` と unit 番号で突き合わせ → kind 差分 0・shim_calls 差分 0。ネガティブコントロール (unit 1 の kind を 1 件書き換えた複製) では kind 差分 1 件で FAIL することを確認。
 - 再現: `bash tools/shimx/evidence_2491/repro.sh` (clean rebuild → probe → diff。HEAD `5d261806` 系で `probe: SAME`)。
 - 測定後のコード差分: `git diff 5d261806 HEAD -- tools/m11/shimx_link tools/shimx/src` は出力 0 行 (本節の追記は REPORT と `evidence_2491/` のみ)。
+
+## 3.3.7 main 取り込み後の再測定 (PR #2550 の競合解消)
+
+- 測定 commit: `c068783c` (`origin/main` `3ef67b40` を merge した commit。コードを変えた最後の commit)。初回測定 `5d261806` からのコード差分: `git diff 5d261806 c068783c -- tools/m11/shimx_link tools/shimx/src` は `probe_lasterr_1985.mjs` の 1 ファイル 42 行追加のみ (main #1985 の probe。build.sh・gen_link.py・trace_rt.c は無変更で、build の入力に含まれない)。
+- clean rebuild: `bash tools/shimx/evidence_2491/repro.sh` の build → `[sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0`。`m11_sx_trace_soft_fix.cjs.wasm` の sha256 先頭 `11c74a05…` (初回と同一)。`repro.sh` 全体 (build と probe) の所要 11 秒。
+- probe unit 1〜23: `probe: SAME` (保存出力 `evidence_2491/probe_u23_shimx_site.txt` と diff 0 行)。
+- survey 942 unit: ok 789 / oob 95 / closure_outside 47 / halt0 9 / clobber 1 / noproc 1 / reboots 1 (初回と同一)。所要 2 分 25 秒 (開始時 load 0.64、4 CPU)。`check_survey_vs_1255.py` で `evidence_1255` と kind 差分 0・shim_calls 差分 0。
+- 素材: `work-m11`・`work-liftdiff` を `$ARTIFACTS_DIR` から展開 (実在確認済み)。EMSDK は `/opt/emsdk` を使用。
