@@ -12,6 +12,7 @@ PM の launch / watchdog を、VM のポーリング (systemd timer) から **we
 | Durable Object `PmDO` (SQLite) | issue / PR / run / 最後の bot 報告 / blocked_by / launch 時刻を保持。App の鍵は AES-GCM で封じて保管 |
 | alarm (webhook の 2 秒後 / 毎分) と Cron Trigger (毎分) | `tick`: 同期 (6 時間ごとに full、5 分ごとに reconcile)・`repository_dispatch` (`oc-watchdog`、前回の送信から 5 分未満は送らない。`LIVE_DISPATCH`。検出した `oc-pm` も同じスイッチ)・launch (`LIVE_LAUNCH`) |
 | `POST /admin/resync` | 管理用の全体同期 (#2339)。派生状態を REST の内容で作り直す (`fullSync` と同じ。永続状態は触らない)。認証は呼び出し側の GitHub token (Bearer) が repo の push 権限を持つこと (新規の API token は作らない)。**未認証・不明な token・読み取りだけの token は 404** (入口で DO を呼ばない)。1 時間に 2 回まで、3 回目は 429 (`retry-after`) |
+| `POST /admin/import` `GET /admin/export` | VM の状態 (`launched`・`relaunch`・`phase`・`pm_art`) の取り込みと書き出し (#2343)。認証は `/admin/resync` と同じ。既定は検証のみで、`?apply=1` のときだけ保存する。取り込み前は launch しない。下の『VM の状態の取り込みと書き出し』 |
 | `GET /setup` `GET /setup/callback` | GitHub App `oc-pm-for-signature-studio` の manifest flow (org 所有)。`/setup` は無認証だが、期限内 (1 時間) の state があれば上書きせず同じ state を返す。state は org 所有の App への変換に成功したときだけ消費する |
 | `GET /status` | 集計のみ (実行中 run 数・ready/blocked 数・最終 reconcile 時刻・モード・健全性の観測。下の『/status の観測』)。`mode_launch` / `mode_dispatch` が経路ごとのモード (`live` / `dry-run`)。`mode` は両方 `live` のときだけ `live` (片方だけなら `partial`、どちらもなら `dry-run`。`tools/pm/pm_gate.sh` は `mode=live` を『VM の command を止めてよい』と読む)。`?detail=1` は repo の push 権限を持つ GitHub token (Bearer) が必要 |
 
@@ -100,6 +101,33 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 - **限界**: 1 走査は最新 100 件の 1 ページだけを読む。それより古い失敗は読まない (GitHub は配送を約 3 日保持する)。失敗が 1 日に 100 件を超えると取りこぼし得る。
 - **`POST /admin/resync`**: 派生状態 (issue・PR・run・コメント・blocked_by・レビュー) を `fullSync` で作り直す。ページ上限と REST の回数は全体同期と同じ。永続状態 (`launchedAt`・`relaunch`・`planned`・`phase`・`counters`) は同期が触らないので残る。1 時間に 2 回まで (試行は失敗しても数える)、3 回目は 429。tick と同時には走らせない (409)。認証と 404 の扱いは上の表を参照。
 
+## VM の状態の取り込みと書き出し (#2343)
+
+Worker の状態 (Durable Object) に、VM が持っていた `launched`・`relaunch`・`phase`・`pm_art` を移す。どれも GitHub から作り直せない値 (`launched` は 3 時間の重複防止、`phase` は Review-Only の現在値、`pm_art` は 24 時間より前の PM の素材指定)。
+
+- **取り込むファイル**: VM の `tools/pm/` の 3 ファイルと、`issues_state.json` の `pm_art`。
+  - `launched.json` → `launched` (`{"<n>": "<ISO 8601>"}`)
+  - `relaunch.json` → `relaunch` (`{"<n>": {"count": 0〜3, "art": "oc_artifacts: …" または null}}`)
+  - `phase.json` → `phase` (`{"review_only": bool, "open_prs": 整数, "since": "<ISO 8601>"}`)。**移行の時点で VM の値を取り直して入れる** (古い値を入れると、Review-Only の判定が移行時点とずれる)
+  - `issues_state.json` の `pm_art` → `pm_art` (`{"<n>": {"at": "<ISO 8601>", "line": "oc_artifacts: <ALLOW_ARTS の部分集合>"}}`)。`issues_state.json` は `issue_snapshot.py` が書き、`launch_issues.py` が読む
+- **値域** (外れると 400 で何も保存しない。`problems` に理由が返る): issue 番号は 1 以上の数字 (7 桁まで)。時刻はタイムゾーン付きの ISO 8601。`count` は 0〜3 の整数。素材名は `src/launch.ts` の `ALLOW_ARTS` の部分集合。キーは 4 つだけ (未知のキー・欠落は 400)。200 KB を超えると 413。
+- **手順** (`$URL` は Worker の URL、`$TOKEN` は repo の push 権限を持つ GitHub token。新しい API token は作らない):
+
+  ```sh
+  jq -n --slurpfile l launched.json --slurpfile r relaunch.json --slurpfile p phase.json --slurpfile s issues_state.json \
+    '{launched: $l[0], relaunch: $r[0], phase: $p[0], pm_art: $s[0].pm_art}' > import.json
+  curl -sS -H "authorization: Bearer $TOKEN" --data-binary @import.json "$URL/admin/import"         # 検証のみ (保存しない)
+  curl -sS -H "authorization: Bearer $TOKEN" --data-binary @import.json "$URL/admin/import?apply=1"  # 保存
+  curl -sS -H "authorization: Bearer $TOKEN" "$URL/admin/export"                                     # 確認 (VM の形式で返る)
+  ```
+
+  検証で 400 が返ったら、`problems` の issue 番号を直してから送り直す (許可外の素材名は VM の `pm_art` に残っていることがある)。
+- **取り込み前は launch しない**: `?apply=1` の取り込みが一度も成功していない間は、新規・再投入の picks を空にし、`/status` に `launch_blocked: "no-import"` を出す (取り込み時刻は `imported_at`)。VM の状態が無い新規の構成のための安全装置。`IMPORT_REQUIRED=0` で外せる。
+- **反映の順序**: この変更を反映すると、取り込みが済むまで launch は止まる。反映の前に取り込むか、反映時に `IMPORT_REQUIRED=0` を入れて、取り込んだ後に外す。
+- **取り込みの扱い**: 同じ issue が既にあるときは、`launched`・`pm_art` は新しい時刻の方、`relaunch` は回数の多い方を残す。`phase` は取り込んだ値にする。取り込んだ `launched` が 3 時間以内の issue は `recent` に入り、着手したばかりの issue に二重に着手しない。取り込んだ値は全体同期 (`/admin/resync`) でも消えない。
+- **書き出し**: `GET /admin/export` は VM の形式で返す (`launched`・`relaunch` (issue 番号のキーだけ。`np:<n>` は VM に無いので出さない)・`phase` (一度も保存していなければ null)・`pm_art`)。VM へ戻すときの順序は『切替』の節と `tools/pm/README.md` に従う (両方が live だと二重投稿になる)。
+- **認証**: `/admin/resync` と同じ。入口 (`index.ts`) と DO (`app.ts`) の両方で確認し、未認証・不明な token・読み取りだけの token・メソッドの違いは 404 で、DO の状態に触れない。
+
 ## 同期の窓と打ち切り
 
 - 全体同期 (6 時間ごと) と reconcile (5 分ごと) は、GitHub の一覧を `per_page=100` のページで読む。`Gh.list` は、上限ページで止めて続きがあるときだけ `truncated=true` を返す
@@ -124,7 +152,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 
 ```
 cd infra/pm-worker && npm test      # Node >= 22.6 (--experimental-strip-types)。依存パッケージなし。Python 3 が要る (突き合わせ)
-cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン
+cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン・VM の状態の取り込み (#2343 test/unit/vm_import.test.ts)
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 

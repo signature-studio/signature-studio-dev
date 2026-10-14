@@ -40,6 +40,8 @@ export interface Env {
   STUCK_HIGH?: string;
   // reviewer App の bot ログイン。review の verdict とマーカー付きコメントの信頼に使う。
   REVIEWER_LOGIN?: string;
+  // "0" のときだけ、VM の状態 (launched・relaunch・phase・pm_art) を取り込む前でも launch する (#2343)。既定は取り込むまで launch しない。
+  IMPORT_REQUIRED?: string;
 }
 
 export interface Config {
@@ -62,6 +64,8 @@ export interface Config {
   commentMaxPages: number;
   stuckHigh: number;
   reviewerLogin: string;
+  // VM の状態を取り込むまで launch しない (#2343)。IMPORT_REQUIRED=0 のときだけ false。
+  importRequired: boolean;
   // oc-pm の対象にしてよい bot の起票者。人は author_association (OWNER / MEMBER / COLLABORATOR) で絞る。
   pmTargetBots: string[];
   manualDeps: Record<string, number[]>;
@@ -96,6 +100,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),
     stuckHigh: num(env.STUCK_HIGH, 40),
     reviewerLogin: env.REVIEWER_LOGIN ?? DEFAULT_REVIEWER_LOGIN,
+    importRequired: env.IMPORT_REQUIRED !== "0",
     pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]"],
     manualDeps,
   };
