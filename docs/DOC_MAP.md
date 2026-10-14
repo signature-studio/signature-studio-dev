@@ -95,8 +95,9 @@
 | `tools/liftlib/REPORT_APPENDIX_1560.md` | ~50 | liftlib CI-28 (#1560) の決定: raw `drc.ll` は比較に使わず正規化後 `base.ll` で判定 (b)。k80 の再実測 (base 4/4 一致・raw 2 種)。`REPORT_APPENDIX_D.md` は 250 行上限のため別置き |
 | `tools/liftlib/REPORT_APPENDIX_D.md` | ~214 | liftlib §22 全文 (LIFTLIB-9 #668: RetDec raw lift 出力の非決定性 = uselistorder・ASLR 依存、A7 後は決定的、回帰 gate `lift_determinism_e2e.sh`)。§23 (LIFTLIB-10/11 #695・#887: k80 の alloca 並び = `canon_alloca_order` で決定化、gate 組込み)。本体 §22 は要約のみ |
 | `tools/flelift/REPORT.md` | ~155 | x64c を FLEngine 向けに汎用化 |
-| `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5: x64c lift による FLEngine boot 連鎖 |
+| `tools/flelift/boot/REPORT.md` | ~350 | FLE-2〜FLE-5・FLE-10 (§10): x64c lift による FLEngine boot 連鎖・IPP 停止 mode・既定経路の no-op |
 | `tools/flelift/boot/REPORT_APPENDIX_2700.md` | ~40 | FLE-8 (#2698) の詳細 (REPORT §9 から移動: E-1 工程の実測・E-2 検証)。FLE-9 の shard 化の実測は REPORT §9 |
+| `tools/flelift/boot/REPORT_APPENDIX_2702.md` | ~80 | FLE-10 (#2702) の付録: 工程の実測 (§A)・再現コマンド (§B)・IPP 呼出しと slot の実測 (§C)・停止点 (§D)・旧 REPORT §10 (FLE-6 #672) の全文 (§E。250 行上限のため分割移動) |
 | `tools/qfclift/REPORT.md` | ~100 | T-SH-12 (#154 部分達成): QuickFontCache_x64.dll の x64c lift (6,347 関数・unsup 0) + SSSE3 handler 注入 (pshufb/pmulhrsw/phaddw) + native-vs-wasm の SSSE3 spot diff。ILTools は `tools/iltools/REPORT.md` 参照。FruityPlug は未着手 |
 | `tools/iltools/REPORT.md` | ~36 | T-SH-12 (#154): ILTools_x64.dll の x64c lift 測定 (11,747 関数・unsup 1,236 は全て x87 → 未達)。x87 命令一式が x64c 未対応 |
 | `tools/fruityplug/REPORT.md` | ~60 | T-SH-12 (#154): SGv2 の win 対応の検証。classify.py の block24353 (FruityPlug_x64.dll 名) は VERSIONINFO で Maximus と判明し SGv2 の根拠にならない。export 名は 133 本で非一意。mac 素材との突合は未達 |

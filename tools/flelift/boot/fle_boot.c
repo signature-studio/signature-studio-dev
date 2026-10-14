@@ -107,6 +107,9 @@ EM_JS(void, fle_js_err, (const char* s), { console.error(UTF8ToString(s)); });
 #define IPP_MAX 512
 static const char* g_ipp_nm[IPP_MAX]; static u32 g_ipp_n, g_ipp_calls[IPP_MAX], g_ipp_total;
 static u64 g_ipp_h; static int g_ipp_on = 0;   /* 既定は無効 (通常 boot の挙動を変えない)。fle_boot_set_ipp(1) で有効 */
+static int g_ipp_stop = 0;                       /* mode 2 (#2702): ippsZero_8u 以外の IPP 呼出で停止 */
+static const char* g_ipp_stop_nm; static u64 g_ipp_stop_site;
+static u64 g_ipp_site[IPP_MAX];                  /* 各 IPP 名の初回呼出元 (ret) */
 static u32 ipp_token(const char* nm) {
     for (u32 i = 0; i < g_ipp_n; i++) if (!strcmp(g_ipp_nm[i], nm)) return IPP_TOK_BASE + i;
     if (g_ipp_n >= IPP_MAX) return 0;
@@ -117,10 +120,14 @@ static u32 ipp_token(const char* nm) {
 static int ipp_call(u64 t) {   /* fle_ff から。処理したら 1 */
     if (t < IPP_TOK_BASE || t >= IPP_TOK_BASE + g_ipp_n) return 0;
     u32 i = (u32)(t - IPP_TOK_BASE);
+    if (!g_ipp_calls[i]) g_ipp_site[i] = LD64(R[4]);
     g_ipp_calls[i]++; g_ipp_total++;
     if (!strcmp(g_ipp_nm[i], "ippsZero_8u")) {   /* IppStatus ippsZero_8u(Ipp8u* pDst, int len) */
         u64 dst = R[1]; int len = (int)(R[2] & 0xffffffffu);
         if (dst && len > 0) memset((void*)(uintptr_t)dst, 0, (size_t)len);
+    } else if (g_ipp_stop) {                     /* mode 2: 停止して名前と呼出元を残す */
+        g_ipp_stop_nm = g_ipp_nm[i]; g_ipp_stop_site = LD64(R[4]);
+        fle_throw_kind((long)(intptr_t)"ipp_stop", (long)i);
     }
     R[4] += 8; R[0] = 0;
     return 1;
@@ -131,11 +138,15 @@ static HMODULE fle_ipp_load_hook(const char* name, DWORD flags) {
     if (g_ipp_on && name && strstr(name, "dsp_ippv2")) { g_ipp_h = IPP_HMOD; return (HMODULE)(uintptr_t)IPP_HMOD; }
     return 0;
 }
-EMSCRIPTEN_KEEPALIVE void fle_boot_set_ipp(int on) { g_ipp_on = (int)(on != 0); }
+/* mode: 0 = 無効 (既定) / 1 = shim 有 (ippsZero_8u 以外は fail-soft) / 2 = shim 有 + ippsZero_8u 以外で停止 (#2702) */
+EMSCRIPTEN_KEEPALIVE void fle_boot_set_ipp(int mode) { g_ipp_on = (int)(mode != 0); g_ipp_stop = (mode == 2); }
 EMSCRIPTEN_KEEPALIVE u32 fle_ipp_total(void) { return g_ipp_total; }
 EMSCRIPTEN_KEEPALIVE u32 fle_ipp_names(void) { return g_ipp_n; }
 EMSCRIPTEN_KEEPALIVE const char* fle_ipp_name(int i) { return (u32)i < g_ipp_n ? g_ipp_nm[i] : ""; }
 EMSCRIPTEN_KEEPALIVE u32 fle_ipp_count(int i) { return (u32)i < g_ipp_n ? g_ipp_calls[i] : 0; }
+EMSCRIPTEN_KEEPALIVE u32 fle_ipp_site(int i) { return (u32)i < g_ipp_n ? (u32)g_ipp_site[i] : 0; }
+EMSCRIPTEN_KEEPALIVE const char* fle_ipp_stop_name(void) { return g_ipp_stop_nm ? g_ipp_stop_nm : ""; }
+EMSCRIPTEN_KEEPALIVE u32 fle_ipp_stop_site(void) { return (u32)g_ipp_stop_site; }
 
 /* fle_cpu.c の fail-fast を JS 例外化 (survey を 1 インスタンスで継続できるように)。
  * unlifted(0) は m11 の icall-miss (ret 0) 揃えで容忍: retaddr を pop して RAX=0 で dispatch に戻る。 */
