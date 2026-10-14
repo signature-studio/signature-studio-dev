@@ -117,3 +117,59 @@ FL_WIN64_DIR=... M11_PE=... bash m11_build.sh                  # 既定 (K12=0)
 SV_ERR_LOG=work/s1511/err.txt node trap_triage/survey_units.mjs work/s1511/out.json
 M11_INSTR_K12=1 bash m11_build.sh                              # 計測 probe 入り
 ```
+
+### #1670 [M11-N114] _CopyArray kind 12 (416720) の到達経路と K12 probe の副作用切り分け (#1511 の残り)
+
+測定 commit `5ff58a9e` (コード変更の最後の commit。起点 `7e665077` = main)。4 vCPU・load 0.53〜0.99 (各 build/survey の前後で `uptime` 記録)。素材 `fl-win64` (`$RUNNER_TEMP/fl-win64`) と `work-m11` を展開し、`m11_gen_ir2.sh` (51 s・rc 0・ldfix applied) → `m11_build.sh` (25 s)。survey は各 13 s。
+
+**変更点**: `m11_build.sh` に `M11_TRACE_ISOLATE` (既定 1) を `-D` で渡し、stamp で `ov.o` を作り直す。`M11_TRACE_ISOLATE=0` で #495 の SP 退避を外した trace (ネガコン) を作れるようにした。既定値は従来と同一。
+
+| 構成 (`5ff58a9e`) | ok/miss/other/halt0/oob/abort/noproc | stderr 行 | `[K12HIT]` | `[CA_KIND]` |
+|---|---|---|---|---|
+| iso1 K12=0 (既定) | 870/47/1/7/16/0/1 | 70 | 0 | 0 |
+| iso0 K12=0 | 870/47/1/7/15/1/1 | 72 | 0 | 0 |
+| iso1 K12=1 | 872/47/1/7/14/0/1 | 86 | 0 | 16 (全件 kind=18) |
+| iso0 K12=1 | 872/47/1/7/14/0/1 | 86 | 0 | 16 (全件 kind=18) |
+
+既定構成の数値は REPORT 上の #1511 節 (870/47/1/7/16/1, 70 行) と一致。
+
+- **受入 2 (kind 12 の到達経路)**: **未特定**。全 4 構成で `[K12HIT]` は 0 件。`[CA_KIND]` は unit 17/86/357/496 の計 16 回のみで全件 kind=18。IR 上の `function_416db0` 呼出し元は 12 箇所 (`boot_final.ll` を `grep` で確認) だが、どの呼出しが kind 12 を渡すかは未確認 (呼出し元ごとの kind を確かめる probe は未実施)。boot 段階 (unit -1) の `[CA_KIND]` は 0 件。
+- **受入 3 (probe の副作用)**: unit 304 と 555 は K12=1 で oob→ok に変わる (iso1 でも iso0 でも同じ)。isolation の有無は差を作らない (iso0 K12=1 = iso1 K12=1)。ただし 304 と 555 では `[CA_KIND]`・`[K12HIT]` が一度も出ていない (`_CopyArray` を呼ばない unit)。よって出力の汚染 (#495) では説明できず、probe 入り build の機械語差が原因と推定 (推定。未切り分け)。
+- **trace isolation の効果 (ネガコン)**: `M11_TRACE_ISOLATE=0` で unit 555 だけが oob→abort (`unresolved function call: function_535c2e`)。unit 304 は変わらない。isolation は既定 build では 555 の結果を変えている。
+- 注: 途中で wasm のコピーを取り違えて「iso0 と iso1 の wasm が同一」と誤読した。これは作業側の取り違えで build の不具合ではない。上表は各構成を build し直し、wasm の md5 が構成ごとに異なることを確認した結果。
+
+stderr 件数は `SV_ERR_LOG` 出力の行数 (`wc -l`)。
+
+**再現**:
+```
+cd tools/m11
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin
+bash m11_gen_ir2.sh
+M11_TRACE_ISOLATE=0 M11_INSTR_K12=1 bash m11_build.sh     # 構成は変数で切替 (既定 1 / 0)
+SV_ERR_LOG=work/s1670/err.txt node trap_triage/survey_units.mjs work/s1670/out.json
+```
+
+**鮮度**: `git diff 5ff58a9e HEAD -- tools/m11` は 0 行 (本節の追加のみ)。
+
+### #1847 [M11-12] _CopyArray (416db0) の呼出し元 site 別計測 (#1670 の残り・測定 commit 365fc973)
+
+起点 main `47ee8a17`。`work-m11` を `tools/m11/work/` に展開、PE は `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`。`m11_gen_ir2.sh` (45 s・ldfix applied) で IR を作り直した。load は測定前 0.27・測定後 0.73 (4 vCPU)。
+
+**変更**: `m11_ov.c` の `[CA_KIND]` に `site` と `ti` を追加し、`count==0` の return より前に出す (`M11_INSTR_K12=1` のみ)。`m11_site_probe.py` を新規追加し、IR の `function_416db0` 呼出し直前に `store volatile i32 <site>, ptr @m11_site_cur` を入れる (site は IR 出現順 1..12)。既定 build は不変。
+
+| 構成 | build | survey | ok/miss/other/halt0/oob/noproc | stderr 行 | K12HIT | CA_KIND (site / kind) |
+|---|---|---|---|---|---|---|
+| 既定 (K12=0, site 無し) | 20 s | 11 s | 870/47/1/7/16/1 | 70 | 0 | 0 |
+| K12=1 + site probe | 20 s | 11 s | 872/47/1/7/14/1 | 86 | 0 | 16 (site=2 のみ・全件 kind=18) |
+
+- 既定値は #1511 節 (870/47/1/7/16/1, 70 行) と一致。K12 build の値も #1670 (872/47/1/7/14, 86 行) と一致。
+- **site 2 のみ実行**: 16 件はすべて site=2 (`function_416750` 内の `416db0` 呼出し)、`ti=0x1328` (kind 18)。unit は 17 / 86 / 357 / 496 の 4 つ (各 4 回)。
+- **site 1・3〜12 は survey で未実行**: `[CA_KIND]` に出ない (`count==0` の呼出しも含めて 0 件)。kind 12 は到達せず。
+- **probe 方式の注意**: 呼出しを挟む probe (`void m11_site_probe(i32)` を call) は survey を変えた (ok 872→829・halt0 7→57) ため不採用。global への volatile store 版は K12 probe 無しの結果と一致 (unit 304/555 を除く)。
+- **副作用 (#1670 から継続)**: 既定 build と K12 build の差は unit 304 / 555 の oob→ok のみ (site probe 有無で差なし)。
+- **静的到達 (上界・直接 call のみ)**: `m11_site_probe.py --reach` で survey 結果から entry VA (RVA + 0x400000) を起点に直接 call で辿った。site 2/3/6 は 82 unit、site 5 は 78 unit、site 1/7/8/9 は unit 895/898 のみ (halt0 unit)、site 4 は unit 501、site 10/11 は unit 17/492。上界であり、実際の到達 (survey) とは一致しない (例: site 2 は上界 82 unit に対し実行は 4 unit)。
+- **受入 1 の判定**: kind 12 (`416720`) の到達経路は **未特定**。直接 call の上界だけでは site 1・4・7〜11 が届かない理由を示せない (実行時に呼出し元関数が動くかは未計測)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| site 1・4〜11 の未実行理由 (呼出し元関数の実行時到達を関数単位 probe で確認) | 受入 1・2 未達 | #1894 [M11-13] |

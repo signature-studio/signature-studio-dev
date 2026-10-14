@@ -1,0 +1,11 @@
+# va	pre_verdict	pre_tags	post_verdict	post_tags	changed
+0x132e8e0	match	-	match	-	no
+0x41ca30	mismatch	ret_only	mismatch	zero_init_drop	yes
+0x44d1c0	unexec	-	unexec	-	no
+0x52a7f0	mismatch	import_call_seq	mismatch	memory_semantics	yes
+0x666c30	mismatch	memory_semantics	mismatch	memory_semantics	no
+0x69c360	mismatch	memory_semantics	mismatch	memory_semantics	no
+0x71dd80	mismatch	import_call_seq	match	-	yes
+0x864f60	match	-	mismatch	ret_only	yes
+0x865020	match	-	match	-	no
+0x977e40	match	-	match	-	no

@@ -15,7 +15,7 @@ python3 trap_triage/probe_entry.py "$fns" --out work/probe ${PROBE_WATCH:+--watc
 touch work/boot_final3.ll
 emcc -c work/probe/boot_probe.ll -o work/obj/boot.o $CF || exit 1
 emcc -c work/probe/probe.c -o work/obj/probe.o $CF || exit 1
-bash m11_build.sh > work/probe/build_$tag.log 2>&1 || { tail -5 work/probe/build_$tag.log; exit 1; }
+M11_KEEP_BOOT_O=1 bash m11_build.sh > work/probe/build_$tag.log 2>&1 || { tail -5 work/probe/build_$tag.log; exit 1; }
 [ -n "$only" ] && export SV_ONLY="$only"
 SV_TRACE_AT=99999 SV_PROG=1 node trap_triage/survey_units.mjs work/probe/$tag.json > work/probe/$tag.out 2> work/probe/$tag.err
 grep -a SURVEY_UNITS work/probe/$tag.out

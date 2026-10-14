@@ -206,8 +206,16 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 - `PLUG_NAME_DEFS=1` の lift.log: `[name_defs_to_va] renamed 2: CreatePlugInstance->function_1800029a0, entry_point->function_180005a50`。
 - 欠落 define は **211 → 209** (B 25,828 → 25,411)。 defines 1391 → 1393 (+2)。 参照欠落 `missing_ref` 67 は不変 (改名は `@<名前>` の参照も書き換えるが、欠落参照の集計は変わらなかった)。
-- 受入条件 `missing_define` = 0 は **未達**。 残り 209 件は §C-1 (a) の RetDec 静的検出 (`statically linked function`) で、 `PLUG_NO_STATIC_DETECT=1` (#1486 の opt-in) の既定化が要る。 起票先: #1536。
+- 上記の 209 件は静的検出 ON の時の数。#1699 (`PLUG_NO_STATIC_DETECT` 既定 1) の後の現 HEAD では **E-2** の通り `missing_define` = 0。
 - `emcc -c` は既定・opt-in とも rc 1 (E3 が先に止める)。 両者の `first_errors.txt` は同一。
+
+### E-2. 受入条件の実測 (現 HEAD、env 指定なし。21202 は cpp_lift.sh が `PLUG_NAME_DEFS=1` を既定化)
+
+- 測定 commit: **002c750f** (`cpp_lift.sh` に 21202 のみ `PLUG_NAME_DEFS` 既定 1 を入れた commit)。 `git diff 002c750f HEAD -- tools/plugins/lift tools/plugins/synth` は測定後のコード差分 (本節のみ更新するため 0 行)。
+- コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/plugins/synth/cpp_lift.sh 21202 1500` (42.9 s、rc 0、load 1.23 → 0.80)。
+- summary.csv: `21202,1579,0,1602,0,12,3,1,0,1,42,0,0,0,23,1602,0` (`missing_define` 0 / `missing_bytes` 0 / defines 1602)。 cpp_lift.sh 変更前 (`PLUG_NAME_DEFS` 未設定) の同条件は `...,42,2,417,0,23,1600,0` (欠落 2 件、同日の実測)。
+- `[name_defs_to_va] renamed 2: CreatePlugInstance->function_1800029a0, entry_point->function_180005a50`。
+- `emcc_c_rc` は 1 のまま (E3 `%arg2` i32/i64 が先に止める。受入条件の対象外)。
 
 
 ## F. #1536 (PLUG_NO_STATIC_DETECT の既定化) の節

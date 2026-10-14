@@ -1,0 +1,12 @@
+#va	verdict_r1	verdict_r2	verdict_r3	case_outcome_changed_patterns
+0x1060950	mismatch	mismatch	mismatch	s=hang|both_fault|both_fault
+0x43a3f0	mismatch	mismatch	mismatch	p0=native_fault|native_fault|both_fault p01=diff|diff|wasm_trap pall=native_fault|native_fault|both_fault pall2=native_fault|native_fault|both_fault q0=diff|diff|wasm_trap qall=diff|diff|wasm_trap u16=native_fault|native_fault|both_fault vm0=diff|diff|wasm_trap
+0x4630d0	mismatch	mismatch	mismatch	z=hang|both_fault|hang
+0x50abe0	unexec	unexec	unexec	q0=hang|hang|both_fault
+0x5c14d0	match	match	match	p0=both_fault|native_fault|native_fault p01=both_fault|native_fault|native_fault p1=both_fault|native_fault|native_fault pall=both_fault|native_fault|native_fault pall2=both_fault|native_fault|native_fault q0=both_fault|native_fault|native_fault s=both_fault|native_fault|native_fault u16=both_fault|native_fault|native_fault vm0=both_fault|native_fault|native_fault z=both_fault|native_fault|native_fault
+0x5c5500	unexec	unexec	unexec	p1=hang|both_fault|hang pall=both_fault|both_fault|hang pall2=both_fault|both_fault|hang q0=both_fault|both_fault|hang qall=both_fault|hang|both_fault
+0x67e2b0	mismatch	mismatch	mismatch	p1=hang|both_fault|hang s=hang|both_fault|hang
+0x6b94b0	unexec	unexec	unexec	q0=hang|native_fault|native_fault
+0x959a40	match	match	mismatch	p1=equal|equal|diff pall=equal|equal|diff qall=equal|equal|diff
+0xde10c0	match	match	match	z=hang|both_fault|hang
+0xf824b0	mismatch	mismatch	mismatch	p1=both_fault|native_fault|native_fault s=both_fault|native_fault|native_fault

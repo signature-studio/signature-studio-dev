@@ -75,3 +75,35 @@
 - FS・HC は「DLL 名 → ラッパー」の直後に export 名を解決する形で、殻が engine を動的ロードして名前で関数を引く推定と整合する (静的な推定。ラッパーの内部で `GetProcAddress` が実際に呼ばれることは未確認)。
 - VC・VP は `VSTPluginMain` の文字列の直接参照が見つからない。VST 系の名前は別経路 (間接・連結・別の文字列表現) の可能性があり、未解析。
 - 殻の `GetProcAddress` 10 箇所のうち、ラッパー経由の 4 箇所 (今回検証した FS の呼出 `0x41d48e` / `0x41d4b9` を含む) の引数の実値はこれで取れていない。上記の名前参照は、その呼出の一部に対応する。
+
+## L. 殻の engine export 名の lea 参照と呼出先 (受入 5、`engine_shell_chain.py`)
+
+測定: `python3 modulation/engine_shell_chain.py <block_PE.bin>` (fl-win64 extracted の殻 4 本、静的のみ、rip 相対 lea のみ列挙)。
+§K (`engine_shell_entry.py`) と §L (`engine_shell_chain.py`) は、どちらも文字列の全出現を `find` の繰り返しで走査する (`engine_shell_entry.py` は VA ごとに `setdefault` で登録)。殻 4 本で両スクリプトの lea 参照と直後の call 先を突き合わせ、一致を確認した。§L は §K の表を呼出先の確認も含めて再確認したもので、置換ではない (§K は履歴として残す)。VC/VP の `VSTPluginMain` は両スクリプトとも rip 相対 lea を検出しない。
+
+| 殻 | 文字列 (VA) | lea 元 → 直後の call | 所見 |
+|--:|---|---|---|
+| 18978 (FS) | `Engine_x64.dll` (0x6de674) | 0x6de5b3 → `call 0x4106d0` → `call 0x4409d0` (LoadLibraryW thunk 0x41d6d0 を含む) | DLL 名を読み込む経路 |
+| 18978 (FS) | `dispatch` (0x6de692) | 0x6de5df → `call 0x41d460` | `0x41d460` は `GetProcAddress` thunk 0x41d450 を呼ぶラッパー。引数は `rcx=module`、`rdx=name` |
+| 19144 (HC) | `engine_x64.dll` (0x6ea304) | 0x6ea244 → `call 0x410400` | DLL 名 |
+| 19144 (HC) | `DispatchToEngine` (0x6ea322) | 0x6ea270 → `call 0x41d1e0` | `0x41d1e0` は GetProcAddress thunk 0x41d1d0 を呼ぶラッパー。FS と同型 |
+| 19265 (VC) | `engine_x64.dll` (0x6ea9a4) | 0x6ea7ff → `call 0x410400` | DLL 名 |
+| 19265 (VC) | `VSTPluginMain` (0x6da9d8) | rip 相対 lea なし | `.data` (0x73e448 / 0x73e4d8) に絶対アドレスの pointer が 2 件。呼出箇所は未特定 |
+| 19267 (VP) | `engine_x64.dll` (0x6edbc4) | 0x6eda1f → `call 0x410400` | DLL 名 |
+| 19267 (VP) | `VSTPluginMain` (0x6dc268) | rip 相対 lea なし | `.data` (0x741720 / 0x7417b0) に絶対 pointer 2 件。呼出箇所は未特定 |
+
+- FS・HC は「DLL 名 → 読込」「export 名 → GetProcAddress ラッパー」の 2 段で、殻が engine を名前で動的ロードする推定と整合する。
+- ラッパーの実引数 (`rdx`) は `lea` の対象文字列であることをバイト列で確認 (FS: `dispatch`、HC: `DispatchToEngine`)。
+- VC・VP の `VSTPluginMain` は rip 相対の lea が無く、`.data` 内の絶対 pointer 2 件だけが一致した。その pointer を読む箇所は未特定 (`.data` の値が文字列 VA と一致することの確認まで)。受入 5 の VST2 部分は未達。
+
+判定: 受入 5 のうち FS・HC の export 名取得経路は実測で確定。VC・VP の呼出経路と、殻との結合方式全体の確定は未了 (本 issue に残す)。
+
+## M. VC / VP の VST 名参照経路 (受入 5 の続き、`engine_shell_vst.py`)
+
+測定: `python3 modulation/engine_shell_vst.py <block_PE.bin> <string_va>` (静的のみ、fl-win64 extracted の殻)。測定 commit: `1efae651` (スクリプト追加のみ。殻の解析結果は本付録の記録)。
+
+- **VC (19265)**: `VSTPluginMain` (0x6da9d8) を指す `.data` の 8 バイト slot は 2 件 (0x73e448 / 0x73e4d8)。どちらも 26 要素の名前表 (0x73e440〜0x73e4f0、各要素は文字列 VA) の中にある。表を読む参照は rip 相対で 0x73e428 / 0x73e430 / 0x73e438 / 0x73e440 の 4 箇所。
+- 表を読む解決関数は `0x6db460`。0x6db488 の `lea rbx, [rip+0x62fb1]` で表を取り、`0x1a` (26) 件を反復して `0x6db430` (名前 → モジュール解決) を呼ぶ。`0x6db460` の唯一の呼出元は `0x6df130`。
+- `0x6df110` (呼出元 `0x6df130` を含む) は `0x6db430` で解決し、失敗時に `0x6db460` (名前表の総当たり) へ進む。`0x6df110` への direct call は無い (関数ポインタ経由と推定)。`.text` 0x6da390 に `0x6df110` を値とする 8 バイト slot が 1 件あり (0x6da180 には `0x6df190` の slot)、その slot を読む rip 相対参照は検出していない (未確定)。
+- **VP (19267)**: `VSTPluginMain` (0x6dc268) の slot は 2 件 (0x741720 / 0x7417b0)。近傍 0x741700〜0x741718 の表を lea/rip で参照する。VP の解決関数は未追跡。
+- 判定: VC の名前表 → 解決関数 `0x6db460` → `0x6df110` までは静的に確定。`0x6df110` を実際に呼ぶ経路 (間接呼出の読み手) と、VP の解決関数は未了。殻と engine の結合方式全体は未確定のまま、受入 5 は本 issue に残す。

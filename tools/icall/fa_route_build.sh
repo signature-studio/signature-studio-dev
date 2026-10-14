@@ -19,7 +19,14 @@ if [ ! -f "$DLL" ]; then echo "[fa_route] $DLL が無い: 素材 plugins-freshai
 BLK_SHIFTED="$(python3 -c "import json,sys;m=json.load(open(sys.argv[1]));print(hex(m['blk']-0x180000000+0x30000000))" "$MAP")"
 source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1
 # 1. 復元後 IR の後処理
-python3 "$HERE/ir_fix_mask.py" "$SRC" "$W/oi.restored.ll" > "$W/fix_mask.json"
+# ICALL-70: cookie global (0x18125eaa8) の load 幅 i32 → i64 (RetDec の global 型決定段が i32 と型付け、#2262 付録 §3)
+# 既定 OFF: 初期値 COOKIE_INIT の出所が未確認のため (REPORT_APPENDIX_2280 §3)。検証する run だけ FA_FIX_COOKIE=1 で有効化する
+if [ "${FA_FIX_COOKIE:-0}" = "1" ]; then
+  python3 "$HERE/ir_fix_cookie.py" "$SRC" "$W/cookie_fixed.ll" > "$W/fix_cookie.json"; SRC_FIX="$W/cookie_fixed.ll"
+else
+  SRC_FIX="$SRC"
+fi
+python3 "$HERE/ir_fix_mask.py" "$SRC_FIX" "$W/oi.restored.ll" > "$W/fix_mask.json"
 python3 "$HERE/ir_fix_vstore.py" "$W/oi.restored.ll" "$W/oi.restored1.ll" > "$W/fix_vstore.json"; mv "$W/oi.restored1.ll" "$W/oi.restored.ll"
 # 2. normalize / ir5_patch → flatten (画像全域を shift)
 python3 "$T/m2/ir_normalize.py" "$W/oi.restored.ll" "$W/oi.norm0.ll" >/dev/null
@@ -36,6 +43,20 @@ python3 "$HERE/vex_gen.py" "$W/oi.flat.ll" "$W/oi.vex.c" > "$W/vex_gen.json"
 python3 "$HERE/simd_merge.py" "$W/oi.simd0.c" "$W/oi.simd.c" "$HERE/rt/icall_simd_extra.c" "$W/oi.vex.c" --report "$W/simd_merge.json" >/dev/null
 # 4. data 敷設 (.rdata/.data/_RDATA, DIR64 補正済み)
 python3 "$T/ott/lift/data_gen.py" "$DLL" "$W/fa_data.c" > /dev/null
+# ICALL-55: native の FA_ENC_INIT=1 と同じ encoded slot 初期化 (enc(NULL)=cookie) を data install の末尾に足す
+if [ "${FA_ENC_INIT:-0}" = "1" ]; then
+python3 - "$W/fa_data.c" <<'PY'
+import sys
+COOKIE = 0x18125eaa8 - 0x180000000 + 0x30000000
+SLOTS = [0x1813068d0, 0x1813068f8, 0x181306900, 0x181306908, 0x181306910, 0x1813072b0,
+         0x1813073f0, 0x1813073f8, 0x181307400, 0x181307408, 0x181307410, 0x181307418]
+p = sys.argv[1]
+src = open(p).read().rstrip()
+assert src.endswith('}')
+add = ''.join('  *(uint64_t*)0x%xu = *(uint64_t*)0x%xu;\n' % (s - 0x180000000 + 0x30000000, COOKIE) for s in SLOTS)
+open(p, 'w').write(src[:-1] + add + '}\n')
+PY
+fi
 # 5. build (BLK = $BLK_SHIFTED, memory 0x3c000000)
 emcc "$W/oi.flat.ll" "$W/oi.simd.c" "$W/oi.vex.c" "$W/oi.table.c" "$W/fa_data.c" "$HERE/rt/icall_rt.c" "$HERE/rt/icall_ovr.c" "$HERE/rt/icall_simd_extra.c" \
   -DICALL_BLK=$BLK_SHIFTED -w -O0 -g -ffp-contract=off -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=2MB -sGLOBAL_BASE=268435456 \

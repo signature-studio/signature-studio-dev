@@ -120,3 +120,56 @@ slot 9 = `0x180082400` が process と特定した (根拠は §9)。Ghidra に�
 - 測定 commit: **5ed14324** (`dsp/scripts/mx_iap_*.py` を追加した commit。以後コード変更なし)。
 - 手順: `work/extracted/VST3/Massive X.vst3` を §6 の手順で生成 → 上記 1〜5 のコマンド。
 - 差分証跡: `git diff 5ed14324 HEAD -- tools/targets/massivex/dsp/scripts` は 0 行。
+
+### 9.4 非 Ghidra 確認 (既存スクリプト + 線形逆アセンブル・#266 の残件 1)
+
+Ghidra は未導入のため、§9.2 の参照元確認を既存スクリプト `mx_vtable_xref.py` と線形逆アセンブルで行った。Ghidra 参照解析ではないので「独立確認」とは呼ばない。
+
+- 測定 commit: **5ed14324** (`git diff 5ed14324 HEAD -- tools/targets/massivex/dsp/scripts` = 0 行を再確認済み)。
+- 再測定 (本 run・素材 `plugins-massivex` を展開。`Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca`、md5-ok 0/125 は既知):
+  - `mx_vtable_xref.py <pe> 0x183973108` の生出力 (本 run: 41.6 s・load 0.80→0.96):
+    ```
+    0x180009e8a lea rax, [rip + 0x3969277] -> 0x183973108
+    # target 0x183973108: 1 refs
+    ```
+  - 逆アセンブル `0x180009e2b`〜`0x180009ed0` の生出力 (線形復号・`.pdata` 不使用):
+    ```
+    0x180009e2b mov qword ptr [rbp], 0xfffffffffffffffe
+    0x180009e33 mov rsi, rcx
+    0x180009e36 call 0x180015dbb
+    0x180009e3b lea rax, [rip + 0x3968f36]
+    0x180009e42 mov qword ptr [rsi], rax
+    0x180009e45 lea rax, [rip + 0x396906c]
+    0x180009e4c mov qword ptr [rsi + 0x10], rax
+    0x180009e50 lea rax, [rip + 0x3969091]
+    0x180009e57 mov qword ptr [rsi + 0x18], rax
+    0x180009e5b lea rax, [rip + 0x39690c6]
+    0x180009e62 mov qword ptr [rsi + 0x30], rax
+    0x180009e66 lea rax, [rip + 0x396915b]
+    0x180009e6d mov qword ptr [rsi + 0x38], rax
+    0x180009e71 lea rax, [rip + 0x3969190]
+    0x180009e78 mov qword ptr [rsi + 0x68], rax
+    0x180009e7c lea rax, [rip + 0x3969205]
+    0x180009e83 mov qword ptr [rsi + 0xb8], rax
+    0x180009e8a lea rax, [rip + 0x3969277]
+    0x180009e91 mov qword ptr [rsi + 0xc0], rax
+    0x180009e98 lea rax, [rip + 0x39692c9]
+    0x180009e9f mov qword ptr [rsi + 0xc8], rax
+    0x180009ea6 lea rax, [rip + 0x39692eb]
+    0x180009ead mov qword ptr [rsi + 0x1b0], rax
+    0x180009eb4 lea rax, [rip + 0x39693ed]
+    0x180009ebb mov qword ptr [rsi + 0xd30], rax
+    0x180009ec2 lea rax, [rip + 0x396940f]
+    0x180009ec9 mov qword ptr [rsi + 0xd38], rax
+    0x180009ed0 lea rax, [rip + 0x3969431]
+    ```
+  - 測定 commit: **5ed14324** (上記 `dsp/scripts` 差分 = 0 行)。
+- 直接参照: `0x183973108` を指す RIP 相対参照は **1 件** (`0x180009e8a`、`lea rax,[rip+0x3969277]`)。
+- 参照元の文脈: `0x180009e2b`〜`0x180009ed0` の範囲で `[rsi]`・`[rsi+0x10]`・…・`[rsi+0xb8]` へ複数の vtable を書き込み、`0x180009e8a` の直後が `mov [rsi+0xc0], rax`。開始 `0x180009e2b` は命令境界が `0x180009e8a` まで揃った候補の一つで、関数境界としては未検証。
+  `rsi` が this を保持しているとみなすのは推論。根拠は `0x180009e33 mov rsi, rcx` (第 1 引数 `rcx` を `rsi` に退避) が `0x180009e36 call 0x180015dbb` の**前**にあり、`rsi` は callee-saved のため call を跨いで保持されるはず、という点。`call` 後の `mov rsi, rcx` ではない。関数境界を検証していないため、「コンストラクタ」とは断定しない。この推論が正しければ、§9.1 の COL.offset=0xC0 と整合する。
+- 確認できたのは「`0x183973108` を書き込む参照がこの 1 件である」ことと、その書き込み先が `this+0xc0` と推論されること、までである。**vtable が IAudioProcessor サブオブジェクトであることの確定は、§9.1 の COL 情報に依る**。
+- **未確認**: slot 9 = process の対応 (SDK 宣言順 = vtable 順)。slot 9 の closure と U2/U5 は #1122 (CLOSED) と本 REPORT の範囲外。
+- 逆アセンブルは `.pdata` を使わず線形に復号した (関数 begin とは限らない点に注意)。
+- 再測定の手順: `oc_artifacts: plugins-massivex` で素材を取得 → `parse_setup_headers.py` → `extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` を作り、`mx_vtable_xref.py <pe> 0x183973108` と `0x180009e2b`〜`0x180009ed0` の線形逆アセンブルを実行 (上記の生出力)。
+
+§9 の結論 (部分確定) は変えない。残る未確定は「SDK 宣言順 = vtable 順」の確認のみ。

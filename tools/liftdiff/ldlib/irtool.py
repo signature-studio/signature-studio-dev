@@ -73,8 +73,13 @@ def parse_sigs(ll_path, prefix='function_'):
 INT_RE = re.compile(r'^i(\d+)$')
 
 
-def instrument(ll_in, ll_out, prefix='function_'):
+BLK_RE = re.compile(r'^dec_label_pc_([0-9a-fA-F]+):(\s*;.*)?$')
+
+
+def instrument(ll_in, ll_out, prefix='function_', blocks=False):
     """各 `function_*` の entry に ld_trace(va, np, a0..a7, x0..x3) 呼出しを挿入する (意味不変)。
+    blocks=True のとき、各 `dec_label_pc_<VA>:` の直後に ld_blk_arr への volatile store を挿入する (LD-64 / #1854)。
+    call を使うと wasm の戻り値が変わるため store で記録する (LD-67 / #1906)。
     戻り値: 計装した関数数"""
     n = 0
     with open(ll_in, errors='replace') as fi, open(ll_out, 'w') as fo:
@@ -82,6 +87,19 @@ def instrument(ll_in, ll_out, prefix='function_'):
         for line in fi:
             if line.lstrip().startswith('uselistorder'):
                 continue
+            if blocks:
+                bm = BLK_RE.match(line.rstrip('\n'))
+                if bm:
+                    fo.write(line)
+                    va = int(bm.group(1), 16)
+                    t = 'ldb%x' % va
+                    fo.write('  %%%s.n = load volatile i64, ptr @ld_blk_n\n'
+                             '  %%%s.i = and i64 %%%s.n, 65535\n'
+                             '  %%%s.p = getelementptr inbounds [65536 x i64], ptr @ld_blk_arr, i64 0, i64 %%%s.i\n'
+                             '  store volatile i64 %d, ptr %%%s.p\n'
+                             '  %%%s.n1 = add i64 %%%s.n, 1\n'
+                             '  store volatile i64 %%%s.n1, ptr @ld_blk_n\n' % (t, t, t, t, t, va, t, t, t, t))
+                    continue
             if pending is not None:
                 # 直前が define 行。entry ラベル行ならその後ろ、そうでなければこの行の前に挿入
                 if re.match(r'^[A-Za-z0-9_.$-]+:', line):
@@ -130,11 +148,13 @@ def instrument(ll_in, ll_out, prefix='function_'):
         if pending is not None:
             fo.write(pending)
         fo.write('\ndeclare void @ld_trace(i64, i32, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64)\n')
+        if blocks:
+            fo.write('@ld_blk_n = external global i64\n@ld_blk_arr = external global [65536 x i64]\n')
     return n
 
 
 C_TYPE = {'void': 'void', 'ptr': 'void*', 'float': 'float', 'double': 'double', 'i64': 'u64'}
-SKIP_DECL = re.compile(r'^(llvm\.|__asm_|__divti3|__modti3|__multi3|__umodti3|__udivti3|__indirect_function_table|__stack_pointer|ld_trace$|__readgsqword$|m11_counter_ptr$|m11_probe$|memcpy$|memset$|memmove$)')
+SKIP_DECL = re.compile(r'^(llvm\.|__asm_|__divti3|__modti3|__multi3|__umodti3|__udivti3|__indirect_function_table|__stack_pointer|ld_trace$|ld_blk$|__readgsqword$|m11_counter_ptr$|m11_probe$|memcpy$|memset$|memmove$)')
 
 
 def ctype(ty):

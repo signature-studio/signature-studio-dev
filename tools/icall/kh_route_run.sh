@@ -19,6 +19,9 @@ b = "ret = M['_' + fname](...call);"
 assert s.count(a) == 1 and s.count(b) == 1, "wasm_runner.mjs の形が変わった"
 s = s.replace(a, "if (!M['_ott_run']) {")
 s = s.replace(b, "ret = M['_ott_run'](%d, ...call, ...Array(8 - call.length).fill(0n));" % va)
+x = "toString(16).padStart(16, '0')} ${'0'.padStart(16, '0')}`);"
+assert s.count(x) == 1, "wasm_runner.mjs の R 行の形が変わった"
+s = s.replace(x, "toString(16).padStart(16, '0')} ${(crashed ? 0n : BigInt.asUintN(64, M._ott_xmm0())).toString(16).padStart(16, '0')}`);")
 open(dst, 'w').write(s)
 EOF
 cp "$NAT/scen.txt" "$W/scen.txt"

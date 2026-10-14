@@ -1,0 +1,4 @@
+ret=2
+[m11][icall] 0x67f00
+[m11][icall] 0xf960
+[m11][icall-miss] target=0x457860 (closure 外; skip, ret 0)

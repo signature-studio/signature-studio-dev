@@ -128,8 +128,44 @@ static int tr_find(u64 addr) {
 static void tr_arm(void) { for (int i = 0; i < g_ntr_set; i++) *(u8*)g_tr_va[i] = 0xCC; }
 static void tr_disarm(void) { for (int i = 0; i < g_ntr_set; i++) *(u8*)g_tr_va[i] = g_tr_orig[i]; g_pending = NULL; }
 
+/* 命令単位の trace (LD-57 / #1636): env LD_STEP_N=<上限>・LD_STEP_OUT=<接頭辞> で有効。
+ * case の関数 entry に int3 を置き、そこから TF (single-step) で image 内の命令を 1 つずつ記録する。
+ * 出力: <接頭辞>.<case id> に 1 行 1 命令 (rva と主要レジスタ, 16 進)。既定 (env 未設定) は無効。 */
+static u64 g_step_entry, g_step_max, g_step_cnt; static u8 g_step_orig; static int g_step_armed, g_step_on; static FILE* g_step_fp;
+static void step_rec(greg_t* g) {
+  if (!g_in_call || g_step_cnt >= g_step_max) { g[REG_EFL] &= ~0x100; g_step_on = 0; return; }
+  u64 rip = (u64)g[REG_RIP];
+  if (rip >= g_imgbase && rip < g_imgbase + g_imgsize) {
+    fprintf(g_step_fp, "%llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx\n", (unsigned long long)(rip - g_imgbase),
+            (unsigned long long)g[REG_RAX], (unsigned long long)g[REG_RCX], (unsigned long long)g[REG_RDX], (unsigned long long)g[REG_RBX],
+            (unsigned long long)g[REG_RSP], (unsigned long long)g[REG_RBP], (unsigned long long)g[REG_RSI], (unsigned long long)g[REG_RDI],
+            (unsigned long long)g[REG_R8], (unsigned long long)g[REG_R9]);
+    g_step_cnt++;
+  }
+  g[REG_EFL] |= 0x100;
+}
+static void step_begin(void) {
+  g_step_max = 0; g_step_cnt = 0; g_step_on = 0; g_step_armed = 0; g_step_fp = NULL;
+  const char* n = getenv("LD_STEP_N"); const char* o = getenv("LD_STEP_OUT");
+  if (!n || !o || !atoll(n)) return;
+  char path[512]; snprintf(path, sizeof path, "%s.%s", o, ld_case.id);
+  g_step_fp = fopen(path, "w"); if (!g_step_fp) return;
+  g_step_max = (u64)atoll(n); g_step_entry = ld_case.fn; g_step_orig = *(u8*)(uintptr_t)ld_case.fn; g_step_armed = 1;
+  *(u8*)(uintptr_t)ld_case.fn = 0xCC;
+}
+static void step_end(void) {
+  if (g_step_armed) { *(u8*)(uintptr_t)g_step_entry = g_step_orig; g_step_armed = 0; }
+  g_step_on = 0; g_step_max = 0;
+  if (g_step_fp) { fclose(g_step_fp); g_step_fp = NULL; }
+}
+
 static void on_sig(int sig, siginfo_t* si, void* ucv) {
   ucontext_t* uc = (ucontext_t*)ucv; greg_t* g = uc->uc_mcontext.gregs;
+  if (sig == SIGTRAP && g_step_on) { step_rec(g); return; }
+  if (sig == SIGTRAP && g_in_call && g_step_armed && (u64)g[REG_RIP] - 1 == g_step_entry) {
+    *(u8*)(uintptr_t)g_step_entry = g_step_orig; g_step_armed = 0; g[REG_RIP] = (greg_t)g_step_entry; g_step_on = 1;
+    step_rec(g); return;
+  }
   if (sig == SIGTRAP && g_in_call) {
     if (g_pending) { *g_pending = 0xCC; g_pending = NULL; g[REG_EFL] &= ~0x100; return; }
     u64 addr = (u64)g[REG_RIP] - 1; int k = tr_find(addr);
@@ -199,7 +235,8 @@ static void run_case(char* line) {
   g_sig = 0; g_pending = NULL; g_fault_rsp = 0; g_fault_stk[0] = 0;
   for (int j = 0; j < 8; j++) g_fault_g[j] = 0;
   scrub_stack(ld_case.stkfill);
-  if (ld_case.trace) tr_arm();
+  step_begin();
+  if (ld_case.trace && !g_step_max) tr_arm();
   struct itimerval it = { {0, 0}, {1, 500000} };
   struct timespec t0, t1;
   ld_native_ms = -1.0;
@@ -212,11 +249,13 @@ static void run_case(char* line) {
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();
+    step_end();
     puts(ld_case_end("ok", NULL, 0, 0, out[0], out[1], out[2], out[3], 1));
   } else {
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();
+    step_end();
     u64 rip = g_fault_rip;
     char det[512]; snprintf(det, sizeof det, "rip_rva=%#llx", (unsigned long long)(rip - g_imgbase));
     /* fault 時の stack 語を detail に加える (call 直後の [rsp] = 呼出し site の復元用) */

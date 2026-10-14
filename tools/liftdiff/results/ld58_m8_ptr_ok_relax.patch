@@ -1,0 +1,14 @@
+# LD-58 (#1637) ガード緩和の差分 (測定用・本流には未反映)
+# 対象: tools/m8/m8_rt.c の m8_ptr_ok のみ。適用: git apply tools/liftdiff/results/ld58_m8_ptr_ok_relax.patch
+# 原文 (-行): a >= M8BASE (0x30000000) / 緩和後 (+行): a >= 0x1000
+--- a/tools/m8/m8_rt.c
++++ b/tools/m8/m8_rt.c
+@@ -14,7 +14,7 @@
+ #define M8BASE 0x30000000ul
+ /* linear memory 許容範囲 (m8 build: GLOBAL_BASE..MAXMEM) 内の妥当な生ポインタ */
+ static int m8_ptr_ok(unsigned long long a) {
+-    return a >= M8BASE && a < 0x36000000ull;
++    return a >= 0x1000ull && a < 0x36000000ull;
+ }
+ static void m8_fail(const char* nm) {
+     fprintf(stderr, "[m8_rt] fail-fast: %s\n", nm);

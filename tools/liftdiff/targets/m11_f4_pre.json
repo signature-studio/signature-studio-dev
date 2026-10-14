@@ -1,0 +1,18 @@
+{
+  "name": "m11_f4_pre",
+  "desc": "FLEngine M11 + F4 A/B: m11_f4_pre",
+  "pe": "${FL_WIN64_DIR}/extracted/block00031_PE.bin",
+  "ir": "tools/m11/work/f4_pre.ll",
+  "image": "tools/m11/work/m11_image.bin",
+  "wasm_origin": "0x0",
+  "fn_prefix": "function_",
+  "simd": {
+    "gen": "python3 tools/m11/m11_simd2.py {ir}",
+    "ir": "tools/m11/work/boot_final.ll",
+    "include": [
+      "tools/m11"
+    ]
+  },
+  "initial_memory": 671088640,
+  "init_table_rva": "0xf768b0"
+}

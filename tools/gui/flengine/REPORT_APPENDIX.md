@@ -23,3 +23,22 @@
 - **S1 の残り (101/291/296)**: base 側だけ trap する 3 unit。survey の順序依存 (REPORT §5-6 の既知) か GUI 実装の差かは未切り分け。子 issue #1635 `[GUI-22]` で扱う。
 
 未解決 (起票先付き): 受入条件 1 は #1426 (304/555/923 の OOB 実値採取)。S1 の 3 unit は #1635 `[GUI-22]`。現 HEAD の S1 FAIL (`870/1/47/24/0` vs `867/1/47/27/0`) は本 PR で解消しない (`Refs #1442`)。
+
+## 6j. GetMonitorInfoW / EnumDisplayMonitors の重複定義 (#1559 / M11-N102)
+
+**測定 commit `60932d35` (main)。実行コードの差分 0** (`git diff 60932d35 HEAD -- tools/gui tools/m11 tools/shim tools/shared ':!*/results/*' ':!*.md'` が 0 行)。
+
+- **重複は現 HEAD で再現しない**。issue 本文の「`wasm-ld: duplicate symbol` で build 段停止」は `97db5a58` (`m11_win.c` の weak 化) と `549e6817` (`build.sh` の `-DEnumDisplayMonitors=m11_win_…` 改名) より前の記述。`tools/gui/flengine/build.sh` の link ログは `duplicate symbol: 0` (L1 link[ff] / link[soft] PASS)。
+- **正とする定義 = GUI 側 (`tools/gui/src/gui_core_ext.inc` の `gui_impl_GetMonitorInfoW` / `gui_impl_EnumDisplayMonitors`)**。理由: `build.sh` が `m11_win.c` 側を `m11_win_*` に改名しており、`obj/win.o` の `m11_win_EnumDisplayMonitors` / `m11_win_GetMonitorInfoW` (weak) は link 上どこからも参照されない (`gen/exclude.txt` にも載る)。実際に使われるのは `gui/gui_adapt_w32.o` の `EnumDisplayMonitors` / `GetMonitorInfoW` → `gui_impl_*`。
+  - 差分: `m11_win.c` 仮実装 = 1920x1080・monitor 1 件 (`0x10001`)・`GetMonitorInfoW` は `hMon == 0x10001` のみ受理・callback を 1 回呼ぶ。GUI 側 = `HMON_PRIMARY` (`0x7B000001`)・画面サイズは `gui_sh()` の `screen_w/h`・`MONITORINFOEXW` (cbSize 104) の `szDevice` 対応・`EnumDisplayMonitors` は `pclip` で矩形を交差。
+  - 本 run の判定 (R2) は GUI 側の到達で PASS (下表)。`m11_win.c` の仮実装は不要になったが、削除は `tools/m11` の範囲で行うため本 PR では触らない。
+
+| 実行 (測定 commit `60932d35`・foreground・各 1 回) | rc | 所要 | load (開始→終了) | 結果 |
+|---|---|---|---|---|
+| `bash tools/m11/ldfix/f4_e2e.sh` | **0** | 288 s | 0.95 → 1.10 | F1・F2・D1 (`RegisterClassW` 2→3・ret `0x0`→`0x110000f`)・D2・P1 (units 52/52・ok 870/870)・A1 ALL PASS。ネガコン N1〜N4 は期待どおり FAIL |
+| `bash tools/gui/flengine/e2e.sh` | **1** | 371 s (e2e 内計測)・6 分 13 秒 (`time`) | 1.13 → 1.06 | judge **13/14**。FAIL は S1 のみ `870/1/47/24/0` (base `867/1/47/27/0`)。他 13 gate PASS: L1 (ff/soft とも `sigmismatch/undefined/duplicate = 0/0/0`)・A1 (193/193/173/20)・B1 (units 52)・R1 (first `LoadStringW`)・**R2 (reached 33 ≥ floor 19・`missing=[]`)**・S2・P1 (`RegisterClassW=3`)・P2〜P5・W1 (11 / 8)。ネガコン N1〜N9 は期待どおり FAIL。selftest 506 passed / 0 failed |
+
+- **R2 再確認 (受入条件 4)**: 重複解消後の現 HEAD で `EnumDisplayMonitors` / `GetMonitorInfoW` を含む 33 API が到達し、floor 19 を満たす (`missing=[]`)。
+- **S1 FAIL は本 issue の範囲外**: 304/555/923 の OOB と 101/291/296 の差は §6i (#1442) の既存未解決で、#1426・#1635 が扱う。
+
+`results/baseline_survey.json`・`results/ir_sha256.txt` は上記 e2e 実行で再生成された値 (現 HEAD の base `867/1/47/27/0`・IR sha256 の更新) に揃えた。

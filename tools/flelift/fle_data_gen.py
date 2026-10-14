@@ -40,6 +40,9 @@ for a, n in meta.get('jt_ranges', []):
     wins.append((a - IMG, n + 16))
 for a in meta.get('textrefs', []):
     wins.append((a - IMG - 16, 96))
+# vtable (#1936/#2005): RIP 相対参照が無く jt_ranges にも入らないため、窓を明示的に足す
+for a, n in [(0x42f670, 0x30)]:
+    wins.append((a - IMG, n))
 
 out = ['#include <stdint.h>\n#include <string.h>\n']
 for k, (rva, n) in enumerate(sorted(set(wins))):

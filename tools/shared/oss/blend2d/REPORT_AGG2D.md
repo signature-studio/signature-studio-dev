@@ -114,3 +114,20 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 **未判明**: 宛先の候補集合。解決にはデータフロー解析 (レジスタ・スタックの値の伝播) か、実行トレースが要る。定数 lea 追跡は閉じない (他の経路は未検証)。
 **未検証**: 線形スイープは `0x180001b82` 付近で止まるため、`.text` 全体の命令列からの集計は未完 (§6 の制約と同じ)。
 **扱い**: 解析スクリプトは作業ツリーに残していない (定数追跡で有用な出力が出ないため)。再開するなら、データフロー解析か動的トレース (fl-win64 の実行) の方式を先に決める。
+
+## 8. AggCreateInstance の export 元 (3 DLL 比較)
+
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_exports.py` (依存: `pefile`・`capstone`、約 0.5 s)。
+
+| PE (extracted 配下) | export 数 | AggCreateInstance の先頭命令 | 判定 |
+|---|---|---|---|
+| `block24339_PE.bin` | 1 | `sub rsp,0x28; mov ecx,0x1170; call ...` (§5 と同じ) | Blend2D 本体 (本 REPORT の対象) |
+| `block24355_PE.bin` | 446 | `push 0x19f8; call ...` | Intel IPP 系 (`ipps*`・`ippi*` の export が大半、`IPPCODE` section) |
+| `block24356_PE.bin` | 446 | `sub rsp,0x28; mov ecx,0x1aec; call ...` | IPP 系 (同上) |
+
+**判明**:
+- `AggCreateInstance` という名前の export は fl-win64 内に **3 本** ある。ただし `block24355`・`block24356` は IPP の DLL で、Agg2D とは無関係。§1〜§7 の対象は `block24339` だけで、正しい。
+- `AggCreateInstance` を import 名で参照する PE は **0 件** (313 PE を走査)。文字列としても 3 PE にしか現れない。`GetProcAddress` は 254 ファイルに現れるが、本 run では解決先を追っていない。
+- `Blend2D`・`blend2d` の文字列は DATA を含む複数ファイルに現れる。`block25162_PE.bin` の一致は素材ファイル名 (`Baggy` 等) による偶然の一致で、Blend2D 本体ではない。
+
+**未判明**: FL 本体が `block24339` の `AggCreateInstance` をどこから呼ぶか (呼び出し元の特定)。名前 import が無いため、`GetProcAddress` の引数の文字列を追うか、呼び出し側の関数ポインタ参照を探す必要がある。受入条件 (b) の画素比較の起点はこの未判明の箇所に依存する。

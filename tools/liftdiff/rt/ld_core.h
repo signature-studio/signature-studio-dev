@@ -53,6 +53,11 @@ typedef struct { u64 va; u32 np; u64 a[8]; u64 x[4]; } ld_tr_t;
 static ld_tr_t ld_trs[LD_MAX_TR];
 static int ld_ntr, ld_tr_over;
 static int ld_trace_on;
+/* LD-64 (#1854): IR basic block 入口の VA 列 (blk=1 の case のみ記録。compare は読まない)。
+ * static 配列にすると wasm の data 配置が変わり、既存の static (ld_wr 等) と重なって結果が変わるため malloc で持つ。 */
+#define LD_MAX_BLK 65536
+static u64* ld_blks;
+static int ld_nblk, ld_blk_over, ld_blk_on;
 
 /* ---------------- 応答モデル ---------------- */
 static u64 ld_tick, ld_qpc, ld_lasterr, ld_tls_next;
@@ -86,9 +91,18 @@ static int ld_dst_ok(u64 p, u64 n) {
 #define LD_FAKEPROC_BASE 0x50010000ull
 #define LD_FAKEPROC_MARK 0x40000000ull   /* thunk → ld_stub_c に渡す index の目印 */
 #define LD_FAKEPROC_SZ   32
+/* LD-48 (#1398): fvm の VMT slot 専用の仮 proc index 域。GetProcAddress 側 (0..255) と重ならせ、
+ * ld_nfakeproc を増やさない (増やすと以後の GetProcAddress 応答の index がずれる)。 */
+#define LD_VMT_IDX0      256
+#define LD_VMT_SLOTS     8
+static const char* ld_vmslot_names[LD_VMT_SLOTS] = {"?vmslot0", "?vmslot1", "?vmslot2", "?vmslot3", "?vmslot4", "?vmslot5", "?vmslot6", "?vmslot7"};
 
 static u64 ld_fake_ptr(u64 i);      /* プラットフォーム固有 (ld_native.c = 実行可能 thunk / wasm = 値のみ) */
-static const char* ld_fakeproc_name(u64 i) { return i < (u64)ld_nfakeproc ? ld_fakeprocs[i].name : "?freeproc"; }
+static int ld_fakeproc_valid(u64 i) { return i < (u64)ld_nfakeproc || (i >= LD_VMT_IDX0 && i < LD_VMT_IDX0 + LD_VMT_SLOTS); }
+static const char* ld_fakeproc_name(u64 i) {
+  if (i >= LD_VMT_IDX0 && i < LD_VMT_IDX0 + LD_VMT_SLOTS) return ld_vmslot_names[i - LD_VMT_IDX0];
+  return i < (u64)ld_nfakeproc ? ld_fakeprocs[i].name : "?freeproc";
+}
 
 static u64 ld_heap_alloc(u64 size, u64 align, int zero);   /* 前方宣言 (下段で定義) */
 /* CAB-233: コマンドライン/環境ブロックは「ゲスト有効ポインタ」(ld_heap 内) を返す。
@@ -132,7 +146,7 @@ static u64 ld_fakemod_get(const char* nm) {
 /* 仮 proc: (mod, name) で同一視 → ld_fake_ptr(i) (native = 実行可能 stub, wasm = 不透明値) */
 static u64 ld_fakeproc_get(u64 mod, const char* nm) {
   for (int i = 0; i < ld_nfakeproc; i++) if (ld_fakeprocs[i].mod == mod && strcmp(ld_fakeprocs[i].name, nm) == 0) return ld_fake_ptr(i);
-  if (ld_nfakeproc >= 256) return 0x50010000ull;
+  if (ld_nfakeproc >= LD_VMT_IDX0) { fprintf(stderr, "[ld_core] 仮 proc が上限 %d を超えた (VMT 域と衝突するため中止)\n", LD_VMT_IDX0); abort(); }
   ld_fakeprocs[ld_nfakeproc].mod = mod;
   snprintf(ld_fakeprocs[ld_nfakeproc].name, sizeof ld_fakeprocs[0].name, "%s", nm);
   return ld_fake_ptr(ld_nfakeproc++);
@@ -453,6 +467,12 @@ static u64 ld_stub(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5
   } else ld_calls_over++;
   return r;
 }
+static void ld_blk_rec(u64 va) {
+  if (!ld_blk_on) return;
+  if (ld_nblk >= LD_MAX_BLK) { ld_blk_over++; return; }
+  if (!ld_blks) ld_blks = (u64*)malloc(LD_MAX_BLK * sizeof(u64));
+  ld_blks[ld_nblk++] = va;
+}
 static void ld_trace_rec(u64 va, u32 np, const u64* a, const u64* x) {
   if (!ld_trace_on) return;
   if (ld_ntr >= LD_MAX_TR) { ld_tr_over++; return; }
@@ -466,7 +486,18 @@ static void ld_add_wr(u64 rva, u64 len) {
   if (ld_nwr >= LD_MAX_WR) return;
   ld_wr[ld_nwr].rva = rva; ld_wr[ld_nwr].len = len; ld_wr[ld_nwr].pristine = NULL; ld_nwr++;
 }
+/* VMT slot の仮 proc 番地を snapshot 前に生成 (native は thunk 敷設) し、cases.make_blob_vm の値と一致しなければ中止 */
+static void ld_fakeproc_vmt_init(void) {
+  for (u64 k = 0; k < LD_VMT_SLOTS; k++) {
+    u64 i = LD_VMT_IDX0 + k;
+    if (ld_fake_ptr(i) != LD_FAKEPROC_BASE + i * LD_FAKEPROC_SZ) {
+      fprintf(stderr, "[ld_core] VMT slot %llu の仮 proc 番地が不一致 (fvm の silent miscompile になるため中止)\n", (unsigned long long)k);
+      abort();
+    }
+  }
+}
 static void ld_snapshot(void) {
+  ld_fakeproc_vmt_init();
   for (int i = 0; i < ld_nwr; i++) {
     free(ld_wr[i].pristine);
     ld_wr[i].pristine = (u8*)malloc(ld_wr[i].len);
@@ -527,7 +558,7 @@ typedef struct {
   char blob[24];
   int nargs; char kind[16]; u64 val[16];   /* 位置引数: kind 'i'(int/ptr) 'd'(f64 bits) 'f'(f32 bits) */
   u64 rax;
-  int trace, xfill, stkfill, keep;
+  int trace, xfill, stkfill, keep, blk;
   int npatch; struct { int region; u64 off; u8 data[64]; int len; } patch[16];
   char abi[16];
 } ld_case_t;
@@ -584,6 +615,7 @@ static int ld_parse_case(char* line) {
     else if (!strcmp(t, "trace")) ld_case.trace = atoi(v);
     else if (!strcmp(t, "stkfill")) ld_case.stkfill = (int)strtol(v, NULL, 16);
     else if (!strcmp(t, "keep")) ld_case.keep = atoi(v);
+    else if (!strcmp(t, "blk")) ld_case.blk = atoi(v);
     else if (!strcmp(t, "xfill")) ld_case.xfill = atoi(v);
     else if (!strcmp(t, "args")) {
       char* s2; for (char* a = strtok_r(v, ",", &s2); a && ld_case.nargs < 16; a = strtok_r(NULL, ",", &s2)) {
@@ -618,6 +650,7 @@ static void ld_case_patch_image_pristine(void) {
 static void ld_case_begin(void) {
   if (ld_case.keep) {   /* 状態を引き継ぐ連続実行: 復元・blob 展開をしない */
     ld_ncalls = 0; ld_calls_over = 0; ld_ntr = 0; ld_tr_over = 0; ld_trace_on = ld_case.trace;
+    ld_nblk = 0; ld_blk_over = 0; ld_blk_on = ld_case.blk;
     return;
   }
   ld_restore_all();
@@ -641,6 +674,7 @@ static void ld_case_begin(void) {
   }
   ld_ncalls = 0; ld_calls_over = 0; ld_ntr = 0; ld_tr_over = 0;
   ld_trace_on = ld_case.trace;
+  ld_nblk = 0; ld_blk_over = 0; ld_blk_on = ld_case.blk;
   ld_case_patch_image_pristine();
 }
 /* native ランナが呼出し所要 ms を入れる (wasm ランナは -1 のまま = 出力しない)。liftdiff の「native が長い case」判定用 (LD-11 / #548) */
@@ -676,6 +710,11 @@ static const char* ld_case_end(const char* status, const char* detail, u64 fault
       ld_ob("]");
     }
     ld_ob("],\"trace_over\":%d", ld_tr_over);
+  }
+  if (ld_case.blk) {
+    ld_ob(",\"blk\":[");
+    for (int i = 0; i < ld_nblk; i++) ld_ob("%s\"0x%llx\"", i ? "," : "", (unsigned long long)ld_blks[i]);
+    ld_ob("],\"blk_over\":%d", ld_blk_over);
   }
   /* メモリ差分 */
   ld_ob(",\"mem\":[");

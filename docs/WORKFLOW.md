@@ -264,6 +264,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - **PM の watch ルール (依頼者指示 116)**: 起動した全ての run は無条件で `gh run watch` する。PM が
   応答を終える時は、background で `gh run watch` が 1 本以上走っていること。完了通知を受けたら、
   結果の処理に入る前に、次の watcher を起動し直す。
+- **PM は依頼者の不在 (最大 2 日) を前提とする (依頼者指示 144)**: 依頼者は一度指示すると最低 2 時間、最大 2 日間は不在になり、
+  依頼者の指示がないと進行できない状態はそのまま遅延になる。依頼者の操作が必要な項目は非ブロッキングにする
+  (`needs-user-input` で積み、それを待たずに他の作業を進める)。依頼者の応答を、他の作業の前提条件にしない。
 - **open PR は 2 状態のみ (依頼者指示 119・120・122・123)**: 実装が始まったチケットは merge まで止めない。
   open PR は常に次の **どちらか** であり、「レビューも修正もされていない状態」(IDLE) を 1 秒も作らない。
 
@@ -306,7 +309,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     停止コメント・完了コメントの実装 App (`opencode-for-signature-studio[bot]`) は login の完全一致で見る
     (前方一致だと別名のアカウントでも write 権限の fix が起動し、停止コメントを偽装して数え直しもできてしまう)。
   - **テスト**: `.github/scripts/tests/test-pr-loop.sh` (fix / verify / reopen) と `test-watchdog.sh` (watchdog の判定と操作)
-    と `test-dispatch-context.sh` (dispatch の入力検証) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
+    と `test-dispatch-context.sh` (dispatch・投稿者の入力検証) と `test-run-outcome.sh` (implement 終了時の記録・review の打ち切りの再起動) を、fake gh で `.github/workflows/scripts-test.yaml` が `.github/scripts/**`・`.github/actions/**`・`opencode.yaml` の
     変更ごとに実行する。
   - **並行制御**: implement job は `opencode-impl-<N>`、review job は `opencode-review-<N>` と group を分ける。
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
@@ -334,6 +337,26 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 
   `oc:stuck` ラベルの PR は触らない (人の判断待ち)。同じ head への watchdog の差し戻しが 6 回、または review の再起動が
   3 回に達したら `oc:stuck` を付けて止める。`DRY=1` なら計画だけを出す。reviewer は login の完全一致 + `Bot` 型で見る。
+
+  **issue の不変条件 (#1950)**: 全ての open issue は『blocked』『着手済み (open PR か実行中の implement run がある)』のいずれかで、
+  どちらでもなければ明示的な終了状態 (`oc:no-pr`・`needs-user-input`・`oc:stuck`) を持つ。実測では implement run (issue_comment) の約 70% が
+  PR を出さずに終わっていた (着手報告のみ・停止報告・1 run に収まらない・素材不足)。
+
+  - **implement の終了時** (`record-run-outcome.sh`、`opencode.yaml` の最終 step。`always()` で、agent の失敗・cancel の後も走る。job は失敗させない):
+    issue の `/oc` run が、open PR も、明示的な終了状態 (`oc:stuck`・`needs-user-input`・`blocked`・open な依存) も残さずに終わったら、
+    issue にラベル `oc:no-pr` と構造化コメント `<!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> run=<run id> -->` を残す。
+    PM Worker はコメント本文を解析せず、**ラベルとマーカー**で扱う。`oc:no-pr` は、次の run が PR を出す (または issue が close・明示的な状態になる) と、この script が外す。
+    `state:*` ラベルは作らない。reason は agent の最終回答の語彙で決める (`tools/pm/launch_issues.py` の `stop_re`・`NEED_RE` と同じ。優先順 artifact > blocked > split > stop):
+    `artifact` 素材不足・`blocked` 依存 issue・前提 PR 未 merge・`split` 1 run に収まらない・`stop` 判断待ち/停止報告/着手不可・`unknown` 上のどれでもない (着手報告のみ・run の失敗)。
+    コメント本文に起動コマンド (行頭の `/oc`) は書かない (自分のコメントで implement を起動しないため)。
+  - **review の打ち切り** (`review-recover.sh`、`review-recover` job): review job が runner の打ち切り (job の annotation が `shutdown signal`・`exit code 143`・
+    `exceeded the maximum execution time`) で cancelled になると、job 内の verify step は走らない (#1420: 同じ head で 7 回連続)。新しい runner の
+    `review-recover` job が、watchdog を待たずに `verify-review-verdict.sh` を呼んで同じ head の review を再起動する。**上限**: 同じ head への再起動は
+    `review-retry` マーカー 3 回まで (verify の step と watchdog と共有。超えたら PR に警告して oc:stuck への経路に入る)。PM の手動 cancel (annotation 無し) では再起動しない。
+    annotation が読めないときは何もしない (watchdog が拾う)。
+  - **watchdog の集計** (`watchdog.sh`): open issue で、blocked でなく、open PR が無く、実行中の implement run も無く、`oc:no-pr`・`needs-user-input`・`oc:stuck` も無い
+    issue を `floating-issues=N` として出力する (step summary にも出る)。**数えるだけで何もしない** (launch は PM Worker の責務)。本文の『依存: #N』『親: #N』による待ちは見ないため、上限値の目安である。
+  - **bot の `/oc`** (#1949): PM 用 GitHub App の `/oc` は `vars.OC_PM_BOT_LOGIN` との完全一致 + `user.type == 'Bot'` で許可する (`.github/README.md`)。
 
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
   IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。

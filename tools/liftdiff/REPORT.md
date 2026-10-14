@@ -1,7 +1,7 @@
 # liftdiff — flelift (x64c) 全数採点 (CAB-232) + native 全起動の参照化 (CAB-233)
 
 > 正本: `tools/liftdiff/REPORT.md`。書式仕様は `docs/FORMAT.md`。
-> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文・§8 wasm_trap トリアージ・§9 wasm_trap 個別原因・§12 被覆拡大 2 パターンの全文)。
+> 付録: [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) (§5 回帰 A/B・§5.1・§5.2 Ablation・§6.1 検収・§6.2 再現性の全文・§8 wasm_trap トリアージ・§9 wasm_trap 個別原因・§12 被覆拡大 2 パターンの全文)。LD-57 (#1636) の命令単位 trace は [`REPORT_APPENDIX_LD57.md`](REPORT_APPENDIX_LD57.md)。
 
 検証起点 commit: 01d5cb5 (CAB-233)。A/B は fba272c (CAB-232) 側。検収は b8e762d (HEAD) から実施。
 既知類型との関係 (DEFECTS.md, 規則 44): 該当 **D15** (メモリ間接 call 脱落) — 残 3 unit の VMT 仮想 call `call qword ptr [rdi+0x18]` (0x513da9) 診断で参照。jump table **D9 (DEFECTS.md)** は未使用。icall REPORT §4 体系 (D1=間接 call / D9=disp_size) とは別物。

@@ -1,0 +1,146 @@
+{
+ "liftdiff_version": 1,
+ "target": "ott_old",
+ "function": {
+  "va": "0x1801c5e84",
+  "name": "function_1801c5e84",
+  "sig": {
+   "ret": "i64",
+   "params": [
+    "i64",
+    "i64"
+   ],
+   "defined": true
+  }
+ },
+ "verdict": "mismatch",
+ "tags": [
+  {
+   "tag": "wasm_trap",
+   "confidence": "high",
+   "evidence": "oob: memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < globalThis.__l"
+  }
+ ],
+ "cases": [
+  {
+   "outcome": "wasm_trap",
+   "native": "ok",
+   "wasm": "trap",
+   "wasm_detail": "memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < globalThis.__ld_call < Script.runInThisContext < Object.runInThisContext < runCase",
+   "pattern": "u16",
+   "native_status": "ok",
+   "wasm_status": "trap",
+   "raw": {
+    "native": {
+     "rax": "0x1",
+     "rdx": "0x555555741600",
+     "x0": "0x6565724670616548",
+     "calls": [
+      {
+       "n": "HeapFree",
+       "a": [
+        "0x0",
+        "0x0",
+        "0x1400000001",
+        "0x9",
+        "0x0",
+        "0x0"
+       ],
+       "r": "0x1"
+      },
+      {
+       "n": "HeapFree",
+       "a": [
+        "0x0",
+        "0x0",
+        "0x530020004c0046",
+        "0x0",
+        "0x0",
+        "0x0"
+       ],
+       "r": "0x1"
+      },
+      {
+       "n": "HeapFree",
+       "a": [
+        "0x0",
+        "0x0",
+        "0x69006400750074",
+        "0x0",
+        "0x0",
+        "0x0"
+       ],
+       "r": "0x1"
+      },
+      {
+       "n": "HeapFree",
+       "a": [
+        "0x0",
+        "0x0",
+        "0x3600320020006f",
+        "0x0",
+        "0x0",
+        "0x0"
+       ],
+       "r": "0x1"
+      },
+      {
+       "n": "HeapFree",
+       "a": [
+        "0x0",
+        "0x0",
+        "0x37002e0031002e",
+        "0x0",
+        "0x0",
+        "0x0"
+       ],
+       "r": "0x1"
+      }
+     ],
+     "mem_blocks": 0,
+     "heap_used": 0,
+     "trace_head": [],
+     "trace_len": 0,
+     "status": "ok"
+    },
+    "wasm": {
+     "detail": "memory access out of bounds @ ld_wasm.wasm.block_ok < ld_wasm.wasm.HeapFree < ld_wasm.wasm.function_1801c0b6c < ld_wasm.wasm.function_1801c5e84 < globalThis.__ld_call < Script.runInThisContext < Object.runInThisContext < runCase",
+     "calls": [],
+     "mem_blocks": 0,
+     "heap_used": 0,
+     "rtype": "i64",
+     "trace_head": [],
+     "trace_len": 0,
+     "status": "trap"
+    }
+   }
+  }
+ ],
+ "static": {
+  "machine": {
+   "ins": 25,
+   "icall": 0,
+   "ijmp": 0,
+   "fpcmp": 0,
+   "simdint": 0,
+   "calls": [
+    6444288876
+   ],
+   "repstr": 0,
+   "arity_gpr": 2,
+   "arity_x": 0,
+   "xmm_slots": [],
+   "stack_args": [],
+   "truncated": false
+  },
+  "ir": {
+   "regslot_deref": 0,
+   "icalls": 0,
+   "fcmp": 0,
+   "asm_calls": 0,
+   "allocas": 3,
+   "unreachable": 0,
+   "lines": 36
+  }
+ }
+}

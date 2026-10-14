@@ -16,6 +16,8 @@ B="$1"; TMO="${2:-2400}"
 export PLUG_AVX256="${PLUG_AVX256:-0}"
 # 21202 のみ E3 修復 (fix_i32_ptr_arg.py の opt-in; #1509)。 他の block は従来どおり修復無し
 if [ "$B" = 21202 ]; then export PLUG_I32PTR_FUNCS="${PLUG_I32PTR_FUNCS:-function_180049450 function_180056120 function_1800599bc}"; fi
+# 21202 のみ名前 define 2 件の function_<VA> 正規化 (#1537; PLUG_NAME_DEFS は lift_ranges.sh の既定 0 のまま)。 他の block は従来どおり
+if [ "$B" = 21202 ]; then export PLUG_NAME_DEFS="${PLUG_NAME_DEFS:-1}"; fi
 OUT="work/synth/cpp$B"
 HLLCAP="${HLL_CAP:-300}"
 resume_lift() {

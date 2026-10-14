@@ -141,8 +141,8 @@ if dsm:
         patch(fn, lambda b, kinds=kinds: xmm_fix(b, kinds, INSNS))
 # [A'] 引数レジスタ接続の欠落: 単一 alloca から読まれる整数 load を、DSM のレジスタ参照で署名の引数に接続する。
 #   署名の整数クラス引数 (fp 以外) の j 番目は SysV の SYSV[j] に入る。load の値が inttoptr されて DSM の
-#   メモリ参照 [reg] になる命令 (!insn.addr) から reg を得る。その命令に束縛できない load は、DSM がメモリ参照に使い、
-#   まだ束縛されていないポインタ引数のレジスタが 1 つだけ残るときに限り束縛する。判定できなければ変更しない。
+#   メモリ参照 [reg] になる命令 (!insn.addr) から reg を得る。その命令に束縛できない load は、ロード幅 (i8/i16/…) と
+#   同幅の [reg] (byte/word/… ptr) を関数内で参照する未束縛ポインタ引数のレジスタが 1 つに定まるときに限り束縛する。判定できなければ変更しない。
 SYSV = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
 FN_RANGE = {m.group(1): (int(m.group(2), 16), int(m.group(3), 16)) for m in re.finditer(r"(?m)^; function: (\S+) at 0x([0-9a-f]+) -- 0x([0-9a-f]+)", open(dsm, errors="replace").read())} if dsm else {}
 def mem_regs(a):
@@ -153,9 +153,14 @@ def insn_of(body, v):
             m = re.search(r"!insn\.addr !(\d+)", line)
             return META.get(m.group(1)) if m else None
     return None
+WIDTH = {"i8": "byte", "i16": "word", "i32": "dword", "i64": "qword"}
+def ptr_width(body, v):
+    m = re.search(r"(%\w+) = inttoptr i64 " + re.escape(v) + r" to ptr", body)
+    if not m: return None
+    ws = set(re.findall(r"= load (i\d+), ptr " + re.escape(m.group(1)) + r"[,\s]", body))
+    return WIDTH.get(ws.pop()) if len(ws) == 1 else None
 def arg_reg(body, kinds, fn):
     lo, hi = FN_RANGE.get(fn, (0, 0))
-    used = {r for a in INSNS if lo <= a < hi for r in mem_regs(a)}
     ptr_arg, j = {}, 0
     for i, k in enumerate(kinds):
         if k in ("f32", "f64"): continue
@@ -170,8 +175,11 @@ def arg_reg(body, kinds, fn):
             regs = mem_regs(insn_of(body, v)) & set(ptr_arg)
             if len(regs) == 1: bound[v] = ptr_arg[regs.pop()]
             else: free.append(v)
-        left = [r for r in ptr_arg if r in used and ptr_arg[r] not in bound.values()]
-        if len(free) == 1 and len(left) == 1: bound[free[0]] = ptr_arg[left[0]]; free = []
+        for v in list(free):
+            w = ptr_width(body, v)
+            cand = {m.group(1) for a in INSNS if lo <= a < hi for o in INSNS[a][1] if w for m in [re.search(rf"{w} ptr \[(r\w+)", o)] if m}
+            cand = {r for r in cand if r in ptr_arg and ptr_arg[r] not in bound.values()}
+            if len(cand) == 1: bound[v] = ptr_arg[cand.pop()]; free.remove(v)
         if free or not bound: continue
         for v, k in bound.items():
             body = body.replace(f"{v} = load i64, ptr {al}\n", f"{v} = ptrtoint ptr %arg{k} to i64\n")

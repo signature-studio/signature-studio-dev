@@ -160,7 +160,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 - 判定 (`judge.py engines`) = lift_rc 0 / defines>0 / pdata>0 / 行が揃う / 最終 IR の `emcc -c` rc 0 (`emcc_c_rc_after_f80`) / `missing_ref` 0。 不合格は exit 1。 以上は到達性の実測で、engine の正しさは示していない。 殻 (Slicer 2) との結合方式 (`DispatchToEngine`・LoadLibrary 経路) は未解析。
 
 - E1 (`icmp P ptr %a, %argN` の i64 被演算子) は 2 pass で直す: `fix_ptr_params.py` (ptr 仮引数を i64 化し、その使用箇所に inttoptr・PR 追加) と main の `fix_icmp_ptr.py` (i64 被演算子に inttoptr・#545)。 合成 `.ll` で役割分担を確認: 片方だけでは残りが落ち、両方を順に通すと二重の inttoptr は出ない。 統合は別 issue。
-- `fold_const_ops` (`ir5_patch.py`) は cast の元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる (5bc59f1)。 回帰テスト `passes/test_fold_const_ops.py` 4 件。 旧版では 3 件 FAIL (255 / 65535 / 2^64-1)。
+- `fold_const_ops` (`ir5_patch.py`) は cast の元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる (5bc59f1)。 回帰テスト `passes/test_fold_const_ops.py` 4 件。 旧版では 3 件 FAIL (255 / 65535 / 2^64-1)。 19048 の i32 仮引数の型揃え (#1834) は [REPORT_APPENDIX_1834.md](REPORT_APPENDIX_1834.md)、 `emcc_c_rc_after_fixcmp` 1 → 0。
 
 ## 6. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner)
 
@@ -240,7 +240,9 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | 本 PR で DOC_MAP §3 に `REPORT.md`・`REPORT_INDIRECT.md` の 2 行を追記して解消 (REPORT 側の PM 追記は不要) |
 | `ALLOW_UNIMPL` (`rep_stosb_memset` 用の許容) の撤去 | 撤去後も既存 CSV に対する judge は PASS 7/7 (`--skip-lift`)。 stub が戻れば FAIL する | 本 PR で撤去 (main 8d883c3 以降の実測で 7 block とも `declares_unimpl` 0) |
 | lowering (f80→f64) の bit-exact 差分 (3 block) | 通過 ≠ 正しさ。 差分試験の対象外 | #197 にコメント済み (REPORT_LEA.md §7b) |
+| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) が未実装 stub のまま (19252: 3 件、19048: 4 件。 flag 未反映) | 2 engine の unimpl が 5 件ずつ残る。 stub は abort ではなく 0 返却のため silent な flag 欠落経路 | [PLG-F3-12] #1582 (本 PR で方式を決定、実装は子 issue) → 子 [PLG-F3-14] (起票) |
 
+- §7b の実測と方式 (#1582 [PLG-F3-12]・VEX comis/ucomis の flag 方式の検討 2 案) は [REPORT_APPENDIX_1582.md](REPORT_APPENDIX_1582.md) §7b。
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
 
 | 類型 | 症状 | 観測 | 検出信号 | 修復 |

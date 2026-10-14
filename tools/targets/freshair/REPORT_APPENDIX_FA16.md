@@ -90,3 +90,56 @@ found 時は `out[0] = node.+0x28`、`out[1] = node.+0x30` (参照カウンタ�
 | native ERR=8/8: setter `0x180c9d74c` の `addr=0x50` SIGSEGV の原因特定 | 未解決 | #1578 (FA-22) |
 | wasm の found 観測点と ERR 形 (`RuntimeError: unreachable`) | 未解決 | #1578 (FA-22) (観測点は #1182 の範囲) |
 | 0x180da6c00 到達と Filter 出力比較 | 未着手 | #1182 (FA-16) |
+
+## 10. FA-25 (#1791): FA_NODE1=1 の fault 値の採取と out[0] の照合
+
+- 付録 `REPORT_APPENDIX_FA22.md` (`83842a6b` で追加済み) の FA-22 の記述 (`rip=180c9d74c addr=0x50`) は `FA_ALT9=1` の結果 (§6 (b)) で、`FA_NODE1=1` の結果ではなかった。
+- `FA_NODE1=1` (probe 無し, 実測): `ERR S900 sig=11 rip=180c9d741 addr=0 ... rcx=a5a5a5a5a5a5a5a5 rdx=0`。`0x180c9d741` は `mov rax,[rcx]` (setter の vtable 読み)。`rcx` は `[out0+0x10]` で、ヒープ poison 値 `a5a5...` が入っている。`a5a5...` は非 canonical アドレスなので #GP となり、Linux は `si_addr=0` を返す。`si_addr` と `rcx` の不一致は採取の誤りではない (`on_sig` は `si_addr` と `REG_RCX` を同一 ucontext から読む)。
+- 旧 probe の `found=1` は誤り: `ca1480_probe` は `out+0x10` を見ていた。修正後 (`found = out[0] != 0`) は `found=0` (S900–S907, key={1,0}, 8/8)。
+- `probe_guard` 版 (`[C+0x318]+0xa8` の読みを範囲内に限る) でも `out[0]=0` で、node Z (`out[0]` 候補) とは一致しない。`out[0]=0` と setter の `rcx=[out0+0x10]` の poison は両立しない。probe 自体が呼出順を変えている可能性があり、未解決。
+- `FA9OBJ` 行 (観測専用) は `out[0]` が自前の node Z と一致するときだけ `+0x10` を読む (`bf7b39fc` で修正。想定外の値は deref しない)。既定 probe (`FA_PROBE9=1`) では `out[0]=0` のため出力 0 行、`FA_NODE1=1` の probe でも `out[0]=0` で 0 行 (実測)。
+- 判定基準 (`run_fa9.sh` (a) の期待値 found=0・ERR=0) は変更していない。
+
+測定 (測定 commit `bf7b39fc` = lift2 のコードを変えた最後の commit, `bash tools/targets/freshair/lift2/run_fa9.sh`, load 0.48→0.52, wall 5 s):
+- (a) base: ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0 / (b) alt: ERR=8/8 path=static / (b-wasm) alt: wasm ERR=8/8 / (c) pert: 差分 395 トークン・L/R 同一 40 呼出・差分 0 呼出 / **GATE: PASS**
+- `bash run_ctrl.sh 2 5`: **BIT-EXACT 15/15** (wall 4 s)
+- 測定 commit から HEAD までの lift2 差分: `git diff bf7b39fc HEAD -- tools/targets/freshair/lift2` (下記 HEAD 時点で 0 行)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `FA_NODE1=1` で `out[0]` が 0 (probe 下) と poison (probe 無し) になる不一致 | out[0] と node Z の照合が未了 (受入 2) | #2097 (FA-28) |
+
+## 11. FA-25 (#1791) 追補: probe 無しの out[0] 実読 (受入 2 の再測定)
+
+- 追加: `FA_OUT0=1` のときだけ、setter `0x180c9d741` の fault 時に `[rsp+0x48]` (= out[0]) を表示 (`pe_map.h`)。`FA_OUT0=1` と `FA_NODE1=1` の両方が要るとき node Z のアドレスを `NODEZ` 行に出す (`native_ctrl.c`)。既定動作は不変。
+- 実測 (probe 無し, `FA_OUT0=1 FA_NODE1=1`, 8 epf 本): 8 本すべて `OUT0 rip=180c9d741 out0 = Z+0x2b0` (例: Z=`...084750`, out0=`...084a00`)。node Z (`[out0]` の候補) とは一致しない。`[out0+0x10]` は `Z+0x2c0` で、rcx=`a5a5a5a5a5a5a5a5` (poison) と整合する。
+- 再現 (上記の実測の手順。probe 無し = `FA_PROBE9` を付けない。入力は factory `.epf` 8 本 = `ctrl_scen.txt` 先頭 8 行、stderr の `OUT0` 行を抽出):
+  `cd tools/targets/freshair/lift2 && bash build_ctrl.sh && cd work/ctrl && python3 ../../gen_ctrl_scen.py ctrl_scen.txt 2 5 0xFA2C0001 && head -8 ctrl_scen.txt > fa9_epf.txt && clang -O1 -ffp-contract=off -frounding-math -w -o native_ctrl_out0 ../../native/native_ctrl.c && FA_OUT0=1 FA_NODE1=1 FA_HEAP_ZERO=1 ./native_ctrl_out0 "../../../work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64" fa9_epf.txt 0 2>&1 >/dev/null | grep -E '^(OUT0|NODEZ)'`
+  (実行バイナリ = `native_ctrl_out0`。`run_fa9.sh` は `FA_PROBE9=1` 版 (`native_probe9`) なので、この `OUT0` 行は出ない。本 run では素材 `plugins-freshair` が無く未実行。実測は `7959db1c`。)
+- probe 下 (`FA_PROBE9=1`, 同じ node 構成) は `out[0]=0` (`FA9CA ... out0=0 found=0`)。probe 無しと probe 下で `out[0]` が 0 と `Z+0x2b0` に分かれ、probe 自体が呼出経路を変えている可能性が高い。原因は未特定。
+- 判定基準 (run_fa9 (a)) は変更していない。受入 2 (out[0] と node Z の照合) は**未達**。
+
+### 測定 (測定 commit `7959db1c` = HEAD, 差分 0)
+- `bash tools/targets/freshair/lift2/run_fa9.sh`: load 0.52→0.55, wall 3 s, **GATE PASS** / (a) ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン
+- `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5`: **BIT-EXACT 15/15** (wall 3 s, rc=0)
+- 差分: `git diff 7959db1c HEAD -- tools/targets/freshair/lift2` の出力 0 行。
+
+## 12. FA-28 (#2097): probe 下 out[0]=0 と probe 無し out[0]=Z+0x2b0 の食い違い
+
+- 観測手段を追加 (既定 OFF): `FA_SET9=1` で setter `0x180c9d700` の入口 (C・id・key) を `SET9` 行に出す。`FA_OUT0=1` のとき `CK0..7` (子 snapin C) と `NODEZ Z=.. C0=..` を出す。`FA9CA` 行に `C` と `key` を追加。既定動作は不変 (`native_ctrl.c`)。
+- 実測 (probe 無し, `FA_OUT0=1 FA_NODE1=1 FA_HEAP_ZERO=1`, 8 epf 本): 8 本すべて `OUT0 rip=180c9d741 out0 = Z+0x2b0` (Z = node 値オブジェクト, `C0` とは一致しない)。`SET9` で入口の key は `kc=1 k0=0` (map 経路)。
+- 実測 (`FA_SET9=1` のみ, 入口観測のみ): probe 無しと同じ `out0 = Z+0x2b0` (8 本とも再現)。入口観測は結果を変えない。
+- 実測 (`FA_SET9=1 FA_PROBE9=1`): `FA9CA` は `kc=1 k0=0 path=map found=0 out0=0` を 8 本で返す。`ca1480` を probe で包むと `out[0]=0` になる。
+- 判断: 食い違いの差は `ca1480` の probe wrapper (`ca1480_probe`) に起因する。wrapper は引数 (C/out/key) を変えず、元の機械語を復元して本物を呼ぶ。wrapper が `out[0]=0` を生む機構は未特定。
+- 逆アセンブル (`disasm.py`): `ca1480` の `kc==0` 分岐 (`0x180ca1651`) は `out[0]=C+0x2b0` を書く。map 経路の found 分岐は `0x180ca7db0` の検索結果から node 値 (`+0x28`) を `out[0]` に書く。probe 無しの `out[0]=Z+0x2b0` は、どちらの分岐の式とも一致しない。原因未特定。
+- 受入 3 (`run_fa9.sh` (a) の期待値は変更しない): 満たす。(a) found=0 のまま。
+- 受入 4 (測定): 測定 commit `cc1762cc` (lift2 のコードを変えた最後の commit)。
+  - `bash tools/targets/freshair/lift2/run_fa9.sh`: load 0.09→0.26, wall 3.1 s, **GATE PASS** / (a) ERR=0・ca1480=72・found=0・da6c00=0 / (b) ERR=8/8 / (b-wasm) ERR=8/8 / (c) 差分 395 トークン
+  - `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5`: **BIT-EXACT 15/15** (wall 3 s, rc=0)
+  - 測定 commit から HEAD までの lift2 差分: `git diff cc1762cc HEAD -- tools/targets/freshair/lift2` (本 REPORT 追記 commit 時点で 0 行)
+- 受入 1・2 (原因特定・node Z との照合の完結) は未達。子 issue に移す (下表)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| wrapper (`ca1480_probe`) 下で `ca1480` が `out[0]=0` を返す機構の特定 (probe の呼出順・経路の変更の有無) | 観測点の正しさ (受入 1) | #2145 (FA-29) |
+| probe 無し `out[0]=Z+0x2b0` の由来 (map found 経路の `+0x28` 値と `+0x2b0` の関係、node Z との照合) | node Z 照合 (受入 2) | #2145 (FA-29) |

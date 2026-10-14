@@ -48,8 +48,28 @@
 - 測定 commit から現 head までの鮮度 (WORKFLOW §6): `git diff ec58d54b HEAD -- tools/targets/freshair/lift2/ ':!*REPORT*'` の出力は 0 行 (差分 0)。`ec58d54b` 以降の変更は、lift2 配下が本ファイル (追記) のみ、リポジトリ全体では `docs/DOC_MAP.md` の索引 1 行。実行コードは不変。このため現 head で再測定はしていない。
 - 素材の実在 (現 head での再測定を試みた run): `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみ。`toolchain-retdec` / `toolchain-emsdk` / `plugins-freshair` は無く、`/opt/retdec` も無いため、現 head での `lift2_e2e.sh` 再実行はできなかった。
 
+## 追記 (stosw 単独 trap の到達確認, origin/main `60932d35`)
+
+- 素材: `plugins-freshair` を展開し `fetch.sh` で factory `.epf` 8 本を確認。`build_ctrl.sh` (trap 無し) exit 0, real 36.9 s, `lifted 1256 / failed 0`。
+- 一時版: `mlift_ops.py` の `h_rep_str` 先頭で `kind == 'stosw'` のとき `llvm.trap` (env `PROBE_STOSW` 指定時のみ)。`ctrl_full.ll` に `llvm.trap` 1655 件。`cmp` で元に戻し、`git status` 差分 0 を確認。
+- 既定 `run_ctrl.sh 2 5` (seed `0xFA2C0001`): wasm / native とも `S2002` (または S2001) で ERR。両側同一 scenario のため PASS 扱い。
+- seed 走査 (`gen_ctrl_scen.py 2 5 <seed>`、native 単独 rc と ERR 行を個別に計測):
+
+| seed | native rc | native 行数 | native ERR 行 | wasm の trap 命中 |
+|---|---|---|---|---|
+| `0x1` / `0x2` / `0x3` / `0x4` / `0x5` | 134 (Abort) | 8〜10 / 15 | 0 | 1〜2 |
+| `0x6` | 99 | 9 / 15 | 0 | 2 |
+| `0x7` | 0 | 15 / 15 | `S2002` 1 件 | 1 |
+| `0x8` | 134 | 8 / 15 | 0 | 2 |
+| `0xFA2C0002` | 134 | 11 / 15 | 0 | wasm rc=1 (行 0) |
+| `0xFA2C0003` / `0xFA2C0010` / `0xFA2C0011` | 99 / 134 / 134 | 8 / 8 / 8 | 0 | 1 / 1 / 0 |
+
+- 注意: 前回までの ERR 集計 (`^ERR`) は行頭が `S… |ERR` の形を取りこぼしていた。seed `0x7` も native 側は `S2002 |ERR` (native の stderr も `ERR S2002 sig=5`) で、ERR 行は両側同一 scenario。
+- 結論: stosw に届いた scenario は、いずれも native 側が ERR で落ちるか、native が途中で abort して行数が欠ける。native が 15 行正常終了し、かつ stosw の trap に届く入力は、今回の seed 走査では得られなかった。
+- 受入 1 (stosw 実行到達 scenario): 未達。受入 2 (stosw 単独ネガコン FAIL): 未達。
+
 ## 次の作業 (起票先 #692 FA-11 に併記, 子 issue は起票しない)
 
 1. native が ERR で落ちない structured 入力の設計 (意味 field への注入を制限する)。乱数 OOB を避ける生成条件を決める。
-2. その入力で movsb trap が FAIL になることの実測、続けて stosw 単独 trap の到達確認。
+2. その入力で movsb / stosw trap が FAIL になることの実測。
 3. 判定規則: 「両側で同一 scenario の ERR」は PASS に数えない版を別途検討 (現行 `run_ctrl.sh` の仕様変更は別 issue)。

@@ -1,0 +1,17 @@
+{
+  "name": "signature-studio-pm-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --no-warnings --test 'test/*.test.ts'",
+    "test:workers": "vitest run --config vitest.config.ts",
+    "build": "bun build src/index.ts --target=browser --format=esm --external 'node:*' --minify --outfile=dist/index.js",
+    "metadata": "node scripts/metadata.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.2",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.151.0"
+  }
+}

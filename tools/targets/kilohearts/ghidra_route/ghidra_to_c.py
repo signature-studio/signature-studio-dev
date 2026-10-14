@@ -36,11 +36,16 @@ STUB = {  # 未 decompile の callee → C 実装 (RetDec stage-0 + kh_lower ル
     0x1813846e0: 'void* FUN_1813846e0(void* d, int c, ulonglong n) { return memset(d, c, (size_t)n); }',
     0x18004cf20: 'longlong FUN_18004cf20(void* a, void* b, void* c) { abort(); return 0; }',
 }
+# IAT thunk (jmp [rip+disp] → KERNEL32 の import) → fail-fast stub。Ghidra は thunk の引数を落として `func_0x000<va>(...)` と呼ぶ。
+# 引数無しの定義 (`()`) は呼出の arity を問わない。Win API の意味は実装しない (到達時に abort し、突合で検出する)。
+THUNK = {
+    0x180fd81e4: 'longlong func_0x000180fd81e4() { abort(); return 0; } /* KERNEL32!FlsGetValue */',
+    0x180fd81ec: 'longlong func_0x000180fd81ec() { abort(); return 0; } /* KERNEL32!FlsSetValue */',
+}
 
 
-RCPPS_HELPER = r'''/* rcpps_w: Ghidra の `auVarD = rcpps(in_XMMk, auVarS)` (第 1 引数は旧 dst で未使用・第 2 引数が源) を、dst へ書き戻す形にする。
- * 実機 (AMD Ryzen 9 9950X) の rcp 近似表で 4 lane を計算。表と指数則は snapins/lift/gen_simd.py の kh_rcp_exact と同一。 */
-static const uint32_t kh_at_rcp[4096] = %(RCP)s;
+RCPPS_HELPER = r'''/* rcpps 2 引数形 rcpps(dest, src): 実機 (AMD Ryzen 9 9950X) の近似表 (snapins/lift/gen_simd.py と同一表・同一指数則)。 */
+static const uint32_t kh_at_rcp[4096] = %s;
 static inline uint32_t kh_rcp_exact(uint32_t x) {
     uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
     if (e == 0) return s | 0x7f800000u;
@@ -48,27 +53,22 @@ static inline uint32_t kh_rcp_exact(uint32_t x) {
     int t = 253 - (int)e;
     return t <= 0 ? s : (s | ((uint32_t)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);
 }
-static inline void rcpps_w(V128 *dst, V128 src) {
-    V128 r;
+static inline V128 rcpps(undefined1 dst[16], V128 src) {
+    V128 r; (void)dst;
     for (int i = 0; i < 4; i++) {
-        uint32_t x, y;
-        memcpy(&x, src.b + 4 * i, 4);
-        y = kh_rcp_exact(x);
-        memcpy(r.b + 4 * i, &y, 4);
+        uint32_t w = kh_rcp_exact(*(uint32_t *)(src.b + 4 * i));
+        memcpy(r.b + 4 * i, &w, 4);
     }
-    *dst = r;
+    return r;
 }
 '''
 
 
-def rcp_table_literal():
-    import base64
-    import struct
-    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'scripts', 'approx_tables.b64')
-    b64 = ''.join(l for l in open(p) if not l.startswith('#'))
-    blob = base64.b64decode(''.join(b64.split()))
-    assert len(blob) == 3 * 4096 * 4, len(blob)
-    return '{%s}' % ','.join(str(v) for v in struct.unpack('<4096I', blob[:4096 * 4]))
+def approx_rcp_table():
+    """snapins/scripts/approx_tables.b64 の rcp 表 (4096 entry) を C 配列リテラルで返す。"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'snapins', 'lift'))
+    import gen_simd
+    return gen_simd.load_approx_tables()['rcp']
 
 
 def pe_bytes(pe, va, n):
@@ -110,6 +110,8 @@ def main():
         ts = infer_type(ls, '%s_%x' % (kind, va))
         gtypes[va] = ('uint' if kind == '_UNK' or 'uint' in ts else ('double' if 'double' in ts else 'float'), kind, sorted(ts))
     out = ['#include "ghidra_shim.h"', '/* 自動生成: ghidra_to_c.py %s (fix=%s) */' % (name, ','.join(sorted(f for f in fixes if f)) or 'none')]
+    if 'rcpps(' in alltxt:
+        out.append(RCPPS_HELPER % approx_rcp_table())
     for va, (ty, kind, _) in sorted(gtypes.items()):
         d = pe_bytes(pe, va, 16)
         out.append('static unsigned char gd_%x[16] __attribute__((aligned(16))) = {%s};' % (va, ','.join(str(x) for x in d)))
@@ -126,11 +128,11 @@ def main():
     # --- 前方宣言 (Ghidra の定義シグネチャから)
     protos = []
     bodies = []
-    rcpps_n = 0
+    abi_hits = {}
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
-        t = re.sub(r'undefined1 (auVar\d+|in_XMM\d+) \[16\];', r'V128 \1;', t)
+        t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         if tbase is not None:
             t = re.sub(r'&UNK_([0-9a-f]{8,9})\b', lambda m: '((unsigned char*)gt_%x + 0x%x)' % (tbase, int(m.group(1), 16) - tbase), t)
         t = re.sub(r'\*\(undefined1 \(\*\) \[16\]\)\((.*?)\) = (auVar\d+) << 0x20;', r'v128_store_shl32((void*)(\1), \2);', t)
@@ -150,23 +152,24 @@ def main():
         if 'stackpair' in fixes:
             t = re.sub(r'\blonglong lStack_e8;\n\s*longlong lStack_e0;', 'longlong lStk[2];', t)
             t = t.replace('&lStack_e8', 'lStk').replace('lStack_e8', 'lStk[0]').replace('lStack_e0', 'lStk[1]')
-        t, nrc = re.subn(r'^([ \t]*)(auVar\d+) = rcpps\(in_XMM\d+,[ \t]*(auVar\d+)\);', r'\1rcpps_w(&\2, \3);', t, flags=re.M)
-        if re.search(r'\brcpps\(', t):
-            raise SystemExit('FUN_%x: rcpps の形が想定外 (`auVarD = rcpps(in_XMMk, auVarS);` 以外)。dst 書戻しを保証できないため停止' % va)
-        rcpps_n += nrc
+        from patches import ABI
+        for nm, rx, rp in ABI.get(name, []):
+            t, k = re.subn(rx, rp, t)
+            abi_hits[nm] = abi_hits.get(nm, 0) + k
         m = re.search(r'^([\w \*]+?)\s*\n?\s*FUN_%x\((.*?)\)\s*\n\s*\{' % va, t, re.S | re.M)
         if not m:
             m = re.search(r'^([\w \*]+?)\s+FUN_%x\((.*?)\)\s*\{?' % va, t, re.S | re.M)
         assert m, 'signature not found %x' % va
         protos.append('%s FUN_%x(%s);' % (m.group(1).strip(), va, ' '.join(m.group(2).split())))
         bodies.append(t)
+    for nm, _, _ in ABI.get(name, []):
+        assert abi_hits.get(nm) == 1, 'ABI rule hit %s: %s' % (abi_hits.get(nm), nm)
     for va, s in STUB.items():
         if ('FUN_%x' % va) in alltxt:
             protos.append(s.split('{')[0].strip() + ';')
-    if rcpps_n:
-        out.append(RCPPS_HELPER % {'RCP': rcp_table_literal()})
     out += protos
     out += [STUB[v] for v in STUB if ('FUN_%x' % v) in alltxt]
+    out += [THUNK[v] for v in THUNK if ('func_0x000%x' % v) in alltxt]
     # --- 呼出名の統一: Ghidra は未命名 callee を func_0x<va> で呼ぶが、定義側は同一 va を FUN_<va> で出す (also 追加分)
     defined = set(vas)
     bodies = [re.sub(r'\bfunc_0x000(180f[0-9a-f]{5})\b', lambda m: 'FUN_' + m.group(1)
