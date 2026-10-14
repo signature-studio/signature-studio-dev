@@ -44,9 +44,11 @@
 8. **ブランチ/PR**: 作業は `N-<slug>` (N = issue 番号) ブランチで行い、push 後 `gh pr create`
    (`--base main`)。body に `Closes #N`・受入条件・検証結果を書く。
    受入条件を全て満たせないときは、issue の範囲を縮めて `Closes #N` にする (規範 11)。
-9. **マージ方法**: このリポジトリは merge commit のみ許可されている
-   (`allow_squash_merge: false` / `allow_rebase_merge: false`)。Auto Merge は
-   `gh pr merge --auto --merge` で有効化する。`--squash` / `--rebase` は必ず失敗する。
+9. **merge はしない (実装者は自分の PR を merge しない・Auto Merge も有効化しない)**: merge は検収 subagent が
+   approve の後、同じ run で行う (`docs/WORKFLOW.md` §2・§3)。このリポジトリは merge commit のみ許可されている
+   (`allow_squash_merge: false` / `allow_rebase_merge: false`)。main に承認必須の Ruleset が無いため、
+   Auto Merge は approve 前に即時 merge になる (#2600)。
+   次は**禁止**: `gh pr merge` (`--auto`・`--merge`・`--squash`・`--rebase` を含む全て)・REST の `pulls/<N>/merge`・GraphQL の `enablePullRequestAutoMerge`。
 10. **sleep による 10 秒以上の待機は禁止**。CI・ビルド等の完了確認は 1 コマンドの
     ポーリングで行う。複数回の確認が必要なら各回を独立した短いコマンドにし、
     連続 sleep を組まない。

@@ -55,9 +55,9 @@ github.event.comment.user.type == 'Bot' && github.event.comment.user.login == va
 
 1. Issue に `/oc <instruction>` をコメント (`oc_actions_allow_write` を含めると書き込み可)
    → **implement ジョブ**: イベント文脈の隔離 → App トークン取得 → checkout →
-   素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成・Auto Merge 有効化
+   素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成 (merge はしない・#2600)
 2. PR が open / synchronize / reopen → **review ジョブ**: 差分取得 →
-   レビュワーエージェントが検証 → approve/request-changes → 必要なら `gh pr merge --merge --delete-branch`
+   レビュワーエージェントが検証 → approve/request-changes → approve なら同じ run で `gh pr merge --merge --delete-branch --match-head-commit <head>`
 3. PR に `/oc <instruction>` → コンフリクト解決などの追加作業
 
 `pull_request` の `synchronize` (PR が更新されるたび) でも review ジョブが起動する。
@@ -156,8 +156,9 @@ allow_squash_merge: false
 allow_rebase_merge: false
 ```
 
-`gh pr merge --squash` は必ず失敗する。プロンプトも `gh pr merge --auto --merge` /
-`gh pr merge --merge --delete-branch` を使う。
+`gh pr merge --squash` は必ず失敗する。merge を行うのは検収 (review) の run だけで、
+`gh pr merge --merge --delete-branch --match-head-commit <head>` を使う。実装 agent は
+`gh pr merge` も Auto Merge の有効化も行わない (`.github/prompts/implementer.md` 規範 9・#2600)。
 
 ## 規約
 

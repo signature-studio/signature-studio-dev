@@ -55,8 +55,8 @@
      経緯: PR #416 は Copilot の妥当な指摘 4 件 (scan() の未実装の戻り値・固定パス・REPORT 行数超過・
      外部絶対パス) が残ったまま merge された。
 4. **マージ**: approve したら **同じ run で必ず merge まで行う** (approve 済みで未 merge の状態を作らない)。
-   Auto Merge が有効な場合はそのまま待つ。
-   Auto Merge が使えない/失敗する場合は、**レビュワーがマージまで担当してよい**:
+   merge は検収 subagent (あなた) の役割で、実装 agent は merge も Auto Merge の有効化もしない
+   (`.github/prompts/implementer.md` 規範 9・#2600)。Auto Merge を待つ経路は無い。レビュワーが次で merge する:
    - `gh pr merge <N> --merge --delete-branch --match-head-commit <レビューした head の完全 SHA>`
      (approve 後のみ。実装 agent は別の job で動くため、レビュー中に push された未レビューの commit を
      巻き込んで merge しないよう、head を指定する。head が進んでいて失敗したら merge せず終える:

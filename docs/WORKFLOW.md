@@ -46,14 +46,16 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                                                   ├ PR review (approve / request changes)
    │                                                                   └ 誤記は fix commit で同 branch に push
    ├ review approve 確認 ──────────────────────────────────────────────┤
-   └ gh pr merge --merge ──→ branch/worktree 削除
+   └ 検収 subagent が approve と同じ run で merge ──→ branch/worktree 削除
 ```
 
 - 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度は PM が確定する。Project の Status は参考で、§3)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
-- **merge は PM のみ**。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
+- **merge は検収 subagent (reviewer) のみ**。approve と同じ run で `gh pr merge --merge --match-head-commit <head>` を行う。
+  実装 subagent は merge も Auto Merge の有効化もしない (`.github/prompts/implementer.md` 規範 9・#2600。承認必須の Ruleset が無い main では、Auto Merge は approve 前に即時 merge になる)。
+  PM は contents 権限を持たないため merge しない (`.github/prompts/pm.md`)。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
 - **競合時**: `git rebase origin/main` で解消してから `push --force-with-lease` (自分 branch のみ)。
 - **既定ブランチは `main`** (`origin/HEAD → origin/main`)。旧 `origin/master` は `main` の祖先で
   12+ commits 遅れの凍結枝。master を base にした PR・master への pull/push は行わない。
@@ -62,9 +64,9 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 役割 | 着手時 | 完了時 | 禁止 |
 |---|---|---|---|
-| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更 |
-| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge・方針変更・是正 | — |
+| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更・PR の merge と Auto Merge の有効化 |
+| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + 同じ run で merge / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | 方針変更・是正 (merge は検収 subagent が行う) | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
