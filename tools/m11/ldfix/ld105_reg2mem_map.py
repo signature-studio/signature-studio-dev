@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ld105_reg2mem_map.py — #2312 (LD-105) cf3790 の残り spill 宛 site の reg2mem 突合表。
 
-機械語の [rbp+disp] store を IR の reg2mem slot (stack_var_(disp-FRAME)・FRAME=0x1d8) に対応づけ、
+機械語の [rbp+disp] store を IR の reg2mem slot (stack_var_-(disp+8)) に対応づけ、
 各 site について次を 1 行に並べる (判定は入れない。判定は突合表を見て人が行う):
   machine   = store 直前 5 命令 (値の由来)
   slot      = 対応する IR slot 名 (alloca の有無)
@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '../../..'))
 sys.path.insert(0, HERE)
 from ldmach_img import ImageMachine  # noqa: E402
+from ld110_reg2mem_link import frame_size  # noqa: E402
 
 W = os.environ.get('M11_WORK', os.path.join(REPO, 'tools/m11/work'))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'results/ld105_reg2mem_map.tsv')
@@ -48,15 +49,12 @@ def slot_of(site):
     return int(m.group(1), 16)
 
 
-# retdec の stack_var_N は関数入口 rsp 基準。rbp = push 4 回 (8 byte) + sub rsp,imm 後の rsp なので N = disp - FRAME。
-# (旧式 -(disp+8) は誤り。[rbp+0x48]=0 が stack_var_-400 の store 0 に対応することで確認: ld109_cf3790_verify.py)
-pro = [x for x in ins[:8]]
-FRAME = 8 * sum(1 for x in pro if x.mnemonic == 'push') + next(
-    int(x.op_str.split(',')[1], 16) for x in pro if x.mnemonic == 'sub' and x.op_str.startswith('rsp'))
+FRAME = frame_size(ins)
 
 
 def ir_name(disp):
-    return 'stack_var_%d' % (disp - FRAME)
+    # 旧式 -(disp+8) は frame 位置の仮定が誤り (#2389)。cf3790 は F=472 (push 4 本 + sub rsp 0x1b8)
+    return 'stack_var_-%d' % (FRAME - disp)
 
 
 rows = ['site\tdisp\tslot\talloca\tir_stores\tir_reload_use\tmachine_prev5\tir_store_value_def']
