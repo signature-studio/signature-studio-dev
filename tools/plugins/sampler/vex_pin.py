@@ -8,9 +8,10 @@
   LEVEL 0x18026e018 = 1  (ISA 段階。 0x1801cd340 が AVX2 段階で 3 を書く。 SSE2 段階は 1)
 それ以外の分岐は両方の辺を残す (保守的: 到達集合は過大評価側)。
 
-usage: vex_pin.py <block> [--pin=none|sse] [--indirect=stored|all|none] [--list] [--dump-vex] [--probe=<hex,...> [--path]]   (環境変数 FL_WIN64_DIR を使う)
-  --pin=none: 固定しない (全辺。 AVX 段階の下で到達できる集合)。  --pin=sse: 上の 2 slot を固定。
-  switch のジャンプテーブル (lea 基底 + add + mov [基底+I*4+D]) は飛び先を解く (上限 cmp が無い場合は関数内に収まるエントリを読む)。
+usage: vex_pin.py <block> [--pin=none|sse] [--flag=0|1] [--level=N] [--indirect=stored|all|none] [--list] [--dump-vex] [--probe=<hex,...> [--path]]   (環境変数 FL_WIN64_DIR を使う)
+  --pin=none: 固定しない (全辺。 AVX 段階の下で到達できる集合)。  --pin=sse: 上の 2 slot を固定 (値は --flag・--level で変えられる。 既定 0・1)。
+  switch のジャンプテーブル (lea 基底 + add + mov [基底+I*4+D]) は飛び先を解く。 上限は表の添字 I に対する `cmp I, N` (同じレジスタ) からだけ取り、
+  そのエントリは全て読む。 上限が取れない場合は、飛び先が関数 [lo,hi) に入る間だけ読んで表の外のエントリで止める。
   解けない間接 jmp は同一関数内の全命令へ、間接 call はデータ内の関数ポインタ全体 (stored) か全関数 (all) か無し (none) へ辺を張る。 stored/all は過大評価側。
 """
 import os, sys, struct, collections, bisect
@@ -23,7 +24,10 @@ X86_REG_T = _XOR
 
 b = int(sys.argv[1])
 pin = 'sse' if '--pin=sse' in sys.argv else 'none'
-PINNED = {0x180277ae4: 0, 0x18026e018: 1} if pin == 'sse' else {}
+_opt = {a.split('=')[0]: a.split('=')[1] for a in sys.argv if a.startswith('--flag=') or a.startswith('--level=')}
+FLAG_V = int(_opt.get('--flag', 0))
+LEVEL_V = int(_opt.get('--level', 1))
+PINNED = {0x180277ae4: FLAG_V, 0x18026e018: LEVEL_V} if pin == 'sse' else {}
 pe = pefile.PE(os.path.join(FL_WIN64_DIR, 'extracted', 'block%05d_PE.bin' % b), fast_load=True)
 base = pe.OPTIONAL_HEADER.ImageBase
 sec = {s.Name.rstrip(b'\0'): s for s in pe.sections}
@@ -62,6 +66,14 @@ def rd(va, n):
     return b''
 
 
+def index_names(tbl):
+    body = tbl[tbl.index('[') + 1:tbl.index(']')]
+    if '*4' not in body:
+        return ()
+    I = body.split('*4')[0].split('+')[-1].strip()
+    return (I, I + 'd' if I[1:].isdigit() else 'e' + I[1:])
+
+
 def jump_table_targets(ins, i, lo, hi):
     # `jmp R` の直前 16 命令内の `add R, B` / `mov R32, dword ptr [B + I*4 + D]` / `cmp I, N` / `lea B, [rip+X]` から
     # switch の飛び先 (B + int32 entry, entry は 0..N) を解く。 解けなければ None (呼出し側は過大評価に戻す)。
@@ -75,7 +87,8 @@ def jump_table_targets(ins, i, lo, hi):
             B = ops[1]
         elif tbl is None and x.mnemonic == 'mov' and B is not None and len(ops) == 2 and ops[0] == R32 and 'dword ptr [' in ops[1]:
             tbl = ops[1]
-        elif tbl is not None and bound is None and x.mnemonic == 'cmp' and len(x.operands) == 2 and x.operands[1].type == CS_OP_IMM:
+        elif tbl is not None and bound is None and x.mnemonic == 'cmp' and len(x.operands) == 2 and x.operands[1].type == CS_OP_IMM \
+                and x.operands[0].type == X86_REG_T and x.op_str.split(', ')[0] in index_names(tbl):
             bound = x.operands[1].imm
     if B is None or tbl is None:
         return None
