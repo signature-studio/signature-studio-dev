@@ -100,3 +100,12 @@
   - 記録 jsonl (`work-liftdiff` 同梱): 16 + 4 = 20 件。`#2242` の結果と同じで、スクリプトが P2 を拾えることの対照になる。
 - **結論**: `930c6dbc` も記録 (2,273 / 2,892 / 2,256) の生成 commit ではない。`0x41c820` mismatch も再現しない。候補 4 件はいずれも記録を再現しなかった。残る `9e9c1315` (#2276) / `38d53ac8` (#2277) は既存の子 issue で扱う。#1035 の受入条件 1 は [~] のまま。
 - **コード差分 (測定 commit → HEAD・候補の判定に影響する範囲)**: `git diff 930c6dbc HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (`--stat`。`930c6dbc` は `origin/main` の祖先)。この範囲の変更が判定に効くかは未測定。本測定は `930c6dbc` の値として読む。
+- **現 head `7be98611` の値ではない (§6 の要件は未充足)**: 上記の集計・verdict 一致数・対象 2 関数の判定は、現 head の値として引用しない。理由は 2 つ。
+  1. **再測定できない**: fix run の素材は `fl-win64` のみ (`$HOME/artifacts`)。`work-m11`・`work-liftdiff` が無いため、`m11_gen_ir2.sh`・batch 入力・`ir_conditions.json` を作れない。
+  2. **差分に判定経路の変更がある**: `git diff 930c6dbc HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の内訳のうち、batch の判定に入る範囲は次のとおり。
+     - `targets/m11.json`: `initial_memory` 469762048 → 671088640 (`ldlib/build_wasm.py` の build 時に読まれる。m11 の wasm メモリ量が変わる)
+     - `ldlib/compare.py` (+58 行)・`ldlib/classify.py`・`ldlib/session.py`・`ldlib/cases.py`: 比較・分類・case 生成
+     - `rt/ld_native.c`・`rt/ld_core.h`・`rt/ld_wasm.c`: native / wasm ランナ本体
+     - `liftdiff.py`: `route = 'clift'` の分岐と `irfeats` の取得条件 (m11 は既定の `ir` route のまま)
+  3. 上の 2 点から、この差分が m11 closure の verdict を変えないとは言えない。現 head での再測定 (`liftdiff.py build` → `batch --set closure --shards 14 --nobuild`) が要る。
+- 「候補 4 件はいずれも記録を再現しなかった」は、`930c6dbc` と `1c4b7c7e` の測定に限った結論として読む。現 head では未確定。
