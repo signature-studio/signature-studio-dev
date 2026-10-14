@@ -190,14 +190,13 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 
 - 測定 commit: `82c44c61` (コード差分 0。本 PR の追加は `store_watch_1046b.sh` と `watch_addr_1046b.c` の 2 ファイルのみ・既存コードは不変)。
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11`・`work-liftdiff` は worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。
-- 再現 (基準): `m11_gen_ir2.sh` rc 0 (52.5 s、490,733 行) → `m11_build.sh` rc 0 (25.9 s) → `survey_units.mjs` rc 0 (13.0 s): `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
-- 値遷移 probe (`probe_1046_watch.mjs`、計装なし): 全 942 unit を 19.2 s で完走。`unit 477 exc 0x1_1029e5d8 -> 0x1_2`、`unit 484 exc 0x1_2 -> 0x1_3`、`unit 492 exc 0x1_3 -> 0x0` (§14 と一致)。
+- 基準の survey 数値と値遷移 (unit 477・484・492 の遷移) は §2・§14 と一致 (本 run で再確認)。
 - 単独範囲: unit 484 を `SV_ONLY` 相当で単独実行 (全 store 計装版) → `[aw]` 0 件。値は前段 unit 依存のため、単独では書込みが起きない (§14 と一致)。
-- 監視 ON/OFF を unit 境界で切る版 (`store_watch_1046b.sh 0 484 <tag> 477 484`、`watch_addr_1046b.c`): 全 store 計装 (54,041 箇所) で unit 0〜484 を流したところ、**unit 106 で停止** (実時間 15 分 22 秒、CPU 41 秒、`[aw]` 0 件)。監視を unit 477〜484 だけ ON にしても、停止点は前段の unit 106 のまま。timeout 900 秒で打ち切り (rc 124)。
-- 打ち切り後は `trap` の復元 (`m11_build.sh` 再実行) で基準に戻ることを確認: `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1`。`git status` は既存ファイルに差分なし。
+- 監視 ON/OFF を unit 境界で切る版 (`store_watch_1046b.sh 0 484 <tag> 477 484`、`watch_addr_1046b.c`): 全 store 計装で unit 0〜484 を流したところ、**unit 106 で停止** (実時間 15 分 22 秒、CPU 41 秒、`[aw]` 0 件)。監視を unit 477〜484 だけ ON にしても、停止点は前段の unit 106 のまま。timeout 900 秒で打ち切り (rc 124)。
+- 打ち切り後は `trap` の復元 (`m11_build.sh` 再実行) で基準に戻ることを確認 (§2 の基準と一致)。`git status` は既存ファイルに差分なし。
 
 ### 結論 (本 run)
-- 停止点 unit 106 は、監視の ON/OFF (unit 477〜484 のみ) と無関係に起きる。計装が入った IR の実行そのものが unit 106 で進まなくなる (計装版 build の副作用)。REPORT §15・§16 の切り分けと一致し、「単独 `SV_ONLY=106` では止まらない」点とも整合する。
+- 停止点 unit 106 は、監視の ON/OFF (unit 477〜484 のみ) と無関係に出た。計装が入った IR の実行で unit 106 以降が進まなくなる原因は**仮説・未切り分け**である (計装版 build の副作用と考えられる。次の手順 1 で切り分ける)。REPORT §15・§16 の切り分けと一致し、「単独 `SV_ONLY=106` では止まらない」点とも整合する。
 - 書込み元 store は未特定。受入条件 1 (IR site 特定) は未達。
 
 ### 次の手順 (#1620 へ)
