@@ -70,7 +70,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "24be607a"
+          "file_last_commit": "1333a9ec"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -149,7 +149,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "24be607a"
+          "file_last_commit": "1333a9ec"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -301,7 +301,7 @@
           "file": "tools/gui/flengine",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "5203a7bc"
+          "file_last_commit": "5c4d8320"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -478,19 +478,19 @@
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /`cfi_probe\\.mjs`・commit `([0-9a-f]{8})`/",
           "measured_commit": "ae963e28",
-          "file_last_commit": "5203a7bc"
+          "file_last_commit": "5c4d8320"
         },
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /^\\| `CreateFruityInstance\\(0xC0, 0xEDE95A, host, &iface\\)` \\| `(Aborted)`/",
           "measured_commit": "ae963e28",
-          "file_last_commit": "5203a7bc"
+          "file_last_commit": "5c4d8320"
         },
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /`\\[shim\\] CS-MISS key=0x([0-9a-f]+)` → `FAIL-FAST: unimplemented Win32 API: (\\w+) /",
           "measured_commit": "ae963e28",
-          "file_last_commit": "5203a7bc"
+          "file_last_commit": "5c4d8320"
         },
         {
           "file": "tools/gui/flengine/REPORT_APPENDIX.md",
@@ -508,7 +508,7 @@
           "file": "tools/gui/flengine/REPORT_APPENDIX_2880.md",
           "locator": "md:### 9-3. /\\| GUI-REACH / icall_miss \\| `(\\w+)` ×3 のみ / \\d+/",
           "measured_commit": "ae963e28",
-          "file_last_commit": "5203a7bc"
+          "file_last_commit": "5c4d8320"
         },
         {
           "file": "tools/gui/flengine/cfi_probe.mjs",
