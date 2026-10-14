@@ -167,6 +167,7 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 | o2/o3lto p50 比 | 1.18〜1.20 (単体測定 1.15〜1.29) | 0.9〜2.0 |
 | wasm bytes o0 / o2 / o3lto | 1,030,416 / 707,139 / 680,905 | 上記上限 |
 | p50 µs (参考) o0 / o2 / o3lto | 328.65〜335.24 / 57.74〜57.88 / 48.39〜49.12 | 判定に使わない |
+| 測定 commit `2d6c45fe` の全体 (agent-setup 展開の `/opt/emsdk`・`$HOME/analysis`) | 82 s・load 0.27→1.06・PASS 11/11 (o0/o2 7.59・o2/o3lto 1.18) | 上記 |
 
 ネガティブコントロール (`judge.mjs` へ入力を壊して FAIL を確認; いずれも exit 1): 期待署名を `deadbeef` → 3 件 FAIL (8/11) / o2 bytes 上限 700,000 → FAIL (707,139) / o0/o2 比下限 8 → FAIL (5.52) / o2 の p50 を 3 倍 (o2 退行の模擬) → o0/o2 1.84・o2/o3lto 3.71 で 2 件 FAIL / 1 行だけ署名を `6b1696f1` に改ざん → FAIL。
 
@@ -176,7 +177,7 @@ PERF_QUICK=1 bash tools/perf/perf.sh     # 代表変種・反復 1 (数分)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| **CI workflow 未設置**: GitHub App に `workflows` 権限が無く `.github/workflows/` への push が拒否された (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`)。テンプレートを `tools/perf/gate/perf-gate.workflow.yaml.txt` に置いた。設置後の Actions 実行も未確認 | CI 化 (受入条件) が未達 | #164 (PM が `.github/workflows/perf-gate.yaml` へ移して設置) |
+| **CI workflow 未設置**: GitHub App に `workflows` 権限が無く `.github/workflows/` への push が拒否された (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`)。テンプレートは `tools/perf/gate/perf-gate.workflow.yaml.txt` (2d6c45fe で pip 段を削除: agent-setup の venv と衝突し EXTERNALLY-MANAGED で失敗するため)。設置後の Actions 実行も未確認 | CI 化 (受入条件) が未達 | #164 (PM が `.github/workflows/perf-gate.yaml` へ移して設置) |
 | 閾値は 1 台の低負荷 runner の実測 (反復 3〜5) から設定。高負荷時の誤検知率は未測 | flaky 化の可能性 | #164 |
 | `perf.sh` (PERF_QUICK, junk 版 M10 RetDec) は本ゲートに含めない。Chrome・M5 カーネル・巨大 wasm は対象外 | 回帰検知範囲は x64c の node 実行のみ | #164 に分割提案 |
 | ゲートは node のみ (Chrome 計測なし) | Chrome 側回帰は検知できない | PERF-P9 (§7) |
