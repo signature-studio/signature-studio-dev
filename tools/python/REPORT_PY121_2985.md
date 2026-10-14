@@ -52,23 +52,23 @@
 
 ## 検証
 
-測定 commit: `2d333ec9` (コードを変えた最後の commit。`Merge origin/main into 2985-screen-state-pe (#2985)`)。以下の表はこの commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから測定した。mock の引数検査の修正 (`5b8c500f`) と、その後の測定 (`535dd91e` の値は無効) は、この merge commit に含まれる。
-main (`f0c00334`) は rebase せず merge した。main 側の `tools/python/REPORT_PY121.md` (#2979 の general log・rec 系の報告) と番号 PY-121 が衝突したため、本 PR の報告は `REPORT_PY121_2985.md` に置いた。
+測定 commit: `a1cba13f` (コードを変えた最後の commit。`Merge origin/main into 2985-screen-state-pe (#2985)`)。以下の表はこの commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから測定した。mock の引数検査の修正 (`5b8c500f`) は、merge commit `2d333ec9` (main `f0c00334` の取り込み) を経て本 commit に含まれる。前回の測定 (`535dd91e`) の値は無効になったので残していない。
+main は `f0c00334` と `e64cfc70` (#3010 の ui 状態) の 2 回を rebase せず merge した。main 側の `tools/python/REPORT_PY121.md` (#2979 の general log・rec 系の報告) と番号 PY-121 が衝突したため、本 PR の報告は `REPORT_PY121_2985.md` に置いた。
 環境: runner 4 core、測定時の load average 0.08 (`uptime` 21:31:20)。`FL_WIN64_DIR` は `[WIN64]` の展開先 (fl-win64 を `$RUNNER_TEMP` 配下に全展開、5.4 秒)。emsdk は `[EMSDK]` と同じ 6.0.12 を初回セットアップした (`toolchain-emsdk` の素材は本 run に無かった)。`build_cpython_wasm.sh` は emsdk の場所を固定で読むため、`[EMSDK]` の場所へ同じ版を向けた。前提生成物: `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 26 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 91 | 0.9 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 91 / 未実装 344 / MCP 静的 60) | 0.34 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 97 | 0.9 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 97 / 未実装 338 / MCP 静的 60) | 0.34 秒 |
 | `node tests/screen_diff.mjs` | calls 32 (順序どおり 16 + 個数違い 4 + 型違い 12)、diffs 0、型違いの期待値一致 (12 呼出し × 2 engine)、PASS | 0.05 秒 |
 | `node tests/general_diff.mjs` | calls 9、diffs 0、PASS (回帰なし) | 0.05 秒 |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.6 秒 |
 
 型違いの 12 呼出し (`unBlank(True)`・`unBlank(1.5)`・`unBlank("1")`・`setScreenActiveCounter(1.5)`・`setScreenActiveCounter("1")`・`setScreenActiveCounter(True)` など) は、結果が状態に依存するので初期状態の新しいエンジン 2 つで流し、期待値 (上の表と同じ) と mock・C の両方を照合した。
 
-件数の変化: main (`f0c00334`) の実装 86 / 未実装 349 から、5 件を追加して 91 / 344 (main 側の `pe100` 2 件を含む)。
+件数の変化: main (`e64cfc70`) の実装 92 / 未実装 343 から、5 件を追加して 97 / 338 (main 側の `pe100` 2 件・`pe119` 6 件を含む)。
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5): 測定 commit `2d333ec9` の `host/fl_mock.mjs` に次の 2 種類を入れ、`node tests/screen_diff.mjs` が FAIL することを確かめてから commit 版へ戻した (戻した後の `cmp` と `git status` は一致・空)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5): 測定 commit `a1cba13f` の `host/fl_mock.mjs` に次の 2 種類を入れ、`node tests/screen_diff.mjs` が FAIL することを確かめてから commit 版へ戻した (戻した後の `cmp` と `git status` は一致・空)。
 - (1) 整数だけを見る回帰: `unBlank` を `argI(a, 0, 0) === 1` から `argI(a, 0, 0) !== 0` にする → `AssertionError: screen 差分 1 件`、rc 1 (FAIL)。`unBlank(2)` の int 入力で検出。
 - (2) 型検査を外した修正前の行: `unBlank` を `a[0] === 1` に戻す → `AssertionError: screen 型違い 期待値と不一致 4 件`、rc 1 (FAIL)。bool・float・str の入力で検出 (修正前の mock は int だけの `screen_diff` を通っていた)。
 戻した後は calls 32・diffs 0・PASS (rc 0)。
@@ -76,7 +76,7 @@ main (`f0c00334`) は rebase せず merge した。main 側の `tools/python/REP
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外。本 REPORT を含む md のみの commit を後から足しても 0 行のまま):
 
 ```
-$ git diff 2d333ec9 HEAD -- tools/python ':!*.md'
+$ git diff a1cba13f HEAD -- tools/python ':!*.md'
 (空)
 ```
 
