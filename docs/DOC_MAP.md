@@ -332,7 +332,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/runtime/REPORT.md` | ~155 | ブラウザ実行基盤 |
-| `tools/runtime/REPORT_APPENDIX_127.md` | ~45 | RT-9 (#127) 音声込み Firefox 測定の手順と実測表 (REPORT §RT-9 の追補) |
+| `tools/runtime/REPORT_APPENDIX_127.md` | ~65 | RT-9 (#127) の追補: 音声込み Firefox 測定の手順と実測表、Playwright WebKit 26.0 (Linux) の参考値 (Safari 実機ではない) |
 | `tools/runtime/rt10/REPORT.md` | ~190 | 実 FLEngine x64c lift (126MB wasm) の Chrome 起動時間・帯域・tier-up・boot ループ soak (RT-10 #128) |
 | `tools/hostbridge/REPORT.md` | ~95 | Fruity Wrapper の VST2 ロード経路解析 + wasm 同梱プラグイン表 |
 | `tools/hostbridge/cb/REPORT.md` | ~145 | shimx R2 コールバック変換の実体接続 |
@@ -411,6 +411,7 @@
 | `tools/python/REPORT_PY27.md` | ~70 | PY-27 (#1138): ui / general / screen / arrangement / launchMapPages の mock 対応状況・`tests/ui_diff.mjs` の結果・保留 150 件 |
 | `tools/python/REPORT_PY87.md` | ~61 | PY-87 (#2738): general の状態読出しゲッター 4 件 (getChangedFlag / getUseMetronome / getPrecount / getRecPPQ) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 146 件は #2830・#2831・#2832 |
 | `tools/python/REPORT_PY94.md` | ~120 | PY-94 (#2830): general 保留 25 件の PE 逆アセンブル。状態読出し 7 件 (undo 履歴 3・safeToEdit・project 文字列 3) を確定して mock/C 実装 (差分 0・値は仮置き)。残り 18 件は #2977・#2978・#2979 |
+| `tools/python/REPORT_PY121.md` | 72 | PY-121 (#2979): general の log・rec 系 4 件 (clearLog・dumpScoreLog・processRECEvent・getRecPPB) の PE 根拠 (entry・fn VA・書式・呼出し鎖)。戻り値の意味は未確定で実装なし。残りは #3001・#3002・#3003 |
 | `tools/python/REPORT_PY23.md` | ~85 | PY-23 (#1054): `enveditor` (Edison API・仕様は block24447) の実装と Audio scripts 12 本の import/実行検証。数値 oracle 6 本・NEG-d・未解決 |
 | `tools/python/REPORT_PY19.md` | ~57 | PY-19 (#792): `Score.loadScoreFromFile` (仮想 FS・JSON) と `ScriptDialog.DialogParams` (MOCK)・数え方の定義 (母集団 64) と再計算・実測・未解決 |
 | `tools/flp/REPORT.md` | ~120 | FLP/FST パーサ・ライタ・往復コーパス |
