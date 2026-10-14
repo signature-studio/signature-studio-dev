@@ -165,23 +165,27 @@ def direct_calls(img, md, rva, maxins=MAXINS):
 
 
 def reach(img, md, roots, depth=3):
-    """roots (name -> [rva]) から direct call を depth 段まで辿る。戻り値: rva -> (最浅深さ, 到達元 export 名の集合)。"""
+    """roots (name -> [rva]) の起点ごとに direct call を depth 段まで独立に辿る。戻り値: rva -> (最浅深さ, 到達元 export 名の集合)。
+    起点集合は子へ伝播させる必要があるため、起点を変えて全体を再訪する (BFS は起点ごと)。"""
+    calls = {}
     seen = {}
-    frontier = {}
     for name, vs in roots.items():
-        for v in vs:
-            frontier.setdefault(v, set()).add(name)
-    for d in range(depth + 1):
-        nxt = {}
-        for f, origins in frontier.items():
-            if f in seen:
-                seen[f][1].update(origins)
-                continue
-            seen[f] = (d, set(origins))
-            for c in direct_calls(img, md, f):
-                nxt.setdefault(c, set()).update(origins)
-        frontier = nxt
-    return seen
+        visited = set()
+        frontier = set(vs)
+        for d in range(depth + 1):
+            nxt = set()
+            for f in frontier - visited:
+                visited.add(f)
+                if f not in seen:
+                    seen[f] = [d, set()]
+                seen[f][0] = min(seen[f][0], d)
+                seen[f][1].add(name)
+                if d < depth:
+                    if f not in calls:
+                        calls[f] = direct_calls(img, md, f)
+                    nxt.update(calls[f])
+            frontier = nxt
+    return {f: (d, org) for f, (d, org) in seen.items()}
 
 
 def negative_control(elq, dsp, md, rows_entries):
@@ -249,7 +253,7 @@ def write_csv(rows):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, 'w', newline='') as f:
         w = csv.writer(f)
-        w.writerow(['entry_va', 'class', 'names', 'origin_exports', 'tools_ipp_poc', 'tokens', 'call_sites',
+        w.writerow(['entry_va', 'class', 'names', 'origin_exports', 'tools_ipp_poc', 'insns', 'call_sites',
                     'dsp_rva', 'dsp_depth', 'ratio'])
         for r in rows:
             named = r['class'] in ('identified', 'family_candidates')
@@ -310,7 +314,7 @@ def main():
     for f in origin:
         dsp_tok[f] = tokens(dsp, md, f)
         by_sig[sha(dsp_tok[f])].append(f)
-    print(f'dsp 候補本体: export 表の variant {len(variant_names)} 個 / export から call で 3 段内 {len(reached)} 個 / dsp .text 由来の IPPCODE 着地点 {len(dsp_hits)} 個 → 照合対象 {len(origin)} 個')
+    print(f'dsp 候補本体: export 表の variant {len(variant_names)} 個 / export から call で {REACH_DEPTH} 段内 {len(reached)} 個 / dsp .text 由来の IPPCODE 着地点 {len(dsp_hits)} 個 → 照合対象 {len(origin)} 個')
 
     ent_info = {}
     for e in entries:
