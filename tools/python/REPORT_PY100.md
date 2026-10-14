@@ -151,7 +151,7 @@
   - `tools/python/tests/provider_check.mjs` のみ競合 (2 箇所)。期待集合 `pe100` (本 PR) と `pe87` (main・PY-87 #2738 の general ゲッター 4 件) を両方残し、期待値を実装 81 → 85・未実装 354 → 350 に直した (`functions` 435 は不変)。
   - `fl_engine.c`・`fl_mock.mjs`・`channels_diff.mjs` は自動マージ。
 - 検証の差: main 側で `channels_diff.mjs` に `channels.soloChannel` の呼出しが 1 件、`device_diff.mjs` の `device.midiOutMsg` に 6 個目の引数の検査が入った (`git diff 48b950c1 bf653917 -- tools/python/tests`)。そのため呼出し数は 160 → 161、device 照合は 7 → 8 (rejects 4)。
-- 入力: fl-win64 の PE (`block00031_PE.bin`) と DATA 4 本だけを `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf ... --wildcards`、3.7 秒)。emsdk は `/opt/emsdk` (emcc 6.0.12) を使った。`fetch_inputs.sh` は `FL_WIN64_DIR` 指定で実行。
+- 入力: fl-win64 の PE (`block00031_PE.bin`) と DATA 4 本だけを `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf ... --wildcards`、3.7 秒)。emsdk は `[EMSDK]` (emcc 6.0.12) を使った。`fetch_inputs.sh` は `FL_WIN64_DIR` 指定で実行。
 
 | 検査 | コマンド (`tools/python` で実行) | 結果 | 所要 |
 |---|---|---|---|
