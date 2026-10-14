@@ -158,3 +158,48 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 - 未実施の理由: 本 run は probe の実装から IR 再生成・build・survey・ネガコンまでを 1 run に収める見込みが無かった。計測と結果の記録は次 run の作業とする。
 - 素材の注記: `pefile` が runner の python に無く、`disasm_fn.py` は `LD_M11_PE` 指定で動いた (本 run で `pip` は使えず、既存の venv 側の導入が要る)。
 - 受入条件 1・2・3 は未達のまま。
+
+## 11. 6 回目の run: `40ff70` の `p-144` probe の実装と測定 (`M11_INSTR_40FF70`)
+
+既知類型との関係: 該当なし (計測 hook の追加のみ。新規類型は未確定。既出 D4 変種 (DEFECTS.md) の範囲で読む)。
+
+### 11.1 実装
+
+- `m11_post.py`: `M11_INSTR_40FF70=1` のときだけ `function_40ff70` の wrapper 先頭に `m11_p144_obs(arg1)` を入れる。`PROBES` の index は変えない (末尾追加)。
+- `m11_ov.c`: `M11_INSTR_40FF70=1` のときだけ `m11_p144_obs` を定義する。`p-144` (= arg1-0x90) と先頭ノードの `word [head]` を `stderr` に `[m11][p144]` として出す。線形メモリ外は読まない。
+- `m11_build.sh`: `M11_INSTR_40FF70` を CF に渡し、`ov.o` と `boot_final3.ll` を stamp で無効化する。既定 0 は従来どおり。
+
+### 11.2 測定 (全体 survey = `SV_RAW=1 node survey_units.mjs`、素材 `fl-win64` を `$RUNNER_TEMP`)
+
+| build | survey 集計 | unit 895 の `[m11][p144]` |
+|---|---|---|
+| probe ON (`M11_INSTR_40FF70=1`) | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` | `#1 arg1=0xc343f0 p-144=0x9078558948704d89 word[head]=0` |
+| probe OFF (既定) | `ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1` (前回 §8・§9 と一致) | (出力なし) |
+| probe ON・`SV_ONLY=895` (単独) | `oob 1` | `#1 arg1=0x0 p-144=0x0 word[head]=0` |
+
+- 集計は probe ON で ok +2 / oob -2 と動く。これは観測 hook が survey の分類を動かした**副作用の確認 (probe ON で分類が変わる)** であり、WORKFLOW §5 のネガティブコントロール (1 件を壊して FAIL を確認) ではない。この build の集計は計測専用で、既定の基準には使わない。
+- 全体 survey の `p-144 = 0x9078558948704d89` をリトルエンディアンで並べると `89 4d 70 48 89 55 78 90` となり、x86 機械語の断片に見える。`p-144` が本来のリスト先頭ではなく、コード・壊れた領域を指している可能性がある。ただし 1 件の観測であり、断定はしない。
+- 単独 (`SV_ONLY=895`) では `arg1=0`、`p-144=0` で、null 先頭からの読み出しになる (oob)。全体 survey と状態が異なる。
+
+### 11.3 受入条件
+
+1. unit 95 の `47ad70` index / arg1: 未達 (現行 main で OOB 不発。§8.2 と同じ)。
+2. unit 895 の `40ff70` の `p-144`: **部分達成**。全体 survey で 1 件の値を取得 (上記)。ただし値が機械語断片に見え、リスト先頭の出所・構造体の中身は未特定。`arg1` の出所 (`40ffe0` の引数) は未確認。
+3. DEFECTS 行案: 未達 (新規類型を確定できず)。
+
+### 11.4 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 全体 survey の `p-144` が機械語断片を指す原因 (壊れたリスト・誤った arg1 のどちらか) | 受入条件 2 | #882 の次 run (`arg1` の caller 側の値の取得) または #684 |
+| probe ON の集計 (872/14) と OFF (870/16) の差 (probe ON で分類が変わるため、probe ON の集計は基準に使えない) | 計測 hook が分類を変える | #684 (PM 判断) |
+| `functions_dll.csv` の素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM 判断 |
+
+### 11.5 検証 (測定 commit と差分)
+
+- 測定 commit: `19b21178` (コード変更の最後の commit。§11.1 の 3 ファイル)。
+- 測定 commit から HEAD までの差分 (`git diff 19b21178 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_882.md'`): 出力 0 byte (コード差分 0)。
+- 同 `--stat` (REPORT のみ): `tools/m11/trap_triage/REPORT_882.md | 18 ++++++++++++++----` (14 insertions, 4 deletions)。変わったのは本 REPORT の文書のみ。コードの再測定は不要。
+- §11.2 の 3 build は作業ツリーで測った。測定時の `git status --porcelain` は記録していない。`19b21178` と同一であることは、本 run では**確認できていない**。再測定 (`git worktree add --detach ... 19b21178`) は、`work-m11` 素材が本 run の `$ARTIFACTS_DIR` に無く (`fl-win64` のみ) 未実施。そのため §11.2 の数値は「作業ツリー測定・未再現」の値として扱い、基準には使わない。
+- 既定 build (probe OFF) は §11.2 の `870 / 16` で前回値 (§8・§9) と一致 (= 既定の挙動は変わらない)。
+- 差分確認: `git diff 31cb5831 19b21178 -- tools/m11` は `m11_build.sh` / `m11_ov.c` / `m11_post.py` の probe 追加のみ (既定 0 で無効)。
