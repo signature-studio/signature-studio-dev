@@ -4,7 +4,7 @@
 **自然起動 (DllMain attach) で最初の GUI API (`LoadStringW`) が shim に到達**した。942 unit の隔離 survey では GUI API **32 種**が shim に到達 (実装済み 31 / fail-fast stub 1 = `LoadImageW`)。
 `CreateWindowExW` は survey で **1 回だけ自然到達**したが、直前の `RegisterClassW` は呼ばれず (`GetClassInfoW` の後に直行)、窓は生成されない (§5-2 の lift 欠陥)。受入条件 1 の意図する「実登録を経た窓生成の自然到達」は未達。
 実 WNDCLASS を JS から指向呼出した場合は `RegisterClassW` ×2 が shim に届き、`TApplication` の窓 (hwnd 31bit) が生成できる。
-前回 FAIL だった S2 は、`SystemParametersInfoW` の未対応 action を fail-fast から `FALSE` 返却へ変えて解消した (§5-5)。判定器は緩めていない。
+前回 FAIL だった S2 は、`SystemParametersInfoW` の未対応 action を fail-fast から `FALSE` 返却へ変えて解消した (§5-5)。**S2 の gate 式は緩和した** (旧式: ff の fail-fast API は soft で STUB 必須 → 新式: soft で fail-fast が増えないことのみ。詳細は REPORT_APPENDIX §6i)。S1 の判定式は変えていない。
 再現: `bash tools/gui/flengine/e2e.sh` (gate 12 + ネガコン 5。FAIL なら exit 1)。
 
 > **注 (review #576 指摘 2・5)**: §1 表・§4 の数値は merge 前 (`b867b94` 以前) の測定。HEAD の実測は **§6c が正**。`EnumFontFamiliesExW` は現 main で IMPL (`gui_gdi.c` の `EnumFontFamiliesExW`)、`survey_soft.json` / `survey_ff.json` も IMPL と記録している。§3 の本文も同じ前提で書き直した。
@@ -363,7 +363,16 @@ review `b9f0b32b` の指摘 1 (S1) と 2 (run.mjs のコメント) への対応�
 
 ## 6i. S1 (soft) の unit 304/555 調査 (#1442 / GUI-21)
 
-結論: 304/555 は base・soft 両方で OOB (真因は #1426 で未達)。S1 は FAIL のまま (差は 101/291/296 の 3 unit)。判定は測定 commit `549e6817` 時点の judge.py によるもので、現 HEAD では未再測定。詳細と実測値は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §6i。
+結論 (測定 commit `719f1c43`・judge 13/14・S1 `870/1/47/24/0` vs base `867/1/47/27/0`): 304/555 は base・soft 両方で OOB (真因は #1426 で未達)。S1 は FAIL のまま (差は 101/291/296 の 3 unit)。
+
+| 判定 gate (現 HEAD) | 結果 | 備考 |
+|---|---|---|
+| S1 survey parity (soft) | FAIL `870/1/47/24/0` (base `867/1/47/27/0`) | 判定式は不変。FAIL は未解消 |
+| S2 soft adds no fail-fast beyond ff | PASS | **緩和した gate** (旧式 ff ⊆ STUB → 新式 soft fail-fast 増加なし)。旧式・新式とも現 HEAD の値で PASS |
+
+詳細と実測値は [REPORT_APPENDIX.md](REPORT_APPENDIX.md) §6i。
+
+- **測定 commit と鮮度の範囲**: 測定 commit `719f1c43` (main `d72318c0` を merge した HEAD)。測定 commit `549e6817` からの差分は `git diff 549e6817 719f1c43 -- tools/gui tools/m11 tools/shim tools/shared ':(exclude)*/results/*'` で 48 files (コード・文書含む)。e2e が実行するもののうち `tools/gui/flengine/judge.py`・`run.mjs`・`tools/m11/m11_win.c`・`m11_build.sh`・`m11_gen_ir2.sh` を含む。REPORT の判定はこの測定 commit を正とする。
 
 ## 7. 未解決
 
