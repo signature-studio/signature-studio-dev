@@ -148,7 +148,7 @@
 | P6 | VA `0x67240d` の書式即値 0 → 2 | 0 | 14 s | 16-bit | `2e067272` |
 
 - 同一入力 3 回 (B) の SHA-256 は一致 (`2e067272…`)。本 run の値は §15 の `13d61a05…` と異なる (run・環境差。§15 の表と同じ扱い)。
-- P1〜P6 の入力行 (`S2_PATCH`): 実行時の行は記録が残っていない (シェル履歴・ログに無い)。下記は表の VA と書換え内容から組み直した行で、**再実行は未実施**。`s2_imm_patch.py` を素材 `block00031_PE.bin` (FLEngine_x64.dll) のコピーに当てると期待バイトが一致し (exit 0)、逆アセンブルは `movzbq 0xe18(%rax),%rcx` → `mov $0x1,%ecx`、`movb $0x0,0x28(%rsp)` → `movb $0x1,…` / `$0x2` になる。
+- P1〜P6 の入力行 (`S2_PATCH`): 実行時の行は記録が残っていない (リポジトリと #2546 のコメントに無い)。下記は表の VA と書換え内容から組み直した行で、**再実行は未実施**。`s2_imm_patch.py` を素材 `block00031_PE.bin` (FLEngine_x64.dll) のコピーに当てると期待バイトが一致し (exit 0)、逆アセンブルは `movzbq 0xe18(%rax),%rcx` → `mov $0x1,%ecx`、`movb $0x0,0x28(%rsp)` → `movb $0x1,…` / `$0x2` になる。
 
 ```
 P1: S2_PATCH=$'ef6d4b|480fb688180e0000|b9010000000f1f00' bash tools/flp/s2_render_probe.sh Autogun.flp 1
@@ -175,11 +175,12 @@ P6: S2_PATCH=$'67240d|c644242800|c644242802' bash tools/flp/s2_render_probe.sh A
 **差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff aafd1c76 HEAD -- tools/flp/s2_render_probe.sh tools/flp/s2_imm_patch.py tools/startup tools/assets` の出力は空 (0 行)。本節を含む REPORT の commit (`tools/flp/REPORT.md`・`tools/flp/REPORT_APPENDIX.md`) だけが HEAD の差分。
 
 **未解決**
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `/R` の 32-bit float 経路 (書式を決める値・関数) が未特定 | 受入 1 未達 | #3052 ([L-14]) |
 | Render tests 82 本 + Demo 3 本の全数書き出しと sha256・メトリクス JSON の commit | 未着手。16-bit では受入 2 を満たさない | #3053 ([L-15]、依存は #3052) |
-| `RenderOptions` の保存値を `/R` が読まない理由 (ダイアログ経由の load 経路か) | 設定経由で形式を切り替えられない | #3052 |
+| `/R` が `RenderOptions` の保存値を読むかは未確定 (`General\Render` の単一相対名は 0 件。`Render` 単独・`General` 直下は未確認) | 設定経由で形式を切り替えられるかを判定できない | #3052 |
 | `Render` 単独・`General` 直下からの open と、`WAV bit depth`・`Export WAV` の値の読出しが未測定 (probe は `NtOpenKeyEx` の鍵名だけ抽出) | `RenderOptions.load` を `/R` が通るかを判定できない | #3052 |
 | P1〜P6 の入力行は未記録。§16.1 の行は組み直しで、未再実行 | §16.1 の P1〜P6 の結果は組み直した行では確認していない | #3052 |
 | data SHA-256 が run・環境で変わる (`2e067272` 本 run / `13d61a05` §15) | 決定性は同一 run 内 3 回一致まで | #2546 にコメント済み (issuecomment-6178890982) |
