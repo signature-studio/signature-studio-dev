@@ -167,6 +167,7 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 | A | root 行 27 件が gain の `*Dsp`/`*MasterDsp`/`*DspModel` の vtable slot に載る | 27 / 27 |
 | B | 非 root 行 133 件で、親関数の `call_site_rva` の命令が `call`/`jmp` rel で子 `func_rva` を指す | 133 / 133 |
 | D | 親鎖を辿ると全行が root に到達する | 160 / 160 |
+| C (情報) | `func_rva` が .pdata の関数先頭と一致 | 113 / 160 (残り 47 は leaf sweep で拾った関数) |
 
 - 測定時間: `verify_gain_tsv.py` 8.432 s (測定 commit `264893e2`)。
 
@@ -178,7 +179,6 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 | 非 root 行 1 件 (`func_rva` 0x5c50) の `call_site_rva` を +1 (0x4d096 → 0x4d097) | B | 133 / 133 | 132 / 133 | 0x5c50 |
 
 - 検査は両方とも 1 件の破損で FAIL し、他の検査 (C・D) は変わらない。レビュワーが別環境で同じ 2 件を壊して得た値 (26 / 27・132 / 133) とも一致。
-| C (情報) | `func_rva` が .pdata の関数先頭と一致 | 113 / 160 (残り 47 は leaf sweep で拾った関数) |
 
 - 判定: **受入 1 (各関数を手で確認し `verified=manual`) は未達**。上記は機械照合であり、人手検証ではない。`verified` 列は 160 行すべて `auto` のまま残した。
 - 受入 2 (手検証 160 との差分 0): **未達・判定不能**。手検証の集合が無いため、差分は取れない。機械照合で「TSV の 160 行は gain の direct closure の再現として整合する」ことまでは言える。
