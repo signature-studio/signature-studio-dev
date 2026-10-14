@@ -10901,7 +10901,9 @@
     "mcp_tools": [],
     "kwsig": {
      "flags": 1,
-     "fmt": null
+     "fmt": "i|ii",
+     "required": 1,
+     "max": 3
     }
    },
    "isValid": {

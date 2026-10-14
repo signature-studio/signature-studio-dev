@@ -4,7 +4,7 @@
 既知の類型との関係: 該当なし (lift していない)。
 
 ## 結論 (1 行)
-REX DLL の export 14 本の閉包を `rex_closure.py` で実測 (0.6 秒・再実行で JSON 一致)。最小の `REXGetCreatorInfo` は 22 関数・924 命令・間接 0。`REXCreate` (514 関数) など REX 読込の中核は閉包が大きいため、lift と差分テストは子 issue に分ける。**lift は §7 (T-SH-44 #2733 の部分達成) に記録**。
+REX DLL の export 14 本の閉包を `rex_closure.py` で実測 (0.6 秒・再実行で JSON 一致)。最小の `REXGetCreatorInfo` は 22 関数・924 命令・間接 0。`REXCreate` (514 関数) など REX 読込の中核は閉包が大きいため、lift と差分テストは子 issue に分ける。**lift は §7 (T-SH-44 #2733 の部分達成) に記録**。中核閉包 (REXCreate 等) の lift と参照元の特定は §8 (T-SH-45 #2734 の部分達成)。
 
 ## 0. 位置づけ
 - 方針: `docs/DECISIONS.md` D20 (#163 の PM 判断, 2026-10-14)。REX は**所有者限定 tier でのみ lift**し、FL 本体と別の side module にして、ビルドフラグで除外できる構成にする。優先度は低いまま。
@@ -133,3 +133,78 @@ FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/rex/lift_x64c.sh all   
 
 ### 7.8 測定後のコード差分 (差分 0 の証跡)
 `git diff fe5f7a4f HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし。以降は本 REPORT の文言のみ)。HEAD は本 REPORT を含む commit。実行経路 (`tools/flelift`・`tools/shared/env.sh`) も範囲に含めた。
+
+## 8. 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の x64c lift と参照元の特定 — T-SH-45 (#2734, 部分達成)
+
+測定 commit: `5fe86502` (`tools/shared/lift/rex/` の最後のコード変更: `importers.py` の store 検索の修正。`lift_core.sh` は `fa18c860` から変更なし)。以降の差分は本 REPORT のみ (差分 0 の証跡は §8.8)。
+既知類型との関係: 該当なし (差分テストは未実施。unsup の内訳は §8.3)。
+
+### 8.1 結論 (1 行)
+3 export の閉包を x64c で lift して wasm (854,208 B) のコンパイルまで通した (519 関数・22,987 命令・unlifted callee 0・unsup 50)。REX export を呼ぶ importer は REX 本体を除く **32 件**で、GetProcAddress の結果を slot 経由で呼ぶ 1 段の静的追跡で確定した。REXGetInfoFromBuffer は 31 件の importer で slot に格納されるが、その呼出は 0 件 (未確認。§8.4)。**元の機械語との差分テストは未実施**: REX 入力 (`.rx2` 等) が素材に無い (受入 3)。差分・side module (受入 5) は子 issue に分けた (§8.5)。
+
+### 8.2 方法
+- lift: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/rex/lift_core.sh`。root は export の RVA 0x10b0 (REXCreate)・0x1170 (REXGetInfoFromBuffer)・0x1280 (REXRenderSlice)。`x64c.py --closure 99` (§7.2 と同じ配置) → emcc (`lift_x64c.sh` と同じ設定)。
+- **間接 call/jmp の解決方法** (x64c の仕様。`tools/flelift/x64c.py` の `ott_dispatch`):
+  1. IAT への直接 call (`call [rip+IAT]`) → import 名へ静的に直結 (34 名)。
+  2. jump table (Delphi 形・MSVC 形) → 静的に展開 (`jt_ranges` 2 範囲)。
+  3. それ以外の register 間接 call/jmp → 実行時に `ott_dispatch(t)` が lift 済み関数表 (519) と IAT pseudo-VA を引く。表に無い先は `ott_unlifted` で止まる (fail-fast)。**静的には先を確定しない**。
+- importer: `python3 tools/shared/lift/rex/importers.py <fl-win64 展開先>` (`grep -rl REXCreate` で 33 件を取り、REX 本体 `block24351` を除く)。判定は次の 1 段:
+  (1) `lea reg,[rip+d]` が REX 名の文字列 VA を指す → (2) 直後 12 命令以内の GetProcAddress 呼出 (`call`/`jmp [rip+IAT]`)。直接 call 先 (ヘルパ) は 2 段まで辿る → (3) 直後 4 命令以内 (rax を上書きする call/jmp/ret・rax への書込みの手前まで) の `mov [rip+S],rax` で slot S に束縛 → (4) `call [rip+S]` (または `mov reg,[rip+S]` の後 6 命令以内の `call reg`) を呼出とみなす。
+  - 文字列の存在だけでは判定しない。IAT・遅延 import に REX 名は 0 件 (33 件すべて)。
+
+### 8.3 実測 (測定 commit `5fe86502`・HEAD 上で実行。`lift_core.sh` は emcc 込みで 4 回、`importers.py` は 2 回)
+| 項目 | 値 |
+|---|---|
+| 閉包 (3 root 同時) | 関数 519・命令 22,987・unlifted callee 0・import 34 (IAT 78 のうち使用 34) |
+| root 別 (参考・単独) | REXCreate 481 関数・19,727 命令 / REXGetInfoFromBuffer 248・8,914 / REXRenderSlice 145・7,162 |
+| unsup 50 箇所 | movnti 24・x87 14 (`fld` 3・`fstp` 2・`fyl2x`・`frndint`・`fxch`・`fsub`・`f2xm1`・`fld1`・`faddp`・`fscale`・`wait`)・repz ret 9・repne scasb 3。閉包内で実行されたかは未計測 |
+| register 間接 call/jmp (`ott_dispatch`) | 101 サイト。静的に先を確定できたのは 0 件。表に無い先の件数は差分テスト未実施のため未計測 |
+| wasm | 854,208 B (emcc 6.0.12・`-O1`)。コンパイル成功 (n=4 で同値)。`toolchain-emsdk` 素材は本 run に無いため、上流の `emsdk install 6.0.12` (`tools/m1/flags.sh` の pin と同版) を取得して実測 |
+| 所要 | lift + emcc は `lift_core.sh` の elapsed で 6〜7 s (n=4)。load (1 分値) は開始 0.45〜0.61・終了 0.54〜0.67 (4 vCPU)。importer 解析 52.6〜53.7 s (n=2) |
+
+注: §3 の間接数 (REXCreate 74・REXGetInfoFromBuffer 42・REXRenderSlice 15) は `rex_closure.py` (pefile の近似) の数え方で、x64c の 101 とは対応しない。比較しない。
+
+### 8.4 参照元の特定 (受入 2)
+- 33 件のうち REX 本体 `block24351` は export 本体で、GetProcAddress を持たない。残り **32 件が importer** で、全件が REX 名 12 件の文字列を参照し、GetProcAddress で解決する (IAT 直載せ 0 件・遅延 import 0 件)。
+- 12 名の格納と呼出 (測定 commit `5fe86502`・`importers.py --json` の集計)。格納 = GetProcAddress の直後に rax を rip 相対 slot へ保存した importer 数。呼出 = その slot への `call [rip+S]` (または `mov reg,[rip+S]` の後の `call reg`) の件数:
+
+| export | 格納 (slot へ束縛した importer) | 呼出を確定した importer (呼出件数) | 呼出を確認できない slot 読込 (importer) |
+|---|---:|---|---|
+| REXCreate | 32 | 31 (31) | 1 (`block24341`) |
+| REXDelete | 32 | 32 (33) | 0 |
+| REXGetInfo | 32 | 32 (32) | 1 (`block24341`。同 importer は同名の呼出も 1 件) |
+| REXGetSliceInfo | 32 | 32 (32) | 0 |
+| REXGetCreatorInfo | 32 | 31 (31) | 1 (`block24341`) |
+| REXRenderSlice | 32 | 31 (31) | 1 (`block24341`) |
+| REXSetOutputSampleRate | 32 | 2 (3) (`block23609`・`block24341`) | 0 |
+| REXRenderPreviewBatch | 31 | 1 (1) (`block24341`) | 0 |
+| REXSetPreviewTempo | 31 | 1 (1) (`block24341`) | 0 |
+| REXStartPreview | 31 | 1 (1) (`block24341`) | 0 |
+| REXStopPreview | 31 | 1 (1) (`block24341`) | 0 |
+| REXGetInfoFromBuffer | 31 | **0 (0)** | 0 |
+
+- REXGetInfoFromBuffer の呼出 0 件は「呼出が無い」の証明ではなく、本判定の範囲で確認できなかったという意味。判定は rip 相対の `mov reg,[rip+S]` と `call [rip+S]` だけを数える。`lea` で番地を取る参照・`cmp` の読込・構造体へ転記した後の参照は数えていない。
+- `block24341` は 4 名 (REXCreate・REXGetCreatorInfo・REXGetInfo・REXRenderSlice) の slot を、直後に呼出を確認できない形で 1 件ずつ読む。REXGetInfoFromBuffer は同 importer で格納 1 件のみ (読込・呼出 0 件)。
+- `block23609` の未束縛の GetProcAddress は 10 サイト (REXGetInfoFromBuffer 2・REXRenderPreviewBatch 2・REXSetPreviewTempo 2・REXStartPreview 2・REXStopPreview 2)。REXGetInfoFromBuffer の 1 サイト (0x18030e8c0) は、GetProcAddress の結果 (rax) を slot に保存する前に、次の GetProcAddress 呼出 (REXGetCreatorInfo) が rax を上書きする (逆アセンブルで確認)。もう 1 サイトは同じ規則で未束縛と判定したが、逆アセンブルは未確認。残り 4 名は rip 相対 slot への保存が無く、構造体への格納等は未確認。
+
+### 8.5 未解決 (起票先)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| REX 入力 (`.rx2` 等) が素材に無い。fl-win64 の全エントリ 25,168 件 (`tar --zstd -tf` の行数。ディレクトリ 1 件を含む。非ディレクトリ 25,167 件、`extracted/` 配下の通常ファイル 25,166 件) のうち、名前に REX・`.rx2`・`.rex` を含むものは 0 件 (大文字小文字を区別しない)。WORKFLOW §11 の許可素材名のどれも REX 入力を含むと確認できない。よって元の機械語との差分テスト (受入 3) と戻り値・書込・import の一致は未検証 | 中核閉包の動作は未確認。lift の正しさは未検証 | 子 [T-SH-49] (素材待ち: PM が REX 入力の素材名を定めて投入する) |
+| 所有者限定 tier の side module 化・ビルドフラグ除外 (受入 5) を中核閉包へ適用 | 公開 tier への混入防止が未実施。現時点の生成物は `tools/shared/work/` (gitignore) のみで commit していない | 子 [T-SH-48] (関連 #2896) |
+| register 間接 call 101 サイトの実行時の解決 (表に無い先の件数)・x64c unsup 50 箇所 (閉包内での到達) | 間接先と unsup の完全性は未確認 | 子 [T-SH-49] (差分テストで計数) |
+| `block23609` の未束縛の GetProcAddress 10 サイト (REXGetInfoFromBuffer 2・REXRenderPreviewBatch 2・REXSetPreviewTempo 2・REXStartPreview 2・REXStopPreview 2) の格納先 (構造体等)・`block24341` の呼出を確認できない slot 読込 4 件 (REXCreate・REXGetCreatorInfo・REXGetInfo・REXRenderSlice)・REXGetInfoFromBuffer の呼出 (格納 31 件・呼出 0 件) | importer 32 件はすべて何らかの export の呼出を確定した。ただし REXGetInfoFromBuffer の呼出は未確認で、上の読込 4 件と未束縛 10 サイトの先は未確定 | 子 [T-SH-49] |
+
+### 8.6 検証範囲
+- **検証した**: lift (519 関数・unsup 50)・emcc のコンパイル (854,208 B・上流 emsdk 6.0.12 で 4 回)・importer 解析 (32 件・HEAD 上の 2 回で JSON が `cmp` 一致)。
+- **範囲外**: 元の機械語との差分テスト・wasm の実行 (素材なし)・side module (受入 5)・成功経路。
+
+### 8.7 再現
+```
+FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk 6.0.12 の emsdk_env.sh> bash tools/shared/lift/rex/lift_core.sh   # lift + wasm (コンパイル確認。EMSDK_ENV 省略時は `[EMSDK]` の emsdk_env.sh)
+python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json        # importer 33 件 (REX 本体を含む)
+```
+`<fl-win64 展開先>` は `extracted/` を含むディレクトリ (`tar --zstd -xf fl-win64.tar.zst -C <dir>`)。生成物は `tools/shared/work/lift/rex-core/` (gitignore)。
+
+### 8.8 測定後のコード差分 (差分 0 の証跡)
+`git diff 5fe86502 HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし)。HEAD は本 REPORT を含む commit。
