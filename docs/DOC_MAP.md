@@ -279,7 +279,7 @@
 | `tools/shimx/BACKLOG.md` | ~540 | shimx の未解決一覧 |
 | `tools/shimx/pathreg/REPORT.md` | ~200 | パス写影/レジストリ永続化の shimx 側インタフェース接続 |
 | `tools/shimx/pathreg/REPORT_CAB-271.md` | ~230 | CAB-271: default mount table の遅延ロード |
-| `tools/startup/REPORT.md` | ~85 | FL 起動シーケンス / 子プロセス / ゲート / レジストリ / スタブ計画 |
+| `tools/startup/REPORT.md` | ~160 | FL 起動シーケンス / 子プロセス / ゲート / レジストリ / スタブ計画 |
 | `tools/startup/helpviewer/REPORT.md` | ~185 | FL の Help 起動経路 (静的解析) + Help を sandbox iframe に出す viewer / error-offline.html 差替 |
 | `tools/startup/glue/REPORT.md` | ~200 | THostInstance + CreateFruityInstance 呼出 + 終了処理 |
 | `tools/startup/keyfix/REPORT.md` | ~165 | vreg low-key 112 エントリ確定 + username 二重表記の統一 |
