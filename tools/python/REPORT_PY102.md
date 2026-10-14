@@ -12,6 +12,7 @@
 
 ## 測定
 
+- 注記: 本節 (`4ecc1062`) は main 取り込み前の測定。main 取り込み後の正本は §8 (測定 commit `4f621cad`)。
 - 測定 commit (コードを変えた最後の commit): `4ecc1062` (main 取り込み後の修正)。`f9666241` は `origin/main` (`5405a304`) の merge で、競合は `flapi_table.py`・生成物 (`flapi_table.json`・`fl_table.c`)・テスト 2 件。取り込みで、表の 23 件の不一致と未実装 19 件は main の #2927 (PR #2956) で解消済み。`83508efa` (`pe102` コメント修正。挙動は変えていない) の後、`4ecc1062` までのコード差分は main の取り込みと、その解消 (`flapi_table.py` の `EXTRA_PARAMS` に `arity_from: kwsig` を付けた 1 行)。統合前の PY-102 のコードは `445dbf9c`・`63fbd940` にある。
 - 差分 0 の証跡: `git diff 4ecc1062 HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。`4ecc1062` から HEAD までの変更ファイルは `tools/python/REPORT_PY102.md` だけ。
 - 検証起点: origin/main `b2b052ce` (着手時)。
@@ -148,3 +149,34 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 - issue の「`tools/python/REPORT_PY62.md` §4」: 当該ファイルは存在しなかった。#2027 の記録は REPORT_PY61 §3・REPORT_PY70 §3 にある。
 - issue の「`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (48/48)」: 実測どおり (§検証)。`tests/provider_check.mjs` の実装件数は PY-102 で 77 → 78、統合後に 80。
 - 推定 (根拠付き): 24 件の不一致のうち、muteTrackLock 以外は PE 側の正しさも stub 側の正しさも未確定。関数ごとの binary 検証は子 #2927。
+
+## 8. main 取り込み後の再測定 (測定 commit `4f621cad`)
+
+- 取り込みの経緯: main の #2955 (PY-113・`playlist.setTrackColor` のバイト順) と #2976 (PY-115・mixer の色) が `host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs` を変えたため、PR と競合した。`origin/main` (`f82768d9`) を merge して解消した (PR コメントに解消方針)。
+  - `setTrackColor`: main の格納式を採用。`muteTrackLock` は残す。
+  - `fl_engine.c` の構造体: `Mix.color_set` (main) と `Pl.lock` (本 PR) を両方残す。
+  - `provider_check.mjs`: `pe102` と `pe115` を両方の集合に入れる。件数は main の `impl 84` に muteTrackLock の +1 で `impl 85・unimpl 350`。
+- 測定 commit: `4f621cad` (コードを変えた最後の commit)。`4f621cad` から HEAD までのコード差分は 0 行 (`git diff 4f621cad HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests`)。
+- `4ecc1062` からの差分は main 側の変更を含む (`git diff --stat 4ecc1062 4f621cad -- <同範囲>` = 6 files, 229 insertions(+), 13 deletions(-))。そのため §測定の値は再測定し、本節が正本になる。
+- 環境: GitHub Actions runner (4 コア)。開始時 `/proc/loadavg` は `0.17 0.34 0.18`。素材は `fl-win64` の 5 block を `FL_WIN64_DIR` 配下に展開 (`extracted/`)。emsdk は [EMSDK] の既定パスに 6.0.12 を上流から取得して配置 (`toolchain-emsdk` 素材は本 run に無い)。stubs は `fetch_inputs.sh`。CPython wasm は `build_cpython_wasm.sh` で作成。
+
+| 検証 | 実行 | 結果 | 所要 |
+|---|---|---|---|
+| CPython wasm | `bash build_cpython_wasm.sh` | exit 0 | 3m52s |
+| provider wasm | `bash provider/build.sh` | flprov.wasm 57,402 B。fl_table.c 435 関数・ハンドラ 85 | 1.1 s |
+| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… EMSDK_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成差分 0 (`git status` が空) | 5.6 s |
+| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 85・unimplemented 350・PASS | - |
+| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425 | 1.8 s |
+| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・host_calls 37,425 | 1.9 s |
+| playlist 差分 | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段 PASS | - |
+| mixer 差分 | `node tests/mixer_diff.mjs` | calls 57・diffs 0・PASS (main の PY-115 で件数増) | - |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 123・diffs 0・PASS | - |
+| device 差分 | `node tests/device_diff.mjs` | calls 8・diffs 0 (rejects 4・midi_out 5)・PASS | - |
+| 表の再生成・ネガコン | `FL_WIN64_DIR=… bash tests/flapi_table_check.sh` | 正常系の差分 0/3・ネガコン PASS・fail 0 | 2.0 s |
+| kwsig 照合 | `python3 tests/kwsig_check.py` | OK | - |
+| kwsig 束縛 | `python3 tests/kwsig_bind_check.py` | PASS (103 関数・6,122 ケース・misbind 0・mismatch 0) | 0.1 s |
+| 引数個数 (after) | `python3 analysis/flapi/sig_arity_check.py <origin/main の表> analysis/flapi/flapi_table.json` | 対象 273・一致 273・不一致 0 | - |
+| 実害の実測 (§3-2) | `node tests/sig_arity_probe.mjs` | kwsig_targets 24・implemented 5・fails 0・PASS | - |
+
+- NC1 (差分検査): `host/fl_mock.mjs` の `playlist.muteTrackLock` を `arity(a, 1, 1)` に戻すと、`tests/playlist_diff.mjs` は `playlist 差分 12 件` で FAIL (AssertionError)。元に戻すと PASS (calls 23・diffs 0)。
+- 製品 KPI: 起動・GUI・ウィンドウに関わらないため、KPI の前後は書かない。
