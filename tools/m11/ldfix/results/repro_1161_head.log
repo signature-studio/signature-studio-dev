@@ -1,0 +1,118 @@
+[audit_lsf_ssa_e2e] 1/6 audit_lsf.py (#484) の集計
+{"functions": 7421, "mach_fns": 7421, "lsf_sites": 90, "lsf_unresolved_base_sites": 370, "fns_with_unresolved_base": 169, "range_table_shorter_than_ir_labels": 534, "fns_with_lsf": 65, "suspect_mixed_fns": 118, "suspect_use_fns": 49, "suspect_use_args": 53, "range_table_le_2_bytes": 15, "suspect_fns": 8, "suspect_sites": 11}
+[audit_lsf_ssa_e2e] 2/6 audit_lsf_ssa.py
+{"functions": 7421, "lsf_sites_arg": 90, "lsf_sites_unresolved": 370, "fns_unresolved": 169, "alg1_flagged_fns": 26, "alg2_flagged_fns": 38, "alg3_flagged_fns": 77, "alg1_or_alg2_fns": 41, "alg_any_fns": 83}
+{"lsf/frame/FRAME": 52, "lsf/store/NOCAND": 1, "lsf/store/OK": 17, "lsf/store/SUSPECT": 20, "unk/frame/FRAME": 178, "unk/store/NOCAND": 28, "unk/store/OK": 156, "unk/store/SUSPECT": 8}
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 17, "unk/NOCAND": 28, "unk/SHALLOW": 78}
+[audit_lsf_ssa_e2e] 3/6 window_recount.py (独立再計算)
+{"window_pairs": 420, "window_fns": 210, "dataflow_sites": 460, "dataflow_nonframe": 230, "window_not_in_dataflow": 0, "window_in_dataflow_nonframe": 219}
+[audit_lsf_ssa_e2e] 4/6 dyn_xcheck.py
+[1] 既知 TRUE_DROP 8 関数 (#484 §3) の動的 verdict
+  5c0270   match     cases={'equal': 6, 'native_fault': 3} tags=[]
+  41a670   match     cases={'native_fault': 3, 'equal': 6} tags=[]
+  66e080   mismatch  cases={'both_fault': 3, 'wasm_trap': 6} tags=['xmm_arg_drop', 'fp_flag_unreflected', 'wasm_trap']
+  7e5240   mismatch  cases={'native_fault': 6, 'diff': 3} tags=['simd_helper']
+  806740   unexec    cases={'both_fault': 9} tags=[]
+  c62780   unexec    cases={'native_fault': 4, 'both_fault': 5} tags=[]
+  417b70   unexec    cases={'native_fault': 1, 'both_fault': 8} tags=[]
+  409c80   mismatch  cases={'equal': 1, 'native_fault': 4, 'diff': 1, 'both_fault': 3} tags=['spill_slot_deref', 'rep_string_helper']
+  集計 {'match': 2, 'mismatch': 3, 'unexec': 3} (分母 8 関数。match/unexec = 動的差分では脱落を見ていない)
+[2] base 解決不能 169 関数の動的 verdict {'unexec': 92, 'match': 25, 'mismatch': 52}
+[3] うち frame 宛でない site を持つ 109 関数 {'unexec': 55, 'mismatch': 36, 'match': 18}
+[audit_lsf_ssa_e2e] 5/6 tally_510.py
+[1] 母集団: base 解決不能 LSF site 370 / 169 関数
+    frame 宛 (spill) 178 / store 宛 192
+[2] store 宛 192 site の最終判定 (source, verdict): {('auto', 'DROP'): 52, ('auto', 'OK'): 57, ('manual', 'DROP'): 37, ('manual', 'OK'): 44, ('manual', 'UNDET'): 2}
+    DROP 89 site / 51 関数 (うち目視確認 37 site, 自動 (cell oracle) 52 site)
+    UNDETERMINED 2 site: [('412680', '412689'), ('681760', '681969')]
+    DROP の型: {'cell(rip 相対セルの 2 段->1 段)': 86, 'その他(base/定数/0 を書く等)': 3}
+    DROP 関数: 525600 7a6c80 806820 cf36c0 d0cee0 d28b00 d34290 dc0f70 dc1440 df7c00 e2a8a0 e53810 e5a740 e5af90 e814c0 ea8210 fe95a0 ff63f0 100a3d0 100be60 101b780 101d180 1021620 1021b10 1024960 10296b0 1046780 1046a30 11c8d20 11c90f0 11c98e0 11ca870 11d44b0 11d47c0 11d4b70 11d4df0 11e79d0 126bdb0 126e650 1280530 128ade0 128c320 128f9e0 12af5c0 12b5540 12bd7c0 12c92e0 12d0c10 12d6920 12e6720 1365660
+[3] 静的方式 vs 目視 (目視済みの store 宛 unk site のみ。UNDETERMINED 除く)
+    目視済み 81 site (TRUE_DROP 37 / OK 44)
+    alg2 (SUSPECT|NOCAND)              TP=5 FP=29 FN=32  感度=5/37
+    alg3 (SHALLOW|NOCAND)              TP=30 FP=27 FN=7  感度=30/37
+    cell oracle (CELL_COLLAPSED)       TP=34 FP=0 FN=3  感度=34/37
+    alg2 | cell oracle                 TP=36 FP=29 FN=1  感度=36/37
+    alg3 | cell oracle                 TP=36 FP=27 FN=1  感度=36/37
+    alg3 SHALLOW のみ (NOCAND 除く)        TP=26 FP=4 FN=11  感度=26/37
+    alg3 SHALLOW | cell oracle         TP=35 FP=4 FN=2  感度=35/37
+[4] 既知 TRUE_DROP 8 関数 (#484) での静的方式の感度 (関数単位)
+    409c80  alg1=False alg2=False alg3=False
+    417b70  alg1=True alg2=True alg3=True
+    41a670  alg1=True alg2=False alg3=False
+    5c0270  alg1=True alg2=True alg3=True
+    66e080  alg1=True alg2=True alg3=True
+    7e5240  alg1=False alg2=True alg3=True
+    806740  alg1=True alg2=True alg3=True
+    c62780  alg1=True alg2=True alg3=True
+    関数単位 (alg1|alg2|alg3): 7/8
+[5] 20 関数標本 (random.Random(510).sample(169 関数, 20)) での 静的 vs 動的 vs 目視
+    410b10   sites=2 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=mismatch
+    43e240   sites=2 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=match
+    45e3c0   sites=2 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    5c5500   sites=1 store宛=1 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    5e0eb0   sites=1 store宛=1 静的flag=False 目視DROP=False 最終DROP=False 動的=match
+    6be960   sites=2 store宛=2 静的flag=False 目視DROP=False 最終DROP=False 動的=mismatch
+    8261a0   sites=1 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    c62720   sites=1 store宛=1 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    cf3790   sites=24 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=mismatch
+    de10c0   sites=1 store宛=1 静的flag=False 目視DROP=False 最終DROP=False 動的=match
+    ea77c0   sites=1 store宛=1 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    f40840   sites=8 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    fe95a0   sites=1 store宛=1 静的flag=True  目視DROP=True  最終DROP=True  動的=unexec
+    ff8b60   sites=3 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    100b890  sites=1 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=match
+    11d47c0  sites=5 store宛=5 静的flag=True  目視DROP=True  最終DROP=True  動的=unexec
+    126cad0  sites=1 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    126e650  sites=4 store宛=4 静的flag=True  目視DROP=True  最終DROP=True  動的=mismatch
+    12d4610  sites=1 store宛=0 静的flag=False 目視DROP=False 最終DROP=False 動的=unexec
+    12e6720  sites=2 store宛=2 静的flag=True  目視DROP=True  最終DROP=True  動的=unexec
+    store 宛 site を持つ標本関数 10 / 20 のうち: 静的 flag 4, 最終 DROP 4, 動的 mismatch 2, 動的 match 2, 動的 unexec 6
+    最終 DROP の標本関数 4 本の動的 verdict: {'unexec': 3, 'mismatch': 1}
+[6] 全 169 関数: 最終 DROP 関数 51 本の動的 verdict (liftdiff batch_closure): {'mismatch': 18, 'unexec': 28, 'match': 5}
+[7] frame 宛 (spill) 178 site: cell oracle (幅 64 以外の load でセル自身を読む形のみ検出) {'-': 75, 'CELL_DEEP': 66, 'CELL_COLLAPSED': 37}, CELL_COLLAPSED の関数 22
+    目視済み (消費者判定) 27 site: {('NO_CONSUMER', 'CELL_COLLAPSED'): 2, ('NO_CONSUMER', 'CELL_DEEP'): 3, ('OK_LOAD', '-'): 9, ('OK_LOAD', 'CELL_COLLAPSED'): 1, ('OK_LOAD', 'CELL_DEEP'): 6, ('TRUE_DROP', 'CELL_COLLAPSED'): 3, ('TRUE_DROP', 'CELL_DEEP'): 3}
+    frame 宛 TRUE_DROP (目視) 6 site / 4 関数, 目視未確認の oracle 候補 31 site / 18 関数
+[8] 脱落関数の和集合: store 宛 DROP 51 関数 + frame 宛 (目視 TRUE_DROP または oracle 候補) = 69 関数 / 169 関数
+[drops_510.tsv] results/ と一致
+[audit_lsf_ssa_e2e] 6/6 ネガティブコントロール
+[NC0] 無改変
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 17, "unk/NOCAND": 28, "unk/SHALLOW": 78}
+  alg1_fns=26 alg2_fns=38 alg3_fns=77 (alg1|alg2)=41 cell={'CELL_COLLAPSED': 123, 'CELL_DEEP': 85}
+  5c0270: alg2=[('5c0301', 'SUSPECT'), ('5c032f', 'SUSPECT')] alg1_deficit=[(64, 2)]
+  100be60: alg2=[('100be69', 'OK')] alg1_deficit=[(32, 0)]
+  525600: [('525622', 'alg3=SHALLOW', 'CELL_COLLAPSED')]
+  52a750: [('52a7a8', 'alg3=OK', 'CELL_DEEP'), ('52a7b1', 'alg3=OK', 'CELL_DEEP')]
+[NC1] 5c0270 の脱落 store 2 件を load 経由に修復した IR
+  patched stores: 2
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 15, "unk/NOCAND": 28, "unk/SHALLOW": 78}
+  alg1_fns=25 alg2_fns=37 alg3_fns=76 (alg1|alg2)=40 cell={'CELL_COLLAPSED': 123, 'CELL_DEEP': 85}
+  5c0270: alg2=[('5c0301', 'OK'), ('5c032f', 'OK')] alg1_deficit=[(64, 0)]
+[NC2] 100be60 の load 由来 store (store i32 %0, ptr %3) を trunc %arg2 に差し替えた IR
+  patched stores: 1
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 17, "unk/NOCAND": 28, "unk/SHALLOW": 78}
+  alg1_fns=27 alg2_fns=39 alg3_fns=77 (alg1|alg2)=42 cell={'CELL_COLLAPSED': 123, 'CELL_DEEP': 85}
+  100be60: alg2=[('100be69', 'SUSPECT')] alg1_deficit=[(32, 1)]
+[NC3] image の 5c0270 区間 (5c0270..5c0392) を nop に潰した機械語
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 15, "unk/NOCAND": 28, "unk/SHALLOW": 78}
+  alg1_fns=25 alg2_fns=37 alg3_fns=76 (alg1|alg2)=40 cell={'CELL_COLLAPSED': 123, 'CELL_DEEP': 85}
+  5c0270: (site 無し = 列挙から消えた)
+[NC4] ablation: --no-alloca-prop (reg2mem alloca 経由の由来伝播を切る)
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 17, "unk/NOCAND": 28, "unk/SHALLOW": 78}
+  alg1_fns=31 alg2_fns=42 alg3_fns=77 (alg1|alg2)=45 cell={'CELL_COLLAPSED': 123, 'CELL_DEEP': 85}
+[NC5] 525600 の cell 1 段 load を 2 段 load (cell -> 実変数) に修復した IR
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 17, "unk/NOCAND": 28, "unk/SHALLOW": 77}
+  alg1_fns=26 alg2_fns=38 alg3_fns=76 (alg1|alg2)=41 cell={'CELL_COLLAPSED': 122, 'CELL_DEEP': 86}
+  525600: [('525622', 'alg3=OK', 'CELL_DEEP')]
+[NC6] 525600 の load をセル内容 V (image 実データ 0x11e60b4 = 18768052) 直読みにした IR (RetDec の静的解決を模擬)
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 17, "unk/NOCAND": 28, "unk/SHALLOW": 78}
+  alg1_fns=26 alg2_fns=38 alg3_fns=77 (alg1|alg2)=41 cell={'CELL_COLLAPSED': 122, 'CELL_DEEP': 85, 'FOLDED_OK': 1}
+  525600: [('525622', 'alg3=SHALLOW', 'FOLDED_OK')]
+[NC7] 52a750 (CELL_DEEP) の 2 段 load (%3 = load i64, ptr %2) をセル自身 (18818816) の 1 段 load に壊した IR
+{"lsf/NOCAND": 1, "lsf/SHALLOW": 17, "unk/NOCAND": 28, "unk/SHALLOW": 80}
+  alg1_fns=26 alg2_fns=38 alg3_fns=78 (alg1|alg2)=41 cell={'CELL_COLLAPSED': 125, 'CELL_DEEP': 83}
+  52a750: [('52a7a8', 'alg3=SHALLOW', 'CELL_COLLAPSED'), ('52a7b1', 'alg3=SHALLOW', 'CELL_COLLAPSED')]
+
+real	2m30.684s
+user	2m29.506s
+sys	0m1.171s
