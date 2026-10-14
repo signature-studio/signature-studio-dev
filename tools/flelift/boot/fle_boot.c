@@ -77,7 +77,7 @@ static void fle_probe_dispatch(u64 t) {
 /* PY-123 (#3028): undo 系 global の 0 化を unit 単位で追う (計測のみ・挙動は変えない)。
  * 監視 slot の値が変わったときだけ記録する。unit = g_units_run (1-based・0 は InitUnits 前)。
  * site: 0 = fle_run 直前 (snap) / 1 = unit dispatch 直前 / 2 = unit dispatch 直後 / 3 = memset 直後 /
- *       4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後。
+ *       4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後 / 8 = GetMem 呼出し直前。
  * proc: site 1・2 は unit の proc VA、3 は memset の長さ、4 は呼出し元、6 は要求サイズ、7 は解放ポインタ。
  * aux: site 3 は memset の dst、6 は GetMem の戻り値 (0 = 失敗)、7 は FastMM の応答 (0 = 成功)。 */
 #define PY_WATCH_N 3
@@ -499,6 +499,7 @@ void fle_ov_getmem(void) {
         u32 gsz = (u32)R[1], gret = (u32)LD64(R[4]);
         fle_blk_getmem_pre(gsz, gret);              /* diag: canary 検証 + 記録 */
         u64 t_ = LD64(MM_TABLE);
+        py_watch(8, gsz, 0);
         R[4] -= 8; ST64(R[4], 0x409424ull);
         ott_dispatch(t_);
         R[4] += 8;                                  /* 拙い push/pop 釣合 (下記注記) */
