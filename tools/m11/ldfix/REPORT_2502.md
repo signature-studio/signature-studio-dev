@@ -112,7 +112,7 @@ PE (`block00031_PE.bin`, VA 0x450560, capstone 線型 disasm) の実行:
 
 ```sh
 cd <worktree>            # branch 2502-m11-fix-450560
-tar --zstd -xf $HOME/artifacts/work-m11.tar.zst -C .   # tools/m11/work/ を展開 (gitignore 対象・読込のみ)
+tar --zstd -xf <artifacts>/work-m11.tar.zst -C .   # tools/m11/work/ を展開 (<artifacts> は素材の置き場。gitignore 対象・読込のみ)
 FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh
 FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP S4_EXTRA_CF=-DM11_OV_NO_450560 bash tools/m11/ldfix/stage4.sh tools/m11/ldfix/work/ldfix_only.ll ldfix_only   # ldfix のみ (事前に ldfix.py で作る)
 python3 tools/m11/ldfix/scan_spill_deref_2502.py tools/m11/work/boot_final3.ll --pe $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin --out tools/m11/ldfix/work/scan_2502.json
