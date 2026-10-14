@@ -12,7 +12,7 @@
 
 ## 1. 測定条件
 
-- 測定 commit: `a1d55799` (origin/main)。本 PR は `tools/liftdiff/REPORT_APPENDIX_LD96.md` と `results/ld96_heap_carryover_s1.tsv` のみ変更 (コード変更なし)。
+- 測定 commit: `a1d55799` (origin/main)。前版 (#2296) は `tools/liftdiff/REPORT_APPENDIX_LD96.md` と `results/ld96_heap_carryover_s1.tsv` のみ変更 (コード変更なし)。
 - 測定 runner: 4 vCPU。`uptime` の load は全体 run 前後で 0.9 程度 (11:03 時点 0.94)。
 - 素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`・`FL_WIN64_DIR`)。`work/` 側は `tools/liftdiff/work/m11`・`tools/m11/work` の既展開物を使用。
 - 生データ: `tools/liftdiff/work/ld58/` (gitignore)。
@@ -87,21 +87,21 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 
 ### 8.3 19 関数 (solo と full) の結果
 
-- solo (19 関数だけ・1 run): 19/19 `match`。監査した case は native 209・wasm 205 (wasm の 4 case は `hang` で heap_left が出ない)。対照行を除き残存 0 (`summary` の solo 行の `z_with_residue` は対照の 1 件のみ)。
-- full (`chunk0` の該当 1 関数 + `chunk1` の 18 関数): 19/19 `mismatch` (§7 と一致)。wasm の先頭 case で残存がある関数は **3/19** (11 B。`0x4bf600`・`0xb77200`・`0x7850d0`。TSV の `chunk1` 行の `wasm_z_n` 列)。native は 0。
+- solo (19 関数だけ・1 run): 19/19 `match` (`ld96_heap_residue.tsv` の `solo` 行の `verdict`)。監査 case は native 209・wasm 205 (`ld96_heap_residue_summary.tsv` の `solo` 行。wasm の 4 case は `hang` で heap_left が出ない)。対照 (`0x4150d0`) 以外は残存 0 (`solo` 行の `native_max_n`・`wasm_max_n` で非 0 は対照の 1 行のみ)。
+- full (`chunk0` の該当 1 関数 + `chunk1` の 18 関数): 19/19 `mismatch` (§7 と一致。`chunk0`・`chunk1` 行の `verdict`)。wasm の先頭 case で残存がある関数は **3/19** (11 B。`0x4bf600`・`0xb77200`・`0x7850d0`。`chunk1` 行の `wasm_z_n` 列)。native は 0。
 - **残存を持たない 16/19 関数は、残存 0 のまま mismatch**。高水位外の残存は 19 関数全体の揺れを説明しない。
-- 残存のある 3 関数は、同じ 11 B が見える。残存が揺れの原因かは未確定 (残存を消して結果が変わるかは未検証)。
-- 19 関数の `mem` 差分 (`mem_blocks` 列) は 1・3000・3002 ブロック、または差分なし (`-`)。前版 (§8.4 旧) の「13 関数で 3000〜3002」の数え直しは今回行っていない。
+- 上の 3 関数が持つ同じ 11 B (`wasm_z_first` 0x353eeb・`wasm_z_last` 0x37fffb) は、chunk1 全体では 14 関数に見える (`chunk1` 行で `wasm_z_n` = 11)。残存が揺れの原因かは未確定 (残存を消して結果が変わるかは未検証)。
+- 19 関数の `mem_blocks` (列の定義は §8.7): 14 件に差分あり (3000 ブロックが 10 件・3002 ブロックが 3 件・1 ブロックが 1 件 = `0x7850d0`)。5 件は `-` (差分なし)。
 
 ### 8.4 chunk 0・1 の全関数 (400 関数ずつ)
 
-- chunk 0: 400 関数中 399 関数に先頭 case がある (`0x442b90` は `unexec` で case が無い)。監査 case は native 409・wasm 409。**残存 0 (native・wasm とも全件)**。
-- chunk 1: 400 関数すべてに先頭 case がある。監査 case は native 580・wasm 576 (wasm の 4 case は `0x4bf600`・`0xb77200` の `p0`・`pall` で `hang`)。
-  - native: 全 580 case で残存 0。
-  - wasm: 先頭 case で残存があるのは **124/400 関数**。残存量は **8 B 〜 53,463,205 B**。1000 B を超えるのは 47 関数。残存量の合計は 2,512,771,101 B。
-- 具体的な値は `results/ld96_heap_residue.tsv` の `chunk1` 行 (`wasm_z_n`・`wasm_z_first`・`wasm_z_last`) と `results/ld96_heap_residue_summary.tsv` の `chunk1 wasm` 行を参照。
+- chunk 0: 400 関数中 399 関数に先頭 case がある (`0x442b90` は `unexec` で case が無い。TSV で `audited_cases` 0)。監査 case は native 409・wasm 409 (summary の `chunk0` 行)。**残存 0 (native・wasm とも全件)**: `native_max_n`・`wasm_max_n` は case のある 399 行すべて 0。
+- chunk 1: 400 関数すべてに先頭 case がある。監査 case は native 580・wasm 576 (summary の `chunk1` 行。wasm の 4 case は `0x4bf600`・`0xb77200` の `p0`・`pall` で `hang`)。
+  - native: 全 580 case で残存 0 (`chunk1` の 400 行すべて `native_max_n` = 0。非 19 関数は先頭 case のみ監査)。
+  - wasm: 先頭 case で残存があるのは **124/400 関数** (summary の `chunk1 wasm` 行 `z_with_residue`)。残存量は **8 B 〜 53,463,205 B** (`z_n_min`・`z_n_max`)。1000 B を超えるのは 47 関数 (`z_n_gt_1000`)。残存量の合計は 2,512,771,101 B (`z_n_sum`)。`wasm_max_n` の非 0 行は 124 で、すべて `wasm_z_n` と一致する。
+- 関数ごとの値は `results/ld96_heap_residue.tsv` の `chunk1` 行 (`wasm_z_n`・`wasm_z_first`・`wasm_z_last`)。
 - 残存は wasm 側だけに出る。native は 0。
-- 残存の書き手・出現順 (前版の観察: index 183 `0x47b4a0` の直後の case) は今回の計測で再確認していない。書き手の特定は未実施。
+- 残存の書き手・出現順は今回の計測では特定していない (未実施)。§8.8 の前版の観察も再確認していない。
 
 ### 8.5 観察: `liftdiff.py build` の simd.c 再生成
 
@@ -119,6 +119,7 @@ shard 1 は 1 つの runner で順に流れる (`ldlib/session.py` `run_function
 | `entry_arg` の表示差 (native 絶対 / wasm 相対) が比較の正規化の問題か | 比較結果の妥当性 | #2258 (残作業) |
 | `liftdiff.py build` の simd.c 再生成と素材版の差 | 再現性 | #2258 (残作業・観察) |
 | wasm の `hang` 4 case (`0x4bf600`・`0xb77200`) で heap_left が出ない | 監査の対象外 | #2258 (残作業) |
+| `0x7850d0` (chunk1) の mem 差分 1 ブロックの位置 (`r`・`o`) と、先頭 case の残存 11 B との関係 | 受入 (b) | #2258 (残作業) |
 
 ### 8.7 再現と差分
 
@@ -143,8 +144,15 @@ git diff 5acd3ea8 HEAD -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/
 - 生データは `work/ld96/` (gitignore)。集計 TSV は `results/ld96_heap_residue.tsv` と `results/ld96_heap_residue_summary.tsv` (コミット済み)。
 - 所要 (**n=1**): solo 54.9 s (load 0.36)。chunk 0 と chunk 1 を並列に流し、両方の完了まで 321 s (load 0.5〜1.2、4 vCPU)。wasm ビルド 8.7 s。
 - 注: n=1 の値であり、min–max レンジは未計測。
+- 列の定義 (`results/ld96_heap_residue.tsv`・1 行 = 1 関数 × run。run = `solo` / `chunk0` / `chunk1`):
+  - `audited_cases`: 監査した case 数 (wasm 側。非 19 関数は先頭 case の 1 件、`unexec` は 0)。
+  - `native_z_n`・`native_z_first`・`native_z_last` (wasm 側も同じ): 先頭 case (pattern `z`) で高水位より外に残った非 0 バイト数 (`n`)。`first`・`last` は残存の最初と最後の非 0 バイトのオフセット。`-` は先頭 case が無い (`unexec`)。
+  - `native_max_n`・`wasm_max_n`: 監査した全 case の `n` の最大。
+  - `mem_blocks`: 監査 case のうち最初に `diffs.mem.count` を持つ case の値。`count` は `ldlib/compare.py` の `cmp_mem` が返す mem 差分ブロックの総数 (`first` は先頭 8 件まで)。`-` の意味は関数の種類で違う: 19 関数は詳細を取るので `-` = 差分なし。それ以外の関数は詳細を取らないので `-` = 未記録。
+  - `0x7850d0` (chunk1) の `mem_blocks` は 1 (差分 1 ブロック)。この関数は先頭 case で wasm 残存 11 B も持つ。ブロックの位置は raw データ (非収録) にあり、残存との対応は未確認 (§8.6)。
+- 列の定義 (`results/ld96_heap_residue_summary.tsv`・run × side): `z_with_residue` = 先頭 case で `n` > 0 の関数数。`z_n_min`・`z_n_max` = その `n` の最小・最大。`z_n_gt_1000` = `n` > 1000 の関数数。`z_n_sum` = `n` の合計。`control` 行は §8.2 の対照。
 
 ### 8.8 前版との差 (`eeed0ced`)
 
-- 前版の数値 (「残存あり 120/400」「1 B 〜 53,463,188 B」「1000 B 超は 46 関数」) は、今回の再測定で「124/400」「8 B 〜 53,463,205 B」「47 関数」に置き換えた。差の原因 (計数の末尾の扱い・ビルドの違い・測定の揺れ) は未確認。
-- 前版の raw データ (`work/ld96/`) は runner に残っていないため、前版の数値を再確認することはできない。
+- 前版 (`eeed0ced`) の chunk 1 の残存件数・量は、今回の再測定で置き換えた (旧値は raw データが無く再現できないため記載しない)。差の原因 (計数の末尾の扱い・ビルドの違い・測定の揺れ) は未確認。
+- 前版の書き手の観察 (case の位置を示した記述) は、今回の TSV からは確認できないため撤回し、再確認していない扱いにする。
