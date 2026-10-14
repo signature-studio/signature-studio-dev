@@ -1,6 +1,6 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
 // 検出に LLM も本文の解析も使わない: ラベル・マーカー・正規表現 (needs.ts) だけ。issue / PR の自由文は payload に入れない。
-import { ASSOC_OK, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
+import { ASSOC_OK, hasOpenPr, KILLED_STOP_AT, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 
 // repository_dispatch の event_type "oc-pm" の kind (列挙 9 値)。prepare-event-context.sh の許可リストと同じ。
 export const PM_KINDS = ["stuck", "no_pr", "refs_orphan", "needs_decision", "stopped_report", "user_answered", "supply", "digest", "retro"] as const;
@@ -89,6 +89,19 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
       if (oc.reason === "split" || oc.reason === "stop" || (oc.reason === "unknown" && relaunched)) {
         out.push({ kind: "no_pr", ref: i.number, at: oc.at });
       }
+    }
+    // 実装 run が PR も出さずに打ち切られ (cancelled / failure / timed_out) 続けて自動の再着手を止めた issue。oc:no-pr の標識は付かない (runner の shutdown では
+    // record-run-outcome.sh が走らない) ので、Worker が数えた sig.kill で検出する。oc:no-pr の検出と重なる issue は 1 回だけ送る。
+    const kill = sig.kill;
+    if (
+      kill &&
+      kill.count >= KILLED_STOP_AT &&
+      !i.labels.some((l) => HOLD_LABELS.includes(l) || l === STUCK_LABEL) &&
+      !answeredAfter(sig.pmAt, kill.at) &&
+      !hasOpenPr(s, i.number) &&
+      !out.some((x) => x.kind === "no_pr" && x.ref === i.number)
+    ) {
+      out.push({ kind: "no_pr", ref: i.number, at: kill.at });
     }
     if (i.labels.includes(NEEDS_USER_LABEL) && sig.labelAt && sig.userAt && t(sig.userAt) > t(sig.labelAt) && !answeredAfter(sig.pmAt, sig.userAt)) {
       out.push({ kind: "user_answered", ref: i.number, at: sig.userAt });

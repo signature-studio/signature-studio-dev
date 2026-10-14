@@ -29,6 +29,7 @@ import { redact } from "./redact.ts";
 import {
   applyEvent,
   EMPTY_STATE,
+  KILLED_STOP_AT,
   NEEDS_USER_LABEL,
   reviewSignal,
   setSig,
@@ -608,6 +609,16 @@ export class Engine {
     return n;
   }
 
+  // 打ち切りが連続して自動の再着手を止めた open な issue と、その回数 (番号順)。
+  killedIssues(): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const i of Object.values(this.s.issues)) {
+      const c = this.s.sig[String(i.number)]?.kill?.count ?? 0;
+      if (i.state === "open" && c >= KILLED_STOP_AT) out.push([i.number, c]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
+  }
+
   // 規則は launch_issues.py の classify に、次の 3 点だけ足す (どれも本文を解析しない)。
   //  1. blocked_by の一覧が不明な issue は着手しない (誤着手より遅れを選ぶ)。
   //  2. open な子を持つ親 issue は着手対象から外す。
@@ -701,6 +712,13 @@ export class Engine {
       moveTo(n, "ready", () => {});
       moveTo(n, "relaunch", () => {});
       rows.user.push([n, hold]);
+    }
+
+    // 実装 run が PR も出さずに連続して打ち切られた issue (webhook.ts の applyKill が数える sig.kill) は、自動で再着手しない。oc:no-pr の標識は付かない
+    // (runner の shutdown では record-run-outcome.sh が走らない) ので、cooldown や再投入の枠には載せず stopped に置き、PM agent (oc-pm の no_pr) に回す。
+    for (const [n, c] of this.killedIssues()) {
+      const from = (["ready", "relaunch", "recent"] as const).find((r) => (rows[r] as unknown[]).some((x) => (Array.isArray(x) ? x[0] : x) === n));
+      if (from) moveTo(n, from, () => rows.stopped.push([n, `killed x${c}`]));
     }
 
     const blocksCount = new Map<number, number>();
@@ -1166,6 +1184,9 @@ export class Engine {
       needs_pm: countLabel(NEEDS_PM_LABEL),
       needs_user: countLabel(NEEDS_USER_LABEL),
       no_pr_by_reason: noPrByReason,
+      // 実装 run が PR も出さずに連続して打ち切られ (cancelled / failure / timed_out)、自動の再着手を止めた open issue の件数と番号 (oc-pm の no_pr で PM agent に回す)。
+      killed_stopped: this.killedIssues().length,
+      killed_issues: this.killedIssues().map(([n]) => n).slice(0, 100),
       refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
       open_issues_delta_24h: base ? open - base.open : null,
       pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
