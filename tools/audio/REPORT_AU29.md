@@ -64,3 +64,40 @@ soak10 の初回 FAIL は、`REPORT_AU10.md` §16.5 と同じ形 (T=1024・dev_f
 | 同一 frame の process() が 2 回呼ばれる条件 (ブラウザ内部の起床) | 無害の根拠は sample 照合のみ。cb は同一 (producer 起因でない) | #1570 |
 | 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock・spike は未計測 | #1570 |
 | cb の時刻そのもの (producer 側の時刻) を未記録 | cb ↔ ct は番号からの換算 (定数 0.280 s) | #1570 |
+| soak30 (30 分) の HEAD 再測定は未実施 (§2 は `7c5ee224` の実測)。対象コードは差分 0 (§6) | 取込み後 HEAD での 30 分ソークの値は無い | PR #3159 の未解決表 (再測定のため子は起票しない) |
+
+## 6. main 取込み後の再測定 (HEAD `c2cbf806`)
+
+PR が main と競合したため main (`b34d93fe`) を取り込んだ (merge `c2cbf806`)。競合は `docs/DOC_MAP.md` の表 1 箇所のみ (AU-10 の行と新規 `REPORT_APPENDIX_1570.md` の行を両側が更新)。main 側の 2 行を残し、本 PR の `REPORT_AU29.md` 行を追加した。
+
+測定 commit: `c2cbf806` (コード変更の最後の commit。以降は本ファイルと DOC_MAP のみ)。
+
+コード差分 (`git diff 7c5ee224 c2cbf806 -- tools/audio public/worklets src/runtime --stat`):
+
+```
+ src/runtime/gui_hostcall.ts                |  23 ++-
+ tools/audio/REPORT_APPENDIX_1570.md        |  63 +++++++
+ tools/audio/REPORT_AU10.md                 |  91 ++++------
+ tools/audio/REPORT_AU29.md                 |  66 +++++++
+ tools/audio/REPORT_AU2_CI.md               |  33 ++--
+ tools/audio/harness/run.mjs                |  15 +-
+ tools/audio/results/au2/null_soak1800.json | 276 +++++++++++++++++++++++++++++
+ 7 files changed, 491 insertions(+), 76 deletions(-)
+```
+
+- 音声経路 (`public/worklets/fl-audio-worklet.js`・`src/runtime/audio-shim.ts`・`tools/audio/src`・`tools/audio/test`・`tools/audio/build.sh`・`tools/audio/flags.sh`・`tools/audio/harness/chrome.mjs`) の差分は 0 行。soak30 の §2 測定は、測定対象コードそのものである。
+- `tools/audio/harness/run.mjs` (+12 −3) は main 側の `--busy` (負荷下ソーク) 追加。既定 (`--busy` なし) では `soakTag` が空文字・spawn は 0 本で、シナリオ名と結果ファイル名は変わらない。
+- `src/runtime/gui_hostcall.ts` は GUI 側の変更。`tools/audio` の build・harness と `audio-shim.ts`・`audio-input.ts` からは参照されない (grep 0 件)。
+
+実測 (HEAD `c2cbf806`): build は `EMSDK_ENV=<emsdk 6.0.12 の emsdk_env.sh> bash tools/audio/build.sh` で `build OK` (emcc 6.0.12、2.3 s)。emsdk は `[EMSDK]` の展開が素材に無かったため上流 (`emscripten-core/emsdk`) から `./emsdk install 6.0.12` で取得した。
+
+| 試行 | 結果 | wall (host) / load 1 分平均 (開始→終了) |
+|---|---|---|
+| `--soak 10` 初回 | PASS: underruns 0, silence 0, ramp 0 / 480,512 f, workletErrors 0, cb 1,875 late 0, cb_max 15,074 µs, T=1024, dev_fill 128/818/1024, jumps 0 | 16.6 s / 0.82 → 0.87 |
+| `--soak 10` 反復 1〜5 | 5/5 PASS: 各回 underruns 0, silence 0, ramp 0 / 480,512 f, workletErrors 0, secs_wall 10.004〜10.005 | 63.3〜63.8 s / 0.74→0.40, 0.40→0.13, 0.13→0.04, 0.04→0.01, 0.01→0.00 |
+
+- 通算: HEAD で `--soak 10` は 6 回 6/6 PASS。§2 の断続 FAIL は HEAD では再現しなかった (原因は未特定のまま #1570)。
+- 初回の wall 16.6 s は反復 (63 s 台) と違う。secs_wall と ramp の結果は通常どおりで、差の原因は未確認。
+- `node tools/audio/test/worklet_jump_check.mjs` は HEAD で PASS 4/4 (exit 0)。
+- HEAD の 6 回の soak10 では jump が 0 件で、`ct`・`pn`・`cb` の表示は実ブラウザで出力されていない。表示の経路は `worklet_jump_check.mjs` (mock) でのみ検査した。
+- `--soak30` は HEAD で再測定していない (30 分の前景実行が本 run の時間上限に収まらないため)。§2 の結果は `7c5ee224` の実測で、対象コードは上記の差分 0 のとおり同一。
