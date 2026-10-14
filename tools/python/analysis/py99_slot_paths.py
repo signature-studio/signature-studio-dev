@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """PY-99 (#3085・親 #2874): SLOT? の読みごとに、合流の先行辺ごとの store 集合を出し、別算法と突合する (実機不要)。
 
-  python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [--negctl drop-pred]
+  python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]
 
   <work/py53/fn.txt> は analysis/py53_dispatch.py の出力 (作業用ファイル)。
+  --md: 読みごとの先行辺 p の S_p 全件を markdown 表で書き出す (先頭行 `自動生成:`・--negctl と併用しない)。
 対象は analysis/py88_writes.py の既定 65 件のうち、直接式で SLOT[ を含む 49 件。
 読み = py88 の式に現れる SLOT[rbp+X]?@j の葉 (読む命令 r と X の組)。
 
@@ -149,7 +150,46 @@ def fmt(s):
     return "{" + ", ".join("IN" if v == ENTRY else f"{v:#x}" for v in sorted(s)) + "}"
 
 
+def write_md(path, cmd, edges, nomerge, stores, nkeys):
+    def cell(s):
+        return s.replace("|", "\\|")
+
+    def wr(ws):
+        return ", ".join(f"{w:#x}" for w in ws)
+
+    def mark(ok):
+        return "閉" if ok else "未閉"
+
+    lines = [
+        f"自動生成: cd tools/python && python3 {cmd}",
+        "# PY-99 (#3085): SLOT? 読みごとの合流先行辺 p の S_p (store の VA 集合)",
+        "",
+        f"- 読み {nkeys} 件 (異なり)・合流 J を持つ読み {len({(e[0], e[1]) for e in edges})} 件 (先行辺 {len(edges)} 本)・"
+        f"合流なし {len(nomerge)} 件。",
+        "- 閉: その集合の全 store の式が閉じている (未閉の葉・⚠合流・入口 IN を含まない。`closed()` の規則)。",
+        "- S_p は算法 B (後ろ向き BFS) の値。",
+        "",
+        "## 合流を持つ読み (先行辺ごと)",
+        "",
+        "| 読み (VA) | X | 書込み (VA) | 合流 J | 先行辺 p | S_p (store VA) | 閉 |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for r, x, ws, j, pl, sp, ok in edges:
+        lines.append(f"| {r:#x} | {x:#x} | {wr(ws)} | {j:#x} | {pl} | {fmt(sp)} | {mark(ok)} |")
+    lines += ["", "## 合流を持たない読み (B の到達 store)", "",
+              "| 読み (VA) | X | 書込み (VA) | 到達 store | 閉 |", "|---|---|---|---|---|"]
+    for r, x, ws, reach, ok in nomerge:
+        lines.append(f"| {r:#x} | {x:#x} | {wr(ws)} | {fmt(reach)} | {mark(ok)} |")
+    lines += ["", "## store の式 (上の表に現れるもの)", "", "| store (VA) | 閉 | 式 |", "|---|---|---|"]
+    for s in sorted(stores):
+        e = stores[s]
+        lines.append(f"| {s:#x} | {mark(closed(e))} | `{cell(e)}` |")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main(argv):
+    cmd = " ".join(["analysis/py99_slot_paths.py"] + list(argv[1:]))
     args = list(argv[1:])
     negctl = None
     if "--negctl" in args:
@@ -158,8 +198,15 @@ def main(argv):
         del args[k:k + 2]
         if negctl != "drop-pred":
             sys.exit("usage: --negctl drop-pred")
+    md_out = None
+    if "--md" in args:
+        k = args.index("--md")
+        md_out = args[k + 1] if k + 1 < len(args) else ""
+        del args[k:k + 2]
+        if not md_out or negctl:
+            sys.exit("usage: --md <out.md> (--negctl と併用しない)")
     if len(args) != 1:
-        sys.exit("usage: python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [--negctl drop-pred]")
+        sys.exit("usage: python3 analysis/py99_slot_paths.py <work/py53/fn.txt> [--negctl drop-pred] [--md <out.md>]")
     path = args[0]
     ins, order = p88.load(path)
     cfg = Cfg(ins, order)
@@ -221,6 +268,7 @@ def main(argv):
     n_merge = n_edges = n_entry = pairs_closed = pairs_open = 0
     edge_hist = {}
     body = []
+    md_edges, md_nomerge, md_stores = [], [], {}
     for r, x in keys:
         j = first_merge(cfg, r, x)
         reach = reach_before(cfg, r, x, cut)
@@ -232,18 +280,22 @@ def main(argv):
         body.append(f"read {r:#x} [rbp+{x:#x}] 書込み: {wl}")
         if j is None:
             body.append(f"  合流なし (線形に遡って最初の store または入口) reach={fmt(reach)}")
+            md_nomerge.append((r, x, reads[(r, x)], reach, ok))
+            md_stores.update({s: expr_of(s) for s in reach if s != ENTRY})
         else:
             n_merge += 1
             n_edges += len(cfg.preds(j))
             body.append(f"  J={j:#x} 先行辺={len(cfg.preds(j))}")
             for p in cfg.preds(j):
-                sp = reach_after(cfg, p, x)
+                sp = reach_after(cfg, p, x, cut)
                 ok_p = ENTRY not in sp and all(closed(expr_of(s)) for s in sp)
                 hist = edge_hist.setdefault(len(sp), [0, 0])
                 hist[0 if ok_p else 1] += 1
-                tag = "  (negctl: 外した辺)" if cut == (p, j) else ""
+                tag = "  (negctl: 外した辺・B の到達集合からは除外)" if cut == (p, j) else ""
                 pl = "IN" if p is None else f"{p:#x}"
                 body.append(f"    p={pl} S_p={fmt(sp)}{tag}")
+                md_edges.append((r, x, reads[(r, x)], j, pl, sp, ok_p))
+                md_stores.update({s: expr_of(s) for s in sp if s != ENTRY})
                 for s in sorted(sp):
                     if s == ENTRY:
                         continue
@@ -303,6 +355,8 @@ def main(argv):
     print(f"# 限界情報: 解析した X {len(xs)} 種のうち lea で取られるもの {taken}・"
           f"X と重なる別オフセットの frame store (byte/word/dword/qword 定数) {overlap} 件・"
           f"frame の非定数オフセット store {nonconst} 件")
+    if md_out:
+        write_md(md_out, cmd, md_edges, md_nomerge, md_stores, len(keys))
     return 0 if mismatch == 0 else 1
 
 
