@@ -15,7 +15,7 @@
 | **Firefox の同期 compile** | メインスレッドで 32 MiB の `new WebAssembly.Module` が **成功** (48 ms)。Chrome の「メイン 8 MB 超 RangeError」は Firefox に無い |
 | **Firefox の compile 規模依存** | Worker で compile: 941 KB 43 ms / 32 MiB 57 ms (Chrome 4.6 / 16.2 ms の 3.5〜9×)。**定常実行は同じ wasm で Chrome の約 1.6〜2× 遅い** (mid 594 vs 297 µs/128f、large 969 vs 597 µs; §3 の分解能注意) |
 | **AudioWorklet** | Chrome headless / headful (Xvfb): 48 kHz・2 s で `process()` 748 / 753 回 (期待 750)、出力は参照モデルと bit 一致。**headful は最大呼出間隔 14 ms・>10 ms が 3 回** (headless は 0 回) = ホスト揺らぎ込みの 1 回測定で、underrun 判定ではない。**Firefox は AudioContext が `suspended` のまま (`Closed before resume completed`)、process() は 1 回も回らず UNMEASURED** (出力デバイス無し) |
-| **Module の transfer** | 全ブラウザで IndexedDB への `WebAssembly.Module` put は `DataCloneError`。`structuredClone(Module)` は 3 構成とも可。**AudioWorklet への `port.postMessage(Module)` は 3 構成とも JS 側で例外にならなかった** (Chrome は PERF.md §4 の通り `messageerror` を worklet 側で受ける経路。本ハーネスは worklet 側の受信確認をしていない → 「例外が出ない」止まりで、Firefox の挙動は未確定) |
+| **Module の transfer** | 全ブラウザで IndexedDB への `WebAssembly.Module` put は `DataCloneError`。`structuredClone(Module)` は 3 構成とも可。**AudioWorklet への `port.postMessage(Module)` は 3 構成とも JS 側で例外にならない。worklet 側では Chrome (headless/headful) が `messageerror` (受信不可・PERF.md §4 と一致)、Firefox 157 (headless) は受信 OK** (§7。runner 上の結果で、実機は未取得) |
 | **bit-exact (判定)** | Worker 27 本 (3 構成 × 3 サイズ × 3 反復) と AudioWorklet 2 本 (Chrome) すべて参照モデル `makeRef` と hash 一致。ネガコン: 期待 hash を 1 bit 壊すと 9/9 が FAIL、結果欠落で FAIL (§2) |
 
 ## 1. 方法
@@ -51,7 +51,7 @@
 | **Safari (WebKit)** | Linux runner に無い | 起票依頼: `[PERF-P7c]` macOS 実機。`p7.mjs` は Chrome/Firefox 以外の起動を未実装 (URL を開くだけで動くので `?cfg=safari` 手動オープンで可) |
 | **Android / モバイル CPU (3〜10× 低速想定)** | 実機無し | `[PERF-P7d]` Android Chrome 実機 (`chrome://inspect` かページ手動オープン)。手順は §6 |
 | headful (実ウィンドウ・GPU 有) の wasm code cache | Xvfb 上では観測できず (§0)。実機の headful で違うかは不明 | 上の実機採取に含める |
-| Firefox の worklet 内 `postMessage(Module)` 挙動 | ハーネスが worklet 側の受信を確認していない | 実機採取時に worklet 側 `messageerror` を記録するよう拡張 |
+| worklet 内 `postMessage(Module)` の受信・`messageerror` の実機採取 (#948 受入条件 3 の残り) | ハーネス拡張は済み (§7)。runner (Linux) では Chrome = messageerror・Firefox 157 = 受信 OK | 実機 (Windows/macOS) で `p7.mjs` を実行し worklet の `modRecv` / `msgerr` を採取 |
 | Firefox 上限: Memory 400 本超 | CAP を 400 にしたため上限未到達 | 実機でも必要なら CAP を上げる (RSS 0 の仮想予約のみ) |
 | compilationHints の機序・低負荷専用機での再測 | 本 run は共有 VM | 既存 REPORT §5.3 に残置 |
 
@@ -85,3 +85,19 @@ runner では Android 実機を使えないため、実機担当者が以下を�
 3. PC 側で `work/p7_android.json` の `done` キーが出るまで待つ。`done` が出てから 3 秒以上待ってから同ファイルを確認する (書き出しは 3 秒おきの interval)。
 4. `work/p7_android.json` を `tools/perf/p7/results/` に移し、compile 時間・定常実行・AudioWorklet の `process()` 間隔 (underrun 判定) を §0 と同じ表形式で本ファイルに追記する。端末名・Chrome バージョン・CPU・メモリを併記する。
 5. 検証: `done` が届かない場合は、Android Chrome の `chrome://inspect` からコンソールのエラーを記録する。
+
+## 7. worklet 内 `postMessage(Module)` の受信・`messageerror` の記録 (#948 受入条件 3)
+
+- ハーネス: `web/worklet.js` は `mod` 受信時に `modRecv {isModule}` を返し、`port.onmessageerror` で `msgerr` を返す。`web/p7.html` は `worklet.modRecv` / `worklet.msgerr` に記録する。判定 (`p7.mjs`): 受信 = PASS (Module でなければ FAIL)、`messageerror` = INFO (判定外の記録で exit は変えない)、どちらも無い = UNMEASURED (`--require-worklet` で FAIL)。
+- 測定 commit: `6edc5ada` (コードを変えた最後の commit)。再現: `xvfb-run -a node tools/perf/p7/p7.mjs --rounds 3 --out <tmp>`。判定区分を INFO に変える前の同コードの実行は、`messageerror` を FAIL として数えたため rc=1 だった (観測値は同じ)。区分変更後に再測定し rc=0。
+
+| 構成 | ブラウザ | wall | loadavg (開始時) | worklet `process()` | worklet 内の `postMessage(Module)` |
+|---|---|---|---|---|---|
+| chrome-headless | Chrome 154.0.8037.97 | 18.7 s | 0.44 | 748 回 (期待 750)・最大間隔 10 ms・>10 ms 0 回。出力は参照と bit 一致 | 受信なし・`messageerror` 発火 |
+| chrome-headful (Xvfb) | 同 | 15.9 s | 0.82 | 748 回・最大間隔 14 ms・>10 ms 9 回。bit 一致 | 受信なし・`messageerror` 発火 |
+| firefox-headless | Firefox 157.0 | 34.7 s | 1.21 | UNMEASURED (AudioContext `suspended`・結果なし) | **受信 OK (`isModule=true`)**。worklet 内の bytes compile は 10 ms で成功 |
+
+- `summary: PASS=30 FAIL=0 SKIP=0 UNMEASURED=1 INFO=2` → exit 0。UNMEASURED は Firefox の worklet `process()` (§0 と同じ)。INFO は Chrome 2 構成の `messageerror`。
+- ネガコン `--negative` は exit 0 (正しい出力 PASS 9 / 1 bit 破壊 FAIL 9/9 / 結果欠落 FAIL 10)。
+- Firefox では AudioContext が `suspended` のままでも Module の受信は成立した (受信と `process()` 実行は別)。実機で同じかは未確認。
+- **未了 (実機)**: Windows/macOS の実機で `xvfb-run` 無しの headful Chrome/Firefox を `p7.mjs --require-worklet` で実行し、受信・`messageerror`・underrun・code cache を採取する。runner で確認したのは受信・`messageerror` の経路と記録まで。
