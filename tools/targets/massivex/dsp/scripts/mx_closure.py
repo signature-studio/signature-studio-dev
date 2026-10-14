@@ -125,16 +125,20 @@ def main(path, vtp, outp):
         rounds += 1
         new = set()
         st = collections.Counter()
-        for e in sorted(entries):
+        sl = sorted(entries)
+        for e in sl:
             if e in callees:
                 continue
             # 自分の区間 = [e, 次の既知入口) (ただし .pdata end を優先)
-            i = bisect.bisect_right(sorted(entries), e)
-            sl = sorted(entries)
+            i = bisect.bisect_right(sl, e)
             nxt = sl[i] if i < len(sl) else t_hi
             end = fsz.get(e)
             if end is None:
-                end = nxt
+                j = bisect.bisect_right(begins, e) - 1
+                if j >= 0 and e < begins[j] + fsz[begins[j]]:
+                    end = begins[j] + fsz[begins[j]]
+                else:
+                    end = nxt
             else:
                 end = e + end
             if end > nxt:
