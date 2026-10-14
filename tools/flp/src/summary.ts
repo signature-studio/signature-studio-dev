@@ -42,7 +42,7 @@ export interface WrapperChunk {
   records: WrapperRecord[];
 }
 
-/** Wrapper chunk (event 213) の record 列。tools/hostbridge/h10/REPORT.md §2 の gate と record walk に従う (5–12 のみ受理、末尾まで厳密に消費できなければ不採用) */
+/** Wrapper chunk (event 213) の record 列。version gate (5–12) は h10 REPORT §2 に従う。Wrapper より厳格: 末尾余剰・切詰め record・record 0 件を拒否 (§2 は min(size, N) の短い record を許容し末尾を見ない)。未対応: §2 の id == 0 (header を追加で 1 つ読む分岐) */
 export function parseWrapperChunk(d: Uint8Array): WrapperChunk | undefined {
   if (d.length < 4) return undefined;
   const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
