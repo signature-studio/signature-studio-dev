@@ -193,17 +193,18 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 ## 15. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
 
-測定した commit: `d662b04e` (コードを変えた最後の commit。origin/main `5a2b7f41` の取り込みと競合の解消を含む)。取得時刻は UTC (2026-10-14)。`git diff aeaaa591 d662b04e -- infra/pm-worker` は 1,737 行 (main 側の取り込み分を含む。PR 自身の差分は `git diff 5a2b7f41 d662b04e -- infra/pm-worker` の 533 行)。以後の commit は `tools/pm` と `docs` だけで、`git diff d662b04e HEAD -- infra/pm-worker` は 0 行。
+測定した commit: `131d3daa` (コードを変えた最後の commit。origin/main `81799351` の取り込みと競合の解消を含む)。取得時刻は UTC (2026-10-14)。`git diff d662b04e 131d3daa -- infra/pm-worker` は 302 行 (main 側の取り込み分。PR 自身の差分は `git diff origin/main 131d3daa -- infra/pm-worker` の 533 行)。以後の commit は `tools/pm` と `docs` だけで、`git diff 131d3daa HEAD -- infra/pm-worker` は 0 行。前回の測定 commit は `d662b04e` (main `5a2b7f41` の取り込みまで)。
 
-競合の解消 (origin/main の取り込みは 2 回。1 回目は `3a6fcf81`、2 回目は `5a2b7f41`):
+競合の解消 (origin/main の取り込みは 3 回。1 回目は `3a6fcf81`、2 回目は `5a2b7f41`、3 回目は `131d3daa`):
 
 - `src/engine.ts` の `status()`: PR 側の `const now` と `cnt` (`runCounts(now)`) を残し、main 側の `now` の重複宣言は 1 つにした (残さないと `SyntaxError: Identifier 'now' has already been declared` で 10 ファイルが落ちる)。counters は main 側 (#2339 の `{ ...this.zero(), ...counters }`) を採用。
 - `src/config.ts`: `DEFAULT_QUEUE_MARGIN`・`DEFAULT_TARGET_MIN` (PR) と `DEFAULT_REPO` (main) を両方残した。`test/status.test.ts` の既存キー一覧は両側のキーを残した。
 - `README.md`: 本機能の節と #2339 の再送の節を両方残した。
 - `tools/pm/REPORT.md`: 本節は main の §13 (R2 素材投入) と §14 (`pm_wake`・#2347) と番号が衝突するため、末尾の §15 に移した。
+- 3 回目 (origin/main `81799351`・競合 2 件): `infra/pm-worker/README.md` の `/status` 表は、main の `last_digest_at` 行と PR の `running` の定義行・`target_eff` ほかの行を両方残した。`test/status.test.ts` の `ADDED_KEYS` は `last_digest_at` と `target_eff` ほかを両方入れた。`src/pm.ts`・`src/classify.ts`・`src/engine.ts` は競合なしで自動マージされ、main の digest の変更と PR の変更が両方入っている (手で触っていない)。
 
-- 単体テスト: `git archive d662b04e infra/pm-worker tools/pm` を作業用の一時 dir に展開し、`cd infra/pm-worker && node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` → **194 pass / 0 fail**、15.3 s、load 0.38 → 0.79 (Node 22.23.3)。main `5a2b7f41` の `test(` 行は 181 件で、本 PR の `test/target.test.ts` の 13 件を足すと 194 件。
-- Worker 実行環境の vitest: 同じ展開先で `npm ci` (86 packages・3 s) → `npx vitest run --config vitest.config.ts` (`test/runtime/` の 3 件) → **3 pass / 0 fail**、1.5 s。
+- 単体テスト (`131d3daa`): `git archive 131d3daa infra/pm-worker tools/pm` を作業用の一時 dir に展開し、`cd infra/pm-worker && node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` → **201 pass / 0 fail**、17.4 s、load 0.84 → 1.63 (Node 22.23.3)。増分 7 件は main 側の `test/digest.test.ts`。前回 (`d662b04e`) は 194 pass / 0 fail (15.3 s)。main `5a2b7f41` の `test(` 行は 181 件で、本 PR の `test/target.test.ts` の 13 件を足すと 194 件。
+- Worker 実行環境の vitest (`131d3daa`): 同じ展開先で `npm ci` (86 packages・4 s) → `npx vitest run --config vitest.config.ts` (`test/runtime/` の 3 件) → **3 pass / 0 fail**、1.5 s。
 
 ネガコン (受入条件 6)。対応するテストは `test/target.test.ts`:
 
