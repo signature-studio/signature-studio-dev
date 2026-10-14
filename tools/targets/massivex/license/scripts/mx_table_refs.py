@@ -78,9 +78,14 @@ def consistent(row, base, ci, t, sections):
     return bool(near) and 2 * same >= len(near)
 
 
-def scan_tables(bases, sec_va, sec_raw, entries, targets, sections):
-    """sec_raw (VA sec_va から) 内の各 base について先頭 entries 個の 4B 符号付き値を読み、targets と照合。
+def scan_tables(bases, sec_va, sec_raw, entries, targets=None, sections=None):
+    """sec_raw (VA sec_va から) 内の各 base について先頭 entries 個の 4B 符号付き値を読み、targets (省略時は TARGETS) と照合。
+    一貫性判定に sections (セクション名・VA 範囲の列) を使うため必須。
     hit は (対象名, base, idx, entry VA, base 参照元, 一貫性) で返す。"""
+    if sections is None:
+        raise ValueError("scan_tables: sections は必須 (一貫性判定に使う)")
+    if targets is None:
+        targets = TARGETS
     buf = np.frombuffer(bytes(sec_raw), dtype=np.uint8)
     hits = []
     cand_bases = [b for b in bases if sec_va <= b and b + 4 * entries <= sec_va + len(buf)]
@@ -129,6 +134,14 @@ def selftest():
     hits, n = scan_tables(bases, rd_va, bytes(table), 8, {t_syn: "synthetic", selfb: "self"}, sections)
     got = {(h[1], h[2]): h[5] for h in hits}
     ok = got == {(good, 3): True, (bad, 3): False, (zero, 3): False, (selfb, 3): False}
+    global TARGETS
+    keep = TARGETS
+    TARGETS = {t_syn: "synthetic"}
+    try:
+        hits_def, _ = scan_tables(bases, rd_va, bytes(table), 8, sections=sections)
+    finally:
+        TARGETS = keep
+    ok = ok and any(h[0] == "synthetic" and h[1] == good and h[2] == 3 for h in hits_def)
     print(f"selftest bases={n} hits={[(hex(h[1]), h[2], h[5]) for h in hits]} (期待 4 件: base={hex(good)} i=3 一貫 OK / base={hex(bad)} i=3 一貫 NG / base={hex(zero)} i=3 (周辺 0 埋め) 一貫 NG / base={hex(selfb)} i=3 (d=0 の自己参照) 一貫 NG)")
     print("selftest:", "PASS" if ok else "FAIL")
     return 0 if ok else 1
