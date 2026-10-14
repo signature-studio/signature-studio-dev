@@ -224,7 +224,11 @@ PROBES = {0x409410: 'GetMem', 0x409440: 'FreeMem', 0x407a50: 'FastMM_GetMem(407a
           0x4fa210: 'ListFind(4fa210)', 0x47a250: 'ListRaise(47a250)'}   # M11-N40: 末尾追加 (既存 index 0-5 不変; OFF の survey 結果の不変は作業者報告・未検証, REPORT_739 §2)
 if os.environ.get('M11_INSTR_413060') == '1':   # #944: 計測専用。既定 0 では入れず、既定 build の post 出力を main と同一に保つ
     PROBES[0x413060] = 'function_413060'   # index 8 (末尾追加; 既存 index 不変)
+if os.environ.get('M11_INSTR_40FF70') == '1':   # #882: 計測専用。wrapper で m11_p144_obs を呼ぶ (PROBES には入れず、index を変えない)
+    PROBES[0x40ff70] = 'function_40ff70'
 probe_wrappers = []
+# #882 計測専用: function_40ff70 の入口で p-144 (arg1-0x90) と先頭ノードを観測する (既定 0 では入れない)
+M11_INSTR_40FF70 = os.environ.get('M11_INSTR_40FF70') == '1'
 
 
 # #1542 計測専用: 413060 の計測 hook を 3 点に分けて単発で切り分ける (既定 '' は従来どおり)
@@ -252,6 +256,8 @@ def weaken(m):
         w = ['define weak %s @%s(%s) {' % (ret, nm, plist)]
         if not (va == 0x413060 and M11_PROBE_VARIANT == 'noprobe'):
             w += ['  call void @m11_probe(i32 %d)' % idx]
+        if va == 0x40ff70 and M11_INSTR_40FF70:
+            w += ['  call void @m11_p144_obs(i64 %p0)']
         if rt == 'void':
             w += ['  call void @%s__lifted(%s)' % (nm, clist), '  ret void']
         else:
@@ -351,7 +357,7 @@ for (nm, ret, args) in fns:
 open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
 ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
 # 計測時 (M11_INSTR_413060=1) のみ PROBES に 0x413060 が入り、dest 観測の宣言が出る
-tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + (['declare void @m11_p144_obs(i64)'] if M11_INSTR_40FF70 else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
 tail.extend(tr)
 tail.append('@m11_disp_n = constant i32 %d' % len(tab))
 tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))

@@ -70,3 +70,16 @@
 - 結論: #942 の「修復対象は function_409c80 の 1 件のみ」は現 main では**一致しない**。`function_409c80` (F2・F3c) は trap の最上位 frame に現れない。最上位 frame に現れる F3a は `function_413540` (base の unit 0x26d1a0 のみ) と `function_4133f0` (unit 0x6d5700。修復後も残る)。
 - chain 上の関数 (非最上位) の判定は本表では確認していない。
 
+## 10. bin 表 P/F の由来とサイズ→bin 表 (#942 受入 1・2・run 6)
+
+測定 commit: `047f97c5` (origin/main)。素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を展開。
+`bash tools/m11/ldfix/ldfix_e2e.sh` は 68.7 秒・rc 0・judge PASS (units 17/942・icall 24・threw `memory access out of bounds`・survey ok 136 / trap 9、base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
+
+- 照合 (`python3 tools/m11/ldfix/bin_table_source.py`、KS = k184/185/186/215/236 の 5 件のみ): k184 / k185 / k186 の P (`0x7a50` 等) は、PE `.data` に生値 `0x407a50` / `0x408040` / `0x408870` (LVA 補正前) として入っている。k236 の P `0xa027` は生値 `0xa027` として PE に入っている。
+- 確認できたのは上記 5 件 (k184/185/186/215/236) のみ。512 スロット (k=0..255) の P/F を image と照合するコードは commit に無く、本 run では `work-m11` の `m11_image.bin` が無いため実行していない。「512/512 一致」は取り下げる。bin 表の初期値全体が PE 静的データ由来かは未確認。
+- PE 上の k187 以降はバイト列 (機械語でない) で、bin 表の由来として扱える値ではない。
+- サイズ→bin 表 (`0x11e6a3c`・326 バイト・`function_407a50` が `size/8` で索引) (`bin_size_probe.mjs`): **前回 run (測定 commit `047f97c5`) の観測値で、本 run・HEAD (`0383a426`) では未再現**。本 run では `work-m11` の `m11_image.bin` が無く、`bin_size_probe.mjs` を再実行していない。前回の値: PRE は全 0、boot 後は非 0 324 件・最大 bin 番号 172・k184 以上を指す参照 0 件。PRE/POST の出力行は本 run に無いため貼れない。
+- 結論 (未確認): k184〜186・k215・k236 の不正な P/F が、サイズ→bin 表から参照されない bin であるか (通常経路 サイズ ≤ 2600 で読まれないか) は**未確認**。前回観測では参照 0 件とされたが、HEAD での再現が必要。unit 17 の trap の発生 load (`function_407a50` の `[P+24]` 読み) に k184 が関与するか否かも未確認で、「仮説は支持されない」とは言えない。
+- 注意: `bin_table_pre_boot.mjs` の `OOB` 表示は `F<8 || F>=MEM` の機械的判定で、F=0x1 などの値も OOB になる。boot 後の 47 件の大半 (`P=0xfa5xxx`・`F=0x1`) はこの判定による見かけの OOB で、実際の trap とは対応しない。
+- 未解決 (起票先): サイズ→bin 表の 172 以下の bin 中で、boot 後に F が不正な bin (trap の発生源候補) の特定 → #942 (次 run)。bin 表 P の書き込み元 (boot で self-loop 化される処理) → #942 (次 run)。
+
