@@ -6,12 +6,14 @@
 #                 窓 = 直近の oc-fix-limit / oc-fix-reset コメント以降の差し戻し (印は MARK_LOGIN の投稿だけを数える。#2622)。窓が MAX 件に達したら、
 #                 直近 3 件が機械的な類型のみ・繰り返し無し・合計が天井未満なら次の窓へ進める (oc-fix-reset)。
 #                 それ以外は oc:stuck を付けて止め、PM agent 用の oc-pm-intent マーカーを残す。
-#                 結果は $GITHUB_OUTPUT に stop=true/false で出す (stop=true なら oc:stuck ラベルを付けて PR にコメントする)
+#                 結果は $GITHUB_OUTPUT に stop=true/false で出す (上限で止めた stop=true なら oc:stuck ラベルを付けて PR にコメントする)。
+#                 窓の判定まで終えたときだけ $GITHUB_ENV に OC_RECORD_OK=1 を書く
+#                 record が途中で失敗したら stop=true と reason=record-failed を出して非 0 で終わる (入力検査・gh の失敗を含む)。
+#                 fail-closed: stop が無いと check が none と判定し、write 権限の retry が起動する (#2638 B3・#2869)。
+#                 この失敗では oc:stuck を付けず PR にもコメントしない。job が赤くなり、原因は run のログで見る。
 #                 ただし次の場合は agent を起動せず stop=true にするだけ (notice を残す。oc:stuck は付けない。#2601):
 #                 PR が open でない (merge・close 済み)、または差し戻しの元の review (pull_request_review の event) の commit が
 #                 現在の head と違う (古い head への差し戻し。その後に push された head の review が判定を担う)
-#                 record が gh の失敗などで途中で終わったら stop=true と reason=record-failed を出して非 0 で終わる。
-#                 PR にはコメントしない (#2869)。窓の判定まで終えたときだけ $GITHUB_ENV に OC_RECORD_OK=1 を書く
 #   check         head が進んだか / 根拠コメントを投稿したかを判定し、result を $GITHUB_OUTPUT に出す
 #                 (OC_RECORD_OK が無ければ result を出さずに失敗する。record が終わっていないのに none と判定しない #2869)
 #                   pushed   : head が進んだ (push が synchronize を起こし、review が再起動する)
@@ -25,6 +27,24 @@
 #             OC_MAX_RESETS_PER_HOUR (repo 全体の自動再開上限, 既定 6)・OC_REPEAT_JACCARD (繰り返しのしきい値, 既定 0.6)
 # 実装 App は PR の comment を投稿する時 user.login が opencode-for-signature-studio[bot] になる。
 set -euo pipefail
+
+# record が途中で終わったら (入力検査・gh の失敗など)、stop=true と reason=record-failed を出して非 0 で終わる (#2869)。
+# 入力検査より前に置く (#2638 B3・m3)。agent と retry は走らせない。PR にはコメントしない (コメントも失敗しうる)。trap の中では gh を呼ばない。
+OC_RECORD_DONE=0
+record_abort() {
+  local rc=$? cmd="${OC_FAIL_CMD:-?}"
+  trap - ERR EXIT
+  if [ "$OC_RECORD_DONE" != 1 ]; then
+    cmd="${cmd//$'\n'/ }"
+    echo "::error::fix-progress record failed (exit $rc, line ${OC_FAIL_LINE:-?}, command: ${cmd:0:120}): the fix run is skipped (reason=record-failed)"
+    printf 'stop=true\nreason=record-failed\n' >> "${GITHUB_OUTPUT:-/dev/null}"
+    exit 1
+  fi
+}
+if [ "${1:-}" = record ]; then
+  trap 'OC_FAIL_LINE=$LINENO; OC_FAIL_CMD=$BASH_COMMAND' ERR
+  trap record_abort EXIT
+fi
 
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
 pr_head() { gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER" --jq .head.sha; }
@@ -83,21 +103,6 @@ DECIDE='
 
 case "${1:-}" in
   record)
-    # record が途中で終わったら (gh の失敗など)、stop=true と reason=record-failed を出して非 0 で終わる (#2869)。
-    # agent と retry は走らせない。PR にはコメントしない (コメントも失敗しうる)。trap の中では gh を呼ばない。
-    OC_RECORD_DONE=0
-    record_abort() {
-      local rc=$? cmd="${OC_FAIL_CMD:-?}"
-      trap - ERR EXIT
-      if [ "$OC_RECORD_DONE" != 1 ]; then
-        cmd="${cmd//$'\n'/ }"
-        echo "::error::fix-progress record failed (exit $rc, line ${OC_FAIL_LINE:-?}, command: ${cmd:0:120}): the fix run is skipped (reason=record-failed)"
-        printf 'stop=true\nreason=record-failed\n' >> "${GITHUB_OUTPUT:-/dev/null}"
-        exit 1
-      fi
-    }
-    trap 'OC_FAIL_LINE=$LINENO; OC_FAIL_CMD=$BASH_COMMAND' ERR
-    trap record_abort EXIT
     pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
     head_now="$(jq -r .head.sha <<< "$pr_json")"
     pr_state="$(jq -r .state <<< "$pr_json")"
@@ -110,6 +115,7 @@ case "${1:-}" in
     # 上限ガード: ラベルが付いている PR は fix を起動しない。
     # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
     stop=false
+    # 取得の失敗で止まる (set -e)。pipefail 付きの if では API の失敗が『ラベル無し』と判定されてしまうため分ける (#2638 m2)。
     labels="$(gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name')"
     if grep -qx "$STUCK_LABEL" <<< "$labels"; then
       stop=true
