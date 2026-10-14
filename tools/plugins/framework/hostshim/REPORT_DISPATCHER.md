@@ -88,7 +88,7 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 |---|---|---|
 | 1 | 0x13173a0 の switch/case 構造を解析し ID → 応答値の対応表 | **部分**。WATCH 番地で case の到達は確定 (0x56/0x2e/0x1d/0x2b/0x67)。応答値の確定は未 |
 | 2 | 未収載 ID (25, 54, 64, 88, 96, 101, 128 ほか) の応答を確定 | **未達**。応答値は callee 依存で未確定 |
-| 3 | `hostshim.c` の応答表を実測に合わせ、Phase A 回帰 (dispatch=38 ff=0) を維持 | **未実施** (shim は変更していない。Phase A の再実行は未) |
+| 3 | `hostshim.c` の応答表を実測に合わせ、Phase A 回帰 (dispatch=38 ff=0) を維持 | **部分** (Phase A 回帰 dispatch=38 ff=0 は実測 PASS。応答表の実測化は未実施。§9 参照) |
 | 4 | 結果を REPORT に実測値で残す | **本節** |
 
 ## 5. 未解決 (起票先)
@@ -203,9 +203,23 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 
 - 受入 1: `0x41a770`・`0x412d60`・`0x412e40`・`0x416230` は機械語で確定。`0x41d110`・`0x86c900` は戻り値の型 (ポインタ / callback 結果) まで確定し、case 別の具体値は未確定。
 - 受入 2: **未達**。未収載 7 ID は戻り値の仮定に依存せず rax=0 (emulator 既定)。実機の応答値は未確定。
-- 受入 3: **未実施**。Phase A (`hs_e2e.sh`) は stage-2 生成物 (`fw_flat4_canon3.ll` ほか) が要る。素材 `work-fw-stage1` は stage-1 のみ。起票先: #196 作業 4 (既存)。
+- 受入 3: **部分**。Phase A 回帰は §9 で実測 PASS。応答表の実測化は未実施 (§9 参照)。
 - 受入 4: 本節で記録。
 
 ### 8.5 次の作業
 
 - case 別の具体的な応答値 (`0x41d110` の TLS 要素が何を指すか、`0x86c900` の callback 登録先) は、実機 (または stage-2 の lift) でしか確定できない。起票先: #1222 (本 issue に残す)。
+
+## 9. #1222 4 回目 run: Phase A 回帰の実測 (受入 3)
+
+測定 commit: `04a7ff1a` (main 起点・コード無変更)。素材: `fl-win64`・`work-fw-stage1` を展開 (`work-fw-stage1` は repo ルート相対で `tar -C .`)。
+
+| 手順 | exit | wall (real) | load (開始 → 終了) | 結果 |
+|---|---|---|---|---|
+| `fw_stage2.sh` (stage-1 再利用・`FL_WIN64_DIR` 指定) | 0 | 6 分 35.98 秒 | 未計測 | smoke `dispatch=38 units_done=0 va=1 heap=1 ff=0` PASS・`fw_smoke_check PASS` |
+| `hs_e2e.sh` | 1 | 2 分 29.85 秒 | 開始 load 3.00 | **Phase A PASS** (`[fw] Phase A: Halt0/RestoreContext dispatch=38 ff=0`)。Phase B は `memory access out of bounds` で FAIL (下記) |
+
+- 受入 3 の判定: **部分**。Phase A 回帰 (dispatch=38 ff=0) は上表のとおり実測 PASS。
+- Phase B の `memory access out of bounds` (`status=0xffffffff plug=0x0 rec=7`) は REPORT_1229 §1 の既知ベースライン (2b2faf52 で同症状) と同一。本 run はコード無変更のため、今回の変更による回帰ではない。起票先は既存の #1229 (`[PLG-P0b-4]`)。
+- 受入 3 の未了: `hostshim.c` の応答表を実測に合わせる作業は未実施 (受入 2 の未収載 ID 応答が未確定のため。#1222 に残す)。
+- 作業ツリー: `ws-1222` (branch `1222-plg-p0b-3-phaseA`)。生成物 (`tools/plugins/work/fw/`・`work/`) は gitignore 対象。

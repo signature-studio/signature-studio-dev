@@ -38,8 +38,10 @@
     - `lpProcName` の文字列は 6 箇所すべて UTF-16 復号で確認 (文字列を取れない呼出しは 0 件)。`0x40dbc6` のみ `GetModuleHandleW` を先に呼んでから `lpProcName` を push する順で、hModule は `ebx` (戻り値)。
   - `0x412abc` は汎用ラッパーで、呼出元は `0x42dfb1` (引数 `[eax-0x4]` の変数)・`0x412ae8` (`ebx` の序数判定)・`0x412b0a` (`0x40a40c` の戻り値)。`0x40ffac` は `0x4108b8` (`[ebp-0x44]` の変数)。変数の上流 (名前・序数の実値) は**未確定**、未追跡。FT 名は UTF-16LE で 14 本 (x64 と同一)、ASCII の FT_ 名は 0 件。
   - **残る限界 (#1648 で未確定)**: 変数引数の上流 (x64 `0x419e71`・`[rbp-0x28]`、i386 `0x40a40c`・`0x42dfb1`・`[ebp-0x44]`) の名前・序数の値は未実測。これらが 17 本 (`FT_Alloc` 等) を解決するかは、動的トレースか上流の追跡が必要。
-  - **shim 結線と wasm 一致 (受入条件 3)**: `oss/freetype/build.sh` を、システム標準の DejaVuSans.ttf を `FONT` 環境変数で指定して実行 (rc 0, 76.7 s)。`[ft] PASS wasm32: native == wasm (40 lines, TOTAL 82b7580a3d8e846b)`、`[ft] PASS wasm64` も同じ TOTAL。**OpenSans-Regular.ttf は環境・素材のどちらにも無いため、DejaVuSans での代替測定**で、OpenSans での再測定は未実施。
-  - **残り**: (a) `0x406e70`・`0x419480` の呼出元と引数の全数確認 (17 本の序数・ハッシュ除外), (b) OpenSans (mac `pkg_extract` 配下の Artwork/Fonts) での 40 行一致の再測定, (c) 14 本の shim 結線 (2.7 wasm 側の import 表)。
+  - **shim 結線と wasm 一致 (受入条件 3)**: `oss/freetype/build.sh` を、システム標準の DejaVuSans.ttf を `FONT` 環境変数で指定して実行 (rc 0, 76.7 s)。`[ft] PASS wasm32: native == wasm (40 lines, TOTAL 82b7580a3d8e846b)`、`[ft] PASS wasm64` も同じ TOTAL。**OpenSans-Regular.ttf は当時の環境・素材のどちらにも無かったため DejaVuSans での代替測定** (OpenSans の実測は下の #1649 が正)。
+  - **OpenSans 再測定 (#1649, 2026-10-14, 測定 commit 72260b63 = origin/main)**: `FONT="$FL_MAC_DIR/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents/Resources/FL/Shared/Artwork/Fonts/OpenSans-Regular.ttf" bash oss/freetype/build.sh` (`FL_MAC_DIR` = `[MAC]`、`docs/REFERENCES.md`) を worktree `ws-1649` で foreground 実行。**rc 0 / 79 s** (load average 開始 0.59 → 終了 2.80, nproc=4)。`[ft] PASS wasm32: native == wasm (40 lines, TOTAL 1c0c857a3891256f)`、`[ft] PASS wasm64: native == wasm (40 lines, TOTAL 1c0c857a3891256f)`。DejaVuSans の代替値 (TOTAL 82b7580a3d8e846b) とは別値で、OpenSans 値は本測定が正。libfreetype.a: native 5,718,718 B / wasm32 714,774 B。
+  - **14 本の定義確認 (受入条件 3 の一部)**: 上記 14 本の `FT_*` は native・wasm32・wasm64 の 3 つの `libfreetype.a` すべてに `T` シンボルとして存在することを `nm` / `llvm-nm` で確認。**shim の import 表 (QuickFontCache 側の 14 本を wasm 側へ結線するコード) は未実装**。本 run は定義の存在確認までで、結線は未解決。
+  - **残り**: (a) shim の import 表 (14 本の結線) の実装。(b) `0x406e70`・`0x419480` の呼出元と引数の全数確認 (17 本の序数・ハッシュ除外)。(b) は #T-SH-29 (親 #1144 の子) で扱う。
 - **走査スクリプト**: `oss/freetype/callers_scan.sh` を UTF-16LE 走査込みに改訂 (本 run)。`bash oss/freetype/callers_scan.sh <extracted_dir>` が rc 0 で完了することを実測。
 
 ## 10. 各ライブラリのビルド詳細

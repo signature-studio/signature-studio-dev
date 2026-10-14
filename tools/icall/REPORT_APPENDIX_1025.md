@@ -111,3 +111,45 @@ index ab3ba4c0..4a9d4642 100644
 1. step 1 で最初に書かれる `self` の f32 フィールド (+104・+108) を生成する命令を、wasm IR 上で特定する (`insn.addr` を `rt_kilohearts-gain/after.0.restored.ll` の `!insn.addr` と突き合わせる)。
 2. その命令が `__asm_movss` / `__asm_movd` 系 helper を経由するなら、helper の部分幅 merge 規則を native (`movss` 同等) と比較する。
 3. `xmm0` 欄の不一致は `ott_xmm0` の戻り値規約を確認してから分類する。
+
+## 再測定と step 1 の差分の切り分け (2026-10-14 03:35〜03:41 UTC・HEAD `72260b63`)
+
+測定 commit: `72260b63` (main)。`4ed14f65..72260b63` で `tools/icall`・`tools/m2`・`tools/m5`・`tools/m11`・`tools/ott/lift`・`tools/liftlib/liftlib/harness` に変更がある (`tools/m11` の `m11_build.sh`・`m11_post.py`・`m11_ov.c` 等)。そのため前回の値を流用せず、HEAD で再測定した。
+
+素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B) を `tools/icall/work/kh_pe/` に配置。`work-icall` / `work-liftlib` は main の checkout の `work/` を symlink で参照。
+
+| 項目 | 実測 (HEAD `72260b63`) |
+|---|---|
+| `kh_route_build.sh` | rc 0 / real 1m03s (main の checkout で 1m10s) |
+| `kh_route.wasm` | 50,762,353 B (PE data 込み。main の checkout で 50,762,457 B。差は絶対パス由来) |
+| `kh_route_run.sh` | rc 0 / real 0.32 s / scenarios 61 / steps 366 / wasm_trap 0 |
+| 比較 | bit 一致 61/366 steps / rax 一致 173/366 |
+| 不一致バッファ (step 数) | self 305・P 293・L 291・R 290 |
+
+前回 (`4ed14f65`) の 61/61 trap 原因は、PE data 敷設の欠如と BLK・メモリ量だった。現在の `kh_route_build.sh` は step 4 で `data_gen.py` により `.rdata` / `.data` / `_RDATA` を敷設し (`reloc fixed 29550`)、`map.json` の `blk` (0x18a25c000) を使う。よって「PE data 未敷設」は解消済みで、残る差分は data ではなく実行の中身にある。
+
+### 差分の位置 (シナリオ 0)
+
+- step 0: 全バッファ・rax (0x67) 一致。
+- step 1: `self` の +104 / +106 / +107 / +108 / +110 と +136 / +152 などが不一致。`P` +8・+9・+10 も不一致。`L` / `R` は先頭から広く不一致 (native と wasm の出力が一致する範囲は少ない)。
+
+| offset | native (f32) | wasm (f32) |
+|---|---|---|
+| self +104 | `0x3c800000` (0.015625) | `0x00000000` (0) |
+| self +108 | `0x3f800000` (1.0) | `0x3f000000` (0.5) |
+| self +136 | `0x3e3efab4` (0.186503) | `0x3e0828a5` (0.132968) |
+| self +152 | `0x3e348942` (0.176305) | `0x3e05ed8b` (0.130789) |
+
++108 は下位 byte だけの食い違いではなく、値そのものが別。よって「部分幅ストアの merge 規則」だけでは説明がつかない。step 0 の出力に現れない状態 (xmm レジスタ・フラグ・step 間で持ち越す値) が step 1 の入力に入っている可能性がある。これは仮説で、未検証。
+
+### 切り分けの結論
+
+- 「PE data 未敷設が trap の原因」→ 解消済み (trap 0)。
+- 「部分幅 store の lane 規則のみ」→ +108 の値が丸ごと異なるため、単独の原因とは言えない。未確定。
+- 未確認: step 1 入力の xmm / フラグが `out_native.txt` と `out_wasm.txt` のどちらでも比較されていないこと。`ott_xmm0` の戻り値規約も未確認 (step 0 の `xmm0` 欄が native `0x3e315071`・wasm `0`)。
+
+### 次の入口 (更新)
+
+1. `scen.txt` の step 1 入力 (`self` / `P` / `L` / `R` / xmm0〜15 / flags) を native 側の trace (`liftlib/work/kh_gain/diff/native_runner`) と突き合わせ、step 1 の入力が一致するかを先に確定する。入力が違うなら、比較対象は step 間の状態持ち越しの扱い。
+2. 入力が一致する場合のみ、step 1 で `self+108` を書く命令を `rt_kilohearts-gain/after.0.restored.ll` の `!insn.addr` から特定する。
+3. `ir_flatten` の `--table` (dispatch 表 164) 経由の呼び出しで、戻り値の float 扱い (`ott_xmm0`) を確認する。
