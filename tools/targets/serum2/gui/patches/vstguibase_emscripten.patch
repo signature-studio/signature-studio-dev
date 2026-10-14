@@ -1,0 +1,22 @@
+diff --git a/vstgui/lib/vstguibase.h b/vstgui/lib/vstguibase.h
+index b24abea..0ed7edd 100644
+--- a/vstgui/lib/vstguibase.h
++++ b/vstgui/lib/vstguibase.h
+@@ -135,6 +135,17 @@
+ 		#define LINUX 1
+ 	#endif
+ 
++#elif defined(__EMSCRIPTEN__)
++    #include <cstdint>
++    #include <type_traits>
++    #include <algorithm>
++    #include <climits>
++    using std::min;
++    using std::max;
++	#ifndef WASM
++		#define WASM 1
++	#endif
++
+ #else
+ #error unsupported system/compiler
+ #endif
