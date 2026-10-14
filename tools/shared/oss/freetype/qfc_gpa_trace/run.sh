@@ -9,6 +9,7 @@ W="$(git rev-parse --show-toplevel)/work/qfc"
 mkdir -p "$W/extracted"
 cd "$W"
 export WINEDEBUG="${WINEDEBUG_OVERRIDE:-+relay}" WINEPREFIX="$W/wpfx"
+rm -rf "$WINEPREFIX"
 
 tar --zstd -xf "$ART/fl-win64.tar.zst" -C "$W" extracted/block24350_PE.bin
 python3 "$HERE/patch_entry.py" extracted/block24350_PE.bin QuickFontCache_x64.dll
@@ -28,6 +29,12 @@ kill "$XPID" 2>/dev/null || true
 echo "wine rc=$RC"
 cat probe_out.txt
 echo "relay lines: $(wc -l < trace.log)"
-# QuickFontCache 内 (VA 0x7bde0000-0x7bfee000) からの GetProcAddress 呼出しだけを抜く
-grep -E 'GetProcAddress\(' trace.log | grep -E 'ret=7bd[e-f][0-9a-f]{5}|ret=7b[e-f][0-9a-f]{6}' > qfc_gpa_calls.txt || true
-echo "QuickFontCache 内からの GetProcAddress 呼出し: $(wc -l < qfc_gpa_calls.txt) 件"
+# 範囲判定は LoadLibrary の基底 (実測 7bde0000) と PE の SizeOfImage から行う (filter_gpa.py)。
+# 件数は Call 行のみ。陽性対照として probe.exe (ImageBase 0x140000000) の呼出しを同じ判定器に通す。
+QFC_BASE="$(sed -n 's/^LoadLibrary=\([0-9a-f]*\) .*/\1/p' probe_out.txt)"
+[ -n "$QFC_BASE" ] && [ "$QFC_BASE" != "0000000000000000" ] || { echo "LoadLibrary 失敗: 範囲判定不可"; exit 1; }
+python3 "$HERE/filter_gpa.py" trace.log QuickFontCache_x64.dll "$QFC_BASE" > qfc_gpa_calls.txt || true
+python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 'CreateVST3Instance|InitDll' > probe_pos_ctrl.txt || true
+python3 "$HERE/filter_gpa.py" trace.log probe.exe 140000000 > probe_pos_all.txt || true
+echo "QuickFontCache 内からの GetProcAddress 呼出し (Call): $(wc -l < qfc_gpa_calls.txt) 件"
+echo "陽性対照 probe (InitDll/CreateVST3Instance): $(wc -l < probe_pos_ctrl.txt) 件 / probe 全体: $(wc -l < probe_pos_all.txt) 件"
