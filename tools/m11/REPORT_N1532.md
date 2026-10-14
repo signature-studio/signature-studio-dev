@@ -111,11 +111,11 @@ Ghidra の `functions_dll.csv` は `tools/m2/ghidra_scripts/DumpFunctions.java` 
 ## 10. 差分
 
 - 測定 commit: `392d8ba5`。コード変更なし (本 REPORT の追加のみ)。
-- `git diff --stat 392d8ba5 HEAD -- tools/m11` の出力 (修正 commit 時点):
+- 測定 commit `392d8ba5` から commit `2c711fd3` までの `git diff --stat 392d8ba5 2c711fd3 -- tools/m11` の実出力:
 
 ```
-tools/m11/REPORT_N1532.md | 114 ++++
-1 file changed, 114 insertions(+)
+tools/m11/REPORT_N1532.md | 121 ++++++++++++++++++++++++++++++++++++++++++++++
+1 file changed, 121 insertions(+)
 ```
 
-- 同範囲のファイル名のみ: `git diff --name-only 392d8ba5 HEAD -- tools/m11` → `tools/m11/REPORT_N1532.md` (コード変更 0)。
+- REPORT 以外のコード差分 (`git diff --stat 392d8ba5 HEAD -- tools/m11 ':!tools/m11/REPORT_N1532.md'`) は出力 0 件 (変更 0)。
