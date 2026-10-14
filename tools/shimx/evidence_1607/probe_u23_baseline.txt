@@ -1,0 +1,10 @@
+PRE|unit 20 slot 0x0 gp 
+PRE|unit 21 slot 0x0 gp 
+PRE|unit 22 slot 0x0 gp 
+SLOT_BEFORE_UNIT|0x0
+unit 23 lva 0x67f00
+SLOT_AT_UNIT|0x0
+exc=halt0
+(sxt 無し: 既存 M11 ビルド)
+MISS_UNIQ 0 MISS_TOTAL 0
+ERR|[m11][stub-notimpl] FormatMessageW called (0 を返して継続)
