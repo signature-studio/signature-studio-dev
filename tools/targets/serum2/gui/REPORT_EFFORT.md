@@ -246,7 +246,4 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 - 詳細・実測・測定 commit と差分: 付録 `REPORT_EFFORT_APPENDIX_2107.md` (本節の全文)。
 
 ## 14. 2026-10-14 run (#2066 / SR-37): XferOnOffButton の .text 対応付けと本体バイト数
-
-- 結論: vtable 由来の override・新規 8 関数 (`XferOnOffButton`) は全件 Ghidra の関数先頭に対応付いた (未対応 0 件)。本体バイト数の合計は **507 B** (8 関数、thunk 2 件を含む。呼び出し先の閉包は未測定)。人日は出さない。
-- 詳細 (表・再現手順・限界): `gui/REPORT_SR37.md`。測定スクリプト `gui/vtable_fn_addrs.py`・`gui/ghidra_fn_size.java`。
-
+- 詳細・実測・測定スクリプト: 付録 `REPORT_EFFORT_APPENDIX_2066.md` (本節の全文)。
