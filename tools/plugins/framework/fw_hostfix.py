@@ -189,42 +189,11 @@ OVERRIDES = {
   store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
   ret i64 0
 }''',
-    # 0x4181e0: TLS getter (native: gs:[0x58][[0x6d6e70]], 0x7162d8 フラグ 0 = TLS 経路)。
-    # [0x6d6e70] (= 7171696) の TLS index は 0x418120 (TlsAlloc) でしか設定されず、headless chain で
-    # 0x418120 は一度も dispatch されない (hs_e2e 実測) → index は -1 のまま。index 未確保なら
-    # TlsAlloc し、スロットが 0 なら 0 埋めブロックを割り当てて戻り値にする (0x4e5f50 は戻り値の +568 を読む)。
-    0x4181e0: '''@fw_tls_block = internal global [4096 x i8] zeroinitializer, align 16
-
-define i64 @function_4181e0() local_unnamed_addr {
-  %ix0 = load i32, ptr inttoptr (i64 7171696 to ptr), align 4
-  %unset = icmp eq i32 %ix0, -1
-  br i1 %unset, label %fw_alloc, label %fw_have
-
-fw_alloc:
-  %ixn = call i32 @TlsAlloc()
-  store i32 %ixn, ptr inttoptr (i64 7171696 to ptr), align 4
-  br label %fw_have
-
-fw_have:
-  %ix = load i32, ptr inttoptr (i64 7171696 to ptr), align 4
-  %tb = call i64 @__readgsqword(i64 88)
-  %ixz = zext i32 %ix to i64
-  %off = mul i64 %ixz, 8
-  %slot = add i64 %tb, %off
-  %sp = inttoptr i64 %slot to ptr
-  %v = load i64, ptr %sp, align 8
-  %empty = icmp eq i64 %v, 0
-  br i1 %empty, label %fw_fill, label %fw_ret
-
-fw_fill:
-  %blk = ptrtoint ptr @fw_tls_block to i64
-  store i64 %blk, ptr %sp, align 8
-  br label %fw_ret
-
-fw_ret:
-  %r = phi i64 [ %v, %fw_have ], [ %blk, %fw_fill ]
-  store i64 %r, ptr inttoptr (i64 9048192 to ptr), align 8
-  ret i64 %r
+    # 0x4181e0: 0x4e5f50 が戻り値 ([BLK+0x80]) を +568 で deref する (hs_dbg 実測: 0x4181e0 →
+    # 0x4e5f50 直後に trap)。戻り値が fold 由来のため「該当なし」= 0 で fail-soft。
+    0x4181e0: '''define i64 @function_4181e0() local_unnamed_addr {
+  store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
+  ret i64 0
 }''',
     # 0x40e720: `ClearWideString(var S)` (native 0x40e720 実測: S[0]!=0 なら refcount--
     # して 0 に達したら FreeMem。rcx は var アドレス)。lift では S が scratch 畳み込みで
