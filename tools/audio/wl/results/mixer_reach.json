@@ -33,6 +33,13 @@
    "distinct_functions": 15
   }
  },
+ "edges": {
+  "direct": 22568,
+  "api": 1106,
+  "indirect": 3801,
+  "total": 27475,
+  "indirect_pct": 13.8
+ },
  "apis": [
   {
    "dll": "kernel32.dll",

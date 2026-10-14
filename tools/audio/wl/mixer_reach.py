@@ -6,12 +6,12 @@ CS / 待機 / スレッド API の個数が要る (tools/audio/wl/REPORT.md §4 
   1. .pdata で関数範囲を得て、各関数を capstone で線形逆アセンブルする
   2. 直接 call (e8) と関数範囲外への直接 jmp (tail call) を辺にして BFS で到達集合を作る
   3. IAT 経由の API 呼出し (`call [rip+IAT]` と `jmp [rip+IAT]` thunk 経由) を thread_api.py の分類で数える
-限界 (下限であることの根拠。REPORT §4 に同じ内容):
+限界 (下限であることの根拠。REPORT §4-2 に同じ内容):
   - 間接 call (`call reg` / `call [reg+disp]` / vtable 呼出し) と switch の間接 jmp は辺にしない。到達集合は下限。
-  - 間接 call の数は到達集合ごとに出す (未追跡の辺の規模)。
+  - 間接 call の数は到達集合ごとに出す (未追跡の辺の規模)。分母 (到達集合内の call/jmp 箇所) も出す。
 判定 (gate): 入口 VA が .pdata の関数先頭であること、到達集合に既知の辺 (winmm!timeGetTime。REPORT の
-  bufferSwitchTimeInfo の systemTime 経路) があること。--negctl は入口を関数内部 (先頭+1) に差し替え、
-  gate が FAIL することを確認する (exit 0 = 期待どおり FAIL)。
+  bufferSwitchTimeInfo の systemTime 経路) があること。gate は到達集合の正しさを検査しない (入口の位置のみ)。
+  --negctl は入口を関数内部 (先頭+1) に差し替え、gate が FAIL することを確認する (exit 0 = 期待どおり FAIL)。
 使い方: FL_WIN64_DIR=<fl-win64 展開先> python3 mixer_reach.py [--json out.json] [--negctl]
 依存: pefile, capstone"""
 import sys, os, re, struct, json, bisect, collections
@@ -78,6 +78,7 @@ def reach(entry_rva):
     ind = collections.Counter()               # 間接 call/jmp の形ごとの箇所数 (未追跡の辺)
     unknown = 0
     insns = 0
+    direct = 0                                # 関数宛て直接 call/jmp (tail call を含む。辺になったもの)
     while q:
         r = q.pop()
         f = func_of(r)
@@ -100,6 +101,7 @@ def reach(entry_rva):
                 elif ins.mnemonic == "jmp" and f[0] <= tgt < f[1]:
                     continue
                 else:
+                    direct += 1
                     q.append(tgt)
             elif op.type == X86_MEM and op.mem.base == RIP and op.mem.index == 0:
                 tgt = ins.address + ins.size + op.mem.disp - base
@@ -112,14 +114,18 @@ def reach(entry_rva):
                 ind[f"{ins.mnemonic} reg"] += 1
             else:
                 ind[f"{ins.mnemonic} [mem]"] += 1
-    return seen, imps, sites, ind, unknown, insns
+    return seen, imps, sites, ind, unknown, insns, direct
 
 
 entry_rva = ENTRY_VA - base + (1 if NEG else 0)
 is_start = any(s == entry_rva for s in fstarts)
-seen, imps, sites, ind, unknown, insns = reach(entry_rva)
+seen, imps, sites, ind, unknown, insns, direct = reach(entry_rva)
 fl = list(seen.values())
 known_hit = imps.get(KNOWN_EDGE, 0)
+api_calls = sum(imps.values())
+indirect_calls = sum(ind.values())
+edge_total = direct + api_calls + indirect_calls          # 分母: 到達集合内の call/jmp 箇所 (関数内の無条件 jmp は除く)
+indirect_pct = 100.0 * indirect_calls / edge_total if edge_total else 0.0
 
 summary = {}
 for cls in CLASSES:
@@ -141,10 +147,15 @@ ok = all(g["ok"] for g in gate)
 print(f"PE: {shown}  (ImageBase {base:#x}, functions(.pdata)={len(funcs)}, imports={len(iat)}, thunks={len(thunks)})")
 print(f"entry: {ENTRY_VA if not NEG else ENTRY_VA + 1:#x} (VA)  pdata 関数先頭: {is_start}")
 print(f"到達集合 (直接 call + tail jmp の BFS): 関数 {len(fl)} / 命令 {insns} / 範囲外の目標 {unknown}")
-print("未追跡の間接 call/jmp (到達集合内の箇所数):")
+print("到達集合内の call/jmp 箇所 (分母。関数内の無条件 jmp は除く):")
+print(f"  {'関数宛て直接':24s} {direct:6d}")
+print(f"  {'API 呼出し':24s} {api_calls:6d}")
+print(f"  {'間接 (下表)':24s} {indirect_calls:6d}  ({indirect_pct:.1f}% of {edge_total})")
+print(f"  {'合計':24s} {edge_total:6d}")
+print("未追跡の間接 call/jmp (到達集合内の箇所数。命令形の内訳。vtable 呼出しとの対応は推定):")
 for k, v in ind.most_common():
     print(f"  {k:24s} {v:6d}")
-print(f"  {'合計':24s} {sum(ind.values()):6d}")
+print(f"  {'合計':24s} {indirect_calls:6d}")
 print("\n## 到達集合内の API 呼出し (分類別: call 箇所 / 呼出し関数の distinct 数)")
 for cls, s in summary.items():
     print(f"  {cls:17s} call_sites={s['call_sites']:5d} distinct_functions={s['distinct_functions']:5d}")
@@ -155,11 +166,13 @@ print("\n## gate")
 for g in gate:
     print(f"  {'PASS' if g['ok'] else 'FAIL'} {g['name']}" + (f" got={g['got']}" if "got" in g else ""))
 if "--json" in sys.argv:
-    json.dump({"pe": shown, "negctl": NEG, "entry_va": hex(ENTRY_VA), "reachable_functions": len(fl),
-               "instructions": insns, "unknown_targets": unknown, "indirect": dict(ind), "summary": summary,
-               "apis": [{"dll": k[0], "api": k[1], "class": API2CLASS.get(k[1]), "call_sites": v} for k, v in imps.most_common()],
-               "gate": gate, "ok": ok},
-              open(sys.argv[sys.argv.index("--json") + 1], "w"), indent=1)
+    with open(sys.argv[sys.argv.index("--json") + 1], "w") as fh:
+        json.dump({"pe": shown, "negctl": NEG, "entry_va": hex(ENTRY_VA), "reachable_functions": len(fl),
+                   "instructions": insns, "unknown_targets": unknown, "indirect": dict(ind), "summary": summary,
+                   "edges": {"direct": direct, "api": api_calls, "indirect": indirect_calls, "total": edge_total,
+                             "indirect_pct": round(indirect_pct, 1)},
+                   "apis": [{"dll": k[0], "api": k[1], "class": API2CLASS.get(k[1]), "call_sites": v} for k, v in imps.most_common()],
+                   "gate": gate, "ok": ok}, fh, indent=1)
 if NEG:
     print(f"\nnegctl: gate {'FAIL (期待どおり)' if not ok else 'PASS (= 検出能力なし)'}")
     sys.exit(0 if not ok else 1)

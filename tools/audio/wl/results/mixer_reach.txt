@@ -1,7 +1,12 @@
 PE: extracted/block00031_PE.bin  (ImageBase 0x400000, functions(.pdata)=57816, imports=738, thunks=832)
 entry: 0xc56ae0 (VA)  pdata 関数先頭: True
 到達集合 (直接 call + tail jmp の BFS): 関数 4433 / 命令 295499 / 範囲外の目標 10
-未追跡の間接 call/jmp (到達集合内の箇所数):
+到達集合内の call/jmp 箇所 (分母。関数内の無条件 jmp は除く):
+  関数宛て直接                    22568
+  API 呼出し                    1106
+  間接 (下表)                    3801  (13.8% of 27475)
+  合計                        27475
+未追跡の間接 call/jmp (到達集合内の箇所数。命令形の内訳。vtable 呼出しとの対応は推定):
   call [mem]                 3593
   call [rip-data]             157
   call reg                     49
