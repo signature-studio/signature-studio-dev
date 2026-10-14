@@ -55,7 +55,7 @@ PE: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前
 ## 検証
 
 測定 commit: `866d2325` (5 回目の main 取り込み (`origin/main` 3e8c8d25) の merge commit。コードを変えた最後の commit)。`git diff 866d2325 HEAD -- tools/python ':!*.md'` は空 (本節の後の変更は md のみ)。取り込み前の測定は `fcfb290c` (PR 実装 commit)。
-環境: runner 4 core、測定後の `uptime` は `load average: 0.75, 1.15, 0.62` (22:01:08)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を全展開)。emsdk は上流 `emscripten-core/emsdk` の tag 6.0.12 を `$RUNNER_TEMP/emsdk` に入れ、scripts の既定位置 `[EMSDK]` (`/opt/emsdk`) へ symlink した。
+環境: runner 4 core、測定後の `uptime` は `load average: 0.75, 1.15, 0.62` (22:01:08)。`FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`fl-win64.tar.zst` を全展開)。emsdk は上流 `emscripten-core/emsdk` の tag 6.0.12 を `$RUNNER_TEMP/emsdk` に入れ、scripts の既定位置 `[EMSDK]` へ symlink した。
 
 前提の生成物 (gitignore・本測定で再生成): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、198 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4 秒)。
 
