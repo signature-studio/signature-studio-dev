@@ -795,7 +795,25 @@ def t24():
     print("T24 ok (blk_global_text: 範囲内 3 件を GEP へ, 範囲外 2 件は不変, 宣言は declare 前, 置換 0 件は無変更)")
 
 
+def t25():
+    base, newbase = 0x180000000, 0x30000000
+    src = "\n".join(["define i64 @f(i64 %x) {",
+                     "  %a = add nuw nsw i64 %x, 6442450944",
+                     "  %b = add nsw i64 %a, 6443624176",
+                     "  %c = add i64 %x, 1",
+                     "  %d = add i64 %x, 6442450943",
+                     "  ret i64 %b", "}", ""])
+    off, n0 = remap.shift_va(src, base, newbase, maxv=0x1803FFFFF)
+    assert "add nuw nsw i64 %x, 6442450944" in off and n0 == 0, off
+    on, n1 = remap.shift_va(src, base, newbase, maxv=0x1803FFFFF, add_forms=True)
+    assert "add nuw nsw i64 %x, 805306368\n" in on, on
+    assert "add nsw i64 %a, 806479600\n" in on, on
+    assert "add i64 %x, 1\n" in on and "add i64 %x, 6442450943" in on, on
+    assert n1 == 2, n1
+    print("T25 ok (add_forms: 加算形の画像 VA を shift, 範囲外・既定 False は不変)")
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25):
         f()
     print("ALL UNIT TESTS PASS")
