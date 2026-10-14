@@ -72,12 +72,19 @@ test("降格 (ネガ): 1 件だけ / 30 分を超えた組 / 判定の窓より�
   await send(old.app, "issue_comment", ocEv(11, 2, VM, T0 - 20 * MIN));
   assert.equal((await status(old)).demoted_reason, null);
 
-  // 同じ id の再配送は記録を増やさない (個人の投稿 1 件だけなら降格しない)。
+  // 窓より前の /oc は、窓の中の /oc と 30 分以内でも組にしない (再読込で届いた古いコメントで降格しない)。
+  const edge = await configuredApp({ live: true, handlers: writeHandlers });
+  await send(edge.app, "issue_comment", ocEv(11, 1, PM_BOT, T0 + 1 * MIN));
+  await send(edge.app, "issue_comment", ocEv(11, 2, VM, T0 - 10 * MIN));
+  assert.equal((await status(edge)).demoted_reason, null);
+
+  // 同じ id の再配送は記録を増やさない (個人の投稿を 2 回配送しても、39 分後の Worker の投稿とは組にしない。記録は 2 件)。
   const dup = await configuredApp({ live: true, handlers: writeHandlers });
   await send(dup.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
   await send(dup.app, "issue_comment", ocEv(11, 1, VM, T0 + 1 * MIN));
+  await send(dup.app, "issue_comment", ocEv(11, 2, PM_BOT, T0 + 40 * MIN));
   assert.equal((await status(dup)).demoted_reason, null);
-  assert.equal((dup.app.engine as any).ocPosts.length, 1);
+  assert.equal((dup.app.engine as any).ocPosts.length, 2);
 
   // Worker (PM App) 同士の 2 件は、降格の組にしない (停止報告の後の再投入で自己降格しない)。
   const worker = await configuredApp({ live: true, handlers: writeHandlers });
