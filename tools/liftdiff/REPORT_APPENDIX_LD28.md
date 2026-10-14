@@ -76,3 +76,15 @@
   - **注意 (未確定)**: `--nobuild` のため、ビルド物は work-m11 archive 同梱の `ld_wasm.cjs` で、`1c4b7c7e` のソースからは作っていない。候補 commit の全件判定は、候補ごとにビルドし直した全件再生成が必要。
 - **`tests/trace_diverge_418be0.py` の再現**: 記録 jsonl では 20 件 (16 + 4) を再現 (`results/m11_418be0_thunk.md` と同じ表)。`1c4b7c7e` の全件 jsonl に対しては、`trace_head` 文字列の解析で `ValueError` (rc 1) になり、集計できなかった。
 - **結論**: 生成 commit は未特定。候補 4 件のいずれも、対象 2 関数の再生成では記録の `0x41c820 mismatch` を再現しなかった。全件の候補別 rebuild と、`trace_diverge_418be0.py` の解析の堅牢化が残る。#1035 の受入条件 1 は [~] のまま。
+
+#### 生成 commit 候補 `9e9c1315` の全件 rebuild (LD-100 / #2276)
+- **測定 commit = `9e9c1315`** (候補 commit を detached worktree で checkout・`git worktree add --detach ../ws-2276-9e9c1315 9e9c1315`)。`9e9c1315` は `38d53ac8` の子で、変更は docs (`FORMAT.md` §3) のみ。`git diff 9e9c1315 origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の stat は 25 files・+1528 / -91 (2329 行。main 取り込み後の差分)。本節の判定は候補 commit のソースに対するもので、main の HEAD の判定ではない。
+- **ビルド**: `liftdiff.py build` (`targets/m11.json` の `pe` を fl-win64 展開先へ向けた複製 target) → rc 0・`sig_mismatch` 0・`undefined` 1 (WindowFromPoint の stub skip 1 件)・wasm 4,439,240 bytes。
+- **全件 closure** (`batch --set closure --shards 14 --nobuild`・候補ビルド物): wall 11 m 22 s (開始時 load average 約 1.0・終了時 7.2)・rc 0。出力 `work/m11/batch_closure_9e9c1315.jsonl` (sha256 先頭 16 桁 `2b6a31200bd38f32`・7,421 行)。
+  - 集計: **一致 3,092 / 不一致 1,524 / 実行不能 2,805** (記録 2,273 / 2,892 / 2,256 と不一致。前節の `1c4b7c7e` の全件再生成 (`--nobuild`・ビルド物は work-m11 同梱) 3,091 / 1,525 / 2,805 とほぼ同じ。ただし本節は候補ソースからビルドし直した値)。
+  - 記録の `batch_closure.jsonl` (sha256 先頭 16 桁 `810b4d3a03df1cf0`) との verdict 一致は 5,705 / 7,421 (`1c4b7c7e` の 5,704 / 7,421 より 1 件多い)。
+  - 実行不能の内訳: native_fault_all_patterns 1,342 / native_null_deref_all_patterns 1,102 / hang 311 / unsupported_sig 50。
+- **対象 2 関数** (全件 jsonl から): 0x418be0 = **match** (記録 match・一致)。0x41c820 = **match** (記録 mismatch・**不一致**。記録の mismatch は候補 `9e9c1315` の rebuild で再現しなかった)。
+- **`tests/trace_diverge_418be0.py` (main の HEAD 時点の版) の全件 jsonl**: rc 0 で終了。出力 = 対象 0 件・thunk 除去後の食い違い 0 件・trace 上限で判定不能 0 件・**解析不能で丸ごと除外 1 件**。前節の `1c4b7c7e` の全件 jsonl では rc 1 (`ValueError`) だった。本節で rc 0 になった理由は未切り分け (script の差分は確認していない)。出力は `results/m11_418be0_thunk.md` を上書きせず、`$RUNNER_TEMP` に置いた (commit しない)。全件 jsonl の 0x418be0 系は 0 件のため、記録の 20 / 16 / 4 の表は再現していない。
+- **結論**: `9e9c1315` をソースからビルドし直した全件 closure は記録 (2,273 / 2,892 / 2,256) と一致しない (3,092 / 1,524 / 2,805)。0x41c820 の記録 mismatch は、この候補の rebuild では再現しない (qall は `match`)。記録と候補の差の原因は未特定 (ビルド条件・work-m11 の由来の切り分けは未実施)。#1035 の受入条件 1 は [~] のまま。
+- **HEAD との関係**: 測定は候補 `9e9c1315` 自体の判定。その後の main (`016cc403`) とは liftdiff のコードが 2,329 行異なるため、HEAD での再測定ではない。本 PR は REPORT のみ変更し、コードは変えない。
