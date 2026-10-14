@@ -99,8 +99,9 @@ python3 m11_cond.py --bind work/boot_final.ll
 # #131: sigfix 復元モードが変わったら post 結果を無効化 (stamp)
 if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_RECOVER:-0}" ]; then rm -f work/boot_final3.ll; fi
 # #944: 計測 probe の有無が変わったら post 結果を無効化 (stamp)
-if [ "$(cat work/instr_413060.stamp 2>/dev/null || echo none)" != "$M11_INSTR_413060" ]; then rm -f work/boot_final3.ll; fi
-echo "$M11_INSTR_413060" > work/instr_413060.stamp
+S_INSTR="$M11_INSTR_413060${M11_PROBE_VARIANT:+:$M11_PROBE_VARIANT}"   # #1542: 変種 (M11_PROBE_VARIANT) も stamp に含める。未設定時は従来の値と同一
+if [ "$(cat work/instr_413060.stamp 2>/dev/null || echo none)" != "$S_INSTR" ]; then rm -f work/boot_final3.ll; fi
+echo "$S_INSTR" > work/instr_413060.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
 if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
   # M11_SIGFIX_RECOVER=1 (#131): sigfix の 0 詰め site を機械語突合し、定数代入が確定する引数だけ復元 (m11_argrecover.py)

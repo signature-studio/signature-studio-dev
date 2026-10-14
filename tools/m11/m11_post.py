@@ -227,12 +227,21 @@ if os.environ.get('M11_INSTR_413060') == '1':   # #944: 計測専用。既定 0 
 probe_wrappers = []
 
 
+# #1542 計測専用: 413060 の計測 hook を 3 点に分けて単発で切り分ける (既定 '' は従来どおり)
+#   noprobe: wrapper から m11_probe(8) の呼出しを外す (改名・dest 観測は残す)
+#   noren  : 413060 を wrapper 化せず本体を元の名前・元の形のまま残す (probe も dest 観測も入らない)
+#   nodecl : m11_dest_obs の宣言と呼出しを外す (probe は残す)
+M11_PROBE_VARIANT = os.environ.get('M11_PROBE_VARIANT', '')
+if M11_PROBE_VARIANT and os.environ.get('M11_INSTR_413060') != '1':
+    sys.exit('[m11_post] M11_PROBE_VARIANT は M11_INSTR_413060=1 のときだけ有効')
 def weaken(m):
     ret = m.group('ret').strip()
     nm = m.group('nm')
     args = m.group('args')
     fns.append((nm, ret, args))
     va = int(nm.split('_')[1], 16)
+    if va == 0x413060 and M11_PROBE_VARIANT == 'noren':
+        return 'define weak %s @%s(%s)%s' % (ret, nm, args, m.group('rest'))
     if va in PROBES:
         idx = list(PROBES).index(va)
         pnames = ['%%p%d' % i for i in range(len(ptypes(args)))]
@@ -240,12 +249,14 @@ def weaken(m):
         plist = ', '.join('%s %s' % (t, pn) for t, pn in zip(ptys, pnames))
         clist = ', '.join('%s %s' % (t, pn) for t, pn in zip(ptys, pnames))
         rt = ret.split()[0]
-        w = ['define weak %s @%s(%s) {' % (ret, nm, plist), '  call void @m11_probe(i32 %d)' % idx]
+        w = ['define weak %s @%s(%s) {' % (ret, nm, plist)]
+        if not (va == 0x413060 and M11_PROBE_VARIANT == 'noprobe'):
+            w += ['  call void @m11_probe(i32 %d)' % idx]
         if rt == 'void':
             w += ['  call void @%s__lifted(%s)' % (nm, clist), '  ret void']
         else:
             w += ['  %%r = call %s @%s__lifted(%s)' % (rt, nm, clist)]
-            if va == 0x413060:  # #944: 呼出し後の dest を観測 (OFF/ON 共通のフック。ネガコン変更もここで行う)
+            if va == 0x413060 and M11_PROBE_VARIANT != 'nodecl':  # #944: 呼出し後の dest を観測 (OFF/ON 共通のフック。ネガコン変更もここで行う)
                 w += ['  call void @m11_dest_obs(i64 %p0)']
             w += ['  ret %s %%r' % rt]
         w.append('}')
@@ -340,7 +351,7 @@ for (nm, ret, args) in fns:
 open(dst.replace('.ll', '_sigs.h'), 'w').write('\n'.join(hdr) + '\n')
 ent = ', '.join('{ i32, ptr } { i32 %d, ptr @m11_tr_%s }' % (va, nm) for va, nm in tab)
 # 計測時 (M11_INSTR_413060=1) のみ PROBES に 0x413060 が入り、dest 観測の宣言が出る
-tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
+tail = ['', 'declare void @m11_probe(i32)'] + (['declare void @m11_dest_obs(i64)'] if 0x413060 in PROBES and M11_PROBE_VARIANT not in ('nodecl', 'noren') else []) + probe_wrappers + ['', '; ---- m11_post.py: 間接 call トランポリン + VA 表 ----']
 tail.extend(tr)
 tail.append('@m11_disp_n = constant i32 %d' % len(tab))
 tail.append('@m11_disp_tab = constant [%d x { i32, ptr }] [%s]' % (len(tab), ent))
