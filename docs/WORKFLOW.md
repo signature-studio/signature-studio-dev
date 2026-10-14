@@ -311,6 +311,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - **review**: run の最後に `verify-review-verdict.sh` が現在の head への verdict (APPROVED / CHANGES_REQUESTED) を
     確認し、無ければ PR にコメントを残して close -> reopen で review を再起動する (同じ head に 3 回まで。超えたら警告して失敗)。
     close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
+    先に PR の状態を読み、merge 済み・close 済み (未 merge) なら再 review する対象が無いので notice を残して成功で終わる (fix run が merge 済みの PR を close しようとして `could not close PR` で落ちない。#2597)。状態を読めない・open のまま close できないのは失敗にする。
     reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
     必ず走らせられる。この変更は App に `workflows` 権限が無く
     agent は push できないため、PM が `.github/workflows/` を直接 push して適用した (現行の運用は下の「workflow 変更の運用」)。
