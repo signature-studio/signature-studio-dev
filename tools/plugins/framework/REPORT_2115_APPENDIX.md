@@ -105,7 +105,7 @@
 | `fw_stage2.sh` (増分) | rc 0・SMOKE PASS (dispatch=38 ff=0)・`fw_route.wasm` 15,063,331 B | 20 秒 | 0.89 / 1.34 / 0.75 (16:12:30) → 0.93 / 1.31 / 0.76 (16:12:50) |
 | `hs_e2e.sh --fresh` | rc 1・Phase A `dispatch=38 ff=0`・Phase B OOB・`rec=7`・1 項目・`hs_route.wasm` 15,038,453 B | 90 秒 | 0.85 / 1.29 / 0.75 (16:12:56) → 0.97 / 1.21 / 0.78 (16:14:26) |
 
-- 差分は表示行の heap アドレスだけ: smoke.log (48 行) と hs_e2e のログ (126 行) で、`[fw][ov] _StartLib ctx` `0x118b6098` → `0x118b60a8`、`[fw][tls] LocalAlloc(0x40, 0x10000880) -> ` `0x118b60a8` → `0x118b60b8`、hostshim の soft-miss `target 0x118b6388` → `0x118b6398` (site `0x5e018a`) の 3 行。`0x118b6xxx` を `HEAP` に置換すると両ログは一致する。Phase A/B・`rec` の値・失敗位置は同じ。
+- 差分は表示行の heap アドレスだけ: `[fw][ov] _StartLib ctx` `0x118b6098` → `0x118b60a8` と `[fw][tls] LocalAlloc(0x40, 0x10000880) -> ` `0x118b60a8` → `0x118b60b8` は smoke.log (48 行) と hs_e2e のログ (126 行) の両方に出る。hs_e2e のログには、さらに hostshim の soft-miss `target 0x118b6388` → `0x118b6398` (site `0x5e018a`) の 1 行が加わる。`0x118b6xxx` を `HEAP` に置換すると両ログは一致する。Phase A/B・`rec` の値・失敗位置は同じ。
 - wasm は fw_route・hs_route とも +33 B (同じ worktree パス内の比較)。wasm の絶対値は worktree パスの文字列を含む (`ws-2115` が wasm 内に 4 回出現) ため、別パスで作った値とは比べない。
 - 推定 (未検証): heap アドレスのずれは、`fw_rt.c` に static 変数 (`g_local_trace`) を 1 つ足して .bss が伸び、heap の開始位置が 16 B 動いたため。戻り値・分岐に関わるログ行は変わらない。
 
