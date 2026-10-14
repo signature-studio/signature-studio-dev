@@ -105,6 +105,27 @@ index 39480f0a..5a9c1929 100644
 - 次の確認 (#1642): (a) 6 件目 `0x88` の入口で `407a50` 内の load アドレスを採る (`q()` の範囲拡大、または load 直前の値の dump)、(b) `PROBE_WATCH` で ON-only の書込みが (a) の参照先に当たるかを切り分ける。
 - 既知類型: 該当なし (未判定)。`407a50` は spin (`__asm_pause`・`Sleep`) を含み、類型判定は (a)(b) の後。
 
+## 5c. 407a50 入口の参照先の実測 (次 run の受入条件 1 の途中結果)
+
+- 測定 commit: 本 PR の probe 変更を入れた commit (base は origin/main `984ff34f`)。素材は fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (35.8 s、ldfix=applied、F1=902、errors=0)、build ON rc=0 (18.3 s)。
+- probe: `probe_entry.py` の `407a50` 入口に読み取り専用の 2 行を追加 (`[raw407]`: `[arg-8]` の値、`[chain407]`: `arg1 < 2601` の表引き (`18770492 + (arg+7)/8`) から `rbx` (`16404744 + 16*b`) → `[rbx+8]` → `[[rbx+8]+24]` の chain)。読み取りは `rd64`/`rd8` が image 範囲 (`0x10000`〜`0x20000000`) のみ読み、範囲外は `0xdead` を返す。
+- ON・OFF とも全 942 unit の probe 版 survey (`SV_ERR_LOG` で unit 番号付きの全 stderr を採取)。unit 190 の `407a50` 入口を順に並べた:
+
+| 順 | 入口 arg1 | `[raw407]` の `[arg-8]` | `[chain407]` (ON / OFF) |
+|--:|--:|--:|---|
+| 1 | 0x404 | 0 | 同じ (`m=1`) |
+| 2 | 0x28 | 0x10bd4e00 | 同じ (`m=10bd4e90`) |
+| 3 | 0x16 | 0x10bd4da00000 | 同じ (`m=10be5240`) |
+| 4 | 0x22 | 0x4e000000000010bd | 同じ (`m=10bd4ec0`) |
+| 5 | 0x88 | 0 | **ON `m=10bbe510` / OFF `m=10bbe5a0`** (差 0x90) |
+| 6 | 0x88 | 0 | ON `m=10bbe510` / OFF `m=10bbe5a0` (5 と同じ差が残る) |
+
+- 読み取り: 入口 1〜4 は ON/OFF で完全一致する。差は 4 件目の後、5 件目 (0x88) の入口で初めて出る。ON の `m` は OFF より 1 ノード (0x90) 手前を指す。OFF は 17 件まで入口が続き、ON は 6 件目の後で trap する。
+- 入口 6 件目の時点で、ON の list 参照は 1 ノード分ずれている。ON-only override (`m11_ov.c` の `410360`→`9b4b00`) がこのリストの 1 ノード分の進みを変えた、と読めるが、書込元は未特定。
+- 書込元の特定 (`PROBE_WATCH=fa5310:18`、`--watch` の `[chg]`) は未完了。watch 版の survey では unit 190 区間に `[chg]` が 0 件 (unit 15〜891 の別 unit では多数出る)。watch 版は `m11_pw` を入れるため、`[pe]`/`[chain407]` の build と挙動が違う。この 2 つの build を同一条件で比べていない。
+- 未確定: ON で 1 ノードずれる書込元、既存 DEFECTS 類型への分類 (受入条件 2)、ON の ok 退行 0 (受入条件 3・4)。いずれも次 run の作業 (起票先 #1642)。
+- 注意: probe を入れた build は通常 build と結果が一致しない (§5b の 866/20 対 869/15 と同じ理由)。§5c の値は probe 版の結果。
+
 ## 6. 差分 (測定 commit から本 PR の HEAD まで)
 
 測定 commit `1e3ee7af` から本 PR の HEAD までの `tools/m11` のコード差分は `probe_entry.py` の 1 行のみ (`(?:__lifted)?`。§5b の diff 参照)。`git diff 1e3ee7af HEAD -- tools/m11 ':(exclude)*.md'` は上記 1 hunk のみ。
