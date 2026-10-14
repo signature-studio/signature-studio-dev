@@ -167,6 +167,19 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 - 単体テスト: `validateFontAsset NEG: 別の部品の sha256 を当てる (名前と sha256 の対応が食い違う)` を追加 (52 pass)。
 - 鮮度 (`docs/WORKFLOW.md` §6): `git diff d7050457 HEAD -- tools/legal/notices ':!tools/legal/notices/REPORT.md'` の出力は空 (0 行)。検証 HEAD は本 REPORT 更新 commit。
 
+### 追補 (#816): 台帳移行後の回帰修正 (検証起点 `989b8655`・クリーン worktree・fl-win64 展開済)
+
+- 回帰: #615 (`4890d607`) で `fetch_fonts.sh` の sha256 直書きを台帳 `tools/gui/test/fonts.tsv` へ移したため、registry の `coveredBy` (`fetch_fonts.sh`) から Open Sans / Barlow の sha256 を照合できず、`notices.test.mjs` の 4 件が FAIL になっていた (#616 時点は 54/54 PASS)。
+- 修正: 両 font-asset の `coveredBy` を台帳 `tools/gui/test/fonts.tsv` に向けた (`bd9108ff`)。台帳の取得 URL は registry と同じ commit 固定 URL に揃えた (`989b8655`)。取得物の sha256 は不変で、取得物を消してから `fetch_fonts.sh` を再実行して確認した。
+- 同梱可否 (OFL 文言上の判断) は `docs/LEGAL.md` §3.1 に記載 (数値は持たない)。
+
+| 項目 | 実測 (`989b8655`) |
+|---|---|
+| `node --test tools/legal/notices/notices.test.mjs` | 51 pass / 0 fail / 3 skip (FL 素材と取得物を要する件)。修正前 (`46c92356` 相当) は 4 FAIL |
+| `FL_WIN64_DIR=<fl-win64 展開先> bash tools/legal/notices/e2e.sh` (n=3) | ALL PASS ×3・27.35 / 28.30 / 28.10 s (load average 終了時 0.59–1.11)。PASS 27・FAIL 0 (うち NEG 12) |
+
+測定 commit `989b8655` から HEAD までのコード差分 (`git diff 989b8655 HEAD -- tools/legal/notices/*.mjs tools/legal/notices/registry.json tools/gui/test/fonts.tsv`) は出力なし (差分 0)。main 取り込み後の再測定は不要。
+
 ## 範囲 / 範囲外
 
 検証範囲: 既存 05-stage 呼び出し元の回帰 (`pnpm release-guard:test`・`chunked.test.mjs`)・fl-win64 素材 (FL 同梱表記 15 本・ファイル一覧)・emsdk 6.0.12 で実行した上記 7 本の build.sh・`vite build`・`05-stage.mjs`。

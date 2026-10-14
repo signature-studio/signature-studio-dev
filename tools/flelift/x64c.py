@@ -28,7 +28,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
 usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME]
                [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000]
 """
-import sys, json, struct, argparse, bisect, collections, os
+import sys, json, struct, argparse, bisect, collections, os, shutil
 import pefile
 import capstone
 from capstone import *
@@ -1565,7 +1565,9 @@ def main():
         nm = thunk_name(e)
         if nm:
             thunks[e] = nm; entries.discard(e)
-    done = {}
+    # メモリ: FnLift (capstone insn 込み) は関数ごとに捨てる。closure 探索は呼出先の収集だけ、
+    # 最終パスは関数ごとに C 本体を一時ファイルへ流し、統計だけ残す (出力は旧版と同一)。
+    done = set()
     queue = sorted(entries)
     known = set(entries)
     depth = 0
@@ -1574,8 +1576,9 @@ def main():
         for e in queue:
             if e in done: continue
             f = FnLift(pe, e, known, md, thunks)
-            done[e] = f
-            f.csrc = ('void f_%x(void) { %s(); }' % (e, overrides[e])) if e in overrides else f.lift()
+            done.add(e)
+            if e not in overrides:
+                f.descend()
             for t in f.calls:
                 if t not in known and t not in thunks:
                     nm = thunk_name(t)
@@ -1583,34 +1586,41 @@ def main():
                         thunks[t] = nm
                     else:
                         newc.add(t)
+            del f
         if depth >= a.closure or not newc:
             break
         depth += 1
         known |= newc
         queue = sorted(newc)
-    final = {}
-    for e in sorted(done):
-        f = FnLift(pe, e, known, md, thunks)
-        f.csrc = ('void f_%x(void) { %s(); }' % (e, overrides[e])) if e in overrides else f.lift()
-        final[e] = f
+    out = a.out
+    os.makedirs(out, exist_ok=True)
+    body_path = os.path.join(out, 'fle_lifted.body.tmp')
     unsup = collections.Counter()
     unl = collections.Counter()
     unsup_sites = []
-    for e, f in sorted(final.items()):
-        unsup.update(f.unsup)
-        unsup_sites += ['%x' % va for va in f.unsup_va]
-        for t in f.calls:
-            if t not in known and t not in thunks:
-                unl[t] += 1
-    out = a.out
-    os.makedirs(out, exist_ok=True)
     used_imps = set(thunks.values())
-    for f in final.values():
-        for ins in f.insns.values():
-            if ins.mnemonic in ('call', 'jmp') and ins.operands and ins.operands[0].type == X86_OP_MEM and ins.operands[0].mem.base == X86_REG_RIP:
-                s = ins.address + ins.size + ins.operands[0].mem.disp
-                if s in pe.iat:
-                    used_imps.add(pe.iat[s])
+    ninsn = 0
+    textrefs = set()
+    jt_ranges = set()
+    with open(body_path, 'w') as bf:
+        for e in sorted(done):
+            f = FnLift(pe, e, known, md, thunks)
+            bf.write(('void f_%x(void) { %s(); }' % (e, overrides[e])) if e in overrides else f.lift())
+            bf.write('\n')
+            unsup.update(f.unsup)
+            unsup_sites += ['%x' % va for va in f.unsup_va]
+            for t in f.calls:
+                if t not in known and t not in thunks:
+                    unl[t] += 1
+            for ins in f.insns.values():
+                if ins.mnemonic in ('call', 'jmp') and ins.operands and ins.operands[0].type == X86_OP_MEM and ins.operands[0].mem.base == X86_REG_RIP:
+                    s = ins.address + ins.size + ins.operands[0].mem.disp
+                    if s in pe.iat:
+                        used_imps.add(pe.iat[s])
+            ninsn += len(f.insns)
+            textrefs |= f.textrefs
+            jt_ranges |= set(f.jt_ranges)
+            del f
     used_imps = sorted(used_imps)
     slots = sorted(pe.iat)                       # IAT slot VA (DLL 宣言順でなく VA 順で固定)
     imp_names = [pe.iat[s] for s in slots]
@@ -1620,15 +1630,16 @@ def main():
             fh.write('void imp_%s(void);\n' % nm)
         for c in sorted(set(overrides.values())):
             fh.write('void %s(void);\n' % c)
-        for e in sorted(final):
+        for e in sorted(done):
             fh.write('void f_%x(void);\n' % e)
-        for e in sorted(final):
-            fh.write(final[e].csrc + '\n')
+        with open(body_path) as bf:
+            shutil.copyfileobj(bf, fh)
+        os.remove(body_path)
         # 間接 dispatch: lifted 関数表 + IAT pseudo-VA 経路
         # (FLE-2: 冒頭に optional probe hook — boot 側で計数/トレースする。未設定なら何もしない)
         fh.write('void ott_dispatch(uint64_t t) {\n')
         fh.write('  if (fle_dispatch_probe) fle_dispatch_probe(t);\n  switch (t) {\n')
-        for e in sorted(final):
+        for e in sorted(done):
             fh.write('  case %s: f_%x(); return;\n' % (hx(sh(e)), e))
         for tv2 in sorted(thunks):
             fh.write('  case %s: imp_%s(); return;\n' % (hx(sh(tv2)), thunks[tv2]))
@@ -1647,16 +1658,16 @@ def main():
     iat_names = {}
     for idx, s in enumerate(slots):
         iat_names['%x' % s] = {'name': pe.iat[s], 'index': idx}
-    meta = {'functions': sorted('%x' % e for e in final), 'unsup': dict(unsup), 'unsup_sites': unsup_sites,
+    meta = {'functions': sorted('%x' % e for e in done), 'unsup': dict(unsup), 'unsup_sites': unsup_sites,
             'unlifted_callees': {'%x' % k: v for k, v in unl.items()},
             'overrides': {'%x' % k: v for k, v in overrides.items()}, 'imports_used': used_imps,
             'iat_map': iat_names, 'impbase': a.impbase,
-            'ninsn': sum(len(f.insns) for f in final.values()),
-            'textrefs': sorted({t for f in final.values() for t in f.textrefs}),
-            'jt_ranges': sorted({r for f in final.values() for r in f.jt_ranges})}
+            'ninsn': ninsn,
+            'textrefs': sorted(textrefs),
+            'jt_ranges': sorted(jt_ranges)}
     json.dump(meta, open(os.path.join(out, 'lift_meta.json'), 'w'), indent=1)
     print('[flelift.x64c] functions %d, insns %d, unsup %s, unlifted callees %d, imports %d' % (
-        len(final), meta['ninsn'], dict(unsup) or '{}', len(unl), len(used_imps)))
+        len(done), meta['ninsn'], dict(unsup) or '{}', len(unl), len(used_imps)))
 
 
 if __name__ == '__main__':

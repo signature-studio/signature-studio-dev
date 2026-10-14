@@ -24,6 +24,7 @@ const outFile = args.includes("--out") ? args[args.indexOf("--out") + 1]
 const underrunFree = (r) => [r.stats.underruns === 0 && r.stats.silence_frames === 0, `underruns=${r.stats.underruns} silence=${r.stats.silence_frames}`];
 const rampExact = (r) => [r.verify?.ramp && r.verify.ramp.mismatches === 0 && r.verify.ramp.frames_checked > 0, `ramp mismatches=${r.verify?.ramp?.mismatches}/${r.verify?.ramp?.frames_checked}`];
 const sineOk = (r) => [r.verify?.sine && r.verify.sine.max_abs_err < 1e-5 && r.verify.sine.zero_runs_ge16 === 0, `sine maxErr=${r.verify?.sine?.max_abs_err?.toExponential(2)} rms=${r.verify?.sine?.rms?.toFixed(4)} zeroRuns=${r.verify?.sine?.zero_runs_ge16}`];
+const dq = (v) => (v === undefined ? "-" : `${(v >>> 31) ? "-" : "+"}q${(v & 0x7fffffff) >>> 0}`);
 const all = (...fs) => (r) => { const rs = fs.map((f) => f(r)); return [rs.every((x) => x[0]), rs.map((x) => x[1]).join("; ")]; };
 
 const scenarios = [];
@@ -174,7 +175,7 @@ await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + 
     console.log(`${ok ? "PASS" : "FAIL"} ${sc.name.padEnd(28)} ${msg}` +
       (r ? `\n       cb=${st.cb_count ?? st.fills} late=${st.cb_late ?? "-"} cb_max=${st.cb_max_us ?? st.fill_max_us}us burst=${st.burst_obs ?? "-"} T=${st.T ?? "-"} (${st.T ? (st.T * 1000 / r.sr).toFixed(1) : "-"}ms) lat_changes=${st.latency_changes ?? "-"} wake_hist=${JSON.stringify(st.wake_hist)} ` +
         `dev_fill[min/avg/max]=${r.verify?.device_fill?.min}/${r.verify?.device_fill?.avg?.toFixed(0)}/${r.verify?.device_fill?.max} ` +
-        `jumps=${r.snapshot?.clock_jumps}/${r.snapshot?.clock_jump_frames}f (skip=${r.snapshot?.clock_skip_frames}f dup=${r.snapshot?.clock_dup_frames}f max=${r.snapshot?.clock_jump_max}f@q${r.snapshot?.clock_jump_max_q}) lat(in/out)=${r.reported?.lat_in ?? "-"}/${r.reported?.lat_out ?? "-"} clock=${r.clock?.rate_hz?.toFixed(1) ?? "-"}Hz` : ""));
+        `jumps=${r.snapshot?.clock_jumps}/${r.snapshot?.clock_jump_frames}f (skip=${r.snapshot?.clock_skip_frames}f dup=${r.snapshot?.clock_dup_frames}f max=${r.snapshot?.clock_jump_max}f@q${r.snapshot?.clock_jump_max_q} first=${dq(r.snapshot?.clock_first_q)} last=${dq(r.snapshot?.clock_last_q)}) cb_max_q=${r.snapshot?.cb_max_q ?? "-"} lat(in/out)=${r.reported?.lat_in ?? "-"}/${r.reported?.lat_out ?? "-"} clock=${r.clock?.rate_hz?.toFixed(1) ?? "-"}Hz` : ""));
   }
 });
 fs.mkdirSync(path.dirname(outFile), { recursive: true });

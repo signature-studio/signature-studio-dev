@@ -92,20 +92,38 @@ export function checkRelaunchIntent(
   return { ok: true, art, ...(r.focus === null ? {} : { focus: Number(r.focus) }) };
 }
 
+export type Prio = "critical" | "normal" | "low";
+const PRIO_RANK: Record<Prio, number> = { critical: 0, normal: 1, low: 2 };
+
+// 優先の区分。prio:critical が付いていれば critical、prio:low なら low、どちらも無ければ normal (両方付いたら高い方)。
+export function prioOf(labels: string[]): Prio {
+  if (labels.includes("prio:critical")) return "critical";
+  if (labels.includes("prio:low")) return "low";
+  return "normal";
+}
+
 export interface ReadyIssue {
   n: number;
   title: string;
   blocksCount: number;
+  labels?: string[];
 }
 
-// launch_issues.py の並び順: (-被ブロック数, 『任意』を含む, 番号)
+// 並び順: 区分 (critical → normal → low) が先。同じ区分の中は launch_issues.py の並び順: (-被ブロック数, 『任意』を含む, 番号)
 export function sortReady(ready: ReadyIssue[]): ReadyIssue[] {
   return [...ready].sort(
     (x, y) =>
+      PRIO_RANK[prioOf(x.labels ?? [])] - PRIO_RANK[prioOf(y.labels ?? [])] ||
       y.blocksCount - x.blocksCount ||
       Number(x.title.includes("任意")) - Number(y.title.includes("任意")) ||
       x.n - y.n,
   );
+}
+
+// oc:no-pr の再着手までの間隔 (ms)。prio:critical は半分にして、臨界経路の再投入を早める。
+export function noPrCooldownMs(labels: string[], cooldownH: number): number {
+  const ms = cooldownH * 3_600_000;
+  return prioOf(labels) === "critical" ? ms / 2 : ms;
 }
 
 export interface LaunchInput {

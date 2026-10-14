@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # M11 closure に tools/shimx をリンクする (CAB-166)。
-#   bash tools/m11/shimx_link/build.sh [--trace] [--soft] [--fix] [--ws]   → tools/m11/work/shimx_link/m11_sx_<variant>_<gui>[_fix][_ws].cjs
+#   bash tools/m11/shimx_link/build.sh [--trace] [--soft] [--fix] [--ws] [--midi]   → tools/m11/work/shimx_link/m11_sx_<variant>_<gui>[_fix][_ws][_midi].cjs
 #     (既定)   plain / GUI fail-fast : IR は無改変, shimx を直接リンク。署名不一致/重複の検査用 (CAB-166 本体)
 #     --trace  lifted 側の shimx/GUI 呼出を __sxt_ ラッパ経由にして計数 (IR の識別子を改名した別 IR を使う)
 #     --soft   GUI/audio 未提供 API を fail-fast ではなく「0 返却+m11_stub_hit 計数」にする (M11 既存挙動と同じ)
@@ -10,6 +10,7 @@
 #     --ws   tools/startup/winstubs を結線 (#223): winstubs 全ソース + wrap_list.txt の -Wl,--wrap=<api> (12 本)、
 #            sx_winstubs.c (constructor で winstubs_init(0))、__asm_cpuid の実体を winstubs_cpuid 委譲に置換 (m11_simd2.py --cpuid=winstubs)。
 #            winstubs が定義する API (weak 含む) は gui/audio スタブを生成しない (gen_link の m11 nm に ws_*.o を加える)
+#     --midi winmm midi* 強定義 (#179 SHX-T6): audio の flmidi*.c を結線し、sx_midi_boot.c の constructor で flmidi_shimx_install() を呼ぶ (既定 variant は不変)
 #   tools/shimx と tools/m11 既存ファイルは読取のみ。成果物は全て tools/m11/work/shimx_link/ (gitignore 済)。
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -135,8 +136,9 @@ OBJS+=("${_multi[@]}")
 [ $MIDI = 1 ] && read -ra _midi <<< "$MIDIOBJ" && OBJS+=("${_midi[@]}")
 WSEXP=""; [ $WS = 1 ] && WSEXP=_sx_ws_probe_cpuid,_sx_ws_probe_g03,_sx_ws_probe_g12,_sx_ws_stat,_sx_ws_loadlib_miss,_winstubs_stats,_winstubs_loadlib_miss,_winstubs_cpuid,
 [ $MIDI = 1 ] && WSEXP="${WSEXP}_sx_midi_probe_numdevs,_flm_init,"
-EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_GetLastError,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_site,_sxt_site_name,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
-EXPORTS="$EXPORTS,_sxt_set_print,_sxt_set_stack"   # SHX-T9k #2593: 呼出し直前の GetLastError と呼出し元 wasm スタックの計装
+EXPORTS=_m11_boot_enter,_entry_point,_m11_init_count,_m11_boot_stage,_m11_va_used,_m11_va_calls,_m11_set_trace,_GetLastError,_m11_icall_ok,_m11_icall_miss,_m11_icall_miss_uniq,_m11_icall_miss_at,_m11_disp_count,_m11_units_run,_m11_units_total,_m11_units_skipped,_m11_stub_total,_m11_stub_uniq,_m11_stub_name,_m11_stub_count,_m11_probe_count,_m11_longjmp_hit,_m11_set_survey,_m11_call_unit,_m11_unit_va,_shimx_set_trace,_shimx_set_trace_file,_shimx_init,${WSEXP}__emscripten_stack_restore,_emscripten_stack_get_current
+# sxt_* は trace_rt.c (--trace のみリンク) が定義する。plain で export すると emcc 6.x が undefined exported symbol で止まる
+if [ $TRACE = 1 ]; then EXPORTS="$EXPORTS,_sxt_n,_sxt_name,_sxt_count,_sxt_ret_n,_sxt_ret_unit,_sxt_ret_idx,_sxt_ret_site,_sxt_site_name,_sxt_ret_a,_sxt_ret_b,_sxt_ret_r,_sxt_set_print,_sxt_set_stack"; fi   # SHX-T9k #2593: 呼出し直前の GetLastError と呼出し元 wasm スタックの計装
 OUT="$W/m11_sx_$TAG"
 emcc "${OBJS[@]}" -o "$OUT.cjs.tmp" \
   -O0 -g1 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$((0x10000000))" \
