@@ -12,7 +12,7 @@
 ## 測定条件
 
 - 素材: `fl-win64.tar.zst` → `extracted/block00031_PE.bin` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`、実測 2.8 秒)。展開先は `tools/python/work/py55/` (gitignore)。
-- 測定 commit: `46faf265` (作業開始時の `origin/main`)。
+- 測定 commit: `61ca0ecb` (コードを変えた最後の commit。解析スクリプトと本 REPORT)。
 - 解析スクリプト: `tools/python/analysis/py55_fieldwrites.py` (新規)。disp32 のバイト列を検索し、ヒット位置の直前 1〜11 バイトから復号して、開始位置が命令境界で disp を含む命令を採用する。
 - ヒット数 (実測): `0x79c` 89 件、`0x794` 469 件 (PY-51 の 90・470 とほぼ一致)。
 - 既知箇所の検証: `0xdd2002` (`mov qword [rax+0x79c], rcx`)・`0xec7bb8` (`mov dword [rax+0x79c], esi`)・`0xdc1540` (`mov byte [rbx+0x79c], 1`)・`0xf4c976` (`mov byte [rax+0x79c], cl`) は逆アセンブルで PY-51 と一致。
@@ -52,5 +52,6 @@ PY-51 の 3 箇所 (`0xdd2002`・`0xec7bb8`・`0xec6098`) は、前回の判断 
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| chan 上で `+0x794` を書く箇所 | `pairedChanIndex` の由来が決まらず、rerollLoopStarter* の chan 対応付けが確定しない | (下記の子 issue) |
-| `+0x79c` の dword・qword 書込み 3 箇所の対象構造体 | 書込幅不一致が推定に留まる | (下記の子 issue) |
+| chan 上で `+0x794` を書く箇所 | `pairedChanIndex` の由来が決まらず、rerollLoopStarter* の chan 対応付けが確定しない | #1973 (PY-58) |
+| `+0x79c` の dword・qword 書込み 3 箇所の対象構造体 | 書込幅不一致が推定に留まる | #1974 (PY-59) |
+| `ChannelFlags51` bit2 の FLP 側の意味 | `chan.flag51Bit2` は暫定名 | #1916 (残り) |
