@@ -93,11 +93,10 @@ argfix の `helper_xmm` が 9 → 12 に増え 0x5e09f0 / 0x5e0a70 / 0x5e0b10 �
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | ~~0x5de3e0 の `[rdx]` store 欠落 (lift)~~ | 解決 (#982, §14.7) | — |
-| 0x5e12b0 の ucomiss 落ち (lift) | abi-mismatch のまま | #331 |
+| 0x5e12b0 の ucomiss 被演算子・flags 落ち (lift) | abi-mismatch のまま (§14.8) | #938 [T-SH-22] (同系統の汎用 IR pass) |
 
 (0x5dee90 / 0x5df040 / 0x5e02b0 は §14.6 で解消。当初の「x87 模型の問題」の推定は外れ、原因は deref の落ち。)
 
-#331 の対象 kernel は 0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0 / 0x5e12b0 の 5 つ (0x5e0d80 は含まない)。
 | ext 精度が必要な kernel の wasm32 検証・framework 統合 | #269 §12.4 と同じ | #197 (既存提案) |
 
 ### 14.6 #983: 残差 3 kernel の原因確定と修復 (検証 HEAD `cb34601`)
@@ -176,6 +175,21 @@ RetDec IR は下位 store (`%arg3`) のみで、`%arg2` の `inttoptr` が未使
 
   - 未検証: `p0c3_e2e.sh` (0x5de3e0 を回帰判定から除外する別経路)、`p0c_e2e.sh` / `p0c2_e2e.sh`。
 - 未検証: 0x5e12b0 (#331)。`p0c3_e2e.sh` の回帰判定 (0x5de3e0 除外の既存処理) の見直しは #331。
+
+### 14.8 #331 の残件の現況 (main `60932d35`、実測)
+
+#331 の残差 5 kernel のうち 4 kernel (0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0) は、#982 (PR #1013) と #983 (PR #1031) で main に取り込み済み。
+main で再測定すると 4 kernel とも buf_diff=0 (ok)。残るのは 0x5e12b0 のみ。
+
+- **0x5e12b0 (未解決)**: 機械語は `ucomiss xmm0,xmm1; ja; movaps xmm0,xmm1; ret` (= max)。RetDec IR は xmm 入力を `xor i128 0,0` に、
+  flags を `xor i1 0,0` に定数化し、`define i64 @function_5e12b0()` (引数ゼロ・戻り値定数 0) になる。
+  `k80abi.json` は xmm0/xmm1 を正しく抽出しており、ABI 抽出ではなく IR 側の欠落。
+  xmm 戻り値 kernel の判定 (ret_diff を合否にするか) を含めて、汎用 IR pass 側の #938 [T-SH-22] が追跡する。
+- 実測 (`60932d35`, 素材 `fl-win64` / `toolchain-retdec` / `toolchain-emsdk`、`llvm-as` は clang 18 の shim で代替):
+  - `p0c_e2e.sh`: rc=0, 7 分 52 秒, `== e2e OK ==`
+  - `p0c4_abi_e2e.py 2000`: rc=0, 30.2 秒, `run=67 ok=67 sig11=0`。0x5de3e0 / 0x5dee90 / 0x5df040 / 0x5e02b0 は buf_diff=0。
+    回帰 11 kernel (0x5de820 0x5dedf0 0x5dfb60 0x5df210 0x5df240 0x5e0760 0x5e0b70 0x5e0bb0 0x5e1590 0x5e1780 0x5e0330) は buf_diff=0。
+    0x5e12b0 は差分表に出ず abi-mismatch のまま。
 
 ## 15. 環境パス置換 (#346, 親 #294・先行 #312): /home/ubuntu 絶対パスを tools/shared へ
 
