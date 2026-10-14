@@ -1,0 +1,23 @@
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/m6/msimd6.c -o tools/liftdiff/work/ott_noguard/obj/x_msimd6.c.o -w -Wno-error=int-conversion -Wno-int-conversion -Wno-implicit-function-declaration -O0 -g1 -Itools/m6/. -Itools/m6/.. -Itools/m6/../.. 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/shim/src/heap.c -o tools/liftdiff/work/ott_noguard/obj/x_heap.c.o -w -Wno-error=int-conversion -Wno-int-conversion -Wno-implicit-function-declaration -O0 -g1 -Itools/shim/src/. -Itools/shim/src/.. -Itools/shim/src/../.. 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/shim/src/failfast.c -o tools/liftdiff/work/ott_noguard/obj/x_failfast.c.o -w -Wno-error=int-conversion -Wno-int-conversion -Wno-implicit-function-declaration -O0 -g1 -Itools/shim/src/. -Itools/shim/src/.. -Itools/shim/src/../.. 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/ott/rt/ott_rt.c -o tools/liftdiff/work/ott_noguard/obj/x_ott_rt.c.o -w -Wno-error=int-conversion -Wno-int-conversion -Wno-implicit-function-declaration -O0 -g1 -Itools/ott/rt/. -Itools/ott/rt/.. -Itools/ott/rt/../.. 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/liftdiff/work/ott_noguard/src/m8_rt.c -o tools/liftdiff/work/ott_noguard/obj/x_m8_rt.c.o -w -Wno-error=int-conversion -Wno-int-conversion -Wno-implicit-function-declaration -O0 -g1 -Itools/liftdiff/work/ott_noguard/src/. -Itools/liftdiff/work/ott_noguard/src/.. -Itools/liftdiff/work/ott_noguard/src/../.. 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/m9/m9_rt.c -o tools/liftdiff/work/ott_noguard/obj/x_m9_rt.c.o -w -Wno-error=int-conversion -Wno-int-conversion -Wno-implicit-function-declaration -O0 -g1 -Itools/m9/. -Itools/m9/.. -Itools/m9/../.. 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/ott/rt/ott_boot.c -o tools/liftdiff/work/ott_noguard/obj/x_ott_boot.c.o -w -Wno-error=int-conversion -Wno-int-conversion -Wno-implicit-function-declaration -O0 -g1 -Itools/ott/rt/. -Itools/ott/rt/.. -Itools/ott/rt/../.. 
+[build] stubs: 46 (skipped 0: [])
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/liftdiff/work/ott_noguard/ir_instr.ll -o tools/liftdiff/work/ott_noguard/obj/ir.o -w -Wno-implicit-function-declaration -O0 -g1 -fno-delete-null-pointer-checks -Itools/liftdiff/rt 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/liftdiff/work/ott_noguard/stubs.c -o tools/liftdiff/work/ott_noguard/obj/stubs.o -w -Wno-implicit-function-declaration -O0 -g1 -fno-delete-null-pointer-checks -Itools/liftdiff/rt 
+[build] $ source [EMSDK]/emsdk_env.sh >/dev/null 2>&1; export TMPDIR=tools/liftdiff/work/ott_noguard/tmp; emcc -c tools/liftdiff/rt/ld_wasm.c -o tools/liftdiff/work/ott_noguard/obj/ld_wasm.o -w -Wno-implicit-function-declaration -O0 -g1 -fno-delete-null-pointer-checks -Itools/liftdiff/rt 
+[build] link 0.7s
+[build] OK {'wasm': 'tools/liftdiff/work/ott_noguard/ld_wasm.cjs', 'wasm_size': 931547, 'sig_mismatch': 0, 'undefined': 0}
+0x1801c67a0 function_1801c67a0 verdict=match
+   case z      both_fault   native=segv wasm=trap
+   case s      both_fault   native=segv wasm=trap
+   case p0     both_fault   native=segv wasm=trap
+   case p1     both_fault   native=segv wasm=trap
+   case p01    both_fault   native=segv wasm=trap
+   case pall   both_fault   native=segv wasm=trap
+   case u16    equal        native=ok wasm=ok
+   case vm0    equal        native=ok wasm=ok
+   case qall   native_fault native=segv wasm=ok
