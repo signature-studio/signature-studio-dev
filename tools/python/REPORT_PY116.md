@@ -15,7 +15,7 @@
 - 測定 commit: `f6f0bbe3` (コード変更の最後の commit。base は `origin/main` `2899945e`)。
 - 差分 0 の証跡: `git diff f6f0bbe3 HEAD -- tools/python/analysis tools/python/tests` の出力は 0 行 (本 REPORT と `docs/DOC_MAP.md` の commit だけが増える)。
 - 環境: GitHub Actions runner (4 コア)。測定時の load average は 20:41 時点で 1 分 0.10・5 分 0.21 (`uptime`)。
-- 素材: `fl-win64` を `tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で `FL_WIN64_DIR=/home/runner/work/_temp/fl64` に展開 (`toolchain-emsdk` は本検証の対象外)。`tools/python/fetch_inputs.sh` で stubs と DATA を `work/` に配置 (gitignore)。
+- 素材: `fl-win64` を `tar --zstd -xf fl-win64.tar.zst --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で `FL_WIN64_DIR=<fl-win64 展開先>` に展開 (`toolchain-emsdk` は本検証の対象外)。`tools/python/fetch_inputs.sh` で stubs と DATA を `work/` に配置 (gitignore)。
 
 | 検証 | 実行 | 結果 |
 |---|---|---|
