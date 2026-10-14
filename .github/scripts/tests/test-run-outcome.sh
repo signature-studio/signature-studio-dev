@@ -506,6 +506,16 @@ OC_NOW="$NT_NOW" OC_OUTPUT_FILE="$TMP/oc.jsonl" bash "$SCRIPTS/detect-rate-limit
 { [ $RC = 0 ] && [ ! -s "$TMP/det" ] && not_logged 'issues/comments'; }
 expect "not a rate limit -> notify-rate-limit.sh is not called (negative control)" $?
 
+# n11b. DRY=1 + 429 は書かない: 番号あり (マーカーの計画だけ) も番号なし (通知の計画だけ) も、通知の条件 (5 件・30%) を満たす fixture で POST 0 件
+nt_base; fx repos/o/r/issues/42/comments '[]'; cp "$FX_429" "$TMP/oc.jsonl"
+DRY=1 OC_NOW="$NT_NOW" OC_OUTPUT_FILE="$TMP/oc.jsonl" bash "$SCRIPTS/detect-rate-limit.sh" 42 > "$TMP/det" 2>&1; RC=$?
+{ [ $RC = 0 ] && grep -q 'DRY: comment on #42' "$TMP/det" && not_logged 'api -X POST'; }
+expect "DRY=1 + 429 with issue 42 (5 runs, 10 completed) -> plans only: no POST (no marker, no label, no issue)" $?
+nt_base; cp "$FX_429" "$TMP/oc.jsonl"
+DRY=1 OC_NOW="$NT_NOW" OC_OUTPUT_FILE="$TMP/oc.jsonl" bash "$SCRIPTS/detect-rate-limit.sh" > "$TMP/det" 2>&1; RC=$?
+{ [ $RC = 0 ] && grep -qx 'cause=rate_limit' "$TMP/det" && not_logged 'api -X POST'; }
+expect "DRY=1 + 429 without number (5 runs, 10 completed) -> notify not called: no POST" $?
+
 # n12. 静的: OC_MODEL_ID の repo 変数 API (actions/variables) を書かない・gh issue/pr のサブコマンド (GraphQL) を使わない・needs-user-input を書かない
 { ! grep -q 'actions/variables' "$SCRIPTS/notify-rate-limit.sh" && ! grep -qE 'gh (issue|pr) ' "$SCRIPTS/notify-rate-limit.sh" \
   && ! grep -q 'needs-user-input' "$SCRIPTS/notify-rate-limit.sh"; }

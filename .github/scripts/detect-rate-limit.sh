@@ -34,30 +34,33 @@ case "$hits" in '' | 0) exit 0 ;; esac
 
 echo "::error title=oc-rate-limit::opencode の error 行に率制限 (rate_limit_error / HTTP 429) を検出しました (run $run)"
 echo "cause=rate_limit"
-bash "$(dirname "$0")/notify-rate-limit.sh"
 
-case "$N" in '' | *[!0-9]*) exit 0 ;; esac
-R="${OC_REPO:-}"
-if [ -z "$R" ] || [ -z "${GH_TOKEN:-}" ]; then
-  echo "::warning::no repo or token: the rate-limit marker is not posted on #$N"
-  exit 0
-fi
+post_marker() {
+  R="${OC_REPO:-}"
+  if [ -z "$R" ] || [ -z "${GH_TOKEN:-}" ]; then
+    echo "::warning::no repo or token: the rate-limit marker is not posted on #$N"
+    return 0
+  fi
 
-marker="<!-- oc-run-outcome: cause=rate_limit run=$run -->"
-if ! cm="$(gh api --paginate "repos/$R/issues/$N/comments")"; then
-  echo "::warning::could not read the comments of #$N: the rate-limit marker is not posted"
-  exit 0
-fi
-if jq -s -e --arg m "$marker" '[.[][] | select((.body // "") | contains($m))] | length > 0' <<< "$cm" > /dev/null; then
-  echo "#$N already has $marker: nothing to post"
-  exit 0
-fi
-url="${GITHUB_SERVER_URL:-https://github.com}/$R/actions/runs/$run"
-body="[rate-limit] この run ($url) は率制限 (rate_limit_error / HTTP 429) で失敗しました。
+  marker="<!-- oc-run-outcome: cause=rate_limit run=$run -->"
+  if ! cm="$(gh api --paginate "repos/$R/issues/$N/comments")"; then
+    echo "::warning::could not read the comments of #$N: the rate-limit marker is not posted"
+    return 0
+  fi
+  if jq -s -e --arg m "$marker" '[.[][] | select((.body // "") | contains($m))] | length > 0' <<< "$cm" > /dev/null; then
+    echo "#$N already has $marker: nothing to post"
+    return 0
+  fi
+  url="${GITHUB_SERVER_URL:-https://github.com}/$R/actions/runs/$run"
+  body="[rate-limit] この run ($url) は率制限 (rate_limit_error / HTTP 429) で失敗しました。
 $marker"
-if [ "$DRY" = 1 ]; then
-  echo "DRY: comment on #$N: $marker"
-  exit 0
-fi
-gh api -X POST "repos/$R/issues/$N/comments" -f body="$body" > /dev/null || echo "::warning::could not post the rate-limit marker on #$N"
+  if [ "$DRY" = 1 ]; then
+    echo "DRY: comment on #$N: $marker"
+    return 0
+  fi
+  gh api -X POST "repos/$R/issues/$N/comments" -f body="$body" > /dev/null || echo "::warning::could not post the rate-limit marker on #$N"
+}
+
+case "$N" in '' | *[!0-9]*) ;; *) post_marker ;; esac
+[ "$DRY" = 1 ] || bash "$(dirname "$0")/notify-rate-limit.sh"
 exit 0
