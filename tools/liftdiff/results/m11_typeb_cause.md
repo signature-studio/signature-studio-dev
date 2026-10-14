@@ -1,60 +1,4 @@
-<!-- 自動生成: python3 tools/liftdiff/tests/trace_fullcompare_typeb.py "$PWD/tools/liftdiff/targets/m11.json" の stdout を §3 に貼る (LD-27 / #1034)。FL_WIN64_DIR は block00031_PE.bin を含む展開先。入力 = tools/liftdiff/work/m11/batch_closure.jsonl (work-m11/work-liftdiff 展開物) -->
-# m11 型 B 候補 34 case の完全 trace 再検証と戻り後の分岐 (LD-27, #1034)
-
-入力: trace_head 基準の型 B 候補 34 case (`results/m11_unreachable_diverge.md` §2)。各 case を完全 trace で xfill=1 / xfill=0 の 2 条件で取り直した (68 行)。
-L = 完全 trace で native/wasm が最後に一致する entry。caller = L の直前の entry (直接 call 命令を `call@` で確認)。
-
-## 1. 類型 (xfill × class)
-
-| xfill | X (xmm 引数脱落) | M (MXCSR 経路) | R (未特定) | 計 |
-|---:|---:|---:|---:|---:|
-| 1 | 28 | 2 | 4 | 34 |
-| 0 | 25 | 4 | 5 | 34 |
-
-- **X (xmm_arg_drop)**: 呼出元 (または L) の entry で「xmm0 を書かれる前に読む」関数があり、その entry の x0 が native ≠ wasm。IR では該当関数の xmm0 入力が `call i64 @__asm_movsd(i128 0)` (`xor i128 0, 0`) に置き換わる (例: `function_40c1d0`)。既存類型 `xmm_arg_drop` (`tools/liftdiff/docs/FORMAT.md` の類型表 107 行)。修復は #547 (PLG-F2-4) の接続で行う。
-- **M (MXCSR 経路)**: L = 0x40a380 (`stmxcsr`/`ldmxcsr` で MXCSR を書く leaf) または 0x40a3b0 (`stmxcsr [rsp]; pop rax; ret` で MXCSR を返す leaf)。wasm の `function_40a3b0` は IR で `call void @__asm_stmxcsr(i32 0)` + `ret i64 0` (`work/m11/ir_instr.ll` の `define weak i64 @function_40a3b0`) のため戻り値は常に 0。native の戻り値は実際の MXCSR (Linux 既定 0x1f80 のため 0 ではないと想定するが、native の戻り値は直接計測していない)。0 は FP 例外の全アンマスク扱いとなり、0x40a1c0 の FP 例外判定 (`test eax, 0x20/0x10/8/4` → `call 0x409730`) が wasm 側で例外を送出する。`tools/m11/m11_ov.c` は同じ欠陥 (#417) に `function_40a3b0 → 0x1f80` の上書きを持つが、この IR (liftdiff の build) では `ret i64 0` のままで、上書きは反映されていない。上書きの効果は未実測。
-- **R (未特定)**: X にも M にも入らない。戻り後の分岐は §3 の該当行。L 0x12f9ed0 (3 件、`mov rax,[rip+…]; test; mov rax,[rax-8]` の大域ポインタの長さを返す leaf。native/wasm の大域の初期状態の差を疑うが未確認)、L 0xfea6a0 (引数オブジェクトのフィールドを読んで al を返す leaf。0xff0600 の `je` が al で決まる)、L 0x4769f0 (完全 trace で notB、xfill=0)、L 0x40ae30 ほか。個別原因は未特定。
-
-## 2. 0x40a3d0 (leaf `movzx rax, word [rcx+rdx*2]; ret`) の戻り値 rax
-
-呼出元 0x40c1d0 は `movsd [rbp+0x28], xmm0` の後に `rcx = &[rbp+0x28]`, `edx = 3` で 0x40a3d0 を呼ぶ。よって rax = (x0 の上位 16 bit) で、x0 は呼出元 entry の trace (`TN[i-1][10]`)。wasm 側 x0 は常に 0 (§1 X)。
-
-| xfill | rax native | rax wasm | 件数 |
-|---:|---|---|---:|
-| 0 | 0x3f84 | 0x0000 | 1 |
-| 0 | 0x3fe2 | 0x0000 | 1 |
-| 0 | 0x3fe6 | 0x0000 | 1 |
-| 0 | 0x3ff0 | 0x0000 | 2 |
-| 0 | 0x4000 | 0x0000 | 3 |
-| 0 | 0x403b | 0x0000 | 3 |
-| 0 | 0x4049 | 0x0000 | 2 |
-| 0 | 0x408f | 0x0000 | 3 |
-| 0 | 0x40b8 | 0x0000 | 1 |
-| 0 | 0x40c3 | 0x0000 | 2 |
-| 0 | 0x40d5 | 0x0000 | 1 |
-| 0 | 0x7ff0 | 0x0000 | 1 |
-| 1 | 0x3f84 | 0x0000 | 1 |
-| 1 | 0x3fe2 | 0x0000 | 1 |
-| 1 | 0x3fe6 | 0x0000 | 1 |
-| 1 | 0x3ff0 | 0x0000 | 2 |
-| 1 | 0x3ff4 | 0x0000 | 3 |
-| 1 | 0x4000 | 0x0000 | 3 |
-| 1 | 0x403b | 0x0000 | 3 |
-| 1 | 0x4049 | 0x0000 | 2 |
-| 1 | 0x4071 | 0x0000 | 1 |
-| 1 | 0x408f | 0x0000 | 3 |
-| 1 | 0x40b8 | 0x0000 | 1 |
-| 1 | 0x40c3 | 0x0000 | 2 |
-| 1 | 0x40d5 | 0x0000 | 1 |
-
-注: rax は leaf の戻り値を直接ダンプしたものではない (runner に戻り値の記録は無い)。trace の x0 と逆アセンブルから導出した値。直接の実測は runner の計装が要る (#1034 の残り)。
-xfill=0 でも native の x0 は非ゼロ (例: 0x3ff0・0x403b) で、wasm は 0 のまま。よって X の差は xfill の人工値だけでは説明できない。
-
-## 3. 全件 (完全 trace・xfill 1 と 0)
-
-`class`: X/M/R (§1)、`L_full`: 完全 trace の L、`typeB_full`: L が ret まで call 無しか、`next(native,wasm)`: L の次 entry、`L_x0`/`caller_x0`: entry の x0 (native,wasm)、`post`: caller の call 直後の命令、`jcc`: その先の最初の条件分岐。
-
-```
+<!-- 自動生成: python3 tools/liftdiff/tests/trace_fullcompare_typeb.py "$PWD/tools/liftdiff/targets/m11.json" の stdout をそのまま保存 (人手編集しない。分析・類型の説明は tools/liftdiff/REPORT_APPENDIX_LD27.md)。FL_WIN64_DIR は block00031_PE.bin を含む展開先。入力 = tools/liftdiff/work/m11/batch_closure.jsonl (work-m11/work-liftdiff 展開物) -->
 # 型 B 候補 34 case (trace_head 基準の L が leaf)
 fn=0x476930 pat=z xfill=1 class=X L_full=0x40a3d0 typeB_full=B next(native,wasm)=('0x40c0e0', '0x40a1c0') native=ok wasm=trap
    L_x0(native,wasm)=0x3ff4000000000000,0x0 caller=0x40c1d0 call@0x40c1ee caller_x0(native,wasm)=0x3ff4000000000000,0x0 post=[mov ecx, eax ; cmp cx, 0x8000 ; jb 0x40c24c ; movabs rax, 0x8000000000000000] jcc=jb 0x40c24c
@@ -193,4 +137,3 @@ fn=0xcd1a70 pat=p0 xfill=1 class=X L_full=0x40c660 typeB_full=B next(native,wasm
 fn=0xcd1a70 pat=p0 xfill=0 class=X L_full=0x40c660 typeB_full=B next(native,wasm)=('0xcc32f0', '0x40c1d0') native=ok wasm=trap
    L_x0(native,wasm)=0x224b,0x0 caller=0x40c660 call@- caller_x0(native,wasm)=0x2247,0x0 post=[-] jcc=-
 ## 集計 (xfill, class): [((0, 'M'), 4), ((0, 'R'), 5), ((0, 'X'), 25), ((1, 'M'), 2), ((1, 'R'), 4), ((1, 'X'), 28)]
-```
