@@ -78,3 +78,31 @@
 | `[rax-0x30]`・`[rbx-0x50]` の実 target と base 設定関数の確定 | list B の base=0 の原因特定 | 既存 #1783 [LD-63] (410320 スロットの書き込み元の実行時 watch) |
 | DEFECTS 行 (D15 同類型か) | 分類 | 上記確定後 (#1931 の残件) |
 | `SV_RAW=1 survey_units.mjs` の n≥2 は未実施 (本 run は e2e 内の survey n=1) | survey 側の再現性が未確認 | 既存 #1783 の再測定に含める |
+
+## 7. #1965 の追補: 間接 call の実 target (n=2 再測定・実行時メモリ)
+
+- 測定 commit: `f9c89955` (origin/main)。素材: `fl-win64` (sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`。`work/lift_pe.sha256` は PE 指紋を手で記録 (§6 と同じ手順)。
+- e2e `m11_e2e.sh` (foreground、rc=0、167 s): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6 と一致)。
+- probe `probe1676_listB_writes.mjs` n=2 (e2e 後の再実行): unit 114 で `L=0x10bd4c20`・`base=0`・`cnt=1` の生成、unit 275 で trap。§6 と同じ結果。
+
+### 7.1 §6 の訂正 (引数の値)
+
+§6 は `40f9e0(0xC9A40, 1)` と書いたが誤り。`8651a0` の call 元 (VA `0x86522d` 等) は `mov rcx, [rip+disp]` で、`disp` 先のグローバルは VA `0x4c9af8` (wasm `0xc9af8`)。その値 (実行後メモリ) は **`0xc9bc0`** (実 object)。`0xC9A40` は object ではない。
+
+### 7.2 間接 call の実 target (実行後メモリで評価)
+
+- `40f9e0(obj=0xc9bc0, dl=1)` → `410320(rcx=obj)` の `call qword ptr [rax-0x30]`: `[obj-0x30]` = `0xf960` → **VA `0x40f960`**。
+- `410360` の `call qword ptr [rbx-0x50]` は `rbx = [410320 の戻り値]` に依存。`410320` は `call` 後 `ret` するので、戻り値は `rcx` (= obj) の引き継ぎ。 `[obj-0x50]` = `0x10070` → VA `0x410070` (`ret` のみ)。
+- `40f960` の中身 (逆アセンブル): `rbx=rcx`、`rcx=[rbx-0x80]` (dword) を `409410` に渡し、結果を `40fb40(rcx=rbx, rdx=rax)` に渡す。
+- `40fb40` は list を走査し (`[rcx-0xc0]` の配列から `[rsi+r9]` へ 8 byte 書き込み)、`[rsi]=rdi` を書く。`40fac0` は再帰で同系統。**base (+8) を 0 から設定する命令はこの走査には見えない**。
+- `409410` の間接 call は `call qword ptr [rip+0xf9c86c]` (IAT slot VA `0x13a5c90` = `0x407a50`)。
+
+### 7.3 IR との突合
+
+- `function_40f960` / `function_40fb40` / `function_40fac0` は IR に定義が無い (`grep 'define.*@function_<VA>'` 0 件)。
+- `function_409410` / `40f9e0` / `410320` / `410360` は IR に定義あり。
+
+### 7.4 未確定
+
+- list B の base (+8) を 0 のまま生成する原因の**設定元**は未確定。`40fb40` の走査が base を書かないため、base は `40f9e0` 以外の経路 (list 生成直後の `[L+8]` 未初期化) の可能性が高いが、本 run では未確認。
+- DEFECTS 行案 (D15 同類型か) は設定元の確定後。
