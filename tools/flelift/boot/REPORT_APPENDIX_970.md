@@ -54,7 +54,7 @@ FLE_CC_OPT="-O2 -flto" FLE_LABEL=o2lto FLE_SHARDS=8 FLE_CC_JOBS=2 FLE_CC_RSS_CAP
 FLE_BOOT_N=10 bash tools/flelift/boot/variant_boot.sh plain o2 o2lto   # 集計: work/boot/variant/summary.tsv
 ```
 
-素材: `oc_artifacts: fl-win64 toolchain-emsdk` (emsdk は既存の `/opt/emsdk` を使用)。生成物は `work/boot/` (gitignore)。
+素材: `oc_artifacts: fl-win64 toolchain-emsdk` (emsdk は `[EMSDK]` (docs/REFERENCES.md) の既存インストールを使用)。生成物は `work/boot/` (gitignore)。
 
 ## F. 未解決
 
