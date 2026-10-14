@@ -156,7 +156,7 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 |---|---|
 | 1. lift 段で canon_alloca 相当の正規化 | 達成 (上記 opt-in 段) |
 | 2. 同一入力 2 回で `lift.ll` / `final.ll` の sha256 一致 | 達成。`lift.ll` `628fa71e...` 両 run 一致、`final.ll` `5a5aee3c...` 両 run 一致 |
-| 2'. `drc.ll` (RetDec 生出力) の sha256 一致 | **未達**。alloca 並びと `uselistorder` 行が実行ごとに揺れる。正規化後 (run_base + canon) の base は一致。→ #1560 |
+| 2'. `drc.ll` (RetDec 生出力) の sha256 一致 | **決定により対象外 (CI-28 #1560)**。raw は実行ごとに揺れるため、比較は正規化後 (run_base + canon) の base で行う方針 (liftlib `REPORT_APPENDIX_1560.md`)。k80 で base 4/4 一致を再確認 |
 | 3. 置換前後の p0c2 出力一致 (lift の取り直しなし) | 達成。canon 無し lift (`d38a7c66...`) と canon 有り lift (`628fa71e...`) を同一 p0c2 に通し、`p0c2_sweep.csv` が `cmp` 一致 |
 
 ### 実測 (HEAD `d5959204`・素の work/ から再生成)
