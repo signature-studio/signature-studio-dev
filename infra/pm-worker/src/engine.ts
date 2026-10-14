@@ -74,15 +74,21 @@ export interface Planned {
   n: number;
   art: string;
   relaunch: boolean;
-  // oc:no-pr の再投入の理由 (計数の対象。stop・split・blocked は再投入しない)
-  np?: "artifact" | "unknown";
+  // oc:no-pr の再投入の理由 (計数の対象。stop・split は再投入しない)
+  np?: NoPrReason;
+  // np が blocked のとき、再着手の根拠にした blocked の報告 (run-outcome) の時刻。同じ報告では 2 回目を出さない。
+  reportAt?: string;
 }
 
-// relaunch バケットの np:<n> (oc:no-pr の再投入の計数。count は artifact と unknown の再投入の合計)
+type NoPrReason = "artifact" | "unknown" | "blocked";
+
+// relaunch バケットの np:<n> (oc:no-pr の再投入の計数。count は artifact・unknown・blocked の再投入の合計)
 interface NoPrCount {
   count: number;
   unknown: number;
   artifact: number;
+  // 最後に blocked の再着手をした報告の時刻 (run-outcome の at)。報告ごとに 1 回だけ再着手する。
+  blocked?: string;
   art: string | null;
 }
 
@@ -695,24 +701,28 @@ export class Engine {
 
     // oc:no-pr の issue は、最後の oc-run-outcome の reason で再着手を決める (PR を出さずに終わった run の後だけ)。
     //  unknown: cooldown の後に 1 回だけ。artifact: 前回の oc_artifacts に無い allowlist 内の素材を足して 1 回 (足す素材が無ければ再投入しない)。
-    //  stop・split は PM agent (detectPm) に回す。blocked は blocker が close されるまで再投入しない。
-    const npPick = new Map<number, { art: string; np: "artifact" | "unknown" }>();
+    //  blocked: blocker が 0 になった後に、その報告につき 1 回だけ (blocker が open の間は blocked の行に置かれ、ここには来ない)。
+    //    同じ報告で一度再着手したら、blocker が再び付いて解除されても再着手しない (新しい報告が出るまで stopped に残る)。
+    //  stop・split は PM agent (detectPm) に回す。
+    const npPick = new Map<number, { art: string; np: NoPrReason; reportAt?: string }>();
     const noPr = (n: number, from: "ready" | "stopped"): void => {
-      const reason = this.s.sig[String(n)]?.outcome?.reason ?? "unknown";
+      const outcome = this.s.sig[String(n)]?.outcome;
+      const reason = outcome?.reason ?? "unknown";
       const c = this.noPrState(n);
       const prevNames = (c.art ?? baseArt(n)).replace("oc_artifacts:", "").trim().split(/\s+/).filter(Boolean);
-      let pick: { art: string; np: "artifact" | "unknown" } | null = null;
-      let to: "recent" | "stopped" | "blocked" = "stopped";
+      let pick: { art: string; np: NoPrReason; reportAt?: string } | null = null;
+      let recent = false;
       let note = reason;
-      if (reason === "blocked") {
-        to = "blocked";
-      } else if (reason === "stop" || reason === "split") {
-        to = "stopped";
+      if (reason === "stop" || reason === "split") {
+        // PM agent の判断待ち (stopped に残す)。
       } else if (nowMs - this.lastAct(n) < cool) {
-        to = "recent";
+        recent = true;
         note = "oc:no-pr cooldown";
       } else if (c.count >= NO_PR_MAX_RELAUNCH) {
         note = "oc:no-pr x" + c.count;
+      } else if (reason === "blocked") {
+        if (outcome?.at && c.blocked === outcome.at) note = "oc:no-pr blocked 再着手済み";
+        else pick = { art: c.art ?? baseArt(n), np: "blocked", reportAt: outcome?.at };
       } else if (reason === "unknown" && c.unknown === 0) {
         pick = { art: baseArt(n), np: "unknown" };
       } else if (reason === "artifact" && c.artifact === 0) {
@@ -729,8 +739,7 @@ export class Engine {
         if (from === "stopped") moveTo(n, "stopped", () => rows.ready.push(n));
         npPick.set(n, pick);
       } else if (from === "ready") {
-        if (to === "blocked") moveTo(n, "ready", () => rows.blocked.push([n, []]));
-        else if (to === "recent") moveTo(n, "ready", () => rows.recent.push([n, note]));
+        if (recent) moveTo(n, "ready", () => rows.recent.push([n, note]));
         else moveTo(n, "ready", () => rows.stopped.push([n, note]));
       }
     };
@@ -791,7 +800,7 @@ export class Engine {
       const cand = relMap.get(n) ?? np?.art ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
       // 本文由来 (PM コメント・bot 報告) の行は、allowlist を通ったものだけを使う。通らなければ推定値に落とす。
       const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
-      picks.push({ n, art, relaunch: relMap.has(n), np: np?.np });
+      picks.push({ n, art, relaunch: relMap.has(n), np: np?.np, reportAt: np?.reportAt });
     }
     const plan: Plan = {
       at: iso(nowMs),
@@ -901,13 +910,15 @@ export class Engine {
         const prev = this.d.store.get<{ count: number; art: string | null }>("relaunch", String(p.n)) ?? { count: 0, art: null };
         this.d.store.put("relaunch", String(p.n), { count: prev.count + 1, art: p.art });
       }
-      // 計数は artifact / unknown の再投入だけ (stop・split・blocked は数えない)。
+      // 計数は artifact・unknown・blocked の再投入 (stop・split は数えない)。blocked は再着手の根拠の報告の時刻を残す (同じ報告では再着手しない)。
       if (p.np) {
         const c = this.noPrState(p.n);
         this.d.store.put("relaunch", `np:${p.n}`, {
+          ...c,
           count: c.count + 1,
           unknown: c.unknown + (p.np === "unknown" ? 1 : 0),
           artifact: c.artifact + (p.np === "artifact" ? 1 : 0),
+          ...(p.np === "blocked" && p.reportAt ? { blocked: p.reportAt } : {}),
           art: p.art,
         });
       }

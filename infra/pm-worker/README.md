@@ -19,12 +19,13 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 1. blocked_by の一覧が不明な issue は着手しない。
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
-3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 3 時間) の間は着手しない。cooldown の後は次のとおり。
+3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 6 時間。`NO_PR_COOLDOWN_H`) の間は着手しない。cooldown の後は次のとおり。
    - `unknown`: 1 回だけ再着手する。
    - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) が停止報告 (`STOP_RE`) で、その報告に前回の `oc_artifacts` に無い allowlist 内の素材があるときだけ 1 回再着手する (増えなければ再投入しない)。
    - `stop`・`split`: 再投入せず、PM agent (`oc-pm`・下の oc-pm 節) に回す。
-   - `blocked`: blocker が close されるまで再投入しない。
-   - 再投入の計数は `unknown` と `artifact` の再投入だけ (上限 3 回)。`launch-unobserved` (投稿の run が 5 分で現れなかった) は再投稿せず stopped に残す。
+   - `blocked`: blocker (`blocked_by`・本文の依存) が open の間は `blocked` の行に置き、再着手しない。blocker が 0 になった tick で、**その blocked の報告 (`run-outcome` の時刻) につき 1 回だけ**再着手する (`np:<n>.blocked` に報告の時刻を残す。連続する tick では二重に投稿しない)。
+     解除後の扱い: 同じ報告のまま blocker が再び付いて解除されても、再着手しない (`stopped` に `oc:no-pr blocked 再着手済み` と残る)。新しい blocked の報告が出れば、その報告につき 1 回だけ再着手する。blocker を持たない blocked の報告は、報告につき 1 回だけ cooldown の後に再着手する (依存が一覧に無いので、解消したとみなして試す)。
+   - 再投入の計数は `unknown`・`artifact`・`blocked` の再投入 (上限 3 回。上限に達した後は stopped に残す)。`launch-unobserved` (投稿の run が 5 分で現れなかった) は再投稿せず stopped に残す。
    `oc:stuck` は人の判断待ち。`pm-apply`・`needs-user-input` は下の oc-pm 節のとおり、再着手せず `user` 行に置く。
    `/status` の `no_pr_needs_pm` は、最後の run-outcome が `artifact` で stopped に残った `oc:no-pr` の件数 (PM の判断待ち)。
 4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
@@ -221,8 +222,8 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 
 - 前提 (merged): #2398 (Review-Only と `oc:stuck` の上限)、#2418 (LIVE の分離)、#2420 (#2380 コメントを新しい順に 24 時間分読む)、#2422 (#2338 `/status` の観測・redact・rate-guard。Worker の REST 残量が 1,500 未満の間は launch を止める)。未 merge の #2343 (VM 状態の取り込み)・#2334 (no-pr の理由別再着手)・#2340 (shadow の自己昇格) は前提から外した。VM が止まっているので二重着手の窓が無く、phase は『open PR < 10 で解除』の規則で足りる。
 - merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 12 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 3 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。oc-pm を含めて live にするのは既定案 (#2319 の設計どおり)。PM の判断は PR #2453 の未解決表と PM のコメントに記録した。突き合わせはこの版 (`e88e1890`) で測り直した。
-- 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)、`NO_PR_COOLDOWN_H="24"` (#2334 が入るまで)。`TARGET` は後で『opencode.yaml の全 run の総数の目標』に意味を改め、既定を 58 にした (上の 6。#2458 は置き換え)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
-- 突き合わせ: dry-run の Worker と VM の `launch_issues.py` の差は、open な子を持つ親の除外・`pm-apply` の user 扱い・`oc:no-pr` の cooldown・VM の `relaunch.json` の有無で説明がつく (推定を含む。測定は #2422・#2423 を含む版。内訳と未解決は `tools/pm/REPORT.md` §12)。`NO_PR_COOLDOWN_H` の既定 (3) では `oc:no-pr` の issue が大量に候補へ戻るので、24 にした。
+- 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)。`NO_PR_COOLDOWN_H` は 24 から 6 に短縮した (#2650。理由別の再着手の規則 (上の 3.) が入ったため。値は下の表)。`TARGET` は後で『opencode.yaml の全 run の総数の目標』に意味を改め、既定を 58 にした (上の 6。#2458 は置き換え)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
+- 突き合わせ: dry-run の Worker と VM の `launch_issues.py` の差は、open な子を持つ親の除外・`pm-apply` の user 扱い・`oc:no-pr` の cooldown・VM の `relaunch.json` の有無で説明がつく (推定を含む。測定は #2422・#2423 を含む版。内訳と未解決は `tools/pm/REPORT.md` §12)。(この版の時点では `NO_PR_COOLDOWN_H` の既定 3 が `oc:no-pr` の issue を大量に候補へ戻すので 24 にしていた。#2650 で、理由別の規則に合わせて 6 にした。)
 - 初回のデプロイでだけ、保存状態を整える一時ビルド (全体同期の前倒しと、phase を VM の `phase.json` に合わせる) を使った。リポジトリの差分には無い。理由と結果は `tools/pm/REPORT.md` §12-5。
 
 戻し方 (VM の timer は再開しない): `wrangler.toml` の `LIVE_LAUNCH` を `"0"` にして再デプロイ (`npx wrangler deploy`)。dispatch も止めるなら `LIVE_DISPATCH` も `"0"`。`/status` の `mode_launch` / `mode_dispatch` が `dry-run` になる。`STORE_KEY` は変わらない。
@@ -241,7 +242,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `TARGET` | 同時に走らせる **opencode.yaml の run の総数** の上限 (room = target_eff − active_all。`active_all` は実装・review・fix・oc-pm・watchdog の全て。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"58"` (上限 60 から 2 を残す。以前の暫定 `"50"` と、80 に戻す案 #2458 は置き換えた) |
 | `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
 | `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
-| `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"24"` (暫定。コードの既定は 3) |
+| `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"6"` (コードの既定も 6。#2650 で 24 から短縮) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
 切替は `[vars]` を書き換えて**再デプロイ**する (`cd infra/pm-worker && npx wrangler deploy`。`STORE_KEY` の secret は変わらない)。リポジトリと稼働中の値を一致させるため、書き換えは PR で merge してから、その main でデプロイする。
