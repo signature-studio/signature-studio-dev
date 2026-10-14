@@ -13,6 +13,9 @@ export type DetectedKind = (typeof DETECTED_KINDS)[number];
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
+// 実装 agent が着手しても PR を出さない/出せない issue (pm-apply は PM が PAT で適用する workflow 変更、needs-user-input は依頼者待ち)。
+// no_pr の検出・再投入の対象から除く。
+export const HOLD_LABELS = ["pm-apply", "needs-user-input"];
 export const REF_MAX = 9_999_999;
 
 export interface PmTarget {
@@ -72,7 +75,7 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
     const sig = s.sig[k];
     if (!sig) continue;
     const oc = sig.outcome;
-    if (i.labels.includes(NO_PR_LABEL) && oc && !answeredAfter(sig.pmAt, oc.at)) {
+    if (i.labels.includes(NO_PR_LABEL) && !i.labels.some((l) => HOLD_LABELS.includes(l)) && oc && !answeredAfter(sig.pmAt, oc.at)) {
       // split / stop は即。unknown は、Worker が再投入した後の run (outcome が最新の launch より後) でも終わった場合だけ。
       const relaunched = o.npCount(i.number) >= 1 && t(oc.at) > t(s.launchedAt[k]);
       if (oc.reason === "split" || oc.reason === "stop" || (oc.reason === "unknown" && relaunched)) {

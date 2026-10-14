@@ -6,7 +6,7 @@ import { Gh, GhError } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
-import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, type HistoryEntry, type PmTarget } from "./pm.ts";
+import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
 import {
   applyEvent,
   EMPTY_STATE,
@@ -412,6 +412,15 @@ export class Engine {
       if (hasLabel(n, "oc:no-pr") && nowMs - lastAct(n) >= cool && npCount(n) < NO_PR_MAX_RELAUNCH && !(children[String(n)] ?? []).length && !hasLabel(n, "oc:stuck") && !unknown.has(n)) {
         moveTo(n, "stopped", () => rows.ready.push(n));
       }
+    }
+
+    // 着手しても PR を出さない/出せない issue (pm-apply・needs-user-input) は、着手も再投入もしない。
+    for (const n of [...rows.ready, ...rows.relaunch.map(([x]) => x)]) {
+      const hold = (labels.get(n) ?? []).find((l) => HOLD_LABELS.includes(l));
+      if (!hold) continue;
+      moveTo(n, "ready", () => {});
+      moveTo(n, "relaunch", () => {});
+      rows.user.push([n, hold]);
     }
 
     const blocksCount = new Map<number, number>();

@@ -406,3 +406,46 @@ test("closed になった PR / issue の手がかりは reconcile の prune で�
   (ctx.app.engine as any).prune();
   assert.equal(ctx.store.get("sig", "10"), undefined);
 });
+
+// ---------------------------------------------------------------- pm-apply / needs-user-input (依頼者・PM 適用の待ち) は対象外
+test("ネガコン (g): pm-apply / needs-user-input が付いた oc:no-pr の issue は、検出も oc-pm の送信も /oc の再投入も 0 回", async () => {
+  const clock = { t: T0 + 4 * 3_600_000 };
+  const ctx = await configuredApp({
+    live: true,
+    now: clock,
+    handlers: [(c) => (c.method === "POST" && (c.url.endsWith("/dispatches") || /\/issues\/\d+\/comments$/.test(c.url)) ? j({}, 201) : undefined)],
+  });
+  const seed: Array<[string, unknown]> = [];
+  for (const [n, labels] of [
+    [91, ["oc:no-pr", "pm-apply"]],
+    [92, ["oc:no-pr", "needs-user-input"]],
+    [93, ["oc:no-pr"]],
+  ] as Array<[number, string[]]>) {
+    seed.push(["issues", issueEv(n, { labels })]);
+    seed.push(["issue_comment", commentEv(n, { login: IMPL }, outcomeBody("split"), at(10))]);
+  }
+  await sendAll(ctx, seed);
+  await markFresh(ctx);
+  assert.deepEqual(targets(ctx), ["no_pr#93"], "対照: ラベルの無い 93 だけが対象");
+  const { picks, rows } = ctx.app.engine.plan();
+  assert.deepEqual(picks.map((p) => p.n), [93], "対照: 93 だけが再投入される");
+  assert.ok(rows.user.some(([n]) => n === 91) && rows.user.some(([n]) => n === 92));
+  await ctx.app.engine.launch(await (ctx.app.engine as any).d.gh());
+  await ctx.app.engine.pmDispatch(await (ctx.app.engine as any).d.gh());
+  const oc = ctx.m.calls.filter((c) => c.method === "POST" && /\/issues\/\d+\/comments$/.test(c.url));
+  assert.deepEqual(oc.map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["93"]);
+  assert.deepEqual(pmCalls(ctx.m.calls).map((c) => c.body.client_payload), [{ kind: "no_pr", ref: 93 }]);
+});
+
+test("pm-apply の issue (oc:no-pr なし) も、ready なら着手しない。needs-user-input の user_answered は対象のまま", async () => {
+  const ctx = await configuredApp();
+  await sendAll(ctx, [
+    ["issues", issueEv(95, { labels: ["pm-apply"] })],
+    ["issues", issueEv(96, { labels: [] })],
+    ["issues", issueEv(97, { labels: ["needs-user-input", "pm-apply"], action: "labeled", label: "needs-user-input", at: at(10) })],
+    ["issue_comment", commentEv(97, HUMAN, "A", at(12))],
+  ]);
+  await markFresh(ctx);
+  assert.deepEqual(ctx.app.engine.plan().picks.map((p) => p.n), [96]);
+  assert.deepEqual(targets(ctx), ["user_answered#97"]);
+});
