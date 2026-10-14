@@ -8,7 +8,7 @@
 1. 2 関数の PyArg 書式・kwlist・既定値・エラー経路を PE で確定した (getStepParam = 5 引数、getCurrentStepParam = 4 引数)。stub (6 引数 / useGlobalIndex) とは binary が違う。
 2. 共通読出し 0xd5b930 の param → 構造体 offset の写像 (0〜8) を確定した。範囲外と構造体無しは -1。
 3. `[global]` (getStepParam の pat / getCurrentStepParam の pat) は **現在のパターン番号**。`patternNumber()` (0xd64d20) と同じ slot を読むことを PE で確認した。
-4. C provider と mock に実装した。構造体 = grid bit が 1 の step とみなし、既定値は stub 順。`channels_diff` 145 呼出し diffs 0、provider 実装 77 → 79、`all_tools` (wasm) 48/48。
+4. C provider と mock に実装した。構造体 = grid bit が 1 の step とみなし、既定値は stub 順。`channels_diff` diffs 0 (呼出し数は §11)、provider 実装 77 → 79、`all_tools` (wasm) 48/48。
 5. **未確定**: 構造体の生成経路 (note をどこで作るか) と既定値 (60/100/64/120/64/64/64/0) の PE 確認、param 8 (+0x11) の既定値。子 #2929 ([PY-111]) に分けた (§8)。
 
 ## 1. 書式と引数 (PE 実測。再現: `analysis/flapi/pe_step_param.py`)
@@ -106,10 +106,11 @@
 
 - [x] 書式・kwlist・既定値・エラー経路を PE で確定し、ABI を決めた (§1・§2)。
 - [x] `[global]` が現在のパターン番号であることの確認 (§4b。slot 同一)。
-- [△] `0x130f1e0` の構造体の**生成条件**と既定値の PE 確定: 検索条件 (note の chanId・pattern・step セル) は確定 (§4)。生成経路と既定値 (stub 値との照合) は未確定 → 子 issue。
 - [x] 決めた ABI で `provider/fl_engine.c` と `host/fl_mock.mjs` に実装、`channels_diff` diffs 0 (§6)。
 - [x] `provider_check` の件数更新 (77 → 79)。
 - [x] `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 ok (§6)。
+
+移管 (本文から除く・§8): 構造体 (note) の生成経路と既定値の PE 照合、param 8 → #2929 (PY-111)。検索条件 (note の chanId・pattern・step セル) は §4 で確定済み。
 
 ## 8. 未解決 (起票先)
 
@@ -120,7 +121,7 @@
 | `f = 0x105f2e0` (note の終端) と `A` (tick / step) の値 | note 長 1 step 以外の検索結果が未確定 | #2929 ([PY-111]) |
 | pattern 次元 (pat 別の note 保持) | mock は単一パターン | #2808 (PY-90) 系の pattern 作業 |
 | `fl_table.c` 行 61 の np=6 (stub 由来) | handler の NARGS で吸収。表の再生成は `gen_provider.py` の作業 | 子 #2929 ([PY-111]) |
-| useGlobalIndex (group 配列 A/B) | group 無しでは未モデル | #2805 (PY-89) |
+| useGlobalIndex (group 配列 A/B) | group 無しでは未モデル | #2808 (PY-90)。#2805 (PY-89) は CLOSED のため、ここへ移した (`親: #2808` の本文を持つ子は起票しない) |
 
 ## 9. main 取り込み後の再測定 (競合解消。測定 commit `9d49d429`)
 
@@ -190,5 +191,5 @@
 | MIDI device 照合 | `node tests/device_diff.mjs` | PASS (calls 8・rejects 4・midi_out 5・diffs 0) | 0.050 秒 |
 
 - 計測直前 `uptime` の load average 0.67 / 1.21 / 0.79 (nproc 4)。
-- 差分: `git diff 4c60dace HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。本 commit は `tools/python/REPORT_PY100.md` だけを変える。
+- 差分: `git diff 4c60dace HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。以後 (review round 2 の doc 修正) の commit は `tools/python/REPORT_PY100.md` と `docs/DOC_MAP.md` だけを変える。
 - 検証は実 FLEngine との比較ではない (§6 と同じ範囲)。
