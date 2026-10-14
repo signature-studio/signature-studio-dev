@@ -139,3 +139,63 @@ seed = `0x1375990` (PE export `CreateFruityInstance`、`.pdata` の大きさ 3,2
 | S1 の順序依存: unit 304・555・923 (base と soft の OOB の向き) | flengine e2e judge 13/14 (main 同型) | #1426 (OPEN) |
 | S1 の順序依存: unit 101・291・296 (base のみ trap) | 同上 | #1635 (OPEN、Refs #1442) |
 | boot の trap 種別 (OOB → unreachable) と survey の RegisterClassW 値 (0 → 1〜2) の差 | 旧 REPORT との整合 | PR 本文の未解決表のみ (切り分けは再測定) |
+
+## 8. WIN-13 (#2905): CreateFruityInstance 起動中の open 系呼出しの trace
+
+既知類型との関係: 該当なし (trace の追加のみ。lift の変換は変えていない)。
+測定 commit: `37cc1097` (コードの最後の commit)。後続の commit は本節の正の対照スクリプト・結果 JSON・本文の追加のみ (`git diff 37cc1097 HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` の出力は `tools/gui/flengine/cfi_probe.mjs` 以外の差分 0 を確認する)。
+
+### 8-1. 仕組み (`tools/shim/src/file.c`・wasm のみ)
+
+CreateFileW の 1 呼出し = printErr の 1 行 `SHIMOPEN {json}`。json は `op`・`path` (Win パス)・`ok`・`w`・`err` (GetLastError)・`access`・`disp`・`caller`・`frames`。
+`caller` は JS スタックの最初の `function_<VA>` (lift 関数名)。native ビルドでは何も出さない。
+`cfi_probe.mjs --trace-out <jsonl>` が行を JSONL に集める。`op`・`path`・`ok`・`w` は assettrace の trace 形式 v1 と同じ (`tools/startup/assettrace/assettrace.mjs` にそのまま読める)。
+
+### 8-2. 正の対照 (`tools/gui/flengine/open_trace_posctl.mjs`)
+
+存在しないパス `C:\nonexistent\x.txt` を `_CreateFileW(GENERIC_READ, OPEN_EXISTING)` で 1 回呼ぶ。
+結果: `n_shimopen` 1・`ok` false・`err` 2 (ENOENT)・`w` false・`path` 一致。**PASS (exit 0)**。
+`caller` は空。JS から直接呼んだため期待どおり。`frames` は `wasm-function[19797]:0x4f311d` のような index 表記で、**wasm に name section が無く `function_<VA>` が出ない** (→ §8-5)。
+
+### 8-3. 実測: CreateFruityInstance の呼出し (`cfi_probe.mjs`・boot7 あり)
+
+| 項目 | 結果 |
+|---|---|
+| `m11_boot_enter` | `unreachable` (WIN-4 §7-4 と同じ) |
+| `CreateFruityInstance(0xC0, 0xEDE95A, host, &iface)` | `Aborted` (`[shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)`)・1 ms |
+| open 系呼出し (CreateFileW) | **0 件** (trace 0 行 = `tools/gui/flengine/results/cfi_probe_win13.json` の `open_trace`) |
+| `icall_miss` / 到達 API | 5 / `LoadStringW` 1 件 (IMPL) |
+
+止まった地点 (`EnterCriticalSection`) より前に、この経路がファイルを開くことは無かった。
+よって実 FL の起動 asset 集合は、この経路では採れない。採れるのは #2880 の修復後になる (→ [WIN-15] #2965)。
+
+### 8-4. 既存 gate (`bash tools/gui/flengine/e2e.sh`・測定 commit `37cc1097`)
+
+| 項目 | 結果 |
+|---|---|
+| 所要 | 379 s (開始 load 0.77 0.70 0.52・終了 1.11 1.00 0.73・nproc 4) |
+| judge | 13/14 (S1 FAIL のみ・既存) |
+| S1 (soft) | `870/1/47/24/0` (base `872/1/47/22/0`)。§7-6 の boot7 あり run と同値 |
+| B1 boot parity | PASS (units_run 52 = base 52) |
+| R1・R2・P1〜P5・W1・A1・L1 | PASS (P4 TApplication 窓 `hwnd=0x110000f`・P5 `hwnd=0x110000e`) |
+| ネガコン N1〜N9 | 9 件すべて期待どおり FAIL |
+| selftest / pe_image parity | 506 passed 0 failed / PASS |
+
+`results/*.json` は boot7 あり構成で再生成されたが commit しない。CI 構成 (boot7 なし) の記録 (S1 `872/22`) と値が違うため。
+本節の数値が e2e の正の記録。
+
+### 8-5. 未達と起票先
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 呼出元 VA (wasm function index → `function_<VA>`) | 受入 1 の「呼出元 VA」が未取得 | [WIN-14] #2964 |
+| 実 trace の採取 (EnterCriticalSection 修復後)・asset 集合・実 FL との差 | 受入 2 未達。実 trace が 0 件 | [WIN-15] #2965 (依存 #2880) |
+| shimx 側 (`tools/shimx`) は構造化 trace を出さない (未変更) | assettrace REPORT §4 の shimx 行は残る | PR 本文の未解決表のみ |
+
+### 8-6. 検証 (実測)
+
+| 項目 | 結果 |
+|---|---|
+| `bash tools/shim/test.sh` | exit 0 (18 s)・shim 53 API × MT/ST・全 PASS |
+| `gcc -Wall -c tools/shim/src/file.c` (native) | 警告 0 |
+| 再現 | `bash tools/gui/flengine/e2e.sh` / `node tools/gui/flengine/cfi_probe.mjs --out <json> --trace-out <jsonl>` / `node tools/gui/flengine/open_trace_posctl.mjs` |
