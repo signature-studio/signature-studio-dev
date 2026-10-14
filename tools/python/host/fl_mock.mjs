@@ -15,6 +15,7 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    numerator: 4, denominator: 4, undoHistoryPos: 0, undoHistoryCount: 0, undoHistoryLast: 0,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -167,6 +168,14 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-119 (#2977): PE の setRecPPQ 0xd69350・setNumerator 0xd694e0・setDenominator 0xd69670 の範囲判定 (範囲外は status -3 Range error)。ゲート (safeToEdit 相当) は未確定のため真と仮定 (REPORT_PY119)
+    "general.setRecPPQ": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 24 || v > 960) throw RANGE("Range error"); st.recPPQ = v; },
+    "general.setNumerator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 1 || v > 16) throw RANGE("Range error"); st.numerator = v; },
+    "general.setDenominator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 2 || v > 16) throw RANGE("Range error"); st.denominator = v; },
+    // undo 3 件は PE 0xd69af0 (共有コールバック) が範囲検査なしに値を書く (kind 0=Pos・1=Count・2=Last)。ゲートは上と同じく仮に真
+    "general.setUndoHistoryPos": (...a) => { arity(a, 1, 1); st.undoHistoryPos = ix(a[0]); },
+    "general.setUndoHistoryCount": (...a) => { arity(a, 1, 1); st.undoHistoryCount = ix(a[0]); },
+    "general.setUndoHistoryLast": (...a) => { arity(a, 1, 1); st.undoHistoryLast = ix(a[0]); },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },
