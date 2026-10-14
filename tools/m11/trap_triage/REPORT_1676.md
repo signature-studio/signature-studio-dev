@@ -92,7 +92,7 @@
 ### 7.2 間接 call の実 target (実行後メモリで評価)
 
 - `40f9e0(obj=0xc9bc0, dl=1)` → `410320(rcx=obj)` の `call qword ptr [rax-0x30]`: `[obj-0x30]` = `0xf960` → **VA `0x40f960`**。
-- `410360` の `call qword ptr [rbx-0x50]` は `rbx = [410320 の戻り値]` に依存。`410320` は `call` 後 `ret` するので、戻り値は `rcx` (= obj) の引き継ぎ。 `[obj-0x50]` = `0x10070` → VA `0x410070` (`ret` のみ)。
+- `410360` の `call qword ptr [rbx-0x50]` (`rbx = [rax]`、`rax` は `410360` の引数) の実 target は **未確定**。前回の `[obj-0x50]` の読みは `rbx=[obj]` を評価していないため誤りで、取り消す。
 - `40f960` の中身 (逆アセンブル): `rbx=rcx`、`rcx=[rbx-0x80]` (dword) を `409410` に渡し、結果を `40fb40(rcx=rbx, rdx=rax)` に渡す。
 - `40fb40` は list を走査し (`[rcx-0xc0]` の配列から `[rsi+r9]` へ 8 byte 書き込み)、`[rsi]=rdi` を書く。`40fac0` は再帰で同系統。**base (+8) を 0 から設定する命令はこの走査には見えない**。
 - `409410` の間接 call は `call qword ptr [rip+0xf9c86c]` (IAT slot VA `0x13a5c90` = `0x407a50`)。
