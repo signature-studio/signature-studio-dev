@@ -1,6 +1,6 @@
 # tools/plugins/f2 REPORT_2492 — PLG-F3-29 (#2492): 0x407a20 の間接呼出し元の道具の修正と検算 (測定 commit 5c25928b、block19148)
 
-- 測定 commit: **5c25928b** (`fptr_callers.py` に VA 自身の参照検索を追加、`rawref_scan.py` を新規追加。コードを変えた最後の commit)。base は aa30a245 (REPORT_1305 §17 の旧測定 commit b824fd01 の後続)。本ファイル・REPORT_1305.md・docs/DOC_MAP.md は文書のみの commit。
+- 測定 commit: **5c25928b** (`fptr_callers.py` に VA 自身の参照検索を追加、`rawref_scan.py` を新規追加。コードを変えた最後の commit)。base は aa30a245 (`0x407a20` の旧 §17 を追加した commit。REPORT_1305 の §17 は main の #2493 の節に置き換わったため、本件の正本は本ファイル)。本ファイル・REPORT_1305.md・docs/DOC_MAP.md は文書のみの commit。
 - 既知類型との関係: (DEFECTS.md) 該当なし。capstone の disp 依存は (icall §4) D9 と同じ依存先。§5 参照。
 - 担当 dir: `tools/plugins/f2/` のみ。素材の抽出物と NC コピーは `$RUNNER_TEMP/ex/` (リポジトリ外・gitignore 対象外だが commit しない)。
 - 範囲: 静的解析のみ。unicorn の実経路は main 取り込み後の HEAD (30dd79d0) で再測定した (§3。取り込みで `unicorn_trace.py` が main の a70461d6 版になった)。
@@ -35,18 +35,18 @@ $PY tools/plugins/f2/fptr_callers.py $RUNNER_TEMP/ex/nc/pos407a00.bin 0x407a00  
 $PY tools/plugins/f2/fptr_callers.py $RUNNER_TEMP/ex/nc/pos407a20.bin 0x407a20   # (b)
 ```
 
-| 対象 | 入力 | 期待 | 実測 (5c25928b) |
+| 対象 | 入力 | 期待 | 実測 (道具 5c25928b、検証 HEAD 36c6eef2 で再実行) |
 |---|---|---|---|
 | (a) 正の対照 | pos407a00.bin・0x407a00 | 格納元 2 件 | `qword 格納 (0x407a00): 2 件 ['0x867c88', '0x867e78']` |
 | (b) 検出能力 | pos407a20.bin・0x407a20 | VA 自身の qword 1 件 | `VA 自身 qword 格納: 1 件 ['0x867e78']` |
 | 実 PE | block19148・0x407a20 | VA 自身の 4 種 0 件 | qword 0・disp 0・IMM 0・4 バイト一致 0 |
 
-## 3. 実測 (実 PE block19148、HEAD 5c25928b、逐次・単独)
+## 3. 実測 (実 PE block19148、道具 5c25928b、検証 HEAD 36c6eef2、逐次・単独)
 
-- `fptr_callers.py $PE 0x407a20 0x40eb30`: rc 0、wall 23.7 秒、load 0.25 → 0.47 (`/proc/loadavg`)。
+- `fptr_callers.py $PE 0x407a20 0x40eb30`: n=3 (各回 rc 0)。wall **17.4・17.8・17.4 秒** (min 17.4 – max 17.8)、load (`/proc/loadavg` の 1 分値) 開始→終了 0.39→0.60・0.60→0.72・0.72→0.78。3 回の出力は md5 一致 (49 行)。
   - 0x407a20: 「VA 自身」の 4 種すべて 0 件。囲む関数 0x407a00。格納元 `0x867c88` 1 件 (表 6 要素)。要素 0 の参照 `0x4093ae`・`0x409455`・`0x41b294` (REPORT_1305 §15 の 3 件と一致)。
   - 0x40eb30: qword 格納 1053 件 (すべて `.text` 内 `0x401000`〜`0x866a4c` の埋め込み表。`.data` 0 件)、IMM 1 件 (`0x41b1a4`)。
-- `unicorn_trace.py $PE 0x83efb0 -H -t 0x40f4fe -t 0x40eb30 -t 0x4093ae -q 0x8c3ca8 -m 2000000` (HEAD 30dd79d0、unicorn 2.1.4): rc 0。取り込み前 (1bda005d、旧版) と出力が全文一致。`trace 0x40f4fe` → `trace 0x40eb30` → `trace 0x4093ae` → `UC_ERR_READ_UNMAPPED rip=0x407a5e`。REPORT_1305 §17 と一致。
+- `unicorn_trace.py $PE 0x83efb0 -H -t 0x40f4fe -t 0x40eb30 -t 0x4093ae -q 0x8c3ca8 -m 2000000` (unicorn 2.1.4。取り込み後の HEAD 30dd79d0 で測定、検証 HEAD 36c6eef2 で再実行): rc 0。取り込み前 (1bda005d、旧版) と出力が全文一致 (30dd79d0 の測定)。`trace 0x40f4fe` → `trace 0x40eb30` → `trace 0x4093ae` → `UC_ERR_READ_UNMAPPED rip=0x407a5e`。REPORT_1305 §15 の実経路の行と一致。
 
 ## 4. 生バイト走査の検算 (rawref_scan.py、capstone 不使用)
 
@@ -66,7 +66,8 @@ $PY tools/plugins/f2/rawref_scan.py $PE 0x407a20 0x407a00
 ## 6. 検証記録 (WORKFLOW §6)
 
 - 依存 (REPORT_1305 §14 と同じ): `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone` (unicorn 2.1.4・pefile 2024.8.26・capstone 5.0.9)。
-- `git status --porcelain=v1 -- tools/plugins/f2` (5c25928b 時点): 空。
+- `git status --porcelain=v1 -- tools/plugins/f2` (検証 HEAD 36c6eef2): 空。
+- `git diff 5c25928b 36c6eef2 -- 'tools/plugins/f2/*.py'` = 0 行 (道具は測定 commit 以降不変。後続の文書のみの commit は `.md` だけ)。
 - `git diff aa30a245 5c25928b -- tools/plugins/f2`: `fptr_callers.py` (+14 −4) と `rawref_scan.py` (新規 +41) のみ。
 - `git diff 5c25928b 30dd79d0 -- 'tools/plugins/f2/*.py'` = `unicorn_trace.py` のみ (main 取り込みで入った a70461d6 版)。`fptr_callers.py`・`rawref_scan.py` は 5c25928b から不変。unicorn 経路は取り込み後に再測定した (§3)。
 - 20 MiB 超 blob: `find tools/plugins/f2 -type f -size +20M -not -path '*/work/*'` = 0 件。
@@ -83,7 +84,7 @@ $PY tools/plugins/f2/rawref_scan.py $PE 0x407a20 0x407a00
 ```sh
 PY=$RUNNER_TEMP/f2venv/bin/python
 PE=$RUNNER_TEMP/ex/extracted/block19148_PE.bin
-$PY tools/plugins/f2/fptr_callers.py $PE 0x407a20 0x40eb30     # §3 (wall 23.7 秒)
+$PY tools/plugins/f2/fptr_callers.py $PE 0x407a20 0x40eb30     # §3 (n=3 で wall 17.4〜17.8 秒)
 $PY tools/plugins/f2/rawref_scan.py $PE 0x407a20 0x407a00      # §4
 $PY tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -t 0x40f4fe -t 0x40eb30 -t 0x4093ae -q 0x8c3ca8 -m 2000000   # §3
 ```
