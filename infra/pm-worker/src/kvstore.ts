@@ -9,6 +9,7 @@ export type Bucket =
   | "launchedAt"
   | "sig"
   | "relaunch"
+  | "launchObs"
   | "meta";
 
 export interface Store {
