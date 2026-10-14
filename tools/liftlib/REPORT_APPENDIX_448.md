@@ -3,13 +3,13 @@
 親 #294 / 元報告 #440 (PR #445 の run)。本体の要約は [`REPORT.md` §24](REPORT.md)。
 
 - **測定 commit**: `2f1b76fc` (コードを変えた最後の commit)。基準は origin/main `54bacdc0`。
-- **作業場所**: worktree `$RUNNER_TEMP/ws-448` (branch `448-relink-workdir`)。main チェックアウトは触っていない。
+- **作業場所**: 張り直しの実測は `$GITHUB_WORKSPACE` (runner の checkout。agent-setup の relink 対象と同じ)。worktree `$RUNNER_TEMP/ws-448` (branch `448-relink-workdir`) は [3] の e2e と §1 の cp -a 再現に使った。`$GITHUB_WORKSPACE` は CI runner の作業領域で、WORKFLOW §2 の PM 共有 main ワークツリーではない。張り直しが書き換えるのは `tools/*/work/` (`.gitignore` の `**/work/`) の symlink だけで、tracked ファイルと git 状態は変えない。
 - **素材**: `$ARTIFACTS_DIR` で fl-win64 / plugins-ott / toolchain-retdec / toolchain-emsdk / work-m6-ott / work-liftlib / analysis-ott-binaries の実在を ls で確認。
 
 ## 1. 受入 1・2: agent-setup の relink と張り直し件数
 
 - 実装: `.github/actions/agent-setup/action.yml` L162〜184 (commit 81b0283a / 06b22b73、PR #449)。旧 `webstudio` 配下 (ubuntu 側の絶対パス) を指す symlink を `$GITHUB_WORKSPACE` 内へ `ln -sfn` で張り直す。find は `tools/*/work/*` に限定し、失敗は `extract_failed` に計上する。
-- 実測 (main チェックアウト、素材展開後):
+- 実測 (`$GITHUB_WORKSPACE`、素材展開後):
 
 | 項目 | 件数 |
 |---|---|
@@ -25,7 +25,7 @@
 ### 2.1 修正前: 素材の `libottnative.so` のまま → [3] が全 FAIL
 
 - 素材 `work-m6-ott` の `tools/ott/work/libottnative.so` (mtime 2026-10-12 18:21) は `nm -D` で `ott_enc_slots` が 0 件。
-- HEAD の `tools/ott/native/ott_native.c` は `ott_enc_slots` を定義する。この関数を追加したのは 214df2d6 (ICALL-51, 2026-10-14 08:05 UTC) と 4c69d5db (#2120, 2026-10-14 09:11 UTC)。素材はそれより前に作られている。
+- HEAD の `tools/ott/native/ott_native.c` は `ott_enc_slots` を定義する。この関数を追加したのは 214df2d6 (ICALL-51, 2026-10-14 08:05 UTC) のみ (`git log -S ott_enc_slots -- tools/ott/native`)。4c69d5db (#2120, 2026-10-14 09:11 UTC) は `tools/icall/diff/slot_trace.{c,sh}` だけを変えた。素材はそれより前に作られている。
 - 結果: `rc=1` / 193 s。[1] (audit_va) と [2] (liftlib ott 0x10000 / 0x1230000) は PASS。[3] は 3 構成とも 89 scenario 全 failed、cells 0。原因は `ottnat.py` の `CDLL` ロード時の `AttributeError: ... undefined symbol: ott_enc_slots`。
 - 前回 run (3418333a, 2026-10-13) は素材 .so と HEAD が整合していたため PASS した。
 
@@ -46,9 +46,9 @@
 
 ### 2.4 測定 commit 以降のコード差分
 
-`git diff 2f1b76fc HEAD -- tools/liftlib/lowbase_e2e.sh tools/ott/native tools/hostbridge/lowbase` は REPORT と付録の追加コミットのみで、コード範囲の差分は 0 行 (実行結果は PR 本文に記載)。
+`git diff 2f1b76fc HEAD -- tools/liftlib/lowbase_e2e.sh tools/ott/native tools/hostbridge/lowbase` の出力は 0 行 (main の取り込み merge の後も同じ。PR HEAD は PR 本文に記載)。測定 commit 以降の commit は REPORT・付録・DOC_MAP と main の取り込みのみ。
 
 ## 3. 未解決
 
 - 素材 `work-m6-ott` の `libottnative.so` は HEAD と不整合。本修正は `lowbase_e2e.sh` の [3] だけを回避する。`tools/ott/native/ottnat.py` を読む他の経路は未確認。素材の再 pack は R2 の更新を伴うため本 run では行わない (起票先は PR 本文の未解決表)。
-- 再現: `bash tools/liftlib/lowbase_e2e.sh` (素材 fl-win64 / work-m6-ott / work-liftlib / analysis-ott-binaries が必要、約 100 秒)。
+- 再現: `bash tools/liftlib/lowbase_e2e.sh` (素材 fl-win64 / work-m6-ott / work-liftlib / analysis-ott-binaries が必要。測定条件は §2.3)。
