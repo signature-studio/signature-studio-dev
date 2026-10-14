@@ -89,9 +89,10 @@
 測定 commit: `edef8fa0` (origin/main)。素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を展開。
 `bash tools/m11/ldfix/ldfix_e2e.sh` は 68.0 秒・rc 0・judge PASS (units 17/942・icall 24・threw `memory access out of bounds`・survey ok 136 / trap 9、base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
 
-- k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k236 P=0xa027 の P 値は、PE `.data` の `.reloc` 補正済み slot の値。生値は 0x407a50 / 0x407e20 / 0x4083b0 / (k236 は非ポインタ)。0x407a50 は `function_407a50` (FastMM_GetMem) の先頭、0x407e20・0x4083b0 も `.text` の関数先頭に当たる。つまり k184〜186 は bin ヘッダではなく、隣接する関数ポインタの配列と読むのが自然 (前節 §10 の「隣接する別データ」説の補強。確定ではない)。
-- k184〜186・k236 の P/F は unit 0〜16 の実行でも変化しない (`oob684_probe.mjs 17 <P slot 4 本> watch`・変化 0 件)。よって書き込みは boot 前のイメージ由来で、実行中の書き込み元ではない。
-- `trap_bins.mjs` (UNIT=17) では trap 前後とも OOB は k184・k185・k186・k236 の 4 件。unit 17 の trap の発生 bin は、この 4 件のどれかとは確定していない (k≥184 は通常経路から参照されないことが §10 で観測済み)。
-- サイズ→bin 表 (`0x11e6a3c`・326 バイト) は、この run では boot 後も全 0 (非 0 は 0 件)。§10 の前回観測 (boot 後 非 0 324 件・最大 172) と**一致しない**。再現条件の差は未切り分け。
-- 結論 (受入 1・2 の進捗): 書き込み元は未特定。ただし「k≥184 が bin 表の一部か」は否定的な材料が増えた。次の入口は、サイズ→bin 表が boot 後に非 0 になる条件 (前回観測の素材・手順) の再現と、bin 0..172 のうち F が不正なものの特定。
+- k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k236 P=0xa027 の P 値は、PE `.data` の `.reloc` 補正済み slot の値 (§10 と同じ)。生値は P + 0x400000 で、k184 = 0x407a50、k185 = 0x408040、k186 = 0x408870 (k236 は非ポインタの 0xa027)。生値が `.text` の関数先頭に当たるかは本 run で未確認 (前版の「関数先頭に当たる」「関数ポインタの配列と読むのが自然」は撤回)。
+- k184〜186・k236 の P/F が unit 0〜16 の実行で変化しないか: **未確認**。`tools/m11/trap_triage/oob684_probe.mjs 17 <P slot 4 本> watch` は本 run で未実行 (素材 `work-m11` の `m11_image.bin` が無いため)。よって「書き込みは boot 前のイメージ由来」とは言えない。
+- `tools/m11/ldfix/trap_bins.mjs` (UNIT=17) の trap 前後の OOB bin: **未確認**。本 run で未実行のため、出力は貼れない。unit 17 の trap の発生 bin が k184〜186・k236 のどれかかも未確認。
+- サイズ→bin 表 (`0x11e6a3c`・326 バイト) の boot 後の状態: **未確認**。`tools/m11/ldfix/bin_size_probe.mjs` は本 run で未実行 (出力なし)。§10 の前回観測 (boot 後 非 0 324 件・最大 172) の再現も未実施。
+- 結論 (受入 1・2 の進捗): 書き込み元は未特定。「k≥184 が bin 表の一部か」は §10 と同じく未確認のまま。次の入口は、サイズ→bin 表が boot 後に非 0 になる条件 (前回観測の素材・手順) の再現と、bin 0..172 のうち F が不正なものの特定。
+- 注: 上記の再実行には素材 `work-m11` (`oc_artifacts` に追加) が必要。
 - 未解決 (起票先): サイズ→bin 表の再現条件の差 / boot 後に F が不正な bin の特定 → #942 (次 run)。現 main IR での ldfix 効果の再判定 → #1292 (merge 済み #1469)。work-m11 の IR と現 main の不一致 → 既存 #680。
