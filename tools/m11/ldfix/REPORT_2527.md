@@ -59,7 +59,7 @@ build 後は `qstore` が適用されて指紋が変わる (post は `67bbdbeb`)
 ## 6. 検証 (WORKFLOW §6)
 
 - 測定 commit: `4ec81912`。`git diff 4ec81912 HEAD -- tools/m11 ':(exclude)*.md'` の出力 (コード・スクリプトの差分) は 0 行 (本文執筆時点の HEAD で確認)。以後の commit は REPORT と DOC_MAP のみ。
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/ldfix/ld115_e2e.sh` (前提: `tools/m11/work` に work-m11、`[EMSDK]` (`/opt/emsdk`)、`capstone`・`pefile`。`fl-win64` は `$ARTIFACTS_DIR/fl-win64.tar.zst` を展開)。
+- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/ldfix/ld115_e2e.sh` (前提: `tools/m11/work` に work-m11、`[EMSDK]` (`docs/REFERENCES.md`)、`capstone`・`pefile`。`fl-win64` は `$ARTIFACTS_DIR/fl-win64.tar.zst` を展開)。
 - 所要: `4ec81912` で 205 秒 (rc 0)。直前のコード同一の実行で 209 秒。load average (1 分) は実行前 0.58、実行後 1.01 (4 コア)。
 - 出力: `LD115_E2E_SUMMARY fail=0` (NC1〜NC4 と IR・指紋・DYN・survey の全 PASS)。
 - 20 MiB 超の blob: 本 PR は含めない (ir・wasm は `work/` にのみ置く)。
