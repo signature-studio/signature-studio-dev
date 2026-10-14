@@ -42,6 +42,8 @@ def trim_case(c, keep_raw):
         d['raw']['native']['trace_len'] = len(n.get('trace', []))
         d['raw']['wasm']['trace_len'] = len(w.get('trace', []))
         d['raw']['native']['status'] = n.get('status'); d['raw']['wasm']['status'] = w.get('status')
+        d['raw']['wasm']['blk'] = w.get('blk', [])   # LD-64: blk=1 の case のみ (IR block 入口 VA の列)
+        d['raw']['wasm']['blk_over'] = w.get('blk_over', 0)
     return d
 
 
