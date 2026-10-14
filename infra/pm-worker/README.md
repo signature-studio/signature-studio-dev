@@ -34,6 +34,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
 5. relaunch (`oc:no-pr` の再投入・素材の追加) も 1 tick の枠 `min(room, BATCH, relaunch + ready)` に入り、残りの枠を ready が使う (`src/launch.ts` の `planLaunch`)。relaunch は room や BATCH を超えても全件出す。枠を `ready` の件数だけで頭打ちにする VM の `launch_issues.py` の式とは、relaunch がある tick で最大 relaunch の件数だけ差が出る (VM の式は変えていない)。relaunch は classify が issue ごとに 2 回までに絞る。
 7. **優先の区分 (`prio:critical` / `prio:low`)**: ready の並びは、区分 (critical → 区分なし (normal) → low) が先。同じ区分の中は従来の並び (被ブロック数の多い順 → 『任意』でない順 → 番号順)。`prio:critical` が付いた ready が枠より多いときは、critical を先に選ぶ。critical が無ければ、他の ready を従来どおり枠の残りに入れる (枠を遊ばせない)。relaunch は従来どおり枠の先頭に全件入り、残りの枠を ready が使う (critical は ready の中で先頭)。ラベルは作成しない (`prio:*` が無ければ従来と同じ並び)。
+   **prio:low の上限 (`LOW_CAP`、#2721)**: 着手済み (started)・launch 可能 (ready・relaunch) で blocked でない `prio:critical` が 1 件以上ある間だけ、未完了の `prio:low` の run (`active_by_prio.low`) を数えて、新しい low の launch を `LOW_CAP - 実行中の low` までに抑える (0 未満にはしない)。critical が無ければ上限は効かない (枠を遊ばせない)。実行中の low の run は止めない。再投入の意図 (`oc-pm-intent: relaunch`) の投稿と picks は同じ枠を共有する (意図は枠が空くまで処理済みにしない)。low の run の対応は、run の題名が issue の題名と一意に一致する `issue_comment`・`workflow_dispatch` の run だけ。対応が取れない run は normal として数える。
 6. **room の基準は opencode.yaml の全 run の総数**: `room = max(0, target_eff - active_all)` (`target_eff` は上の『同時実行の上限の推定』で決まり、推定が無ければ `TARGET`)。`active_all` は `workflow_run.path` が `opencode.yaml` の未完了の run (in_progress・queued・pending・waiting・requested) を **event を問わず** 全て数える (`src/active.ts`)。VM 版の `active_runs` は実装・fix の run (`issue_comment` `workflow_dispatch` `pull_request_review` と題名が `oc-fix` の `repository_dispatch`) だけを数え、review (`pull_request`)・oc-pm・watchdog を数えなかった。同時実行の上限 (Team プランで 60) はこれらを含む opencode.yaml の全 run が共有するので、旧い数え方では `room` が過大になり、上限を超えて queued が出た (実測は #2625)。別 workflow (`scripts-test.yaml` `terms-watch.yaml`) の run は別枠で数えない。`path` を持たない run (この版より前の保存値) は opencode.yaml として数える (過大に数える側)。reconcile (5 分ごと) が REST の `path` で埋める。TARGET の既定は **58** (上限 60 から 2 を残す)。推定の観測 (`running` / `queued`) は従来どおり workflow を問わない (同時実行の上限は repo の全 workflow の job が共有するため)。
 7. ラベル `oc:hold` の open な issue (Worker の自動着手を見送る印。#2651) は `hold` 行に置き、着手 (picks) も再投入の意図 (`oc-pm-intent`) も投稿しない。判定は `needs-user-input` の次で、`blocked`・`started` より前 (付いていれば、ほかの行を見ない)。詳細は下の『oc:hold ラベル』の節。
 
@@ -153,6 +154,8 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `no_pr_needs_pm` | 最後の run-outcome が `artifact` で stopped に残った open な `oc:no-pr` の件数 (新しい素材が無い・停止報告でない・再投入済み・上限に達したものを含む。PM の判断待ち)。`split`・`stop`・`blocked`・`unknown` は数えない |
 | `no_pr_by_reason` | `{split, artifact, unknown, blocked, stop}`: open な `oc:no-pr` の issue を、最新の outcome の理由別に数えた値。outcome の無いものは数えない |
 | `ready_by_prio` | `{critical, normal, low}`: 着手待ち (`ready`) の件数を優先の区分別に数えた値。`prio:critical`・`prio:low` のラベルで決まり、無ければ normal。合計は `ready` と一致する |
+| `active_by_prio` | `{critical, normal, low}`: 未完了の opencode.yaml の run (`active_all` と同じ集合) を優先の区分別に数えた値。対応の取れない run は normal。合計は `active_all` と一致する (#2721) |
+| `low_cap` | `{cap, running, applied}`: prio:low の上限 (`LOW_CAP`)・実行中の low の run 数・上限が効いているか (critical が着手済みか launch 可能な間だけ真。投稿の直後は、投稿した critical が recent に移るので偽になり得る) (#2721) |
 | `refs_only_merge_rate_24h` | `{merged, refs_only, rate}`: 直近 24 時間に merge された PR の件数 (`merged`) と、そのうち本文が `Refs #N` のみ (`Closes` / `Fixes` / `Resolves` が 1 つでもあれば数えない) の件数 (`refs_only`) と率。0 件なら `rate` は `null`。merge 済み PR の『Refs のみ』は merge 時点の本文から取った真偽値だけを持つ (本文は保存しない)。導入前に merge された PR は、次の全体同期 (6 時間以内) で埋まる |
 | `open_issues_delta_24h` | 現在の open issue 数から、24 時間前以前で最も新しい 1 時間ごとの点 (`meta/openHist`、最大 48 点) の数を引いた差。点が無い (履歴が 24 時間分に満たない) ときは `null`。同期が古い間と一覧を打ち切った間は点を残さない |
 | `pm_dispatch_1h` | 直近 1 時間の `oc-pm` の送信数 (dry-run の would を含む。`pmHistory` と同じ live / dry-run の別) |
@@ -344,6 +347,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
 | `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
 | `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間。`prio:critical` の issue は半分 (#2683) | `"6"` (コードの既定も 6。#2650 で 24 から短縮) |
+| `LOW_CAP` | `prio:low` の issue の未完了の run の上限。`prio:critical` が着手済みか launch 可能な間だけ効く (#2721)。空・非数・負は既定に戻す | `"10"` (`config.ts` の `DEFAULT_LOW_CAP` と同じ) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
 切替は `[vars]` を書き換えて**再デプロイ**する (`cd infra/pm-worker && npx wrangler deploy`。`STORE_KEY` の secret は変わらない)。リポジトリと稼働中の値を一致させるため、書き換えは PR で merge してから、その main でデプロイする。
