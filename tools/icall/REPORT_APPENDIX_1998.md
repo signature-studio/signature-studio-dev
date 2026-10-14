@@ -4,9 +4,11 @@
 
 ## 1. 結論
 
-- **書き込み元の IR store を特定した (IR 行まで)**: `function_181057d20` (`oi.flat.ll` 行 19132・19134)。
-  - 行 19132: `store i64 %1, ptr inttoptr(909217800)` = 書込み先 `0x36319008` (trap が読む番地)。値 `%1` = `0x63736d65` ("emsc")。
-  - 行 19134: `store i64 %1, ptr inttoptr(909217808)` = 書込み先 `0x36319010` (BLK+0x10 側)。
+- **BLK+0 (`0x36319008`) への書込み元 (全 store 計装後の実測)**: 行 18686・18724・18782・18817・18940・18967・19132 の 7 行 (`function_181057a10`/`a90`/`b38`/`d20`)。`0x36319008` を書く store は 1 入力あたり 7 件で、8 入力では 56 件。
+  - **"emsc" (`0x63736d65`) を `0x36319008` に書くのは行 19132 の 1 件のみ** (8 入力全て)。他 6 行の値は `5`・`4`・`0x104af3e8` 等でポインタ/小整数。
+  - 行 19132: `store i64 %1, ptr %ce31n11_function_181057d20` = 書込み先 `0x36319008`。値 `%1` = `0x63736d65` ("emsc")。
+  - 行 19134: `store i64 %1, ptr %ce32n11_function_181057d20` = 書込み先 `0x36319010`。
+  - 行 19124 `store i64 %1, ptr %13` は任意アドレスへの "emsc" 書込み (`WCV`、BLK 範囲外の `0x104af4d8` 等 8 件)。"emsc" の発生源は行 19124 の `%1` で、これが 19132・19134 の値になる。
 - **値 "emsc" の出所は線形メモリの address 0 (null ページ)**。行 18807–18813 の load chain: `%23 = load [%1+8]` = `0x400000004` → `%25 = load [0x400000004]` = 0 → `%29 = load [0]` = "emsc" (§2)。
 - **emscripten のヌルページ sentinel**: 空の emscripten モジュール (main が 0 を返すだけ) でも address 0 から `65 6d 73 63` が見える。つまり "emsc" は route が敷設したデータではなく emscripten runtime 自身が置く値。
 - **分類 (暫定)**: 書込み命令 (store) は **lift 側** (lift が生成した IR の store)。ただし値は **null ページを指すポインタ chain** を経由する。ポインタ値 `0x400000004` の由来 (どの store が誤ったポインタを作ったか) は未特定。route 側 (data 敷設) は否定 (§3)。
@@ -18,16 +20,17 @@
 
 ## 2. 追跡 (実測)
 
-測定: `fa_wc.py` の IR 監視 (全 5526 store に `__wchk` を挿入) + `ott_run` を `181057b38` に対して 8 入力で実行。全 8 入力で trap (memory access out of bounds)。
+測定: `fa_wc.py` の IR 監視 (`oi.flat.ll` の全 5526 store に `__wchk` を挿入、未対応 0) + `fa_wc_drv.cjs` で `181057b38` に対して 8 入力を実行。全 8 入力で trap (memory access out of bounds)。`store` 行数 `grep -cE '^\s*store\b'` = 5526、挿入 `call void @__wchk` = 5526 (一致)。
 
 | 段階 | 観測 | 根拠 |
 |---|---|---|
 | instantiate 直後 | 線形 address 0 に `65 6d 73 63` | `scan.cjs` (`after-instantiate` total=1, BLK 範囲 0) |
 | `ott_data_install` 後 | 変化なし (address 0 のみ、BLK 範囲 0) | `scan.cjs` `after-data-install` |
-| `ott_run` 中の BLK+0 書込み | 行 19132 (`function_181057d20`) が `0x63736d65` を BLK+0 へ書く | `fa_wc` WC 行 |
-| 値の源 | 行 18807–18813 の load chain (`DBG` 行): `load [%1+8]`=0x400000004 → `load [0x400000004]`=0 → `load [0]`="emsc" | `dbg.ll` (`__dbgv` 挿入) |
+| `ott_run` 中の BLK 窓 (`0x36319000`–`0x36319020`) への書込み | 168 WC 行 (22 IR 行、8 入力)。`0x36319008`/`0x36319010`/`0x36319018` へ各 56 件 | `fa_wc_drv.cjs` の stderr (`WC line=`) |
+| "emsc" の BLK 窓への書込み | 行 18819 (→ `0x36319010`)・行 19132 (→ `0x36319008`)・行 19134 (→ `0x36319010`) の 3 行。各入力で同じ | 同上 |
+| 値の源 | 行 19124 `store i64 %1, ptr %13` が任意アドレスへ "emsc" を書く (`WCV` 8 件、BLK 窓外 `0x104af4d8` 等)。行 18807–18813 の load chain (`DBG` 行): `load [%1+8]`=0x400000004 → `load [0x400000004]`=0 → `load [0]`="emsc" | `WCV` と `dbg.ll` (`__dbgv` 挿入) |
 
-行 18819 (`store %29 → 0x36319010`) が最初に BLK 範囲へ "emsc" を書き (BLK+0x10)、行 19132 (`→ 0x36319008`) がトラップ番地を "emsc" にする。時系列は `run181b.err` で確認済み。
+行 18819 (`store %29 → 0x36319010`) が最初に BLK 窓へ "emsc" を書き (BLK+0x10)、行 19132 (`→ 0x36319008`) がトラップ番地を "emsc" にする。時系列は `run181b.err` で確認済み (旧測定)。
 
 ## 3. 否定できたこと
 
@@ -54,6 +57,7 @@
 | 値 `0x400000004` を作る store (null ページを指すポインタの生成元) の特定 (`-DWVAL` 絞り込みの再実行では WCV 0 件で未取得) | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #1998 (本 PR は Refs。残りは同 issue で継続) |
 | IR 行 19132 → wasm 命令オフセットの対応 | 受入条件「wasm オフセットか IR 命令まで」の wasm 側 | 同上 |
 | 引数付き lifted 関数の dispatch table 登録規則 | abort 6 件 (1852 付録 §2) | #1897 (ICALL-49) 既存 |
+| 監視の対象外: `llvm.memcpy` / `llvm.memset` 等の intrinsic、`cmpxchg` / `atomicrmw`、C 側 (`oi.*.c`・`rt/*.c`)、emscripten libc の書込み。集成体型 (`[N x T]`・`{...}`) の store は `fa_wc.py` が挿入せず件数を出す (`unhandled`) | 上記の書込みは BLK 窓への書込みを見逃しうる。`fa_wc.py` は 5526 件中 5526 件を挿入 (未対応 0) で、この集合には該当しない | 本付録 (監視の限界として明記) |
 
 ## 6. 再現
 
@@ -67,4 +71,4 @@ grep '^WC line=19132' err.txt                  # BLK+0 への書込み (IR 行 1
 bash tools/icall/diff/fa_sweep.sh 8 60
 ```
 
-範囲外: 値 `0x400000004` の生成元は本付録では未特定。IR 行から wasm オフセットへの変換も未実施。`diff/fa_wc_drv.cjs` は work/ の drv.cjs と同一 (引数: `<fa_wc.cjs 絶対パス> <VA>`)。`diff/fa_wc_drv.cjs` は work/ の drv.cjs と同一 (引数: `<fa_wc.cjs 絶対パス> <VA>`)。
+範囲外: 値 `0x400000004` の生成元は本付録では未特定。IR 行から wasm オフセットへの変換も未実施。`diff/fa_wc_drv.cjs` は work/ の drv.cjs と同一 (引数: `<fa_wc.cjs 絶対パス> <VA>`)。
