@@ -97,7 +97,7 @@
 | 2 (再 build) | 42 | 44 | build 成功 (wasm 192,136 B) |
 | 3 | 80 | 92 | build 成功 (wasm 436,971 B) |
 | 4 | 166 | 154 | build 成功 (wasm 876,222 B) |
-| 5 | 313 | — | build 失敗 (`i256` 1 件 `1813846e0` を除外) |
+| 5 | 313 | — | build 失敗 (記録上の結果。原因の分類は未確認) |
 
 round 5 の扱い (確認結果):
 
@@ -119,5 +119,5 @@ round 5 の扱い (確認結果):
 |---|---|---|
 | 閉包の収束 (未 lift callee 40 → 154 と増加。STL map/string/vector・EH の lift/shim 方針) | 受入 1・2 未達 | #1817 [KH-28] |
 | 313 関数 lift 時の入口 `memory access out of bounds` | 閉包を広げた状態の実行検証不能 | #1821 [KH-29] |
-| ymm (AVX2) 2 件 `0x180f89cf0` / `0x180fb6124` の lift | 閉包を広げると i256 で build 失敗 | #709 (KH-14・既存) |
+| ymm (AVX2) 2 件 `0x180f89cf0` / `0x180fb6124` の lift | 閉包を広げると build 失敗 (記録上。round 5 の原因は未確認) | #709 (KH-14・既存) |
 | 0x180ef7fc0 の native oracle (ctx-fuzz) | bit 照合不可 | #1761 継続 |
