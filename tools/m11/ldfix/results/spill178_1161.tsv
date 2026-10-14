@@ -91,10 +91,10 @@ cf3790	cf3f55	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0xa0], rax
 cf3790	cf3fd3	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x98], rax
 cf3790	cf3fe1	cand	OK_LOAD	確定	-	mov qword ptr [rbp + 0x90], rax
 dcdde0	dcdeee	cand	UNDETERMINED	判定不能	CELL_COLLAPSED	mov dword ptr [rbp + 0x58], eax
-ddf630	ddf6b5	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
-ddf630	ddf6c6	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xb8], rax
-ddf630	ddff5a	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xa0], rax
-ddf630	de0bfe	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xc0], rax
+ddf630	ddf6b5	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x80], rax
+ddf630	ddf6c6	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xb8], rax
+ddf630	ddff5a	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xa0], rax
+ddf630	de0bfe	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xc0], rax
 e4f410	e4f4e1	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x20], eax
 ea7ae0	ea7c61	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x20], eax
 ea7ae0	ea7c97	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x28], eax
@@ -129,18 +129,18 @@ ff8b60	ff8c63	manual	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x30],
 1046a30	104c9e6	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x5b8], eax
 1046a30	104cb44	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x2a8], rax
 1046a30	104cbcb	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x2a0], rax
-10c7cd0	10ca5a9	-		未判定	-	mov dword ptr [rbp + 0x6a4], eax
-10c7cd0	10ca5ca	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x688], rax
-10c7cd0	10cb9db	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x5e8], rax
-10c7cd0	10cba2c	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x5e0], rax
-10c7cd0	10cba77	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x5d8], rax
-10c7cd0	10cbb43	-		未判定	-	mov dword ptr [rbp + 0x48d8], eax
-10c7cd0	10cbb5f	-		未判定	-	mov dword ptr [rbp + 0x5d4], eax
-10c7cd0	10cbb80	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x5b8], rax
-10c7cd0	10ccf91	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x518], rax
-10c7cd0	10ccfe2	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x510], rax
-10c7cd0	10cd02d	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x508], rax
-10c7cd0	10cd0f8	-		未判定	-	mov dword ptr [rbp + 0x48d8], eax
+10c7cd0	10ca5a9	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x6a4], eax
+10c7cd0	10ca5ca	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x688], rax
+10c7cd0	10cb9db	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x5e8], rax
+10c7cd0	10cba2c	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x5e0], rax
+10c7cd0	10cba77	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x5d8], rax
+10c7cd0	10cbb43	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x48d8], eax
+10c7cd0	10cbb5f	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x5d4], eax
+10c7cd0	10cbb80	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x5b8], rax
+10c7cd0	10ccf91	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x518], rax
+10c7cd0	10ccfe2	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x510], rax
+10c7cd0	10cd02d	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x508], rax
+10c7cd0	10cd0f8	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x48d8], eax
 11f16b0	11f1785	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x20], eax
 1221290	1221676	cand	OK_LOAD	確定	-	mov dword ptr [rbp + 0x4c], eax
 1221840	1221a63	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x20], eax

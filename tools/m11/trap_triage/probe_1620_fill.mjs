@@ -1,5 +1,6 @@
 // #1620 診断 (読取り + stack 埋め。IR 不変): 各 unit の前に、現在 SP より下の stack 領域を FILL で埋める。
 // 0x10a9f910 の遷移と unit ごとの戻り値が、埋め値に依存するかを見る。usage: node fill_probe.mjs <fillByte> <from> <to>
+// 注: W は埋め範囲 [sp-64KiB, sp) に入りうる。埋めで W を上書きすると遷移が埋め値に見えるため、埋めの前後で W の 8B を保存・復元する。
 import fs from 'fs';
 const M11 = new URL('../', import.meta.url).pathname.replace(/\/$/, '');
 const W = 0x10a9f910;
@@ -16,11 +17,14 @@ try { mod._m11_boot_enter(0n, 1n); } catch (e) {
 const sp0 = mod._emscripten_stack_get_current();
 const rd = () => { const dv = new DataView(mod.HEAPU8.buffer); return [dv.getUint32(W, true), dv.getUint32(W + 4, true)]; };
 const hex = (v) => '0x' + (v[1] ? v[1].toString(16) + '_' : '') + v[0].toString(16);
+console.log('sp0 0x' + sp0.toString(16) + ' W-sp0 ' + (W - sp0) + (W >= sp0 - 65536 && W < sp0 ? ' (W は埋め範囲 [sp-64KiB, sp) の中)' : ''));
 let prev = rd();
 const out = [];
 for (let i = from; i <= to; i++) {
   const sp = mod._emscripten_stack_get_current();
+  const keep = mod.HEAPU8.slice(W, W + 8);
   if (fill >= 0) mod.HEAPU8.fill(fill, sp - 65536, sp);
+  if (fill >= 0) mod.HEAPU8.set(keep, W);
   let kind;
   try { kind = mod._m11_call_unit(i) === 1 ? 'ok' : 'nonok'; } catch (e) {
     kind = (e && e.m11_dllmain_done !== undefined) ? 'halt0' : 'exc';

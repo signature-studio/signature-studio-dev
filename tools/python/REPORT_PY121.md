@@ -1,88 +1,72 @@
-# tools/python REPORT: PY-121 screen 状態の 5 関数の PE 確定と C provider 実装 (#2985, 親 #2832)
+# tools/python REPORT: PY-121 general の log・rec 系 4 件の PE 根拠 (#2979, 親 #2830)
 
-> 正本: `tools/python/REPORT_PY87.md` (手順の雛形)。本付録は PY-121 の実測のみ。
+> 前段: `tools/python/REPORT_PY87.md` (general 状態読出しゲッター 4 件)・`tools/python/REPORT_PY39.md` / `REPORT_PY70.md` (processRECEvent の書式)。
+> issue #2979 が参照する `tools/python/REPORT_PY94.md` は repo に存在しない (main `eec639a3` で確認)。本付録は PY-121 の実測のみ。
+> 既知類型との関係: 該当なし (lift ではなく PE の直接逆アセンブル。docs/DEFECTS.md の類型は対象外)。
 
 ## 結論
 
-- #2985 の screen 28 件のうち **5 件** (`screen.isBlanked`・`isUnBlank`・`getScreenActiveCounter`・`setScreenActiveCounter`・`unBlank`) を PE で確定し、mock と C provider に実装した。mock と C の差分は 0 (`tests/screen_diff.mjs` 32 呼出し)。確認した引数は int・bool・float・str と個数違い。None (既定値扱い)・bytes は未確認 (未解決)。
-- **値は未確定**。5 関数の初期値 (`blanked false` / `unBlank false` / `activeCounter 0`) は mock と C で揃えた仮置き。実機値は未実測。
-- 残り **23 件** は子 issue 3 件 (#3021 PY-134・#3022 PY-135・#3025 PY-136) に分けた。引数名と書式の表記は #2952 (PY-116) の範囲で、子は意味論と実装だけを扱う。
-- flapi 表の `returns` は 5 件とも `None` のままだが、PE の読み方では値を返す (getter)。表の型は未修正 (生成元 `analysis/flapi_kwargs.py` 系の対象外。未解決の表を参照)。
+- 4 関数 (`general.clearLog`・`general.dumpScoreLog`・`general.processRECEvent`・`general.getRecPPB`) の**ハンドラ VA・書式・呼出し鎖**を PE (`block00031_PE.bin`) から確定した。書式と引数個数は flapi 表 (`analysis/flapi/flapi_table.json`) と一致した。
+- **戻り値の意味と副作用は 4 件とも未確定**。clearLog・dumpScoreLog は共通の dispatch `0xd843d0` の先の下位関数 (`0x11eb5f0`・`0x124c020`) の意味が要る。processRECEvent は `0xd84740`、getRecPPB は実行時にどちらの経路が生きているかが要る。
+- 未確定の意味を mock/C に書くと silent miscompile になる。**本 PR は mock・C provider を変えない** (実装数・未実装数の変化 0、`general_diff.mjs` の対象 0)。残りは子 issue #3001・#3002・#3003 に移した。
+
+## PE 根拠 (VA)
+
+| 関数 | PyMethodDef entry | fn (VA) | flags | 書式 (kwlist) | 確定した呼出し鎖 | 未確定 |
+|---|---|---|---|---|---|---|
+| `general.clearLog` | 0x151ac80 | 0xd6a1f0 | 4 (NOARGS) | なし | `0xd6a8e0` で eng 取得 → dispatch `0xd843d0` (out=[rbp+0x78]・callback `0xd6a1a0`・sync=1) → `0xd82c20(code)` で Python 値へ | `0xd6a1a0` 先の `0x11eb5f0(V(0x15e0ff8), 1)` の効果 |
+| `general.dumpScoreLog` | 0x151ac60 | 0xd6a060 | 3 (VARARGS\|KEYWORDS) | `i\|i` (time, silent) | PyArg 解析 → dispatch `0xd843d0` (time・silent を task に複製・callback `0xd69ff0`) → callback が `0x124c020(V(0x15e0ff8), time, silent==1)` | `0x124c020` の効果・time の単位 |
+| `general.processRECEvent` | 0x151ac40 | 0xd69f00 | 1 (VARARGS) | `Iii` (eventId, value, flags) | PyArg 解析 → `0xd84740(eng, &out, eventId, value, flags)` → out の第 1 qword ≠ 0 なら error、0 なら第 2 の dword を `0x15e4280` (int 変換) へ | `0xd84740` の意味・out の型と範囲 code |
+| `general.getRecPPB` | 0x151aa40 | 0xd69310 | 4 (NOARGS) | なし | `0xd68d90` の戻り値 X の `dword [X+0xb20]` を `0x15e4280` へ | X の切替 (下節) |
+
+- 書式は `pe_handler_probe.py` が引いた文字列 (clearLog は無し、dumpScoreLog は `i|i` 、processRECEvent は `Iii`) と flapi 表の `kwsig` が一致した。
+- `processRECEvent` の channels 版 (entry 0x15171c8・fn 0xd58e00) は同じ `0xd84740` を呼ぶ (REPORT_PY39 の既知点と一致)。
+- 変換スロット `0x15e4280` は REPORT_PY87 の既知点と一致 (getRecPPB・processRECEvent の両方で確認)。
+
+## dispatch `0xd843d0` と述語 (clearLog・dumpScoreLog 共通)
+
+- 引数: `rcx=eng`・`rdx=out`・`r8=callback`・`r9=userdata (0)`・5 番目以降はスタック。入口で `*out = -2` (`0xfffffffffffffffe`、0xd843e9)。
+- 5 番目以降の引数を task (`eng` 系の構造) の `+0x18`〜`+0x40` へ複製 (0xd84429〜0xd84467)。callback を `+0x58` に置く (0xd8446b)。11 番目の引数 (`[rbp+0xb0]`) が sync flag (0xd84471)。
+- callback の規約 (両 callback 共通の形): 先頭で `task[+0x60] = -2`。述語 `pred = vtbl(this)[+0x98]()` が真なら `task[+0x60] = 0` を書いて本体を呼ぶ。偽なら -2 のまま。
+  - `this = *(*(*(0x15e4790)) + 8)` (`0xd6a1b0`〜`0xd6a1c1`)。`general.safeToEdit` (0xd6a2c0) と同じ読み方 (REPORT_PY87 の観察と一致)。
+  - 本体の対象 `V(0x15e0ff8)` (`0xd6a1d6`・`0xd6a026` で同じ global)。
+- `0xd843d0` が `task[+0x60]` を `*out` へ写す箇所は**未確認** (推定。写す処理を見ないと、out が -2 のまま返る経路の有無が言えない)。
+- 結果変換 `0xd82c20(code)` (入口で `[rbp+0x24]` = code、戻り値 rax は `[rbp+0x28]`。`pe_disasm.py d82c20` で確認):
+  - (a) `code == 0` (`0xd82c35`〜`0xd82c3a`): `0xd82c3c` で関数ポインタ (`call [rax]`、`[rip+0x860485]` 経由) を呼び、戻り値 rax の null を見る (真偽の述語ではなくポインタ返し)。非 null なら `0xd82c4a` で戻り値を 0 とし、`0xc38bc0` を呼ばずに `0xd82dda` へ戻る。null なら (b) と同じ経路 (`0xd82c55` → `0xd82c5c`)。
+  - (b) `code ≥ 0` (`0xd82c58`〜`0xd82c5a` の `jl` が成立しない。(a) の null を含む): `0xd82c5c` で `0xc38bc0` を呼び、その戻り値を `0xd82c61` で戻り値とする。
+  - (c) `code < 0` (`0xd82c5a` の `jl 0xd82c6a` が成立): `0xd82c6a`〜`0xd82c84` で `this` (`*(*(*(0x15e4790))+8)`) の `vtbl[+0x88]()` を呼ぶ。
+    - 偽なら `0xd82dd0` で引数を設定せず `0xc38bc0` を呼ぶ (rcx は述語呼出し後で未定義。(b) と同じ `0xc38bc0`)。
+    - 真なら `0xd82c8c`〜 の code 別の分岐へ進む。`-1`〜`-3` は `0xd82cce`〜、`-4` は `0xd82d3c`、`-5`〜`-8` は `0xd82d4e`〜`0xd82d84`、`-9` 以下は `0xd82d96`。どの分岐も RIP 相対の文字列を `0x4135e0` で `[rbp+0x38]` に書いたのち `0xd82da6` へ進み、`0x414000` → `call [rbx]` (rcx = `*(*(0x15e1140))`、rdx = 文字列。例外設定の形に見えるが、関数名と引数の意味は未同定) → `0xd82dc8` で戻り値 0 を返す。
+- 戻り値の意味は未確定 (`0xc38bc0` の戻り値は None と推定・推定と明記)。よって、述語偽 (`code < 0` かつ `vtbl[+0x88]` が偽) のときに Python 側が None を返すか例外を投げるかは、`0xc38bc0` の同定まで確定しない。述語真の経路 (c-真) は、code 別のメッセージを設定して 0 を返す形。
+
+## getRecPPB の切替 (`0xd68d90`)
+
+- `P = *(0x15e4558)` (`0xd68d90`)。
+- `*(P) != 0` なら `X = *(P)` (`0xd68d97`〜`0xd68da7`)。
+- `*(P) == 0` なら `X = *(*(0x15e35c8))` (`0xd68da9`〜`0xd68db3`)。
+- 戻り値は `dword [X + 0xb20]` (`0xd69319`)。
+- どちらの経路が FLEngine の実行時に生きているかは PE の静的解析では決まらない。`0x15e4558` の値、`*(P)` が 0 になる条件 (プロジェクト・エンジンの状態)、`0x15e35c8` の指す struct の役割の同定が要る。
 
 ## 手段
 
-- ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>` (`extracted/block00031_PE.bin`)。entry VA と関数先頭 VA を得る。引数は PyMethodDef の素名 (`isBlanked`・`unBlank` など)。`screen.isBlanked` のように接頭辞を付けると出力が空になる (実測)。screen の entry は `0x151e5b8`〜`0x151e918` の範囲に限る (`init` は別の名前衝突が `0x151e058` にある)。
-- 逆アセンブル: `analysis/flapi/pe_disasm.py <VA>`。
-- 展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先>` (全体展開 5.6 秒)。
-
-## 確定した 5 関数 (PE 根拠)
-
-共通の読み方: 関数先頭で `call 0xd7eca0` (間接呼出しで対象オブジェクトのアドレスを返す共通アクセサ) → `[rax]` → `+0x50` → `+0x3f8` で screen 状態 (以下 `scr`) を得る。`scr` が 0 の経路は下の「未確定」を参照。
-
-| 関数 | PyMethodDef entry | fn (VA) | flags | 書式 | 処理 (PE) | 変換 |
-|---|---|---|---|---|---|---|
-| `screen.isBlanked` | 0x151e838 | 0xd7c7e0 | 4 (NOARGS) | — | `movzx rcx, byte [scr+0x1d0]` を変換して返す | `call [0x15e4280]` (bool) |
-| `screen.isUnBlank` | 0x151e858 | 0xd7c830 | 4 (NOARGS) | — | `movzx rcx, byte [scr+0x1d1]` を変換して返す | `call [0x15e4280]` (bool) |
-| `screen.getScreenActiveCounter` | 0x151e878 | 0xd7c880 | 4 (NOARGS) | — | `mov ecx, dword [scr+0x1cc]` を変換して返す | `call [0x15e4280]` (int) |
-| `screen.setScreenActiveCounter` | 0x151e898 | 0xd7c8c0 | 1 | `i` (0xd7c94c) | 引数 `i` を `add dword [scr+0x1cc], ecx` (**加算**。名前は set だが PE は足す) | 戻りは `0xd82c20(0)` 経路 |
-| `screen.unBlank` | 0x151e818 | 0xd7c740 | 1 | `i` (0xd7c7d0) | `byte [scr+0x1d1] = (arg == 1)` (`sete`) | 戻りは `0xd82c20(0)` 経路 |
-
-- 変換スロットは 3 件とも絶対アドレス `0x15e4280` (PY-87 の `general.*` と同じ)。bool と int は PE から区別できない (変換は値 1 個を `rcx` で渡す)。型は下の表の判断。
-- 型の判断 (stub の doc から): `isBlanked`・`isUnBlank` は bool、`getScreenActiveCounter` は int。flapi 表の `returns: None` は PE と食い違う。
-- `isBlanked` と `unBlank` が参照する `+0x1d0` と `+0x1d1` は別の byte。`+0x1d0` の書込み元 (`blank` の候補) は未確定。`+0x1cc` の他の参照元は未確定。
-- 引数の書式 `i` は flapi 表の `kwsig.fmt` と一致 (`setScreenActiveCounter`・`unBlank` とも `i`・必須 1)。書式 `i` は bool も int として受理する (CPython の bool は int の subclass)。C の `fl_a_int` が `'B'` を `'I'` と同じに受理するのと一致する。`'D'` (float) と `'S'` (str) は C で code 5 (`type_ok`)。
-
-## 未確定 (本 run で確定できなかった点)
-
-1. **`scr == 0` (screen 未初期化) の経路**: `isBlanked`・`isUnBlank`・`getScreenActiveCounter` は `or ecx,-1` → `call 0xd82c20` (負値の経路) へ入る。`setScreenActiveCounter`・`unBlank` は書込みを飛ばし、引数の書式 parse 結果 (成功時 1) をそのまま `0xd82c20` に渡す (成功経路は 0 を渡す)。**例外の型・code・Python 側の戻り値は未確定**。mock と C は初期化済み (`scr != 0`) の経路だけを模す。
-2. **`0xd82c20` の分岐の意味**: 0 は None 相当、正は `0xc38bc0` (整数化)、負はエラー経路と読めるが、0 の経路の内部 (`[rip+0x860485]` の呼出し) は未読。
-3. **bool / int の変換**: 同じ `0x15e4280` を使う。PE からは区別できない (PY-87 と同じ)。
-4. **`+0x1d0` の書込み元**: `blank` (`0xd7c600`・書式 `ii`) は `0xd843d0` を描画側の引数で呼ぶだけで、`+0x1d0` を直接書いていない。子 PY-135 で確認する。
-5. **`0xd7eca0` の中身**: 間接呼出しで対象オブジェクトのアドレスを返す。どの global かは未確定 (全 screen 関数で共通)。
-
-## 子 issue (残り 23 件)
-
-| 題名 | 件数 | 対象 |
-|---|---|---|
-| `[PY-134]` (#3021) | 6 | addTextLine・removeTextLine・findTextLine・displayText・displayTimedText・animateText |
-| `[PY-135]` (#3022) | 7 | addMeter・displayBar・fillRect・drawRect・drawText・eraseRect・blank |
-| `[PY-136]` (#3025) | 10 | init・setup・update・deInit・keepDisplayActive・hideMenu・menuShowing・menuItemClick・menuNext・menuPrev |
-
-親の #2985 は、本 PR で 5 件を完了単位として題名と本文を縮めた。子の番号は各 issue を起票した後に PR 本文の未解決表へ書く。
+- 実行の cwd は全て `tools/python/` (`analysis/flapi/` は `tools/python/analysis/flapi/`)。
+- 展開: `mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64" --wildcards '*block00031_PE.bin'` (2.9 秒・`extracted/block00031_PE.bin`)。
+- probe: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_handler_probe.py clearLog dumpScoreLog processRECEvent getRecPPB` (entry と fn が `analysis/flapi/flapi_kwargs.json` の `fn_va` と一致。`flapi_table.json` には `fn_va` が無い)。
+- 逆アセンブル: `cd tools/python && FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_disasm.py <VA 16 進> <命令数>` (本文の VA は全て、このコマンドで読んだもの)。
+- RIP 相対の絶対アドレス = 次命令のアドレス + disp32 で手計算。検算: `0xd68d90`・`0xd68d9d` の 2 命令が同じ `0x15e4558` を指すこと、`0xd6a1b0`・`0xd6a000`・`0xd6a1d6`・`0xd6a026` の指す先が各々 `0x15e4790`・`0x15e0ff8` で一致すること。
 
 ## 検証
 
-測定 commit: `5b8c500f` (コードを変えた最後の commit。`fix(python): mock の screen 引数検査を C provider と揃える (#2985)`)。以下の表はこの commit のクリーンな作業ツリーで、`provider/build.sh` を再実行してから測定した。前回の測定 (`535dd91e`) は mock の引数検査を直したことで無効になったので、値は残していない。
-環境: runner 4 core、測定時の load average 0.58 (`uptime` 21:27:36)。`FL_WIN64_DIR` は `[WIN64]` の展開先 (fl-win64 を `$RUNNER_TEMP` 配下に全展開、5.4 秒)。emsdk は `[EMSDK]` と同じ 6.0.12 を初回セットアップした (`toolchain-emsdk` の素材は本 run に無かった)。`build_cpython_wasm.sh` は emsdk の場所を固定で読むため、`[EMSDK]` の場所へ同じ版を向けた。前提生成物: `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 26 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒)。
-
-| コマンド | 結果 | wall |
-|---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 89 | 0.9 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 89 / 未実装 346 / MCP 静的 60) | 0.35 秒 |
-| `node tests/screen_diff.mjs` | calls 32 (順序どおり 16 + 個数違い 4 + 型違い 12)、diffs 0、型違いの期待値一致 (12 呼出し × 2 engine)、PASS | 0.05 秒 |
-| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS (回帰なし) | 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.7 秒 |
-
-型違いの 12 呼出し (`unBlank(True)`・`unBlank(1.5)`・`unBlank("1")`・`setScreenActiveCounter(1.5)`・`setScreenActiveCounter("1")`・`setScreenActiveCounter(True)` など) は、結果が状態に依存するので初期状態の新しいエンジン 2 つで流し、期待値 (上の表と同じ) と mock・C の両方を照合した。
-
-件数の変化: main (`f82768d9`) の実装 84 / 未実装 351 から、5 件を追加して 89 / 346。
-
-ネガティブコントロール (`docs/WORKFLOW.md` §5): 測定 commit `5b8c500f` の `host/fl_mock.mjs` に次の 2 種類を入れ、`node tests/screen_diff.mjs` が FAIL することを確かめてから commit 版へ戻した (戻した後の `cmp` と `git status` は一致・空)。
-- (1) 整数だけを見る回帰: `unBlank` を `argI(a, 0, 0) === 1` から `argI(a, 0, 0) !== 0` にする → `AssertionError: screen 差分 1 件`、rc 1 (FAIL)。`unBlank(2)` の int 入力で検出。
-- (2) 型検査を外した修正前の行: `unBlank` を `a[0] === 1` に戻す → `AssertionError: screen 型違い 期待値と不一致 4 件`、rc 1 (FAIL)。bool・float・str の入力で検出 (修正前の mock は int だけの `screen_diff` を通っていた)。
-戻した後は calls 32・diffs 0・PASS (rc 0)。
-
-コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外。本 REPORT を含む md のみの commit を後から足しても 0 行のまま):
-
-```
-$ git diff 5b8c500f HEAD -- tools/python ':!*.md'
-(空)
-```
+- コード変更なし。測定の基点は main `eec639a3`。コード差分 (`tools/python` の .md 以外): `git diff eec639a3 HEAD -- tools/python ':!*.md'` の出力は空。
+- e2e (`general_diff.mjs`・`provider_check.mjs`・`all_tools.mjs`) はコードを変えていないため対象外。件数 (実装 / 未実装) は変えていない。
+- ネガティブコントロールは対象外 (RE の記述のみ。実装の検査が無い)。
 
 ## 未解決
 
-- 5 関数の値 (`blanked` / `unBlank` / `activeCounter` の初期値) は仮置き。実機の値は未実測。mock の値をそのまま正として扱わないこと。
-- `scr == 0` の経路 (上の未確定 1)・`0xd82c20` の分岐 (上の未確定 2)・bool/int の区別 (未確定 3)。
-- mock と C の型検査の照合は int・bool・float・str と個数違いだけ。None (既定値扱い)・bytes は呼出し列で未確認。
-- flapi 表の `returns` (5 件とも `None`) の修正は、表の生成元を直す別作業 (起票先: #2952 (PY-116)。表の整理に含めることを依頼する)。
-- 残り 23 件: 子 #3021 (PY-134)・#3022 (PY-135)・#3025 (PY-136)。
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| clearLog・dumpScoreLog: `0xd843d0` の out の写し方・`0x11eb5f0`・`0x124c020` の効果・述語偽 (-2) の Python 側の挙動 | 2 関数の mock/C 実装ができない | #3001 (PY-125) |
+| processRECEvent: `0xd84740` の意味と out の構造・範囲 code | 1 関数の mock/C 実装ができない。channels 版と共有 | #3002 (PY-126) |
+| getRecPPB: `0xd68d90` の切替条件 (`0x15e4558`・`0x15e35c8` の実行時の値) | 1 関数の値が確定しない | #3003 (PY-127) |
+| issue #2979 が参照する `tools/python/REPORT_PY94.md` が repo に存在しない | 既知点 (PY-94) の出典が確認できない | #2979 のコメント |
+| `[PY-121]` の題名が 3 件ある (#2979・#2982・#2985) | 題名の重複 (番号の衝突) | PM (題名の正規化。実装 subagent はリネームしない) |
