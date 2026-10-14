@@ -220,6 +220,8 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 
 **結論**: 閉包リンクは現 main で再びリンクできる (修正前は exit 1)。ただし現 IR の boot は unit 17 で `rc=1` により停止し、FL の自然経路で LoadLibrary が 1 回も呼ばれない。`winstubs_loadlib_miss` の lift 実機取得 (受入) は未達。`LOADLIB_MISS ["WebView2Loader.dll"]` は引き続き probe 由来。
 
+**mismatch 1 の根因 (#2839)**: `midiOutShortMsg` の HMIDIOUT が IR で `i64` になるのは、RetDec 署名 DB の `unknown` 型による (x64 の 8 バイト幅に忠実)。修正方針は正規化 pass の恒久化 (b)。測定値と突合は `REPORT_APPENDIX_2839.md`。
+
 **差分確認 (測定 commit から HEAD まで・コード範囲)**: `git diff e7491b4f HEAD -- tools/m11/shimx_link/build.sh tools/m11/shimx_link/*.c tools/m11/shimx_link/*.py` の出力は 0 行 (本節は REPORT のみ変更)。
 
 ## 11. 旧 main の link 失敗の修正と `--midi` の winstubs 結線 (#179 SHX-T6)
@@ -230,5 +232,5 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 ## 12. midiOutShortMsg の HANDLE 幅 (#1628 SHX-T25): IR 側の正規化 (要約)
 
 - 結論: IR 側の宣言と呼出しを i32 に揃える正規化 (`sx_handle_norm.py`、`build.sh` 2c) で、plain / trace の `signature mismatch` 1 → 0 (測定 commit `e0e35f9a`)。切り詰めは HMIDIOUT の値を変えない。
-- 測定値・修正前の出典と IR 同一性の限界・e2e の範囲: 付録 `REPORT_APPENDIX_1628.md` §12 が正本。fail-closed 化 (`763a599d`) は未測定のため本 PR から外した (付録 §12.4)。
-- 未解決の起票先: IR 生成側の根本 → #2839 `[SHX-T31]`。fail-closed 化の復元と HEAD での再測定 (942 survey・plain の boot 到達点を含む) → #2877 `[SHX-T32]`。
+- 測定値・修正前の出典と IR 同一性の限界・e2e の範囲: 付録 `REPORT_APPENDIX_1628.md` §12 が正本。fail-closed 化 (`763a599d`) は `c4a575ce` で復元し、HEAD で再測定した (付録 §12.6・#2877 `[SHX-T32]`)。
+- 未解決: IR 生成側の根本 → #2839 `[SHX-T31]`。ws_e2e の旧基準 (init 18 / PASS 19) が本環境で再現しない → 付録 §12.5 (本 PR の未解決表)。

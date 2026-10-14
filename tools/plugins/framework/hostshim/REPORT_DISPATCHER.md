@@ -224,9 +224,24 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 - 受入 3 の未了: `hostshim.c` の応答表を実測に合わせる作業は未実施 (受入 2 の未収載 ID 応答が未確定のため。#1222 に残す)。
 - 作業ツリー: `ws-1222` (branch `1222-plg-p0b-3-phaseA`)。生成物 (`tools/plugins/work/fw/`・`work/`) は gitignore 対象。
 
-## 10. #2886 (PLG-P0b-25): 格納元の機械語確定
+## 10. #2782 応答スロット `[rbp+0x11a0]` の格納元と未収載 ID (測定 commit 48f2ced9)
 
-部分達成。詳細と VA は `REPORT_DISPATCHER_APPENDIX.md` (250 行上限のため分割)。測定 commit は `2d523491` (解析) と `2dca40dd` (応答表)。
+詳細表は `REPORT_DISPATCHER_APPENDIX.md` (§A 格納 (A-1 全書き込み命令 69 件・A-2 最後の書き込み 28 行)・§B 出口と callee 戻り値への依存 (B-2)・§C 未収載 7 ID・§D 感度試験・§E 再現手順)。
+
+- 応答は末尾 `0x1328a38` の `mov rax,[rbp+0x11a0]` (共通読み出し)。格納は case 本体と、分岐木より前の共通初期化 `0x131873f` (`mov [rbp+0x11a0],0`)。全 256 ID で最初の書き込みは `0x131873f` (機械語で確定)。
+- 機械語の書き込み命令は 69 件 (A-1)。基準 run で実行されたのは 30 件、残り 39 件は基準 run で未実行。
+- 感度試験 (`HS_DISP_STACK_FILL=0xa5`): rax・経路・外部呼出し・書き込み列・unmapped が 256 ID 全件で一致 (差 0)。応答は初期スタック内容に依存しない。
+- 内訳 (基準 run・callee 戻り値 0): 読み出し到達かつ格納が初期化のみ **202 件** / case 格納あり 27 件 / 読み出し前の出口 (仮想呼出し) 27 件。
+- 202 件の応答 0 は **callee 戻り値 0 を仮定した経路判定**。callee 戻り値を 1 にすると集合が変わる (`0x40fe90`=1 で ID 0x17 が外れ 0x0a が入る)。ID 0x17 は `0x40fe90` の戻り値に依存する (B-2)。
+- case 格納 27 件の格納元: 定数 1 が 1 件・0 の分岐が 7 件・残り 19 件は未確定 (callee 戻り値)。未実行の格納 39 件のうち 4 件は戻り値 1 で実行される (B-2)。残り 35 件は分岐条件を未解析。
+- 未収載 ID (受入 2): 25 (0x19)・54 (0x36)・64 (0x40)・88 (0x58)・128 (0x80) は、callee 戻り値 0 の仮定の上で応答 0 (基準・全 callee=1・`0x40fe90`=1 の 3 run で応答 0 の集合に残る)。96 (0x60) は未確定 (出口 `0x13228eb` の `call [rbx+0xb8]` の先が未モデル)。101 (0x65) は未確定 (`0x1322b47` が `[obj+0x2e4]` の float ビット列を格納)。
+- 未確定の残り・受入 3 は子 #2886 へ (PR 本文の未解決表)。hostshim.c と hs_e2e.sh は本節で変更していない。
+- 測定値 (実行時間・load・distinct・unmapped) は `REPORT_DISPATCHER_APPENDIX.md` §D が正本 (測定 commit `48f2ced9`)。
+- 差分: `git diff 48f2ced9 HEAD -- tools/plugins/framework/hostshim/hs_disp_emu.py` は 0 行。hostshim.c・hs_e2e.sh は 0bb93345 以降 0 行。
+
+## 11. #2886 (PLG-P0b-25): 格納元の機械語確定
+
+部分達成。詳細と VA は `REPORT_DISPATCHER_APPENDIX_2886.md` (250 行上限のため別ファイル)。測定 commit は `2d523491` (解析) と `2dca40dd` (応答表)。
 
 - 受入 1 (格納元 19 ID): 出所を VA 付きで確定。TLS 要素ポインタ + `0x2a8` 6 ID / call 戻り値 6 ID / callee 出力引数 1 / グローバル・フィールド 5 / ローカル 1。値の実体は未確定。
 - 受入 2 (仮想呼出し出口 27 ID): A (戻り値を格納) 3 / B (戻り値を捨てて `0x13281af` へ) 13 / C (後続未読) 11。B は応答が状態格納 0〜4 で決まる。

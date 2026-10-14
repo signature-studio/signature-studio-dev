@@ -5,6 +5,7 @@
 - 検証起点 commit: **09d9fd8** (origin/main 0f22d9c を基点とする `199-plg-f2-eq-filter-step1`)。数値はすべてこの HEAD から `bash tools/plugins/f2/f2_step1.sh` を 3 回実行して取得。
 - 日付: 2026-10-13 / 担当 dir: `tools/plugins/f2/` のみ (生成物は `tools/plugins/work/` = gitignore)
 - 既知類型との関係: **(icall §4) D1 = 間接 call/jmp 脱落** が 11 閉包すべてで再現 (§3)。(DEFECTS.md) D15 は x64c stage-0 経路の同種事象で、本件は RetDec 経路 (別経路)。新規類型なし。
+- 既知類型との関係 (#2726・§11): **(DEFECTS.md) D5** (xmm 引数脱落) の残件 (no_placeholder・slot_occupied・引数の割当て)。新規類型なし。
 - 範囲: issue #199 の手順 1 (固有閉包 lift → `emcc -c`) と、手順 3 (差分試験) の実行可否の判定まで。**§8 (#515) で「機械語にも間接 call 無し」の leaf 23 関数だけ関数単位差分を実施**。**手順 2〜4 と出口条件 (差分試験 bit-exact) は未達** (§5)。
 
 ## 0. 結論 (先出し)
@@ -228,22 +229,21 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 
 受入条件 1 は**未達** (不一致 8 のまま。pass は opt-in `PLUG_XMMARG=1`・既定 OFF)。HEAD `2f77ace` での実測 (6 block lift・`leaf_diff.sh` n=3・`nc_leaf.py`) は一致 15 / 不一致 8 / 実行不能 0 で、接続前と同一。分類器 (`xmm_arg_drop`) の変更は liftdiff 全体に効くが、既存 results (`tools/liftdiff/results/*`・`tools/flelift/boot/results/mixed_summary.md`) は旧分類のまま・再分類は未実施。実測・未解決は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9。
 
-## 10. PLG-F2-5 (#613): #232 (LD-1) `ldfix` の接続 (opt-in `PLUG_LDFIX=1`)
-
-受入条件 1 は**未達** (不一致 6 のまま)。受入条件 3 は**部分判定**: #232 の F2 (`spill_slot_deref`) 修復は適用できる。
-
-- 接続: `lift_ranges.sh` に opt-in `PLUG_LDFIX=1` (既定 0) を追加。`tools/m11/ldfix/ldfix.py` を `fix_xmm_args` の前段に挿入。既定鎖は不変。
-- 対照 (同一鎖・同一 6 block・`leaf_diff.sh` 1 回ずつ。A = `PLUG_XMMARG=1`、B = A + `PLUG_LDFIX=1`):
-
-| arm | 最終判定 (23 関数) | 最終 mismatch のタグ | `leaf_diff` real |
-|---|---|---|--:|
-| A (LDFIX=0) | 一致 15 / 不一致 8 / 実行不能 0 | xmm_arg_drop 7・fp_flag_unreflected 4・arg_drop 4・spill_slot_deref 4・ret_only 1 | 137 s |
-| B (LDFIX=1) | 一致 17 / 不一致 6 / 実行不能 0 | xmm_arg_drop 5・fp_flag_unreflected 4・arg_drop 2・spill_slot_deref 2・ret_only 1 | 137 s |
-
-- A と B の差は 2 関数のみ: 0x6b0ef0 (18982) と 0x6ca5c0 (19013) が mismatch → match。両者は同一コード (`REPORT_APPENDIX.md` §8 の重複表記)。他 21 関数の判定は不変。A が対照 (pass 無し) として機能している。
-- B は `ldfix` の `F2` が 4 関数 (0x6b0ef0・0x6c8c90・0x6cc2e0・0x6ca5c0) に当たり、そのうち 2 が一致に変わった。残る 0x6c8c90・0x6cc2e0 は同一コードで不一致のまま。
-- 残 6 不一致: 0x6bfec0・0x6c8fc0・0x6c9b60 (no_placeholder)、0x6c8c90・0x6cc2e0 (slot_occupied + spill_slot_deref)、0x6f1650 (署名は一致だが値が届かない)。起票先は #871 ([PLG-F2-6])。
-- 再現: `source tools/shared/env.sh; source tools/plugins/f2/env.sh; cd tools/plugins && PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0 bash lift/batch_lift.sh 18975 18982 19005 19006 19013 19059; cd ../..; bash tools/plugins/f2/leaf_diff.sh`
-- 既定化 (`PLUG_LDFIX` ON 化) は未実施。全 block・全 closure での回帰は範囲外。
+## 10. PLG-F2-5 (#613): #232 (LD-1) `ldfix` の接続 (opt-in `PLUG_LDFIX=1`) → 付録
+受入条件 1 は**未達** (現行 26f90ada の V1 は不一致 8)。受入条件 3 は**未達に改める**: #613 の B arm (`PLUG_LDFIX=1`) で一致に変わったとした 0x6b0ef0・0x6ca5c0 は、現行の V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`、測定 commit 26f90ada) で再現せず、両方とも不一致 (最終判定 15/8/0)。LDFIX 単独の寄与は現行では未測定で、#613 の A/B 対照 (17/6) が現行で再現しない原因は未確定。詳細は [`REPORT_APPENDIX_613.md`](REPORT_APPENDIX_613.md) 末尾の追補 (#2726)。
 ## 10.1 (#871 部分) 0x6f1650 の切り分け → 付録
 0x6f1650 (19059) の不一致は image 配置 (RVA) と IR 絶対 VA 定数のずれが原因と確定。修正は未実施で #871 に残す。詳細は [`REPORT_APPENDIX_871.md`](REPORT_APPENDIX_871.md)。
+
+## 11. PLG-F2-8 (#2726): 残不一致 6 関数の原因切り分けと #547 ablation の再定義 → 付録
+
+- 結論: arm V0 (`PLUG_XMMARG=0 PLUG_LDFIX=0`) と V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`) で一致 15 / 不一致 8 / 実行不能 0 が同一。V1 は XMMARG と LDFIX を同時に切り替えた arm で、両者の寄与は分離していない。V0 → V1 (合成) で最終判定が変わった関数は 0 件 (合成 arm の事実で、LDFIX 単独の効果はここからは言えない)。一次採点が変わったのは 0x6b0ef0・0x6ca5c0 (0/8 → 7/8、不一致のまま)。測定 commit `26f90ada`。
+- 残 6 関数の原因 (1 行ずつ):
+
+| VA (block) | 原因 | 根拠 |
+|---|---|---|
+| 0x6bfec0 (18975)・0x6c9b60 (18975) | no_placeholder | 接続できる placeholder が無い (`skipped`=`no_placeholder`) |
+| 0x6c8c90 (19005)・0x6cc2e0 (19006) | slot_occupied | 位置 3 を整数 `%arg4` で宣言済み (`slot_occupied(xmm3, IR params=4)`) |
+| 0x6b0ef0 (18982)・0x6ca5c0 (19013) | 引数の割当て | 復元は xmm2 のみ。xmm1・xmm3 は entry の `je 0x6b0f03` → 0x6b117f の経路で未定義のまま読まれる (k80abi の線形走査が見落とす) |
+
+- 0x6f1650 (19059): 署名のみ変化 (両方 match 11/11/11)。不一致の原因は #871 の image 配置で、pass とは無関係。
+- 修復は未適用 (子 issue へ)。数値・再現は [`REPORT_APPENDIX_2726.md`](REPORT_APPENDIX_2726.md)。

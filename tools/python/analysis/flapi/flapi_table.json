@@ -749,9 +749,15 @@
        "name": "value",
        "type": "int",
        "default": "-1"
+      },
+      {
+       "name": "inGroup",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -777,9 +783,15 @@
        "name": "index",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -882,9 +894,15 @@
        "name": "index",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -1710,8 +1728,8 @@
        "default": null
       },
       {
-       "name": "index",
-       "type": "int",
+       "name": "offset",
+       "type": null,
        "default": null
       },
       {
@@ -1723,14 +1741,10 @@
        "name": "padsStride",
        "type": "int",
        "default": "16"
-      },
-      {
-       "name": "useGlobalIndex",
-       "type": "bool",
-       "default": "False"
       }
      ],
-     "returns": "int"
+     "returns": "int",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -2860,12 +2874,18 @@
        "default": null
       },
       {
+       "name": "value",
+       "type": null,
+       "default": "PE_OPTIONAL"
+      },
+      {
        "name": "useGlobalIndex",
        "type": "bool",
        "default": "False"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -2925,9 +2945,15 @@
        "name": "index",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "value",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -3023,9 +3049,15 @@
        "name": "index",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "value",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -3679,9 +3711,15 @@
        "name": "index",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "maxLen",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "str"
+     "returns": "str",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -4345,9 +4383,15 @@
        "name": "index",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "value",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -5052,9 +5096,15 @@
        "name": "index",
        "type": "int | None",
        "default": "None"
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": null
+     "returns": null,
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -8765,9 +8815,15 @@
        "name": "data2",
        "type": "int",
        "default": "-1"
+      },
+      {
+       "name": "arg4",
+       "type": null,
+       "default": "PE_OPTIONAL"
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9608,8 +9664,35 @@
    "addMeter": {
     "doc": "Add meter",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg2",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg3",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg4",
+       "type": null,
+       "default": "PE_OPTIONAL"
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9635,9 +9718,25 @@
        "name": "line",
        "type": "int",
        "default": null
+      },
+      {
+       "name": "arg2",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg3",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg4",
+       "type": null,
+       "default": null
       }
      ],
-     "returns": "None"
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9653,8 +9752,15 @@
    "animateText": {
     "doc": "Animate text",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9670,8 +9776,20 @@
    "blank": {
     "doc": "Blank",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9821,8 +9939,35 @@
    "drawRect": {
     "doc": "Draw rectangle",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg2",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg3",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg4",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9838,8 +9983,40 @@
    "drawText": {
     "doc": "Draw text",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg2",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg3",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg4",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg5",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9855,8 +10032,30 @@
    "eraseRect": {
     "doc": "Erase rectangle",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg2",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg3",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -9915,8 +10114,30 @@
    "findTextLine": {
     "doc": "Find text line",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg2",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg3",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -10115,8 +10336,20 @@
    "removeTextLine": {
     "doc": "Remove text line",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      },
+      {
+       "name": "arg1",
+       "type": null,
+       "default": "PE_OPTIONAL"
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -10132,8 +10365,15 @@
    "setScreenActiveCounter": {
     "doc": "Set screen active counter",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -10197,8 +10437,15 @@
    "unBlank": {
     "doc": "Unblank",
     "sig": {
-     "params": [],
-     "returns": "None"
+     "params": [
+      {
+       "name": "arg0",
+       "type": null,
+       "default": null
+      }
+     ],
+     "returns": "None",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -10248,12 +10495,18 @@
        "default": "midi.GC_BackgroundColor"
       },
       {
+       "name": "paramIndex",
+       "type": null,
+       "default": "PE_OPTIONAL"
+      },
+      {
        "name": "useGlobalIndex",
        "type": "bool",
        "default": "False"
       }
      ],
-     "returns": "int"
+     "returns": "int",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
@@ -10529,17 +10782,13 @@
        "default": "-1"
       },
       {
-       "name": "pickupMode",
-       "type": "int",
-       "default": "midi.PIM_None"
-      },
-      {
        "name": "useGlobalIndex",
        "type": "bool",
        "default": "False"
       }
      ],
-     "returns": "str"
+     "returns": "str",
+     "arity_from": "kwsig"
     },
     "new_vs_stubs": false,
     "win_pair_verified": true,
