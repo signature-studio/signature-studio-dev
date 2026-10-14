@@ -2,7 +2,7 @@
 # SHX-T37 (#3070) 再現スクリプト: HeapReAlloc / GlobalLock / GlobalUnlock / GlobalFree の不正入力の
 # 戻り値と GetLastError を shimx (ST ビルド) で実測する。
 #   - 表本体: work/probe.tsv (gitignore 対象)
-#   - 負の対照: src の blk_ok に範囲検査 (#3056 の A 項と同じ式) を入れた複製で同じ probe を回し、
+#   - 負の対照: src の blk_ok に範囲検査 (#3056 の A 項と同じ判定。積の型は REPORT_SHX-T37.md §3) を入れた複製で同じ probe を回し、
 #     0xFFFFFFF0 の trap が消えることを確かめる。複製は work/src_rc/ に作り、commit 対象の src は変えない。
 # 使い方: EMSDK_ENV=<docs/REFERENCES.md [EMSDK] の emsdk_env.sh> bash tools/shimx/evidence_3070/run.sh
 set -uo pipefail
@@ -46,7 +46,7 @@ build_probe "$SHX/src" "$WORK/probe" || { echo "run.sh: emcc 失敗 (表本体)"
     run_case "$WORK/probe.cjs" unlocked 0x0
 } | tee "$WORK/probe.tsv"
 
-# 負の対照: blk_ok に範囲検査を入れた複製 (式は tools/shimx/src/heap.c の #3056 A 項と同じ)
+# 負の対照: blk_ok に範囲検査を入れた複製 (判定は #3056 A 項と同じ。積の型の差は REPORT_SHX-T37.md §3)
 rm -rf "$WORK/src_rc" && mkdir -p "$WORK/src_rc" && cp "$SHX"/src/*.c "$SHX"/src/*.h "$WORK/src_rc/"
 ANCHOR='    if (!user || ((uintptr_t)user & 15u)) return 0;'
 RANGE='    if ((uintptr_t)user < HEAP_HDR || (uintptr_t)user > (uintptr_t)__builtin_wasm_memory_size(0) * 65536u) return 0;'
