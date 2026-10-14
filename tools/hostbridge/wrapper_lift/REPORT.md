@@ -254,3 +254,9 @@
 
 - 結論: loop 外の `break -> 0x<VA>` は、飛び先の注釈 `// 0x<VA>` が同じ関数内にあるものだけ `goto lab_0x<VA>` に直す (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
 - 測定値 (emcc exit 0 件数・error 行数)・方式の根拠・未検証項目は付録 `REPORT_APPENDIX_1679.md` にのみ置く。残りは子 issue #1954 (HB-H41) と #2071 (HB-H42)。
+
+## 13. #1822: exit 0 ファイルの wasm link と採用方式 (測定 commit: 7d15ceab)
+
+- 結論: **採用方式は x64c (`x64c_wrapper.py`)**。両 block とも `emcc -c` と wasm link (`--export-all --allow-undefined`) が exit 0 で通り、block19091 は 43,828,879 B、block23676 は 43,833,146 B。RetDec 経路は emcc exit 0 の 17 / 41 ファイルを結合しても、batch ごとに同名のグローバル `g*` が衝突 (両 block で約 1,500 件 `duplicate symbol`) し、wasm link できない。
+- 測定値・手順・未検証項目は付録 `REPORT_APPENDIX_1822.md` を参照。§12 の exit 0 値 (3 / 41) は `--wide` を含まない手順の値と推定され、本付録の値 (17 / 41) と食い違う (§13 付録 §1 に差の説明)。
+- 未検証: wasm の実行 (bit 一致)・CreatePlugInstance 到達 (#829)。
