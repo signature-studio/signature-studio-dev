@@ -8,6 +8,7 @@
 ## 結論 (1 行)
 
 5 関数とも引数解析・内部ディスパッチの形は PE で確定した。**範囲外 code の扱い・各 callback が変える状態・戻り値の意味は未確定**のため、`provider/fl_engine.c` への実装は今回行わない (推測実装の禁止)。mock にも 5 関数の意味論は無い。残りは #1529 で継続する。
+(追記 run 7: §8 のとおり、確定した引数書式と index 範囲だけを C provider と mock に実装した。述語・戻り値・UI 副作用は未モデル。)
 
 ## 1. 入口と引数形式 (確定)
 
@@ -59,7 +60,7 @@ callback の VA: `closeGraphEditor` → 0xd5ca50 / `updateGraphEditor` → 0xd5c
 5. **`showCSForm` の `state` の意味**: `state` は `[obj+0x20]` に入り、`-1` / `0` / その他で分岐する (`0xd5c1d6` 以降)。各分岐の意味は未読。
 6. **`focusEditor` の `useGlobalIndex`**: `[rbx+0x20]>0` で `0x1005730` の `dl` を決める。`dl=0` 時の index の扱いは未確定。
 
-## 4. 実装と検証の状態
+## 4. 実装と検証の状態 (run 1 時点。run 7 の実装は §8)
 
 - `provider/fl_engine.c` に 5 関数は未実装 (`FL_H(channels, ...)` が無い)。`provider/gen/fl_table.c` には weak 宣言のみ。
 - mock (`host/fl_mock.mjs`) に 5 関数の定義は無い (`mixer.focusEditor` のみ、別関数)。そのため差分検査 (`mock` と C の diffs 0) は実施できない。
