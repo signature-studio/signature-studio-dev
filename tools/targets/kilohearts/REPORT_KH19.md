@@ -140,7 +140,7 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - 一覧: `gain_before_160.tsv` (正本・生成: `scripts/gain_before_list.py`)。各行は root からの親 (parent_rva) と call 位置 (call_site_rva)。`verified` 列は全行 `auto` (機械生成)。
 - 差分: 一覧は `vtable_closure` と同じ `direct_closure(roots)` から作るため、「before 160 の再現が一覧と一致する」ことは自明にしか確認できず、手検証の代替にはならない。
 - **受入 1 (各関数を手で確認) は未達**。受入 2 (手検証 160 との差分 0) は未達。`verified` 列を `manual` に変える行は、本 run では 0 件。
-- 人手検証の範囲と差分の判定は別 issue に切り出す (下記 未解決)。
+- 人手検証の範囲と差分の判定は #1816 (KH-19f) に切り出す。
 
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
