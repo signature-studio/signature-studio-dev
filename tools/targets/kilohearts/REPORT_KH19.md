@@ -244,5 +244,6 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 ## 11. KH-38 (#3065) 対照 Gain closure の unsup 被覆 (結論のみ)
 
 - 対照 Gain の before 160 closure で残っていた unsup (VEX/FMA 系ほか) を flelift x64c で被覆した。before / after の数値・内訳・未解決は [REPORT_APPENDIX_3065.md](REPORT_APPENDIX_3065.md)。
+- #2176 (KH-35): before 160 の 160 行を `verified=manual` にした (判定者は実装エージェント。独立した人手ではない)。集合の差分 0。詳細は [REPORT_APPENDIX_2176.md](REPORT_APPENDIX_2176.md)。
 - 再測定スクリプト: `scripts/lift_closure_x64c.sh`。差分テスト: `tools/flelift/tests/x64c_vex_diff.py`。
 
