@@ -54,6 +54,10 @@ def class_name(vmt):
     return shortstr(ti + 1)
 
 
+def hx(v):
+    return "None" if v is None else f"{v:#x}"
+
+
 for vmt in vmts:
     selfp = u64(vmt - 0xC8)
     ti = u64(vmt - 0xA8)
@@ -69,12 +73,12 @@ for vmt in vmts:
     ok_self = "OK" if selfp == vmt else "NG"
     ok_name = "OK" if ti_name is not None and ti_name == cn_name else "NG"
     print(f"VMT {vmt:#x}")
-    print(f"  [-0xc8] self      = {selfp:#x}  ({ok_self}: 自己を指す)")
-    print(f"  [-0xa8] typeinfo  = {ti:#x}  kind={ti_kind} name={ti_name!r}")
-    print(f"  [-0x88] classname = {cn:#x}  name={cn_name!r}  ({ok_name}: typeinfo 名と一致)")
-    print(f"  [-0x80] instsize  = {size:#x}")
+    print(f"  [-0xc8] self      = {hx(selfp)}  ({ok_self}: 自己を指す)")
+    print(f"  [-0xa8] typeinfo  = {hx(ti)}  kind={ti_kind} name={ti_name!r}")
+    print(f"  [-0x88] classname = {hx(cn)}  name={cn_name!r}  ({ok_name}: typeinfo 名と一致)")
+    print(f"  [-0x80] instsize  = {hx(size)}")
     pvmt = u64(parent) if parent and va_to_off(parent) is not None else None
-    print(f"  [-0x78] parent    = {parent:#x}  -> parent VMT {pvmt:#x} ({class_name(pvmt)!r})" if pvmt else
-          f"  [-0x78] parent    = {parent:#x}  -> (読めず)")
+    print(f"  [-0x78] parent    = {hx(parent)}  -> parent VMT {hx(pvmt)} ({class_name(pvmt)!r})" if pvmt else
+          f"  [-0x78] parent    = {hx(parent)}  -> (読めず)")
     if slot is not None:
-        print(f"  [+{slot:#x}] slot    = {u64(vmt + slot):#x}")
+        print(f"  [+{slot:#x}] slot    = {hx(u64(vmt + slot))}")
