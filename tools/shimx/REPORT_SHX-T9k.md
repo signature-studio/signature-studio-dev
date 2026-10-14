@@ -14,7 +14,7 @@
 
 ## 2. 測定
 
-### 2.1 受入 1: unit 22 の shim 呼出し列 (測定 commit `a50c3ea7`・clean rebuild・probe)
+### 2.1 受入 1: unit 22 の shim 呼出し列 (測定 commit `6603d5f5`・clean rebuild・probe)
 
 `probe_sxlasterr_2593.mjs` で unit 1〜21 を通常実行した後、unit 22 だけ trace (`sxt_set_print` と `sxt_set_stack` を 1)。`le` は呼出し直前の GetLastError。
 
@@ -35,19 +35,19 @@ IR は build 入力の `tools/m11/work/shimx_link/gen_fix/boot_trace.ll` (`--fix
 
 | 呼出し | IR 行 (boot_trace.ll) | 関数 (IR) | wasm オフセット | 関数範囲 (wasm-ld map) | 逆アセンブル |
 |---|---|---|---|---|---|
-| GetModuleHandleW("oleaut32.dll") | 160539 `%0 = call ptr @__sxt_GetModuleHandleW(…)` | `function_457c70` (160536〜) | `0x1bea33` (`call 16648` = `__sxt_GetModuleHandleW`) | `0x1bea0e`+`0x323` | `evidence_2593/objdump_0x1bea33.txt` |
-| GetProcAddress (126 を立てる 1 回目) | 160524 `%6 = call ptr @__sxt_GetProcAddress(ptr %5, ptr %arg2)` | `function_457c40` (160513〜) | `0x1be9e2` (`call 16650` = `__sxt_GetProcAddress`) | `0x1be9b6`+`0x58` | `evidence_2593/objdump_0x1be9e2.txt` |
-| 呼出し元 (function_457c70 → function_457c40, 1 回目) | 160540 `%1 = call i64 @function_457c40(…, i64 4551360)` | `function_457c70` | `0x1bea49` (`call 4611`) | 同上 | `evidence_2593/objdump_0x1bea49.txt` |
+| GetModuleHandleW("oleaut32.dll") | 160539 `%0 = call ptr @__sxt_GetModuleHandleW(…)` | `function_457c70` (160536〜) | `0x1beac0` (`call 16648` = `__sxt_GetModuleHandleW`) | `0x1bea99`+`0x325` | `evidence_2593/objdump_0x1beac0.txt` |
+| GetProcAddress (126 を立てる 1 回目) | 160524 `%6 = call ptr @__sxt_GetProcAddress(ptr %5, ptr %arg2)` | `function_457c40` (160513〜) | `0x1bea6d` (`call 16650` = `__sxt_GetProcAddress`) | `0x1bea3f`+`0x5a` | `evidence_2593/objdump_0x1bea6d.txt` |
+| 呼出し元 (function_457c70 → function_457c40, 1 回目) | 160540 `%1 = call i64 @function_457c40(…, i64 4551360)` | `function_457c70` | `0x1bead6` (`call 4611`) | 同上 | `evidence_2593/objdump_0x1bead6.txt` |
 
-- V8 フレームの対応 (`probe_u22_shimx_head.txt` の `#0`・`#1`): GetModuleHandleW は `sxt_enter` → `[16648]` (wrapper) → `[4612]:0x1bea33` (= function_457c70)。GetProcAddress は `sxt_enter` → `[16650]` (wrapper) → `[4611]:0x1be9e2` (= function_457c40) → `[4612]:0x1bea49` (= function_457c70)。
+- V8 フレームの対応 (`probe_u22_shimx_head.txt` の `#0`・`#1`): GetModuleHandleW は `sxt_enter` → `[16648]` (wrapper) → `[4612]:0x1beac0` (= function_457c70)。GetProcAddress は `sxt_enter` → `[16650]` (wrapper) → `[4611]:0x1bea6d` (= function_457c40) → `[4612]:0x1bead6` (= function_457c70)。
 - 同じ呼出し元 `function_457c70` は `function_457c40` を 22 回呼ぶ (IR 160540〜160582 行)。2 回目の戻り先は `0x1bea6b` (IR 160542 行)。
 - 対応の検証: 逆アセンブルの命令境界 (`call` 命令の先頭) と V8 の offset が一致する。map の関数範囲に全て収まる。
 
 ### 2.3 再現性の注意: archive 由来の `work-m11` の IR では 126 は出ない
 
-- 素材 `work-m11.tar.zst` 同梱の `boot_final3.ll` (2026-10-10) を使った shimx `--trace --soft --fix` は、unit 18 が `exc=memory access out of bounds lasterr=87`、unit 22 が `lasterr=0` だった (126 は出ない)。REPORT_SHX-T9j §2.3 の「旧 IR」行と同じ挙動。
+- (a50c3ea7 時点の測定。6603d5f5 では未再測定) 素材 `work-m11.tar.zst` 同梱の `boot_final3.ll` (2026-10-10) を使った shimx `--trace --soft --fix` は、unit 18 が `exc=memory access out of bounds lasterr=87`、unit 22 が `lasterr=0` だった (126 は出ない)。REPORT_SHX-T9j §2.3 の「旧 IR」行と同じ挙動。
 - 126 を再現するには **IR を現行コードから再生成する** 必要がある: `FL_WIN64_DIR=… bash tools/m11/m11_gen_ir2.sh` (50 秒・`490735 行`) → `FL_WIN64_DIR=… bash tools/m11/m11_build.sh` (25 秒・`boot_final3.ll` 再生成)。その後で shimx を clean rebuild する。
-- 再生成後の baseline (`m11_boot.cjs`) は unit 22 `ret=1 lasterr=0` (`evidence_2593/probe_u22_baseline_regen.txt`)。
+- 再生成後の baseline (`m11_boot.cjs`) は unit 22 `ret=1 lasterr=0` (`evidence_2593/probe_u22_baseline_regen.txt`・6603d5f5 で再実行し証跡と同一)。
 
 ### 2.4 IR 上の確認 (hModule の出所)
 
@@ -57,15 +57,15 @@ IR は build 入力の `tools/m11/work/shimx_link/gen_fix/boot_trace.ll` (`--fix
 
 ## 3. 再現性 (WORKFLOW §6)
 
-- 測定 commit: `a50c3ea7` (計装のみ: `tools/m11/shimx_link/trace_rt.c`・`build.sh`・`probe_sxlasterr_2593.mjs`)。前段 `0cfb592c` は同じ計装で、`build.sh` の EXPORTS に 2 語を同じ行に足していた。`a50c3ea7` はその 2 語を別行へ分けただけで、wasm と probe の出力は `0cfb592c` と同一 (§2.2 のオフセットも同じ)。
+- 測定 commit: `6603d5f5` (`a50c3ea7` に `origin/main` (`9b352bd7`) を merge した commit。競合は `build.sh` の EXPORTS 行のみで、main の `_sxt_ret_site,_sxt_site_name` と本計装の `_sxt_set_print,_sxt_set_stack` を両方残した)。計装 (`tools/m11/shimx_link/trace_rt.c`・`build.sh`・`probe_sxlasterr_2593.mjs`) の中身は `a50c3ea7` と同じ。main 取り込みで IR の `__sxt_GetProcAddress` に site 引数が増え、wasm の配置が変わった (§2.2 のオフセットは `a50c3ea7` 時点の `0x1bea33`・`0x1be9e2`・`0x1bea49` から変わっている)。§2.1 の値 (le・戻り値) は両 commit で同一。前段 `0cfb592c` → `a50c3ea7` は EXPORTS の 2 語を別行へ分けただけ。
 - 再現手順 (clean rebuild → probe):
   1. 素材を展開: `tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst -C <worktree>`・`work-liftdiff` も同様。`fl-win64` は `extracted/block00031_PE.bin` だけ (`mkdir -p $RUNNER_TEMP/fl-win64 && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block00031_PE.bin`)。
   2. IR 再生成: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_gen_ir2.sh` → `FL_WIN64_DIR=… bash tools/m11/m11_build.sh`。
   3. shimx clean rebuild: `rm -rf tools/m11/work/shimx_link/obj tools/m11/work/shimx_link/gen_fix && bash tools/m11/shimx_link/build.sh --trace --soft --fix` → `[sxlink] OK trace_soft_fix` (`evidence_2593/build_trace_soft_fix_head.log`・15 秒)。
   4. probe: `node tools/m11/shimx_link/probe_sxlasterr_2593.mjs $PWD/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs 21` (unit 22 を trace。0.5 秒)。
-- 測定時の値: `m11_sx_trace_soft_fix.cjs` sha256 `c8b0c4d3…`・`.wasm` sha256 `63bfc70c…` (先頭 20 桁)。emcc は 6.0.12 (`[EMSDK]`)。`uptime` load 0.29〜0.34 (4 CPU)。
-- 結果は HEAD (`a50c3ea7`) の clean rebuild で再現した (§2.1 は HEAD の出力・`evidence_2593/probe_u22_shimx_head.txt`)。証跡内のワークツリー絶対パスは `<repo>/` に置換した (それ以外は出力のまま)。
-- `git diff a50c3ea7 HEAD -- tools/m11 tools/shimx/src` の出力: 0 行 (本節の PR は REPORT と evidence と DOC_MAP と T9j の追記のみ)。
+- 測定時の値: `m11_sx_trace_soft_fix.cjs` sha256 `bd963f6b…`・`.wasm` sha256 `349d53f3…` (先頭 16 桁)。emcc は 6.0.12 (`[EMSDK]`)。`uptime` load 0.78 (build 時・4 CPU)。
+- 結果は HEAD (`6603d5f5`) の clean rebuild で再現した (§2.1 は HEAD の出力・`evidence_2593/probe_u22_shimx_head.txt`)。証跡内のワークツリー絶対パスは `<repo>/` に置換した (それ以外は出力のまま)。
+- `git diff 6603d5f5 HEAD -- tools/m11 tools/shimx/src` の出力: 0 行 (測定後の変更は本 REPORT と evidence のみ)。参考: `git diff --stat a50c3ea7 6603d5f5 -- tools/m11 tools/shimx/src` は 19 files (+851 / −65) で、main 取り込み分。
 
 ## 4. 未解決
 

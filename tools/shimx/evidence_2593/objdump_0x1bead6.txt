@@ -1,0 +1,32 @@
+
+m11_sx_trace_soft_fix.cjs.wasm:	file format wasm
+
+Disassembly of section CODE:
+
+001bea44 <function_457c40>:
+        .local i64, i32, i64, i32, i32
+  1bea99:      	end
+  1bea9a:      	local.get	2
+  1bea9c:      	return
+  1bea9d:      	end
+
+001bea9e <function_457c70>:
+        .local i32, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64
+  1beaa5:      	global.get	0
+  1beaab:      	i32.const	64
+  1beaae:      	i32.sub 
+  1beaaf:      	local.set	0
+  1beab1:      	local.get	0
+  1beab3:      	global.set	0
+  1beab9:      	i64.const	360204
+  1beabd:      	i32.wrap_i64
+  1beabe:      	i32.const	22
+  1beac0:      	call	16648
+  1beac6:      	drop
+  1beac7:      	local.get	0
+  1beac9:      	i32.const	8
+  1beacb:      	i32.add 
+  1beacc:      	i64.const	360230
+  1bead0:      	i32.wrap_i64
+  1bead1:      	i64.const	4551360
+  1bead6:      	call	4611

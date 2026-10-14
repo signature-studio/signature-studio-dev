@@ -1,9 +1,0 @@
-
-m11_sx_trace_soft_fix.cjs.wasm:	file format wasm
-
-Disassembly of section CODE:
-
-001bea13 <function_457c70>:
-        .local i32, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64, i64
-  1bea44:      	i64.const	4551360
-  1bea49:      	call	4611

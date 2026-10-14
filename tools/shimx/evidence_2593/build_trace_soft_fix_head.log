@@ -30,8 +30,10 @@
 [sxlink] cc m11_data.c
 [sxlink] cc sx_liftfix.c
 [sxlink] cc sx_cbboot.c
+[fix_alloca] 拡幅 alloca 0 個 (0 関数)
 [gen_link] 外部参照 570: shimx=184 lift_c=211 lift_unresolved=0 libc=0 intrinsic=3 gui=170 audio=1 unknown=1
 [gen_link] ラッパ 356 本 (varargs で除外 0: ) / スタブ 172 本
+[gen_link] RET_LOG 呼出し元 site 24 件 (GetModuleHandleW GetProcAddress)
 [sxlink] cc gui_stubs_soft.c
 [sxlink] cc gui_compat.c
 [sxlink] cc boot_trace.ll
