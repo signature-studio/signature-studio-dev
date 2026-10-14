@@ -8,7 +8,7 @@
 - **cookie と decode 規則は一致**: SlateCore `0x18125eaa8` と OTT `0x180260ce0` の cookie はどちらも静的既定 `0x2b992ddfa232` (rot = cookie & 0x3f = 50)。decode は両者とも `ror(entry ^ cookie, cookie & 0x3f)`。
 - **配置も一致 (静的状態)**: OTT api-set 表 (32 entry = 256 B) も SlateCore の既知 12 slot・T1 `0x181307100`・T2 `0x1813071a0` も、すべて `.data` の **zero-fill 域** にあり、ファイル上の生値は 0。
 - **受入条件「entry 数の比較」は未達**: OTT 側は 32 entry と確定。SlateCore 側は T1/T2 の終点が未確定のため、仮定を置いても一致・相違のどちらとも判定しない。確定は #2226 (ICALL-66)。本 appendix の判定は形式 (cookie・decode 式・zero-fill 配置) の一致のみ。
-- **訂正**: `tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の「api-set 表 0x18026c9f0 のファイル生値は非ゼロ 32/32」は誤り。実測は 0/32 (§2.3)。`tools/ott/crtinit/REPORT.md` §3 の「全 0」が正しい。本 PR では ACCEPTANCE 文書を書き換えず、未解決表に残す。
+- **訂正**: `tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の「api-set 表 0x18026c9f0 のファイル生値は非ゼロ 32/32」は誤り。表は `.data` の raw 範囲外にあり、ファイル上に生値が無い (根拠は §2.4 のセクションヘッダとの比較)。`tools/ott/crtinit/REPORT.md` §3 の「全 0」が正しい。本 PR では ACCEPTANCE 文書を書き換えず、未解決表に残す。
 
 ## 2. 実測
 
@@ -38,15 +38,24 @@
 | 表の起点 | `0x18026c9f0` (api-set 表) | T1 `0x181307100`・T2 `0x1813071a0` |
 | entry 数 | **32** (8 B × 32 = 256 B) | 未確定 (#2226) |
 | 配置 | `.data` zero-fill (raw end `0x180269000`・virt end `0x18026cbcc`) | `.data` zero-fill (raw end `0x18128f400`・virt end `0x18130a000`) |
-| 生値 | 32/32 が 0 | 既知 12 slot・T1・T2 の起点が 0 |
-| 個別 slot | `0x18026c028`・`0x18026c388`・`0x18026cb40`・`0x18026cb88` すべて 0 | 既知 12 (`0x1813068d0`〜`0x181307418`) すべて 0 |
+| 生値 | raw 範囲外 (zero-fill) のためファイル上に無し | 既知 12 slot・T1・T2 の起点も zero-fill のためファイル上に無し |
+| 個別 slot | `0x18026c028`・`0x18026c388`・`0x18026cb40`・`0x18026cb88` も zero-fill (raw 範囲外) | 既知 12 (`0x1813068d0`〜`0x181307418`) も zero-fill (raw 範囲外) |
 
 - 「encoded 表 = zero-fill に enc(NULL)=cookie を敷いて初期化」という形式は、両者で同じ。OTT は `ott_crt_init_tables` が、SlateCore は harness の `SLOT_ENC_INIT=1` が同じ書込みを行う。
 - OTT の `enc(NULL)` は `rol(0,14) ^ cookie` で `cookie` に等しい (`crtinit/REPORT.md` と一致)。
 
-### 2.4 注意: 直読みの取り違え
+### 2.4 事実の根拠: セクションヘッダの raw end と表の VA
 
-最初の試行では `.data` の raw 末尾 (`0x180269000`) より後ろの VA を `get_offset_from_rva` で読んだため、ファイル内の別位置を読んで「非ゼロ」と誤判定した。zero-fill を明示的に 0 とする読み直しで 0/32 に確定した。その読み直しは追跡対象の `tools/icall/diff/ott_apiset_cmp.py` (raw 末尾より後の VA は 0) に移した。`ACCEPTANCE_CAB137_CAB138.md` §4.3 の「非ゼロ 32/32」は同じ誤りと見られる (因果は未確認)。
+「api-set 表は zero-fill 域にあり、ファイル上の生値は 0」の根拠は、次の PE セクションヘッダの値との比較である (実測値の出力ではない)。
+
+- OTT の `.data`: raw end `0x180269000` (`PointerToRawData + SizeOfRawData` 相当の VA)、virt end `0x18026cbcc`。
+- api-set 表の起点 `0x18026c9f0` (8 B × 32 = 終点 `0x18026caf0`) は raw end `0x180269000` より後ろで、virt end の内側。
+- よって表の全 entry はファイルの raw 範囲の外にあり、ファイル上の生バイトを持たない。
+
+`tools/icall/diff/ott_apiset_cmp.py` は、VA が raw 範囲外の場合を `zero-fill (ファイル外・0 固定)` と表示し、raw 範囲内の場合のみ `raw` 由来の値と数える。表が zero-fill のときは「raw 由来の非ゼロ 0/32」を出さず、「実値 (raw) なし」と出す。
+以前の REPORT・検収文書にあった「非ゼロ 32/32」は、raw 範囲外の VA を読んでファイル内の別位置の値を拾った取り違えに基づく (`tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の訂正根拠もこの比較)。
+
+注: 本 HEAD では `ott_apiset_cmp.py` を実 DLL で実行していない (§2.1)。上記は section ヘッダの比較で、スクリプトの出力を根拠にしない。スクリプトの 3 分岐 (raw・一部 zero-fill・セクション外) は合成した PE 風オブジェクトで確認した (py_compile 通過)。
 
 ## 3. 再現
 
@@ -58,7 +67,7 @@ python3 tools/icall/diff/ott_apiset_cmp.py <OTT_vst2_win64.dll>   # <OTT_vst2_wi
 
 - OTT の DLL の所在は `docs/REFERENCES.md` の `[ANALYSIS-PLUGINS]` (`ott/binaries/`)。Actions では `oc_artifacts: analysis-ott-binaries` で取得する (`docs/WORKFLOW.md` §11)。
 - `tools/icall/diff/ott_apiset_cmp.py` は cookie `0x180260ce0`・api-set 表 `0x18026c9f0` (32 × u64) を読み、`ror(entry ^ cookie, cookie & 0x3f)` で decode して出力する。zero-fill は 0 とする (§2.4)。
-- 本 fix run では `ott_apiset_cmp.py` を OTT の DLL に対して**実行していない** (素材なし)。py_compile の確認のみ。
+- 本 fix run では `ott_apiset_cmp.py` を OTT の DLL に対して**実行していない** (素材なし)。py_compile と、合成 PE 風オブジェクトでの 3 分岐 (raw・一部 zero-fill・セクション外) の確認のみ。実 DLL の出力は未取得 (`analysis-ott-binaries` 付きの再 run で取得し、ここに貼る)。
 
 
 
