@@ -12,26 +12,25 @@
 
 ## 測定
 
-- 測定 commit (コードを変えた最後の commit): `63fbd940` (`test(python): add sig arity probe for wasm dispatch codes (PY-102)`)。
-- 表の所要と件数は、直前のコード commit `445dbf9c` (`feat(python): implement playlist.muteTrackLock value arg (PY-102)`) で取得した。`63fbd940` は `tests/sig_arity_probe.mjs` を足しただけで、主要検証を `63fbd940` で再実行し、件数と PASS が同じことを確認した (provider_check 435/78・all_tools 48/48 (mock と wasm)・playlist_diff 23/0・probe の code 5 は 3 件・flapi_table_check fail=0)。
-- 差分 0 の証跡: `git diff 63fbd940 HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本 REPORT の commit で増えたのは `tools/python/REPORT_PY102.md` と `docs/DOC_MAP.md` だけ。
-- 検証起点: origin/main `b2b052ce`。
-- 環境: GitHub Actions runner (4 コア)。測定前の `/proc/loadavg` は `0.28 1.14 0.74`、検証の途中は `0.45`〜`0.49` (1 分値)。並列 1 本。
+- 測定 commit (コードを変えた最後の commit): `72bffbbd` (`origin/main` (`aa676107`) の取り込み merge)。取り込みで `tests/provider_check.mjs` と `tests/channels_diff.mjs` の件数が変わったため、統合後に全件を取り直した。統合前の PY-102 のコードは `445dbf9c`・`63fbd940` にある。
+- 差分 0 の証跡: `git diff 72bffbbd HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本 REPORT の commit で増えたのは `tools/python/REPORT_PY102.md` と `docs/DOC_MAP.md` だけ。
+- 検証起点: origin/main `b2b052ce` (着手時)。
+- 環境: GitHub Actions runner (4 コア)。測定開始時の `/proc/loadavg` は `0.36 0.42 0.53`、終了時は `0.38 0.42 0.53`。並列 1 本。
 - 素材: `fl-win64` は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.86 s)。emsdk は runner に入っている既定値 (`EMSDK_DIR` の既定、emcc 6.0.12) を使った。`toolchain-emsdk` の展開はしていない。
-- 素材の利用: `fetch_inputs.sh` で win64 の DATA block から midi.py・utils.py・MCPTools.pyc・device script を配置。stub は `git clone --depth 1 IL-Group/FL-Studio-API-Stubs` (work/ 配下、gitignore)。CPython wasm は `build_cpython_wasm.sh` で作成 (4 分 13 秒)。
+- 素材の利用: `fetch_inputs.sh` で win64 の DATA block から midi.py・utils.py・MCPTools.pyc・device script を配置。stub は `git clone --depth 1 IL-Group/FL-Studio-API-Stubs` (work/ 配下、gitignore)。CPython wasm は `build_cpython_wasm.sh` で作成 (4 分 13 秒。統合前に作成し、統合後も流用。CPython 側のソースは統合で変わっていない)。
 
-### 検証の実測 (コード commit `445dbf9c`。件数は `63fbd940` で再確認済み)
+### 検証の実測 (測定 commit `72bffbbd`)
 
 | 検証 | 実行 | 結果 | 所要 |
 |---|---|---|---|
-| provider wasm | `bash provider/build.sh` | `flprov.wasm` 56,850 B | 0.92 s |
-| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… bash build_flpy.sh` | `flpy.wasm` 5,924,680 B。再生成 3 ファイルは差分 0 | 7.00 s |
-| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 78・unimplemented 357・PASS | 0.37 s |
-| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0 | 1.92 s |
-| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・host_calls 37,425 | 2.23 s |
-| playlist 差分 (新規) | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段 PASS | 計 0.2 s (下 4 本と合算) |
+| provider wasm | `bash provider/build.sh` | flprov.wasm 57,061 B | 0.92 s |
+| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 | 6.96 s |
+| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 80・unimplemented 355・PASS | 0.37 s |
+| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0 | 2.07 s |
+| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・host_calls 37,425 | 2.11 s |
+| playlist 差分 (新規) | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段 PASS | 4 本合計 0.21 s |
 | mixer 差分 | `node tests/mixer_diff.mjs` | calls 48・diffs 0 | (同上) |
-| channels 差分 | `node tests/channels_diff.mjs` | calls 107・diffs 0 | (同上) |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 122・diffs 0 | (同上) |
 | device 差分 | `node tests/device_diff.mjs` | calls 7・diffs 0 | (同上) |
 | 表の再生成・ネガコン | `FL_WIN64_DIR=… bash tests/flapi_table_check.sh` | 正常系の差分 0/3・win_pair_verified 388 件・ネガコン 6/6 PASS | 2.27 s |
 | kwsig 照合 | `python3 tests/kwsig_check.py` | OK (比較 229 件のうち同結果 213・差 11 関数。変更前と同じ) | 0.05 s |
@@ -39,8 +38,7 @@
 | 引数個数 (before/after) | `python3 analysis/flapi/sig_arity_check.py before.json analysis/flapi/flapi_table.json` | before 対象 273・一致 249・不一致 24 / after 一致 250・不一致 23。変わった関数 1 件 (`playlist.muteTrackLock` 1→2) | - |
 | 実害の実測 (§3-2) | `node tests/sig_arity_probe.mjs` | 表の個数の呼出しが code 5 になる関数 3 件 (`channels.soloChannel`・`device.midiOutMsg`・`mixer.getTrackName`) | - |
 
-- before は `git show origin/main:tools/python/analysis/flapi/flapi_table.json`。
-- 引数個数の不一致の根拠: `FL_STUBS_DIR=work/fl-stubs python3 analysis/flapi/sig_mismatch_evidence.py` (§3 の表の出典)。
+- before は `git show b2b052ce:tools/python/analysis/flapi/flapi_table.json`。
 
 ### ネガティブコントロール
 
@@ -149,5 +147,5 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 
 - issue の「`tools/python/tests/playlist_diff.mjs` の 2 個呼出しを code 5 から差分 0 に変える」: 当該ファイルは repo に無かった。新規作成した (§2)。
 - issue の「`tools/python/REPORT_PY62.md` §4」: 当該ファイルは存在しなかった。#2027 の記録は REPORT_PY61 §3・REPORT_PY70 §3 にある。
-- issue の「`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (48/48)」: 実測どおり (§検証)。`tests/provider_check.mjs` の実装件数は 77 → 78 に変わった。
+- issue の「`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (48/48)」: 実測どおり (§検証)。`tests/provider_check.mjs` の実装件数は PY-102 で 77 → 78、統合後に 80。
 - 推定 (根拠付き): 24 件の不一致のうち、muteTrackLock 以外は PE 側の正しさも stub 側の正しさも未確定。関数ごとの binary 検証は子 #2927。
