@@ -28,7 +28,7 @@
 ## 3. 未実施 (この run の時間内に収まらないため)
 
 - フル `e2e.sh` (約 9 分 + ASIO COM 経路 約 3 分) と 30 分ソーク: 行列にすると 1 run の 58 分上限を超えるため未実施
-- Firefox 行列: ハーネスが Chrome 専用
+- Firefox 行列: §9 で実施 (AU-23 #2540)
 - Windows / macOS runner の仮想オーディオ workflow: 未着手 (権限・検証手段の確認が先)
 
 ## 4. 未解決
@@ -36,7 +36,11 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | ~~Chrome が null-sink に接続したか未確認~~ → 解消 (§5-4: `results/au2_recheck/null_r1_sinkinputs.txt` に ci_null 接続を保存。報告値・burst は fake と異なる) | — | — |
-| Firefox 行列がハーネス未対応 | 行列 {Chrome, Firefox} × {48k, 96k} の片側が未測定 | #187 |
+| ~~Firefox 行列がハーネス未対応~~ → 解消 (§9: Firefox 157.0 で 48k/96k とも 3/3 PASS・sink-input の ci_null 接続 6/6) | — | — |
+| Chrome 行列 (§5) の再測定。測定 commit `54bacdc0` の後に main に入った clock_jump の差分 26 行 (§8) が未適用 | §5 の数値は clock_jump 前のコードで測った値。burst・T・underrun への影響は未確認 | #187 |
+| Firefox 48k の rep 1 の burst・T の差 (§9-4) | 行列の burst・T の範囲に影響。PASS (underrun・sine・sink 接続) には影響しない | #187 |
+| sink の規格固定と PulseAudio の再サンプルの有無 (Chrome・Firefox 共通) | 96k の clock が sink 経路で変わるかは未確定 (§5・§9-4) | #187 |
+| Firefox 他版・Safari・30 分ソーク・負荷下 | Firefox は 157.0・10 s・無負荷のみ。版差・長時間・負荷下は未確認 | #187 / [AU-22] (#2366) |
 | `asio_ramp_b128_d2` の FAIL (quick, 負荷起因の疑い) | 回帰判定の不安定さ | #187 (要切り分け) |
 | 30 分ソーク (AU-10 null-sink 版) | 長時間の underrun 0 が未確認 | #187 |
 | 実機の outputLatency・総往復遅延・Safari | CI で測れない | [AU-22] (#2366) |
@@ -111,7 +115,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| Firefox 行列 (PulseAudio null-sink × 48k/96k) | `tools/audio/harness` が Chrome CDP 専用。Firefox の行が未測定 | **[AU-23]** (子 issue, 実装) |
+| ~~Firefox 行列 (PulseAudio null-sink × 48k/96k)~~ | ~~`tools/audio/harness` が Chrome CDP 専用~~ → 解消 (§9・AU-23 #2540) | — |
 | OPEN 較正の安全係数 (1.25 → 候補 1.30〜1.50) の実装と e2e 再測定 | 96k の null-sink で、初回の T 不足を run 中の grows で補っている | **[AU-24]** (子 issue, 実装) |
 | 30 分ソーク (null-sink, 48k B=256) | 10 分 PASS のみ。30 分の underrun 0 は未確認 | #187 (測定のみのため子にせず残す) |
 | P2 burst の p99 | worklet が最大値しか公開しない。分布は未計測 | #187 (worklet 拡張が要るため次 run) |
@@ -122,13 +126,70 @@
 ## 7. 検証範囲 / 範囲外
 
 - 範囲: ubuntu runner の Chrome 154 (fake / PulseAudio null-sink) の 48k・96k。null-sink は PulseAudio の出力経路で、実デバイス (実 IF の outputLatency) を代表しない (AU-22 #2366)。
-- 範囲外: Firefox・Safari・Windows/macOS・実機の総往復遅延。
+- 範囲外: Safari・Windows/macOS・実機の総往復遅延。Firefox は §9 (157.0・headless・Linux のみ)。
 
-## 8. コード差分 (測定 commit `54bacdc0` → 最終 head)
+## 8. コード差分 (Chrome 行列の測定 commit `54bacdc0` → 最終 head)
 
-測定に使ったコード (`tools/audio/{src,harness,test}`・`public/worklets`) の差分は 0。再採取 §5-4 も同じコードで実行した。
+§5 の Chrome 行列が使うコード (`tools/audio/{src,test,build.sh,harness/run.mjs,harness/chrome.mjs}`・`public/worklets`・`src/runtime`) の差分:
 
-- 実行: `git diff 54bacdc0 HEAD -- tools/audio/src tools/audio/harness tools/audio/test public/worklets`
-- 出力: 空 (0 行) — 最終 head で実行。HEAD は本 REPORT を含む PR の最終 commit (hash は PR 本文の `検証` 節)。前回 head `10badcc3` と旧 head `2181abc0` でも同じ出力 (空) を確認した。
+- 実行: `git diff --stat 54bacdc0 HEAD -- tools/audio/src tools/audio/test tools/audio/build.sh tools/audio/harness/run.mjs tools/audio/harness/chrome.mjs public/worklets src/runtime`
+- 出力:
 
-本 REPORT の commit は測定コードを変えない (`docs/WORKFLOW.md` §6)。変更したのは測定スクリプト `tools/audio/au2_matrix.sh`・`tools/audio/au2_summary.mjs`、本 REPORT、結果 `results/au2/` と `results/au2_recheck/` のみ。
+```
+ public/worklets/fl-audio-worklet.js | 12 +++++++++++-
+ src/runtime/audio-layout.ts         |  1 +
+ src/runtime/audio-shim.ts           |  2 +-
+ tools/audio/harness/run.mjs         |  2 +-
+ tools/audio/src/flaudio.c           |  3 ++-
+ tools/audio/src/flaudio.h           |  6 +++++-
+ 6 files changed, 21 insertions(+), 5 deletions(-)
+```
+
+- 差分の由来: `429f36bd` (clock_jump の正/負成分の別計上, #1570) が `54bacdc0` の後に main に入った。本 PR (#2540) の変更ではない。よって §5 の Chrome 行列は、この 26 行を含まないコードで測った値である。取り込み後 HEAD での Chrome 行列の再測定は §4 の未解決。
+- 本 PR で追加した `harness/bidi.mjs`・`harness/au2.mjs` は Firefox 専用 (Chrome の `run.mjs` は使わない) なので、上の範囲には含めていない。Firefox 行列の測定 commit と差分は §9-1。
+
+## 9. Firefox 行列 (AU-23 #2540・WebDriver BiDi)
+
+- **測定 commit**: `63ea7d45` (main `322f81b6` を取り込んだ merge)。`tools/audio/au2_firefox_matrix.sh`・`tools/audio/au2_firefox_summary.mjs` の追加と `harness/au2.mjs` の説明の修正はこの commit に含む。以後の HEAD でコードは変えていない。
+  コード差分: `git diff --stat 63ea7d45 HEAD -- tools/audio/src tools/audio/harness tools/audio/test tools/audio/build.sh tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs public/worklets src/runtime` の出力は空 (0 行)。
+- **環境**: ubuntu runner (4 vCPU)・Firefox 157.0 (headless)・PulseAudio 16.1 (apt 導入)・既定 sink = `module-null-sink sink_name=ci_null`。emsdk は素材 `toolchain-emsdk` を `$RUNNER_TEMP` に展開して使った (`EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh`。`[EMSDK]` 参照)。
+- **駆動**: `harness/bidi.mjs` (`withFirefox`: `chrome.mjs` の `serve` を共用し、`{navigate, eval}` は `withChrome` と同形。評価は `script.evaluate` + `awaitPromise`)、`harness/au2.mjs` (1 rep で 48k・96k を 1 セッション実行。再生中に `pactl list short sink-inputs` を 300 ms 間隔で採取)。
+- **再現**: `EMSDK_ENV=$RUNNER_TEMP/emsdk/emsdk_env.sh bash tools/audio/build.sh` → `bash tools/audio/au2_firefox_matrix.sh 3` (→ `results/au2/firefox_r{1,2,3}.json`、集計 `node tools/audio/au2_firefox_summary.mjs`)。条件は B=256・depth=2・sine・10 s。48k は `asio_sine_b256_d2`、96k は `asio_sine_b256_96k` と同名 (`harness/run.mjs`)。NC は §9-3。
+- **PASS の判定**: `run.mjs` の `underrunFree` と `sineOk` に加え、`ctx.sampleRate` が要求値に一致し、abort と worklet エラーが無く、sink-input が既定 sink (`ci_null`) に接続したこと (`pulse_sink_input.on_ci_null`)。`au2_firefox_matrix.sh` の終了コード 0 はこの全条件が全 rep で成立したことを表す。
+
+### 9-1 行列 (n=3, 測定 commit `63ea7d45`)
+
+| browser | sampleRate | シナリオ | n | PASS | underruns | burst (f) | T (f) | clock (Hz) | baseLatency (s) | outputLatency (s) | sink-input が ci_null に接続 | sink-input の規格 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| firefox | 48000 | asio_sine_b256_d2 | 3 | 3/3 | 0 | 1024–1152 | 1536–1792 | 48005–48021 | 0 | 0.0283125–0.049083333 | 3/3 | float32le 2ch 48000Hz |
+| firefox | 96000 | asio_sine_b256_96k | 3 | 3/3 | 0 | 1920 | 2816 | 96003–96016 | 0 | 0.046041666–0.04909375 | 3/3 | float32le 2ch 96000Hz |
+
+- 表は `node tools/audio/au2_firefox_summary.mjs` の出力そのもの (`results/au2/firefox_r{1,2,3}.json`)。baseLatency は Firefox が 0 を報告した値で、意味は未確認。outputLatency は報告値をそのまま載せた。
+- wall: rep 1 = 41.7 s (Firefox 起動直後の cold 実行)、rep 2・3 = 26.4 s。行列全体 94.9 s。各 rep 開始時の load avg (1 分値) = 0.99 / 0.96 / 0.63。sine の最大誤差は 6 run すべて 1.49e-8、`zero_runs_ge16=0`。`ctx.sampleRate` は 6 run すべて要求値と一致。
+- 旧測定 (`98ef9d3b`・測定 commit `db9eb829`) の数値はこの節で置き換えた (Git 履歴に残る)。
+
+### 9-2 Firefox の制約 (受入 4・probe を各 rep 1 回、計 3 回)
+
+| 項目 | 実測 (Firefox 157.0) | 判定 |
+|---|---|---|
+| SharedArrayBuffer / crossOriginIsolated | `function` / `true` (3/3) | 成り立つ |
+| main thread の `Atomics.wait(…, 0)` | TypeError (3/3) | 成り立つ (main では wait 不可) |
+| AudioWorklet 内 `Atomics.wait(…, timeout 20 ms)` | `timed-out`、経過 20 ms (3/3) | **成り立たない**: Firefox は worklet での wait を止めず、実際にブロックする |
+| AudioWorklet 内 `Atomics.notify` | `function` (3/3) | 成り立つ |
+
+- `public/worklets/fl-audio-worklet.js` は wait を呼ばず notify のみ (3 箇所) を使う (ほかに `Atomics.load/store/add` を使う)。そのため shim の動作は、worklet 内 wait が Firefox で成り立つかに依らない。
+- 行列の 6 run がすべて underrun 0 で通ったことも、worklet が Firefox で正常に動いている証跡になる。Chrome・Safari の worklet は Firefox 側の測定の範囲外。
+
+### 9-3 ネガティブコントロール (各 n=1)
+
+| NC | 操作 | 期待 | 実測 |
+|---|---|---|---|
+| 強制 underrun | `node tools/audio/harness/au2.mjs --rep 1 --extra "hiccup_ms=60&hiccup_every=200" --out tools/audio/results/au2/neg/hiccup_r1.json` | 両条件 FAIL・終了コード非 0 | 0/2 PASS・rc=1。48k は underruns=8・silence=7168f、96k は underruns=16・silence=30336f (`results/au2/neg/hiccup_r1.json` の `rc`・`failed`) |
+| sink 接続 | `pactl load-module module-null-sink sink_name=ci_other` → `pactl set-default-sink ci_other` → `node tools/audio/harness/au2.mjs --rep 1 --secs 4 --out tools/audio/results/au2/neg/sink_other_r1.json` → `pactl set-default-sink ci_null` | sink-input の `ci_null` 接続が false・両条件 FAIL・終了コード非 0 | 0/2 PASS・rc=1。音声判定 (underrun 0・sine 一致) は両条件で満たすが `on_ci_null=false` のため FAIL。JSON の `pulse.default_sink` は `ci_other` (`results/au2/neg/sink_other_r1.json`) |
+
+### 9-4 検証範囲 / 範囲外 / sink の規格
+
+- **範囲**: Firefox 157.0 headless (Linux)・PulseAudio null-sink (既定 sink)・48k/96k・sine・B=256・depth=2・10 s・n=3。NC は各 n=1。
+- **範囲外**: Safari・Firefox 他版・30 分ソーク・負荷下・実機 outputLatency ([AU-22])。
+- **sink の規格**: 測定中に固定していない。各 rep 開始時の ci_null 規格は `results/au2/firefox_r*.json` の `pulse.ci_null_before` に記録 (rep 1 = `s16le 2ch 44100Hz`、rep 2・3 = `s16le 2ch 48000Hz`)。sink-input の規格は全 run で要求どおり (48000 / 96000 Hz、float32)。PulseAudio が sink 側へ再サンプルしたかは未確認 (`clock` は AudioContext 側の値)。
+- **rep 1 の差**: 48k の burst・T は rep 1 = 1152・1792、rep 2・3 = 1024・1536。96k は 3 rep とも 1920・2816。rep 1 の clock は 48020.6 Hz で rep 2 と同じ (旧測定の rep 1 の 46590 Hz は今回は出なかった)。rep 1 だけ開始時の sink 規格が 44100 Hz だった点は旧測定と同じ。rep 1 の 48k の burst の差の原因は未切り分け (§4)。
