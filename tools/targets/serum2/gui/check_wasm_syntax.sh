@@ -10,10 +10,11 @@ export EM_IGNORE_SANITY=1
 export PATH="$work/emsdk/upstream/emscripten:$PATH"
 
 cd "$work/vstgui4" || exit 2
-if ! git diff --quiet -- vstgui/lib/vstguibase.h; then
-  echo "vstguibase.h は既に変更済み (patch 適用済み扱い)"
+if ! git diff --quiet -- vstgui/lib/vstguibase.h vstgui/lib/platform/platformfwd.h; then
+  echo "vstguibase.h / platformfwd.h は既に変更済み (patch 適用済み扱い)"
 else
   git apply "$here/patches/vstguibase_emscripten.patch" || exit 2
+  git apply "$here/patches/platformfwd_emscripten.patch" || exit 2
 fi
 
 printf '%s\n' \
