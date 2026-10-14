@@ -1,7 +1,7 @@
 # 付録: icall #2675 (ICALL-80) — SlateCore.core_64 205 B (0x181057b38) の sha256 照合 (plugins-freshair)
 
 > 親: #2508 (ICALL-78)。`tools/icall/REPORT_APPENDIX_2508.md` §6 の未解決 1 件目 (受入 3: `plugins-freshair` が無く未実施) を解く。
-> 測定 commit: `6bf05f6a` (`tools/icall/diff/fa_va_sha.py` を追加した commit。コードを変えた最後の commit)。
+> 測定 commit: `84140c52` (`tools/icall/diff/fa_va_sha.py` の範囲チェックを直した commit。コードを変えた最後の commit)。初版の照合器 (`6bf05f6a`) は、セクションの SizeOfRawData を跨ぐ範囲を黙って誤読していた (§3 E)。205 B の照合結果は初版と同一。
 
 ## 1. 結論
 
@@ -17,7 +17,7 @@
 | 検証起点 | `origin/main` `208b4ef9` から作った worktree (`2675-slatecore-core64-sha256`) |
 | 素材 | `plugins-freshair` (`Fresh Air.Win.zip` を `tools/targets/freshair/fetch.sh` で展開 → `SlateCore.core_64` 36,285,952 B)。`work-icall` (`tools/icall/work/rt_freshair-core/rw.dll` 36,361,728 B・`before.0.drc.dsm`)。`fl-win64`・`toolchain-*`・`work-liftlib` は未使用 |
 | 素材の鮮度 | `rw.dll` は `work-icall` の展開物と、リポジトリ作業ディレクトリに既にあった `tools/icall/work/rt_freshair-core/rw.dll` の sha256 が一致 (`2098d2f37d5dd135a12d9fbdd6caa1f98ba5a91fe38cec58d9b7a7816baa6c71`) |
-| 所要・load | `fa_va_sha.py` 3 回 0.03 s・0.03 s・0.03 s (`/usr/bin/time`)。load 1 分平均 0.11 → 0.11 (並列 1)。素材展開は plugins-freshair 0.09 s、`work-icall` の `rw.dll` のみ 6.6 s、`work-icall` 全体 9.8 s |
+| 所要・load | `fa_va_sha.py` 3 回 0.02 s・0.02 s・0.02 s (`/usr/bin/time`)。load 1 分平均 0.28 → 0.28 (並列 1)。素材展開は `work-icall` の `rw.dll` のみ 6.7 s、`before.0.drc.dsm` のみ 6.9 s (`$RUNNER_TEMP` 下に展開)。初版の測定 (`6bf05f6a`) は `fa_va_sha.py` 0.03 s × 3・展開 `work-icall` 全体 9.8 s |
 
 ## 3. 照合結果
 
@@ -27,6 +27,7 @@
 | B | `dd` で file offset を直接読む。offset は objdump の `.text` (File off `0x400`・VMA `0x180001000`) から手計算 `0x181057b38 - 0x180001000 + 0x400 = 0x1056f38` | 両者 `9294…e1c3` → **一致** |
 | C | `python3 tools/icall/frame_slot_probe.py mc --dsm tools/icall/work/rt_freshair-core/before.0.drc.dsm --va 0x181057b38 --pe <PE>` (dsm の関数 `0x181057b38` は 48 命令・205 B) | `SlateCore.core_64`・`rw.dll` とも「dsm の bytes と 一致」 |
 | D | 全体比較 `cmp -l` (`SlateCore.core_64` と `rw.dll` の先頭 36,285,952 B) | 差分 22 B。全て `0x136`–`0x377` (PE ヘッダ・セクションテーブル。`SizeOfHeaders` `0x400` の内側)。`.text` 以下は差 0 |
+| E | 範囲チェック (境界)。`fa_va_sha.py` で VA `0x1810c39c0`–`0x1810c3ac0` (256 B) を照合 | `.text` の SizeOfRawData は VA `0x1810c3a00` で終わる。範囲のうち後ろ 0xc0 B は raw の外 (zero-fill)。現版は `error: … は 1 セクションの SizeOfRawData に収まらない`・exit 2 (照合しない)。初版 (`6bf05f6a`) は file の `.rdata` 側から 256 B を読み、両 PE 一致 (exit 0) と判定していた。`pefile.get_data` は同じ範囲を 64 B (raw 内) だけ返す |
 
 ネガティブコントロール: `rw.dll` のコピー (`$RUNNER_TEMP` 下) の `+100` (VA `0x181057b9c`) の 1 bit (`^0x01`) を反転すると、A は `first diff at +100 (VA 0x181057b9c)`・`sha256=f5bd28d5944e15b5b3288309d32fcd22cf7c65f8cc4ddd272a30b6c4bb4f04c2`・`不一致`・exit 1 になった。照合器は差を検出する。
 
@@ -38,6 +39,8 @@ FA_DL="$RUNNER_TEMP/plugins-freshair" bash tools/targets/freshair/fetch.sh
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C . tools/icall/work/rt_freshair-core/rw.dll
 python3 tools/icall/diff/fa_va_sha.py "tools/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64" tools/icall/work/rt_freshair-core/rw.dll 181057b38 181057c05
 # 期待: 両者 sha256=9294534282e8ea79736ba1e8febf7311f0301fd9c491cb4e383063de80f0e1c3 → 一致 (exit 0)
+python3 tools/icall/diff/fa_va_sha.py "tools/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64" tools/icall/work/rt_freshair-core/rw.dll 1810c39c0 1810c3ac0
+# 期待: error (SizeOfRawData に収まらない)・exit 2 (§3 E)
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C .          # dsm 系統 (C) 用に work-icall 全体を展開 (約 10 s)
 python3 tools/icall/frame_slot_probe.py mc --dsm tools/icall/work/rt_freshair-core/before.0.drc.dsm --va 0x181057b38 --pe tools/icall/work/rt_freshair-core/rw.dll | tail -1
 ```
