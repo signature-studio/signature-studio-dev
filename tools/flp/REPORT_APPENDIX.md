@@ -127,3 +127,45 @@
 | SHA が run 間で変わる (`363fb7aa68bea2d5614c97b84b68803432f77b87041802cdde97134e16dbcf2b` (f6bce8c1)・`13d61a057ac2f6a6920b409e8b5693293ec7f3a43b5688eae139e64b0c3c6299` (8be0756f)。`d3d0e4f9` の SHA は 64 桁の記録なし)。原因未特定 | 決定性は同一 run 内の 3 回一致まで。別 run・別環境での一致は未確認 | #113 に継続コメント |
 | Render tests 82 本 + Demo 3 本の全数書き出しと、sha256・メトリクス JSON の commit (S3) | S3 は未着手 | #2546 (子、親 #113) |
 | 書き出し WAV の内容 (音色・レベル) の妥当性は未確認。T5 の C/D 閾値の校正には使えない | #106 の閾値確定が未着手 | #106 |
+
+## 16. #2546 (L-13): `/R` の書き出し形式 (32-bit float) の経路調査
+
+測定 commit: **`aafd1c76`** (`tools/flp/s2_render_probe.sh` と `tools/flp/s2_imm_patch.py` を変えた最後のコード commit)。環境: Ubuntu 24.04、wine64 9.0 (`/usr/lib/wine/wine64`)、xvfb-run、`nproc`=4。素材 `fl-win64` は `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (25,165 block)、インストール木は 25,131 件 (`recover_paths` 経由、組立 3 m 02 s)。
+
+**結論: 受入 1 (48 kHz / 32-bit float) は未達。** 試したすべての `/R` 書き出しが 48 kHz / **16-bit** (fmt 1・2 ch) のままだった。経路は未特定で、子 #3052・#3053 に切り出した。
+
+**16.1 実測** (`bash tools/flp/s2_render_probe.sh Autogun.flp 1`、各 run は同一 HEAD。SHA-256 は data チャンク)
+
+| 試行 | 変えたもの | rc | 所要 | 形式 | data SHA-256 (先頭 8 桁) |
+|---|---|--:|--:|---|---|
+| B | 無変更 (n=3) | 0 | 15 / 14 / 15 s | 16-bit | `2e067272` ×3 (同一) |
+| T | `S2_TRACE_REG=1` (`WINEDEBUG=+reg`) | 0 | 15 s | 16-bit | `2e067272` |
+| P1 | `FLEngine_x64.dll` VA `0xef6d4b` の `movzbq 0xe18(%rax),%rcx` を `mov $1,%ecx` に置換 | 0 | 14 s | 16-bit | `2e067272` |
+| P2 | VA `0xa64b66` の書式即値 0 → 1 | 0 | 14 s | 16-bit | `2e067272` |
+| P3 | VA `0x6725e1` の書式即値 0 → 1 | 0 | 15 s | 16-bit | `2e067272` |
+| P4 | VA `0x6725e1` の書式即値 0 → 2 | 0 | 13 s | 16-bit | `2e067272` |
+| P5 | VA `0x67240d` の書式即値 0 → 1 | 0 | 14 s | 16-bit | `2e067272` |
+| P6 | VA `0x67240d` の書式即値 0 → 2 | 0 | 14 s | 16-bit | `2e067272` |
+
+- 同一入力 3 回 (B) の SHA-256 は一致 (`2e067272…`)。本 run の値は §15 の `13d61a05…` と異なる (run・環境差。§15 の表と同じ扱い)。
+- 前段 (変更前の probe、`S2_REG` で `Software\Image-Line\FL Studio 26\General\Render` に `WAV bit depth`=0/1/2/3・`Export WAV`=1・`Dither`=0 を書いた 4 試行): すべて 16-bit。`user.reg` には値が残る (`"WAV bit depth"="3"`) が、`/R` は読まなかった (16.2)。
+
+**16.2 トレース** (T、開かれたレジストリキー 759 種): `General\Render` は **0 件**、`WAV bit depth`・`Export WAV` の読出しも 0 件。開かれたのは `General\WAVRenderForm` (30 回) と `General\WAVRenderForm (mixer)` (1 回) など。→ `/R` は `RenderOptions.load` (VA `0xeec630`) を通っていない。
+
+**16.3 静的所見** (`FLEngine_x64.dll`、ImageBase `0x400000` 込みの VA。`objdump -d` と目視、未確定の推定を含む)
+- `RenderOptions.load` の `WAV bit depth` (VA `0xeec933`): 読込ヘルパ `0xeec5d0` が `[0,2]` に丸めて `obj+0xe18` (1 byte) に格納。構築側 `0xedff36` の `movb $0x2,0xe18(%rcx)` が既定値 2。
+- `RenderOptions.load` の呼出し元 wrapper は `0xee6a20` (VA `0xee6a2c` で load)。`/R` からの直接の呼出しは見つからなかった。
+- `0xef6d4b` は `obj+0xe18` を読み、フラグ `0x45`・`0x46` に変換して `0xef6e2d` (`0x672580`) 等へ渡す (P1 で変えても出力は不変)。
+- `RIFF` / `fmt ` を書くのは VA `0x670fd0` だけ (`0x671082`・`0x67111c`)。書式引数 `0x178` が 1 のとき fmt を `0x674e10` で書き (`bits=0x18`)、それ以外は汎用 sample writer。
+- `0x670fd0` の直接の呼出し元: `0x672130` (書式は 6 番目の引数)、`0x672390` (書式 0 の即値は VA `0x67240d` = P5・P6)、`0xa64b6b` (書式 0 の即値は VA `0xa64b66` = P2)。`0x672130` の呼出し元は `0x672580` (書式 = `r8b`。`0xef6e2d` から `0x45` を渡す)、`0x6725c0` (書式 0 の即値は VA `0x6725e1` = P3・P4)、ほか 8 箇所。`0x672390` の呼出し元は wrapper `0x696a60` と `0x11e9704`。
+- 32-bit float (fmt タグ 3) を書くコードは、上記の範囲では確認できなかった。
+
+**16.4 解釈と次の一手**: `/R` は `General\Render` を読まず、保存された書式は使われない。構築側の既定値 2 は効いていない。P1〜P6 のいずれも出力を変えなかったため、採用されている書出し経路はこれら即値を通らない。次は `/R` のコマンドライン処理から書出し関数までを追う (#3052)。
+
+**未解決** (`| 未解決 | 影響 | 起票先 |`)
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `/R` の 32-bit float 経路 (書式を決める値・関数) が未特定 | 受入 1 未達 | #3052 ([L-14]) |
+| Render tests 82 本 + Demo 3 本の全数書き出しと sha256・メトリクス JSON の commit | 未着手。16-bit では受入 2 を満たさない | #3053 ([L-15]、依存は #3052) |
+| `RenderOptions` の保存値を `/R` が読まない理由 (ダイアログ経由の load 経路か) | 設定経由で形式を切り替えられない | #3052 |
+| data SHA-256 が run・環境で変わる (`2e067272` 本 run / `13d61a05` §15) | 決定性は同一 run 内 3 回一致まで | #2546 にコメント |
