@@ -54,3 +54,25 @@
 - **差の規模**: verdict が変わった関数 1,807 件。記録と pattern 別 outcome が完全一致した関数は 50 件 / 7,421。現 head は pattern 集合が 9 → 11 (`vm0`・`u16` を追加) で、記録と生成条件が異なる。
 - **shards 1 と 14 の差** (関数 302 件 = 乱数 300 件 + 0x418be0 + 0x41c820・`random.Random(7)`): verdict 一致 276 / 302、pattern 別 outcome 一致 232 / 302。shard 数で結果が変わるため、shards 14 の値は shards 1 と同一とみなせない。0x418be0 と 0x41c820 は両 shard 数とも同じ verdict (match)。
 - **結論**: 受入条件 1 (commit・sha256・件数の記録) は満たす。条件 2 (差の説明) は規模を定量化したが原因は未特定。条件 4 (0x418be0 系 20 / 16 / 4 の一致) は **未達**。現 head の全件再生成では 0x418be0 系は再現せず、20 / 16 / 4 は受入の根拠に使えない。#1035 の受入条件 1 は [~] のまま。
+
+#### 生成 commit の候補再生成と shards 反復 (LD-74 / #2012)
+- **測定 commit = `c171b9dc`** (main 取り込み後の HEAD の基点。head 系の測定はこの commit で行った)。候補 commit は `1c4b7c7e` / `9e9c1315` / `38d53ac8` / `930c6dbc` (`git worktree` の detached checkout で測定)。
+- **コード差分 (候補範囲)**: `git diff 1c4b7c7e 930c6dbc -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は出力 0 行。候補範囲で変わったのは docs だけ。
+- **入力の確認**: `work/m11/batch_closure.jsonl` の sha256 = `810b4d3a…bf6` (記録と一致)。jsonl から数えた集計は 2,273 / 2,892 / 2,256 で REPORT と一致。一方、同素材 `batch_closure.log` 末尾の集計 2,275 / 2,885 / 2,261 は jsonl と一致しない (log の集計は別の run の値の可能性)。
+- **対象 2 関数の再生成** (`--set file:<2 件>`・既定ビルド):
+
+  | commit | shards | 0x418be0 | 0x41c820 | pattern 別 outcome (記録と一致) |
+  |---|---:|---|---|---|
+  | `c171b9dc` (HEAD) | 1 | match | match | 0x418be0 は 11 pattern (vm0・u16 追加)、0x41c820 は s/p0/p1/q0 で native_fault、qall で both_fault |
+  | `c171b9dc` (HEAD) | 14 × 2 回 | match | match | 2 回とも上と同一 |
+  | `1c4b7c7e` | 1 | match | match | 0x418be0 一致 / 0x41c820 不一致 |
+  | `1c4b7c7e` | 14 × 2 回 | match | match | 2 回とも同一 |
+  | `9e9c1315` | 1 | match | match | 0x418be0 一致 / 0x41c820 不一致 |
+  | `38d53ac8` | 1 | match | match | 0x418be0 一致 / 0x41c820 不一致 |
+  | `930c6dbc` | 1 | match | match | 0x418be0 一致 / 0x41c820 不一致 |
+
+  記録の 0x41c820 は `mismatch` (qall `diff`) だが、いずれの候補でも `match` (qall `both_fault`)。shard 1 と 14 の間、また同一 shard 数の反復の間では、この 2 関数の判定は変わらなかった。
+- **全件 closure の再生成 (`1c4b7c7e`・shards 14・`--nobuild`)**: 632 s (wall 10 m 32 s)・開始時 load average 約 1.0。集計 3,091 / 1,525 / 2,805 (記録 2,273 / 2,892 / 2,256 とも HEAD の 3,233 / 1,488 / 2,700 とも不一致)。記録と verdict が同じ関数は 5,704 / 7,421。
+  - **注意 (未確定)**: `--nobuild` のため、ビルド物は work-m11 archive 同梱の `ld_wasm.cjs` で、`1c4b7c7e` のソースからは作っていない。候補 commit の全件判定は、候補ごとにビルドし直した全件再生成が必要。
+- **`tests/trace_diverge_418be0.py` の再現**: 記録 jsonl では 20 件 (16 + 4) を再現 (`results/m11_418be0_thunk.md` と同じ表)。`1c4b7c7e` の全件 jsonl に対しては、`trace_head` 文字列の解析で `ValueError` (rc 1) になり、集計できなかった。
+- **結論**: 生成 commit は未特定。候補 4 件のいずれも、対象 2 関数の再生成では記録の `0x41c820 mismatch` を再現しなかった。全件の候補別 rebuild と、`trace_diverge_418be0.py` の解析の堅牢化が残る。#1035 の受入条件 1 は [~] のまま。
