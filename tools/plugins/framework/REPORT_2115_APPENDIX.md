@@ -66,7 +66,7 @@
 |---|---|
 | `0x418120` (hooks[1]) | `[0x6d6e70] = TlsAlloc()`。`0x4180d0()`。`[0x7162d0] = TlsGetValue([0x6d6e70])` |
 | `0x4180d0` | `ebx = 0x4180c0()` (= 0x288 固定・`lea rax,[0x288]; ret`)。`blk = LocalAlloc(0x40, ebx)`。`blk != 0` なら `TlsSetValue(idx, blk)` |
-| `0x4181e0` (TLS getter・引数なし) | 分岐は `[0x7162d8]` (1 バイトの flag) で決まる。idx は `[0x6d6e70]`。`[0x7162d8] == 0` なら `gs:[0x58][idx*8]` を返す (idx = -1 なら範囲外)。`[0x7162d8] != 0` なら `TlsGetValue(idx)` を呼ぶ: 0 でなければ返す。0 なら `0x4180d0` を呼んでから `TlsGetValue(idx)` を再度呼び、0 でなければ返す。なお 0 なら `[0x7162d0]` を返す |
+| `0x4181e0` (TLS getter・引数なし) | 分岐は `[0x7162d8]` (1 バイトの flag) で決まる。idx は `[0x6d6e70]`。`[0x7162d8] == 0` なら `gs:[0x58][idx*8]` を返す (idx = -1 なら範囲外)。`[0x7162d8] != 0` なら `TlsGetValue(idx)` を呼ぶ: 0 でなければ返す。0 なら `0x4180d0` を呼んでから `TlsGetValue(idx)` を再度呼び、0 でなければ返す。2 回目の `TlsGetValue` が 0 なら `[0x7162d0]` を返す |
 | `0x4189c0` (_StartLib) | `reason==1` で `[0x716290]=1`・`[0x7162d8]=1` 等 (fw_boot.c の既存実装と一致) |
 
 - 上の分岐は `block18983_PE.bin` の逆アセンブル (capstone) で確認した。`0x418030`・`0x418010`・`0x418040` は IAT 名で `TlsGetValue`・`TlsAlloc`・`TlsSetValue` に対応する。`0x4180a0` は `LocalAlloc(0x40, ecx)` (`0x417ff0` = `LocalAlloc`)。idx の `[0x6d6e70]` は、分岐の 3 箇所の rip 相対参照で確認した。
@@ -119,14 +119,15 @@ index 1ae5159c..641239e2 100644
  void *TlsGetValue(int i) { void *r = (i >= 0 && i < 128) ? (void *)(uintptr_t)g_tls_slots[i] : 0; if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] TlsGetValue(%d) -> 0x%llx\n", i, (unsigned long long)(uintptr_t)r); return r; }
 ```
 
-- この差分は実行コードのため、WORKFLOW §6 の再測定の対象。**未実施**: `work-fw-stage1` と emsdk が本 run の環境に無い (`$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。構文は `clang -fsyntax-only` (`emscripten.h` を空スタブ) で修正前後ともエラー 0。merge 前の再測定は REPORT_2115.md §9 の未解決。
+- この差分は実行コードのため、WORKFLOW §6 の再測定の対象。**未実施** (fix round 6 と fix round 7 の両方): `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみで、`work-fw-stage1`・`toolchain-emsdk`・`toolchain-retdec` が無い。runner に `/opt/emsdk`・`/opt/retdec` も無いため、`fw_stage2.sh` と `hs_e2e.sh --fresh` を実行できない。PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1` で次 run に取得させる。構文は `clang -fsyntax-only` (`emscripten.h` を空スタブ) で修正前後ともエラー 0。merge 前の再測定は REPORT_2115.md §9 の未解決。
+- 次 run の測定手順: 測定 commit は実行時の HEAD。`bash tools/plugins/framework/fw_stage2.sh` (SMOKE PASS・`dispatch=38 ff=0`) と `bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh` を実行し、所要・load (開始 → 終了)・PASS/FAIL をこの節に追記する。Phase B の OOB 位置・`rec`・E2E 項目は、§11.4 の対照 (4c00ec24) と比べる。Phase A が `dispatch=38 ff=0` から外れた場合は、表示カウンタ分離 (`058c2049`) との切り分けのため、同じ run で `4c00ec24` の `fw_rt.c` を対照に測る。
 
 ### 11.5 注入実験 (未採用)
 
 | 条件 | commit | Phase A | Phase B |
 |---|---|---|---|
 | E1: `0x4180d0` を native の意味に注釈 (`0x4181e0` の `return 0` は残す) | 未コミット (未採用・本 PR に含めない) | — | 数値は報告しない (未コミットの WIP のため WORKFLOW §6 により判定に使わない)。採用する場合はコミットして HEAD 上で再測定する |
-| E3: Phase B の `hs_e2e_run` の先頭で `fw_call_cur(0x418120)` を 1 回呼ぶ + `0x4180d0` 注釈 + `0x4181e0` 注釈の削除 | `f850508a` (revert `4c00ec24` で戻し) | `dispatch=38 ff=0` | `rec=7`・1 項目・OOB。TLS は `TlsAlloc → 1`・`TlsSetValue(1, 0x118b6628)`・`TlsGetValue(1) → 0x118b6628` (正しい block)。失敗位置は変化: `0x40d807` の soft-miss (target 0) は消え、`0x4e5fa6` の間接 target が文字列バイト列 `0x6572432000000000` になる |
+| E3: Phase B の `hs_e2e_run` の先頭で `fw_call_cur(0x418120)` を 1 回呼ぶ + `0x4180d0` 注釈 + `0x4181e0` 注釈の削除 | `f850508a` (revert `4c00ec24` で戻し)。所要・load は未記録 (ログも時刻も保存していない。WORKFLOW §5 の未充足。未採用のため再測定しない) | `dispatch=38 ff=0` | `rec=7`・1 項目・OOB。TLS は `TlsAlloc → 1`・`TlsSetValue(1, 0x118b6628)`・`TlsGetValue(1) → 0x118b6628` (正しい block)。失敗位置は変化: `0x40d807` の soft-miss (target 0) は消え、`0x4e5fa6` の間接 target が文字列バイト列 `0x6572432000000000` になる |
 
 ### 11.6 結論
 
