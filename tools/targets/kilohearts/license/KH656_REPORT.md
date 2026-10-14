@@ -89,7 +89,7 @@ Windows 側の抽出は成功、macOS 側は `llvm-lipo` が無く rc=127 (本�
 
 `python3 scripts/kh656_closure.py --rounds 6` (1 分 53 秒): round 1 (lift 8→40 未 lift) → round 2 build 失敗 (`i256`: `0x180f89cf0`・`0x180fb6124` 除外) → round 3 (lift 42) → round 4 (lift 80) → round 5 (lift 166) → round 6 build 失敗 (`i256` 判定で `1813846e0` を除外)。
 
-round 6 の失敗は `1813846e0` が **i256 ではなく memset**。`kh656_closure.py` の `i256_defs()` が `n1.ll` の define 内に `i256` を含む関数を全て除外するため、`1813846e0` の本体の何らかの命令が `i256` を含むと誤判定された (要確認)。shim 登録 (module F shims に `1813846e0: memset`) で閉包から外すと 313 集合で build が通る。
+round 6 の失敗の扱い: `kh656_closure.py` は `dropped_i256` に `1813846e0` を載せたが、`n1.ll` に `1813846e0` の定義は無く (確認済み)、i256 による除外の根拠は無い。`1813846e0` は memset で、module F の shims に未登録だったため閉包に入った。shim 登録 (module F shims に `1813846e0: memset`) を加えると 313 集合で build が通る。round 6 の失敗原因 (`dropped_i256` の判定経路) は未特定。
 
 ### 7.2 測定値 (コミット HEAD の state で実行)
 
