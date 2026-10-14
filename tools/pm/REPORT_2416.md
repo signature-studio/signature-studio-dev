@@ -2,9 +2,9 @@
 
 > **正本の宣言**: `infra/pm-worker/README.md` の build 節 (『再デプロイ』手順 4・5、『ロールバック』3) の根拠。PR #2477 の差し戻し round 1 への対応。
 > `tools/pm/REPORT.md` (250 行上限ちょうど) は変更していない。PM Worker の測定値は `tools/pm/REPORT.md` と本付録が正本 (`docs/DOC_MAP.md` §4)。
-> PR #2477 が `origin/main` と競合したため main を取り込んだ (競合解消)。取り込みで `infra/pm-worker/src`・`test` が変わったので、測定は取り込み後の commit で取り直した (§0-2)。
+> PR #2477 が `origin/main` と競合したため main を取り込んだ (競合解消。main は取り込み中にも進んだため 2 回取り込んだ)。取り込みで `infra/pm-worker/src`・`test` が変わったので、測定は最後の取り込み commit で取り直した (§0-2)。
 
-**結論**: 検証 HEAD `037fa935` の `npm test` (162 件) と `npm run test:workers` (4 件) は、3 回とも全件 pass。`wrangler` 4.151.0 の dry-run では、`--define` は引用符付きでのみ通り hash は bundle に入らない。`--var` は bindings に `(hidden)` で出る。実 Worker での反映は未確認 (README の `[未確認]`)。
+**結論**: 検証 HEAD `efd86292` の `npm test` (180 件) と `npm run test:workers` (4 件) は、3 回とも全件 pass。`wrangler` 4.151.0 の dry-run では、`--define` は引用符付きでのみ確実に通り、hash は bundle に入らない (引用符なしは hash の先頭文字で結果が変わる。§3)。`--var` は bindings に `(hidden)` で出る。実 Worker での反映は未確認 (README の `[未確認]`)。
 
 ## 0. 取得方法・環境
 
@@ -12,24 +12,25 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `037fa935` (`Merge remote-tracking branch 'origin/main' into 2416-pm-worker-status-build`)。コードを変えた最後の commit (main の取り込み) |
-| 検証 HEAD | `037fa935` (測定は HEAD と clean な作業ツリーで実施。コードは未編集。`npm ci` 後の `git status --porcelain` は空) |
+| 測定 commit | `efd86292` (`Merge remote-tracking branch 'origin/main' into 2416-pm-worker-status-build`)。コードを変えた最後の commit (main の取り込み) |
+| 検証 HEAD | `efd86292` (測定は HEAD と clean な作業ツリーで実施。コードは未編集。`package*.json` は取り込み前の `npm ci` のまま変化なし。`git status --porcelain` は空) |
 | Node / npm | v22.23.3 / 10.9.9 |
 | wrangler | 4.151.0 (`npx wrangler --version`) |
 | vitest | v4.1.11 (`vitest run` の `RUN` 行。`package.json` は `^4.1.11`) |
 | CPU | `nproc` = 4、`os.availableParallelism()` = 4 |
 | `node --test` の並列数 | 3 (既定の `--test-concurrency` = `os.availableParallelism() - 1`。Node 公式 docs の Command-line API) |
-| 対象 | `npm test` = `test/*.test.ts` の 14 ファイル。`npm run test:workers` = `test/runtime/**/*.test.ts` の 1 ファイル (`do.workers.test.ts`、workerd 上で実行) |
+| 対象 | `npm test` = `test/*.test.ts` の 15 ファイル。`npm run test:workers` = `test/runtime/**/*.test.ts` の 1 ファイル (`do.workers.test.ts`、workerd 上で実行) |
 
 ### 0-2 測定したコードと検証 HEAD の差分 (WORKFLOW §5・§6)
 
 ```sh
-git diff 815eb526 037fa935 -- infra/pm-worker/src infra/pm-worker/test | wc -l   # 488 (前版の測定 commit からの差。main の取り込みで変わった分)
-git diff 037fa935 HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l       # 0 (最終 HEAD。本付録の追記だけで src・test は変えない)
+git diff 815eb526 efd86292 -- infra/pm-worker/src infra/pm-worker/test | wc -l   # 1190 (前版の測定 commit からの差。main の取り込みで変わった分)
+git diff efd86292 HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l       # 0 (最終 HEAD。本付録の追記だけで src・test は変えない)
 ```
 
 - 前版の測定 (測定 commit `815eb526`、検証 HEAD `199bbc02`・`345eb75f`。149 件) は、main の取り込みで `src`・`test` が変わったため無効になった。その数値は git 履歴に残る。
-- 本付録の数値は、取り込み commit `037fa935` で測った。最終 HEAD (本付録を含む commit) の `src`・`test` の差分は上の 0 行。最終 HEAD の hash は PR 本文の検証欄に書く。
+- 中間の取り込み commit `037fa935` でも 162 件・4 件で測ったが、2 回目の取り込み (`efd86292`) で `src`・`test` が再び変わったため、数値は `efd86292` のものに置き換えた。
+- 本付録の数値は、取り込み commit `efd86292` で測った。最終 HEAD (本付録を含む commit) の `src`・`test` の差分は上の 0 行。最終 HEAD の hash は PR 本文の検証欄に書く。
 
 ### 0-3 取得方法
 
@@ -44,52 +45,54 @@ git diff 037fa935 HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l      
 
 | run | wall (s) | `# duration_ms` | pass / fail / cancelled | load (前 → 後、1/5/15 分) |
 |---|---:|---:|---|---|
-| 1 | 7.79 | 7702.4 | 162 / 0 / 0 | 0.66/0.51/0.22 → 0.85/0.55/0.23 |
-| 2 | 7.64 | 7543.7 | 162 / 0 / 0 | 0.85/0.55/0.23 → 1.24/0.64/0.27 |
-| 3 | 7.72 | 7630.2 | 162 / 0 / 0 | 1.24/0.64/0.27 → 1.78/0.77/0.31 |
-| **min–max** | **7.64–7.79** | **7544–7702** | 162 / 0 / 0 (3 回とも) | 1 分値の最大 1.78 (nproc 4 未満) |
+| 1 | 8.53 | 8433.0 | 180 / 0 / 0 | 0.14/0.46/0.26 → 0.42/0.51/0.28 |
+| 2 | 8.41 | 8315.5 | 180 / 0 / 0 | 0.42/0.51/0.28 → 0.47/0.52/0.29 |
+| 3 | 8.38 | 8294.5 | 180 / 0 / 0 | 0.47/0.52/0.29 → 0.99/0.63/0.33 |
+| **min–max** | **8.38–8.53** | **8294.5–8433.0** | 180 / 0 / 0 (3 回とも) | 1 分値の最大 0.99 (nproc 4 未満) |
 
-- TAP の `# tests 162`・`# suites 0`・`# skipped 0`・`# todo 0` (3 回とも同じ)。並列数は既定の 3。
+- TAP の `# tests 180`・`# suites 0`・`# skipped 0`・`# todo 0` (3 回とも同じ)。並列数は既定の 3。
 
 ## 2. `npm run test:workers` (`vitest run --config vitest.config.ts`)
 
 | run | wall (s) | vitest `Duration` | Tests (pass / fail) | load (前 → 後、1/5/15 分) |
 |---|---:|---|---|---|
-| 1 | 1.53 | 855 ms | 4 / 0 | 1.72/0.77/0.31 → 1.72/0.77/0.31 |
-| 2 | 1.51 | 873 ms | 4 / 0 | 1.72/0.77/0.31 → 1.66/0.77/0.32 |
-| 3 | 1.49 | 861 ms | 4 / 0 | 1.66/0.77/0.32 → 1.66/0.77/0.32 |
-| **min–max** | **1.49–1.53** | **855–873 ms** | 4 / 0 (3 回とも) | — |
+| 1 | 1.51 | 885 ms | 4 / 0 | 0.91/0.62/0.33 → 0.91/0.62/0.33 |
+| 2 | 1.52 | 868 ms | 4 / 0 | 0.91/0.62/0.33 → 0.91/0.62/0.33 |
+| 3 | 1.51 | 868 ms | 4 / 0 | 0.91/0.62/0.33 → 0.92/0.63/0.33 |
+| **min–max** | **1.51–1.52** | **868–885 ms** | 4 / 0 (3 回とも) | — |
 
 - vitest の `Test Files  1 passed (1)`・`Tests  4 passed (4)` (3 回とも)。
-- wall (1.49–1.53 s) と vitest の `Duration` (855–873 ms) は別の量。1 つの値に丸めて書かない。
+- wall (1.51–1.52 s) と vitest の `Duration` (868–885 ms) は別の量。1 つの値に丸めて書かない。
 
 ## 3. wrangler の `--define` / `--var` (dry-run)
 
-すべて `CI=1 npx wrangler deploy --dry-run --outdir <tmp>/<案>` に次の引数を足したもの。`<HASH>` は `git rev-parse 037fa935` の全 40 字 (`037fa935608bae5027167cfc5ffc2ff79cf9a064`)。`<tmp>` は作業用の一時 dir で、確認後に削除した。dry-run は Cloudflare に接続せず、認証は不要。
+すべて `CI=1 npx wrangler deploy --dry-run --outdir <tmp>/<案>` に次の引数を足したもの。`<HASH>` は `git rev-parse efd86292` の全 40 字 (`efd86292828d1609766dd3ff75c096023ec35331`)。`<tmp>` は作業用の一時 dir で、確認後に削除した。dry-run は Cloudflare に接続せず、認証は不要。
 
 | 案 | 追加した引数 | exit | bindings の `BUILD_COMMIT` | bundle (`index.js`) に hash が入るか |
 |---|---|---:|---|---|
-| a | `--define BUILD_COMMIT:<HASH>` (引用符なし) | **1** | build が失敗。`Invalid define value (must be an entity name or JS literal)` | — (bundle は出ない) |
-| b | `--define 'BUILD_COMMIT:"<HASH>"'` (引用符あり) | 0 | 表示なし | **0 件**。`buildCommit(env.BUILD_COMMIT)` の参照は置換されず、bundle は d と `cmp` で同一 |
+| a | `--define BUILD_COMMIT:<HASH>` (引用符なし) | 0 | 表示なし | **0 件**。bundle は d と `cmp` で同一 (define は `env.BUILD_COMMIT` の参照に効かない) |
+| b | `--define 'BUILD_COMMIT:"<HASH>"'` (引用符あり) | 0 | 表示なし | **0 件**。bundle は d と `cmp` で同一 |
 | c | `--var BUILD_COMMIT:<HASH>` | 0 | `env.BUILD_COMMIT ("(hidden)")` | **0 件** (runtime の binding。bundle は d と `cmp` で同一) |
 | d | (引数なし) | 0 | 表示なし | 0 件 |
 | e | `--var TARGET:999` | 0 | `env.TARGET ("(hidden)")` (`[vars]` の `"50"` を上書き) | — (binding の上書きの確認) |
 
-- 全ケース `Total Upload: 89.77 KiB / gzip: 28.21 KiB` (前版 86.97 KiB / 27.40 KiB。main 側の src 変更による増加)。bindings の一覧は、c のみ `BUILD_COMMIT` の行が増える (b と d は同じ一覧)。
-- `index.js` は 91,925 バイト・2,138 行 (b・c・d・e で同一。前版 89,061 バイト・2,084 行)。
+- 案 a の exit は hash の先頭文字で変わる。`efd86292…` (英字始まり) は識別子として受理されるので exit 0。先頭が数字の hash (中間の取り込み commit `037fa935…`) では `Invalid define value (must be an entity name or JS literal)` で exit 1 になった (同じ dry-run を `037fa935` で実施)。どちらでも hash は bundle に入らない。
+- 全ケース `Total Upload: 94.69 KiB / gzip: 29.66 KiB` (前版 86.97 KiB / 27.40 KiB。main 側の src 変更による増加)。bindings の一覧は、c のみ `BUILD_COMMIT` の行が増える (a・b・d・e は同じ一覧)。
+- `index.js` は 96,966 バイト・2,235 行 (a・b・c・d・e で同一。前版 89,061 バイト・2,084 行)。
 - c の値が upload の metadata で実際に渡るかは dry-run では見えない (表示は `(hidden)`)。届くことは実 Worker の `/status` でのみ確かめられる (§4-3)。
 
 ## 4. 検証範囲・ネガティブコントロール・未確認
 
 ### 4-1 検証範囲
 
-- `npm test` 162 件・`npm run test:workers` 4 件を、検証 HEAD と同一のコードで 3 回ずつ実行。
+- `npm test` 180 件・`npm run test:workers` 4 件を、検証 HEAD と同一のコードで 3 回ずつ実行。
 - `/status` の `build` の挙動は、既存テストで確認済み: `test/status.test.ts` (`BUILD_COMMIT` 未設定で `null`・形式が違う値は `null`)、`test/runtime/do.workers.test.ts` (workerd の DO env から hash を読む・未設定で `null`)。
 - wrangler は dry-run のみ (bindings の表示と bundle の内容)。
 
 ### 4-2 ネガティブコントロール
 
-- **a**: `--define` の引用符なしは build が失敗する。引用符付き (b) は通るが hash は bundle に入らない。どちらも README 手順 4 (c) で『`--define` は採らない』とした根拠。
+- **a**: `--define` の引用符なしは、hash が英字で始まれば通るが、bundle は d と同一で hash は入らない。数字で始まる hash では build が失敗する (§3 の注)。どちらも hash を bundle に入れられないので、README 手順 4 (c) の『`--define` は採らない』の根拠になる。
+- **b**: 引用符付きは通るが、やはり hash は bundle に入らない。
 - **d**: `--var` を付けないと bindings に `BUILD_COMMIT` が出ない。このとき `/status` の `build` は `null` (`test/status.test.ts` の未設定ケース)。README 手順 5 の『`null` のままなら反映とは判断しない』の前提。
 - **e**: `--var` は同名の `[vars]` を上書きする (`TARGET` が `"50"` → `(hidden)`)。
 
@@ -106,12 +109,12 @@ git diff 037fa935 HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l      
 ## 5. 再現コマンド
 
 ```sh
-# リポジトリ直下 (検証 HEAD 037fa935)
-git diff 037fa935 HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l
+# リポジトリ直下 (検証 HEAD efd86292)
+git diff efd86292 HEAD -- infra/pm-worker/src infra/pm-worker/test | wc -l
 cd infra/pm-worker && npm ci
 npm test                  # TAP 末尾の # pass / # duration_ms。wall は前後の date 差
 npm run test:workers      # 出力の Duration / Tests 行
-H=$(git rev-parse 037fa935)
+H=$(git rev-parse efd86292)
 CI=1 npx wrangler deploy --dry-run --outdir <tmp>/a --define BUILD_COMMIT:$H
 CI=1 npx wrangler deploy --dry-run --outdir <tmp>/b --define "BUILD_COMMIT:\"$H\""
 CI=1 npx wrangler deploy --dry-run --outdir <tmp>/c --var BUILD_COMMIT:$H
