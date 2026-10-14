@@ -133,6 +133,7 @@
 | `tools/icall/REPORT_APPENDIX_2225.md` | ~245 | icall #2225 (ICALL-65): SlateCore 符号化表と OTT api-set 表 `0x18026c9f0` の形式比較。cookie・decode 式・zero-fill 配置・entry 数 (T1 20・T2 34) が両 PE で一致。OTT の `APISET_N` 32 は 2 entry 不足、既知 12 slot は T1/T2 の外。CRT の初期化ループから終点を静的確定 (`tools/icall/diff/dispatcher_ids.py`)。OTT の PE 直読みは `ott_apiset_cmp.py`。動的な最大 index は #2226 |
 | `tools/icall/REPORT_APPENDIX_2226.md` | ~110 | icall #2226 (ICALL-66): T1 `0x181307100`〜`0x1813071a0` (20 entry)・T2 `0x1813071a0`〜`0x1813072b0` (34 entry) の境界の再確認。動的に読まれた最大 index は既定条件で T2 6 (静的上限 33 との差 27・下限)、T1 0 件。stub・T2 初期化 (`SLOT_T2_INIT`) でも T2 の最大は 6。dispatcher の decode 0 で T1 を読む経路 (機械語で確認)。測定値の正本 |
 | `tools/icall/REPORT_APPENDIX_2231.md` | ~113 | icall #2231 (ICALL-67): fatal RIP 群 B/C/D/E/G/H の引数由来 (D・G は heap 引数の直接使用、B・E・H は未追跡)、群 C の `SLOT_ENC_INIT` 因果、群 I の整列違反 (thunk 呼出し元の `rsp` 不整列)。`slot_trace.sh` の fatal 抽出に `regs`/`heap_args` を含める修正。測定 commit と差分 0 の証跡を §5 に記載 |
+| `tools/icall/REPORT_APPENDIX_2224.md` | 160 | icall #2224 (ICALL-64): 既知 12 slot のうち 5 件 (`0x1813068d0`〜`0x181306910`) を読む表の特定 (部分達成)。5 件は個別変数 (RIP 相対の直接参照 10 命令・含む関数 7 個)。表は、RIP 直接参照の全数と disp 範囲内の添字参照の形に限ると見つからない (範囲外の形は列挙していない)。添字候補は届かないか上限未確定 (4 命令・#2900 へ移管)。再現スクリプト `tools/icall/diff/known12_readers.py`。`SLOT_ENC_INIT=1` が `0x181306910` (バイトフラグ) に cookie を書く所見 |
 | `tools/icall/REPORT_APPENDIX_2081.md` | ~78 | icall #2081 (ICALL-57): SlateCore encoded slot の静的解析 (`slatecore_fptr_table.py`)。受入条件 1・3 は未達で #2120 へ。受入条件 2 は部分達成 (12 slot は zero-fill 部の参照として確認) |
 | `tools/icall/REPORT_APPENDIX_2262.md` | ~70 | icall #2262 (ICALL-69): site `0x1810553e6` の target `0xb77e88c8000` の由来 (= `ror(cookie,50)` の下位 44 bit。lifted IR が cookie を `load i32` で読むことが原因)。`fa_sweep.sh 8 60` の再測定 (131 関数 artifact・bit 一致 47)。表への包含判定と cookie 幅の修復は子 issue へ移管 |
 | `tools/icall/REPORT_APPENDIX_2394.md` | ~120 | icall #2394 (ICALL-75): `function_181057b38` の値 `0x400000004` は元の機械語に無い。真因は RetDec が frame 上の 2 store を IR から脱落させること (段の特定・回復実験・census・D24 行案は付録)。再現は `tools/icall/frame_slot_2394.sh` |
@@ -211,7 +212,8 @@
 | `tools/m11/qstore/REPORT.md` | ~90 | 64bit スタック局所の即値 store が 4B に縮む欠陥 (DEFECTS D17) の検出・修復・idx 87/898/58–63 の帰属・#513 取り込み後の実測 (#516) |
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
 | `tools/m11/trap_triage/REPORT_2212.md` | ~115 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
-| `tools/m11/trap_triage/REPORT_714.md` | ~242 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
+| `tools/m11/trap_triage/REPORT_714.md` | ~246 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
+| `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_1602.md` | ~191 | #1602: C 版内 stderr 計測 (§13)・hook 変種 (§14)・範囲内常時出力版 (§15) の不採用試行と、V8 inspector (`inspect_trap.mjs`、build 不変) による trap 時点の wasm local 採取 (§16、判定不変・304/555/923 の実値) |
 | `tools/m11/trap_triage/REPORT_1352.md` | ~50 | #1352: 計測 build (`M11_INSTR_413060=1`) の OFF は HEAD `1be53b3f` で既定と同じ 870/24/0 (871/23 は再現せず)・`M11_DEST_READ=0` でも 870/24/0。3 点切り分けは未実施・再現 `repro_1352.sh` |
 | `tools/m11/trap_triage/REPORT_2672.md` | 125 | #2672: unit 477 の `0x10a9f910` 下位 4B 書込みの主体 (C 版 `function_4133f0` の shadow stack 局所、`m11_ov.c:340`)。wasm 側 store 計装 (`watch_store_2672.mjs`・`store_sites_2672.py`) の陰性対照 (942 unit の kind 差分 0)・陽性対照 (OLD=0 で unit 1 hit)・類型案 (管理型局所のゼロ初期化欠落、仮説) |
@@ -349,7 +351,7 @@
 | `tools/assets/deploy-manifest/REPORT.md` | ~60 | 配備 manifest 生産側 (05-stage 契約) |
 | `tools/python/REPORT.md` | ~250 | CPython wasm + flapi/MCP 解析 + ブリッジ設計。§7c (ilmcp, PY-3 #82)・§9 (下流チケット案 T1〜T9) は要約のみで全文は `REPORT_APPENDIX.md` に、§PY-12 (#587) は要約のみで全文は `REPORT_PY12.md` に、§PY-13 (#588)・§12/§13 (#81 kwargs 署名の静的復元)・§14 (#79 Piano roll) は要約のみで全文は `REPORT_APPENDIX.md` に、§15 (#654 PY-16) は要約のみで全文は `REPORT_PY16.md`、§16 (#653 PY-15 省略引数) は要約のみで全文は `REPORT_PY15.md` に分割 |
 | `tools/python/REPORT_CHROME.md` | ~55 | python REPORT §14b: Piano roll scripts の Chrome (headless, agent-browser) 上の実行と node との出力一致 (#466 PY-11)。250 行上限のため分離 |
-| `tools/python/REPORT_PY41_APPENDIX.md` | ~55 | PY-41 REPORT の付録。`REPORT_PY41.md` の PY-49 (#1828)・PY-52 (#1875) の節の全文 (250 行上限のため分割移動) |
+| `tools/python/REPORT_PY41_APPENDIX.md` | ~165 | PY-41 REPORT の付録。`REPORT_PY41.md` の PY-49 (#1828)・PY-52 (#1875)・PY-64 (#2033)・PY-88 (#2788) の節の全文 (250 行上限のため分割移動) |
 | `tools/python/REPORT_PY56.md` | ~70 | PY-56 (#1934): playlist 38 関数のうち `selectTool` (書式 `i`)・`scrollTo` (書式 `iiii`) の引数確定。残り 36 関数は子 #1971 (PY-57) |
 | `tools/python/REPORT_PY57.md` | ~75 | PY-57 (#1971): playlist 残り 36 関数のうち 8 件の逆アセンブル骨格 (戻り値・範囲 code は未確定)。未読 26 件は #2026 (PY-61) |
 | `tools/python/REPORT_PY61.md` | ~130 | PY-61 (#2026): playlist 未読 26 関数の引数・戻り値の型・範囲 code を VA 付きで確定。`-4` ↔ `RANGE` は文言で対応 (数値は非対応)。操作コアと残り helper は子 #2809 (PY-91) |
@@ -360,9 +362,10 @@
 | `tools/python/REPORT_PY71.md` | ~95 | PY-71 (#2501, 完了単位 1・2a): VMT (RTTI) の配置を 3 クラスで検証 (ネガティブコントロール 6/6 NG)。受入 1 (P = TGraphEditorForm・非 chan。全親鎖を実測)・2a (`0xffe370` = TPublicChannel のスロット 52、親 TChannel) を確定。2b (`call [reg+0x1a0]` 37 件の受け手)・3・4 は子 #2701 へ移した |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |
-| `tools/python/REPORT_PY39.md` | ~220 | PY-39 (#1527): channels 操作 7 関数の PE ハンドラ位置・PyArg 書式・引数の確定。他関数の戻り値・範囲外 code は未確定。`analysis/flapi/pe_handler_probe.py` の測定と selectAll 等 4 件の表エントリの扱い。PY-69 節は `REPORT_PY69.md`、#2548 の節は `REPORT_PY39_2548.md` へ分割移動 (250 行上限) |
+| `tools/python/REPORT_PY39.md` | ~220 | PY-39 (#1527): channels 操作 7 関数の PE ハンドラ位置・PyArg 書式・引数の確定。他関数の戻り値・範囲外 code は未確定。`analysis/flapi/pe_handler_probe.py` の測定と selectAll 等 4 件の表エントリの扱い。PY-69 節は `REPORT_PY69.md`、#2548 の節は `REPORT_PY39_2548.md`、8 回目 run 節は `REPORT_PY39_2668.md` へ分割移動 (250 行上限) |
 | `tools/python/REPORT_PY69.md` | ~109 | PY-69 (#2499): `selectOneChannel` の PE 意味論。排他選択 (`0x11e84a0`→setter `0xff8a90`)・stack 引数の出所・前提ゲート `0xd5af58`・後段ゲート `0xd82c6a`・選択ゲート `0xffac20` の読解と未解決 ([PY-82] #2642)。`analysis/flapi/pe_scan_store.py` の書込み箇所列挙 |
 | `tools/python/REPORT_PY39_2548.md` | ~80 | PY-39 追補 (#2548): setStepParameterByIndex の呼出し経路・status 表 (範囲外 `-4`)・param 3〜8 の副作用を PE で確定 (REPORT_PY39.md の節の分割移動)。param 0〜2・item 列挙・述語の型は未確定 (子 #2581) |
+| `tools/python/REPORT_PY39_2668.md` | ~100 | PY-85 (#2668): channels.selectAll の選択値 `*p` (`0x154528c`) の書込み元 4 関数の所属関数と、selectAll 閉包 (直接 call・566 関数) からの非到達 (間接 call 191 箇所は未解決)、段 6 の status → 例外文言の写像 (`0xd82c20`) を PE で確定。選択値・ゲートは未確定 (実装なし)。測定は `analysis/flapi/pe_callgraph.py` (直接 call 元の逆引き `callers` を含む)。8 回目 run 節 (REPORT_PY39.md からの分割移動) を含む |
 | `tools/python/REPORT_PY41_1514.md` | ~75 | PY-41 追補 (#1514): channels.getChannelType を公開 stub の型定数 (CT_Sampler 0・CT_GenPlug 2) で実装した根拠と測定。残り 12 関数の分割 (子 #2805・#2808 と #1514 に残す 6 関数) |
 | `tools/python/REPORT_PY70.md` | ~95 | PY-70 (#2500): flapi 表の生成器が stub の位置専用引数 (`/`) を読み落としていた不具合の修正 (`channels.processRECEvent` 0→3 引数)。引数個数が変わった 15 関数と未解決 (stub/PE の個数不一致 24 件) の一覧。残りの 4 関数の意味論は子 #2544・#2547・#2548 |
 | `tools/python/REPORT_PY35.md` | ~61 | PY-35 (#1345): patterns 未実装 31 関数の意味論は repo 内に根拠無し (実装 0・コード変更 0)。読み取り 14 件 #1667 (PY-42)・選択/移動/書き込み 17 件 #1668 (PY-43) に分割 |
@@ -426,8 +429,9 @@
 | `tools/plugins/sampler/REPORT_ENGINE_LINK.md` | ~55 | sampler REPORT §5 の付録: Fruity Slicer 2 殻 (23663) と engine (23664) の結線。 `engine_x64.dll` のロード経路・`DispatchToEngine` の case 表 (#540 受入条件 4 の部分達成) |
 | `tools/plugins/sampler/REPORT_ENGINE_LINK_APPENDIX_540.md` | ~64 | REPORT_ENGINE_LINK §10 の分割移動: #540 受入条件 4 の残り (a)(b)(c) の再解析 (sel 2・4 の呼出し元 17 件と内側 id の表)。 §11: 受入条件 5 (VEX の SSE 固定) の静的判定 (vex_reach.py・vex_pin.py の実測)。 §12: 固定後の VEX 8 命令の経路 (値依存の NaN 判定分岐・vex_nan_branch.py)。 250 行上限のため別置き |
 | `tools/plugins/slayer_x86/REPORT.md` | ~132 | FL Slayer x86 engine (Slayer_Engine.dll) の結合方式 (ilbridge.exe 経由) と lift 方針 (#536) |
-| `tools/plugins/slayer_engine_ia32/REPORT.md` | ~223 | FL Slayer x86 engine (block22434 = Slayer_Engine.dll) の ia32 decode 基準値 (#674 中間): 線形掃引の実測・gate C1〜C4・ネガコン N1〜N3・objdump 検算。§9 は AEffect marshal 表の実測 (store 列・gate・ネガコン) |
+| `tools/plugins/slayer_engine_ia32/REPORT.md` | ~238 | FL Slayer x86 engine (block22434 = Slayer_Engine.dll) の ia32 decode 基準値 (#674 中間): 線形掃引の実測・gate C1〜C4・ネガコン N1〜N3・objdump 検算。§9 は AEffect marshal 表の実測 (store 列・gate・ネガコン) |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_894.md` | ~62 | slayer_engine_ia32 REPORT §9.5・§9.6 (#894 events[] 探索) の全文を分割移動した付録。 `scan_events.py` の所要 (n=3 min–max)・load・鮮度証跡 (`git diff` 実出力) を含む。 REPORT.md は 250 行上限のため分割 |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1098.md` | ~95 | Slayer_Engine.dll (block22434) の .text の ia32 lift (#1098、測定 commit `fc2e70be`): 関数境界の根拠、被覆、jump table・IAT の実データ照合、x64 回帰、未被覆域の区間内訳と未解決 (子 #2814)。 測定値の正本は付録 §2・§3 |
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
 | `tools/shared/elastique/REPORT.md` | ~140 | élastique 2.2.15 (win x64) の静的 IPP 入口 197 件の API 同定 (T-SH-40 / #2613): 線形走査の入口再現・dsp_ippv2 の本体照合 (一意名 8・族候補 26・未同定 163)・tools/ipp の stub 名 28 (stub のみ 18・混在 16 入口。#2613 受入 2)・間接経路の静的確認。対応表は `data/entries.csv` |
@@ -464,6 +468,7 @@
 | `tools/targets/serum2/license/REPORT.md` | ~160 | Serum2 認可機構の呼出点マップ |
 | `tools/targets/serum2/license/authstub/REPORT.md` | ~232 | authorization stub 設計・実装。§13b・§14 の詳細は付録 `REPORT_APPENDIX.md` §13b・§14b (250 行上限のため分割移動) |
 | `tools/targets/serum2/license/authstub/REPORT_APPENDIX.md` | ~95 | authstub REPORT の分割移動節: §13b (L1 脱落条件の突合・census の数え方) と §14b (L1 復元 pass の census・ネガコン・e2e 実測、LF 束縛の詳細) |
+| `tools/targets/serum2/license/authstub/REPORT_APPENDIX_1009.md` | 49 | authstub #1009 (SR-12) の受入 2・3: L1 復元 pass の前後 census の再計算手順 (`l1_recompute.py`)・ネガコン (pass 無し = 脱落状態・二重適用の拒否)・実測と未解決 (§14f) |
 | `tools/targets/serum2/sr4/REPORT.md` | ~110 | SR-4 (#75) DSP 段階 lift 第 1 段: vtable root 56 関数の対象表 + pilot lift 9 本 (実機 vs wasm 差分) + strict gate + ネガコン |
 | `tools/targets/serum2/gui/REPORT.md` | ~76 | SR-7 (#68, 部分達成): Splice 3 テンプレートの実体化分岐は未特定 / overlay_demo_version は template 定義 0 件 (静的確認のみ) |
 | `tools/targets/serum2/gui/REPORT_SR24.md` | ~111 | SR-24 (#1710): Splice テンプレート実体化分岐の静的解析。sub-controller 振り分け `0x1804a1950` まで特定、demo bit 書込元・demo ダイアログ呼出元を列挙。分岐の特定は未達 (子 #1917) |
