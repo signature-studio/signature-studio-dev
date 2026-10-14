@@ -45,7 +45,7 @@ fix の内容: BLK を `map.json` の `blk` から取得 (旧 `0x3a25c000` は�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| PE の .rdata/.data 敷設 (`ott_data_install` が空定義) | wasm 実行の memory access out of bounds の直接原因の候補 (未切り分け) | #1025 (本 issue) |
+| (解消済み) PE の .rdata/.data 敷設: 旧 `ott_data_install` 空定義は廃止し、`data_gen.py` で敷設 (実行段節参照) | wasm 実行の memory access out of bounds の原因候補だったもの | #1025 (本 issue) |
 | wasm 実行と native (`liftlib/work/kh_gain/diff` 61 シナリオ) の差分 | 受入条件 1・2 が未達 | #1025 |
 | 再現コマンド 1 本化 (実行・差分込み) | 受入条件 3 は部分達成 (`kh_route_run.sh` で実行・native 差分まで 1 本化済み。実行には素材 `plugins-kilohearts toolchain-retdec toolchain-emsdk work-icall work-liftlib` が必要。本 run では未再実行) | #1025 |
 
