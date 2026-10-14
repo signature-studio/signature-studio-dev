@@ -42,7 +42,7 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 | `issue_snapshot.py` | open の issue / PR / run / 最新の bot コメントを `issues_state.json` に保存する (`launch_issues.py` が呼ぶ) |
 | `manual_deps.json` | 停止報告に根拠のある依存 (子 → [依存先])。**追跡する設定ファイル** (他の json は状態で、`.gitignore`) |
 | `rest_heal.py` | open PR を CONFLICT / FIX / NOREVIEW / DRAFT / APPROVED / COVERED / STUCK_LABELLED に分類し、足りない次の一手を `/oc` コメントか close→reopen で補う。watchdog (`.github/scripts/watchdog.sh`) の補助 |
-| `sync_status.py` | Project V2 の Status を PR / Issue の実態に同期する (冪等)。Status は参考で、チケット状態の正は issue の open/closed + ラベル + PR (`docs/WORKFLOW.md` §3)。実行しないと Status が陳腐化する。**退役後は同期をやめる (根拠: #2353 の PM 判断)** |
+| `sync_status.py` | Project V2 の Status を PR / Issue の実態に同期する (冪等)。Status は参考で、チケット状態の正は issue の open/closed + ラベル + PR (`docs/WORKFLOW.md` §3)。実行しないと Status が陳腐化する。**退役後は同期をやめる (根拠: #2356。下表)** |
 | `pm_needs.py` | 最新の差し戻しが PM 判断を求めていて、PM の応答が無い PR を列挙する。heartbeat のたびに実行して未回答を 0 にする |
 | `idle_report.sh` | watchdog の run 履歴から『idle>0 が 15 分以上続いた回数』を数える (VM の `pm-watchdog.timer` を止めてよいかの soak 判定用)。REST のみ。`idle_report.sh --since <ISO> --until <ISO>`。使い方は下の節。テスト: `bash tools/pm/test_idle_report.sh` |
 | `pr_gaps.py` | open PR を「レビュー中 / 修正中 / 担当なし」に分類する |
@@ -63,10 +63,11 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `.gitignore` | 残す | 状態ファイル (`launched.json` など) を追跡しないための除外。退役後も誤コミット防止に残す | なし | - |
 | `README.md` | 残す | 本書 (運用ツールの地図と退役の表) | なし | #2436 |
 | `REPORT.md` | 残す | 測定値の正本 | なし | - |
+| `REPORT_APPENDIX_2380.md` | 残す | 測定値の付録 (REPORT §10 の全文。250 行上限のため REPORT.md から分割移動) | なし | - |
 | `dismiss_spam.py` | 廃止 | 旧 watchdog が『(watchdog)』を付けて出した request-changes の取り下げ (#731) の一回限りの後始末。ただし現行の `watchdog.sh` の FIX_IDLE も本文の末尾に同じ `(watchdog)` を付けて reviewer の token で出すため、このスクリプトは現行の FIX_IDLE も取り下げ対象にする | 退役前に、FIX_IDLE の本文から marker を外す (または判定を変える) 変更を main に入れてから、`DRY=1` で対象 0 件を確認して削除する。それまで watchdog の稼働中には実行しない | #2355 |
 | `find_silent_runs.sh` | 廃止 (後継: `record-run-outcome.sh`。App token が発行された run でだけ動く。token が無ければ何もしない (`.github/workflows/opencode.yaml` の `Record the run outcome` step)) | implement の run の末尾 (`if: always()`) で `record-run-outcome.sh` が、PR も push も無い終了 (success を含む) に `oc:no-pr` と理由マーカーを残す。報告の無い success は、この経路で `oc:no-pr` として見える | 削除のみ | #2355 |
 | `find_unreviewed.sh` | `watchdog.sh` | verdict の無い現在 head の PR (NOREVIEW) を `watchdog.sh` が点検ごとに戻す | 削除のみ | #2355 |
-| `heartbeat.sh` | PM agent | PM セッションへの定期プロンプトは、`pm` job (`oc-pm`) と Worker の `oc-pm` 送信が担う。`pm-heartbeat.service` は無効化済み | `pm` job の実 run が `oc-pm-decision` を残すことを確認してから削除 (親 #2319 の A4) | #2347 (置換案。取り下げ提案中) |
+| `heartbeat.sh` | PM agent | PM セッションへの定期プロンプトは、`pm` job (`oc-pm`) と Worker の `oc-pm` 送信が担う。`pm-heartbeat.service` は無効化済み | `pm` job の実 run が `oc-pm-decision` を残すことを確認してから削除 (親 #2319 の A4) | #2347 |
 | `idle_report.sh` | 残す | REST のみで VM に依存しない。watchdog の担当なし時間の計測として残す (VM 停止の判定用の役は終わった) | なし | #2354 |
 | `issue_snapshot.py` | 廃止 | open issue の集計は Worker の同期 (`fullSync`・`reconcile`) が担う。`launch_issues.py` だけが読んでいた | `launch_issues.py` と同時に削除。状態の扱いは下の『状態ファイル』の節 | #2355 |
 | `launch_issues.py` | Worker | `plan`・`launch` は Worker が live (`/oc` の投稿と着手の判断)。`blocked` (GitHub の依存欄への同期) は Worker が書かないため、退役後は依存欄が新規分で更新されない。判定は本文の `blockedBy:` を Worker の `classify.ts` が読むので、影響は表示のみ | 『状態ファイル』の節の扱いを反映してから削除。依存欄の同期が要るなら別 issue | #2355 |
@@ -78,8 +79,8 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `rerun_review.sh` | `watchdog.sh` | review の再起動 (close→reopen) は、`watchdog.sh` の NOREVIEW が `reopen-pr.sh` で行う | 削除のみ | #2355 |
 | `rest_heal.py` | `watchdog.sh` | 冒頭に『watchdog.sh が main に入るまでの橋渡し』と書かれた役。`watchdog.sh` が同じ分類で戻す | 削除のみ | #2355 |
 | `restart_failed.sh` | 実装 run: Worker (`oc:no-pr` の再着手)。review 側: `watchdog.sh` (NOREVIEW → `reopen-pr.sh`) | 失敗した実装 run の再投入は、`oc:no-pr` の再着手 (`NO_PR_COOLDOWN_H`) に置き換わる。即時の再投入は無くなり、再着手は cooldown の後になる。review 側は watchdog の点検 (NOREVIEW) で戻るため、即時の再起動は無くなる。レート制限の判定は #2344 | 遅れを許容する判断を PR 本文に書いてから削除。理由別の再着手は #2334 | #2334・#2344 |
-| `status_sync.py` | Actions (`status-sync.yaml`) | `docs/STATUS.md` の自動節を更新する後継の workflow が未配線 (pm-apply) | 後継が main に入るまで残す。入らない間は STATUS の自動節が古いままになる | #2362 |
-| `sync_status.py` | 廃止 | Project V2 の Status 同期を退役と同時にやめる (PM 判断 2026-10-14)。根拠は #2356 (PM App に Projects の書き込み権限を追加するかの依頼者への質問。既定は『追加しない』で not_planned で閉じた)。このため App の token では Project V2 の Status を更新できず、Status は参考扱い | `docs/` の『Status が唯一の正』の文言を外してから削除 | #2435 |
+| `status_sync.py` | 未実装 (#2362) | `docs/STATUS.md` の自動節を更新する後継の workflow が未配線 (pm-apply) | 後継が main に入るまで残す。入らない間は STATUS の自動節が古いままになる | #2362 |
+| `sync_status.py` | 廃止 | Project V2 の Status 同期を退役と同時にやめる (PM 判断 2026-10-14)。根拠は #2356 (PM App に Projects の書き込み権限を追加するかの依頼者への質問。既定は『追加しない』で not_planned で閉じた)。このため App の token では Project V2 の Status を更新できず、Status は参考扱い | 済 (#2435) | #2435 |
 | `systemd/pm-heartbeat.service` | 廃止 (後継は `pm` job) | 無効化済み | 削除のみ (systemd の変更は PM が行う) | #2355 |
 | `systemd/pm-launch.service` | Worker | `/oc` の投稿は Worker (`LIVE_LAUNCH`)。timer は 2026-10-14 に停止し、再開しない | 停止済み。ファイルの削除は退役の最後 | #2355 |
 | `systemd/pm-launch.timer` | Worker | 同上 | 停止済み | #2355 |
@@ -88,7 +89,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `test_idle_report.sh` | 残す | `idle_report.sh` と同じ | なし | #2354 |
 | `test_launch_issues.py` | 廃止 | `launch_issues.py` と同時。Worker の規則は `infra/pm-worker/test/` (vitest と `*_crosscheck.py`) で確かめる | `launch_issues.py` と同時に削除 | #2355 |
 | `test_pm_gate.sh` | 廃止 | `pm_gate.sh` と同時 | 同上 | #2355 |
-| `test_status_sync.py` | Actions (`status-sync.yaml`。`status_sync.py` と同じ) | `status_sync.py` の検証。後継の workflow が入るまで残す | `status_sync.py` と同時に削除 (後継 #2362 が main に入るまで残す) | #2362 |
+| `test_status_sync.py` | 未実装 (#2362) | `status_sync.py` の検証。後継の workflow が入るまで残す | `status_sync.py` と同時に削除 (後継 #2362 が main に入るまで残す) | #2362 |
 | `watch_runs.notes.md` | 廃止 | `watch_runs.sh` の注記。測定値は `REPORT.md` §8 に移送済み | `watch_runs.sh` と同時に削除 | #2355 |
 | `watch_runs.sh` | Worker・`watchdog.sh` | PM が run の完了を待つための監視。完了は Worker が `workflow_run` の webhook で受け、点検は `watchdog.sh` が行う。PM は oc-pm で起動されるので待つ必要が無い | 削除のみ | #2355 |
 | `worker_url` | 残す | `watchdog.sh` が Worker の `/status` を読む先。VM に依存しない | なし | - |
