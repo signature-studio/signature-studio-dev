@@ -165,4 +165,4 @@
 - **決定**: `__asm_movntps(i128,i128)` の呼び出しは `ir5_patch.py` の `lower_asm_store` で `store i128` に復元する (`movups`/`movaps`/`movdqa` と同じ扱い)。 helper 側 (`m11_simd2.py` の `gen_body`) は void 形を movups 系と同じ分岐に入れる。
 - **比較した方式**: (a) 宛先を 0 で埋める (誤った番地への store になるため不採用)、(b) helper 側だけで no-op にして呼び出しを残す (store が無音で消えるため不採用)。
 - **理由**: 第 1 引数は `%75` 等から `load i128` した値で、そのポインタ (`inttoptr`) が IR に残っている。 issue 本文の「宛先は IR 側に無い」は誤りだった。 `ir5_patch` 後は `movntps` の呼び出しが `e.norm0.ll` 8 件 → `e.lift.ll` 0 件 (19048)。 宣言だけが残り、helper 側の分岐に入る。
-- **影響**: 19048・19252 の unimpl から `movntps` が消えた (実測は `tools/plugins/dynamics/REPORT.md`)。 共有鎖 (`ir5_patch.py`) の変更なので、`movntps` を含む他 plugin の lift 出力は変わりうる。 OTT (`tools/liftlib/work` の `ott_lift.ll` 等) で 8 件ずつ出る。 その影響は未測定 (liftlib e2e の前提素材が本 run に無い)。
+- **影響**: 19048・19252 の unimpl から `movntps` が消えた (実測は `tools/plugins/dynamics/REPORT_APPENDIX.md` §F)。 共有鎖 (`ir5_patch.py`) の変更なので、`movntps` を含む他 plugin の lift 出力は変わりうる。 OTT (`tools/liftlib/work` の `ott_lift.ll` 等) で 8 件ずつ出る。 その影響は未測定 (liftlib e2e の前提素材が本 run に無い)。

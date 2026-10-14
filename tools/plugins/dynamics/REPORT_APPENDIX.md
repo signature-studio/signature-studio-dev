@@ -138,7 +138,9 @@ REPORT §4 の「脱落の原因」の全文。 本付録は本体から分割�
 - `movntps` 呼び出しの残数 (`e.final.ll`・`e.fixcmp.ll`・`e.lift.ll`): 両 engine とも 0 件。 `e.norm0.ll` (ir5_patch 前) は 19048 で 8 件。
 - 受入条件の判定: (1) `movntps` が unimpl に出ない → 達成。 (2) `emcc -c` rc 0 → 達成。 (3) 復元方式を DECISIONS に記録 → 達成 (D17)。
 - 残件 (本 issue 外): `vcomisd`・`vucomisd`・`vucomiss` は #1774 / #1582 (flag 反映)、`vmovsd` store は #2017。
-- 共有鎖 (`ir5_patch.py`) の変更。 `movntps` を含む他 plugin の出力への影響は **未測定**。 OTT の `tools/liftlib/work/ott_lift.ll` 等で 8 件ずつ出るため、liftlib e2e (`tools/liftlib/liftlib_e2e.sh`) での回帰確認が要る (本 run では素材不足で未実行)。
+- 共有鎖 (`ir5_patch.py`) の変更。 `movntps` を含む他 plugin の出力への影響は **未測定**。 OTT の `tools/liftlib/work/ott_lift.ll` 等で 8 件ずつ出るため、liftlib e2e (`tools/liftlib/liftlib_e2e.sh`) での回帰確認が要る。
+- **素材不足で測定不可** (fix run の検証ログ): `$ARTIFACTS_DIR` (`/home/runner/artifacts`) の実在を確認したところ `fl-win64.tar.zst` のみ。 `work-liftlib` / `plugins-ott` (必要なら `work-m6-ott`) は取得されていない。 `liftlib_e2e.sh` の before/after 差分と rc は本 run では取得していない。 PR 本文に `oc_artifacts: work-liftlib plugins-ott` を追記したので、次の run で素材を取得して測定する。
+- 差分 0 の証跡 (`docs/WORKFLOW.md` §6): 測定 commit `f941654a` 以降の `git diff f941654a HEAD -- tools/plugins/lift tools/plugins/dynamics ':!*.md'` は `tools/plugins/dynamics/b1_measure.py` (+21 行、commit `d05b9297`) のみ。 `b1_measure.py` は `engine_lift.sh` から呼ばれない (grep で確認。 `B1 の 0 埋め内訳` の手動集計用)。 よって `engine_lift.sh` の測定値 (19048 / 19252) は有効。
 
 ## G. [PLG-F3-19] #2047: B1 の 0 埋め内訳と方式選定 (測定 HEAD: b073ffa3)
 
