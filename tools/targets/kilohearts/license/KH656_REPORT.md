@@ -78,3 +78,30 @@
 - 範囲内: module F の build (lift→stub→emcc)・`kh249_check.mjs` (17 項目)・未 lift callee の census。
 - 範囲外: 閉包展開の完了、分類結果の lift IR 照合、native oracle との突合、module A/B/E/snapin 6 種の再実行 (本変更は F のみ)。
 - 作業ログ: 素材 (`plugins-kilohearts` の Windows installer zip 3.8 GB) は `$RUNNER_TEMP/kh_src` に展開し、`tools/targets/kilohearts/work/winpkg` (gitignore) に Windows 側のみ展開。emsdk/retdec は `[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md`) の既設を使用。Python 依存は `$RUNNER_TEMP/kh_venv` (pefile/capstone/numpy)。
+
+## 7. 閉包展開の再試行 (#1761 / KH-27、実測)
+
+`scripts/kh656_closure.py --rounds 6` を HEAD `0eaf2989` で実行。`#710` (Win32 import 宣言) は closed、`#709` (ymm) は open。
+
+| ラウンド | lift 数 | 未 lift callee | 結果 |
+|---|---|---|---|
+| 0 (HEAD) | 8 | 40 | build 成功 (wasm 54,394 B・sha `7ba79e65…`) |
+| 1 | 8 → +34 | 40 | build 失敗 (`i256` = AVX2 2 件を除外) |
+| 2 (再 build) | 42 | 44 | build 成功 (wasm 192,136 B) |
+| 3 | 80 | 92 | build 成功 (wasm 436,971 B) |
+| 4 | 166 | 154 | build 成功 (wasm 876,222 B) |
+| 5 | 313 | — | build 失敗 (`i256` 1 件 `1813846e0` を除外) |
+
+- 閉包は**収束しない**。未 lift callee は 40 → 154 と増え、ラウンドごとに新しい callee が出る。6 ラウンドの上限でも `todo == []` に届かなかった。
+- 313 関数を lift した状態の wasm (1,543,901 B) では `kh249_check.mjs` の入口実行が `memory access out of bounds` で落ちる (fail-fast の `unlifted callee 0x180112a30` には届かない)。入口の挙動は閉包の拡大で変わる。
+- 上記の変更は**コミットしていない** (`lic_config.json` は HEAD に戻した)。HEAD の状態は再 build で上記と一致 (wasm 54,394 B・sha `7ba79e65…`・undefined import 0・`kh249_check` ok=17 ng=0・入口 `unlifted callee 0x180112a30`)。
+- 所要: 閉包 6 ラウンド 1 分 36 秒 (`time`)、HEAD の `lic_build.py --module F` 12.25 秒 (`time`)、終了時 load average 0.08 / 0.08 / 0.14 (4 CPU)。
+
+**受入条件の判定**: 2 (入口を越えた分類結果の照合) と 3 (ネガティブコントロール) は未達のまま。閉包の収束が取れないため、受入 1 も未完。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 閉包の収束 (未 lift callee 40 → 154 と増加。STL map/string/vector・EH の lift/shim 方針) | 受入 1・2 未達 | #1817 [KH-28] |
+| 313 関数 lift 時の入口 `memory access out of bounds` | 閉包を広げた状態の実行検証不能 | #1821 [KH-29] |
+| ymm (AVX2) 2 件 `0x180f89cf0` / `0x180fb6124` の lift | 閉包を広げると i256 で build 失敗 | #709 (KH-14・既存) |
+| 0x180ef7fc0 の native oracle (ctx-fuzz) | bit 照合不可 | #1761 継続 |
