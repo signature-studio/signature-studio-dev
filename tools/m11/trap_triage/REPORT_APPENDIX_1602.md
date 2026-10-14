@@ -186,5 +186,5 @@ load average は測定中 0.73 前後。`check_682.py` は HEAD では未実行�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 304・555: `function_535c11` → `function_535bf2` の引数なし call (obj = 0) の修復 (`M11_FIX_535BF2` の C 版は REPORT §3) | OOB の除去 | #714 (継続) |
-| 923: `obj` (0x10bd3960) の vptr が 0 になる由来 (構築が走らないのか、解放・消去後か)。`inspect_trap.mjs` で `function_4fb910` 以降の生成元を追える | OOB の除去 | #714 (継続) |
+| 304・555: `function_535c11` → `function_535bf2` の引数なし call (obj = 0) の修復 (`M11_FIX_535BF2` の C 版は REPORT §3) | OOB の除去 | #1426 (継続) |
+| 923: `obj` (0x10bd3960) の vptr が 0 になる由来 (構築が走らないのか、解放・消去後か)。`inspect_trap.mjs` で `function_4fb910` 以降の生成元を追える | OOB の除去 | #1426 (継続) |

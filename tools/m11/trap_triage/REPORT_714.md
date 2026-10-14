@@ -40,8 +40,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 304・555: `function_535bf2` の戻り/境界で OOB。closure 外参照は転記で消えたが、OOB の真因は未特定 | 2 unit が trap | #714 (継続) |
-| 923: `410b10` 系 `[obj-0x80..]` の OOB 起点 | 1 unit が trap | #714 (継続) |
+| 304・555: `function_535bf2` の戻り/境界で OOB。closure 外参照は転記で消えたが、OOB の真因は未特定 | 2 unit が trap | #1426 (継続) |
+| 923: `410b10` 系 `[obj-0x80..]` の OOB 起点 | 1 unit が trap | #1426 (継続) |
 | `M11_SURVEY_STACK` は wasm フレームを出さない (メッセージのみ) | OOB の起点特定が手作業 | 要ツール化 (PM 判断) |
 
 ## 5. 再現
@@ -239,4 +239,4 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 
 **#1602 r2 追記 (2026-10-14)**: 計測 hook の本体を変えると 304・555 の判定が 872/22 ↔ 870/24 と変わるが、どちらも範囲外の読みは 0 件で、値は採れていない。詳細は [REPORT_APPENDIX_1602.md](REPORT_APPENDIX_1602.md) §14。trap 位置は 304・555 が `function_535bf2`、923 が `function_410b10`。未解決は #1426 (継続)。
 
-**#1602 r4 追記 (2026-10-14)**: 受入 1・2 を達成。V8 inspector (`trap_triage/inspect_trap.mjs`、build 不変) で trap 時点の wasm local を読み、判定は不変 (870/24)。304・555 は `function_535bf2` の `obj = 0` (`tbl`・`cnt` は範囲外の値)、923 は `function_410b10` の `obj = 0x10bd3960` (範囲内) で `*(obj) = 0` のため `*(obj)-0x80 = 0xffffff80` が範囲外。測定表・呼出し鎖は [REPORT_APPENDIX_1602.md](REPORT_APPENDIX_1602.md) §16。未解決は #714 (継続)。
+**#1602 r4 追記 (2026-10-14)**: 受入 1・2 を達成。V8 inspector (`trap_triage/inspect_trap.mjs`、build 不変) で trap 時点の wasm local を読み、判定は不変 (870/24)。304・555 は `function_535bf2` の `obj = 0` (`tbl`・`cnt` は範囲外の値)、923 は `function_410b10` の `obj = 0x10bd3960` (範囲内) で `*(obj) = 0` のため `*(obj)-0x80 = 0xffffff80` が範囲外。測定表・呼出し鎖は [REPORT_APPENDIX_1602.md](REPORT_APPENDIX_1602.md) §16。未解決は #1426 (継続) (#714 は 2026-10-14 に close 済み)。
