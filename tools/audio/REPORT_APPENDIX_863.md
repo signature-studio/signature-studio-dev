@@ -114,5 +114,5 @@
 - 失敗 run の位置情報 (旧 HEAD・probe 前のため fill 推移は無し): `dev:tone max_err=6.85e-1 zero_runs=1 first_err_frame=56576 first_zero_run_frame=56607 first_underrun_frame=56576 fill_at_first_underrun=0 fill_min_before_first_underrun=0 cb_gap_max_ms=11 cb_gap_over20=0`。dev のみで preview は PASS。
 - 同一フレームの再出現: `first_err_frame = first_underrun_frame = 56576` (quantum 442) は §19 / §23 / 本節の 3 件すべてで一致。負荷量はばらばらで、相関は見えていない。
 - 読み: 失敗 run では `fill_at_first_underrun=0` (underrun の時点でリングは空)。`cb_gap_max_ms=11` / `cb_gap_over20=0` で、audio callback 間隔は 20 ms を超えていない。ただし fill 推移は取れていないため、producer 遅延か consumer 停止かは**未確定**。
-- 通算: 旧 HEAD 含む同一 e2e で FAIL 3 件 / 計 90 run (§19〜§24 の 2 件 / 86 run に、本節の旧 HEAD 初回 FAIL 1 件 / 1 run と、本節の probe 後 44 run の全 PASS を加算。probe 後の 44 run は同一 HEAD で行った 1 セット)。
+- 通算 (§19〜§25 の同一 e2e): FAIL 3 件 / 計 131 run (§19〜§24 の 2 件 / 86 run に、本節の 45 run・FAIL 1 件を加算)。本節の FAIL は旧 HEAD `b6361886` の初回 1 run のみで、probe 後の 44 run は全 PASS。
 - 未解決 (追跡 **#863**): (a) fill 推移を含む失敗 log が未取得 (次回失敗時に `fill_trace` で判定)。(b) 同一フレーム 56576 が 3 回出る理由は未特定 (起動からの相対位置が固定なら、決定的な起動経路の問題の可能性)。(c) producer 側の到達時刻 (wasm 側の変更) は本 PR の範囲外。
