@@ -76,6 +76,6 @@
 - 固定の再測定 (`vex_pin.py 23664 --pin=sse --indirect=none --probe=0x1801f2ed4,0x1801f2f30,0x1801f2ec8 --path`): VEX 命令 8 / 関数 1 (§11 と同値)。 3 点とも `reached=True`。
 - 経路上の分岐 (`0x1801f1920` から `0x1801f2eb0` まで): `0x1801f1939 cmp dword [0x180277ae4], 0; jne` は AVX 旗 (CPUID 由来) で、§11 の SSE 固定で外れる。 後続の `0x1801f1970 je`・`0x1801f20ec je`・`0x1801f20f5 je` は r8・r9 などの値に依存し、CPUID 固定の対象ではない。 `vex_pin` はこれらの両辺を残すため、8 命令の到達は上限評価 (値依存の到達性は未確定)。
 - ネガコン (`vex_nan_branch.py`): `--ctrl=0x180277ae4` (CPUID 旗、`.data`) は `.text` から書込み 1 件 (書込み検出が働くことの確認)。 `--branch=0x1801f2ec8` (分岐でない) は形の検査で NG かつ exit 1。
-- **判定 (受入条件 5)**: 「CPUID 分岐で SSE 路に固定できるか」は**不成立**。 CPUID 旗は `0x1801f1939` の 1 箇所だけで、固定すると外れる。 残る VEX 8 命令は値依存の分岐の両辺にあり、固定では除外できない。 残りの問いは (i) 関数 `0x1801f1920` の入力 r8 等の値域 (呼出し元 `0x18014b4a4` の鎖の解析)、(ii) 8 命令の helper 実装 (#779)。 動的確認 (wine 等) は未実施。
+- **判定 (受入条件 5)**: 「CPUID 分岐で SSE 路に固定できるか」は**不成立**。 probe が示した経路上の CPUID 旗の分岐は `0x1801f1939` の 1 箇所だけで、固定すると外れる。 残る VEX 8 命令は値依存の分岐の両辺にあり、固定では除外できない。 残りの問いは (i) 関数 `0x1801f1920` の入力 r8 等の値域 (呼出し元 `0x18014b4a4` の鎖の解析)、(ii) 8 命令の helper 実装 (#779)。 動的確認 (wine 等) は未実施。
 - 再現: `python3 tools/plugins/sampler/vex_nan_branch.py "$RUNNER_TEMP/fl-win64/extracted/block23664_PE.bin"` (実測 3.0 s、exit 0)。 `vex_pin.py` の再現は §11 と同じ。
 - 鮮度の証跡 (測定 commit `4d16053d` から HEAD まで、コード差分): `git diff 4d16053d HEAD -- tools/plugins/sampler ':!*.md'` の出力は 0 行 (確認時 HEAD `383efaa1`。 変更は REPORT 2 ファイル・DOC_MAP の md のみ)。
