@@ -18,7 +18,7 @@ python3 trap_triage/watch_store_682.py --out work/probe2270 --fns "${WATCH_FNS:?
 emcc -c work/probe2270/boot_sw.ll -o work/obj/boot.o $CF || exit 1
 emcc -c trap_triage/watch_addr_2099.c -o work/obj/sw682.o $CF -DM11_WATCH_ADDR_OVR=${WATCH_ADDR:-0x10bd4c20u} || exit 1
 emcc -c m11_ov.c -o work/obj/ov.o $CF -DM11_FIX_682=1 -DM11_NOTIFY_682=0 || exit 1
-bash m11_build.sh > work/probe2270/build_$tag.log 2>&1 || { tail -5 work/probe2270/build_$tag.log; exit 1; }
+M11_KEEP_BOOT_O=1 bash m11_build.sh > work/probe2270/build_$tag.log 2>&1 || { tail -5 work/probe2270/build_$tag.log; exit 1; }
 cat > work/probe2270/run_$tag.mjs <<EOF
 import fs from 'fs';
 const M11 = '$HERE';
