@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""native (元の機械語) と wasm (x64c lift) の差分判定。case ごとに RAX・import 呼出回数・arena・.data のバイト列を全比較する。
+カバレッジ gate: 戻り値の種類 >= 2, import 経路を通った case >= 1, ctx=NULL の case >= 1, 両 export の case >= 1 (欠ければ exit 1)。
+usage: diff_test.py WORKDIR [--mutate-wasm]   (--mutate-wasm: wasm 結果の 1 バイトを反転 = ネガティブコントロール)
+exit 0: 全 case 一致かつカバレッジ充足。exit 1: 不一致 / カバレッジ不足。
+"""
+import json, struct, sys, collections
+
+W = sys.argv[1]
+MUTATE = '--mutate-wasm' in sys.argv
+L = json.load(open(W + '/layout.json'))
+ARENA_SZ, DATA_SZ = L['arena_sz'], L['data_sz']
+REC = 16 + ARENA_SZ + DATA_SZ
+nat = open(W + '/res_native.bin', 'rb').read()
+was = bytearray(open(W + '/res_wasm.bin', 'rb').read())
+assert len(nat) % REC == 0 and len(was) % REC == 0, (len(nat), len(was), REC)
+n = len(nat) // REC
+assert len(was) // REC == n, 'case 数不一致 native=%d wasm=%d' % (n, len(was) // REC)
+CRASH = 0xC2A5C2A5C2A5C2A5
+if MUTATE:
+    first = next(i for i in range(n) if struct.unpack_from('<Q', nat, i * REC)[0] != CRASH)
+    was[first * REC + 16 + 5] ^= 0x01   # 比較対象の最初の case の arena の 5 バイト目を 1 bit 反転 (比較器が検出するか)
+
+cases = open(W + '/cases.bin', 'rb').read()
+fns = []
+ctxnull = 0
+p = 4
+for _ in range(n):
+    fn = struct.unpack_from('<I', cases, p)[0]
+    ctx = struct.unpack_from('<Q', cases, p + 8 + 32)[0]
+    fns.append(fn)
+    ctxnull += (ctx == 0)
+    p += 8 + 32 + 8 + ARENA_SZ
+
+bad = []
+rax_hist = collections.Counter()
+hit_cases = 0
+crashed = []
+for i in range(n):
+    a = nat[i * REC:(i + 1) * REC]
+    b = bytes(was[i * REC:(i + 1) * REC])
+    if struct.unpack_from('<Q', a, 0)[0] == CRASH:
+        crashed.append(i)
+        continue
+    rax_hist[struct.unpack_from('<Q', a, 0)[0]] += 1
+    hit_cases += struct.unpack_from('<Q', a, 8)[0] > 0
+    if a != b:
+        off = next(k for k in range(REC) if a[k] != b[k])
+        bad.append((i, off))
+compared = n - len(crashed)
+
+cov = {'compared': compared, 'native_crash_excluded': len(crashed), 'distinct_rax': len(rax_hist),
+       'import_cases': hit_cases, 'ctx_null': ctxnull, 'fn0': fns.count(0), 'fn1': fns.count(1)}
+cov_ok = (compared >= n // 2 and cov['distinct_rax'] >= 2 and cov['import_cases'] >= 1 and cov['ctx_null'] >= 1
+          and cov['fn0'] >= 1 and cov['fn1'] >= 1)
+print('[diff] cases=%d compared=%d match=%d mismatch=%d native_crash_excluded=%d' % (n, compared, compared - len(bad), len(bad), len(crashed)))
+print('[diff] first mismatches (case, byte offset in record): %s' % bad[:5])
+print('[diff] coverage %s ok=%s' % (cov, cov_ok))
+print('[diff] rax top: %s' % [('%#x' % k, v) for k, v in rax_hist.most_common(4)])
+ok = not bad and cov_ok
+print('[diff] RESULT %s' % ('PASS' if ok else 'FAIL'))
+sys.exit(0 if ok else 1)
