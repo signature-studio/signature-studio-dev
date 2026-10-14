@@ -140,5 +140,5 @@
 - **状態**: 採用 (2026-10-14, issue #1408 [PLG-F3-8])
 - **決定**: `vf[n]m{add,sub}{132,213,231}sd` の 3 引数形を `m11_simd2.py` で `msimd11_core.h` の `_[f|fn]m{a|s}{132|213|231}sd(a, b, c)` へ委譲する。第 3 引数は i64 なら `asd(c)`、i128 なら `lane0_d(c)` で double に変換する。`a` = dst (第 1 引数)。
 - **比較した方式**: (a) ヘッダの式をそのまま使う (採用)、(b) IR 側の引数順を並べ替えて 132 形に統一する。
-- **根拠**: 実機 (AMD EPYC 7763・FMA3) で FMA3 sd の 10 形 (132/213/231 の fma・fms・fnm の各種) を inline asm で直接実行し、`_fma*sd` 系と低位 double が 20,000 乱数ケースで全件一致。未検証は `vfnmsub132sd` の 1 形のみ (残件に出ていない)。
-- **影響**: 両 engine の FMA 残件 (19252 で 7 宣言、19048 で 5 宣言 = distinct 計 12) は unimpl から消えた。movntps・vmovsd store・ucomis/comis の flag は未対応で、子 issue に分割した。
+- **根拠**: 実機 FMA3 との照合で 12 形すべての値が一致。ただし fnm/fnms の 6 形は ±0 と NaN の符号が実機と異なる。 検証手順と数値は `tools/plugins/dynamics/REPORT.md` §4 を参照。
+- **影響**: 両 engine の FMA 残件は unimpl から消えた (件数は REPORT §4)。 符号差は未解決。 movntps・vmovsd store・ucomis/comis の flag は未対応で、子 issue に分割した。
