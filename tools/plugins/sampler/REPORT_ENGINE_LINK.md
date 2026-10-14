@@ -156,7 +156,7 @@
 - 測定 commit: **`5880a9f6`** (下表の実測はこの commit のコードで行った。 `6769c2c7` の時点で記録された系列)。
 - 解析 HEAD (§9 の逆アセンブル・参照走査): `ba4babca`。 `git diff --stat ba4babca HEAD -- tools/plugins/sampler ':!*.md'` は空 (0 行)。
 - 測定 commit から現 head `c2155cc2` までの測定経路の差分 (`git diff --stat 5880a9f6 HEAD -- tools/plugins/lift tools/plugins/sampler ':!*.md'` = 16 files / 1072 insertions / 30 deletions。 内訳の要点):
-  - `tools/plugins/lift/lift_ranges.sh` (31 行追加・2 行削除) は測定経路に入る (上の訂正参照)。 RetDec 呼出の既定が変わるため、表は HEAD の既定では未測定。
+  - `tools/plugins/lift/lift_ranges.sh` (31 行追加・2 行削除) は測定経路に入る (上の訂正参照)。 RetDec 呼出の既定が変わるため、表は HEAD の既定では未測定 (`sampler_engines.sh` の既定経路は下の行で実測済み)。
   - `tools/plugins/sampler/` の 6 ファイルは別経路 (下の訂正参照)。 sampler 側の stat:
 
 ```
@@ -177,12 +177,13 @@
   - `5880a9f6` (env 未設定): `--select-decode-only --timeout 60` (静的検出の無効化なし)
   - HEAD `8a7f32ba` (env 未設定): `--select-decode-only --disable-static-code-detection --timeout 60`
   - HEAD `8a7f32ba` (`PLUG_NO_STATIC_DETECT=0`): `--select-decode-only --timeout 60` (`5880a9f6` と同一)
-- よって表の実測 (`5880a9f6`) は、HEAD で `PLUG_NO_STATIC_DETECT=0` を立てた経路と RetDec argv が一致する。 HEAD の既定 (静的検出なし) での `sampler_engines.sh` / `sampler_e2e.sh` の結果は未測定。 RetDec の出力差 (define 数・emcc 判定) は RetDec 本体が無いため測れていない。
+- よって表の実測 (`5880a9f6`) は、HEAD で `PLUG_NO_STATIC_DETECT=0` を立てた経路と RetDec argv が一致する。 HEAD の既定 (静的検出なし) での `sampler_engines.sh` は実測済み (下の「既定経路」行)、`sampler_e2e.sh` の既定経路は未測定。
 - 上の 6 ファイル (`closure_unreached.py`・`f80_split.py`・`lea_lift.sh`・`nc2_imm_synth.py`・`unr_nega.sh`・`x87_check.py`) を呼ぶのは `lea_e2e.sh` / `unr_e2e.sh` / `unr_nega.sh` / `unr_lift.sh` (別経路) だけ。 この点はレビュー側の `git grep` 確認と一致する。
-- **再測定は未実施・未解決**: RetDec v5.0 (`toolchain-retdec`) と emsdk (`toolchain-emsdk`) がこの run に無い (`$ARTIFACTS_DIR` は `fl-win64` のみ)。 次の run で `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` を指定し、HEAD で `sampler_engines.sh` と `sampler_e2e.sh` を env 未設定 (既定) で流して表を更新する。 起票先: #540 (本 PR の親 issue)。 それまで §7 の表は「5880a9f6 の実測」として読むこと。
+- **既定経路 (HEAD `PLUG_NO_STATIC_DETECT` 未設定 = 1) の実測**: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` で RetDec (`/opt/retdec`) と emsdk (`/opt/emsdk`) を展開して実行。 `sampler_engines.sh` を 1 回のみ実行 (`sampler_e2e.sh` は未実行)。 結果は下の「既定経路」行。 本 HEAD の表は表と別に読むこと。
+- 既定経路の実行条件: 測定 HEAD `f73bcab0` (本節のみ変更、コード差分 0 で測定経路は `8a7f32ba` と同じ)。 env 未設定。 `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、PATH に `/opt/emsdk/upstream/emscripten`。
 - 上の 6 ファイルの変更 (f80 計数・U6・NC2a/b) は別経路の検証の範囲で、本 REPORT の測定対象外。
 
-以下の表は **`PLUG_NO_STATIC_DETECT=0` 相当 (RetDec argv が `5880a9f6` と同じ経路) の実測** である。 HEAD の既定経路 (`PLUG_NO_STATIC_DETECT` 未設定 = 1、`--disable-static-code-detection` あり) の結果は **未測定**。
+以下の表は **`PLUG_NO_STATIC_DETECT=0` 相当 (RetDec argv が `5880a9f6` と同じ経路) の実測** である。 HEAD の既定経路 (`PLUG_NO_STATIC_DETECT` 未設定 = 1、`--disable-static-code-detection` あり) の `sampler_engines.sh` は下の「既定経路」行に実測を置く (`sampler_e2e.sh` の既定経路は未測定)。
 
 | 項目 | 結果 (実測・`PLUG_NO_STATIC_DETECT=0` 相当) |
 |---|---|
@@ -191,6 +192,7 @@
 | 殻の結線 0x843790〜0x84386a | 逆アセンブル成功 (`disasm_range.py`)、`[obj+0x1c0]` 保存・`[obj+0x1b8]` engine 保存を確認 |
 | 検証 HEAD (記録) | `cb3a89a6` と記載 (§7 冒頭の `5880a9f6` との不整合は下の注記)。 コード変更なし |
 | `sampler_engines.sh` (受入条件 1) | **exit 0・4:59.15 (299 s)**・Maximum RSS 3.52 GB (`/usr/bin/time -v`、2 engine 並列)・終了直後の load average 1.18 (1 分平均)。 `judge engines: PASS 2/2`。 23664: pdata 5,160 / lift_rc 0 / define 5,993 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 23677: pdata 2,355 / lift_rc 0 / define 2,525 / `emcc_c_rc_after_f80` 0 / missing_ref 0。 (23677 は `emcc_c_rc` = 1、`emcc_c_rc_after_fixcmp` = 1、f80 処理後の `emcc_c_rc_after_f80` = 0 で判定を通る。 23664 は `emcc_c_rc` = 0。) ログに `do not know how to soften fp_extend` (final.ll / fixcmp.ll、計 2 件) が出るが、判定は PASS。 原因は未調査 |
+| `sampler_engines.sh` 既定経路 (`PLUG_NO_STATIC_DETECT` 未設定) | **rc 0・4:56.02 (296 s)**・Maximum RSS 3.52 GB・開始時 load 0.70 / 終了直後 load 1.15 (1 分平均)。 `judge engines: PASS 2/2`。 23664: pdata 5,160 / lift_rc 0 / define 5,993 / `emcc_c_rc_after_f80` 0 / missing_ref 0 / missing_define 3。 23677: pdata 2,355 / lift_rc 0 / define 2,525 / `emcc_c_rc_after_f80` 0 / missing_ref 0 / missing_define 1。 (上の `PLUG_NO_STATIC_DETECT=0` 相当の表と比べ、pdata・lift_rc・define・`emcc_c_rc_after_f80`・missing_ref は両 block で一致。 `--disable-static-code-detection` の有無による差は、この 2 block の上の列では観測されなかった) |
 | `sampler_e2e.sh` (受入条件 2、既存 T0/T1 の emcc 退行確認) | **exit 0・14:13.43 (853 s)**・load average 4.80 (5 分平均、run 中盤)。 `judge shells: PASS 7/7` (lift_rc / emcc_c_rc / f80 全 0)。 batch 7 本すべて `rc=0 emcc_c=0 f80=0`。 `ids_crosscheck: 7/7` |
 
 - 注記: 上の数値は本 run の 1 回の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
