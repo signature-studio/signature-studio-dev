@@ -1,6 +1,7 @@
 # M11 × shimx リンク REPORT (CAB-166 / SHX-T1) — 担当 T1
 
 - 日付: 2026-10-10 / 環境: emcc 6.0.12, node v26.10.0 / 再現: `bash tools/m11/m11_e2e.sh` (前提; lift 成果物生成) → **`bash tools/m11/shimx_link/e2e.sh`** (約 40 秒, 常に exit 0)
+- 既知類型との関係: 該当なし。D11 (絶対 VA の i64 定数の切り捨て) と D17 (8B store の 4B 縮小) は wasm32 の幅差を含むが機構は別。本件は外部関数 (shimx) との宣言の型幅の不一致 (詳細は付録 §12)。
 - 書込: `tools/m11/shimx_link/` のみ。`tools/shimx` / `tools/m11` 既存ファイル / `tools/startup` は **読取のみ (差分 0 行)**。一時物は `tools/m11/work/shimx_link/` (gitignore 済)
 - **tools/m11 既存ビルド/実行スクリプトへの差分: なし** (build.sh は M11 のソース `m11_rt.c` `m11_ov.c` と work/ の生成物を無改変で再利用する別系統ビルド)
 
@@ -227,3 +228,9 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 
 - 結論: 旧 main (`46c92356`) で実測した 4 variant (既定・`--ws`・`--midi`・`--ws --midi`) は全て `undefined exported symbol: "_sxt_count"` で rc 1 だった。`sxt_*` を `--trace` 限定にする修正は #2732 (`e7491b4f`、§10.3) で main に入り済み。`--midi` の e2e と `--ws --midi` の boot 基準は測定 commit `397c4161` で確認 (`midi_e2e.mjs` 3/3 PASS、`ws_e2e.mjs` PASS 19 / BOOT init 18 / units 17/942)。
 - 修正前後の表・e2e 実測・起動 KPI・残件: `tools/m11/shimx_link/REPORT_APPENDIX_179.md` (§11.1〜§11.4)。
+
+## 12. midiOutShortMsg の HANDLE 幅 (#1628 SHX-T25): IR 側の正規化 (要約)
+
+- 結論: IR 側の宣言と呼出しを i32 に揃える正規化 (`sx_handle_norm.py`、`build.sh` 2c) で、plain / trace の `signature mismatch` 1 → 0 (測定 commit `e0e35f9a`)。切り詰めは HMIDIOUT の値を変えない。
+- 測定値・修正前の出典と IR 同一性の限界・e2e の範囲: 付録 `REPORT_APPENDIX_1628.md` §12 が正本。fail-closed 化 (`763a599d`) は未測定のため本 PR から外した (付録 §12.4)。
+- 未解決の起票先: IR 生成側の根本 → #2839 `[SHX-T31]`。fail-closed 化の復元と HEAD での再測定 (942 survey・plain の boot 到達点を含む) → #2877 `[SHX-T32]`。
