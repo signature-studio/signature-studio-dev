@@ -49,7 +49,7 @@ lint "$(body 'Refs #2239\n理由: test\n')"
 
 new_case v-closes
 echo "y" >> "$R/src/a.txt"; commit_case v-closes
-lint "$(body 'Closes #2250\n\n| 受入 | 結果 |\n|---|---|\n| 1 | [ ] 未達 |\n')"
+lint "$(body 'Closes #2250\n\n| 受入 | 結果 |\n|---|---|\n| 1 | 未達 |\n')"
 { [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "#2250 型: Closes なのに未達 [ ] を検出" || ng "#2250 型: Closes なのに未達 [ ] を検出 (rc=$RC)"
 
 new_case v-report
@@ -91,8 +91,13 @@ lint "$(body 'Closes #1\n')"
 
 new_case n-sync-exempt
 echo "sync" >> "$R/docs/STATUS.md"; commit_case n-sync-exempt
-OUT="$(cd "$R" && OC_LINT_STRICT=1 bash "$SCRIPT" --base main --head HEAD --body-file "$(body 'Closes #2\n\n| 受入 |\n|---|\n| 1 [ ] |\n')" --title 'docs(status): sync 2026-10-14' 2>&1)"; RC=$?
+OUT="$(cd "$R" && OC_LINT_STRICT=1 bash "$SCRIPT" --base main --head HEAD --body-file "$(body 'Closes #2\n\n| 受入 |\n|---|\n| 1 未達 |\n')" --title 'docs(status): sync 2026-10-14' 2>&1)"; RC=$?
 { [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: docs(status): sync の STATUS のみ PR は (c) 対象外" || ng "ネガ: docs(status): sync の STATUS のみ PR は (c) 対象外 (rc=$RC)"
+
+new_case n-prose-mention
+echo "x" >> "$R/src/a.txt"; commit_case n-prose-mention
+lint "$(body 'Closes #1\n\n背景: #2250 の未達 [ ] 検出を記す。\n')"
+{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: 本文の散文に 未達 や [ ] を書いても違反にしない" || ng "ネガ: 本文の散文に 未達 や [ ] を書いても違反にしない (rc=$RC)"
 
 new_case n-report-250
 sed -i '$ s/.*/changed/' "$R/tools/x/REPORT.md"; commit_case n-report-250
