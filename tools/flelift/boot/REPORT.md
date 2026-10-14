@@ -237,9 +237,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 | 既定 (root 無し・未指定) | 209 | 1,890 / 776 | なし (0x67264b が dispatch(0) = icall-miss で ret 0・`ippsZero_8u` 未適用) | unlifted 0x6a7b70 |
 
 - **機構** (実測): `fle_lifted_s5.c` の `/* 672644 */ mov rax,[0x15e0a48]` の次が `/* 67264b */ call qword ptr [rax]` (`FF 10`・2 byte)。PE の逆アセンブルでも同じ。push される戻り番地は 0x67264d (summary の `ipp.called` の ret はこの値)。呼出時の target は shim 有で `ippsZero_8u` (非 0)、既定経路で 0 (`dispatch(0)`)。終了時の `[0x15e0a48]` は shim 有で 0、既定経路で 0x15F34A0 で、呼出時の値とは一致しない。shim 有で登録が呼出時には効いていたが終了前に 0 へ戻る経路は**推定** (書換え元は未特定)。よって `FLEBOOT_IPP_CHECK` (終了時の 0x15F34A0 を見る) の NG は呼出しの不発を示さない。
-- **#141 (IPP-4 実呼出の採取) / #38 (IPP-10 代替実装)**: boot 209 までの対象は `ippsZero_8u` 1 件のみ。
-- shim 有と negctl の差: `getproc` 511 / 88 (+423)。GetMem・FreeMem もともに +423 (2,314 − 1,891、1,199 − 776)。units は同じだが、shim は実行経路が negctl と同一ではない。+423 の内訳 (どの呼出元か) は未確認。
-- mode 2 (`FLE_IPP=2`) の停止経路 (`ipp_call` の `g_ipp_stop` 分岐) は今回の boot で発火していない (`ipp_stop`=null。発火の確認は未実施)。「非 ippsZero の呼出し 0 件」の結論は `ipp.total` の計数 (停止判定より前に数える) から有効。
+- shim 有と negctl の差: `getproc` 511 / 88、GetMem・FreeMem もともに +423。units は同じだが実行経路は同一ではない (+423 の内訳は未確認)。mode 2 (`FLE_IPP=2`) の停止経路 (`g_ipp_stop`) は未発火 (`ipp_stop`=null・発火の確認は未実施)。「非 ippsZero の呼出し 0 件」は `ipp.total` の計数 (停止判定より前) から有効。
 
 測定は route ごと n=1 (変動の min–max は未測定)。測定 commit `4869ad16` (`fle_boot.mjs` の L101 コメントの訂正のみ。コードを変えた最後の commit)。経緯: `56e515e1` → main 取り込み merge `a0f659bf` (`fle_boot.mjs` に PY-123 の `undo_probe` 出力が入り、結果 JSON に `undo_probe` 項目が増えた。units・GetMem/FreeMem・停止点は不変) → `6b62f031` (REPORT と結果 JSON の再採取) → `4869ad16` (呼出点の訂正)。`4869ad16` で再測定した結果 JSON は `6b62f031` の版とバイト一致。コード差分 `git diff 4869ad16 HEAD -- tools/flelift/x64c.py tools/flelift/boot/fle_boot.c tools/flelift/boot/fle_boot.mjs tools/flelift/boot/build.sh tools/flelift/boot/fle6_measure.sh` は空 (差分 0)。工程秒・RSS・再現コマンドは `REPORT_APPENDIX_2702.md` §A・§B。
 

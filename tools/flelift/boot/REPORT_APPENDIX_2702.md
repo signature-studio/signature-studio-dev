@@ -41,6 +41,8 @@ FLE_IPP=<0|1|2|空> FLE_BOOT_VARIANT=plain node tools/flelift/boot/fle_boot.mjs 
 - 呼出点は `0x67264b`。`fle_lifted_s5.c` の `/* 672644 */ mov rax,[0x15e0a48]` の次が `/* 67264b */ call qword ptr [rax]` (`FF 10`・2 byte)。push される戻り番地は `0x67264d` (`ipp.called` の ret)。0x67264d は呼出点ではない。
 - ippsZero_8u が呼出点 0x67264b から呼ばれたのは root 有の 2 回だけ (shim・ipp2)。mode 2 は非 ippsZero の IPP 呼出しが 0 件で、停止条件に達しなかった (停止経路 `g_ipp_stop` は未発火)。
 - 呼出時の target: shim 有は `ippsZero_8u`、既定経路は 0。既定経路のログ行は `[fleboot][ff] dispatch(0) -> ret 0 (m11 icall-miss 揃え, call site ret=0x67264d)`。
+- **#141 (IPP-4 実呼出の採取) / #38 (IPP-10 代替実装)**: boot 209 までの対象は `ippsZero_8u` 1 件のみ (REPORT §10 から移動)。
+- shim 有と negctl の差の内訳: GetMem・FreeMem の +423 (2,314 − 1,891、1,199 − 776) と `getproc` 511 / 88 の呼出元は未確認。
 
 ## D. 停止点 (root 有・unit 209 の後)
 
