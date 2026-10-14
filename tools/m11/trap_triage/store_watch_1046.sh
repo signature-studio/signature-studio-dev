@@ -6,6 +6,7 @@
 #   終了時に work/obj/boot.o を元の boot_final3.ll から再生成し sw682.o / ov.o を消す (trap で必ず復元).
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
+# emsdk は docs/REFERENCES.md の [EMSDK] (toolchain-emsdk 素材の展開先) を使う。store_watch_682.sh と同じ既定パス。
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 FIX=${M11_FIX_682:-1}; NOTIFY=${M11_NOTIFY_682:-0}
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0} -DM11_OV_CLASSCREATE=${M11_OV_CLASSCREATE:-0} -I."

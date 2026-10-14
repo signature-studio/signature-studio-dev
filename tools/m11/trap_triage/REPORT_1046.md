@@ -118,7 +118,9 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 
 ## 12. 再着手 run (HEAD `cb3a89a6` 起点): 書込み元 store の探索 (途中・結論なし)
 
-- 再現: `m11_gen_ir2.sh` rc 0 (29.0 s) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0 (6.7 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2 と一致。
+- 測定 commit: `cb3a89a6` (本節の計装と §12 の監視結果を取った時点のコード)。
+- 再現 (`cb3a89a6` 時点で実施): `m11_gen_ir2.sh` rc 0 (29.0 s) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0 (6.7 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2 と一致。
+- 現 head での再測定は未実施 (素材 `toolchain-emsdk`・`toolchain-retdec`・`work-m11`・`work-liftdiff` が Actions run に無く、再 build 不可)。`cb3a89a6` → `HEAD` の `tools/m11` 差分は下記。
 - 計装: `trap_triage/watch_addr_1046.c` (監視番地 `0x10a9f910` の固定版。`watch_store_682.c` の `[[g+8]+8]` 監視は使わない) と `trap_triage/store_watch_1046.sh` (`SV_ONLY` で unit を絞れる)。全 store に `m11_sw` を入れる IR は `watch_store_682.py` を流用。
 - 全 942 unit 実行 (監視版): `[aw]` は unit 106 付近まで記録されたが 900 秒の上限で打ち切り。`0x10a9f910` への書込みは unit の前半から多数 (`val=10bd48f0`、`val=537301`、`val=10bb6820` 等)。
 - `SV_ONLY=492` 単独 (監視版): `[aw]` 0 件、survey は `oob 1`。全 unit 実行で見えた書込みは unit 492 単独では起きない。`0x10a9f910` の値は前の unit が共有ヒープに残した状態に依存する。
