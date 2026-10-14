@@ -150,10 +150,10 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 - 再現 (全コマンド共通。`tools/python` で実行):
   ```
   P=$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin
-  T=$(python3 -c 'print(",".join(hex(0xfe2c80+8*k) for k in range(69)))')
+  T=0xfe2c80,0xfe2c88,0xfe2c90,0xfe2c98,0xfe2ca0,0xfe2ca8,0xfe2cb0,0xfe2cb8,0xfe2cc0,0xfe2cc8,0xfe2cd0,0xfe2cd8,0xfe2ce0,0xfe2ce8,0xfe2cf0,0xfe2cf8,0xfe2d00,0xfe2d08,0xfe2d10,0xfe2d18,0xfe2d20,0xfe2d28,0xfe2d30,0xfe2d38,0xfe2d40,0xfe2d48,0xfe2d50,0xfe2d58,0xfe2d60,0xfe2d68,0xfe2d70,0xfe2d78,0xfe2d80,0xfe2d88,0xfe2d90,0xfe2d98,0xfe2da0,0xfe2da8,0xfe2db0,0xfe2db8,0xfe2dc0,0xfe2dc8,0xfe2dd0,0xfe2dd8,0xfe2de0,0xfe2de8,0xfe2df0,0xfe2df8,0xfe2e00,0xfe2e08,0xfe2e10,0xfe2e18,0xfe2e20,0xfe2e28,0xfe2e30,0xfe2e38,0xfe2e40,0xfe2e48,0xfe2e50,0xfe2e58,0xfe2e60,0xfe2e68,0xfe2e70,0xfe2e78,0xfe2e80,0xfe2e88,0xfe2e90,0xfe2e98,0xfe2ea0
   ```
 
-### 実測 (コミット済み `ea3c0c27`・n=1)
+### 実測 (コミット済み `ea3c0c27`・件数のみ)
 
 所要時間は受入判定に使わないため記録しない。出力の件数で再現を確かめた。
 
@@ -161,9 +161,9 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 - `python3 analysis/py71_slot.py "$P" 0x1306300,0x13a5c90,0x15e3d38 16 16`: 出力 178 行。
 - `python3 analysis/py71_callers.py "$P" "$T" 0` (表スキャン・受入 2a/2b の根拠): `[imm]`・`[load]`・`STORE`・`[lea]` 0 件。絶対 8 バイト `0xfe2cf8` の格納 2 件 (VA `0xfe2c30`・`0xfe2ed8`)。
 - `python3 analysis/py71_vtable.py "$P" 0x13063c8 0x714,0x718,0x739,0x794` と `... 0xfe2cf8 ...`: 5.4 の表の値。
-- 差分 0 の証跡 (`git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src`) は「差分 0 の証跡」節。
+- 差分 0 の証跡は本節末尾。
 
-### 差分 0 の証跡
+### 差分 0 の証跡 (§5)
 
 ```
 $ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
@@ -173,7 +173,7 @@ $ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
 ### ネガティブコントロール
 
 - RIP 経路 (正の対照): `python3 analysis/py71_callers.py "$P" 0x1306300 0` → `[load]` 1 件 (`0x11be449`・`mov rcx, [rip+0x147eb0]`)。既知の RIP 参照は検出される。表スキャンの RIP 0 件はこの検出器で見た 0 件。
-- 即値経路: `$RUNNER_TEMP/py71_nc/` (`$RUNNER_TEMP` 下・`tools/**/work/` は使わない) に PE の写しを作り、`0x4074ff` の `mov ecx, 0xa` (`b9 0a 00 00 00`) の即値を `0xfe2c88` (表の 1 要素) に書き換える (差分 3 バイト)。
+- 即値経路: `$RUNNER_TEMP/py71_nc/` (`$RUNNER_TEMP` 下・`tools/**/work/` は使わない) に PE の写しを作り、`0x4074ff` の `mov ecx, 0xa` (`b9 0a 00 00 00`) の即値を `0xfe2c88` (表の 1 要素) に書き換える (差分 3 バイト)。以下を `$RUNNER_TEMP/py71_nc/nc_patch.py` として保存する。
   ```python
   import struct, sys, pefile, capstone
   src, dst = sys.argv[1], sys.argv[2]
@@ -195,7 +195,7 @@ $ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
       off += ins.size
   open(dst, "wb").write(data)
   ```
-  `python3 nc_patch.py "$P" "$RUNNER_TEMP/py71_nc/block00031_PE_nc.bin"` の後、`python3 analysis/py71_callers.py "$RUNNER_TEMP/py71_nc/block00031_PE_nc.bin" "$T" 0` を実行すると `[imm]` は 0 件 → 1 件 (`0x4074ff: mov ecx, 0xfe2c88  [imm]`)。表スキャンの即値 0 件は、この検出器が即値経路で動くことを確かめた上での 0 件。
+  `python3 $RUNNER_TEMP/py71_nc/nc_patch.py "$P" "$RUNNER_TEMP/py71_nc/block00031_PE_nc.bin"` の後、`python3 analysis/py71_callers.py "$RUNNER_TEMP/py71_nc/block00031_PE_nc.bin" "$T" 0` を実行すると `[imm]` は 0 件 → 1 件 (`0x4074ff: mov ecx, 0xfe2c88  [imm]`)。元の PE に同じコマンドを実行すると `[imm]` は 0 件のまま。表スキャンの即値 0 件は、この検出器が即値経路で動くことを確かめた上での 0 件。
 
 ### 5.1 g ← P の経路 (静的)
 
