@@ -36,5 +36,30 @@
       "nonzero_samples": 16380,
       "total_samples": 16384
     }
+  },
+  "presets": {
+    "LD - Analog Crispy Cotton": {
+      "file": "Presets/Factory/Lead/LD - Analog Crispy Cotton.SerumPreset",
+      "preset_file_sha256": "8c4698c31189b5e951fcbf41c8fbcab2ba56c62425737cb84ece28f8981a60c5",
+      "format": {
+        "tag": "IEEE float",
+        "bits": 32,
+        "channels": 2,
+        "sample_rate": 48000
+      },
+      "frames": 8192,
+      "content": "work/content_full (installer 全展開)。state = preset を seed (Init) DOM に重ねた processor_state (host/preset_state.py overlay)",
+      "state": "processor = preset DOM overlay on seed (Init) DOM (preset_state.py overlay)。controller = Init",
+      "midi": "NoteOn pitch=60 block 0 / NoteOff block 24 (既定と同じ)",
+      "command": "bash tools/targets/serum2/host/ref_render.sh <outdir> 60 'tools/targets/serum2/work/content_full/Presets/Factory/Lead/LD - Analog Crispy Cotton.SerumPreset'",
+      "sha256_data": "f94982308a40d62e9917de34dfdc831548c8974d2d0c83745f433ef4d186c1fe",
+      "sha256_file": "1411258156b70c809d01a2f332a524cc09169338bf1c95f72deb366c6e16b940",
+      "metrics": {
+        "peak": 0.165479,
+        "rms": 0.076246,
+        "nonzero_samples": 16378,
+        "total_samples": 16384
+      }
+    }
   }
 }
