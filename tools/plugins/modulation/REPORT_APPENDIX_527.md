@@ -54,6 +54,6 @@
 
 - KERNEL32 の import thunk (`jmp qword ptr [rip+…]`) を経由する呼出を列挙。thunk は殻ごとに求め直す (アドレスは殻で異なる)。
 - `LoadLibraryExW` の呼出は 4 本とも 1 箇所 (FS 0x415b7b / HC・VC・VP 0x4158ab)。`LoadLibraryW` は 4 本とも 9 箇所、`LoadLibraryA` は 1 箇所。
-- `GetProcAddress` の呼出は 4 本とも 10 箇所。そのうち `GetLogicalProcessorInformation` / `GetThreadPreferredUILanguages` / `GetLongPathNameW` など 6 箇所は引数の文字列を取れた (エンジン関係ではない)。残り 4 箇所は引数がラッパー関数 (FS 0x41d450 / 0x418350、VC 0x41d1a0 / 0x4180d0 など) 経由で、文字列を静的に取れていない。
+- `GetProcAddress` の呼出は 4 本とも 10 箇所。そのうち `GetLogicalProcessorInformation` / `GetThreadPreferredUILanguages` / `GetLongPathNameW` など 6 箇所は引数の文字列を取れた (エンジン関係ではない)。残り 4 箇所は引数がラッパー関数 (FS 0x41d450 / 0x418350、VC 0x41d1a0 / 0x4180d0 など) 経由で、文字列を静的に取れていない。ラッパーのアドレスは `engine_shell_gpa.py` の出力には含まれず、出典 (手作業の逆アセンブルか否か) は未記録のため、未検証の値として扱う。
 - 殻内の engine export 名は UTF-16 で入る (ASCII は無し)。FS: `dispatch` 0x2dda92、HC: `DispatchToEngine` 0x2e9722、VC / VP: `VSTPluginMain` 0x2d9dd8 / 0x2db668。engine 名 `Engine_x64.dll` (FS, 0x1a2b58) / `engine_x64.dll` (HC 0x2e9704, VC 0x2e9da4, VP 0x2ecfc4)。
-- 結論: 殻は `LoadLibraryExW(engine_x64.dll)` を 1 箇所で呼び、`GetProcAddress` のラッパー経由で export 名を引く、という構造までは確認。ラッパーに渡る引数の実値 (どの export 名を引くか) と、VST2 engine の `VSTPluginMain` 呼出箇所は未了。受入 5 は未達のまま #527 に残す。
+- 結論 (推定): 殻は `LoadLibraryExW` を 1 箇所で呼び (スクリプトで確認)、その引数が `engine_x64.dll` であること (推定。LoadLibraryExW 行の引数は未取得)、`GetProcAddress` のラッパー経由で export 名を引く、という構造と推定する。ラッパーに渡る引数の実値 (どの export 名を引くか) と、VST2 engine の `VSTPluginMain` 呼出箇所は未了。受入 5 は未達のまま #527 に残す。
