@@ -34,9 +34,12 @@
 
 ## 未読 26 件
 
-REPORT_PY44 の未実装 38 件から、確定 2 件 (`selectTool`・`scrollTo`・PY-56)、読めた 8 件、目視 2 件を除いた残り:
+REPORT_PY44 の未実装 38 件から、確定 2 件 (`selectTool`・`scrollTo`・PY-56)、読めた 8 件、目視 2 件を除いた残り 26 件:
 
-`soloTrack`・`isTrackMuteLock`・`muteTrackLock`・`isTrackSelected`・`selectAll`・`deselectAll`・`getTrackActivityLevelVis`・`getDisplayZone`・`lockDisplayZone`・`liveDisplayZone`・`getLiveLoopMode`・`getLiveTriggerMode`・`getLivePosSnap`・`getLiveTrigSnap`・`getLiveBlockStatus`・`getLiveStatus`・`getLiveBlockColor`・`triggerLiveClip`・`refreshLiveClips`・`incLivePosSnap`・`incLiveTrigSnap`・`incLiveLoopMode`・`incLiveTrigMode`・`liveTimeToBlockNum`・`liveBlockNumToTime`
+`soloTrack`・`isTrackMuteLock`・`muteTrackLock`・`isTrackSelected`・`selectAll`・`deselectAll`・`getTrackColor`・`getTrackActivityLevelVis`・`getDisplayZone`・`lockDisplayZone`・`liveDisplayZone`・`getLiveLoopMode`・`getLiveTriggerMode`・`getLivePosSnap`・`getLiveTrigSnap`・`getLiveBlockStatus`・`getLiveStatus`・`getLiveBlockColor`・`triggerLiveClip`・`refreshLiveClips`・`incLivePosSnap`・`incLiveTrigSnap`・`incLiveLoopMode`・`incLiveTrigMode`・`liveTimeToBlockNum`・`liveBlockNumToTime`
+
+- 件数の内訳: 42 件 (playlist 配列) − 実装済み 4 件 (`trackCount`・`getTrackName`・`setTrackName`・`setTrackColor`) = 未実装 38 件。このうち確定 2・読めた 8・目視 2 を除いて 26 件。
+- `getTrackColor` は REPORT_PY44 の表 (37 行) に行が無い。playlist 配列には存在する (`tools/python/provider/gen/fl_table.c:454`)。PY44 の表の欠落は本 PR では直さず、ここで補う。
 
 ## 検証
 
@@ -47,6 +50,6 @@ REPORT_PY44 の未実装 38 件から、確定 2 件 (`selectTool`・`scrollTo`�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 未読 26 件の戻り値・範囲 code・引数の意味 | C 実装が決まらない | 子 issue (本 PR 作成時に起票・番号は #1971 のコメント参照) |
-| 読めた 8 件の呼び出し先 (`0xd843d0`・`0x12e68a0`・`0xd82c20` ほか) の意味と `-4` ↔ `RANGE` の対応 | 8 件の実装が決まらない | 同上 |
-| 決めた関数の `fl_engine.c` 実装・`provider_check.mjs` 件数更新・mock 差分 0・`all_tools` 48/48 | 受入条件の残り | 同上 |
+| 未読 26 件の戻り値・範囲 code・引数の意味 | C 実装が決まらない | #2026 (PY-61) |
+| 読めた 8 件の呼び出し先 (`0xd843d0`・`0x12e68a0`・`0xd82c20` ほか) の意味と `-4` ↔ `RANGE` の対応 | 8 件の実装が決まらない | #2026 (PY-61) |
+| 決めた関数の `fl_engine.c` 実装・`provider_check.mjs` 件数更新・mock 差分 0・`all_tools` 48/48 | 受入条件の残り | #2027 (PY-62) |
