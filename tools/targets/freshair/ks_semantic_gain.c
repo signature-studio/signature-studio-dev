@@ -78,7 +78,7 @@ static void gen(Case* c) {
 
 static void hexdump(const void* p, size_t n) { const uint8_t* b = p; for (size_t i = 0; i < n; i++) printf("%02x", b[i]); }
 
-static void run(int sc, uint64_t va, Case* c, int perturb, int dump) {
+static void run(int sc, uint64_t va, Case* c, int perturb, int dump, int idx) {
     uint8_t* self = calloc(1, 0x200);
     uint8_t* aud = calloc(1, 0x40);                 /* L/R ptr と n (ctx 相当) */
     float *L = calloc(MAXN + 1, 4), *R = calloc(MAXN + 1, 4);
@@ -94,6 +94,7 @@ static void run(int sc, uint64_t va, Case* c, int perturb, int dump) {
     self[so + 0x78] = (uint8_t)c->first;
     *(float*)(self + so + 0x84) = c->c1; *(float*)(self + so + 0x88) = c->m1;
     *(float*)(self + so + 0x94) = c->c2; *(float*)(self + so + 0x98) = c->m2;
+    if (dump) fprintf(stderr, "M%d %.9g %.9g %.9g %.9g\n", idx, *(float*)(self + so + 0x88), *(float*)(self + so + 0x84), *(float*)(self + so + 0x98), *(float*)(self + so + 0x94));
     if (sc) {
         uint8_t* P = calloc(1, 0xa000); uint8_t* Q = calloc(1, 0x80);
         *(void**)(self + 0x90) = P; *(void**)(P + 0x9f30) = Q;
@@ -117,7 +118,6 @@ static void run(int sc, uint64_t va, Case* c, int perturb, int dump) {
         *(float*)(Q + 0x28) = c->q28;
         Q[0x5c] = (uint8_t)c->dl; Q[0x7c] = (uint8_t)c->dr;
         *(int**)(V + 0x68) = vec; *(int**)(V + 0x70) = vec + 16;
-        if (dump) fprintf(stderr, "M %.9g %.9g %.9g %.9g\n", *(float*)(self + so + 0x88), *(float*)(self + so + 0x84), *(float*)(self + so + 0x98), *(float*)(self + so + 0x94));
         ((fn_t)va)(self, ctx, aud);
         int np = (int)(*(int**)(V + 0x68) - vec);
         printf("%d ", np);
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
         Case c; memset(&c, 0, sizeof c);
         gen(&c);
         printf("C%d n=%d mode=%d first=%d dl=%d dr=%d ", i, c.n, c.mode, c.first, c.dl, c.dr);
-        run(sc, va, &c, perturb && !sc, dump);
+        run(sc, va, &c, perturb && !sc, dump, i);
     }
     return 0;
 }

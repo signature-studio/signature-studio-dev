@@ -93,16 +93,18 @@
 
 ### §A3-3. meter (m1・m2) 更新式の照合 (#1467 FA-20, 実測)
 
-- 測定 commit: `37c8193d` (ハーネスに `METER_DUMP=1` 時の stderr 出力と `ks_meter_replay.py` を追加。stdout は不変)。`git diff 37c8193d HEAD -- tools/targets/freshair/*.c tools/targets/freshair/*.py tools/targets/freshair/*.sh` は本節の commit までで 0 行。
-- 再現: `cc -O1 -ffp-contract=off -o h tools/targets/freshair/ks_semantic_gain.c -lm` → `./h sc <SlateCore> 200 7 > sc.txt`・`./h kh <HeartCore> 200 7 > kh.txt` → `python3 ks_meter_replay.py sc.txt kh.txt`。逆アセンブルは capstone 5.0.7 (SC 0x180afe090・KH 0x1804b0380 の先頭 900 命令)。
+- 測定 commit: 本節の再計算 (`ks_meter_replay.py` の漸化式再計算) は **未実測**。`37c8193d` の時点では漸化式を計算しておらず、実機の数値は持たない。本 commit でハーネスに SC 側の `M<i>` 行 (実行前 m1/c1/m2/c2、`METER_DUMP=1`) を追加し、`ks_meter_replay.py` に再計算を実装した (stdout は不変)。
+- 再現: `cc -O1 -ffp-contract=off -o h tools/targets/freshair/ks_semantic_gain.c -lm` → `METER_DUMP=1 ./h sc <SlateCore> 200 7 > sc.txt 2> sc_m.txt`・`METER_DUMP=1 ./h kh <HeartCore> 200 7 > kh.txt 2> kh_m.txt` → `python3 ks_meter_replay.py sc.txt kh.txt sc_m.txt kh_m.txt`。逆アセンブルは capstone 5.0.7 (SC 0x180afe090・KH 0x1804b0380 の先頭 900 命令)。
+- 素材: `SlateCore.core_64` (`work/win/Fresh Air/`) と `HeartCore.core_64` (`tools/targets/kilohearts/work/winpkg/`) が要る。`fl-win64` には含まれない (`tar --zstd -tf` で確認)。`oc_artifacts: fl-win64 work-liftlib-targets` での再実行が必要。
 - 実測 (`37c8193d`、nproc=4): ハーネス 2 本で 0.053 s real、load 0.08 (測定時)。`ks_semantic_gain_cmp.py` = `{"cases": 200, "bit_exact_LRS": 127, "mismatch_L": 73, "mismatch_R": 73, "mismatch_S": 48, "notify_count_mismatch": 0}` (§A3 と一致)。
 - meter 更新式 (両側同形): ループ内で `m = (s*s - m)*c + m` (`mulss` → `subss` → `mulss` → `addss`)。対応 (SC = KH + 0x38): m1 `0x88`⇄`0xc0`・c1 `0x84`⇄`0xbc`、m2 `0x98`⇄`0xd0`・c2 `0x94`⇄`0xcc`。SC `0x180afe1b4`〜`0x180afe1e2`、KH `0x1804b04a1`〜`0x1804b04f2`。
 - 初期値 (m1・m2・c1・c2) は 200/200 一致。
-- 出力 L/R から同じ式を float32 で再計算すると、自側の state (m1 `0x88`・m2 `0x98`) と **SC 199/199・KH 199/199 で一致** (n>0 の case)。式が再現できる。
+- 出力 L/R から同じ式を float32 で再計算して自側の state (m1 `0x88`・m2 `0x98`) と比べる処理は `ks_meter_replay.py` に実装済み (`recalc_SC` / `recalc_KH` を JSON に出力)。**実測は未実施** (素材不足)。前版の「SC 199/199・KH 199/199 で一致」は、その時点のコードでは再現できなかったため取り下げる。式が再現するかは未確定。
+- 合成データでの動作確認 (実機ではない): 既知の m から式で作った state を入れると一致 1/1、1 ケースに 1e-6 のずれを入れると不一致 1/1 と判定される (`replay` の判定が機能することのみを確認)。
 - meter 不一致 (state 比較): m1 28 件・m2 35 件。`ks_meter_replay.py` の内訳: `m1_mismatch_with_L_identical` 0・`m2_mismatch_with_R_identical` 0。つまり meter 不一致は全て対応する出力チャネル (L/R) の不一致と同じ case に出る。
 - `cur` 一致かつ meter 不一致 30 件 (§A3-2 の 30 件と同じ) は、全て L/R 出力の差からの伝播として説明できる。
 - L 差の内訳: `cur` 不一致 18 件・`cur` 一致 55 件 (`cur` が一致するのに L が違う case がある)。
 - 例 case 3: 出力 L の index 2 のみが 1 ulp ずれ (SC -0.4080760180950165 / KH -0.4080759882926941)、以降の差は同じ起点から伝播。
 - **判定 (受入条件 1 は未達)**: ずれる式は **meter 更新式には見つからなかった**。meter 差は L/R 差の伝播で、式そのものの差ではないと読む。
-- 未確定: L 差の起点。`cur` の逐次値 (ramp の丸め順) の bit 単位照合が未了。harness は逐次 `cur` を出力しないため、そのままでは確定できない。起票先 → 子 issue (ramp 逐次値のダンプと照合)。
+- 未確定: L 差の起点。`cur` の逐次値 (ramp の丸め順) の bit 単位照合が未了。harness は逐次 `cur` を出力しないため、そのままでは確定できない。起票先 → #1617 [FA-23] (ramp 逐次値のダンプと照合)。
 - 受入条件 3 (本節の追記) は本 commit で満たす。受入条件 2 (単体再現で 30 件を説明) は「meter 式は同一・30 件は L/R 伝播」まで。L 差の起点の説明は未了。
