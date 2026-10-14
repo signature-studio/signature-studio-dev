@@ -62,7 +62,7 @@
 | `deploy/EDGE-SIM.md` | ~30 | edge-sim の調整一覧 |
 | `tools/e2e/REPORT.md` | ~120 | ブラウザ E2E ハーネスと配信構成の実測 |
 | `tools/hosting/REPORT.md` | ~135 | 既定ホスト名だけで COOP/COEP を成立させる配信構成 (案 S の根拠) |
-| `tools/legal/REPORT.md` | ~105 | LGL-6 (#89): Massive X (`.exe` 展開不能・`.dmg` に文書無し) / Fresh Air (同梱 EULA はファイル名判定で無し) の同梱 EULA 再測定 (2026-10-14)・Xfer 公式規約ページの取得結果。LEGAL.md §7 の実測値の正本 |
+| `tools/legal/REPORT.md` | ~140 | LGL-6 (#89): Massive X (`.exe` 展開不能・`.dmg` に文書無し) / Fresh Air (同梱 EULA はファイル名判定で無し) の同梱 EULA 再測定 (2026-10-14)・Xfer 公式規約ページの取得結果。LEGAL.md §7 の実測値の正本 |
 | `tools/legal/release-guard/REPORT.md` | ~75 | release guard (LGL-2): 公開前に dist を走査し FL/プラグイン由来バイト列を検出して失敗させる deny-list ゲート |
 | `tools/legal/terms-watch/REPORT.md` | ~145 | terms-watch (LGL-5): 各社 EULA/ToU の取得 (Xfer は NSIS インストーラのヘッダから)・正規化ハッシュ比較・台帳更新・差分時非ゼロ終了 |
 | `tools/legal/notices/REPORT.md` | ~110 | THIRD_PARTY_NOTICES 自動生成 (LGL-3): OSS 再ビルド記録 (upstream 版・configure 引数・パッチ) + FL 同梱表記 15 本 + フォント一覧から NOTICES を生成し、記録なしの同梱 OSS を CI/stage ゲートで検出 |

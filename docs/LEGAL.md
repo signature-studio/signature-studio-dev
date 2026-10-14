@@ -188,7 +188,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - 技術側: HeartCore に PACE iLok/Eden + Kilohearts 独自 LicenseManager (`TGT/kilohearts/REPORT.md` §5)。ライセンス層の扱いは方針事項 (同 REPORT §7・KH-8)。
 
 ### 4.3 Slate Digital (Fresh Air) — `[SLATE-ToS]` (オンライン・非同梱)
-- Fresh Air のインストーラ/zip に **EULA は含まれない** (ファイル名判定。`tools/legal/REPORT.md` §2)。同梱 User Guide は "An iLok license is required to use Fresh Air. … Fresh Air will not function without a valid license" (`TGT/freshair/work/guide.txt` 相当、PDF p.5, p.11)。
+- Fresh Air のインストーラ/zip には、ファイル名判定では **EULA は含まれない** (`tools/legal/REPORT.md` §2)。同梱 User Guide は "An iLok license is required to use Fresh Air. … Fresh Air will not function without a valid license" (`TGT/freshair/work/guide.txt` 相当、PDF p.5, p.11)。
 - 公式 ToS (Audiotonix General Terms of Use; 契約主体は地域で Slate Digital LLC / Audiotonix Group Ltd / Klang Technologies GmbH、準拠法 California / England & Wales / Germany):
   - §3.1: "Each license is to be used by only one (1) person and cannot be shared."
   - §6: "copy, modify, host, stream, sublicense, or resell the Services and Software"; "…as a part of a hosted service, or on behalf of any third party"; "circumvent any access or use restrictions"; "data scraping for machine learning".
