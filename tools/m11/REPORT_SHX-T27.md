@@ -66,11 +66,11 @@
 
 - 測定 commit: `5d167ecd624185d98140f4d7bb641484a8ff3de2` (コード差分の最終 commit。commit 済み・clean)。
 - 測定の場所: `git worktree add --detach work/wt_verify 7738ce46` (main の作業ツリーは使わない)。素材 `work-m11.tar.zst` を worktree 直下に `tar --zstd -xf` で展開 (`tools/m11/work/` 233 エントリ・gitignore)。測定後 `git worktree remove --force work/wt_verify` で後始末する。
-- 鮮度 (§6 形式): `git diff 5d167ecd 7738ce46 -- tools/m11 tools/shimx --stat` の出力は次のとおり。
+- 鮮度 (§6 形式): `git diff 5d167ecd 7738ce46 -- tools/m11 tools/shimx --stat` の出力は次のとおり (測定 HEAD `7738ce46`)。
 
 ```
  tools/m11/REPORT_SHX-T27.md | 68 +++++++++++++++++++++++++++++++++
  1 file changed, 68 insertions(+)
 ```
 
-- 上記は本 REPORT 自身の追加 (68 行) のみで、コード差分は 0。
+- 上記の後に REPORT 自身を修正した commit (`4ec4dfae`) を積んだ。`git diff 5d167ecd HEAD -- tools/m11 tools/shimx` は `tools/m11/REPORT_SHX-T27.md` のみで、コード差分は 0。
