@@ -71,7 +71,7 @@ python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408
 
 ## 8. (b) 二分探索の結果 (#1597・部分達成・候補区間)
 - 測定 commit: 各行の commit ごとに `git archive <commit> tools/m11 tools/shim tools/shared` を展開し、work-m11 の lift 成果物から IR を再生成 (`m11_gen_ir2.sh`, `M11_LDFIX=1`, `M11_QSTORE=0`) → `m11_build.sh` → `m11_survey.mjs`。PE は fl-win64 の `block00031_PE.bin` (sha256 `b2c64da4…`)。n=1。4 vCPU。load 0.8〜1.3。
-- 対象列: `git rev-list --first-parent d6a17b64..origin/main -- tools/m11 tools/shim tools/shared` の 221 件 (`4c3f7458` 時点の main 上)。
+- 対象列: `git rev-list --first-parent d6a17b64..4c3f7458 -- tools/m11 tools/shim tools/shared` の 221 件 (終端は測定 commit `4c3f7458` に固定。`origin/main` は後から進むため使わない)。下表の `c2936605`・`8afdc9e1`・`5ee72b93` はこの列の外 (側枝 commit。`d6a17b64..4c3f7458` の祖先ではあるが first-parent の path 絞りに出ない) で、測定の参考として載せる。表の行順は時系列ではない (`035274be` は列内、`c2936605` は側枝で、PE 修正の説明の順に並べた)。
 - 実測 (survey の ok/miss/trap) は下表の **個別測定 18 commit** のみ。未測定の commit は表に含めない (下記の注意 4)。
 
 | commit | ok | miss | trap | 備考 |
