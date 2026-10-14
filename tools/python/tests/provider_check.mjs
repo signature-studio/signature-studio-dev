@@ -31,16 +31,18 @@ const stub89 = new Set(["channels.getChannelIndex", "channels.getChannelMidiInPo
 // PE で状態読出しと確認した ui ゲッター 9 件 (REPORT_PY95・PY-95 #2831)。値は未実測の仮置き、tests/ui_state_diff.mjs が mock と照合
 const pe95 = new Set(["ui.isClosing", "ui.getTimeDispMin", "ui.isMetronomeEnabled", "ui.isPrecountEnabled", "ui.isStartOnInputEnabled",
   "ui.isLoopRecEnabled", "ui.getStepEditMode", "ui.isBrowserAutoHide", "ui.getSnapMode"]);
+// PE 0xd5ec60 で取得式を確定した 1 関数 (REPORT_PY115 §2・PY-115 #2951)
+const pe115 = new Set(["mixer.getTrackColor"]);
 let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || stub41.has(id) || stub89.has(id) || pe87.has(id) || pe95.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || stub41.has(id) || stub89.has(id) || pe87.has(id) || pe95.has(id) || pe115.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + stub 確定 6 (stub41) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 9 (pe95)
-assert.equal(impl, 92); assert.equal(unimpl, 343);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + stub 確定 6 (stub41) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 9 (pe95) + PE 確定 1 (pe115)
+assert.equal(impl, 93); assert.equal(unimpl, 342);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
