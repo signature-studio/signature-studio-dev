@@ -5,13 +5,13 @@
 
 ## 結論
 
-- 受入条件 1 (3 箇所の対象構造体の同定) は**部分達成**。`0xec7bb8`・`0xec6098` は、書込み先 `this` を持つ関数 (`0xec7840`・`0xec53b0`) まで特定した。`0xdd2002` は `0xdd1fa0` 関数内で `this` (`[rbp+0x60]`) が引数 `rcx` と判明したが、型は未同定。
+- 受入条件 1 (3 箇所の対象構造体の同定) は**部分達成**。`0xec7bb8`・`0xec6098` は、書込み先 `this` を持つ関数 (`0xec7840`・`0xec53b0`) まで特定した。`0xdd2002` は `0xdd1fa0` 関数内で `this` (`[rbp+0x60]`) を引数 `rcx` で初期化するが、`0xdd1fde` で `0x410320` の戻り値に再代入される (呼び出し元 14 件はすべて `dl!=0` で、この経路に入る)。型は未同定。
 - 受入条件 2 (幅不一致の扱い) は**未達**。同一構造体の同一フィールドか、別構造体の同オフセットかは、型名が決まらないと確定できない。
 
 ## 測定条件
 
-- 素材: `fl-win64.tar.zst` → `extracted/block00031_PE.bin` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`、実測 2.8 秒・22,227,016 B)。展開先は `tools/python/work/py59/` (gitignore)。
-- 測定 commit: 本 PR の commit (解析スクリプト `tools/python/analysis/py59_func.py`・`py59_callers.py` を追加)。
+- 素材: `fl-win64.tar.zst` → `extracted/block00031_PE.bin` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`、22,227,016 B)。展開先は `tools/python/work/py59/` (gitignore)。展開の実測は 2 回: 2.27 秒 (cfc80969 の再測定)・2.86 秒 (レビュー側の再測定)。
+- 測定 commit: `2f115b91` (解析スクリプト `tools/python/analysis/py59_func.py`・`py59_callers.py` を最後に変えた commit)。`git diff 2f115b91 HEAD -- tools/python/analysis` の出力は 0 行 (差分 0)。後続 `cfc80969` は本 REPORT の文言修正のみ。
 - 関数範囲は `.pdata` (RUNTIME_FUNCTION・PE 例外テーブル) から取る。実測: 57,816 件。`int3` 区切りや線形復号による推定は、途中の不正命令で境界がずれたため使わなかった (後述 §4)。
 - 解析スクリプト:
   - `tools/python/analysis/py59_func.py <PE.bin> <VA> [dump]` — VA を含む関数範囲 (`.pdata`) と、必要なら関数全体の逆アセンブル。
@@ -22,7 +22,7 @@
 
 | 書込み | 関数 (`.pdata`) | `this` の由来 | 関数の呼び出し元 |
 |---|---|---|---|
-| `0xdd2002` `mov qword [rax+0x79c],rcx` | `0xdd1fa0..0xdd2124` (0x184) | 引数 `rcx` を `[rbp+0x60]` に退避。`rax=[rbp+0x60]` | `0xe39e2f` 他 14 箇所 (`call`) |
+| `0xdd2002` `mov qword [rax+0x79c],rcx` | `0xdd1fa0..0xdd2124` (0x184) | 引数 `rcx` を `[rbp+0x60]` に退避。`0xdd1fde` で `[rbp+0x60]` を `0x410320` の戻り値で再代入 (`dl!=0` のとき。`dl==0` なら rcx のまま)。`rax=[rbp+0x60]` | 計 14 箇所 (`0xe39e2f` を含む・全件 `call`。全件で呼出し直前 8 命令の窓内に `mov dl, 1` があり、窓内で dl を書く命令はそれだけ) |
 | `0xec7bb8` `mov dword [rax+0x79c],esi` | `0xec7840..0xec7d68` (0x528) | 引数 `rcx` を `[rbp+0x48]` に退避。`rax=[rbp+0x48]` | `0xec7716`・`0xec7f79`・`0xec8002`・`0xec8063` |
 | `0xec6098` `mov dword [rax+0x79c],ecx` | `0xec53b0..0xec61dc` (0xe2c) | 引数 `rcx` を `[rbp+0x120]` に退避。`rax=[rbp+0x120]` | `0xebf564` 1 箇所 (ラッパー `0xebf510`) |
 
@@ -32,7 +32,7 @@
 
 ## 2. 幅不一致の扱い (推定)
 
-- `0xec6098` (dword) と `0xec7bb8` (dword) は、`+0x79c` を dword で書く。`0xffa6d0` と chan 生成 (`0xdc1540`・`0xdc107f`・`0xdbe405`) は `+0x79c` を byte で読み書きする。
+- `0xec6098` (dword) と `0xec7bb8` (dword) は、`+0x79c` を dword で書く。`+0x79c` を byte で読むのは `0xffa6d0` (`cmp byte [rcx+0x79c],0` の読出しのみ)、byte で書くのは chan 生成 (`0xdc1540`・`0xdc107f`・`0xdbe405`、書込みのみ)。
 - `0xdd2002` (qword) は `0xdd1fa0` で qword として読み、`cmp qword [rax+0x79c],0` で判定する。
 - **結論 (推定)**: `+0x79c` は `0xdd1fa0` 系 (qword) と、`0xec53b0`・`0xec7840` 系 (dword) の**少なくとも 2 種類**の `this` に現れる。`0xec6098`・`0xec7bb8` は同じ `this` レイアウト (`+0x7e0`・`+0x7e8`・`+0x7f4` が共通) を持つ可能性があり、`0xdd1fa0` とは別物と見られる。ただし型名は未同定のため、確定ではない。
 
@@ -46,6 +46,7 @@
 
 - `int3` 区切りと線形復号による関数先頭の推定は、`0xec7bb8` で失敗した (逆アセンブル開始位置がずれ、`0xec6bb8` の誤表示も出た)。
   以後は `.pdata` (`py59_func.py`) で範囲を取る。`REPORT_PY55.md` の `py55_fieldwrites.py` が出す偽陽性 (命令の途中から読んだ誤命令) は、本件でも同じ条件で出うる。
+- `py59_callers.py` は E8/E9 のバイト列走査のため、単独では命令境界を保証しない。§1 の呼び出し元の件数は、逆アセンブルで命令境界上の `call` と照合して全件一致を確認した。
 
 ## 5. 未解決
 
