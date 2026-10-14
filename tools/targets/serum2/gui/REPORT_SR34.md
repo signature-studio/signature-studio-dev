@@ -73,6 +73,6 @@ venv/bin/python $P/indirect_calls.py Serum2_win64.vst3 0x180a24158 0x28
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (A) `call [reg+0x60]` / `call [reg+0x28]` (rip 除外後の件数を含む) のうち、SerumDSP object 由来のものの絞り込み (getter `0x180002a80` / `0x180002c70` の呼出元を含む) | 受入 1・2 | PR #2113 本文の未解決表 (解析の続き。子 issue は未起票) |
-| (B) `.rdata` 4 byte 表 `0x180ff0400` の参照経路 (間接 base 参照の特定) と `0x18004ffc0` の到達 | 受入 3・4 | PR #2113 本文の未解決表 (同上) |
+| (A) `call [reg+0x60]` / `call [reg+0x28]` (rip 除外後の件数を含む) のうち、SerumDSP object 由来のものの絞り込み (getter `0x180002a80` / `0x180002c70` の呼出元を含む) | 受入 1・2 | PM 判断 (未起票。解析の続きで子 issue は未起票) |
+| (B) `.rdata` 4 byte 表 `0x180ff0400` の参照経路 (間接 base 参照の特定) と `0x18004ffc0` の到達 | 受入 3・4 | PM 判断 (未起票。同上) |
 | (C) 実 VSTGUI 上の動的確認 | SR-30 受入 4 と同じ | `#68` 残作業 (GUI lift 時) |
