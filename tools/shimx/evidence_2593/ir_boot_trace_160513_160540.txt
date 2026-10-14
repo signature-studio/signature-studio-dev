@@ -1,0 +1,28 @@
+define weak i64 @function_457c40(ptr %arg1, ptr %arg2, i64 %arg3) local_unnamed_addr {
+dec_label_pc_457c40:
+  %0 = ptrtoint ptr %arg1 to i64
+  %1 = add i64 %0, 40
+  %2 = inttoptr i64 %1 to ptr
+  %3 = load i64, ptr %2, align 8
+  %4 = icmp eq i64 %3, 0
+  br i1 %4, label %dec_label_pc_457c67, label %dec_label_pc_457c56
+
+dec_label_pc_457c56:                              ; preds = %dec_label_pc_457c40
+  %5 = inttoptr i64 %3 to ptr
+  %6 = call ptr @__sxt_GetProcAddress(ptr %5, ptr %arg2)
+  %7 = ptrtoint ptr %6 to i64
+  %8 = icmp eq ptr %6, null
+  %9 = icmp eq i1 %8, false
+  %spec.select = select i1 %9, i64 %7, i64 %arg3
+  ret i64 %spec.select
+
+dec_label_pc_457c67:                              ; preds = %dec_label_pc_457c40
+  ret i64 %arg3
+
+}
+
+define weak i64 @function_457c70() local_unnamed_addr {
+dec_label_pc_457c70:
+  %stack_var_-56 = alloca [7 x i64], align 8
+  %0 = call ptr @__sxt_GetModuleHandleW(ptr getelementptr inbounds ([13 x i16], ptr inttoptr (i64 360204 to ptr), i64 0, i64 0))
+  %1 = call i64 @function_457c40(ptr nonnull %stack_var_-56, ptr getelementptr inbounds ([20 x i8], ptr inttoptr (i64 360230 to ptr), i64 0, i64 0), i64 4551360)

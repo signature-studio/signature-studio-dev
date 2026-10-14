@@ -1,0 +1,19 @@
+
+m11_sx_trace_soft_fix.cjs.wasm:	file format wasm
+
+Disassembly of section CODE:
+
+001be9bb <function_457c40>:
+        .local i64, i32, i64, i32, i32
+  1be9d0:      	loop    	unknown_type            # label0:
+  1be9d2:      	memory.grow	32
+  1be9d4:      	loop    	invalid_type            # label1:
+  1be9d6:      	unreachable
+  1be9d7:      	i64.eq  
+  1be9d8:      	i32.const	1
+  1be9da:      	i32.and 
+  1be9db:      	br_if   	0                       # 0: up to label1
+  1be9dd:      	local.get	3
+  1be9df:      	i32.wrap_i64
+  1be9e0:      	local.get	1
+  1be9e2:      	call	16650
