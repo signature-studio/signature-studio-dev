@@ -222,7 +222,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 - 取り込み (3 回目)。`origin/main` (`8fd940bb`) を merge (`5b35c23b`)。競合は `tests/provider_check.mjs` の 1 箇所だけ。main 側は PY-121 (#2985) の `pe121` (`screen.isBlanked` ほか 5 関数)、本 PR は `pe102` (`playlist.muteTrackLock`)。両方を集合に入れ、件数は main の `impl 97・unimpl 338` に `pe102` の +1 を加えて `impl 98・unimpl 337` (合計 435 は不変)。`provider/fl_engine.c`・`host/fl_mock.mjs`・`flapi_table.json`・`flapi_table.py`・`gen/fl_table.c` は自動マージで衝突なし。
 - 測定 commit: `5b35c23b` (コードを変えた最後の commit)。`git diff 5b35c23b HEAD -- tools/python ':!tools/python/REPORT_PY102.md'` は 0 行 (本節の追記だけが差分)。
 - 素材: `fl-win64` の 5 block (`block00031_PE`・`block24429_DATA`・`block24430_DATA`・`block25159_DATA`・`block24618_DATA`) を `$RUNNER_TEMP/fl-win64/extracted/` へ展開 (2.804 s)。`FL_WIN64_DIR` でこれを指した。`fetch_inputs.sh` で `work/` を作成 (stubs は git clone)。`toolchain-emsdk` は本 run の素材に無い。
-- emsdk: 上流 `emsdk install 6.0.12` (`$RUNNER_TEMP/emsdk`) を `activate` し、`/opt/emsdk` へ symlink した (`build_cpython_wasm.sh` が既定位置を直書きするため。[EMSDK])。
+- emsdk: 上流 `emsdk install 6.0.12` を導入して `activate` し、[EMSDK] の既定位置へ symlink した (`build_cpython_wasm.sh` が既定位置を直書きするため)。
 - CPython wasm: 本 run で `build_cpython_wasm.sh` を実行 (21:59:55 → 22:04:34、exit 0)。CPython 側のソースは変えていない。
 
 | 検証 | 実行 | 結果 | 所要 |
