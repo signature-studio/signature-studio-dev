@@ -78,7 +78,7 @@ static void gen(Case* c) {
 
 static void hexdump(const void* p, size_t n) { const uint8_t* b = p; for (size_t i = 0; i < n; i++) printf("%02x", b[i]); }
 
-static void run(int sc, uint64_t va, Case* c, int perturb) {
+static void run(int sc, uint64_t va, Case* c, int perturb, int dump) {
     uint8_t* self = calloc(1, 0x200);
     uint8_t* aud = calloc(1, 0x40);                 /* L/R ptr と n (ctx 相当) */
     float *L = calloc(MAXN + 1, 4), *R = calloc(MAXN + 1, 4);
@@ -117,6 +117,7 @@ static void run(int sc, uint64_t va, Case* c, int perturb) {
         *(float*)(Q + 0x28) = c->q28;
         Q[0x5c] = (uint8_t)c->dl; Q[0x7c] = (uint8_t)c->dr;
         *(int**)(V + 0x68) = vec; *(int**)(V + 0x70) = vec + 16;
+        if (dump) fprintf(stderr, "M %.9g %.9g %.9g %.9g\n", *(float*)(self + so + 0x88), *(float*)(self + so + 0x84), *(float*)(self + so + 0x98), *(float*)(self + so + 0x94));
         ((fn_t)va)(self, ctx, aud);
         int np = (int)(*(int**)(V + 0x68) - vec);
         printf("%d ", np);
@@ -136,12 +137,13 @@ int main(int argc, char** argv) {
     int nc = atoi(argv[3]);
     rng = (uint32_t)strtoul(argv[4], 0, 0) * 2654435761u + 12345u; if (!rng) rng = 1;
     int perturb = getenv("PERTURB") && getenv("PERTURB")[0] == '1';
+    int dump = getenv("METER_DUMP") && getenv("METER_DUMP")[0] == '1';
     map_pe(argv[2]);
     for (int i = 0; i < nc; i++) {
         Case c; memset(&c, 0, sizeof c);
         gen(&c);
         printf("C%d n=%d mode=%d first=%d dl=%d dr=%d ", i, c.n, c.mode, c.first, c.dl, c.dr);
-        run(sc, va, &c, perturb && !sc);
+        run(sc, va, &c, perturb && !sc, dump);
     }
     return 0;
 }
