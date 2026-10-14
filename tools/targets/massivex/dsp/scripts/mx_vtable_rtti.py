@@ -45,18 +45,21 @@ def main():
         name = cstr(td + 0x10)  # TypeDescriptor: pVFTable(8) spare(8) name[]
         print('vtable 0x%x  COL=0x%x sig=%d offset=0x%x cdOffset=0x%x' % (vt, col, sig, off, cdoff))
         print('  type = %s' % name)
+        # RTTIClassHierarchyDescriptor: signature(+0) attributes(+4) numBaseClasses(+8) pBaseClassArray(+12, RVA)
         cd = IB + cdrva
-        numbase = u32(cd + 4)
+        numbase = u32(cd + 8)
         arr = IB + u32(cd + 12)
         for i in range(numbase):
+            # RTTIBaseClassDescriptor: pTypeDescriptor(+0, RVA) numContainedBases(+4) mdisp(+8) pdisp(+12) vdisp(+16) attributes(+20)
             bcd = IB + u32(arr + 4 * i)
             btd = IB + u32(bcd)
-            print('  base[%d] = %s  (mdisp=%d pdisp=%d vdisp=%d attr=%d)' % (
+            print('  base[%d] = %s  (numContained=%d mdisp=%d pdisp=%d vdisp=%d attr=%d)' % (
                 i, cstr(btd + 0x10),
-                struct.unpack('<i', rd(bcd + 4, 4))[0],
+                u32(bcd + 4),
                 struct.unpack('<i', rd(bcd + 8, 4))[0],
                 struct.unpack('<i', rd(bcd + 12, 4))[0],
-                u32(bcd + 16)))
+                struct.unpack('<i', rd(bcd + 16, 4))[0],
+                u32(bcd + 20)))
 
 
 if __name__ == '__main__':

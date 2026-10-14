@@ -10,8 +10,9 @@
 
 **PR #1422 の候補「partial vtable 0x1839761b8 の slot 9 = process」は、前提が崩れたため棄却する。**
 
-- partial vtable 0x1839761b8 は **`MassiveXAudioClass` の副 vtable (this offset 0x80)** で、IAudioProcessor の vtable ではない
-  (RTTI COL の型名は両方とも `.?AVMassiveXAudioClass@@`・基底は自分のみ)。
+- partial vtable 0x1839761b8 は **`MassiveXAudioClass` の副 vtable (this offset 0x80)** と読める (COL の型名 `.?AVMassiveXAudioClass@@` の読みは #1565 レビューで確認済み)。
+  基底の一覧は RTTI 構造体オフセットの誤り (§3) により**未検証**で、「基底は自分のみ」は撤回する。
+  IAudioProcessor の vtable ではないという結論は、基底一覧の再測定 (§2) で確定させる。
 - したがって partial slot 9 を IAudioProcessor の process とみなす根拠は無い。
 - slot 9 本体 (0x1800119c0) は ProcessData (rdx) を読まず (`xor edx, edx` で上書き)、process の形ではない。
 
@@ -24,18 +25,20 @@ RTTI の COL 走査で探すこと (§4)。
 |---|---|---|
 | 主 vtable 0x183976038 の slot 0〜11 | 0x180017f60 / 0x18002a6c0 / 0x1800dd0e0 / 0x1800de4a0 / 0x180011450 / 0x1800114e0 / 0x180011830 / 0x1800118f0 / 0x1800119a0 / 0x1800119c0 / 0x180011980 ほか | `dsp/scripts/mx_slot_probe.py` |
 | 各 slot 本体の `[rdx+disp]` 集計 (max 400 insn) | 0 件 (slot 0,1,2,3,4,6,8,9,10)。slot 5・7 で `[rdx+0x70]` が 1 件 (`lea` 直後の関数 post 処理) | `dsp/scripts/mx_slot_body.py` |
-| 0x1839761b8 (partial) を RIP 相対で参照する命令 | 0x18000e58e (`lea rax,[rip+...]; mov [rcx+0x80],rax`) / 0x18000e924 | `dsp/scripts/mx_vtable_xref.py` (43 s) |
-| 0x183976038 (主) を参照する命令 | 0x18000e580 (`mov [rcx],rax`) / 0x18000e91a | 同上 |
-| RTTI (COL) | 両 vtable とも COL 型名 `.?AVMassiveXAudioClass@@`・offset 0x0 / 0x80 | `dsp/scripts/mx_vtable_rtti.py` |
+| 0x1839761b8 (partial) を RIP 相対で参照する命令 | 前 run 記録: 0x18000e58e (`lea rax,[rip+...]; mov [rcx+0x80],rax`) / 0x18000e924。**#1565 レビューで未再確認・未再測定** | `dsp/scripts/mx_vtable_xref.py` (前 run・43 s) |
+| 0x183976038 (主) を参照する命令 | **未測定** (前 run の「0x18000e580 (mov [rcx],rax)」は RIP 相対でなく本スクリプトの出力対象外のため撤回) | `dsp/scripts/mx_vtable_xref.py` |
+| RTTI (COL) | 型名 `.?AVMassiveXAudioClass@@` の読みは確認済み。基底の読みは §3 の誤りで**未検証** | `dsp/scripts/mx_vtable_rtti.py` (修正済み・未再実行) |
 
-0x18000e580 は、0x183976038 (主) を `[rcx]` に、0x1839761b8 (副) を `[rcx+0x80]` に書くコンストラクタ部。
-`MassiveXAudioClass` の多重継承の副基底 vtable と読める。
+0x18000e580 をコンストラクタ部とする前 run の記述は、実測の裏付けが無いため撤回する。
+主・副 vtable の書き込み位置の同定は、`plugins-massivex` での再測定 (§7) で行う。
 
 ## 3. 前 run の誤りの原因
 
 - PR #1422 は「partial = IAudioProcessor の vtable」と仮定して 0-based 順で slot 9 を選んだ。仮定の検証 (RTTI 突合) を
   行わなかった。REPORT §12 の「前提 (未確認)」にも同じ注記があった。
-- 本 run で RTTI を突合したところ、partial は MassiveXAudioClass 自身の副 vtable だった。
+- 本 run で RTTI を突合したところ、partial は MassiveXAudioClass 自身の副 vtable と読めた。ただし RTTI 読みに誤り
+  (`numBaseClasses` を `cd+4` = attributes から読む、`RTTIBaseClassDescriptor` のフィールド位置ずれ) があり、
+  #1565 レビュー (oc-reviewer) で指摘された。修正は `mx_vtable_rtti.py` に反映済み。
 
 ## 4. 次の作業 (U1 の正しい入口)
 
@@ -46,14 +49,30 @@ RTTI の COL 走査で探すこと (§4)。
 
 **注意**: `mx_roots.py` は全 class 実行で 15 分超のため (#266 の前 run 報告)、RTTI 全走査は対象を限定して行う。
 
-## 5. 本 run の検証 (実測)
+## 5. 前 run の検証記録 (未再現)
 
-- `mx_vtable_xref.py`: 0x1839761b8 / 0x183976038 の RIP 相対参照を 2 件ずつ検出 (43 s, load 未測定)。
-- `mx_vtable_rtti.py`: 2 vtable とも COL 型名 `MassiveXAudioClass`。
+- `mx_vtable_xref.py` (前 run): 0x1839761b8 / 0x183976038 の RIP 相対参照を 2 件ずつ検出 (43 s, load 未測定)。
+  ただし件数の出力内容は #1565 レビューで照合不能と判明 (§2)。
+- `mx_vtable_rtti.py` (前 run・修正前スクリプト): 2 vtable とも COL 型名 `MassiveXAudioClass`。
 - 線形逆アセンブル (`capstone` を `.text` 先頭から) は 0x180004c27 で停止 (データ・未対応命令)。
   このため xref は disp32 の全位置照合方式にした。線形を使う方式は採らない。
 
-## 6. 未解決 (起票先)
+## 6. 本 run の再測定 (#1565 修正)
+
+- 修正 commit: 本 PR の fix commit (後述)。修正前の測定 commit は `2b283a5f`。
+- `plugins-massivex` が本 run の `$ARTIFACTS_DIR` (`fl-win64` のみ) に無く、展開物も手元に無いため、
+  修正後の `mx_vtable_rtti.py` / `mx_vtable_xref.py` は**実行できていない**。
+- 実施済み: `mx_vtable_rtti.py` の構文チェック (py_compile) のみ。
+- 再測定は `oc_artifacts: plugins-massivex` 付きの依頼で行う (§7 の手順)。その結果が出るまで、§2 の基底・xref 件数は確定値ではない。
+
+## 7. 再測定の手順 (次 run)
+
+1. `oc_artifacts: plugins-massivex` で起動し、`work/extracted/VST3/Massive X.vst3` を再生成する。
+2. `python3 dsp/scripts/mx_vtable_rtti.py <pe> 0x1839761b8 0x183976038` で基底一覧 (numBaseClasses / base 名) を出す。
+3. `python3 dsp/scripts/mx_vtable_xref.py <pe> 0x1839761b8 0x183976038` で RIP 相対参照の全件・アドレスを出し、§2 を書き直す。
+4. 測定 commit と `git diff <測定 commit> HEAD -- tools/targets/massivex/dsp` を本節に添える。
+
+## 8. 未解決 (起票先)
 
 - U1 本体 (IAudioProcessor を基底に持つクラスの主 vtable 同定と process slot の本体解析): **#266** (本 issue・残件)。
 - U2/U5 (closure 厳密化): #1122 (CLOSED・成果は `REPORT_MX5.md`)。
