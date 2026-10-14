@@ -1,7 +1,7 @@
 # 付録: icall #2394 (ICALL-75) — 値 `0x400000004` の 2 本の i32 store と元の機械語の突合
 
 > 親: #2311 (ICALL-73)。`REPORT_APPENDIX_1998.md` §6 の未確定 (a)(b) を閉じる。測定対象は Fresh Air SlateCore の `function_181057b38`。
-> **既知類型との関係**: `docs/DEFECTS.md` の D22 (escape 済み stack_var の内部 read が別 alloca になる) に近い (frame の slot を独立した alloca に分ける RetDec の前提が同根)。D17 (store 幅不足) とは別。脱落するのは store 命令そのものなので **新規類型 (D23 候補、行案は §6)**。
+> **既知類型との関係**: `docs/DEFECTS.md` の D22 (escape 済み stack_var の内部 read が別 alloca になる) に近い (frame の slot を独立した alloca に分ける RetDec の前提が同根)。D17 (store 幅不足) とは別。脱落するのは store 命令そのものなので **新規類型 (D24 候補、行案は §6)**。
 
 ## 1. 結論
 
@@ -9,7 +9,7 @@
 - **(b) alloca 配置は元の stack frame 由来ではなく lift 側 (RetDec + LLVM)**。真因は「2 本の store が 8B にまとまっていない」ことではなく、**`mov [rbp-8],rax` (`0x181057b71`) と `mov [rbp-0x20],rax` (`0x181057b87`) の 2 store が IR から脱落**していること (§3)。callee は `[r8+8]` (= `[rbp-8]`) → `[[r8+8]]` (= `[rbp-0x20]`) と読むため、wasm では `[rbp-0x10]` の alloca の 8B 先 (= 隣の alloca の `4,4`) を読んで `0x400000004` を得る。
 - 脱落の段: RetDec の `LLVM instruction optimization using RDA` で `stack_var_-16` が alloca ごと消え、その後 `Combine redundant instructions` で `stack_var_-40` が消える (§3 表)。decode 直後 (`Input binary to LLVM IR decoding`) はレジスタ global と `inttoptr` 経由で alloca が無く、`Stack optimization` の直後は両方の slot に alloca と store がある。
 - **回復実験**: 2 store を戻し、`[rbp-0x10]` と `[rbp-8]` を 16B の 1 alloca に置いた IR で route を作り直すと、`181057b38` は 8 入力で **TRAP 8 → OK 8**、BLK+0 (`0x36319008`) への "emsc" 書込みは **8 → 0**。負の対照 (store だけ戻し alloca は別のまま) は TRAP 8・"emsc" 書込み 8 のまま (§4)。`fa_sweep.sh 8 60` で行が変わる関数は `0x181057b38` の 1 件だけ (他 130 関数は不変)。
-- **DEFECTS.md の分岐**: issue の「元からまとまった 8B store なら DEFECTS.md に類型追記」には該当しない (元から 2 本)。もう一方の分岐「RetDec の lift 側の欠陥として (a)(b) を閉じる」に該当。D23 の行案は §6 に置き、DEFECTS.md の編集は PM 判断 (`docs/WORKFLOW.md` §5)。
+- **DEFECTS.md の分岐**: issue の「元からまとまった 8B store なら DEFECTS.md に類型追記」には該当しない (元から 2 本)。もう一方の分岐「RetDec の lift 側の欠陥として (a)(b) を閉じる」に該当。D24 の行案は §6 に置き、DEFECTS.md の編集は PM 判断 (`docs/WORKFLOW.md` §5)。
 - **受入条件**: [x] `181057b38` 該当区間を元の機械語と突合 (§2)。[x] 付録 1998 §6 の未確定 (a)(b) を閉じた (本付録、1998 付録は本付録への参照に更新)。未達なし。
 
 ## 2. 元の機械語 (a)
@@ -79,11 +79,11 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 
 `181057b38` の 2 件は §3–§4 で確定。`180da6e60` は同じ形を含む (`mov [rbp-0x31],rcx`・`mov [rbp-0x29],rcx` の組を `lea rdx,[rbp-0x31]` → `call r10` で渡す。`[rbp-0x29]` の store が脱落) が、callee が `[rdx+8]` を読むことと wasm 上の挙動は未確認。残り 9 件の内訳は未確認。この関数は `fa_sweep.sh` で native crash/timeout のため比較できない。**候補は miscompile の確定ではない**。
 
-## 6. DEFECTS.md 形式の行案 (D23 候補・DEFECTS.md は未編集)
+## 6. DEFECTS.md 形式の行案 (D24 候補・DEFECTS.md は未編集)
 
 | ID | 層 | 新旧 | 症状 (silent) | 根本原因 | 観測 (証拠) | 検出信号 (機械的) | 修復 |
 |---|---|---|---|---|---|---|---|
-| D23 | opt (RetDec RDA + instcombine。decode 段は正しい) | **新規** (ICALL-75 / #2394) | frame 上の隣接 slot 群 (`{ptr, ptr}` の組・小配列) の先頭 address だけを callee に渡すと、先頭以外の slot への store が IR から消える。callee の `[arg+8]` は別 alloca (wasm では隣の `4,4` = `0x400000004`) を読み、そこから null ページの "emsc" を拾って BLK+0 に書き trap | RetDec は frame slot ごとに alloca を作り (Stack optimization)、address を取られず読まれない slot への store を dead とみなして alloca ごと消す (RDA 段、推定)。escape した slot の `+8` を callee が読む使い方は考慮されない。残った alloca の配置は wasm backend が決める | `181057b38`: `[rbp-8]`・`[rbp-0x20]` の 2 store が脱落。2 store と 16B 1 alloca を戻すと 8 入力 TRAP 8 → OK 8、BLK+0 への "emsc" 8 → 0。store だけ戻して別 alloca のままだと TRAP 8 のまま (§4) | 機械語の rbp 相対 store に対応する IR store が無く、その slot が `lea [rbp+e]` で address を取られた slot の上側 0x40 以内 (`frame_slot_probe.py census`)。F 131 関数で候補 2 関数 (確認済み 1) | 脱落 store を戻し、escape した slot とその隣を 1 つの alloca にまとめる IR pass (実験は `frame_slot_probe.py restore`。一般化は §8、#2427) |
+| D24 | opt (RetDec RDA + instcombine。decode 段は正しい) | **新規** (ICALL-75 / #2394) | frame 上の隣接 slot 群 (`{ptr, ptr}` の組・小配列) の先頭 address だけを callee に渡すと、先頭以外の slot への store が IR から消える。callee の `[arg+8]` は別 alloca (wasm では隣の `4,4` = `0x400000004`) を読み、そこから null ページの "emsc" を拾って BLK+0 に書き trap | RetDec は frame slot ごとに alloca を作り (Stack optimization)、address を取られず読まれない slot への store を dead とみなして alloca ごと消す (RDA 段、推定)。escape した slot の `+8` を callee が読む使い方は考慮されない。残った alloca の配置は wasm backend が決める | `181057b38`: `[rbp-8]`・`[rbp-0x20]` の 2 store が脱落。2 store と 16B 1 alloca を戻すと 8 入力 TRAP 8 → OK 8、BLK+0 への "emsc" 8 → 0。store だけ戻して別 alloca のままだと TRAP 8 のまま (§4) | 機械語の rbp 相対 store に対応する IR store が無く、その slot が `lea [rbp+e]` で address を取られた slot の上側 0x40 以内 (`frame_slot_probe.py census`)。F 131 関数で候補 2 関数 (確認済み 1) | 脱落 store を戻し、escape した slot とその隣を 1 つの alloca にまとめる IR pass (実験は `frame_slot_probe.py restore`。一般化は §8、#2427) |
 
 ## 7. 測定条件
 
@@ -102,7 +102,7 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 |---|---|---|
 | 脱落 store を戻す IR pass の一般化と `fa_route_build.sh` への組込み (現状は `181057b38` 専用の置換)、`180da6e60` の候補 10 件の判定、fixed 後も `181057b38` が 8/8 不一致の原因、RDA 段が store を消す条件の確認 | BLK+0 の trap は実験で解消するが、closure 全体の bit 一致は 46 のまま | ICALL-77 (#2427、本 PR で起票) |
 | 元 `SlateCore.core_64` 本体の bytes との照合 (本 run は `plugins-freshair` なし) | (a) の根拠は元 PE の decode 結果 + `rw.dll` の同 VA。ファイル本体の sha256 とは未突合 | ICALL-77 (#2427) の run で `plugins-freshair` を取得して照合 |
-| `docs/DEFECTS.md` への D23 行の追加 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
+| `docs/DEFECTS.md` への D24 行の追加 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
 | `fa_sweep.sh` の ±1 の揺れ (旧 46/66/9/10 と本 run の 47/66/9/9。同じコードで 1 関数の判定が揺れる) | 数値の正本の取り方 | #2302 (ICALL-71、既存) |
 
 ## 9. 再現

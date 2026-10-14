@@ -1,8 +1,8 @@
 # REPORT (SHX-T9h / #2489) — 現行 m11_ov.c で baseline を再生成して unit 23 を比較
 
-> 分割元: `tools/shimx/REPORT_SHX-T9.md` §3.3.5 から分割移動した付録 (§ 番号は分割元のもの)。
+> 分割元: `tools/shimx/REPORT_SHX-T9.md` の旧 §3.3.5 から分割移動した付録 (main の SHX-T9i が §3.3.5 を使ったため、本付録の節番号は §3.3.7 とする)。
 
-## 3.3.5 現行 m11_ov.c で baseline を再生成して unit 23 を比較 (SHX-T9h #2489)
+## 3.3.7 現行 m11_ov.c で baseline を再生成して unit 23 を比較 (SHX-T9h #2489)
 
 - 結論: 素材 `work-m11` の `m11_boot.cjs`・`obj/ov.o` は現行 main と一致しない旧 snapshot だった (`ov.o` に `function_410320`・`function_40f960`・`function_40fb40`・`function_467c40` が無く、qstore 未適用)。現行 IR から再生成した baseline は unit 23 で shimx 版と同じ経路 (`ret=2`・`0xf960` 進入) を通る。§3.3.3 の baseline 行 (`halt0`) は旧 snapshot の値で、本 round で再実行しても `halt0` を再現した。どの変更 (ov の差・qstore/ldfix/ld108) が効いたかは未分離。
 - 測定 commit: `4cca6c28` (origin/main `df2f7aaf` を取り込んだ merge commit。コードを変えた最後の commit)。

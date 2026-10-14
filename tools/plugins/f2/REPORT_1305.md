@@ -239,7 +239,7 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 測定 (逐次、n=3、load 0.36→0.46): wall A 1.22〜1.27 秒・B 1.23〜1.37 秒・C 1.24〜1.31 秒、RSS A/B 約 227 MB・C 約 237 MB。A `-H` は `UC_ERR_READ_UNMAPPED rip=0x407a5e` (§15 と一致)。B `-H -p 0x409090` は `0x407a20` を通過し、`VirtualAlloc` の戻り 0 で `rip=0x41bfaa` (エラー経路)。C `-H -V -p 0x409090` は初回確保 (`0x407630`→`0x407c21`) まで進み、pool への書込み 44 件の後、`UC_ERR_INSN_INVALID rip=0x50138d06` (pool 内) で停止。
 - 受入 3 (chunk header) **部分達成** (使用中ヘッダは実測、空きリンクは推定): blk=`0x50138cc0`。`[blk-8]`=size+6 (`0x407c25`)、`[blk+0]`=所有 bin `0x867200` (`0x407c31`)、`[blk+0x18]`=空きリスト先頭 0、`[blk+0x20]`=使用数 1 (`0x407c34`・`0x407c38`)。最初の obj (`blk+0x30`) の `[obj-8]`=blk (`0x407c60`)。空き obj の `[obj-8]` は次の空き obj へのリンクと推定 (読取り側 `0x407a5e` の `and rcx,[rax-8]` から)。`[blk+0x18]`=0 のため書込み側は未観測で、検証は子 #2468 に移す。
 - 受入 4 (0x411a80 到達) **未達**: 停止点 `0x50138cf0`→`0x50138d06` (pool)。`0x5da06d` (`mov rax,[rax]`) は 1 回実行され、そのときの rcx (this) は 0。停止と this の対応は未確定。`0x407520` が `[blk+0]` を `0x867200`→`0x8c02c0` に書換える (`0x407553`) ことも確認。
-- 受入 5 (0x411bb8 の記録) **未達** (受入 4 が前提)。残件は子 #2468 に移した。
+- 受入 5 (0x411bb8 の記録) **未達** (受入 4 が前提)。残件は子 #2468 に移した。続き (#2468): 停止点 `0x5da070` の連鎖は `REPORT_APPENDIX_2468.md`。#2303 の受入 4 (0x411a80 到達) は未達のまま (#2468 の受入 3 に当たる)。
 - 再現 (a70461d6。依存 `uv venv f2venv && uv pip install unicorn==2.1.4 pefile capstone`。リポジトリ直下から、`PE` は block19148_PE.bin): A `unicorn_trace.py $PE 0x83efb0 -H -m 2000000`、B `unicorn_trace.py $PE 0x83efb0 -H -p 0x409090 -m 2000000`、C `unicorn_trace.py $PE 0x83efb0 -H -V -p 0x409090 -w 0x50000000:0x50200000 -m 2000000`。
 - 鮮度: `git diff a70461d6 HEAD -- 'tools/plugins/f2/*.py'` = 0 行 (a70461d6 以降の commit は REPORT のみ)。
 
