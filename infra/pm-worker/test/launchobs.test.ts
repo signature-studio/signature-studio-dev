@@ -126,6 +126,20 @@ test("観測後に run が完了し、報告が無いまま 3 時間たったら
   assert.ok(ctx.app.engine.plan().picks.some((p) => p.n === 61), "3 時間を過ぎたら候補に戻る");
 });
 
+test("(e) 観測した run の完了時刻 (updatedAt) を doneAt に残す。進行中の間は残さず、完了を見た tick で残す", async () => {
+  const ctx = await live();
+  await tickAt(ctx, T0);
+  await send(ctx.app, "workflow_run", runPayload(7, "in_progress", { event: "issue_comment", title: TITLE, created: iso(T0 + 30_000) }));
+  await tickAt(ctx, T0 + MIN);
+  assert.equal(obsOf(ctx)?.state, "observed");
+  assert.equal(obsOf(ctx)?.doneAt, undefined);
+  await send(ctx.app, "workflow_run", runPayload(7, "completed", { event: "issue_comment", title: TITLE, created: iso(T0 + 30_000), at: iso(T0 + 3 * MIN) }));
+  await tickAt(ctx, T0 + 4 * MIN);
+  assert.equal(obsOf(ctx)?.doneAt, iso(T0 + 3 * MIN));
+  const r = ctx.app.engine.plan().rows;
+  assert.ok(r.recent.some(([n, why]) => n === 61 && why.startsWith("run finished")), "完了から 3 時間以内は recent (run finished)");
+});
+
 test("観測の純関数: 作成時刻の境界・5 分の境界・failed の後の観測", () => {
   const run = (created: number, title = TITLE, event = "issue_comment") => ({ id: 1, event, title, status: "in_progress", conclusion: null, updatedAt: "", createdAt: iso(created) });
   assert.equal(observedBy([run(T0 - 61_000)], TITLE, T0), false, "投稿の 61 秒前は数えない");

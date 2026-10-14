@@ -44,6 +44,8 @@ export interface ClassifyInput {
   launched: Record<string, string>;
   // 投稿の観測状態 (launchobs.ts)。無い issue は観測記録の無い古い launch (従来の 3 時間判定)。
   launchState?: Record<string, LaunchState>;
+  // 観測済み launch の、観測した run の完了時刻 (launchobs.ts の doneAt)。ある観測済み launch は完了から 3 時間を recent の基準にする。無ければ投稿から 3 時間。
+  launchDoneAt?: Record<string, string>;
   relaunch: Record<string, RelaunchState>;
   // manual_deps.json (キーは issue 番号の文字列)。
   manualDeps: Record<string, number[]>;
@@ -221,12 +223,16 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
       const reported = !!bl && (!isLaunched || ageH(bl.at) < ageH(launchedAt));
       const stopHit = !!bl && STOP_RE.test(bl.head) && !OUTCOME_OR_PM_RE.test(input.fullBotBody[k] ?? "");
       const ls = input.launchState?.[k];
+      // 観測済みで完了を見た run があれば、その完了から 3 時間を recent にする (run が進行中は started が先に効く)。
+      const doneAt = ls === "observed" ? input.launchDoneAt?.[k] : undefined;
       // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
       if (ls === "failed") {
         rows.stopped.push([n, "launch-unobserved"]);
       } else if (isLaunched && ls === "launched" && !reported) {
         rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
-      } else if (isLaunched && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
+      } else if (isLaunched && doneAt !== undefined && ageH(doneAt) < 3 && !reported) {
+        rows.recent.push([n, `run finished ${fmt1(ageH(doneAt))}h ago`]);
+      } else if (isLaunched && doneAt === undefined && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
         rows.recent.push([n, `launched ${fmt1(ageH(launchedAt))}h ago`]);
       } else if (bl && reported && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
