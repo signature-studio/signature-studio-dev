@@ -17,7 +17,7 @@
 | 測定 commit (コードを変えた最後の commit) | `df420360` (IR probe `probe134_ir.py`・`m11_rt.c` の記録関数・`m11_survey.mjs` の読取り・`m11_build.sh` の `M11_PROBE_134` 分岐) |
 | 検証 HEAD | この PR の head (最後の push)。PR 本文の「検証 HEAD」と一致させる |
 | 差分の証跡 | `git diff df420360 HEAD -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_survey.mjs tools/m11/trap_triage/probe134_ir.py tools/m11/trap_triage/probe_134.sh` の出力は空 (本ファイルの変更のみ) |
-| 素材 (本 run で展開・実在を確認) | `fl-win64` (`extracted/block00031_PE.bin` のみ展開)・`work-m11` (→ `tools/m11/work/`)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`) |
+| 素材 (本 run で展開・実在を確認) | `fl-win64` (`extracted/block00031_PE.bin` のみ展開)・`work-m11` (→ `tools/m11/work/`)・`toolchain-emsdk` ([EMSDK])・`toolchain-retdec` ([RETDEC]) |
 | PE | `extracted/block00031_PE.bin`、sha256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` |
 | IR | `bash m11_gen_ir2.sh` を本 run で再生成 (33 秒)。`ir_sha256` = `f199b896…be22` (build 後の値。qstore・ldfix・ld108 = applied)。旧 REPORT の `de46cada…8636` とは一致しない |
 | build | 採取: `M11_PROBE_134=1 bash m11_build.sh` (IR probe 入り)。既定: `bash m11_build.sh` |
