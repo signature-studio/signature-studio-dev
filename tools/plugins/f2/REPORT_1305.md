@@ -164,3 +164,13 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 追加した道具: `unicorn_trace.py -t <VA>` (そのアドレスに入るたびに rcx/rdx と [rcx]・[rcx+0x28] を最初の 20 回まで出す)。
 - 判定: 受入 1 **達成**、受入 2 **未達** (実引数が無い)、受入 3 (プログラム全体の経路の書込み追跡) **未達** (`0x83efb0` 経路が合成入力で止まる)。waiver は変更しない。
 - 未解決 (起票先: 本 issue の残件。実引数を与える経路の確定が必要): `CreatePlugInstance` のホスト引数 (`0x777290` の読み出し先) を実 FL の呼出し値で与えること、またはホストが `CreatePlugInstance` に渡す構造体の形を決めること。これが決まるまで `0x8c3ca8` の最終値は確定しない。
+
+## 12. PLG-F3-25 (#2284): 合成 host による CreatePlugInstance の到達範囲 (測定 commit 656932d2、block19148)
+
+- 道具: `unicorn_trace.py -H` を追加。rcx・rdx に合成 host (`SCRATCH+0x10000`) を置き、`[host]` を vtable とする。`vtable[0]` は戻り値として第 2 の合成 obj (`SCRATCH+0x12000`) を返す。vtable の各スロットは ret stub。`-H` 無指定時は従来どおりで、§11 の結果 (`0x8525f0` の書込み 2 件、`0x83efb0` の `UC_ERR_READ_UNMAPPED` rip=0x7772be) を再現した。
+- 実測 (`python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000`、2 回、逐次、wall 1.38 / 1.40 秒、RSS 約 227 MB、load 0.31 → 0.39):
+  - `0x777290` の `call [rbx]` (host.vtable[0]) は通過する。
+  - `0x83cad7` の `call [rax+0x30]` (obj.vtable[0x30]) も通過する。
+  - `0x407a5e` の `and rcx, [rax-8]` で `UC_ERR_READ_UNMAPPED` (rip=0x407a5e・rax=0)。直前の `0x407a20` は `[rbx+8]`・`[rdx+0x18]`・`[rax-8]` を読むアロケータ状の処理。
+- 判定: 受入 1 (`0x411a80` 到達) **未達**。受入 2 (`0x411bb8` 呼出し時の記録) と受入 3 (`-w` によるプログラム全体の書込み追跡) は受入 1 が前提のため未実施。waiver は変更しない。
+- 残件 (子 issue に移す): `0x407a20` が読むブロック構造 (`[rax-8]` のヘッダ形式、`[rbx]`・`[rbx+8]`・`[rdx+0x18]` の初期化) を PE 内の初期化コードから復元し、合成 host/obj に入れる。
