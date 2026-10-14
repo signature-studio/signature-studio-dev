@@ -101,6 +101,12 @@ if [ $FIX = 1 ]; then
   if [ ! -f "$IR" ] || [ "$IR0" -nt "$IR" ] || [ "$HERE/fix_alloca.py" -nt "$IR" ]; then python3 "$HERE/fix_alloca.py" "$IR0" "$IR" --report "$W/fix_report.json"; fi
 fi
 
+# 2c. HANDLE 幅の正規化 (全 variant, #1628): IR の midiOutShortMsg (HMIDIOUT i64) を shimx 定義 (wasm32 i32) に揃える。
+#     plain の直リンクと gen_link.py (trace_wrap.c の型) の両方が正規化後の IR を見る。
+IRH="$W/boot_hn$SUF.ll"
+if [ ! -f "$IRH" ] || [ "$IR" -nt "$IRH" ] || [ "$HERE/sx_handle_norm.py" -nt "$IRH" ]; then python3 "$HERE/sx_handle_norm.py" "$IR" "$IRH" --report "$W/handle_norm$SUF.json"; fi
+IR="$IRH"
+
 # 3. 分類 + スタブ + トレースラッパ生成 ------------------------------------------
 M11NM="$W/m11_nm.txt"; [ $WS = 1 ] && M11NM="$W/m11ws_nm.txt"
 if [ ! -f "$GEN/classes.json" ] || [ "$IR" -nt "$GEN/classes.json" ] || [ "$HERE/gen_link.py" -nt "$GEN/classes.json" ] || [ "$W/shimx_nm.txt" -nt "$GEN/classes.json" ] || [ "$M11NM" -nt "$GEN/classes.json" ]; then
