@@ -12,8 +12,8 @@ cd "$HERE"
 source ../shared/env.sh   # FL_WIN64_DIR
 PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
 RETDEC_BIN="${RETDEC:-$(command -v retdec-decompiler || true)}"
-[ -n "$RETDEC_BIN" ] || RETDEC_BIN="${RETDEC_ROOT:-/opt/retdec}/bin/retdec-decompiler"
-[ -x "$RETDEC_BIN" ] || { echo "FAIL: retdec-decompiler 無し (RETDEC_ROOT=${RETDEC_ROOT:-unset})" >&2; exit 1; }
+[ -n "$RETDEC_BIN" ] || RETDEC_BIN="${RETDEC_ROOT:-}/bin/retdec-decompiler"
+[ -x "$RETDEC_BIN" ] || { echo "FAIL: retdec-decompiler 無し (RETDEC か PATH・RETDEC_ROOT で指定)" >&2; exit 1; }
 [ -f "$PE" ] || { echo "FAIL: PE 無し: $PE" >&2; exit 1; }
 [ -f work/boot_ranges.txt ] || { echo "FAIL: work/boot_ranges.txt 無し (work-m11 を展開)" >&2; exit 1; }
 N_ON="${1:-4}"; N_OFF="${2:-3}"; N_TC="${3:-2}"; N_PASS="${4:-2}"
