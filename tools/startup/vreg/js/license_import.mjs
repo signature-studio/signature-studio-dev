@@ -80,6 +80,4 @@ export class LicenseImport {
       machineGuid: v.machineGuid,
     };
   }
-
-  async close() { await this._serial(() => this.vreg.close()); }
 }
