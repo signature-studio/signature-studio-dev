@@ -42,3 +42,70 @@
 - **S1 FAIL は本 issue の範囲外**: 304/555/923 の OOB と 101/291/296 の差は §6i (#1442) の既存未解決で、#1426・#1635 が扱う。
 
 `results/baseline_survey.json`・`results/ir_sha256.txt` は上記 e2e 実行で再生成された値 (現 HEAD の base `867/1/47/27/0`・IR sha256 の更新) に揃えた。
+
+## 7. WIN-4 (#2715): CreateFruityInstance の closure 取込と呼出し (部分達成)
+
+既知類型との関係: 該当 DEFECTS 行なし。新規の sigfix 欠陥 1 件 (§7-3, 行案あり)。検証起点は origin/main `26f90ada`。
+
+### 7-1. 受入条件の状態
+
+| 受入 | 状態 | 根拠 |
+|---|---|---|
+| 1 closure の実測と seed 追加 | 達成 | §7-2。現 IR に `0x1375990` の label は 0 件。閉包外 2,071 関数を boot7 として lift (§7-3) |
+| 2 glue 経由で `CreateFruityInstance` を呼ぶ | 部分 | §7-4。呼出しは到達し、`EnterCriticalSection` で fail-fast |
+| 3 Run ループ (S22) の Worker 置換 | 未達 | 未着手 (S12 の前で停止) |
+| 4 観測の REPORT | 部分 | §7-4・§7-5 |
+| 5 shim の追加 | 0 件 | 止まりは未実装 API ではない (§7-5) |
+| 6 `open()` の trace | 未達 | 未着手 |
+| 7 既存 gate の回帰なし | 未達 (FAIL) | §7-6。S1 が FAIL (boot7 の有無を問わず) |
+| 8 #174 の証跡 | 未達 | 窓の実登録を経た生成は未到達 |
+
+### 7-2. closure 測定 (`gf_seed_closure.py`)
+
+seed = `0x1375990` (PE export `CreateFruityInstance`、`.pdata` の大きさ 3,213 B)。call/jmp 即値の閉包は 6,591 関数 / 1,965,676 B。
+現 IR (`tools/m11/work/boot_final3.ll`) に既にあるのは 4,520 関数、閉包外は **2,071 関数 / 761,038 B**。
+`grep -c 1375990 tools/m11/work/boot_final3.ll` = 0 (lift の label 無し)。
+再現: `python3 tools/gui/flengine/gf_seed_closure.py --pe <PE> --ir tools/m11/work/boot_final3.ll --seed 0x1375990 --json-out <json> --ranges-out <ranges>`
+
+### 7-3. lift と IR 生成
+
+| 手順 | 結果 (実測) |
+|---|---|
+| `m11_lift.sh work/boot_ranges_cfi.txt boot7 780` | rc 0・**3 分 24 秒**・`boot7.lift.ll` 222,014 行。RetDec は 0x1375990 を export 名 `@CreateFruityInstance` で出力 |
+| `m11_gen_ir2.sh` (boot7 を CH に追加) | rc 0・**1 分 21 秒**・`boot_final.ll` 707,524 行、define 9,531 (取込前 7,422) |
+| `m11_build.sh` (1 回目) | rc 1: `work/boot_final3.ll:78502: invalid cast opcode for cast from 'i32' to 'i8'` |
+| 同 (修正後) | rc 0・35.7 秒・wasm-ld signature mismatch 0 / undefined 0 |
+
+- 原因: `call i64 @function_6bc010(i64 %48, ptr null)` の callee は i8 引数。`m11_post.py` の `_conv` が ptr→i8 を `zext i32 → i8` で作っていた (狭い型への zext は不正 IR)。`trunc` に修正 (既存の有効な出力は変わらない: この枝は従来 IR を出さなかった)。
+- DEFECTS 行案: 症状=clang が invalid cast で止まる / 根本原因=sigfix の ptr→narrow 変換が zext / 検出信号=`invalid cast opcode` / 修復=trunc (`m11_post.py` `_conv`)。
+
+### 7-4. 呼出し (`cfi_probe.mjs`)
+
+- 手順: DllMain attach (`_m11_boot_enter(0,1)`) → THostInstance (0x38 B) を wasm の malloc に作る (+0 ダミー vtable、+8=1、+0xc=0、+0x18=ANSI `"FL Studio"` のポインタ、+0x30=cmdline 0x8000 B) → `_CreateFruityInstance(0xC0, 0xEDE95A, host, &iface)`。
+- 結果: `boot_enter` は trap `unreachable` (`boot_threw`)。`CreateFruityInstance` は `[shim] FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)` の後に `abort()` (1 ms)。`iface` は 0 のまま。GUI-REACH は `LoadStringW` ×3 のみ。
+- 止まった地点: `EnterCriticalSection` の呼出元 VA は未特定 (IR 中の `call void @EnterCriticalSection` は 4 箇所)。この CS は `InitializeCriticalSection` で登録されていない (または別アドレス) と読める。
+
+### 7-5. shim に足すべき API
+
+0 件。`EnterCriticalSection` は `tools/shim/src/sync.c:255` に実装済みで、止まりは「登録表に無い CS への lookup 失敗」(未実装 API ではない)。原因は lift 側の CS 初期化経路の欠落の可能性があり、子 issue で切り分ける。
+
+### 7-6. 既存 gate (`bash tools/gui/flengine/e2e.sh`)
+
+| 実行 | rc | 所要 | judge | S1 (soft vs base) |
+|---|---|---|---|---|
+| boot7 あり | 1 | 543 s | 13/14 | `870/1/47/24/0` vs `872/1/47/22/0` (unit 304・555 が base ok → soft OOB) |
+| boot7 なし (CI と同じ素材構成) | 1 | 473 s | 13/14 | `872/1/47/22/0` vs `870/1/47/24/0` (同じ 2 unit が逆向き) |
+
+- 残り 13 gate は PASS (L1 0/0/0・A1 193=193・B1 units_run 52 = base・R1・R2・S2・P1〜P5・W1)。ネガコン 9 件は期待どおり FAIL。`selftest` は boot7 ありの run で 506 passed / 0 failed。
+- S1 は順序依存 (REPORT §5-6 と同型)。**main `26f90ada` の同一 e2e は本 run で未測定**のため、既存か本 PR 起因かは未確定。boot7 の有無で符号が入れ替わることから、取込 IR の変化が効いているとみる (推定)。
+- `boot_threw` は `unreachable` (旧 REPORT §5-1 は `memory access out of bounds`)。boot7 なしの run でも同じ値のため、本 PR の追加 IR に起因するとは言えない。要因は未切り分け。
+- survey の reach は `RegisterClassW` ×1〜2 / `CreateWindowExW` ×1〜2 (`survey_ff.json` / `survey_soft.json`)。旧 REPORT §1 の「RegisterClassW 自然到達 0」と異なる。差の原因は未切り分け。
+
+### 7-7. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `CreateFruityInstance` の経路で登録されていない CS に `EnterCriticalSection` (§7-4) | S12 より前で停止。Run ループ・窓生成に届かない | 子 issue |
+| S1 の順序依存 (unit 304・555) | flengine e2e judge 13/14 | 未起票 (PM) |
+| S22 の Worker 置換・`open()` の trace (受入 3・6) | 未着手 | 未起票 (PM) |
+| boot の trap 種別の変化 (OOB → unreachable) と survey の RegisterClassW 値 | 旧 REPORT との整合 | 未起票 (PM) |
