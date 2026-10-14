@@ -36,7 +36,7 @@
 
 - **結論 (pass 単位)**: `--print-after-all` の stderr (約 17,954 件の IR dump・81 MB) は P1 と P2 で md5 が完全一致した。`uselistorder` は pass dump に 1 行も現れない (0 件)。最終 `drc.ll` の差は `@WriteFile` の `uselistorder` 1 行の並び (`{ 0, 1, 2, 4, 3 }` と `{ 2, 0, 1, 4, 3 }`) だけ。つまり並びは LLVM の最終 writer 段で生じ、pass の中身の差では無い。
 - **結論 (ASLR)**: ASLR を無効にすると 2 回とも `7eae26d1` で一致した。並びの揺れは実行ごとのアドレス (ポインタ) の割り当てに由来する可能性が高い。ただし ASLR を無効にしたときの `lift.ll` 段は未計測で、この結論は「可能性が高い」止まり。
-- **受入 2 (固定化)**: A7 (`tools/m5/ir5_patch.py` の `uselistorder` 行除去) を通した `lift.ll` は、上記の 5 本の drc.ll (md5 4 種類) すべてで `23c8ea5b` に収束した。`tools/liftlib/liftlib/passes/base.py` の `normalize()` (A7) も同じ正規表現で除去し、P1・N1・N2 の 3 本の出力が `94a8363c` で一致した (Z1 は lift 段が未計測のため対象外)。新しい正規化は不要と判断する。
+- **受入 2 (固定化)**: A7 (`tools/m5/ir5_patch.py` の `uselistorder` 行除去) を通した `lift.ll` は、上記の 5 本の drc.ll (md5 4 種類) すべてで `23c8ea5b` に収束した。`tools/liftlib/liftlib/passes/base.py` の `normalize()` (A7) も同じ正規表現で除去し、P1・N1・N2 の 3 本の出力が `94a8363c` で一致した (Z1 は lift 段が未計測のため対象外)。新しい正規化は不要と判断する。**§19 で覆った: 新しい正規化 (A7 の空行ごと除去) が必要 (旧 A7 は先頭の空行を残すため `boot_final.ll` が揺れた)。**
 - **未解決**: (a) `--passes` 相当の段の切り分けは `--print-after-all` で代替した。LLVM writer 段で並びが変わる仕組みそのものは未確認。(b) ASLR 無効時の `lift.ll` 段は未計測。(c) `@global_var_*` 行位置差 (§14) は今回の 150 range では再現せず、未切り分け (`--full` 全 range で要確認)。
 - 再現: `RETDEC=<[RETDEC]>/bin/retdec-decompiler`・PE `block00031_PE.bin` で `retdec-decompiler <PE> -o x.drc.c --select-ranges "$(cat r150.txt)" --select-decode-only --print-after-all 2> x.pass.log` を 2 回。`drc.ll` の md5 と `uselistorder` 行を比較。ASLR 無効は `setarch x86_64 -R` を前置。
 
@@ -139,5 +139,15 @@
 - **結論**: 同一 HEAD・同一 PE・同一素材で `--full` の `ir_sha256` が 3 回とも一致した。F1・F2・F3 の `boot_final.ll` は `cmp` で bytes 一致。`M11_SUMMARY` の `units_run_full` 53 / `units_total` 942 / `stop_reason` も一致。
 - **一致の強さ**: 修正前は同条件で一致 (§17 Q1=Q2) と不一致 (§14 N1≠N2・§15 N3≠N4) が混在したため、修正前後を同一 n で比べてはいない。修正後は原因 (空行) を直したうえでの n=3 で、RetDec 単体の再現 (上表) でも一致を確認した。`--full` の F1 と F3 では boot0〜boot5 の lift.ll も全て bytes 一致した (RetDec 単体の再現で出た chunk 3 の globals の順差は、この 2 回では出なかった)。
 - F2・F3 の前に `work/ir_conditions.json`・`boot*.lift.ll`・`boot*.drc.*`・`boot_final.ll`・`lift_pe.sha256` を削除してから全再生成した。
-- **未解決**: (a) `@global_var_*` の出力順が実行ごとに変わる仕組み (RetDec / LLVM writer 段)。(b) 他の `ir5_patch.py` 複製・他 target の IR への同じ空行残りの有無 (m11 以外は未測定)。
+- **検証範囲 / 範囲外**: 範囲内は `m11_e2e.sh --full` (F1〜F3)・`tools/m11/test_a7_uselistorder.py`・素材 `work-m11` の drc.ll boot0〜3 の directive 残り。範囲外は `tools/liftlib/tests/test_unit.py` T1 (下表 1 行目)。
+- **T1 (本 run)**: `python3 tools/liftlib/tests/test_unit.py` は rc 1 (`FileNotFoundError: tools/m6/work/ott.drc.ll`)。本 run の素材は fl-win64・toolchain-emsdk・toolchain-retdec・work-liftdiff・work-m11 の 5 本で、`work-m6-ott` が無かった。PR 本文の oc_artifacts に `work-m6-ott` を追加した (次の review run で取得)。T1 の 2 本目の loop が読む `targets/*/work/**/lift_gain`・`poc_gain/work` は許可名の対象外 (docs/WORKFLOW.md §11 に無い) で、無いと `os.path.exists` で skip される。次の run で T1 が ok でも、証拠は OTT (1 本目) だけになる。
+- **代替の実測 (T1 ではない)**: `work-m11` の `boot0〜3.drc.ll` (RetDec の実出力) に `tools/m5/ir5_patch.py` と `base.py` の `normalize` を当てると、残留の `; uselistorder directives` と `uselistorder ` はどちらも 0 件。ただし 2 つの全体出力は一致しない (`!insn.addr` 等の metadata 行の扱いの差で、A7 と無関係。PR 前から)。A7 の一致の証拠にはしない。
+- **限界**: `uselistorder_bb` (基本ブロック用 directive) は A7 の正規表現 (`uselistorder ` の空白あり) に一致せず除去されない。素材の drc.ll boot0〜3 では 0 件 (`grep -c uselistorder_bb` で実測)。回帰テストには含まれない。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `test_unit.py` T1 (`base.run_base` の OTT golden 比較) が未実行。素材 `work-m6-ott` が本 run に無い | `base.py` の A7 変更が OTT の lift 出力を変えないことの実測が無い | 既存 issue #1664 にコメント (次の review run で実測し、結果を書いてから merge) |
+| `@global_var_*` の出力順が実行ごとに変わる仕組み (RetDec / LLVM writer 段) | lift.ll 単体の比較にだけ出る。`boot_final.ll` は merge の `sorted()` で一致 | 親 #960 へ提案 (観測のみ。順序の由来は §18 の writer 段まで) |
+| `ir5_patch.py` の複製 (`tools/plugins/lift/passes/`・`tools/m3/ir_patch.py`・`tools/targets/*/`) の同じ空行残り | m11 の `--full` が使わない複製で未測定。A7 は変更していない | 親 #960 へ提案 |
+| `uselistorder_bb` (基本ブロック用 directive) が A7 で除去されない | 素材 drc.ll boot0〜3 では 0 件。回帰テストの対象外 | 親 #960 へ提案 |
 - 再現: §14 と同じ (`FL_WIN64_DIR`・`RETDEC_ROOT`・`PATH` を設定し `bash tools/m11/m11_e2e.sh --full` を 3 回)。RetDec 単体は §18 の手順で chunk を 2 回流し、`m2/ir_normalize.py` → `m5/ir5_patch.py` → `m11_gen_ir2.sh` を通して `boot_final.ll` の md5 を比べる。
