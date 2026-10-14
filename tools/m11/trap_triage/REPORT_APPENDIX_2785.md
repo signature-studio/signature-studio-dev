@@ -2,6 +2,8 @@
 
 # #2785: obj の生成元 (IR 静的追跡と inspector 実測, 2026-10-14, n=1)
 
+**既知類型との関係**: 該当なし。`535c11` → `535bf2` の引数脱落は `docs/DEFECTS.md` の既存類型に当たらない。近い候補は D5 (xmm など float 引数の落ち、RetDec の ABI 解析の取り違え) と D21 (呼出し引数の値が定数でなくスタック番地の下位 byte)。本件は整数の obj 引数が call 文から消えており機構が違う。新類型候補は §5 の行案。
+
 測定 commit `bbb07d80` (origin/main)。素材 `fl-win64` (`extracted/block00031_PE.bin` のみ) と `work-m11` を展開。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。build は `work/obj`・`boot.o` を消してから行った clean build。
 
 ## 1. 工程と既定 survey (HEAD)
@@ -12,6 +14,8 @@
 | `m11_build.sh` (clean) | rc=0 |
 | `m11_survey.mjs` (既定) | ok 872 / trap 22 / noproc 1 / miss 47 / units 942 |
 | `check_682.py` | 4/5 (304=ok 555=ok 923=trap 291=ok 296=ok) rc=1 |
+
+所要 (`42.3 秒`) の load average・並列数は未記録 (測定時に採取していない)。本 fix では素材 (work-m11・toolchain-retdec) が無く IR を再生成できないため再測定していない。
 
 REPORT の既定 (870 / 24、304・555 が trap) とは一致しない。`bbb07d80` の既定挙動であり、本 PR はコードを変えない (`git diff bbb07d80 HEAD -- tools/m11 ':!*.md'` は 0 件)。差の原因は未特定。
 
@@ -28,10 +32,21 @@ REPORT の既定 (870 / 24、304・555 が trap) とは一致しない。`bbb07d
 ### 2-2. 923 (`function_410b10` の obj)
 
 - inspector (`M11_INSPECT_FRAMES=9`, `bbb07d80` 既定 build): trap 時の `410b10` local0 = `0x10bd3960` (obj)。呼出し鎖は `410730 (local0=0x10bd3960, -1)` ← `4fb910 (local0=0xf6b900, local1=0x1faa18)` ← `136c660` ← `m11_tr_function_136c660` ← `m11_icall` ← `m11_call_unit` (unit 923)。
-- `4fb910` の 2 引数は `136c660` の IR 定数 (`102127` 行: `16169216` = `0xf6b900`, `2074840` = `0x1faa18`)。obj ではない。obj は `410730` の第 1 引数 = `G`。
+- `4fb910` の 2 引数は `136c660` の IR 定数 (`102127` 行: `16169216` = `0xf6b900`, `2074840` = `0x1fa8d8`)。obj ではない。obj は `410730` の第 1 引数 = `G`。
 - `G` への書込みは 2 箇所だけ。`function_52f1f0` (`187880` 行) が `G = function_4fa990(995616, %20)` で設定し、`function_52f090` (`187795` 行) が 0 にする。`function_4fa990` (`178676` 行) は `410320` で確保し、`40f9e0` で初期化する。
 - 実測: obj `0x10bd3960` は線形メモリ内。`[obj+8]` (peek) = 0。
-- REPORT_714 §9・§12 の `4fb910 local1 = 0x1fa8d8` は、この HEAD の実測 (`0x1faa18`、IR 定数と一致) と違う。旧 build の値として扱う。
+- **不一致 (原因未特定)**: IR 定数 `2074840` = `0x1fa8d8` と、inspector 実測の `4fb910` local1 = `0x1faa18` (`2075160`) は一致しない (差 320 B)。REPORT_714 §9・§12 の `0x1fa8d8` は IR 定数と同じ値。trap 時の正しい値はどちらか、未確定。
+
+### 2-3. 行番号の再現
+
+```sh
+grep -n 'call i64 @function_535bf2()' tools/m11/work/boot_final.ll         # 189403 行
+grep -n 'call i64 @function_535bf2(i64 0)' tools/m11/work/boot_final3.ll   # 192097 行
+sed -n 102127p tools/m11/work/boot_final.ll | grep -o '16169216\|2074840'  # 0xf6b900 と 0x1fa8d8
+wc -l < tools/m11/work/boot_final.ll                                       # 490735
+```
+
+本 fix run では素材が無く上記を再実行していない。行番号は #2785 の run の出力。
 
 ## 3. 判定
 
@@ -42,6 +57,15 @@ REPORT の既定 (870 / 24、304・555 が trap) とは一致しない。`bbb07d
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `535c11` → `535bf2` の obj 引数の取りこぼし (IR に残る。`boot_final3.ll` では `i64 0`) | 304・555 の obj が 0 のまま | #1426 (継続) |
+| `535c11` → `535bf2` の obj 引数の取りこぼし (IR に残る。`boot_final3.ll` では `i64 0`。補う工程は未特定) | 304・555 の obj が 0 のまま | #1426 (継続) |
 | HEAD の既定 survey 872/22 と REPORT の 870/24 の差。304・555 が HEAD で ok になる理由も未確認 | 受入 4 | #1426 (継続) |
 | 923: `G` = `0x10bd3960` の `[obj+8]` = 0 の由来 (`52f090` の 0 化との順序) | 923 が trap | #1426 (継続) |
+| `4fb910` の local1: IR 定数 `0x1fa8d8` と inspector 実測 `0x1faa18` が一致しない (差 320 B)。REPORT_714 §9・§12 の値の正否 | 923 の呼出し鎖の値の正しさ | #1426 (継続) |
+
+## 5. DEFECTS 行案 (新類型候補・番号未割当、PM 判断)
+
+既存の D5・D21 とは機構が異なるため、`docs/DEFECTS.md` 形式の行案を置く。DEFECTS.md の直接編集は PM 判断。
+
+| ID | 層 | 状態 | 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
+|---|---|---|---|---|---|---|---|
+| (PM 割当) | fe (未確定) | 新規 (#2785 発見・機構未確定) | IR の call 文から引数が欠落し、304・555 の obj が 0 になる (callee は obj を受け取れない) | 未確定。`function_535c11` の境界外分岐が `call i64 @function_535bf2()` (引数なし、`boot_final.ll` 189403 行) を出す。`boot_final3.ll` では `i64 0` (192097 行) になる。補う工程は未特定 | 304・555 の obj 生成元 (§2-1) | 呼出し文の引数数と callee 定義の引数数の照合 (未実装) | 機構未確定のため未定。候補: 照合で欠落を検出し fail-closed にする |
