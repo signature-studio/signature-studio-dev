@@ -4,7 +4,7 @@
 
 ## 1. 測定
 
-- 測定 commit: `9b7ddcc75c8e7dea72650757f9708293d9e279ee` (完全 SHA・e2e を実行した HEAD。main (`798bbb67`) の取り込み merge)。その後に積む commit は docs のみ (REPORT・DOC_MAP・PR 本文)。`git diff 9b7ddcc7 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` の出力は 0 行 (`docs/WORKFLOW.md` §6)
+- 測定 commit: `9b7ddcc75c8e7dea72650757f9708293d9e279ee` (完全 SHA・e2e を実行した HEAD。main (`798bbb67`) の取り込み merge)。その後の commit は docs (REPORT・DOC_MAP) と main の取り込み merge (`e87eb52a` まで・測定対象のパスは main 側でも変更なし) のみ。`git diff 9b7ddcc7 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` の出力は 0 行 (`docs/WORKFLOW.md` §6)
 - 素材: `work-m11` / `work-liftdiff` を `tar --zstd -xf` で `tools/m11/work/`・`tools/liftdiff/work/` (gitignore) に展開。PR 本文の `oc_artifacts: fl-win64 work-m11 work-liftdiff` で取得
 - 実行: `TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground・`timeout 900`)
 - **測定 commit `9b7ddcc7` の結果**: rc=0・real 1m27.5s・load average (1 分値) 0.13 → 0.87。1〜7/7 完走 (`[audit_lsf_ssa_e2e] n/7` の 7 段すべて出力)。`drops_510.tsv` は results/ と cmp 一致、`spill178_1161.tsv` は results/ と cmp 一致
