@@ -46,7 +46,7 @@ md = Cs(CS_ARCH_X86, CS_MODE_64)
 md.detail = False
 code = text.get_data()
 rip_re = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
-mem_re = re.compile(r"^qword ptr \[(r[a-z0-9]+)(?: \+ (0x[0-9a-f]+))?\]$")
+mem_re = re.compile(r"^qword ptr \[(r(?!ip\b)[a-z0-9]+)(?: \+ (0x[0-9a-f]+))?\]$")
 
 lea_hits = []
 calls = []
