@@ -167,6 +167,7 @@ const negatives: Array<[string, string, Opts]> = [
   ["needs-user-input", "user", { labels: ["needs-user-input"] }],
   ["pm-apply", "user", { labels: ["pm-apply"] }],
   ["oc:stuck", "user", { labels: ["oc:stuck"] }],
+  ["oc:hold (#2651)", "hold", { labels: ["oc:hold"] }],
   ["open PR 21-x (started)", "started", { pre: async (ctx) => assert.equal((await send(ctx.app, "pull_request", { ...prEv(91), pull_request: { ...prEv(91).pull_request, head: { ref: "21-x" } } })).status, 202) }],
   [
     "依存: #22 (open) (blocked)",
