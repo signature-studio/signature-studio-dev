@@ -187,7 +187,7 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `MemoryBudget` の SharedArrayBuffer カウンタを `PluginPool` の既定経路 (Worker) に配線し、main+Worker 合算の 124 を pool 経路で試験 | 本試験は per-thread カウンタ。実運用の上限は未検証 | [RT-13] #2519 |
-| `hb_bridge.mjs` `LoadLibraryW` の handle 採番 (`loaded.size + 1`) の解放後衝突を再現し、共有 poc 側を修正 | 本試験は派生クラス `PoolBridge` で回避。共有 poc は未修正 (導出のみ・再現は未実施) | [RT-14] #2520 |
+| 派生 `PoolBridge` を撤去し、memload real を共有 `hb_bridge.mjs` で PASS させる (RT-15 受入 1) | 共有 poc の採番修正は #2553 で merge 済み (再現・ネガコンは `tools/hostbridge/REPORT.md` §5-c)。撤去は #2552 の PR。`pnpm runtime:memload:real` は OTT DLL (`analysis-ott-binaries`) 素材無しで未実測 (`REPORT_APPENDIX_2552.md`) | [RT-15] #2552 (素材を添えて再依頼) |
 | dispose 時の FL 側 state 保存仕様 (保存の要否・形式) | 設計判断。pool は dispose フックだけ提供 | #125 へコメント (未決として記載済み) |
 | 1 wasm に常駐 Memory が 124 超を載せる場合 (Kilohearts 47 stub 等の同居) | 追い出し対象外の常駐は回避できず OOM になる。回避策は未実装 | #96 (HB-H7) |
 | Chrome 以外の Memory 上限 (Firefox / Safari) | 予算値 96 は Chrome 154 の実測のみに基づく | #127 (RT-9) |
