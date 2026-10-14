@@ -2,7 +2,7 @@
 
 ## 0. 結論
 
-- 測定 commit: **`fb3c40c3`** (測定時にコードを変えた最後の commit)。以降は main 取り込み (`00083cdb`) で #1894 の entry probe が `m11_ov.c`・`m11_build.sh` に入ったが、既定 OFF (§5)。
+- 測定 commit: **`fb3c40c3`** (測定時にコードを変えた最後の commit)。以降は main 取り込み (`00083cdb`) で #1894 の entry probe が `m11_ov.c`・`m11_build.sh` に入ったが、既定 OFF。**HEAD `4489d55a` で同じ 6 構成を再測定し、§1 の表と全セル一致** (§5。`fb3c40c3`..`4489d55a` の build 経路差分は 50 行あり、§6 の基準に従い再測定した)。
 - −4 は **rt.o の計測 flag** に帰属した。`rt.o` だけ計測 OFF (既定) に戻すと getmem は 2008 → **2012 (既定と一致)**。`rt.o` だけ計測 ON にすると既定 IR のままでも 2008。
 - `ov.o` の計測 flag (O0) は本切り分けでは検証対象外。`m11_ov.c` の計測本体は `M11_OV_413060=0`・`M11_OV_CLASSCREATE=0` の条件で未コンパイルのため、`M11_OV_INSTR` を変えても ov.o の object は C と同一で、O0 の 2008 は構造上の必然 (寄与の有無は判定していない)。ov.o の寄与を測るには `M11_OV_413060=1` 側の比較が必要 (IR 挙動を変えるため別 issue)。リンク時 EXPORTS (`_m11_dest_obs_*`) を外しても 2008 のまま (寄与なし)。
 - survey 判定 (ok/trap/clobber) は全構成で 870/24/0。既定の基準 (870/24/0) は変えていない。
@@ -52,10 +52,23 @@ IR 生成: `ldfix=applied`・F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0 (REP
 
 ## 5. 測定 commit からの差分と HEAD での再測定
 
-- `git diff fb3c40c3 00083cdb -- tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_survey.mjs` (main 側の測定コード差分): `m11_build.sh` の `-DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0}` 追加・ov.o の stamp 追加・EXPORTED_FUNCTIONS への `_m11_fe_get,_m11_fe_clear` 条件付き追加、`m11_ov.c` の `function_417b70` の `#if M11_ENTRY_PROBE` 囲み、`m11_survey.mjs` 1 行。**既定 (`M11_ENTRY_PROBE=0`) では `#if` が偽・EXPORTS 不変**で、ov.o のソースは既定 build で同じ内容になる (`#if` 偽)。ただし stamp 追加により ov.o は初回に 1 回再コンパイルされる。build 結果が同一であることは未確認 (再測定が必要)。
+- `git diff fb3c40c3 00083cdb -- tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_survey.mjs` (main 側の測定コード差分): `m11_build.sh` の `-DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0}` 追加・ov.o の stamp 追加・EXPORTED_FUNCTIONS への `_m11_fe_get,_m11_fe_clear` 条件付き追加、`m11_ov.c` の `function_417b70` の `#if M11_ENTRY_PROBE` 囲み、`m11_survey.mjs` 1 行。**既定 (`M11_ENTRY_PROBE=0`) では `#if` が偽・EXPORTS 不変**で、ov.o のソースは既定 build で同じ内容になる (`#if` 偽)。ただし stamp 追加により ov.o は初回に 1 回再コンパイルされる。HEAD `4489d55a` の再測定で、build 結果 (IR md5・getmem) は測定 commit と一致 (上記)。
 - 測定 commit からの本 PR の差分 (`git diff fb3c40c3 HEAD -- tools/m11/m11_build.sh tools/m11/m11_ov.c`) は、上記 main 側差分 + 本 PR の `M11_RT_INSTR`・`M11_OV_INSTR`・`M11_LINK_INSTR` 追加 (既定 build 不変)。
 - **前処理レベルの確認 (HEAD `709996a8`・実測)**: `M11_ENTRY_PROBE=0` 相当の `-D` (計測系 flag は全て既定値) で `m11_ov.c` を `cc -E -P` した出力を、測定 commit `fb3c40c3` の `m11_ov.c` と比較した。両者 1689 行で `cmp` 一致 (差分 0)。これは ov.o の前処理結果が同一であることの確認で、object (`.o`) や IR の同一性は未確認。
-- **HEAD での再測定は未実施 (素材不足・fix run 時点)**: `$ARTIFACTS_DIR` には `fl-win64.tar.zst` のみで、`work-m11`・`toolchain-emsdk`・`toolchain-retdec` が無い。`tools/m11/work/`・emsdk・retdec も存在しないため `m11_build.sh` は `/opt/emsdk` の不在で止まり、`repro_1701_rt_ov.sh` は実行できない。§1 の数値は測定 commit `fb3c40c3` の値であり、HEAD の値ではない。再測定は PR 本文の `oc_artifacts: fl-win64 work-m11 toolchain-emsdk toolchain-retdec` 指定で再起動して行う。
+- **HEAD `4489d55a` での再測定 (実測・2026-10-14 08:24 UTC 開始)**: 素材 `fl-win64`・`work-m11`・`toolchain-emsdk`・`toolchain-retdec` を展開し (`work-m11` 展開後に `m11_gen_ir2.sh` を実行: ldfix=applied・F1=902・errors=0)、`bash tools/m11/trap_triage/repro_1701_rt_ov.sh 1` を直列・foreground で実行 (所要 3 分 46 秒、開始時 load 1.01、4 vCPU)。
+
+  | 構成 | boot_final3.ll md5 | undefined symbol | ok/trap/clobber | getmem | fastmm_getmem_impl |
+  |---|---|--:|--:|--:|--:|
+  | A_default | baa100ff | 0 | 870/24/0 | 2012 | 2096 |
+  | C_noren | baa100ff | 0 | 870/24/0 | 2008 | 2091 |
+  | R0_rtOFF | baa100ff | 0 | 870/24/0 | 2012 | 2096 |
+  | O0_ovOFF | baa100ff | 0 | 870/24/0 | 2008 | 2091 |
+  | L0_lnkOFF | baa100ff | 0 | 870/24/0 | 2008 | 2091 |
+  | R1_rtON | baa100ff | 0 | 870/24/0 | 2008 | 2091 |
+
+  §1 (`fb3c40c3`) の表と全セル一致。帰属 (rt.o が −4) は崩れていない。ここで確認したのは IR md5・undefined symbol・survey 判定・getmem の一致で、**object (`.o`) 単位の同一性は未確認**。
+- **測定コード差分 (測定 commit `4489d55a` 時点)**: `git diff fb3c40c3 4489d55a -- tools/m11/m11_build.sh tools/m11/m11_ov.c` は 50 行 (下記 diff の内容と同じ差分)。§6 の基準では差分 0 ではないため、この実測をもって再測定とする。
+- **前処理レベルの確認 (HEAD `709996a8`・実測)**: `M11_ENTRY_PROBE=0` 相当の `-D` (計測系 flag は全て既定値) で `m11_ov.c` を `cc -E -P` した出力を、測定 commit `fb3c40c3` の `m11_ov.c` と比較した。両者 1689 行で `cmp` 一致 (差分 0)。
 - **測定コード差分の全文 (`git diff fb3c40c3 d19f47c4 -- tools/m11/m11_build.sh tools/m11/m11_ov.c`)**: 以下。この差分は build 経路 (ov.o の再コンパイル判定・EXPORTS・`#if` 囲み) に入るため、§6 の基準では再測定が必要。`M11_ENTRY_PROBE=0` では `#if` 偽・EXPORTS 不変だが、object・IR の同一性は未確認。
 
 ```diff
@@ -105,5 +118,4 @@ IR 生成: `ldfix=applied`・F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0 (REP
      u64 len = Q(lengths);
      if ((long long)len <= 0) {
 ```
-- **§5 の判定 (HEAD `d19f47c4` 時点・文字列レベルの確認のみ)**: 既定 (`M11_ENTRY_PROBE=0`) での変化は次のとおり。(a) `CF` に `-DM11_ENTRY_PROBE=0` が増える (`#if` 偽のため C のコード生成は変わらない見込み)。(b) stamp 行の追加により、初回 build で ov.o が 1 回再コンパイルされる。(c) EXPORTED_FUNCTIONS の文字列は `M11_ENTRY_PROBE=0` では変わらない (追加部分が空に展開される)。object・IR・getmem の同一性は未確認で、再測定で確認する。
-- 参考 (前回記録・本 run では未再現): 前 HEAD `69f3dd3b` で `repro_1701_rt_ov.sh 1` を再実行した記録は A=2012 / C=2008 / R0=2012 / O0=2008 / L0=2008 / R1=2008、全構成 IR md5 `baa100ff`・undefined symbol 0・870/24/0。所要 3 分 21 秒。
+- **既定 (`M11_ENTRY_PROBE=0`) での変化**: (a) `CF` に `-DM11_ENTRY_PROBE=0` が増える (`#if` 偽のため C のコード生成は変わらない)。(b) stamp 行の追加により、初回 build で ov.o が 1 回再コンパイルされる。(c) EXPORTED_FUNCTIONS の文字列は `M11_ENTRY_PROBE=0` では変わらない。HEAD `4489d55a` の再測定 (上記) で IR md5・getmem の一致を確認した。
