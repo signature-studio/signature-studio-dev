@@ -133,6 +133,32 @@ $ git diff eba7e821 HEAD -- tools/python/host tools/python/provider tools/python
 
   この REPORT と解析スクリプト (`analysis/flapi/pe_launchmap_entries.py`) は測定 commit の後に加えた。どちらもテスト・provider のビルドに入らない。
 
+### main 取り込み後の再測定 (merge `5a95319a`)
+
+main (`0064cfbc`) を取り込んだ merge で、競合は `tests/provider_check.mjs` の集合定義 (main の `pe115` と本件の `pe120`) だけだった。両方を残して解消し、期待値は実装 87 / 未実装 348 (main の 86 / 349 に本件の 1 件を加えた値)。
+
+測定 commit: `5a95319a` (コードを変えた最後の commit)。環境は runner。`FL_WIN64_DIR` は fl-win64 から DATA block 4 件だけ展開した先、emsdk は `/opt/emsdk`。
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `node tests/provider_check.mjs` | PASS (435 / 実装 87 / 未実装 348 / MCP 静的 60) | 0.35 秒 |
+| `node tests/launchmap_diff.mjs` | calls 3、diffs 0、PASS | 0.05 秒 |
+| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 | 1.6 秒 |
+| `channels` / `device` / `ilmcp` / `midi_path` / `mixer` / `transport` / `ui` の `*_diff.mjs` | 全て diffs 0、PASS | ループ実行 (個別未計測) |
+| `node tests/browser_check.mjs` | BROWSER OK (tools 48) | ループ実行 (個別未計測) |
+| `build_flpy_static.sh` 後の `node tests/static_check.mjs` | STATIC CHECK OK (tool 別差 0/48) | 0.35 秒 |
+| `node tests/static_browser_check.mjs` | STATIC BROWSER OK (SAB 48/48・static 48/48・diff 0) | 2.7 秒 |
+| `CPY_PTHREADS=1` の CPython・static 後の `node tests/static_mt_check.mjs` | STATIC MT CHECK OK (single_vs_stock diff 0、thread_mismatch 0、runs 50、wall_ms 378) | 0.8 秒 |
+| `node tests/mcp_ui_check.mjs` / `node tests/midi_ui_check.mjs` | MCP UI OK / MIDI UI OK | 2.0 秒 / 2.4 秒 |
+
+コード差分 (測定 commit から HEAD まで、テスト・mock・C に効く範囲):
+
+```
+$ git diff 5a95319a HEAD -- tools/python/host tools/python/provider tools/python/tests
+(空)
+```
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
