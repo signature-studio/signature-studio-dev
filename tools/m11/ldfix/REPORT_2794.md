@@ -13,8 +13,8 @@
 ## 1. 測定条件
 
 - 測定 commit: `f5b35a1d` (コードを変えた最後の commit: `fix(m11): repair spill TRUE_DROP sites with 1-to-1 machine check (#2794)`)。作業 worktree `ws-2794` (branch `2794-spill-true-drop-repair`)、起点 `origin/main` = `40dd4460`。
-- 素材: `work-m11` を `tools/m11/work/` に展開 (`boot_final3.ll` 21.7 MB・`m11_image.bin`・`boot*.drc.config.json`)。`work-m11` は #516 以前の snapshot で、結論はこの IR に限る (REPORT_1169 §1 と同じ注意)。emcc は runner 既存の `[EMSDK]` (`/opt/emsdk`) を使い、`toolchain-emsdk` の展開は不要だった。`work-liftdiff` は本 e2e では未使用 (受入の `oc_artifacts` 行には残す)。
-- 実行: `bash tools/m11/ldfix/fix_d17_e2e.sh` (`RUNNER_TEMP=/home/runner/work/_temp` を `TMPDIR` として使用、foreground)。
+- 素材: `work-m11` を `tools/m11/work/` に展開 (`boot_final3.ll` 21.7 MB・`m11_image.bin`・`boot*.drc.config.json`)。`work-m11` は #516 以前の snapshot で、結論はこの IR に限る (REPORT_1169 §1 と同じ注意)。emcc は runner 既存の `[EMSDK]` を使い、`toolchain-emsdk` の展開は不要だった。`work-liftdiff` は本 e2e では未使用 (受入の `oc_artifacts` 行には残す)。
+- 実行: `bash tools/m11/ldfix/fix_d17_e2e.sh` (`RUNNER_TEMP` を `TMPDIR` として使用、foreground)。
 - 実測 (測定 commit `f5b35a1d`、n=2。レンジは未取得): real 46.50 s / 46.40 s、rc=0 / rc=0、load average (1 分) 0.85 / 0.93。対照として、修復 pass を入れる前の `40dd4460` で同じ script の既存 5 step を回すと real 31.10 s、rc=0、load average 0.85 (1 分)。増分 15.30 s (46.40 − 31.10) は、修復 pass と修復後 audit (step 5) の追加による。
 - 測定後の差分 (測定 commit から HEAD までのコード差分。この REPORT を追加する commit 以外は無い):
 
