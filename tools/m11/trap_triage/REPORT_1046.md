@@ -176,3 +176,12 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
   - `store_watch_682.sh` は生成した `survey_sv.mjs` を `work/probe682/` に置くため、`import ... './m11_ptrcheck.mjs'` が解決できず survey が起動しない (`ERR_MODULE_NOT_FOUND`)。`store_watch_1046.sh` は `tools/m11/` 直下に `survey_sv_1046.mjs` を置くので影響しない。
 - 受入の判定 (本 run): 1 は §10 で達成済み。2 (`0x92492493`) は未着手。3 は未確定 (書込み元 store の特定が未了)。4 は修復未実施で未達。
 - 次の手順: (a) 計装版が unit 106 で止まる原因を切り分ける (unit 106 だけを `SV_ONLY=106` で単独実行し、時間と停止位置を取る)。(b) 止まらない計装 (例: 監視を unit 492 の直前だけ有効にする) で、`0x10a9f910` への最後の書込みを IR 行に戻す。(c) D17 か別類型かを判定する。
+
+## 16. #1620 run (HEAD `7e665077` = origin/main、コード変更なし): 計装の停止点の切り分け
+
+- 測定 commit: `7e665077` (コード差分 0。本節の追記のみ)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11`・`work-liftdiff` は worktree `ws-1620` の `tools/m11/work`・`tools/liftdiff/work` に実コピー (硬リンクにしていない)。
+- 再現: `m11_gen_ir2.sh` rc 0 (49.8 s、490,733 行、ldfix errors=0) → `m11_build.sh` rc 0 (24.6 s、wasm-ld signature mismatch 0・undefined 0) → `survey_units.mjs` rc 0 (12.8 s): `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
+- 停止点の切り分け: 全 store 計装版 (`store_watch_1046.sh`) を `SV_ONLY=106` で単独実行 → rc 1 (`[sw] hits: 0` の grep 終了コード。survey 自体は完走)、約 45 秒。unit 106 は計装版でも単独では止まらない。§15 の「unit 106 で停止」は計装版の全件実行の副作用で、unit 106 の処理そのものではない可能性が高い (全件実行の切り分けは未了)。
+- 値遷移 probe (`probe_1046_watch.mjs`、HEAD `7e665077`): 全 942 unit を 12.8 s で完走。`0x10a9f910` の遷移は §14 と一致: `unit 477 exc 0x1_1029e5d8 -> 0x1_2`、`unit 484 exc 0x1_2 -> 0x1_3`、`unit 492 exc 0x1_3 -> 0x0`。
+- 結論 (本 run): 受入条件 1 (書込み元 store の IR site 特定) は未達。全 store 計装を unit 0〜484 で完走させる手段は本 run の時間内に作れなかった。`[aw]` 計装は本 run では入れていない (build 後の基準 survey で一致を確認)。
+- 次の手順: (a) 計装版の 0〜484 全件実行を unit 範囲に分割して (例: 0–240 / 241–484) 実行し、各範囲の `[aw]` を取る。範囲をまたぐ状態は probe で確かめた `0x1_2` 遷移点 (unit 477) を起点にする。(b) `[aw]` に unit 境界を出す計装 (`unit N` 行を `[aw]` と同じ stderr に出す) を入れ、計装有無で survey 結果が変わらないことを確認する。(c) D17 か別類型かを判定する。
