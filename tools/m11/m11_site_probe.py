@@ -35,7 +35,7 @@ def insert_probes(src, dst):
             sites[n] = fn
         out.append(line)
     text = '\n'.join(out)
-    text = text.replace('source_filename = "m11"', 'source_filename = "m11"\n@m11_site_cur = external global i32', 1)
+    text = re.sub(r'(?m)^(target datalayout = .*)$', r'\1\n@m11_site_cur = external global i32', text, count=1)
     if dst != '/dev/null':
         open(dst, 'w').write(text)
     return sites
