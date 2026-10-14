@@ -125,7 +125,7 @@
 | 0x104743c〜0x1047446 | `sub eax,0x80000000` / `cmp 0x70000000` / `jb 0x104aa87` | ecx ∈ [0x80000000, 0xf0000000) → 0x104aa87 |
 | 0x104744c〜0x1047456 | `sub eax,0x80000000` / `cmp 0x10000000` / `jb 0x1047497` | ecx ∈ [0x00000000, 0x10000000) → 0x1047497 |
 | 0x1047458〜0x104745f | `sub eax,0x40000000` / `test eax,eax` / `jne 0x104caae` / 以降 `jmp 0x104c2a6` | ecx == 0x40000000 → 0x104c2a6、他 → 0x104caae |
-| 0x104746a〜0x1047492 | `sub eax,0x40000002` / `je 0x104c64f` / `sub 3` / `je 0x104c919` / `sub 0x2ffffffb` / `cmp 0x10000000` / `jae 0x104caae` / `jmp 0x104aa87` | ecx == 0x40000002 → 0x104c64f、ecx == 0x40000005 → 0x104c919、ecx ∈ [0x40000006, 0xf0000000) → 0x104aa87、他 → 0x104caae |
+| 0x104746a〜0x1047492 | `sub eax,0x40000002` / `je 0x104c64f` / `sub 3` / `je 0x104c919` / `sub 0x2ffffffb` / `cmp 0x10000000` / `jae 0x104caae` / `jmp 0x104aa87` | ecx == 0x40000002 → 0x104c64f、ecx == 0x40000005 → 0x104c919、ecx ∈ [0x70000000, 0x80000000) → 0x104aa87、ecx ∈ [0x40000006, 0x70000000) → 0x104caae（`sub 0x2ffffffb` 後の eax が 0x10000000 以上に wrap） |
 
 - 分岐表の検算 (別アルゴリズム): `analysis/py53_ecx_route.py` は 32bit 演算の if 文で分岐先を直接求める。`analysis/py53_ecx_check.py` は逆アセンブル命令 (`work/py53/fn.txt`) を実行して分岐先を求め、両者を境界値 20 件 (0・0xffff・0x10000000・0x40000000〜0x40000006・0x6fffffff・0x70000000・0x80000000・0xefffffff・0xf0000000・0xffffffff など) で比べる。
   - 結果: `cases=20 mismatch=0` (exit 0)。
@@ -215,9 +215,9 @@
 
 ## 測定
 
-- 素材を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で `work/py64/` に展開 (2.3 秒)。
-- `analysis/py53_dispatch.py` → 4,664 命令。`analysis/py60_objdump_check.py` → 614 辺 一致 614・不一致 0 (exit 0)。
-- `analysis/py64_branch_regions.py work/py53/fn.txt` → 固有部分の命令数と書込み 76 件 (0x1047497 55・0x104aa87 15・他 3 件は各 2)。
+- 素材を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'` で展開 (2.3 秒)。展開先は `work/py64/extracted/block00031_PE.bin`。
+- `analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` → 4,664 命令・`work/py53/fn.txt`。`analysis/py60_objdump_check.py` → 614 辺 一致 614・不一致 0 (exit 0)。
+- `analysis/py64_branch_regions.py work/py53/fn.txt` → 到達命令数 (0x1047497 2556・0x104aa87 1284。両者で 141 命令が重なる) と書込み 76 件 (重複込み。0x1047497 55・0x104aa87 15・他 3 件は各 2)。一意な書込みは 71 件 (重なる 5 件は 1 件と数える)。関数全体の直接書込みは 74 件。
 
 ## 分岐先ごとの式 (入口 `[rbp+0x5b8]` = edx、0x1046d6b)
 
@@ -230,12 +230,13 @@
 
 ## 未了 (2 件)
 
-| 分岐先 | 入る ecx | 固有命令数 | `[rbp+0x5b8]` 書込み | -1 exit への分岐元 |
+| 分岐先 | 入る ecx | 到達命令数 | `[rbp+0x5b8]` 書込み | -1 exit への分岐元 |
 |---|---|---|---|---|
-| 0x1047497 | [0, 0x10000000) | 2556 | 55 件 | 0x10474b9・0x104846a・0x104847b・0x10495f6・0x1049621・0x104a7ba・0x104a7d0 |
-| 0x104aa87 | [0x80000000, 0xf0000000) と [0x40000006, 0xf0000000) | 1284 | 15 件 | 0x104a7ba・0x104a7d0 |
+| 0x1047497 | [0, 0x10000000) | 2556 (0x104aa87 と 141 命令が重なる) | 55 件 | 0x10474b9・0x104846a・0x104847b・0x10495f6・0x1049621・0x104a7ba・0x104a7d0 |
+| 0x104aa87 | [0x70000000, 0xf0000000) (2 区間の和: [0x80000000, 0xf0000000) と [0x70000000, 0x80000000)) | 1284 (0x1047497 と 141 命令が重なる) | 15 件 | 0x104a7ba・0x104a7d0 |
 
-書込み箇所の VA と直前命令は `analysis/py64_branch_regions.py` の出力が正本。各式の読む値・書く値は未読。
+書込み箇所の VA と直前命令は `analysis/py64_branch_regions.py` の出力が正本。各式の読む値・書く値は未読。書込み件数は直接 `mov dword ptr [rbp+0x5b8], reg` の列挙で、一意な書込みは 71 件。
+間接書込みは列挙に含まれない: 0x104a924 `lea r8,[rbp+0x5b8]` → `call 0xc61250` の 0xc6129a `mov dword ptr [rdi], eax` (0xc62db0 の戻り値の下位 1 byte が非 0 のとき書く)。この箇所は 0x1047497 と 0x104aa87 の到達範囲に含まれ、確定 4 件の到達範囲には含まれない。
 
 ## 受入条件・未解決
 
@@ -243,5 +244,5 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x1047497 (55 件) と 0x104aa87 (15 件) の書込み式・読む値・書く値 | ecx ∈ [0, 0x10000000) と [0x80000000, 0xf0000000) 経路の戻り値 | PY-88 (子) |
+| 0x1047497 (55 件) と 0x104aa87 (15 件) の書込み式・読む値・書く値 | ecx ∈ [0, 0x10000000) と [0x70000000, 0xf0000000) 経路の戻り値 | PY-88 (子) |
 | 4 件の式の別算法照合 | 式の確定の検算 | PY-88 (子) |
