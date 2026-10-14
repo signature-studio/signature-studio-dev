@@ -1,5 +1,6 @@
 import manualDepsJson from "../../../tools/pm/manual_deps.json" with { type: "json" };
 import { DEFAULT_BATCH } from "./launch.ts";
+import { DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 
 // 既定の TARGET は 80。GitHub の同時 job 上限 (60) を超えた分は queued になり、常時 60 に張り付くための余裕。
 export const DEFAULT_TARGET_WORKER = 80;
@@ -34,6 +35,8 @@ export interface Env {
   COMMENT_MAX_PAGES?: string;
   // oc:stuck の open PR がこれを超えたら launch を止める (既定 40)。
   STUCK_HIGH?: string;
+  // reviewer App の bot ログイン。review の verdict とマーカー付きコメントの信頼に使う。
+  REVIEWER_LOGIN?: string;
 }
 
 export interface Config {
@@ -43,7 +46,7 @@ export interface Config {
   batch: number;
   // launch の /oc コメント投稿を実行するか。
   liveLaunch: boolean;
-  // repository_dispatch (oc-watchdog) の送信を実行するか。
+  // repository_dispatch (oc-watchdog と oc-pm) の送信を実行するか。
   liveDispatch: boolean;
   botLogin: string;
   pmLogins: string[];
@@ -53,6 +56,9 @@ export interface Config {
   commentWindowH: number;
   commentMaxPages: number;
   stuckHigh: number;
+  reviewerLogin: string;
+  // oc-pm の対象にしてよい bot の起票者。人は author_association (OWNER / MEMBER / COLLABORATOR) で絞る。
+  pmTargetBots: string[];
   manualDeps: Record<string, number[]>;
 }
 
@@ -83,6 +89,8 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     commentWindowH: Math.max(MIN_COMMENT_WINDOW_H, num(env.COMMENT_WINDOW_H, DEFAULT_COMMENT_WINDOW_H)),
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),
     stuckHigh: num(env.STUCK_HIGH, 40),
+    reviewerLogin: env.REVIEWER_LOGIN ?? DEFAULT_REVIEWER_LOGIN,
+    pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]"],
     manualDeps,
   };
 }

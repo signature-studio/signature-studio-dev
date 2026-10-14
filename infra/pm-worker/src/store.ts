@@ -23,6 +23,7 @@ const KINDS: Array<{ kind: string; field: Field }> = [
   { kind: "pm_art", field: "pmArt" },
   { kind: "blocked_by", field: "blockedBy" },
   { kind: "launched_at", field: "launchedAt" },
+  { kind: "sig", field: "sig" },
 ];
 const FIELD_OF: Record<string, Field> = Object.fromEntries(KINDS.map((k) => [k.kind, k.field]));
 
@@ -33,7 +34,7 @@ export function migrate(storage: StorageLike): void {
 }
 
 export function loadState(storage: StorageLike): PmState {
-  const state: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, pmArt: {}, blockedBy: {}, launchedAt: {} };
+  const state: PmState = { issues: {}, prs: {}, runs: {}, botLast: {}, pmArt: {}, blockedBy: {}, launchedAt: {}, sig: {} };
   for (const row of storage.sql.exec("SELECT kind, key, json FROM pm_entities").toArray()) {
     const field = FIELD_OF[String(row.kind)];
     if (!field) continue;
