@@ -8,7 +8,8 @@
 #   例 (#113 の 16-bit 試行): S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|4' bash tools/flp/s2_render_probe.sh Autogun.flp 1
 # 検証用の即値パッチ: S2_PATCH に 1 行 1 件 `<VA hex>|<期待バイト hex>|<新バイト hex>` を入れる (oracle ローカルコピーの FLEngine_x64.dll のみ)。
 # レジストリ・トレース: S2_TRACE_REG=1 で WINEDEBUG=+reg にし、開かれたキーを $WORKDIR/s2_reg_keys_<n>.txt に出す。
-# 出力は $RUNNER_TEMP 配下のみ (commit 対象外)。結果の要約は tools/flp/REPORT_APPENDIX.md §15・§16。
+# WAV 形式: WAVRenderForm\WFBox = ${S2_WFBOX:-2} (0 = 16-bit / 1 = 24-bit / 2 = 32-bit float、#3052 で実測)、WAVRenderForm\DitherBox = 0 (dither off)。16-bit に戻すには S2_WFBOX=0。
+# 出力は $RUNNER_TEMP 配下のみ (commit 対象外)。結果の要約は tools/flp/REPORT_APPENDIX.md §15・§16・§17。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ART="${RUNNER_TEMP:-/tmp}"
@@ -35,6 +36,8 @@ while IFS='|' read -r pva pexp pnew; do
 done <<< "${S2_PATCH:-}"
 
 wine64 reg add 'HKCU\Software\Image-Line\FL Studio 26\Devices\Audio output' /v 'Sample rate' /t REG_SZ /d 48000 /f >/dev/null 2>&1 || true
+wine64 reg add 'HKCU\Software\Image-Line\FL Studio 26\General\WAVRenderForm' /v WFBox /t REG_SZ /d "${S2_WFBOX:-2}" /f >/dev/null 2>&1 || true
+wine64 reg add 'HKCU\Software\Image-Line\FL Studio 26\General\WAVRenderForm' /v DitherBox /t REG_SZ /d 0 /f >/dev/null 2>&1 || true
 while IFS='|' read -r rkey rname rval; do
   [[ -n "$rkey" ]] || continue
   wine64 reg add "HKCU\\$rkey" /v "$rname" /t REG_SZ /d "$rval" /f >/dev/null 2>&1 || true
