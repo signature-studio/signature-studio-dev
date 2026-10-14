@@ -55,9 +55,9 @@ github.event.comment.user.type == 'Bot' && github.event.comment.user.login == va
 
 1. Issue に `/oc <instruction>` をコメント (`oc_actions_allow_write` を含めると書き込み可)
    → **implement ジョブ**: イベント文脈の隔離 → App トークン取得 → checkout →
-   素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成・Auto Merge 有効化
+   素材 DL → プロンプト組み立て → OpenCode 実装 → コミット/push/PR 作成 (実装者は自分の PR を merge しない)
 2. PR が open / synchronize / reopen → **review ジョブ**: 差分取得 →
-   レビュワーエージェントが検証 → approve/request-changes → 必要なら `gh pr merge --merge --delete-branch`
+   レビュワーエージェントが検証 → approve/request-changes → approve したら同じ run で `gh pr merge --merge --delete-branch`
 3. PR に `/oc <instruction>` → コンフリクト解決などの追加作業
 
 `pull_request` の `synchronize` (PR が更新されるたび) でも review ジョブが起動する。
@@ -156,8 +156,10 @@ allow_squash_merge: false
 allow_rebase_merge: false
 ```
 
-`gh pr merge --squash` は必ず失敗する。プロンプトも `gh pr merge --auto --merge` /
-`gh pr merge --merge --delete-branch` を使う。
+`gh pr merge --squash` は必ず失敗する。merge は reviewer が approve した後に
+`gh pr merge --merge --delete-branch --match-head-commit <head>` で行う。
+**実装者は自分の PR を merge しない** (`gh pr merge`・`--auto`・REST `pulls/N/merge`・`enablePullRequestAutoMerge` を実行しない)。
+Auto Merge は承認なしで即時 merge され、独立した review を迂回するため、実装プロンプトから外した (#2600)。
 
 ## 規約
 

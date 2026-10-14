@@ -53,7 +53,10 @@ PM (main)                      subagent (実装)                  subagent (検�
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
-- **merge は PM のみ**。merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
+- **実装者は自分の PR を merge しない** (`gh pr merge`・`--auto`・REST `pulls/N/merge`・`enablePullRequestAutoMerge` を含む。#2600)。
+  merge は独立した検収 (Actions 上は oc-reviewer) が approve した後に、検収または PM が行う (§11)。
+  実装者が merge すると、独立した review を経ない自己 merge になる。
+  merge 後、`git worktree remove --force` で**自分が使った worktree** を片付ける。
 - **競合時**: `git rebase origin/main` で解消してから `push --force-with-lease` (自分 branch のみ)。
 - **既定ブランチは `main`** (`origin/HEAD → origin/main`)。旧 `origin/master` は `main` の祖先で
   12+ commits 遅れの凍結枝。master を base にした PR・master への pull/push は行わない。
@@ -62,9 +65,9 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 役割 | 着手時 | 完了時 | 禁止 |
 |---|---|---|---|
-| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更 |
+| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更・**自分の PR の merge (Auto Merge を含む)** |
 | 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge・方針変更・是正 | — |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge (検収の approve 後)・方針変更・是正 | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
@@ -339,6 +342,9 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     同じ group だと fix が pending の間に review が入って fix が黙って取り消される (pending は 1 件しか持てない)。
     その代わり fix と review が重なりうるので、reviewer は `gh pr merge --match-head-commit <レビューした head>` で
     未レビューの commit を巻き込まない。
+  - **merge の担い手**: 実装 agent は自分の PR を merge しない。Auto Merge も使わない (承認なしで即時 merge され、review を迂回する。
+    2026-10-14 是正。#2600)。reviewer が approve した同じ run で `gh pr merge --merge --delete-branch --match-head-commit <head>` を実行する。
+    `.github/scripts/tests/test-no-self-merge.sh` が、実装プロンプトに merge の指示が戻っていないことを検査する。
   - PR は **常に ready・base は main** で作る (draft / stacked は REVIEWING でも FIXING でもない状態を作るため禁止)。
     未完でも ready で出す。満たした範囲に issue の範囲を縮めて `Closes #N` とし、未解決は子 issue か PR 本文の未解決表に書く (§3)。前提 PR が未 merge の作業は着手しない。
 
