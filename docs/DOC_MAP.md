@@ -320,7 +320,7 @@
 | `tools/shimx/REPORT_SHX-T9h.md` | ~49 | SHX-T9h (#2489): 現行 `m11_ov.c` から baseline を再生成して unit 23 を shimx 版と比較。測定値の正本。REPORT_SHX-T9.md の旧 §3.3.5 から分割移動 (250 行上限のため) |
 | `tools/shimx/REPORT_SHX-T9i.md` | ~45 | SHX-T9i (#2491): unit 23 の GetModuleHandleW/GetProcAddress の呼出し元 site と戻り値の実測 (§3.3.5)・survey 942 unit の回帰確認 (§3.3.6)。REPORT_SHX-T9.md §3.3.5・§3.3.6 から分割 (250 行上限) |
 | `tools/shimx/REPORT_SHX-T9j.md` | ~80 | SHX-T9j (#2533): unit 23 の GetLastError を再生成 baseline と shimx `--trace --soft --fix` の両版で実測 (REPORT_SHX-T9.md §3.3.4 の追補) |
-| `tools/shimx/REPORT_SHX-T39.md` | ~95 | SHX-T39 (#3149): unit 23 の baseline が 0xf960 の後に入る分岐条件 (`function_467c40` の slot ゲート) の IR 行つき特定。証跡と IR 行の再抽出は `tools/shimx/evidence_3149/` (`repro.sh`)。 |
+| `tools/shimx/REPORT_SHX-T39.md` | 92 | SHX-T39 (#3149): unit 23 の baseline が 0xf960 の後に入る分岐条件 (`function_467c40` の slot ゲート) の IR 行つき特定。証跡と IR 行の再抽出は `tools/shimx/evidence_3149/` (`repro.sh`)。 |
 | `tools/shimx/REPORT_SHX-T9k.md` | ~76 | SHX-T9k (#2593): unit 22 の GetLastError=126 の発生元 (GetProcAddress の 1 回目) と、IR 行番号 ↔ wasm バイトオフセットの対応 (REPORT_SHX-T9j.md §2.4 の後続) |
 | `tools/shimx/REPORT_SHX-T35.md` | ~118 | SHX-T35 (#3023): HeapFree の範囲外ポインタを M4 契約に揃えた判断と測定 (REPORT.md は 250 行上限のため付録) |
 | `tools/shimx/REPORT_SHX-T37.md` | 103 | SHX-T37 (#3070): HeapReAlloc・GlobalLock/GlobalUnlock/GlobalFree の不正入力の戻り値・GetLastError を M4 契約・native 参照・MSDN と突き合わせた表と「直さない」判断。実測は `tools/shimx/evidence_3070/run.sh`。範囲外 trap は #3056 (merge 済み) で解消 |
