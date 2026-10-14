@@ -240,3 +240,7 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 **#1602 r2 追記 (2026-10-14)**: 計測 hook の本体を変えると 304・555 の判定が 872/22 ↔ 870/24 と変わるが、どちらも範囲外の読みは 0 件で、値は採れていない。詳細は [REPORT_APPENDIX_1602.md](REPORT_APPENDIX_1602.md) §14。trap 位置は 304・555 が `function_535bf2`、923 が `function_410b10`。未解決は #1426 (継続)。
 
 **#1602 r4 追記 (2026-10-14)**: 受入 1・2 を達成。V8 inspector (`trap_triage/inspect_trap.mjs`、build 不変) で trap 時点の wasm local を読み、判定は不変 (870/24)。304・555 は `function_535bf2` の `obj = 0` (`tbl`・`cnt` は範囲外の値)、923 は `function_410b10` の `obj = 0x10bd3960` (範囲内) で `*(obj) = 0` のため `*(obj)-0x80 = 0xffffff80` が範囲外。測定表・呼出し鎖は [REPORT_APPENDIX_1602.md](REPORT_APPENDIX_1602.md) §16。未解決は #1426 (継続) (#714 は 2026-10-14 に close 済み)。
+
+## 14. obj の生成元 (#2785, 2026-10-14, n=1)
+
+304・555 の obj は `function_4fad10` 内で `535240`→`535b30`→`410320` が確保する node。`535c11` は `535bf2` へ渡す引数を IR で落としており (`call 535bf2()`)、obj は 0 になる。923 の obj は `G = [0x11f26a0]` で、設定は `52f1f0` → `4fa990`。HEAD `bbb07d80` の既定 survey は ok 872 / trap 22 (本節の基準 870/24 とは不一致、原因未特定)。受入 3 は達成、受入 4 は未達。詳細は [REPORT_APPENDIX_2785.md](REPORT_APPENDIX_2785.md)。
