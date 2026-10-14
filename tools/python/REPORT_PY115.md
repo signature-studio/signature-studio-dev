@@ -6,7 +6,7 @@
 
 - **格納 (mixer)**: `setTrackColor(i, v)` は v の R と B を入替え、alpha を `0xff` に固定した `swap_rb(v) | 0xff000000` を、track 要素 (`base + i*0x1478`) の **+0x4 (dword)** へ格納し、**+0x0 (byte) のフラグを 1** にする。`0xffffff` での切り捨ては無い (issue の「alpha 保持」の仮説は外れ、alpha は入力によらず `0xff`)。
 - **取得 (mixer)**: フラグが立っていれば `swap_rb(+0x4) | 0xff000000` を返す。往復は `setTrackColor(1, 0x123456)` → `getTrackColor(1)` = `0xff123456` (playlist 側と同じ期待値)。
-- **未確定 (フラグが立っていない track)**: 戻り値は既定色 (グローバル参照先の実行時値) に依存し、静的には確定できない。C と mock は仮置き `0x5A6B7C` (旧 mock の初期値)。→ 未解決の表 (§7)。
+- **未確定 (フラグが立っていない track)**: 戻り値は既定色 (グローバル参照先の実行時値) に依存し、静的には確定できない。C と mock の既定色は REPORT_PY118 で初期値 `0xff636c71` に確定した (実行時値は #3059)。本節の仮置きの記述は古い。
 - **修正**: C の `FL_H(mixer, setTrackColor)` を格納式に合わせ、`FL_H(mixer, getTrackColor)` を追加した。mock も同じ式にした (`provider/fl_engine.c`・`host/fl_mock.mjs`)。
 
 ## 1. 測定
@@ -48,8 +48,8 @@
 
 ## 4. 既定経路 (フラグ無し) の未確定
 
-- `0x12c18fa` の `mov rax,[rip+0x321f57]` は VA `0x15e3858` (.data) の pointer を読む。その file 値は `0x15f6774` で、これは `.bss` (file 内に実体無し)。つまり既定色の実体は FL の実行時に決まり、静的には確定できない。
-- C と mock の仮置き `MIX_DEFAULT_COLOR = 0x5A6B7C` (旧 mock の初期値を流用)。未設定 track の `getTrackColor` は `0xff5a6b7c` を返す。実機の既定値とは一致する保証が無い。
+- `0x12c18fa` の `mov rax,[rip+0x321f57]` は VA `0x15e3858` (.data) の pointer を読む。その file 値は `0x15f6774` で、これは `.bss` (file 内に実体無し)。既定色の初期値は REPORT_PY118 で `0xff636c71` に確定した (実行時値は #3059)。
+- 既定色は REPORT_PY118 の初期値 `0xff636c71` に置き換えた。このファイルの `0x5A6B7C` の記述は取り込み前の仮置きで、古い。
 
 ## 5. 変更と検証
 

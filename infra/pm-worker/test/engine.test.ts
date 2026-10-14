@@ -437,12 +437,12 @@ test("launch (#2758): 本文の悪い素材名は落ち、残りの行を使う 
   assert.equal(pickArt(p, 33), "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk");
 });
 
-test("launch (#2758): PM の行は本文の行より優先する", async () => {
+test("launch (#3050): PM の行と本文の行は和集合にする (本文だけの名前も加わる)", async () => {
   const ctx = await configuredApp();
   await seed(ctx, 34, { body: "oc_artifacts: fl-win64 work-m11" });
   await send(ctx.app, "issue_comment", commentPayload(34, "pycabbage", "oc_artifacts: fl-win64 plugins-ott"));
   await markFresh(ctx);
-  assert.equal(pickArt(ctx.app.engine.plan(), 34), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal(pickArt(ctx.app.engine.plan(), 34), "oc_artifacts: fl-win64 plugins-ott work-m11");
 });
 
 test("launch (#2758): 本文に素材行が無い・自然文なら推定 (従来どおり)", async () => {
