@@ -136,7 +136,7 @@ M11_INSTR_K12=1 bash m11_build.sh                              # 計測 probe �
 - **受入 2 (kind 12 の到達経路)**: **未特定**。全 4 構成で `[K12HIT]` は 0 件。`[CA_KIND]` は unit 17/86/357/496 の計 16 回のみで全件 kind=18。IR 上の `function_416db0` 呼出し元は 12 箇所 (`boot_final.ll` を `grep` で確認) だが、どの呼出しが kind 12 を渡すかは未確認 (呼出し元ごとの kind を確かめる probe は未実施)。boot 段階 (unit -1) の `[CA_KIND]` は 0 件。
 - **受入 3 (probe の副作用)**: unit 304 と 555 は K12=1 で oob→ok に変わる (iso1 でも iso0 でも同じ)。isolation の有無は差を作らない (iso0 K12=1 = iso1 K12=1)。ただし 304 と 555 では `[CA_KIND]`・`[K12HIT]` が一度も出ていない (`_CopyArray` を呼ばない unit)。よって出力の汚染 (#495) では説明できず、probe 入り build の機械語差が原因と推定 (推定。未切り分け)。
 - **trace isolation の効果 (ネガコン)**: `M11_TRACE_ISOLATE=0` で unit 555 だけが oob→abort (`unresolved function call: function_535c2e`)。unit 304 は変わらない。isolation は既定 build では 555 の結果を変えている。
-- 注: 旧版の bug を修正した。最初の試行で `M11_TRACE_ISOLATE` を `-D` に渡さず `ov.o` が再ビルドされない状態があったため、その試行の数値 (iso0 の wasm が同一に見えた件) は捨て、上表は全構成を build し直した結果。
+- 注: 途中で wasm のコピーを取り違えて「iso0 と iso1 の wasm が同一」と誤読した。これは作業側の取り違えで build の不具合ではない。上表は各構成を build し直し、wasm の md5 が構成ごとに異なることを確認した結果。
 
 stderr 件数は `SV_ERR_LOG` 出力の行数 (`wc -l`)。
 
