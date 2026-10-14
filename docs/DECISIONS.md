@@ -170,17 +170,17 @@
 ## D18 — IPP の A11 系・NaN 入力・VectorSlope の「規格内の高精度実装による bit 不一致」は許容する
 
 - **状態**: 採用 (2026-10-14, issue #142 [IPP-Q1]。#135 検収時の暫定決定を PM が確定)
-- **決定**: 自前 IPP 実装 (`tools/ipp`、親 #38) が実 Intel IPP と bit 一致しないことを、次の 3 群に限って許容する。(1) `ippsSqrt/Exp/Ln…_A11` 系 (実 IPP は A11 = 約 11.9〜14.5 bit 精度、自前は 24 bit)、(2) NaN 入力の挙動 (`Convert_32f32s_Sfs`・`Threshold_GT/LT`、NaN の仮数ペイロード)、(3) `VectorSlope` (実 IPP はブロック累積で真値から漂う)。許容リストはこの 3 群で閉じる。リスト外の関数が実 IPP と bit 不一致になったら不具合として扱い、リストへの追加には新しい ADR を要する。
+- **決定**: 自前 IPP 実装 (`tools/ipp`、親 #38) が実 Intel IPP と bit 一致しないことを、次の 3 群に限って許容する。(1) `ippsSqrt/Exp/Ln…_A11` 系 (実 IPP の A11 は精度を落とした仕様、自前はより高精度)、(2) NaN 入力の挙動 (`Convert_32f32s_Sfs`・`Threshold_GT/LT`、NaN の仮数ペイロード)、(3) `VectorSlope` (実 IPP はブロック累積で真値から漂う)。許容リストはこの 3 群で閉じる。リスト外の関数が実 IPP と bit 不一致になったら不具合として扱い、リストへの追加には新しい ADR を要する。
 - **比較した方式**: (a) 許容 (採用)、(b) 不許容: 特定の ISA 経路 (例 AVX-512) の出力を係数ごと再現する。
-- **理由**: 実 IPP 自身が CPU 経路で出力を変える (AVX-512 対 AVX2 で Sqrt_A11 は最大 4098 ulp、Exp_A11 は最大 1802 ulp。NaN 入力の Convert/Threshold も経路間で異なる)。ユーザ環境ごとに本物の FL の出力も bit 単位では異なり、bit-exact は定義できない。arm64 Mac 版 FL 自身も Accelerate の高精度実装を使う。決定的な 21/24 関数は実 IPP と bit 一致済み。(b) は A11 近似多項式の逆解析が要り、工数が大きい割に、どの ISA 経路を正とするかの根拠が無い。実測は `tools/ipp/REPORT.md` §4・§8。
-- **影響**: 許容群の関数は bit 一致ではなく、真値に対する誤差が実 IPP の精度仕様以下であることで判定し、NaN の仮数ペイロードは比較から外す。bit 一致の 21 関数は回帰ゲートとして維持する。退路は (b) (不許容に戻す場合は ISA 経路を 1 つ選んで係数を再現する)。影響チケットは #38 配下の [IPP-2] ipp-fill。
+- **理由**: 実 IPP 自身が CPU 経路で出力を変える (AVX-512 と AVX2 で A11 系の出力が大きく異なり、NaN 入力の Convert/Threshold も経路間で異なる)。ユーザ環境ごとに本物の FL の出力も bit 単位では異なり、bit-exact は定義できない。arm64 Mac 版 FL 自身も Accelerate の高精度実装を使う。決定的な関数の大半は実 IPP と bit 一致済み。(b) は A11 近似多項式の逆解析が要り、工数が大きい割に、どの ISA 経路を正とするかの根拠が無い。実測は `tools/ipp/REPORT.md` §4・§8。
+- **影響**: 許容群の関数は bit 一致ではなく、真値に対する誤差が実 IPP の精度仕様以下であることで判定し、NaN の仮数ペイロードは比較から外す。bit 一致している関数は回帰ゲートとして維持する。退路は (b) (不許容に戻す場合は ISA 経路を 1 つ選んで係数を再現する)。影響チケットは #38 配下の [IPP-2] ipp-fill。
 
 ## D19 — 将来 mac 版 FLEngine を lift する場合の基準は x86_64 スライス
 
 - **状態**: 採用 (2026-10-14, issue #143 [IPP-Q2]。#135 検収時の暫定方針を PM が確定)
 - **決定**: 現計画の lift 対象は win64 `FLEngine_x64.dll` のまま。将来 mac 版 (FPC 製、universal2) を lift する場合は **x86_64 スライスを基準**にし、arm64 スライスは lift しない。mac 版 lift の優先度は低いままで、着手するかどうかは別途 PM が判断する。
 - **比較した方式**: (a) x86_64 (採用)、(b) arm64。
-- **理由**: x86_64 スライスは本物の Intel IPP をロードし、既存の lift pass 資産 (x64c / liftlib / flelift) がそのまま使えて win64 との差分が小さい。arm64 は FL 自作の別 IPP 実装 (Accelerate 依存) をロードし、Accelerate (vDSP/vImage/vForce) 呼出が残るため wasm では結局 C での再実装が要る。lift 器の RetDec 5.0 は arm64 を名目上サポートするだけで未検証。IPP の使用 API は arm64 234 / x86_64 234 / win64 229 でほぼ同一なので、自前 IPP 実装 (#38) は基準によらず共通で、本決定は #38 に影響しない。根拠は `tools/ipp/REPORT.md` §2・§3。
+- **理由**: x86_64 スライスは本物の Intel IPP をロードし、既存の lift pass 資産 (x64c / liftlib / flelift) がそのまま使えて win64 との差分が小さい。arm64 は FL 自作の別 IPP 実装 (Accelerate 依存) をロードし、Accelerate (vDSP/vImage/vForce) 呼出が残るため wasm では結局 C での再実装が要る。lift 器の RetDec 5.0 は arm64 を名目上サポートするだけで未検証。IPP の使用 API は arm64 / x86_64 / win64 でほぼ同一なので、自前 IPP 実装 (#38) は基準によらず共通で、本決定は #38 に影響しない。根拠は `tools/ipp/REPORT.md` §2・§3。
 - **影響**: mac を lift する時は、SysV 呼出規約 (rdi, rsi, rdx, rcx, r8, r9 / xmm0-7) 用のブロック版 thunk が別途要る (現 shim は MS x64 規約の `IppBlk`。`tools/ipp/shim/REPORT.md` §7・§9-5)。mac 版は FPC 製なので RTL は FPC RTL (OSS) を扱うことになる (D21)。
 
 ## D20 — 第三者の商用・利用制限付き・派生成分 (IPP / GPC / libkio / élastique / REX) は配布 tier で扱いを分ける
@@ -220,5 +220,5 @@
   - **ZGameEditor Visualizer (殻 19304 + 19299/19300/19303/19305/19306)**: 選択肢 B。保留する。#29 (PLG-E2) の GL→WebGL の描画経路が動いた後に、「殻 + ZgeNano / ZgeSkelet / ZGEBullet のみ lift + GL→WebGL shim」で再評価する。NDI / Spout / DMX / Hue / OSC は D3 に従って切り落とす。それまで #210 の lift 対象から外す。
   - 対象外とした plugin が FLP に現れたら「未対応プラグイン」として扱い、状態 (チャンク) は保持して素通しにする。
 - **比較した方式**: Razer・ReWired・FL Mobile は A (対象外) / B (no-op の殻として lift、または x64c の測定後に再判断) / C (実機能の提供、または RetDec 鎖で lift)。ZGE は A (対象外) / B (保留) / C (ZGE の実行系を WebGL で再実装)。
-- **理由**: Razer は周辺機器の LED 制御、ReWired は別プロセスの ReWire ホストとのルーティングで、どちらもブラウザに相手方がおらず、音声処理も無い (demo 出現 0)。FL Mobile は demo 出現 0 で、.NET CLR (`mscoree.dll`)・`ws2_32` (D3 の対象外) を持ち、C++ engine の窓 lift が 6 窓中 2 窓で `emcc -c` に失敗する (追跡は #527)。推定工数に対して利用実績がほぼ無く、élastique・DirectWave を内包する点も D20 の所有者限定 tier の範囲を広げるだけになる。ZGE は demo 9・preset 230 でユーザに見えるが、閉包が取れず (`plugin_closure` が vtable 入口を 0 件しか見つけない)、描画も #29 待ちのため、保留が可逆で進捗を止めない。値は `tools/plugins/hostx/REPORT.md` §1・§2・§4。
+- **理由**: Razer は周辺機器の LED 制御、ReWired は別プロセスの ReWire ホストとのルーティングで、どちらもブラウザに相手方がおらず、音声処理も無く、demo での出現も無い。FL Mobile も demo での出現が無く、.NET CLR (`mscoree.dll`)・`ws2_32` (D3 の対象外) を持ち、C++ engine の窓 lift の一部が `emcc -c` に失敗する (追跡は #527)。推定工数に対して利用実績がほぼ無く、élastique・DirectWave を内包する点も D20 の所有者限定 tier の範囲を広げるだけになる。ZGE は demo での出現と preset が多くユーザに見えるが、閉包が取れず (`plugin_closure` が vtable 入口を 0 件しか見つけない)、描画も #29 待ちのため、保留が可逆で進捗を止めない。値の正本は `tools/plugins/hostx/REPORT.md` §1・§2・§4。
 - **影響**: `tools/plugins/hostx/REPORT.md` §0・§1 の区分を確定に合わせた。#558・#560 は close、#559 は #29 に blocked_by を付けて open のまま。#210 の lift 対象は 6 本 (Wrapper×2 / Patcher×2 / MIDI Out / Video Player)。A とした 5 本を再開する場合は新しい ADR を要する (FL Mobile は x64c 経路 (`tools/flelift`) の測定から)。
