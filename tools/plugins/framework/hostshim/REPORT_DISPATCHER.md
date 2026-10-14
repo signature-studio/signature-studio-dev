@@ -236,5 +236,5 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 - case 格納 27 件の格納元: 定数 1 が 1 件・0 の分岐が 7 件・残り 19 件は未確定 (callee 戻り値)。未実行の格納 39 件のうち 4 件は戻り値 1 で実行される (B-2)。残り 35 件は分岐条件を未解析。
 - 未収載 ID (受入 2): 25 (0x19)・54 (0x36)・64 (0x40)・88 (0x58)・128 (0x80) は、callee 戻り値 0 の仮定の上で応答 0 (基準・全 callee=1・`0x40fe90`=1 の 3 run で応答 0 の集合に残る)。96 (0x60) は未確定 (出口 `0x13228eb` の `call [rbx+0xb8]` の先が未モデル)。101 (0x65) は未確定 (`0x1322b47` が `[obj+0x2e4]` の float ビット列を格納)。
 - 未確定の残り・受入 3 は子 #2886 へ (PR 本文の未解決表)。hostshim.c と hs_e2e.sh は本節で変更していない。
-- 測定: 48f2ced9 で 既定 51.87 秒・0xa5 埋め 55.58 秒 (load 未計測)。distinct (rax, path) 109・unmapped 61 ID / 5,340 件は §1・§3.3 と一致。
+- 測定値 (実行時間・load・distinct・unmapped) は `REPORT_DISPATCHER_APPENDIX.md` §D が正本 (測定 commit `48f2ced9`)。
 - 差分: `git diff 48f2ced9 HEAD -- tools/plugins/framework/hostshim/hs_disp_emu.py` は 0 行。hostshim.c・hs_e2e.sh は 0bb93345 以降 0 行。
