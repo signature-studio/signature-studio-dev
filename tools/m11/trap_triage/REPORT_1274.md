@@ -181,6 +181,25 @@ index 39480f0a..5a9c1929 100644
 + M11_KEEP_BOOT_O=1 bash m11_build.sh > work/probe/build_$tag.log 2>&1 || ...
 ```
 
+## 5f. 410360 vcall 経路の切り分け (測定 commit `32663fde`、#1642)
+
+- 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11 を展開 (`work-m11` は `tools/m11/work/` を内包するため、展開先は `tools/m11/` 直下)。IR `m11_gen_ir2.sh` rc=0 (51.4 s、ldfix=applied、F1=902、errors=0)。
+- 切り分け変更: `m11_ov.c` の `m11_vcall` に `M11_NOVCALL` (既定 0) を入れ、1 のとき ICALL_AT を呼ばず `self` を返す。`m11_build.sh` の CF に `-DM11_NOVCALL=${M11_NOVCALL:-0}` を追加。既定 0 では出力は変わらない。
+- **注意 (キャッシュ)**: `ov.o` は `work/ov_*.stamp` で一部の macro だけ無効化される。`M11_NOVCALL` は stamp の対象外のため、最初の測定 (`ov.o` 再利用) は `M11_NOVCALL=1` が効いていなかった (869/15 は stale)。`rm -f work/obj/ov.o` の後に測り直した値のみ採る。
+- 測定 (全 942 unit、`SV_RAW=1`、各 build は `ov.o` を作り直した後):
+
+| build | ok / oob / abort / halt0 | unit 190 |
+|---|---|---|
+| OFF (`M11_OV_CLASSCREATE=0`) | 870 / 16 / 0 / 7 | ok 以外 (oob) |
+| ON (`M11_OV_CLASSCREATE=1`) | 869 / 15 / 2 / 7 | oob |
+| ON + `M11_NOVCALL=1` (410360 の vcall 経路を外す) | 869 / 15 / 2 / 6 | oob |
+
+- `survey_diff.py` OFF→ON: ok 退行 unit は **190 の 1 件** (ok→oob)。kind 変化は 190 (ok→oob)・304・555 (oob→abort, #1275)。
+- `survey_diff.py` ON→ON+NOVCALL: 変化は unit 314 の halt0→oob の 1 件のみ (kind 変化、ok 退行なし)。unit 190 は oob のまま。ok 退行は 0。
+- 読み: 410360 の vcall 経路 (`site 0x41037d`) を外しても unit 190 の oob は消えない。unit 190 の trap は 410360 を経由しない (§3 と一致)。受入条件 1 の「原因の特定」は依然未達。
+- 注意 (§5d の再検討): §5d の「9b4b00 の書込みを 1 文ずつ外す (8 通り)」「table 差し替えを外す」の測定は `define` の差し替えで、`ov.o` の stamp 対象外。stale な `ov.o` が使われていた可能性があり、§5d の「ON-only 差分は説明できない」は未確認に格下げする。再測定は未実施 (次手)。
+- 未達 (受入条件): 1 (unit 190 の `[arg-8]` 参照先の変化の特定)・2 (DEFECTS 類型への分類)・3 (ON の ok 退行 0 の unit 単位確認: 190 が残る)。起票先: #1642。
+
 ## 6. 差分 (§5e の測定 commit `91655f69` から本 PR の HEAD まで)
 
 測定 commit `91655f69` から本 PR の HEAD (`4c2f69d1`) までの `tools/m11` のコード差分は 0 行 (`git diff 91655f69 HEAD -- tools/m11 ':(exclude)*.md'`)。本 PR の変更は REPORT のみ。§5e の値は、この HEAD と `tools/m11` が同一の code で測定した値。
