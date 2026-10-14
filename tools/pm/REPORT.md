@@ -210,7 +210,7 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ## 12. PM Worker の live 切替前の突き合わせ (#2443)
 
-測定した commit: `2f884d99` (main。PR の基点で、PR 内の Worker コードは変えていない)。取得時刻は UTC (2026-10-14)。VM: `issue_snapshot.py` → `launch_issues.py` の classify (13:18〜13:22Z)。Worker: dry-run (Version `7441616e`) の `GET /status?detail=1` (13:24Z。候補の全件を出すため一時ビルドで `TARGET=1000 BATCH=1000 NO_PR_COOLDOWN_H=24`)。
+測定した commit: `2f884d99` (main。PR の基点で、PR 内の Worker コードは変えていない)。head `8a158e61` の Worker コードは、この測定の後に main から #2422 が入って変わった (差分と未了の再測定は `tools/pm/REPORT_2443.md`)。取得時刻は UTC (2026-10-14)。VM: `issue_snapshot.py` → `launch_issues.py` の classify (13:18〜13:22Z)。Worker: dry-run (Version `7441616e`) の `GET /status?detail=1` (13:24Z。候補の全件を出すため一時ビルドで `TARGET=1000 BATCH=1000 NO_PR_COOLDOWN_H=24`)。
 
 ### 12-1. 分類の件数 (全カテゴリ)
 
@@ -232,7 +232,7 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ### 12-3. `NO_PR_COOLDOWN_H`
 
-既定の 3 (13:23Z) では候補 (ready + relaunch) が 167 件 (ready 165 + relaunch 2)。ready 165 件のうち 134 件 (= 165 − 31) は全て `oc:no-pr` で、最後の着手か bot の報告から 3.1〜22.0 時間 (中央値 4.2 時間)。`24` では候補 33 件 (ready 31 + relaunch 2)。VM の classify も停止語を含む報告から 24 時間は stopped に置くので、24 が VM と同じ。
+既定の 3 (13:23Z) では候補 (ready + relaunch) が 167 件 (ready 165 + relaunch 2)。ready 165 件のうち 134 件 (= 165 − 31) は全て `oc:no-pr` で、最後の着手か bot の報告から 3.1〜22.0 時間 (中央値 4.2 時間)。`24` では候補 33 件 (ready 31 + relaunch 2)。VM の classify も停止語を含む報告の 24 時間を stopped の窓に使う (ソースの対応)。134 件の最後の報告が停止語を含むことの実測は未確認で、VM との一致は実測していない。
 
 ### 12-4. 二重着手の確認
 
@@ -246,4 +246,4 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 - VM の `relaunch.json` (67 件。count=1 が 60、2 が 7) は Worker に無い。履歴の無い issue を最大 2 回余分に再投入し得る (#2343)。
 - 保存 phase の初期値 (未保存なら Review-Only): 新しいデプロイ先で open PR が 10 以上だと launch が止まる。今回は VM の値で保存した (#2343 が扱う phase の引継ぎ)。
-- 突き合わせは main 取り込み前の Worker で測った。以後 main に入った #2338 (rate-guard・`reconcile_diff`) は未測定。
+- 突き合わせは main 取り込み前の Worker で測った。以後 main に入った #2422 (#2338 の rate-guard・`reconcile_diff`) は未測定。再測定の未了と手順は `tools/pm/REPORT_2443.md`。
