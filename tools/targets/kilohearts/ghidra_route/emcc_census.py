@@ -1,23 +1,27 @@
 #!/usr/bin/env python3
-"""emcc ログ (build_cmp.sh が書く <outdir>/emcc.log) の clang error を排他的に分類して件数を出す。
+"""emcc ログの clang error を排他的に分類して件数を出す。
 
+  emcc -c -ferror-limit=0 -I ghidra_route <gr>/<name>/<name>.c -o <o> 2> <emcc.log>
   python3 tools/targets/kilohearts/ghidra_route/emcc_census.py <emcc.log>
 
-分類は下の RULES を上から順に当てる (先頭一致。1 error 行は必ず 1 分類に入るので、分類の合計 = error 行数)。
+<emcc.log> は `-ferror-limit=0` で得た stderr を使う (build_cmp.sh の emcc は既定の 20 件で打ち切るため件数が合わない)。
+分類は下の RULES を上から順に先頭一致で当てる (1 error 行は必ず 1 分類に入るので、分類の合計 = error 行数)。
 出力は TSV (分類 TAB 件数) と合計行。
 """
 import re
 import sys
 
 ERR = re.compile(r'^[^\s:]+:\d+:\d+: error: (.*)$')
+UNDECL = r"(undeclared identifier|call to undeclared function) '"
 RULES = [
     ('未関数化 callee (未宣言の FUN_/func_ 呼出)', r"call to undeclared function '(FUN_|func_)|implicit declaration of function '(FUN_|func_)"),
-    ('128bit レーン型 (V128 / undefined1[16])', r'V128|undefined1 \[16\]'),
+    ('128bit レーン型 (V128・undefined1[N]・メンバ参照)', r'V128|undefined1 ?\[\d+\]|member reference base type'),
     ('引数数不一致 (引数なし呼出を含む)', r'too (few|many) arguments|no matching function'),
-    ('未宣言の SIMD 疑似関数', r"undeclared identifier '(rsqrtps|rcpps|maxps|minps|vpsrldq\w*|ZEXT\d+|SUB\d+|ABS)'"),
-    ('未宣言の Win API・LOCK/UNLOCK・MXCSR', r"undeclared identifier '(Heap\w+|Get\w+|Set\w+|IsProcessorFeaturePresent|TerminateProcess|LOCK|UNLOCK|MXCSR)'"),
-    ('演算・代入の型不一致', r'invalid operands|incompatible|assigning to|initializing|non-void|cannot (assign|convert)'),
-    ('未宣言の型・識別子 (その他)', r"unknown type name|undeclared identifier"),
+    ('未宣言の SIMD・AVX・swi 疑似関数', UNDECL + r"(rsqrtps|rcpps|maxps|minps|ZEXT\d+|SUB\d+|ABS|swi|v[a-z0-9]+_avx)'"),
+    ('未宣言の Win API・LOCK/UNLOCK・MXCSR', UNDECL + r"(Heap\w+|Get\w+|Set\w+|IsProcessorFeaturePresent|TerminateProcess|LOCK|UNLOCK|MXCSR)'"),
+    ('code 型の間接呼出し (called object type)', r'called object type'),
+    ('未定義 identifier (DAT_・uRam・LAB_・PTR__)', r"undeclared identifier '(DAT_|uRam|LAB_|PTR__)"),
+    ('演算・代入・ポインタの型不一致', r'invalid operands|incompatible|assigning to|initializing|non-void|cannot (assign|convert)|indirection requires|operand of type|cannot be cast to a pointer|is not assignable|passing .* to parameter of incompatible'),
 ]
 
 
