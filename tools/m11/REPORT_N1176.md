@@ -58,3 +58,22 @@
   - 作り直し後の `llvm-nm rt.o` で `m11_set_va_bigtrace` が `T` (定義あり)。GNU `nm` は wasm を読めないため 0 件表示になる (手元の誤読、結論に影響なし)。
 - 測定 commit `12586095` から HEAD までのコード差分: 本節の追記 commit は `tools/m11/REPORT_N1176.md` のみ。`git diff 12586095 HEAD -- tools/m11/*.sh tools/m11/*.c` は空。
 - 注意: 本 run の展開は worktree 内 `tools/m11/work/` (gitignore)。`functions_dll.csv` は `tools/m2/work/ghidra_dll/` (gitignore)。いずれも commit しない。
+
+## 6. HEAD での再確認 (run 1176・測定 commit `ebad5b80`)
+
+- 測定 commit: `ebad5b80` (origin/main。worktree `1176-m11-build-recheck`)。runner: 4 vCPU・16 GiB。
+- 素材: fl-win64・toolchain-emsdk (`/opt/emsdk`)・toolchain-retdec・work-m11 (`tools/m11/work/`)・work-liftdiff を展開。
+- `functions_dll.csv`: Ghidra 12.1.4 (sha256 `ddac49f9…` 一致・JDK 21・`DumpFunctions.java`) で再生成。rc 0・521 s・2,087,706 bytes。
+  - 注: `analyzeHeadless` の JVM ヒープは `-Xmx` 引数ではなく環境変数 `MAXMEM=12G` で渡す (`-Xmx16G` は InvalidInputException)。
+- 手順と実測:
+
+| 手順 | rc | 所要 | 結果 |
+|---|---|---|---|
+| `m11_build.sh` (IR 未作成) | 2 | 0 s | `ir_conditions.json` に `ldfix=applied` 無し (fail-closed)。先に `m11_gen_ir2.sh` が要る |
+| `m11_gen_ir2.sh` | 0 | 41 s | `ldfix=applied`・`boot_final.ll` 491,108 行 (ldfix errors=0) |
+| `touch work/obj/{rt,win}.o` して `m11_build.sh` | 0 | 24 s | `OK: work/m11_boot.cjs(+.wasm)`・signature mismatch 0・undefined 0。`rt.o` に `set_va_bigtrace` 1 件 |
+| `bash m11_e2e.sh --full` (foreground・MAXMEM=12G・JDK 21) | 0 | 609 s | `m11_scan: ok`・`m11_bounds: ok`・`build (emcc 増分): ok`。reached_stage 4/6 (trap "unreachable")・`ir_sha256` `38309…` |
+
+- reached_stage 4/6 と trap は #1557 (測定 commit `12586095`) と同じで、本 issue の対象外。
+- `ir_sha256` は #1557 の `9dc2d896…` と異なる (IR の指紋が実行ごとに変わる既知事象。未切り分け)。build の成否には影響しない。
+- 測定 commit `ebad5b80` から HEAD までのコード差分: 本節の追記 commit のみ (REPORT のみ)。
