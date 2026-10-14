@@ -50,5 +50,53 @@
 - 全再生成 (`m11_bounds.py`) が要求する `functions_dll.csv` の問題は前回と同じく未解決 (#1141 のコメントで追跡)。
 - 未測定 (#1141 残り): 4c3baa4 (boot5 / 467c40 間接 call) の単独無効化は前回の boot5 除去のみ。faee5b6 の `SysReAllocStringLen`・`SysStringLen` 単独の寄与は未測定。
 
+### #1141 再実行 (run 3): 4c3baa4 の 467c40 override と BSTR 単独の無効化 (測定 commit cd83e84c = origin/main)
+
+起点 `cd83e84c` (main)。`work-m11` を `tools/m11/work/` に展開、PE は `$RUNNER_TEMP/win64/extracted/block00031_PE.bin` (sha256 b2c64da4…)。`work/lift_pe.sha256` は PE の sha256 を手で書いた差分経路 (前回と同じ限界)。boot5 は本 run で RetDec lift 済み (`lift boot5 (RetDec): ok`)。load は各実行とも 0.6〜1.1。
+
+| 構成 | units_run | 停止 | survey ok/trap/miss/clobber | e2e 所要 | rc |
+|---|---|---|---|---|---|
+| baseline (cd83e84c, gate 無し) | 53 | `unreachable` @ function_8c5eb0 | 872/23/46/0 | 155 s | 0 |
+| gate 導入後・既定 (override 有効) | 53 | 同上 | 872/23/46/0 | 48 s | 0 |
+| D: `function_467c40` (4c3baa4 の間接 call 復元) を無効 | 22 | Halt0 経由の早期終了 | 871/24/46/0 | 47 s | 0 |
+| E: `SysReAllocStringLen` (faee5b6 の BSTR) を無効 | 53 | 同上 (baseline と同じ) | 872/23/46/0 | 48 s | 0 |
+| F: `SysStringLen` (faee5b6 の BSTR) を無効 | 53 | 同上 (baseline と同じ) | 872/23/46/0 | 48 s | 0 |
+| 復元後 (HEAD の既定) | 53 | 同上 | 872/23/46/0 | 49 s | 0 |
+
+- gate の確認: D は `llvm-nm work/obj/ov.o` で `function_467c40` の定義が消えたことを確認。E/F は `win.o` で該当シンボルの定義が 0 件になったことを確認。
+- 方式: 一時 gate (`#if !M11_ABL_*`) を `m11_ov.c` / `m11_win.c` に入れ、`m11_build.sh` の CF に `${M11_ABL_CF:-}` を一時的に足して 1 つずつ測定。測定後に `git restore` で全て戻し、`tools/m11` の差分は 0。
+- 読み取り: 4c3baa4 の 467c40 間接 call 復元 (`function_467c40` override) が units_run 53 を支えている。これを外すと 22 unit で Halt0 に落ちる。
+- faee5b6 の override のうち units_run に効くのは 3 点: `function_417b70` (run 2 A: 単独無効化で 50)・`function_409470` (run 2 B: 22)・`SysAllocStringLen` (run 2 C: 22)。`SysReAllocStringLen`・`SysStringLen` は単独では units_run 53 のまま (run 3 E/F で影響なし)。
+- 注意: これらはいずれも「外すと lift 版 (RetDec・既知の D7 型欠陥) に戻って壊れる」結果であり、faee5b6 が退行を起こしたことの実証ではない。今回の D は 467c40 override を外す単独の変化。boot5 (25 関数の lift 追加) と 467c40 の組み合わせ分解はしていない。ov.o は gate 変更でキャッシュ無効化され再コンパイル済み。
+- 受入 2 (`_CopyArray` kind 12) は今 run では未実施 (子 issue #1511 で扱う)。
+
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 本体 REPORT.md から移動)
 main `6e5c8dac` で通常起動・survey は完走 (53/942, survey ok 870)。ネガコン (boot5 除去) は 52/942 で「元の停止に戻る」は不成立。faee5b6 の二分は逆パッチが衝突し未成立。詳細は `REPORT_N15.md` §16。
+
+### #1511 [M11-N97] survey の stderr 全行捕捉と _CopyArray kind 12 (416720) の到達確認
+
+測定 commit `c22f8b6b` (コード変更の最後の commit。起点は `1e3ee7af` = main)。4 vCPU・load 0.5〜0.7 (各実行の前後で記録)。素材 `work-m11` を `tools/m11/work/` に展開し、`fl-win64` の PE (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`) で `m11_gen_ir2.sh` (45 s・ldfix applied) → `m11_build.sh` (26 s)。全再生成 (`m11_e2e.sh --full`) は行っていない (RetDec・Ghidra 中間物は不要)。
+
+**変更点**: (a) `survey_units.mjs` に `SV_ERR_LOG=<file>` を追加し、非 trace の stderr を unit 番号付きで全行出す (既存の `rec.err` は unit あたり先頭 3 行のみ)。既定 OFF。(b) `m11_ov.c` の case 12 に `M11_INSTR_K12` (既定 0) の計測 probe `[K12HIT]`、`_CopyArray` 入口に `[CA_KIND]` を追加。`m11_build.sh` は `M11_INSTR_K12` を `-D` で渡し、stamp で `ov.o` を作り直す。
+
+| 構成 | ok/miss/other/halt0/oob/noproc | 所要 | stderr 行 (unit 数) | `[K12HIT]` | `[CA_KIND]` |
+|---|---|---|---|---|---|
+| 変更前 (1e3ee7af 相当・同じ build) | 870/47/1/7/16/1 | 13 s | (`SV_ERR_LOG` 無し) | - | - |
+| HEAD `c22f8b6b`・既定 (K12=0) | 870/47/1/7/16/1 | 13 s | 70 (31 unit) | 0 | 0 |
+| HEAD・probe (K12=1) | 872/47/1/7/14/1 | 13 s | 86 (31 unit) | 0 | 16 (全件 kind=18) |
+
+- 受入 1 (既定結果が変わらない): 達成。変更前と HEAD 既定で kind 分布は完全一致 (差分 0)。JSON は frames の `survey_units.mjs` 行番号が変わるだけで、units の kind は全 942 unit 一致。注: REPORT 上の旧基準「ok 872 / trap 23 / miss 46」は #1141 時点の値で、現 main の同一 build は 870/47 (boot5 除去等の既存差分。本 issue では変えていない)。
+- 受入 2 (kind 12 の到達): **未到達**。probe 入り build で全 942 unit の survey を実行し、`[K12HIT]` は 0 件。`_CopyArray` の入口 (`function_416db0`) は 16 回 (unit 17 / 86 / 357 / 496 の各 4 回) で、全件 kind=18 (kind 12 の要素型が現れない)。boot 段階 (unit -1) の stderr は 2 行で `[CA_KIND]` は無し。
+- **probe の副作用 (未解決)**: probe 入り build で unit 304 (`535bf2`→oob が ok) と unit 555 (同じく oob→ok) の kind が変わった。`[CA_KIND]`・`[K12HIT]` の出力経路 (`M11_TRACE`) は #495 の SP 退避で汚染を抑えているが、この 2 unit の差は説明できていない。計測の透過性は未確認のため、kind 12 が既定 build で別経路から到達している可能性は残る (既定 build からは直接観測できない)。
+- 受入 3 (測定 commit・load・所要秒・stderr 件数): 上表に記載。
+
+stderr 件数の注意: `rec.err` 由来の `err` は unit あたり 3 行で打ち切られるため、件数はこの表の `SV_ERR_LOG` 出力のみを使う。
+
+再現:
+```
+cd tools/m11
+FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin bash m11_gen_ir2.sh
+FL_WIN64_DIR=... M11_PE=... bash m11_build.sh                  # 既定 (K12=0)
+SV_ERR_LOG=work/s1511/err.txt node trap_triage/survey_units.mjs work/s1511/out.json
+M11_INSTR_K12=1 bash m11_build.sh                              # 計測 probe 入り
+```
