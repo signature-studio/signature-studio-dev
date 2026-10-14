@@ -49,7 +49,13 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 ## 5. #2003 追記: 読出しなし ON の実測・unit 158 の trap frame・単独実行 (受入条件 2・4)
 
 測定 commit: **`a22c1aef`** (HEAD で実測)。5.1〜5.3 の数値はすべて `a22c1aef` の `tools/m11` で取った。`c171b9dc` からの差分の扱いは 5.5。
-素材: `fl-win64` (`$RUNNER_TEMP/fl-win64` に展開)・`work-m11` (展開後に `m11_gen_ir2.sh` で `ir_conditions.json` 再生成: F1=902 F3c=36 errors=0)。`toolchain-emsdk` は展開せず、既設の `/opt/emsdk` を使った (`emcc` 確認済み)。直列・単発・foreground。
+`repro_1389.sh` の所要時間は測定 commit **`af65d115`** (検証 HEAD) で取り直した値 (5.0)。`a22c1aef..af65d115` の測定経路差分は 0 (5.5)。
+
+### 5.0 `repro_1389.sh` の所要 (測定 commit `af65d115`・直列・単発・foreground)
+
+- 全体 real 1m49.3 s・load 1.05 (OFF 開始時)。OFF: 16.356 s・OFF 再実行: 15.994 s・ON: 16.103 s。
+- OFF 2 回: 記録 227 件が完全一致 (差 0)。OFF/ON: 216 件の突合で差 1 件 (unit `0x26d1a0` j=12・`st` `len` `rc` `h`)。判定 PASS。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64` に展開)・`work-m11` (展開後に `m11_gen_ir2.sh` で `ir_conditions.json` 再生成: F1=902 F3c=36 errors=0)。`toolchain-emsdk` は展開せず、既設の [EMSDK] を使った (`emcc` 確認済み)。直列・単発・foreground。
 
 ### 5.1 `M11_DEST_READ=0` の ON (読出しなし・HEAD 実測)
 
@@ -63,7 +69,7 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 `SV_ONLY=158 SV_RAW=1 node trap_triage/survey_units.mjs <out>` (単独実行・計測 ON・読出しあり) で frame を取得した。同一構成を 2 回実行し、`kind` と `frames` の全列が一致した。
 
 - kind `oob` (memory access out of bounds)。最上位 wasm frame: **`function_407a50__lifted`** ← `function_407a50` ← `function_409410__lifted` ← `function_409410` ← `function_412c20` ← `function_414ad0` ← `function_414bb0` ← `function_652500` ← `function_653660` ← `function_6539e0` ← `function_665bd0` ← `function_66d050` ← `function_66d1a0` ← `m11_tr_function_66d1a0` ← … (以降は `m11_icall` 経由。全列は run の JSON `frames` にある)。
-- 注意: この frame は単独実行での値。記録あり ON の全体 survey では unit 158 の frame を取っていない (未解決 6)。全体 survey の trap 位置と一致する保証はない (5.3)。
+- 注意: この frame は単独実行での値。記録あり ON の全体 survey では unit 158 の frame を取っていない (§6 の未解決表 (記録あり ON の全体 survey))。全体 survey の trap 位置と一致する保証はない (5.3)。
 
 ### 5.3 単独実行で unit 158 はすべての構成で trap (HEAD 実測)
 
