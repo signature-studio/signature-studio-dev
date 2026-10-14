@@ -60,7 +60,8 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 - 抑止 (DO の `meta/pmDispatch`): 同じ (kind, ref) は 60 分に 1 回・全体で 1 時間に 12 起動・同じ ref に 24 時間で 3 回まで。未送信の対象を先に、送信済みは古い順に選ぶ。失敗した試行も数える (403 / 429 はその tick を打ち切る)。同期が 15 分以上止まっている間は送らない。
 - **dry-run (既定。`LIVE_DISPATCH` が `"1"` でないとき)**: 送らず、`/status` の `would_dispatch_pm` (`?detail=1` のみ) と `counters.wouldDispatchPm`、`pm_detected` (kind ごとの検出数) に記録する。履歴は live と分ける (`meta/pmWould`)。`LIVE_LAUNCH` は関係しない。
 - ラベル `pm-apply` / `needs-user-input` の issue (着手しても PR を出さない/出せない) は、`no_pr` の検出から除く。`plan()` は、この 2 ラベルの issue を ready・再投入の対象であっても着手せず `user` 行に置く (`oc:no-pr` の有無に依らない)。`user_answered` は `needs-user-input` が対象。`tools/pm/launch_issues.py` との差は PR 本文の未解決表に書く。
-- 検出するのは上の 4 kind。`refs_orphan` は [CI-58]、`supply` / `digest` は [CI-71] / [CI-70] が担当する。
+- 検出するのは上の 4 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
+- `digest` (#2349・CI-70) は状態ではなく時刻で送る: `ref` は 0 だけ。初回の tick は起点を置くだけで、以後 24 時間に 1 回 (`meta/digestAt`)。送信に失敗した試行も 1 回と数え、毎分叩き直さない。dry-run は `would_dispatch_pm` に `digest#0` を記録するだけ。PM agent 側の集計は `.github/prompts/pm.md` の digest 節。
 
 ## /status の観測 (#2338)
 
@@ -70,6 +71,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 |---|---|
 | `last_webhook_at` | 署名を検証できた webhook の最後の受信時刻 (401 では進めない)。無ければ `null` |
 | `last_dispatch_at` | `repository_dispatch` (`oc-watchdog`) に成功した最後の時刻。dry-run では `null` のまま (would は既存の `last_watchdog`) |
+| `last_digest_at` | 直近の digest (`oc-pm kind=digest`) を試行した時刻。起点の tick・送信・送信失敗・dry-run の記録を含む (24 時間に 1 回進む)。無ければ `null` |
 | `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event は問わない (TARGET に数える `active_runs` とは別) |
 | `dry_run_skipped_posts` | dry-run のために投稿しなかった書き込み (`/oc` 投稿 + `repository_dispatch`) の累計 (`counters.wouldLaunch + wouldDispatch`) |
 | `reconcile_diff` | `{last, total}`: reconcile が REST を適用して DO の内容が変わった entity (issue・PR・run・bot/PM のコメント) の件数と累計。webhook の欠落の指標。`updatedAt` だけの違い (コメント追加で進む) と full sync は数えない。配送遅延の最中の差も数えるので、1 回の小さな値は欠落とは限らない |

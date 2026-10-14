@@ -34,7 +34,7 @@
 1. **手法そのものが条項の禁止行為に直接触れる (全社共通)。** Image-Line は逆アセンブル・逆コンパイル・改変・翻訳・派生物作成を列挙して禁止し、個人利用の例外を置かない (`[FL-EULA] §7(i)` / `[FL-ToU] art.11 General restrictions 1(i)`)。Xfer `(c)`、Kilohearts `§2(c)` (法令上許される範囲は除外)、Slate/Audiotonix `§16` (「port」「入出力監視による再現」まで明記)、NI `§3.1` も同趣旨。運用形態を変えても「作業そのもの」の論点は消えず、変わるのは *誰が行うか* と *成果物が誰の手に渡るか* だけ (§6)。
 2. **ライセンスは「本人1名」単位で、ネットワーク越しの利用も各人の個別ライセンスが前提。** `[FL-EULA] §4` (L559–; 引用箇所は L572): "Any, even non-simultaneous, use by multiple people of a personally licensed copy … is strictly prohibited." → Cloudflare Access の許可リストは「正規ライセンス保有者本人」に限る設計が前提 (複数人に開けるなら各人が個別に保有)。ASP 条項 (`§7(ii)` / ToU 11.1(ii): "service bureau, application service provider, or similar business") はサーバ実行型 (FL をサーバで動かす) に直接関係する条項である。クライアント側 wasm 実行は設計上これを避けるが、「サーバが FL 派生物を配る」行為は別論点 (2.3)。
 3. **「Cracked」の定義とライセンス stub の線引き。** `[FL-EULA] §1` "Cracked": ライセンス機構を回避して支払い無しにアンロックしたソフト。`§2` / ToU art.3-3 / art.10-1: Cracked 複製には **権利が一切付与されない**。ToU art.11 General restrictions 2 は "creation or distribution of cracked versions" も禁止。strategy §6.7 の「ローカルでの起動検通に限定した stub」は、**未登録 (トライアル/デモ) のまま起動する設計**と、**アンロック済みを装う設計**で意味が大きく異なる。後者は Cracked 定義に近づく懸念があり、前者でも「トライアルは個人利用限定・成果物の商用利用禁止」(2.5) が付く。登録キーが第三者アクセス可能な場所に出ると失効し得る (ToU art.12-7)。→ **2026-10-10 ユーザ指示**: 本プロジェクトの方針は「登録済みとして振る舞う (無条件アクティベーション)」に確定 (§6.0 運用規程)。上記は条項上の事実の記載として残し、Cracked 定義と本方針の関係について新たな判断は加えない。
-4. **Slate/Audiotonix の規約が最も厳しく、Fresh Air は同梱 EULA が無い。** 公式 ToS (オンライン取得・非同梱・適用版は未確認) `§16`: "modify, port, adapt, or translate", "reverse engineer (including … monitoring or tracking the inputs and outputs … to recreate that system)", AI/ML 学習禁止 (C)。`§6`: "copy, modify, host, stream, sublicense, or resell" / "hosted service"。Fresh Air のインストーラ (zip/pkg) には EULA 文書が含まれず、バイナリ内に iLok 実装も見当たらず、pkg の識別子は `com.MakingGreatestPizza…` (§7)。**入手元・保有ライセンスの確認が先決。** また Xfer `(e)` は無償の OTT でも "share, publish or distribute … without prior consent" を禁じるため、OTT バイナリの再ホストは (無料でも) 同意が要る論点。
+4. **Slate/Audiotonix の規約が最も厳しく、Fresh Air は同梱 EULA がファイル名判定では無い。** 公式 ToS (オンライン取得・非同梱・適用版は未確認) `§16`: "modify, port, adapt, or translate", "reverse engineer (including … monitoring or tracking the inputs and outputs … to recreate that system)", AI/ML 学習禁止 (C)。`§6`: "copy, modify, host, stream, sublicense, or resell" / "hosted service"。Fresh Air のインストーラ (zip/pkg) にはファイル名判定で EULA 文書が見当たらず、バイナリ内に iLok 実装も見当たらず、pkg の識別子は `com.MakingGreatestPizza…` (§7)。**入手元・保有ライセンスの確認が先決。** また Xfer `(e)` は無償の OTT でも "share, publish or distribute … without prior consent" を禁じるため、OTT バイナリの再ホストは (無料でも) 同意が要る論点。
 5. **OSS 側にも運用上の義務があり、FL 側 EULA と衝突し得る箇所がある。** FFmpeg は LGPL (`ffmpeg.txt` は v2.1 と表記、win 同梱ビルドの実コンフィグは `--enable-version3` = LGPLv3+、`--enable-gpl` なし)。LGPL-2.1 §6 は結合物の条件が「改変と、その改変のデバッグ目的のリバースエンジニアリングを許す」ことを要求し (`ffmpeg.txt` L103)、"contradicts the license restrictions of other proprietary libraries … you cannot use both them and the Library together" (L115)。→ 方針どおり upstream から wasm 再ビルドし、**FL 由来 (リフト済み) コードと同一 wasm に静的リンクしない** (別 side module / 差し替え可能) 設計が論点を最小化する。FreeType は謝辞の掲載が必須 (FTL §2)。`LAME MP3 encoder/LGPL.txt` の実体は **GPL v2 本文** で名称と不一致 (3.1)。
 
 ---
@@ -56,7 +56,7 @@
 | `[NSIS-FL]` | win インストーラ UI 文言 (INI) | `WIN/block00030_DATA.bin` ほか | — |
 | `[XFER]` | Xfer Records EULA (1,914 文字) | Serum 2 mac pkg: `TGT/serum2/work/pkg_extract/Resources/License.txt` (`Distribution` に `<license>`)。OTT/Serum 2 win: NSIS ヘッダ (zlib 解凍) 内ライセンスページ文 | **OTT win / Serum 2 win / Serum 2 mac の 3 者が空白正規化後に完全一致**。OTT mac pkg には `<license>` なし |
 | `[KH]` | Kilohearts EULA (全 6 条) | `TGT/kilohearts/work/dmg/Kilohearts Installer/Kilohearts Installer.app/Contents/Resources/EULA.txt`。win: `Kilohearts Installer.exe` 内 (file offset 15,125,160) | win 埋込と mac は空白正規化後に一致 |
-| `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認。同梱 EULA の有無は未検証 (素材未取得、§7) |
+| `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認。同梱 EULA はファイル名判定では無し (`tools/legal/REPORT.md` §2) |
 | `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (2026-10-10。作成時は検索スニペットのみ、検収時に全文を取得: 契約主体 inMusic NI GmbH、ページ表記 "Latest Version 2026-07-01") | **同梱ではない**。Massive X v1.7.1 インストーラ (Inno Setup 6.4.2) の復号ヘッダに EULA 文書・本文は無し (LGL-10、`tools/legal/REPORT.md` §1、§7) |
 
 補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 (`docs/REFERENCES.md` `[LEGAL-WORK]`) (抽出作業用 dir は当時 `.gitignore` 対象外だったため)。
@@ -188,7 +188,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - 技術側: HeartCore に PACE iLok/Eden + Kilohearts 独自 LicenseManager (`TGT/kilohearts/REPORT.md` §5)。ライセンス層の扱いは方針事項 (同 REPORT §7・KH-8)。
 
 ### 4.3 Slate Digital (Fresh Air) — `[SLATE-ToS]` (オンライン・非同梱)
-- Fresh Air のインストーラ/zip に **EULA は含まれない**。同梱 User Guide は "An iLok license is required to use Fresh Air. … Fresh Air will not function without a valid license" (`TGT/freshair/work/guide.txt` 相当、PDF p.5, p.11)。
+- Fresh Air のインストーラ/zip には、ファイル名判定では **EULA は含まれない** (`tools/legal/REPORT.md` §2)。同梱 User Guide は "An iLok license is required to use Fresh Air. … Fresh Air will not function without a valid license" (`TGT/freshair/work/guide.txt` 相当、PDF p.5, p.11)。
 - 公式 ToS (Audiotonix General Terms of Use; 契約主体は地域で Slate Digital LLC / Audiotonix Group Ltd / Klang Technologies GmbH、準拠法 California / England & Wales / Germany):
   - §3.1: "Each license is to be used by only one (1) person and cannot be shared."
   - §6: "copy, modify, host, stream, sublicense, or resell the Services and Software"; "…as a part of a hosted service, or on behalf of any third party"; "circumvent any access or use restrictions"; "data scraping for machine learning".
@@ -197,7 +197,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - Fresh Air は Kilohearts "HeartCore" 上の製品 (`TGT/freshair/REPORT.md`)。Kilohearts EULA は Kilohearts 製品に適用され、Fresh Air にどちらが適用されるかは文書からは不明。
 
 ### 4.4 Native Instruments (Massive X) — `[NI-EULA]` (オンライン・非同梱)
-- インストーラ未入手 (同梱版の有無・Web 版との同一性は未確認)。作成時は検索スニペットのみだったが、検収時に公式ページ全文 ("Latest Version 2026-07-01", 契約主体 inMusic NI GmbH) を取得して確認:
+- 同梱版は無い (LGL-10 の判定、`tools/legal/REPORT.md` §1-3)。Web 版との同一性の比較対象は無い。作成時は検索スニペットのみだったが、検収時に公式ページ全文 ("Latest Version 2026-07-01", 契約主体 inMusic NI GmbH) を取得して確認:
   - §3.1 "not entitled to copy or have copied, decompile or have decompiled, reverse engineer or have reverse engineered the Product or parts thereof"、データマイニング (Sec. 44b German Copyright Act)・AI 学習目的の利用禁止。§3.5 改変は機能維持・復旧目的を除き不可。
   - §3.3 3 台まで・同時使用不可、"may not be used on a network by multiple users, unless each user possesses a license"。§3.6 レンタル・貸与は禁止、恒久譲渡は一定条件で可。§3.7 サウンドライブラリ作成の禁止 (Sound License Agreement)。
   - §2.1 Native Access でのアカウント作成とシリアル登録が必要 (未アクティベートは "demo mode")。§7.3 ドイツ法。ホスティング/ASP/service bureau に当たる文言は無い。
@@ -266,9 +266,9 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 ## 7. 見つからなかった/確認できなかった文書、出所に関する事実
 
 見つからない/読めなかった:
-- **Native Instruments (Massive X)**: **同梱なし** (LGL-10 / #2498、2026-10-14 実測。`Native Instruments Massive X v1.7.1.exe` の setup-0 を LZMA1 で復号したヘッダに、EULA の文書ファイル名・使用許諾本文は無い。`tools/legal/REPORT.md` §1-3)。Web 版 EULA は検収時に全文確認済み (§4.4)。同梱版が無いため Web 版との同一性比較の対象は無い。インストーラの CRC 3 種は 6.4.2 の定義と一致せず、原因は未確定 (`tools/legal/REPORT.md` §1-4)。
-- **Slate Digital (Fresh Air)**: 同梱 EULA は未検証 (素材 `plugins-freshair` 未取得。前回取得時の記録は `tools/legal/REPORT.md`)。公式 ToS はオンライン版のみ。
-- **Xfer OTT (mac)**: pkg に `<license>` なし。OTT 専用の規約文書は未確認 (共通 Xfer EULA が win ライセンス画面に出る)。Xfer の公式サイト上の規約ページは未確認 (`/eula`・`/terms`・`/terms_of_service` は 404。`/privacy_policy` のみ取得可能で、利用規約の文面ではない。2026-10-14 レビュー時も同じ)。
+- **Native Instruments (Massive X)**: **同梱なし** (LGL-10 / #2498、2026-10-14 実測。`Native Instruments Massive X v1.7.1.exe` の setup-0 を LZMA1 で復号したヘッダに、EULA の文書ファイル名・使用許諾本文は無い。`tools/legal/REPORT.md` §1-3)。インストーラの CRC 3 種は 6.4.2 の定義と一致せず、完全性は未確認で原因も未確定 (§1-4)。Web 版 EULA は検収時に全文確認済み (§4.4)。同梱版が無いため Web 版との同一性比較の対象は無い。
+- **Slate Digital (Fresh Air)**: 同梱 EULA はファイル名判定では**なし** (`tools/legal/REPORT.md` §2)。公式 ToS はオンライン版のみで、適用される版は未確認。
+- **Xfer OTT (mac)**: pkg に `<license>` なし。OTT 専用の規約文書は未確認 (共通 Xfer EULA が win ライセンス画面に出る)。Xfer の公式規約ページは**公式ページなし** (確認日 2026-10-14、`tools/legal/REPORT.md` §3)。
 - **Image-Line FAQ (公開)**: 未確認。LGL-6 の範囲だが本文書では扱っていない。
 - **Image-Line (実際に承諾した版)**: 公開 ToU / EULA は台帳 `fl-tou-web`・`fl-tou-rtf`・`fl-eula-html` の 3 版で保持済み (§2.1)。依頼者が実際に承諾した版は依頼者の記録事項で確認できないため**未確認**。運用形態 B では他の作業の前提にしない (§6.0)。
 - **Intel IPP / zplane / Chicken Systems / SoftVoice / Ultrafunk / ReWire / NDI / WebView2 / Edge Update** の個別ライセンス本文: 同梱なし。
