@@ -6,7 +6,8 @@
 #   終了時に work/obj/boot.o を元の boot_final3.ll から再生成し sw1783.o / ov.o を消す (trap で必ず復元).
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
-source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" > /dev/null 2>&1
+: "${EMSDK_ENV:?EMSDK_ENV を設定してください ([EMSDK]・docs/REFERENCES.md §4)}"
+source "$EMSDK_ENV" > /dev/null 2>&1
 W=${M11_WATCH_1783:-0x1ac308}
 FIX=${M11_FIX_682:-0}
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0} -DM11_OV_CLASSCREATE=${M11_OV_CLASSCREATE:-0} -I."
