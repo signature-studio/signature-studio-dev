@@ -54,7 +54,7 @@ main (`00ca9f1b`) を取り込んだ merge `53835669` で、競合は 2 件だ�
 
 - 測定 commit 以前の main 側差分 (参考): `git diff --stat 236a8106 53835669 -- tools/python/analysis/flapi` は空。`tools/python/host`・`provider`・`tests` は取り込みで 8 files 変わった (main の `pe119`・`ui_state_diff` と、競合解消の `provider_check.mjs` を含む)。
 
-### 再取り込み後の再測定 (merge `a2a56bf8`・main `5191cf9f`・HEAD `0549e22b` で測り直し)
+### 履歴: 再取り込み後の再測定 (merge `a2a56bf8`・main `5191cf9f`・HEAD `0549e22b` で測り直し)
 
 測定 commit: `a2a56bf8` (コードを変えた最後の commit。merge)。測定時の HEAD: `0549e22b` (差し戻し対応の測定。以後の commit は本 REPORT と PR 本文のみ)。環境: runner (4 core)。`FL_WIN64_DIR` は fl-win64 から DATA block 4 件と PE 本体 (`block00031_PE.bin`) だけを展開した先。emsdk は [EMSDK] (6.0.12)。vite は本体 checkout の `node_modules` を symlink して解決した (コミットしない)。
 
@@ -80,7 +80,7 @@ CPython wasm は HEAD で再ビルドした (流用なし): `fetch_inputs.sh` �
 | `node tests/midi_ui_check.mjs` | MIDI UI OK | 2 |
 | `python3 analysis/flapi/pe_launchmap_entries.py` | 12/12 OK (PE 本体を展開して再実行) | 0 |
 
-- static_mt の host_calls (37,424) と all_tools・static_browser_check (37,425) の 1 差は計数元の違い。原因は未調査 (各 check の判定条件どおりで FAIL ではない)。
+- static_mt の host_calls (37,424) と all_tools・static_browser_check (37,425) の 1 差は原因未調査 (計数元の違いかは未確認。各 check の判定条件どおりで FAIL ではない)。
 - 負のコントロール: 前節の結果を引き継ぐ。`fl_mock.mjs` の `launchPages` の既定値は 0 のまま。
 - コード差分 (測定 commit `a2a56bf8` から HEAD まで、テスト・mock・C・解析に効く範囲): 下の出力を HEAD で取った。
 
