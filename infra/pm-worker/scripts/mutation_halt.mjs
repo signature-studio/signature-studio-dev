@@ -17,6 +17,8 @@ const MUTANTS = [
   { name: "止まっている間に起点を毎回今にする", file: "src/halt.ts", from: "return { ...prev, reasons };", to: "return { since: now, reasons };" },
   { name: "条件が 0 になっても区間を消さない", file: "src/halt.ts", from: "if (reasons.length === 0) return undefined;", to: "if (reasons.length === 0) return prev;" },
   { name: "同じ停止区間の重複抑止 (notifiedAt) を外す", file: "src/halt.ts", from: "!halt.notifiedAt && ", to: "" },
+  { name: "降格中も停止通知を live で送る (降格ゲートを外す)", file: "src/engine.ts", from: "const live = this.dispatchLive() && !!gh;", to: "const live = this.d.cfg.liveDispatch && !!gh;" },
+  { name: "降格中の停止通知も区間の 1 回を使う (保留しない)", file: "src/engine.ts", from: "const held = this.d.cfg.liveDispatch && !this.dispatchLive();", to: "const held = false;" },
 ];
 
 const runTests = () => {

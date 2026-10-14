@@ -91,3 +91,46 @@ test("launch の停止: 解消した後の新しい停止は、新しい起点�
   clock.t = T0 + 100 * MIN;
   assert.equal(await ctx.app.engine.haltNotify(null), "would", "前の区間の通知とは別に 1 回送る (同じ digest#0 の 60 分の上限の外)");
 });
+
+// 降格 (#2340) の中の停止通知: dispatch と同じ降格ゲート。降格中は送らず would に数え、区間の 1 回を使わずに保留する。解除の後に送る。
+test("降格中は停止通知を送らず would に数え、解除の後に 1 回送る", async () => {
+  const clock = { t: T0 };
+  const repoPush = (c: Call) => (c.method === "GET" && c.url.endsWith("/repos/signature-studio/signature-studio-dev") && c.auth === "Bearer ghp_valid_push_token_x" ? j({ permissions: { push: true } }) : undefined);
+  const ctx = await configuredApp({ live: true, now: clock, handlers: [ok, repoPush], env: { IMPORT_REQUIRED: "1", LIVE_LAUNCH: "0" } });
+  const tickAt = async (min: number) => {
+    clock.t = T0 + min * MIN;
+    await markFresh(ctx);
+    await ctx.app.engine.tick();
+  };
+  const oc = (id: number, login: string, min: number) => send(ctx.app, "issue_comment", {
+    action: "created",
+    repository: { full_name: "signature-studio/signature-studio-dev" },
+    issue: { number: 901 },
+    comment: { id, user: { login }, body: "/oc\noc_artifacts: fl-win64", created_at: iso(min) },
+  });
+  assert.equal((await send(ctx.app, "issues", issuePayload(901))).status, 202);
+  await tickAt(0);
+  assert.deepEqual((ctx.app.engine.status() as any).launch_halted, { reason: "no-import", since: iso(0) });
+
+  await oc(1, "pycabbage", 1);
+  await oc(2, "oc-pm-for-signature-studio[bot]", 2);
+  assert.equal((ctx.app.engine.status() as any).demoted_reason, "double-oc #901");
+
+  const before = (ctx.app.engine.status() as any).counters.wouldDispatchPm ?? 0;
+  await tickAt(31);
+  assert.equal(digestCalls(ctx.m.calls).length, 0, "降格中は停止通知を送らない");
+  assert.ok(((ctx.app.engine.status() as any).counters.wouldDispatchPm ?? 0) > before, "降格中は would に数える");
+  assert.equal((ctx.app.engine.status() as any).counters.pmDispatched ?? 0, 0);
+  assert.equal(ctx.app.engine.meta.halt?.notifiedAt, undefined, "降格中は区間の 1 回を使わない");
+
+  await tickAt(32);
+  assert.equal(digestCalls(ctx.m.calls).length, 0, "60 分以内の再試行は would の重複を数えない");
+
+  const reset = await ctx.app.handle(new Request("https://pm.example/demote/reset", { method: "POST", headers: { authorization: "Bearer ghp_valid_push_token_x" } }));
+  assert.equal(reset.status, 200);
+  await tickAt(40);
+  assert.equal(digestCalls(ctx.m.calls).length, 1, "解除の後に 1 回送る");
+  assert.equal((ctx.app.engine.status() as any).launch_halted?.since, iso(0), "区間は解消していない");
+  await tickAt(41);
+  assert.equal(digestCalls(ctx.m.calls).length, 1, "送ったあとは同じ区間で繰り返さない");
+});

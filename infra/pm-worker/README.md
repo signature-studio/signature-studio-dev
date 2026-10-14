@@ -168,7 +168,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 
 ## launch の停止と通知 (#2795)
 
-launch を止める条件は次の 5 つ。`src/halt.ts` の `haltReasons` が決める (先頭が `launch_halted.reason`)。
+`launch_halted` に出る、launch を止める条件は次の 5 つ。`src/halt.ts` の `haltReasons` が決める (先頭が `launch_halted.reason`)。
 
 | reason | 条件 | 判定 |
 |---|---|---|
@@ -179,12 +179,13 @@ launch を止める条件は次の 5 つ。`src/halt.ts` の `haltReasons` が�
 | `stale` | 同期が古い (reconcile から 15 分以上) か、一覧を打ち切った。launch は書かない | `fresh()` |
 
 含めないもの: `/oc` の投稿で 403/429 が返ったとき (一時的。次の tick で再試行し、`last_error` に出る)。`room` が 0 (同時実行の上限に達しただけで、正常な待ち)。
+降格 (#2340・`meta.demoted`) も含めない。降格中は launch が dry-run になる (投稿しない) が、`launch_halted` には出さない。降格は『投稿と dispatch を止めて人が確認する』安全装置で、解除は repo の push 権限者の操作 (`/demote/reset`) による。PM agent へ知らせる対象ではなく、`/status.demoted_reason` で見える。
 
 - **区間**: 止まった時刻を `meta.halt.since` に保存する。止まり続けている間は起点を変えない。全ての条件が無くなると区間を消す (次の停止の起点に使い回さない)。
 - **/status**: `launch_halted` (`{reason, since}`。止まっていなければ `null`) と `launch_halted_overdue` (15 分以上止まり、かつ `ready` と `room` がある間は `true`)。
-- **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 12 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。
+- **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 12 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。降格中 (`demoted_reason` がある間) は送らず、区間の 1 回も使わずに保留する (解除の後に送る。降格中の would は 60 分に 1 回まで数える)。
 - **限界**: `digest` の PM run が受け取るのは kind と ref だけで、`/status` は読まない (oc-pm の workflow に `PM_WORKER_URL` は無い)。そのため通知を受けた PM agent は『launch が止まっている』とは分からず、通常の digest の集計をする。停止の理由を通知に載せるには、CI 側 (`.github/scripts/watchdog.sh` が `/status` を読んで障害 issue を起票する経路) への接続が要る。この PR の範囲外 (未解決の表に起票先を書く)。
-- **変異テスト**: `npm run test:mutation` が、既定値・閾値・区間の起点・解消・重複抑止の 7 か所を 1 つずつ壊し、テストが落ちることを確かめる (`scripts/mutation_halt.mjs`)。
+- **変異テスト**: `npm run test:mutation` が、既定値・閾値・区間の起点・解消・重複抑止・降格中の通知 (降格ゲートと保留) の 9 か所を 1 つずつ壊し、テストが落ちることを確かめる (`scripts/mutation_halt.mjs`)。
 
 ## /oc 投稿の観測 (#2342)
 
