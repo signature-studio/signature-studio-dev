@@ -63,7 +63,7 @@
 
 測定 commit: `bd7db129` (コードを変えた最後の commit。main `65ea0ce3` を取り込んだ merge。競合は無く、自動 merge)。直前の測定は `6a9fe2df` (main `8fd940bb` 取り込み後)。以後の commit は本 REPORT_PY125.md のみ。
 main 取り込みの `tools/python` 側の変更 (`git diff --stat 8fd940bb 65ea0ce3 -- tools/python`) は `REPORT_PY109.md`・`tests/browser/static_subinterp.html`・`tests/static_subinterp_browser.mjs` の追加 (313 行) だけで、`host/`・`provider/`・検証 tests (`general_diff`・`provider_check`・`all_tools`・`mixer_diff`・`screen_diff`) は変わっていない。
-環境: runner 4 core。`uptime` 22:05:28 (テスト直後) の load average 1.13 (1 分値)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 7.9 秒)、`FL_WIN64_DIR` はその展開先。`toolchain-emsdk` を `$RUNNER_TEMP/toolchain-emsdk` に展開 (6.5 秒)。ビルドは `/opt/emsdk` (6.0.12。artifact と同版。`build_cpython_wasm.sh` が `/opt/emsdk` を直接 source する) を使った。
+環境: runner 4 core。`uptime` 22:05:28 (テスト直後) の load average 1.13 (1 分値)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 7.9 秒)、`FL_WIN64_DIR` はその展開先。`toolchain-emsdk` を `$RUNNER_TEMP/toolchain-emsdk` に展開 (6.5 秒)。ビルドは [EMSDK] (6.0.12。artifact の `toolchain-emsdk` と同版。`build_cpython_wasm.sh` は既定の [EMSDK] 位置を直接 source する) を使った。
 
 前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0、0.9 秒)・`bash build_cpython_wasm.sh` (rc 0、3 分 7.6 秒。`bd7db129` の tree で作成)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒)・`bash provider/build.sh` (rc 0、1.0 秒)。ハンドラ数は `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` で 99 (期待値 99 と一致)。
 
