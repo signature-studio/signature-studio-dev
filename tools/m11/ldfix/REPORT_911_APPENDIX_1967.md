@@ -16,5 +16,6 @@
 
 - 41a6a0・41a6d3 の各 1 回は、§6c の deref 脱落 2 命令と一致する。
 - **未確定**: siteA が L163〜166 (`gv` の分岐) に当たるかは、バイナリに DWARF が無く (`addr2line` は `??`) 逆アセンブル照合でのみ推定した。siteA は別の `convertConstantToType` 呼び出し (ngv 系) と区別できていない。
-- 所要: 41a670-41a6f4 の 1 回 7.54 秒 (real、n=1、4 コア)。load は未測定。
+- 所要: 41a670-41a6f4 の 1 回 7.54 秒 (real、n=1、4 コア)。load average は**未測定** (元の測定時に記録していない)。
+- 再現: `tools/m11/ldfix/uprobe_1967.sh` (env: `RETDEC_BIN`・`PE_BIN`・`FUNC_BASE`)。**未検証**: 本 run では `toolchain-retdec` が無く未実行、`perf` は tracefs 権限無しで probe 登録を試せなかった。`FUNC_BASE` (呼び出し元関数の VA) は付録に記録が無く未確定。初回実行で構文と件数を確かめること。
 
