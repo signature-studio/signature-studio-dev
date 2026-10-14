@@ -6,7 +6,7 @@
 
 - 測定 commit: `6444b186` (測定に使った main 作業ツリー)。本 PR の起点は `76168f2a` (origin/main)。
   `git diff 6444b186 76168f2a -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/m11_gen_ir2.sh tools/m11/m11_lift.sh tools/m2 tools/m5` の出力は 0 行
-  (差分は #2141 の REPORT・結果 JSON のみ)。本 PR のコード差分は `repro_2143.sh` の追加 (69 行) のみ。計測対象 (`audit_undefload*.py`・`ldfix.py`・`m11_gen_ir2.sh`) の差分は 0。
+  (差分は #2141 の REPORT・結果 JSON のみ)。本 PR のコード差分は `repro_2143.sh` の追加 (93 行) のみ。計測対象 (`audit_undefload*.py`・`ldfix.py`・`m11_gen_ir2.sh`) の差分は 0。
 - 入力 IR は 2 種類。**監査 (§1・§3) は norm0、F4 (§4・§5) は pre IR** で、混ぜない。
   - norm0: `work-m11` 素材の `tools/m11/work/boot0..4.norm0.ll` (`NORM0` に渡す)。
   - pre IR: `M11_LDFIX=0 bash tools/m11/m11_gen_ir2.sh` が出す `work/boot_final.ll` (ldfix 適用前)。`BOOT_FINAL` に渡す。§4 に作成手順を書く。
