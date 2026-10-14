@@ -93,8 +93,8 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 異なる plugin を 1 Memory に畳む際の VA 衝突・共有 static の汚染 (本計測は同一 OTT の M 個 = 同一 binary の別 state) | 異なる plugin を同居させる場合は未検証 | #1259 [PERF-P19] |
-| AudioWorklet での M 個駆動 | 本計測は Dedicated Worker のみ。worklet 側の上限・コストは未測 | #1259 [PERF-P19] |
+| 異なる plugin を 1 Memory に畳む際の VA 衝突・共有 static の汚染 (本計測は同一 OTT の M 個 = 同一 binary の別 state) | 異なる plugin を同居させる場合は未検証 | #2963 [PERF-P20] |
+| AudioWorklet での M 個駆動 | §7 で M=130 を実測 (署名 130/130 一致・instantiate 失敗なし)。worklet 上の setup 時間は未測 (§7) | #1259 の PR (§7) で解消。setup 時間は pre-warm の設計で扱う |
 | setup 時間 (M=130 で約 0.8〜1.0 s) | 起動時の一括 instantiate/setup の遅延。pre-warm の設計が必要 | REPORT_P8 §11 (pre-warm) と同じ経路 |
 
 ## 5. 再現
@@ -132,3 +132,47 @@ node tools/perf/p15/chrome_shared.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3  
 - chrome_shared の µs/block は run 間で 118.93〜140.77 に散る (全 9 行の min/max)。定常の数値は 1 回の値ではなく 3 回の中央値で読む。
 
 **測定 commit から HEAD までの tools/perf 差分**: 測定コード (スクリプト) の差分は空。HEAD で追加されたのは `results/rerun_20261014_*.jsonl` の 3 ファイル (17 行) のみ。`git diff --stat 2b2faf52 HEAD -- tools/perf/p15` の出力は PR 本文の「検証」節と一致する。
+
+## 7. AudioWorklet 上での M 個駆動の実測 (PERF-P19 / #1259)
+
+**結論**: AudioWorklet (AudioWorkletGlobalScope) 上でも、1 instance (Memory 1 本) に OTT 処理オブジェクト M=130 を畳み込み、instantiate 失敗なし・全 130 obj の署名が既知値 `6b1696f0` と一致した (3 run。9 行すべて一致)。異なる plugin の畳み込みは本節の対象外で、子 issue #2963 [PERF-P20] に移した。
+
+| 項目 | 結果 |
+|---|---|
+| 駆動方法 | `OfflineAudioContext` 上の `AudioWorkletProcessor`。1 render quantum (128 frame) ごとに全 obj を 1 block ずつ process する。音声デバイス不要 |
+| 署名 | 9 行すべて `6b1696f0`。M 個全て一致 (M=1: 1/1, M=4: 4/4, M=130: 130/130)。instantiate 失敗・error 行なし。memory は各 864 MiB |
+| 定常 (µs/block p50 の 3 run 中央値) | M=1: 134.00 / M=4: 145.75 / M=130: 139.80 |
+| 読み方 | M=1 (134.00) に対し M=130 (139.80) は +4%。M=4 が M=130 より高く単調増加ではない。1 run 内の min〜max の散らばりが 10〜40 µs あり、傾向は断定できない |
+| Worker との比較 | §6 再測定の Dedicated Worker M=130 中央値 125.70 (同じ EPYC 9V45)。run 間の散らばり (worklet M=130: 115〜145) の中にあり、差の有無は n=3 では判定しない |
+
+- 測定 commit: `80298b02` (`tools/perf/p15/chrome_worklet.mjs`・`web/shared_worklet.js`・`web/worklet_page.html`)。
+- 環境: Chrome 154.0.8037.97 (headless), CPU `AMD EPYC 9V45 96-Core Processor` (4 vCPU), node v22.23.3。素材 `work-m6-ott` (`tools/ott/work/lift/ottl.wasm`)。
+- 時刻の取り方: AudioWorkletGlobalScope には `performance` が無い (`ReferenceError` を確認)。rep ごとの時間は `Date.now()` (1 ms 分解能) で取る。M=1 の 1 rep は約 0.13 s で、1 ms は約 0.8%。M=130 の 1 rep は約 18 s で、分解能の影響は無視できる。
+- 条件: 1 run = 署名区間 1000 quantum + warm 300 quantum + 計測 7 rep × 1000 quantum。Chrome は条件×反復ごとに新規起動。
+
+| M | run | µs/block p50 [min–max] | loadavg (1 分) | 署名 |
+|---|---|---|---|---|
+| 1 | 0 | 134 [133–149] | 0.85 | `6b1696f0` (1/1) |
+| 1 | 1 | 141 [140–150] | 1.25 | `6b1696f0` (1/1) |
+| 1 | 2 | 120 [119–158] | 1.09 | `6b1696f0` (1/1) |
+| 4 | 0 | 130.75 [129.75–160] | 0.87 | `6b1696f0` (4/4) |
+| 4 | 1 | 161 [158.25–174.25] | 1.23 | `6b1696f0` (4/4) |
+| 4 | 2 | 145.75 [141–161.5] | 1.08 | `6b1696f0` (4/4) |
+| 130 | 0 | 139.8 [138.2–142.08] | 1.25 | `6b1696f0` (130/130) |
+| 130 | 1 | 144.63 [137.21–149.02] | 1.09 | `6b1696f0` (130/130) |
+| 130 | 2 | 115.08 [112.97–116.81] | 1.01 | `6b1696f0` (130/130) |
+
+- node (同じ commit `80298b02`、`shared_obj.mjs`): M=1 署名 `6b1696f0` (sig_n=1)、M=4 (sig_n=4)、M=130 (sig_n=130, setup 381.33 ms)。いずれも `sig_ok=true`。Chrome 表の署名一致の前提を確認するための確認で、定常の数値は §3 と本節の Chrome 表を正とする。
+- 未解決: worklet 上の setup 時間は未測 (`setup_ms` を出力していない)。M=130 の setup は Dedicated Worker で約 0.8〜1.0 s (§3)。同じ経路で pre-warm の設計が要る (§4)。
+
+再現:
+
+```sh
+export PERF_TMP=$RUNNER_TEMP/perf
+node tools/perf/p15/shared_obj.mjs tools/ott/work/lift/ottl.cjs 130   # node 署名 (M=1,4 も同じ)
+node tools/perf/p15/chrome_worklet.mjs --m 1,4,130 --reps 7 --blk 1000 --runs 3   # §7 の表
+```
+
+前提: `oc_artifacts: work-m6-ott` (`tools/ott/work/lift/ottl.wasm`・`ottl.cjs`)。
+
+**測定 commit から HEAD までの tools/perf/p15 差分**: 測定コードの差分は空。`git diff --stat 80298b02 HEAD -- tools/perf/p15` は、測定結果 `results/chrome_worklet.jsonl` (9 行) の追加だけを示す。
