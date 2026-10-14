@@ -209,7 +209,12 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 - 受入条件 `missing_define` = 0 は **未達**。 残り 209 件は §C-1 (a) の RetDec 静的検出 (`statically linked function`) で、 `PLUG_NO_STATIC_DETECT=1` (#1486 の opt-in) の既定化が要る。 起票先: #1536。
 - `emcc -c` は既定・opt-in とも rc 1 (E3 が先に止める)。 両者の `first_errors.txt` は同一。
 
-## F. main (ba4babca) での 9 本再測定と known.json 更新 (#534)
+
+## F. #1536 (PLUG_NO_STATIC_DETECT の既定化) の節
+
+§F は 250 行上限のため [REPORT_APPENDIX_F.md](REPORT_APPENDIX_F.md) に分割移動した。
+
+## G. main (ba4babca) での 9 本再測定と known.json 更新 (#534)
 
 - 測定 HEAD: **ba4babca** (origin/main)。 コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/plugins/synth/cpp_lift.sh <block> 2400` を 9 本 `xargs -P 3`。 既定 `HLL_CAP=300`、既定の opt-in (`PLUG_I32PTR_FUNCS` は 21202 のみ既定で ON)。 素材 `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` を `$HOME/artifacts` から展開して使用。
 - 総経過 **569 s** (9 本、終了コード 0 が 9 本)。 load (測定後) `2.04`。

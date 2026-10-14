@@ -82,3 +82,32 @@ index ab3ba4c0..4a9d4642 100644
 | native との比較 | **bit 一致 61/366 steps**。不一致バッファ: self 305・P 293・L 291・R 290 (step 数) |
 
 判定: **受入 1・2 は未達**。wasm が trap せず 366 step を返すところまで成立した。残る差分は float 系バッファ (`self` の f32 フィールド・`L`/`R` 出力) と `rax` の不一致で、原因は未切り分け (候補: `__asm_movss` 系 SIMD helper の lane 扱い、`__icall_comis` のフラグ、`ott_run` の引数 ABI)。
+
+## 再測定と食い違いの特徴 (2026-10-14 01:56〜02:00 UTC)
+
+測定 commit: `4ed14f65` (main)。`a1830d49..4ed14f65` の `tools/icall` 差分は `kh_route_run.sh` の no-op 削除 1 行のみ。`tools/m2 tools/m5 tools/m11 tools/ott/lift tools/liftlib/liftlib/harness` に差分なし。よって上の実行段の数値は本 HEAD のコードに対しても有効 (WORKFLOW §6)。
+
+素材: `plugins-kilohearts` → Installer zip → payload.dat → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B。REPORT と一致)。`work-icall` / `work-liftlib` は main の checkout から worktree の `tools/` へ複製して使用。
+
+| 項目 | 実測 |
+|---|---|
+| `kh_route_build.sh` | rc 0 / real 61.5 s |
+| `kh_route_run.sh` | rc 0 / real 0.35 s / scenarios 61 / steps 366 / wasm_trap 0 |
+| 最初の食い違い step | step 0 が 34 シナリオ、step 1 が 27 シナリオ (全 61 シナリオが step 1 以前で発散) |
+
+比較値 (bit 一致・rax 一致)・食い違いの多いバッファは §実行段の表を参照 (再測定で同値)。
+
+### 食い違いの観察 (未切り分け)
+
+- step 0 は全バッファが一致し、`rax` も一致 (0x67)。発散は step 1 以降。
+- 最初の発散の代表 (シナリオ 0・step 1): `self` の 16 bit 境界外 (+106) から始まる。`self` +104 は native `0x0000803c` (f32 0.015625)・wasm `0x00000000` (0)、+108 は native 1.0・wasm 0.5。+136 は native `0xb4fa3e3e` (0.186503)・wasm `0xa528083e` (0.132968)。
+- 食い違いの頻度: `P` +8 (291)・`L` +0 (275)・`R` +0 (274)・`self` +104 (211)・`self` +106 (64)・`self` +107 (27)。half-word・byte 単位のずれが多く、部分幅ストア (`movss`・`movd` 系) の lane / merge 規則が疑わしい。
+- `xmm0` 欄は step 0 で native `0x3e315071`・wasm `0`。`ott_xmm0` の読み出し経路か戻り値の扱いの差か未確定 (差分としては未分類)。
+
+判定: **受入 1・2 は引き続き未達**。wasm 実行は安定 (trap 0) したが、native と bit 一致するのは 61/366 step。食い違いの原因切り分けは次の入口 (下記) に残す。
+
+### 次の入口
+
+1. step 1 で最初に書かれる `self` の f32 フィールド (+104・+108) を生成する命令を、wasm IR 上で特定する (`insn.addr` を `rt_kilohearts-gain/after.0.restored.ll` の `!insn.addr` と突き合わせる)。
+2. その命令が `__asm_movss` / `__asm_movd` 系 helper を経由するなら、helper の部分幅 merge 規則を native (`movss` 同等) と比較する。
+3. `xmm0` 欄の不一致は `ott_xmm0` の戻り値規約を確認してから分類する。

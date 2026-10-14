@@ -15,7 +15,7 @@ B="$1"; TMO="${2:-2400}"
 # C++ DLL 9 本 (#534) の結果列を #535 の fix_avx256 で変えない (shell 12 本だけが対象)。 resume / 通常の両経路に効く
 export PLUG_AVX256="${PLUG_AVX256:-0}"
 # 21202 のみ E3 修復 (fix_i32_ptr_arg.py の opt-in; #1509)。 他の block は従来どおり修復無し
-if [ "$B" = 21202 ]; then export PLUG_I32PTR_FUNCS="${PLUG_I32PTR_FUNCS:-function_180049450 function_180056120}"; fi
+if [ "$B" = 21202 ]; then export PLUG_I32PTR_FUNCS="${PLUG_I32PTR_FUNCS:-function_180049450 function_180056120 function_1800599bc}"; fi
 OUT="work/synth/cpp$B"
 HLLCAP="${HLL_CAP:-300}"
 resume_lift() {
