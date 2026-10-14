@@ -300,10 +300,11 @@ Workers Builds は 2026-10-14 に接続された (『Workers Builds』節)。た
 
 ### 現状 (2026-10-14。Cloudflare API の読み取りで確認)
 
-依頼者の許可で接続された (下の『接続しないと決めた理由』は、その前の判断)。設定: repo `signature-studio/signature-studio-dev`・branch `main`・root directory `infra/pm-worker`・watch paths include `infra/pm-worker/*`・preview ビルド無効・build command 空・deploy command `npx wrangler deploy`。build token は Cloudflare が自動作成した `Workers Builds - 2026-10-14 22:04`。
+Cloudflare API では接続されている (下の『接続しないと決めた理由』は、その前の判断)。ただし依頼者の承認の記録は repo に無い。#2357 の 2026-10-14 13:00:34Z の PM コメントは、依頼者に接続の操作を求めるだけで、答えは確認できていない。経緯は #2357 で確認中。設定: repo `signature-studio/signature-studio-dev`・branch `main`・root directory `infra/pm-worker`・watch paths include `infra/pm-worker/*`・preview ビルド無効・build command 空・deploy command `npx wrangler deploy`。build token は Cloudflare が自動作成した `Workers Builds - 2026-10-14 22:04`。
 
 - **install は pnpm で走る。** Workers Builds は、`infra/pm-worker/package.json` が npm を宣言していても、`infra/pm-worker` で `pnpm install --frozen-lockfile` を実行する (ビルドログで実測)。pnpm が選ばれる理由は、リポジトリ直下の `package.json` の `packageManager: pnpm@12.10.1` と推定している (未確認。ビルドログの `Detected the following tools` に `pnpm@12.10.1` が出る)。そのため `infra/pm-worker` には `pnpm-lock.yaml` が要る。`package.json` に `packageManager: npm@...` を書いても pnpm 12 が実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。lockfile が無いと `ERR_PNPM_NO_LOCKFILE` で落ちる (#2454 → #2585 の経緯)。
 - `pnpm-workspace.yaml` の `allowBuilds` は、pnpm 12 の `strictDepBuilds` (既定) で esbuild と workerd の postinstall を許すためのもの。依存を足して postinstall を持つものが入ったら、ここに足す (足さないと `ERR_PNPM_IGNORED_BUILDS`)。
+- `pnpm-workspace.yaml` の `minimumReleaseAgeExclude` (wrangler・@cloudflare/vitest-plugin・miniflare の exact 版 3 件) は、公開後 24 時間以内の版を lockfile install で通すための供給網ポリシーの例外。PM 判断待ち (経緯は #2585)。却下されたら該当行を削除し、2026-10-15T05:53:30Z 以降に install する。版を変えるときは exclude も見直す。
 - **deploy は `wrangler.toml` が正。** `[observability]` を削ると、次の deploy (VM でも Workers Builds でも) が Workers Logs を無効にする。`[vars]` も同じ (上の再デプロイの手順 4)。
 - watch paths を `infra/pm-worker/*` にしても、`infra/pm-worker` を触らない merge でビルドが走ることがある (2026-10-14 に実測。件数は #2585)。公式は『push event の変更ファイルが 0 件ならパス判定を飛ばして build する』と書く。原因は未確認。無関係な merge でも deploy が走りうる。
 - ビルドの状態は `GET /accounts/{id}/builds/workers/{script_tag}/builds`、ログは `GET /accounts/{id}/builds/builds/{uuid}/logs` で読める。

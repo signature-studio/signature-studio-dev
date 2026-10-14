@@ -1,5 +1,10 @@
 # pnpm 12 は strictDepBuilds が既定で、ここに無い postinstall があると install が ERR_PNPM_IGNORED_BUILDS で失敗する。
 # Workers Builds が infra/pm-worker で `pnpm install --frozen-lockfile` を実行する (#2585)。
+# minimumReleaseAgeExclude は供給網ポリシーの例外 (公開後 24 時間以内の版を入れる)。版を exact で止め、依存の版は変えない。PM 判断待ち (経緯は #2585)。
+minimumReleaseAgeExclude:
+  - wrangler@4.151.0
+  - '@cloudflare/vitest-plugin@1.4.2'
+  - miniflare@5.20261012.0-beta
 allowBuilds:
   esbuild: true
   workerd: true
