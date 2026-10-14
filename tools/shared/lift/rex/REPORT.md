@@ -201,7 +201,7 @@ FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/rex/lift_x64c.sh all   
 
 ### 8.7 再現
 ```
-FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk 6.0.12 の emsdk_env.sh> bash tools/shared/lift/rex/lift_core.sh   # lift + wasm (コンパイル確認。EMSDK_ENV 省略時は /opt/emsdk/emsdk_env.sh)
+FL_WIN64_DIR=<fl-win64 展開先> EMSDK_ENV=<emsdk 6.0.12 の emsdk_env.sh> bash tools/shared/lift/rex/lift_core.sh   # lift + wasm (コンパイル確認。EMSDK_ENV 省略時は `[EMSDK]` の emsdk_env.sh)
 python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json        # importer 33 件 (REX 本体を含む)
 ```
 `<fl-win64 展開先>` は `extracted/` を含むディレクトリ (`tar --zstd -xf fl-win64.tar.zst -C <dir>`)。生成物は `tools/shared/work/lift/rex-core/` (gitignore)。
