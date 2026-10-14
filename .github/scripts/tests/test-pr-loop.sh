@@ -19,7 +19,7 @@ LOG="$TMP/gh.log"
 mkdir -p "$FIX" "$TMP/bin"
 cat > "$TMP/bin/gh" << 'EOF'
 #!/bin/bash
-echo "gh $*" >> "$FAKE_LOG"
+echo "gh $* [GH_TOKEN=${GH_TOKEN:-}]" >> "$FAKE_LOG"
 if [ "$1" = pr ]; then
   [ "$2" = close ] && [ -n "${FAKE_CLOSE_FAILS:-}" ] && exit 1
   if [ "$2" = reopen ] && [ -n "${FAKE_REOPEN_FAILS:-}" ]; then
@@ -87,9 +87,10 @@ reviews() { # <submitted_at> <count> [<submitted_at> <count> ...]: oc-reviewer �
   printf '[%s]' "${s%,}"
 }
 stop_at() { # <created_at> [login]: 停止コメント (マーカー付き) の JSON 配列
-  printf '[{"created_at":"%s","user":{"login":"%s"},"body":"上限 <!-- oc-fix-limit -->"}]' "$1" "${2:-opencode-for-signature-studio[bot]}"
+  printf '[{"created_at":"%s","user":{"login":"%s","type":"Bot"},"body":"上限 <!-- oc-fix-limit -->"}]' "$1" "${2:-github-actions[bot]}"
 }
-run_fix() { GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" bash "$SCRIPTS/fix-progress.sh" "$@"; }
+# OC_MARK_TOKEN は workflow が github.token を渡す値 (#2622)。未設定なら既定のテスト値、空なら「無し」として渡す。
+run_fix() { GITHUB_ENV="$TMP/env" GITHUB_OUTPUT="$TMP/out" OC_MARK_TOKEN="${OC_MARK_TOKEN-mark-tok}" bash "$SCRIPTS/fix-progress.sh" "$@"; }
 # rv <submitted_at> <classes> <body>: oc-reviewer の CHANGES_REQUESTED review (本文末尾に oc-review マーカー)
 rv() {
   jq -nc --arg t "$1" --arg c "$2" --arg b "$3" '{user:{login:"oc-reviewer-for-signature-studio[bot]"},state:"CHANGES_REQUESTED",commit_id:"c",submitted_at:$t,body:($b + "\n<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=" + $c + " -->")}'
@@ -148,7 +149,7 @@ grep -qx 'stop=false' "$TMP/out"; expect "ネガ (c): conflict 2 件 + doc 3 件
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(cat_rv "$(cat_rv "$(seq_rv doc 5 1)" '[]')" "$(seq_rv doc 5 6)")"
-fx repos/o/r/issues/7/comments "$(jq -nc '[{created_at:"2026-01-05T12:00:00Z",user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=1 -->"},{created_at:"2026-01-10T12:00:00Z",user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=2 -->"}]')"
+fx repos/o/r/issues/7/comments "$(jq -nc '[{created_at:"2026-01-05T12:00:00Z",user:{login:"github-actions[bot]",type:"Bot"},body:"<!-- oc-fix-reset n=1 -->"},{created_at:"2026-01-10T12:00:00Z",user:{login:"github-actions[bot]",type:"Bot"},body:"<!-- oc-fix-reset n=2 -->"}]')"
 fx repos/o/r/pulls/7/reviews "$(cat_rv "$(seq_rv doc 15 1)" '[]')"
 run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ネガ (d): 合計 15 件 -> stop=true" $?
@@ -162,7 +163,7 @@ logged 'oc-fix-reset n=1'; expect "ネガ (e): 1 窓目は oc-fix-reset n=1" $?
 
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(cat_rv "$(seq_rv "" 5 1)" "$(seq_rv "" 5 6)")"
-fx repos/o/r/issues/7/comments "$(jq -nc '[{created_at:"2026-01-05T12:00:00Z",user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=1 -->"}]')"
+fx repos/o/r/issues/7/comments "$(jq -nc '[{created_at:"2026-01-05T12:00:00Z",user:{login:"github-actions[bot]",type:"Bot"},body:"<!-- oc-fix-reset n=1 -->"}]')"
 run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ネガ (e): マーカー欠落の 2 窓目 -> stop=true" $?
 logged 'reason=unknown'; expect "ネガ (e): 停止理由 reason=unknown" $?
@@ -170,25 +171,25 @@ logged 'reason=unknown'; expect "ネガ (e): 停止理由 reason=unknown" $?
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
 now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-fx repos/o/r/issues/comments "$(jq -nc --arg t "$now" '[range(0;6)|{created_at:$t,user:{login:"opencode-for-signature-studio[bot]"},body:"<!-- oc-fix-reset n=1 -->"}]')"
+fx repos/o/r/issues/comments "$(jq -nc --arg t "$now" '[range(0;6)|{created_at:$t,user:{login:"github-actions[bot]",type:"Bot"},body:"<!-- oc-fix-reset n=1 -->"}]')"
 run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ネガ (f): 1 時間に 7 件目の reset -> stop=true" $?
 logged 'reason=ceiling'; expect "ネガ (f): 停止理由は reason=ceiling" $?
 
 # 停止コメント (oc-fix-limit) より前の差し戻しは数えない: ラベルを外して再開できる
 setup aaa '[]' 5
-fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"},"body":"stop <!-- oc-fix-limit -->"}]'
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"github-actions[bot]","type":"Bot"},"body":"stop <!-- oc-fix-limit -->"}]'
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後に差し戻し 0 件 (ラベルを外した直後) -> stop=false" $?
 
 setup aaa '[]' 5
-fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"},"body":"stop <!-- oc-fix-limit -->"}]'
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"github-actions[bot]","type":"Bot"},"body":"stop <!-- oc-fix-limit -->"}]'
 fx repos/o/r/pulls/7/reviews "$(jq -c '. + [{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"CHANGES_REQUESTED","commit_id":"n1","submitted_at":"2026-04-01T00:00:00Z"}]' < "$FIX/repos_o_r_pulls_7_reviews")"
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後の差し戻し 1 件 -> stop=false (数え直し)" $?
 
 setup aaa '[]' 5
-fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"opencode-for-signature-studio[bot]"},"body":"stop <!-- oc-fix-limit -->"}]'
+fx repos/o/r/issues/7/comments '[{"created_at":"2026-03-01T00:00:00Z","user":{"login":"github-actions[bot]","type":"Bot"},"body":"stop <!-- oc-fix-limit -->"}]'
 fx repos/o/r/pulls/7/reviews "$(jq -c '. + [range(0;5)|{"user":{"login":"oc-reviewer-for-signature-studio[bot]"},"state":"CHANGES_REQUESTED","commit_id":"n","submitted_at":"2026-04-01T00:00:00Z"}]' < "$FIX/repos_o_r_pulls_7_reviews")"
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "停止コメントの後に再び 5 件 (マーカー無し = unknown の 1 窓目) -> 自動再開" $?
@@ -225,6 +226,53 @@ fx repos/o/r/pulls/7/reviews "$(reviews 2026-01-01T00:00:00Z 5 2026-01-03T00:00:
 fx repos/o/r/issues/7/comments "$(stop_at 2026-01-02T00:00:00Z someone)"
 run_fix record > /dev/null
 grep -qx 'stop=false' "$TMP/out"; expect "他人の oc-fix-limit マーカーは区切りにしない (6 件を窓として数える -> 1 窓目で再開)" $?
+
+echo "== fix-progress.sh record (偽装: 実装 App 名義の窓の印は信じない #2622)"
+IMPL="opencode-for-signature-studio[bot]"
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv code 6 1)"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "ネガ (偽 0): 印なしの code 6 件 -> stop=true" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv code 6 1)"
+fx repos/o/r/issues/7/comments "$(jq -nc --arg u "$IMPL" '[{created_at:"2026-02-01T00:00:00Z",user:{login:$u,type:"Bot"},body:"偽 <!-- oc-fix-limit -->"}]')"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "偽装 (停止印): 実装 App 名義の oc-fix-limit では窓を空にできない -> stop=true" $?
+logged 'reason=code'; expect "偽装 (停止印): 停止理由は reason=code のまま" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 16 1)"
+fx repos/o/r/issues/7/comments "$(jq -nc --arg u "$IMPL" '[{created_at:"2026-01-16T12:00:00Z",user:{login:$u,type:"Bot"},body:"偽 <!-- oc-fix-reset n=1 -->"},{created_at:"2026-01-16T13:00:00Z",user:{login:$u,type:"Bot"},body:"偽 <!-- oc-fix-reset n=2 -->"}]')"
+run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "偽装 (再開印): 実装 App 名義の oc-fix-reset で合計の天井を越えられない -> stop=true" $?
+logged 'reason=ceiling'; expect "偽装 (再開印): 停止理由 reason=ceiling" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
+now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+fx repos/o/r/issues/comments "$(jq -nc --arg t "$now" --arg u "$IMPL" '[range(0;6)|{created_at:$t,user:{login:$u,type:"Bot"},body:"偽 <!-- oc-fix-reset n=1 -->"}]')"
+run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "偽装 (1 時間の上限): 実装 App 名義の reset 6 件では正当な自動再開を止めない" $?
+logged 'oc-fix-reset n=1'; expect "偽装 (1 時間の上限): 正当な再開は oc-fix-reset n=1 を投稿する" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
+OC_MARK_TOKEN=mark-tok run_fix record > /dev/null
+grep -qx 'stop=false' "$TMP/out"; expect "正例 (印): OC_MARK_TOKEN があれば 5 件で窓を閉じる" $?
+logged 'oc-fix-reset n=1.*GH_TOKEN=mark-tok'; expect "正例 (印): 窓の印は OC_MARK_TOKEN で投稿する" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 5 1)"
+OC_MARK_TOKEN= run_fix record > /dev/null
+grep -qx 'stop=true' "$TMP/out"; expect "印を投稿できない (OC_MARK_TOKEN 無し) -> 窓を閉じずに stop=true" $?
+! logged 'oc-fix-reset'; expect "印を投稿できない -> oc-fix-reset を投稿しない" $?
+logged 'reason=ceiling'; expect "印を投稿できない -> 停止理由 reason=ceiling" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv code 5 1)"
+OC_MARK_TOKEN=mark-tok run_fix record > /dev/null
+logged 'oc-pm-intent: stuck pr=7 reason=code.*GH_TOKEN=mark-tok'; expect "停止印は OC_MARK_TOKEN で投稿する (PM intent の読み手と同じ作者)" $?
 
 echo "== fix-progress.sh check (pushed / answered / none)"
 setup bbb '[]' 1
