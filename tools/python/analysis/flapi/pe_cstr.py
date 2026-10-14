@@ -3,7 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_cstr.py <VA(16進)> [...]
 
-REPORT_PY119 の status → 文言の表 (0xd82c20 の lea rdx 先) を再現する。
+REPORT_PY119_2977 の status → 文言の表 (0xd82c20 の lea rdx 先) を再現する。
 """
 import os
 import sys

@@ -139,8 +139,9 @@ LPVOID HeapReAlloc(HEAP_HANDLE heap, DWORD flags, LPVOID p, SIZE_T bytes) {
 
 BOOL HeapFree(HEAP_HANDLE heap, DWORD flags, LPVOID p) {
     (void)heap; (void)flags;
-    if (!block_ok(p)) { SetLastError(ERROR_INVALID_FUNCTION); return FALSE; }
-    free(raw_of(p));
+    /* liftdiff の native 参照 (tools/liftdiff/rt/ld_core.h の HeapFree は引数を見ず 1) と同じ応答にする (#2821)。
+     * 割当てのない p は解放せず TRUE を返す (block_ok で範囲外を読まない) */
+    if (block_ok(p)) free(raw_of(p));
     SetLastError(ERROR_SUCCESS);
     return TRUE;
 }
