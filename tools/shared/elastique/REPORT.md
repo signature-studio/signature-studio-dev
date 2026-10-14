@@ -7,10 +7,12 @@
 
 | 受入条件 (#2613) | 結果 |
 |---|---|
-| 1. 197 入口のそれぞれに IPP API 名か「未同定」 | 197 入口を再現 (線形走査)。**一意の API 名 8 入口** (`ippsRealToCplx_32f` 4・`ippsSet_8u` 2・`ippsConj_32fc` 2)、**API 族の候補集合 26 入口** (dsp の同一本体を共有する export 群、7 群)、**未同定 163 入口** (内訳 §3)。対応表は `data/entries.csv` |
+| 1. 197 入口のそれぞれに IPP API 名か「未同定」 | 197 入口を再現 (線形走査)。**一意の API 名 8 入口** (`ippsRealToCplx_32f` 4・`ippsSet_8u` 2・`ippsConj_32fc` 2)、**API 族の候補集合 26 入口** (dsp の同一本体を共有する export 群、7 群。うち 1 入口 `0x1803e71b0` は偶然一致の候補、§3 注)、**未同定 163 入口** (内訳 §3)。対応表は `data/entries.csv` |
 | 2. 同定 API のうち tools/ipp の実装対応が無いもの | 名付けた入口 34 件のうち、**18 件は候補名が全て fail-soft stub のみ** (`tools/ipp` の PoC 未実装。STRICT でのみ fail-fast)、**16 件は実装済み名と stub 名の混在**、実装済みのみは 0 件。stub 名は 28 (§4 に列挙)。#2613 の受入 2 の文言「対応が無い入口が 1 件でも残るなら、D20 の停止条件に従い理由を報告して停止する (その入口は実装しない)」に従い、本 run ではこれらを実装しない |
 | 3. 関数ポインタ経由の到達が無いことの確認 | **静的確認のみ** (IPPCODE 番地を生成する命令 0・データ中のポインタ 0)。実行トレースは未実施 (この runner に wine 等が無い)。子 #2643 ([T-SH-42]) に移管 |
 | 4. REPORT に測定 commit・再現コマンド・差分 | 本書 §1・§2 |
+| 追記 (#2613 コメント 2026-10-14 16:23) の 1〜3: dispatch 表の飛び先 186 個の同定・2 段目 251 個の同定・初期化スタブと外向き分岐 | **本 PR では扱わない**。原文のまま子 **#2667** ([T-SH-43]) に移管 (§7) |
+| 追記 4: thunk 頭 33 本の到達元 | 静的参照 0 件 (§6)。子 #2643 ([T-SH-42]) の本文に追記して移管 (§7) |
 
 ## 1. 対象・素材・測定 commit
 
@@ -29,7 +31,7 @@
 # 素材の展開 (fl-win64 は docs/WORKFLOW.md §11 の手順)
 mkdir -p "$RUNNER_TEMP/fl-win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/fl-win64"
 mkdir -p tools/shared/work/win && cp "$RUNNER_TEMP/fl-win64/extracted/block24357_PE.bin" tools/shared/work/win/elastique_x64.dll
-FL_WIN64_DIR="$RUNNER_TEMP/fl-win64" python3 tools/shared/elastique/ipp_entries.py   # 実測 38.2 秒 (real)、load average 0.25 → 0.74
+FL_WIN64_DIR="$RUNNER_TEMP/fl-win64" python3 tools/shared/elastique/ipp_entries.py   # 実測 (real): 測定 commit 時 38.2 秒 (load average 0.25 → 0.74)。検証 HEAD `9ecc1301` での再実行 22.4 秒 (実行時間は機械負荷で変わるため参考値。出力の一致が検証の対象)
 ```
 
 - 出力: `data/entries.csv` (197 行・コミット対象) と `tools/shared/work/elastique/facts.json` (中間物・gitignore)。
@@ -60,7 +62,7 @@ lea rip で IPPCODE を指す箇所: 0 箇所 / 0 着地点 (うち入口 0)
 先頭が `jmp rel32` / `jmp [rip+x]` の thunk は 4 段まで追う。今回の 197 入口はいずれも thunk ではなかった (`thunk_hops = 0`)。
 
 **dsp の名付け**: dsp の export 446 件の先頭は CPU 別ディスパッチ `movsxd rax,[rip+X]; lea r10,[rip+T]; jmp [r10+rax*8]` で、表 T の項 (6 が 374 件、7 が 57 件、1 が 14 件、9 が 1 件) が variant 本体。
-表の全項 (2,566 本体) を export 名に対応づけ、**起点 (export) ごとに独立に** direct call を最大 12 段まで辿って到達する本体 (3,646 本体) と、dsp `.text` の call 先のうち IPPCODE にある着地点 (2,470) を照合対象 (5,825 本体) とする。
+表の項 (項数の合計 2,666 のうち distinct 2,566 本体。100 件は複数の export で共有) を export 名に対応づけ、**起点 (export) ごとに独立に** direct call を最大 12 段まで辿って到達する本体 (3,646 本体) と、dsp `.text` の call 先のうち IPPCODE にある着地点 (2,470) を照合対象 (5,825 本体) とする。
 起点ごとの独立 BFS は `bcab4049` での修正。`f3310a00` は既訪問ノードへ起点を伝播させず、名前集合が不完全だった。
 
 **判定区分** (上から優先):
@@ -88,6 +90,8 @@ lea rip で IPPCODE を指す箇所: 0 箇所 / 0 着地点 (うち入口 0)
 | 3 | `ippsFFTInit_R_32f`†・`ippsFFTInit_R_64f`†, `ippsZero_16s`・`ippsZero_32f`†・`ippsZero_32s`・`ippsZero_64f`・`ippsZero_64s`・`ippsZero_8u`† | 混在 |
 | 3 | `ippsConjCcs_*`・`ippsConjPack_*`・`ippsConjPerm_*` (32fc・64fc), `ippsCopy_32s` | stub のみ |
 
+注 (偶然一致の候補): 上の ippiResize 族 3 入口のうち `0x1803e71b0` (10 命令・呼出元 33 か所) は `push rcx/rdx/r8/r9; call T; pop ×4; ret` の退避ラッパで、呼出先 `0x1800010a0` は正規化により `T` に伏せられる。dsp の同形ラッパ `0x1839810` と形だけ一致したもので、呼出先の同一性は確認していない。TRIVIAL (8 命令) を超えるため除外されず、偶然一致の候補として残す。未同定へ戻した場合の試算 (script・CSV は変えていない。`data/entries.csv` から再集計): 族候補 25・未同定 164 (`exact_dsp_internal_no_export` 123・照合不能 31・自明本体 10)・名付けた入口 33 (stub のみ 17・混在 16)。stub 名は他の 2 入口が同名を持つため 28 のまま。
+
 **一意の API 名 (8 入口)**:
 
 | 入口 VA | API 名 | dsp の対応 (depth = export からの call 段数) |
@@ -105,7 +109,7 @@ lea rip で IPPCODE を指す箇所: 0 箇所 / 0 着地点 (うち入口 0)
 
 | 入口の分類 (`tools_ipp_poc`) | 入口数 |
 |---|---|
-| 候補名が全て stub のみ (`stub_only`) | 18 (一意名 8 + 族候補 10) |
+| 候補名が全て stub のみ (`stub_only`) | 18 (一意名 8 + 族候補 10。族候補のうち 1 入口は §3 注の偶然一致の候補) |
 | 実装済み名と stub 名の混在 (`mixed`) | 16 (族候補) |
 | 候補名が全て実装済み | 0 |
 
@@ -118,6 +122,7 @@ stub 名 28 (`implemented_poc = 0`): `ippiResize_8u_C3R`・`ippiResize_8u_C4R`�
 
 - **ネガティブコントロール (偶然一致)**: dsp の pdata 関数のうち、IPPCODE への call 先でないもの 3,000 件 (IPP 本体ではないものが大半と推定。厳密な分類は未実施) を、同じ完全一致照合にかけた。一致 **0 件** (`negative_control.exact_matches_with_entries = 0`)。
 - **入口数の再現**: 線形走査の 197 は issue 本文の 197 と一致。pdata 基準は 181 (issue 182)。
+- **差し戻し round 2 の再実行**: 検証 HEAD `9ecc1301` で §2 のコマンドを再実行した。出力は §2 のログと全行一致。`data/entries.csv` は差分 0 (`git status` に現れない)。script は測定 commit から変えていない (`git diff bcab4049 HEAD -- tools/shared/elastique/ipp_entries.py` = 0 行)。
 - **thunk 追跡**: 197 入口すべて `thunk_hops = 0`。
 - **修正の影響 (`f3310a00` → `bcab4049`)**: 入口・区分・照合の件数は不変 (8 / 26 / 122 / 31 / 10)。名前集合が変わったのは族候補 16 入口のみで、旧名の集合は全て新名に含まれる。入口ごとに増えた名は stub 6 名 (`ippsAutoCorr_NormA_32f`・`ippsCopy_16s`・`ippsCopy_32s`・`ippsCopy_64f`・`ippsCopy_64s`・`ippsFIR64f_32f`) と実装済み 3 名 (`ippsCopy_32f`・`ippsFFTInit_R_32f`・`ippsFFTInit_R_64f`)。このうち stub 名の集合で新たに加わるのは 4 名 (`ippsAutoCorr_NormA_32f`・`ippsCopy_16s`・`ippsCopy_64f`・`ippsCopy_64s`) で、stub 名は 24 → 28。名付けた入口の内訳は stub のみ 28 → 18・混在 6 → 16。
 
@@ -137,6 +142,8 @@ stub 名 28 (`implemented_poc = 0`): `ippiResize_8u_C3R`・`ippiResize_8u_C4R`�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 間接 call/jmp (2,714 箇所) の実行時の宛先が IPP に当たらないことの確認 (受入 3) | 静的確認のみ。実行経路は未確認 | 子 #2643 ([T-SH-42]) |
+| 追記受入 1〜3 (dispatch 表の飛び先 186 個の同定・2 段目 251 個の IPP 同定・初期化スタブと外向き分岐 33 件) | 未実施。本 PR では扱わない | 子 #2667 ([T-SH-43])。親 #2613 の追記コメント (16:23) の原文を移した |
+| 追記受入 4 (thunk 頭 33 本の到達元) | 静的参照 0 件。実行時の呼出元は未確認 | 子 #2643 ([T-SH-42]) の本文に追記 |
 | 未同定 163 入口 (dsp 内部関数と一致 122・照合不能 31・自明本体 10) | API 名が付かない。tools/ipp の実装対応を判定できない | 本 PR 本文の未解決表 (追跡のみ。`Closes #2613` で閉じるため本表が正) |
 | API 族の候補 26 入口 (共有本体) | 一意の API 名に決まらない | 本 PR 本文の未解決表 (同上) |
 | `.pdata` 基準の入口数 181 と issue 本文の 182 | 1 件の定義差 (呼出元の範囲の端の扱い等。未確定) | 本 PR 本文の未解決表 (同上) |
