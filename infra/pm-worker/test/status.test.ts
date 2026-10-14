@@ -76,6 +76,8 @@ const ADDED_KEYS = [
   "mode_close", "auto_close_detected", "launch_unobserved",
   // VM の状態の取り込み (#2343)
   "launch_blocked", "imported_at",
+  // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
+  "hold",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];
