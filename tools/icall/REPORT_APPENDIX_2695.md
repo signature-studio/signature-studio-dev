@@ -151,7 +151,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 期待: bit
 
 ## 8. 測定 commit からの差分
 
-測定 commit `63a82b32` から HEAD までの `tools/icall`・`tools/ott` の差分は、本付録 (`tools/icall/REPORT_APPENDIX_2695.md`) を除いて 0 行。確認: `git diff 63a82b32 HEAD -- tools/icall tools/ott ':!tools/icall/REPORT_APPENDIX_2695.md'` の出力は空。
+測定 commit `63a82b32` から HEAD までの `tools/icall`・`tools/ott` の差分は、本付録を除いて 2 ファイル。`tools/icall/REPORT_APPENDIX_2675.md` と `tools/icall/diff/fa_va_sha.py` は main の取り込み (merge commit) で入った #2675 の成果。測定経路のコード差分は 0 行。確認: `git diff 63a82b32 HEAD -- tools/icall/diff/fa_cmp.py tools/icall/fa_route_build.sh tools/icall/diff/fa_sweep.sh tools/icall/diff/hit_180da6e60.py tools/icall/frame_slot_restore.py tools/ott/native` の出力は空 (0 行)。`fa_va_sha.py` を参照するのは `REPORT_APPENDIX_2675.md` と同 script のみ (`grep -rln fa_va_sha tools/icall tools/ott`)。
 
 ## 9. 未解決
 
