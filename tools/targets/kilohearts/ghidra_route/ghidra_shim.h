@@ -33,6 +33,9 @@ static inline void v128_store_shl32(void* dst, V128 v) {
 /* x86 MXCSR (制御/状態レジスタ) は wasm に無い。Resonator の callee 2 件 (180fd6498 読み・180fd662c 書き) が参照するため、
  * 状態変数として持つ。初期値 0x1F80 は x86 の既定値 (全例外マスク・丸め=最近接・FTZ/DAZ 無効)。意味は突合で検証する。 */
 static uint MXCSR = 0x1F80;
+/* Win API GetLastError/SetLastError (Resonator の 973/1001 行)。native harness (scen_khmath/scen_khmaster) と同じく常に 0・SetLastError は無視。 */
+static inline uint GetLastError(void) { return 0; }
+static inline void SetLastError(uint v) { (void)v; }
 static inline ulonglong CONCAT44(uint hi, uint lo) { return ((ulonglong)hi << 32) | lo; }
 /* float 引数で CONCAT44(float, float) が出る場合 (ビット列として連結) */
 #define CONCAT44F(hi, lo) CONCAT44(f2u(hi), f2u(lo))

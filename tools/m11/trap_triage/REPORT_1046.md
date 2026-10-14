@@ -185,3 +185,20 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 - 値遷移 probe (`probe_1046_watch.mjs`、HEAD `7e665077`): 全 942 unit を 12.8 s で完走。`0x10a9f910` の遷移は §14 と一致: `unit 477 exc 0x1_1029e5d8 -> 0x1_2`、`unit 484 exc 0x1_2 -> 0x1_3`、`unit 492 exc 0x1_3 -> 0x0`。
 - 結論 (本 run): 受入条件 1 (書込み元 store の IR site 特定) は未達。全 store 計装を unit 0〜484 で完走させる手段は本 run の時間内に作れなかった。`[aw]` 計装は本 run では入れていない (build 後の基準 survey で一致を確認)。
 - 次の手順: (a) 計装版の 0〜484 全件実行を unit 範囲に分割して (例: 0–240 / 241–484) 実行し、各範囲の `[aw]` を取る。範囲をまたぐ状態は probe で確かめた `0x1_2` 遷移点 (unit 477) を起点にする。(b) `[aw]` に unit 境界を出す計装 (`unit N` 行を `[aw]` と同じ stderr に出す) を入れ、計装有無で survey 結果が変わらないことを確認する。(c) D17 か別類型かを判定する。
+
+## 17. #1620 run (HEAD `82c44c61` = origin/main、コード変更なし): unit 範囲つき監視の試行 (結論なし)
+
+- 測定 commit: `82c44c61` (コード差分 0。本 PR の追加は `store_watch_1046b.sh` と `watch_addr_1046b.c` の 2 ファイルのみ・既存コードは不変)。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11`・`work-liftdiff` は worktree の `tools/m11/work`・`tools/liftdiff/work` に展開。
+- 基準の survey 数値と値遷移 (unit 477・484・492 の遷移) は §2・§14 と一致 (本 run で再確認)。
+- 単独範囲: unit 484 を `SV_ONLY` 相当で単独実行 (全 store 計装版) → `[aw]` 0 件。値は前段 unit 依存のため、単独では書込みが起きない (§14 と一致)。
+- 監視 ON/OFF を unit 境界で切る版 (`store_watch_1046b.sh 0 484 <tag> 477 484`、`watch_addr_1046b.c`): 全 store 計装で unit 0〜484 を流したところ、**unit 106 で停止** (実時間 15 分 22 秒、CPU 41 秒、`[aw]` 0 件)。監視を unit 477〜484 だけ ON にしても、停止点は前段の unit 106 のまま。timeout 900 秒で打ち切り (rc 124)。
+- 打ち切り後は `trap` の復元 (`m11_build.sh` 再実行) で基準に戻ることを確認 (§2 の基準と一致)。`git status` は既存ファイルに差分なし。
+
+### 結論 (本 run)
+- 停止点 unit 106 は、監視の ON/OFF (unit 477〜484 のみ) と無関係に出た。計装が入った IR の実行で unit 106 以降が進まなくなる原因は**仮説・未切り分け**である (計装版 build の副作用と考えられる。次の手順 1 で切り分ける)。REPORT §15・§16 の切り分けと一致し、「単独 `SV_ONLY=106` では止まらない」点とも整合する。
+- 書込み元 store は未特定。受入条件 1 (IR site 特定) は未達。
+
+### 次の手順 (#1620 へ)
+1. unit 106 で計装版が止まる原因を、計装版 IR の unit 105 → 106 の間の挙動で切り分ける (`[aw]` でなく、unit 106 直前の `[m11]` trace の有無で確認)。計装 `m11_sw` の呼び出しを、必要な unit 範囲だけ IR 内で分岐させる形 (`if (watch_on)` を IR 側に入れる) へ変えると、計装の副作用が減るか試す。
+2. 計装版が完走したら、`[aw]` の unit 境界 (`unit N` 行) と sites.json で fn・IR 行に戻す。
