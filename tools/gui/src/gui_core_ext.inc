@@ -639,6 +639,7 @@ int gui_touch_count(void) { return tp_count(); }
 extern int shimx_path_to_posix(const char *win, char *out, size_t cap) __attribute__((weak));
 extern void shimx_set_notify_hook(void (*fn)(void)) __attribute__((weak));
 extern void shimx_set_shell_execute_hook(int (*fn)(const char *, const char *, const char *)) __attribute__((weak));
+extern void shimx_set_file_close_hook(void (*fn)(const char *)) __attribute__((weak));
 extern int shimx_drag_accepts(size_t hwnd) __attribute__((weak));
 extern size_t shimx_hdrop_create(const uint16_t *const *wpaths, uint32_t n, int x, int y, int nc) __attribute__((weak));
 extern void DragFinish(size_t hdrop) __attribute__((weak));
@@ -839,11 +840,22 @@ static void pump_drops(void) {
   }
 }
 
-/* ---- shimx 結線 (起動時に 1 回): bit0 = kernel object 通知→doorbell, bit1 = ShellExecute hook ---- */
+/* #958: 書込み file の CloseHandle を stage 配下に限って host へ通知する (host は保存待ちの先なら実体へ反映する) */
+static void gui_file_close(const char *posix) {
+  const char *d = gui_stage_dir_posix();
+  size_t n = strlen(d);
+  if (strncmp(posix, d, n) != 0 || posix[n] != '/') return;
+  size_t len = strlen(posix);
+  if (len >= 1900) return;
+  gui_hostcall(GUI_HC_FILE_CLOSED, 0, posix, (uint32_t)len + 1, NULL, 0, NULL, 30000);
+}
+
+/* ---- shimx 結線 (起動時に 1 回): bit0 = kernel object 通知→doorbell, bit1 = ShellExecute hook, bit3 = file close→host (#958) ---- */
 GUI_EXPORT int gui_shimx_attach(void) {
   int m = 0;
   if (shimx_set_notify_hook) { shimx_set_notify_hook(gui_doorbell); g_kernel_notify_attached = 1; m |= 1; }
   if (shimx_set_shell_execute_hook) { shimx_set_shell_execute_hook(gui_shell_execute); m |= 2; }
   if (shimx_drop_invoke) { gui_set_drop_target_invoker(shimx_drop_invoke); m |= 4; }   /* #1388 SHX-T23: RegisterDragDrop 窓の IDropTarget 呼出し */
+  if (shimx_set_file_close_hook) { shimx_set_file_close_hook(gui_file_close); m |= 8; }
   return m;
 }

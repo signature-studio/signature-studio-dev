@@ -21,6 +21,7 @@ export function createMockEngine() {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    selStart: -1, selEnd: -1,
     arrTime: 0,
     numerator: 4, denominator: 4, undoHistoryPos: 0, undoHistoryCount: 0, undoHistoryLast: 0,
     screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
@@ -36,6 +37,7 @@ export function createMockEngine() {
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
+    displayTime: 0,
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
     midiOut: [],
@@ -57,6 +59,7 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -176,6 +179,13 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-121 (#2982): PE で確定した引数書式 (PyArg fmt) と時間引数の頭打ち (0x7d0)。表示そのものは未モデルで、最後の時間引数だけ st.displayTime に残す
+    "ui.crDisplayRect": (...a) => disp(a, 5, 6, 4),
+    "ui.miDisplayRect": (...a) => disp(a, 3, 4, 2),
+    "ui.miDisplayDockRect": (...a) => disp(a, 4, 4, 3),
+    "ui.showNotification": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
+    "ui.closeAllMenu": (...a) => { arity(a, 0, 0); },
+    "ui.closeActivePopupMenu": (...a) => { arity(a, 0, 0); },
     // PY-119 (#2980): PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119)。値は未実測の仮置き (provider/fl_engine.c と同じ)
     "ui.getFocused": (...a) => { arity(a, 1, 1); ix(a[0]); return false; },
     "ui.getFocusedFormID": (...a) => { arity(a, 0, 0); return 0; },
@@ -198,6 +208,12 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-96 (#2832): 選択範囲の読出し 4 件。PE 0xd786e0/0xd78700/0xd78500 は obj+0xd74 (start)・obj+0xd78 (end) を読み、
+    // 0xd78720 は 0xe43e80 (start>=0 かつ end>=0) を bool で返す。未選択は負値。初期値 -1 は未実測の仮置き (provider/fl_engine.c と同じ)
+    "arrangement.selectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionEnd": (...a) => { arity(a, 0, 0); return st.selEnd; },
+    "arrangement.liveSelectionStart": (...a) => { arity(a, 0, 0); return st.selStart; },
+    "arrangement.selectionIsActive": (...a) => { arity(a, 0, 0); return st.selStart >= 0 && st.selEnd >= 0; },
     // PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i')。個数は fl_table (必須 2) に合わせた暫定で、jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。
     // 選択・マーカーの 5 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
