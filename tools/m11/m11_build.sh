@@ -22,7 +22,7 @@ M11_NEG_413060="${M11_NEG_413060:-0}"   # #944 ネガコン: 1 = dest に p+0x40
 M11_INSTR_413060="${M11_INSTR_413060:-0}"   # #944: 1 = 計測専用に function_413060 へ probe (index 8) と dest 観測 hook を post で入れる。既定 0 は main と同一の post 出力
 M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_DEST_GUARD=${M11_DEST_GUARD:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -154,7 +154,7 @@ if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c 
   M11_EXCLUDE=work/defined_c.txt python3 m11_genstubs.py work/boot_final.ll work > work/genstubs.log
   touch work/m11_winstubs.c work/m11_fnstubs.c
 fi
-cc work/boot_final3.ll work/obj/boot.o
+if [ "${M11_KEEP_BOOT_O:-0}" != 1 ] || [ ! -f work/obj/boot.o ]; then cc work/boot_final3.ll work/obj/boot.o; fi   # #1756: probe_entry.sh は差し替えた probe 版 boot.o を残す
 cc work/m11_simd.c work/obj/simd.o msimd11_core.h
 cc work/m11_winstubs.c work/obj/winstubs.o
 cc work/m11_fnstubs.c work/obj/fnstubs.o
@@ -176,6 +176,9 @@ if [ "$(cat work/ov_535bf2.stamp 2>/dev/null || echo none)" != "$M11_FIX_535BF2"
 # M11_INSTR_K12 が変わったら ov.o だけ無効化 (計測 probe の ON/OFF で古い ov.o を再リンクしない)
 if [ "$(cat work/ov_instr_k12.stamp 2>/dev/null || echo none)" != "${M11_INSTR_K12:-0}" ]; then rm -f work/obj/ov.o; fi
 echo "${M11_INSTR_K12:-0}" > work/ov_instr_k12.stamp
+# M11_TRACE_ISOLATE が変わったら ov.o だけ無効化 (#495 のネガコン: trace の SP 退避を外した build)
+if [ "$(cat work/ov_trace_isolate.stamp 2>/dev/null || echo 1)" != "${M11_TRACE_ISOLATE:-1}" ]; then rm -f work/obj/ov.o; fi
+echo "${M11_TRACE_ISOLATE:-1}" > work/ov_trace_isolate.stamp
 # #882: 40ff70 観測 probe の ON/OFF で古い ov.o を再リンクしない
 if [ "$(cat work/ov_instr_40ff70.stamp 2>/dev/null || echo none)" != "${M11_INSTR_40FF70:-0}" ]; then rm -f work/obj/ov.o; fi
 echo "${M11_INSTR_40FF70:-0}" > work/ov_instr_40ff70.stamp

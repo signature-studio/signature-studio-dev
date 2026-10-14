@@ -37,7 +37,7 @@ static void __attribute__((ms_abi)) map_hook(void* child, int id, float v, void*
 /* FA-9 観測プローブ (FA_PROBE9=1): 0x180ca1480 (controller lookup) / 0x180da6c00 (param 書込) の入口で引数を記録し、
  * 元の機械語を一時復元して本物を呼び、再度 jmp を敷く (unpatch-call-repatch)。FA_ALT9=1 は C+0x328 を C+0x2d0 と不一致にし
  * 静的分岐 (map を引かず {C+0x308,C+0x470}) を強制する (ネガティブコントロール)。 */
-static unsigned char g_sv_ca[12], g_sv_da[12]; static unsigned char *g_p_ca, *g_p_da;
+static unsigned char g_sv_ca[12], g_sv_da[12]; static unsigned char *g_p_ca, *g_p_da; static unsigned char* g_nodeZ;
 static void patch12(unsigned char* p, const void* t, unsigned char* sv) { memcpy(sv, p, 12); p[0] = 0x48; p[1] = 0xb8; memcpy(p + 2, &t, 8); p[10] = 0xff; p[11] = 0xe0; }
 typedef void* (__attribute__((ms_abi)) *ca1480_t)(void*, void*, void*); typedef void (__attribute__((ms_abi)) *da6c00_t)(void*, int, int, int);
 static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key) {
@@ -50,7 +50,10 @@ static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key)
     patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca);
     uint64_t o0, o1, o2; memcpy(&o0, out, 8); memcpy(&o1, (char*)out + 8, 8); memcpy(&o2, (char*)out + 0x10, 8);
     fprintf(stderr, "FA9CA S%d eq=%d kc=%u k0=%u path=%s ret=%s out0=%llx out1=%llx found=%d hdr=%llx,%llx,%llx\n", g_trSidx, a2d0 == a328, kc, k0, pth,
-            r == out ? "out" : "?", (unsigned long long)o0, (unsigned long long)o1, o2 != 0, (unsigned long long)h[0], (unsigned long long)h[1], (unsigned long long)h[2]);
+            r == out ? "out" : "?", (unsigned long long)o0, (unsigned long long)o1, o0 != 0, (unsigned long long)h[0], (unsigned long long)h[1], (unsigned long long)h[2]);
+    /* 観測のみ: out[0] が自前で確保した node Z の値オブジェクトを指すときだけ +0x10 を読む (想定外の値は deref しない) */
+    if (o0) { int isZ = g_nodeZ && (unsigned char*)o0 == g_nodeZ; uint64_t o16 = 0; if (isZ) memcpy(&o16, (char*)o0 + 0x10, 8);
+              fprintf(stderr, "FA9OBJ S%d out0_is_Z=%d obj=%llx obj+0x10=%llx\n", g_trSidx, isZ, (unsigned long long)o0, (unsigned long long)o16); }
     return r;
 }
 static void __attribute__((ms_abi)) da6c00_probe(void* T, int id, int idx, int r9) {
@@ -105,7 +108,7 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
           W64(N, 0x00, C + 0x21b8); W64(N, 0x08, C + 0x21b8); W64(N, 0x10, C + 0x21b8);
           W64(N, 0x28, Z); W64(N, 0x30, NB);
           W64(NB, 0, NB + 0x10); W32(NB, 8, 0x40); W32(NB, 0xc, 0x40); W64(NB, 0x18, 0x1803b4070ULL); W64(NB, 0x20, 0x1803b4070ULL);
-          W64(C + 0x21b8, 0x00, N); W64(C + 0x21b8, 0x08, N); W64(C + 0x21b8, 0x10, N); }
+          W64(C + 0x21b8, 0x00, N); W64(C + 0x21b8, 0x08, N); W64(C + 0x21b8, 0x10, N); if (k == 0) g_nodeZ = Z; }
         /* param block +0x10 = mgr。mgr は driver 0x180da68c0 が [mgr+0x19a8/0x19b0] (shared_ptr pair) を
          * 読むため、ダミー mgr を渡す (C+0x1900 = 0x1a00B, +0x19a8 = self, +0x19b0 = C+0x1c00 blk refcount=0x40)。 */
         W64(C, 0x370, C + 0x620); W64(C, 0x480, C + 0x620);

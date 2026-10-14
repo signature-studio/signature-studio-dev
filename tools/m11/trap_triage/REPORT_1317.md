@@ -135,3 +135,45 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 - 結論: 830 を含むと 880 が 60 s 超で止まる境界は、前 run までの記録 (§4a・§6) と一致。停止は再現した。
 - 未解決 (受入 1・2・3・4 は未達): 循環の有無 (`0x40fb40` の `[rcx-0x78]` 連鎖)、830 が残す状態、修正案、修正後の完走。今回は計装 (連鎖長の計測) を入れる前に時間切れのため、未着手。
 - 次の一手: `0x40fb40` の入口で `rcx` の連鎖を `SV_WATCH` 相当で辿る計装を新設するか、IR 側で連鎖長に上限を入れて停止位置を変えるかを決める。
+
+## 8. 追補 (2026-10-14・#1317 5 回目 run): 再測定と計装の切り出し
+
+- 測定 commit: `60932d35` (origin/main。作業 branch `1317-m2p-trap-880-cycle` は同じ commit から作成)。本追補のみが差分 (コード差分 0)。
+- 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`m11_gen_ir2.sh` 46 s 前後 rc=0 / `m11_build.sh` rc=0 (`M11_M2P=1`、`wasm-ld signature mismatch: 0, undefined symbol: 0`)。生成物は `tools/m11/work/m11_boot.cjs` (gitignore)。
+- 再現 (`SV_ONLY` + `survey_units.mjs`、各 1 回):
+
+| 条件 | rc | 所要 | 結果 |
+|---|---|---|---|
+| `0..829` + 880 | 0 | 2.00 s | `{"ok":765,"oob":13,"miss":46,"other":1,"halt0":4,"abort":2}` |
+| `0..830` + 880 | 124 | 60.02 s (打ち切り) | 出力なし |
+
+- load average: 測定中 0.6〜0.9。
+- 結論: §4a・§6・§7 の境界 (830 を含むと 880 が 60 s 超で停止、829 までは完走) と一致。停止は再現。
+- 循環の計装は未実施。`SV_WATCH` (`oob_top.mjs`) は各 unit の境界で固定 lva を辿る仕組みで、`0x40fb40` の `rcx` は実行時のレジスタ値なので、そのままでは連鎖を追えない。guest 側の計装 (IR 生成への追加) が要るため、1 run では終わらないと判断し、子 issue に切り出した (§9)。
+- 受入の状況は §6 の表のまま (1・3・4 未達、2 部分)。
+
+## 10. 追補 (2026-10-14・#1786 run): `0x40fb40` 計装の試行と判明事項
+
+- 測定 commit: `381dd7c2` (origin/main)。コード差分は無し (計装は試行後に破棄)。
+- 素材: fl-win64 (`$RUNNER_TEMP/extracted`)・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。capstone / pefile を pip で補った。
+- IR (ON, `M11_M2P=1`): `m11_gen_ir2.sh` 51 s rc=0 (`F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0`)。build 25 s rc=0 (`wasm-ld signature mismatch: 0, undefined symbol: 0`)。load 0.5 前後。
+- 再現 (上限 60 s): `0..829`+880 = rc=0 / 1.74 s。`0..830`+880 = rc=124 / 60.02 s。境界は §6〜8 と一致。
+
+### 判明事項 (停止候補 `0x40fb40` は build に存在しない)
+
+- `boot_final.ll` / `boot_final3.ll` に `function_40fb40`・`function_40f960` の定義・呼出しが無い。間接 call 表 `m11_disp_tab` にも `4258624` (`0x40fb40`)・`4258144` (`0x40f960`) の登録が無い。
+- そのため、§4a・§6 の「`0xf960` → `0x40f960` → `0x40fb40` の連鎖」は、IR 上では辿れる経路ではない。`0xf960` の icall 値 (変換前) も IR から解決できていない。
+- 入口 hook (`M11_INSTR_40FB40` 相当、`m11_post.py` の wrapper) を試したが、wrapper を入れる対象が IR に無いため 1 回も発火しなかった (`0..830`+880 の stderr は 0 行)。計装は測定対象に届かないので、コードは残さず破棄した。
+- 従って、§6 の「`0x40fb40` の連鎖走査の循環」は**仮説のまま**。循環の有無は未計測。
+
+### 次の一手 (起票先: 本 issue #1317)
+
+- `0xf960` (icall 値) が IR のどの関数に解決されるかを、`m11_icall` の `tkey` 変換 (`target + 0x400000 - M11_LB_BASE`) と `m11_disp_tab` の突合で特定する。`0x40f960` が表に無い理由 (lift 漏れ・別 VA への写像) を先に確定する。
+- 解決先が確定するまで、#1786 の計装 (連鎖の循環検出) は着手しない。
+
+## 9. 子 issue (起票先)
+
+| 未解決 | 起票先 |
+|---|---|
+| `0x40fb40` の `[rcx-0x78]` 連鎖の循環有無 (guest 計装で連鎖長・循環を計測) | #1786 `[M11-N121]` (親 #1317) |
+| 830 が残す状態 (受入 1)・修正案 (受入 3)・修正後の完走 (受入 4) | 本 issue #1317 (次の run) |
