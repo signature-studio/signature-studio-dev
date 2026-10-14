@@ -1,12 +1,12 @@
 # M11 REPORT (#3134 / [M11-N171] / 親 #1154): set_other 非 imm 349 件の定義探索と 3 値分類
 
-結論: 台帳の非 imm 349 件 (reg 123・mem 150・lea 76) を、機械語で代入元の定義を後ろ向きに探して分類した。修正前の分類器 (測定 commit `69bab10e`) の実測は **実値化 0 / 復元不能 0 / 未決 349 / 未分類 0**。定義を mov 連鎖・符号拡張・即値演算まで辿っても定数に決まった件は 0 だった (#1154 の REPORT_N86 §2 と同じ結果)。復元不能 0 は、呼出し越えで揮発族が壊れた件が非 imm に無かったため。未決 349 は接続先を 3 子 issue (#3140・#3141・#3142) に分けた (§3)。survey 退行の受入 (ok ≥ 870) は素材の欠落で測れず、未達 (§5・§6)。**分類器を修正した後 (commit `91396a79`) の再測定は未実施** (素材 `work-m11` が取得できなかった run のため。§2 注)。
+結論: 台帳の非 imm 349 件 (reg 123・mem 150・lea 76) を、機械語で代入元の定義を後ろ向きに探して分類した。分類器の修正後の HEAD (測定 commit `c295b2c3`) の実測は **実値化 0 / 復元不能 0 / 未決 349 / 未分類 0** (§2)。定義を mov 連鎖・符号拡張・即値演算まで辿っても定数に決まった件は 0 だった (#1154 の REPORT_N86 §2 と同じ結果)。復元不能 0 は、呼出し越えで揮発族が壊れた件が非 imm に無かったため。未決 349 は接続先を 3 子 issue (#3140・#3141・#3142) に分けた (§3)。survey 退行の受入 (ok ≥ 870) は素材 (`functions_dll.csv`) の欠落で測れず、#1154 で追跡する (§5・§6)。
 
 ## 1. 接続方式 (決めたこと)
 
 - 対象: 台帳 (`m11_argrecover.py` の `site_detail[].src` が `imm` 以外) の各引数。レジスタ引数 (pos 0〜3) は rcx/rdx/r8/r9 の族、スタック引数 (pos ≥ 4) は `[rsp + 0x20 + 8*(pos-4)]` のスロット。
 - 遡る範囲: call 直前から後ろ向きの直線区間。分岐先 (jump target) を越える時点で `merge`、ret/jmp で `branch`、関数入口で `entry`。jcc は値を変えないので越える。
-- 書かない命令: 完全一致の集合 `NOWRITE` (jcc は `j` 前方一致)。`bt`・`btr`・`bts`・`btc`・`cmpxchg`・SSE の `cmpeq*sd` は書く命令として定義に扱う (前方一致だと読み飛ばした)。`cmpxchg` (cmpxchg8b/16b は rdx も) は rax を暗黙に書くため `CMPX_W` で明示する (capstone の `regs_access` は返さない)。
+- 書かない命令: 完全一致の集合 `NOWRITE` (jcc は `j` 前方一致)。`bt` は CF だけを書き宛先は書かないので書かない命令 (commit `c295b2c3`)。`btr`・`bts`・`btc`・`cmpxchg`・SSE の `cmpeq*sd` は書く命令として定義に扱う (前方一致だと読み飛ばした)。`cmpxchg` (cmpxchg8b/16b は rdx も) は rax を暗黙に書くため `CMPX_W` で明示する (capstone の `regs_access` は返さない)。
 - 定義の読み方:
   - 全幅 (32/64bit) の `mov r, imm`・`xor r, r`・同族の全幅コピー (`mov r, r`・`movss/movaps` の xmm コピー) は、元の定義まで連鎖をたどる。
   - `movzx`/`movsx`/`movsxd` (reg 源) と即値の `add`/`sub`/`and`/`or` は、旧値をたどって値を計算する (終端が定数なら実値化)。
@@ -16,17 +16,17 @@
 - call の扱い: 揮発族 (rax/rcx/rdx/r8/r9/r10/r11/xmm0〜5) は call で壊れる。定義が無いまま call に当たった場合、rax・xmm0 は戻り値 (`call_ret`・未決)、その他は `call_clobber` (復元不能: Win64 ABI で call 後の値が保証されない)。引数領域 (スタック) も同じ扱い。
 - 実値化の条件: 直線区間で全幅の定数に到達すること。IR の引数型幅は使わない (型幅が要る件は `stack_narrow` として未決に残した)。
 
-## 2. 測定 (実測・修正前の分類器)
+## 2. 測定 (HEAD の実測)
 
-- 測定 commit: `69bab10e` (分類器 `tools/m11/m11_setother_nonimm_class.py` を追加した最後の commit・修正前)。
-- **注**: 本節の表は修正前の分類器 (`NOWRITE_PREFIX` 前方一致・スロットの RMW 無制限) の値で、HEAD (`91396a79` 以降) の値ではない。修正後の 349 件は `work-m11` が届く run で再測定し、本節と §3 を更新する。
-- 入力: `work-m11` の `tools/m11/work/boot_final.ll` (sha256 `69c774ded8aaf717…`)・PE は `fl-win64` の `extracted/block00031_PE.bin`。
-- 実行 (HEAD `69bab10e`・すべて rc 0):
-  1. `m11_post.py` → 既定出力 sha `ecab191b13590dd0…` (REPORT_N86 §4 と一致)。
-  2. `m11_argrecover.py` → 台帳 set_other 系 410・非 imm 349・imm 61。
-  3. `m11_setother_ledger_verify.py` → `match 410`・exit 0 (台帳の kind 分類は不変)。
-  4. `m11_setother_nonimm_class.py` → 下表。
-  5. `m11_setother_imm_class.py` → `full_const 6 / partial_write 35 / stack_partial 9 / arith 11` (変化なし)。
+- 測定 commit: `c295b2c3` (分類器を最後に変えた commit。`bt` を `NOWRITE` に入れた。以後の commit は md のみ・§7)。
+- 入力: `work-m11` の `tools/m11/work/boot_final.ll` (sha256 `69c774ded8aaf717…`)・PE は `fl-win64` の `extracted/block00031_PE.bin` (sha256 `b2c64da40921cf26…`)。
+- 実行 (HEAD `c295b2c3`・すべて rc 0。出力は `tools/m11/work/sigfix_stats/`・gitignore 対象):
+  1. `python3 m11_post.py work/boot_final.ll work/sigfix_stats/final3_base.ll --pads work/sigfix_stats/pads.json` → 既定出力 sha `ecab191b13590dd0…` (REPORT_N86 §4 と一致)。
+  2. `python3 m11_argrecover.py work/sigfix_stats/pads.json --pe <PE> --out work/sigfix_stats/fixes.json` → 台帳 set_other 系 410 (378 + 32)・非 imm 349 (reg 123・mem 150・lea 76)・imm 61。
+  3. `python3 m11_setother_ledger_verify.py work/sigfix_stats/fixes.json --pe <PE>` → `match 410`・exit 0 (台帳の kind 分類は不変)。
+  4. `python3 m11_setother_nonimm_class.py work/sigfix_stats/fixes.json --pe <PE>` → **実値化 0 / 復元不能 0 / 未決 349 / 未分類 0** (下表)。
+  5. `python3 m11_setother_imm_class.py work/sigfix_stats/fixes.json work/boot_final.ll --pe <PE>` → `full_const 6 / partial_write 35 / stack_partial 9 / arith 11` (計 61)。
+- 直前の HEAD `741d8696` (`bt` を変える前) の再実行も同じ件数だった。`bt` を入れても、349 件の理由に `other:bt` は現れない (件数は変わらない)。
 
 | 台帳 kind | 終端の理由 | 件数 | 区分 |
 |---|---|---|---|
@@ -75,20 +75,20 @@
 
 | 受入 | 判定 | 根拠 |
 |---|---|---|
-| 1. 非 imm 349 件を 実値化 / 復元不能 / 未決 の 3 値で件数実測・未分類 0 | **未確認** (修正前の分類器では達成: §2 の 0 / 0 / 349 / 0。修正後の HEAD での再測定は未実施) | §2・§7。接続で実値化できた件は無く、未決の接続は子 3 件へ移した |
-| 2. `M11_SIGFIX_RECOVER=1` の `m11_e2e.sh` で survey ok ≥ 870 | **未達 (測れない)** | §6。素材に `functions_dll.csv` が無い。本分類器は IR と `fixes.json` を変えないので、既定経路の値は変わらない (コード差分 0 行は §7) |
+| 1. 非 imm 349 件を 実値化 / 復元不能 / 未決 の 3 値で件数実測・未分類 0 | **達成** (HEAD `c295b2c3` で実測・§2) | §2。接続で実値化できた件は無く、未決の接続は子 3 件へ移した |
+| 2. `M11_SIGFIX_RECOVER=1` の `m11_e2e.sh` で survey ok ≥ 870 | **未達 (測れない・#1154 へ移した)** | §6。素材に `functions_dll.csv` が無い。分類器のみの変更で、IR と `fixes.json` は変えていない (§7) |
 | 3. 実値化した値を `m11_argrecover_verify.py` で一致 | **該当なし** | 実値化 0 件 |
 
 ## 6. survey が測れない理由 (実測)
 
 - `M11_SIGFIX_RECOVER=1 FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/m11_e2e.sh` を `timeout 240` で 1 回実行。`work/lift_pe.sha256` が無いため全再生成モードに入り、`m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を読めず fail-closed で停止 (`FileNotFoundError`・`M11_SUMMARY {"reached_stage":0}`・rc 1・0.5 秒)。
 - `functions_dll.csv` は Ghidra 中間物で素材に無い (REPORT_N86 §6・§8・REPORT_N112 §5 と同じ)。本 run では解消できない。
-- 起票先: #1154 (既存の追跡先)。
+- 起票先: #1154 (既存の追跡先)。受入の原文 (#3134 本文: `ok ≥ 870`) は #1154 のコメントに転記した。
 
 ## 7. 測定 commit と差分
 
-- 測定 commit: `69bab10e` (修正前に §2 を測定した最後の commit)。
-- 修正 commit: `91396a79` (分類器の 3 点: `NOWRITE` 完全一致・`CMPX_W`・スロットの `MOVS` 制限)。以後の REPORT の commit は md のみ。
+- 測定 commit: `c295b2c3` (§2 を測定した最後の commit)。以後の commit は REPORT (md) のみ。`git diff c295b2c3 HEAD -- tools/m11 ':(exclude)*.md'` は 0 行。
+- 修正 commit: `91396a79` (分類器の 3 点: `NOWRITE` 完全一致・`CMPX_W`・スロットの `MOVS` 制限)。`c295b2c3` (`bt` を `NOWRITE` に入れた)。
 - `git diff 69bab10e 91396a79 -- tools/m11 ':(exclude)*.md'` の出力 (`m11_setother_nonimm_class.py` のみ・9 行追加 3 行削除):
 
 ```diff
@@ -105,7 +105,7 @@
 ```
 
 - 修正の確認 (commit 上で実施): capstone で 13 種の命令を復号し、旧式と新式の「書かない命令」判定を比べた。旧式は btr・bts・btc・cmpxchg・cmpeqsd を書かない命令と誤判定し、新式は正しく書く命令と判定する (`cmp`・`test`・`jmp`・`jne`・`push`・`ucomisd`・`nop`・`ret` は両式で書かない)。定義探索の 5 ケース (`btr` 越え・`cmpxchg` 越え・`cmp` 越え・`add [rsp+0x20]`・`mov [rsp+0x20]`) を通すと、修正後は `btr`→未決 `other:btr`、`cmpxchg`→未決 `other:cmpxchg`、`add` RMW→未決 `stack_other:add`、`cmp` は飛ばして `mov` の定数 5 (実値化)、`mov` スロットの定数 5 (実値化) となった。この確認は一時スクリプト (リポジトリ外) で、PE・IR を使わない。
-- 修正後 HEAD の 349 件の再測定は未実施 (§2 注・§8)。
+- `git diff 91396a79 c295b2c3 -- tools/m11 ':(exclude)*.md'` は 2 行追加 1 行削除: `NOWRITE` に `bt` を入れ、その説明コメントを 1 行足した (`bt` は CF だけを書く)。
 - `m11_post.py`・`m11_argrecover.py`・`ldfix/ldmach.py`・既存の検算スクリプトは変更していない。
 
 ## 8. 未解決
@@ -116,5 +116,4 @@
 | 未決 58 件 (call_ret・算術・狭い格納) | 同上 | #3141 ([M11-N173]) |
 | 未決 256 件 (メモリ読込・lea) | 同上 | #3142 ([M11-N174]) |
 | 未決 1 件 (関数入口) | 同上 | #1154 (#1373 は CLOSED のため移した) |
-| 修正後の分類器の再測定 (§2 の表・§3 の内訳は修正前の値) | 修正後の理由別内訳・件数は未確認 (0 / 0 / 349 は変わらない見込み) | 本 PR (`work-m11` が届く run で §2・§3 を更新) |
 | survey (受入 2): `functions_dll.csv`・`lift_pe.sha256` の欠落 | survey 退行が未判定 | #1154 |
