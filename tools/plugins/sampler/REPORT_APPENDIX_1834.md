@@ -20,12 +20,12 @@
 
 | block | 修正前 (HEAD 486eab5d) summary 列 7 / 列 9 | 修正後 (本 PR) 列 7 / 列 9 | 備考 |
 |---|---|---|---|
-| 19048 | 1 / 1 (`'%arg2' ... i32`) | **0 / 0** | 最終 HEAD `81be9e49` の summary: `19048,1658,0,1712,0,5,0,0,0,63,2,97,0,54,1710,0`。 `fix_arg_width: defs = 1 callsites = 24 ptr_args = 0 ptr_uses = 1` (`%penv` の 3 段目が発火)。 66.5 s (load 0.24) |
+| 19048 | 1 / 1 (`'%arg2' ... i32`) | **0 / 0** | 測定 commit `81be9e49` (現 head `425d40c8` と実行コードは同一。 差分は appendix のみ) の summary: `19048,1658,0,1712,0,5,0,0,0,63,2,97,0,54,1710,0`。 `fix_arg_width: defs = 1 callsites = 24 ptr_args = 0 ptr_uses = 1` (`%penv` の 3 段目が発火)。 66.5 s (load 0.24) |
 | 19252 | 1 / 1 (REPORT §5 と一致) | 1 / 1 (変化なし) | 最終 HEAD の summary: `19252,522,0,551,1,5,1,0,1,16,2,165,0,29,549,0`。 `fix_arg_width: defs = 0 callsites = 0 ptr_args = 0 ptr_uses = 0`。 `e.argw.ll` = `e.final.ll` (cmp 一致)。 17.9 s (load 0.68)。 f80 段 (列 16) は 0 のまま |
 
 - 列 7 (`emcc_c_rc`) は、本 PR で pass を最初の emcc の前に移したため、「素の `e.final.ll`」から「引数幅修正後の `e.argw.ll`」の判定に変わった。 19252 では pass が何も変えないので値は不変。
 - 19048 の残り: `unimpl 5` (vcomisd / vucomisd / vucomiss / movntps) は #1582 の子 (PLG-F3-14) の範囲で、本 issue では触らない。
-- 23677 の `emcc_c_rc` 1 (`do not know how to soften fp_extend`) は REPORT §5 行 6 (x86_fp80) と §7 の追跡先 (#197 の `f80_lower.py`・#540 [PLG-G3-2]) に対応する。 本 PR の pass は 23677 の `.ll` を変えない (`e.argw.ll` = `e.final.ll`) ため、emcc 入力は本 PR 前と同じ。 REPORT §5/§6 の旧値 (4c3ae00 時点の 0) との差の原因は未切り分け (§7 に記載済み)。
+- 23677 の `emcc_c_rc` 1 (`do not know how to soften fp_extend`) は REPORT §5 行 6 (x86_fp80) と §7 の追跡先 (#197 の `f80_lower.py`・#540 [PLG-G3-2]) に対応する。 現 head の 23677 は未測定 (3 段目の追加は未検証)。 測定 commit 7891a242 は 3 段目を含まない版のため、その時の「pass は `.ll` を変えない」は現 head には適用しない。 REPORT §5/§6 の旧値 (4c3ae00 時点の 0) との差の原因は未切り分け (§7 に記載済み)。
 
 ## 4. 実行環境
 
