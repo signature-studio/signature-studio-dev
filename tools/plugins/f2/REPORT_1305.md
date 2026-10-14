@@ -175,14 +175,33 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 判定: 受入 1 (`0x411a80` 到達) **未達**。受入 2 (`0x411bb8` 呼出し時の記録) と受入 3 (`-w` によるプログラム全体の書込み追跡) は受入 1 が前提のため未実施。waiver は変更しない。
 - 残件 (子 issue に移す): `0x407a20` が読むブロック構造 (`[rax-8]` のヘッダ形式、`[rbx]`・`[rbx+8]`・`[rdx+0x18]` の初期化) を PE 内の初期化コードから復元し、合成 host/obj に入れる。
 
-## 13. PLG-F3-26 (#2295): 0x407a20 の入力状態と呼出し経路 (測定 commit e53d845b、block19148)
+## 13. PLG-F3-24 (#2272): CreatePlugInstance (0x83efb0) の実引数による到達 (部分、測定 commit cdfa8bda)
 
-- 入力: `$RUNNER_TEMP/ex/extracted/block19148_PE.bin` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst extracted/block19148_PE.bin`、5,904,384 B)。依存: `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。
-- 再現 (e53d845b、逐次、load 0.28 → 0.33): `unicorn_trace.py $PE 0x83efb0 -H -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` = `UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0`、wall 1.68 s、RSS 227,384 KB。§12 と一致。
-- 0x407a20 の入口レジスタ (一時的な計測コピーで取得、リポジトリ外): `rbx=0x867100` (.data)・`rdx=0x9`・`rcx=0x48`・`r8=0x8bfa3c`・`esi` は `[0x4b7682 相当の rip 相対 byte]` の結果。`0x867100` の初期内容は `00 00 10 00 00 00 00 00` (qword 0 = `0x0000000000100000`)、以降 0。
-- 命令列 (0x407a43〜0x407a5e) の意味: `rdx=[rbx+8]` が 0 のとき `[rdx+0x18]` が読めず、後続 `and rcx,[rax-8]` が `rax=0` で `UC_ERR_READ_UNMAPPED`。`cmp rdx,rbx; je 0x407a74` は `[rbx+8]==rbx` で空を表す循環リスト。すなわち `0x867100` 付近の bin が**自己参照で初期化されていない**ことが直接の原因。
-- 計測 (リポジトリ外の一時コピー、`0x867100` の `[+8]`・`[+0x10]` に自己ポインタを置く): 1 段目の読出しは通過し、`0x407a94` の `mov qword [rax-8], rdx` (rax=0) で `UC_ERR_WRITE_UNMAPPED`。つまり自己参照だけでは不足で、**`[rax-8]` が指す有効なチャンクヘッダ** (ヒープ/アリーナ領域) が要る。`0x867100` だけの seed では受入 1 は達成しない。
-- 呼出し経路の探索 (`.text` 全走査、capstone): `0x407a20` への直接 `call` は **0 件**、同アドレスへの `jcc`/`jmp` は **0 件**。よって `0x407a20` は間接 (関数ポインタ・vtable・テーブル) 経由でのみ到達する。`0x867100` への rip 相対参照は `.text` 内に **0 件** (`scan.py`)。アリーナの初期化は別のレジスタ経由 (ベースポインタ) で行われる可能性が高い。
-- 判定: 受入 1 (`0x407a20` が読むブロック構造の復元) **未達**。原因と必要な入力は上記で確定したが、初期化経路 (間接呼出し元と、`0x867100` のアリーナを構築する関数) が未特定のため、ヘッダ形式を PE 内から復元できていない。受入 2〜4 は受入 1 が前提のため未実施。waiver は変更しない。
-- 未解決 (本 issue #2295 の残件、次 run で追跡): (1) `0x407a20` の間接呼出し元 (`.data`/`.rdata` の関数ポインタ・vtable から逆引き)、(2) `0x867100` を指すアリーナ構築関数 (レジスタベースの書込み追跡: unicorn `-w 0x867100:0x867200` で書込み元 rip を取る)、(3) `[rax-8]` のチャンクヘッダ形式 (`0x407a94`・`0x407b98` の `and rdi,[rsi-8]` の使用から逆算)。
-- 再現: 上記 unicorn コマンド。`scan.py` (rip 相対参照の走査、capstone) は §13 の本文に記載の手順で再現できる (リポジトリには置かない)。
+- 道具の追加 (114843e2): `unicorn_trace.py` に `-d addr=val` (実行前の qword 書込み。ホスト構造体の合成用) と `-t hex` (番地に入るたびに rcx/rdx/r8/r9 を出す) を追加。既存の `-r`/`-w`/`-q` の挙動は不変。
+- 入力: `block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block19148_PE.bin`、`TMPDIR=$RUNNER_TEMP` 下に展開)。fl-win64 には実行時のメモリダンプが無く、host の実データは PE から得られない。
+- 静的確認: `0x83efb0` は `call 0x777290` (r8=0x9876、r9=`0x8bbc04`) の結果が真なら `0x83cb50` → `0x8402b0` の経路。`0x777290` は第 1 引数 `[rcx]` を vtable として `call qword ptr [rbx]` (0x7772be) を行う。
+- 実測 (head cdfa8bda、block19148、逐次、uptime load 1 分 0.53、各実行 wall 数秒):
+  - 試行 1 (`-r rcx=0x40000000`): `UC_ERR_FETCH_PROT` rip=0x0・rax=0x40000000。`0x7772be` の `call [rbx]` が 0 を呼ぶ (呼出し元の戻り番地 `[rsp]=0x7772c0`)。Issue の `UC_ERR_READ_UNMAPPED` (rip=0x7772be) は**再現しない**。
+  - 試行 1' (`-r rcx=0x400000`): `UC_ERR_READ_UNMAPPED` rip=0x7772be・rax=0x400000。Issue と一致するのはこちら。
+  - 試行 2 (`-r rcx=0x40000000 -d 0x40000000=0x40000200 -d 0x40000200=0x100ffff0`): `0x777290` は通過し、`0x83cad7` (`call qword ptr [rax+0x30]`) で `UC_ERR_READ_UNMAPPED` rip=0x83cad7・rax=0x100ffff0 (vtable 項目 `+0x30` が未マップ)。
+  - 試行 3 (`-H`、合成 host・vtable の全 slot は ret stub): `0x777290` → `0x83cb50` → `0x83cca0` → `0x407a20` (rcx=0x48・rdx=0x9) を経て、`0x407a5e` (`and rcx, [rax-8]`) で `UC_ERR_READ_UNMAPPED` rip=0x407a5e・rax=0x0。stub hits は host.vtable[0x0] 2 回・obj.vtable[0x30] 1 回。`0x411bb8`・`0x411940` には届かず、`[0x8c3ca8]` の書込みは 0 件。
+- 判定 (受入条件): 1 (実引数で `0x411a80` に届く) **未達**。`0x407a20` 系が読むヒープ/リンク構造を PE 内の静的情報から合成する必要がある。2 (`0x411bb8` の `[0x8c3c80]`・`[[rcx]+0x28]` の確定) **未達**。3 (`0x83efb0` 起点の `-w 0x8c3ca8:0x8c3cb0`) **未達** (受入 1 が前提)。REPORT の結論 (§9・§10) は変更しない。waiver は変更しない。
+- 残件 (#2272 で追跡): host 構造体の合成を `0x407a20` 系まで行い、`0x411a80` に届かせる。届いた後に `0x411bb8`・`0x411940` の trace と `0x8c3ca8` の最終値を確定する。
+
+## 14. PLG-F3-26 (#2295): 0x407a20 の入力状態と呼出し経路 (測定 commit e53d845b、block19148)
+
+- 入力: `$RUNNER_TEMP/ex/extracted/block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/ex extracted/block19148_PE.bin`、5,904,384 B)。依存: `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。
+- 再現 (逐次、`PE=$RUNNER_TEMP/ex/extracted/block19148_PE.bin`): `python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` = `UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0x0`。§12 と一致。
+- 走査の再現 (リポジトリ内の script):
+  - `python3 tools/plugins/f2/callsite_scan.py $PE 0x407a00 0x867100` = `0x407a00` への e8/e9 直接呼出し元 9 件、`0x867100` への rip 相対 lea 4 件 (`0x407a19`・`0x408933`・`0x40909a`・`0x409216`)、読み書き 0 件。
+  - `python3 tools/plugins/f2/jump_scan.py $PE 407a20 407a00 867100` = jcc/jmp 0 件 (3 アドレスとも)。
+- 入口: `0x407a20` は pdata 関数 `[0x407a00,0x407dc1)` の内側で、`0x407a00` から fall-through で入る。`0x407a00`〜`0x407a19` が `rbx`・`r8`・`rdx` を設定する (`rdx=(ecx+7)>>3`・`r8=0x8bfa3c`・`rbx=0x867100`)。入力は `rcx` のみ。
+- `-t` の実測 (`-H` 実行): `0x407a00` で `rcx=0x48 rdx=0x1`、`0x407a20` で `rcx=0x48 rdx=0x9` (`[rcx]=0`)。
+- `0x407a20` の処理: `esi=[0x8bf0a9]` (rip 相対 `0x407a27+0x4b7682`) = 0 (分岐 `test esi,esi; jne 0x407ab1` は不成立)。`byte[r8+rdx]` = `byte[0x8bfa45]` = 0 → `rbx = 0x867100 + 0`。`rdx=[rbx+8]=0`、`rax=[rdx+0x18]=[0x18]=0` (page 0 は 0x2000 B マップ済みで読める)、`cmp rdx,rbx` 不成立で `add dword [rdx+0x20],1` (page 0 への書込み)。最後の `and rcx,[rax-8]` が `rax=0` で `[-8]` を読み `UC_ERR_READ_UNMAPPED`。
+- 直接原因: `rbx`=`0x867100` の bin で `[rbx+8]=0`。`0x867100` の初期内容は `00 00 10 00 00 00 00 00` (qword 0 = `0x100000`、qword 1 = 0)、`0x867110`〜`0x86713f` は 0、`0x867140` は `00 00 20 00 ...` (qword = `0x200000`)。`[rbx+8]` が自己ポインタでないため空リストとして扱われず、`rax=0` の `[rax-8]` 読出しに進む。
+- 自己参照 seed の実測 (`-d` で書込み): `-d 0x867108=0x867100` では `0x407a94` の `mov [rax-8],rdx` (rax=0) で `UC_ERR_WRITE_UNMAPPED`。`0x867110` も併せて seed しても同じ。つまり `0x867100` の自己参照だけでは不足で、`[rax-8]` が指す有効なチャンクヘッダ (ヒープ/アリーナ領域) が要る。
+- 呼出し経路: `0x407a00` への直接 call 9 件 (上記)。`-H` 実行での上流経路は §13 (PLG-F3-24) の試行 3 (`0x777290` → `0x83cb50` → `0x83cca0` → `0x407a20`)。`.data`/`.rdata` の関数ポインタ経由の到達は未確認。
+- 判定: 受入 1 (`0x407a20` が読むブロック構造の復元) **未達**。受入 2〜4 は受入 1 が前提のため未実施。waiver は変更しない。
+- 未解決 (#2303 で追跡): (1) `0x407a20` の間接呼出し元 (`.data`/`.rdata` の関数ポインタ・vtable から逆引き)、(2) `0x867100` を指すアリーナ構築関数 (`-w 0x867100:0x867200` で書込み元 rip を取る)、(3) `[rax-8]` のチャンクヘッダ形式 (`0x407a94`・`0x407b98` の使用から逆算)。
+- 再現: 上記 unicorn コマンドと callsite_scan.py / jump_scan.py。
+

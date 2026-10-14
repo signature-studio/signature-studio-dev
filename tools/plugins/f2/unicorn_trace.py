@@ -6,6 +6,8 @@
 # 依存: pefile・unicorn (pip install unicorn)。未解決の間接 call で止まる場合は fault 行に戻り番地を出す。
 # usage: python3 unicorn_trace.py <block_PE.bin> <entry_hex> [-r reg=hex ...] [-a hex ...]
 #                                 [-w lo:hi ...] [-q hex ...] [-m MAX_INSN]
+#                                 [-d addr=val ...] [-t hex ...]
+#   -d: 実行前に qword を書く (ホスト構造体の合成用)。-t: 番地に入るたびに rcx/rdx/r8/r9 を出す。
 import argparse
 import collections
 import struct
@@ -47,6 +49,7 @@ def main():
     ap.add_argument('-q', action='append', default=[], type=lambda s: int(s, 0),
                     help='実行前後に表示する qword アドレス')
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
+    ap.add_argument('-d', action='append', default=[], help='実行前に書く qword addr=val (hex)')
     ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
                     help='この VA に入ったとき rcx/rdx の値と [rcx]・[rcx+0x28] を出す (最初の 20 回)')
     ap.add_argument('-H', action='store_true',
@@ -82,6 +85,12 @@ def main():
 
     uc.mem_map(SCRATCH, SCRATCH_SIZE, UC_PROT_READ | UC_PROT_WRITE)
     uc.mem_map(STACK_TOP - STACK_SIZE, STACK_SIZE, UC_PROT_READ | UC_PROT_WRITE)
+    RET_STUB = STUB + STUB_SIZE - 0x10
+    uc.mem_write(RET_STUB, b'\xc3')
+    print('ret stub %#x (-d の vtable 先に使える)' % RET_STUB)
+    for item in a.d:
+        ad, val = item.split('=')
+        uc.mem_write(int(ad, 0), struct.pack('<Q', int(val, 0)))
     uc.mem_map(SENT & ~(PAGE - 1), PAGE, UC_PROT_READ)
     rsp = STACK_TOP - 0x208
     uc.mem_write(rsp, struct.pack('<Q', SENT))
