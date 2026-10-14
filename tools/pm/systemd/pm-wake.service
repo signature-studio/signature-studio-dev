@@ -1,0 +1,8 @@
+[Unit]
+Description=PM wake: start the PM session only when /status asks for it (replaces pm-heartbeat, #2347)
+
+[Service]
+Type=oneshot
+Environment=PM_SESSION_ID_FILE=/PATH/TO/PM_SESSION_ID
+Environment=OPENCODE_BIN=/PATH/TO/opencode
+ExecStart=/bin/bash /PATH/TO/REPO/tools/pm/pm_wake.sh

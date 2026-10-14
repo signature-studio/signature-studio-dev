@@ -1,0 +1,4 @@
+0000223c T function_40f960
+00001ed3 T function_40fb40
+000022e9 T function_410320
+0000413e T function_467c40

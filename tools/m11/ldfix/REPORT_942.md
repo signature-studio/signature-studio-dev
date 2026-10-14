@@ -1,6 +1,7 @@
 # #942 (CI-22) m11 ldfix stage4 の memory access out of bounds — 切り分け (部分達成)
 
 親 #757。受入条件の進捗 (本 run 時点): 1 = 部分 (frame → IR 対応で trap の関数 7 種まで特定。発生 load は未特定) / 2 = 部分 (trap chain に修復関数無し = ldfix 起因ではないと確定。trap の load 特定は未了) / 3 = 部分 (snapshot 限定の判定。現 main 生成素材は #1292)。
+通常 boot の trap 位置・lift 誤り候補 (最新) は [REPORT_942_APPENDIX.md §14](REPORT_942_APPENDIX.md) を参照。
 
 ## 1. 実測 (検証起点 origin/main `b4dac086`・runner 1 台)
 

@@ -1136,7 +1136,13 @@
    "closeGraphEditor": {
     "doc": "Close graph editor",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "None"
     },
     "new_vs_stubs": false,
@@ -2086,7 +2092,23 @@
    "processRECEvent": {
     "doc": "Process rec event",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "eventId",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "int"
     },
     "new_vs_stubs": false,
@@ -4239,7 +4261,18 @@
    "remoteFindEventValue": {
     "doc": "Remote find event value",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "flags",
+       "type": "int",
+       "default": "0"
+      }
+     ],
      "returns": "float"
     },
     "new_vs_stubs": false,
@@ -5066,7 +5099,18 @@
    "ensureValidNoteRecord": {
     "doc": "Ensure Valid Note Record",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "playNow",
+       "type": "int",
+       "default": "0"
+      }
+     ],
      "returns": "int"
     },
     "new_vs_stubs": false,
@@ -5178,7 +5222,18 @@
    "getChannelLoopStyle": {
     "doc": "Get channel loop style",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "pattern",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "channel",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "int"
     },
     "new_vs_stubs": false,
@@ -5233,7 +5288,13 @@
    "getPatternGroupName": {
     "doc": "Get pattern group name",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "str"
     },
     "new_vs_stubs": false,
@@ -5296,7 +5357,13 @@
    "getPatternsInGroup": {
     "doc": "Get patterns in group",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "tuple[int, ...]"
     },
     "new_vs_stubs": false,
@@ -5508,7 +5575,18 @@
    "setChannelLoop": {
     "doc": "Set channel loop",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "channel",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "loopPoint",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "str"
     },
     "new_vs_stubs": false,
@@ -6502,7 +6580,13 @@
    "setUndoHistoryLast": {
     "doc": "Set undo history last",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "index",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "None"
     },
     "new_vs_stubs": false,
@@ -8158,7 +8242,13 @@
    "directFeedback": {
     "doc": "Send out generic midi message",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "eventData",
+       "type": "FlMidiMsg",
+       "default": null
+      }
+     ],
      "returns": "None"
     },
     "new_vs_stubs": false,
@@ -8823,7 +8913,28 @@
    "sendMsgGeneric": {
     "doc": "Send out generic midi message",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "id",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "message",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "lastMsg",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "offset",
+       "type": "int",
+       "default": "0"
+      }
+     ],
      "returns": "str"
     },
     "new_vs_stubs": false,
@@ -9514,7 +9625,18 @@
    "addTextLine": {
     "doc": "Add text line",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "text",
+       "type": "str",
+       "default": null
+      },
+      {
+       "name": "line",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "None"
     },
     "new_vs_stubs": false,
@@ -9750,7 +9872,33 @@
    "fillRect": {
     "doc": "Fill rectangle",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "start_x",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "start_y",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "end_x",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "end_y",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "None"
     },
     "new_vs_stubs": false,
@@ -9814,7 +9962,38 @@
    "init": {
     "doc": "Init screen object",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "display_width",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "display_height",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "text_row_height",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "font_size",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value_a",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "value_b",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "None"
     },
     "new_vs_stubs": false,
@@ -9970,7 +10149,38 @@
    "setup": {
     "doc": "Setup screen properties",
     "sig": {
-     "params": [],
+     "params": [
+      {
+       "name": "sysex_header",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "screen_active_timeout",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "screen_auto_timeout",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "text_scroll_pause",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "text_scroll_speed",
+       "type": "int",
+       "default": null
+      },
+      {
+       "name": "text_display_time",
+       "type": "int",
+       "default": null
+      }
+     ],
      "returns": "None"
     },
     "new_vs_stubs": false,
