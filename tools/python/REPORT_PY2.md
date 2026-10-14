@@ -78,7 +78,6 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | `_PyInterpreterState_GetRefTotal` を FL が実際に使うか | 使うなら upstream release build では束縛が失敗する (FL 側の失敗時挙動は未確認) | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
 | wasm でのサブインタプリタ (`Py_NewInterpreterFromConfig`) 動作 | FL がサブインタプリタ運用なら MIDI/piano roll の分離に影響 | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
 | pthread 版での複数スレッド + GIL | MIDI スレッド分離の可否 | 子 #2633 (PY-80)。旧 #76 (CLOSED) の T6 から移管 |
-| `build_flpy.sh` が追跡中の `flapi_table.json` / `FLAPI.md` を書き換える (runner に win PE / mac dylib が無いため) | 本 PR では再生成物をコミットしていない | #588 (CLOSED・解消済み。入力欠落時は exit 2、§PY-13) |
 
 ## 7e. 再検証 (測定 commit 322f81b6) と #83 の受入条件の判定
 
@@ -108,7 +107,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 | 参考: 空の Python 関数呼出し | 0.108 (0.102–0.232) |
 | Worker + SAB (同一 provider、`channelCount()`) | 42.7 (38.587–45.076) |
 
-同一 run の median 比は 42.7 ÷ 0.569 = 75.0 倍。7d の過去値 (0.34µs / 21.5〜25.7µs) より両経路とも大きいのは runner の負荷差による。比較は本 run 内の値だけで行う。<1µs は 5 trial の max 0.843µs まで満たす。
+同一 run の median 比は 42.7 ÷ 0.569 = 75.0 倍。7d の過去値 (0.34µs / 21.5〜25.7µs) より両経路とも大きいのは、推定で runner の負荷差による。根拠: 本 run の load 1.14 は、7d の f6352cd 行 (load 0.96) と 5a0b3c3 行 (load 0.78) より高い。f6352cd 行の median と比べると両経路とも約 2 倍に伸びた (静的 `channelCount()` 0.289→0.569µs、×1.97。SAB 版 21.545→42.7µs、×1.98)。ただし provider 側の変更が両経路に効いた可能性は切り分けていない (負荷だけを変えた再測定はしていない)。比較は本 run 内の値だけで行う。<1µs は 5 trial の max 0.843µs まで満たす。
 
 ネガコン: 静的版だけ `channels.channelCount` の戻り値を +1 に改変 (`provider/fl_engine.c` 1 行。SAB 版 (`provider/build.sh` の出力) は再ビルドしていない) → `build_flpy_static.sh` のみ再リンク → `static_check.mjs` は FAIL (rc=1)。mock 比較で 19/48 差、summary の ok は 47/48、host_calls 37,461 (期待 37,425)。改変を戻して再リンク → `STATIC CHECK OK` (rc=0)。
 
