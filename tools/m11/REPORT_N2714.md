@@ -17,7 +17,7 @@
 ## 1. 測定 (測定 commit `cf64d9c8`)
 
 - 測定 commit: `cf64d9c8` (コードを変えた最後の commit)。base は origin/main `46c92356` (PR の base)。
-- 環境: runner 4 vCPU・Node v22.23.3・emsdk は `/opt/emsdk` (既存)・RetDec は `/opt/retdec` (既存)。
+- 環境: runner 4 vCPU・Node v22.23.3・emsdk は [EMSDK]・RetDec は [RETDEC] (いずれも `docs/REFERENCES.md`・runner に既存)。
   素材 work-m11 を両方の worktree に展開し、`m11_e2e.sh` が `m11_gen_ir2.sh` を実行して IR を作った (ldfix=applied・qstore=applied・ld108=applied・ir_sha256 `de46cada…`)。
   PE は `fl-win64` の `extracted/block00031_PE.bin` (sha256 `b2c64da4…`)。
 - **注記 (素材の不足・手書き)**: 素材 work-m11 に `work/lift_pe.sha256` が無い。e2e は PE 指紋が一致しないと RetDec の全再生成に入るが、再生成に必要な `tools/m2/work` が無い。
@@ -137,7 +137,8 @@ trap 21 unit の修復と miss 46 の `0xfa9390` の出所特定は、次の作�
   寛容起動だけなら `M11_TOLERANT_OUT=work/tolerant_units.json node tools/m11/m11_tolerant.mjs`。
 - 判定: `python3 tools/m11/m11_tolerant_gate.py --strict-done 56 --survey-ok 872` (exit 0)、`--negctl --strict-done 56 --survey-ok 872` (NEGCTL_OK ×3)。
 - 区間内訳: `python3 tools/m11/m11_tolerant_sections.py <PE> --md` (§4-2 の表はこの出力)。
-- 測定 commit `cf64d9c8` から HEAD までのコード差分: `git diff cf64d9c8 HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` の出力は 0 行 (本 REPORT と PR 本文の変更だけが後から入る)。
+- 測定 commit `cf64d9c8` から HEAD (`3722021f`) までのコード差分: `git diff cf64d9c8 HEAD -- tools/m11 ':!tools/m11/REPORT*.md'` は `m11_tolerant_sections.py` の 1 ファイル (5 行追加・3 行削除) のみで、PE の既定パスを環境変数・引数から取る変更。
+  e2e (`m11_e2e.sh`) はこのスクリプトを呼ばないため、測定値は変わらない。§4-2 の表は変更後のスクリプトで再生成し、変更前と同一 (diff 0) を確認した。
 
 ## 8. 未解決
 
