@@ -186,5 +186,25 @@
    ],
    "file": "boot3.norm0.ll"
   }
+ ],
+ "dest_riprip": [
+  {
+   "fn": "11ca250",
+   "ty": "i128",
+   "cls": "DEST_RIPREAD",
+   "detail": [
+    "11ca2d9 movsd qword ptr [rax], xmm0 <- 11ca2d2 mov rax, qword ptr [rip + 0x416a87]"
+   ],
+   "file": "boot3.norm0.ll"
+  },
+  {
+   "fn": "69c360",
+   "ty": "i32",
+   "cls": "DEST_RIPREAD",
+   "detail": [
+    "69c381 not eax <- 69c378 mov eax, dword ptr [rip + 0xf58576]"
+   ],
+   "file": "boot1.norm0.ll"
+  }
  ]
 }
