@@ -52,3 +52,31 @@
 
 ## 16. #490 [M11-N15]: main HEAD の 4c3baa4 / faee5b6 状態 (部分達成, 本体 REPORT.md から移動)
 main `6e5c8dac` で通常起動・survey は完走 (53/942, survey ok 870)。ネガコン (boot5 除去) は 52/942 で「元の停止に戻る」は不成立。faee5b6 の二分は逆パッチが衝突し未成立。詳細は `REPORT_N15.md` §16。
+
+### #1511 [M11-N97] survey の stderr 全行捕捉と _CopyArray kind 12 (416720) の到達確認
+
+測定 commit `c22f8b6b` (コード変更の最後の commit。起点は `1e3ee7af` = main)。4 vCPU・load 0.5〜0.7 (各実行の前後で記録)。素材 `work-m11` を `tools/m11/work/` に展開し、`fl-win64` の PE (`$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`) で `m11_gen_ir2.sh` (45 s・ldfix applied) → `m11_build.sh` (26 s)。全再生成 (`m11_e2e.sh --full`) は行っていない (RetDec・Ghidra 中間物は不要)。
+
+**変更点**: (a) `survey_units.mjs` に `SV_ERR_LOG=<file>` を追加し、非 trace の stderr を unit 番号付きで全行出す (既存の `rec.err` は unit あたり先頭 3 行のみ)。既定 OFF。(b) `m11_ov.c` の case 12 に `M11_INSTR_K12` (既定 0) の計測 probe `[K12HIT]`、`_CopyArray` 入口に `[CA_KIND]` を追加。`m11_build.sh` は `M11_INSTR_K12` を `-D` で渡し、stamp で `ov.o` を作り直す。
+
+| 構成 | ok/miss/other/halt0/oob/noproc | 所要 | stderr 行 (unit 数) | `[K12HIT]` | `[CA_KIND]` |
+|---|---|---|---|---|---|
+| 変更前 (1e3ee7af 相当・同じ build) | 870/47/1/7/16/1 | 13 s | (`SV_ERR_LOG` 無し) | - | - |
+| HEAD `c22f8b6b`・既定 (K12=0) | 870/47/1/7/16/1 | 13 s | 70 (31 unit) | 0 | 0 |
+| HEAD・probe (K12=1) | 872/47/1/7/14/1 | 13 s | 86 (31 unit) | 0 | 16 (全件 kind=18) |
+
+- 受入 1 (既定結果が変わらない): 達成。変更前と HEAD 既定で kind 分布は完全一致 (差分 0)。JSON は frames の `survey_units.mjs` 行番号が変わるだけで、units の kind は全 942 unit 一致。注: REPORT 上の旧基準「ok 872 / trap 23 / miss 46」は #1141 時点の値で、現 main の同一 build は 870/47 (boot5 除去等の既存差分。本 issue では変えていない)。
+- 受入 2 (kind 12 の到達): **未到達**。probe 入り build で全 942 unit の survey を実行し、`[K12HIT]` は 0 件。`_CopyArray` の入口 (`function_416db0`) は 16 回 (unit 17 / 86 / 357 / 496 の各 4 回) で、全件 kind=18 (kind 12 の要素型が現れない)。boot 段階 (unit -1) の stderr は 2 行で `[CA_KIND]` は無し。
+- **probe の副作用 (未解決)**: probe 入り build で unit 304 (`535bf2`→oob が ok) と unit 555 (同じく oob→ok) の kind が変わった。`[CA_KIND]`・`[K12HIT]` の出力経路 (`M11_TRACE`) は #495 の SP 退避で汚染を抑えているが、この 2 unit の差は説明できていない。計測の透過性は未確認のため、kind 12 が既定 build で別経路から到達している可能性は残る (既定 build からは直接観測できない)。
+- 受入 3 (測定 commit・load・所要秒・stderr 件数): 上表に記載。
+
+stderr 件数の注意: `rec.err` 由来の `err` は unit あたり 3 行で打ち切られるため、件数はこの表の `SV_ERR_LOG` 出力のみを使う。
+
+再現:
+```
+cd tools/m11
+FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin bash m11_gen_ir2.sh
+FL_WIN64_DIR=... M11_PE=... bash m11_build.sh                  # 既定 (K12=0)
+SV_ERR_LOG=work/s1511/err.txt node trap_triage/survey_units.mjs work/s1511/out.json
+M11_INSTR_K12=1 bash m11_build.sh                              # 計測 probe 入り
+```

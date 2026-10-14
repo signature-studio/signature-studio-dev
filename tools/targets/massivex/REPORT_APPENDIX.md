@@ -148,3 +148,46 @@
 - 残件: 間接呼び出し元の特定 (vtable / 関数ポインタ表の `.rdata` 走査) → #1439 [MX-9]。N5 の読み手の特定 → #1439 [MX-9]。
 - e2e (`license/e2e.sh`) は本節では未実行。e2e の実測は §12.6 (#1280) が正本。
 - コード差分: 測定 commit `1260d27e` から HEAD までの `tools/targets/massivex/license` と非 md の差分は 0 行 (`git diff 1260d27e HEAD -- tools/targets/massivex ':!*.md'` が空)。
+
+### 12.8 間接参照の 4 系統総当たり (#1439 [MX-9]・2026-10-14)
+
+- 素材: `plugins-massivex` を `$RUNNER_TEMP/mx` に展開 → `scripts/parse_setup_headers.py <exe> work/key` → `scripts/extract_massivex.py <exe> work/key key`。`work/key/extracted/VST3/Massive X.vst3` = 95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca` (§11.1 と一致)。extract の checksum 不一致 125/125 は §1・§8・§12.4 と同じ既知事象。
+- 新規スクリプト `license/scripts/mx_indirect_refs.py` (`--selftest` 付き)。読み手 5 関数 (§12.7) と N5/N6 文字列 10 VA (§12.2) を次の 4 系統で走査:
+  - A: 8B 絶対 VA (全セクションの raw バイト列)
+  - B: 4B RVA (image base 相対、全セクション)
+  - C: 命令の RIP 相対 mem 実効先・即値 (`.text` 線形逆アセンブル、capstone)
+  - D: 自己相対 4B (位置 p の値 d について p+d が対象 VA)
+- 陽性対照: `--selftest` で 4 系統とも既知 1 件を検出 (`abs8=1 rva4=1 self4=1 rip/imm=1`) → PASS。
+- **修正版の全域再走査 (commit `605b43b2`・B/D を開始 offset 0〜3 で走査)**: 下表が現行の結果。旧版 (4B 整列のみ) では offset 1 / 33 の既知参照が `rva4=0 self4=0` (期待 1) になることを確認済みで、旧版の「0 件」は無効。修正版の `--selftest` は非整列 (offset 1 / 33) の陽性対照を含み PASS (`unaligned rva4=0x180100001 self4=0x180100021`)。
+- 再現手順 (`tools/targets/massivex` 直下): `python3 license/scripts/mx_indirect_refs.py --selftest` (rc 0) → `python3 license/scripts/mx_indirect_refs.py "work/key/extracted/VST3/Massive X.vst3"` (rc 0・約 1 分 43 秒)。PE は `work/key/` に §12.8 冒頭の手順で生成 (md5 `622993e7…` 一致)。
+- C (rip/imm) の 0 件は `.text` 線形逆アセンブルで、§12.7 の未デコード区間 34,167 B (約 0.06%) の命令は見ていない。C の 0 件はこの区間を含まない。
+
+| 対象 | A abs8 | B rva4 | C rip/imm | D self4 |
+|---|--:|--:|--:|--:|
+| 読み手 0x180f95e20 (N6-1) | 0 | 2 (.pdata・.xdata 各 1) | 0 | 0 |
+| 読み手 0x181142370 (N6-2) | 0 | 2 (.pdata・.xdata 各 1) | 0 | 0 |
+| 読み手 0x181144570 (N6-3) | 0 | 2 (.pdata・.xdata 各 1) | 0 | 0 |
+| 読み手 0x181142640 (N6-4) | 0 | 2 (.pdata・.xdata 各 1) | 0 | 0 |
+| 読み手 0x1811453f0 (N6-5) | 0 | 2 (.pdata・.xdata 各 1) | 0 | 0 |
+| N6 文字列 6 件 (0x184ffcf87〜0x184ffd131) | 0 | 1 (0x184ffd03f ← `.rdata` 0x183c8c947・非整列 mod 4 = 3) | 0 | 1 (0x184ffd0d6 ← `.rdata` 0x184bfd0d6・非整列 mod 4 = 2) |
+| N5 文字列 4 件 (MXDemoPopup.qml / demoExpired / demoExpiredChanged / subscriptionExpired) | 0 | 0 | 0 | 0 |
+
+- 読み手 5 件の rva4 (各 2 件) は `.pdata` (`0x185fc0ff8` 等) と `.xdata` (`0x18630d324` 等) 内の関数範囲表の登録で、呼び出し元ではない (§12.5 と同じ判定)。
+- 非整列の 2 件 (N6 文字列への参照) の分類: **表・構造体とは判定できず、誤検出の疑い**。
+  - `.rdata` 0x183c8c947 (B): 周囲は `fd 4f d0 ff 04` の周期的なバイト列で、前後の整列 4B 値も image 内 RVA として意味を持たない。4B 窓の値 `0x04ffd03f` が偶然 `0x184ffd03f` と一致した可能性が高い。
+  - `.rdata` 0x184bfd0d6 (D): 周囲は `00 00 04 00 00 00 3b 00 00 00 7e 02 …` の 16bit 値の列で、4B 窓が値の境界をまたいでいる。`0x00400000` が自己相対 disp として偶然 `0x184ffd0d6` を指した可能性が高い。
+  - 参照元の表を特定するには、両位置を含む `.rdata` の構造 (stride・型) を未同定のまま残す。この 2 件は差し替え点の根拠にしない。
+- 実行: `mx_indirect_refs.py` rc 0、実測 1 min 43 s (`load` 1.11 → 開始時・4 vCPU・並列 1)。
+- 判定: 読み手 5 関数への参照は A/B(非 .pdata/.xdata)/C/D のいずれでも 0 件。N5 文字列も 0 件。N6 文字列への参照は非整列の 2 件のみで、いずれも誤検出の疑い (上記)。前版の「vtable / 関数ポインタ表経由」の仮説は絶対ポインタ形式で否定された。残る候補は (E) テーブル基準 (表先頭 base) からの相対差分 (`t - base` が 4B 符号付き) と文字列 index 経由の間接参照で、本節では未走査。
+- 差し替え点は未確定のため `license/scripts/mx_lic_stub.py` の RULES は**変更しない** (根拠なしの br_force / store は silent miscompile になる)。
+- 残件: (E) の走査、呼び出し元の確定、差し替え点の決定、`acpt_verify_mx2.py` の拡張 (N5/N6 の抑制を機械検証)。→ 子 issue [MX-11] に起票 (番号は PR 本文・issue コメント参照)。
+
+#### e2e 再測定 (同一素材・冷間 = `license/work` 削除後)
+
+| MX_OPT | 所要 (wall) | load (開始) | harness | 結果 |
+|---|--:|--:|--:|---|
+| `-O0` | 81.9 s | 1.50 | 11/11 | PASS (exit 0) |
+| `-O1` (既定) | 87.2 s | 0.83 | 11/11 | PASS (exit 0) |
+| `-O2` | 73.9 s | 0.90 | 11/11 | PASS (exit 0) |
+
+- 素材: `toolchain-retdec` (`$RUNNER_TEMP/rd/retdec`) と `toolchain-emsdk` (`$RUNNER_TEMP/em/emsdk`) を `RETDEC` / `EMSDK` で指定。`license/e2e.sh` 本体は未変更 (`mx_lic_stub.py` も未変更)。

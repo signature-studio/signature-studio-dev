@@ -130,6 +130,10 @@ def main():
             slot = insns[idx].address + insns[idx].size + o.mem.disp
             if iat.get(slot) is None:
                 need.add(slot)
+        elif o.type == X86_OP_REG:
+            d = back_def(insns, idx, md.reg_name(o.reg))
+            if d[0] == 'rip_mem' and iat.get(int(d[1], 16)) is None:
+                need.add(int(d[1], 16))
     # 線形スイープは data 混在で途中停止するため、.pdata の関数単位で逆アセンブルする
     stores = {s: [] for s in need}
     loads = {s: [] for s in need}
@@ -177,34 +181,51 @@ def main():
                 if th and any(k in th[1] for k in RAISE_NAMES):
                     raise_slots.setdefault(s_, []).append([st_[0], '%s!%s' % th])
 
+    # slot の番地が .data/.rdata の qword として現れる箇所 (間接書込みの足がかり候補)
+    data_ptr = {s_: [] for s_ in need}
+    for sec in pe.sections:
+        if sec.Name.rstrip(b'\0') in (b'.data', b'.rdata'):
+            d_ = sec.get_data()
+            sva = base + sec.VirtualAddress
+            for k in range(0, len(d_) - 7, 8):
+                v_ = struct.unpack_from('<Q', d_, k)[0]
+                if v_ in data_ptr:
+                    data_ptr[v_].append(hex(sva + k))
+
+    def resolve_slot(row, slot):
+        v = read_q(slot)
+        row['slot'] = hex(slot)
+        row['slot_value_in_file'] = hex(v) if v is not None else None
+        st = stores.get(slot, [])
+        row['stores'] = st
+        vals = set()
+        for s_ in st:
+            if s_[1][0] == 'imm':
+                vals.add(s_[1][1])
+            elif s_[2] and s_[2][0] == 'rip_lea':
+                vals.add(hex(int(s_[2][1], 16)))
+        if v is not None and v != 0 and v in iat:
+            row['resolved'] = 'import %s!%s' % iat[v]
+        elif v is not None and v != 0 and func_of(v) is not None:
+            row['resolved'] = 'function %s' % hex(v)
+        elif st:
+            row['resolved'] = 'runtime store x%d; values %s' % (len(st), sorted(vals) or 'not literal')
+        else:
+            row['resolved'] = 'no store found'
+            row['data_ptr_to_slot'] = data_ptr.get(slot, [])
+
     rows = []
     for f, insns, idx in sites:
         ins = insns[idx]
         o = ins.operands[0]
         row = {'func': hex(f), 'site': hex(ins.address), 'asm': '%s %s' % (ins.mnemonic, ins.op_str)}
         if o.type == X86_OP_MEM and o.mem.base == X86_REG_RIP:
-            slot = ins.address + ins.size + o.mem.disp
-            v = read_q(slot)
-            row['slot'] = hex(slot)
-            row['slot_value_in_file'] = hex(v) if v is not None else None
-            st = stores.get(slot, [])
-            row['stores'] = st
-            vals = set()
-            for s_ in st:
-                if s_[1][0] == 'imm':
-                    vals.add(s_[1][1])
-                elif s_[2] and s_[2][0] == 'rip_lea':
-                    vals.add(hex(int(s_[2][1], 16)))
-            if v is not None and v != 0 and v in iat:
-                row['resolved'] = 'import %s!%s' % iat[v]
-            elif v is not None and v != 0 and func_of(v) is not None:
-                row['resolved'] = 'function %s' % hex(v)
-            elif st:
-                row['resolved'] = 'runtime store x%d; values %s' % (len(st), sorted(vals) or 'not literal')
-            else:
-                row['resolved'] = 'no store found'
+            resolve_slot(row, ins.address + ins.size + o.mem.disp)
         elif o.type == X86_OP_REG:
             row['def'] = back_def(insns, idx, md.reg_name(o.reg))
+            if row['def'][0] == 'rip_mem':
+                row['via_reg_slot'] = row['def'][1]
+                resolve_slot(row, int(row['def'][1], 16))
         elif o.type == X86_OP_MEM:
             reg = md.reg_name(o.mem.base) if o.mem.base else None
             row['def'] = back_def(insns, idx, reg) if reg else ('abs', hex(o.mem.disp))

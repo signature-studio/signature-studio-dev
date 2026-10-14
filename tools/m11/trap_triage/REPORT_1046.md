@@ -115,3 +115,24 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
   - 計装を外して再 build し、`ok 870 / oob 16` に戻ることを確認 (作業ツリーに差分なし)。
 - 受入の判定 (本 run): 2 (`0x92492493` 配列長) は未着手。3 (DEFECTS 類型) は §10 の D17 同型の疑いのまま未確定。4 (修復後の kind) は修復を行っていないため未達。
 - 未解決 (起票先 #1288): (a) unit 492 の範囲に限定した `0x10a9f910` 書込みの store 特定 (unit 境界の出力を計装側に入れる必要あり)、(b) D17 か別類型かの判定、(c) `4473f0` `0x92492493` の検証。
+
+## 12. 再着手 run (HEAD `cb3a89a6` 起点): 書込み元 store の探索 (途中・結論なし)
+
+- 測定 commit: `cb3a89a6` (本節の計装と §12 の監視結果を取った時点のコード)。
+- 再現 (`cb3a89a6` 時点で実施): `m11_gen_ir2.sh` rc 0 (29.0 s) → `m11_build.sh` rc 0 → `survey_units.mjs` rc 0 (6.7 s)。結果 `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` で §2 と一致。
+- 現 head での再測定は未実施 (素材 `toolchain-emsdk`・`toolchain-retdec`・`work-m11`・`work-liftdiff` が Actions run に無く、再 build 不可)。
+- `cb3a89a6` → `a7d3975d` の `tools/m11` 差分 (実測。`git diff --stat cb3a89a6 a7d3975d -- tools/m11`: 28 files, +3055 / -53)。実行パスに効く 16 files (`m11_gen_ir2.sh`・`m11_win.c`・`ldfix/`) の出力は下記。これらは本 PR のコミットではなく、main 取り込み (`564`・`577` 系の merge、`cb3a89a6` の後) で入った変更。本 PR の 3 ファイル (`REPORT_1046.md`・`store_watch_1046.sh`・`watch_addr_1046.c`) はコード差分を含まない。
+  ```
+  git diff --stat cb3a89a6 a7d3975d -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_win.c tools/m11/ldfix/
+   16 files changed, 2688 insertions(+), 13 deletions(-)
+  ```
+- 計装: `trap_triage/watch_addr_1046.c` (監視番地 `0x10a9f910` の固定版。`watch_store_682.c` の `[[g+8]+8]` 監視は使わない) と `trap_triage/store_watch_1046.sh` (`SV_ONLY` で unit を絞れる)。全 store に `m11_sw` を入れる IR は `watch_store_682.py` を流用。
+- 全 942 unit 実行 (監視版): `[aw]` は unit 106 付近まで記録されたが 900 秒の上限で打ち切り。`0x10a9f910` への書込みは unit の前半から多数 (`val=10bd48f0`、`val=537301`、`val=10bb6820` 等)。
+- `SV_ONLY=492` 単独 (監視版): `[aw]` 0 件、survey は `oob 1`。全 unit 実行で見えた書込みは unit 492 単独では起きない。`0x10a9f910` の値は前の unit が共有ヒープに残した状態に依存する。
+- 結論: 書込み元 store は未特定。単独 unit では再現しないため、OOB 直前の書込みを探すには全 unit 実行の監視が要るが、この run の時間では完了できなかった。
+
+### 次の手順 (#1288 を継続)
+
+1. 監視版を全 unit 実行で完走させる (`store_watch_1046.sh` を `timeout` の上限を延ばして実行。900 秒では不足)。
+2. 最後の `[aw]` 書込み (`val=0x100000003` 相当の store) の `site` を `sites.json` で IR 行に戻す。
+3. その store が D17 (qword → i32 縮退) か別類型かを判定する。

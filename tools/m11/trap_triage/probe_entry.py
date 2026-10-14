@@ -18,7 +18,7 @@ n = 0
 if fns == ['all']:
     fns = sorted(set(re.findall(r'^define [^\n@]*@function_([0-9a-f]+)\(', src, re.M)))
 for f in fns:
-    pat = re.compile(r'(^define [^\n@]*@function_%s\(([^)]*)\)[^\n]*\{\n[^\n]*:[^\n]*\n)' % f, re.M)
+    pat = re.compile(r'(^define [^\n@]*@function_%s(?:__lifted)?\(([^)]*)\)[^\n]*\{\n[^\n]*:[^\n]*\n)' % f, re.M)
     m = pat.search(src)
     if not m: print('no define for', f, file=sys.stderr); continue
     args = re.findall(r'(i64|ptr|i32) (?:nonnull )?(%arg\d+)', m.group(2))

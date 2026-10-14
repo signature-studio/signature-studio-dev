@@ -90,3 +90,24 @@
 - したがって**主因は meter 経路 (`m1`/`m2` の更新式)** と読めるが、meter の更新式の逆アセンブル照合は本 run で未実施。
 - 判定: 受入条件 1 (主因特定) は**部分達成** (`cur` 丸め形は確定、meter は未特定)。受入条件 2 (200/200 bit 一致) は**未達**。受入条件 3 (Gain 以外への拡大判定) は**未決定**。
 - 起票先: meter 経路の逆アセンブル照合と主因の確定 → #1467 [FA-20]。bit 一致化と Gain 以外への拡大判定 → #1264 の残件 (#52 配下)。
+
+### §A3-3. meter (m1・m2) 更新式の照合 (#1467 FA-20, 実測)
+
+- 測定 commit: `87fd84b7` (コードを変えた最後の commit は `e532b06a`。`git diff e532b06a 87fd84b7 -- tools/targets/freshair/*.c tools/targets/freshair/*.py tools/targets/freshair/*.sh` は 0 行)。`37c8193d` の時点では漸化式を計算しておらず、実機の数値は持たない。`e532b06a` でハーネスに SC/KH 両側の `M<i>` 行 (実行前 m1/c1/m2/c2、`METER_DUMP=1`) を追加し、`ks_meter_replay.py` に再計算を実装した (stdout は不変)。
+- 再現: `cc -O1 -ffp-contract=off -o h tools/targets/freshair/ks_semantic_gain.c -lm` → `METER_DUMP=1 ./h sc <SlateCore> 200 7 > sc.txt 2> sc_m.txt`・`METER_DUMP=1 ./h kh <HeartCore> 200 7 > kh.txt 2> kh_m.txt` → `python3 ks_meter_replay.py sc.txt kh.txt sc_m.txt kh_m.txt`。逆アセンブルは capstone 5.0.7 (SC 0x180afe090・KH 0x1804b0380 の先頭 900 命令)。
+- 素材: `work-liftlib-targets` (`tools/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64`・`tools/targets/kilohearts/work/winpkg/HeartCore.core_64`)。`fl-win64` には含まれない (`tar --zstd -tf` で確認)。
+- 実測 (測定 commit `87fd84b7`、素材 `work-liftlib-targets`、`cc -O1 -ffp-contract=off -Wall` 警告 0、実行直前の load 0.37〜0.43): `./h sc` 0.019 s real・`./h kh` 0.024 s real。
+  - `ks_meter_replay.py` = `{"cases_n_gt0": 199, "m1_mismatch": 28, "m2_mismatch": 35, "cur_equal": 181, "meter_mismatch_with_cur_equal": 30, "m1_mismatch_with_L_identical": 0, "m2_mismatch_with_R_identical": 0, "L_identical": 126, "R_identical": 126, "recalc_SC": {"n": 199, "ok": 199, "bad_cases": []}, "recalc_KH": {"n": 199, "ok": 199, "bad_cases": []}}`
+  - `ks_semantic_gain_cmp.py` = `{"cases": 200, "bit_exact_LRS": 127, "mismatch_L": 73, "mismatch_R": 73, "mismatch_S": 48, "notify_count_mismatch": 0}` (§A3 と一致)。
+  - `cases_n_gt0: 199` は case C109 (`n=0`) の 1 件が対象外のため (`recalc_SC` / `recalc_KH` の `n` も 199)。
+- meter 更新式 (両側同形): ループ内で `m = (s*s - m)*c + m` (`mulss` → `subss` → `mulss` → `addss`)。対応 (SC = KH + 0x38): m1 `0x88`⇄`0xc0`・c1 `0x84`⇄`0xbc`、m2 `0x98`⇄`0xd0`・c2 `0x94`⇄`0xcc`。SC `0x180afe1b4`〜`0x180afe1e2`、KH `0x1804b04a1`〜`0x1804b04f2`。
+- 初期値 (m1・m2・c1・c2) は 200/200 一致。
+- 出力 L/R から同じ式を float32 で再計算して自側の state (m1 `0x88`・m2 `0x98`) と比べる (`ks_meter_replay.py` の `recalc_SC` / `recalc_KH`): **SC 199/199・KH 199/199 で一致** (上記の実測)。式は両側で実行後 state を再現する。
+- 合成データでの動作確認 (実機ではない): 既知の m から式で作った state を入れると一致 1/1、1 ケースに 1e-6 のずれを入れると不一致 1/1 と判定される (`replay` の判定が機能することのみを確認)。
+- meter 不一致 (state 比較): m1 28 件・m2 35 件。`ks_meter_replay.py` の内訳: `m1_mismatch_with_L_identical` 0・`m2_mismatch_with_R_identical` 0。つまり meter 不一致は全て対応する出力チャネル (L/R) の不一致と同じ case に出る。
+- `cur` 一致かつ meter 不一致 30 件 (§A3-2 の 30 件と同じ) は、全て L/R 出力の差からの伝播として説明できる。
+- L 差の内訳: `cur` 不一致 18 件・`cur` 一致 55 件 (`cur` が一致するのに L が違う case がある)。
+- 例 case 3: 出力 L の index 2 のみが 1 ulp ずれ (SC -0.4080760180950165 / KH -0.4080759882926941)、以降の差は同じ起点から伝播。
+- **判定 (受入条件 1 は未達)**: meter 更新式は SC/KH で同一で、実機で再計算が 199/199 一致した。ずれる式は **meter 更新式には見つからなかった**。meter 差は L/R 差の伝播で、式そのものの差ではない。
+- 未確定: L 差の起点。`cur` の逐次値 (ramp の丸め順) の bit 単位照合が未了。harness は逐次 `cur` を出力しないため、そのままでは確定できない。起票先 → #1617 [FA-23] (ramp 逐次値のダンプと照合)。
+- 受入条件 3 (本節の追記) は満たす。受入条件 2 (単体再現で 30 件を説明) は「meter 式は同一・30 件は L/R 伝播」まで。L 差の起点の説明は未了 (#1617)。

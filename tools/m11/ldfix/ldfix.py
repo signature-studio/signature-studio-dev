@@ -23,7 +23,13 @@
     IR の xor i64 0,0 が 1 本・機械語に自己 xor 無し・load 先ベースが argN と解決」の
     厳密条件が揃ったときだけ復元する。
 
-使い方: python3 ldfix.py IN.ll OUT.ll --pe PE.bin [--report OUT.json] [--only 4133f0,...] [--passes f3c] [--dry-run]
+  F4 frame_read_dropped (escape 済み stack_var 内部の read, #564 / function_52a7f0):
+    `cmp [rbp+0x70], rcx` の被 read は callee (GetClassInfoW) が書く escape 済み `%stack_var_-96` の +8 だが、RetDec が
+    store 無しの別 alloca の load (= undef) にし、m5 ir5_patch B1 が `xor i64 0, 0` に固定する (比較が定数に畳まれ分岐が消える)。
+    ブロック内 xor-0-0 が 1 本・機械語のその区間に自己 xor 無し・frame read が 1 本で escape 済み stack_var の gap 内に解決・
+    その slot への機械語 store 無し・B1 の残骸 (使用ゼロの無名 alloca) 有り、が揃ったとき stack_var + 偏移の load に置換する。
+
+使い方: python3 ldfix.py IN.ll OUT.ll --pe PE.bin [--report OUT.json] [--only 4133f0,...] [--passes f3c] [--no-f4] [--dry-run]
 """
 import argparse
 import bisect
@@ -34,7 +40,8 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ldmach import Machine, FnMach  # noqa: E402
+from ldmach import Machine, FnMach, memops_of  # noqa: E402
+from ldframe import is_write_only, frame_model, escaped_stack_vars  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lb_base import LB, IMG_BASE  # noqa: E402
@@ -1671,6 +1678,191 @@ def fix_f3c(fn, fv, rep, ctr):
 # main
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# F4: frame_read_dropped (escape 済み stack_var 内部の read が undef → B1 で xor 0,0 になった, #564)
+# ---------------------------------------------------------------------------
+
+XORZ_RE = re.compile(r'^(\s*)(%[\w.$-]+) = xor i(8|16|32|64) 0, 0\s*$')
+UNNAMED_ALLOCA_RE = re.compile(r'^  (%\d+) = alloca ', re.M)
+
+
+def f4_candidates(fn, fv, rep):
+    """[(ir_line_index, xname, type_bits, stack_var, offset, width_bits, addr)] を返す (rep に棄却理由を数える)。"""
+    lines = fn.body.split('\n')
+    # B1 の残骸 = 使用ゼロの無名 alloca が無ければ対象外
+    unused = [a for a in UNNAMED_ALLOCA_RE.findall(fn.body)
+              if len(re.findall(re.escape(a) + r'(?![\w.$-])', fn.body)) == 1]
+    if not unused:
+        return []
+    blocks = fn.blocks()
+    cum = 0
+    meta = []
+    for (bva, ls) in blocks:
+        meta.append((bva, cum, cum + len(ls), ls))
+        cum += len(ls)
+    mblk, _ = fn_mach_blocks(fv, fn.va, [b[0] for b in meta if b[0] is not None])
+    if mblk is None:
+        return []
+    svars = None
+    fm = None
+    out = []
+    for (bva, ia, ib, ls) in meta:
+        if bva is None:
+            continue
+        xs = [(ia + k, XORZ_RE.match(l)) for k, l in enumerate(ls) if XORZ_RE.match(l)]
+        if len(xs) != 1:
+            continue
+        entry = bva == next((b[0] for b in meta if b[0] is not None), None) and len([1 for l in lines if XORZ_RE.match(l)]) == 1
+        # B1 の xor は関数入口ブロックへ hoist されることがある (71dd80: read は後続ブロック)。入口ブロックで IR 中の xor-0-0 が
+        # その 1 本だけのときは、own-block に read が無ければ機械語側を関数全体で突合する (read / 自己 xor / store 衝突も関数全体)。
+        mins = mblk.get(bva, [])
+        if entry and not any(mo['base'] in ('rbp', 'rsp') for i in mins if not is_write_only(i) for mo in memops_of(fv.cs, i) if mo['kind'] in ('load', 'rmw', 'other')):
+            mins = list(fv.ins)
+        if any(i.mnemonic == 'xor' and len(i.operands) == 2 and i.operands[0].type == 1 and i.operands[0].reg == i.operands[1].reg for i in mins):
+            rep['f4_selfxor_block'] = rep.get('f4_selfxor_block', 0) + 1
+            continue
+        if fm is None:
+            fm = frame_model(fv.cs, fv.ins)
+            esc = escaped_stack_vars(fn.body)
+            svars = {n: e for n, e in esc.items() if e}
+            order = sorted(esc)
+            gap = {n: n - (order[i - 1] if i else 0) for i, n in enumerate(order)}
+        xi, xm = xs[0]
+        bits = int(xm.group(3))
+        reads = []
+        for i in mins:
+            if is_write_only(i):
+                continue
+            for mo in memops_of(fv.cs, i):
+                if mo['kind'] in ('load', 'rmw', 'other') and mo['base'] in ('rbp', 'rsp') and not mo['index'] and mo.get('rip_rva') is None:
+                    reads.append((i, mo))
+        if len(reads) != 1:
+            rep['f4_read_count'] = rep.get('f4_read_count', 0) + 1
+            continue
+        i, mo = reads[0]
+        rs, rb = fm.get(i.address, (None, None))
+        basev = rs if mo['base'] == 'rsp' else rb
+        w = mo['size_bits']
+        if basev is None or not w or w > bits or w not in (8, 16, 32, 64):
+            rep['f4_unresolved'] = rep.get('f4_unresolved', 0) + 1
+            continue
+        o = basev + mo['disp']
+        cover = [n for n in svars if -n <= o]
+        n = min(cover) if cover else None
+        if n is None or o + n + w // 8 > gap[n]:
+            rep['f4_not_in_escaped_gap'] = rep.get('f4_not_in_escaped_gap', 0) + 1
+            continue
+        # 同じ frame 番地への機械語 store があれば IR が store を持つはず (= 脱落でない): 曖昧なので触らない
+        clash = False
+        for j in fv.ins:
+            if j is i:
+                continue
+            for m2 in memops_of(fv.cs, j):
+                if m2['base'] in ('rbp', 'rsp') and not m2['index'] and m2.get('rip_rva') is None and (m2['write'] or is_write_only(j)):
+                    rs2, rb2 = fm.get(j.address, (None, None))
+                    b2 = rs2 if m2['base'] == 'rsp' else rb2
+                    w2 = m2['size_bits'] or 64
+                    if b2 is not None and b2 + m2['disp'] < o + w // 8 and o < b2 + m2['disp'] + w2 // 8:
+                        clash = True
+        if clash:
+            rep['f4_frame_store_clash'] = rep.get('f4_frame_store_clash', 0) + 1
+            continue
+        # load の置き場: B1 の xor は関数入口側に置かれるため、そこでは stack_var への callee 書込み前になる。
+        # 最初の使用行の直前に置く。全使用が最初の使用と同一 IR ブロック内で、stack_var を渡す call が同ブロックのその前にあること。
+        xname = xm.group(2)
+        anyuse = [k for k, l in enumerate(lines) if k != xi and re.search(re.escape(xname) + r'(?![\w.$-])', l)]
+        ub = next(((ba, bb) for (_v, ba, bb, _l) in meta if anyuse and ba <= min(anyuse) < bb), None)
+        if not anyuse or ub is None or not all(ub[0] <= k < ub[1] for k in anyuse):
+            rep['f4_use_shape'] = rep.get('f4_use_shape', 0) + 1
+            continue
+        first = min(anyuse)
+        al = {'%%stack_var_-%d' % n}
+        for k, l in enumerate(lines):
+            bm = re.match(r'^  (%[\w.$-]+) = bitcast ptr (%[\w.$-]+) to ptr', l)
+            if bm and bm.group(2) in al:
+                al.add(bm.group(1))
+        esc_before = any(re.match(r'^\s*(?:%[\w.$-]+ = )?call ', lines[k]) and any(re.search(re.escape(a) + r'(?![\w.$-])', lines[k]) for a in al)
+                         for k in range(ub[0], first))
+        if not esc_before:
+            rep['f4_no_escape_before_use'] = rep.get('f4_no_escape_before_use', 0) + 1
+            continue
+        nxt = None
+        for k, j in enumerate(fv.ins):
+            if j is i and k + 1 < len(fv.ins):
+                nj = fv.ins[k + 1]
+                if nj.mnemonic in ('je', 'jne') and nj.operands and nj.operands[0].type == 2:
+                    nxt = (nj.mnemonic, nj.operands[0].imm)
+        out.append((xi, xname, bits, n, o + n, w, i.address, xm.group(1), first, nxt))
+    return out
+
+
+NO_CONSUMER = [False]
+
+
+def fix_f4(fn, fv, rep, ctr):
+    cands = f4_candidates(fn, fv, rep)
+    if not cands:
+        return 0
+    lines = fn.body.split('\n')
+    edits = {}
+    drop = set()
+    ren = []
+    andfix = []
+    for (xi, xname, bits, n, off, w, addr, ind, first, nxt) in cands:
+        ctr[0] += 1
+        nm = 'ldf4_%d' % ctr[0]
+        # LLVM の無名値 (%N) は番号が連続でなければならない。xor 行は (使用ゼロの dead 値として) 残し、使用箇所だけを名前付き値へ置換する。
+        pre = ['%s%%%s_i = ptrtoint ptr %%stack_var_-%d to i64' % (ind, nm, n),
+               '%s%%%s_a = add i64 %%%s_i, %d' % (ind, nm, nm, off),
+               '%s%%%s_p = inttoptr i64 %%%s_a to ptr' % (ind, nm, nm)]
+        if w == bits:
+            edits[first] = pre + ['%s%%%s_v = load i%d, ptr %%%s_p, align 1' % (ind, nm, bits, nm)]
+        else:
+            edits[first] = pre + ['%s%%%s_l = load i%d, ptr %%%s_p, align 1' % (ind, nm, w, nm),
+                                  '%s%%%s_v = zext i%d %%%s_l to i%d' % (ind, nm, w, nm, bits)]
+        ren.append((xi, xname, '%%%s_v' % nm))
+        andfix.append((xname, nxt, addr))
+        rep.setdefault('f4_sites', []).append('%x@%x->stack_var_-%d+%d' % (fn.va, addr, n, off))
+    out = []
+    for i, l in enumerate(lines):
+        if i in drop:
+            continue
+        if i in edits:
+            out.extend(edits[i])
+        out.append(l)
+    body = '\n'.join(out)
+    ls2 = body.split('\n')
+    for (_xi, old_n, new_n) in ren:
+        pat = re.compile(re.escape(old_n) + r'(?![\w.$-])')
+        defn = re.compile(r'^\s*' + re.escape(old_n) + r' = ')
+        ls2 = [l if defn.match(l) else pat.sub(new_n, l) for l in ls2]
+    body = '\n'.join(ls2)
+    # consumer 復元: RetDec は undef の自由度で `skip = registered && (v == K)` を `icmp eq i1 (v == K), registered` に畳んでいた
+    # (v を正しく load しても未登録+不一致で skip が真になる)。`cmp [frame], K; je T` の直後が je T で、
+    # `%C = icmp eq iN v, K` → `%oc = icmp eq i1 %C, %X` → `br i1 %oc, label %T` の形のときだけ `and i1 %C, %X` に戻す。
+    for (xname, nxt, addr) in ([] if NO_CONSUMER[0] else andfix):
+        if not nxt or nxt[0] != 'je':
+            continue
+        vn = [r for r in ren if r[1] == xname][0][2]
+        cm = re.search(r'^  (%[\w.$-]+) = icmp eq i\d+ ' + re.escape(vn) + r', -?\d+\s*$', body, re.M)
+        if not cm:
+            continue
+        ec = re.escape(cm.group(1))
+        om = re.search(r'^(  (%[\w.$-]+) = )icmp eq i1 (?:' + ec + r', (%[\w.$-]+)|(%[\w.$-]+), ' + ec + r')\s*$', body, re.M)
+        if not om:
+            continue
+        ocn = om.group(2)
+        brm = re.findall(r'^\s*br i1 ' + re.escape(ocn) + r', label %dec_label_pc_([0-9a-f]+), label %\S+', body, re.M)
+        if len(brm) != 1 or int(brm[0], 16) != nxt[1] or len(re.findall(re.escape(ocn) + r'(?![\w.$-])', body)) != 2:
+            rep['f4_consumer_shape'] = rep.get('f4_consumer_shape', 0) + 1
+            continue
+        other = om.group(3) or om.group(4)
+        body = body.replace(om.group(0), om.group(1) + 'and i1 ' + cm.group(1) + ', ' + other, 1)
+        rep.setdefault('f4_consumer_and', []).append('%x@%x' % (fn.va, addr))
+    fn.body = body
+    return len(cands)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('infile')
@@ -1679,19 +1871,23 @@ def main():
     ap.add_argument('--report')
     ap.add_argument('--only', help='カンマ区切りの VA (16進) のみ修復')
     ap.add_argument('--dry-run', action='store_true')
-    ap.add_argument('--passes', help='カンマ区切りで pass を限定 (f1,f1v,f2,f3a,f3b,f3c)。既に ldfix 済みの IR へ F3c だけを重ねる用 (#509)')
+    ap.add_argument('--passes', help='カンマ区切りで pass を限定 (f1,f1v,f2,f3a,f3b,f3c,f4)。既に ldfix 済みの IR へ F3c だけを重ねる用 (#509)')
+    ap.add_argument('--f4-no-consumer', action='store_true', help='F4 の consumer 復元 (and i1) だけ外す (ネガコン, #564)')
+    ap.add_argument('--no-f4', action='store_true', help='F4 (#564) を無効化 (ネガコン / 旧出力との差分確認)')
     a = ap.parse_args()
     passes = set(a.passes.split(',')) if a.passes else None
     only = set(int(x, 16) for x in a.only.split(',')) if a.only else None
+    NO_CONSUMER[0] = a.f4_no_consumer
     text = open(a.infile, errors='replace').read()
     mach = Machine(a.pe)
     for m in DEF_RE.finditer(text):
         F3C_ARITY[int(m.group('name')[len('function_'):], 16)] = len([x for x in m.group('args').split(',') if x.strip()])
     rep = collections.OrderedDict()
     ctr = [0]
-    counts = collections.OrderedDict((k, 0) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c'))
-    fn_lists = collections.OrderedDict((k, []) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c'))
+    counts = collections.OrderedDict((k, 0) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c', 'f4'))
+    fn_lists = collections.OrderedDict((k, []) for k in ('f1', 'f1v', 'f2', 'f3a', 'f3b', 'f3c', 'f4'))
     ctr_f1v = [0]               # F1v は専用 counter (F1〜F3 の SSA 名採番を不変に保つ)
+    ctr_f4 = [0]                # F4 も専用 counter
     out_parts = []
     last = 0
     nfn = 0
@@ -1708,10 +1904,12 @@ def main():
             mach.cover(va, max(blk_vas))
         fv = FnMach(mach, va, blk_vas)
         try:
-            for tag, func in (('f1', fix_f1), ('f1v', fix_f1v), ('f2', fix_f2), ('f3a', fix_f3a), ('f3b', fix_f3b), ('f3c', fix_f3c)):
+            for tag, func in (('f1', fix_f1), ('f1v', fix_f1v), ('f2', fix_f2), ('f3a', fix_f3a), ('f3b', fix_f3b), ('f3c', fix_f3c), ('f4', fix_f4)):
                 if passes is not None and tag not in passes:
                     continue
-                c = ctr_f1v if tag == 'f1v' else ctr
+                if tag == 'f4' and a.no_f4:
+                    continue
+                c = ctr_f1v if tag == 'f1v' else ctr_f4 if tag == 'f4' else ctr
                 if func(fn, fv, rep, c):
                     counts[tag] += 1
                     fn_lists[tag].append('%x' % va)
@@ -1725,8 +1923,8 @@ def main():
     for k in counts:
         rep[k + '_fns'] = counts[k]
         rep[k + '_vas'] = fn_lists[k]
-    log('F1(load_dropped)=%d F1v(variant)=%d F2(spill_slot)=%d F3a(old-value)=%d F3b(count-load)=%d F3c(store-arg)=%d (errors=%d)'
-        % (counts['f1'], counts['f1v'], counts['f2'], counts['f3a'], counts['f3b'], counts['f3c'], rep.get('errors', 0)))
+    log('F1(load_dropped)=%d F1v(variant)=%d F2(spill_slot)=%d F3a(old-value)=%d F3b(count-load)=%d F3c(store-arg)=%d F4(frame-read)=%d (errors=%d)'
+        % (counts['f1'], counts['f1v'], counts['f2'], counts['f3a'], counts['f3b'], counts['f3c'], counts['f4'], rep.get('errors', 0)))
     if not a.dry_run:
         open(a.outfile, 'w').write(result := ''.join(out_parts))
     if a.report:

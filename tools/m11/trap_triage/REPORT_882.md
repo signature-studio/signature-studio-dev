@@ -148,3 +148,13 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 - `MessageBoxA` のアドレスは §8 (`f7bebc7b`) が `0000000010251440`、§9 (`12586095`) が `0000000010251450`。測定 commit が違い (間に `tools/m11` の変更あり)、commit 差によるものか未切り分け。
 - 次の一手: `40ff70` の入口で `p-144` と走査ノードの `word [rcx]` を出す probe を生成 IR に入れる (`m11_ov.c` 改修か `ov` 試験パッチ。`ov_409470_410320_experiment.patch` と同方式)。これは別 run の作業。
 - 受入条件 1・3 は本 run でも未達 (§3・§8.2 と同じ)。
+
+## 10. 5 回目の run: probe 設計の確認のみ (実装・測定は未実施)
+
+測定 commit: `origin/main` `83e6ff76` (worktree `ws-882` / branch `882-m11-p144-probe`)。計測・再ビルドは行っていない。
+
+- 機械語の再確認 (`disasm_fn.py 40ff70`、`block00031_PE.bin`、size 109): §8.3 の読みと一致。`rax=rcx` → `[rax-0x90]` (p-144) を先頭ノードとし、`word [rcx]` の要素数で走査、`[rax-0x78]` を次ノードとして辿る。
+- probe の入れ方: 既存の計測 probe (`M11_INSTR_413060`、#944) と同じく、C の強定義 `function_40ff70` を `M11_INSTR_40FF70` (既定 0) で gate する。`40ff70` の入口で `p-144` の値と先頭ノードの `word [rcx]` を `m11_probe` / stderr に出す。`m11_post.py` が IR 側を weak 化しているため、強定義で差し替えられる。
+- 未実施の理由: 本 run は probe の実装から IR 再生成・build・survey・ネガコンまでを 1 run に収める見込みが無かった。計測と結果の記録は次 run の作業とする。
+- 素材の注記: `pefile` が runner の python に無く、`disasm_fn.py` は `LD_M11_PE` 指定で動いた (本 run で `pip` は使えず、既存の venv 側の導入が要る)。
+- 受入条件 1・2・3 は未達のまま。
