@@ -161,6 +161,7 @@ Fruity Slicer 2 は殻 (block 23663) とは別に C++ engine DLL (block 23664、
 
 - E1 (`icmp P ptr %a, %argN` の i64 被演算子) は 2 pass で直す: `fix_ptr_params.py` (ptr 仮引数を i64 化し、その使用箇所に inttoptr・PR 追加) と main の `fix_icmp_ptr.py` (i64 被演算子に inttoptr・#545)。 合成 `.ll` で役割分担を確認: 片方だけでは残りが落ち、両方を順に通すと二重の inttoptr は出ない。 統合は別 issue。
 - `fold_const_ops` (`ir5_patch.py`) は cast の元の型幅でマスクし、sext は符号拡張してから宛先幅に合わせる (5bc59f1)。 回帰テスト `passes/test_fold_const_ops.py` 4 件。 旧版では 3 件 FAIL (255 / 65535 / 2^64-1)。
+- engine 19048 の `function_18004f7f8` の引数型 (i32 推定の誤り) の切り分けと修正 (#1834): [REPORT_APPENDIX_1834.md](REPORT_APPENDIX_1834.md)。 `emcc_c_rc_after_fixcmp` は 19048 で 1 → 0。
 
 ## 6. 検証 (コミット済み HEAD・4 core / 15 GiB の Actions runner)
 

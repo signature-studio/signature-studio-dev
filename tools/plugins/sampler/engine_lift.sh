@@ -30,9 +30,11 @@ PY
 erc=-1; erc2=-1; erc3=-1; NP=0
 emcc_c() { ( source /opt/emsdk/emsdk_env.sh >/dev/null 2>&1; TMPDIR="$OUT/tmp" emcc -c "$1" -o "$OUT/e.o" -w -O0 -msimd128 > "$2" 2>&1 ); echo $?; }
 if [ -f "$OUT/e.final.ll" ]; then
-  erc=$(emcc_c "$OUT/e.final.ll" "$OUT/emcc.log")
+  # RetDec が i32 と推定した仮引数がポインタとして使われる関数 (#1834) を定義・call site ごと i64 に揃える (erc の前)
+  python3 sampler/fix_arg_width.py "$OUT/e.final.ll" "$OUT/e.argw.ll" 2> "$OUT/fix_arg_width.log" || cp "$OUT/e.final.ll" "$OUT/e.argw.ll"
+  erc=$(emcc_c "$OUT/e.argw.ll" "$OUT/emcc.log")
   # engine-local 修復 (icmp ptr/i64 型不整合) を当てた後の再試行。 clang は最初の型エラーで止まるため、次に露見する欠陥類型を記録する
-  NP=$(python3 sampler/engine_fixcmp.py "$OUT/e.final.ll" "$OUT/e.fixcmp.ll" 2>&1 | sed 's/.*= //')
+  NP=$(python3 sampler/engine_fixcmp.py "$OUT/e.argw.ll" "$OUT/e.fixcmp.ll" 2>&1 | sed 's/.*= //')
   erc2=$(emcc_c "$OUT/e.fixcmp.ll" "$OUT/emcc_fixcmp.log")
   { echo "[final.ll]"; grep -m1 'error' "$OUT/emcc.log" || true; echo "[fixcmp.ll]"; grep -m1 'error' "$OUT/emcc_fixcmp.log" || true; } > "$OUT/first_errors.txt"
   # f80 関数が wasm バックエンドで落ちる (fp_extend / frem / fp_round) 場合の既存 pass (p0c/f80_lower.py: x86_fp80 → f64)。 f80 が無ければ erc3=erc2
