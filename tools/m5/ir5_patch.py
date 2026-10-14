@@ -265,6 +265,9 @@ def normalize(text):
     text = re.sub(r"(?m)^!\w[\w.\-]* *= !\{.*\}\s*\n?", "", text)
 
     cuse = len(re.findall(r"(?m)^uselistorder", text))
+    # RetDec は directive を持つ関数だけ `\n; uselistorder directives\n` を出す。先頭の空行ごと消し,
+    # directive の有無 (実行ごとに変わる) が空行数に残らないようにする (#1664)
+    text = re.sub(r"(?m)^\n; uselistorder directives\n(?:[ \t]*uselistorder .*\n)*", "", text)
     text = re.sub(r"(?m)^\s*uselistorder .*\n", "", text)
     text = re.sub(r"(?m)^; uselistorder directives\n", "", text)
     text = re.sub(r"(?m)^\n\n\n+", "\n\n", text)
