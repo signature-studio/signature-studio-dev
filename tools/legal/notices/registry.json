@@ -406,7 +406,7 @@
    },
    "flTexts": [],
    "coveredBy": [
-    "tools/gui/test/fetch_fonts.sh"
+    "tools/gui/test/fonts.tsv"
    ],
    "note": "GUI-9 (#186) の Windows 標準フォント代替 (face alias)。FL 同梱の旧版 Open Sans とは別物 (FL 同梱は fonts.json の origin-unverified)。upstream の OFL.txt は 3.003 のフォントメタデータ (name ID 13) と同じ OFL 1.1。Reserved Font Name の指定なし。無改変で配布する。"
   },
@@ -443,7 +443,7 @@
    },
    "flTexts": [],
    "coveredBy": [
-    "tools/gui/test/fetch_fonts.sh"
+    "tools/gui/test/fonts.tsv"
    ],
    "note": "GUI-9 (#186) の代替フォント。FL 同梱の Barlow (fonts.json の origin-unverified) とは別に、google/fonts の OFL 1.1 版を取得して使う。Reserved Font Name の指定なし。無改変で配布する。"
   },
