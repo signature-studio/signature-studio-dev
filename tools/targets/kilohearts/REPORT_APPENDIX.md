@@ -168,36 +168,32 @@
 - 回帰 (`f847e8c6`, 1000 trial / seed 7, `build_cmp.sh gain`): Gain **1000/1000** bit-exact (calls 4999/4999, wasm 15,161 B)。Haas / Gate は同じ converter 経路のため本 run では未再測定 (件数は §10-7o の値)。
 - 未実施: Stereo / Delay の 1000 trial 突合・ネガコン・第二 oracle の結論 (emcc 未通過のため)。子 issue #3071 [KH-39] (Stereo)・#3072 [KH-40] (Delay)・#3073 [KH-41] (突合・ネガコン・結論) に分割。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。build_cmp.sh 単体では作られないため `mkdir -p` が要る)。
-- 差分確認: 測定後のコード変更は 10-7p-2 を参照 (現行の測定 commit `ad3c5235`)。
+- 差分確認: 測定後のコード変更は 10-7p-2 を参照 (現行の測定 commit `6f5e17fa`)。
 
-#### 10-7p-2. #1216 差し戻し対応 (round 2): 本体の thunk 呼出の写し先を飛び先 `FUN_<X>` にする (B1 の一意性規則を撤回)
+#### 10-7p-2. #1216 差し戻し対応 (round 2・3): 本体の thunk 呼出は飛び先 `FUN_<X>` へ写す・census の分類規則を修正
+- 経緯: 差し戻し B1 (c2003a0c) の規則 (本体の呼出 `thunk_FUN_<X>` を「X を飛び先に持つ thunk の VA」へ写し、0 本・2 本以上なら停止) は、`thunk_FUN_180fb6bf8` の写し先が 2 本 (`180f8791c`・`180f87d40`) あり `候補 2 件 (停止)` で止まった。本体の呼出は lift 順の raw で 3 件 (`1802ed640` に 2 件、`180f87cac` に 1 件)。round 2 の「raw の本体 thunk 呼出 0 件」は再現しなかった (§10-7q ① の注記どおり、decompile の順序で出力が変わる)。
+- 採用 (merge `ad3c5235`・round 3 で承認): main 側 (`7d1d0e2e`) の規則 = 飛び先 `FUN_<X>` へ写す。定義ヘッダは `THUNK_HDR` で `FUN_<va>`。
+- jmp の同一性 (PE バイト・`HeartCore.core_64`): `180f8791c` → `jmp` → `180f87d40` → `jmp` → `180fb6bf8`、`180fc61dc` → `jmp` → `180fd66a0`、`180f87cac` → `jmp` → `180f878e0` (本体の `thunk_FUN_180fd66a0` は thunk `180fc61dc` を指す)。いずれも単一の `jmp rel32`。
+- 測定 commit: `6f5e17fa` (census の規則修正。converter は `ad3c5235` から不変)。`git diff 6f5e17fa HEAD -- tools/targets/kilohearts/ghidra_route` の出力は 0 行。
+- 環境: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B、手展開)・`toolchain-emsdk` ([EMSDK] 6.0.12)・[GHIDRA] 12.1.4 (sha256 `ddac49f9…d2db` 一致)・JDK 21。repo 外で作業。n=1。
 
-- 経緯: 差し戻し B1 (c2003a0c) は、本体の呼出 `thunk_FUN_<X>` を「X を飛び先に持つ thunk の VA」へ写し、写し先が 0 本・2 本以上なら停止する規則だった。実データの本体の呼出は 3 件 (lift 順 141 関数の raw decompile): `1802ed640` に `thunk_FUN_180fb6bf8()` 2 件、`180f87cac` に `thunk_FUN_180fd66a0(param_1)` 1 件。`180fb6bf8` を飛び先に持つ thunk は `180f8791c`・`180f87d40` の 2 本のため、B1 の converter は `候補 2 件 (停止)` で止まり、C を出さなかった (下の表 1 行目)。
-- 採用 (merge `ad3c5235`): main 側 (`7d1d0e2e`) の写し先 = 飛び先 `FUN_<X>` を採る。jmp thunk の呼出は飛び先の呼出と同じ動作で、写し先は X で一意に決まる。定義ヘッダは `THUNK_HDR` (`{` で終わるヘッダだけ) で `FUN_<va>`。`thunk_targets`・`thunk_call_target` は削除。reviewer の B1 の指定 (thunk VA への写し・一意性で停止) からは外れるため、再判断を依頼する。
-- 注記: round 2 の「raw の本体 thunk 呼出 0 件」は、本 run の lift 順の raw では再現しなかった (3 件)。§10-7q ① の注記 (decompile の順序で出力が変わる) と整合する。converter は本 run の入力で停止せず写す。
-- 測定 commit: `ad3c5235` (merge。コードを変えた最後の commit)。`git diff ad3c5235 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は 0 行 (本節を載せた docs commit 以降はコード差分なし)。
-- 環境: 素材 `plugins-kilohearts` (`Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B、手展開) と `toolchain-emsdk` (`[EMSDK]`)。Ghidra 12.1.4 (`ghidra_12.1.4_PUBLIC_20260921.zip`、sha256 `ddac49f9…d2db` 一致)、JDK 21 (temurin-21)。作業は repo 外。n=1。
-
-| 項目 | 結果 |
+| 項目 (`6f5e17fa`) | 結果 |
 |---|---|
-| 旧 B1 の converter (c2003a0c の規則) | delay: `thunk_FUN_180fb6bf8 の呼出 (in FUN_1802ed640) の写し先が一意に決まらない: 候補 2 件 (停止)`。C 未出力 |
-| decompile (lift 141 件・`DecompEach.java`・`analyzeHeadless` 1 回) | **141/141 OK** (wall 22.9 s) |
-| C 化 delay (`ghidra_to_c.py delay … --fix bitcast,intload,stackpair,assoc,concat`) | 7,248 行・2.2 s。残存 `thunk_FUN_` **0**・自己呼出し **0** (`selfcall_check.py`) |
-| emcc delay (`emcc -c -ferror-limit=0 -I ghidra_route delay.c`、`grep -c 'error:'`) | **601** (10.5 s)。`emcc_census.py` の合計も 601 |
-| emcc stereo (同フラグ) | C 891 行。**39** |
-| C の byte 一致 (main = `origin/main` の `ghidra_route` と `snapins`) | gain 122 行・haas 301 行・gate 429 行・stereo 891 行・delay 7,248 行の 5 本すべて `cmp` 一致 |
-| `thunk_map_check.py` (合成入力) | **RESULT 7/7** (正例 6: 呼出の写し先 FUN_X・自己再帰 0・呼出元ヘッダ不変・thunk 自身のヘッダ FUN_T・2 本の thunk を持つ飛び先 180fb6bf8 の呼出が停止せず写る・thunk でない関数は不変、対照 1: 旧実装は自己再帰を作る) |
+| decompile (lift 141 / stereo 8) | **141/141 OK**・**8/8 OK** (`summary.tsv`)。0x 付きの引数では 137 件目で `NumberFormatException` により中断したため、10 進で再実行 |
+| C 化 | delay 7,248 行・stereo 891 行。残存 `thunk_FUN_` 0・自己呼出し 0 (`selfcall_check.py`) |
+| emcc (`emcc -c -ferror-limit=0`・`2> emcc.log`) | delay **601** (7.3 s)・stereo **39** (0.08 s) |
+| C の byte 一致 | delay・stereo を `origin/main` の converter (`git archive`) で出した C と `cmp` 一致 (本 run)。gain・haas・gate は `ad3c5235` 時点で一致 |
+| `thunk_map_check.py` | RESULT 7/7 (本 run) |
 
-- Gain/Haas/Gate: C が main と同一のため、1000 trial の結果 (§10-7q ⑤ の Gain/Haas/Gate 1000/1000 bit-exact) は main の測定をそのまま引き継ぐ。本 run では再突合していない。
-- 件数の内訳 (`emcc_census.py`・排他的。合計 = error 行数): delay 601 = 未関数化 callee 6・レーン型 50・引数数不一致 108・SIMD 0・Win API/LOCK 0・型不一致 183・型・識別子 17・その他 237。stereo 39 = 2・9・10・0・0・2・0・16。`その他` の分類は見直していない (起票先未定)。
-- 旧記録の扱い: §10-7p の表の Delay 710 と [f847e8c6 時点] の内訳は当時の値。現行の件数は本節の 601 (Stereo 39 は一致)。
-- 未実施: Stereo / Delay の 1000 trial 突合・ネガコン・第二 oracle (#3073)。n≥3 の所要。
-- 再現 (repo 外の作業ディレクトリ。`<G>` = Ghidra 12.1.4 の展開先、`<C>` = `HeartCore.core_64`、lift 集合 = `snapins/snapins.json` の `delay.lift` の一意アドレス・出現順):
+- census (`emcc_census.py`・排他的・合計 = error 行数。`grep -c 'error:'` は 601 / 39 でドライバ行 0): delay 601 = 未関数化 callee 6・レーン 200・引数数不一致 108・SIMD/AVX/swi 61・Win API 0・code 間接呼出 21・未定義 identifier 17・型不一致 186・その他 2 (`conflicting types`)。stereo 39 = 2・16・10・9・0・0・0・2・0。
+- 起票先: #3094 [KH-42] = レーン 200 / #3095 [KH-43] = SIMD/AVX/swi 61 / #3096 [KH-44] = 残り 340 (引数 108・型不一致 186・code 21・未定義 identifier 17・未関数化 6・その他 2)。§10-7q ④ は main 側の旧分類で区切りが異なる。件数の正本はこの census。
+- 旧記録: §10-7p の 710 は `f847e8c6` 時点の旧値。Gain/Haas/Gate の 1000 trial は §10-7q ⑤ を引き継ぐ。未実施: Stereo / Delay の 1000 trial 突合・ネガコン・第二 oracle (#3073)、n≥3 の所要。
+- 再現 (`<G>` = [GHIDRA]、`<C>` = `HeartCore.core_64`、`<gr>`・`<out>` は repo 外。lift = `snapins/snapins.json` の `delay.lift` の一意アドレスを 10 進で渡す):
   ```
-  JAVA_HOME=<JDK21> <G>/support/analyzeHeadless <proj> kh -import <C> -noanalysis -scriptPath scripts/ghidra -postScript DecompEach.java <out>/delay <lift...> -deleteProject
+  JAVA_HOME=<JDK21> <G>/support/analyzeHeadless <proj> kh -import <C> -noanalysis -scriptPath scripts/ghidra -postScript DecompEach.java <out>/delay <lift 10進...> -deleteProject
   python3 ghidra_route/ghidra_to_c.py delay <gr>/delay <out>/delay <C> --fix bitcast,intload,stackpair,assoc,concat
-  emcc -c -ferror-limit=0 -I ghidra_route <gr>/delay/delay.c && python3 ghidra_route/emcc_census.py <emcc.log>
-  python3 ghidra_route/selfcall_check.py <gr>/delay/delay.c ; python3 ghidra_route/thunk_map_check.py
+  emcc -c -ferror-limit=0 -I ghidra_route <gr>/delay/delay.c -o <gr>/delay/delay.o 2> <gr>/delay/emcc.log; python3 ghidra_route/emcc_census.py <gr>/delay/emcc.log
+  python3 ghidra_route/selfcall_check.py <gr>/delay/delay.c; python3 ghidra_route/thunk_map_check.py
   ```
 
 #### 10-7q. #3072 (KH-40) run: Delay の Ghidra 変換 (型名・LOCK・Win API stub・thunk 正規化) (部分・emcc は未通過)
