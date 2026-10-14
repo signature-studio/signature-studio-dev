@@ -224,7 +224,7 @@ In Review の検収が止まり、実装側 subagent も止まり、全体スル
 | 状態の二重管理 (§3-2)。`state:*` ラベルと Project Status の併存 | `docs/WORKFLOW.md` §3 (チケット状態の正は **issue の open/closed + ラベル + PR** (Project V2 の Status は 2026-10-14 #2435 で参考に格下げ)・**label `state:*` は使わない**・分類を変えるラベルの変更は PM の責務)・`AGENTS.md` §4-7 (Linear 書き込み・`state:*` ラベル新規作成・付与の禁止)・`docs/pm/DIRECTIVES.md` §2 |
 | CAB-\* と #N の混在 (§3-3)。2,682 箇所の後追い置換 | `docs/WORKFLOW.md` §7 (commit/PR に過去の `CAB-xxx` 採番を**参照してよい**＝番号の対応は保つ)・`docs/REFERENCES.md` `[CAB_TO_GH]` (対応表の正本) |
 | 委任逆行 (§3-5)。10-11 17〜18 時に shell 50 / subagent 0 | `AGENTS.md` §1 (**全作業は subagent 委任。1 チケット = 1 subagent、10 tool call 超は必ず委任**)・`docs/WORKFLOW.md` §7 (同文)・§2 (PM は merge と方針変更のみ) |
-| 1 agent = 複数チケット (§3-6)。21:41 の 4 本・orchestrator 入れ子 | `AGENTS.md` §1・`docs/WORKFLOW.md` §7 (**1 チケット = 1 subagent**)・§3 (役割区分: 実装 / 検収 / PM の 3 区分・検収は独立 subagent・自分を Done にしない) |
+| 1 agent = 複数チケット (§3-6)。21:41 の 4 本・orchestrator 入れ子 | `AGENTS.md` §1・`docs/WORKFLOW.md` §7 (**1 チケット = 1 subagent**)・§3 (役割区分: 実装 / 検収 / PM の 3 区分・検収は独立 subagent・自分で完了にしない) |
 | sleep ポーリング (§3-7)。3 回指示されても根絶せず PM 自身も違反 | `docs/WORKFLOW.md` §6 (**長時間の待機に `sleep` を繋げない。完了確認は 1 コマンドのポーリングか、結果が返る仕組みを使う**) |
 | worktree 導入前の古い記述で subagent が master に書き込む (§3-1)。user 21:18:29 の指摘 | `docs/DOC_MAP.md` (正史は `docs/` に集約)・`AGENTS.md` §1・§2・`docs/pm/DIRECTIVES.md` §2 (「古い記述が大幅に含まれる」への対応として docs/ 正史化) |
 | 検証手順の属人化 (旧 preflight 証跡のハッシュ転記) | `docs/DECISIONS.md` D6 (証跡転記の廃止)・`docs/WORKFLOW.md` §6 (preflight 代替: 報告前に自分で実行する検証コマンド群) |
