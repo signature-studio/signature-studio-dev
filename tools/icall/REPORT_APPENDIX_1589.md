@@ -7,7 +7,7 @@
   ただし `audit_icall.py` は IR に call 系命令があれば `kept_indirect` と数え、`icall_rewrite.py` は tail `jmp` を `call __icall_dispatch` + `ret` に書き換える。
   そのため「RetDec が jmp を復元した」のか「rewrite 後の call が数えられた」のかは **未切り分け**。復元の実証は未了。
 - 受入条件 1 (`jt_dropped > 0` の `jmp [mem]` 関数の特定) は未達。残りは `plugins-*` 素材の監査。**#1589 の範囲からは外し、下の未解決表に「次 run で実施」として残す** (再測定のため子 issue にしない)。
-- 本 PR は #1589 の範囲を受入条件 2・3 に縮めて閉じる (受入条件 1 は未解決表へ移動)。縮めた範囲での判定: 受入条件 2 は **部分達成** (rewrite 経由の分類変化 lost 2 → 0 の記録のみ。「indexed tail jump の drop 改善」とは主張しない)。受入条件 3 は達成。
+- 本 PR は #1589 の範囲を受入条件 2・3 に縮めて閉じる (受入条件 1 は未解決表へ移動)。縮めた範囲での判定: 受入条件 2 は **部分達成** (rewrite 経由の分類変化 lost 2 → 0 の記録のみ。「indexed tail jump の drop 改善」とは主張しない)。受入条件 3 は **部分達成** (測定 commit 未特定。diff は添付済み)。
 
 ## 測定
 
