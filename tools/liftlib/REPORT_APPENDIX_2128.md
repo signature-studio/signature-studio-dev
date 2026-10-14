@@ -1,14 +1,14 @@
 # liftlib #2128 (部分達成) — ott_getparam leaf への icall runtime 配線 (付録)
 
 親: [`REPORT.md`](REPORT.md) §11 (leafspec) と [`REPORT_APPENDIX_883.md`](REPORT_APPENDIX_883.md) (BLK 配線の追跡)。
-PR: #2162 (`2128-ott-getparam-icall-leaf`)。受入の扱い: 受入 3・4 を達成、受入 2 を達成 (BLK の wasm global 化の配線)、受入 1 は配線のみ達成で表の充足は子 #2161 へ分離。
+PR: #2162 (`2128-ott-getparam-icall-leaf`)。受入の扱い: 受入 2・3・4 を達成 (受入 2 の FAIL-FAST 発火の確認は子 #2161)、受入 1 は配線のみ達成で表の充足は子 #2161 へ分離 (本 PR では未達)。
 
 ## 測定 config
 
 | 項目 | 値 |
 |---|---|
 | 測定 commit (コードを変えた最後の commit) | `f8bd2ea0` (`feat(liftlib): wire icall runtime into ott_getparam leaf (BLK global + table) (Refs #2128)`) |
-| 測定 commit の HEAD 条件 | 測定は `f8bd2ea0` の worktree で実施。以後の commit は REPORT・DOC_MAP の追記のみでコード差分は 0 (下記) |
+| 測定 commit の HEAD 条件 | 測定は `f8bd2ea0` の worktree で実施。main 取り込み merge `1d2e582c` までの差分は、測定経路のファイル (下記「差分 0 の確認」) で 0 行。`main` (`858e5139`) の取り込み merge を含むため、`tools/` 全体の差分は 0 ではない (測定経路の外) |
 | 変更前の比較 commit | `df2eebde` (測定 commit の親。`ott_getparam` の leaf は icall runtime 未配線) |
 | 素材 | `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`、`work-liftlib` → `tools/liftlib/work/`、`work-m6-ott` → `tools/m6/work/` ほか。`OTT_DLL` で F.txt を生成 (`gen_ott_getparam_F.sh`, `0x18011e5a0-0x18011e76c`, 460 bytes) |
 | emsdk | `/opt/emsdk` (既存。`emcc` を PATH に通して実行) |
@@ -33,14 +33,16 @@ PR: #2162 (`2128-ott-getparam-icall-leaf`)。受入の扱い: 受入 3・4 を�
 
 ## 差分 0 の確認
 
-コード範囲 (`tools/` から `REPORT*.md` を除く) の差分は 0 行。
+測定経路 (leafspec が読む liftlib 本体・icall runtime) の差分は 0 行。
 
 ```
-$ git diff f8bd2ea0 HEAD -- tools/ ':(exclude)tools/liftlib/REPORT*.md' | wc -l
+$ git diff f8bd2ea0 HEAD -- tools/liftlib tools/icall/rt ':(exclude)tools/liftlib/REPORT*.md' | wc -l
 0
 ```
 
-付録追記の commit (`4c2d893b` 以降) の差分は `docs/DOC_MAP.md`・`tools/liftlib/REPORT.md`・本付録のみ。
+- 測定経路の 5 ファイル (`tools/icall/rt/icall_rt.c`・`tools/liftlib/liftlib/passes/icall.py`・`tools/liftlib/liftlib/pipeline.py`・`tools/liftlib/targets/ott_getparam.json`・`tools/liftlib/tests/test_unit.py`) は `f8bd2ea0` と HEAD で同一。
+- `main` (`858e5139`) の取り込み merge (`1d2e582c`) で `tools/` の他領域 (`m11`・`plugins`・`python`・`shared/oss`・`targets/serum2` ほか) に差分が入った。`liftlib` の実行時 import 先ではない (`grep` で `tools/plugins/lift` 等の参照が無いことを確認。`liftlib/passes/base.py` は vendored コピーを使う)。よって測定値は取り込み後も有効 (WORKFLOW §6)。
+- 付録・文書の追記 commit (`4c2d893b` 以降) の差分は `docs/DOC_MAP.md`・`tools/liftlib/REPORT.md`・本付録のみ。
 
 ## 未解決 (起票先)
 
