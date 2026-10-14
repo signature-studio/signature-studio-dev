@@ -143,9 +143,11 @@ k236 P=0xa027 値 0x40a027: なし
 ## 13. bin 表の boot 前後差分と k184〜186 の正体 (#942 受入 1・2・run 9)
 
 測定: `S4_NAME=base|fix node tools/m11/ldfix/bin_table_diff.mjs` (新規・`bin_post_probe.mjs` と同じ手順で boot 前後の bin 表 k=0..255 を比較)。
-素材 `fl-win64` / `work-m11` (`tools/m11/work/` を worktree から参照)。`ldfix_e2e.sh` は 59.6 秒・rc 0・judge PASS (base = fix)。
+素材 `fl-win64` / `work-m11` (`tools/m11/work/` を worktree から参照)。
+測定 commit `d5f5ee92` (HEAD・コードを変えた最後の commit)。`bash tools/m11/ldfix/ldfix_e2e.sh` は 50 秒 (real)・rc 0・load 0.82 / 0.87 / 0.49・judge PASS (base = fix)。units 17/942・icall 24・threw `memory access out of bounds` (base = fix)・survey ok 136 / trap 9 (base = fix)。修復件数 F3a 2 / F3c 33。
+鮮度: `git diff d5f5ee92 HEAD -- tools/m11/ldfix/` は本 REPORT の追記のみ (ldfix_e2e.sh の実行経路は変更なし)。
 
-- boot 前後で bin 表 (BASE 16404744・16 バイト刻み) の変化は base / fix とも **96 スロット・同一** (md5 一致)。
+- boot 前後で bin 表 (BASE 16404744・16 バイト刻み) の変化は base / fix とも **96 スロット** で、変化した k の一覧は一致 (一覧の md5 一致。値の一致は未比較)。
   変化した k は 0,1,4,5,6,8,9,10,… と 216 (k184〜186・215・236・255 は変化なし)。修復 pass の有無は boot の書き込みを変えない。
 - `bin_post_probe.mjs` (base/fix): k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k215 P=0xee / k236 P=0xa027 は PRE・POST で同一。
 - `bin_size_probe.mjs` (fix・`S4_IMAGE` 指定): PRE nonzero=0 / POST nonzero=324・max_bin=172・refs_ge184=0。
@@ -160,7 +162,7 @@ k236 P=0xa027 値 0x40a027: なし
 
 ### 結論 (受入 1・2 の進捗)
 - **確定**: boot は k184〜186・215・236 の P/F を書き換えない。bin 表の不正な値は boot より前 (イメージ読込時) から存在する。
-- **確定**: 修復 pass の有無は boot 前後の bin 表差分 (96 スロット) を変えない。ldfix は boot の threw の原因ではない。
+- **確定**: 修復 pass の有無は boot 後の threw (`memory access out of bounds`) を変えない。変化スロットの一覧も一致する。ただし値の比較は未実施のため「書き込みの値が同一」とは言わない。
 - **未確定**: boot の `memory access out of bounds` を起こす load の番地。boot で書かれる 96 スロットの値そのもの (書き込み元の関数) は未特定。
 - **未確定**: unit 17 の trap が k184〜186 を実際に読むか (trap_bins は状態の表示のみ)。
 - 次の入口: boot の書き込み関数 (96 スロットを書く store の関数) の特定と、k≥173 が bin 表の外であることの確認 (bin 表の長さ = `size/8` 索引の上限と照合)。
