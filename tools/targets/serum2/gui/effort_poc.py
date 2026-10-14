@@ -82,3 +82,20 @@ l2, b2 = size(plat)
 print("include closure (non-test, vstgui/ 内):", len(cl), "files")
 print("  excluding platform/:", len(non_plat), "files /", l1, "lines /", b1, "B")
 print("  platform/ only    :", len(plat), "files /", l2, "lines /", b2, "B")
+
+COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
+PURE = re.compile(r"\bvirtual\b[^;{}]*?=\s*0\s*;", re.S)
+iface = sorted(r for r in files if r.startswith(os.path.join("lib", "platform") + os.sep)
+               and (os.path.basename(r).startswith("iplatform") or os.path.basename(r) == "platformfactory.h")
+               and r.endswith(".h"))
+print("canvas interface (lib/platform/iplatform*.h + platformfactory.h):", len(iface), "files")
+total = 0
+rows = []
+for r in iface:
+    with open(files[r], encoding="utf-8", errors="replace") as fh:
+        n = len(PURE.findall(COMMENT.sub("", fh.read())))
+    rows.append((r, n))
+    total += n
+for r, n in rows:
+    print(f"  {n:3d}  {r}")
+print("pure virtual functions:", total)
