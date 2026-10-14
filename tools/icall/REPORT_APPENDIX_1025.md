@@ -4,7 +4,7 @@ REPORT.md §15 相当。REPORT.md の 250 行上限のため別置き。親 #853
 
 ## 結論
 
-**達成 (HEAD `63e150e2`・2026-10-14 19:35 UTC)**。wasm 実行は 61 シナリオ / 366 step すべて trap 0、全バッファと xmm0 が native と bit 一致 (366/366)。差分の原因は runner 側 (`_ott_data_install()` 未呼出しによる data 未敷設) で、`REPORT_APPENDIX_1025_FIX.md` に記す。これより前の節の「未達」「未特定」の記述は、この原因で説明がつく。
+**達成 (測定 commit `63e150e2`・commit 時刻 19:35 UTC。測定窓 19:21〜19:40 UTC は commit をまたぐ。clean `b757a183` での再測定は 20:12〜20:13 UTC・`REPORT_APPENDIX_1025_FIX.md`)**。wasm 実行は 61 シナリオ / 366 step すべて trap 0、全バッファと xmm0 が native と bit 一致 (366/366)。差分の原因は runner 側 (`_ott_data_install()` 未呼出しによる data 未敷設) で、`REPORT_APPENDIX_1025_FIX.md` に記す。これより前の節の「未達」「未特定」の記述は、この原因で説明がつく。
 
 ## 実測 (HEAD `a42f84e1`・`ws-1025` worktree・2026-10-13 21:36 UTC)
 
@@ -216,7 +216,7 @@ kh_gain 本体 `0x1804b03d1` の `movups [self+104], xmm` は、RetDec が `%50 
 
 - step 1 の `self+104` 最終値は native `0x3c800000` (0.015625)・wasm `0`。`shufps(movq(xmm0), 2)` の lane 0 は定義上 0 なので、この値は修復した store ではなく、後続の別 store か別経路で書かれる。未特定。
 - native 側の comis 入力 (`a`・xmm0 ローカル) が wasm と一致するかは未確認。native の trace が無いため (`native_runner` は ll_ms_call 内部を見られない)。
-- 残 unresolved 20 件は `__asm_vmovdqa.25` 系 (i256)。fail-fast stub で、本 run の trap 0 から実行されていないと見てよい (間接確認)。
+- 残 unresolved 20 件は `__asm_vmovdqa.25` 系 (i256) 16 件と `__asm_movups` (i128) 4 件。(訂正: 前記の「20 件すべて fail-fast」は誤り。i256 の 16 件は abort スタブ、movups の 4 件は no-op。内訳と未解決は `REPORT_APPENDIX_1025_FIX.md` の未解決節。)
 
 ### 次の入口
 

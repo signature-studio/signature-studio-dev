@@ -2,21 +2,19 @@
 
 REPORT_APPENDIX_1025.md の後続節。親 #853 (ICALL-12)。REPORT.md §15 から参照。
 
-## runner 修正と差分ゼロ (2026-10-14 19:21〜19:40 UTC)
+## runner 修正と差分ゼロ
 
-測定 commit: `63e150e2` (`tools/icall/kh_route_run.sh` を変えた commit。`kh_route_build.sh` はヘッダ注記のみ変更)。鮮度: `63e150e2..HEAD` の `tools/icall` のうち REPORT 以外は 0 行 (下記 `git diff`)。
+### 測定の時刻と tree
 
-### 測定の時刻と tree (訂正・fix 対応)
+- 測定 commit (コードを変えた最後の commit): `63e150e2` (`tools/icall/kh_route_run.sh` を変更。`kh_route_build.sh` はヘッダ注記のみ)。
+- `63e150e2` の commit 時刻は 19:35:43 UTC。それ以前の測定 (19:21〜19:35) は未コミットの作業 tree で行われた。この窓の数値は次の clean 再測定で置き換える。
+- **clean 再測定 (本節の正本)**: コミット済み tree `b757a183` (worktree `/home/runner/work/ws-2845`・`git status` は空) で実行。build 2026-10-14 20:12:18 UTC 開始、run 20:13:29 UTC 開始。素材は `$ARTIFACTS_DIR` の `plugins-kilohearts`・`work-icall`・`work-liftlib` (展開先は `tools/icall/work/`・`tools/liftlib/work/`)、emcc は `/opt/emsdk`。
+- 前版の「最終 HEAD で再実行し一致」の記述は、実行ログが無かったため撤回済み。レビュー run `38627376099` (clean `git archive b757a183`) でも同じ値を得たと報告されている (PR #2845 round 2)。
 
-- 測定窓 19:21〜19:40 UTC は、`63e150e2` のコミット時刻 (19:35:43 UTC) をまたぐ。測定の一部は未コミットの作業 tree で行われた。最終の build / run がコミット済み tree (clean checkout) で行われた時刻は**記録が無く、不明**。
-- fix 対応の run (`ws-2845`・HEAD `c02a208c`) では再実行していない。`$ARTIFACTS_DIR` には `fl-win64` のみ (`plugins-kilohearts`・`work-icall`・`work-liftlib`・`toolchain-*` が無い)。`kh_route_build.sh` の入力 (`work/rt_kilohearts-gain/`・`work/kh_pe/`) も無いため、再ビルドできない。
-- 前 run の PR 本文の「最終 HEAD `c02a208c` で再実行し同じ数値・sha256 が一致」は、実行ログ (時刻・tree・sha256) を本書に残していなかった。この記述は撤回し、下の未解決に移す。
-- コミット済み tree での再実行は、PR 本文の `oc_artifacts:` 行で素材を揃えた次回 review run で行い、結果を本節に追記する。
-
-証跡 (fix 対応の run・HEAD `c02a208c` で実行):
+証跡 (clean `b757a183`):
 
 ```
-$ git diff 63e150e2 HEAD -- tools/icall ':!tools/icall/REPORT*' | wc -l
+$ git diff 63e150e2 b757a183 -- tools/icall ':!tools/icall/REPORT*' | wc -l
 0
 $ git status --porcelain=v1 -- tools/icall | wc -l
 0
@@ -24,18 +22,22 @@ $ find tools/icall -type f -size +20M -not -path '*/work/*' | wc -l
 0
 ```
 
-素材: `plugins-kilohearts` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B) を `tools/icall/work/kh_pe/` に配置。`work-icall` / `work-liftlib` は main checkout の `work/` を symlink で参照。`toolchain-emsdk` は [EMSDK] (`docs/REFERENCES.md` §4)。
+### 実測 (clean `b757a183`)
 
-| 項目 | 実測 (前 run・commit `63e150e2`) |
+| 項目 | 実測 |
 |---|---|
-| `kh_route_build.sh` | rc 0 / real 1m04s。2 回 build で `kh_route.wasm` / `kh_route.cjs` の sha256 が一致 (前 run の記録) |
-| `kh_route.wasm` | 50,774,295 B (sha256 先頭 `03055cd1`) |
-| `kh_route_run.sh` | rc 0 / real 0.32 s / scenarios 61 / steps 366 / wasm_trap 0 |
-| 全バッファ bit 一致 | **366/366** (不一致 0)。`kh_route_run.sh` の `bit_exact_steps` 出力 |
-| xmm0 一致 | **未集計**。`kh_route_run.sh` は xmm0 を判定に使わず出力にも含めない。前 run の 366/366 は数え方の記録が無いため採らない |
-| rax 一致 | 173/366 (`kh_route_run.sh` の `rax_match` 出力)。不一致 193 の内訳 (native のホスト空間ポインタ・wasm の線形メモリオフセット) は**未集計**。判定からは除外したまま |
+| `kh_route_build.sh` | rc 0 / real 1m02.9s |
+| `kh_route.wasm` | 50,774,127 B (sha256 先頭 `8cc3330d`) |
+| `kh_route_run.sh` | rc 0 / real 0.34 s / scenarios 61 / steps 366 / wasm_trap 0 / rax_match 173 |
+| 全バッファ bit 一致 | **366/366** (`kh_route_run.sh` の `bit_exact_steps`。不一致バッファ 0) |
+| xmm0 一致 | **366/366** (数え方は下) |
+| rax 一致 | 173/366。不一致 193 件の内訳は下 |
 
-再現: `bash tools/icall/kh_route_build.sh && bash tools/icall/kh_route_run.sh`。
+**xmm0 の数え方**: `kh_route_run.sh` の集計表示 (`bit_exact_steps`) には xmm0 は含まれない。ただし wasm と native の両方が R 行 (`R <scen> <step> <crash> <rax> <xmm0>`) の第 5 フィールドに xmm0 を出力している (`kh_route_run.sh` が生成する `wr_ott.mjs` の R 行を書き換えて出力させている)。`liftlib.harness.diff.parse_out` で `out_native.txt` と `out_wasm.txt` を読み、366 の (scen, step) キーごとに第 5 フィールドを直接比較した (crash 0)。
+
+**rax 不一致 193 件の内訳**: 全件で native が `0x00005a…` (ネイティブ実行プロセス側のアドレス)、wasm が `< 0x40000000` (線形メモリ内オフセット。build 上限 `0x3c000000` より小さい)。両者は同じアドレス空間の値ではない。rax は判定 (bit 一致) には使わない。
+
+**wasm サイズの差 (m4)**: wasm 内に絶対パス `/home/runner/work/…` の文字列が 8 箇所埋め込まれている (`-g`)。同じ commit を build パス長 25 字 (`/home/runner/work/ws-2845`) と 58 字 (symlink・20:14:23〜20:15:25 UTC) で build したところ、50,774,127 B と 50,774,391 B だった (差 264 B = 8 × 33)。サイズはビルド絶対パス長 1 字あたり +8 B で線形に変わる。前版の記録 50,774,295 B (差 +168 B = 8 × 21) と、レビュー run の 50,774,239 B (差 +112 B = 8 × 14) は、記録時の build パス長が異なると見れば説明がつく (記録時のパス長は未記録のため未確認)。58 字の probe wasm は run していない。
 
 ### 原因: `_ott_data_install()` が呼ばれていなかった
 
@@ -51,8 +53,12 @@ $ find tools/icall -type f -size +20M -not -path '*/work/*' | wc -l
 
 ### 未解決
 
+`ir_fix_vstore` の unresolved 20 件 (`fix_vstore.json`) の内訳は、`__asm_vmovdqa.25` 16 件と `__asm_movups` (i128 store) 4 件。
+
+- `__asm_vmovdqa__25` (C 名。16 件) は `tools/icall/work/kh_route/oi.simd.c:395` の abort スタブ (`fprintf` の後に `abort()`) で、fail-fast。生成元は `tools/m11/m11_simd2.py` (i256 の未実装 helper は abort を生成する)。`simd_merge.json` の `remaining_unimpl_stubs` (13 件) には含まれない (`__asm_vmovdqa`・`__asm_movups` とも不含)。前版の「`remaining_unimpl_stubs` に入れば fail-fast」という対応の推定は機構として誤りで、撤回する。
+- `__asm_movups` (4 件) は `oi.simd.c:227` の no-op 定義 (`(void)a; (void)b;`。生成元 `tools/m11/m11_simd2.py` の void 戻り movups 分岐)。wasm では store が落ちる。前版の movups 修復 (`--direct`・63 件) の対象外で、未修復。
+
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `ir_fix_vstore` の unresolved 20 件 (前 run の記録では `__asm_vmovdqa.25` 系 i256)。fail-fast stub との対応は**推定・未確認** (`simd_merge.py` は残存未実装 stub を abort 付きに差し替えるため、名前が `simd_merge.json` の `remaining_unimpl_stubs` に入れば fail-fast。当該 json は本 run に無い) | 61 シナリオでは trap 0・全バッファ一致。別入力で実行されるかは未検証 | 既存の親 #853 へのコメント (提案: unresolved 20 件の名前と `remaining_unimpl_stubs` の照合) |
-| `ir_fix_vstore.py --direct` の要否 (本修正のみで差分 0 になるか) | 判定には影響しない。修復の必要性は未検証 | 既存の親 #853 へのコメント (提案: `--direct` を外した比較の 1 回実行) |
-| コミット済み tree での再実行 (最終 build / run の時刻・tree の記録、xmm0 の計数、rax 不一致 193 の内訳) | 本 fix run では再実行できず。前 run の「再実行で一致」記述は撤回 | PR #2845 の次回 review run (PR 本文の `oc_artifacts:` の素材で実行し、本節に追記) |
+| unresolved のうち `__asm_movups` (i128 store) 4 件が no-op のまま (`oi.simd.c:227`)。`__asm_vmovdqa.25` 16 件は abort スタブ (`oi.simd.c:395`) で、trap 0 の 61 シナリオでは実行されていない (間接確認) | 61 シナリオでは全バッファ一致。no-op の 4 件が観測バッファに効くかは未検証。別入力で当該 store が効けば差分になる | 既存の親 #853 へのコメント (提案: no-op 4 件の宛先の確認と、unresolved 20 件の扱い) |
+| `ir_fix_vstore.py --direct` の要否 (本修正だけで差分 0 になるか) | 判定には影響しない。修復の必要性は未検証 | 既存の親 #853 へのコメント (提案: `--direct` を外した比較の 1 回実行) |
