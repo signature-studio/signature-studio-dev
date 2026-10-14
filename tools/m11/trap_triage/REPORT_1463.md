@@ -36,3 +36,13 @@
 | 3. ネガコン (修復を外すと oob 復帰) | 未着手 | #1463 (続き) |
 
 次の手順: (a) `[a1]=10bbdb00` が wasm メモリ境界内か (メモリサイズと突き合わせる)、(b) `4133f0` 内で `&slot` への store を watch する (書込元の VA を link 時 VA で指定)、(c) 修復後に n≥3 survey。
+
+## 5. 再着手 (2026-10-14 run) の結果
+
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` (`extracted/` と exe)、`work-m11` / `work-liftdiff` を worktree 直下に展開。`m11_gen_ir2.sh` rc=0 (`boot_final.ll` 490733 行、前回 490693 行と差。未確認)。`M11_FIX_652500=0 m11_build.sh` rc=0 (wasm 6,029,036 B)。
+- (a) 解決: wasm 初期メモリは `INITMEM=0x12000000` (`m11_build.sh`)。入口値 `[a1]=10bbdb00` は `< 0x12000000` で、`[a1]-8=10bbdaf8` は初期メモリ内。よって**入口時点の `[a1]` 値だけでは `[%1-8]` は境界外にならない**。oob を起こす値はトラップ直前 (入口後) に書かれたもの。REPORT §3 の「境界近傍」は誤りで、境界内と訂正する。
+- (b) 不成立 (既存ツールの不具合): `probe_entry.sh p412 412e40 149` は `[pe]` 行 0 件、終了 1。原因は `m11_build.sh` 157 行 `cc work/boot_final3.ll work/obj/boot.o` が毎回走り、`probe_entry.sh` が置いた probe 版 `boot.o` (`m11_pe` 入り) を非 probe 版で上書きするため。`boot.o` / `boot_final3.ll` に `m11_pe` が 0 件であることを確認。`PROBE_WATCH` の書込元追跡も同じ経路のため未成立。
+- 修正は `m11_build.sh` の共有ビルドの変更になるため本 issue の範囲外。子 issue に分割する (下記)。
+- 受入条件 2 (修復・n≥3 survey)・3 (ネガコン): 未着手 (受入条件 1 の結論に依存)。
+
+起票先: 受入条件 1 (書込元特定) は #1463 続き。probe 基盤の修復は子 issue (下記)。
