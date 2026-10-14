@@ -266,6 +266,91 @@ def cases():
         s['YL'][3] = [0, 0]
         return s
     add('vsubsd xmm3, xmm5, xmm2', e_subsd)
+
+    def e_subsd_dd(st):
+        s = clone(st)
+        s['X'][3] = [dbits(fval(st['X'][5][0]) - fval(st['X'][3][0])), st['X'][5][1]]
+        s['YL'][3] = [0, 0]
+        return s
+    add('vsubsd xmm3, xmm5, xmm3', e_subsd_dd)
+
+    def e_divsd_dd(st):
+        s = clone(st)
+        s['X'][4] = [dbits(fval(st['X'][6][0]) / fval(st['X'][4][0])), st['X'][6][1]]
+        s['YL'][4] = [0, 0]
+        return s
+    def p_divsd_dd(st):
+        st['X'][6][0] = dbits(7.0); st['X'][4][0] = dbits(2.0)
+        return st
+    add('vdivsd xmm4, xmm6, xmm4', e_divsd_dd, p_divsd_dd)
+
+    def p_ss_dd(st):
+        st['X'][5][0] = fbits32(7.0) | (0x1234 << 32); st['X'][3][0] = fbits32(2.0) | (0x0badc0de << 32)
+        return st
+    def e_subss_dd(st):
+        s = clone(st)
+        lo5 = st['X'][5][0]; lo3 = st['X'][3][0]
+        s['X'][3] = [(lo5 & 0xffffffff00000000) | fbits32(f32val(lo5) - f32val(lo3)), st['X'][5][1]]
+        s['YL'][3] = [0, 0]
+        return s
+    add('vsubss xmm3, xmm5, xmm3', e_subss_dd, p_ss_dd)
+
+    def p_ssdiv_dd(st):
+        st['X'][6][0] = fbits32(7.0) | (0x5678 << 32); st['X'][4][0] = fbits32(2.0) | (0x9abc << 32)
+        return st
+    def e_divss_dd(st):
+        s = clone(st)
+        lo6 = st['X'][6][0]; lo4 = st['X'][4][0]
+        s['X'][4] = [(lo6 & 0xffffffff00000000) | fbits32(f32val(lo6) / f32val(lo4)), st['X'][6][1]]
+        s['YL'][4] = [0, 0]
+        return s
+    add('vdivss xmm4, xmm6, xmm4', e_divss_dd, p_ssdiv_dd)
+
+    def e_xorps(st):
+        s = clone(st)
+        s['X'][1] = [st['X'][2][0] ^ st['X'][3][0], st['X'][2][1] ^ st['X'][3][1]]
+        s['YL'][1] = [0, 0]
+        return s
+    add('vxorps xmm1, xmm2, xmm3', e_xorps)
+
+    def e_cvtt(st):
+        s = clone(st)
+        lo = (math.trunc(fval(st['X'][6][0])) & 0xffffffff) | ((math.trunc(fval(st['X'][6][1])) & 0xffffffff) << 32)
+        s['X'][5] = [lo, 0]
+        s['YL'][5] = [0, 0]
+        return s
+    def p_cvtt(st):
+        st['X'][6] = [dbits(2.5), dbits(-3.75)]
+        return st
+    add('vcvttpd2dq xmm5, xmm6', e_cvtt, p_cvtt)
+
+    QNAN = 0x7ff8000000000000
+    def e_cmpneq_nan(st):
+        s = clone(st)
+        s['X'][0] = [MASK, 0]
+        return s
+    def p_cmpneq_nan(st):
+        st['X'][0] = [QNAN, dbits(1.0)]; st['X'][1] = [QNAN, dbits(1.0)]
+        return st
+    add('cmpneqpd xmm0, xmm1', e_cmpneq_nan, p_cmpneq_nan)
+
+    def e_cmpneq_ne(st):
+        s = clone(st)
+        s['X'][0] = [0, MASK]
+        return s
+    def p_cmpneq_ne(st):
+        st['X'][0] = [dbits(1.0), dbits(2.0)]; st['X'][1] = [dbits(1.0), dbits(3.0)]
+        return st
+    add('cmpneqpd xmm0, xmm1', e_cmpneq_ne, p_cmpneq_ne)
+
+    def e_vpsrldq(st):
+        s = clone(st)
+        v = (st['X'][3][1] << 64) | st['X'][3][0]
+        r = v >> 40
+        s['X'][2] = [r & MASK, r >> 64]
+        s['YL'][2] = [0, 0]
+        return s
+    add('vpsrldq xmm2, xmm3, 5', e_vpsrldq)
     return C
 
 
