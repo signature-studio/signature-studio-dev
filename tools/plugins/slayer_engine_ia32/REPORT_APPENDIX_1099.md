@@ -4,7 +4,7 @@
 
 - 親 REPORT: `tools/plugins/slayer_engine_ia32/REPORT.md` §11 (#1098 の結論)。 方式は `docs/DECISIONS.md` D28 (f80→f64)。 本付録が測定値の正本。
 - 測定 commit: `ce0f0872` (`feat(ott): lower x87 subset for ia32 (PLG-G2-9)`。 lowering・runtime・差分試験を含む)。 本付録の commit は docs のみ。
-  `git diff ce0f0872 HEAD -- tools/ott/lift tools/ott/rt tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_diff_native.c tools/plugins/slayer_engine_ia32/x87_diff_lowered.c tools/plugins/slayer_engine_ia32/x87_crosscheck.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の出力は 0 行 (差分 0)。
+  `git diff ce0f0872 HEAD -- tools/ott/lift tools/ott/rt tools/plugins/slayer_engine_ia32/x87_diff.py tools/plugins/slayer_engine_ia32/x87_diff_main.h tools/plugins/slayer_engine_ia32/x87_diff_native.c tools/plugins/slayer_engine_ia32/x87_diff_lowered.c tools/plugins/slayer_engine_ia32/x87_crosscheck.py tools/plugins/slayer_engine_ia32/x64_regress_1099.py` の出力は 88 行で、全行が `x87_crosscheck.py` (新規追加・commit `1adb69c3`) である。 この検算スクリプトを除く code (lift・rt・driver・C 参照) の差分は 0 行。 §4 の検算は HEAD で再実行し、同じ値を得た (2026-10-14)。
 - 起動・GUI に関わらない (製品 KPI は対象外)。 入力は fl-win64 の `block22434_PE.bin` (`$FL_WIN64_DIR/extracted/`) と生成した試行のみ。
 
 ## 1. 結論
