@@ -55,3 +55,14 @@
 | `0xdd2002`・`0xec7bb8`・`0xec6098` の型名 (クラス名) と vtable | 幅不一致の確定 (受入条件 1・2) | #1974 (PY-59・残り) |
 | `0xec53b0` の `this` が単一グローバルか、複数インスタンスか | 同一構造体かどうかの確定 | #1974 (PY-59・残り) |
 | `REPORT_PY50.md` の未確定表の更新 | 受入条件 2 | #1974 (PY-59・残り) |
+
+## 6. 追加の測定 (2 回目 run)
+
+- 測定 commit: 本 run の新規 `tools/python/analysis/py59_refs.py` の commit (初版)。前回の測定 commit `2f115b91` からの差分は新規ファイル 1 本のみ。
+- 新規スクリプト `tools/python/analysis/py59_refs.py <PE.bin> <VA>...` は `.pdata` の関数単位で逆アセンブルし、rip 相対で指定 VA を参照する命令を列挙する。実測 33.6 秒 (`.text` 全体)。
+- global slot `0x16baaf0` (`0xebf558` で `0xec53b0` の `this` として読む) を rip 相対で参照する箇所は 13 件 (`0xebf51e`・`0xebf528`・`0xebf53f`・`0xebf54b`・`0xebf558`・`0xebf584`・`0xebf58e`・`0xebf7b2`・`0xebf7bb`・`0xebfb04`・`0xebfb12`・`0xec652e`・`0xec6537`)。
+  - 直接の書込みは `0xebf7bb`・`0xec6537` の `mov qword [slot], 0` の 2 箇所のみ。
+  - `0xebf53f` は `lea rdx, [slot]` で slot の**アドレス**を `0x11c8950` に渡す。slot の実体はこの呼出し先で間接的に書かれうるため、「非 0 を入れる命令は無い」とは言えない。`0x11c8950` の中身は未確認。
+- `0xdd1fde` の `call 0x410320` は vtable 呼出しの thunk: `mov rax, rcx` の後 `dl>=0` のとき `call qword [rax-0x30]` を行い、戻り値を `this` にする。thunk の先頭アドレスから型は導けない。
+- RTTI の型名文字列 (`.?AV...`) は本 binary に見当たらない (`grep -a` で 0 件)。型名は vtable の直接参照を辿る必要がある。
+- 以上により、受入条件 1 (型名・vtable) は未達のまま。残りは「global slot の実体を入れる生成元の特定」と「`[obj+0]` に vtable を書く生成関数の特定」。
