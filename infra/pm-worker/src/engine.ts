@@ -6,7 +6,7 @@ import { countOpencodeRuns, type ActiveCount } from "./active.ts";
 import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
+import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
@@ -758,7 +758,7 @@ export class Engine {
     const labels = new Map(snap.issues.map((i) => [i.number, i.labels] as const));
     const title = new Map(snap.issues.map((i) => [i.number, i.title] as const));
     const nowMs = this.d.now();
-    const cool = this.d.cfg.noPrCooldownH * 3_600_000;
+    const cool = (n: number) => noPrCooldownMs(labels.get(n) ?? [], this.d.cfg.noPrCooldownH);
     const hasLabel = (n: number, l: string) => (labels.get(n) ?? []).includes(l);
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
@@ -790,7 +790,7 @@ export class Engine {
       let note = reason;
       if (reason === "stop" || reason === "split") {
         // PM agent の判断待ち (stopped に残す)。
-      } else if (nowMs - this.lastAct(n) < cool) {
+      } else if (nowMs - this.lastAct(n) < cool(n)) {
         recent = true;
         note = "oc:no-pr cooldown";
       } else if (c.count >= NO_PR_MAX_RELAUNCH) {
@@ -856,7 +856,7 @@ export class Engine {
     const blocksCount = new Map<number, number>();
     const cls = classify(snap, input);
     for (const [k, v] of Object.entries(cls.blocksCount)) blocksCount.set(Number(k), v);
-    const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0 }));
+    const ready = rows.ready.map((n) => ({ n, title: title.get(n) ?? "", blocksCount: blocksCount.get(n) ?? 0, labels: labels.get(n) ?? [] }));
     const act = this.activeRuns();
     const active = act.all;
     // 推定の上限が無ければ TARGET のまま (変えない)。推定があれば、上限 + 余裕 (下限 TARGET_MIN、上限 TARGET)。
@@ -1133,7 +1133,7 @@ export class Engine {
     if (labels.includes("oc:stuck") || HOLD_LABELS.some((l) => labels.includes(l))) return { kind: "reject", reason: "user" };
     if ((ctx.children[String(n)] ?? []).length) return { kind: "reject", reason: "stopped" };
     if (labels.includes("oc:no-pr")) {
-      if (nowMs - this.lastAct(n) < this.d.cfg.noPrCooldownH * 3_600_000) return { kind: "wait" };
+      if (nowMs - this.lastAct(n) < noPrCooldownMs(labels, this.d.cfg.noPrCooldownH)) return { kind: "wait" };
       if (this.noPrState(n).count >= NO_PR_MAX_RELAUNCH) return { kind: "reject", reason: "stopped" };
     }
     if (at.row === "stopped" && INTENT_HARD_STOP.includes(at.why)) return { kind: "reject", reason: "stopped" };
@@ -1473,6 +1473,9 @@ export class Engine {
     const stuckAges = openPrs
       .filter(withLabel(STUCK_LABEL))
       .map((p) => Math.max(0, Math.floor((now - Date.parse(this.s.sig[String(p.number)]?.stop?.at ?? p.updatedAt)) / 60_000)));
+    // 着手待ち (ready) を優先の区分で数える (launch は critical を先頭、low を末尾に並べる)。
+    const readyByPrio = { critical: 0, normal: 0, low: 0 };
+    for (const n of rows.ready) readyByPrio[prioOf(this.s.issues[String(n)]?.labels ?? [])]++;
     const noPrByReason = { split: 0, artifact: 0, unknown: 0, blocked: 0, stop: 0 };
     for (const i of openIssues.filter(withLabel(NO_PR_LABEL))) {
       const r = this.s.sig[String(i.number)]?.outcome?.reason;
@@ -1521,6 +1524,8 @@ export class Engine {
       blocked: c("blocked"),
       started: c("started"),
       ready: c("ready"),
+      // ready の区分別の件数 (prio:critical / prio:low のラベル。無ければ normal)。合計は ready と一致する。
+      ready_by_prio: readyByPrio,
       relaunch: c("relaunch"),
       user: c("user"),
       hold: c("hold"),
