@@ -35,8 +35,9 @@
 - 変更 (`ghidra_route/ghidra_to_c.py` のみ): `SNAPINS` に `stereo` を追加 (proc `0x18080d4d0`、`also` = lift 値の残り 7 関数 `0x180fcd690` `0x180fce0d0` `0x180fdc470` `0x180fdc660` `0x180fdc700` `0x180fdfdb0` `0x180fdc6d8`)。
 - decompile (`DecompEach.java`, 8 関数): 8 件すべて OK (summary.tsv, import 込み 35.5 s wall, n=1)。
 - native 参照: `native_ref ... stereo 1000 7` で `vec_1000_7.bin` を生成 (0.21 s, n=1)。
-- emcc (stereo, 修復なし, `-ferror-limit=0`): **error 40 件** (`/opt/emsdk` 配下の clang 行を除く)。`build_cmp.sh` の既定 `-ferror-limit` では 20 件で打ち切り。分類: `param_1` 不足 8・`undefined1[16]` へのメンバ参照 6・`V128` 同士の二項演算 6・`V128` への int 代入 3・`ABS` 未宣言 3・`sbyte` 型名 2・引数数不一致 2・`SUB168` 未宣言 2・`FUN_180fd8aac` 未宣言 2・`ZEXT416`/`maxps`/`rsqrtps`/`vpsrldq_avx` 各 1。
-- 残件の意味 (未対応): (a) `rsqrtps`・`maxps`・`vpsrldq_avx`・`ZEXT416`・`SUB168` は shim 未定義の SIMD 疑似関数 (§10-4 の census と一致)、(b) `FUN_180fd8aac` は未関数化 callee (Resonator の `func_0x…` 閉包と同じ種類)、(c) `param_1` 不足 8 は引数なし呼出 (§10-4 の ABI 復元の対象)。
+- emcc (stereo, 修復なし, `-ferror-limit=0`): **失敗。記録値 error 40 件 (`[EMSDK]` 配下の clang 行を除く・未再現)**。`build_cmp.sh` の既定 `-ferror-limit` では 20 件で打ち切り。
+- 件数の内訳 (記録時の分類。合計 38 件で、記録値 40 件と 2 件合わない・原因未確定): `param_1` 不足 8・`undefined1[16]` へのメンバ参照 6・`V128` 同士の二項演算 6・`V128` への int 代入 3・`ABS` 未宣言 3・`sbyte` 型名 2・引数数不一致 2・`SUB168` 未宣言 2・`FUN_180fd8aac` 未宣言 2・`ZEXT416`/`maxps`/`rsqrtps`/`vpsrldq_avx` 各 1。`grep -c error:` の生出力とログは保存していない (`work/` にも残っていない)。本 run は `plugins-kilohearts`・`toolchain-emsdk`・`toolchain-retdec` が無く再実行できなかったため、件数と分類は未確認。
+- 残件の意味 (未対応): (a) `rsqrtps` は §10-4 の census (Stereo 1 件) と一致。`maxps`・`vpsrldq_avx`・`ZEXT416`・`SUB168` は shim 未定義の SIMD 疑似関数だが、§10-4 の census に Stereo の記載は無く census 外の新出 (本 run の実測のみ)。(b) `FUN_180fd8aac` は未関数化 callee (Resonator の `func_0x…` 閉包と同じ種類)。(c) `param_1` 不足 8 は引数なし呼出で、§10-4 の ABI 復元と同じ類型 (census の Stereo 件数は無い)。
 - 突合・ablation・ネガコン・第二 oracle: 未実施 (emcc 未通過のため)。
 - 回帰: 本 run は `SNAPINS` にエントリを足しただけで、Gain / Haas / Gate の converter 経路は変えていない (`run_all.sh` は再実行せず、値は §10-3 を引用)。
 - 起票: 残件は #1216 (KH-24) の範囲。新規起票は今 run では行っていない。
