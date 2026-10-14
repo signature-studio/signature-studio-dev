@@ -264,7 +264,7 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 
 | build | survey 集計 | 観測行 |
 |---|---|---|
-| probe ON (`M11_INSTR_40FFE0=1 M11_INSTR_40FF70=1`) | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` (13.7 s) | `[m11][ffe0] #1 arg1=0x0 v=[arg1]=0xc343f0 p-144=0x9078558948704d89` |
+| probe ON (`M11_INSTR_40FFE0=1 M11_INSTR_40FF70=1`、HEAD `b559594b` で再測定、load 1.00) | `ok 872 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1` (13.1 s、rc=0) | `[m11][ffe0] #1 arg1=0x0 v=[arg1]=0xc343f0 p-144=0x9078558948704d89` |
 | probe OFF (既定) | `ok 870 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1` | 0 件 |
 
 - 観測の 1 件目 (unit 895 の `err` 内) では `40ffe0` の `arg1` が **0 (null)**。`v = [0] = 0xc343f0` が `40ff70` の `arg1` になり、§12 の `[m11][p144] arg1=0xc343f0` と一致する。
