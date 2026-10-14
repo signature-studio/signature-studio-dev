@@ -74,6 +74,8 @@ const ADDED_KEYS = [
   // 自律運転の指標 (#2335)
   "stuck", "stuck_age_max_min", "needs_pm", "needs_user", "no_pr_by_reason", "refs_only_merge_rate_24h", "open_issues_delta_24h", "pm_dispatch_1h",
   "mode_close", "auto_close_detected", "launch_unobserved",
+  // 実装 run の打ち切りが連続して自動の再着手を止めた issue
+  "killed_stopped", "killed_issues",
   // VM の状態の取り込み (#2343)
   "launch_blocked", "imported_at",
   // Worker の自動着手を見送る oc:hold の issue の数 (#2651)

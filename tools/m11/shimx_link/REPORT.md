@@ -8,7 +8,7 @@
 
 | 項目 | 実測 |
 |---|---|
-| shimx リンク | M11 closure (boot_final3.ll, 外部参照 570) に shimx 全 19 ソースを**厳密リンク (重複許容なし)**: **signature mismatch 0 / undefined symbol 0 / duplicate 0** (5 ビルド全て)。wasm 6.18 MB (既存 6.01 MB) |
+| shimx リンク | M11 closure (boot_final3.ll, 外部参照 570) に shimx 全 19 ソースを**厳密リンク (重複許容なし)**: **signature mismatch 0 / undefined symbol 0 / duplicate 0** (5 ビルド全て。**旧 IR の値。現 IR の値は §10.3**)。wasm 6.18 MB (既存 6.01 MB) |
 | 退役した旧 shim | `tools/shim` 5 ファイル (heap/failfast/file/timer/sync, 計 59 定義) と `m11_win.c` (35 定義) をリンクから外した。うち 85 シンボルが shimx の定義に置換、`m11_win.c` の残り 3 (LoadStringW/MessageBoxA/MessageBoxW = user32) は暫定互換 `gui_compat.c` (soft のみ) |
 | 外部参照 557 の内訳 (boot_final2) | shimx **182** (+署名ずれ declare `SHGetFolderPathW.1` 1 = shimx REPORT の 183 と一致) / GUI・audio 対象外 **171** / lift 由来 **203** (うち m11 側 C が提供 188 = SIMD helper 179 + fnstub 8 + rt 1, 未提供 12, intrinsic 3) |
 | **純リンクだけでは後退する** | IR 無改変 + shimx: GUI fail-fast では **unit 16** (`LoadStringW`) で停止、0 返却 GUI でも **unit 17** で shadow stack を破壊して Halt0 に至る (偽の「DllMain 完走」)。原因は lift 側 (§3)。**補正 `--fix` (alloca 拡幅 + 列挙コールバック変換 + `_WStrClr` 1 関数)** を入れると M11 既存と同じ **17 unit 完走・unit #18 で OOB** に戻る (後退なし) |
@@ -198,10 +198,35 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
 - #103 引継ぎ 3 点のうち未着手: (1) `m11_genstubs.py` の除外リストへの pump API 追加は、`shimx_link` 系が genstubs の `m11_winstubs.c` を使わず pump TU も未リンクのため**現構成では不要** (pump を closure に入れる #102 で必要)。(2) `pump_ring_addr()` → `new PumpRing(...)` 結線も #102。(3) 時計較正は ctrl 単体を使わない — 本結線は時計に触れない。
 - `--trace` と `--ws` の併用は未検証 (trace_wrap の改名 IR は ws の定義済み名と未突合)。リンクのみ確認 (`--trace --soft --fix --ws`: mismatch 0 / undefined 0 / duplicate 0)、実行は未確認。trace の obj / `BOOT` パスは `$WSUF` 付きで WS 有無のキャッシュを分離済み (`boot_trace_fix.o` 4,282,726 B と `boot_trace_fix_ws.o` 4,282,642 B は別内容)。
 
+### 10.3 再測定 (2026-10-14, 測定 commit `e7491b4f`): 閉包リンクの復旧と現 IR での boot 到達点
+
+§10.1 の値は旧 IR (`work-m11` の `boot_final3.ll`, 2026-10-10 生成) での測定。以下は現 main のコードで IR を作り直した結果。
+
+| 項目 | 実測 |
+|---|---|
+| 修正前 (origin/main `580dd294`) | `build.sh --soft --fix --ws` が exit 1。`emcc: error: undefined exported symbol: "_sxt_count" [-Wundefined] [-Werror]`。`--trace` 専用の `sxt_*` (`trace_rt.c`) を plain の EXPORTS に入れていたため (emsdk 6.0.12 は未定義 export を -Werror 扱い) |
+| 修正 (`e7491b4f`) | `sxt_*` の EXPORTS を `[ $TRACE = 1 ]` のときだけ追加 (`build.sh` 2 行) |
+| リンク `--soft --fix --ws` | exit 0 / signature mismatch 1 / undefined 0 / duplicate 0 (3.8 s, obj キャッシュ有) |
+| リンク `--soft --fix` (ws 無し) | exit 0 / mismatch 1 / undefined 0。plain の mismatch は §10.1 (旧 IR) で 0、再生成 IR で 1。変化の原因は未確認 |
+| リンク `--trace --soft --fix` | exit 0 / mismatch 1 / undefined 0 |
+| mismatch 1 の出所 | `midiOutShortMsg`: 再生成 IR は (i64,i32)→i32、`tools/shimx/src/midi_conv.c:163` は (HANDLE,DWORD)→UINT。IR 側 i64 と shimx 定義 i32 の型不一致 (REPORT_N1050 の trace 版 mismatch 1 と同じ組)。本 PR は shimx を変更していない (`git diff origin/main...HEAD -- tools/shimx` 0 行)。起票先 #1628 (SHX-T25, OPEN) に mismatch 1 の事実をコメント済み |
+| EXPORTS 変更の影響 (確認した事実) | 本修正の差分は `build.sh` の `_sxt_*` 13 本を `--trace` のときだけ EXPORTS に足す分岐のみ (`git diff origin/main...HEAD -- tools/m11/shimx_link/build.sh` で確認)。export 指定は各 object の関数型を変えないため、型照合 (mismatch) の入力にならない。同一 IR で trace (`_sxt_*` あり) と plain (なし) が共に mismatch 1 だが、trace は改名 IR の別ビルドなので export の有無だけを変えた比較ではない。修正前後の件数比較は、修正前の plain が exit 1 で件数行を出していないため未実施 |
+| IR 再生成 | `M11_PE=<fl-win64 の extracted/block00031_PE.bin> bash tools/m11/m11_gen_ir2.sh` → OK (490,735 行, 45 s)。続けて `bash tools/m11/m11_build.sh` → OK (wasm-ld signature mismatch 0 / undefined 0, 22 s)。`m11_e2e.sh --full` は `m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` (素材に無い) を要求して止まるため使えなかった。起票先: #223 へのコメント (親への提案。既存記録 `tools/m11/REPORT_N1004.md` の「PM 起票を要求」行と同じ論点。子 issue は作らない) |
+| `ws_e2e.mjs` | PASS 19 / FAIL 0 (0.35 s) |
+| boot 到達点 (ws 込み, 現 IR) | `boot_stage 1 / init_count 18 / units_run 17/942 / threw null / rc "1"`。§10.1 の OOB (`memory access out of bounds`) は消えた |
+| boot 到達点 (ws 無し, 同 IR) | 同じ (`units_run 17 / threw null / rc "1"`)。ws の有無で到達点は変わらない |
+| `BOOT_WS_STATS` (ws 込み) | `cpuid 8` (lift の自然経路) / `loadlib_calls 0` / `loadlib_miss 0` / `createprocess 0` / `pump_calls 0` |
+
+**結論**: 閉包リンクは現 main で再びリンクできる (修正前は exit 1)。ただし現 IR の boot は unit 17 で `rc=1` により停止し、FL の自然経路で LoadLibrary が 1 回も呼ばれない。`winstubs_loadlib_miss` の lift 実機取得 (受入) は未達。`LOADLIB_MISS ["WebView2Loader.dll"]` は引き続き probe 由来。
+
+**差分確認 (測定 commit から HEAD まで・コード範囲)**: `git diff e7491b4f HEAD -- tools/m11/shimx_link/build.sh tools/m11/shimx_link/*.c tools/m11/shimx_link/*.py` の出力は 0 行 (本節は REPORT のみ変更)。
+
 ## 11. 旧 main の link 失敗の修正と `--midi` の winstubs 結線 (#179 SHX-T6)
 
 - 測定 commit: `397c4161` (コードを変えた最後の commit。以後は本節のみ)。修正前: `46c92356` (main)。
 - 差分: `git diff 46c92356 397c4161 -- tools/m11/shimx_link` は `build.sh` のみ (EXPORTS の sxt_* 分離と usage 注記)。
+- main 取り込み: 同じ EXPORTS 修正は #2732 (`e7491b4f`、§10.3) で main に入り済み。main 取り込みの競合では測定済みの本節の `build.sh` を残した (意味は同じ。書式は `if ...; fi` と `[ $TRACE = 1 ] &&` の違いのみ)。
+- 差分確認 (測定 commit から取り込み merge 後の HEAD まで・コード範囲): `git diff 397c4161 HEAD -- tools/m11/shimx_link ':!*.md'` の出力は 0 行 (再測定は不要)。
 
 ### 11.1 旧 main で全 variant の link が失敗していた原因
 
