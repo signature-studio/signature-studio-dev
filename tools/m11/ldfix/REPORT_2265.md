@@ -100,7 +100,7 @@
   - 実行 2 (分類の追記後・結果ファイル更新前): rc=1。step 7 の `cmp` が `spill178_1161.tsv` の 23 行 (未判定 → 確定) で旧 TSV と不一致。結果ファイルを $OUT の生成物で更新して実行 3 で再測定した。
 - **head `1da6d153` と本 commit の e2e は未実施**: 本 run の `$ARTIFACTS_DIR` には `fl-win64.tar.zst` しか無く、`tools/m11/work/` (boot_final3.ll・m11_image.bin・boot*.drc.config.json) と `tools/liftdiff/work/` が無い。`audit_lsf_ssa_e2e.sh` は起動できない。
 - **e2e 外の再生成確認 (IR 不要)**: `python3 tools/m11/ldfix/spill_classify_1161.py tools/m11/ldfix/results/audit_510_ssa.json` は、head の commit 版 `spill178_1161.tsv` と一致した (cmp OK・判定の撤回前)。撤回後は同じコマンドで TSV を再生成した (§3 の数値はその出力)。step 7 の入力 `ssa.json` は head で IR から生成されるため、これは step 7 の代替ではなく、分類表の再生成が commit 済み入力だけで決まることの確認。
-- **差分の証跡 (測定 commit から HEAD まで・測定対象)**: `git diff --stat 482ec43d HEAD -- tools/m11/ldfix/ld98_dump.py tools/m11/ldfix/results` は空ではない (main 取込の候補行 29 行・本 PR の判定 23 行の追記と撤回 9 行・TSV の更新)。WORKFLOW §6 により、この差分の分だけ e2e の再測定が要る (未解決表)。
+- **差分の証跡 (測定 commit から HEAD まで・測定対象)**: 前版の「`git diff --stat 482ec43d HEAD -- ... results` → 空」は誤りだった (取り消す)。実測の `git diff --stat 482ec43d HEAD -- tools/m11/ldfix/ld98_dump.py tools/m11/ldfix/results` は 7 files changed, 507 insertions(+), 47 deletions(-)。内訳: `audit_undefload_dest_2202.json` (+210)・`audit_undefload_dest_2202_head.json` (+201)・`ld105_reg2mem_map.tsv` (+16)・`ld110_reg2mem_link.tsv` (+4) は main 取込 (`1da6d153`) 由来。`candidate_verdicts_1161.jsonl` は main 由来の 29 行追記と本 commit の 9 行削除。`spill178_1161.tsv` は 76 行の差し替え (main 由来の候補判定 29 行の反映と、本 commit の 9 行の判定撤回)。`held_verdicts_2265.jsonl` は本 commit の新規 9 行。`ld98_dump.py` は差分 0。WORKFLOW §6 により、この差分の分だけ e2e の再測定が要る (未解決表)。
 - 検査: `find tools/m11/ldfix -type f -size +20M` は 0 件。
 
 ## 7. 未解決
