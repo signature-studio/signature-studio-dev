@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ART="${RUNNER_TEMP:-/tmp}"
 EXT="$ART/fl-win64/extracted"
 INST="$ART/fl-install"
-WORK="$ROOT/tools/assets/work"
+WORK="$ART/work"
 export WINEPREFIX="$ART/wineprefix" WINEDEBUG="${WINEDEBUG:--all}" WINEARCH=win64
 export PATH="/usr/lib/wine:$PATH"
 
