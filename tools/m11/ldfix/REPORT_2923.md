@@ -4,11 +4,11 @@
 
 ## 1. 測定
 
-- 測定 commit: `fd183f0b` (コードを変えた最後の commit。`candidate_verdicts_2923.jsonl` の 10479c7 の evidence の番地を直した。判定は変えていない)。基点は `origin/main` の `71bf0957`
+- 測定 commit: `594ba318` (コードを変えた最後の commit。main (`e87eb52a`) を merge した。競合は `spill_classify_1161.py` の 2 行 (`candidate_verdicts_2921.jsonl` と `2923.jsonl` の読込) で、両方を読む形に解消した)。その前に `candidate_verdicts_2923.jsonl` の 10479c7 の evidence の番地を直した (`fd183f0b`・判定は変えていない)。基点は `origin/main` の `71bf0957`
 - 前回測定 (`94db5f8b`・10479c7 を OK_LOAD と判定していた時点・work-m11 あり): `TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` rc=0・real 122 s・load average 0.01 → 0.87・7/7 完走。このときの確定 121 のうち 10479c7 (OK_LOAD) は撤回した
-- 本 round の e2e (全 7 step): `work-m11` / `work-liftdiff` を `$RUNNER_TEMP` に展開し、`M11_WORK` / `LD_WORK` で指定した (repo の `work/` は不使用)。`TMPDIR=$RUNNER_TEMP M11_WORK=$RUNNER_TEMP/m11w LD_WORK=$RUNNER_TEMP/ldw bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (HEAD `fd183f0b`) → rc=0・real 169 s・load average 0.11 → 0.95・7/7 完走。`drops_510.tsv` と `spill178_1161.tsv` は `results/` と `cmp` で一致
-- 集計 (step 7): spill 宛 unk site 178 / 71 関数。status 確定 120 (前 121) / 判定不能 31 (前 30) / 未判定 27 (同)。脱落関数の和集合は [5] 69 + [6] 5 = 74 (変化なし)
-- 測定後の差分: `git diff fd183f0b HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (以降の変更は本 REPORT のみ)
+- 本 round の e2e (全 7 step): `work-m11` / `work-liftdiff` を `$RUNNER_TEMP` に展開し、`M11_WORK` / `LD_WORK` で指定した (repo の `work/` は不使用)。`TMPDIR=$RUNNER_TEMP M11_WORK=$RUNNER_TEMP/m11w LD_WORK=$RUNNER_TEMP/ldw bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (HEAD `594ba318`) → rc=0・real 164 s・load average 0.16 → 0.95・7/7 完走。`drops_510.tsv` と `spill178_1161.tsv` は `results/` と `cmp` で一致。merge 前の `fd183f0b` でも rc=0・real 169 s・7/7 完走だった
+- 集計 (step 7・HEAD `594ba318`): spill 宛 unk site 178 / 71 関数。status 確定 124 (前 120) / 判定不能 31 (同) / 未判定 23 (前 27)。main の LD-138 (`3ec6620c`・ddf630 の 4 site を TRUE_DROP と確定) を取り込んだため、未判定から確定へ 4 件移った。10479c7 は判定不能のまま。脱落関数の和集合は [5] 69 + [6] 6 = 75 (前 74。増えたのは ddf630)
+- 測定後の差分: `git diff 594ba318 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (以降の変更は本 REPORT のみ)
 
 ## 2. 判定結果 (`1046a30` の 2 site)
 
