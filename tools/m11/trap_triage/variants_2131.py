@@ -5,8 +5,8 @@
 #   variant の意味:
 #     vdisp  : 41c130・9b4b00 の disp entry を外す
 #     v413   : 413060 の C override を外す (gate を M11_OV_413060 のみに)
-#     vnc    : 410360 の vcall を M11_NOVCALL=1 で外す
-#     vall   : vdisp + v413 + vnc
+#     vnc    : 410360 の m11_vcall で shortcut 以外の ICALL_AT dispatch を外す (M11_NOVCALL=1)。shortcut (target == R(0x10070)) 内の icall 計数 (icall_bump 2 回) は残る
+#     vall   : vdisp + v413 + vnc (shortcut 内の icall 計数は残るため、vall からは計数の必要性は判定できない)
 #     vx     : vdisp + v413 + 410360 の本体を `return inst;` だけにする (VMT 読みと icall 計数を両方外す)
 #     vy     : vdisp + v413 + 410360 の VMT 読み `Q(Q(inst)-0x50)` だけ残し, icall 計数は外す
 #     vz     : vdisp + v413 + 410360 の icall 計数 (m11_vcall の shortcut 内の icall_bump 2 回) だけ残し, VMT 読みは外す
@@ -43,7 +43,7 @@ V = {
     'vall': (gate413(disp(src)), {'M11_NOVCALL': '1'}),
     'vx': (rep(gate413(disp(src)), VCALL, '    return inst;'), {}),
     'vy': (rep(gate413(disp(src)), VCALL, '    (void)Q(Q(inst) - 0x50);\n    return inst;'), {}),
-    'vz': (rep(gate413(disp(src)), VCALL, '    m11_vcall(0x41037d, 0x10070u, inst);\n    return inst;'), {}),
+    'vz': (rep(gate413(disp(src)), VCALL, '    m11_vcall(0x41037d, R(0x10070), inst);\n    return inst;'), {}),
 }
 try:
     for name, (text, extra) in V.items():

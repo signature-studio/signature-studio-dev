@@ -25,7 +25,7 @@
 
 | 変種 (ON のまま外すもの) | 測定 commit | ok / oob / abort / halt0 | unit 190 |
 |---|---|---|---|
-| `all_off`: 41c130 disp・9b4b00 disp・413060 gate・410360 vcall (`M11_NOVCALL=1`) を同時に外す | 記載の `016cc403` は出所未検証 (run id 不明) | 869 / 16 / 2 / 6 (出所未検証) | oob (出所未検証) |
+| `all_off`: 41c130 disp・9b4b00 disp・413060 gate・410360 vcall (`M11_NOVCALL=1`。shortcut 外の `ICALL_AT` dispatch だけ外れ、shortcut 内の icall 計数は残る) を同時に外す | 記載の `016cc403` は出所未検証 (run id 不明) | 869 / 16 / 2 / 6 (出所未検証) | oob (出所未検証) |
 | `ret0_410360`: 410360 の C 版の戻り値だけ 0 にする | 記載上 `016cc403` (出所未検証) | 未測定 (記録上の記述・未検証: survey が 400 s で timeout) | 未測定 |
 
 - 結論: 本節の測定結果は未確定。all_off の行は run id・日付・測定ログ・JSON のいずれも残っておらず、出所を示せないため、結論には使わない。「4 要素を同時に外しても oob は消えない」とは書かない。本節で確定しているのは、切り分けスクリプト (`ablate_2131.py` の `all_off`・`ret0_410360` 変種) の追加と、その変種の置換対象が `016cc403` の `m11_ov.c` と一致することまで。
@@ -75,26 +75,30 @@
 
 ### 同一状態の切り分け (unit 189 直後のメモリと SP を揃えて unit 190 だけ走らせる)
 
-| 状態 (189 直後) | code | unit 190 |
-|---|---|---|
-| OFF の状態 | OFF | ok |
-| ON の状態 | ON | oob |
-| ON の差分 24 ページを OFF へ (状態は ON と一致) | OFF | ok |
-| OFF の差分ページを ON へ (状態は OFF と一致) | ON | oob |
-| ON の状態 (差分 24 ページを OFF へ) → `0xfa5320` と `0xfa5010` だけ OFF の値へ | ON | oob |
-| OFF の状態 | vall (下記) | oob |
-| ON の状態 | vall | oob |
-| ON の状態 | v413 | oob |
-| ON の状態 | vnc | oob |
-| ON の状態 | vdisp | oob |
-| ON の状態 | vx | ok |
-| OFF の状態 | vx | ok |
-| OFF の状態 | vy | ok |
-| OFF の状態 | vz | oob |
+記録の範囲: 下表の「作り方」は `lockstep_2131.mjs`・`variants_2131.py` の分岐から書いた想定である。本測定で実際に渡した env (`LS_*` の値)・反復回数 n・強制後の `diffPages now=` の出力は記録が無い。よって本表は「記録上の結果」であり、同一状態の確認は未検証。`LS_FORCEB`・`LS_REVERSE` は差分ページを全て写すため、強制後の diffPages は構造上 0 になる (heap 長が違えば `heap length differs` が出る)。その出力の記録は無い。
 
-- variant の定義は `trap_triage/variants_2131.py` (vdisp: 41c130・9b4b00 の disp entry を外す / v413: 413060 の C override を外す / vnc: 410360 の vcall を `M11_NOVCALL=1` で外す / vall: vdisp+v413+vnc / vx: vdisp+v413 で 410360 の本体を `return inst;` だけにする / vy: vdisp+v413 で 410360 の VMT 読み `Q(Q(inst)-0x50)` だけ残す / vz: vdisp+v413 で 410360 の `m11_vcall` の shortcut 内の icall_bump 2 回だけ残す)。
-- 読み: 同じメモリ状態でも、ON 専用の code を走らせると unit 190 は oob になる (ON の状態と OFF の状態を入れ替えても code で決まる)。vall (ON 専用の差を 4 要素外した版) も OFF の状態で oob になる。vy (VMT 読みだけ残す) は ok、vz (icall 計数だけ残す) は oob。よって trap に効くのは 410360 の ON 専用 code のうち icall 計数 (`icall_bump` 2 回) の側で、VMT 読みだけでは起きない。計数が trap を起こす仕組みは未特定。
-- 注意: 差分ページを移す試験は 2 つの build のメモリを比べるため、build 間でデータ配置が違うページ (例: `0x10250000` の文字列定数) を含む。`0x10250000` が唯一の原因という読みは、後述の instrumented 版の結果に基づくもので、build 間の配置差の可能性が高く採らない。`0xfa5320` を OFF の値へ直しても ON の trap は消えない (表の 5 行目) ので、リスト先頭の 0x90 ずれ単独では説明できない。
+| 状態 (189 直後) | code | unit 190 | 作り方 (スクリプト上の想定・env 未記録) | 強制後 diffPages now= | n |
+|---|---|---|---|---|---|
+| OFF の状態 | OFF | ok | 並走の B の自然な状態 (強制なし。checkpoint 189 の差分は 24 ページ) | 強制なし | 未記録 |
+| ON の状態 | ON | oob | 並走の A の自然な状態 (強制なし) | 強制なし | 未記録 |
+| ON の差分 24 ページを OFF へ (状態は ON と一致) | OFF | ok | `LS_FORCEB=1` (A=ON の差分ページと SP を B=OFF へ写す) | 未記録 (構造上 0) | 未記録 |
+| OFF の差分ページを ON へ (状態は OFF と一致) | ON | oob | `LS_REVERSE=1` (B=OFF の差分ページを A=ON へ写す) | 未記録 (構造上 0) | 未記録 |
+| ON の状態のまま、`0xfa5320`・`0xfa5010` の 2 語だけ OFF の値へ | ON | oob | `LS_FIX=fa5320,fa5010` (checkpoint 189 で A の 2 語へ B の値) | 0 にならない。2 語は同じ 4 KiB ページ `0xfa5000` 内にあり、差分 24 ページのうち高々 1 ページしか解消しないため、23 ページ以上が残る。同一状態の行ではない | 未記録 |
+| OFF の状態 | vall | oob | `LS_FORCEB=1` (A=OFF、B=vall) | 未記録 (構造上 0) | 未記録 |
+| ON の状態 | vall | oob | `LS_FORCEB=1` (A=ON、B=vall) | 未記録 (構造上 0) | 未記録 |
+| ON の状態 | v413 | oob | `LS_FORCEB=1` (A=ON、B=v413) | 未記録 (構造上 0) | 未記録 |
+| ON の状態 | vnc | oob | `LS_FORCEB=1` (A=ON、B=vnc) | 未記録 (構造上 0) | 未記録 |
+| ON の状態 | vdisp | oob | `LS_FORCEB=1` (A=ON、B=vdisp) | 未記録 (構造上 0) | 未記録 |
+| ON の状態 | vx | ok | `LS_FORCEB=1` (A=ON、B=vx) | 未記録 (構造上 0) | 未記録 |
+| OFF の状態 | vx | ok | `LS_FORCEB=1` (A=OFF、B=vx) | 未記録 (構造上 0) | 未記録 |
+| OFF の状態 | vy | ok | `LS_FORCEB=1` (A=OFF、B=vy) | 未記録 (構造上 0) | 未記録 |
+| OFF の状態 | vz | oob | `LS_FORCEB=1` (A=OFF、B=vz) | 未記録 (構造上 0) | 未記録 |
+
+- variant の定義は `trap_triage/variants_2131.py` (vdisp: 41c130・9b4b00 の disp entry を外す / v413: 413060 の C override を外す / vnc: 410360 の `m11_vcall` で shortcut (`target == R(0x10070)`) 以外の `ICALL_AT` dispatch だけを外す (`M11_NOVCALL=1`。shortcut 内の icall_bump 2 回は残る) / vall: vdisp+v413+vnc (shortcut 内の icall 計数は残る) / vx: vdisp+v413 で 410360 の本体を `return inst;` だけにする (VMT 読みも計数も外す) / vy: vdisp+v413 で 410360 の VMT 読み `Q(Q(inst)-0x50)` だけ残す / vz: vdisp+v413 で 410360 の `m11_vcall` の shortcut 内の icall_bump 2 回だけ残す (target は `R(0x10070)`))。
+- 読み (記録上の結果。同一状態の確認値は未記録のため、下表の注を参照): 状態と code を入れ替えても、結果は code で決まる (ON の状態 + OFF code は ok、OFF の状態 + ON code は oob)。vx・vy・vz はいずれも vdisp+v413 を含む。その下で、vz (shortcut 内の icall 計数だけ残す) は oob、vy (VMT 読みだけ残す) は ok、vx (両方外す) は ok。よって、trap を起こすのは 410360 の shortcut 内の icall 計数 (`icall_bump` 2 回) で、VMT 読みだけでは起きない、と読める。計数が trap を起こす仕組みは未特定。
+- vnc (shortcut 外の `ICALL_AT` dispatch だけ外す) でも ON は oob のままなので、trace の `inst=0xe660` の経路 (`icall 0xf960`、shortcut 外) は trap の必要条件ではない、と読める。
+- vall は計数を残すため、vall からは計数の必要性は判定できない。判定に使うのは vz (計数のみ) / vy (VMT 読みのみ) / vx (両方なし) の比較。
+- 注意: 差分ページを移す試験は 2 つの build のメモリを比べるため、build 間でデータ配置が違うページ (例: `0x10250000` の文字列定数。boot 直後の差分 2 ページの中身が ON と OFF で違うことは `boot_probe_2131.mjs` の出力で記録した) を含む。`0x10250000` が唯一の原因という読みは採らない。根拠はこの配置差のみで、ページ縮約 (overlay・minimal page set) の出力は記録が無いため根拠にしない。`0xfa5320` を OFF の値へ直しても ON の trap は消えない (表の 5 行目) ので、リスト先頭の 0x90 ずれ単独では説明できない。
 
 ### 補助 (unit 158 と unit 190 の ON 専用 code の実行)
 
@@ -107,7 +111,7 @@
 
 ### 結論 (部分達成)
 
-- 確定: unit 190 の ON 限定の trap は、同じメモリ状態 (unit 189 直後、SP 一致) で ON 専用 code を走らせたときだけ起きる。ON 専用 code のうち、410360 の m11_vcall 内の icall 計数 (`icall_bump`) だけで OFF の状態から oob が再現する (vz)。VMT 読みだけでは再現しない (vy)。
+- 記録上の結果 (未検証。「確定」とは書かない): unit 190 の ON 限定の trap は、同じメモリ状態 (unit 189 直後、SP 一致) で ON 専用 code を走らせたときだけ起きる、と読める。ON 専用 code のうち、410360 の m11_vcall の shortcut 内の icall 計数 (`icall_bump`) だけで OFF の状態から oob が再現する (vz)。VMT 読みだけでは再現しない (vy)。ただし強制後の `diffPages now=` の出力と反復回数 n は記録が無いため、「同一状態」の主張は次 run の再測定 (次節 (e)) まで保留する。
 - 未確定: icall 計数がなぜ oob を起こすか (計数表 `g_isite`・`g_itgt` の linear memory 上の位置と、407a50 の chain・スタックとの重なり)。`0xfa5320` の 0x90 ずれは 413060 override 由来 (v413 で消える) だが、単独では trap の原因ではない (LS_FIX)。
 - 受入条件: 1 (書込元の特定) は未達。2 (REPORT 記録) は本節で部分達成。3 (ok 退行 0) は未達 (unit 190 が残る)。
 
@@ -116,6 +120,8 @@
 - (a) `g_isite`・`g_itgt` の表 (`_e`・`_h`・`n`) の linear address を vz の build で特定し、unit 190 中の計数書込みの address を watch する (watch 版は挙動が変わるので、書込みの address だけを見る)。
 - (b) vz の oob の frame (`SV_RAW=1` の生 frame) を、410360 の icall_bump の前後で比べ、どの load/store が範囲外かを切り分ける。
 - (c) 0xfa5010 (unit 87) の値の出所 (build 間の定数配置か、実行時の書込みか) を、unit 87 の trace で切り分ける。
+- (d) 410360 の呼出元で `this` が誤っている候補: trace の `inst=0xe660` は `M11_LB_BASE=0` (LVA=RVA) では image 内 (RVA 0xe660) を指し、ヒープ上のインスタンスには見えない。`icall 0xf960` の経路 (shortcut 外) は vnc で外れても ON は oob のままなので trap の必要条件ではないと読めるが、この `this` の出所は未確認で、否定もしていない。(a)〜(c) と合わせ、410360 の呼出元で `this` の値を記録して確かめる。
+- (e) 表の再測定 (記録の補完): 各 row について、実際に渡した env (`LS_A`・`LS_B`・`LS_FORCEB`・`LS_REVERSE`・`LS_FIX`・`LS_CKPT`・`LS_MAX`・`LS_TARGET`)、強制後の `diffPages now=` (0 であり、`heap length differs` が出ないこと)、反復回数 n を REPORT に残す。強制後 diffPages が 0 にならない `LS_FIX` の行は同一状態の結論に使わない。素材は `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` で取得する (本 fix run では素材不足のため未実施)。
 
 ### 差分 (測定 commit `3b581236` から本 PR の HEAD まで、tools/m11 の build 入力)
 
