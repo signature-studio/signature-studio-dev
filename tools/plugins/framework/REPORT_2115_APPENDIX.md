@@ -81,7 +81,35 @@
 - その結果 `[0x7162d0] = 1`。TLS 値の不正は、TLS の意味論ではなく lift の fold 由来。
 - 起票先: `#2510` (生成側で定数の `ptrtoint` が値に fold される欠陥。同じ類型の別インスタンスとして `#2510` にコメントで追記する)。`docs/DEFECTS.md` D21 と同型の可能性はあるが未確認。`#1890`・`#2008` は close 済みのため使わない。
 
-### 11.4 実測 (測定 commit 4c00ec24)
+### 11.4 実測
+
+#### 11.4.1 測定 commit 058c2049 (本 fix・実行は HEAD fa128b1b)
+
+- 測定 commit は `058c2049` (実行コードの最終 commit)。実行は `fa128b1b` のクリーンな worktree (`ws-2115`) で行った。`git diff 058c2049 fa128b1b -- tools/plugins/framework ':!*.md'` は 0 行。
+- 素材: `work-fw-stage1` を repo ルートで展開 (`tools/plugins/work/fw/` の 12 ファイル)。`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12) を使用。`fl-win64` は展開していない (`fw_stage2.sh`・`hs_e2e.sh` は `FL_WIN64_DIR` を読まない)。`toolchain-retdec` は呼ばれない (`r2`・`r3` の restored.ll は素材に含まれ、`--fresh` を使わない)。
+- 順序: `fw_stage2.sh` (stage-1 の 12 ファイルだけの状態から全段) → `hostshim/hs_e2e.sh --fresh`。逐次・並列数 1 (nproc 4)。
+
+| 手順 | 結果 | 所要 (real) | load average (開始 → 終了) |
+|---|---|---|---|
+| `fw_stage2.sh` (中間物なしの全段) | rc 0・`SMOKE PASS` (dispatch=38 units_done=0 va=1 heap=1 ff=0)・`fw_route.wasm` 15,063,364 B | 278 秒 | 0.19 / 0.37 / 0.18 (16:05:41) → 2.63 / 1.66 / 0.75 (16:10:19) |
+| `hs_e2e.sh --fresh` | rc 1・Phase A `dispatch=38 ff=0`・Phase B `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7`・`E2E FAIL: 1 項目`・`hs_route.wasm` 15,038,486 B | 91 秒 | 2.12 / 1.60 / 0.74 (16:10:34) → 1.25 / 1.44 / 0.77 (16:12:05) |
+
+- n=1 (min–max は未取得)。Phase A の dispatch は 38 で、Phase B は §11.4.2 と同じ失敗形 (OOB・rec=7・1 項目)。Phase A が外れなかったため、切り分けは不要。
+- TLS trace (Phase A の stderr) は §11.1 と一致: `hooks[1]=0x418120` → `TlsAlloc -> 1` → `LocalAlloc(0x40, 0x10000880) -> 0x118b60b8` → `TlsSetValue(1, 0x1)` → `TlsGetValue(1) -> 0x1` → `hooks[1] done: tls_idx=1`。
+- 終端の `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` は smoke.log の 47 行目に出る (基準 4c00ec24 も同じ位置に同じ行)。SMOKE PASS の判定は変わらない。`REPORT_2115.md` §9 に未解決として記録。
+
+**基準 4c00ec24 との比較** (同じ worktree・同じ手順。基準の `fw_rt.c` を一時的に入れ、`fw_stage2.sh` は `fw_route.cjs`・`fw_route.wasm` を削除して emcc のみ再ビルド (増分)、`hs_e2e.sh --fresh` は同じ。実行後に HEAD 版へ戻した):
+
+| 手順 | 結果 | 所要 (real) | load (開始 → 終了) |
+|---|---|---|---|
+| `fw_stage2.sh` (増分) | rc 0・SMOKE PASS (dispatch=38 ff=0)・`fw_route.wasm` 15,063,331 B | 20 秒 | 0.89 / 1.34 / 0.75 (16:12:30) → 0.93 / 1.31 / 0.76 (16:12:50) |
+| `hs_e2e.sh --fresh` | rc 1・Phase A `dispatch=38 ff=0`・Phase B OOB・`rec=7`・1 項目・`hs_route.wasm` 15,038,453 B | 90 秒 | 0.85 / 1.29 / 0.75 (16:12:56) → 0.97 / 1.21 / 0.78 (16:14:26) |
+
+- 差分は表示行の heap アドレスだけ: smoke.log (48 行) と hs_e2e のログ (126 行) で、`[fw][ov] _StartLib ctx` `0x118b6098` → `0x118b60a8`、`[fw][tls] LocalAlloc(0x40, 0x10000880) -> ` `0x118b60a8` → `0x118b60b8`、hostshim の soft-miss `target 0x118b6388` → `0x118b6398` (site `0x5e018a`) の 3 行。`0x118b6xxx` を `HEAP` に置換すると両ログは一致する。Phase A/B・`rec` の値・失敗位置は同じ。
+- wasm は fw_route・hs_route とも +33 B (同じ worktree パス内の比較)。wasm の絶対値は worktree パスの文字列を含む (`ws-2115` が wasm 内に 4 回出現) ため、別パスで作った値とは比べない。
+- 推定 (未検証): heap アドレスのずれは、`fw_rt.c` に static 変数 (`g_local_trace`) を 1 つ足して .bss が伸び、heap の開始位置が 16 B 動いたため。戻り値・分岐に関わるログ行は変わらない。
+
+#### 11.4.2 測定 commit 4c00ec24 (旧測定・表示行を入れた時点)
 
 | 手順 | 結果 | 所要 (real) | load (開始 → 終了) |
 |---|---|---|---|
@@ -119,8 +147,8 @@ index 1ae5159c..641239e2 100644
  void *TlsGetValue(int i) { void *r = (i >= 0 && i < 128) ? (void *)(uintptr_t)g_tls_slots[i] : 0; if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] TlsGetValue(%d) -> 0x%llx\n", i, (unsigned long long)(uintptr_t)r); return r; }
 ```
 
-- この差分は実行コードのため、WORKFLOW §6 の再測定の対象。**未実施** (fix round 6 と fix round 7 の両方): `$ARTIFACTS_DIR` は `fl-win64.tar.zst` のみで、`work-fw-stage1`・`toolchain-emsdk`・`toolchain-retdec` が無い。runner に [EMSDK]・[RETDEC] の導入先も無いため、`fw_stage2.sh` と `hs_e2e.sh --fresh` を実行できない。PR 本文の `oc_artifacts: fl-win64 toolchain-emsdk work-fw-stage1` で次 run に取得させる。構文は `clang -fsyntax-only` (`emscripten.h` を空スタブ) で修正前後ともエラー 0。merge 前の再測定は REPORT_2115.md §9 の未解決。
-- 次 run の測定手順: 測定 commit は実行時の HEAD。`bash tools/plugins/framework/fw_stage2.sh` (SMOKE PASS・`dispatch=38 ff=0`) と `bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh` を実行し、所要・load (開始 → 終了)・PASS/FAIL をこの節に追記する。Phase B の OOB 位置・`rec`・E2E 項目は、§11.4 の対照 (4c00ec24) と比べる。Phase A が `dispatch=38 ff=0` から外れた場合は、表示カウンタ分離 (`058c2049`) との切り分けのため、同じ run で `4c00ec24` の `fw_rt.c` を対照に測る。
+- この差分 (`058c2049`) は実行コードのため WORKFLOW §6 の再測定の対象。**§11.4.1 で再測定済み** (測定 commit 058c2049・Phase A `dispatch=38 ff=0`・Phase B は §11.4.2 と同じ失敗形)。構文は `clang -fsyntax-only` (`emscripten.h` を空スタブ) で修正前後ともエラー 0 (fix round 6 時点の確認)。
+- 再現手順: §11.4.1 の順序 (`bash tools/plugins/framework/fw_stage2.sh` → `bash tools/plugins/framework/hostshim/hs_e2e.sh --fresh`)。Phase A が `dispatch=38 ff=0` から外れた場合は、表示カウンタ分離 (`058c2049`) との切り分けのため、同じ手順で `4c00ec24` の `fw_rt.c` を対照に測る (§11.4.1 の比較の方法)。
 
 ### 11.5 注入実験 (未採用)
 

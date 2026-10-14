@@ -213,7 +213,8 @@ for m in re.finditer(b"\xe8", d):
 | Phase B (`hs_e2e_run`) は framework 初期化 (`_StartLib`・TLS 初期化) を通らない。TLS 値を正しくしても OOB は残る (付録 §11.5 E3) | 受入 2 (Phase B の変化) | #2571 (子) |
 | `0x418120` の実行経路の訂正: `_InitLib` の hooks 表 (`0x6d6ef8`・reason=1 → `[+8]`) からの間接 call で実行される (§10.1 の「呼ばれない」は誤り) | 前提の訂正 | 付録 §11.1 で訂正済み |
 | lift の fold 欠陥: `function_4180a0` の引数 `ecx` が `ptrtoint @683` に化け、`function_4180d0` の戻り値が 1 になる | TLS block が正しく作られない | #2510 (`[PLG-P0b-18]`・OPEN。同じ類型の別インスタンスとしてコメントで追記)・付録 §11.3 |
-| fix round 6 の `fw_rt.c` 表示カウンタ分離 (commit `058c2049`) は実行コードの差分。WORKFLOW §6 の再測定が必要 | merge 前の e2e 再測定が未実施 (fix round 6・7 とも素材 `work-fw-stage1`・`toolchain-emsdk` が無く実行不能。表示のみで戻り値は不変。付録 §11.4 に差分全文と次 run の測定手順) | #2115 (継続。PR 本文の `oc_artifacts` 行で次 run に素材を取得して再測定) |
+| `fw_rt.c` 表示カウンタ分離 (commit `058c2049`) の再測定 | 解消。付録 §11.4.1 で再測定済み (Phase A `dispatch=38 ff=0`・Phase B は 4c00ec24 と同じ OOB・`rec=7`・1 項目)。基準との差は表示行の heap アドレス 3 件のみ | — (解消) |
+| smoke 終端の `Aborted(Runtime error: The application has corrupted its heap memory area (address zero)!)` (smoke.log 47 行目。基準 4c00ec24 にも同一行。trace 由来ではない) | SMOKE PASS の判定には影響しない。address zero への書込みの有無は未調査 | #2115 (継続・原因は未調査) |
 
 ## 10. TLS index 未設定の確認と stand-in 版の実験 (未採用・測定 commit 91308efd)
 
