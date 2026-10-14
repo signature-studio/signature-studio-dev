@@ -103,8 +103,8 @@ long long fw_call_cur(uint32_t va) {
 #include "fw_rt.h"
 
 /* ---- Local 系, Global 系メモリ API (RetDec が IAT thunk を名前解決して直接 call する) ---- */
-static int g_tls_trace = 0;
-void *LocalAlloc(unsigned flags, unsigned bytes) { void *r = HeapAlloc(0, flags, bytes); if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] LocalAlloc(0x%x, 0x%x) -> 0x%llx\n", flags, bytes, (unsigned long long)(uintptr_t)r); return r; }
+static int g_local_trace = 0;
+void *LocalAlloc(unsigned flags, unsigned bytes) { void *r = HeapAlloc(0, flags, bytes); if (g_local_trace++ < 16) fprintf(stderr, "[fw][tls] LocalAlloc(0x%x, 0x%x) -> 0x%llx\n", flags, bytes, (unsigned long long)(uintptr_t)r); return r; }
 void *LocalReAlloc(void *p, unsigned bytes, unsigned flags) { (void)flags; return HeapReAlloc(0, 0, p, bytes); }
 void *LocalFree(void *p) { HeapFree(0, 0, p); return p; }
 void *LocalLock(void *p) { return p; }
@@ -184,6 +184,7 @@ __attribute__((used)) void __frontend_reg_store_fpr(uint32_t idx, double v) { fw
 /* ---- TLS (gs:[0x58] = ThreadLocalStoragePointer) ---- */
 static uint64_t g_tls_slots[128];
 static uint32_t g_tls_next = 1;
+static int g_tls_trace = 0;
 int TlsAlloc(void) { int r = (int)(g_tls_next++); if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] TlsAlloc -> %d\n", r); return r; }
 int TlsFree(int i) { (void)i; return 1; }
 void *TlsGetValue(int i) { void *r = (i >= 0 && i < 128) ? (void *)(uintptr_t)g_tls_slots[i] : 0; if (g_tls_trace++ < 16) fprintf(stderr, "[fw][tls] TlsGetValue(%d) -> 0x%llx\n", i, (unsigned long long)(uintptr_t)r); return r; }
