@@ -360,6 +360,7 @@
 | `tools/gui/REPORT_APPENDIX_B.md` | ~28 | gui REPORT §11 (GUI-9 #186 FreeType テキスト) の全文 (250 行上限のため無変更で分割移動)。§13 (GUI-13 #615) の追補 (c4b293d の再確認・RetDec 不在のブロッカー実測) |
 | `tools/gui/REPORT_APPENDIX_C.md` | ~42 | gui REPORT §14 (GUI-7 #183 popup/tooltip・NC・複数矩形・DPI) の全文 (250 行上限のため無変更で分割移動)。§14 内の検証表 (HEAD 63cfe0f / 67d5cb7 / 87c20fc 等) を含む |
 | `tools/gui/shimx_coexist/REPORT.md` | ~110 | shimx weak × gui 強定義の共存リンクと Web 実装接続 (ShellExecute/ファイルダイアログ/D&D) (#172) |
+| `tools/gui/shimx_coexist/REPORT_SHX-T15.md` | ~90 | #958 SHX-T15 の検証の全文 (REPORT §11 から参照): save 反映の契機を書込み file の CloseHandle に決め、host が保存待ちの先を自動反映する経路。検証表・NC3・限界。本番結線と再読み込み復元は [SHX-T38] #3131 |
 | `tools/audio/REPORT.md` | ~100 | ASIO/WASAPI/DirectSound → AudioWorklet + SAB リング |
 | `tools/audio/REPORT_MIDI.md` | ~65 | AU-3 (#188) Web MIDI shim の検証全文 (REPORT.md §13 から分割) |
 | `tools/audio/REPORT_AU10.md` | ~30 | AU-10 (#191) 30 分ソーク (`--soak30`) の検証全文 (REPORT.md §16 から分割) |
