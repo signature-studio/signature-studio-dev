@@ -72,14 +72,14 @@
 - 回帰 (同一 HEAD `98885e93`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-3 と一致。
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`GetLastError`/`SetLastError` の stub 規則は未決定 (本 run は IAT thunk のみ)。
 
-#### 10-7l. #1994 (KH-32) run: rcpps 2 引数形の対応 (部分・Resonator はビルド未通過)
+#### 10-7m. #1994 (KH-32) run: rcpps 2 引数形の対応 (部分・Resonator はビルド未通過)
 - 素材: `plugins-kilohearts` の Installer zip のみ `tar --zstd -xf` で取り出し → payload.dat → windows.zip → HeartCore.core_64 (手展開, dmg 不要)。Ghidra 12.1.4 = GitHub release (zip sha256 `ddac49f9…d2db` 一致・`/opt` 配下に無かったため runner の一時領域に展開)、JDK 21 (Temurin)、emsdk 6.0.12 ([EMSDK])。測定 commit = `730709ae` (コード変更は `ghidra_route/ghidra_to_c.py` のみ、HEAD = 同 commit)。
 - 変更: `ghidra_to_c.py` に `rcpps(dest, src)` (V128 を返す 2 引数形) を追加。近似表は `snapins/scripts/approx_tables.b64` を `gen_simd.load_approx_tables()` 経由で読み、`rcp` 表のみ出力 (`rcpps(` を含む出力にだけ差し込む)。指数則・特殊値の扱いは `gen_simd.py` の `kh_rcp_exact` と同一。`gen_simd.py` (RetDec route) は変更していない。
 - decompile (Resonator 集合 22 関数 = proc + `also` 16 + 未関数化 callee 3 + IAT thunk 2 件): **22/22 OK** (`summary.tsv`, `analyzeHeadless` wall 17.5 s, n=1)。
 - emcc (resonator, 修復なし, `-ferror-limit=0`, `emcc -c`, rc 1):
   - 変更前 (HEAD `7726ccb5`): **10 件** (`grep -c error:`)。
   - 変更後 (HEAD `730709ae`): **8 件**。消えたもの = `rcpps` 未宣言 1・`V128` への `rcpps` 戻り値代入 1。
-  - 残件 8 件: `param_1` 引数不足 3 (`FUN_180fcf904`・`FUN_180fbdfcc`・`FUN_180fcf904` の引数なし呼出)・引数数不一致 1 (`FUN_180fbdef4` expected 2, have 3)・未宣言 callee 4 (`FUN_180fd4f30` 2・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1 = 閉包は [KH-31] #1989 の範囲)。
+  - 残件 8 件: `param_1` 引数不足 3 (引数なしで呼ばれる側の関数: `FUN_180fcf904`・`FUN_180fbdfcc`。呼出元 3 件の内訳は未検証 — 本 run の emcc ログを手元で再取得できなかった。呼出元ごとの確認が要る)・引数数不一致 1 (`FUN_180fbdef4` expected 2, have 3)・未宣言 callee 4 (`FUN_180fd4f30` 2・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1 = 閉包は [KH-31] #1989 の範囲)。
   - 件数の基準: 本 run は `grep -c error:` の clang 診断行数で、§10-7i/§10-7j の 14 件・§10-7k の 15 件とは HEAD が異なるため直接比較しない (同一 HEAD 同士の 10 → 8 のみ比較可能)。
 - 回帰 (測定 commit `730709ae` と同一 C 生成, `build_cmp.sh` の fix 全部 = `bitcast,intload,stackpair,assoc,concat`, `native_ref` 1000 trial / seed 7, 各 wall ~0.3 s):
   - Gain **1000/1000 bit-exact** (calls 4999/4999, wasm 15,161 B)
