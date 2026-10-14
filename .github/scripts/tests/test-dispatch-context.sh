@@ -256,6 +256,11 @@ for s in '24 時間ごと' '直近 24 時間' '本文・題名の個票は読み
   pm_has "$s"
   expect "pm.md digest: has '$s'" $?
 done
+# 率制限の alert (CI-102 #2539): 観測元は /status の rate_limit_alert と rest_remaining。Worker の停止は watchdog (pm-worker-down) に回す。
+for s in '率制限の alert' '`rate_limit_alert` が true' '`rest_remaining` が 1500 未満' 'tools/pm/worker_url' '`curl -fsS -m 10` で読む' '緊急に数えない' '`.github/scripts/watchdog.sh` が 5 分ごとに `/status` を読んで検知' '`pm-worker-down`'; do
+  pm_has "$s"
+  expect "pm.md digest (rate alert): has '$s'" $?
+done
 for s in '回答を反映して issue 本文を更新' '`needs-user-input` を外す' '「確定」コメント' '回答が曖昧なとき' '聞き直す'; do
   pm_has "$s"
   expect "pm.md user_answered: has '$s'" $?
