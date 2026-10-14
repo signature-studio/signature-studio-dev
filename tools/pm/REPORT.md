@@ -228,3 +228,7 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 結論: `npm test` 213 件 PASS / 0 FAIL (n=3)。`test:unit` 10 件・`test:workers` 3 件 PASS。ネガコン 5 種は各 1 件ずつ壊して FAIL を確認。
 - 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 - 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
+
+## 16. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
+- 測定 commit `55b21686` (コードを変えた最後の commit)、測定時刻 2026-10-14T16:14Z。偽の opencode・間隔 1 秒・`timeout 4`: 文面ファイルあり 送信 3 回 (監査 3・既定 0)、未設定 送信 3 回 (既定 3)、存在しない・空・空白のみ・PM_SESSION_ID 無しは終了 1・送信 0。初回送信は間隔 2 秒で 2.01 秒後。`bash tools/pm/test_pm_wake.sh` 20 passed。
+- 差分 (測定 commit から HEAD まで・コード範囲): `git diff 55b21686 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は空 (差分 0)。
