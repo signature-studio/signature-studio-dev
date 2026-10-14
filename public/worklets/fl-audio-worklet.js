@@ -90,8 +90,14 @@ class FlShimProcessor extends AudioWorkletProcessor {
     const outp = outputs[0];
     const frame = currentFrame, time = currentTime;
     if (this.prevFrame >= 0 && frame !== this.prevFrame + Q) {
+      const d = (frame - this.prevFrame - Q) | 0;   // >0: 描画されなかったフレーム (実スキップ), <0: 重複・後退 (符号付き合計では相殺しうるので別計上)
       Atomics.add(i, x.clock_jumps, 1);
-      Atomics.add(i, x.clock_jump_frames, (frame - this.prevFrame - Q) | 0);
+      Atomics.add(i, x.clock_jump_frames, d);
+      if (d > 0) Atomics.add(i, x.clock_skip_frames, d); else Atomics.add(i, x.clock_dup_frames, -d);
+      if (Math.abs(d) > Atomics.load(i, x.clock_jump_max)) {
+        Atomics.store(i, x.clock_jump_max, Math.abs(d));
+        Atomics.store(i, x.clock_jump_max_q, Atomics.load(i, x.quanta));
+      }
     }
     this.prevFrame = frame;
     {   // バースト長の観測: Date.now() 差 <=1ms で連続する process() の総フレーム数の最大値を burst_obs に公開
@@ -136,6 +142,10 @@ class FlShimProcessor extends AudioWorkletProcessor {
       this.q = 0;
       Atomics.store(i, x.clock_jumps, 0);
       Atomics.store(i, x.clock_jump_frames, 0);
+      Atomics.store(i, x.clock_skip_frames, 0);
+      Atomics.store(i, x.clock_dup_frames, 0);
+      Atomics.store(i, x.clock_jump_max, 0);
+      Atomics.store(i, x.clock_jump_max_q, 0);
       Atomics.store(i, x.play_start_frame, frame >>> 0);
       Atomics.store(i, x.play_start_frame + 1, Math.floor(frame / 4294967296) | 0);
       Atomics.store(i, x.wl_state, WL_BUFFERING);
