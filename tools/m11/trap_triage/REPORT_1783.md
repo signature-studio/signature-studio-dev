@@ -160,7 +160,7 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 ### 8.1 測定条件
 
 - 測定 commit: `796507e9` (コードを変えた最後の commit。run4 はこの commit の `store_watch_1783.sh` で実施)。
-- 素材: `fl-win64` → `/home/runner/work/_temp/fl-win64` (`FL_WIN64_DIR`)、`work-m11`・`work-liftdiff` は worktree の `tools/m11/work/`・`tools/liftdiff/work/` に展開、`toolchain-emsdk` は展開したが、`m11_build.sh` が `/opt/emsdk` を固定で読むため runner の `/opt/emsdk` (emcc 6.0.12 pin) を使った。
+- 素材: `fl-win64` を [WIN64] (`FL_WIN64_DIR`) に展開、`work-m11`・`work-liftdiff` は worktree の `tools/m11/work/`・`tools/liftdiff/work/` に展開。`toolchain-emsdk` は展開したが、`m11_build.sh` が [EMSDK] (`/opt/emsdk`) を固定で読むため runner の [EMSDK] (emcc 6.0.12 pin) を使った。
 - `m11_gen_ir2.sh` rc 0 (40.1 s、`boot_final.ll` 490,735 行)、`m11_build.sh` rc 0 (21.3 s、`signature mismatch: 0, undefined symbol: 0`)。
 
 ### 8.2 計装なし (基準)
