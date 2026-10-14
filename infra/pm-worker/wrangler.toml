@@ -11,8 +11,11 @@ workers_dev = true
 [vars]
 REPO = "signature-studio/signature-studio-dev"
 ORG = "signature-studio"
-TARGET = "80"
-BATCH = "25"
+# TARGET・BATCH・NO_PR_COOLDOWN_H は live の値 (2026-10-14 時点、PR #2454 の表)。deploy で [vars] が置き換わるため、live と揃えておく。
+# src/config.ts の既定 (TARGET 80・BATCH 25・NO_PR_COOLDOWN_H 3) とは食い違う。80/25/3 への変更は PM の判断で別 PR。
+TARGET = "1000"
+BATCH = "1000"
+NO_PR_COOLDOWN_H = "24"
 BOT_LOGIN = "opencode-for-signature-studio[bot]"
 PM_LOGINS = "pycabbage"
 LIVE_LAUNCH = "0"
