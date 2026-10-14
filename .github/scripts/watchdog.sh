@@ -44,7 +44,7 @@
 #   ファイルが無い・取得失敗・JSON 不正は警告だけ出して何もしない (終了コードは変えない)。OC_WORKER_URL_FILE で URL のファイルを差し替えられる (テスト用)。
 #
 # 暫定の oc-pm 起動 (#CI-50): Worker が live になるまで、PM agent の判断待ちの対象を repository_dispatch (oc-pm) で起動する。
-#   stuck : oc:stuck の PR で、最新の oc-fix-limit コメントに oc-pm-intent: stuck がある (fix-progress.sh の停止印)
+#   stuck : oc:stuck の PR で、最新の oc-fix-limit コメント (実装 App の投稿) に、当該 PR の oc-pm-intent: stuck がある (fix-progress.sh の停止印)
 #   no_pr : oc:no-pr の open issue で、最後の oc-run-outcome の reason が split か stop (pm-apply・needs-user-input の付いた issue は除く)
 #   送るのは kind と ref の 2 つだけ。送る前に対象へ <!-- oc-pm-dispatch:<ref> ts=... --> を残す (残せなければ送らない)。
 #   上限は 1 回の点検で 3 件、1 時間に 12 件、同じ ref に 24 時間で 3 件 (記録のコメントを数える。記録は REVIEWER_LOGIN の Bot だけ数える)。
@@ -59,6 +59,7 @@ set -uo pipefail
 R="$OC_REPO"
 DRY="${DRY:-0}"
 REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
+IMPLEMENTER_LOGIN="${OC_IMPLEMENTER_LOGIN:-opencode-for-signature-studio[bot]}"
 SETTLE_MIN="${OC_SETTLE_MINUTES:-4}"
 MAX_ACTIONS="${OC_MAX_ACTIONS:-12}"
 WD_MAX="${OC_WATCHDOG_MAX:-6}"
@@ -555,8 +556,9 @@ else
       echo "#$sn oc-pm: failed to read comments (not a candidate this pass)"
       continue
     fi
-    fixl="$(jq -s -r --arg who "$REVIEWER_LOGIN" '[.[][] | select(.user.login == $who and .user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-limit -->")))] | last | .body // ""' <<< "$cm")"
-    if printf '%s' "$fixl" | grep -q 'oc-pm-intent: stuck'; then
+    # 停止印は fix-progress.sh record が実装 App のトークンで書く (投稿者は実装 App)。intent は当該 PR の pr= のものだけ数える。
+    fixl="$(jq -s -r --arg who "$IMPLEMENTER_LOGIN" '[.[][] | select(.user.login == $who and .user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-limit -->")))] | last | .body // ""' <<< "$cm")"
+    if printf '%s' "$fixl" | grep -Eq "oc-pm-intent: stuck pr=${sn}([^0-9]|\$)"; then
       pm_cands+=("stuck $sn")
     fi
   done
