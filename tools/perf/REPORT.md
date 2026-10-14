@@ -109,7 +109,7 @@ M5 純 SSE カーネル (128 sample/call, µs): waveshaper O0 2.11 / O2 0.845 / 
 - 上限: `size > maximum module size (1073741824)` — L-1 / L は成功 (2.1〜2.2 s, RSS 3.2GB)、L+1 / L+1MiB は失敗。関数数 111→OK / 112 (1,000,832) → `exceeds internal limit of 1000000`。
 - メモリ: `WebAssembly.Memory` 16MB〜4GiB (shared 含む) 確保 0.07〜0.54 ms・RSS 増なし。864MiB × **124 個**で `could not allocate memory`。
 - 帯域: 100 Mbps で K=10 は stream 2816 ms (≈転送時間)、bytes→eager 4051 ms。1 Gbps: eager stream 750 vs bytes 1131 ms。
-- AudioWorklet: `Module` postMessage → `messageerror`。bytes transfer で compile+instantiate 1+4 ms (OTT)、K400 は 38+3 ms。main で eager compile (481 ms) 済みなら worklet 33 ms。2 秒実時間 1048/1048 ブロック処理 (null sink)。
+- AudioWorklet: `Module` postMessage → `messageerror` (版の記載なしの旧測定。版別の結果は `tools/perf/REPORT_P7.md` §7)。bytes transfer で compile+instantiate 1+4 ms (OTT)、K400 は 38+3 ms。main で eager compile (481 ms) 済みなら worklet 33 ms。2 秒実時間 1048/1048 ブロック処理 (null sink)。
 - キャッシュ: IDB `put(Module)` → `DataCloneError`。bytes IDB (32MiB) put 174 / get 72 / 再 compile 54 ms。Cache API 経由 compileStreaming 71〜94 ms、`Code Cache/wasm` は 4 ロード後も index のみ。
 - compilationHints: 既定で効果なし (§PERF 4)。
 
