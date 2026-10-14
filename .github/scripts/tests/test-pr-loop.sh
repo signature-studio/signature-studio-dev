@@ -236,6 +236,51 @@ vsetup NONE
 env -u OC_REPO -u OC_PR_NUMBER GH_TOKEN=x GITHUB_EVENT_PATH=/dev/null RUNNER_TEMP="$TMP" bash "$SCRIPTS/verify-review-verdict.sh" > "$TMP/v.out" 2>&1; rc=$?
 { [ $rc = 0 ] && ! logged 'pr close' && ! logged 'pr reopen' && ! logged 'pr comment'; }; expect "Prepare PR context 失敗で OC_REPO/OC_PR_NUMBER が無い -> 何もせず 0 で終わる (二次失敗しない)" $?
 
+echo "== review-recover.sh (review job が打ち切られたら watchdog を待たず同じ head で再起動 #1950 / CI-38)"
+# rrun <annotation> [review-retry マーカー数]: 初期化 -> review job の annotation を仕込んで review-recover.sh を走らせる
+rrun() {
+  vsetup NONE # vsetup は reset で fixture を消すので、先に呼ぶ
+  printf '%s' '{"pull_request":{"number":7,"head":{"sha":"hhh"}}}' > "$TMP/event.json"
+  fx repos/o/r/actions/runs/123/jobs '{"jobs":[{"name":"build","id":1},{"name":"review","id":555}]}'
+  fx repos/o/r/check-runs/555/annotations "[{\"message\":\"$1\"}]"
+  if [ "${2:-0}" -gt 0 ]; then
+    local c="[" i
+    for ((i = 0; i < $2; i++)); do c="$c{\"body\":\"x <!-- review-retry:hhh -->\"},"; done
+    fx repos/o/r/issues/7/comments "${c%,}]"
+  fi
+  GH_TOKEN=x RUNS_TOKEN=x OC_REPO=o/r GITHUB_RUN_ID=123 GITHUB_EVENT_PATH="$TMP/event.json" \
+    bash "$SCRIPTS/review-recover.sh" > "$TMP/v.out" 2>&1; rc=$?
+}
+
+rrun "The runner has received a shutdown signal."
+{ [ $rc = 0 ] && logged 'pr close 7' && logged 'pr reopen 7'; }; expect "shutdown signal で打ち切られ verdict 無し -> watchdog を待たず同じ head で再起動" $?
+
+rrun "The job has exceeded the maximum execution time of 60 minutes."
+{ [ $rc = 0 ] && logged 'pr reopen 7'; }; expect "実行時間超過の打ち切り -> 再起動" $?
+
+rrun "The operation was canceled."
+{ [ $rc = 0 ] && ! logged 'pr close' && ! logged 'pr reopen'; }; expect "打ち切り文言が無い (PM の手動 cancel 相当) -> 再起動しない" $?
+
+rrun "The runner has received a shutdown signal." 3
+{ [ $rc = 1 ] && ! logged 'pr reopen' && logged 'pr comment 7'; }; expect "同じ head の再起動が上限 3 回に達している -> 再起動せず警告して失敗 (watchdog と上限共有)" $?
+
+rrun "The runner has received a shutdown signal." 2
+{ [ $rc = 0 ] && logged 'pr reopen 7'; }; expect "上限未満 (2 回) なら再起動する (上限は review-retry の数で数える)" $?
+
+vsetup NONE
+printf '%s' '{"pull_request":{"number":7,"head":{"sha":"hhh"}}}' > "$TMP/event.json"
+fx repos/o/r/actions/runs/123/jobs '{"jobs":[{"name":"build","id":1}]}'
+GH_TOKEN=x RUNS_TOKEN=x OC_REPO=o/r GITHUB_RUN_ID=123 GITHUB_EVENT_PATH="$TMP/event.json" \
+  bash "$SCRIPTS/review-recover.sh" > "$TMP/v.out" 2>&1; rc=$?
+{ [ $rc = 0 ] && ! logged 'pr reopen'; }; expect "review job が見つからない -> 何もせず 0 で終わる (watchdog が拾う)" $?
+
+rrun "The runner has received a shutdown signal."
+fx repos/o/r/pulls/7 '{"state":"closed","head":{"sha":"hhh"}}'
+: > "$LOG"
+GH_TOKEN=x RUNS_TOKEN=x OC_REPO=o/r GITHUB_RUN_ID=123 GITHUB_EVENT_PATH="$TMP/event.json" \
+  bash "$SCRIPTS/review-recover.sh" > "$TMP/v.out" 2>&1; rc=$?
+{ [ $rc = 0 ] && ! logged 'pr reopen'; }; expect "打ち切られた時点で PR が closed/merged -> 再起動しない" $?
+
 echo
 printf '%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]

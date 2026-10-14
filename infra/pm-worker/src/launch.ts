@@ -14,6 +14,7 @@ const ART_PREFIX = "oc_artifacts:";
 
 export function validateArtLine(line: string): boolean {
   if (!line.startsWith(ART_PREFIX)) return false;
+  if (line.slice(ART_PREFIX.length).trim() === "none") return true;
   const names = line.slice(ART_PREFIX.length).trim().split(/\s+/).filter(Boolean);
   return names.length > 0 && names.every((a) => ALLOW_ARTS.includes(a));
 }

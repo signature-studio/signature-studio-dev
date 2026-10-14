@@ -6,6 +6,8 @@ import { loadState, migrate, saveChanges, type StorageLike } from "./store.ts";
 export interface WebhookEnv {
   webhookSecret: string;
   botLogin: string;
+  pmLogins?: string[];
+  repo?: string;
 }
 
 export function receiveWebhook(storage: StorageLike, env: WebhookEnv, headers: Headers, body: string): WebhookResult {
@@ -21,6 +23,8 @@ export function receiveWebhook(storage: StorageLike, env: WebhookEnv, headers: H
     signature,
     body,
     botLogin: env.botLogin,
+    pmLogins: env.pmLogins,
+    repo: env.repo,
   });
   saveChanges(storage, prev, result.state);
   return result;

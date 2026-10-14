@@ -46,4 +46,17 @@ for (let i = 0; i < nn; i++) { const d = mod._sxt_count(i) - c0[i]; if (d) conso
 if (!HAS) console.log('(sxt 無し: 既存 M11 ビルド)');
 console.log('MISS_UNIQ', mod._m11_icall_miss_uniq(), 'MISS_TOTAL', mod._m11_icall_miss());
 for (let k = 0; k < mod._m11_icall_miss_uniq(); k++) console.log('MISS_AT|' + k + ' ' + mod._m11_icall_miss_at(k).toString(16));
+// 戻り値ログ (trace_rt.c の sxt_ret): 全 unit 分を出し、unit idx+1 の行を後で見る
+if (typeof mod._sxt_ret_n === 'function') {
+  const rn = mod._sxt_ret_n();
+  for (let k = 0; k < rn; k++) {
+    const nm = mod.UTF8ToString(mod._sxt_name(mod._sxt_ret_idx(k)));
+    const a = mod._sxt_ret_a(k), b = mod._sxt_ret_b(k);
+    const u8 = mod.HEAPU8;
+    let str = '';
+    if (nm === 'GetModuleHandleW' && a > 0 && a < u8.length) { for (let p = a; p + 1 < u8.length && (u8[p] | u8[p + 1] << 8); p += 2) str += String.fromCharCode(u8[p] | u8[p + 1] << 8); }
+    if (nm === 'GetProcAddress' && b > 0 && b < u8.length) { for (let p = b; p < u8.length && u8[p]; p++) str += String.fromCharCode(u8[p]); }
+    console.log('RET|unit', mod._sxt_ret_unit(k), nm, 'a=0x' + a.toString(16), 'b=0x' + b.toString(16), 'r=0x' + mod._sxt_ret_r(k).toString(16), str ? 'name=' + JSON.stringify(str) : '');
+  }
+}
 for (const l of errs.slice(e0)) console.log('ERR|' + l.slice(0, 300));
