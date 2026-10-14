@@ -9,10 +9,10 @@
 |---|---|---|---|
 | 1 | サブインタプリタ (静的版 wasm32) | **達成**。12/12 PASS | §1 |
 | 2 | pthread + GIL | **未実施**。子 #2856 (PY-97) に分割 | §4 |
-| 3 | Memory64 | **部分**。`MEMORY64=1` はリンクまで成功、node 22.23 では validate 不可。`MEMORY64=2` は実行でき 11/12 PASS (heap 増加 1 件 FAIL)。実行検証は子 #2858 (PY-98) | §3 |
+| 3 | Memory64 | **部分**。`MEMORY64=1` はリンクまで成功。headless Chrome 154 では validate 可、node 22.23 では validate 不可 (エンジン依存)。`MEMORY64=2` は node で実行でき 11/12 PASS (heap 増加 1 件 FAIL)。`MEMORY64=1` の実行検証は子 #2858 (PY-98) | §3 |
 | 4 | `_PyInterpreterState_GetRefTotal` | **FL PE は呼んでいない**。参照は束縛時の store 1 件のみ。束縛失敗は無言 | §2 |
 
-測定 commit: `7e34fa2b` (コードを変えた最後の commit。以降は本節を含む文書のみ)。`git diff 7e34fa2b HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行。`7e34fa2b` は、それより前の commit `37164f82` (同じ測定を実施) から、`build_cpython_wasm64.sh` の emsdk の指定だけを変えたもの (`[EMSDK]` の lint 対応)。測定は 7e34fa2b で再ビルドし直して行った。
+測定 commit: `2a85bd96` (コードを変えた最後の commit。以降は本節を含む文書のみ)。`git diff 2a85bd96 HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行。probe の値は commit `7e34fa2b` で再ビルドして測定し、`7e34fa2b` → `2a85bd96` の差分は Chrome の validate 確認ページ (`tests/memory64_validate_chrome.html`) 1 件だけで、probe の測定経路には入らない。`7e34fa2b` は、それより前の commit `37164f82` (同じ測定) から `build_cpython_wasm64.sh` の emsdk の指定だけを変えたもの ([EMSDK] の lint 対応)。
 
 環境: GitHub Actions runner (4 core)、node v22.23.3、emcc 6.0.12 ([EMSDK])。load は各 run 直前の `/proc/loadavg` 1 分値。
 
@@ -59,7 +59,9 @@
 ## 3. Memory64 — リンクは成功、実行は node 22.23 で一部
 
 - `build_cpython_wasm64.sh`: wasm64 の configure は config.site に sizeof の固定値を持たないため、ポインタ幅は CFLAGS の `-sMEMORY64=1` に従う。
-- `-sMEMORY64=1` (wasm64 libpython + 静的版): リンク 6,375,065 B。node 22.23.3 で `WebAssembly.validate` は **false** (`--experimental-wasm-memory64` を付けても false)。instantiate は `invalid table elements limits flags` で失敗する (table64 の形式)。この環境では実行できない。
+- `-sMEMORY64=1` (wasm64 libpython + 静的版): リンク 6,375,065 B。
+  - node 22.23.3 で `WebAssembly.validate` は **false** (`--experimental-wasm-memory64` を付けても false)。instantiate は `invalid table elements limits flags` で失敗する (table64 の形式)。
+  - headless Chrome 154 (`google-chrome --headless=new --allow-file-access-from-files --dump-dom tests/memory64_validate_chrome.html`) では `validate=true` (wasm32 の `flpy_static.wasm` も true)。table64 はブラウザでは受理される。instantiate と probe の実行は未実施 (子 #2858)。
 - `-sMEMORY64=2` (binaryen の memory64/table64 lowering): リンク 6,548,115 B。`validate` は **true**。
   - `STATIC_WASM=flpy_static64l STATIC_MEM64=2 node tests/static_subinterp_probe.mjs` は `STATIC SUBINTERP FAIL` (rc 2)。**11/12 PASS**。失敗は wasm メモリ不変の 1 件だけ。3 系列とも 33,554,432 → 48,365,568 B (+14,811,136 B)。wall 23.53 秒 (load 0.98)。
   - 同一 instance の推移 (20 回区間): 33,554,432 (0〜100 回) → 40,304,640 (120 回) → 40,304,640 (140 回) → 48,365,568 (160 回)。32bit 版は同じ 160 回で増えない (§1)。
@@ -77,7 +79,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | pthread + GIL の静的版のビルドと複数スレッドからの実行 | MIDI スレッド分離の可否 | 子 #2856 (PY-97) |
-| `MEMORY64=1` の実行 (node 22.23 は table64 を validate できない。table64 対応エンジンで同じ probe を通す) | Memory64 の実行可否が未確認 | 子 #2858 (PY-98) |
+| `MEMORY64=1` の instantiate と probe 実行 (node 22.23 は validate 不可、Chrome 154 は validate 可) | Memory64 の実行可否が未確認 | 子 #2858 (PY-98) |
 | `MEMORY64=2` の heap 増加 (160 回で +14.8 MB、32bit 版は 0) の原因 | Memory64 (lowered) 版で長い作成/破棄を繰り返すと増える可能性 | 子 #2858 (PY-98) |
 | `_PyInterpreterState_GetRefTotal` の結論は FLEngine PE の rip 相対・絶対参照の走査に限る | python312.dll や他 DLL での利用は未調査 | 追加起票なし (結論の範囲の注記) |
 
