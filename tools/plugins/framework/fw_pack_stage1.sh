@@ -3,7 +3,7 @@
 #   bash fw_pack_stage1.sh pack   [SRC_DIR] [OUT.tar.zst]   # 既定 SRC=tools/plugins/work/fw / OUT=artifacts/work-fw-stage1.tar.zst
 #   bash fw_pack_stage1.sh verify [TARBALL]                 # 構成 (12 ファイル・重複・パス・非空・JSON・想定外エントリ無し) を検査。不合格は exit 1
 # tarball の最上位は tools/plugins/work/fw/ (agent-setup が $GITHUB_WORKSPACE へ展開する work-* 規約)。
-# upload は PM: aws s3 cp OUT s3://signature-studio-artifacts/artifacts/work-fw-stage1.tar.zst --endpoint-url <R2>
+# upload は依頼者 (手順は docs/WORKFLOW.md §11): aws s3 cp OUT s3://signature-studio-artifacts/artifacts/work-fw-stage1.tar.zst --endpoint-url <R2>
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/../../shared/env.sh"
