@@ -4,7 +4,7 @@
 
 **判定: 達成 (issue の範囲を縮めた)**。配線・ir_conditions / IR diff・通常 build の wasm での実測・survey 突合・`%arg1` assert・DEFECTS 更新は達成。受入条件 4 の ok 絶対値は、869 と 870 の差を IR の出所 (同梱 IR と再生成 IR の差) まで特定した。**ただし 5872 行のどの変更が差を生むかは未特定で、136 は本 run で再現せず原因は未特定**。「136 の原因特定」と「869/870 差の変更の特定」は issue の受入条件から外した (§5・§8)。
 
-測定 commit: `d2fe925a` (main 取り込み後の HEAD。`ldfix_509_e2e.sh`・`ld108_e2e.sh` を同 commit で実測。§9)。`git diff d2fe925a HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行。取り込み前の `3de663ee` と `28d10d58` の値は §7・§9 に残す。
+測定 commit: `d2fe925a` (main 取り込み後の HEAD。コードを変えた最後の commit)。`ldfix_509_e2e.sh`・`ld108_e2e.sh` は `6b13fb26` の worktree で実測した (`git diff d2fe925a 6b13fb26 -- tools/m11` は 0 行)。`git diff d2fe925a HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行。取り込み前の `3de663ee` と `28d10d58` の値は §7・§9 に残す。
 
 ## 1. 受入条件
 
@@ -58,7 +58,10 @@
 | 項目 | 修復前 (`M11_FIX_LD108=0`) | 修復後 (本番経路) |
 |---|---|---|
 | 41a670 の head (期待 0x2222) | 0x3333 FAIL | **0x2222 PASS** |
-| `audit_lsf_disp.py` の SUSPECT | 4 (41a670 6677a0 d237e0 de1da0) | 3 (6677a0 d237e0 de1da0) |
+| `audit_lsf_disp.py` の SUSPECT (既定 = 変位形 + movs・lea 列挙) | 1 (41a670) | 0 (なし) |
+| `audit_lsf_disp.py --no-strmov` (#2316 時点の列挙) | 4 (41a670 6677a0 d237e0 de1da0) | 3 (6677a0 d237e0 de1da0) |
+
+既定の検出器で、修復後 IR の `audit_lsf.py` の `SUSPECT_DISP_VAS` は空になる (#2402 スレッドの提案の確認)。`--no-strmov` の残る 3 件は `movs`・`lea` 経由の誤検出で、REPORT_2396 §3 で突合済み (未解決ではない)。既定の 41a670 の 1 件は修復で消える。測定は §9。
 | survey 942 unit | ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1 | 同じ |
 
 `survey_diff.py` の突合: ok 退行 unit 0、kind 以外を含む差分 unit 0、icall sites・targets の総数差 0。survey の差が 0 であることは、41a670 の修復が survey の結果を変えないことを示すだけで、survey が head 解除の分岐を通るかは未確認 (§8)。分岐の効果を示す証拠は直接呼びだけである。
@@ -109,19 +112,18 @@ main 取り込み前の run も同じ値だった (ir_sha256 3 種・survey 870 
 | ok 136 型 (miss 797) の発生条件。本 run は再現せず、検査と環境記録を足した | 再発すると survey の値が基準から外れる | 本表のみ (再現待ちの追跡のため子 issue は起票しない)。再発したら `ld108_e2e.sh` の環境記録と `SURVEY_ANOMALY` の出力を添えて新規に起票する |
 | 同梱 `boot_final.ll` と再生成 IR の 5872 行差のうち、ok 869 と 870 の差 (oob 15→16、abort 2→0) を生む変更の特定 | 旧 IR の値を基準にした過去 REPORT の絶対値は 870 と一致しない | 同上 (測定の基準は再生成 IR に統一済み) |
 | survey の差が 0 (survey が 41a670 の head 解除の分岐を通るかは未確認)。効果の証拠は wasm 直接呼びだけ | 実機経路での効果は未確認 | 本表のみ (survey の経路確認は再測定にあたる) |
-| `audit_lsf_disp.py` の `audit_lsf.py` 統合、残 SUSPECT 3 件の突合 | REPORT_2316 §5 のとおり | #2396 (LD-111) |
 | `666a60` のループ内 store (`store i64 %29`) の修復 | 同型の誤りが残る (REPORT_735 §1.2・REPORT_509 §1) | #2447 (LD-115。親: #2402)。#1091 は CLOSED のため付け替えた。#2316 は 41a670 の修復が受入条件で範囲外 |
 
-## 9. 指摘 round 1 への対応の実測 (測定 commit `d2fe925a`)
+## 9. 再測定 (指摘 round 2 への対応。測定 commit `d2fe925a`)
 
-main 取り込み後の HEAD `d2fe925a` で、foreground 1 回ずつ実測した。所要時間は計測していない (`time` を付けなかった)。取り込みで `tools/m11` に 20 ファイル・差分 1350 行が入ったため、取り込み後の HEAD で再測定した (WORKFLOW §6)。
+測定は `6b13fb26` の worktree で、foreground 1 回ずつ実施した。`6b13fb26` の `tools/m11` は `d2fe925a` と同一 (`git diff d2fe925a 6b13fb26 -- tools/m11` は 0 行)。取り込み後の HEAD で測り直す方針は round 1 と同じで、round 1 (`d2fe925a`) の値と一致した。所要時間は `time` で計測した。
 
 | 検査 | rc | 結果 |
 |---|---|---|
-| `FL_WIN64_DIR=<fl-win64> EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/m11/ldfix/ldfix_509_e2e.sh` | 0 | 6/7 build 成功 (修復前 = `ldfix=disabled` + `M11_ALLOW_LDFIX_DISABLED=1`、修復後 = `ldfix=applied` + `ld108=disabled` + `M11_ALLOW_LD108_DISABLED=1`)。survey: 修復前 ok 868 / oob 17 / halt0 8 / miss 47 / other 1 / noproc 1、修復後 ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1、ok 退行 0。reach 26 関数を計装。7/7 `DYN_SUMMARY after_fail=0/5`、5 関数すべて修復前 FAIL → 修復後 PASS |
-| `FL_WIN64_DIR=<fl-win64> bash tools/m11/ldfix/ld108_e2e.sh` | 0 | `LD108_E2E_SUMMARY fail=0`。修復前 FAIL (0x3333) → 修復後 PASS (0x2222) を含む。survey ok 退行 0 |
+| `FL_WIN64_DIR=<fl-win64> EMSDK_ENV=/opt/emsdk/emsdk_env.sh bash tools/m11/ldfix/ldfix_509_e2e.sh` | 0 | 6/7 build 成功 (修復前 = `ldfix=disabled` + `M11_ALLOW_LDFIX_DISABLED=1`、修復後 = `ldfix=applied` + `ld108=disabled` + `M11_ALLOW_LD108_DISABLED=1`)。survey: 修復前 ok 868 / oob 17 / halt0 8 / miss 47 / other 1 / noproc 1、修復後 ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1、ok 退行 0 (`survey_diff.py`。遷移は halt0 → ok 1 ほか)。kind 以外も含めた差分 unit 14 (修復で出力が変わる unit)。`reach_509.sh` は 26 関数を計装し、41a670 は 7 unit から到達。7/7 `DYN_SUMMARY after_fail=0/5`、5 関数すべて修復前 FAIL → 修復後 PASS。real 6 分 40.723 秒 |
+| `FL_WIN64_DIR=<fl-win64> bash tools/m11/ldfix/ld108_e2e.sh` | 0 | `LD108_E2E_SUMMARY fail=0` (PASS 15 検査)。IR の差は 41a670 の 1 関数 (`ld108_irdiff.py` PASS)。修復前 FAIL (0x3333) → 修復後 PASS (0x2222)。survey 修復前後 ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1、ok 退行 0、kind 以外の差分 0、icall sites・targets の差 0。NC1〜NC4 PASS。audit の値は §4。real 3 分 27.311 秒。環境 (開始時): node v22.23.3 / python 3.14.8 / nproc 4 / MemAvailable 14474 MiB / load 1.14 0.51 0.21 |
 
 - **6/7 の ld108 の扱い (指摘 blocking 1)**: `ldfix_509_e2e.sh` は `fix_ld108.py` を適用しない。REPORT_1290 の測定条件 (ldfix のみ) を保つため、修復後経路で `ld108=disabled` を明示し、build に `M11_ALLOW_LD108_DISABLED=1` を付けた (スクリプト冒頭と同じ)。
 - **reach の rc (指摘の付随)**: `9b74f4c2` の `ldfix_509_e2e.sh` は `EMSDK_ENV` が無いと 6/7 の reach だけが失敗し、rc 0 のままだった。`3de663ee` で `EMSDK_ENV` を必須にし、`reach_509.sh` の失敗を `FAIL=1` に反映した。上の rc 0 は reach 成功後の値。
 - 参考 (取り込み前 `3de663ee`): 同じ 2 本が rc 0。509 real 5 分 20.894 秒、ld108 real 3 分 23.637 秒。
-- 測定後のコード差分 (`git diff d2fe925a HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'`) は 0 行。
+- 測定後のコード差分 (`git diff d2fe925a HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'`) は 0 行 (round 2 の再測定の時点でも、`d2fe925a` から `6b13fb26` までの `tools/m11` 差分は 0 行)。
