@@ -18,6 +18,7 @@ EVENT_NAME="${OC_EVENT_NAME:-unknown}"
 PERMISSION="${OC_PERMISSION:-read}"
 REPO="${OC_REPO:-${GITHUB_REPOSITORY:-unknown}}"
 PR_NUMBER="${OC_PR_NUMBER:-none}"
+DISPATCH_REASON="${OC_DISPATCH_REASON:-}"
 ISSUE_NUMBER="${OC_ISSUE_NUMBER:-none}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROMPTS_DIR="${OC_PROMPTS_DIR:-$SCRIPT_DIR/../prompts}"
@@ -145,14 +146,25 @@ fence="$(fence_for "$comment")"
       printf '6. draft にしない。新しい PR を作らない (この PR を直す)。\n'
       ;;
     repository_dispatch)
-      # watchdog が送った fix 依頼 (競合の解消。#731)。競合 PR は review イベントでは起動しないため、この経路で起動する。
-      printf '**これは watchdog が送った競合解消の依頼である。PM の指示を待たずに、あなた自身が完了させる。**\n\n'
-      printf '1. `gh pr checkout %s` した PR ブランチ上で `git fetch origin main && git merge origin/main` を実行し、競合を解消する。\n' "$PR_NUMBER"
-      printf '   rebase はしない。force push はしない。main 側の変更を消さない。競合解消以外の変更はしない。\n'
-      printf '2. 解消後、PR が触る領域の検証 (該当 e2e またはテスト) を再実行し、結果を PR コメントに実測で書く。\n'
-      printf '3. 同じブランチへ push する (push が review を自動で再起動する)。PR 本文の検証 HEAD・実測値は最新の HEAD に更新する。\n'
-      printf '4. 競合した箇所と解消方針を PR コメントで報告する。**何も push せず、PR コメントも書かずに終了してはならない。**\n'
-      printf '5. draft にしない。新しい PR を作らない (この PR を直す)。\n'
+      if [ "$DISPATCH_REASON" = changes-requested ]; then
+        # watchdog が送った差し戻しの修正依頼 (review イベントが起動しなかった差し戻し。#719)。
+        printf '**これは watchdog が送った差し戻しの修正依頼である。PM の指示を待たずに、あなた自身が修正を完了させる。**\n\n'
+        printf '1. `gh pr checkout %s` した PR ブランチ上で、現在の head に対する oc-reviewer の最新の差し戻し (review と inline コメント) を読み、妥当な指摘を全て修正する。\n' "$PR_NUMBER"
+        printf '   force push はしない。main と競合している場合は main を merge して解消する (rebase はしない)。\n'
+        printf '2. 修正を同じブランチへ push する (push が review を自動で再起動する)。PR 本文の検証 HEAD・実測値は最新の HEAD に更新する。\n'
+        printf '3. 妥当でないと判断した指摘は、PR コメントに根拠 (実測) を書く。\n'
+        printf '4. **何も push せず、PR コメントも書かずに終了してはならない。** 終了前に、指摘ごとの対応 (修正 commit / 対応しない理由) を PR コメントで報告する。\n'
+        printf '5. draft にしない。新しい PR を作らない (この PR を直す)。\n'
+      else
+        # watchdog が送った fix 依頼 (競合の解消。#731)。競合 PR は review イベントでは起動しないため、この経路で起動する。
+        printf '**これは watchdog が送った競合解消の依頼である。PM の指示を待たずに、あなた自身が完了させる。**\n\n'
+        printf '1. `gh pr checkout %s` した PR ブランチ上で `git fetch origin main && git merge origin/main` を実行し、競合を解消する。\n' "$PR_NUMBER"
+        printf '   rebase はしない。force push はしない。main 側の変更を消さない。競合解消以外の変更はしない。\n'
+        printf '2. 解消後、PR が触る領域の検証 (該当 e2e またはテスト) を再実行し、結果を PR コメントに実測で書く。\n'
+        printf '3. 同じブランチへ push する (push が review を自動で再起動する)。PR 本文の検証 HEAD・実測値は最新の HEAD に更新する。\n'
+        printf '4. 競合した箇所と解消方針を PR コメントで報告する。**何も push せず、PR コメントも書かずに終了してはならない。**\n'
+        printf '5. draft にしない。新しい PR を作らない (この PR を直す)。\n'
+      fi
       ;;
     pull_request)
       printf '1. PR の差分を読み、依頼された追加作業を実施する。\n'

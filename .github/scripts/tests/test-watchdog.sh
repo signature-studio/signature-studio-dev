@@ -209,13 +209,21 @@ wd
 logged 'pr ready 2'
 expect "draft -> ready" $?
 
-# 3. 現在の head に差し戻しがあるのに fix が無い -> [watchdog] 再提出
+# 3. 現在の head に差し戻しがあるのに fix が無い -> repository_dispatch (oc-fix, changes-requested)。差し戻しは再提出しない (#719)
 reset
 base "[$(pr 3 ccc333 false "$OLD")]"
 detail 3 true "[$(review "$REVIEWER" ccc333 CHANGES_REQUESTED)]"
 wd
-logged 'pr review 3 .*--request-changes' && logged '\[watchdog\]'
-expect "unfixed changes_requested -> [watchdog] re-request" $?
+logged 'client_payload\[pr\]=3' && logged 'client_payload\[reason\]=changes-requested' && not_logged 'pr review 3'
+expect "unfixed changes_requested -> repository_dispatch oc-fix (no re-request)" $?
+
+# 3b. 同じ head の差し戻しの fix dispatch が上限 (3 回) に達したら oc:stuck で止める (#719)
+reset
+base "[$(pr 3 ccc333 false "$OLD")]"
+detail 3 true "[$(review "$REVIEWER" ccc333 CHANGES_REQUESTED)]" "[$(for _ in 1 2 3; do printf '{"user":{"login":"%s","type":"Bot"},"body":"x <!-- oc-dispatch:ccc333 -->"},' "$REVIEWER"; done | sed 's/,$//')]"
+wd
+logged 'pr edit 3 .*--add-label oc:stuck' && not_logged 'repos/o/r/dispatches'
+expect "changes_requested dispatch limit reached -> oc:stuck, no more dispatch" $?
 
 # 4. approve 済みで未 merge -> --match-head-commit 付きで merge
 reset

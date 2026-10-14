@@ -15,7 +15,8 @@
 #                     実装 run を起動する (同じ head へは DISPATCH_MAX 回まで。超えたら oc:stuck。#731)。
 #                     fork からの PR は dispatch しない (write 権限の run を第三者の入力で動かさないため。oc:stuck も付けず一覧に出すだけ)
 #   DRAFT             draft -> ready (ready_for_review で review が起動する)
-#   FIX_IDLE          現在の head に CHANGES_REQUESTED があるのに fix run が無い -> CHANGES_REQUESTED を再提出して fix 経路へ
+#   FIX_IDLE          現在の head に CHANGES_REQUESTED があるのに fix run が無い -> repository_dispatch (oc-fix, reason=changes-requested) で fix run を起動
+#                     (同じ head へは DISPATCH_MAX 回まで。超えたら oc:stuck)。差し戻しの再提出は使わない: approve 後に main が進んで merge できなくなった差し戻しは、review の run が作られないことがあった (#719 実測)
 #   APPROVED          approve 済みで未 merge -> merge。失敗したら理由付きの CHANGES_REQUESTED
 #   NOREVIEW          現在の head に verdict (APPROVED / CHANGES_REQUESTED) が無い。COMMENT だけの review も含む
 #                     (Copilot 待ちの保留は廃止した) -> close -> reopen で review を再起動
@@ -89,9 +90,14 @@ reopen() { # reopen <PR> <head>: 試行を数えるマーカー付きのコメ�
   OC_REPO="$R" OC_PR_NUMBER="$1" bash "$(dirname "$0")/reopen-pr.sh"
 }
 dispatch_fix() { # dispatch_fix <PR> <head> <reason> <artifacts>: 試行を数えるマーカー付きのコメント -> repository_dispatch (oc-fix)
-  local marker="oc-dispatch:${2:0:12}"
+  local marker="oc-dispatch:${2:0:12}" why
+  if [ "$3" = conflict ]; then
+    why="この PR は main と競合しています。競合 PR は review イベントでワークフローが起動しないため、repository_dispatch で競合解消の実装 run を起動します"
+  else
+    why="現在の head に対する差し戻し (CHANGES_REQUESTED) の修正がまだ無いため、repository_dispatch で修正の実装 run を起動します"
+  fi
   gh pr comment "$1" --repo "$R" \
-    --body "[watchdog] この PR は main と競合しています。競合 PR は review イベントでワークフローが起動しないため、repository_dispatch で競合解消の実装 run を起動します (head ${2:0:7})。<!-- $marker -->" || true
+    --body "[watchdog] ${why} (head ${2:0:7})。<!-- $marker -->" || true
   gh api -X POST "repos/$R/dispatches" -f event_type=oc-fix \
     -F "client_payload[pr]=$1" -f "client_payload[reason]=$3" -f "client_payload[artifacts]=$4"
 }
@@ -459,7 +465,7 @@ for i in $(seq 0 $((total - 1))); do
   # 補正を 1 回しても入力不正が残る head は、人の判断が要る (oc:stuck)。
   repair_due=0
   if [ "$reason" = NOREVIEW ] && [ -n "$bad" ] && [ "$repaired_n" -eq 0 ]; then repair_due=1; fi
-  if { [ "$reason" != NOREVIEW ] && [ "$reason" != CONFLICT ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$repair_due" = 0 ] && [ "$retry_n" -ge 3 ]; } || { [ "$reason" = CONFLICT ] && [ "$disp_n" -ge "$DISPATCH_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ -n "$bad" ] && [ "$repaired_n" -ge 1 ]; }; then
+  if { [ "$reason" != NOREVIEW ] && [ "$reason" != CONFLICT ] && [ "$wd_n" -ge "$WD_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ "$repair_due" = 0 ] && [ "$retry_n" -ge 3 ]; } || { { [ "$reason" = CONFLICT ] || [ "$reason" = FIX_IDLE ]; } && [ "$disp_n" -ge "$DISPATCH_MAX" ]; } || { [ "$reason" = NOREVIEW ] && [ -n "$bad" ] && [ "$repaired_n" -ge 1 ]; }; then
     echo "  STUCK: automatic recovery exhausted on ${head:0:7} (watchdog=$wd_n review-retry=$retry_n dispatch=$disp_n repaired=$repaired_n): labelled oc:stuck, no further action"
     do_it "oc:stuck on #$n" mark_stuck "$n"
     continue
@@ -475,8 +481,7 @@ for i in $(seq 0 $((total - 1))); do
       do_it "ready #$n" gh pr ready "$n" --repo "$R"
       ;;
     FIX_IDLE)
-      do_it "re-request changes on #$n" request_changes "$n" \
-        "[watchdog] 現在の head に対する直前の oc-reviewer の差し戻し (CHANGES_REQUESTED) の指摘を、まだ誰も修正していません。その review・inline コメント・Copilot の指摘を読み、修正して push してください。(watchdog)"
+      do_it "dispatch oc-fix (changes-requested) for #$n" dispatch_fix "$n" "$head" changes-requested "$(pr_artifacts "$pr")"
       ;;
     APPROVED)
       if [ "$DRY" = 1 ]; then

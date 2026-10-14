@@ -40,6 +40,11 @@ c="$TMP/rt/opencode-comment.txt"
 grep -q 'main と競合しています' "$c" && ! grep -q -e 'IGNORE' -e 'evil.example' -e 'rm -rf' "$c" && ! grep -q -e 'IGNORE' -e 'evil.example' -e 'rm -rf' "$TMP/env"
 expect "free text in the payload never reaches the instruction or the env" $?
 
+# 2b. 差し戻しの修正依頼 (changes-requested) は固定文で、差し戻しの修正を指示する
+ctx '{"pr":123,"reason":"changes-requested","artifacts":""}'
+grep -q 'CHANGES_REQUESTED' "$TMP/rt/opencode-comment.txt" && out_has 'should_run=true'
+expect "changes-requested -> fixed instruction to address the review, should_run" $?
+
 # 3. PR 番号は数字のみ
 for bad in '"12; rm -rf /"' '"12 13"' '"-1"' '"1e3"' '12345678' '""' 'null'; do
   ctx "{\"pr\":$bad,\"reason\":\"conflict\",\"artifacts\":\"\"}"
@@ -374,6 +379,16 @@ grep -q '^## 今回の依頼 (oc-pm)' "$PMP" && grep -q '今回の kind は stuc
 expect "oc-pm prompt: pm.md template + the fixed instruction (kind and ref)" $?
 [ "$(grep -c '^`\{11,\}$' "$PMP")" -eq 2 ]
 expect "oc-pm prompt: the body fence pair is intact (no extra fence injected)" $?
+
+# 13. 差し戻しの修正依頼 (changes-requested) は理由を環境に渡し、prompt は競合解消の手順を含まない (#719)
+ctx '{"pr":123,"reason":"changes-requested","artifacts":""}'
+env_has 'OC_DISPATCH_REASON=changes-requested'
+expect "changes-requested -> OC_DISPATCH_REASON is passed to the prompt step" $?
+OC_PROMPT_FILE="$TMP/cr-prompt.txt" OC_EVENT_NAME=repository_dispatch OC_DISPATCH_REASON=changes-requested OC_PR_NUMBER=123 \
+  OC_COMMENT_FILE="$TMP/rt/opencode-comment.txt" OC_PERMISSION=write OC_REPO=o/r RUNNER_TEMP="$TMP/rt" \
+  bash "$HERE/../assemble-prompt.sh" > "$TMP/asm-cr.log" 2>&1
+grep -q '差し戻しの修正依頼' "$TMP/cr-prompt.txt" && ! grep -q 'git merge origin/main' "$TMP/cr-prompt.txt"
+expect "changes-requested prompt is the fix instruction, not the conflict merge" $?
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]
