@@ -36,8 +36,8 @@ slot の対応 (block24339 の種別 × block24356 の種別, 件数):
 | store_ret | 2 | 0 | 0 | 0 | 2 |
 
 **判明**:
-- 両 DLL とも vtable は 130 slot。Blend2D.dll の 49 slot は同一の `ret 0` (`0x18000c530`) を指す no-op で、dsp_ippv2 では 42 slot が実処理を持つ。Blend2D.dll 側でこれらが未実装 (または no-op 扱い) であることを示す。
-- Blend2D.dll で実体のある slot は **81** (= 130 − 49。code 76 + ret_const 3 + store_ret 2)、そのうち unique 関数は **78** (code 76 + ret_const 1 + store 1)。vtable 層の glue 規模はこの 78 関数が上限。
+- 両 DLL とも vtable は 130 slot。Blend2D.dll では no-op の slot が 49 ある (同一の `ret 0`、`0x18000c530`)。dsp_ippv2 では 42 slot が実処理を持つ。
+- Blend2D.dll で実体のある slot は **81** (= 130 − 49。code 76 + ret_const 3 + store_ret 2)、そのうち unique 関数は **78** (code 76 + ret_const 1 + store 1)。vtable 直下の実体関数は 78。
 - §9 の閉包 (depth 50, 221 関数) のうち vtable 79 root を除く **142 関数** は、Blend2D 内部か glue の補助かが未判定 (帰属は未測定)。
 
 **未検証 (本節の結論を強める前に確認が要る)**:

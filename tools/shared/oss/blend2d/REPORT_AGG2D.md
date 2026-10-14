@@ -187,8 +187,8 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 
 ## 12. vtable の slot 単位比較: Blend2D.dll と dsp_ippv2
 
-結論: Blend2D.dll の vtable 130 slot のうち 49 slot は同一の `ret 0` (no-op)、実体のある slot は 81 (unique 関数 78)。dsp_ippv2 (block24356) は同数 130 slot で実処理 123。測定値と未検証事項は `REPORT_APPENDIX_AGG2D.md` §12。
+結論: 2 DLL の vtable を slot 単位で比較した。差分と未検証事項は `REPORT_APPENDIX_AGG2D.md` §12。
 
 ## 13. AggCreateInstance の呼び出し元の手がかり
 
-結論: block18797 が `Blend2D.dll` を読み込み `AggCreateInstance` を解決する lazy 初期化 loader を持つ (UTF-16 の両文字列を含む block 145 件)。消費側は未特定。測定値は `REPORT_APPENDIX_AGG2D.md` §13。
+結論: block18797 に lazy 初期化 loader がある。消費側は未特定。測定値は `REPORT_APPENDIX_AGG2D.md` §13。
