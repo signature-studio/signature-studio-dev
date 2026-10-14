@@ -152,7 +152,7 @@ def edit(fn, restores, escaped, md, gl_text):
     def same_block(p):
         for j in range(p - 1, -1, -1):
             l = lines[j]
-            if re.match(r'^[A-Za-z0-9_.$-]+:', l) or re.match(r'^\s+(br|switch|ret|unreachable|indirectbr)\b', l):
+            if re.match(r'^(?:[A-Za-z0-9_.$-]+:|;\s*<label>:)', l) or re.match(r'^\s+(br|switch|ret|unreachable|indirectbr)\b', l):
                 return False
             if '!insn.addr' in l and 'alloca' not in l:
                 return True
