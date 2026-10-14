@@ -54,6 +54,18 @@
   - **最終測定 (測定 commit 3a35cb58 = HEAD, clean 作業ツリー)**: `bash oss/freetype/qfc_gpa_trace/run.sh` を foreground 実行。**rc 0 / 41.3 s / load 0.42→0.51 (nproc=4)**。Call 行 254 件 (全体)、QuickFontCache 範囲 `[0x7bde0000, 0x7bfee000)` = **0 件**、probe 陽性対照 = **26 件** (うち `InitDll`/`CreateVST3Instance` 2 件)。`git diff 3a35cb58 HEAD -- tools/shared/oss` は 0 件 (3a35cb58 以降の差分は REPORT_APPENDIX のみ = 測定コードに差分なし)。
   - **実行条件**: `run.sh` は毎回 wine prefix を作り直す (旧版は prefix 残存で relay 行数が変わった: 10.6M 行 → 0.37M 行)。再現は `apt-get install wine64 gcc-mingw-w64-x86-64 xvfb` の後に `bash oss/freetype/qfc_gpa_trace/run.sh`。`0x563000` は abs64 参照が無く、`0x563820`/`0x563840` (refcount init/fini) の 2 つの abs64 参照元 (`.text` 内 `0x19cac0`/`0x19cac8`) の経路を未特定。よって 17 本の到達性は**依然未確定**。次の一手: `0x19cac0` 付近の参照テーブルの持ち主を同定し、その経路を実行する export を探す。
   - **残り**: (b) `0x406e70`・`0x419480` の呼出元と引数の全数確認 (17 本の序数・ハッシュ除外)。(b) は #T-SH-29 (親 #1144 の子) で扱う。
+  - **#2220 (2026-10-14, x64 `block24350`・測定 commit 19e64ac6)**: 上の 0 件は harness の副作用だった。`patch_entry.py` が DllMain を `mov eax,1; ret` に置換しており、DllMain 内の FT 解決が走らなかった。`run.sh` の既定を**素材の DllMain の無改変実行**に変えた (`QFC_PATCH_ENTRY=1` で旧方式)。
+    - **実測 (19e64ac6, `bash oss/freetype/qfc_gpa_trace/run.sh`, foreground)**: rc 0 / 162 s / load 0.02→0.02 (1 分平均, nproc=4)。wine の終了は timeout (150 s) の rc 124。DllMain は FT 解決の後にウィンドウ処理 (`window proc`・WM_MOUSEMOVE) へ入り、150 s の時点で戻らない。そのため probe の `LoadLibrary=` 行は出ず、基底は relay の `PROCESS_ATTACH` 行 (`module=7BDE0000`) から取る。relay 行 440,398 (prefix 作成は `wineboot -i` で記録外)。
+    - **GetProcAddress (QuickFontCache 範囲 `[0x7bde0000, 0x7bfee000)`・Call 行) = 950 件**。呼出元の戻り番地は全て QFC 内。問い合わせ先モジュール (`LoadLibraryW`/`GetModuleHandleW` の戻り値で対応付け): `dsp_ippv2_x64.dll` (スタブ) への ipps 名 846 件、`kernel32` 21 件、`freetype_x64.dll` (スタブ) への FT 名 14 件、ほか oleaut32・ole32 等。名前は全件が引用符付きの文字列 (**序数 0 件**)。
+    - **FT 名 14 件**: `FT_Init_FreeType`・`FT_Done_FreeType`・`FT_Attach_File`・`FT_New_Memory_Face`・`FT_New_Face`・`FT_Done_Face`・`FT_Select_Charmap`・`FT_Set_Charmap`・`FT_Get_Char_Index`・`FT_Load_Glyph`・`FT_Render_Glyph`・`FT_Get_Kerning`・`FT_Set_Char_Size`・`FT_Set_Pixel_Sizes`。戻り番地は全て RVA `0x41d7be` (共通ラッパ `0x41d760` 内)。`LoadLibraryW(freetype_x64.dll)` の直後に連続して出る。
+    - **受入 3 (欠落 17 本・`tools/shared/data/freetype_export_diff.json` の win 欠落、一覧は `qfc_gpa_trace/missing17.txt`)**: 950 件の中に **0 件** (名前一致 0・序数 0)。DllMain の実行経路では、この 17 本は GetProcAddress で要求されない。
+    - **陽性対照**: probe の `GetProcAddress(kernel32, "GetLastError")` (ret は probe 像内) を判定器が 1 件記録。判定器は機能している。
+    - **静的 (受入 1 の一部)**: `.text` の pdata 関数境界で全 `call`/`jmp` を走査した。
+      - `0x563000` の直接の呼出元は **1 件のみ** (`0x563854`、関数 `0x563840`)。
+      - `0x563840` は `sub [0x5d9f20],1` の後、`[0x5d9f24] == -1` なら `call 0x563000`。`0x563820` は `add [0x5d9f20],1` の後、`[0x5d9f24] == 0` なら `call 0x5637f0`。`0x5637f0` は `[0x5d9f28]` が非 0 なら `call 0x41d620` で解放して 0 にする。
+      - `0x563000` の本体: `[0x5d9f28]` が非 0 なら何もせず戻る。0 なら `call 0x522d20` (引数は `freetype.dll` の UTF-16 `0x563550`) の戻り値を `[0x5d9f28]` に格納し、続けて 14 組 (`lea` で格納先スロット `0x5d9eb0`・`0x5d9eb8`・… の 8 B 刻みと名前を置き、`call 0x411540` → `call 0x41d760`) を行う。
+      - 関数ポインタ対の表: RVA `0x19c7e0`〜`0x19ccf0` に 16 B 単位の対が 81 組 (`0x19cac0` の対は `(0x563840, 0x563820)`)。この表を指す rip 相対参照は `.text` 全域で 0 件、表の VA (`0x59c7e0`〜`0x59ccf0`) を指す abs64・abs32 の値も 0 件。**持ち主は未同定** (間接呼出しで参照されると推定)。
+    - **未達 (本 run では閉じない)**: 受入 1 の表の持ち主と `0x563000` へ至る上流の呼出し経路。受入 4 の i386 `0x410678` の ILT 持ち主 (静的・動的とも未着手)。子 issue は PR 本文の未解決表を参照。
 - **走査スクリプト**: `oss/freetype/callers_scan.sh` を UTF-16LE 走査込みに改訂 (本 run)。`bash oss/freetype/callers_scan.sh <extracted_dir>` が rc 0 で完了することを実測。
 
 ## 10. 各ライブラリのビルド詳細
