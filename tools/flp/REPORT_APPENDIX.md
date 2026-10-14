@@ -97,13 +97,13 @@
 
 - 3 回の data SHA-256 は全て一致 (同一 run 内の T2 決定性)。3 run の合計 real 49.2 s (準備を含む)。load average 開始 0.86 / 0.87 / 0.49、終了 1.52 / 1.06 / 0.58。
 - **SHA は run ごとに変わる** (3 つの値が併存。下の run 表): run A `363fb7aa…`、run B `13d61a05…`、run C `fe7a0614…`。run C の `fe7a061441eaa6b26261bb988ea6217c4a7afacae3f565a4c46a0c57b0fe561a` は、履歴の `d3d0e4f9` の省略記録 `fe7a0614…e561a` と先頭 8 桁・末尾 5 桁が一致する。`d3d0e4f9` の完全な 64 桁の記録は無いため、同一だとは断定しない。変わる原因は未特定 (ホスト CPU・wineprefix の状態が候補)。決定性は「同一 run 内の 3 回一致」まで。
-- 実行ごとの環境 (未記録の欄は記録が無いことを示す。レビュワーの再実行は round 3 の review 記載の値):
+- 実行ごとの環境 (「未記録」は測定時に記録が無かった欄。事後に特定できない。CPU は run C で `/proc/cpuinfo` から記録した):
 
 | run | 測定 commit | CPU | wine | wineprefix | S2 の data SHA-256 (3 回) |
 |---|---|---|---|---|---|
 | A (前回 fix) | `f6bce8c1` | AMD EPYC 9V45 | 9.0 | 未記録 | `363fb7aa68bea2d5614c97b84b68803432f77b87041802cdde97134e16dbcf2b` |
 | B (本節の表) | `8be0756f` | 未記録 | 9.0 | 新規 (本 run) | `13d61a057ac2f6a6920b409e8b5693293ec7f3a43b5688eae139e64b0c3c6299` |
-| レビュワー再実行 (計 6 本) | `6a5a4092`・`8be0756f` | 不明 | 不明 | 不明 | `363fb7aa68bea2d5614c97b84b68803432f77b87041802cdde97134e16dbcf2b` |
+| 再実行 (計 6 本) | `6a5a4092`・`8be0756f` | 不明 | 不明 | 不明 | `363fb7aa68bea2d5614c97b84b68803432f77b87041802cdde97134e16dbcf2b` |
 | C (本 fix の検証 run、新規 runner) | `8be0756f` | AMD EPYC 7763 | 9.0 (Ubuntu 9.0~repack-4build3) | 新規 (本 run で作成) | `fe7a061441eaa6b26261bb988ea6217c4a7afacae3f565a4c46a0c57b0fe561a` (3 回一致) |
 
 - 出力 sample rate: `HKCU\Software\Image-Line\FL Studio 26\Devices\Audio output` の `Sample rate` (既定 44100) を 48000 にすると 48000 Hz (本測定の全 run で確認)。
