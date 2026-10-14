@@ -56,8 +56,8 @@
 | `[NSIS-FL]` | win インストーラ UI 文言 (INI) | `WIN/block00030_DATA.bin` ほか | — |
 | `[XFER]` | Xfer Records EULA (1,914 文字) | Serum 2 mac pkg: `TGT/serum2/work/pkg_extract/Resources/License.txt` (`Distribution` に `<license>`)。OTT/Serum 2 win: NSIS ヘッダ (zlib 解凍) 内ライセンスページ文 | **OTT win / Serum 2 win / Serum 2 mac の 3 者が空白正規化後に完全一致**。OTT mac pkg には `<license>` なし |
 | `[KH]` | Kilohearts EULA (全 6 条) | `TGT/kilohearts/work/dmg/Kilohearts Installer/Kilohearts Installer.app/Contents/Resources/EULA.txt`。win: `Kilohearts Installer.exe` 内 (file offset 15,125,160) | win 埋込と mac は空白正規化後に一致 |
-| `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認。同梱 EULA の有無は未検証 (素材未取得、§7) |
-| `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (2026-10-10。作成時は検索スニペットのみ、検収時に全文を取得: 契約主体 inMusic NI GmbH、ページ表記 "Latest Version 2026-07-01") | **同梱ではない**。Massive X の同梱 EULA の有無は未検証 (素材未取得、§7) |
+| `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認。同梱 EULA は無い (2026-10-14 再確認、`tools/legal/REPORT.md` §2) |
+| `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (2026-10-10。作成時は検索スニペットのみ、検収時に全文を取得: 契約主体 inMusic NI GmbH、ページ表記 "Latest Version 2026-07-01") | **同梱ではない**。Massive X の同梱 EULA は未確認 (`.exe` 展開不能、`tools/legal/REPORT.md` §1、§7) |
 
 補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 (`docs/REFERENCES.md` `[LEGAL-WORK]`) (抽出作業用 dir は当時 `.gitignore` 対象外だったため)。
 
@@ -197,7 +197,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - Fresh Air は Kilohearts "HeartCore" 上の製品 (`TGT/freshair/REPORT.md`)。Kilohearts EULA は Kilohearts 製品に適用され、Fresh Air にどちらが適用されるかは文書からは不明。
 
 ### 4.4 Native Instruments (Massive X) — `[NI-EULA]` (オンライン・非同梱)
-- インストーラ未入手 (同梱版の有無・Web 版との同一性は未確認)。作成時は検索スニペットのみだったが、検収時に公式ページ全文 ("Latest Version 2026-07-01", 契約主体 inMusic NI GmbH) を取得して確認:
+- インストーラは素材 `plugins-massivex` にあるが `.exe` は展開できず、同梱版の有無・Web 版との同一性は未確認 (§7)。作成時は検索スニペットのみだったが、検収時に公式ページ全文 ("Latest Version 2026-07-01", 契約主体 inMusic NI GmbH) を取得して確認:
   - §3.1 "not entitled to copy or have copied, decompile or have decompiled, reverse engineer or have reverse engineered the Product or parts thereof"、データマイニング (Sec. 44b German Copyright Act)・AI 学習目的の利用禁止。§3.5 改変は機能維持・復旧目的を除き不可。
   - §3.3 3 台まで・同時使用不可、"may not be used on a network by multiple users, unless each user possesses a license"。§3.6 レンタル・貸与は禁止、恒久譲渡は一定条件で可。§3.7 サウンドライブラリ作成の禁止 (Sound License Agreement)。
   - §2.1 Native Access でのアカウント作成とシリアル登録が必要 (未アクティベートは "demo mode")。§7.3 ドイツ法。ホスティング/ASP/service bureau に当たる文言は無い。
@@ -266,9 +266,9 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 ## 7. 見つからなかった/確認できなかった文書、出所に関する事実
 
 見つからない/読めなかった:
-- **Native Instruments (Massive X)**: 同梱 EULA は未検証 (素材 `plugins-massivex` 未取得のため、インストーラの確認は再現できない。前回取得時の記録は `tools/legal/REPORT.md`)。Web 版 EULA は検収時に全文確認済み (§4.4)。Web 版と同梱版の同一性は**未確認**のまま。
-- **Slate Digital (Fresh Air)**: 同梱 EULA は未検証 (素材 `plugins-freshair` 未取得。前回取得時の記録は `tools/legal/REPORT.md`)。公式 ToS はオンライン版のみ。
-- **Xfer OTT (mac)**: pkg に `<license>` なし。OTT 専用の規約文書は未確認 (共通 Xfer EULA が win ライセンス画面に出る)。Xfer の公式サイト上の規約ページは未確認 (`/eula`・`/terms`・`/terms_of_service` は 404。`/privacy_policy` のみ取得可能で、利用規約の文面ではない。2026-10-14 レビュー時も同じ)。
+- **Native Instruments (Massive X)**: 同梱 EULA は**未確認**。2026-10-14 の再測定で、`.exe` (Inno Setup 6.4.2) は 7-Zip と innoextract (6.4.2 対応の調査用ビルド) のいずれでも展開できず、`.dmg` (InstallBuilder 製) に文書名の付いたファイルは無かった (`tools/legal/REPORT.md` §1)。Web 版 EULA は検収時に全文確認済み (§4.4)。Web 版と同梱版の同一性は**未確認**のまま。
+- **Slate Digital (Fresh Air)**: 同梱 EULA は**なし** (2026-10-14 再確認: win zip・pkg に文書無し、同梱は User Guide PDF のみ。`tools/legal/REPORT.md` §2)。公式 ToS はオンライン版のみで、適用される版は未確認。
+- **Xfer OTT (mac)**: pkg に `<license>` なし。OTT 専用の規約文書は未確認 (共通 Xfer EULA が win ライセンス画面に出る)。Xfer の公式規約ページは**公式ページなし** (確認日 2026-10-14: `/eula`・`/terms`・`/terms_of_service` ほか 7 候補 URL は 404。トップ・freeware・Serum 2 ページに規約リンク無し。`/privacy_policy` のみ取得可能で、利用規約の文面ではない。`tools/legal/REPORT.md` §3)。
 - **Image-Line FAQ (公開)**: 未確認。LGL-6 の範囲だが本文書では扱っていない。
 - **Image-Line (実際に承諾した版)**: 公開 ToU / EULA は台帳 `fl-tou-web`・`fl-tou-rtf`・`fl-eula-html` の 3 版で保持済み (§2.1)。依頼者が実際に承諾した版は依頼者の記録事項で確認できないため**未確認**。運用形態 B では他の作業の前提にしない (§6.0)。
 - **Intel IPP / zplane / Chicken Systems / SoftVoice / Ultrafunk / ReWire / NDI / WebView2 / Edge Update** の個別ライセンス本文: 同梱なし。
