@@ -27,8 +27,8 @@ $ git diff --stat 5cb7d7a0 HEAD -- tools/icall/diff tools/icall/*.sh tools/icall
 |---|---|
 | 素材 | `fl-win64`・`plugins-freshair`・`toolchain-retdec`・`toolchain-emsdk`・`work-icall`・`work-liftlib` を `$HOME/artifacts` で確認 (実在)。`work-icall` は `tools/icall/work/` に、`plugins-freshair` は `fetch.sh` で `tools/targets/freshair/work/` に展開 |
 | native 側 | `bash tools/ott/native/build.sh` で `work/libottnative.so` を生成 (未ビルドだと `fa_cmp.py` が `OSError` で全件 crash 扱いになる。build.sh を先に走らせる) |
-| `fa_route_build.sh` | OK、8.5 s、load 0.67 |
-| `fa_sweep.sh 8 60` | 131 関数、70.7 s、load 0.54 → 0.95。**bit 一致 41 / native crash・timeout 66 / wasm のみ err 15 / 値の不一致 9** (同一 commit で 2 回再現) |
+| `fa_route_build.sh` | OK、8.5 s、開始時 load 0.71 |
+| `fa_sweep.sh 8 60` | 131 関数、70.7 s (2 回目)、開始時 load 0.54・終了時 0.95。**bit 一致 41 / native crash・timeout 66 / wasm のみ err 15 / 値の不一致 9** (同一コード状態で 2 回再現) |
 | 単体 `fa_cmp.py 1803b3d10 --n 8` | 8/8 bit 一致、native_err 0、wasm_err 0 |
 
 ### 2.1 wasm route の作り方 (ott_route.sh との差)
