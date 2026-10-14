@@ -1,15 +1,15 @@
 # tools/flelift/boot — #2719 (WIN-8) x64c 寛容起動: 942 unit の逐次試行と CreateFruityInstance の観測
 
-> 正本の要約は `tools/flelift/boot/REPORT.md` §11。本書は詳細 (工程・結果表・skip 一覧・survey との差・リスク評価)。
+> 正本の要約は `tools/flelift/boot/REPORT.md` 冒頭 (5 行目の #2719 案内)。本書は詳細 (工程・結果表・skip 一覧・survey との差・リスク評価)。
 > 測定 commit: **a55cb0d5** (`fle_boot.c` / `fle_boot.mjs` / `build.sh` / `fle6_measure.sh` を変えた最後の commit)。
-> 既知類型との関係: 寛容起動で見えた clobber (units 配列・InitContext・unit 先頭 8B の 0 化) は、#3060 の `f_6a7b70` 広域ゼロ埋めと同じ現象と推定 (未実測の推定)。`docs/DEFECTS.md` D1a〜D23 のどれにも直接は当たらない (推定)。
+> 既知類型との関係: 寛容起動で見えた clobber (呼出し時に units 配列の proc が 0 を返した現象。どの段が 0 になったかは未測) は、#3060 の `f_6a7b70` 広域ゼロ埋めと同じ現象と推定 (未実測の推定)。`docs/DEFECTS.md` D1a〜D23 のどれにも直接は当たらない (推定)。
 
 ## 0. 結論
 
 - x64c の寛容起動を足した (`FLE_TOLERANT=1` 寛容 / `FLE_TOLERANT=2` 診断)。**既定 (未指定) の数値は不変** (209 / GetMem 1,890 / FreeMem 776 / 停止 unlifted `0x6a7b70`)。
-- **942 unit を最後まで試行した** (mode 1・mode 2 とも 942)。ただし mode 1 は unit 245 (VA `0x733090`・dispatch 209 番目) の ExitProcess の後に units 配列を含む InitContext が 0 になり、695 unit が clobber で走れなかった。
+- **942 unit を最後まで試行した** (mode 1・mode 2 とも 942)。ただし mode 1 は unit 245 (VA `0x733090`・dispatch 209 番目) の ExitProcess の後、unit 246〜940 の 695 件が呼出し時に proc 0 を返し (clobber)、走れなかった。どの段が 0 になったか (InitContext のポインタ・InitTable・units 配列) は未測 (§3)。
 - mode 2 (診断: 失敗 unit の後で InitContext・InitTable・units 配列・unit 先頭 8B を起動時の値へ戻す) では 942 unit が走り、ok 811 / empty 46 / exit 19 / oob 65 / noproc 1。ただし mode 2 は補修であり、状態の欠落を消すものではない (§6)。
-- **CreateFruityInstance (0x1375990) には到達しなかった**。両 mode とも呼出しは `oob` で即 trap し、API (RegisterClassW・CreateWindowExW を含む) は 1 件も呼ばれなかった (`soft_called` 空)。trap 地点は CFI 本体 (または直接呼出し先) 内と推定 (未特定)。残件は #3077 [WIN-16] (CFI の trap 地点と CS 0x12bd390 の登録経路) に寄せる。
+- **CreateFruityInstance (0x1375990) は入口まで dispatch され、本体内で `oob` trap した** (両 mode とも)。trap 地点は CFI 本体内 (または直接呼出し先) と読めるが未特定。soft (未実装 import) の呼出しは 0 件 (`soft_called` 空) で、API 段 (S12〜S22) への到達は記録上 0。残件は #3077 [WIN-16] (CFI の trap 地点と CS 0x12bd390 の登録経路) に寄せる。
 - 寛容 mode 1 の dispatch は 209 (unit 245 で ExitProcess)。mode 2 は 895 dispatch (試行 942 のうち)。
 
 ## 1. 測定条件
@@ -34,11 +34,11 @@
 | 経路 | 試行 | ok | empty | noproc | clobber | exit | oob | dispatch (units_run) | GetMem / FreeMem | 停止 | CFI |
 |---|--:|--:|--:|--:|--:|--:|--:|--:|--:|---|---|
 | 既定 (root 無し) | (停止) | - | - | - | - | - | - | 209 | 1,890 / 776 | unlifted `0x6a7b70` | 未実行 |
-| 寛容 mode 1 | 942 | 208 | 37 | 1 | 695 | 1 | 0 | 209 | 2,314 / 1,199 | unit 245 の ExitProcess (`0x412a12` 系) | oob 即時 |
-| 寛容 mode 2 (診断・補修あり) | 942 | 811 | 46 | 1 | 0 | 19 | 65 | 895 | 2,320 / 1,200 | 全 942 試行の後 ExitProcess (exit 20) | oob 即時 |
+| 寛容 mode 1 | 942 | 208 | 37 | 1 | 695 | 1 | 0 | 209 | 2,314 / 1,199 | unit 245 の ExitProcess (`0x412a12` 系) | 入口後 oob trap |
+| 寛容 mode 2 (診断・補修あり) | 942 | 811 | 46 | 1 | 0 | 19 | 65 | 895 | 2,320 / 1,200 | 全 942 試行の後 ExitProcess (exit 20) | 入口後 oob trap |
 
-- mode 1 の clobber 695 は unit 246〜941 (proc の先頭 8B が 0 = 起動時は非 0 だった)。InitContext (`0x15eac90`) のポインタ自体が 0 になっていた (`fle_unit_proc` が全て 0 を返す)。
-- mode 2 の補修 84 回 (`restored`) は、skip の各 unit の後に InitContext 16B・InitTable 16B・units 配列・unit 先頭 8B を起動時の値へ戻した回数。mode 1 の補修前は同じ 942 のうち 246 以降が 0 化されていた。
+- mode 1 の clobber 695 は unit 246〜940 (呼出し時、units 配列の proc が 0 を返した。起動時の proc は非 0 だった)。どの段が 0 になったかは未測。InitContext (`0x15eac90`) のポインタの 0 化は推定 (hook は開始時の `tblP` しか記録せず、呼出し後の値は取っていない)。
+- mode 2 の補修 84 回 (`restored`) は、skip の各 unit の後に InitContext 16B・InitTable 16B・units 配列・unit 先頭 8B を起動時の値へ戻した回数。mode 1 (補修なし) では同じ 942 のうち 246 以降が clobber だった。
 - mode 2 の empty 46 は隔離 survey (`results/survey.json`) の empty 46 と一致。noproc 1 も一致。
 - 寛容 mode 1 の最初の 209 dispatch は、#3062 の shim 行 (units 209 / GetMem 2,314 / FreeMem 1,199) と一致する。
 
@@ -134,7 +134,7 @@
 
 ```
 
-mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜941 の `clobber` 695 件 + 起動時 proc 0 の `noproc` 1 件は skip に数えず)。
+mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜940 の `clobber` 695 件)。unit 941 は起動時から proc 0 の `noproc` 1 件で、skip には数えていない。
 
 ## 5. 隔離 survey (`results/survey.jsonl`) との差 (unit 番号)
 
@@ -158,8 +158,11 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜941 の `clo
 
 - lift: root に追加 (`FLE_EXTRA_ROOTS=0x6a7b70,0x1375990`)。増分は関数 29 (root 0x6a7b70 のみの 29,908 → 29,937)。
 - 呼出し: 寛容起動の後で `fle_run` を 1 回 (mode 1・mode 2 とも)。結果は `oob` (memory access out of bounds)。`longjmp` 0・`exit` 0・soft 呼出し 0。
-- dispatch リング末尾 4 件: `0x1375170` → `0x13751b0` → `0x13751d0` → `0x1375990`。trap は CFI 本体 (または直接呼出し先) で起きた。直接呼出しは dispatch 記録に出ないため、trap の関数は未特定。
-- S12〜S22 の到達: 0 (API が呼ばれていない)。`RegisterClassW` / `CreateWindowExW` の自然到達: 0。
+- 入口の記録: `fle_run` は手書きの `tools/flelift/rt/fle_glue.c` (生成物ではない) で、`ott_dispatch(va)` を呼ぶ。`ott_dispatch` 冒頭の probe (`fle_dispatch_probe`・`x64c.py` 生成) が ring に `va` を記録する。末尾の `0x1375990` はこの入口の 1 件。
+- dispatch リング末尾 4 件 (`fle_ring_at(124..127)`・古い順): mode 1 (`tol`) `0x6a7b70` → `0x6a7b70` → `0x6a7b70` → `0x1375990`。mode 2 (`tol2`) `0x1375170` → `0x13751b0` → `0x13751d0` → `0x1375990`。CFI 呼出し中に記録されたのは末尾の `0x1375990` の 1 件だけ。先頭 3 件は CFI 呼出しより前 (逐次起動の末尾) の記録。
+- trap: 入口の後に間接 dispatch の記録が無いため、trap は `0x1375990` の本体内、または直接呼出し先 (直接 call は dispatch 記録に出ない) で起きたと読める。地点は未特定。
+- API 段 (S12〜S22) の到達: 記録しているのは soft 呼出しだけで、0 件。`RegisterClassW`・`CreateWindowExW` は shimx の実装にも curated にも無く、gen_boot.py の規則で soft スタブになるため、呼出しが有れば `soft_called` に出ていた。実装済み shim (getmem・getproc 等) の呼出しは CFI について計数していない。
+- soft 名の表示: `fle_boot.mjs` の `softSnap`・`soft_called`・`soft_top` は C 文字列のポインタ番号を名前として出す (既存の欠陥。#3077 で直す)。CFI 中の soft 0 件の判定は件数の差分で行うため、この結論は表示に依存しない。
 - trap 地点の特定は #3077 [WIN-16] の範囲。本 issue では観測までに留める。
 
 ## 8. 製品 KPI の前後 (PR 本文の表と同じ値)
@@ -167,9 +170,9 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜941 の `clo
 | KPI | 前 (#3062 の寛容前) | 後 (本測定 a55cb0d5) |
 |---|---|---|
 | x64c の逐次起動の unit 進行 | dispatch 209 / 完走 208 (停止 unlifted `0x6a7b70`) | 寛容 mode 1: 試行 942・dispatch 209・ExitProcess (unit 245) / 寛容 mode 2 (補修あり): 試行 942・dispatch 895・ok 811・skipped 84 |
-| `CreateFruityInstance` 到達の有無 | 無し | 無し (oob 即時) |
-| 最終到達ステップ (S12〜S22) | S12 未達 (推定) | 到達なし (API 呼出し 0 件) |
-| `RegisterClassW`/`CreateWindowExW` の自然到達 | 0 | 0 |
+| `CreateFruityInstance` 到達の有無 | 未実行 | 入口 (0x1375990) は dispatch 記録あり・本体内で oob trap (両 mode) |
+| API 段 (S12〜S22) の到達 | S12 未達 (推定) | soft 呼出し 0 件 |
+| `RegisterClassW`/`CreateWindowExW` の呼出し (soft 計数) | 0 | 0 |
 | 既定経路の回帰 | 209 / GetMem 1,890 / FreeMem 776 | 209 / 1,890 / 776 (不変) |
 
 起動 KPI (最初のウィンドウ) は未達。窓は描けていない。
@@ -179,6 +182,7 @@ mode 1 の skip は 696 件 (unit 245 の `exit` 1 件 + unit 246〜941 の `clo
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | CFI (0x1375990) の trap 地点と、CS 0x12bd390 の登録経路 | 最初のウィンドウ未達。S12〜S22 の到達なし | #3077 [WIN-16] (既存・重複起票せず) |
+| soft 名の表示 (`softSnap`・`soft_top`・`soft_called` が C 文字列のポインタ番号を出す。`UTF8ToString` を通していない) | CFI の結論には影響しない (件数差分で判定・CFI 中の soft 0 件)。名前の読み取りは未了 | #3077 [WIN-16] (既存・同じ解析の範囲) |
 | unit 245 (VA 0x733090) の ExitProcess (RunError 経路) の原因と、`f_6a7b70` の広域ゼロ埋めの範囲 | 寛容起動が 245 で fatal 扱いになる。clobber 695 の原因 | #3060 [FLE-11] (既存) |
 | 補修 (mode 2) の妥当性。戻す範囲の外の欠落 (R1) | mode 2 の ok 811 の確度 | #3060 (受入に追加済み) |
 | x64c の寛容起動レコードを `tools/startup/boot_metric.json` に追加 | 受入 6 (WIN-2 と同一スキーマ) | #3147 [WIN-17] |
