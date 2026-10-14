@@ -54,7 +54,7 @@ FLE_APPENDIX_2880 = "tools/gui/flengine/REPORT_APPENDIX_2880.md"
 CFI_PROBE = "tools/gui/flengine/cfi_probe.mjs"
 
 COMMENT_LINE = ("#", "//", "/*", "* ", "*/")
-COMMENT_TAIL = re.compile(r"(^|\s)(#|//)\s.*$")
+COMMENT_MARK = re.compile(r"(#|//)\s")
 
 
 def _call_re(word):
@@ -62,12 +62,31 @@ def _call_re(word):
     return re.compile(rf'(?<![@\w])_?{w}\s*\(|["\']_?{w}["\']')
 
 
+def _strip_tail(line):
+    """文字列リテラルの外にある行末コメント (空白の後の `#`・`//` + 空白) を落とす。"""
+    quote = None
+    i = 0
+    while i < len(line):
+        c = line[i]
+        if quote:
+            if c == "\\":
+                i += 1
+            elif c == quote:
+                quote = None
+        elif c in "\"'`":
+            quote = c
+        elif c in "#/" and (i == 0 or line[i - 1].isspace()) and COMMENT_MARK.match(line, i):
+            return line[:i]
+        i += 1
+    return line
+
+
 def _code_text(text):
     out = []
     for line in text.split("\n"):
         if line.lstrip().startswith(COMMENT_LINE):
             continue
-        out.append(COMMENT_TAIL.sub("", line))
+        out.append(_strip_tail(line))
     return "\n".join(out)
 
 

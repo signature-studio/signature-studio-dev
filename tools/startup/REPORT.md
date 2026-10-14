@@ -86,7 +86,7 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 
 既知類型との関係: 該当なし (lift・逆アセンブル・IR pass は触らない。既存 REPORT と results からの算出のみ)。
 
-**結論 (測定 commit 時点の値)**: 「起動」の数え方は 5 通り (17 / 52 / 53・56 / 209 / 928) あり、いずれも別の量を指す。`tools/startup/boot_metric.json` (`boot_metric/v1`) に、路線 (m11 / x64c / native-ref) とモード別のレコードとして載せた。m11 / x64c の DllMain 連鎖の record では、最終到達ステップは S09 (DllMain 内の unit 初期化まで)、CreateFruityInstance (S11) 未到達。この 2 点は harness の構造による (§8-3)。flengine 路線の record (`flengine-cfi-probe`) では CreateFruityInstance の入口 (S12) まで到達する (§8-6)。`docs/STATUS.md` 先頭の 1 行がこの結論を指す。
+**結論 (測定 commit 時点の値)**: 「起動」の数え方は 5 通り (17 / 52 / 53・56 / 209 / 928) あり、いずれも別の量を指す。`tools/startup/boot_metric.json` (`boot_metric/v1`) に、路線 (m11 / x64c / native-ref) とモード別のレコードとして載せた。m11 / x64c の DllMain 連鎖の record では、最終到達ステップは S09 (DllMain 内の unit 初期化まで)、CreateFruityInstance (S11) 未到達。この 2 点は harness の構造による (§8-3)。flengine 路線の record (`flengine-cfi-probe`) では CreateFruityInstance の入口 (S12) まで到達する (測定 commit `ae963e28` 時点。現 HEAD は未再測定。§8-6)。`docs/STATUS.md` 先頭の 1 行がこの結論を指す。
 
 ### 8-1. 5 通りの数え方 → スキーマのフィールド対応
 
@@ -141,6 +141,7 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 | x64c-strict-sequential (測定 commit 不明) | `ac5d6d46` | 991 files (+136,528 / −2,213) |
 | x64c-isolated-survey (測定 commit 不明) | `12958453` | 983 files (+136,291 / −2,152) |
 | native-ref-hybrid | `2ca85816` | 382 files (+42,129 / −145) |
+| flengine-cfi-probe (範囲は `tools/shim`・`cfi_probe.mjs`) | `ae963e28` | 非 0 (`tools/shim` に差分。内訳は `REPORT_APPENDIX_2880.md` §9-8) |
 
   どの路線も差分は 0 ではない。文書と results は測定 commit 時点の値であり、現 HEAD の実測ではない。再測定は本 issue の範囲外で、要否は §8-5 で PM 判断とする。
 - 文書・results の変更有無 (出典 6 ファイル): `git diff --stat 580dd294 4e8bdd8c -- tools/m11/REPORT.md tools/m11/REPORT_APPENDIX_1430.md tools/gui/flengine/results tools/flelift/boot/results tools/flelift/boot/REPORT.md tools/liftdiff/REPORT_LD26.md tools/startup/STARTUP.md` の出力は空 (base 4e8bdd8c までの範囲)。
@@ -159,7 +160,9 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 | `first_wm_paint`・`pixels` (最初の WM_PAINT・画素) は全路線で未測定 | 最初のウィンドウの数値は null | PM 判断 (後続 WIN の issue は未起票) |
 | native hybrid の `first_fail 830` の意味 (失敗か停止か) が REPORT に無い | `units.failed` は null | PM 判断 (liftdiff 担当の issue は未特定) |
 | gui `results/survey_soft.json` は `5f9d7cbd` で 870/24 → 872/22 に更新されたが、gui REPORT §6d・§6i は測定 commit `719f1c43` の 870/24 のまま | `m11-gui-survey` は `719f1c43` 時点の JSON を読む (本 PR で変更)。HEAD の JSON とは食い違う | #174 (OPEN, GUI-3) へ。PM 判断 |
+| flengine-cfi-probe の値は測定 commit `ae963e28` の実測。現 HEAD は `tools/shim` (HeapFree・#2821) に差分があり、再測定していない | record・STATUS 先頭行は `ae963e28` 時点の値。現 HEAD で成り立つかは未確認 (`REPORT_APPENDIX_2880.md` §9-8) | PM 判断 (素材 `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` の run で再測定するか、#3191 受入 (3) の「最新」を縮める) |
+| 規則 (f) (pr-lint) の対象は #3191 の 4 パス (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/`・`tools/startup/`)。`boot_metric.json` の出典には `tools/m11/REPORT_N2714.md`・`tools/m11/REPORT_APPENDIX_1430.md`・`tools/liftdiff/REPORT_LD26.md`・`tools/flelift/boot/results/boot_summary_plain.json` もあるが、これらの変更では警告されない | 出典を変えた PR の boot_metric.json 更新漏れを検出しない | PM 判断 (対象の拡張。issue 未起票) |
 
 ### 8-6. flengine 路線の record (`flengine-cfi-probe`)
 
-測定 commit `ae963e28` (出典: `tools/gui/flengine/REPORT_APPENDIX_2880.md` §9-3・`REPORT_APPENDIX.md` §7-4)。`cfi_probe.mjs` が DllMain attach の後に CreateFruityInstance を 1 回呼ぶと、入口 (STARTUP S12) に届き、本体内で EnterCriticalSection の fail-fast (CS `0x12bd390`、登録されていない CS) により `Aborted` する。`last_step: S12` は**下限**で、S13 以降の到達と fail-fast の位置・呼出元 VA は未測定 (#3077 [WIN-16])。fail-fast の API は §7-4 と §9-3 の一致を検査する。
+測定 commit `ae963e28` (出典: `tools/gui/flengine/REPORT_APPENDIX_2880.md` §9-3・`REPORT_APPENDIX.md` §7-4)。`cfi_probe.mjs` が DllMain attach の後に CreateFruityInstance を 1 回呼ぶと、入口 (STARTUP S12) に届き、本体内で EnterCriticalSection の fail-fast (CS `0x12bd390`、登録されていない CS) により `Aborted` する。`last_step: S12` は**下限**で、S13 以降の到達と fail-fast の位置・呼出元 VA は未測定 (#3077 [WIN-16])。fail-fast の API は §7-4 と §9-3 の一致を検査する。現 HEAD では `tools/shim` に差分があり (`REPORT_APPENDIX_2880.md` §9-8)、この record は `ae963e28` 時点の値で、現 HEAD では再測定していない (§8-5 の未解決)。

@@ -6,7 +6,7 @@ REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動)。外部�
 
 既知類型との関係: 該当 DEFECTS 行なし。原因は未確定 (lift 欠陥か init 列の扱いか) のため、類型は追加しない。
 測定 commit: `ae963e28` (コードを変えた最後の commit。shim の診断 1 行のみ)。後続の commit は docs のみ (本節・REPORT_APPENDIX の要約・DOC_MAP)。REPORT.md は変えていない。
-差分の証跡 (WORKFLOW §6): `git diff ae963e28 HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` の出力は 0 行。
+差分の証跡 (WORKFLOW §6): `git diff ae963e28 HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` は、測定時点では 0 行だったが、main 取り込み後の HEAD では出力がある (§9-8)。本節の 9-1〜9-7 は `ae963e28` 時点の実測で、現 HEAD の実測ではない。
 
 ### 9-1. 受入条件の状態 (#2880 の 3 項目)
 
@@ -87,3 +87,21 @@ IR 指紋 (fix で追記。e2e は再実行していない): 素材展開直後�
 | 呼出元 VA (wasm name section 無し) | 受入 1 の呼出元 VA | 同上 |
 | 解放側 `function_41cd70` が init 列に入る理由 | boot が 41cd70 に届くと `0x11EAF00` を削除する (推定) | 同上 |
 | S1 の差 (§9-6 の 13/14 と 14/14) | 判定の再現性 | PR 本文の未解決表のみ (再測定) |
+| 現 HEAD での `cfi_probe.mjs` の再測定 (shim に差分あり・§9-8) | 9-3 の値が現 HEAD で成り立つかは未確認 | PM 判断 (素材付きの run が要る) |
+
+### 9-8. 差分の証跡と再測定の状況 (#3191 差し戻し)
+
+`git diff --stat ae963e28 7a8fe50c -- tools/shim tools/gui/flengine/cfi_probe.mjs` の出力 (`7a8fe50c` は main 取り込み後の commit。以後の commit は shim と `cfi_probe.mjs` を変えない):
+
+```
+tools/shim/REPORT.md        | 52 +++++++++++++++++++++++++++++++++++++++++++-
+tools/shim/src/heap.c       |  5 +++--
+tools/shim/test/test_main.c | 11 +++++++---
+3 files changed, 61 insertions(+), 7 deletions(-)
+```
+
+- 差分の中身: `tools/shim/src/heap.c` の HeapFree は、割当てのない p を FALSE・`ERROR_INVALID_FUNCTION` から TRUE・`ERROR_SUCCESS` に変えた (commit `7278e857`・#2821)。`tools/shim/test/test_main.c` は同じ変更の検査。`cfi_probe.mjs` に差分は無い。`tools/shim/src/sync.c` (CS-MISS の出力元) にも差分は無い。
+- cfi_probe の GUI 実行は `tools/shim` を使う (`tools/gui/flengine/e2e.sh` の複製元) ため、9-3 の結果は HeapFree の変更の影響を受け得る。影響の有無は未測定。
+- 再測定しなかった理由: この run で展開された素材は `fl-win64` だけ (`$ARTIFACTS_DIR` に `fl-win64.tar.zst`)。toolchain-emsdk (emcc)・toolchain-retdec・work-m11・work-liftdiff が無いため、9-2 の build (`m11_lift.sh`・`m11_gen_ir2.sh`・`m11_build.sh`・`gui/flengine/build.sh`) を実行できず、現 HEAD で `cfi_probe.mjs` を動かせない。
+- 扱い: 9-3・9-6 の値は `ae963e28` 時点の実測として残す (現 HEAD の値として書かない)。`flengine-cfi-probe` の record の `commit` は `ae963e28` のまま。STATUS 先頭行と REPORT §8-6 は「最新」と書かず、未再測定と明記する。
+- 残り: 素材 `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` を付けた run で 9-2 の手順を実行し、9-3 と同じ項目を現 HEAD で測定して、本節に測定 commit を付けて追記する。値が変われば `python3 tools/startup/boot_metric.py` で再生成する (手で編集しない)。

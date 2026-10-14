@@ -354,6 +354,10 @@ class BootMetricTest(unittest.TestCase):
     def test_comment_mention_is_not_a_call(self):
         self.build({"tools/m11/note.sh": "CH=x   # boot7 = CreateFruityInstance (0x1375990)\n"})
 
+    def test_call_after_string_with_comment_marker_fails(self):
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/m11/harness.mjs": 'log("a // b"); mod._CreateFruityInstance(0xC0n)\n'})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -164,6 +164,21 @@ mkdir -p "$R/tools/startup" && echo "x" >> "$R/tools/startup/x.txt"; commit_case
 lint "$(body 'Closes #3191\n\nboot_metric: unchanged ()\n')"
 { [ "$RC" = 1 ] && has_rule boot-metric; } && ok "boot_metric: unchanged の理由が空なら違反" || ng "boot_metric: unchanged の理由が空なら違反 (rc=$RC)"
 
+new_case v-boot-metric-flengine
+mkdir -p "$R/tools/gui/flengine" && echo "x" >> "$R/tools/gui/flengine/x.txt"; commit_case v-boot-metric-flengine
+lint "$(body 'Closes #3191\n')"
+{ [ "$RC" = 1 ] && has_rule boot-metric; } && ok "gui/flengine の変更に boot_metric.json の更新が無いのを検出" || ng "gui/flengine の変更に boot_metric.json の更新が無いのを検出 (rc=$RC)"
+
+new_case v-boot-metric-m11-report
+mkdir -p "$R/tools/m11" && echo "x" >> "$R/tools/m11/REPORT.md"; commit_case v-boot-metric-m11-report
+lint "$(body 'Closes #3191\n')"
+{ [ "$RC" = 1 ] && has_rule boot-metric; } && ok "tools/m11/REPORT.md の変更に boot_metric.json の更新が無いのを検出" || ng "tools/m11/REPORT.md の変更に boot_metric.json の更新が無いのを検出 (rc=$RC)"
+
+new_case v-boot-metric-flelift-report
+mkdir -p "$R/tools/flelift/boot" && echo "x" >> "$R/tools/flelift/boot/REPORT.md"; commit_case v-boot-metric-flelift-report
+lint "$(body 'Closes #3191\n')"
+{ [ "$RC" = 1 ] && has_rule boot-metric; } && ok "tools/flelift/boot/REPORT.md の変更に boot_metric.json の更新が無いのを検出" || ng "tools/flelift/boot/REPORT.md の変更に boot_metric.json の更新が無いのを検出 (rc=$RC)"
+
 new_case n-boot-metric-json
 mkdir -p "$R/tools/startup" && echo "x" >> "$R/tools/startup/x.txt"; echo "{}" > "$R/tools/startup/boot_metric.json"; commit_case n-boot-metric-json
 lint "$(body 'Closes #3191\n')"
