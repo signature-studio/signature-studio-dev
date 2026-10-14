@@ -410,7 +410,7 @@
 | `tools/python/REPORT_PY80.md` | 93 | PY-80 (#2633): 静的版 (flpy_static) のサブインタプリタは達成。Memory64 は部分 (validate は node 22.23 で不可・headless Chrome 154 で可、実行検証は未了)。`_PyInterpreterState_GetRefTotal` は FL PE が呼ばない。結論の正本は REPORT の結論表。pthread+GIL は子 #2856 (PY-97)、Memory64 実行は子 #2858 (PY-98) |
 | `tools/python/REPORT_PY27.md` | ~70 | PY-27 (#1138): ui / general / screen / arrangement / launchMapPages の mock 対応状況・`tests/ui_diff.mjs` の結果・保留 150 件 |
 | `tools/python/REPORT_PY87.md` | ~61 | PY-87 (#2738): general の状態読出しゲッター 4 件 (getChangedFlag / getUseMetronome / getPrecount / getRecPPQ) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 146 件は #2830・#2831・#2832 |
-| `tools/python/REPORT_PY119.md` | ~110 | PY-119 (#2983): arrangement 8 件のうち 6 件 (currentTime / addAutoTimeMarker / jumpToMarker / liveSelection / selectionClear / selectionSet) の PE 根拠・mock/C 差分 0・値と副作用は未確定。変換スロット 0x15e4280 = PyLong_FromLong を同定。残りは子 #3041 (PY-143)・#3043 (PY-144) |
+| `tools/python/REPORT_PY152.md` | ~111 | PY-152 (#2983): arrangement 8 件のうち 6 件 (currentTime / addAutoTimeMarker / jumpToMarker / liveSelection / selectionClear / selectionSet) の PE 根拠・mock/C 差分 0・値と副作用は未確定。jumpToMarker の必須個数は PE (1) と表 (2) が不一致で PM 判断待ち。変換スロット 0x15e4280 = PyLong_FromLong を同定。残りは子 #3041 (PY-143)・#3043 (PY-144) |
 | `tools/python/REPORT_PY121.md` | 72 | PY-121 (#2979): general の log・rec 系 4 件 (clearLog・dumpScoreLog・processRECEvent・getRecPPB) の PE 根拠 (entry・fn VA・書式・呼出し鎖)。戻り値の意味は未確定で実装なし。残りは #3001・#3002・#3003 |
 | `tools/python/REPORT_PY23.md` | ~85 | PY-23 (#1054): `enveditor` (Edison API・仕様は block24447) の実装と Audio scripts 12 本の import/実行検証。数値 oracle 6 本・NEG-d・未解決 |
 | `tools/python/REPORT_PY19.md` | ~57 | PY-19 (#792): `Score.loadScoreFromFile` (仮想 FS・JSON) と `ScriptDialog.DialogParams` (MOCK)・数え方の定義 (母集団 64) と再計算・実測・未解決 |

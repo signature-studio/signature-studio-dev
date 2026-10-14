@@ -1,4 +1,4 @@
-// arrangement の PE 確定 6 関数 (PY-119・#2983) の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と
+// arrangement の PE 根拠で実装した 6 関数 (PY-152・#2983) の差分検査: 同じ呼出し列を JS mock (host/fl_mock.mjs) と
 // C provider (provider/fl_engine.c) に流し、各呼出しの戻り値・エラー code が一致することを確認する。
 //   node tests/arrangement_diff.mjs     (前提: provider/build.sh 済み)
 import fs from "node:fs";

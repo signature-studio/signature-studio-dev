@@ -1,10 +1,12 @@
-# tools/python REPORT: PY-119 arrangement 残り 8 件の PE 確定と C provider 実装 (#2983, 親 #2832)
+# tools/python REPORT: PY-152 arrangement 残り 8 件の PE 確定と C provider 実装 (#2983, 親 #2832)
 
-> 正本: `tools/python/REPORT_PY87.md` (PE 解析の手順・方式)。本付録は PY-119 の実測のみ。
+> 正本: `tools/python/REPORT_PY87.md` (PE 解析の手順・方式)。本付録は PY-152 の実測のみ。
+> 番号: 題名の `[PY-152]` (#2983) に揃えた。`REPORT_PY119.md` は #2980 (ui 6 件) の別 REPORT で、番号が衝突していたため本 REPORT を改名した。
 
 ## 結論
 
-- 対象 8 件のうち **6 件** (`currentTime`・`addAutoTimeMarker`・`jumpToMarker`・`liveSelection`・`selectionClear`・`selectionSet`) を、PE の PyArg 書式と flapi 表の個数・型に合わせて mock と C に実装した。mock と C の差分は 0 (`tests/arrangement_diff.mjs` 25 呼出し)。
+- 対象 8 件のうち **6 件** (`currentTime`・`addAutoTimeMarker`・`jumpToMarker`・`liveSelection`・`selectionClear`・`selectionSet`) を mock と C に実装した。呼出し構造と PyArg 書式は PE で確定した。個数は flapi 表 (fl_table) に合わせた暫定。mock と C の差分は 0 (`tests/arrangement_diff.mjs` 25 呼出し)。
+- **`jumpToMarker` は PE と個数が不一致**。PE の書式は `i|i` (必須 1)、表は必須 2。mock と C は表どおり必須 2 にしている (既定・挙動は変えない)。PE (1) に寄せるかは **PM agent の判断待ち** (下の未解決表)。
 - **値と副作用は未確定**。`currentTime` は仮置き 0。選択・マーカーの 5 件は呼出し経路 (共通ラッパー `0xd843d0` とコールバック) まで確認したが、コールバックの中身は未同定のため状態を変えず、引数検査だけ行う。
 - 変換スロット `0x15e4280` の先は **`PyLong_FromLong`** と同定した。`long` は Win64 では 32 bit なので、`-1` は Python の int `-1` になる。
 - 残り 2 件 (`currentTimeHint`・`getMarkerName`、str を返す) と、副作用・引数個数の確定は子 issue に分けた (下表)。
@@ -13,12 +15,12 @@
 ## 手段
 
 - 素材: `$ARTIFACTS_DIR` の `fl-win64.tar.zst` から `extracted/block00031_PE.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin`・`block25159_DATA.bin` を `tar --zstd -xf` で展開し、`FL_WIN64_DIR=<展開先>` とした。`toolchain-emsdk` は `$ARTIFACTS_DIR` に実在したが、ビルドは runner 既存の emsdk (`EMSDK_DIR` 既定) で行った。
-- ハンドラ探索: `analysis/flapi/pe_handler_probe.py` (entry・fn・flags・PyArg 書式)。関数本体は同じ方式で `ret` まで逆アセンブルした (解析補助は未コミット、`$RUNNER_TEMP` 配下)。
+- ハンドラ探索: `analysis/flapi/pe_handler_probe.py` (entry・fn・flags・PyArg 書式)。関数本体は `ret` まで逆アセンブルして人手で読んだ (手動同定)。その出力を作った補助スクリプトは未コミットで、`$RUNNER_TEMP` 配下にあった。下の「本体の要点」は再現コマンドを持たない手動同定の値である。
 - 呼出し先の同定: `analysis/flapi/pe_rip_refs.py` でスロットの参照を列挙し、書込み元の前後で `lea rdx` が指す名前を読んだ。スロットの値は `.data` の初期値 (cell の番地)、cell の中身は `.bss` で実行時に埋まる。cell の名前は UTF-16 の初期化文字列 (`0x4235f0` の GetProcAddress 相当の呼出し) として `.text` に残っていた。
 
 ## PE 確定 (対象 8 件 + liveSelectionStart)
 
-| 関数 | entry | fn | flags | 引数 (PyArg 書式) | 戻り | 本体の要点 |
+| 関数 | entry | fn | flags | 引数 (PyArg 書式) | 戻り | 本体の要点 (手動同定) |
 |---|---|---|---|---|---|---|
 | currentTime | 0x151dcd0 | 0xd78520 | 1 | `i` (snap) | int (`PyLong_FromLong`) | `0xd77e20()` → `0xe43fa0(obj, snap==1)` の int を変換 |
 | currentTimeHint | 0x151dcf0 | 0xd785a0 | 1 | `ii\|ii` (mode, time, setRecPPB, isLength) | str (`PyUnicode_FromString`) | setRecPPB の既定値 = `[[0x15e4558]]+0xb20` の dword。`0xe4b8b0` で文字列を作る |
@@ -49,6 +51,7 @@
 
 - `provider/fl_engine.c` と `host/fl_mock.mjs` で、同じ個数・型検査と同じ戻り値に揃えた。
 - 個数・型は `provider/gen/fl_table.c` (stub 由来) の値で dispatch (`fl_dispatch.c`) が検査する。`selectionClear`・`selectionSet` は `np = -1` のため handler の `NARGS` で検査する。
+- 表と PE の書式の差: `jumpToMarker` は個数 (表 2・PE 1)。`liveSelection` は型 (表 `ib`・PE `ii`)。`fl_dispatch.c` の `type_ok` は `i`・`b` のどちらも int と bool を受理するので、この型差は挙動に出ない。
 - `currentTime` は仮置きの状態 `arr_time` (mock の `st.arrTime`) を返す。値は未実測で、既定値 0 は PE から決めていない。
 - 選択・マーカーの 5 件は副作用を持たない。呼出しは mock の `record` (既存の呼出し記録) に残る。
 
@@ -102,7 +105,7 @@ $ git diff --stat 3a0f9b9a 4f1ca1a3 -- tools/python ':!*.md'
 |---|---|---|
 | `currentTimeHint`・`getMarkerName` (str 返し) の PE 確定と C 実装 (`0xe4b8b0`・`0xe53c90` の同定) | 2 件が未実装 | 子 #3041 [PY-143] |
 | 選択・マーカーの副作用 (`0xd843d0` のコールバック 5 件・`0xd77e20` の object・`[0x15e4790]+0x98` のゲート) | 5 件の状態変化が未モデル | 子 #3043 [PY-144] |
-| `jumpToMarker` の必須個数: PE は `i\|i` (必須 1)、flapi 表は必須 2 (stub 由来) | mock と C は表に合わせて 2 件必須。PE の 1 件呼出しを許すかは未確定 | 子 #3043 [PY-144] |
+| `jumpToMarker` の必須個数: PE は `i\|i` (必須 1)、flapi 表は必須 2 (stub 由来) | mock と C は表どおり必須 2 (現行、挙動は変えない)。PE (1) と不一致のまま。PM agent の判断待ち: jumpToMarker の必須個数を PE (1) に寄せるか、表 (2) のままか。既定案: 表どおり 2 | 子 #3043 [PY-144]・PM 判断 |
 | `liveSelectionStart` の引数個数: PE は引数を読まず、表は 0 件 | 個数の確定は未了 | 子 #3043 [PY-144] |
 | int と bool の区別 (`PyLong_FromLong` 1 本)、負値 `-1` の実機値 | PY-87 の bool 4 件の Python 型が未確定 | 子 #3043 [PY-144] |
 | #2832 (PY-96) の 4 件が main に未実装 (`REPORT_PY96.md` も無い) | #2983 の前提が成立していない | 親 #2832 (PM 判断) |

@@ -189,7 +189,7 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
-    // PY-119 (#2983): 個数・型は fl_table と PE の PyArg 書式 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i') に合わせる。
+    // PY-152 (#2983): 呼出し構造と PyArg 書式は PE で確定 (currentTime 'i'・selectionSet 'ii|iii'・liveSelection 'ii'・addAutoTimeMarker 'is'・jumpToMarker 'i|i')。個数は fl_table (必須 2) に合わせた暫定で、jumpToMarker は PE (必須 1) と不一致 (REPORT_PY152 未解決)。
     // 選択・マーカーの 5 件は副作用が未同定のため状態を変えない。currentTime は仮置きの状態 arrTime (0) を返す (provider/fl_engine.c と同じ)
     "arrangement.currentTime": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return st.arrTime; },
     "arrangement.selectionClear": (...a) => { arity(a, 0, 0); },

@@ -29,7 +29,7 @@ const pe100 = new Set(["channels.getStepParam", "channels.getCurrentStepParam"])
 const pe87 = new Set(["general.getChangedFlag", "general.getUseMetronome", "general.getPrecount", "general.getRecPPQ"]);
 // stub 確定 2 関数 (REPORT_PY41_1514 追補 #2805・PY-89)。PE 0xd5bd60 / 0xd5bcd0 で範囲検査と戻り field を確認
 const stub89 = new Set(["channels.getChannelIndex", "channels.getChannelMidiInPort"]);
-// PE の PyArg 書式と fl_table の個数・型で確定した arrangement 6 関数 (REPORT_PY119・PY-119 #2983)。副作用は未同定、tests/arrangement_diff.mjs が mock と照合
+// PE の PyArg 書式で呼出し構造を確定し、個数は fl_table に合わせた arrangement 6 関数 (REPORT_PY152・PY-152 #2983。jumpToMarker は PE と個数不一致の未解決)。副作用は未同定、tests/arrangement_diff.mjs が mock と照合
 const pe119 = new Set(["arrangement.currentTime", "arrangement.selectionClear", "arrangement.selectionSet", "arrangement.liveSelection", "arrangement.addAutoTimeMarker", "arrangement.jumpToMarker"]);
 // PE 0xd5ec60 で取得式を確定した 1 関数 (REPORT_PY115 §2・PY-115 #2951)
 const pe115 = new Set(["mixer.getTrackColor"]);
