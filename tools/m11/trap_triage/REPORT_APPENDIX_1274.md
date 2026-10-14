@@ -30,3 +30,19 @@
 - `survey_diff.py` OFF→ON: ok 退行 unit は **190 の 1 件** (ok→oob)。kind 変化は 190 (ok→oob)・304・555 (oob→abort, #1275)。§2 と一致。
 - 読み: 現 main で再現性は確認した。ただし本 run は trap 源の特定 (受入条件 1)・DEFECTS 類型への分類 (受入条件 2) には進めていない。ON の ok 退行 0 (受入条件 3) も未達 (unit 190 が残る)。
 - 未達: 受入条件 1〜3 は未達のまま。起票先: #1642 (親 #1274)。
+
+## 5k. origin/main での再現 (測定 commit `d33c763a` = origin/main、#1274 再 run・worktree ws-1274)
+
+- 素材: fl-win64 (`FL_WIN64_DIR` = `$RUNNER_TEMP/fl-win64`)・toolchain-retdec・toolchain-emsdk・work-m11・work-liftdiff を展開。`m11_gen_ir2.sh` rc=0 (50 s、ldfix=applied、F1=902、errors=0)。
+- 展開の注意: `work-m11` / `work-liftdiff` の tar は `tools/m11/work/` 等の相対パスを内包する。`-C tools/m11` で展開すると `tools/m11/tools/m11/work/` に二重化するため、`-C` を付けず repo 直下で展開する (本 run は誤展開後に移動して解消)。
+- build: ON・OFF とも `ov.o` を作り直してから rc=0 (ON 24 s、OFF 19 s)。
+- survey: 全 942 unit、`SV_RAW=1`、JSON は `work/probe1274/{on,off}.json` (work/ 配下・commit 対象外)。
+
+| build | ok / oob / abort / halt0 / miss / noproc / other |
+|---|---|
+| ON (`M11_OV_CLASSCREATE=1`) | 869 / 15 / 2 / 7 / 47 / 1 / 1 |
+| OFF (`M11_OV_CLASSCREATE=0`) | 870 / 16 / 0 / 7 / 47 / 1 / 1 |
+
+- `survey_diff.py` OFF→ON: ok 退行 unit は **190 の 1 件** (ok→oob)。kind 変化は 190 (ok→oob)・304・555 (oob→abort, #1275)。§5j・§2 と一致。
+- 読み: 現 main でも同じ数値が再現した。書込元の切り分け (ON-only override の除外や書込マスク) は本 run では未実施。§5h・§5i で否定済みの 3 要素 (9b4b00/9b5450 の書込み、41c130・9b4b00 の disp、413060 の override) を再実施しても新しい情報は得られないため、次の切り分けは別経路 (ON build で変わる lift 本体側の書込み、ov.o 以外の gate) に絞る必要がある。
+- 未達: 受入条件 1 (書込元の特定)・2 (DEFECTS 類型への分類)・3 (ON の ok 退行 0: unit 190 が残る)。起票先: #1642 (親 #1274)。
