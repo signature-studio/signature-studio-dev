@@ -159,6 +159,17 @@ index 39480f0a..5a9c1929 100644
 - `[raw407]` の `[arg-8]` 値は全入口で `dead` (参照先が image 範囲外)。§5c の範囲外読みによる値は採らない。
 - watch 版 (`PROBE_WATCH=fa5310:18 probe_entry.sh onw all`): 全関数入口の probe。ok 839 / oob 47 と通常 build から大きく変わるため、書込元の判定には使えない (watch build は挙動を変える)。`[chg]` 22 件は未解析。
 - 未達 (受入条件 2〜4): ON で 1 ノードずれる書込元の特定、既存類型 (DEFECTS) への分類、ON の ok 退行 0。起票先: #1642 (次 run)。
+- 測定後の差分 (本 PR の HEAD は main 取り込み後の merge commit): `git diff 7e665077 HEAD -- tools/m11 ':(exclude)*.md'` は 4 files (48 insertions, 3 deletions)。本 PR の変更ではなく main 側の変更で、`m11_build.sh` は `M11_TRACE_ISOLATE` (既定 1 = 従来どおり) と `M11_KEEP_BOOT_O` (既定 0 = 従来どおり) の分岐を追加、`probe_entry.sh` は `M11_KEEP_BOOT_O=1` を渡す 1 行のみ。既定値の経路は変わらない。ldfix の results (jsonl・tsv) は data。レビュー (oc-reviewer) の判定により、この差分の下では再測定しない。
+
+```diff
+# tools/m11/m11_build.sh (抜粋)
++ -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1}
++ if [ "${M11_KEEP_BOOT_O:-0}" != 1 ] || [ ! -f work/obj/boot.o ]; then cc work/boot_final3.ll work/obj/boot.o; fi
++ if [ "$(cat work/ov_trace_isolate.stamp 2>/dev/null || echo 1)" != "${M11_TRACE_ISOLATE:-1}" ]; then rm -f work/obj/ov.o; fi
+# tools/m11/trap_triage/probe_entry.sh
+- bash m11_build.sh > work/probe/build_$tag.log 2>&1 || ...
++ M11_KEEP_BOOT_O=1 bash m11_build.sh > work/probe/build_$tag.log 2>&1 || ...
+```
 
 ## 6. 差分 (測定 commit から本 PR の HEAD まで)
 
