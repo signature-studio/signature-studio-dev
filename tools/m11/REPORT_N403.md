@@ -139,7 +139,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 
 ## 6. 本 runner の実測 (#2779・LB=0 / 0x10000 の後段)
 
-測定日 2026-10-14。素材 fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (#516 以前の snapshot)。toolchain は runner 同梱の `/opt/emsdk`・`/opt/retdec`。
+測定日 2026-10-14。素材 fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (#516 以前の snapshot)。toolchain は runner 同梱の [EMSDK]・[RETDEC] (`docs/REFERENCES.md`)。
 測定 commit: LB=0 は `94dea77f` (測定時のコード)、LB=0x10000 は `51b20449` (fix。測定時の作業ツリーと同一)。
 製品 KPI (`tools/flelift/boot/REPORT.md`) は本節で測っていない。
 
