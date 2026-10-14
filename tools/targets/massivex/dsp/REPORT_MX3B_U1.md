@@ -120,3 +120,16 @@ slot 9 = `0x180082400` が process と特定した (根拠は §9)。Ghidra に�
 - 測定 commit: **5ed14324** (`dsp/scripts/mx_iap_*.py` を追加した commit。以後コード変更なし)。
 - 手順: `work/extracted/VST3/Massive X.vst3` を §6 の手順で生成 → 上記 1〜5 のコマンド。
 - 差分証跡: `git diff 5ed14324 HEAD -- tools/targets/massivex/dsp/scripts` は 0 行。
+
+### 9.4 独立確認 (Ghidra 非依存・#266 の残件 1)
+
+Ghidra は未導入のため、§9.2 の「独立の証拠」を既存スクリプトと逆アセンブルで取った。
+
+- 測定 commit: **5ed14324** (スクリプト差分 0 行を確認済み)。素材 `plugins-massivex` の installer → `work/extracted/VST3/Massive X.vst3` を再生成 (md5-ok 0/125 は既知)。
+- 直接参照 (`mx_vtable_xref.py`・27.4 s): `0x183973108` を指す RIP 相対参照は **1 件** (`0x180009e8a`、`lea rax,[rip+0x3969277]`)。
+- 参照元の文脈 (線形復号。開始 `0x180009e2b` は 0x200 手前から試した候補のうち、`0x180009e8a` まで命令境界が揃った最初の開始点。関数境界としては未検証): `0x180009e2b`〜`0x180009ed0` の一続きで、`[rsi]`・`[rsi+0x10]`・…・`[rsi+0xb8]` へ複数の vtable を書き込み、`0x180009e8a` の直後に `mov [rsi+0xc0], rax`。
+  `rsi` は `call 0x180015dbb` の後に保持された this (`mov rsi, rcx`)。よって `this+0xc0` へ IAudioProcessor サブオブジェクトの vtable を置くコンストラクタであり、§9.1 の COL.offset=0xC0 と一致する。
+- 限界: この確認は「その vtable が this+0xc0 の IAudioProcessor サブオブジェクトである」ことを独立に裏付けるもので、**slot 9 = process の対応 (SDK 宣言順) は未独立**。slot 9 の closure と U2/U5 は #1122 (CLOSED) と本 REPORT の範囲外。
+- 逆アセンブルは `.pdata` を使わず、上記の開始点から線形に復号した (関数 begin とは限らない点に注意)。
+
+§9 の結論 (部分確定) は変えない。残る未確定は「SDK 宣言順 = vtable 順」の独立確認のみ。
