@@ -496,6 +496,7 @@
 | `tools/plugins/framework/REPORT_APPENDIX.md` | ~318 | framework REPORT §10 (2026-10-11 検収)・§12 (CAB-194 検収)・§13 (CAB-269 修正) 全文。分割移動のみで内容は変更なし |
 | `tools/plugins/framework/REPORT_985.md` | ~50 | PLG-P0b-1 (#985, 部分達成): hs_e2e 判定の是正 (Phase B 例外 = FAIL・誤 PASS の実測) と RTL fold deref の現状。`plug != 0` は未達で子 #1229 へ |
 | `tools/plugins/framework/REPORT_2115_APPENDIX.md` | ~50 | framework REPORT_2115 §10 (TLS index 未設定の確認・未採用の stand-in 版の実験・n=1 の実測と対照) を REPORT_2115.md から分割移動 (250 行上限・本文は改訂済み)。測定値の正本 |
+| `tools/plugins/framework/REPORT_3150.md` | ~90 | PLG-P0b-31 (#3150): stage-2 smoke の `Runtime error 203 at 0x1` の書込み元の IR 上の候補 (named 形のポインタだけの集計で定数 203 の store は 0 件。inline 定数式の store は未集計)・after-exit で情報値が 0 になる原因 (`fw_stage2.sh` の `EXIT_RUNTIME=1`)・`fw_smoke_check` の runerr 判定の漏れ。結論・実測は本文 |
 | `tools/plugins/framework/REPORT_3120.md` | ~100 | PLG-P0b-29 (#3120): stage-2 smoke の InitUnits 中の `Runtime error 203 at 0x1` の発生経路を静的 IR で `4070f0`→`4072b0`→`40e400` まで絞った (書込み元は未特定・BLK 修正との因果は未切り分け)。修正前素材との比較 (n=1) の数値は `REPORT_3120.md` §3 が正本。 |
 | `tools/plugins/framework/REPORT_3186.md` | ~90 | PLG-P0b-32 (#3186): smoke 判定の RunError 正規表現 (`Runtime error N at` を数える) と `EXIT_RUNTIME=0`。修正前後の stage-2 実測 (150a83fa・8d8d0e6a の 2 基点) は判定・情報値とも不変。#3150 の 203 と情報値 0 は本素材の stage-1 では再現せず、実ログの確認は #3186 に残す |
 | `tools/plugins/framework/REPORT_2571.md` | ~75 | PLG-P0b-22 (#2571): hs_e2e Phase B に TLS 初期化 (`[0x7162d8]=1` → `0x418120`) を CreatePlugInstance の前に通す方式・対照との実測 (n=1)・注釈 `0x4181e0` の判定 (外せない)。Phase B は依然 OOB |
