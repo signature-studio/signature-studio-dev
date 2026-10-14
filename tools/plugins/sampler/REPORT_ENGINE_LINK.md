@@ -6,7 +6,7 @@
 
 - 殻 (block 23663、ImageBase 0x400000) は `engine_x64.dll` を名前で読み、`DispatchToEngine` を名前で引く。 殻から `DispatchToEngine` を呼ぶ箇所は 9 件 (§4)。
 - 受入条件 4 は **部分達成**。 ロード経路・export 取得・呼出し箇所 9 件・各 selector 値は確定。 `DispatchToEngine` の引数規約 (`r8`/`r9` の意味・戻り値) は未解析。
-- 受入条件 1・2 は `PLUG_NO_STATIC_DETECT=0` 相当の経路 (RetDec argv が `5880a9f6` と同じ) では PASS (§7): `sampler_engines.sh` exit 0・`PASS 2/2`、`sampler_e2e.sh` exit 0・`PASS 7/7`。 既定経路 (HEAD、`PLUG_NO_STATIC_DETECT` 未設定 = 1) では `sampler_engines.sh` のみ PASS 2/2 を実測。 `sampler_e2e.sh` の既定経路は未測定 (起票先: #540)。 既定経路での受入条件 1・2 の達成は、`sampler_e2e.sh` 既定経路の実測が揃うまで未確認。
+- 受入条件 1・2 は `PLUG_NO_STATIC_DETECT=0` 相当の経路 (RetDec argv が `5880a9f6` と同じ) では PASS (§7): `sampler_engines.sh` exit 0・`PASS 2/2`、`sampler_e2e.sh` exit 0・`PASS 7/7`。 ただし表の測定 commit は未確定 (`5880a9f6` / `cb3a89a6`) のため、現 HEAD では未確認 (#540)。 既定経路 (HEAD、`PLUG_NO_STATIC_DETECT` 未設定 = 1) では `sampler_engines.sh` のみ PASS 2/2 を実測。 `sampler_e2e.sh` の既定経路は未測定 (起票先: #540)。 既定経路での受入条件 1・2 の達成は、`sampler_e2e.sh` 既定経路の実測が揃うまで未確認。
 
 ## 2. 殻側の経路 (block 23663)
 
@@ -183,7 +183,7 @@
 - 既定経路の実行条件: 測定 HEAD `f73bcab0` (本節のみ変更、コード差分 0 で測定経路は `8a7f32ba` と同じ)。 env 未設定。 `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、PATH に `/opt/emsdk/upstream/emscripten`。
 - 上の 6 ファイルの変更 (f80 計数・U6・NC2a/b) は別経路の検証の範囲で、本 REPORT の測定対象外。
 
-以下の表は **`PLUG_NO_STATIC_DETECT=0` 相当 (RetDec argv が `5880a9f6` と同じ経路) の実測** である。 HEAD の既定経路 (`PLUG_NO_STATIC_DETECT` 未設定 = 1、`--disable-static-code-detection` あり) の `sampler_engines.sh` は下の「既定経路」行に実測を置く (`sampler_e2e.sh` の既定経路は未測定)。
+以下の表は **`PLUG_NO_STATIC_DETECT=0` 相当 (RetDec argv が `5880a9f6` と同じ経路) の実測** である。 測定 commit は `5880a9f6` と `cb3a89a6` のどちらか未確定で、`5880a9f6`..HEAD の測定経路にはコード差分がある (上の stat)。 そのため **表の値は現 HEAD に対する鮮度を確認していない** (記録として扱う、#540)。 HEAD の既定経路 (`PLUG_NO_STATIC_DETECT` 未設定 = 1、`--disable-static-code-detection` あり) の `sampler_engines.sh` は下の「既定経路」行に実測を置く (`sampler_e2e.sh` の既定経路は未測定)。
 
 | 項目 | 結果 (実測・`PLUG_NO_STATIC_DETECT=0` 相当) |
 |---|---|
