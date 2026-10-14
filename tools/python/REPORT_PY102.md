@@ -1,6 +1,6 @@
 # PY-102 (#2883): playlist.muteTrackLock の value を実装し、flapi 表の引数個数の不一致 (24 件) に根拠を付ける
 
-親: #2027 (PY-62)。残り 23 件の解消は子 #2927 ([PY-110])。muteTrackLock の binary 意味論は `tools/python/REPORT_PY61.md` §3。
+親: #2027 (PY-62)。残り 23 件の解消は子 #2927 ([PY-110])。準備判定 (-2) の未モデルは子 #2959 ([PY-117])。muteTrackLock の binary 意味論は `tools/python/REPORT_PY61.md` §3。
 既知類型との関係: 該当なし (lift 作業ではない。flapi 表の生成器・provider・mock の実装)。
 
 ## 結論
@@ -12,31 +12,31 @@
 
 ## 測定
 
-- 測定 commit (コードを変えた最後の commit): `72bffbbd` (`origin/main` (`aa676107`) の取り込み merge)。取り込みで `tests/provider_check.mjs` と `tests/channels_diff.mjs` の件数が変わったため、統合後に全件を取り直した。統合前の PY-102 のコードは `445dbf9c`・`63fbd940` にある。
-- 差分 0 の証跡: `git diff 72bffbbd HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。本 REPORT の commit で増えたのは `tools/python/REPORT_PY102.md` と `docs/DOC_MAP.md` だけ。
+- 測定 commit (コードを変えた最後の commit): `83508efa` (`tools/python/tests/provider_check.mjs` の `pe102` コメントを直した commit。挙動は変えていない)。その前の `72bffbbd` (`origin/main` (`aa676107`) の取り込み merge) からのコード差分は、このコメント 1 行だけ。統合前の PY-102 のコードは `445dbf9c`・`63fbd940` にある。
+- 差分 0 の証跡: `git diff 83508efa HEAD -- tools/python/analysis/flapi tools/python/analysis/flapi_table.py tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。`83508efa` から HEAD までの変更ファイルは `tools/python/REPORT_PY102.md` だけ。
 - 検証起点: origin/main `b2b052ce` (着手時)。
-- 環境: GitHub Actions runner (4 コア)。測定開始時の `/proc/loadavg` は `0.36 0.42 0.53`、終了時は `0.38 0.42 0.53`。並列 1 本。
-- 素材: `fl-win64` は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.86 s)。emsdk は runner に入っている既定値 (`EMSDK_DIR` の既定、emcc 6.0.12) を使った。`toolchain-emsdk` の展開はしていない。
-- 素材の利用: `fetch_inputs.sh` で win64 の DATA block から midi.py・utils.py・MCPTools.pyc・device script を配置。stub は `git clone --depth 1 IL-Group/FL-Studio-API-Stubs` (work/ 配下、gitignore)。CPython wasm は `build_cpython_wasm.sh` で作成 (4 分 13 秒。統合前に作成し、統合後も流用。CPython 側のソースは統合で変わっていない)。
+- 環境: GitHub Actions runner (4 コア)。測定開始時の `/proc/loadavg` は `0.10 0.36 0.21`、終了時は `0.36 1.01 0.63` (CPython ビルド直後)。並列 1 本。
+- 素材: `fl-win64` は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 --wildcards '*block00031_PE.bin' '*block24429_DATA.bin' '*block24430_DATA.bin' '*block25159_DATA.bin' '*block24618_DATA.bin'` で展開 (2.31 s)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` を使う。emsdk は `toolchain-emsdk` を展開せず、runner 既定の emsdk を使った (`build_flpy.sh` の `EMSDK_DIR`、`provider/build.sh` の `EMSDK_ENV` の既定値。[EMSDK])。PR 本文の `oc_artifacts` は `fl-win64` のみ。
+- 素材の利用: `fetch_inputs.sh` で win64 の DATA block から midi.py・utils.py・MCPTools.pyc・device script を配置。stub は `git clone --depth 1 IL-Group/FL-Studio-API-Stubs` (work/ 配下、gitignore)。CPython wasm は `build_cpython_wasm.sh` で作成 (3 分 20 秒。本測定で作成。CPython 側のソースは変わっていない)。
 
-### 検証の実測 (測定 commit `72bffbbd`)
+### 検証の実測 (測定 commit `83508efa`)
 
 | 検証 | 実行 | 結果 | 所要 |
 |---|---|---|---|
-| provider wasm | `bash provider/build.sh` | flprov.wasm 57,061 B | 0.92 s |
-| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 | 6.96 s |
-| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 80・unimplemented 355・PASS | 0.37 s |
-| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0 | 2.07 s |
-| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・host_calls 37,425 | 2.11 s |
-| playlist 差分 (新規) | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段 PASS | 4 本合計 0.21 s |
-| mixer 差分 | `node tests/mixer_diff.mjs` | calls 48・diffs 0 | (同上) |
-| channels 差分 | `node tests/channels_diff.mjs` | calls 122・diffs 0 | (同上) |
-| device 差分 | `node tests/device_diff.mjs` | calls 7・diffs 0 | (同上) |
-| 表の再生成・ネガコン | `FL_WIN64_DIR=… bash tests/flapi_table_check.sh` | 正常系の差分 0/3・win_pair_verified 388 件・ネガコン 6/6 PASS | 2.27 s |
-| kwsig 照合 | `python3 tests/kwsig_check.py` | OK (比較 229 件のうち同結果 213・差 11 関数。変更前と同じ) | 0.05 s |
-| kwsig 束縛 | `python3 tests/kwsig_bind_check.py` | PASS (103 関数・6,122 ケース・misbind 0・mismatch 0) | 0.10 s |
+| provider wasm | `bash provider/build.sh` | flprov.wasm 57,061 B | 1.06 s |
+| flpy link (表の再生成を含む) | `FL_WIN64_DIR=… bash build_flpy.sh` | flpy.wasm 5,924,680 B。再生成 3 ファイル差分 0 (`git status` が空) | 5.5 s |
+| provider ABI | `node tests/provider_check.mjs` | functions 435・implemented 80・unimplemented 355・PASS | - |
+| 48 tools (mock) | `node tests/all_tools.mjs` | 48/48・soft_error 0・raised 0・host_calls 37,425 | - |
+| 48 tools (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48・host_calls 37,425 | - |
+| playlist 差分 (新規) | `node tests/playlist_diff.mjs` | calls 23・diffs 0・mock 状態 8 段 PASS | - |
+| mixer 差分 | `node tests/mixer_diff.mjs` | calls 48・diffs 0・PASS | - |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 122・diffs 0・PASS | - |
+| device 差分 | `node tests/device_diff.mjs` | calls 7・diffs 0 (rejects 4・midi_out 4)・PASS | - |
+| 表の再生成・ネガコン | `FL_WIN64_DIR=… bash tests/flapi_table_check.sh` | 正常系の差分 0/3・win_pair_verified 388 件・ネガコン 6/6 PASS・fail 0 | 1.96 s |
+| kwsig 照合 | `python3 tests/kwsig_check.py` | OK (比較 229 件のうち同結果 213・差 11 関数。変更前と同じ) | - |
+| kwsig 束縛 | `python3 tests/kwsig_bind_check.py` | PASS (103 関数・6,122 ケース・misbind 0・mismatch 0) | - |
 | 引数個数 (before/after) | `python3 analysis/flapi/sig_arity_check.py before.json analysis/flapi/flapi_table.json` | before 対象 273・一致 249・不一致 24 / after 一致 250・不一致 23。変わった関数 1 件 (`playlist.muteTrackLock` 1→2) | - |
-| 実害の実測 (§3-2) | `node tests/sig_arity_probe.mjs` | 表の個数の呼出しが code 5 になる関数 3 件 (`channels.soloChannel`・`device.midiOutMsg`・`mixer.getTrackName`) | - |
+| 実害の実測 (§3-2) | `node tests/sig_arity_probe.mjs` | 表の個数の呼出しが code 5 になる関数 3 件 (`channels.soloChannel`・`device.midiOutMsg`・`mixer.getTrackName`)。`plugins.getParamValueString` は 4 引数で ok | - |
 
 - before は `git show b2b052ce:tools/python/analysis/flapi/flapi_table.json`。
 
@@ -54,7 +54,7 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 | `1 <= index <= 0x1f4 (500)` の外は -4 (文言 "Index out of range" = `FL_E_RANGE`) | `PL(0)` が index 1..500 の外で RANGE (code 4) |
 | `value == -1` なら `track+0xd5` の byte を反転 | `value == -1` (既定) なら `lock = !lock` |
 | それ以外は同じ byte へ `value` の下位 1 byte を書く | `lock = (uint8_t)value` (mock は `v & 0xff`) |
-| 準備判定 `call [rax+0x98]` が偽なら -2 (文言 "Operation unsafe" = `FL_E_UNSAFE`) | **未モデル** (常に準備済み)。`[rax+0x98]` の呼出し先は未特定。未解決 §5 |
+| 準備判定 `call [rax+0x98]` が偽なら -2 (文言 "Operation unsafe" = `FL_E_UNSAFE`) | **未モデル** (常に準備済み)。`[rax+0x98]` の呼出し先は未特定。未解決 §5 (子 #2959) |
 | 戻り値 None (`0xd82c20` の status 0) | `fl_ret_none` / `return null` |
 
 - 表: `analysis/flapi_table.py` の `EXTRA_PARAMS` で `value:int=-1` を追加した。公開 stub は `index` のみを宣言している (`sig` 1 個)。binary の書式 `i|i` と REPORT_PY61 §3 の `value:int=-1` を根拠にした。生成結果は `flapi_table.json` の 5 行だけ変わり、`provider/gen/fl_table.c` は `{"playlist", "muteTrackLock", 'n', 2, 1, "ii", ...}` の 1 行だけ変わった。
@@ -134,10 +134,10 @@ binary (コア `0xd56510`・REPORT_PY61 §3) と実装の対応:
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| muteTrackLock の準備判定 `call [rax+0x98]` の呼出し先が未特定。偽のとき -2 (`FL_E_UNSAFE`) を返す経路が C・mock に無い | 準備前の呼出しで code 3 にならない (実機と差がある) | #2809 (PY-91: 残りのコアと helper の意味。REPORT_PY61 §3 の記載) |
-| 不一致 23 件 (§3-1) の表の個数・名前の修正 | 実装済みの 3 関数が PE の個数の呼出しを code 5 で拒否する (§3-2) | 子 #2927 ([PY-110]) |
-| 差分検査 `mixer_diff.mjs` は 2 引数の `getTrackName` を含まない | §3-2 の差が差分検査で検出されない | 子 #2927 (受入条件に差分検査の呼出し列の追加を含める) |
-| 表の個数が PE と違う未実装の関数 (19 件) は code 2 のまま | 実装が入るまで個数の不一致は表面化しない | #2809 (PY-91)・REPORT_PY57 の未読 26 件 |
+| muteTrackLock の準備判定 `call [rax+0x98]` (0xd56535) の呼出し先が未特定。偽のとき -2 (`FL_E_UNSAFE`) を返す経路が C・mock に無い (REPORT_PY61 §3) | 準備前の呼出しで code 3 にならない (実機と差がある) | #2959 |
+| 不一致 23 件 (§3-1) の表の個数・名前の修正 | 実装済みの 3 関数が PE の個数の呼出しを code 5 で拒否する (§3-2) | #2927 |
+| 差分検査 `mixer_diff.mjs` は 2 引数の `getTrackName` を含まない | §3-2 の差が差分検査で検出されない | #2927 |
+| 表の個数が PE と違う未実装の関数 (19 件) は code 2 のまま | 実装が入るまで個数の不一致は表面化しない | #2927 |
 
 ## 6. DEFECTS.md への行案 (報告のみ。DEFECTS.md は未編集)
 
