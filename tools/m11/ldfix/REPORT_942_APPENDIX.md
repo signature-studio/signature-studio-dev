@@ -75,8 +75,8 @@
 測定 commit: `047f97c5` (origin/main)。素材 fl-win64 / work-m11 / work-liftdiff / toolchain-emsdk を展開。
 `bash tools/m11/ldfix/ldfix_e2e.sh` は 68.7 秒・rc 0・judge PASS (units 17/942・icall 24・threw `memory access out of bounds`・survey ok 136 / trap 9、base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
 
-- 照合 (`python3 tools/m11/ldfix/bin_table_source.py`): k184 / k185 / k186 の P (`0x7a50` 等) は、PE `.data` の RVA `0xfa5c90` / `0xfa5ca0` / `0xfa5cb0` に生値 `0x407a50` / `0x408040` / `0x408870` (LVA 補正前) として入っている。3 スロットとも .reloc の対象。k236 の P `0xa027` は RVA `0xfa5fd0` に生値 `0xa027` (reloc 外)。
-- 512 スロット (bin 表 k=0..255 の P/F、LVA) を PE `.data` の生値と照合 (reloc 補正のみ): 512/512 一致。つまり bin 表の初期値は PE 静的データ由来で、イメージ段階で既に入っている。
+- 照合 (`python3 tools/m11/ldfix/bin_table_source.py`、KS = k184/185/186/215/236 の 5 件のみ): k184 / k185 / k186 の P (`0x7a50` 等) は、PE `.data` に生値 `0x407a50` / `0x408040` / `0x408870` (LVA 補正前) として入っている。k236 の P `0xa027` は生値 `0xa027` として PE に入っている。
+- 確認できたのは上記 5 件 (k184/185/186/215/236) のみ。512 スロット (k=0..255) の P/F を image と照合するコードは commit に無く、本 run では `work-m11` の `m11_image.bin` が無いため実行していない。「512/512 一致」は取り下げる。bin 表の初期値全体が PE 静的データ由来かは未確認。
 - PE 上の k187 以降はバイト列 (機械語でない) で、bin 表の由来として扱える値ではない。
 - サイズ→bin 表 (`0x11e6a3c`・326 バイト・`function_407a50` が `size/8` で索引) (`bin_size_probe.mjs`): PRE は全 0、boot 後は非 0 324 件・最大 bin 番号 172。**k184 以上を指す参照は 0 件**。
 - 結論: k184〜186・k215・k236 の不正な P/F は、サイズ→bin 表から参照されない bin であり、FastMM_GetMem の通常経路 (サイズ ≤ 2600) では読まれない。unit 17 の trap の発生 load (`function_407a50` の `[P+24]` 読み) に k184 が直接関与するという仮説は、この観測では支持されない。
