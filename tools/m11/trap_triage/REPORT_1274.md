@@ -65,6 +65,27 @@ kind が変わった unit (OFF → ON):
 - 注: 全 unit の通常 survey で unit 190 の `frames` 欄の先頭は `function_412e40` を示す。`SV_ONLY` の単独実行 (生 frame) と全体実行で最内フレームが違う。どちらが REPORT_912 §3 の `412e40` に対応するかは未切り分け (#912 へ申し送り)。
 - 静的確認: `407a50` (`@function_407a50`) は `arg < 2601` で `(arg+7)/8` の表 (`18770492` 基点) を引く枝と、それ以外の枝を持つ連結リスト操作。`409410(1028)` は `sext(1028)` を渡す (1028 < 2601 なので表引き枝)。
 - 未実施: `407a50` 入口の実 pointer 値の計測 (probe 機構が `m11_post.py` / `m11_ov.c` に無く、新設が必要)。受入条件 1 の未達はこのため。起票先は #1642 (親 #1274)。
+  - 訂正 (次節 §5b): 既存の `trap_triage/probe_entry.py` で `407a50` の入口値は採れる。新設は不要だった。
+
+## 5b. 407a50 入口の probe 実測 (測定 commit `1e3ee7af` = origin/main)
+
+- 素材: fl-win64 / toolchain-retdec / toolchain-emsdk / work-m11 を展開 (`tools/m11/work/`・`$RUNNER_TEMP/fl-win64`・`$HOME/retdec`・`$HOME/emsdk`)。IR `m11_gen_ir2.sh` rc=0 (45.2 s、ldfix=applied、F1=902、errors=0)。build ON rc=0 (25.0 s)。
+- probe: `probe_entry.py` の正規表現を `function_<hex>(?:__lifted)?(` に変更 (`407a50` は lift 本体が `function_407a50__lifted`。変更前は `no define` で 0 件)。probe は読み取りのみ。
+- 単独 unit 190 (ON・OFF とも): `407a50` 入口 1 回、`arg1` = `0x404` (= 1028、`6ced90` の定数と一致)。単独実行は前 unit の状態を持たないため ON/OFF で差は出ない。
+- 全 unit (942) の probe 版 survey: ON `ok 866 / oob 20`、OFF `ok 871 / oob 15`。probe 無しの §5 (ON 869/15、OFF 870/16) とは一致しない。**probe 版 build は通常 build と結果が一致しない** (`[pe]` 挿入自体が挙動を変える)。以下の入口列は probe 版の結果。
+- unit 190 の `407a50` 入口 `arg1` 列 (先頭 6 件):
+
+| 順 | ON | OFF |
+|--:|--:|--:|
+| 1〜6 | 0x404, 0x28, 0x16, 0x22, 0x88, 0x88 | 同左 (一致) |
+| 7 | (trap まで無し) | 0x88 |
+| 8〜17 | (無し) | 0x88, 0x3e, 0x40, 0x32, 0x16, 0x20, 0x28, 0x28, 0x20, 0x18, 0x44 |
+
+- 読み取り: 先頭 6 件は ON と OFF で一致する。ON は 6 件目の後で trap し (§3 の生 frame 先頭が `407a50`)、OFF は同じ `0x88` の入口をさらに続けて 17 件まで進む。**入口の引数は同じで、参照先の状態が ON と OFF で違う**と読める。
+- 未確定: `[arg-8]` の読み先の値は取れていない (probe の `q()` は image 外候補 (`0x10000` 未満) を読まず `dead` を出す)。ON の差がこの読み先に当たるかは未確定。
+- ON-only override (`m11_ov.c` の `410360`→`9b4b00`) は `[rbx+0x54]`・`[rbx+0x34]`・`9b5450` のフィールド 0 クリアを書く。`407a50` の参照先との重なりは未照合。
+- 次の確認 (#1642): (a) 6 件目 `0x88` の入口で `407a50` 内の load アドレスを採る (`q()` の範囲拡大、または load 直前の値の dump)、(b) `PROBE_WATCH` で ON-only の書込みが (a) の参照先に当たるかを切り分ける。
+- 既知類型: 該当なし (未判定)。`407a50` は spin (`__asm_pause`・`Sleep`) を含み、類型判定は (a)(b) の後。
 
 ## 6. 差分 (測定 commit から本 PR の HEAD まで)
 
