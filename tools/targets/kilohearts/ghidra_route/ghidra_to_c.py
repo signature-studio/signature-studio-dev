@@ -56,7 +56,9 @@ static inline uint32_t kh_rcp_exact(uint32_t x) {
 static inline V128 rcpps(undefined1 dst[16], V128 src) {
     V128 r; (void)dst;
     for (int i = 0; i < 4; i++) {
-        uint32_t w = kh_rcp_exact(*(uint32_t *)(src.b + 4 * i));
+        uint32_t x, w;
+        memcpy(&x, src.b + 4 * i, 4);
+        w = kh_rcp_exact(x);
         memcpy(r.b + 4 * i, &w, 4);
     }
     return r;
@@ -100,6 +102,10 @@ def main():
     vas = list(dict.fromkeys(cfg['exports'] + cfg.get('also', [])))
     src = {va: open(os.path.join(ddir, '%x.c' % va)).read() for va in vas}
     alltxt = '\n'.join(src.values())
+    # rcpps は代入形 `X = rcpps(D, S);` だけを許す (戻り値を捨てる形は数値が silent に誤るため停止)
+    rc_bad = [l for l in alltxt.split('\n') if 'rcpps(' in l and not re.match(r'^\s*\w+ = rcpps\(\w+,\s*\w+\);\s*$', l)]
+    if rc_bad:
+        raise SystemExit('rcpps の非代入形を検出 (停止): ' + ' | '.join(rc_bad[:3]))
     # --- グローバル
     gl = {}
     for m in re.finditer(r'\b(_DAT|_UNK)_([0-9a-f]{8,9})\b', alltxt):
