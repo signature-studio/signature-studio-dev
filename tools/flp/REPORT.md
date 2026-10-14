@@ -221,6 +221,14 @@
 
 - wine: apt の `wine64` 9.0 (Ubuntu 9.0~repack-4build3) + `xvfb`。`wineboot -i` でプレフィックス作成まで成功。
 - 起動 (`xvfb-run -a wine64 FL64.exe`、90 s 上限): **timeout (rc 124) で終了しない**。`Mfplat.dll` の読込 (G01) は成功、`WinVerifyTrust` が `FLEngine_x64.dll` に対して呼ばれ (G03)、その後 `MSGBOX` を出して停止。**`FLEngine_x64.dll` のロードには到達せず**。
-- MessageBox の本文はトレースに出ず未確定。画面キャプチャ道具 (xwd/PIL) が runner に無く、文言の目視はしていない。
+- MessageBox の本文: `WINEDEBUG=+msgbox` の trace で取得 (`MSGBOX_OnInit`)。画面キャプチャ道具は使わず、文言はトレースから確定。
 - 判定: S1 は **未達**。止まった箇所は G03 (Authenticode 検査、ホスト側 `0x1400062a0`) と推定。wine の `WinVerifyTrust` を shim する (DLL override) か、oracle 用ローカルパッチが要る。S2 (WAV 書き出し) には未到達。
-- 未解決: MessageBox 文言の確定 / G03 回避手段 (oracle 用ローカルパッチ or wine DLL override) / S2・S3 全部 → #113 に残す (Refs #113)。
+- 検証 (再測定): 測定 commit `155382c8` (`WORK` を `$RUNNER_TEMP/work` に変更したスクリプトで `bash tools/flp/s1_wine_probe.sh` を実行)。rc 0、実行 5 m 15 s、`blocks with path 25164 / 25165`、multi-dest 1207 blocks。中間成果物は `$RUNNER_TEMP/work` に出力され、`tools/assets/work/` は作られない。`FLEngine_x64.dll` は 22,227,016 B。
+- 起動の trace 根拠 (`WINEDEBUG=+loaddll,+msgbox,+wintrust,+crypt`、90 s 上限、rc 124):
+  ```
+  0024:trace:wintrust:WinVerifyTrust (0000000000000000, {00aac56b-cd44-11d0-8cc2-00c04fc295ee}, 000000000011FBA0)
+  0024:trace:loaddll:build_module Loaded L"C:\\windows\\system32\\WINTRUST.dll" at 00006FFFFAA50000: builtin
+  0024:trace:msgbox:MSGBOX_OnInit L"The validity of the program could not be verified. Please reinstall it and try again."
+  ```
+  `FLEngine_x64.dll` のロード行は無い。
+- 未解決: G03 回避手段 (oracle 用ローカルパッチ or wine DLL override) / S2・S3 全部 → #113 に残す (Refs #113)。
