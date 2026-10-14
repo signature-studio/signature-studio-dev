@@ -338,10 +338,28 @@ jobs:
           exit 1
 
       # ---------------------------------------------------------------------
+      # 終了時の不変条件 (#1950): issue は常に『blocked』『着手済み』『closed』のいずれか。
+      # issue の /oc run が PR も push も出さずに (成功・失敗・cancel のいずれでも) 終わったとき、issue に
+      # ラベル oc:no-pr と構造化コメント (<!-- oc-run-outcome: no-pr reason=... run=... -->) を残し、PM Worker が
+      # コメント本文を解析せずに扱えるようにする。PR がある・明示的な終了状態 (oc:stuck / needs-user-input / blocked)
+      # なら何もしない (oc:no-pr は外す)。観測用で、この step は job を失敗させない。
+      # always(): agent の失敗・cancel の後でも走らせる。App token は発行済みのときだけ使える (無ければ何もしない)。
+      # ---------------------------------------------------------------------
+      - name: Record the run outcome (issue without a PR)
+        if: ${{ always() && steps.context.outputs.should_run == 'true' && env.OC_PERMISSION == 'write' && github.event_name == 'issue_comment' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          OC_JOB_STATUS: ${{ job.status }}
+        run: bash .github/scripts/record-run-outcome.sh
+
+      # ---------------------------------------------------------------------
       # pr-lint.sh (CI-43): agent が出した (直した) PR を、差し戻しの上位原因 (REPORT 行数・repo 外パス・Closes/Refs と
       # 受入の整合・oc_artifacts の値域・DOC_MAP 登録) で決定的に検査し、結果を step summary に書く。
-      # PR は agent の step の中で作られる (workflow に PR 作成 step は無い) ので、agent の step が全て終わった後 (job の最後) に、
+      # PR は agent の step の中で作られる (workflow に PR 作成 step は無い) ので、agent の step が全て終わった後に、
       # その PR を探して検査する。agent 自身も PR を出す前に同じ検査を走らせる (prompt)。
+      # job の最後 (Record the run outcome より後) に置く: job の上限 (60 分) に当たったとき、#1950 の不変条件を守る Record
+      # (always()) が lint に時間を取られて走らないことが無いように。lint は !cancelled() なので、上限での打ち切りの後には走らない。
       # 既定は警告のみ: continue-on-error で job を落とさず、OC_LINT_STRICT は repo 変数 (未設定なら警告のまま)。
       # script は origin/main の版を取り出して使う (agent が作業ツリーを PR ブランチに移していても、PR 側のコードを実行しない)。
       # 検査する PR: fix モード (pull_request_review / repository_dispatch oc-fix) と PR 上の /oc は OC_PR_NUMBER、
@@ -395,37 +413,29 @@ jobs:
             body="$RUNNER_TEMP/pr-lint-body-$pr.md"
             out="$RUNNER_TEMP/pr-lint-$pr.out"
             jq -r '.body // ""' <<< "$meta" > "$body"
-            # 出力には PR のファイル名が入る。『::』で始まる名前が workflow command として解釈されないよう、
-            # pr-lint.sh 自身の ::warning:: 以外で『::』から始まる行は無効化する。
-            bash "$trusted/.github/scripts/pr-lint.sh" --base origin/main --head "refs/oc-lint/pr-$pr" \
+            # pr-lint.sh の出力の行頭は PR のファイル名で、『::』で始まる名前は workflow command として runner に解釈される。
+            # pr-lint.sh は OC_LINT_STRICT が 1 でないと違反ごとに『::warning::<ファイル名>...』を出すので、常に OC_LINT_STRICT=1 で
+            # 走らせて (違反があれば終了 1。::warning:: は出ない)、job ログに流す行は全行に固定の接頭辞を付ける
+            # (空白を除いた行頭が『::』なら command になる。空白の種類に依らず、全行を例外なく無効化する)。
+            # 警告のみか strict かは、repo 変数 (この step の env の OC_LINT_STRICT) をここで見て決める。
+            OC_LINT_STRICT=1 bash "$trusted/.github/scripts/pr-lint.sh" --base origin/main --head "refs/oc-lint/pr-$pr" \
               --body-file "$body" --title "$(jq -r '.title // ""' <<< "$meta")" 2>&1 \
-              | sed -E '/^::warning::/! s/^[[:space:]]*::/[lint] ::/' | tee "$out"
+              | tee "$out" | sed 's/^/pr-lint> /'
             r=${PIPESTATUS[0]}
+            if [ "$r" -eq 1 ] && [ "${OC_LINT_STRICT:-}" != 1 ]; then
+              echo "::warning::pr-lint found violations in PR #$pr (warn-only; see the step summary)"
+              r=0
+            fi
             [ "$r" -eq 0 ] || rc=$r
+            # 出力の全行を字下げして載せる (字下げのコードブロックはファイル名の ``` で閉じられない)。
             {
               echo "### pr-lint (PR #$pr, implement)"
-              echo '```'
-              grep -v '^::warning::' "$out" || true
-              echo '```'
+              echo
+              sed 's/^/    /' "$out"
+              echo
             } >> "$GITHUB_STEP_SUMMARY"
           done
           exit "$rc"
-
-      # ---------------------------------------------------------------------
-      # 終了時の不変条件 (#1950): issue は常に『blocked』『着手済み』『closed』のいずれか。
-      # issue の /oc run が PR も push も出さずに (成功・失敗・cancel のいずれでも) 終わったとき、issue に
-      # ラベル oc:no-pr と構造化コメント (<!-- oc-run-outcome: no-pr reason=... run=... -->) を残し、PM Worker が
-      # コメント本文を解析せずに扱えるようにする。PR がある・明示的な終了状態 (oc:stuck / needs-user-input / blocked)
-      # なら何もしない (oc:no-pr は外す)。観測用で、この step は job を失敗させない。
-      # always(): agent の失敗・cancel の後でも走らせる。App token は発行済みのときだけ使える (無ければ何もしない)。
-      # ---------------------------------------------------------------------
-      - name: Record the run outcome (issue without a PR)
-        if: ${{ always() && steps.context.outputs.should_run == 'true' && env.OC_PERMISSION == 'write' && github.event_name == 'issue_comment' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          OC_JOB_STATUS: ${{ job.status }}
-        run: bash .github/scripts/record-run-outcome.sh
 
   review:
     # レビュワーエージェント: PR opened / synchronize / reopened / ready_for_review で起動し、
@@ -541,17 +551,25 @@ jobs:
           git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main' "+refs/pull/${OC_PR_NUMBER}/head:refs/oc-lint/pr-${OC_PR_NUMBER}" \
             || { echo "::warning::could not fetch main and the PR head for pr-lint"; exit 1; }
           out="$RUNNER_TEMP/pr-lint.out"
-          # 出力には PR のファイル名が入る。『::』で始まる名前が workflow command として解釈されないよう、
-          # pr-lint.sh 自身の ::warning:: 以外で『::』から始まる行は無効化する。
-          bash .github/scripts/pr-lint.sh --base origin/main --head "refs/oc-lint/pr-${OC_PR_NUMBER}" \
+          # pr-lint.sh の出力の行頭は PR のファイル名で、『::』で始まる名前は workflow command として runner に解釈される。
+          # pr-lint.sh は OC_LINT_STRICT が 1 でないと違反ごとに『::warning::<ファイル名>...』を出すので、常に OC_LINT_STRICT=1 で
+          # 走らせて (違反があれば終了 1。::warning:: は出ない)、job ログに流す行は全行に固定の接頭辞を付ける
+          # (空白を除いた行頭が『::』なら command になる。空白の種類に依らず、全行を例外なく無効化する)。
+          # 警告のみか strict かは、repo 変数 (この step の env の OC_LINT_STRICT) をここで見て決める。
+          OC_LINT_STRICT=1 bash .github/scripts/pr-lint.sh --base origin/main --head "refs/oc-lint/pr-${OC_PR_NUMBER}" \
             --body-file "$OC_PR_BODY_FILE" --title "$(cat "$OC_PR_TITLE_FILE")" 2>&1 \
-            | sed -E '/^::warning::/! s/^[[:space:]]*::/[lint] ::/' | tee "$out"
+            | tee "$out" | sed 's/^/pr-lint> /'
           rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 1 ] && [ "${OC_LINT_STRICT:-}" != 1 ]; then
+            echo "::warning::pr-lint found violations in PR #${OC_PR_NUMBER} (warn-only; see the step summary)"
+            rc=0
+          fi
+          # 出力の全行を字下げして載せる (字下げのコードブロックはファイル名の ``` で閉じられない)。
           {
             echo "### pr-lint (PR #${OC_PR_NUMBER}, review)"
-            echo '```'
-            grep -v '^::warning::' "$out" || true
-            echo '```'
+            echo
+            sed 's/^/    /' "$out"
+            echo
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$rc"
 
