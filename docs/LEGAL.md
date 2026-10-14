@@ -56,7 +56,7 @@
 | `[NSIS-FL]` | win インストーラ UI 文言 (INI) | `WIN/block00030_DATA.bin` ほか | — |
 | `[XFER]` | Xfer Records EULA (1,914 文字) | Serum 2 mac pkg: `TGT/serum2/work/pkg_extract/Resources/License.txt` (`Distribution` に `<license>`)。OTT/Serum 2 win: NSIS ヘッダ (zlib 解凍) 内ライセンスページ文 | **OTT win / Serum 2 win / Serum 2 mac の 3 者が空白正規化後に完全一致**。OTT mac pkg には `<license>` なし |
 | `[KH]` | Kilohearts EULA (全 6 条) | `TGT/kilohearts/work/dmg/Kilohearts Installer/Kilohearts Installer.app/Contents/Resources/EULA.txt`。win: `Kilohearts Installer.exe` 内 (file offset 15,125,160) | win 埋込と mac は空白正規化後に一致 |
-| `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認。同梱 EULA はファイル名判定では無し (`tools/legal/REPORT.md` §2) |
+| `[SLATE-ToS]` | Audiotonix General Terms of Use (Slate Digital) | <https://slatedigital.com/terms-of-service/> を 2026-10-10 に取得 | **同梱ではない**。Fresh Air に適用される版かは未確認。同梱 EULA はファイル名判定と User Guide PDF 本文の検索で無し (`tools/legal/REPORT.md` §2・§2-1) |
 | `[NI-EULA]` | Native Instruments EULA | <https://www.native-instruments.com/pages/end-user-license-agreement> (2026-10-10。作成時は検索スニペットのみ、検収時に全文を取得: 契約主体 inMusic NI GmbH、ページ表記 "Latest Version 2026-07-01") | **同梱ではない**。Massive X v1.7.1 インストーラ (Inno Setup 6.4.2) の復号ヘッダに EULA 文書・本文は無し (LGL-10、`tools/legal/REPORT.md` §1、§7) |
 
 補足: FL mac の dmg に Software License Agreement リソースは無い (dmg XML plist に `LPic`/`STR#`/`RTF `/`TEXT` 無し)。抽出物の置き場はリポジトリ外 (`docs/REFERENCES.md` `[LEGAL-WORK]`) (抽出作業用 dir は当時 `.gitignore` 対象外だったため)。
@@ -188,7 +188,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - 技術側: HeartCore に PACE iLok/Eden + Kilohearts 独自 LicenseManager (`TGT/kilohearts/REPORT.md` §5)。ライセンス層の扱いは方針事項 (同 REPORT §7・KH-8)。
 
 ### 4.3 Slate Digital (Fresh Air) — `[SLATE-ToS]` (オンライン・非同梱)
-- Fresh Air のインストーラ/zip には、ファイル名判定では **EULA は含まれない** (`tools/legal/REPORT.md` §2)。同梱 User Guide は "An iLok license is required to use Fresh Air. … Fresh Air will not function without a valid license" (`TGT/freshair/work/guide.txt` 相当、PDF p.5, p.11)。
+- Fresh Air のインストーラ/zip には、ファイル名判定と User Guide PDF 本文の検索では **EULA は含まれない** (`tools/legal/REPORT.md` §2・§2-1)。同梱 User Guide は "An iLok license is required to use Fresh Air. … Fresh Air will not function without a valid license" (`TGT/freshair/work/guide.txt` 相当、PDF p.5, p.11)。
 - 公式 ToS (Audiotonix General Terms of Use; 契約主体は地域で Slate Digital LLC / Audiotonix Group Ltd / Klang Technologies GmbH、準拠法 California / England & Wales / Germany):
   - §3.1: "Each license is to be used by only one (1) person and cannot be shared."
   - §6: "copy, modify, host, stream, sublicense, or resell the Services and Software"; "…as a part of a hosted service, or on behalf of any third party"; "circumvent any access or use restrictions"; "data scraping for machine learning".
@@ -267,9 +267,9 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 
 見つからない/読めなかった:
 - **Native Instruments (Massive X)**: **同梱なし** (LGL-10 / #2498、2026-10-14 実測。`Native Instruments Massive X v1.7.1.exe` の setup-0 を LZMA1 で復号したヘッダに、EULA の文書ファイル名・使用許諾本文は無い。`tools/legal/REPORT.md` §1-3)。インストーラの CRC 3 種は 6.4.2 の定義と一致せず、完全性は未確認で原因も未確定 (§1-4)。Web 版 EULA は検収時に全文確認済み (§4.4)。同梱版が無いため Web 版との同一性比較の対象は無い。
-- **Slate Digital (Fresh Air)**: 同梱 EULA はファイル名判定では**なし** (`tools/legal/REPORT.md` §2)。公式 ToS はオンライン版のみで、適用される版は未確認。
+- **Slate Digital (Fresh Air)**: 同梱 EULA はファイル名判定と User Guide PDF 本文の検索では**なし** (`tools/legal/REPORT.md` §2・§2-1)。公式 ToS はオンライン版のみで、適用される版は未確認。
 - **Xfer OTT (mac)**: pkg に `<license>` なし。OTT 専用の規約文書は未確認 (共通 Xfer EULA が win ライセンス画面に出る)。Xfer の公式規約ページは**公式ページなし** (確認日 2026-10-14、`tools/legal/REPORT.md` §3)。
-- **Image-Line FAQ (公開)**: 未確認。LGL-6 の範囲だが本文書では扱っていない。
+- **Image-Line FAQ (公開)**: 公開 FAQ hub (2026-10-14 取得) に規約文は無い。個別の FAQ 記事は静的 HTML に無く未確認 (`tools/legal/REPORT.md` §6)。
 - **Image-Line (実際に承諾した版)**: 公開 ToU / EULA は台帳 `fl-tou-web`・`fl-tou-rtf`・`fl-eula-html` の 3 版で保持済み (§2.1)。依頼者が実際に承諾した版は依頼者の記録事項で確認できないため**未確認**。運用形態 B では他の作業の前提にしない (§6.0)。
 - **Intel IPP / zplane / Chicken Systems / SoftVoice / Ultrafunk / ReWire / NDI / WebView2 / Edge Update** の個別ライセンス本文: 同梱なし。
 - **win の NSIS ヘッダは全体を読んだわけではない** (ライセンス関連語での検索のみ)。`CopyLicenseToAllUsers.exe`/`RemoveLicenses.exe` の挙動・文言は未調査。
@@ -304,7 +304,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 - **LGL-3**: `THIRD_PARTY_NOTICES` 自動生成 (FreeType 謝辞、BSD/MIT 表示、PSF、Apache NOTICE) + upstream バージョン/configure 記録。
 - **LGL-4**: FFmpeg/LAME 等の LGPL 部品を side module (差し替え可能) として upstream から再ビルドする設計 + `--enable-gpl`/`--enable-version3` 検出 CI。
 - **LGL-5**: 規約差分監視 (FL ToU/EULA.html、Xfer、Kilohearts、Slate、NI の最新版取得・ハッシュ比較) を FL 追従プロセスに追加。 → 実装済み (7 件の基準線を台帳に記録。Xfer は OTT win インストーラの NSIS ヘッダから取得。`tools/legal/terms-watch/REPORT.md`)。
-- **LGL-6**: 一次文書の補完取得 (NI Massive X インストーラ同梱版 EULA ※LGL-10 で同梱なしを確認済み、Slate Fresh Air 個別条項、Xfer 公式規約、Image-Line の公開 ToU/FAQ)。
+- **LGL-6**: 一次文書の補完取得 (NI Massive X インストーラ同梱版 EULA ※LGL-10 で同梱なしを確認済み、Slate Fresh Air 個別条項、Xfer 公式規約、Image-Line の公開 ToU/FAQ)。→ #89 で受入条件を確認し、結果は §7 に記録 (未確認項目は §7 に残す)。
 
 ---
 

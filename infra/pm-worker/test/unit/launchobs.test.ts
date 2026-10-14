@@ -127,6 +127,20 @@ describe("/oc 投稿の観測 (launchObs)", () => {
     expect(ctx.app.engine.plan().picks.some((p) => p.n === 61), "3 時間を過ぎたら候補に戻る").toBe(true);
   });
 
+  it("(e) 観測した run の完了時刻 (updatedAt) を doneAt に残す。進行中の間は残さず、完了を見た tick で残す", async () => {
+    const ctx = await live();
+    await tickAt(ctx, T0);
+    await send(ctx.app, "workflow_run", runPayload(7, "in_progress", { event: "issue_comment", title: TITLE, created: iso(T0 + 30_000) }));
+    await tickAt(ctx, T0 + MIN);
+    expect(obsOf(ctx)?.state).toBe("observed");
+    expect(obsOf(ctx)?.doneAt).toBeUndefined();
+    await send(ctx.app, "workflow_run", runPayload(7, "completed", { event: "issue_comment", title: TITLE, created: iso(T0 + 30_000), at: iso(T0 + 3 * MIN) }));
+    await tickAt(ctx, T0 + 4 * MIN);
+    expect(obsOf(ctx)?.doneAt).toBe(iso(T0 + 3 * MIN));
+    const r = ctx.app.engine.plan().rows;
+    expect(r.recent.some(([n, why]) => n === 61 && why.startsWith("run finished")), "完了から 3 時間以内は recent (run finished)").toBe(true);
+  });
+
   it("観測の純関数: 作成時刻の境界・5 分の境界・failed の後の観測", () => {
     const run = (created: number, title = TITLE, event = "issue_comment") => ({ id: 1, event, title, status: "in_progress", conclusion: null, updatedAt: "", createdAt: iso(created) });
     expect(observedBy([run(T0 - 61_000)], TITLE, T0), "投稿の 61 秒前は数えない").toBe(false);
