@@ -241,9 +241,9 @@
 | `emcc -c` | 0 / 0 | 45 / 45 | 0.99→1.04 / 0.76→0.93 | 1 |
 | wasm link (43,828,879 B / 43,833,146 B) | 0 / 0 | 11 / 1 | 1.03→1.49 / 0.93→0.93 | 1 |
 
-- 到達 (block19091): NULL host・ゼロ埋め host の両方で `entered=true`。最初に失敗する関数は `f_77fbb0` の `0x77fbf3` `call qword ptr [rax]` (host 由来の値が無いことが原因と推定。未検証)。NC (別 VA) は `entered=false` (弱い NC)。
+- 到達 (block19091): harness が VA を直接呼ぶ入場 (`_ott_run`)。Wrapper の LoadLibrary → GetProcAddress 経路は通していない。NULL host・ゼロ埋め host の両方で `entered=true`。最初に失敗する関数は `f_77fbb0` の `0x77fbf3` `call qword ptr [rax]` (host 由来の値が無いことが原因と推定。未検証)。NC (別 VA) は `entered=false` (弱い NC)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| CreatePlugInstance の完走 (host object の再構成) | 完走・Dispatcher 実行・bit 一致は未検証 | 未起票 (PM 判断) |
-| block23676 の入場 (VA 0x86a970) | build のみ検証 | 未起票 (PM 判断) |
+| CreatePlugInstance の完走 (host object の再構成)・起動経路 (LoadLibrary → GetProcAddress) からの到達 | 完走・Dispatcher 実行は未検証 | #2653 (HB-H46) |
+| block23676 の入場 (VA 0x86a970) | build のみ検証 | #2653 (HB-H46) |

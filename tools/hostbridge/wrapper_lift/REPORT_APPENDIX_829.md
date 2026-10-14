@@ -2,7 +2,7 @@
 
 > **正本 (測定値)**: 本付録。`tools/hostbridge/wrapper_lift/REPORT.md` §14 は結論と表のみ。
 
-測定 commit: `a55fd489` (harness コードを追加した commit)。測定は `a55fd489` の harness で行った。`cpi_reach.sh` の差分は実行に影響しないコメント 2 行 (測定後に追記) のみ。
+測定 commit: `a55fd489` (harness コードを追加した commit)。測定は `a55fd489` の harness で行った。`a55fd489` から HEAD までの `.py`・`.sh`・`.mjs`・`.c` の差分は 0 行 (`cpi_reach.sh` は測定後に変更していない)。
 検証起点: `origin/main` @ `9b352bd7` (作業ブランチ `829-wrapper-cpi-reach`、worktree `ws-829`)。
 環境: `[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP/r829/extracted`)・node v22.23.3。4 vCPU。全段直列 (並列 1)。load average は各段の開始・終了時の 1 分値 (`/proc/loadavg`)。
 
@@ -44,6 +44,7 @@
 - **最初に失敗する関数**: `f_77fbb0` (VA `0x77fbb0`)、命令 VA `0x77fbf3` の `call qword ptr [rax]` (C 行 1162331 付近)。直前の `0x77fbec` `mov rax, [rbp+0x30]`・`0x77fbf0` `mov rax, [rax]` で得たポインタを間接 call の先頭に使う。
 - **理由 (推定)**: host 引数 (RCX) が実体の object を指していない。NULL と zero 領域のどちらでも vtable 相当の値が得られず、間接 call 先が不正になる。この推定は「host object を与えると先へ進む」ことを確かめていないため未検証。
 - 命令数 49 は `cpi_at` の総件数 (ring は直近 256 件を保持するので全件保持)。
+- 検収時の再実行 (測定時の `cpi.cjs` を流用し、a0 = `0x30000000`): `entered: true`・最後の VA `0x77fbf3`・trap は `ott_unlifted` の abort。上表の 2 行目と一致。
 
 ### 2.3 ネガティブコントロール (弱い)
 
@@ -76,6 +77,7 @@ node tools/hostbridge/wrapper_lift/cpi_reach.mjs $RUNNER_TEMP/r829/cpi19091/cpi.
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| CreatePlugInstance 入場後の完走: host object (TFruityPlug 側) の再構成が要る。NULL・ゼロ領域では `f_77fbb0` の 1 回目の間接 call で停止 (§2.2) | 完走・Dispatcher 実行は未検証 | 未起票 (PM 判断) |
-| block23676 の入場 (VA `0x86a970`) | build のみ検証 | 未起票 (PM 判断) |
-| wasm の実行結果 (bit 一致) | 未検証 | 未起票 (PM 判断) |
+| CreatePlugInstance 入場後の完走: host object (TFruityPlug 側) の再構成が要る。NULL・ゼロ領域では `f_77fbb0` の 1 回目の間接 call で停止 (§2.2) | 完走・Dispatcher 実行は未検証 | #2653 (HB-H46) |
+| 入場の経路: 本 harness は VA を直接呼ぶ (`_ott_run`)。Wrapper の LoadLibrary → GetProcAddress 経路は未通過 | 起動経路からの到達は未検証 | #2653 (HB-H46) |
+| block23676 の入場 (VA `0x86a970`) | build のみ検証 | #2653 (HB-H46) |
+| wasm の実行結果 (bit 一致) | 未検証 (完走後に判定) | #2653 (HB-H46) |
