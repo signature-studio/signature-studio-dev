@@ -86,7 +86,7 @@
 #### 11.4.1 測定 commit 058c2049 (本 fix・実行は HEAD fa128b1b)
 
 - 測定 commit は `058c2049` (実行コードの最終 commit)。実行は `fa128b1b` のクリーンな worktree (`ws-2115`) で行った。`git diff 058c2049 fa128b1b -- tools/plugins/framework ':!*.md'` は 0 行。
-- 素材: `work-fw-stage1` を repo ルートで展開 (`tools/plugins/work/fw/` の 12 ファイル)。`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12) を使用。`fl-win64` は展開していない (`fw_stage2.sh`・`hs_e2e.sh` は `FL_WIN64_DIR` を読まない)。`toolchain-retdec` は呼ばれない (`r2`・`r3` の restored.ll は素材に含まれ、`--fresh` を使わない)。
+- 素材: `work-fw-stage1` を repo ルートで展開 (`tools/plugins/work/fw/` の 12 ファイル)。`toolchain-emsdk` は [EMSDK] (emcc 6.0.12) を使用。`fl-win64` は展開していない (`fw_stage2.sh`・`hs_e2e.sh` は `FL_WIN64_DIR` を読まない)。`toolchain-retdec` は呼ばれない (`r2`・`r3` の restored.ll は素材に含まれ、`--fresh` を使わない)。
 - 順序: `fw_stage2.sh` (stage-1 の 12 ファイルだけの状態から全段) → `hostshim/hs_e2e.sh --fresh`。逐次・並列数 1 (nproc 4)。
 
 | 手順 | 結果 | 所要 (real) | load average (開始 → 終了) |
