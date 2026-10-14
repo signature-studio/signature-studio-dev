@@ -65,7 +65,7 @@ Chrome Dedicated Worker で M=130 のオブジェクトを 1 Memory に畳み、
 | 130 | 23.81 | 795.9 | 141.01 | `6b1696f0` (1) | OK (sig_n=130) |
 
 - M=1 の署名 `6b1696f0` は `tools/perf/p8/real/bench_real.mjs` の既知値と同一。M=130 でも全 obj がこの値になり、obj 間の状態は汚染されない。
-- 注: 定常の比較は §3 の Chrome 表を正とする (本表は署名確認が目的)。
+- 注: 定常の比較は §3 の Chrome 表を正とする (本表は署名確認が目的)。本表の node 行 (load・setup・署名) に対応する生データは `tools/perf/p15/results/` に無い。署名の根拠は §3 の Chrome 行 (`results/chrome_shared.jsonl` の `sig_ok`) とし、本表の node 行は参考値。
 
 ## 3. Chrome 実測 (受入条件: N=130 の駆動)
 
