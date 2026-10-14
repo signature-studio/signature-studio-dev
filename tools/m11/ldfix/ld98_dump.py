@@ -49,7 +49,7 @@ for fn, site in SITES:
         out.write('%s\t%s\t%s\t-\t-\t-\tNO_FRAME_OPERAND\n' % (fn, site, text))
         continue
     base, disp = m.group(1), int(m.group(2), 0)
-    pat = re.compile(r'\[%s ?\+ ?0x%x\]' % (base, disp))
+    pat = re.compile(r'\[%s ?\+ ?(0x%x|%d)\]' % (base, disp, disp))
     reads, writes, leas, hits = 0, 0, 0, []
     for i in ins:
         if i.address <= sva or not pat.search(i.op_str):

@@ -222,6 +222,27 @@ pm_has '<!-- oc-pm-decision: rule=Rn reversible=yes/no -->'
 expect "pm.md: the oc-pm-decision marker format" $?
 pm_has '<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->'
 expect "pm.md: the oc-pm-intent marker format" $?
+# needs_decision は PR 起点 (Worker の detectPm と同じ条件)、対象なしは rule=skip、投稿前の /oc 検査、質問前の状態確認 (#2591)
+PMTS="$HERE/../../../infra/pm-worker/src/pm.ts"
+NEEDSTS="$HERE/../../../infra/pm-worker/src/needs.ts"
+COND='sig.review?.state === "CHANGES_REQUESTED" && sig.review.needs'
+KEY='PM 判断|PM に求める|PM が決め|PM の決定|起票依頼|PM 起票|PM 採番|PM 承認|PM が .*(起票|判断)'
+pm_has "$COND"
+expect "pm.md: needs_decision quotes the Worker's PR-origin condition (CHANGES_REQUESTED + review.needs)" $?
+grep -qF -- "$COND" "$PMTS"
+expect "pm.md's quoted needs_decision condition is still in infra/pm-worker/src/pm.ts" $?
+pm_has "$KEY"
+expect "pm.md: needs_decision quotes NEEDS_KEY" $?
+grep -qF -- "$KEY" "$NEEDSTS"
+expect "pm.md's quoted NEEDS_KEY is still in infra/pm-worker/src/needs.ts" $?
+pm_has '<!-- oc-pm-decision: rule=skip reversible=yes -->'
+expect "pm.md: rule=skip for no target (R9 is not reused)" $?
+pm_has "grep -c '/oc'"
+expect "pm.md: the /oc count check before posting is a required step" $?
+pm_has '否定形・引用・説明であっても書かない'
+expect "pm.md: a /oc string is banned even in negation, quote or explanation" $?
+pm_has '質問・`needs-user-input` の前に対象の状態を確認する'
+expect "pm.md: closed / merged / post-merge review are checked before asking" $?
 
 # 10b. 不在中ダイジェスト (CI-70 #2349): digest 節は 24 時間ごと・件数だけ・1 日 1 件までの緊急コメント。user_answered は回答を反映して確定する。
 pm_has '### `digest`'

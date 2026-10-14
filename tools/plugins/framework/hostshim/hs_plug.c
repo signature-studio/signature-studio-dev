@@ -102,9 +102,26 @@ static uint64_t plug_call(uint32_t va, uint64_t a1, uint64_t a2, uint64_t a3, ui
 
 static int in_image(uint64_t va) { return va >= 0x400000u && va < 0xd02000u; }
 
+/* framework 初期化の TLS 部分 (#2571)。_StartLib (0x4189c0) の reason==1 は [0x7162d8]=1 を立てた後,
+ * _InitLib が hooks[1] (= 0x418120) を呼んで TlsAlloc → [0x6d6e70] を設定する。Phase B はこの経路を
+ * 通らず CreatePlugInstance に入るため, ここで同じ 2 手を先に実行する。_StartLib 全体 (0x4189c0) は
+ * InitUnits (0x40da80) を含むため採らない (Phase B の route では未検証)。 */
+#define VA_TLS_INIT    0x418120u
+#define VA_TLS_FLAG    0x7162d8u
+#define VA_TLS_INDEX   0x6d6e70u
+static void hs_fw_init_tls(void) {
+    *(volatile uint8_t *)(uintptr_t)VA_TLS_FLAG = 1;
+    long long r = fw_call_cur(VA_TLS_INIT);
+    fprintf(stderr, "[hs] framework init: 0x418120 -> rax=0x%llx, [0x6d6e70]=0x%x, [0x7162d8]=%u\n",
+            (unsigned long long)r, *(volatile uint32_t *)(uintptr_t)VA_TLS_INDEX,
+            (unsigned)*(volatile uint8_t *)(uintptr_t)VA_TLS_FLAG);
+    fflush(stderr);
+}
+
 EMSCRIPTEN_KEEPALIVE uint32_t hs_e2e_run(void) {
     hs_status = 0; hs_plug = 0; plug_log_n = 0; hs_slots_called = 0;
     fw_hs_install();
+    hs_fw_init_tls();
 
     /* ---- 1. CreatePlugInstance(Host, Tag) — HostTag は 64bit 幅で受領 (ABI.md §1.1) ---- */
     uint64_t host = 0;
