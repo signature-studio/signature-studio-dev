@@ -334,6 +334,7 @@
 |---|---:|---|
 | `tools/runtime/REPORT.md` | ~155 | ブラウザ実行基盤 |
 | `tools/runtime/REPORT_APPENDIX_127.md` | ~65 | RT-9 (#127) の追補: 音声込み Firefox 測定の手順と実測表、Playwright WebKit 26.0 (Linux) の参考値 (Safari 実機ではない) |
+| `tools/runtime/REPORT_APPENDIX_2552.md` | ~15 | RT-15 (#2552): memload real の派生 loader `PoolBridge` 撤去 (共有 hb_bridge.mjs の HostBridge に接続)。memload real の実測は OTT DLL 素材待ち (REPORT §RT-6 の追補) |
 | `tools/runtime/rt10/REPORT.md` | ~190 | 実 FLEngine x64c lift (126MB wasm) の Chrome 起動時間・帯域・tier-up・boot ループ soak (RT-10 #128) |
 | `tools/hostbridge/REPORT.md` | ~95 | Fruity Wrapper の VST2 ロード経路解析 + wasm 同梱プラグイン表 |
 | `tools/hostbridge/cb/REPORT.md` | ~145 | shimx R2 コールバック変換の実体接続 |
@@ -383,6 +384,7 @@
 | `tools/python/REPORT_PY67_2159.md` | ~100 | PY-67 (#2159) 3 回目: 受入 3 (`0xec60ae` の対象) を TPlugListForm (非 chan) と確定し除外。受入 4 (`0x8ed012` の Self の出所) は呼出し元 5 件を列挙し未確定。残りは子 #2701 |
 | `tools/python/REPORT_PY71.md` | ~95 | PY-71 (#2501, 完了単位 1・2a): VMT (RTTI) の配置を 3 クラスで検証 (ネガティブコントロール 6/6 NG)。受入 1 (P = TGraphEditorForm・非 chan。全親鎖を実測)・2a (`0xffe370` = TPublicChannel のスロット 52、親 TChannel) を確定。2b (`call [reg+0x1a0]` 37 件の受け手)・3・4 は子 #2701 へ移した |
 | `tools/python/REPORT_PY116.md` | 105 | PY-116 (#2952): flapi 表の kwlist 無し引数 (flags=1) の書式を wrapper の出力ポインタ数と照合 (304 件中 302 件一致。`screen.addTextLine`・`screen.addMeter` の 6 個目は解析されない余剰で、表の個数 5 は正)。`plugins.getPresetCount` は kw 形式の唯一の flags=1 として書式 `i\|ii` を照合 (表の kwsig 1 件のみ変更)。名前の新規確定 0 件 (未確定 42 位置は `arg{i}` のまま) |
+| `tools/python/REPORT_PY123.md` | 122 | PY-123 (#3028): boot 停止時点 (unit 209) の undo 管理 global `0x15e1c78`・安全判定 global `0x15e4790`・singleton `0x16b82e0` が全て 0 (shim 有無で同じ)。敷設直後は PE 値 (`0x16bb068`・`0x141d6b8`) を読めるが、boot 本体の途中で 0 に戻る (戻す箇所は未特定) |
 | `tools/python/REPORT_PY12.md` | ~46 | PY-12 (#587): `_flhost` の per-module state 化・サブインタプリタ採用判断の実測 (REPORT.md の PY-12 節の全文。250 行上限のため分離) |
 | `tools/python/REPORT_PY31.md` | ~50 | PY-31 (#1329): mixer 残り 57 関数の扱い決定 (今回非実装・根拠は MCP 利用 0 件と mock 定義 0 件)、未実装 57 件の一覧、分割先 #941、検証 (provider_check / mixer_diff / all_tools) |
 | `tools/python/REPORT_PY39.md` | ~220 | PY-39 (#1527): channels 操作 7 関数の PE ハンドラ位置・PyArg 書式・引数の確定。他関数の戻り値・範囲外 code は未確定。`analysis/flapi/pe_handler_probe.py` の測定と selectAll 等 4 件の表エントリの扱い。PY-69 節は `REPORT_PY69.md`、#2548 の節は `REPORT_PY39_2548.md`、8 回目 run 節は `REPORT_PY39_2668.md` へ分割移動 (250 行上限) |
@@ -398,6 +400,7 @@
 | `tools/python/REPORT_PY72.md` | ~145 | PY-72 (#2542): channels.setChannelPitch (`0xd5aa30`) の PE 意味論。書式・委譲 `0xd843d0`・callback `0xd5a720` の判定順 (index → NaN 検査 → pitchUnit 0/1/2)・status → 例外文言 (-1/-2/-3/-4)。効果関数・guard・一覧 A/B・N の既定値は未確定 (実装なし)。測定は `analysis/flapi/pe_disasm.py`・`pe_rip_consts.py`。「追加解析 (PY-75 / #2562)」節 (callback `0xd5a720` の guard・値検査・pitchUnit 0/1/2、効果関数 `0x1051d20` の 7 引数。本体の未確定は子 #2576 [PY-77]) を含む。REPORT_PY39.md の 250 行上限のため分離 |
 | `tools/python/REPORT_PY73.md` | 250 | PY-73 (#2547・途中記録): channels.incEventValue (`Ii|d`) の戻り値の型 (flags bit1 で int / float ビット列)・`0x1051330` 本体の範囲外 code (例外経路なし)・本体の副作用 (スタック書込みのみ) を PE で確定 (§7)。事象表は eventId の初回参照で要素を作る遅延キャッシュと確定 (§8)。事象 flags の分類器 `0x104d0d0` の PE 確定 (§9): B 経路 (A 以外) の flags は 0x00/0x04 のみ。未確定は A 経路の flags (getter)・`0x1046a30` の lo・hi・cur・表挿入 `0x664090` (子 #2887) と channels.midiNoteOn (`iii|i`) の副作用。文言は `analysis/flapi/pe_errmsg_probe.py`、参照箇所は `analysis/flapi/pe_xref.py`、RIP スロットの実バイトは `analysis/flapi/pe_flag_slots.py` で再現 |
 | `tools/python/REPORT_PY73_APPENDIX_2817.md` | ~85 | PY-93 (#2817・部分): `0x11d1430` のゲート参照鎖 (G3 → スロット → Q → T)・T の書込み元 2 箇所・T の vptr (`0x125b1c0`。`0x40fb40` の `mov [rsi],rdi`)・vtable 先 `0x1262a90`・-2 ゲートの条件 (フラグ 3 byte の実行時値は未確定)。測定は `analysis/flapi/pe_slot_writers.py` で再現。`REPORT_PY73.md` §8-4 の付録 |
+| `tools/python/REPORT_PY73_APPENDIX_2547.md` | ~65 | PY-73 (#2547・5 回目 run・縮小後の受入 1 の付録): `0x1046a30` (lo・hi・cur の共通 getter) の eventId 種別振り分け表 (`0x1047424` の compare チェーン 7 分岐先・根拠 VA 付き)、mode `0x240` の直行条件、`0x10476f9` 系の mode 0x20 経路。RetDec の `return` 誤読の注意。値源は #2887 (PY-103)。測定は `analysis/flapi/pe_disasm.py`・`analysis/flapi/pe_retdec.sh` で再現 |
 | `tools/python/REPORT_PY74.md` | ~50 | PY-1 ilmcp 意味論の整合 (#74, PR #763): getBrowserNames 木・getHighlightNames 21 件・addChannel/addEffect/storePRScript 検証の実測表、`tests/ilmcp_diff.mjs` の結果、NC (addEffect 検証を外して 2 件差分)、非 ASCII 空白の未解決。REPORT.md §7b-3 の実測表の全文 |
 | `tools/python/REPORT_PY8.md` | ~45 | PY-8 (#80): MIDI 1 イベント flapi 呼出し数・所要時間と遅いモード切り分け (REPORT.md の分割ではなく新規。250 行上限とは無関係) |
 | `tools/python/REPORT_PY100.md` | ~150 | PY-100 (#2879): channels.getStepParam・getCurrentStepParam の PE 確定 (書式 `iiii\|i`/`iii\|i`・kwlist・padsStride 既定 16・`[global]` = patternNumber と同じ slot・param 0〜8 の写像・-1/-3/-4 の経路) と C provider・mock の実装、`channels_diff` diffs 0 (実測は REPORT_PY100 §11)。構造体 (note) の生成経路と既定値は未確定 (子 issue) |
@@ -407,12 +410,14 @@
 | `tools/python/REPORT_PY97.md` | 129 | PY-97 (#2856 / 親 #2633, REPORT_PY80.md §4 の子): `--enable-wasm-pthreads` の静的版 `flpy_static_pthread` の rc 0 リンク、単一スレッド 48 tool が stock と 0/48 差、2/4 スレッドからの同時 tool 呼出しが基準と 104/104 一致 (§9 で main 取り込み後に再測定)。#2633 の記録は REPORT_PY80.md |
 | `tools/python/REPORT_PY2.md` | ~221 | PY-2 (#83/#115, REPORT §7d 本体の全文): CPython と flapi provider の同一 wasm 静的リンク・往復コスト・`Py_*` 動的束縛 110 名の対応表・スレッド/GIL 方針。§7f (PY-81 #2634): 静的版の Worker 内実行と headless Chrome での SAB 版との 48 tool 比較・run_all.sh 全体の未達理由。§7g (#2649): fl-win64 + toolchain-emsdk だけの run_all.sh rc=0 (本体は付録 `REPORT_APPENDIX_2649.md`) |
 | `tools/python/REPORT_APPENDIX_2649.md` | ~142 | python REPORT §7g (#2649 run_all.sh を fl-win64 + toolchain-emsdk だけで rc=0 にする) の全文。main 取り込み後の再測定 (HEAD `6bec0214`、step 別所要・負のコントロール・未解決) (250 行上限のため分割移動) |
+| `tools/python/REPORT_APPENDIX_2858.md` | ~114 | PY-98 (#2858): main の経路 (`build_cpython_wasm64.sh`) で作った MEMORY64=1 の静的版 `flpy_static64` を headless Chrome で読込・smoke 実行 (validate・init・print・subinterp 1+160 回・heap 測定) と負のコントロール。旧経路 (撤回) の測定は git 履歴。MEMORY64=2 の heap 増加は子 #2918、12 check 版は子 #2919 |
 | `tools/python/REPORT_APPENDIX.md` | ~50 | python REPORT §PY-13 (build_flpy.sh の env 化 #588) と §12/§13 (PY-9 b kwargs 署名復元・wasm 回帰・未解決 #81) の全文 (250 行上限のため無変更で分割移動) |
 | `tools/python/REPORT_PY16.md` | ~100 | PY-16 (#654): stubs 既定値 `midi.*` の評価 (eval 撤去・許可式の評価器・検証・ネガコン) の全文 (REPORT.md §15 の分割移動) |
 | `tools/python/REPORT_PY80.md` | 93 | PY-80 (#2633): 静的版 (flpy_static) のサブインタプリタは達成。Memory64 は部分 (validate は node 22.23 で不可・headless Chrome 154 で可、実行検証は未了)。`_PyInterpreterState_GetRefTotal` は FL PE が呼ばない。結論の正本は REPORT の結論表。pthread+GIL は子 #2856 (PY-97)、Memory64 実行は子 #2858 (PY-98) |
 | `tools/python/REPORT_PY27.md` | ~70 | PY-27 (#1138): ui / general / screen / arrangement / launchMapPages の mock 対応状況・`tests/ui_diff.mjs` の結果・保留 150 件 |
 | `tools/python/REPORT_PY87.md` | ~61 | PY-87 (#2738): general の状態読出しゲッター 4 件 (getChangedFlag / getUseMetronome / getPrecount / getRecPPQ) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 146 件は #2830・#2831・#2832 |
 | `tools/python/REPORT_PY95.md` | ~96 | PY-95 (#2831): ui の状態読出しゲッター 9 件 (isClosing / getTimeDispMin / isMetronomeEnabled / isPrecountEnabled / isStartOnInputEnabled / isLoopRecEnabled / getStepEditMode / isBrowserAutoHide / getSnapMode) の PE 根拠・mock/C 差分 0・値は未実測の仮置き。残り 60 件は #2980・#2981・#2982 |
+| `tools/python/REPORT_PY119.md` | ~87 | PY-119 (#2980): ui の状態・フォーカス・文字列ゲッター 6 件 (getFocused / getFocusedFormID / getFocusedFormCaption / getFocusedPluginName / getHintMsg / isInPopupMenu) の PE 根拠・mock/C 差分 0・値は仮置き。保留 12 件は #3005・#3006・#3007 |
 | `tools/python/REPORT_PY121.md` | 72 | PY-121 (#2979): general の log・rec 系 4 件 (clearLog・dumpScoreLog・processRECEvent・getRecPPB) の PE 根拠 (entry・fn VA・書式・呼出し鎖)。戻り値の意味は未確定で実装なし。残りは #3001・#3002・#3003 |
 | `tools/python/REPORT_PY23.md` | ~85 | PY-23 (#1054): `enveditor` (Edison API・仕様は block24447) の実装と Audio scripts 12 本の import/実行検証。数値 oracle 6 本・NEG-d・未解決 |
 | `tools/python/REPORT_PY19.md` | ~57 | PY-19 (#792): `Score.loadScoreFromFile` (仮想 FS・JSON) と `ScriptDialog.DialogParams` (MOCK)・数え方の定義 (母集団 64) と再計算・実測・未解決 |
@@ -514,6 +519,7 @@
 | `tools/targets/massivex/REPORT_APPENDIX.md` | ~248 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017) |
 | `tools/targets/massivex/REPORT_APPENDIX_2151.md` | ~70 | Massive X §12.12〜§12.14 (#1976・#2108・#2151 MX-31) の分割移動全文。§12.14 の `.pdata` 訂正は未確定 |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
+| `tools/targets/massivex/dsp/REPORT_MX6.md` | ~130 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。測定値の正本 |
 | `tools/targets/kilohearts/REPORT.md` | ~200 | Kilohearts インストーラ解析 + snap-in lift 可否 |
 | `tools/targets/kilohearts/REPORT_KH19.md` | 70 | KH-19 (#782) ホスト 3 種 (Snap Heap / Multipass / Phase Plant) の vtable 間接 call 込み closure 再計算 (下界・過大評価の参考値・限界) |
 | `tools/targets/kilohearts/license/REPORT.md` | ~125 | HeartCore ライセンス層の呼出点特定 |

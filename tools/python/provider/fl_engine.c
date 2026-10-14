@@ -254,6 +254,13 @@ FL_H(ui, isLoopRecEnabled) { NARGS(0, 0); return fl_ret_b(c, ui_loop_rec); }
 FL_H(ui, getStepEditMode) { NARGS(0, 0); return fl_ret_b(c, ui_step_edit); }
 FL_H(ui, isBrowserAutoHide) { NARGS(0, 0); return fl_ret_b(c, ui_browser_auto_hide); }
 FL_H(ui, getSnapMode) { NARGS(0, 0); return fl_ret_i(c, ui_snap_mode); }
+/* PY-119 (#2980): PE 0xd6cd80 / 0xd6ca80 / 0xd6c9d0 / 0xd6cab0 / 0xd6c4c0 / 0xd6d6b0 は呼出し経路を確定 (REPORT_PY119)。値は未実測の仮置き */
+FL_H(ui, getFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
+FL_H(ui, getFocusedFormID) { NARGS(0, 0); return fl_ret_i(c, 0); }
+FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
+FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
+FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
+FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
