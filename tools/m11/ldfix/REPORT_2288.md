@@ -142,5 +142,5 @@
 ### 8-5 検証
 
 - `python3 tools/m11/ldfix/ld104_reach.py` → rc=0・1.2 s (CPU 1 core・load average 0.94)。
-- `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`RUNNER_TEMP=/home/runner/work/_temp`): 2m44s・load average 0.94 で 1〜6/7 は完走。7/7 の `cmp` は 12 行差分 (c589b0 の 12 site: 未判定 → 確定) で rc=1 になった。差分は想定どおり (`diff` で 12 行のみ)。`results/spill178_1161.tsv` を新出力で置換し、`cmp` は OK。`drops_510.tsv` は cmp OK (脱落関数の和集合 69 不変)。
+- `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`RUNNER_TEMP=<作業用一時ディレクトリ>`): 2m44s・load average 0.94 で 1〜6/7 は完走。7/7 の `cmp` は 12 行差分 (c589b0 の 12 site: 未判定 → 確定) で rc=1 になった。差分は想定どおり (`diff` で 12 行のみ)。`results/spill178_1161.tsv` を新出力で置換し、`cmp` は OK。`drops_510.tsv` は cmp OK (脱落関数の和集合 69 不変)。
 - 集計 (7/7 の出力): 確定 109 / 判定不能 16 / 未判定 53 (基点 927cd651 は 確定 97 / 判定不能 16 / 未判定 65)。
