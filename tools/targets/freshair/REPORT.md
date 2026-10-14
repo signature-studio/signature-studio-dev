@@ -228,7 +228,7 @@ RetDec 出力の欠陥と修復 (対照実験 `lift/gain_ablate.sh` で各々が
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実 snapin 構築 (FLE boot 連鎖) からの C+0x2d0/C+0x328/C+0x318 の実値 (受入 1) | 空 map が実機と同じかが不明 | #253 / #672 (boot 連鎖・open) と #702 (FA-9b で追跡)。#227 は closed のため参照しない |
-| 非空 map の構築 (controller 木 + {ptr, ctrl} 値 + 子 object の vtable slot +0x50/+0x18/+8) で 0x180da6c00 を到達させ、Filter 出力の native/wasm 比較 (受入 2 後半)。静的読み (map 探索・ノード配置・入口条件) は `REPORT_APPENDIX_FA16.md` §1〜3 | 0x157/0x158 の効果が未測定 | #702 (FA-9b) / #1182 (FA-16) |
+| 非空 map の構築 (controller 木 + {ptr, ctrl} 値 + 子 object の vtable slot +0x50/+0x18/+8) で 0x180da6c00 を到達させ、Filter 出力の native/wasm 比較 (受入 2 後半)。静的読み (map 探索・ノード配置・入口条件) は `REPORT_APPENDIX_FA16.md` §1〜3。FA_NODE1=1 時の setter addr=0x50 系の失敗形の読みは `REPORT_APPENDIX_FA22.md` (部分達成、#1578) | 0x157/0x158 の効果が未測定 | #702 (FA-9b) / #1182 (FA-16) / #1791・#1789 (FA-25・FA-24) |
 | Filter#2 (DUMP idx 2) に macro ID が届く経路と、ID 1〜4 との対応 (受入 3) | Filter#2 のパラメタ連動が不明 | #702 |
 | 0x157/0x158/0x15a の Compressor/Gain 側の意味 (受入 4)。候補 53 件のうち ≥100KB の 38 件は pdata 境界かテーブルの疑いで未検証 | 子 ID 写像の全体像 | #648 (PM コメント済み) |
 | 2・3 周目の 0x157/0x158/0x15a の値の式 (12-2 の観測行) | 1 周目以外の ID 写像が未確定 | #665 (親へ注記。子は PM 起票待ち) |
