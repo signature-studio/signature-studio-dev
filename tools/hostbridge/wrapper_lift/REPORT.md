@@ -239,3 +239,10 @@
 - 修正前の値 (旧判定): §8 の表 (a10c1f60 時点) を参照。
 - ネガティブコントロール (範囲ヘッダ経由の定義を 1 行削除して `ok` → `no_definition` に変わることの実測): 本 run は未実施。RetDec (`toolchain-retdec`) が素材に無く、`retdec_batch.py --nc` を実行できなかった。合成入力での確認のみ: `// Address range: 0x1000 - 0x1010` + `int64_t __dbk_fcall_wrapper(...) {` の 2 関数を入力すると `defined_before`=2・対象 0x1000 の削除後 `target_status_after`=`no_definition`。`negative_control()` は範囲ヘッダ経由の VA を選ぶよう修正 (`nc_remove`)。実 RetDec 出力での数値は再実行で埋める。
 - 未達 (受入条件 2・3): emcc exit 0 の wasm link と方式比較表は本 run で未実施。REPORT §9 の通り emcc exit 0 は 40 ファイル中 1 件 (#1679・#1680 が未完)。
+
+## 11. #1679: loop 外 break・undeclared label の制御構造復元 (測定 commit: 10d45b08)
+
+- 結論: loop 外の `break -> 0x<VA>` (78 件 / block19091) は、RetDec の注釈 `// 0x<VA>` が同じ関数内にある 51 件だけ、その飛び先への `goto lab_0x<VA>` に直した (`retdec_gotofix.py`)。機械的な `break` 書換えは採らない。
+- emcc exit 0 (40 ファイル中): 修復のみ 1 → 修復 + goto 化 2 (block19091 / block23676 とも)。error 行は 1,377 → 1,326 (block19091)。
+- 残り 43 件 (`statement not in loop` 27・`use of undeclared label` 16) は子 issue `[HB-H41]` に分割。引数型不一致 1,245 件は #1680 (HB-H36)。
+- 測定の全文・機械語照合 (1,314 / 1,427 件が jump で一致)・方式の根拠は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1679.md`。
