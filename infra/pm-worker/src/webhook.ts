@@ -44,6 +44,8 @@ export interface BotComment {
   issueNumber: number;
   at: string;
   body: string;
+  // コメントの id。created_at が同時刻 (秒精度) のコメントの新旧を、適用順に依らず決めるために持つ。
+  id?: number;
 }
 export interface PmState {
   issues: Record<string, IssueState>;
@@ -52,7 +54,7 @@ export interface PmState {
   // issue ごとの最後の bot コメント (分類の bot_last に相当)
   botLast: Record<string, BotComment>;
   // PM のコメントに書かれた最後の `oc_artifacts:` 行 (分類の pm_art に相当)
-  pmArt: Record<string, { at: string; line: string }>;
+  pmArt: Record<string, { at: string; line: string; id?: number }>;
   // issue dependencies (blocked_by) の blocker 番号 (open/closed 問わず。分類側で open だけに絞る)
   blockedBy: Record<string, number[]>;
   // PM (人間の PAT / PM App) が `/oc` コメントで着手を依頼した最後の時刻 (分類の launched に相当)
@@ -110,12 +112,22 @@ function applyIssue(s: PmState, p: Json): PmState {
 
 const ART_LINE_RE = /^oc_artifacts:[^\n]*$/m;
 
+// c が prev と同じか新しいコメントなら true。created_at が同時刻なら id の大きい方を新しいとみなす
+// (id が無ければ同時刻は後から適用した方が勝つ)。どの順に適用しても、最新のコメントが残る。
+function notOlder(prev: { at: string; id?: number }, c: Json): boolean {
+  const a = Date.parse(c.created_at);
+  const b = Date.parse(prev.at);
+  if (a !== b) return a > b;
+  return typeof c.id === "number" && typeof prev.id === "number" ? c.id >= prev.id : true;
+}
+
 function applyIssueComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = []): PmState {
   const c = p.comment;
   const i = p.issue;
   if (!c || !i || p.action !== "created" || "pull_request" in i) return s;
   const k = String(i.number);
   const isBot = c.user?.login === botLogin;
+  const id = typeof c.id === "number" ? { id: c.id } : {};
   let next: PmState = s;
   if (pmLogins.includes(c.user?.login) && /^\/oc\b/m.test(c.body ?? "")) {
     const prevL = s.launchedAt[k];
@@ -126,14 +138,14 @@ function applyIssueComment(s: PmState, p: Json, botLogin: string, pmLogins: stri
   if (pmLogins.includes(c.user?.login)) {
     const m = ART_LINE_RE.exec(c.body ?? "");
     const prev = s.pmArt[k];
-    if (m && (!prev || Date.parse(c.created_at) >= Date.parse(prev.at))) {
-      next = { ...next, pmArt: { ...next.pmArt, [k]: { at: c.created_at, line: m[0] } } };
+    if (m && (!prev || notOlder(prev, c))) {
+      next = { ...next, pmArt: { ...next.pmArt, [k]: { at: c.created_at, line: m[0], ...id } } };
     }
   }
   if (isBot) {
     const prev = s.botLast[k];
-    if (!prev || Date.parse(c.created_at) >= Date.parse(prev.at)) {
-      next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000) } } };
+    if (!prev || notOlder(prev, c)) {
+      next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000), ...id } } };
     }
   }
   return next;
