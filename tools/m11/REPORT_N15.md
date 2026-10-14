@@ -151,7 +151,7 @@ SV_ERR_LOG=work/s1670/err.txt node trap_triage/survey_units.mjs work/s1670/out.j
 
 **鮮度**: `git diff 5ff58a9e HEAD -- tools/m11` は 0 行 (本節の追加のみ)。
 
-### #1847 [M11-N?] _CopyArray (416db0) の呼出し元 site 別計測 (#1670 の残り・測定 commit 365fc973)
+### #1847 [M11-12] _CopyArray (416db0) の呼出し元 site 別計測 (#1670 の残り・測定 commit 365fc973)
 
 起点 main `47ee8a17`。`work-m11` を `tools/m11/work/` に展開、PE は `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin`。`m11_gen_ir2.sh` (45 s・ldfix applied) で IR を作り直した。load は測定前 0.27・測定後 0.73 (4 vCPU)。
 
@@ -172,4 +172,4 @@ SV_ERR_LOG=work/s1670/err.txt node trap_triage/survey_units.mjs work/s1670/out.j
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| site 1・4・7〜11 の未実行理由 (呼出し元関数の実行時到達を関数単位 probe で確認) | 受入 1・2 未達 | 子 issue (本 PR で起票) |
+| site 1・4〜11 の未実行理由 (呼出し元関数の実行時到達を関数単位 probe で確認) | 受入 1・2 未達 | #1894 [M11-13] |
