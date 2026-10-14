@@ -36,11 +36,36 @@ def f32val(b):
     return struct.unpack('<f', struct.pack('<I', b & 0xffffffff))[0]
 
 
+MASKS_W = {8: 0xff, 16: 0xffff, 32: 0xffffffff, 64: MASK}
+
+
+def rcr_ref(w, a, cnt, F):
+    """RCR の参照値 (Intel SDM の疑似コード + 実機 rcr の測定)。
+    count は &0x1F (64bit は &0x3F)。マスク後が 0 なら flags 不変。8bit は MOD 9、16bit は MOD 17 で回転量を決める
+    (マスク後が 9・17 の倍数なら回転 0 でも CF は不変、OF は更新される)。CF は (W+1)bit 環の最後に落ちたビット、
+    OF = MSB(結果) ^ MSB-1(結果) (SDM は 1bit のみ定義。実機は count>1 でも同式)。ZF/SF/PF は変えない。"""
+    c = cnt & (0x3F if w == 64 else 0x1F)
+    if c == 0:
+        return a, dict(F)
+    if w == 8:
+        c %= 9
+    elif w == 16:
+        c %= 17
+    v = (F['CF'] << w) | a
+    for _ in range(c):
+        v = (v >> 1) | ((v & 1) << w)
+    r = v & MASKS_W[w]
+    nf = dict(F)
+    nf['CF'] = (v >> w) & 1
+    nf['OF'] = ((r >> (w - 1)) ^ (r >> (w - 2))) & 1
+    return r, nf
+
+
 def fresh_state():
     st = {'X': [[random.getrandbits(64), random.getrandbits(64)] for _ in range(16)],
           'YL': [[random.getrandbits(64), random.getrandbits(64)] for _ in range(16)],
           'R': [random.getrandbits(64) for _ in range(16)],
-          'F': {'ZF': 0, 'SF': 0, 'CF': 0, 'OF': 0, 'PF': 0}}
+          'F': {k: random.getrandbits(1) for k in ('ZF', 'SF', 'CF', 'OF', 'PF')}}
     for i in range(16):
         st['X'][i][0] = dbits(random.choice(NICE))
     return st
@@ -144,22 +169,48 @@ def cases():
         return s
     add('vinsertf128 ymm1, ymm2, xmm3, 1', e_insert)
 
-    def e_rcr(st):
-        s = clone(st)
-        edx = st['R'][2] & 0xffffffff
-        cf = st['F']['CF']
-        v = (cf << 32) | edx
-        b = v & 1
-        v = (v >> 1) | (b << 32)
-        ncf = (v >> 32) & 1
-        r = v & 0xffffffff
-        s['R'][2] = r
-        s['F']['CF'] = ncf
-        s['F']['OF'] = ((r >> 31) & 1) ^ ncf
-        s['F']['ZF'] = int(r == 0); s['F']['SF'] = (r >> 31) & 1
-        s['F']['PF'] = 1 if bin(r & 0xff).count('1') % 2 == 0 else 0
-        return s
-    add('rcr edx, 1', e_rcr)
+    def rcr_case(asm, reg, w, count_of, val=None, cf=None, flags=None, rcx=None):
+        def prep(st):
+            if val is not None:
+                st['R'][reg] = val
+            if cf is not None:
+                st['F']['CF'] = cf
+            if flags is not None:
+                st['F'].update(flags)
+            if rcx is not None:
+                st['R'][1] = rcx
+            return st
+
+        def e(st):
+            s = clone(st)
+            r, f = rcr_ref(w, st['R'][reg] & MASKS_W[w], count_of(st), st['F'])
+            keep = 0 if w >= 32 else st['R'][reg] & ~MASKS_W[w] & MASK
+            s['R'][reg] = keep | r
+            s['F'] = f
+            return s
+        add(asm, e, prep)
+
+    rcr_case('rcr edx, 1', 2, 32, lambda st: 1, val=0xdead00000001, cf=0,
+             flags={'ZF': 1, 'SF': 1, 'PF': 0, 'OF': 0})
+    rcr_case('rcr edx, 1', 2, 32, lambda st: 1, val=0xdead00000001, cf=1,
+             flags={'ZF': 0, 'SF': 0, 'PF': 1, 'OF': 1})
+    rcr_case('rcr edx, 32', 2, 32, lambda st: 32, val=1, cf=0)
+    rcr_case('rcr edx, 33', 2, 32, lambda st: 33, val=1, cf=0)
+    rcr_case('rcr edx, 0', 2, 32, lambda st: 0)
+    rcr_case('rcr edx, cl', 2, 32, lambda st: st['R'][1] & 0xff, val=1, cf=0, rcx=33)
+    rcr_case('rcr edx, cl', 2, 32, lambda st: st['R'][1] & 0xff, val=1, cf=0, rcx=32)
+    rcr_case('rcr dl, 9', 2, 8, lambda st: 9)
+    rcr_case('rcr dl, 18', 2, 8, lambda st: 18)
+    rcr_case('rcr dl, 10', 2, 8, lambda st: 10, cf=1)
+    rcr_case('rcr ax, 17', 0, 16, lambda st: 17)
+    rcr_case('rcr ax, 31', 0, 16, lambda st: 31, cf=1)
+    rcr_case('rcr rax, 1', 0, 64, lambda st: 1, val=0x8000000000000001, cf=0)
+    rcr_case('rcr rax, 1', 0, 64, lambda st: 1, val=0x8000000000000001, cf=1)
+    rcr_case('rcr rax, 64', 0, 64, lambda st: 64)
+    rcr_case('rcr rax, 65', 0, 64, lambda st: 65, cf=1)
+    rcr_case('rcr rax, 63', 0, 64, lambda st: 63)
+    rcr_case('rcr rax, 2', 0, 64, lambda st: 2)
+    rcr_case('rcr edx, 5', 2, 32, lambda st: 5)
 
     def e_movsld(st):
         s = clone(st)

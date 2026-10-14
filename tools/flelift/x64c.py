@@ -1654,13 +1654,18 @@ class FnLift:
     def i_emms(self, ins, ops): pass
 
     def i_rcr(self, ins, ops):
-        """rcr (rotate through carry right)。CF:a の (W+1)bit 環を右回転 (OTT の i_rcr と同式)。"""
+        """rcr: CF を含む (W+1)bit 環を右回転。count は &0x1F (64bit は &0x3F)、8/16bit は続けて MOD 9/17。
+        マスク後の count が 0 なら flags は不変、それ以外は CF と OF (= MSB ^ MSB-1) だけ更新 (実機 rcr 約 1.2 万件と一致)。
+        32bit の書き込みは count 0 でも上位をゼロ拡張する (実機)。"""
         sz = ops[0].size; W = sz * 8; T = 'uint%d_t' % W
         cnt = self.rd(ins, ops[1], 1) if len(ops) > 1 else '1'
-        self.L('{ %s a_ = %s; unsigned c_ = (unsigned)(%s) %% %d; uint64_t v_ = ((uint64_t)fCF << %d) | (uint64_t)a_; '
-               'while (c_--) { uint64_t b_ = v_ & 1; v_ = (v_ >> 1) | (b_ << %d); } '
-               'fCF = (uint8_t)((v_ >> %d) & 1); %s r_ = (%s)v_; fOF = ((r_ >> %d) & 1) ^ fCF; SETZSP(%d, r_); %s }' % (
-                   T, self.rd(ins, ops[0], sz), cnt, W + 1, W, W, W, T, T, W - 1, W, self.wr(ins, ops[0], 'r_', sz)))
+        cm = 63 if sz == 8 else 31
+        n = '(c_ %% %d)' % (W + 1) if sz < 4 else 'c_'
+        self.L('{ %s a_ = %s; %s r_ = a_; unsigned c_ = (unsigned)(%s) & %d; '
+               'if (c_) { unsigned __int128 v_ = ((unsigned __int128)fCF << %d) | a_; unsigned n_ = %s; '
+               'while (n_--) v_ = (v_ >> 1) | ((v_ & 1) << %d); '
+               'fCF = (uint8_t)((v_ >> %d) & 1); r_ = (%s)v_; fOF = ((r_ >> %d) ^ (r_ >> %d)) & 1; } %s }' % (
+                   T, self.rd(ins, ops[0], sz), T, cnt, cm, W, n, W, W, T, W - 1, W - 2, self.wr(ins, ops[0], 'r_', sz)))
 
     def i_int(self, ins, ops):
         # int 0x29 = __fastfail (CRT 異常終了経路) — guest では fail-fast が同じ意味 (OTT と同じ扱い)
