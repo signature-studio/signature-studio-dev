@@ -75,6 +75,11 @@ int main(int argc, char** argv) {
                                        0x1813073f0, 0x1813073f8, 0x181307400, 0x181307408, 0x181307410, 0x181307418};
         ott_enc_slots(0x18125eaa8, enc, 12);
     }
+    if (getenv("SLOT_T2_INIT")) {
+        uint64_t t2[34];
+        for (int i = 0; i < 34; i++) t2[i] = 0x1813071a0ULL + 8 * i;
+        ott_enc_slots(0x18125eaa8, t2, 34);
+    }
     if (getenv("SLOT_STUB_VA")) {
         g_stub_va = strtoull(getenv("SLOT_STUB_VA"), NULL, 16);
         g_stub_ret = 1;

@@ -1,0 +1,77 @@
+{
+ "variant": "plain",
+ "boot": {
+  "rc": null,
+  "threw": {
+   "cls": "exit",
+   "code": 0
+  },
+  "units_run": 209,
+  "units_total": 942,
+  "units_empty": 37,
+  "rax": "0x0",
+  "longjmp": 0,
+  "stage": 1,
+  "getmem": 1891,
+  "freemem": 776,
+  "va_calls": 20,
+  "va_bytes": 15470544,
+  "getproc": 88,
+  "exit": 1,
+  "cb_calls": 0,
+  "soft_calls": 64,
+  "soft_uniq": 21,
+  "mm_after": {
+   "getmem": "0x0",
+   "freemem": "0x0",
+   "realloc": "0x0",
+   "slot3": "0x0"
+  },
+  "ipp_ptr_15F34A0": "0x0",
+  "ipp_ptr_15F40E8": "0x0",
+  "ipp_total": 0,
+  "ipp_called": [],
+  "stopped_at_1based": 209
+ },
+ "survey": null,
+ "soft_top": [
+  "268448940:21",
+  "268437183:7",
+  "268438499:5",
+  "268449529:3",
+  "268437897:3",
+  "268449560:3",
+  "268448813:3",
+  "268448553:3",
+  "268448283:3",
+  "268448670:2",
+  "268441282:1",
+  "268448485:1",
+  "268436613:1",
+  "268437861:1",
+  "268448539:1",
+  "268448325:1",
+  "268448052:1",
+  "268448415:1",
+  "268448698:1",
+  "268437838:1",
+  "268437274:1"
+ ],
+ "ipp": {
+  "on": false,
+  "ptr_15F34A0": "0x0",
+  "ptr_15F40E8": "0x0",
+  "total": 0,
+  "called": []
+ },
+ "notes": {
+  "entry": "0x1376820",
+  "longjmp_target": "0x1376840",
+  "init_table": "0x13768b0",
+  "baseline_retdec": {
+   "boot_units": "17 dispatched (16 completed), raise 0xEEDFADE in unit#17 (0x454090)",
+   "survey": "m11 sx 純リンク baseline (tools/m11/work/shimx_link/baseline/m11_boot.survey.json): ok 800 / oob 50 / halt0 44 / closure外 46 / abort 1 / noproc 1。なお --fix 変種は ok 800 / oob 41 / halt0 53 (CAB-129 halt0 対応表適用)。",
+   "route_diff": "results/verdict_boot.jsonl (gen_verdict.py: baseline を native 側、x64c を wasm 側に対応)"
+  }
+ }
+}
