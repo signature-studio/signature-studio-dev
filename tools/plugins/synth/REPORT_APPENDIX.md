@@ -73,6 +73,37 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 - 既定経路の summary は修復前と同一 (`emcc_c_rc`=1、最初のエラーも同一)。`lift_s` のみ測定ごとに変動 (36 → 45 秒)。他 8 本の `emcc_c_rc` は未測定。
 - 注: `e.fh.ll` は llvm-as 18 では 7651 行の `add i64 0, i64 %...` で不正 (RetDec 出力の元からの問題)。clang 18 の `-fsyntax-only` は通る。検証は clang で行う。
 
+## E. E3 残件の修復 (#1509; `function_180056120` の i32 仮引数)
+
+修復前: `e.final.ll:114486` の `'%arg2' defined with type 'i32' but expected 'i64'` (`function_180049450`)。
+`function_180056120(i32 %arg1, …)` の `%arg1` は本体で `inttoptr` されず、`function_180049450` へ渡すだけのため、#1485 の pass 規則 (inttoptr で使われる仮引数のみ) では対象外だった。
+
+修正: `fix_i32_ptr_arg.py` に伝播を追加した。`--func` で指定した呼出元 C の `i32` 仮引数 `%P` は、受け先 (変換済み callee) へ `i64` で渡す場合に限り `i64` 化する (C は `--func` の順序で受け先の後)。定数・trunc 規則は不変。 `cpp_lift.sh` は block 21202 のみ `PLUG_I32PTR_FUNCS="function_180049450 function_180056120"` を既定にする (他の block は従来どおり)。
+
+- 回帰テスト: `TMPDIR=$RUNNER_TEMP bash tools/plugins/lift/passes/test_fix_i32_ptr_arg.sh` → `ALL PASS` (既存 5 ケース + 伝播成功 (clang -fsyntax-only 通過) + 順序逆で失敗・出力無し)。
+- 実測 (`bash tools/plugins/synth/cpp_lift.sh 21202 1500`、既定 = 受入コマンドそのまま、測定 commit `dae815ef`、素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-liftlib・work-fw-stage1 を展開):
+
+| 条件 | lift rc | summary.csv | `emcc_c_rc` | 最初のエラー |
+|---|--:|---|--:|---|
+| 修復前 (1e3ee7af) | 0 | `21202,1579,0,1393,0,2,3,0,0,0,57,211,25828,67,23,1391,0` | 1 | `e.final.ll:114486 '%arg2' … i64` |
+| 修復後 (dae815ef、既定) | 0 | `21202,1579,0,1393,0,2,3,0,0,0,57,211,25828,67,23,1391,0` | **0** | — |
+
+- 修復前の既定実行 (1e3ee7af) の所要 58.6 秒、修復後 (dae815ef) 59.3 秒。load は 0.84 → 0.74 (測定前後)。`emcc_c_rc_after_fixcmp` は 0。`P-T2` 分類: const 11 / trunc 11 / param 1。
+- 測定 commit 以降のコード差分: `git diff dae815ef HEAD -- tools/plugins/lift tools/plugins/synth` (本 REPORT の commit は文書のみ)。
+
+### 他 block の emcc_c_rc (受入条件 3) の測定
+
+既定経路 (修復無し) の値。`cpp_lift.sh` の既定変更は 21202 のみ、他 block は `PLUG_I32PTR_FUNCS` 未設定の経路を通るため、既定値は不変 (pass は `cp` のみ)。
+
+| block | summary.csv (dae815ef、既定) | emcc_c_rc |
+|---|---|--:|
+| 23914 | `23914,3194,0,3697,0,34,3,0,0,0,165,2,111,0,503,3695,0` | 0 |
+| 23916 | `23916,3193,0,3694,1,35,3,1,0,1,169,2,111,0,501,3692,0` | 1 |
+| 23944 | `23944,3050,0,3321,0,41,24,0,0,0,448,1,61,0,271,3320,354` | 0 |
+
+- 23916 の `emcc_c_rc=1` は本 run では修復前の比較値を採取していないため、#534 の既存結果との一致は**未確認** (本 run の修復は 21202 以外に効かない設計のため、変化は無いはず、と推定)。残り 5 本 (24159・24163・24167・24216・24298) は未測定。
+- 測定時間の制約 (3 本で 13 分 26 秒) により、残り 5 本は本 run で測定しない。修復は `PLUG_I32PTR_FUNCS` 未設定時 `cp` のみで既定経路に影響しないことをコードで確認した。
+
 ## B. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
@@ -158,3 +189,22 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 - `emcc -c` は通過 (`emcc.log` 0 バイト、`first_errors.txt` 空)。未実装 helper は §A と不一致 (52 vs 121)。差の原因は `m11_simd2.py` の変更 (711d9ece・f2bbad10、#1163。VEX 3 オペランド形の SSE 委譲、cvt/rep 系の対応追加) で、§A (604e900f) の時点より未実装が減ったことによる。コードの差分からの説明であり、旧 commit での再測定はしていない。それ以外の列 (defines / i256 trap / f80 / emcc_c_rc / lift 秒を除く) は §A の再開経路と一致した。`.ll` 本体の差分比較はしていない。
 - 出力: `tools/plugins/work/synth/cpp23944/` (gitignore)。
+
+## E. #1537: 名前 define 2 件の `function_<VA>` 正規化 (opt-in `PLUG_NAME_DEFS=1`)
+
+- 測定 commit: **4609ee03** (コードを変えた最後の commit)。 `git diff 4609ee03 HEAD -- tools/plugins/lift tools/plugins/synth` の出力は 0 行 (HEAD = 4609ee03)。
+- 修復: `tools/plugins/lift/passes/name_defs_to_va.py` (新規)。 PE の export 名 (`CreatePlugInstance`) と entry point (`entry_point`) で RetDec が出した define を、`function_<VA>` に改名する。 `sampler/export_rename.py` (#707) は export 名だけを扱うため、entry point を加えた別 pass にした。
+  `lift_ranges.sh` に `PLUG_NAME_DEFS=1` の時だけ掛ける。 既定 (未設定) は従来と同一。
+- 改名の対象 (21202): `CreatePlugInstance` (0x1800029a0) → `function_1800029a0`、 `entry_point` (0x180005a50) → `function_180005a50`。
+
+### E-1. 実測 (4609ee03、`bash tools/plugins/synth/cpp_lift.sh 21202 1500`)
+
+| 条件 | summary.csv | `emcc_c_rc` | 最初のエラー |
+|---|---|--:|---|
+| 既定 (`PLUG_NAME_DEFS` 未設定) | `21202,1579,0,1393,0,2,3,1,0,1,57,211,25828,67,23,1391,0` | 1 | `'%arg2' defined with type 'i32' but expected 'i64'` |
+| `PLUG_NAME_DEFS=1` | `21202,1579,0,1393,0,2,3,1,0,1,57,209,25411,67,23,1393,0` | 1 | 同上 |
+
+- `PLUG_NAME_DEFS=1` の lift.log: `[name_defs_to_va] renamed 2: CreatePlugInstance->function_1800029a0, entry_point->function_180005a50`。
+- 欠落 define は **211 → 209** (B 25,828 → 25,411)。 defines 1391 → 1393 (+2)。 参照欠落 `missing_ref` 67 は不変 (改名は `@<名前>` の参照も書き換えるが、欠落参照の集計は変わらなかった)。
+- 受入条件 `missing_define` = 0 は **未達**。 残り 209 件は §C-1 (a) の RetDec 静的検出 (`statically linked function`) で、 `PLUG_NO_STATIC_DETECT=1` (#1486 の opt-in) の既定化が要る。 起票先: #1536。
+- `emcc -c` は既定・opt-in とも rc 1 (E3 が先に止める)。 両者の `first_errors.txt` は同一。
