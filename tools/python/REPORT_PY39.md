@@ -7,7 +7,7 @@
 - 7 関数 (selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn / incEventValue / processRECEvent) の**ハンドラ位置と引数書式は PE から確定**した。
 - **意味論 (戻り値・範囲外 code・副作用) は未確定**。各ハンドラは下位関数へ薄く委譲しており、実処理の所在まで追えていない。推測では実装しない。
 - 1〜6 回目は解析のみ (コード変更 0 件)。**7 回目 run で `selectAll` の経路を RetDec 逆コンパイルで確定した (経路は確定・選択値とゲートは未確定)**。選択値 (`ffac20`) の判定に依存するため、C provider と mock への実装は見送った (`c6485d55` の実装は `481bcd62` で戻した。下の「7 回目 run」節)。残り 6 関数は未実装のまま子 issue に分離した。受入条件は未達 (`Refs #1527`)。
-- PY-69 (#2499): `selectOneChannel` の意味論を PE で確定し、C provider と mock に実装した (末尾の PY-69 節)。`setChannelPitch` は未確定のため子 #2542 に分けた。
+- PY-69 (#2499): `selectOneChannel` の意味論を PE で確定し、C provider と mock に実装した (末尾の PY-69 節)。`setChannelPitch` は PE 意味論を PY-72 (`REPORT_PY72.md`・#2542 の子) で確定し、残りは #2562・#2563 に分けた。
 
 ## 測定
 
@@ -205,7 +205,7 @@
 | selectAll の選択値: `*p` (`0x154528c` の int32) の実行時の値と書込み元 (ロード時の初期値は -1) | 通常状態の値が 0 以上なら `item+0x798 == *p` の channel だけが選ばれる。実装は見送り | 未解決表のみ (親 #1527 に残す。子は起票しない) |
 | selectAll のゲート: `obj+80` の通常時の値と `d84f30`、callback の状態 byte | 通常時にゲートが通るかが未確認 (通らないと -2 で何もしない) | 未解決表のみ (親 #1527 に残す) |
 | `ff8b60` の呼出先 `0x1311d90`・`0x4232e0`・`0x1060420`・`0x423980`・`0xfdee80` | 選択フラグ `+812` への間接的な影響は未読 | 未解決表のみ (親 #1527 に残す) |
-| `selectOneChannel` の前提ゲート `0xd5af58`・後段ゲート `0xd82c6a`・選択ゲート `0xffac20`・`useGlobalIndex>0` の表 (排他選択と stack 引数の出所は PY-69 節で確定) | 未モデル (C provider は常に選択する) | #2542 (PY-69 節の未解決表) |
+| `selectOneChannel` の前提ゲート `0xd5af58`・後段ゲート `0xd82c6a`・選択ゲート `0xffac20`・`useGlobalIndex>0` の表 (排他選択と stack 引数の出所は PY-69 節で確定) | 未モデル (C provider は常に選択する) | [PY-82] #2642 (PY-69 節の未解決表) |
 | `setChannelPitch` の意味論 | 未実装 | [PY-69] #2499 |
 | `setStepParameterByIndex`・`midiNoteOn`・`incEventValue` の意味論と `processRECEvent` の flapi 署名修正 | 未実装 4 件 | [PY-70] #2500 |
 | `d843d0` の `425210`・`526190` (同期待ち) の中身 | 同期実行の前提 (callback 完了後に `*result` を読む) が未確認 | 未解決表のみ (親 #1527 に残す) |

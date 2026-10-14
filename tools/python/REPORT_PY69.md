@@ -5,7 +5,7 @@
 ## 解析の詳細 (PY-69)
 
 - 既知類型との関係: 該当なし (lift 作業ではない。PE 逆アセンブルによる意味論の確定)。
-- 測定 commit: `96de54b9` (コード変更の最後の commit。main の取り込み merge。PY-69 のコード変更は `68aefd04`: `provider/fl_engine.c`(コメント)・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`(コメント)・`analysis/flapi/pe_scan_store.py`。`683aef61` の後に mock の 2 番目引数の型検査と差分テストの呼出し 3 件を足した)。
+- 測定 commit: `96de54b9` (main の取り込み merge。main の PY-70 (`1530a544`) のコード変更を含む merge 上で測定した。PY-69 のコード変更は `68aefd04`: `provider/fl_engine.c`(コメント)・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`(コメント)・`analysis/flapi/pe_scan_store.py`。`683aef61` の後に mock の 2 番目引数の型検査と差分テストの呼出し 3 件を足した)。
 - 逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'`。`-C` を省くと作業ツリーに展開される。実測 2.9 秒)。
 - 書込み箇所の列挙: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_scan_store.py 0x32c` (PE 全 `.text` 16,397,488 バイトの線形走査、19.6 秒、10 件)。
 
@@ -63,7 +63,7 @@
 
 - 所要 (実測, `96de54b9`): `provider/build.sh` 0.6 秒、`build_flpy.sh` 4.8 秒、`channels_diff` 0.04 秒、`provider_check` 0.25 秒、`all_tools` 1.12 秒 (mock) / 1.13 秒 (wasm)。`build_cpython_wasm.sh` 2 分 42 秒と `pe_scan_store.py 0x32c` 19.6 秒は `68aefd04` での実測 (`96de54b9` では再実行していない)。
 - load average: nproc 4、`uptime` は 15:37:20 時点で `0.13 / 0.38 / 0.44` (1・5・15 分平均)。ビルド中の値は採取していない。
-- 差分 0 の証跡: `git diff 96de54b9 HEAD -- tools/python/provider tools/python/host tools/python/tests` (本節を含む commit は docs のみのため出力 0 行。PR 作成時に実行して確認)。
+- 差分 0 の証跡: `git diff 96de54b9 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (`9674d0cb`・その後の docs のみの commit で確認。PR 本文の検証 HEAD で再確認)。
 
 ### main 取り込み後の再実行 (HEAD `116cd354`)
 
@@ -83,16 +83,15 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 前提ゲート `0xd5af58` (`[[[0x15E4790]]+8]` の vtable `+0x98`) の判定条件。偽なら status `-2` のまま返る。`-2` の文言 (上記) から「操作不可時の失敗」と推定するが未確定 | 偽の経路で結果が変わる。C provider は常に選択する | #2542 |
-| ゲート `0xd82c6a` (`[[[0x861b1f]]+8]` の vtable `+0x88`) の意味。真なら status < 0 を例外化、偽なら成功経路 `0xc38bc0` | `-4`・`-2` の例外の有無 | #2542 |
-| `useGlobalIndex>0` の表 (`0x1005730` の `dl=1` 分岐 `[rip+0x5dcad3]`) | `dl=1` の経路を C 側で rack 扱いしている | #2542 (受入 2) |
-| 選択 gating `0xffac20` (偽なら対象は選ばれず他は解除) | 選択不可の channel で結果が変わる可能性。C 側は未モデル | #2542 (受入 2) |
-| `+0x32c` への byte 書込み 9 箇所 (`0x6e9f4d`・`0x82bbf4`・`0x82bcb5`・`0x82bce0`・`0xfe96ed`・`0x11f8889`・`0x11f88e9`・`0x11f8981`・`0x11f8a43`) | 構造体の型が未確定。channel item への書込みかは未確定 | #2542 |
+| 前提ゲート `0xd5af58` (`[[[0x15E4790]]+8]` の vtable `+0x98`) の判定条件。偽なら status `-2` のまま返る。`-2` の文言 (上記) から「操作不可時の失敗」と推定するが未確定 | 偽の経路で結果が変わる。C provider は常に選択する | [PY-82] #2642 |
+| ゲート `0xd82c6a` (`[[[0x861b1f]]+8]` の vtable `+0x88`) の意味。真なら status < 0 を例外化、偽なら成功経路 `0xc38bc0` | `-4`・`-2` の例外の有無 | [PY-82] #2642 |
+| `useGlobalIndex>0` の表 (`0x1005730` の `dl=1` 分岐 `[rip+0x5dcad3]`) | `dl=1` の経路を C 側で rack 扱いしている | [PY-82] #2642 |
+| 選択 gating `0xffac20` (偽なら対象は選ばれず他は解除) | 選択不可の channel で結果が変わる可能性。C 側は未モデル | [PY-82] #2642 |
+| `+0x32c` への byte 書込み 9 箇所 (`0x6e9f4d`・`0x82bbf4`・`0x82bcb5`・`0x82bce0`・`0xfe96ed`・`0x11f8889`・`0x11f88e9`・`0x11f8981`・`0x11f8a43`) | 構造体の型が未確定。channel item への書込みかは未確定 | [PY-82] #2642 |
 | `item+0x32d` の前置と後段 UI 分岐 (`+0xd34`・`+0x160`) | UI 状態のみ。C provider に UI 状態は無い | 追跡のみ (子は起票しない) |
-| `setChannelPitch` の意味論と実装 | 未実装 | #2542 |
+| `setChannelPitch` の効果関数・guard の PE (意味論の残り。確定済み部分は `REPORT_PY72.md`) と C provider / mock 実装 | 未実装 | #2562 (PY-75)・#2563 (PY-76) |
 
-### 次の提案 (#2542)
+### 次の提案 (起票先 [PY-82] #2642)
 
 - `0x1005730` の global 表 (`[rip+0x5dcad3]`) の対応を解決し、rack と global の違いを REPORT に残す。
 - `0xffac20` の判定は本節で読んだ。残りは前提ゲート `0xd5af58` と `0xd82c6a` の vtable 先を読み、判定条件を確定する。
-- `setChannelPitch` は `0x477180`・`0x40c660`・`0xf81ce0` を読んでから実装する。
