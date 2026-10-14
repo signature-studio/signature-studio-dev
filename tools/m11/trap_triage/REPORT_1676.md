@@ -34,7 +34,7 @@
 ## 3. 生成経路 (IR と機械語の突合)
 
 - `function_867510` は `8674a0` (list を走査) の後 `EnumDisplayMonitors(… [G2+188])` を呼ぶ。`8674a0` は `50aa70` と `40faa0` を呼ぶ。
-- list の生成元は `function_8651a0` (object 構築)。`[obj+188]` は `40f9e0(0xC9A40, 1)` の戻り値。
+- list の生成元は `function_8651a0` (object 構築)。`[obj+188]` は `40f9e0(obj, 1)` の戻り値 (引数の訂正は §7.1 で訂正: `0xC9A40` は誤りで、正しくは obj=`0xc9bc0`)。
 - `40f9e0` → `410320` (alloc 相当) / `410360` (固定サイズ helper)。IR はどちらも `ret arg1`。
 - 機械語 (`disasm_img.py`):
   - `410320`: `test dl,dl; ...; call qword ptr [rax-0x30]` (**vtable 間接 call**)。
@@ -79,11 +79,10 @@
 | DEFECTS 行 (D15 同類型か) | 分類 | 上記確定後 (#1931 の残件) |
 | `SV_RAW=1 survey_units.mjs` の n≥2 は未実施 (本 run は e2e 内の survey n=1) | survey 側の再現性が未確認 | 既存 #1783 の再測定に含める |
 
-## 7. #1965 の追補: 間接 call の実 target (n=2 再測定・実行時メモリ)
+## 7. #1965 の追補: 間接 call の実 target (probe 1 回・実行時メモリ)
 
-- 測定 commit: `f9c89955` (origin/main)。素材: `fl-win64` (sha256 `b2c64da4…`)・`toolchain-retdec`・`toolchain-emsdk`・`work-m11`。`work/lift_pe.sha256` は PE 指紋を手で記録 (§6 と同じ手順)。
-- e2e `m11_e2e.sh` (foreground、rc=0、167 s): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6 と一致)。
-- probe `probe1676_listB_writes.mjs` n=2 (e2e 後の再実行): unit 114 で `L=0x10bd4c20`・`base=0`・`cnt=1` の生成、unit 275 で trap。§6 と同じ結果。
+- 測定 commit: `f9c89955` (origin/main)。素材・e2e の結果は §6 参照 (本節では e2e を再実行していない)。
+- probe `probe1676_listB_writes.mjs` は 1 回のみ実行 (n=1 相当)。n≥2 は未実施。結果: unit 114 で `L=0x10bd4c20`・`base=0`・`cnt=1` の生成、unit 275 で trap。
 
 ### 7.1 §6 の訂正 (引数の値)
 
