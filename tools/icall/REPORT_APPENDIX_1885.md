@@ -6,10 +6,14 @@
 
 ## 結論
 
-- 0x1801a31fb (`jmp r9`, targets 17) が before 段階で `jt_dropped` なのは、**jump table の入口 `jbe 0x1801a31e0` (0x1801a30e8) の真の側が、RetDec の before IR で `dec_label_pc_1801a3198` (ret ブロック) へ誤結線されている** ため。
+確定したこと (IR 上の事実):
+- 0x1801a31fb (`jmp r9`, targets 17) が before 段階で `jt_dropped` なのは、**jump table の入口 `jbe 0x1801a31e0` (0x1801a30e8) の真の側が、RetDec の before IR で `dec_label_pc_1801a3198` (ret ブロック) へ向いている** ため (jcc 真の側が ret ブロックへ向く、という IR 上の事実)。
+
+未確定:
+- 上の誤結線が **RetDec のどの段で生じるか** (CFG 構築か LLVM 変換か) は未特定。本 REPORT は発生段を断定しない。
 - その結果、0x1801a31e0〜0x1801a31fe の dispatch ブロック (`mov rdx,r9` → `lea` → 表引き → `add` → `add rcx,r8` → `jmp r9`) が before IR に 1 命令も残らない。`insn.addr` を持つ命令が無いので audit は `jt_dropped` と判定する。
 - ICALL-42 の 7 件 (switch 畳み込み) とは別機構。`switch` は `function_1801a30d0` に 0 件。
-- 修正は RetDec の CFG 構築側 (before 段階の jcc 結線) で行うべきで、`ir_icall_restore.py` で addr を捏造する範囲を超える。本 run では修正せず、残件として記録する (受入条件の「不要なら説明可能な残件」に該当)。
+- 修正対象は RetDec 側の before 段の jcc 結線と見られるが、発生段が未特定のため修正箇所は確定しない。`ir_icall_restore.py` で addr を捏造する範囲は超える。本 run では修正せず、残件として記録する (受入条件の「不要なら説明可能な残件」に該当)。
 
 ## 機構の根拠 (before.0.drc.ll / dsm)
 
@@ -40,8 +44,9 @@
 
 ## 再現とネガティブコントロール
 
-- 再現: `python3 tools/icall/repro_1885.py <rt_ott-F>` (0.28 s、load average 0.04–0.14)。出力: dsm jbe→0x1801a31e0 / IR true→dec_label_pc_1801a3198 / IR true == dsm 飛び先: False / dispatch ラベル: False / switch: 0 / insn.addr 行 (関数全体): 160 / dsm の jmp r9 0x1801a31fb: True。
-- ネガティブコントロール: 正しく結線された入口 jcc `0x1801ac5ba` (dsm → 0x1801ac6ea、ICALL-42 側の switch 畳み込み site) に同じ突合を当てると IR true 一致 = True (n=1)。対象 site だけ不一致になることを確認した。
+- 再現: `python3 tools/icall/repro_1885.py <rt_ott-F>`。対象 jcc `0x1801a30e8` と、ネガティブコントロール `0x1801ac5ba` (正しく結線された switch 畳み込み側) の両方を同じ規則 (dsm の飛び先 と IR の true 側 の一致判定) で突合する。
+- 実測 (前回 run・素材 `work-icall` 取得時): 対象 `0x1801a30e8` は IR true == dsm 飛び先: False / ネガティブコントロール `0x1801ac5ba` は True (n=1)。dispatch ラベル: False / switch: 0 / insn.addr 行 (関数全体): 160 / dsm の jmp r9 0x1801a31fb: True。
+- 注: 上記の実測値は前回 run の出力。本 run では `work-icall` が `$ARTIFACTS_DIR` に無く再実行できなかった (下記「素材」)。スクリプトは対照点を含むよう修正したが、修正後のスクリプトの出力は未再測定。
 
 ## 判定ロジックの確認
 
@@ -54,22 +59,26 @@
 `git diff 09ed7bbc origin/main -- tools/icall/audit_icall.py tools/icall/ir_icall_restore.py` の出力は空 (判定ロジック差分 0)。
 `tools/icall` 全体では main 取り込みで 13 ファイル・667 行の差分があるが、本件の判定に使ったファイルは含まない。
 
-素材: `work-icall` の `rt_ott-F` (before.0.drc.ll / before.0.drc.dsm / F.ranges / map.json)、`analysis-ott-binaries` の `OTT_vst2_win64.dll`。
+before IR の生成元: `tools/icall/roundtrip.sh` の before 段 (`retdec_chunks` で `before.<i>.drc.ll` / `before.<i>.drc.dsm` を生成し、同じ段で `audit_icall.py` が `audit_before.txt` / `audit_before.json` を出す)。`09ed7bbc..HEAD` で `roundtrip.sh`・`audit_icall.py`・`ir_icall_restore.py`・`prep_targets.py`・`ott_route.sh` の差分は 0 (`git diff 09ed7bbc HEAD -- <これら>` の出力は空)。ただし `ott_route.sh` の before 段は持たない (after 段の経路)。
 
-| 入力 | 結果 |
+素材 (前回 run): `work-icall` の `rt_ott-F` (before.0.drc.ll / before.0.drc.dsm / F.ranges / map.json)、`analysis-ott-binaries` の `OTT_vst2_win64.dll`。`audit_before.txt` はこの素材の `roundtrip.sh` 実行の tee 出力で、リポジトリには含まれない (`tools/icall/work/` は gitignore)。本 run では `$ARTIFACTS_DIR` に `fl-win64` のみあり、`work-icall`・`analysis-ott-binaries` は無い。
+
+| 入力 | 結果 (前回 run の実測) |
 |---|---|
 | before.0.drc.ll `function_1801a30d0` の `br` (0x1801a30e8) | 真の側 `dec_label_pc_1801a3198`、dsm の jbe 飛び先 0x1801a31e0 と不一致 |
 | before.0.drc.ll 内の `dec_label_pc_1801a31e0` | 0 件 |
 | before.0.drc.ll 内の `switch` (`function_1801a30d0`) | 0 件 |
-| audit (before) `jmptable` | `jt_dropped=1 jt_present=7` (`audit_before.txt` と一致) |
+| audit (before) `jmptable` | `jt_dropped=1 jt_present=7` (前回 run の `audit_before.txt`) |
+
+本 run での再確認: 未実施 (素材なし)。PR 本文に `oc_artifacts: fl-win64 toolchain-retdec analysis-ott-binaries work-icall` を足して再 run した時点で再測定する。
 
 ## 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| RetDec の before 段階で jump table 入口 jcc (0x1801a30e8) の真の側が ret ブロックへ誤結線される機構の、RetDec 内の発生段 (CFG 構築 / LLVM 変換 のどこか) は未特定 | 残件 1 件 (0x1801a31fb)。修復方針が RetDec 側か前段か未確定 | #1885 のコメントで残件として明記 (本 PR は調査記録のみ) |
-| 0x1801a2c92・0x1801a2f36 (jmp r11) の入口飛び先も before IR に無い。同型かは未検証 | 本 audit の jmptable 集計外 (jt_present/jt_dropped 対象外) の可能性 | 子 issue の候補 (本 run では起票しない: 実装作業ではなく再測定・検証のため、PR 本文の未解決表に残す) |
-| DEFECTS.md への新類型行 | 「分岐の真の側が ret ブロックへ誤結線」の類型行案 (下記) | PM 判断 (DEFECTS.md は PM が編集) |
+| RetDec の before 段で jump table 入口 jcc (0x1801a30e8) の真の側が ret ブロックへ向く発生段 (CFG 構築 / LLVM 変換) は未特定 | 残件 1 件 (0x1801a31fb)。修復方針が RetDec 側か前段か未確定 | #1885 へのコメント (残件として明記。本 PR は調査記録のみ) |
+| 0x1801a2c92・0x1801a2f36 (jmp r11) の入口飛び先も before IR に無い。同型かは未検証 | 本 audit の jmptable 集計外 (jt_present/jt_dropped 対象外) の可能性 | #1885 へのコメント (調査候補として明記。新規 issue は本 run では起票しない) |
+| DEFECTS.md への新類型行案 | 「分岐の真の側が ret ブロックへ誤結線」の類型行案 (下記) | DEFECTS.md の正本は PM 管理。#1885 へのコメントで PM に判断を依頼 |
 
 ### DEFECTS.md 類型行案
 
