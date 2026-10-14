@@ -43,7 +43,7 @@
 
 - 訂正: §3 の「修復前 53 site」は誤り。`REPORT_968.md` §2 の表では 53 は**修復後**の値。現 HEAD の修復前は store 宛 CELL_COLLAPSED **86 site / 49 関数**。
 - 訂正: §1 の鮮度記述「`916d9932` 以降はドキュメントのみ」は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` の非 md は **18 件**、`git diff --numstat 916d9932 HEAD -- tools/m11` の非 md は **+698 / -27** (本節の旧記載「51 件・988 行」は誤り。LD-47 review で計測し直した)。`tools/m11` のコードを最後に変えた commit は `02e2c5a2` (`12586095` の祖先)。
-- 訂正: §1 の「空 = コード差分 0」の証跡も誤り。測定 commit `12586095` から本 PR の HEAD までの `tools/m11` の非 md 差分は **32 件** (`git diff --name-only 12586095 HEAD -- tools/m11 | grep -v '\.md$'`)。e2e の経路 (`fix_d17_e2e.sh`・`audit_lsf_ssa.py`・`fix_d17.py`) はこの範囲で変更なし (`git diff --quiet 12586095 HEAD -- <3 files>` が 0)。`m11_build.sh`・`m11_gen_ir2.sh`・`ldfix.py` 等は e2e スクリプトから呼ばれない。上記の再現は測定 commit `12586095` の tools/m11 で行った。
+- 訂正: §1 の「空 = コード差分 0」の証跡も誤り。測定 commit `12586095` から本 PR の HEAD までの `tools/m11` の非 md 差分は 0 件ではない (件数は HEAD ごとに変わるため本文に書かない。`git diff --name-only 12586095 HEAD -- tools/m11 | grep -v '\.md$'` で再計算する)。e2e の経路 (`fix_d17_e2e.sh`・`audit_lsf_ssa.py`・`fix_d17.py`) はこの範囲で変更なし (`git diff --quiet 12586095 HEAD -- <3 files>` が 0)。`m11_build.sh`・`m11_gen_ir2.sh`・`ldfix.py` 等は e2e スクリプトから呼ばれない。上記の再現は測定 commit `12586095` の tools/m11 で行った。
 
 e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、foreground、31 秒、emcc rc=0。測定 commit `12586095`):
 
