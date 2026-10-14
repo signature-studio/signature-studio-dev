@@ -2,6 +2,8 @@
 
 親: #2078 (PY-66)・前段: `REPORT_PY66.md`・`REPORT_PY58.md`。既知類型との関係: 該当なし (lift 作業ではない)。
 
+> 2 回目 (2026-10-14 run) の結果は **§4**。受入条件 1 は書込み元 (PE 解析箇所) まで特定し、書込み先の型は未確定。受入条件 2〜4 は 1 回目と同じく未達。
+
 ## 結論
 
 - 受入条件 1 (`0x196eba0` の書込み元) は**未達**。RIP 相対の store・`lea`・disp32 絶対参照の全てで 0 件。`.data` の slot (VA `0x15e3d38`) 経由の書込みは未確認 (下記「未完」)。
@@ -71,3 +73,54 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 - `.data` slot `0x15e3d38` の load 直後の store を `py67_indirect.py` 内で 1 関数にまとめて追う (ワンライナーは使わない)。
 - `0xfe2e98` の表が vtable かどうかを、`.rdata` / `.data` の vtable 候補 (絶対値の連続配置) で確認する。
 - `0xec60ae`・`0x8ed012` の対象型は、所属関数の引数の由来 (`rbp+0x120`・`rbp+0x70` の代入元) を遡る。
+
+## 4. 2 回目: slot `0x15e3d38` 経由の書込み元 (受入条件 1・部分達成)
+
+### 結論
+
+- `0x196eba0` (g) は `.bss` の 8 バイト変数で、値 P (= `*g`) が `0x1306dbf`・`0x130760f` の `[P+0x794]` 書込みの基底。1 回目の「`0x196eba0` が指すオブジェクト」の読みは正しい。
+- g 自体への書込みは次の 1 経路だけ。
+  - `0x86a4e1: mov qword ptr [rax], rcx` (関数 `0x86a470`)。`rax` = `[rbp+0x80]` = 第 3 引数 r8 = `&g`。`rcx` = `[rbp+0x48]` = `0x86a4cf` の `call qword ptr [rax-0x30]` の戻り値。
+  - 同関数の `0x86a504: mov qword ptr [rax], 0` は g = 0 を書く。
+- 呼出し経路: `0x11be450: mov rdx,[rip+0x4258e1]` (= slot の中身 `&g` を読む) → `0x11be457: call 0x11c8950` → `0x11c896d: call 0x86a470`。`0x11c8950` は引数を並べ替えて (r8 = rdx = &g) 渡すだけの転送関数。
+- 未確定 (受入条件 1 の後半): P の型。`0x86a4cf` の間接呼出し先 `*(A-0x30)` の戻り値型が決まらない。A は `0x11be449: mov rcx,[rip+0x147eb0]` = `*(0x1306300)` で、その由来は未追跡。
+
+### 根拠 (実測)
+
+- `&g` の静的な出所は slot `0x15e3d38` だけ。`0x196eba0` の 8 バイト絶対値の一致は 1 件 (file offset `0x11e2738` = slot 自身)。即値 0 件、`lea` 0 件。
+- slot の RIP 相対 load (`mov reg,[rip+slot]`) は 75 件。全件 load。
+- 追跡 (`py67_slot.py`・window 400・call/ret で打ち切り):
+  - `&g` (depth 1) からの mov store: 0 件。
+  - `*g` (depth 2) からの mov store: 1 件 (`0x1037608: mov byte ptr [rcx+0x79c], al`)。
+  - `&g` を引数 (rcx/rdx/r8/r9) に渡す direct call: 1 件 (`0x11be457`・rdx)。
+- `py67_callers.py` の結果: `0x86a470` の direct 呼出し元は 2 件 (`0x11c8950` 経由の `0x11c896d`、`0x10dc775`。後者は r8 = ローカル `[rbp+0x68]` で g ではない)。`0x11c8950` の direct 呼出し元は 23 件で、`&g` を渡すのは `0x11be457` だけ。
+
+### 関数 `0x86a470` (g への書込み関数) の要点
+
+- 第 1 引数 rcx (= X) の `+0x179` へ `al` を書く (`0x86a4b8`)。
+- 第 2 引数 rdx (= A) を `[rbp+0x78]` に保存し、`0x86a4cf` で `call [A-0x30]` を呼ぶ。戻り値を `0x86a4e1` で `[&g]` に書く。
+- 型の手がかり: 書いた直後 (`0x86a4ef`〜`0x86a4f6`) で P (= `[rbp+0x48]`) の vtable を読み、`call [vtable+0x78]` (第 2 引数 dl = 0xff、第 3 引数 r8 = X) を呼ぶ。P は仮想関数を持つオブジェクトで、この vtable スロットの実装を読むと P の型を絞れる (次の手順)。
+
+### 他の P 書込み (参考・深さ 2)
+
+- `P` を引数で受けて書く呼出し先: `0x1307ae0` (`mov dword ptr [rcx+0x788], edx`・`0x12d492f` ほか 2 件から呼出し)、`0x13105d0` (`mov dword ptr [rcx+0x7a8], eax`・`0x1037593` ほか 2 件)。P 上の同一フィールドかは未確認。
+
+### 限界
+
+- 追跡はレジスタの複写と `mov r,[r]` (深さ 2 まで) だけ。`call` で caller-saved レジスタを破棄するため、呼出しをまたぐ store は見ない。間接呼出し (`call [reg]`) の先は追わない。
+- 線形走査。store 箇所 `0x86a4e1`・`0x86a504` は `py58_context.py` で命令境界を確認済み (`<==` 付きで出力)。
+- 1 回目の追跡器 (本節の前段の版) は、レジスタの上書きで追跡を止めず、store 374 件の出力を出した。誤りだったため採用しない。
+
+### 測定
+
+- 測定 commit: `6cc14f57` (`py67_callers.py` 追加。解析コードの最後の変更)。`py67_slot.py` は `06c29d90` で追加。
+- 差分 (測定 commit から本 REPORT の親 commit まで・コード範囲 `tools/python/analysis`・`tools/python/src`): 0 行 (commit 直前に `git diff 6cc14f57 HEAD -- tools/python/analysis tools/python/src` を実行)。
+- 実測 (wall・1 回・逐次・他プロセス並列なし): `py67_slot.py work/py67/extracted/block00031_PE.bin 0x15e3d38 0x196eba0 400`: 53.56 秒。`py67_callers.py ... 0x11c8950,0x86a470`: 26.77 秒。load 平均は未計測。
+- 再現: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py67 --wildcards '*block00031_PE.bin'` → `cd tools/python` → 上記 2 コマンド。
+
+### 未確定 (2 回目)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| P (= `*g`) の型: `0x86a4cf` の `call [A-0x30]` の戻り値型と、A = `*(0x1306300)` の由来 | `0x1306dbf`・`0x130760f` の `+0x794` の対象型が確定しない (受入条件 1 後半) | 子 issue #2501 (`[PY-71]`) |
+| 受入条件 2〜4 (`0xffe370` の所属・`0xec60ae` の型・`0x8ed012` の chan 判定) | 未達のまま | 子 issue #2501 (`[PY-71]`) |
