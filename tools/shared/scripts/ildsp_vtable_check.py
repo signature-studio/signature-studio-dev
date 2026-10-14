@@ -179,8 +179,8 @@ def main():
         p += blk
     slot_relocs = sorted(x for x in relocs if 0x268000 <= x < 0x268300)
     check(len(slot_relocs) == 16, f"スロット領域の DIR64 reloc 数 {len(slot_relocs)} (期待 16)")
-    check(0x268260 in relocs and 0x268268 in relocs, "0x268260 / 0x268268 に DIR64 reloc が無い")
-    check(0x268088 not in relocs and 0x268090 not in relocs, "0x268088 / 0x268090 に DIR64 reloc がある")
+    check(0x268260 in relocs and 0x268268 in relocs, "0x268260 / 0x268268 のどちらかに DIR64 reloc が無い")
+    check(0x268088 not in relocs and 0x268090 not in relocs, "0x268088 / 0x268090 のどちらかに DIR64 reloc がある")
     print(f"[.reloc] 0x268000–0x268300 の DIR64 = {len(slot_relocs)} 件: {' '.join(hex(x) for x in slot_relocs)}")
 
     if fails:
