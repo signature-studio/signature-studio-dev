@@ -2,15 +2,11 @@
 # PY-2 (#83): CPython (libpython3.12.a) + flpy.c + flapi provider (fl_api_call) を 1 つの wasm にリンクする。
 #   _flhost.call は同一 wasm 内の C 呼出し (JS import・JSON・SAB・Worker いずれも経由しない)。
 # 前提: bash build_cpython_wasm.sh 済み (work/build-wasm)。出力: dist/flpy_static.{js,wasm,data} (gitignore)
-# Memory64 版 (PY-80 #2633): FLPY_MEMORY64=1|2 CPY_BUILD=$PWD/work/build-wasm64 STATIC_OUT=flpy_static64 (前提: build_cpython_wasm64.sh 済み)
-#   PY-98 (#2858): FLPY_MEMORY64=1 だけで dist/flpy_static64.* を作れる (既定の CPY_BUILD は work/build-wasm64・STATIC_OUT は flpy_static64)。
-#   stdlib zip は wasm32 版 (work/build-wasm) から取る (wasm64 の libpython 段は stock python.js を作らないため zip が無い)。
+# Memory64 版 (PY-80 #2633): FLPY_MEMORY64=1 CPY_BUILD=$PWD/work/build-wasm64 STATIC_OUT=flpy_static64 (前提: build_cpython_wasm64.sh 済み)
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-FLPY_MEMORY64="${FLPY_MEMORY64:-0}"
-if [ "$FLPY_MEMORY64" = 1 ]; then DEF_B=build-wasm64; DEF_OUT=flpy_static64; else DEF_B=build-wasm; DEF_OUT=flpy_static; fi
-OUT="${STATIC_OUT:-$DEF_OUT}"        # ネガコン用: STATIC_OUT=flpy_static_neg ENGINE_SRC=<改変した fl_engine.c>
-WORK="$HERE/work"; SRC="$WORK/Python-3.12.1"; B="${CPY_BUILD:-$WORK/$DEF_B}"; ZB="$WORK/build-wasm"; D="$HERE/dist"; ST="$WORK/staging_$OUT"
+OUT="${STATIC_OUT:-flpy_static}"        # ネガコン用: STATIC_OUT=flpy_static_neg ENGINE_SRC=<改変した fl_engine.c>
+WORK="$HERE/work"; SRC="$WORK/Python-3.12.1"; B="${CPY_BUILD:-$WORK/build-wasm}"; D="$HERE/dist"; ST="$WORK/staging_$OUT"
 P="$HERE/provider"
 ENGINE_SRC="${ENGINE_SRC:-$P/fl_engine.c}"
 MEM64=()
@@ -21,7 +17,7 @@ source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1
 python3 "$P/gen_provider.py" --check-handlers "$ENGINE_SRC"
 rm -rf "$ST"; mkdir -p "$ST/fl/Lib" "$ST/usr/local/lib/python3.12/lib-dynload" "$D"
 cp "$HERE/src/fl_rt.py" "$HERE/src/fl_api.py" "$HERE/analysis/flapi/flapi_table.json" "$ST/fl/Lib/"
-cp "$ZB/usr/local/lib/python312.zip" "$ST/usr/local/lib/"
+cp "$B/usr/local/lib/python312.zip" "$ST/usr/local/lib/"
 touch "$ST/usr/local/lib/python3.12/lib-dynload/.empty"
 
 emcc -O2 -g0 "${MEM64[@]}" -DFLPY_STATIC -I"$SRC/Include" -I"$B" -I"$P" -c "$HERE/src/flpy.c" -o "$WORK/$OUT.o"
