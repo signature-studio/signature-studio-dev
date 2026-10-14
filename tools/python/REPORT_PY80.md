@@ -91,7 +91,7 @@ reset → 同じ tool を逐次 2 回 → 各回の status・host_calls を JSON
 - `src/flpy.c` `flpy_mt_call`: `strdup` と `malloc` の戻り値を検査していなかった。修正後は、`pthread_create` 失敗と `strdup` 失敗 (out が NULL) のスレッドには代用の `{"err":"thread result missing"}` を並べる (`strdup` の代わりに定数を使う)。`buf` の `malloc` が NULL なら確保済みの out を解放して NULL を返す。JS 側 `mtCall` は NULL を例外にする。
 - `tests/static_mt_check.mjs`: (2) の比較を全文 (`full`) に変えた。引数 `<tool>` で §4 の再現モード (reset → 逐次 2 回) を追加。
 - 検証 (本 run): 手元の gcc (`-std=gnu11 -Wall -Wextra`、Python 3.12 の system headers、`EMSCRIPTEN_KEEPALIVE` だけ空定義の stub) で `src/flpy.c` の構文チェック rc 0 (修正前後とも、警告 0)。`node --check tests/static_mt_check.mjs` rc 0。
-- 未実施: `build_cpython_wasm.sh`・`build_flpy_static.sh` の再ビルドと、`static_check.mjs`・`static_mt_check.mjs` の再実行。本 run には `toolchain-emsdk` (`/opt/emsdk`) の素材が無く、wasm を作れなかった。次の review run で `oc_artifacts: fl-win64 toolchain-emsdk` により独立に再実行する。
+- 未実施: `build_cpython_wasm.sh`・`build_flpy_static.sh` の再ビルドと、`static_check.mjs`・`static_mt_check.mjs` の再実行。本 run には `toolchain-emsdk` ([EMSDK]) の素材が無く、wasm を作れなかった。次の review run で `oc_artifacts: fl-win64 toolchain-emsdk` により独立に再実行する。
 - 測定 commit `a2926d53` から fix commit までのコード差分 (`git diff --stat a2926d53 HEAD -- tools/python ':(exclude)*.md'`):
 
 ```
