@@ -1,11 +1,11 @@
-# #2115 REPORT — 0x4181e0 の 0 引数呼出と `rcx` (前提の訂正・注釈の置換)
+# #2115 REPORT — 0x4181e0 の 0 引数呼出と `rcx` (前提の訂正・注釈は未変更)
 
 > **付録**: §10 の詳細は `REPORT_2115_APPENDIX.md` へ分割移動した (250 行上限のため。本文は改訂済み)。測定値の正本は付録 §10.3。
 
 - 担当 issue: #2115 `[PLG-P0b-15]` (親 #2069 / 元 #2069 `[PLG-P0b-13]`)。
 - 起点: `origin/main` 637b70de。branch `2115-plg-p0b-15-0x4181e0-rcx`。
 - 素材: `fl-win64` → `$RUNNER_TEMP/fl-win64` (`extracted/block18983_PE.bin` を使用)、`work-fw-stage1` を worktree 直下の `tools/plugins/work/fw/` に展開。
-- コード変更: `fw_hostfix.py` の 0x4181e0 注釈を TLS 置換へ変更 (§10・測定 commit 91308efd)。それ以外は本 REPORT の追加。
+- コード変更: なし。`fw_hostfix.py` は 3b581236 と同一 (0x4181e0 注釈は `return 0` のまま)。TLS 0 埋めの stand-in は未採用の実験で、commit 91308efd に残す (戻した commit は 8858cc0f。§10)。
 
 ## 1. 結論
 
@@ -50,11 +50,11 @@ REPORT_2069 の解析は FW の PE (`block18983_PE.bin`) ではなく `block0003
 
 ## 3. lift 側 (前 run の記録・fix run では未検証)
 
-`work-fw-stage1` は fix round 3 (2026-10-14) で展開し、件数だけ再確認した (IR の本体の読み書きは未再確認)。以下は REPORT_2069 §3.2 の前回 run の記録。
+`work-fw-stage1` は fix round 3・round 4 (2026-10-14) で展開し、件数だけ再確認した (IR の本体の読み書きは未再確認)。以下は REPORT_2069 §3.2 の前回 run の記録。
 
 - 前回の記録: 0 引数版 `@function_4181e0()` (`fw0.restored.ll:7185`) は `[BLK+0x20..0x40]` と `[BLK+0x88]` を読み、`[BLK+8]` (= 9048072) を読まない。`9048072` を使う IR は 0 件。(再確認: `grep -c 'i64 9048072'` は 12 ファイル全て 0 件。本体の読み書きは未再確認)
 - 前回の記録では、0 引数版の本体は `rcx` 非依存で、戻り値は `spec.select(TLS 経由の値, @global_var_7162d0)` の形を取る。(未再確認)
-- 0 引数呼出元 (`grep -c 'call i64 @function_4181e0()'`・round 3 で再確認): fw0 14・fw1 10・fw2 7・fw3 2・fw4 6・fw5 12・fw6 8・fw7 8・r2 8・fw_all 67 (REPORT_2069 §3.2 と一致)。IR 行は未列挙。
+- 0 引数呼出元 (`grep -c 'call i64 @function_4181e0()'`・round 3・round 4 で再確認): work-fw-stage1 の 10 ファイルで計 75 件 (fw0 14・fw1 10・fw2 7・fw3 2・fw4 6・fw5 12・fw6 8・fw7 8・r2 8・r3 0)。REPORT_2069 §3.2 の 142 件は、これに stage-2 の結合 IR `fw_all` (67 件・archive に無い) を加えた値。IR 行は未列挙。
 - 引数付き呼出は r3 のみ 8 件 (r3 7054・7078・7100・82308・82312・144053・192518・192530)。0 引数定義との不一致は残る (受入 1 の付随確認・今回未検証)。
 
 ## 4. 受入条件の達成状況
@@ -62,8 +62,8 @@ REPORT_2069 の解析は FW の PE (`block18983_PE.bin`) ではなく `block0003
 | # | 受入条件 | 結果 |
 |---|---|---|
 | 1 | 0 引数呼出元で `rcx` が失われる経路を確定し、REPORT に呼出元の IR 行を列挙 | **部分達成**。native では `rcx` は失われても読まれない (§2)。native 呼出元 68 件は call site 単位で一覧化 (§5)。lift 側の 0 引数呼出元 142 件の IR 行は**未列挙** (§3・§9 の未解決 #2115) |
-| 2 | 正しい戻り値を確定し `fw_hostfix.py` の 0x4181e0 注釈を修正 | **未達**。正しい戻り値は未確定。注釈は 0 埋めブロックの stand-in に置換した (§10)。OOB は解消していない |
-| 3 | 実測 (所要・load・PASS/FAIL) とネガティブコントロール | **部分達成**。注釈あり・注釈削除の 2 種を実測し、負のコントロールを記録 (§8)。測定値は §6 と同じ分担 (注釈版の負のコントロールは §8、TLS 置換版と対照は付録 §10.3) |
+| 2 | 正しい戻り値を確定し `fw_hostfix.py` の 0x4181e0 注釈を修正 | **未達**。正しい戻り値は未確定。既定の注釈は 3b581236 の `return 0` のまま。0 埋め stand-in は未採用の実験 (§10)。OOB は解消していない |
+| 3 | 実測 (所要・load・PASS/FAIL) とネガティブコントロール | **部分達成**。注釈あり・注釈削除の 2 種を実測し、負のコントロールを記録 (§8)。測定値は §6 と同じ分担 (注釈版の負のコントロールは §8、stand-in 版 (未採用) と対照は付録 §10.3) |
 
 ## 5. native 呼出元 (`block18983`・`call 0x4181e0` の直接 rel32)
 
@@ -145,7 +145,7 @@ REPORT_2069 の解析は FW の PE (`block18983_PE.bin`) ではなく `block0003
 
 ## 6. 実測
 
-e2e の実測値の正本は 2 つに分ける: 注釈版の負のコントロールは §8 (c2f67568)、TLS 置換版と対照は付録 `REPORT_2115_APPENDIX.md` §10.3 (測定 commit 91308efd)。本節には測定値を書かない。
+e2e の実測値の正本は 2 つに分ける: 注釈版の負のコントロールは §8 (c2f67568)、stand-in 版 (未採用) と対照は付録 `REPORT_2115_APPENDIX.md` §10.3 (stand-in 版の測定 commit 91308efd・対照 3b581236)。本節には測定値を書かない。
 
 - 前 run (起点 637b70de) で行った素材展開 (`work-fw-stage1`・`fl-win64`) は、fix round 3 では `work-fw-stage1` のみ展開した (`fw_stage2.sh` と `hs_e2e.sh` は `fl-win64` を読まない)。round 3 の実測は付録 §10.3。
 - REPORT_2069 の基準値 (Phase A `dispatch=38 ff=0`・Phase B OOB) は前回測定 (commit 0d9b5385) の記録で、本 REPORT は再掲しない。
@@ -158,7 +158,7 @@ tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64
 tar --zstd -xf $ARTIFACTS_DIR/work-fw-stage1.tar.zst            # repo ルートで展開 (§3 用・tools/plugins/work/fw/ に 12 ファイル)
 # block18983_PE.bin の .pdata で 0x4181e0 が関数先頭 (0x418233 まで) / 0x418190 は先頭でないことを確認
 # (pefile で DIRECTORY_ENTRY_EXCEPTION の BeginAddress を比較)
-grep -c 'call i64 @function_4181e0()' tools/plugins/work/fw/*.restored.ll   # 計 142 件 (§3・未再確認)
+grep -c 'call i64 @function_4181e0()' tools/plugins/work/fw/*.restored.ll   # 10 ファイルで計 75 件 (round 4 で確認)。142 件は stage-2 結合 IR fw_all (67 件・archive に無い) を加えた値
 grep -c 'i64 9048072' tools/plugins/work/fw/*.restored.ll                    # 0 件が期待値
 ```
 
@@ -194,26 +194,27 @@ for m in re.finditer(b"\xe8", d):
 - 1 回測定 (n=1)。変動レンジは未取得。
 - **負のコントロール**: 注釈 (`return 0`) を外しても Phase B の失敗は同一。よって、この注釈が Phase B OOB の原因ではない。REPORT_2069 の `rec=7` (1 項目) と異なり、現 main では `rec=8` / 3 項目で失敗している (注釈・Phase B 以外の変更で変化した可能性。原因は未確定)。
 - 注釈の戻り値の正しい値は、この測定では確定しなかった。lift 本体の挙動 (`fw0.restored.ll:7185` は `rax` を返すだけで `[BLK+0x80]` に store しない、`[BLK+0x80]` を読むのは呼出元) は**前 run の記録であり、未再確認**。正しい戻り値は未確定のため、§8 の時点では `fw_hostfix.py` を変更していない (REPORT_2069 §4 の理由と同じ)。
-- 本 fix run での再確認 (コード差分): `git diff c2f67568 HEAD -- tools/plugins/framework ':!*.md'` の出力は空 (実行コードの変更なし)。
+- 検証 HEAD での再確認 (コード差分): `git diff c2f67568 HEAD -- tools/plugins/framework ':!*.md'` の出力は 0 行 (実行コードの変更なし)。
 
 ## 9. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `fw_hostfix.py` の 0x4181e0 注釈 (`return 0`) の妥当性。正しい TLS 値 (`gs:[0x58]` 配列と `[0x7162d0]`) の確定 | Phase B OOB の原因が注釈かどうか未確定 | #2115 (本 issue。受入 2・3 を継続) |
-| lift 側 0 引数呼出元 142 件の IR 行 (ファイル名・行番号) の列挙 | 受入 1 の残り | #2115 (`work-fw-stage1` を用意して再生成) |
+| lift 側 0 引数呼出元の IR 行 (ファイル名・行番号) の列挙: work-fw-stage1 の 75 件と、stage-2 結合 IR `fw_all` の 67 件 | 受入 1 の残り | #2115 (次 run で生成して列挙) |
 | `rcx` 書換えの有無による呼出元の分類 | 本 REPORT では採用せず (戻り値に影響しないため判断は不要) | 未実施のまま (定義を決めてから再測定) |
 | REPORT_2069 §3.1 の解析対象の誤り (`block00031` を使用) | 前提の誤伝播 | 本 PR で §1 に訂正を記載 |
 | r3 系の引数付き呼出 (8 件) と 0 引数定義の不一致 | 引数規約の不整合 | #2115 (同上) |
 | fold deref (`0x40d6e0` / `[0x710040]`) と `plug != 0` | Phase B OOB | #1890 / #2008 (既存) |
-| 対照と置換版の各 n=1 (`--fresh`・load 記録済み。付録 §10.3)。n≥3 の min–max は未実施 | 失敗位置 (`0x4e5fa6` の target 0 / `0x1712`) の解釈と効果の判定 | #2115 (継続。次 run で n≥3) |
+| 対照 (既定と同一コード) と stand-in 版 (未採用) の各 n=1 (`--fresh`・load 記録済み。付録 §10.3)。n≥3 の min–max は未実施 | 失敗位置 (`0x4e5fa6` の target 0 / `0x1712`) の解釈。stand-in 版を採用する判断の前提 | #2115 (継続。採用を検討する場合は n≥3) |
 | 同一の実行コードで §8 と付録 §10.3 の結果が食い違う。失敗位置の変化は n=1 で変動未評価 | Phase B 結果の解釈 | #2115 (継続) |
 | `hostshim/hs_e2e.sh` の増分判定 (49 行目) が `fw_hostfix.py` の変更を見ない (`--fresh` の測定には影響しない) | plain 実行で古い `hs_flat3.ll` が混入する余地 | #2115 (継続。測定ハーネスの修正は再測定を伴うため本 PR では未変更) |
-| main 側で 3b581236 以降に framework 8 ファイル (`fw_rt.c`・`fw_boot.c`・`hostshim/hs_preinit.mjs` 等) が変わった。merge 後の挙動は未測定 | merge 後の Phase A 回帰 (`dispatch=38 ff=0` の確認) | #2115 (継続) |
+| main 側で 3b581236 以降に framework 8 ファイル (`fw_rt.c`・`fw_boot.c`・`hostshim/hs_preinit.mjs` 等) が変わった。merge 後の挙動は未測定。本 PR はコード差分 0 (docs のみ) のため、この merge 結果は本 PR の判定対象外 | merge 後の Phase A 回帰 (`dispatch=38 ff=0` の確認)。merge 時に確認 | #2115 (継続) |
 
-## 10. TLS index 未設定の確認と注釈の置換 (測定 commit 91308efd)
+## 10. TLS index 未設定の確認と stand-in 版の実験 (未採用・測定 commit 91308efd)
 
-- 確認事実 (TLS index は `0x418120` でしか設定されず、`0x6d6e70` は `.data` で `0xFFFFFFFF`) と注釈の置換 (`fw_hostfix.py` 0x4181e0: `TlsAlloc` + 0 埋めブロック) は付録 `REPORT_2115_APPENDIX.md` §10.1・§10.2。
-- 実測 (付録 §10.3・全て n=1): 対照と置換版はどちらも Phase B が OOB。§8 との食い違い・失敗位置の変動は付録 §10.3 を参照。**受入 2 は未達。効果は未確認。**
-- 差分確認: `git diff 91308efd HEAD -- tools/plugins/framework ':!*.md'` は 0 行 (md を含めると本節の追記が出る)。
-- 再測定 (対照と置換版の `--fresh`・load average・`hs_flat3.ll` の mtime と sha256) は fix round 3 で実施 (付録 §10.3・各 n=1)。
+- 確認事実 (TLS index は `0x418120` でしか設定されず、`0x6d6e70` は `.data` で `0xFFFFFFFF`) と stand-in 版 (`fw_hostfix.py` 0x4181e0: `TlsAlloc` + 0 埋めブロック) の定義・実測は付録 `REPORT_2115_APPENDIX.md` §10.1〜§10.3。
+- **stand-in 版は未採用**。既定の注釈は 3b581236 の `return 0` のまま (戻した commit は 8858cc0f)。stand-in 版のコードは commit 91308efd を参照する。
+- 実測 (付録 §10.3・全て n=1): 対照 (既定と同一コード) と stand-in 版はどちらも Phase B が OOB。§8 との食い違い・失敗位置の変動は付録 §10.3 を参照。**受入 2 は未達。効果は未確認。**
+- 差分確認: `git diff 3b581236 HEAD -- tools/plugins/framework ':!*.md'` は 0 行 (既定のコードは対照の測定 commit 3b581236 と同一)。
+- 既定の値は付録 §10.3 の対照の実測を引用する。HEAD は対照と同一コードのため、追加の再測定は行わない (WORKFLOW §6)。
