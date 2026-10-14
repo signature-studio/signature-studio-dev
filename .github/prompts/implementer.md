@@ -71,6 +71,12 @@
     workflow があなたを fix モードで自動起動する。その PR ブランチを直して push すれば review が
     自動で再起動する。新しい PR は作らない。何も push せず・何もコメントせずに終了しない。
 
+## 路線 (D5)・製品 KPI・docs の扱い (必須)
+
+1. **新規の lift・起動の作業は x64c / flelift / liftlib を使う。RetDec 路線 (`tools/m6`〜`tools/m11`) は、issue が明示した場合と、起動指標を動かす PM 承認済みの場合を除き、新規の作業を始めない (D5: `docs/DECISIONS.md`)。**
+2. **起動・GUI・ウィンドウに関わる PR は、本文に製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)、最初のウィンドウの有無) を書く。動かせなかったときは『動かしていない』と書く。** 起動・GUI に関わらない PR は KPI を書かなくてよい。
+3. **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。
+
 規約の正本はリポジトリ内にあり、本書は抜粋である。着手前に必ず確認すること:
 
 - `AGENTS.md` — エージェント規約の要約 (読む順・禁止事項)
