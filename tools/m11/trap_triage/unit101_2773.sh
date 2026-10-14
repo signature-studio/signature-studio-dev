@@ -21,7 +21,7 @@ export FL_WIN64_DIR="${FL_WIN64_DIR:-$RUNNER_TEMP/fl-win64}"
 export M11_PE="$FL_WIN64_DIR/extracted/block00031_PE.bin"
 mkdir -p work/trap_triage
 uv run --with capstone --with pefile bash m11_gen_ir2.sh > work/gen.log 2>&1 || { echo GEN_FAIL; tail -n 5 work/gen.log; exit 1; }
-M11_OV_CLASSCREATE=1 uv run --with capstone --with pefile bash m11_build.sh > work/build_on.log 2>&1 || { echo BUILD_FAIL; tail -n 5 work/build_on.log; exit 1; }
+M11_OV_CLASSCREATE=${OVC:-1} uv run --with capstone --with pefile bash m11_build.sh > work/build_on.log 2>&1 || { echo BUILD_FAIL; tail -n 5 work/build_on.log; exit 1; }
 timeout 600 node trap_triage/survey_units.mjs work/trap_triage/on.json > work/on_survey.out 2>&1
 echo "C=$C${F:+ ablation=$F(from $P)} $(tail -n 1 work/on_survey.out)"
 node -e 'const r=require("./work/trap_triage/on.json"); const u=r.find(x=>x.unit===101); if(!u){console.log("unit101 absent");process.exit(0)} const s=u.icall&&u.icall.sites||{}; console.log("unit101 kind="+u.kind+" 0x41037d="+((s["0x41037d"]||[0])[0])+" 0x41032e="+((s["0x41032e"]||[0])[0]))'

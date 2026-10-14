@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int64_t disp_time;
 static int64_t arr_time;
 static int scr_blanked, scr_unblank, scr_active;
 
@@ -68,11 +69,13 @@ void fl_engine_reset(void) {
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
     arr_time = 0;
     scr_blanked = 0; scr_unblank = 0; scr_active = 0;
-    dev_port = 0; midi_out_n = 0; sel_chan = 0;
+    dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
 int fl_engine_midi_out_count(void) { return midi_out_n; }
+/* 検査用の読出し口: 最後に作用先へ渡した時間引数 (頭打ち後)。tests/ui_display_diff.mjs が mock と照合 */
+int64_t fl_engine_display_time(void) { return disp_time; }
 /* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
 int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
@@ -249,6 +252,16 @@ FL_H(playlist, muteTrackLock) { PL(0); int64_t v = A_INT(1, -1); p->lock = v == 
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
 FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
+/* PY-121 (#2982): PE 0xd6e860 (crDisplayRect 'iiiii|i')・0xd6ea40 (miDisplayRect 'iii|i')・0xd6ebf0 (miDisplayDockRect 'iiii') は
+ * PyArg で読み、時間引数 (duration / time) を 0x7d0 で頭打ちにして作用先へ渡す (cmp rax,0x7d0)。表示そのものは未モデル */
+#define DISP_MAX 0x7d0
+FL_H(ui, crDisplayRect) { NARGS(5, 6); int64_t v[6]; for (int i = 0; i < 6; i++) v[i] = A_INT(i, 0); disp_time = v[4] > DISP_MAX ? DISP_MAX : v[4]; return fl_ret_none(c); }
+FL_H(ui, miDisplayRect) { NARGS(3, 4); int64_t v[4]; for (int i = 0; i < 4; i++) v[i] = A_INT(i, 0); disp_time = v[2] > DISP_MAX ? DISP_MAX : v[2]; return fl_ret_none(c); }
+FL_H(ui, miDisplayDockRect) { NARGS(4, 4); int64_t v[4]; for (int i = 0; i < 4; i++) v[i] = A_INT(i, 0); disp_time = v[3] > DISP_MAX ? DISP_MAX : v[3]; return fl_ret_none(c); }
+/* PE 0xd6c8b0 (showNotification 'i')・0xd6d7c0 / 0xd6d8e0 (NOARGS): 引数の範囲検査は PE に無い。作用は未モデル */
+FL_H(ui, showNotification) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(ui, closeAllMenu) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(ui, closeActivePopupMenu) { NARGS(0, 0); return fl_ret_none(c); }
 /* PY-119 (#2980): PE 0xd6cd80 / 0xd6ca80 / 0xd6c9d0 / 0xd6cab0 / 0xd6c4c0 / 0xd6d6b0 は呼出し経路を確定 (REPORT_PY119)。値は未実測の仮置き */
 FL_H(ui, getFocused) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_b(c, 0); }
 FL_H(ui, getFocusedFormID) { NARGS(0, 0); return fl_ret_i(c, 0); }

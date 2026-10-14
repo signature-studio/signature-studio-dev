@@ -36,6 +36,7 @@ export function createMockEngine() {
     })),
     playlist: Array.from({ length: 500 }, (_, i) => ({ name: `Track ${i + 1}`, color: 0x485156, lock: 0 })),
     windows: { 0: true, 1: false, 2: true, 3: false, 4: true, 5: false },
+    displayTime: 0,
     params: [{ name: "Cutoff", v: 0.5 }, { name: "Resonance", v: 0.2 }, { name: "Gain", v: 0.8 }],
     prScripts: {},
     midiOut: [],
@@ -57,6 +58,7 @@ export function createMockEngine() {
     throw WRONG();
   };
   const arity = (a, lo, hi) => { if (a.length < lo || a.length > hi) throw WRONG(); };
+  const disp = (a, lo, hi, ti) => { arity(a, lo, hi); const v = Array.from({ length: hi }, (_, i) => argI(a, i, 0)); st.displayTime = Math.min(v[ti], 0x7d0); };
 
   const impl = {
     "channels.channelCount": () => st.channels.length,
@@ -178,6 +180,13 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-121 (#2982): PE で確定した引数書式 (PyArg fmt) と時間引数の頭打ち (0x7d0)。表示そのものは未モデルで、最後の時間引数だけ st.displayTime に残す
+    "ui.crDisplayRect": (...a) => disp(a, 5, 6, 4),
+    "ui.miDisplayRect": (...a) => disp(a, 3, 4, 2),
+    "ui.miDisplayDockRect": (...a) => disp(a, 4, 4, 3),
+    "ui.showNotification": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
+    "ui.closeAllMenu": (...a) => { arity(a, 0, 0); },
+    "ui.closeActivePopupMenu": (...a) => { arity(a, 0, 0); },
     // PY-119 (#2980): PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119)。値は未実測の仮置き (provider/fl_engine.c と同じ)
     "ui.getFocused": (...a) => { arity(a, 1, 1); ix(a[0]); return false; },
     "ui.getFocusedFormID": (...a) => { arity(a, 0, 0); return 0; },
