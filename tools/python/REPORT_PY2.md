@@ -136,7 +136,7 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 
 **結論**: `flpy_static.wasm` を module Worker 内で動かし、headless Chrome 上で SAB 版 (flpy + provider) と 48 tool を比較した。tool 別の status・result・host_calls・api_calls は **差 0/48** で、48/48 ok。`run_all.sh` 全体は **rc=2 (前提チェックで停止)** のため rc=0 は未達。mac 素材を要する部分は子 #2649 (PY-83) に分離。
 
-測定 commit: **`982c4a2e`** (main 取り込みの merge。コードを変えた最後の commit)。前回の測定 commit は `77448069` で、その後の main 取り込みで `tools/python` に 4 ファイルが入ったため再測定した (下の「main 取り込み後の再測定」節)。以降の commit は本節を含む文書のみ。`git diff 982c4a2e HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行 (差分 0)。
+測定 commit: **`fa68d2fe`** (main 取り込みの merge。コードを変えた最後の commit)。前回の測定 commit は `77448069` で、その後の main 取り込みで `tools/python` の 9 ファイルが変わったため再測定した (下の「main 取り込み後の再測定」節)。以降の commit は本節を含む文書のみ。`git diff fa68d2fe HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行 (差分 0)。
 
 ### 構成 (検証の作り)
 
@@ -145,30 +145,35 @@ gate (`pybind_extract.py --check`、不合格は exit 1): 抽出件数 = 110、�
 - 合格条件: 48 件すべて status ok、tool 別 4 キーの差 0、`static_host_calls` = `sab_host_calls`、callback 往復 true、静的版が Worker 内で動いた (`static_in_worker`)。
 - `run_all.sh` に step `10b` として追加 (step 10 の直後)。
 
-### main 取り込み後の再測定 (HEAD `982c4a2e`、merge commit)
+### main 取り込み後の再測定 (HEAD `fa68d2fe`、merge commit)
 
-main の取り込みで `tools/python` に次の 4 ファイルが入った (`analysis/py71_callers.py`・`analysis/py71_slot.py`・`analysis/py71_vtable.py` 追加、`analysis/flapi/pe_rip_consts.py` 変更)。`git diff 77448069 982c4a2e -- tools/python ':(exclude)*.md' --stat` の出力は次のとおり (全文 386 行は本節の行数上限のため省略)。
+main の取り込みで `tools/python` の 9 ファイルが変わった。`git diff 77448069 fa68d2fe -- tools/python ':(exclude)*.md' --stat` の出力は次のとおり (全文 432 行は本節の行数上限のため省略):
 
 ```
  tools/python/analysis/flapi/pe_rip_consts.py |   4 +-
+ tools/python/analysis/flapi/pe_scan_store.py |  49 ++++++++
  tools/python/analysis/py71_callers.py        | 104 ++++++++++++++++
  tools/python/analysis/py71_slot.py           | 171 +++++++++++++++++++++++++++
  tools/python/analysis/py71_vtable.py         |  71 +++++++++++
- 4 files changed, 349 insertions(+), 1 deletion(-)
+ tools/python/host/fl_mock.mjs                |   7 ++
+ tools/python/provider/fl_engine.c            |   6 +
+ tools/python/tests/channels_diff.mjs         |  16 +++
+ tools/python/tests/provider_check.mjs        |   8 +-
+ 9 files changed, 432 insertions(+), 4 deletions(-)
 ```
 
-この 4 ファイルは測定経路 (`fetch_inputs.sh`・`build_*.sh`・`provider/`・`tests/`・`analysis/pybind_extract.py`) から参照されない。`git grep 'py71_\|pe_rip_consts' 982c4a2e -- tools docs .github` の参照は、各スクリプト自身の usage 行・`REPORT_PY72.md`・`docs/DOC_MAP.md` のみ。`tools/python` の上記 4 ファイル以外は 77448069 と同一 (`--stat` の 4 行が全差分)。同じ手順を `982c4a2e` で再実行した。
+測定経路に入るのは `provider/fl_engine.c` (`channels.selectOneChannel` 追加、PY-69 #2499)・`host/fl_mock.mjs` (同)・`tests/provider_check.mjs` (実装数 70 → 71) の 3 ファイル。残りは測定経路の外で、参照は REPORT 系・`docs/DOC_MAP.md`・各スクリプト自身の usage 行のみ (`git grep` で確認)。`982c4a2e` → `fa68d2fe` の間で CPython 側の入力 (`build_cpython_wasm.sh`・CPython ソース) は変わらないため、`libpython3.12.a` は `982c4a2e` で行った 3 分 53.99 秒のビルドを流用し、provider と static は `fa68d2fe` で再ビルドした。
 
 | 手順 / 検証 | コマンド | 結果 | 所要 (real) | load |
 |---|---|---|---|---|
-| 入力配置 | `bash fetch_inputs.sh` | rc=0。MCPTools.pyc 100,674B・midi.py・utils.py を `work/` に配置 | 0.85 s | — |
-| CPython wasm | `bash build_cpython_wasm.sh` (素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、emsdk は [EMSDK] (`EMSDK_ENV`)) | rc=0 | 3 分 53.99 秒 | — |
-| flpy / provider / static | `FLPY_SKIP_TABLE=1 bash build_flpy.sh`・`bash provider/build.sh`・`bash build_flpy_static.sh` | 全て rc=0。`flpy.wasm` 5,924,680B・`flpy_static.wasm` 5,967,865B (追跡済み `flapi_table.json` は変更なし) | flpy 6.15 s・static 6.37 s (provider は未計時) | — |
-| provider 単体 | `node tests/provider_check.mjs` | `"PASS":true` (functions 435・implemented 70・unimplemented 365・mcp_static 60) | 0.40 s | 2.53 (直前) |
+| 入力配置・CPython wasm | `bash fetch_inputs.sh`・`bash build_cpython_wasm.sh` (素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開、emsdk は [EMSDK] (`EMSDK_ENV`)) | rc=0。MCPTools.pyc 100,674B。CPython は `982c4a2e` のビルドを流用 | 0.85 s・3 分 53.99 秒 (`982c4a2e`) | — |
+| flpy / provider / static | `FLPY_SKIP_TABLE=1 bash build_flpy.sh`・`bash provider/build.sh`・`bash build_flpy_static.sh` | 全て rc=0。`flprov.wasm` 55,678B・`flpy.wasm` 5,924,680B・`flpy_static.wasm` 5,968,196B (追跡済み `flapi_table.json` は変更なし) | 5.79 s・0.81 s・6.01 s | — |
+| provider 単体 | `node tests/provider_check.mjs` | `"PASS":true` (functions 435・implemented 71・unimplemented 364・mcp_static 60) | 0.35 s | 0.80 (直前) |
 | SAB + provider 48 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.64 s | — |
 | 静的版 node 検査 | `node tests/static_check.mjs` | `STATIC CHECK OK`。48/48 ok、host_calls 37,425、callback 往復 true | 0.39 s | — |
-| 静的版 Worker + headless Chrome (正例) | `node tests/static_browser_check.mjs` | **PASS** (`STATIC BROWSER OK`)。48/48 ok (SAB 48・静的 48)、差 0/48、host_calls 37,425 = 37,425、callback 往復 true、Worker 内 true。SAB init 203 ms・tools 1,439 ms、静的 init 127 ms・tools 85 ms、スクリプト内 wall 2,730 ms | 11.85 s (Chrome 起動込み) | 2.77 (終了時) |
-| pybind 束縛表 | `python3 analysis/pybind_extract.py --pe <block00031_PE.bin> --lib work/build-wasm/libpython3.12.a --out work/pybind --expect 110 --check` | `PYBIND CHECK OK` (names 110・unique 110・in_lib 109・許容 1)。`--out` は追跡ファイルを避けて `work/` へ | 0.13 s | — |
+| 静的版 Worker + headless Chrome (正例 1 回) | `node tests/static_browser_check.mjs` | **PASS** (`STATIC BROWSER OK`)。48/48 ok (SAB 48・静的 48)、差 0/48、host_calls 37,425 = 37,425、callback 往復 true、Worker 内 true。SAB init 163 ms・tools 1,496 ms、静的 init 153 ms・tools 129 ms、スクリプト内 wall 2,815 ms | 4.13 s (Chrome 起動込み) | 0.90 (終了時) |
+| 既存 headless Chrome (SAB・mock) | `node tests/browser_check.mjs` | `BROWSER OK` | 1.13 s | — |
+| pybind 束縛表 | `python3 analysis/pybind_extract.py --pe <block00031_PE.bin> --lib work/build-wasm/libpython3.12.a --out work/pybind --expect 110 --check` | `PYBIND CHECK OK` (names 110・unique 110・in_lib 109・許容 1)。`--out` は追跡ファイルを避けて `work/` へ | 0.11 s | — |
 
 負例 (`STATIC_WASM=flpy_static_neg`) は本再測定では未実施で、結果は下の 77448069 の節のとおり。`run_all.sh` 全体は未実施 (#2649)。
 
