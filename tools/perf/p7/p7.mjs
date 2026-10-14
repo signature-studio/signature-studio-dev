@@ -60,6 +60,12 @@ export function judge(results, { corrupt = false } = {}) {
       const expect = corrupt ? (ref.h ^ 1) >>> 0 : ref.h;
       add(`${cfg}: worklet bit-exact (${wl.result.hashBlocks} blocks)`, wl.result.hash === expect && sameRaw(wl.result.raw8, ref.raw) ? 'PASS' : 'FAIL', `hash=${wl.result.hash} ref=${expect}`);
     }
+    if (wl && wl.available !== false && !wl.error) {
+      const name = `${cfg}: worklet postMessage(Module)`;
+      if (wl.modRecv) add(`${name} 受信`, wl.modRecv.isModule ? 'PASS' : 'FAIL', `isModule=${wl.modRecv.isModule}`);
+      if (wl.msgerr) add(`${name} messageerror`, 'INFO', 'worklet 側で messageerror (Module 直接 post は不可・判定外の記録)');
+      if (!wl.modRecv && !wl.msgerr) add(`${name} 受信`, REQ_WL ? 'FAIL' : 'UNMEASURED', '受信・messageerror とも通知なし (worklet が稼働していない可能性)');
+    }
   }
   return checks;
 }
@@ -139,5 +145,5 @@ fs.writeFileSync(OUT, Object.entries(all).map(([cfg, r]) => JSON.stringify({ cfg
 const checks = judge(all);
 for (const c of checks) console.log(`${c.status} ${c.name} ${c.detail}`);
 const n = (s) => checks.filter((c) => c.status === s).length;
-console.log(`\nsummary: PASS=${n('PASS')} FAIL=${n('FAIL')} SKIP=${n('SKIP')} UNMEASURED=${n('UNMEASURED')} → ${OUT}`);
+console.log(`\nsummary: PASS=${n('PASS')} FAIL=${n('FAIL')} SKIP=${n('SKIP')} UNMEASURED=${n('UNMEASURED')} INFO=${n('INFO')} → ${OUT}`);
 process.exit(n('FAIL') ? 1 : 0);

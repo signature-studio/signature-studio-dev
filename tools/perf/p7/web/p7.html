@@ -75,7 +75,7 @@ if (round > 0) {
     await ctx.audioWorklet.addModule('/worklet.js');
     const bytes = await (await fetch('/wasm?c=small&salt=300')).arrayBuffer();
     const node = new AudioWorkletNode(ctx, 'p7-proc', { numberOfInputs: 0, outputChannelCount: [1] });
-    const msg = new Promise((res) => { node.port.onmessage = (e) => { if (e.data.type === 'result') res(e.data); else if (e.data.type === 'loaded') out.loaded = e.data; }; });
+    const msg = new Promise((res) => { node.port.onmessage = (e) => { if (e.data.type === 'result') res(e.data); else if (e.data.type === 'loaded') out.loaded = e.data; else if (e.data.type === 'modRecv') out.modRecv = e.data; else if (e.data.type === 'msgerr') out.msgerr = true; }; });
     const mod = await WebAssembly.compile(bytes.slice(0));
     try { node.port.postMessage({ type: 'mod', mod }); out.moduleDirectPostThrew = false; } catch (e) { out.moduleDirectPostThrew = String(e).slice(0, 100); }
     node.connect(ctx.destination);
