@@ -7,6 +7,7 @@
 #                 直近 3 件が機械的な類型のみ・繰り返し無し・合計が天井未満なら次の窓へ進める (oc-fix-reset)。
 #                 それ以外は oc:stuck を付けて止め、PM agent 用の oc-pm-intent マーカーを残す。
 #                 結果は $GITHUB_OUTPUT に stop=true/false で出す (stop=true なら oc:stuck ラベルを付けて PR にコメントする)
+#                 途中で失敗したときも stop=true を出す (fail-closed。stop が無いと check が none と判定し、write 権限の retry が起動する。#2638 B3)
 #                 ただし次の場合は agent を起動せず stop=true にするだけ (notice を残す。oc:stuck は付けない。#2601):
 #                 PR が open でない (merge・close 済み)、または差し戻しの元の review (pull_request_review の event) の commit が
 #                 現在の head と違う (古い head への差し戻し。その後に push された head の review が判定を担う)
@@ -80,6 +81,12 @@ DECIDE='
 
 case "${1:-}" in
   record)
+    record_done=false
+    record_fail() {
+      local rc=$?
+      if [ "$rc" -ne 0 ] && [ "$record_done" != true ]; then echo "stop=true" >> "$GITHUB_OUTPUT"; fi
+    }
+    trap record_fail EXIT
     pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
     head_now="$(jq -r .head.sha <<< "$pr_json")"
     pr_state="$(jq -r .state <<< "$pr_json")"
@@ -144,6 +151,7 @@ case "${1:-}" in
       fi
     fi
     echo "stop=$stop" >> "$GITHUB_OUTPUT"
+    record_done=true
     ;;
   check)
     : "${OC_HEAD_BEFORE:?}" "${OC_START_TS:?}"

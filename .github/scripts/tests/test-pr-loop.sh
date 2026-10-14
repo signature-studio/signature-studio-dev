@@ -12,7 +12,7 @@ export OC_REPO=o/r OC_PR_NUMBER=7 RUNNER_TEMP="$TMP" OC_REOPEN_WAIT=0 GITHUB_EVE
 
 # fake gh: `gh api [--paginate] [-X M] repos/... [--jq E]` は $FIX/<path の / を _ にした名前> を返す。
 # `gh pr comment|close|reopen` と POST は $LOG に記録するだけ。
-# FAKE_REOPEN_FAILS=N なら、最初の N 回の `gh pr reopen` を失敗させる。FAKE_CLOSE_FAILS=1 なら `gh pr close` を失敗させる。
+# FAKE_REOPEN_FAILS=N なら、最初の N 回の `gh pr reopen` を失敗させる。FAKE_CLOSE_FAILS=1 なら `gh pr close`、FAKE_COMMENT_FAILS=1 なら `gh pr comment` を失敗させる。
 # fixture <名前>.2 があれば、2 回目以降の同じ path の読み取りはそちらを返す (close の間に PR の状態が変わった競合の再現)。
 FIX="$TMP/fixtures"
 LOG="$TMP/gh.log"
@@ -22,6 +22,7 @@ cat > "$TMP/bin/gh" << 'EOF'
 echo "gh $* [GH_TOKEN=${GH_TOKEN:-}]" >> "$FAKE_LOG"
 if [ "$1" = pr ]; then
   [ "$2" = close ] && [ -n "${FAKE_CLOSE_FAILS:-}" ] && exit 1
+  [ "$2" = comment ] && [ -n "${FAKE_COMMENT_FAILS:-}" ] && exit 1
   if [ "$2" = reopen ] && [ -n "${FAKE_REOPEN_FAILS:-}" ]; then
     n=$(($(cat "$FAKE_FIX/reopen_calls" 2> /dev/null || echo 0) + 1))
     echo "$n" > "$FAKE_FIX/reopen_calls"
@@ -205,6 +206,27 @@ setup aaa '[{"name":"oc:stuck"}]' 0
 run_fix record > /dev/null
 grep -qx 'stop=true' "$TMP/out"; expect "ラベル済みなら stop=true" $?
 ! logged 'pr comment'; expect "ラベル済みなら再コメントしない" $?
+
+echo "== fix-progress.sh record (途中で失敗したら stop=true を残す: retry を起動しない #2638 B3)"
+# FAKE_COMMENT_FAILS=1: gh pr comment が失敗する。窓の印 (reset) と停止コメント (ceiling) のどちらでも stop=true を残す
+setup aaa '[]' 5
+export FAKE_COMMENT_FAILS=1
+run_fix record > /dev/null 2>&1
+rc=$?
+unset FAKE_COMMENT_FAILS
+[ "$rc" -ne 0 ] && logged "pr comment 7" && grep -qx 'stop=true' "$TMP/out"
+expect "窓の印を投稿できない (reset) ときは rc!=0 かつ stop=true" $?
+setup aaa '[]' 15
+export FAKE_COMMENT_FAILS=1
+run_fix record > /dev/null 2>&1
+rc=$?
+unset FAKE_COMMENT_FAILS
+[ "$rc" -ne 0 ] && logged "pr comment 7" && grep -qx 'stop=true' "$TMP/out"
+expect "停止コメントを投稿できない (ceiling) ときは rc!=0 かつ stop=true" $?
+setup aaa '[]' 0
+run_fix record > /dev/null
+[ "$?" = 0 ] && grep -qx 'stop=false' "$TMP/out" && ! grep -q 'stop=true' "$TMP/out"
+expect "失敗しなければ stop=false だけを出す (trap は stop=true を足さない)" $?
 
 echo "== fix-progress.sh record (merge 済み・古い head への差し戻しは agent を起動しない #2601)"
 # review_event <review の commit_id>: pull_request_review の event payload (差し戻しの元になった review) を書く
