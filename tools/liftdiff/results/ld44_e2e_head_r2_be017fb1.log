@@ -1,0 +1,30 @@
+[batch] 800 functions, shards=12
+[batch] 400/800  51s
+[batch] 800/800  107s
+[batch] done 107s -> work/m11/batch_head_r2.jsonl
+関数数 800: 一致 360 / 不一致 230 / 実行不能 210
+
+不一致の類型 (主因 = 優先順位最上位の1つ / 該当数 = 複数タグ重複あり):
+  callee_divergence        主因    54   該当   103
+  wasm_trap                主因    44   該当    69
+  callsite_arg_drop        主因    27   該当    27
+  memory_semantics         主因    25   該当    26
+  ret_only                 主因    16   該当    16
+  icall_drop               主因    16   該当    20
+  xmm_arg_drop             主因    15   該当    21
+  import_arg_diff          主因    10   該当    11
+  simd_helper              主因     6   該当     6
+  zero_init_drop           主因     5   該当     9
+  fp_flag_unreflected      主因     4   該当    15
+  spill_slot_deref         主因     3   該当     3
+  import_call_seq          主因     2   該当    24
+  unresolved_callee        主因     2   該当     3
+  arg_drop                 主因     1   該当     2
+
+不一致のうち callee を一切呼ばずに差分が出た (= その関数自身の欠陥と確定) : 49 / wasm trap を含む : 69
+
+実行不能の内訳:
+  native_fault_all_patterns            124
+  native_null_deref_all_patterns        48
+  hang                                  37
+  unsupported_sig                        1

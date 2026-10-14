@@ -1,0 +1,7 @@
+#条件	run	一致	不一致	実行不能
+e2e条件(--shards 12 --state auto)	ld44_e2e_r1	match=361	mismatch=229	unexec=210
+e2e条件(--shards 12 --state auto)	ld44_e2e_r2	match=360	mismatch=230	unexec=210
+e2e条件(--shards 12 --state auto)	ld44_e2e_r3	match=360	mismatch=230	unexec=210
+非e2e条件(--shards 4・--state なし)	ld44_r1	match=352	mismatch=170	unexec=278
+非e2e条件(--shards 4・--state なし)	ld44_r2	match=352	mismatch=170	unexec=278
+非e2e条件(--shards 4・--state なし)	ld44_r3	match=352	mismatch=170	unexec=278
