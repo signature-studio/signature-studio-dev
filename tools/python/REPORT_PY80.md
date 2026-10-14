@@ -12,16 +12,16 @@
 | 3 | Memory64 | **部分**。`MEMORY64=1` はリンクまで成功、node 22.23 では validate 不可。`MEMORY64=2` は実行でき 11/12 PASS (heap 増加 1 件 FAIL)。実行検証は子 #2858 (PY-98) | §3 |
 | 4 | `_PyInterpreterState_GetRefTotal` | **FL PE は呼んでいない**。参照は束縛時の store 1 件のみ。束縛失敗は無言 | §2 |
 
-測定 commit: `37164f82` (コードを変えた最後の commit。以降は本節を含む文書のみ)。`git diff 37164f82 HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行。
+測定 commit: `7e34fa2b` (コードを変えた最後の commit。以降は本節を含む文書のみ)。`git diff 7e34fa2b HEAD -- tools/python ':(exclude)*.md'` の出力は 0 行。`7e34fa2b` は、それより前の commit `37164f82` (同じ測定を実施) から、`build_cpython_wasm64.sh` の emsdk の指定だけを変えたもの (`[EMSDK]` の lint 対応)。測定は 7e34fa2b で再ビルドし直して行った。
 
-環境: GitHub Actions runner (4 core)、node v22.23.3、emcc 6.0.12 (`/opt/emsdk`)。load は各 run 直前の `/proc/loadavg` 1 分値。
+環境: GitHub Actions runner (4 core)、node v22.23.3、emcc 6.0.12 ([EMSDK])。load は各 run 直前の `/proc/loadavg` 1 分値。
 
 ## 0. 素材と再ビルド (測定 commit で実行)
 
-- `$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards 'extracted/*'` で `$RUNNER_TEMP/fl-win64/extracted` に展開 (4.7 秒)。
+- 素材 fl-win64 ([WIN64]) の `extracted/` を `tar --zstd -xf ... --wildcards 'extracted/*'` で `$RUNNER_TEMP/fl-win64/extracted` に展開 (4.7 秒)。
 - `bash build_cpython_wasm.sh` (wasm32): 3 分 59.8 秒、rc 0。
-- `bash build_cpython_wasm64.sh` (`MEMORY64_LEVEL=1` 既定。`--host=wasm64-unknown-emscripten` で configure が `-sMEMORY64=1` を CFLAGS / LDFLAGS に付与): 2 分 39 秒、rc 0。
-- `MEMORY64_LEVEL=2 bash build_cpython_wasm64.sh` (`CFLAGS/LDFLAGS=-sMEMORY64=2`): 2 分 18 秒、rc 0。
+- `EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash build_cpython_wasm64.sh` (`MEMORY64_LEVEL=1` 既定。`--host=wasm64-unknown-emscripten` で configure が `-sMEMORY64=1` を CFLAGS / LDFLAGS に付与): 2 分 39 秒、rc 0。
+- `MEMORY64_LEVEL=2 EMSDK_ENV=... bash build_cpython_wasm64.sh` (`CFLAGS/LDFLAGS=-sMEMORY64=2`): 2 分 18 秒、rc 0。
 - `FL_WIN64_DIR=... bash build_flpy_static.sh` (wasm32): `dist/flpy_static.wasm` 5,969,111 B。
 - `FLPY_MEMORY64=1 CPY_BUILD=$PWD/work/build-wasm64 STATIC_OUT=flpy_static64 bash build_flpy_static.sh`: 6,375,065 B。
 - `FLPY_MEMORY64=2 CPY_BUILD=$PWD/work/build-wasm64l STATIC_OUT=flpy_static64l bash build_flpy_static.sh`: 6,548,115 B。
@@ -31,7 +31,7 @@
 
 `node tests/static_subinterp_probe.mjs` (新規)。SAB 版 `tests/subinterp_probe.mjs` (`REPORT.md` §11・`REPORT_PY12.md`) と同じ観点。違い: `_flhost` は JS コールバックではなく静的版 provider (`channels.channelCount`) に直結するため、サブ内の `_flhost.call` が main と同じ値 (3) を返すことを検査する。
 
-| 検査 | 結果 (HEAD `37164f82`) |
+| 検査 | 結果 (測定 commit `7e34fa2b`) |
 |---|---|
 | 3 構成 (isolated OWN_GIL / isolated SHARED_GIL / legacy) で作成→実行→破棄、main 継続 | 3/3 PASS |
 | FL 同梱 stdlib 22 module を isolated で import | PASS |
@@ -42,9 +42,9 @@
 | 150 回 (50×3) の作成/実行/破棄の 3 系列で wasm メモリが増えない | PASS |
 | **合計** | **12/12 PASS** (`STATIC SUBINTERP OK`、rc 0) |
 
-- 所要 (wall): run 1 22.25 秒 (load 1.05)、run 2 22.29 秒 (load 1.03)。
-- 1 インタプリタの作成〜破棄 (50 回平均、ms、3 trial): isolated json+re 34.25〜35.50、isolated+_flhost 33.61〜34.96、legacy+_flhost 33.53〜33.98。
-- ネガティブコントロール `node tests/static_subinterp_probe.mjs --neg` (期待 1 件を欠く): `NEG-CONTROL DETECTED`、rc 1 (wall 22.04 秒、load 0.94)。
+- 所要 (wall): run 1 21.96 秒 (load 0.88)、run 2 22.13 秒 (load 0.84)。
+- 1 インタプリタの作成〜破棄 (50 回平均、ms、run 1 の 3 trial): isolated json+re 33.55〜35.10、isolated+_flhost 33.39〜33.69、legacy+_flhost 33.28〜33.67。
+- ネガティブコントロール `node tests/static_subinterp_probe.mjs --neg` (期待 1 件を欠く): `NEG-CONTROL DETECTED`、rc 1 (wall 22.15 秒、load 0.97)。
 - wasm メモリの推移 (同一 instance、20 回ずつ 8 区間 = 160 回): 33,554,432 B で不変。
 
 ## 2. `_PyInterpreterState_GetRefTotal` — FL PE は呼んでいない
@@ -61,9 +61,9 @@
 - `build_cpython_wasm64.sh`: wasm64 の configure は config.site に sizeof の固定値を持たないため、ポインタ幅は CFLAGS の `-sMEMORY64=1` に従う。
 - `-sMEMORY64=1` (wasm64 libpython + 静的版): リンク 6,375,065 B。node 22.23.3 で `WebAssembly.validate` は **false** (`--experimental-wasm-memory64` を付けても false)。instantiate は `invalid table elements limits flags` で失敗する (table64 の形式)。この環境では実行できない。
 - `-sMEMORY64=2` (binaryen の memory64/table64 lowering): リンク 6,548,115 B。`validate` は **true**。
-  - `STATIC_WASM=flpy_static64l STATIC_MEM64=2 node tests/static_subinterp_probe.mjs` は `STATIC SUBINTERP FAIL` (rc 2)。**11/12 PASS**。失敗は wasm メモリ不変の 1 件だけ。3 系列とも 33,554,432 → 48,365,568 B (+14,811,136 B)。wall 23.51 秒 (load 0.96)。
+  - `STATIC_WASM=flpy_static64l STATIC_MEM64=2 node tests/static_subinterp_probe.mjs` は `STATIC SUBINTERP FAIL` (rc 2)。**11/12 PASS**。失敗は wasm メモリ不変の 1 件だけ。3 系列とも 33,554,432 → 48,365,568 B (+14,811,136 B)。wall 23.53 秒 (load 0.98)。
   - 同一 instance の推移 (20 回区間): 33,554,432 (0〜100 回) → 40,304,640 (120 回) → 40,304,640 (140 回) → 48,365,568 (160 回)。32bit 版は同じ 160 回で増えない (§1)。
-  - 1 インタプリタの作成〜破棄 (50 回平均、ms): isolated json+re 36.01〜37.68。
+  - 1 インタプリタの作成〜破棄 (50 回平均、ms、run 1 の 3 trial): isolated json+re 36.39〜37.76。
   - 原因は未切り分け (lowering の影響、アロケータの経路差、Python 側の保持のいずれか)。
 - table64 に対応するエンジン (headless Chrome など) での `MEMORY64=1` の実行は未検証 → 子 #2858 (PY-98)。
 
