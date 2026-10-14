@@ -13,6 +13,7 @@
   **`f_653f40` (VCL フォーム登録ルーチン) が早期 return して
   fill コールバック `0x15F34A0` が未設定** であることを 5 段の逆引きで実証 (付録 §B 3-5)。
 - ラウンドごとの詳細 (FLE-2〜FLE-5 の成果・修正 3 件・FLE-4/5 の逆引き 5 段) は `REPORT_APPENDIX.md` §A・§B。
+- **FLE-8 (§9, #2698) の結果**: lift は runner 内で完走。単一 TU の clang は RSS cap で打ち切られ、boot 未到達 (残作業は #2700)。
 
 
 ## 1. 成果物 (tools/flelift/boot/)
@@ -192,6 +193,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 ## 9. FLE-8 (#2698): fa0ecaad の取込と clang の RSS 上限 (2026-10-14)
 
 - **結論**: lift は runner 内で完走する (ピーク RSS **609MB**・**63〜64 s**)。単一 TU の `emcc -c fle_lifted.c` は **cap 11000MB 超で打ち切られる** (11261〜11436MB・97〜98 s)。cap の下で runner は生存し、本節まで到達した。**boot 未到達** (clang 段で停止、残作業は #2700)。#918 で runner を落としたのは lift ではなく clang の単一 TU (旧 lift は 13.8GB 超で kill、付録 §C)。
+- 既知類型との関係: 該当なし (`docs/DEFECTS.md` D1a〜D23 と照合。出力は旧 x64c と cmp 一致 (§9-2) のため新たな類型は生じない)。
 - 測定 commit: `a3639395` (コードを変えた最後の commit。取込元 `c4895395` = `fa0ecaad`)。検証起点: `origin/main` `aaa3763e`。
 - 差分 0 の証跡: `git diff --stat a3639395 HEAD -- tools/flelift/x64c.py tools/flelift/boot/rss_cap.py tools/flelift/boot/build.sh tools/flelift/boot/boot_e2e.sh` は空 (本節の commit は REPORT のみ)。
 - 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/flelift/boot/fle6_measure.sh` (gen-A → lift → build plain。clang 段の cap 超過で rc=1)。素材 `oc_artifacts: fl-win64 toolchain-emsdk` (emsdk は `[EMSDK]`)。
@@ -211,7 +213,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 
 ### 9-2. 検証 (同一性・負例対照)
 
-- **出力同一性**: roots 先頭 400 件・`--closure 2` で旧 `x64c.py` (origin/main) と新の `fle_lifted.c` (1,434,084 B)・`lift_meta.json` が `cmp` 一致 (386 関数・13,293 insn)。
+- **出力同一性**: roots 先頭 400 件・`--closure 2` で旧 `x64c.py` (origin/main) と新の `fle_lifted.c` (1,434,084 B)・`lift_meta.json` が `cmp` 一致 (386 関数・13,293 insn)。負例: `fle_lifted.c` の 1 byte (offset 2197) を反転した複製は `cmp` rc=1 (`differ: byte 2198, line 72`)、無変更の比較は rc=0 (HEAD で再実行)。
 - **子孫 kill**: 子が孫 (300MB 確保) を起こし上限 100MB で打ち切る小テスト。旧 `rss_cap.py` は直接の子だけに SIGTERM し、**孫 318MB が PPID=1 の孤児として残存** (`ps` で確認)。新版は `kill pids=[3901, 3902]` で両方止まり、残存 0。
 
 | 未解決 | 影響 | 起票先 |
