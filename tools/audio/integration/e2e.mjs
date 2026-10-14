@@ -14,6 +14,17 @@ const root = process.env.AU9_ROOT;
 if (!root) throw new Error("AU9_ROOT 未設定 (e2e.sh 経由で実行)");
 const results = [];
 const rec = (name, ok, detail) => { results.push({ name, ok, detail }); console.log(`${ok ? "PASS" : "FAIL"} ${name}: ${detail}`); };
+// producer の write 記録 (ctl.pw_trace) の要約。pw_at_underrun は underrun 直前の write と次の write (w/fill/起床µs/完了µs。w = 書き込み開始 frame)
+const pwInfo = (v) => {
+  const pw = v.producer.writes;
+  const lat = pw.map((e) => e.done_us - e.wake_us);
+  const gaps = pw.slice(1).map((e, i) => e.wake_us - pw[i].wake_us);
+  const steps = [...new Set(pw.slice(1).map((e, i) => e.w - pw[i].w))];
+  let at = -1;
+  pw.forEach((e, i) => { if (v.first_underrun_frame >= 0 && e.w <= v.first_underrun_frame) at = i; });
+  const atStr = pw.slice(Math.max(0, at - 2), at + 2).map((e) => `${e.w}/${e.fill}/${e.wake_us}/${e.done_us}`).join(",");
+  return `pw_n=${v.producer.pw_n} pw_w_step=${steps.length === 1 ? steps[0] : `mixed:${steps.join("|")}`} pw_lat_max_us=${Math.max(...lat)} pw_gap_max_us=${Math.max(...gaps)}${v.underrun_count ? ` pw_at_underrun=[${at < 0 ? "none" : atStr}]` : ""}`;
+};
 // keep-alive 接続 (Chrome 側) が残ると httpServer.close の callback が来ず永久に待つため、接続を強制切断してから閉じ、上限を付ける
 const closeServer = async (srv, isDev) => {
   const closed = isDev ? srv.close() : new Promise((r) => srv.httpServer.close(r));
@@ -52,7 +63,7 @@ try {
       // 3 秒分以上ダンプされるまで待って照合
       await page.waitForExpr(`(window.__audio?.verify()?.covered_frames ?? 0) > 48000 * 3`, 30000);
       const v = await page.evaluate("window.__audio.verify()");
-      const loc = `first_err_frame=${v.first_err_frame} first_zero_run_frame=${v.first_zero_run_frame} underrun_cap=${v.underrun_count} first_underrun_frame=${v.first_underrun_frame} last_underrun_frame=${v.last_underrun_frame} fill_at_first_underrun=${v.fill_at_first_underrun} fill_min_before_first_underrun=${v.fill_min_before_first_underrun} cb_gap_max_ms=${v.cb_gap_max_ms} cb_gap_over20=${v.cb_gap_over20_count} prod_wake_hist=${v.producer.wake_hist.join("/")} prod_wake_count=${v.producer.wake_count} prod_wait_timeouts=${v.producer.wait_timeouts} prod_cb_count=${v.producer.cb_count} prod_cb_max_us=${v.producer.cb_max_us} prod_cb_max_q=${v.producer.cb_max_q}${v.underrun_count ? ` fill_trace=[${v.fill_trace_before_first_underrun.join(",")}]` : ""}`;
+      const loc = `first_err_frame=${v.first_err_frame} first_zero_run_frame=${v.first_zero_run_frame} underrun_cap=${v.underrun_count} first_underrun_frame=${v.first_underrun_frame} last_underrun_frame=${v.last_underrun_frame} fill_at_first_underrun=${v.fill_at_first_underrun} fill_min_before_first_underrun=${v.fill_min_before_first_underrun} cb_gap_max_ms=${v.cb_gap_max_ms} cb_gap_over20=${v.cb_gap_over20_count} prod_wake_hist=${v.producer.wake_hist.join("/")} prod_wake_count=${v.producer.wake_count} prod_wait_timeouts=${v.producer.wait_timeouts} prod_cb_count=${v.producer.cb_count} prod_cb_max_us=${v.producer.cb_max_us} prod_cb_max_q=${v.producer.cb_max_q} ${pwInfo(v)}${v.underrun_count ? ` fill_trace=[${v.fill_trace_before_first_underrun.join(",")}]` : ""}`;
       rec(tag("tone"), v.max_abs_err < 1e-5 && Math.abs(v.rms - 0.5 / Math.SQRT2) < 0.005 && v.zero_runs_ge16 === 0,
         `frames=${v.covered_frames} sr=${v.sampleRate} max_err=${v.max_abs_err.toExponential(2)} rms=${v.rms.toFixed(4)} (理論 0.3536) zero_runs=${v.zero_runs_ge16} peak=${v.peak.toFixed(3)} ${loc}`);
       rec(tag("underruns"), v.underruns === 0, `underruns=${v.underruns} ${loc}`);
