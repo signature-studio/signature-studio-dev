@@ -24,6 +24,7 @@
 - **run2 (`80d011cc`)**: `FL_WIN64_DIR` に [WIN64] の展開先を指定して `bash trap_triage/store_watch_1783.sh run2`、foreground・`timeout 1200` (20 分)。
   - rc **124** (timeout で打ち切り)。計装 54,041 store (run1 と同一)。実行時間 20 分 22 秒 (07:37:47〜07:58:10)。
   - survey は **unit 0〜145 (146 unit) を完走**し、unit 146 以降は未実行。全 942 unit のうち 146 unit が完走 (15.5%)。
+    - **§7 で訂正**: 完走は unit 0〜144 (145 unit)。unit 145 は開始行 (`unit 145`) のみで、完走していない。
   - `[aw]` 件数: `grep -c '\[aw\] ' work/probe1783/run2.aw` = **0** (`.aw` は 2,595 byte。`unit -1`・`unit 15`・`unit 17` 等の `[m11]` 行のみ)。`[aw] ` 検出経路は `.aw` に届く (`m11_sw` の `fprintf` → `SV_ERR_LOG`)。接頭辞付きの合成入力で旧 grep 0・新 grep 1 は §6 の通り確認済み。
   - 終了時の restore trap で `m11_boot.cjs.wasm` は元に戻った (`m11_build.sh` rc 0 を確認)。
 - 結論: unit 0〜145 の範囲では書込み監視 (`0x1ac308`) の hit は 0。unit 146 以降は未確認。`0x5ac308` の書込み元はこの run では特定できていない。
@@ -82,15 +83,72 @@ bash trap_triage/store_watch_1783.sh run1   # 全 unit 完走まで要時間 (ru
 
 ## 7. #1869 追記: 全 942 unit の値判定と計装版の停止点 (2026-10-14)
 
-- 測定 commit: `a10edf01` (`survey_units.mjs` に `SV_SLOT` を追加。以降 `tools/m11` のコードは同一)。
-- 素材: work-m11・toolchain-emsdk・fl-win64 を R2 素材から展開 (fl-win64 は一時ディレクトリ)。`m11_gen_ir2.sh` rc 0 (45.7 s)、`m11_build.sh` rc 0 (21.6 s)。
-- (a) 計装なし build・全 942 unit (`SV_SLOT=0x1ac308`): rc 0・11.4 s。boot_enter 後の `0x1ac308` の値は `0xf960`。**値が変わった unit は 0 件** (`work/probe1869/slot.json` に `slot` 付きの unit 無し)。値が同じままの書込みは、この方法では見えない。
-- (b) 計装版 `store_watch_1783.sh run1` (計装 54,041 store・`timeout 1500`): rc 124・25 分 19 秒。進捗行 `unit N` は unit N の**開始**を示す。完走は unit 0〜144 (145 unit)、`[aw]` は 0 件。**unit 145 が 25 分以上完走せず** (`run1.err` の最終行 `unit 145`)。計装なし版は同じ unit を含めて 11.4 s で完走する。
-- 前節 §2 の run2 の「unit 0〜145 (146 unit) を完走」は、進捗行を完走と読み違えた記述。完走は 0〜144 が正しい。
-- 受入条件の判定: 1 (全 942 unit の `[aw]` 採取) は未達 (計装版が unit 145 で停止)。2 (native 側の `0x5ac308` 捕捉) は未着手。3 (REPORT_1783 への実測記録) は本節で部分達成。
-- 未解決 (起票先):
+**判定 (#1869 の縮小後の受入 1)**: 計装なしの全 942 unit で `0x1ac308` の値変化を判定し、計装版の停止点を記録した。値が変わった unit は 0 件。計装版は unit 145 が timeout (1500 s) 内に終わらず、全 942 unit の `[aw]` 採取は未達。
+§3 の番号 (1〜3) は #1783 の受入で、本節の番号とは別。移管: 旧 受入 1 (計装版で全 942 unit の `[aw]` を site 単位で採る) → #2769。旧 受入 2 (native 側 `0x5ac308` の書込み命令アドレスと値) → #2770。
+
+### 7.1 測定の条件
+
+- 測定 commit: `a10edf01` (`survey_units.mjs` に `SV_SLOT` を追加)。以降、`tools/m11` のうち REPORT を除くコードは変わっていない。
+- 差分証跡: `git diff a10edf01 HEAD -- tools/m11 ':(exclude)*REPORT*'` の出力は 0 byte (本節の作成時点の HEAD で確認)。
+- 素材: work-m11・toolchain-emsdk・fl-win64 (実装 run で展開)。PR 本文に `oc_artifacts: fl-win64 toolchain-emsdk work-m11` を記載。
+- main との関係: 枝は `580dd294` 起点で、`origin/main` (`8693fd4b`、本節の作成時点) より 216 commit 古い。main 側は `tools/m11` のうち REPORT を除く 14 ファイルを変えているが、測定に使った 4 ファイル (`survey_units.mjs`・`m11_build.sh`・`m11_gen_ir2.sh`・`trap_triage/store_watch_1783.sh`) は含まれない。他の 14 ファイルがビルド結果を変えるかは未確認。merge 後の main とは測定対象が完全には一致しない。
+
+### 7.2 再現コマンド
+
+(a) 計装なし・全 942 unit (1 行):
+
+```sh
+export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> && cd tools/m11 && mkdir -p work/probe1869 && bash m11_gen_ir2.sh && bash m11_build.sh && SV_SLOT=0x1ac308 node trap_triage/survey_units.mjs work/probe1869/slot.json
+```
+
+- stdout の `SLOT_BOOT` 行は `survey_units.mjs` の 57 行目、`SURVEY_UNITS` 行は 103 行目で出る。JSON は `work/probe1869/slot.json`。
+
+(b) 計装版 (停止点):
+
+```sh
+export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> && cd tools/m11 && bash m11_gen_ir2.sh && bash m11_build.sh && timeout 1500 bash trap_triage/store_watch_1783.sh run1
+```
+
+- 出力: `work/probe1783/run1.out` (`SURVEY_UNITS` 行)、`run1.err` (進捗 `unit N`)、`run1.aw` (`[aw]` 行)。
+
+### 7.3 計装なし・全 942 unit (a)
+
+- 実装 run の記録: `m11_gen_ir2.sh` rc 0 (45.7 s)、`m11_build.sh` rc 0 (21.6 s)、survey rc 0・11.4 s。boot_enter 後の `0x1ac308` の値は `0xf960`。値が変わった unit は 0 件 (`slot` 付きの unit が無い)。
+- 942 unit の範囲: 反復は `for (i = 0; i < 942; i++)` (`survey_units.mjs` 61 行目)。`SV_ONLY`・`SV_SKIP` を指定しなければ、`SURVEY_UNITS` 行の kinds の合計は 942 になる (コードの性質であり、出力の引用ではない)。
+- 値の判定: unit ごとに、実行前 (69 行目) と実行後 (94 行目) の 4 バイトを比べ、違えば `slot` を付ける。
+
+### 7.4 原本の引用 (未了)
+
+- 引用できないもの: (i) 7.2 (a) の `SURVEY_UNITS` 行 (kinds 合計 942 の確認用)、(ii) 7.2 (a) の `SLOT_BOOT` 行、(iii) 7.2 (b) の `run1.err` の最終行 (`unit 145`)。
+- 理由: 測定時の stdout・stderr と `work/` を repo に残していない。この fix run の `$ARTIFACTS_DIR` には `fl-win64` しか無く、`work-m11`・`toolchain-emsdk` (emcc) が無いため再実行できない。実装 run の CI ログは取得できなかった。
+- 扱い: 7.3 の数値は「実装 run の記録」として読む。repo 内の出力では再確認できない。`work-m11`・`toolchain-emsdk` を指定した run で 7.2 (a) を実行し、上の 3 行をここに引用する (起票先 #2769)。
+
+### 7.5 計装版の停止点 (b)
+
+- 実装 run の記録: `store_watch_1783.sh run1` (計装 54,041 store)。rc 124・25 分 19 秒 (timeout 1500 s の後の EXIT 時 restore を含む)。`[aw]` は 0 件。
+- 進捗行 `unit N` は unit N の**開始**時に出る (`SV_PROG=1`、`survey_units.mjs` 72 行目)。最後の進捗行は `unit 145`。unit 146 の開始行は timeout までに出なかった。unit 145 の開始行があるので、unit 0〜144 は完了している (順次実行)。
+- 計装なしでは、unit 145 を含む 942 unit 全体が 11.4 s で完走した (7.3)。
+- 「停止」の意味: timeout 内に unit 145 が終わらなかったことだけを示す。処理が止まった (hang) のか、計装 store の分だけ遅いのかは区別していない。切り分けは #2769。
+
+### 7.6 値変化 0 件の範囲と REPORT_1588 §4.5 との関係
+
+- 判定の範囲: 基準値は各 unit の直前 (69 行目) と直後 (94 行目) で取る。最初の基準は `boot_enter` の後の値 (`0xf960`) なので、`boot_enter` 内の書込みは見ていない。unit 境界で比べるため、unit 内で一度変わって戻る書込みと、同じ値への書込みも見えない。よって 0 件は「各 unit の前後で 4 バイトが変わらなかった」ことだけを示す。「0x5ac308 は unit 中に書き換わらない」とは書けない。
+- REPORT_1588 §4.5 との関係: §4.5 は wasm の 410320 入口で `[rax-0x30]` (= `0x1ac308`) の読み値が `0x5af3d0` だったことから、「このスロットは実行時に書き換えられる」と結論している。本節の boot 後の値 `0xf960` は、その `0x5af3d0` とも一致しない。考えられる説明は (i) boot_enter 内の書込み、(ii) unit 内で変わって戻る書込み、(iii) 同じ値への書込み、(iv) §4.5 の再現 (`repro_1588.sh`、p01) と survey の実行経路の違い。どれかは未確定。本節は §4.5 の結論を取り消さない。起票先 #2769。
+- boot 後の `0xf960` と静的値 `0x40f960` (§4.5): 下位 16 bit は一致するが、同じ由来かは未確認 (差は `0x400000` で、イメージ基底の差に見えるが未検証)。起票先 #2769。
+
+### 7.7 差分証跡と鮮度
+
+- 測定 commit `a10edf01` から作成時 HEAD までの `tools/m11` のコード差分 (REPORT を除く) は 0 byte (7.1)。
+- merge 後の main で再測定した結果は未確認 (7.1 の main 側の差分)。再測定は子を起票せず、PR 本文の未解決表で扱う。
+
+### 7.8 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 計装版の unit 145 の停止原因と、停止を避けた全 942 unit の `[aw]` 採取 | wasm 側の書込み元が未確定 | 子 issue (本 PR 本文の表) |
-| native 側 `0x5ac308` の store 捕捉 (ld_native に監視が無い) | 両側の比較ができない | 子 issue (本 PR 本文の表) |
+| 計装版の unit 145 が timeout 内に終わらない原因 (hang か遅さか)、全 942 unit の `0x1ac308` への `[aw]` 採取 | wasm 側の書込み元が未確定 | #2769 |
+| native 側 `0x5ac308` の store 捕捉 (ld_native に監視が無い) | 両側の比較ができない | #2770 |
+| 両側で書込み値が分かれる最初の地点と書込み元関数の記録 | 上 2 件の結果が要る | #2769・#2770 |
+| 7.6 の判定範囲 (boot_enter 内・unit 内で戻る書込み・同値書込み) と REPORT_1588 §4.5 の関係 | 0 件を「書き換わらない」と読めない | #2769 |
+| boot 後の `0xf960` と静的 `0x40f960` の由来 | スロットの初期値の出所が未確定 | #2769 |
+| 7.4 の原本 (`SURVEY_UNITS` 行・`SLOT_BOOT` 行・`run1.err` 最終行) | repo 内の出力では 942 unit の完走を示せない | #2769 (同じ build・survey の再実行で引用) |
+| merge 後の main での再測定 | 測定対象が main と一致しない | 本 PR 本文の未解決表 (再測定のみのため子は起票しない) |
