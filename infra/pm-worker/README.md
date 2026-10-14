@@ -142,7 +142,7 @@ App の id・private key・webhook secret は Worker が受け取って暗号化
 VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済み。Worker が着手と `oc-watchdog` の dispatch を担う状態にするため、`LIVE_LAUNCH` `LIVE_DISPATCH` を `"1"` にした。VM の timer は**再開しない**。
 
 - 前提 (merged): #2398 (Review-Only と `oc:stuck` の上限)、#2418 (LIVE の分離)、#2420 (#2380 コメントを新しい順に 24 時間分読む)、#2422 (#2338 `/status` の観測・redact・rate-guard。Worker の REST 残量が 1,500 未満の間は launch を止める)。未 merge の #2343 (VM 状態の取り込み)・#2334 (no-pr の理由別再着手)・#2340 (shadow の自己昇格) は前提から外した。VM が止まっているので二重着手の窓が無く、phase は『open PR < 10 で解除』の規則で足りる。
-- merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 12 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 3 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。**PM 判断 (PM 代行、2026-10-14): oc-pm を含めて live にする。** #2333 の設計が `oc-watchdog` と同じスイッチで、送信の上限・値域・token の権限が上のとおり限られ、dry-run の検出は 0 件だった (`tools/pm/REPORT.md` §12-5)。突き合わせはこの版 (`e88e1890`) で測り直した。
+- merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 12 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 3 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。oc-pm を含めて live にするのは既定案 (#2319 の設計どおり)。PM の判断は PR #2453 の未解決表と PM のコメントに記録した。突き合わせはこの版 (`e88e1890`) で測り直した。
 - 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)、`NO_PR_COOLDOWN_H="24"` (#2334 が入るまで)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
 - 突き合わせ: dry-run の Worker と VM の `launch_issues.py` の差は、open な子を持つ親の除外・`pm-apply` の user 扱い・`oc:no-pr` の cooldown・VM の `relaunch.json` の有無で説明がつく (推定を含む。測定は #2422・#2423 を含む版。内訳と未解決は `tools/pm/REPORT.md` §12)。`NO_PR_COOLDOWN_H` の既定 (3) では `oc:no-pr` の issue が大量に候補へ戻るので、24 にした。
 - 初回のデプロイでだけ、保存状態を整える一時ビルド (全体同期の前倒しと、phase を VM の `phase.json` に合わせる) を使った。リポジトリの差分には無い。理由と結果は `tools/pm/REPORT.md` §12-5。
@@ -150,6 +150,8 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 戻し方 (VM の timer は再開しない): `wrangler.toml` の `LIVE_LAUNCH` を `"0"` にして再デプロイ (`npx wrangler deploy`)。dispatch も止めるなら `LIVE_DISPATCH` も `"0"`。`/status` の `mode_launch` / `mode_dispatch` が `dry-run` になる。`STORE_KEY` は変わらない。
 
 ## 切替 (PM の判断)
+
+> **旧案 (段階的な切替) の記録。** 2026-10-14 の切替は上の『切替の記録』の手順で行った (`LIVE_LAUNCH` と `LIVE_DISPATCH` を一度に `"1"`、VM の timer は再開しない)。戻し方は『切替の記録』が正本。下の A・B にある『VM の timer を再開する』は VM の timer を使っていた当時の手順で、今は使わない。
 
 スイッチは `wrangler.toml` の `[vars]` にある 2 つ。値は秘密ではない (`wrangler secret` は使わない)。`"1"` だけが live で、それ以外 (`"0"`・`""`・`"true"`・未設定) は dry-run。
 
@@ -184,14 +186,14 @@ Worker が送る type は `oc-watchdog` と `oc-pm` の 2 つだけ。`oc-watchd
      --jq '.workflow_runs[]|select(.display_title=="watchdog")|.created_at' | sort | python3 -c 'import sys,datetime as d; t=[d.datetime.fromisoformat(l.strip().replace("Z","+00:00")) for l in sys.stdin if l.strip()]; g=[(b-a).total_seconds() for a,b in zip(t,t[1:])]; print(len(t),"runs, max gap",max(g),"s")'
    ```
 
-戻す場合: `pm-watchdog.timer` を `enable --now` で再開し、`LIVE_DISPATCH` を `"0"` にして再デプロイする (oc-pm の送信も止まる)。
+戻す場合 (旧案。今は『切替の記録』の戻し方に従い、VM の timer は再開しない): `pm-watchdog.timer` を `enable --now` で再開し、`LIVE_DISPATCH` を `"0"` にして再デプロイする (oc-pm の送信も止まる)。
 
 ### B. launch を live にする
 
 1. dry-run の出力 (`GET /status?detail=1` の `would_launch_now` と `log`) を、VM の `launch_issues.py plan` と数時間比較する。
 2. 一致したら `LIVE_LAUNCH` を `"1"` にして再デプロイする (A の後なら `mode` が `live` になる)。同時に Actions 側の `vars.OC_PM_BOT_LOGIN` に `GET /status` の `pm_bot_login` (`oc-pm-for-signature-studio[bot]`) を設定する (別 issue)。
 3. VM の `pm-launch.timer` を止める (A を済ませていなければ `pm-watchdog.timer` も)。
-4. 戻す場合: `LIVE_LAUNCH` を `"0"` にして再デプロイし、VM の timer を再開する (VM 版は変更していない)。同期が壊れたら `/status` の `fresh` が false になり、Worker は投稿しない。
+4. 戻す場合 (旧案。今は『切替の記録』の戻し方に従い、VM の timer は再開しない): `LIVE_LAUNCH` を `"0"` にして再デプロイし、VM の timer を再開する (VM 版は変更していない)。同期が壊れたら `/status` の `fresh` が false になり、Worker は投稿しない。
 
 ## 再デプロイ (PM。VM に残した wrangler の OAuth)
 
@@ -211,7 +213,7 @@ Workers Builds は接続しない (後述)。デプロイするのは **main に
 2. 戻し先の記録。デプロイ前に `wrangler deployments status` を実行し、稼働中の version id を控える (ロールバックの戻し先)。あわせて `curl -fsS "$PM_WORKER_URL/status"` の `mode` `mode_launch` `mode_dispatch` `fresh` `last_tick` を控える (`PM_WORKER_URL` は `tools/pm/README.md` の `pm_gate.sh` と同じ)。
 3. ビルドの確認: `wrangler deploy --dry-run --outdir <作業用の一時 dir>`。認証なしで通り、bindings の一覧 (`PM` と `[vars]`) が出る。migration の有無はここでは分からない。
 4. デプロイ: `wrangler deploy --tag <commit の先頭 7 桁> --message "<commit hash> <issue または PR の番号>"`。`--tag` `--message` は version に付き、`wrangler deployments status` と `wrangler versions list` に出る (ロールバックで戻し先を選ぶ手がかり)。
-   - **`[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。** `--keep-vars` なしの既定では、dashboard 等で変えた var は消える (`wrangler deploy --help` の説明)。特に `LIVE_LAUNCH` / `LIVE_DISPATCH`: `wrangler.toml` はどちらも `"0"` (dry-run) なので、dashboard 等で `"1"` にしても再デプロイすると `wrangler.toml` の値で置き換わって dry-run に戻る。切替の手順は「切替」節 (A・B) が正本で、値を変えるときも `wrangler.toml` を変えて merge してから deploy する (正本はリポジトリ)。デプロイ前に手順 2 の `mode` `mode_launch` `mode_dispatch` を見て、意図しない `live` → `dry-run` の変化が出ないことを確かめる。
+   - **`[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。** `--keep-vars` なしの既定では、dashboard 等で変えた var は消える (`wrangler deploy --help` の説明)。特に `LIVE_LAUNCH` / `LIVE_DISPATCH`: dashboard 等で変えても、再デプロイすると `wrangler.toml` の値 (2026-10-14 以降は `"1"`) で置き換わる。切替の手順は「切替」節 (A・B) が正本で、値を変えるときも `wrangler.toml` を変えて merge してから deploy する (正本はリポジトリ)。デプロイ前に手順 2 の `mode` `mode_launch` `mode_dispatch` を見て、意図しない `live` → `dry-run` の変化が出ないことを確かめる。
    - secret (`STORE_KEY`) は deploy で消えない (ソースで `keepSecrets: true`、`--help` に『secrets are never deleted by deployments』)。`STORE_KEY` を作り直さない (App の鍵が復号できなくなる)。
    - Durable Object のコードを変えるだけなら migration は要らない (公式: <https://developers.cloudflare.com/durable-objects/reference/durable-object-class-migrations-legacy/>)。migration は適用済みの tag を飛ばして、新しい tag の分だけが deploy 時に適用される。現在の `wrangler.toml` は `v1` (`new_sqlite_classes = ["PmDO"]`) だけ。`[[migrations]]` を足す変更は、ロールバックできなくなる境界を作る (後述)。単独の PR・単独のデプロイにする。
 5. 反映の確認。
