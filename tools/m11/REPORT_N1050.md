@@ -128,6 +128,7 @@
 
 ### 7-4. 未解決 (起票先)
 
-- `function_8c5eb0` の trap 位置と D19 の関係 (stack の最上段が export 無しの `wasm-function[1352]`): 起票先 → 本 issue #1493 の子 (下記)。
-- `midiOutShortMsg` の IR 宣言 `i64` と shimx 定義 `i32` の不一致の解消 (`gen_link.py` 由来の trace wrapper 型): 起票先 → 子 issue (下記)。
-- file API 到達を妨げる原因 (unit 18 の `GetLocaleInfoW` 反復の後にある `memory access out of bounds`): 起票先 → 子 issue (下記)。
+- `function_8c5eb0` の trap 位置と D19 の関係 (stack の最上段が export 無しの `wasm-function[1352]`): 起票先 → #1629 (SHX-T26)。
+- `midiOutShortMsg` の IR 宣言 `i64` と shimx 定義 `i32` の不一致の解消 (`gen_link.py` 由来の trace wrapper 型): 起票先 → #1628 (SHX-T25)。
+- file API 到達を妨げる原因 (unit 18 の `GetLocaleInfoW` 反復の後にある `memory access out of bounds`) と ftrace 件数: 起票先 → #1630 (SHX-T27)。
+- 本 issue #1493 の受入条件 5 件のうち、上記 3 件の解消まで条件 1〜4 は未達。条件 5 (期待値不変) は本 PR では検証していない (コード変更なし)。
