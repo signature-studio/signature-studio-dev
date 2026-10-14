@@ -18,7 +18,7 @@
 - 候補判定は call 先の集合差分のみ。P1・P2 は候補であり確定ではない。
 - **0x417b70 (LD-28 受入条件 1・静的確認のみ、動的未確認)**: 食い違いの次 entry 組の件数は `results/m11_unreachable_diverge.md` の表を正本とする (ここには再掲しない)。
   L の機械語は `417c56: idiv qword ptr [rbp+0x60]` (符号付き除算、直前の `cqo` で符号拡張)。機械語は `block00031_PE.bin` (RVA `0x17c56`, ImageBase `0x400000`) で確認。
-  IR は `%29 = udiv i64 %28, %arg4` (符号なし) と前回 run で記録したが、**`boot_final3.ll` の行番号は未確認** (本 run でも再照合していない)。
+  IR は `%29 = udiv i64 %28, %arg4` (符号なし) と前回 run で記録したが、素材 `work-m11` の `boot_final3.ll` は本 run では再照合していない (IR の行番号は未確認)。
   その直後の `icmp eq %29, %27` が偽のとき `call 0x409730; unreachable` へ進む。stride×count が負で count ≥ 2 なら、符号付き除算は stride を返すが符号なし除算は一致しない。count = 1 では一致する (下記)。
   数値例 (積の符号のみ・64bit 整数で計算): −16×2 (count 2)、−32×4、−8×3、−16×3 で udiv は stride を返さず、idiv は返す。反例: count = 1 では udiv も idiv も stride を返し一致する (−16×1 で両方 −16)。
   仮説: 32 件の一部は、この udiv が trap 経路 (0x409730) を誤って取ることで生じる。**未確認**: 32 件の stride 符号・経路の実測、および sdiv への修正後に食い違いが消えるかの再実行。
@@ -38,7 +38,7 @@
     - 素材内 `batch_closure.log` (`[batch] 7421 functions, shards=14` 〜 `done 602s`・ログ mtime 08:30:33 UTC) から、開始は 08:20:31 UTC (17:20:31 JST)、終了は 08:30:33 UTC と読める。
     - `[batch] done` 出力を持つ harness の初出 commit は `1c4b7c7e` (08:36:56 UTC = 17:36:56 JST) で、生成はそれより前。よって生成は当時の未 commit 作業ツリーで行われた可能性が高い (推定)。
     - 入力のパターン 9 種 (`z, s, p0, p1, p01, pall, pall2, q0, qall`) は `ldlib/cases.py` (`1c4b7c7e` で初めて追加) と一致する。
-    - 確定には `fl-win64` と `work-m11` を要する再走が必要。本 run では未実施 (素材は展開済みだが、生成 commit の特定は行っていない)。
+    - 確定には `fl-win64` と `work-m11` を要する再走が必要。再走 (生成 commit の特定) は本 run では未実施。素材は展開し、sha256・集計・rerun diff は再測定済み。
 - **IR 側の `call 0x407030` 脱落**: 本 run では未確認。前 run (#1569) で「IR は `@LoadStringW` を直接呼ぶ・thunk 経由なし」と記録済み。thunk を除いても 16 件が食い違うため、thunk の脱落は原因ではなく表現差 (#1569 と整合)。
 - **結論**: 0x418be0 系の原因は未特定。食い違いの次段は 0x410320 (VMT 間接 call の関数・LD-17 の D15 型候補と同じ entry) が最多で、0x410320 以後の分岐が次の調査対象。受入条件 1 の 0x418be0 は、thunk の表現差の切り分けまで完了・原因は未達 → #1035 に残す。
 - **再現手順**: `python3 tools/liftdiff/tests/trace_diverge_418be0.py > tools/liftdiff/results/m11_418be0_thunk.md` (リポジトリルートから実行。既定入力 `tools/liftdiff/work/m11/batch_closure.jsonl`。PE・IR 不要、batch jsonl のみ)。素材は `work-liftdiff` (`tools/liftdiff/work/`)。
@@ -46,7 +46,7 @@
 #### 現 head での全件再生成と記録の比較 (LD-60 / #1736)
 - **再生成の基準 = `576c4976`** (測定時の `origin/main`)。ただし再生成の値は `576c4976` のコードの結果とは言えない。fix run で `git diff 576c4976 8a75e60a -- tools/liftdiff` を確認すると 17 ファイル・444 行追加の差分があり、空ではない (同一コードという前版の主張は誤りだった)。
   - 鮮度の正本は上の `200cc2b4` 側 (測定に使う 3 ファイルの差分 0 行) で、`576c4976` 基準の差分は参考値。
-  - 比較 (検証 HEAD `c66ddd7b`): `git diff 576c4976 c66ddd7b -- tools/liftdiff` = 20 files・592 insertions・10 deletions (本 REPORT の追記 7 insertions・6 deletions を含む)。`origin/main` (`5229fe5f`) と HEAD `85e75eec` の `git diff -- tools/liftdiff` は `REPORT_APPENDIX_LD28.md` のみ (19 insertions・6 deletions)。merge 前後で `tools/liftdiff` のコードは変わっていない (`git diff 848d83fd 85e75eec -- tools/liftdiff` = 0 行)。
+  - 比較 (検証 HEAD `c66ddd7b`): `git diff 576c4976 c66ddd7b -- tools/liftdiff` = 20 files・592 insertions・10 deletions (本 REPORT の追記 7 insertions・6 deletions を含む)。`origin/main` と HEAD `85e75eec` の `git diff -- tools/liftdiff` は `REPORT_APPENDIX_LD28.md` のみ (19 insertions・6 deletions)。merge 前後で `tools/liftdiff` のコードは変わっていない (`git diff 848d83fd 85e75eec -- tools/liftdiff` = 0 行)。
 - **コマンド**: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/liftdiff/liftdiff.py batch tools/liftdiff/targets/m11.json --set closure --shards 14 --nobuild --out tools/liftdiff/work/m11/batch_closure_head.jsonl` (build は同じ target で事前に実施)。
 - **入力・出力 sha256**: 素材 `block00031_PE.bin` = `b2c64da4…9496d` (22,227,016 bytes)。比較対象の記録 `batch_closure.jsonl` = `810b4d3a…bf6` (49,316,750 bytes)。再生成出力 `batch_closure_head.jsonl` = `b7990688…ae462` (51,854,845 bytes)。
 - **所要**: 858 s (shards 14・4 コア・開始時 load average 0.41・RC 0)。
