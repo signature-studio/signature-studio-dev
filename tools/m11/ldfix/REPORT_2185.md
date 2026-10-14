@@ -38,7 +38,7 @@
 | UNDETERMINED | 44 | 46 |
 | NOSLOT (読みが frame 基底でない) | — | 1 (7e45e0) |
 
-- UNDETERMINED 44 関数の内訳 (関数単位): `ONLY_ENTRY_AFTER_CALL` 25 関数 (call を越えて ENTRY に達するだけ)、`BARRIER` 19 関数 (ポインタ経由 store・部分重なりで打ち切り)。
+- UNDETERMINED 44 関数の内訳 (関数単位): `ONLY_ENTRY_AFTER_CALL` のみ 25 関数 (call を越えて ENTRY に達するだけ)、`BARRIER` のみ 18 関数 (ポインタ経由 store・部分重なりで打ち切り)、両方が混在 1 関数。したがって「BARRIER 19」は混在 1 関数を BARRIER 側に数えた値 (25 + 19 = 44)。site 単位の理由は `ONLY_ENTRY_AFTER_CALL` 27・`BARRIER` 19 (`sites[*].why`)。
 - 関数単位の判定は、site が全て DROP なら DROP、全て LIVE-IN なら LIVE-IN、それ以外は UNDETERMINED。
 - 未判定 44 関数の一覧 (関数 / 判定 / 理由コード / 読み site)。理由コードは関数内の site から取った主因 (`BARRIER` を優先)。site 単位の理由は `results/frame_store_verdict_2185.json` の `sites[*].why` が正本。
 
@@ -128,14 +128,14 @@ LIVE-IN:
 
 ### 3.5 差分の出力 (WORKFLOW §6)
 
-コマンド: `git diff --stat a511e0c7 HEAD -- tools/m11/ldfix`、`git diff --name-status a511e0c7 HEAD -- tools/m11/ldfix`、`git diff a511e0c7 HEAD -- tools/m11/ldfix/audit_frame_store_verdict.py | wc -l`。測定 HEAD は `8756da9e` (negctl と未判定一覧を含む commit)。以降の commit は REPORT の文言だけを変える。
+コマンド: `git diff --stat a511e0c7 HEAD -- tools/m11/ldfix`、`git diff --name-status a511e0c7 HEAD -- tools/m11/ldfix`、`git diff a511e0c7 HEAD -- tools/m11/ldfix/audit_frame_store_verdict.py | wc -l`。測定 HEAD は `183b2957` (negctl・未判定一覧・差分証跡を含む commit)。この表の後に続く REPORT 文言の commit は本節の数値を変えない (`.py` の差分は 0 のまま)。最新 HEAD の差分は PR 本文の検証結果に載せる。
 
 ```
- tools/m11/ldfix/REPORT_2185.md                     |  146 +++
+ tools/m11/ldfix/REPORT_2185.md                     |  165 +++
  tools/m11/ldfix/negctl_frame_store_2185.py         |   61 ++
  .../ldfix/results/frame_store_verdict_2185.json    | 1067 ++++++++++++++++++++
  .../m11/ldfix/results/negctl_frame_store_2185.json |  108 ++
- 4 files changed, 1382 insertions(+)
+ 4 files changed, 1401 insertions(+)
 A	tools/m11/ldfix/REPORT_2185.md
 A	tools/m11/ldfix/negctl_frame_store_2185.py
 A	tools/m11/ldfix/results/frame_store_verdict_2185.json
