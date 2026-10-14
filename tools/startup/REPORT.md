@@ -81,3 +81,61 @@ T5 の trace → 最小 asset 集合の変換器は `tools/startup/assettrace/RE
 `docs/REFERENCES.md` `[WIN64]` / `[MAC]` の REPORT (記述のうち「FL64.exe が WebView2 を使う」は**誤り**で、WebView2 はエンジン側に動的束縛される。「Electron/CEF 無し」は正しい),
 `tools/m2/{REPORT.md,SHIM_INVENTORY.md,work/ghidra_dll}`, `tools/m11/` (存在確認のみ)。既存 REPORT の「registry/ファイル関連付けは Web では memory/cookie」は、本調査で
 **エンジンの全設定が REG_SZ の TRegistry 経由**と判明したため、cookie ではなく **vreg (IndexedDB)** を推奨に修正。
+
+## 8. #2713 [WIN-2]: 起動指標の統一 — `boot_metric.json` (単一スキーマ)
+
+既知類型との関係: 該当なし (lift・逆アセンブル・IR pass は触らない。既存 REPORT と results からの算出のみ)。
+
+**結論**: 「起動」の数え方は 5 通り (17 / 52 / 53・56 / 209 / 928) あり、いずれも別の量を指す。`tools/startup/boot_metric.json` (`boot_metric/v1`) に、路線 (m11 / x64c / native-ref) とモード別のレコードとして載せた。FLEngine の現在地は `CreateFruityInstance` 未到達 (最終到達ステップ S09 = DllMain 内の unit 初期化まで)。`docs/STATUS.md` 先頭の 1 行がこの結論を指す。
+
+### 8-1. 5 通りの数え方 → スキーマのフィールド対応
+
+| 値 | 何を数えているか | 出典 | boot_metric の対応 (`id`.フィールド) | 扱い |
+|---|---|---|---|---|
+| 17 | m11 通常起動の完了 unit | `tools/m11/REPORT.md` §1 表 (#132 以前の旧値が表に残存) | 対応なし | 旧値。現行は 53 |
+| 52 | m11 + GUI shim 結合版の units_run | `tools/gui/flengine/results/boot.json` | `m11-gui-tolerant`.units.ok | 現行 |
+| 53 / 56 | m11 通常起動の units_run (実行 53) / 完了 (実行 53 + skip 3) | `tools/m11/REPORT.md` §14 の `de50ffa` 行と skip 内訳 | `m11-tolerant-sequential`.units.ok (53)、units.ok + units.skipped (56 = 完了。派生) | 現行 |
+| 209 | x64c boot の dispatch (完走 208) | `tools/flelift/boot/results/boot_summary_plain.json` | `x64c-strict-sequential`.units.dispatched (209)、units.ok (208 = dispatched − failed) | 現行 |
+| 928 | native 実機械語の hybrid の units_run (wasm ではない) | `tools/liftdiff/REPORT_LD26.md` §1 (測定 commit `2ca85816`) | `native-ref-hybrid`.units.ok (928)、units.total (942) | 参照値 |
+| 872 | m11 隔離 survey の ok | `tools/m11/REPORT_APPENDIX_1430.md` (測定 commit `7e149974`) | `m11-isolated-survey`.units.ok | 現行 (`de50ffa` の §14 の 866 より新しい commit) |
+| 892 | x64c 隔離 survey の ok (FLE-5 末) | `tools/flelift/boot/results/survey.json` | `x64c-isolated-survey`.units.ok | 現行 (#253 の 888 は FLE-3 の表値) |
+
+### 8-2. 現在値 (`boot_metric.json` の算出結果)
+
+| id | 測定 commit | 完走 (ok) | 失敗 (failed) | dispatch | 停止 (unit / VA / kind) |
+|---|---|---|---|---|---|
+| m11-tolerant-sequential | `de50ffa` | 53 (完了 56) | 1 | 57 | 57 / 0x16fde0 / halt0 |
+| m11-isolated-survey | `7e149974` | 872 | 23 (trap) | — | — (miss 46・noproc 1) |
+| m11-gui-tolerant | `c1a81f39` (boot.json) | 52 | 1 | — | — |
+| m11-gui-survey | `52424296` (survey_soft.json) | 870 | 24 (trap) | — | — (miss 47・noproc 1) |
+| x64c-strict-sequential | `ac5d6d46` | 208 | 1 | 209 | 209 / 0x816e80 / oob |
+| x64c-isolated-survey | `12958453` | 892 | 3 (unlifted) | — | — (uncovered 47) |
+| native-ref-hybrid | `2ca85816` | 928 (total 942) | — (first_fail 830) | — | — |
+
+`gui_natural` (RegisterClassW / CreateWindowExW の自然到達回数): boot (`m11-gui-tolerant`) は 0 / 0、隔離 survey (`m11-gui-survey`, 現 HEAD 相当の `survey_soft.json`) は 2 / 2。`probes`: x64c boot は GetMem 1886・FreeMem 776 (出典の JSON 値)。`first_wm_paint`・`pixels` は全レコード null (未測定)。
+
+### 8-3. 算出の仕組み
+
+- 生成: `python3 tools/startup/boot_metric.py` (`--check` は既存 JSON との一致検査、`--route x64c` は路線の現在値だけを表示)。
+- 出典: REPORT の表行 (節の中で一意に一致させる) か results の JSON キー。手で値を書かない。
+- 出典が無い・一意でない・合計が 942 にならない場合は `MetricError` で止まる (exit 1)。値は捏造しない。
+- 測定 commit: 表行に測定 commit が書かれていればそれ (m11 §14 の `de50ffa`、liftdiff の `2ca85816` など)。無ければ出典ファイルの最終更新 commit (`git log -1 -- <file>`)。
+- 出典に無い項目は null とし、理由を各レコードの `null_reasons` に書く (例: x64c の skip・miss・noproc、GUI 計数)。
+
+### 8-4. 検証
+
+- 単体 (固定 fixture): `python3 tools/startup/test_boot_metric.py` → 7 件 OK。期待値 (m11 53 / 57 / 0x16fde0、survey 872 / 23 / 46 / 1、x64c 208 / 209 / 0x816e80、x64c survey 892 / uncovered 47、native 928 / 942 / 830 など) を固定入力で検査。
+- ネガティブコントロール 4 件 (いずれも期待どおり `MetricError`): (a) 表行 `de50ffa` を壊す → 出典が無い扱い、(b) JSON の `units_run` キーを消す、(c) 出典ファイル (`survey.json`) を消す、(d) survey の ok を 900 にして合計 942 と食い違わせる。
+- 実データ: `python3 tools/startup/boot_metric.py --check` → OK (既存 `boot_metric.json` と再算出結果が一致)。
+- 測定 commit と差分: 再測定はしていない (既存 REPORT / results からの算出のみ)。出典 6 ファイルは `580dd294..4e8bdd8c` の間に変更なし (`git diff --stat 580dd294 4e8bdd8c -- <出典>` の出力は空)。コード変更の最後の commit は本 PR の commit (後述)。
+
+### 8-5. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| x64c の GetMem: `boot_summary_plain.json` は 1886、`tools/flelift/boot/REPORT.md` §9 (CI 再測) は 1,890 | 同じ unit 209 停止で数値が 4 食い違う。JSON 値 (1886) を採用 | #253 へ (PM 判断) |
+| gui `boot.json` の `boot_threw` は `unreachable`、`tools/gui/flengine/REPORT.md` §6d (B1) は `memory access out of bounds` | 停止理由の表記が食い違う。`m11-gui-tolerant` は failed 1 のみ記録 | #174 へ (PM 判断) |
+| m11 の survey は `REPORT.md` §14 (866, `de50ffa`) と `REPORT_APPENDIX_1430.md` (872, `7e149974`) が並存。本体 REPORT は §14 を最新扱い | JSON は commit が新しい 872 を採用。本体 REPORT の更新は未了 | PM 判断 (m11 REPORT 更新の依頼) |
+| x64c の隔離 survey は closure 外 46 / noproc 1 を分けていない | miss・noproc は null (合計 uncovered 47 のみ) | #253 へ (survey 出力に分類を足す) |
+| `first_wm_paint`・`pixels` (最初の WM_PAINT・画素) は全路線で未測定 | 最初のウィンドウの数値は null | 後続の WIN の issue (本 issue の範囲外) |
+| native hybrid の `first_fail 830` の意味 (失敗か停止か) が REPORT に無い | `units.failed` は null | liftdiff 担当 (PM 判断) |
