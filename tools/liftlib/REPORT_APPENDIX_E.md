@@ -115,3 +115,22 @@ DEFECTS.md 行案 (編集は PM 判断):
 ### 23.11 残作業 (起票先)
 - 整数フラグ再結線 (`shr`/`bsr`/`cmp` の flag 追跡 + 4 分岐の再結線) の実装 → #1687 (LIFTLIB-18)。
 - 修正後の `leafspec` tanf wide 40/40、SVF 180126040 の `--n 40` 再測定、`liftlib_e2e.sh` ALL PASS → #1687。
+
+### 23.12 LIFTLIB-18 (#1687) — 修正前の実測 (ベースライン・未修正)
+- **測定 commit**: `4ed14f65` (main)。`git diff 4ed14f65 origin/main -- tools/liftlib` = 0 行 (同一コード)。
+- **素材**: `work-m6-ott` / `work-liftlib` / `work-icall` / `work-liftlib-targets` / `analysis-ott-binaries` / `toolchain-*` を展開 (`$ARTIFACTS_DIR`)。
+- **IR の現状** (`ott_leaf_fixed.ll`・`function_1801ba860`): `br i1 true` (jae 0x1801baa53) / `br i1 false` (jne 0x1801baa94) / `br i1 false` (jl 0x1801baabb) / `br i1 undef` (je 0x1801baabd)。4 分岐すべてが畳まれたまま。
+- **p1 の未対応 (機械語)**: `shr rax,cl` (レジスタ count) / `bsr` / `adc rax,0` / `cmp rcx,0` は p1 に flag 生成の handler が無い。`bts`・`btr`・`mul`・`not`・`movd xmm4` 等も同じ block にある。
+- **leafspec 実測** (`targets/ott_leaf.json --n 40`、16.4 s、開始 load 1.54 / 終了 1.49):
+
+  | spec | match | mismatch | native_crash | wasm_trap |
+  |---|---|---|---|---|
+  | exp | 40 | 0 | 0 | 0 |
+  | log | 32 | 0 | 8 | 0 |
+  | tan | 40 | 0 | 0 | 0 |
+  | tanf (既定) | 40 | 0 | 0 | 0 |
+  | svf (180126040) | 24 | 9 | 7 | 2 |
+  | cvt | 26 | 0 | 14 | 0 |
+
+- **tanf wide** (`unif[-1e12,1e12]`、spec の `mix` は既定どおり、`work/1687/` の gitignore 領域): **match 15 / mismatch 25 / native_crash 0 / wasm_trap 0** (gate FAIL、目標 40/40)。§23.9 の 33/40 (8e077944) とは値が違う。原因は未切り分け (spec の seed/生成の差の候補)。
+- 既定経路 (tan / tanf / exp の既定 spec) は本ベースラインで不変。修正の対象は整数 flag 経路のみ。
