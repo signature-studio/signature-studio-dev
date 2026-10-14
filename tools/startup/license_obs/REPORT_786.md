@@ -261,7 +261,7 @@
 それでも byte アクセスの集合は増えなかった (分岐先でのみ現れる退避先は、この素材では存在しない)。
 
 **受入 2 (callee 越し) の判定**: callee 越しに渡された gradeChar タグは `summary.callee_tagged_pairs` = 77 の (callee, 入口タグ) 組で解析し、0 件の追加を得た。
-追跡できなかった箇所 (`results/escaped_1492.json` の `summary.untraced_events` と各リスト):
+追跡できなかった箇所 (件数は `results/escaped_1492.json` の `untraced_tagged_indirect_call` / `untraced_tagged_recursive_call` の一覧の要素数。`summary.untraced_events` (`indirect-call-with-tag` 899・`recursive` 597) は根ごとに重複して数えたイベント回数で、一覧の件数ではない):
 
 | 未追跡 | 件数 | 理由 | 起票先 |
 |---|---|---|---|
