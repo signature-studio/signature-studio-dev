@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "vstgui/lib/cstring.h"
 #include "vstgui/lib/platform/iplatformfont.h"
 #include <string>
 
