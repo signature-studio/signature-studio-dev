@@ -6,7 +6,7 @@
 ## 1. 結論
 
 - commit 単位の二分探索 (`7e149974..392d8ba5`, 665 commit) は **本 run (上限 58 分) では実行できない**。
-  1 段の `m11_e2e.sh --full` は 649 s (`REPORT_N1702.md` の実測値) で、二分探索は 10 段 (⌈log2 665⌉ = 10)。10 段分の計算値は 649 s × 10 = 6,490 s (約 108 分) で、上限を超える。
+  1 段の `m11_e2e.sh --full` は 649 s (`REPORT_N1702.md` の実測値) で、二分探索は 10 段 (⌈log2 665⌉ = 10)。10 段分の計算値は 649 s × 10 = 6,490 s (108 分) で、上限を超える。
 - 探索対象を、lift 段 (boot0〜6・tail 反復・wndclass 閉包) の入力に触れた commit に絞ると 16 commit になった (計算値 ⌈log2 16⌉ = 4 段 × 649 s = 2,596 s)。ただし pathspec は不完全で、§3 の依存を含めると範囲は広がる。
 - 原因 commit は **未特定**。本 PR では二分探索を実行していない。
 
@@ -17,8 +17,8 @@
 | 基準 commit | `origin/main` = `c171b9dc` (worktree `ws-1997`, branch `1997-m11-zeropad-bisect`) |
 | 対象範囲 | `7e149974` (旧, 1,049 site) .. `392d8ba5` (新, 1,061 site)。`git merge-base --is-ancestor` で祖先関係を確認 (OK) |
 | 範囲内 commit 数 | 665 (`git rev-list --count`) |
-| 1 段の所要 | 約 649 秒 (`REPORT_N1702.md`・`m11_e2e.sh --full` の実測値を引用。本 run では測っていない) |
-| 本 run の実行 | 素材 (`work-m11`・`fl-win64`・`toolchain-retdec`・`toolchain-emsdk`) の実在を `$HOME/artifacts` で確認。e2e は実行していない |
+| 1 段の所要 | 649 秒 (`REPORT_N1702.md`・`m11_e2e.sh --full` の実測値を引用。本 run では測っていない) |
+| 本 run の素材 | `ARTIFACTS_DIR` を `ls` で確認した結果、実在は `fl-win64` (`fl-win64.tar.zst`) のみ。`[WORK-M11]`・`toolchain-retdec`・`toolchain-emsdk` は不在。e2e は未実行 |
 
 ## 3. 範囲の絞り込み
 
@@ -34,9 +34,9 @@
 
 ## 4. 素材の状態
 
-- `work-m11.tar.zst` の一覧 (`tar --zstd -tf`) で `tools/m11/work/scan_index.json`・`tools/m11/work/boot_ranges_extra.txt` の存在を確認した。
-- `functions_dll.csv`・`lift_pe.sha256`・`ir_conditions.json` は同一一覧に無い (`grep` 0 件)。`REPORT_APPENDIX_1430.md` によれば `functions_dll.csv` は Ghidra で作る (9 分 37 秒)。したがって `--full` の 1 段は 649 s に Ghidra 時間が含まれるかを、子 issue で確認する必要がある。
-- `/opt/retdec/bin`・`/opt/emsdk/emsdk_env.sh` は存在を確認 (`ls`)。
+- 本 run の確認 (`ls`): `ARTIFACTS_DIR` の実在は `fl-win64` のみ。`[WORK-M11]` (`work-m11`) の素材は不在のため、`tools/m11/work/` の中身 (`scan_index.json`・`boot_ranges_extra.txt` 等) は**未確認**。
+- `[RETDEC]`・`[EMSDK]` のツールも本 run には不在 (`docs/REFERENCES.md` §1 の `[OPT-TOOLS]` 配下。`toolchain-retdec`・`toolchain-emsdk` の取得指定が要る)。
+- `functions_dll.csv`・`lift_pe.sha256`・`ir_conditions.json` の有無は**未確認**。`REPORT_APPENDIX_1430.md` によれば `functions_dll.csv` は Ghidra で作られる (9 分 37 秒)。したがって `--full` の 1 段の 649 s に Ghidra 時間が含まれるかは、子 issue で確認する必要がある。
 
 ## 5. 未解決 (起票先付き)
 
@@ -49,7 +49,8 @@
 - 祖先関係: `git merge-base --is-ancestor 7e149974 392d8ba5` = OK。
 - 範囲 commit 数: `git rev-list --count 7e149974..392d8ba5` = 665。
 - pathspec 絞り込み: `git log --oneline 7e149974..392d8ba5 -- <§3 の pathspec>` = 16 commit。
-- コード変更なし。e2e 未実行 (§2)。
+- 祖先関係・件数は上記コマンドで本 run に再実測した値 (`merge-base` OK / 665 / 16)。
+- コード変更なし。e2e 未実行 (§2)。素材は `fl-win64` のみ実在し、他は不在 (§2・§4)。
 
 ## 7. 差分
 
