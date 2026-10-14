@@ -908,6 +908,16 @@ wd
 not_logged 'dispatches' && not_logged 'issue comment 8[01] '
 expect "ネガコン: pm-apply / needs-user-input issues get no dispatch and no comment" $?
 
+# 35b. oc:no-pr の一覧が上限 (200 件) に達したら、取りこぼしを警告する (送るかどうかは変えない)
+reset
+base '[]'
+rows=(); for i in $(seq 1 200); do rows+=("$(nrow "$i" '{"name":"oc:no-pr"}')"); done
+nopr "$(IFS=,; echo "${rows[*]}")"
+ledger ''
+wd
+grep -q 'oc:no-pr list reached the limit (200)' "$TMP/out"
+expect "oc:no-pr list at the limit (200) -> warning" $?
+
 # 36. ネガコン: Worker が mode=live かつ fresh=true なら送らない (partial・fresh=false・取れない は送る)
 reset
 pm_base

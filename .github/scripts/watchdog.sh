@@ -561,6 +561,7 @@ else
     fi
   done
   if nopr_raw="$(gh issue list --repo "$R" --state open --label oc:no-pr --limit 200 --json number,labels)"; then
+    [ "$(jq length <<< "$nopr_raw")" -ge 200 ] && echo "::warning::oc:no-pr list reached the limit (200); the rest are not checked this pass"
     for n in $(jq -r '.[] | select(([.labels[].name] | any(. == "pm-apply" or . == "needs-user-input")) | not) | .number' <<< "$nopr_raw"); do
       if ! cm="$(gh api --paginate "repos/$R/issues/$n/comments")"; then
         echo "#$n oc-pm: failed to read comments (not a candidate this pass)"
