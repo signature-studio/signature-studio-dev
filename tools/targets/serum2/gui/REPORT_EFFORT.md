@@ -209,7 +209,12 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 |---|---|
 | canvas 側の純粋仮想 103 関数 (6 files) の wasm 実装 (受入条件 1 の残り) | #2064 ([SR-35]) |
 | `CTextLabel` 系 + `XferOnOffButton` 1 view の canvas 描画 (受入条件 2 の残り) | #2065 ([SR-36])・前提 #2064 |
-| `XferOnOffButton` の .text 対応付けと本体バイト数 (受入条件 3 の残り) | #2066 ([SR-37]) |
+| `XferOnOffButton` の .text 対応付けと本体バイト数 (受入条件 3 の残り) | #2066 ([SR-37]) → §11 で完了 |
 
 - 親 #2029 ([SR-31]) は、上記 3 件へ未達の受入条件を移したうえで範囲を縮めた。
 - 測定 commit: 本 §10 と `vtable_measure.py`・`check_wasm_syntax.sh` を追加した commit (PR 本文参照)。
+
+## 11. 2026-10-14 run (#2066): XferOnOffButton の .text 対応付けと本体バイト数
+
+- 結論: vtable 由来の override・新規 8 関数 (`XferOnOffButton`) は全件 Ghidra の関数先頭に対応付いた (未対応 0 件)。本体バイト数の合計は **507 B** (8 関数、thunk 2 件を含む。呼び出し先の閉包は未測定)。人日は出さない。
+- 詳細 (表・再現手順・限界): `gui/REPORT_SR37.md`。測定スクリプト `gui/vtable_fn_addrs.py`・`gui/ghidra_fn_size.java`。
