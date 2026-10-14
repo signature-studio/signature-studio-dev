@@ -231,6 +231,15 @@ sed -n 9872p $LIFT   # => br i1 %110, label %dec_label_pc_1800c2f08, label %dec_
 
 全文は REPORT_APPENDIX.md §13b (機械語 ↔ raw IR の突合・census の数え方・実測の記録)。
 
+## 14d. N2b と L1 の適用順規約 (#1228 / SR-16, 詳細は APPENDIX §14d)
+
+- 判断 (PM 判断, #1265 本文で確定): **patched 経路は N2b を優先し、N2b-2 (0x1800c2d59→f08 の強制) は変えない。L1 復元 pass は patched 経路に組み込まない。** 根拠: N2b-2 を外すと demo 判定ブロックの到達性が変わり N2b の検証 (23/23) が崩れる。L1 を patched に入れても d5f 側が到達不能のまま ef4 は復元されない (実測)。
+- L1 は faithful 経路 (N2b を当てない lift) の忠実性を測る部品として残す。適用順は「base 修復 → L1 → (faithful 専用)」で、patched 経路では L1 を呼ばない。
+- 到達性 (実測, raw lift sha256 先頭 16 桁 `05a6e15a8db8a92f`): raw ef4=absent・L1 後 REACHABLE / patched ef4=absent・L1 後も unreachable。
+- 受入 4 (ネガコン) の扱い: pass 無しの patched でも通知経路 d5f は既に unreachable のため「pass を外すと通知経路が消える」は patched 経路では成立しない。ネガコンは faithful 経路 (raw) で実施 (raw: L1 無し absent / L1 有り REACHABLE)。
+- 23/23 は patched 経路 (L1 無し) で再測定 PASS (APPENDIX §14d)。
+- 未達: icall #228 界面の整合 (BLK 前段 store) は #1497 [SR-22] (open)。faithful 経路への L1 組込みと適用順の e2e 反映は #1265 [SR-17] (open)。
+
 ## 15. LF 束縛先 global の役割導出 (#1208, SR-15)
 
 - 結論: LF1/2/3/4/5/6/7 の束縛先 global 名を、束縛 site の値の**使われ方** (役割) から導く (`authstub_irpass.derive_role`)。役割 → global の対応は `ROLE_GLOBAL` の 3 行のみ。詳細・site 表・ネガコンは REPORT_APPENDIX.md §15。

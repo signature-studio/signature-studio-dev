@@ -81,3 +81,18 @@
 - 30 分 JSON の値 (`results/soak_1800.json`, head `6aa4b39`) の再計測: `cb_max_us` 18,165 µs → 今回 184 µs、`clock_jumps` 10 → 4。旧 18 ms は単発の大きい spike だった可能性が高いが、spike 単発の原因は未特定 (一度きりで再現せず)。`clock_jumps` は件数が試行ごとに変わり、`clock_jump_frames` 合計は 0 のまま。ramp は全フレーム bit-exact のため、音声データの欠落は無いと判断する。
 - 計測経路 (コード読解): `cb_max_us` は producer スレッドの `do_buffer` 内で `emscripten_get_now()` 差を取った wall-clock 時間 (`tools/audio/src/flasio.c` L200-204 = `bufferSwitch` 1 回の所要)。`clock_jumps` は worklet の `process()` が `currentFrame` の連続性を見る件数 (`public/worklets/fl-audio-worklet.js` L92-95 = `frame !== prevFrame + Q` で計上・`clock_jump_frames` はその差の合計)。shim の underrun とは別計上 (`tools/audio/docs/PROTOCOL.md` L69)。
 - 未解決: 10 秒ソーク FAIL の原因、30 分の `cb_max` spike の原因 (単発・未再現)、`clock_jumps` の発生源 (ブラウザ側スキップか、計測タイミングか) は未特定。子 issue で追う (下記)。
+
+### 16.4 AU-20 (#1363) 切り分け: head `12586095` での 30 分 1 回・10 秒 5 回 (2026-10-13〜14)
+
+測定 commit: `12586095` (origin/main, コード変更なし。本 run は `tools/audio/REPORT_AU10.md` のみ変更)。環境: GitHub runner 4 core / 15 GiB, headless google-chrome 154, `bash tools/audio/build.sh` 直後 (emcc 6.0.12)。生ログ・JSON は `tools/audio/work/soak10/` (gitignore)。
+
+| 試行 | 結果 | 所要 / load (開始→終了) |
+|---|---|---|
+| `--soak 10` 1〜5 回目 | 5/5 PASS: underruns 0, silence 0, ramp 0 / 480,512 f (全 5 回), workletErrors 0, lat_changes 0。cb_max 25 / 70 / 45 / 770 / 50 µs。dev_fill min 1024 (全 5 回)、clock_jumps 0 (全 5 回) | 各 63 s / 0.01〜0.15 |
+| `--soak30` (1800 s, 無負荷) 1 回目 | PASS (exit=1 完了): underruns 0, silence 0, ramp 0 / 86,406,272 f, workletErrors 0, **cb_max 169 µs**, T=1024, dev_fill 512/794/1024, **clock_jumps 14 / clock_jump_frames 0** | 1808 s / 0.41 → 0.16 |
+
+結論:
+- 10 秒ソーク FAIL は今回 5 回で再現せず (通算 head `57519ca`〜`12586095` で 1/15)。FAIL 時の T・dev_fill・underrun・lat_changes は harness の console 行と `soak_<秒>.json` に既に出る仕組みで、本 run では FAIL が出ないため採取データは無い。原因は**未特定**。
+- 30 分ソークの `cb_max` spike (18 ms 級) は今回の 1 回で再現せず (169 µs)。前回 d7d91d2 の 184 µs と合わせ 2 回とも 1 ms 未満。spike の発生時刻・原因は未特定。
+- `clock_jumps` は 30 分ソークで 14 件だが `clock_jump_frames` は 0。件数は試行ごとに 4 → 14 と変動し、欠落フレームは無い。ramp は全フレーム bit-exact。発生源 (ブラウザ側スキップか計測タイミングか) は未特定。
+- 次の切り分けは子 issue で行う (下記)。
