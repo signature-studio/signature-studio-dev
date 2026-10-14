@@ -29,7 +29,7 @@ DWARF の行表 (`llvm-dwarfdump --debug-line`) には `.ll` の行情報が無�
 | 項目 | 値 |
 |---|---|
 | 測定 commit (コードを変えた最後の commit) | `586c8b0c` (origin/main 取り込み時点の HEAD。本 PR はコード変更なし) |
-| 素材 | `fl-win64`・`plugins-freshair` (`fetch.sh`: win 17 files, factory .epf 8)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`)・`work-icall`・`work-liftlib` |
+| 素材 | `fl-win64`・`plugins-freshair` (`fetch.sh`: win 17 files, factory .epf 8)・`toolchain-emsdk` ([EMSDK])・`toolchain-retdec` ([RETDEC])・`work-icall`・`work-liftlib` |
 | `tools/ott/native/build.sh` | OK |
 | `tools/icall/fa_route_build.sh` | OK、11.5 s |
 | `tools/icall/diff/fa_wc_build.sh` | OK、3.2 s (`store total=5526 instrumented=5526 unhandled=0`) |
@@ -37,7 +37,7 @@ DWARF の行表 (`llvm-dwarfdump --debug-line`) には `.ll` の行情報が無�
 | 区分 | **bit 一致 46 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 10** (合計 131) |
 
 - wasm のみ err は 9 件で、1998 §4 と一致。
-- bit 一致 / 値の不一致 は 1998 §4 (47 / 9) と 1 件ずれた。`fa_sweep` の bit 一致が ±1 揺れる件は #2302 (ICALL-71) で追跡中。本付録では再現判定を行わず、この実測値をそのまま記録する。
+- bit 一致 / 値の不一致 は 1998 §4 (47 / 9) と 1 件ずれた。**`REPORT_APPENDIX_1998.md` §4 の 47 / 9 が正本**で、本 run の 46 / 10 は `fa_sweep` の ±1 揺れと判断し、#2302 (ICALL-71) で追跡する。本付録では再現判定を行わず、この実測値をそのまま記録する。
 
 ## 4. 未解決 (起票先)
 
@@ -49,7 +49,8 @@ DWARF の行表 (`llvm-dwarfdump --debug-line`) には `.ll` の行情報が無�
 ## 5. 再現
 
 ```
-export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FA_DL=$RUNNER_TEMP/plugins-freshair RETDEC_ROOT=$HOME/retdec TMPDIR=$RUNNER_TEMP
+export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 FA_DL=$RUNNER_TEMP/plugins-freshair TMPDIR=$RUNNER_TEMP
+export RETDEC_ROOT=<[RETDEC] の展開先>   # 環境変数の規約は WORKFLOW §11。[EMSDK] の所在は emsdk_env.sh が設定する $EMSDK
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C .
 mkdir -p "$FL_WIN64_DIR" "$FA_DL" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$FL_WIN64_DIR"
 tar --zstd -xf "$ARTIFACTS_DIR/plugins-freshair.tar.zst" -C "$FA_DL"
@@ -60,6 +61,6 @@ bash tools/icall/diff/fa_wc_build.sh
 node tools/icall/diff/fa_wc_drv.cjs $PWD/tools/icall/work/fa_wc/fa_wc.cjs 181057b38 2>err.txt
 grep -c '^WC line=' err.txt                       # 168
 grep '^WC line=19132' err.txt | head -1           # addr=36319008 val=63736d65
-/opt/emsdk/upstream/bin/llvm-objdump -d tools/icall/work/fa_wc/fa_wc.wasm | grep -A1 'i64.const.*19132' # 直後の store (0x427be)
+"$EMSDK/upstream/bin/llvm-objdump" -d tools/icall/work/fa_wc/fa_wc.wasm | grep -A1 'i64.const.*19132' # 直後の store (0x427be)
 bash tools/icall/diff/fa_sweep.sh 8 60
 ```
