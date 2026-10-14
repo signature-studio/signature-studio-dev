@@ -231,8 +231,14 @@ test("本文の素材行 (#2758): 検証済みの 1 行にする。allowlist 外
 });
 
 test("本文の素材行 (#2758): 最後の行を使い、前の行には戻らない", () => {
-  assert.equal(bodyArtLine("oc_artifacts: fl-win64\noc_artifacts: work-m11\n"), "oc_artifacts: work-m11");
+  assert.equal(bodyArtLine("oc_artifacts: fl-win64\noc_artifacts: work-m11\n"), "oc_artifacts: fl-win64 work-m11");
   assert.equal(bodyArtLine("oc_artifacts: fl-win64\noc_artifacts: evil\n"), null);
+});
+
+test("本文の素材行 (#2758): fl-win64 が無ければ先頭に補い、重複は除く (addArts と揃える)", () => {
+  assert.equal(bodyArtLine("oc_artifacts: plugins-ott\n"), "oc_artifacts: fl-win64 plugins-ott");
+  assert.equal(bodyArtLine("oc_artifacts: work-m11 work-m11\n"), "oc_artifacts: fl-win64 work-m11");
+  assert.equal(bodyArtLine("oc_artifacts: fl-win64 fl-win64\n"), "oc_artifacts: fl-win64");
 });
 
 test("本文の素材行 (#2758): none は単独の行のときだけ有効。混在は none を落とす", () => {
@@ -275,4 +281,7 @@ test("素材行へ足す (#2758): none は外し、fl-win64 を先頭に補う�
   assert.equal(addArts("oc_artifacts: none", []), null);
   assert.equal(addArts("oc_artifacts: fl-win64", ["fl-win64"]), null);
   assert.equal(addArts("oc_artifacts: fl-win64", ["evil-thing"]), null);
+  assert.equal(addArts("oc_artifacts: none", ["fl-win64"]), "oc_artifacts: fl-win64", "none の後に fl-win64 を足すと 1 件だけ入る (二重にしない)");
+  assert.equal(addArts("oc_artifacts: plugins-ott", ["fl-win64"]), "oc_artifacts: fl-win64 plugins-ott", "fl-win64 が base に無く extra にあっても二重にしない");
+  assert.equal(addArts("oc_artifacts: plugins-ott", ["fl-win64", "plugins-serum2", "fl-win64"]), "oc_artifacts: fl-win64 plugins-ott plugins-serum2");
 });

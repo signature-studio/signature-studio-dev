@@ -218,3 +218,29 @@ test("分類 (#2758): 本文が oc_artifacts: none なら、不足素材は none
   const rows = classify(snap, input).rows;
   assert.deepEqual(rows.relaunch, [[91, "oc_artifacts: fl-win64 plugins-serum2"]]);
 });
+
+test("分類 (#2758): 不足素材が fl-win64 のとき、本文の none・本文の行のどちらでも fl-win64 を重複させない", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const at = new Date(now - 5 * 3_600_000).toISOString();
+  const head = "素材不足: fl-win64 が無い";
+  const snap = (artLine: string): Snapshot => ({
+    issues: [{ number: 92, title: "[CI-92] t92", labels: [], body: "", deps: null, artLine }],
+    prs: [],
+    runs: [],
+    bot_last: { "92": { at, head, art: null } },
+    bot_report: { "92": { at, head, art: null } },
+    pm_art: {},
+  });
+  const input: ClassifyInput = {
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "92": head },
+    reportBody: { "92": head },
+    outcomeReason: { "92": "artifact" },
+  };
+  assert.deepEqual(classify(snap("oc_artifacts: none"), input).rows.relaunch, [[92, "oc_artifacts: fl-win64"]]);
+  assert.deepEqual(classify(snap("oc_artifacts: plugins-ott"), input).rows.relaunch, [[92, "oc_artifacts: fl-win64 plugins-ott"]]);
+});

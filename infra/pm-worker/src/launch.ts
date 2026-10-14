@@ -47,10 +47,14 @@ export function inferArtifacts(title: string, labels: string[]): string {
 export const BODY_ART_CHARS = 4000;
 const BODY_ART_RE = /^\s*`?(oc_artifacts:[^`]*)`?\s*$/;
 
+// 素材名の並びに fl-win64 を先頭から補う (既に有れば位置はそのまま)。既定で取得されるのは fl-win64 のみ。
+const withFlWin64 = (names: string[]): string[] => (names.includes("fl-win64") ? names : ["fl-win64", ...names]);
+
 // issue 本文の先頭 BODY_ART_CHARS 字の、最後の oc_artifacts: 行を検証済みの 1 行にする。
 // allowlist 外の名前は落とし、残りが 1 つ以上ならその行を返す。残りが 0 なら null (呼び出し側は推定に戻る)。
 // `oc_artifacts: none` は単独の行のときだけ有効 (validateArtLine と同じ)。最後の行だけを見る (前の行には戻らない)。
 // 字数で切った境界をまたぐ行 (改行で終わっていない末尾の行) は見ない。
+// fl-win64 が無ければ先頭に補う (addArts と同じ。本文の行が素材を明示していないときも既定の fl-win64 を取る)。
 export function bodyArtLine(body: string): string | null {
   const chars = Array.from(body ?? "");
   const lines = chars.slice(0, BODY_ART_CHARS).join("").split(/\r\n|\r|\n/);
@@ -63,20 +67,20 @@ export function bodyArtLine(body: string): string | null {
   if (last === null) return null;
   const names = last.slice(ART_PREFIX.length).trim().split(/\s+/).filter(Boolean);
   if (names.length === 1 && names[0] === "none") return ART_PREFIX + " none";
-  const keep = names.filter((a) => ALLOW_ARTS.includes(a));
+  const keep = [...new Set(names.filter((a) => ALLOW_ARTS.includes(a)))];
   if (keep.length === 0) return null;
-  const line = ART_PREFIX + " " + keep.join(" ");
+  const line = ART_PREFIX + " " + withFlWin64(keep).join(" ");
   return validateArtLine(line) ? line : null;
 }
 
 // 素材行 line に、allowlist 内の素材名 extra のうち、まだ無いものを足した行 (足すものが無ければ null)。
 // `none` は素材 0 件とみなして外す (none と他の名前は混在できない)。足すときは fl-win64 を先頭に補う (既定で取得されるのは fl-win64 のみ)。
+// extra に fl-win64 があって line に無い場合も、補った先頭と足す分で二重にしない (重複は除く)。
 export function addArts(line: string, extra: string[]): string | null {
   const names = line.replace(ART_PREFIX, "").trim().split(/\s+/).filter((a) => a && a !== "none");
   const add = extra.filter((a) => ALLOW_ARTS.includes(a) && !names.includes(a));
   if (add.length === 0) return null;
-  const head = names.includes("fl-win64") ? names : ["fl-win64", ...names];
-  const out = ART_PREFIX + " " + [...head, ...add].join(" ");
+  const out = ART_PREFIX + " " + [...new Set([...withFlWin64(names), ...add])].join(" ");
   return validateArtLine(out) ? out : null;
 }
 
