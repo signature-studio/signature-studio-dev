@@ -1,0 +1,8 @@
+# heap の 0x1000 ずれの切り分け。対象行: UStrAsg の dest=0x11f1148 (src が heap 領域)。
+# (1) 0bdd046d の shimx ビルドに HEAD の tools/shimx/src/heap.c だけを入れて再ビルドした unit 23
+  [m11][UStrAsg] dest=0x11f1148 src=0x1141aa30 old=0x0
+# (2) 0bdd046d の記録 (evidence_2533/probe_lasterr_shimx_trace_soft_fix.txt)
+  [m11][UStrAsg] dest=0x11f1148 src=0x1141aa30 old=0x0
+# (3) HEAD 8e6cb10e の実測 (probe_run1_shimx.txt)
+  [m11][UStrAsg] dest=0x11f1148 src=0x1142aa30 old=0x0
+# 結論: (1) は (2) と一致し、heap.c 単独では src は 0x1141aa30 のまま (0x1000 はずれない)。
