@@ -4,7 +4,7 @@
 フィールド + issue の open/closed。`docs/WORKFLOW.md` §3)。
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
-- 更新責任: merge の事実を反映する更新は agent も PR で行ってよい (自動更新は #2361)。方針の変更・MS の定義の改訂は PM。
+- 更新責任: merge の事実を反映する更新は agent も PR で行ってよい。自動節 (§5) は `tools/pm/status_sync.py` が更新する (#2361)。方針の変更・MS の定義の改訂は PM。
 - 測定値・実測数値は書かない。各リンク先 (`tools/<area>/REPORT.md`) が単一の正本。
 - 引き継ぎ情報は `docs/HANDOFF/2026-10-12.md`。
 
@@ -123,6 +123,78 @@
 3. **audio / gui の FLEngine 接続** — MS7/MS8。`tools/audio`・`tools/gui` の設計を runtime へ実装。
 4. **OpenCode Actions 基盤 (GitHub Actions)** — 2026-10-12 main 稼働開始 (PR #282, merge `bec32da`)。残 follow-ups は [CI-1] #284 で管理。
 5. **Issue/PR の整理** — `[AREA-n]` prefix 統一・`state:*` ラベル不使用 (PM 担当)。
+
+
+## 5. 直近の merge の要約 (自動)
+
+下の節 (`status-auto` マーカーの内側だけ) は `tools/pm/status_sync.py` が更新する。**手で編集しない**。
+直近 24 時間に main へ merge された PR を、MS またはサブシステムに写像した件数と代表 PR の番号だけを書く
+(測定値は書かない。正本は `tools/<area>/REPORT.md`)。写像できない PR は「その他」に件数だけ数える。
+
+<!-- status-auto:begin -->
+- 期間: (未実行)
+- merge 件数: (未実行)
+- updated: (未実行)
+<!-- status-auto:end -->
+
+## 6. 写像表 (`status_sync.py` が読む)
+
+PR → 対象の優先順: 紐づく issue (`Closes`/`Refs`/`Fixes #N`) の題名 `[AREA-n]` → PR 題名の AREA → ラベル →
+題名の `MS<数字>` → PR 題名の scope (`type(scope):`) → 本文の `MS<数字>` → その他。
+AREA は題名の `[...]` の先頭から最長一致で引く。`subsystems` は §3 の行名 (`scopes` の既定の照合先)。
+AREA 別の対応は `CI` `DOCS` `LGL` `E2E` を「その他 (CI/DOCS)」とする (#2360 の対応表を引き継ぐ)。
+
+<!-- status-map
+{
+  "ms": ["MS1", "MS2", "MS3", "MS4", "MS5", "MS6", "MS7", "MS8", "MS9", "MS10", "MS11", "MS12"],
+  "subsystems": [
+    "m1", "m2", "m3", "m5", "m11", "m11/alloca",
+    "m11/ldfix", "m11/shimx_link", "ott", "flelift", "flelift/boot", "liftlib",
+    "liftdiff", "icall", "icall/disp_size", "icall/landing", "shim", "shimx",
+    "shimx/pathreg", "startup", "startup/glue", "startup/keyfix", "startup/pump", "startup/vreg",
+    "startup/winstubs", "startup/helpviewer", "startup/loadpaths", "runtime", "hostbridge", "hostbridge/cb",
+    "hostbridge/h2", "hostbridge/lowbase", "hostbridge/nfo", "hostbridge/h10", "gui", "audio",
+    "audio/asio", "assets", "assets/wvfs", "python", "flp", "plugins",
+    "plugins/framework", "plugins/p0c", "shared", "ipp", "ipp/shim", "ipp/shim/fft",
+    "targets/serum2", "targets/serum2/license", "targets/massivex", "targets/massivex/dsp", "targets/kilohearts", "targets/kilohearts/license",
+    "targets/kilohearts/snapins", "targets/freshair", "targets/freshair/lift2", "e2e", "hosting", "legal/notices",
+    "deploy", "perf"
+  ],
+  "areas": {
+    "M11": "m11", "FLE": "flelift/boot", "LD": "liftdiff",
+    "ICALL": "icall", "LIFTLIB": "liftlib", "P0c": "plugins/p0c",
+    "PLG": "plugins", "PLG-F": "plugins/framework", "PLG-P0a": "plugins/framework",
+    "PLG-P0b": "plugins/framework", "SR": "targets/serum2", "FA": "targets/freshair",
+    "KH": "targets/kilohearts", "MX": "targets/massivex", "AU": "audio",
+    "GUI": "gui", "PY": "python", "T-SH": "shared",
+    "IPP": "ipp", "RT": "runtime", "HB": "hostbridge",
+    "SHX": "shimx", "ST": "startup", "PERF": "perf",
+    "OTT": "ott", "L": "flp", "H": "hosting",
+    "CI": "その他", "DOCS": "その他", "LGL": "その他",
+    "E2E": "その他"
+  },
+  "labels": {
+    "area:audio": "audio", "area:e2e": "その他", "area:flp": "flp",
+    "area:freshair": "targets/freshair", "area:fruity": "plugins", "area:gui": "gui",
+    "area:hostbridge": "hostbridge", "area:hosting": "hosting", "area:icall": "icall",
+    "area:ipp": "ipp", "area:kilohearts": "targets/kilohearts", "area:legal": "その他",
+    "area:liftdiff": "liftdiff", "area:liftlib": "liftlib", "area:m11": "m11",
+    "area:massivex": "targets/massivex", "area:ott": "ott", "area:perf": "perf",
+    "area:plugin": "plugins", "area:python": "python", "area:runtime": "runtime",
+    "area:serum": "targets/serum2", "area:sharedlib": "shared", "area:shimx": "shimx",
+    "area:startup": "startup", "area:vfs": "assets/wvfs"
+  },
+  "scopes": {
+    "ldfix": "m11/ldfix", "m11-ldfix": "m11/ldfix", "serum2": "targets/serum2",
+    "serum2-host": "targets/serum2", "freshair": "targets/freshair", "massivex": "targets/massivex",
+    "kilohearts": "targets/kilohearts", "kh": "targets/kilohearts", "p0c": "plugins/p0c",
+    "asio": "audio/asio", "nfo": "hostbridge/nfo", "hostbridge-nfo": "hostbridge/nfo",
+    "vreg": "startup/vreg", "actions": "その他", "workflow": "その他",
+    "ci": "その他", "pm": "その他", "pm-worker": "その他",
+    "watchdog": "その他", "docs": "その他"
+  }
+}
+-->
 
 
 更新 2026-10-14T11:53Z (基準 commit `9ea012b6` / origin/main)。対象期間 2026-10-13T06:13Z 以降の merge PR 1015 件 (REST `pulls?state=closed&base=main` の `merged_at`)。

@@ -120,14 +120,44 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 - `status=completed` は GitHub API の 1000 件上限があるため、本ツールは使わない (対象は実行中の 4 状態のみ)。
 - 件数が 100 件を超える状態の再現は、本 run ではできなかった (実行中 run が 50 件前後)。
 
-## 10. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
+## 10. PM Worker のコメント同期 (#2380)
+
+測定した commit: `7e8df56f` (コードを変えた最後の commit。main の #2332・#2418 を取り込んだ merge)。取得時刻は UTC (2026-10-14)。コメント件数の再測定は同期の実装と独立。
+
+コメント件数の再測定 (`GET /repos/<R>/issues/comments?sort=created&direction=desc&per_page=100` を `created_at` が窓の端に届くまで読む。本文は取らない):
+
+| 窓 | 取得時刻 | 窓内の件数 | ページ数 | 取得方法 |
+|---|---|---:|---:|---|
+| 3 時間 | 12:19Z | 1,145 | 12 | 全ページ |
+| 24 時間 | 12:20Z | 10,265 | 103 | 全ページ |
+| 48 時間 | 12:34Z | 12,321 | 124 | 窓の端をまたぐページを二分探索 |
+
+直近 24 時間が 48 時間の 83% を占める (件数が直近に集中して増えている)。PR は全 1,211 件 (12:17Z。`search/issues` の `total_count`)。§1 の 262 件 (2026-10-13 09:20Z) から約 27 時間で約 950 件増えたので、`state=all` の 30 ページ (3,000 件) は数日で上限に届く。
+
+実 API で `Engine.fullSync` を 1 回 (dry-run・メモリ store・GitHub へ書き込まない。認証は実装 App の installation token)。open issue 412〜414・open PR 10〜12:
+
+| `COMMENT_MAX_PAGES` | 所要 | REST 回数 (全体 / うちコメント) | `fresh` | `sync_truncated` |
+|---:|---:|---:|---|---|
+| 80 (コードの既定) | 80.7 s | 181 / 81 | false | `comments` pages=80 |
+| 150 (`wrangler.toml`) | 95.5 s | 202 / 102 | true | なし |
+
+- 既定の 80 ページでは 24 時間の窓に届かない (窓内 102〜103 ページ。窓は時間とともに動くので 1 ページ前後ずれる)。そのため `wrangler.toml` に `COMMENT_MAX_PAGES = "150"` を置いた。窓内の件数が 15,000 件を超えたら打ち切りになり、`/status` の `sync_truncated` に出る。
+- 窓内 10,265 件の読み取りは、最後の 103 ページ目が窓の端をまたぐので 103 回で終わる (「窓内の件数 / 100 の切り上げ」と一致。受入条件 5 の上限は + 1)。
+
+単体テスト (`cd infra/pm-worker && npm test`、Node 22.23、コミット済み `7e8df56f`): 97 件 PASS / 0 FAIL、11.3 s、load average 1.20 (main 側 81 + `test/sync.test.ts` 16)。
+ネガコン (merge 前の `1c33bdd2` で、実装を 1 か所だけ壊して `test/sync.test.ts` が落ちるか。落ちた件数): `fresh()` が打ち切りを見ない 9 / 上限の次の 1 ページを読まない 6 / 同時刻の comment id による比較をやめる 2 / コメントを昇順で読む 6 / watchdog が `fresh()` を見ない 3。元に戻すと 16 件 PASS。
+旧実装相当 (昇順・40 ページ・窓 48 時間) は 48 時間 12,000 件の fixture で古い側の 4,000 件しか読めず、2 時間前の `/oc` と最新の bot 報告が入らない (テスト (a))。
+
+測定 commit から HEAD までのコード差分: `git diff 7e8df56f HEAD -- infra/pm-worker/src infra/pm-worker/test` は出力なし (差分 0)。
+
+## 11. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
 
 既知類型との関係: 該当なし (lift の欠陥ではなく PM 運用ツール)。使い方と数え方の定義は [`README.md`](README.md) の `idle_report.sh` の節。
 
 - 測定 commit: `95b501b2` (コードを変えた最後の commit)。それ以降の `tools/pm/idle_report.sh` `tools/pm/test_idle_report.sh` の差分: `git diff 95b501b2 HEAD -- tools/pm/idle_report.sh tools/pm/test_idle_report.sh` の出力は 0 行。`f10dfd36` から `95b501b2` までの変更は説明文 (コメント・README) だけ (`git diff f10dfd36 95b501b2 -- tools/pm/idle_report.sh tools/pm/test_idle_report.sh` の非コメント行は 0 行)。
 - 環境: runner (4 コア)。load average は各測定の直後の `/proc/loadavg` の 1 分値。
 
-### 10-1. fake gh のテスト (`bash tools/pm/test_idle_report.sh`)
+### 11-1. fake gh のテスト (`bash tools/pm/test_idle_report.sh`)
 
 | 項目 | 結果 |
 |---|---|
@@ -151,7 +181,7 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 | 残量の検査を無効化 | 4 件 (e の全部) |
 | idle=0 で区間を閉じない | 3 件 (d の全部) |
 
-### 10-2. 実データの確認 (`signature-studio/signature-studio-dev` の REST)
+### 11-2. 実データの確認 (`signature-studio/signature-studio-dev` の REST)
 
 2026-10-14T13:04Z に取得 (測定 commit `95b501b2`)。`--since 2026-10-14T10:00:00Z --until 2026-10-14T12:30:00Z`・`--bucket` 既定 (day)・`--events` 既定 (3 event)。期間は run の作成時刻で切る。標本の時刻は `--until` を数分越えうる (例: run `38564218200` は作成 12:29:44Z で期間内、その標本は 12:30:26Z)。
 
@@ -168,7 +198,7 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
   通常の idle は 1 回 (127.12 分)・stuck 除外は 2 回 (15.8 分・32.68 分) で一致した。
 - この期間は oc:stuck の PR が残っており、通常の idle は 127 分連続で 0 にならなかった。stuck 除外の値で soak を判定する理由は README に書いた。
 
-### 10-3. 検証範囲・未解決
+### 11-3. 検証範囲・未解決
 
 確認範囲: `schedule` の run は実リポジトリで 5 件 (`actions/workflows/opencode.yaml/runs?event=schedule`: 2026-10-13 18:23Z・23:00Z、2026-10-14 01:48Z・06:47Z (cancelled)・12:29:44Z)。うち 12:29:44Z の run `38564218200` は実測期間に入り (作成 10:00〜12:30Z)、その watchdog job (`115852677230`) のログの idle 行 (12:30:26.96Z・`idle=1`) を読めた (標本 124 件に含む)。この標本は 12:27:49Z〜12:30:26Z の区間 (5 標本・2.62 分・不計数) の末尾。他の 4 件は実測期間の外で、ログは未確認。
 レート制限の中断と 1,000 件上限は fake gh でだけ確認した (実 API で残量を 1,500 未満にはしていない)。

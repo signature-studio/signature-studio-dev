@@ -17,6 +17,7 @@ mkdir -p "$R/docs" "$R/tools/x" "$R/src"
 printf '%s\n' '| `REPORT.md` (日本語) | **250 行** | 分割 |' > "$R/docs/DOC_MAP.md"
 for i in $(seq 1 250); do echo "line $i"; done > "$R/tools/x/REPORT.md"
 echo base > "$R/src/a.txt"
+printf '%s\n' '手書き A' '<!-- status-auto:begin -->' '- updated: old' '<!-- status-auto:end -->' '手書き B' > "$R/docs/STATUS.md"
 g add docs tools src && g commit -qm base
 
 pass=0 fail=0
@@ -99,10 +100,48 @@ echo 'see [WIN64] in docs/REFERENCES.md' >> "$R/src/a.txt"; commit_case n-entry-
 lint "$(body 'Closes #1\n')"
 { [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: [WIN64] のエントリ ID 参照" || ng "ネガ: [WIN64] のエントリ ID 参照 (rc=$RC)"
 
+SYNC_BODY='Closes #2\n\n| 受入 |\n|---|\n| 1 未達 |\n'
+sync_lint() { # sync_lint <題名>: 本文は Closes + 未達 (除外されなければ closes-unmet になる)
+  OUT="$(cd "$R" && OC_LINT_STRICT=1 bash "$SCRIPT" --base main --head HEAD --body-file "$(body "$SYNC_BODY")" --title "$1" 2>&1)"; RC=$?
+}
+T_SYNC='docs(status): sync merged PRs'
+
 new_case n-sync-exempt
-echo "sync" >> "$R/docs/STATUS.md"; commit_case n-sync-exempt
-OUT="$(cd "$R" && OC_LINT_STRICT=1 bash "$SCRIPT" --base main --head HEAD --body-file "$(body 'Closes #2\n\n| 受入 |\n|---|\n| 1 未達 |\n')" --title 'docs(status): sync 2026-10-14' 2>&1)"; RC=$?
-{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: docs(status): sync の STATUS のみ PR は (c) 対象外" || ng "ネガ: docs(status): sync の STATUS のみ PR は (c) 対象外 (rc=$RC)"
+sed -i 's/^- updated: old$/- updated: new/' "$R/docs/STATUS.md"; commit_case n-sync-exempt
+sync_lint "$T_SYNC"
+{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: docs(status): sync merged PRs で STATUS の自動節だけ変更は (c) 対象外" || ng "ネガ: docs(status): sync merged PRs で STATUS の自動節だけ変更は (c) 対象外 (rc=$RC)"
+sync_lint "$T_SYNC (2026-10-14)"
+{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: 題名が sync merged PRs で始まれば後続の文字列は問わない" || ng "ネガ: 題名が sync merged PRs で始まれば後続の文字列は問わない (rc=$RC)"
+
+new_case v-sync-outside
+sed -i 's/^- updated: old$/- updated: new/; s/^手書き B$/手書き B2/' "$R/docs/STATUS.md"; commit_case v-sync-outside
+sync_lint "$T_SYNC"
+{ [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "違反: 自動節の外 (1 行) も変えた STATUS は除外しない" || ng "違反: 自動節の外 (1 行) も変えた STATUS は除外しない (rc=$RC)"
+
+new_case v-sync-outside-eof
+sed -i 's/^- updated: old$/- updated: new/' "$R/docs/STATUS.md"; printf '\n' >> "$R/docs/STATUS.md"; commit_case v-sync-outside-eof
+sync_lint "$T_SYNC"
+{ [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "違反: 自動節の外に空行 1 つ足しただけでも除外しない" || ng "違反: 自動節の外に空行 1 つ足しただけでも除外しない (rc=$RC)"
+
+new_case v-sync-title
+sed -i 's/^- updated: old$/- updated: new/' "$R/docs/STATUS.md"; commit_case v-sync-title
+sync_lint 'docs(status): sync 2026-10-14'
+{ [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "違反: 題名が docs(status): sync merged PRs で始まらない" || ng "違反: 題名が docs(status): sync merged PRs で始まらない (rc=$RC)"
+
+new_case v-sync-other-file
+sed -i 's/^- updated: old$/- updated: new/' "$R/docs/STATUS.md"; echo "x" >> "$R/src/a.txt"; commit_case v-sync-other-file
+sync_lint "$T_SYNC"
+{ [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "違反: STATUS 以外のファイルも変える PR は除外しない" || ng "違反: STATUS 以外のファイルも変える PR は除外しない (rc=$RC)"
+
+new_case v-sync-marker
+sed -i '/^<!-- status-auto:end -->$/d; s/^- updated: old$/- updated: new/' "$R/docs/STATUS.md"; commit_case v-sync-marker
+sync_lint "$T_SYNC"
+{ [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "違反: 自動節のマーカーを消した STATUS は除外しない" || ng "違反: 自動節のマーカーを消した STATUS は除外しない (rc=$RC)"
+
+new_case v-sync-no-title
+sed -i 's/^- updated: old$/- updated: new/' "$R/docs/STATUS.md"; commit_case v-sync-no-title
+OUT="$(cd "$R" && OC_LINT_STRICT=1 bash "$SCRIPT" --base main --head HEAD --body-file "$(body "$SYNC_BODY")" 2>&1)"; RC=$?
+{ [ "$RC" = 1 ] && has_rule closes-unmet; } && ok "違反: --title が無ければ除外しない" || ng "違反: --title が無ければ除外しない (rc=$RC)"
 
 new_case n-prose-mention
 echo "x" >> "$R/src/a.txt"; commit_case n-prose-mention
