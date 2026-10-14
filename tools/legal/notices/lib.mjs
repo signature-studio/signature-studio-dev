@@ -131,7 +131,9 @@ export function validateFontAsset(c, { repoRoot = REPO } = {}) {
       continue;
     }
     if (!x.url.includes(f.commit ?? "\0")) p.push(`${x.name}: url が commit 固定でない`);
-    if (scriptText !== null && !scriptText.includes(x.sha256)) p.push(`${x.name}: sha256 が取得スクリプトの検証値に無い (registry と取得物が食い違う)`);
+    // 台帳 (fonts.tsv: file<TAB>url<TAB>sha256<TAB>face) の同名行で、名前と sha256 の対応を見る
+    const paired = (scriptText ?? "").split("\n").some((l) => { const c = l.split("\t"); return c[0] === x.name && c.includes(x.sha256); });
+    if (scriptText !== null && !paired) p.push(`${x.name}: sha256 が取得スクリプトの検証値に無い (台帳の同名行と食い違う。registry と取得物が食い違う)`);
     if (!allow.some((e) => e.sha256 === x.sha256 && e.reason)) p.push(`${x.name}: sha256 が release-guard の allowlist.json に無い (FL 同梱フォントと窓を共有するため公開物が guard で exit 6 になる)`);
   }
   return p;

@@ -51,6 +51,28 @@ json.dump(rec, open(f"{w}/records/lame-3.99.5.json", "w"), ensure_ascii=False)
 PY
 NOTICES_RECORDS_DIR="$W/records" expect_fail "記録に GPL フラグ" 1 "禁止フラグ --enable-gpl" node tools/legal/notices/cli.mjs check
 NOTICES_REGISTRY="$W/registry-uncovered.json" expect_fail "build.sh が registry に無い (oss/ffmpeg)" 1 "oss/ffmpeg/build.sh: OSS 再ビルドスクリプトが registry の coveredBy に無い" node tools/legal/notices/cli.mjs check
+python3 - "$W" <<'PY'
+import json, os, sys
+w = sys.argv[1]
+rel = lambda p: os.path.relpath(p, ".")
+rows = open("tools/gui/test/fonts.tsv", encoding="utf-8").read().splitlines()
+def registry_with(name, comp, ledger_rows):
+    p = f"{w}/{name}.tsv"; open(p, "w", encoding="utf-8").write("\n".join(ledger_rows) + "\n")
+    r = json.load(open("tools/legal/notices/registry.json"))
+    for c in r["components"]:
+        if c["id"] == comp: c["coveredBy"] = ["tools/gui/test/fetch_fonts.sh", rel(p)]
+    json.dump(r, open(f"{w}/registry-{name}.json", "w"), ensure_ascii=False)
+registry_with("ledger-sha", "open-sans", [l.replace(l.split("\t")[2], "0" * 64) if l.startswith("OpenSans-Regular.ttf\t") else l for l in rows])
+registry_with("ledger-row", "barlow", [l for l in rows if not l.startswith("Barlow-Regular.ttf\t")])
+r = json.load(open("tools/legal/notices/registry.json"))
+bs = next(c for c in r["components"] if c["id"] == "barlow")["fontAsset"]["files"][0]["sha256"]
+for c in r["components"]:
+    if c["id"] == "open-sans": c["fontAsset"]["files"][0]["sha256"] = bs
+json.dump(r, open(f"{w}/registry-swap.json", "w"), ensure_ascii=False)
+PY
+NOTICES_REGISTRY="$W/registry-ledger-sha.json" expect_fail "台帳の sha256 を壊す (open-sans・fonts.tsv 側)" 1 "OpenSans-Regular.ttf: sha256 が取得スクリプトの検証値に無い" node tools/legal/notices/cli.mjs check
+NOTICES_REGISTRY="$W/registry-ledger-row.json" expect_fail "台帳から行を消す (barlow・fonts.tsv 側)" 1 "Barlow-Regular.ttf: sha256 が取得スクリプトの検証値に無い" node tools/legal/notices/cli.mjs check
+NOTICES_REGISTRY="$W/registry-swap.json" expect_fail "sha256 の取り違え (open-sans に barlow の sha256)" 1 "OpenSans-Regular.ttf: sha256 が取得スクリプトの検証値に無い" node tools/legal/notices/cli.mjs check
 mkdir -p "$W/empty"; echo "<html>" > "$W/empty/index.html"
 expect_fail "NOTICES の無い成果物" 1 "THIRD_PARTY_NOTICES.txt が成果物に無い" node tools/legal/notices/cli.mjs check --artifact "$W/empty"
 if [ -n "$WASM" ]; then
