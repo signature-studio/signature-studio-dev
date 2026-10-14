@@ -99,7 +99,17 @@ def legacy_p1(text, quiet=True):
         inserts[idx] = (opx, repl)
     stats['inserted'] = len(inserts)
     stats['hits'] = dict(hits)
-    # apply
+    # repmap は挿入前の行番号 j で登録されているため, 挿入前の原行 lines[j] に適用してから挿入する (#3067)。
+    # 旧名は % 無し (cf.N)・新名は % 付き (%pcNcf) なので, 旧名は % 付き・後続文字の境界付きで置換する。
+    repmap = {}
+    for (idx, repl) in inserts.values():
+        for (j, old, new) in repl:
+            repmap.setdefault(j, []).append((old, new))
+    for j, repls in sorted(repmap.items()):
+        ln = lines[j]
+        for (old, new) in repls:
+            ln = re.sub(r'%' + re.escape(old) + r'(?![\w.\-])', lambda _m, n=new: n, ln, count=1)
+        lines[j] = ln
     out = []
     for i, l in enumerate(lines):
         if i in inserts:
@@ -108,15 +118,6 @@ def legacy_p1(text, quiet=True):
             out.append(l)
         else:
             out.append(l)
-    repmap = {}
-    for (idx, repl) in inserts.values():
-        for (j, old, new) in repl:
-            repmap.setdefault(j, []).append((old, new))
-    for j, repls in sorted(repmap.items()):
-        ln = out[j]
-        for (old, new) in repls:
-            ln = ln.replace(old, new, 1)
-        out[j] = ln
     return '\n'.join(out), stats
 
 
