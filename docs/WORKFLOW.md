@@ -38,7 +38,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                ├ push -u origin <N>-<slug>        │
    │                                ├ gh pr create --base main         │
    │                                ├ gh issue comment N (進捗・実測)   │
-   │                                └ Status → In review を依頼 ────────┤
+   │                                └ ready PR を出して依頼 ───────────┤
    │                                                                   ├ 自分の worktree で
    │                                                                   │  PR branch を checkout
    │                                                                   ├ e2e 独立再実行 + 別算法検算
@@ -49,7 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
-- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度・Status は PM が確定する)。
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度は PM が確定する。Project の Status は参考で、§3)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
@@ -62,9 +62,9 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 役割 | 着手時 | 完了時 | 禁止 |
 |---|---|---|---|
-| 実装 subagent | In progress | **In review** (自分を Done にしない) | Done への変更・他チケットの Status 変更 |
-| 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定 | merge・方針変更・是正 | — |
+| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更 |
+| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge・方針変更・是正 | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
@@ -82,20 +82,36 @@ PM (main)                      subagent (実装)                  subagent (検�
   `gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`
   起票の直前にもう一度、`gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -cF '[<AREA>-<n>]'`
   が 0 になることを確認する (番号の重複を作らない)。② 本文に `親: #N`・受入条件・
-  必要な `oc_artifacts:` 行を書く。③ milestone・優先度・Project の Status は PM が確定する (subagent は触らない)。
+  必要な `oc_artifacts:` 行を書く。③ milestone・優先度は PM が確定する (subagent は触らない。Project の Status は参考のため触らない)。
   ④ 起票した番号を、最終回答と issue コメントに書く。
-- **チケット状態の唯一の正は Project V2 の Status フィールド + issue の open/closed**
-  (技術進捗の正本は `docs/STATUS.md`)。不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
+- **チケット状態の正は issue の open/closed + ラベル + PR の状態** (技術進捗の正本は `docs/STATUS.md`)。
+  open な issue は次の表のどれかに分類する。語は `/status` (PM Worker) と `tools/pm/launch_issues.py plan` が出すもので、新しい語は作らない。
+  上から順に判定し、最初に当たったものが分類になる。
+
+| 分類 | 判定 (GitHub の事実) | 意味・次の一手 |
+|---|---|---|
+| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 依頼者の回答・適用待ち。自動着手しない |
+| `blocked` | open な blocked_by (issue dependencies) がある、本文の依存行 (`依存:`・`blockedBy:` など) が open な issue を指す、`tools/pm/manual_deps.json` の依存 (停止報告に根拠のあるもの) が open、または子 issue を持つ親で PR が無い | blocker が close されるまで着手しない |
+| `started` (着手済み) | open PR が `N-<slug>` ブランチか `Closes/Refs/Fixes #N` で紐づく、または実装 run が稼働中 | 実装・レビュー・修正の途中。二重に着手しない |
+| `stopped` | 直近 24 時間以内の bot の最後のコメントが停止報告で、再投入の素材が無い、または再投入の上限 (2 回) に達した | PM の判断待ち |
+| `ready` | 上のどれにも当たらない (未着手・非ブロック) | 次の `launch` の対象 |
+
+- 停止報告の窓は **24 時間**。24 時間を過ぎた停止報告は `stopped` にならず、`ready` 扱いで次の `launch` の対象になる (`classify` の窓は `launch_issues.py` と Worker で同じ)。
+- `pm-apply` の issue は、Worker の `plan()` が着手も再投入もせず `user` 行に置く (`oc:no-pr` の有無に依らない)。
+- `recent` (`/oc` の投稿から 3 時間以内で報告がまだ無い、または bot のコメントから 1.5 時間以内) は着手直後の待ちとして `started` と同様に扱う。
+  `relaunch` (停止報告の素材名で再投入する候補) は `plan` の一時分類。`oc:stuck` の PR は着手数の律速に数えない。
+- **Project V2 の Status は参考**。VM の `tools/pm/sync_status.py` が動いている間だけ同期し、VM 退役後は更新されない。
+  判断の根拠にしない (根拠: #2353 の PM 判断)。
 - **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
 - **1 状態遷移 = 1 コメント**。コメントなしの状態変更は禁止。
-- **Status を変えるのは PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
-- **中断・ブロックで終了する場合**: Status は In progress のまま、中断コメント (到達点・WIP 所在・再開手順) を残し、
-  最終回答の冒頭に「未完・In Progress のまま」と明記。
+- **分類を変えるラベル (`needs-user-input`・`pm-apply`・`oc:stuck`・`oc:no-pr`) と milestone の変更は PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
+- **中断・ブロックで終了する場合**: issue は open のまま (分類は `started` か `stopped`)。中断コメント (到達点・WIP 所在・再開手順) を残し、
+  最終回答の冒頭に「未完・open のまま」と明記。
 
 ## 4. 着手前の確認 (毎回・省略不可)
 
 1. `gh issue view <N>` でスコープ・受入条件・親 issue・検証方法を確認。
-2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
+2. 同一チケット / 同一 dir に open PR (`started`) か稼働中の実装 run があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
    **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D23 と `tools/icall/REPORT.md` §4 の D1〜D13 は
@@ -289,7 +305,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
     reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
     必ず走らせられる。この変更は App に `workflows` 権限が無く
-    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した。
+    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した (現行の運用は下の「workflow 変更の運用」)。
     COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
     (Copilot の review は来ないことがあり、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
@@ -366,6 +382,25 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
   IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
   着手報告だけで終わった実装 run は `find_silent_runs.sh` で検出する。
+
+### workflow 変更の運用 (VM 退役後の凍結・`pm-apply`)
+
+実装 App には `workflows` 権限が無く、agent は `.github/workflows/` を push できない。これまでは PM の PAT で
+PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次の運用に置き換える (判断: 2026-10-14、#2319。運用の正本はこの節)。
+
+- **(a) 凍結**: VM 退役後は `.github/workflows/` の変更を凍結する。ロジックは `.github/scripts/`・`.github/prompts/` に寄せ、workflow は薄い配線に保つ。
+- **(b) 依頼**: 変更が必要になったら、issue に `pm-apply` と `needs-user-input` を付け、`git apply` できる unified diff をコメントに書いて止まる。diff は `.github/workflows/` の変更だけにする。PM agent は `pm-apply` を付けられない (許可ラベル外。`.github/prompts/pm.md`)。その場合は `needs-user-input` だけを付けて依頼者へ渡し、依頼者が `pm-apply` を付ける。
+- **(c) 適用 (依頼者が手元で行う)**: 依頼者は diff の内容 (特に `permissions:` と `secrets.*` の参照) を確かめてから、コメントの diff を `diff.patch` に保存し、次を実行する。merge は reviewer App が行うため、PAT は要らない。
+
+  ```sh
+  git fetch origin main && git switch -c <N>-workflow origin/main && git apply diff.patch
+  git add .github/workflows && git commit -m "ci: <要旨>" -- .github/workflows
+  git push -u origin HEAD
+  gh pr create --base main --title "ci: <要旨>" --body "Closes #<N>"
+  ```
+
+- **(d) App に `workflows` 権限を足さない理由**: 足すと、検査 (review) を通らない workflow 変更を agent が作れ、`OC_APP_PRIVATE_KEY`・`OC_REVIEW_APP_PRIVATE_KEY`・`OC_AUTH_EXPORT`・`CF_R2_*` などの secrets を読む workflow を書けてしまう。検査を迂回する経路が 1 つでもあれば、secrets の持ち出しに直結する。足す場合の条件は、org owner の承認と、workflow 変更を機械的に検査してから適用する設計の両方が揃うこと。経緯は #2352 (staged-apply、不採用)。
+- **退役の条件**: VM の timer・PAT・keyring を止める前に、open の `pm-apply` の issue が 0 件であること (確認: `gh api "repos/<R>/issues?labels=pm-apply&state=open" --jq length`)。
 
 
 ## 12. 依頼者不在時の運用 (needs-user-input・assume-and-proceed)
