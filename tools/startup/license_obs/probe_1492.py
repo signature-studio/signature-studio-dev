@@ -7,11 +7,12 @@ probe_1220.py (線形走査) との違い:
     callee の戻り値 (rax のタグ) は呼出し元へ返す。
 限界 (未網羅・件数を結果 JSON の untraced に出す): 間接 call・間接 jmp (jump table)・.pdata 外への jmp・
 スタック渡し引数 (push したタグ)・深さ上限 (DEPTH_MAX)・callee 再帰。
-usage: python3 probe_1492.py [--write] [--no-slot] [--no-callee]  (環境変数 PROBE_DEPTH で callee 深さ上限)
+usage: python3 probe_1492.py [--write] [--no-slot] [--no-callee] [--no-rec-summary]  (環境変数 PROBE_DEPTH で callee 深さ上限)
   --no-slot: スタック退避の伝播を止める (ネガティブコントロール。退避経由は 0 件になるはず)
   --no-callee: callee 越しを止める (callee 越しの寄与を見る比較用)
+  --no-rec-summary: 再帰打切り (approx) の要約を空にする (アブレーション。再帰要約の寄与を見る比較用)
 """
-import json, os, re, sys, time
+import json, os, re, struct, sys, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from peidx import Image, rip_target  # noqa: E402
@@ -19,8 +20,10 @@ from scan_consumers import GSLOT, GOFF, VOLATILE  # noqa: E402
 from probe_1220 import parse_mem, canon, is_r64, rip_target_of, ARGREGS, run_func  # noqa: E402
 
 DEPTH_MAX = int(os.environ.get('PROBE_DEPTH', '30'))
+INDIRECT_RIP = re.compile(r'^qword ptr \[rip ([+-]) 0x[0-9a-f]+\]$')
 HEXIMM = re.compile(r'^0x[0-9a-f]+$')
 EMPTY = frozenset()
+NO_REC = '--no-rec-summary' in sys.argv
 
 
 def direct_imm(x):
@@ -161,11 +164,34 @@ class Az:
         self.hi = {lo: hi for lo, hi in im.funcs if im.text_lo <= lo < im.text_hi}
         self.dis = {}
         self.memo = {}
+        self.approx = {}
         self.inprog = set()
         self.depth = 0
         self.lims = set()
         self.unreach = {}
         self.stat = {'join_edges': 0, 'join_disagree': 0, 'join_new': 0}
+        self.written = self._refs()
+
+    def _refs(self):
+        refs = set()
+        for lo in self.hi:
+            for x in self.fn(lo):
+                if x.mnemonic == 'call':
+                    continue
+                t = rip_target(x)
+                if t is not None:
+                    refs.add(t)
+                refs.update(int(h, 16) for h in re.findall(r'0x[0-9a-f]+', x.op_str))
+        return refs
+
+    def static_slot_target(self, x):
+        if x.mnemonic != 'call' or not INDIRECT_RIP.match(x.op_str):
+            return None
+        slot = rip_target(x)
+        if slot in self.written:
+            return None
+        val = struct.unpack('<Q', self.im.read(slot, 8))[0]
+        return val if val in self.hi else None
 
     def fn(self, lo):
         if lo not in self.dis:
@@ -281,6 +307,10 @@ class Az:
             evs.append({'ev': 'passed', 'va': va, 'why': r, 'origins': sorted(t)})
         tgt = direct_imm(x)
         if tgt is None:
+            tgt = self.static_slot_target(x)
+            if tgt is not None and sig:
+                evs.append({'ev': 'static-indirect', 'why': 'slot', 'va': va, 'target': tgt})
+        if tgt is None:
             if sig:
                 evs.append({'ev': 'untraced', 'why': 'indirect-call-with-tag', 'va': va})
             self.lim('indirect-call', va)
@@ -294,10 +324,13 @@ class Az:
             pass
         elif self.depth >= DEPTH_MAX:
             evs.append({'ev': 'untraced', 'why': 'depth', 'va': va})
-        elif (tgt, frozenset(sig.items())) in self.inprog:
-            evs.append({'ev': 'untraced', 'why': 'recursive', 'va': va})
         else:
-            cev, rax = self.analyze(tgt, sig)
+            key = (tgt, frozenset(sig.items()))
+            if key in self.inprog:
+                evs.append({'ev': 'approx', 'why': 'recursive', 'va': va})
+                cev, rax = ([], EMPTY) if NO_REC else self.approx.get(key, ([], EMPTY))
+            else:
+                cev, rax = self.analyze(tgt, sig)
             for e in cev:
                 ne = dict(e)
                 ne['via'] = (va,) + tuple(e.get('via', ()))
@@ -313,17 +346,17 @@ def is_escaped_byte(e):
     return e.get('ev') in ('gcp_byte', 'gcp_other') and e.get('origin') != 'd'
 
 
-def main(use_slot, use_callee):
-    t0 = time.time()
-    im = Image()
-    az = Az(im, use_slot, use_callee)
-    roots = [lo for lo in az.hi if az.has_gs(lo)]
-    new_keys, new_direct, new_via, fns = {}, set(), set(), {}
+def one_pass(az, roots):
+    az.memo = {}
+    az.unreach = {}
+    az.lims = set()
+    az.stat = {'join_edges': 0, 'join_disagree': 0, 'join_new': 0}
+    new_keys, new_direct, new_via = {}, set(), set()
     untr = {}
     rec_roots = 0
     for lo in roots:
         evs, _ = az.analyze(lo, {})
-        if any(e['ev'] == 'untraced' and e['why'] == 'recursive' for e in evs):
+        if any(e['ev'] == 'approx' and e['why'] == 'recursive' for e in evs):
             rec_roots += 1
         for e in evs:
             if e['ev'] == 'untraced':
@@ -336,6 +369,26 @@ def main(use_slot, use_callee):
                 new_via.add(k)
             else:
                 new_direct.add(k)
+    sig = frozenset((k, rax, frozenset(keyof(e) for e in evs if is_escaped_byte(e)))
+                    for k, (evs, rax) in az.memo.items())
+    return new_keys, new_direct, new_via, untr, rec_roots, sig
+
+
+def main(use_slot, use_callee):
+    t0 = time.time()
+    im = Image()
+    az = Az(im, use_slot, use_callee)
+    roots = [lo for lo in az.hi if az.has_gs(lo)]
+    prev = None
+    az.converged = False
+    for it in range(1, 33):
+        new_keys, new_direct, new_via, untr, rec_roots, sig = one_pass(az, roots)
+        if sig == prev:
+            az.converged = True
+            break
+        prev = sig
+        az.approx = dict(az.memo)
+    az.iters = it
     t_new = time.time() - t0
     lin_keys, lin_fn = set(), set()
     for lo in roots:
@@ -360,6 +413,8 @@ def main(use_slot, use_callee):
         'join': dict(az.stat),
         'callee_tagged_pairs': sum(1 for (_, ent) in az.memo if ent),
         'roots_reaching_recursive': rec_roots,
+        'fixpoint': {'iters': az.iters, 'converged': az.converged},
+        'static_slot_calls': sum(1 for lo in az.hi for x in az.fn(lo) if az.static_slot_target(x)),
         'limits': {w: sum(1 for why, _ in az.lims if why == w) for w in sorted({w for w, _ in az.lims})},
         'untraced_events': untr,
         'elapsed_s': round(t_new, 2),
@@ -395,9 +450,9 @@ if __name__ == '__main__':
             'untraced_tagged_indirect_call': sorted({(f'0x{e["fn"]:x}', f'0x{e["va"]:x}') for lo in az.hi if az.has_gs(lo)
                                                      for e in az.analyze(lo, {})[0]
                                                      if e['ev'] == 'untraced' and e['why'] == 'indirect-call-with-tag'}),
-            'untraced_tagged_recursive_call': sorted({(f'0x{e["fn"]:x}', f'0x{e["va"]:x}') for lo in az.hi if az.has_gs(lo)
-                                                      for e in az.analyze(lo, {})[0]
-                                                      if e['ev'] == 'untraced' and e['why'] == 'recursive'}),
+            'approx_recursive_call': sorted({(f'0x{e["fn"]:x}', f'0x{e["va"]:x}') for lo in az.hi if az.has_gs(lo)
+                                             for e in az.analyze(lo, {})[0]
+                                             if e['ev'] == 'approx' and e['why'] == 'recursive'}),
         }
         with open(os.path.join(out, 'escaped_1492.json'), 'w') as f:
             json.dump(dump, f, indent=1, ensure_ascii=False)
