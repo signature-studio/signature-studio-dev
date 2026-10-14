@@ -58,3 +58,66 @@ load average は測定中 0.73 前後。`check_682.py` は HEAD では未実行�
 | 採取手段の候補 (未着手): (a) `m11_ov.c` の C 版 (`M11_FIX_535BF2=1`) の内部で `tbl`・`cnt` を stderr に出す (C 側は wasm local を直接読める)、(b) trap 直前の `i32.load` の address を `m11_survey.mjs` の catch で wasm memory から逆算する | 同上 | #1426 の範囲 (次 run) |
 
 「#1426 (継続)」は、#1602 の残作業を #1426 (M11-N91) が保持している既存の起票先である。§12 の実値採取の計画もこの起票先に登録されている。
+
+## 14. 再試行 (#1602 r2, 2026-10-14, n=1)
+
+測定 commit `0d9b5385` (origin/main、本 PR の作業ベース。コード変更なし)。素材 fl-win64・toolchain-retdec ([RETDEC])・toolchain-emsdk・work-m11・work-liftdiff を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64`。load average は開始時 1.03。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490733 行、F1=902 errors=0) | 46.9 秒 |
+| `m11_build.sh` (既定) | rc=0 | 23.3 秒 |
+| `m11_survey.mjs` (既定) | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 15.2 秒 |
+| `check_682.py` (既定、`M11_SURVEY_UNITS` の JSON を渡す) | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) | - |
+
+計測 hook (`M11_FIX_535BF2=1` で `function_535bf2` 内の範囲チェック付き読取り、`function_410b10` の hook) を入れた版の結果は次のとおり。
+
+| build | survey | check_682 | `[1602]` 行 | 備考 |
+|---|---|---|---|---|
+| FIX=1, INSTR=0 | ok 870 / trap 24 | 2/5 | - | 対照 |
+| FIX=0, INSTR=0 | ok 870 / trap 24 | 2/5 | - | 既定 |
+| FIX=1, INSTR=1, 410b10 hook = 空関数 | ok 872 / trap 22 | 4/5 (304=ok 555=ok 923=trap) | 0 | 同一 build を 3 回 survey し、3 回とも同じ |
+| FIX=1, INSTR=1, 410b10 hook = 範囲チェック付き読取り | ok 870 / trap 24 | 2/5 | 0 | 同一 build を 2 回取り直し、2 回とも同じ |
+
+- **判定を変えているのは読取り値ではない**。どちらの版も `[1602]` 行は 0 件で、範囲外の読みは起きていない。空関数版と読取り版の差は hook の本体だけで、それがコンパイル後のコードを変えて 304・555 の判定が変わったと見るのが妥当 (機構は未確認)。
+- **よって受入 1・2 の実値はこの方式でも採れていない**。範囲内なので値は読めたはずだが、ログに出す条件 (範囲外のときだけ出す) に一度も当たらず、実値は出力されない。実値を見るには「範囲内でも常に出す」版が要る。
+- trap 位置 (`M11_SURVEY_STACK=304,923,555`、既定 build、wasm 関数名は `m11_wasmnames.py`): 304 と 555 の先頭フレームは `function_535bf2` (wasm 3372)、923 は `function_410b10` (wasm 14900)。OOB がこの 2 関数で起きることを確認した。
+- 計測 patch: `trap_triage/ov_1602_probe_r2.patch` (`git apply --check` は本ツリーで通る)。`m11_build.sh` と `m11_ov.c` の 2 ファイル。本体には入れていない。前の `ov_1602_probe.patch` は現行 main に当たらないため、そのまま残す (旧版として扱う)。
+
+### 判定 (r2)
+
+受入 1・2 は**未達のまま**。受入 3 (回帰 0) は既定 build で ok 870 / trap 24 / noproc 1 / miss 47、check_682 2/5 を確認 (前 run と一致)。
+
+### 未解決 (r2)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 範囲内でも常に値を出す計測版での 304・555・923 の実値採取 (現行は範囲外のときだけ出すため値が出ない) | 受入 1・2 が未達 | #1426 (継続) |
+| 410b10 の hook 本体の違い (空関数 / 読取り) で 304・555 の判定が 872/22 ↔ 870/24 と変わる機構が未特定 | 計測の影響を判定に使えない | #1426 (継続) |
+
+## 15. 範囲内でも常に出す計測版 (#1602 r3, 2026-10-14, n=1)
+
+測定 commit `27a324e0` (origin/main、コード変更なし)。素材 fl-win64・toolchain-retdec・toolchain-emsdk・work-m11 を展開。`FL_WIN64_DIR=$RUNNER_TEMP/ws1602/fl-win64` (`extracted/` の親を指定)。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` | rc=0 (`boot_final.ll` 490733 行、F1=902 errors=0) | 33.0 秒 |
+| `m11_build.sh` (既定) | rc=0 (`undefined symbol: 0`) | 18.7 秒 |
+| `m11_survey.mjs` (既定) | rc=0 / ok 870 / noproc 1 / miss 47 | 8.7 秒 |
+
+計測版 (`ov_1602_probe_r3.patch`: `function_535bf2` と `function_410b10` の入口で、範囲内でも必ず 1 行出す。`#define M11_PROBE_1602 1` を入れたとき) の結果:
+
+| build | survey | `[1602]` 行 | 備考 |
+|---|---|---|---|
+| 既定 | ok 870 / trap 24 / miss 47 | - | 対照 |
+| `M11_PROBE_1602=1` (範囲内でも常に出す) | ok 837 / trap 43 / miss 61 | 0 | `wasm-ld` が `undefined symbol: 1` を出す (原因未確認) |
+
+- 計測版は判定を大きく変える (870 → 837、trap 24 → 43)。`[1602]` 行が 0 件なので、ログ出力そのものは実行されていない、もしくは出力が survey の捕捉から漏れている。どちらかは未確認。
+- したがって、この計測版では受入 1・2 の値は採れていない。受入 3 (計測の影響なし) も満たさない。
+- r2 の patch (`ov_1602_probe_r2.patch`) は現行 main に当たらない (`m11_build.sh` の CF 行が変わっている)。r3 の patch は `m11_ov.c` 単体で、`27a324e0` に対して作成。
+- 候補 (b) (trap address の逆算) は未着手。survey の catch で受け取る RuntimeError に faulting address が含まれるかは未確認。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 計測版で判定が 870 → 837 に動く機構 (`undefined symbol: 1` と `[1602]` 0 件の原因を含む) | 受入 1・2 が未達 | #1426 (継続) |
+| 候補 (b) trap address の逆算の実現性 (RuntimeError の address の有無) | 受入 1・2 が未達 | #1426 (継続) |

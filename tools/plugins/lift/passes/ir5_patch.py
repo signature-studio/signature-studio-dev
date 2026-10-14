@@ -648,14 +648,14 @@ def _find_store_srcs(block):
     return m
 
 
-ASM_STORE_CALL = r"^  call void @__asm_(?:movups|movaps|movdqa)(?:__\d+|\.\d+)?\.?(?:__)?\d*\(i128 (%[\w.\-]+), i128 (%[\w.\-]+)\)(?: .*)?$"
+ASM_STORE_CALL = r"^  call void @__asm_(?:movups|movaps|movdqa|movntps)(?:__\d+|\.\d+)?\.?(?:__)?\d*\(i128 (%[\w.\-]+), i128 (%[\w.\-]+)\)(?: .*)?$"
 
 
 def lower_asm_store(blocks):
     """[S1a] `call void @__asm_movups*(load値, 値)` を store へ復元。名前は
     RetDec の overload 接尾 (`.2` / R1 名寄せ後 `__2`) の両方を許容。"""
     n = 0
-    pat = re.compile(r"^  call void @__asm_(?:movups|movaps|movdqa)(?:__\d+|\.\d+)?\(i128 (%[\w.\-]+), i128 (%[\w.\-]+)\)(?: .*)?$")
+    pat = re.compile(r"^  call void @__asm_(?:movups|movaps|movdqa|movntps)(?:__\d+|\.\d+)?\(i128 (%[\w.\-]+), i128 (%[\w.\-]+)\)(?: .*)?$")
     for name, body in list(blocks.items()):
         lines = body.split("\n")
         srcs = _find_store_srcs(body)

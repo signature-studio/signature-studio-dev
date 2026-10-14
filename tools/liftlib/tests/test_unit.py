@@ -785,7 +785,7 @@ def t24():
         assert "getelementptr inbounds i8, ptr @__icall_blk, i64 %d" % off in out, off
     for v in (blk + 0x200, blk - 1):
         assert "inttoptr i64 %d to ptr" % v in out, v
-    decl = "@__icall_blk = internal global [512 x i8] zeroinitializer, align 16"
+    decl = "@__icall_blk = external global [512 x i8], align 16"
     assert out.count(decl) == 1
     assert out.index(decl) < out.index("declare i64 @function_1000"), out
     far = "\n".join(["define i64 @function_1001() {", "entry:",

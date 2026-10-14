@@ -205,6 +205,40 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 
 ### 10-3. 未達 (本 run の範囲外)
 
-- canvas 側の純粋仮想 159 関数 (16 files) の wasm 実装、リンク、描画、`XferOnOffButton` の .text 対応付け (Ghidra が要る)。
-- 起票先: #2029 ([SR-31])。
+| 未達 | 起票先 |
+|---|---|
+| canvas 側の純粋仮想 103 関数 (6 files) の wasm 実装 (受入条件 1 の残り) | #2064 ([SR-35]) |
+| `CTextLabel` 系 + `XferOnOffButton` 1 view の canvas 描画 (受入条件 2 の残り) | #2065 ([SR-36])・前提 #2064 |
+| `XferOnOffButton` の .text 対応付けと本体バイト数 (受入条件 3 の残り) | #2066 ([SR-37]) → §15 で完了 |
+
+- 親 #2029 ([SR-31]) は、上記 3 件へ未達の受入条件を移したうえで範囲を縮めた。
 - 測定 commit: 本 §10 と `vtable_measure.py`・`check_wasm_syntax.sh` を追加した commit (PR 本文参照)。
+
+## 11. 2026-10-14 run (#2064 / SR-35): canvas platform の wasm 実装 (部分)
+
+- 範囲: §6 の 103 関数 (6 files) のうち、依存が閉じる 2 files (bitmap 7・graphicspath 13 = 20 関数) を実装。残り 4 files (font 7・graphicsdevice 31・frame 25・factory 20 = 83 関数) は子 issue へ分割。
+- 実装: `gui/canvas/canvas_bitmap.{h,cpp}`・`gui/canvas/canvas_graphicspath.{h,cpp}`。bitmap は RGBA8 の連続メモリ、graphicspath は頂点列保持。楕円・円弧・テキスト輪郭は PoC の近似 (正確な曲線・文字輪郭は未実装)。
+- 検証: `gui/canvas/check_canvas_syntax.sh` (em++ `-fsyntax-only`、`-D__linux__` 補正なし)。bitmap rc=0 errors=0、graphicspath rc=0 errors=0。`check_wasm_syntax.sh` (seed 6) rc=0 errors=0 を維持。
+- 未検証: リンク・実行・描画 (受入条件 2 の範囲外、#2065)。閉包が実際に要求する関数はリンク時に確定させる (§6 の注記どおり)。
+- 測定 commit: `38072d4a` (コードを変えた最後の commit)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| canvas 側 font 7・graphicsdevice 31・frame 25・factory 20 (計 83 関数) の wasm 実装 | 描画の閉包が完結しない | 子 issue (親 #2064) |
+
+## 12. 2026-10-14 run (#2109 / SR-40): canvas の frame 実装 (factory は子 #2139 へ)
+
+- 詳細・実測・検証 (frame 実装と初回の include 不足の対策): 付録 `REPORT_EFFORT_APPENDIX_2109.md` (本節の全文)。
+
+## 13. 2026-10-14 run (#2107 / SR-39): canvas platform の font・graphicsdevice (wasm)
+
+- 結論: font 7 + graphicsdevice 31 (計 38 関数) を wasm 実装。構文検査は測定 commit `89495465` で 5/5 rc=0、具象性検査 (`check_concrete.cpp`) rc=0。リンク・閉包確定・描画は未実施 (#2065)。
+- 詳細・実測・測定 commit と差分: 付録 `REPORT_EFFORT_APPENDIX_2107.md` (本節の全文)。
+
+## 14. 2026-10-14 run (#2139 / SR-42): canvas platformfactory (wasm)
+
+- 結論: factory 20 関数 (`IPlatformFactory`) を wasm 実装。`check_canvas_syntax.sh` 6 files・`check_wasm_syntax.sh`・`check_concrete.cpp` すべて rc=0 errors=0 (測定 commit `e5ba8809`)。リンク・描画は未実施 (#2065)。
+- 詳細・実測・前提の解決 (`platformfwd_emscripten.patch` と `VSTGUI_OPENGL_SUPPORT 0`): 付録 `REPORT_EFFORT_APPENDIX_2139.md` (本節の全文)。
+
+## 15. 2026-10-14 run (#2066 / SR-37): XferOnOffButton の .text 対応付けと本体バイト数
+- 詳細・実測・測定スクリプト: 付録 `REPORT_EFFORT_APPENDIX_2066.md` (本節の全文)。

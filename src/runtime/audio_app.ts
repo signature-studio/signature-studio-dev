@@ -127,6 +127,8 @@ export interface ToneCheck {
   fill_at_first_underrun: number;
   /** 最初の underrun までの 32 quantum 内の充填量最小値 (producer 遅延なら低下が先行する。-1 = 無し) */
   fill_min_before_first_underrun: number;
+  /** 最初の underrun までの 32 quantum の充填量の推移 (古い順・最後が underrun の quantum。underrun 無しは空) */
+  fill_trace_before_first_underrun: number[];
   /** audio callback 間隔の最大 (ms) と 20ms 超の回数 (consumer 側の停止の観測) */
   cb_gap_max_ms: number;
   cb_gap_over20_count: number;
@@ -156,15 +158,16 @@ export function verifyToneCapture(cap: FlCaptureSpec, sr: number): ToneCheck {
   const q0 = uc ? Atomics.load(hdr, 4) : -1;
   const fillAt = q0 >= 0 && q0 < fillLen ? fill[q0] : -1;
   let fillMin = -1;
+  const trace: number[] = [];
   if (q0 >= 0 && q0 < fillLen) {
     fillMin = fill[q0];
-    for (let q = Math.max(0, q0 - 31); q <= q0; q++) fillMin = Math.min(fillMin, fill[q]);
+    for (let q = Math.max(0, q0 - 31); q <= q0; q++) { fillMin = Math.min(fillMin, fill[q]); trace.push(fill[q]); }
   }
   return {
     covered_frames: covered, max_abs_err: maxErr, peak, rms: covered ? Math.sqrt(ss / covered) : 0, zero_runs_ge16: runs,
     first_err_frame: firstErr, first_zero_run_frame: firstRun,
     underrun_count: uc, first_underrun_frame: uc ? q0 * 128 : -1, last_underrun_frame: uc ? Atomics.load(hdr, 5) * 128 : -1,
-    fill_at_first_underrun: fillAt, fill_min_before_first_underrun: fillMin,
+    fill_at_first_underrun: fillAt, fill_min_before_first_underrun: fillMin, fill_trace_before_first_underrun: trace,
     cb_gap_max_ms: Atomics.load(hdr, 14), cb_gap_over20_count: Atomics.load(hdr, 12) + Atomics.load(hdr, 13),
   };
 }

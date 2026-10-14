@@ -10,6 +10,7 @@
 
 分類 (consumer 直接 memop の判定は audit_undefload と同じ。REGLIVE だったものだけ dest 追跡を試す):
   DEST_FRAME_IN_ESCAPED  dest 元が escape 済み stack_var 内部の frame read (= 本件の型の候補)
+  DEST_FRAME_PTR_ESCAPED 同上だが、consumer が dest 値をメモリアドレス (base/index) に使う (ポインタ値 read)
   DEST_FRAME_OTHER       dest 元が frame read だが escape 無し / 解決不能
   DEST_MEMREAD           dest 元が非 frame の memory read
   REGLIVE                dest 追跡でも memory read に辿れない (従来どおり脱落ではない扱い)
@@ -30,6 +31,8 @@ from ldframe import is_write_only, frame_model, escaped_stack_vars  # noqa: E402
 from audit_undefload import scan_text, META_RE  # noqa: E402
 
 STOP_MN = ('call', 'ret', 'jmp')
+RMW_REG_MN = ('add', 'sub', 'and', 'or', 'xor', 'not', 'neg', 'inc', 'dec', 'shl', 'shr', 'sar',
+              'rol', 'ror', 'adc', 'sbb', 'imul')
 BACK_MAX = 16
 
 
@@ -42,13 +45,21 @@ def regs_of(cs, ids):
     return out
 
 
+READS_DEST_EXTRA = ('cmp', 'test', 'xchg', 'bswap', 'bt', 'bts', 'btr', 'btc', 'shld', 'shrd', 'xadd', 'cmpxchg', 'rcl', 'rcr')
+
+
+def reads_dest(mn):
+    """第 1 オペランド (dest) を読む命令か。cvttsd2si rax,xmm0 等の純粋な def は false (旧 reads_of は dest を常に read 扱いしていた)。"""
+    return mn in RMW_REG_MN or mn in READS_DEST_EXTRA or mn.startswith('cmov')
+
+
 def reads_of(cs, ins):
     """命令が値を読むレジスタ (memory オペランドの base/index を含む。dest のみの mov 先は除く)。"""
     import capstone
     out = set(regs_of(cs, ins.regs_read))
     ops = ins.operands
     for i, op in enumerate(ops):
-        if op.type == capstone.CS_OP_REG and i > 0 or (op.type == capstone.CS_OP_REG and i == 0 and ins.mnemonic not in ('mov', 'movzx', 'movsx', 'movsxd', 'lea')):
+        if op.type == capstone.CS_OP_REG and i > 0 or (op.type == capstone.CS_OP_REG and i == 0 and reads_dest(ins.mnemonic)):
             n = cs.reg_name(op.reg)
             if n:
                 out.add(n.lower())
@@ -63,7 +74,12 @@ def reads_of(cs, ins):
 
 def norm_reg64(name):
     from ldmach import _REG_ALIAS
+    if name in _LOW8_CL:
+        return _LOW8_CL[name]
     return _REG_ALIAS.get(name)
+
+
+_LOW8_CL = {'cl': 'rcx'}  # shl/shr/sar/rol/ror の可変シフト量。ldmach の _REG_ALIAS には無い (本監査内だけで補う)
 
 
 def mem_read_of(cs, ins):
@@ -73,8 +89,24 @@ def mem_read_of(cs, ins):
     return reads[0] if reads else None
 
 
+def is_reg_rmw(cs, w):
+    """dest レジスタを読んで書き戻すだけの命令 (メモリ無し)。`sub eax,1` 等。`xor eax,eax` 等の自己ゼロ化は純粋な def なので除く。"""
+    import capstone
+    if w.mnemonic not in RMW_REG_MN or not w.operands or w.operands[0].type != capstone.CS_OP_REG:
+        return False
+    if any(op.type == capstone.CS_OP_MEM for op in w.operands):
+        return False
+    if w.mnemonic == 'imul' and len(w.operands) != 2:
+        return False
+    if w.mnemonic in ('xor', 'sub', 'sbb') and len(w.operands) == 2 and w.operands[1].type == capstone.CS_OP_REG \
+            and w.operands[1].reg == w.operands[0].reg:
+        return False
+    return True
+
+
 def trace_dest(mach, va, addr, cs_ins):
-    """consumer (addr) が読むレジスタを直前に書いた命令を辿り、その memory read を返す。(mo, writer_ins) or (None, None)"""
+    """consumer (addr) が読むレジスタを直前に書いた命令を辿り、その memory read を返す。(mo, writer_ins) or (None, None)
+    reg-only RMW writer (is_reg_rmw) は値の元ではなく途中経過なので飛ばし、同じレジスタを書いた次の writer まで遡る。"""
     cs = mach.cs
     seq = mach.disasm_fn(va) or []
     idx = next((i for i, x in enumerate(seq) if x.address == addr), None)
@@ -91,9 +123,26 @@ def trace_dest(mach, va, addr, cs_ins):
         if w.operands and w.operands[0].type == 1 and w.mnemonic not in ('cmp', 'test'):
             wr.add(norm_reg64(cs.reg_name(w.operands[0].reg)))
         if want & wr:
+            if is_reg_rmw(cs, w):
+                # 途中経過は飛ばすが、その命令の第 2 オペランドレジスタ (add eax,ecx の ecx / shl eax,cl の cl) は値の元なので追跡に加える
+                want |= {norm_reg64(cs.reg_name(op.reg)) for op in w.operands[1:] if op.type == 1} - {None}
+                continue
             mo = mem_read_of(cs, w)
             return mo, w
     return None, None
+
+
+def used_as_ptr(mach, cs_ins, w):
+    """consumer が dest 元 (w のレジスタ) をメモリオペランドの base/index に使うなら True (ポインタ値 read)。"""
+    import capstone
+    cs = mach.cs
+    wr = {norm_reg64(cs.reg_name(w.operands[0].reg))} if w.operands and w.operands[0].type == 1 else set()
+    for op in cs_ins.operands:
+        if op.type == capstone.CS_OP_MEM:
+            for r in (op.mem.base, op.mem.index):
+                if r and norm_reg64(cs.reg_name(r)) in wr:
+                    return True
+    return False
 
 
 def classify_dest(mach, va, addr, cs_ins, fm, svars):
@@ -111,6 +160,8 @@ def classify_dest(mach, va, addr, cs_ins, fm, svars):
         cover = [n for n in svars if -n <= o]
         n = min(cover, key=lambda n: o + n) if cover else None
         if n is not None and svars[n] and o - (-n) < 4096:
+            if used_as_ptr(mach, cs_ins, w):
+                return 'DEST_FRAME_PTR_ESCAPED', w
             return 'DEST_FRAME_IN_ESCAPED', w
         return 'DEST_FRAME_OTHER', w
     if mo['base'] in ('rbp', 'rsp'):
@@ -150,14 +201,16 @@ def main():
                     detail.append('%x %s %s <- %x %s %s' % (addr, ins.mnemonic, ins.op_str, w.address, w.mnemonic, w.op_str))
             if not cls:
                 continue
-            top = next((k for k in ('DEST_FRAME_IN_ESCAPED', 'DEST_FRAME_OTHER', 'DEST_RIPREAD', 'DEST_MEMREAD', 'REGLIVE', 'NOADDR') if cls[k]), 'NOADDR')
+            top = next((k for k in ('DEST_FRAME_IN_ESCAPED', 'DEST_FRAME_PTR_ESCAPED', 'DEST_FRAME_OTHER', 'DEST_RIPREAD', 'DEST_MEMREAD', 'REGLIVE', 'NOADDR') if cls[k]), 'NOADDR')
             sites.append(dict(fn='%x' % rec['va'], ty=rec['ty'], cls=top, detail=detail[:3], file=os.path.basename(path)))
     tally = collections.Counter(s['cls'] for s in sites)
     fns = collections.defaultdict(set)
     for s in sites:
         fns[s['cls']].add(s['fn'])
     res = dict(sites_total=len(sites), by_class=dict(tally), fns_by_class={k: len(v) for k, v in fns.items()},
-               dest_frame_in_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_IN_ESCAPED'], key=lambda s: s['fn']))
+               dest_frame_in_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_IN_ESCAPED'], key=lambda s: s['fn']),
+               dest_frame_ptr_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_PTR_ESCAPED'], key=lambda s: s['fn']),
+               dest_riprip=sorted([s for s in sites if s['cls'] == 'DEST_RIPREAD'], key=lambda s: s['fn']))
     json.dump(res, open(out, 'w'), indent=1)
     print('sites', len(sites), dict(tally), {k: len(v) for k, v in fns.items()})
 
