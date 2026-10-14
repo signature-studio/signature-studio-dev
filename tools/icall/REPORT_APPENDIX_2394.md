@@ -94,7 +94,7 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 | 所要 | 206.6 s (`2c8088f4`)。前回は 202.6 s (`bfe8bffc`)・191.9 s (`aa3c8758`)・187.4 s (`5eb91673`)。load (1 分平均) は `2c8088f4` の実行前 0.29 → 後 1.05 (`uptime`)。1 並列 (逐次実行) |
 | 素材 | `work-icall` (`rt_freshair-core`)・RetDec v5.0 (commit `53e55b4b`、`toolchain-retdec` の `retdec-decompiler` と size・mtime が一致する [RETDEC])・`toolchain-emsdk` ([EMSDK])。`plugins-freshair` は未使用 (`toolchain-retdec` の tar は展開せず、runner に展開済みのものを使った) |
 | `FA_CORE` | `rw.dll` (元 PE + `.icall`)。`data_gen.py` の .rdata/.data 敷設と native 実行に使う。元 DLL での base は 1998 付録 §4 の 47 / 66 / 9 / 9。rw.dll での base は本 run (`2c8088f4`) で 47 / 66 / 9 / 9、旧 REPORT で 46 / 66 / 9 / 10 (±1 の揺れは #2302 で追跡中。rw.dll 代替が原因かは未切り分け) |
-| コード差分 | 測定 commit `2c8088f4` から HEAD までの `tools/icall` の変更 (`git diff --name-only 2c8088f4 HEAD -- tools/icall`) は本付録 (md) だけ。スクリプト・コードの差分は 0 |
+| コード差分 | `git diff --name-only 2c8088f4 b965b56c -- tools/icall` の出力は `tools/icall/REPORT_APPENDIX_2394.md` の 1 行だけ (md。スクリプト・コードの差分は 0)。`b965b56c` は本付録の指摘対応の commit (この行を書いた commit の 1 つ前) |
 
 ## 8. 未解決 (起票先)
 
