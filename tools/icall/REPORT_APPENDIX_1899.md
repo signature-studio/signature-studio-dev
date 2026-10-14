@@ -42,8 +42,10 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 脱落 store を戻す pass (#2427) | wasm のみ err 2 件 (本付録 §1)、分類は lift 側 (`REPORT_APPENDIX_2310.md` §6) | 分類 #2310 (完了) / 修復 #2427 (ICALL-77) |
+| 脱落 store を戻す pass (#2427 → #2514 で merge 済み。残件は #2508) | wasm のみ err 2 件 (本付録 §1)、分類は lift 側 (`REPORT_APPENDIX_2310.md` §6) | 分類 #2310 (完了) / 修復 #2427 (ICALL-77・CLOSED、実装 #2514) / 残件 #2508 (ICALL-78) |
 | 引数付き lifted 関数を dispatch table に載せる規則 | abort 6 件 (1852 付録 §2) | #1897 (ICALL-49) 既存 |
+
+> 注: route 側 = data 敷設 (`REPORT_APPENDIX_1998.md` §3 で否定)。memory shift・heap 配置は個別には測っていない。本表から memory shift の候補は消えている (`REPORT_APPENDIX_2310.md` §6)。
 
 ## 5. 再現
 

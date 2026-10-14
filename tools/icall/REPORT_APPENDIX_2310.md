@@ -46,7 +46,7 @@ DWARF の行表 (`llvm-dwarfdump --debug-line`) には `.ll` の行情報が無�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| §6 で分類済み (#2310 の受入条件 2)。脱落 store を戻す pass → #2427 (ICALL-77) | 受入条件 2 | #2427 (ICALL-77) |
+| §6 で分類済み (#2310 の受入条件 2)。脱落 store を戻す pass は #2427 (ICALL-77・CLOSED) の修復 #2514 で merge 済み。残件は #2508 (ICALL-78) | 受入条件 2 | #2514 (merge 済み) / #2508 (ICALL-78) |
 | `fa_sweep` の bit 一致の ±1 揺れ (本 run 46、1998 は 47) | sweep 件数の判定精度 | #2302 (ICALL-71) |
 
 ## 5. 再現
@@ -70,16 +70,16 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 
 ## 6. 受入条件 2: 書込み元の分類 (route / lift)
 
-**結論: BLK+0 (`0x36319008`) への "emsc" 書込みの書込み元は lift 側に分類する。** route 側 (data 敷設) は否定済み。値を作る frame store 2 本が RetDec の RDA 段 (と後続の Combine 段) で脱落することが原因で、これは lift 側の欠陥。store を戻すと結果が変わることを §6-2 で実測した。
+**結論: BLK+0 (`0x36319008`) への "emsc" 書込みの書込み元は lift 側に分類する。** route 側 (data 敷設) は否定済み。値を作る frame store 2 本が RetDec の RDA 段 (と後続の Combine 段) で脱落することが原因で、これは lift 側の欠陥。脱落 store を戻し alloca を統合すると結果が変わることを §6-2 で実測した。因果の範囲は下の真因の項。
 
 根拠 (引用元):
 
 - 書込み命令: lift が生成した `function_181057d20` 内の `store i64 %1, ptr %ce31n11_function_181057d20` (§2・`REPORT_APPENDIX_1998.md` §2)。
-- route 側の否定: `ott_data_install` が書くのは `0x310c4000`・`0x3125c000`・`0x31354000` のみで BLK を含まない。DLL の bytes に "emsc" は無い (`REPORT_APPENDIX_1998.md` §3。本 HEAD の `rw.dll` でも `emsc` の出現 0 件を確認)。
+- route 側の否定: `ott_data_install` が書くのは `0x310c4000`・`0x3125c000`・`0x31354000` のみで BLK を含まない。DLL の bytes に "emsc" は無い (`REPORT_APPENDIX_1998.md` §3。本 HEAD の `rw.dll` でも `emsc` の出現 0 件を確認)。route 側 = data 敷設の意味で、memory shift・heap 配置 (route 内部の配置) は個別には測っていない。
 - 元の機械語: `0x181057b38` の 2 本の 4B store (`mov [rbp-0x30],eax`・`mov [rbp-0x2c],eax`)。8B で読む命令は無い (`REPORT_APPENDIX_2394.md` §2)。
-- 真因: RetDec の `LLVM instruction optimization using RDA` 段で `[rbp-8]` (`0x181057b71`)・`[rbp-0x20]` (`0x181057b87`) の 2 本の frame store が IR から脱落する (`REPORT_APPENDIX_2394.md` §3 の段別表)。2 store を戻し 16B 1 alloca にすると BLK+0 への "emsc" 書込みは 8 → 0 (`REPORT_APPENDIX_2394.md` §4)。
+- 真因: RetDec の `LLVM instruction optimization using RDA` 段で `[rbp-8]` (`0x181057b71`)・`[rbp-0x20]` (`0x181057b87`) の 2 本の frame store が IR から脱落する (`REPORT_APPENDIX_2394.md` §3 の段別表)。2 store を戻し 16B 1 alloca にすると BLK+0 への "emsc" 書込みは 8 → 0 (`REPORT_APPENDIX_2394.md` §4)。因果の範囲: この 8 → 0 は『2 store を戻す + alloca を 16B 1 本に統合』の結果。alloca を別のまま store だけ戻す negative (sep) は TRAP 8・BLK+0 emsc 8 のまま (`fs2394.log` の sep 行、HEAD でも同じ)。よって真因は『脱落 store』と『callee の +8 読みが alloca の範囲外 (UB) になる配置』の組合せ (`REPORT_APPENDIX_2394.md` §1(b)・§3)。
 - 既知類型との関係: D23 候補 (`REPORT_APPENDIX_2394.md` §6・新規、DEFECTS.md 未編集)。
-- 脱落 store を戻す IR pass の一般化は本付録の範囲外 (#2427 / ICALL-77)。
+- 脱落 store を戻す pass は #2427 (ICALL-77・CLOSED) で実装され、#2514 で merge 済み (`REPORT_APPENDIX_2427.md`)。残件 (180da6e60 候補 10 件の分類・fixed 後の 8/8 不一致・SlateCore bytes 照合) は #2508 (ICALL-78・OPEN)。merge 規則の一般化 (他関数での妥当性) は 2427 §5 の限界に記載されており、起票表には無い (PM 判断)。
 
 ### 6-1. HEAD 再測定 (WORKFLOW §6)
 
@@ -94,13 +94,15 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 | load (`uptime` の 1 分平均) | 開始 0.73 → 終了 1.05 (1 並列・逐次) |
 | 素材 | `work-icall` (`rt_freshair-core`・`rw.dll`)、RetDec (`toolchain-retdec` の展開先)、emsdk (runner 既設の [EMSDK])。`plugins-freshair`・`fl-win64` は未使用 |
 
+> 注: 検証 HEAD は 54bacdc0。その後 origin/main は #2514 (#2427 の修復、merge 2026-10-14 14:51:41Z) で `tools/icall/fa_route_build.sh` 等が変わった。`git diff 54bacdc0 origin/main -- tools/icall/fa_route_build.sh tools/icall/frame_slot_restore.py tools/icall/diff tools/ott/native tools/targets/freshair tools/shared | grep -c '^[+-][^+-]'` は 202 行 (`fa_route_build.sh` +6・`frame_slot_restore.py` 新規)。本付録の数値は 54bacdc0 の値。現 main の再測定は #2514 の付録 (`REPORT_APPENDIX_2427.md`) に委ねる。
+
 ### 6-2. 実測結果 (`frame_slot_2394.sh` §4 の 8 入力と §1〜§3)
 
-| 条件 | 8 入力 | WC 行 | "emsc" の WC 行 | BLK+0 への "emsc" | `REPORT_APPENDIX_2394.md` §4 と |
+| 条件 | 8 入力 | WC 行 | emsc を含む行 (WC+WCV) | BLK+0 への "emsc" | `REPORT_APPENDIX_2394.md` §4 と |
 |---|---|---|---|---|---|
-| base (現 IR) | OK 0 / TRAP 8 | 168 | 32 | 8 | 一致 |
+| base (現 IR) | OK 0 / TRAP 8 | 168 | 32 (WC 24 + WCV 8) | 8 | 一致 |
 | fixed (2 store 戻し・16B 1 alloca) | OK 8 / TRAP 0 | 168 | 0 | 0 | 一致 |
-| sep (負の対照) | OK 0 / TRAP 8 | 168 | 32 | 8 | 一致 |
+| sep (負の対照) | OK 0 / TRAP 8 | 168 | 32 (WC 24 + WCV 8) | 8 | 一致 |
 
 - §1 (元の機械語): `before.0.drc.dsm` の再 decode と `rw.dll` の同 VA が 205 B 一致。
 - §2 (RDA 段の表): `REPORT_APPENDIX_2394.md` §3 の段別表と全セル一致。
@@ -124,8 +126,8 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 | `i64.const` (IR 行) の wasm 位置 (`llvm-objdump -d`) | 0x4279a | **0x42799** |
 | `i64.store offset=909217800` の wasm 位置 | 0x427be | **0x427bd** |
 
-- HEAD の WC 行は 168 行、`0x63736d65` を含む WC 行は 32 件、BLK+0 への書込みは 8 件 (`WC line=19056 addr=36319008 sz=8 val=63736d65`)。`fa_wc.cjs` は HEAD の `fa_route` から `fa_wc_build.sh` で作り直した。
-- wasm の確認: `llvm-objdump -d fa_wc.wasm` で `42799: i64.const 19056`、続けて `427bd: i64.store 909217800` (base は `i32.const 0` のアドレス + offset `0x36319008`)。
+- HEAD の WC 行は 168 行、`0x63736d65` を含む行は 32 件 (WC 24 + WCV 8。`frame_slot_2394.sh` は err 全体を grep する)、BLK+0 への書込みは 8 件 (`WC line=19056 addr=36319008 sz=8 val=63736d65`)。`fa_wc.cjs` は HEAD の `fa_route` から `fa_wc_build.sh` で作り直した。
+- wasm の確認: `llvm-objdump -d fa_wc.wasm` で `42799: i64.const 19056`。`427bd: i64.store 909217800` は、その間に 12 命令 (`__wchk` の呼出し 1 件を含む) を挟んで続く (base は `i32.const 0` のアドレス + offset `0x36319008`)。
 
 ### 6-5. 受入条件 3 の HEAD 再測定 (`fa_sweep.sh 8 60`)
 
@@ -147,7 +149,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 | 項目 | 値 |
 |---|---|
 | 差分 | `git diff 586c8b0c 54bacdc0 -- tools/m5/ir5_patch.py` の変更は `52ad0ce1` (#1664) の 1 件。`normalize` に「`; uselistorder directives` の見出しと直前の空行を消す」正規表現を 3 行追加 |
-| 他の経路 | `586c8b0c`..HEAD で `tools/m2`・`tools/icall/ir_flatten.py` に変更なし (`git log` で確認)。`fa_route_build.sh` の変更は `FA_SRC` の既定値を変えないフック (`4831c686`) |
+| 他の経路 | `586c8b0c`..HEAD で `tools/m2`・`tools/icall/ir_flatten.py` に変更なし (`git log` で確認)。`fa_route_build.sh` の変更は `FA_SRC` の既定値を変えないフック (`4831c686`)。`52ad0ce1` は `tools/liftlib/liftlib/passes/base.py` (+3) と `tools/m11/test_a7_uselistorder.py` (+51) も変更するが、fa_route 経路 (`fa_route_build.sh`・`ir_flatten.py`・`ir5_patch.py`・`m2/ir_normalize.py` 等) は liftlib を参照しない (grep 0 件) ため結論に影響しない |
 | 旧版の再現 | `git show 52ad0ce1^:tools/m5/ir5_patch.py` を `$RUNNER_TEMP` に書き出し、HEAD の `work/fa_route/oi.norm0.ll` に当てる。続けて HEAD の `tools/icall/ir_flatten.py` (`--limit 0x10000000`) を通す |
 | 結果 | 旧版: lift 段 26014 行、flat 段 **25805 行・store 行 19132**。HEAD: lift 段 25903 行、flat 段 25694 行・store 行 19056 |
 | 整合 | 旧版の flat 段は `REPORT_APPENDIX_1998.md` §2 の 25805 行・行 19132 と一致。差 111 行は HEAD の `oi.norm0.ll` の `; uselistorder directives` 見出し件数 (111) と一致 |
