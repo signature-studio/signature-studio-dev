@@ -166,11 +166,11 @@
 
 親: #2874 (PY-99)。前段: 上節 PY-88 (#2788)。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
 前提: `analysis/py99_slot_paths.py` と #2874 の PR は main に無かった (`origin/main` に py99 のファイル・#2874 の commit が無いことを確認)。本節の script は新規作成した。
-測定 commit: `a5fb0d2d` (本節のコードを含む commit の 1 つ前の HEAD)。本 commit のコード変更は `analysis/py99_slot_paths.py` の新規 1 ファイルだけ (REPORT を除く)。`analysis/py88_writes.py`・`analysis/py64_check_expr.py`・`provider`・`host`・`tests` は無変更 (`git diff --stat a5fb0d2d HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は py99 の 1 行だけ)。
+測定 commit: `2d7e4792` (`analysis/py99_slot_paths.py` を追加した commit。本節の数値はこの script の出力)。基点は `a5fb0d2d` (origin/main)。`git diff --stat a5fb0d2d 2d7e4792 -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は py99 の新規 1 ファイルだけ。`analysis/py88_writes.py`・`analysis/py64_check_expr.py`・`provider`・`host`・`tests` は無変更。
 
-### 結論 (部分達成・`Refs #3085`)
+### 結論 (受入 2 達成・受入 1 の閉包は子 #3104 に移管・`Closes #3085` (範囲縮小))
 
-- 受入 1 (SLOT? 49 件の書込みについて、合流の先行経路ごとの式を VA つきで記録): **script は実施、閉包は未達**。49 件の書込みから SLOT? の読み 77 件 (異なり) を取り、読みごとに合流 J と先行辺 p ごとの store 集合 S_p (VA と式) を出す。合流を持つ読みは 65 件 (先行辺 136)。閉じた書込みは **0/49**。
+- 元の受入 1 (SLOT? 49 件の書込みについて、合流の先行経路ごとの式を VA つきで記録): **先行辺ごとの store の VA 集合 (S_p) と式の記録まで実施。式の閉包は未達** (子 #3104 へ移管)。49 件の書込みから SLOT? の読み 77 件 (異なり) を取り、読みごとに合流 J と先行辺 p ごとの store 集合 S_p (VA と式) を出す。合流を持つ読みは 65 件 (先行辺 136)。閉じた書込みは **0/49**。
 - 受入 2 (閉じた式の検算 mismatch 0・ネガティブコントロールを数値で): 算法 A (前向き固定点) と算法 B (後ろ向き BFS) の 77 件で mismatch **0**。辺 1 本を外すと mismatch **15**・exit **1**。
 
 ### 測定条件
@@ -225,10 +225,10 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 閉じた書込み 0/49: 未閉の (読み,store) 77 対。store 値に残る SLOT? 葉 (入れ子の読み) と ⚠合流 の閉包 | 受入 1 (閉じた式) | 親 #2874 の子 (子 issue 起票は PM が行う。起票先: #2874) |
-| ACC?⚠合流 (`[rbp+0x5b8]` の合流読み・30 件) を同じ算法で解く | 受入 1 の一部 (ACC 側) | #2874 (PY-99) の子 |
-| py88 が線形で IN とした読みの CFG 到達 (ループの戻り辺) | 取りこぼしの有無 | #2874 (PY-99) の子 |
-| CFG 構築 (A・B 共通) の検証。mismatch 0 は到達計算の一致のみ | 検算の範囲 | #2874 (PY-99) の子 |
+| 閉じた書込み 0/49: 未閉の (読み,store) 77 対。store 値に残る SLOT? 葉 (入れ子の読み) と ⚠合流 の閉包 | 元の受入 1 (閉じた式) | #3104 (PY-162) |
+| ACC?⚠合流 (`[rbp+0x5b8]` の合流読み・30 件) を同じ算法で解く | 元の受入 1 の一部 (ACC 側) | #3104 (PY-162) |
+| py88 が線形で IN とした読みの CFG 到達 (ループの戻り辺) | 取りこぼしの有無 | #3104 (PY-162) |
+| CFG 構築 (A・B 共通) の検証。mismatch 0 は到達計算の一致のみ | 検算の範囲 | #3104 (PY-162) |
 
 ### 再現コマンド
 
