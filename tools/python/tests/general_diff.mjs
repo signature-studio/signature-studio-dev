@@ -33,6 +33,10 @@ const arity = [
   ["general.getChangedFlag", [1]], ["general.getUseMetronome", [0]],
   ["general.getPrecount", [1]], ["general.getRecPPQ", [0]],
   ["general.safeToEdit", [1]], ["general.getProjectTitle", [0]],
+  ["general.setRecPPQ", [24]], ["general.setRecPPQ", [960]], ["general.setRecPPQ", [23]], ["general.setRecPPQ", [961]],
+  ["general.setNumerator", [1]], ["general.setNumerator", [16]], ["general.setNumerator", [0]], ["general.setNumerator", [17]],
+  ["general.setDenominator", [2]], ["general.setDenominator", [16]], ["general.setDenominator", [1]], ["general.setDenominator", [17]],
+  ["general.setUndoHistoryPos", [0]], ["general.setUndoHistoryPos", [-5]], ["general.setUndoHistoryCount", [3]], ["general.setUndoHistoryLast", [7]],
 ];
 
 const diffs = [];

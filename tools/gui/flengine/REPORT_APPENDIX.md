@@ -199,3 +199,7 @@ CreateFileW の 1 呼出し = printErr の 1 行 `SHIMOPEN {json}`。json は `o
 | `bash tools/shim/test.sh` | exit 0 (18 s)・shim 53 API × MT/ST・全 PASS |
 | `gcc -Wall -c tools/shim/src/file.c` (native) | 警告 0 |
 | 再現 | `bash tools/gui/flengine/e2e.sh` / `node tools/gui/flengine/cfi_probe.mjs --out <json> --trace-out <jsonl>` / `node tools/gui/flengine/open_trace_posctl.mjs` |
+
+## 9. WIN-11 (#2880): EnterCriticalSection の失敗 CS と初期化経路 (部分達成)
+
+結論: fail-fast の CS は `0x12bd390` (実測・動的引数)。呼出元 VA と boot の trap 地点は未特定 (子 issue #3077 [WIN-16])。測定 commit `ae963e28`。実測と未解決の全文は [REPORT_APPENDIX_2880.md](REPORT_APPENDIX_2880.md)。
