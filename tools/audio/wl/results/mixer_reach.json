@@ -1,0 +1,1616 @@
+{
+ "pe": "extracted/block00031_PE.bin",
+ "negctl": false,
+ "entry_va": "0xc56ae0",
+ "reachable_functions": 4433,
+ "instructions": 295499,
+ "unknown_targets": 10,
+ "indirect": {
+  "call [mem]": 3593,
+  "call [rip-data]": 157,
+  "call reg": 49,
+  "jmp [mem]": 2
+ },
+ "summary": {
+  "thread_create": {
+   "call_sites": 4,
+   "distinct_functions": 4
+  },
+  "blocking_wait": {
+   "call_sites": 188,
+   "distinct_functions": 121
+  },
+  "nonblocking_sync": {
+   "call_sites": 201,
+   "distinct_functions": 131
+  },
+  "atomic": {
+   "call_sites": 0,
+   "distinct_functions": 0
+  },
+  "thread_attr": {
+   "call_sites": 18,
+   "distinct_functions": 15
+  }
+ },
+ "apis": [
+  {
+   "dll": "kernel32.dll",
+   "api": "LeaveCriticalSection",
+   "class": "nonblocking_sync",
+   "call_sites": 178
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "EnterCriticalSection",
+   "class": "blocking_wait",
+   "call_sites": 170
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "VariantInit",
+   "class": null,
+   "call_sites": 36
+  },
+  {
+   "dll": "user32.dll",
+   "api": "PostMessageW",
+   "class": null,
+   "call_sites": 25
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "DeleteObject",
+   "class": null,
+   "call_sites": 22
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "CloseHandle",
+   "class": null,
+   "call_sites": 20
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetLastError",
+   "class": null,
+   "call_sites": 19
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IntersectRect",
+   "class": null,
+   "call_sites": 15
+  },
+  {
+   "dll": "advapi32.dll",
+   "api": "RegCloseKey",
+   "class": null,
+   "call_sites": 14
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetCurrentThreadId",
+   "class": "thread_attr",
+   "call_sites": 13
+  },
+  {
+   "dll": "advapi32.dll",
+   "api": "RegQueryValueExW",
+   "class": null,
+   "call_sites": 13
+  },
+  {
+   "dll": "winmm.dll",
+   "api": "timeGetTime",
+   "class": null,
+   "call_sites": 12
+  },
+  {
+   "dll": "advapi32.dll",
+   "api": "RegOpenKeyExW",
+   "class": null,
+   "call_sites": 12
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "Sleep",
+   "class": "blocking_wait",
+   "call_sites": 11
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "OffsetRgn",
+   "class": null,
+   "call_sites": 11
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "UnmapViewOfFile",
+   "class": null,
+   "call_sites": 10
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "SetWindowOrgEx",
+   "class": null,
+   "call_sites": 10
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "CombineRgn",
+   "class": null,
+   "call_sites": 9
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IsWindowVisible",
+   "class": null,
+   "call_sites": 9
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetModuleFileNameW",
+   "class": null,
+   "call_sites": 8
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetCapture",
+   "class": null,
+   "call_sites": 8
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "QueryPerformanceCounter",
+   "class": null,
+   "call_sites": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetTickCount",
+   "class": null,
+   "call_sites": 7
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "CreateRectRgn",
+   "class": null,
+   "call_sites": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "CompareStringW",
+   "class": null,
+   "call_sites": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "InitializeCriticalSection",
+   "class": "nonblocking_sync",
+   "call_sites": 7
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetEvent",
+   "class": "nonblocking_sync",
+   "call_sites": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FindFirstFileW",
+   "class": null,
+   "call_sites": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FindClose",
+   "class": null,
+   "call_sites": 6
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetWindowPlacement",
+   "class": null,
+   "call_sites": 6
+  },
+  {
+   "dll": "user32.dll",
+   "api": "ShowWindow",
+   "class": null,
+   "call_sites": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "CreateFileW",
+   "class": null,
+   "call_sites": 6
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SendMessageW",
+   "class": null,
+   "call_sites": 6
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "ResetEvent",
+   "class": "nonblocking_sync",
+   "call_sites": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "WriteFile",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "VirtualAlloc",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "user32.dll",
+   "api": "RedrawWindow",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "SetRectRgn",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetWindowPos",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "SelectObject",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "SelectClipRgn",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "CreateEventW",
+   "class": "nonblocking_sync",
+   "call_sites": 5
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetWindowLongPtrW",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetWindowLongPtrW",
+   "class": null,
+   "call_sites": 5
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FreeLibrary",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetStdHandle",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "VirtualQuery",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetProcAddress",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "MultiByteToWideChar",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetKeyState",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetMonitorInfoW",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetFileAttributesW",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetClipBox",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetWindowThreadProcessId",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "user32.dll",
+   "api": "UnionRect",
+   "class": null,
+   "call_sites": 4
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "WaitForSingleObject",
+   "class": "blocking_wait",
+   "call_sites": 3
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "SysFreeString",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "VirtualFree",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetModuleHandleW",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "LoadStringW",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetSystemDefaultUILanguage",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetLocaleInfoW",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "MonitorFromWindow",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "CreateRectRgnIndirect",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "VariantClear",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "VariantCopy",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "WideCharToMultiByte",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SystemParametersInfoW",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FindNextFileW",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "MapViewOfFile",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetUpdateRgn",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LoadLibraryW",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetLocalTime",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetCurrentProcess",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "PeekMessageW",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetTimer",
+   "class": "thread_create",
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetCursor",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetParent",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IsWindowUnicode",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "user32.dll",
+   "api": "MapWindowPoints",
+   "class": null,
+   "call_sites": 3
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "TlsGetValue",
+   "class": "thread_attr",
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetUserDefaultUILanguage",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "IsValidLocale",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "lstrlenW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetRgnBox",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "EqualRgn",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetFocus",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "SafeArrayGetLBound",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "SafeArrayGetUBound",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "SysAllocStringLen",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "SafeArrayPtrOfIndex",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "InvalidateRect",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "MessageBoxW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetWindowPlacement",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "CreateFileMappingW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetThreadErrorMode",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "ExpandEnvironmentStringsW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetACP",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FileTimeToLocalFileTime",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "ExtSelectClipRgn",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetClipRgn",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetWindowOrgEx",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "IntersectClipRect",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetRegionData",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "ReleaseDC",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetCurrentProcessId",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "ScrollWindowEx",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetErrorMode",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetFullPathNameW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetThreadLocale",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetDateFormatW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "version.dll",
+   "api": "VerQueryValueW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "api": "RegCreateKeyExW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FindResourceW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetComputerNameExW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "advapi32.dll",
+   "api": "RegOpenKeyExA",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetClassInfoW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "UnregisterClassW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "RegisterClassW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "KillTimer",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetFileAttributesExW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "MoveFileW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetCursorPos",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "ReleaseCapture",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "UnhookWindowsHookEx",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "MsgWaitForMultipleObjects",
+   "class": "blocking_wait",
+   "call_sites": 2
+  },
+  {
+   "dll": "user32.dll",
+   "api": "DispatchMessageW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetCurrentDirectoryW",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "dsound.dll",
+   "api": "DirectSoundCreate",
+   "class": null,
+   "call_sites": 2
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SignalObjectAndWait",
+   "class": "blocking_wait",
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "ExitProcess",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "TlsSetValue",
+   "class": "thread_attr",
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LocalAlloc",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SwitchToThread",
+   "class": "blocking_wait",
+   "call_sites": 1
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "SysReAllocStringLen",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LoadLibraryExW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "CharNextW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetCurrentThread",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FormatMessageW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LocalFree",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "CreateThread",
+   "class": "thread_create",
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetSystemMetrics",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "EnumDisplayMonitors",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "RectInRegion",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "shell32.dll",
+   "api": "PathCleanupSpec",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "SafeArrayCreate",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetClientRect",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetWindowRect",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetActiveWindow",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IsWindow",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "EnableWindow",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "EnumThreadWindows",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetActiveWindow",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetLastActivePopup",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GdiFlush",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "CreateCompatibleDC",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "CreateDIBSection",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "SetDIBColorTable",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "SetDIBitsToDevice",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "BitBlt",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "CharUpperBuffW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "CharLowerBuffW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "imagehlp.dll",
+   "api": "ImageNtHeader",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "advapi32.dll",
+   "api": "RegFlushKey",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "shfolder.dll",
+   "api": "SHGetFolderPathW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "ole32.dll",
+   "api": "CoTaskMemFree",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetCPInfo",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FileTimeToDosDateTime",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "ValidateRgn",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "BeginPaint",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "ExcludeClipRect",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "EndPaint",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "LPtoDP",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetRandomRgn",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetDCOrgEx",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "BeginDeferWindowPos",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "DeferWindowPos",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "EndDeferWindowPos",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetFocus",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "OffsetRect",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GlobalFindAtomW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetPropW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "ValidateRect",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "InvalidateRgn",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "OutputDebugStringW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetDllDirectoryW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetMenuItemInfoW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetMenuItemInfoW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "DrawMenuBar",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetVersionExW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "DeleteFileW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "RemoveDirectoryW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetLastError",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "CheckMenuItem",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "CreateDirectoryW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "TerminateProcess",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetEnvironmentVariableW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "version.dll",
+   "api": "GetFileVersionInfoSizeW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "version.dll",
+   "api": "GetFileVersionInfoW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "advapi32.dll",
+   "api": "RegSetValueExW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LoadResource",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LockResource",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SizeofResource",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "CreateWindowExW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "ResumeThread",
+   "class": "thread_attr",
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "DestroyWindow",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetThreadPriority",
+   "class": "thread_attr",
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LCMapStringW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetFileAttributesW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FileTimeToSystemTime",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetFileSize",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetLogicalDriveStringsW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "QueryDosDeviceW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetVolumeInformationW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetDriveTypeW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "DosDateTimeToFileTime",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "LocalFileTimeToFileTime",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetFileTime",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetDC",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetDeviceCaps",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "CharUpperW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "oleaut32.dll",
+   "api": "VariantCopyInd",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "shell32.dll",
+   "api": "ShellExecuteW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IsIconic",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "wininet.dll",
+   "api": "InternetGetConnectedState",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "SetFilePointer",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "ReadFile",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GlobalAlloc",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GlobalLock",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GlobalUnlock",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetClipboardData",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GlobalFree",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetTempPathW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "CreateSolidBrush",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "DeleteAtom",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetCursorInfo",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetCursor",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "FindAtomW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "AddAtomW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "QueryPerformanceFrequency",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "PostQuitMessage",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetSysColor",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "gdi32.dll",
+   "api": "GetTextMetricsW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "WaitMessage",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetWindowTextW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IsWindowEnabled",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "WindowFromPoint",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "TranslateMessage",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "DispatchMessageA",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IsDialogMessageW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "IsDialogMessageA",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SendMessageA",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "TranslateMDISysAccel",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "SetWindowsHookExW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "winmm.dll",
+   "api": "midiOutShortMsg",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "DuplicateHandle",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "MapVirtualKeyW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "user32.dll",
+   "api": "GetKeyNameTextW",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "kernel32.dll",
+   "api": "GetExitCodeThread",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "ole32.dll",
+   "api": "CoInitialize",
+   "class": null,
+   "call_sites": 1
+  },
+  {
+   "dll": "ole32.dll",
+   "api": "CoCreateInstance",
+   "class": null,
+   "call_sites": 1
+  }
+ ],
+ "gate": [
+  {
+   "name": "entry_is_pdata_start",
+   "ok": true
+  },
+  {
+   "name": "known_edge_timeGetTime_reached",
+   "ok": true,
+   "got": 12
+  }
+ ],
+ "ok": true
+}
