@@ -18,7 +18,14 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 1. blocked_by の一覧が不明な issue は着手しない。
 2. open な子 (`親: #N`) を持つ親 issue は着手対象から外す。
-3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。cooldown (既定 3 時間) の間は着手せず、過ぎたら再着手する (3 回まで。超えたら stopped)。`oc:stuck` は人の判断待ち。素材を足して再投入するのは、最後の run-outcome の reason が `artifact` で、直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) が停止報告 (`STOP_RE`) のときだけ。報告の素材のうち前回の `oc_artifacts` に無いものを足して 1 回だけ再投入する。`split`・`stop`・`blocked`・`unknown` は素材で再投入しない (cooldown の後に base の素材で再着手する経路は残る。reason 別の規則は #2334)。
+3. ラベル `oc:no-pr` は『PR を出さずに終わった』run の後。最後の `oc-run-outcome` の reason で再着手を決める (`plan()` の `noPr`)。cooldown (既定 3 時間) の間は着手しない。cooldown の後は次のとおり。
+   - `unknown`: 1 回だけ再着手する。
+   - `artifact`: 直前の報告 (`botReport`。run-outcome と PM のマーカーを含むコメントを除く) が停止報告 (`STOP_RE`) で、その報告に前回の `oc_artifacts` に無い allowlist 内の素材があるときだけ 1 回再着手する (増えなければ再投入しない)。
+   - `stop`・`split`: 再投入せず、PM agent (`oc-pm`・下の oc-pm 節) に回す。
+   - `blocked`: blocker が close されるまで再投入しない。
+   - 再投入の計数は `unknown` と `artifact` の再投入だけ (上限 3 回)。`launch-unobserved` (投稿の run が 5 分で現れなかった) は再投稿せず stopped に残す。
+   `oc:stuck` は人の判断待ち。`pm-apply`・`needs-user-input` は下の oc-pm 節のとおり、再着手せず `user` 行に置く。
+   `/status` の `no_pr_needs_pm` は、最後の run-outcome が `artifact` で stopped に残った `oc:no-pr` の件数 (PM の判断待ち)。
 4. 同期が 15 分以上止まっている間、または一覧を上限ページで打ち切った間 (下の「同期の窓と打ち切り」) は、投稿も `oc-watchdog` の dispatch もしない (`/status` の `fresh=false`)。
 5. relaunch (`oc:no-pr` の再投入・素材の追加) も 1 tick の枠 `min(room, BATCH, relaunch + ready)` に入り、残りの枠を ready が使う (`src/launch.ts` の `planLaunch`)。relaunch は room や BATCH を超えても全件出す。枠を `ready` の件数だけで頭打ちにする VM の `launch_issues.py` の式とは、relaunch がある tick で最大 relaunch の件数だけ差が出る (VM の式は変えていない)。relaunch は classify が issue ごとに 2 回までに絞る。
 
@@ -33,7 +40,7 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 | `stuck` | `oc:stuck` の PR で、最新の停止コメント (`<!-- oc-fix-limit -->`、bot 投稿) に `<!-- oc-pm-intent: stuck pr=N ... -->` がある (`pr=` が当該 PR の番号) |
 | `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`) |
 | `needs_decision` | reviewer の最新の verdict が CHANGES_REQUESTED で、本文が `NEEDS_KEY` (`src/needs.ts`。`tools/pm/pm_needs.py` の `KEY` と同じ正規表現・同じ行分割) に一致し、その後に PM 応答が無い |
-| `user_answered` | `needs-user-input` の issue に、ラベルが付いた後に非 bot のユーザーのコメントが付いた |
+| `user_answered` | `needs-user-input` の issue に、ラベルが付いた後に非 bot のユーザーのコメントが付いた (コメント者が `MEMBER` / `OWNER` / `COLLABORATOR` のものだけ。第三者のコメントでは起こさない #2461) |
 
 - マーカーは **bot (実装 App・reviewer App) の投稿だけ** を信じる (誰でもコメントできるため)。PM 応答は、PM のログイン (`PM_LOGINS` と PM App) のコメント、または bot の `oc-pm-decision` / `oc-pm-intent: relaunch` マーカー付きコメント。根拠より後にあれば、その対象は送らない。
 - 状態は `sig` (issue / PR 番号ごとの時刻・列挙値・真偽。本文は持たない)。webhook の増分で更新し、webhook で埋まらない reviewer の verdict と `needs-user-input` の付与時刻は reconcile で REST から一度だけ補う (best effort)。
@@ -65,7 +72,7 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `stuck_age_max_min` | 上の PR の経過分の最大。起点は最新の停止コメント (無ければ PR の更新時刻)。該当が無ければ `null` |
 | `needs_pm` | open な issue と PR のうち `needs-pm` の付いた数 (合計) |
 | `needs_user` | open な issue と PR のうち `needs-user-input` の付いた数 (合計) |
-| `no_pr_needs_pm` | 最後の run-outcome が `artifact` で止まった open な `oc:no-pr` のうち、直前の報告に新しい素材が無く再投入しない件数 (PM の判断待ち。cooldown の中のものと、再着手の上限に達したもの)。`split`・`stop`・`blocked`・`unknown` は数えない |
+| `no_pr_needs_pm` | 最後の run-outcome が `artifact` で stopped に残った open な `oc:no-pr` の件数 (新しい素材が無い・停止報告でない・再投入済み・上限に達したものを含む。PM の判断待ち)。`split`・`stop`・`blocked`・`unknown` は数えない |
 | `no_pr_by_reason` | `{split, artifact, unknown, blocked, stop}`: open な `oc:no-pr` の issue を、最新の outcome の理由別に数えた値。outcome の無いものは数えない |
 | `refs_only_merge_rate_24h` | `{merged, refs_only, rate}`: 直近 24 時間に merge された PR の件数 (`merged`) と、そのうち本文が `Refs #N` のみ (`Closes` / `Fixes` / `Resolves` が 1 つでもあれば数えない) の件数 (`refs_only`) と率。0 件なら `rate` は `null`。merge 済み PR の『Refs のみ』は merge 時点の本文から取った真偽値だけを持つ (本文は保存しない)。導入前に merge された PR は、次の全体同期 (6 時間以内) で埋まる |
 | `open_issues_delta_24h` | 現在の open issue 数から、24 時間前以前で最も新しい 1 時間ごとの点 (`meta/openHist`、最大 48 点) の数を引いた差。点が無い (履歴が 24 時間分に満たない) ときは `null`。同期が古い間と一覧を打ち切った間は点を残さない |

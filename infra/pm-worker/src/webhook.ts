@@ -154,6 +154,8 @@ export function setSig(s: PmState, k: string, patch: Partial<Signal>): PmState {
 }
 
 export const isBotUser = (u: Json | undefined | null): boolean => u?.type === "Bot" || /\[bot\]$/.test(u?.login ?? "");
+// 人として信じる author_association (起票者・コメント者の絞り込み。pm.ts の authorAllowed と userAt の両方で使う)。
+export const ASSOC_OK = ["MEMBER", "OWNER", "COLLABORATOR"];
 
 function applyIssue(s: PmState, p: Json): PmState {
   const i = p.issue;
@@ -272,7 +274,8 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
     if (reason) patch.outcome = { at, reason };
   }
   if ((pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body))) && later(cur?.pmAt)) patch.pmAt = at;
-  if (login && !isBotUser(c.user) && later(cur?.userAt)) patch.userAt = at;
+  // 人の回答は、非 bot かつ MEMBER / OWNER / COLLABORATOR のコメントだけ (第三者のコメントで PM を起こさない)。
+  if (login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association) && later(cur?.userAt)) patch.userAt = at;
   return setSig(s, k, patch);
 }
 

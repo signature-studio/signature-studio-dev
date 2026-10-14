@@ -24,6 +24,7 @@ test("分類: 固定 JSON で TS の classify が期待どおりの行に振り�
     manualDeps: fx.manualDeps,
     liveBlockers: fx.liveBlockers,
     fullBotBody: fx.fullBotBody,
+    reportBody: fx.reportBody,
     outcomeReason: fx.outcomeReason,
   };
   const { rows } = classify(fx.snapshot, input);
@@ -63,12 +64,12 @@ test("分類 (ネガコン): 最後の run-outcome が artifact でなければ�
     manualDeps: fx.manualDeps,
     liveBlockers: fx.liveBlockers,
     fullBotBody: fx.fullBotBody,
+    reportBody: fx.reportBody,
     outcomeReason: { ...fx.outcomeReason, "12": "split", "21": "unknown" },
   };
-  const { rows, noNewArt } = classify(fx.snapshot, input);
+  const { rows } = classify(fx.snapshot, input);
   assert.deepEqual(rows.relaunch, []);
   assert.deepEqual(rows.stopped.map(([n]) => n), [12, 13, 17, 21]);
-  assert.deepEqual(noNewArt, [], "artifact 以外は、素材が増えなかった件数 (no_pr_needs_pm) にも数えない");
 });
 
 test("分類: TS と Python (tools/pm/launch_issues.py の classify) が同じ rows を返す", () => {
@@ -79,9 +80,39 @@ test("分類: TS と Python (tools/pm/launch_issues.py の classify) が同じ r
     manualDeps: fx.manualDeps,
     liveBlockers: fx.liveBlockers,
     fullBotBody: fx.fullBotBody,
+    reportBody: fx.reportBody,
     outcomeReason: fx.outcomeReason,
   };
   const ts = classify(fx.snapshot, input).rows;
   const py = JSON.parse(execFileSync("python3", [crosscheck, fixturePath], { encoding: "utf8" }));
   assert.deepEqual(ts, py);
+});
+
+test("分類: STOP_RE の判定から run-outcome と PM マーカーの本文を除く (素材不足の定型文を停止報告にしない)", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const at = new Date(now - 30 * 60_000).toISOString();
+  const outcome = "理由の分類: artifact=素材不足\n<!-- oc-run-outcome: no-pr reason=artifact run=1 -->";
+  const snap = (body: string): Snapshot => ({
+    issues: [{ number: 70, title: "[X-1] t", labels: ["oc:no-pr"], body: "", deps: null }],
+    prs: [],
+    runs: [],
+    bot_last: { "70": { at, head: body.slice(0, 400), art: null } },
+    bot_report: {},
+    pm_art: {},
+  });
+  const input = (body: string): ClassifyInput => ({
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "70": body },
+    reportBody: {},
+    outcomeReason: {},
+  });
+  const plain = classify(snap("素材不足のため停止します"), input("素材不足のため停止します")).rows;
+  assert.deepEqual(plain.stopped.map(([n]) => n), [70], "対照: マーカーの無い停止報告は stopped");
+  const marked = classify(snap(outcome), input(outcome)).rows;
+  assert.deepEqual(marked.stopped, [], "run-outcome は stopped にしない");
+  assert.deepEqual(marked.recent.map(([n]) => n), [70]);
 });

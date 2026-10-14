@@ -50,8 +50,10 @@ export interface ClassifyInput {
   manualDeps: Record<string, number[]>;
   // issue dependencies (blocked_by) の open な番号。total_blocked_by > 0 の issue ごとに必要。
   liveBlockers: Record<string, number[]>;
-  // 直前の報告の全文 (素材名の抽出に使う)。
+  // 最後の bot コメントの全文 (停止報告の素材名抽出に使う)。
   fullBotBody: Record<string, string>;
+  // 直前の報告の全文 (run-outcome を除く)。素材名の抽出に使う (neededArts)。
+  reportBody: Record<string, string>;
   // 最後の run-outcome の reason (stop / split / blocked / artifact / unknown)。素材による再投入は artifact のときだけ。
   outcomeReason: Record<string, string>;
 }
@@ -67,6 +69,8 @@ export interface Rows {
 
 const NEED_RE = /不足|無い|無く|無かった|ない|存在しな|必要|依頼|欠|足りな|未配置|未展開|入っていな|のみ|だけ|揃っ/;
 const STOP_RE = /着手不可|着手できません|着手に必要|素材不足|停止します|停止報告|ブロック|PM に.*依頼|判断を/;
+// run-outcome (record-run-outcome.sh の定型文) と PM の応答は、停止報告ではない (VM 版と同じ規則)。
+const OUTCOME_OR_PM_RE = /<!-- oc-run-outcome:|<!-- oc-pm-/;
 const WORD = "\\p{L}\\p{N}_\\-";
 
 function wordBounded(a: string): RegExp {
@@ -173,9 +177,9 @@ function startedMap(d: Snapshot, iss: Map<number, SnapIssue>): Map<number, strin
   return st;
 }
 
-function neededArts(n: number, input: ClassifyInput): string[] {
+export function neededArts(n: number, input: ClassifyInput): string[] {
   const out: string[] = [];
-  for (const line of lines(input.fullBotBody[String(n)] ?? "")) {
+  for (const line of lines(input.reportBody[String(n)] ?? "")) {
     if (!NEED_RE.test(line)) continue;
     for (const a of ALLOW_ARTS) if (wordBounded(a).test(line) && !out.includes(a)) out.push(a);
   }
@@ -187,6 +191,7 @@ const artTokens = (line: string | null | undefined): string[] =>
 // 行の素材名 (allowlist 内) のうち、base に無いもの。
 const newArts = (line: string | null | undefined, base: string[]): string[] =>
   artTokens(line).filter((a) => ALLOW_ARTS.includes(a) && !base.includes(a));
+export const isStopReport = (text: string): boolean => STOP_RE.test(text);
 const head90 = (s: string): string => Array.from(s).slice(0, 90).join("").replaceAll("\n", " ");
 const fmt1 = (x: number): string => x.toFixed(1);
 
@@ -195,8 +200,6 @@ export interface Classified {
   blocksCount: Record<string, number>;
   // 親 (open) -> open な子の番号。
   children: Record<string, number[]>;
-  // 最後の run-outcome が artifact で止まり、素材を足そうとしたが増えなかった (前回の oc_artifacts と同じ) issue。
-  noNewArt: number[];
 }
 
 export function classify(d: Snapshot, input: ClassifyInput): Classified {
@@ -210,7 +213,6 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
 
   const artifactsFor = (n: number, i: SnapIssue): string => d.pm_art[String(n)]?.line ?? inferArtifacts(i.title, i.labels);
   const rlOf = (n: number): RelaunchState => input.relaunch[String(n)] ?? { count: 0, art: null };
-  const noNewArt: number[] = [];
 
   for (const [n, i] of [...iss].sort((a, b) => a[0] - b[0])) {
     const k = String(n);
@@ -226,13 +228,11 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
       rows.started.push([n, st.get(n) ?? []]);
     } else {
       const reported = !!bl && (!isLaunched || ageH(bl.at) < ageH(launchedAt));
-      const stopHit = !!bl && STOP_RE.test(bl.head);
+      const stopHit = !!bl && STOP_RE.test(bl.head) && !OUTCOME_OR_PM_RE.test(input.fullBotBody[k] ?? "");
       // 素材による再投入は、直前の報告 (rep) が停止報告で、最後の run-outcome が artifact のときだけ。
-      // 停止の判定は従来どおり bot_last も見る (stopLike)。bot_last は run-outcome で、その凡例の語にも一致しうる。
       const rep = d.bot_report[k];
       const repStop = !!rep && STOP_RE.test(rep.head);
-      const artOk = input.outcomeReason[k] === "artifact";
-      const stopLike = stopHit || repStop;
+      const material = repStop && input.outcomeReason[k] === "artifact";
       const ls = input.launchState?.[k];
       // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
       if (ls === "failed") {
@@ -241,25 +241,20 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         rows.recent.push([n, `launch not observed yet (${fmt1(ageH(launchedAt) * 60)} min)`]);
       } else if (isLaunched && ls !== "launched" && ageH(launchedAt) < 3 && !reported) {
         rows.recent.push([n, `launched ${fmt1(ageH(launchedAt))}h ago`]);
-      } else if (bl && reported && ageH(bl.at) < 24 && stopLike) {
+      } else if (bl && reported && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
         const baseLine = artifactsFor(n, i);
         const base = artTokens(baseLine);
-        const material = artOk && repStop;
         const extra = material ? neededArts(n, input).filter((a) => !base.includes(a)) : [];
         let cand: string | null = extra.length ? "oc_artifacts: " + [...base, ...extra].join(" ") : null;
         if (!cand && material && newArts(rep?.art, base).length) cand = rep?.art ?? null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
-        else {
-          rows.stopped.push([n, head90(bl.head)]);
-          if (artOk && (!cand || cand === rl.art)) noNewArt.push(n);
-        }
+        else rows.stopped.push([n, head90(bl.head)]);
       } else if (bl && ageH(bl.at) < 1.5) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
-      } else if (bl && ageH(bl.at) < 24 && stopLike) {
+      } else if (bl && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
-        const baseArts = artTokens(artifactsFor(n, i));
-        const cand = artOk && repStop && newArts(rep?.art, baseArts).length ? (rep?.art ?? null) : null;
+        const cand = material && newArts(rep?.art, artTokens(artifactsFor(n, i))).length ? (rep?.art ?? null) : null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else rows.stopped.push([n, head90(bl.head)]);
       } else {
@@ -274,6 +269,5 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
     rows,
     blocksCount: Object.fromEntries(blocksCount),
     children: Object.fromEntries([...children].map(([k, v]) => [String(k), [...v]])),
-    noNewArt,
   };
 }
