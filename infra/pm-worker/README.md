@@ -33,11 +33,14 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 再投入の意図 (`<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->`、#2475): issue ごとに最新の意図マーカーを保持する。実装 App の意図は第三者の意図より優先する。意図のコメントは bot の投稿でも `botLast` (停止報告の窓) を動かさない。次を**全て**通ったときだけ `/oc` を投稿する。
   - 検査 (`src/launch.ts` の `checkRelaunchIntent`): 書き手は実装 App・`issue=` がコメントの issue と一致・`arts` が `ALLOW_ARTS` の部分集合・`focus` は 1〜9 (任意)・同じ issue に 24 時間で 3 回まで。
-  - 分類 (`plan()` の rows): 投稿してよいのは picks と同じ `ready`・`relaunch`・`stopped` (PM の判断待ち) だけ。`user`・`blocked`・`started` は投稿しない。`recent` (着手直後の待ち) は処理済みにせず、次の tick に回す。`oc:stuck`・`pm-apply`・`needs-user-input` は投稿しない。`oc:no-pr` は picks の再着手と同じ cooldown (`NO_PR_COOLDOWN_H`) と上限 (3 回) を見る。`stopped` のうち親の子待ち (`parent/stuck`) と未観測の launch (`launch-unobserved`) は投稿しない。
+  - 分類 (`plan()` の rows): 投稿してよいのは picks と同じ `ready`・`relaunch`・`stopped` (PM の判断待ち) だけ。`user`・`blocked`・`started` は投稿しない。`recent` (着手直後の待ち) と `blocked_by` が未同期 (unknown) の issue は処理済みにせず、次の tick に回す。`oc:stuck`・`pm-apply`・`needs-user-input` は投稿しない。`oc:no-pr` は picks の再着手と同じ cooldown (`NO_PR_COOLDOWN_H`) と上限 (3 回) を見る。`stopped` のうち親の子待ち (`parent/stuck`) と未観測の launch (`launch-unobserved`) は投稿しない。
   - 順序: 意図は picks より先に処理し、意図で扱った issue は picks から外す (picks が先だと、同じ issue の意図が focus なしで処理済みになるため)。403/429 や REST の残量で止まったら、同じ tick の picks も止める。
-  - 投稿後に出た意図 (PM の手動の `/oc` を含む) と、停止中 (review-only・stuck 上限・REST の残量不足) は処理しない。
+  - 最後の `/oc` より前に出た意図 (PM の手動の `/oc` を含む) は捨てる。停止中 (review-only・stuck 上限・REST の残量不足) は処理しない (意図も残し、停止が明けたら判定する)。
   - 拒否は理由ごとに `counters.intentRejected` へ数え (語彙: `author` `issue` `arts` `focus` `limit` `user` `blocked` `started` `stopped`)、その意図は処理済みにする。
-  - 投稿の可否は `LIVE_LAUNCH` に従う (既定 dry-run。`counters.intentWouldLaunch` に記録)。dry-run で保留した意図は処理済みにならないので、`LIVE_LAUNCH` を `"1"` にすると、保留分がその tick で投稿される。切替の前に `GET /status` の `counters.intentWouldLaunch` と `would_launch_now` を確認する。
+  - 投稿の可否は `LIVE_LAUNCH` に従う (コードの既定は dry-run。dry-run では `counters.intentWouldLaunch` と `log` に記録し、処理済みにしない)。
+  - **稼働中の `wrangler.toml` は `LIVE_LAUNCH = "1"` なので、この版をデプロイすると、意図の経路も dry-run を経ずに即 live で `/oc` を投稿する。** 待ち (oc:no-pr の cooldown・blocked_by の未同期) が明けた意図は、その tick で投稿され得る。
+  - `would_launch_now` は picks (launch の計画) だけを出す。保留中の意図 (待ち・処理済みでないもの) は `/status` に出ない。`counters.intentWouldLaunch` は dry-run の期間に記録された件数で、live では増えない。
+  - **PM agent の判断待ち**: deploy 時に、既存の意図を live で処理してよいか。既定案: issue #2475 の受入条件 4 どおり `LIVE_LAUNCH` に従う (現状 `"1"` なので live)。focus の値域は #2575 で決める (pm.md の `focus=K` は issue 番号で、検査は受入条件番号 1〜9)。
 
 ## oc-pm: PM agent を起こす終端状態の検出と送信 (#2333)
 

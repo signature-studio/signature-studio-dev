@@ -249,3 +249,43 @@ test("統合 (中断の引き継ぎ): 意図の投稿が 403 で止まったら�
   assert.equal(postsTo(ctx, 22).length, 0, "止まった後は picks も投稿しない");
   assert.equal((ctx.app.engine.status() as any).counters.launched, 0);
 });
+
+// 分類が確定する前 (blocked_by が未同期) の ready な issue は、意図を待つ。拒否にも処理済みにもしない (指摘 B1 round 2)。
+test("統合 (unknown): blocked_by が未同期の ready な issue の意図は、投稿も拒否もせず待つ。同期して依存が無いと確定したら投稿する", async () => {
+  const ctx = await configuredApp({ env: { LIVE_LAUNCH: "1" }, handlers: writeHandlers });
+  assert.equal((await send(ctx.app, "issues", issuePayload(21, { blocked: 1 }))).status, 202);
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+  await tickNow(ctx);
+  assert.equal(postsTo(ctx, 21).length, 0);
+  assert.equal((ctx.app.engine.status() as any).counters.intentRejected, undefined, "待ちは拒否として数えない");
+  assert.equal(ctx.store.get<{ seen?: string }>("relaunch", "it:21")?.seen, undefined, "待ちは処理済みにしない");
+  assert.equal((await send(ctx.app, "issues", issuePayload(21))).status, 202);
+  await tickNow(ctx);
+  assert.equal(focusPosts(ctx).length, 1, "依存が無いと確定した後の tick で投稿される");
+});
+
+// 子を持つ親 (parent/stuck) は、意図でも着手させない (INTENT_HARD_STOP のネガコン。指摘 M2)。子を外すと停止報告の行は stopped のままで、投稿の条件は同じ。
+test("ネガコン (M2): 子 issue を持つ親 (parent/stuck) は意図で /oc を投稿せず、stopped として数える", async () => {
+  const ctx = await configuredApp({ env: { LIVE_LAUNCH: "1" }, handlers: writeHandlers });
+  assert.equal((await send(ctx.app, "issues", issuePayload(21))).status, 202);
+  assert.equal((await send(ctx.app, "issues", issuePayload(22, { body: "親: #21" }))).status, 202);
+  const pr = prEv(91);
+  assert.equal((await send(ctx.app, "pull_request", { ...pr, pull_request: { ...pr.pull_request, head: { ref: "21-x" }, state: "closed" } })).status, 202);
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, "停止します。判断を求めます。\noc_artifacts: fl-win64", at(0)))).status, 202);
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(5)))).status, 202);
+  await tickNow(ctx);
+  assert.equal(postsTo(ctx, 21).length, 0);
+  assert.equal((ctx.app.engine.status() as any).counters.intentRejected?.stopped, 1);
+});
+
+// 第三者の意図を先に処理した後で、created_at の古い実装 App の意図が遅れて届いても、捨てずに投稿する (指摘 M3 round 2)。
+test("統合 (M3 順序): 第三者の意図を処理した後に、より古い created_at の実装 App の意図が届いても投稿する", async () => {
+  const ctx = await stopped({ LIVE_LAUNCH: "1" });
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, HUMAN, HUMAN_INTENT, at(5)))).status, 202);
+  await tickNow(ctx);
+  assert.equal(postsTo(ctx, 21).length, 0);
+  assert.equal((ctx.app.engine.status() as any).counters.intentRejected?.author, 1);
+  assert.equal((await send(ctx.app, "issue_comment", commentEv(21, IMPL_BOT, GOOD, at(3)))).status, 202);
+  await tickNow(ctx);
+  assert.equal(focusPosts(ctx).length, 1, "実装 App の意図は時刻に依らず処理される");
+});

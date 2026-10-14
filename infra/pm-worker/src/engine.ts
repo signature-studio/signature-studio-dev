@@ -517,7 +517,7 @@ export class Engine {
     this.saveMeta();
   }
 
-private zero(): NonNullable<Meta["counters"]> {
+  private zero(): NonNullable<Meta["counters"]> {
     return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, redelivered: 0, wouldRedeliver: 0 };
   }
 
@@ -850,7 +850,7 @@ private zero(): NonNullable<Meta["counters"]> {
   // 投稿してよいのは ready・relaunch・stopped (PM の判断待ち)。user・blocked・started は理由を counters.intentRejected に数えて処理済みにする。
   // recent (着手直後の待ち) は処理済みにせず、次の tick に回す。検査・分類で落ちた意図も、毎 tick 数え直さないように処理済みにする。
   // 戻り値: 403/429 や残量で止まったか (halted)、この tick で投稿 (dry-run は記録) の対象にした issue (handled。picks から外す)。
-  // dry-run では投稿せず記録だけする。処理済みにはしないので、live に切り替えると投稿される (README の切替の手順で確認する)。
+  // dry-run では投稿せず記録だけする。処理済みにはしないので、live に切り替えると投稿される (README の『PM agent の判断待ち』を参照)。
   private async relaunchIntents(
     gh: Gh | null,
     live: boolean,
@@ -874,15 +874,17 @@ private zero(): NonNullable<Meta["counters"]> {
       const key = `it:${k}`;
       const st = this.d.store.get<{ seen?: string; posted?: number[] }>("relaunch", key) ?? {};
       const at = Date.parse(r.at);
-      if (st.seen && at <= Date.parse(st.seen)) continue;
-      // 投稿の後 (PM の手動の /oc を含む) に出た意図は、もう処理しない。
+      // 処理済みかは、いまの意図 (issue ごとの 1 枠) の識別子で比べる。時刻で比べると、先に処理した第三者の意図より後に届く bot の古い意図が捨てられる。
+      const ident = `${r.bot ? "bot" : "user"}:${r.id ?? r.at}`;
+      if (st.seen === ident) continue;
+      // 最後の /oc より前に出た意図は捨てる (PM の手動の /oc を含む)。
       if ((Date.parse(this.s.launchedAt[k] ?? "") || 0) >= at) {
-        this.d.store.put("relaunch", key, { ...st, seen: r.at });
+        this.d.store.put("relaunch", key, { ...st, seen: ident });
         continue;
       }
       const reject = (reason: string) => {
         c.intentRejected = { ...(c.intentRejected ?? {}), [reason]: (c.intentRejected?.[reason] ?? 0) + 1 };
-        this.d.store.put("relaunch", key, { ...st, seen: r.at });
+        this.d.store.put("relaunch", key, { ...st, seen: ident });
         this.pushLog({ kind: "skip", n, note: `relaunch intent rejected: ${reason}` });
       };
       const v = checkRelaunchIntent(n, r, st.posted ?? [], nowMs);
@@ -920,7 +922,7 @@ private zero(): NonNullable<Meta["counters"]> {
         this.d.store.put("relaunch", `np:${n}`, { ...np, count: np.count + 1, art: v.art });
       }
       const posted = [...(st.posted ?? []), nowMs].filter((t) => nowMs - t < RELAUNCH_WINDOW_MS);
-      this.d.store.put("relaunch", key, { seen: r.at, posted });
+      this.d.store.put("relaunch", key, { seen: ident, posted });
       c.launched++;
       c.intentLaunched = (c.intentLaunched ?? 0) + 1;
       this.pushLog({ kind: "launch", n, art: v.art, note: "relaunch intent" });
@@ -937,8 +939,9 @@ private zero(): NonNullable<Meta["counters"]> {
     nowMs: number,
   ): { kind: "post" } | { kind: "wait" } | { kind: "reject"; reason: string } {
     if (!at) return { kind: "wait" };
-    if (at.row === "user" || at.row === "blocked" || at.row === "started") return { kind: "reject", reason: at.row };
+    // blocked_by が未同期 (unknown) の間は、ready でも blocked の行に移っているので、先に待つ (確定してから拒否・投稿を決める)。
     if (at.row === "recent" || unknown.has(n)) return { kind: "wait" };
+    if (at.row === "user" || at.row === "blocked" || at.row === "started") return { kind: "reject", reason: at.row };
     const labels = this.s.issues[String(n)]?.labels ?? [];
     if (labels.includes("oc:stuck") || HOLD_LABELS.some((l) => labels.includes(l))) return { kind: "reject", reason: "user" };
     if (labels.includes("oc:no-pr")) {
