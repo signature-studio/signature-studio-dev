@@ -240,9 +240,10 @@ NC4 は #506 の reviewer が再現した「不合格行を追記しても exit 
 | `docs/DOC_MAP.md` の REPORT 索引に本書が未掲載 | 索引漏れ | 本 PR で DOC_MAP §3 に `REPORT.md`・`REPORT_INDIRECT.md` の 2 行を追記して解消 (REPORT 側の PM 追記は不要) |
 | `ALLOW_UNIMPL` (`rep_stosb_memset` 用の許容) の撤去 | 撤去後も既存 CSV に対する judge は PASS 7/7 (`--skip-lift`)。 stub が戻れば FAIL する | 本 PR で撤去 (main 8d883c3 以降の実測で 7 block とも `declares_unimpl` 0) |
 | lowering (f80→f64) の bit-exact 差分 (3 block) | 通過 ≠ 正しさ。 差分試験の対象外 | #197 にコメント済み (REPORT_LEA.md §7b) |
-| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) が未実装 stub のまま (19252: 3 件、19048: 4 件。 flag 未反映) | 2 engine の unimpl が 5 件ずつ残る。 stub は abort ではなく 0 返却のため silent な flag 欠落経路 | [PLG-F3-12] #1582 (本 PR で方式を決定、実装は子 issue) → 子 [PLG-F3-14] (起票) |
+| VEX の `vcomisd` / `vucomisd` / `vucomiss` (`__asm_v*comis*`) の flag が未反映 (同一ブロック内の読みのみ反映 #1774。 残りは消費条件が IR に無い) | 2 engine の unimpl に 3 種が残る (4 件)。 stub は 0 返却のため silent な flag 欠落経路 | 子 [PLG-F3-33] (起票)。 非 VEX は [PLG-F3-34] (起票) |
 
 - §7b の実測と方式 (#1582 [PLG-F3-12]・VEX comis/ucomis の flag 方式の検討 2 案) は [REPORT_APPENDIX_1582.md](REPORT_APPENDIX_1582.md) §7b。
+- §7c の実測 (#1774 [PLG-F3-14]: 同一ブロック内の flag 反映 pass・機械語の消費命令と IR の参照・icall 別案の不採用理由) は [REPORT_APPENDIX_1774.md](REPORT_APPENDIX_1774.md) §7c。
 ## 8. DEFECTS.md 行案 (候補・追加の可否は PM 判断)
 
 | 類型 | 症状 | 観測 | 検出信号 | 修復 |
