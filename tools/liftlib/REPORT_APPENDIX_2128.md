@@ -8,7 +8,7 @@ PR: #2162 (`2128-ott-getparam-icall-leaf`)。受入の扱い: 受入 3・4 を�
 | 項目 | 値 |
 |---|---|
 | 測定 commit (コードを変えた最後の commit) | `f8bd2ea0` (`feat(liftlib): wire icall runtime into ott_getparam leaf (BLK global + table) (Refs #2128)`) |
-| 測定 HEAD | `f8bd2ea0` (測定 commit = HEAD。本付録の追記は `tools/liftlib/REPORT*.md` のみで、コード差分は 0) |
+| 測定 commit の HEAD 条件 | 測定は `f8bd2ea0` の worktree で実施。以後の commit は REPORT・DOC_MAP の追記のみでコード差分は 0 (下記) |
 | 変更前の比較 commit | `df2eebde` (測定 commit の親。`ott_getparam` の leaf は icall runtime 未配線) |
 | 素材 | `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`、`work-liftlib` → `tools/liftlib/work/`、`work-m6-ott` → `tools/m6/work/` ほか。`OTT_DLL` で F.txt を生成 (`gen_ott_getparam_F.sh`, `0x18011e5a0-0x18011e76c`, 460 bytes) |
 | emsdk | `/opt/emsdk` (既存。`emcc` を PATH に通して実行) |
@@ -33,12 +33,14 @@ PR: #2162 (`2128-ott-getparam-icall-leaf`)。受入の扱い: 受入 3・4 を�
 
 ## 差分 0 の確認
 
-測定 commit と HEAD が同一のため、コード差分は構造的に 0。コード範囲 (`tools/` から本付録と `REPORT*.md` を除く) の出力:
+コード範囲 (`tools/` から `REPORT*.md` を除く) の差分は 0 行。
 
 ```
 $ git diff f8bd2ea0 HEAD -- tools/ ':(exclude)tools/liftlib/REPORT*.md' | wc -l
 0
 ```
+
+付録追記の commit (`4c2d893b` 以降) の差分は `docs/DOC_MAP.md`・`tools/liftlib/REPORT.md`・本付録のみ。
 
 ## 未解決 (起票先)
 
