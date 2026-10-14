@@ -53,7 +53,7 @@
 - よって表の全 entry はファイルの raw 範囲の外にあり、ファイル上の生バイトを持たない。
 
 `tools/icall/diff/ott_apiset_cmp.py` は、VA が raw 範囲外の場合を `zero-fill (ファイル外・0 固定)` と表示し、raw 範囲内の場合のみ `raw` 由来の値と数える。表が zero-fill のときは「raw 由来の非ゼロ 0/32」を出さず、「実値 (raw) なし」と出す。
-以前の REPORT・検収文書にあった「非ゼロ 32/32」は、raw 範囲外の VA を読んでファイル内の別位置の値を拾った取り違えに基づく (`tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の訂正根拠もこの比較)。
+以前の REPORT・検収文書にあった「非ゼロ 32/32」が、どの読み方に由来するかは未確認 (前 run の読出し手順は残っていない)。`tools/ott/ACCEPTANCE_CAB137_CAB138.md` §4.3 の訂正は、本節のセクションヘッダとの比較を根拠とする。
 
 注: 本 HEAD では `ott_apiset_cmp.py` を実 DLL で実行していない (§2.1)。上記は section ヘッダの比較で、スクリプトの出力を根拠にしない。スクリプトの 3 分岐 (raw・一部 zero-fill・セクション外) は合成した PE 風オブジェクトで確認した (py_compile 通過)。
 
