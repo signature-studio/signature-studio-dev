@@ -29,7 +29,7 @@
 | `partial_old_entry` | 2 | 旧値が関数入口の引数 |
 | `mem_old_merge` | 6 | `mov dword [rsp+0x20], N` の前に分岐先 |
 | `mem_old_call_clobber` | 3 | 同上、call |
-| `arith_old_unhandled` | 9 | `add/sub edx` の旧値が `mov edx, edi/esi/r13d/eax` 等の別レジスタ・メモリ由来 (未対応の源) |
+| `arith_old_unhandled` | 9 | `add/sub` の旧値が別レジスタ・メモリ由来で未対応の源。実測の内訳: `mov edx, edi` (4)・`mov edx, esi` (1)・`mov edx, r13d` (1)・`mov edx, dword ptr [rbp + 0x58]` (2)・`mov r8d, dword ptr [rbp + 0x9c]` (1) |
 | `arith_old_copy_call_clobber` | 1 | 同上、call |
 | `arith_old_arith_nonimm` | 1 | 旧値が加減算の連鎖 |
 | **計** | **55** | **決まった 0** |
@@ -49,17 +49,19 @@
 
 ## 5. 受入 3 (survey) が測れない理由
 
-- `m11_e2e.sh` の既定経路は `work/ir_conditions.json`・`work/lift_pe.sha256` を要する。`work-m11` の展開物には無い (`ls` で確認: 3 件とも不在)。
-- `functions_dll.csv` は素材に無い Ghidra 中間物。`m11_bounds.py` が fail-closed で止まる (REPORT_N86 §6・§9)。
-- よって `69c774…` の IR で `M11_SIGFIX_RECOVER=1` の survey は取れない。#1154 の前提と同じ。
+- `ir_conditions.json` は作れる。`FL_WIN64_DIR=<fl-win64 展開先> bash tools/m11/m11_gen_ir2.sh` (WORKFLOW §11) を HEAD `1688a113` で実行し、rc 0・`[gen_ir2] OK` を確認した (`ldfix=applied`・`qstore=not-applied`・`ir_sha256` `08c7b646…`)。
+  ただしこの生成 IR は `work-m11` の `69c774…` と別物 (`08c7b646…`)。`69c774…` の測定入力は展開物を戻して使った。
+- 残るブロッカーは 2 つ。(a) `work/lift_pe.sha256` が無いため `m11_e2e.sh` は全再生成 (`m11_scan` → `m11_bounds` → RetDec) に入る。(b) `m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` を読めず停止する (`FL_WIN64_DIR` を指定した実測で `FileNotFoundError`・rc 1)。`functions_dll.csv` は素材に無い Ghidra 中間物で、REPORT_N86 §6・§9 と同じ。
+- `lift_pe.sha256` を手で書いて差分経路に入れる方法は、lift の出自を検証しない迂回になるため採らない (REPORT_N86 §6)。
+- よって `69c774…` の IR で `M11_SIGFIX_RECOVER=1` の survey は取れず、受入 3 は未判定。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 55 件の旧値 def 接続 (CFG の到達定義・merge の越え方・call の clobber 規則) | set_other imm 非定数 55 件の値が未決。0 詰め引数の意味が未保証 | #1660 (残り) |
-| `m11_argrecover_verify.py` の stack 位置 (pos ≥ 4) 非対応 (`KeyError: 4`) | `m11_sigfix_stats.sh` が途中停止。受入 2・3 の入口 | #1660 (残り) |
-| `ir_conditions.json`・`lift_pe.sha256`・`functions_dll.csv` の生成 (受入 3 の前提) | survey 退行が未判定 | #1154 (REPORT_N86 §8 と同じ) |
+| 55 件の旧値 def 接続 (CFG の到達定義・merge の越え方・call の clobber 規則) | set_other imm 非定数 55 件の値が未決。0 詰め引数の意味が未保証 | #1835 |
+| `m11_argrecover_verify.py` の stack 位置 (pos ≥ 4) 非対応 (`KeyError: 4`) | `m11_sigfix_stats.sh` が途中停止。受入 2・3 の入口 | #1835 |
+| survey の前提: `work/lift_pe.sha256` (全再生成の回避) と `functions_dll.csv` (Ghidra 中間物・`m11_bounds.py` の入力)。`ir_conditions.json` は `m11_gen_ir2.sh` で作成可 (§5) | survey 退行が未判定 (受入 3) | #1154 |
 
 ## 7. 測定 commit と差分
 
