@@ -4,7 +4,7 @@
 フィールド + issue の open/closed。`docs/WORKFLOW.md` §3)。
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
-- 更新責任: **PM (main) のみ**。subagent は REPORT で報告し、PM がここを更新する。
+- 更新責任: merge の事実を反映する更新は agent も PR で行ってよい (自動更新は [DOCS-21])。方針の変更・MS の定義の改訂は PM。
 - 測定値・実測数値は書かない。各リンク先 (`tools/<area>/REPORT.md`) が単一の正本。
 - 引き継ぎ情報は `docs/HANDOFF/2026-10-12.md`。
 
@@ -46,7 +46,7 @@
 | MS8 | オーディオパス (AudioWorklet + SAB ring) | 設計・PoC あり (`tools/audio/`) |
 | MS9 | プロジェクト入出力 + FL 純正プラグイン in-process | 部分 (`tools/flp`, `tools/plugins/`) |
 | MS10 | 性能・安定性チューニング | 計測基盤あり (`tools/perf/`) |
-| MS11 | E2E 統合 + FL 追従 + EULA/非再配布運用固定化 | 未達。FL 新版取り込み手順は素材ありで `pnpm terms-watch` (FL 同梱 2 文書 + Xfer) を呼ぶこと (週次 workflow `terms-watch.yaml` は Web 4 文書のみ (配置待ち)。`tools/legal/terms-watch/REPORT.md`) |
+| MS11 | E2E 統合 + FL 追従 + EULA/非再配布運用固定化 | 未達。FL 新版取り込み手順は素材ありで `pnpm terms-watch` (FL 同梱 2 文書 + Xfer) を呼ぶこと (週次 workflow `terms-watch.yaml` は Web 4 文書のみ・配置済み。`tools/legal/terms-watch/REPORT.md`) |
 | MS12 | ホストデプロイ + `agent-browser` E2E 検証 | **部分達成** (デプロイ実績あり・FLEngine 起動は未達) |
 
 状態の判断基準: 「完了」= 各段の検証条件が満たされたこと。「部分達成」= 一部の検証項目のみクリア。
@@ -85,15 +85,15 @@
 | `hostbridge` | 設計+mini VST2 host PoC | `tools/hostbridge/REPORT.md` |
 | `hostbridge/{cb,h2,lowbase,nfo}` | 各実装済 | 各 `REPORT.md` |
 | `hostbridge/h10` | Wrapper chunk reader 静的解析済 (実行検証は #267) | `tools/hostbridge/h10/REPORT.md` |
-| `gui` | 設計+PoC | `tools/gui/REPORT.md` |
-| `audio` | 設計+PoC (e2e で既知 FAIL 1 件あり・詳細は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
+| `gui` | 設計+PoC。e2e は agent-browser / puppeteer 駆動が main 入り。FL の窓種別に依存する部分は未達 | `tools/gui/REPORT.md` |
+| `audio` | 設計+PoC。DirectSound shim・Web MIDI shim・FlAudioShim の本体適用が main 入り。dev 経路の断続 FAIL の再現・切り分け (AU-15) は未了。ソークは AU-10 で一部達成 (残件は REPORT) | `tools/audio/REPORT.md`・`tools/audio/asio/REPORT.md` |
 | `audio/asio` | COM アダプタ+soak | `tools/audio/asio/REPORT.md` |
 | `assets` | chunk ローダ+二段キャッシュ | `tools/assets/REPORT.md` |
 | `assets/wvfs` | 書込可能 VFS | `tools/assets/wvfs/REPORT.md` |
-| `python` | CPython wasm+ブリッジ設計 | `tools/python/REPORT.md` |
+| `python` | CPython wasm+ブリッジ。flapi provider の静的リンクと per-module state が main 入り。FLEngine 実機上の動作は未達 | `tools/python/REPORT.md` |
 | `flp` | FLP/FST パーサ設計 | `tools/flp/REPORT.md` |
 | `plugins` | 141 種マップ (カウントの正本: `tools/plugins/REPORT.md`) | `tools/plugins/REPORT.md` |
-| `plugins/framework` | TFruityHost shim | `tools/plugins/framework/REPORT.md` |
+| `plugins/framework` | TFruityHost shim。fw stage-2 は runner で再構築可能 (PLG-P0a)。e2e chain は work-fw-stage1 素材で通る | `tools/plugins/framework/REPORT.md` |
 | `plugins/p0c` | kernel 表検証+f80 | `tools/plugins/p0c/REPORT.md` |
 | `shared` | 分類+OSS 再ビルド+プロプラ lift PoC | `tools/shared/REPORT.md` |
 | `ipp` | 評価・PoC・優先 stub 充填まで完了 | `tools/ipp/REPORT.md` |
@@ -124,3 +124,5 @@
 4. **OpenCode Actions 基盤 (GitHub Actions)** — 2026-10-12 main 稼働開始 (PR #282, merge `bec32da`)。残 follow-ups は [CI-1] #284 で管理。
 5. **Issue/PR の整理** — `[AREA-n]` prefix 統一・`state:*` ラベル不使用 (PM 担当)。
 
+
+更新 2026-10-14T11:53Z (基準 commit `9ea012b6` / origin/main)。対象期間 2026-10-13T06:13Z 以降の merge PR 1015 件 (REST `pulls?state=closed&base=main` の `merged_at`)。
