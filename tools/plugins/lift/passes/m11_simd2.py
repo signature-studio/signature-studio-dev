@@ -165,7 +165,7 @@ def gen_body(base, R, A):
         return ['memset(a, (int)(b & 0xffu), (size_t)c); /* rep stosb: b = AL, c = byte 数 */']
     if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd', 'lddqu', 'vmovaps', 'vmovapd', 'vmovdqa', 'vmovdqu', 'vmovups', 'vmovupd') and n == 1:
         return {'i128': ['return a;'], 'i64': ['return (u64)a;'], 'i32': ['return (u32)a;']}.get(R)
-    if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd') and R == 'void':
+    if base in ('movaps', 'movapd', 'movdqa', 'movdqu', 'movups', 'movupd', 'movntps') and R == 'void':
         return ['(void)a; (void)b; /* store: RetDec が dst を引数に持たない no-op */']
     if base == 'movss':
         if n == 1 and A[0] == 'i32' and R == 'i128': return ['return set_u32_lo(a);']

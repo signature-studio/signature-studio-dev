@@ -158,3 +158,11 @@
 - **比較した方式**: (a) `vmovsd` を store 化する (宛先 0 への誤 store で不採用)、(b) B1 の 0 埋めを止める (共有 lift 鎖の全 plugin に影響するため範囲外)、(c) 委譲や abort で unimpl から消す (silent miscompile を隠すため不採用)。
 - **理由**: 機械語は `[rsp+0x20]` への spill で、宛先は定数 0 ではない。 宛先 0 のまま store を作ると誤った番地へ書く。 同じ宛先値は分岐・演算にも使われるため、stub で隠すと誤りが検出できなくなる。 実測は `tools/plugins/dynamics/REPORT_APPENDIX.md` §E。
 - **影響**: 19252 の unimpl に `vmovsd` store が残る (5 件のうち 1 件)。 `emcc -c` は rc 0 のまま。 正しさは未確認。
+
+## D17 — `movntps` (非テンポラル store) は既存の SSE store 復元 (`lower_asm_store`) に含め、宛先は IR 側から復元する
+
+- **状態**: 採用 (2026-10-14, issue #1581 [PLG-F3-11])
+- **決定**: `__asm_movntps(i128,i128)` の呼び出しは `ir5_patch.py` の `lower_asm_store` で `store i128` に復元する (`movups`/`movaps`/`movdqa` と同じ扱い)。 helper 側 (`m11_simd2.py` の `gen_body`) は void 形を movups 系と同じ分岐に入れる。
+- **比較した方式**: (a) 宛先を 0 で埋める (誤った番地への store になるため不採用)、(b) helper 側だけで no-op にして呼び出しを残す (store が無音で消えるため不採用)。
+- **理由**: 第 1 引数は `%75` 等から `load i128` した値で、そのポインタ (`inttoptr`) が IR に残っている。 issue 本文の「宛先は IR 側に無い」は誤りだった。 `ir5_patch` 後は `movntps` の呼び出しが `e.norm0.ll` 8 件 → `e.lift.ll` 0 件 (19048)。 宣言だけが残り、helper 側の分岐に入る。
+- **影響**: 19048・19252 の unimpl から `movntps` が消えた (実測は `tools/plugins/dynamics/REPORT_APPENDIX.md` §F2)。 共有鎖は `lift/lift_ranges.sh` 経由の plugin 群 (reverb_delay / hostx / modulation / synth / p0c / dynamics 等) で、`ir5_patch.py` の変更が効く。 liftlib (OTT) は `tools/liftlib/liftlib/passes/base.py` の独自 `lower_asm_store` を使い `ir5_patch.py` を import しないため、今回の変更は効かない (`ott_lift.ll` では `__asm_movntps` の呼出が 8 件 (すべて `function_1801a30d0`) 残る。宣言は 1 行。これは既存どおり)。 plugin 群の回帰は §F2 の before/after で測定した。
