@@ -95,3 +95,30 @@ grep -c '^wp ' work/wp_F.txt; tail -1 work/wp_F.txt     # wp 件数・wpsum
 | 未走 14 unit の内訳 (skip 10 件の `units[i]==0` と `*proc==0` の分解) | 未走範囲の確定 | #2770 |
 | 窓の負の対照 (窓を踏ませる run・alrm_def の検出経路)、幅 16 を超える書込みとカーネル内書込みの扱い | 0 件の信頼性 | #2770 |
 | 全 942 unit の wasm 側 `[aw]` 採取と、書込み元の特定 | 書込み元が未確定 | #2769 |
+
+### 8.7 main 取り込み後の再測定 (merge `bda3d706`)
+
+- 測定 commit: `bda3d706` (`origin/main` `a7ea7667` を取り込んだ merge commit)。コードは merge 結果をそのまま測った。
+- 前の測定 commit `8db3c10c` からの変更 (main 側。`git diff --stat 8db3c10c bda3d706 -- tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/liftdiff.py tools/liftdiff/targets/m11.json`): `ldlib/build_wasm.py` (変更 4 行)、`ldlib/irtool.py` (変更 69 行)。`rt/ld_native.c`・`rt/ld_ms_call.S`・`liftdiff.py`・`targets/m11.json` は差分 0。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`work-m11`・`work-liftdiff` を `tools/m11/work/`・`tools/liftdiff/work/` に展開。
+- ビルド: `gcc -O1 -g -Wall -Wno-unused-function -o work/ld_native rt/ld_native.c rt/ld_ms_call.S -lm`。警告 3 件はすべて `rt/ld_core.h` 由来 (`ld_native.c` は 0 件)。
+- 実行: `python3 liftdiff.py bootstate targets/m11.json --mode hybrid --nobuild`、直列 16 run。合計 302 s (`date` の差)。終了時 1 分 load 1.00。
+
+| run 群 | 環境変数 | n (run 名) | rsp | units_run | img_runs・bytes | wp 件数 | wpsum faults/timeouts/alrm_def |
+|---|---|---|---|---|---|---|---|
+| F | `LD_WATCH_ADDR=5ac308` | 3 (F, r2F, F3) | `0x7fffffffbc60` | 928/942 | 215・48,484 | 0 (各 run) | 0/0/0 (各 run) |
+| C (陽性対照) | `LD_WATCH_ADDR=15eac98` | 3 (C, r2C, C3) | `0x7fffffffbc60` | 928/942 | 215・48,484 | 248 (各 run) | 726/0/0 (各 run) |
+| B (監視なし) | なし | 6 (B, B2, B3, B4, r2B, r2B2) | `0x7fffffffbce0` | 928/942 | 216・48,516 | — | — |
+| E2 | `LD_WATCH_OUT` のみ | 1 (E2) | `0x7fffffffbc70` | 928/942 | 216・48,516 | — | — |
+| X6 | `LD_WATCH_ADDR=000000` | 1 (X6) | `0x7fffffffbc60` | 928/942 | 215・48,484 | — | — |
+| X0 | `LD_WATCH_ADDR=0` | 2 (X0, X0b) | `0x7fffffffbcc0` | 928/942 | 215・48,484 | — | — |
+
+- 16 run 全てで entry (segv・rip RVA `0x26833d`)・k=246・ok+682・fail 3・最初 830・units_run 928/942 が同一。PR 側の 01e767de の表と集計は一致する。
+- rsp は 8.2 の値 (`0x7fffffffbc50`・`bcd0` 等) と違う。rsp は環境変数と cwd・OUT パスの長さで決まり、worktree の path が違うためで、arm の有無の比較は rsp を揃えた組 (F・C・X6 は `bc60`) で読む。
+- img (RVA、rsp を揃えた組): F vs X6 は `0x11e69bf` の 1 byte のみ (PR 側と同じ)。F3 vs X6 は 0 byte (`0x11e69bf` は揺れる byte)。C vs X6 も `0x11e69bf` の 1 byte のみ。
+- **8.2b の C 固有の 11 byte (`0x11ead38`〜`0x11ead52`) は、この rsp の組の img (215 要素) に含まれず、観測できなかった**。PR 側の 216 要素の組 (rsp `bc50`) で見えた差を、この測定で再現も反証もしていない。rsp を `bc50` に揃える (または 216 要素の rsp `bce0` の組に C を入れる) 追加測定が要る。それまで §8.4 の「非摂動性は未確認」は変えない。
+- 同じ組内の差 (run 間): F 群・C 群・B 群の全組の対 (`F`・`r2F`・`F3`・`X6`、`C`・`r2C`・`C3`・`X6`、B 系 6 run) で、差は `0x11e69bf` の 1 byte か 0 件のみ。
+
+#### 8.7.1 差分証跡と鮮度
+
+- 測定 commit `bda3d706` から作成時 HEAD までの `tools/liftdiff` の差分 (REPORT を除く) は 0 byte (`git diff bda3d706 HEAD -- tools/liftdiff ':(exclude)*REPORT*'` の出力は空)。
