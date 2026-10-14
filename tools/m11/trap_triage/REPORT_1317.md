@@ -190,43 +190,35 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 
 ## 12. 追補 (2026-10-14・#1317 8 回目 run): function_40f960 / 40fb40 の計測 (既定 OFF)
 
-- 測定 commit: `b36d3b5f` (計測 probe のコードはこの commit で最後に変わった。`M11_INSTR_40F960` 既定 0)。
-  - `git diff b36d3b5f HEAD -- tools/m11/m11_ov.c` は 28 行 (main 取り込み `ab13d73d` で入った #882 の `M11_INSTR_40FFE0` 計測。既定 0 では `#if` 内で inert)。`40f960` / `40fb40` の計測コードは変わらない。
-  - `git diff b36d3b5f HEAD -- tools/m11/m11_build.sh tools/m11/m11_rt.c` の出力は 4 行・20 行。main 取り込み (merge `b09ad4eb`) で入った #1952 の knob (`M11_RT_PADPRE`・`M11_RT_PADPOST`・`M11_RT_EMPTY`、既定 0)。`m11_rt.c` の追加は全て `#if M11_RT_*` 内、`m11_build.sh` の `S_NEG` は既定 0 のとき従来と同一の文字列になるため、既定 0 では build 出力は変わらない。
-  - `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
-  - 前の commit `731a232a` の計測値は無効 (旧 `static` カウンタはプロセス全体の累計)。全 diff は `REPORT_1317_APPENDIX.md` §12。
-- 旧記録 (§4a・§6〜§8) の rc=124 (`0..830`+880) は、旧 IR 依存の可能性がある。素材の RetDec v5.0 で再生成した IR では再現しなかった (下記)。
-- 旧計測 (`731a232a`) の「`40fb40` の連鎖長 10 万未満」は**無効**。`40f960` の確保サイズ (呼び出しごとに出力) は有効な値。
-- 再測定 (`b36d3b5f`・`M11_INSTR_40F960=1`・`M11_M2P=1`・`survey_units.mjs` 60 s 上限): 素材 `work-m11` / `work-liftdiff` / `fl-win64` を展開して実施。
-  - 素材: `toolchain-retdec` を `$RUNNER_TEMP/tc/retdec` に、`toolchain-emsdk` を `$RUNNER_TEMP/tc/emsdk` に展開 (`tar --zstd -xf`)。RetDec は `retdec-decompiler --version` で v5.0 (commit `53e55b4`・build date 2022-12-08)。`/opt/retdec/bin/retdec-decompiler` と md5 が一致し、runner 既存版と同一。emsdk は `6.0.12` (`upstream/.emsdk_version` の `releases-6e9f6885...`)。`llvm-nm` は `emsdk/upstream/bin/llvm-nm` にあるため PATH に emsdk の bin を前置して build した (`RETDEC_ROOT=$RUNNER_TEMP/tc/retdec`・`EMSDK=$RUNNER_TEMP/tc/emsdk`)。
-  - IR: 素材 `work-m11` に `ir_conditions.json` が無いため、素材の RetDec で `m11_gen_ir2.sh` を再生成 (rc=0・51.3 s・`ldfix errors=0`・`ir_conditions.json` は `ldfix=applied`)。`m11_gen_ir2.sh` 直後の `ir_sha256` は `08c7b6…`、build の前処理 (alloca/guard/fix912 の正規化) 後は `b47a4d…` で `--check` が通る。素材 `work-m11` の旧 `boot_final.ll` (490,653 行) とは一致しない (今回 490,749 行・alloca 型の差が出る)。素材の旧 IR は `m11_cond.py --check` で拒否される (指紋記録なし)。
-  - `0..829`+880: rc=0、6.5 s、`{"ok":763,"oob":14,"miss":46,"other":1,"halt0":7}`。`40f960` 521 回・`40fb40` 521 回 (`chain_len` 1〜7)。
-  - `0..830`+880: rc=0、12.3 s、`{"ok":763,"oob":15,"miss":46,"other":1,"halt0":7}`。`40f960` 523 回・`40fb40` 523 回 (`chain_len` 1〜7)。
-  - 対照 (`M11_INSTR_40F960=0`・同 IR): `0..829`+880 rc=0 6.9 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":14}`、`0..830`+880 rc=0 13.0 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":15}`。計測 probe の ON/OFF で結果は 1 件ずれる (`ok`・`halt0`)。
-  - 扱い: probe ON の結果は挙動を 1 件変えるため、停止判定には使わない。ずれの原因は未切り分け。各条件は 1 回の測定で、再現性 (2 回目の値) は未確認。
-  - **REPORT §4a・§6〜§8 の「`0..830`+880 は rc=124」とは再現が一致しない**。今回の IR (素材の RetDec v5.0 で再生成) と旧 IR の差が原因かは未切り分け (旧 IR は `ir_conditions.json` が無く、同一条件で作り直せない)。
-  - 再測定の追加 (素材 RetDec 再生成 IR・`b36d3b5f` の build): OFF 0..829 を 3 回 (`ok 764 / halt0 6` 3 回とも一致)。ON 0..829 は 2 回 (`ok 763 / halt0 7` 2 回とも一致)。ON と OFF のずれは再現する。
-  - main 取り込み後の HEAD `e7c5c062` で build し直して再測定: ON `0..829`+880 rc=0 6.44 s `ok 763 / halt0 7` (`40f960` 521・`chain_len` 521・abort 0)、ON `0..830`+880 rc=0 12.21 s `ok 763 / halt0 7` (523・523・abort 0)、OFF `0..829`+880 rc=0 6.92 s `ok 764 / halt0 6`、OFF `0..830`+880 rc=0 12.90 s `ok 764 / halt0 6`。取り込み前と同じ値。
+- 測定 commit: `e7c5c062` (main 取り込み後の HEAD。`e7c5c062..HEAD` のコード差分は無し)。計測 probe は既定 0 で inert。
+- 既定 0 で build 出力が変わらない根拠 (`git diff --stat b36d3b5f e7c5c062`・6 ファイル 78 行追加 / 11 行削除。全文は `REPORT_1317_APPENDIX.md` §12):
+  - `tools/m11/m11_ov.c` +17: #882 `M11_INSTR_40FFE0` 計測。`#if` 内のみ。既定 0 で追加されるコードなし。
+  - `tools/m11/m11_post.py` +7/-1: 同 wrapper。`os.environ.get('M11_INSTR_40FFE0') == '1'` のときだけ PROBES と wrapper を追加。既定 0 では従来と同一。
+  - `tools/m11/m11_build.sh` 13 行: `M11_INSTR_40FFE0` の CF 追加と stamp 形式 (`0:0`)。既定 0 では CF に `-DM11_INSTR_40FFE0=0` が増えるだけ (ov.o の再生成は stamp 変化時のみ)。`S_NEG` は既定 0 で従来と同一。build 出力の bit 同一性は未検証。
+  - `tools/m11/m11_rt.c` +20: #1952 の `M11_RT_*` knob。`#if` 内のみ。
+  - `tools/m11/shimx_link/probe_trace_unit.mjs` +24 / `probe_unit23.mjs` 8 行: 独立した shimx 系 probe。`m11_build.sh`・`survey_units.mjs` からは呼ばれない (grep 確認)。`probe_unit23.mjs` は slot アドレス定数を `0x15f10e0` から `0x11f10e0` (LVA) に直したもの。
+- 素材: `fl-win64`・`work-m11`・`work-liftdiff`・`toolchain-retdec` (v5.0・commit `53e55b4`・[RETDEC] と md5 一致)・`toolchain-emsdk` (6.0.12、[EMSDK]) を展開。`llvm-nm` は emsdk の `upstream/bin` を PATH に前置。
+- IR: 素材の RetDec で `m11_gen_ir2.sh` を再生成 (rc=0・51.5 s・`ldfix errors=0`・`ir_sha256` `3506a9…`・`boot_final.ll` 490,733 行)。前 run の `08c7b6…` とは一致しない。2 回目の再生成 (後続の再測定の前) の `ir_sha256` も `3506a9…`。
+- 測定 (`M11_M2P=1`・`survey_units.mjs`・上限 60 s・load 0.8〜1.0)。
 
-| 条件 | `40f960` の呼び出し (self, size) | `40fb40` の chain_len 最大 | 最後の出力 |
-|---|---|---|---|
-| `0..829`+880 | 521 回 (`unit 880` は 6 回)。size: 16:18, 24:5, 32:10, 40:55, 48:92, 52:4, 56:51, 64:22, 72:6, 80:3, 88:149, 96:30, 104:10, 120:2, 128:17, 136:19, 144:5, 152:2, 160:2, 176:1, 192:1, 200:4, 208:1, 232:1, 240:1, 352:2, 368:1, 416:1, 728:1, 912:1, 1064:1, 1136:2, 2520:1 (最大 2520) | 7 (1:17, 2:213, 3:217, 4:63, 5:4, 6:5, 7:2) | `unit 880` の `GetComputerNameExW`・`RegOpenKeyExA`・`RegCloseKey` stub (完走) |
-| `0..830`+880 | 523 回 (`unit 880` は 6 回)。size は 0..829 と同じ分布で、差は 48:+1, 72:+1 のみ (unit 830 の 2 回) | 7 (1:17, 2:213, 3:219, 4:63, 5:4, 6:5, 7:2) | `unit 880` の `40fb40 chain_len=3 self=0x4cf790` (完走) |
+| 条件 | build | rc | 所要 | 結果 |
+|---|---|---|---|---|
+| `0..829`+880 | ON (`M11_INSTR_40F960=1`) | 0 | 1.3〜1.4 s (4 回とも同値) | `ok 765 / oob 13 / miss 46 / other 1 / halt0 4 / abort 2` |
+| `0..829`+880 | OFF | 0 | 1.7 s (2 回とも同値) | `ok 765 / oob 13 / miss 46 / other 1 / halt0 4 / abort 2` |
+| `0..830`+880 | ON | 124 (上限 60 s) | 60 s 超 | 完走せず。240 s 上限でも rc=124 (最後の出力は `unit 880`) |
+| `0..830`+880 | OFF | 124 (上限 60 s) | 60 s 超 | 完走せず (2 回とも rc=124) |
 
-- 計測の要点:
-  - `40f960` の確保サイズは最大 2520 で、`unit 880` の 6 回は 48〜200 (120, 200, 128, 128, 88, 48)。どちらも大きくない。
-  - `40fb40` の連鎖長は最大 7。この観測は「連鎖が 7 で終わる」ことを示すだけで、循環の有無を証明するものではない (停止しない条件での観測のため)。
-  - `VA-big` の大きな値 (2060124160 等) は `40f960` の呼び出しではない。
-- 結論 (今回の実測): 停止は再現しなかった (rc=0)。(a) 確保サイズ過大と (b) 連鎖の循環は、この計測では停止の原因として観測されなかった。ただし素材 IR と同条件ではないため、(a)・(b) の判定は未確定のまま。
-
-- 前 run の「(a)・(b) 両方否定」は**撤回** (旧 `static` カウンタの値が無効だったため)。今回の実測で再判定したが、停止が再現しないため判定は未確定。
-- 受入の状況 (本 run 末):
+- ON と OFF で `0..829` の結果は一致した (取り込み前の記録にあった 1 件ずれは再現しなかった)。
+- `0..829` の `abort` 2 件 (unit 304 `0x483140`・unit 555 `0x7f2500`) は `m11_unresolved_function` での abort。前 run の記録には無く、未切り分け。
+- 計測ログ: ON `0..829` の JSON に `[m11][40f960]` 行 88 件・`chain_len=` 行 86 件。`0..830` は JSON 未出力 (上限で打ち切り) のため集計なし。
+- 前 run (`b36d3b5f` 時点) の数値 (`ok 763`・`40f960` 521 件・`0..830` rc=0 13 s) は今回の IR と一致せず再現しない。IR が異なるため比較もできず、本節では採用しない (旧値は git 履歴の `b36d3b5f` 版 REPORT に残る)。
+- 結論 (今回の実測): `0..830`+880 は ON/OFF とも完走せず、停止は §4a・§6〜§8 の rc=124 と一致する。`40f960`/`40fb40` の計測は `0..829` で動くが、停止する `0..830` では出力を取れていないため、(a) 確保サイズ過大・(b) 連鎖の循環の判定は未確定。
 
 | 受入 | 状態 |
 |---|---|
-| 1. 830 が残す状態 | 未達 (未特定。今回 830 を含めても停止せず、停止条件の再現が取れていない) |
-| 2. 停止命令・wasm frame | 未達 (今回の IR では停止しないため特定対象が無い) |
+| 1. 830 が残す状態 | 未達 (830 を含めると 880 で停止。残す状態は未特定) |
+| 2. 停止命令・wasm frame | 未達 (停止位置の trace 未取得) |
 | 3. 修正案 | 未達 |
-| 4. 修正後の完走 | 未達 (今回の IR では `0..830`+880 が完走 (OFF rc=0 13.0 s・ON rc=0 12.3 s)。§4a・§6〜§8 の rc=124 との差は未切り分け) |
+| 4. 修正後の完走 | 未達 (`0..830`+880 は ON/OFF とも rc=124) |
 
-- 次の一手: 旧 IR (§4a・§6〜§8) と今回の IR の差 (alloca 型の差を含む) の切り分け。素材の旧 IR は指紋記録が無く、同一条件で作り直せないため、`m11_gen_ir2.sh` の入力 (旧 RetDec 版の有無・`m11_cond.py` 導入前の生成条件) を揃えないと再現にならない。
+- 次の一手: `0..830` の停止位置を `SV_TRACE_AT=880` (§3 の手順) で ON/OFF 別に取り、`40f960` の呼び出しを 880 直前まで出力する。
