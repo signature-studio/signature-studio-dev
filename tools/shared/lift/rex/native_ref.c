@@ -23,8 +23,10 @@ static uint64_t __attribute__((ms_abi)) st_raise(uint64_t c, uint64_t f, uint64_
 typedef uint64_t (__attribute__((ms_abi)) *FN)(uint64_t, uint64_t, uint64_t, uint64_t);
 #include <setjmp.h>
 static sigjmp_buf jb;
-static volatile sig_atomic_t in_case, n_segv, n_alrm;
-static void on_fault(int sig) { if (in_case) { if (sig == SIGALRM) n_alrm++; else n_segv++; siglongjmp(jb, 1); } _exit(4); }
+static volatile sig_atomic_t in_case, n_segv, n_alrm, last_sig;
+static volatile uintptr_t last_addr;
+static uint32_t n_null, n_arena, n_img, n_oth;
+static void on_fault(int sig, siginfo_t *si, void *uc) { (void)uc; if (in_case) { last_sig = sig; last_addr = (uintptr_t)si->si_addr; if (sig == SIGALRM) n_alrm++; else n_segv++; siglongjmp(jb, 1); } _exit(4); }
 #define CRASH_MARK 0xC2A5C2A5C2A5C2A5ULL
 #define DIE(...) do { fprintf(stderr, __VA_ARGS__); return 2; } while (0)
 
@@ -44,9 +46,13 @@ int main(int argc, char **argv) {
                           MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
     if (arena != (void *)REX_ARENA) DIE("mmap arena failed\n");
 
-    signal(SIGSEGV, on_fault);
-    signal(SIGBUS, on_fault);
-    signal(SIGALRM, on_fault);
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = on_fault;
+    sa.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+    sigaction(SIGALRM, &sa, NULL);
     FILE *fc = fopen(argv[2], "rb"), *fo = fopen(argv[3], "wb");
     if (!fc || !fo) DIE("open cases/out\n");
     uint32_t ncase; rd_exact(fc, &ncase, 4);
@@ -74,6 +80,16 @@ int main(int argc, char **argv) {
         } else {
             /* 元の機械語が無効アクセス/時間超過: 定義された結果が無いので比較対象から外す (件数は diff_test が報告) */
             hits = CRASH_MARK; memset(arena, 0, REX_ARENA_SZ); memset(img + REX_DATA_RVA, 0, REX_DATA_SZ);
+            if (last_sig == SIGALRM) {
+                fprintf(stderr, "[native] crash case=%u fn=%u sig=ALRM\n", c, fn);
+            } else {
+                uintptr_t ad = last_addr;
+                if (ad < 0x10000) n_null++;
+                else if (ad >= REX_ARENA && ad < REX_ARENA + REX_ARENA_SZ) n_arena++;
+                else if (ad >= REX_BASE && ad < REX_BASE + REX_IMG_SIZE) n_img++;
+                else n_oth++;
+                fprintf(stderr, "[native] crash case=%u fn=%u sig=%d addr=0x%llx\n", c, fn, (int)last_sig, (unsigned long long)ad);
+            }
         }
         in_case = 0;
         fwrite(&rax, 8, 1, fo);
@@ -82,6 +98,7 @@ int main(int argc, char **argv) {
         fwrite(img + REX_DATA_RVA, 1, REX_DATA_SZ, fo);
     }
     fclose(fo);
-    fprintf(stderr, "[native] excluded: SIGSEGV/SIGBUS=%d SIGALRM(300ms)=%d\n", (int)n_segv, (int)n_alrm);
+    fprintf(stderr, "[native] excluded: SIGSEGV/SIGBUS=%d (addr<0x10000: %u / arena: %u / image: %u / other: %u) SIGALRM(300ms)=%d\n",
+            (int)n_segv, n_null, n_arena, n_img, n_oth, (int)n_alrm);
     return 0;
 }

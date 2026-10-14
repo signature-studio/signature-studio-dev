@@ -6,8 +6,10 @@ case 形式 (little endian, native_ref.c と run_wasm.mjs が同じ規約で読�
   ctx : REX の ctx 大域 (RVA 0x49e08) に入れる値。0 (NULL) か arena 内の構造体。
   a0  : arena 内ポインタ、または 32 / 64 bit の奇数乱数 (arena 外の値を含む)。
   a1  : 0 / 1 / 0x100-0x7ff の整数。a2 : arena 内ポインタか 0。a3 : 0 か arena 内ポインタ。
-  arena: qword 単位で {0, arena 内ポインタ} だけを入れる。整数値は入れない (REX が値を pointer として deref しても
-         native 側で SIGSEGV せず、wasm 側でも線形メモリ内の別データを読まないため)。
+  arena: qword 単位で {0, arena 内ポインタ} だけを入れる。整数値は入れない (deref 先の内容が native の仮想アドレスと
+         wasm の線形メモリで一致しないため)。arena 内ポインタは両側で同じ内容を指す。arena 内の 0 qword (ctx 領域の外で約 10%)
+         を deref すると NULL 参照で native 側は SIGSEGV する (除外の候補。落ちた case の fault アドレスは native_ref の
+         stderr に出る。REPORT §7.6)。
 usage: gen_cases.py OUT [N]
 """
 import random, struct, sys

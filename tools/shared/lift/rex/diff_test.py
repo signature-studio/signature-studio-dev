@@ -47,14 +47,12 @@ bad = []
 rax_hist = collections.Counter()
 hit_cases = 0
 crashed = []
-crash_a0_ext = 0
 w_arena = w_data = w_any = 0
 for i in range(n):
     a = nat[i * REC:(i + 1) * REC]
     b = bytes(was[i * REC:(i + 1) * REC])
     if struct.unpack_from('<Q', a, 0)[0] == CRASH:
         crashed.append(i)
-        crash_a0_ext += not (ARENA_LO <= a0s[i] < ARENA_LO + ARENA_SZ)
         continue
     rax_hist[struct.unpack_from('<Q', a, 0)[0]] += 1
     hit_cases += struct.unpack_from('<Q', a, 8)[0] > 0
@@ -75,7 +73,11 @@ cov_ok = (compared >= n // 2 and cov['distinct_rax'] >= 2 and cov['import_cases'
 print('[diff] cases=%d compared=%d match=%d mismatch=%d native_crash_excluded=%d' % (n, compared, compared - len(bad), len(bad), len(crashed)))
 print('[diff] first mismatches (case, byte offset in record): %s' % bad[:5])
 print('[diff] writes (入力 arena・初期 .data から変化した case, ctx 除く): any=%d arena=%d data=%d / compared=%d' % (w_any, w_arena, w_data, compared))
-print('[diff] native crash のうち a0 が arena 外: %d / %d' % (crash_a0_ext, len(crashed)))
+a0_ext = [not (ARENA_LO <= a0s[i] < ARENA_LO + ARENA_SZ) for i in range(n)]
+ext_n, ext_c = sum(a0_ext), sum(a0_ext[i] for i in crashed)
+int_n, int_c = n - ext_n, len(crashed) - ext_c
+print('[diff] native crash と a0 の範囲: a0 arena 外 %d / %d (%.0f%%), a0 arena 内 %d / %d (%.0f%%)' % (
+    ext_c, ext_n, 100.0 * ext_c / max(ext_n, 1), int_c, int_n, 100.0 * int_c / max(int_n, 1)))
 print('[diff] coverage %s ok=%s' % (cov, cov_ok))
 print('[diff] rax top: %s' % [('%#x' % k, v) for k, v in rax_hist.most_common(4)])
 ok = not bad and cov_ok
