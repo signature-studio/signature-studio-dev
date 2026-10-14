@@ -9,6 +9,6 @@ exc=halt0
 MISS_UNIQ 0 MISS_TOTAL 0
 ERR|[m11][stub-notimpl] FormatMessageW called (0 を返して継続)
 
-real	0m0.585s
-user	0m0.481s
-sys	0m0.247s
+real	0m0.694s
+user	0m0.477s
+sys	0m0.353s

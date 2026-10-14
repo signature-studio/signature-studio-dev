@@ -8,4 +8,4 @@ m11_boot.cjs (JS グルー) の sha256: A = B = 49e6cce219f84655a2744a1a084391f1
   (データ配列は .wasm に入るため、.cjs の sha は変わらない)
 m11_boot.cjs.wasm の sha256: A = 47fdb4bde9d558332513ecf1e66e202b8c2712ea5663b0e560c218aa0a3b48d4 / B = 5f94d9701c4553fa0de1ab3c4251b83b108735c2d41bc4a6c7b2be8c7717480d
 wasm の差分 (cmp -l): 1 バイト。オフセット 6017376 (10 進・1 始まり)、0x42 -> 0x02
-probe 9 本 (3 probe x 3 版): B の出力は、前回の証跡 (`642077fa` 時点で取得) と時間行を除いて一致 (diff 0 行)。A の probe 出力は取っていない
+probe 9 本 (3 probe x 3 版): B の出力 (HEAD `8ef418e6` で再測定) は、前回の証跡と時間行を除いて一致。ただし `probe_unit23_shimx_trace_soft_fix.txt` は main 取り込みの probe 変更 (RET 行の `site=`・`ord=`) で行が変わる (`site=`・`ord=` を除けば一致)。A の probe 出力は取っていない

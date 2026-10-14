@@ -33,6 +33,7 @@
 [fix_alloca] 拡幅 alloca 0 個 (0 関数)
 [gen_link] 外部参照 570: shimx=184 lift_c=211 lift_unresolved=0 libc=0 intrinsic=3 gui=170 audio=1 unknown=1
 [gen_link] ラッパ 356 本 (varargs で除外 0: ) / スタブ 172 本
+[gen_link] RET_LOG 呼出し元 site 24 件 (GetModuleHandleW GetProcAddress)
 [sxlink] cc gui_stubs_soft.c
 [sxlink] cc gui_compat.c
 [sxlink] cc boot_trace.ll
@@ -40,8 +41,8 @@
 [sxlink] cc trace_rt.c
 [sxlink] OK trace_soft_fix: signature mismatch=1 undefined symbol=0 duplicate=0  -> <repo>/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs
 rc=0
-[sha256 shimx cjs] 66181f8fb2e3edeafaf125dcbeccd8a3f7b4612d1658318875410e0de31af2da  work/shimx_link/m11_sx_trace_soft_fix.cjs
+[sha256 shimx cjs] 64faf9c6ef5e40ac840efdbcc69308fa7cb18f86c7f62b1fa4da49b04667ceac  work/shimx_link/m11_sx_trace_soft_fix.cjs
 
-real	0m16.378s
-user	0m14.346s
-sys	0m2.043s
+real	0m16.651s
+user	0m14.687s
+sys	0m2.164s
