@@ -12,8 +12,8 @@
 | 出典 | 受入条件 | 結果 |
 |---|---|---|
 | #1609 #1 | `[0x710040]` の実行時の値と書込み元を計測 | **部分達成**。実行時の値は trap 時点で 0 (§2)。書込み元は IR・image に無し (§3) |
-| #1609 #2 | fold deref を塞ぎ `hs_e2e.sh --fresh` の Phase B で `plug != 0` | **未達** (§4) |
-| #1609 #3 | fail-soft 3 件の戻り値の意味を確定 | **未達**。本 run では着手せず |
+| #1609 #2 | fold deref を塞ぎ `hs_e2e.sh --fresh` の Phase B で `plug != 0` | **子 issue #1848 に移管** (本 issue の範囲外。§4) |
+| #1609 #3 | fail-soft 3 件の戻り値の意味を確定 | **子 issue #1848 に移管** (§6.1) |
 | #1609 #4 | REPORT に実測値・Phase A 回帰 `dispatch=38 ff=0` | **達成** (§2) |
 
 ## 2. 実測
@@ -40,10 +40,19 @@
 ## 4. 未達と残作業
 
 - `0x40d6e0` の分岐: `[0x710040]` == 0 のとき `dec_label_pc_7b812a` (`0x40d807` の icall) に進み、`[0x710030]` を読む。実行上は `0x40d807` が target 0 の soft-miss を返して抜ける (e2e ログ)。その後 `0x40e720` (既存 override) を経由して trap。
-- 残作業 A: `0x710030` / `0x710040` の値を FL 本体 export table から求めるか、呼出元 `0x40d820` の引数を復元して `0x40d6e0` の経路そのものを塞ぐ。どちらも FL 本体側の table 読解が必要で、本 run の時間内では完了しない。
-- 残作業 B: fail-soft 3 件 (0x52cf40 / 0x4e6060 / 0x4181e0) の戻り値の読解 (#1609 受入 3)。
+- 残作業 A: `0x710030` / `0x710040` の値を FL 本体 export table から求めるか、呼出元 `0x40d820` の引数を復元して `0x40d6e0` の経路そのものを塞ぐ。どちらも FL 本体側の table 読解が必要で、本 run の時間内では完了しない。→ 子 issue #1848 (受入 1)。
+- 残作業 B: fail-soft 3 件 (0x52cf40 / 0x4e6060 / 0x4181e0) の戻り値の読解 (#1609 受入 3)。→ 子 issue #1848 (受入 2)。
 
-## 5. 再現手順
+## 5. 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 受入 2: `0x40d6e0` の fold deref 解消 (`0x40d820` の引数復元 / override) | Phase B の `plug != 0` 未達 | #1848 |
+| 受入 3 残: `0x52cf40` の比較先 `%10`・`0x4181e0` の 0 の意味 | fail-soft 戻り値の確定 | #1848 |
+| `fw_stage2.sh` の load (§6) 未計測・所要時間のレンジ未取得 (n=1) | 実測値の鮮度・ばらつきが不明 | #1848 (再測定時に取得) |
+| `fw_hostfix.py` の `0x4181e0` の注釈 (0 = 該当なし) | 注釈が読解と合わない可能性 (要再検討。本 PR ではコード変更なし) | #1848 |
+
+## 6. 再現手順
 
 ```sh
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 ANALYSIS_DIR=$RUNNER_TEMP/analysis
@@ -57,14 +66,16 @@ bash tools/plugins/framework/hostshim/hs_dbg.sh                # trap 直前の�
 
 - 起点: `origin/main` 6e001233。worktree `ws-1609`・branch `1609-plg-p0b-6-fail-soft-callers`。コード変更なし (本 REPORT の追記のみ)。
 - 素材: `fl-win64`・`work-fw-stage1` を展開。`fw_stage2.sh` は stage-1 再利用で作り直し。
-- 実測 (同一 commit 6e001233 で各 1 回):
+- 実測 (同一 commit 6e001233 で各 1 回。**n=1 (レンジ未取得)**):
 
 | 手順 | 結果 | 所要時間 (real) | load (開始時) |
 |---|---|---|---|
-| `fw_stage2.sh` (`FL_WIN64_DIR` 指定・stage-1 再利用) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 4 分 48 秒 | 未計測 (開始時の uptime は取っていない) |
-| `hs_e2e.sh --fresh` | exit 1 / Phase A `dispatch=38 ff=0` (回帰 OK) / Phase B `memory access out of bounds` / `status=0xffffffff plug=0x0 rec=7` | 1 分 26.9 秒 | 0.03 / 0.66 / 0.60 |
+| `fw_stage2.sh` (`FL_WIN64_DIR` 指定・stage-1 再利用) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 4 分 48 秒 (n=1) | **未計測** (開始時の uptime は取っていない) |
+| `hs_e2e.sh --fresh` | exit 1 / Phase A `dispatch=38 ff=0` (回帰 OK) / Phase B `memory access out of bounds` / `status=0xffffffff plug=0x0 rec=7` | 1 分 26.9 秒 (n=1) | 0.03 / 0.66 / 0.60 |
 
+- `fw_stage2.sh` の load は未計測 (本 run の時点では取得していない)。所要時間のレンジは n=1 のため未取得。
 - 1 回目 (§2) と同じ失敗 (Phase B OOB) を再現。受入 2・3 の失敗ではなく、本 run は読解のみ。Phase A 回帰は両回とも `dispatch=38 ff=0`。
+- 測定 commit: `6e001233` (コード差分 0。`git diff 6e001233 HEAD -- tools/plugins/framework` は本 REPORT の追記のみ)。
 
 ### 6.1 fail-soft 3 件の呼出側 (`hs_flat3.ll` の IR 読解)
 
