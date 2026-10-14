@@ -1396,6 +1396,8 @@ export class Engine {
     let base: OpenSample | undefined;
     for (const h of this.d.store.get<OpenSample[]>("meta", "openHist") ?? []) if (h.at <= now - DAY_MS && (!base || h.at > base.at)) base = h;
     return {
+      // デプロイした commit (--var BUILD_COMMIT)。渡していなければ null。反映の確認に使う (README『再デプロイ』手順 5)。
+      build: this.d.cfg.build,
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
       mode: this.d.cfg.liveLaunch && this.d.cfg.liveDispatch ? "live" : this.d.cfg.liveLaunch || this.d.cfg.liveDispatch ? "partial" : "dry-run",
