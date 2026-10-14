@@ -128,3 +128,82 @@ python3 m11_icall_audit.py work/boot_final.ll                          # §4 間
 | `function_50a830` の Grow / Notify の復元 (転記 + `ICALL_AT`) と、unit 114・survey への影響の測定 | list B の `+8` が 0 でなくなるかの確認。unit 114 の `halt0` と unit 275 の oob が変わるか | 子 issue #2439 (親 #2408) |
 | unit 106 で止まる機構の検証 (`-O0` の `m11_sw` が書くスタック残骸を読む関数の特定) | §2 の機構は推定のまま | PR 本文の未解決表 (診断のみで実装を伴わないため起票しない) |
 | DEFECTS.md への D23 追記 | 横断正本の更新 | PM 判断 (`docs/WORKFLOW.md` §5) |
+
+## 7. #2439: `function_50a830` の Grow/Notify 復元 (`M11_FIX_50A830`、既定 OFF)
+
+既知類型との関係: **D15 同型** (§4 の行案 D23 案)。測定 commit `4efc5b82` (`m11_ov.c` +70 行、`m11_build.sh` +2/-1)。基点は origin/main `9f403c97`。
+
+### 7.0 結論
+
+1. ON (`M11_FIX_50A830=1`) で list B の `+8` は unit 114 で `0x0` → `0x10bc4f10` (非 0) になる (`probe1676_watch.mjs`)。受入条件 2 を満たす。
+2. ON の survey は ok 872 → 871、trap 23 → 24。unit 144 (VA `0x25c540`) が **ok → oob の回帰 1 件**。unit 304・555 は oob → abort (IR 未定義 `function_535c2e` への到達)。回帰があるため既定は OFF のまま (受入条件 1 の「回帰が無ければ既定 ON」の分岐を採らない)。
+3. unit 114 は halt0 のまま、unit 275 は oob のまま。e2e の回帰ゲート (`e2e_expect.env`: stage 4・survey ok 800) は ON・併用とも通る (rc=0)。
+4. 未解決 (unit 144 の回帰・`function_535c2e` の既定化・既定 ON 化) は子 issue **#2521** (`[M11-19]`、親 #2439)。
+
+### 7.1 転記の内容 (`tools/m11/m11_ov.c`、`#if M11_FIX_50A830` で囲む)
+
+- `function_50a830(self, item)`: `cnt == [self+0x18]` なら `call [VMT+0]` (Grow)。`FItems[cnt] = item; Count++`。`item != 0` かつ VMT が `Q(RVA 0xc9af8)` と異なれば `call [VMT+8](self, item, 0)` (Notify)。VMT 経由は `ICALL_AT(0x50a84f / 0x50a87d, …)`。
+- Grow 実体 `function_50aac0` (VA `0x50aac0`): hook 全域 `G` = RVA `0x11e4390` の指す `P` の `*P` が非 0 なら `call *P` で newcap を得る。静的値は 0 のため既定経路は容量の増分 (cap > 0x40 → `3*cap >> 1`、8 < cap ≤ 0x40 → +0x10、それ以外 → +4) を newlen まで繰り返す。
+- SetCapacity `function_50ade0` (VA `0x50ade0`): newcap < Count なら `function_50a9a0` (エラー経路)。newcap ≠ Capacity なら `function_417fc0(&FItems, ti, 1, newcap)` の後 Capacity := newcap。`ti` = `Q(RVA 0xc9730)`。
+- Notify 実体 VA `0x50b3f0` は `ret` 1 命令 (`disp_find` の `tr_ret0`)。Grow は `disp_find` の `tr_50aac0` で登録。
+- RIP 相対の参照先は `ip + disp` を Python で計算して確認した (G = VA `0x15e4390`、VMT 比較の大域 = VA `0x4c9af8`、ti = VA `0x4c9730`、50ade0 の rdx = VA `0x15e2a30`)。
+
+### 7.2 結果 (HEAD `4efc5b82` = 基点 `9f403c97` + 本変更。`m11_gen_ir2.sh` で `ld108=applied` に再生成してから測定)
+
+| 項目 | OFF (既定) | ON (`M11_FIX_50A830=1`) | ON + `M11_FIX_535BF2=1` |
+|---|---|---|---|
+| e2e rc | 0 | 0 | 0 |
+| reached_stage | 4 | 4 | 4 |
+| survey ok / trap / miss / noproc | 872 / 23 / 46 / 1 | 871 / 24 / 46 / 1 | 871 / 24 / 46 / 1 |
+| probe `base` (list B `+8`、unit 114 後) | `0x0` | `0x10bc4f10` | `0x10bc4f10` |
+| unit 114 (VA `0x223840`) | halt0 | halt0 | halt0 |
+| unit 275 (VA `0x40e170`) | oob | oob | oob |
+| OFF からの変化 (unit 単位) | — | 144 ok→oob、304 oob→abort、555 oob→abort | 144 ok→oob (304・555 は oob に戻る) |
+| `failfast_functions` (IR 未定義) | `{}` | `{function_535c2e: 2}` | `{}` |
+| wall (`real`) | 52.5 s | 50.0 s | 未計測 |
+
+- 負荷: OFF の直後の `uptime` は load average 0.95 / 0.74 / 0.51 (1/5/15 分)。並列 1 本 (e2e は直列)。
+- 旧基点 `54bacdc0` (ld108 再生成前) でも同じ差分を得た (n=1): OFF 872/23/46、ON 871/24/46、併用 871/24/46、probe OFF `0x0` / ON `0x10bc4f10`。
+- 測定の n: OFF は HEAD で 2 回 (同一結果)、ON は HEAD で 1 回 + 旧基点で 1 回、併用は HEAD で 1 回。
+
+### 7.3 検証・ネガティブコントロール・同型の確認
+
+- **フラグ依存のネガコン**: `cc()` (`m11_build.sh`) は更新時刻だけで再コンパイルを判定するため、フラグだけを変えても `work/obj/ov.o` は作り直されない。HEAD で最初に ON を実行したときは `rm` を忘れ、OFF と同一出力 (`base 0x0`、ok 872) になった。`ov.o` を削除して再実行すると `base 0x10bc4f10` になった。以後の全測定は `ov.o` を削除してから実行した。
+- **受入条件 4 (同型の他関数)**: `function_47b260` (TList Add。`M11_NOTIFY_682` と同型) は機械語に `47b29d: cmp [rbx+0x20],0` / `47b2a2: je` / `47b2ae: call [rbx+0x20]` (Notify) がある。IR の本体には直接 call `@function_47a3e0` の 1 件だけで、間接 call は無い。`m11_icall_audit.py` は機械語の間接 call 4,175 件 / 1,631 関数に対し IR は 0 件 (脱落率 100.0%)。
+- **IR sha256**: 旧基点 `54bacdc0` で `987f28f5…`、基点 `9f403c97` で `de46cada…`。§1 の `6909f85d…` とは一致しない (原因は未調査。survey の値は §1 と一致)。
+- **素材の注意**: `work-m11` に `work/lift_pe.sha256` が含まれず、`m11_e2e.sh` が全再生成に入って `m2/work` 不足で失敗した。§1 と同じく PE 指紋 `b2c64da4…` を手で書いて回避した。
+
+### 7.4 unit 単位の差分の詳細
+
+- ON で変化: unit 144 (VA `0x25c540`) ok → `memory access out of bounds`、unit 304 (VA `0x483140`) と unit 555 `memory access out of bounds` → `Aborted`。
+- 併用 (`M11_FIX_535BF2=1`) で変化: unit 144 のみ ok → oob。304・555 の abort は IR 未定義 `function_535c2e` の経路で、§4 の `M11_FIX_535BF2` が消す。
+- 残りの 939 unit は OFF と同一。
+
+### 7.5 再現
+
+```
+cd tools/m11                                       # 基点 9f403c97 の worktree (work/ は共有)
+bash m11_gen_ir2.sh                                # ld108=applied の IR (51 s)。前提: work/lift_pe.sha256 を手記録
+rm -f work/obj/ov.o && M11_SURVEY_DETAIL=<path> bash m11_e2e.sh           # 既定 OFF
+rm -f work/obj/ov.o && M11_FIX_50A830=1 bash m11_e2e.sh                   # ON
+rm -f work/obj/ov.o && M11_FIX_50A830=1 M11_FIX_535BF2=1 bash m11_e2e.sh  # 併用
+node trap_triage/probe1676_watch.mjs                                      # base (OFF 0x0 / ON 0x10bc4f10)
+```
+
+### 7.6 測定 commit から HEAD までの差分
+
+測定 commit `4efc5b82`。`git diff 4efc5b82 HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行 (本節の追記は `trap_triage/` のみのため、コード差分 0)。
+
+### 7.7 検証範囲 / 範囲外
+
+- 範囲内: list B `+8` (probe)、942 unit の分類、survey 集計、e2e 回帰ゲート、同型の機械語 (`function_47b260`)。
+- 範囲外: 他の Add 呼出し元 (IR 27 件) の個別確認、unit 144 の回帰の原因 (子 #2521)、DEFECTS.md への D23 追記 (PM 判断)。
+
+### 7.8 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 144 の ok → oob 回帰 (Grow 後の FItems・Capacity の状態が後続の添字アクセスを越える経路) | 既定 ON にできない (survey ok -1) | 子 issue #2521 (`[M11-19]`、親 #2439) |
+| `function_535c2e` (IR 未定義。RetDec が `535bf2` の末尾 ret を落とした) の既定化 | ON 時の unit 304・555 の abort (併用で解消) | #2521 |
+| 既定 ON 化と回帰ゲートの更新 | — | #2521 |
+| DEFECTS.md への D23 追記 | 横断正本の更新 | PM 判断 (`docs/WORKFLOW.md` §5) |

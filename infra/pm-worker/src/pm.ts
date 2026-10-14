@@ -1,6 +1,6 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
 // 検出に LLM も本文の解析も使わない: ラベル・マーカー・正規表現 (needs.ts) だけ。issue / PR の自由文は payload に入れない。
-import { NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
+import { ASSOC_OK, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 
 // repository_dispatch の event_type "oc-pm" の kind (列挙 9 値)。prepare-event-context.sh の許可リストと同じ。
 export const PM_KINDS = ["stuck", "no_pr", "refs_orphan", "needs_decision", "stopped_report", "user_answered", "supply", "digest", "retro"] as const;
@@ -21,6 +21,8 @@ export const DIGEST_ROLLING_RE = /^\[[A-Za-z]+-\d+\] 自律運転ダイジェス
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
+// PM の判断待ちの印 (/status の集計だけに使う。検出の対象ではない)。
+export const NEEDS_PM_LABEL = "needs-pm";
 // 実装 agent が着手しても PR を出さない/出せない issue (pm-apply は PM が PAT で適用する workflow 変更、needs-user-input は依頼者待ち)。
 // no_pr の検出・再投入の対象から除く。
 export const HOLD_LABELS = ["pm-apply", "needs-user-input"];
@@ -41,8 +43,6 @@ export interface HistoryEntry {
 
 // 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 12 起動、同じ ref に 24 時間で 3 回)。
 export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 12, dayMs: 24 * 3_600_000, refDayMax: 3 };
-
-const ASSOC_OK = ["MEMBER", "OWNER", "COLLABORATOR"];
 
 // 対象の起票者が MEMBER / OWNER / COLLABORATOR か許可 bot か。未設定 (古い保存値) は許可しない。
 export function authorAllowed(x: { author?: string; authorType?: string; assoc?: string }, bots: string[]): boolean {
