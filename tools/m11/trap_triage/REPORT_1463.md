@@ -46,3 +46,13 @@
 - 受入条件 2 (修復・n≥3 survey)・3 (ネガコン): 未着手 (受入条件 1 の結論に依存)。
 
 起票先: 受入条件 1 (書込元特定) は #1463 続き。probe 基盤の修復は子 issue (下記)。
+
+## 6. 再々着手 (2026-10-14 run) の結果: probe 経路の修復と trap 位置の訂正
+
+- 測定 commit: `97647e7c` (probe 経路の修復)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下に展開。`m11_gen_ir2.sh` rc=0 (51 s, `boot_final.ll` 490733 行)。
+- 修復 (#1756): `m11_build.sh` の `boot.o` 再コンパイルを `M11_KEEP_BOOT_O=1` で止める (既定 0 は従来どおり)。`probe_entry.sh` は `M11_KEEP_BOOT_O=1` で build する。
+- 実測 (n=1, `SV_ONLY=149`):
+  - `probe_entry.sh p407 407a50 149`: rc=0, `[pe] 407a50` 1 行 (probe.o が link された)。`probe_entry.sh p412 412e40 149`: `[pe] 412e40` 0 行 (下記の理由で入らない)。
+  - probe 無しのベースライン (`m11_build.sh` 既定): unit 149 は oob。最上位 frame は `function_407a50__lifted` ← `407a50` ← `409410` ← `412c20` ← `414ad0` ← `414bb0` ← `652500`。
+- **訂正**: §5 までの「oob の最上位 frame は `412e40`」は、本 run の build では成立しない。最上位は `407a50` (ベースラインと probe 版で一致)。`412e40` は trap 時のスタックに無い。§1〜§5 の `412e40` 前提は、この build では再検証が必要。
+- 未解決 (#1463 続き): 受入条件 1 (`0x40` slot 非 0 の書込元) は、まず trap 位置 (`407a50`) の `[a1]` 経路を特定してから進める。受入条件 2・3 は未着手。
