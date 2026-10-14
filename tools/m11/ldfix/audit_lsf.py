@@ -21,7 +21,12 @@ ldfix.fix_f3c とは**別算法**: IR ブロックと機械語ブロックの対
 ('arg',n) | ('ld',n,w) | ('ldu',w) を記号実行し、ブロック入口の状態は pred の出口状態の join (一致する値だけ残す) の不動点で求める。
 call は volatile reg を消去し、stack home (prologue の `mov [rbp|rsp+d], argreg`) は維持する。
 
-使い方: python3 audit_lsf.py IR.ll IMAGE.bin 'CONFIG_GLOB' [--json OUT] [--only VA,VA] [--pe PE]    (--pe 指定時は PE の .pdata を使う)
+  [変位形 (41a670 型, #2396 LD-111)]
+  SUSPECT_DISP audit_lsf_disp.py の信号。機械語の argN+disp の load 値の store に対し、IR の store 値の出元 `load (argN+c)` の c が
+               機械語の同じ (n, w) の disp 集合に無い。上の 3 判定とは独立 (SUSPECT_VAS / SUSPECT_USE_VAS / SUSPECT_MIXED_VAS の算出には関与しない)。
+               出力は SUSPECT_DISP_VAS と、既存判定との突合 (SUSPECT_DISP_ONLY_VAS = SUSPECT_VAS・SUSPECT_USE_VAS のどちらにも無い関数)。--no-disp で無効化。
+
+使い方: python3 audit_lsf.py IR.ll IMAGE.bin 'CONFIG_GLOB' [--json OUT] [--only VA,VA] [--pe PE] [--no-disp] [--no-strmov]    (--pe 指定時は PE の .pdata を使う)
 """
 import argparse
 import collections
@@ -345,15 +350,25 @@ def main():
     ap.add_argument('--json')
     ap.add_argument('--only')
     ap.add_argument('--pe')
+    ap.add_argument('--no-disp', action='store_true', help='変位形 (SUSPECT_DISP) の判定と出力を省く')
+    ap.add_argument('--no-strmov', action='store_true', help='変位形で文字列転送 (movs) と lea 経由の変位を列挙しない (#2316 時点の挙動)')
     a = ap.parse_args()
     only = set(int(x, 16) for x in a.only.split(',')) if a.only else None
     text = open(a.ir, errors='replace').read()
     mach = Machine(a.pe) if a.pe else ImageMachine(a.image, a.cfg)
     for m in DEF_RE.finditer(text):
         ARITY[int(m.group(1), 16)] = len([x for x in m.group(2).split(',') if x.strip()])
+    disp_suspects = None
+    if not a.no_disp:
+        sys.modules.setdefault('audit_lsf', sys.modules[__name__])  # __main__ 実行でも audit_lsf_disp の `import audit_lsf` が同じ ARITY を見る
+        import audit_lsf_disp
+        audit_lsf_disp.STRMOV = not a.no_strmov
+        disp_suspects = audit_lsf_disp.disp_suspects
     out = collections.OrderedDict()
     out_use = collections.OrderedDict()
     out_mixed = collections.OrderedDict()
+    out_disp = collections.OrderedDict()
+    tot_disp = collections.Counter()
     tot = collections.Counter()
     for va, _args, body in ir_functions(text):
         if only and va not in only:
@@ -365,6 +380,13 @@ def main():
             tot['range_table_shorter_than_ir_labels'] += 1
         if ent and ent[1] <= 2:
             tot['range_table_le_2_bytes'] += 1
+        if disp_suspects:
+            has_sites, dsus = disp_suspects(mach, va, body)
+            tot_disp['disp_mach_fns'] += 1 if has_sites else 0
+            if dsus:
+                out_disp['%x' % va] = dsus
+                tot_disp['suspect_disp_fns'] += 1
+                tot_disp['suspect_disp_keys'] += len(dsus)
         ms = machine_sites(mach, va, labels)
         if ms is None:
             tot['no_machine_range'] += 1
@@ -413,12 +435,27 @@ def main():
     summary['suspect_vas'] = sorted(out.keys(), key=lambda x: int(x, 16))
     summary['suspect_use_vas'] = sorted(out_use.keys(), key=lambda x: int(x, 16))
     summary['suspect_mixed_vas'] = sorted(out_mixed.keys(), key=lambda x: int(x, 16))
+    if disp_suspects:
+        # 既存の判定 (上の 3 つ) の算出と出力順は変えない。変位形の集計は既存キーの後ろに足す。
+        summary.update(tot_disp)
+        summary['suspect_disp_vas'] = sorted(out_disp.keys(), key=lambda x: int(x, 16))
+        known = set(summary['suspect_vas']) | set(summary['suspect_use_vas'])
+        summary['suspect_disp_only_vas'] = [x for x in summary['suspect_disp_vas'] if x not in known]
+        summary['suspect_disp_and_store_fns'] = len(set(summary['suspect_disp_vas']) & set(summary['suspect_vas']))
+        summary['suspect_disp_and_use_fns'] = len(set(summary['suspect_disp_vas']) & set(summary['suspect_use_vas']))
+        summary['suspect_disp_only_fns'] = len(summary['suspect_disp_only_vas'])
     print(json.dumps({k: v for k, v in summary.items() if not k.endswith('_vas')}, ensure_ascii=False))
     print('SUSPECT_VAS ' + ' '.join(summary['suspect_vas']))
     print('SUSPECT_USE_VAS ' + ' '.join(summary['suspect_use_vas']))
     print('SUSPECT_MIXED_VAS %d (自動修復の対象外: argN をポインタとしても deref 後の値としても使う。--json の suspects_mixed)' % len(summary['suspect_mixed_vas']))
+    if disp_suspects:
+        print('SUSPECT_DISP_VAS ' + ' '.join(summary['suspect_disp_vas']))
+        print('SUSPECT_DISP_ONLY_VAS ' + ' '.join(summary['suspect_disp_only_vas']) + '  (SUSPECT_VAS・SUSPECT_USE_VAS のどちらにも無い変位形の関数)')
     if a.json:
-        json.dump(dict(summary=summary, suspects=out, suspects_use=out_use, suspects_mixed=out_mixed), open(a.json, 'w'), indent=1, ensure_ascii=False)
+        dump = dict(summary=summary, suspects=out, suspects_use=out_use, suspects_mixed=out_mixed)
+        if disp_suspects:
+            dump['suspects_disp'] = out_disp
+        json.dump(dump, open(a.json, 'w'), indent=1, ensure_ascii=False)
 
 
 if __name__ == '__main__':

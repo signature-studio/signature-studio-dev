@@ -1,5 +1,7 @@
 # #1848 REPORT — fail-soft 3 件の戻り値の読解と Phase B 再測定 (途中経過)
 
+> 注 (#2008 §8 で訂正): `0x710030`・`0x710038`・`0x710040` は FL 本体の export table ではなく Delphi RTL の例外フック (`0x40d6e0` = raise の参照先)。下記の「export table」前提の記述は誤りで、正本は `tools/plugins/framework/REPORT_2008.md` §8.1。
+
 - 担当 issue: #1848 `[PLG-P0b-7]` (親 #1609)。受入 1 (fold deref 解消と `plug != 0`) は未達・子へ移管。
   受入 2 (fail-soft 3 件の戻り値の意味) は部分達成。受入 3 (REPORT 実測) は達成 (§2)。
 - 起点: `origin/main` 47ee8a17。worktree `ws-1848`・branch `1848-plg-failsoft-retval`。

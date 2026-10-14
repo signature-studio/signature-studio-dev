@@ -1,5 +1,7 @@
 # #1890 REPORT — Phase B icall 0x40d6e0 の fold deref 解消 (plug != 0) (部分達成・読解と再現)
 
+> 注 (#2008 §8 で訂正): `0x710030`・`0x710038`・`0x710040` は FL 本体の export table ではなく Delphi RTL の例外フック (`0x40d6e0` = raise の参照先)。下記の「export table」前提の記述は誤りで、正本は `tools/plugins/framework/REPORT_2008.md` §8.1。
+
 - 担当 issue: #1890 `[PLG-P0b-8]` (親 #1848)。受入 1 (0x710030 / 0x710040 の値確定と 0x40d6e0 経路の遮断)・受入 2 (`hs_e2e.sh --fresh` Phase B の `plug != 0`) は **未達**。受入 3 (Phase A 回帰 `dispatch=38 ff=0`) は **達成**。
 - 起点: `origin/main` 576c4976。worktree `ws-1890`・branch `1890-plg-p0b-8-fold-deref`。コード変更なし (本 REPORT の追加のみ)。
 - 素材: `work-fw-stage1` (repo ルート展開 → `tools/plugins/work/fw`・12 件)・`fl-win64` (`$RUNNER_TEMP/fl-win64` は未展開。fw_stage2 は `FL_WIN64_DIR` 指定で動作)・ツールチェーンは [EMSDK]・[RETDEC] で確認済み。

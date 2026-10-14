@@ -74,4 +74,25 @@ describe("PmDO (実 Durable Object ランタイム)", () => {
       expect(kvRows(state).some((r) => r.k === "5555")).toBe(false);
     });
   });
+  it("/status: 観測のキーを返し、last_webhook_at は検証済みの配送だけで進む。webhook の自由文に混ぜた secret は出さない", async () => {
+    await runInDurableObject(pmStub(), async (_i, state: any) => {
+      if (!kvRows(state).some((r) => r.bucket === "meta" && r.k === "app")) await seedApp(state);
+    });
+    const status = async () => (await SELF.fetch("https://pm.test/status")).text();
+    const evil = "-----BEGIN RSA PRIVATE KEY-----\nMIIEdummyKEYmaterial\n-----END RSA PRIVATE KEY----- ghp_DUMMYtokenDUMMYtoken0123456789abcdef whsec_dummy";
+    const before = JSON.parse(await status());
+    for (const k of ["last_webhook_at", "last_dispatch_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at"]) {
+      expect(before).toHaveProperty(k);
+    }
+    expect(before.rest_remaining).toBeNull();
+    expect(before.mode).toBe("dry-run");
+
+    expect((await post(issue(6001, evil), "sha256=00")).status).toBe(401);
+    expect(JSON.parse(await status()).last_webhook_at).toBe(before.last_webhook_at);
+
+    expect((await post(issue(6002, evil))).status).toBe(202);
+    const text = await status();
+    expect(Date.parse(JSON.parse(text).last_webhook_at)).toBeGreaterThan(0);
+    for (const needle of ["BEGIN RSA PRIVATE KEY", "MIIEdummyKEYmaterial", "ghp_DUMMY", "whsec_dummy", SECRET, STORE_KEY]) expect(text).not.toContain(needle);
+  });
 });

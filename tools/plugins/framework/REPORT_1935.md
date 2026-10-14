@@ -1,5 +1,7 @@
 # #1935 REPORT — hs_irfix の定数前提を現行 stage-2 IR に合わせ、Phase B の plug != 0 を実測 (部分達成)
 
+> 注 (#2008 §8 で訂正): `0x710030`・`0x710038`・`0x710040` は FL 本体の export table ではなく Delphi RTL の例外フック (`0x40d6e0` = raise の参照先)。下記の「export table」前提の記述は誤りで、正本は `tools/plugins/framework/REPORT_2008.md` §8.1。
+
 - 担当 issue: #1935 `[PLG-P0b-10]` (親 #1890)。受入 1 のうち「`hs_irfix.py` の修正と停止位置の解消」は達成。受入 2 (`0x710030`/`0x710040` の値確定) と受入 3 (`plug != 0`) は **未達**。受入 4 (Phase A 回帰 `dispatch=38 ff=0`) は **達成**。
 - 起点: `origin/main` 46faf265。worktree `ws-1935`・branch `1935-plg-p0b-10-irfix`。
 - 測定 commit: `d5b737af` (hs_irfix.py の修正。以降のコード差分は本 REPORT の追加のみ)。
