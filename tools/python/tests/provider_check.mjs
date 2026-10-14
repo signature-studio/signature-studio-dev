@@ -41,7 +41,6 @@ for (const id of ids) {
   notImpl ? unimpl++ : impl++;
 }
 // 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 確定 1 (pe102) + stub 確定 6 (stub41) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 1 (pe115)
-
 assert.equal(impl, 85); assert.equal(unimpl, 350);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
