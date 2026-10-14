@@ -130,6 +130,24 @@ kh_180ef7fc0 → kh_18012e420 → kh_1801d3b60 → kh_180138750 → kh_180138a30
 | `kh656_closure.py` の `i256_defs()` の誤判定 (memset `1813846e0` を i256 扱い) | 閉包の自動化が round 6 で止まる | #1817 (KH-28) |
 | 閉包の収束 (未 lift 40 → 154) | 受入 1 未達 | #1817 (KH-28) |
 
+### 7.6 trap 命令の特定 (#1821 / KH-29、実測・2 回目 run)
+
+測定 commit: `9d491eb4` (main 取り込み後)。コード差分 (REPORT 除く) は本節追加時点で 0 (`lic_config.json` は HEAD に戻した)。
+環境: nproc=4・load average 0.9 (測定時)。`plugins-kilohearts` は `Kilohearts Offline Installer.zip` から `work/winpkg` を再抽出。
+
+- 閉包 313 の再現: `lic_build.py --module F` は shim `1813846e0: memset` を F の `shims` に追加した状態で 1,543,901 B・undefined import 0 (§7.2 と同値)。
+- 入口 `function_180ef7fc0` は `memory access out of bounds` で再現 (`kh249_check` ok=16 ng=1)。
+- `emcc -g` 版で trap 位置を取得: `kh_180ef7fc0 → kh_18012e420 → kh_1801d3b60 → kh_180138750 → kh_180138a30 → kh_180f88394 → kh_180fa7678`、trap は `kh_180fa7678` の wasm 命令オフセット `0x1262c` (`i32.load8_u`)。
+- 逆アセンブル (capstone・`HeartCore.core_64`) で VA を一意に対応付け: `0x180fa76a8 cmp byte ptr [rax + rdi], 0` (`0x180fa76a5`〜`0x180fa76ac` の NUL 走査ループ)。`rax = [rcx]` (`0x180fa7699`) が wasm32 線形メモリ外のアドレス。lift IR (`kh_180fa7678` の `@rax + @rdi` の byte load) と命令列は一致 (lift の命令誤りは本ループでは見えない)。
+- 未確定: `rax` の値 (`[rcx]` の内容) の出所。`kh_stack` 内に native VA 形 (`0x18xxxxxxx`) の値は見つからなかった。呼び出し元 `kh_180f88394` の `rcx` 設定 (`[rsp+32]`) を辿る必要がある。
+- DEFECTS 類型: 未判定。`D11` (絶対 VA の wasm32 切り捨て) が形の上で近いが、`rax` の出所が未確認のため当てはめない。
+
+### 7.7 未解決 (起票先付き)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `rcx` (`[rsp+32]`) の設定元と、`[rcx]` に入る値 (絶対 VA か stack 由来か) | 原因 (lift 誤り / 配置) と DEFECTS 類型 ID の判定 | #1821 継続 |
+
 ## 8. 閉包展開の再試行 (#1761 / KH-27、実測)
 
 `scripts/kh656_closure.py --rounds 6` を実行した。`#710` (Win32 import 宣言) は closed、`#709` (ymm) は open。
