@@ -95,9 +95,24 @@
 測定 commit: `e6cefa06` (main)。本 run は repo のコードを変えていない (2019-03 版は外部ソースを GitHub から取得して測った)。初回 PR head `c81c9f9a` (2026-10-14) では `git diff e6cefa06 c81c9f9a -- tools/m11/ldfix` が本節の追記のみ (+23 行)。main 取り込み後の HEAD との差分には main 側の変更も入るため、この確認は `c81c9f9a` に対してのみ成り立つ。
 ビルド対象: avast/retdec `6edcaaea` (2019-03-09) を `git clone` で取得し、`deps/` は同梱のもの (LLVM は `avast-tl/llvm` `3d1e5d0b` を CMake が取得)。
 
-ビルド (Makefile generator・`RelWithDebInfo`・`-j4`・4 コア・RAM 15GB。load average は make 前後の `uptime`):
-- クリーン 1 回目 (`build-clean`・`CXXFLAGS=-include cstdint -include string`): real 644 s (10 分 44 秒)。rc=0。load average 1.19 → 4.95。n=1。
+ビルド 1 回目 (実装 run・Makefile generator・`RelWithDebInfo`・`-j4`・4 コア・RAM 15GB。load average は make 前後の `uptime`):
+- クリーン (`build-clean`・`CXXFLAGS=-include cstdint -include string`): real 644 s (10 分 44 秒)。rc=0。load average 1.19 → 4.95。n=1。
+- cmake の configure 引数と `time` を付けた正確なコマンド行は、実装 run で記録されていない (確認できない)。このため 644 s が configure・LLVM ソース取得・`make install` を含むかは、この測定からは言えない。生ログも残っていない。
 - 前段の試行 (LLVM 段で ninja が失敗・pelib/yaramod の sub-build を再実行) は本測定に含めない。
+
+ビルド 2 回目 (fix run の再測定・コマンド記録あり・n=1。repo の HEAD は `62aef8b9`、測定にコードは使っていない。4 コア・RAM 15GB):
+```
+git clone https://github.com/avast/retdec && git -C retdec checkout 6edcaaea   # 取得 2.6 s (測定外)
+sudo apt-get install -y libfl-dev                                              # 5 s (測定外)
+mkdir build-remeasure && cd build-remeasure
+export CXXFLAGS="-include cstdint -include string"
+time cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=../install   # real 3.7 s・rc=0
+time make -j4                                                                         # real 860 s (14 分 20 秒)・rc=0
+```
+- load average は make 開始時 0.31 → 終了時 4.84。`make install` は実行していない (計測外。share の 404 で失敗する段は §6i の阻害要因 1)。
+- LLVM ソース (`external/src/llvm-project`、71M) の取得は `make` の中で行われるが、ExternalProject の download stamp は make 開始 (12:33:15Z) の 3 秒後 (12:33:18Z) で、取得時間は 860 s に含まれるが数秒。LLVM のビルド完了は make 開始の 6 分 17 秒後 (12:39:32Z)、yaramod は 1 分 32 秒後 (12:34:47Z)。残りは RetDec 本体。
+- 644 s と 860 s の差の原因は未確認 (1 回目のコマンドが不明で、run も別)。どちらも 60 分未満。
+- cfg.log・make.log は成果物にしない (runner の一時領域で run 終了時に破棄される)。
 
 ビルド時に必要だった回避 (v5.0 と異なる点):
 - GCC 13 で `std::uintN_t`・`std::string` が未 include: `CXXFLAGS` に `-include cstdint -include string` を付けた (`CMAKE_CXX_FLAGS` だけでは pelib の ExternalProject に届かない)。
@@ -105,7 +120,7 @@
 - 2019 版には `RETDEC_COMPILE_YARA` が無い (v5.0 の回避は使えない)。
 
 判定 (縮小後の #2314 の受入):
-- **受入 1 (ソースビルド + 所要時間の実測) は達成**。real 644 s = 10 分 44 秒 < 60 分・rc=0・n=1。60 分に収まる。
+- **受入 1 (ソースビルド + 所要時間の実測) は達成**。real 644 s = 10 分 44 秒 (1 回目)・860 s = 14 分 20 秒 (2 回目の `make -j4`)、いずれも rc=0・n=1 ずつ。60 分に収まる。
 - **受入 2 (41a6a0 での分岐発火確認) は未実施** → #2405 に移した。前提の 2019 版 `retdec-decompiler` を起動できなかったため (下の阻害要因)。受入 1 の不足ではない。
 
 受入 2 の前提を満たせなかった阻害要因 (#2405 の背景):
