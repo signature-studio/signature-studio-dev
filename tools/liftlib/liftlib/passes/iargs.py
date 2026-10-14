@@ -202,9 +202,37 @@ def _entry_off(binder, mf, reg, va, depth=0):
     return None if b is None else b + it.mem["disp"]
 
 
-def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0, own_params=None):
-    """C 直前の reg の値: (token, type) | None。IR 値が無い lea / add-sub imm は合成する。"""
+def _dom_at(ix, dpos, use):
+    """IR 命令位置 dpos=(bi, li) の値が use=(bi, li) の位置で参照できるか (同一 block は行順, 他 block は支配)。"""
+    (dbi, dli), (ubi, uli) = dpos, use
+    if dbi == ubi:
+        return dli < uli
+    return ix.dominates(dbi, ubi)
+
+
+def _bind_use(binder, reg, C, use):
+    """reg の直前値 (bind) を、呼出し位置 use で参照できる形で返す (支配しない IR 値は使わない)。
+    RetDec の phi 退避 (reg2mem alloca) で同じ値を覆う store があり、use を支配する load があれば、その reload を返す。
+    どちらも無ければ None (呼出側が機械語から合成するか unbound にする)。use が None なら検査しない。"""
     v = binder.bind(reg, C)
+    if use is None or v is None or str(v[0]).startswith("@@"):
+        return v
+    ix = binder.ix
+    if v[0] not in ix.defs or _dom_at(ix, ix.defs[v[0]], use):
+        return v
+    for a, sts in ix.stores.items():
+        if a not in ix.allocas or not any(vtok == v[0] for (_b, _l, vtok, _t) in sts):
+            continue
+        for (lbi, lli, dst) in ix.loads.get(a, []):
+            if _dom_at(ix, (lbi, lli), use):
+                return (dst, ix.allocas[a])
+    return None
+
+
+def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0, own_params=None, use=None):
+    """C 直前の reg の値: (token, type) | None。IR 値が無い lea / add-sub imm は合成する。
+    use=(bi, li) は値を参照する呼出し位置 (支配検査用)。"""
+    v = _bind_use(binder, reg, C, use)
     if v is not None and not str(v[0]).startswith("@@"):
         return v
     if depth > 4:
@@ -234,7 +262,7 @@ def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0, own_params=None):
             return None
         src = _canon_reg(it._ci, it.ops[1].reg)
         sw = it.ops[1].size * 8
-        base = _resolve(binder, mf, mod, src, d, tag, nm + "v", ins, depth + 1)
+        base = _resolve(binder, mf, mod, src, d, tag, nm + "v", ins, depth + 1, use=use)
         if base is None:
             return None
         if re.match(r"^-?\d+$", str(base[0])):
@@ -245,7 +273,7 @@ def _resolve(binder, mf, mod, reg, C, tag, nm, ins, depth=0, own_params=None):
         t = _conv(base[0], base[1], src_ty, tag, nm + "mt", ins)
         return (_conv(t, src_ty, ty, tag, nm + "mz", ins), ty)
     if it.mnem == "lea" and it.mem and not it.mem["index"] and it.mem["base"] not in (None, "rip", "rsp"):
-        base = _resolve(binder, mf, mod, it.mem["base"], d, tag, nm + "b", ins, depth + 1)
+        base = _resolve(binder, mf, mod, it.mem["base"], d, tag, nm + "b", ins, depth + 1, use=use)
         if base is None:
             return None
         disp = it.mem["disp"]
@@ -377,7 +405,7 @@ def run(mod, img, log=None, stats=None, repair=True):
                     continue
                 if k < len(cur):
                     continue
-                v = _resolve(binder, mf, mod, reg, C, tag, nm_, ins, own_params=own_params)
+                v = _resolve(binder, mf, mod, reg, C, tag, nm_, ins, own_params=own_params, use=(bi, li))
                 if v is None:
                     stats["site_unbound"] = stats.get("site_unbound", 0) + 1
                     log.append("iargs call %s@%x: %s unbound (0 を渡す)" % (g, C, reg))

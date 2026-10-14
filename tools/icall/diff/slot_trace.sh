@@ -4,6 +4,7 @@
 #   前提: $FA_DL に plugins-freshair を展開済み (fetch.sh で work/win/Fresh Air ができていること)。
 #   出力: work/slot_trace_enc.txt (F 行 = 関数ごとの rc と ACC 件数, ACC 行 = <fn> ACC <addr> <rip> <count>)。
 #   用法: bash tools/icall/diff/slot_trace.sh [SLOT_ENC_INIT=1 を付けると enc(NULL)=cookie を事前に敷く]
+#   SLOT_T2_INIT=1 を併せると、T2 の 34 entry も enc(NULL)=cookie で敷く (CRT 初期化 0x18105ea78 の終状態)。既定は敷かない。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 T="$HERE/../.."
@@ -33,4 +34,19 @@ for l in open(sys.argv[1]):
 print('funcs', sum(rc.values()), 'exit', dict(sorted(rc.items())))
 print('distinct zero-fill addrs', len(acc), ' '.join(hex(a) for a in sorted(acc)))
 print('known 12 hit', len(acc & known), 'miss', len(known - acc))
+# T1 (module handle 表, 20 entry)・T2 (encoded 関数ポインタ表, 34 entry) の index 別読出し (静的な終点は REPORT_APPENDIX_2225 §2.5)
+TABLES = {'T1': (0x181307100, 0x1813071a0, 20), 'T2': (0x1813071a0, 0x1813072b0, 34)}
+idx = {}
+for l in open(sys.argv[1]):
+    p = l.split()
+    if len(p) >= 5 and p[1] == 'ACC':
+        a = int(p[2], 16)
+        for name, (lo, hi, n) in TABLES.items():
+            if lo <= a < hi: idx.setdefault(name, {}).setdefault((a - lo) // 8, set()).add((hex(a), '0x' + p[3]))
+for name, (lo, hi, n) in TABLES.items():
+    hit = idx.get(name, {})
+    for i in sorted(hit): print(name, 'index', i, sorted(hit[i]))
+    top = max(hit) if hit else None
+    print(name, 'static entry', n, 'distinct read', len(hit), 'max read', top, 'static max', n - 1,
+          'gap', (n - 1 - top) if top is not None else 'n/a (no read)')
 PY

@@ -6,13 +6,16 @@
 #                 窓 = 直近の oc-fix-limit / oc-fix-reset コメント以降の差し戻し (印は MARK_LOGIN の投稿だけを数える。#2622)。窓が MAX 件に達したら、
 #                 直近 3 件が機械的な類型のみ・繰り返し無し・合計が天井未満なら次の窓へ進める (oc-fix-reset)。
 #                 それ以外は oc:stuck を付けて止め、PM agent 用の oc-pm-intent マーカーを残す。
-#                 結果は $GITHUB_OUTPUT に stop=true/false で出す (上限で止めた stop=true なら oc:stuck ラベルを付けて PR にコメントする)
-#                 途中で失敗したときも stop=true を出す (fail-closed。stop が無いと check が none と判定し、write 権限の retry が起動する。#2638 B3)。
-#                 この失敗による stop=true は oc:stuck を付けず PR にも書かない。job が失敗で赤くなり、原因は run のログで見る。
+#                 結果は $GITHUB_OUTPUT に stop=true/false で出す (上限で止めた stop=true なら oc:stuck ラベルを付けて PR にコメントする)。
+#                 窓の判定まで終えたときだけ $GITHUB_ENV に OC_RECORD_OK=1 を書く
+#                 record が途中で失敗したら stop=true と reason=record-failed を出して非 0 で終わる (入力検査・gh の失敗を含む)。
+#                 fail-closed: stop が無いと check が none と判定し、write 権限の retry が起動する (#2638 B3・#2869)。
+#                 この失敗では oc:stuck を付けず PR にもコメントしない。job が赤くなり、原因は run のログで見る。
 #                 ただし次の場合は agent を起動せず stop=true にするだけ (notice を残す。oc:stuck は付けない。#2601):
 #                 PR が open でない (merge・close 済み)、または差し戻しの元の review (pull_request_review の event) の commit が
 #                 現在の head と違う (古い head への差し戻し。その後に push された head の review が判定を担う)
 #   check         head が進んだか / 根拠コメントを投稿したかを判定し、result を $GITHUB_OUTPUT に出す
+#                 (OC_RECORD_OK が無ければ result を出さずに失敗する。record が終わっていないのに none と判定しない #2869)
 #                   pushed   : head が進んだ (push が synchronize を起こし、review が再起動する)
 #                   answered : push せず PR にコメントした (review は起動しないので reopen で起こす)
 #                   none     : どちらもしていない
@@ -25,13 +28,23 @@
 # 実装 App は PR の comment を投稿する時 user.login が opencode-for-signature-studio[bot] になる。
 set -euo pipefail
 
-# record の途中失敗 (下の入力検査・API 呼び出しで止まる場合を含む) でも stop=true を残す。入力検査より前に置く (#2638 B3・m3)。
-record_done=false
-record_fail() {
-  local rc=$?
-  if [ "$rc" -ne 0 ] && [ "$record_done" != true ]; then echo "stop=true" >> "$GITHUB_OUTPUT"; fi
+# record が途中で終わったら (入力検査・gh の失敗など)、stop=true と reason=record-failed を出して非 0 で終わる (#2869)。
+# 入力検査より前に置く (#2638 B3・m3)。agent と retry は走らせない。PR にはコメントしない (コメントも失敗しうる)。trap の中では gh を呼ばない。
+OC_RECORD_DONE=0
+record_abort() {
+  local rc=$? cmd="${OC_FAIL_CMD:-?}"
+  trap - ERR EXIT
+  if [ "$OC_RECORD_DONE" != 1 ]; then
+    cmd="${cmd//$'\n'/ }"
+    echo "::error::fix-progress record failed (exit $rc, line ${OC_FAIL_LINE:-?}, command: ${cmd:0:120}): the fix run is skipped (reason=record-failed)"
+    printf 'stop=true\nreason=record-failed\n' >> "${GITHUB_OUTPUT:-/dev/null}"
+    exit 1
+  fi
 }
-if [ "${1:-}" = record ]; then trap record_fail EXIT; fi
+if [ "${1:-}" = record ]; then
+  trap 'OC_FAIL_LINE=$LINENO; OC_FAIL_CMD=$BASH_COMMAND' ERR
+  trap record_abort EXIT
+fi
 
 : "${OC_REPO:?}" "${OC_PR_NUMBER:?}"
 pr_head() { gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER" --jq .head.sha; }
@@ -155,11 +168,16 @@ case "${1:-}" in
           --body "reviewer の差し戻しが ${n} 件に達したため、自動修正を止めます (上限 ${MAX_FIX_REVIEWS}、合計 ${total}、停止理由 ${decision})。自動復旧を試みます。PM agent が処理します。ラベル \`${STUCK_LABEL}\` を外すと再開できます (再開後は、この停止コメント以降の差し戻しだけを数えます)。${STOP_MARK} <!-- oc-pm-intent: stuck pr=${OC_PR_NUMBER} reason=${decision} -->"
       fi
     fi
+    if [ "$stop" = false ]; then printf 'OC_RECORD_OK=1\n' >> "$GITHUB_ENV"; fi
     echo "stop=$stop" >> "$GITHUB_OUTPUT"
-    record_done=true
+    OC_RECORD_DONE=1
     ;;
   check)
     : "${OC_HEAD_BEFORE:?}" "${OC_START_TS:?}"
+    if [ "${OC_RECORD_OK:-}" != 1 ]; then
+      echo "::error::fix-progress check: record did not finish the window check (OC_RECORD_OK is unset): no result is given" >&2
+      exit 1
+    fi
     if [ "$(pr_head)" != "$OC_HEAD_BEFORE" ]; then
       result=pushed
     else

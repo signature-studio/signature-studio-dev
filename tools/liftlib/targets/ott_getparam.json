@@ -3,7 +3,7 @@
  "image": "${OTT_DLL}",
  "retdec": {"ranges": "0x18011e5a0-0x18011e6ff", "timeout": 1200},
  "passes": {
-  "icall": {"funcs": "tools/liftlib/work/ott_getparam/F.txt", "jtchain": true, "blk_global": true},
+  "icall": {"funcs": "tools/icall/work/ott_F.txt", "jtchain": true, "blk_global": true},
   "p1": false,
   "f7": false,
   "f2": false,
@@ -18,5 +18,6 @@
  "emcc": {"opt": "-O1", "lb_layout": {"newbase": "0x30000000"}, "sources": ["tools/icall/rt/icall_rt.c"], "extra": ["-DICALL_BLK_GLOBAL"]},
  "regress": {"expect_match": "all"},
  "stub_externals": true,
+ "stub_skip": ["HeapAlloc", "HeapFree", "GetCurrentThreadId", "GetLastError", "SetLastError", "EnterCriticalSection", "LeaveCriticalSection"],
  "gdata_pad": true
 }
