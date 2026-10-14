@@ -49,7 +49,7 @@
 ## 5. 再現
 
 ```
-bash tools/gui/shimx_coexist/coexist.sh           # M11_IR 既定 tools/m11/work/boot_final3.ll (work-m11 を展開)、emsdk は /opt/emsdk
+bash tools/gui/shimx_coexist/coexist.sh           # M11_IR 既定 tools/m11/work/boot_final3.ll (work-m11 を展開)、emsdk は [EMSDK]
 EMSDK_ENV=[EMSDK]/emsdk_env.sh bash tools/gui/shimx_coexist/browser_e2e.sh   # node_modules (tsc) を要する
 ```
 
