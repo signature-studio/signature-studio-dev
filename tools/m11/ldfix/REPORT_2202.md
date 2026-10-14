@@ -11,20 +11,20 @@
 ## 測定条件
 
 - 測定 commit: `7117602e` (fix(ldfix): review fixes for dest trace (#2202))。以後 `audit_undefload_dest.py` のコードは変わっていない (下の差分節を参照)
-- 検証 HEAD: `1626c4c7`
+- 検証 HEAD: `ace67882` (main `2f409728` を merge 済み。`1626c4c7` からコード差分 0 行)
 - 入力: `work-m11` の `tools/m11/work/boot{0,1,2,3,4}.norm0.ll` (5 入力, `$HOME/artifacts/work-m11.tar.zst` から展開。gitignore・commit しない)
 - PE: `fl-win64` の `extracted/block00031_PE.bin` (`$HOME/artifacts/fl-win64.tar.zst` から展開。commit しない)
 - 比較基準 (before): `cdc67bb8` 時点の `audit_undefload_dest.py` (`git show cdc67bb8:...`)。出力は `dest_riprip` を含むよう作業用コピーで 1 箇所だけ補った (`work/2202/base/`)。分類ロジックは cdc67bb8 のまま。依存 (`ldmach.py`・`ldframe.py`・`audit_undefload.py`) は cdc67bb8 → HEAD で不変
 - 実行: `python3 audit_undefload_dest.py <PE> <OUT> boot{0..4}.norm0.ll`。rc 0。
-  - 検証 HEAD (`1626c4c7`): 53.3 秒
-  - before (`cdc67bb8`): 50.3 秒
-  - 実行環境: 4 vCPU, load average 0.5〜0.8 (実行前後の `uptime`)
+  - 検証 HEAD (`ace67882`): real 49.96 秒 (`time` 実測。`user` 49.63 秒)
+  - before (`cdc67bb8`): 50.3 秒 (`1626c4c7` 時点の測定)
+  - 実行環境: 4 vCPU, load average 0.29〜0.76 (実行前後の `uptime`)
 
 ## 実測 (sites 2,729 同一)
 
-結果 JSON: `results/audit_undefload_dest_2202.json` (検証 HEAD `1626c4c7`・`dest_riprip` 入り)、`results/audit_undefload_dest_2202_head.json` (before `cdc67bb8`・`dest_riprip` 入り)。
+結果 JSON: `results/audit_undefload_dest_2202.json` (検証 HEAD `ace67882` で再生成・`dest_riprip` 入り。`1626c4c7` 時点の値と同一)、`results/audit_undefload_dest_2202_head.json` (before `cdc67bb8`・`dest_riprip` 入り)。
 
-| 分類 | before (cdc67bb8) | after (1626c4c7) | 差 |
+| 分類 | before (cdc67bb8) | after (ace67882) | 差 |
 |---|---|---|---|
 | DEST_FRAME_IN_ESCAPED | 15 | 15 | 0 |
 | DEST_FRAME_PTR_ESCAPED | 3 | 3 | 0 |
@@ -67,16 +67,18 @@ python3 tools/m11/ldfix/audit_undefload_dest.py extracted/block00031_PE.bin out.
 
 ## 測定 commit から検証 HEAD までの差分 (コード)
 
-測定 commit `7117602e` → 検証 HEAD `1626c4c7` (`git diff 7117602e 1626c4c7 -- tools/m11/ldfix/audit_undefload_dest.py` の実出力):
+測定 commit `7117602e` → 検証 HEAD `ace67882` (`git diff 7117602e ace67882 -- tools/m11/ldfix/audit_undefload_dest.py tools/m11/ldfix/ldmach.py tools/m11/ldfix/ldframe.py tools/m11/ldfix/audit_undefload.py` の実出力):
 
 ```
 (空: 差分 0 行)
 ```
 
-測定 commit は、コードを最後に変えた commit (`7117602e`)。それ以降 `1626c4c7` までに変わったのは `REPORT_2202.md`・`verify_dest_2202.py` 等の文書・検証のみで、測定対象の `audit_undefload_dest.py` は変わっていない。
+測定 commit は、コードを最後に変えた commit (`7117602e`)。それ以降 `ace67882` までに変わったのは `REPORT_2202.md`・`results/`・`verify_dest_2202.py` 等の文書・検証のみで、測定対象のコード (上の 4 ファイル) は変わっていない。
 したがって表の件数は検証 HEAD のコードの値である。
 
-(参考: 旧測定 commit `d7998dca` → `1626c4c7` の差分は `13 insertions, 2 deletions` で、`dest_riprip` 出力と指摘 2・3 の規則を含む。`d7998dca` の値は本節の値に置き換えた。)
+(参考: 検証 HEAD `1626c4c7` 時点の `git diff 7117602e 1626c4c7` も 0 行。`d7998dca` 以前の差分は測定 commit ではないため記載しない。)
+
+
 
 ## review 対応 (fix モード)
 
@@ -93,10 +95,10 @@ PR head `255d5a53` の review (request-changes) への対応 (測定 commit `711
 
 `tools/m11/ldfix/verify_dest_2202.py` (commit `07cb1f47`)。入力: `fl-win64` の `extracted/block00031_PE.bin` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst extracted/block00031_PE.bin`)。合成機械語は同ファイル内に記載。
 
-実行 (検証 HEAD `1626c4c7`、リポジトリ直下で実行。`timeout 300`・rc 0):
+実行 (検証 HEAD `ace67882`、リポジトリ直下で実行。`timeout 300`・rc 0):
 
 ```
-$ python3 tools/m11/ldfix/verify_dest_2202.py extracted/block00031_PE.bin
+$ python3 tools/m11/ldfix/verify_dest_2202.py $RUNNER_TEMP/pe2202/extracted/block00031_PE.bin
 [1] PE 69c381 eax <- 69c378 mov eax, dword ptr [rip + 0xf58576] : rip_rva=0x15f48f4  OK
 [2a add eax,ecx (ecx=reg def)] consumer cmp eax, 0 -> writer mov ecx, edx  mem=False  OK
 [2b shl eax,cl (cl=rip read)] consumer cmp eax, 0 -> writer mov ecx, dword ptr [rip + 0x1fa]  mem=True  OK
@@ -110,10 +112,10 @@ ALL OK
 
 ### 既存 18 件 (DEST_FRAME_IN_ESCAPED 15 / PTR_ESCAPED 3) の件数・site 一覧
 
-5 入力・検証 HEAD で再測定し、before/after で `dest_frame_in_escaped`・`dest_frame_ptr_escaped` の site 一覧が完全一致した (上の実測節)。
+5 入力・検証 HEAD (`ace67882`) で再測定し、before/after で `dest_frame_in_escaped`・`dest_frame_ptr_escaped` の site 一覧が完全一致した (上の実測節)。
 指摘 2・3 の規則 (第 2 オペランド追跡・`reads_dest` 拡張) は、これら 18 件の分類を変えていない。
 
 ### 実測の範囲
 
-- 5 入力 (`boot{0..4}.norm0.ll`) で、検証 HEAD と before の両方を実行した。件数の差は上の実測節の 1 件 (69c381) のみ。
+- 5 入力 (`boot{0..4}.norm0.ll`) で、検証 HEAD (`ace67882`) と before の両方を実行した。件数の差は上の実測節の 1 件 (69c381) のみ。
 - 本 run で再生成した JSON は `dest_riprip` を含む (`results/audit_undefload_dest_2202.json`)。受入条件 1 の根拠は `dest_riprip` の 69c360 エントリ。
