@@ -549,7 +549,8 @@
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
 | `tools/targets/massivex/REPORT.md` | ~160 | Massive X 事前解析 + ライセンス呼出点マップ |
-| `tools/targets/massivex/REPORT_APPENDIX.md` | ~248 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017) |
+| `tools/targets/massivex/REPORT_APPENDIX.md` | ~244 | Massive X MX2-3 (#830) N5/N6 実測の付録 (REPORT §12 の分割移動・未達の起票先 #1017・§12.9 の対照と一貫性 #3154) |
+| `tools/targets/massivex/REPORT_APPENDIX_3154.md` | ~71 | Massive X §12.2・§12.2a・§12.10 の分割移動全文 (#3154 MX-34・250 行上限のため・内容無変更) |
 | `tools/targets/massivex/REPORT_APPENDIX_2151.md` | ~70 | Massive X §12.12〜§12.14 (#1976・#2108・#2151 MX-31) の分割移動全文。§12.14 の `.pdata` 訂正は未確定 |
 | `tools/targets/massivex/dsp/REPORT.md` | ~220 | Massive X DSP closure 特定と lift 計画 |
 | `tools/targets/massivex/dsp/REPORT_MX6.md` | ~130 | MX-6 (#1123): vectorcall 静的検出・.pdata unwind census・FH3 funclet 一覧と #228 同型判定。測定値の正本 |
