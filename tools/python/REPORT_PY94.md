@@ -69,7 +69,7 @@ main の取り込みで 4 ファイルが競合した (`docs/DOC_MAP.md`・`host
 - `host/fl_mock.mjs`・`provider/fl_engine.c`: 両側の項目を残した。main の選択範囲の状態 (`selStart`・`selEnd`、C は `sel_start`・`sel_end`) と `arr_time` を残した。main 側の `undoHistory*` の状態行は採らず、前の取り込みからの統一 (`undoPos`・`undoCount`・`undoLast`) を保った。
 - `tests/provider_check.mjs`: `pe94`・`pe96`・`pe121_2982` を含む判定集合を全て残した。期待値は **実装 126 / 未実装 309** (main の 119 (pe96 の 4 件と pe121_2982 の 6 件を含む) に pe94 の 7 件を足した値。total 435、MCP 静的 60)。
 
-環境: runner 4 core。検証開始直前の load average 0.14 / 0.25 / 0.12 (`uptime`)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開し (5 秒)、`FL_WIN64_DIR` に指定した。emsdk は runner の `[EMSDK]` (`/opt/emsdk`) を `provider/build.sh` が既定の `EMSDK_ENV` で読んだ。`toolchain-emsdk.tar.zst` は展開していない。
+環境: runner 4 core。検証開始直前の load average 0.14 / 0.25 / 0.12 (`uptime`)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開し (5 秒)、`FL_WIN64_DIR` に指定した。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md` §4) を `provider/build.sh` が既定の `EMSDK_ENV` で読んだ。`toolchain-emsdk.tar.zst` は展開していない。
 
 前提の生成物 (gitignore。worktree を新規に作ったため `work/` は再利用せず、すべて新規に生成した):
 
