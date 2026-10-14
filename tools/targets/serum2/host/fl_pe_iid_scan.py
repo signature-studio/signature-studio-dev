@@ -87,6 +87,21 @@ def count_hits(paths):
     return out
 
 
+def dword_hits(paths):
+    out = {}
+    for name, h in IIDS.items():
+        raw = bytes.fromhex(h.replace(' ', ''))
+        chunks = [raw[i:i + 4] for i in range(0, 16, 4)]
+        all4 = []
+        for p in paths:
+            with open(p, 'rb') as fh:
+                data = fh.read()
+            if all(c in data for c in chunks):
+                all4.append(os.path.basename(p))
+        out[name] = all4
+    return out
+
+
 def negative_control(pe_path):
     tmpdir = tempfile.mkdtemp()
     out = {}
@@ -115,6 +130,9 @@ def main():
     print('IID hits over valid PE files (files with hit: LE, BE):')
     for name, (n_le, n_be) in count_hits(pe_paths).items():
         print('  %s: LE=%d BE=%d' % (name, n_le, n_be))
+    print('4-byte chunk check (LE, all four chunks of the IID present in one PE; 即値分割の検出用):')
+    for name, hits in dword_hits(pe_paths).items():
+        print('  %s: all4=%d %s' % (name, len(hits), hits))
     if len(sys.argv) >= 3:
         ctl = sys.argv[2]
         print('negative control (copy of %s with IIDs appended, one order at a time):' % os.path.basename(ctl))
@@ -122,6 +140,17 @@ def main():
             for name, (n_le, n_be) in res.items():
                 n = n_le if order == 'LE' else n_be
                 print('  wrote %s, %s: hits=%d' % (order, name, n))
+        tmp = tempfile.mkdtemp()
+        try:
+            dst = os.path.join(tmp, 'control_chunk.bin')
+            shutil.copy(ctl, dst)
+            with open(dst, 'ab') as fh:
+                for h in IIDS.values():
+                    fh.write(patterns(h)[0])
+            for name, hits in dword_hits([dst]).items():
+                print('  wrote LE (chunk check), %s: all4=%d' % (name, len(hits)))
+        finally:
+            shutil.rmtree(tmp)
 
 
 if __name__ == '__main__':
