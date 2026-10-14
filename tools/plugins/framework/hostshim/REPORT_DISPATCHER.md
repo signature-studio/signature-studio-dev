@@ -241,9 +241,9 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 
 ## 11. #2886 (PLG-P0b-25): 格納元の機械語確定
 
-部分達成。詳細と VA は `REPORT_DISPATCHER_APPENDIX_2886.md` (250 行上限のため別ファイル)。測定 commit は `2d523491` (解析) と `2dca40dd` (応答表)。
+部分達成。詳細と VA は `REPORT_DISPATCHER_APPENDIX_2886.md` (新規ファイル・分割移動ではない)。測定 commit は `2d523491` (解析) と `2dca40dd` (応答表)。callee 依存の再測定は `470a8f15` (付録 §6)。
 
 - 受入 1 (格納元 19 ID): 出所を VA 付きで確定。TLS 要素ポインタ + `0x2a8` 6 ID / call 戻り値 6 ID / callee 出力引数 1 / グローバル・フィールド 5 / ローカル 1。値の実体は未確定。
 - 受入 2 (仮想呼出し出口 27 ID): A (戻り値を格納) 3 / B (戻り値を捨てて `0x13281af` へ) 13 / C (後続未読) 11。B は応答が状態格納 0〜4 で決まる。
 - 受入 3: `hostshim.c` に 0x07・0x1c・0x4e (非 NULL) を追加。Phase A `dispatch=38 ff=0` PASS。Phase B の OOB は変更前後で同一。
-- 未解決: [PLG-P0b-27] (受入 2 の残り)・[PLG-P0b-28] (整数・bool 格納元の実値)。
+- 未解決: [PLG-P0b-27] (受入 2 の残り)・[PLG-P0b-28] (整数・bool 格納元の実値)・親 #2886 (callee 0x40fe90 以外の個別影響と、分岐条件未解析の格納。付録 §5)。

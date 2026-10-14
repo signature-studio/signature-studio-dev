@@ -77,17 +77,16 @@ emulator の経路は末端の間接 call で止まる (受け手の vtable が 
 
 ### 3.4 callee 戻り値 0 への依存 (実測)
 
-emulator は未実行の callee を戻り値 0 で代替する。その仮定が経路と応答 0 の集合を変えるかを、callee 0x40fe90 (戻り値 1) で測った。
-測定 commit `aff22692` (`hs_disp_emu.py` の `HS_DISP_RET_SPEC=0x40fe90:one`・`hs_store_cov.py`)。基準 (既定) と変更の 2 回、全 256 ID・`HS_DISP_PATH=1`、各 51 秒 (n=1)。
+emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90 = 1 の影響 (経路が変わる 11 ID・応答 0 の 202 件の構成変化 0x17 out / 0x0a in・rax が変わる 4 ID) の数値は、main の `REPORT_DISPATCHER_APPENDIX.md` §B-2 (測定 commit `48f2ced9`) が正本で、ここには再掲しない。本 PR の HEAD で同じ run を再測定し、一致した (§6)。本節は格納の観点の分類だけを書く。
 
-- 0x40fe90 を経由する ID は 11 件 (0x0a 0x11 0x14 0x15 0x17 0x32 0x33 0x34 0x38 0x4c 0x4d)。戻り値 1 で **11 件すべての経路が変わる**。rax も変わるのは 4 件 (0x0a: `0x54534154`→0、0x17: 0→`0x54534154`、0x34: 1→0、0x4c: 0→`0x2a8`)。
-- 応答 0 の 202 件 (共通初期化 `0x131873f` の格納だけを実行し、共通終端 `0x1328a4a` に到達する ID): 基準 202、変更 202。件数は同じだが構成が変わる (ID 0x17 が外れ、ID 0x0a が入る)。
-- 未収載 25・54・64・88・128 は、基準・変更とも応答 0・共通終端 `0x1328a4a` に到達する (0x40fe90 には依らない)。**ただし 0x40fe90 以外の 81 callee の戻り値依存は未測定**。
-- 未実行の格納 (静的 69 − 基準の実行被覆 30 = **39**): 変更で新たに実行されるのは 4 件 (0x1320f72 = ID 0x32、0x13210ae = 0x33、0x13211a1 = 0x34、0x1321efb = 0x4c)。変更で失われるのは 3 件 (0x1320fda・0x13210e8・0x1321225)。
-- 残りの未実行格納 35 件の内訳:
-  - **11 件は callee 戻り値ではなく受け手の実値に依存**: 仮想呼出し出口の後続 (A 群 0x1320e23・0x13213f3・0x1322971 の 3 件) と、共通後処理 `0x13281af` 以降 (0x1328098・0x1328104・0x1328114・0x1328124・0x1328131・0x132818a・0x1328197・0x13281a4 の 8 件)。emulator は受け手 (vtable) が 0 埋めのため末端で止まる → [PLG-P0b-27]。
-  - **24 件は分岐条件が未解析** (callee 戻り値に依存するかは未確定) → [PLG-P0b-28]。
-- 旧 #2888 の A-1・B-2 節は本ブランチにも main にも無いため、上記の数値はすべて本節で再導出した。
+- 応答 0 の 202 件は callee 戻り値 0 の仮定の上でのみ成り立つ。未収載 25・54・64・88・128 は、基準・`0x40fe90`=1 の両 run で応答 0 の集合に残る。0x40fe90 以外の 81 callee は個別には未測定 (main B-2 の「基準で呼ばれた 82 VA を全て 1」の run は集合の結果だけを持つ)。
+- 基準の未実行格納 39 件 (静的 69 − 基準の実行被覆 30) の、変更 run での扱い:
+  - 変更で新たに実行: 4 件 (0x1320f72 = ID 0x32、0x13210ae = 0x33、0x13211a1 = 0x34、0x1321efb = 0x4c)。
+  - 変更でも未実行: 35 件。
+    - **受け手の実値に依存 11 件**: A 群の後続 3 件 (0x1320e23・0x13213f3・0x1322971) と、共通後処理 `0x13281af` 以降の 8 件 (0x1328098・0x1328104・0x1328114・0x1328124・0x1328131・0x132818a・0x1328197・0x13281a4)。emulator は受け手 (vtable) が 0 埋めのため末端で止まる → [PLG-P0b-27]。
+    - **分岐条件が未解析 24 件** → 親 #2886 (PM 判断)。
+- 基準で実行され変更で失う格納 3 件: 0x1320fda (ID 0x32・値 0)、0x13210e8 (ID 0x33・値 0)、0x1321225 (ID 0x34・bool、`movsx rax, al`)。3 件とも、0x40fe90 = 1 で分岐の向きが変わる ID の、基準側の格納である。分岐は 0x32 が `0x1320ef5 je 0x1320fd0`、0x33 が `0x132101a je 0x13210e8`、0x34 が `0x132110d je 0x13211db` で、基準は `je` が成立して格納へ進み、変更は次の命令へ進む。A/B/C 群には属さない。分岐の判定値の供給元は未解析 → 親 #2886 (PM 判断)。
+- 件数の検算: 変更の被覆 31 (= 30 − 3 + 4)。変更の未実行 38 (= 69 − 31 = 35 + 3)。
 
 ## 4. 受入 3: `hostshim.c` 応答表と Phase A 回帰
 
@@ -96,32 +95,34 @@ emulator は未実行の callee を戻り値 0 で代替する。その仮定が
   - 非 NULL (obj): 0x07・0x0e・0x1c・0x1d・0x3d・0x4e (TLS+0x2a8)・0x2e・0x47・0x56 (ポインタ・deref 系の既定)。
   - 0 固定: 0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65 (整数・bool・グローバル値。実値は未確定 = [PLG-P0b-28] の範囲)。
   - 注意: 非 NULL 応答は `0x41d110` の戻り値 (TLS 要素) ではなく obj を返す。非 NULL 性のみ一致させた。
-- Phase A (`hs_e2e.sh` の framework smoke): `[fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0` → **PASS** (変更前後とも)。
-- stage-2 (`fw_stage2.sh`・stage-1 再利用・n=1): 5 分 30.2 秒。`SMOKE PASS (Halt0/RestoreContext 到達): dispatch=38 units_done=0 va=1 heap=1 ff=0` は PASS。
+- Phase A (`hs_e2e.sh` の framework smoke): `[fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0` → **PASS** (`2dca40dd` 時点の前回測定。本節 §6 では未再実行)。`hs_e2e.sh` の Phase A は `$WFW/fw_route.cjs` (CAB-194 artifact) をそのまま使い、`hostshim.c` をコンパイルしない (`hs_e2e.sh` 17 行目)。よって hostshim.c の変更は Phase A の経路に入らない。
+- stage-2 (`fw_stage2.sh`・stage-1 再利用・n=1): 5 分 30.2 秒。`SMOKE PASS (Halt0/RestoreContext 到達): dispatch=38 units_done=0 va=1 heap=1 ff=0` は PASS (測定 commit は付録に未記録のため、鮮度は保証しない)。
   `fw_smoke_check` は **FAIL** (`runerr=1`・`init_reach=16` MISMATCH)。これは `REPORT_2425.md` §4・`REPORT_2510.md` §1 に記録済みの既存状態 (#2510 の idx 16 RunError)。
-  `fw_stage2.sh` は hostshim を含まないため、本変更は stage-2 の判定に影響しない (変更前 HEAD でも同一の既存状態)。
-- Phase B (`hs_e2e.sh`): `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7 pluglog=0 slotsCalled=0x0` → **FAIL**。変更前 (`2d523491` の hostshim.c) と変更後 (`2dca40dd`) で同一行 (既存 #1229・#2911 の範囲)。
+  `fw_stage2.sh` は hostshim を含まないため、本変更は stage-2 の判定に影響しない。今回は未再実行 (素材 `work-fw-stage1` と `/opt/emsdk` が本 run に無い)。
+- Phase B (`hs_e2e.sh`): `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7 pluglog=0 slotsCalled=0x0` → **FAIL** (前回測定の時点は `2d523491`・`2dca40dd`。既存 #1229・#2911 の範囲)。今回は未再実行。
+  Phase B の hs_route ビルドは `fw_hostfix.py` と `fw_rt.c` を使う。この 2 つは `2dca40dd` と `470a8f15` の間で main 取り込みにより変わっている (2 ファイル 43 行追加・6 行削除)。よって §6 の基準では Phase B の再測定が要る。素材 `work-fw-stage1`・`toolchain-emsdk` が本 run に無いため、PR 本文の `oc_artifacts` で依頼した。
 - 時間: `hs_e2e.sh` 初回 (IR 生成込み) 1 分 58.8 秒 (n=1)。変更後の再実行 12.8 秒 (emcc 増分)。開始 load は未計測。
 
 ## 5. 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 仮想呼出し出口のうち A 群 (3 ID)・C 群 (11 ID) の応答値、B 群の状態格納 (0〜4) の実行時条件 | 受入 2 | [PLG-P0b-27] |
-| 未実行格納のうち受け手の実値に依存する 11 件 (§3.4) | 受入 2 | [PLG-P0b-27] |
-| 整数・bool 格納元の実値 (0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65 と call 先 `0x11ffde0`・`0x9636a0`・`0xe4e970`・`0xed6780`・`0x11d06e0`、`0x86c900`・`0x75b3d0` の戻り値の意味論) | 受入 1 の値・受入 3 の表 | [PLG-P0b-28] |
-| callee 0 代替の影響: 0x40fe90 = 1 で経路が変わる 11 ID と 202 件の構成変化 (0x17 out・0x0a in) は実測済み (§3.4)。0x40fe90 以外の 81 callee は未測定 | 受入 2 の 202 件・未収載 ID の応答 0 | [PLG-P0b-28] |
-| 未実行格納のうち分岐条件が未解析の 24 件 (§3.4) | 受入 1・3 | [PLG-P0b-28] |
-| Phase B の OOB (本 run 変更前後で同一) | Phase B の PASS | #2911 (既存) |
+| 仮想呼出し出口のうち A 群 (3 ID)・C 群 (11 ID) の応答値、B 群の状態格納 (0〜4) の実行時条件 | 受入 2 | [PLG-P0b-27] (#2944) |
+| 未実行格納のうち受け手の実値に依存する 11 件 (§3.4) | 受入 2 | [PLG-P0b-27] (#2944) |
+| 整数・bool 格納元の実値 (0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65 と call 先 `0x11ffde0`・`0x9636a0`・`0xe4e970`・`0xed6780`・`0x11d06e0`、`0x86c900`・`0x75b3d0` の戻り値の意味論) | 受入 1 の値・受入 3 の表 | [PLG-P0b-28] (#2945) |
+| 0x40fe90 以外の 81 callee の個別の影響 (未測定。全 82 VA = 1 の集合の結果は main 付録 B-2)。202 件の応答 0 と未収載 ID の応答 0 は callee 戻り値 0 の仮定の上 | 受入 2 の 202 件・未収載 ID の応答 0 | 親 #2886 (PM 判断。再測定だけのため子は起票しない) |
+| 分岐条件が未解析の未実行格納 24 件と、基準で実行され変更で失う格納 3 件 (§3.4) | 受入 1・3 | 親 #2886 (PM 判断。解析だけのため子は起票しない) |
+| Phase B (`hs_e2e.sh`) と stage-2 の再測定 (§4。素材 `work-fw-stage1`・`toolchain-emsdk` が必要) | Phase B・stage-2 の鮮度 | 本 PR (`oc_artifacts` で素材を依頼し再測定する) |
+| Phase B の OOB | Phase B の PASS | #2911 (既存) |
 | stage-2 smoke `fw_smoke_check` の `init_reach=16` | Phase A の判定 (dispatch=38 は PASS) | #2510 (既存) |
 
-## 6. main 取り込み後の再測定 (測定 commit `e1515204`・競合解消の merge)
+## 6. 再測定 (測定 commit `470a8f15`)
 
-main (`3d37a190`) の取り込みで、本付録と同名の `REPORT_DISPATCHER_APPENDIX.md` (#2782 の付録) が衝突したため、本付録を `REPORT_DISPATCHER_APPENDIX_2886.md` へ改名した。`hs_disp_emu.py` は main 側の `HS_DISP_STACK_FILL`・`slot_writes`・`rbp_ok` (#2782) と本 PR の `HS_DISP_PATH`・`callout_at`・`one` を両方残した。以下は merge 後の実測 (n=1)。
-
-- 既定・全 256 ID: exit 0・71.7 秒。`distinct (rax, path) = 109`・unmapped 61 ID / 5,340 件 / 200 組 / 197 ページ (§1 と一致)。取り込み前 `97b9aee7` の既定 run との比較: rax・stop・steps・callouts・path_hash・trail・unmapped・unmapped_pages・hit の差は 256 ID で 0 件。
-- `HS_DISP_PATH=1` の基準と `HS_DISP_RET_SPEC=0x40fe90:one` (各 exit 0)、`hs_store_cov.py`: 静的 69・基準の実行被覆 30・未実行 39・変更で新規 4・失う 3・応答 0 の 202 件 (leave 0x17 / enter 0x0a)。§3.4 と一致。
-- `hs_resp_src.py 0x01 0x07 0x0e 0x18`: 格納 VA は §2 と一致 (0x1318e46・0x13192eb・0x1319561・0x131a268)。
-- Phase A (`hs_e2e.sh`) は再実行していない。素材は `fl-win64` のみで `work-fw-stage1` が無い。`hostshim.c` は取り込み前の差分がコメント 1 行 (参照名) のみで、コードは変わらない。
-- 測定 commit `e1515204` 以降、本節を含む commit で変わるのは `REPORT_DISPATCHER_APPENDIX_2886.md` と `docs/DOC_MAP.md` のみ (コード `*.py`・`*.c`・`*.sh` の差分 0 行)。
-- 取り込み前後のコード差分 (`git diff --numstat 97b9aee7 e1515204 -- tools/plugins/framework/hostshim/`): `hs_disp_emu.py` 31+/6−・`hostshim.c` 1+/1− (コメント)・`REPORT_DISPATCHER.md` 17+/2−・`REPORT_DISPATCHER_APPENDIX_2886.md` 新規 116 行。
+- 測定 commit: `470a8f15` (コードを変えた最後の commit)。`git diff 470a8f15 HEAD -- '*.py' '*.c' '*.sh'` は 0 行 (以降は docs のみ)。`hs_resp_src.py` は `2dca40dd` 以降の差分 0 行のため §2 は再実行していない。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 bytes) を `$RUNNER_TEMP/fl-win64` に展開 (2.9 秒)。`unicorn 2.1.4`・`pefile 2024.8.26`・`capstone 5.0.9` を `$RUNNER_TEMP/pylib` に導入。実測は n=1。
+- 既定・全 256 ID (`hs_disp_emu.py`): exit 0・71.1 秒。`distinct (rax, path) = 109`・unmapped 61 ID / 5,340 件 / 200 組 / 197 ページ (§1 と一致)。
+- 基準 (`HS_DISP_PATH=1`): exit 0・72.4 秒。
+- `HS_DISP_PATH=1 HS_DISP_RET_SPEC=0x40fe90:one`: exit 0・72.4 秒。unmapped 65 ID / 5,346 件。
+- `hs_store_cov.py` (基準・変更): 5.9 秒。静的 69・基準の実行被覆 30・未実行 39・変更で新規 4・失う 3・変更の被覆 31・応答 0 の 202 件 (leave 0x17 / enter 0x0a)。§3.4 と一致。
+- 上の主要な数値 (distinct・unmapped・静的・被覆・新規・失う・応答 0 の 202) は、main 取り込み後の測定 (`e1515204`) の記録と一致した。
+- Phase A・Phase B・stage-2 は本節では再測定していない。理由と前回測定の扱いは §4 を参照。
