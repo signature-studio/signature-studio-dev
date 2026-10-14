@@ -238,4 +238,4 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 - 初回 (include 不足) の失敗: `canvas_frame.cpp` は `IPlatformTextEdit` / `IPlatformOptionMenu` / `IPlatformViewLayer` が不完全型のまま `SharedPointer` を返すため error 3 件。対策は 3 つの `iplatformXXX.h` の include 追加。これで abstract 化の error も消えた。
 - factory 未実装の原因: `platformfactory.h` → `platformfwd.h:36` が `static_assert (false, "unknown platform")` で止まる。`vstguibase_emscripten.patch` は `WASM 1` のみで `LINUX` を立てないため。factory の 20 関数はこの分岐が決まるまで実装・検証できない (#2139)。
 - 未検証: リンク・実行・描画 (#2065 の範囲)。
-- 測定 commit: 本節を含むこの commit の直前 (コード変更の最後) の commit。
+- 測定 commit: `c9a7329a` (コードを変えた最後の commit。本節の REPORT 修正は含まない)。
