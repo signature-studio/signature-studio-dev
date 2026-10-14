@@ -48,4 +48,10 @@ IR 生成: `ldfix=applied`・F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0 (REP
 ## 4. 再現
 
 - `bash tools/m11/trap_triage/repro_1701_rt_ov.sh [N]` (N = 反復回数・既定 1)。`work/split_1701/table.tsv` に出力。前提: `m11_gen_ir2.sh` 実行済み・`FL_WIN64_DIR` 設定・[EMSDK] 配置済み。
-- 測定 commit `fb3c40c3`。`git diff fb3c40c3 HEAD -- tools/m11` は本 REPORT のみ (§5 参照)。
+- 測定 commit `fb3c40c3`。
+
+## 5. 測定 commit からの差分と HEAD での再測定
+
+- `git diff fb3c40c3 HEAD -- tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_survey.mjs` は **空** (行数 0)。main 取り込みで変わったのは `ldfix/link_d17*`・REPORT 類のみで、IR 生成・build・survey のどれからも呼ばれない。
+- HEAD (main 取り込み後) で `repro_1701_rt_ov.sh 1` を再実行: A=2012 / C=2008 / R0=2012 / O0=2008 / L0=2008 / R1=2008、全構成 IR md5 `baa100ff`・undefined symbol 0・870/24/0。§1 と一致。所要 3 分 21 秒。
+- `git diff --stat fb3c40c3 HEAD -- tools/m11` (参考・全体): 14 files, +793/−8。うち測定コードは 0。
