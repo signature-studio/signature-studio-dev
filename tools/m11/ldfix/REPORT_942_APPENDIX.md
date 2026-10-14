@@ -147,7 +147,7 @@ k236 P=0xa027 値 0x40a027: なし
 測定 commit `d5f5ee92` (HEAD・コードを変えた最後の commit)。`bash tools/m11/ldfix/ldfix_e2e.sh` は 50 秒 (real)・rc 0・load 0.82 / 0.87 / 0.49・judge PASS (base = fix)。units 17/942・icall 24・threw `memory access out of bounds` (base = fix)・survey ok 136 / trap 9 (base = fix)。修復件数 F3a 2 / F3c 33。
 鮮度: `git diff d5f5ee92 HEAD -- tools/m11/ldfix/` は本 REPORT の追記のみ (ldfix_e2e.sh の実行経路は変更なし)。
 
-- boot 前後で bin 表 (BASE 16404744・16 バイト刻み) の変化は base / fix とも **96 スロット** で、変化した k の一覧は一致 (一覧の md5 一致。値の一致は未比較)。
+- boot 前後で bin 表 (BASE 16404744・16 バイト刻み) の変化は base / fix とも **96 スロット** で、変化した k の一覧は base / fix で一致する (一致の照合手順は commit に無く、md5 照合は本 run では未再現。値の一致は未比較)。
   変化した k は 0,1,4,5,6,8,9,10,… と 216 (k184〜186・215・236・255 は変化なし)。修復 pass の有無は boot の書き込みを変えない。
 - `bin_post_probe.mjs` (base/fix): k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k215 P=0xee / k236 P=0xa027 は PRE・POST で同一。
 - `bin_size_probe.mjs` (fix・`S4_IMAGE` 指定): PRE nonzero=0 / POST nonzero=324・max_bin=172・refs_ge184=0。
@@ -155,7 +155,7 @@ k236 P=0xa027 値 0x40a027: なし
 
 ### P の正体 (新知見)
 - k184〜186 の P の生値 (0x7a50 / 0x8040 / 0x8870) は、PE `.data` 上で VA (0x407a50 / 0x408040 / 0x408870) として `.reloc` DIR64 対象になっている (§12)。
-- P が指す先の先頭バイトは `55 57 56 53` (push rbp/r15/r14/r13)・`55 41 57 41`・`53 48 83 ec` で、3 件とも関数の prologue に見える。
+- P が指す先の先頭バイトは `55 57 56 53` (push rbp/rdi/rsi/rbx)・`55 41 57 41`・`53 48 83 ec` で、3 件とも関数の prologue に見える。
 - 従って k184〜186 の「bin ポインタ」は、bin 表の隣に並ぶ**関数ポインタ表**の要素を 16 バイト刻みで読んでいる可能性がある。
   サイズ→bin 表は bin 172 までしか参照せず (refs_ge184=0)、k≥173 は bin 表の外と考えられる。仮説。
 - k236 (P=0xa027) は先頭バイト `48 8d 4d 38` (lea) で、prologue とは言い切れない。仮説の支持は 3/4。
