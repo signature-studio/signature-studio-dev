@@ -6,7 +6,9 @@
 # 使い方: bash tools/flp/s2_render_probe.sh <Render tests の .flp 名> [REPEAT=3]
 # 追加試行: S2_REG に 1 行 1 件 `<HKCU 下のキー>|<値名>|<REG_SZ の値>` を入れる (値は WINEPREFIX に残る)。
 #   例 (#113 の 16-bit 試行): S2_REG=$'Software\\Image-Line\\FL Studio 26\\General|LastExportedFormats|4' bash tools/flp/s2_render_probe.sh Autogun.flp 1
-# 出力は $RUNNER_TEMP 配下のみ (commit 対象外)。結果の要約は tools/flp/REPORT_APPENDIX.md §15。
+# 検証用の即値パッチ: S2_PATCH に 1 行 1 件 `<VA hex>|<期待バイト hex>|<新バイト hex>` を入れる (oracle ローカルコピーの FLEngine_x64.dll のみ)。
+# レジストリ・トレース: S2_TRACE_REG=1 で WINEDEBUG=+reg にし、開かれたキーを $WORKDIR/s2_reg_keys_<n>.txt に出す。
+# 出力は $RUNNER_TEMP 配下のみ (commit 対象外)。結果の要約は tools/flp/REPORT_APPENDIX.md §15・§16。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 ART="${RUNNER_TEMP:-/tmp}"
@@ -16,7 +18,8 @@ SRC="$ART/fl-install/Data/System/Render tests"
 WORKDIR="$ART/s2"
 NAME="${1:?usage: s2_render_probe.sh <name.flp> [repeat]}"
 REPEAT="${2:-3}"
-export WINEPREFIX="$ART/wineprefix" WINEARCH=win64 WINEDEBUG="-all"
+export WINEPREFIX="$ART/wineprefix" WINEARCH=win64
+if [[ "${S2_TRACE_REG:-0}" == 1 ]]; then export WINEDEBUG="+reg"; else export WINEDEBUG="-all"; fi
 export PATH="/usr/lib/wine:$PATH"
 
 [[ -d "$INST" ]] || { echo "missing $INST (先に s1_wine_probe.sh)" >&2; exit 2; }
@@ -26,6 +29,10 @@ cp "$SRC/$NAME" "$WORKDIR/"
 cp "$EXT"/block00038_* "$INST/FL64.exe"
 cp "$EXT"/block00031_* "$INST/FLEngine_x64.dll"
 (cd "$INST" && python3 "$ROOT/tools/flp/s1_g03_patch.py" FL64.exe && python3 "$ROOT/tools/flp/s1_g03_patch.py" FLEngine_x64.dll)
+while IFS='|' read -r pva pexp pnew; do
+  [[ -n "$pva" ]] || continue
+  python3 "$ROOT/tools/flp/s2_imm_patch.py" "$INST/FLEngine_x64.dll" "$pva" "$pexp" "$pnew"
+done <<< "${S2_PATCH:-}"
 
 wine64 reg add 'HKCU\Software\Image-Line\FL Studio 26\Devices\Audio output' /v 'Sample rate' /t REG_SZ /d 48000 /f >/dev/null 2>&1 || true
 while IFS='|' read -r rkey rname rval; do
@@ -44,6 +51,9 @@ for n in $(seq 1 "$REPEAT"); do
   (cd "$INST" && timeout 120 xvfb-run -a wine64 FL64.exe /R "Z:${WINPATH}\\$NAME" > "$WORKDIR/s2_run_$n.log" 2>&1) || rc=$?
   e=$(date +%s)
   cp "$WORKDIR/$base.wav" "$WORKDIR/${base}_run_$n.wav" 2>/dev/null || true
+  if [[ "${S2_TRACE_REG:-0}" == 1 ]]; then
+    grep -oE 'NtOpenKeyEx \(0x[0-9a-f]+,L"[^"]*"' "$WORKDIR/s2_run_$n.log" | sed 's/.*L"//' | sort | uniq -c > "$WORKDIR/s2_reg_keys_$n.txt" || true
+  fi
   python3 - "$WORKDIR/${base}_run_$n.wav" "$n" "$rc" "$((e - s))" <<'EOF'
 import hashlib, struct, sys
 path, n, rc, sec = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]

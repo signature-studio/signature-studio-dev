@@ -3,21 +3,25 @@
 // 返す number は整数なら int、実数なら float になる。整数値の float は F(x) で明示。
 import { createIlmcp } from "./ilmcp.mjs";
 const F = (v) => ({ t: "D", v });
+// PY-100 (#2879): PE 0xd5b930 の readout (C provider と同一)。構造体 = grid bit が立つ step。param 0..7 の既定値は stub 順、範囲外と param 8 (未モデル) は -1
+const STEP_DEF = [60, 100, 64, 120, 64, 64, 64, 0];
+const stepParam = (k, pos, prm) => (pos < 0 || pos >= 64 || !k.steps[pos] || prm < 0 || prm > 7 ? -1 : STEP_DEF[prm]);
 
 class FlError extends Error {
   constructor(msg, code) { super(msg); this.flCode = code; }
 }
 const RANGE = (m) => new FlError(m || "Index out of range", 4);
 const WRONG = (m) => new FlError(m || "Wrong number of function parameters or wrong parameter type", 5);
-// mixer の色の R/B 入替え (REPORT_PY115.md §2)。MIX_DEFAULT_COLOR は未確定の既定値 (C の MIX_DEFAULT_COLOR と同じ仮置き)
+// mixer の色の R/B 入替え (REPORT_PY115.md §2)。既定色は FL の .bss 0x15f6774 の初期値 (REPORT_PY118)
 const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
-const MIX_DEFAULT_COLOR = 0x5a6b7c;
+const MIX_DEFAULT_COLOR = 0xff636c71;
 
 export function createMockEngine() {
   const st = {
     tempo: 130,
     playing: false,
     changedFlag: 0, useMetronome: false, precount: false, recPPQ: 96,
+    screenBlanked: false, screenUnBlank: false, screenActiveCounter: 0,
     selectedChannel: 0,
     channels: [
       { name: "Kick", plugin: "Sampler", vol: 0.78125, pan: 0, mute: false, solo: false, color: 0x5A6B7C, sel: true, fx: 1, steps: new Array(64).fill(0) },
@@ -96,6 +100,20 @@ export function createMockEngine() {
     },
     // PY-41 (#1514): stub midi.CT_Sampler = 0 / CT_GenPlug = 2 を plugin 名で決める (C と同一・Hybrid 等は未モデル)
     "channels.getChannelType": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).plugin === "Sampler" ? 0 : 2; },
+    // PY-100 (#2879): PE 0xd5bb30 / 0xd5ba00 (C と同一)。引数を読んでから index を検査。padsStride 既定 16、0 は Range error
+    "channels.getCurrentStepParam": (...a) => {
+      arity(a, 3, 4);
+      const step = argI(a, 1, 0), prm = argI(a, 2, 0); argI(a, 3, 0);
+      return stepParam(ch(a[0]), step, prm);
+    },
+    "channels.getStepParam": (...a) => {
+      arity(a, 4, 5);
+      const step = argI(a, 0, 0), prm = argI(a, 1, 0), off = argI(a, 2, 0), st0 = argI(a, 3, 0), pads = argI(a, 4, 16);
+      if (pads === 0) throw new FlError("Range error", 4);
+      const q = Math.trunc(step / pads), idx = q + off;
+      if (idx < 0 || idx >= st.channels.length) throw RANGE();
+      return stepParam(st.channels[idx], step - q * pads + st0, prm);
+    },
     // PY-89 (#2805): C と同一。identity (全 channel が 1 グループ)・既定 -2 (未割当)
     "channels.getChannelIndex": (...a) => { arity(a, 1, 1); const i = ix(a[0]); ch(i); return i; },
     "channels.getChannelMidiInPort": (...a) => { arity(a, 1, 2); ch(a[0]); argI(a, 1, 0); return -2; },
@@ -156,6 +174,13 @@ export function createMockEngine() {
     "ui.getVisible": (w) => !!st.windows[w],
     "ui.showWindow": (w) => { st.windows[w] = true; },
     "ui.hideWindow": (w) => { st.windows[w] = false; },
+    // PY-119 (#2980): PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119)。値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "ui.getFocused": (...a) => { arity(a, 1, 1); ix(a[0]); return false; },
+    "ui.getFocusedFormID": (...a) => { arity(a, 0, 0); return 0; },
+    "ui.getFocusedFormCaption": (...a) => { arity(a, 0, 0); return ""; },
+    "ui.getFocusedPluginName": (...a) => { arity(a, 0, 0); return ""; },
+    "ui.getHintMsg": (...a) => { arity(a, 0, 0); return ""; },
+    "ui.isInPopupMenu": (...a) => { arity(a, 0, 0); return false; },
     "plugins.isValid": (i, slot = -1) => (slot < 0 ? !!st.channels[i] : !!st.mixer[i]?.slots[slot]),
     "plugins.getPluginName": (i, slot = -1, userName) => (slot < 0 ? ch(i).plugin : (tr(i).slots[slot] ?? "")),
     "plugins.getParamCount": () => st.params.length,
@@ -171,6 +196,12 @@ export function createMockEngine() {
     "general.getUseMetronome": (...a) => { arity(a, 0, 0); return st.useMetronome; },
     "general.getPrecount": (...a) => { arity(a, 0, 0); return st.precount; },
     "general.getRecPPQ": (...a) => { arity(a, 0, 0); return st.recPPQ; },
+    // PY-121 (#2985): screen 状態の 5 関数 (PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740)。初期値は未実測の仮置き (provider/fl_engine.c と同じ)
+    "screen.isBlanked": (...a) => { arity(a, 0, 0); return st.screenBlanked; },
+    "screen.isUnBlank": (...a) => { arity(a, 0, 0); return st.screenUnBlank; },
+    "screen.getScreenActiveCounter": (...a) => { arity(a, 0, 0); return st.screenActiveCounter; },
+    "screen.setScreenActiveCounter": (...a) => { arity(a, 1, 1); st.screenActiveCounter = (st.screenActiveCounter + argI(a, 0, 0)) | 0; },
+    "screen.unBlank": (...a) => { arity(a, 1, 1); st.screenUnBlank = argI(a, 0, 0) === 1; },
     "device.getPortNumber": () => st.devicePort ?? 0,
     "device.isAssigned": () => true,
     "device.setHasMeters": () => { st.hasMeters = true; },

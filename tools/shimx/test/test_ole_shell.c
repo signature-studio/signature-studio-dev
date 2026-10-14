@@ -22,6 +22,11 @@ static void test_guid_bstr(void) {
     CHECK(!IsEqualGUID(&a, &b) && IsEqualGUID(&a, &a) && (a.Data3 >> 12) == 4);
     LPVOID obj = (LPVOID)1;
     CHECK(CoCreateInstance((uint64_t)(uintptr_t)&a, NULL, 1, &b, &obj) == REGDB_E_CLASSNOTREG && obj == NULL);
+    GUID shelllink;                                                       /* IFileDialog 以外の CLSID は従来どおり REGDB_E_CLASSNOTREG (SHX-T33) */
+    CHECK(CLSIDFromString(W("{00021401-0000-0000-C000-000000000046}"), &shelllink) == S_OK);
+    obj = (LPVOID)1;
+    CHECK(CoCreateInstance((uint64_t)(uintptr_t)&shelllink, NULL, 1, &b, &obj) == REGDB_E_CLASSNOTREG && obj == NULL);
+    CHECK(CoCreateInstance(0, NULL, 1, &b, &obj) == REGDB_E_CLASSNOTREG && obj == NULL);
     CHECK(CoInitialize(NULL) == S_OK && CoInitialize(NULL) == S_FALSE); CoUninitialize(); CoUninitialize();
 
     BSTR bs = SysAllocString(W("hello"));
