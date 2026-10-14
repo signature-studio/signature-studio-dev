@@ -159,6 +159,26 @@ FL_H(channels, fillEachNSteps) {
     return fl_ret_none(c);
 }
 FL_H(channels, showEditor) { CH(0); (void)k; return fl_ret_none(c); }
+/* PY-40 (#1529): PE 0xd5ca50 / 0xd5c920 / 0xd5cbd0 / 0xd5c180 / 0xd5c5d0。引数は PyArg 順に全部読んでから index を検査 (範囲外は code 4)。
+ * 述語 (前提ゲート) は真と仮定し、UI 副作用・戻り値の内部経路・useGlobalIndex による配列の違いは未モデル (REPORT_PY40 §8) */
+FL_H(channels, closeGraphEditor) { (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(channels, updateGraphEditor) { return fl_ret_none(c); }
+FL_H(channels, showGraphEditor) {
+    (void)A_INT(0, 0); (void)A_INT(1, 0); (void)A_INT(2, 0);
+    int64_t idx = A_INT(3, 0); (void)A_INT(4, 1);
+    if (idx < 0 || idx >= nch) RANGE();
+    return fl_ret_none(c);
+}
+FL_H(channels, showCSForm) {
+    int64_t idx = A_INT(0, 0); (void)A_INT(1, 1); (void)A_INT(2, 0);
+    if (idx < 0 || idx >= nch) RANGE();
+    return fl_ret_none(c);
+}
+FL_H(channels, focusEditor) {
+    int64_t idx = A_INT(0, 0); (void)A_INT(1, 0);
+    if (idx < 0 || idx >= nch) RANGE();
+    return fl_ret_none(c);
+}
 /* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす (生成条件は未確定)。
  * 既定値は stub の並び (param 0..7 = pitch 60・velocity 100・release 64・fine pitch 120・pan 64・mod X 64・mod Y 64・ticks 0)。
  * 構造体が無い・param が 0..7 の外は -1 (PE: 構造体 NULL で -1)。param 8 (PE: byte +0x11) は既定値未確定のため未モデル (-1) */
