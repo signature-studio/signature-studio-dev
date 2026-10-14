@@ -1,6 +1,6 @@
 import manualDepsJson from "../../../tools/pm/manual_deps.json" with { type: "json" };
 import { DEFAULT_BATCH } from "./launch.ts";
-import { DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
+import { DEFAULT_MARK_LOGIN, DEFAULT_REVIEWER_LOGIN } from "./webhook.ts";
 
 // 既定の TARGET は 58: 同時に走らせる opencode.yaml の run の総数 (実装・review・fix・oc-pm・watchdog の全て。active.ts) の上限。
 // GitHub の同時実行の上限 (60) から 2 を残す (oc-pm・watchdog と、投稿直後でまだ run が現れていない分の余裕)。
@@ -41,6 +41,8 @@ export interface Env {
   LIVE_REDELIVER?: string;
   // 実装 App (bot) のログイン。bot_last (最後の報告) の判定に使う。
   BOT_LOGIN?: string;
+  // 停止印 (oc-fix-limit) の作者。型 Bot でこの login の投稿だけを停止として信じる (既定 github-actions[bot]。#2639)。
+  MARK_LOGIN?: string;
   // PM の人間アカウント (PAT)。PM App の bot ログインは slug から自動で加える。
   PM_LOGINS?: string;
   WATCHDOG_INTERVAL_S?: string;
@@ -87,6 +89,7 @@ export interface Config {
   commentMaxPages: number;
   stuckHigh: number;
   reviewerLogin: string;
+  markLogin: string;
   // VM の状態を取り込むまで launch しない (#2343)。IMPORT_REQUIRED=1 のときだけ true (#2795 で既定を false に反転)。
   importRequired: boolean;
   // oc-pm の対象にしてよい bot の起票者。人は author_association (OWNER / MEMBER / COLLABORATOR) で絞る。
@@ -131,6 +134,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),
     stuckHigh: num(env.STUCK_HIGH, 40),
     reviewerLogin: env.REVIEWER_LOGIN ?? DEFAULT_REVIEWER_LOGIN,
+    markLogin: env.MARK_LOGIN ?? DEFAULT_MARK_LOGIN,
     importRequired: env.IMPORT_REQUIRED === "1",
     pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]"],
     build: buildCommit(env.BUILD_COMMIT),

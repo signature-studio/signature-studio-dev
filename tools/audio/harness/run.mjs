@@ -3,6 +3,7 @@
 //        node harness/run.mjs --soak30   # 30 分ソークのみ (AU-10)
 import { withChrome } from "./chrome.mjs";
 import path from "node:path"; import fs from "node:fs"; import os from "node:os"; import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const quick = args.includes("--quick");
@@ -12,13 +13,18 @@ const S = (full, q) => (quick ? q : full);
 //   --soak30        : 1800 秒 (30 分) ランプ・ソーク (B=256, 48kHz, 全フレーム bit-exact 照合)
 //   --soak <秒>     : 秒数指定 (短縮確認・ネガコン用)
 //   --inject-hiccup : ネガティブコントロール。60ms の強制ブロックを混入し、gate が FAIL (exit 1) することを確認する用
+//   --busy <N>      : 負荷下ソーク (AU-21 #1570)。soak と同時に busy ループ N 本 (sh の while ループ) を並走させ、終了後に PID 指定で止める
 const soakSecs = args.includes("--soak30") ? 1800 : args.includes("--soak") ? +args[args.indexOf("--soak") + 1] : 0;
 if (args.includes("--soak") && !(soakSecs > 0)) { console.error("--soak には 1 以上の秒数が必要です"); process.exit(2); }
 const injectHiccup = args.includes("--inject-hiccup");
 if (injectHiccup && !(soakSecs > 0)) { console.error("--inject-hiccup は --soak30 / --soak <秒> と併用してください"); process.exit(2); }
-// 既定の results/results.json (全シナリオの記録) を soak 単独実行で上書きしない: soak は results/soak_<秒>[_negctl].json
+const busyN = args.includes("--busy") ? +args[args.indexOf("--busy") + 1] : 0;
+if (args.includes("--busy") && !(busyN > 0)) { console.error("--busy には 1 以上の本数が必要です"); process.exit(2); }
+if (busyN > 0 && !(soakSecs > 0)) { console.error("--busy は --soak30 / --soak <秒> と併用してください"); process.exit(2); }
+const soakTag = `${busyN > 0 ? `_busy${busyN}` : ""}${injectHiccup ? "_negctl" : ""}`;
+// 既定の results/results.json (全シナリオの記録) を soak 単独実行で上書きしない: soak は results/soak_<秒>[_busy<N>][_negctl].json
 const outFile = args.includes("--out") ? args[args.indexOf("--out") + 1]
-  : path.join(here, "../results", soakSecs > 0 ? `soak_${soakSecs}${injectHiccup ? "_negctl" : ""}.json` : "results.json");
+  : path.join(here, "../results", soakSecs > 0 ? `soak_${soakSecs}${soakTag}.json` : "results.json");
 
 // expect: 判定関数 (r) => [ok:boolean, msg]
 const underrunFree = (r) => [r.stats.underruns === 0 && r.stats.silence_frames === 0, `underruns=${r.stats.underruns} silence=${r.stats.silence_frames}`];
@@ -148,7 +154,7 @@ if (soakSecs > 0) {
   const wall = (r) => [(r.secs_wall ?? 0) >= soakSecs, `secs_wall=${r.secs_wall} ≥ ${soakSecs}`];
   const noWorkletErr = (r) => [(r.workletErrors ?? []).length === 0 && !r.aborted && r.exit === 1, `workletErrors=${(r.workletErrors ?? []).length} aborted=${!!r.aborted} exit=${r.exit}(1=完了, 2=エラー)`];
   // 合格条件 (全て AND): underrun 0 / silence 0 / ランプ全フレーム bit-exact / 実フレーム ≥ 公称 99% / 実時間 ≥ 公称 / worklet エラー 0
-  scenarios.push({ name: `asio_ramp_b256_soak${soakSecs}${injectHiccup ? "_negctl" : ""}`,
+  scenarios.push({ name: `asio_ramp_b256_soak${soakSecs}${soakTag}`,
     q: `api=asio&mode=ramp&buf=256&depth=2&secs=${soakSecs}${injectHiccup ? "&hiccup_ms=60&hiccup_every=200" : ""}`,
     expect: all(underrunFree, rampExact, covered, wall, noWorkletErr) });
 }
@@ -156,6 +162,8 @@ const sel = scenarios.filter((s) => !only || only.includes(s.name));
 const loadStart = os.loadavg(), tStart = Date.now();
 const results = [];
 let failed = 0;
+const busy = Array.from({ length: busyN }, () => spawn("sh", ["-c", "while :; do :; done"], { stdio: "ignore" }));
+process.on("exit", () => { for (const p of busy) p.kill(); });
 await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + sel[0].q, log: () => {} }, async (cdp) => {
   let first = true;
   for (const sc of sel) {
@@ -178,6 +186,7 @@ await withChrome({ root: path.join(here, "../build/web"), page: "index.html?" + 
         `jumps=${r.snapshot?.clock_jumps}/${r.snapshot?.clock_jump_frames}f (skip=${r.snapshot?.clock_skip_frames}f dup=${r.snapshot?.clock_dup_frames}f max=${r.snapshot?.clock_jump_max}f@q${r.snapshot?.clock_jump_max_q} first=${dq(r.snapshot?.clock_first_q)} last=${dq(r.snapshot?.clock_last_q)}) cb_max_q=${r.snapshot?.cb_max_q ?? "-"} lat(in/out)=${r.reported?.lat_in ?? "-"}/${r.reported?.lat_out ?? "-"} clock=${r.clock?.rate_hz?.toFixed(1) ?? "-"}Hz` : ""));
   }
 });
+for (const p of busy) p.kill();
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 let merged = results;
 if (only && fs.existsSync(outFile)) {   // 部分再実行: 既存結果へ名前単位でマージ

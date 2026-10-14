@@ -7,6 +7,7 @@
   T4 同じ名前でも署名が違えば別 helper になる (FA の mulss(i128,i32) と OTT の mulss(i128,i128))
   T5 mnemonic 被覆: KH census 205 種のうち未被覆 0 (pcmpistri / vinsertf128 は LIFTLIB #241 で被覆)
   T6 機械語解析: FA gain の live-in / 到達定義
+  (全テストを実行し, 失敗は最後に一覧表示する。終了コードは失敗があれば非 0)
 """
 import json
 import os
@@ -34,6 +35,18 @@ def nb(t):
     return [l for l in t.split("\n") if l.strip()]
 
 
+def repmap_delta(new, ref):
+    """#3067 の修正前参照 (tools/m6/work/ir7e_p*.ll) との差分行数を返す。差分は repmap の書換えだけであること:
+    comis 直後の分岐 (`br i1 %<旧名>.reload` → `%pcNcf/zf`) と or 1 行 (2 組) の計 18 行。旧名と新名以外は一致する。
+    参照は work/ のみの修正前出力 (commit 不可) で, R2 (work-m6-ott) を再投入するまで据え置く。再投入後は `==` の比較に戻す。"""
+    a, b = new.split("\n"), ref.split("\n")
+    assert len(a) == len(b), (len(a), len(b))
+    d = [(x, y) for x, y in zip(a, b) if x != y]
+    for x, y in d:
+        assert re.sub(r"%pc\d+(?:cf|zf|pf)\b", "%F", x) == re.sub(r"%(?:cf|zf|pf)\.\d+\.reload\b", "%F", y), (x, y)
+    return len(d)
+
+
 def t1():
     text, _ = base.run_base(open(os.path.join(T, "m6/work/ott.drc.ll")).read(), base.make_args())
     assert nb(IR.Module.parse(text).dump(strip=True)) == nb(open(os.path.join(T, "m6/work/ott_lift.ll")).read())
@@ -49,14 +62,17 @@ def t1():
 
 
 def t2():
+    """T2: p1_legacy/shift/gdata の段別出力を m6 の参照鎖と比べる。
+    参照 (ir7e_p1/p2/p3.ll) は #3067 修正前の出力 (work/ のみ・commit 不可)。修正で変わるのは repmap の 18 行だけ (repmap_delta)。
+    R2 (work-m6-ott) 再投入で参照が修正後になったら, 下の repmap_delta(...) == 18 を `o == ref` の完全一致に戻す。"""
     M6 = os.path.join(T, "m6/work")
     o, st = p1_legacy.legacy_p1(open(os.path.join(M6, "ott_lift.ll")).read())
-    assert o == open(os.path.join(M6, "ir7e_p1.ll")).read()
+    assert repmap_delta(o, open(os.path.join(M6, "ir7e_p1.ll")).read()) == 18
     o2, n = remap.shift_va(o)
-    assert o2 == open(os.path.join(M6, "ir7e_p2.ll")).read()
+    assert repmap_delta(o2, open(os.path.join(M6, "ir7e_p2.ll")).read()) == 18
     o3, gst = remap.gdata_legacy(o2, Image(OTT_DLL))
-    assert o3 == open(os.path.join(M6, "ir7e_p3.ll")).read()
-    print("T2 ok (p1_legacy/shift/gdata == m6 chain; p1 inserts=%d shift=%d gdata=%d)" % (st["inserted"], n, gst["replaced"]))
+    assert repmap_delta(o3, open(os.path.join(M6, "ir7e_p3.ll")).read()) == 18
+    print("T2 ok (p1_legacy/shift/gdata == m6 chain, 修正前参照との差は repmap 18 行のみ; p1 inserts=%d shift=%d gdata=%d)" % (st["inserted"], n, gst["replaced"]))
 
 
 def t3():
@@ -816,17 +832,26 @@ def t25():
 def t26():
     """T26 (#2863): IR 一致ゲートの `%pc` 改名に対する感度。空行を除いた入力では p1 の一時名 (行 index) が変わるが,
     改名を除けば内容は一致する。(ネガ) 比較述語 1 箇所 (ult→ule) の変更は一致しない。(別算法) 行対応の写像が一意かつ単射。"""
+    import tempfile
+    from liftlib.recipes import ott as OTT
     M6 = os.path.join(T, "m6/work")
-    ref = open(os.path.join(M6, "ir7e_p1.ll")).read()
-    lift_nb = "\n".join(nb(open(os.path.join(M6, "ott_lift.ll")).read())) + "\n"
-    o, st = p1_legacy.legacy_p1(lift_nb)
+    raw = open(os.path.join(M6, "ott_lift.ll")).read()
+    o, st = p1_legacy.legacy_p1("\n".join(nb(raw)) + "\n")   # 空行を除いた入力
+    ref = p1_legacy.legacy_p1(raw)[0]                        # 空行入りの入力 (修正後の出力同士で比べる)
     assert o != ref                                   # 前提: 名前は行 index 依存で変わる
     assert nb(p1_legacy.canon_tags(o)) == nb(p1_legacy.canon_tags(ref))
     bad = re.sub(r"fcmp ult (float|double) %pc", r"fcmp ule \1 %pc", ref, count=1)
     assert bad != ref and nb(p1_legacy.canon_tags(bad)) != nb(p1_legacy.canon_tags(ref))
-    from liftlib.recipes import ott as OTT
-    ref_path = os.path.join(M6, "ir7e_p1.ll")
-    assert OTT.same(o, ref_path) is True and OTT.same(bad, ref_path) is False
+    with tempfile.NamedTemporaryFile("w", suffix=".ll", delete=False) as f:
+        f.write(ref)
+    try:
+        assert OTT.same(o, f.name) is True and OTT.same(bad, f.name) is False
+    finally:
+        os.remove(f.name)
+    # 修正前参照 (work/ のみ・R2 再投入まで据え置き): 改名を除いた差は repmap の 18 行だけ (repmap_delta)。
+    # R2 再投入で参照が修正後になったら, この 1 行を `canon(o) == canon(参照)` の完全一致に戻す。
+    pre = open(os.path.join(M6, "ir7e_p1.ll")).read()
+    assert repmap_delta("\n".join(nb(p1_legacy.canon_tags(o))), "\n".join(nb(p1_legacy.canon_tags(pre)))) == 18
     a, b = nb(o), nb(ref)
     assert len(a) == len(b)
     m = {}
@@ -836,10 +861,21 @@ def t26():
         for p, q in zip(X, Y):
             assert m.setdefault(p, q) == q            # 写像は一意
     assert len(set(m.values())) == len(m)             # 単射
-    print("T26 ok (%%pc 改名だけ無視: 行 %d・改名 %d 種・ネガ FAIL 確認)" % (len(a), len(m)))
+    print("T26 ok (%%pc 改名だけ無視: 行 %d・改名 %d 種・ネガ FAIL 確認・修正前参照との差は repmap 18 行)" % (len(a), len(m)))
 
 
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26):
-        f()
-    print("ALL UNIT TESTS PASS")
+    import traceback
+    tests = (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26)
+    fails = []
+    for f in tests:
+        try:
+            f()
+        except (Exception, SystemExit):
+            fails.append(f.__name__)
+            print("%s FAIL" % f.__name__.upper())
+            traceback.print_exc()
+    if fails:
+        print("FAIL %d/%d: %s" % (len(fails), len(tests), " ".join(fails)))
+        sys.exit(1)
+    print("ALL UNIT TESTS PASS (%d)" % len(tests))

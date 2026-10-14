@@ -150,3 +150,54 @@
 - 回帰 (HEAD `81090e96`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7m と一致。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。`mkdir -p` で解消)。
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI (float 引数・short 戻り値) は呼出元 2 件と callee 本体の機械語で確認済み (上記「呼出元・callee の確定」)。native 突合での実行検証は未実施。
+
+#### 10-7q. #3072 (KH-40) run: Delay の Ghidra 変換 (型名・LOCK・Win API stub・thunk 正規化) (部分・emcc は未通過)
+- 結論: Delay の lift 141 関数はすべて decompile OK。thunk 正規化は**列 0 の定義行だけ**に限定した (`7d1d0e2e`)。これで本体の thunk 呼出し行が自己呼出しに変わる誤書換えを止めた。emcc clang 診断は **601 件** (測定 commit `7d1d0e2e`)。旧記載の 736 → 526 は本 run で再現しなかった (③)。Gain/Haas/Gate 1000/1000 bit-exact (回帰なし)。残件 601 件の内訳と起票先は ④。
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip/`1ccb1df8…` → `HeartCore.core_64` (76,642,304 B, 手展開)。Ghidra 12.1.4 = `[GHIDRA]` (zip sha256 `ddac49f9…d2db` 一致)、JDK 21 (temurin-21)、emsdk 6.0.12 (`[EMSDK]`)。
+
+**① 自己呼出し (レビュー指摘 1)**
+- 原因: 旧正規表現 `^([\w \*]+?)\s+thunk_FUN_[0-9a-f]+\(` の `[\w \*]` は空白を含む。そのため本体のインデント付き呼出し行 `  thunk_FUN_<X>(...)` にも一致し、`count=1` によって関数ごとに最初の 1 箇所が `FUN_<その関数の va>(...)` (自己呼出し) に変わっていた。
+- 修正: `^(\w[\w \*]*?)[ \t]+thunk_FUN_[0-9a-f]+\(` (列 0 の定義行だけ・空白は `[ \t]` に限定。`\s` は改行を跨ぐため使わない)。呼出し行は従来どおり `thunk_FUN_` → `FUN_` の置換で飛び先の `FUN_<飛び先>` になる。
+- 実データでの発生 (lift 順 141 関数の decompile・`work/ghidra/out141`): 本体のインデント付き `thunk_FUN_` 呼出しは 3 行 (`1802ed640` の行 37・79、`180f87cac` の行 10)。旧版は `1802ed640` の行 37 を `FUN_1802ed640();` (自己呼出し) にした。`1802ed640` の 1 関数・1 行。修正版は 0 件。
+- 件数では検出できない: 旧版と修正版の生成 C の差分は 4 行だけで、emcc 件数は両方 601 (自己呼出しは C として通るため)。
+- 測定 (`ghidra_route/selfcall_check.py`、関数本体が自分の `FUN_<va>` を呼ぶ箇所を数える): 修正版 **0 件**、旧版 **1 関数 (1 行)**。
+- decompile の結果は実行順で変わる (未検証の推定: Ghidra の関数作成順の影響): 同じ 141 関数を昇順で decompile した union 実行 (150 関数) では、3 ファイル (`1802ed640`・`1802ed7f0`・`180f87cac`) の出力が lift 順と異なり、呼出しは `func_0x000180fc61dc` 形になって `thunk_FUN_` の呼出し行は出なかった。この union 実行の emcc は 602 件。本節の測定は lift 順 (141 関数) で行った。
+
+**② Delay 測定 (測定 commit `7d1d0e2e`、コミット済み HEAD で再現)**
+- decompile: lift 集合 141 件 (`snapins.json` の delay.lift の一意アドレス) → **141/141 OK** (`analyzeHeadless` wall 27.7 s, decompile の内訳は `work/ghidra/out141/summary.tsv`, n=1)。
+- C 化: `ghidra_to_c.py delay` → コード集合 139 件 (exports 1 + also 138)。lift 141 = コード集合 139 + IAT thunk 2 件 (`180fd81e4`・`180fd81ec`、THUNK 表へ)。
+- 自己呼出し: 修正版 0 件 / 旧版 1 関数 (①)。
+- emcc (`emcc -c -ferror-limit=0 -I ghidra_route delay.c`, `grep -c 'error:'`): 修正版 **601** (15.6 s)。旧版 601 (件数は変わらない)。
+- 更新前の数値との関係: 旧記載の 710 → 736 (正規化で増えた) の原因は本 run では未特定。自己呼出し 1 件は件数を変えない (601 = 601)。正規化なしの対照は測れない (定義 `thunk_FUN_<X>` が `FUN_<va>` に直されず、`signature not found` で停止するため)。
+
+**③ 526 の再現不能 (旧記載の訂正)**
+- 旧記載 (測定 commit `dfe3592e`) の emcc 526 件は、同じ commit 内容・同じ shim・同じ数え方の本 run では再現しなかった。同じ内容で decompile の順序だけを変えると 601 (lift 順 141 件) / 602 (昇順 150 件)。`build_cmp.sh` の `-Wno-error=…` 付きの起動では 499 件 (昇順 150 件での測定)。526 を出した条件は未特定。本節の数値は 601 で置き換える。
+
+**④ 残件 601 件の内訳 (`emcc` の `error:` 行を種類で分けた。合計 = 601)**
+
+| 種類 | 件数 | 起票先 |
+|---|---|---|
+| レーン参照 `undefined1[64]`・`[16]` のメンバ参照 ("member reference base type") | 138 | #3094 [KH-42] |
+| SIMD/AVX 疑似関数の未宣言 (ABS 10・SUB168 5・SUB84 3・ZEXT816/416 各 2・vcvtdq2pd_avx 3 ほか) | 40 | #3095 [KH-43] |
+| `swi(3)` 未宣言 | 21 | #3095 [KH-43] |
+| 引数の過不足 ("too few arguments" 84・"too many arguments" 24) | 108 | #3096 [KH-44] |
+| 型不一致・ポインタ型 (invalid operands・assigning to・int-conversion・incompatible pointer 等) | 248 | #3096 [KH-44] |
+| `code` 型の間接呼出し ("called object type 'code'") | 21 | #3096 [KH-44] |
+| 未定義 identifier (`DAT_`・`uRam`・`LAB_`・`PTR__`) | 17 | #3096 [KH-44] |
+| 未関数化 callee (`func_0x…`・`FUN_…` の未宣言 call) | 6 | #3096 [KH-44] |
+| その他 (`FUN_18004cf20` の STUB 宣言と本体の型の衝突 "conflicting types") | 2 | #3096 [KH-44] |
+| **合計** | **601** | #3094 138 / #3095 61 / #3096 402 |
+
+- 振り分け (`error:` 行のメッセージ語で 1 行 1 種類): `member reference base type` → レーン / `'swi'` → swi / `undeclared function` で `func_0x`・`FUN_` → 未関数化 callee、それ以外 → SIMD・AVX 疑似関数 / `undeclared identifier` → 未定義 identifier / `too few`・`too many arguments` → 引数 / `called object type` → code 間接呼出し / `invalid operands`・`assigning to`・`incompatible`・`passing`・`indirection`・`operand of type` → 型不一致 / 残り → その他。
+
+**⑤ 回帰 (HEAD `7d1d0e2e`、`build_cmp.sh <name> 1000 7 bitcast,intload,stackpair,assoc,concat`)**
+- Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7n と一致。
+- Gain/Haas/Gate の生成 C は旧版 (`e45456e4`) と 3 本とも差分 0 行 (この 3 本の decompile には、インデント付き `thunk_FUN_` 呼出しが無い)。
+
+**⑥ 測定 commit の証跡**
+- 測定 commit = `7d1d0e2e` (コード変更: `ghidra_route/ghidra_to_c.py` と新規 `ghidra_route/selfcall_check.py`)。
+- `git diff 7d1d0e2e HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` は 0 行 (この節の追記 commit は REPORT のみ)。
+
+- 未実施: Delay の native 突合 (emcc 未通過のため)。#3073 [KH-41] の範囲。`swi(3)` と SIMD 疑似関数の意味付けは #3095 [KH-43]。
+#### 10-7r. #3071 (KH-39) 1 単位: Stereo の emcc 残件の機械修復 (部分・emcc 39 → 10 件・Stereo はビルド未通過)
+- 結論・測定・ABI 規則 1〜11・未解決 1〜5 の全文は付録 `REPORT_APPENDIX_3071.md` §10-7r へ分割移動した (本ファイル 250 行上限・内容は削除していない)。
