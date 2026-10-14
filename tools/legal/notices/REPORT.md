@@ -216,7 +216,7 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 1. Actions job を有効化できていない (App に `workflows` 権限なし) | CI 上の自動失敗は未稼働。ローカル/`05-stage` ゲートは稼働 | 新規 `[CI-n]` (親 [CI-1] #284): 権限のある人が `cp tools/legal/notices/ci/notices.yaml .github/workflows/notices.yaml`。#86 にコメント済 |
+| 1. ~~Actions job を有効化できていない~~ → #935 で `.github/workflows/notices.yaml` を配線 (PM が PAT で適用。merge 後の初回の job 実行結果は未確認) | merge 前は CI 上の自動失敗が未稼働。ローカル/`05-stage` ゲートは稼働 | #935 (親 [CI-1] #284) |
 | 2. mac `Shared/Artwork/Fonts` の OFL 本文 (12 family) を NOTICES に反映していない (win の一覧のみ。win で本文があるのは Cuprum / Francois One の 2 つ) | OFL 本文のあるフォントも「出所未確認」に入る | LGL-6 (一次文書の補完取得) に mac 素材付きで依頼 |
 | 3. plugins-* 由来の同梱 OSS (OTT の Roboto Condensed (Apache-2.0)・zlib 1.2.3 等) は registry 未登録 | plugin wasm を同梱するとき NOTICES から漏れる | 新規子チケット案 `[LGL-3b]` (素材 `plugins-ott` 等が必要) |
 | 4. 記録は build.sh のスナップショットで、引数を変えて再実行しないと食い違うのを自動検出しない | 記録と実ビルドの乖離 | #86 のフォローアップ (build.sh の sha256 を記録して stale 検出する案。再実行コストとのトレードオフ) |
