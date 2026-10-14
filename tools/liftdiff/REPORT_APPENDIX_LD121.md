@@ -12,7 +12,7 @@
 
 ## 1. 測定条件
 
-- 素材: `fl-win64` (`extracted/block00031_PE.bin`)・`work-liftdiff`・`work-m11` を展開。`toolchain-emsdk` は runner 既存の `/opt/emsdk` (emcc 6.0.12・pin と一致) を使い、展開はしていない。`simd.c` は素材版 (sha256 `d82e2759…`)。再ビルド後も同じ。
+- 素材: `fl-win64` (`extracted/block00031_PE.bin`)・`work-liftdiff`・`work-m11` を展開。`toolchain-emsdk` は runner 既存の `[EMSDK]` (emcc 6.0.12・pin と一致) を使い、展開はしていない。`simd.c` は素材版 (sha256 `d82e2759…`)。再ビルド後も同じ。
 - ビルド: `build_wasm.build(t, False)` (`simd.c` は再生成されない)、`gcc` で `work/ld_native`。
 - 測定機: 4 vCPU。4 条件 (`none`・`native`・`wasm`・`both`) は同時に流した。
 
