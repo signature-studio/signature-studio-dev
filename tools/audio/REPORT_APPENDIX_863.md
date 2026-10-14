@@ -169,7 +169,7 @@
 | busy loop `yes` ×12 (`timeout 60`・開始時 load 7.9 / 13.4) | 2 | 2/2 PASS exit 0 | 293/12/21/0/0/0 (count 326)・315/7/9/0/0/0 (count 331) | 0 (全 2 run) |
 | `hunt.sh 400 1080` (foreground・時間上限 1080 s) | 91 | **91/91 PASS exit 0・FAIL 0** | hunt は run ごとの統計を残さない (最終 run のみログに残る) | — |
 
-- 計 98 run (初回 1・無負荷 4・負荷 2・hunt 91) 全 PASS。dev:tone `max_err=1.49e-8`・`zero_runs=0`・`underruns=0`・`first_err_frame=-1` (全 run 同値)。preview も全 PASS。
-- 読み: 無負荷では全 wake が 2 ms 未満 (<1 ms と <2 ms の 2 区間のみ)。`yes` ×12 の負荷では 2〜4 ms の区間に 21 / 9 回入り、負荷の強さに応じて producer の起床遅延が増えることは観測できた。≥8 ms の起床は 0 回で、underrun も 0 だった。判定指標としての感度は確認できた (負例の失敗は作れていない)。
+- 計 98 run (初回 1・無負荷 4・負荷 2・hunt 91) 全 PASS。dev:tone の `max_err=1.49e-8`・`zero_runs=0`・`underruns=0`・`first_err_frame=-1` は、判定行を確認した run の**代表値**であり、全 run の値ではない。hunt の 91 run は PASS 判定と check 件数 (`check=13/13 PASS`) だけを `summary.txt` に残し、dev:tone の値は残していない (`last.log` は最終 run のみ)。preview も全 PASS。
+- 読み (観測事実のみ): 無負荷の 4 run では全 wake が 2 ms 未満 (<1 ms と <2 ms の 2 区間のみ)。`yes` ×12 の 2 run では 2〜4 ms の区間に 21 / 9 回入り、≥8 ms は 0 回、underrun は 0 だった。負荷は `yes` ×12 の 1 段階だけで、負荷量と起床遅延の関係 (用量反応) は測っていない。`wake_hist` は PASS/FAIL の判定条件 (`rec` の条件式) に入っておらず、負例も作っていないため、判定指標としての感度は未検証。判定への組み込みも未検証。
 - 失敗の記録 (通算): §19・§23・§25 の FAIL 3 件はいずれも、その節で最初に走らせた e2e run (§19 は初回 1 run・§23 は無負荷の 1 回目・§25 は旧 HEAD の初回)。同じく節内の初回 run でも §21・§22 (改修前)・§24・本節は PASS。母数が少ないため「初回 run で起きやすい」は**仮説**に留める。FAIL の位置は 3 件とも `first_err_frame = first_underrun_frame = 56576` (quantum 442)。
 - 未解決 (追跡 **#863**): (a) 失敗時刻と照合できる producer 側の時系列 (quantum ごとの起床時刻) は wasm (`flasio.c`) の変更が必要で、本節の範囲外。(b) 再現条件の特定。(c) 初回 run の仮説の検証 (再起動直後・キャッシュ状態を分けた実測)。
