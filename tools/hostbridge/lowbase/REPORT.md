@@ -125,22 +125,35 @@ python3 tools/hostbridge/lowbase/audit_va.py <dll> 0x10000
 ```
 前提: `tools/m10/work/ott_m10.ll`, `tools/hostbridge/work/ott_hb.cjs` (「再配置前」基準; `hostbridge.sh` の産物), `tools/plugins/work/balance/k.final.ll`, `tools/ott/work/libottnative.so`, python (capstone/pefile), emsdk, Chrome。tools/m6〜m10, ott, plugins, shim, hostbridge の既存ファイルは読取のみ (生成物は `lowbase/work`, gitignore 済み)。
 
-## 9. HB-H24 (#974): ブラウザ実機検証の受入条件の対応 (2026-10-13 実測)
+## 9. HB-H24 (#974): ブラウザ実機検証の受入条件の対応 (2026-10-14 再測定)
 
-以下の数値は PR 作成 run (38452251025) の記録であり、再現は未了。当該 run のログは保存されていない。素材 (`fl-win64` → `[WIN64]`、`plugins-ott` → `[ANALYSIS-PLUGINS]`、`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib`) の展開先は `docs/REFERENCES.md` 参照。2026-10-13 の fix run は `fl-win64` のみ取得でき、`lowbase_e2e.sh` は再実行していない。
+- 測定 commit: `85e27fe2` (コードを変えた最後の commit。`lowbase_e2e.sh` の変更)。`git diff 85e27fe2 HEAD -- tools/hostbridge/lowbase ':!tools/hostbridge/lowbase/REPORT.md'` の出力は下記。測定後の差分は `lowbase_e2e.sh` のヘッダ 6 行目 (`#` のコメント行) の 1 行だけで、`#` 以外の行は `85e27fe2` と同一 (下の比較の出力は空)。
 
-| # | 受入条件 (#974) | 実測 | 判定 |
+```diff
+-#   所要: ビルド/試験すべて合わせて約 1〜2 分 (キャッシュ不要; 全ビルドは数秒)。tools/m6..m10, ott, plugins, shim, hostbridge の既存ファイルは読取のみ (生成物は lowbase/work).
++#   所要: ビルド/試験すべて合わせて約 1〜2 分 (キャッシュ不要; 全ビルドは数秒)。tools/m6..m10, ott, plugins, shim, hostbridge の既存ファイルは読取のみ (生成物は lowbase/work。ただし ott/work/libottnative.so は build.sh で毎回作り直す).
+```
+
+```sh
+diff <(git show 85e27fe2:tools/hostbridge/lowbase/lowbase_e2e.sh | grep -v '^[[:space:]]*#') <(grep -v '^[[:space:]]*#' tools/hostbridge/lowbase/lowbase_e2e.sh)
+```
+
+- 再測定: 未実施 (この fix run の `$ARTIFACTS_DIR` は `fl-win64` のみで、`plugins-ott`・`work-m6-ott` が無く `lowbase_e2e.sh` を実行できない)。上の実測値は `85e27fe2` のもの。PR 本文に `oc_artifacts` 行を足したので、次の review run で素材付きの独立再実行を行う。
+- 検証: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS** (PASS 29 / FAIL 0)、所要 **92.7 秒** (全ビルド・Chrome 155 込み)。load average 0.70 (開始時)。
+- 素材: `fl-win64` → `[WIN64]`、`plugins-ott` → `[ANALYSIS-PLUGINS]`、`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib` (展開先は `docs/REFERENCES.md` 参照)。前提の `ott_hb.cjs` は `hostbridge.sh` (ALL PASS)、`k.final.ll` は `t0_e2e.sh` (357/357 × seed 3 種) で当 run に生成。
+
+| # | 受入条件 (#974) | 実測 (Chrome/155・`work/chrome_result.json`・`work/ring/ring_result.json`) | 判定 |
 |---|---|---|---|
-| 1 | OTT lowbase を headless Chrome dedicated Worker で同期 `WebAssembly.Instance` 化し C1〜C4 PASS | (PR 作成 run の記録) Chrome/154 Worker: C1 (OTT×4 + Balance が同一 host/bridge に LoadLibrary) OK, C4 (追加 100 instance 生成) OK 771 ms | 実測記録あり・再現未了 |
-| 2 | OTT 出力 sha256 が node と一致 | (PR 作成 run の記録) C2: `4262907b2a26cd5d` = node (500blk×128f) | 実測記録あり・再現未了 |
-| 3 | OTT 出力を SAB ring 経由で AudioWorklet に流し消費量と総和が一致 | 未実施 (AudioWorklet 側の結線は本 run に無い) | 未達 → 子 issue |
-| 4 | Worker を SAB + `Atomics.wait` RPC で呼び出し、`VSTPluginMain` 経由の処理が往復 | 未実施 (`chrome_worker.mjs` は直接呼出のみ) | 未達 → 子 issue |
-| 5 | 128 frame の 1 処理の実時間を実測 | (PR 作成 run の記録) C5: median 0.820 ms / p99 1.010 ms / min 0.795 ms (n=1000, 50 回ウォームアップ後, OTT 単独 `effs[0]`) / 予算 2.902 ms (128/44100) | 実測記録あり・再現未了 (headless Worker 計測。AudioWorklet 上の値ではない) |
+| 1 | OTT lowbase を headless Chrome dedicated Worker で同期 `WebAssembly.Instance` 化し C1〜C4 PASS | C1 (OTT×4 + Balance が同一 host/bridge に LoadLibrary) OK / C3 (Balance block0 sha256 = node) OK / C4 (追加 100 instance 生成) OK 662 ms・linear 計 2,400 MiB | 達成 |
+| 2 | OTT 出力 sha256 が node と一致 | C2: `4262907b2a26cd5d` = node (500blk×128f) | 達成 |
+| 3 | OTT 出力を SAB ring 経由で AudioWorklet に流し消費量と総和が一致 | step [5] A3a/A3b: 消費 126,976 float (= 期待値)、総和 uint32 `1952270321` = node。実装は #1419 (§10) | 達成 (#1419) |
+| 4 | Worker を SAB + `Atomics.wait` RPC で呼び出し、`VSTPluginMain` 経由の処理が往復 | step [5] A4/A4b: RPC 区間 24.8 ms、先頭 4 ブロックのビットが node と一致。実装は #1419 (§10) | 達成 (#1419) |
+| 5 | 128 frame の 1 処理の実時間を実測 | C5: median **0.685 ms** / p99 0.880 ms / min 0.635 ms (n=1000, 50 回ウォームアップ後, OTT 単独 `effs[0]`) / 予算 2.902 ms (128/44100)。headless Worker 計測 (AudioWorklet 上の値ではない) | 達成 |
 
-- 検証 e2e: `bash tools/hostbridge/lowbase/lowbase_e2e.sh` = **ALL PASS**、所要 **98 秒** (Chrome 込み・全ビルド込み、worktree `ws-974`, Chrome 154)。※ PR 作成 run (38452251025) の記録。当該 run のログは保存されていないため未再現。素材付き再実行 (`oc_artifacts: fl-win64 plugins-ott analysis-ott-binaries work-m6-ott work-liftlib`) で ALL PASS 行と C1〜C5 値 (`run_chrome.mjs` の出力 JSON) を確認するまで、受入 1・2・5 は「実測記録あり・再現未了」とし、#974 はクローズしない。
-- 修正: §3 の wasm 名前空間検査が `wasm-objdump` (runner に無い) に依存して 0 件と誤判定していた。node の `WebAssembly.Module.exports` で数えるよう変更 (`ott_function_*` 211 件 / 無接頭 `function_*` 0 件)。
-- 残り (子 issue): 受入 3・4 は AudioWorklet 側の SAB ring 消費と `Atomics.wait` RPC の新規実装が要る。RT-4 (#123) の「AudioWorklet は ring 消費専用 (`Atomics.wait` 不可)」制約を前提に設計する。
-  → 実装済み (#1174)。§10 参照。
+- 修正 (本 PR): `lowbase_e2e.sh` が `tools/ott/work/libottnative.so` を毎回 `build.sh` で作る。素材 `work-m6-ott` 同梱の版は `ott_enc_slots` を欠き、x64c matrix が 89/89 で `undefined symbol` により失敗していた。stale 版を戻して再現し、修正後の `85e27fe2` で ALL PASS。
+- 旧記録 (PR 作成 run 38452251025・ログ未保存・Chrome 154・C5 median 0.820 ms) は本測定で置き換えた。前段として `9286a6bb` でも、素材 `.so` を手で作り直した状態で ALL PASS・C5 median 0.695 ms を得ている。
+- §3 の wasm 名前空間検査の修正: `wasm-objdump` (runner に無い) の代わりに node の `WebAssembly.Module.exports` で数える。`ott_function_*` 211 件 / 無接頭 `function_*` 0 件。
+- 経緯 (受入 3・4 は子 issue #1174 へ分割): AudioWorklet 側の SAB ring 消費と `Atomics.wait` RPC の新規実装が要った。RT-4 (#123) の「AudioWorklet は ring 消費専用 (`Atomics.wait` 不可)」制約を前提に設計し、#1419 で実装・close 済み。§10 参照。
 
 ## 10. HB-H27 (#1174): SAB ring → AudioWorklet と Atomics.wait RPC の往復 (2026-10-14 実測)
 
