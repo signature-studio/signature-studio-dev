@@ -134,7 +134,7 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 
 ## 9. x64c による lift 可否の実測 (閉包の深さ別)
 
-> 測定 commit: `87d5c6ad` (CFG dispatch の計数をレジスタ経由形に対応させた commit。前回測定は `6b11bfd9`)。`git diff 87d5c6ad HEAD -- tools/flelift/x64c.py tools/shared/oss/blend2d/*.py` は 0 行 (この範囲で以後に変えたのは本 REPORT のみ)。
+> 測定 commit: `87d5c6ad` (CFG dispatch の計数をレジスタ経由形に対応させた commit。前回測定は `6b11bfd9`)。`git diff 87d5c6ad HEAD -- tools/flelift/x64c.py tools/shared/oss/blend2d/*.py` は 0 行 (この範囲で以後に変えたのは本 REPORT と `docs/DOC_MAP.md` のみ)。
 > 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_lift_probe.py` (依存: `pefile`・`capstone`、6.4 s)。出力は `tools/shared/work/agg2d_lift_probe.json` (gitignore)。
 > lifter は `tools/flelift/x64c.py` (FLEngine 向け fork)。`--img 0x180000000 --img-size 0x300000` (block24339 の ImageBase / SizeOfImage)、roots は §5 の unique 79 VA。
 
