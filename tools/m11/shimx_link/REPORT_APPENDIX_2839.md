@@ -15,7 +15,7 @@
 | 不一致の本体 | x64 (8B) と wasm32 (4B) の target ABI の幅差。shimx は wasm32 規約で `HANDLE` = `ULONG_PTR` (4B) (`tools/shimx/src/shimx.h:63-64`、`midi_conv.c:13`) |
 | 採る修正方針 | **(b) 正規化 pass を恒久策として残す** (link 時の `i64`→`i32`。実装は PR #2796 の `sx_handle_norm.py`、未 merge)。(a) IR 生成側の型変更は採らない (§4) |
 
-## 2. 機械語 ↔ IR ↔ 署名 DB の突合 (実測・HEAD `0adc58e7`)
+## 2. 機械語 ↔ IR ↔ 署名 DB の突合 (実測・測定 commit `97908347`)
 
 | 段 | 実測 |
 |---|---|
@@ -29,7 +29,7 @@
 
 第 2 引数 `DWORD` は `i32` で一致している。食い違うのは第 1 引数の HMIDIOUT だけ。
 
-## 3. 対照: HANDLE 系の型は pointer になる (同じ手順・HEAD `0adc58e7`)
+## 3. 対照: HANDLE 系の型は pointer になる (同じ手順・測定 commit `97908347`)
 
 | 段 | 実測 |
 |---|---|
