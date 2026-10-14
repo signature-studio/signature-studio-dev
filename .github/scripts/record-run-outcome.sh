@@ -7,7 +7,7 @@
 # run の最後 (workflow の if: always() の step) で、issue が次のどれかかを判定する:
 #   closed                              : 何もしない (oc:no-pr を外す)
 #   明示的な終了状態                     : oc:stuck / needs-user-input / blocked (ラベル、または依存 issue が open) -> 何もしない (oc:no-pr を外す)
-#   着手済み                            : この issue を指す open PR がある (ブランチ名 <N>-... か本文の Closes/Refs/Fixes #N) -> 何もしない (oc:no-pr を外す)
+#   着手済み                            : この issue を指す open PR がある、または run の開始以降に作成・merge された PR がある (ブランチ名 <N>-... か本文の Closes/Refs/Fixes #N。run 中に open→merge まで済んだ PR を含む) -> 何もしない (oc:no-pr を外す)
 #   上のどれでもない (PR も push も無い)   : ラベル oc:no-pr と構造化コメントを残す
 #       <!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> run=<run id> -->
 # PM Worker はコメント本文を解析せず、ラベルとマーカーで判断する。oc:no-pr は次の run が PR を出したときこの script が外す。
@@ -99,6 +99,40 @@ if ! prs_raw="$(gh api --paginate "repos/$R/pulls?state=open&per_page=100")"; th
 fi
 if jq -s -e --argjson n "$N" '[.[][] | select(((.head.ref // "") | test("^" + ($n | tostring) + "-")) or ((.body // "") | test("(Closes|Refs|Fixes|Resolves) #" + ($n | tostring) + "([^0-9]|$)"; "i")))] | length > 0' <<< "$prs_raw" > /dev/null; then
   echo "issue #$N has an open PR: started"
+  remove_label
+  exit 0
+fi
+
+# open の一覧には、run 中に open→merge まで済んだ PR (数秒で merge されたもの) が出ない。run の開始 (起動したコメントの created_at。
+# 無ければ run の run_started_at) 以降に作成・merge された PR を数える。updated 降順に読み、run の開始より前に更新された PR が
+# 出たところで止める (作成・merge された PR は必ず開始以降に更新されている)。読めなければ、上限まで読めなければ、何も書かない。
+start="$(jq -r '.comment.created_at // empty' "$EV" 2> /dev/null)"
+if [ -z "$start" ]; then
+  start="$(gh api "repos/$R/actions/runs/${GITHUB_RUN_ID:-0}" --jq '.run_started_at // empty' 2> /dev/null)" || start=""
+fi
+if [ -z "$start" ]; then
+  echo "::warning::could not read the run start: the run outcome is not recorded"
+  exit 0
+fi
+recent_raw=""
+complete=0
+for page in 1 2 3 4 5 6 7 8 9 10; do
+  if ! p="$(gh api "repos/$R/pulls?state=all&sort=updated&direction=desc&per_page=100&page=$page")"; then
+    echo "::warning::could not list recent PRs: the run outcome is not recorded"
+    exit 0
+  fi
+  recent_raw="$recent_raw$p"$'\n'
+  if jq -e --arg s "$start" 'length < 100 or ((.[-1].updated_at // "") < $s)' <<< "$p" > /dev/null; then
+    complete=1
+    break
+  fi
+done
+if [ "$complete" != 1 ]; then
+  echo "::warning::more than 1000 PRs were updated since the run started: the run outcome is not recorded"
+  exit 0
+fi
+if jq -s -e --argjson n "$N" --arg start "$start" '[.[][] | select(((.head.ref // "") | test("^" + ($n | tostring) + "-")) or ((.body // "") | test("(Closes|Refs|Fixes|Resolves) #" + ($n | tostring) + "([^0-9]|$)"; "i"))) | select(((.created_at // "") >= $start) or ((.merged_at // "") >= $start))] | length > 0' <<< "$recent_raw" > /dev/null; then
+  echo "issue #$N has a PR opened or merged during this run: started"
   remove_label
   exit 0
 fi
