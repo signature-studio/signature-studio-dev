@@ -78,6 +78,53 @@ test("manifest callback: state 不一致・期限切れ・再利用・設定済�
   assert.equal(bad2.status, 400, "setup を開いていなければ state が無く拒否");
 });
 
+const stateOf = async (app: PmApp): Promise<string> =>
+  /state=([^"&]+)/.exec(await (await app.handle(new Request("https://pm.example/setup"))).text())?.[1] as string;
+
+test("/setup: 有効な state があれば何度開いても同じ state を返す (第三者が叩いても変わらない)", async () => {
+  const clock = { t: T0 };
+  const m = mockFetch([]);
+  const store = new MemoryStore();
+  const app = new PmApp({ store, cfg: loadConfig({}), storeKey: STORE_KEY, now: () => clock.t, fetch: m.f, scheduleSoon: async () => {} });
+  const first = await stateOf(app);
+  assert.ok(first && first.length >= 24);
+  clock.t += 30 * 60_000;
+  assert.equal(await stateOf(app), first, "PM が開いた後に第三者が /setup を叩いても同じ state");
+  assert.equal(await stateOf(app), first, "PM がもう一度開いても同じ state");
+  assert.equal(store.get<any>("meta", "setupState").exp, T0 + 60 * 60_000, "期限は延ばさない");
+  // 進行中の state で callback は通る (正)
+  const ok = mockFetch([(c) => (c.url.includes("/app-manifests/") ? j({ id: 1, slug: "oc-pm-for-signature-studio", pem: "p", webhook_secret: "w", owner: { login: "signature-studio" } }, 201) : undefined)]);
+  const app2 = new PmApp({ store, cfg: loadConfig({}), storeKey: STORE_KEY, now: () => clock.t, fetch: ok.f, scheduleSoon: async () => {} });
+  assert.equal((await app2.handle(new Request(`https://pm.example/setup/callback?code=${"a".repeat(40)}&state=${first}`))).status, 200);
+  assert.equal(store.get("meta", "setupState"), undefined, "成功したら state を消費する");
+});
+
+test("/setup: 期限切れの state は新しく発行し、古い state は受け付けない", async () => {
+  const clock = { t: T0 };
+  const m = mockFetch([]);
+  const app = new PmApp({ store: new MemoryStore(), cfg: loadConfig({}), storeKey: STORE_KEY, now: () => clock.t, fetch: m.f, scheduleSoon: async () => {} });
+  const old = await stateOf(app);
+  clock.t += 61 * 60_000;
+  const fresh = await stateOf(app);
+  assert.notEqual(fresh, old);
+  assert.equal((await app.handle(new Request(`https://pm.example/setup/callback?code=${"a".repeat(40)}&state=${old}`))).status, 400);
+  assert.equal(m.calls.length, 0);
+});
+
+test("callback: 第三者が不正な code / 不一致の state で叩いても、進行中の state は失効しない", async () => {
+  const m = mockFetch([(c) => (c.url.includes("/app-manifests/") ? j({ message: "Not Found" }, 404) : undefined)]);
+  const store = new MemoryStore();
+  const app = new PmApp({ store, cfg: loadConfig({}), storeKey: STORE_KEY, now: () => T0, fetch: m.f, scheduleSoon: async () => {} });
+  const st = await stateOf(app);
+  const before = JSON.stringify(store.get("meta", "setupState"));
+  assert.equal((await app.handle(new Request(`https://pm.example/setup/callback?code=zzz&state=${st}`))).status, 400, "形式不正の code");
+  assert.equal((await app.handle(new Request(`https://pm.example/setup/callback?code=${"f".repeat(40)}&state=WRONG`))).status, 400, "state 不一致");
+  assert.equal((await app.handle(new Request(`https://pm.example/setup/callback?code=${"f".repeat(40)}&state=${st}`))).status, 502, "GitHub が拒否する code");
+  assert.equal(JSON.stringify(store.get("meta", "setupState")), before, "進行中の state は変わらない");
+  assert.equal(store.get("meta", "app"), undefined);
+  assert.equal(await stateOf(app), st, "その後も同じ state で手順を続けられる");
+});
+
 test("manifest callback: GitHub の変換が失敗したら保存しない", async () => {
   const m = mockFetch([(c) => (c.url.includes("/app-manifests/") ? j({ message: "x" }, 404) : undefined)]);
   const store = new MemoryStore();
