@@ -3,7 +3,7 @@
 > **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §12。本付録は計測の全文。
 
 測定 commit: `10d45b08` (`retdec_gotofix.py` / `goto_jump_check.py` を追加した commit。本 PR でこの commit 以降に変えたのは main 取り込みによる `retdec_batch.py` (+16 / -2、#1819 の `lift_set` 再試行) のみ)。
-**本付録の値は `10d45b08` 時点の値で、現 HEAD (`retdec_batch.py` が変わった状態) では未測定。** 現 HEAD での再測定は `toolchain-retdec` / `toolchain-emsdk` の素材が必要で、未実施。
+**本付録の値は `10d45b08` 時点の値で、現 HEAD (`retdec_batch.py` が変わった状態) では未測定。** 現 HEAD での再測定は `toolchain-retdec` / `toolchain-emsdk` の素材が必要で、未実施 (fix run `3f2ed9d0` の runner に素材が無かった)。再測定は `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` 付きの run で行い、結果を本節の表に置き換える。
 環境: `[RETDEC]` v5.0 (`toolchain-retdec`)・`[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP` に展開)。load average (1 分値) 0.07–0.74。
 
 ## 1. 原因の切り分け (受入条件 1)
