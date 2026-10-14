@@ -362,3 +362,20 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
   着手報告だけで終わった実装 run は `find_silent_runs.sh` で検出する。
 
+
+## 12. 依頼者不在時の運用 (needs-user-input・assume-and-proceed)
+
+依頼者は指示後、最低 2 時間・最大 2 日間不在になりうる。依頼者の判断が要る事項は `needs-user-input` で積み、
+他の作業を止めない。規則 R1〜R9 と境界 U1〜U8 の**正本は `.github/prompts/pm.md`** である (本節に複製しない)。
+
+- **書式**: `needs-user-input` を付けた issue の本文先頭に、次の 4 項目を順に書く。
+  1. 質問
+  2. 既定案 (依頼者の回答が無いときに採る案)
+  3. 既定で進むと何が起きるか
+  4. 答えを変えたときの戻し方
+- **依存 issue は既定案で進める (assume-and-proceed)**。依存 issue を `blocked_by` にしない。
+  依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
+- **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
+  PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
+- **不在中の自動判断**: PM agent が行った判断は `<!-- oc-pm-decision: rule=Rn reversible=yes/no -->` マーカーで残る。
+  事後の確認はダイジェスト ([CI-70]) で行う。
