@@ -951,6 +951,9 @@ void m11_probe(int i);
 void m11_dest_obs(unsigned long long dest);
 #endif
 unsigned long long function_413060(unsigned long long dest, void* src, unsigned long long len) {
+#if M11_PRINT_DEST_2118
+    fprintf(stderr, "[d413060] dest=%llx len=%llu\n", dest, len);
+#endif
 #if M11_INSTR_413060
     m11_probe(8);
 #endif
