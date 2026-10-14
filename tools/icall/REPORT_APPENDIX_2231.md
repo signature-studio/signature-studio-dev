@@ -1,54 +1,66 @@
 # 付録: icall #2231 (ICALL-67) — fatal RIP 群 B/C/D/E/G/H の引数由来と群 I の正体
 
 > 親: #2198 (ICALL-63)。前付録: `REPORT_APPENDIX_2198.md` §2.3。本 run は受入条件 1〜3 の切り分けまで。
-> 測定 commit: `slot_trace.c` の fatal 経路にレジスタダンプを足した変更 (本 PR)。
+> 測定 commit: `4c59ce30` (`slot_trace.sh` の fatal 行抽出に `regs` / `heap_args` を追加。計測条件は不変)。
+> 検証 HEAD と差分の証跡は §5。
 
 ## 1. 結論
 
-- **群 I (下位 12 bit `0x96f`) は harness 側の現象で確定**: 落ちている RIP は `missing_import` の `movaps [rsp],xmm6` (`slot_trace+0x296f`)。
-  thunk は `rcx=0x40` (import index) で `missing_import` を `call rax` するため、`rsp` が 16 byte 整列していない状態で `movaps` が SIGSEGV する。
-  この SIGSEGV は `fprintf` より前に起きるため `MISSING IMPORT` が出ない。guest の挙動ではない。
-- **群 G・H・D は harness の synthetic 引数 (0 埋め heap・`0x5000xxxx` の heap ポインタ) に由来**と確認した。
+- **群 I (下位 12 bit `0x96f`) は harness の thunk 経路の現象**: 落ちている RIP は `missing_import` の `movaps [rsp],xmm6` (`slot_trace+0x296f`)。
+  落ちた時点の `rsp` は `…478` (16 で割ると余り 8)。`missing_import` の入口 `rsp` は 16 の倍数で、正規の `16n+8` からずれている。
+  thunk 内の `push` ×2 と `sub 0xa8` は入口 `rsp` が `16n+8` なら整列するので、**原因は thunk に入る時点の呼出し元の `rsp` が整列していないこと**。
+  呼出し元 (harness の entry か guest 内の call 元か) は未追跡。`fprintf` より前に落ちるため `MISSING IMPORT` が出ない。
+- **群 D: 1 件は harness 引数 (heap 引数 0) を直接使っている**。入口 `0x18106a3b0` の行は `ecx=0x50000010` = heap 引数 0 そのもの。
+  `mov [rsp+8],ecx` の後の `ldmxcsr [rsp+8]` で、MXCSR の予約ビット (bit 16–31) が立つ値のため #GP → SIGSEGV。
+  もう 1 件 (入口 `0x18105c1cc`) の `ecx=0x50001b80` は heap 引数のどれとも一致せず、guest 内で得た値 (未追跡)。
+- **群 G: 1 件は harness 引数を直接使い、fault の `rax=0` は読出し結果**。入口 `0x180da6e60` の行は `rcx=0x50000010` = heap 引数 0 そのもの。
+  `mov rax,[rcx+0x10]` (`0x180da6e95`) の結果が 0 (0 埋め heap)。fault 番地 `0x19a4` は `rax=0` 基準のアクセス (命令 bytes が途中で切れており、disp の完全な確認は未了)。
+  もう 1 件 (入口 `0x180ca2450`) は `rcx=0x50000370` で heap 域内の guest 計算値 (未追跡)。
+- **群 H は harness 由来とは言えない (未追跡)**: `rcx=0` は heap 引数 (`0x50000010` 等) と一致しない。
+  `mov rax,[rcx+0x8]` (`0x180da6d0b`) で `rcx=0` を読み、fault 番地 `0x8` = `rcx(0)+8` と一致。`rcx` を 0 にした経路は未追跡。
 - **群 C (`0x18103d494` fast-fail) は harness の `SLOT_ENC_INIT` 設定に依存**: `SLOT_ENC_INIT` なしでは stub 経路が `rc=0` で正常復帰、あり (`0x1813068d0` を cookie で敷く) では `int 0x29`。
   guest の不正とは断定しない。harness が敷いた暗号化 slot の値が fast-fail の条件になっている。
-- **群 B・E は由来が harness 由来とは言えない**。faulting 値 (`0xa080`・`0x400`) は heap の `0x5000xxxx` でも 0 でもない。
-  guest 内で計算・読込された値と見るのが妥当だが、値の起源はまだ追跡していない (未解決)。
-- 受入条件 (1)(3) は部分達成。(2) は因果を実測で確認した。
+- **群 B・E は harness 由来とは言えない**。faulting 値 (`rcx=0xa080`・`rax=0x400`) は heap 引数のどれとも一致しない。guest 内で計算・読込された値と見るのが妥当だが、起源は未追跡。
+- 受入条件 (1) は部分達成 (D の 1 件・G の 1 件は heap 引数由来と確認、他は未追跡)。(2) は因果を実測で確認。(3) は達成。
 
 ## 2. 実測
 
 ### 2.1 測定条件
 
 - 再現: `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (baseline) / `SLOT_STUB_VA=1810806a0 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (stub)。
-- 所要: baseline 13.8 s real / user 11.3 s / sys 2.0 s。stub は修正後に時間を計測していない。
-- load average: 1.37 (10:26 測定時)。
-- 素材: `fl-win64`・`plugins-freshair`・`work-icall`・`work-liftlib` を展開。
+- 所要 (検証 HEAD の 1 回目の実測):
+  - baseline: 12.77 s real / user 11.31 s / sys 1.82 s。load average (1 分) 0.93 (10:41 開始時)。
+  - stub: 12.66 s real / user 11.30 s / sys 1.75 s。load average 0.89 (10:41 開始時)。
+- 別 run (レビュー側の再実行) では baseline 17.6 s real / user 11.0 s / load 2.20 で、本 run より遅い。
+  同じ harness でも負荷で wall time が変わるため、時間は参考値。rc・件数の内訳は両 run で一致した (§2.2)。
+- 素材: `plugins-freshair` (`Fresh Air.Win.zip` を `fetch.sh` で展開)・`work-icall`・`work-liftlib` を `$HOME/artifacts` から展開。`tools/ott/native/build.sh` は OK。
 
-### 2.2 集計 (clean rerun)
+### 2.2 集計 (clean run)
 
 | 条件 | rc 内訳 | zero-fill VA 数 | 既知 12 hit |
 |---|---|--:|--:|
 | baseline | rc=0: 69, rc=124: 1, rc=95: 53, rc=98: 8 | 10 | 3/12 |
-| stub 有効 | rc=0: 72, rc=124: 1, rc=95: 47, rc=97: 3, rc=98: 8 | 11 | 4/12 |
+| stub 有効 | rc=0: 73, rc=124: 1, rc=95: 47, rc=97: 2, rc=98: 8 | 11 | 4/12 |
 
-2198 の REPORT と一致する。`0x1813068d0` が stub 有効で新規 hit (2198 と同じ)。
-
-注意: 同じ出力ファイルに対して実行を重ねると `F` 行が重複して 262 件になる (作業中の計数誤り)。本表は各 run を
-クリーンに取り直した値のみ。
+- stub の `rc=97` は 2 件 (レビュー側の clean run と一致)。前版の「3 件」は誤記で、本版で 2 件に直した。
+- `0x1813068d0` が stub 有効で新規 hit (2198 と同じ)。
+- 注意: 同じ出力ファイルに対して実行を重ねると `F` 行が重複する (作業中の計数誤り)。本表は各 run をクリーンに取り直した値のみ。
+- fatal 行の保存: `slot_trace_fatal.txt` に `fatal` / `regs` / `heap_args` の 3 種が入る (base: 53 件ずつ・stub: 47 件ずつ)。
 
 ### 2.3 群ごとの確定結果 (baseline / stub)
 
 | 群 | RIP | base / stub | fault | 引数の由来 (実測) |
 |---|---|--:|---|---|
-| B | `0x180c8b9c0` | 3 / 3 | SIGSEGV `0xa098` | `rcx=0xa080`。heap (`0x5000xxxx`) でも 0 でもない。guest 内で計算された値の可能性 (未追跡) |
-| C | `0x18103d494` | 1 / 4 | `int 0x29` | 下記 §2.4 |
-| D | `0x18106a3b4` | 2 / 2 | SIGSEGV (nil) | `ldmxcsr [rsp+8]`。`ecx=0x50001b80` (heap ポインタを MXCSR として渡している)。harness の heap 引数に由来 |
-| E | `0x18105bd74` | 2 / 0 | SIGSEGV `0x400` | `rax=0x400`・`rcx=0x6000`。`0x400` は harness の heap サイズと一致するが、由来は未追跡 (未解決) |
-| G | `0x180da6e99` | 2 / 2 | SIGSEGV `0x19a4` | `rax=0`・`rcx=0x50000010` (heap 引数 0)。`[rcx+0x10]` が 0 → harness 由来 |
-| H | `0x180da6d0b` | 2 / 2 | SIGSEGV `0x8` | `rcx=0`・`rax=0x20`。`[rcx+0x10]` が 0 → harness 由来 |
-| I | `0x55..96f` 形 | 9 / 9 | SIGSEGV (nil) | §2.5 (harness 側) |
+| B | `0x180c8b9c0` | 3 / 3 | SIGSEGV `0xa098` | `mov rax,[rcx+0x18]`。`rcx=0xa080` (`0xa080+0x18=0xa098` と一致)。heap 引数と不一致。未追跡 |
+| C | `0x18103d494` | 1 / 4 | `int 0x29` | §2.4 |
+| D | `0x18106a3b4` | 2 / 2 | SIGSEGV (nil) | `ldmxcsr [rsp+8]` (`0x18106a3b4`)。入口 `0x18106a3b0` の行は `ecx=0x50000010` (heap 引数 0 直接)。入口 `0x18105c1cc` の行は `ecx=0x50001b80` (heap 引数と不一致・未追跡) |
+| E | `0x18105bd74` | 2 / 0 | SIGSEGV `0x400` | `mov ecx,[rax]`。`rax=0x400`・`rcx=0x6000`。heap 引数と不一致。未追跡 |
+| G | `0x180da6e99` | 2 / 2 | SIGSEGV `0x19a4` | `mov rax,[rcx+0x10]` (`0x180da6e95`) の結果が 0。入口 `0x180da6e60` の行は `rcx=0x50000010` (heap 引数 0 直接)。入口 `0x180ca2450` の行は `rcx=0x50000370` (未追跡) |
+| H | `0x180da6d0b` | 2 / 2 | SIGSEGV `0x8` | `mov rax,[rcx+0x8]`。`rcx=0` (heap 引数と不一致)。未追跡 |
+| I | `0x55..96f` 形 | 9 / 9 | SIGSEGV (nil) | §2.5 |
 
-群 A (`0x1810806a0`・stub で消える)・F (`0x18100ca79`) は 2198 の記録どおり。
+- 群 A (`0x1810806a0`・stub で消える)・F (`0x18100ca79`) は 2198 の記録どおり。
+- 群 D の ldmxcsr: `0x50000010`・`0x50001b80` はどちらも bit 30 を持つ (MXCSR の予約ビット)。値が heap ポインタであることが #GP の原因と読める (推定。実測は fault のみ)。
 
 ### 2.4 群 C の因果
 
@@ -57,16 +69,17 @@
 - 実測: stub 有効 (`SLOT_STUB_VA=1810806a0`) で `0x18103d42c` を単体実行した。
   - `SLOT_ENC_INIT` なし: `rc=0`・`STUB 2`・`DONE` (正常復帰)。
   - `SLOT_ENC_INIT=1`: `rc=95`・`fatal sig=11 rip=0x18103d494`。
-- 結論: fast-fail の条件は harness が `0x1813068d0` 系の slot に cookie を敷くことである。
-  guest の不正入力ではない。stub で `rax=0` を返すこと自体は正常経路に乗る。
+- 結論: fast-fail の条件は harness が `0x1813068d0` 系の slot に cookie を敷くことである。guest の不正入力ではない。
 
 ### 2.5 群 I の正体
 
 - 落ちる RIP の下位 12 bit `0x96f` は `missing_import` (`slot_trace+0x2962` から `+0x296f`) の `movaps [rsp],xmm6`。
-- `make_thunk` は `mov ecx,idx; mov rax,missing_import; call rax` で入る。`call` は 16 byte 整列を崩すため、
-  `sub rsp,0xa8` 後の `movaps` が整列違反で SIGSEGV する。
-- 実測の register: `rcx=0x40` (import index)・`rsp` 整列違反。`fprintf` より前に落ちるので `MISSING IMPORT` が出ない。
-- 2198 の仮説 (`movaps` 整列不一致) は確定。計測のノイズで、群 I の 9 件はすべてこれ。
+- 実測 (9 件中の代表 `0x1803b3fc0`): fault 時 `rsp=0x7ffd1b012478` (`…478` = 16 で割ると余り 8)。
+  thunk の `push` ×2 + `sub 0xa8` (計 0xb8) を戻すと入口 `rsp` は `…530` (16 の倍数) で、正規の `16n+8` からずれている。
+- `make_thunk` は `mov ecx,idx; mov rax,missing_import; call rax` で入る。thunk 内の `push` ×2 と `sub 0xa8` は、入口 `rsp` が `16n+8` なら `movaps` で整列する。
+  よって違反の原因は thunk に入る時点の呼出し元の `rsp` である (thunk 自体の押し込みは原因ではない)。
+- 実測の register: `rcx=0x40` (import index)。`fprintf` より前に落ちるので `MISSING IMPORT` が出ない。
+- 2198 の仮説 (`movaps` 整列不一致) は確定。計測のノイズではなく、9 件すべてこの経路 (`0x55..96f` 形 9 件)。
 
 ## 3. 再現
 
@@ -79,12 +92,22 @@ SLOT_STUB_VA=1810806a0 SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh
 cp tools/icall/work/slot_trace_fatal.txt tools/icall/work/fatal_stub.txt
 ```
 
-レジスタ確認 (本 PR で追加した stderr 行): `gcc -O1 -g -o tools/icall/work/slot_trace tools/icall/diff/slot_trace.c tools/ott/native/ms_call.S -lm`
-後、`tools/icall/work/slot_trace "<SlateCore.core_64>" <fn_va>` の stderr に `regs` と `heap_args` が出る。
+- `fatal_*.txt` には `regs` / `heap_args` 行も入る (`slot_trace.sh` の抽出を `grep -E 'fatal|regs|heap_args'` に修正済み, `4c59ce30`)。
+- 単体の register 確認: `gcc -O1 -g -o tools/icall/work/slot_trace tools/icall/diff/slot_trace.c tools/ott/native/ms_call.S -lm` の後、
+  `tools/icall/work/slot_trace "<SlateCore.core_64>" <fn_va>` の stderr に `regs` と `heap_args` が出る。
 
 ## 4. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 群 B (`rcx=0xa080`)・群 E (`rax=0x400`) の faulting 値の起源 (guest 内で計算された値か) | 受入条件 1 (群 B・E の切り分け) | #2247 (ICALL-68) |
+| 群 B (`rcx=0xa080`)・群 E (`rax=0x400`)・群 H (`rcx=0`) の faulting 値の起源 (guest 内で計算された値か) | 受入条件 1 (群 B・E・H の切り分け) | #2247 (ICALL-68) |
+| 群 D (入口 `0x18105c1cc` 行の `ecx=0x50001b80`)・群 G (入口 `0x180ca2450` 行の `rcx=0x50000370`) の heap 域値の起源 | 受入条件 1 (群 D・G の残り) | #2247 (ICALL-68) |
+| 群 I の thunk 呼出し元 (harness の entry か guest 内の call 元か) | 群 I の機構の上流 | #2247 (ICALL-68) |
 | 群 C の `SLOT_ENC_INIT` 依存が guest の意図か harness の artefact か | 受入条件 2 の解釈 | #2247 (ICALL-68) |
+
+## 5. 検証
+
+- 測定 commit: `4c59ce30` (`tools/icall/diff/slot_trace.sh` の fatal 抽出修正。`tools/icall/diff` の計測コードの最後の変更)。
+- 検証 HEAD: 本付録を含む最新 commit (PR 本文と PR コメントに記載)。
+- `git diff 4c59ce30 HEAD -- tools/icall/diff tools/ott` の出力は 0 行 (測定 commit 以降のコード差分は無し)。
+- 参考: `git diff 2c1c8121 4c59ce30 -- tools/icall/diff` は `slot_trace.sh` の 1 行 (`grep fatal` → `grep -E 'fatal|regs|heap_args'`) のみ。
