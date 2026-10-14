@@ -39,7 +39,7 @@
 ## 4. 差分と再現
 
 - 測定 commit `e244259e` から HEAD までの tools/m11 のコード差分 (本 REPORT を除く): `git diff --stat e244259e HEAD -- tools/m11 ':!tools/m11/REPORT_N1479.md'` は出力 0 件。
-- 再現: `export FL_WIN64_DIR=<fl-win64 展開先> PATH="$HOME/.local/agent-py/bin:$PATH"; cd tools/m11 && bash m11_xmm_ab.sh` (前提: `work/boot_final.ll`・`work/ir_conditions.json`・emsdk (`[EMSDK]`))。出力は `work/xmm_ab/`。
+- 再現: `export FL_WIN64_DIR=<fl-win64 展開先> PATH="<capstone・pefile 入り venv の bin>:$PATH"; cd tools/m11 && bash m11_xmm_ab.sh` (前提: `work/boot_final.ll`・`work/ir_conditions.json`・emsdk (`[EMSDK]`))。出力は `work/xmm_ab/`。
 
 ## 5. 基準 (`7e149974` 全再生成) との関係 (未実施)
 
