@@ -87,11 +87,11 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 残り x87 87 件 (超越関数 fsin/fcos/fyl2x/f2xm1/fldl2e 等、frndint/fscale/fprem/fsqrt、ftst/fxam、fiadd/fimul、fnsave/frstor/fnstenv/fldenv、fnclex) | lift の unsup が残る | #1099 の残り (子 issue は PM が起票) |
-| 関数単位の native vs wasm 差分試験 (emcc と 32bit 実機 harness) | lowered の実 wasm での一致は未確認 | #1099 の残り (子 issue は PM が起票) |
-| fld/fstp m80 の差分試験 (乱択に入れていない) | 80bit メモリ経路の丸めは未試験 | #1099 の残り |
-| RC の算術への適用・`fst m32` の RC (ADR D28 制限 2・5) | RC≠nearest の算術・fst m32 は native と一致しない (RC 試行で 1,446 件) | PM 判断 (ADR D28 の改訂) |
-| f80→f64 の精度差 (§6 の行案 D24) | 比較・桁落ちの差分の既知の源 | PM 判断 (`docs/DEFECTS.md` 編集) |
+| 残り x87 87 件 (超越関数 fsin/fcos/fyl2x/f2xm1/fldl2e 等、frndint/fscale/fprem/fsqrt、ftst/fxam、fiadd/fimul、fnsave/frstor/fnstenv/fldenv、fnclex) | lift の unsup が残る | #2966 (PLG-G2-23) |
+| x87 を含む関数の native vs wasm 差分試験 (emcc と 32bit 実機 harness) | lowered の実 wasm での一致は未確認 | #2989 (PLG-G2-25。#1223 の受入に x87 関数は無い) |
+| fld/fstp m80 の差分試験 (乱択に入れていない) | 80bit メモリ経路の丸めは未試験 | #2967 (PLG-G2-24) |
+| RC の算術への適用・`fst m32` の RC (ADR D28 制限 2・5) | RC≠nearest の算術・fst m32 は native と一致しない (RC 試行で 1,446 件) | PM agent の判断待ち: ADR D28 を改訂して RC 算術・fst m32 の RC を対象に含めるか・既定案: 改訂せず制限 2・5 として残す (材料は #2967 の実測) |
+| f80→f64 の精度差 (§6 の行案 D24) | 比較・桁落ちの差分の既知の源 | PM agent の判断待ち: `docs/DEFECTS.md` に D24 (f80→f64 精度差) の行を追加するか・既定案: §6 の行案どおり追加する (本 PR では DEFECTS.md は未編集) |
 | 例外フラグ・C1・stack fault の未モデル化 (ADR D28 制限 4) | `fnstsw` の PE/C1 が native と違う | #1223 (PLG-G2-11) |
 | Slayer `.text` の未被覆 11,348 B と非 x87 2 件 (`std`・`shld`) | `.text` 全体の lift は未達 | #2814 (PLG-G2-22) |
 
