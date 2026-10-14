@@ -1,4 +1,4 @@
-// unit 23 (index 22) の icall miss・slot (0x15f10e0)・GetProcAddress 呼出し数を、前処理 unit 1..idx-1 の後で 1 回実測する probe (SHX-T9e #1607).
+// unit 23 (index 22) の icall miss・slot (LVA 0x11f10e0 = VA 0x15f10e0)・GetProcAddress 呼出し数を、前処理 unit 1..idx-1 の後で 1 回実測する probe (SHX-T9e #1607).
 //   node probe_unit23.mjs <m11_sx_*.cjs | m11_boot.cjs> <unit_index (0 始まり, 既定 22)>
 //   素材: tools/m11/work/ (work-m11) と tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs (build.sh --trace --soft --fix)
 import fs from 'fs';
@@ -18,7 +18,7 @@ const sp = mod._emscripten_stack_get_current();
 try { mod._m11_boot_enter(0n, 1n); } catch (e) { if (!(e && e.m11_dllmain_done !== undefined)) throw e; mod.__emscripten_stack_restore(sp); }
 const sp0 = mod._emscripten_stack_get_current();
 // survey_trace.mjs と同じく、対象 unit の前の unit 0..idx-1 を先に順に実行する (状態を揃えるため)
-const slotPre = () => { const dv = new DataView(mod.HEAPU8.buffer); return dv.getBigUint64(0x15f10e0, true); };
+const slotPre = () => { const dv = new DataView(mod.HEAPU8.buffer); return dv.getBigUint64(0x11f10e0, true); };
 const pre = (typeof mod._sxt_n === 'function') ? mod._sxt_n() : 0;
 const gpIdx = []; for (let i = 0; i < pre; i++) { const nm = mod.UTF8ToString(mod._sxt_name(i)); if (nm === 'GetProcAddress' || nm === 'GetModuleHandleW') gpIdx.push([nm, i]); }
 const gpc = () => gpIdx.map(([nm, i]) => nm + '=' + mod._sxt_count(i)).join(' ');
@@ -28,8 +28,8 @@ for (let i = 0; i < idx; i++) {
   const s1 = slotPre();
   if (s0 !== s1 || i >= idx - 3) console.log('PRE|unit', i + 1, 'slot', '0x' + s1.toString(16), 'gp', gpc());
 }
-// .bss slot 0x15f10e0 (LVA = RVA, M11_LB_BASE=0)。0 なら fallback 0x457860 に流れる
-const slotVal = () => { const dv = new DataView(mod.HEAPU8.buffer); return Number(dv.getBigUint64(0x15f10e0, true)).toString(16); };
+// .bss slot: LVA 0x11f10e0 (= VA 0x15f10e0, LVA = VA - 0x400000)。0 なら fallback 0x457860 に流れる
+const slotVal = () => { const dv = new DataView(mod.HEAPU8.buffer); return Number(dv.getBigUint64(0x11f10e0, true)).toString(16); };
 console.log('SLOT_BEFORE_UNIT|0x' + slotVal());
 const e0 = errs.length;
 const HAS = typeof mod._sxt_n === 'function';
