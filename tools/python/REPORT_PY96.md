@@ -33,42 +33,47 @@
 
 ## 検証
 
-測定 commit: `73cdd073` (コードを変えた最後の commit。`origin/main` (`eeca4ded`) の取り込み merge。PR #2991 の競合解消)。衝突は 5 ファイル。`docs/DOC_MAP.md` (1 箇所: 両側の行を残した)、`tools/python/host/fl_mock.mjs` (2 箇所: 状態の初期化・impl 表の末尾。両側を残した)、`tools/python/provider/fl_engine.c` (3 箇所: 状態変数・reset・ハンドラ。両側を残した)、`tools/python/tests/provider_check.mjs` (1 箇所: 集合の宣言と件数 assert。両側の集合を 1 つの `if` に併せ、期待値を 実装 113 / 未実装 322 にした)、`tools/python/tests/arrangement_diff.mjs` (両側が同名で新規作成していた。main の PY-152 版をそのまま残し、本 PR のテストは `tests/arrangement_selection_diff.mjs` に分けた)。
+測定 commit: `4d732ba4` (コードを変えた最後の commit。`origin/main` (`4b81e78a`) の取り込み merge)。経緯: 最初の取り込み `73cdd073` (`origin/main` `eeca4ded`) の後、main が `4b81e78a` (PR #3019) に進んで再び衝突したため、`4d732ba4` で取り込み直した。
 
-環境: runner 4 core (load 1 分平均 0.76 (測定開始時))。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`、7.3 秒)、`FL_WIN64_DIR` を設定して `bash fetch_inputs.sh` (rc 0)。emsdk は `[EMSDK]` (`docs/REFERENCES.md` §4。`EMSDK_ENV=<[EMSDK]>/emsdk_env.sh` で `emcc` の実在を確認)。
+衝突の内訳 (`73cdd073`): 5 ファイル。`docs/DOC_MAP.md` (1 箇所: 両側の行を残した)、`tools/python/host/fl_mock.mjs` (2 箇所: 両側を残した)、`tools/python/provider/fl_engine.c` (3 箇所: 両側を残した)、`tools/python/tests/provider_check.mjs` (1 箇所: 両側の集合を 1 つの `if` に併せた)、`tools/python/tests/arrangement_diff.mjs` (両側が同名で新規作成していた。main 版をそのまま残し、本 PR のテストを `tests/arrangement_selection_diff.mjs` に分けた)。
 
-前提の生成物 (`73cdd073` の作業ツリーで生成。gitignore 対象): `bash build_cpython_wasm.sh` (rc 0・wall 194 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0・wall 5 秒)・`bash provider/build.sh` (rc 0・wall 1.25 秒)。`gen_provider.py --check-handlers` は 435 関数・ハンドラ 113。
+衝突の内訳 (`4d732ba4`): 2 ファイル。`tools/python/provider/fl_engine.c` (1 箇所: 状態変数。`sel_start`/`sel_end` と main の `disp_time` を両方残した)、`tools/python/tests/provider_check.mjs` (1 箇所: main の `pe121_2982` (PR #3019・ui 表示/メニュー 6 件) を集合に加え、期待値を 実装 119 / 未実装 316 にした)。
 
-測定は `73cdd073` の作業ツリー (未コミットの変更なし)。
+環境: runner 4 core。素材 `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`、7.3 秒)、`FL_WIN64_DIR` を設定して `bash fetch_inputs.sh` (rc 0)。emsdk は `[EMSDK]` (`docs/REFERENCES.md` §4。`EMSDK_ENV=<[EMSDK]>/emsdk_env.sh` で `emcc` の実在を確認)。
 
-| コマンド (`73cdd073`) | 結果 | wall |
+前提の生成物 (gitignore 対象): `bash build_cpython_wasm.sh` (rc 0・wall 194 秒。`73cdd073` で実行。以後 CPython の入力は変わらないため再実行していない)、`bash provider/build.sh` (`4d732ba4`・rc 0・ハンドラ 119)、`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (`4d732ba4`・rc 0)。`gen_provider.py --check-handlers` は 435 関数・ハンドラ 119。
+
+測定は `4d732ba4` の作業ツリー (未コミットの変更なし)。測定後の `/proc/loadavg` の 1 分平均は 0.36。
+
+| コマンド (`4d732ba4`) | 結果 | wall |
 |---|---|---|
-| `node tests/provider_check.mjs` | rc 0・`{"functions":435,"implemented":113,"unimplemented":322,"mcp_static":60,"PASS":true}` | 0.295 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・48/48 ok・soft_error 0・host_calls 37,425・callback_roundtrip true | 1.48 秒 |
-| `node tests/arrangement_selection_diff.mjs` | calls 8、diffs 0、PASS | 0.04 秒 |
-| `node tests/arrangement_diff.mjs` (main の PY-152) | calls 25、diffs 0、PASS | 0.04 秒 |
-| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 0.04 秒 |
-| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 0.04 秒 |
-| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 0.04 秒 |
-| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 0.04 秒 |
-| `node tests/ui_state_diff.mjs` | calls 12、diffs 0、PASS | 0.04 秒 |
-| `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5、diffs 0、PASS | 0.04 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0 (範囲外の既知差 3)、PASS | 0.04 秒 |
-| `node tests/ilmcp_diff.mjs` | calls 32・state_checks 9、diffs 0、PASS | 未計測 |
-| `node tests/midi_path_diff.mjs` | cases 30、diffs 0、PASS | 未計測 |
-| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 未計測 |
-| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_selection_check.py` | PASS (4 関数 ok、0xe43e80 の比較 2 件) | 5 秒 |
+| `node tests/provider_check.mjs` | rc 0・`{"functions":435,"implemented":119,"unimplemented":316,"mcp_static":60,"PASS":true}` | 0.319 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | rc 0・48/48 ok・soft_error 0・host_calls 37,425・callback_roundtrip true | 1.603 秒 |
+| `node tests/arrangement_selection_diff.mjs` | calls 8、diffs 0、PASS | 0.038 秒 |
+| `node tests/arrangement_diff.mjs` (main の PY-152) | calls 25、diffs 0、PASS | 0.042 秒 |
+| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 0.044 秒 |
+| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 0.040 秒 |
+| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 0.048 秒 |
+| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 0.041 秒 |
+| `node tests/ui_state_diff.mjs` | calls 12、diffs 0、PASS | 0.041 秒 |
+| `node tests/device_diff.mjs` | calls 8、rejects 4、midi_out 5、diffs 0、PASS | 0.038 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0 (範囲外の既知差 3)、PASS | 0.040 秒 |
+| `node tests/ui_display_diff.mjs` (main の PY-121 ui 表示) | ok 12・bad 11、diffs 0、PASS | 0.041 秒 |
+| `node tests/ilmcp_diff.mjs` | calls 32、state_checks 9、diffs 0、PASS | 0.052 秒 |
+| `node tests/midi_path_diff.mjs` | cases 30、diffs 0、PASS | 0.041 秒 |
+| `node tests/transport_diff.mjs` | calls 7、diffs 0、PASS | 0.038 秒 |
+| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_selection_check.py` | PASS (4 関数 ok、0xe43e80 の比較 2 件) | 5.540 秒 |
 
-件数の変化: 前 PR HEAD (`45f47d11`) の期待値は 実装 101 / 未実装 334。main (`eeca4ded`) の取り込みで main 側の `pe119set` (general setter 6 件・PY-119 #2977) と `pe152` (arrangement 6 件・PY-152 #2983) が加わり、本 PR の `pe96` 4 件と合わせて 実装 113 / 未実装 322 (total 435)。内訳: MCP 60 + device 5 + mig 5 + pe39 1 + stub41 6 + pe100 2 + stub89 2 + pe87 4 + pe96 4 + pe115 1 + pe121 5 + pe119 6 + pe119set 6 + pe152 6 = 113。
+件数の変化: 前 PR HEAD (`45f47d11`) の期待値は 実装 101 / 未実装 334。`73cdd073` で main (`eeca4ded`) の `pe119set` (general setter 6 件・PY-119 #2977) と `pe152` (arrangement 6 件・PY-152 #2983) が加わり 113 / 322。`4d732ba4` で main (`4b81e78a`) の `pe121_2982` (ui 表示・メニュー 6 件・PY-121 #2982・PR #3019) が加わり 119 / 316 (total 435)。内訳: MCP 60 + device 5 + mig 5 + pe39 1 + stub41 6 + pe100 2 + stub89 2 + pe87 4 + pe96 4 + pe115 1 + pe121 5 + pe119 6 + pe119set 6 + pe152 6 + pe121_2982 6 = 119。
 
-旧測定 (`5607f4bc`・main `8fd940bb` 取り込み時点の表) は git 履歴に残し、本節の表で置き換えた。
+旧測定 (`5607f4bc`・`73cdd073` 時点の表) は git 履歴に残し、本節の表で置き換えた。
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `selStart: -1, selEnd: -1,` の `selEnd` を `0` にすると、`node tests/arrangement_selection_diff.mjs` は `AssertionError [ERR_ASSERTION]: arrangement 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 8・diffs 0・PASS (rc 0)。測定 commit `73cdd073` で行った (`sed` で一時変更して検査し、同じ `sed` で戻した。`git status` は clean)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `selStart: -1, selEnd: -1,` の `selEnd` を `0` にすると、`node tests/arrangement_selection_diff.mjs` は `arrangement 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 8・diffs 0・PASS (rc 0)。測定 commit `4d732ba4` で行った (`sed` で一時変更して検査し、同じ `sed` で戻した。`git status` は clean)。
 
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 73cdd073 HEAD -- tools/python ':!*.md'
+$ git diff 4d732ba4 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
@@ -84,5 +89,5 @@ $ git diff 73cdd073 HEAD -- tools/python ':!*.md'
 
 ## 検証範囲 / 範囲外
 
-- 検証範囲: arrangement の選択範囲 4 件の mock/C 差分 (既定値の戻り値・引数個数違い)、provider の表・件数、main 取り込み後の既存テスト群 (general・screen・mixer・channels・ui・device・ilmcp・midi 経路・transport) の回帰、全 48 件の wasm 経路 (`all_tools`)。
+- 検証範囲: arrangement の選択範囲 4 件の mock/C 差分 (既定値の戻り値・引数個数違い)、provider の表・件数、main 取り込み後の既存テスト群 (general・screen・mixer・channels・ui・ui 表示・device・ilmcp・midi 経路・transport) の回帰、全 48 件の wasm 経路 (`all_tools`)。
 - 範囲外: 選択状態を変える経路 (本 provider に setter 無し。既定値の 1 通りだけを比べた)、実機の値、`liveSelectionStart` の引数付き呼出し。
