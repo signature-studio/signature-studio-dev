@@ -122,6 +122,28 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 呼出し元の引数: `r9` (= 関数内の `rbx`) は `lea r9,[rip+0x44e9d7]` で `0x86b188` (`.data`) を指す。`r8` は `0x86b128`。`r13d` (7 番目引数、格納先の分岐用) は `0x41c752` の `mov r13d,r9d`。
 - `0x411330` 内の格納: `rax = [rbx]` (= `[0x86b188]`) を `0x4113f2` で `[r13+0x28]` に格納する (§8 の `0x4113f2` と同一)。
 - `[0x86b188]` の PE 内初期値: `0x41bf30` (関数の先頭。`sub rsp,0x28; lea rax,[0x298]; ...`)。PE 内の rip 相対の参照 (読み書き) は 0 件 (`[rip±d]` の有効アドレス走査)。
-- したがって `0x8c3ca8` の格納値は **`[0x86b188]` の実行時値**。PE 内の初期値は `0x41bf30` だが、実行時の書換えは PE 内の直接書込み 0 件で否定できない (間接書込み・他経路は未証明)。
+- したがって `0x8c3ca8` の格納値は **`[0x86b188]` の実行時値**。PE 内の初期値は `0x41bf30` だが、実行時の書換えは `.text` 内の直接書込み 0 件 (§9 追補) で否定できない (間接書込み・他経路は未証明)。
 - 未達 (次の段): (1) `[0x86b188]` が実行時にどの値になるかの確定 (unicorn で `0x41bf30` 呼出し後の値を再現)、(2) `0x8c3ca8` の格納値 → 14 件の `object_or_register_based` の vtable 型確定、(3) 19245 の同判定 (`0x8aeca8`・`0x8aa0a0` 系)、(4) #529 への報告。いずれも実行時再現 (unicorn) が要る。
 - 再現 (`slot_base_store.py` と別アルゴリズム = PE を VA 配置の平坦イメージに展開して生バイト走査、逆アセンブル不使用): `python3 tools/plugins/f2/callsite_scan.py <extracted/block19148_PE.bin> 0x411330 0x86b188 0x86b128`。期待出力: `[1] ... 1 件 0x41c7d4`・`[2] qword 参照: 0 件`・`[3] 0x86b188: lea 1 件 0x41c7aa / 読み書き 0 件`・`[3] 0x86b128: lea 2 件 0x41bfc4 0x41c7a3 / 読み書き 0 件`・`[4] ... [0x41c740,0x41c7e3)`・`[5] 0x86b188 の初期値 0x41bf30`。負のコントロール: target `0x411338` で 1 の件数が 0、rip `0x86b189` で lea/rw が 0。`0x8c3ca8` への rip 参照は `0x411ba2` の `call qword ptr [rip+...]` (読み出し) の 1 件のみで、格納 0 件とは矛盾しない。
+- 追補 (#1807 2 回目 run、測定 commit は本 PR の commit): `0x86b188` の初期値 `0x41bf30` は、PE の `.reloc` に DIR64 (type 10) の再配置エントリ 1 件 (VA `0x86b188`) として載っており、再配置対象の絶対ポインタ (ロード時に補正される。値は `0x41bf30` の関数 VA)。`.data` のデータ値ではない。
+- 入力の出所: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `extracted/block19148_PE.bin` (5,904,384 B) を `tar --zstd -xf <fl-win64.tar.zst> extracted/block19148_PE.bin` で展開して使う (`TMPDIR=$RUNNER_TEMP` 下の scratch に置き、リポジトリには置かない)。
+- 走査範囲: `slot_write_scan.py` は `IMAGE_SCN_MEM_EXECUTE` を持つ全セクションを走査する。19148 の実行可能セクションは `.text` のみ (`.data`・`.bss`・`.idata`・`.rdata`・`.reloc`・`.pdata`・`.rsrc` は非実行)。よって「PE 内の rip/abs 直接アクセス」は `.text` 内の直接アクセスと一致する。
+- 測定 HEAD: `0a1fdacd` (スクリプトの最終版。以降の commit は REPORT のみ)。実測 (block19148 のみ、逐次、`python3 tools/plugins/f2/slot_write_scan.py <block19148_PE.bin> 0x86b180 0x86b190`): 3 回の wall = 18.80 / 18.88 / 19.05 秒 (min–max 18.80–19.05 秒、RSS 約 220 MB、並列数 1、開始時 load average (1 分) 0.86 / 0.90 / 0.93)。
+- 結果: `relocs overlapping: 1`・`direct accesses (rip/abs disp), excluding lea: 0`。同じ範囲の rip 相対・絶対 disp アクセスは `lea` を除き 0 件 (書込みも読出しも 0)。
+- ネガティブコントロール (同じ検出器、同じ入力): (a) 正のコントロール: `0x8c3ca8`〜`0x8c3cb0` で `direct accesses: 1` (`0x411ba2 call qword ptr [rip + 0x4b2100]`、`relocs overlapping: 0`) — 検出器は rip 参照を数えられる。(b) 再配置のコントロール: 再配置の無い `0x86b189`〜`0x86b18a` で `relocs overlapping: 0`・`direct accesses: 0`。
+- したがって `0x411330` が受け取る `rbx` (= `0x86b188`) の中身は、`.text` 内に rip/abs 形式の直接書込みが無い限りローダ設定の `0x41bf30` のまま。「直接書込みが無い」は rip/abs 形式の静的アクセスに限る。レジスタ経由の間接書込みは未除外で、unicorn での実行時確認が残件。
+- 前段の誤り訂正 (scratch 検証で判明): 再配置の突き合わせは RVA と VA の取り違えで一度 0 件と誤判定した。RVA `0x46b188` で再確認し、VA `0x86b188` の再配置 1 件を確認。
+
+## 10. PLG-F3-21 (#1807 子 A): unicorn による実行時確定 (測定 commit 4a4987bc)
+
+- 道具: `tools/plugins/f2/unicorn_trace.py` (unicorn 2.1.4・pefile)。PE を preferred base 0x400000 に展開し、import (通常 IAT・遅延 IAT) を ret の stub に差し替え、指定関数を実行する。書込み監視範囲の書込み元 rip と、フォルト時の直前命令列を出す。
+- 入力: `$RUNNER_TEMP/fl-win64/extracted/block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block19148_PE.bin`)。
+- 測定 (block19148、逐次、負荷 load 0.19 → 0.25):
+  - T1 `0x41bf30` 単体 (`[0x86b188]` の初期化経路): 実行後 `[0x86b188] = 0x41bf30` (変化なし)・戻り値 `rax = 0x298`・監視範囲 `0x86b188:0x86b190` への書込み 0 件。wall 1.63 秒・RSS 約 227 MB。
+  - T2 `0x411330` (呼出し元と同じ引数、r9=`0x86b188`、7 番目引数 1、r13 = `0x8c3c80` 系): `0x4113f2` で `[0x86b188] = 0x41bf30` が `0x8c3ca8` に書込まれる (rip=0x4113f2)。その後、同じ実行内で `0x41196b` が `0x8c3ca8` に `0` を書込む (rip=0x41196b、`rep movsq`)。最終値 `[0x8c3ca8] = 0`。フォルト (`rip=0`、`[rsp]=0`) で停止。直前は `0x4118f2`〜`0x411922` の命令列。wall 1.63 秒。
+- 静的解析の前提との差: §9 の「`0x8c3ca8` の格納値は `[0x86b188]` の実行時値」は `0x4113f2` の時点では正しいが、同じ実行内で `0x41196b` が `0x8c3ca8` を上書きする。よって「`0x8c3ca8` の最終値 = `0x41bf30`」とは言えない。
+- `0x41196b` の書込みは `0x411940` 内の `rep movsq` (コピー元は引数 rcx が指す構造体)。T2 では rcx に scratch 領域を渡したため、0 の値は合成入力由来であり、実プログラムで同じ値になるとは言えない。
+- 未確定: (1) `0x411940` の実呼出し元と、そのときの rcx (実データで `0x8c3c80` 系に当たるか)。(2) T2 のフォルト (`rip=0`) が合成引数によるものか。(3) `0x41bf30` の戻り値 `0x298` と `object_or_register_based` 14 件の関係。
+- 判定 (受入条件): 1 (`0x41bf30` 呼出し後の `[0x86b188]` の確定) **達成** (`0x41bf30` のまま、書換えなし)。2 (レジスタ経由の書込みの実行時トレース) **部分達成** (T1 は関数単位で書込み 0 件。プログラム全体の実行は未実施)。3 (`[rbx]` → `0x8c3ca8` の確定) **未達** (`0x4113f2` で `0x41bf30` が入るが、`0x41196b` が後で 0 を書く)。4 (REPORT §9 への記録) **達成** (本節と §9 の注記)。waiver は変更しない。
+- 静的側の照合 (issue 検証方法): `python3 tools/plugins/f2/slot_write_scan.py <block19148_PE.bin> 0x86b180 0x86b190` = `relocs overlapping: 1`・`direct accesses (rip/abs disp), excluding lea: 0` (wall 24.29 秒、load 0.12 → 0.42)。実行可能セクションは `.text` のみ。
+- 再現: `python3 tools/plugins/f2/unicorn_trace.py <block19148_PE.bin> 0x41bf30 -q 0x86b188 -q 0x8c3ca8 -w 0x86b188:0x86b190 -m 100000` と `python3 tools/plugins/f2/unicorn_trace.py <block19148_PE.bin> 0x411330 -r rcx=0x40000000 -r rdx=0x40000100 -r r8=0x86b128 -r r9=0x86b188 -a 0 -a 0x40000200 -a 1 -a 0 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 200000`。

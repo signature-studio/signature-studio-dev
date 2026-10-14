@@ -223,3 +223,20 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 - 受入 1 (書込み元 store の IR site 特定): **未達**。計装 IR では unit 106 が止まり、全 store 計装で unit 0〜484 を通せない。
 - 停止の性質: 「`m11_sw` の C 実装」ではなく「計装 IR そのもの」が、前段 unit 1 の挙動 (`0x10a9f910` への書込み) を変えている。原因は未切り分け。
 - 次の手順 (子 issue に移す): (a) 計装 IR の差分 (`declare` 以外の追加行) を、`wsa_`/`wsv_` を消さずに 1 種類ずつ外して、unit 1 の書込みが消える最小の変更を探す。(b) 最小変更で unit 0〜484 が完走する計装版を作り、`[aw]` の unit 境界で `0x10a9f910` への書込み site を取る。(c) D17 か別類型かを判定する。
+
+## 19. #1620 run (HEAD `7d15ceab` = origin/main): 未初期化 stack 読みの仮説 (結論なし)
+
+- 測定 commit: `7d15ceab` (コード差分 0)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11`・`work-liftdiff` は worktree `ws-1620` に展開。`ir_conditions.json` が無いため `m11_gen_ir2.sh` で IR を再生成した。
+- 再現 (素の build): `m11_gen_ir2.sh` rc 0 (31.4 s、490,733 行、ldfix errors=0) → `m11_build.sh` rc 0 (18.8 s) → `survey_units.mjs` rc 0 (10.5 s): `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
+- 新規 `trap_triage/probe_1620_fill.mjs` (読取りと stack 埋めのみ・IR 不変): 各 unit の前に現在 SP より下の 64 KiB を埋め値 `FILL` で埋め、`0x10a9f910` の 8B 遷移を見る。`FILL=-1` は埋めなし。
+- 実測 (全 942 unit、各 1 回):
+  - `FILL=-1` (埋めなし): `unit 477 exc 0x1_1029e5d8 -> 0x1_2`、`unit 484 exc 0x1_2 -> 0x1_3`、`unit 492 exc 0x1_3 -> 0x0`。§14 と一致。
+  - `FILL=0`: `unit 477 exc 0x0 -> 0x2`、`unit 484 exc 0x0 -> 0x3`。値の型が変わる (`0x1_xxxxxxxx` が出ない)。
+  - `FILL=0xAA` / `0xCC`: `unit 477 exc → 0xaaaaaaaa_2` / `0xcccccccc_2`、`unit 484 → …_3`。上位 dword が埋め値のまま残る。
+- 所見: 同じ unit 列でも、未使用 stack の埋め値によって `0x10a9f910` に書かれる値と unit 単位の戻り値 (`ok`・`exc`) が変わる。埋め値が結果に効く = lift 側が**書いていない stack スロットを読んでいる**。`0x10a9f910` の `0x1_2` / `0x1_3` は、この未初期化読みを経由した値と読める。
+- 含意 (仮説): §15〜§18 の「計装 IR で unit 106 が止まる」「unit 1 の書込みが変わる」も、`m11_sw` 呼出しで stack フレームの残留バイトが変わったことに由来する可能性が高い。ただし `FILL` 実験は「埋め値に依存する」ことを示すのみで、計装との同一機構は未実証。
+- 結論: 受入 1 (書込み元 store の IR site 特定) は**未達**。未初期化読みの具体的なスロット (fn・IR 行) は未特定。受入 2・3・4 も未達。
+- 次の手順: (a) `FILL` 実験で `exc`/`ok` が変わる unit を先頭から列挙し、最初に値が変わる unit の fn と stack 読み (`[rbp-X]` 相当の load) を IR で特定する。(b) その load に対応する未初期化 store の有無を確かめ、D17 (縮退) か未初期化 stack 読み (別類型) かを判定する。
+
+### 差分 0 の証跡
+- `git diff --stat 7d15ceab HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_rt.c tools/m11/m11_win.c tools/m11/trap_triage/survey_units.mjs tools/m11/ldfix`: 本 PR の追加は `tools/m11/trap_triage/probe_1620_fill.mjs` と本節のみ (build・survey 本体は不変)。
