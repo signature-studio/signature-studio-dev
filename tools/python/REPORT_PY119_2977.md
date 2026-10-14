@@ -62,31 +62,33 @@
 
 - `host/fl_mock.mjs`: 6 関数。範囲外は `RANGE("Range error")` (code 4)。undo 3 件は値を `st.undoHistoryPos/Count/Last` に記録。既定値 `numerator 4`・`denominator 4`・undo 0 は仮置き。
 - `provider/fl_engine.c`: 同じ 6 関数。`RANGE_MSG(m)` マクロを追加 (文言を変えるため)。`fl_table.c` は再生成していない (weak 宣言が既にある)。
-- `tests/provider_check.mjs`: 実装 86 → 92、未実装 349 → 343 (総数 435 は不変)。`pe119` 集合 6 件を追加。基準の 86 は main の `pe100` (`channels.getStepParam`・`getCurrentStepParam`) と `pe115` (`mixer.getTrackColor`, PY-115) を含む (main 取り込み後の値。PR 単独の差分は 83 → 89)。
+- `tests/provider_check.mjs`: この PR の追加は `pe119set` 集合 6 件 (general setter) のみ。main 取り込み後の件数は 実装 97 → 103、未実装 338 → 332 (総数 435 は不変)。基準の 97 は main の `pe121` (screen 5 件・#2985) と ui の `pe119` (6 件・#2980) を含む。
 - `tests/general_diff.mjs`: 呼出し 21 件 (setRecPPQ 4・setNumerator 4・setDenominator 4・undo 4 と既存 5) + 引数個数違い 4 件 = 計 25。
 
 ## 検証
 
-測定 commit: `07dfe30d` (コードを変えた最後の commit。main `940c0d6a` を merge した commit)。merge の競合は 2 件。`tests/provider_check.mjs` は main 側の `pe100`・`pe115` と本 PR の `pe119` の 3 集合を残し、件数を 92 / 343 に直した。`docs/DOC_MAP.md` は両側の行 (PY-119 と PY-121) を残した。作業ツリーは `git status` 空で測定した。前提: `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 05 秒。この実行は main 取り込み前の `fd542167` で行い、`8afbdbef`→`940c0d6a` の間にビルド側の変更は無い)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒) と `provider/build.sh` を `07dfe30d` で再実行。`fl-win64` は `$ARTIFACTS_DIR` から DATA block 4 件だけを展開 (`midi.py`・`utils.py`・`MCPTools.pyc`・device script)。
+測定 commit: `981529d0` (コードを変えた最後の commit。main `3e8c8d25` を取り込んだ merge commit)。merge の競合は 4 件。`docs/DOC_MAP.md` は両側の行を残し、本 PR 側の行を REPORT_PY119_2977.md に向けた。`tools/python/REPORT_PY119.md` は main (#2980 ui 状態) と同名の add/add。main 側を REPORT_PY119.md に残し、本 PR の報告を REPORT_PY119_2977.md に移した (REPORT_PY121_2985.md と同じ命名)。`tools/python/host/fl_mock.mjs` は両側の state 初期値と関数を残した。`tests/provider_check.mjs` は 集合 `pe121`・`pe119` (main) と `pe119set` (本 PR) を残し、件数を 103 / 332 に直した。作業ツリーは追跡ファイルの差分 0 で測定した (`dist/`・`work/` は gitignore)。前提: `fetch_inputs.sh` (`FL_WIN64_DIR` に `fl-win64` の DATA block 4 件だけを展開し、rc 0)・`build_cpython_wasm.sh` (rc 0、238 秒。同じ内容の作業ツリーで実行)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 92 | 0.90 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.36 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 103 | 0.93 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 103 / 未実装 332 / MCP 静的 60) | 0.35 秒 |
 | `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 0.05 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.06 秒 |
-| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 0.07 秒 |
-| `node tests/mixer_diff.mjs` | calls 57、diffs 0、PASS | 0.07 秒 |
-| `node tests/device_diff.mjs` | calls 8、rejects 4、midi_out 5、diffs 0、PASS | 0.07 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.05 秒 |
+| `node tests/ui_state_diff.mjs` | calls 12、diffs 0、PASS | 0.05 秒 |
+| `node tests/screen_diff.mjs` | calls 32、diffs 0、PASS | 0.06 秒 |
+| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 0.06 秒 |
+| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS | 0.05 秒 |
+| `node tests/device_diff.mjs` | calls 8、rejects 4、midi_out 5、diffs 0、PASS | 0.06 秒 |
 | `node tests/ilmcp_diff.mjs` | calls 32、state_checks 9、diffs 0、PASS | 0.07 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.17 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.57 秒 |
 
-- 測定時の load average: 0.39 (1 分平均、`uptime` 21:21:34、4 core)。
-- ネガティブコントロール (`07dfe30d` で実施): `host/fl_mock.mjs` の `setNumerator` の上限を 16 → 15 に変えると `node tests/general_diff.mjs` は `general.setNumerator` の args `[16]` の差分で rc 1 (FAIL)。元に戻すと calls 25・diffs 0・PASS (rc 0)。
+- 測定時の load average: 0.59 (1 分平均、`uptime` 21:55:48、4 core)。
+- ネガティブコントロール (`981529d0` で実施): `host/fl_mock.mjs` の `setNumerator` の上限を 16 → 15 に変えると `node tests/general_diff.mjs` は `general.setNumerator` の args `[16]` (mock code 4・wasm ok) の差分で rc 1 (FAIL)。元に戻すと calls 25・diffs 0・PASS (rc 0)。
 - コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外): 本 REPORT を含む md のみの commit を後から足しても 0 行。
 
 ```
-$ git diff 07dfe30d HEAD -- tools/python ':!*.md'
+$ git diff 981529d0 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
