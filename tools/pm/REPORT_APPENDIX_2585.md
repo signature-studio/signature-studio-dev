@@ -86,6 +86,7 @@ rc=1
 - 結果: rc=0。`fsevents@2.3.3` は `node_modules/.pnpm` に入った。`node_modules/.modules.yaml` の `pendingBuilds` は `[]`。
 - `fsevents@2.3.3` の tarball (`npm pack`) の `scripts` は `clean`・`build`・`test`・`prepublishOnly` だけで、`install`・`preinstall`・`postinstall` は無い。`fsevents.node` は同梱されている。
 - 旧 `package-lock.json` は fsevents に `hasInstallScript: true` を記録していたが、tarball と食い違う。記録の根拠は未確認。`allowBuilds` への追加は不要と判断した。
+- Copilot の inline 指摘 (`pnpm-workspace.yaml`・926cc99b。macOS で `ERR_PNPM_IGNORED_BUILDS` になる) は**不当**と判断し、対応しない。根拠は上の 2 点。ただし `npm view fsevents@2.3.3 scripts` (packument) は `install: node-gyp rebuild` を返す。npm 経路は repo に無い (`package-lock.json` は廃止) ので影響は無いと判断した。実機の macOS では未確認。
 
 ### 4-5. npm registry の公開時刻 (`npm view <pkg>@<ver> time`)
 
@@ -115,16 +116,22 @@ exclude を入れていた時点の測定。PM 判断 (2026-10-14) で採らな�
 
 - 競合は 2 回とも `infra/pm-worker/README.md` の 1 箇所。1 回目はテストのコマンド (PR 側の `pnpm` 表記を採り、main 側の注記 `/oc 投稿の観測 (#2342) のネガコン` を足した)。2 回目は『Workers Builds』節の注記 (PR 側の構成を採り、main 側の `BUILD_COMMIT` の注記 1 文を統合した)。
 - 既定設定の install (`CI=true`・`node_modules` を削除してから実行。16:45Z): rc=1。`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` (3 版・§4-1 と同じ)。
-- 診断 (repo の設定・lockfile は変えず、CLI の一時上書きだけ): `pnpm install --frozen-lockfile --config.minimum-release-age=0` rc=0 (`pnpm-lock.yaml` と `git status` の差分 0)。以下はこの install の後の値。この上書きは Workers Builds の install には効かない。
+- 診断 (repo の設定・lockfile は変えず、CLI の一時上書きだけ): `pnpm install --frozen-lockfile --config.minimum-release-age=0` rc=0 (`pnpm-lock.yaml` と `git status` の差分 0)。この上書きは Workers Builds の install には効かない。
+- 下の表の『診断 install の後』の行は、この install の後に `node_modules/.bin` の bin を直接呼んだ値。
 
 | コマンド (測定 commit `a17e3674`) | 結果 | rc |
 |---|---|---|
-| `pnpm test` (依存なし) | tests 279 / pass 279 / fail 0 (17.6 s) | 0 |
+| `pnpm test` (依存なし・既定設定) | tests 279 / pass 279 / fail 0 (17.6 s) | 0 |
 | `npm test` (同じ script) | tests 279 / pass 279 / fail 0 | 0 |
-| `pnpm run test:unit` | 19 / 19 (2 files, 1.15 s) | 0 |
-| `pnpm run test:workers` | 4 / 4 (1 file, 1.50 s) | 0 |
-| `pnpm exec wrangler deploy --dry-run --outdir <repo 外の一時 dir>` | Total Upload 127.31 KiB / gzip 38.97 KiB。bindings は `PM` (`PmDO`) と `[vars]` 10 個 (`REPO` `ORG` `TARGET` `BATCH` `BOT_LOGIN` `PM_LOGINS` `LIVE_LAUNCH` `LIVE_DISPATCH` `NO_PR_COOLDOWN_H` `COMMENT_MAX_PAGES`) | 0 |
+| `./node_modules/.bin/vitest run --config vitest.unit.config.ts` (診断 install の後) | 19 / 19 (2 files, 1.15 s) | 0 |
+| `./node_modules/.bin/vitest run --config vitest.config.ts` (診断 install の後) | 4 / 4 (1 file, 1.50 s) | 0 |
+| `./node_modules/.bin/wrangler deploy --dry-run --outdir <repo 外の一時 dir>` (診断 install の後) | Total Upload 127.31 KiB / gzip 38.97 KiB。bindings は `PM` (`PmDO`) と `[vars]` 10 個 (`REPO` `ORG` `TARGET` `BATCH` `BOT_LOGIN` `PM_LOGINS` `LIVE_LAUNCH` `LIVE_DISPATCH` `NO_PR_COOLDOWN_H` `COMMENT_MAX_PAGES`) | 0 |
 | `wrangler.toml` の `[observability]` | `enabled = true`・`head_sampling_rate = 1` | — |
+| 既定設定の `pnpm run test:unit` (install 失敗の後) | `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` と `[WARN] The install that runs before scripts failed` の後に `vitest: not found`。テストは走らない | 127 |
+| 既定設定の `pnpm run test:workers` (同上) | 同上 (`vitest: not found`)。テストは走らない | 127 |
+| 既定設定の `pnpm exec wrangler deploy --dry-run` (同上) | `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` の後に `Command "wrangler" not found`。dry-run は走らない | 1 |
+| 診断 install の後の `pnpm run test:unit`・`test:workers`・`pnpm exec wrangler deploy --dry-run` | 既定設定の行と同じ (rc 127・127・1)。install 検証は CLI の一時上書きを見ない | 127・127・1 |
 
-- `pnpm run` は既定設定の install 前検証を走らせ、`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` を表示して `[WARN] The install that runs before scripts failed` を出す。ただしスクリプトは実行された (`test:workers`・dry-run のログ)。`pnpm run` の rc は 0。
+- `pnpm run` と `pnpm exec` は、install 前検証 (`verifyDepsBeforeRun`) が既定設定で失敗すると、スクリプトの前に止まる (`pnpm run` は script 自体が `vitest` を見つけられず 127、`pnpm exec` は 1)。依存を使わない `pnpm test` だけが既定設定で rc 0 になる。install 失敗の後の `node_modules/.bin` は空 (0 件)。
+- 旧版の記述『`pnpm run` の rc は 0』(スクリプトは実行された) は、この検証で再現しなかったので取り消す。
 - 2026-10-15 05:55Z 以降に既定設定の install が通るかは、まだ確認していない (未確認)。

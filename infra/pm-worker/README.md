@@ -193,6 +193,8 @@ cd infra/pm-worker && pnpm run test:workers # vitest + workerd (実 Durable Obje
 
 `pnpm install --frozen-lockfile` が要る (`test:unit` と `test:workers` は devDependencies の vitest を使う)。lockfile は `pnpm-lock.yaml` (このディレクトリ。`package-lock.json` は 2026-10-14 に廃止。理由は『Workers Builds』節)。
 
+既定設定の install が通るまで (2026-10-15 05:55Z より前)、`pnpm run`・`pnpm exec` は install 検証で失敗する。依存を使わない `pnpm test` だけが既定設定でも通る (数値は [tools/pm/REPORT_APPENDIX_2585.md](../../tools/pm/REPORT_APPENDIX_2585.md) §6)。
+
 `npm run build` は bun、デプロイは wrangler を使う。wrangler は `login --device` がある版 (公式 docs の例は 4.119.0 の出力。VM は 4.151.0 で `--device` の存在を `wrangler login --help` で確認済み)。VM では root 不要で `$HOME/.local/bin` に置く
 (`npm install --prefix $HOME/.local/wrangler wrangler@<版>`、bun は npm の `bun` パッケージ)。
 
