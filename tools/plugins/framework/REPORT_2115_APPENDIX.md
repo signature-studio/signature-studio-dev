@@ -1,6 +1,6 @@
 # #2115 REPORT 付録 — §10 (TLS index 未設定の確認と注釈の置換)
 
-> **正本**: `tools/plugins/framework/REPORT_2115.md`。本書は同 REPORT の §10 を 250 行上限のため分割移動したもの (本文は改訂済み・改訂前の節は Git 履歴にある)。§1〜§9 は本体に残す。
+> **測定値の正本**: 本書 (§10.3・`docs/DOC_MAP.md` の登録と一致)。結論と受入の判定は `REPORT_2115.md` が正本。本書は同 REPORT の §10 を 250 行上限のため分割移動したもの (本文は改訂済み・改訂前の節は Git 履歴にある)。
 
 ## 10. TLS index 未設定の確認と注釈の置換 (測定 commit 91308efd)
 
@@ -36,8 +36,9 @@
 
 ### 10.4 再測定の扱い (この fix run)
 
-- 対照の `--fresh` 再測定と load average の補完は**未実施**。この run では emsdk・RetDec (`[EMSDK]`・`[RETDEC]`) の実体と `tools/plugins/work/fw/` が無く、`fw_stage2.sh` / `hs_e2e.sh` を実行できない (`ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。
-- 次 run の素材要請: `oc_artifacts: fl-win64 work-fw-stage1 toolchain-emsdk toolchain-retdec` (`docs/WORKFLOW.md` §11 の許可名)。対照と置換版をそれぞれ n≥3 で測り min–max を書く (WORKFLOW §5)。`hs_hostfix.json` の 0x4181e0 注入記録も添える。
+- 対照の `--fresh` 再測定と load average の補完は**未実施**。fix round 2 の run でも emsdk・RetDec (`[EMSDK]`・`[RETDEC]`) の実体と `tools/plugins/work/fw/` が無く、`fw_stage2.sh` / `hs_e2e.sh` を実行できない (`ARTIFACTS_DIR` は `fl-win64.tar.zst` のみ)。round 1 の run では PR 本文に `oc_artifacts:` 行が無く、素材が取得対象外だった。
+- 素材要請: PR 本文の行頭に `oc_artifacts: fl-win64 work-fw-stage1 toolchain-emsdk toolchain-retdec` を追加した (`docs/WORKFLOW.md` §11 の許可名)。素材が展開された run で、対照と置換版をそれぞれ n≥3 で測り min–max を書く (WORKFLOW §5)。`hs_hostfix.json` の 0x4181e0 注入記録も添える。
+- 対照の増分判定 (切り分けの材料・未検証): 対照 (plain) の開始時刻は未記録。対照が `fw_stage2.sh` (canon3 を 12:49–12:56 に新規生成) の後に走ったなら、canon3 が hs_flat より新しいので `hostshim/hs_e2e.sh` の 37–49 行目の `-nt` 連鎖で hs_flat → hs_flat2 → hs_flat3 が作り直されているはず。`hs_flat3.ll` の時刻と内容は確認していない。`--fresh` で再測定すれば、この説明は不要になる。
 - 再測定まで、本節の数値は n=1 の観測としてのみ扱う。
 
 ### 10.5 結論
