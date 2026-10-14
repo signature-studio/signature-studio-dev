@@ -401,7 +401,7 @@
 | `tools/python/REPORT_PY99_APPENDIX.md` | ~127 | PY-99 (#2874) 付録: `call 0x10469f0` の本体式 `edx + rint(2^-30·ecx·(r8d−edx))` と、その 7 件の戻り値式 (ecx は入口 edx)。後ろ向き CFG 経路列挙の節 (`[rbp+X]` 読み 171 件の到達 store)。`REPORT_PY41_APPENDIX.md` の 250 行上限のため別置き |
 | `tools/python/REPORT_PY159.md` | 134 | PY-159 (#3086): PY-88 の 65 件の `[rbp+0x5b8]` 書込みの全件表 (VA・式・未確定印)。手計算突合 (SLOT 非依存の 7 件) とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。残りの SLOT 依存 55 件と ACC 合流は #2874 (PY-99) |
 | `tools/python/REPORT_PY163.md` | 97 | PY-163 (#3135): PY-88 の VCALL 3 件の呼出し先・引数・戻り値式 (CFG 到達定義による式。呼出し先は実行時データで未確定)。結果は `REPORT_PY163.md` §1・§3〜§5。解析は `analysis/py163_vcall.py` |
-| `tools/python/REPORT_PY167.md` | 79 | PY-167 (#3181): `flrack.flr` は PE に無く (NUL 終端 `flr` 0 件)・pyc も読まない。Chord progression の `flr` は `rack.py` の `flr = Rack()` (module global)。mock 2 行の実態照合。解析は `analysis/flapi/pe_flrack_flr_probe.py`・`analysis/py167_flr_pyc.py` |
+| `tools/python/REPORT_PY167.md` | 83 | PY-167 (#3181): `flrack.flr` は PE に無く (NUL 終端 `flr` 0 件)・pyc も読まない。Chord progression の `flr` は `rack.py` の `flr = Rack()` (module global・推定)。mock 2 行の実態照合。解析は `analysis/flapi/pe_flrack_flr_probe.py`・`analysis/py167_flr_pyc.py` |
 | `tools/python/REPORT_PY56.md` | ~70 | PY-56 (#1934): playlist 38 関数のうち `selectTool` (書式 `i`)・`scrollTo` (書式 `iiii`) の引数確定。残り 36 関数は子 #1971 (PY-57) |
 | `tools/python/REPORT_PY57.md` | ~75 | PY-57 (#1971): playlist 残り 36 関数のうち 8 件の逆アセンブル骨格 (戻り値・範囲 code は未確定)。未読 26 件は #2026 (PY-61) |
 | `tools/python/REPORT_PY61.md` | ~130 | PY-61 (#2026): playlist 未読 26 関数の引数・戻り値の型・範囲 code を VA 付きで確定。`-4` ↔ `RANGE` は文言で対応 (数値は非対応)。操作コアと残り helper は子 #2809 (PY-91) |

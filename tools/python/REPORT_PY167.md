@@ -6,7 +6,7 @@
 
 - **`flrack.flr` は FLEngine PE に存在しない。** NUL 終端の `flr` は全 PE block で 0 件。`flrack` 系の名前は `flrack`・`flrack.Channel`・`flrack.Channels`・`flrack.Rack` の 4 件のみ (VA は §1)。
 - **同梱 pyc は `flrack.flr` を読まない。** 全 40 pyc・全 code object で `LOAD_ATTR flr`・`STORE_ATTR flr` は各 0 件 (§2 (6))。よって `chord_progression_call_probe.mjs` の mock `flrack.flr` と `flrack.rack.flr` (および `chord_progression_e2e.mjs` の同じ 2 行) は、どの pyc からも読まれない。
-- **Chord progression が使う `flr` は C 側の属性ではなく、pyc の module global** (`rack.py` 285 行 `flr = Rack()`)。型は pyc 内の Python クラス `rack.Rack` のインスタンスで、PE の VA は無い (根拠は pyc のみ)。`from rack import flr` で 5 モジュールが取り込む (§2)。
+- **`flr` は C 側の属性ではなく、pyc の module global と推定する**。`rack.py` 285 行 `flr = Rack()` (module global への代入) と、`from rack import flr` で 5 モジュールが取り込むことは確定した。ただし Chord progression の代表関数から `rack.flr` に至る経路は確認していない (推定)。`flr` の型は pyc 内の Python クラス `rack.Rack` のインスタンスで、PE の VA は無い (根拠は pyc のみ)。詳細は §2。
 - **根拠が取れない部分** (mock・根拠なし): `flr` の各メソッド・属性の戻り値。読取の名前と件数は §2 で確定したが、戻り値は `rack.py` の Python 本体の解析が要る。mock 表の置換と合わせて #3182 (PY-168) の scope に追記して追跡する (§4)。
 
 ## 手段
@@ -39,6 +39,7 @@
 | `flrack` の束縛 (§2 (7)) | `control_rack.py`・`util_rack.py` は `import rack as flrack` (`IMPORT_NAME rack` → `STORE_NAME flrack`)。`rack.py` は `import flrack` と `from flrack import rack as fl_rack`。`flrack` の実体 (C モジュールか) は pyc からは確定しない。推定: C モジュール |
 
 - 名前参照の元は `block24774_DATA.bin` の file offset 43908 付近 (`fl2py` の `inner` の `co_names` `('flr', 'update')`)。issue の 3 件はこの系統。
+- 推定: `flr` が Chord progression から使われる実体は module global (`from rack import flr` する 5 モジュールからの推定)。Chord progression の代表関数から `rack.flr` に至る経路は確認していない。
 - `rack.Rack` の型: pyc 定義の Python クラス (PE 外)。`Rack()` の戻り値はそのインスタンス。型の根拠は pyc の `STORE_GLOBAL` (285 行)。
 
 ## 3. mock 表との照合
@@ -56,7 +57,7 @@
 |---|---|---|
 | `flr` (`rack.Rack`) の各メソッド・属性の戻り値 (`rack.py` の `Rack` クラス本体)。戻り値は mock (根拠なし) のまま | 読取の名前と件数だけ確定 | #3182 (PY-168) の scope に追記 (コメント) |
 | mock 表の `flrack.flr`・`flrack.rack.flr` を `rack.flr` の定義へ置換 (2 probe) | 未読のため現行 probe の結果は変わらないが、表と実態が食い違う | #3182 (PY-168) の scope に追記 (コメント) |
-| `flr` の値の実 FL 照合 (旧 #81 PY-9 の残り。#81 は CLOSED) | 実機の値との一致は未確認。実機 FL (26.1.7) が要る | #3176 (PY-166・open の親) に追記 (コメント) |
+| `flr` の値の実 FL 照合 (旧 #81 PY-9 の残り。#81 は CLOSED) | 実機の値との一致は未確認。実機 FL (26.1.7) が要る | #3182 (PY-168) に追記 (コメント) |
 
 ## 5. 検証
 
