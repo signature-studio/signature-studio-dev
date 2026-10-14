@@ -235,4 +235,5 @@
 - 別フィールドへの書込み: 0x1003e32 の `mov dword ptr [rax+0x798], 0` は `p+0x798` (`*p` ではない)。`ffac20` の `item+0x798` との対応は未確認。
 - 結論: `*p` の書込み候補 4 箇所を列挙したが、selectAll の経路 (0xd5b150 → 0xd843d0 → 0xd5b100 → 0x11e8670) がこれらを通るかは未確認。実行時の値も未確定。`selectAll` の実装は見送る。
 - 次に読む対象: 0x103b950 の呼出元 (0x103bb1a・0x103bc1b) の関数先頭、0x103b781・0x103be3a・0x103c01c の所属関数と引数、それらが selectAll の経路から呼ばれるかの call 連鎖。
-- 受入条件 (#1527) の扱い: selectAll の未解決は本節の候補列挙までとし、残りは子 issue に移した (本 PR の本文を参照)。
+- 受入条件 (#1527) の扱い: selectAll の未解決は本節の候補列挙までとし、残りは子 issue #2668 (`[PY-85]`) に移した。
+- 検証 (測定 commit `12e711cc`・コミット済み HEAD): `fetch_inputs.sh` 0.98 秒 / `build_cpython_wasm.sh` 220 秒 / `FLPY_SKIP_TABLE=1 build_flpy.sh` 4.8 秒 / `provider/build.sh` 1.0 秒。`channels_diff` 69 呼出し diffs 0 PASS (0.15 秒)。`provider_check` 実装 71・未実装 364 PASS。`FL_ENGINE=wasm all_tools` 48/48 ok (1.34 秒)。`git diff 12e711cc HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行。
