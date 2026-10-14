@@ -150,6 +150,8 @@ def main():
         if 'stackpair' in fixes:
             t = re.sub(r'\blonglong lStack_e8;\n\s*longlong lStack_e0;', 'longlong lStk[2];', t)
             t = t.replace('&lStack_e8', 'lStk').replace('lStack_e8', 'lStk[0]').replace('lStack_e0', 'lStk[1]')
+        if re.search(r'^\s*rcpps\(', t, re.M):
+            raise SystemExit('FUN_%x: rcpps の戻り値が捨てられている (文頭の呼出し)。代入先を確認すること' % va)
         m = re.search(r'^([\w \*]+?)\s*\n?\s*FUN_%x\((.*?)\)\s*\n\s*\{' % va, t, re.S | re.M)
         if not m:
             m = re.search(r'^([\w \*]+?)\s+FUN_%x\((.*?)\)\s*\{?' % va, t, re.S | re.M)
