@@ -9,12 +9,12 @@
 #   tag     : タグ v3.3 の install-share.py の内容と所在、301f4e64 の rename、retdec-support の commit 件数 (gh api)
 # env:
 #   WORK         作業先 (既定 ${RUNNER_TEMP:-/tmp}/share2405)
-#   RETDEC_ROOT  [RETDEC] (v5.0) の root。比較元 (既定 /opt/retdec。docs/REFERENCES.md §4)
+#   RETDEC_ROOT  [RETDEC] (v5.0) の root。比較元 (必須。docs/REFERENCES.md §4)
 # 前提: curl・unzip・tar (xz)・gh (認証済み)。
 set -euo pipefail
 
 WORK="${WORK:-${RUNNER_TEMP:-/tmp}/share2405}"
-RETDEC_ROOT="${RETDEC_ROOT:-/opt/retdec}"
+RETDEC_ROOT="${RETDEC_ROOT:?RETDEC_ROOT ([RETDEC] v5.0 の root。docs/REFERENCES.md §4) を指定}"
 V5="$RETDEC_ROOT/share/retdec/support"
 ZIP_URL=https://github.com/avast/retdec/releases/download/v3.3/retdec-v3.3-ubuntu-64b.zip
 ZIP_SHA=83b8e45bd4d405dbe4f79035de9acc153f56c3dc3188dcc83d22274646dbfe3c
