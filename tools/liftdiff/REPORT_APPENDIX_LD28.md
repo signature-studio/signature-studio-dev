@@ -54,3 +54,11 @@
 - **差の規模**: verdict が変わった関数 1,807 件。記録と pattern 別 outcome が完全一致した関数は 50 件 / 7,421。現 head は pattern 集合が 9 → 11 (`vm0`・`u16` を追加) で、記録と生成条件が異なる。
 - **shards 1 と 14 の差** (関数 302 件 = 乱数 300 件 + 0x418be0 + 0x41c820・`random.Random(7)`): verdict 一致 276 / 302、pattern 別 outcome 一致 232 / 302。shard 数で結果が変わるため、shards 14 の値は shards 1 と同一とみなせない。0x418be0 と 0x41c820 は両 shard 数とも同じ verdict (match)。
 - **結論**: 受入条件 1 (commit・sha256・件数の記録) は満たす。条件 2 (差の説明) は規模を定量化したが原因は未特定。条件 4 (0x418be0 系 20 / 16 / 4 の一致) は **未達**。現 head の全件再生成では 0x418be0 系は再現せず、20 / 16 / 4 は受入の根拠に使えない。#1035 の受入条件 1 は [~] のまま。
+
+#### batch_closure.jsonl の出所の再確認 (LD-70 / #1960)
+- **確認した素材**: `work-liftdiff` の `tools/liftdiff/work/m11/batch_closure.jsonl` (sha256 `810b4d3a…bf6`・49,316,750 bytes・mtime 2026-10-10 08:54:42 UTC) と `batch_closure.log` (mtime 08:30:33 UTC・`[batch] 7421 functions, shards=14`・`done 602s`)。`build.json` の wasm は `sig_mismatch` 0・`undefined` 1。
+- **jsonl の集計 (実測)**: match 2,273 / mismatch 2,892 / unexec 2,256 (計 7,421)。REPORT の値と一致。pattern 集合は 9 種 (z, s, p0, p1, p01, pall, pall2, q0, qall) が 7,371 件、空が 50 件。`liftdiff_version` は全件 1。
+- **ログ末尾の集計との不一致**: `batch_closure.log` の `関数数 7421: 一致 2275 / 不一致 2885 / 実行不能 2261` は jsonl の集計と一致しない (match +2・mismatch −7・unexec +5)。ログと jsonl が同一 run の出力かは確認できていない。
+- **生成 commit**: 特定できず。`git log -S` で `batch_closure` / `[batch] done` / `wasm_trap` を探しても、記録に対応する commit は残っていない。`ldlib/cases.py` で `vm0`・`u16` が追加されたのは `79584ef7` (2026-10-13) で、jsonl の 9 pattern はそれより前の集合と整合する。ただし commit は一意に決まらない。
+- **再生成との対応**: `python3 tools/liftdiff/tests/trace_diverge_418be0.py <jsonl>` の出力は `results/m11_418be0_thunk.md` と diff 0 行で一致 (本 run で確認)。
+- **未解決**: (a) 生成 commit の特定と、その commit での 0x418be0 系 20 / 16 / 4 の再走、(b) 現 head と記録の差 (pattern 別 outcome) の説明、(c) shards 1 と 14 の差の原因 (0x418be0 / 0x41c820 の単体 run で非決定性か shard 間の状態共有かを切り分ける)。
