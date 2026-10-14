@@ -85,7 +85,7 @@
 
 所要 (`time`、n=1、並列数 1、wineprefix 新規作成を含む): S1 probe 全体 (インストール木の組立 + 起動 120 s) real 7 m 42 s (user 1 m 21 s / sys 4 m 20 s)。load average (1 / 5 / 15 分): 開始 0.36 / 0.25 / 0.11、終了 1.02 / 0.90 / 0.50。
 
-**run C (本 fix の検証 run、新規 runner)**: 同じ 1 コマンド (commit `8be0756f`) を、apt で `wine64` 9.0 と `xvfb` を入れた直後の新規 runner で実行。結果は run B と同じ: rc 124・MSGBOX 0 件・`FLEngine_x64.dll` native 1 件。WinVerifyTrust 6 回 (`80096010` 3 回・`00000000` 3 回)、Mfplat 1 件。パッチ 3 箇所も同じ (`740b → eb0b`、`750f → eb0f` ×2)。real 7 m 39 s (user 1 m 17 s / sys 4 m 21 s)、load average (1 分) 開始 0.31・終了 1.01、並列数 1。同じ run で S2 を 3 回: rc 0・48000 Hz・16-bit・data 385,000 B、15 s / 15 s / 17 s、3 回の SHA-256 一致 (`fe7a0614…e561a`)、load average (1 分) 開始 0.85・終了 1.88。
+**run C (本 fix の検証 run、新規 runner)**: 同じ 1 コマンド (commit `8be0756f`) を、apt で `wine64` 9.0 と `xvfb` を入れた直後の新規 runner で実行。結果は run B と同じ: rc 124・MSGBOX 0 件・`FLEngine_x64.dll` native 1 件。WinVerifyTrust 6 回 (`80096010` 3 回・`00000000` 3 回)、Mfplat 1 件。パッチ 3 箇所も同じ (`740b → eb0b`、`750f → eb0f` ×2)。real 7 m 39 s (user 1 m 17 s / sys 4 m 21 s)、load average (1 分) 開始 0.31・終了 1.01、並列数 1。同じ run で S2 を 3 回: rc 0・48000 Hz・16-bit・data 385,000 B、15 s / 15 s / 17 s、3 回の SHA-256 一致 (`fe7a061441eaa6b26261bb988ea6217c4a7afacae3f565a4c46a0c57b0fe561a`)、load average (1 分) 開始 0.85・終了 1.88。
 
 **S2 (部分)**: `bash tools/flp/s2_render_probe.sh Autogun.flp 3` (`Data/System/Render tests/Autogun.flp`、render 2.0 s の 1 本) を commit `8be0756f` で、S1 と同じ wineprefix 上で連続 3 回実行。各 run の前に block から FL64.exe / FLEngine_x64.dll を取り直し、G03 パッチを当てる。
 
@@ -96,7 +96,7 @@
 | 3 | 0 | 17 s | 同上 | 385,000 | 同上 |
 
 - 3 回の data SHA-256 は全て一致 (同一 run 内の T2 決定性)。3 run の合計 real 49.2 s (準備を含む)。load average 開始 0.86 / 0.87 / 0.49、終了 1.52 / 1.06 / 0.58。
-- **SHA は run ごとに変わる** (3 つの値が併存。下の run 表): run A `363fb7aa…`、run B `13d61a05…`、run C `fe7a0614…`。run C の `fe7a061441eaa6b26261bb988ea6217c4a7afacae3f565a4c46a0c57b0fe561a` は、履歴の `d3d0e4f9` の省略記録 `fe7a0614…e561a` と先頭 8 桁・末尾 5 桁が一致する。`d3d0e4f9` の完全な 64 桁の記録は無いため、同一だとは断定しない。変わる原因は未特定 (ホスト CPU・wineprefix の状態が候補)。決定性は「同一 run 内の 3 回一致」まで。
+- **SHA は run ごとに変わる** (3 つの値が併存。下の run 表): run A `363fb7aa68bea2d5614c97b84b68803432f77b87041802cdde97134e16dbcf2b`、run B `13d61a057ac2f6a6920b409e8b5693293ec7f3a43b5688eae139e64b0c3c6299`、run C `fe7a061441eaa6b26261bb988ea6217c4a7afacae3f565a4c46a0c57b0fe561a`。run C の `fe7a061441eaa6b26261bb988ea6217c4a7afacae3f565a4c46a0c57b0fe561a` は、履歴の `d3d0e4f9` の省略記録 `fe7a0614…e561a` と先頭 8 桁・末尾 5 桁が一致する。`d3d0e4f9` の完全な 64 桁の記録は無いため、同一だとは断定しない。変わる原因は未特定 (ホスト CPU・wineprefix の状態が候補)。決定性は「同一 run 内の 3 回一致」まで。
 - 実行ごとの環境 (「未記録」は測定時に記録が無かった欄。事後に特定できない):
 
 | run | 測定 commit | CPU | wine | wineprefix | S2 の data SHA-256 (3 回) |
@@ -122,7 +122,7 @@
 - 再現の注意: `wine64 reg add` の直後に FL64.exe を起動すると rc 231 で即終了する。`wineserver -k` で止めると正常に戻る (`s2_render_probe.sh` に反映済み)。
 
 **ネガティブコントロール** (run C、`docs/WORKFLOW.md` §5。入力だけを変え、判定が変わることを数値で示す。入力は `$RUNNER_TEMP` の一時ファイルで commit しない):
-- S2: run C の `Autogun_run_1.wav` の data チャンク先頭から 1000 byte 目の bit 0 を反転すると、data SHA-256 は `47a0586955c84799cf36ca9738e91b91bfa6ceaebc36b30ba2778a98cfb57466` になり、一致値 `fe7a0614…e561a` と一致しない。
+- S2: run C の `Autogun_run_1.wav` の data チャンク先頭から 1000 byte 目の bit 0 を反転すると、data SHA-256 は `47a0586955c84799cf36ca9738e91b91bfa6ceaebc36b30ba2778a98cfb57466` になり、一致値 `fe7a061441eaa6b26261bb988ea6217c4a7afacae3f565a4c46a0c57b0fe561a` と一致しない。
 - S1: FL64.exe の検査分岐 (VA `0x140006eaf`、file offset `0x62af`) の期待バイト `74 0b` を `75 0b` に変えた入力では、`s1_g03_patch.py` が `FL64.exe: VA 0x140006eaf expected 740b got 750b` で終了 (rc 1)。変えない入力は rc 0 (`740b -> eb0b`)。
 
 **差分 0 の証跡** (`docs/WORKFLOW.md` §6): `git diff 8be0756f HEAD -- tools/flp/s1_g03_patch.py tools/flp/s2_render_probe.sh tools/flp/s1_wine_probe.sh tools/startup tools/assets` の出力は空 (0 行)。`git diff --stat 8be0756f HEAD` で `tools/flp/REPORT.md` と `tools/flp/REPORT_APPENDIX.md` だけが変わっている (REPORT の文言修正のみ)。
