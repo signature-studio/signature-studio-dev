@@ -37,4 +37,6 @@ if [ -f m11_extra_ranges5.txt ]; then
   run bash m11_gen_ir2.sh
 fi
 run bash m11_sigfix_stats.sh
-echo "[bisect $SHA] $(grep '^\[stats\] zeropad' "$L" | tail -1)"
+END="$(grep '^\[stats\] zeropad' "$L" | tail -1 || true)"
+[ -n "$END" ] || { echo "[bisect $SHA] FAILED: 終端行 [stats] zeropad が無い" >&2; tail -20 "$L" >&2; exit 1; }
+echo "[bisect $SHA] $END"
