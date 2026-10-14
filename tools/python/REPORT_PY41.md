@@ -65,7 +65,7 @@
 ## 測定条件
 
 - 素材: `oc_artifacts: fl-win64` の `flstudio_win64_26.1.7.5653.exe/extracted/block00031_PE.bin` (22,227,016 B)。
-  `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C tools/python/work/py41 extracted/block00031_PE.bin` で `work/` に展開 (gitignore)。展開 2.5 秒 (実測)。
+  `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/py41 extracted/block00031_PE.bin` で `work/` に展開 (gitignore)。展開 2.5 秒 (実測)。
 - 逆アセンブル: `python3 tools/python/analysis/py41_disasm.py tools/python/work/py41/extracted/block00031_PE.bin 0x1046a30` (capstone 5.0.7・pefile)。
 - コード差分 0 の確認 (測定 commit = 本 commit、`provider/` は未変更): `git diff ecf6d6e5 HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 PR で変更なし)。
 
@@ -92,7 +92,7 @@
 
 ## #1765 (PY-45) 追記: `0x1046a30` の呼出し元 (実測・1 件)
 
-- 測定: `tools/python/work/py41/extracted/block00031_PE.bin` (`tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で展開・2.8 秒)。逆アセンブルは `analysis/py41_disasm.py` (capstone・pefile)。
+- 測定: `tools/python/work/py41/extracted/block00031_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で展開・2.8 秒)。逆アセンブルは `analysis/py41_disasm.py` (capstone・pefile)。
 - 呼出し元 `0x10473a5` (`call 0x1046a30`) を確認。直前の引数設定は `ecx = [rbp+0x5b0]`・`edx = 0`・`r8d = 2`。戻り値は `[rbp+0x580]` に格納 (0x10473aa)。呼出し元 `0x10473a5` は `.pdata` (RUNTIME_FUNCTION) で `0x1046a30`〜`0x104cccb` の関数に含まれ、呼出し先 `0x1046a30` と同一関数内 (自己呼出し)。`0x1046edf` は関数の先頭ではなく、`0x1046a30` 関数内の分岐先。
 - 呼出しに至る経路: `0x104734a`〜`0x1047394` の走査ループ (`0x12df530` の戻り値判定) を抜けた後。ループ内で `0x1047382` の一致が見つかった場合は `je 0x1047424` で `0x1046a30` を呼ばずに抜ける。
 - **未確認 (#1828 (PY-49) に移管)**: 呼出し元の全件。全 `.text` を走査する補助スクリプトの初回実行は 0 件を返したが、スクリプト側の誤りであり、呼出し元 0 件とは判定しない。
@@ -111,7 +111,7 @@
 
 ## PY-53 (#1911): ecx 分岐表 (0x104742a〜0x104745f) の確定 (実測・逆アセンブル)
 
-- 測定: `analysis/py53_dispatch.py work/py41/extracted/block00031_PE.bin work/py53` (0.1 秒・capstone 5.0.7・pefile)。関数 0x1046a30〜0x104ccca を 4,664 命令に逆アセンブル (PY-52 と同数)。素材 `fl-win64` は `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で展開 (2.8 秒)。
+- 測定: `analysis/py53_dispatch.py work/py41/extracted/block00031_PE.bin work/py53` (0.1 秒・capstone 5.0.7・pefile)。関数 0x1046a30〜0x104ccca を 4,664 命令に逆アセンブル (PY-52 と同数)。素材 `fl-win64` は `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で展開 (2.8 秒)。
 - 既知類型との関係: 該当なし (逆アセンブルの分岐読解のみ・lift/IR 変換は行っていない)。
 
 ### ecx の分岐表 (本 run で確定)
@@ -215,7 +215,7 @@
 
 ## 測定
 
-- 素材を `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で `work/py64/` に展開 (2.3 秒)。
+- 素材を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` で `work/py64/` に展開 (2.3 秒)。
 - `analysis/py53_dispatch.py` → 4,664 命令。`analysis/py60_objdump_check.py` → 614 辺 一致 614・不一致 0 (exit 0)。
 - `analysis/py64_branch_regions.py work/py53/fn.txt` → 固有部分の命令数と書込み 76 件 (0x1047497 55・0x104aa87 15・他 3 件は各 2)。
 
