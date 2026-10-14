@@ -16,7 +16,7 @@
 
 - 測定 commit: `f15f25b4` (分類スクリプト `tools/icall/sites_block_classify.py` の最終版。段番号・ブロック数・1 対 1 検証・ネガティブコントロールを script が出す)。
 - 入力: `measure_flengine_split.sh` の出力 (測定経路は HEAD `1d363e63`)。素材 `fl-win64` (`block00031_PE.bin`、22,227,016 B、`$RUNNER_TEMP/fl-win64/extracted`)。
-- RetDec: 上流 release v5.0 (`RetDec-v5.0-Linux-Release.tar.xz`、sha256 `e5a7dd82…8ab1a5`) を `$RUNNER_TEMP/retdec` に展開し、`/opt/retdec` に symlink (`[RETDEC]`)。素材 bundle `toolchain-retdec` は本 run に無かったため、上流配布物で測定した。bundle 版での独立再実行は PR 本文の `oc_artifacts` 行で行う。
+- RetDec: 上流 release v5.0 (`RetDec-v5.0-Linux-Release.tar.xz`、sha256 `e5a7dd82…8ab1a5`) を `$RUNNER_TEMP/retdec` に展開し、`[RETDEC]` の位置 (`docs/REFERENCES.md` §4) に symlink した。素材 bundle `toolchain-retdec` は本 run に無かったため、上流配布物で測定した。bundle 版での独立再実行は PR 本文の `oc_artifacts` 行で行う。
 - 所要 (各 1 回。min–max レンジは未取得):
   - `measure_flengine_split.sh`: real 132.9 s (user 133.1 s、sys 55.9 s、終了時の 1 分 load 1.53、4 core)。base 366 / c2 366 (基準どおり)。site 374 (0xc589b0 側 183 / 0x128f9e0 側 191)。段 dump 709 段。
   - `sites_block_classify.py` (`RETDEC_BIN` 指定、段 dump を RetDec で取り直す): real 68.2 s (user 21.0 s、sys 47.2 s、終了時の 1 分 load 0.67)。
@@ -73,3 +73,28 @@
   3. 段 dump を再利用する場合は、2 の後ろに段 dump のパス `<outdir2>/print_after_all.txt` を付ける (RetDec を呼ばない)。
 - 測定経路の差分: `git diff --stat 26f90ada f15f25b4 -- tools/icall/measure_flengine_split.sh tools/icall/roundtrip.sh tools/icall/audit_icall.py tools/icall/icall_rewrite.py tools/icall/ir_icall_restore.py tools/icall/passes_stub_count.py tools/icall/sccp_stub_drop.py` は 0 行。
 - 範囲外: native での動的検証 (受入条件 3) は未実施。段 dump は RetDec v5.0 の出力に依存する。
+
+## 8. 前版の履歴 (`REPORT_APPENDIX.md` §12.4.1・§12.4.2 から分割移動)
+
+### 8.1 (旧 §12.4.1) 本 run (HEAD `12586095`) の実測と、分類で判明した点
+
+測定経路のコード差分は `711b58ca` → `12586095` で 0 行。§12.1 / §12.3 の数値は本 run で再確認した。
+
+- `measure_flengine_split.sh`: 132.7 s (real, 4 core) は HEAD `12586095` で新規取得した実測。
+- 段 dump の `!N` 番号は最終 `.ll` の `!N` と一致しない (例: 最終 `.ll` の `!392` は `30189433`)。`map.json` の `sites[].new` と最終 `.ll` の META 値の共通は 0 件。site → 段 dump ブロックの突合は現成果物では組めず、段単位で `!N` を保存する修正が要る。
+- `__icall_dispatch(i64 <site VA>)` は restored IR に 8 件あり、§12.3 の kept 集合と一致する。dropped の VA は現れない。
+
+受入条件 2・3 は未達。次 run の入力: `oc_artifacts: fl-win64 toolchain-retdec`。
+
+### 8.2 (旧 §12.4.2) 段 dump の構造の確定 (HEAD `1017f349`、測定は `measure_flengine_split.sh` を再実行)
+
+測定値: `measure_flengine_split.sh` 119.9 s (real, 4 core, load 1.70)。base 366 / c2 366 (基準どおり)。`passes_stub.txt` 709 段。`passes_stub_count.py` の段 dump は 2,692,856 行 (119 MB)。
+
+段 dump (`retdec-decompiler --print-after-all` の stderr) について、次を実物で確認した。突合 (受入条件 2) の前提になる構造である。
+
+- **ヘッダ 1 個 = 段 1 本ではない**。同じ段名 (例 `Global Value Numbering`) のヘッダが段内で複数回出る。`function_1cc0000` の `define` は段 `GVN` の 3 本のヘッダのうち 1 本 (2476420 側の後ろ) にしか出ず、先頭の 2460095 側の本文は `__decompiler_undefined_function_*` の宣言だけの空関数だった。段の単位をヘッダで切ると関数と段の対応がずれる。
+- **`!N` の META 定義はヘッダの直前の段に属する**。例: `!8632` の定義は 1468692 行にあり、その直前のヘッダは `Assembly mapping instruction removal` (1430666)。META は次のヘッダ (`C++ class hierarchy optimization` 1470748) の直前にまとめて出る。したがって `!N → VA` は段本文ではなく、META が並ぶ位置で解決する。
+- 同じ `!8632` が段ごとに別の値を持つ (1468692 では `30212733`、1627480 では `30213838`)。`!N` を最終 `.ll` の番号と照合してはならない (前回の不一致の原因)。
+- `block_map.py` (作業用・PR 外) で段ヘッダ単位に切ると、`function_1cc0000` の基本ブロックが 1 個にしか見えず、stub 呼出しを含むブロックの VA 集合が取れなかった。上の構造 (同名ヘッダの複数化) を反映して切り直すのが次の作業。
+
+受入条件 2・3 は引き続き未達 (受入条件 2 は `REPORT_APPENDIX_1014.md` で達成)。同名ヘッダを束ねる規則は作っておらず、同付録は「関数の `define` がある段だけを使う」方式で回避している。修正 (受入条件 3) は未着手。

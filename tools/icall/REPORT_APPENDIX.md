@@ -191,28 +191,7 @@ awk -F'\t' -v a=401 -v b=404 'NR>1 && $1>=a && $1<=b {s+=$4; l+=$5; n+=$6; u+=$7
 | ブロック単位の before / after 分類 (受入条件 2) と 1 対 1 対応 | 結果・検証・ネガティブコントロールは `REPORT_APPENDIX_1014.md` §3〜§4 を正本とする | #1014 (受入条件 2 は同付録で達成) |
 | 修正して kept を 366 から減らす | 受入条件 3 | #1014 (継続) |
 
-#### 12.4.1 本 run (HEAD `12586095`) の実測と、分類で判明した点
-
-測定経路のコード差分は `711b58ca` → `12586095` で 0 行。§12.1 / §12.3 の数値は本 run で再確認した。
-
-- `measure_flengine_split.sh`: 132.7 s (real, 4 core) は HEAD `12586095` で新規取得した実測。
-- 段 dump の `!N` 番号は最終 `.ll` の `!N` と一致しない (例: 最終 `.ll` の `!392` は `30189433`)。`map.json` の `sites[].new` と最終 `.ll` の META 値の共通は 0 件。site → 段 dump ブロックの突合は現成果物では組めず、段単位で `!N` を保存する修正が要る。
-- `__icall_dispatch(i64 <site VA>)` は restored IR に 8 件あり、§12.3 の kept 集合と一致する。dropped の VA は現れない。
-
-受入条件 2・3 は未達。次 run の入力: `oc_artifacts: fl-win64 toolchain-retdec`。
-
-#### 12.4.2 段 dump の構造の確定 (HEAD `1017f349`、測定は `measure_flengine_split.sh` を再実行)
-
-測定値: `measure_flengine_split.sh` 119.9 s (real, 4 core, load 1.70)。base 366 / c2 366 (基準どおり)。`passes_stub.txt` 709 段。`passes_stub_count.py` の段 dump は 2,692,856 行 (119 MB)。
-
-段 dump (`retdec-decompiler --print-after-all` の stderr) について、次を実物で確認した。突合 (受入条件 2) の前提になる構造である。
-
-- **ヘッダ 1 個 = 段 1 本ではない**。同じ段名 (例 `Global Value Numbering`) のヘッダが段内で複数回出る。`function_1cc0000` の `define` は段 `GVN` の 3 本のヘッダのうち 1 本 (2476420 側の後ろ) にしか出ず、先頭の 2460095 側の本文は `__decompiler_undefined_function_*` の宣言だけの空関数だった。段の単位をヘッダで切ると関数と段の対応がずれる。
-- **`!N` の META 定義はヘッダの直前の段に属する**。例: `!8632` の定義は 1468692 行にあり、その直前のヘッダは `Assembly mapping instruction removal` (1430666)。META は次のヘッダ (`C++ class hierarchy optimization` 1470748) の直前にまとめて出る。したがって `!N → VA` は段本文ではなく、META が並ぶ位置で解決する。
-- 同じ `!8632` が段ごとに別の値を持つ (1468692 では `30212733`、1627480 では `30213838`)。`!N` を最終 `.ll` の番号と照合してはならない (前回の不一致の原因)。
-- `block_map.py` (作業用・PR 外) で段ヘッダ単位に切ると、`function_1cc0000` の基本ブロックが 1 個にしか見えず、stub 呼出しを含むブロックの VA 集合が取れなかった。上の構造 (同名ヘッダの複数化) を反映して切り直すのが次の作業。
-
-受入条件 2・3 は引き続き未達 (受入条件 2 は `REPORT_APPENDIX_1014.md` で達成)。同名ヘッダを束ねる規則は作っておらず、同付録は「関数の `define` がある段だけを使う」方式で回避している。修正 (受入条件 3) は未着手。
+同名ヘッダを束ねる規則は作らず、`REPORT_APPENDIX_1014.md` は「関数の `define` がある段だけを使う」方式で回避している。前版の §12.4.1・§12.4.2 (実測と段 dump の構造) は同付録 §8 へ分割移動した。
 
 ## 14. ICALL-16: stack 引数の動的検証の実測 (#1023, REPORT.md §12 から分割移動)
 
