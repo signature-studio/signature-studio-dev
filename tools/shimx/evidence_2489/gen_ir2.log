@@ -1,0 +1,26 @@
+[merge] defines: 7422 / globals: 11962 / declares: 2242 / work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll work/boot4.lift.ll -> work/boot_all.ll
+[numfix] numeric globals: 21
+[asmfix] combos: 201 / suffix assigned: 22 / dup names: 0 []
+[asmfix] remaining dup-decl: 0
+[ir11][M2l] num-global defs kept: 21 (dropped: 0)
+[ir11][M1] global_var uses→inttoptr 20616, drop defs 11941 (incl. numeric-globals)
+[ir11][M2] inttoptr constant VA remap: 0
+[ir11][M2q] function_980ed0 VA->LVA remap: 1 sites
+[ir11][M2d] inttoptr i32→i64 fix: 1 sites
+[ir11][M2e] binary-op operand cast: 1 sites
+[ir11][M2c] typed-operand sext/zext/trunc: 172 sites
+[ir11][M2g] specific ptrtoint→ptr fix: 2 sites
+[ir11][M2h] const-select  lift: 1 sites
+[ir11][M2i] constexpr function-name inttoptr lift: 2 sites
+[ir11][M2j] add-imm normalize: 47 sites
+[ir11][M2k] decl dedup: 1674 lines dropped
+[ir11][M2n] call signature sites rewritten: 3939 (skipped: 6676)
+[ir11][M2b] store/add/sub VA remap: 0
+[ir11][M5] init prologue counter-insert: 1791 fn
+[ir11][M11] ir passes done: out=work/boot_final.ll (491108 lines)
+[genstubs] fn stubs: 8 -> work/m11_fnstubs.c
+[genstubs] win stubs: 322 -> work/m11_winstubs.c
+[dotfix+fnclex0] done
+[ldfix] F1(load_dropped)=902 F1v(variant)=4 F2(spill_slot)=30 F3a(old-value)=3 F3b(count-load)=5 F3c(store-arg)=36 F4(frame-read)=10 (errors=0)
+[fix_ld108] function_41a670: 41a69c ブロックの head/rax store を [arg1+0] の load に置換
+[gen_ir2] OK: work/boot_final.ll (490735 行)

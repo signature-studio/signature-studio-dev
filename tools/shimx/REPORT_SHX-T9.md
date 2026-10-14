@@ -165,6 +165,30 @@
 - 推定 (未確認): `--fix` 有りの shimx 版が `0xf960` に進む機構。`function_467f00` (IR `boot_final3.ll` L174409 付近) は flag==0 のとき `function_40f9e0(arg, (arg2&~0xff)|1)` を呼ぶ。`function_40f9e0` が `function_410320` (`_ClassCreate`) を経由し `ICALL_AT(Q(self-0x30))` = `0xf960` に至る経路は、`tools/liftdiff/REPORT.md` §9 と `REPORT_APPENDIX.md` §9 では `function_410320` の lift 後 IR に VMT 間接 call が無い (`ret %arg1` のみ) と記録されており、矛盾する。この `--fix` IR 上の該当 call は本 PR の素材 (`work-m11` 未展開) では確認できていない。`0xf960` 進入そのものは trace で実測 (上表) だが、その IR 経路は未確認のため、「IR の構造どおり」とは書かない。
 - 未確定: baseline が `0x67f00` の直後に `FormatMessageW` へ進む理由。`m11_boot.cjs` は `--fix` 無しの別 IR 由来で、`0x67f00` の入口 `arg2` (icall 時の引数) と `m11_icall` の dispatch 先の比較は未実測。残りの差はここにある (起票先: #1985 に残す)。
 - 注記: `probe_flag_shimx_fix.txt` は先頭 80 行のみ保存 (`[m11][UStrAsg]` の繰り返しを省略)。全行は再現コマンドで得られる。
+- 訂正 (#2489): 上表の baseline 行 (`halt0`) は旧 snapshot の `m11_boot.cjs` の値。現行 IR から再生成した baseline は `ret=2` で、shimx 版と同じ経路になる (§3.3.4)。
+
+#### 3.3.4 現行 m11_ov.c で baseline を再生成して unit 23 を比較 (SHX-T9h #2489)
+
+- 結論: 素材 `work-m11` の `m11_boot.cjs`・`obj/ov.o` は現行 main と一致しない旧 snapshot だった (`ov.o` に `function_410320`・`function_40f960`・`function_40fb40`・`function_467c40` が無く、qstore 未適用)。現行 IR から再生成した baseline は unit 23 で shimx 版と同じ経路 (`ret=2`・`0xf960` 進入) を通る。§3.3.3 の baseline 行 (`halt0`) は旧 snapshot の値。どの変更 (ov の差・qstore/ldfix/ld108) が効いたかは未分離。
+- 測定 commit: `9f403c97` (origin/main)。測定時の m11・shimx のコードは同一。本 PR の差分は probe 1 本の追加のみ (`git diff --stat 9f403c97 HEAD -- tools/m11/m11_ov.c tools/m11/shimx_link tools/shimx/src` → `probe_miss_units_2489.mjs` の追加 28 行)。
+- 再現手順 (素材 `oc_artifacts: fl-win64 work-m11 work-liftdiff toolchain-retdec toolchain-emsdk`。`FL_WIN64_DIR` は fl-win64 の展開先。ログは `tools/shimx/evidence_2489/`):
+  1. `bash tools/m11/m11_gen_ir2.sh` → rc 0・40 秒 (`ldfix=applied`・`ld108=applied`・`ir_sha256` `7c653b0f…`)
+  2. `rm work/obj/ov.o; bash tools/m11/m11_build.sh` → rc 0・19 秒 (qstore 適用・`m11_boot.cjs` 5,766,813 B)
+  3. `rm -rf work/shimx_link/obj work/shimx_link/gen_fix; bash tools/m11/shimx_link/build.sh --trace --soft --fix` → `[sxlink] OK` (12 秒)
+  4. `node tools/m11/shimx_link/probe_flag_1985.mjs <cjs 絶対パス> 22` (exc・trace)、`probe_unit23.mjs` (miss・slot・sxt 計数)、`probe_miss_units_2489.mjs` (unit ごとの miss 累計)
+- 受入 1 (`llvm-nm work/obj/ov.o`): 4 つの T シンボルが全て出る。artifact 版は 4 つとも無く T 22 本、再生成版は T 52 本。
+- unit 23 (index 22、unit 1〜22 の後に 1 回):
+
+| 版 | unit 23 の結果 | 経路 (非 UStrAsg) | icall-miss (unit 1〜22 / unit 23) |
+|---|---|---|---|
+| artifact baseline (旧 snapshot) | halt0 | `0x67f00` → FormatMessageW (stub) → Halt0 | 0 / 0 |
+| 再生成 baseline (`m11_boot.cjs`) | ret=2 | `0x67f00` → `0xf960` → miss `0x457860` | 0 / 2 |
+| shimx `--trace --soft --fix` (clean rebuild) | ret=2 | 同左 | 1 (unit 18, `0x4476d0`) / 2 |
+
+- 再生成 baseline と shimx 版: unit 23 の probe 出力はアドレスを除くと一致 (diff 0 行。UStrAsg 388 件の dest 列も一致)。unit 23 直前の slot `0x11f10e0` は両版とも `0x457860` (fallback)。shimx 版の sxt 計数では unit 23 中の wrapped API 呼出しは 0 件。
+- 未解決 (差): shimx 版のみ unit 18 で icall-miss `0x4476d0` (1 件、closure 外として skip)。再生成 baseline は unit 1〜22 で miss 0 件。機構は未特定。
+- 受入 2 の残り (子 issue へ分離): issue が指定した `tools/m11/shimx_link/probe_lasterr_1985.mjs` は repo にも git 履歴 (`git log --all -S probe_lasterr`) にも無い。代わりに `probe_flag_1985.mjs` (同じ引数形式) を使った。GetLastError は未取得: baseline は `tools/shim/src/file.c` の static `g_last_error`、shimx は `tools/shimx/src/teb.c` の TEB+0x68 に置かれ、どちらも JS から読めない。
+- 注意: `m11_image.bin` は素材のもの (再生成していない)。`work-m11` 旧 snapshot を基準にした既存の baseline 値 (§3.3.3 ほか) は同じ影響を受けている可能性がある (未確認)。
 
 ### 3.4 検証の commit と差分 (WORKFLOW §6)
 

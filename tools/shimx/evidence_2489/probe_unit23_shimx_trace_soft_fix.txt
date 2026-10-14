@@ -1,0 +1,45 @@
+PRE|unit 20 slot 0x0 gp GetModuleHandleW=6 GetProcAddress=6
+PRE|unit 21 slot 0x0 gp GetModuleHandleW=6 GetProcAddress=6
+PRE|unit 22 slot 0x457860 gp GetModuleHandleW=7 GetProcAddress=28
+SLOT_BEFORE_UNIT|0x457860
+unit 23 lva 0x67f00
+SLOT_AT_UNIT|0x457860
+ret=2
+MISS_UNIQ 2 MISS_TOTAL 3
+MISS_AT|0 4476d0
+MISS_AT|1 457860
+RET|unit 2 GetModuleHandleW a=0x9ae8 b=0x0 r=0x112ee000 name="kernel32.dll"
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x9b02 r=0x0 name="GetLogicalProcessorInformation"
+RET|unit 2 GetModuleHandleW a=0x18eb4 b=0x0 r=0x112ee000 name="kernel32.dll"
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x18ece r=0x7f00000a name="GetThreadPreferredUILanguages"
+RET|unit 2 GetModuleHandleW a=0x18eb4 b=0x0 r=0x112ee000 name="kernel32.dll"
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x18eec r=0x7f00000b name="SetThreadPreferredUILanguages"
+RET|unit 2 GetModuleHandleW a=0x18eb4 b=0x0 r=0x112ee000 name="kernel32.dll"
+RET|unit 2 GetProcAddress a=0x112ee000 b=0x18f0a r=0x7f00000c name="GetThreadUILanguage"
+RET|unit 18 GetModuleHandleW a=0x4b894 b=0x0 r=0x11441000 name="NTDLL.DLL"
+RET|unit 18 GetProcAddress a=0x11441000 b=0x13fdc r=0x0 
+RET|unit 18 GetModuleHandleW a=0x105e8 b=0x0 r=0x112ee000 name="kernel32.dll"
+RET|unit 18 GetProcAddress a=0x112ee000 b=0x10602 r=0x25a name="GetLogicalProcessorInformation"
+RET|unit 22 GetModuleHandleW a=0x57f0c b=0x0 r=0x11443000 name="oleaut32.dll"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f26 r=0x0 name="VariantChangeTypeEx"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f3a r=0x0 name="VarNeg"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f41 r=0x0 name="VarNot"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f48 r=0x0 name="VarAdd"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f4f r=0x0 name="VarSub"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f56 r=0x0 name="VarMul"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f5d r=0x0 name="VarDiv"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f64 r=0x0 name="VarIdiv"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f6c r=0x0 name="VarMod"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f73 r=0x0 name="VarAnd"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f7a r=0x0 name="VarOr"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f80 r=0x0 name="VarXor"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f87 r=0x0 name="VarCmp"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f8e r=0x0 name="VarI4FromStr"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57f9b r=0x0 name="VarR4FromStr"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57fa8 r=0x0 name="VarR8FromStr"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57fb5 r=0x0 name="VarDateFromStr"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57fc4 r=0x0 name="VarCyFromStr"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57fd1 r=0x0 name="VarBoolFromStr"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57fe0 r=0x0 name="VarBstrFromCy"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57fee r=0x0 name="VarBstrFromDate"
+RET|unit 22 GetProcAddress a=0x56670 b=0x57ffe r=0x0 name="VarBstrFromBool"
