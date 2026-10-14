@@ -37,11 +37,21 @@
 - **flow 測定**: `python3 dsp/scripts/mx_closure.py "work/extracted/VST3/Massive X.vst3" work/mx13/rtti.json work/mx13/flow flow` → 20 分で打ち切り (rc 124)。
 - **鮮度 (WORKFLOW §6)**: `git diff 96a8bbaf HEAD -- tools/targets/massivex/dsp` は本 REPORT の追加のみ。
 
-## 4. 未解決 (子 issue へ)
+## 3.1 fix モード (差し戻し対応・2026-10-14) の状況
+
+- **素材不足で未測定**: `plugins-massivex` が `$HOME/artifacts` に無く (取得されたのは `fl-win64` のみ)、`work/extracted/VST3/Massive X.vst3` が存在しない。よって以下は本 run で**実行していない**。
+  - flow 測定の round 6 以降 (受入 2)・間接 jmp の到達確定 (受入 1)。
+  - e2e の n≥3 レンジ (§5 の数値規約)・所要の並列数。
+  - round 推移の別アルゴリズム検算 (§5)。
+  - 文字列窓の除外 (受入 1)。コードは未変更。除外の定義 (テーブル窓の判定基準) を実測前に決めると、検証なしの変更になるため未着手。
+- **必要素材**: `oc_artifacts: fl-win64 plugins-massivex` を付けて再起動する必要がある (`docs/WORKFLOW.md` §11)。
+- **検証範囲 / 範囲外**: 本 REPORT の e2e・negctl は linear 経路の検証。`mx_closure.py` の `flow` モードは既定の `linear` と経路が別で、flow モードの正しさは本 REPORT では示していない。
+
+## 4. 未解決 (追跡先)
 
 | 残件 | 受入 | 起票先 |
 |---|---|---|
-| flow モードの収束 (round 6 以降) と収束後の round 推移 | 2 | 未起票 (本 run の時間切れ・PR 本文の未解決表に記載) |
-| 間接 jmp (jump table) の先の到達の確定 (現状は未解決件数のみ) | 1 | 未起票 (同上) |
-| 文字列窓の除外 (code 扱いされた data の件数) | 1 | 未起票 (同上) |
-| leaf 境界を実 unwind / 境界に置換 | 3 (MX-14) | #1488 の子 (MX-14) |
+| flow モードの収束 (round 6 以降) と収束後の round 推移・収束しない場合の原因 (到達バイト増加・間接 jmp 未解決 390 件の扱い) | 2 | #1625 (素材 `plugins-massivex` 付きの再実行を要する。コメントで追跡) |
+| 間接 jmp (jump table) の先の到達の確定 (現状は未解決件数のみ) | 1 | #1625 (同上) |
+| 文字列窓の除外 (code 扱いされた data の件数・除外の判定基準は PM 確認待ち) | 1 | #1625 (同上) |
+| leaf 境界を実 unwind / 境界に置換 | 3 (MX-14) | #1626 (MX-14) |
