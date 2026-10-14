@@ -17,6 +17,7 @@ class Session:
         self.trace = trace
         self.prefix = self.t.get('fn_prefix', 'function_')
         if build:
+            build_wasm.ensure_native()
             build_wasm.build(self.t)
         W = self.t['work']
         self.sigs = json.load(open(W + '/sigs.json'))
