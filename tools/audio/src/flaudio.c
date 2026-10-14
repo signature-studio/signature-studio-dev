@@ -104,7 +104,7 @@ int fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frame
     if (burst < FLA_QUANTUM) burst = FLA_QUANTUM;
     /* 目標充填 T: worklet は burst (= baseLatency 相当, 通常 128..1024; 96kHz では 2048..4096) フレームを連続で引く。
      * T >= burst + buffer_frames でないと 1 回の burst で枯渇する (PROTOCOL.md §4) */
-    uint64_t need = ((uint64_t)burst + burst / 4 + buffer_frames + buffer_frames - 1) / buffer_frames;
+    uint64_t need = ((uint64_t)burst * FLA_BURST_PCT / 100 + buffer_frames + buffer_frames - 1) / buffer_frames;
     if (need > depth) depth = (uint32_t)need;
     /* depth の固定上限は置かない。制約は ring 容量のみ: 動的 T 拡張 (flasio, 上限 ring-2B) の余地を含め
      * (depth+2)*B <= FLA_MAX_RING が必要。超過はホストを落とさずエラー返却 (呼び側が CreateBuffers エラーに写像) */
