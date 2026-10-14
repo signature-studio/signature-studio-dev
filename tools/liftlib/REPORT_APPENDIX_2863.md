@@ -56,7 +56,7 @@
 
 - ユニット (`python3 tests/test_unit.py` 相当): T1〜T5・T7〜T26 は PASS (T17b は `LL_XRET_*` 未設定で skip。`work/cab2863/run_each.py` で個別実行)。**T6 は FAIL**: `tools/targets/freshair/work/...` (FA の `SlateCore.core_64`) が無いため `FileNotFoundError`。本 run の素材に無く、修復とは無関係。
 - `bash tools/liftlib/liftlib_e2e.sh --quick`: **rc=2** (前提検査で停止)。`前提が無い: .../targets/freshair/work/win/Fresh Air/.../SlateCore.core_64 (bash tools/targets/freshair/fetch.sh)`。FA と KH の展開物は本 run に無い。必要な `oc_artifacts` 名は `work-liftlib-targets` `plugins-freshair` `plugins-kilohearts` (本 issue の `oc_artifacts:` 行には含まれているが、直近の依頼コメントの行には含まれていなかった)。
-- 素材の確認: `$HOME/artifacts` には `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`plugins-ott`・`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib`・`work-icall`・`work-fw-stage1` のみ。展開先の `tools/targets/{freshair,kilohearts}/work` は存在しない。
+- 素材の確認: `$ARTIFACTS_DIR` (R2 から展開された素材の置き場) には `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`plugins-ott`・`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib`・`work-icall`・`work-fw-stage1` のみ。展開先の `tools/targets/{freshair,kilohearts}/work` は存在しない。
 
 ## 5. 未解決
 
