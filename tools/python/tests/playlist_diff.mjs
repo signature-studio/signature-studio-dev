@@ -46,6 +46,14 @@ const seq = [
   ["playlist.muteTrackLock", [1, 1]],
   ["playlist.muteTrackLock", [1, 0]],
   ["playlist.isTrackMuteLock", [1]],
+  // 設定は反転ではない (同じ値の 2 回目も同じ状態)・下位 1 byte (256 → 0、2 → 2)
+  ["playlist.muteTrackLock", [2, 1]],
+  ["playlist.muteTrackLock", [2, 1]],
+  ["playlist.isTrackMuteLock", [2]],
+  ["playlist.muteTrackLock", [3, 256]],
+  ["playlist.isTrackMuteLock", [3]],
+  ["playlist.muteTrackLock", [3, 2]],
+  ["playlist.isTrackMuteLock", [3]],
   // 範囲外 index は両者とも code 4 (RANGE)
   ["playlist.muteTrackLock", [0]],
   ["playlist.muteTrackLock", [501]],
