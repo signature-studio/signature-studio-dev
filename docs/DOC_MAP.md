@@ -199,6 +199,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/m11/REPORT.md` | ~229 | FLEngine_x64.dll 部分起動 PoC (stage 4/6・残 trap・次の一手)・§11 (#572, 要約のみ)・§12 survey の OOM/clobber 分離 (#513)・§13 (#516 qstore D17, 要約のみ)。§8 (LB_BASE #222)・§9 (sigfix #131)・§10 の commit 別測定表 (#132, §10a)・§10 の一部 (真因・修正 4 点・NC・次 blocker, §10b) は `REPORT_APPENDIX.md` に分割 |
+| `tools/m11/REPORT_SHX-T28.md` | ~105 | #2444 (SHX-T28, 親 #1630): 機械語から親フレーム共有 site を検出する `tools/m11/frame_share/detect.py` の結果 (閉包 7,421 関数で mov 渡し 307 site・D23 信号 301 site・親 63・callee 94)、`function_448490` の親 IR に `[rbp+0x4c]` の初期 store が無い静的観測、修復前 baseline (units_run 17・unit 18 の VirtualAlloc/MessageBoxA)。修復は子 [SHX-T40] |
 | `tools/m11/REPORT_N171.md` | ~120 | #3134 (M11-N171, 親 #1154): set_other 非 imm 349 件 (reg 123・mem 150・lea 76) の定義探索と 3 値分類 (件数は REPORT 参照)。接続方式の決定と未決の接続先 (#3140・#3141・#3142)。survey は素材欠落で未測定 (#1154)。分類器 `m11_setother_nonimm_class.py` |
 | `tools/m11/REPORT_N87.md` | ~80 | #1373 (M11-N87, 部分達成せず・実値化 0 件): sigfix 0 詰め inherit 1,172 件の呼出元 def 追跡 (基本ブロック到達定義・入口の呼出元再帰・call 越しの引数レジスタ要約)・復元不能 1,172 件 (未分類 0) の理由別内訳・survey ok 872 (退行なし) |
 | `tools/m11/REPORT_N2778.md` | ~74 | #2778 (M11-N157, 部分達成): run・survey の ptrcheck に基準付きゲート (`M11_PTRCHECK_MAX_NEW`・`M11_PTRCHECK_SURVEY_MAX_NEW`・既定は情報出力のみ) を追加。ネガコン (`m11_ptrcheck_negctl.sh`) の実測・survey 未実行の理由・基準を ratchet とした理由 |
