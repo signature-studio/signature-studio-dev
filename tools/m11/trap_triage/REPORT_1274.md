@@ -159,9 +159,17 @@ index 39480f0a..5a9c1929 100644
 - `[raw407]` の `[arg-8]` 値は全入口で `dead` (参照先が image 範囲外)。§5c の範囲外読みによる値は採らない。
 - watch 版 (`PROBE_WATCH=fa5310:18 probe_entry.sh onw all`): 全関数入口の probe。ok 839 / oob 47 と通常 build から大きく変わるため、書込元の判定には使えない (watch build は挙動を変える)。`[chg]` 22 件は未解析。
 - 未達 (受入条件 2〜4): ON で 1 ノードずれる書込元の特定、既存類型 (DEFECTS) への分類、ON の ok 退行 0。起票先: #1642 (次 run)。
-- 測定後の差分 (本 PR の HEAD は main 取り込み後の merge commit): `git diff 7e665077 HEAD -- tools/m11 ':(exclude)*.md'` は 4 files (48 insertions, 3 deletions)。本 PR の変更ではなく main 側の変更で、`m11_build.sh` は `M11_TRACE_ISOLATE` (既定 1 = 従来どおり) と `M11_KEEP_BOOT_O` (既定 0 = 従来どおり) の分岐を追加、`probe_entry.sh` は `M11_KEEP_BOOT_O=1` を渡す 1 行のみ。既定値の経路は変わらない。ldfix の results (jsonl・tsv) は data。
+- 測定後の差分 (main 取り込み後の merge commit を含む): `git diff 7e665077 HEAD -- tools/m11 ':(exclude)*.md'` は 4 files (48 insertions, 3 deletions)。本 PR の変更ではなく main 側の変更で、`m11_build.sh` は `M11_TRACE_ISOLATE` (既定 1 = 従来どおり) と `M11_KEEP_BOOT_O` (既定 0 = 従来どおり) の分岐を追加、`probe_entry.sh` は `M11_KEEP_BOOT_O=1` を渡す 1 行のみ。既定値の経路は変わらない。ldfix の results (jsonl・tsv) は data。上の §5e は、この差分を含む現 HEAD で再測定した値。
 
-ただし `probe_entry.sh` の `M11_KEEP_BOOT_O=1` は probe 測定の経路そのものを変える (probe 版 boot.o を残す。旧版は build の `cc` で boot.o を上書きする)。よって上の ON/OFF survey (ok 869 / 870 など) は測定時点の旧 `probe_entry.sh` の経路で取った値で、現 HEAD の経路の値ではない。現 HEAD での survey 再測定は未実施 (本 run に `toolchain-retdec`・`toolchain-emsdk`・`work-m11` が無く、`/opt/emsdk` も無いため)。再測定は次 run で行い、本節の値は更新する (#1642 次 run)。
+`probe_entry.sh` の `M11_KEEP_BOOT_O=1` は probe 測定の経路を変える (probe 版 boot.o を残す。旧版は build の `cc` で boot.o を上書きする)。そのため、下記の現 HEAD (`91655f69`) の再測定で ON/OFF の値を取り直した。
+
+- 現 HEAD (`91655f69`) の再測定: `M11_OV_CLASSCREATE=1 probe_entry.sh <tag> 407a50` と `=0` を各 1 回 (IR は `m11_gen_ir2.sh` で再生成、rc=0、F1=902、errors=0)。
+  - ON: `ok 869 / oob 14 / halt0 10 / miss 47 / other 1 / noproc 1` (2 回目・3 回目で再現)
+  - OFF: `ok 870 / oob 13 / halt0 10 / miss 47 / other 1 / noproc 1`
+  - 上の旧経路の値と一致した。値は変わらない。
+- 1 回目の ON は `ok 136 / oob 8 / miss 797 / halt0 1` で、2 回目以降は再現しなかった。`m11_gen_ir2.sh` の直後、初回 build の直後に得た値。原因は未特定 (単発の異常値として記録する。ON の survey 値はこの 1 回を除く 2 回で判断した)。
+- 通常 build の対照 (probe 無し、`SV_RAW=1`、同一 restore 後の build): `ok 869 / miss 47 / other 1 / halt0 7 / oob 15 / abort 2 / noproc 1`。§5 の基準と一致。
+- 未達 (受入条件 2〜4): ON で 1 ノードずれる書込元の特定、既存類型 (DEFECTS) への分類、ON の ok 退行 0。起票先: #1642 (次 run)。
 
 ```diff
 # tools/m11/m11_build.sh (抜粋)
@@ -173,8 +181,8 @@ index 39480f0a..5a9c1929 100644
 + M11_KEEP_BOOT_O=1 bash m11_build.sh > work/probe/build_$tag.log 2>&1 || ...
 ```
 
-## 6. 差分 (測定 commit から本 PR の HEAD まで)
+## 6. 差分 (§5e の測定 commit `7e665077` から本 PR の HEAD まで)
 
-測定 commit `1e3ee7af` から本 PR の HEAD までの `tools/m11` のコード差分は `probe_entry.py` の 1 行のみ (`(?:__lifted)?`。§5b の diff 参照)。`git diff 1e3ee7af HEAD -- tools/m11 ':(exclude)*.md'` は上記 1 hunk のみ。
+§5e の測定 commit `7e665077` から本 PR の HEAD (`91655f69`) までの `tools/m11` のコード差分は 4 files (48 insertions, 3 deletions)。main 取り込み由来で、内訳は §5e の diff (`m11_build.sh` の 2 分岐、`probe_entry.sh` の `M11_KEEP_BOOT_O=1` 1 行) と ldfix の results (jsonl・tsv、data)。`git diff 7e665077 HEAD -- tools/m11 ':(exclude)*.md'` の出力は上記 4 files のみ。§5e の値は、この差分を含む HEAD で再測定済み。
 - `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。
 - `find tools/m11/trap_triage -type f -size +20M`: 0 件 (20MiB 超の blob なし)。
