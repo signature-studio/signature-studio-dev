@@ -46,7 +46,8 @@
 #
 # PM Worker の率制限 alert (#CI-142): fresh=true の /status で、rate_limit_alert が true (Worker が 5 件・30%・2 回連続と判定。ratealert.ts)
 #   または rest_remaining が 1500 未満 (ratelimit.ts) なら、ラベル oc:rate-limit の open issue があれば 60 分に 1 回まで追記、無ければ
-#   題名 `[CI-n] PM Worker 率制限 alert (日付)` を起票する。同じラベルは notify-rate-limit.sh (run 側) も使うので、二重に起票しない。
+#   題名 `[CI-n] PM Worker 率制限 alert (日付)` を起票する。ただし 6 時間以内に閉じた oc:rate-limit の issue があれば起票しない (人が close した直後の再起票を防ぐ。reopen はしない)。
+#   同じラベルは notify-rate-limit.sh (run 側) も使うので、二重に起票しない。
 #   fresh=false の間の値は古いかもしれないので使わない (停止は pm-worker-down が扱う)。
 #
 # 暫定の oc-pm 起動 (#CI-50): Worker が live になるまで、PM agent の判断待ちの対象を repository_dispatch (oc-pm) で起動する。
@@ -323,6 +324,7 @@ worker_check() { # 結果の 1 行を worker_line に入れる。常に 0 を返
 RATE_LABEL=oc:rate-limit
 REST_REMAINING_MIN=1500
 RATE_NOTE_MIN="${OC_RATE_NOTE_MIN:-60}"
+RATE_CLOSE_SEC=21600 # 閉じた issue の後は新しい issue を立てない時間 (notify-rate-limit.sh の 6 時間と同じ)
 rate_line="rate=unknown"
 rate_body() { # rate_body <kind: new|note> <理由> <status json>
   local at
@@ -330,7 +332,7 @@ rate_body() { # rate_body <kind: new|note> <理由> <status json>
   if [ "$1" = new ]; then
     printf '%s\n' "@pycabbage PM Worker (\`signature-studio-pm\`) の GitHub REST の率制限が危険域にあることを、watchdog.sh が \`/status\` を読んで検知しました (${at})。" ""
     printf '%s\n' "- 判定: $2" "- 条件: \`rate_limit_alert\` が true (直近 30 分の \`cause=rate_limit\` の run が 5 件以上かつ完了 run の 30% 以上を 2 回連続)、または \`rest_remaining\` が ${REST_REMAINING_MIN} 未満" "- 影響: \`rest_remaining\` が ${REST_REMAINING_MIN} 未満の間、PM Worker は launch を止めます (理由 \`rate-guard\`)。" ""
-    printf '%s\n' "この issue は自動では close しません (率制限は時間で戻る。確認のあとに人が close する)。続報は 60 分に 1 回まで、この issue へのコメントで届きます。" ""
+    printf '%s\n' "この issue は自動では close しません (率制限は時間で戻る。確認のあとに人が close する)。close から 6 時間は新しい issue を立てません。続報は 60 分に 1 回まで、この issue へのコメントで届きます。" ""
   else
     printf '%s\n' "[watchdog] 率制限の危険域がまだ続いています (${at})。判定: $2 <!-- oc-rate-limit-note -->" ""
   fi
@@ -343,8 +345,8 @@ rate_file() { # rate_file <題名> <本文ファイル>: 通知のラベルを (
     -f description="rate-limit notices (notify-rate-limit.sh / watchdog.sh)" > /dev/null 2>&1 || true
   gh issue create --repo "$R" --title "$1" --body-file "$2" --label "$RATE_LABEL"
 }
-rate_down() { # rate_down <理由>: 同じラベルの open issue があれば追記のみ (RATE_NOTE_MIN 分に 1 回まで)。無ければ [CI-n] の題名で起票する
-  local open target created cm last title f="${RUNNER_TEMP:-/tmp}/oc-rate-limit-body.md"
+rate_down() { # rate_down <理由>: 同じラベルの open issue があれば追記のみ (RATE_NOTE_MIN 分に 1 回まで)。無ければ、閉じた issue が RATE_CLOSE_SEC 以内に無いことを確かめてから [CI-n] の題名で起票する
+  local open target created cm last title closed recent f="${RUNNER_TEMP:-/tmp}/oc-rate-limit-body.md"
   if ! open="$(gh issue list --repo "$R" --state open --label "$RATE_LABEL" --limit 200 --json number,createdAt)"; then
     echo "::warning::failed to list $RATE_LABEL issues; no issue is filed or updated"
     return 0
@@ -366,6 +368,16 @@ rate_down() { # rate_down <理由>: 同じラベルの open issue があれば�
     fi
     rate_body note "$1" "$worker_status_json" > "$f"
     do_it "add a note to the open $RATE_LABEL issue #$target" worker_note "$target" "$f"
+    return 0
+  fi
+  if ! closed="$(gh issue list --repo "$R" --state closed --label "$RATE_LABEL" --limit 200 --json number,closedAt)"; then
+    echo "::warning::failed to list closed $RATE_LABEL issues; no issue is filed"
+    return 0
+  fi
+  recent="$(jq -r --argjson sec "$RATE_CLOSE_SEC" \
+    '[.[] | select(.closedAt != null and (.closedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) > (now - $sec))] | sort_by(.closedAt) | last | .number // empty' <<< "$closed")"
+  if [ -n "$recent" ]; then
+    echo "rate: #$recent was closed within $((RATE_CLOSE_SEC / 3600)) hours: no new issue is filed"
     return 0
   fi
   ci_next_title_n || return 0

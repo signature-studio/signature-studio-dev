@@ -1083,8 +1083,12 @@ logged 'client_payload\[ref\]=66' && grep -q '#65 oc-pm: failed to read comments
 expect "a stuck PR whose comments cannot be read is skipped, the others continue" $?
 
 # 40〜. PM Worker の率制限 alert (#CI-142)。rate_limit_alert (true) か rest_remaining (1500 未満) で、ラベル oc:rate-limit の issue に載せる。
-#       fresh=false の値は古いかもしれないので使わない。open があれば追記のみ (60 分に 1 回まで)。
-rate_setup() { worker_setup; fx 'issue-list?state=open&label=oc:rate-limit' "[${1:-}]"; } # rate_setup <open の oc:rate-limit issue の JSON (無ければ空)>
+#       fresh=false の値は古いかもしれないので使わない。open があれば追記のみ (60 分に 1 回まで)。open が無くても 6 時間以内に閉じた issue があれば起票しない。
+rate_setup() { # rate_setup <open の oc:rate-limit issue の JSON (無ければ空)> [閉じた issue の JSON (無ければ空)]
+  worker_setup
+  fx 'issue-list?state=open&label=oc:rate-limit' "[${1:-}]"
+  fx 'issue-list?state=closed&label=oc:rate-limit' "[${2:-}]"
+}
 RATE_BODY="$TMP/oc-rate-limit-body.md"
 rnote() { printf '{"user":{"login":"%s","type":"%s"},"created_at":"%s","body":"[watchdog] x <!-- oc-rate-limit-note -->"}' "${2:-$REVIEWER}" "${3:-Bot}" "$(agoz "$1")"; } # rnote <分前> [login] [type]
 no_rate_calls() { ! grep -q 'oc:rate-limit' "$LOG"; } # 何もしない判定では、oc:rate-limit を含む gh 呼び出し (読みも書きも) が 0 件
@@ -1234,6 +1238,27 @@ expect "rate result is written to the step summary" $?
 grep -q '^REST_REMAINING_MIN=1500$' "$SCRIPTS/watchdog.sh" && grep -qx 'export const REST_REMAINING_MIN = 1500;' "$SCRIPTS/../../infra/pm-worker/src/ratelimit.ts" &&
   grep -qx 'export const RATE_MIN_COUNT = 5;' "$SCRIPTS/../../infra/pm-worker/src/ratealert.ts" && grep -qx 'export const RATE_MIN_PERCENT = 30;' "$SCRIPTS/../../infra/pm-worker/src/ratealert.ts" && grep -qx 'export const RATE_STREAK = 2;' "$SCRIPTS/../../infra/pm-worker/src/ratealert.ts"
 expect "thresholds match infra/pm-worker (REST 1500; alert 5 runs / 30% / 2 streak)" $?
+
+# 40r. ネガコン: 人が close した oc:rate-limit issue が 1 時間前にあれば、alert が続いても起票しない (再起票の抑止。reopen もしない)
+rate_setup '' "{\"number\":90,\"closedAt\":\"$(agoz 60)\"}"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd; rc=$?
+[ "$rc" = 0 ] && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && not_logged 'issue reopen' && not_logged 'issue comment' && grep -q 'was closed within 6 hours' "$TMP/out"
+expect "ネガコン: a rate issue closed 1 hour ago -> no new issue, no reopen (6-hour hold)" $?
+
+# 40s. 25 時間前に閉じた oc:rate-limit issue なら、もう新しい issue を起票する
+rate_setup '' "{\"number\":90,\"closedAt\":\"$(agoz 1500)\"}"
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+wd; rc=$?
+[ "$rc" = 0 ] && logged "issue create --repo o/r --title \[CI-62\] PM Worker 率制限 alert ($TODAY) --body-file .* --label oc:rate-limit"
+expect "a rate issue closed 25 hours ago -> a new [CI-62] issue is filed" $?
+
+# 40t. ネガコン (fail-closed): 閉じた oc:rate-limit issue の一覧が取れなければ起票しない。終了コードは 0
+rate_setup ''
+worker true true true "$(ago 1)" '"rate_limit_alert":true,"rest_remaining":1200'
+FAKE_FAIL='issue-list?state=closed&label=oc:rate-limit' wd; rc=$?
+[ "$rc" = 0 ] && [ "$(grep -c 'issue create' "$LOG")" = 0 ] && grep -q 'failed to list closed oc:rate-limit issues' "$TMP/out"
+expect "ネガコン: closed oc:rate-limit list fails -> nothing filed (fail-closed), exit 0" $?
 
 printf '\n%s passed, %s failed\n' "$pass" "$fail"
 [ "$fail" = 0 ]
