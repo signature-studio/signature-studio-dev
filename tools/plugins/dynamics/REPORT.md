@@ -132,12 +132,20 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 - 既知の限界: `ucomis`/`comis` の SSE 形は従来どおり `(void)a; (void)b;` で flag を反映しない (`m6 ir6 [P1]` 相当は未移植)。 本 PR はこれを変えていない。 `movntps`・`vmovsd` store・FMA の意味は未確定で stub のまま。
 
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 19048 は 210 件のうち 67 件が call 先として `declare` だけ残り、link 時に未解決になる。
-  19252 の 2 件は参照なし。 原因 (RetDec の関数境界統合 / 復号失敗) は未調査。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
+  19252 の 2 件は参照なし。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
+- **脱落の原因 (#1412、検証 commit は本節末尾)**: 既定の RetDec 呼出し (`--disable-static-code-detection` 無し) が、定数 libc 系の関数を
+  「statically linked function」として除去する (`e.retdec.log` の `Running phase: removing functions from standard libraries`)。
+  19048 の欠落 210 件のうち **208 件** は dsm の `statically linked function` 行の開始 VA と一致 (`e.drc.dsm`)。 残る 2 件は
+  `CreateEngine` (0x18000b1a0) / `entry_point` (0x18000bb98) で、RetDec は名前付きの `function:` として出力しており、
+  `define @CreateEngine` / `define @entry_point` は final.ll に存在する。 `engine_defs.py` は `function_<VA>` 形式しか見ないため、この 2 件は偽陽性。
+  ネガティブ/切替の実測: `PLUG_NO_STATIC_DETECT=1 bash tools/plugins/dynamics/engine_lift.sh 19048` で `missing_define` 210 → **2** (97 B)、`missing_ref` 67 → **0**、`define` 1,504 → 1,712。
+  19252 は切替前後とも 2 件 (165 B) で不変 (静的検出の対象外。 原因は未特定のまま)。
+  ただし切替後の 19048 は `emcc -c` rc 1 (fixcmp 後も rc 1): `e.final.ll` の `%arg2` i32/i64 不整合 (既存の修正対象) の後に、`e.fixcmp.ll` で `%penv` の i64/ptr 不整合が露見 (未修正)。 既定の切替は `lift_ranges.sh` の既定値 (#1486) に関わるため、既定の変更は本 run では行わない。
 - 失敗の連鎖と修正 (clang は最初の型エラーで止まるため 1 件ずつ露見。 修正は engine 局所の `dynamics/engine_fixcmp.py`、共有鎖には未組込):
   1. 両 engine: `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → 修正済み (19252 は該当 0 件、19048 は 1 件)。
   2. 19048: `inttoptr i64 %arg2` で `%arg2` が i32 → 修正済み (`zext i32 → i64` を挿入。 `function_18004f7f8` の 1 件)。 修正後の `emcc -c` rc 0。
   3. 19252: 旧記載の `zext` 定数式 (`__asm_rep_stosq_memset`) は今回の HEAD では露見せず。 代わりに f80 (`fpext`/`frem`/`fp_round` on x86_fp80) が `emcc -c` を落としていた → `PLUG_F80_LOWER=1` (既存の `p0c/f80_lower.py`) で解消。 `engine_lift.sh` の既定を `1` にした。
-- 残り (本 issue の範囲外として子 issue へ): 未実装 helper 宣言 (VEX 含む) の 59 / 34、 `.pdata` 関数の define 脱落 (19252 2 件 / 19048 210 件、うち 19048 の 67 件は call 先) の原因。 脱落の原因は本 run では未調査。
+- 残り (本 issue の範囲外として子 issue へ): 未実装 helper 宣言 (VEX 含む) の 59 / 34、 `.pdata` 関数の define 脱落 (19252 2 件 / 19048 210 件、うち 19048 の 67 件は call 先) の原因 → 19048 は §4 の通り静的検出が原因 (208 件)。 19252 の 2 件は未特定 (子 issue)。
 - VEX 形の委譲の前提 (未検証を含む): (a) 委譲は `gen_body` で SSE 形を呼ぶため、SSE 分岐の条件 (`n == 2` 等) を満たす 2 引数 VEX 形 (`__asm_vaddsd(i128,i128)`・`__asm_vaddsd__21(i128,i64)`) だけが実装される。 合成 `.ll` で確認: 3 引数 `__asm_vaddsd__30(i128,i128,i128)` と `__asm_vfmadd213sd(i128,i128,i64)` は委譲後も未実装のまま。 (b) 残件に 3 引数形は出る (FMA の `i128,i128,i128` 形が 19252 で 3 行、19048 で 1 行。 `c0afd85b` の `e.simd.log` で実測)。 前段の「2 引数形だけ実装」の説明は、3 引数 FMA が残件に残ることで裏付けられる。 (c) VEX.128 は dst の上位 128bit をゼロにするが、委譲は SSE 形と同じく src1 由来で保持する。 ymm 系は i256 trap で止まるため現状の到達には影響しない前提 (未検証)。
 - VEX helper 未実装 (`vaddsd` / `vfmadd*` / `vcvt*` 等、distinct 宣言数) は、CPUID 分岐で SSE 路に固定できるかが未確認 (T1 の AVX 2 種は CPUID 分岐で SSE 路固定と plugins/REPORT.md §4.3 に記録あり)。
   Transient engine の f80 1 関数は #197 の `f80_lower.py` の適用対象。
