@@ -147,6 +147,24 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - **受入 1 (各関数を手で確認) は未達**。受入 2 (手検証 160 との差分 0) は未達。`verified` 列を `manual` に変える行は、本 run では 0 件。
 - 人手検証の範囲と差分の判定は #1816 (KH-19f) に切り出す。
 
+## 8. #1816 (KH-19f) 機械照合と手検証の判定 (4 vCPU, 基点 main `f34e4f46`)
+
+- 前提 #1823 (KH-19e) は merge 済み。TSV は main に存在する (`3a76c8cb`・`verified` 全 160 行 `auto`)。
+- 素材: `plugins-kilohearts` の `Kilohearts Offline Installer.zip` のみ展開 (tar で zip だけ取り出し)。Windows 側の `extract_installer.sh` 相当 (`payload.dat` → `windows.zip/*` → `HeartCore.core_64` 76,642,304 B)。mac 側は不要のため未展開。
+- 再生成 (4 vCPU・各 1 回): `rtti_walk.py` 1.9 s → `callgraph.py` 7.8 s → `vtable_closure.py gain all` 11.3 s。before 160 / after(all) 1,995 / vtable 1,847 / iat 251 / rip_data 54 / reg 62 — §2・§5 と一致。
+- 機械照合 `scripts/verify_gain_tsv.py` (TSV の各行を .text のバイト列から独立に検査、160 行):
+
+| 検査 | 内容 | 結果 |
+|---|---|---|
+| A | root 行 27 件が gain の `*Dsp`/`*MasterDsp`/`*DspModel` の vtable slot に載る | 27 / 27 |
+| B | 非 root 行 133 件で、親関数の `call_site_rva` の命令が `call`/`jmp` rel で子 `func_rva` を指す | 133 / 133 |
+| D | 親鎖を辿ると全行が root に到達する | 160 / 160 |
+| C (情報) | `func_rva` が .pdata の関数先頭と一致 | 113 / 160 (残り 47 は leaf sweep で拾った関数) |
+
+- 判定: **受入 1 (各関数を手で確認し `verified=manual`) は未達**。上記は機械照合であり、人手検証ではない。`verified` 列は 160 行すべて `auto` のまま残した。
+- 受入 2 (手検証 160 との差分 0): **未達・判定不能**。手検証の集合が無いため、差分は取れない。機械照合で「TSV の 160 行は gain の direct closure の再現として整合する」ことまでは言える。
+- 受入 3 (自動生成分を手検証済みと書かない): 本節で遵守。
+
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
 未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は CLOSED。受入 2 は未達のまま)。rip_data は #849、lift 失敗点は #850 (§4)。
