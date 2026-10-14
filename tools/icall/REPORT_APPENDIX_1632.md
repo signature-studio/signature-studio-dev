@@ -6,9 +6,9 @@
 ## 1. 結論
 
 - 値不一致 9 関数は、native と wasm の両方が正常終了して xmm0 の bit が違う。
-- 疑われていた未実装 SIMD stub 5 種 (`__asm_int` `__asm_int3` `__asm_movntps` `__asm_vucomisd` `__asm_vucomiss`) は **9 関数のどれにも到達しない**。直接の本体にも、推移的な callee にも現れない (§3.2)。stub 仮説は否定した。
-- 8 関数は wasm 側が一律 `0` を返す。native で存在する分岐・call が lift 済み IR から落ちているのが症状として見える (§3.3)。`1803de190` は native に `je` 5 本・call 2 本があるのに、IR は 1 ブロック・0 call で、戻り値は未初期化の alloca (`%1`) になる。
-- 残り 1 関数 `18105d9fc` も IR 1 ブロック・0 分岐。native は 4 命令のみで call を持たず、戻り値の出どころは同じく未初期化 alloca (`ret i64 %1`)。
+- 疑われていた未実装 SIMD stub 5 種 (`__asm_int` `__asm_int3` `__asm_movntps` `__asm_vucomisd` `__asm_vucomiss`) は、**直接 call の到達範囲では 9 関数のどれにも現れない** (§3.2)。間接 call 先は未確認のため、SIMD stub 仮説は直接経路では否定、間接経路は未確認。
+- 7 関数 (`1803de190` `180829c20` `180c98240` `180c99430` `181055400` `181056a4c` `181056aa0`) は wasm 側が一律 `0` を返す。`180da4030` は逆向きで、wasm が値を返し native が 0 を返す。`18105d9fc` は整数ポインタ相当の別値 (§3.1)。native で存在する分岐・call が lift 済み IR から落ちているのが症状として見える (§3.3)。`1803de190` は native に `je` 5 本・call 2 本があるのに、IR は 1 ブロック・0 call で、戻り値は未初期化の alloca (`%1`) になる。
+- `18105d9fc` は IR 1 ブロック・0 分岐。native は 4 命令のみで call を持たず、戻り値の出どころは同じく未初期化 alloca (`ret i64 %1`)。
 - 原因の正式な特定 (どの lift 段で CFG・命令が落ちるか) は未了。DEFECTS.md の D1b・D15・D19 と同型の疑いが強い。修復は子 ICALL-41。
 
 ## 2. 測定
@@ -21,8 +21,9 @@
 | plugins-freshair | `fetch.sh` rc 0 (win 17 files / factory .epf 8)。mac は pkg・xar 無しで skip |
 | native | `tools/ott/native/build.sh` OK。出力は `tools/ott/work/libottnative.so` (build.sh の `../work` 解決) |
 | `fa_route_build.sh` | OK、8.1 s、開始 load 0.83 |
-| `fa_sweep.sh 8 60` | 131 関数、70.7 s (`real 1m10.754s`)、開始 load 0.72・終了 0.91 |
+| `fa_sweep.sh 8 60` | 131 関数、69.2 s (`real 1m9.194s`)、開始 load 1.81・終了 1.28 (4 vCPU) |
 | 内訳 | **bit 一致 41 / native crash・timeout 66 / wasm のみ err 15 / 値の不一致 9** (REPORT_APPENDIX_1451 §3 と一致) |
+| 注記 | main の `REPORT_APPENDIX_1606.md` §2.2 は同じ sweep を 40 / 66 / 15 / 10 と記録。本 run の実測は 41 / 9 で、1606 の記録とは 1 関数ずれる。差の 1 関数は未特定 (1606 は関数別の出力を残していない) |
 
 コード差分: 測定 commit から HEAD まで 0 (本 PR はコードを変えない。付録のみ)。
 
@@ -32,11 +33,11 @@
 
 | 関数 | native xmm0 (入力 1 件目) | wasm | 区分 |
 |---|---|---|---|
-| `1803de190` | `c000c5300342457c` | `0` | 8 関数 同型 |
+| `1803de190` | `c000c5300342457c` | `0` | 同型 |
 | `180829c20` | 同上 | `0` | 同型 |
 | `180c98240` | 同上 | `0` | 同型 |
 | `180c99430` | 同上 | `0` | 同型 |
-| `180da4030` | 0 (wasm 側に値) | `c000c5300342457c` | 同型 (native と wasm が逆) |
+| `180da4030` | 0 (wasm 側に値) | `c000c5300342457c` | 逆向き (native と wasm が逆) |
 | `181055400` | 同上 | `0` | 同型 |
 | `181056a4c` | 同上 | `0` | 同型 |
 | `181056aa0` | 同上 | `0` | 同型 |
@@ -44,15 +45,15 @@
 
 `180da4030` は native と wasm の向きが逆。wasm が値を返し native が 0 を返すので、どちらが正かは未確定。
 
-### 3.2 SIMD stub の到達性 (仮説の否定)
+### 3.2 SIMD stub の到達性 (直接経路での否定・間接経路は未確認)
 
-`work/rt_freshair-core/after.0.restored.ll` (131 関数) で、各関数から直接・推移的に到達できる関数を辿った。辿るのは名前付きの直接 call (`@function_...`) のみで、間接 call (`call i64 %x`) 先は含まない (その分は未確認)。
+`work/rt_freshair-core/after.0.restored.ll` (131 関数) で、各関数から直接・推移的に到達できる関数を辿った。辿るのは名前付きの直接 call (`@function_...`) のみで、間接 call (`call i64 %x`) 先は含まない。間接 call 先は未確認。
 
 | 関数 | 到達 関数数 | 未実装 stub |
 |---|---|---|
-| 9 関数すべて | 1〜3 | なし |
+| 9 関数すべて | 1〜3 | 直接 call 範囲には なし |
 
-`fa_route` の `oi.simd.c` では stub 5 種は `m11_simd_unimpl_once` を出す実装 (silent 0 返却) だが、9 関数のどれからも呼ばれない。値不一致の原因ではない。
+`fa_route` の `oi.simd.c` では stub 5 種は `m11_simd_unimpl_once` を出す実装 (silent 0 返却) だが、直接 call の到達範囲の 9 関数からは呼ばれない。間接 call 経由で呼ばれる可能性は未確認のため、値不一致の原因を確定はしない。
 
 また `__asm_movsd` は 9 関数の一部が使うが、`oi.simd.c` で実装済み (`set_u64_lo` / `u64` 返却)。
 
@@ -91,9 +92,10 @@ native (`SlateCore.core_64`、`objdump -d`) と IR の構造比較。
 | 8〜9 関数の lift 段の分岐・call 欠落 (CFG 復元で辺・call が捨てられる) の原因特定と修復 | 値不一致 9 関数。`fa_sweep` の 9 件 | ICALL-41 (#1838・子) |
 | `180da4030` の native と wasm の向きが逆 (どちらが正か未確定) | 1 関数の判定 | ICALL-41 (#1838) の受入条件に含める |
 | `18105d9fc` の wasm 値と native 値の不一致 (整数ポインタ相当) | 1 関数 | ICALL-41 (#1838) の受入条件に含める |
-| 元の受入条件「原因を切り分ける」は本付録で部分達成 (SIMD stub 仮説は否定、lift 欠落が主因の疑い) | 原因の正式確定 | ICALL-41 (#1838) |
-| CRT 初期化の native 再現 | 66 関数が判定不能 | #1606 (既存) |
-| closure 外 callee の wasm err 15 関数 | 15 関数 | #1633 (既存) |
+| 元の受入条件「原因を切り分ける」は本付録で部分達成 (直接経路では SIMD stub 仮説は否定、間接経路は未確認。lift 欠落が主因の疑い) | 原因の正式確定 | ICALL-41 (#1838) |
+| CRT 初期化の native 再現 | 66 関数が判定不能 | #1814 (ICALL-40) |
+| closure 外 callee の wasm err 15 関数 | 15 関数 | #1633 (ICALL-37) |
+| 1606 (40/10) と本 run (41/9) の 1 関数差 | 集計の再現性 | 未特定 (本 PR 内で追跡せず、本文に記録のみ) |
 
 ## 5. 再現
 
