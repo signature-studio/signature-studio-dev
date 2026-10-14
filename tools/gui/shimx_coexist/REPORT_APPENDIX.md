@@ -24,15 +24,17 @@
 ## 3. 未実施と理由
 
 - **fail-fast 実装の見送り**: `SHBrowseForFolderA/W` を未登録のまま strict abort にすると、呼ばれない import でも起動時に落ちる可能性がある。shimx の import 解決タイミングをコードから確定できなかったため、根拠なしに変えない。
-  - **覆した (2026-10-14、§7 で実施)**: 上の見送りは、次の事実で覆した。`tools/shimx/src/` で `GetProcAddress(` を呼ぶ箇所は無い (定義 `module.c:315`・宣言 `shimx.h:849`・エラー文字列 `module.c:355` のみ)。shimx は PE の import を `GetProcAddress` 経由で解決しない。静的 import の結線は m11 の IR 宣言と `gen_link.py` の stub 生成が担う。よって §7 の分岐は**動的な名前解決 (`GetProcAddress("SHBrowseForFolderA/W")`) にしか効かず、静的 import の起動時には効かない**。
+  - **覆した (2026-10-14、§7 で実施)**: 上の見送りは、次の事実で覆した。`tools/shimx/src/` で `GetProcAddress(` を呼ぶ箇所は無い (定義 `module.c:315`・宣言 `shimx.h:849`・エラー文字列 `module.c:355` のみ。コメント 1 件 `shord.c:6` の `GetProcAddress(序数)` を除く)。shimx は PE の import を `GetProcAddress` 経由で解決しない。静的 import の結線は m11 の IR 宣言と `gen_link.py` の stub 生成が担う。よって §7 の分岐は**動的な名前解決 (`GetProcAddress("SHBrowseForFolderA/W")`) にしか効かず、静的 import の起動時には効かない**。
 - **web 側の directory picker 実装の見送り**: 呼出の有無が未確定で、仕様 (picker の UI・戻り値のステージング先) を決められない。
 - **次に必要な素材**: `work-m11` (`oc_artifacts` に追加)。trace 版の再 build が必要な場合は `tools/m11/REPORT_N1050.md` §5 の手順に従う。
 
 ## 4. 残作業 (起票先)
 
-1. FL の `SHBrowseForFolderA/W` と `IFileDialog` の実呼出を `SHIMX_TRACE` で確認し、結果を本付録に追記する (#1179 で継続)。
-2. 呼出ありと確定した場合: Web の対応 (File System Access directory picker) を実装し、node + mock 検査を `tools/gui/test` に追加する (#1179 で継続)。
-3. 呼出なしと確定した場合: 未対応を fail-fast で明示する (`shimx` の登録と strict abort) し、`IMPORTS.md` を再生成する (#1179 で継続)。
+注 (2026-10-14): #1179 は本 PR で閉じる。以下 1〜3 の残りは §7-3 の未解決表へ移した (受入 1 は既存 #942、IFileDialog は #2916、gui 検査は #2917)。
+
+1. FL の `SHBrowseForFolderA/W` と `IFileDialog` の実呼出を `SHIMX_TRACE` で確認し、結果を本付録に追記する (§7-3 へ移管)。
+2. 呼出ありと確定した場合: Web の対応 (File System Access directory picker) を実装し、node + mock 検査を `tools/gui/test` に追加する (§7-3 へ移管)。
+3. 呼出なしと確定した場合: 未対応を fail-fast で明示する (`shimx` の登録と strict abort) し、`IMPORTS.md` を再生成する (§7-3 へ移管)。
 
 ## 5. 再測定 (work-m11 展開・trace variant 再 build、run 2026-10-13)
 
@@ -59,8 +61,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| boot が unit 17〜18 付近で `memory access out of bounds` により停止する問題の解消 | 停止より後の UI 経路 (フォルダ選択の呼出位置) に到達できず、呼出有無が確定しない | #1050 (既存、`REPORT_N1050.md` §4) |
-| `SHBrowseForFolder*` / `GetOpenFileNameW` 等の IR 宣言が無いことの原因 (lift の import 解決範囲) | IR 上の宣言だけでは呼出を判定できない | #1179 で継続 (lift 側の確認が必要な場合は子 issue) |
+| boot が unit 17〜18 付近で `memory access out of bounds` により停止する問題の解消 | 停止より後の UI 経路 (フォルダ選択の呼出位置) に到達できず、呼出有無が確定しない | #942 (既存・open、boot の `threw` の切り分け。#1050 は 2026-10-14 に CLOSED のため付け替え) |
+| `SHBrowseForFolder*` / `GetOpenFileNameW` 等の IR 宣言が無いことの原因 (lift の import 解決範囲) | IR 上の宣言だけでは呼出を判定できない | 原因は未特定。§6 で FL 本体 EXE の呼出は closure 外と判明。残りは #942 へのコメントに併記 (trace 判定の前提として) |
 
 ## 6. 静的 call 箇所の再確認 (run 2026-10-14、コード差分 0)
 
@@ -83,13 +85,15 @@
 
 測定 commit: `bc6b8a32` (コードを変えた最後の commit。基点 `26f90ada`)。素材 `work-m11` を展開 (snapshot IR)。`bash tools/m11/shimx_link/build.sh --trace --soft` は `signature mismatch=1` (#1628 残件) で rc=0。
 
-**適用範囲 (差し戻し対応 2026-10-14、B2 (b))**: 本節の数値は `work-m11` (snapshot IR) 上の**相対比較**に限る。`docs/WORKFLOW.md` §11 は `work-m11` を「survey の基準には使わない」と定めるため、IR の正 (`bash tools/m11/m11_e2e.sh --full` の出力) での基点と head の survey は取り直していない (素材 `toolchain-retdec`・`toolchain-emsdk`・`work-m11` は本 run で未取得)。よって 7-1 の「init unit の呼出 0 件」は受入条件 1 の根拠にしない。
+**適用範囲 (差し戻し対応 2026-10-14、B2 (b))**: 本節の数値は `work-m11` (snapshot IR) 上の**相対比較**に限る。`docs/WORKFLOW.md` §11 は `work-m11` を「survey の基準には使わない」と定めるため、IR の正 (`bash tools/m11/m11_e2e.sh --full` の出力) での基点と head の survey は本 PR では取り直していない。取り直しは #2877 へ移した。よって 7-1 の「init unit の呼出 0 件」は受入条件 1 の根拠にしない。
 - 基点 `26f90ada` 以降、main (`665a704d`。差し戻し時の main は `b2b052ce`) では `tools/m11/ldfix`・`tools/m11/trap_triage` 等が変わっている (対象 dir で 13 files)。merge 後の挙動が本節の数値と一致する保証は無い。
+
+所要の注 (m3): 基点・測定の所要 (2 分 43 秒) は測定時の load average・並列数を採取していないため、比較の根拠にならない。差し戻し後のレビュー run (head `38f66a44`) で同じ survey は 5 分 23 秒 (load average 未記録) で、差の原因は未確定。WORKFLOW §5 の形 (所要 + load average + 並列数) の記録は次回の測定から行う。
 
 | 項目 | 基点 `26f90ada` | 測定 `bc6b8a32` |
 |---|---|---|
 | 逐次 boot (`run_trace.mjs`) | `units_run=17` `threw="memory access out of bounds"` `total_calls=97` | 同左 |
-| unit 隔離 survey (942 unit、`survey_trace.mjs`) | ok 789・oob 95・closure_outside 47・halt0 9・clobber 1・noproc 1・`api_units` 69・abort 0 (2 分 43 秒) | 同左 (abort 0) |
+| unit 隔離 survey (942 unit、`survey_trace.mjs`) | ok 789・oob 95・closure_outside 47・halt0 9・clobber 1・noproc 1・`api_units` 69・abort 0 (2 分 43 秒。load average・並列数は未記録) | 同左 (abort 0。所要・load average の記録なし) |
 | survey の `GetProcAddress miss` (`SHIMX_TRACE=1`) | 名前付きの miss は `dwmapi`・`user32`・`comctl32` 等。`SHBrowseForFolder` は 0 件。`shell32.dll!` の miss は 1 件 (unit 137・名前は空で同定できず) | 同左 |
 | `SHBrowseForFolderW/A`・`GetOpenFileNameW`・`GetSaveFileNameW`・`CoCreateInstance` の呼出 (survey) | 0 件 (abort 以外の unit は trap 前の呼出を計数) | 同左 |
 | IR (`boot_final3.ll`) の宣言 | `SHBrowseForFolder*`・`GetOpenFileNameW` 0 件。`CoCreateInstance` 宣言 1・呼出 2 | 同じ IR のため同左 |
@@ -131,8 +135,9 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 受入 1 (UI 経路の実呼出の確認。逐次 boot の unit 17 停止が前提) | フォルダ選択の呼出有無が確定しない | 既存 #1050 へのコメント (boot 停止の解消後に確認する) |
-| IFileDialog (`CoCreateInstance`) の明示 fail-fast (受入 2 の残り) | IFileDialog 経路は黙って失敗する | 新規子 issue (`親: #1179`) |
-| gui の node + mock 検査 (受入 3) | 検査が無い | 新規子 issue (`親: #1179`) |
-| 文字列長で survey の結果が変わる原因 (7-2 の行案) | shimx 変更ごとに survey の再測定が要る | 親 #957 への提案コメント (原因特定を子に切るかは PM 判断) |
-| FLEngine の起動 (`tools/flelift`) の KPI (dispatch 数・通過 unit 数) | 未測定。survey の `ok` 数 (基点と一致) のみ | 既存 #1050 へのコメント (boot 停止の解消後に KPI を測る) |
+| 受入 1 (UI 経路の実呼出の確認) と FLEngine の起動 KPI (dispatch 数・通過 unit 数) の再測定。逐次 boot は snapshot IR で unit 17 `memory access out of bounds` により停止 (`dllmain_done=false`) | フォルダ選択の呼出有無が確定しない。KPI は未測定 (survey の `ok` 数が基点と一致するのみ) | 既存 #942 へのコメント (boot の OOB 停止の切り分けに、本節の停止位置・件数を追記。停止の解消後に確認する)。#1050 は CLOSED のため付け替え。#2444 (unit 18・新 IR・入れ子手続) と #2446 (unit 57) は停止位置と IR が異なるため、同一原因とは判定していない |
+| IR 宣言 0 件の原因 (§5-2・§6) | IR 上の宣言だけでは呼出を判定できない | 既存 #942 へのコメントに併記 (trace 判定の前提) |
+| IFileDialog (`CoCreateInstance`) の明示 fail-fast (受入 2 の残り) | IFileDialog 経路は黙って失敗する | 新規子 #2916 (SHX-T33、`親: #1179`) |
+| gui の node + mock 検査 (受入 3) | 検査が無い | 新規子 #2917 (SHX-T34、`親: #1179`) |
+| IR の正 (`m11_e2e.sh --full`) での基点・head の survey 取り直し (適用範囲の節) | 本節の数値は snapshot 上の相対比較に限る | 既存 #2877 へのコメント (HEAD で 942 survey を再測定する受入に、基点の IR 正での取り直しを加える) |
+| 文字列長で survey の結果が変わる原因 (7-2 の行案) | shimx 変更ごとに survey の再測定が要る | 既存 #2877 へのコメント (再測定の受入に 7-2 の 5 変種のうち長いメッセージの版を加える。原因の特定は未着手) |
