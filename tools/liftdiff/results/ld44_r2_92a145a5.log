@@ -1,0 +1,30 @@
+[batch] 800 functions, shards=4
+[batch] 400/800  49s
+[batch] 800/800  139s
+[batch] done 139s -> work/tmp/ld44_r2.jsonl
+関数数 800: 一致 352 / 不一致 170 / 実行不能 278
+
+不一致の類型 (主因 = 優先順位最上位の1つ / 該当数 = 複数タグ重複あり):
+  callee_divergence        主因    34   該当    71
+  memory_semantics         主因    25   該当    26
+  callsite_arg_drop        主因    20   該当    20
+  icall_drop               主因    18   該当    20
+  ret_only                 主因    17   該当    17
+  wasm_trap                主因    15   該当    34
+  xmm_arg_drop             主因    14   該当    19
+  simd_helper              主因     6   該当     6
+  zero_init_drop           主因     5   該当     9
+  spill_slot_deref         主因     4   該当     4
+  fp_flag_unreflected      主因     4   該当    15
+  import_arg_diff          主因     3   該当     5
+  import_call_seq          主因     2   該当    17
+  unresolved_callee        主因     2   該当     4
+  arg_drop                 主因     1   該当     2
+
+不一致のうち callee を一切呼ばずに差分が出た (= その関数自身の欠陥と確定) : 55 / wasm trap を含む : 34
+
+実行不能の内訳:
+  native_fault_all_patterns            144
+  native_null_deref_all_patterns       101
+  hang                                  32
+  unsupported_sig                        1
