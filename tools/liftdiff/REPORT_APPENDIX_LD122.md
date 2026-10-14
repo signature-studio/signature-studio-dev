@@ -74,7 +74,7 @@ python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # wall は stderr �
 - A・C・D・E4・R が mismatch、solo・B・S27・F・E1・E2・E5 が match。
 - W (0x5bfff0) だけを前に置く場合は match (B)。X を含むことが必要。
 - F で runner を作り直すと消える。残存は runner の内部状態にある。
-- **fvm の注意**: `_fvm_cases` は前の case で `'s'` の fault が出たときだけ走る。E2 の X 側は `q0=both_fault` のみで、first_outcomes に fvm 行が無い (走らない)。E4 の X 側は fvm 行がある。よって E2 対 E4 は fvm の有無と前置の内容が交絡し、z〜pall2 の要不要は言えない。fvm が走る条件同士の対比は E1 (match) 対 E4 (mismatch) だけで、q0 の要否はこれで言う。
+- **fvm の注意**: `_fvm_cases` (`ldlib/session.py`) は、その関数の case に equal・diff・wasm_trap が 1 つも無いときだけ走り、`'s'` の native fault アドレスから候補を作る。E2 の X 側は `q0` のみで `'s'` が無いため候補 0 となり、fvm 行が出ない (first_outcomes に fvm 行なし)。E4 の X 側は `'s'` を含み fvm 行が出る。よって E2 対 E4 は fvm の有無と前置の内容が交絡し、z〜pall2 の要不要は言えない。fvm が走る条件同士の対比は E1 (match) 対 E4 (mismatch) だけで、q0 の要否はこれで言う。
 - tail (qall・vm0・u16) は必要ではない: E4 は tail を含まないのに mismatch (A と同じ判定)。E5 (tail のみ) は match。
 - E4 は 1 回のみ測定 (反復なし)。E1 は ×2 反復で match。
 - TSV の `Y_tags` 列は driver が `make_record(sess, rec, {})` (IR 特徴なし) で作るため、batch の tags と同じとは限らない。本表の判定は verdict と outcome で行い、tags は参考。
