@@ -9,7 +9,7 @@
         2) PE の Machine / SizeOfOptionalHeader から、セクション表がファイル内に収まることを確認する。
         3) IID の 16 byte を LE (記載どおり) / BE (GUID 各フィールドのバイト反転) の両方で検索する。
   negative control: <negative_control_pe> を指定すると、その PE の末尾 (オーバーレイ) に IID を
-        LE で書き足した複製を作り、同じ検索器がヒットすることを確認する (複製は一時ファイル)。
+        LE / BE それぞれで書き足した複製を作り、同じ検索器がヒットすることを確認する (複製は一時ファイル)。
 依存: 標準ライブラリのみ。
 """
 import os
