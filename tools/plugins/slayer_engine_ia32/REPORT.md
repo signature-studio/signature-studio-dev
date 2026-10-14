@@ -221,3 +221,12 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 ### 9.6 `mov r,[X+8]` → `[r+idx*4]` の形による events[] 候補の列挙 (#894 受入 1 の追加調査・未達)
 
 - 結論 1 行: 候補 5 件はいずれも `events[i]` 読取と判定できず、受入 1 は未達のまま (表・再現・所要・鮮度証跡は [REPORT_APPENDIX_894.md](REPORT_APPENDIX_894.md) §9.6)。
+
+## 10. emcc -c の再測定 (#674 受入 1 の入口, main `5a45be80`)
+
+- 入力: `block22434_PE.bin` (sha256 `84b64c43…de724a9`、fl-win64 素材)。 root = export `main` (0x10007ca0)、`--arch ia32 --closure 2`。
+- 再現: `python3 tools/ott/lift/x64c.py --pe <PE> --entries <roots=[0x10007ca0]> --out <dir> --closure 2 --arch ia32` → `emcc -c -O1 -w -I tools/ott/rt <dir>/ott_lifted.c`。
+- lift: `functions 8, insns 301, unlifted callees 8, imports 0`。 unsup は x87 4 件 (`fld` 2・`fcomp` 1・`fnstsw` 1)、いずれも `ott_unsup` 関数で止まる。
+- `emcc -c` (toolchain-emsdk 6.0.12): rc 0、object 5,836 B。 所要 0.15 s (lift wall)。
+- 範囲: これは closure 2 (8 関数) のみ。 受入 1 の「.text 全体 (73,002 B)」は未達 (#1098)。 x87 の意味論は未実装 (#1099)。 gate C1〜C4 は本節では通していない。
+- 注意: `0x10001300` (opcode dispatcher) を root にした場合の jump table 検証は `tools/ott/REPORT.md` §14 を参照。
