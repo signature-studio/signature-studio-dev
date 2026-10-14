@@ -34,7 +34,7 @@ fi
 # 2. m11 側 C を -pthread で再コンパイル (m11_win.c の user32 3 本は shim 定義と衝突するため改名してリンクから実質除外)
 for f in heap failfast file timer sync; do cc "$M/../shim/src/$f.c" "$W/obj/shim_$f.o" $CF; done
 cc "$M/m11_rt.c" "$W/obj/rt.o" $CF -I"$M"
-cc "$M/m11_win.c" "$W/obj/win.o" $CF -I"$M" -DLoadStringW=m11_win_LoadStringW -DMessageBoxA=m11_win_MessageBoxA -DMessageBoxW=m11_win_MessageBoxW
+cc "$M/m11_win.c" "$W/obj/win.o" $CF -I"$M" -DLoadStringW=m11_win_LoadStringW -DMessageBoxA=m11_win_MessageBoxA -DMessageBoxW=m11_win_MessageBoxW -DEnumDisplayMonitors=m11_win_EnumDisplayMonitors -DGetMonitorInfoW=m11_win_GetMonitorInfoW
 cc "$M/m11_ov.c" "$W/obj/ov.o" $CF -I"$M" -I"$MW"
 cc "$MW/m11_simd.c" "$W/obj/simd.o" $CF -I"$M"
 cc "$MW/m11_fnstubs.c" "$W/obj/fnstubs.o" $CF

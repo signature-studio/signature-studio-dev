@@ -51,6 +51,7 @@ CI や他人の環境では存在しないため、再現手順は本ファイ�
 | `[GHIDRA]` | `/opt/ghidra` | Ghidra 12.1.4 (解析支援) |
 | `[_TEST]` | `/opt/_test/` | toolchain E2E 実証のスクラッチ領域 (`tools/m1` が参照) |
 | `[PNPM-HOME]` | `/home/ubuntu/.local/share/pnpm/bin` | pnpm (と同梱 node) のユーザローカル配置 (`tools/shared`・`tools/audio/asio` が参照) |
+| `[APT-MINGW]` | `/usr/bin/x86_64-w64-mingw32-gcc` (apt 導入の MinGW-w64 クロスコンパイラ) | 版は未記録 (`tools/gui/flengine/REPORT_APPENDIX.md` §6i の実行で使用。再現時は `x86_64-w64-mingw32-gcc --version` の出力を REPORT に残す) |
 
 ---
 
