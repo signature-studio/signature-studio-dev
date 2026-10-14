@@ -110,7 +110,7 @@ python3 tools/m11/ldfix/audit_lsf.py tools/m11/work/boot_final3.ll tools/m11/wor
 
 ### 8.3 未判定の残り 12 site と、脱落関数の和集合
 
-- 未判定 12 site は子 issue #2438 に移した (415610 の 2 site、415c30 の 2 site、417b70、41e490、45a2a0、45b170、45c290、45d0a0 の 2 site、45d610、45f560)。
+- 未判定 12 site は子 issue #2438 に移した (415610 の 1 site、415c30 の 2 site、417b70、41e490、45a2a0、45b170、45c290、45d0a0 の 2 site、45d610、45f560)。
 - `tally_510.py` の [8] (store 宛 + frame 宛の目視・oracle 候補) は 69 のまま。`candidate_verdicts_1161.jsonl` は tally_510 に算入されない設計のため、変化しない。
 - `spill_classify_1161.py` の [6] では、spill 宛の確定 TRUE_DROP 20 関数のうち drops_510.tsv に無いものが 4120c0・41a5d0 の 2 関数 (和集合の追加候補)。和集合への正式な反映は tally 側の扱いを決める必要があるため、本 PR では行わない。
 
