@@ -65,7 +65,7 @@ python3 tools/m11/ldfix/audit_lsf.py tools/m11/work/boot_final3.ll tools/m11/wor
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 前半 23 site の機械語 + IR 両面の分類 (測定時点で 0 件確定) | spill 宛の脱落関数の和集合 69 が未確定。前半 19 関数が和集合に入るかが未判定 | #2264 (open のまま。次 run で分類を継続) |
+| 前半 23 site の機械語 + IR 両面の分類 (測定時点で 0 件確定。§8 で 11 site を判定済み、残り 12 site は移管) | spill 宛の脱落関数の和集合 69 が未確定。前半 19 関数が和集合に入るかが未判定 (§8.3 の 2 関数は PM 判断待ち) | #2438 (LD-114。残り 12 site。#2264 は §8 の 11 site 判定で範囲を縮めて Closes) |
 | 後半 23 site の分類 | 同上 | #2265 (LD-98) |
 | UNDETERMINED 7 site の IR 側再検証 | 同上 | #2253 (LD-95・既存) |
 | 群 A / 群 B の分類 | 同上 | #2244 / #2245 (既存) |
@@ -77,3 +77,46 @@ python3 tools/m11/ldfix/audit_lsf.py tools/m11/work/boot_final3.ll tools/m11/wor
 - 測定 commit から HEAD までの差分 (`git diff 25d2cdc0 HEAD -- tools/m11/ldfix`) は本 REPORT の追加のみ。判定ファイル (`candidate_verdicts_1161.jsonl`・`results/spill178_1161.tsv`) の差分は 0。
 - 差分の範囲は `tools/m11/ldfix/REPORT_2264.md` のみ (docs 追加)。REPORT は自身の commit hash を内部に書けないため、最終 HEAD での `git diff --stat 25d2cdc0 HEAD -- tools/m11/ldfix` の出力は PR コメントに載せる。
 
+
+## 8. 2 回目の run: 23 site のうち 11 件を判定 (残り 12 件は #2438 へ)
+
+- 判定データの測定 commit: `9de3e2fc` (`candidate_verdicts_1161.jsonl` に 11 行を追記、`results/spill178_1161.tsv` を `spill_classify_1161.py` で再生成)。基準は main `3b581236`。
+- 測定 (測定 commit の tree): `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` → rc=0・2m32s (user 2m31s)・load average 0.96・7/7 完了。`spill178_1161.tsv` と `drops_510.tsv` は results/ と cmp 一致。
+- 同じ e2e の基準 (main `3b581236`、判定追加前): rc=0・2m31s・load 0.92・7/7。tsv の状態は 未判定 102 / 確定 69 / 判定不能 7 で、判定追加後は 未判定 91 / 確定 78 / 判定不能 9。
+- §4 の「未判定 120」は前回 run 時点の値。その後 main に入った他 PR の判定で 102 まで減っている (本 run の変更ではない)。
+
+### 8.1 判定 (機械語 → IR の突合)
+
+| 関数 | site | 判定 | 根拠の要点 |
+|---|---|---|---|
+| 410770 | 4107c7 | OK_LOAD | 機械語 4107c4 `mov rax,[rcx]` (二段参照) → IR %7 (二段 deref) → `stack_var_-16.0.reg2mem` → 4107ec の reload → ret |
+| 4120c0 | 4120da | TRUE_DROP | count (`mov ecx,[rax]`、二段参照) は IR %3 で正しく deref 済み。しかし消費者 4120f0 / 41212c (ループ境界の `cmp`) が IR に無い。IR はループ本体 (`dec_label_pc_4120f5` の定義が 0 件) を持たず preheader で止まる |
+| 412ee0 | 412ef6 | OK_LOAD | 機械語 412ef3 `mov rax,[rsi]` → IR %3。消費者 412efa `cmp [rbp+0x28],0` = IR %4 (icmp)、412f08 `mov rcx,[rbp+0x28]` → 412f0c call SysFreeString = IR %5 |
+| 417310 | 417355 | OK_LOAD | 機械語 41734e `mov rax,[rax+0xa]` → 417352 `mov rax,[rax]` (二段) → IR %15 / %17。消費者 417359 `cmp byte [rax],0xd` = IR %19 / %20、417362 `movzx rcx,byte [rax+1]` = IR %23 / %25 |
+| 41a5d0 | 41a5fa | OK_LOAD | 機械語 41a5f7 `mov rax,[rax]` → 41a5fa `[rbp+0x30]` → 41a614 reload。IR %3 → `rax.0.reg2mem` → ret |
+| 41a5d0 | 41a618 | TRUE_DROP | 機械語 41a607 `call qword ptr [rbx+8]` (rbx = `[rbp+0x38]`) の vtable 呼出しが、IR のループ本体 (`dec_label_pc_41a5f3`) に無い。消費者が脱落 |
+| 41a670 | 41a6e2 | OK_LOAD | 機械語 41a6df `mov rax,[rax]` → 41a6e2 `[rbp+0x38]` → 41a6e6 `cmp [rbp+0x38],0` = IR %9 → %12 / %13 (icmp)。ループ先頭の reload → deref も一致 |
+| 41ba50 | 41ba8a | UNDETERMINED | 16 バイト複写 (movsq ×2) の元 r8 と、IR の %11 (1 語の load) の対応が確定できない |
+| 41bfa0 | 41bfb7 | OK_LOAD | 機械語 41bfb4 `mov rax,[rcx]` → 41bfb7 `[rbp+8]`。IR %storemerge1 → lcssa と `or` (= 機械語 41bfbd の `or rdx,1`) |
+| 41bfa0 | 41bfd1 | UNDETERMINED | 機械語 41bfc9 `lock cmpxchg` の後の `mov rax,[rcx]` が格納値。IR は lock cmpxchg を平文 store (%8 の無条件格納) に落としており、失敗経路の値を表せない |
+| 44f440 | 44f50a | OK_LOAD | 機械語 44f507 `mov rax,[rdi]` → 44f50a `[rsp+0x20]` (= call 414da0 の第 5 引数)。IR %33 (deref 済み) が `call function_414da0` の第 5 引数 |
+
+判定 11 件 (OK_LOAD 7・TRUE_DROP 2・UNDETERMINED 2) を `candidate_verdicts_1161.jsonl` に追記した (evidence は同ファイルの形式)。
+
+### 8.2 前回 §3 の訂正
+
+- 前回 §3 で「44f440 の `[rsp+0x20]` は後続読み出し 0 件」とした件は誤り。`call` 直前の `[rsp+0x20]` は第 5 引数であり、消費者は callee (414da0)。IR で対応を確認し OK_LOAD とした。
+- config 経路の `NO DESCEND` 17 件は本 run では再測定していない (判定は PE 経路 `--pe` のみ)。
+
+### 8.3 未判定の残り 12 site と、脱落関数の和集合
+
+- 未判定 12 site は子 issue #2438 に移した (415610 の 1 site、415c30 の 2 site、417b70、41e490、45a2a0、45b170、45c290、45d0a0 の 2 site、45d610、45f560)。
+- `tally_510.py` の [8] (store 宛 + frame 宛の目視・oracle 候補) は 69 のまま。`candidate_verdicts_1161.jsonl` は tally_510 に算入されない設計のため、変化しない。
+- `spill_classify_1161.py` の [6] では、spill 宛の確定 TRUE_DROP 20 関数のうち drops_510.tsv に無いものが 4120c0・41a5d0 の 2 関数 (和集合の追加候補)。和集合への正式な反映は tally 側の扱いを決める必要があるため、本 PR では行わない。
+- PM agent の判断待ち: 2 関数を脱落集合 (tally_510) へ入れるか・既定案: 入れない (候補判定は算入しない設計のまま。本 PR で既存の数値は変えない)。
+
+### 8.4 検証の範囲
+
+- 判定の根拠は機械語 (`audit_lsf.descend` と capstone の逆アセンブル、PE 経路) と IR (`boot_final3.ll`、`function_X__lifted` または `function_X`) の両方を見た。確認したのは上の 11 site のみ。
+- e2e の 7/7 は判定追加の前後で成立 (rc=0)。判定の正しさを e2e は保証しない (step 7 は tsv の再生成と cmp のみ)。
+- 差し戻し対応 (review の指摘 1) の run では、素材 work-m11 / work-liftdiff が `$ARTIFACTS_DIR` に無く (fl-win64 のみ)、IR 側 (`boot_final3.ll`) の突合と `audit_lsf_ssa_e2e.sh` の再実行は行っていない。PR 本文の `oc_artifacts:` 行により review job が素材を取得して独立に検証する。本節の数値 (§8 冒頭) は 2 回目の run の実測のまま。
