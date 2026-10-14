@@ -11,7 +11,7 @@
 ## 測定条件
 
 - 素材: `fl-win64.tar.zst` → `extracted/block00031_PE.bin` (`tar --zstd -xf ... --wildcards '*block00031_PE.bin'`、22,227,016 B)。展開先は `tools/python/work/py59/` (gitignore)。展開の実測は 2 回: 2.27 秒 (cfc80969 の再測定)・2.86 秒 (レビュー側の再測定)。
-- 測定 commit: `2f115b91` (解析スクリプト `tools/python/analysis/py59_func.py`・`py59_callers.py` を最後に変えた commit)。`git diff 2f115b91 HEAD -- tools/python/analysis` の出力は 0 行 (差分 0)。後続 `cfc80969` は本 REPORT の文言修正のみ。
+- 測定 commit: `2f115b91` (解析スクリプト `tools/python/analysis/py59_func.py`・`py59_callers.py` を最後に変えた commit)。`git diff 2f115b91 HEAD -- tools/python/analysis/py59_func.py tools/python/analysis/py59_callers.py` の出力は 0 行 (差分 0)。後続 `cfc80969` は本 REPORT の文言修正のみ。`tools/python/analysis` 全体では main 取り込み (py54・py58 の追加) により差分があるが、PY-59 の解析スクリプトには触れていない。
 - 関数範囲は `.pdata` (RUNTIME_FUNCTION・PE 例外テーブル) から取る。実測: 57,816 件。`int3` 区切りや線形復号による推定は、途中の不正命令で境界がずれたため使わなかった (後述 §4)。
 - 解析スクリプト:
   - `tools/python/analysis/py59_func.py <PE.bin> <VA> [dump]` — VA を含む関数範囲 (`.pdata`) と、必要なら関数全体の逆アセンブル。
