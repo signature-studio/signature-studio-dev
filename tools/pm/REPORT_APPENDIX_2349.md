@@ -89,6 +89,21 @@
   - 24 時間ガード `if (false && ...)` → `digest.test.ts` の 4 件が FAIL (初回・(a)・(b)・送信失敗)。
   - rolling 除外を無効化 (`classify.ts`・`launch_issues.py`) → `digest.test.ts` (e) と `test_digest_rolling_issue_is_not_ready` が FAIL。
 
+## 8. main の 3 回目の取り込み (#2339 の pm-worker 変更) 後の再測定
+
+- 測定 commit: `3c7dbae4` (検証範囲のコードを最後に変えた commit。`origin/main` (`decb3285`) の merge。競合は `engine.ts` の 3 箇所 (`digest()` と `redeliver()` の閉じ括弧・tick 内の呼出し・公開 `/status` の追加キー) と `status.test.ts` の 1 箇所。どれも両側を残した)。
+- 検証 HEAD: `eb880c98` (main の取り込みのみ。`git diff 3c7dbae4 HEAD -- infra/pm-worker/ .github/ tools/pm/launch_issues.py tools/pm/test_launch_issues.py` の出力は 0 行)。
+- §7 の測定 commit `5726e190` から `3c7dbae4` までの検証範囲の差分は 775 行 (main の #2339: `infra/pm-worker/src/engine.ts`・`webhook.ts`・`test/unit/resync_redeliver.test.ts` ほか)。
+- `test/unit/resync_redeliver.test.ts` (#2339 の main 側テスト) は `npm test` (`test/*.test.ts`) にも `npm run test:workers` (`test/runtime/**`) にも入っていない。`node --test` で実行すると vitest の import で FAIL する。vitest の workerd 設定 (`test/unit/**`・ほかは同じ bindings) で走らせると 10 / 10 PASS (作業ツリー限りの一時 config で実行し、削除した)。
+- load average: 4.53 → 6.28 (高い負荷の下で測った。所要時間は §2・§6・§7 と比べない)。
+
+| 検証 | コマンド | 結果 | 所要 (wall) |
+|---|---|---|---:|
+| Worker の node テスト | `npm test` (`infra/pm-worker`) | 188 / 188 PASS・0 FAIL | 27.3 s |
+| Worker の workerd テスト | `npm run test:workers` | 3 / 3 PASS | 4.4 s |
+| pm.md と dispatch 文脈の検査 | `bash .github/scripts/tests/test-dispatch-context.sh` | 135 passed・0 failed | 6.3 s |
+| launch 判定の Python テスト | `python3 -m unittest test_launch_issues` (`tools/pm`) | 8 / 8 OK | 0.13 s |
+
 | 検証 | コマンド | 結果 | 所要 (wall) |
 |---|---|---|---:|
 | Worker の node テスト | `npm test` (`infra/pm-worker`) | 188 / 188 PASS・0 FAIL | 25.9 s |
