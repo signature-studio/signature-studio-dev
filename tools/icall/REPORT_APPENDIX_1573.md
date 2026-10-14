@@ -1,6 +1,6 @@
 # 付録: icall #1573 — OTT F の jt_dropped 8 件の展開後残件数 (ICALL-31)
 
-測定 commit `d16d7f5d` (icall 関連コードは HEAD `ecf6d6e5` まで無変更)。素材 `analysis-ott-binaries` (`OTT_vst2_win64.dll`)・`toolchain-retdec`・`work-icall` (`ott_F.txt`)。
+測定 commit `d16d7f5d` (以降の icall コード差分は下記鮮度の証跡を参照)。素材 `analysis-ott-binaries` (`OTT_vst2_win64.dll`)・`toolchain-retdec`・`work-icall` (`ott_F.txt`)。
 再現: `tools/icall/roundtrip.sh <analysis-ott-binaries>/OTT_vst2_win64.dll work/ott_F.txt ott-F-1573 work/rt_ott-F-1573`。
 foreground、rc 0、所要 32.7 s (`time` 実測)、開始時 load 0.87。関数集合は 282 関数 (`F.ranges`、`ott_F.txt` 由来)。
 
@@ -37,11 +37,6 @@ foreground、rc 0、所要 32.7 s (`time` 実測)、開始時 load 0.87。関数
 
 ## 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit: `d16d7f5d`。レビュー head: `0a6f0bed`。
-- `git diff d16d7f5d 0a6f0bed -- tools/icall ':(exclude)*.md'` の出力: 空 (コード差分 0)。
-- 除外なしの `git diff d16d7f5d 0a6f0bed -- tools/icall --stat` の出力 (すべて docs):
-  - `REPORT_APPENDIX.md` | 2 +-
-  - `REPORT_APPENDIX_1206.md` | 2 +-
-  - `REPORT_APPENDIX_1573.md` | 47 +++++++++++++++++++++++++++++++++++++
-  - 合計 3 files changed, 49 insertions(+), 2 deletions(-)
+- 測定 commit: `d16d7f5d`。
+- `git diff d16d7f5d HEAD -- tools/icall ':(exclude)*.md'` の出力: 空 (コード差分 0)。
 - よって測定値は現 head でも有効。再測定は不要。
