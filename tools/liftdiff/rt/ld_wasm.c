@@ -19,6 +19,7 @@ void ld_trace(u64 va, u32 np, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5, u6
   u64 a[8] = { a0, a1, a2, a3, a4, a5, a6, a7 }, x[4] = { x0, x1, x2, x3 };
   ld_trace_rec(va, np, a, x);
 }
+void ld_blk(u64 va) { ld_blk_rec(va); }
 u64 __readgsqword(u64 off) { return *(u64*)(g_heap + LD_TEB_OFF + off); }
 int32_t* m11_counter_ptr(void) { return &g_counter; }
 void m11_probe(int i) { (void)i; }

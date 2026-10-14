@@ -1,6 +1,6 @@
 # REPORT 付録 — #1679 (HB-H35): loop 外 break・undeclared label の制御構造復元
 
-> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §11。本付録は計測の全文。
+> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md` §12。本付録は計測の全文。
 
 測定 commit: `10d45b08` (`retdec_gotofix.py` / `goto_jump_check.py` を追加した commit。以降、本 PR でこの範囲のコードは変えていない)。
 環境: `[RETDEC]` v5.0 (`toolchain-retdec`)・`[EMSDK]` 6.0.12 (`toolchain-emsdk`)・`fl-win64` (`$RUNNER_TEMP` に展開)。load average (1 分値) 0.07–0.74。

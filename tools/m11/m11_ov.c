@@ -779,7 +779,13 @@ unsigned long long function_43a3f0(unsigned long long s, unsigned long long valu
  * 1 段 deref を 2 箇所とも落とし, lengths (スタックアドレス) を配列長, a を配列本体として扱った.
  * → GetMem に巨大サイズが渡り 0 を返して Error(reOutOfMemory) → Halt0 (survey halt0 の 17 unit 直接原因, #130).
  * 逆アセンブル (417b70..417fa2) から転記. 動的配列ヘッダ: hdr = data-16, [hdr+4]=refcnt, [hdr+8]=length. */
+#if M11_ENTRY_PROBE
+extern volatile int m11_fe_417b70;
+#endif
 unsigned long long function_417b70(unsigned long long a, unsigned long long ti, unsigned long long dimcnt, unsigned long long lengths) {
+#if M11_ENTRY_PROBE
+    m11_fe_417b70 = 1;
+#endif
     u64 p = Q(a);
     u64 len = Q(lengths);
     if ((long long)len <= 0) {
@@ -1163,14 +1169,18 @@ unsigned long long function_4159e0(unsigned long long p, unsigned long long ti, 
     }
 }
 
+#if M11_INSTR_K12
+volatile unsigned int m11_site_cur = 0;
+#endif
+
 unsigned long long function_416db0(unsigned long long dest, unsigned long long src, unsigned long long ti, unsigned int count32) {
     u64 count = count32;
+#if M11_INSTR_K12
+    M11_TRACE("[CA_KIND] site=%u kind=%u count=%llu dest=0x%llx src=0x%llx ti=0x%llx\n", m11_site_cur, B(ti), count, dest, src, ti);
+#endif
     if (!count) return 0;
     u32 kind = B(ti);
     u64 r = (kind == 13 || kind == 14 || kind == 22) ? TI_REC(ti) : 0;
-#if M11_INSTR_K12
-    M11_TRACE("[CA_KIND] kind=%u count=%llu dest=0x%llx src=0x%llx\n", kind, count, dest, src);
-#endif
     do {
         u64 step = 8;
         switch (kind) {
