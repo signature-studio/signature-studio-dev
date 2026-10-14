@@ -239,10 +239,11 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 
 ## 18. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
 
-- 測定 commit: `13329492` (origin/main)。API と `gh pr list` の読み取りだけで、Ruleset は変更していない。取得 2026-10-14 16:26Z (`gh pr list --state merged --limit 1000 --json mergedAt,mergedBy`。取得 1000 件、最古 15:52Z で窓を含む)。
-- 設定 (API): id `25094342`・enforcement `active`・承認 1 以上・merge のみ・作成 16:03:11Z。`bypass_actors` は**未設定**・`current_user_can_bypass=never` (issue 本文の Admin (actor_id 5) bypass と不一致)。
-- 24 時間窓 (2026-10-13T16:03:11Z〜10-14T16:03:11Z) の merge 主体: 973 件 = 実装 App 120 件 (12.3%) + reviewer App 851 件 + 人 2 件。PM 記録の 121 件・約 12% と整合。
-- 適用後 (16:03:11Z〜16:26:38Z): merge 21 件、全て reviewer App。実装 App は 0 件。
-- canary (承認前は 405・reviewer の APPROVED で通る・Admin bypass で通る) は PM 記録のみで未再測定。bypass 未設定のため、bypass の部分は現状では再現できない。
+- 測定 commit: `13329492` (origin/main)。API と `gh pr list`・`gh api search/issues` の読み取りだけで、Ruleset は変更していない。
+- 設定 (API、取得 2026-10-14 16:26Z): id `25094342`・enforcement `active`・承認 1 以上・merge のみ・作成 16:03:11Z。`bypass_actors` は**未設定**・`current_user_can_bypass=never` (issue 本文の Admin (actor_id 5) bypass と不一致)。
+- 24 時間窓 `merged:2026-10-13T16:03:11Z..2026-10-14T16:03:11Z` (取得 2026-10-14 16:40Z): 984 件 = reviewer App 862 件・実装 App (`app/opencode-for-signature-studio`) 120 件 (12.2%)・人 2 件。実装 App の 120 件は、merge 前の APPROVED が 0 件 (APPROVED が付いた 22 件は、いずれも merge の後)。PM 記録 (121 件・約 12%) は取得時刻・コマンドが無いので照合に使わない。
+- 取得方法: `gh pr list --repo signature-studio/signature-studio-dev --state merged --search 'merged:<窓>' --limit 1000 --json number,mergedAt,mergedBy,reviews` (件数 984 は 1000 未満で切れていない)。件数の照合は `gh api -X GET search/issues -f q='repo:signature-studio/signature-studio-dev is:pr is:merged merged:<窓>' --jq .total_count`。merge 前の承認は `reviews` のうち `state=="APPROVED"` かつ `submittedAt <= mergedAt` の件数 (jq)。旧方法 (`--state merged --limit 1000`) は作成日時の新しい順のため窓の merge を取りこぼす (2026-10-14 の検収時に 970 件と再現)。
+- 適用後 `merged:2026-10-14T16:03:11Z..2026-10-14T16:26:38Z` (取得 2026-10-14 16:40Z): 21 件、全て reviewer App。実装 App は 0 件。
+- PM 記録・未再測定: canary (承認前は 405・reviewer の APPROVED で通る・Admin bypass で通る)。approve の 7〜8 秒後に merge が通った。bypass 未設定のため、bypass の部分は現状では再現できない。
 - コード差分: `git diff 13329492 HEAD -- .github/scripts .github/workflows` の出力は 0 行 (文書のみの変更)。
 - 未解決 (PM 判断。追跡は #2648 のコメント): bypass の設定、reviewer token 失敗時の挙動、`gh pr merge --auto` の挙動。

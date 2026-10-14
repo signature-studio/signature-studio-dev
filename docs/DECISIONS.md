@@ -260,7 +260,7 @@
 - **状態**: 採用 (2026-10-14, issue #2648 [DOCS-27]。親 #2319。Ruleset は API の作成時刻 2026-10-14 16:03Z に適用済み)
 - **決定**: main への merge に APPROVED の承認を 1 件以上必須とする GitHub Ruleset `main-require-review` (id `25094342`、merge commit のみ) を正とする。通常の承認と merge は reviewer App が行い、実装 App の PR は承認が無ければ merge されない。PM の緊急 merge は `docs/WORKFLOW.md` §2 の手順による。
 - **比較した方式**: (a) Ruleset で承認 1 件以上を必須にする (採用)、(b) 据え置く (実装 agent の Auto Merge が承認要件なしで通る)、(c) 人の承認を必須にする。
-- **理由**: (b) では実装 App の自己 merge が起きていた。2026-10-13 16:03Z〜10-14 16:03Z の 24 時間で 973 件中 120 件 (約 12.3%) が実装 App の merge で、review を経ずに main に入っていた (`tools/pm/REPORT.md` §18 の再測定)。規約 (`docs/WORKFLOW.md` §2・§3) は「検収 → merge」だが、守らせるのは workflow と prompt の書き方だけで、GitHub 側では強制されていなかった。Ruleset は GitHub が強制するので、prompt や workflow の書き方に依存しない。(c) は、依頼者の不在 (最大 2 日。`docs/WORKFLOW.md` §3) の間に merge を止めるため採らない。元の設計意図は `docs/pm/DIRECTIVES.md` の 596 行付近 (「1人以上の Approve を必要とする Ruleset によってマージはブロック」) である。
+- **理由**: (b) では実装 App の merge が承認なしに main へ入っていた (実測は `tools/pm/REPORT.md` §18)。規約 (`docs/WORKFLOW.md` §2・§3) は「検収 → merge」だが、守らせるのは workflow と prompt の書き方だけで、GitHub 側では強制されていなかった。Ruleset は GitHub が強制するので、prompt や workflow の書き方に依存しない。(c) は、依頼者の不在 (最大 2 日。`docs/WORKFLOW.md` §3) の間に merge を止めるため採らない。元の設計意図は `docs/pm/DIRECTIVES.md` の 596 行付近 (「1人以上のApproveを必要とするRulesetによってマージはブロックされていますが」) である。
 - **影響**:
   - reviewer token が取れないと、実装 App は承認できず、PR が承認されないまま止まる見込み (未検証)。
   - 承認の後の Auto Merge の挙動は未検証。

@@ -64,7 +64,7 @@ PM (main)                      subagent (実装)                  subagent (検�
   2026-10-14 16:03Z 作成)。main への merge は **APPROVED の承認が 1 件以上**ある PR だけが通る (`required_approving_review_count=1`)。
   merge 方式は merge commit のみ (`allowed_merge_methods=[merge]`)。CODEOWNERS・最後の push 後の承認・thread 解決は要求しない。
 - **効果**: 承認の無い PR の merge は 405 で失敗する。reviewer App (`oc-reviewer-for-signature-studio`) の APPROVED は承認として数えられる
-  (PM の canary 記録。approve の 7〜8 秒後に merge が通った。再測定していない)。実装 App 単独の承認では merge できない見込み (未検証)。
+  (PM の canary 記録。再測定していない。所見と取得方法は `tools/pm/REPORT.md` §18)。実装 App 単独の承認では merge できない見込み (未検証)。
 - **通常経路**: reviewer App が approve し、同じ run で `gh pr merge --merge --match-head-commit <レビューした head>` を行う
   (`.github/prompts/reviewer.md` の手順 4)。実装 agent が `gh pr merge --auto --merge` で Auto Merge を有効化しても、承認が要るため
   承認の後に merge される見込み。**Auto Merge の挙動は未検証。**
