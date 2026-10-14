@@ -41,6 +41,11 @@ static unsigned char g_sv_ca[12], g_sv_da[12]; static unsigned char *g_p_ca, *g_
 static void patch12(unsigned char* p, const void* t, unsigned char* sv) { memcpy(sv, p, 12); p[0] = 0x48; p[1] = 0xb8; memcpy(p + 2, &t, 8); p[10] = 0xff; p[11] = 0xe0; }
 typedef void* (__attribute__((ms_abi)) *ca1480_t)(void*, void*, void*); typedef void (__attribute__((ms_abi)) *da6c00_t)(void*, int, int, int);
 static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key) {
+    /* FA-29 (#2145): FA_P9MIN=1 は call-through のみ (観測なし・前後の out[0] だけ記録)。full probe との差を切り分ける */
+    if (getenv("FA_P9MIN")) { unsigned char tmp[12]; memcpy(tmp, g_sv_ca, 12); memcpy(g_p_ca, tmp, 12);
+        if (getenv("FA_P9RD")) { uint64_t c2d0, c328, ctl, h[3]; memcpy(&c2d0, (char*)C + 0x2d0, 8); memcpy(&c328, (char*)C + 0x328, 8); memcpy(&ctl, (char*)C + 0x318, 8); memcpy(h, (char*)ctl + 0xa8, 24); fprintf(stderr, "P9RD S%d ctl=%llx\n", g_trSidx, (unsigned long long)ctl); }
+        void* r0 = ((ca1480_t)(g_p_ca))(C, out, key); patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca);
+        uint64_t q0; memcpy(&q0, out, 8); fprintf(stderr, "P9MIN S%d out0=%llx C=%p\n", g_trSidx, (unsigned long long)q0, C); return r0; }
     uint64_t a2d0, a328, ctl, h[3]; memcpy(&a2d0, (char*)C + 0x2d0, 8); memcpy(&a328, (char*)C + 0x328, 8); memcpy(&ctl, (char*)C + 0x318, 8);
     uint32_t kc = 0xffffffffu, k0 = 0xffffffffu; if (key) { memcpy(&kc, key, 4); memcpy(&k0, (char*)key + 4, 4); }
     const char* pth = !key || kc == 0 ? "nokey" : a2d0 == a328 ? "map" : kc != 1 ? "zero" : k0 == 0 ? "static" : "map";

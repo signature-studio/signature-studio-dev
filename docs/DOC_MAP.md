@@ -84,6 +84,7 @@
 | `tools/liftlib/REPORT_APPENDIX_B.md` | ~250 | liftlib §13〜§16 全文 (LIFTLIB-3 CAB-264 / LIFTLIB-4 CAB-272 / LIFTLIB-1 #224 検収 / 環境パス置換 #386) |
 | `tools/liftlib/REPORT_APPENDIX.md` | ~266 | liftlib §17 全文 (HB-H3 #93 iargs pass)・§18 全文 (LIFTLIB #241 ymm(i256) helper ABI / pcmpistri / F2 xmm 戻り搬送) |
 | `tools/liftlib/REPORT_APPENDIX_898.md` | ~35 | liftlib #898 (HB-H22) iargs 未対応 3 site の bind の付録 (REPORT_APPENDIX §17 の #898 節を分割移動)。`movzx` 合成 (1801a3117 解決)、残り 2 site は main の HB-H25 #1158 で bind 済み。高バイト unbound (T16b)。測定値は REPORT_APPENDIX_898.md が正本 |
+| `tools/liftlib/REPORT_APPENDIX_2128.md` | ~60 | liftlib #2128 (部分達成): ott_getparam leaf への icall runtime 配線の実測 (測定 commit `f8bd2ea0`・変更前 `df2eebde` との比較・unit T1〜T5・未解決の起票先)。測定値の正本 |
 | `tools/liftlib/REPORT_APPENDIX_883.md` | ~48 | liftlib #883 (HB-H21) ott_getparam の BLK 配線と this 仮引数化の付録 (REPORT_APPENDIX §17.9・§17.10 の追跡)。測定値は REPORT_APPENDIX.md §17.9 が正本。未解決は #883 に残す |
 | `tools/liftlib/REPORT_APPENDIX_C.md` | ~95 | liftlib §19 全文 (PERF-P1 #155 標準ビルド設定 + 出力 bit 署名ガード + fail-open 封じ込め)・§20 (LIFTLIB-7 #478 ott_auto_none fail-closed + census 再計算) |
 | `tools/liftlib/REPORT_APPENDIX_1560.md` | ~50 | liftlib CI-28 (#1560) の決定: raw `drc.ll` は比較に使わず正規化後 `base.ll` で判定 (b)。k80 の再実測 (base 4/4 一致・raw 2 種)。`REPORT_APPENDIX_D.md` は 250 行上限のため別置き |
@@ -102,6 +103,8 @@
 | `tools/liftdiff/REPORT_APPENDIX_865.md` | ~20 | liftdiff LD-18 (#865) 新規節: trace_head 外 27 件の 414ad0 到達確認 (25/27)・OOB 最上位 frame 集計 (239 件、件数定義と 222 件との差)。`REPORT_APPENDIX.md` は 250 行上限のため増やさず別置き |
 | `tools/liftdiff/REPORT_APPENDIX_LD28.md` | ~26 | liftdiff LD-28 (#1035) の型 C・D 原因候補 (P1〜P3)・0x417b70 の idiv/udiv 仮説の節全文 (REPORT_APPENDIX §9 から分割移動)。測定 commit・鮮度の証跡・数値例 (count = 1 の反例を含む) |
 | `tools/liftdiff/REPORT_APPENDIX_LD62.md` | ~50 | liftdiff LD-62 (#1767) の実測: 0x417b70 の除算 trap 入力 8 件 (native 全件 segv・U1〜U4 未解決) と、予測式の境界値 (旧 float 除算 vs 整数除算、96 件) の計算。生成物は `results/m11_417b70_trap_inputs.md`・`results/m11_417b70_div_boundary.md` |
+| `tools/liftdiff/REPORT_APPENDIX_LD68.md` | ~90 | liftdiff LD-68 (#1907): 計装版 block trace の既定 build 比較 (12 case 差 0・測定時の記録)、1801c5e84 vm0 の wasm block 列、native `1c0b6f`・`1c0b82` の並び。IR 由来の対応 (`ott.ll` 依存) は本 run で未検証。命令単位 trace は子 #2192 (LD-83)、残り 5 関数は #2193 (LD-84) |
+| `tools/liftdiff/REPORT_APPENDIX_LD67.md` | ~70 | liftdiff LD-67 (#1906): ld_blk 計装が OTT 旧 chain の vm0 戻り値を変える件の切り分けと修正。12 case の既定 build との比較 (LD-64 の baseline) |
 | `tools/liftdiff/REPORT_APPENDIX_LD41.md` | ~20 | liftdiff LD-41 (#1238) の新規追記: 0x417b70 の機械語 (idiv 符号付き) と IR (udiv 符号なし) の静的対応。LD-28 付録の 0x417b70 節の補足 (件数は results 参照)。動的確認は #1576 |
 | `tools/liftdiff/REPORT_LD24.md` | ~70 | liftdiff LD-24 (#976) 節: m11 closure `unsupported_sig` 50 件の内訳と #1193 / #1194 への分割 (署名内訳は IR 未照合)。REPORT.md §12 から参照 |
 | `tools/liftdiff/tests/ld24_sig_breakdown.py` | ~110 | LD-24 (#976) の署名内訳スクリプト: `unsupported_sig` 50 行の va/name を IR (`boot_final3.ll`) の define/declare 行から引き、署名形ごとの件数と #1193/#1194 振り分けを出力 (IR 必須・IR 無しは終了コード 1) |
@@ -113,6 +116,8 @@
 | `tools/icall/REPORT_APPENDIX_2083.md` | ~47 | icall #2083 (ICALL-58): crash 残り 3 件の切り分け。`0x1803b3fc0`・`0x1803b5b60` は未実装 import `KERNEL32!RtlPcToFileHeader` (idx 64) の thunk 由来の stack 不整列、`0x1803b9ff0` は `rcx=0xa0001440` 書込みで落ちる切り分けのみ (原因未確定)。idx 64 の確認は `tools/icall/diff/fa_import_names.py` (要 `plugins-freshair`) |
 | `tools/icall/REPORT_APPENDIX_2009.md` | ~61 | icall #2009 (ICALL-55): wasm 側 encoded slot 初期化 (`FA_ENC_INIT=1`) の試行と、crash 残り 3 件の切り分け (未達。受入条件 1・2・3 は未達で #2083 へ) |
 | `tools/icall/REPORT_APPENDIX_2120.md` | ~70 | icall #2120 (ICALL-59): SlateCore encoded slot の実行時トレース (closure 131 関数の zero-fill 読出し VA 7 個・既知 12 slot のうち 3 件)。53 関数の SIGSEGV と `0x1810806a0` の因果は推定 (未実測)。表の境界・entry 数・OTT 比較は #2148 (ICALL-60) へ移管 |
+| `tools/icall/REPORT_APPENDIX_2148.md` | ~80 | icall #2148 (ICALL-60): `0x1810806a0` を迂回した再トレースと読出し VA の追加採取 (部分)。`0x1307100`・`0x13071a0` 起点の 2 系統テーブルを読むディスパッチャ `0x18105de80` の確認。表の境界・entry 数・OTT 比較は子 #2197 (ICALL-62) へ移管 |
+| `tools/icall/REPORT_APPENDIX_2170.md` | ~84 | icall #2170 (ICALL-61): `slot_trace.sh` の fatal RIP 採取 (`work/slot_trace_fatal.txt`)、fatal RIP の群別集計 (baseline 53 件・stub 47 件)、table 2 本 (`0x181307100`・`0x1813071a0`) の静的参照範囲。受入条件 3 のみ部分達成。表の終点・既知 12 slot 判定・OTT 比較は #2197 (ICALL-62)、fatal RIP 原因は #2198 (ICALL-63) へ移管 |
 | `tools/icall/REPORT_APPENDIX_2081.md` | ~78 | icall #2081 (ICALL-57): SlateCore encoded slot の静的解析 (`slatecore_fptr_table.py`)。受入条件 1・3 は未達で #2120 へ。受入条件 2 は部分達成 (12 slot は zero-fill 部の参照として確認) |
 | `tools/icall/REPORT_APPENDIX_2079.md` | ~62 | icall #2079 (ICALL-56): closure 外 indirect target `0x1810806a0` の扱い (closure root に追加・152 関数)。`fa_sweep.sh` の実測と、`0x1810553d0` の値の不一致が未解消であること (#2120 で追跡) |
 | `tools/icall/REPORT_APPENDIX_1921.md` | ~72 | icall #1921 (ICALL-51): SlateCore の encoded 関数ポインタ表・cookie の特定と、native loader の enc(NULL)=cookie 初期化 (`FA_ENC_INIT=1`)。受入条件 1・2 は部分達成 (wasm 側と api-set 表は #2009・#1922 へ移管)。`fa_sweep.sh 8 60` の件数変化の実測を含む |
@@ -378,6 +383,7 @@
 | `tools/targets/freshair/REPORT.md` | ~145 | Fresh Air インストーラ解析 + lift 可否 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA5.md` | ~113 | freshair REPORT §11 (FA-5 #52) の付録: 最大値の除外基準 (§A1)・`.rdata` 不一致 20 関数の分類詳細 (§A2)・Gain の意味同一性の差分実行 (§A3)・FA-18 の切り分け (§A3-2)・meter 更新式の照合 (§A3-3, #1467)・`value` 17 件の参照内訳 (§A4, `ks_rdata_detail.py`)・語単位切り分け (§A5, `ks_rdata_value.py`)・RVA 候補の指す先の切り分け (§A5-3, `ks_rdata_rva_table.py`)。§A1〜§A3 は 250 行上限のため無変更で分割移動、§A4・§A5 は #52 残件として追加 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA22.md` | ~60 | freshair FA-22 (#1578) の付録。FA_NODE1=1 時の setter 0x180c9d74c の失敗形 (逆アセンブル・実測)。部分達成で、判定は子 #1789・#1791 に分割 |
+| `tools/targets/freshair/REPORT_APPENDIX_FA29.md` | ~50 | freshair FA-29 (#2145) の付録。`ca1480` の out[0]=Z+0x2b0 の由来 (key 無し分岐 `C+0x2b0`・2 回目の呼出 C=Z)・full probe が 2 回目で ERR する理由。部分達成で、呼出元の特定は #2187 |
 | `tools/targets/freshair/REPORT_APPENDIX_FA16.md` | ~50 | freshair REPORT §12-5 (未解決: 非空 controller map による 0x180da6c00 到達) の静的読み付録 (FA-16 #1182)。0x180ca1480 の分岐・0x180ca7db0 の map lower_bound ノード配置・0x180c9d700 / 0x180da6c00 の入口条件。実行による検証は含まない。REPORT §12-5 から分割移動 |
 | `tools/targets/freshair/lift2/REPORT.md` | ~210 | Fresh Air Compressor/Filter/制御層 lift (§12 は `REPORT_APPENDIX_FA4.md` に分割移動) |
 | `tools/targets/freshair/lift2/REPORT_APPENDIX.md` | ~180 | lift2 FA-10 (#666): ctrl 工程 FAILED の epf 素材切り分け (同一コード A/B)・rep movs/stosw の実装と e2e 未実行の実測・未解決 FA-11/FA-12 (REPORT §12 から参照)。FA-14 (#907): §7 回帰セットの seed 依存実測・§8 受入の未達と起票先 (#1105)・§9 lift2_e2e 実測 (実測 commit `c531a0cb`) |

@@ -10,6 +10,7 @@
 
 分類 (consumer 直接 memop の判定は audit_undefload と同じ。REGLIVE だったものだけ dest 追跡を試す):
   DEST_FRAME_IN_ESCAPED  dest 元が escape 済み stack_var 内部の frame read (= 本件の型の候補)
+  DEST_FRAME_PTR_ESCAPED 同上だが、consumer が dest 値をメモリアドレス (base/index) に使う (ポインタ値 read)
   DEST_FRAME_OTHER       dest 元が frame read だが escape 無し / 解決不能
   DEST_MEMREAD           dest 元が非 frame の memory read
   REGLIVE                dest 追跡でも memory read に辿れない (従来どおり脱落ではない扱い)
@@ -96,6 +97,19 @@ def trace_dest(mach, va, addr, cs_ins):
     return None, None
 
 
+def used_as_ptr(mach, cs_ins, w):
+    """consumer が dest 元 (w のレジスタ) をメモリオペランドの base/index に使うなら True (ポインタ値 read)。"""
+    import capstone
+    cs = mach.cs
+    wr = {norm_reg64(cs.reg_name(w.operands[0].reg))} if w.operands and w.operands[0].type == 1 else set()
+    for op in cs_ins.operands:
+        if op.type == capstone.CS_OP_MEM:
+            for r in (op.mem.base, op.mem.index):
+                if r and norm_reg64(cs.reg_name(r)) in wr:
+                    return True
+    return False
+
+
 def classify_dest(mach, va, addr, cs_ins, fm, svars):
     mo, w = trace_dest(mach, va, addr, cs_ins)
     if mo is None:
@@ -111,6 +125,8 @@ def classify_dest(mach, va, addr, cs_ins, fm, svars):
         cover = [n for n in svars if -n <= o]
         n = min(cover, key=lambda n: o + n) if cover else None
         if n is not None and svars[n] and o - (-n) < 4096:
+            if used_as_ptr(mach, cs_ins, w):
+                return 'DEST_FRAME_PTR_ESCAPED', w
             return 'DEST_FRAME_IN_ESCAPED', w
         return 'DEST_FRAME_OTHER', w
     if mo['base'] in ('rbp', 'rsp'):
@@ -150,14 +166,15 @@ def main():
                     detail.append('%x %s %s <- %x %s %s' % (addr, ins.mnemonic, ins.op_str, w.address, w.mnemonic, w.op_str))
             if not cls:
                 continue
-            top = next((k for k in ('DEST_FRAME_IN_ESCAPED', 'DEST_FRAME_OTHER', 'DEST_RIPREAD', 'DEST_MEMREAD', 'REGLIVE', 'NOADDR') if cls[k]), 'NOADDR')
+            top = next((k for k in ('DEST_FRAME_IN_ESCAPED', 'DEST_FRAME_PTR_ESCAPED', 'DEST_FRAME_OTHER', 'DEST_RIPREAD', 'DEST_MEMREAD', 'REGLIVE', 'NOADDR') if cls[k]), 'NOADDR')
             sites.append(dict(fn='%x' % rec['va'], ty=rec['ty'], cls=top, detail=detail[:3], file=os.path.basename(path)))
     tally = collections.Counter(s['cls'] for s in sites)
     fns = collections.defaultdict(set)
     for s in sites:
         fns[s['cls']].add(s['fn'])
     res = dict(sites_total=len(sites), by_class=dict(tally), fns_by_class={k: len(v) for k, v in fns.items()},
-               dest_frame_in_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_IN_ESCAPED'], key=lambda s: s['fn']))
+               dest_frame_in_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_IN_ESCAPED'], key=lambda s: s['fn']),
+               dest_frame_ptr_escaped=sorted([s for s in sites if s['cls'] == 'DEST_FRAME_PTR_ESCAPED'], key=lambda s: s['fn']))
     json.dump(res, open(out, 'w'), indent=1)
     print('sites', len(sites), dict(tally), {k: len(v) for k, v in fns.items()})
 
