@@ -8,7 +8,7 @@
 
 - 検証起点: `origin/main` `54bacdc0` (worktree `../ws-2425`・branch `2425-plg-p0b-16-init-units`)。
 - 測定 commit (コードを変えた最後の commit): `980dfcff` (`fix(plugins): smoke gate を InitUnits 完走基準に再定義 (#2425)`)。
-- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に、`work-liftlib` を `tools/liftlib/work/` に展開 (gitignore。`tar --zstd -xf`)。`toolchain-emsdk` / `toolchain-retdec` は runner の `/opt/emsdk`・`/opt/retdec` が既に存在したため展開しなかった (`/opt/emsdk/emsdk_env.sh`・`/opt/retdec/bin/retdec-decompiler` の存在を確認)。`fl-win64` は stage-2 (`fw_icall.dll` 起点) が使わないため展開していない。
+- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に、`work-liftlib` を `tools/liftlib/work/` に展開 (gitignore。`tar --zstd -xf`)。`toolchain-emsdk` / `toolchain-retdec` は runner に `[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md` §4) が既に存在したため展開しなかった (存在を確認)。`fl-win64` は stage-2 (`fw_icall.dll` 起点) が使わないため展開していない。
 
 ## 1. 旧基準 (`dispatch=38`) の中身 — 受入 2 の「旧基準が RunError 終端だった事実」
 
