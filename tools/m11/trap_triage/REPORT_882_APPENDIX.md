@@ -137,7 +137,7 @@
 ### 14.6 現 head での再測定 (競合解消 merge `8963d89b`)
 
 - 測定 commit: `8963d89b` (`origin/main` `fec12353` を取り込む merge。コードを変えた最後の commit)。競合は `tools/m11/m11_build.sh` の `CF=` 行 1 か所のみで、main の `-DM11_INSTR_40F960` (#1317) と本 PR の `-DM11_INSTR_60A270` (#882) を両方残して解消した。
-- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下に展開。`/opt/emsdk` は無かったため emsdk 6.0.12 を `emsdk install 6.0.12` で入れた。`llvm-nm` が PATH に無かったため emsdk 同梱の `llvm-nm` を PATH に通した。
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64`、`work-m11` / `work-liftdiff` を worktree 直下に展開。[EMSDK] が runner に無かったため emsdk 6.0.12 を `emsdk install 6.0.12` で入れた。`llvm-nm` が PATH に無かったため emsdk 同梱の `llvm-nm` を PATH に通した。
 - `m11_gen_ir2.sh` rc=0 (29.7 s、`ldfix` errors=0)。`m11_build.sh` は 4 build とも rc=0 (15〜16 s、`wasm-ld signature mismatch: 0`)。`survey_units.mjs` (`SV_RAW=1`) は 4 回とも rc=0 (6.3〜6.6 s)。load average (1 分) は 0.72〜1.21。
 - 前回の測定 commit `a28a8e30` から測定 commit までの差: `git diff --numstat a28a8e30 8963d89b -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_ov.c tools/m11/m11_post.py` は `m11_build.sh` +4/-2・`m11_ov.c` +16/-0・`m11_rt.c` +13/-1 (`m11_post.py` は差分なし)。内容は次のとおりで、いずれも既定 0 では build 出力を変えない。
   - `m11_build.sh`: CF に `-DM11_DEST_GUARD` (#1547)・`-DM11_INSTR_40F960` (#1317) を追加。`S_NEG` の stamp に `-guard` の項を追加。`ov_instr_40f960.stamp` を追加。
