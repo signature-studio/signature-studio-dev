@@ -118,7 +118,7 @@
 - 方法: `ks_semantic_gain.c` に `CUR_PROBE=1` を足した。入力 L を全サンプル 1.0 にすると L 出力が逐次 cur そのもの (`1.0 * cur` は厳密)。既定実行 (`CUR_PROBE` 無し) の stdout は変更前と **byte 一致** (SC/KH とも `cmp` で確認)。probe の stderr に入力 L (`I<idx>`) と、ramp の係数・端点 (SC `coef`/`A`/`B`、KH `inc`/`a`/`b`) を出す。
 - 検算: probe の cur に入力 L を掛けた値が既定 L と **全 case で bit 一致** (SC/KH とも。違えば照合を止める)。
 - 式 (機械語から読んだ形。`ks_cur_trace.py` の docstring): KH `cur = a + (b-a)*t` (`t = pos*inc`)、SC `cur = (1-t)*a + t*b` (`t = pos*coef`)。`pos` は両側で case 開始時 0。float32 で各演算を丸める。
-- 実測 (測定 commit: この PR の commit。`git diff <測定 commit> HEAD -- tools/targets/freshair/` は 0 行。`ks_cur_trace.sh 200 7` を 3 回実行: 0.52 / 0.52 / 0.54 s real、load 0.02〜0.08、nproc=4):
+- 実測 (測定 commit: `d8d7128a`。`git diff <測定 commit> HEAD -- tools/targets/freshair/` は 0 行。`ks_cur_trace.sh 200 7` を 3 回実行: 0.52 / 0.52 / 0.54 s real、load 0.02〜0.08、nproc=4):
 
 | 群 | L 同一・cur 同一 | L 差・cur 差 | L 差・cur 同一 |
 |---|---|---|---|
