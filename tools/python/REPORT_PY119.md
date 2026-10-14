@@ -62,31 +62,31 @@
 
 - `host/fl_mock.mjs`: 6 関数。範囲外は `RANGE("Range error")` (code 4)。undo 3 件は値を `st.undoHistoryPos/Count/Last` に記録。既定値 `numerator 4`・`denominator 4`・undo 0 は仮置き。
 - `provider/fl_engine.c`: 同じ 6 関数。`RANGE_MSG(m)` マクロを追加 (文言を変えるため)。`fl_table.c` は再生成していない (weak 宣言が既にある)。
-- `tests/provider_check.mjs`: 実装 84 → 90、未実装 351 → 345 (総数 435 は不変)。`pe119` 集合 6 件を追加。基準の 84 は main の `pe115` (`mixer.getTrackColor`, PY-115) を含む (main 取り込み後の値。PR 単独の差分は 83 → 89)。
+- `tests/provider_check.mjs`: 実装 86 → 92、未実装 349 → 343 (総数 435 は不変)。`pe119` 集合 6 件を追加。基準の 86 は main の `pe100` (`channels.getStepParam`・`getCurrentStepParam`) と `pe115` (`mixer.getTrackColor`, PY-115) を含む (main 取り込み後の値。PR 単独の差分は 83 → 89)。
 - `tests/general_diff.mjs`: 呼出し 21 件 (setRecPPQ 4・setNumerator 4・setDenominator 4・undo 4 と既存 5) + 引数個数違い 4 件 = 計 25。
 
 ## 検証
 
-測定 commit: `fd542167` (コードを変えた最後の commit。main `8afbdbef` を merge した commit)。merge の競合は `tests/provider_check.mjs` の 1 件だけで、main 側の `pe115` と本 PR の `pe119` の両集合を残し、件数を 90 / 345 に直した。作業ツリーは `git status` 空で測定した。前提: `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 05 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.2 秒)。`fl-win64` は `$ARTIFACTS_DIR` から DATA block 4 件だけを展開 (`midi.py`・`utils.py`・`MCPTools.pyc`・device script)。
+測定 commit: `07dfe30d` (コードを変えた最後の commit。main `940c0d6a` を merge した commit)。merge の競合は 2 件。`tests/provider_check.mjs` は main 側の `pe100`・`pe115` と本 PR の `pe119` の 3 集合を残し、件数を 92 / 343 に直した。`docs/DOC_MAP.md` は両側の行 (PY-119 と PY-121) を残した。作業ツリーは `git status` 空で測定した。前提: `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 05 秒。この実行は main 取り込み前の `fd542167` で行い、`8afbdbef`→`940c0d6a` の間にビルド側の変更は無い)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒) と `provider/build.sh` を `07dfe30d` で再実行。`fl-win64` は `$ARTIFACTS_DIR` から DATA block 4 件だけを展開 (`midi.py`・`utils.py`・`MCPTools.pyc`・device script)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 90 | 1.29 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 90 / 未実装 345 / MCP 静的 60) | 0.42 秒 |
-| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 0.07 秒 |
-| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.07 秒 |
-| `node tests/channels_diff.mjs` | calls 123、diffs 0、PASS | 0.09 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 92 | 0.90 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.36 秒 |
+| `node tests/general_diff.mjs` | calls 25、diffs 0、PASS | 0.05 秒 |
+| `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.06 秒 |
+| `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS | 0.07 秒 |
 | `node tests/mixer_diff.mjs` | calls 57、diffs 0、PASS | 0.07 秒 |
-| `node tests/device_diff.mjs` | calls 8、rejects 4、midi_out 5、diffs 0、PASS | 0.06 秒 |
-| `node tests/ilmcp_diff.mjs` | calls 32、state_checks 9、diffs 0、PASS | 0.06 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.13 秒 |
+| `node tests/device_diff.mjs` | calls 8、rejects 4、midi_out 5、diffs 0、PASS | 0.07 秒 |
+| `node tests/ilmcp_diff.mjs` | calls 32、state_checks 9、diffs 0、PASS | 0.07 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.17 秒 |
 
-- 測定時の load average: 1.39 (1 分平均、`uptime`、4 core。CPython ビルド直後)。
-- ネガティブコントロール (fd542167 で実施): `host/fl_mock.mjs` の `setNumerator` の上限を 16 → 15 に変えると `node tests/general_diff.mjs` は `general.setNumerator` の args `[16]` の差分で rc 1 (FAIL)。元に戻すと calls 25・diffs 0・PASS (rc 0)。
+- 測定時の load average: 0.39 (1 分平均、`uptime` 21:21:34、4 core)。
+- ネガティブコントロール (`07dfe30d` で実施): `host/fl_mock.mjs` の `setNumerator` の上限を 16 → 15 に変えると `node tests/general_diff.mjs` は `general.setNumerator` の args `[16]` の差分で rc 1 (FAIL)。元に戻すと calls 25・diffs 0・PASS (rc 0)。
 - コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外): 本 REPORT を含む md のみの commit を後から足しても 0 行。
 
 ```
-$ git diff fd542167 HEAD -- tools/python ':!*.md'
+$ git diff 07dfe30d HEAD -- tools/python ':!*.md'
 (空)
 ```
 
