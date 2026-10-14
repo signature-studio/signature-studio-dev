@@ -60,7 +60,7 @@ bash tools/m11/trap_triage/store_watch_1783.sh run1   # 全 unit 完走まで要
 - 測定 commit: `8ba5017d` (コードを変えた最後の commit。`store_watch_1783.sh` の実測はこの時点)。
 - 修正 commit: `e124f367` (`store_watch_1783.sh` の `[aw]` 経路・dead code 削除)。`2c0c8f4d` は REPORT のみ。`eb55aef7` は main (`3624a5fc`) の取り込み merge。
 - **差分は 0 ではない**: `8ba5017d..HEAD` の `tools/m11` には、本 PR の script 修正のほか、main 取り込みで入った他 PR の code 変更が含まれる (`m11_build.sh` の `M11_TRACE_ISOLATE` 追加など)。この差分の下では `8ba5017d` の実測値は HEAD の値とみなせない。**修正後 HEAD の再測定は未実施**: `emcc`・`work-m11`・`work-liftdiff`・`toolchain-emsdk` が runner に無く、取得済みは `fl-win64` のみ。
-- `git diff --stat 8ba5017d HEAD -- tools/m11` (`d46838cc` 時点、14 files, +576 −21):
+- `git diff --stat 8ba5017d 22eb21be -- tools/m11` (現 HEAD 時点、14 files, +577 −22):
 
 ```
  tools/m11/REPORT_APPENDIX_960.md                   |  20 +++
@@ -74,9 +74,9 @@ bash tools/m11/trap_triage/store_watch_1783.sh run1   # 全 unit 完走まで要
  tools/m11/m11_build.sh                             |   5 +-
  tools/m11/trap_triage/REPORT_1046.md               |   9 ++
  tools/m11/trap_triage/REPORT_1317.md               |  19 +++
- tools/m11/trap_triage/REPORT_1783.md               |  45 +++++-
+ tools/m11/trap_triage/REPORT_1783.md               |  67 ++++++++-
  tools/m11/trap_triage/REPORT_718.md                |  27 +++-
- tools/m11/trap_triage/store_watch_1783.sh          |  10 +-
+ tools/m11/trap_triage/store_watch_1783.sh          |  12 +-
 ```
 - 本 PR 自身の差分 (`8ba5017d..e124f367`、`store_watch_1783.sh` のみ) は上記 diff の `store_watch_1783.sh` 行。`git diff 8ba5017d e124f367 -- tools/m11/trap_triage/store_watch_1783.sh` で再現できる。
 - `git diff 6e001233 8ba5017d -- tools/m11` は追加 2 ファイル (REPORT_1783.md・store_watch_1783.sh) のみ。
