@@ -89,6 +89,11 @@ echo 'see [WIN64] in docs/REFERENCES.md' >> "$R/src/a.txt"; commit_case n-entry-
 lint "$(body 'Closes #1\n')"
 { [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: [WIN64] のエントリ ID 参照" || ng "ネガ: [WIN64] のエントリ ID 参照 (rc=$RC)"
 
+new_case n-sync-exempt
+echo "sync" >> "$R/docs/STATUS.md"; commit_case n-sync-exempt
+OUT="$(cd "$R" && OC_LINT_STRICT=1 bash "$SCRIPT" --base main --head HEAD --body-file "$(body 'Closes #2\n\n| 受入 |\n|---|\n| 1 [ ] |\n')" --title 'docs(status): sync 2026-10-14' 2>&1)"; RC=$?
+{ [ "$RC" = 0 ] && ! has_violation; } && ok "ネガ: docs(status): sync の STATUS のみ PR は (c) 対象外" || ng "ネガ: docs(status): sync の STATUS のみ PR は (c) 対象外 (rc=$RC)"
+
 new_case n-report-250
 sed -i '$ s/.*/changed/' "$R/tools/x/REPORT.md"; commit_case n-report-250
 lint "$(body 'Closes #1\n')"

@@ -8,13 +8,14 @@
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-BASE="" HEAD_REF="" BODY=""
-usage() { echo "usage: pr-lint.sh --base <ref> --head <ref> --body-file <path>" >&2; exit 2; }
+BASE="" HEAD_REF="" BODY="" TITLE=""
+usage() { echo "usage: pr-lint.sh --base <ref> --head <ref> --body-file <path> [--title <PR 題名>]" >&2; exit 2; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) [ $# -ge 2 ] || usage; BASE="$2"; shift 2 ;;
     --head) [ $# -ge 2 ] || usage; HEAD_REF="$2"; shift 2 ;;
     --body-file) [ $# -ge 2 ] || usage; BODY="$2"; shift 2 ;;
+    --title) [ $# -ge 2 ] || usage; TITLE="$2"; shift 2 ;;
     *) usage ;;
   esac
 done
@@ -50,8 +51,14 @@ while IFS=$'\t' read -r f n text; do
 done < <(git diff --unified=0 "$BASE...$HEAD_REF" -- . ':!.github/scripts/pr-lint.sh' ':!.github/scripts/tests/test-pr-lint.sh' \
   | awk '/^\+\+\+ /{f=substr($0,7); next} /^@@/{split($3,a,","); sub(/^\+/,"",a[1]); n=a[1]-1; next} /^\+/{n++; print f "\t" n "\t" substr($0,2); next}')
 
-# (c) Closes/Refs と受入の整合
-if grep -qE '(^|[^A-Za-z])Closes #[0-9]+' "$BODY"; then
+# (c) Closes/Refs と受入の整合。自動 PR (題名 docs(status): sync で変更が docs/STATUS.md のみ) は対象外 (DOCS-21 で例外化)
+sync_only=0
+case "$TITLE" in "docs(status): sync"*)
+  [ "$(git diff --name-only "$BASE...$HEAD_REF" | sort | tr '\n' ' ')" = "docs/STATUS.md " ] && sync_only=1 ;;
+esac
+if [ "$sync_only" = 1 ]; then
+  :
+elif grep -qE '(^|[^A-Za-z])Closes #[0-9]+' "$BODY"; then
   while IFS=: read -r n _; do
     report "$BODY" "$n" "closes-unmet" "Closes #N なのに未達の受入条件がある (Closes を外すか、未達を子 issue に移して本文から外す)"
   done < <(grep -nE '\[ \]|未達' "$BODY" || true)
