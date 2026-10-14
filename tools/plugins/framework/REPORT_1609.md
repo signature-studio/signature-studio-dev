@@ -1,5 +1,7 @@
 # #1609 REPORT — Phase B の icall 間接呼出先 [0x710040] の実行時値計測 (途中経過)
 
+> 注 (#2008 §8 で訂正): `0x710030`・`0x710038`・`0x710040` は FL 本体の export table ではなく Delphi RTL の例外フック (`0x40d6e0` = raise の参照先)。下記の「export table」前提の記述は誤りで、正本は `tools/plugins/framework/REPORT_2008.md` §8.1。
+
 - 担当 issue: #1609 `[PLG-P0b-6]` (親 #1478・#985 の残件)。受入 1 (`[0x710040]` の実行時値計測) を実施。
   受入 2〜4 は未達。
 - 起点: `origin/main` 1e3ee7af。worktree `ws-985`・branch `985-plg-p0b-icall-slot`。
