@@ -1,7 +1,9 @@
 [Unit]
-Description=PM heartbeat (audit-only prompt, every PM_HEARTBEAT_SECONDS; see tools/pm/README.md)
+Description=PM heartbeat (audit only, every 2 hours; directive 145): sends the workflow-audit prompt to the PM session
 
 [Service]
+Environment=PM_HEARTBEAT_SECONDS=7200
+Environment=PM_HEARTBEAT_MSG_FILE=/PATH/TO/REPO/tools/pm/heartbeat_msg_audit.txt
 ExecStart=/bin/bash /PATH/TO/REPO/tools/pm/heartbeat.sh
 Restart=always
 RestartSec=30
