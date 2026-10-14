@@ -22,7 +22,7 @@ M11_NEG_413060="${M11_NEG_413060:-0}"   # #944 ネガコン: 1 = dest に p+0x40
 M11_INSTR_413060="${M11_INSTR_413060:-0}"   # #944: 1 = 計測専用に function_413060 へ probe (index 8) と dest 観測 hook を post で入れる。既定 0 は main と同一の post 出力
 M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -181,6 +181,9 @@ if [ "$(cat work/ov_trace_isolate.stamp 2>/dev/null || echo 1)" != "${M11_TRACE_
 echo "${M11_TRACE_ISOLATE:-1}" > work/ov_trace_isolate.stamp
 # #882: 40ff70 観測 probe の ON/OFF で古い ov.o を再リンクしない
 if [ "$(cat work/ov_instr_40ff70.stamp 2>/dev/null || echo none)" != "${M11_INSTR_40FF70:-0}" ]; then rm -f work/obj/ov.o; fi
+# #1894: entry probe (417b70 の ov 版) の ON/OFF で古い ov.o を再リンクしない
+if [ "$(cat work/ov_entry_probe.stamp 2>/dev/null || echo 0)" != "${M11_ENTRY_PROBE:-0}" ]; then rm -f work/obj/ov.o; fi
+echo "${M11_ENTRY_PROBE:-0}" > work/ov_entry_probe.stamp
 echo "${M11_INSTR_40FF70:-0}" > work/ov_instr_40ff70.stamp
 echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
 cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
@@ -195,7 +198,7 @@ emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 \
   --no-entry -Wl,--export-all \
   -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction \
-  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_INSTR_413060" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec ) \
+  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_INSTR_413060" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec )$( [ "${M11_ENTRY_PROBE:-0}" = 1 ] && echo ,_m11_fe_get,_m11_fe_clear ) \
   -Wl,--initial-memory="$INITMEM" -Wl,--max-memory="$MAXMEM" 2> work/link.log || { tail -30 work/link.log; exit 1; }
 mv work/m11_boot.cjs.tmp work/m11_boot.cjs
 python3 m11_postjs.py work/m11_boot.cjs 2>/dev/null
