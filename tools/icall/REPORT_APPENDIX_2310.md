@@ -90,7 +90,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60
 | 実行 | `bash tools/icall/frame_slot_2394.sh` (SWEEP なし)。exit 0 |
 | 所要 | 51 s (14:38:09 → 14:39:00) |
 | load (`uptime` の 1 分平均) | 開始 0.73 → 終了 1.05 (1 並列・逐次) |
-| 素材 | `work-icall` (`rt_freshair-core`・`rw.dll`)、RetDec (`toolchain-retdec` の展開先)、`/opt/emsdk` ([EMSDK])。`plugins-freshair`・`fl-win64` は未使用 |
+| 素材 | `work-icall` (`rt_freshair-core`・`rw.dll`)、RetDec (`toolchain-retdec` の展開先)、emsdk (runner 既設の [EMSDK])。`plugins-freshair`・`fl-win64` は未使用 |
 
 ### 6-2. 実測結果 (`frame_slot_2394.sh` §4 の 8 入力と §1〜§3)
 
