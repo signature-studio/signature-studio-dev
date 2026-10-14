@@ -22,7 +22,7 @@ M11_NEG_413060="${M11_NEG_413060:-0}"   # #944 ネガコン: 1 = dest に p+0x40
 M11_INSTR_413060="${M11_INSTR_413060:-0}"   # #944: 1 = 計測専用に function_413060 へ probe (index 8) と dest 観測 hook を post で入れる。既定 0 は main と同一の post 出力
 M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
-CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0}"
+CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0}"
 # image 終端 (SizeOfImage 0x18c0000) + LB_BASE が GLOBAL_BASE (0x10000000) 以内であること
 python3 - <<PYEOF
 import sys
@@ -102,6 +102,9 @@ if [ "$(cat work/sigfix_recover.stamp 2>/dev/null || echo 0)" != "${M11_SIGFIX_R
 S_INSTR="$M11_INSTR_413060${M11_PROBE_VARIANT:+:$M11_PROBE_VARIANT}"   # #1542: 変種 (M11_PROBE_VARIANT) も stamp に含める。未設定時は従来の値と同一
 if [ "$(cat work/instr_413060.stamp 2>/dev/null || echo none)" != "$S_INSTR" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_INSTR" > work/instr_413060.stamp
+# #882: 40ff70 観測 probe の有無が変わったら post 結果を無効化 (stamp)
+if [ "$(cat work/instr_40ff70.stamp 2>/dev/null || echo none)" != "${M11_INSTR_40FF70:-0}" ]; then rm -f work/boot_final3.ll; fi
+echo "${M11_INSTR_40FF70:-0}" > work/instr_40ff70.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
 if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
   # M11_SIGFIX_RECOVER=1 (#131): sigfix の 0 詰め site を機械語突合し、定数代入が確定する引数だけ復元 (m11_argrecover.py)
@@ -173,6 +176,9 @@ if [ "$(cat work/ov_535bf2.stamp 2>/dev/null || echo none)" != "$M11_FIX_535BF2"
 # M11_INSTR_K12 が変わったら ov.o だけ無効化 (計測 probe の ON/OFF で古い ov.o を再リンクしない)
 if [ "$(cat work/ov_instr_k12.stamp 2>/dev/null || echo none)" != "${M11_INSTR_K12:-0}" ]; then rm -f work/obj/ov.o; fi
 echo "${M11_INSTR_K12:-0}" > work/ov_instr_k12.stamp
+# #882: 40ff70 観測 probe の ON/OFF で古い ov.o を再リンクしない
+if [ "$(cat work/ov_instr_40ff70.stamp 2>/dev/null || echo none)" != "${M11_INSTR_40FF70:-0}" ]; then rm -f work/obj/ov.o; fi
+echo "${M11_INSTR_40FF70:-0}" > work/ov_instr_40ff70.stamp
 echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
 cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
