@@ -242,6 +242,20 @@ test("reconcile: webhook を取りこぼした完了 run・close・新規 issue 
   assert.ok(ctx.m.calls.filter((c) => !c.url.includes("/app/")).length <= 12, "REST は最小限");
 });
 
+test("reconcile: status=requested の run は一覧に出るので completed 扱いにしない", async () => {
+  const clock = { t: T0 };
+  const requested = { id: 10, event: "issue_comment", display_title: "run 10", status: "requested", conclusion: null, updated_at: "2026-10-14T11:30:00Z" };
+  const ctx = await configuredApp({ now: clock, handlers: syncHandlers({ requestedRuns: [requested] }) });
+  await send(ctx.app, "workflow_run", runPayload(10, "requested"));
+  await seed(ctx, 80);
+  await markFresh(ctx);
+  assert.equal(ctx.app.engine.countActive(), 1);
+  clock.t += 6 * 60_000;
+  const gh = await (ctx.app.engine as any).d.gh();
+  await ctx.app.engine.reconcile(gh);
+  assert.equal(ctx.app.engine.countActive(), 1, "requested の run は reconcile 後も稼働中として残る");
+});
+
 test("fullSync: open issue・PR・run・コメントを一括で取り込み、open でなくなった issue は closed にする", async () => {
   const ctx = await configuredApp({
     handlers: syncHandlers({
@@ -290,13 +304,13 @@ test("セットアップ前 (App 未作成) の tick は何もせず、落ちな
 });
 
 // full / reconcile が叩く REST の応答 (空の repo)。
-function syncHandlers(o: { issues?: any[]; blockers?: Record<number, any[]>; comments?: any[]; openRuns?: any[] } = {}) {
+function syncHandlers(o: { issues?: any[]; blockers?: Record<number, any[]>; comments?: any[]; openRuns?: any[]; requestedRuns?: any[] } = {}) {
   return [
     (c: Call) => {
       if (c.method !== "GET") return undefined;
       const u = new URL(c.url);
       const p = u.pathname;
-      if (p.endsWith("/actions/runs")) return j({ workflow_runs: u.searchParams.get("status") === "in_progress" ? (o.openRuns ?? []) : [] });
+      if (p.endsWith("/actions/runs")) return j({ workflow_runs: u.searchParams.get("status") === "in_progress" ? (o.openRuns ?? []) : u.searchParams.get("status") === "requested" ? (o.requestedRuns ?? []) : [] });
       if (/\/repos\/[^/]+\/[^/]+\/issues$/.test(p)) return j(o.issues ?? []);
       if (p.endsWith("/issues/comments")) return j(o.comments ?? []);
       const m = /\/issues\/(\d+)\/dependencies\/blocked_by$/.exec(p);

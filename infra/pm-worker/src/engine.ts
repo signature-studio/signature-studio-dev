@@ -176,7 +176,7 @@ export class Engine {
   private async syncRuns(gh: Gh): Promise<void> {
     const R = this.d.cfg.repo;
     const seen = new Set<string>();
-    for (const st of ["in_progress", "queued", "pending", "waiting"]) {
+    for (const st of ["requested", "in_progress", "queued", "pending", "waiting"]) {
       const runs = await gh.list<any>(`/repos/${R}/actions/runs?status=${st}`, 3, (j) => j?.workflow_runs ?? []);
       for (const w of runs) {
         seen.add(String(w.id));
