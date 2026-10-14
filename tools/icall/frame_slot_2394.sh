@@ -34,6 +34,10 @@ drive base
 $P restore --src "$RT/after.0.restored.ll" --out "$EXP/after.0.restored.fixed.ll"
 FA_SRC="$EXP/after.0.restored.fixed.ll" bash "$HERE/fa_route_build.sh" > /dev/null 2>&1
 drive fixed
+echo "## 5. 負の対照 (2 store を戻すが [rbp-0x10] と [rbp-8] を別 alloca のままにする)"
+$P restore --separate --src "$RT/after.0.restored.ll" --out "$EXP/after.0.restored.sep.ll"
+FA_SRC="$EXP/after.0.restored.sep.ll" bash "$HERE/fa_route_build.sh" > /dev/null 2>&1
+SWEEP=0 drive sep
 if [ "${SWEEP:-0}" = 1 ]; then
   python3 - "$EXP/sweep_base.jsonl" "$EXP/sweep_fixed.jsonl" <<'PY'
 import json, sys

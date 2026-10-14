@@ -3,7 +3,7 @@
   mc     : 元 PE の decode 結果 (before.0.drc.dsm) の 1 関数を capstone で再 decode し、rbp 相対 store を列挙。
            rw.dll (元 PE + .icall) の同 VA の bytes と一致するかも出す。
   phase  : retdec-decompiler --print-after-all の stderr を段ごとに割り、1 関数の stack_var alloca の store/load/ptrtoint を追う。
-  restore: 回復実験用。after.0.restored.ll の function_181057b38 に、脱落した 2 store ([rbp-8]・[rbp-0x20]) を戻した IR を書く。
+  restore: 回復実験用 (--separate で -24 と -16 を別 alloca のままにする負の対照)。after.0.restored.ll の function_181057b38 に、脱落した 2 store ([rbp-8]・[rbp-0x20]) を戻した IR を書く。
            [rbp-0x10] と [rbp-8] は callee が [r8+8] で読むため、1 つの 16B alloca (stack_var_-24 の下位・上位 8B) に置く。
   census : F.ranges の関数群で、機械語の rbp 相対 store のうち、before.0.drc.ll に同 insn.addr の store が無いもの (脱落) を数える。
            脱落 store の slot が、lea [rbp+e] で address を取られた slot の 0x40 以内上側にあるものを「候補」として別に数える。
@@ -105,13 +105,17 @@ def cmd_restore(a):
     old_alloca = '  %stack_var_-24 = alloca i64, align 8\n'
     old_store = '  store i64 %9, i64* %stack_var_-24, align 8, !insn.addr !6585\n'
     assert f.count(old_alloca) == 1 and f.count(old_store) == 1
-    g = f.replace(old_alloca, (
-        '  %fa_pair = alloca i128, align 16\n'
-        '  %stack_var_-24 = bitcast i128* %fa_pair to i64*\n'
-        '  %fa_pair_i = ptrtoint i128* %fa_pair to i64\n'
-        '  %fa_pair_h = add i64 %fa_pair_i, 8\n'
-        '  %stack_var_-16 = inttoptr i64 %fa_pair_h to i64*\n'
-        '  %stack_var_-40 = alloca i64, align 8\n'))
+    if a.separate:  # 負の対照: store は戻すが、-24 と -16 を別 alloca のままにする
+        new = ('  %stack_var_-24 = alloca i64, align 8\n  %stack_var_-16 = alloca i64, align 8\n'
+               '  %stack_var_-40 = alloca i64, align 8\n')
+    else:
+        new = ('  %fa_pair = alloca i128, align 16\n'
+               '  %stack_var_-24 = bitcast i128* %fa_pair to i64*\n'
+               '  %fa_pair_i = ptrtoint i128* %fa_pair to i64\n'
+               '  %fa_pair_h = add i64 %fa_pair_i, 8\n'
+               '  %stack_var_-16 = inttoptr i64 %fa_pair_h to i64*\n'
+               '  %stack_var_-40 = alloca i64, align 8\n')
+    g = f.replace(old_alloca, new)
     g = g.replace(old_store, old_store + (
         '  store i64 ptrtoint (i64* @global_var_181306ce0 to i64), i64* %stack_var_-40, align 8\n'
         '  %fa_p40 = ptrtoint i64* %stack_var_-40 to i64\n'
@@ -177,5 +181,5 @@ if __name__ == '__main__':
     q = sp.add_parser('phase'); q.add_argument('--err', required=True); q.add_argument('--func', required=True)
     q.add_argument('--slots', default='-16,-40,-24,-56,-52'); q.set_defaults(f=cmd_phase)
     q = sp.add_parser('census'); q.add_argument('--dsm', required=True); q.add_argument('--ll', required=True); q.add_argument('--ranges', required=True); q.set_defaults(f=cmd_census)
-    q = sp.add_parser('restore'); q.add_argument('--src', required=True); q.add_argument('--out', required=True); q.set_defaults(f=cmd_restore)
+    q = sp.add_parser('restore'); q.add_argument('--src', required=True); q.add_argument('--out', required=True); q.add_argument('--separate', action='store_true'); q.set_defaults(f=cmd_restore)
     a = p.parse_args(); a.f(a)
