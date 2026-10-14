@@ -1,5 +1,6 @@
 [
   {"block": "18979", "site": "0x741035", "function": "0x740e30",
+   "proof": "f2/waiver_proof.py (#514): 到達不能の前提 V1〜V5 を機械検査。ネガコンは f2/nc_waiver_proof.py",
    "reason": "到達不能と推定 (RetDec が site を含む基本ブロック 0x741007-0x74103b を除去。call [rdi+0x1f0])",
    "evidence": "0x740e6a-0x740e70: eax=[rbp+0x40]; cmp eax,0xe; jge 0x74139c => 以降 v<14 (符号付き)。 0x740ee6 で再読込, 0x740ee9 cmp eax,5; jg 0x740f15 => v>=6, 0x740f15 sub eax,6; je => v>=7, 0x740f1c sub eax,8 => v-14 は -7..-1 (符号なしでは 6 以上), 0x740f22 jae 0x7411dd が必ず成立し、0x740f28 jmp 0x741007 は実行されない (Delphi case 14..19 ラベルの死コード。 [rbp+0x40] は 0x740e6a-0x740ee6 間で書かれず、介在する call 0x409fe0 も触らない前提)"},
   {"block": "19148", "site": "0x780d84", "function": "0x780d00",
