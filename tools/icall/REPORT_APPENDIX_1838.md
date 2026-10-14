@@ -13,37 +13,45 @@ REPORT §15 から参照。修正の本体は `tools/icall/prep_targets.py` の 
 - 伸ばした範囲に、親の断片以外の関数開始 VA (`img.bounds`) が入る場合は伸ばさない。
 - 境界条件は `tools/icall/tests/test_chain_end.py` (PE 不要・4 件) で固定。
 
-## 3. 実測 (測定 HEAD `16f7f452`)
+## 3. 実測 (現 HEAD `d64c86c5`・コード差分 0)
 
-コードの測定 commit は `77be6b71` (最後にコードを変えた commit)。`git diff 77be6b71 HEAD -- tools/icall/prep_targets.py tools/icall/chain_ranges_diff.py tools/icall/tests` の出力は 0 行。以下の測定は `16f7f452` の worktree で行った (コード差分は上記の通り 0)。
+- コードの測定 commit は `77be6b71` (最後にコードを変えた commit)。`git diff 77be6b71 HEAD -- tools/icall/prep_targets.py tools/icall/chain_ranges_diff.py tools/icall/tests` の出力は 0 行 (測定は `d64c86c5` の worktree で実施)。
+- ただし PR 本文の「`git diff 3cdf8cf3 HEAD -- tools/icall` は差分 0」は成り立たない。`3cdf8cf3..HEAD` では `tools/icall` の 13 files が変わっている (`audit_icall.py` 35 行・`rt/icall_rt.c` 1 行・`diff/fa_imports.py` 追加など。`chain_end` 本体の変更は `77be6b71`)。`3cdf8cf3` の旧測定値は使わない。
 
-| 項目 | 結果 |
+| 項目 | 結果 (実測) |
 |---|---|
 | `tests/test_chain_end.py` (合成データ・境界 4 条件) | PASS 4/4 |
-| `chain_ranges_diff.py` (実 PE・131 entries) | `chained=False` と `True` の差分 12 行。伸長 12 件。`leak 件数 0`。PASS |
-| 伸長 12 件 | `1803b5500` `1803de190` `18040c950` `180829930` `180829c20` `180c97f20` `180c98240` `180c99430` `180ca1480` `180da4030` `180da5f20` `180da6720` |
-| `1803de190` の範囲 | `chained=False` `0x1803de190-0x1803de1b7` / `chained=True` `0x1803de190-0x1803de260` |
-| `1803de190` decode 直後 (`--select-decode-only`) | `chained=False` br 0・call 0 / `chained=True` br 6・call 2 |
-| `1803de190` roundtrip after (`after.0.restored.ll`) | `chained=False` br 2・call 5 / `chained=True` br 8・call 14 |
-| audit `call_lost` (after) | `chained=False` 6 / `chained=True` 6 (before は両方 87。after の 6 は非 IAT 残 6 件で不変) |
+| `chain_ranges_diff.py` (入力: 下記 3.1 の 1213 件) | `entries 1213`・`chained=False` と `True` の差分 **931 行**・全行が伸長 (縮小 0)・`PASS leak 件数 0` |
+| `1803de190` の範囲 | `chained=False` `0x1803de190-0x1803de1b7` → `chained=True` `0x1803de190-0x1803de260` |
+| `1803de190` decode 直後 (`before.0.drc.ll`) | `chained=False` br 0・call 0 / `chained=True` br 6・call 2 |
+| `1803de190` roundtrip after (`after.0.restored.ll`) | `chained=False` br 2・call 5 / `chained=True` br 8・call 8 |
+| audit `call_lost` (`roundtrip.sh`) | `chained=False` before 0 → after 0 (`ir_call_dir_total` 0 → 1) / `chained=True` before 0 → after 0 (`ir_call_dir_total` 2 → 2) |
 | sweep (`fa_sweep.sh 8 60`) | 未実施 (子 #1886) |
 
-### 3.1 素材の扱い
+数え方: br / call は `^\s+br ` と `^\s+(%[^ ]+ = )?call ` の行数 (LL の命令行)。`audit_*.json` の `ir_call_dir_total` は別の集計で、before/after で値が違う。前回の付録にあった「`chained=True` after call 14」は、この数え方では再現しない (8)。
 
-- `plugins-freshair` を展開し `fetch.sh` で `SlateCore.core_64` (`tools/targets/freshair/work/win/...`) を得た。
-- `clo_freshair_all.json` は素材に無い。`work-icall` 内の `fa_ranges.txt` (`chained` 修正前の範囲、131 entries) の VA から `{"funcs":[{"va":...}]}` を再構成して `tools/icall/work/clo_freshair_all.json` に置いた (`work/` は gitignore 対象で commit しない)。
-  元の JSON は手元に無いため、元の VA 集合との一致は確認していない。再構成した JSON は `work-icall` の範囲と同じ 131 VA を持つ。
-- 現 HEAD の範囲 (`chained=True`) は `work-icall` の `fa_ranges.txt` と比べて 12 件だけ異なる (`chained` 修正による伸長)。
+### 3.1 入力・素材
 
-## 4. 再現手順 (素材 `plugins-freshair` + `work-icall` が必要)
+- 素材: `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し、`FA_DL=... bash tools/targets/freshair/fetch.sh` で `SlateCore.core_64` (36,285,952 B) を得た。
+- `clo_freshair_all.json` は素材に無い。差し戻しの指定どおり、同じ PE の CHAININFO 親の VA 集合 (`chain_parents` の値の一意集合 = **1213 件**。断片は 2557 件) を入力にした。`tools/icall/work/clo_freshair_all.json` (gitignore 対象・commit しない)。
+- 元の `clo_freshair_all.json` (1213 件以外の VA を含む可能性) とは一致を確認していない。`work-icall` の `fa_ranges.txt` (131 entries) を入力にした旧測定は、この付録では使わない。
+
+### 3.2 対象 VA の注意
+
+- 伸長 931 行の一覧は `chain_ranges_diff.py` の出力 (`PASS leak 件数 0`) を正とする。`3cdf8cf3` 時点の「伸長 12 件」一覧 (131 entries 入力) は、今回の入力 (1213 件) とは対象が違うため、現 head では再現できない。
+
+## 4. 再現手順 (素材 `plugins-freshair` が必要)
 
 ```sh
 python3 tools/icall/tests/test_chain_end.py                                  # PE 不要
 mkdir -p "$RUNNER_TEMP/plugins-freshair" && tar --zstd -xf "$ARTIFACTS_DIR/plugins-freshair.tar.zst" -C "$RUNNER_TEMP/plugins-freshair"
 FA_DL="$RUNNER_TEMP/plugins-freshair" bash tools/targets/freshair/fetch.sh
 PE="tools/targets/freshair/work/win/Fresh Air/C__ProgramData_Slate Digital/Fresh Air/SlateCore.core_64"
+# 入力: chain_parents の値の一意集合 (1213 件) を JSON 化する (clo_freshair_all.json は素材に無い)
+python3 -c 'import json,sys; sys.path.insert(0,"tools/icall"); import audit_icall as A, prep_targets as P; img=A.Image(sys.argv[1]); json.dump({"funcs":[{"va":hex(v)} for v in sorted(set(P.chain_parents(img).values()))]}, open("tools/icall/work/clo_freshair_all.json","w"))' "$PE"
 python3 tools/icall/chain_ranges_diff.py "$PE" tools/icall/work/clo_freshair_all.json
+# roundtrip (1803de190): 範囲ファイルは chained=False `0x1803de190-0x1803de1b7` / chained=True `0x1803de190-0x1803de260`
+bash tools/icall/roundtrip.sh "$PE" <範囲ファイル> <label> <outdir>
 ```
 
 `chain_ranges_diff.py` は範囲の差分 (`chained=False` と `True`)・伸長件数・伸長後の範囲に他関数の開始 VA が入るかを出す。`leak` が 1 件でもあれば FAIL。
-roundtrip は `bash tools/icall/roundtrip.sh "$PE" <範囲ファイル> <label> <outdir>` (範囲は `prep_targets.ranges_with_ends(..., chained=True/False)` で作る)。
