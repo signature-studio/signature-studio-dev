@@ -7,7 +7,7 @@
 ## 1. 測定条件
 
 - 測定 commit: `30860c30` (コードを変えた最後の commit。判定対応の e2e 追加)。作業 worktree `ws-1169` (branch `1169-spill-frame-verdict`)
-- 素材: `work-m11` (`tools/m11/work/` に展開) と `toolchain-emsdk` (`/opt/emsdk` に展開)。どちらも PR 本文の `oc_artifacts:` 行で agent-setup が展開する (`docs/WORKFLOW.md` §11)。実装 run の測定は ws-1169 に素材が無かったため、`M11_WORK` で main の展開先を読んだ (読込のみ)。再現の手順は §5 の 1 通り
+- 素材: `work-m11` (`tools/m11/work/` に展開) と `toolchain-emsdk` (`[EMSDK]` に展開)。どちらも PR 本文の `oc_artifacts:` 行で agent-setup が展開する (`docs/WORKFLOW.md` §11)。実装 run の測定は ws-1169 に素材が無かったため、`M11_WORK` で main の展開先を読んだ (読込のみ)。再現の手順は §5 の 1 通り
 - 素材の性質: `work-m11` は #516 qstore 以前の生成で、現 main の生成手順と一致しない snapshot (`docs/WORKFLOW.md` §11・#680)。以下の「37 のまま」の結論はこの IR に限る。現 main の IR に対する結論ではない
 - 実行: `bash tools/m11/ldfix/fix_d17_e2e.sh` (既定の `M11_WORK` = `tools/m11/work`、`TMPDIR=$RUNNER_TEMP`、foreground)。測定時は `M11_WORK=<main>/tools/m11/work` を指した
 - 結果: rc=0、real 23.3 s、load average (uptime) 0.09 → 0.40。5 ステップすべて完走、emcc rc=0、`spill37_1169.tsv` は results/ と一致
@@ -58,13 +58,13 @@
 
 ## 5. 再現
 
-素材は agent-setup が PR 本文の `oc_artifacts: work-m11 toolchain-emsdk` で展開する (`work-m11` → `tools/m11/work/`、`toolchain-emsdk` → `/opt/emsdk`)。再現の手順は次の 1 通り。
+素材は agent-setup が PR 本文の `oc_artifacts: work-m11 toolchain-emsdk` で展開する (`work-m11` → `tools/m11/work/`、`toolchain-emsdk` → `[EMSDK]`)。再現の手順は次の 1 通り。
 
 ```
 bash tools/m11/ldfix/fix_d17_e2e.sh
 ```
 
-agent-setup の外で再現するときも同じ配置にする (`tar --zstd -xf <work-m11>.tar.zst -C <repo 直下>`、`sudo tar --zstd -xf <toolchain-emsdk>.tar.zst -C /opt`)。
+agent-setup の外で再現するときも同じ配置にする (`tar --zstd -xf <work-m11>.tar.zst -C <repo 直下>`、`sudo tar --zstd -xf <toolchain-emsdk>.tar.zst -C [OPT-TOOLS]`)。
 
 step 4 (判定対応) だけを試すなら audit JSON を渡す: `python3 tools/m11/ldfix/spill37_1169.py OUT.tsv AUDIT.json [AUDIT_AFTER.json]`。`results/audit_510_ssa.json` (#510 時点の snapshot。HEAD の audit の代用ではない) を入力にすると、素材なしで `results/spill37_1169.tsv` と `cmp` 一致する (本 round で 1 本・2 本の両方を確認)。
 
