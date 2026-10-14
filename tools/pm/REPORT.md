@@ -126,7 +126,8 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ## 11. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
 
-fake gh のテスト・ネガコン・実データの検証と、未解決 (schedule の未確認の run・soak の合格ライン)。全文は [`REPORT_APPENDIX_2354.md`](REPORT_APPENDIX_2354.md) (§11 の分割移動)。
+- 結論: fake gh の判定テストと、実データの検算は一致した。数え方 (区間・閾値・残量の扱い) は [`README.md`](README.md) の `idle_report.sh` の節。
+- 全文 (測定値・ネガコン・未解決): [`REPORT_APPENDIX_2354.md`](REPORT_APPENDIX_2354.md) (§11 の分割移動)。
 
 ## 12. PM Worker の live 切替前の突き合わせ (#2443)
 
@@ -190,49 +191,40 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 - live (読み取りのみの `GET /status`、15:18Z): `needs_pm`・`stuck`・`stuck_age_max_min` が返らない。`pm_wake.sh` は `result=status-failed reason=parse`・exit 2 で、送信は 0 件。本番 Worker は #2335 の変更を含まない版と見られる `[未確認: デプロイ版]`。再デプロイ後に needs_pm 経路が有効になる。
 - 差分 (測定 commit から HEAD まで・コード範囲): `git diff edb3ab39 HEAD -- tools/pm/pm_wake.sh tools/pm/test_pm_wake.sh tools/pm/systemd` の出力は空 (差分 0)。
 
-## 15. oc-pm の refs_orphan 検出 (#2337・PR #2478)
+## 15. PM Worker の同時実行の上限の推定 (#2381・PR #2485)
 
-- 測定 commit: `ebfd0a41` (閉じキーワードの `owner/repo#N` と親行の規則の修正)。main は `80d02d77` まで取り込み済み (pm-worker に main 側の変更は無い)。取得時刻は UTC (2026-10-14)。環境: runner・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
-- 差分の証跡: `git diff ebfd0a41 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+測定した commit: `131d3daa` (コードを変えた最後の commit。origin/main `81799351` の取り込みと競合の解消を含む)。取得時刻は UTC (2026-10-14)。`git diff d662b04e 131d3daa -- infra/pm-worker` は 302 行 (main 側の取り込み分。PR 自身の差分は `git diff origin/main 131d3daa -- infra/pm-worker` の 533 行)。以後の commit は `tools/pm` と `docs` だけで、`git diff 131d3daa HEAD -- infra/pm-worker` は 0 行。前回の測定 commit は `d662b04e` (main `5a2b7f41` の取り込みまで)。
 
-### 15-1. 測定
+競合の解消 (origin/main の取り込みは 3 回。1 回目は `3a6fcf81`、2 回目は `5a2b7f41`、3 回目は `131d3daa`):
 
-| 項目 | 結果 |
+- `src/engine.ts` の `status()`: PR 側の `const now` と `cnt` (`runCounts(now)`) を残し、main 側の `now` の重複宣言は 1 つにした (残さないと `SyntaxError: Identifier 'now' has already been declared` で 10 ファイルが落ちる)。counters は main 側 (#2339 の `{ ...this.zero(), ...counters }`) を採用。
+- `src/config.ts`: `DEFAULT_QUEUE_MARGIN`・`DEFAULT_TARGET_MIN` (PR) と `DEFAULT_REPO` (main) を両方残した。`test/status.test.ts` の既存キー一覧は両側のキーを残した。
+- `README.md`: 本機能の節と #2339 の再送の節を両方残した。
+- `tools/pm/REPORT.md`: 本節は main の §13 (R2 素材投入) と §14 (`pm_wake`・#2347) と番号が衝突するため、末尾の §15 に移した。
+- 3 回目 (origin/main `81799351`・競合 2 件): `infra/pm-worker/README.md` の `/status` 表は、main の `last_digest_at` 行と PR の `running` の定義行・`target_eff` ほかの行を両方残した。`test/status.test.ts` の `ADDED_KEYS` は `last_digest_at` と `target_eff` ほかを両方入れた。`src/pm.ts`・`src/classify.ts`・`src/engine.ts` は競合なしで自動マージされ、main の digest の変更と PR の変更が両方入っている (手で触っていない)。
+
+- 単体テスト (`131d3daa`): `git archive 131d3daa infra/pm-worker tools/pm` を作業用の一時 dir に展開し、`cd infra/pm-worker && node --experimental-strip-types --no-warnings --test 'test/*.test.ts'` → **201 pass / 0 fail**、17.4 s、load 0.84 → 1.63 (Node 22.23.3)。増分 7 件は main 側の `test/digest.test.ts`。前回 (`d662b04e`) は 194 pass / 0 fail (15.3 s)。main `5a2b7f41` の `test(` 行は 181 件で、本 PR の `test/target.test.ts` の 13 件を足すと 194 件。
+- Worker 実行環境の vitest (`131d3daa`): 同じ展開先で `npm ci` (86 packages・4 s) → `npx vitest run --config vitest.config.ts` (`test/runtime/` の 3 件) → **3 pass / 0 fail**、1.5 s。
+
+ネガコン (受入条件 6)。対応するテストは `test/target.test.ts`:
+
+| 条件 | テスト |
 |---|---|
-| `cd infra/pm-worker && npm test` (n=3) | 200 件 PASS / 0 FAIL。9.13・9.13・9.23 s。load 0.18・0.60・0.95 (件数は前回と同じ。既存の検査に assert を足した) |
-| `npm run test:unit` (vitest) | 10 件 PASS / 0 FAIL。511 ms。load 0.71 |
-| `npm run test:workers` (vitest + workerd) | 3 件 PASS / 0 FAIL。879 ms。load 0.71 |
-| `bun build src/index.ts --target=browser --format=esm --external 'node:*'` | 93.60 KB (93,603 bytes)。`--minify` を付けると 61.63 KB (61,632 bytes) |
+| 正例: running=60・queued=20 が 30 分 → 70 (29 分では 80) | 「(正例) running=60・queued=20」 |
+| 正例: running=20・queued=15 が 30 分 → 30 | 「(正例) running=20・queued=15」 |
+| (a) queued=0 → TARGET / (d) cap 100 でも 80 を超えない | 「(a) running=40・queued=0」 |
+| (b) queued>0 が 29 分だけ → 変えない / (f) dry-run で POST 0 | 「(正例) running=60・queued=20」 |
+| (c) cap_est=5 → target_eff ≥ 30 | 「(c) cap_est=5」 |
+| (e) 24 時間後に TARGET へ戻る | 「(e) 24 時間の窓」 |
+| (g) TARGET=40 → target_eff ≤ 40 | 「(g) TARGET を env で 40」 |
+| 上限の引き上げ・古い peak で押し上げ直さない・room=0 | 「上限が上がったら」「上限を 60 → 20」「room は target_eff」 |
+| 純関数: 30 分の streak・観測の空きをまたがない・観測の保持 | 「saturatedRunning」「nextCap / capValue」「観測の保持」 |
 
-### 15-2. ネガコン (1 件を壊して FAIL を確認・測定 commit `ebfd0a41`)
+review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engine.ts` の tick)。観測の空き (2 分超) をまたぐ streak は数えない (`SAT_GAP_MS`。テストは「saturatedRunning」)。`fresh` の分岐を直接作るテストは無い (tick 単位の stale を mock で作れない)。既存の tick テスト (`test/status.test.ts`) で回帰は見た。
 
-`infra/pm-worker` を scratch に複写し (`tools/` は symlink)、baseline は 200 件 PASS。worktree は変えていない。
+## 16. oc-pm の refs_orphan 検出 (#2337・PR #2478)
 
-| 壊し方 | 結果 (全 200 件) | FAIL した項目 |
-|---|---|---|
-| `src/refs.ts`: CLOSE_RE の `(?:[\w.-]+\/[\w.-]+)?` を外す | FAIL 2 (PASS 198) | ネガコン (a)・解析 |
-| `src/refs.ts`: 親行を `^親[:：]` (空白を許さない) に戻す | FAIL 1 (PASS 199) | 解析 (`親 : #2319`) |
-| `src/webhook.ts`: `refsOnlyNums` を `[]` に | FAIL 10 (PASS 190) | 検出・(b)(c)(f)・送信・(d)(e)(g)・REST 経路 |
-| `src/webhook.ts`: `pr.merged_at` の条件を外す | FAIL 1 (PASS 199) | REST 経路 |
-| `src/pm.ts`: `refs_orphan` の `dayMax` 10 を 1000 に | FAIL 1 (PASS 199) | ネガコン (d) |
-
-### 15-3. Refs のみの判定の差 (指標と refs_orphan・未統一)
-
-同じ本文に 2 つの判定を当てた結果。`refsOnlyBody` は指標 `refs_only_merge_rate_24h` (`src/webhook.ts`・#2335)、`refsOnlyNumbers` は refs_orphan (`src/refs.ts`)。指標の値を変えるかは PM 判断のため、本 PR では統一しない。追跡は #2623 ([CI-115])。
-
-| 入力 | 指標 (`refsOnlyBody`) | refs_orphan (`refsOnlyNumbers`) |
-|---|---|---|
-| `Closes:#6 Refs #5` | true (指標が閉じキーワードを取りこぼす) | false (正) |
-| `Refs owner/repo#5` | true (別リポの番号を Refs と数える) | false (同じリポの親ではない) |
-| `Refs:#5` | false | true |
-| `Refs #12345678` | true | false (番号は 7 桁まで) |
-
-両者が一致する例: `Closes owner/repo#6 Refs #5`・`Fixes owner/repo#6` + `Refs #5`・`Closes #6` + `Refs #5` (両方 false)、`Refs #5` (両方 true)。
-
-親行は `src/classify.ts`・`tools/pm/launch_issues.py` と同じ規則に揃えた (最初の `親:` 行の最初の `#N` だけ。`親 : #N` の空白を許す)。`親: #10` と `親: #11` の併記は 10 だけを親とする。
-
-### 15-4. 検証範囲
-
-- 検証は fetch のモック (node:test と vitest) まで。実 GitHub API・Cloudflare 上の Worker・live の送信は未実行。
-- `LIVE_*` のスイッチの値は変更していない。
-- 取り込みの経緯: main `5745f0c9`・`d460d139`・`322f81b6` (競合解消は各 merge の commit message)、main `80d02d77` (競合なし)。
+- 測定 commit: `ebfd0a41` (閉じキーワードの `owner/repo#N` と親行の規則の修正)。main は `b3c699d4` まで取り込み済み。全文 (測定・ネガコン・Refs のみ判定の差): [`REPORT_APPENDIX_2337.md`](REPORT_APPENDIX_2337.md) (§16 の分割移動)。
+- 結論: `npm test` 200 件 PASS / 0 FAIL (n=3)。`test:unit` 10 件・`test:workers` 3 件 PASS。ネガコン 5 種は各 1 件ずつ壊して FAIL を確認。
+- 差分の証跡: `git diff ebfd0a41 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。

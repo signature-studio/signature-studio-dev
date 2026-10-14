@@ -1,6 +1,6 @@
-# tools/pm 付録: REPORT §11 の全文 (idle_report.sh の検証 #2354)
+# tools/pm REPORT 付録 — `idle_report.sh` の検証 (#2354)
 
-> **REPORT の付録**: `tools/pm/REPORT.md` §11 の全文 (250 行上限のため無変更で分割移動)。測定値の正本はこの付録。
+> **正本**: `tools/pm/REPORT.md` §11 の分割移動 (250 行上限・`docs/DOC_MAP.md` §1)。本文は無変更で移した。REPORT の §11 は結論と本ファイルへのリンクだけを持つ。
 
 ## 11. `idle_report.sh` の検証 (#2354・watchdog の担当なし時間の集計)
 
@@ -59,3 +59,4 @@
 |---|---|---|
 | `schedule` の run のうち実測期間の外の 4 件 (cancelled 1 件を含む) のログは未確認。cron は約 18 時間に 5 件と疎 | 今後の発火ぶんの標本が読めるかは未確認 (読めなければ `runs.skipped.no_idle_line` に数えるので気づける) | #2355 (timer 停止の手順書) の soak 開始時の確認項目 (訂正コメント済み) |
 | soak の合格ライン (何日・何回までを許すか) は未決 | ツールは回数を出すだけで、判定はしない | #2355 にコメント (判定は PM) |
+
