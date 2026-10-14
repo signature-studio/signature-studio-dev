@@ -153,9 +153,10 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
   180037656: mov eax, 2                           ; 両方失敗 → 2
   ```
 - QI の IID (rdata の `0x11be750` / `0x11be8e8`) は未復号 (rdata 読出の範囲判定が未完)。どの interface を探しているかは未確定。
-- 書込元 `0xacf70` の address は rdata `0xa2bf00` の qword に現れる (vtable 内の位置・所属 class は未確認。IEditController の `0xa2bf58` とは別位置)。直接 call/jmp は 1 件 (`0x1800b4ea4`、thunk。詳細は §4-3 の静的走査)。
+- 書込元 `0xacf70` の address は rdata `0xa2bf00` の qword に現れる (所属 class は `SerumController`、RTTI で確定。訂正 (#1545): 旧記述の「IEditController の `0xa2bf58`」は誤記で、`0xa2bf58` は同 class の第 2 vtable。詳細は `REPORT_SR23.md` §1)。直接 call/jmp は 1 件 (`0x1800b4ea4`、thunk。詳細は §4-3 の静的走査)。
 - 結論: `armWatch` を呼んだスレッド上では、+0x10c は **controller 生成〜editor 準備の区間で、QI 結果から値 2 が格納される経路**を通る (main スレッドで 1 回のみ観測。他スレッドの書込は未観測)。REPORT §3-3 の「copy ctor 0x18000d1b0 が候補」との関係は未検証。0x800010 の観測 (= 1 への遷移) は、この QI 結果が変わる条件の解明が前提。
-- 未検証: IID の内容 / 所属 class / `0xacf70` の呼出元 / 0x800010 の既定 host 受信。
+- 訂正 (#1545): 上の watch 抜粋の `stack[47]` の RVA `0x1134d60` は戻り番地ではなく `.data` 範囲の値 (`REPORT_SR23.md` §1-3)。
+- 未検証 (#1545 で一部解消): IID の内容は §4-3 で突合済み。所属 class は `SerumController` (`REPORT_SR23.md` §1)。`0xacf70` の呼出元 / 0x800010 の既定 host 受信は未解決。
 
 - e2e (`S2HOST_WATCH` 未設定, 実行 commit **`c9fbfc54`** = `git rev-parse` `c9fbfc5473f98cc8902f6ee8daffca3e5446eb1f`、`vst3host.cpp` は `35737960` と同一): **50/50 OK, 67.93 s** (`bash tools/targets/serum2/host/e2e.sh`、exit 0)、NC1/NC2 期待どおり (exit=1, NG=1)、load 0.09 → 0.14。(同コードの `35737960` 時点の run は 71.40 s。)
 
@@ -181,7 +182,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
   [watch] iid@11BE8E8 = C69D316DC5604262B32C951B93BEF4C6
   ```
   - `RVA 0x48954d` は関数 `0x4894c0` (size 180) 内、`0x489548: call 0x1809a8f0c` の直後 (命令境界。`sr1c_func_head.py` と capstone で確認)。所属 class は未確定。
-  - `RVA 0x1134d60` は戻り番地として逆アセンブルで確認していない (未確定)。
+  - 訂正 (#1545): `RVA 0x1134d60` は戻り番地ではなく、`.data` 範囲 (RVA `0x1121000`〜) の値。「戻り番地として未確定」は誤記 (`REPORT_SR23.md` §1-3)。
   - 戻り番地の列挙は RSP から 64 語。frame pointer を省略しているため、呼出連鎖 (thunk → 本体) は完全には追えていない。
 - IID の突合 (SDK 計算値との照合):
   - RVA `0x11be750` の raw `C5C6B8A3 95C08846 B0916F0B B697AA44` は、`DECLARE_CLASS_IID(IVst3ToAUWrapper, 0xA3B8C6C5, 0xC0954688, 0xB0916F0B, 0xB697AA44)` を `INLINE_UID` (little-endian 側) で展開した byte 列と**一致**。
@@ -192,7 +193,7 @@ shim 候補 (SR-3/SR-4 入力) は呼出確認 110 件のうち kernel32 (メモ
   - `sr1c_callers.py … 0xacf70` → `call/jmp 0x1800b4ea4 (.text) RVA 0xb4ea4` が **1 件** (thunk)、`qword@ 0x180a2bf00 (.rdata) RVA 0xa2bf00` が 1 件。
   - thunk `0xb4ea0` (`add rcx,-0x20` → `jmp 0x1800acf70`) への参照は `call/jmp` 0 件、`qword@ 0x180a2bf70 (.rdata) RVA 0xa2bf70` が 1 件 (vtable 要素)。直接の call 元は thunk の 1 件のみ。
   - thunk `0xb4ea0` は `.pdata` に該当エントリが無い (`sr1c_func_head.py` が「pdata に該当なし」)。
-  - vtable の所属 class は、RTTI (`.?AV` 名) が DLL 内に無いため**未確定**。
+  - 訂正 (#1545): vtable の所属 class は RTTI で**確定** (`.?AVSerumController@@`、COL `0xa2c7c0`)。「RTTI 無しのため未確定」は誤記 (`REPORT_SR23.md` §1-1)。
   - vtable 経由の間接 call は候補が多数 (`call [reg+0x70/0x78]` 1126 件、前 HEAD の計測) で、静的には一意に決まらない。
 - 結論:
   - watch hit の値 2 と、同 console の `kNoInterface` 2 件 (両 QI 失敗) は時系列で整合する。戻り値 (`0x180037600`) そのものは未記録のため、「両 QI 失敗 → 2」の因果は未確認。
