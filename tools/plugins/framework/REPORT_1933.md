@@ -23,10 +23,13 @@
 | 手順 | commit | 結果 | 所要時間 (real) | load (開始時) |
 |---|---|---|---|---|
 | `fw_stage2.sh` (stage-1 再利用) | 46faf265 (`hs_callee_disasm.py` 変更前) | exit 0・`SMOKE PASS` (`dispatch=38 units_done=0 va=1 heap=1 ff=0`) | 458.49 s | 0.26 / 0.39 / 0.21 (07:59) |
-| `hs_e2e.sh --fresh` | 46faf265 (同上) | exit 1 / Phase A `dispatch=38 ff=0` (回帰 OK) / `Phase B 例外: memory access out of bounds` / `status=0xffffffff plug=0x0 rec=7` / `E2E FAIL: 1 項目` | 158.40 s | 1.79 / 2.11 / 1.09 (08:07) |
+| `hs_e2e.sh --fresh` | 46faf265 (変更前) | exit 1 / Phase A `dispatch=38 ff=0` (回帰 OK) / `Phase B 例外: memory access out of bounds` / `status=0xffffffff plug=0x0 rec=7` / `E2E FAIL: 1 項目` | 158.40 s | 1.79 / 2.11 / 1.09 (08:07) |
+| `hs_e2e.sh --fresh` (**測定 commit**) | 37177467 (`hs_callee_disasm.py` 修正後) | exit 1 / Phase A `dispatch=38 ff=0` (回帰 OK) / `Phase B 例外: memory access out of bounds` / `status=0xffffffff plug=0x0 rec=7` / `E2E FAIL: 1 項目` | 158.95 s | 0.24 / 1.05 / 0.93 (08:12) |
 
 - Phase B の失敗は REPORT_1891 §2 と同一 (OOB・`plug=0x0 rec=7`)。本 run で変化なし。
-- `hs_callee_disasm.py` は `hs_e2e.sh` の経路外のため、e2e の測定 commit は 46faf265 のまま。
+- `hs_callee_disasm.py` は `hs_e2e.sh` から呼ばれない独立の診断ツール (grep で確認)。e2e の経路外。
+  それでも HEAD (37177467) で再測定し、baseline と同じ結果を確認した。
+- 測定 commit 37177467 から HEAD までのコード差分は 0 (測定 commit が HEAD)。
 
 ## 3. 読解
 
