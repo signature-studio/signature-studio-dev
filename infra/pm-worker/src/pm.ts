@@ -1,7 +1,7 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
 // 検出に LLM は使わない。自由文は解析しない: ラベル・マーカー・番号の正規表現だけ (needs.ts・refs.ts)。issue / PR の自由文は payload に入れない。
 import { parentNumbers } from "./refs.ts";
-import { ASSOC_OK, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
+import { ASSOC_OK, hasOpenPr, KILLED_STOP_AT, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 
 // repository_dispatch の event_type "oc-pm" の kind (列挙 9 値)。prepare-event-context.sh の許可リストと同じ。
 export const PM_KINDS = ["stuck", "no_pr", "refs_orphan", "needs_decision", "stopped_report", "user_answered", "supply", "digest", "retro"] as const;
@@ -22,6 +22,8 @@ export const DIGEST_ROLLING_RE = /^\[[A-Za-z]+-\d+\] 自律運転ダイジェス
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
+// Worker の自動着手を見送る印 (#2651)。付いた open な issue は classify の hold 行に置き、着手 (picks) も relaunch の意図も投稿しない。
+export const OC_HOLD_LABEL = "oc:hold";
 // PM の判断待ちの印 (/status の集計だけに使う。検出の対象ではない)。
 export const NEEDS_PM_LABEL = "needs-pm";
 // 実装 agent が着手しても PR を出さない/出せない issue (pm-apply は PM が PAT で適用する workflow 変更、needs-user-input は依頼者待ち)。
@@ -94,6 +96,19 @@ export function detectPm(s: PmState, o: DetectOpts): PmTarget[] {
       if (oc.reason === "split" || oc.reason === "stop" || (oc.reason === "unknown" && relaunched)) {
         out.push({ kind: "no_pr", ref: i.number, at: oc.at });
       }
+    }
+    // 実装 run が PR も出さずに打ち切られ (cancelled / failure / timed_out) 続けて自動の再着手を止めた issue。oc:no-pr の標識は付かない (runner の shutdown では
+    // record-run-outcome.sh が走らない) ので、Worker が数えた sig.kill で検出する。oc:no-pr の検出と重なる issue は 1 回だけ送る。
+    const kill = sig.kill;
+    if (
+      kill &&
+      kill.count >= KILLED_STOP_AT &&
+      !i.labels.some((l) => HOLD_LABELS.includes(l) || l === STUCK_LABEL) &&
+      !answeredAfter(sig.pmAt, kill.at) &&
+      !hasOpenPr(s, i.number) &&
+      !out.some((x) => x.kind === "no_pr" && x.ref === i.number)
+    ) {
+      out.push({ kind: "no_pr", ref: i.number, at: kill.at });
     }
     if (i.labels.includes(NEEDS_USER_LABEL) && sig.labelAt && sig.userAt && t(sig.userAt) > t(sig.labelAt) && !answeredAfter(sig.pmAt, sig.userAt)) {
       out.push({ kind: "user_answered", ref: i.number, at: sig.userAt });

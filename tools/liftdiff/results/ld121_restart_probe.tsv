@@ -1,0 +1,20 @@
+va	name	chunk	none	native	wasm	both	none_r2	native_r2	wasm_r2	both_r2	class
+0x4150d0	function_4150d0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x423810	function_423810	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x423f80	function_423f80	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x4388d0	function_4388d0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x4425f0	function_4425f0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x44ec40	function_44ec40	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x4bf600	function_4bf600	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x50ab90	function_50ab90	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x529280	function_529280	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x53d7e0	function_53d7e0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x5d19e0	function_5d19e0	0	mismatch	mismatch	mismatch	match	mismatch	mismatch	mismatch	match	両側の持ち越し
+0x6971f0	function_6971f0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x6cd900	function_6cd900	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x7850d0	function_7850d0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x9567c0	function_9567c0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0x959a40	function_959a40	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0xa21170	function_a21170	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0xb77200	function_b77200	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
+0xde10c0	function_de10c0	1	mismatch	mismatch	match	match	mismatch	mismatch	match	match	wasm 側の持ち越し
