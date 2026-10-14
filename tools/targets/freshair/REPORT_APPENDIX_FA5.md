@@ -142,6 +142,35 @@
 | SC の ramp 式 `(1-t)*a+t*b` を、ソースと照らして意図する式かを確認する | 「SC が誤り」と断定はしていない。どちらが正しい式かは未確定 | #1264 (FA-18 の bit 一致化判定) |
 | 200/200 bit 一致 (§A3-2 の未達) | Gain の意味同一性の判定 | #1264 |
 
+### §A3-5. 丸め形だけを差し替えたモデルで L・R・state を再現 (#52 ①・#1264 受入 2, 実測)
+
+- 測定 commit: `76862382` (コードを変えた最後の commit。追加: `ks_gain_model.py`、`ks_semantic_gain.c` の `IN_DUMP=1` (stderr のみ。既定 stdout は byte 一致)、`ks_semantic_gain.sh` の 1 行追加)。
+- 再現: `SC_CORE`・`KH_CORE` に `work-liftlib-targets` の SlateCore.core_64・HeartCore.core_64 を指定して `bash tools/targets/freshair/ks_semantic_gain.sh 200 7` (1 コマンド。出力 `model.json`)。
+- 方法: 実行後 state の ramp 端点 (coef・A・B・cur) は、両側で bit 一致することを確認した上で使う (`nonform_state_fields_sc_vs_kh` 200/200)。harness の入力 `inc`・`a`・`b` は実行中に native 側で再計算されるため、実行前の値は使えない。
+  - ramp の丸め形だけを入れ替える。SC 形 `(1-t)*A + t*B`、KH 形 `A + (B-A)*t` (t = pos·coef、pos を 1 ずつ増やす。float32 の各演算を丸める)。first=1 は実行後 cur の一定値。
+  - L = in·cur、R = in·cur。m1 は L に c1 を、m2 は R に c2 を順に適用 (`m = (s*s-m)*c+m`)。state は実行後の 0x38 B のうち cur・m1・m2 の 3 箇所だけをモデル値に置き換えて比べる。
+- 結果 (測定 commit `76862382`、EXIT=0、0.625 s real、load 0.05→0.17、nproc=4。2 回実行で `sc.txt`・`kh.txt`・`cmp.json`・`ulp.json`・`model.json` の md5 一致):
+
+| モデルの比較 | L・R・m1・m2 一致 (n>0 の 199 件) | 実行後 state を含む LRS 一致 (200 件) |
+|---|---|---|
+| 検証: SC 形 × SC 入力 → SC native | 199/199 | 200/200 |
+| 検証: KH 形 × KH 入力 → KH native | 199/199 | 200/200 |
+| **反実仮想: KH 形 × SC 入力 → KH native** | **199/199** | **200/200** |
+| 負例: SC 形 × SC 入力 → KH native | 126/199 | 127/200 |
+
+- 入力の一致: 実行前の入力 (L・R・state) は harness が両側に同じ乱数を与えるため構成上 SC/KH 同一 (`input_same_sc_kh_cases` 200/200)。実測として確かめたのは、丸め形以外の実行後 state フィールドが 200/200 で一致すること (`nonform_state_fields_sc_vs_kh`) である。
+- 読み: 同じ端点・同じゲイン適用・同じメーター式で、差は ramp 補間の丸め形 (`(1-t)*A + t*B` と `A + (B-A)*t`) だけ。この 1 点を KH 形に換えたモデルは、SC 入力から KH native の L・R・state 全 200 case を再現する。負例は SC 形のままでは 127/200 にとどまり、判定は感度を持つ。
+- 限界: (a) SC の機械語そのものは差し替えていない。モデルは Python の再実装で、両側の native を 200/200 で再現することを確かめた上での反実仮想である。機械語の ramp 命令を置き換えた native での確認は未実施。(b) どちらの丸め形が元のソースの意図かは未確定。「SC が誤り」とは言えない。(c) 結論は本入力 (seed 7、200 case) の Gain に限る。他の snapin への拡大は未検証。
+- 判定 (#1264 受入 2): モデル上では **達成** (主因 = ramp 丸め形の 1 点で、取り除くと 200/200)。native での確認と受入 3 (Gain 以外への拡大) は未了。
+
+#### 未解決 (本節の範囲外)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 機械語の ramp 命令を KH 形に置き換えた native で 200/200 を確認する | 反実仮想がモデル上の結果にとどまる | #52 (残件) |
+| SC の ramp 丸め形がソースの意図か | 「どちらが正しい式か」は未確定 | #52 (残件) |
+| Gain 以外の snapin への同じ差分実行の拡大 (#1264 受入 3) | ①の意味同一性は Gain の 1 件のみで判定 | #52 (残件) |
+
 ### §A5-2. value 17 件の位置対応・再配置・指す先の切り分け (#2024, 実測)
 
 - 測定 commit: `2ca41218` (追加した 3 本のスクリプトを含む commit。`git diff 2ca41218 HEAD -- tools/targets/freshair` は 0 行)。
