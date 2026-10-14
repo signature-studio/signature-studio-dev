@@ -16,6 +16,7 @@ function snap(runs: SnapRun[] = []): Snapshot {
     prs: [],
     runs,
     bot_last: {},
+    bot_report: {},
     pm_art: {},
   };
 }
@@ -31,6 +32,8 @@ function input(o: { launchedAt: number; state?: "launched" | "observed" | "faile
     manualDeps: {},
     liveBlockers: {},
     fullBotBody: {},
+    reportBody: {},
+    outcomeReason: {},
   };
 }
 

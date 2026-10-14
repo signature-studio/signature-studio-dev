@@ -21,6 +21,13 @@ def arg(name, default):
     return type(default)(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default
 
 
+def blk_xmm0_out():
+    # ICALL-78 (#2508): BLK+0x88 = ott_xmm0 が読む出力スロット。ott_run は入力 xmm0 を BLK+0x28 にだけ置くので、
+    # xmm0 を素通しする関数 (native は入力のまま返す) で出力が未初期化の 0 になる。native と同じく入力で初期化してから呼ぶ。
+    blk = json.load(open(os.path.join(T, 'icall', 'work', 'rt_freshair-core', 'map.json')))['blk']
+    return blk - 0x180000000 + 0x30000000 + 0x88
+
+
 def wasm_run(vas, xs):
     js = tempfile.NamedTemporaryFile('w', suffix='.cjs', delete=False, dir=os.environ.get('TMPDIR'))
     js.write(
@@ -35,13 +42,14 @@ def wasm_run(vas, xs):
         "      try {\n"
         "        const g = [0, 1, 2, 3].map(() => BigInt(mod._malloc(0x400)));\n"
         "        const dv = new DataView(new ArrayBuffer(8)); dv.setFloat64(0, x);\n"
+        "        new DataView(mod.HEAPU8.buffer).setBigUint64(%d, dv.getBigUint64(0), true);\n"
         "        mod._ott_run(0x30000000 + (va - 0x180000000), g[0], g[1], g[2], g[3], dv.getBigUint64(0), 0n, 0n, 0n);\n"
         "        out[va].push(BigInt.asUintN(64, mod._ott_xmm0()).toString(16).padStart(16, '0'));\n"
         "      } catch (e) { out[va].push('ERR:' + String(e).slice(0, 60)); }\n"
         "    }\n"
         "  }\n"
         "  console.log(JSON.stringify(out));\n"
-        "});\n" % (MOD, json.dumps(vas), json.dumps(xs)))
+        "});\n" % (MOD, json.dumps(vas), json.dumps(xs), blk_xmm0_out()))
     js.close()
     r = subprocess.run(['node', js.name], capture_output=True, text=True, cwd=T)
     os.unlink(js.name)

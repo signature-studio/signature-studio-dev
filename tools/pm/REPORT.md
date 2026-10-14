@@ -229,7 +229,15 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 差分の証跡: `git diff b7fb7a40 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 - 未解決: refs-only の判定が 2 系統 (指標 `refsOnlyBody`・refs_orphan `refsOnlyNumbers`)。判定の差は付録 §16-3。追跡は #2623 ([CI-115])。
 
-## 17. 観測済み launch の 3 時間 recent を、観測した run の完了から数える (#2645)
+## 17. /oc 投稿の観測のネガコン (#2342・#2473 の vitest 化)
+
+- 測定 commit: `dd9931bf` (`test/launchobs.test.ts` を `test/unit/launchobs.test.ts` に移して vitest 化。README の 1 行)。worktree で `pnpm install --frozen-lockfile --config.minimum-release-age=0` (診断用。既定設定は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`)。
+- 結論: `test:unit` (vitest) **19 件 PASS** (うち観測 9 件)・2.1 s。`test:workers` **3 件 PASS**・1.5 s。`npm test` (node:test) **204 件 PASS / 0 FAIL**・17.7 s。load 0.33 (Node 22.23.3)。
+- ネガコン: `src/launchobs.ts` を 1 行ずつ壊して FAIL を確認。(b) の題名一致を外す → (b) と純関数の 2 件 FAIL。5 分の境界 `>` を `>=` → (a) と純関数の 2 件 FAIL。元に戻した後 `git diff -- src` は 0 行。
+- 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
+- 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。
+
+## 18. 観測済み launch の 3 時間 recent を、観測した run の完了から数える (#2645)
 
 測定した commit: `cd72e291` (コードを変えた最後の commit。base は origin/main `927cd651`)。測定時刻は UTC 2026-10-14 16:27〜16:28。
 - 結論: 観測済み launch の `recent` の基準を、投稿時刻から、観測した run の完了時刻 (`launchObs.doneAt` = `RunState.updatedAt`) に置き換えた。完了時刻が無い観測済み launch と観測記録の無い古い launch は、従来どおり投稿から 3 時間。

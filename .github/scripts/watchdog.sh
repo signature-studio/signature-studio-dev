@@ -59,7 +59,8 @@ set -uo pipefail
 R="$OC_REPO"
 DRY="${DRY:-0}"
 REVIEWER_LOGIN="${OC_REVIEWER_LOGIN:-oc-reviewer-for-signature-studio[bot]}"
-IMPLEMENTER_LOGIN="${OC_IMPLEMENTER_LOGIN:-opencode-for-signature-studio[bot]}"
+# 停止印 (oc-fix-limit) を信じる作者。fix-progress.sh record が job の GITHUB_TOKEN で投稿する (#2622)。実装 App 名義の印は agent が偽造できる。
+MARK_LOGIN="${OC_MARK_LOGIN:-github-actions[bot]}"
 SETTLE_MIN="${OC_SETTLE_MINUTES:-4}"
 MAX_ACTIONS="${OC_MAX_ACTIONS:-12}"
 WD_MAX="${OC_WATCHDOG_MAX:-6}"
@@ -556,8 +557,8 @@ else
       echo "#$sn oc-pm: failed to read comments (not a candidate this pass)"
       continue
     fi
-    # 停止印は fix-progress.sh record が実装 App のトークンで書く (投稿者は実装 App)。intent は当該 PR の pr= のものだけ数える。
-    fixl="$(jq -s -r --arg who "$IMPLEMENTER_LOGIN" '[.[][] | select(.user.login == $who and .user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-limit -->")))] | last | .body // ""' <<< "$cm")"
+    # 停止印は fix-progress.sh record が job の GITHUB_TOKEN で書く (投稿者は MARK_LOGIN。実装 App 名義は agent が偽造できるので数えない #2622)。intent は当該 PR の pr= のものだけ数える。
+    fixl="$(jq -s -r --arg who "$MARK_LOGIN" '[.[][] | select(.user.login == $who and .user.type == "Bot" and ((.body // "") | contains("<!-- oc-fix-limit -->")))] | last | .body // ""' <<< "$cm")"
     if printf '%s' "$fixl" | grep -Eq "oc-pm-intent: stuck pr=${sn}([^0-9]|\$)"; then
       pm_cands+=("stuck $sn")
     fi
