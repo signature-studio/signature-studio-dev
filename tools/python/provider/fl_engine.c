@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int64_t disp_time;
 
 static void set_name(char *dst, const char *s) { snprintf(dst, NAME, "%s", s); }
 static void init_chan(Chan *c, const char *name, const char *plugin, double vol, double pan, int sel, int fx, int64_t color) {
@@ -64,11 +65,13 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
-    dev_port = 0; midi_out_n = 0; sel_chan = 0;
+    dev_port = 0; midi_out_n = 0; sel_chan = 0; disp_time = 0;
 }
 int64_t fl_engine_highlight_cb(void) { return hl_cb; }
 int fl_engine_channel_count(void) { return nch; }
 int fl_engine_midi_out_count(void) { return midi_out_n; }
+/* 検査用の読出し口: 最後に作用先へ渡した時間引数 (頭打ち後)。tests/ui_display_diff.mjs が mock と照合 */
+int64_t fl_engine_display_time(void) { return disp_time; }
 /* 検査用の読出し口: チャンネル c のステップ p (範囲外は -1)。tests/midi_path_diff.mjs が副作用を比べる */
 int fl_engine_grid_bit(int c, int p) {
     if (c < 0 || c >= nch || p < 0 || p >= NSTEP) return -1;
@@ -208,6 +211,16 @@ FL_H(playlist, setTrackColor) { PL(0); p->color = A_INT(1, 0); return fl_ret_non
 FL_H(ui, getVisible) { WN(0); return fl_ret_b(c, win[_w]); }
 FL_H(ui, showWindow) { WN(0); win[_w] = 1; return fl_ret_none(c); }
 FL_H(ui, hideWindow) { WN(0); win[_w] = 0; return fl_ret_none(c); }
+/* PY-121 (#2982): PE 0xd6e860 (crDisplayRect 'iiiii|i')・0xd6ea40 (miDisplayRect 'iii|i')・0xd6ebf0 (miDisplayDockRect 'iiii') は
+ * PyArg で読み、時間引数 (duration / time) を 0x7d0 で頭打ちにして作用先へ渡す (cmp rax,0x7d0)。表示そのものは未モデル */
+#define DISP_MAX 0x7d0
+FL_H(ui, crDisplayRect) { NARGS(5, 6); int64_t v[6]; for (int i = 0; i < 6; i++) v[i] = A_INT(i, 0); disp_time = v[4] > DISP_MAX ? DISP_MAX : v[4]; return fl_ret_none(c); }
+FL_H(ui, miDisplayRect) { NARGS(3, 4); int64_t v[4]; for (int i = 0; i < 4; i++) v[i] = A_INT(i, 0); disp_time = v[2] > DISP_MAX ? DISP_MAX : v[2]; return fl_ret_none(c); }
+FL_H(ui, miDisplayDockRect) { NARGS(4, 4); int64_t v[4]; for (int i = 0; i < 4; i++) v[i] = A_INT(i, 0); disp_time = v[3] > DISP_MAX ? DISP_MAX : v[3]; return fl_ret_none(c); }
+/* PE 0xd6c8b0 (showNotification 'i')・0xd6d7c0 / 0xd6d8e0 (NOARGS): 引数の範囲検査は PE に無い。作用は未モデル */
+FL_H(ui, showNotification) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
+FL_H(ui, closeAllMenu) { NARGS(0, 0); return fl_ret_none(c); }
+FL_H(ui, closeActivePopupMenu) { NARGS(0, 0); return fl_ret_none(c); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }
