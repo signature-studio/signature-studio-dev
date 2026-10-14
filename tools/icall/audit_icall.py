@@ -20,6 +20,8 @@
 IR 突合 (insn.addr のある raw RetDec IR のみ per-site): 各 site VA について IR が
   kept_indirect (call で callee が @name 以外) / resolved_direct (call だが @name; RetDec が静的に解決) /
   other_insn (call 以外の IR 命令だけ有る: jmp→br/ret 等) / dropped (その VA の IR 命令が 0)
+jmptable は jt_present / jt_dropped / jt_folded。jt_folded は jt 比較列が RetDec で switch に畳まれた site
+  (--map 指定時のみ判定: 新区間の終端が switch の default 先で、case 数 = targets-1)。addr は復元しない。
 insn.addr の無い IR (パス鎖後) は per-function の indirect call 件数だけで総数比較する (--ir-counts-only 相当, 自動).
 """
 import argparse, bisect, collections, json, re, struct, sys, os
@@ -393,6 +395,7 @@ def scan_ir(path):
     addr_kind = collections.defaultdict(set)
     per_fn_ind = collections.Counter()
     per_fn_dir = collections.Counter()
+    switch_ncase = collections.Counter()
     cur = None
     n_with_addr = 0
     asm_re = re.compile(r'insn\.addr !(\d+)')
@@ -441,8 +444,10 @@ def scan_ir(path):
             addr_kind[a].add(kind)
             if kind == 'other':
                 addr_kind[a].add('op:' + opname)
+    for m in re.finditer(r'switch i\d+ %[\w.]+, label %dec_label_pc_([0-9a-f]+) \[(.*?)\n  \]', data, re.S):
+        switch_ncase[int(m.group(1), 16)] = len(re.findall(r'label %dec_label_pc_[0-9a-f]+', m.group(2)))
     return dict(fn_defs=fn_defs, has_addr=n_with_addr > 0, n_with_addr=n_with_addr, addr_kind=addr_kind,
-                per_fn_ind=per_fn_ind, per_fn_dir=per_fn_dir)
+                per_fn_ind=per_fn_ind, per_fn_dir=per_fn_dir, switch_ncase=switch_ncase)
 
 
 def dsm_icall_vas(path):
@@ -474,6 +479,7 @@ def main():
     ap.add_argument('--dsm', action='append', default=[])
     ap.add_argument('--json')
     ap.add_argument('--sites')
+    ap.add_argument('--map', help='icall_rewrite の map.json (jt 比較列の new 区間を引く。switch 畳み込み判定用)')
     ap.add_argument('--label', default='')
     ap.add_argument('--max-fn-size', type=int, default=0x40000)
     a = ap.parse_args()
@@ -534,12 +540,20 @@ def main():
     per_fn_ind = collections.Counter()
     per_fn_dir = collections.Counter()
     any_addr = False
+    switch_ncase = {}
     for r in irs:
         any_addr |= r['has_addr']
         for k, v in r['addr_kind'].items():
             addr_kind[k] |= v
         per_fn_ind.update(r['per_fn_ind'])
         per_fn_dir.update(r['per_fn_dir'])
+        switch_ncase.update(r['switch_ncase'])
+    jt_new = {}
+    if a.map:
+        jt_vas = jt_targets_of(sites)
+        for n, l, o in json.load(open(a.map))['insn_ranges']:
+            if o in jt_vas:
+                jt_new[o] = (n, l)
     status_cnt = collections.defaultdict(collections.Counter)
     gap_sites = [s for s in sites.values() if s.gap]
     res['gap_sites'] = len(gap_sites)
@@ -559,6 +573,8 @@ def main():
                 st = 'dropped'
             if s.kind == 'jmptable':
                 st = 'jt_' + ('present' if ks else 'dropped')
+                if not ks and s.va in jt_new and jt_folded(s, jt_new[s.va], switch_ncase):
+                    st = 'jt_folded'
         else:
             st = 'n/a'
         s.ir = st
@@ -589,6 +605,7 @@ def main():
         jts = [s for s in sites.values() if s.kind == 'jmptable']
         res['jmptable_sites'] = len(jts)
         res['jmptable_dropped'] = sum(1 for s in jts if s.ir == 'jt_dropped')
+        res['jmptable_folded'] = sum(1 for s in jts if s.ir == 'jt_folded')
     res['fns_with_indirect_call'] = len({s.fn for s in call_sites})
     if dsm_ic:
         res['retdec_dsm_indirect'] = len(dsm_ic)
@@ -605,6 +622,18 @@ def main():
     print_table(res)
 
 
+def jt_targets_of(sites):
+    return {v for v, s in sites.items() if s.kind == 'jmptable'}
+
+
+def jt_folded(s, new_rg, switch_ncase):
+    """jt 比較列が RetDec で switch に畳まれたか: 新区間の終端が switch の default 先で、case 数 = targets-1"""
+    n, l = new_rg
+    end = n + l
+    ncase = switch_ncase.get(end)
+    return ncase is not None and s.targets is not None and ncase == len(s.targets) - 1
+
+
 def print_table(res):
     print('== %s: funcs=%d (range無し %d) insn=%d sites=%d (gap-only %d, うち RetDec dsm 内 %d)' % (res['label'], res['nfuncs'], res['nfuncs_norange'],
                                                                       res['ninsn'], res['sites_total'], res['gap_sites'], res['gap_sites_in_retdec_dsm']))
@@ -614,9 +643,9 @@ def print_table(res):
     print('call total=%d (非IAT %d) / fns_with_indirect_call=%d / IR indirect call=%d direct=%d' % (
         res['call_total'], res['call_non_iat'], res['fns_with_indirect_call'], res['ir_call_ind_total'], res['ir_call_dir_total']))
     if 'call_dropped' in res:
-        print('call: kept_indirect=%d resolved_direct=%d other_insn=%d dropped=%d  => lost %d (非IAT %d) | tail-jmp %d (lost %d) | jmptable %d (dropped %d)' % (
+        print('call: kept_indirect=%d resolved_direct=%d other_insn=%d dropped=%d  => lost %d (非IAT %d) | tail-jmp %d (lost %d) | jmptable %d (dropped %d, folded %d)' % (
             res['call_kept'], res['call_resolved_direct'], res['call_other'], res['call_dropped'], res['call_lost'], res['call_lost_non_iat'],
-            res['jmp_tail_sites'], res['jmp_tail_lost'], res['jmptable_sites'], res['jmptable_dropped']))
+            res['jmp_tail_sites'], res['jmp_tail_lost'], res['jmptable_sites'], res['jmptable_dropped'], res['jmptable_folded']))
     if 'retdec_dsm_indirect' in res:
         print('RetDec dsm 内の間接 call/jmp=%d / うち capstone と一致=%d' % (res['retdec_dsm_indirect'], res['capstone_in_retdec_dsm']))
 
