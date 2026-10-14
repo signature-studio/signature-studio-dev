@@ -139,3 +139,30 @@ k236 P=0xa027 値 0x40a027: なし
 - 言えないこと: boot 中・unit 0〜16 の実行で書き込まれていないこと。これは本 PR で未検証であり、「書き込み元から除外した」とは書かない。PE 側の値が bin 表 (16 バイト stride) の中に入る理由 (表の長さ・構造体の重なり) も未確認。
 - 未確認 (次の入口): (a) unit 17 の trap がこの 4 スロットの F を実際に読むか (`trap_bins.mjs` は状態だけで、読み取り命令の特定は未実施)。(b) bin 表 k≥184 が FastMM の bin 表の一部か (PE の `.data` が同じ領域に別の配列を持つ可能性)。(c) 0x407a50 の `.text` 関数と P の関係 (`function_407a50__lifted` が FastMM_GetMem の実体かは未確認。根拠は未取得)。
 - 未解決 (起票先): unit 17 の trap 命令の特定と、bin 表 k≥184 の構造 → #942 (次 run)。
+
+## 13. bin 表の boot 前後差分と k184〜186 の正体 (#942 受入 1・2・run 9)
+
+測定: `S4_NAME=base|fix node tools/m11/ldfix/bin_table_diff.mjs` (新規・`bin_post_probe.mjs` と同じ手順で boot 前後の bin 表 k=0..255 を比較)。
+素材 `fl-win64` / `work-m11` (`tools/m11/work/` を worktree から参照)。`ldfix_e2e.sh` は 59.6 秒・rc 0・judge PASS (base = fix)。
+
+- boot 前後で bin 表 (BASE 16404744・16 バイト刻み) の変化は base / fix とも **96 スロット・同一** (md5 一致)。
+  変化した k は 0,1,4,5,6,8,9,10,… と 216 (k184〜186・215・236・255 は変化なし)。修復 pass の有無は boot の書き込みを変えない。
+- `bin_post_probe.mjs` (base/fix): k184 P=0x7a50 / k185 P=0x8040 / k186 P=0x8870 / k215 P=0xee / k236 P=0xa027 は PRE・POST で同一。
+- `bin_size_probe.mjs` (fix・`S4_IMAGE` 指定): PRE nonzero=0 / POST nonzero=324・max_bin=172・refs_ge184=0。
+- `trap_bins.mjs` (fix・unit 17): BEFORE/AFTER とも k184・185・186・236 が OOB、k215 は F=0。unit 17 の trap は bin 表を書き換えない。
+
+### P の正体 (新知見)
+- k184〜186 の P の生値 (0x7a50 / 0x8040 / 0x8870) は、PE `.data` 上で VA (0x407a50 / 0x408040 / 0x408870) として `.reloc` DIR64 対象になっている (§12)。
+- P が指す先の先頭バイトは `55 57 56 53` (push rbp/r15/r14/r13)・`55 41 57 41`・`53 48 83 ec` で、3 件とも関数の prologue に見える。
+- 従って k184〜186 の「bin ポインタ」は、bin 表の隣に並ぶ**関数ポインタ表**の要素を 16 バイト刻みで読んでいる可能性がある。
+  サイズ→bin 表は bin 172 までしか参照せず (refs_ge184=0)、k≥173 は bin 表の外と考えられる。仮説。
+- k236 (P=0xa027) は先頭バイト `48 8d 4d 38` (lea) で、prologue とは言い切れない。仮説の支持は 3/4。
+
+### 結論 (受入 1・2 の進捗)
+- **確定**: boot は k184〜186・215・236 の P/F を書き換えない。bin 表の不正な値は boot より前 (イメージ読込時) から存在する。
+- **確定**: 修復 pass の有無は boot 前後の bin 表差分 (96 スロット) を変えない。ldfix は boot の threw の原因ではない。
+- **未確定**: boot の `memory access out of bounds` を起こす load の番地。boot で書かれる 96 スロットの値そのもの (書き込み元の関数) は未特定。
+- **未確定**: unit 17 の trap が k184〜186 を実際に読むか (trap_bins は状態の表示のみ)。
+- 次の入口: boot の書き込み関数 (96 スロットを書く store の関数) の特定と、k≥173 が bin 表の外であることの確認 (bin 表の長さ = `size/8` 索引の上限と照合)。
+
+- 未解決 (起票先): boot 書き込み元の関数・trap の load 番地 → #942 (次 run)。現 main 生成 IR での ldfix 効果の再判定 → #1292 (merge 済み #1469)。work-m11 の IR と現 main の不一致 → 既存 #680。
