@@ -14,7 +14,7 @@ build 入力 (m11 の IR・C・build スクリプト) は origin/main `208b4ef9`
 ## 1. 手法: IR にも C にも手を入れない wasm 計装
 
 - 既存の計装は C 呼出し (`m11_sw`) や IR の変更で、shadow stack の残骸を変えて結果が変わった (REPORT_1046 §18・§19)。本節は C・IR のどちらも変えない。
-- `wasm-opt --instrument-memory` (binaryen 133、`/opt/emsdk/upstream/bin`) で `m11_boot.cjs.wasm` の全 store に `env.store_ptr(id, bytes, offset, ptr)` と `env.store_val_*` の hook を入れた `instr.wasm` を作る (`work/trap_2672/`、commit しない)。
+- `wasm-opt --instrument-memory` (binaryen 133、`[EMSDK]` の `upstream/bin`) で `m11_boot.cjs.wasm` の全 store に `env.store_ptr(id, bytes, offset, ptr)` と `env.store_val_*` の hook を入れた `instr.wasm` を作る (`work/trap_2672/`、commit しない)。
 - hook は JS import。`ptr` をそのまま返し、線形メモリには書かない (wasm の local と call は線形メモリの shadow stack を使わない)。
 - 記録条件 (issue の条件そのまま): 実効アドレス `ptr + offset` が `W = 0x10a9f910` (8B) と重なり、かつ現在の下位 4B が `OLD` に等しい store。hit では `new Error().stack` の wasm frame を取る。`store_val` で書込み値を取る。
 - 計装版は glue の `instantiateWasm` で読む。survey の手順 (`m11_image.bin` の投入・`m11_boot_enter`・unit ループ) は `survey_units.mjs` と同一。
@@ -97,8 +97,9 @@ export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64   # tar --zstd -xf $ARTIFACTS_DIR/fl-w
 bash tools/m11/m11_gen_ir2.sh && bash tools/m11/m11_build.sh
 mkdir -p tools/m11/work/trap_2672
 node tools/m11/trap_triage/survey_units.mjs tools/m11/work/trap_triage/base.json          # 基準 (§2.1)
-/opt/emsdk/upstream/bin/wasm-opt --instrument-memory tools/m11/work/m11_boot.cjs.wasm -o tools/m11/work/trap_2672/instr.wasm
-/opt/emsdk/upstream/bin/wasm-dis tools/m11/work/trap_2672/instr.wasm -o tools/m11/work/trap_2672/instr.wat
+# wasm-opt / wasm-dis は [EMSDK] の emsdk_env.sh を source した PATH のもの (m11_build.sh と同じ)
+wasm-opt --instrument-memory tools/m11/work/m11_boot.cjs.wasm -o tools/m11/work/trap_2672/instr.wasm
+wasm-dis tools/m11/work/trap_2672/instr.wasm -o tools/m11/work/trap_2672/instr.wat
 python3 tools/m11/trap_triage/store_sites_2672.py tools/m11/work/trap_2672/instr.wat tools/m11/work/trap_2672/sites.json
 WATCH_OLD=0 WATCH_UNITS=0,1 node tools/m11/trap_triage/watch_store_2672.mjs out_pos.json   # 陽性対照 (§2.3)
 WATCH_OLD=0x1029e5d8 node tools/m11/trap_triage/watch_store_2672.mjs out_main.json          # 本番 (§2.2・§2.4)
