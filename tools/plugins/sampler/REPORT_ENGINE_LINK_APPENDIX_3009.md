@@ -10,9 +10,9 @@
 
 ## 2. 測定の前提
 
-- 素材: `fl-win64` を `$FL_WIN64_DIR/extracted` に展開 (`tar --zstd -xf`、8.5 s)。 対象は block23663 (殻)・block23664 (engine)。
-- 測定 commit: **`74c4b07e`** (`dispatch_selectors.py` の追加 commit)。 本付録と REPORT の追記は md のみ。 `git diff 74c4b07e HEAD -- tools/plugins/sampler ':!*.md'` の出力は 0 行 (§8)。
-- 実行: `python3 tools/plugins/sampler/dispatch_selectors.py "$FL_WIN64_DIR/extracted"`。 `RESULT: PASS` (CHECK 7 件 OK)、wall 15.16 s、最大 RSS 213,648 KB、4 vCPU、load average 0.25〜0.41 (実行前後の `uptime`)。 n=1。
+- 素材: `fl-win64` を `$FL_WIN64_DIR/extracted` に展開 (`tar --zstd -xf`、block23663・block23664 の 2 件のみ)。 対象は block23663 (殻)・block23664 (engine)。
+- 測定 commit: **`8135335f`** (`dispatch_selectors.py` に 8 byte 絶対 VA の走査を足した commit。 直前の測定 commit は `74c4b07e`)。 本付録と REPORT の追記は md のみ。 `git diff 8135335f HEAD -- tools/plugins/sampler ':!*.md'` の出力は 0 行 (§8)。
+- 実行: `python3 tools/plugins/sampler/dispatch_selectors.py "$FL_WIN64_DIR/extracted"`。 `RESULT: PASS` (CHECK 12 件 OK)、`--nc` は MISMATCH 1 件・exit 1。 時間・RSS・load は §8。
 - 走査: 関数は `.pdata` の全 RUNTIME_FUNCTION から作る。 参照は命令単位 (即値・RIP 相対) とデータ内の 4 byte RVA で数える (線形走査は使わない)。
 
 ## 3. (c) engine 側 `DispatchToEngine` (block23664) の戻り値
@@ -77,7 +77,7 @@ pdata の全関数から走査した呼出し元。 前の付録 (`REPORT_ENGINE
 | 0x84571c | 0x8456d0 | 14 | 直後に `rax` を上書き |
 | 0x84b49e | 0x84b3c0 | 8 | 使わない |
 | 0x84bd8f | 0x84bc30 | {3, 7} (§5) | 使わない (ループ先頭で上書き) |
-| 0x84bdfa | 0x84bc30 | §5 の集合 | 使わない (sel 2 は常に 0) |
+| 0x84bdfa | 0x84bc30 | §5 の集合 | 使う: 直後の `mov ax,1` (16bit の部分書込み) の後、`shl eax,cl` が eax 全体を読む (eax の上位 16bit は call の戻り値のまま)。 sel 2 の戻り値は常に 0 のため値には依らない |
 
 - wrapper 0x846ac0 (sel 4): **12 件**。 戻り値を使う件が多い:
 
@@ -96,7 +96,7 @@ pdata の全関数から走査した呼出し元。 前の付録 (`REPORT_ENGINE
 | 0x847863 | 0x847670 | 1 | `mov edx, eax` |
 | 0x847e56 | 0x847e40 | 10 | `test eax,eax; jge` |
 
-- 訂正: 付録 540 §10 の「sel 2 の呼出し元 9 件・sel 4 の 8 件」は、0x844533・0x84bdfa (sel 2) と 0x843de6・0x843dfa・0x844a05・0x845692 (sel 4) を含まない。 正しくは sel 2 が 11 件、sel 4 が 12 件。 0x843930 の呼出し元も 5 件ではなく 6 件 (0x843b9f を含む)。 0x84bc30 のコード参照は 0 件 (`.pdata` の unwind 項目のみ)。
+- 訂正: 付録 540 §10 の「sel 2 の呼出し元 9 件・sel 4 の 8 件」は、0x844533・0x84bdfa (sel 2) と 0x843de6・0x843dfa・0x844a05・0x845692 (sel 4) を含まない。 正しくは sel 2 が 11 件、sel 4 が 12 件。 0x843930 の呼出し元も 5 件ではなく 6 件 (0x843b9f を含む)。 0x84bc30 の命令参照 (即値・RIP 相対) は 0 件。 8 byte 絶対 VA は `.text` 内の表の 1 件 (§5)。
 
 ## 5. (a) 0x84bd8f と 0x84bdfa の内側 id
 
@@ -109,8 +109,12 @@ pdata の全関数から走査した呼出し元。 前の付録 (`REPORT_ENGINE
 5. `0x84bda3`: mask 判定が偽。 `esi ≥ 0x110` (符号付き) なら sel 3 setter (0x846b10)。 それ以外は `0x84bde1` で `call 0x846a80` (sel 2、`rdx = esi`)。 これが 0x84bdfa。
 
 - 0x84bd8f の集合: mask 0x88 のビットは {3, 7}。 `esi = 3` は手順 2 で `0xc` に写るため、フラグ `[[rsp+0x38]+0x7c8]+0x48e == 0` のときだけ残る。 よって **{3, 7}** (script の CHECK `0x84bd8f inner ids` = [3, 7] OK)。
-- 0x84bdfa の集合: `esi` が符号付きで 0x110 未満、かつ手順 4 に入らないもの (= 0〜7 のうち mask が偽のもの、8、負の値、0xc)。 `|[rbx+0x18]|` の値域に依存し、rbx の由来が未確定のため **未確定**。
-- 0x84bc30 の呼出し元: コード参照 0 件 (即値・RIP 相対・データ内 RVA4 の全走査)。 関数ポインタ経由と推定 (未確認)。
+- 0x84bdfa の集合: `esi` が符号付きで 0x110 未満、かつ手順 4 (ループ) に入らないもの。 `|[rbx+0x18]|` の値域に依存し、rbx の由来が未確定のため **未確定**。
+- 0x84bc30 の参照 (`dispatch_selectors.py` の 3 種の走査。 命令の即値・RIP 相対は全関数 (`.text` を含む)、4 byte RVA は `.text` 以外のデータ section、8 byte 絶対 VA は全 section):
+  - 命令の即値・RIP 相対: 0 件。
+  - 4 byte RVA (`.text` 以外): 1 件 (`.pdata` の unwind 項目、VA 0x9a1858)。 `.text` の 4 byte 列は走査しない (偶発一致が出るため。 例: 0x843d30 は `.text` に 4 byte 一致 1 件 (VA 0x430877) があるが、4 byte 境界にない非整列の偶発一致で、参照ではない)。
+  - 8 byte 絶対 VA (全 section): **1 件** (VA 0x84a468、`.text` 内、8 byte 整列、`.reloc` の DIR64 項目に載る = ローダが補正する画像内ポインタ)。 この位置は名前文字列と関数ポインタが並ぶ表に見える (0x84a400〜0x84a4b8 で確認。 隣の 0x84a488 は 0x84bba0 を指す)。 **この表が 0x84bc30 の参照元の候補**。 表を読む側のコードは未確認 (§7)。
+  - 0x846a80・0x846ac0・0x843930・0x843d30 は 8 byte 絶対 VA で 0 件。
 
 ## 6. (b) sel 10 の第 2 引数 (関数 0x843930 の `rdx`)
 
@@ -131,13 +135,14 @@ pdata の全関数から走査した呼出し元。 前の付録 (`REPORT_ENGINE
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x84bc30 の呼出し元と `|[rbx+0x18]|` の値域 (0x84bdfa の内側 id の集合) | sel 2 の 0x84bdfa 経路の内側 id | #540 (継続) |
+| 0x84bc30 の参照元 (8 byte 絶対 VA は表 0x84a468 の 1 件のみ。 表を読む側のコードは未確認のまま残す) と `|[rbx+0x18]|` の値域 (0x84bdfa の内側 id の集合) | sel 2 の 0x84bdfa 経路の内側 id | #540 (継続。 表を読む側の参照の確認を含む) |
 | `[[rsp+0x38]+0x7c8]+0x48e` の設定元 (3 と 12 の分岐) | 0x84bd8f で id 3 が届くかどうか | #540 (継続) |
 | sel 10 の第 2 引数 (C 文字列) の内容。 §6 の 6 呼出し元の由来 (実行時値) | sel 10・14 の入力文字列 | #540 (継続)。 動的確認は wine 不在のため不可 |
 | sel 4 の id 0 の戻り値 (0x843d30 の呼出し元 6 件での使用) | sel 4 id 0 の値の使われ方 | #540 (継続) |
 
 ## 8. 検証
 
-- 測定 commit `74c4b07e` 以降の sampler コード差分: `git diff 74c4b07e HEAD -- tools/plugins/sampler ':!*.md'` (本 REPORT の commit は md のみ)。
-- 通常実行: `RESULT: PASS`、CHECK 7 件 (sel 2 の 0 返し 15/15、sel 4 の 0 返し 0/15、sel 2 呼出し元 11、sel 4 呼出し元 12、0x84bd8f の id [3, 7]、0x84bc30 のコード参照 0、0x843930 のコード参照 6)、exit 0、15.16 s。
-- ネガティブコントロール: `dispatch_selectors.py <dir> --nc` は sel 2 の 0 返しの期待値を 14 に変え、`MISMATCH` で exit 1 (15.47 s)。
+- 測定 commit: `8135335f` (コードを変えた最後の commit)。 その commit 以降の sampler のコード差分 (md 以外): `git diff 8135335f HEAD -- tools/plugins/sampler ':!*.md'` の出力は 0 行 (本 REPORT の commit は md のみ)。 再測定は要らない。
+- 通常実行 (n=1、4 vCPU、`/usr/bin/time -v`): `RESULT: PASS`、CHECK 12 件 OK、exit 0、wall 20.40 s、最大 RSS 330,668 KB、load average 0.16 (1 分平均、開始前) → 0.40 (終了後)。 CHECK の内訳: sel 2 の 0 返し 15/15、sel 4 の 0 返し 0/15、sel 2 呼出し元 11、sel 4 呼出し元 12、0x84bd8f の id [3, 7]、0x84bc30 の命令参照 0、0x843930 の命令参照 6、8 byte 絶対 VA は 0x84bc30 = 1 件 (VA 0x84a468)・0x846a80・0x846ac0・0x843930・0x843d30 = 0 件。
+- ネガティブコントロール: `dispatch_selectors.py <dir> --nc` は sel 2 の 0 返しの期待値を 14 に変え、`MISMATCH` で exit 1 (wall 20.74 s、最大 RSS 330,436 KB)。
+- 測定の範囲 (機械化の制限): `classify_case` は線形走査で、jcc の分岐先を追わず、最初の jmp・ret・共通出口で止まる。 sel 2・4 の結論の根拠は script の CHECK と、レビュー側の CFG 走査 (jcc・noreturn を考慮) による独立検算の一致。 CFG 走査は script に入れていない。
