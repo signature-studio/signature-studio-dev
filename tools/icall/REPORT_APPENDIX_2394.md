@@ -43,9 +43,11 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 | Function parameters and returns optimization | 1/1/0/0 | 1/1/0/2 | 1/1/0/1 | 1/1/1/1 |
 | **LLVM instruction optimization using RDA** | **0/0/0/0 (消滅)** | 1/1/0/1 | 1/1/0/1 | 1/1/1/1 |
 | LLVM instruction optimization | 0 | 1/1/0/1 | 1/1/0/0 | 1/1/1/0 |
+| Value protection optimization | 0 | 1/2/0/1 | 1/2/0/0 | 1/2/1/0 |
 | **Combine redundant instructions** | 0 | **0/0/0/0 (消滅)** | 1/2/0/0 | 1/2/1/0 |
 | Dead Store Elimination | 0 | 0 | 1/1/0/0 | 1/1/1/0 |
 
+- `Value protection optimization` の段では `-40`・`-24`・`-56`・`-52` の store 数が 1→2 になる (理由は未確認)。
 - `-16` は `ptrtoint` 0・`load` 0 (address を取られず読まれない slot) で、RDA 段が store ごと消す。`-40` は唯一の user (= `-16` に入る address) が消えたあと instcombine が消す。`-24` は `lea r8,[rbp-0x10]` で address が callee へ渡るので残る。**消す条件は観測からの推定** (RetDec 本体のソースは未読)。
 - callee の IR は `@function_181057a90(i64* %arg1, i32* %arg2, i64* %arg3, i32* %arg4)` で、呼出しは `(stack_var_16, stack_var_-52, stack_var_-24, stack_var_-56)`。`a90` の IR は `%3 = ptrtoint %arg3` → `%6 = add i64 %3, 8` → `load i64` (`before.0.drc.ll`)。`stack_var_-24` は `alloca i64` (8B) なので、`+8` は **alloca の範囲外**を指す。LLVM では未定義で、backend の frame 配置次第で隣の alloca に当たる。
 - wasm の配置 (1998 付録 §6 の実測。本 run では再測定していない): `stack_var_-24` = `0x104af3d8`、`stack_var_-56` = `0x104af3e0`、`stack_var_-52` = `0x104af3e4`。したがって `+8` = `0x104af3e0` の 8B = `0x400000004`。元の frame では `[rbp-0x10]` の 8B 先は `[rbp-8]` で、`-0x30`/`-0x2c` とは無関係。wasm backend が `-24` の直後に `-56`/`-52` を置いた。**配置は元の frame ではなく LLVM wasm backend の frame layout 由来**。
@@ -60,7 +62,8 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 | fixed (2 store + 16B 1 alloca) | **OK 8 / TRAP 0** | 168 | **0** | **0** |
 | negative (2 store のみ・別 alloca) | OK 0 / TRAP 8 | 168 | 32 | 8 |
 
-`fa_sweep.sh 8 60` (131 関数・`FA_CORE` は rw.dll): base は bit 一致 46 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 10、fixed は 46 / 66 / 8 / 11。**行が変わる関数は `0x181057b38` の 1 件**で、`wasm_err` 8 → 0、`mismatch` は 8 のまま (wasm の xmm0 は 0、native は入力の xmm0 のまま。この不一致の原因は未調査)。他 130 関数の判定と `n/match/mismatch/wasm_err/native_err` は base と一致。
+`fa_sweep.sh 8 60` (131 関数・`FA_CORE` は rw.dll・測定 commit `2c8088f4`): base は bit 一致 47 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 9、fixed は 47 / 66 / 8 / 10。旧値 46 / 66 / 9 / 10 (`bfe8bffc`・`5eb91673`・`aa3c8758` の 3 回で同一) と ±1 異なる。同じコードでも 1 関数の判定が揺れるが、どの関数かは未特定 (#2302)。**行が変わる関数は `0x181057b38` の 1 件** (`2c8088f4` でも 1 件)で、`wasm_err` 8 → 0、`mismatch` は 8 のまま (wasm の xmm0 は 0、native は入力の xmm0 のまま。この不一致の原因は未調査)。他 130 関数の判定と `n/match/mismatch/wasm_err/native_err` は base と一致。
+スクリプト末尾 (§6) で `work/fa_route`・`work/fa_wc` を base で作り直す。負の対照の route を後続の `fa_sweep.sh` が拾わないため。
 
 ## 5. 脱落 store の census (F.ranges 131 関数)
 
@@ -74,7 +77,7 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 | IR に store が無い (脱落) | 21 件 |
 | 脱落のうち、`lea` で address を取られた slot の 0x40 以内上側にある (候補) | 12 件 / 2 関数 (`181057b38` が 2 件・`180da6e60` が 10 件) |
 
-`181057b38` の 2 件は §3–§4 で確定。`180da6e60` は同じ形を含む (`mov [rbp-0x31],rcx`・`mov [rbp-0x29],rcx` の組を `lea rdx,[rbp-0x31]` → `call r10` で渡す。`[rbp-0x29]` の store が脱落) が、callee が `[rdx+8]` を読むことと wasm 上の挙動は未確認。残り 9 件にはスタック cookie (`[rbp+0x2f]`) などの無害な脱落が混じる。この関数は `fa_sweep.sh` で native crash/timeout のため比較できない。**候補は miscompile の確定ではない**。
+`181057b38` の 2 件は §3–§4 で確定。`180da6e60` は同じ形を含む (`mov [rbp-0x31],rcx`・`mov [rbp-0x29],rcx` の組を `lea rdx,[rbp-0x31]` → `call r10` で渡す。`[rbp-0x29]` の store が脱落) が、callee が `[rdx+8]` を読むことと wasm 上の挙動は未確認。残り 9 件の内訳は未確認。この関数は `fa_sweep.sh` で native crash/timeout のため比較できない。**候補は miscompile の確定ではない**。
 
 ## 6. DEFECTS.md 形式の行案 (D23 候補・DEFECTS.md は未編集)
 
@@ -86,12 +89,12 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 
 | 項目 | 値 |
 |---|---|
-| コードを変えた最後の commit | `bfe8bffc` |
-| 測定に使った HEAD | `bfe8bffc` で `SWEEP=1 bash tools/icall/frame_slot_2394.sh` を実行。同じ実行を `5eb91673`・`aa3c8758` でも各 1 回行い、§1–§4 の出力は 3 回とも同一 (負の対照 = §4 negative は `bfe8bffc` だけ) |
-| 所要 | 202.6 s (`bfe8bffc`)・191.9 s (`aa3c8758`)・187.4 s (`5eb91673`)。load (1 分平均) は `bfe8bffc` の実行前 0.77 → 後 1.02 (`uptime`)。1 並列 (逐次実行) |
+| コードを変えた最後の commit | `2c8088f4` (`tools/icall/frame_slot_2394.sh` の §6 後始末の追加。指摘 m3) |
+| 測定に使った HEAD | `2c8088f4` で `SWEEP=1 bash tools/icall/frame_slot_2394.sh` を 1 回実行 (ログ `work/measure_2c8088f4.log`)。§1–§3 と §4 の 8 入力の結果は、前回 (`bfe8bffc`・`5eb91673`・`aa3c8758`) と一致。sweep の集計のみ ±1 (§4) |
+| 所要 | 206.6 s (`2c8088f4`)。前回は 202.6 s (`bfe8bffc`)・191.9 s (`aa3c8758`)・187.4 s (`5eb91673`)。load (1 分平均) は `2c8088f4` の実行前 0.29 → 後 1.05 (`uptime`)。1 並列 (逐次実行) |
 | 素材 | `work-icall` (`rt_freshair-core`)・RetDec v5.0 (commit `53e55b4b`、`toolchain-retdec` の `retdec-decompiler` と size・mtime が一致する [RETDEC])・`toolchain-emsdk` ([EMSDK])。`plugins-freshair` は未使用 (`toolchain-retdec` の tar は展開せず、runner に展開済みのものを使った) |
-| `FA_CORE` | `rw.dll` (元 PE + `.icall`)。`data_gen.py` の .rdata/.data 敷設と native 実行に使う。元 DLL での base は 1998 付録 §4 の 47 / 66 / 9 / 9、rw.dll での base は 46 / 66 / 9 / 10 (±1 の揺れは #2302 で追跡中。rw.dll 代替が原因かは未切り分け) |
-| コード差分 | `git diff --name-only bfe8bffc HEAD -- tools/icall` の出力は `tools/icall/REPORT_APPENDIX_1998.md`・`tools/icall/REPORT_APPENDIX_2394.md` の 2 行だけ。コード差分 0 |
+| `FA_CORE` | `rw.dll` (元 PE + `.icall`)。`data_gen.py` の .rdata/.data 敷設と native 実行に使う。元 DLL での base は 1998 付録 §4 の 47 / 66 / 9 / 9。rw.dll での base は本 run (`2c8088f4`) で 47 / 66 / 9 / 9、旧 REPORT で 46 / 66 / 9 / 10 (±1 の揺れは #2302 で追跡中。rw.dll 代替が原因かは未切り分け) |
+| コード差分 | 測定 commit `2c8088f4` から HEAD までの `tools/icall` の変更 (`git diff --name-only 2c8088f4 HEAD -- tools/icall`) は本付録 (md) だけ。スクリプト・コードの差分は 0 |
 
 ## 8. 未解決 (起票先)
 
@@ -100,7 +103,7 @@ IR の store の `!insn.addr` (`!2531`–`!2537`) を引いた対応は `b41 b49
 | 脱落 store を戻す IR pass の一般化と `fa_route_build.sh` への組込み (現状は `181057b38` 専用の置換)、`180da6e60` の候補 10 件の判定、fixed 後も `181057b38` が 8/8 不一致の原因、RDA 段が store を消す条件の確認 | BLK+0 の trap は実験で解消するが、closure 全体の bit 一致は 46 のまま | ICALL-77 (#2427、本 PR で起票) |
 | 元 `SlateCore.core_64` 本体の bytes との照合 (本 run は `plugins-freshair` なし) | (a) の根拠は元 PE の decode 結果 + `rw.dll` の同 VA。ファイル本体の sha256 とは未突合 | ICALL-77 (#2427) の run で `plugins-freshair` を取得して照合 |
 | `docs/DEFECTS.md` への D23 行の追加 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
-| `fa_sweep.sh` の ±1 の揺れ (46/66/9/10 と 47/66/9/9) | 数値の正本の取り方 | #2302 (ICALL-71、既存) |
+| `fa_sweep.sh` の ±1 の揺れ (旧 46/66/9/10 と本 run の 47/66/9/9。同じコードで 1 関数の判定が揺れる) | 数値の正本の取り方 | #2302 (ICALL-71、既存) |
 
 ## 9. 再現
 
