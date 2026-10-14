@@ -185,6 +185,7 @@
 | 再生成 baseline (`m11_boot.cjs`) | ret=2 | `0x67f00` → `0xf960` → miss `0x457860` | 0 / 2 |
 | shimx `--trace --soft --fix` (clean rebuild) | ret=2 | 同左 | 1 (unit 18, `0x4476d0`) / 2 |
 
+- 負荷 (4 CPU): 測定区間の load は未採取。参考値は 14:46 の `uptime` 1 分平均 1.05、測定後 14:58 は 0.03。build・probe はすべて直列実行 (並列なし)。
 - 再生成 baseline と shimx 版: unit 23 の probe 出力はアドレスを除くと一致 (diff 0 行。UStrAsg 388 件の dest 列も一致)。unit 23 直前の slot `0x11f10e0` は両版とも `0x457860` (fallback)。shimx 版の sxt 計数では unit 23 中の wrapped API 呼出しは 0 件。
 - 未解決 (差): shimx 版のみ unit 18 で icall-miss `0x4476d0` (1 件、closure 外として skip)。再生成 baseline は unit 1〜22 で miss 0 件。機構は未特定。
 - 受入 2 の残り (子 issue へ分離): issue が指定した `tools/m11/shimx_link/probe_lasterr_1985.mjs` は repo にも git 履歴 (`git log --all -S probe_lasterr`) にも無い。代わりに `probe_flag_1985.mjs` (同じ引数形式) を使った。GetLastError は未取得: baseline は `tools/shim/src/file.c` の static `g_last_error`、shimx は `tools/shimx/src/teb.c` の TEB+0x68 に置かれ、どちらも JS から読めない。
