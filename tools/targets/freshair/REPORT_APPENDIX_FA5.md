@@ -149,7 +149,7 @@
 - 方法: 実行後 state の ramp 端点 (coef・A・B・cur) は、両側で bit 一致することを確認した上で使う (`nonform_state_fields_sc_vs_kh` 200/200)。harness の入力 `inc`・`a`・`b` は実行中に native 側で再計算されるため、実行前の値は使えない。
   - ramp の丸め形だけを入れ替える。SC 形 `(1-t)*A + t*B`、KH 形 `A + (B-A)*t` (t = pos·coef、pos を 1 ずつ増やす。float32 の各演算を丸める)。first=1 は実行後 cur の一定値。
   - L = in·cur、R = in·cur。m1 は L に c1 を、m2 は R に c2 を順に適用 (`m = (s*s-m)*c+m`)。state は実行後の 0x38 B のうち cur・m1・m2 の 3 箇所だけをモデル値に置き換えて比べる。
-- 結果 (測定 commit `76862382`、EXIT=0、0.625 s real、load 0.05→0.17、nproc=4。2 回実行で `sc.txt`・`kh.txt`・`cmp.json`・`ulp.json`・`model.json` の md5 一致):
+- 結果 (測定 commit `76862382`、EXIT=0、0.625 s real、実行前後の uptime で load average 0.05 (1 分値)・0.17 (5 分値)、nproc=4。2 回実行で `sc.txt`・`kh.txt`・`cmp.json`・`ulp.json`・`model.json` の md5 一致):
 
 | モデルの比較 | L・R・m1・m2 一致 (n>0 の 199 件) | 実行後 state を含む LRS 一致 (200 件) |
 |---|---|---|
