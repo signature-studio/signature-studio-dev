@@ -203,3 +203,49 @@ OOB 16 件の最上位 frame (現行 build): 144 `407e20` / 149 `412e40` / 275 `
 - §11.2 の 3 build は作業ツリーで測った。測定時の `git status --porcelain` は記録していない。`19b21178` と同一であることは、本 run では**確認できていない**。再測定 (`git worktree add --detach ... 19b21178`) は、`work-m11` 素材が本 run の `$ARTIFACTS_DIR` に無く (`fl-win64` のみ) 未実施。そのため §11.2 の数値は「作業ツリー測定・未再現」の値として扱い、基準には使わない。
 - 既定 build (probe OFF) は §11.2 の `870 / 16` で前回値 (§8・§9) と一致 (= 既定の挙動は変わらない)。
 - 差分確認: `git diff 31cb5831 19b21178 -- tools/m11` は `m11_build.sh` / `m11_ov.c` / `m11_post.py` の probe 追加のみ (既定 0 で無効)。
+
+## 12. 7 回目の run: `p-144` の再現測定 (HEAD `edef8fa0`、`work-m11` 由来 IR)
+
+既知類型との関係: 該当なし (計測のみ。新規類型は未確定。`p-144` の値が D4 (deref 脱落) に当たるかは未検証のため、DEFECTS の既知 ID には紐付けない)。
+
+### 12.1 手順と結果
+
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`FL_WIN64_DIR` はその展開先)、`work-m11` / `work-liftdiff` を repo 直下から展開。`m11_gen_ir2.sh` rc=0 (ldfix errors=0)。
+- `m11_gen_ir2.sh` が読むもの: `work/boot0..6.lift.ll` (`work-m11` 同梱の lift 成果) と `$FL_WIN64_DIR` の `block00031_PE.bin` (ldfix の突合用 PE)。
+- **IR の出所**: `work-m11` 由来 (#516 以前の生成で、`m11_e2e.sh --full` 由来ではない。WORKFLOW §11・#680)。このため本 §12 の数値は「`work-m11` 由来 IR での実測」であり、survey の基準値ではない。
+- 検証 HEAD: `edef8fa0` (origin/main。`git worktree add --detach <repo>/work/wt_verify edef8fa0` で展開し、終了時に `git worktree remove --force`)。
+- probe ON (`M11_INSTR_40FF70=1 m11_build.sh`) を 2 回: 2 回とも rc=0・survey 集計は `ok 871 / halt0 7 / miss 47 / oob 14 / other 1 / noproc 1`。
+  - 出力行: `[m11][p144] #1 arg1=0xc343f0 p-144=0x9078558948704d89 word[head]=0` (survey JSON の unit 895 の `err` 内、unit 896 の直前に出る)。
+  - 2 回で同一。`p-144` の値は再現した。
+- probe OFF (既定) を 2 回: 2 回とも `ok 869 / halt0 7 / miss 47 / oob 16 / other 1 / noproc 1`。
+  - `[m11][p144]` 行は 0 件。
+- survey の所要: 約 13 s (rc=0)。
+
+### 12.2 §11.2 との差分
+
+- §11.2 の probe OFF `ok 870 / oob 16` は、本 run の `edef8fa0` 再測定 (`ok 869 / oob 16`) と 1 件ずれる。§11.2 の数値は作業ツリー測定 (commit 未確定) で、今回の commit 済み HEAD と一致しない。
+- §11.2 の probe ON `ok 872 / oob 14` も、本 run (`871 / 14`) と 1 件ずれる。
+- 本 §12 の値は `work-m11` 由来 IR の測定で、survey の基準にはしない。§11.2 の数値と合わせて「未再現 (IR 出所が異なる)」として残す。
+- `git diff 19b21178 HEAD -- tools/m11 ':!tools/m11/trap_triage/REPORT_882.md'` の出力は 0 byte ではない (56 files・3076 insertions 等)。§11.5 の「コード差分 0」は、この main 取り込みにより成立しなくなった。
+
+### 12.3 解釈 (断定しない)
+
+- `p-144` の 8 byte `89 4d 70 48 89 55 78 90` は、リトルエンディアンで x86 機械語 (`mov [rbp+0x70],ecx` / `mov [rbp+0x78],rdx` / `nop` に見える) として読める。`p-144` が本来のリスト先頭ではなく、コード領域を指している可能性は残る。
+- 単独 (`SV_ONLY=895`) では `arg1=0`・`p-144=0` (§11.2 と同じ)。全体 survey と単独で状態が異なる点は未切り分け。
+- `arg1` (`0xc343f0`) の caller 側の値は未確認。
+
+### 12.4 受入条件
+
+1. unit 95 `47ad70` の index / arg1: 未達 (現行 main で OOB 不発。観測対象が無い)。
+2. unit 895 `40ff70` の `p-144`: 部分達成 (値は `work-m11` 由来 IR の 2 回の probe ON で再現)。リスト先頭の出所・構造体の中身・`arg1` の caller 側は未特定。
+3. DEFECTS 行案: 未達 (新規類型未確定)。
+
+### 12.5 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `p-144` が機械語を指す原因 (壊れたリスト / 誤った `arg1`) | 受入条件 2 | #882 の次 run (`arg1` の caller 側) または #684 |
+| §11.2 の作業ツリー測定値 (870/16・872/14) と本 §12 の `work-m11` 由来値 (869/16・871/14) の差 | 数値の基準 | #684 (PM 判断) |
+| `m11_e2e.sh --full` 由来 IR での再測定 (本 §12 の値の再現) | 数値の出所 | #882 の次 run (`oc_artifacts:` に `work-m11` を含める場合は素材名を明記) |
+| probe ON で分類が変わる (ok +2 / oob -2) | 計測 hook が survey を動かす | #684 (PM 判断) |
+| `functions_dll.csv` 素材化 (`m11_e2e.sh` 全再生成) | e2e 全体の再現 | PM 判断 |

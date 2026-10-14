@@ -20,6 +20,9 @@ M11_FIX_652500="${M11_FIX_652500:-0}"   # #748: 1 = m11_ov.c の function_652500
 M11_OV_413060="${M11_OV_413060:-0}"   # #944: 1 = m11_ov.c の function_413060 (dest の旧値 deref 復元, D4) を有効化; 0 = lift 版 (既定)。413060 だけを切り替える独立 gate
 M11_NEG_413060="${M11_NEG_413060:-0}"   # #944 ネガコン: 1 = dest に p+0x40 を書く既知変更 (b)。感度確認用。既定 0
 M11_INSTR_413060="${M11_INSTR_413060:-0}"   # #944: 1 = 計測専用に function_413060 へ probe (index 8) と dest 観測 hook を post で入れる。既定 0 は main と同一の post 出力
+M11_RT_INSTR="${M11_RT_INSTR:-$M11_INSTR_413060}"   # #1701: rt.o をコンパイルする時の M11_INSTR_413060 値 (既定は M11_INSTR_413060 と同じ = 従来どおり)。1 を 0 にすると rt.o だけ計測 OFF
+M11_OV_INSTR="${M11_OV_INSTR:-$M11_INSTR_413060}"   # #1701: ov.o をコンパイルする時の M11_INSTR_413060 値 (既定は同じ)。1 を 0 にすると ov.o だけ計測 OFF
+M11_LINK_INSTR="${M11_LINK_INSTR:-$M11_INSTR_413060}"   # #1701: リンク時の EXPORTS (_m11_dest_obs_* 等) を足すか。既定は M11_INSTR_413060 と同じ
 M11_DEST_READ="${M11_DEST_READ:-1}"   # #944: 0 = 413060 後の dest 読出し (指紋) を止める。読出しが挙動を変えるかの切り分け用。既定 1
 M11_FIX_535BF2="${M11_FIX_535BF2:-0}"   # #714: 1 = m11_ov.c の function_535c11/535bf2 転記 (IR 未定義 535c2e・境界 535c11 の再現); 0 = lift 版 (既定)
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=$M11_LB_BASE -DM11_OV_CLASSCREATE=$M11_OV_CLASSCREATE -DM11_OV_414AD0=$M11_OV_414AD0 -DM11_FIX_652500=$M11_FIX_652500 -DM11_OV_413060=$M11_OV_413060 -DM11_NEG_413060=$M11_NEG_413060 -DM11_DEST_READ=$M11_DEST_READ -DM11_INSTR_413060=$M11_INSTR_413060 -DM11_FIX_535BF2=$M11_FIX_535BF2 -DM11_INSTR_K12=${M11_INSTR_K12:-0} -DM11_INSTR_40FF70=${M11_INSTR_40FF70:-0} -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1} -DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0} -DM11_NOVCALL=${M11_NOVCALL:-0}"
@@ -139,15 +142,16 @@ cc() { # cc <src> <obj> [extra deps...]
 }
 # 別 TU (tools/shim, m11_rt/ov/win) が定義する Win32 API は winstubs から除外 (duplicate symbol 回避)
 for f in heap failfast file timer sync; do cc ../shim/src/$f.c work/obj/shim_$f.o; done
-S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060"
+S_NEG="$M11_NEG_413060-$M11_DEST_READ-$M11_INSTR_413060-rt$M11_RT_INSTR"
 if [ "$(cat work/neg_413060.stamp 2>/dev/null || echo none)" != "$S_NEG" ]; then rm -f work/obj/rt.o; fi
 echo "$S_NEG" > work/neg_413060.stamp
 # #1176: work-m11 同梱の rt.o/win.o は古い snapshot のことがある (mtime だけでは判定できない: 同梱 obj が source より新しく見える)。
 #   ソースの sha256 が記録と違えば作り直す (stamp 無し = 初回・snapshot 由来も作り直す)。
 RTWIN_SHA="$(cat m11_rt.c m11_win.c | sha256sum | cut -d' ' -f1)"
 if [ "$(cat work/rtwin.sha256 2>/dev/null || echo none)" != "$RTWIN_SHA" ]; then rm -f work/obj/rt.o work/obj/win.o; fi
-cc m11_rt.c work/obj/rt.o
-cc m11_win.c work/obj/win.o
+CF_BASE="$CF"
+CF="${CF_BASE//-DM11_INSTR_413060=$M11_INSTR_413060/-DM11_INSTR_413060=$M11_RT_INSTR}" cc m11_rt.c work/obj/rt.o
+CF="$CF_BASE" cc m11_win.c work/obj/win.o
 echo "$RTWIN_SHA" > work/rtwin.sha256
 llvm-nm --defined-only work/obj/shim_*.o work/obj/rt.o work/obj/win.o 2>/dev/null | awk '$2 ~ /^[TtWwDd]$/ {print $3}' | sort -u > work/defined_c.txt
 if [ ! -f work/m11_winstubs.c ] || [ work/defined_c.txt -nt work/m11_winstubs.c ] || [ m11_genstubs.py -nt work/m11_winstubs.c ] || [ work/boot_final.ll -nt work/m11_winstubs.c ]; then
@@ -168,7 +172,7 @@ echo "$M11_OV_414AD0" > work/ov_414ad0.stamp
 if [ "$(cat work/ov_652500.stamp 2>/dev/null || echo none)" != "$M11_FIX_652500" ]; then rm -f work/obj/ov.o; fi
 echo "$M11_FIX_652500" > work/ov_652500.stamp
 # M11_OV_413060 が変わったら ov.o だけ無効化 (#944)
-S413="$M11_OV_413060-$M11_NEG_413060-$M11_INSTR_413060"
+S413="$M11_OV_413060-$M11_NEG_413060-$M11_INSTR_413060-ov$M11_OV_INSTR"
 if [ "$(cat work/ov_413060.stamp 2>/dev/null || echo none)" != "$S413" ]; then rm -f work/obj/ov.o; fi
 echo "$S413" > work/ov_413060.stamp
 # M11_FIX_535BF2 が変わったら ov.o だけ無効化 (#714)
@@ -186,7 +190,7 @@ if [ "$(cat work/ov_entry_probe.stamp 2>/dev/null || echo 0)" != "${M11_ENTRY_PR
 echo "${M11_ENTRY_PROBE:-0}" > work/ov_entry_probe.stamp
 echo "${M11_INSTR_40FF70:-0}" > work/ov_instr_40ff70.stamp
 echo "$M11_FIX_535BF2" > work/ov_535bf2.stamp
-cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
+CF="${CF_BASE//-DM11_INSTR_413060=$M11_INSTR_413060/-DM11_INSTR_413060=$M11_OV_INSTR}" cc m11_ov.c work/obj/ov.o work/boot_final3_sigs.h
 cc work/m11_data.c work/obj/data.o
 
 INITMEM="$((0x12000000))"
@@ -198,7 +202,7 @@ emcc work/obj/*.o -o work/m11_boot.cjs.tmp \
   -sERROR_ON_UNDEFINED_SYMBOLS=0 -sEXIT_RUNTIME=1 \
   --no-entry -Wl,--export-all \
   -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPF32,HEAP32,HEAPF64,HEAPU32,HEAP64,wasmTable,addFunction \
-  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_INSTR_413060" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec )$( [ "${M11_ENTRY_PROBE:-0}" = 1 ] && echo ,_m11_fe_get,_m11_fe_clear ) \
+  -sEXPORTED_FUNCTIONS=$EXPORTS$( [ "$M11_LINK_INSTR" = 1 ] && echo ,_m11_dest_obs_n,_m11_dest_obs_hhi,_m11_dest_obs_hlo,_m11_dest_rec )$( [ "${M11_ENTRY_PROBE:-0}" = 1 ] && echo ,_m11_fe_get,_m11_fe_clear ) \
   -Wl,--initial-memory="$INITMEM" -Wl,--max-memory="$MAXMEM" 2> work/link.log || { tail -30 work/link.log; exit 1; }
 mv work/m11_boot.cjs.tmp work/m11_boot.cjs
 python3 m11_postjs.py work/m11_boot.cjs 2>/dev/null
