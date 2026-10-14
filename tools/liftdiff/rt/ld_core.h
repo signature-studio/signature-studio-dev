@@ -91,9 +91,18 @@ static int ld_dst_ok(u64 p, u64 n) {
 #define LD_FAKEPROC_BASE 0x50010000ull
 #define LD_FAKEPROC_MARK 0x40000000ull   /* thunk → ld_stub_c に渡す index の目印 */
 #define LD_FAKEPROC_SZ   32
+/* LD-48 (#1398): fvm の VMT slot 専用の仮 proc index 域。GetProcAddress 側 (0..255) と重ならせ、
+ * ld_nfakeproc を増やさない (増やすと以後の GetProcAddress 応答の index がずれる)。 */
+#define LD_VMT_IDX0      256
+#define LD_VMT_SLOTS     8
+static const char* ld_vmslot_names[LD_VMT_SLOTS] = {"?vmslot0", "?vmslot1", "?vmslot2", "?vmslot3", "?vmslot4", "?vmslot5", "?vmslot6", "?vmslot7"};
 
 static u64 ld_fake_ptr(u64 i);      /* プラットフォーム固有 (ld_native.c = 実行可能 thunk / wasm = 値のみ) */
-static const char* ld_fakeproc_name(u64 i) { return i < (u64)ld_nfakeproc ? ld_fakeprocs[i].name : "?freeproc"; }
+static int ld_fakeproc_valid(u64 i) { return i < (u64)ld_nfakeproc || (i >= LD_VMT_IDX0 && i < LD_VMT_IDX0 + LD_VMT_SLOTS); }
+static const char* ld_fakeproc_name(u64 i) {
+  if (i >= LD_VMT_IDX0 && i < LD_VMT_IDX0 + LD_VMT_SLOTS) return ld_vmslot_names[i - LD_VMT_IDX0];
+  return i < (u64)ld_nfakeproc ? ld_fakeprocs[i].name : "?freeproc";
+}
 
 static u64 ld_heap_alloc(u64 size, u64 align, int zero);   /* 前方宣言 (下段で定義) */
 /* CAB-233: コマンドライン/環境ブロックは「ゲスト有効ポインタ」(ld_heap 内) を返す。
@@ -137,7 +146,7 @@ static u64 ld_fakemod_get(const char* nm) {
 /* 仮 proc: (mod, name) で同一視 → ld_fake_ptr(i) (native = 実行可能 stub, wasm = 不透明値) */
 static u64 ld_fakeproc_get(u64 mod, const char* nm) {
   for (int i = 0; i < ld_nfakeproc; i++) if (ld_fakeprocs[i].mod == mod && strcmp(ld_fakeprocs[i].name, nm) == 0) return ld_fake_ptr(i);
-  if (ld_nfakeproc >= 256) return 0x50010000ull;
+  if (ld_nfakeproc >= LD_VMT_IDX0) { fprintf(stderr, "[ld_core] 仮 proc が上限 %d を超えた (VMT 域と衝突するため中止)\n", LD_VMT_IDX0); abort(); }
   ld_fakeprocs[ld_nfakeproc].mod = mod;
   snprintf(ld_fakeprocs[ld_nfakeproc].name, sizeof ld_fakeprocs[0].name, "%s", nm);
   return ld_fake_ptr(ld_nfakeproc++);
@@ -477,7 +486,18 @@ static void ld_add_wr(u64 rva, u64 len) {
   if (ld_nwr >= LD_MAX_WR) return;
   ld_wr[ld_nwr].rva = rva; ld_wr[ld_nwr].len = len; ld_wr[ld_nwr].pristine = NULL; ld_nwr++;
 }
+/* VMT slot の仮 proc 番地を snapshot 前に生成 (native は thunk 敷設) し、cases.make_blob_vm の値と一致しなければ中止 */
+static void ld_fakeproc_vmt_init(void) {
+  for (u64 k = 0; k < LD_VMT_SLOTS; k++) {
+    u64 i = LD_VMT_IDX0 + k;
+    if (ld_fake_ptr(i) != LD_FAKEPROC_BASE + i * LD_FAKEPROC_SZ) {
+      fprintf(stderr, "[ld_core] VMT slot %llu の仮 proc 番地が不一致 (fvm の silent miscompile になるため中止)\n", (unsigned long long)k);
+      abort();
+    }
+  }
+}
 static void ld_snapshot(void) {
+  ld_fakeproc_vmt_init();
   for (int i = 0; i < ld_nwr; i++) {
     free(ld_wr[i].pristine);
     ld_wr[i].pristine = (u8*)malloc(ld_wr[i].len);

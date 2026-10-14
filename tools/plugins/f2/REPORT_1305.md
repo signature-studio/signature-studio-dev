@@ -164,3 +164,70 @@ python3 tools/plugins/f2/indirect_resolve.py 19148        # 間接 call 23 件�
 - 追加した道具: `unicorn_trace.py -t <VA>` (そのアドレスに入るたびに rcx/rdx と [rcx]・[rcx+0x28] を最初の 20 回まで出す)。
 - 判定: 受入 1 **達成**、受入 2 **未達** (実引数が無い)、受入 3 (プログラム全体の経路の書込み追跡) **未達** (`0x83efb0` 経路が合成入力で止まる)。waiver は変更しない。
 - 未解決 (起票先: 本 issue の残件。実引数を与える経路の確定が必要): `CreatePlugInstance` のホスト引数 (`0x777290` の読み出し先) を実 FL の呼出し値で与えること、またはホストが `CreatePlugInstance` に渡す構造体の形を決めること。これが決まるまで `0x8c3ca8` の最終値は確定しない。
+
+## 12. PLG-F3-25 (#2284): 合成 host による CreatePlugInstance の到達範囲 (測定 commit 656932d2、block19148)
+
+- 道具: `unicorn_trace.py -H` を追加。rcx・rdx に合成 host (`SCRATCH+0x10000`) を置き、`[host]` を vtable とする。`vtable[0]` は戻り値として第 2 の合成 obj (`SCRATCH+0x12000`) を返す。vtable の各スロットは ret stub。`-H` 無指定時は従来どおりで、§11 の結果 (`0x8525f0` の書込み 2 件、`0x83efb0` の `UC_ERR_READ_UNMAPPED` rip=0x7772be) を再現した。
+- 実測 (`python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000`、2 回、逐次、wall 1.38 / 1.40 秒、RSS 約 227 MB、load 0.31 → 0.39):
+  - `0x777290` の `call [rbx]` (host.vtable[0]) は通過する。
+  - `0x83cad7` の `call [rax+0x30]` (obj.vtable[0x30]) も通過する。
+  - `0x407a5e` の `and rcx, [rax-8]` で `UC_ERR_READ_UNMAPPED` (rip=0x407a5e・rax=0)。直前の `0x407a20` は `[rbx+8]`・`[rdx+0x18]`・`[rax-8]` を読むアロケータ状の処理。
+- 判定: 受入 1 (`0x411a80` 到達) **未達**。受入 2 (`0x411bb8` 呼出し時の記録) と受入 3 (`-w` によるプログラム全体の書込み追跡) は受入 1 が前提のため未実施。waiver は変更しない。
+- 残件 (子 issue に移す): `0x407a20` が読むブロック構造 (`[rax-8]` のヘッダ形式、`[rbx]`・`[rbx+8]`・`[rdx+0x18]` の初期化) を PE 内の初期化コードから復元し、合成 host/obj に入れる。
+
+## 13. PLG-F3-24 (#2272): CreatePlugInstance (0x83efb0) の実引数による到達 (部分、測定 commit cdfa8bda)
+
+- 道具の追加 (114843e2): `unicorn_trace.py` に `-d addr=val` (実行前の qword 書込み。ホスト構造体の合成用) と `-t hex` (番地に入るたびに rcx/rdx/r8/r9 を出す) を追加。既存の `-r`/`-w`/`-q` の挙動は不変。
+- 入力: `block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst extracted/block19148_PE.bin`、`TMPDIR=$RUNNER_TEMP` 下に展開)。fl-win64 には実行時のメモリダンプが無く、host の実データは PE から得られない。
+- 静的確認: `0x83efb0` は `call 0x777290` (r8=0x9876、r9=`0x8bbc04`) の結果が真なら `0x83cb50` → `0x8402b0` の経路。`0x777290` は第 1 引数 `[rcx]` を vtable として `call qword ptr [rbx]` (0x7772be) を行う。
+- 実測 (head cdfa8bda、block19148、逐次、uptime load 1 分 0.53、各実行 wall 数秒):
+  - 試行 1 (`-r rcx=0x40000000`): `UC_ERR_FETCH_PROT` rip=0x0・rax=0x40000000。`0x7772be` の `call [rbx]` が 0 を呼ぶ (呼出し元の戻り番地 `[rsp]=0x7772c0`)。Issue の `UC_ERR_READ_UNMAPPED` (rip=0x7772be) は**再現しない**。
+  - 試行 1' (`-r rcx=0x400000`): `UC_ERR_READ_UNMAPPED` rip=0x7772be・rax=0x400000。Issue と一致するのはこちら。
+  - 試行 2 (`-r rcx=0x40000000 -d 0x40000000=0x40000200 -d 0x40000200=0x100ffff0`): `0x777290` は通過し、`0x83cad7` (`call qword ptr [rax+0x30]`) で `UC_ERR_READ_UNMAPPED` rip=0x83cad7・rax=0x100ffff0 (vtable 項目 `+0x30` が未マップ)。
+  - 試行 3 (`-H`、合成 host・vtable の全 slot は ret stub): `0x777290` → `0x83cb50` → `0x83cca0` → `0x407a20` (rcx=0x48・rdx=0x9) を経て、`0x407a5e` (`and rcx, [rax-8]`) で `UC_ERR_READ_UNMAPPED` rip=0x407a5e・rax=0x0。stub hits は host.vtable[0x0] 2 回・obj.vtable[0x30] 1 回。`0x411bb8`・`0x411940` には届かず、`[0x8c3ca8]` の書込みは 0 件。
+- 判定 (受入条件): 1 (実引数で `0x411a80` に届く) **未達**。`0x407a20` 系が読むヒープ/リンク構造を PE 内の静的情報から合成する必要がある。2 (`0x411bb8` の `[0x8c3c80]`・`[[rcx]+0x28]` の確定) **未達**。3 (`0x83efb0` 起点の `-w 0x8c3ca8:0x8c3cb0`) **未達** (受入 1 が前提)。REPORT の結論 (§9・§10) は変更しない。waiver は変更しない。
+- 残件 (#2272 で追跡): host 構造体の合成を `0x407a20` 系まで行い、`0x411a80` に届かせる。届いた後に `0x411bb8`・`0x411940` の trace と `0x8c3ca8` の最終値を確定する。
+
+## 14. PLG-F3-26 (#2295): 0x407a20 の入力状態と呼出し経路 (測定 commit 6d471846、block19148)
+
+- 測定 commit: **6d471846** (この節の `-t`・`-d`・走査の件数・`esi`/バイトの読み値は、すべて 6d471846 で取得した)。e53d845b の測定 (1.68 s、同じ fault) は旧測定として残すだけで、判定の根拠にしない。e53d845b からの差分は `unicorn_trace.py` +9 行 (main 側の `-d` 追加) と `jump_scan.py` 新規。`tools/plugins/f2/` の差分は `git diff e53d845b 6d471846 -- tools/plugins/f2/` で確認できる。
+- 入力: `$RUNNER_TEMP/ex/extracted/block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/ex extracted/block19148_PE.bin`、5,904,384 B)。依存: `uv venv $RUNNER_TEMP/f2venv && VIRTUAL_ENV=$RUNNER_TEMP/f2venv uv pip install unicorn==2.1.4 pefile capstone`。
+- 再現 (逐次、`PE=$RUNNER_TEMP/ex/extracted/block19148_PE.bin`): `python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -t 0x411940 -t 0x411bb8 -q 0x8c3ca8 -w 0x8c3ca8:0x8c3cb0 -m 2000000` = `UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0x0`。§12 と一致。
+- 走査の再現 (リポジトリ内の script):
+  - `python3 tools/plugins/f2/callsite_scan.py $PE 0x407a00 0x867100` = `0x407a00` への e8/e9 直接呼出し元 9 件、`0x867100` への rip 相対 lea 4 件 (`0x407a19`・`0x408933`・`0x40909a`・`0x409216`)、読み書き 0 件。
+  - `python3 tools/plugins/f2/jump_scan.py $PE 407a20 407a00 867100` = jcc/jmp 0 件 (3 アドレスとも)。
+- 入口: `0x407a20` は pdata 関数 `[0x407a00,0x407dc1)` の内側で、`0x407a00` から fall-through で入る。`0x407a00`〜`0x407a19` が `rbx`・`r8`・`rdx` を設定する (`rdx=(ecx+7)>>3`・`r8=0x8bfa3c`・`rbx=0x867100`)。入力は `rcx` のみ。
+- `-t` の実測 (`-H` 実行): `0x407a00` で `rcx=0x48 rdx=0x1`、`0x407a20` で `rcx=0x48 rdx=0x9` (`[rcx]=0`)。
+- `0x407a20` の処理: `esi=[0x8bf0a9]` (rip 相対 `0x407a27+0x4b7682`) = 0 (分岐 `test esi,esi; jne 0x407ab1` は不成立)。`byte[r8+rdx]` = `byte[0x8bfa45]` = 0 → `rbx = 0x867100 + 0`。`rdx=[rbx+8]=0`、`rax=[rdx+0x18]=[0x18]=0` (page 0 は 0x2000 B マップ済みで読める)、`cmp rdx,rbx` 不成立で `add dword [rdx+0x20],1` (page 0 への書込み)。最後の `and rcx,[rax-8]` が `rax=0` で `[-8]` を読み `UC_ERR_READ_UNMAPPED`。
+- 直接原因: `rbx`=`0x867100` の bin で `[rbx+8]=0`。`0x867100` の初期内容は `00 00 10 00 00 00 00 00` (qword 0 = `0x100000`、qword 1 = 0)、`0x867110`〜`0x86713f` は 0、`0x867140` は `00 00 20 00 ...` (qword = `0x200000`)。`[rbx+8]` が自己ポインタでないため空リストとして扱われず、`rax=0` の `[rax-8]` 読出しに進む。
+- 自己参照 seed の実測 (`-d` で書込み): `-d 0x867108=0x867100` では `0x407a94` の `mov [rax-8],rdx` (rax=0) で `UC_ERR_WRITE_UNMAPPED`。`0x867110` も併せて seed しても同じ。つまり `0x867100` の自己参照だけでは不足で、`[rax-8]` が指す有効なチャンクヘッダ (ヒープ/アリーナ領域) が要る。
+- 呼出し経路: `0x407a00` への直接 call 9 件 (上記)。`-H` 実行での上流経路は §13 (PLG-F3-24) の試行 3 (`0x777290` → `0x83cb50` → `0x83cca0` → `0x407a20`)。`.data`/`.rdata` の関数ポインタ経由の到達は未確認。
+- 判定: 受入 1 (`0x407a20` が読むブロック構造の復元) **未達**。受入 2〜4 は受入 1 が前提のため未実施。waiver は変更しない。
+- 未解決 (#2303 で追跡): (1) `0x407a20` の間接呼出し元 (`.data`/`.rdata` の関数ポインタ・vtable から逆引き)、(2) `0x867100` を指すアリーナ構築関数 (`-w 0x867100:0x867200` で書込み元 rip を取る)、(3) `[rax-8]` のチャンクヘッダ形式 (`0x407a94`・`0x407b98` の使用から逆算)。
+- 再現: 上記 unicorn コマンドと callsite_scan.py / jump_scan.py。
+
+## 15. PLG-F3-27 (#2303): 0x407a20 の間接呼出し元と arena 初期化 (部分、測定 commit 4048b18a、block19148)
+
+- 道具: `tools/plugins/f2/fn_refs.py` を追加 (4048b18a)。`fn_refs.py <block19148_PE.bin> <VA>...` で、囲む pdata 関数・rel32 call/jmp 元・絶対 qword 格納・rip 相対参照 (lea/mov/call) を出す。入力は `$RUNNER_TEMP/ex/extracted/block19148_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $RUNNER_TEMP/ex extracted/block19148_PE.bin`)。
+- 注: `0x407a20` は関数先頭ではなく、pdata 関数 `0x407a00` の内側 (fall-through)。`0x407a20` を指す rel32・qword・rip 参照は 0 件。実際に読まれる関数は `0x407a00`。
+- 受入 1 (0x407a20 / 0x407a00 の間接呼出し元): **部分達成**。
+  - `0x407a00` の格納元は `.data` の qword 表 `0x867c88` (要素 0 = `0x407a00`) の 1 件のみ。
+  - 表 `0x867c88` を `call qword ptr [rip+...]` で呼ぶのは `0x4093ae`・`0x409455`・`0x41b294` の 3 件。`0x41b294` は thunk `0x41b290` (直接呼出し元 `0x41b2cc`)。
+  - `0x41b2cc` を含む `0x41b2c0` (wrapper) の直接呼出し元は `0x847159`・`0x847178`・`0x847197` (いずれも関数 `0x847120`)。`0x847120` の直接呼出し元は `0x83f637`。
+  - 残りの `0x407a00` 直接 call 元 (`0x40796b`・`0x4079b9`・`0x408038`・`0x40807f`・`0x4081bd`・`0x408303`・`0x408371`・`0x418ecd`・`0x41a1e0`) は一覧のみ。
+  - CreatePlugInstance (`0x83efb0 -H`) の実経路: `0x4093a0` (`call qword ptr [0x867c88]` を含む関数) → `0x4093ae` → 表経由で `0x407a00` (`rcx=0x48`・`rdx=1`・`[rcx]=0`) → `0x407a5e` で `UC_ERR_READ_UNMAPPED` (`-t` 出力、各 1 回)。`0x409370`・`0x4093d0` は経路外。`0x41b2c0`・`0x847120`・`0x83f637`・`0x409090`・`0x41bc60` は未到達 (`-t` 出力なし)。
+- 受入 2 (0x867100 を構築するアリーナ初期化): **部分達成**。
+  - `0x867100` を指す rip 相対 `lea` は 4 件 (`0x407a19`・`0x408933`・`0x40909a`・`0x409216`)。`0x407a19` は `0x407a00` 内の `rbx` 初期化。`0x867100` 自体への rip 相対の読み書きは `lea` 以外 0 件 (`fn_refs.py`)。
+  - arena 初期化の候補は `0x409090` (`0x867100`・`0x8671xx` を `lea r8` で構築)。直接呼出し元は `0x41bc8c` のみ (`0x41bc60` 内)。`0x41bc60` は `.data` 表 `0x8526c0` の要素で、`0x8526c0` への参照は PE 内に 0 件 (実行時に埋まる)。
+  - unicorn: `0x409090` を単体 (`-H -w 0x867100:0x867200`) で実行すると arena が構築される (`0x867190`・`0x867188`・`0x8671a0` 等に書込み)。`0x8525f0` と `0x83efb0 -H` のどちらでも `0x409090` には到達しない。`0x83efb0 -H -w 0x867100:0x867200` の書込みは 0 件。
+- 判定: 受入 1 **部分達成** (間接の連鎖は静的に追えた。実経路に乗るかは未確定)。受入 2 **部分達成** (構築関数 `0x409090` を特定、呼出し経路は未確定)。受入 3 (`[rax-8]` のヘッダ形式の復元) **未達**。受入 4 (`0x83efb0` が `0x411a80` に届く) **未達** (`0x407a5e` で停止)。受入 5 (`0x411bb8` 呼出し時の記録) **未達**。waiver は変更しない。
+- 再現 (4048b18a):
+  - `python3 tools/plugins/f2/fn_refs.py $PE 0x407a00 0x867c88 0x41b290 0x41b2c0 0x847120 0x409090 0x867100` (wall 18.4 秒、単独逐次。load は未計測)
+  - `python3 tools/plugins/f2/unicorn_trace.py $PE 0x83efb0 -H -w 0x867100:0x867200 -m 2000000` (wall 1.4 秒、`UC_ERR_READ_UNMAPPED` rip=0x407a5e)
+  - `python3 tools/plugins/f2/unicorn_trace.py $PE 0x409090 -H -q 0x867100 -w 0x867100:0x867200 -m 2000000` (arena 構築の書込みを出す)
+- 再測定 (測定 commit **458a92f2**、main (84932c5a) 取り込み後、逐次、uptime load 0.45〜0.58):
+  - 鮮度: `git diff 4048b18a 458a92f2 -- tools/plugins/f2/fn_refs.py tools/plugins/f2/unicorn_trace.py` = 0 行 (測定対象の `.py` は不変)。
+  - `fn_refs.py $PE 0x407a00 0x867c88 0x41b290 0x41b2c0 0x847120 0x409090 0x867100`: rc=0、wall 12.96 秒。出力は上記の結論と一致 (`0x407a00` の格納元は `0x867c88` のみ、`0x867c88` の rip 参照は `0x4093ae`・`0x409455`・`0x41b294`、`0x407a00` への rel32 は 9 件、`0x867100` への lea は 4 件)。
+  - `unicorn_trace.py $PE 0x83efb0 -H -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、`UC_ERR_READ_UNMAPPED rip=0x407a5e rax=0x0`、書込み 0 件。
+  - `unicorn_trace.py $PE 0x409090 -H -q 0x867100 -w 0x867100:0x867200 -m 2000000`: rc=0、wall 1.32 秒、書込み 28 件 (rip=0x4090a1〜0x4090f9)。
+- 未解決 (#2303 の残件。起票先は本 issue。実経路で `0x847120`・`0x409090` を呼ぶ上位関数を確定する必要あり): (a) `0x847120` の呼出し元 `0x83f637` が `0x83efb0` の経路に乗るか、(b) `0x409090` の呼出し元 `0x41bc60` (表 `0x8526c0`) が実行時に埋まる経路、(c) `[rax-8]` のチャンクヘッダ形式 (受入 3)、(d) `0x411bb8` 記録 (受入 5)。
