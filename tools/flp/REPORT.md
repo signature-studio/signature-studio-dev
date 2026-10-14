@@ -92,7 +92,7 @@
 | 20 | Pitcher | 18 | 20 | 4 |
 
 - 137 種中、projects で使われず preset のみに現れるのは 32 種 (Kepler Exo 192, VFX Script 99, VFX Key Mapper 42, Transmitter 39, FL Studio Mobile Rack FX 36, Multiband Delay 22 …)。
-- **第三者 VST は本コーパスに存在しない** (wrapper 経由は Fruity Mute 2 / Phase Inverter の 2 件のみ)。VST2/VST3 の chunk 解析 (`parseWrapperData`) は合成データでのみ検証。Serum 2 / OTT 等を含む FLP は素材待ち (§7)。
+- **第三者 VST は本コーパスに存在しない** (wrapper 経由は Fruity Mute 2 / Phase Inverter の 2 件のみ)。`parseWrapperData` は実データで検証 (#110: 実機 OTT.fst + 上記 2 件の chunk が往復 byte 一致、`test/wrapper_real.test.ts`)。Serum 2 / OTT 等を含む FLP は素材待ち (§7)。
 - tools/plugins への示唆: 実効影響は **ミキサ insert の EQ/Limiter/Reverb/Delay/Maximus/WaveShaper/PanOMatic** (instance 数) と **ジェネレータ 3x Osc / Sytrus / Harmless / Harmor**。Render tests が各々単体検証の足場になる。
 
 ## 6. コーパス manifest (`corpus/manifest.json`) の概況

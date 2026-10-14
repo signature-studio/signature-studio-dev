@@ -17,12 +17,65 @@ export const FORMAT_NAMES: Record<number, string> = {
 };
 
 export interface VstInfo {
-  kind: number;
+  /** chunk 先頭 u32 = format version (5–12)。kind ではない: Wrapper 自身の writer は 12、FL 11.5.5 の DB writer と実機 VST3 OTT.fst は 8 */
+  version: number;
+  /** record 50。欠落時 0 (= VST2 fx) — Wrapper の挙動 (tools/hostbridge/h10/REPORT.md §2) */
+  plugclass: number;
   name?: string;
   vendor?: string;
   fourcc?: string;
   guid?: string;
   path?: string;
+  /** record 57 = effGetVstVersion (u32)。欠落時 1 */
+  vstVersion: number;
+  /** record 58 = CLAP id */
+  clapId?: string;
+}
+
+export interface WrapperRecord {
+  id: number;
+  payload: Uint8Array;
+}
+
+export interface WrapperChunk {
+  version: number;
+  records: WrapperRecord[];
+}
+
+/** Wrapper chunk (event 213) の record 列。tools/hostbridge/h10/REPORT.md §2 の gate と record walk に従う (5–12 のみ受理、末尾まで厳密に消費できなければ不採用) */
+export function parseWrapperChunk(d: Uint8Array): WrapperChunk | undefined {
+  if (d.length < 4) return undefined;
+  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
+  const version = dv.getUint32(0, true);
+  if (version < 5 || version > 12) return undefined;
+  const records: WrapperRecord[] = [];
+  let p = 4;
+  while (p < d.length) {
+    if (p + 12 > d.length) return undefined;
+    const id = dv.getUint32(p, true);
+    const size = dv.getBigUint64(p + 4, true);
+    if (size > BigInt(d.length - p - 12)) return undefined;
+    const n = Number(size);
+    records.push({ id, payload: d.slice(p + 12, p + 12 + n) });
+    p += 12 + n;
+  }
+  return records.length > 0 ? { version, records } : undefined;
+}
+
+/** parseWrapperChunk の逆。record の順序・payload をそのまま書き戻す */
+export function writeWrapperChunk(c: WrapperChunk): Uint8Array {
+  const total = c.records.reduce((n, r) => n + 12 + r.payload.length, 4);
+  const out = new Uint8Array(total);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, c.version, true);
+  let p = 4;
+  for (const r of c.records) {
+    dv.setUint32(p, r.id, true);
+    dv.setBigUint64(p + 4, BigInt(r.payload.length), true);
+    out.set(r.payload, p + 12);
+    p += 12 + r.payload.length;
+  }
+  return out;
 }
 
 export interface PluginUse {
@@ -82,31 +135,24 @@ function readU16Text(d: Uint8Array, ver: FlVersion, id: number): string {
   return decodeText(d, textIsUtf16(defOf(id), id, ver)).text;
 }
 
-/** Wrapped third-party plugin state: u32 kind (8 = VST2, 10 = VST3) followed by { u32 id, u64 size, payload } records. */
+/** Wrapped third-party plugin state (event 213 of a Fruity Wrapper slot). Fields as read by the Wrapper (h10 REPORT §2). */
 export function parseWrapperData(d: Uint8Array): VstInfo | undefined {
-  if (d.length < 12) return undefined;
-  const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
-  const kind = dv.getUint32(0, true);
-  if (kind !== 8 && kind !== 10) return undefined;
-  const info: VstInfo = { kind };
-  let p = 4;
-  let ok = false;
-  while (p + 12 <= d.length) {
-    const id = dv.getUint32(p, true);
-    const size = Number(dv.getBigUint64(p + 4, true));
-    p += 12;
-    if (p + size > d.length || size > d.length) return ok ? info : undefined;
-    const body = d.subarray(p, p + size);
-    const s = () => new TextDecoder('utf-8').decode(body);
-    if (id === 50) ok = true;
-    if (id === 51) info.fourcc = s();
-    else if (id === 52) info.guid = hex(body);
-    else if (id === 54) info.name = s();
-    else if (id === 55) info.path = s();
-    else if (id === 56) info.vendor = s();
-    p += size;
+  const c = parseWrapperChunk(d);
+  if (!c) return undefined;
+  const info: VstInfo = { version: c.version, plugclass: 0, vstVersion: 1 };
+  const str = (b: Uint8Array): string => new TextDecoder('utf-8').decode(b);
+  for (const { id, payload: b } of c.records) {
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    if (id === 50 && b.length >= 4) info.plugclass = dv.getUint32(0, true);
+    else if (id === 51) info.fourcc = str(b);
+    else if (id === 52) info.guid = hex(b);
+    else if (id === 54) info.name = str(b);
+    else if (id === 55) info.path = str(b).replaceAll('/', '\\');
+    else if (id === 56) info.vendor = str(b);
+    else if (id === 57 && b.length >= 4) info.vstVersion = dv.getUint32(0, true);
+    else if (id === 58) info.clapId = str(b);
   }
-  return ok && p === d.length ? info : ok ? info : undefined;
+  return info;
 }
 
 interface Cur {
