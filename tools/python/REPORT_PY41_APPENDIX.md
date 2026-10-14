@@ -103,7 +103,7 @@
 親: #2033 (PY-64)。前段: 上節の PY-64。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
 測定 commit: `7e6c748a` (`analysis/py88_writes.py` の ACC 合流表示・store 検出の修正と `analysis/py64_check_expr.py` を入れたコード commit)。`git diff 7e6c748a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT のみ)。
 
-後続 (#3086・PY-159): 65 件の全件表と手計算突合 7 件 (mismatch 0・ネガコン mismatch 1) は `REPORT_PY159.md`。
+後続 (#3086・PY-159): 65 件の全件表は `REPORT_PY159.md` §3。手計算突合とネガティブコントロールを実施。結果は `REPORT_PY159.md` §4。
 
 ### 結論 (部分達成・`Refs #2788`)
 

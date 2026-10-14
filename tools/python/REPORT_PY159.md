@@ -4,17 +4,17 @@
 
 ## 1. 結論
 
-- 受入 1 (65 件の式・書込み VA・未確定印の表): **達成**。§3 の 65 行。読む値・書く値の数値は静的には確定しない。表の「書く値の式」が書く値で、式中の `ACC` (書込み前の `[rbp+0x5b8]`) と `SLOT[rbp+X]?` (合流を越えた frame 変数) が読む値の未確定部分。
-- 受入 2 (手計算突合を PY-64 の 6 件を超えて・mismatch 0): **達成 (7 件)**。65 件のうち SLOT? を含まず VCALL でもない 7 件 (CALL 4・rint 3) を機械語から手で読み、機械スライスと一致 (mismatch 0)。PY-64 の 6 件とは別集合で、合計 13 件。残り 58 件は未照合 (§5)。
+- 受入 1 (65 件の式・書込み VA・未確定印の表): **達成**。§3 の 65 行。読む値・書く値の数値は静的には確定しない。表の「書く値の式」が書く値で、式中の `ACC?⚠合流` (書込み前の `[rbp+0x5b8]`・分岐の合流を越える) と `SLOT[rbp+X]?` (合流を越えた frame 変数) が読む値の未確定部分。
+- 受入 2 (手計算突合を PY-64 の 6 件を超えて・mismatch 0): **達成 (7 件)**。65 件のうち SLOT? を含まず VCALL でもない 7 件 (CALL 4・rint 3) を機械語から手で読み、機械スライスと一致 (mismatch 0)。PY-64 の 6 件とは別集合で、合計 13 件。残り 58 件は未照合 (§5)。ただし 7 件の一致は「`ACC?⚠合流` を ACC と同一視した式の形の一致」であり、書く値の一致ではない (ACC の値は未確定)。
 - 受入 3 (ネガティブコントロールの数値): **達成**。手計算 1 件 (0x1047719 の r8d) を 1 だけ変えると mismatch=1・exit 1 (§4)。
 - 機械スライスの件数は PY-88 と同じ (直接式 49・CALL 7・rint 6・VCALL 3)。ACC 合流 30 件も PY-88 と一致する。SLOT? の 55 件は PY-88 の内訳 (直接式 49・CALL 3・rint 3) の和。
 
 ## 2. 測定条件
 
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `block00031_PE.bin` (22,227,016 B)。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py159 --wildcards '*block00031_PE.bin'` (1.6 秒) で `work/py159/extracted/` へ展開。
-- 逆アセンブル: `python3 analysis/py53_dispatch.py work/py159/extracted/block00031_PE.bin work/py159/py53` → `fn=4664 dispatch=13 r8d_tests=174` (0.07 秒)。入力は `work/py159/py53/fn.txt`。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` の `block00031_PE.bin` (22,227,016 B)。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py159 --wildcards '*block00031_PE.bin'` (2.8 秒) で `work/py159/extracted/` へ展開。
+- 逆アセンブル: `python3 analysis/py53_dispatch.py work/py159/extracted/block00031_PE.bin work/py159/py53` → `fn=4664 dispatch=13 r8d_tests=174` (0.10 秒)。入力は `work/py159/py53/fn.txt`。
 - 対象: `analysis/py88_writes.py` の既定 (0x1047497・0x104aa87 の到達範囲の一意な `mov dword ptr [rbp + 0x5b8], reg` 65 件)。
-- 測定 commit: `b965416b` (スクリプト `analysis/py159_table.py`・`analysis/py159_check_hand.py` を追加したコード commit)。REPORT は後続 commit で書いた。`git diff b965416b HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT・DOC_MAP のみ)。
+- 測定 commit: `19bf08b2` (`analysis/py159_check_hand.py` に `--negctl` の値検査を入れたコード commit。ここで全測定を再実行した)。REPORT は後続 commit で書いた。`git diff 19bf08b2 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT・DOC_MAP・付録のみ)。
 - e2e: 対象外。解析スクリプトだけの変更で wasm 出力に影響しない。素材は逆アセンブルの入力にのみ使う。
 
 ## 3. 65 件の全件表
@@ -108,7 +108,7 @@
 | 0x104a999 | `rint(f64(ACC) · *(0x104cd00))`。0x104a98c `mulsd` の次 0x104a994 + 0x236c = 0x104cd00 | 一致 |
 
 - 測定: `python3 analysis/py159_check_hand.py work/py159/py53/fn.txt` → `# n=7 mismatch=0`・exit 0。
-- ネガティブコントロール: `python3 analysis/py159_check_hand.py work/py159/py53/fn.txt --negctl r8d` → `0x1047719: 不一致` (`r8d: hand=('num', 12801) mach=('num', 12800)`)・他 6 件は一致・`# n=7 mismatch=1`・exit 1。
+- ネガティブコントロール: `python3 analysis/py159_check_hand.py work/py159/py53/fn.txt --negctl r8d` → `0x1047719: 不一致` (`r8d: hand=('num', 12801) mach=('num', 12800)`)・他 6 件は一致・`# n=7 mismatch=1`・exit 1。未知の値 (`--negctl foo`) と値なし (`--negctl`) は usage を出して exit 2 (測定: 両方 exit 2・比較は行わない)。
 - 突合していない 3 件 (VCALL 0x104a8a3・0x104a95f・0x104a9c7): 呼出し先は `*(*([rbp+0x410]) + 0x30)` と手で読めるが、機械スライスは VCALL の呼出し先と引数 (edx の `[rbp+0x570]`・r8d の ACC・r9d の定数または `[rbp+0x5c0]`) を式に出さないので、突合の対象にしない。
 - 回帰: PY-64 の 6 件 `python3 analysis/py64_check_expr.py work/py159/py53/fn.txt` → `n=6 mismatch=0`・exit 0 (PY-88 節と同じ)。
 
