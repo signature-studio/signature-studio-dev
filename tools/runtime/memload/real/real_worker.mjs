@@ -1,5 +1,5 @@
 // RT-6 実 loader 試験 (#125): PluginPool (src/runtime/memory_budget.ts) を hostbridge の loader に接続する Worker。
-// loader = host_vst2.wasm + hb_bridge.mjs の LoadLibraryW / FreeLibrary (LoadLibraryW の採番だけ PoolBridge で置換)。lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
+// loader = host_vst2.wasm + 共有 hb_bridge.mjs の HostBridge (LoadLibraryW / FreeLibrary)。lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
 // PluginPool 経由で pin / unpin / LRU 追い出しする。判定は run_real.mjs 側。
 import { ModuleTable, HostBridge, EmscriptenGuest, HMODULE_BASE } from "./hb_bridge.mjs";
 import { PluginPool, MemoryBudget, DEFAULT_PLUGIN_CAPACITY } from "./memory_budget.js";
@@ -8,26 +8,6 @@ globalThis.Buffer = { from: (s) => Uint8Array.from(s, (c) => c.charCodeAt(0)) };
 const SR = 44100, HALF = 128, NPLUG = 150, PINS_CHURN = 170;
 const sha256 = async (u8) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", u8))].map((b) => b.toString(16).padStart(2, "0")).join("");
 const loadFactory = async (url) => new Function((await (await fetch(url)).text()) + "\n;return createModule;")();
-
-// hostbridge の LoadLibraryW は handle を loaded.size+1 から作るため、解放後に既存 handle と衝突する
-// (FreeLibrary が別 module の登録を消す)。ここでは単調増加の採番に置き換える。他は hb_bridge.mjs の LoadLibraryW と同一。
-class PoolBridge extends HostBridge {
-  constructor(table) { super(table); this.hseq = 0; }
-  LoadLibraryW(pPath) {
-    const path = this.readWStr(pPath);
-    const desc = this.table.resolve(path);
-    this.lastLoadMode = this.errorMode;
-    if (!desc) { this.lastError = 126; return 0n; }
-    let lm = this.loaded.get(desc.id);
-    if (lm) { lm.refs++; return lm.handle; }
-    const guest = desc.acquire();
-    guest.mod.hbHostCall = (eff, op, idx, vlo, vhi, ptr, opt) => this.upcall(guest, eff, op, idx, vlo, vhi, ptr, opt);
-    guest.init();
-    lm = { desc, guest, refs: 1, handle: HMODULE_BASE + BigInt(++this.hseq) * 0x10000n, entrySlots: new Map() };
-    this.loaded.set(desc.id, lm); this.byHandle.set(lm.handle, lm);
-    return lm.handle;
-  }
-}
 
 function fillIn(f) {
   for (let i = 0; i < HALF; i++) { f[i] = Math.fround(Math.sin(i * 0.05) * 0.7 + Math.sin(i * 0.011) * 0.3); f[HALF + i] = Math.fround(Math.cos(i * 0.13) * 0.5); }
@@ -44,7 +24,7 @@ async function runCase(mode) {
       acquire() { const g = this.guests.pop(); if (!g) throw new Error("pool empty"); return g; }, release() {} });
   }
   const table = new ModuleTable(); descs.forEach((d) => table.register(d));
-  const bridge = new PoolBridge(table);
+  const bridge = new HostBridge(table);
   const host = new WebAssembly.Instance(new WebAssembly.Module(await (await fetch("host_vst2.wasm")).arrayBuffer()), bridge.imports());
   bridge.attachHost(host);
   const x = host.exports;
