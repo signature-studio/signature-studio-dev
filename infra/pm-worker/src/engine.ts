@@ -33,6 +33,7 @@ import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type
 import {
   applyEvent,
   EMPTY_STATE,
+  KILLED_STOP_AT,
   NEEDS_USER_LABEL,
   reviewSignal,
   setSig,
@@ -508,8 +509,10 @@ export class Engine {
     const R = this.d.cfg.repo;
     let diff = 0;
     // 一覧は 1 回に数千件になるので、状態に使うコメント (bot・reviewer と PM) 以外は本文を持たない。reviewer は webhook 経路と同じマーカーを読むため含める。
+    // 人の /oc は本文で『着手であって応答ではない』と判定する (webhook.ts の answered) ので、/oc で始まる本文だけは残す。
     const mine = new Set([this.d.cfg.botLogin, this.d.cfg.reviewerLogin, ...this.pmLogins()]);
-    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: mine.has(c.user?.login) ? c.body : "" });
+    const keepBody = (c: any) => mine.has(c.user?.login) || /^\/oc\b/m.test(c.body ?? "");
+    const slim = (c: any) => ({ id: c.id, issue_url: c.issue_url, created_at: c.created_at, user: { login: c.user?.login }, author_association: c.author_association, body: keepBody(c) ? c.body : "" });
     const cs = this.note(
       "comments",
       await gh.list<any>(
@@ -632,15 +635,18 @@ export class Engine {
         this.s = { ...this.s, runs: rest };
       }
     }
-    // 閉じた issue / PR の手がかりは使わない
+    // 閉じた issue / PR の手がかりは使わない。数えた run の id (killRun) だけは残す (reopen の後に古い run の配送が届いても数え直さない)。
     for (const k of Object.keys(this.s.sig)) {
       const i = this.s.issues[k];
       const p = this.s.prs[k];
-      if ((i || p) && i?.state !== "open" && p?.state !== "open") {
-        this.d.store.del("sig", k);
-        const { [k]: _, ...rest } = this.s.sig;
-        this.s = { ...this.s, sig: rest };
-      }
+      if (!((i || p) && i?.state !== "open" && p?.state !== "open")) continue;
+      const killRun = this.s.sig[k].killRun;
+      const keep = killRun === undefined ? undefined : { killRun };
+      if (JSON.stringify(keep) === JSON.stringify(this.s.sig[k])) continue;
+      if (keep) this.d.store.put("sig", k, keep);
+      else this.d.store.del("sig", k);
+      const { [k]: _, ...rest } = this.s.sig;
+      this.s = { ...this.s, sig: keep ? { ...rest, [k]: keep } : rest };
     }
   }
 
@@ -704,6 +710,16 @@ export class Engine {
 
   countActive(): number {
     return this.activeRuns().all;
+  }
+
+  // 打ち切りが連続して自動の再着手を止めた open な issue と、その回数 (番号順)。
+  killedIssues(): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const i of Object.values(this.s.issues)) {
+      const c = this.s.sig[String(i.number)]?.kill?.count ?? 0;
+      if (i.state === "open" && c >= KILLED_STOP_AT) out.push([i.number, c]);
+    }
+    return out.sort((a, b) => a[0] - b[0]);
   }
 
   // 全 event の run を状態別に数える (running = in_progress、queued = queued・pending・waiting)。
@@ -828,6 +844,13 @@ export class Engine {
       moveTo(n, "ready", () => {});
       moveTo(n, "relaunch", () => {});
       rows.user.push([n, hold]);
+    }
+
+    // 実装 run が PR も出さずに連続して打ち切られた issue (webhook.ts の applyKill が数える sig.kill) は、自動で再着手しない。oc:no-pr の標識は付かない
+    // (runner の shutdown では record-run-outcome.sh が走らない) ので、cooldown や再投入の枠には載せず stopped に置き、PM agent (oc-pm の no_pr) に回す。
+    for (const [n, c] of this.killedIssues()) {
+      const from = (["ready", "relaunch", "recent"] as const).find((r) => (rows[r] as unknown[]).some((x) => (Array.isArray(x) ? x[0] : x) === n));
+      if (from) moveTo(n, from, () => rows.stopped.push([n, `killed x${c}`]));
     }
 
     const blocksCount = new Map<number, number>();
@@ -1517,6 +1540,9 @@ export class Engine {
       needs_pm: countLabel(NEEDS_PM_LABEL),
       needs_user: countLabel(NEEDS_USER_LABEL),
       no_pr_by_reason: noPrByReason,
+      // 実装 run が PR も出さずに連続して打ち切られ (cancelled / failure / timed_out)、自動の再着手を止めた open issue の件数と番号 (oc-pm の no_pr で PM agent に回す)。
+      killed_stopped: this.killedIssues().length,
+      killed_issues: this.killedIssues().map(([n]) => n).slice(0, 100),
       refs_only_merge_rate_24h: { merged: mergedDay.length, refs_only: refsOnly, rate: mergedDay.length ? refsOnly / mergedDay.length : null },
       open_issues_delta_24h: base ? open - base.open : null,
       pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
