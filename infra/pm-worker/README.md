@@ -61,7 +61,8 @@ Worker の健全性を外から判断するための集計。既存のキーは�
 | `last_webhook_at` | 署名を検証できた webhook の最後の受信時刻 (401 では進めない)。無ければ `null` |
 | `last_dispatch_at` | `repository_dispatch` (`oc-watchdog`) に成功した最後の時刻。dry-run では `null` のまま (would は既存の `last_watchdog`) |
 | `last_digest_at` | 直近の digest (`oc-pm kind=digest`) を試行した時刻。起点の tick・送信・送信失敗・dry-run の記録を含む (24 時間に 1 回進む)。無ければ `null` |
-| `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event は問わない (TARGET に数える `active_runs` とは別) |
+| `running` | `{in_progress, queued, pending}`: DO が持つ未完了 run を状態別に数えた値。event は問わない (TARGET に数える `active_runs` とは別)。`running.queued` は status が `queued` のものだけ (`pending`・`waiting` は数えない)。top-level の `queued` は queued・pending・waiting の合計で、定義が違う |
+| `target_eff` / `cap_est` / `peak_running` / `queued` / `oldest_queued_age_min` | 同時実行の上限の推定 (#2381)。`target_eff` は launch の目標、`cap_est` は推定の上限 (無ければ `null`)、`peak_running` は直近 24 時間の tick ごとの `in_progress` の最大値。`queued` は queued・pending・waiting の数、`oldest_queued_age_min` は最も古い queued の経過分 (無ければ `null`)。詳細は下の節 |
 | `dry_run_skipped_posts` | dry-run のために投稿しなかった書き込み (`/oc` 投稿 + `repository_dispatch`) の累計 (`counters.wouldLaunch + wouldDispatch`) |
 | `reconcile_diff` | `{last, total}`: reconcile が REST を適用して DO の内容が変わった entity (issue・PR・run・bot/PM のコメント) の件数と累計。webhook の欠落の指標。`updatedAt` だけの違い (コメント追加で進む) と full sync は数えない。配送遅延の最中の差も数えるので、1 回の小さな値は欠落とは限らない |
 | `rest_remaining` / `rest_used` / `rest_reset_at` | Worker の GitHub REST クライアント (installation token) の全応答の `x-ratelimit-remaining` / `-used` / `-reset` (ヘッダが正。`gh api rate_limit` の本文は食い違う)。失敗応答も含む。ヘッダの無い応答・数値でない値では更新しない。一度も観測していなければ `null` (0 ではない)。JWT で叩く `/app/*` と、`/status?detail=1` の呼び出し側の token は別枠なので記録しない |
@@ -93,6 +94,21 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 **secrets を出さない**: `/status` は集計だけで、issue のタイトル・本文・コメントは載せない。自由文は `last_error.what` とログの `note` だけ (どちらも `?detail=1` のみ)。
 これらと `console.log` は `src/redact.ts` を通し、PEM・`gh*_` / `github_pat_` の token・JWT・`Bearer …`・`sha256=…` と、実行時に分かっている secret (webhook secret・PEM・STORE_KEY・直近の installation token) を `[redacted]` にする。
 
+## 同時実行の上限の推定 (#2381)
+
+GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 など)。固定の `TARGET` だと、上限が下がったときに queued が際限なく積まれる。そこで tick ごとに run 数を観測し、上限を推定する (`src/saturation.ts` の純関数。GitHub への書き込みは増やさない)。
+
+- 観測: 全 event の run を `in_progress` (running) と `queued`・`pending`・`waiting` (queued) に数え、1 分ごとに 1 件を `meta/obs` に残す (24 時間で捨てる)。
+  記録するのは `fresh` な tick だけ (launch と同じ条件)。同期が古い間や一覧を打ち切った間は run 一覧が不完全で、偽の飽和を作り得るため記録しない。
+- 飽和: queued > 0 のまま running が**同じ値で 30 分続いた**とき、その値を `cap_est` とする。途中で running が変わればそこから数え直す。
+  連続する 2 件の観測の間隔が 2 分 (`SAT_GAP_MS`) を超えたら、その間は連続とみなさない (空いた後の streak は空きの後の観測から数える)。
+- 引き上げ: 推定の後の観測 (`cap_est` を決めた時刻以降) の peak が推定を超えたら、その peak に上げる (上限が上がった場合)。古い peak で押し上げ直さないよう、窓は推定を決めた時刻から始まる。
+- 期限: 推定を決めた (更新した) 時刻から 24 時間たって更新が無ければ推定を消す。
+- 目標: `target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))`。推定が無ければ `TARGET` のまま。`room = target_eff − active` (`active` は TARGET と同じ数え方)。
+- env: `QUEUE_MARGIN` (既定 10)、`TARGET_MIN` (既定 30)。`TARGET` は上限のままで、推定はそれを超えない。
+
+現行の `wrangler.toml` は `TARGET="50"` なので、推定が 40 以上のとき `target_eff` は 50 に張り付く (上限 60 でも 50 まで)。`TARGET` を 80 に戻すまでは、この上限が効く。
+
 ## 失敗した webhook 配送の回収と `/admin/resync` (#2339)
 
 - **再送**: GitHub は失敗した配送を自動で再送しない。tick は 5 分ごとに、App の JWT (`appJwt`。installation token とは別枠) で `GET /app/hook/deliveries?per_page=100` を 1 ページ読み、`status != OK` の配送を古い順に `POST /app/hook/deliveries/{id}/attempts` で再送する。同じ `guid` に OK の配送が 1 つでもあれば回収済みとみなして触らない。再送された配送 (`redelivery: true`) は、失敗しても再送しない (連鎖させない。元の配送の上限だけで止まる)。
@@ -116,7 +132,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 ## ファイル構成
 
 - `src/index.ts` Worker の入口 (対象外のイベントは DO を起こさず捨てる)。`src/do.ts` Durable Object `PmDO` (SQLite の `kv` 表 + alarm)。
-- `src/app.ts` HTTP 面 (`/webhook` `/setup` `/setup/callback` `/status` `/tick`)。`src/engine.ts` 同期・分類・launch・watchdog・status。`src/ratelimit.ts` `src/redact.ts` は #2338 の rate limit の解釈と自由文の redact (純関数)。
+- `src/app.ts` HTTP 面 (`/webhook` `/setup` `/setup/callback` `/status` `/tick`)。`src/engine.ts` 同期・分類・launch・watchdog・status。`src/ratelimit.ts` `src/redact.ts` は #2338 の rate limit の解釈と自由文の redact (純関数)。`src/saturation.ts` は #2381 の同時実行の上限の推定 (純関数)。
 - `src/webhook.ts` `src/classify.ts` `src/launch.ts` `src/hmac.ts` は純関数 (#1751 / #1795)。`src/pm.ts` (oc-pm の検出・抑止) と `src/needs.ts` (PM 判断を求める語彙) も純関数 (#2333)。
 - `src/store.ts` `src/route.ts` は #1882 の entity 単位の SQLite 増分保存 (`receiveWebhook`)。`src/kvstore.ts` は Engine が使う汎用の保管 (bucket/key)。
   Worker の本番経路は `index.ts` → `do.ts` → `app.ts` → `engine.ts` (kvstore)。`store.ts` / `route.ts` は #1882 のテスト (`test/route.test.ts`) で検証される増分保存の実装で、
@@ -203,7 +219,9 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `LIVE_LAUNCH` | launch の `/oc` コメント投稿 (`POST /repos/{o}/{r}/issues/{n}/comments`) | `"1"` (2026-10-14〜。コードの既定は dry-run) |
 | `LIVE_DISPATCH` | `repository_dispatch` の送信 (`POST /repos/{o}/{r}/dispatches`)。`oc-watchdog` と、oc-pm 節の `oc-pm` (PM agent の起動) の両方。別スイッチは無い | `"1"` (同上) |
 | `LIVE` (旧) | 上の 2 つのうち、未設定のほうにだけ効く (両方の既定値) | (置かない) |
-| `TARGET` | 同時に走らせる run の目標 (room = TARGET − active) | `"50"` (暫定。80 に戻す作業は #2458) |
+| `TARGET` | 同時に走らせる run の上限 (room = target_eff − active。推定が無ければ target_eff = TARGET。推定の仕組みは『同時実行の上限の推定』) | `"50"` (暫定。80 に戻す作業は #2458) |
+| `QUEUE_MARGIN` | 推定の上限 (`cap_est`) に足す余裕。`target_eff = min(TARGET, max(TARGET_MIN, cap_est + QUEUE_MARGIN))` | 未設定 (コードの既定 10) |
+| `TARGET_MIN` | `target_eff` の下限 | 未設定 (コードの既定 30) |
 | `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"24"` (暫定。コードの既定は 3) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
