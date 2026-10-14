@@ -44,7 +44,7 @@
 
 - **測定 commit**: `db9eb829` (コードを変えた最後の commit。`bbfe9795` → `7c94bec0` の後に、PASS へ sink 接続の判定を加え、初回 navigate を 1 回に統一し、summary の列を §5-1 に合わせて、行列と NC を取り直した)。
   コード差分の確認: `git diff db9eb829 HEAD -- tools/audio/harness tools/audio/au2_matrix.sh tools/audio/au2_summary.mjs tools/audio/build.sh tools/audio/src tools/audio/test` の出力は空 (差分 0)。
-- **環境**: ubuntu runner (4 vCPU)・Firefox 157.0 (`--headless`, `MOZ_HEADLESS=1`)・PulseAudio 16.1 (apt 導入)・既定 sink = `module-null-sink sink_name=ci_null`・emsdk は runner の `/opt/emsdk` (`tools/audio/build.sh` の既定 `EMSDK_ENV`)。
+- **環境**: ubuntu runner (4 vCPU)・Firefox 157.0 (`--headless`, `MOZ_HEADLESS=1`)・PulseAudio 16.1 (apt 導入)・既定 sink = `module-null-sink sink_name=ci_null`・emsdk は runner 既定の `[EMSDK]` (`docs/REFERENCES.md`、`tools/audio/build.sh` の既定 `EMSDK_ENV`)。
 - **駆動**: `harness/bidi.mjs` (`withFirefox`: `chrome.mjs` の `serve` を共用し、`{navigate, eval}` は `withChrome` と同形。評価は `script.evaluate` + `awaitPromise`)、`harness/au2.mjs` (1 rep で 48k・96k を 1 セッション実行、再生中に `pactl list short sink-inputs` を 300 ms 間隔で採取)。
 - **再現**: `bash tools/audio/au2_matrix.sh 3` → `results/au2/firefox_r{1,2,3}.json`、集計 `node tools/audio/au2_summary.mjs`。条件は B=256・depth=2・sine・10 s。48k は `asio_sine_b256_d2`、96k は `asio_sine_b256_96k` と同名 (`harness/run.mjs`)。
 - **PASS の判定**: `run.mjs` の `underrunFree` と `sineOk` に加え、`ctx.sampleRate` が要求値に一致し、abort と worklet エラーが無く、sink-input が既定 sink (`ci_null`) に接続したこと (`pulse_sink_input.on_ci_null`)。`au2_matrix.sh` の終了コード 0 はこの全条件が全 rep で成立したことを表す。
