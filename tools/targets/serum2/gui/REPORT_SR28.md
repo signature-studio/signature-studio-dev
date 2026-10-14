@@ -4,6 +4,7 @@
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は受入条件 4 (範囲外・GUI lift 時)。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3`。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` / 19,236,864 B (SR-24 と一致)。作業用 scratch dir (リポジトリ外・`$SCRATCH`、runner の `_temp` 配下) に置いた。
 - 検証起点: 本 PR の測定 commit (下記 §0-1)。
+- **訂正 (SR-30 #2000)**: `0x180a86b88` は SpliceController ではなく SerumEditor の sub-object の vtable。`0x180498198` / `0x180498734` は SpliceController の生成ではない。詳細は `REPORT_SR30.md` §0-1 (本文の誤記は内容を残す)。
 
 ## 0. 結論
 
