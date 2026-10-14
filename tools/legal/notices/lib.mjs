@@ -103,7 +103,7 @@ export function validateRecord(rec, expectedId, { repoRoot = REPO, forbiddenArgs
 /**
  * font-asset (GUI-9 の OSS 代替フォント。リポジトリには入れず fetch スクリプトが取得する) の検証。問題文字列の配列 (空 = OK)。
  *   - upstream は commit 固定 (url に commit を含む)・版・著作権表示・ライセンス本文 (sha256 一致)・各ファイルの size/sha256 が必須
- *   - 各ファイルの sha256 が取得スクリプト (coveredBy) の検証値と一致すること (registry だけ更新して取得物が変わる事故の検出)
+ *   - 各ファイルの sha256 が取得スクリプト・検証値台帳 (coveredBy の存在するファイル全て) の検証値と一致すること (registry だけ更新して取得物が変わる事故の検出)
  *   - 各ファイルの sha256 が release guard の allow-list にあること (FL 同梱の旧版と窓を共有し、無いと公開物が exit 6 になる: REPORT)
  */
 export function validateFontAsset(c, { repoRoot = REPO } = {}) {
@@ -120,8 +120,8 @@ export function validateFontAsset(c, { repoRoot = REPO } = {}) {
   else if (sha256(lic.text) !== lic.sha256) p.push("fontAsset.licenseFile の sha256 が本文と一致しない");
   if (lic.url && !lic.url.includes(f.commit ?? "\0")) p.push("fontAsset.licenseFile.url が commit 固定でない");
   if (!Array.isArray(f.files) || f.files.length === 0) p.push("fontAsset.files が空");
-  const script = (c.coveredBy ?? []).map((x) => path.join(repoRoot, x)).find((x) => existsSync(x) && statSync(x).isFile());
-  const scriptText = script ? readFileSync(script, "utf8") : null;
+  const scripts = (c.coveredBy ?? []).map((x) => path.join(repoRoot, x)).filter((x) => existsSync(x) && statSync(x).isFile());
+  const scriptText = scripts.length ? scripts.map((x) => readFileSync(x, "utf8")).join("\n") : null;
   if (scriptText === null) p.push("coveredBy に取得スクリプト (ファイル) が無い");
   const allowPath = path.join(repoRoot, "tools/legal/release-guard/allowlist.json");
   const allow = existsSync(allowPath) ? (JSON.parse(readFileSync(allowPath, "utf8")).entries ?? []) : [];
