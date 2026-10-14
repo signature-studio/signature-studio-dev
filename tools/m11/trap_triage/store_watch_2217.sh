@@ -3,13 +3,16 @@
 #   窓 = `icall 0x1c04a0` (VA 0x5c04a0, 戻り 0 の stub) の入口から `icall 0xf960` (TObject.NewInstance) の入口まで.
 #   unit 106 で止まっていた #2099/#2165 と違い, 監視 (m11_watch_on) を unit 114 の窓内だけで ON にし, 計装 build の
 #   m11_sw 呼出し自体は unit 0..113 でも実行される. 窓の端は probe と同じ icall 行 (M11_TRACE) を printErr で拾って切る.
-#   usage: store_watch_2217.sh <tag>
+#   usage: store_watch_2217.sh <tag> [w114|diag]
+#     w114 (既定): stderr に `unit i` 行だけを出す (unit 0..106 で 107 行)。
+#     diag: 各 unit の結果と ms (`unit i <結果> ms=...`) も出す。
 #   出力: work/probe2217/<tag>.err (`[aw]` 行), work/probe2217/sites.json
 #   終了時に work/obj を消して m11_build.sh で clean な wasm に復元する (trap で必ず復元).
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
 source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
 tag=${1:?tag}
+mode=${2:-w114}
 CF="-w -Wno-error=int-conversion -Wno-implicit-function-declaration -O0 -g1 -DM11_LB_BASE=${M11_LB_BASE:-0} -DM11_OV_CLASSCREATE=${M11_OV_CLASSCREATE:-0} -I."
 restore() { rm -f work/obj/sw682.o work/obj/boot.o work/obj/ov.o; touch work/boot_final3.ll; bash m11_build.sh > /dev/null 2>&1; }
 trap restore EXIT
@@ -22,6 +25,7 @@ bash m11_build.sh > work/probe2217/build_$tag.log 2>&1 || { tail -5 work/probe22
 cat > work/probe2217/run_$tag.mjs <<EOF
 import fs from 'fs';
 const M11 = '$HERE';
+const diag = '$mode' === 'diag';
 const m2 = await import(M11 + '/work/m11_boot.cjs');
 let mod = null, n_on = 0, n_off = 0;
 const printErr = (s) => {
@@ -29,7 +33,6 @@ const printErr = (s) => {
   if (!mod) { if (s.startsWith('[aw]')) fs.writeSync(2, s + '\n'); return; }
   if (s.includes('[m11][icall] 0x1c04a0')) { n_on++; mod._m11_watch_on(1); fs.writeSync(2, '[win] ON ' + n_on + '\n'); }
   else if (s.includes('[m11][icall] 0xf960') && n_on > n_off) { n_off++; mod._m11_watch_on(0); fs.writeSync(2, '[win] OFF ' + n_off + '\n'); }
-  else if (s.includes('[m11][icall] ')) { if (n_on > n_off) { n_off++; mod._m11_watch_on(0); fs.writeSync(2, '[win] OFF ' + n_off + '\n'); } }
   else if (s.startsWith('[aw]')) fs.writeSync(2, s + '\n');
 };
 mod = await m2.default({ printErr });
@@ -42,7 +45,7 @@ try { mod._m11_boot_enter(0n, 1n); } catch (e) {
 }
 const sp0 = mod._emscripten_stack_get_current();
 const run = (i) => { try { return mod._m11_call_unit(i); } catch (e) { mod.__emscripten_stack_restore(sp0); return e && e.m11_dllmain_done !== undefined ? 'halt0' : 'trap'; } };
-for (let i = 0; i < 114; i++) { const t0 = Date.now(); fs.writeSync(2, 'unit ' + i + '\\n'); const r0 = run(i); fs.writeSync(2, 'unit ' + i + ' ' + r0 + ' ms=' + (Date.now() - t0) + '\\n'); }
+for (let i = 0; i < 114; i++) { const t0 = Date.now(); fs.writeSync(2, 'unit ' + i + '\\n'); const r0 = run(i); if (diag) fs.writeSync(2, 'unit ' + i + ' ' + r0 + ' ms=' + (Date.now() - t0) + '\\n'); }
 fs.writeSync(2, 'unit 114 (trace on)\\n');
 mod._m11_set_trace(1);
 const r = run(114);

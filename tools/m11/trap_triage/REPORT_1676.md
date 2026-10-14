@@ -176,13 +176,11 @@
 
 - 測定 commit: `27a324e0` (origin/main)。本節のコード差分は `trap_triage/store_watch_2217.sh` の追加のみ。
 - 素材: `fl-win64` (`block00031_PE.bin` sha256 `b2c64da4…`・`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`)・`toolchain-emsdk`・`toolchain-retdec`・`work-m11`・`work-liftdiff` を展開。`work/lift_pe.sha256` は PE 指紋で手記録 (§6 と同じ)。
-- 前提の確認: 展開直後の `work-m11` の wasm は `_m11_icall_cnt_n` を持たず、unit 114 が `abort()` (`RuntimeError: Aborted`)。`m11_e2e.sh` (非 `--full`、foreground、rc=0、wall 134 s、user 128 s、load 1.17): reached_stage 4、survey_ok 872、survey_trap 23、miss 46、IR sha256 `6909f85d…` (§6〜§11 と一致)。再生成後の `probe1676_watch.mjs` (unit 114、n=1): `halt0`、`after [icall 0x1c04a0] before [icall 0xf960]: L 0x0->0x10bd4c20, base -->0x0, cnt -->1` (§8〜§11 と一致)。
-- 窓の確認: `probe1676_u114.mjs` の trace (84 行) で、最後の `icall 0x1c04a0` の直後が `icall 0xf960` (§8 と一致)。IR 上の窓内候補は `function_8651a0` (`boot_final3.ll` 333572〜333722)・`function_40f9e0`・`function_410320`・`function_410360`・`function_409410` (定義あり)。`function_40f960`・`function_40fb40`・`function_40fac0`・`function_5c0e70`・`function_5c04a0` は `boot_final3.ll` に定義が無い。
-- 計装: `store_watch_2217.sh` は `store_watch_2099.sh` と同じ全 store 計装 (54,342 store) を使い、監視 ON を `[m11][icall] 0x1c04a0` で開き `[m11][icall] 0xf960` で閉じる (unit 114 のみ trace 有効)。
-- 計装 build の実測 (n=1、いずれも foreground):
-  - `store_watch_2217.sh w114` (`timeout 600`): rc=124、`[aw]` 0 件、stderr 107 行で unit 106 に停止。`[win]` ON/OFF は 0 件 (unit 114 に届かない)。
-  - `store_watch_2217.sh diag` (unit ごとの ms を出す版、`timeout 300`): rc=124。unit 0〜105 は 0〜57 ms で完了、unit 106 は 300 秒超で戻らない。
-  - 計装を外した同じ wasm (`probe1676_watch.mjs`) は unit 0〜113 を約 1 秒で実行する。**監視を OFF にしていても、全 store の計装 build 自体が unit 106 で止まる** (#2099・#2165 と同じ現象)。
+- 前提: 素材・測定の基準値は §8 (baseline の e2e・probe 数値) を参照。展開直後の `work-m11` の wasm は `_m11_icall_cnt_n` を持たず、再生成が必要 (§1 と同じ)。
+- 窓: 監視 ON は `[m11][icall] 0x1c04a0` (VA `0x5c04a0`) で開き、`[m11][icall] 0xf960` (VA `0x40f960`) でだけ閉じる。窓内の他の icall 行では閉じない (fix 版の script で実装)。IR 上の窓内候補は `function_8651a0` (`boot_final3.ll` 333572〜333722)・`function_40f9e0`・`function_410320`・`function_410360`・`function_409410` (定義あり)。`function_40f960`・`function_40fb40`・`function_40fac0`・`function_5c0e70`・`function_5c04a0` は `boot_final3.ll` に定義が無い。
+- 計装: `store_watch_2217.sh <tag> [w114|diag]` は `store_watch_2099.sh` と同じ全 store 計装 (54,342 store) を使い、unit 114 のみ trace 有効。`w114` (既定) は stderr に `unit i` 行のみ、`diag` は各 unit の結果と ms も出す。
+- 計装 build の旧版測定 (commit されていない作業版で取得、n=1、foreground): `w114` 相当は `timeout 600` で rc=124、`[aw]` 0 件、unit 106 で停止。`diag` 相当は unit 0〜105 が 0〜57 ms、unit 106 が 300 秒超で戻らない。計装を外した同じ wasm は unit 0〜113 を約 1 秒で実行する。**監視を OFF にしても、全 store の計装 build 自体が unit 106 で止まる** (#2099・#2165 と同じ現象)。
+- 未測定 (本 fix 時点): 本 commit の script (`w114`・`diag` 分岐の追加後) からの再測定。runner に `toolchain-emsdk`・`toolchain-retdec`・`work-m11` が無く (`fl-win64` のみ)、計装 build を再現できなかった。旧版の数値は本 commit の script の出力とは一致しないものとして扱う。
 - 後始末: 停止しなかった node (`run_diag.mjs`) は PID 指定で停止した。その後 `m11_build.sh` (`FL_WIN64_DIR` を export) で clean な wasm に復元し、`m11_sw` の参照が 0 件、`probe1676_watch.mjs` の baseline が `halt0` で再現することを確認した。
 - 結論: 窓内の書込み主体 (関数・命令) は本 run では未確定。窓に絞っても全 store 計装 build が unit 106 で止まるため、監視の範囲 (窓) では回避できなかった。次段は計装を store 単位でなく関数単位にするか、unit 106 の停止原因 (計装で変わる実行経路) の切り分け。
 
