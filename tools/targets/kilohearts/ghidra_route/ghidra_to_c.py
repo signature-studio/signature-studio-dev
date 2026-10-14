@@ -113,6 +113,15 @@ def pe_bytes(pe, va, n):
     return pe.get_data(rva, n)
 
 
+THUNK_HDR = re.compile(r'^([\w \*]+?\s*\n?\s*)thunk_FUN_([0-9a-f]+)(\([^;{}]*\)\s*\n\s*\{)', re.S | re.M)
+
+
+def rewrite_thunks(t, va):
+    """関数 va の本文 (コメント除去済み): 定義ヘッダの thunk_FUN_<X> は FUN_<va>、本体の呼出 thunk_FUN_<X> は飛び先の FUN_<X> (jmp thunk なので同じ動作)。"""
+    t = THUNK_HDR.sub(lambda m: m.group(1) + 'FUN_%x' % va + m.group(3), t, count=1)
+    return re.sub(r'\bthunk_FUN_([0-9a-f]+)\b', r'FUN_\1', t)
+
+
 def infer_type(lines, sym):
     """グローバル sym ごとの C 型推定。(double) キャスト直前の比較 → double / `& sym`・`uVarN = sym`・`sym = uVarN` → uint / 他 float。
     Ghidra は同一グローバルを float と uint の両方で使うことがある (abs マスク 0x1813d6fc0)。uint が 1 行でもあれば uint。"""
@@ -179,9 +188,7 @@ def main():
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
-        # jmp thunk: 列 0 の定義行 `thunk_FUN_<飛び先>(` は FUN_<va>、呼出しは飛び先の FUN_<飛び先> (同じ動作)。列 0 に限る (本体はインデント付き)
-        t = re.sub(r'^(\w[\w \*]*?)[ \t]+thunk_FUN_[0-9a-f]+\(', lambda m: '%s FUN_%x(' % (m.group(1).strip(), va), t, count=1, flags=re.M)
-        t = t.replace('thunk_FUN_', 'FUN_')
+        t = rewrite_thunks(t, va)
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         t = re.sub(r'undefined1 (in_XMM\d+) \[16\];', r'V128 \1;', t)
         t = re.sub(r'\b(in_XMM\d+)\._0_8_\b', r'\1._0_8_d', t)

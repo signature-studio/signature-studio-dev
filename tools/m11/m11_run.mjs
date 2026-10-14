@@ -66,3 +66,7 @@ if (!ptrCheckRes.gate.pass) {   // #2778: ptrcheck ゲート不合格 (M11_PTRCH
   console.error('FAIL: ptrcheck image_va_words_new=' + ptrCheckRes.image_va_words_new + ' > max=' + ptrCheckRes.gate.max + ' (' + ptrCheckRes.gate.env + ')');
   process.exitCode = 1;
 }
+if (!ptrCheckRes.unremap.gate.pass) {   // #3113: 未 remap の疑い (分類 B) の基準不合格・分類ファイル欠落 (fail-closed)
+  console.error('FAIL: ptrcheck unremap_cand=' + ptrCheckRes.unremap.unremap_cand + ' > max=' + ptrCheckRes.unremap.gate.max + ' (' + ptrCheckRes.unremap.gate.env + ', classes=' + ptrCheckRes.unremap.classes.file + ' available=' + ptrCheckRes.unremap.classes.available + ')');
+  process.exitCode = 1;
+}
