@@ -216,7 +216,8 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 
 ## G. main (ba4babca) での 9 本再測定と known.json 更新 (#534)
 
-- 測定 HEAD: **ba4babca** (origin/main)。 コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/plugins/synth/cpp_lift.sh <block> 2400` を 9 本 `xargs -P 3`。 既定 `HLL_CAP=300`、既定の opt-in (`PLUG_I32PTR_FUNCS` は 21202 のみ既定で ON)。 素材 `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` を `$HOME/artifacts` から展開して使用。
+- **状態 (現 head `ba71f8c0` に対して未確認)**: 下表は測定 HEAD `ba4babca` の値で、現 head には対応しない。`git diff ba4babca HEAD -- tools/plugins` は 0 行ではない (`lift/lift_ranges.sh`: `PLUG_NO_STATIC_DETECT` の既定が未設定→1 (RetDec 引数が変わる)、`synth/cpp_lift.sh`: 21202 の `PLUG_I32PTR_FUNCS` に `function_1800599bc` を追加、`synth/known.json`: 本 PR の変更)。現 head での 9 本再測定は、素材 `toolchain-emsdk` / `toolchain-retdec` が無いため未実施。known.json は再測定までの間、main の内容 (`emcc_c_rc` を含む) に戻した。
+- 測定 HEAD: **ba4babca** (origin/main)。 コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 TMPDIR=$RUNNER_TEMP bash tools/plugins/synth/cpp_lift.sh <block> 2400` を 9 本 `xargs -P 3`。 既定 `HLL_CAP=300`、既定の opt-in (`PLUG_I32PTR_FUNCS` は 21202 のみ既定で ON。ba4babca 時点の既定は 2 関数 `function_180049450 function_180056120`。現 head では `function_1800599bc` を加えた 3 関数)。 素材 `fl-win64` / `toolchain-emsdk` / `toolchain-retdec` を `$HOME/artifacts` から展開して使用。
 - 総経過 **569 s** (9 本、終了コード 0 が 9 本)。 load (測定後) `2.04`。
 
 | block | 名前 | pdata | lift_rc | defines | f80 | unimpl | i256 | emcc_c_rc | missing_define | lift_s |
@@ -234,6 +235,7 @@ pass は次の場合に**出力を書かず非 0 終了**する (`lift_ranges.sh
 - `emcc -c` 通過 **5/9**: 21202 BooBass_Eng (E3 は `PLUG_I32PTR_FUNCS` の既定化で解消)・23914・23944・24159・24298。 不通過 4 本は f80 libcall (`fp_round` / `fp_extend` 系、23916・24163・24167・24216)。
 - 21202 の `missing_define` は 211 のまま (#1301・#1486・#1536 の範囲)。 9 本とも `missing_define` は 0 ではない (1〜211) ため、受入条件は未達。
 
-### known.json の更新
-- `judge.py` (judge only, C++ 9 行) の結果は **FIXED 1 (21202 の `emcc_c_rc`)**。 FIXED は exit 1 になるため、21202 の `emcc_c_rc` を `known.json` から外した。 変更後の判定: `judge: 9 rows; PASS 0 / KNOWN 9 / NEW-FAIL 0 / FIXED 0 / MISSING 0`、exit 0。
-- 判定 CSV は `cpp_lift.sh` の summary.csv を `mk_status.py` と同じ列対応で並べて作った (shell 12 本は未測定のため、`synth_e2e.sh` 全体の判定は未実行)。
+### known.json の扱い (未決)
+- ba4babca 時点の `judge.py` (judge only, C++ 9 行) では FIXED 1 (21202 の `emcc_c_rc`) だった。FIXED は exit 1 になるため、当時は 21202 の `emcc_c_rc` を外す案を立てた。
+- 現 head での 21202 の `emcc_c_rc` と judge 結果は未測定のため、本 PR では known.json を main の内容に戻し、判定の更新は再測定の後に行う。
+- 以前の CSV 組み立て (`summary.csv` を手作業で列対応させた) は再現できない記述だったため撤回する。判定は `summary.csv` を `mk_status.py` / `judge.py` に通した出力で行う (shell 12 本は未測定のため `synth_e2e.sh` 全体の判定は未実行)。
