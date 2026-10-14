@@ -26,7 +26,7 @@
 |---|---|
 | 引数解析 | 間接呼出し `[rax]` で `fmt` = `rip+0x58` (`Ii|d`)。eventId → `[rbp+0x3c]` (int)、step → `[rbp+0x38]` (int)、res → `[rbp+0x30]` (double) (0xd58f06-0xd58f1c) |
 | 既定値 | `movabs rax, 0x3fa5555555555555` (= 1/24) を res に先に置く (0xd58ef8)。PY-15 の既定値修正と一致 |
-| 解析失敗 | 戻り値 ≤ 0 で `call 0xd82c20(ecx=0)` (0xd58f5b) |
+| 解析失敗 | 戻り値 ≤ 0 で分岐 (0xd58f30 `jle 0xd58f5b`)。`mov ecx, eax` (0xd58f5b) で ecx = 解析の戻り値 eax (≤0) を渡し、`call 0xd82c20` (0xd58f5d) |
 | 成功 | `0x1051330(ecx=eventId, edx=step, xmm2=(float)res, r9=0, [rsp+0x20]=0x7fffffff)` (0xd58f49)。戻り値 eax を**そのまま** PyLong に変換 (`[0x88b329]` 経由、0xd58f57)。`0xd82c20` は通らない |
 | 範囲外 code | incEventValue 自体に検査は無い。検査は下位関数 1-b の内部にある (1 回目の記録。§7-3 で本体に例外経路が無いと確定) |
 
@@ -42,7 +42,7 @@
 | 項目 | PE 実測 (VA) |
 |---|---|
 | 引数解析 | `iii|i`: indexGlobal → `[rbp+0x4c]`、note → `[rbp+0x48]`、velocity → `[rbp+0x44]`、channel → `[rbp+0x40]` (既定 -1 = `0xffffffff`、0xd5c808) |
-| 解析失敗 | 戻り値 ≤ 0 で `0xd82c20(ecx=0)` (0xd5c8d5 経路) |
+| 解析失敗 | 戻り値 ≤ 0 で分岐 (0xd5c856 `jle 0xd5c8d3`)。`mov ecx, eax` (0xd5c8d3) で ecx = 解析の戻り値 eax (≤0) を渡し、`call 0xd82c20` (0xd5c8d5) |
 | 状態ゲート | `call 0x11d1430` の結果 `al` が偽なら内部 code `-2` (0xd5c861-0xd5c868) → `0xd82c20(-2)`。`0x11d1430` は global → vtable `[+0x88]` を呼ぶだけで、述語の意味は未確定 |
 | 範囲検査 | `0 <= indexGlobal <= [obj+0x10] - 1` (obj = `*(*(0x8859a7))`、0xd5c86a-0xd5c886)。外れると `-4` (0xd5c8cc) → `0xd82c20(-4)` |
 | 副作用 (範囲内のみ) | `call 0x63a730` の xmm0 に定数 `[rip+0x41]` を掛け、`*(double*)(*[0x884601])` に書く (0xd5c88b-0xd5c89f)。`0x63a730` と書込み先は未確定 |
@@ -98,6 +98,7 @@
 - RetDec: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 RETDEC_BIN=$RUNNER_TEMP/retdec-root/retdec/bin/retdec-decompiler bash analysis/flapi/pe_retdec.sh <out.c> 0x1051330-0x1051720` → 実測 7.2 秒、関数 1 件 (`0x1051330`-`0x10516f6`)。
 - 逆アセンブル: `analysis/flapi/pe_disasm.py 1051330 260` (242 行、終端 `ret` は 0x10516f5)。RetDec の分岐と逆アセンブルを照合した。
 - 定数の読出し (ファイルのバイト列): `0x10516f8`=0.0 (f32)、`0x10516fc`=1.0 (f32)、`0x1051700`=1.0 (f64)、`0x1051708`=100.0 (f64)。
+- 文言・分岐の再照合 (fix 2 回目、`pe_disasm.py`): `0xf82484` = `movss xmm0, dword ptr [rbp+0x34]`、`0xd58f30` = `jle 0xd58f5b`、`0xd58f5b` = `mov ecx, eax`、`0xd58f5d` = `call 0xd82c20`、`0xd5c856` = `jle 0xd5c8d3`、`0xd5c8d3` = `mov ecx, eax`。§1・§2・§7-2 の記述はこれに合わせた。
 - 差分 0 の証跡: 本 run のコード変更は 0。`git diff e1e816c2 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (commit `c301cb31` の時点で実行。以後の commit は docs のみ)。
 
 ### 7-1. 経路 (ハンドラ 0xd58ef0)
@@ -115,7 +116,7 @@
 分岐は flags の bit1 (`test r13b, 2`、0x10513ad) で決まる。
 
 (A) bit1 = 1 (float 型。0x10513b3 以降): 現在値は `movss` で float として読む。
-- step != 0 (0x105149d): `new = cur_f + (float)step × f823f0(ptr, res)`。`f823f0` は ptr==0 のとき xmm1 をそのまま返す (0xf82484 `movups xmm0,[rbp+0x34]`)。clamp: new < 0.0 → 0.0、new > 1.0 → 1.0 (0x10514bf〜0x1051511)。
+- step != 0 (0x105149d): `new = cur_f + (float)step × f823f0(ptr, res)`。`f823f0` は ptr==0 のとき xmm1 の値を xmm0 で返す (0xf823f0-0xf82408 で xmm1 を `[rbp+0x34]` に写し、0xf82484 `movss xmm0, dword ptr [rbp+0x34]` で返す)。clamp: new < 0.0 → 0.0、new > 1.0 → 1.0 (0x10514bf〜0x1051511)。
 - step == 0 (0x10513bb): ptr==0 のとき `result = (float)(1 - Round(cur_f))` (0x10513c8〜0x10513df)。
 - 結果は float のビット列として `[rbp+0x2c]` に書き、終端 0x10516dc の `mov eax,[rbp+0x2c]` で int として返す。
 
@@ -132,7 +133,7 @@
 |---|---|
 | 戻り値の型 | int (32bit)。bit1 の立つ event (float 型) では **float のビット列を int として返す**。bit1 == 0 の event では整数値。未解決 1 の「int か float か」は、event の flags で決まるという答え |
 | 範囲外 code | `0x1051330` 本体に例外経路は無い (確定。`-2`・`-4` を返す経路も `0xd82c20` の呼出しも無く、分岐先は全て関数内、間接ジャンプ無し)。incEventValue の `0xd82c20` 呼出しは引数解析失敗のみ。呼出し先 `0x1046a30` 側の範囲外経路は未確定 (§7-4) |
-| 副作用 | `0x1051330` 本体はスタックへの書込みのみ (確定。宛先メモリは全て `[rbp+...]`)。ハンドラにも書込みは無い。呼出しは 0x1050f90・0x1046a30・0xf823f0・0x40c660 の 4 種のみ。`0xf823f0` は ptr==0 で xmm1 を返すだけ (0xf82484)。`0x40c660` は cvtsd2si (Round)。**呼出し先の副作用は未確定**: `0x1046a30(eventId, 0, 2)` は sentinel のたびに必ず実行され、本体はロック `0x4232e0`・`0x423980` を呼び、`rax` 基準の書込み (0x1046f16・0x10472d0 ほか) を持つ (本体の大半は未読)。`0x1050f90` の副作用も未読 |
+| 副作用 | `0x1051330` 本体はスタックへの書込みのみ (確定。宛先メモリは全て `[rbp+...]`)。ハンドラにも書込みは無い。呼出しは 0x1050f90・0x1046a30・0xf823f0・0x40c660 の 4 種のみ。`0xf823f0` は ptr==0 で xmm1 の値を xmm0 で返すだけ (0xf82484)。`0x40c660` は cvtsd2si (Round)。**呼出し先の副作用は未確定**: `0x1046a30(eventId, 0, 2)` は sentinel のたびに必ず実行され、本体はロック `0x4232e0`・`0x423980` を呼び、`rax` 基準の書込み (0x1046f16・0x10472d0 ほか) を持つ (本体の大半は未読)。`0x1050f90` の副作用も未読 |
 
 ### 7-4. 残る未確定 (値源。実装はこれが決まるまで保留)
 
