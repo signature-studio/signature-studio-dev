@@ -57,39 +57,49 @@
 - `provider/fl_engine.c`: 同じ。`NARGS(0,0)` / `NARGS(1,2)` と `A_INT`。
 - 効果 (0x12df090・0x124c020) は API から観測できないため状態を持たない。P と gate は真の定数とし、-2 の経路は到達させない (仮置き)。
 - `tests/general_diff.mjs`: 呼出し 3 件と引数違い・型違い 4 件を追加 (計 16 件。既存 9 件)。
-- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349 (PY-125 の PR 作成時の base 上)。main 取り込み後は main 側の `pe100` (2 関数)・`pe119` (6 関数) を含むため、期待値は 実装 92→94、未実装 343→341 (main `875eba29` まで)。main `8fd940bb` の取り込み後は main 側の `pe121` (5 関数) を含むため、97→99、未実装 338→336 (merge commit `6a9fe2df`)。
+- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349 (PY-125 の PR 作成時の base 上)。main 取り込み後は main 側の `pe100` (2 関数)・`pe119` (6 関数) を含むため、期待値は 実装 92→94、未実装 343→341 (main `875eba29` まで)。main `8fd940bb` の取り込み後は main 側の `pe121` (5 関数) を含むため、97→99、未実装 338→336 (merge commit `6a9fe2df`)。main `eeca4ded` の取り込み後は main 側の `pe119set` (general の setter 6 関数)・`pe152` (arrangement 6 関数) を含むため、実装 111・未実装 324 (計 435。merge commit `6ed3cfe1`)。
 
 ## 検証
 
-測定 commit: `bd7db129` (コードを変えた最後の commit。main `65ea0ce3` を取り込んだ merge。競合は無く、自動 merge)。直前の測定は `6a9fe2df` (main `8fd940bb` 取り込み後)。以後の commit は本 REPORT_PY125.md のみ。
-main 取り込みの `tools/python` 側の変更 (`git diff --stat 8fd940bb 65ea0ce3 -- tools/python`) は `REPORT_PY109.md`・`tests/browser/static_subinterp.html`・`tests/static_subinterp_browser.mjs` の追加 (313 行) だけで、`host/`・`provider/`・検証 tests (`general_diff`・`provider_check`・`all_tools`・`mixer_diff`・`screen_diff`) は変わっていない。
-環境: runner 4 core。`uptime` 22:05:28 (テスト直後) の load average 1.13 (1 分値)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 7.9 秒)、`FL_WIN64_DIR` はその展開先。`toolchain-emsdk` を `$RUNNER_TEMP/toolchain-emsdk` に展開 (6.5 秒)。ビルドは [EMSDK] (6.0.12。artifact の `toolchain-emsdk` と同版。`build_cpython_wasm.sh` は既定の [EMSDK] 位置を直接 source する) を使った。
+測定 commit: `6ed3cfe1` (コードを変えた最後の commit。main `eeca4ded` を取り込んだ merge)。競合は `tools/python` の 4 ファイル (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/general_diff.mjs`・`tests/provider_check.mjs`) で、いずれも main 側と本 PR 側の追加を両方残した (関数・エントリの削除なし)。`provider_check.mjs` の期待値は両側の件数を合算 (実装 111・未実装 324)。直前の測定は `bd7db129` (main `65ea0ce3` 取り込み後)。以後の commit は本 REPORT_PY125.md のみ。
+main 取り込みの `tools/python` 側の変更 (`git diff --stat 65ea0ce3 eeca4ded -- tools/python ':!*.md'`) は 9 ファイル (+344/-3。`analysis/py159_*`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/arrangement_diff.mjs`・`general_diff.mjs`・`provider_check.mjs` など)。本 PR の `tools/python` 差分は main 比で 4 ファイル (+16/-3)。
+環境: runner 4 core。`uptime` 22:26:59 (`all_tools` 直後) の load average 1.82 (1 分値)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`)、`FL_WIN64_DIR` はその展開先。`toolchain-emsdk` は本測定では展開せず、`/opt/emsdk` (6.0.12。`upstream/emscripten/emscripten-version.txt` で確認。pin と同版) を使った。`build_cpython_wasm.sh`・`build_flpy.sh`・`provider/build.sh` が `/opt/emsdk` を直接 source するため。
 
-前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0、0.9 秒)・`bash build_cpython_wasm.sh` (rc 0、3 分 7.6 秒。`bd7db129` の tree で作成)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒)・`bash provider/build.sh` (rc 0、1.0 秒)。ハンドラ数は `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` で 99 (期待値 99 と一致)。
+前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0、0.65 秒)・`bash build_cpython_wasm.sh` (rc 0、239.2 秒。merge commit `6ed3cfe1` の tree で作成)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.1 秒)・`bash provider/build.sh` (rc 0、1.3 秒)。ハンドラ数は `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` で 111 (`fl_table.c: 435 関数, ハンドラ 111`)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.047 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 99 / 未実装 336 / MCP 静的 60) (rc 0) | 0.271 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.317 秒 |
-| `node tests/all_tools.mjs` (既定 JS mock) | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.236 秒 |
-| `node tests/mixer_diff.mjs` (main 側の追加分。既定色 0xff636c71 を mock と wasm で検査) | calls 59、diffs 0、PASS (rc 0) | 0.038 秒 |
-| `node tests/screen_diff.mjs` (main 側 #2985 の追加分) | calls 32、diffs 0、PASS (rc 0) | 0.041 秒 |
+| `node tests/general_diff.mjs` (本 PR の 16 件 + main 側の setter 16 件) | calls 32、diffs 0、PASS (rc 0) | 0.078 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 111 / 未実装 324 / MCP 静的 60) (rc 0) | 0.365 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 2.231 秒 |
+| `node tests/all_tools.mjs` (既定 JS mock) | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 2.183 秒 |
+| `node tests/mixer_diff.mjs` (main 側の追加分。既定色 0xff636c71 を mock と wasm で検査) | calls 59、diffs 0、PASS (rc 0) | 0.047 秒 |
+| `node tests/screen_diff.mjs` (main 側 #2985 の追加分) | calls 32、diffs 0、PASS (rc 0) | 0.049 秒 |
+| `node tests/arrangement_diff.mjs` (main 側 #2983 の追加分) | calls 25、diffs 0、PASS (rc 0) | 0.048 秒 |
+| `node tests/ui_state_diff.mjs` (main 側 #2980 の追加分) | calls 12、diffs 0、PASS (rc 0) | 0.049 秒 |
+| `node tests/device_diff.mjs` (`fl_mock` を照合) | calls 8、rejects 4、midi_out 5、diffs 0、PASS (rc 0) | 0.048 秒 |
 
 wall は `date +%s.%N` の差 (node 起動を含む)。
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5。前回測定 `6a9fe2df` で実施。その後 PR の対象コード (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/general_diff.mjs`) は変わっていない): `host/fl_mock.mjs` の `clearLog` の戻り値を `undefined` から `0` にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1。元に戻すと calls 16・diffs 0・PASS (rc 0)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5)。測定 commit `6ed3cfe1` で再実施: `host/fl_mock.mjs` の `clearLog` の戻り値を `undefined` から `0` にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1。元に戻すと calls 32・diffs 0・PASS (rc 0)。元に戻した後の作業ツリーは clean。
 
-コード差分 (前回の測定 commit `6a9fe2df` から `bd7db129` まで。`tools/python` の .md 以外。main 側の追加のみ):
+コード差分 (前回の測定 commit `bd7db129` から `6ed3cfe1` まで。`tools/python` の .md 以外。main 取り込みと競合解消の差分):
 
 ```
-$ git diff --stat 6a9fe2df bd7db129 -- tools/python ':!*.md'
- tools/python/tests/browser/static_subinterp.html | 162 +++++++++++++++++++++++
- tools/python/tests/static_subinterp_browser.mjs  |  56 ++++++++
- 2 files changed, 218 insertions(+)
+$ git diff --stat bd7db129 6ed3cfe1 -- tools/python ':!*.md'
+ tools/python/analysis/flapi/pe_cstr.py         |  39 ++++++++++++
+ tools/python/analysis/flapi/pe_ui_ops_probe.py |  83 ++++++++++++++++++++++++++
+ tools/python/analysis/py159_check_hand.py      |  83 ++++++++++++++++++++++++++
+ tools/python/analysis/py159_table.py           |  35 +++++++++++
+ tools/python/host/fl_mock.mjs                  |  18 ++++++
+ tools/python/provider/fl_engine.c              |  22 +++++++
+ tools/python/tests/arrangement_diff.mjs        |  53 ++++++++++++++++
+ tools/python/tests/general_diff.mjs            |   4 ++
+ tools/python/tests/provider_check.mjs          |  10 +++-
+ 9 files changed, 344 insertions(+), 3 deletions(-)
 ```
 
-`static_subinterp_browser.mjs` は main 側 PY-109 の headless Chrome probe で、本 PR の検証対象ではない (本測定では実行していない)。測定 commit から本 REPORT の commit までの差分 (`git diff bd7db129 HEAD -- tools/python ':!*.md'`) は空 (本 commit は REPORT_PY125.md だけを変える)。
+測定 commit から本 REPORT の commit までの差分 (`git diff 6ed3cfe1 HEAD -- tools/python ':!*.md'`) は空 (本 commit は REPORT_PY125.md だけを変える)。
 
 
 ## 未解決
