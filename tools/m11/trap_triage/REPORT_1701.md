@@ -2,7 +2,7 @@
 
 ## 0. 結論
 
-- 測定 commit: **`fb3c40c3`** (コードを変えた最後の commit。以降は本 REPORT のみ)。
+- 測定 commit: **`fb3c40c3`** (測定時にコードを変えた最後の commit)。以降は main 取り込み (`00083cdb`) で #1894 の entry probe が `m11_ov.c`・`m11_build.sh` に入ったが、既定 OFF (§5)。
 - −4 は **rt.o の計測 flag** に帰属した。`rt.o` だけ計測 OFF (既定) に戻すと getmem は 2008 → **2012 (既定と一致)**。`rt.o` だけ計測 ON にすると既定 IR のままでも 2008。
 - `ov.o` の計測 flag (O0) は本切り分けでは検証対象外。`m11_ov.c` の計測本体は `M11_OV_413060=0`・`M11_OV_CLASSCREATE=0` の条件で未コンパイルのため、`M11_OV_INSTR` を変えても ov.o の object は C と同一で、O0 の 2008 は構造上の必然 (寄与の有無は判定していない)。ov.o の寄与を測るには `M11_OV_413060=1` 側の比較が必要 (IR 挙動を変えるため別 issue)。リンク時 EXPORTS (`_m11_dest_obs_*`) を外しても 2008 のまま (寄与なし)。
 - survey 判定 (ok/trap/clobber) は全構成で 870/24/0。既定の基準 (870/24/0) は変えていない。
@@ -52,6 +52,7 @@ IR 生成: `ldfix=applied`・F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0 (REP
 
 ## 5. 測定 commit からの差分と HEAD での再測定
 
-- `git diff fb3c40c3 HEAD -- tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_survey.mjs` は **空** (行数 0)。main 取り込みで変わったのは `ldfix/link_d17*`・REPORT 類のみで、IR 生成・build・survey のどれからも呼ばれない。
-- HEAD (main 取り込み後) で `repro_1701_rt_ov.sh 1` を再実行: A=2012 / C=2008 / R0=2012 / O0=2008 / L0=2008 / R1=2008、全構成 IR md5 `baa100ff`・undefined symbol 0・870/24/0。§1 と一致。所要 3 分 21 秒。
-- `git diff --stat fb3c40c3 HEAD -- tools/m11` (参考・全体): 14 files, +793/−8。うち測定コードは 0。
+- `git diff fb3c40c3 00083cdb -- tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_survey.mjs` (main 側の測定コード差分): `m11_build.sh` の `-DM11_ENTRY_PROBE=${M11_ENTRY_PROBE:-0}` 追加・ov.o の stamp 追加・EXPORTED_FUNCTIONS への `_m11_fe_get,_m11_fe_clear` 条件付き追加、`m11_ov.c` の `function_417b70` の `#if M11_ENTRY_PROBE` 囲み、`m11_survey.mjs` 1 行。**既定 (`M11_ENTRY_PROBE=0`) では `#if` が偽・EXPORTS 不変**で、ov.o のソースは既定 build で同じ内容になる (`#if` 偽)。ただし stamp 追加により ov.o は初回に 1 回再コンパイルされる。build 結果が同一であることは未確認 (再測定が必要)。
+- 測定 commit からの本 PR の差分 (`git diff fb3c40c3 HEAD -- tools/m11/m11_build.sh tools/m11/m11_ov.c`) は、上記 main 側差分 + 本 PR の `M11_RT_INSTR`・`M11_OV_INSTR`・`M11_LINK_INSTR` 追加 (既定 build 不変)。
+- **HEAD での再測定は未実施**: 本 fix の時点でローカルに `toolchain-emsdk`・`toolchain-retdec`・`work-m11` が無い (`fl-win64` のみ)。素材が要るため、再測定の依頼は `oc_artifacts: fl-win64 work-m11 toolchain-emsdk toolchain-retdec` 指定で行う。§1 の数値は測定 commit `fb3c40c3` の値であり、HEAD の値ではない。
+- 参考 (前回記録・本 run では未再現): 前 HEAD `69f3dd3b` で `repro_1701_rt_ov.sh 1` を再実行した記録は A=2012 / C=2008 / R0=2012 / O0=2008 / L0=2008 / R1=2008、全構成 IR md5 `baa100ff`・undefined symbol 0・870/24/0。所要 3 分 21 秒。
