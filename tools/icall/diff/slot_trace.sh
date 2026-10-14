@@ -18,7 +18,7 @@ gcc -O1 -g -o "$BIN" "$HERE/slot_trace.c" "$T/ott/native/ms_call.S" -lm || exit 
 for va in $(python3 -c "import json,sys;print(' '.join(k[2:] for k in json.load(open(sys.argv[1]))['func_map']))" "$MAP"); do
   r="$(SLOT_ENC_INIT="${SLOT_ENC_INIT:-}" timeout 10 "$BIN" "$FA" "$va" 2>"$ERR")"; rc=$?
   echo "F $va rc=$rc $(echo "$r" | grep -c ACC)" >> "$OUT"
-  grep fatal "$ERR" | sed "s/^/$va /" >> "$ERR_OUT"
+  grep -E 'fatal|regs|heap_args' "$ERR" | sed "s/^/$va /" >> "$ERR_OUT"
   echo "$r" | grep ACC | sed "s/^/$va /" >> "$OUT"
 done
 python3 - "$OUT" <<'PY'
