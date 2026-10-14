@@ -16,8 +16,8 @@ LD-133 付録 (`REPORT_APPENDIX_LD133.md`) は main に無い (branch `2821-ld84
 ## 1. 測定条件
 
 - 作業: worktree `../ws-3180` (branch `3180-ld147-bool-sext`、base `origin/main` = `729a67cb`)。素材 `work-m6-ott` を `tools/{m6,m8,m9,m10,ott}/work/` へ `tar --zstd -xf` で展開。`tools/ott/work/ott.ll` は 957,145 B・sha256 `989cf685e9091c0a1d4a01e7a6b89f7f5bf4da75d5962be8bfd533db8797cd3f` (LD-133 付録の記録と一致)。
-- 素材の実在: `analysis-ott-binaries` は `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll` (`ANALYSIS_DIR=/home/runner/analysis`)、`toolchain-emsdk` は `/opt/emsdk/emsdk_env.sh`。`tools/liftdiff/work/` は素材に無いため空の出力先として作成 (gitignore 対象)。
-- 複製: `$RUNNER_TEMP/ld147/` (`/home/runner/work/_temp/ld147/`) に 3 variant の IR と target JSON。`tools/ott/work/` には書いていない (sha256 は測定前後で不変)。
+- 素材の実在: `analysis-ott-binaries` は `[ANALYSIS-DIR]` 配下の `plugins/ott/binaries/OTT_vst2_win64.dll` (`ANALYSIS_DIR` を環境変数で設定)、`toolchain-emsdk` は `[EMSDK]` の `emsdk_env.sh`。`tools/liftdiff/work/` は素材に無いため空の出力先として作成 (gitignore 対象)。
+- 複製: `$RUNNER_TEMP/ld147/` に 3 variant の IR と target JSON。`tools/ott/work/` には書いていない (sha256 は測定前後で不変)。
 
 | variant | 変更 | 変更行 |
 |---|---|---|
