@@ -36,6 +36,9 @@ export interface ProducerStats {
   wake_hist: number[];
   wake_count: number;
   wait_timeouts: number;
+  cb_count: number;
+  cb_max_us: number;
+  cb_max_q: number;
 }
 
 export interface FlAudioShimOptions {
@@ -356,6 +359,9 @@ export class FlAudioShim {
       wake_hist: [0, 1, 2, 3, 4, 5].map((k) => Atomics.load(this.i32, base + k) >>> 0),
       wake_count: this.ld("wake_count") >>> 0,
       wait_timeouts: this.ld("wait_timeouts") >>> 0,
+      cb_count: this.ld("cb_count") >>> 0,
+      cb_max_us: this.ld("cb_max_us") >>> 0,
+      cb_max_q: this.ld("cb_max_q") >>> 0,
     };
   }
 

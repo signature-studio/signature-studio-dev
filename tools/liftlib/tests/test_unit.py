@@ -813,7 +813,33 @@ def t25():
     print("T25 ok (add_forms: 加算形の画像 VA を shift, 範囲外・既定 False は不変)")
 
 
+def t26():
+    """T26 (#2863): IR 一致ゲートの `%pc` 改名に対する感度。空行を除いた入力では p1 の一時名 (行 index) が変わるが,
+    改名を除けば内容は一致する。(ネガ) 比較述語 1 箇所 (ult→ule) の変更は一致しない。(別算法) 行対応の写像が一意かつ単射。"""
+    M6 = os.path.join(T, "m6/work")
+    ref = open(os.path.join(M6, "ir7e_p1.ll")).read()
+    lift_nb = "\n".join(nb(open(os.path.join(M6, "ott_lift.ll")).read())) + "\n"
+    o, st = p1_legacy.legacy_p1(lift_nb)
+    assert o != ref                                   # 前提: 名前は行 index 依存で変わる
+    assert nb(p1_legacy.canon_tags(o)) == nb(p1_legacy.canon_tags(ref))
+    bad = re.sub(r"fcmp ult (float|double) %pc", r"fcmp ule \1 %pc", ref, count=1)
+    assert bad != ref and nb(p1_legacy.canon_tags(bad)) != nb(p1_legacy.canon_tags(ref))
+    from liftlib.recipes import ott as OTT
+    ref_path = os.path.join(M6, "ir7e_p1.ll")
+    assert OTT.same(o, ref_path) is True and OTT.same(bad, ref_path) is False
+    a, b = nb(o), nb(ref)
+    assert len(a) == len(b)
+    m = {}
+    for x, y in zip(a, b):
+        X, Y = re.findall(r"%pc(\d+)[a-z]", x), re.findall(r"%pc(\d+)[a-z]", y)
+        assert len(X) == len(Y)
+        for p, q in zip(X, Y):
+            assert m.setdefault(p, q) == q            # 写像は一意
+    assert len(set(m.values())) == len(m)             # 単射
+    print("T26 ok (%%pc 改名だけ無視: 行 %d・改名 %d 種・ネガ FAIL 確認)" % (len(a), len(m)))
+
+
 if __name__ == "__main__":
-    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25):
+    for f in (t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14, t15, t16, t16b, t17, t18, t19, t20, t21, t22, t23, t24, t25, t26):
         f()
     print("ALL UNIT TESTS PASS")

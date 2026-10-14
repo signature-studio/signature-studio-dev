@@ -121,7 +121,7 @@ ff8b60	ff8c63	manual	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x30],
 1046a30	1047208	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x378], rax
 1046a30	10472ea	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x560], eax
 1046a30	1047556	cand	UNDETERMINED	判定不能	CELL_DEEP	mov qword ptr [rbp + 0x520], rax
-1046a30	10479c7	-		未判定	-	mov dword ptr [rbp + 0x5b8], eax
+1046a30	10479c7	cand	UNDETERMINED	判定不能	-	mov dword ptr [rbp + 0x5b8], eax
 1046a30	104a9f6	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x320], rax
 1046a30	104c3f0	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x5b8], eax
 1046a30	104c56d	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x5b8], eax
@@ -170,9 +170,9 @@ ff8b60	ff8c63	manual	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rsp + 0x30],
 128f9e0	12945a8	cand	UNDETERMINED	判定不能	CELL_DEEP	mov qword ptr [rbp + 0x2f0], rax
 12a4450	12a451c	cand	NO_CONSUMER	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x4c], eax
 12a4450	12a4531	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x3c], eax
-12cb680	12cb8e1	cand	UNDETERMINED	判定不能	-	mov dword ptr [rbp + 0x38], eax
-12cb680	12cba4d	-		未判定	-	mov dword ptr [rbp + 0x38], eax
-12cb680	12cbab4	-		未判定	-	mov dword ptr [rbp + 0x38], eax
+12cb680	12cb8e1	cand	TRUE_DROP	確定	-	mov dword ptr [rbp + 0x38], eax
+12cb680	12cba4d	cand	TRUE_DROP	確定	-	mov dword ptr [rbp + 0x38], eax
+12cb680	12cbab4	cand	TRUE_DROP	確定	-	mov dword ptr [rbp + 0x38], eax
 12d4610	12d475b	manual	OK_LOAD	確定	-	mov qword ptr [rbp + 0x30], rax
 12f9730	12f9752	-		未判定	-	mov dword ptr [rsp + 0x50], eax
 1354630	1354b99	cand	TRUE_DROP	確定	CELL_COLLAPSED	mov dword ptr [rbp + 0x58], eax

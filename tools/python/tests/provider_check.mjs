@@ -27,6 +27,10 @@ const stub41 = new Set(["channels.isChannelMuted", "channels.isChannelSolo", "ch
 const pe100 = new Set(["channels.getStepParam", "channels.getCurrentStepParam"]);
 // PE で状態読出しと確認した general ゲッター 4 件 (REPORT_PY87・PY-87 #2738)。値は未実測の仮置き、tests/general_diff.mjs が mock と照合
 const pe87 = new Set(["general.getChangedFlag", "general.getUseMetronome", "general.getPrecount", "general.getRecPPQ"]);
+// PE で screen 状態読出し・書込みと確認した 5 関数 (REPORT_PY121_2985・PY-121 #2985)。値は未実測の仮置き、tests/screen_diff.mjs が mock と照合
+const pe121 = new Set(["screen.isBlanked", "screen.isUnBlank", "screen.getScreenActiveCounter", "screen.setScreenActiveCounter", "screen.unBlank"]);
+// PE で呼出し経路を確定した ui ゲッター 6 件 (REPORT_PY119・PY-119 #2980)。値は未実測の仮置き、tests/ui_state_diff.mjs が mock と照合
+const pe119 = new Set(["ui.getFocused", "ui.getFocusedFormID", "ui.getFocusedFormCaption", "ui.getFocusedPluginName", "ui.getHintMsg", "ui.isInPopupMenu"]);
 // stub 確定 2 関数 (REPORT_PY41_1514 追補 #2805・PY-89)。PE 0xd5bd60 / 0xd5bcd0 で範囲検査と戻り field を確認
 const stub89 = new Set(["channels.getChannelIndex", "channels.getChannelMidiInPort"]);
 // PE 0xd5ec60 で取得式を確定した 1 関数 (REPORT_PY115 §2・PY-115 #2951)
@@ -35,12 +39,12 @@ let impl = 0, unimpl = 0;
 for (const id of ids) {
   const r = direct(id, ...Array(40).fill(null).slice(0, 0));
   const notImpl = r.err?.startsWith("Unspecified error (not implemented:");
-  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || stub41.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe115.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
+  if (mcp.has(id) || dev.has(id) || mig.has(id) || pe39.has(id) || stub41.has(id) || pe100.has(id) || stub89.has(id) || pe87.has(id) || pe115.has(id) || pe121.has(id) || pe119.has(id)) assert.ok(!notImpl, `実装済みのはず: ${id} が未実装`);
   else assert.ok(notImpl, `${id} は未実装のはず`);
   notImpl ? unimpl++ : impl++;
 }
-// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + stub 確定 6 (stub41) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 1 (pe115)
-assert.equal(impl, 86); assert.equal(unimpl, 349);
+// 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + stub 確定 6 (stub41) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + PE 確定 6 (pe119)
+assert.equal(impl, 97); assert.equal(unimpl, 338);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);

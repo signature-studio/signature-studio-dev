@@ -20,6 +20,10 @@ const run = (eng, name, args) => {
   }
 };
 
+// 既定経路 (未設定 track 2) の確定値 (.bss 0x15f6774 = 0xff636c71・REPORT_PY118)。seq の set より前に pin する
+assert.deepEqual(run(mock, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
+assert.deepEqual(run(wasm, "mixer.getTrackColor", [2]), { ok: 0xff636c71 });
+
 const seq = [
   ["mixer.trackCount", []],
   ["mixer.getTrackName", [0]],
@@ -37,6 +41,8 @@ const seq = [
   ["mixer.getTrackPan", [1]],
   ["mixer.setTrackPan", [1, -0.25]],
   ["mixer.getTrackPan", [1]],
+  ["mixer.getTrackColor", [0]],
+  ["mixer.getTrackColor", [2]],
   ["mixer.setTrackColor", [1, 0x123456]],
   ["mixer.getTrackColor", [1]],
   ["mixer.getTrackColor", [0]],
