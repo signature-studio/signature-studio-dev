@@ -31,7 +31,7 @@ h2{font-size:13px;margin:0 0 6px;color:var(--mut);font-weight:600}
 .cfg{background:var(--warn);color:#fff;padding:8px 12px;border-radius:8px;font-weight:600;margin:8px 0}
 .cfg a{color:#fff}
 .kv{display:grid;grid-template-columns:1fr auto;gap:0 10px;padding:5px 0;border-top:1px dashed var(--line)}
-.kv .k{color:var(--fg)}
+.kv .k{color:var(--fg);min-width:9em}
 .kv .s{grid-column:1/-1;color:var(--mut);font-size:11px;word-break:break-all}
 .v{font-variant-numeric:tabular-nums;text-align:right}
 .v.ok{color:var(--ok)}
