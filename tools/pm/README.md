@@ -1,7 +1,7 @@
 # tools/pm — PM 運用ツール (VM 版。退役の途中)
 
 PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停止し、再開しない運用に切り替えた
-(`infra/pm-worker/README.md` の『切替の記録』)。`/oc` の投稿と `oc-watchdog`・`oc-pm` の送信は Worker
+(監査専用の heartbeat だけは指示 145 で再開する。下の『heartbeat (監査専用・指示 145)』。`infra/pm-worker/README.md` の『切替の記録』)。`/oc` の投稿と `oc-watchdog`・`oc-pm` の送信は Worker
 (`infra/pm-worker`、Cloudflare) が担い、点検は Actions の `watchdog.sh`、PM の判断は Actions の `pm` job (PM agent) に移した (配線済み。実 run の確認は親 #2319 の A4)。
 このディレクトリの大半は VM 版のツールで、後継と退役の扱いは下の『VM 退役後の扱い』の表が正本。実装 agent は使わない。
 数値の正本は [`REPORT.md`](REPORT.md)、運用規約の正本は `docs/WORKFLOW.md` §11。
@@ -31,12 +31,12 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 
 ## ツール
 
-> 2026-10-14 の切替で、VM の timer と `heartbeat.sh` の役は Worker と Actions に移った (timer は停止したまま再開しない)。各ファイルの後継と退役の扱いは『VM 退役後の扱い』の表が正本。
+> 2026-10-14 の切替で、VM の timer と `heartbeat.sh` の役は Worker と Actions に移った (`pm-launch`・`pm-watchdog` の timer は停止したまま再開しない)。`heartbeat.sh` は監査専用として残す (指示 145。下の『heartbeat (監査専用・指示 145)』)。各ファイルの後継と退役の扱いは『VM 退役後の扱い』の表が正本。
 
 | ファイル | 用途 |
 |---|---|
 | `watch_runs.sh` | 実行中の Actions run を REST で監視し、1 本終わるたびに 1 行出して終了する。**終了通知を受けたら、結果の処理より先に再起動する** (指示 116)。詳細は [`watch_runs.notes.md`](watch_runs.notes.md) |
-| `heartbeat.sh` | 30 分ごとに PM のセッションへ作業継続のプロンプトを送る (指示 102・116・120)。`systemd/pm-heartbeat.service`。置換は `pm_wake.sh` (下の『heartbeat からの置換』) |
+| `heartbeat.sh` | 2 時間ごとに PM のセッションへ監査専用のプロンプトを送る (指示 145)。間隔は `PM_HEARTBEAT_SECONDS` (既定 1800 秒)、文面は `PM_HEARTBEAT_MSG_FILE` (未設定なら作業継続の既定文面。指示 102・116・120)。`systemd/pm-heartbeat.service`。作業継続の置換は `pm_wake.sh` (下の『heartbeat からの置換』) |
 | `pm_wake.sh` | `/status` を読み、PM のセッションが必要なときだけ固定文を送る (`heartbeat.sh` の置換。#2347)。送るのは needs_pm > 0・fresh=false が 30 分続く・stuck_age_max_min > 360 のどれかのときだけで、送信は 3 時間に 1 回・24 時間に 6 回まで。終了コードは 0 (判定の結果) / 1 (セッション ID 無し) / 2 (`/status` の取得・解析失敗。`needs_pm` が無い古い Worker も含む) / 3 (送信失敗)。テスト: `bash tools/pm/test_pm_wake.sh` |
 | `pm_watchdog_ping.sh` | 5 分ごとに `repository_dispatch` (`oc-watchdog`) を送り、Actions の watchdog を起こす (GitHub の schedule が発火しないため)。`systemd/pm-watchdog.*` |
 | `pm_gate.sh` | `pm_gate.sh <command...>`。Worker (`infra/pm-worker`) が primary (`/status` が `mode=live`・`fresh=true`・`last_tick` が 15 分以内) の間は command を実行せず終了 0 にする。それ以外 (取得失敗・dry-run・JSON 不正) は command を実行する (fail-open)。URL は env `PM_WORKER_URL`、無ければ `tools/pm/worker_url`。テスト: `bash tools/pm/test_pm_gate.sh` |
@@ -56,6 +56,13 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 | `restart_failed.sh` | 失敗した run の再投入 (`impl` / `review` / `both`、`SINCE`) |
 | `systemd/` | user unit の例。`/PATH/TO/REPO` を置換して `~/.config/systemd/user/` に置く |
 
+## heartbeat (監査専用・指示 145)
+
+heartbeat は監査専用。着手・watchdog は Worker (`infra/pm-worker`) と Actions の watchdog が担う。
+`heartbeat.sh` は `PM_HEARTBEAT_SECONDS` ごと (VM は 7200) に `PM_HEARTBEAT_MSG_FILE` の文面 (`heartbeat_msg_audit.txt`) を PM セッションへ送る。
+送るのは監査 (Actions・チケットの状況を含む開発フロー) だけ。`pm-launch.timer`・`pm-watchdog.timer` は再開しない (Worker と二重になる)。
+VM の上書きは drop-in `~/.config/systemd/user/pm-heartbeat.service.d/audit.conf` (`[Service]` の下に `Environment=PM_HEARTBEAT_SECONDS=7200` と `Environment=PM_HEARTBEAT_MSG_FILE=<repo>/tools/pm/heartbeat_msg_audit.txt`)。
+
 ## VM 退役後の扱い
 
 `git ls-files tools/pm` の全ファイル。退役は [#2355](https://github.com/signature-studio/signature-studio-dev/issues/2355) の手順に従い、
@@ -71,7 +78,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `dismiss_spam.py` | 廃止 | 旧 watchdog が『(watchdog)』を付けて出した request-changes の取り下げ (#731) の一回限りの後始末。ただし現行の `watchdog.sh` の FIX_IDLE も本文の末尾に同じ `(watchdog)` を付けて reviewer の token で出すため、このスクリプトは現行の FIX_IDLE も取り下げ対象にする | 退役前に、FIX_IDLE の本文から marker を外す (または判定を変える) 変更を main に入れてから、`DRY=1` で対象 0 件を確認して削除する。それまで watchdog の稼働中には実行しない | #2355 |
 | `find_silent_runs.sh` | 廃止 (後継: `record-run-outcome.sh`。App token が発行された run でだけ動く。token が無ければ何もしない (`.github/workflows/opencode.yaml` の `Record the run outcome` step)) | implement の run の末尾 (`if: always()`) で `record-run-outcome.sh` が、PR も push も無い終了 (success を含む) に `oc:no-pr` と理由マーカーを残す。報告の無い success は、この経路で `oc:no-pr` として見える | 削除のみ | #2355 |
 | `find_unreviewed.sh` | `watchdog.sh` | verdict の無い現在 head の PR (NOREVIEW) を `watchdog.sh` が点検ごとに戻す | 削除のみ | #2355 |
-| `heartbeat.sh` | PM agent・`pm_wake.sh` | PM セッションへの定期プロンプトは、`pm` job (`oc-pm`) と Worker の `oc-pm` 送信が担う。必要なときだけ起こす補助は `pm_wake.sh` (#2347)。`pm-heartbeat.service` は無効化済み | `pm` job の実 run が `oc-pm-decision` を残すことを確認してから削除 (親 #2319 の A4) | #2347 |
+| `heartbeat.sh` | 残す (監査専用。指示 145) | 作業継続のプロンプトは、`pm` job (`oc-pm`) と Worker の `oc-pm` 送信が担う。2 時間ごとの監査だけを `heartbeat.sh` が送る (指示 145)。必要なときだけ起こす補助は `pm_wake.sh` (#2347)。`pm-heartbeat.service` は監査専用で再開 (指示 145) | なし (残すため削除しない) | #2607 |
 | `idle_report.sh` | 残す | REST のみで VM に依存しない。watchdog の担当なし時間の計測として残す (VM 停止の判定用の役は終わった) | なし | #2354 |
 | `issue_snapshot.py` | 廃止 | open issue の集計は Worker の同期 (`fullSync`・`reconcile`) が担う。`launch_issues.py` だけが読んでいた | `launch_issues.py` と同時に削除。状態の扱いは下の『状態ファイル』の節 | #2355 |
 | `launch_issues.py` | Worker | `plan`・`launch` は Worker が live (`/oc` の投稿と着手の判断)。`blocked` (GitHub の依存欄への同期) は Worker が書かないため、退役後は依存欄が新規分で更新されない。判定は本文の `blockedBy:` を Worker の `classify.ts` が読むので、影響は表示のみ | 『状態ファイル』の節の扱いを反映してから削除。`classify_crosscheck.py`・`phase_crosscheck.py` (`infra/pm-worker/test/`) が `launch_issues.py` を importlib で読み、`classify.test.ts`・`phase.test.ts` がそれを `python3` で呼ぶため、先に crosscheck の Python 依存を fixture 固定に置き換える。依存欄の同期が要るなら別 issue | #2355 |
@@ -86,7 +93,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `restart_failed.sh` | 実装 run: Worker (`oc:no-pr` の再着手)。review 側: `watchdog.sh` (NOREVIEW → `reopen-pr.sh`) | 失敗した実装 run の再投入は、`oc:no-pr` の再着手 (`NO_PR_COOLDOWN_H`) に置き換わる。即時の再投入は無くなり、再着手は cooldown の後になる。review 側は watchdog の点検 (NOREVIEW) で戻るため、即時の再起動は無くなる。レート制限の判定は #2344 | 遅れを許容する判断を PR 本文に書いてから削除。理由別の再着手は #2334 | #2334・#2344 |
 | `status_sync.py` | 未実装 (#2362) | `docs/STATUS.md` の自動節を更新する後継の workflow が未配線 (pm-apply) | 後継が main に入るまで残す。入らない間は STATUS の自動節が古いままになる | #2362 |
 | `sync_status.py` | 廃止 | Project V2 の Status 同期を退役と同時にやめる (PM 判断 2026-10-14)。根拠は #2356 (PM App に Projects の書き込み権限を追加するかの依頼者への質問。既定は『追加しない』で not_planned で閉じた)。このため App の token では Project V2 の Status を更新できず、Status は参考扱い | 済 (#2435) | #2435 |
-| `systemd/pm-heartbeat.service` | 廃止 (後継は `pm` job) | 無効化済み | 削除のみ (systemd の変更は PM が行う) | #2355 |
+| `systemd/pm-heartbeat.service` | 残す (監査専用。指示 145) | 監査専用の heartbeat の unit (指示 145) | なし (systemd の変更は PM が行う) | #2607 |
 | `systemd/pm-launch.service` | Worker | `/oc` の投稿は Worker (`LIVE_LAUNCH`)。timer は 2026-10-14 に停止し、再開しない | 停止済み。ファイルの削除は退役の最後 | #2355 |
 | `systemd/pm-launch.timer` | Worker | 同上 | 停止済み | #2355 |
 | `systemd/pm-wake.service` | 例 (有効化は PM) | `pm_wake.sh` の unit の例。`/PATH/TO/...` を置換して使う。VM の timer は停止したまま | なし | #2347 |
@@ -121,7 +128,7 @@ systemd の変更自体は PM が行う (この README には含まれない)。
 
 ## heartbeat からの置換 (`pm_wake.sh`)
 
-`heartbeat.sh` は 30 分ごとに PM セッションを無条件で起こす。`pm_wake.sh` は、PM のセッションでしか進まないものがあるときだけ起こす (#2347、親 #2319)。
+`heartbeat.sh` の作業継続の既定文面は 30 分ごとに PM セッションを無条件で起こす (VM では止めている)。`pm_wake.sh` は、PM のセッションでしか進まないものがあるときだけ起こす (#2347、親 #2319)。監査専用の heartbeat (指示 145) は別に 2 時間ごとに送り、作業継続の代わりにはしない。
 systemd timer から 10 分ごとに 1 回ずつ呼ぶ。`/status` (公開・集計のみ) を `curl` で 1 回読み、次の kind のどれかのときだけ固定文を `opencode api post` で送る。
 
 | kind | 条件 | 送る文面 |
@@ -139,9 +146,9 @@ systemd timer から 10 分ごとに 1 回ずつ呼ぶ。`/status` (公開・集
 1. PM セッション ID を 1 行でファイルに書く (例: `~/.config/pm-wake/session_id`)。
 2. 1 回だけ手で動かして記録を確かめる: `PM_SESSION_ID_FILE=~/.config/pm-wake/session_id bash tools/pm/pm_wake.sh; echo $?` のあと、`tools/pm/pm_wake.log` の最後の行を読む。
 3. `systemd/pm-wake.service` と `systemd/pm-wake.timer` の `/PATH/TO/...` を置換し、`~/.config/systemd/user/` に置く。`systemctl --user daemon-reload` の後に `systemctl --user enable --now pm-wake.timer`。
-4. `pm-heartbeat.service` は無効化したままにする。
+4. `pm-heartbeat.service` は作業継続のプロンプトとしては無効化したままにする。監査専用で再開する場合 (指示 145) は『heartbeat (監査専用・指示 145)』の節の drop-in に従う。送る文面は `pm_wake.sh` と別。
 
-戻し方: `systemctl --user disable --now pm-wake.timer`。heartbeat に戻すなら `systemctl --user enable --now pm-heartbeat.service` (`heartbeat.sh` は変えていない)。
+戻し方: `systemctl --user disable --now pm-wake.timer`。作業継続の heartbeat に戻すなら drop-in を外して `systemctl --user daemon-reload` の後に `systemctl --user enable --now pm-heartbeat.service`。`heartbeat.sh` は `PM_HEARTBEAT_MSG_FILE` があれば文面をそのファイルから読むように変えた (未設定なら従来どおりの既定文面)。
 
 ## watchdog の担当なし時間を集計する (`idle_report.sh`)
 

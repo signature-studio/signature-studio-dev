@@ -1,5 +1,5 @@
 [Unit]
-Description=PM heartbeat: wake the PM session every 30 minutes so the project never stalls
+Description=PM heartbeat (audit-only prompt, every PM_HEARTBEAT_SECONDS; see tools/pm/README.md)
 
 [Service]
 ExecStart=/bin/bash /PATH/TO/REPO/tools/pm/heartbeat.sh
