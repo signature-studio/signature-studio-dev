@@ -33,7 +33,7 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 
 ## oc-pm: PM agent を起こす終端状態の検出と送信 (#2333)
 
-PM の判断が要る終端状態を **決定的に** (ラベル・マーカー・正規表現だけ。LLM も本文の解析も使わない) 検出し、`repository_dispatch` の `oc-pm` を送る。入口側は `.github/scripts/prepare-event-context.sh` (#2327)。
+PM の判断が要る終端状態を **決定的に** (ラベル・マーカー・正規表現だけ。LLM は使わず、自由文は解析しない。番号の正規表現だけ読む: `src/refs.ts`) 検出し、`repository_dispatch` の `oc-pm` を送る。入口側は `.github/scripts/prepare-event-context.sh` (#2327)。
 
 | kind | 検出 (すべて open の対象。起票者は後述の絞り込みを通ったものだけ) |
 |---|---|
@@ -41,15 +41,16 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 | `no_pr` | `oc:no-pr` の issue で、最後の `<!-- oc-run-outcome: no-pr reason=... -->` が `split` / `stop`、または `unknown` で Worker が再投入済み (再投入の後の run でも `unknown`) |
 | `needs_decision` | reviewer の最新の verdict が CHANGES_REQUESTED で、本文が `NEEDS_KEY` (`src/needs.ts`。`tools/pm/pm_needs.py` の `KEY` と同じ正規表現・同じ行分割) に一致し、その後に PM 応答が無い |
 | `user_answered` | `needs-user-input` の issue に、ラベルが付いた後に非 bot のユーザーのコメントが付いた (コメント者が `MEMBER` / `OWNER` / `COLLABORATOR` のものだけ。第三者のコメントでは起こさない #2461) |
+| `refs_orphan` | `Refs #N` のみ (閉じキーワード `Closes` / `Fixes` / `Resolves` の系が無い) で merge された PR の N が open で、本文に `親: #N` を持つ open の子が無い。`ref` は親 N (`src/refs.ts`。merge 時点の本文から番号だけを `prs[PR].refsOnlyNums` に残す) |
 
 - マーカーは **bot (実装 App・reviewer App) の投稿だけ** を信じる (誰でもコメントできるため)。PM 応答は、PM のログイン (`PM_LOGINS` と PM App) のコメント、または bot の `oc-pm-decision` / `oc-pm-intent: relaunch` マーカー付きコメント。根拠より後にあれば、その対象は送らない。
 - 状態は `sig` (issue / PR 番号ごとの時刻・列挙値・真偽。本文は持たない)。webhook の増分で更新し、webhook で埋まらない reviewer の verdict と `needs-user-input` の付与時刻は reconcile で REST から一度だけ補う (best effort)。
 - 送信: payload は `{"event_type":"oc-pm","client_payload":{"kind":<列挙>,"ref":<数字>}}` だけ。値は検証済みの列挙・整数から組み立て、issue / PR の自由文は入らない。PM App の installation token で送る。スイッチは `LIVE_DISPATCH` (oc-watchdog と同じ。別スイッチは作らない)。
 - 絞り込み: 起票者が `MEMBER` / `OWNER` / `COLLABORATOR`、または許可 bot (`opencode-for-signature-studio[bot]` `oc-reviewer-for-signature-studio[bot]`) の対象だけ。起票者が未取得の対象は送らない。
-- 抑止 (DO の `meta/pmDispatch`): 同じ (kind, ref) は 60 分に 1 回・全体で 1 時間に 12 起動・同じ ref に 24 時間で 3 回まで。未送信の対象を先に、送信済みは古い順に選ぶ。失敗した試行も数える (403 / 429 はその tick を打ち切る)。同期が 15 分以上止まっている間は送らない。
+- 抑止 (DO の `meta/pmDispatch`): 同じ (kind, ref) は 60 分に 1 回・全体で 1 時間に 12 起動・同じ ref に 24 時間で 3 回まで。未送信の対象を先に、送信済みは古い順に選ぶ。失敗した試行も数える (403 / 429 はその tick を打ち切る)。同期が 15 分以上止まっている間は送らない。`refs_orphan` だけは種類ごとの上限 (`KIND_LIMITS`) が加わり、同じ N に 24 時間 1 回・1 日 10 件まで (全体の上限にも従う)。
 - **dry-run (既定。`LIVE_DISPATCH` が `"1"` でないとき)**: 送らず、`/status` の `would_dispatch_pm` (`?detail=1` のみ) と `counters.wouldDispatchPm`、`pm_detected` (kind ごとの検出数) に記録する。履歴は live と分ける (`meta/pmWould`)。`LIVE_LAUNCH` は関係しない。
 - ラベル `pm-apply` / `needs-user-input` の issue (着手しても PR を出さない/出せない) は、`no_pr` の検出から除く。`plan()` は、この 2 ラベルの issue を ready・再投入の対象であっても着手せず `user` 行に置く (`oc:no-pr` の有無に依らない)。`user_answered` は `needs-user-input` が対象。`tools/pm/launch_issues.py` との差は PR 本文の未解決表に書く。
-- 検出するのは上の 4 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
+- 検出するのは上の 5 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
 - `digest` (#2349・CI-70) は状態ではなく時刻で送る: `ref` は 0 だけ。初回の tick は起点を置くだけで、以後 24 時間に 1 回 (`meta/digestAt`)。送信に失敗した試行も 1 回と数え、毎分叩き直さない。dry-run は `would_dispatch_pm` に `digest#0` を記録するだけ。PM agent 側の集計は `.github/prompts/pm.md` の digest 節。
 
 ## /status の観測 (#2338)
@@ -325,11 +326,14 @@ Cloudflare API の読み取りでは接続されている (下の『接続しな
 - **install は pnpm で走る。** Workers Builds は、`infra/pm-worker/package.json` が npm を宣言していても、`infra/pm-worker` で `pnpm install --frozen-lockfile` を実行する。pnpm が選ばれる理由は、リポジトリ直下の `package.json` の `packageManager: pnpm@12.10.1` と推定している (未確認)。そのため `infra/pm-worker` には `pnpm-lock.yaml` が要る。`package.json` に `packageManager: npm@...` を書いても pnpm 12 が実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。lockfile が無いと `ERR_PNPM_NO_LOCKFILE` で落ちる (#2454 → #2585 の経緯)。
 - `pnpm-workspace.yaml` の `allowBuilds` は、pnpm 12 の `strictDepBuilds` (既定) で esbuild と workerd の postinstall を許すためのもの。依存を足して postinstall を持つものが入ったら、ここに足す (足さないと `ERR_PNPM_IGNORED_BUILDS`)。
 - `pnpm-workspace.yaml` の `minimumReleaseAgeExclude` (wrangler・@cloudflare/vitest-plugin・miniflare の exact 版 3 件) は、公開後 24 時間以内の版を lockfile install で通すための供給網ポリシーの例外。PM 判断待ち (経緯は #2585)。却下されたら該当行を削除し、2026-10-15T05:55Z 以降に install する (3 版のうち最後の公開は 2026-10-14T05:54:48Z)。版を変えるときは exclude も見直す。
+- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る)。release-age の影響を外して診断するだけなら `--config.minimum-release-age=0` を付けた install を使う (README の手順にはしない)。
 - **deploy は `wrangler.toml` が正。** `[observability]` を削ると、次の deploy (VM でも Workers Builds でも) が Workers Logs を無効にする。`[vars]` も同じ (上の再デプロイの手順 4)。
 - watch paths を `infra/pm-worker/*` にしても、`infra/pm-worker` を触らない merge でビルドが作られることがある (観測の詳細は付録。原因は未確認)。公式は『push event の変更ファイルが 0 件ならパス判定を飛ばして build する』と書く。無関係な merge でも deploy が走りうる。
 - ビルドの状態は `GET /accounts/{id}/builds/workers/{script_tag}/builds`、ログは `GET /accounts/{id}/builds/builds/{uuid}/logs` で読める。
 
 ### 接続しないと決めた理由 (2026-10-14 の最初の判断)
+
+> **注意 (#2585)**: 下の判断 (接続しない) は、2026-10-14 の実測で Workers Builds のビルド記録が見えた事実と食い違う。接続の有無と判断の見直しは PM (#2357) が決める。接続の状態は上の『現状』を見る。
 
 Workers Builds (Cloudflare 側に repo を接続し、main への merge で自動ビルド・デプロイする機能) は、既定ではビルド用の API token を Cloudflare がアカウントに**自動で発行**する (公式: <https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token>)。依頼者の指示 4・9 (無断で token を作らない・secrets を平文で保存しない) の趣旨に反しうるため、PM 判断 (2026-10-14、#2357 [CI-78]) で接続しないと決めた。代わりに、上の手順で PM が VM の OAuth を使って再デプロイする。引き換えに、merge から反映までは PM の操作を待ち、OAuth が失効している間は反映できない (稼働中の Worker は止まらない)。依頼者が判断を変えたら、#2357 を再開して判断する。
 
