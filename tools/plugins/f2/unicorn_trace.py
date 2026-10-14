@@ -14,7 +14,8 @@ import pefile
 import unicorn
 from unicorn import (Uc, UcError, UC_ARCH_X86, UC_MODE_64, UC_PROT_ALL, UC_PROT_READ,
                      UC_PROT_WRITE, UC_HOOK_CODE, UC_HOOK_MEM_WRITE)
-from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RSP, UC_X86_REG_RIP
+from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX,
+                               UC_X86_REG_RSP, UC_X86_REG_RIP)
 
 PAGE = 0x1000
 STUB = 0x10000000
@@ -46,6 +47,10 @@ def main():
     ap.add_argument('-q', action='append', default=[], type=lambda s: int(s, 0),
                     help='実行前後に表示する qword アドレス')
     ap.add_argument('-m', type=int, default=2000000, help='最大命令数')
+    ap.add_argument('-t', action='append', default=[], type=lambda s: int(s, 0),
+                    help='この VA に入ったとき rcx/rdx の値と [rcx]・[rcx+0x28] を出す (最初の 20 回)')
+    ap.add_argument('-H', action='store_true',
+                    help='合成 host: rcx を SCRATCH+0x10000 の host に向け、[host]=vtable (0x40 スロット、全て ret stub)')
     a = ap.parse_args()
 
     data = open(a.pe, 'rb').read()
@@ -83,6 +88,24 @@ def main():
     for i, v in enumerate(a.a):
         uc.mem_write(rsp + 0x28 + 8 * i, struct.pack('<Q', v))
     uc.reg_write(UC_X86_REG_RSP, rsp)
+    rets = {}
+    if a.H:
+        host = SCRATCH + 0x10000
+        vtab = SCRATCH + 0x11000
+        obj = SCRATCH + 0x12000
+        otab = SCRATCH + 0x13000
+        uc.mem_write(host, struct.pack('<Q', vtab))
+        uc.mem_write(obj, struct.pack('<Q', otab))
+        for base, tab, nm in ((host, vtab, 'host'), (obj, otab, 'obj')):
+            for i in range(0x40):
+                sva = STUB + 16 * (k + i + (0 if nm == 'host' else 0x40))
+                uc.mem_write(sva, b'\xc3')
+                names[sva] = '%s.vtable[%#x]' % (nm, 8 * i)
+                uc.mem_write(tab + 8 * i, struct.pack('<Q', sva))
+                if nm == 'host' and i == 0:
+                    rets[sva] = obj
+        uc.reg_write(UC_X86_REG_RCX, host)
+        uc.reg_write(UC_X86_REG_RDX, host)
     for item in a.r:
         name, val = item.split('=')
         uc.reg_write(reg_id(name), int(val, 0))
@@ -92,11 +115,24 @@ def main():
 
     tail = collections.deque(maxlen=12)
 
+    tcount = collections.Counter()
+
     def on_code(uc_, addr, size, ud):
         tail.append(addr)
+        if addr in a.t and tcount[addr] < 20:
+            tcount[addr] += 1
+            rcx = uc_.reg_read(UC_X86_REG_RCX)
+            info = 'trace %#x #%d rcx=%#x rdx=%#x' % (addr, tcount[addr], rcx, uc_.reg_read(UC_X86_REG_RDX))
+            try:
+                info += ' [rcx]=%#x [rcx+0x28]=%#x' % (
+                    struct.unpack('<Q', uc_.mem_read(rcx, 8))[0],
+                    struct.unpack('<Q', uc_.mem_read(rcx + 0x28, 8))[0])
+            except UcError:
+                info += ' (rcx 未マップ)'
+            print(info)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
-            uc_.reg_write(UC_X86_REG_RAX, 0)
+            uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 
     def on_write(uc_, access, addr, size, value, ud):
         if len(log) < LOG_LIMIT:

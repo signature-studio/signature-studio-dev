@@ -88,3 +88,14 @@
 - **`tests/trace_diverge_418be0.py` (main の HEAD 時点の版) の全件 jsonl**: rc 0 で終了。出力 = 対象 0 件・thunk 除去後の食い違い 0 件・trace 上限で判定不能 0 件・**解析不能で丸ごと除外 1 件**。前節の `1c4b7c7e` の全件 jsonl では rc 1 (`ValueError`) だった。本節で rc 0 になった理由は未切り分け (script の差分は確認していない)。出力は `results/m11_418be0_thunk.md` を上書きせず、`$RUNNER_TEMP` に置いた (commit しない)。全件 jsonl の 0x418be0 系は 0 件のため、記録の 20 / 16 / 4 の表は再現していない。
 - **結論**: `9e9c1315` をソースからビルドし直した全件 closure は記録 (2,273 / 2,892 / 2,256) と一致しない (3,092 / 1,524 / 2,805)。0x41c820 の記録 mismatch は、この候補の rebuild では再現しない (qall は `match`)。記録と候補の差の原因は未特定 (ビルド条件・work-m11 の由来の切り分けは未実施)。#1035 の受入条件 1 は [~] のまま。
 - **HEAD との関係**: 測定は候補 `9e9c1315` 自体の判定。その後の main (`016cc403`) とは liftdiff のコードが 2,329 行異なるため、HEAD での再測定ではない。本 PR は REPORT のみ変更し、コードは変えない。
+
+#### 候補 `1c4b7c7e` の全件 closure rebuild (LD-91 / #2242)
+- **測定 commit = `1c4b7c7e`** (コードを変えた最後の commit。detached worktree で測定)。素材は `fl-win64` + `work-m11` + `work-liftdiff` (`tools/liftdiff/work/m11/batch_closure.jsonl` は記録と同一素材)。
+- **ビルド**: `liftdiff.py build` を `1c4b7c7e` のソースから実行 (rc 0・`sig_mismatch 0`・`undefined 1`・wasm 4,439,240 B)。`--nobuild` の前回値 (LD-74) とは異なり、ビルド物は候補 commit 由来。
+- **batch**: `batch --set closure --shards 14 --nobuild` (ビルド直後・`targets/m11_local_2242.json` は `pe` だけ `fl-win64` 展開先へ向けた複製。`targets/m11.json` の `pe` は `/home/ubuntu/...` 固定のため、repo の target は変更していない)。rc 0・**約 9 分 42 秒** (10:47:49 → 10:57:31)・開始時 load 0.94 / 終了時 load 6.23 (shards 14 のため上昇)。
+- **集計**: 一致 3,092 / 不一致 1,524 / 実行不能 2,805 (記録 2,273 / 2,892 / 2,256 と不一致・前回 `--nobuild` の 3,091 / 1,525 / 2,805 とほぼ同じ)。
+- **記録との verdict 一致**: 7,421 関数中 5,705 (前回 `--nobuild` は 5,704)。
+- **対象 2 関数**: `0x418be0` = 記録 match / rebuild match。`0x41c820` = 記録 mismatch / rebuild match (記録の mismatch は再現せず)。
+- **`trace_diverge_418be0.py` (rc 0)**: 本 commit の `tests/` には当該スクリプトが無いため、main の版 (`500acb3d` / `c00790d1` 反映済み) を入力 jsonl に与えた。除外 1 件 (解析不能要素)・対象 0 件 (`0x418be0` の共通 entry 直後の食い違いが無い)。記録 jsonl で得た 20 件 (16 + 4) は、この rebuild では再現しない。
+- **結論**: `1c4b7c7e` は記録 (2,273 / 2,892 / 2,256) の生成 commit ではない。`0x41c820` mismatch も再現しない。残りの候補 `9e9c1315` / `38d53ac8` / `930c6dbc` は子 issue に切り出す (1 run に収まらないため): #2276 (`9e9c1315`) / #2277 (`38d53ac8`) / #2278 (`930c6dbc`)。
+- **コード差分 (測定 commit → HEAD・候補の判定に影響する範囲)**: `git diff 1c4b7c7e origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (LD-74 の「候補範囲で差分 0」は、この範囲には当てはまらない)。

@@ -15,6 +15,7 @@ static uint64_t g_acc_addr[MAXACC], g_acc_rip[MAXACC], g_acc_cnt[MAXACC];
 static int g_nacc;
 static uint64_t g_stub_va;
 static int g_stub_ret, g_stubbed;
+static uint64_t g_gpr[4];
 
 static void record(uint64_t a, uint64_t rip) {
     for (int i = 0; i < g_nacc; i++)
@@ -49,6 +50,11 @@ static void on_acc(int sig, siginfo_t* si, void* uc_) {
         return;
     }
     fprintf(stderr, "[slot_trace] fatal sig=%d rip=%#llx addr=%p\n", sig, (unsigned long long)g[REG_RIP], si->si_addr);
+    fprintf(stderr, "[slot_trace] regs rax=%#llx rcx=%#llx rdx=%#llx rsp=%#llx rbp=%#llx r8=%#llx r9=%#llx\n",
+            (unsigned long long)g[REG_RAX], (unsigned long long)g[REG_RCX], (unsigned long long)g[REG_RDX],
+            (unsigned long long)g[REG_RSP], (unsigned long long)g[REG_RBP], (unsigned long long)g[REG_R8], (unsigned long long)g[REG_R9]);
+    fprintf(stderr, "[slot_trace] heap_args %#llx %#llx %#llx %#llx\n", (unsigned long long)g_gpr[0], (unsigned long long)g_gpr[1],
+            (unsigned long long)g_gpr[2], (unsigned long long)g_gpr[3]);
     for (int i = 0; i < g_nacc; i++)
         printf("ACC %llx %llx %llu\n", (unsigned long long)g_acc_addr[i], (unsigned long long)g_acc_rip[i], (unsigned long long)g_acc_cnt[i]);
     fflush(stdout);
@@ -60,7 +66,7 @@ int main(int argc, char** argv) {
     if (ott_load(argv[1]) != 0) return 3;
     uint64_t fn = strtoull(argv[2], NULL, 16);
     uint64_t gpr[4], xmm[4] = {0, 0, 0, 0}, out[2] = {0, 0};
-    for (int i = 0; i < 4; i++) gpr[i] = (uint64_t)heap_alloc(0x400, 1);
+    for (int i = 0; i < 4; i++) g_gpr[i] = gpr[i] = (uint64_t)heap_alloc(0x400, 1);
     double x = 1.5; memcpy(&xmm[0], &x, 8);
     struct sigaction sa; memset(&sa, 0, sizeof sa);
     sa.sa_sigaction = on_acc; sa.sa_flags = SA_SIGINFO; sigemptyset(&sa.sa_mask);
