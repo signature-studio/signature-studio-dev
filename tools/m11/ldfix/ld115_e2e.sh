@@ -7,7 +7,7 @@
 #   4/5 survey 942 unit を修復前 / POST で測る
 #   5/5 unit 単位の突合 (ok 退行 0 であること)
 # 前提: tools/m11/work に work-m11 の展開 (boot_final.prealloca.ll・m11_image.bin・boot*.drc.config.json)、
-#       FL_WIN64_DIR (fl-win64 の展開先 = extracted/block00031_PE.bin)、/opt/emsdk (docs/REFERENCES.md)。
+#       FL_WIN64_DIR (fl-win64 の展開先 = extracted/block00031_PE.bin)、[EMSDK] (docs/REFERENCES.md)。
 # 使い方: FL_WIN64_DIR=<展開先> bash tools/m11/ldfix/ld115_e2e.sh
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
