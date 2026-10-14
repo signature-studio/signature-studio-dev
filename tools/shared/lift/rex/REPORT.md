@@ -80,7 +80,7 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/lift/rex/rex_closure.py [
 ### 7.1 結論 (1 行)
 REXGetCreatorInfo / REXGetInfo の閉包 (x64c で 35 関数・982 命令) を lift して wasm (80,154 B) にし、元の機械語の直接実行と比べた。比較できた 133 case は戻り値・import 呼出回数・arena・.data が全バイト一致 (不一致 0)。ネガコン 2 件は FAIL。**ただし書込が発生した比較 case は 0 件** (全 133 件で arena・.data が入力・初期値から不変。ctx 大域は除く)。そのため書込バッファの一致は検証されておらず、成功経路 (戻り値 1 / 3) も未到達。書込の一致と成功経路は子 #2870 (T-SH-46) で、side module・ビルドフラグは子 #2896 (T-SH-47) で扱う。
 
-### 7.2 対象と閉包 (x64c・測定 commit `744b5cfc`)
+### 7.2 対象と閉包 (x64c・測定 commit `fe5f7a4f`)
 - DLL: `block24351_PE.bin` (SizeOfImage 0x6a000)。root は export wrapper の 2 本 (VA 0x1800011c0 = REXGetCreatorInfo / 0x180001130 = REXGetInfo)。
 - `python3 tools/flelift/x64c.py --pe <dll> --entries <roots> --closure 99 --img 0x180000000 --shift 0x150000000 --img-size 0x6a000 --impbase 0x1D80000` の出力: 関数 35・命令 982・unlifted 0・unsup 25 箇所 (`movnti` 24・`repz ret` 1)・import 5 (GetLastError / RaiseException / ReleaseMutex / RtlPcToFileHeader / WaitForSingleObject)。
 - §3 の RetDec 測定 (22 / 39 関数) とは数え方が違う (x64c は tail jmp と thunk を別に扱う)。本節の数値は x64c の出力そのもの。
