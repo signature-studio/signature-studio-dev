@@ -76,6 +76,8 @@ $ git diff db86f35b HEAD -- tools/python ':!*.md'
 (空)
 ```
 
+測定後の main: `origin/main` (`6d7f3d03` 時点) は `tools/python` を 8 ファイル (323 行追加・141 行削除) 進めている (`git diff db86f35b origin/main -- tools/python`)。本 PR はまだ取り込んでいない。`git merge-tree` では衝突は無い。取り込むと測定 commit からのコード差分が生じるため、取り込んだ後に再測定する (`docs/WORKFLOW.md` §6)。
+
 ## 5. 保留 (残り 54 件・子 issue へ)
 
 PE の handler VA だけを記録した。引数の意味・戻り値の範囲・作用先は未解析。#2980 は #3010 (PY-119) で 6 件を実装して閉じ、残り 12 件は #3005・#3006・#3007 に分けられた (`tools/python/REPORT_PY119.md` の保留表)。
