@@ -226,7 +226,7 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 - 入力: `block22434_PE.bin` (sha256 `84b64c43…de724a9`、fl-win64 素材)。 root = export `main` (0x10007ca0)、`--arch ia32 --closure 2`。
 - 再現: `python3 tools/ott/lift/x64c.py --pe <PE> --entries <roots=[0x10007ca0]> --out <dir> --closure 2 --arch ia32` → `emcc -c -O1 -w -I tools/ott/rt <dir>/ott_lifted.c`。
-- lift: `functions 8, insns 301, unlifted callees 8, imports 0`。 unsup は x87 4 件 (`fld` 2・`fcomp` 1・`fnstsw` 1)、いずれも `ott_unsup` 関数で止まる。
+- lift: `functions 8, insns 301, unlifted callees 8, imports 0`。 unsup は x87 4 件 (`fld` 2・`fcomp` 1・`fnstsw` 1)、いずれも生成 C では `ott_unsup(...)` 呼び出しとして残る (実行時の扱いは未定義・未検証)。
 - `emcc -c` (toolchain-emsdk 6.0.12): rc 0、object 5,836 B。 所要 0.15 s (lift wall)。
 - 範囲: これは closure 2 (8 関数) のみ。 受入 1 の「.text 全体 (73,002 B)」は未達 (#1098)。 x87 の意味論は未実装 (#1099)。 gate C1〜C4 は本節では通していない。
 - 注意: `0x10001300` (opcode dispatcher) を root にした場合の jump table 検証は `tools/ott/REPORT.md` §14 を参照。
