@@ -19,11 +19,16 @@
 
 `SLOT_ENC_INIT=1 bash tools/icall/diff/slot_trace.sh` (closure 131 関数):
 
-- 所要 13.5 s (real) / user 11.3 s / sys 1.8 s。load average 1.37 (開始時, 10:07)。
+- 測定 commit: `ce200f95` (コードを変えた commit。変更は `tools/icall/diff/slot_table_reach.py` の追加のみ)。
+- 所要 12.997 s (real) / user 11.026 s / sys 1.817 s。load average 0.64 (10:18, 開始時)。
 - 結果: funcs 131 / exit rc=0: 69, rc=124: 1, rc=95: 53, rc=98: 8 / zero-fill VA 7 個 / 既知 12 中 hit 3・miss 9。
 - #2170 (REPORT_APPENDIX_2170 §2.1) のベースラインと一致。
+- 鮮度の根拠: 直前の `origin/main` の `f5d2aa3b` から測定 commit `ce200f95` までの測定対象範囲の差分は 0 行。
 
-測定 commit: 本 PR の HEAD 直前の `origin/main` (`f5d2aa3b`)。コードを変えたのは `tools/icall/diff/slot_table_reach.py` の追加のみ。
+```
+$ git diff f5d2aa3b ce200f95 -- tools/icall/diff/slot_trace.sh tools/icall/diff/slot_trace.c tools/ott tools/targets/freshair tools/icall/work
+(出力なし・0 行)
+```
 
 ### 2.2 既知 12 slot と T1/T2 の index 域
 
@@ -72,6 +77,6 @@ python3 tools/icall/diff/slot_table_reach.py tools/icall/work/core64_dis.txt
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| T1・T2 の終点と entry 数の確定。動的に読まれた最大 index の採取 (`slot_trace` の ACC を index 付きで記録) | 受入条件 1 | #2197 (本 PR は部分達成のため `Refs`) |
-| 既知 12 中 5 件 (`0x1813068d0`〜`0x181306910`) が読まれる表の特定 (T1/T2 以外の表) | 受入条件 2 | 子 issue (下記) |
-| OTT api-set 表 `0x18026c9f0` との形式比較 (entry 数・slot 配置) | 受入条件 4 | 子 issue (下記) |
+| T1・T2 の終点と entry 数の確定。動的に読まれた最大 index の採取 (`slot_trace` の ACC を index 付きで記録) | 受入条件 1 | #2226 (ICALL-66) |
+| 既知 12 中 5 件 (`0x1813068d0`〜`0x181306910`) が読まれる表の特定 (T1/T2 以外の表) | 受入条件 2 | #2224 (ICALL-64) |
+| OTT api-set 表 `0x18026c9f0` との形式比較 (entry 数・slot 配置) | 受入条件 4 | #2225 (ICALL-65) |
