@@ -1,0 +1,70 @@
+ImageBase 0x180000000 sections 10
+
+== target 0x1809e3240 (rva 0x9e3240) sec .text
+  (a) abs8 hits: 0 
+  (b) rva4 hits: 3 .rdata:0x111df10 .rdata:0x111df24 .pdata:0x210793c
+
+== target 0x1809eb7b0 (rva 0x9eb7b0) sec .text
+  (a) abs8 hits: 0 
+  (b) rva4 hits: 3 .rdata:0x111e35c .rdata:0x111e370 .pdata:0x2107d74
+
+== target 0x1809ef030 (rva 0x9ef030) sec .text
+  (a) abs8 hits: 0 
+  (b) rva4 hits: 3 .rdata:0x111e534 .rdata:0x111e568 .pdata:0x2107edc
+
+== target 0x1809ef7b0 (rva 0x9ef7b0) sec .text
+  (a) abs8 hits: 0 
+  (b) rva4 hits: 1 .pdata:0x2107f24
+
+== target 0x180a0a3e0 (rva 0xa0a3e0) sec .text
+  (a) abs8 hits: 0 
+  (b) rva4 hits: 3 .rdata:0x111f634 .rdata:0x111f64c .pdata:0x2109028
+
+== target 0x180a0f3f0 (rva 0xa0f3f0) sec .text
+  (a) abs8 hits: 0 
+  (b) rva4 hits: 2 .pdata:0x2109458 .pdata:0x2109460
+
+== target 0x180fdc5dc (rva 0xfdc5dc) sec .rdata
+  (a) abs8 hits: 1 .rdata:0xfae6c8
+  (b) rva4 hits: 0 
+
+== target 0x180fdc880 (rva 0xfdc880) sec .rdata
+  (a) abs8 hits: 0 
+  (b) rva4 hits: 0 
+
+== target 0x180fdc69c (rva 0xfdc69c) sec .rdata
+  (a) abs8 hits: 1 .rdata:0xfae688
+  (b) rva4 hits: 0 
+
+== target 0x180fdc5b0 (rva 0xfdc5b0) sec .rdata
+  (a) abs8 hits: 1 .rdata:0xfae6f8
+  (b) rva4 hits: 0 
+
+== target 0x180fdc890 (rva 0xfdc890) sec .rdata
+  (a) abs8 hits: 1 .rdata:0xfae678
+  (b) rva4 hits: 0 
+
+(c0) 線形走査の被覆率 (実行可能セクション。デコード済みバイト / セクション長、再開 = 無効バイトからの再開回数、未デコード位置 = 無効バイトの VA)
+  .text    10593790/10593792 B = 100.00% 未デコード 2 B 再開 2 回 位置 0x180a0fcac 0x180a16cdc
+  合計 10593790/10593792 B = 100.00% 未デコード 2 B
+
+(c) .text RIP-relative operands scanned: 95679
+  0x1809e3240: 1 0x1809e3231(imm:jmp)
+  0x1809eb7b0: 2 0x1800bbb06(imm:call) 0x18088fb25(imm:call)
+  0x1809ef030: 1 0x1809ef021(imm:jmp)
+  0x1809ef7b0: 59 0x180049352(imm:call) 0x180049359(imm:call) 0x180081522(imm:call) 0x180081529(imm:call) 0x1800815f9(imm:call) 0x180081600(imm:call) 0x18012f9b3(imm:call) 0x1802f63c5(imm:call) 0x1802f6435(imm:call) 0x1802f6443(imm:call)
+  0x180a0a3e0: 1 0x1809e322b(imm:je)
+  0x180a0f3f0: 5 0x1809eb0a1(imm:call) 0x1809eb0bf(imm:call) 0x1809eb331(imm:call) 0x1809eb35f(imm:call) 0x1809eb395(imm:call)
+  0x180fdc5dc: 2 0x1809e330e(lea) 0x180a0a49d(lea)
+  0x180fdc880: 2 0x1809eb80e(lea) 0x1809eb87a(lea)
+  0x180fdc69c: 2 0x1809ef0f1(lea) 0x180a10864(lea)
+  0x180fdc5b0: 1 0x1809ef800(lea)
+  0x180fdc890: 1 0x180a0f3f4(lea)
+
+(d) 6 関数の直接呼出元の所属 (cut 表 = 区分済みの OSS 境界 1,510 関数)。call/jmp と jcc (条件分岐) を分けて数える
+  0x1809e3240: call/jmp 1 件 → (cut 外) 1 / jcc 0 件
+  0x1809eb7b0: call/jmp 2 件 → (cut 外) 2 / jcc 0 件
+  0x1809ef030: call/jmp 1 件 → (cut 外) 1 / jcc 0 件
+  0x1809ef7b0: call/jmp 59 件 → (cut 外) 59 / jcc 0 件
+  0x180a0a3e0: call/jmp 0 件 →  / jcc 1 件 0x1809e322b(je)
+  0x180a0f3f0: call/jmp 5 件 → (cut 外) 5 / jcc 0 件

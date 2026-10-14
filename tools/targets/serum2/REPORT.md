@@ -226,7 +226,7 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 - **別証拠クラスの検算** (`sr3_verify_strings.py`): upstream `sqlite3.c` 3.19.3 の文字列リテラル 1,864 個 (長さ ≥10・`\`/`%` なし) のうち、バイナリ `.rdata` に**単独終端かつ先頭一致**で存在しコードから参照されるものは 143 個、参照元 **189 関数**。うち **183 関数 (96.8%) が SQLite 窓内**。窓外 6 関数 (計 9,310 B) の参照語は `parameters` ×3 (0x1800e61f0/0x18040a2a0/0x1804bf130)・`0123456789abcdef` (0x1801bee30)・`AreFileApisANSI` ×2 (0x180a00638/0x180a00eac) で、いずれも汎用語 (Serum 側の別用途・Win32 API 名) と推定。なお先頭一致に限定する前は 241 関数中 199 (82.6%) だったが、増分は lld の文字列末尾共有 (`...qualified name` の途中 `name` 等) による偽陽性だった。
 - **ネガティブコントロール**: 同じ SQLite リテラル集合で zstd 窓 (209 関数) 内の参照元 = **0**。同サイズの index 窓を ±1〜3 倍ずらした 6 通りも全て **0 関数**。
 - **muParser は弱い**: upstream v2.3.2 リテラル 84 個のうち参照されるもの 26、参照元 8 関数中の窓内は **2** (0x18091ad70・0x18099a6d0。25.0%)。窓外 6 関数 (0x1809e3240/0x1809eb7b0/0x1809ef030/0x1809ef7b0/0x180a0a3e0/0x180a0f3f0, 計 1,343 B) は `acos`/`log2`/`sinh`/`sqrt`/`log10` の関数名を参照する 32〜306 B の関数で、muParser 本体窓 (0x18091ace0–0x18092741d) の外にある。窓は組込み関数の登録側を含まず不足の可能性が高い → 拡張は SR-4 前に動的トレースで確定。
-- **偽の版文字列を除外**: `2.1.4`/`2.1.3` (0xfd3379/0xfd3547) は直前後が `Env 4`/`CC 73: Sound Controller 4` の Serum 独自テーブルで、muParser 版ではない。muParser の版は**未確定** (v2.3.2 リテラルの突合は窓内 2 関数のみで版の識別力なし。v2.2.5 も窓内 2 関数で同様 (先頭一致に限定する前の予備測定))。
+- **偽の版文字列を除外**: `2.1.4`/`2.1.3` (0xfd3379/0xfd3547) は直前後が `Env 4`/`CC 73: Sound Controller 4` の Serum 独自テーブルで、muParser 版ではない。muParser の版は**確定不能** (§11.5。2.2.0〜2.2.4 が未取得のため完全突合できず。v2.3.2 リテラルの突合は窓内 2 関数のみで版の識別力なし。v2.2.5 も窓内 2 関数で同様 (先頭一致に限定する前の予備測定))。
 - **`.pdata` 外コード整理 (`out/sr3_gap_blocks.tsv`)**: `.text` の `.pdata` 隙間 29,354 区間 / 463,748 B から、0xCC/0x90/0x00 パディング 145,350 B を除き **20,467 ブロック / 318,398 B / 61,895 命令 / ret 5,096** (§4.1 の旧値 318KB・ret 5,096 と一致)。clean decode 20,459 ブロック / 318,167 B。ブロック先頭を direct call/jmp/lea が指すもの = **1,352 ブロック / 101,257 B** (実関数入口と推定)。残り 19,115 ブロックは分割ブロック/到達未確認で**関数としては確定していない**。cut 窓内: sqlite 48・muparser 120・libsfz 37・zl_convolver 10・nlohmann 2 (計 217 ブロック / 2,280 B)、窓外 20,250 ブロック / 316,118 B。
 - 範囲外: 実機/wasm での挙動一致・upstream の再ビルド品との関数単位の一致確認・mac 版。
 
@@ -239,7 +239,7 @@ GHIDRA=1 bash tools/targets/serum2/scripts/run_all.sh   # +Ghidra 全自動解�
 ### 11.5 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| zlib/zstd/PFFFT/libSFZ は版文字列から確定不能。muParser は 2.2.x 系と推定 (2.2.0〜2.2.4 未突合)。libsndfile/FLAC は未検査 | 再ビルド対象版を固定できない | #71 継続 (詳細は `REPORT_SR3b.md`・再現 `scripts/sr3b_run.sh`) |
+| zlib/zstd/PFFFT/libSFZ は版文字列から確定不能。muParser は確定不能 (2.2.0〜2.2.4 が未取得のため完全突合できず。2.2.x 系と推定)。libsndfile/FLAC は未検査 | 再ビルド対象版を固定できない | #71 継続 (詳細は `REPORT_SR3b.md`・再現 `scripts/sr3b_run.sh`) |
 | muParser 窓が組込み関数の登録側を含まない (§11.3 の 6 関数。帰属は未確定、詳細 `REPORT_SR3c.md`) | lift 対象に muParser 一部が残る | #71 継続 |
 | nlohmann::json instantiation が 36 関数しか seed 化できていない (推定: 実数は数百) | 除外不足 (lift 側に残るだけで安全側) | #19 と共有 |
 | 窓内 `window` タグ (SQLite 921 / zstd 202 ほか) はリンク連結による推定で、upstream 関数との 1:1 照合なし | 過除外すると DSP を落とす恐れ。SQLite は §11.3 の検算で支持 (183/189) | SR-4 着手時の動的トレース (blockedBy #71) |

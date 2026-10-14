@@ -441,6 +441,7 @@
 | パス | 行数目安 | 何が書かれているか |
 |---|---:|---|
 | `tools/targets/serum2/REPORT.md` | ~200 | Serum 2 インストーラ解析 + lift 可否評価 |
+| `tools/targets/serum2/REPORT_SR3d.md` | ~90 | SR-3d (#867): 窓外 muParser 6 関数の VA 参照走査 (abs8・RVA4・RIP lea)・呼出元の cut 照合・名前表の所在。帰属は未確定 (#71) |
 | `tools/targets/serum2/host/REPORT.md` | ~240 | Serum 2 最小 VST3 host |
 | `tools/targets/serum2/host/REPORT_SR1c.md` | ~222 | SR-1c (#256) 付録: controller ゲート (+0x10c / +0xdc) の静的 writer 走査と API 突合 (import 327 / 呼出 110 / 未呼出 217)。API 名一覧は `host/sr1c_api_surface.tsv` |
 | `tools/targets/serum2/host/REPORT_SR23.md` | ~78 | SR-23 (#1545) 付録: 書込元 `0x1800acf70` の所属 class (`SerumController`・vtable slot 3) と、wrapper IID (`IVst3ToAUWrapper`/`AAX`) に応答する host 根拠 (SDK 参照 host は応答しない) |
