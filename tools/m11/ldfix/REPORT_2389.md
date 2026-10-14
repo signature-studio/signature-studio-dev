@@ -26,7 +26,7 @@
 
 ## 3. 測定
 
-- 測定 commit (コードを変えた最後の commit): `d0a7f2db`。それ以降は REPORT_2389.md と DOC_MAP の追加だけ (`git diff d0a7f2db HEAD -- tools/m11/ldfix` は REPORT 追加前の HEAD で出力 0 行)。
+- 測定 commit (コードを変えた最後の commit): `d0a7f2db`。以降の自分の変更は REPORT_2389.md と DOC_MAP の追加だけ。main 取り込み後 (`d9fab364`) の `git diff d0a7f2db HEAD -- tools/m11/ldfix/ld110_reg2mem_link.py tools/m11/ldfix/ld105_reg2mem_map.py tools/m11/ldfix/results tools/m11/ldfix/{audit_lsf,audit_lsf_ssa,window_recount,dyn_xcheck,tally_510,spill_classify_1161,ldmach,ldmach_img}.py tools/m11/ldfix/negctl_510.sh tools/m11/lb_base.py` は出力 0 行 (測定した script と e2e の入力に差分なし)。同範囲 `tools/m11/ldfix` 全体の差分は他 issue の追加 (REPORT_2316・fix_ld108.py ほか 6 件) と本 REPORT だけ。
 - `ld110_reg2mem_link.py` (1 コマンド再現: `M11_WORK=<work-m11> python3 tools/m11/ldfix/ld110_reg2mem_link.py`): 3 回とも rc=0・real 0.32〜0.35 s・load average 0.56・出力 TSV は `results/ld110_reg2mem_link.tsv` と cmp 一致。`ld105_reg2mem_map.py` の再生成も `results/ld105_reg2mem_map.tsv` と cmp 一致。
 - `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`M11_WORK`・`LD_WORK` は main の work を指定): rc=0・real 1m50.035s・開始時 load average 0.11・7/7 完了。status 未判定 **117** / 確定 **54** / 判定不能 **7** (REPORT_2287 の測定と同一。判定は TRUE_DROP のまま、根拠文の書換えだけ)。`drops_510.tsv`・`spill178_1161.tsv` は results/ と cmp 一致。
 - ネガティブコントロール (`ld110_reg2mem_link.py` 内):
