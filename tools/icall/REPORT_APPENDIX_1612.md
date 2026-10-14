@@ -48,11 +48,11 @@
 
 | 項目 | 状態 | 起票先 |
 |---|---|---|
-| decode 段内で間接 call を消す処理の特定 (pass 名・条件) | 未達 | PM に起票を依頼 (未起票。親 #1454 / 本 #1612 の子として) |
-| pass 143 以降の `!insn.addr` 追跡の連続判定 | 未達 | 同上 |
-| `0x180c97aa0` の `*(var12) = -1` 警告 5 件との対応 | 未達 | 同上 |
-| `lost 0` (修復 / 段と条件の分類) | 未達 | 同上 |
-| 本 run で未再確認の §1 計測 (素材 `toolchain-retdec plugins-freshair work-icall` が必要) | 未検証 | 同上 (再実行は PR 本文の `oc_artifacts` 行で依頼) |
+| decode 段内で間接 call を消す処理の特定 (pass 名・条件) | 未達 | #1844 (ICALL-43、親 #1612) |
+| pass 143 以降の `!insn.addr` 追跡の連続判定 | 未達 | #1844 (ICALL-43) |
+| `0x180c97aa0` の `*(var12) = -1` 警告 5 件との対応 | 未達 | #1844 (ICALL-43) |
+| `lost 0` (修復 / 段と条件の分類) | 未達 | #1844 (ICALL-43) |
+| 本 run で未再確認の §1 計測 (素材 `toolchain-retdec plugins-freshair work-icall` が必要) | 未検証 | 本 PR の未解決表で追跡 (再実行は PR 本文の `oc_artifacts` 行で依頼) |
 
 ## 4. 再現手順
 
