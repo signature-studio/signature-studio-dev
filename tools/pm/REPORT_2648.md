@@ -31,10 +31,12 @@ gh api -X GET search/issues -f q='repo:signature-studio/signature-studio-dev is:
 jq '[.[] | .mergedBy.login] | group_by(.) | map({login: .[0], n: length})' work/win.json
 jq '[.[] | select(.mergedBy.login=="app/opencode-for-signature-studio") | . as $pr | select([$pr.reviews[] | select(.state=="APPROVED" and .submittedAt <= $pr.mergedAt)] | length > 0)] | length' work/win.json
 jq '[.[] | select(.mergedBy.login=="app/opencode-for-signature-studio") | select([.reviews[] | select(.state=="APPROVED")] | length > 0)] | length' work/win.json
+jq '[.[] | . as $pr | select([$pr.reviews[] | select(.author.login=="oc-reviewer-for-signature-studio" and .state=="APPROVED" and .submittedAt <= $pr.mergedAt)] | length > 0)] | length' work/win.json
 ```
 
 - 3 行目の期待値は、24 時間窓で `app/oc-reviewer-for-signature-studio` 862・`app/opencode-for-signature-studio` 120・人 2。
 - 4 行目 (実装 App・merge 前の APPROVED) は 0。5 行目 (実装 App・APPROVED あり) は 22。
+- 6 行目は、merge 前に reviewer App (`oc-reviewer-for-signature-studio`) の APPROVED が付いていた件数 (`.author.login` で照合)。適用後の窓では 21 (全 21 件)。WORKFLOW §2 の「reviewer の APPROVED は承認として数えられる」の裏付け。
 - 旧方法 `gh pr list --state merged --limit 1000` は作成日時の新しい順に返すため、窓の merge を取りこぼす (検収時に 970 件と再現)。`--search 'merged:<窓>'` で取り直す。
 
 ## 5. PM 記録 (未再測定)
