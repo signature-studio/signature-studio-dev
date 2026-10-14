@@ -117,6 +117,7 @@
 
 - 測定 commit: `88711d17` (コードを変えた最後の commit)。実装 `7aece32c` に `origin/main` (`f59db604`) を merge した (競合は無し)。main 側の変更は 38 files (`tools/audio`・`tools/python`・`tools/shimx` など。`docs/DOC_MAP.md` を含む) で、`infra/pm-worker`・`.github`・`tools/pm` には入っていない (`git diff --name-only 7aece32c 88711d17 -- infra/pm-worker .github tools/pm` は 0 行)。
 - 範囲の差分: `git diff 7aece32c 88711d17 -- .github/prompts/pm.md .github/scripts/tests/` は 0 行。測定した pm.md と dispatch 文脈のテストは、実装の `7aece32c` と同じ内容。
+- 検証 HEAD までの差分 (測定 commit の後): `git diff 88711d17 86ab6cfc -- .github/prompts/pm.md .github/scripts/tests/` の出力は 0 行。検証 HEAD は `86ab6cfc` (`origin/main` (`0064cfbc`) の merge と `635d56f2` の docs 修正。どちらも pm.md とテストに触れていない)。この節を足す commit は `tools/pm/REPORT_APPENDIX_2349.md` (と PR 本文) だけを変える。その commit を HEAD にしても同じ diff は 0 行 (hash は PR コメントに書く)。
 - 判定の値: pm.md の率制限の条件 (5 件・30%・2 回連続・`rest_remaining` 1500) は `infra/pm-worker/src/ratealert.ts` (`RATE_MIN_COUNT = 5`・`RATE_MIN_PERCENT = 30`・`RATE_STREAK = 2`) と `ratelimit.ts` (`REST_REMAINING_MIN = 1500`) と一致する。
 - load average: 1 分値 (`/proc/loadavg`) の前後で測った。
 
@@ -127,4 +128,6 @@
 
 - ネガコン: なし。率制限の項目は文言の検査 (`test-dispatch-context.sh` の 8 件) だけで、PM run の判定を実行して確かめるものは無い。
 - 本番への影響: `infra/pm-worker/` の挙動は変えない (README の記述だけ)。launch は止まらない。pm.md の digest 節は次回の digest run (24 時間周期) から効く。
-- 未解決: 率制限の検知は digest の周期 (24 時間) でしか出ない。即時の通知は子 #3047 (`[CI-142]`・`watchdog.sh` に同型の alert を足す) で扱う。
+- 未解決: 率制限の検知は digest の周期 (24 時間) でしか出ない。
+  - 既存の即時通知は #2346 (`[CI-67]`・closed) の `notify-rate-limit.sh`。`record-run-outcome.sh` → `detect-rate-limit.sh` → `notify-rate-limit.sh` の経路で、直近 30 分に 5 件以上かつ完了 run の 30% 以上なら `[CI] 率制限` を起票・コメントする。この経路の残件は #2862 (`[CI-136]`・open・implement job に件数読み取り用の `RUNS_TOKEN` (actions:read) を渡す) と #2359 (`[CI-81]`・open・review/fix の job の最後に `detect-rate-limit.sh` を配線する)。
+  - #3047 (`[CI-142]`・`watchdog.sh` が `/status` を読んで digest を待たず通知する) は、この経路と同じ目的を二重に持つ。既定は #3047 を起票したまま残す (#2862・#2359 の経路に寄せるか、#3047 を別に持つかは PM 判断)。
