@@ -147,8 +147,44 @@ index 39480f0a..5a9c1929 100644
 - 測定に使った一時変更 (`M11_9B_SKIP`・`M11_NO_TBL` の define) は本 PR に含めない (`m11_ov.c` は commit 前に `git restore` で戻した)。
 - 注記: 本 run は REPORT の追記のみのコード差分 0 のため、再測定の commit 指定は §5 のまま。
 
-## 6. 差分 (測定 commit から本 PR の HEAD まで)
+## 5e. 修正 probe の ON/OFF 再測定 (#1642・測定 commit `91655f69`、tools/m11 の code は `4c2f69d1` と同一)
 
-測定 commit `1e3ee7af` から本 PR の HEAD までの `tools/m11` のコード差分は `probe_entry.py` の 1 行のみ (`(?:__lifted)?`。§5b の diff 参照)。`git diff 1e3ee7af HEAD -- tools/m11 ':(exclude)*.md'` は上記 1 hunk のみ。
+- 素材: fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (F1=902、errors=0)。build `M11_OV_CLASSCREATE=1`・`=0` とも rc=0 (signature mismatch 0・undefined 0)。
+- probe: `probe_entry.sh <tag> 407a50` (修正済み `[raw407]`: `rd64` 版。範囲外は `0xdead`)。ON・OFF とも全 942 unit の probe 版 survey。
+  - ON: `ok 869 / oob 14 / halt0 10 / miss 47 / other 1 / noproc 1`
+  - OFF: `ok 870 / oob 13 / halt0 10 / miss 47 / other 1 / noproc 1`
+  - probe 版は通常 build と結果が一致しない (§5b と同じ)。
+- unit 190 の `407a50` 入口 `arg1` (ON・OFF 共通): 0x404, 0x28, 0x16, 0x22, 0x88, 0x88 (ON はここで trap)。OFF はさらに 0x88, 0x3e, 0x40, 0x32, 0x16, 0x20, 0x28, 0x28, 0x20, 0x18, 0x44 と続く。
+- `[chain407]` の `m` (入口 5 件目 0x88): ON `0x10bbe510`、OFF `0x10bbe5a0` (差 0x90)。入口 1〜4 は ON/OFF で一致。
+- `[raw407]` の `[arg-8]` 値は全入口で `dead` (参照先が image 範囲外)。§5c の範囲外読みによる値は採らない。
+- watch 版 (`PROBE_WATCH=fa5310:18 probe_entry.sh onw all`): 全関数入口の probe。ok 839 / oob 47 と通常 build から大きく変わるため、書込元の判定には使えない (watch build は挙動を変える)。`[chg]` 22 件は未解析。
+- 未達 (受入条件 2〜4): ON で 1 ノードずれる書込元の特定、既存類型 (DEFECTS) への分類、ON の ok 退行 0。起票先: #1642 (次 run)。
+- 参考 (main 取り込み由来・測定 commit 外): `git diff 7e665077 91655f69 -- tools/m11 ':(exclude)*.md'` は 4 files (48 insertions, 3 deletions)。本 PR の変更ではなく main 側の変更で、`m11_build.sh` は `M11_TRACE_ISOLATE` (既定 1 = 従来どおり) と `M11_KEEP_BOOT_O` (既定 0 = 従来どおり) の分岐を追加、`probe_entry.sh` は `M11_KEEP_BOOT_O=1` を渡す 1 行のみ。既定値の経路は変わらない。ldfix の results (jsonl・tsv) は data。上の §5e は、この差分を含む code で測定した値。
+
+`probe_entry.sh` の `M11_KEEP_BOOT_O=1` は probe 測定の経路を変える (probe 版 boot.o を残す。旧版は build の `cc` で boot.o を上書きする)。そのため、下記の再測定で ON/OFF の値を取り直した (測定 commit `91655f69` = `tools/m11` の code が現 HEAD `4c2f69d1` と同一の状態)。
+
+- 測定 commit `91655f69` の再測定: `M11_OV_CLASSCREATE=1 probe_entry.sh <tag> 407a50` と `=0` を各 1 回 (IR は `m11_gen_ir2.sh` で再生成、rc=0、F1=902、errors=0)。
+  - ON: `ok 869 / oob 14 / halt0 10 / miss 47 / other 1 / noproc 1` (2 回目・3 回目で再現)
+  - OFF: `ok 870 / oob 13 / halt0 10 / miss 47 / other 1 / noproc 1`
+  - 上の旧経路の値と一致した。値は変わらない。
+- 1 回目の ON は `ok 136 / oob 8 / miss 797 / halt0 1` で、2 回目以降は再現しなかった。`m11_gen_ir2.sh` の直後、初回 build の直後に得た値。原因は未特定 (単発の異常値として記録する。ON の survey 値はこの 1 回を除く 2 回で判断した)。
+- 通常 build の対照 (probe 無し、`SV_RAW=1`、同一 restore 後の build): `ok 869 / miss 47 / other 1 / halt0 7 / oob 15 / abort 2 / noproc 1`。§5 の基準と一致。
+- 未達 (受入条件 2〜4): ON で 1 ノードずれる書込元の特定、既存類型 (DEFECTS) への分類、ON の ok 退行 0。起票先: #1642 (次 run)。
+
+```diff
+# tools/m11/m11_build.sh (抜粋)
++ -DM11_TRACE_ISOLATE=${M11_TRACE_ISOLATE:-1}
++ if [ "${M11_KEEP_BOOT_O:-0}" != 1 ] || [ ! -f work/obj/boot.o ]; then cc work/boot_final3.ll work/obj/boot.o; fi
++ if [ "$(cat work/ov_trace_isolate.stamp 2>/dev/null || echo 1)" != "${M11_TRACE_ISOLATE:-1}" ]; then rm -f work/obj/ov.o; fi
+# tools/m11/trap_triage/probe_entry.sh
+- bash m11_build.sh > work/probe/build_$tag.log 2>&1 || ...
++ M11_KEEP_BOOT_O=1 bash m11_build.sh > work/probe/build_$tag.log 2>&1 || ...
+```
+
+## 6. 差分 (§5e の測定 commit `91655f69` から本 PR の HEAD まで)
+
+測定 commit `91655f69` から本 PR の HEAD (`4c2f69d1`) までの `tools/m11` のコード差分は 0 行 (`git diff 91655f69 HEAD -- tools/m11 ':(exclude)*.md'`)。本 PR の変更は REPORT のみ。§5e の値は、この HEAD と `tools/m11` が同一の code で測定した値。
+
+参考 (測定 commit 外): `7e665077` から `91655f69` までの main 取り込み由来の `tools/m11` 差分は 4 files (48 insertions, 3 deletions)。内訳は §5e の diff (`m11_build.sh` の 2 分岐、`probe_entry.sh` の `M11_KEEP_BOOT_O=1` 1 行) と ldfix の results (jsonl・tsv、data)。
 - `git status --porcelain=v1 -- tools/m11`: 本 commit の時点で 0 行 (作業ツリーに tools/m11 の未コミット変更なし)。
 - `find tools/m11/trap_triage -type f -size +20M`: 0 件 (20MiB 超の blob なし)。
