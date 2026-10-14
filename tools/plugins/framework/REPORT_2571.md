@@ -1,6 +1,6 @@
 # #2571 REPORT — hs_e2e Phase B に framework 初期化 (TLS 初期化) を通す [PLG-P0b-22]
 
-既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID に一致する類型は無い。`0x4181e0` の `return 0` は既存の fail-soft stub (`fw_hostfix.py`)。戻り値の fold 欠陥は既存の #1890 / #2008 系)。
+既知類型との関係: 該当なし (`docs/DEFECTS.md` の既存 ID に一致する類型は無い。`0x4181e0` の `return 0` は既存の fail-soft stub (`fw_hostfix.py`)。戻り値の fold 欠陥は既存の #1890 / #2008 系 (CLOSED。追跡先は #2115))。
 
 親: #2115。前提の経緯は `REPORT_2115.md` と `REPORT_2115_APPENDIX.md` §10〜§11 (PR #2572)。
 
