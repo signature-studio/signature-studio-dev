@@ -47,7 +47,7 @@ python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # wall は stderr �
 - 0x959a40 は chunk 1 (`vas[400:800]`) の shard 4 (`[4::12]`・33 関数) に入り、その 29 番目 (前置 28 関数)。
 - **SHARD (`ld122_origin.py`) の導出**: `liftdiff.py` の `cmd_batch` は chunk ごとに `run_functions(part)` を呼び、shard k は `part[k::12]` (`ldlib/session.py`)。jsonl は part の順 (chunk 内の sort 順) に書かれるので、jsonl の 401〜800 行の `[4::12]` が shard 4 になる。次の 1 コマンドで先頭の 29 件を出し、driver の `SHARD` (29 件目が 0x959a40) と一致することを確かめる。
   ```sh
-  sed -n '401,800p' work/m11/batch_final_r1.jsonl | python3 -c "import sys,json; rs=[json.loads(l)['va'] for l in sys.stdin]; print(' '.join(rs[4::12][:29]))"
+  sed -n '401,800p' work/m11/batch_final_r1.jsonl | python3 -c "import sys,json; rs=[json.loads(l)['function']['va'] for l in sys.stdin]; print(' '.join(rs[4::12][:29]))"
   ```
   - 本 REPORT の作成 run では jsonl と `work/m11/sigs.json` が素材に無く、このコマンドは**実行していない** (動かしていない)。`SHARD` の値は driver に手で置いたもので、この照合は未実施。
 - 同じ runner で前置列を流し直した replay (`R_shard4_replay`) も `mismatch` (§4)。全体 run の 0x959a40 の結果は、この runner の状態で決まる。
@@ -91,5 +91,5 @@ python3 ld122_origin.py > results/ld122_959a40_origin.tsv   # wall は stderr �
 ## 6. 差分
 
 - 前段 `5d88dda2` → 測定 commit `4efe8c5b`: `git diff 5d88dda2 4efe8c5b -- tools/liftdiff` は新規ファイル `tools/liftdiff/ld122_origin.py` のみ (ldlib・rt・liftdiff.py は変更 0 行)。
-- 測定 commit → HEAD のコード差分: `git diff 4efe8c5b HEAD -- tools/liftdiff/ld122_origin.py tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/liftdiff.py | wc -l` = 0 (本付録と results の追加のみ)。
+- 測定 commit → HEAD のコード差分: `git diff 4efe8c5b HEAD -- tools/liftdiff/ld122_origin.py tools/liftdiff/ldlib tools/liftdiff/rt tools/liftdiff/liftdiff.py | wc -l` = 0 (出力 0 行。main 取り込み後の HEAD でも 0 行。本付録と results の追加のみ)。
 - 生ログ (`work/`) は gitignore 対象のため repo には入れていない。集計は `results/ld122_959a40_origin.tsv` (コミット済み)。
