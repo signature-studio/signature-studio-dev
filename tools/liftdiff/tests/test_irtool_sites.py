@@ -3,7 +3,7 @@
 
   python3 tools/liftdiff/tests/test_irtool_sites.py     # 全 PASS で exit 0、1 件でも FAIL なら exit 1
 
-(1) 関数先頭の dec_label_pc_ の直後の import call・br にも site store が入る (PR #2810 レビュー blocking 1)。
+(1) 関数先頭の dec_label_pc_ の直後の import call・br にも site store が入る。
     正例 = function_1c0b6c の先頭 HeapFree と先頭 br。ネガコン = 先頭 call の site store を外すと FAIL。
 (2) define ごとに VA を戻す: dec_label_pc_ で始まらない先頭 block の site は記録せず、前の関数の VA を付けない。
 (3) sites=False では site store が 1 件も入らない (既定 build と差が無いこと)。

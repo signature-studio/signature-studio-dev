@@ -4,14 +4,14 @@
 
 既知類型との関係: 該当なし (本付録の対象は IR への観測 store の計装で、lift 出力の意味誤りを指す `docs/DEFECTS.md` の D1a〜D23 のいずれにも当たらない)。
 
-## 修正 (レビュー round 2 への対応)
+## 修正 (測定 commit の変更)
 
 - 修正 commit `ed712942` (測定 commit):
-  - blocking 2: `irtool.py` で、BLK_RE に一致しない block 境界 (`; <label>:N`・`dec_label_pc_<VA>.<suffix>:`) から次の `dec_label_pc_` までの site を記録しない。VA と ord を解除し、件数を `sites skipped` に数える。BLK_RE (LD-64) は変えていない。
-  - blocking 3: `decode_sites.py` の ord 判定を、呼び出し先の block 記録を挟める形にした。site の VA (下位 32 bit) で戻り先を解決し、戻り先より上の block は呼び出し先として閉じる。B の VA (33 bit) と site の VA の桁を揃える。
-  - minor b: `build_wasm.py` で `site_trace` は `block_trace` 必須 (無ければ終了)。
+  - 境界: `irtool.py` で、BLK_RE に一致しない block 境界 (`; <label>:N`・`dec_label_pc_<VA>.<suffix>:`) から次の `dec_label_pc_` までの site を記録しない。VA と ord を解除し、件数を `sites skipped` に数える。BLK_RE (LD-64) は変えていない。
+  - ord 判定: `decode_sites.py` の ord 判定を、呼び出し先の block 記録を挟める形にした。site の VA (下位 32 bit) で戻り先を解決し、戻り先より上の block は呼び出し先として閉じる。B の VA (33 bit) と site の VA の桁を揃える。
+  - `build_wasm.py`: `site_trace` は `block_trace` 必須 (無ければ終了)。
 - 追加 commit `21194fc0` (テストのみ): 呼び出し先が 2 site を持つ正例。
-- blocking 3 の前提: ord 連番は「記録の欠落」の検査として使えない。呼び出し先の block 記録が戻りの印無しで挟まるため。今の検査は VA による戻り先の解決に依る。同じ VA の再帰呼出しでは戻り先を誤りうる (§6)。
+- ord 連番の前提: ord 連番は「記録の欠落」の検査として使えない。呼び出し先の block 記録が戻りの印無しで挟まるため。今の検査は VA による戻り先の解決に依る。同じ VA の再帰呼出しでは戻り先を誤りうる (§6)。
 - 単体テスト (`python3 tools/liftdiff/tests/test_irtool_sites.py`): 11 件 PASS (`21194fc0`)。ネガティブコントロール: 旧版 (`irtool.py`・`decode_sites.py` とも `a14de29c`) に同じテストを当てると 3 件 FAIL (境界の skip・呼び出し先の正例・VA 未解決の NG)。
 
 ## 結論
@@ -19,10 +19,10 @@
 - 受入条件 1 (方式の決定と実装) は**部分達成**。方式は「IR 側の site 記録」: block 内の conditional br と import call の直前に volatile store を入れ、block VA・種別・block 内の順番・br の条件値を記録する。
   全命令の VA は RetDec IR に無い (`tools/ott/work/ott.ll` に命令単位の VA 注記は無く、`dec_label_pc_` は block 先頭の 1943 件のみ)。命令単位の完全な trace は未達で、子 #2801 (LD-131) に切り出す。
 - 既定 build との差 0: `results/ld67/compare_blk.py` の 12 case で `cases=12 diff=0` (測定 commit `ed712942`・2 回)。block 件数は LD-67 と一致 (vm0 の 27・287・42・304)。
-- 境界の修正 (blocking 2) で、`ott.ll` の `; <label>:N` と `.threadK` 形式の block の site 21 件は記録されなくなった (前版の 22 件のうち 1 件 (`1c5e84` vm0 の `C801c2173.1`) など、VA の帰属を誤っていた site)。
+- 境界の修正 (`ed712942`) で、`ott.ll` の `; <label>:N` と `.threadK` 形式の block の site 21 件は記録されなくなった (前版の 22 件のうち 1 件 (`1c5e84` vm0 の `C801c2173.1`) など、VA の帰属を誤っていた site)。
 - 受入条件 2 (1c0b6f・1c0b82 の wasm 側の位置) は **site 単位で対応付けた**。vm0 の `1c0b6c` の br は 5 回とも native の `je` (1c0b6f) の成立・不成立と一致し、HeapFree の call site は 1 回で native (vm0) の 1 回と一致する (§4)。
 - u16 は、前版 (`a14de29c`) では `1c0b71` の HeapFree で shim の trap により止まっていた。main の shim 修正 `a4a620a9` (#2802・PR #2846) を取り込んだ後は trap せず、block 列が最後まで取れる。native (u16) と同じ 5 回の HeapFree を wasm 側でも記録する (§4・§5)。
-- 残り 5 関数 (受入の範囲外) は #2193 (LD-84)。
+- 残り 5 関数 (受入の範囲外) の native 対応は `REPORT_APPENDIX_LD84.md` を参照 (#2193 は CLOSED)。
 
 ## 1. 測定条件
 
@@ -32,7 +32,7 @@
 - 素材: `work-m6-ott` (`tools/ott/work/ott.ll`・`tools/m6/work`・`tools/m8/work`・`tools/m9/work`・`tools/m10/work`)・`work-liftdiff` (`tools/liftdiff/work/`)・`analysis-ott-binaries` (`[ANALYSIS-PLUGINS]` の `ott/binaries/`。`PLUGINS_DIR=[ANALYSIS-PLUGINS]`)・emcc は既存の emsdk (`[EMSDK]`)。`toolchain-emsdk` は展開していない。
 - build: `python3 ldlib/build_wasm.py targets/ott_old_site.json --force` (rc 0・`sig_mismatch` 0・`undefined` 0・stderr `[irtool] sites skipped (block without dec_label_pc_ VA): 21`)。既定版は `targets/ott_old.json --force` (rc 0・`sig_mismatch` 0・`undefined` 0)。
 - run: `python3 liftdiff.py run targets/ott_old_site.json --fn 0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc --pattern vm0,u16 --nobuild --notrace --json <out>` (既定版は `targets/ott_old.json` で同じ引数)。r1・r2 の 2 回。
-- 比較: `python3 results/ld67/compare_blk.py work/ld83/head_def_r<k>.json work/ld83/head_site_r<k>.json` (`k`=1,2)。両方 `cases=12 diff=0`。site JSON と既定 JSON は r1 と r2 でバイト一致 (`cmp`)。
+- 比較: `python3 results/ld67/compare_blk.py work/ld83/head_def_r<k>.json work/ld83/head_site_r<k>.json` (`k`=1,2)。両方 `cases=12 diff=0`。計装版の JSON と既定版の JSON は、それぞれ r1 と r2 でバイト一致する (`cmp`)。計装版と既定版の内容は site 記録の分だけ異なる。
 - 内訳: `python3 results/ld83/decode_sites.py work/ld83/head_site_r<k>.json --seq 15` (`--seq` の列は §4)。ord 欄が全 case `ok`。
 - 単体テスト: `python3 tools/liftdiff/tests/test_irtool_sites.py` → 11 件 OK。
 
@@ -69,7 +69,7 @@
 
 `cases=12 diff=0`。blocks の vm0 の列 (27・287・42・304) と 1c682c u16 (43) は LD-67 の `blk` 件数 (27・4・287・6・42・43・304・10) と一致する。LD-67 の u16 の残り (4・6・10) は shim の trap で止まった値で、§3 の (c) のとおり変わった。`sites skipped`: 21 (`ott_old_site` の build の stderr)。
 
-- 前版 (`a14de29c`) からの変化: (a) site 数: 1c5e84 vm0 22→21、1c621c vm0 189→188、1c682c vm0 39→38 (u16 40→39)、1c69cc vm0 204→202。境界の 1 件 (`C801c2173.1`・`; <label>:25` の `SetLastError`) を VA 付きで数えていたため。(b) ord: 前版は 5 case が NG。境界の修正だけでは 5 case とも NG のまま (レビュワーの試験・本 run では未再現)。呼び出し先の戻りを扱う ord 判定で 5 case とも ok になった。(c) u16: outcome が `wasm_trap` → `diff`、blocks が 4・6・10 → 67・337・354 (shim の trap が main の `a4a620a9` で消えたため。既定版も同じ outcome で、計装の差ではない)。
+- 前版 (`a14de29c`) からの変化: (a) site 数: 1c5e84 vm0 22→21、1c621c vm0 189→188、1c682c vm0 39→38 (u16 40→39)、1c69cc vm0 204→202。境界の 1 件 (`C801c2173.1`・`; <label>:25` の `SetLastError`) を VA 付きで数えていたため。(b) ord: 前版 (`a14de29c`) は 5 case が NG だった。原因は呼び出し先の block 記録が挟まる場合の期待値のずれで、戻り先を VA で解決する今の判定では 5 case とも ok になった。(c) u16: outcome が `wasm_trap` → `diff`、blocks が 4・6・10 → 67・337・354 (shim の trap が main の `a4a620a9` で消えたため。既定版も同じ outcome で、計装の差ではない)。
 
 ord 判定の制約: 呼び出し先の block が同じ VA (再帰呼出し) の場合は、戻り先を誤って解決しうる。実データ 12 case では全て ok (再帰の有無は未確認)。
 
@@ -94,9 +94,8 @@ ord 判定の制約: 呼び出し先の block が同じ VA (再帰呼出し) の
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 命令単位の完全な trace (RetDec IR に命令の VA が無い。方式は RetDec 側の変更か x64c の別経路かの PM 判断が要る) | site 単位でしか native 命令と対応しない。受入 1 の残り | #2801 (LD-131) |
-| `dec_label_pc_` 以外の block 境界 (`; <label>:N`・`.<suffix>`) の site は記録しない (`ott_old_site` で 21 件・VA 不明) | その block の site は trace に現れない。site 数は `sites skipped` で確認できる | PM 判断 (未起票) |
-| ord 判定の再帰呼出しでの解決誤り (同じ VA の block が積まれる場合) | 実データ 12 case は ok。再帰の有無は未確認 | PM 判断 (未起票) |
-| 残り 5 関数の native 対応 | 受入の範囲外 | #2193 (LD-84) |
+| `dec_label_pc_` 以外の block 境界 (`; <label>:N`・`.<suffix>`) の site は記録しない (`ott_old_site` で 21 件・VA 不明) | その block の site は trace に現れない。site 数は `sites skipped` で確認できる | #2801 (LD-131) にコメント |
+| ord 判定の再帰呼出しでの解決誤り (同じ VA の block が積まれる場合) | 実データ 12 case は ok。再帰の有無は未確認 | #2801 (LD-131) にコメント |
 
 ## 7. 測定 commit と差分
 
