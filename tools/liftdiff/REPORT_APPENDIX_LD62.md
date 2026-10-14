@@ -60,7 +60,7 @@ trace 先頭 (`t[0]` は hex 文字列。全文は results 側):
 1. `python3 tools/m11/m11_sdiv_variant.py`: 素材 `work-m11` の `tools/m11/work/boot_final3.ll` を読む。行 125366 が `  %29 = udiv i64 %28, %arg4` と一致するのを確かめてから、その 1 行だけ `sdiv` に変えた `tools/m11/work/boot_final3_sdiv.ll` を書く。`tools/liftdiff/targets/m11.json` の `name` を `m11_sdiv`、`ir` を上の IR に差し替えて `tools/liftdiff/work/m11_sdiv/target.json` を書く。
 2. harness `trace_417b70_sdiv_rerun.py` が 1 を呼び、`m11_sdiv` を `build_wasm.build` でビルドしてから、udiv 版 (`work/m11`) と sdiv 版を同じ 8 入力で流す。
 
-### 再実行の実測 (測定 commit: 本 PR の HEAD)
+### 再実行の実測 (測定 commit: `dfab4e7f`。以後 HEAD `018993a7` までのコード差分は 0 行、main 取り込みのみ)
 
 - 素材: `fl-win64` は `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`、`work-m11` と `work-liftdiff` は worktree の `tools/m11/work/`・`tools/liftdiff/work/` に展開。
 - 再現コマンド: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/liftdiff/tests/trace_417b70_sdiv_rerun.py > tools/liftdiff/results/m11_417b70_sdiv_rerun.md` (rc=0・所要 19.7 秒・load 0.22 (起動 8 分後の 1 分値))。
