@@ -65,7 +65,7 @@ const EXISTING_KEYS = [
   "sync_truncated", "last_full_sync_rest_calls", "last_full_sync_comment_rest_calls", "comment_window_h", "comment_max_pages",
 ];
 const ADDED_KEYS = [
-  "last_webhook_at", "last_dispatch_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
+  "last_webhook_at", "last_dispatch_at", "last_digest_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
   "last_redeliver_scan", "hook_failed_last_scan",
   "demoted_reason", "shadow",
   // 自律運転の指標 (#2335)
