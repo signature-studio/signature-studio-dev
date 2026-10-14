@@ -82,28 +82,10 @@ def pe_bytes(pe, va, n):
 THUNK_HDR = re.compile(r'^([\w \*]+?\s*\n?\s*)thunk_FUN_([0-9a-f]+)(\([^;{}]*\)\s*\n\s*\{)', re.S | re.M)
 
 
-def thunk_targets(texts):
-    """jmp thunk は定義ヘッダが thunk_FUN_<飛び先 X> になる。{thunk の VA: X} を返す (定義ヘッダだけを見る)。"""
-    out = {}
-    for va, t in texts.items():
-        m = THUNK_HDR.search(re.sub(r'/\*.*?\*/', '', t, flags=re.S))
-        if m:
-            out[va] = int(m.group(2), 16)
-    return out
-
-
-def thunk_call_target(X, thunk_of, caller):
-    """本体の呼出 thunk_FUN_<X> の写し先 (thunk の VA)。X を飛び先に持つ thunk が 1 つだけのときに限る (fail-closed)。"""
-    ts = [T for T, x in thunk_of.items() if x == X]
-    if len(ts) != 1:
-        raise SystemExit('thunk_FUN_%x の呼出 (in FUN_%x) の写し先が一意に決まらない: 候補 %d 件 (停止)' % (X, caller, len(ts)))
-    return ts[0]
-
-
-def rewrite_thunks(t, va, thunk_of):
-    """関数 va の本文 (コメント除去済み): 定義ヘッダの thunk_FUN_<X> だけを FUN_<va> にし、本体の呼出 thunk_FUN_<X> は写し先 thunk の FUN_<T> にする。"""
+def rewrite_thunks(t, va):
+    """関数 va の本文 (コメント除去済み): 定義ヘッダの thunk_FUN_<X> は FUN_<va>、本体の呼出 thunk_FUN_<X> は飛び先の FUN_<X> (jmp thunk なので同じ動作)。"""
     t = THUNK_HDR.sub(lambda m: m.group(1) + 'FUN_%x' % va + m.group(3), t, count=1)
-    return re.sub(r'\bthunk_FUN_([0-9a-f]+)\b', lambda m: 'FUN_%x' % thunk_call_target(int(m.group(1), 16), thunk_of, va), t)
+    return re.sub(r'\bthunk_FUN_([0-9a-f]+)\b', r'FUN_\1', t)
 
 
 def infer_type(lines, sym):
@@ -163,11 +145,10 @@ def main():
     protos = []
     bodies = []
     abi_hits = {}
-    thunk_of = thunk_targets(src)
     for va in vas:
         t = src[va]
         t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
-        t = rewrite_thunks(t, va, thunk_of)
+        t = rewrite_thunks(t, va)
         t = re.sub(r'undefined1 (auVar\d+) \[16\];', r'V128 \1;', t)
         if tbase is not None:
             t = re.sub(r'&UNK_([0-9a-f]{8,9})\b', lambda m: '((unsigned char*)gt_%x + 0x%x)' % (tbase, int(m.group(1), 16) - tbase), t)
