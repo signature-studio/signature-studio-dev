@@ -98,7 +98,7 @@
 
 ## 8. 3 回目 run: c589b0 の 12 site を到達不能と確定 (NO_CONSUMER)・128f9e0 は子 issue #2679 へ (LD-104 継続)
 
-- 測定の基点: origin/main `927cd651`。測定 commit (コードを変えた最後の commit): `c00fa9f3` (`ld104_reach.py` の枝刈りを読み値 v から算出し、支配・外部分岐の測定を追加)。`git diff c00fa9f3 HEAD -- tools/m11/ldfix` は本 REPORT と `results/candidate_verdicts_1161.jsonl` の c589b0 の 12 行の evidence 文だけ (verdict・status は不変)。
+- 測定の基点: origin/main `927cd651`。測定 commit (コードを変えた最後の commit): `ee237f22` (`ld104_reach.py` の到達探索の上限を config endAddr にし、(d) の測定を追加。前版は `c00fa9f3`)。`git diff ee237f22 HEAD -- tools/m11/ldfix` は本 REPORT (`REPORT_2288.md`) だけ。コードと結果 TSV の差分は 0。
 - 素材: `work-m11` を `M11_WORK=<主 checkout>/tools/m11/work` で読み取り専用に参照 (worktree には展開していない)。fl-win64 は未使用。
 
 ### 8-1 IR 側の欠落 (事実)
@@ -110,6 +110,7 @@
 ### 8-2 到達性 (枝刈りは c59271 の読み値 v から算出)
 
 - c59271 `mov eax,[FLAG]` の後、eax は v-6 (c5927c `je c59299`)・v-10 (c59283 `je c5a7b8`)・v-11 (c5928e `jne c5d220`) で判定される。枝刈り (`prune_for_v`) は v から機械的に決める。v=8 は §8-3 (a) で確定する。
+- 到達探索の上限は config の endAddr (c589b0: `c5d649`・128f9e0: `1294ab8`)。前版の固定 0x8000 を廃止した。site の到達は前版と変わらず (`ld104_reach.tsv` は cmp 一致)。c589b0 の CFG 到達命令数は枝刈り無し 3477→3470・枝刈り後 468→461 (endAddr 外へ出る 7 命令を除外)。
 - 結果 (`results/ld104_checks.txt` から転記。12 site = c589b0 の site 数):
 
 | 読み値 v / 枝刈り | 到達 site |
@@ -130,6 +131,7 @@
 - (a) 支配: 入口から c59271 は到達する (Y)。c59182 を除くと c59271 は到達しない (N)。c5918c も同様 (Y → N)。
 - (b) c5918c〜c59271 の call: 0 件 (線形逆アセンブル)。
 - (c) config 関数 8227 本 (`boot*.drc.config.json`・開始番地で統合) の全命令で、c5918c〜c59277 の外から内への直接分岐・call は 0 件 (直接分岐・call 61325 件を走査)。
+- (d) 外から c589b0 本体 (c589b0〜c5d649) への直接分岐・call: 入口 c589b0 への呼出しが 1 件 (`125338d` の call・呼出し元は config 関数 1253260〜1253517)、入口以外の本体への分岐・call は 0 件。入口への呼出しは通常の呼出しで、(a) は入口を起点に測っているため結論は変わらない。間接分岐・call (config 内 4250 件) は範囲外。
 - FLAG (VA 0x1504dd4) を rip 相対で指す命令 (config 全関数): 書込み 1 件 (c59182 `mov dword ptr [rip+..], 8`)、読み 4 件 (c591a9・c591d4・c59208・c59271)、アドレス取得 (lea) 0 件。
 - 結論: c59271 が読む値は、そこへ至るどの経路でも c59182 の書込み値 8 である (c59182 が必ず先行し、その間に書込みも call も無い)。
 
@@ -142,9 +144,11 @@
 
 ### 8-5 検証
 
-- `M11_WORK=<主 checkout>/tools/m11/work python3 tools/m11/ldfix/ld104_reach.py`: rc=0・1.2 s。出力は `results/ld104_reach.tsv` (前版と cmp 一致) と `results/ld104_checks.txt`。
+- `M11_WORK=<主 checkout>/tools/m11/work python3 tools/m11/ldfix/ld104_reach.py`: 測定 commit `ee237f22` で rc=0。出力 `results/ld104_reach.tsv`・`results/ld104_checks.txt` と cmp 一致。
 - 負の対照: v=6 の枝刈りで 4/12 が届き、v=8 で 0/12 になる (分岐の判定 1 件で到達が変わる)。
-- e2e (`audit_lsf_ssa_e2e.sh`): 本 fix では再実行していない。`ld104_reach.py` は e2e から呼ばれず、e2e の入力 (`results/spill178_1161.tsv`・`drops_510.tsv`) は変更していない。直前 run の値 (2m44s・load average 0.94・確定 109 / 判定不能 16 / 未判定 53) は §8 の前版と同じ。
+- e2e (`audit_lsf_ssa_e2e.sh`): 測定 commit `ee237f22` (HEAD 上で実行) で再実行。`RUNNER_TEMP=/home/runner/work/_temp`・`M11_WORK`・`LD_WORK` は主 checkout に展開済みの `tools/m11/work`・`tools/liftdiff/work` を読み取りだけに使った。rc=0・2m31s・7/7 完了・終了直後の 1 分 load average 0.83。`drops_510.tsv` と `spill178_1161.tsv` は `results/` と cmp 一致 (差分 0)。集計 (7/7): 確定 109 / 判定不能 16 / 未判定 53、脱落関数の和集合 69。
+- spill178 の c589b0 の 12 行 (未判定 → 確定) は `c7f36256` の e2e で `results/` に反映済み (rc=1 → 新出力で置換 → cmp OK)。`candidate_verdicts_1161.jsonl` は `c7f36256` と HEAD の比較で evidence 文 (12 行) だけが変わり、evidence 以外の差分は 0 (verdict・status は不変)。
+- e2e の 7 step は `ld104_reach.py` を呼ばない。
 
 ### 8-6 新類型候補 (DEFECTS.md 形式の行案・PM 判断)
 
