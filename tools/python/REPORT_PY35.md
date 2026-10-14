@@ -5,7 +5,7 @@
 ## 結論
 
 - patterns の未実装 31 関数は、C provider・mock ともに実装 0 件 (`provider/fl_engine.c` に `FL_H(patterns, *)` 無し、`host/fl_mock.mjs` に patterns 定義無し)。
-- 意味論の根拠は repo 内に無い。`analysis/flapi/flapi_table.json` は docstring 1 行と署名のみ、`analysis/flapi/FLAPI.md` は件数表のみ。
+- 意味論の根拠は repo 内に無い。`tools/python/analysis/flapi/flapi_table.json` は docstring 1 行と署名のみ、`tools/python/analysis/flapi/FLAPI.md` は件数表のみ。
 - 実機 (FL 26.1.7 `fl-win64`) の逆解析無しに戻り値・副作用を決めると推測実装になるため、本 PR ではコードを変えない。
 - 31 件を読み取り系 14 件と、選択・移動・書き込み系 17 件に分けて子 issue に分割する。
   - 読み取り系: #1667 (`[PY-42]`)
@@ -13,7 +13,7 @@
 
 ## 分類
 
-分類は `analysis/flapi/flapi_table.json` の署名と docstring (動詞) に基づく。実機で副作用が無いと確かめたものではない。
+分類は `tools/python/analysis/flapi/flapi_table.json` の署名と docstring (動詞) に基づく。実機で副作用が無いと確かめたものではない。
 
 ### 読み取り系 (14) → #1667
 
