@@ -3,7 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py <VA(16進)> [<VA(16進)> ...]
 
-例: pe_rip_refs.py 0x154528c   (selectAll の *p の指す int32 を参照する命令)
+例: pe_rip_refs.py 0x15e3a60   (selectAll の *p を格納するスロット。0x154528c は RIP 相対の直接参照が 0 件で hits 0 になる)
 出力: 命令アドレス・命令・参照先 VA。書込み/読込みの区別は行わない (mnemonic と先頭オペランドで目視する)。
 
 線形走査: 復号できないバイトは 1 バイト進めて再同期する (pe_scan_store.py と同じ方式)。
