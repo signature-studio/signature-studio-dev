@@ -31,14 +31,11 @@ def first_diff(a, b):
     return i
 
 
-def parse_trace(head, cnt):
-    out = []
-    for t in head:
-        try:
-            out.append(int(t[0], 16))
-        except (TypeError, ValueError, IndexError):
-            cnt['bad_trace_entry'] += 1
-    return out
+def parse_trace(head):
+    try:
+        return [int(t[0], 16) for t in head]
+    except (TypeError, ValueError, IndexError):
+        return None
 
 
 def main():
@@ -52,8 +49,11 @@ def main():
         c = cs[0]
         if not (c.get('wasm_detail') or '').startswith('unreachable') or c.get('wasm_status') == 'badjson':
             continue
-        N = parse_trace(c['raw']['native']['trace_head'], cnt)
-        W = parse_trace(c['raw']['wasm']['trace_head'], cnt)
+        N = parse_trace(c['raw']['native']['trace_head'])
+        W = parse_trace(c['raw']['wasm']['trace_head'])
+        if N is None or W is None:
+            cnt['bad_trace_case'] += 1
+            continue
         i = first_diff(N, W)
         if i == 0 or (i == len(N) == len(W)) or N[i - 1] != ENTRY:
             continue
@@ -76,7 +76,7 @@ def main():
     print('|---|---:|')
     print('| thunk 除去後も trace_head 内で食い違う | %d |' % cnt['diverge_after_thunk'])
     print('| trace_head (最大 12 件) の上限で判定不能 | %d |' % cnt['cap_limited'])
-    print('| 解析不能として除外した trace_head 要素 | %d |' % cnt['bad_trace_entry'])
+    print('| trace_head に解析不能要素があり丸ごと除外したケース (N/W いずれか) | %d |' % cnt['bad_trace_case'])
     print('')
     print('| 直前の共通 entry (L2) | native 次 entry | wasm 次 entry | 件数 |')
     print('|---|---|---|---:|')
