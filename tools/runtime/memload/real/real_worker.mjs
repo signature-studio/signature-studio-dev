@@ -1,5 +1,5 @@
 // RT-6 実 loader 試験 (#125): PluginPool (src/runtime/memory_budget.ts) を hostbridge の実 loader に接続する Worker。
-// 実 loader = host_vst2.wasm の LoadLibraryW / FreeLibrary (hb_bridge.mjs) で、lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
+// loader = host_vst2.wasm + hb_bridge.mjs の LoadLibraryW / FreeLibrary (LoadLibraryW の採番だけ PoolBridge で置換)。lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
 // PluginPool 経由で pin / unpin / LRU 追い出しする。判定は run_real.mjs 側。
 import { ModuleTable, HostBridge, EmscriptenGuest, HMODULE_BASE } from "./hb_bridge.mjs";
 import { PluginPool, MemoryBudget, DEFAULT_PLUGIN_CAPACITY } from "./memory_budget.js";
@@ -72,7 +72,7 @@ async function runCase(mode) {
   });
 
   // OTT は block 間で DSP 状態を持つ。bit 一致を見られるのは cold ロード直後の初回 block だけ (基準 = 最初の cold ロード)。
-  // warm pin (追い出されず残っていた instance) は、出力ではなくパラメータの読み戻しで instance の取り違えを見る。
+  // warm pin (追い出されず残っていた instance) は出力を照合せず、param 0 の読み戻しで生存だけを見る (全 instance が同じ値を持つため取り違えは検出しない)。
   const use = async (k, held) => {
     const before = R.loads;
     const h = await pool.pin(`p${k}`);

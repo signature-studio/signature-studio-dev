@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // RT-6 実 loader 試験 (#125) 1 コマンド: `node tools/runtime/memload/real/run_real.mjs [--neg-only|--pos-only]`
-// PluginPool を hostbridge の実 loader (host_vst2.wasm の LoadLibraryW/FreeLibrary) に接続し、lowbase 版 OTT を
+// PluginPool を hostbridge の loader (host_vst2.wasm + hb_bridge.mjs。LoadLibraryW の採番だけ PoolBridge で置換) に接続し、lowbase 版 OTT を
 // 150 種 + 320 pin で回す。各ケースは新しい headless Chrome (= 新しいレンダラ)。判定が崩れたら exit 1。
 // ネガティブコントロール (NEG) は「壊すと OOM / 判定 FAIL になる」ことを確認し、検出しなければ exit 1。
 // 前提: bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh (lowbase 版 OTT) と retdec/build_host_lb.sh (host_vst2.wasm)。
@@ -48,7 +48,7 @@ const isOom = (e) => !!e && /could not allocate memory|Out of memory/i.test(e.me
 const checks = {
   pos: (r) => {
     const f = [];
-    if (r.fatal || r.err) f.push(`例外 ${JSON.stringify(r.err)} (ロード ${r.loads} 回目${r.atLoad != null ? "" : ""})`);
+    if (r.fatal || r.err) f.push(`例外 ${JSON.stringify(r.err)} (ロード ${r.loads} 回目)`);
     if (r.pins !== PINS) f.push(`pins=${r.pins} != ${PINS}`);
     if (r.loads <= NATIVE_LIMIT) f.push(`累計ロード ${r.loads} がネイティブ上限 ${NATIVE_LIMIT} を超えていない (追い出しが効いていない)`);
     if (r.loads !== r.evictions + r.finalSize) f.push(`loads(${r.loads}) != evictions(${r.evictions}) + 生存(${r.finalSize}) (追い出し以外で entry が消えた/残った)`);
@@ -56,7 +56,7 @@ const checks = {
     if (r.finalInUse !== r.finalSize) f.push(`枠と entry の不一致 inUse=${r.finalInUse} size=${r.finalSize}`);
     if (r.coldLoads !== r.loads) f.push(`cold 照合 ${r.coldLoads} 件 != ロード ${r.loads} 件 (照合されていないロードがある)`);
     if (r.hashMismatch !== 0) f.push(`cold ロード直後の出力 sha256 が基準と不一致 ${r.hashMismatch} 件 (基準 ${r.refHash?.slice(0, 16)})`);
-    if (r.paramMismatch) f.push(`warm pin でパラメータ読み戻しが不一致 ${r.paramMismatch} 件 (instance の取り違え疑い)`);
+    if (r.paramMismatch) f.push(`warm pin で param 読み戻しが不一致 ${r.paramMismatch} 件 (instance の状態喪失疑い)`);
     if (r.handleMismatch !== 0) f.push(`hostbridge の handle と pool の対応が崩れた ${r.handleMismatch} 件`);
     if (!r.refHash) f.push("出力 sha256 の基準が無い");
     if (r.bridgeLoaded !== r.finalSize || r.bridgeHandles !== r.bridgeLoaded) f.push(`bridge の登録数 ${r.bridgeLoaded} / 一意 handle ${r.bridgeHandles} が生存 entry ${r.finalSize} と一致しない`);
