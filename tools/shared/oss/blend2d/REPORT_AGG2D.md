@@ -221,3 +221,7 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 - 78 関数の役割と、各関数が呼ぶ Blend2D API の名前 (export・シンボル無し)。
 
 **判断への影響**: (a) の既定案 (glue のみ C++ 再実装) の範囲は「FL が呼ぶ slot 集合」と「各 slot の呼び先 Blend2D 内部関数」で決まる。前者は静的測定では決まらず、実行時の vtable 呼び出し記録が要る。その記録は FLEngine の boot が最初のウィンドウに届くことが前提で (`tools/flelift/boot/REPORT.md` §9 は unit 209 で停止)、(b) の画素比較と同じ依存。(a) と (b) は boot の進行に依存し、本 issue 単独では前進しない。
+
+## 15. x64c の未対応 6 mnemonic の被覆 (#3138)
+
+結論: 閉包 50 の unsup_sites は **13 → 0**。差分試験は 44 PASS / 0 FAIL (新規 9 件)。FLEngine の lift 出力は変更前後でバイト一致。製品 KPI (起動・GUI) は未測定。閉包別の表・ネガティブコントロール・diff の詳細は `REPORT_APPENDIX_AGG2D.md` §15。
