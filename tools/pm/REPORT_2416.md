@@ -29,6 +29,7 @@ git diff --stat 815eb526 199bbc02                                               
 
 - `815eb526..199bbc02` の commit は `199bbc02` の 1 件 (README の 1 行の文言修正)。`src/`・`test/` の差分は 0 行。
 - よって測定したテストとコードは、検証 HEAD と同一。測定は docs の commit より前に行った。
+- 本付録を追記した後の HEAD (`345eb75f`) でも `git diff 815eb526 345eb75f -- infra/pm-worker/src infra/pm-worker/test | wc -l` は 0 (追記後に再確認)。同じ HEAD で `npm test` を 1 回再実行: 149 pass / 0 fail、wall 13.64 s、`# duration_ms` 13460.8 (§1 の n=3 とは別の確認)。
 
 ### 0-3 取得方法
 
@@ -61,7 +62,7 @@ git diff --stat 815eb526 199bbc02                                               
 | **min–max** | **2.52–2.53** | **1.44–1.45 s** | 4 / 0 (3 回とも) | — |
 
 - vitest の `Test Files  1 passed (1)`・`Tests  4 passed (4)` (3 回とも)。
-- wall (約 2.5 s) と vitest の `Duration` (約 1.4 s) は別の量。1 つの値に丸めて書かない。
+- wall (2.52–2.53 s) と vitest の `Duration` (1.44–1.45 s) は別の量。1 つの値に丸めて書かない。
 
 ## 3. wrangler の `--define` / `--var` (dry-run)
 
@@ -97,9 +98,9 @@ git diff --stat 815eb526 199bbc02                                               
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 実 Worker の `/status` の `build` に、`--var` で渡した hash が出ること | 手順 5 の反映の判定が実機で未確認 | #2416 (次の再デプロイで確認。README の `[未確認]`) |
-| `--var` なしの deploy で `build` が `null` に戻ること | 手順 5 の『`null` は反映とみなさない』の実機での裏付け | #2416 (README の `[未確認]`)。推定: コードと vitest から `null` |
-| rollback で戻し先の `BUILD_COMMIT` (binding) が戻ること。戻らないときの `build` の値 (現在の hash のままか `null` か) | 『ロールバック』3 で戻し先の `build` を見る前提 | #2416 (README の `[未確認]` の rollback 項目) |
+| 実 Worker の `/status` の `build` に、`--var` で渡した hash が出ること | 手順 5 の反映の判定が実機で未確認 | 次の再デプロイで PM が README 手順 5 の `build` を見て確認 (README 末尾の `[未確認]`) |
+| `--var` なしの deploy で `build` が `null` に戻ること | 手順 5 の『`null` は反映とみなさない』の実機での裏付け | 次の再デプロイ (README 末尾の `[未確認]`)。推定: コードと vitest から `null` |
+| rollback で戻し先の `BUILD_COMMIT` (binding) が戻ること。戻らないときの `build` の値 (現在の hash のままか `null` か) | 『ロールバック』3 で戻し先の `build` を見る前提 | README 末尾の `[未確認]` の rollback 項目 (実機で未実行) |
 
 - 実 Worker への `wrangler deploy`・`wrangler rollback` は、この測定では行っていない (認証を使う操作のため)。
 
