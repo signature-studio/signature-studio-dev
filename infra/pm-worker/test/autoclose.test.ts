@@ -1,9 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { closeComment, detectRuleA, AUTO_CLOSE_MAX } from "../src/autoclose.ts";
 import { EMPTY_STATE, applyEvent, type IssueState, type PmState, type PrState } from "../src/webhook.ts";
 import { configuredApp, j, markFresh, REPO, T0, type Call } from "./helpers.ts";
 import { HUMAN, IMPL, REVIEWER, at, issueEv, prEv, send, type Ctx } from "./pm_helpers.ts";
+
+const here = fileURLToPath(new URL(".", import.meta.url));
+const fixturePath = `${here}fixtures/rule_a.input.json`;
+const crosscheck = `${here}rule_a_crosscheck.py`;
 
 // ---------------------------------------------------------------- 判定 (純関数)
 const byNum = <T extends { number: number }>(xs: T[]): Record<string, T> => Object.fromEntries(xs.map((x) => [String(x.number), x]));
@@ -115,6 +122,30 @@ test("closeComment: 書式 (規則・merged PR・残りの追跡先・マーカ�
     closeComment({ n: 100, mergedPr: 200, child: 101 }),
     "[auto-close] 規則 A: merged PR #200、残りは #101 が追跡 <!-- oc-auto-close: rule=A -->",
   );
+});
+
+test("Python 版 (test/rule_a_crosscheck.py) と同じ判定: 固定 fixture の候補が一致する (本文の参照の抽出は webhook の保存経路を通す)", () => {
+  const fx = JSON.parse(readFileSync(fixturePath, "utf8"));
+  const upd = "2026-10-14T11:00:00Z";
+  let s: PmState = structuredClone(EMPTY_STATE);
+  for (const i of fx.issues) {
+    const issue = { number: i.number, title: `[CI-${i.number}] t`, body: i.body, state: i.state, updated_at: upd, labels: i.labels.map((name: string) => ({ name })), issue_dependencies_summary: { total_blocked_by: i.blockedByCount } };
+    s = applyEvent(s, "issues", { issue }, IMPL, [], REVIEWER);
+  }
+  for (const p of fx.prs) {
+    const pull_request = { number: p.number, title: p.title, body: p.body, state: p.state, merged_at: p.merged ? "2026-10-14T10:30:00Z" : null, updated_at: upd, labels: [], head: { ref: `${p.number}-x` }, user: { login: "x", type: "Bot" } };
+    s = applyEvent(s, "pull_request", { pull_request }, IMPL, [], REVIEWER);
+  }
+  s = { ...s, blockedBy: fx.blockedBy };
+  const py = JSON.parse(execFileSync("python3", [crosscheck, fixturePath], { encoding: "utf8" })) as number[][];
+  const ts = detectRuleA(s).map((t) => [t.n, t.mergedPr, t.child]);
+  assert.deepEqual(ts, py);
+  assert.deepEqual(py, [
+    [100, 200, 101],
+    [110, 210, 111],
+    [115, 215, 116],
+    [190, 290, 191],
+  ]);
 });
 
 // ---------------------------------------------------------------- 保存 (webhook の参照抽出)
