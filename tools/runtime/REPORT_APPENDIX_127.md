@@ -37,21 +37,25 @@
 - `npx playwright@1.56.1 install --with-deps webkit` で WebKit 26.0 を取得し、依存を `sudo apt` で導入 (2026-10-14 の runner で成功)。PR #433 では依存不足で導入できなかったが、今回は `--with-deps` で導入できた (前回と同じ手順かは未確認)。
 - `PLAYWRIGHT_CORE=<作業dir>/node_modules/playwright-core/index.mjs node tools/runtime/probe/run_features_webkit.mjs` → `tools/runtime/work/features_result_webkit.json`。
 
-実測 (`d010b5d7`、3 回、全て exit 0、wall 2.35〜2.36 s、開始時 load 0.13〜0.15)。3 回で同値。
+実測 (`d010b5d7`、3 回、全て exit 0、作者計測で wall 2.35〜2.36 s、開始時 load 0.13〜0.15)。3 回で同値。
+- wall の計測: `time PLAYWRIGHT_CORE=<作業dir>/node_modules/playwright-core/index.mjs node tools/runtime/probe/run_features_webkit.mjs` の real を 1 回ずつ採る。初回 (cold) は warm と分けて記録し、比較には warm のみを使う。作者の 2.35〜2.36 s は計測コマンドが記録されていなかった。検収側の再現 (load 0.29〜0.43) は cold 6.78 s、warm 2.00 s ×2 で一致しなかった (再測定は未実施)。
+- 差分 0 の確認: `git diff d010b5d7 HEAD -- tools/runtime/probe tools/runtime/lib | wc -l` → `0` (付録を直す commit は probe・lib を含まない。検証 HEAD は PR 本文の検証節)。
 
-| 項目 | Chromium 154 / Firefox 157 (REPORT.md RT-9 本文) | WebKit 26.0 (Linux・参考) |
-|---|---|---|
-| wasm validate: memory64 / multi_memory / relaxed_simd | true (両者) | false / false / false |
-| wasm validate: simd・threads・bulk・ref types・tail_call・extended_const・eh・gc・shared_everything | true | true |
-| JSPI (`WebAssembly.promising` / `Suspending`) | function | undefined |
-| `new WebAssembly.Memory({address:"i64"})` と mem64 系 5 項目 | 生成可 | 未対応 (BigInt 変換エラー) |
-| 4 worker atomic add (期待 4,000,000) | 一致 (Firefox 86.5〜96 ms / Chromium 146 ms) | 一致 (61.7〜68.6 ms) |
-| AudioContext / AudioWorklet | Firefox は仮想 sink があるときのみ running | running・hello・process 201 回 (sink 無しで動作) |
-| WebGPU / File System Access / WebHID | Firefox は undefined | undefined |
-| Worker OffscreenCanvas 2D | 可 | 可 (255) |
-| Worker WebGL2 | Firefox は Xvfb 非 headless で可 | null (headless では判定不能。未解決) |
-| OPFS (`navigator.storage.getDirectory`) | 可 | `navigator.storage` 自体が無い (ERR) |
-| `ArrayBuffer(8GiB)` | Firefox 可 / Chromium 失敗 | ERR length too large |
+Chromium / Firefox の値は本付録に書き写さない。比較は [`REPORT.md`](REPORT.md) RT-9 本文の値と行う。
+
+| 項目 | WebKit 26.0 (Linux・参考) |
+|---|---|
+| wasm validate: memory64 / multi_memory / relaxed_simd | false / false / false |
+| wasm validate: simd・threads・bulk・ref types・tail_call・extended_const・eh・gc・shared_everything | true |
+| JSPI (`WebAssembly.promising` / `Suspending`) | undefined |
+| `new WebAssembly.Memory({address:"i64"})` と mem64 系 5 項目 | 未対応 (BigInt 変換エラー) |
+| 4 worker atomic add (期待 4,000,000) | 一致 (61.7〜68.6 ms) |
+| AudioContext / AudioWorklet | running・hello・process 201 回 (sink 無しで動作) |
+| WebGPU / File System Access / WebHID | undefined |
+| Worker OffscreenCanvas 2D | 可 (255 = 赤チャネル。`features.worker.js:14` の `#f00` を読み戻した値) |
+| Worker WebGL2 | null (headless では判定不能。未解決) |
+| OPFS (`navigator.storage.getDirectory`) | `navigator.storage` 自体が無い (ERR) |
+| `ArrayBuffer(8GiB)` | ERR length too large |
 
 判定 (Safari 入力としての読み方):
 - Playwright WebKit 26.0 では **memory64 と JSPI が無い**。Chromium / Firefox と違い、フォールバック設計 (`DESIGN.md §4.1`) では JSPI 無しの経路 (`Atomics.wait` + SAB ring) と wasm32 (4GiB 上限) だけで成立させる必要がある可能性が高い。ただし Safari 実機が同じかは未確認。
