@@ -233,6 +233,12 @@ RETDEC=<retdec-decompiler> PE=<block00031_PE.bin> python3 tools/m11/ldfix/retdec
 
 既存 v5.0 バイナリへの uprobe で、関数内の 3 呼び出し点 (siteA/B/C) の発火を測定。41a6a0・41a6d3・666b10 で siteA が各 1 回発火。siteA が L163〜166 (`gv` 分岐) に当たるかは DWARF 無しのため未確定。詳細・表は `tools/m11/ldfix/REPORT_911_APPENDIX_1967.md`。
 
+## 6g. #2038 (LD-75): 発火行の確定 (ソースビルド)
+
+v5.0 (`53e55b4b`) のソースビルドで発火行を確定。詳細・表・注は付録 `REPORT_911_APPENDIX_1967.md` §6g。
+要点: **41a6a0・41a6d3・666b10 の発火は単独範囲の測定で、すべて L167 (gv 分岐)**。41a693-41a69a は L150。これにより §6f の siteA の所在は L167 と対応すると確定した。全体範囲 (41a670-41a6f4) の件数の内訳未確認の 2 回は付録 §6g に記す (L167 の結論は単独範囲に依存)。
+判定 (受入 4): **部分達成**。同一分岐 (L167) での発火は実測で確認。**同一機構かは未確定** (段 16 と 17 の段番号差を実測で示せない。理由と残件は付録 §6g)。機構の所在は lift 段 (推定。`retdec-constants`)。
+
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
 
 - 検証 HEAD: PR head の hash は PR 本文と `gh pr view` が正本 (REPORT 内には書かない。自己参照になるため)。

@@ -14,6 +14,7 @@ def opt(name, dflt):
 HERE = os.path.dirname(os.path.abspath(__file__)); M11 = os.path.join(HERE, '..')
 src_path = opt('--src', os.path.join(M11, 'work', 'boot_final3.ll'))
 out = opt('--out', os.path.join(M11, 'work', 'probe682'))
+only = set(opt('--fns', '').split(',')) - {''}   # #2270: 指定時はこの関数の store だけ計装する (他は素通し)
 os.makedirs(out, exist_ok=True)
 
 STORE = re.compile(r'^(\s*)store (.*), ptr (nonnull )?(%[-a-zA-Z$._0-9]+|@[-a-zA-Z$._0-9"]+|inttoptr \(i64 (-?\d+) to ptr\)|null)(, align \d+)?\s*$')
@@ -60,6 +61,8 @@ for ln, line in enumerate(lines, 1):
         fn = m.group(1)
     out_lines.append(line)
     if not line.startswith(' ') or not line.lstrip().startswith('store '):
+        continue
+    if only and fn not in only:
         continue
     sm = STORE.match(line)
     if not sm:

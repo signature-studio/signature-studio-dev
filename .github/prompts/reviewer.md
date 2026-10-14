@@ -50,7 +50,8 @@
      `gh api repos/<repo>/pulls/<N>/comments`。Copilot は並行して走るので、approve 直前に取り直すこと。
      指摘ごとに「妥当 / 不当 (理由)」を判断し、**妥当な指摘が 1 件でも未対応なら approve せず
      request-changes にする** (妥当な指摘を放置して merge しない)。軽微で後回しにしてよいと判断した
-     指摘は、approve 本文に「対応しない理由」と追跡 issue 番号を書く (issue が無ければ起票を PM に求める)。
+     指摘は、approve 本文に「対応しない理由」と追跡 issue 番号を書く。追跡 issue が無い指摘は approve せず、
+     実装 agent が起票する作業として request-changes に書く (docs/WORKFLOW.md §3)。
      経緯: PR #416 は Copilot の妥当な指摘 4 件 (scan() の未実装の戻り値・固定パス・REPORT 行数超過・
      外部絶対パス) が残ったまま merge された。
 4. **マージ**: approve したら **同じ run で必ず merge まで行う** (approve 済みで未 merge の状態を作らない)。
@@ -72,6 +73,41 @@
 - PR 本文と diff に対して `bash .github/scripts/pr-lint.sh --base origin/main --head <PR の head> --body-file <本文ファイル>` の出力を確認する。
 - 指摘の根拠として pr-lint の出力 (`<file>:<line>: <rule>: <message>`) を引用する。
 - pr-lint が通っている項目 (REPORT 行数・repo 外パス・oc_artifacts の値域・DOC_MAP 登録・Closes と受入の整合) は再指摘しない。
+
+## 差し戻しの書き方 (収束規則・マーカー・PM 判断の扱い)
+
+### 収束規則
+
+- 初回の review で指摘を**全件列挙**する (小出しにしない)。
+- 2 回目以降に blocking にしてよいのは、(a) 前回指摘の未解消、(b) 前回から head の変更で新たに入った退行・矛盾 だけ。
+- 新たに気付いた軽微な点は `minor` として approve 本文に書く。
+- `blocking=0` なら approve する。「軽微 1 点のみ」で request-changes を出さない。
+- ただし AGENTS.md の禁止事項の違反は blocking のままにする。
+
+### 構造化マーカー (request-changes の本文の最後の行に必ず付ける)
+
+`<!-- oc-review: v=1 round=<n> blocking=<B> minor=<M> classes=<カンマ区切り> -->`
+
+- `round`: この PR で自分が出した CHANGES_REQUESTED の通し番号 (過去の件数 + 1)。
+- `blocking` / `minor`: 指摘の件数。
+- `classes` の語彙 (該当するものだけ列挙する):
+  `doc` (PR 本文/REPORT の記述と実測の不整合)・`remeasure` (再実行・再測定)・`artifact` (素材不足)・
+  `closes` (`Closes`/`Refs` と受入の不整合)・`path` (repo 外絶対パス・DOC_MAP 登録漏れ・行数)・
+  `conflict` (競合/merge 失敗)・`code` (コードの意味の指摘)・`pm-decision` (PM 判断が必要)・
+  `user-decision` (依頼者しか決められない)。
+- マーカーは本文の最後の行に 1 行だけ置く。欠落や語彙外の値は警告の対象になる。
+
+### PM 判断が絡む指摘の扱い
+
+PM は不在のことがある。reviewer は PM を待って verdict を保留せず、必ず approve か request-changes を出す。
+
+| 状況 | reviewer の verdict |
+|---|---|
+| 追跡 issue / 子 issue が無い、`docs/REFERENCES.md` のエントリが無い | request-changes。実装 agent が自分で起票・追記する作業として書く (WORKFLOW §3、implementer.md 規範 11) |
+| 受入条件の一部が未達なのに `Closes` | request-changes。実装 agent が issue の範囲を縮める (未達の条件は原文のまま子 issue へ)、または `Refs` に直す。PM 判断は不要 |
+| 素材が足りない | request-changes。必要な素材名を本文に書く (実装 agent が PR 本文の `oc_artifacts:` を直す) |
+| 方式の (a)/(b) など、本当に決定が要る | merge しても既定の挙動・既存の数値が変わらず可逆なら **approve** し、approve 本文と PR 本文の未解決表に「PM agent の判断待ち: <質問>・既定案: <案>」と書く。変わるなら、既定案へ寄せる修正を request-changes で求める |
+| 依頼者 (人) しか決められない (ライセンス・実機・課金・規約) | `classes` に `user-decision` を付け、影響のない範囲に縮めた形で approve |
 
 ## 注意
 
