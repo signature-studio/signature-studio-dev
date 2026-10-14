@@ -226,6 +226,8 @@ LD_M11_PE=$FL_WIN64_DIR/extracted/block00031_PE.bin python3 tools/m11/trap_triag
 
 ## 19. #1620 run (HEAD `7d15ceab` = origin/main): 未初期化 stack 読みの仮説 (結論なし)
 
+> **訂正 (#1620 次 run、`REPORT_1620.md` §10)**: 本節の FILL 実験は埋め範囲 `[sp−64 KiB, sp)` が W (`0x10a9f910`) を含み、埋めで W を上書きしていた。「W の値が埋め値に依存する」結論は取り消す。W への書込みは初期 SP の配置で消える (§10.2)。
+
 - 測定 commit: `7d15ceab` (コード差分 0)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin` 確認)。`work-m11`・`work-liftdiff` は worktree `ws-1620` に展開。`ir_conditions.json` が無いため `m11_gen_ir2.sh` で IR を再生成した。
 - 再現 (素の build): `m11_gen_ir2.sh` rc 0 (31.4 s、490,733 行、ldfix errors=0) → `m11_build.sh` rc 0 (18.8 s) → `survey_units.mjs` rc 0 (10.5 s): `ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1` (§2 と一致)。
 - 新規 `trap_triage/probe_1620_fill.mjs` (読取りと stack 埋めのみ・IR 不変): 各 unit の前に現在 SP より下の 64 KiB を埋め値 `FILL` で埋め、`0x10a9f910` の 8B 遷移を見る。`FILL=-1` は埋めなし。
