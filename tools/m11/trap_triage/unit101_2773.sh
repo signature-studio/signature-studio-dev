@@ -10,7 +10,7 @@ set -uo pipefail
 C="${1:?commit を指定}"; F="${2:-}"; P="${3:-}"
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
-ROOT="${RUNNER_TEMP:-/tmp}/unit101_2773"
+ROOT="${RUNNER_TEMP:?RUNNER_TEMP が必要}/unit101_2773"
 D="$ROOT/$C${F:+_abl}"
 rm -rf "$D"; mkdir -p "$D"
 git -C "$REPO" archive "$C" tools/m11 tools/shared | tar -x -C "$D" || { echo ARCHIVE_FAIL; exit 1; }
@@ -24,4 +24,4 @@ uv run --with capstone --with pefile bash m11_gen_ir2.sh > work/gen.log 2>&1 || 
 M11_OV_CLASSCREATE=1 uv run --with capstone --with pefile bash m11_build.sh > work/build_on.log 2>&1 || { echo BUILD_FAIL; tail -n 5 work/build_on.log; exit 1; }
 timeout 600 node trap_triage/survey_units.mjs work/trap_triage/on.json > work/on_survey.out 2>&1
 echo "C=$C${F:+ ablation=$F(from $P)} $(tail -n 1 work/on_survey.out)"
-node -e 'const r=require("./work/trap_triage/on.json"); const u=r.find(x=>x.unit===101); const s=u.icall&&u.icall.sites||{}; console.log("unit101 kind="+u.kind+" 0x41037d="+((s["0x41037d"]||[0])[0])+" 0x41032e="+((s["0x41032e"]||[0])[0]))'
+node -e 'const r=require("./work/trap_triage/on.json"); const u=r.find(x=>x.unit===101); if(!u){console.log("unit101 absent");process.exit(0)} const s=u.icall&&u.icall.sites||{}; console.log("unit101 kind="+u.kind+" 0x41037d="+((s["0x41037d"]||[0])[0])+" 0x41032e="+((s["0x41032e"]||[0])[0]))'
