@@ -10,8 +10,8 @@ PR: #2162 (`2128-ott-getparam-icall-leaf`)。受入の扱い: 受入 2・3・4 �
 | 測定 commit (コードを変えた最後の commit) | `f8bd2ea0` (`feat(liftlib): wire icall runtime into ott_getparam leaf (BLK global + table) (Refs #2128)`) |
 | 測定 commit の HEAD 条件 | 測定は `f8bd2ea0` の worktree で実施。main 取り込み merge `1d2e582c` までの差分は、測定経路のファイル (下記「差分 0 の確認」) で 0 行。`main` (`858e5139`) の取り込み merge を含むため、`tools/` 全体の差分は 0 ではない (測定経路の外) |
 | 変更前の比較 commit | `df2eebde` (測定 commit の親。`ott_getparam` の leaf は icall runtime 未配線) |
-| 素材 | `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`、`work-liftlib` → `tools/liftlib/work/`、`work-m6-ott` → `tools/m6/work/` ほか。`OTT_DLL` で F.txt を生成 (`gen_ott_getparam_F.sh`, `0x18011e5a0-0x18011e76c`, 460 bytes) |
-| emsdk | `/opt/emsdk` (既存。`emcc` を PATH に通して実行) |
+| 素材 | `analysis-ott-binaries` → `[ANALYSIS-PLUGINS]` 配下 `ott/binaries/OTT_vst2_win64.dll`、`work-liftlib` → `tools/liftlib/work/`、`work-m6-ott` → `tools/m6/work/` ほか。`OTT_DLL` で F.txt を生成 (`gen_ott_getparam_F.sh`, `0x18011e5a0-0x18011e76c`, 460 bytes) |
+| emsdk | `[EMSDK]` (既存。`emcc` を PATH に通して実行) |
 | 負荷 | 測定時の load 0.8〜0.9 (1 分平均)。runner は 4 コア |
 
 ## 測定 (`python3 -m liftlib leafspec targets/ott_getparam.json --n 200`)
