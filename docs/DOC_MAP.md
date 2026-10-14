@@ -437,7 +437,7 @@
 | `tools/pm/REPORT_APPENDIX_2461.md` | ~64 | PM Worker の `user_answered` の回答を MEMBER / OWNER / COLLABORATOR のコメントに限る (#2461)。変更の要点・件数・テスト a〜c・測定 (`npm test` 163 件・`test:workers` 3 件・所要)・ネガコン A/B・未解決。`REPORT.md` は 250 行上限のため本体へ追記しない |
 | `tools/pm/REPORT.md` | ~245 | PM 運用の実測 (PR 件数・PR とチケットの対応・Project Status・Actions run 集計・PM Worker のコメント同期 #2380 (全文は付録)・`idle_report.sh` の検証 #2354・PM Worker の live 切替前の突き合わせ #2443・R2 素材投入の頻度 #2434・`pm_wake.sh` の判定テストと live 確認 #2347)。RETRO・DIRECTIVES の数値の正本 |
 | `tools/pm/REPORT_APPENDIX_2380.md` | ~32 | tools/pm REPORT §10 (PM Worker のコメント同期 #2380) の全文。250 行上限のため REPORT.md から分割移動 (#2434) |
-| `tools/pm/REPORT_2336.md` | ~110 | PM Worker の規則 A (merged PR を持つ親 issue の自動 close・#2336) の実データ dry-run の実測 (Worker の判定と別実装の再計算の照合・候補の内訳・ネガコン・判定条件を外したときの FAIL)。運用の正本は `infra/pm-worker/README.md` |
+| `tools/pm/REPORT_2336.md` | ~93 | PM Worker の規則 A (merged PR を持つ親 issue の自動 close・#2336) の実データ dry-run の実測 (Worker の判定と別実装の再計算の照合・候補の内訳・ネガコン・判定条件を外したときの FAIL)。運用の正本は `infra/pm-worker/README.md` |
 | `tools/targets/freshair/lift2/REPORT_FA15.md` | ~60 | lift2 FA-15 (#1105): ctrl closure の ymm (AVX2 256bit) lowering (`vpcmpeqw`/`vpxor`/`vpmovmskb` ymm・`vzeroupper`)。`build_ctrl.sh` の `failed` 1→0、`lift2_e2e.sh` ALL PASS の実測 |
 | `tools/targets/freshair/lift2/REPORT_FA13_REACH.md` | ~46 | lift2 FA-13 (#905): rep movsb/stosw の実行到達の再探索。結論: 受入 1 (実行到達 scenario)・2 (ネガコン FAIL) は未達のまま。測定値は本 REPORT のみ |
 | `tools/targets/freshair/lift2/REPORT_FA8.md` | ~60 | FA-8 (#648): Filter setter の native/wasm bit-exact・型別 ID 感度・FA-7 probe 測定バグ修正 |
