@@ -99,6 +99,37 @@ $ git diff --stat 3a0f9b9a 4f1ca1a3 -- tools/python ':!*.md'
 
 測定 commit から HEAD までのコード差分 (`git diff 4f1ca1a3 HEAD -- tools/python ':!*.md'`) は空。この節の後の commit は REPORT の追記だけ。
 
+### main 再取り込み後の再測定 (`5b0e0d89`)
+
+現在の正の測定値。`origin/main` (`875eba29`) の取り込み (merge) で `tools/python` のコードが変わったため、上の `4f1ca1a3` の値はこの節で置き換える。測定 commit は `5b0e0d89` (コードを変えた最後の commit。main の merge と、`provider_check.mjs` の期待値を 98/337 に直し、arrangement 用の集合を `pe152` に改名した)。測定は同 commit の作業ツリー (`git status` 空) で行った。load average は `provider/build.sh` の実行直後の `uptime` で 2.56 (1 分)・1.83 (5 分)・0.93 (15 分)。
+
+merge の競合は `docs/DOC_MAP.md` (REPORT 索引の行) の 1 件だけ。`REPORT_PY119.md` は main の #2980 (ui 6 件) の別 REPORT で、本 PR の REPORT が同名だったため `REPORT_PY152.md` へ改名した (題名の `[PY-152]` に揃えた)。`provider_check.mjs` は main の `pe119` (ui) と本 PR の `pe119` (arrangement) が同名になり、merge 結果で二重宣言になっていたため、本 PR 側を `pe152` に改名した (期待値は main の ui 6 件と合算して 98/337)。
+
+前提の生成物 (gitignore): `FL_WIN64_DIR` = fl-win64 の必要 block 5 件 (`extracted/block00031_PE.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin`・`block25159_DATA.bin`) を `tar --zstd -xf` で展開した先。
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash fetch_inputs.sh` | rc 0 | 0.4 秒 |
+| `bash build_cpython_wasm.sh` | rc 0 (`cpython-3.12.1.json` の notices 記録のみ。`git status` は空のまま) | 4 分 23.5 秒 |
+| `FLPY_SKIP_TABLE=1 bash build_flpy.sh` | rc 0 | 5.7 秒 |
+| `bash provider/build.sh` | rc 0・fl_table 435 関数・ハンドラ 98 | 1.2 秒 |
+| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 0.06 秒 |
+| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 0.05 秒 |
+| `node tests/provider_check.mjs` | PASS (functions 435 / implemented 98 / unimplemented 337 / mcp_static 60)。flpy 節まで通過 (`work/midi.py` あり) | 0.35 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 (実装前と同値)、callback 往復 true | 2 秒 |
+| `node tests/*_diff.mjs` (10 本) | 全て rc 0・PASS (channels 161・device 8・ilmcp 32・midi_path 30・mixer 59・transport 7・ui 17・ui_state 12・arrangement 25・general 9 呼出し) | 個別未計測 |
+
+ネガティブコントロール: `host/fl_mock.mjs` の 24 行目 `arrTime: 0,` を 1 にすると、`node tests/arrangement_diff.mjs` は `arrangement 差分 3 件` で rc 1 (FAIL)。0 に戻すと `git diff` は空で、calls 25・diffs 0・PASS。
+
+取り込みで増えたコード差分 (`4f1ca1a3` から `5b0e0d89` まで、`tools/python` の .md 以外):
+
+```
+$ git diff --stat 4f1ca1a3 5b0e0d89 -- tools/python ':!*.md'
+ 10 files changed, 284 insertions(+), 12 deletions(-)
+```
+
+測定 commit から HEAD までのコード差分 (`git diff 5b0e0d89 HEAD -- tools/python ':!*.md'`) は空。この節の後の commit は REPORT の追記と、PR 本文・issue 本文の数値の修正だけ。
+
 ## 未解決
 
 | 未解決 | 影響 | 起票先 |
