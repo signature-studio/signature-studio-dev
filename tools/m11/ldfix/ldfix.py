@@ -1115,7 +1115,7 @@ def _f3c_leaders(ins):
 
 
 def _f3c_note_uses(cs, i, st, uses):
-    """argN を持つ reg の「使用」を記録する: ('deref', addr, n, 幅) = zero-disp 64/32bit load の base / ('raw', addr, n) = それ以外の読み。
+    """argN を持つ reg の「使用」を記録する: ('deref', addr, n, 幅, 出所) = zero-disp 64/32bit load の base (出所 'arg' | 'argv') / ('raw', addr, n) = それ以外の読み。
     reg→reg の 64bit コピーと frame への spill は使用に数えない (call の引数 reg・ret の rax は数える)"""
     mn, ops = i.mnemonic, i.operands
     if mn == 'mov' and len(ops) == 2:
@@ -1129,7 +1129,7 @@ def _f3c_note_uses(cs, i, st, uses):
             if not o1.mem.index and not o1.mem.disp and mb and o1.size in (4, 8):
                 sv = st.get(mb)
                 if sv and sv[0] in ('arg', 'argv'):
-                    uses.append(('deref', i.address, sv[1], o1.size * 8))
+                    uses.append(('deref', i.address, sv[1], o1.size * 8, sv[0]))
                     return
         if o0.type == 3 and o1.type == 1:
             mb = gprnorm(cs, o0.mem.base) if o0.mem.base else None
@@ -1246,7 +1246,7 @@ def _f3c_static_state(cs, ins):
 def _f3c_bump_slots(cs, ins, sslot):
     """引数ポインタを写し、ループ内で `add/sub [slot], imm` だけで前進させる frame slot → argN (#1324)。
     slot への書き込みが「argN の reg からの 64bit mov」1 本と bump だけの slot を採る。値は argN+可変なので、
-    deref 記録 ('argv') にだけ使い、lsf/ptr/raw/fix_f3c_use の判定には使わない"""
+    deref 記録 ('argv') にだけ使い、lsf/ptr/raw/fix_f3c_use の門 (出所 'arg' の deref だけ数える) には使わない"""
     st = {r: ('arg', n) for r, n in ARGREG_ARG.items()}
     plain, bump = collections.defaultdict(list), collections.Counter()
     for i in ins:
@@ -1596,8 +1596,8 @@ def fix_f3c_use(fn, fv, rep, ctr):
             pty[idx + 1] = p.split()[0] if p.split() else 'i64'
     edits = {}
     done = 0
-    for n in sorted({u[2] for u in uses if u[0] == 'deref'}):
-        derefs = [u for u in uses if u[0] == 'deref' and u[2] == n]
+    for n in sorted({u[2] for u in uses if u[0] == 'deref' and u[4] == 'arg'}):
+        derefs = [u for u in uses if u[0] == 'deref' and u[2] == n and u[4] == 'arg']
         first = min(u[1] for u in derefs)
         raws = [u for u in uses if u[0] == 'raw' and u[2] == n]
         if first not in blk0 or not all(u[3] == 64 for u in derefs) or any(u[1] > first for u in raws):

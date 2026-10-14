@@ -16,8 +16,11 @@
 
 - `_f3c_bump_slots` (新設): 引数 reg の値を frame slot へ 64bit で 1 回だけ写し、以後ループ内で `add/sub [slot], imm` だけで前進させる slot を求める。値は `argN+可変` なので新タグ `('argv', n)` にする。
 - `f3c_track`: bump slot を `('argv', n)` として各ブロックの初期状態に入れる。
-- `_f3c_note_uses`: `argv` の値を zero-disp load の base とした場合も `deref` として記録する。
-- `argv` は `lsf` / `ptr` / `raw` の判定には使わない (`_f3c_step` の `('arg', n)` 判定は不変)。書き換えの根拠になる `lsf`・`ptr` を変えないための分離。
+- `_f3c_note_uses`: `argv` の値を zero-disp load の base とした場合も `deref` として記録する。タプルは `('deref', addr, n, 幅, 出所)` (出所 = `'arg'` | `'argv'`)。
+- `argv` は `lsf` / `ptr` / `raw` の判定に使わない (`_f3c_step` の `('arg', n)` 判定は不変)。
+- **`fix_f3c_use` の門 (a) は出所 `'arg'` の deref だけを数える** (レビュー指摘 1 への修正)。`argv` 由来の deref で IR を書き換えない。
+- 分類 (`use_residual_509.py`・`trk_probe_1134.py`・`gate_5c44b0_1324.py`) は出所を問わず全 deref を数える (`u[4]` は見ない)。
+- 注: 修正前 (c5e6944c) の §3・§4・§5 の数値は、この出所フィルタを入れる前のコードでの測定。修正後の再測定は §6 参照。
 
 ## 3. 受入条件 1: deref 記録 (実測・`python3 ldfix/trk_probe_1134.py`)
 
@@ -64,17 +67,34 @@
 
 **ablation** (`bumps = {}` に置換して argv を無効化した版): 上記 3 組以外の 53 組は修正前と完全一致 (`diff` で差 3 行のみ・3 組の分類だけ)。
 
-### 5.3 未解決 (受入条件 3 の残り)
+### 5.3 db6480 arg4 の `raw-after` の由来 (指摘 2 への回答)
+
+- 分類の定義: `raw-after` = 「最初の deref より後に、同じ argN の生の使用がある」。
+- 修正前 (c5e6944c 以前) は db6480 arg4 の deref が 0 件 (`tracker-no-deref`) で、`raw-after` は判定されない。
+- `argv` 導入後は db657b (`mov r8d,[r8]`、2 段目) の 32bit deref が唯一の deref になり、その後に arg4 の生の使用が残るため `raw-after` が付く。
+- 2 段目の deref は `argv` (bump slot) 由来。根拠は ablation (§5.2): `bumps = {}` で 3 組以外が完全一致し、db6480 だけが変わるため。ただし `work/` が無く、db657b の出所タグを直接は再確認していない。
+- したがって `raw-after` は argv 由来の deref を起点に付いたものである。
+
+### 5.4 指摘 1 の修正 (出所フィルタ) が IR を変えない根拠 (コード上)
+
+- `_f3c_step` で `argv` を参照するのは `st` の値の伝播だけ。`lsf` は `('ld', ...)`、`ptr` は `('arg', ...)` のみを採るので、`argv` は `lsf`・`ptr` に入らない。
+- `_f3c_note_uses` の raw 記録は `('arg', ...)` のみ。`'arg'` の値の集合と順序は、`argv` が入る前と同じ。
+- `fix_f3c_use` の門 (a)〜(d) の入力は、出所 `'arg'` の deref と raw だけになった。よって `fix_f3c_use` の出力 IR は、argv 導入前 (8483b900) と同一になるはず。
+- 修正 commit 後の旧新 `cmp` は未実施 (§6)。上記はコードの読解による推論である。
+
+### 5.5 未解決 (受入条件 3 の残り)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| db6480 arg4 に `raw-after` が新規に付いた (`fix_f3c_use` は門 (b) で見送るため IR は不変。分類表の既存行は崩れていないが、分類の定義上は組が 1 つ増えた) | 分類の解釈のみ。IR 出力は不変 (§5.1) | #1325 (LD-46) の着手前に PM が分類定義を確認 |
+| db6480 arg4 の `raw-after` (argv 由来の新しい deref が起点) を分類定義上どう扱うか | 分類の解釈のみ。IR 出力は不変 (§5.4)。受入条件 3 は未チェックのまま | PM 判断 (#1325 (LD-46) の着手前) |
 | 3 関数の deref を使って `fix_f3c_use` を通す修復は行っていない (門 (a) で見送り) | 3 関数の修復は未着手 | #1325 (LD-46) |
 
 ## 6. 検証範囲
 
-- **検証した**: `trk_probe_1134.py` (記号実行の deref)、`use_residual_509.py` (分類)、`ldfix.py` 出力 IR の旧新一致、`gate_5c44b0_1324.py` (5c44b0 の門)。
-- **範囲外**: e2e (`ldfix_509_e2e.sh` の 6/7 wasm 比較・7/7 動的確認)。本修正は IR 出力を変えないため、wasm は変わらない (§5.1 の一致より)。e2e は実施していない。
+- **検証した (修正前コードでの実測・§3〜§5)**: `trk_probe_1134.py`、`use_residual_509.py`、`ldfix.py` 出力 IR の旧新一致、`gate_5c44b0_1324.py`。
+- **修正後 (出所フィルタ入り) の再測定は未実施**: この run では `work/boot_final3.ll`・`work/m11_image.bin` が無く (`$ARTIFACTS_DIR` に `work-m11.tar.zst` なし。`fl-win64` のみ)、上記スクリプトを実行できなかった。`py_compile` と import は通過。
+- **修正後 IR が変わらないことの根拠 (推論・未測定)**: §3 の 3 関数の deref は 75a180 (loop 内 = entry 外)、db6480 (32bit)、dc27c0 (32bit) で、修正前も門 (a) で落ちていた。出所 `'arg'` の deref だけに絞ると、この 3 組で門の判定は変わらない。ただし同一 n に arg 由来と argv 由来の deref が混在する関数では、門の `first` と 64bit 判定が変わり得る。混在の有無は未確認。
+- **範囲外**: e2e (`ldfix_509_e2e.sh` の 6/7 wasm 比較・7/7 動的確認)。e2e は未実施。wasm が変わらないとは、修正後の旧新 `cmp` (work-m11 素材が要る) が取れるまで言えない。
 - **範囲外**: `REPORT_930` の 23/24 と 30/33 の不一致 (#1134 §4 で未調査として残件。本 PR では触らない)。
 
 ## 7. 再現
