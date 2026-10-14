@@ -86,5 +86,5 @@ cp tools/icall/work/slot_trace_fatal.txt tools/icall/work/fatal_stub.txt
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 群 B (`rcx=0xa080`)・群 E (`rax=0x400`) の faulting 値の起源 (guest 内で計算された値か) | 受入条件 1 (群 B・E の切り分け) | 子 issue (本 run で起票) |
-| 群 C の `SLOT_ENC_INIT` 依存が guest の意図か harness の artefact か | 受入条件 2 の解釈 | #2231 の後続 (ICALL-64 の既知 12 判定と合わせて判定) |
+| 群 B (`rcx=0xa080`)・群 E (`rax=0x400`) の faulting 値の起源 (guest 内で計算された値か) | 受入条件 1 (群 B・E の切り分け) | #2247 (ICALL-68) |
+| 群 C の `SLOT_ENC_INIT` 依存が guest の意図か harness の artefact か | 受入条件 2 の解釈 | #2247 (ICALL-68) |
