@@ -10,13 +10,13 @@
 
 ## 測定
 
-- 測定 commit: `69598b07` (§3 の block24412 の測定時の HEAD)。以後の `aaedb47d` は `tools/icall/scan_jmpmem.py` の追加のみで、監査コードは変えていない。§1・§2 は未再測定。
-- 監査コード (`audit_icall.py` / `roundtrip.sh` / `icall_rewrite.py`) は `69598b07` から `aaedb47d` まで無変更 (`git diff 69598b07 aaedb47d -- tools/icall/audit_icall.py tools/icall/roundtrip.sh tools/icall/icall_rewrite.py` は空)。
+- 測定 commit: `6e7294c6` (§1・§3 を実行した commit。`scan_jmpmem.py` の最終版を含む)。§2 は前 run 記録のまま未再測定。
+- 監査コード (`audit_icall.py` / `roundtrip.sh` / `icall_rewrite.py`) は `69598b07` から HEAD まで無変更 (`git diff 69598b07 HEAD -- tools/icall/audit_icall.py tools/icall/roundtrip.sh tools/icall/icall_rewrite.py` は空)。`6e7294c6` から HEAD までの `tools/icall` のコード差分も 0 (差分は本付録のみ)。
 - 素材: `fl-win64` (`block*_PE.bin` 313 本、`$FL_WIN64_DIR/extracted/` = [WIN64])、`toolchain-retdec` ([RETDEC])、`work-icall` (`tools/icall/work/`)。展開を確認済み。
 
 ### 0. 実行環境
 
-- `toolchain-retdec` → [RETDEC] (`/opt/retdec`)。RetDec 実行可を確認。
+- `toolchain-retdec` → [RETDEC]。RetDec 実行可を確認。
 - `work-icall` → `tools/icall/work/` (5.6 GiB。`rt_*` や `audit_*.json` 等の前 run の中間物を含む)。
 - `fl-win64` → `$FL_WIN64_DIR/extracted/` ([WIN64]。`*_PE.bin` 313 本)。
 
@@ -41,7 +41,7 @@
 ### 3. block24412 の before / after (現 HEAD で再測定)
 
 - 対象 F: `0x1800bc760-0x1800bc78c`, `0x1801f7e00-0x1801f7e60` (`tools/icall/work/F_24412.txt`)。
-- 実行: `bash tools/icall/roundtrip.sh $HOME/analysis/win64/extracted/block24412_PE.bin work/F_24412.txt r24412` (6.4 秒、load 1.0)。
+- 実行: `bash tools/icall/roundtrip.sh $FL_WIN64_DIR/extracted/block24412_PE.bin work/F_24412.txt r24412` (6.4 秒、load 1.0)。
 - 結果 (本 run 実測):
 
 | 項目 | before | after |
@@ -57,8 +57,10 @@
 
 ### 4. 測定 commit と差分
 
-- 測定 commit: `aaedb47d` (§3 のみ)。§1・§2 は現 HEAD で未再測定。
-- `git diff 4efa6820 aaedb47d -- tools/icall` の全差分は `REPORT_APPENDIX_1589.md`・`scan_jmpmem.py` (新規) のみ (コード差分は `scan_jmpmem.py` の追加だけで、既存監査コードは不変)。
+- 測定 commit: `6e7294c6` (§1・§3 を実行。§2 は前 run 記録のまま)。
+- `git diff 6e7294c6 b0ee9709 -- tools/icall` の出力: `REPORT_APPENDIX_1589.md` のみ (コード差分 0)。
+- `git diff 69598b07 b0ee9709 -- tools/icall/audit_icall.py tools/icall/roundtrip.sh tools/icall/icall_rewrite.py` の出力: 空 (§3 の監査コードは測定時から無変更)。
+- `git diff 4efa6820 b0ee9709 -- tools/icall` の全差分は `REPORT_APPENDIX_1589.md`・`scan_jmpmem.py` (新規) のみ。
 - 受入条件 3 の判定: **部分達成** (§3 は現 HEAD で再測定。§1・§2 は前 run 記録のまま)。
 
 ## 前 run との差分
@@ -69,8 +71,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 現 HEAD の `audit_icall.py` で 153 PE の before 監査を再実行し、`jt_dropped > 0` の件数を確定する (旧 audit の「0 件」の検証)。走査 265 関数 / 288 site の定義を特定する (現 HEAD は 250 / 267) | 受入条件 1・3 の判定と数値の鮮度 | #2387 `[ICALL-74]` |
-| plugins-ott / plugins-freshair の `jmp [mem]` 監査 (受入条件 1 の本体) | 受入条件 1 の未達 | #2387 `[ICALL-74]` (素材: `plugins-ott` / `plugins-freshair`) |
+| 現 HEAD の `audit_icall.py` で 153 PE の before 監査を再実行し、`jt_dropped > 0` の件数を確定する (旧 audit の「0 件」の検証)。走査 265 関数 / 288 site の定義を特定する (現 HEAD は 250 / 267) | 受入条件 1・3 の判定と数値の鮮度 | 次 run で実施 (素材: `toolchain-retdec`・`work-icall`) |
+| plugins-ott / plugins-freshair の `jmp [mem]` 監査 (受入条件 1 の本体) | 受入条件 1 の未達 | 次 run で実施 (素材: `plugins-ott` / `plugins-freshair`) |
 | block24412 の `dropped → kept_indirect` が RetDec の jmp 復元か rewrite 後の call の計数か未切り分け | 復元の実証 (本 PR は分類変化の記録止まり) | 次 run で実施 (after IR の命令種) |
 | block24356 の rewrite 後 `jt_dropped` 0 → 51 (前 run 実測) | `#1402` の cmp/je 展開の副作用の疑い | #1402 配下 |
 | indexed tail jump の `other_insn:ret` 9 site の意味 | 監査定義上は良性。未検証 | 次 run で実施 |
