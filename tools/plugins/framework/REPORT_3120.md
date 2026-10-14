@@ -10,7 +10,7 @@ stage-1 を BLK 修正後の `icall_rewrite` で再生成し stage-2 を再現�
 ## 1. 検証起点と測定 commit
 
 - 測定 commit: **`77205e76`** (`origin/main` `c98d2c99` に `66a3dbe1` を cherry-pick した commit。worktree `../ws-3120`・branch `3120-plg-p0b-29-stage2-smoke`)。
-- 素材: `work-fw-stage1` と `work-liftlib` を展開 (gitignore)。`fl-win64` は member 2 本 (`extracted/block18983_PE.bin`・`extracted/block00031_PE.bin`) のみ展開。`[EMSDK]`・`[RETDEC]` は runner 既存 (`/opt/emsdk`・`/opt/retdec`)。
+- 素材: `work-fw-stage1` と `work-liftlib` を展開 (gitignore)。`fl-win64` は member 2 本 (`extracted/block18983_PE.bin`・`extracted/block00031_PE.bin`) のみ展開。`[EMSDK]`・`[RETDEC]` (`docs/REFERENCES.md` §4) は runner 既存。
 - 補助物: `tools/plugins/work/fw_hash_counts.json` は `{}` で代用 (`REPORT_2566.md` §1 と同じ。framework 統計の出力のみに影響)。
 - 修正前素材の比較: `work-fw-stage1` を `$RUNNER_TEMP/pre_root` に展開し、`FW_W` で stage-2 を独立に再実行 (`#2584` より前に生成された stage-1 成果物)。
 - 実行環境: runner 4 vCPU・RAM 15 GiB。
