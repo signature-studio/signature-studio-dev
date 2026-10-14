@@ -52,17 +52,43 @@
   - 揺れの源 (native 側の非決定性、shard 配置、負荷のどれか): **未切り分け**。同一 commit で 361/360 が出ており、run 間の揺れとして扱う。
 - 参考: 同一 commit `2626e445` の 3 回で件数が 361・361・360 と揺れたことは、LD-44 の `92a145a5` (361/360/360) と `be017fb1` (360/360/360) の差が commit 差分だけによるものではない可能性を示す。ただし 2 commit の比較は本 run では行っていない。
 
+### 3.1 再測定 (HEAD `5b254578`・直列実行)
+
+前回 (`2626e445`) の 361/361/360 は、今回の HEAD では再現しなかった。同 commit で測り直した:
+
+| run | 一致 | 不一致 | 実行不能 | 所要 (wall) |
+|---|---|---|---|---|
+| r1 | 361 | 229 | 210 | 1m49.8s (load 0.9→5.7) |
+| r2 | 360 | 230 | 210 | 1m45.8s |
+| r3 | 360 | 230 | 210 | 1m48.2s |
+| r4 | 360 | 230 | 210 | 1m44.3s |
+
+- r1 だけ 0x959a40 の verdict が `match`、r2〜r4 は `mismatch`。ほかの 799 関数の verdict は 4 回とも同じ (揺れは 0x959a40 の 1 関数のみ)。
+- 0x959a40 の揺れた case は p1・pall・qall。r1 は `equal` (native ok・wasm ok)、r2〜r4 は `diff` (native ok・wasm ok)。**timeout ではない**。
+- r2〜r4 の差分の中身 (p1): `ret` が native `0xffffd4e8` / wasm `0x2206ec00` で不一致、かつ `trace` に `wasm_extra_entry` (wasm が余分に関数 `0x956550` を通る)。
+- 全 27 件の case 揺れ (3 回以上の run にまたがるもの) のうち、timeout・hang を含むものが大半 (native `hang`・wasm `timeout`/`crash`/`hang` の組)。0x959a40 以外の関数の verdict は揺れていない。
+- 単独測定 (`--set file:` で 0x959a40 のみ、shards 1 ×2 / 12 ×2): 4 回とも `match` (p1・pall・qall は全て `equal`)。
+  → **sample:800 の全体実行の中でのみ `diff` が出る**。単独では再現しない。
+
+### 3.2 揺れの分類 (現時点の結論)
+
+- timeout (native・wasm どちらか) による件数揺れ: **該当なし**。0x959a40 の verdict 変化は両側 ok の case による。
+- 揺れの源: **未確定**。単独で `match` になり、全体 run でのみ `diff` になるため、他の関数を同じ worker で先に走らせたときの状態の持ち越し (ld_wasm の共有 arena・heap の残り) か、全体 run の負荷 (load 最大 14.7) が疑わしい。ただし shard 数の差 (1 vs 12) では説明できなかった。切り分けには同一プロセス内で関数順を変える実験が要る。
+- 件数 361 と 360 の差は、r1 の 1 回だけ出た。以後は 360 が 3 回続く。
+
 ## 4. 測定 commit と差分
 
-- 測定 commit: `2626e445`。
-- `git diff 2626e445 HEAD -- tools/liftdiff/ldlib tools/m8 tools/ott tools/m11 tools/m6 tools/m9 tools/liftdiff/rt` = **空** (コード変更なし。本 PR は REPORT と `results/` のみ)。よって測定値は HEAD のコードに対応する。
+- 再測定 (§3.1) の測定 commit: **`5b254578`** (origin/main)。
+- `git diff 5b254578 HEAD -- tools/liftdiff/ldlib tools/m8 tools/ott tools/m11 tools/m6 tools/m9 tools/liftdiff/rt` = **空** (本 PR は REPORT と `results/` のみ変更)。よって測定値は HEAD のコードに対応する。
+- 前回 (§3) の測定 commit `2626e445` から `5b254578` までは、上記パスで 72 files / +3502 / -57 の差分がある (`git diff --stat 2626e445 5b254578 -- <同パス>`)。前回の値 (361/361/360) と今回の値 (361/360/360/360) は同一 commit ではないため直接比較できない。
+- 生データ: `results/ld58_m11_sample800_n3_5b254578.tsv` (case 揺れと件数)。JSONL は `work/m11/batch_head_r{1..4}.jsonl` (gitignore)。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ガード緩和の本流への反映方法 (ガード範囲の arena 合わせ・関数単位の除外) | `1801c67a0` の u16・vm0 は本流 wasm で abort のまま | 未起票。本 PR 対象外。`Refs #1637` の次 run で扱う |
-| `qall` の native_fault への変化の解釈 (ガード緩和で wasm が進んだ後の native segv) | 緩和版の判定の妥当性 | 未起票。本 PR 対象外。`Refs #1637` の次 run で扱う |
-| 0x959a40 の p1/pall/qall の native・wasm 値の差 (r3 のみ) の発生源 | 件数 361/360 の揺れの説明 | 未起票。本 PR 対象外。`Refs #1637` の次 run で扱う |
-| arena ポインタ実値の記録 | 「範囲外」の判定の確定 | 未起票。`Refs #1637` の次 run で扱う |
+| 0x959a40 の全体 run だけで diff が出る原因 (他関数との状態持ち越し・負荷のどちらか) | 件数 360/361 の揺れの説明 | 未起票。本 PR 対象外 (切り分けには関数順を変える実験が要る) |
+| ガード緩和の本流への反映方法 (ガード範囲の arena 合わせ・関数単位の除外) | `1801c67a0` の u16・vm0 は本流 wasm で abort のまま | 未起票。本 PR 対象外 |
+| `qall` の native_fault への変化の解釈 (ガード緩和で wasm が進んだ後の native segv) | 緩和版の判定の妥当性 | 未起票 |
+| arena ポインタ実値の記録 | 「範囲外」の判定の確定 | 未起票 |
 | OTT 8 関数のうち 1801c67a0 以外の 7 関数の再確認 | LD-44 §2 の未実施分 | LD-57 (#1636) |
