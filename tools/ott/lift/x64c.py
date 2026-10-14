@@ -253,6 +253,8 @@ class FnLift:
                 seg = '(ott_gsbase + (uint64_t)'    # Win64: gs = TEB shadow (ott_cpu.c)
             elif snm == 'fs':
                 seg = '(ott_fsbase + (uint64_t)'
+            elif IA32 and snm in ('es', 'ds', 'cs', 'ss'):   # ia32 user mode: 平坦 (base 0)
+                seg = ''
             else:
                 raise Unsup('segment ' + snm)
         if m.base == X86_REG_RIP:
@@ -387,6 +389,8 @@ class FnLift:
         L('/* %x: %s %s */' % (va, m, ins.op_str.replace('*/', '* /')))
         if m.startswith('rep '):
             return self.rep(ins)
+        if m == 'repne scasb':
+            return self.repne_scasb(ins)
         h = getattr(self, 'i_' + m, None)
         if h is not None:
             return h(ins, ops)
@@ -440,6 +444,8 @@ class FnLift:
                 return self.L(self.wr(ins, ops[0], gv(TLSA_VA), 8))
             if m.disp == 0x10:
                 return self.L(self.wr(ins, ops[0], '(R[RSP] + 0x1000)', 8))
+        if IA32 and seg == 'fs':   # ia32 の TEB 参照 (fs:[disp]): ea() が ott_fsbase 基準で読む
+            return self.L(self.wr(ins, ops[0], self.rd(ins, ops[1], ops[0].size)))
         raise Unsup('segment ' + seg)
 
     def i_movabs(self, ins, ops): self.i_mov(ins, ops)
@@ -710,8 +716,42 @@ class FnLift:
             return self.L('X[%d].d[0] = X[%d].d[0];' % (di, self.xd(ins, s)))
         self.L('{ uint32_t v_ = LD32(%s); X[%d].d[0] = v_; X[%d].d[1] = X[%d].d[2] = X[%d].d[3] = 0; }' % (self.ea(ins, s), di, di, di, di))
 
+    def ia32_only(self, m):
+        if not IA32:
+            raise Unsup(m)
+
+    def ia32_str(self, ins, kind, w):
+        """ia32 の非 rep 文字列命令 (1 要素)。DF=0 前提 (rep() と同じ)。ES/DS は平坦 (ea() 参照)。"""
+        self.ia32_only(ins.mnemonic)
+        if kind == 'movs':
+            return self.L('{ uint%d_t v_ = LD%d(R[RSI]); ST%d(R[RDI], v_); R[RSI] += %d; R[RDI] += %d; }' % (w * 8, w * 8, w * 8, w, w))
+        self.L('ST%d(R[RDI], R[RAX]); R[RDI] += %d;' % (w * 8, w))
+
+    def i_movsb(self, ins, ops): self.ia32_str(ins, 'movs', 1)
+    def i_movsw(self, ins, ops): self.ia32_str(ins, 'movs', 2)
+    def i_stosb(self, ins, ops): self.ia32_str(ins, 'stos', 1)
+    def i_stosw(self, ins, ops): self.ia32_str(ins, 'stos', 2)
+    def i_stosd(self, ins, ops): self.ia32_str(ins, 'stos', 4)
+
+    def repne_scasb(self, ins):
+        self.ia32_only('repne scasb')
+        self.L('{ while (R[RCX] != 0) { uint8_t a_ = (uint8_t)R[RAX]; uint8_t b_ = LD8(R[RDI]); FL_SUB(8, a_, b_, (uint8_t)(a_ - b_)); R[RDI] += 1; R[RCX] -= 1; if (fZF) break; } }')
+
+    def i_sahf(self, ins, ops):
+        self.ia32_only('sahf')   # AF は runtime が持たないため未反映 (x87 比較の後の分岐は CF/ZF/PF で足りる)
+        self.L('{ uint8_t ah_ = (uint8_t)(R[RAX] >> 8); fCF = ah_ & 1; fPF = (ah_ >> 2) & 1; fZF = (ah_ >> 6) & 1; fSF = (ah_ >> 7) & 1; }')
+
+    def i_xlatb(self, ins, ops):
+        self.ia32_only('xlatb')
+        self.L('{ uint64_t a_ = R[RBX] + (R[RAX] & 0xff); R[RAX] = (R[RAX] & ~0xffULL) | LD8(a_); }')
+
+    def i_wait(self, ins, ops):
+        self.ia32_only('wait')   # fwait: 未処理 x87 例外の模型を持たないため no-op
+
     def i_movsd(self, ins, ops):
         d, s = ops
+        if IA32 and d.type == X86_OP_MEM and s.type == X86_OP_MEM:   # ia32 の非 rep movsd (文字列)
+            return self.ia32_str(ins, 'movs', 4)
         if d.type == X86_OP_MEM:
             return self.L('STF64(%s, X[%d].df[0]);' % (self.ea(ins, d), self.xd(ins, s)))
         di = self.xd(ins, d)
