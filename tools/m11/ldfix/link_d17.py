@@ -94,23 +94,76 @@ def mach_chains(mach, labels, want):
                 why = 'base_clobbered'
                 break
         if d is None:
-            res[k].append((blk, None, why))
+            res[k].append((blk, None, why, None))
             continue
         rD = ins_list[d].operands[0].reg
         used = False
+        use_kind = None
         for m in ins_list[d + 1:d + 9]:
             if is_stop(m.mnemonic):
                 break
             if any(o.type == capstone.CS_OP_REG and o.reg == rD for o in m.operands[1:]):
                 used = True
+                use_kind = mach_use_kind(m, rD)
                 break
             if m.operands and m.operands[0].type == capstone.CS_OP_REG and m.operands[0].reg == rD:
                 break
         if not used:
-            res[k].append((blk, None, 'dst_unused'))
+            res[k].append((blk, None, 'dst_unused', None))
             continue
-        res[k].append((blk, ins_list[d].operands[0].size * 8, None))
+        res[k].append((blk, ins_list[d].operands[0].size * 8, None, use_kind))
     return res
+
+
+MACH_USE = {'add': 'add', 'sub': 'sub', 'and': 'and', 'or': 'or', 'xor': 'xor', 'cmp': 'icmp', 'test': 'icmp',
+            'movzx': 'zext', 'movsx': 'sext', 'movsxd': 'sext'}
+
+
+def mach_use_kind(m, rD):
+    """rD (値として) を最初に使う命令 -> 種類。対応が無ければ None。"""
+    ops = m.operands
+    if m.mnemonic == 'mov' and len(ops) == 2 and ops[0].type == capstone.CS_OP_MEM:
+        return 'store' if ops[1].type == capstone.CS_OP_REG and ops[1].reg == rD else None
+    if ops[0].type == capstone.CS_OP_REG and ops[0].reg == rD and len(ops) == 2 and ops[1].type == capstone.CS_OP_REG:
+        return None
+    return MACH_USE.get(m.mnemonic)
+
+
+def ir_use_kind(lines, n, nm):
+    """load 行 n の値 nm を最初に使う命令 (同じ関数内) -> 種類。見つからない・対応外は None。"""
+    pat = re.compile(re.escape(nm) + r'(?![\w.])')
+    for ln in lines[n + 1:]:
+        if LABEL.match(ln) or ln.startswith('}'):
+            break
+        if not pat.search(ln):
+            continue
+        s = ln.strip()
+        if re.match(r'store \S+ ' + re.escape(nm) + r',', s):
+            return 'store'
+        m = re.match(r'%\S+ = (\w+)', s)
+        if m and m.group(1) in ('add', 'sub', 'and', 'or', 'xor', 'icmp', 'zext', 'sext'):
+            return m.group(1)
+        return None
+    return None
+
+
+def pair_by_use(lines, irs, ms):
+    """同一ブロックの IR load (n, w, nm) と chain (w, why, uk) を使用種類で 1 対 1 に結ぶ。
+    両側で種類が一意 (重複なし)・集合一致・種類ごとの幅一致のときだけ [(n, w, nm)]。それ以外は None。"""
+    ir_k = [(n, w, nm, ir_use_kind(lines, n, nm)) for (n, w, nm) in irs]
+    if any(uk is None for (_, _, _, uk) in ir_k) or any(uk is None for (_, _, uk) in ms):
+        return None
+    ir_kinds = [uk for (_, _, _, uk) in ir_k]
+    m_kinds = [uk for (_, _, uk) in ms]
+    if len(set(ir_kinds)) != len(ir_kinds) or len(set(m_kinds)) != len(m_kinds) or set(ir_kinds) != set(m_kinds):
+        return None
+    m_w = {uk: w for (w, _, uk) in ms}
+    out = []
+    for (n, w, nm, uk) in ir_k:
+        if m_w[uk] != w:
+            return None
+        out.append((n, w, nm))
+    return out
 
 
 def link_fn(lines, mach, labels, ks):
@@ -130,17 +183,25 @@ def link_fn(lines, mach, labels, ks):
         for (n, blk, w, _k, nm) in by_k[k]:
             ir_by_blk[blk].append((n, w, nm))
         m_by_blk = collections.defaultdict(list)
-        for (blk, w, why) in chains.get(k, []):
-            m_by_blk[blk].append((w, why))
+        for (blk, w, why, uk) in chains.get(k, []):
+            m_by_blk[blk].append((w, why, uk))
         r = dict(ir_loads=len(by_k[k]), mach_chains=len(chains.get(k, [])), linked=0, reasons=collections.Counter())
         for blk in set(ir_by_blk) | set(m_by_blk):
             irs = ir_by_blk.get(blk, [])
             ms = m_by_blk.get(blk, [])
-            good = [w for (w, why) in ms if why is None]
+            good = [w for (w, why, uk) in ms if why is None]
             if len(irs) == 1 and len(ms) == 1 and good and good[0] == irs[0][1]:
                 linked.append((irs[0][0], k, irs[0][1], irs[0][2]))
                 r['linked'] += 1
                 continue
+            if irs and ms and len(irs) == len(ms) and len(good) == len(ms):
+                pairs = pair_by_use(lines, irs, ms)
+                if pairs is not None:
+                    for (n, w, nm) in pairs:
+                        linked.append((n, k, w, nm))
+                    r['linked'] += len(pairs)
+                    r['by_use_kind'] = r.get('by_use_kind', 0) + len(pairs)
+                    continue
             if not irs:
                 r['reasons']['mach_only'] += len(ms)
             elif not ms:
