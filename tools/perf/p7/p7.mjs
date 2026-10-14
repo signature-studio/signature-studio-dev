@@ -37,7 +37,7 @@ function refHash(stages, blocks) {
 const sameRaw = (x, y) => Array.isArray(x) && x.length === y.length && x.every((r, i) => r.length === y[i].length && r.every((v, j) => Math.fround(v) === Math.fround(y[i][j])));
 
 // ---- 判定 (純関数; --negative で破壊入力を与えて FAIL になることを確認) ----
-export function judge(results, { corrupt = false } = {}) {
+export function judge(results, { corrupt = false, requireWorklet = REQ_WL } = {}) {
   const checks = [];
   const add = (name, status, detail = '') => checks.push({ name, status, detail });
   for (const [cfg, r] of Object.entries(results)) {
@@ -54,11 +54,17 @@ export function judge(results, { corrupt = false } = {}) {
     }
     const wl = r.worklet;
     if (!wl || wl.error || wl.available === false) add(`${cfg}: worklet`, 'UNMEASURED', JSON.stringify(wl || {}).slice(0, 160));
-    else if (!wl.result || wl.result.error || !wl.result.calls) add(`${cfg}: worklet process() ran`, REQ_WL ? 'FAIL' : 'UNMEASURED', `ctx=${wl.stateAfterResume} result=${JSON.stringify(wl.result || null).slice(0, 120)}`);
+    else if (!wl.result || wl.result.error || !wl.result.calls) add(`${cfg}: worklet process() ran`, requireWorklet ? 'FAIL' : 'UNMEASURED', `ctx=${wl.stateAfterResume} result=${JSON.stringify(wl.result || null).slice(0, 120)}`);
     else {
       const ref = refHash(SIZES.small.stages, wl.result.hashBlocks);
       const expect = corrupt ? (ref.h ^ 1) >>> 0 : ref.h;
       add(`${cfg}: worklet bit-exact (${wl.result.hashBlocks} blocks)`, wl.result.hash === expect && sameRaw(wl.result.raw8, ref.raw) ? 'PASS' : 'FAIL', `hash=${wl.result.hash} ref=${expect}`);
+    }
+    if (wl && wl.available !== false && !wl.error) {
+      const name = `${cfg}: worklet postMessage(Module)`;
+      if (wl.modRecv) add(`${name} 受信`, wl.modRecv.isModule ? 'PASS' : 'FAIL', `isModule=${wl.modRecv.isModule}`);
+      if (wl.msgerr) add(`${name} messageerror`, 'INFO', 'worklet 側で messageerror (Module 直接 post は不可・判定外の記録)');
+      if (!wl.modRecv && !wl.msgerr) add(`${name} 受信`, requireWorklet ? 'FAIL' : 'UNMEASURED', '受信・messageerror とも通知なし (worklet が稼働していない可能性)');
     }
   }
   return checks;
@@ -123,7 +129,27 @@ if (NEG) {
   console.log(`positive (正しい出力): FAIL=${goodFails} PASS=${good.filter((c) => c.status === 'PASS').length} → ${okPos ? 'OK' : 'BAD'}`);
   console.log(`negative (期待 hash を 1 bit 破壊): FAIL=${badFails}/9 → ${badFails === 9 ? 'OK (検出)' : 'BAD (見逃し)'}`);
   console.log(`negative (done 無し/結果欠落): FAIL=${missFails} → ${missFails > 0 ? 'OK (検出)' : 'BAD (見逃し)'}`);
-  process.exit(okPos && badFails === 9 && missFails > 0 ? 0 : 1);
+  // worklet の postMessage(Module) 判定 (受信 / messageerror / 通知なし) の負例: 注入した worklet 結果ごとに区分が出ることを確認
+  const st = (cs, s) => cs.filter((c) => c.status === s).length;
+  const wlJudge = (worklet, requireWorklet) => judge({ x: { done: true, ...fake, worklet } }, { requireWorklet }).filter((c) => c.name.includes('postMessage(Module)'));
+  const wlPos = wlJudge({ available: true, modRecv: { isModule: true } }, true);
+  const wlBad = wlJudge({ available: true, modRecv: { isModule: false } }, false);
+  const wlNone = wlJudge({ available: true }, true);
+  const wlNoneLoose = wlJudge({ available: true }, false);
+  const wlMsgerr = wlJudge({ available: true, msgerr: true }, false);
+  const wlOk = [
+    st(wlPos, 'PASS') === 1 && st(wlPos, 'FAIL') === 0,
+    st(wlBad, 'FAIL') >= 1,
+    st(wlNone, 'FAIL') === 1,
+    st(wlNoneLoose, 'UNMEASURED') === 1 && st(wlNoneLoose, 'FAIL') === 0,
+    st(wlMsgerr, 'INFO') === 1 && st(wlMsgerr, 'FAIL') === 0,
+  ];
+  console.log(`worklet 受信 isModule=true (正例): PASS=${st(wlPos, 'PASS')} FAIL=${st(wlPos, 'FAIL')} → ${wlOk[0] ? 'OK' : 'BAD'}`);
+  console.log(`worklet 受信 isModule=false (負例): FAIL=${st(wlBad, 'FAIL')} → ${wlOk[1] ? 'OK (検出)' : 'BAD (見逃し)'}`);
+  console.log(`worklet 通知なし + --require-worklet (負例): 受信 FAIL=${st(wlNone, 'FAIL')} → ${wlOk[2] ? 'OK (検出)' : 'BAD (見逃し)'}`);
+  console.log(`worklet 通知なし (既定): 受信 UNMEASURED=${st(wlNoneLoose, 'UNMEASURED')} FAIL=${st(wlNoneLoose, 'FAIL')} → ${wlOk[3] ? 'OK' : 'BAD'}`);
+  console.log(`worklet messageerror のみ (判定外): INFO=${st(wlMsgerr, 'INFO')} FAIL=${st(wlMsgerr, 'FAIL')} → ${wlOk[4] ? 'OK' : 'BAD'}`);
+  process.exit(okPos && badFails === 9 && missFails > 0 && wlOk.every(Boolean) ? 0 : 1);
 }
 
 const srv = await startServer();
@@ -139,5 +165,5 @@ fs.writeFileSync(OUT, Object.entries(all).map(([cfg, r]) => JSON.stringify({ cfg
 const checks = judge(all);
 for (const c of checks) console.log(`${c.status} ${c.name} ${c.detail}`);
 const n = (s) => checks.filter((c) => c.status === s).length;
-console.log(`\nsummary: PASS=${n('PASS')} FAIL=${n('FAIL')} SKIP=${n('SKIP')} UNMEASURED=${n('UNMEASURED')} → ${OUT}`);
+console.log(`\nsummary: PASS=${n('PASS')} FAIL=${n('FAIL')} SKIP=${n('SKIP')} UNMEASURED=${n('UNMEASURED')} INFO=${n('INFO')} → ${OUT}`);
 process.exit(n('FAIL') ? 1 : 0);

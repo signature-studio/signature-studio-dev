@@ -6,9 +6,10 @@ class P7 extends AudioWorkletProcessor {
   constructor() {
     super(); this.inst = null; this.n = 0; this.h = 2166136261; this.raw = []; this.run = false; this.calls = 0; this.gaps = [];
     this.port.onmessage = (e) => this.onMsg(e.data).catch((er) => this.port.postMessage({ type: 'result', error: String(er && er.stack || er).slice(0, 300) }));
+    this.port.onmessageerror = () => this.port.postMessage({ type: 'msgerr' });
   }
   async onMsg(m) {
-    if (m.type === 'mod') { this.gotMod = true; return; }
+    if (m.type === 'mod') { this.gotMod = true; this.port.postMessage({ type: 'modRecv', isModule: m.mod instanceof WebAssembly.Module }); return; }
     if (m.type !== 'load') return;
     const t0 = Date.now(); const mod = await WebAssembly.compile(m.bytes); const t1 = Date.now();
     this.inst = await WebAssembly.instantiate(mod, {}); this.sr = m.sr; this.durMs = m.durMs; this.hashBlocks = m.hashBlocks;
