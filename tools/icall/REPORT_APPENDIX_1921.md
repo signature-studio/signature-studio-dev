@@ -51,7 +51,7 @@ HEAD までのコード差分は 0 のため、再測定は不要 (`docs/WORKFLO
 
 素材: `work-icall` (`tools/icall/work/`)・`work-liftlib` (`tools/liftlib/work/`)・`plugins-freshair`
 (`FA_DL=$RUNNER_TEMP/fa_dl bash tools/targets/freshair/fetch.sh`・win 17 files・factory .epf 8 本)・`toolchain-*` は未使用
-(`fa_route_build.sh` は `/opt/emsdk` を使用)。
+(`fa_route_build.sh` は [EMSDK] を使用)。
 
 ## 4. 未解決
 
