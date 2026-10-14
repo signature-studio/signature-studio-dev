@@ -91,6 +91,8 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
   - `py67_callers.py $P 0xfe2c80+8k (k=0..68) 0`: 86.9 秒 (RIP・即値の参照 0 件)
   - `py67_vtable.py` (vptr `0xfe2cf8`・`0x13063c8`): 各 0.2 秒
   - load average (1 分): 計測開始前 0.13、最初の sweep 直後 2.02 (sweep は 1 プロセス)
+- 正の対照: `0x11c8950` の直接 call 23 件 (前回の逆アセと一致)、`0x11be450` の `0x15e3d38` 読込みが `0x11c8950` の第 2 引数に入る (`py67_slot.py` の出力)。
+- ネガティブコントロール: スクリプトとしては未実施。`0xffe370` が vptr `0x13063c8` のスロットに無いことは静的に確認 (110 スロット・`[]`)。`0xfe2c80+8k` の RIP・即値参照 0 件は実測。
 
 ### 差分 0 の証跡
 
