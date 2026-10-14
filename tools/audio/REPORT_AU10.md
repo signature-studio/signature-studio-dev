@@ -180,3 +180,29 @@
 | 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock/ spike は未計測 | #1570 |
 
 鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `429f36bd` → HEAD の `git diff --stat 429f36bd HEAD -- tools/audio public/worklets src/runtime` は REPORT_AU10.md のみ (修正 commit 時点で確認。e2e が取り込むのは `build.sh` が cp する `public/worklets/fl-audio-worklet.js` と、トランスパイルされる `src/runtime/`)。
+
+### 16.9 AU-21 (#1570) 切り分け 5: head `084d2e36` (jump の位置・cb_max の発生 quantum を記録)
+
+測定 commit: `084d2e36` (origin/main `f1711848` 起点の worktree `ws-1570`、ブランチ `1570-au21-soak-triage-4`)。コード変更は計測の追加のみ。worklet が clock_jump の**最初と直近の位置** (`clock_first_q` / `clock_last_q`: process() 通し番号、bit31 = 負 = 重複・後退) を、producer が **cb_max_us を更新した時点の quantum 番号** (`cb_max_q`) を記録する。`pad2[3]` (180〜191) を置換し、構造体サイズ (384 B) と既存オフセットは不変。C 表 (`flaudio.c` g_layout)・TS 表 (`audio-layout.ts`)・snapshot (`audio-shim.ts`)・harness 表示 (`run.mjs`) を同時更新し、`verifyLayout` は通過。環境: GitHub runner 4 core / 15 GiB, headless google-chrome 154, `bash tools/audio/build.sh` OK (3.0 s, emcc 6.0.12, [EMSDK] 既存)。生ログ・JSON は `tools/audio/work/soak10/` (gitignore)。quantum 番号 q の時刻換算は q × 128 / 48000 s。
+
+| 試行 | 結果 | 所要 / load (開始→終了, 1 分平均) |
+|---|---|---|
+| `--soak 10` 1 回目 (16:45:23 UTC) | PASS: underruns 0, ramp 0 / 481,024 f, T=1536, cb_max 90 µs (cb_max_q 177 ≈ 0.47 s), jumps 0 | 64.1 s / 0.10 → 0.06 |
+| `--soak 10` 2 回目 | PASS: underruns 0, ramp 0 / 481,024 f, T=1536, cb_max 70 µs (cb_max_q 176 ≈ 0.47 s), jumps 0 | 63.5 s / 0.00 → 0.00 |
+| `--soak 10` 3 回目 | PASS: underruns 0, ramp 0 / 481,024 f, T=1536, cb_max 199 µs (cb_max_q 1,424 ≈ 3.8 s), jumps 0 | 63.5 s / 0.00 → 0.35 |
+| **`--soak30` (1800 s, 無負荷)** (16:46:36〜17:16:38 UTC) | **PASS**: underruns 0, silence 0, ramp **0 / 86,401,536 f**, cb 337,504 回 late 0, **cb_max 1,055 µs (cb_max_q 550,685 ≈ 1,468.5 s)**, T=1536 固定 (lat_changes 0), dev_fill 1024/1311/1536, **clock_jumps 6 / skip 384 f (+128 × 3) / dup 384 f (−128 × 3) / 符号付き合計 0**, first −q451,592 (≈ 1,204.2 s), last +q655,407 (≈ 1,747.7 s) | 1801.5 s / 0.05 → 0.00 |
+
+判定:
+- 30 分ソーク (無負荷) の通算は 7 回 (`d7d91d2`・`12586095`・`60932d35`・`5229fe5f`・`c2f67568`・`429f36bd`・`084d2e36`)。cb_max は 184 / 169 / 475 / 344 / 385 / 155 / **1,055** µs。1 ms 超は §16.1 の 18,165 µs に続く 2 例目。ただし 18 ms 級の再現は無く、今回の 1,055 µs も単発で原因は**未特定**。発生時刻は q550,685 (≈ 1,468.5 s、試行の後半)。
+- clock_jumps (今回の 30 分): 6 件で、skip と dup が 3 件ずつ・符号付き合計 0 (§16.8 の「±組」仮説と整合)。ただし記録した最初 (dup, q451,592) と直近 (skip, q655,407) は 543.5 s 離れており、**単一の隣接ペアではない**。中間 4 件の位置は未記録のため、隣接性と発生源は**未特定**。cb_max_q (q550,685) は記録した 2 件のどちらとも一致しない。
+- 10 秒ソーク: 本 head で 3/3 PASS。通算 (head `57519ca`〜`084d2e36`) で FAIL は 2/38。原因は**未特定**。FAIL 時の `cb_max_q` 採取データは無い (§16.5 の 1 回のみ、cb_max 174 ms)。
+- 負荷下の 30 分ソークは本 run では未実施 (§16.2 が最新)。
+
+鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `084d2e36` → 本 REPORT commit の `git diff --stat 084d2e36 HEAD -- tools/audio public/worklets src/runtime` は REPORT_AU10.md のみ (PR 作成時点で確認。出力は PR 本文に添付)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 10 秒ソーク FAIL の原因 (通算 2/38) | 30 分実測の信頼性 | #1570 (FAIL 時は cb_max_q・dev_fill・underrun・clock_first_q/last_q を採取) |
+| clock_jumps 6 件のうち中間 4 件の位置 (隣接性) と発生源 | 実スキップか計測由来かの切り分けが未完 | #1570 (全件の位置記録は次の実装) |
+| cb_max 1,055 µs (q550,685) の原因 | 単発の 1 ms 超。原因不明 | #1570 |
+| 負荷下 (load avg 10 超) の 30 分ソーク | 負荷下の clock・spike は未計測 | #1570 |

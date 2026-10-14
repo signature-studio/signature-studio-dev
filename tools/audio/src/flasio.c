@@ -201,7 +201,7 @@ static void do_buffer(int idx) {
     uint32_t u = (uint32_t)us;
     c->cb_count++;
     c->cb_sum_us_lo += u;
-    if (u > c->cb_max_us) c->cb_max_us = u;
+    if (u > c->cb_max_us) { c->cb_max_us = u; c->cb_max_q = LD(c->quanta); }
     fla_out_write((const float *const *)A.obuf[idx], A.B);
 }
 
@@ -210,7 +210,7 @@ static void *thread_fn(void *arg) {
     fla_ctl_t *c = fla_ctl();
     int idx = 0;
     for (uint32_t k = 0; k < A.depth; k++) { do_buffer(idx); idx ^= 1; }     /* prefill (ASIO: 起動時に連続 bufferSwitch) */
-    c->cb_count = 0; c->cb_sum_us_lo = 0; c->cb_max_us = 0; c->in_underflows = 0;   /* prefill 分は統計から除外 */
+    c->cb_count = 0; c->cb_sum_us_lo = 0; c->cb_max_us = 0; c->cb_max_q = 0; c->in_underflows = 0;   /* prefill 分は統計から除外 */
     fla_go();
     __atomic_store_n(&A.ready, 1, __ATOMIC_SEQ_CST);
     wake32(&A.ready);

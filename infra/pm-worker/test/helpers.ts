@@ -60,7 +60,8 @@ export async function configuredApp(opts: { live?: boolean; now?: { t: number };
   let soon = 0;
   const app = new PmApp({
     store,
-    cfg: loadConfig({ LIVE: opts.live ? "1" : undefined, ...(opts.env ?? {}) }, {}),
+    // 既定は VM の状態を取り込み済み扱い (IMPORT_REQUIRED=0)。取り込みの前提を見るテストだけ IMPORT_REQUIRED を "1" にする (#2343)。
+    cfg: loadConfig({ LIVE: opts.live ? "1" : undefined, IMPORT_REQUIRED: "0", ...(opts.env ?? {}) }, {}),
     storeKey: STORE_KEY,
     now: () => clock.t,
     fetch: m.f,
