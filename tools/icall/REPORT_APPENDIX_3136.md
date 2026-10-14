@@ -1,7 +1,7 @@
 # 付録: icall #3136 (ICALL-86) — SlateCore.core_64 の lea 基底の添字参照の静的網羅 (5 件 0x1813068d0〜0x181306910)
 
 > 親: #2224 (ICALL-64)。前付録: `REPORT_APPENDIX_2224.md` (§2.2 の (1)、§2.3 の (2) について SlateCore 上の出力が未取得だった件・§5 の残件)。
-> **測定 commit: `ff2442ba`** (走査コードを変えた最後の commit。N1 の修正)。以後に変えたのは本付録・候補 TSV・`docs/DOC_MAP.md` のみ (§2.3)。
+> **測定 commit: `ff2442ba`** (走査コードを変えた最後の commit。N1 の修正)。以後に変えたのは本付録・候補 TSV・`docs/DOC_MAP.md` のみ (§2.2)。
 > 走査: `tools/icall/diff/lea_index_scan.py`。負の対照: `tools/icall/diff/lea_index_scan_selftest.sh` (合成入力・素材不要・7/7 PASS)。
 > 候補の全行 (1,256 行): `tools/icall/REPORT_APPENDIX_3136_candidates.tsv` (先頭行 `自動生成:`)。
 
