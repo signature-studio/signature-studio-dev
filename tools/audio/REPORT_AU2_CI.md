@@ -227,3 +227,17 @@
 - **範囲外**: Safari・Firefox 他版・30 分ソーク・負荷下・実機 outputLatency ([AU-22])。
 - **sink の規格**: 測定中に固定していない。各 rep 開始時の ci_null 規格は `results/au2/firefox_r*.json` の `pulse.ci_null_before` に記録 (rep 1 = `s16le 2ch 44100Hz`、rep 2・3 = `s16le 2ch 48000Hz`)。sink-input の規格は全 run で要求どおり (48000 / 96000 Hz、float32)。PulseAudio が sink 側へ再サンプルしたかは未確認 (`clock` は AudioContext 側の値)。
 - **rep 1 の差**: 48k の burst・T は rep 1 = 1152・1792、rep 2・3 = 1024・1536。96k は 3 rep とも 1920・2816。rep 1 の clock は 48020.6 Hz で rep 2 と同じ (旧測定の rep 1 の 46590 Hz は今回は出なかった)。rep 1 だけ開始時の sink 規格が 44100 Hz だった点は旧測定と同じ。rep 1 の 48k の burst の差の原因は未切り分け (§4)。
+
+## 10. Windows / macOS 行列への Firefox・Safari 追加 (AU-33 #3168・部分達成)
+
+- 測定 commit: `9aa9239b` (コード最終)。`git diff 9aa9239b HEAD -- tools/audio/harness tools/audio/au2_firefox_matrix.sh tools/audio/au2_firefox_summary.mjs` の出力は 0 行。詳細は `REPORT_APPENDIX_3168.md` §A〜§F。
+- 変更: Firefox 経路の既定出力判定を OS 別にした (Linux = ci_null の sink-input / Windows = `CABLE Input` / macOS = `BlackHole 2ch`)。シナリオを Chrome 行列と同じ 3 本にした。`bidi.mjs` の既定 Firefox を OS 別にした。
+- ubuntu 再現 (Firefox 157.0・PulseAudio null-sink・n=3): **9/9 PASS** (3 シナリオ × 3 rep。underrun 0・既定 sink 接続 9/9)。48k は burst 1024・T 1536、96k は burst 1920・T 2816 (§9-1 の範囲と一致)。wall 41.0 / 40.5 / 40.6 s、load (1 分) 0.18〜0.36。
+- ネガティブコントロール (n=1): 期待外れ sink → 0/3 PASS (`on_expected=false`)。強制 underrun → 0/3 PASS。
+- **Safari**: 経路は未作成。理由: Linux runner では Safari を起動・測定できず、既存 harness は Chrome CDP と Firefox BiDi の 2 経路のみ。代替: macOS の `safaridriver` 経路 (未着手。#3168 で追跡)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| Windows / macOS の Firefox 行は #3169 (yaml) の merge 後に PM が適用。dispatch 結果は未取得 | 受入 1 の Win/mac 未達 | #3168 |
+| `win32`・`darwin` の判定分岐は Linux runner で未実行 | 判定の実機確認なし | #3168 |
+| Safari の P1〜P4 (経路未作成) | Safari 未測定 | #3168 |
