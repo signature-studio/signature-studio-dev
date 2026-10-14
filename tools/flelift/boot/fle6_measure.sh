@@ -60,7 +60,7 @@ elapsed "clang-plain" "$T"
 run_boot() {
   local log="$W/run_${TAG}_$1.log"
   local rc=0
-  FLE_IPP="$3" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
+  FLE_IPP="$3" FLE_TOLERANT="${4:-0}" FLE_BOOT_VARIANT=plain "$NODE" "$HERE/fle_boot.mjs" "$W/fleboot_plain.cjs" "$2" --boot-only > "$log" 2>&1 || rc=$?
   grep 'FLEBOOT_RESULT' "$log" || true
   grep 'FLEBOOT_IPP_CHECK' "$log" || { echo "[fle6] $1: FLEBOOT_IPP_CHECK 行が無い ($log)"; exit 4; }
   [ -s "$2" ] || { echo "[fle6] $1: 結果 JSON が無い ($2)"; exit 4; }
@@ -75,6 +75,8 @@ for r in $RUNS; do
     negctl)  run_boot negctl  "$HERE/results/boot_summary_${TAG}_negctl.json" 0 ;;
     ipp2)    run_boot ipp2    "$HERE/results/boot_summary_${TAG}_ipp2.json"   2 ;;
     default) run_boot default "$HERE/results/boot_summary_${TAG}_default.json" "" ;;
+    tol)     run_boot tol     "$HERE/results/boot_summary_${TAG}_tol.json"    1 1 ;;   # 寛容起動 (#2719): shim 有 + 逐次 unit 寛容 + CreateFruityInstance 観測
+    tol2)    run_boot tol2    "$HERE/results/boot_summary_${TAG}_tol2.json"   1 2 ;;   # 診断: 失敗 unit の後で InitTable を起動時の値へ戻す (補修。既定ではない)
     *) echo "[fle6] unknown run: $r"; exit 2 ;;
   esac
   elapsed "boot $r" "$T"
