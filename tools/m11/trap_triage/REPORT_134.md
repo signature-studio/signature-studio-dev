@@ -1,120 +1,121 @@
-# #134 (M11-N5): unit 56 (VA 0x16fde0) の fail-fast 辺の入力と、probe が読んだ object (訂正版)
+# #134 (M11-N5): unit 56 (VA 0x16fde0) の fail-fast 辺の guard 入力 (trap 時の実測)
 
-**既知類型との関係**: 該当なし (DEFECTS.md の D1a〜D23 への対応は未照合)。`function_410360` の vtable 呼出し脱落は間接 call 脱落の類型に近いが、icall §4 (D1〜D13) との突合は未実施 (別体系。下の未解決 #2)。
+**既知類型との関係**: 該当なし (DEFECTS.md の D1a〜D23 への対応は未照合)。`function_410360` の vtable 呼出しの IR 脱落は、間接 call 脱落の類型に近いが、icall §4 (D1〜D13) との突合は未実施 (未解決 #3)。
 
-**訂正 (review round 1 対応)**: 初版の結論 (a)(b)(c) は撤回する。probe が読んだ 2 つの object (VA `0x566d68` / `0x566eb0`) は、fail-fast 辺の入力 (R と list) ではなかった。§3 の機械語照合で、この 2 object は `function_56fde0` が `function_8c5eb0` へ渡す `this` (Delphi の VMT) であり、guard の件数は `410320(this, 1)` の戻り値 R の経路から読まれると確認した。R と list の trap 時の値は未測定。
+## 0. 結論 (本 run の実測で言えること)
 
-## 0. 結論 (現時点で言えること)
-
-- **実測** (probe n=3 + NC): 2 つの VMT object の件数 (+0x14)・先頭 qword・`[vt-0x50]` は trap 時点で 3 回同一。全 942 unit の実行で、両 object の件数・先頭 qword は変わらなかった (`changed_after_unit: []`)。
-- **静的** (PE 機械語): `56fde0` の 2 つの `8c5eb0` 呼出し (`570296`・`5702ae`) は、どちらも `dl=1` (bit 7 が立たない)。このとき `410320` は `[this-0x30]` を呼び、その戻り値 R を `8c5eb0` が使う。`[this-0x30]` は 2 つの VMT で同じ `0x40f960`。
-- **guard の入力**: 件数は `[list + 0x14]`、list は `8c67a0(R)`。fail-fast 辺 (`8c608d`) の receiver は R (`410360(R)`)。
-- **未測定 (B1)**: R・list・R の vtable (`[R-0x50]`)。件数 0 や vtable の無効値は、R について何も言えない。
-- **撤回**: (a) 件数 0 は実行時の状態である、(b) 書込み元は skip unit か lift 脱落 store、(c) native は `[vt-0x50]` へ call する。いずれも guard の入力 R を測っていないため、結論にできない。
-- **未実施の理由**: この run の `$ARTIFACTS_DIR` には `fl-win64` しか無く、`toolchain-retdec`・`toolchain-emsdk`・`work-m11` が無い。IR・`m11_boot.cjs`・`m11_image.bin` を生成できないため、probe を再実行できない。PR 本文に `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` を入れ、次の run で素材を取得する (§5)。
+- **guard の入力を trap 時点で実測した** (§3。n=3 + NC、3 回とも同一)。8c5eb0 の入口 arg2 は `dl = 0x01` (bit 7 なし)。guard の R (410320 の戻り) の先頭 qword は `0x566d68` = this。list (8c67a0(R) の戻り) の件数 `[list+0x14]` は **0**。
+- **件数 0 は wasm 実行の trap 時点の値**。ただし native の値は未測定のため、「wasm で 0」までが言える。
+- **R と list の `[vt-0x50]` は両方 VA `0x410070`**。PE の静的値 (`[0x566d18]`・`[0x8bd308]`) と一致し、その番地は `ret` 1 命令の stub (no-op)。よって fail-fast 辺の vtable 呼出し先は有効な no-op で、「vtable が無効」が trap の原因ではない。
+- **旧 §3 の VMT (this) の値は本 run で再現** (n=3 同一)。VMT は補助 (§3 の表 B)。
+- **未判定**: (b) skip 3 の書込み元 (本測定の範囲外)。native 側の件数 (比較の手段が無い)。
 
 ## 1. 測定条件
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit (probe コード) | `a380b7c4` (`m11_survey.mjs` の env-gated probe と `probe_134.sh`。この commit が最後のコード変更。`46c92356..a380b7c4` は 1 commit) |
-| 基準 survey 数値 | `46c92356` (a380b7c4 の直前。probe 無し) で測定。下 §2 |
-| 検証 HEAD | `c58a7a34` (訂正版)。コードの差分は `m11_survey.mjs` と `probe_134.sh` の**コメントのみ** (挙動不変)。文書の差分は REPORT_134.md と DOC_MAP の 1 行 |
-| 差分の証跡 (コード) | `git diff a380b7c4 HEAD -- tools/m11/m11_survey.mjs tools/m11/trap_triage/probe_134.sh` の出力 (変更行のみ): `-// #134 probe (既定 off): unit 56 の fail-fast 辺で読まれる object …` → `+// #134 probe (既定 off): unit 56 が 8c5eb0 へ渡す this (VMT。…) … guard の入力 R ではない (REPORT_134 §4)`。`-# #134: unit 56 (VA 0x16fde0) の fail-fast 辺 …` → `+# #134: unit 56 (VA 0x16fde0) が 8c5eb0 へ渡す this (VMT) の状態を …` (2 行ずつ、コメントのみ) |
-| 差分の証跡 (範囲) | `git diff --stat a380b7c4 HEAD -- tools/m11`: `m11_survey.mjs` 2 行・`probe_134.sh` 2 行・`REPORT_134.md` (文書)。`docs/DOC_MAP.md` の差分は 1 行 (索引) |
-| PE | `fl-win64` の `extracted/block00031_PE.bin`、sha256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` (本 run で `sha256sum` と一致を確認) |
-| 素材 (前回 run) | `work-m11.tar.zst` を `tools/m11/work/` へ展開して測定した。本 run では再測定していない |
-| `work/lift_pe.sha256` | 手で作成。内容は PE の sha256 hex 1 行 (パス無し)。`m11_e2e.sh` の 62 行 `echo "$PE_SHA" > work/lift_pe.sha256` と同じ書式。展開物に無く、全再生成は `m2/work/ghidra_dll` 欠落で `m11_bounds.py` が失敗するため手で作った |
-| IR (前回 run) | `m11_gen_ir2.sh` で再生成。`ir_sha256` = `de46cada…8636`、ldfix/qstore = applied |
+| 測定 commit (コードを変えた最後の commit) | `df420360` (IR probe `probe134_ir.py`・`m11_rt.c` の記録関数・`m11_survey.mjs` の読取り・`m11_build.sh` の `M11_PROBE_134` 分岐) |
+| 検証 HEAD | この PR の head (最後の push)。PR 本文の「検証 HEAD」と一致させる |
+| 差分の証跡 | `git diff df420360 HEAD -- tools/m11/m11_rt.c tools/m11/m11_build.sh tools/m11/m11_survey.mjs tools/m11/trap_triage/probe134_ir.py tools/m11/trap_triage/probe_134.sh` の出力は空 (本ファイルの変更のみ) |
+| 素材 (本 run で展開・実在を確認) | `fl-win64` (`extracted/block00031_PE.bin` のみ展開)・`work-m11` (→ `tools/m11/work/`)・`toolchain-emsdk` (`/opt/emsdk`)・`toolchain-retdec` (`/opt/retdec`) |
+| PE | `extracted/block00031_PE.bin`、sha256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` |
+| IR | `bash m11_gen_ir2.sh` を本 run で再生成 (33 秒)。`ir_sha256` = `f199b896…be22` (build 後の値。qstore・ldfix・ld108 = applied)。旧 REPORT の `de46cada…8636` とは一致しない |
+| build | 採取: `M11_PROBE_134=1 bash m11_build.sh` (IR probe 入り)。既定: `bash m11_build.sh` |
+| 実行日時・出力 | 採取 2026-10-14 18:11〜18:12 UTC。出力は `tools/m11/work/v134/` (gitignore。`n1`〜`n3`・`nc_shift1`・`build.log`) |
+
+`work/lift_pe.sha256` は本 run で作っていない (`m11_gen_ir2.sh` と `m11_build.sh` だけを使った。`m11_e2e.sh` の全再生成経路は通していない)。
 
 ## 2. 基準の数値 (m4)
 
-| 測定 | HEAD | survey ok / trap / miss / noproc | 備考 |
+| 測定 | commit | 環境 (IR) | ok / trap / miss / noproc (clobber) |
 |---|---|---|---|
-| 本 PR の基準 (前回 run) | `46c92356` (probe 無し) | **872 / 23** / 46 / 1 (clobber 0) | `m11_e2e.sh` n=1。stage 4/6、units_run 53 / 942 |
-| issue 記載 | `750340fc` | 871 / 24 / 46 / 1 | issue 本文の値 |
-| #134 の 2026-10-13 実測 | main `427eab37` | 870 / 25 (review 指摘の値) | 出所の REPORT は本 run で未照合。miss / noproc は未確認 |
-| main の現在 (`b745bcbc`) | — | **未測定** | 本 run は素材不足で e2e 不可 |
+| 本 run・既定 off (本 PR の head) | `df420360` の既定 build | 本 run の再生成 IR | **870 / 24 / 47 / 1 (0)** |
+| 本 run・基準 (control) | `46c92356` (本 PR の基点) | 本 run の再生成 IR | **870 / 24 / 47 / 1 (0)** |
+| 旧 REPORT の値 | `46c92356` | 前回 run (IR `de46cada…`) | 872 / 23 / 46 / 1 (0)。本 run では再現せず |
+| issue 本文 | `750340fc` | — | 871 / 24 / 46 / 1 |
+| review 指摘 | `427eab37` | — | 870 / 25 (出所の REPORT は未照合) |
 
-- 872/23 と 870/25 の差は HEAD の差 (`750340fc`・`427eab37`・`46c92356`) による可能性があるが、切り分けは未実施。
-- **既定 off の挙動**: probe は `M11_PROBE_134=1` のときだけ動く。a380b7c4 の既定 off の survey を本 run で再測定していない (素材不足)。コードの diff 精読で挙動不変を確認した (review の確認と同じ)。
-- 基準 e2e の内訳: trap 内訳は unreachable 1、halt0→longjmp 7、OOB 15。停止は `unreachable` @ `function_8c5eb0` <- `function_56fde0`。
+- 本 PR の head と基点 `46c92356` は、同じ環境・同じ IR 生成で同一の値。本 PR のコードは既定 off の survey を変えない (測定値)。
+- `872/23` は本 run で再現しない。差の原因は IR の再生成の環境差 (ir_sha が一致しない) と推定するが、切り分けは未実施 (未解決 #4)。
+- main の現在の基準は未測定。`m11_judge` (stage) と `m11_run` は本 run で未実行。
 
-## 3. probe の実測 (`bash trap_triage/probe_134.sh`, n=3 + NC)
+## 3. 採取の実測 (B1: trap 時の guard 入力。n=3 + NC)
 
-**注意: probe が読む対象は VMT (`this`) であり、guard の入力ではない。下の表の値は VMT の状態である (§4)。**
+probe の方式は §5。単位は trap 時点 (unit 56 の catch)。linear 0x… は wasm 線形メモリの番地 (VA = linear + 0x400000)。
 
-| object (linear / VA) | 件数 +0x14 (i32) | 先頭 qword (wasm / VA) | `[vt-0x50]` (wasm の値) |
-|---|---|---|---|
-| 1469800 / 0x566d68 | 0 (n=3: 0, 0, 0) | 0x168b50 / 0x568b50 | `0xffffd3a8e8000000` (n=3 同一) |
-| 1470128 / 0x566eb0 | 0 | 0x16e0d0 / 0x56e0d0 | `0xccccccccccc35f5e` |
+**表 A: guard の入力 (IR probe で 8c5eb0 の call 戻り値を採取)**
 
-- n=3 の範囲: 件数・先頭 qword・`[vt-0x50]` は 3 回とも同一 (min = max)。trap 文字列は 3 回とも `unreachable`。
-- 全 942 unit: 両 object の件数・先頭 qword は、どの unit の前後でも変わらなかった (`changed_after_unit: []`)。これは **VMT の不変性**の証拠であり、R と list の不変性の証拠ではない。
-- **ネガティブコントロール** (NC): 読み取り先を 1 byte ずらした (`M11_PROBE_134_OBJS=1469801,1470129`) とき、件数は `536870912` (0x20000000)、先頭 qword は `0xf000000000001800` 系になり、VMT の値と一致しなかった。読み取り先が object に依存することの確認にはなる。
-- NC は別アドレスの値であり、実 object の不変性の証拠にはならない (n=4 と数えない。実 object は n=3)。
-- probe の `[vt-0x50]` は、`vt = [obj]` (先頭 qword) の `-0x50` 位置の値 (obj を instance と見たときの vtable 呼出し先)。guard の receiver (R) の vtable ではない。wasm の `410360` は IR で vtable を呼ばない (§4 の 410360 の行)。
-
-## 4. 静的照合 (PE の機械語、capstone。PE sha256 `b2c64da4…9496d`)
-
-| 位置 | 機械語 | 意味 |
+| 項目 | 採取値 (n=1・n=2・n=3 同一) | NC (1 byte ずらした読取り) |
 |---|---|---|
-| `8c5eb0`〜`8c5ed1` | `mov [rbp+0x88], dl`; `cmp byte [rbp+0x88], 0`; `je 8c5ef5` | dl == 0 なら R = this |
-| `8c5eda`〜`8c5eee` | `rcx = [rbp+0x80]` (this); `rdx = dl`; `call 410320`; `mov [rbp+0x80], rax` | dl ≠ 0 なら R = `410320(this, dl)` |
-| `410320` | `test dl, dl`; `jl 410331`; (bit 7 が立たない) `call [rax-0x30]` (rcx = this); `ret` | bit 7 が立つ → R = this。立たない → R = `[this-0x30](this)` の戻り値 |
-| `8c5ef6`〜`8c5f0c` | `rcx = [rbp+0x80]` (R); `call 8c67a0`; `[rbp+0x58] = rax` (list); `ebx = [list+0x14]` | 件数 = `[list+0x14]`、list = `8c67a0(R)` |
-| `8c608d` | fail-fast 辺: `410360([rbp+0x80])` | receiver は R |
-| `410360` | `rbx = [rax]` (R の先頭 qword); `call [rbx-0x50]` | 機械語では R の vtable を呼ぶ。**IR では `ret i64 %arg1` で脱落** (下の未解決 #2) |
-| `56fde0`〜`5702be` (1 関数。途中に ret 無し) | `57028a`〜`570296`: `rcx = [0x566ca0]` (= 0x566d68); `dl = 1`; `xor r8, r8`; `call 8c5eb0`。`5702a2`〜`5702ae`: `rcx = [0x566de8]` (= 0x566eb0); `dl = 1`; `xor r8, r8`; `call 8c5eb0` | 2 呼出しとも `dl = 1` (bit 7 が立たない)。よって `410320` は `[this-0x30]` を呼ぶ |
-| `[0x566d38]` = `[0x566e80]` | `0x40f960` | 2 つの VMT の `-0x30` スロットは同じ関数 |
+| (i) arg2 | `dl = 0x01`、bit 7 = false (期待値 `dl = 1` どおり) | — |
+| (ii) R = `410320` の戻り | `0x10b698c0` | — |
+| R `+0x14` (i32) | **0** | `+0x15` = 0 (真の値と同じ 0 のため NC として弱い) |
+| R 先頭 qword | `0x166d68` (= VA `0x566d68` = this) | `+1` 読みは `0x166d` (別値) |
+| R `[vt-0x50]` | `0x10070` (VA `0x410070`) | — |
+| (iii) list = `8c67a0(R)` の戻り | `0x10bc4e40` (R とは別の番地) | — |
+| list `+0x14` (i32) | **0** (件数 0) | `+0x15` = 0 (同上) |
+| list 先頭 qword | `0x4bd358` (VA `0x8bd358`) | `+1` 読みは `0x4bd3` (別値) |
+| list `[vt-0x50]` | `0x10070` (VA `0x410070`) | — |
 
-- 以上から、`function_56fde0` が unit 56 で `8c5eb0` を呼ぶとき、guard が読む件数は `0x40f960(this)` の戻り値 R の list の +0x14 である。probe が読んだ `this` (VMT) の件数ではない。
-- `dl = 1` のとき、R が this になるのは `410320` が bit 7 を見て this を返す場合だけ。`dl = 1` では bit 7 が立たないので、R = this にはならない。(dl = 0 のときも R = this になるが、この呼出しでは起きない)
-- R の値は `0x40f960` の実行結果で、静的には決まらない。
+- 記録 mask = 7 (arg2・R・list が揃っている)。trap は list を求めた後で起きた (fail-fast 辺)。
+- 記録件数 n = 1: unit 56 の trap 時点まで 8c5eb0 の入口は 1 回だけ。trap は 1 回目の呼出し (this = `0x566d68`) で起き、2 回目 (this = `0x566eb0`) には到達しない。
+- R が「採った対象」であること: R の先頭 qword = this は、`dl` の bit 7 が立たない経路で `[this-0x30]` (= `0x40f960`) が生成したインスタンスの性質 (`[inst] = self`) と一致する。list は R と別の番地。両方とも IR の call 戻り値 (`%5` = 410320、`%6` = 8c67a0) を記録したもので、メモリの読取りではない。
 
-## 5. 次の作業 (B1 の採取仕様・未実施)
+**表 B: 補助 (this = VMT の状態。guard の入力ではない。旧 §3 の値の再測定)**
 
-採る対象 (trap 時点。n=3 + NC):
-
-1. (i) arg2 の値 (`dl`・bit 7。期待値は `dl = 1`)
-2. (ii) `410320` の戻り値 R
-3. (iii) `8c67a0(R)` の戻り値 list
-4. (iv) R と list それぞれの `+0x14` (i32)・先頭 qword・`[vt-0x50]` (先頭 qword の -0x50 位置)
-
-手段 (どちらでもよい。採った対象を REPORT に明記する):
-
-- `tools/m11/trap_triage/inspect_trap.mjs` (#1602、REPORT_1602 §16) で trap 時の wasm local を読む。`M11_INSPECT_FN` に `8c5eb0` の wasm 関数 index、`M11_INSPECT_FRAMES` と `M11_INSPECT_PEEK` で R・list を追う。`--wasm-enforce-bounds-checks` が要る。
-- または `m11_ov.c` の C 転記で戻り値を大域に残す (再生成が要る)。
-
-NC: R 系の読み取り先を 1 byte ずらす。繰返しは n=3。
-
-素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` (PR 本文に記載)。
-
-## 6. 判定 (訂正後)
-
-| 判定 | 初版 | 訂正後 | 根拠 |
+| object (linear / VA) | `+0x14` (i32) | 先頭 qword | `[vt-0x50]` |
 |---|---|---|---|
-| (a) 件数 <= 0 は実行時の値か | 実行時の値 | **未判定** (R の件数は未測定) | guard は `[list+0x14]` を読む (§4) |
-| (b) skip 3 が初期化するはずの object か | 未確定 | **未判定** (VMT の不変性のみ確認) | `changed_after_unit` は VMT の不変性で、R と list の不変性ではない |
-| (c) vtable[-0x50] は有効な VA か | 無効 | **未判定** (probe の値は VMT の値) | `410360` の receiver は R (§4)。wasm では IR 脱落で vtable を呼ばない |
+| 1469800 / `0x566d68` | 0 | `0x168b50` (VA `0x568b50`) | `0xffffd3a8e8000000` |
+| 1470128 / `0x566eb0` | 0 | `0x16e0d0` (VA `0x56e0d0`) | `0xccccccccccc35f5e` |
+
+- n=3 同一。全 942 unit の実行で不変 (`changed_after_unit: []`)。これは VMT の不変性であり、R と list の不変性ではない。
+- NC (読取り先を 1 byte ずらす `1469801,1470129`): 件数 `536870912`、先頭 qword `0xf000000000001800` 系で、VMT の値と一致しない (`nc_shift1`)。
+
+## 4. 静的照合 (PE の機械語・データ。capstone / pefile)
+
+| 位置 | 内容 | 意味 |
+|---|---|---|
+| `56fde0` の 2 呼出し (`570296`・`5702ae`) | 直前に `dl = 1`、`rcx = [0x566ca0]`・`[0x566de8]` (= 0x566d68・0x566eb0) | `410320` は bit 7 が立たず `[this-0x30]` を呼ぶ |
+| `410320` | `test dl,dl; jl`。bit 7 なし → `call [rax-0x30]` | R = `[this-0x30](this)` の戻り |
+| `[0x566d38]` = `[0x566e80]` | `0x40f960` | 2 つの VMT の `-0x30` は同じ NewInstance |
+| `[0x566d18]` | `0x410070` | R の `[vt-0x50]` (wasm 実測と一致) |
+| `[0x8bd308]` | `0x410070` | list の `[vt-0x50]` (wasm 実測と一致) |
+| `0x410070` | `c3` (`ret`)。`0x410060`・`0x410080` も `ret` の stub | 有効な no-op。int3 padding ではない |
+| `410360` | `rbx = [R]`; `call [rbx-0x50]` | fail-fast 辺の vtable 呼出し。IR では `ret i64 %arg1` で脱落 (未解決 #2) |
+
+## 5. 採取の方法 (本 run で実施)
+
+- `trap_triage/probe134_ir.py` が `function_8c5eb0` の本体に 3 点の観測呼出しを入れる: 入口の `arg2` (f=0)、`410320` の戻り `%5` (f=1)、`8c67a0` の戻り `%6` (f=2)。`m11_rt.c` の `m11_p134_put`/`m11_p134_get` が 64 件の環状配列に記録する。
+- 挿入は `M11_PROBE_134=1` のときだけ (`m11_build.sh` の stamp `work/instr_134.stamp` で post 出力を作り直す)。既定 build は IR に観測呼出しが無く、`_m11_p134_*` も export されない。`m11_rt.c` の記録関数は既定 build にも含まれるが、呼出し元が無い。
+- survey は unit 56 の catch で `p134ir()` を読む (R・list の `+0x14`・先頭 qword・`[vt-0x50]`、NC は 1 byte ずらす)。読取りは trap 直後で、state を変えない。
+- `inspect_trap.mjs` (REPORT_APPENDIX_1602.md §16) は使わなかった。
+
+## 6. 判定
+
+| 判定 | 結果 | 根拠 |
+|---|---|---|
+| (a) 件数 0 は実行時の値か | **wasm では trap 時点の list の件数は 0** (native は未測定) | §3 表 A |
+| (b) skip 3 の object の初期化 | 未判定 (本測定の範囲外) | — |
+| (c) `[vt-0x50]` は有効か | **有効**。R・list とも VA `0x410070` = `ret` の stub (no-op) | §3 表 A・§4 |
+| fail-fast 辺の `410360` の IR 脱落 | 対象の vtable 呼出し先は no-op のため、この脱落が trap の原因とは言えない。脱落の影響そのものは未確認 | §4 |
+
+撤回: 初版 (a)(b)(c) の結論は、訂正版の時点で撤回済み。本判定は R と list を直接採った値による。
 
 ## 7. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| B1: R・list・R の vtable の trap 時実測 (§5) | (a)(c) の判定が未確定。unit 56 の原因の特定は未達 | 本 PR の次の round (`oc_artifacts` 行で素材を取得して実施) |
-| `function_410360` の `call [rbx-0x50]` が IR で脱落 (`ret i64 %arg1`)。wasm の後段 (R の vtable 呼出し) が消えている疑い | 間接 call 脱落の別 miscompile の疑い。icall §4 (D1〜D13) との突合は未実施 | PM 判断 (子 issue 候補) |
-| `410320` が `[this-0x30]` を呼ぶ先 `0x40f960` の wasm 側の lift 検証 | R の値が native と一致するかは未確認 | 上の B1 と同じ round |
-| skip 3 の Init 0xfa9390 の出所 | skip 3 の unit の init が wasm で走らない疑い | PM 判断 |
-| 基準 survey 数値の差 (872/23・871/24・870/25) | HEAD 差の影響は未切り分け | #718 への追記候補 (PM 判断) |
+| native 側の list 件数 (0 か) | 件数 0 が native でも起きるかは不明。native 比較の手段が無い | PM 判断 |
+| `function_410360` の `call [rbx-0x50]` の IR 脱落 (`ret i64 %arg1`) | 対象の呼出し先は no-op。他の間接 call 脱落との突合 (icall §4 D1〜D13) は未実施 | PM 判断 (子 issue 候補) |
+| skip 3 の Init `0xfa9390` の出所 | (b) の判定。unit 56 の原因特定は未達 | PM 判断 |
+| 基準 survey の差 (872/23 と 870/24) | 本 run で基点も 870/24。IR 再生成の環境差の切り分けは未実施 | #718 への追記候補 (PM 判断) |
 
 ## 8. 再現
 
 ```sh
-export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"
+export FL_WIN64_DIR="$RUNNER_TEMP/fl-win64"   # extracted/block00031_PE.bin を展開しておく
 cd tools/m11
-bash m11_e2e.sh                       # 基準 (stage 4/6, units_run 53, survey 872/23/46/1 — 46c92356 の値)
-bash trap_triage/probe_134.sh         # VMT の probe n=3 + NC (出力は work/v134/)。guard の入力 R は採らない (§5 が未実施)
+bash m11_gen_ir2.sh                  # IR を再生成 (約 33 秒。ir_conditions.json)
+bash trap_triage/probe_134.sh        # M11_PROBE_134=1 で build し、n=3 + NC (約 50 秒)。出力は work/v134/
+M11_PROBE_134=0 bash m11_build.sh && node m11_survey.mjs   # 既定 off の基準 (870/24/47/1 相当)
 ```
-
-- 静的照合は PE だけで再現できる (§4)。`capstone` と `pefile` が要る。`block00031_PE.bin` の sha256 は §1。
