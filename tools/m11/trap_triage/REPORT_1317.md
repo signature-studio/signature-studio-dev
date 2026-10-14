@@ -190,15 +190,18 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 
 ## 12. 追補 (2026-10-14・#1317 8 回目 run): function_40f960 / 40fb40 の計測 (既定 OFF)
 
-- 測定 commit: `731a232a` (計測 probe 込み・`M11_INSTR_40F960` 既定 0)。
-- 以降のコード変更: `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
-- `git diff 731a232a HEAD -- tools/m11` は `m11_ov.c` の 6 行のみ (全文は `REPORT_1317_APPENDIX.md` §12)。
-- 旧計測 (`731a232a`) の「`40fb40` の連鎖長 10 万未満」は**無効**。旧 `static` カウンタはプロセス全体の累計で、各連鎖の長さではない。`40f960` の確保サイズ (呼び出しごとに出力) は有効な値。
+- 測定 commit: `b36d3b5f` (計測 probe のコードはこの commit で最後に変わった。`M11_INSTR_40F960` 既定 0)。検証 HEAD `93e5fcb9`。
+  - `git diff b36d3b5f 93e5fcb9 -- tools/m11/m11_ov.c tools/m11/m11_build.sh` は出力なし (差分 0)。
+  - `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
+  - 前の commit `731a232a` の計測値は無効 (旧 `static` カウンタはプロセス全体の累計)。全 diff は `REPORT_1317_APPENDIX.md` §12。
+- 旧記録 (§4a・§6〜§8) の rc=124 (`0..830`+880) は、素材 IR 依存の可能性がある。公開 RetDec 由来の IR では再現しなかった (下記)。
+- 旧計測 (`731a232a`) の「`40fb40` の連鎖長 10 万未満」は**無効**。`40f960` の確保サイズ (呼び出しごとに出力) は有効な値。
 - 再測定 (`b36d3b5f`・`M11_INSTR_40F960=1`・`M11_M2P=1`・`survey_units.mjs` 60 s 上限): 素材 `work-m11` / `work-liftdiff` / `fl-win64` を展開して実施。
   - IR は素材に `ir_conditions.json` が無く build を通せなかったため、公開 RetDec v5.0 (`avast/retdec` release) で `m11_gen_ir2.sh` を再生成 (rc=0・`ldfix errors=0`・49.9 s) してから build (rc=0・22.1 s)。emsdk は `6.0.12` を `[EMSDK]` に導入 (`llvm-nm` が PATH に無く build が rc=127 になったため `[EMSDK]/upstream/emscripten/llvm-nm` へリンク)。素材の `ir_conditions.json` / 素材 IR との同一性は未確認。
   - `0..829`+880: rc=0、6.5 s、`{"ok":763,"oob":14,"miss":46,"other":1,"halt0":7}`。`40f960` 521 回・`40fb40` 521 回 (`chain_len` 1〜7)。
   - `0..830`+880: rc=0、12.3 s、`{"ok":763,"oob":15,"miss":46,"other":1,"halt0":7}`。`40f960` 523 回・`40fb40` 523 回 (`chain_len` 1〜7)。
   - 対照 (`M11_INSTR_40F960=0`・同 IR): `0..829`+880 rc=0 6.9 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":14}`、`0..830`+880 rc=0 13.0 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":15}`。計測 probe の ON/OFF で結果は 1 件ずれる (`ok`・`halt0`)。
+  - 扱い: probe ON の結果は挙動を 1 件変えるため、停止判定には使わない。ずれの原因は未切り分け。各条件は 1 回の測定で、再現性 (2 回目の値) は未確認。
   - **REPORT §4a・§6〜§8 の「`0..830`+880 は rc=124」とは再現が一致しない**。今回の IR (公開 RetDec 由来) と素材 IR の差が原因かは未切り分け。
 
 | 条件 | `40f960` の呼び出し (self, size) | `40fb40` の chain_len 最大 | 最後の出力 |
