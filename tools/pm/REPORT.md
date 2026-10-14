@@ -210,7 +210,7 @@ RETRO §3 の良い点の根拠。数値はこちらが正本。
 
 ## 12. PM Worker の live 切替前の突き合わせ (#2443)
 
-測定した commit: `e88e1890` (`infra/pm-worker` は #2422・#2423 を含む origin/main `803d5164` と同一)。`git diff 2f884d99 e88e1890 -- infra/pm-worker/src infra/pm-worker/test` は 19 ファイル +1,841/−56。launch の判定に効くのは engine.ts の rate-guard (launch を止める条件)と、pm-apply・needs-user-input の issue を ready/relaunch から user に移す規則 (#2423)。取得時刻は UTC (2026-10-14)。
+測定した commit: `e88e1890` (`infra/pm-worker` は #2422・#2423 を含む origin/main `803d5164` と同一。以後の main の変更は `package.json` の `packageManager` の固定 (#2452) だけ)。`git diff 2f884d99 e88e1890 -- infra/pm-worker/src infra/pm-worker/test` は 19 ファイル +1,841/−56。launch の判定に効くのは engine.ts の rate-guard (launch を止める条件)と、pm-apply・needs-user-input の issue を ready/relaunch から user に移す規則 (#2423)。取得時刻は UTC (2026-10-14)。
 VM: 13:18〜13:22Z の `issue_snapshot.py` に増分 (`since=13:17Z`、REST 7 回) を当てて `launch_issues.py` の classify (14:03:28Z。`full_bot_body` は REST を使わず空にした。relaunch の素材追加の判定だけ変わり得る)。Worker: `GET /status?detail=1` (14:04Z。reconcile 14:02:49Z。head から作った dry-run の版、候補の全件を出すため一時ビルドで `TARGET=1000 BATCH=1000 NO_PR_COOLDOWN_H=24`、`rest_remaining=4980`)。
 
 ### 12-1. 分類の件数 (全カテゴリ)
