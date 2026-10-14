@@ -102,14 +102,16 @@
 
 ビルド 2 回目 (fix run の再測定・コマンド記録あり・n=1。repo の HEAD は `62aef8b9`、測定にコードは使っていない。4 コア・RAM 15GB):
 ```
+# 作業ディレクトリを W とする。W/retdec がソース、W/build-remeasure がビルド先
 git clone https://github.com/avast/retdec && git -C retdec checkout 6edcaaea   # 取得 2.6 s (測定外)
 sudo apt-get install -y libfl-dev                                              # 5 s (測定外)
 mkdir build-remeasure && cd build-remeasure
 export CXXFLAGS="-include cstdint -include string"
-time cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=../install   # real 3.7 s・rc=0
+time cmake ../retdec -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=../install   # real 3.7 s・rc=0
 time make -j4                                                                         # real 860 s (14 分 20 秒)・rc=0
 ```
-- load average は make 開始時 0.31 → 終了時 4.84。`make install` は実行していない (計測外。share の 404 で失敗する段は §6i の阻害要因 1)。
+- 上の記録の初版は `cmake ..` としていたが、cwd が W のままだと `..` は RetDec のソース (CMakeLists.txt) を指さず、configure は失敗する。本 run で同じ cwd (W で `cmake ..`) を試し、rc=1 (`does not appear to contain CMakeLists.txt`) を確認した。前回 run の実際の cwd は本 run から確認できないため、構成を上のとおり `cmake ../retdec` に明示して書き直した。修正後の構成で configure 段のみ再確認した (測定外。real 3.8 s・rc=0)。
+- load average は make 開始時 0.31 → 終了時 4.84。2 回目 (本再測定) では `make install` を実行していない (計測外)。share の 404 は 1 回目 (実装 run) の `make install` で観測したもので、本再測定では再確認していない (§6i の阻害要因 1)。
 - LLVM ソース (`external/src/llvm-project`、71M) の取得は `make` の中で行われるが、ExternalProject の download stamp は make 開始 (12:33:15Z) の 3 秒後 (12:33:18Z) で、取得時間は 860 s に含まれるが数秒。LLVM のビルド完了は make 開始の 6 分 17 秒後 (12:39:32Z)、yaramod は 1 分 32 秒後 (12:34:47Z)。残りは RetDec 本体。
 - 644 s と 860 s の差の原因は未確認 (1 回目のコマンドが不明で、run も別)。どちらも 60 分未満。
 - cfg.log・make.log は成果物にしない (runner の一時領域で run 終了時に破棄される)。
