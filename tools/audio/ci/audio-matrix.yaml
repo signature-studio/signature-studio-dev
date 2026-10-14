@@ -47,6 +47,9 @@ jobs:
           - os: macos-latest
             browser: chrome
             chrome: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+          - os: macos-latest
+            browser: safari
+            chrome: ''
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -75,6 +78,9 @@ jobs:
           sleep 5
           SwitchAudioSource -s "BlackHole 2ch"
           SwitchAudioSource -c
+      - name: Safari の remote automation を許可 (macOS・Safari 行のみ・未検証)
+        if: matrix.browser == 'safari'
+        run: sudo safaridriver --enable
       - name: P1〜P4 の測定 (AU-2 の 3 シナリオ × n=3)
         shell: bash
         env:
@@ -83,7 +89,7 @@ jobs:
           mkdir -p audio-results
           rc=0
           for rep in 1 2 3; do
-            node tools/audio/harness/run.mjs --only asio_sine_b256_d2,asio_sine_b256_96k,asio_sine_b512_96k \
+            node tools/audio/harness/run.mjs --browser ${{ matrix.browser }} --only asio_sine_b256_d2,asio_sine_b256_96k,asio_sine_b512_96k \
               --out "audio-results/${{ matrix.os }}_${{ matrix.browser }}_r${rep}.json" || rc=1
           done
           exit $rc
