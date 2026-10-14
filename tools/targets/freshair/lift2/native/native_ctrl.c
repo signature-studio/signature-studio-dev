@@ -60,17 +60,28 @@ static void* __attribute__((ms_abi)) ca1480_probe(void* C, void* out, void* key)
     uint64_t a2d0, a328, ctl, h[3]; memcpy(&a2d0, (char*)C + 0x2d0, 8); memcpy(&a328, (char*)C + 0x328, 8); memcpy(&ctl, (char*)C + 0x318, 8);
     uint32_t kc = 0xffffffffu, k0 = 0xffffffffu; if (key) { memcpy(&kc, key, 4); memcpy(&k0, (char*)key + 4, 4); }
     const char* pth = !key || kc == 0 ? "nokey" : a2d0 == a328 ? "map" : kc != 1 ? "zero" : k0 == 0 ? "static" : "map";
-    memcpy(h, (char*)ctl + 0xa8, 24);
+    /* FA-29 (#2145): FA_P9GUARD=1 は ctl が poison (a5a5…) のとき +0xa8 を読まない (2 回目の呼出 C=Z では ctl を deref して ERR になっていた)。既定 OFF */
+    if (getenv("FA_P9GUARD") && ctl == 0xa5a5a5a5a5a5a5a5ULL) memset(h, 0, 24);
+    else memcpy(h, (char*)ctl + 0xa8, 24);
     { unsigned char tmp[12]; memcpy(tmp, g_sv_ca, 12); memcpy(g_p_ca, tmp, 12); }
     void* r = ((ca1480_t)(g_p_ca))(C, out, key);
     patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca);
     uint64_t o0, o1, o2; memcpy(&o0, out, 8); memcpy(&o1, (char*)out + 8, 8); memcpy(&o2, (char*)out + 0x10, 8);
-    fprintf(stderr, "FA9CA S%d eq=%d kc=%u k0=%u path=%s ret=%s out0=%llx out1=%llx found=%d hdr=%llx,%llx,%llx\n", g_trSidx, a2d0 == a328, kc, k0, pth,
+    fprintf(stderr, "FA9CA S%d C=%p key=%p eq=%d kc=%u k0=%u path=%s ret=%s out0=%llx out1=%llx found=%d hdr=%llx,%llx,%llx\n", g_trSidx, C, key, a2d0 == a328, kc, k0, pth,
             r == out ? "out" : "?", (unsigned long long)o0, (unsigned long long)o1, o0 != 0, (unsigned long long)h[0], (unsigned long long)h[1], (unsigned long long)h[2]);
     /* 観測のみ: out[0] が自前で確保した node Z の値オブジェクトを指すときだけ +0x10 を読む (想定外の値は deref しない) */
     if (o0) { int isZ = g_nodeZ && (unsigned char*)o0 == g_nodeZ; uint64_t o16 = 0; if (isZ) memcpy(&o16, (char*)o0 + 0x10, 8);
               fprintf(stderr, "FA9OBJ S%d out0_is_Z=%d obj=%llx obj+0x10=%llx\n", g_trSidx, isZ, (unsigned long long)o0, (unsigned long long)o16); }
     return r;
+}
+typedef void (__attribute__((ms_abi)) *set9_t)(void*, int, float, void*);
+static unsigned char g_sv_set[12]; static unsigned char* g_p_set;
+static void __attribute__((ms_abi)) set9_probe(void* C, int id, float v, void* key) {
+    uint32_t kc = 0xffffffffu, k0 = 0xffffffffu; if (key) { memcpy(&kc, key, 4); memcpy(&k0, (char*)key + 4, 4); }
+    fprintf(stderr, "SET9 S%d C=%p id=0x%x key=%p kc=%u k0=%u\n", g_trSidx, C, (unsigned)id, key, kc, k0);
+    unsigned char tmp[12]; memcpy(tmp, g_sv_set, 12); memcpy(g_p_set, tmp, 12);
+    ((set9_t)(g_p_set))(C, id, v, key);
+    patch12(g_p_set, (const void*)&set9_probe, g_sv_set);
 }
 static void __attribute__((ms_abi)) da6c00_probe(void* T, int id, int idx, int r9) {
     fprintf(stderr, "FA9DA S%d this_id=0x%x idx=%d r9=%d\n", g_trSidx, (unsigned)id, idx, r9);
@@ -124,7 +135,7 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
           W64(N, 0x00, C + 0x21b8); W64(N, 0x08, C + 0x21b8); W64(N, 0x10, C + 0x21b8);
           W64(N, 0x28, Z); W64(N, 0x30, NB);
           W64(NB, 0, NB + 0x10); W32(NB, 8, 0x40); W32(NB, 0xc, 0x40); W64(NB, 0x18, 0x1803b4070ULL); W64(NB, 0x20, 0x1803b4070ULL);
-          W64(C + 0x21b8, 0x00, N); W64(C + 0x21b8, 0x08, N); W64(C + 0x21b8, 0x10, N); if (k == 0) { g_nodeZ = Z; if (getenv("FA_OUT0")) fprintf(stderr, "NODEZ Z=%p\n", (void*)Z); } }
+          W64(C + 0x21b8, 0x00, N); W64(C + 0x21b8, 0x08, N); W64(C + 0x21b8, 0x10, N); if (k == 0) { g_nodeZ = Z; if (getenv("FA_OUT0")) fprintf(stderr, "NODEZ Z=%p C0=%p\n", (void*)Z, (void*)C); } }
         /* param block +0x10 = mgr。mgr は driver 0x180da68c0 が [mgr+0x19a8/0x19b0] (shared_ptr pair) を
          * 読むため、ダミー mgr を渡す (C+0x1900 = 0x1a00B, +0x19a8 = self, +0x19b0 = C+0x1c00 blk refcount=0x40)。 */
         W64(C, 0x370, C + 0x620); W64(C, 0x480, C + 0x620);
@@ -167,6 +178,10 @@ int main(int argc, char** argv) {
         unsigned char* h = im + (0x180c9d700ULL - 0x180000000ULL); uint64_t t = (uint64_t)(uintptr_t)&map_hook;
         h[0] = 0x48; h[1] = 0xb8; memcpy(h + 2, &t, 8); h[10] = 0xff; h[11] = 0xe0;
     }
+    if (getenv("FA_SET9")) {   /* FA-28: setter 0x180c9d700 の入口で key を記録 (観測のみ・probe 無しと同じ経路を通す) */
+        g_p_set = im + (0x180c9d700ULL - 0x180000000ULL);
+        patch12(g_p_set, (const void*)&set9_probe, g_sv_set);
+    }
     if (getenv("FA_PROBE9")) {
         g_p_ca = im + (0x180ca1480ULL - 0x180000000ULL); g_p_da = im + (0x180da6c00ULL - 0x180000000ULL);
         patch12(g_p_ca, (const void*)&ca1480_probe, g_sv_ca); patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
@@ -184,6 +199,7 @@ int main(int argc, char** argv) {
         build_tree(im, &F, &M, Ck, Wk, Pk, Qk, blk, Rgk, Rbk, vcap);
         unsigned char* ctx = gr_alloc(0x100);
         for (int i = 0; i < 8; i++) g_trCk[i] = Ck[i];
+        if (getenv("FA_OUT0")) for (int i = 0; i < 8; i++) fprintf(stderr, "CK%d=%p\n", i, (void*)Ck[i]);
         g_trSidx = sidx;
         if (getenv("FA_FT")) fprintf(stderr, "post-ctor F=%p *(F+0x90)=%p M=%p\n", (void*)F, (void*)*(void**)(F + 0x90), (void*)M);
         *fma = fma_v;

@@ -82,3 +82,36 @@
 | `qall` の native_fault への変化の解釈 (ガード緩和で wasm が進んだ後の native segv) | 緩和版の判定の妥当性 | 未起票 |
 | arena ポインタ実値の記録 | 「範囲外」の判定の確定 | 未起票 |
 | OTT 8 関数のうち 1801c67a0 以外の 7 関数の再確認 | LD-44 §2 の未実施分 | LD-57 (#1636) |
+| shard 1 で 19 関数の verdict が変わる原因 (§7) | 全体 run の件数揺れの説明 | 未起票。切り分けは関数順を変える実験が要る |
+
+## 7. shard 数による差 (HEAD `7d15ceab`・追試)
+
+§3 の 4 回は shard 12 のみだった。shard 数を変えると件数が変わるかを追試した。測定 commit は `7d15ceab` (origin/main。`git diff 7d15ceab HEAD` は本 PR のみ)。
+
+- コマンドは §3 と同一 (`--set sample:800 --nobuild --state auto`)。`--shards 12` を 4 回、`--shards 1` を 1 回。
+- 所要 (wall): shard 12 は r1 1m50s・r2 1m52s・r3 1m47s・r4 1m51s。shard 1 は 6m25s。
+- load (`/proc/loadavg` 1 分値, 開始→終了): r1 0.8→6.0・r2 5.1→7.1・r3 7.1→6.4・r4 6.4→6.9・shard 1 5.8→0.9。4 vCPU。
+- 件数 (一致/不一致/実行不能): shard 12 は r1 361/229/210、r2〜r4 360/230/210。**shard 1 は 342/248/210**。
+
+結果 (`results/ld58_m11_sample800_shards_t1.tsv`。verdict が run 間で変わる関数):
+
+- shard 12 の 4 回で変わったのは `0x959a40` だけ (r1 match、r2〜r4 mismatch)。`p1`・`pall`・`qall` の wasm 側で `wasm_extra_entry` (`0x956550`) または `ret` の差。timeout ではない。
+- shard 1 では **19 関数** の verdict が match から mismatch に変わった (`0x959a40` を含む)。shard 12 の r1 とは一致しない。
+- shard 1 で変わった関数の差分は主に wasm 側の heap の値 (`0xccccccccccc35b20`・`0xff800000ff800000` など、native は `unchanged(0x0)`) と `ret`・`calls` (`GetDeviceCaps` の引数)。全ケースが native ok・wasm ok で、timeout の差ではない。
+- 修正前の §3.1 の「shard 数の差 (1 vs 12) では説明できなかった」は、この追試で**修正が必要**になった。shard 配置が差に関わる (shard 1 の方が件数が多く揺れる)。
+
+### 7.1 読み取った範囲の仕組み (未検証の推測)
+
+- `session.run_functions` は関数を shard ごとに `vas[i::shards]` で割り、shard の中では同じ `(nat, was)` の runner で順に実行する。shard 1 は全 800 関数を 1 つの runner で走らせる。
+- `ld_core.h` の `ld_case_begin` は、`keep` でない case で `ld_restore_all` (img・arena・heap を pristine へ戻す) を行う。heap の復元は `ld_model_reset` が `ld_heap_hw` までの範囲で行う。
+- 推測: wasm 側で snapshot 時点の high-water を超えて書かれた heap 領域が、後続の case で 0 クリアされず残る。shard 1 は同じ runner で多くの関数が走るため、この残りが後続関数に効く。ただしこれは読んだ範囲からの推測で、未検証。
+
+### 7.2 結論 (本 run)
+
+- 受入 (b) の「件数揺れと `0x959a40` の verdict 変化の出所を分類する」は、以下まで分かった。
+  - 揺れは timeout ではない (`0x959a40` の揺れた case は両側 ok)。
+  - 単独 (`--set file:`) では揺れない (§3)。
+  - shard 12 の全体 run では `0x959a40` の 1 関数だけが揺れる (§3, 本節)。
+  - shard 1 では 19 関数が揺れる。揺れの範囲は shard 配置に依存する。
+- 「原因 (他関数の状態持ち越しか負荷か) の特定」は未達。負荷は shard 1 で load が高くない (0.9〜5.8) ため、負荷だけでは説明しにくい。原因の確定には、heap の残りを検出する実験 (case 後に heap を全域比較) または関数順を変える実験が要る。
+- したがって受入 (b) は未達のまま。

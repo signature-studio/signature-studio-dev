@@ -101,3 +101,27 @@
 - 回帰 (commit `50652246`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7k と一致。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (ディレクトリ未作成が原因。`mkdir -p` 後に解消)。
 - 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`rcpps` 2 引数形・`param_1` ABI・未関数化 callee 閉包・型不一致は未着手。
+
+#### 10-7n. #2087 (KH-33) run: Resonator emcc の param_1 引数 ABI 復元 (部分・Resonator はビルド未通過)
+- 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64 (手展開)。Ghidra 12.1.4 = GitHub release `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 先頭 16 桁 `ddac49f9…` 一致)、JDK 21 (Temurin)、emsdk 6.0.12 ([EMSDK])。測定 commit = `81090e96` (コード変更は `ghidra_route/ghidra_to_c.py`・`ghidra_route/patches.py` のみ)。
+- 素材展開 (fix run 2 / HEAD `0d6c73a5`): `plugins-kilohearts.tar.zst` → `Kilohearts Offline Installer.zip` → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B, REPORT 値と一致)。Ghidra 12.1.4 の zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致。emsdk 6.0.12 を `emsdk install` で導入。
+- 呼出元・callee の確定 (本 run で Ghidra decompile 5 関数 + capstone 逆アセンブル、`analyzeHeadless` wall 29.2 s):
+  - 宣言型 (Ghidra 出力を引用):
+    - `FUN_180fbbfb8`: `short FUN_180fbbfb8(float *param_1,float param_2,int param_3)` → `param_2` は **float**。
+    - `FUN_180fbc1f4`: `float afStackX_8 [2];` → `afStackX_8[0]` は **float**。
+    - `FUN_180fcf904`: `void FUN_180fcf904(undefined4 param_1)` (Ghidra の宣言。戻り値は呼出元の `sVar1` / `sVar2` = short)。
+    - `FUN_180fbdfcc`: `short FUN_180fbdfcc(short *param_1)`。
+    - `FUN_180fbdef4`: `ulonglong FUN_180fbdef4(ushort *param_1,short param_2)` → 引数は **2 個**。
+  - 機械語の確認: 呼出元 `FUN_180fbbfb8` は `movaps xmm0, xmm6` (xmm6 = `param_2`) の直後に `call 0x180fcf904` (`0x180fbbfe9`)。呼出元 `FUN_180fbc1f4` は `movaps xmm6, xmm0` (xmm0 = 入力 float) の後に `call 0x180fcf904` (`0x180fbc206`)。callee `FUN_180fcf904` は `movss [rsp+8], xmm0` で xmm0 を読み、戻り値は `ax` (`shr eax,0x10; and eax,0x8000`)。よって引数は float、戻り値は short で、`FUN_180fcf904(float)` の規則は機械語と一致する。
+  - `FUN_180fbdef4` の読みレジスタ (callee 本体 213 B を capstone で全命令走査): 入力として読むのは **rcx・dx の 2 つのみ**。冒頭 `mov r8, rcx` は rcx からのコピーで、r8 は読む前に書かれる。r9 は `mov r9d, 0x96` で先に書かれてから読まれる。`xor edx,edx` は零化で入力ではない。呼出元 `FUN_180fbc1f4` は `lea rcx,[rsp+0x48]` と `xor edx,edx` の後に `call 0x180fbdef4` (`0x180fbc24e`) で、r8 は設定しない。よって 3 個目の引数 (r8) を落とす規則は正しい。
+  - `FUN_180fbdfcc` の呼出元 `FUN_180fbbfb8` は `mov rbx, rcx` (rcx = 入力 `param_1`) の後に `call 0x180fbdfcc` (`0x180fbbfde`)。
+- 変更: `patches.py` の ABI 表 (resonator 7 規則) は本 run で変更なし (`git diff 81090e96 HEAD -- tools/targets/kilohearts/ghidra_route` = 0 行)。ABI 表の各規則は生成 C で 1 件ずつ適用されていることを確認 (`resonator.c`: `FUN_180fcf904(float param_1)`・`FUN_180fbdef4(ushort*, short)` の宣言)。
+- 変更: `patches.py` に `ABI` 表 (resonator 7 規則)、`ghidra_to_c.py` で適用し各規則の件数が 1 でなければ停止 (assert)。gain/haas/gate には適用されない。
+- emcc (resonator, 修復なし, `-ferror-limit=0`, `emcc -c`, rc 1, `grep -c 'error:'`):
+  - 変更前 (HEAD `b7cfd62e` = origin/main 時点の resonator 生成, §10-7m と同じ件数): **8 件**。
+  - 変更後 (HEAD `81090e96`): **4 件**。消えたもの = `param_1` 不足 3 (`FUN_180fcf904` 呼出元 2 件・`FUN_180fbdfcc` 呼出元 1 件) と引数数不一致 1 (`FUN_180fbdef4`)。
+  - 再測定 (fix run 2, HEAD `0d6c73a5`, 同じ Ghidra 出力を再生成): `build_cmp.sh` の `-Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=incompatible-pointer-types-discards-qualifiers` を付けると **4 件** (未宣言 callee のみ)。フラグを付けない `emcc -c -ferror-limit=0 -w -Ighidra_route` では **7 件** (うち pointer 型不一致 3 件 = `resonator.c:527`・`:614`・`:742`。`build_cmp.sh` は同フラグで warning 扱いにして通している既存挙動で、本 run の ABI 規則とは無関係)。
+  - 残件 4 件 = 未宣言 callee のみ: `FUN_180fd4f30` 2・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1。閉包は [KH-31] #1989 の範囲 (§10-7j の試行で callee 追加は 13→26 件に悪化するため、本 run では扱わない)。
+- 回帰 (HEAD `81090e96`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7m と一致。
+- 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。`mkdir -p` で解消)。
+- 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI (float 引数・short 戻り値) は呼出元 2 件と callee 本体の機械語で確認済み (上記「呼出元・callee の確定」)。native 突合での実行検証は未実施。
