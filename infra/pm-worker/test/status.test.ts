@@ -68,6 +68,8 @@ const ADDED_KEYS = [
   "last_webhook_at", "last_dispatch_at", "last_digest_at", "running", "dry_run_skipped_posts", "reconcile_diff", "rest_remaining", "rest_used", "rest_reset_at", "pm_detected",
   "target_eff", "cap_est", "peak_running", "queued", "oldest_queued_age_min",
   "last_redeliver_scan", "hook_failed_last_scan",
+  // 同時実行の計数 (opencode.yaml の全 run を TARGET に数える)
+  "active_all", "active_impl", "active_other", "active_by_event",
   // 自律運転の指標 (#2335)
   "stuck", "stuck_age_max_min", "needs_pm", "needs_user", "no_pr_by_reason", "refs_only_merge_rate_24h", "open_issues_delta_24h", "pm_dispatch_1h",
   "launch_unobserved",
@@ -158,7 +160,7 @@ test("running: in_progress / queued / pending を run の event によらず数�
   for (const [id, status, event] of runs) await send(ctx.app, "workflow_run", runPayload(id, status, { event }));
   const s = (await (await get(ctx)).json()) as any;
   assert.deepEqual(s.running, { in_progress: 2, queued: 2, pending: 1 });
-  assert.equal(s.active_runs, 3, "TARGET に数える active_runs は従来どおり (issue_comment / workflow_dispatch / review。pull_request・push は数えない)");
+  assert.equal(s.active_runs, 6, "TARGET に数える active_runs は opencode.yaml の未完了の run の総数 (event を問わない。completed だけ除く。path の無い run は opencode.yaml として数える)");
 });
 
 test("dry_run_skipped_posts: dry-run のために投稿しなかった /oc 投稿と dispatch の累計。live では増えない", async () => {
