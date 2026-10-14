@@ -180,7 +180,7 @@ provider・mock の実装は、上の値源 (cur/lo/hi/flags) を状態モデル
 | `0x104d0d0(eventId)` (flags 分類器) | `0x104d000` でオブジェクトを引き、`[+0x64]==2` で分岐。eventId の下位 16 bit と上位ビットで分岐。本体は未読 | 事象の flags (bit1 = float 型か) が決まらない | #2547 |
 | `0x1046a30(eventId, sub, mode)` (汎用の照会) | mode 0x20 で範囲、mode 2 で現在値 (§7-4 と同じ)。0x590 のスタックフレームで本体の大半は未読 | lo・hi・cur が決まらない | #2547 |
 | `0x664090` (挿入) と `[S+0x10]`・`[S+8]` の更新 | 挿入先の書込みは `0x105112f` の戻り先。本体は未読 | 件数・並びの正しさ | #2547 |
-| midiNoteOn の述語 `0x11d1430` | `mov rax,[G3]; mov rax,[rax+8]; mov rcx,rax; mov rax,[rax]; call [rax+0x88]` (1 段の間接呼出し)。G3 = VA `0x15e4790` は 2422 箇所から読まれる広域グローバル (store 0 件)。`0x11d1460` は同形で `+0x90` | -2 ゲートの条件が決まらない | #2547 |
+| midiNoteOn の述語 `0x11d1430` | `mov rax,[G3]; mov rax,[rax]; mov rax,[rax+8]; mov rcx,rax; mov rax,[rax]; call [rax+0x88]` (this = `[[G3]+8]`、vtable 経由の 1 段の間接呼出し)。G3 = VA `0x15e4790` は 2422 箇所から読まれる広域グローバル (store 0 件)。`0x11d1460` は同形で `+0x90` | -2 ゲートの条件が決まらない | #2547 |
 | midiNoteOn 本体 `0x10002a0`・`0x63a730` | §2・§4 のまま | 副作用が決まらない | #2547 |
 
 ### 8-4. 受入条件への影響
