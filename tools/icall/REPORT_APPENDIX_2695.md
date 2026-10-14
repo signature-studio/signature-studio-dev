@@ -147,7 +147,7 @@ harness 状態別の結果 (n=8、先頭 1 点。wasm は全環境・全 8 点�
 - 0x1803dee20 は、9V45 では bit 一致 (入力素通し)、7763 (`599f793c`・本 fix) と 9V74 では不一致 (native `0000…`)。
 - 値の不一致の内訳 (9V74 の再確認): 0x1803dee20 (native `0000…`)、0x180da4030 (native `0000…`・wasm は入力素通し)、0x18105d9fc (native `0000000050400010`・wasm `00000000104af418`、先頭 1 点)。本 fix の不一致は 0x1803dee20 と 0x180da4030 の 2 件で、0x18105d9fc は一致する (下の行)。
 - 0x180da4030 は 9V45 では native 正常・wasm 値が異なる (native の値は未記録)。0/8 の環境 (7763・9V74) では native `0000…`。環境差として併記する。
-- 0x18105d9fc の不一致は `ptr_norm` (`3127f774`) より前の run にある。`a2c2c126` と `599f793c` には無く、本 fix では PTR 扱いで 8/8 一致する (`FA_PTR_NORM=0` では native `0000000050400010`・wasm `00000000104af418` の 0/8 に戻る)。ポインタの基底差の吸収である。
+- 0x18105d9fc は `ptr_norm` (`3127f774`) より前の run で不一致だった (9V74 の再確認 = `599f793c` の不一致 3 件に含む)。9V45 (`a2c2c126`) の不一致 2 件のうち 1 件は 0x180da4030 (上の行)、もう 1 件の内訳は未記録。本 fix では PTR 扱いで 8/8 一致する (`FA_PTR_NORM=0` では native `0000000050400010`・wasm `00000000104af418` の 0/8 に戻る)。ポインタの基底差の吸収である。
 - 2 件とも本 issue の範囲外で、個別の調査は行っていない。
 
 ## 7. 再現
@@ -161,7 +161,7 @@ FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh                 # fixed route
 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8                 # 期待: match 8 / mismatch 0 (件数 0)
 FA_LOOP_N=0 python3 tools/icall/diff/hit_180da6e60.py 180da6e60   # 候補の実行 (件数 0): No 1・SIGSEGV 点・出口のみ 1
 FA_LOOP_N=1 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8     # 件数 1 (§10.4): match 8 / mismatch 0
-FA_LOOP_N=1 FA_ELEM_STATE=0 python3 tools/icall/diff/hit_180da6e60.py 180da6e60   # §10.3 state 0: 41a0・No 1・出口・loop 先頭が各 1
+FA_LOOP_N=1 FA_ELEM_STATE=0 python3 tools/icall/diff/hit_180da6e60.py 180da6e60   # §10.3 state 0: 41a0・No 1・SIGSEGV 点・loop 先頭・出口が各 1
 python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8                 # 9V45: 8/8 (native 入力素通し) / 7763 (本 fix)・9V74: 0/8 (native 0000…)
 FA_HEAP_FILL=0xcc python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45: 8/8 / 7763・9V74: 0/8 (native cccc…)
 FA_ENC_INIT=1 python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45: 8/8 / 7763・9V74: 0/8 (native 0000…)
@@ -206,18 +206,18 @@ bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 9V45: 56 / 
 
 | state | native (修正後) | trace の候補 hit |
 |--:|---|---|
-| 0 | 戻る (xmm0 = 入力) | 41a0 entry 1・No 1 1・出口 1・loop 先頭 1 |
+| 0 | 戻る (xmm0 = 入力) | 41a0 entry 1・No 1 1・SIGSEGV 点 1・loop 先頭 1・出口 1 |
 | 1 | SIGSEGV `rip=0x180da7084` (`[A+8]`=0 を経由した load) | — (落ちる) |
 | 2 | SIGSEGV `rip=0x180da6f27` (`[A]` vtable = 0) | — |
 | 3 | SIGSEGV `rip=0x180da6fe9` (`[A]` vtable = 0) | — |
-| 4 | 戻る | 41a0 entry 1・No 1 1・出口 1 |
+| 4 | 戻る | 同上 (41a0 entry 1・No 1 1・SIGSEGV 点 1・loop 先頭 1・出口 1) |
 | 5 | 戻る | 同上 |
 | 6 | 戻る | 同上 |
 | 7 | SIGSEGV `rip=0x180da71b8` (`[rdi+0x100128]` = 0) | — |
 | 8 | SIGSEGV `rip=0x180da72fc` (`[A]` vtable = 0) | — |
 | 9 | 戻る | 同上 |
 
-No 2・6・7・9・10 は 0 hit (state 2・8 の分岐内)。
+state 0・4・5・6・9 の trace は `FA_LOOP_N=1 FA_ELEM_STATE=S hit_180da6e60.py` (`ws-2823`・EPYC 7763・本 fix) で再確認。No 2・6・7・9・10 は 0 hit (state 2・8 の分岐内)。
 
 ### 10.4 fa_cmp と sweep (本 fix・HEAD `7e23750a`・EPYC 7763・単発)
 
