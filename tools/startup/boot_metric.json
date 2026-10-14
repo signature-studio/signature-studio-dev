@@ -70,7 +70,86 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (非 work・SKIP_DIRS を除く)",
           "measured_commit": null,
-          "file_last_commit": "8d632b57"
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "存在確認 /^\\| S11 \\| host \\|[^\\n]*CreateFruityInstance/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        },
+        {
+          "file": "tools/startup/STARTUP.md",
+          "locator": "md: /^\\| (S\\d\\d) \\| host \\|[^\\n]*\\*\\*DllMain\\*\\*/",
+          "measured_commit": null,
+          "file_last_commit": "feb3e4ff"
+        }
+      ]
+    },
+    {
+      "id": "m11-tolerant-skip",
+      "route": "m11",
+      "mode": "tolerant-skip",
+      "build": "m11 寛容起動 (失敗 unit を skipped として 942 unit を逐次続行・REPORT_N2714 §0・§1 C 行)",
+      "commit": "cf64d9c8",
+      "units": {
+        "total": 942,
+        "ok": 874,
+        "skipped": 67,
+        "failed": 21,
+        "miss": 46,
+        "noproc": 1,
+        "dispatched": 942,
+        "uncovered": null
+      },
+      "stop": null,
+      "create_fruity_instance": {
+        "reached": false,
+        "last_step": "S09"
+      },
+      "gui_natural": null,
+      "first_wm_paint": null,
+      "pixels": null,
+      "probes": null,
+      "null_reasons": {
+        "units.uncovered": "逐次起動では使わない",
+        "stop": "寛容起動は停止 unit を持たない (942 試行を最後まで回す)。終端の Halt0→longjmp (boot_rc=1) は stage 6 の定義に当たらない (REPORT_N2714 §6)",
+        "gui_natural": "寛容起動は GUI 結合なし。GUI 結合版は m11-gui-tolerant",
+        "probes": "出典に probes の計数が無い",
+        "first_wm_paint": "全路線で未測定 (最初の WM_PAINT は後続 WIN の範囲)",
+        "pixels": "全路線で未測定 (画素は後続 WIN の範囲)"
+      },
+      "derived": {
+        "units.total": "寛容起動の試行数。§0 の本文と §1 表の試行数を照合し、942 と一致を検査",
+        "units.skipped": "miss + halt0 + oob + unreachable (§0 の内訳と一致を検査)",
+        "units.failed": "halt0 + oob + unreachable (trap。skipped のうち miss を除いたもの)",
+        "units.dispatched": "試行数 (§0 の本文)。ok + noproc + skipped の合計と一致を検査",
+        "create_fruity_instance": "harness 構造による (m11 の非 work の実行ファイル (.md を除く) に CreateFruityInstance の参照 0 件・STARTUP の DllMain の段が最後)"
+      },
+      "source": [
+        {
+          "file": "tools/m11/REPORT_N2714.md",
+          "locator": "md:## 1. /^- 測定 commit: `([0-9a-f]{8})`/",
+          "measured_commit": "cf64d9c8",
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/m11/REPORT_N2714.md",
+          "locator": "md:## 0. /で (\\d+) unit を全て試行した\\*\\*。ok (\\d+) / noproc (\\d+) / skipped (\\d+) \\(miss (\\d+)・halt0 (\\d+)・oob (\\d+)・unreachable (\\d+)\\)/",
+          "measured_commit": "cf64d9c8",
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/m11/REPORT_N2714.md",
+          "locator": "md:## 1. /^\\| C 寛容起動 \\(本 PR\\) \\| — \\| (\\d+) 試行・ok (\\d+)・noproc (\\d+)・skip (\\d+)・boot_rc=\\d+ \\| — \\|/",
+          "measured_commit": "cf64d9c8",
+          "file_last_commit": "3edd9d13"
+        },
+        {
+          "file": "tools/m11",
+          "locator": "grep 0 件 /CreateFruityInstance/ (非 work・SKIP_DIRS を除く)",
+          "measured_commit": null,
+          "file_last_commit": "3edd9d13"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -428,13 +507,13 @@
           "file": "tools/flelift/boot/REPORT.md",
           "locator": "md:### 4-1. /^\\| plain \\| [^|]*\\| \\*\\*209 dispatch\\*\\* / oob \\(`f_([0-9a-f]+)`\\)/",
           "measured_commit": null,
-          "file_last_commit": "b992be67"
+          "file_last_commit": "619d9553"
         },
         {
           "file": "tools/flelift/boot",
           "locator": "grep 0 件 /CreateFruityInstance/ (非 work・SKIP_DIRS を除く)",
           "measured_commit": null,
-          "file_last_commit": "b992be67"
+          "file_last_commit": "619d9553"
         },
         {
           "file": "tools/startup/STARTUP.md",

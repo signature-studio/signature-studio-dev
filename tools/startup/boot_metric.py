@@ -38,6 +38,7 @@ SKIP_DIRS = {"work", "venv", "node_modules", "dist", ".wrangler", ".git"}
 M11_DIR = "tools/m11"
 M11_REPORT = "tools/m11/REPORT.md"
 M11_APPENDIX = "tools/m11/REPORT_APPENDIX_1430.md"
+M11_N2714 = "tools/m11/REPORT_N2714.md"
 GUI_DIR = "tools/gui/flengine"
 GUI_REPORT = "tools/gui/flengine/REPORT.md"
 GUI_BOOT = "tools/gui/flengine/results/boot.json"
@@ -167,7 +168,8 @@ class Source:
         self._note(rel, f"存在確認 /{pattern}/")
 
     def absent(self, rel_dir, word):
-        """rel_dir 以下の非 work ファイルに word が 0 件であることを検査する。"""
+        """rel_dir 以下の非 work の実行ファイルに word が 0 件であることを検査する。
+        .md は説明文であって呼出しではないので数えない (REPORT が『呼んでいない』と書くことを禁じないため)。"""
         base = self.root / rel_dir
         if not base.is_dir():
             raise MetricError(f"出典ディレクトリが無い: {rel_dir}")
@@ -176,6 +178,8 @@ class Source:
             dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for name in filenames:
                 path = Path(dirpath) / name
+                if path.suffix == ".md":
+                    continue
                 try:
                     text = path.read_text(encoding="utf-8")
                 except (UnicodeDecodeError, OSError):
@@ -274,6 +278,53 @@ def _m11_tolerant(src):
         "m11-tolerant-sequential", "m11", "tolerant-sequential",
         "m11 通常起動 (RetDec 路線、#134 の 6654322 / de50ffa 行)",
         units, stop, cfi, None, commit, nulls, src.end(), derived=derived,
+    )
+
+
+def _m11_tolerant_skip(src):
+    src.begin()
+    (commit,) = src.match(M11_N2714, "## 1.", r"^- 測定 commit: `([0-9a-f]{8})`", commit_group=0)
+    attempted, ok, noproc, skipped, miss, halt0, oob, unreach = src.match(
+        M11_N2714, "## 0.",
+        r"で (\d+) unit を全て試行した\*\*。ok (\d+) / noproc (\d+) / skipped (\d+) "
+        r"\(miss (\d+)・halt0 (\d+)・oob (\d+)・unreachable (\d+)\)",
+        measured=commit,
+    )
+    row_att, row_ok, row_noproc, row_skip = src.match(
+        M11_N2714, "## 1.",
+        r"^\| C 寛容起動 \(本 PR\) \| — \| (\d+) 試行・ok (\d+)・noproc (\d+)・skip (\d+)・boot_rc=\d+ \| — \|",
+        measured=commit,
+    )
+    if (int(row_att), int(row_ok), int(row_noproc), int(row_skip)) != (int(attempted), int(ok), int(noproc), int(skipped)):
+        raise MetricError("寛容起動の §0 と §1 表の値が食い違う")
+    if int(attempted) != UNITS:
+        raise MetricError(f"寛容起動の試行数が {UNITS} でない: {attempted}")
+    if int(ok) + int(noproc) + int(skipped) != UNITS:
+        raise MetricError("寛容起動の ok + noproc + skipped が試行数と合わない")
+    if int(miss) + int(halt0) + int(oob) + int(unreach) != int(skipped):
+        raise MetricError("寛容起動の skip の内訳が skipped と合わない")
+    trap = int(halt0) + int(oob) + int(unreach)
+    units = {
+        "total": UNITS, "ok": int(ok), "skipped": int(skipped), "failed": trap,
+        "miss": int(miss), "noproc": int(noproc), "dispatched": int(attempted), "uncovered": None,
+    }
+    cfi = _cfi(src, M11_DIR)
+    nulls = {
+        "units.uncovered": "逐次起動では使わない",
+        "stop": "寛容起動は停止 unit を持たない (942 試行を最後まで回す)。終端の Halt0→longjmp (boot_rc=1) は stage 6 の定義に当たらない (REPORT_N2714 §6)",
+        "gui_natural": "寛容起動は GUI 結合なし。GUI 結合版は m11-gui-tolerant",
+    }
+    derived = {
+        "units.total": f"寛容起動の試行数。§0 の本文と §1 表の試行数を照合し、{UNITS} と一致を検査",
+        "units.skipped": "miss + halt0 + oob + unreachable (§0 の内訳と一致を検査)",
+        "units.failed": "halt0 + oob + unreachable (trap。skipped のうち miss を除いたもの)",
+        "units.dispatched": "試行数 (§0 の本文)。ok + noproc + skipped の合計と一致を検査",
+        "create_fruity_instance": "harness 構造による (m11 の非 work の実行ファイル (.md を除く) に CreateFruityInstance の参照 0 件・STARTUP の DllMain の段が最後)",
+    }
+    return _record(
+        "m11-tolerant-skip", "m11", "tolerant-skip",
+        "m11 寛容起動 (失敗 unit を skipped として 942 unit を逐次続行・REPORT_N2714 §0・§1 C 行)",
+        units, None, cfi, None, commit, nulls, src.end(), derived=derived,
     )
 
 
@@ -485,6 +536,7 @@ def build(root=REPO, commit_of=None):
     src = Source(root, commit_of)
     records = [
         _m11_tolerant(src),
+        _m11_tolerant_skip(src),
         _m11_survey(src),
         _m11_gui_boot(src),
         _m11_gui_survey(src),

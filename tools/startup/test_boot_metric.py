@@ -34,6 +34,21 @@ x
 x
 """
 
+M11_N2714 = """# M11 REPORT #2714
+
+## 0. 結論
+
+- **寛容起動 (`tools/m11/m11_tolerant.mjs`) で 942 unit を全て試行した**。ok 874 / noproc 1 / skipped 67 (miss 46・halt0 7・oob 13・unreachable 1)。試行 942 = ok + noproc + skipped の和で、集計は合う。clobber 0。
+
+## 1. 測定 (測定 commit `cf64d9c8`)
+
+- 測定 commit: `cf64d9c8` (e2e を実行した HEAD)。base は origin/main `46c92356`。
+
+| 実行 | 変更前 (`46c92356`) | HEAD (`cf64d9c8`) | 差 |
+|---|---|---|---|
+| C 寛容起動 (本 PR) | — | 942 試行・ok 874・noproc 1・skip 67・boot_rc=1 | — |
+"""
+
 APPENDIX = """# appendix
 
 ## 基準 (before) #1430: xmm
@@ -99,6 +114,7 @@ def make_fixture(root, overrides=None):
     files = {
         "tools/m11/REPORT.md": M11_REPORT,
         "tools/m11/REPORT_APPENDIX_1430.md": APPENDIX,
+        "tools/m11/REPORT_N2714.md": M11_N2714,
         "tools/gui/flengine/REPORT.md": GUI_REPORT,
         "tools/gui/flengine/results/boot.json": json.dumps(GUI_BOOT),
         "tools/gui/flengine/results/survey_soft.json": json.dumps(GUI_SURVEY),
@@ -146,6 +162,15 @@ class BootMetricTest(unittest.TestCase):
         self.assertEqual(m11["commit"], "de50ffa")
         self.assertFalse(m11["create_fruity_instance"]["reached"])
         self.assertEqual(m11["create_fruity_instance"]["last_step"], "S09")
+
+        skip = recs["m11-tolerant-skip"]
+        self.assertEqual((skip["units"]["total"], skip["units"]["dispatched"]), (942, 942))
+        self.assertEqual((skip["units"]["ok"], skip["units"]["noproc"], skip["units"]["skipped"]), (874, 1, 67))
+        self.assertEqual((skip["units"]["miss"], skip["units"]["failed"]), (46, 21))
+        self.assertIsNone(skip["stop"])
+        self.assertEqual(skip["commit"], "cf64d9c8")
+        self.assertEqual(skip["mode"], "tolerant-skip")
+        self.assertFalse(skip["create_fruity_instance"]["reached"])
 
         survey = recs["m11-isolated-survey"]
         self.assertEqual((survey["units"]["ok"], survey["units"]["failed"],
@@ -238,7 +263,20 @@ class BootMetricTest(unittest.TestCase):
 
     def test_negative_harness_mentions_create_fruity_instance_fails(self):
         with self.assertRaises(bm.MetricError):
-            self.build({"tools/m11/hit.md": "CreateFruityInstance を呼ぶ"})
+            self.build({"tools/m11/hit.mjs": "CreateFruityInstance(0xC0)"})
+
+    def test_doc_mention_of_create_fruity_instance_is_not_a_call(self):
+        self.build({"tools/m11/note.md": "CreateFruityInstance は呼んでいない"})
+
+    def test_negative_tolerant_sum_mismatch_fails(self):
+        broken = M11_N2714.replace("ok 874 / noproc 1 / skipped 67", "ok 875 / noproc 1 / skipped 67")
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/m11/REPORT_N2714.md": broken})
+
+    def test_negative_tolerant_table_mismatch_fails(self):
+        broken = M11_N2714.replace("942 試行・ok 874", "942 試行・ok 873")
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/m11/REPORT_N2714.md": broken})
 
 
 if __name__ == "__main__":
