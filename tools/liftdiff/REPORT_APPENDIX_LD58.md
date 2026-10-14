@@ -10,12 +10,12 @@
   - 件数揺れは `0x959a40` 1 関数の verdict だけ (r1 のみ `match`、r2〜r4 は `mismatch`)。他 799 関数の verdict は 4 回とも同じ。
   - 揺れた case は `p1`・`pall`・`qall` で、**timeout ではない** (native・wasm とも ok で戻り値だけ不一致)。timeout を含むケース数は run 間で揺れるが、件数揺れの原因ではない。
   - 単独 run (`--set file:` で `0x959a40` のみ、4 回) は 4/4 `match`。全体 run (4 回) は 1/4 `match`。**全体 run の中でのみ diff が出て、単独では再現しない**。
-  - 全体 run でのみ出ることから、同じ worker・プロセスで先に走った他関数の状態の持ち越しが疑わしい。ただし shard 数 (1 と 12) では説明できず、**原因は未切り分け**。
+  - 全体 run でのみ出ることから、同じ worker・プロセスで先に走った他関数の状態の持ち越しが疑わしい。shard 配置は関与する (shard 1 で 19 関数、shard 12 で 1 関数が揺れる・§7)。ただし **原因は未特定** で、切り分けは子 #2682 に移した (§7.3 で分類まで)。
 - 受入 (c): 測定 commit と `git diff` は §5 に記載。
 
 ## 1. 測定条件
 
-- 測定 commit: `5b254578` (origin/main 当時の HEAD。`git diff 5b254578 HEAD -- tools/liftdiff/ldlib tools/m8 tools/ott tools/m11 tools/m6 tools/m9 tools/liftdiff/rt` は空。§5)
+- 測定 commit: `5b254578` (origin/main 当時の HEAD。その後の HEAD との差分は非空。§5)
 - 測定 runner: 4 vCPU。load は `uptime` で記録したのは r1 のみ (開始 0.9・終了 5.7)。r2〜r4 の load は未記録。
 - 素材: `fl-win64` (`FL_WIN64_DIR` = `[WIN64]`)・`work-m6-ott`・`work-m11`・`work-liftdiff`・`work-liftlib`・`analysis-ott-binaries` (`ANALYSIS_DIR` = `[ANALYSIS-DIR]`)・`plugins-ott` (`PLUGINS_DIR` = `[ANALYSIS-PLUGINS]`)・`toolchain-emsdk` (`[EMSDK]`)。全て展開を確認済み。
 - 生データ (`work/` は gitignore): `work/m11/batch_head_r{1..4}.jsonl`・`work/m11/batch_head_r{1..4}.log`・`work/ott_noguard/run_1801c67a0.log`。
@@ -57,7 +57,7 @@
 ### 3.1 揺れの分類 (現時点の結論)
 
 - timeout (native・wasm どちらか) による件数揺れ: **該当なし**。`0x959a40` の verdict 変化は両側 ok の case による。
-- 揺れの源: **未確定**。単独で `match` になり、全体 run でのみ `diff` になるため、他の関数を同じ worker で先に走らせたときの状態の持ち越し (ld_wasm の共有 arena・heap の残り) が疑わしい。shard 数の差 (1 vs 12) では説明できなかった。run ごとの load は r1 しか記録していないため、負荷との関係は確認していない。切り分けには同一プロセス内で関数順を変える実験が要る。
+- 揺れの源: **未特定** (§7.3 で 4 軸の分類まで)。単独で `match` になり、全体 run でのみ `diff` になるため、他の関数を同じ worker で先に走らせたときの状態の持ち越し (ld_wasm の共有 arena・heap の残り) が疑わしい。shard 配置は関与する (§7)。load は §7 で記録したが、相関は判定できない。切り分けには同一プロセス内で関数順を変える実験が要り、子 #2682 の範囲。
 - 件数 361 と 360 の差は、r1 の 1 回だけ出た。以後は 360 が 3 回続く。
 
 ## 4. 前回測定 (`2626e445`・参考・§3 とは別 commit)
@@ -70,19 +70,22 @@
 ## 5. 測定 commit と差分
 
 - 再測定 (§3) の測定 commit: **`5b254578`** (origin/main)。
-- `git diff 5b254578 HEAD -- tools/liftdiff/ldlib tools/m8 tools/ott tools/m11 tools/m6 tools/m9 tools/liftdiff/rt` = **空** (本 PR は REPORT と `results/` のみ変更)。よって測定値は HEAD のコードに対応する。
+- 本節の再確認 (本 PR 作成時・HEAD `d90b3220`): `git diff 5b254578 HEAD --stat -- tools/liftdiff/ldlib tools/m8 tools/ott tools/m11 tools/m6 tools/m9 tools/liftdiff/rt` = **190 files changed, 19894 insertions(+), 228 deletions(-)**。
+- §7 の測定 commit `7d15ceab` からの同じ範囲の差分: `git diff 7d15ceab HEAD --stat -- (同じ範囲)` = **151 files changed, 11252 insertions(+), 359 deletions(-)**。
+- よって §3・§7 の測定値は HEAD のコードに対応しない。HEAD での再現は本 PR では行っていない (ビルドと素材を伴うため)。再現は子 #2682 の範囲。
 - 生データ: `results/ld58_m11_sample800_n3_5b254578.tsv` (case 揺れと件数。ファイル名は n=3 だが中身は r1〜r4 の 4 run を含む)。JSONL は `work/m11/batch_head_r{1..4}.jsonl` (gitignore)。
 
 ## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 0x959a40 の全体 run だけで diff が出る原因 (他関数との状態持ち越し・負荷のどちらか) | 件数 360/361 の揺れの説明 | 未起票。本 PR 対象外 (切り分けには関数順を変える実験が要る) |
-| ガード緩和の本流への反映方法 (ガード範囲の arena 合わせ・関数単位の除外) | `1801c67a0` の u16・vm0 は本流 wasm で abort のまま | 未起票。本 PR 対象外 |
-| `qall` の native_fault への変化の解釈 (ガード緩和で wasm が進んだ後の native segv) | 緩和版の判定の妥当性 | 未起票 |
-| arena ポインタ実値の記録 | 「範囲外」の判定の確定 | 未起票 |
+| 0x959a40 の全体 run だけで diff が出る原因 (他関数との状態持ち越し・負荷のどちらか) | 件数 360/361 の揺れの説明 | #2682 (前提: #2681) |
+| shard 1 で 19 関数の verdict が変わる原因 (§7) | 全体 run の件数揺れの説明 | #2681 (前提) → #2682 |
+| 測定 commit から HEAD までのコード差分 (§5: 190 files) | §3・§7 の分類が HEAD で再現するか未確認 | #2682 (HEAD 再測定を含める) |
+| ガード緩和の本流への反映方法 (ガード範囲の arena 合わせ・関数単位の除外) | `1801c67a0` の u16・vm0 は本流 wasm で abort のまま | 本 PR の未解決表で追跡 (子は起票しない) |
+| `qall` の native_fault への変化の解釈 (ガード緩和で wasm が進んだ後の native segv) | 緩和版の判定の妥当性 | 同上 |
+| arena ポインタ実値の記録 | 「範囲外」の判定の確定 | 同上 |
 | OTT 8 関数のうち 1801c67a0 以外の 7 関数の再確認 | LD-44 §2 の未実施分 | LD-57 (#1636) |
-| shard 1 で 19 関数の verdict が変わる原因 (§7) | 全体 run の件数揺れの説明 | 未起票。切り分けは関数順を変える実験が要る |
 
 ## 7. shard 数による差 (HEAD `7d15ceab`・追試)
 
@@ -108,10 +111,18 @@
 
 ### 7.2 結論 (本 run)
 
-- 受入 (b) の「件数揺れと `0x959a40` の verdict 変化の出所を分類する」は、以下まで分かった。
-  - 揺れは timeout ではない (`0x959a40` の揺れた case は両側 ok)。
-  - 単独 (`--set file:`) では揺れない (§3)。
-  - shard 12 の全体 run では `0x959a40` の 1 関数だけが揺れる (§3, 本節)。
-  - shard 1 では 19 関数が揺れる。揺れの範囲は shard 配置に依存する。
-- 「原因 (他関数の状態持ち越しか負荷か) の特定」は未達。負荷は shard 1 で load が高くない (0.9〜5.8) ため、負荷だけでは説明しにくい。原因の確定には、heap の残りを検出する実験 (case 後に heap を全域比較) または関数順を変える実験が要る。
-- したがって受入 (b) は未達のまま。
+- 受入 (b) の「件数揺れと `0x959a40` の verdict 変化の出所を分類する」は、§7.3 の 4 軸 (timeout・shard 配置・負荷・単独 run) の判定までで完了とする。
+- 原因 (他関数の状態持ち越しか負荷か) の特定は本 issue の範囲から外し、子 #2682 (前提 #2681) に移した。原因の確定には、heap の残りを検出する実験 (case 後に heap を全域比較) または関数順を変える実験が要る。
+- 負荷は shard 1 で load が高くない (0.9〜5.8) ため、負荷だけでは説明しにくい (§7.3)。
+
+### 7.3 分類 (4 軸・既存の測定結果の再集計。測定 commit `7d15ceab`・`5b254578`)
+
+| 軸 | 判定 | 根拠 |
+|---|---|---|
+| native / wasm の timeout | **除外** | `0x959a40` の揺れた case (p1・pall・qall) は測定したすべての run で native ok・wasm ok。§3 |
+| shard 配置 | **関与する (単独要因ではない)** | shard 1 (342/248/210) で 19 関数が揺れる。shard 12 (361 / 360×3) では `0x959a40` の 1 関数だけ。shard 12 の内部でも揺れるため、shard 配置だけでは決まらない |
+| 負荷 (loadavg 1 分値) | **判定不能** | shard 12 の r1 (0.8→6.0) は一致、r2〜r4 (5.1〜7.1) は不一致。shard 1 (5.8→0.9) は 19 関数が揺れる。低負荷でも揺れ、高負荷の r1 は一致するため相関は見えない。n=5 のため否定もできない |
+| 単独 run (`--set file:`) | **揺れない** | shards 1 ×2・12 ×2 の計 4 回とも `0x959a40` は `match` (p1・pall・qall は `equal`)。全体 run の中でのみ出る。状態の持ち越しが疑わしい (未検証) |
+
+- case 単位の `native_status`・`wasm_status`: `results/ld58_m11_sample800_n3_5b254578.tsv` (r1〜r3 の行。r4 は件数のみ) と、前回 n=3 の `0x959a40` の case 単位記録 `results/ld58_m11_sample800_0x959a40_case_status.tsv` (§4)。
+- 他の関数の case 単位では hang/timeout が run ごとに揺れる (`ld58_m11_sample800_n3_5b254578.tsv`)。ただし verdict は変わらず、件数揺れの源ではない。
