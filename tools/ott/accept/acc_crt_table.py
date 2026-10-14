@@ -2,10 +2,10 @@
 """acc_crt_table.py — CAB-138 独立再計算 (別アルゴリズム: PE 生バイト直接読み + ror の 3 方式検算)。
 
 定義 (規則 36):
-  - api-set 関数ポインタ表 = .data の RVA 0x26c9f0 (= VA 0x18026c9f0) から 8 B × 32 entry。
-    「32 entry」= ott_crt.c の `APISET_N 32` と同じ**固定読み出し幅**で数えたもの。
-  - .data 生値 = PE ファイル (ディスク) に載っている値。**ランタイムの初期値ではない**
-    (元の静的値は 0 = 未解決で、PE ローダの .data 適用・reloc で変わりうる)。
+  - api-set 関数ポインタ表 = .data の RVA 0x26c9f0 (= VA 0x18026c9f0) から 8 B × 34 entry (0x110 B)。
+    34 は CRT 初期化 0x1801c43a4 の rep stosq 個数と一致する (ICALL-76・REPORT §10)。
+  - 静的値 = PE ファイルに載っている値。**ランタイムの初期値ではない**。表は .data の raw 領域
+    (先頭 0xa000 B) の外 (仮想のみの 0 埋め領域) にあるため、raw 外は 0 として読む。
   - __security_cookie = RVA 0x260ce0 の 8 B 生値 (UCRT の静的既定 0x2b992ddfa232)。
   - decode(x) = ror(x ^ cookie, cookie & 0x3f) / enc(p) = rol(p, 64-(cookie&0x3f)) ^ cookie。
     OTT の resolver (0x1801c38c8) が使う式。cookie & 0x3f = 50。
@@ -24,15 +24,19 @@ from paths import PLUGINS_DIR  # noqa: E402
 DLL = sys.argv[1] if len(sys.argv) > 1 else \
     os.path.join(PLUGINS_DIR, 'ott', 'binaries', 'OTT_vst2_win64.dll')
 IMG = 0x180000000
-COOKIE_RVA, TABLE_RVA, N = 0x260ce0, 0x26c9f0, 32
+COOKIE_RVA, TABLE_RVA, N = 0x260ce0, 0x26c9f0, 34
 ESLOT_RVA = [0x26c028, 0x26c388, 0x26cb40, 0x26cb88]
 M64 = 0xFFFFFFFFFFFFFFFF
 
 
-def rva2off(pe, rva):
+def read_rva(pe, data, rva, n):
+    # raw 領域 (SizeOfRawData) の外は仮想のみの 0 埋め領域。隣のセクションの生バイトは読まない。
     for s in pe.sections:
         if s.VirtualAddress <= rva < s.VirtualAddress + max(s.Misc_VirtualSize, s.SizeOfRawData):
-            return s.PointerToRawData + (rva - s.VirtualAddress)
+            off = rva - s.VirtualAddress
+            avail = max(0, min(n, s.SizeOfRawData - off))
+            start = s.PointerToRawData + off
+            return data[start:start + avail] + bytes(n - avail)
     raise SystemExit('rva 0x%x not mapped' % rva)
 
 
@@ -50,7 +54,7 @@ def main():
     import pefile
     pe = pefile.PE(DLL)
     data = open(DLL, 'rb').read()
-    rd = lambda rva, n: data[rva2off(pe, rva):rva2off(pe, rva) + n]
+    rd = lambda rva, n: read_rva(pe, data, rva, n)
 
     cookie = struct.unpack('<Q', rd(COOKIE_RVA, 8))[0]
     rot = cookie & 0x3f
@@ -58,9 +62,9 @@ def main():
           % (IMG + COOKIE_RVA, cookie, cookie == 0x2b992ddfa232))
     print('cookie & 0x3f (回転量) = %d' % rot)
 
-    tbl = list(struct.unpack('<32Q', rd(TABLE_RVA, 8 * N)))
+    tbl = list(struct.unpack('<%dQ' % N, rd(TABLE_RVA, 8 * N)))
     nz = sum(1 for v in tbl if v)
-    print('api-set 表 VA 0x%x: %d entry / 非ゼロ %d entry (ファイル生値)'
+    print('api-set 表 VA 0x%x: %d entry / 非ゼロ %d entry (PE 上の静的値・raw 外は 0)'
           % (IMG + TABLE_RVA, N, nz))
 
     print()
@@ -92,7 +96,7 @@ def main():
 
     print()
     print('--- 結論 (静的 vs ランタイム) ---')
-    print('  ファイル生値の api-set 表は非ゼロ %d/%d (reloc/ローダ適用後)。' % (nz, N))
+    print('  PE 上の api-set 表の静的値は非ゼロ %d/%d (raw 領域の外は 0 埋め)。' % (nz, N))
     print('  一方 native CRT 未初期化状態 (DllMain 未実行) ではランタイム生値 0 なので')
     print('  decode(0) = ror(cookie, %d) = 0x%016x ≠ 0 → 誤って「解決済み」と判定される。' % (rot, b))
 

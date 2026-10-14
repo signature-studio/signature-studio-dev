@@ -3,6 +3,7 @@
 // Python の defaultdict のキー挿入順を保つ (循環除去の結果が順序に依るため)。
 import { ALLOW_ARTS, inferArtifacts, sortReady } from "./launch.ts";
 import type { LaunchState } from "./launchobs.ts";
+import { DIGEST_ROLLING_RE } from "./pm.ts";
 
 export interface SnapIssue {
   number: number;
@@ -63,6 +64,8 @@ export interface Rows {
 
 const NEED_RE = /不足|無い|無く|無かった|ない|存在しな|必要|依頼|欠|足りな|未配置|未展開|入っていな|のみ|だけ|揃っ/;
 const STOP_RE = /着手不可|着手できません|着手に必要|素材不足|停止します|停止報告|ブロック|PM に.*依頼|判断を/;
+// run-outcome (record-run-outcome.sh の定型文) と PM の応答は、停止報告ではない (VM 版と同じ規則)。
+const OUTCOME_OR_PM_RE = /<!-- oc-run-outcome:|<!-- oc-pm-/;
 const WORD = "\\p{L}\\p{N}_\\-";
 
 function wordBounded(a: string): RegExp {
@@ -169,7 +172,7 @@ function startedMap(d: Snapshot, iss: Map<number, SnapIssue>): Map<number, strin
   return st;
 }
 
-function neededArts(n: number, input: ClassifyInput): string[] {
+export function neededArts(n: number, input: ClassifyInput): string[] {
   const out: string[] = [];
   for (const line of lines(input.fullBotBody[String(n)] ?? "")) {
     if (!NEED_RE.test(line)) continue;
@@ -201,6 +204,8 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
   const rlOf = (n: number): RelaunchState => input.relaunch[String(n)] ?? { count: 0, art: null };
 
   for (const [n, i] of [...iss].sort((a, b) => a[0] - b[0])) {
+    // 日次 digest の rolling issue (CI-70) は PM agent が本文を更新するだけ。どの行にも入れず、着手も再投入もしない。
+    if (DIGEST_ROLLING_RE.test(i.title)) continue;
     const k = String(n);
     const launchedAt = input.launched[k];
     const isLaunched = Object.hasOwn(input.launched, k);
@@ -214,7 +219,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
       rows.started.push([n, st.get(n) ?? []]);
     } else {
       const reported = !!bl && (!isLaunched || ageH(bl.at) < ageH(launchedAt));
-      const stopHit = !!bl && STOP_RE.test(bl.head);
+      const stopHit = !!bl && STOP_RE.test(bl.head) && !OUTCOME_OR_PM_RE.test(input.fullBotBody[k] ?? "");
       const ls = input.launchState?.[k];
       // 観測できなかった投稿は再投稿しない (stopped で止める)。観測するまでは recent (run が現れれば started になる)。
       if (ls === "failed") {

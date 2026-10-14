@@ -1,4 +1,4 @@
-// AU-2 (#187) 行列の 1 rep: Firefox (WebDriver BiDi) で {48k, 96k} の sine 経路を測る。au2_matrix.sh から呼ぶ。
+// AU-2 (#187) Firefox 行列の 1 rep: Firefox (WebDriver BiDi) で {48k, 96k} の sine 経路を測る。au2_firefox_matrix.sh から呼ぶ。
 // 使い方: node harness/au2.mjs --rep <n> [--secs 10] [--out results/au2/firefox_r<n>.json]
 // 比較対象の名前は run.mjs と同じ (48k = asio_sine_b256_d2, 96k = asio_sine_b256_96k)。sink-input は再生中に pactl で採取する。
 import { withFirefox } from "./bidi.mjs";

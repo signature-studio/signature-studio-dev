@@ -1,27 +1,40 @@
-// AU-2 行列の集計: results/au2/<browser>_r<rep>.json を読み、条件ごとの PASS 数と min–max を Markdown 表で出す (REPORT_AU2_CI.md §5-1 の元)。
-// 使い方: node tools/audio/au2_summary.mjs
-import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
-const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "results/au2");
-const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^[a-z]+_r\d+\.json$/.test(f)).sort() : [];
+// AU-2 (#187) 行列の集計: results/au2/<cond>_r<rep>.json を読み、セルごとの P1〜P4 を Markdown 表で出す。
+// 使い方: node tools/audio/au2_summary.mjs [results/au2 のパス]
+// P2 は worklet が公開する burst_obs (連続 process の総フレーム数の最大値) のみ。p99 は未計測 (分布を取るには worklet 側の拡張が要る)。
+// P4: T_req = ceil((burst×1.25 + B)/B)×B を各セルの最大 burst から再計算し、実 T (stats.T) と比べる。
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const dir = process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "results/au2");
 const rows = new Map();
-const range = (xs) => { const v = xs.filter(Number.isFinite); if (!v.length) return "-"; const a = Math.min(...v), b = Math.max(...v); return a === b ? `${a}` : `${a}–${b}`; };
-for (const f of files) {
-  const d = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
-  for (const r of d.results) {
-    const k = `${d.browser}|${r.sr}|${r.name}`;
-    if (!rows.has(k)) rows.set(k, { browser: d.browser, sr: r.sr, name: r.name, runs: [] });
-    rows.get(k).runs.push({ ...r, rep: d.rep });
+for (const f of fs.readdirSync(dir).filter((x) => /^(fake|null)_r\d+\.json$/.test(x)).sort()) {
+  const cond = f.startsWith("fake") ? "Chrome fake シンク" : "Chrome PulseAudio null-sink";
+  for (const x of JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")).results) {
+    const r = x.result, s = r?.stats ?? {}, ctx = r?.ctx ?? {};
+    const B = r?.cfg?.buf ?? 0, burst = s.burst_obs ?? 0;
+    const key = `${cond} | ${r?.sr ?? "-"} | ${x.name}`;
+    if (!rows.has(key)) rows.set(key, []);
+    rows.get(key).push({
+      ok: x.ok, underruns: s.underruns ?? -1, silence: s.silence_frames ?? -1, burst, T: s.T ?? 0, B,
+      Treq: B ? Math.ceil((burst * 1.25 + B) / B) * B : 0,
+      base: (ctx.baseLatency ?? 0) * 1000, out: (ctx.outputLatency ?? 0) * 1000, clock: r?.clock?.rate_hz ?? 0,
+    });
   }
 }
-console.log("| browser | sampleRate | シナリオ | n | PASS | underruns | burst (f) | T (f) | clock (Hz) | baseLatency (s) | outputLatency (s) | sink-input が ci_null に接続 | sink-input の規格 |");
+const f1 = (v) => v.toFixed(1);
+// 最小〜最大 (n=3 のセル内レンジ)。min と max が同じなら単一値
+const rng = (lo, hi, fmt = String) => (lo === hi ? fmt(lo) : `${fmt(lo)}〜${fmt(hi)}`);
+console.log("| 条件 | sr | シナリオ | n | PASS | underrun (合計) | burst max (f) | 実 T (f) | T_req (f) | T≥T_req | baseLatency (ms) | outputLatency (ms) | clock (Hz, 平均) |");
 console.log("|---|---|---|---|---|---|---|---|---|---|---|---|---|");
-for (const { browser, sr, name, runs } of rows.values()) {
-  const pass = runs.filter((x) => x.ok).length;
-  const conn = runs.filter((x) => x.pulse_sink_input?.on_ci_null).length;
-  const specs = [...new Set(runs.flatMap((x) => x.pulse_sink_input?.specs ?? []))].join(", ");
-  console.log(`| ${browser} | ${sr} | ${name} | ${runs.length} | ${pass}/${runs.length} | ${range(runs.map((x) => x.underruns))} | ${range(runs.map((x) => x.burst))} | ${range(runs.map((x) => x.T))} | ${range(runs.map((x) => (x.clock_hz == null ? null : Math.round(x.clock_hz))))} | ${range(runs.map((x) => x.ctx?.baseLatency))} | ${range(runs.map((x) => x.ctx?.outputLatency))} | ${conn}/${runs.length} | ${specs} |`);
-}
-for (const f of files) {
-  const d = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
-  console.log(`\n${f}: ${JSON.stringify(d.probe)}`);
+for (const [key, xs] of rows) {
+  const [cond, sr, name] = key.split(" | ");
+  const mx = (k) => Math.max(...xs.map((x) => x[k]));
+  const mn = (k) => Math.min(...xs.map((x) => x[k]));
+  const avg = (k) => xs.reduce((a, x) => a + x[k], 0) / xs.length;
+  const pass = xs.filter((x) => x.ok).length;
+  const ur = xs.reduce((a, x) => a + x.underruns, 0);
+  // T≥T_req は run ごとの判定 (表の脚注参照)。セル最大 burst 基準の判定は REPORT 側に書く
+  const tOk = xs.every((x) => x.T >= x.Treq);
+  console.log(`| ${cond} | ${sr} | ${name} | ${xs.length} | ${pass}/${xs.length} | ${ur} | ${rng(mn("burst"), mx("burst"))} | ${rng(mn("T"), mx("T"))} | ${mx("Treq")} | ${tOk ? "OK" : "NG"} | ${rng(mn("base"), mx("base"), f1)} | ${rng(mn("out"), mx("out"), f1)} | ${f1(avg("clock"))} |`);
 }
