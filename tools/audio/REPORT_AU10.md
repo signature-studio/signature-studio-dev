@@ -207,7 +207,15 @@
 - cb_max ≥ 1 ms の無負荷 30 分は、§16.3〜§16.10 の 8 回の範囲では 1 回 (§16.9)。範囲外の §16.1 (6aa4b39) を含めると 2 回。本節の負荷下 1 回は該当しない。
 - 10 秒ソーク FAIL: 本 run では反復せず、動作確認の 1 回 (負荷下) が PASS のみ。通算 2/45 の内訳は、無負荷 2/44 (§16.10 までの通算) と負荷下 0/1 (本節)。原因は**未特定**。
 
-鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `306ecc9b`。
+鮮度の証跡 (docs/WORKFLOW.md §6): 測定 commit `306ecc9b`。検証 HEAD `dc4ded5a` (本節の文言修正を含む直前の commit) で `git diff --stat 306ecc9b dc4ded5a -- tools/audio public/worklets src/runtime` の出力:
+
+```
+ tools/audio/REPORT_APPENDIX_1570.md | 63 ++++++++++++++++++++++++++++
+ tools/audio/REPORT_AU10.md          | 83 ++++++++++++-------------------------
+ 2 files changed, 90 insertions(+), 56 deletions(-)
+```
+
+コード差分 (`*.md` 除外) は 0 (`git diff --stat 306ecc9b dc4ded5a -- tools/audio public/worklets src/runtime ':!*.md'` の出力なし)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
