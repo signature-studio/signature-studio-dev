@@ -34,7 +34,7 @@
 | N1〜N3 (dump なし) | 0 | `ee485e91` / `cbee7ce0` / `cbee7ce0` | `23c8ea5b` ×3 | — | 同上 |
 | Z1・Z2 (`setarch x86_64 -R`・ASLR 無効) | 0 | `7eae26d1` / `7eae26d1` | 未計測 | — | — |
 
-- **結論 (pass 単位)**: `--print-after-all` の stderr (約 17,954 件の IR dump・81 MB) は P1 と P2 で md5 が完全一致した。`uselistorder` は pass dump に 1 行も現れない (0 件)。最終 `drc.ll` の差は `@WriteFile` の `uselistorder` 1 行の並び (`{ 0, 1, 2, 4, 3 }` と `{ 2, 0, 1, 4, 3 }`) だけ。つまり並びは LLVM の最終 writer 段で生じ、pass の中身の差では無い。
+- **結論 (pass 単位)**: `--print-after-all` の stderr (約 17,954 件の IR dump・81 MB) は P1 と P2 で警告行を除いて一致した (警告は run ごとに 1〜2 件揺れる。§20 項 5・項 6)。`uselistorder` は pass dump に 1 行も現れない (0 件)。最終 `drc.ll` の差は `@WriteFile` の `uselistorder` 1 行の並び (`{ 0, 1, 2, 4, 3 }` と `{ 2, 0, 1, 4, 3 }`) だけ。つまり並びは LLVM の最終 writer 段で生じ、pass の中身の差では無い。
 - **結論 (ASLR)**: ASLR を無効にすると 2 回とも `7eae26d1` で一致した。並びの揺れは実行ごとのアドレス (ポインタ) の割り当てに由来する可能性が高い。ただし ASLR を無効にしたときの `lift.ll` 段は未計測で、この結論は「可能性が高い」止まり。
 - **受入 2 (固定化)**: A7 (`tools/m5/ir5_patch.py` の `uselistorder` 行除去) を通した `lift.ll` は、上記の 5 本の drc.ll (md5 4 種類) すべてで `23c8ea5b` に収束した。`tools/liftlib/liftlib/passes/base.py` の `normalize()` (A7) も同じ正規表現で除去し、P1・N1・N2 の 3 本の出力が `94a8363c` で一致した (Z1 は lift 段が未計測のため対象外)。新しい正規化は不要と判断する。**§19 で覆った: 新しい正規化 (A7 の空行ごと除去) が必要 (旧 A7 は先頭の空行を残すため `boot_final.ll` が揺れた)。**
 - **未解決**: (a) `--passes` 相当の段の切り分けは `--print-after-all` で代替した。LLVM writer 段で並びが変わる仕組みそのものは未確認。(b) ASLR 無効時の `lift.ll` 段は未計測。(c) `@global_var_*` 行位置差 (§14) は今回の 150 range では再現せず、未切り分け (`--full` 全 range で要確認)。
@@ -197,26 +197,42 @@
 
 - 群ごとの distinct (drc.ll / drc.bc / drc.c / lift.ll / 指示行と空行を除いた drc.ll): on 3 / 3 / 1 / 1 / 1、off 1 / 1 / 1 / 1 / 1、tc 1 / 1 / 1 / 1 / 1。
 - ASLR 有効の drc.ll は、計 4 回の計測 (16 run) で 8 種。同じ手順の計測 (スクリプトの版は違う) でも組が変わった。
-- ASLR 無効の drc.ll も計測ごとに変わった: `907ab19c` (be4c830b の計測・3 run とも同一) → `451df75d` (1a6fb03e)。違いは環境変数 `RETDEC` の有無だけで、プロセスのスタック位置が変わる。
+- ASLR 無効の drc.ll も計測ごとに変わった: `907ab19c` (be4c830b の計測・3 run とも同一) → `451df75d` (1a6fb03e)。違いは環境変数 `RETDEC` の有無だけで、プロセスのスタック位置が変わった、と推定する (未確認。n が少ない)。ASLR 有効の pass2 の drc.ll (下の再現) も `907ab19c` で、be4c830b の ASLR 無効の値と一致した。drc.ll の値は ASLR の on/off では分かれないかもしれない。
 - 指示行の数は、説明行 `; uselistorder directives` (76 = directive を持つ関数数) を除いたもの。
+
+### 再現 run (コード差分 0 の HEAD `b4b7370d`・fix round 1)
+
+- 再現 HEAD: `b4b7370d` (PR #2530 の head)。`git diff 1a6fb03e b4b7370d -- tools ':!tools/m11/REPORT_APPENDIX_960.md'` は 0 行。同じスクリプトを前景で 1 回実行 (`M11_PE=<fl-win64>/extracted/block00031_PE.bin RETDEC=<toolchain-retdec>/bin/retdec-decompiler bash tools/m11/uselist_origin_2456.sh 4 3 2 2`)。PE sha256 `b2c64da4…`・RetDec sha256 `9d49ffcf…` (1a6fb03e と同じ)。
+
+| 群 | drc.ll | 指示行除去 drc.ll | drc.c | lift.ll (A7 後) | 指示行数 |
+|---|---|---|---|---|---|
+| on1〜4 (ASLR 有効) | `30cd458d`・`c3334c92`・`6c09a7a9`・`f250e521` (4 種) | `407eb71e` ×4 | `fffbd338` ×4 | `946aefb3` ×4 | 741・740・741・742 |
+| off1〜3 (ASLR 無効) | `fd47ef1b` ×3 | `407eb71e` ×3 | `fffbd338` ×3 | `946aefb3` ×3 | 739 ×3 |
+| tc1・2 (ASLR 無効 + tcache 0) | `c96f0e04` ×2 | `407eb71e` ×2 | `fffbd338` ×2 | `946aefb3` ×2 | 741 ×2 |
+| pass1・2 (`--print-after-all`・ASLR 有効) | `cc6dac6c`・`907ab19c` | `407eb71e` ×2 | `fffbd338` ×2 | —(pass dump の run には無い) | 742・741 |
+
+- 群ごとの distinct (drc.ll / drc.bc / drc.c / lift.ll / 指示行除去 drc.ll): on 4 / 4 / 1 / 1 / 1、off 1 / 1 / 1 / 1 / 1、tc 1 / 1 / 1 / 1 / 1。
+- 差が出た関数 (run 対の和集合): `function_408400`・`function_4099c0`・`function_407a50` の 3 関数 (1a6fb03e の計測の 5 関数と違う)。
+- pass dump: pass1・pass2 の stderr は全体で `340d476b`・81,366,993 B (一致)。警告 1 件 (`function_4087e0`) を含む。警告行を除くと両方 `bcb87297`。
+- 所要 (RetDec・逐次・4 コア): 1 回 9.6〜9.9 秒 (ASLR 有効・無効・tc 共通)、pass dump 1 回 59.6 秒。RetDec の合計 206.6 秒。load 1.00〜1.16。
 
 ### 切り分け
 
-1. **差は指示行だけ**: 指示行と空行を除いた drc.ll は全 11 run で 1 種 (`407eb71e`)。drc.c と A7 後の lift.ll も全 run 一致。負例: 同じ on 群の生の drc.ll は 3 種。→ §19 の A7 がこの差を吸収する。
+1. **差は指示行だけ**: 指示行と空行を除いた drc.ll は全 11 run で 1 種 (`407eb71e`)。drc.c と A7 後の lift.ll も全 run 一致 (再現 run でも同じ)。負例: 同じ on 群の生の drc.ll は計測ごとに変わる (1a6fb03e の計測では 3 種・再現 run では 4 種)。→ §19 の A7 がこの差を吸収する。
 2. **差は一部の関数に限られる**: directive を持つ 76 関数のうち、最終計測の run 対で差が出たのは 5 関数 (`function_407520`・`function_408400`・`function_4099c0`・`function_4087e0`・`function_40b620`)。差は指示行の有無 (一方の run にだけ指示がある) と、指示値の順列の両方。同じ行の集合で並びだけ違う関数は 0 件。例: `@WriteFile` の指示値が `{ 0, 1, 2, 4, 3 }` と `{ 2, 0, 1, 4, 3 }` で違う (§18 と同じ指示。計測 1 回目で確認)。
 3. **差は書き出し前のモジュール内状態にある**: 同一 run の `.ll` と `.bc` が両方 run ごとに変わる (on 群で各 3 種)。ログでは `.ll`・`.bc` が `.c` より前に続けて書かれる。二つの writer が同じ状態から別々に揺れるとは考えにくいので、揺れは writer より前にある (推定)。→ §18 の「writer 段」は取り下げ (上の訂正)。
-4. **アドレス依存 (推定)**: ASLR 無効でヒープの割り当てだけ変えた tc は off と drc.ll・drc.bc が違う (`451df75d` → `886852d5`、`f99b628a` → `1a4d9f52`)。ASLR 無効でも環境変数 1 つでスタックの位置が変わると値が変わる (上の `907ab19c` → `451df75d`)。順序は割り当てられたポインタ値に依存すると見てよい。機構 (どの container か) は未特定。同梱 toolchain の `retdec.tar.xz` は include/ と bin/ のみで `.cpp` が無く、コードでの確認はできない。
-5. **pass 単位 (未達)**: `--print-after-all` の IR テキスト (17,954 件) は 2 run で md5 一致 (`340d476b`・81,366,993 B・指示行 0)。同じ 2 run の drc.ll と drc.bc は違う (上表)。テキストは use-list の順序を持たないので、テキストに差が無いことは「順序が変わらない」根拠にならない。段の特定には use-list 付きの per-pass dump が要るが、v5.0 バイナリは `--print-after-all`・`--print-before-all` しか持たない。差の入る範囲は、ログの `Input binary to LLVM IR decoding` の後から `.ll`/`.bc` の書き出しまでの最適化フェーズ群 (推定)。
-6. 副次観測: HLL 段の `found break outside of a loop` 警告は run ごとに 1 件 (on4 だけ 2 件)。`.c` は全 run 同一。揺れの原因は未特定で、DEFECTS 類型には当てない (出力に影響が無いため)。
+4. **アドレス依存 (推定・n は少ない)**: ASLR 無効でヒープの割り当てだけ変えた tc は off と drc.ll・drc.bc が違う (`451df75d` → `886852d5`、`f99b628a` → `1a4d9f52`)。ASLR 無効の drc.ll の値も計測ごとに変わった (上の結果)。順序は割り当てられたポインタ値に依存する、と推定する。機構 (どの container か) は未特定。同梱 toolchain の `retdec.tar.xz` は include/・bin/・lib/・share/ のみで、`.cpp` と `.c` が 0 件 (展開して確認。コードでの確認はできない)。
+5. **pass 単位 (未達)**: `--print-after-all` の IR テキスト (17,954 件) は、警告行を除くと 2 run で一致する (再現 run: 両方 `bcb87297`・指示行 0)。stderr 全体の md5 は、1a6fb03e の計測と再現 run では `340d476b`・81,366,993 B で一致したが、PR #2530 のレビュー時の再現では警告 1 行の差で不一致 (pass2 が `b050138d`・81,367,079 B。項 6)。同じ 2 run の drc.ll と drc.bc は違う (上表)。テキストは use-list の順序を持たないので、テキストに差が無いことは「順序が変わらない」根拠にならない。段の特定には use-list 付きの per-pass dump が要るが、v5.0 バイナリは `--print-after-all`・`--print-before-all` しか持たない。差の入る範囲は、ログの `Input binary to LLVM IR decoding` の後から `.ll`/`.bc` の書き出しまでの最適化フェーズ群 (推定)。
+6. 副次観測: HLL 段の「outside of a loop」(`break` の位置) の警告は run ごとに 1 件 (1a6fb03e の計測は on4 だけ 2 件、再現 run は on3 だけ 2 件。関数は `function_4087e0`・`function_408b60`)。stderr の差は、観測した範囲では警告行だけ。`.c` は全 run 同一。揺れの原因は未特定で、DEFECTS 類型には当てない (出力に影響が無いため)。
 
 ### 受入 1 の到達
 
-- 達成: 差の場所 (drc.ll の 5 関数の指示行)・差の段 (書き出し前のモジュール内状態、writer ではない)・性質 (ポインタ値に依存・推定)。
-- 未達: pass 単位 (`--passes` 相当) の特定。use-list を見る手段が v5.0 の配布物に無い。
+- 達成: 差の場所 (drc.ll の指示行。差の関数の集合は計測ごとに変わる: 1a6fb03e の計測で 5 関数・再現 run で 3 関数)・差の段 (書き出し前のモジュール内状態、writer ではない・推定)・性質 (ポインタ値に依存・推定)。
+- 未達: pass 単位 (`--passes` 相当) の特定。use-list を見る手段が v5.0 の配布物に無い。子 issue #2577 に移した (#2456 の範囲は raw 出力の特定まで)。
 - 決定への影響: §19 の方針 (RetDec 側は決定化せず、A7 で吸収) を維持する。RetDec 側の決定化はソース非同梱のため採らない。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| pass 単位の段の特定 (use-list 付き per-pass dump が無い) | 上流 (RetDec) の修正箇所が決まらない | #2456 (Refs で残す・PM 判断) |
-| アドレス依存の機構 (どの container か) | 推定止まり (tcache 摂動と環境変数の 2 種で観測。n は少ない) | #2456 (同上) |
+| pass 単位の段の特定 (use-list 付き per-pass dump が無い) | 上流 (RetDec) の修正箇所が決まらない | 子 issue #2577 (#2456 から移管) |
+| アドレス依存の機構 (どの container か) | 推定止まり (tcache 摂動と環境変数の 2 種で観測。n は少ない) | 子 issue #2577 (同上) |
 | HLL 段の break 警告の件数の揺れ | `.c` に影響なし (全 run 同一) | 親 #960 へ提案 (観測のみ) |
