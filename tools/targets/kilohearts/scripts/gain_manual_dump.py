@@ -31,7 +31,8 @@ def main(corep, tsvp):
         print(f"#{i} {r['func_rva']} size={r['size']} root={r['root_class'] or '-'}")
         if not r['parent_rva']:
             print("  ROOT")
-            for x in ins_at(f, 16)[:3]:
+            end = f + int(r['size'])
+            for x in [x for x in ins_at(f, 48) if x.address - base < end][:3]:
                 print(f"    {x.address - base:#x}: {x.mnemonic} {x.op_str}")
             continue
         p = int(r['parent_rva'], 16)
