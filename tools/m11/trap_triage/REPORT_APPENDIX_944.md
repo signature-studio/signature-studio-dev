@@ -182,3 +182,46 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 `bash trap_triage/repro_1389.sh` (OFF → OFF 再実行 → ON・直列・単発): 全体 1 分 43.0 s (`time` の real)・判定 `PASS`。survey elapsed は OFF 15.176 s / OFF 再実行 15.000 s / ON 15.349 s、load 開始 1.52 / 1.29 / 1.17。
 `cmp_1389.py`: OFF と OFF 再実行は記録 227 件が完全一致 (差 0)。OFF と ON は 216 件の突合で差 1 件 (`0x26d1a0` j=12、`st`・`len`・`rc`・`h` の 4 フィールド)。注: 本 run では `repro_1389.sh` の後に既定 build (`M11_OV_413060=0`) を再ビルドして §8.1 を測った。したがって §8.1 の 2 区間の結果は既定 build 上の値で、§8 の計測 build (`M11_INSTR_413060=1`) の値とは別物。
 注: 既定 build の `boot_final3.ll` md5 は `baa100ff…` で、§0 の `4fd74f…` と一致しない。`m11_gen_ir2.sh` を本 run で再実行した IR から作ったため (§7 の `7304232a…` と同じ種類の差。原因は未切り分け)。計数 870/24 は §0 と一致。
+
+## 9. #2118 追記: 2 区間を書く先行 unit 1 の関数 (M11-N139・部分・旧 本体 §10)
+
+測定 commit: **`637b70de`** (origin/main。本節の作業では m11 の既存コードを変えていない。追加は `n139_writers.py`・`watch_range_2118.c`・`writers_2118.mjs` の 3 ファイル)。
+素材: `fl-win64`・`work-m11` (`m11_gen_ir2.sh` で `ir_conditions.json` 生成 F1=902 F3c=36 errors=0)・`toolchain-emsdk`。既定 build の `boot_final3.ll` md5 `baa100ff37a790dc1103c26a2e648d12` (REPORT_944 §6 と一致)。
+
+### 9.1 2 区間の再現 (既定 build・`state_158.mjs`)
+
+`dump 0,1` → `overlay fa5108-fa5c64,11e69b0-11e6b94` = `ok`、`overlay none` = `trap:memory access out of bounds` (REPORT_944 §6.1 と一致)。
+
+### 9.2 静的解析 (IR・直接 call のみ)
+
+`n139_writers.py` は unit 1 (`function_41ce10`) から直接 call で到達する 19 関数を辿り、絶対定数 (`inttoptr (i64 N)`) で 2 区間に触れる関数を列挙する。
+- 書込み: `function_4090e0` (0x11e6b88/0x11e6b90)・`function_41ca50` (0x11e6a30)・`function_41ce10` (0x11e6a28/2c/38)。
+- 読込み: `function_409070`・`function_4090e0`・`function_409bf0`・`function_40d1f0`・`function_41ce10`。
+- **限界**: 第 1 区間 (`0xfa5108`〜) への書込みは store の宛先が計算値で、定数では見えない。また indirect call 先は辿らない。下の実行時計装で補う。
+
+### 9.3 実行時計装 (unit 0・1 の実行・store 直後の監視)
+
+`watch_store_682.py` (全 54,041 store 計装) + `watch_range_2118.c` (範囲版 `m11_sw`) で、unit 0・1 の実行中に 2 区間へ書く store を site 単位で記録した (`writers_2118.mjs`・`M11_KEEP_BOOT_O=1`)。
+
+| 区間 | 書込み件数 (unit 0 / unit 1) | 書込み関数 (IR 行) |
+|---|---|---|
+| A `0xfa5108`〜`0xfa5c68` | 0 / 321 | `function_4090e0` のみ (IR 行 109818〜109881・7 site) |
+| B `0x11e69b0`〜`0x11e6b98` | 0 / 347 | `function_409070` 326 件 (行 109765・`store i8`)・`function_40f4b0` 15 件 (行 115082/115086)・`function_4090e0` 2 件 (行 109897/109899)・`function_41ca50` 1 件 (行 130213)・`function_41ce10` 3 件 (行 130275/130307/130308) |
+
+- unit 1 だけが両区間を書く。unit 0 は書かない (REPORT_944 §6.1 の「unit 1 が必要」と整合)。
+- 計装 build の unit 158 は trap する (A 版・B 版の両方で `trap`)。これは計装の副作用で、clean build (計装なし) の `0,1,158` = `ok`・`0,158` = `trap` と一致する。計装版の値は書込み元の特定にだけ使い、判定には使わない。
+- 計装版の unit 158 が 2 区間の外に書く 2 件 (`0x11e6b88`/`0x11e6b90` = `10ab0000`) は、unit 158 自身の書込みで、先行 unit 1 の書込みとは別。
+
+### 9.4 受入条件の進捗 (#2118)
+
+1. **2 区間を書く関数の特定 (部分達成)**: 書込み元は §9.3 で unit 単位に特定した。**未達**: unit 158 の後続経路 (呼出し元・後続の読出し) と j=12 (`dest` k=148) が 2 区間に触れるかの突合は未了。
+2. **ON 記録 (`M11_DEST_READ=1`) が 2 区間を書換えるか**: **未達**。`repro_1389.sh` (OFF・OFF 再実行・ON) は PASS (REPORT_944 §8 と一致) したが、ON の 2 区間への書込みの計装測定は未実施。
+3. **REPORT_944 §4(a)・付録 §7.3 の結論**: 結論 (意味的差 / ビルド差 / 観測副作用) は**未決**のまま。本節の 9.3 は、先行 unit 1 の 2 区間書込みを関数単位で確定した材料。
+4. **決定性・所要・load**: `repro_1389.sh` の全体 1 分 26.5 s (`time` の real)・load 開始 0.75 / 0.85 / 0.90・OFF 2 回の計数・dest 記録は REPORT_944 §8 と一致し PASS。
+
+### 9.5 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 158 の後続経路 (読出し) と j=12 dest (k=148) が 2 区間に触れるかの IR 突合 | 意味的差か観測副作用かの判定 (REPORT_944 §4 (a)) | 子 issue (#2118 の残り・本 run で起票) |
+| ON 版 (`M11_DEST_READ=1`) で 2 区間への書込みを計装測定する | ON が 2 区間を書換えるかの確定 (受入条件 2) | 同上 |

@@ -268,3 +268,27 @@
 - 判定: **N6 読み手 8 関数は確定** (文字列 blob 参照の実命令で確認)。**呼び出し元は未確定**: 直接・即値・絶対・RVA の 4 系統で 0 件。テーブル基準の 4 件は同一差分の 1 組で、base 参照元が関数外のため候補止まり。N5 の読み手は ASCII・UTF-16 とも未特定。
 - `mx_lic_stub.py` の RULES は変更しない (呼び出し元が未確定のため、差し替え点を決めると silent miscompile になる)。
 - 残件 (起票先は PR 本文の未解決表): (1) テーブル基準候補 `0x183b27dda` 系の base 参照元の逆引き (関数外のため、呼び出し経路の確定が必要)、(2) N5 読み手の特定 (ASCII / UTF-16 とも `.text` 直接参照 0 件のため、文字列 index 経由・関数ポインタ埋め込みを疑う)、(3) `acpt_verify_mx2.py` の DLL 対応。
+
+### 12.13 DLL の N5 読み手・テーブル基準候補の確認 (#2108 [MX-30]・測定 commit `637b70de`・2026-10-14)
+
+- 素材: `plugins-massivex` → `$RUNNER_TEMP/mx` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work/key key`。`work/key/extracted/Native Instruments/Massive X.dll` = 95,249,816 B (§12.12 と一致)。md5 `9b3f9107a7b2d7ccd9146622bb39eefb`。checksum 不一致 125/125 は既知事象。
+- 実行 (`tools/targets/massivex` 直下・いずれも rc 0):
+  - `python3 license/scripts/mx_dll_readers.py` (2 min 34 s・load 1.53 開始)。§12.12 の読み手 8 関数と blob 一覧を再現。
+  - `python3 license/scripts/mx_dll_table_refs.py` (2 min 18 s)。§12.12 の hit 4 件を再現。
+  - 調査用の追加確認 (`work/` のみ・commit しない): 参照元の逆引き・セクション表・call 先の内容。
+- 結果:
+
+| 項目 | 結果 |
+|---|---|
+| N5 blob (`demoExpired`×2 `0x184862d19`/`0x184862e67`・`subscriptionExpired` `0x184862e7a`) の読み手 | 関数 0 件 (blob 参照の命令は N6 のみ。直接 call/jmp・即値も 0 件) |
+| N5 UTF-16 `MXDemoPopup.qml` (`0x18414cd91`) の読み手 | RIP 相対・即値 0 件 |
+| テーブル基準候補 base `0x183b27dda` の参照元 `0x1831c9e45` | pdata 範囲外 (関数外)。`call 0x183b27dda` の命令。**その call 先 `0x183b27dda` は `.rdata` (chars `0x40000040`・実行不可)** |
+| テーブル基準候補 base `0x184021d48` の参照元 `0x1838565d3` | pdata 範囲外 (関数外)。`call 0x184021d48` の命令。**call 先 `0x184021d48` も `.rdata`** |
+| base `0x183b27dda` の表 (idx 236/244/249) | いずれも `0x181133db0` (N6-8 読み手) を指す。他 idx の target は散らばり、表として一貫しない |
+| base `0x184021d48` の表 (idx 239) | `0x184fe84b3` (N6 文字列) を指す。idx 236/244/249 の target は散らばる |
+
+- 判定:
+  - **受入条件 1 (N5 読み手の特定): 未達**。N5 の 4 文字列は直接参照・即値の走査で 0 件。文字列 index 経由・関数ポインタ埋め込み (§12.10 の残件) は未走査。
+  - **受入条件 2 (候補の判定): 判定保留**。参照元 2 箇所は pdata 範囲外で、前後の命令は `.text` 内で連続している。`call` 先の候補アドレスは `.rdata` にあり、実行可能な call 先としては不自然なので、偶然一致の可能性が高い。ただし参照元の領域が非コード (データ) の誤デコードである可能性も残り、関数としての特定はできていない。idx 236/244/249 の `0x181133db0` 一致は 3 件とも同一差分 `-0x29f402a` の繰り返しで、表全体の一貫性は確認できない。**N6 読み手の呼び出し元は依然として未確定**。
+  - 差し替え点は未確定のため `license/scripts/mx_lic_stub.py` の RULES は変更しない。
+  - e2e は本 run でコードを変えていないため未実行 (§12.6・§12.10 が正本)。
