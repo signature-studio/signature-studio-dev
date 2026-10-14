@@ -92,3 +92,26 @@ DEFECTS.md 行案 (編集は PM 判断):
 - **#1087 本文の仮説 (`cvttpd2dq` の INT32_MIN 規約) との関係**: 大引数で通るのは `cvttpd2dq` の分岐ではなく Payne-Hanek 分岐。`x86_cvtt_f2i32` 単体の誤りは支持されない。
 - **SVF への波及 (未確定)**: SVF 残 mismatch 9 の `this[0..3]` は tanf 戻りの直接 store。tanf の大引数不一致が SVF の残差を説明するかは未検証 (SVF 側の引数は別計算のため、tanf の `x` を再計算して突合する必要がある)。
 - **未解決 (起票先)**: flag-folding (`bsr` / `shr` / `cmp` の CF・ZF・SF を分岐に再結線する) の修正と、修正後の tanf wide 40/40 + SVF 再測定 → 子 issue (下記 §23.9 の起票先)。
+
+### 23.10 LIFTLIB-17 (#1330) — Payne-Hanek 分岐のフラグ流れ (機械語側の確定)
+- **素材**: `OTT_vst2_win64.dll` (`$HOME/analysis/plugins/ott/binaries/`)、IR は `tools/liftlib/work/ott_lb10000/ott_lift.ll` (line 12060 付近)。コードは未変更 (解析のみ・e2e 未実施)。
+- **機械語 (capstone 逆アセンブル、`0x1801ba9c8`〜`0x1801bab26`)**: フラグを消費する命令と、その直前の定義を VA 順に示す。
+
+  | VA | 命令 | 定義元 (フラグ) | 消費 |
+  |---|---|---|---|
+  | `0x1801baa3a`〜 | `mul rcx` → `add r10,rax` | (mul の CF/OF) | — |
+  | `0x1801baa4a`〜`0x1801baa50` | `sub rcx,r11` / `shr rax,cl` | `shr` の CF (最後に押し出された bit) | `0x1801baa53` `jae 0x1801baa70` |
+  | `0x1801baa70` | `adc rax,0` | CF (上の `jae` とは別の CF 読み) | — |
+  | `0x1801baa90` | `bsr rcx,r10` | `bsr` の ZF (src==0 で ZF=1) | `0x1801baa94` `jne 0x1801baab0` |
+  | `0x1801baab7` | `cmp rcx,0` | `cmp` (SF/ZF/CF) | `0x1801baabb` `jl 0x1801baae0` / `0x1801baabd` `je 0x1801bab00` |
+
+- **p1 の処理 (`tools/liftlib/liftlib/passes/p1.py`)**:
+  - `shr` reg,imm の handler (line 1455-1466) は値だけ更新し `st["fl"] = None` にする。`shr rax,cl` (レジスタ shift) は handler に入らず、フラグは前段の状態のまま残る。
+  - `bsr` は p1 に handler が無く (grep で一致なし)、ZF を追跡しない。
+  - `flag_consumers` (line 73) は `defs_before(va,"flags") == {A}` (comis 起点) の jcc だけを拾う。したがって `jae` / `jne` / `jl` / `je` はいずれも comis 由来ではないため、分岐の再構成 (dropped/folded 経路) の対象外になっている。
+- **IR との対応 (VA 順からの推定・未検証)**: `dec_label_pc_1801ba9c8` の `br i1 true` が `jae 0x1801baa70` に、`dec_label_pc_1801baa70` の `br i1 false` が `jne 0x1801baab0` に、`dec_label_pc_1801baab0` の `br i1 false` が `jl 0x1801baae0` に、`dec_label_pc_1801baabd` の `br i1 undef` が `je 0x1801bab00` に当たると読める。どの値が畳まれたかは IR の `%` 定義を追うまで確定しない。
+- **修正の方向 (案)**: p1 に整数 flag 生成 (`shr` reg,cl の CF / `bsr` の ZF / `cmp rcx,0` の SF・ZF) を追加し、上の 4 分岐を `icmp` で再結線する。これは comis 起点の `p1` 経路とは別の経路になる。実装と測定は子 issue に分ける。
+
+### 23.11 残作業 (起票先)
+- 整数フラグ再結線 (`shr`/`bsr`/`cmp` の flag 追跡 + 4 分岐の再結線) の実装 → #1687 (LIFTLIB-18)。
+- 修正後の `leafspec` tanf wide 40/40、SVF 180126040 の `--n 40` 再測定、`liftlib_e2e.sh` ALL PASS → #1687。

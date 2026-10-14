@@ -1,5 +1,7 @@
 # REPORT — HB-H15 Fruity Wrapper の lift 方式判定 (分割 a: 計測の土台)
 
+> **正本**: `tools/hostbridge/wrapper_lift/REPORT.md`。§9 (#1521) の全文は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md`。
+
 - 親: #94 (HB-H4) / 本 issue: #783 / 担当 dir: `tools/hostbridge/wrapper_lift/`
 - 検証起点: `origin/main` @ 7c5f7a8f (作業ブランチ `783-wrapper-lift-method`)
 - 素材: `fl-win64` (`flstudio_win64_26.1.7.5653.exe` 由来の `extracted/block19091_PE.bin` / `block23676_PE.bin`)
@@ -222,3 +224,8 @@
 **wasm link・採用方式 (受入条件 2・3)**: 未実施。修復済みでも 40 ファイル全てが `emcc -c` で exit 1 のため、link に進めない。wasm link の所要・サイズは未測定。採用方式は未決定 (§7 の暫定 x64c 候補は変更なし)。
 
 **本 run で未達のもの → 子 issue**: goto/break・int/pointer 混在の修復と emcc exit 0 化 → #1521 (HB-H31)。`no_definition` 残り 4 件の原因、wasm link の所要・サイズ、方式比較表の完成 → #1522 (HB-H32)。
+
+## 9. #1521: int/pointer・frontend helper の修復と emcc 通過数 (測定 commit: bb076c69)
+
+- 結論: int/pointer 混在 (`-Wint-conversion`) は修復済み (block19091_0.c で 46 → 0、全 40 ファイルで修復後 0)。emcc exit 0 は 40 ファイル中 1 件のみで受入条件 3 は未達 (残りは goto/break 94 件と引数型不一致 1,245 件)。未達は子 issue #1679 (HB-H35)・#1680 (HB-H36) に分割。
+- 測定表・残り error の内訳 (合計 1,377)・受入条件の判定・再測定手順・未検証項目は付録 `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_1521.md` (§9 全文の分割移動) を参照。

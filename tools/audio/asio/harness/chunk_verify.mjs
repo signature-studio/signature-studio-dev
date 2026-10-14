@@ -56,10 +56,22 @@ export class ChunkVerifier {
 
   finish() { this.step(); return this.result(); }
 
+  // underrun 直前の ring 充填 (quantum 単位, cap.fill の時系列)。hdr[4] = 初回 underrun の quantum, hdr[5] = 最終 underrun の quantum。
+  // hdr[8..13] = worklet 呼出間隔ヒストグラム (ms: 0 / 1-5 / 6-12 / 13-20 / 21-40 / >40)、hdr[14] = 最大間隔 (ms)。
+  underrunTrace(radius = 64) {
+    if (Atomics.load(this.hdr, 6) === 0) return null;
+    const F = this.fill.length, q1 = Atomics.load(this.hdr, 4), qN = Atomics.load(this.hdr, 5);
+    const lo = Math.max(0, q1 - radius), before = [];
+    for (let k = lo; k <= q1; k++) before.push(this.fill[k % F]);
+    return { first_q: q1, last_q: qN, fill_before_first: before, fill_at_last: this.fill[qN % F] };
+  }
+
   result() {
     const v = {
       covered_frames: this.done, sr: this.sr, underrun_events: Atomics.load(this.hdr, 6), fail: this.fail,
       device_fill: { min: this.fmin, max: this.fmax, avg: this.fcnt ? this.fsum / this.fcnt : 0 },
+      callback_gap: { bins_ms: ["0", "1-5", "6-12", "13-20", "21-40", ">40"], hist: Array.from(this.hdr.subarray(8, 14)), max_ms: this.hdr[14] },
+      underrun_trace: this.underrunTrace(),
     };
     if (this.mode === "ramp") {
       v.ramp = { frames_checked: this.done, bit_exact: this.ok, mismatches: this.bad, first_mismatch_frame: this.firstBad };
