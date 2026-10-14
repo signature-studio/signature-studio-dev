@@ -257,6 +257,16 @@ EMSCRIPTEN_KEEPALIVE double m11_probe_count(int i) { return (i >= 0 && i < PROBE
 #ifndef M11_RT_EMPTY
 #define M11_RT_EMPTY 0
 #endif
+#ifndef M11_RT_NODATA
+#define M11_RT_NODATA 0
+#endif
+#if M11_RT_NODATA
+void m11_dest_obs(unsigned long long dest) { (void)*(volatile unsigned long long*)(uintptr_t)dest; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) { (void)k; (void)field; return -1.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return 0.0; }
+EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hlo(void) { return 0.0; }
+#else
 #if M11_RT_PADPRE
 static unsigned char g_pad_pre[M11_RT_PADPRE] __attribute__((used));
 #endif
@@ -318,4 +328,5 @@ EMSCRIPTEN_KEEPALIVE double m11_dest_rec(int k, int field) {
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_n(void) { return (double)g_dest_n; }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hhi(void) { return (double)(unsigned)(g_dest_h >> 32); }
 EMSCRIPTEN_KEEPALIVE double m11_dest_obs_hlo(void) { return (double)(unsigned)(g_dest_h & 0xffffffffu); }
+#endif
 #endif
