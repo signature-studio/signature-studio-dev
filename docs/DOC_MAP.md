@@ -316,7 +316,7 @@
 | `tools/hostbridge/lowbase/REPORT.md` | ~125 | VA 敷設 base 可変化 (+ `x64c/` に x64c ラッパ 3 本目: `x64c/lb_x64c.py` は `tools/ott/lift/x64c.py` を無改変 import) |
 | `tools/hostbridge/nfo/REPORT.md` | ~148 | Plugin database (`.nfo`/`.fst`) 書式解読 + 合成 DB 生成器。§10〜§12 は `REPORT_APPENDIX_A.md`・§13〜§14 は `REPORT_APPENDIX_B.md` に分割 |
 | `tools/hostbridge/nfo/REPORT_APPENDIX_A.md` | ~112 | nfo §10〜§12 全文 (実機 OTT.fst / `.Plugins.ini`+VerifiedIDs 照合 / VST3 path 規則・KH magic・Massive X CID。#437 で無変更分割移動) |
-| `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_2071.md` | ~75 | #2071 (HB-H42): 引数・代入・初期化の `L"..."` (`int[N]` → `int16_t *`) 型不一致の判定 (呼出側の wide literal・宣言側は正) と `retdec_repair.py --wide` の代入・初期化への拡張。修復前後の emcc exit 0・error 行の実測 (測定 commit `f70faf97`)。残件は #1954 (HB-H41)・#2853 (HB-H47) |
+| `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_2071.md` | ~110 | #2071 (HB-H42): 引数・代入・初期化の `L"..."` (`int[N]` → `int16_t *`) 型不一致の判定 (呼出側の wide literal・宣言側は正) と `retdec_repair.py --wide` の代入・初期化への拡張。修復前後の emcc exit 0・error 行の実測 (測定 commit `f70faf97`)。修復後 literal の PE 一致は `wide_literal_check.py` (§7)。残件は #1954 (HB-H41)・#2853 (HB-H47)・#2653 (HB-H46) |
 | `tools/hostbridge/wrapper_lift/REPORT_APPENDIX_829.md` | ~88 | #829 (HB-H20): x64c wasm build の中間物サイズ (C・`.o`)・unsup 内訳と CreatePlugInstance (0x86ab10) 入場ログ・最初に失敗する関数の実測。表に無い値の正本。exit・秒・load・wasm サイズは REPORT §14 の表が正本 |
 | `tools/hostbridge/nfo/REPORT_APPENDIX_B.md` | ~150 | nfo §13〜§14 全文 (generateDb→wvfs 結線 e2e CAB-216 + 検収。#437 で無変更分割移動) |
 | `tools/gui/flengine/REPORT.md` | ~244 | GUI-3 (#174) 実 FLEngine lift × GUI shim 結合: 自然起動・survey で shim に実到達した API、指向呼出、gate 12 + ネガコン 5。§8 = GUI-12 (#566) `__pe_image` の m11_data_gen 方式統合 (実 FLEngine PE parity・ネガコン) |
