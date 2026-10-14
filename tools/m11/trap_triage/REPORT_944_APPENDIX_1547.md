@@ -5,7 +5,14 @@
 ## 9. #1547 追記: unit 158 の観測副作用の切り分け (受入条件 1〜3)
 
 測定 commit: **`49f5dd63`** (`m11_rt.c` に `M11_DEST_GUARD` (既定 0) を追加し、`m11_build.sh` の `CF` に 1 語足した)。後続の `1f6c107b` は `m11_build.sh` の `rt.o` 作り直し stamp (`S_NEG`) に `M11_DEST_GUARD` を足しただけで、測定値の計算には影響しない。
-再検証 (HEAD `1f6c107b`・直列・単発): `repro_1389.sh` PASS (OFF/OFF 再実行 227 件一致、ON は 0x26d1a0 j=12 の 1 件差)。ガード 1 の build + survey は ok 870 / trap 24 / clobber 0、dest 記録 227 件、st=3 は 0 件 (`work/g1chk`)。既定 survey は 870/24/0 (12.447 s、load 0.88)。
+検証 HEAD: **`9fc311b2`** (main 取り込み merge・PR head)。§9.1 の表は `1f6c107b` 時点の実測。`git diff 1f6c107b 9fc311b2 -- tools/m11` の差分は main 由来 (`m11_build.sh` の `M11_TRACE_ISOLATE`・`M11_KEEP_BOOT_O`、`probe_entry.sh`) で、既定値 (`M11_TRACE_ISOLATE=1` は C 側の `#define` 既定と同じ・`M11_KEEP_BOOT_O=0` は従来どおり `boot.o` を作る) では生成物が変わらない。
+
+`9fc311b2` での再検証 (直列・単発・foreground・各 timeout 付き・素材 fl-win64 / work-m11 / toolchain-emsdk・`m11_gen_ir2.sh` で `ir_conditions.json` 再生成 F1=902 F3c=36 errors=0):
+- `repro_1389.sh`: **PASS** (全体 1 分 50.1 秒)。OFF 16.207 s (load 0.84) / OFF 再実行 16.136 s (load 0.97) / ON 16.289 s (load 0.98)。OFF/OFF 再実行 227 件一致、ON は 0x26d1a0 j=12 の 1 件差。
+- 既定 build の survey: `units 942, ok 870, noproc 1, miss 47, trap 24, clobber 0` (16.298 s、終了時 load 0.87)。基準 870/24/0 と一致。
+- `M11_DEST_GUARD=1` の survey: `ok 870 / trap 24 / clobber 0`、dest 記録 227 件、記録の st は 0 が 199・1 が 28、**st=3 は 0 件** (16.266 s)。
+
+§9.1 の表の値 (`1f6c107b`) は上の値と一致する。
 
 ### 9.1 測定 (実測・直列・単発)
 
