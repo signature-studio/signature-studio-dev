@@ -3,7 +3,7 @@
 既知類型との関係: DEFECTS.md の類型は新規確定しない。該当なし。
 
 ## 1. 結論
-- (c) の段の切り分け: **部分達成**。snapshot IR (`69c774de…`) と ldfix0 再生成 IR (`25e931f2…`) の差は、`m11_gen_ir2.sh` の **ldfix 段** (`ldfxr`・`ldfxc`) と、`alloca [N x i64]` の出所 (§4) の 2 段で生じる。`boot_all.ll`・`boot_allfx.ll` (merge・numfix・asmfix) までは snapshot と sha256 が完全一致する。両者は同じ `boot{0..4}.lift.ll` を入力にしているため、lift 段の差は本測定の範囲に無い。RetDec を再実行した lift 段の再現 (`--full`) は未実施。snapshot の ldfix 版と現 ldfix 版の `ldfxc` 差 (54 件) は未切り分け (§6)。
+- (c) の段の切り分け: **部分達成**。snapshot IR (`69c774de…`) と ldfix0 再生成 IR (`25e931f2…`) の差は、`m11_gen_ir2.sh` の **ldfix 段** (`ldfxr`・`ldfxc`) と、`alloca [N x i64]` の出所 (§4) の 2 段で生じる。`boot_all.ll`・`boot_allfx.ll` (merge・numfix・asmfix) までは snapshot と sha256 が完全一致する。両者は同じ `boot{0..4}.lift.ll` を入力にしているため、lift 段の差は本測定の範囲に無い。RetDec を再実行した lift 段の再現 (`--full`) は未実施。snapshot の `ldfxc` 差 (54 件) は **`b5eeb322` (#736・F3c-block の値 store 門) で生じる**。その直前の `7db8953b` の ldfix で snapshot の `ldfxc` 66 行と完全一致し、`b5eeb322` 以降は 12 行 (§3-2)。
 - `alloca [N x i64]` の 54 件 (snapshot) と 0 件 (ldfix0 再生成) の差: **`159d9fc0` (alloca pass R8 の追加) で生じる**。R8 導入前の `m11_alloca.py` (`159d9fc0~1`) を ldfix1 再生成 IR に当てると `alloca [N x i64]` は **54 件** で snapshot と一致する (§4)。現 HEAD の `m11_alloca.py` は 2,408 件を生む。
 - (b) ok 818 → 868 (+50) の二分探索: **未着手** (commit 727 件が対象。本 run の残り時間では不可)。子 issue に切り出す (§6)。
 - (d) `m11_e2e.sh` 既定経路の再通し: **未達**。`functions_dll.csv` は素材に無く、Ghidra 12.1.4 (`[GHIDRA]` 無し) の取得と headless 実行 (約 10 分) を本 run で行う時間が無かった。子 issue に切り出す (§6)。
@@ -28,7 +28,23 @@
 - `boot_all.ll` の sha256 の訂正: 旧記載の `3292943d…` は誤り。repo 内・`work-m11` 内に該当ファイルは無く、出典の build は特定できない。現 HEAD の `m11_merge.py` を `boot{0..4}.lift.ll` に掛け、`m11_gen_ir2.sh` と同じ numfix 置換 (`@<数値>` → `@m11num_<数値>`) を行うと、出力は snapshot と `cmp` で完全一致する (`24107dae…`・491,197 行)。
 - ldfix0 と ldfix1 は REPORT_N1165 §3-2 の `25e931f2…` / `2c68ceae…` と一致する。
 - snapshot と ldfix0 の差: diff の変更行 7,237 行。`ldfxr` は snapshot 3,027 件・ldfix0 0 件。`ldfxc` は snapshot 66 件・ldfix0 0 件。ldfix 段が差の一因。
-- snapshot と ldfix1 の差: `ldfxr` は両方 3,027 件で一致。`ldfxc` は snapshot 66 件・ldfix1 12 件で一致しない。ldfix1 の `ldfix_report` は `F1(load_dropped)=902`・`F1v=4`・`F2=30`・`F3a=3`・`F3b=5`・`F3c=36` (errors 0)。ldfix の変換差 (`ldfxc` 54 件) は、snapshot 生成時の ldfix 版との差として残る (未切り分け)。
+- snapshot と ldfix1 の差: `ldfxr` は両方 3,027 件で一致。`ldfxc` は snapshot 66 件・ldfix1 12 件で一致しない。ldfix1 の `ldfix_report` は `F1(load_dropped)=902`・`F1v=4`・`F2=30`・`F3a=3`・`F3b=5`・`F3c=36` (errors 0)。
+
+### 3-2. `ldfxc` 54 件の出所 (#1739・実測)
+- 方法: 同一の pre-ldfix IR (`M11_LDFIX=0` で生成・`25e931f2…`) に、`ldfix.py` を変えた 16 commit (`git log 7dc07f40..origin/main -- tools/m11/ldfix/ldfix.py`) のそれぞれを `git archive <commit> tools/m11` の展開先で実行し、`ldfxc` を含む行数と snapshot との差を数えた。
+- 測定 commit: `576c4976` (origin/main HEAD)。`ldfix.py` は `5b6d03c2` と HEAD で同一 (`git diff 5b6d03c2 HEAD -- tools/m11/ldfix/ldfix.py` は空)。ldfix 段の結果は HEAD と同じ。
+- 結果 (`grep -c ldfxc`・snapshot の `ldfxc` 行は 66):
+
+| commit | 内容 | `ldfxc` 行 | snapshot との差 |
+|---|---|---|---|
+| `d7a04be8` `95054de6` `3162415b` `3f1d7b8b` `0e7a240a` `7be6bab5` `8a6dcf4b` `7db8953b` `1e3e499a` | #736 より前 | 66 | 0 |
+| `b5eeb322` | #736 F3c-block の値 store 門 | 12 | 54 |
+| `ec1326d2` `7aa4f6a9` `c5e6944c` `1af9cad2` `5b6d03c2` (HEAD の ldfix.py と同一) | #736 以降 | 12 | 54 |
+
+- `e6066afc` は `ldfix.py` の `NameError` (`a` 未定義) で終了し、出力が無い。対象外。
+- `1e3e499a` は #736 より前の枝を取り込んだ merge で、`b5eeb322` を含まない。66 行を出すのはこのため。
+- 差の 54 行は 12 関数 (`5c1030`・`607b90`・`6088a0`・`60f010`・`6214a0`・`737d10`・`73b300`・`7cbc20`・`7ff6e0`・`840720`・`d243c0`・`e404e0`) の `load i64 [%argN]` 修復。`ldfix/REPORT_736.md` §3 がこの 12 関数を「戻り値 reg へのコピーだけを修復していた誤修復」と記録し、門で外している。よって `ldfxc` 54 件は誤修復の除去で、snapshot 生成時の ldfix 版は #736 より前の版。
+- 注: `ldfxc` 行の一致は ldfix 段のみの切り分け。snapshot と HEAD の IR 全体は一致しない (`alloca` 54 件 (§4) と `ldfxr` 番号の繰り上がり等が残る。`ldfxc` 以外の残差は本節の対象外)。
 
 ## 4. `alloca [N x i64]` の出所
 | IR | `alloca [N x i64]` 件数 |
@@ -53,7 +69,7 @@
 |---|---|---|
 | (b) 旧 build (`d6a17b64`) → HEAD で ok 818 → 868 (+50) の二分探索 (commit 727 件が対象) | 過去数値の解釈 | #1597 ([M11-N103]) |
 | (d) `m11_e2e.sh` 既定経路の再通し: `functions_dll.csv` (Ghidra 12.1.4 headless・約 10 分) の作成と、e2e 全体の実測 | 受入 (e2e 検証) | #1598 ([M11-N104]) |
-| ldfix1 と snapshot の `ldfxc` 差 54 件 (snapshot 66・ldfix1 12) の切り分け | (c) の ldfix 段の完全な特定 | #1415 に残す (本 PR で部分達成) |
+| (解決) ldfix1 と snapshot の `ldfxc` 差 54 件 → `b5eeb322` (#736) で生じると §3-2 で特定 | — | #1739 で完了 |
 | `159d9fc0` (R8) が snapshot IR の alloca 54 件 → 2,408 件を生む件の survey 影響の実測 (ok/trap が変わるか) | R8 の採否 | #132 (R8 の起票元) |
 
 ## 7. 再現
