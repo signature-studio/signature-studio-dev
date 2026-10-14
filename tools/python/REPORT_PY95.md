@@ -50,7 +50,7 @@
 
 測定は `fb0a1619` の内容 (作業ツリーはクリーン) で行った。環境: runner 4 core。測定時の load average 0.24 (`uptime`、21:37:08)。
 
-再ビルド (`fb0a1619` の内容から): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.5 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 95)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、4.8 秒)。`build_cpython_wasm.sh` は rc 0 (3 分 27 秒) で、その後 `tools/python/src`・`build_cpython_wasm.sh` に変更は無い (`git diff 9f540f4c fb0a1619 -- tools/python/src tools/python/build_cpython_wasm.sh` は 0 行)。
+再ビルド (`fb0a1619` の内容から): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.5 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 101)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、4.8 秒)。`build_cpython_wasm.sh` は rc 0 (3 分 27 秒) で、その後 `tools/python/src`・`build_cpython_wasm.sh` に変更は無い (`git diff 9f540f4c fb0a1619 -- tools/python/src tools/python/build_cpython_wasm.sh` は 0 行)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
