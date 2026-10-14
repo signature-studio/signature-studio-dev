@@ -128,7 +128,7 @@ cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd �
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 
-依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。
+依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。既定設定の `pnpm install --frozen-lockfile` は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する (理由は『Workers Builds の接続状態と pnpm 経路』の節の release-age の項)。
 
 `npm run build` は bun、デプロイは wrangler を使う。wrangler は `login --device` がある版 (公式 docs の例は 4.119.0 の出力。VM は 4.151.0 で `--device` の存在を `wrangler login --help` で確認済み)。VM では root 不要で `$HOME/.local/bin` に置く
 (`npm install --prefix $HOME/.local/wrangler wrangler@<版>`、bun は npm の `bun` パッケージ)。
@@ -306,8 +306,9 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
   - `pnpm-lock.yaml`: `package-lock.json` から `pnpm import` で作った。版は変えていない。`package-lock.json` は置かない。
   - `pnpm-workspace.yaml` の `allowBuilds` (esbuild・workerd): pnpm 12 は既定で依存の build script を止める。無いと `ERR_PNPM_IGNORED_BUILDS` で install が落ちる。新しい依存が install script を持つときは、ここに足す。
   - `infra/pm-worker/package.json` に npm の `packageManager` を書かない。pnpm 12 は npm 指定のプロジェクトで実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。
-- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る)。
+- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。ただし既定設定の install は 2026-10-15 05:55Z まで失敗する。下の release-age の項)。
 - 2026-10-14 の時点で、Workers Builds の install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。merge 後の Workers Builds の結果は、この README では確認していない。
+- **pnpm 12 の release-age (既定設定では 2026-10-15 05:55Z まで install が失敗する)**: pnpm 12.10.1 は既定で `minimumReleaseAge` = 1440 分 (公開から 24 時間未満の版を拒否する)。`pnpm-lock.yaml` の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` は 2026-10-14 05:43Z〜05:55Z に公開された版なので、既定設定の `pnpm install --frozen-lockfile` は `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。3 件が 24 時間を過ぎる 2026-10-15 05:55Z 以降は既定設定で通る見込み (未確認)。それまでの診断は `--config.minimum-release-age=0` を付けた install で行える (診断用。README の手順にはしない)。`minimumReleaseAgeExclude` での除外や版の変更は入れていない (#2585 の範囲外。PM 判断)。Workers Builds が pnpm 12.10.1 の既定を使うなら、同じ失敗が出る (推定。未確認)。
 
 ## 確認できていない点 `[未確認]` のチェックリスト
 
