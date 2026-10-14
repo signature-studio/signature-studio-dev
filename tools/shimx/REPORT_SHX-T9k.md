@@ -40,7 +40,7 @@ IR は build 入力の `tools/m11/work/shimx_link/gen_fix/boot_trace.ll` (`--fix
 | 呼出し元 (function_457c70 → function_457c40, 1 回目) | 160540 `%1 = call i64 @function_457c40(…, i64 4551360)` | `function_457c70` | `0x1bead6` (`call 4611`) | 同上 | `evidence_2593/objdump_0x1bead6.txt` |
 
 - V8 フレームの対応 (`probe_u22_shimx_head.txt` の `#0`・`#1`): GetModuleHandleW は `sxt_enter` → `[16648]` (wrapper) → `[4612]:0x1beac0` (= function_457c70)。GetProcAddress は `sxt_enter` → `[16650]` (wrapper) → `[4611]:0x1bea6d` (= function_457c40) → `[4612]:0x1bead6` (= function_457c70)。
-- 同じ呼出し元 `function_457c70` は `function_457c40` を 22 回呼ぶ (IR 160540〜160582 行)。2 回目の戻り先は `0x1bea6b` (IR 160542 行)。
+- 同じ呼出し元 `function_457c70` は `function_457c40` を 22 回呼ぶ (IR 160540〜160582 行)。2 回目の呼出し (IR 160542 行・`call 4611`・直前に `i64.const 360250`・`4551440`) の wasm 位置は `0x1beaf8` (probe 証跡 `#2` の `[4612]:0x1beaf8`)。
 - 対応の検証: 逆アセンブルの命令境界 (`call` 命令の先頭) と V8 の offset が一致する。map の関数範囲に全て収まる。
 
 ### 2.3 再現性の注意: archive 由来の `work-m11` の IR では 126 は出ない
