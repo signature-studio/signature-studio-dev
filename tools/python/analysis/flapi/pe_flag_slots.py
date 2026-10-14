@@ -3,7 +3,7 @@
 
   FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_flag_slots.py <開始VA(16進)> <終了VA(16進)>
 
-既定の対象は 0x104d0d0 (事象 flags 分類器) の範囲 0x104d0d0-0x104d290。
+例: 事象 flags 分類器 0x104d0d0 の範囲は `104d0d0 104d290`。
 展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import os
@@ -16,6 +16,8 @@ PE = os.path.join(os.environ["FL_WIN64_DIR"], "extracted", "block00031_PE.bin")
 
 
 def main():
+    if len(sys.argv) < 3:
+        sys.exit("usage: FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_flag_slots.py <開始VA(16進)> <終了VA(16進)>")
     lo, hi = (int(x, 16) for x in sys.argv[1:3])
     raw = open(PE, "rb").read()
     pe = pefile.PE(data=raw, fast_load=True)
