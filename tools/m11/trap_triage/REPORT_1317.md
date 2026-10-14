@@ -202,3 +202,29 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 |---|---|
 | `0x40fb40` の `[rcx-0x78]` 連鎖の循環有無 (guest 計装で連鎖長・循環を計測) | #1786 `[M11-N121]` (親 #1317) |
 | 830 が残す状態 (受入 1)・修正案 (受入 3)・修正後の完走 (受入 4) | 本 issue #1317 (次の run) |
+
+## 12. 追補 (2026-10-14・#1317 8 回目 run): function_40f960 / 40fb40 の計測 (既定 OFF)
+
+- 測定 commit: `origin/main` (`6444b186` 起点)。コード差分: `m11_ov.c` に `M11_INSTR_40F960` (既定 0) の計測を追加、`m11_build.sh` に同フラグの CF 渡しと ov.o stamp を追加。既定 0 では build 出力は変わらない。
+- 素材: fl-win64・work-m11・work-liftdiff を展開 (`tools/m11/work/`・`tools/liftdiff/work/`)。`/opt/emsdk` 既存。`m11_gen_ir2.sh` 46 s rc=0 / `m11_build.sh` 22 s rc=0 (`M11_M2P=1`、`wasm-ld signature mismatch: 0, undefined symbol: 0`)。load 1.0 前後。
+- 再現 (`SV_ONLY`、上限 60 s): `0..829`+880 = rc=0、1.52 s / `0..830`+880 = rc=124、60.01 s。§7〜11 の境界と一致。
+- 計測 build (`M11_INSTR_40F960=1`): `SV_ERR_LOG` で stderr 全行を unit 番号付きで取得。
+
+| 条件 | unit 880 の `40f960` 呼び出し | `40fb40` の連鎖長 | 最後の出力 |
+|---|---|---|---|
+| `0..829`+880 | 複数回 (size 128, 128, 88, 48 ほか)。`40fb40` は各回抜ける | 10 万未満 (`chain>100000` 0 件) | `RegCloseKey` stub → 完走 |
+| `0..830`+880 | 1 回 (self=`0xe5b1c0`, size=120)。`40fb40` は抜ける | 10 万未満 (0 件) | `GetFileVersionInfoSizeW` stub (以後無し) |
+
+- 結論:
+  - §11 の「停止候補 (a) 確保サイズ過大 / (b) 40fb40 の連鎖循環」は**どちらも否定**。830 込みでも確保サイズは 120 で妥当な値、`40fb40` の連鎖は 10 万回以内で終わっている。
+  - 停止は `40f960` / `40fb40` の**後**、`GetFileVersionInfoSizeW` stub の後の unit 880 の処理にある。830 込みの run では `40f960` が 829 込みより少ない回数しか呼ばれない点 (1 回対 複数回) も差として残るが、停止箇所の特定には至っていない。
+- 受入の状況 (本 run 末):
+
+| 受入 | 状態 |
+|---|---|
+| 1. 830 が残す状態 | 未達 (未特定。停止経路からは外れた) |
+| 2. 停止命令・wasm frame | 部分 (`GetFileVersionInfoSizeW` stub の後まで。停止命令は未特定) |
+| 3. 修正案 | 未達 |
+| 4. 修正後の完走 | 未実施 (停止は再現済み) |
+
+- 次の一手: `GetFileVersionInfoSizeW` stub の戻り後から 880 の終了までの呼び出し列を、`SV_ERR_LOG` と同じ方式で `icall` 行 (TRACE) を全件取り、829 込みの同一区間と diff する。

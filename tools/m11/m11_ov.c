@@ -60,6 +60,9 @@ EM_JS(void, m11_stk_restore, (unsigned sp), {
 #else
 #define M11_TRACE(...) fprintf(stderr, __VA_ARGS__)
 #endif
+#ifndef M11_INSTR_40F960
+#define M11_INSTR_40F960 0   /* 1 = function_40f960 の確保サイズと function_40fb40 の入口・連鎖長を stderr に出す計測専用 (#1317). 既定 0 は build 出力に影響しない */
+#endif
 #ifndef M11_INSTR_K12
 #define M11_INSTR_K12 0   /* 1 = _CopyArray kind 12 (416720) の到達を stderr に出す計測専用 probe. 既定 0 は build 出力に影響しない */
 #endif
@@ -459,7 +462,13 @@ u64 function_40fb40(u64 self, u64 inst) {
     u64 cls = self;
     memset((void*)(uintptr_t)inst, 0, (size_t)(long long)(int)D(self - 0x80));
     Q(inst) = self;
+#if M11_INSTR_40F960
+    fprintf(stderr, "[m11][40fb40] self=0x%llx inst=0x%llx size=%d\n", (unsigned long long)self, (unsigned long long)inst, (int)D(self - 0x80));
+#endif
     do {
+#if M11_INSTR_40F960
+        { static int chain_n = 0; if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 cls=0x%llx\n", (unsigned long long)cls); abort(); } }
+#endif
         u64 it = Q(cls - 0xc0);
         if (it) {
             int cnt = (int)D(it);
@@ -480,6 +489,9 @@ u64 function_40fb40(u64 self, u64 inst) {
 
 /* function_40f960  VA 0x40f960  (System.TObject.NewInstance = vmtNewInstance 既定実体): GetMem(InstanceSize) → InitInstance */
 u64 function_40f960(u64 self) {
+#if M11_INSTR_40F960
+    fprintf(stderr, "[m11][40f960] self=0x%llx size=%d\n", (unsigned long long)self, (int)D(self - 0x80));
+#endif
     u64 obj = function_409410((unsigned)(int)D(self - 0x80));
     return function_40fb40(self, obj);
 }
