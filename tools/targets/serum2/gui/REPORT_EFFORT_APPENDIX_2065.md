@@ -68,20 +68,20 @@
 - 状態設定の no-op 7 件: `setLineStyle` `setDrawMode` `setTransformMatrix` `saveGlobalState` `restoreGlobalState` (graphicsdevice) と `setMouseCursor` `setupGenericOptionMenu` (frame)。実装 6 件は `setLineWidth` `setClipRect` `setFillColor` `setFrameColor` `setGlobalAlpha` `setSize`。
 - 16-4 の「描画命令は no-op」は、この計数と一致する。
 
-### 16-6. 未解決 (阻害要因と子 issue 案)
+### 16-6. 未解決 (阻害要因と子 issue)
 
 | 未解決 | 影響 (実測) | 起票先 |
 |---|---|---|
-| 文字列 `IPlatformString` が未実装 (`createString` が `nullptr`) | 文字描画の呼出が canvas に届かない (`text_width=-1`) | 子 issue 案 A |
-| 描画命令 15 件が全て no-op (ラスタライザ無し) | 描画 0 画素 (`nonzero_after=0`) | 子 issue 案 A |
-| `createBitmapContext` が bitmap を結線しない | 描画先が無く、画素を計数できない | 子 issue 案 A |
-| wasm の初期化経路が無い (`platformfactory.cpp` に wasm 分岐が無く `em++` 2 error。`init()` 相当の呼出口が無い) | 本 harness は `getPlatformFactory` の代替と `CFontDesc::init()` の直呼びで回避。本番の初期化経路は閉じていない | 子 issue 案 B |
-| XferOnOffButton の canvas 実装 (upstream 宣言 0 件・override 8 関数・本体は未 lift) | 受入条件 1 の XferOnOffButton を含む描画は未着手。本 run では stub を作らない | 子 issue 案 C |
+| 文字列 `IPlatformString` が未実装 (`createString` が `nullptr`) | 文字描画の呼出が canvas に届かない (`text_width=-1`) | #3260 (SR-50) |
+| 描画命令 15 件が全て no-op (ラスタライザ無し) | 描画 0 画素 (`nonzero_after=0`) | #3260 (SR-50) |
+| `createBitmapContext` が bitmap を結線しない | 描画先が無く、画素を計数できない | #3260 (SR-50) |
+| wasm の初期化経路が無い (`platformfactory.cpp` に wasm 分岐が無く `em++` 2 error。`init()` 相当の呼出口が無い) | 本 harness は `getPlatformFactory` の代替と `CFontDesc::init()` の直呼びで回避。本番の初期化経路は閉じていない | #3261 (SR-51) |
+| XferOnOffButton の canvas 実装 (upstream 宣言 0 件・override 8 関数・本体は未 lift) | 受入条件 1 の XferOnOffButton を含む描画は未着手。本 run では stub を作らない | #3262 (SR-52) |
 
-- 子 issue 案 (親が起票する。最大 3 件):
-  - **A**: `[SR-xx] canvas の文字列と描画命令を実装 (IPlatformString・ラスタライザ・bitmap 結線)`。受入: `check_render_poc.sh` の `nonzero_after>0` かつ `text_width>=0`。依存: #2064 の後続 (#2064 は CLOSED)。`oc_artifacts: toolchain-emsdk`。
-  - **B**: `[SR-xx] wasm の初期化経路 (platformfactory.cpp の WASM 分岐と init() 相当の呼出口)`。受入: harness の `getPlatformFactory` 定義と `CFontDesc::init()` 直呼びが不要になる。依存: なし (A と独立)。`oc_artifacts: toolchain-emsdk`。
-  - **C**: `[SR-xx] XferOnOffButton の canvas 向け実装 (Xfer 固有、バイナリから lift)`。受入: uidesc の XferOnOffButton を含む 1 view が canvas に描画される (A の後)。依存: A・#2066 (完了)。`oc_artifacts: plugins-serum2 toolchain-emsdk`。
+- 子 issue (起票済み・最大 3 件):
+  - **A** (#3260): `[SR-50] canvas の文字列と描画命令を実装 (IPlatformString・ラスタライザ・bitmap 結線)`。受入: `check_render_poc.sh` の `nonzero_after>0` かつ `text_width>=0`。依存: #2064 の後続 (#2064 は CLOSED)。`oc_artifacts: toolchain-emsdk`。
+  - **B** (#3261): `[SR-51] wasm の初期化経路 (platformfactory.cpp の WASM 分岐と init() 相当の呼出口)`。受入: harness の `getPlatformFactory` 定義と `CFontDesc::init()` 直呼びが不要になる。依存: なし (A と独立)。`oc_artifacts: toolchain-emsdk`。
+  - **C** (#3262): `[SR-52] XferOnOffButton の canvas 向け実装 (Xfer 固有、バイナリから lift)`。受入: uidesc の XferOnOffButton を含む 1 view が canvas に描画される (A の後)。依存: A・#2066 (完了)。`oc_artifacts: plugins-serum2 toolchain-emsdk`。
 
 ### 16-7. 検証範囲 / 範囲外
 
