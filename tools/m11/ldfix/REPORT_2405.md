@@ -27,7 +27,7 @@
 
 経緯: `install-share.py` は `3edc8d0f` (2019-03-03) で 2019-03-03 を指し、`4782b5b8` (03-05) で sha256 を更新した。`301f4e64` (2019-03-18、v3.3) で `cmake/install-share.py` が `support/install-share.py` へ移動した (git 上は renamed。同じ commit で `scripts/retdec-config.py` は modified)。support は repo 内の `support/` と 2019-03-08 に移った。つまり `6edcaaea` (03-09) 〜 03-17 だけが 2019-03-03 を要する版で、その asset は GitHub から消えている。パッケージの内容は retdec-support の README によると ordinal 表・型 DB・static-code の YARA・暗号定数の YARA で、元データは repo に無く、source からの再生成はできない。
 
-再現: `bash tools/m11/ldfix/share_check_2405.sh all` (`share_check_2405.sh` は commit `46ebf26c` で追加。`zip`・`archive`・`tag` の個別実行も可)。取得物は sha256 を検証してから使う。下は `46ebf26c` で実行した出力 (`WORK` の絶対パスは `$WORK` に置換。sha256 の OK 行は 2 件とも通過)。所要 real 23.3 s (4 コア)。
+再現: `RETDEC_ROOT` に [RETDEC] (v5.0) の root を指定して `bash tools/m11/ldfix/share_check_2405.sh all` (`zip`・`archive`・`tag` の個別実行も可)。`share_check_2405.sh` は commit `46ebf26c` で追加し、`0ae2b7d8` で `RETDEC_ROOT` の既定値を外した。取得物は sha256 を検証してから使う。下は `0ae2b7d8` で実行した出力 (`WORK` の絶対パスは `$WORK` に置換。出力は `46ebf26c` で実行したものと同一)。所要は `46ebf26c` の実行で real 23.3 s (4 コア)。
 
 ```
 $WORK/v33.zip: OK
@@ -148,4 +148,4 @@ v5.0 (REPORT_911 §6c・§6e) との比較: 値の変化 (`load *rax` → `load 
 - 所要: `stages` は 1 回目のビルドで real 14.4 s、2 回目で 18.6 s (n=1)。範囲の real は §4。
 - main 取り込み (`264030a7`) で入った `tools/m11/ldfix/` の差分は他 issue の追加だけで、測定経路 (上の 3 ファイル) には入らない。
 - `git diff c810b847 HEAD -- tools/m11/ldfix/retdec2019_gv_2405.sh tools/m11/ldfix/retdec_constants_trace_2405.patch tools/m11/ldfix/retdec_stage_1091.py` の出力は、`26b98f8f` の 1 行 (`retdec2019_gv_2405.sh` のコメント。既定値の説明を repo 外パスから repo 内の参照に置換) だけ。パッチと `retdec_stage_1091.py` は 0 行。
-- `share_check_2405.sh` (§1) は `46ebf26c` で新規追加。上の 3 ファイルには入らず、§1 の照合 (share・tag・履歴) だけに使う。gv 分岐の測定は変えていない。
+- `share_check_2405.sh` (§1) は `46ebf26c` で新規追加 (`0ae2b7d8` で `RETDEC_ROOT` の既定値を外した)。上の 3 ファイルには入らず、§1 の照合 (share・tag・履歴) だけに使う。gv 分岐の測定は変えていない。
