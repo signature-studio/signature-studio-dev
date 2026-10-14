@@ -7,11 +7,14 @@
     正例 = function_1c0b6c の先頭 HeapFree と先頭 br。ネガコン = 先頭 call の site store を外すと FAIL。
 (2) define ごとに VA を戻す: dec_label_pc_ で始まらない先頭 block の site は記録せず、前の関数の VA を付けない。
 (3) sites=False では site store が 1 件も入らない (既定 build と差が無いこと)。
+(4) results/ld83/decode_sites.py: blk 列の B/J/C 分解と ord 連番検査。ネガコン = 1 件抜くと sites と ord が変わる。
 """
-import os, re, sys, tempfile, unittest, io, contextlib
+import json, os, re, sys, tempfile, unittest, io, contextlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'results', 'ld83'))
 from ldlib import irtool
+import decode_sites
 
 IR = '''declare void @HeapFree(i32, i32, ptr)
 declare void @ExitProcess(i32)
@@ -103,6 +106,50 @@ class SitesOff(unittest.TestCase):
         txt, err = run_instrument(IR, sites=False)
         self.assertEqual(len(SITE_STORE_RE.findall(txt)), 0)
         self.assertEqual(err, '')
+
+
+def blk_list(drop=None):
+    # function_1c0b6c の 1 case: B1c0b6c, C(ord0), J(ord1, cond=0), B1c0b71, C(ord0)
+    seq = [0x1c0b6c,
+           (1 << 62) | (2 << 56) | 0x1c0b6c,
+           (1 << 62) | (1 << 56) | (1 << 40) | 0x1c0b6c,
+           0x1c0b71,
+           (1 << 62) | (2 << 56) | 0x1c0b71]
+    return [hex(v) for i, v in enumerate(seq) if i != drop]
+
+
+class DecodeSites(unittest.TestCase):
+    def write_run(self, blk):
+        d = tempfile.mkdtemp(prefix='ld83_dec_')
+        p = os.path.join(d, 'run.json')
+        with open(p, 'w') as f:
+            json.dump([{'function': {'va': '0x1c0b6c'}, 'cases': [
+                {'pattern': 'vm0', 'outcome': 'diff', 'raw': {'wasm': {'blk': blk, 'blk_over': 0}}}]}], f)
+        return p
+
+    def test_counts_and_order(self):
+        items = [decode_sites.decode(v) for v in decode_sites.vals(blk_list())]
+        self.assertEqual([t[0] for t in items], ['B', 'C', 'J', 'B', 'C'])
+        self.assertEqual(items[2], ('J', 0x1c0b6c, 1, 0))
+        self.assertTrue(decode_sites.ord_ok(items))
+        self.assertEqual(decode_sites.seq_str(items, 5), 'B1c0b6c C1c0b6c.0 J1c0b6c.1=0 B1c0b71 C1c0b71.0')
+
+    def test_negative_control_drop_one_site(self):
+        # 先頭の call の記録を 1 件抜くと site 数が 3 → 2、J の ord が 1 から始まるため NG になる
+        items = [decode_sites.decode(v) for v in decode_sites.vals(blk_list(drop=1))]
+        self.assertEqual(sum(1 for t in items if t[0] in 'JC'), 2)
+        self.assertFalse(decode_sites.ord_ok(items))
+
+    def test_cli_runs(self):
+        out = io.StringIO()
+        saved = sys.argv
+        sys.argv = ['decode_sites.py', self.write_run(blk_list()), '--seq', '5']
+        try:
+            with contextlib.redirect_stdout(out):
+                decode_sites.main()
+        finally:
+            sys.argv = saved
+        self.assertIn('0x1c0b6c\tvm0\tdiff\t2\t1\t2\t3\t5\tok\t0', out.getvalue())
 
 
 if __name__ == '__main__':
