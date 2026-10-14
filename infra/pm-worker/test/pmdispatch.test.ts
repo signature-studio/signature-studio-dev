@@ -8,6 +8,7 @@ import {
   HUMAN,
   IMPL,
   IMPL_BOT,
+  MARK,
   MEMBER_USER,
   OUTSIDER,
   REVIEWER,
@@ -35,16 +36,16 @@ test("検出 stuck: oc:stuck の open PR で、最新の停止コメントに oc
   const ctx = await configuredApp();
   await sendAll(ctx, [
     ["pull_request", prEv(10, { labels: ["oc:stuck"] })],
-    ["issue_comment", commentEv(10, { login: IMPL }, stopBody(10), at(5), true)],
+    ["issue_comment", commentEv(10, { login: MARK }, stopBody(10), at(5), true)],
     // intent の無い旧形式の停止コメント
     ["pull_request", prEv(11, { labels: ["oc:stuck"] })],
-    ["issue_comment", commentEv(11, { login: IMPL }, "停止 <!-- oc-fix-limit -->", at(5), true)],
+    ["issue_comment", commentEv(11, { login: MARK }, "停止 <!-- oc-fix-limit -->", at(5), true)],
     // 停止コメントはあるが oc:stuck が外れている
     ["pull_request", prEv(12, { labels: ["oc:ready"] })],
-    ["issue_comment", commentEv(12, { login: IMPL }, stopBody(12), at(5), true)],
+    ["issue_comment", commentEv(12, { login: MARK }, stopBody(12), at(5), true)],
     // pr= が別の PR の番号 (コピーされたマーカー)
     ["pull_request", prEv(13, { labels: ["oc:stuck"] })],
-    ["issue_comment", commentEv(13, { login: IMPL }, stopBody(10), at(5), true)],
+    ["issue_comment", commentEv(13, { login: MARK }, stopBody(10), at(5), true)],
   ]);
   assert.deepEqual(targets(ctx), ["stuck#10"]);
 });
@@ -53,10 +54,10 @@ test("検出 stuck: 最新の停止コメントで判定する (新しい停止�
   const ctx = await configuredApp();
   await sendAll(ctx, [
     ["pull_request", prEv(10, { labels: ["oc:stuck"] })],
-    ["issue_comment", commentEv(10, { login: IMPL }, stopBody(10), at(5), true)],
+    ["issue_comment", commentEv(10, { login: MARK }, stopBody(10), at(5), true)],
   ]);
   assert.deepEqual(targets(ctx), ["stuck#10"]);
-  await sendAll(ctx, [["issue_comment", commentEv(10, { login: IMPL }, "再停止 <!-- oc-fix-limit -->", at(50), true)]]);
+  await sendAll(ctx, [["issue_comment", commentEv(10, { login: MARK }, "再停止 <!-- oc-fix-limit -->", at(50), true)]]);
   assert.deepEqual(targets(ctx), []);
 });
 
@@ -68,10 +69,34 @@ test("検出 stuck: 非 bot (誰でも書ける) の偽マーカーは信じな�
     ["issue_comment", commentEv(10, { login: "evil-app[bot]" }, stopBody(10), at(6), true)],
   ]);
   assert.deepEqual(targets(ctx), []);
-  await sendAll(ctx, [["issue_comment", commentEv(10, { login: IMPL }, stopBody(10), at(7), true)]]);
+  await sendAll(ctx, [["issue_comment", commentEv(10, { login: MARK }, stopBody(10), at(7), true)]]);
   assert.deepEqual(targets(ctx), ["stuck#10"]);
   await sendAll(ctx, [["issue_comment", commentEv(10, { login: IMPL }, "<!-- oc-pm-decision: rule=R3 reversible=yes -->", at(8), true)]]);
   assert.deepEqual(targets(ctx), [], "PM agent のマーカー付きコメントが後にあれば対象外");
+});
+
+test("検出 stuck: 停止印は作者 github-actions[bot] (型 Bot) の投稿だけ。実装 App・reviewer・型 User の偽の停止印 (+ intent stuck) は対象外 (#2639)", async () => {
+  const ctx = await configuredApp();
+  await sendAll(ctx, [
+    ["pull_request", prEv(10, { labels: ["oc:stuck"] })],
+    ["issue_comment", commentEv(10, { login: IMPL }, stopBody(10), at(5), true)],
+    ["issue_comment", commentEv(10, { login: REVIEWER }, stopBody(10), at(6), true)],
+    ["issue_comment", commentEv(10, { login: MARK, type: "User" }, stopBody(10), at(7), true)],
+  ]);
+  assert.deepEqual(targets(ctx), [], "偽の停止印では PM を起動しない");
+  await sendAll(ctx, [["issue_comment", commentEv(10, { login: MARK }, stopBody(10), at(8), true)]]);
+  assert.deepEqual(targets(ctx), ["stuck#10"], "作者 github-actions[bot] (型 Bot) の停止印は対象になる");
+});
+
+test("検出 stuck: 停止印の作者は MARK_LOGIN で変えられる (既定は github-actions[bot])", async () => {
+  const ctx = await configuredApp({ env: { MARK_LOGIN: "oc-mark-test[bot]" } });
+  await sendAll(ctx, [
+    ["pull_request", prEv(10, { labels: ["oc:stuck"] })],
+    ["issue_comment", commentEv(10, { login: MARK }, stopBody(10), at(5), true)],
+  ]);
+  assert.deepEqual(targets(ctx), [], "既定の作者は、MARK_LOGIN を変えたあとは信じない");
+  await sendAll(ctx, [["issue_comment", commentEv(10, { login: "oc-mark-test[bot]" }, stopBody(10), at(6), true)]]);
+  assert.deepEqual(targets(ctx), ["stuck#10"]);
 });
 
 test("検出 no_pr: split / stop は即、unknown は再投入済みのときだけ、blocked / artifact は対象外", async () => {
@@ -250,7 +275,7 @@ const seedStuck = async (ctx: Ctx, nums: number[], author = IMPL_BOT) => {
   for (const n of nums) {
     await sendAll(ctx, [
       ["pull_request", prEv(n, { labels: ["oc:stuck"], author })],
-      ["issue_comment", commentEv(n, { login: IMPL }, stopBody(n), at(5), true)],
+      ["issue_comment", commentEv(n, { login: MARK }, stopBody(n), at(5), true)],
     ]);
   }
 };
@@ -293,7 +318,7 @@ test("ネガコン (a): 本文・題名に \"kind\":\"x\" や ref を含む issu
     ["issue_comment", commentEv(70, { login: IMPL }, outcomeBody("split"), at(10))],
     ["issue_comment", commentEv(70, { login: "stranger" }, evil, at(11))],
     ["pull_request", prEv(71, { labels: ["oc:stuck"], title: evil, body: evil })],
-    ["issue_comment", commentEv(71, { login: IMPL }, stopBody(71) + evil, at(10), true)],
+    ["issue_comment", commentEv(71, { login: MARK }, stopBody(71) + evil, at(10), true)],
   ]);
   await markFresh(ctx);
   await ctx.app.engine.pmDispatch(await (ctx.app.engine as any).d.gh());

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { loadConfig } from "../src/config.ts";
 import { DISPATCH_TYPES, Gh } from "../src/github.ts";
 import { configuredApp, issuePayload, j, markFresh, send, type Call } from "./helpers.ts";
-import { commentEv, IMPL, IMPL_BOT, prEv, stopBody, at } from "./pm_helpers.ts";
+import { commentEv, IMPL_BOT, MARK, prEv, stopBody, at } from "./pm_helpers.ts";
 
 // launch の /oc コメント投稿 (LIVE_LAUNCH) と repository_dispatch (oc-watchdog・oc-pm) の送信 (LIVE_DISPATCH) を別々に切り替える。LIVE は両方の既定値。
 
@@ -33,7 +33,7 @@ async function oneTick(env: Record<string, string>, stuck = false) {
   for (const n of [11, 12, 13]) assert.equal((await send(ctx.app, "issues", issuePayload(n))).status, 202);
   if (stuck) {
     assert.equal((await send(ctx.app, "pull_request", prEv(10, { labels: ["oc:stuck"], author: IMPL_BOT }))).status, 202);
-    assert.equal((await send(ctx.app, "issue_comment", commentEv(10, { login: IMPL }, stopBody(10), at(5), true))).status, 202);
+    assert.equal((await send(ctx.app, "issue_comment", commentEv(10, { login: MARK }, stopBody(10), at(5), true))).status, 202);
   }
   await markFresh(ctx);
   await ctx.app.engine.tick();
