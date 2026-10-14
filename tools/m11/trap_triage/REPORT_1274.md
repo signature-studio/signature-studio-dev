@@ -221,7 +221,7 @@ index 39480f0a..5a9c1929 100644
 
 - `survey_diff.py` OFF→ON: ok 退行 unit は **190 の 1 件** (ok→oob)。§5f の結果と一致。
 - `survey_diff.py` ON→ON+NOVCALL: ok 退行 0。変化は halt0→oob の 1 件のみ (halt0 7→6、oob 15→16 と整合)。unit 190 は oob のまま。**この 1 件の unit 番号は本 run の出力に保存していなかったため、特定できていない** (§5f の unit 314 は未確認)。
-- 同一構成の値の食い違い: §5f の ON+NOVCALL 行 (869/15/2/6) は ok+oob+abort+halt0 の合計が 892 で、miss 47・other 1・noproc 1 を足すと 941 となり、全 942 unit と一致しない。§5g の同行 (869/16/2/6) は合計 893 で 942 と一致する。§5f の NOVCALL 行は survey が欠けた状態の値である可能性が高いが、原因は未特定。
+- 同一構成の値の食い違い: §5f の ON+NOVCALL 行 (869/15/2/6) は ok+oob+abort+halt0 の合計が 892 で、miss 47・other 1・noproc 1 を足すと 941 となり、全 942 unit と一致しない。§5g の同行 (869/16/2/6) は ok〜halt0 の合計 893 に miss 47・other 1・noproc 1 を足すと 942 となり、全 unit と一致する。§5f の NOVCALL 行は survey が欠けた状態の値である可能性が高いが、原因は未特定。
 - 断定の撤回: 前版の「§5f の 869/15 は stale な ov.o によるものだった」は根拠が無いため撤回する。本 run で ov.o を作り直したのは §5g の 3 build のみ。
 - 結論の範囲: 作り直した単発の NOVCALL (869/16/2/6) では unit 190 が oob のまま。ここから言えるのは「vcall 経路を外しても 190 の oob は消えなかった (1 回・未再現)」まで。410360 の vcall 経路が原因でないとは断定しない。NOVCALL は未再現のため、再測定が必要。
 - 未確定: §5d の `9b4b00` 書込みマスク測定は define 差し替えで、ov.o の stamp 対象外のため、stale の可能性が残る。再測定は未実施 (次 run: `m11_ov.c` の書込みマスクを `ov.o` 作り直しで測る)。
