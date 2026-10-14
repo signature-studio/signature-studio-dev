@@ -2,6 +2,11 @@
 // 使い方: node --wasm-enforce-bounds-checks --import ./tools/m11/trap_triage/inspect_trap.mjs tools/m11/m11_survey.mjs
 //   --wasm-enforce-bounds-checks が要る: 既定 (trap handler) だと OOB 時の frame に local の side table が無く、local が空で返る。
 // 環境変数: M11_INSPECT_OUT=<path> (JSONL の出力先。既定 stderr) / M11_INSPECT_FN=<idx,..> (記録する先頭 wasm 関数 index。既定は全部)
+//   M11_INSPECT_PEEK=<json> 関数 index ごとに guest メモリの u64 を追う。{"3372":[["$var0",8,8]]} は local $var0 から
+//     addr1=local+8, v1=*addr1, addr2=v1+8, v2=*addr2 を順に読む。addr は i32 に wrap し、範囲外なら 'oor'
+//   M11_INSPECT_DUMP=<addr>:<len>[,<addr>:<len>..] peek を持つ関数の trap 時点で、guest メモリのこの範囲を hex で添える (addr は 0x 可)
+//   M11_INSPECT_FRAMES=<n> peek を持つ関数の trap で、呼出し元 n フレームの local (0 以外のみ) も添える
+// trap 時の例外 (RuntimeError) だけを記録し、すぐ resume する。wasm 側の build・実行内容は変えない。
 import inspector from 'node:inspector';
 import fs from 'node:fs';
 
