@@ -7,6 +7,7 @@
 
 ## 1. 結論
 
+- **main 取り込み後の最新 (merge `f69b2bb8`)**: 同じ probe を wasm64・wasm32 で各 n=3 再測定し、6/6 PROBE OK。負のコントロールは FAIL。値は §11。以下の §1〜§10 は `38344a16`・`10156444` 版の記録。
 - **受入 1 (縮小後の範囲で達成。12 check 版は #2919)**: `flpy_static64` (`-sMEMORY64=1`) は headless Chrome 154 で読めた。
   n=3 の全回で validate true、`_flpy_init` 0、`print(1 + 1)` が `2`、`_flpy_subinterp_run` は 1 回と 160 回の全てで ok。
   判定は **PROBE OK (3/3)**。同じ probe の wasm32 版 `flpy_static` も 3/3 PASS。
@@ -160,3 +161,38 @@ load の 5 分値・15 分値は測っていない。
   wasm64 libpython `20:25:17 → 20:27:22` = 2 分 05 秒 (rc 0、native は流用)。
   flpy link 2 本 (`20:27:22 → 20:27:48`)。flpy64 単独の `time` real は 20.0 秒。
 - probe: 6 回 (flpy_static64 3 回・flpy_static 3 回)。負のコントロール 1 回。再リンク 2 回 (sha 確認)。
+
+## 11. main 取り込み後の再測定 (merge `f69b2bb8`)
+
+- 測定 commit: `f69b2bb8` (main `2899945e` を merge したコミット。競合は `tools/python/build_flpy_static.sh` の 2 ブロック。解消方針は PR コメント)。
+- 再測定の理由: main 取り込みで `tools/python` が測定 commit `38344a16` から変わった。
+  `git diff 38344a16 f69b2bb8 -- tools/python ':!tools/python/REPORT_APPENDIX_2858.md'` は 2,275 行 (25 file)。§6 の値は `38344a16`・`10156444` 版の記録として残す。
+- 測定後のコード差分: `git diff f69b2bb8 HEAD -- tools/python ':!tools/python/REPORT_APPENDIX_2858.md'` の出力は 0 行 (本節の REPORT の commit だけが後に続く)。
+- 環境: emcc 6.0.12 ([EMSDK] の pin) を上流から install・activate (素材 `toolchain-emsdk` は使わず)。nproc = 4。google-chrome 154.0.8037.97 (headless)。
+- 手順と所要 (UTC・rc 0 は全件):
+  - `bash build_cpython_wasm.sh` (native と wasm32): 4 分 23 秒 (`20:43:51 → 20:48:14`)。
+  - `CPY_MEMORY64=1 bash build_cpython_wasm.sh`: 2 分 02 秒 (`20:48:25 → 20:50:27`)。
+  - `FLPY_MEMORY64=1 bash build_flpy_static.sh` (既定の出力名 `flpy_static64`): 19.5 秒。
+  - `bash build_flpy_static.sh` (wasm32 の `flpy_static`): 完了 (`20:51:01`)。
+
+### 11-1. probe (n=3・直列)
+
+| 版 | n | probe 直前の load1 | validate | load ms | init ms | run ms | subinterp 1 回 ms | subinterp 160 回 ms | heap (160 回の前後) | wall ms | 判定 |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---|---:|---|
+| flpy_static64 | 1 | 3.44 | true | 238 | 151 | 26 | 121 | 3,561 | 33,554,432 → 33,554,432 | 4,175 | PROBE OK |
+| flpy_static64 | 2 | 3.25 | true | 212 | 133 | 21 | 97 | 3,385 | 同上 | 3,923 | PROBE OK |
+| flpy_static64 | 3 | 3.71 | true | 159 | 120 | 26 | 122 | 3,395 | 同上 | 3,945 | PROBE OK |
+| flpy_static | 1 | 3.49 | true | 176 | 101 | 22 | 98 | 2,786 | 同上 | 3,280 | PROBE OK |
+| flpy_static | 2 | 3.49 | true | 187 | 115 | 16 | 98 | 2,738 | 同上 | 3,272 | PROBE OK |
+| flpy_static | 3 | 3.69 | true | 179 | 87 | 23 | 89 | 2,823 | 同上 | 3,308 | PROBE OK |
+
+- 6 回とも `heap_grew: false`・`run_stdout: "2"`・`sub_loop_ok: 160`・rc 0。
+- load1 は 1 分値で、直前の link・build の影響を受けている (4 コア・load 3.2〜3.7)。5 分値・15 分値は測っていない。
+
+### 11-2. 負のコントロールと再現性
+
+- 負のコントロール: `dist/flpy_static64.wasm` (6,375,560 B) を `truncate -s -1` → `STATIC64 PROBE FAIL`・rc 1。退避先から戻し、`cmp` で一致を確認。
+- 再現性: 同一 HEAD で 2 回目の link をし、sha256 は 1 回目と一致 (`flpy_static64.wasm` = `6b22fd07…d76aa`、`flpy_static.wasm` = `91b95e52…2336e`)。
+  §6-3 の sha256 (`38344a16` 版) とは一致しない。`tools/python` のソースが main 取り込みで変わったため (原因の切り分けはしていない)。
+- 変更点の確認 (zip 取得元): wasm32 の既定は `$WORK/build-wasm` の stdlib zip を使い、link と probe 3/3 PASS を確認。
+  `FLPY_MEMORY64=2` (`CPY_BUILD=work/build-wasm64l`) の経路は本節では回していない (`build_cpython_wasm64.sh` 未実行)。zip 取得元の変更がその経路に効く点は未確認。
