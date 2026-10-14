@@ -102,6 +102,16 @@ FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/trap_triage/negctl_594.sh   
 - 判断: base で 8cc190 系の OOB が 0 件のため、mask 実験は救済する対象を持たない。G1/G5 の前提を満たす IR 状態は、本 main では再現できない。gate の期待値は緩めていない。
 - 再設計の判断 (期待値を残すか・gate を廃止するか・8cc190 系の別の再現源を使うか) は PM 判断。下記 §6 の表 #1041 行の解消は未了。
 
+### 6-4. #1041 受入 1: ldfix=disabled の測定経路 (拒否を外さず既存 opt-in で測る)
+- 経路: `trap_triage/measure_ldoff_594.sh`。`M11_LDFIX=0 m11_gen_ir2.sh` → `M11_ALLOW_LDFIX_DISABLED=1 M11_QSTORE=0 m11_build.sh` → `survey_units.mjs`。
+  `m11_build.sh` の拒否 (#680) は外していない。opt-in は #1165 で既に存在し、§6-3 の「一時コピーで拒否を外した」手順は不要だった。
+- 測定: 検証 HEAD `8483b900` (origin/main)。IR は ldfix=disabled、build は `M11_QSTORE=0` (qstore 無し = base)。
+  gen 7.8 秒 (rc 0)、build 22.1 秒 (rc 0, `wasm-ld signature mismatch: 0, undefined symbol: 0`)、survey 9.4 秒 (rc 0)、load 0.72–0.98。
+  kind: 56=other、57–63=ok (**58–63 は全て ok**)。SURVEY `ok=867 oob=18 halt0=8 miss=47 other=1 noproc=1`。
+- 結論: 58–63 は ldfix の有無で ok のまま (§6-3 と一致)。ldfix=disabled を測る正式な手順が確定した。
+- 同じ HEAD で `negctl_594.sh` を foreground 実行: rc 1、**3 分 47 秒** (`real 3m47.164s`)、survey 9.2–10.3 秒、load 0.85–1.09。
+  SUMMARY FAIL (G1, G5, G8, G10, G12)。§6-1 / §6-3 と同じ FAIL 集合。期待値は変更していない (受入 2 は PM 判断待ち)。
+
 ## 6. 検証範囲 / 範囲外 / 未解決
 
 範囲: `m11_ov.c` + `work-m11` スナップショットの survey 942 unit を、qstore 無し (`M11_QSTORE=0`) と qstore 有り (main の既定) の両方で測定。範囲外: `m11_e2e.sh` 全体 (units_run は未測定)、`M11_OV_CLASSCREATE` (#419 / PR #446 の opt-in。main に無いため対象外)。
