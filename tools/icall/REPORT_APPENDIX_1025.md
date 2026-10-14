@@ -170,7 +170,7 @@ index ab3ba4c0..4a9d4642 100644
 | 不一致バッファ (step 数) | self 305・P 293・L 291・R 290 |
 | rax 一致 | 173/366 だが参考値。rax は wasm / native で address space が異なるポインタを含むため判定に使わない |
 
-- step 1 (シナリオ 0) の `self` 不一致は 9 bytes: offset 106・107・110・136〜138・152〜154。`self+104` は native `0x0000803c` (0x3c800000 = 0.015625)・wasm `0x0000` 。
+- step 1 (シナリオ 0) の `self` 不一致は 9 bytes: offset 106・107・110・136〜138・152〜154。`self+104` は native `0x3c800000` (0.015625)・wasm `0x00000000` (0)。`self+108` は native `0x3f800000` (1.0)・wasm `0x3f000000` (0.5)。
 - 0x3c800000 (0.015625) はイメージ内の `.rdata` 範囲 (0x13a1000〜) 以外にも複数箇所に現れ、`data_gen.py` の敷設対象 (`.rdata`/`.data`/`_RDATA`) で値が出るかは未確認。`.text` 側の即値・`.pdata`・`.rsrc` 由来の可能性を含めて未切り分け。
 - step 0 で全バッファ一致しているため、step 1 で初めて現れる入力 (step 0 の出力で更新された状態、もしくは `ott_run` の引数 ABI) が疑わしい。`ms_ctx` は native 側で毎回 `memset` されており、状態の持ち越しは native に無い。wasm 側の持ち越しは未確認。
 
