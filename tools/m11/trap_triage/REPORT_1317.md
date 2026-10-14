@@ -192,59 +192,34 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 
 - 測定 commit: `731a232a` (計測 probe 込み・`M11_INSTR_40F960` 既定 0)。
 - 以降のコード変更: `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
-- `git diff 731a232a HEAD -- tools/m11` の出力:
-
-```diff
-diff --git a/tools/m11/m11_ov.c b/tools/m11/m11_ov.c
-index de9d5907..becfc455 100644
---- a/tools/m11/m11_ov.c
-+++ b/tools/m11/m11_ov.c
-@@ -463,11 +463,12 @@ u64 function_40fb40(u64 self, u64 inst) {
-     memset((void*)(uintptr_t)inst, 0, (size_t)(long long)(int)D(self - 0x80));
-     Q(inst) = self;
- #if M11_INSTR_40F960
-+    int chain_n = 0;
-     fprintf(stderr, "[m11][40fb40] self=0x%llx inst=0x%llx size=%d\n", (unsigned long long)self, (unsigned long long)inst, (int)D(self - 0x80));
- #endif
-     do {
- #if M11_INSTR_40F960
--        { static int chain_n = 0; if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 cls=0x%llx\n", (unsigned long long)cls); abort(); } }
-+        if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 self=0x%llx cls=0x%llx\n", (unsigned long long)self, (unsigned long long)cls); abort(); }
- #endif
-         u64 it = Q(cls - 0xc0);
-         if (it) {
-@@ -484,6 +485,9 @@ u64 function_40fb40(u64 self, u64 inst) {
-         if (cls) cls = Q(cls);
-     } while (cls);
-     if (flag) ov_initinst_nested(self, inst);
-+#if M11_INSTR_40F960
-+    fprintf(stderr, "[m11][40fb40] chain_len=%d self=0x%llx\n", chain_n, (unsigned long long)self);
-+#endif
-     return inst;
- }
- 
-```
-
+- `git diff 731a232a HEAD -- tools/m11` は `m11_ov.c` の 6 行のみ (全文は `REPORT_1317_APPENDIX.md` §12)。
 - 旧計測 (`731a232a`) の「`40fb40` の連鎖長 10 万未満」は**無効**。旧 `static` カウンタはプロセス全体の累計で、各連鎖の長さではない。`40f960` の確保サイズ (呼び出しごとに出力) は有効な値。
-- 再測定 (`b36d3b5f`・`M11_INSTR_40F960=1`・`oc_artifacts: fl-win64 work-m11 work-liftdiff`): **未実施**。本 run では `work-m11` / `work-liftdiff` が取得できず、`tools/m11/work/`・`tools/liftdiff/work/` を展開できなかった。下表は再測定で埋める (旧値は埋めない)。
+- 再測定 (`b36d3b5f`・`M11_INSTR_40F960=1`・`M11_M2P=1`・`survey_units.mjs` 60 s 上限): 素材 `work-m11` / `work-liftdiff` / `fl-win64` を展開して実施。
+  - IR は素材に `ir_conditions.json` が無く build を通せなかったため、公開 RetDec v5.0 (`avast/retdec` release) で `m11_gen_ir2.sh` を再生成 (rc=0・`ldfix errors=0`・49.9 s) してから build (rc=0・22.1 s)。emsdk は `6.0.12` を `[EMSDK]` に導入 (`llvm-nm` が PATH に無く build が rc=127 になったため `[EMSDK]/upstream/emscripten/llvm-nm` へリンク)。素材の `ir_conditions.json` / 素材 IR との同一性は未確認。
+  - `0..829`+880: rc=0、6.5 s、`{"ok":763,"oob":14,"miss":46,"other":1,"halt0":7}`。`40f960` 521 回・`40fb40` 521 回 (`chain_len` 1〜7)。
+  - `0..830`+880: rc=0、12.3 s、`{"ok":763,"oob":15,"miss":46,"other":1,"halt0":7}`。`40f960` 523 回・`40fb40` 523 回 (`chain_len` 1〜7)。
+  - 対照 (`M11_INSTR_40F960=0`・同 IR): `0..829`+880 rc=0 6.9 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":14}`、`0..830`+880 rc=0 13.0 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":15}`。計測 probe の ON/OFF で結果は 1 件ずれる (`ok`・`halt0`)。
+  - **REPORT §4a・§6〜§8 の「`0..830`+880 は rc=124」とは再現が一致しない**。今回の IR (公開 RetDec 由来) と素材 IR の差が原因かは未切り分け。
 
 | 条件 | `40f960` の呼び出し (self, size) | `40fb40` の chain_len 最大 | 最後の出力 |
 |---|---|---|---|
-| `0..829`+880 | 未測定 | 未測定 | 未測定 |
-| `0..830`+880 | 未測定 | 未測定 | 未測定 |
+| `0..829`+880 | 521 回 (`unit 880` は 6 回)。size: 16:18, 24:5, 32:10, 40:55, 48:92, 52:4, 56:51, 64:22, 72:6, 80:3, 88:149, 96:30, 104:10, 120:2, 128:17, 136:19, 144:5, 152:2, 160:2, 176:1, 192:1, 200:4, 208:1, 232:1, 240:1, 352:2, 368:1, 416:1, 728:1, 912:1, 1064:1, 1136:2, 2520:1 (最大 2520) | 7 (1:17, 2:213, 3:217, 4:63, 5:4, 6:5, 7:2) | `unit 880` の `GetComputerNameExW`・`RegOpenKeyExA`・`RegCloseKey` stub (完走) |
+| `0..830`+880 | 523 回 (`unit 880` は 6 回)。size は 0..829 と同じ分布で、差は 48:+1, 72:+1 のみ (unit 830 の 2 回) | 7 (1:17, 2:213, 3:219, 4:63, 5:4, 6:5, 7:2) | `unit 880` の `40fb40 chain_len=3 self=0x4cf790` (完走) |
 
-- 旧計測 (`731a232a`) で確認済みの値 (参考・再測定までは暫定): `0..830`+880 では `40f960` が 1 回 (self=`0xe5b1c0`, size=120) で、停止は `GetFileVersionInfoSizeW` stub の後。`0..829`+880 は複数回 (size 128, 128, 88, 48 ほか・全件は未記録)。
-- 結論 (前 run の「(a)・(b) 両方否定」は**撤回**):
-  - (a) 確保サイズ過大: 旧値 size=120 は妥当に見えるが、全件の確認は未了。未確定。
-  - (b) `40fb40` 連鎖の循環: 旧計測は無効。未確定。
-  - 停止位置: `40f960` / `40fb40` の後の `GetFileVersionInfoSizeW` stub 以降 (旧 trace。これは有効)。
+- 計測の要点:
+  - `40f960` の確保サイズは最大 2520 で、`unit 880` の 6 回は 48〜200 (120, 200, 128, 128, 88, 48)。どちらも大きくない。
+  - `40fb40` の連鎖長は最大 7。この観測は「連鎖が 7 で終わる」ことを示すだけで、循環の有無を証明するものではない (停止しない条件での観測のため)。
+  - `VA-big` の大きな値 (2060124160 等) は `40f960` の呼び出しではない。
+- 結論 (今回の実測): 停止は再現しなかった (rc=0)。(a) 確保サイズ過大と (b) 連鎖の循環は、この計測では停止の原因として観測されなかった。ただし素材 IR と同条件ではないため、(a)・(b) の判定は未確定のまま。
+
+- 前 run の「(a)・(b) 両方否定」は**撤回** (旧 `static` カウンタの値が無効だったため)。今回の実測で再判定したが、停止が再現しないため判定は未確定。
 - 受入の状況 (本 run 末):
 
 | 受入 | 状態 |
 |---|---|
-| 1. 830 が残す状態 | 未達 (未特定) |
-| 2. 停止命令・wasm frame | 部分 (`GetFileVersionInfoSizeW` stub の後まで。停止命令は未特定) |
+| 1. 830 が残す状態 | 未達 (未特定。今回 830 を含めても停止せず、停止条件の再現が取れていない) |
+| 2. 停止命令・wasm frame | 未達 (今回の IR では停止しないため特定対象が無い) |
 | 3. 修正案 | 未達 |
-| 4. 修正後の完走 | 未実施 (停止は再現済み) |
+| 4. 修正後の完走 | 未達 (今回の IR では `0..830`+880 が完走。§4a・§6〜§8 の rc=124 との差は未切り分け) |
 
-- 次の一手: `oc_artifacts: fl-win64 work-m11 work-liftdiff` で `b36d3b5f` を再測定し、上表を全件埋める。`GetFileVersionInfoSizeW` stub の戻り後から 880 の終了までの icall 列を `SV_ERR_LOG` と同じ方式で取り、829 込みと diff する。
+- 次の一手: 素材 IR と今回の IR の差を切り分ける。素材 `work-m11` に `ir_conditions.json` が無いため、IR 生成条件 (RetDec の版・`m11_gen_ir2.sh` の入力) を揃えないと同一条件での再現にならない。

@@ -20,3 +20,36 @@
 
 - `0xf960` (icall 値) が IR のどの関数に解決されるかを、`m11_icall` の `tkey` 変換 (`target + 0x400000 - M11_LB_BASE`) と `m11_disp_tab` の突合で特定する。`0x40f960` が表に無い理由 (lift 漏れ・別 VA への写像) を先に確定する。
 - 解決先が確定するまで、#1786 の計装 (連鎖の循環検出) は着手しない。
+
+## 12. (付録) #1317 8 回目 run: git diff 731a232a HEAD -- tools/m11 の全文
+
+```diff
+diff --git a/tools/m11/m11_ov.c b/tools/m11/m11_ov.c
+index de9d5907..becfc455 100644
+--- a/tools/m11/m11_ov.c
++++ b/tools/m11/m11_ov.c
+@@ -463,11 +463,12 @@ u64 function_40fb40(u64 self, u64 inst) {
+     memset((void*)(uintptr_t)inst, 0, (size_t)(long long)(int)D(self - 0x80));
+     Q(inst) = self;
+ #if M11_INSTR_40F960
++    int chain_n = 0;
+     fprintf(stderr, "[m11][40fb40] self=0x%llx inst=0x%llx size=%d\n", (unsigned long long)self, (unsigned long long)inst, (int)D(self - 0x80));
+ #endif
+     do {
+ #if M11_INSTR_40F960
+-        { static int chain_n = 0; if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 cls=0x%llx\n", (unsigned long long)cls); abort(); } }
++        if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 self=0x%llx cls=0x%llx\n", (unsigned long long)self, (unsigned long long)cls); abort(); }
+ #endif
+         u64 it = Q(cls - 0xc0);
+         if (it) {
+@@ -484,6 +485,9 @@ u64 function_40fb40(u64 self, u64 inst) {
+         if (cls) cls = Q(cls);
+     } while (cls);
+     if (flag) ov_initinst_nested(self, inst);
++#if M11_INSTR_40F960
++    fprintf(stderr, "[m11][40fb40] chain_len=%d self=0x%llx\n", chain_n, (unsigned long long)self);
++#endif
+     return inst;
+ }
+ 
+```
