@@ -84,6 +84,7 @@
 | `tools/liftlib/REPORT_APPENDIX_A.md` | ~240 | liftlib §10〜§12 全文 (lowbase 取り込み CAB-220 / mini-lifter 語彙 + leaf spec CAB-239 / LIFTLIB-2 CAB-256) |
 | `tools/liftlib/REPORT_APPENDIX_B.md` | ~250 | liftlib §13〜§16 全文 (LIFTLIB-3 CAB-264 / LIFTLIB-4 CAB-272 / LIFTLIB-1 #224 検収 / 環境パス置換 #386) |
 | `tools/liftlib/REPORT_APPENDIX.md` | ~266 | liftlib §17 全文 (HB-H3 #93 iargs pass)・§18 全文 (LIFTLIB #241 ymm(i256) helper ABI / pcmpistri / F2 xmm 戻り搬送) |
+| `tools/liftlib/REPORT_APPENDIX_448.md` | ~60 | liftlib CI-8 (#448) の付録: work-* 絶対 symlink の張り直し実測、素材 `libottnative.so` が HEAD と不整合で `lowbase_e2e.sh` [3] が FAIL した件と、[3] で `build.sh` から再生成する修正 (2f1b76fc) の実測。測定値の正本。本文は REPORT §24 |
 | `tools/liftlib/REPORT_APPENDIX_898.md` | ~35 | liftlib #898 (HB-H22) iargs 未対応 3 site の bind の付録 (REPORT_APPENDIX §17 の #898 節を分割移動)。`movzx` 合成 (1801a3117 解決)、残り 2 site は main の HB-H25 #1158 で bind 済み。高バイト unbound (T16b)。測定値は REPORT_APPENDIX_898.md が正本 |
 | `tools/liftlib/REPORT_APPENDIX_2128.md` | ~60 | liftlib #2128 (部分達成): ott_getparam leaf への icall runtime 配線の実測 (測定 commit `f8bd2ea0`・変更前 `df2eebde` との比較・unit T1〜T5・未解決の起票先)。測定値の正本 |
 | `tools/liftlib/REPORT_APPENDIX_883.md` | ~48 | liftlib #883 (HB-H21) ott_getparam の BLK 配線と this 仮引数化の付録 (REPORT_APPENDIX §17.9・§17.10 の追跡)。測定値は REPORT_APPENDIX.md §17.9 が正本。未解決は #883 に残す |
@@ -393,7 +394,7 @@
 | `tools/targets/serum2/host/REPORT.md` | ~240 | Serum 2 最小 VST3 host |
 | `tools/targets/serum2/host/REPORT_SR1c.md` | ~222 | SR-1c (#256) 付録: controller ゲート (+0x10c / +0xdc) の静的 writer 走査と API 突合 (import 327 / 呼出 110 / 未呼出 217)。API 名一覧は `host/sr1c_api_surface.tsv` |
 | `tools/targets/serum2/host/REPORT_SR23.md` | ~78 | SR-23 (#1545) 付録: 書込元 `0x1800acf70` の所属 class (`SerumController`・vtable slot 3) と、wrapper IID (`IVst3ToAUWrapper`/`AAX`) に応答する host 根拠 (SDK 参照 host は応答しない) |
-| `tools/targets/serum2/host/REPORT_SR5.md` | ~63 | SR-5 (#73): 参照音源 (wine64 上の実 Serum2 DLL) の WAV 生成と dB 誤差ハーネス。決定性 (file SHA-256 一致)・content dir 条件 (空 dir / installer 全展開) ごとの参照 pin・ネガコン・測定 commit の対応・stub による補助確認 (再測定ではない) |
+| `tools/targets/serum2/host/REPORT_SR5.md` | ~120 | SR-5 (#73) / SR-47 (#2414): 参照音源 (wine64 上の実 Serum2 DLL) の WAV 生成と dB 誤差ハーネス。決定性 (file SHA-256 一致)・content dir 条件 (既定 installer 全展開 / variant 空 dir) ごとの参照 pin・ネガコン・測定 commit の対応・stub による補助確認 (再測定ではない)・content 条件の判断 (§4) |
 | `tools/targets/serum2/license/REPORT.md` | ~160 | Serum2 認可機構の呼出点マップ |
 | `tools/targets/serum2/license/authstub/REPORT.md` | ~232 | authorization stub 設計・実装。§13b・§14 の詳細は付録 `REPORT_APPENDIX.md` §13b・§14b (250 行上限のため分割移動) |
 | `tools/targets/serum2/license/authstub/REPORT_APPENDIX.md` | ~95 | authstub REPORT の分割移動節: §13b (L1 脱落条件の突合・census の数え方) と §14b (L1 復元 pass の census・ネガコン・e2e 実測、LF 束縛の詳細) |
