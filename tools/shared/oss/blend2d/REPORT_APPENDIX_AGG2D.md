@@ -4,9 +4,9 @@
 
 ## 12. vtable の slot 単位比較: Blend2D.dll と dsp_ippv2
 
-> 測定 commit: `cc8baecb` (`agg2d_vtable.py` を DLL 指定と ctor/vtable の自動検出に一般化し、`agg2d_vtable_cmp.py` を追加)。
-> `git diff cc8baecb HEAD -- tools/shared/oss/blend2d/agg2d_vtable.py tools/shared/oss/blend2d/agg2d_vtable_cmp.py` の出力は 0 行 (以後に変えたのは `agg2d_callers.py` の追加と REPORT・`docs/DOC_MAP.md` のみ)。
-> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_vtable_cmp.py` (依存: `pefile`・`capstone`、数秒)。出力は `tools/shared/work/agg2d_vtable_cmp.json` (gitignore)。
+> 測定 commit: `53b584d8` (`agg2d_vtable.py` の import 用定数 (`CTOR_VA`・`VTABLE_VA`) を戻し、`agg2d_vtable_cmp.py` のヘッダを直した commit。DLL 指定と ctor/vtable の自動検出は `cc8baecb` で導入)。
+> `git diff 53b584d8 HEAD -- tools/shared/oss/blend2d/agg2d_vtable.py tools/shared/oss/blend2d/agg2d_vtable_cmp.py` の出力は 0 行 (以後に変えたのは REPORT・`docs/DOC_MAP.md` のみ)。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_vtable_cmp.py` (依存: `pefile`・`capstone`)。出力は `tools/shared/work/agg2d_vtable_cmp.json` (gitignore)。
 > 比較対象は `AggCreateInstance` を export する 2 DLL: **block24339 (Blend2D.dll)** と **block24356 (dsp_ippv2、IPP + AGG + GPC を同梱)**。block24355 は export 数 446・先頭が別形のため対象外。
 
 | 項目 | block24339 (Blend2D.dll) | block24356 (dsp_ippv2) | 根拠 |
@@ -63,11 +63,10 @@ slot の対応 (block24339 の種別 × block24356 の種別, 件数):
 | `Blend2D.dll` を指す参照 | VA `0x6555cd` (`lea rcx,…; xor edx,edx; xor r8,r8`、`LoadLibraryExW` 系の引数設定と読める) | 同 |
 | `AggCreateInstance` を指す参照 | VA `0x6555f6` → `call 0x425280` → 戻り値を格納 | 同 |
 | 格納先 (関数ポインタの保持先) | VA `0x8d8168` (格納 `0x655602`) | 同 |
-| 格納先を指す参照 | 3 件: `0x6555c2` (読み出し)・`0x655602` (格納)・`0x655609` (`cmp qword ptr [rip+X], 0`) | 同 3) |
+| 格納先を指す参照 | 3 件: `0x6555c2` (`mov qword ptr [rip+X], 0`、初期化)・`0x655602` (格納)・`0x655609` (`cmp qword ptr [rip+X], 0`、判定) | 同 3) (命令形は capstone で確認) |
 
-**判明**: block18797 は `Blend2D.dll` を読み込み、`AggCreateInstance` を解決して結果を 1 つの global に保持する lazy 初期化 loader。格納先の参照は loader の判定 2 箇所と格納 1 箇所だけ。
+**判明**: block18797 は `Blend2D.dll` を読み込み、`AggCreateInstance` を解決して結果を 1 つの global に保持する lazy 初期化 loader。格納先の参照は 3 件だけで、初期化 store 1・格納 1・判定 1 (`cmp` は `0x655609` の 1 箇所)。
 **未判明**: 同 block 内に、この global を使って `AggCreateInstance` を呼ぶ消費側は無い。loader 関数を返す getter の有無と、その呼び出し元。残り 144 block が同型の loader か。
-**未検証**: `0x6555c2` の命令形 (`cmp` と推定)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|

@@ -8,8 +8,8 @@
 ## 1. 対象 DLL の同定
 
 - `classify.py` の `win=("Blend2D.dll", 24339)` に従い **`extracted/block24339_PE.bin`** を対象にした。
-- `AggCreateInstance` を export する PE は **`dsp_ippv2` (block24356) と block24339 の 2 つ**ある。名前だけで
-  探すと dsp_ippv2 を拾う (初版スクリプトの誤り)。そのため DLL 番号で固定した。
+- `AggCreateInstance` を export する PE は **3 つ** (`block24339` (Blend2D.dll)・`block24355`・`block24356` (dsp_ippv2)) ある。
+  名前だけで探すと dsp_ippv2 を拾う (初版スクリプトの誤り)。そのため DLL 番号で固定した。
 - PE32+ DLL x86-64, 2,065,920 B, sha256 先頭 16 桁 `66634d24412084b7`。
 
 ## 2. 実測
@@ -123,10 +123,10 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 |---|---|---|---|
 | `block24339_PE.bin` | 1 | `sub rsp,0x28; mov ecx,0x1170; call ...` (§5 と同じ) | Blend2D 本体 (本 REPORT の対象) |
 | `block24355_PE.bin` | 446 | `push 0x19f8; call ...` | Intel IPP 系 (`ipps*`・`ippi*` の export が大半、`IPPCODE` section) |
-| `block24356_PE.bin` | 446 | `sub rsp,0x28; mov ecx,0x1aec; call ...` | IPP 系 (同上) |
+| `block24356_PE.bin` | 446 | `sub rsp,0x28; mov ecx,0x1aec; call ...` | IPP 系 + AGG 同梱 (付録 §12 で比較) |
 
 **判明**:
-- `AggCreateInstance` という名前の export は fl-win64 内に **3 本** ある。ただし `block24355`・`block24356` は IPP の DLL で、Agg2D とは無関係。§1〜§7 の対象は `block24339` だけで、正しい。
+- `AggCreateInstance` という名前の export は fl-win64 内に **3 本** ある。`block24356` は IPP 系 DLL だが AGG を同梱し `AggCreateInstance` を持つ (付録 §12 で比較)。`block24355` は先頭の形が別で、比較対象外。§1〜§7 の対象は `block24339` だけで、正しい。
 - `AggCreateInstance` を import 名で参照する PE は **0 件** (313 PE を走査)。文字列としても 3 PE にしか現れない。`GetProcAddress` は 254 ファイルに現れるが、本 run では解決先を追っていない。
 - `Blend2D`・`blend2d` の文字列は DATA を含む複数ファイルに現れる。`block25162_PE.bin` の一致は素材ファイル名 (`Baggy` 等) による偶然の一致で、Blend2D 本体ではない。
 
@@ -134,8 +134,8 @@ lift か C++ 再実装かの判断には、この依存の確定が要る。`tri
 
 ## 9. x64c による lift 可否の実測 (閉包の深さ別)
 
-> 測定 commit: `87d5c6ad` (CFG dispatch の計数をレジスタ経由形に対応させた commit。前回測定は `6b11bfd9`)。`git diff 87d5c6ad HEAD -- tools/flelift/x64c.py tools/shared/oss/blend2d/*.py` は 0 行 (この範囲で以後に変えたのは本 REPORT と `docs/DOC_MAP.md` のみ)。
-> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_lift_probe.py` (依存: `pefile`・`capstone`、6.4 s)。出力は `tools/shared/work/agg2d_lift_probe.json` (gitignore)。
+> 測定 commit: `53b584d8` (`agg2d_vtable.py` の import 用定数を戻した commit)。`git diff 53b584d8 HEAD -- tools/flelift/x64c.py tools/shared/oss/blend2d/*.py` は 0 行 (以後に変えたのは本 REPORT と `docs/DOC_MAP.md` のみ)。前回測定 (`87d5c6ad`) の鮮度主張は、main 取り込みで x64c.py が変わっていたため成り立たなかった。
+> 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_lift_probe.py` (依存: `pefile`・`capstone`、測定 4.36 s)。出力は `tools/shared/work/agg2d_lift_probe.json` (gitignore)。
 > lifter は `tools/flelift/x64c.py` (FLEngine 向け fork)。`--img 0x180000000 --img-size 0x300000` (block24339 の ImageBase / SizeOfImage)、roots は §5 の unique 79 VA。
 
 | 閉包の深さ (`--closure`) | 関数 | 命令 | 未対応 site | 未対応 mnemonic 種 | 未 lift の直接 call (件) | 使用 import |
