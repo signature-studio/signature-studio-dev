@@ -67,6 +67,8 @@ export interface Signal {
   labelAt?: string;
   // reviews を REST で一度取得した
   revChecked?: boolean;
+  // 最新の oc-pm-intent: relaunch (issue コメント)。書き手が実装 App かどうか (bot) と、マーカーの字句 (issue・arts・focus) だけを持つ。検査は engine が行う。
+  relaunch?: { at: string; id?: number; bot: boolean; issue: string; arts: string; focus: string | null };
 }
 export interface RunState {
   id: number;
@@ -77,7 +79,22 @@ export interface RunState {
   updatedAt: string;
   // run の作成時刻 (launch の観測に使う)。古い state には無い。
   createdAt?: string;
+  // run を起こした workflow のファイル名 (`.github/workflows/opencode.yaml` なら `opencode.yaml`)。古い state には無い。
+  wf?: string;
 }
+
+// 同時実行の上限 (60) を食う opencode.yaml の run だけを TARGET に数える。他の workflow (scripts-test.yaml など) は別枠。
+export const OPENCODE_WORKFLOW = "opencode.yaml";
+
+// workflow_run.path (REST は `.github/workflows/x.yaml`、ref 付きの形 `...@refs/heads/main` もあり得る) からファイル名を取る。
+export function workflowFile(path: unknown): string | undefined {
+  if (typeof path !== "string" || path === "") return undefined;
+  const file = path.split("@")[0].split("/").pop() ?? "";
+  return file === "" ? undefined : file;
+}
+
+// path を持たない run (古い保存値、path の無い配送) は opencode.yaml として数える。数え漏らして上限を超えるより、過大に数えるほうを選ぶ。
+export const isOpencodeRun = (r: RunState): boolean => r.wf === undefined || r.wf === OPENCODE_WORKFLOW;
 export interface BotComment {
   issueNumber: number;
   at: string;
@@ -217,7 +234,8 @@ function applyBotComment(s: PmState, p: Json, botLogin: string, pmLogins: string
       next = { ...next, pmArt: { ...next.pmArt, [k]: { at: c.created_at, line: m[0], ...id } } };
     }
   }
-  if (isBot) {
+  // 再投入の意図は bot の投稿でも botLast (停止報告の窓) を動かさない。意図の直後に窓が立つと、分類が 1.5 時間 recent になるため。
+  if (isBot && !RELAUNCH_RE.test(c.body ?? "")) {
     const prev = s.botLast[k];
     if (!prev || notOlder(prev, c)) {
       next = { ...next, botLast: { ...next.botLast, [k]: { issueNumber: i.number, at: c.created_at, body: (c.body ?? "").slice(0, 20000), ...id } } };
@@ -247,6 +265,18 @@ export function parseOutcomeReason(body: string): string | null {
   return OUTCOME_REASONS.includes(m[1]) ? m[1] : "unknown";
 }
 
+// oc-pm-intent: relaunch の属性を字句のまま取り出す (検証は engine の checkRelaunchIntent)。マーカーが無ければ null。
+const RELAUNCH_RE = /<!-- oc-pm-intent: relaunch ([^>]{0,300})-->/;
+export function parseRelaunchIntent(body: string): { issue: string; arts: string; focus: string | null } | null {
+  const m = RELAUNCH_RE.exec(body);
+  if (!m) return null;
+  return {
+    issue: /(?:^|\s)issue=(\S*)/.exec(m[1])?.[1] ?? "",
+    arts: /(?:^|\s)arts="([^"]*)"/.exec(m[1])?.[1] ?? "",
+    focus: /(?:^|\s)focus=(\S*)/.exec(m[1])?.[1] ?? null,
+  };
+}
+
 // コメントから終端状態の手がかりを取る。マーカーは bot (実装 App・reviewer App) の投稿だけを信じる (誰でもコメントできるため)。
 function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: string[], reviewer: string): PmState {
   const c = p.comment;
@@ -267,6 +297,13 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
     if (reason) patch.outcome = { at, reason };
   }
   if ((pmLogins.includes(login) || (trusted && PM_MARK_RE.test(body))) && later(cur?.pmAt)) patch.pmAt = at;
+  // 再投入の意図は issue のコメントだけ。実装 App の意図は第三者の意図より優先する (第三者の後に来ても置き換えない)。
+  // 同じ区分の中では最新を残す。どの順に適用しても結果は同じ。第三者の意図も残す (engine が author として拒否し、counters に記録する)。
+  const rel = !("pull_request" in i) ? parseRelaunchIntent(body) : null;
+  const impl = login === botLogin;
+  if (rel && (!cur?.relaunch || (impl && !cur.relaunch.bot) || (impl === cur.relaunch.bot && notOlder(cur.relaunch, c)))) {
+    patch.relaunch = { at, ...(typeof c.id === "number" ? { id: c.id } : {}), bot: impl, ...rel };
+  }
   // 人の回答は、非 bot かつ MEMBER / OWNER / COLLABORATOR のコメントだけ (第三者のコメントで PM を起こさない)。
   if (login && !isBotUser(c.user) && ASSOC_OK.includes(c.author_association) && later(cur?.userAt)) patch.userAt = at;
   return setSig(s, k, patch);
@@ -362,6 +399,8 @@ function applyRun(s: PmState, p: Json): PmState {
   if (!w) return s;
   const k = String(w.id);
   if (!newer(s.runs[k], w.updated_at)) return s;
+  // path は run 自身 (REST・webhook とも) か、webhook の workflow オブジェクトにある。配送に無いときは既知の値を残す。
+  const wf = workflowFile(w.path ?? p.workflow?.path) ?? s.runs[k]?.wf;
   const next: RunState = {
     id: w.id,
     event: w.event,
@@ -370,6 +409,7 @@ function applyRun(s: PmState, p: Json): PmState {
     conclusion: w.conclusion ?? null,
     updatedAt: w.updated_at,
     ...(typeof w.created_at === "string" ? { createdAt: w.created_at } : {}),
+    ...(wf ? { wf } : {}),
   };
   return { ...s, runs: { ...s.runs, [k]: next } };
 }
