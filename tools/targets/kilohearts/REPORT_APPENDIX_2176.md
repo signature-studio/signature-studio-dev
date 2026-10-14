@@ -87,7 +87,7 @@
 
 ```sh
 W=$RUNNER_TEMP/kh2176; mkdir -p $W && cd $W
-tar --zstd -xf $HOME/artifacts/plugins-kilohearts.tar.zst
+tar --zstd -xf $ARTIFACTS_DIR/plugins-kilohearts.tar.zst
 unzip -q -o "Kilohearts Offline Installer.zip" payload.dat -d win
 unzip -q -o win/payload.dat index.json 'windows.zip/*' -d blobs
 unzip -q -o blobs/windows.zip/1ccb1df8c8f10745 -d winpkg
