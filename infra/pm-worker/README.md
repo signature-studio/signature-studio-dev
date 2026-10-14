@@ -12,6 +12,7 @@ PM の launch / watchdog を、VM のポーリング (systemd timer) から **we
 | Durable Object `PmDO` (SQLite) | issue / PR / run / 最後の bot 報告 / blocked_by / launch 時刻を保持。App の鍵は AES-GCM で封じて保管 |
 | alarm (webhook の 2 秒後 / 毎分) と Cron Trigger (毎分) | `tick`: 同期 (6 時間ごとに full、5 分ごとに reconcile)・`repository_dispatch` (`oc-watchdog`、前回の送信から 5 分未満は送らない。`LIVE_DISPATCH`。検出した `oc-pm` も同じスイッチ)・launch (`LIVE_LAUNCH`) |
 | `POST /admin/resync` | 管理用の全体同期 (#2339)。派生状態を REST の内容で作り直す (`fullSync` と同じ。永続状態は触らない)。認証は呼び出し側の GitHub token (Bearer) が repo の push 権限を持つこと (新規の API token は作らない)。**未認証・不明な token・読み取りだけの token は 404** (入口で DO を呼ばない)。1 時間に 2 回まで、3 回目は 429 (`retry-after`) |
+| `POST /admin/import` `GET /admin/export` | VM の状態 (`launched`・`relaunch`・`phase`・`pm_art`) の取り込みと書き出し (#2343)。認証は `/admin/resync` と同じ。既定は検証のみで、`?apply=1` のときだけ保存する。取り込み前は launch しない。下の『VM の状態の取り込みと書き出し』 |
 | `GET /setup` `GET /setup/callback` | GitHub App `oc-pm-for-signature-studio` の manifest flow (org 所有)。`/setup` は無認証だが、期限内 (1 時間) の state があれば上書きせず同じ state を返す。state は org 所有の App への変換に成功したときだけ消費する |
 | `GET /status` | 集計のみ (実行中 run 数・ready/blocked 数・最終 reconcile 時刻・モード・健全性の観測。下の『/status の観測』)。`mode_launch` / `mode_dispatch` が経路ごとのモード (`live` / `dry-run`)。`mode` は両方 `live` のときだけ `live` (片方だけなら `partial`、どちらもなら `dry-run`。`tools/pm/pm_gate.sh` は `mode=live` を『VM の command を止めてよい』と読む)。`?detail=1` は repo の push 権限を持つ GitHub token (Bearer) が必要 |
 
@@ -150,7 +151,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 投稿した `/oc` (launch) に対して、題名が issue 題名と一致する `issue_comment` 由来の run (`in_progress`・`queued`・`pending`・`completed`) が現れたかを DO (`launchObs`) に記録する。
 投稿の応答時刻から 5 分以内に観測できなければ `failed` (着手失敗) とし、`/status.launch_unobserved` に issue 番号を出す。`failed` の issue は**自動では再投稿しない** (`stopped` に `launch-unobserved` として置く)。
 後から同じ題名の run が作成時刻 (投稿の 1 分前以降) で現れたら `observed` に直す。dry-run は投稿しないので記録しない。
-観測の判定は同期が新しいときだけ `failed` にする。観測済み・記録の無い古い launch は従来どおり 3 時間の `recent` 判定を残す (完了済みで報告の無い run を即時に再投稿しないため)。
+観測の判定は同期が新しいときだけ `failed` にする。観測済みの launch は、観測した run の完了時刻 (`launchObs.doneAt`・run の `updatedAt`) から 3 時間を `recent` の基準にする (run が進行中は `started` が先に効く)。完了時刻は観測の tick で記録する (`RunState` は完了 1 時間後に prune されるため)。完了時刻の無い観測済み・記録の無い古い launch は従来どおり投稿から 3 時間の `recent` 判定を残す (完了済みで報告の無い run を即時に再投稿しないため)。
 
 **secrets を出さない**: `/status` は集計だけで、issue のタイトル・本文・コメントは載せない。自由文は `last_error.what` とログの `note` だけ (どちらも `?detail=1` のみ)。
 これらと `console.log` は `src/redact.ts` を通し、PEM・`gh*_` / `github_pat_` の token・JWT・`Bearer …`・`sha256=…` と、実行時に分かっている secret (webhook secret・PEM・STORE_KEY・直近の installation token) を `[redacted]` にする。
@@ -179,6 +180,42 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
 - **限界**: 1 走査は最新 100 件の 1 ページだけを読む。それより古い失敗は読まない (GitHub は配送を約 3 日保持する)。失敗が 1 日に 100 件を超えると取りこぼし得る。
 - **`POST /admin/resync`**: 派生状態 (issue・PR・run・コメント・blocked_by・レビュー) を `fullSync` で作り直す。ページ上限と REST の回数は全体同期と同じ。永続状態 (`launchedAt`・`relaunch`・`planned`・`phase`・`counters`) は同期が触らないので残る。1 時間に 2 回まで (試行は失敗しても数える)、3 回目は 429。tick と同時には走らせない (409)。認証と 404 の扱いは上の表を参照。
 
+## VM の状態の取り込みと書き出し (#2343)
+
+Worker の状態 (Durable Object) に、VM が持っていた `launched`・`relaunch`・`phase`・`pm_art` を移す。どれも GitHub から作り直せない値 (`launched` は 3 時間の重複防止、`phase` は Review-Only の現在値、`pm_art` は 24 時間より前の PM の素材指定)。
+
+- **取り込むファイル**: VM の `tools/pm/` の 3 ファイルと、`issues_state.json` の `pm_art`。
+  - `launched.json` → `launched` (`{"<n>": "<ISO 8601>"}`)
+  - `relaunch.json` → `relaunch` (`{"<n>": {"count": 0〜3, "art": "oc_artifacts: …" または null}}`)
+  - `phase.json` → `phase` (`{"review_only": bool, "open_prs": 整数, "since": "<ISO 8601>"}`)。**VM の `phase.json` は使わない。** 切替 (『切替の記録』) の後は、fresh な tick ごとに `launch()` が DO の `meta/phase` を保存するので、DO の値が live の現在値になる。VM の `phase.json` は切替の時点で凍結されていて、取り込むと live の Review-Only の状態が古い値に戻る (open PR が 10〜80 の間は直前の値を保つ規則のため、ずれが残る)。取り込みの `phase` は `GET /admin/export` の DO の現在値を使う (下の手順)
+  - `issues_state.json` の `pm_art` → `pm_art` (`{"<n>": {"at": "<ISO 8601>", "line": "oc_artifacts: <ALLOW_ARTS の部分集合>" または "oc_artifacts: none"}}`)。`issues_state.json` は `issue_snapshot.py` が書き、`launch_issues.py` が読む
+- **値域** (外れると 400 で何も保存しない。`problems` に理由が返る): issue 番号は 1 以上の数字 (7 桁まで)。時刻はタイムゾーン付きの ISO 8601。`launched` と `pm_art.at` は、取り込み時の現在時刻 + 5 分より後なら 400 (`phase.since` は未来の値も通る)。`count` は 0〜3 の整数。素材行は `oc_artifacts: none` (追加素材なし) か、`src/launch.ts` の `ALLOW_ARTS` の部分集合 (`none` と素材名の混在は 400)。キーは 4 つだけ (未知のキー・欠落は 400)。200 KB を超えると 413。
+- **手順** (`$PM_WORKER_URL` は Worker の URL、`$TOKEN` は repo の push 権限を持つ GitHub token。新しい API token は作らない):
+
+  ```sh
+  curl -fsS -H "authorization: Bearer $TOKEN" "$PM_WORKER_URL/admin/export" > export.json   # DO の現在値 (phase はここから取る)
+  jq -n --slurpfile l launched.json --slurpfile r relaunch.json --slurpfile e export.json --slurpfile s issues_state.json \
+    '{launched: $l[0], relaunch: $r[0], phase: $e[0].phase, pm_art: $s[0].pm_art}' > import.json
+  curl -sS -H "authorization: Bearer $TOKEN" --data-binary @import.json "$PM_WORKER_URL/admin/import"          # 検証のみ (保存しない)
+  curl -sS -H "authorization: Bearer $TOKEN" --data-binary @import.json "$PM_WORKER_URL/admin/import?apply=1"  # 保存
+  curl -sS -H "authorization: Bearer $TOKEN" "$PM_WORKER_URL/admin/export"                                     # 確認 (VM の形式で返る)
+  ```
+
+  検証で 400 が返ったら、`problems` の issue 番号を直してから送り直す (許可外の素材名は VM の `pm_art` に残っていることがある)。
+  送る前に、`relaunch.json` の `art` に `none` と素材名が並ぶ行がないか確かめる。VM の `launch_issues.py` は、既存の行が `none` のとき不足の素材を足すので (`cand = base + extra`)、`oc_artifacts: none fl-win64` の形を書き得る。この形の行が 1 件でもあると、取り込みは全件 400 になる。見つけたら `none` を外して (`oc_artifacts: fl-win64` の形に) 直してから送る。見つける方法: `jq -r 'to_entries[] | select(.value.art != null and (.value.art | contains(" none "))) | "\(.key) \(.value.art)"' relaunch.json`
+- **取り込み前は launch しない**: `?apply=1` の取り込みが一度も成功していない間は、新規・再投入の picks を空にし、`/status` に `launch_blocked: "no-import"` を出す (取り込み時刻は `imported_at`)。再投入の意図 (`oc-pm-intent`) による /oc の投稿も同じく止める (意図は処理済みにせず、取り込み後の tick で投稿する)。VM の状態が無い新規の構成のための安全装置。`IMPORT_REQUIRED=0` で外せる (`wrangler.toml` の `[vars]` に置く。dashboard で入れた値は deploy で消える)。
+- **反映の順序** (依頼者の操作。この変更は `wrangler.toml` を変えていない):
+  1. この変更を反映する (「デプロイ」節の手順 4)。`/admin/import` はこの変更で初めて存在するので、反映の前には取り込めない。
+  2. 反映の直後から、取り込みが済むまで launch は止まる (`/status` の `launch_blocked` が `"no-import"`)。
+  3. 上の手順で取り込む (`?apply=1`)。
+  4. `curl -fsS "$PM_WORKER_URL/status"` の `launch_blocked` が `null`、`imported_at` が時刻になったことを確認する。
+  - 手順 2 の期間は、『切替の記録』の『#2343 は前提から外した』とは異なる (反映の時点で launch が止まる)。どのくらい止めてよいかは依頼者の判断。既定案は、反映の直後に取り込みを行い、止まる期間を取り込みまでの数分にすること (`IMPORT_REQUIRED` は既定の 1 のまま)。
+  - 反映から取り込みまでを止めたくないときは、`wrangler.toml` の `[vars]` に `IMPORT_REQUIRED = "0"` を入れる変更を先に main へ merge してから反映する。取り込んだ後は、その行を外す変更を merge して反映する (残すと、取り込みの確認なしで launch する状態が続く)。
+- **取り込みの扱い**: 同じ issue が既に DO にあるときは、`launched`・`pm_art` は時刻が新しい方、`relaunch` は回数の多い方を残す。VM の凍結値が DO の新しい値を消すことはない (切替の後に DO が launch した issue の時刻は、VM の凍結値より新しい)。`relaunch` は VM だけが持つ履歴で、切替の前の `relaunch.json` (件数は `tools/pm/REPORT.md` §12-6) を Worker に入れる。これが無いと、履歴の無い issue を最大 2 回余分に再投入し得る。`phase` は取り込んだ値 (上の手順では DO の現在値) にする。取り込んだ `launched` が 3 時間以内の issue は `recent` に入り、着手したばかりの issue に二重に着手しない。取り込んだ値は全体同期 (`/admin/resync`) でも消えない。
+- **書き出し**: `GET /admin/export` は VM の形式で返す (`launched`・`relaunch` (issue 番号のキーだけ。`np:<n>` は VM に無いので出さない)・`phase` (一度も保存していなければ null)・`pm_art`)。VM へ戻すときの順序は『切替』の節と `tools/pm/README.md` に従う (両方が live だと二重投稿になる)。
+- **往復の例外**: 書き出した JSON を取り込み直して通るのは、許可内の値だけ。Worker の webhook は PM の `oc_artifacts:` 行を検証せずに保存するので、許可外の素材名の行 (例: `oc_artifacts: fetchsh`) が `pm_art` に入ると、その行の書き出しは取り込み直しで 400 になる。取り込みではその行は消えず、新しい PM 投稿で上書きされるまで残る。`phase` が一度も保存されていないとき (最初の tick の前) は `phase` が null で、取り込み直しは 400 になる。取り込み直しの前に、書き出しの `pm_art` の行と `phase` を確認する。
+- **認証**: `/admin/resync` と同じ。入口 (`index.ts`) と DO (`app.ts`) の両方で確認し、未認証・不明な token・読み取りだけの token・メソッドの違いは 404 で、DO の状態に触れない。
+
 ## 同期の窓と打ち切り
 
 - 全体同期 (6 時間ごと) と reconcile (5 分ごと) は、GitHub の一覧を `per_page=100` のページで読む。`Gh.list` は、上限ページで止めて続きがあるときだけ `truncated=true` を返す
@@ -203,11 +240,11 @@ GitHub の同時実行の上限は契約で変わる (Team 60、終了後 20 な
 
 ```
 cd infra/pm-worker && npm test      # Node >= 22.6 (--experimental-strip-types)。依存パッケージなし。Python 3 が要る (突き合わせ)
-cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン・/oc 投稿の観測 (#2342) のネガコン
+cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン・/oc 投稿の観測 (#2342) のネガコン・VM の状態の取り込み (#2343 test/unit/vm_import.test.ts)
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 
-依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。既定設定の `pnpm install --frozen-lockfile` は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する (理由は『Workers Builds の接続状態と pnpm 経路』の節の release-age の項)。
+依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。既定設定 (`minimumReleaseAge` を変えない) の `pnpm install --frozen-lockfile` が通る版の組を lock に入れてある (理由と版の選び方は『Workers Builds の接続状態と pnpm 経路』の節の release-age の項)。
 
 `npm run build` は bun、デプロイは wrangler を使う。wrangler は `login --device` がある版 (公式 docs の例は 4.119.0 の出力。VM は 4.151.0 で `--device` の存在を `wrangler login --help` で確認済み)。VM では root 不要で `$HOME/.local/bin` に置く
 (`npm install --prefix $HOME/.local/wrangler wrangler@<版>`、bun は npm の `bun` パッケージ)。
@@ -266,6 +303,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 - 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)。`NO_PR_COOLDOWN_H` は 24 から 6 に短縮した (#2650。理由別の再着手の規則 (上の 3.) が入ったため。値は下の表)。`TARGET` は後で『opencode.yaml の全 run の総数の目標』に意味を改め、既定を 58 にした (上の 6。#2458 は置き換え)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
 - 突き合わせ: dry-run の Worker と VM の `launch_issues.py` の差は、open な子を持つ親の除外・`pm-apply` の user 扱い・`oc:no-pr` の cooldown・VM の `relaunch.json` の有無で説明がつく (推定を含む。測定は #2422・#2423 を含む版。内訳と未解決は `tools/pm/REPORT.md` §12)。(この版の時点では `NO_PR_COOLDOWN_H` の既定 3 が `oc:no-pr` の issue を大量に候補へ戻すので 24 にしていた。#2650 で、理由別の規則に合わせて 6 にした。)
 - 初回のデプロイでだけ、保存状態を整える一時ビルド (全体同期の前倒しと、phase を VM の `phase.json` に合わせる) を使った。リポジトリの差分には無い。理由と結果は `tools/pm/REPORT.md` §12-5。
+- 後から入れる取り込み (『VM の状態の取り込みと書き出し』) では、取り込みの `phase` に DO の現在値を使う (VM の `phase.json` は切替の時点で凍結されている)。反映の時点で launch が取り込みまで止まる (同節の『反映の順序』)。
 
 戻し方 (VM の timer は再開しない): `wrangler.toml` の `LIVE_LAUNCH` を `"0"` にして再デプロイ (`npx wrangler deploy`)。dispatch も止めるなら `LIVE_DISPATCH` も `"0"`。`/status` の `mode_launch` / `mode_dispatch` が `dry-run` になる。`STORE_KEY` は変わらない。
 
@@ -390,9 +428,12 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
   - `pnpm-lock.yaml`: `package-lock.json` から `pnpm import` で作った。版は変えていない。`package-lock.json` は置かない。
   - `pnpm-workspace.yaml` の `allowBuilds` (esbuild・workerd): pnpm 12 は既定で依存の build script を止める。無いと `ERR_PNPM_IGNORED_BUILDS` で install が落ちる。新しい依存が install script を持つときは、ここに足す。
   - `infra/pm-worker/package.json` に npm の `packageManager` を書かない。pnpm 12 は npm 指定のプロジェクトで実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。
-- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。ただし既定設定の install は 2026-10-15 05:55Z まで失敗する。下の release-age の項)。
+- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。install が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落ちたら、下の release-age の項)。
 - 2026-10-14 の時点で、Workers Builds の install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。merge 後の Workers Builds の結果は、この README では確認していない。
-- **pnpm 12 の release-age (既定設定では 2026-10-15 05:55Z まで install が失敗する)**: pnpm 12.10.1 は既定で `minimumReleaseAge` = 1440 分 (公開から 24 時間未満の版を拒否する)。`pnpm-lock.yaml` の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` は 2026-10-14 05:43Z〜05:55Z に公開された版なので、既定設定の `pnpm install --frozen-lockfile` は `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。3 件が 24 時間を過ぎる 2026-10-15 05:55Z 以降は既定設定で通る見込み (未確認)。それまでの診断は `--config.minimum-release-age=0` を付けた install で行える (診断用。README の手順にはしない)。`minimumReleaseAgeExclude` での除外や版の変更は入れていない (#2585 の範囲外。PM 判断)。Workers Builds が pnpm 12.10.1 の既定を使うなら、同じ失敗が出る (推定。未確認)。
+- **pnpm 12 の release-age (`minimumReleaseAge` = 1440 分)**: 公開から 24 時間未満の版は既定で install を拒否する。2026-10-14 05:43Z〜05:55Z 公開の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` は、既定設定の `pnpm install --frozen-lockfile` を `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落とした (#2691 で実測)。そこで範囲を `wrangler` `^4.150.0`・`@cloudflare/vitest-plugin` `^1.4.1` に下げ、公開から 24 時間以上たつ版の組 (`wrangler@4.150.0` が依存する `miniflare@5.20261006.2-beta`・`workerd@1.20261006.1`) で lock を作り直した。
+  - 除外しない理由: `minimumReleaseAgeExclude` や `--config.minimum-release-age=0` で通すと、公開直後の版が Workers Builds の token (権限が広い) で入る。このポリシーが防ぐ侵害の入口になるので、ポリシーは変えない。
+  - 版の選び方: `pnpm view <pkg> time --json` で公開時刻を見て、24 時間以上たつ最新版を範囲に書く。lock に古い版が残ると範囲を書き換えても残るので、`pnpm remove <pkg>` の後に `pnpm add -D <pkg>@^<版>` で解決し直す。推移的な依存 (miniflare・workerd) も同じ確認の対象。
+  - Workers Builds の install の結果 (merge 後) は、この README では確認していない (PM が確認する)。
 
 ## 確認できていない点 `[未確認]` のチェックリスト
 
