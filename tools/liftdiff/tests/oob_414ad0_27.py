@@ -22,7 +22,7 @@ for line in open(os.path.join(OUT, 'list.txt')):
         rows.append((va, pat, 'NO_RUN', None))
         continue
     r = json.load(open(path))
-    cs = [c for c in r['cases'] if c['outcome'] == 'wasm_trap']
+    cs = [c for c in r['cases'] if c['outcome'] in ('wasm_trap', 'both_fault')]
     if not cs:
         rows.append((va, pat, 'NO_TRAP:' + ','.join(c['outcome'] for c in r['cases']), None))
         continue

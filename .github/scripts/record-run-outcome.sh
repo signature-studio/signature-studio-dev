@@ -9,8 +9,9 @@
 #   明示的な終了状態                     : oc:stuck / needs-user-input / blocked (ラベル、または依存 issue が open) -> 何もしない (oc:no-pr を外す)
 #   着手済み                            : この issue を指す open PR がある、または run の開始以降に作成・merge された PR がある (ブランチ名 <N>-... か本文の Closes/Refs/Fixes #N。run 中に open→merge まで済んだ PR を含む) -> 何もしない (oc:no-pr を外す)
 #   上のどれでもない (PR も push も無い)   : ラベル oc:no-pr と構造化コメントを残す
-#       <!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> run=<run id> -->
+#       <!-- oc-run-outcome: no-pr reason=<stop|split|blocked|artifact|unknown> [cause=rate_limit] run=<run id> -->
 # PM Worker はコメント本文を解析せず、ラベルとマーカーで判断する。oc:no-pr は次の run が PR を出したときこの script が外す。
+# 率制限 (opencode の error 行の rate_limit_error / HTTP 429) は detect-rate-limit.sh で判定し、annotation を出して cause=rate_limit を入れる (#2344)。
 #
 # reason は agent の最終回答 (opencode の JSONL の最後の text) から決める。語彙は tools/pm/launch_issues.py の stop_re / NEED_RE と同じ:
 #   artifact : 素材不足 (素材名・oc_artifacts の要求)    blocked : 依存 issue・前提 PR 未 merge・ブロック
@@ -45,6 +46,9 @@ case "$N" in '' | *[!0-9]*)
   exit 0
   ;;
 esac
+det="$(bash "$(dirname "$0")/detect-rate-limit.sh")"
+[ -n "$det" ] && printf '%s\n' "$det"
+cause="$(sed -n 's/^cause=//p' <<< "$det")"
 if [ -z "${GH_TOKEN:-}" ]; then
   echo "::warning::no token: the run outcome is not recorded"
   exit 0
@@ -145,8 +149,12 @@ reason="$(classify "$text")"
 status="${OC_JOB_STATUS:-unknown}"
 run="${GITHUB_RUN_ID:-0}"
 url="${GITHUB_SERVER_URL:-https://github.com}/$R/actions/runs/$run"
-marker="<!-- oc-run-outcome: no-pr reason=$reason run=$run -->"
-body="[run-outcome] この run ($url, job status: $status) は PR も push も出さずに終了しました。理由の分類: $reason (stop=判断待ち・停止, split=1 run に収まらない, blocked=依存, artifact=素材不足, unknown=不明)。この issue は blocked でも着手済みでもないため、ラベル \`$NOPR_LABEL\` を付けました。PM はコメント本文でなく、ラベルとこのマーカーで扱ってください (次の run が PR を出すとラベルは自動で外れます)。
+cause_field=""
+[ -n "$cause" ] && cause_field="cause=$cause "
+marker="<!-- oc-run-outcome: no-pr reason=$reason ${cause_field}run=$run -->"
+rl_note=""
+[ -n "$cause" ] && rl_note=" opencode の error 行に率制限 (rate_limit_error / HTTP 429) があり、cause=rate_limit を付けました。"
+body="[run-outcome] この run ($url, job status: $status) は PR も push も出さずに終了しました。理由の分類: $reason (stop=判断待ち・停止, split=1 run に収まらない, blocked=依存, artifact=素材不足, unknown=不明)。$rl_note この issue は blocked でも着手済みでもないため、ラベル \`$NOPR_LABEL\` を付けました。PM はコメント本文でなく、ラベルとこのマーカーで扱ってください (次の run が PR を出すとラベルは自動で外れます)。
 $marker"
 
 echo "issue #$N ended without a PR: reason=$reason status=$status run=$run"

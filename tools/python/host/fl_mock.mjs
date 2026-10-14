@@ -91,6 +91,8 @@ export function createMockEngine() {
       if (!sel.length) return none ? -1 : 0;
       return sel[Math.min(off, sel.length - 1)];
     },
+    // PY-41 (#1514): stub midi.CT_Sampler = 0 / CT_GenPlug = 2 を plugin 名で決める (C と同一・Hybrid 等は未モデル)
+    "channels.getChannelType": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).plugin === "Sampler" ? 0 : 2; },
     "channels.selectChannel": (i, v) => { ch(i).sel = tog(ch(i).sel, v); },
     "channels.deselectAll": () => { st.channels.forEach((c) => (c.sel = false)); },
     // PE 0xd5afc0 → 0x11e84a0: 対象だけ選択し他は解除 (useGlobalIndex は未モデル・C と同じ)
