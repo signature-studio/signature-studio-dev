@@ -152,7 +152,7 @@ FL_WIN64_DIR=<fl-win64 展開先> bash tools/shared/lift/rex/lift_x64c.sh all   
   (1) `lea reg,[rip+d]` が REX 名の文字列 VA を指す → (2) 直後 12 命令以内の GetProcAddress 呼出 (`call`/`jmp [rip+IAT]`)。直接 call 先 (ヘルパ) は 2 段まで辿る → (3) 直後 4 命令以内 (rax を上書きする call/jmp/ret・rax への書込みの手前まで) の `mov [rip+S],rax` で slot S に束縛 → (4) `call [rip+S]` (または `mov reg,[rip+S]` の後 6 命令以内の `call reg`) を呼出とみなす。
   - 文字列の存在だけでは判定しない。IAT・遅延 import に REX 名は 0 件 (33 件すべて)。
 
-### 8.3 実測 (測定 commit `fa18c860`・`lift_core.sh` と `importers.py` を HEAD 上で実行して同値)
+### 8.3 実測 (測定 commit `5fe86502`・HEAD 上で実行。`lift_core.sh` は emcc 込みで 4 回、`importers.py` は 2 回)
 | 項目 | 値 |
 |---|---|
 | 閉包 (3 root 同時) | 関数 519・命令 22,987・unlifted callee 0・import 34 (IAT 78 のうち使用 34) |
@@ -207,4 +207,4 @@ python3 tools/shared/lift/rex/importers.py <fl-win64 展開先> --json OUT.json 
 `<fl-win64 展開先>` は `extracted/` を含むディレクトリ (`tar --zstd -xf fl-win64.tar.zst -C <dir>`)。生成物は `tools/shared/work/lift/rex-core/` (gitignore)。
 
 ### 8.8 測定後のコード差分 (差分 0 の証跡)
-`git diff fa18c860 HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし)。HEAD は本 REPORT を含む commit。
+`git diff 5fe86502 HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力: 行数 0 (0 = コード差分なし)。HEAD は本 REPORT を含む commit。
