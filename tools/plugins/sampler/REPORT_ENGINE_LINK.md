@@ -155,7 +155,9 @@
 
 - 測定 commit: **`5880a9f6`** (下表の実測はこの commit のコードで行った。 `6769c2c7` の時点で記録された系列)。
 - 解析 HEAD (§9 の逆アセンブル・参照走査): `ba4babca`。 `git diff --stat ba4babca HEAD -- tools/plugins/sampler ':!*.md'` は空 (0 行)。
-- 測定 commit から現 head `8ea7a78b` までの sampler コード差分 (`git diff --stat 5880a9f6 8ea7a78b -- tools/plugins/sampler ':!*.md'`):
+- 測定 commit から現 head `8a7f32ba` までの測定経路の差分 (`git diff --stat 5880a9f6 8a7f32ba -- tools/plugins/lift tools/plugins/sampler ':!*.md'` の要点):
+  - `tools/plugins/lift/lift_ranges.sh` (31 行追加・2 行削除) は測定経路に入る (上の訂正参照)。 RetDec 呼出の既定が変わるため、表は HEAD の既定では未測定。
+  - `tools/plugins/sampler/` の 6 ファイルは別経路 (下の訂正参照)。 sampler 側の stat:
 
 ```
  closure_unreached.py | 65 +++++++++++++++++----
@@ -169,8 +171,12 @@
 
   全文の patch は 250 行上限 (`docs/DOC_MAP.md` §1) を超えるため載せない。 上の stat と同じ範囲で `git diff 5880a9f6 HEAD -- tools/plugins/sampler ':!*.md'` を実行すれば再現できる。
 
-- **差分は測定した経路に入らない**: 測定対象の `sampler_engines.sh` (受入条件 1) と `sampler_e2e.sh` (受入条件 2) の経路は、`engine_lift.sh`・`lift_from_ll.sh`・`lift/batch_lift.sh`・`judge.py`・`closure_facts.py`・`matrix_check.py`・`ids_crosscheck.py`・`unreached_unique.py`・`targets.py`・`env.sh`。 このうち `sampler_engines.sh`・`sampler_e2e.sh`・`engine_lift.sh`・`lift_from_ll.sh`・`judge.py`・`lift/batch_lift.sh`・`closure_facts.py`・`env.sh`・`targets.py` は `git diff --stat 5880a9f6 8ea7a78b -- <それぞれ>` が空 (0 行)。 上の 6 ファイルを呼ぶのは `lea_e2e.sh` / `unr_e2e.sh` / `unr_nega.sh` / `unr_lift.sh` (別経路の e2e) だけで、`git grep` で確認した。
-- したがって表の測定結果は現 head の測定経路にも当てはまる。 再測定は行わない。 6 ファイルの変更 (f80 計数・U6・NC2a/b) は lea・unreached 系の検証の範囲で、本 REPORT の測定対象外。
+- **訂正 (測定経路に `lift/lift_ranges.sh` の差分が入る)**: `sampler_engines.sh` (受入条件 1) は `engine_lift.sh` → `lift_from_ll.sh` (`lift_ranges.sh` の RetDec 行を切り出して実行) 経由、`sampler_e2e.sh` (受入条件 2) は `lift/batch_lift.sh` → `lift_ranges.sh` 経由で RetDec を呼ぶ。 この `lift_ranges.sh` は `5880a9f6`..HEAD で変わっている (`git diff 5880a9f6 HEAD -- tools/plugins/lift/lift_ranges.sh`: 31 行追加・2 行削除)。
+- 変更の要点: RetDec 呼出 `--select-decode-only` の後ろが `${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection}` (5880a9f6、env 未設定なら付かない) から、既定 1 で付く形 (HEAD、`PLUG_NO_STATIC_DETECT=0` で付かない) に変わった。 env を立てない測定経路 (`sampler_engines.sh`・`sampler_e2e.sh`) は HEAD の既定で RetDec の argv が変わる。
+- 表の実測 (上の行) は `5880a9f6` の RetDec argv (静的検出あり) に対応する。 HEAD の既定 (静的検出なし) での `sampler_engines.sh` / `sampler_e2e.sh` の結果は未測定。 HEAD で `PLUG_NO_STATIC_DETECT=0` を立てると RetDec の argv は 5880a9f6 と同じになる (`NOSD_ARGS` が空になるコード読解。実測は未実施)。
+- 上の 6 ファイル (`closure_unreached.py`・`f80_split.py`・`lea_lift.sh`・`nc2_imm_synth.py`・`unr_nega.sh`・`x87_check.py`) を呼ぶのは `lea_e2e.sh` / `unr_e2e.sh` / `unr_nega.sh` / `unr_lift.sh` (別経路) だけ。 この点はレビュー側の `git grep` 確認と一致する。
+- **再測定は未実施・未解決**: RetDec v5.0 (`toolchain-retdec`) と emsdk (`toolchain-emsdk`) がこの run に無い (`$ARTIFACTS_DIR` は `fl-win64` のみ)。 次の run で `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` を指定し、HEAD で `sampler_engines.sh` と `sampler_e2e.sh` を env 未設定 (既定) で流して表を更新する。 起票先: #540 (本 PR の親 issue)。 それまで §7 の表は「5880a9f6 の実測」として読むこと。
+- 上の 6 ファイルの変更 (f80 計数・U6・NC2a/b) は別経路の検証の範囲で、本 REPORT の測定対象外。
 
 | 項目 | 結果 (実測) |
 |---|---|
