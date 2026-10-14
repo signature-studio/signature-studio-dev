@@ -140,7 +140,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 ## 6. 本 runner の実測 (#2779・LB=0 / 0x10000 の後段)
 
 測定日 2026-10-14。素材 fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (#516 以前の snapshot)。toolchain は runner 同梱の [EMSDK]・[RETDEC] (`docs/REFERENCES.md`)。
-測定 commit: LB=0 は `94dea77f` (測定時のコード)、LB=0x10000 は `51b20449` (fix。測定時の作業ツリーと同一)。
+測定 commit: LB=0 は `6566443d` (HEAD。修正前の `94dea77f` でも測定済み)、LB=0x10000 は `51b20449` (fix。測定時の作業ツリーと同一。以降はコード差分 0)。
 製品 KPI (`tools/flelift/boot/REPORT.md`) は本節で測っていない。
 
 ### 6.1 `m11_e2e.sh` 1 コマンドは通らない (受入 1 未達)
@@ -150,7 +150,8 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 
 | 条件 | 結果 | rc | wall |
 |---|---|---|---|
-| LB=0 (`94dea77f`) | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・tolerant gate と negctl は OK | 0 | 1 m 58 s |
+| LB=0 (`94dea77f`・修正前) | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・tolerant gate と negctl は OK | 0 | 1 m 58 s |
+| LB=0 (`6566443d`・HEAD で再測定) | 上と同一 (ir_sha256 `39e97946…` は修正前と同じ)。gen_ir2 から build まで全再構築 | 0 | 1 m 21 s |
 | LB=0x10000 (`94dea77f`) | gen_ir2 が `fix_ld108` の assert で停止 (即値不一致) | 1 | 0 m 31 s |
 | LB=0x10000 (ld108 のみ修正) | build が `fix912` で停止 (`対象行が無い`) | 1 | 0 m 52 s |
 | LB=0x10000 (`51b20449`) | gen_ir2・build OK (build は obj 全再構築で 9 分)。units_run 37 (Halt0 早期終了)・survey ok 869 / noproc 1 / miss 46 / trap 26。寛容起動は 600 s の `timeout` で打ち切られ出力空 → tolerant gate FAIL | 1 | 11 m 10 s |
@@ -224,7 +225,7 @@ index 238016e9..4d099709 100755
  
 ```
 
-LB=0 は HEAD で再 build していない (LB=0x10000 の build が obj を消すため、再 build は約 9 分)。差分は LB=0 で文字列が変わらないことの確認だけなので、LB=0 の数値は `94dea77f` の測定を採る。
+LB=0 は HEAD (`6566443d`) で再測定した (上の表の 2 行目)。`51b20449` 以降のコード差分は無く (`git diff 51b20449 HEAD -- tools/m11 ':!tools/m11/REPORT_N403.md'` は 0 バイト)、IR の `ir_sha256` は修正前と同じ `39e97946…`。
 
 ### 6.5 未解決 (起票先)
 
