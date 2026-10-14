@@ -13,6 +13,7 @@ CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
 # boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt; #132 unit #23)
 [ -f work/boot5.lift.ll ] && CH="$CH work/boot5.lift.ll"
 [ -f work/boot6.lift.ll ] && CH="$CH work/boot6.lift.ll"   # boot6 = WNDCLASS 静的実体の WNDPROC 閉包 (m11_wndclass_scan.py, #565)
+[ -f work/boot7.lift.ll ] && CH="$CH work/boot7.lift.ll"   # boot7 = CreateFruityInstance (0x1375990) の閉包のうち現 closure に無い分 (gf_seed_closure.py, #2715)
 python3 m11_merge.py $CH -o work/boot_all.ll
 python3 - <<'PYnum'
 import re

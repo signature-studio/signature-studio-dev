@@ -63,6 +63,7 @@ echo "[gf] strong 重複定義シンボル: $(grep -c . "$W/gen/dups.txt" || tru
 # 5. リンク
 EXPORTS=$(sed -n 's/^EXPORTS=//p' "$M/m11_build.sh" | head -1),_malloc,_free
 if [ $BASE = 0 ]; then EXPORTS="$EXPORTS,_gui_shared_ptr,_gui_shared_size,_gui_reach_dump,_gui_reach_json,_gui_reach_distinct,_gui_reach_calls,_gf_icall_count,_gf_thunk_count,_gf_ring_discarded,_gf_failfast_count,_gf_soft_stub_count"; fi
+if grep -q '^define [^@]*@CreateFruityInstance(' "$MW/boot_final.ll"; then EXPORTS="$EXPORTS,_CreateFruityInstance"; fi   # boot7 取込済み (#2715) の IR のみ
 GUI_OBJS=$(ls "$W"/gui/*.o 2>/dev/null || true)
 if [ $BASE = 1 ]; then rm -f "$W/obj/glue.o" "$W/obj/gf_thunks.o"; fi   # 前回の GUI 結合 build の残骸を比較元に混ぜない
 emcc "$W"/obj/*.o $GUI_OBJS -o "$W/$OUT.cjs.tmp" \
