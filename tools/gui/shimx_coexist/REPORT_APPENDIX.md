@@ -108,7 +108,7 @@
 | データだけ追加 (52 B の文字列配列) | 基点と一致 |
 | **短いメッセージ `SHBrowseForFolder`** (採用) | 基点と一致 (ok 789・api 69・abort 0) |
 
-- unit 102 の別実行 (前 unit を走らせた後に unit 102 だけ呼ぶ probe) でも、新版は VirtualAlloc 125 MB を繰り返した後に `function_535c2e` で abort する。`SHBrowseForFolder` の fail-fast は呼ばれていない。
+- unit 102 の別実行 (前 unit を走らせた後に unit 102 だけ呼ぶ probe。noinline 版で実施) でも、変更版は VirtualAlloc 125 MB を繰り返した後に `function_535c2e` で abort する。`SHBrowseForFolder` の fail-fast は呼ばれていない。
 - 推定 (未検証): メッセージの長さやコードの配置で、m11 の lift 済みコードが参照する未初期化の領域やアドレスが変わる。この測定では原因を特定していない。以後、shimx の変更のたびに survey を取り直すこと。
 
 ### 7-3. 未実施
