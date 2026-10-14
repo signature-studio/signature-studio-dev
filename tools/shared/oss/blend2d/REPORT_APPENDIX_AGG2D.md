@@ -159,3 +159,17 @@ funcs・insns・unlifted は変更前後で同一 (受入条件 (1) 達成)。pr
 **C 出力の差分** (閉包 50 の `fle_lifted.c`): 変更前 58,903 行 → 変更後 58,914 行。`diff` の変更は **13 行 (`ott_unsup` の 13 site) を 24 行 (新 handler) に置換する hunk のみ**で、他の行は変化しない。内訳: vsubsd 5 site × 2 行、vdivsd 2 × 2、vxorps 2 × 2、vpsrldq 1 × 2、vcvttpd2dq 1 × 2、cmpneqpd 2 × 1 (計 24 行)。閉包 0・1・3 の C 出力の diff は取っていない (unsup 表は上の通り)。
 
 **FLEngine の lift 出力** (受入条件 (3)): `block00031_PE.bin` を `--closure 0`、entries は `tools/flelift/fle_entries.json`、引数は `fle_lift.sh` と同じ (emcc は省略)。変更前は `origin/main` の `x64c.py` を一時ディレクトリに置いて実行。両方 **7,018 関数 / 340,761 命令 / unsup {} / unlifted 0 / import 354**。`fle_lifted.c` と `lift_meta.json` は `cmp` で**バイト一致** (差分 0)。FLEngine の lift には今回の変更が効く unsup 箇所が無く、出力は変わらない。lift 所要は各 19 秒。
+
+**統合後の再測定** (測定 commit `5fc307db` = `origin/main` `6cfa2e8a` を取り込んだ merge commit)。取り込みで `fe2dc9ed` からの x64c.py・blend2d 側のコード差分が入ったため (`--cfg-rax` 既定 OFF、rcr の docstring)、上の表は取り込み前の値として残し、以下で測り直した。`git diff 5fc307db HEAD -- tools/flelift tools/shared/oss/blend2d ':(exclude)*.md'` = 0 行。
+
+| 閉包 | funcs / insns (両側同一) | unsup_sites origin/main → 5fc307db | unsup_mnemonics | unlifted_callees |
+|---|---|---|---|---|
+| 0 | 79 / 4,265 | 0 → 0 | 0 → 0 | 107 → 107 |
+| 1 | 110 / 9,007 | 4 → 0 | 2 → 0 | 36 → 36 |
+| 3 | 168 / 22,681 | 13 → 0 | 6 → 0 | 26 → 26 |
+| 50 | 221 / 27,684 | 13 → 0 | 6 → 0 | 0 → 0 |
+
+- 閉包プローブ (`agg2d_lift_probe.py`、`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`) は 5fc307db で exit 0。CFG のネガティブコントロール (`control`: 既知 slot 値 True・未知値 False) は両側で同じ。`--cfg-rax` の閉包 50 は rax_in_dispatch_sites=6 で両側同一。
+- 閉包 50 の `fle_lifted.c`: origin/main 58,903 行 → 5fc307db 58,914 行。`diff` は 13 行の削除と 24 行の追加 (上の本文と同じ)。
+- FLEngine (`block00031_PE.bin`、`--closure 0 --img 0x400000 --shift 0 --img-size 0x18c0000 --impbase 0x1D80000`、entries は `tools/flelift/fle_entries.json`): 両側とも **7,018 関数 / 340,761 命令 / unsup {} / unlifted 0 / import 354**、lift 所要 18 秒 (両側 `SECONDS`)。`fle_lifted.c` (745,214 行) と `lift_meta.json` は `cmp` で**バイト一致**。
+- 差分試験 `tools/flelift/tests/x64c_vex_diff.py`: 5fc307db で **44 PASS / 0 FAIL**。`tools/flelift/tests/rcr_native_check.py` (取り込みで入った側の試験): 4004 / 4004 pass。
