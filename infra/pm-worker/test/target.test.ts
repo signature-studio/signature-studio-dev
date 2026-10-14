@@ -67,7 +67,7 @@ test("nextCap / capValue: 24 時間たつと推定は消える。上限を下げ
 
 // ---------------------------------------------------------------------------------------------------------------- 受入 6
 test("(正例) running=60・queued=20 が 30 分続く → target_eff=70 (29 分では変えない)。dry-run なので POST は 0 回", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   await shape(ctx, 60, 20);
   ctx.app.engine.observe(ctx.clock.t);
   minutes(ctx, 29);
@@ -85,7 +85,7 @@ test("(正例) running=60・queued=20 が 30 分続く → target_eff=70 (29 分
 });
 
 test("(正例) running=20・queued=15 が 30 分続く → target_eff=30 (下限 TARGET_MIN)", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   await shape(ctx, 20, 15);
   ctx.app.engine.observe(ctx.clock.t);
   minutes(ctx, 30);
@@ -94,7 +94,7 @@ test("(正例) running=20・queued=15 が 30 分続く → target_eff=30 (下限
 });
 
 test("(a) running=40・queued=0 (未飽和) → target_eff=TARGET。(d) 上限を超えない (cap 100 でも 80)", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   await shape(ctx, 40, 0);
   minutes(ctx, 40);
   assert.equal(st(ctx).target_eff, 80);
@@ -106,7 +106,7 @@ test("(a) running=40・queued=0 (未飽和) → target_eff=TARGET。(d) 上限�
 });
 
 test("(c) cap_est=5 の異常値でも target_eff>=30", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   await shape(ctx, 5, 3);
   minutes(ctx, 31);
   assert.equal(st(ctx).cap_est, 5);
@@ -122,7 +122,7 @@ test("(g) TARGET を env で 40 に下げると target_eff<=40 (running=60・que
 });
 
 test("(e) 24 時間の窓を過ぎ、飽和の観測が無ければ target_eff は TARGET に戻る", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   await shape(ctx, 60, 20);
   minutes(ctx, 31);
   assert.equal(st(ctx).target_eff, 70);
@@ -136,7 +136,7 @@ test("(e) 24 時間の窓を過ぎ、飽和の観測が無ければ target_eff �
 });
 
 test("上限が上がったら (peak が推定を超えたら) 引き上げる。上限が下がったら飽和で下げる", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   await shape(ctx, 20, 15);
   minutes(ctx, 31);
   assert.equal(st(ctx).cap_est, 20);
@@ -148,7 +148,7 @@ test("上限が上がったら (peak が推定を超えたら) 引き上げる�
 });
 
 test("上限を 60 → 20 に下げても、24 時間の窓の 60 の peak で 20 を押し上げ直さない (target_eff=30 のまま)", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   await shape(ctx, 60, 20);
   minutes(ctx, 31);
   assert.equal(st(ctx).cap_est, 60);
@@ -163,7 +163,7 @@ test("上限を 60 → 20 に下げても、24 時間の窓の 60 の peak で 2
 });
 
 test("room は target_eff で決まる: 上限 20 で 35 件 (running 20 + queued 15) がある間は新規 0 件", async () => {
-  const ctx = await configuredApp();
+  const ctx = await configuredApp({ env: { TARGET: "80" } });
   for (const n of [31, 32]) assert.equal((await send(ctx.app, "issues", issuePayload(n))).status, 202);
   await shape(ctx, 20, 15);
   minutes(ctx, 31);
