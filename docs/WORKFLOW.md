@@ -303,7 +303,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     close -> reopen は `reopen-pr.sh` が行い、reopen が 3 回失敗したら PR に `oc:stuck` を付けて失敗する (closed のまま放置しない)。
     reviewer の step に 50 分の上限 (`timeout-minutes: 50`) を置くと、verify を job の 60 分と App token の 1 時間寿命の内側で
     必ず走らせられる。この変更は App に `workflows` 権限が無く
-    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した。
+    agent は push できないため、PM が `.github/workflows/` を直接 push して適用した (現行の運用は下の「workflow 変更の運用」)。
     COMMENT だけの review は verdict と認めない。**Copilot の review を待って verdict を保留することはしない**
     (Copilot の review は来ないことがあり、保留した PR は誰にも動かされず止まるため)。Copilot の review が
     approve 前に既にあれば読んで判断する。run の途中で head が進んだ場合は、その push の synchronize が起動する
@@ -380,6 +380,25 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   PM の運用スクリプト (`pr_gaps.py` で IDLE を計測、`sweep_prs.sh` で復旧) は **バックストップ**であり、
   IDLE が 1 件でも出たらそれ自体を workflow の不具合として扱う (所在は `docs/REFERENCES.md` `[PM-SCRIPTS]`)。
   着手報告だけで終わった実装 run は `find_silent_runs.sh` で検出する。
+
+### workflow 変更の運用 (VM 退役後の凍結・`pm-apply`)
+
+実装 App には `workflows` 権限が無く、agent は `.github/workflows/` を push できない。これまでは PM の PAT で
+PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次の運用に置き換える (判断: 2026-10-14、#2319。運用の正本はこの節)。
+
+- **(a) 凍結**: VM 退役後は `.github/workflows/` の変更を凍結する。ロジックは `.github/scripts/`・`.github/prompts/` に寄せ、workflow は薄い配線に保つ。
+- **(b) 依頼**: 変更が必要になったら、issue に `pm-apply` と `needs-user-input` を付け、`git apply` できる unified diff をコメントに書いて止まる。diff は `.github/workflows/` の変更だけにする。PM agent は `pm-apply` を付けられない (許可ラベル外。`.github/prompts/pm.md`)。その場合は `needs-user-input` だけを付けて依頼者へ渡し、依頼者が `pm-apply` を付ける。
+- **(c) 適用 (依頼者が手元で行う)**: 依頼者は diff の内容 (特に `permissions:` と `secrets.*` の参照) を確かめてから、コメントの diff を `diff.patch` に保存し、次を実行する。merge は reviewer App が行うため、PAT は要らない。
+
+  ```sh
+  git fetch origin main && git switch -c <N>-workflow origin/main && git apply diff.patch
+  git add .github/workflows && git commit -m "ci: <要旨>" -- .github/workflows
+  git push -u origin HEAD
+  gh pr create --base main --title "ci: <要旨>" --body "Closes #<N>"
+  ```
+
+- **(d) App に `workflows` 権限を足さない理由**: 足すと、検査 (review) を通らない workflow 変更を agent が作れ、`OC_APP_PRIVATE_KEY`・`OC_REVIEW_APP_PRIVATE_KEY`・`OC_AUTH_EXPORT`・`CF_R2_*` などの secrets を読む workflow を書けてしまう。検査を迂回する経路が 1 つでもあれば、secrets の持ち出しに直結する。足す場合の条件は、org owner の承認と、workflow 変更を機械的に検査してから適用する設計の両方が揃うこと。経緯は #2352 (staged-apply、不採用)。
+- **退役の条件**: VM の timer・PAT・keyring を止める前に、open の `pm-apply` の issue が 0 件であること (確認: `gh api "repos/<R>/issues?labels=pm-apply&state=open" --jq length`)。
 
 
 ## 12. 依頼者不在時の運用 (needs-user-input・assume-and-proceed)
