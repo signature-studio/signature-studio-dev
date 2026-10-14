@@ -11,7 +11,7 @@
 
 ## 2. 測定条件
 
-- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (= `$HOME/artifacts/fl-win64.tar.zst`・2.3 GB) から `block00031_PE.bin` (22,227,016 B) を展開。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py163 --wildcards '*block00031_PE.bin'` (2.9 秒)。`work/` は gitignore。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2.3 GB・素材の置き場は実行環境の `ARTIFACTS_DIR`) から `block00031_PE.bin` (22,227,016 B) を展開。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py163 --wildcards '*block00031_PE.bin'` (2.9 秒)。`work/` は gitignore。
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py163/extracted/block00031_PE.bin work/py163/py53` → `fn=4664 dispatch=13 r8d_tests=174` (0.10 秒)。入力は `work/py163/py53/fn.txt`。
 - 測定: `python3 analysis/py163_vcall.py work/py163/py53/fn.txt --check` → `# bfs-check n=12 mismatch=0`・`# n=12 mismatch=0`・exit 0。実時間 0.37 秒 (user 0.37 秒)・load average 0.28 (run 中の `uptime`)。
 - 測定 commit: `aa61c729` (`analysis/py163_vcall.py` の最後のコード commit)。`git diff aa61c729 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT・DOC_MAP・付録のみ)。
