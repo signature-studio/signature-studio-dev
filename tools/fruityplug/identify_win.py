@@ -3,7 +3,7 @@
 
 入力: FL_WIN64_DIR/extracted/block*_PE.bin (fl-win64 素材)。
 出力: work/identify.tsv (gitignore 対象) と標準出力の集計。判定 (gate) は行わない。
-tools/shared/scripts/classify.py の SGv2 ↔ block24353 推定の検証に使う。 結果と解釈は REPORT.md。
+tools/shared/scripts/classify.py の SGv2 ↔ block24353 推定の検証に使う。結果と解釈は REPORT.md。
 """
 import collections
 import glob
@@ -71,7 +71,7 @@ tgt = [r for r in rows if r['block'] == TARGET]
 print('target %s: %s' % (TARGET, tgt[0] if tgt else 'not found'))
 same_size = [r['block'] for r in rows if tgt and r['size'] == tgt[0]['size']]
 print('同サイズ (%d B) の FruityPlug 名 PE: %s' % (tgt[0]['size'] if tgt else 0, same_size))
-pc = collections.Counter(r['ProductName'] or '(none)' for r in rows)
-print('ProductName 種類: %d / VERSIONINFO なし: %d' % (
+pc = collections.Counter(r['ProductName'] for r in rows if r['ProductName'])
+print('ProductName 種類 (空を除く): %d / VERSIONINFO なし: %d' % (
     len(pc), sum(1 for r in rows if not r['ProductName'] and not r['InternalName'])))
 print('ProductName 上位: %s' % pc.most_common(40))
