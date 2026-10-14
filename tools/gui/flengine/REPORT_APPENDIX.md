@@ -199,3 +199,87 @@ CreateFileW の 1 呼出し = printErr の 1 行 `SHIMOPEN {json}`。json は `o
 | `bash tools/shim/test.sh` | exit 0 (18 s)・shim 53 API × MT/ST・全 PASS |
 | `gcc -Wall -c tools/shim/src/file.c` (native) | 警告 0 |
 | 再現 | `bash tools/gui/flengine/e2e.sh` / `node tools/gui/flengine/cfi_probe.mjs --out <json> --trace-out <jsonl>` / `node tools/gui/flengine/open_trace_posctl.mjs` |
+
+## 9. WIN-11 (#2880): EnterCriticalSection の失敗 CS と初期化経路 (部分達成)
+
+既知類型との関係: 該当 DEFECTS 行なし。原因は未確定 (lift 欠陥か init 列の扱いか) のため、類型は追加しない。
+測定 commit: `ae963e28` (コードを変えた最後の commit。shim の診断 1 行のみ)。後続の commit は本節と REPORT.md の 1 行だけ。
+差分の証跡 (WORKFLOW §6): `git diff ae963e28 HEAD -- tools/shim tools/gui/flengine/cfi_probe.mjs` の出力は 0 行。
+
+### 9-1. 受入条件の状態 (#2880 の 3 項目)
+
+| 受入 | 状態 | 根拠 |
+|---|---|---|
+| 1 呼出元 VA と CS の登録経路を実測で特定 | 部分達成 | CS = `0x12bd390` (実測)。呼出元 VA は未特定。boot 中に `0x12bd390` の登録は無い (§9-4・§9-5) |
+| 2 類型照合・shim の修復 | 未達 | 原因未確定。shim 側の欠陥は見つからず。shim の変更は失敗時の CS キー表示 1 行 |
+| 3 `cfi_probe.mjs` が EnterCriticalSection を越える | 未達 | 同じ地点で fail-fast (§9-3) |
+
+### 9-2. 素材と再現 (boot7 の取込)
+
+今回の素材: `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`。work-m11 は boot7 を含まないため、WIN-4 の手順で boot7 を作り直した。
+
+| 手順 | 結果 (実測) |
+|---|---|
+| `gf_seed_closure.py --ir tools/m11/work/boot_final3.ll` | closure 6,591 関数 / 1,965,676 B・既存 4,520・新規 2,071 / 761,038 B (§7-2 と一致) |
+| `m11_lift.sh <絶対パスの ranges> boot7 780` | rc 0・2 分 45 秒・`boot7.lift.ll` 222,014 行 (§7-3 と一致) |
+| `m11_gen_ir2.sh` | rc 0・1 分 06 秒・`boot_final.ll` 707,524 行・ldfix / ld108 applied |
+| `m11_build.sh` | rc 0・34.1 秒・signature mismatch 0 / undefined 0 |
+| `gui/flengine/build.sh` | rc 0・22.8 秒・`m11_gui.cjs` (signature 0 / undefined 0 / duplicate 0) |
+
+再現の注意: (1) `m11_lift.sh` は ranges を相対パスで渡すと `cd` 後に解決できず、文字列として扱われる。絶対パスで渡す。(2) flengine の build は `x86_64-w64-mingw32-gcc` を要する (`gen_api.py` の arity 表)。今回の oc_artifacts に `apt-mingw` が無かったため、`sudo apt-get install gcc-mingw-w64-x86-64` を手で入れた (agent-setup の apt-mingw と同じパッケージ)。(3) `EMSDK_ENV=/opt/emsdk/emsdk_env.sh` と `RETDEC=/opt/retdec/bin/retdec-decompiler` を環境に入れる。
+
+### 9-3. 実測: CreateFruityInstance の呼出し (`cfi_probe.mjs`・commit `ae963e28`)
+
+| 項目 | 結果 |
+|---|---|
+| `boot_enter` | `unreachable` (§7-4 と同じ) |
+| `CreateFruityInstance(0xC0, 0xEDE95A, host, &iface)` | `Aborted`・1 ms・`iface` = 0x0 |
+| 最後の shim 行 | `[shim] CS-MISS key=0x12bd390` → `FAIL-FAST: unimplemented Win32 API: EnterCriticalSection (未初期化/未登録)` |
+| GUI-REACH / icall_miss | `LoadStringW` ×3 のみ / 5 (§7-4 と同じ) |
+
+`CS-MISS` の行は本 commit で追加した (失敗時の 1 行のみ。挙動は変えない)。§7-4 の記録は CS のアドレスを出さないため、キーは今回初めて得た。
+
+### 9-4. boot 側の測定 (同じ build・一時診断)
+
+一時診断 (`InitializeCriticalSection` の登録ログ。コミットしない) と、boot 直後のメモリ読取の結果:
+
+| 項目 | 結果 |
+|---|---|
+| boot の停止 | `unreachable`・`init_count` 54・`boot_stage` 1 (`entry_point` は戻らない) |
+| boot 中に登録された CS | `0x11eaf00`・`0x11f0800`・`0x10c63a50` (いずれも `ok=1`)。`0x12bd390` は登録されない |
+| boot 中に出た stub | `GetLocaleInfoW`・`EnumCalendarInfoW` (`stub-notimpl`)。その後に trap |
+| 後始末フラグ `0x11e6a38` (boot 後) | -1 |
+| `G = 0x15e1db8` (boot 後) | 0 (`P = *G` = 0) |
+
+### 9-5. IR の読取 (boot7 込み・`boot_final3.ll`)
+
+- `EnterCriticalSection` の呼出し: 定数 CS は `function_419560` の `0x11EAF00` のみ。残りは引数が動的な呼出し (`function_4232e0`、ラッパ `function_406f50` 経由)。失敗した `0x12bd390` は動的な引数なので、呼出元はこの候補のどれか。**呼出元 VA は未特定** (wasm に name section が無く、JS の stack は wasm 関数 index しか出ない)。
+- 初期化と解放の対: `function_41ce10` は init 列の 3 番目 (`inits_text.txt`)。フラグ `0x11e6a38` を `dec` し、結果が 0 のときに初期化本体に入る。本体は `function_418e10` (= `InitializeCriticalSection(0x11EAF00)`) を呼ぶ。`function_41cd70` は init 列の 4 番目で、`add 1` の結果が 0 のとき `function_418f20` → `DeleteCriticalSection(0x11EAF00)` を呼ぶ。解放側が init 列に入る理由は未確認 (`m11_bounds.py` の抽出規則)。
+- trap の候補: `unreachable` を持つのは `function_447860` のみ。`G` → `P` → `*P` が 0 のとき `function_409730` の後に `unreachable` へ落ちる。ただし実測では `G = 0` → `P = 0` → `*P` = `load [0]` = 0x4bdb50 ≠ 0 なので、この分岐は通る。**trap 地点は未特定**。
+
+### 9-6. e2e (`bash tools/gui/flengine/e2e.sh`・commit `ae963e28`)
+
+| 項目 | 結果 |
+|---|---|
+| 所要 | wall 7 分 13 秒 (スクリプト表示 433 s)・load 0.49 0.48 0.46 → 1.10 0.94 0.71・nproc 4・exit 0 |
+| judge | JUDGE PASS (14/14 gates) |
+| S1 (soft) | `872/1/47/22/0` (base `872/1/47/22/0`) |
+| B1 boot parity | PASS (units_run 52 = base 52) |
+| R1・R2 | PASS (R2 reached 33 / floor 19) |
+| P1〜P5・W1・A1・L1 | PASS (P4 `hwnd=0x110000f`・P5 `hwnd=0x110000e`) |
+| ネガコン N1〜N9 | 9 件すべて期待どおり FAIL |
+| selftest / pe_image | 506 passed 0 failed / PASS |
+
+WIN-13 (`37cc1097`) の記録は 13/14 (S1 `870/1/47/24/0` で FAIL)。今回は 14/14 (S1 = base)。IR 入力の指紋は `results/ir_sha256.txt` の material 行と一致しており、IR 入力の差ではない。差の原因は未切り分け (§9-7)。
+
+### 9-7. shim の検査と未解決
+
+- `bash tools/shim/test.sh`: rc 0・2.5 秒・53 API × MT/ST 全 PASS。`gcc -Wall -c tools/shim/src/sync.c` の警告 3 件は既存 (`emscripten_get_now` の暗黙宣言ほか)。変更行には無い。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| boot の `unreachable` の地点と理由 | `CreateFruityInstance` の前に boot が止まる | 子 issue `[WIN-16]` (`親: #2880`) |
+| `0x12bd390` の登録経路 (どの unit が初期化するか) | 呼出しの完了 (受入 3) | 同上 |
+| 呼出元 VA (wasm name section 無し) | 受入 1 の呼出元 VA | 同上 |
+| 解放側 `function_41cd70` が init 列に入る理由 | boot が 41cd70 に届くと `0x11EAF00` を削除する (推定) | 同上 |
+| S1 の差 (§9-6 の 13/14 と 14/14) | 判定の再現性 | PR 本文の未解決表のみ (再測定) |
