@@ -91,6 +91,66 @@ def main():
     print('[unsup] 非 x87 = %s' % {k: v for k, v in meta['unsup'].items() if not k.startswith('f')})
     print('[summary] functions %d, insns %d, unlifted callees %d, jump tables %d' % (
         len(meta['functions']), meta['ninsn'], sum(meta['unlifted_callees'].values()), len(meta['jt_ranges'])))
+    gap_stats(pe, img, IMG, T0, text, cov, md, meta)
+
+
+def gap_stats(pe, img, IMG, T0, text, cov, md, meta):
+    """未被覆区間の内訳 (REPORT_APPENDIX_1098.md §3)。 定義: 区間 = cov==0 の連続域。 jt 表 = lift_meta の jt_ranges。
+    reloc 値 = .text 内の HIGHLOW のうち、位置と値が共に jt の外で、値が .text を指すもの。 直接分岐 = 線形掃引 (CS_MODE_32) の call/jmp/jcc の rel 先。"""
+    from capstone.x86 import X86_OP_IMM
+    TS = len(cov)
+    jtm = bytearray(TS)
+    for s, sz in meta['jt_ranges']:
+        for k in range(max(s - T0, 0), min(s - T0 + sz, TS)):
+            jtm[k] = 1
+    gaps, i = [], 0
+    while i < TS:
+        if cov[i]:
+            i += 1
+            continue
+        j = i
+        while j < TS and not cov[j]:
+            j += 1
+        gaps.append((i, j))
+        i = j
+    def gap_of(off):
+        return next((g for g in gaps if g[0] <= off < g[1]), None)
+    R = set()
+    nreloc = 0
+    for b in pe.DIRECTORY_ENTRY_BASERELOC:
+        for e in b.entries:
+            off = e.rva - text.VirtualAddress
+            if e.type != 3 or not (0 <= off < TS) or jtm[off]:
+                continue
+            v = struct.unpack_from('<I', img, e.rva)[0]
+            if T0 <= v < T0 + TS and not jtm[v - T0]:
+                nreloc += 1
+                g = gap_of(v - T0)
+                if g:
+                    R.add(g)
+    D = set()
+    ndir = 0
+    code = img[text.VirtualAddress:text.VirtualAddress + TS]
+    for ins in md.disasm(code, T0):
+        if (ins.mnemonic == 'call' or ins.mnemonic.startswith('j')) and ins.operands and ins.operands[0].type == X86_OP_IMM:
+            t = ins.operands[0].imm
+            if T0 <= t < T0 + TS:
+                g = gap_of(t - T0)
+                if g:
+                    D.add(g)
+                    ndir += 1
+    jt_bytes = sum(min(s - T0 + sz, TS) - max(s - T0, 0) for s, sz in meta['jt_ranges'] if s - T0 < TS)
+    jt_gap = sum(sum(1 for k in range(max(s - T0, 0), min(s - T0 + sz, TS)) if not cov[k]) for s, sz in meta['jt_ranges'])
+    jt_gap_uniq = sum(1 for k in range(TS) if jtm[k] and not cov[k])
+    big = max(gaps, key=lambda g: g[1] - g[0])
+    print('[gap] 未被覆区間 %d 個 (計 %d B)。 最大 0x%x〜0x%x (%d B)' % (
+        len(gaps), sum(b - a for a, b in gaps), big[0] + T0, big[1] + T0, big[1] - big[0]))
+    print('[gap] jt 表 %d 本 (計 %d B) のうち未被覆域 %d B (区間ごとの和。 表どうしの重なりを除いた一意バイトは %d B)' % (
+        len(meta['jt_ranges']), jt_bytes, jt_gap, jt_gap_uniq))
+    print('[gap] reloc (jt の外・値が .text) %d 本のうち、未被覆域の値を含む区間 %d 個' % (nreloc, len(R)))
+    print('[gap] 直接 call/jmp/jcc の先を含む区間 %d 個 (%d 本)' % (len(D), ndir))
+    rest = [g for g in gaps if g not in R and g not in D]
+    print('[gap] 上記のどちらも含まない区間 %d 個 (%d B)' % (len(rest), sum(b - a for a, b in rest)))
 
 
 if __name__ == '__main__':

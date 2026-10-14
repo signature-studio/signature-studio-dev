@@ -444,7 +444,7 @@ class FnLift:
                 return self.L(self.wr(ins, ops[0], gv(TLSA_VA), 8))
             if m.disp == 0x10:
                 return self.L(self.wr(ins, ops[0], '(R[RSP] + 0x1000)', 8))
-        if IA32 and seg == 'fs':   # ia32 の TEB 参照 (fs:[disp]): ea() が ott_fsbase 基準で読む
+        if IA32 and seg in ('fs', 'es', 'ds', 'cs', 'ss'):   # ia32: ea() と同じ経路 (fs は ott_fsbase、es/ds/cs/ss は平坦)
             return self.L(self.wr(ins, ops[0], self.rd(ins, ops[1], ops[0].size)))
         raise Unsup('segment ' + seg)
 
