@@ -243,6 +243,7 @@
 | `tools/m11/ldfix/REPORT_2447.md` | ~146 | LD-115 (#2447): 666a60 のループの修復 (回数の初期値 `[N]` とループ内 store `*arg1`)。機械語と IR の対応表、`fix_ld115.py` の検証用単独パッチ、wasm 直接呼びの 3 版 (修復前 TRAP / 回数のみ FAIL(slot.f16) / 修復後 PASS)、survey 942 unit 突合 (ok 869 → 869、退行 0)。本番配線は #2527、回数 0 の早期脱出は #2513 |
 | `tools/m11/ldfix/REPORT_2405.md` | ~151 | LD-113 (#2405): RetDec 2019-03 版 (`6edcaaea`) の gv 分岐 (constants.cpp L163〜168) の発火実測。2019-03-03 の share (retdec-support) は入手不可として扱い (v3.3 同梱 share も 2019-03-03 と確認できず)、代用 share で 41a6a0・41a6d3・666b10 の発火を v5.0 と件数・root まで一致で確認。一時ログ付きビルドの所要。再現は `retdec2019_gv_2405.sh` (gv 分岐)、`share_check_2405.sh` (share・tag の照合) |
 | `tools/m11/ldfix/REPORT_2396.md` | ~120 | LD-111 (#2396): `audit_lsf_disp.py` の変位形を `audit_lsf.py` に統合 (既存 3 判定は byte 不変、SUSPECT_DISP_VAS を並べて出力)。残 SUSPECT 3 件 (6677a0・d237e0・de1da0) を機械語 `movs` の列挙漏れ (誤検出) と確定し、列挙を拡張して 4 → 1 件 (41a670 のみ、修復後 0)。独立算法 `triage_ld111.py` の突合と NC 5 本 |
+| `tools/m11/ldfix/REPORT_2438.md` | ~106 | LD-114 (#2438): #2264 §8.3 から移管された spill 宛 未判定 12 site の消費者分類 (OK_LOAD 5・UNDETERMINED 7)。入口の memory 読みの `xor i64 0, 0` (新類型候補・3009 関数) を記録 |
 | `tools/m11/ldfix/REPORT_2402.md` | ~110 | LD-112 (#2402): `fix_ld108.py` を `m11_gen_ir2.sh` の ldfix 直後に常設配線 (`ld108` 記録・`m11_build.sh` の拒否・`%arg1` 型 assert)。`ir_conditions` と IR diff (41a670 の 1 関数だけ)、通常 build の wasm での直接呼び、survey 942 unit の突合 (ok 退行 0)、ok 絶対値 869 / 870 の差は IR の出所まで特定 (どの変更が差を生むかは未特定)、136 型は再現せず原因未特定。`666a60` の修復は #2447 |
 | `tools/m11/ldfix/REPORT_2388.md` | ~75 | LD-109 (#2388): cf3790 の spill 宛 未判定 15 site を全て OK_LOAD と判定 (機械語・IR の行を `ld109_cf3790_verify.py` が照合して生成)・slot 名の式の独立確認 (#2389 と同じ `stack_var_(disp-0x1d8)`)・基底が上流の脱落値由来で汚染される注意。静的突合のみ |
 | `tools/m11/ldfix/REPORT_942.md` | 248 | #942 (CI-22) stage4 の memory access out of bounds の切り分け (部分達成)。trap 9 件の unit 別最上位 frame・boot threw の入口・bin 表の観測 (§9)・サイズ→bin 表 (§10 は要約)。§8-3 の全表と §10 の詳細は付録 |
@@ -359,6 +360,7 @@
 | `tools/plugins/framework/REPORT_2115_APPENDIX.md` | ~50 | framework REPORT_2115 §10 (TLS index 未設定の確認・未採用の stand-in 版の実験・n=1 の実測と対照) を REPORT_2115.md から分割移動 (250 行上限・本文は改訂済み)。測定値の正本 |
 | `tools/plugins/framework/REPORT_2425.md` | ~130 | PLG-P0b-16 (#2425): smoke 判定を InitUnits 完走基準 (`runerr=0 ff=0 init_reach=288`) に再定義し、旧 `dispatch=38` が idx 16 の RunError 終端だった事実・IR の fold 位置 (`function_40ea20` 38146 行〜) と n=3 の実測 (増分 23.94〜24.55 秒) を記録。修復は子へ移管 |
 | `tools/plugins/framework/REPORT_P0c9.md` | ~36 | P0c-9 (#610) stage-1 成果物の素材化 (`fw_pack_stage1.sh` pack/verify・`work-fw-stage1` allowlist)。REPORT.md から分割移動 |
+| `tools/plugins/framework/REPORT_2426.md` | ~78 | PLG-P0b-17 (#2426): hs InitUnits の OOB 1 件目 `function_414390` の入力定数化 (`hs_irfix.py` `fix_414390`) の原因・修復・実測と、次の OOB `function_40c4d0` の記録。新規 (分割移動なし) |
 | `tools/plugins/p0c/REPORT.md` | ~139 | kernel 表妥当性検証 + f80 assessment (§1〜§7)。§8〜§16 は `REPORT_APPENDIX_A.md`〜`F.md` に分割し、本体末尾に付録索引 (#378) |
 | `tools/plugins/p0c/REPORT_APPENDIX_A.md` | ~164 | p0c §8 (P0c-2 CAB-241 f80→f64 lowering)・§9 (P0c-3 CAB-251 x87 スタック模型修復) 全文 (#378 で無変更分割移動) |
 | `tools/plugins/p0c/REPORT_APPENDIX_B.md` | ~189 | p0c §10 (P0c-4 CAB-196 ext-emulation mode) 全文 (同上) |
@@ -387,6 +389,7 @@
 | `tools/shared/oss/blend2d/REPORT_AGG2D.md` | ~45 | Agg2D glue 棚卸し (T-SH-02/#146): FL Blend2D.dll (block24339) の export 1 本・RTTI 44 個 (Agg2D 2)・import 実測と未解決の起票先 |
 | `tools/shared/lift/libreverb/REPORT.md` | ~60 | libreverb (win `Reverb.dll`) lift + 差分テスト (T-SH-15 #161 部分達成)。ildsp は §6 で一行参照のみ |
 | `tools/shared/lift/ildsp/REPORT.md` | ~150 | ildsp (`block24360_PE.bin`) 規模調査 (§1–3: 命令数・call 数・export closure 表・SIMD 比の未解決) と GeneralPitchShifter_CreateInstance の instance vtable (§4: 6 slot の種別・間接 call のスロットと宛先・生バイト検算とネガティブコントロール・実測) (T-SH-19 #791 / #2483)。測定値の正本 |
+| `tools/shared/lift/ildsp/REPORT_CLOSURE.md` | ~140 | ildsp vtable 経由の実体 closure (10 export・`.pdata` の無い先を含む・推移閉包・間接 call 内訳と末尾 jmp 内訳・objdump 検算) (T-SH-15 #161)。分離元は `REPORT.md` §2 の下限表 (§4 は GPS vtable)。測定値の正本 |
 
 ### IPP
 
