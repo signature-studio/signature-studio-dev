@@ -8,7 +8,7 @@ REPORT_APPENDIX_1025.md の後続節。親 #853 (ICALL-12)。REPORT.md §15 か�
 
 - 測定 commit (コードを変えた最後の commit): `63e150e2` (`tools/icall/kh_route_run.sh` を変更。`kh_route_build.sh` はヘッダ注記のみ)。
 - `63e150e2` の commit 時刻は 19:35:43 UTC。それ以前の測定 (19:21〜19:35) は未コミットの作業 tree で行われた。この窓の数値は次の clean 再測定で置き換える。
-- **clean 再測定 (本節の正本)**: コミット済み tree `b757a183` (`git worktree add` で作った clean checkout・`git status` は空) で実行。build 2026-10-14 20:12:18 UTC 開始、run 20:13:29 UTC 開始。素材は `$ARTIFACTS_DIR` の `plugins-kilohearts`・`work-icall`・`work-liftlib` (展開先は `tools/icall/work/`・`tools/liftlib/work/`)、emcc は `/opt/emsdk`。
+- **clean 再測定 (本節の正本)**: コミット済み tree `b757a183` (`git worktree add` で作った clean checkout・`git status` は空) で実行。build 2026-10-14 20:12:18 UTC 開始、run 20:13:29 UTC 開始。素材は `$ARTIFACTS_DIR` の `plugins-kilohearts`・`work-icall`・`work-liftlib` (展開先は `tools/icall/work/`・`tools/liftlib/work/`)、emcc は [EMSDK] (`docs/REFERENCES.md` §4)。
 - 前版の「最終 HEAD で再実行し一致」の記述は、実行ログが無かったため撤回済み。レビュー run `38627376099` (clean `git archive b757a183`) でも同じ値を得たと報告されている (PR #2845 round 2)。
 
 証跡 (clean `b757a183`):
