@@ -123,16 +123,8 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 
 - 前提 (merged): #2398 (Review-Only と `oc:stuck` の上限)、#2418 (LIVE の分離)、#2420 (#2380 コメントを新しい順に 24 時間分読む)。未 merge の #2343 (VM 状態の取り込み)・#2334 (no-pr の理由別再着手)・#2340 (shadow の自己昇格) は前提から外した。VM が止まっているので二重着手の窓が無く、phase は『open PR < 10 で解除』の規則で足りる。
 - 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す PR は別)、`NO_PR_COOLDOWN_H="24"` (#2334 が入るまで)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
-- 突き合わせ (dry-run、VM の `launch_issues.py` の classify と同時刻): 下表。`NO_PR_COOLDOWN_H` の既定 3 では、`oc:no-pr` の 134 件 (最後の着手か報告から 3〜22 時間たった issue) が ready に戻り、VM の ready 34 件に対し Worker は 167 件 (ready 165 + relaunch 2) だった。24 にすると 31 件になる。
-- 初回の 1 回だけ、デプロイ作業として行ったこと (リポジトリの差分には無い): (1) 再デプロイ直後の Worker は、旧版が保存した状態を引き継ぐ。旧版は `comments?since=` を古い順に 40 ページ (4,000 件) で打ち切っていたので、直近の VM の `/oc` を持たない。そこで全体同期の間隔を短くした一時ビルドで全体同期を 1 回前倒しした (新版の全体同期は REST 123 回、うちコメント 102 回。打ち切り無し、`fresh=true`)。(2) 保存された phase は『未保存なら Review-Only』の初期値だった (open PR 12 件 > 10 で解除されない)。VM の `phase.json` (`review_only=false`) に合わせて、同じ一時ビルドで `review_only=false` を保存した。突き合わせは、この一時ビルドに `TARGET=1000 BATCH=1000` を付けて ready の全件を出して行った。いずれも dry-run で、突き合わせの後に main の版 (dry-run) に戻した。本 PR の値でのデプロイは merge 後。
-
-| 項目 | VM (`launch_issues.py`) | Worker (`/status?detail=1`) | 差の理由 |
-|---|---|---|---|
-| ready | 34 | 31 | VM の 3 件 (#1274 #2145 #2152) は open な子を持つ親。Worker は除外する (仕様) |
-| relaunch | 0 | 2 (#125 #448) | VM の `relaunch.json` は両方 count=2 (上限)。Worker に履歴が無い (#2343 の範囲)。Worker 側の数え始めが 0 なので、最大 2 回の再投入 |
-| started / recent / user | 13 / 19 / 2 | 10 / 19 / 2 | started の差 3 件の原因は未確認 (VM は 13:18〜13:22Z、Worker は 13:24Z の値) |
-| 同じ art 行 | | 29 件が両方の ready で、art 行の差 0 | |
-| VM が 3 時間以内に着手した issue を Worker が選ぶか | | 11 件 (#1170 #1527 #1570 #1974 #1985 #2159 #2258 #2265 #2272 #2288 #2303)。全て VM の ready にも入っていて、着手後に bot が報告済み (run は終了) | 二重着手ではない (VM も次に着手する) |
+- 突き合わせの結論: dry-run の Worker と VM の `launch_issues.py` の分類は、差の全てに理由がつく (親 3 件の除外・同期の時刻差・VM の `relaunch.json` を持たないこと)。`NO_PR_COOLDOWN_H` の既定 (3) では `oc:no-pr` の issue が大量に ready に戻るので、24 にした。実測は `tools/pm/REPORT.md` §12。
+- 初回のデプロイでだけ、保存状態を整える一時ビルド (全体同期の前倒しと、phase を VM の `phase.json` に合わせる) を使った。リポジトリの差分には無い。理由と結果は `tools/pm/REPORT.md` §12-5。
 
 戻し方 (VM の timer は再開しない): `wrangler.toml` の `LIVE_LAUNCH` を `"0"` にして再デプロイ (`npx wrangler deploy`)。dispatch も止めるなら `LIVE_DISPATCH` も `"0"`。`/status` の `mode_launch` / `mode_dispatch` が `dry-run` になる。`STORE_KEY` は変わらない。
 
@@ -145,7 +137,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `LIVE_LAUNCH` | launch の `/oc` コメント投稿 (`POST /repos/{o}/{r}/issues/{n}/comments`) | `"1"` (2026-10-14〜。コードの既定は dry-run) |
 | `LIVE_DISPATCH` | `repository_dispatch` の `oc-watchdog` の送信 (`POST /repos/{o}/{r}/dispatches`) | `"1"` (同上) |
 | `LIVE` (旧) | 上の 2 つのうち、未設定のほうにだけ効く (両方の既定値) | (置かない) |
-| `TARGET` | 同時に走らせる run の目標 (room = TARGET − active) | `"50"` (暫定。80 に戻す PR は別) |
+| `TARGET` | 同時に走らせる run の目標 (room = TARGET − active) | `"50"` (暫定。80 に戻す作業は #2458) |
 | `NO_PR_COOLDOWN_H` | `oc:no-pr` の issue を再着手するまでの時間 | `"24"` (暫定。コードの既定は 3) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
