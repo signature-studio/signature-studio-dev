@@ -236,9 +236,9 @@ RETDEC=<retdec-decompiler> PE=<block00031_PE.bin> python3 tools/m11/ldfix/retdec
 ## 6g. #2038 (LD-75): 発火行の確定 (ソースビルド)
 
 v5.0 (`53e55b4b`) をソースからビルドし、gv 分岐 (L165〜170) の発火を一時ログで確かめた。結果と実測は付録 `REPORT_911_APPENDIX_1967.md` §6g。
-要点: **41a6a0・41a6d3・666b10 の発火はすべて L167 (gv 分岐)**。41a693 は L150 (`max == &root` 分岐) で、41a670 の siteA 候補は L167 と確定。
-これにより §6f の「siteA が L163〜166 か未確定」は解消した。666b10 は段 17 で L167 と同じ分岐に入る (§6e の判定と整合)。
-判定 (受入 4): 41a6a0 (段 16) と 666b10 (段 17) は **同一の分岐 (v5.0 `constants.cpp` L167) で発火**しており、同一機構と判定する。段番号の差は同じ `ConstantsAnalysis` の複数回の適用によるもの。機構の所在は **lift 段** (RetDec 本体の `retdec-constants` pass。ldfix 段ではない)。
+要点: **41a6a0・41a6d3・666b10 の発火は単独範囲の測定で、すべて L167 (gv 分岐)**。41a693-41a69a の発火は L150 (`max == &root` 分岐)。41a670 の siteA 候補は L167 と対応する。
+これにより §6f の「siteA が L163〜166 か未確定」は解消した。666b10 は段 17 で L167 と同じ分岐に入る (§6e の判定と整合)。全体範囲 (41a670-41a6f4) の件数の内訳は付録 §6g に記す。L167 の結論は単独範囲の件数に基づき、全体範囲の件数には依存しない。
+判定 (受入 4): 41a6a0 (段 16) と 666b10 (段 17) は **同一の分岐 (v5.0 `constants.cpp` L167) で発火**しており、同一分岐の発火は確認した。ただし同一機構かは **未確定 (#1091)**。段番号の差 (段 16 と 17) の説明は推定を含み、同じ `ConstantsAnalysis` (`retdec-constants`) の複数回の適用とみる見方は §6d のソース読み (推定) に基づく。実測による確認はしていない。機構の所在は **lift 段** と推定する (§6d のとおり `retdec-constants` は RetDec 本体の pass で、ldfix 段ではない。pass の特定はソース読みによる)。
 注: 自前ビルドの `retdec-decompiler` は、素材 `toolchain-retdec` の `retdec/share` を隣に置かないと `Initialization` 後に無言終了した。計測は素材の share を使った。
 
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
