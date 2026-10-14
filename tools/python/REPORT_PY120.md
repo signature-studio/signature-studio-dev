@@ -74,32 +74,33 @@ PE から確定した契約 (保留の中身。実装には使わない):
 
 ## 検証
 
-- 測定 commit (コードを変えた最後の commit): `13087005` (`origin/main` の取り込み。PR 側のコードは `97c60b6c` から変わっていない)。解析補助 `pe_ui_ops_probe.py` の最後の変更は `97c60b6c` (`.pdata` 終端にし、r8/r9 の判定を書き直した)。`97c60b6c` の作業ツリー clean 状態で 27 関数を再実行した。`13087005` でも同じ 27 関数を再実行した (下表)。
+- 測定 commit (コードを変えた最後の commit): `8306f425` (`origin/main` の 2 回目の取り込み。PR 側のコードは `97c60b6c` から変わっていない)。解析補助 `pe_ui_ops_probe.py` の最後の変更は `97c60b6c` (`.pdata` 終端にし、r8/r9 の判定を書き直した)。`97c60b6c` の作業ツリー clean 状態で 27 関数を再実行した。`8306f425` でも同じ 27 関数を再実行し、出力は `13087005` での再実行と一致した (下表)。
   - 改修前の出力との比較: 関数ごとの本体行は同一。header に `ret=1` が加わった (27 関数すべて ret 1 個)。`py_compile` rc 0。
   - 独立検算 (`.pdata` 範囲の逆アセンブル、リポジトリ外の一時スクリプト): 27 関数すべて ret 1 個、`call 0xd6fd10` 1 個、`call 0xd84680` 26 個、`call 0xd843d0` 1 個 (scrollWindow のみ)。`mov rax,[rip+X]` の解決先は 0x15e1e58 (14 関数) と 0x15e4280 (26 関数)。
-- provider・host・tests: 旧版はこの節で「`13b6ae46` 以降は差分 0」と書いたが、確認に使ったパスがリポジトリ直下基準で、実際には見ていなかった。`13087005` (main 取り込み) では `tools/python/provider/fl_engine.c` (+43)・`tools/python/host/fl_mock.mjs` (+27)・`tools/python/tests/` の 5 件が変わっている (`git diff --stat 97c60b6c 13087005 -- tools/python/provider tools/python/host tools/python/tests`: 7 files, 251 insertions(+), 14 deletions(-))。下表は `13087005` での実測。旧測定 (`13b6ae46`: ハンドラ 83・実装 83・未実装 352) からの増分 3 件は main の provider 変更によるもので、PY-120 の増減は 0。
+- provider・host・tests: 旧版はこの節で「`13b6ae46` 以降は差分 0」と書いたが、確認に使ったパスがリポジトリ直下基準で、実際には見ていなかった。main の取り込みで `tools/python/provider/fl_engine.c`・`tools/python/host/fl_mock.mjs`・`tools/python/tests/` などが変わっている (`git diff --stat 97c60b6c 8306f425 -- tools/python/provider tools/python/host tools/python/tests`: 11 files, 438 insertions(+), 14 deletions(-))。下表は `8306f425` での実測。旧測定 (`13b6ae46`: ハンドラ 83・実装 83・未実装 352) からの増分 9 件は main の provider 変更によるもので、PY-120 の増減は 0。
 
 環境 (`13b6ae46` の測定): runner 4 core、load average は開始時 0.29 (`uptime`、20:52)、検証時 0.10 (21:04)。`FL_WIN64_DIR` は `[WIN64]` の展開先 (`block00031_PE.bin` と DATA 4 本を展開)。emsdk は `[EMSDK]` (6.0.12)。
 環境 (`97c60b6c` の probe 再実行): `FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`extracted/block00031_PE.bin` と DATA 4 本を `tar --zstd -xf` の `--wildcards` で展開)。
-環境 (`13087005` の再実行): 素材は `$ARTIFACTS_DIR` の `fl-win64` と `toolchain-emsdk` (`[EMSDK]`、emcc 6.0.12)。`fl-win64` から `extracted/block00031_PE.bin` と DATA 4 本 (block24429・24430・25159・24618) を `--wildcards` で展開 (2.96 秒)。runner 4 core、load average は開始時 0.43 (21:34:46)。
+環境 (`13087005`・`8306f425` の再実行): 素材は `$ARTIFACTS_DIR` の `fl-win64` と `toolchain-emsdk` (`[EMSDK]`、emcc 6.0.12)。`fl-win64` から `extracted/block00031_PE.bin` と DATA 4 本 (block24429・24430・25159・24618) を `--wildcards` で展開 (2.96 秒)。runner 4 core、load average は計測時 0.30 (21:44:15)。
 
-前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 2.7 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、5.96 秒)・`bash provider/build.sh` (rc 0、1.28 秒、ハンドラ 86)。旧測定の生成物は `13b6ae46` の環境 (3 分 31 秒・4.6 秒) で、下表は `13087005` の再実行。
+前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 2.7 秒、`13087005` の環境で作成)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、`8306f425` で 5.78 秒)。旧測定の生成物は `13b6ae46` の環境 (3 分 31 秒・4.6 秒)。下表は `8306f425` の再実行。
 
-| コマンド (測定 commit 13087005) | 結果 | wall |
+| コマンド (測定 commit 8306f425) | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 86 | 1.28 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 86 / 未実装 349 / MCP 静的 60) | 0.37 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 92 | 0.94 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.35 秒 |
 | `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback_roundtrip true | 1.59 秒 |
-| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_ops_probe.py <27 関数 名前:fn VA>` | rc 0。27 関数すべて `ret=1`、`call d84680` 26 件、`call d843d0` 1 件 | 3.1 秒 |
+| `node tests/ui_state_diff.mjs` (main の PY-119 追加テスト。参考) | calls 12、diffs 0、PASS | 0.05 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback_roundtrip true | 1.64 秒 |
+| `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_ops_probe.py <27 関数 名前:fn VA>` | rc 0。27 関数すべて `ret=1`、`call d84680` 26 件、`call d843d0` 1 件 | 3.15 秒 |
 | `py_compile analysis/flapi/pe_ui_ops_probe.py` (97c60b6c) | rc 0 | — |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5・`13087005` で実測): `host/fl_mock.mjs` の `windows` 既定値 (35 行。旧版は 29 行) の `0: true` を `0: false` に変えると、`node tests/ui_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 17・diffs 0・PASS (rc 0)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5・`8306f425` で実測): `host/fl_mock.mjs` の `windows` 既定値 (35 行。旧版は 29 行) の `0: true` を `0: false` に変えると、`node tests/ui_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 17・diffs 0・PASS (rc 0)。
 
-コード差分 (測定 commit `13087005` から HEAD まで、`tools/python` の .md 以外):
+コード差分 (測定 commit `8306f425` から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 13087005 HEAD -- tools/python ':!*.md'
+$ git diff 8306f425 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
