@@ -140,7 +140,7 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 
 | # | 受入条件 (#2501) | 結果 |
 |---|---|---|
-| 1 | `0x86a4cf` の `call [A-0x30]` の戻り値型と g の値 P の型 | **達成**。P は vptr `0x13063c8`・サイズ `0x840` のクラス (クラス名は無い (stripped)) |
+| 1 | `0x86a4cf` の `call [A-0x30]` の戻り値型と g の値 P の型 | **達成**。P は vptr `0x13063c8`・サイズ `0x840` のクラス (クラス名は TGraphEditorForm。RTTI に残る。`REPORT_PY71.md` §1・§2) |
 | 2 | `0xffe370` の所属クラスと呼出し元 | 所属は**達成** (vptr `0xfe2cf8`・サイズ `0x8a8` のクラス、仮想スロット 52)。呼出し元は**未達** |
 | 3 | `0xec60ae` の対象型 (chan 以外なら除外) | **未達** (`[rbp+0x120]` の出所を追えず) |
 | 4 | `0x8ed012` の `[rbp+0x70]` が chan か | **未達** (判定材料を得られず) |
@@ -210,11 +210,11 @@ $ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
 
 - `[A]=0x619200` (先頭スロット) で、vtable は 110 スロット。`0x86a4ef`〜`0x86a4f6` は `mov rax,[P]`・`mov rax,[rax]` (vptr) の後に `call [rax+0x78]` を呼ぶ (vtable スロット 15 = `0x80c850`)。
 - `0x1306dbf` (`mov [rcx+0x794], rax`・`rcx=g`) と `0x130760f` (`mov [rax+0x794], r14`・`rax=g`) はどちらも P の `+0x794` へ書く。`0x794 < 0x840` で、対象型は vptr A のクラス。
-- クラス名は無い (stripped)。chan かどうかは 5.4 の近似でも確定しない。
+- 訂正: 「クラス名は無い (stripped)」は誤り。クラス名は TGraphEditorForm で RTTI に残る (`REPORT_PY71.md` §1)。非 chan の判定は 5.4 の近似ではなく、この名前で行う。
 
 ### 5.3 0xffe370 の所属 (vptr `0xfe2cf8`)
 
-- `V = 0xfe2cf8`: `[V-0x80] = 0x8a8` (サイズ)、`[V-0x30] = 0x40f960` (A と同じ factory F)。`0xfe2c78..0xfe2cf0` (V-0x80..V-0x8) は V の 16 語のメタデータ (A の `A-0x80..A-0x8` と同じ形)。
+- `V = 0xfe2cf8` (クラス名 TPublicChannel。親 TChannel。`REPORT_PY71.md` §1): `[V-0x80] = 0x8a8` (サイズ)、`[V-0x30] = 0x40f960` (A と同じ factory F)。`0xfe2c78..0xfe2cf0` (V-0x80..V-0x8) は V の 16 語のメタデータ (A の `A-0x80..A-0x8` と同じ形)。
 - 仮想表 `0xfe2cf8..0xfe2ea0` は 54 スロット。`0xffe370` = スロット 52 (`+0x1a0`)、`0xffa930` = スロット 53。`0xffe370` は `[rcx+0x794]`・`[rcx+0x9c]` を書き、`[rcx+0x7ac]` を読む (V のメソッドとして整合)。
 - 表を指す参照は、RIP 相対・即値の参照 0 件 (`0xfe2c80+8k` の 69 個全て。「ネガティブコントロール」節の検出器で確認)。絶対 8 バイト値 `0xfe2cf8` は 2 件 (`.text` の `0xfe2c30`・`0xfe2ed8` に格納)。同じスキャンで `0xfe2d00`・`0xfe2e00` にも絶対値の格納が 1 件ずつある (VA `0x94ab97`・`0x94aba7`)。隣接値は `0x15ec29800` と交互に並び、V の vtable 列とは別の構造。未調査。
 - 未解決: 呼出し元 (V のインスタンスの `call [reg+0x1a0]`) と、V の vptr を書く箇所。`0xfe2c30`・`0xfe2ed8` の格納元も未追跡。
@@ -235,7 +235,7 @@ $ git diff ea3c0c27 HEAD -- tools/python/analysis tools/python/src
 | `0xec60ae` の `[rbp+0x120]` の出所 (`push rbp` を 0x3000 バイト内に見つけられず) | 受入条件 3 | #2501 (Refs で残す) |
 | `0x8ed012` の `[rbp+0x70]` の出所 (関数先頭は未特定。直前の `push rbp` `0x8ea780` は `sub rsp,0x28` の別関数で、`[rbp+0x70]` の代入元ではない) | 受入条件 4 | #2501 |
 | V (`0xfe2cf8`) のインスタンス生成箇所と、`call [reg+0x1a0]` の呼出し元 | 受入条件 2 (呼出し元) | #2501 |
-| A (`0x13063c8`) のクラス名と chan 判定 | 5.4 の判定根拠 | #2501 |
+| A (`0x13063c8`) の chan 判定 | クラス名 TGraphEditorForm で非 chan と確定 (`REPORT_PY71.md` §2)。解決済み | — |
 
 ### 名称
 
