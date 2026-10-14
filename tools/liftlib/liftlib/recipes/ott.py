@@ -81,6 +81,8 @@ def run(workdir, build=True, helpers="gen", auto=(), lb_base=None):
     legacy = L["legacy"]
     for f in ("full_t1.drc.ll", "full_t1.drc.dsm"):
         dst = os.path.join(W, "work", f)
+        if os.path.islink(dst) and not os.path.exists(dst):   # 素材同梱の壊れた symlink (VM の絶対パス) は張り直す
+            os.remove(dst)
         if not os.path.exists(dst):
             os.symlink(os.path.join(M6, "work", f), dst)
     # ---- O1 base 正規化
