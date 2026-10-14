@@ -192,3 +192,29 @@ test("分類 (#2758): 素材の再投入の基準は本文の oc_artifacts 行 (
   const inferred = classify(snap(), input).rows;
   assert.deepEqual(inferred.relaunch, [[90, "oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk plugins-serum2"]], "対照: 本文の行が無ければ推定値が基準");
 });
+
+test("分類 (#2758): 本文が oc_artifacts: none なら、不足素材は none を外して fl-win64 を補って足す (none と混在させない)", () => {
+  const now = Date.parse("2026-10-14T12:00:00Z");
+  const at = new Date(now - 5 * 3_600_000).toISOString();
+  const head = "素材不足: plugins-serum2 が無い";
+  const snap: Snapshot = {
+    issues: [{ number: 91, title: "[CI-91] t91", labels: [], body: "", deps: null, artLine: "oc_artifacts: none" }],
+    prs: [],
+    runs: [],
+    bot_last: { "91": { at, head, art: null } },
+    bot_report: { "91": { at, head, art: null } },
+    pm_art: {},
+  };
+  const input: ClassifyInput = {
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "91": head },
+    reportBody: { "91": head },
+    outcomeReason: { "91": "artifact" },
+  };
+  const rows = classify(snap, input).rows;
+  assert.deepEqual(rows.relaunch, [[91, "oc_artifacts: fl-win64 plugins-serum2"]]);
+});

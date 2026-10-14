@@ -389,6 +389,36 @@ test("artifact の再投入: 報告が停止報告 (STOP_RE) でなければ、�
   assert.equal(pickArt(p, 85), undefined);
 });
 
+test("artifact の再投入 (#2758・noPr 経路): 本文が oc_artifacts: none でも、不足素材は none を外して fl-win64 を補って足す", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 74, { labels: ["oc:no-pr"], body: "oc_artifacts: none" });
+  await send(ctx.app, "issue_comment", commentPayload(74, "pycabbage", "/oc oc_actions_allow_write\noc_artifacts: none", atT0(-5 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(74, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(74, BOT, outcomeBody(1), atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  assert.equal(pickArt(ctx.app.engine.plan(), 74), "oc_artifacts: fl-win64 plugins-serum2");
+  const gh = await (ctx.app.engine as any).d.gh();
+  await ctx.app.engine.launch(gh);
+  const posts = postsTo(ctx.m.calls, 74);
+  assert.equal(posts.length, 1);
+  assert.match(posts[0].body.body, /^\/oc oc_actions_allow_write\noc_artifacts: fl-win64 plugins-serum2\n/);
+});
+
+test("artifact の再投入 (#2758・relaunch 経路): 本文が oc_artifacts: none でも、停止報告の不足素材は none を外して fl-win64 を補って足す", async () => {
+  const clock = { t: T0 };
+  const ctx = await configuredApp({ now: clock, live: true, handlers: [(c) => (/\/comments$/.test(c.url) && c.method === "POST" ? j({}, 201) : undefined)] });
+  await seed(ctx, 75, { body: "oc_artifacts: none" });
+  await send(ctx.app, "issue_comment", commentPayload(75, BOT, outcomeBody(1), atT0(-4 * HOUR)));
+  await send(ctx.app, "issue_comment", commentPayload(75, BOT, "停止します。素材不足: plugins-serum2 が無い", atT0(-4 * HOUR + 1000)));
+  clock.t += 7 * HOUR;
+  await markFresh(ctx);
+  const p = ctx.app.engine.plan();
+  assert.deepEqual(p.rows.relaunch, [[75, "oc_artifacts: fl-win64 plugins-serum2"]]);
+  assert.equal(pickArt(p, 75), "oc_artifacts: fl-win64 plugins-serum2");
+});
+
 // 素材行の既定 (#2758): PM の行 → 本文の oc_artifacts 行 → 推定。
 test("launch (#2758): PM の行が無いとき、本文の oc_artifacts 行を素材行にする (推定とは違う行)", async () => {
   const ctx = await configuredApp();

@@ -50,10 +50,13 @@ const BODY_ART_RE = /^\s*`?(oc_artifacts:[^`]*)`?\s*$/;
 // issue 本文の先頭 BODY_ART_CHARS 字の、最後の oc_artifacts: 行を検証済みの 1 行にする。
 // allowlist 外の名前は落とし、残りが 1 つ以上ならその行を返す。残りが 0 なら null (呼び出し側は推定に戻る)。
 // `oc_artifacts: none` は単独の行のときだけ有効 (validateArtLine と同じ)。最後の行だけを見る (前の行には戻らない)。
+// 字数で切った境界をまたぐ行 (改行で終わっていない末尾の行) は見ない。
 export function bodyArtLine(body: string): string | null {
-  const head = Array.from(body ?? "").slice(0, BODY_ART_CHARS).join("");
+  const chars = Array.from(body ?? "");
+  const lines = chars.slice(0, BODY_ART_CHARS).join("").split(/\r\n|\r|\n/);
+  if (chars.length > BODY_ART_CHARS) lines.pop();
   let last: string | null = null;
-  for (const l of head.split(/\r\n|\r|\n/)) {
+  for (const l of lines) {
     const m = BODY_ART_RE.exec(l);
     if (m) last = m[1];
   }
@@ -64,6 +67,17 @@ export function bodyArtLine(body: string): string | null {
   if (keep.length === 0) return null;
   const line = ART_PREFIX + " " + keep.join(" ");
   return validateArtLine(line) ? line : null;
+}
+
+// 素材行 line に、allowlist 内の素材名 extra のうち、まだ無いものを足した行 (足すものが無ければ null)。
+// `none` は素材 0 件とみなして外す (none と他の名前は混在できない)。足すときは fl-win64 を先頭に補う (既定で取得されるのは fl-win64 のみ)。
+export function addArts(line: string, extra: string[]): string | null {
+  const names = line.replace(ART_PREFIX, "").trim().split(/\s+/).filter((a) => a && a !== "none");
+  const add = extra.filter((a) => ALLOW_ARTS.includes(a) && !names.includes(a));
+  if (add.length === 0) return null;
+  const head = names.includes("fl-win64") ? names : ["fl-win64", ...names];
+  const out = ART_PREFIX + " " + [...head, ...add].join(" ");
+  return validateArtLine(out) ? out : null;
 }
 
 // launch の素材行の既定: PM が明示した行 (検証済み) → issue 本文の行 (検証済み) → 題名・ラベルからの推定。

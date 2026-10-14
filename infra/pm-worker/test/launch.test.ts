@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   ALLOW_ARTS,
+  addArts,
   bodyArtLine,
   buildLaunchBody,
   defaultArtLine,
@@ -217,4 +218,18 @@ test("素材行の既定 (#2758): PM の行 → 本文の行 → 推定の順。
   assert.equal(defaultArtLine("oc_artifacts: evil", "oc_artifacts: fl-win64 work-m11", "[CI-1] t", []), "oc_artifacts: fl-win64 work-m11");
   assert.equal(defaultArtLine(null, "oc_artifacts: none", "[CI-1] t", []), "oc_artifacts: none");
   assert.equal(defaultArtLine(undefined, null, "[SR-1] serum", []), inferArtifacts("[SR-1] serum", []));
+});
+
+test("本文の素材行 (#2758): 字数の境界をまたぐ末尾の行は採らない (改行で終わる行だけ見る)", () => {
+  assert.equal(bodyArtLine("x".repeat(3975) + "\noc_artifacts: fl-win64 plugins-ott"), null);
+  assert.equal(bodyArtLine("x".repeat(3900) + "\noc_artifacts: fl-win64 work-m11\n" + "y".repeat(200)), "oc_artifacts: fl-win64 work-m11");
+});
+
+test("素材行へ足す (#2758): none は外し、fl-win64 を先頭に補う。足すものが無ければ null", () => {
+  assert.equal(addArts("oc_artifacts: none", ["plugins-serum2"]), "oc_artifacts: fl-win64 plugins-serum2");
+  assert.equal(addArts("oc_artifacts: plugins-ott", ["plugins-serum2"]), "oc_artifacts: fl-win64 plugins-ott plugins-serum2");
+  assert.equal(addArts("oc_artifacts: fl-win64 work-m11", ["work-m11", "plugins-serum2"]), "oc_artifacts: fl-win64 work-m11 plugins-serum2");
+  assert.equal(addArts("oc_artifacts: none", []), null);
+  assert.equal(addArts("oc_artifacts: fl-win64", ["fl-win64"]), null);
+  assert.equal(addArts("oc_artifacts: fl-win64", ["evil-thing"]), null);
 });
