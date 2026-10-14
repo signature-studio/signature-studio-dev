@@ -242,5 +242,5 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 
 ## 13. 2026-10-14 run (#2107 / SR-39): canvas platform の font・graphicsdevice (wasm)
 
-- 結論: font 7 + graphicsdevice 31 (計 38 関数) を wasm 実装。構文検査は測定 commit `22e33688` で 4/4 rc=0。リンク・閉包確定・描画は未実施 (#2065)。
+- 結論: font 7 + graphicsdevice 31 (計 38 関数) を wasm 実装。構文検査は測定 commit `89495465` で 5/5 rc=0、具象性検査 (`check_concrete.cpp`) rc=0。リンク・閉包確定・描画は未実施 (#2065)。
 - 詳細・実測・測定 commit と差分: 付録 `REPORT_EFFORT_APPENDIX_2107.md` (本節の全文)。
