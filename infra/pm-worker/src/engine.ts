@@ -7,7 +7,7 @@ import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
-import { advanceLaunch, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
+import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import {
@@ -631,10 +631,14 @@ export class Engine {
     const relaunch: ClassifyInput["relaunch"] = {};
     for (const [k, v] of this.d.store.all<{ count: number; art: string | null }>("relaunch")) relaunch[k] = v;
     const launchState: Record<string, LaunchState> = {};
-    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) launchState[k] = v.state;
+    const launchDoneAt: Record<string, string> = {};
+    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) {
+      launchState[k] = v.state;
+      if (v.state === "observed" && v.doneAt !== undefined) launchDoneAt[k] = v.doneAt;
+    }
     return {
       snap: { issues, prs, runs, bot_last, bot_report, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, launchDoneAt, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
       unknown,
     };
   }
@@ -846,7 +850,7 @@ export class Engine {
     return this.d.store.get<PhaseState>("meta", "phase") ?? { review_only: true };
   }
 
-  // 投稿した /oc の観測を進める (launchObs)。書くのは状態が変わったときだけ。失敗の判定は同期が新しいときだけ。
+  // 投稿した /oc の観測を進める (launchObs)。書くのは状態が変わったとき・観測した run の完了時刻が進んだときだけ。失敗の判定は同期が新しいときだけ。
   // dry-run は投稿しないので launchObs を作らず、ここでは何もしない。
   private observeLaunches(): void {
     const fresh = this.fresh();
@@ -855,10 +859,11 @@ export class Engine {
     for (const [k, obs] of this.d.store.all<LaunchObs>("launchObs")) {
       const title = this.s.issues[k]?.title;
       if (title === undefined) continue;
-      const next = advanceLaunch(obs, now, observedBy(runs, title, Date.parse(obs.at)), fresh);
+      const launchedMs = Date.parse(obs.at);
+      const next = advanceLaunch(obs, now, observedBy(runs, title, launchedMs), fresh, doneAtOf(runs, title, launchedMs));
       if (!next) continue;
       this.d.store.put("launchObs", k, next);
-      this.pushLog({ kind: next.state === "failed" ? "unobserved" : "observed", n: Number(k), note: next.state === "failed" ? "launch not observed in 5 min" : undefined });
+      if (next.state !== obs.state) this.pushLog({ kind: next.state === "failed" ? "unobserved" : "observed", n: Number(k), note: next.state === "failed" ? "launch not observed in 5 min" : undefined });
     }
   }
 
@@ -943,7 +948,7 @@ export class Engine {
   }
 
   // 再投入の意図 (oc-pm-intent: relaunch)。checkRelaunchIntent の検査を全て通し、かつ分類 (plan の rows) で投稿してよい行だけ /oc を投稿する。
-  // 投稿してよいのは ready・relaunch・stopped (PM の判断待ち)。user・blocked・started は理由を counters.intentRejected に数えて処理済みにする。
+  // 投稿してよいのは ready・relaunch・stopped (PM の判断待ち)。user・hold・blocked・started は理由を counters.intentRejected に数えて処理済みにする。
   // recent (着手直後の待ち) は処理済みにせず、次の tick に回す。検査・分類で落ちた意図も、毎 tick 数え直さないように処理済みにする。
   // 戻り値: 403/429 や残量で止まったか (halted)、この tick で投稿 (dry-run は記録) の対象にした issue (handled。picks から外す)。
   // dry-run では投稿せず記録だけする。処理済みにはしないので、live に切り替えると投稿される (README の『PM agent の判断待ち』を参照)。
@@ -1034,7 +1039,7 @@ export class Engine {
   }
 
   // 意図の投稿先の判定。wait は次の tick に回す (処理済みにしない)。reject は処理済みにして理由を数える。
-  // 行は plan の rows (picks と同じ分類)。oc:stuck・pm-apply・needs-user-input と、oc:no-pr の cooldown・上限は picks の再着手と同じに見る。
+  // 行は plan の rows (picks と同じ分類)。oc:stuck・pm-apply・needs-user-input・oc:hold と、oc:no-pr の cooldown・上限は picks の再着手と同じに見る。
   // 子 issue (open) を持つ親は、停止報告の内容に依らず投稿しない (plan は ready・relaunch の親を blocked・stopped に移すが、停止報告だけの親は stopped のまま残るため)。
   private intentGate(
     n: number,
@@ -1045,7 +1050,7 @@ export class Engine {
     if (!at) return { kind: "wait" };
     // blocked_by が未同期 (unknown) の間は、ready でも blocked の行に移っているので、先に待つ (確定してから拒否・投稿を決める)。
     if (at.row === "recent" || ctx.unknown.has(n)) return { kind: "wait" };
-    if (at.row === "user" || at.row === "blocked") return { kind: "reject", reason: at.row };
+    if (at.row === "user" || at.row === "hold" || at.row === "blocked") return { kind: "reject", reason: at.row };
     // 実行中の run だけで started のときは、run の完了後に分類し直すまで待つ (run の途中で意図を受け取っても捨てない)。open な PR があれば拒否する。
     if (at.row === "started") return at.openPr ? { kind: "reject", reason: "started" } : { kind: "wait" };
     const labels = this.s.issues[String(n)]?.labels ?? [];
@@ -1444,6 +1449,7 @@ export class Engine {
       ready_by_prio: readyByPrio,
       relaunch: c("relaunch"),
       user: c("user"),
+      hold: c("hold"),
       stopped: c("stopped"),
       // 最後の run-outcome が artifact で止まり、新しい素材が無く再投入しないもの (PM の判断待ち)。
       no_pr_needs_pm: rows.stopped.filter(([n]) => (this.s.issues[String(n)]?.labels ?? []).includes("oc:no-pr") && this.s.sig[String(n)]?.outcome?.reason === "artifact").length,

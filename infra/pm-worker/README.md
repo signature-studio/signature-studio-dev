@@ -34,20 +34,34 @@ launch の規則は `tools/pm/launch_issues.py` の `classify` と同じ入出�
 5. relaunch (`oc:no-pr` の再投入・素材の追加) も 1 tick の枠 `min(room, BATCH, relaunch + ready)` に入り、残りの枠を ready が使う (`src/launch.ts` の `planLaunch`)。relaunch は room や BATCH を超えても全件出す。枠を `ready` の件数だけで頭打ちにする VM の `launch_issues.py` の式とは、relaunch がある tick で最大 relaunch の件数だけ差が出る (VM の式は変えていない)。relaunch は classify が issue ごとに 2 回までに絞る。
 7. **優先の区分 (`prio:critical` / `prio:low`)**: ready の並びは、区分 (critical → 区分なし (normal) → low) が先。同じ区分の中は従来の並び (被ブロック数の多い順 → 『任意』でない順 → 番号順)。`prio:critical` が付いた ready が枠より多いときは、critical を先に選ぶ。critical が無ければ、他の ready を従来どおり枠の残りに入れる (枠を遊ばせない)。relaunch は従来どおり枠の先頭に全件入り、残りの枠を ready が使う (critical は ready の中で先頭)。ラベルは作成しない (`prio:*` が無ければ従来と同じ並び)。
 6. **room の基準は opencode.yaml の全 run の総数**: `room = max(0, target_eff - active_all)` (`target_eff` は上の『同時実行の上限の推定』で決まり、推定が無ければ `TARGET`)。`active_all` は `workflow_run.path` が `opencode.yaml` の未完了の run (in_progress・queued・pending・waiting・requested) を **event を問わず** 全て数える (`src/active.ts`)。VM 版の `active_runs` は実装・fix の run (`issue_comment` `workflow_dispatch` `pull_request_review` と題名が `oc-fix` の `repository_dispatch`) だけを数え、review (`pull_request`)・oc-pm・watchdog を数えなかった。同時実行の上限 (Team プランで 60) はこれらを含む opencode.yaml の全 run が共有するので、旧い数え方では `room` が過大になり、上限を超えて queued が出た (実測は #2625)。別 workflow (`scripts-test.yaml` `terms-watch.yaml`) の run は別枠で数えない。`path` を持たない run (この版より前の保存値) は opencode.yaml として数える (過大に数える側)。reconcile (5 分ごと) が REST の `path` で埋める。TARGET の既定は **58** (上限 60 から 2 を残す)。推定の観測 (`running` / `queued`) は従来どおり workflow を問わない (同時実行の上限は repo の全 workflow の job が共有するため)。
+7. ラベル `oc:hold` の open な issue (Worker の自動着手を見送る印。#2651) は `hold` 行に置き、着手 (picks) も再投入の意図 (`oc-pm-intent`) も投稿しない。判定は `needs-user-input` の次で、`blocked`・`started` より前 (付いていれば、ほかの行を見ない)。詳細は下の『oc:hold ラベル』の節。
 
 `/oc` コメントの本文は固定テンプレートで、可変なのは `oc_artifacts:` 行と、再投入の意図に `focus=K` があるときの受入条件 1 行だけ。素材名は `.github/scripts/prepare-event-context.sh` の `ARTIFACT_RE` と同じ集合 (`ALLOW_ARTS`) を通ったものだけ。webhook の自由文 (タイトル・本文・コメント) は指示文に入らない。
 
 再投入の意図 (`<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->`、#2475): issue ごとに最新の意図マーカーを保持する。実装 App の意図は第三者の意図より優先する。意図のコメントは bot の投稿でも `botLast` (停止報告の窓) を動かさない。次を**全て**通ったときだけ `/oc` を投稿する。
   - 検査 (`src/launch.ts` の `checkRelaunchIntent`): 書き手は実装 App・`issue=` がコメントの issue と一致・`arts` が `ALLOW_ARTS` の部分集合・`focus` は 1〜9 (任意)・同じ issue に 24 時間で 3 回まで。
-  - 分類 (`plan()` の rows): 投稿してよいのは picks と同じ `ready`・`relaunch`・`stopped` (PM の判断待ち) だけ。`user`・`blocked` は投稿しない。`started` は open な PR があれば投稿しない (理由 `started`)。実行中の run だけで started のときは、run の完了後に分類し直すまで待つ (処理済みにしない)。`recent` (着手直後の待ち) と `blocked_by` が未同期 (unknown) の issue も、処理済みにせず次の tick に回す。`oc:stuck`・`pm-apply`・`needs-user-input` は投稿しない。`oc:no-pr` は picks の再着手と同じ cooldown (`NO_PR_COOLDOWN_H`) と上限 (3 回) を見る。子 issue (open) を持つ親は、停止報告の行 (`stopped`) でも投稿しない (停止報告に素材行があるかどうかに依らない)。未観測の launch (`launch-unobserved`) も投稿しない。
+  - 分類 (`plan()` の rows): 投稿してよいのは picks と同じ `ready`・`relaunch`・`stopped` (PM の判断待ち) だけ。`user`・`blocked` は投稿しない。`started` は open な PR があれば投稿しない (理由 `started`)。実行中の run だけで started のときは、run の完了後に分類し直すまで待つ (処理済みにしない)。`recent` (着手直後の待ち) と `blocked_by` が未同期 (unknown) の issue も、処理済みにせず次の tick に回す。`oc:stuck`・`pm-apply`・`needs-user-input`・`oc:hold` は投稿しない。`oc:no-pr` は picks の再着手と同じ cooldown (`NO_PR_COOLDOWN_H`) と上限 (3 回) を見る。子 issue (open) を持つ親は、停止報告の行 (`stopped`) でも投稿しない (停止報告に素材行があるかどうかに依らない)。未観測の launch (`launch-unobserved`) も投稿しない。
   - 順序: 意図は picks より先に処理し、意図で扱った issue は picks から外す (picks が先だと、同じ issue の意図が focus なしで処理済みになるため)。403/429 や REST の残量で止まったら、同じ tick の picks も止める。
   - 枠: 意図の投稿は `room`・`BATCH` の枠に入らず、条件を通ったものは全件出す (picks の relaunch と同じ)。一斉に意図が届くと、同時に走る run の数 (`TARGET`) を超え得る。
   - 最後の `/oc` より前に出た意図 (PM の手動の `/oc` を含む) は捨てる。停止中 (review-only・stuck 上限・REST の残量不足) は処理しない (意図も残し、停止が明けたら判定する)。
-  - 拒否は理由ごとに `counters.intentRejected` へ数え (語彙: `author` `issue` `arts` `focus` `limit` `user` `blocked` `started` `stopped`)、その意図は処理済みにする。
+  - 拒否は理由ごとに `counters.intentRejected` へ数え (語彙: `author` `issue` `arts` `focus` `limit` `user` `hold` `blocked` `started` `stopped`)、その意図は処理済みにする。
   - 投稿の可否は `LIVE_LAUNCH` に従う (コードの既定は dry-run。dry-run では `counters.intentWouldLaunch` と `log` に記録し、処理済みにしない)。
   - **稼働中の `wrangler.toml` は `LIVE_LAUNCH = "1"` なので、この版をデプロイすると、意図の経路も dry-run を経ずに即 live で `/oc` を投稿する。** 待ち (oc:no-pr の cooldown・blocked_by の未同期) が明けた意図は、その tick で投稿され得る。
   - `would_launch_now` は picks (launch の計画) だけを出す。保留中の意図 (待ち・処理済みでないもの) は `/status` に出ない。`counters.intentWouldLaunch` は dry-run の期間に記録された件数で、live では増えない。
   - **PM agent の判断待ち**: deploy 時に、既存の意図を live で処理してよいか。既定案: issue #2475 の受入条件 4 どおり `LIVE_LAUNCH` に従う (現状 `"1"` なので live)。focus の値域は #2575 で決める (pm.md の `focus=K` は issue 番号で、検査は受入条件番号 1〜9)。
+
+## oc:hold ラベル (#2651)
+
+Worker の自動着手 (`/oc` の投稿) を見送らせる印。PM の subagent が自分で実装する issue に付け、Worker が同じ issue に着手コメントを重ねて重複 PR を作るのを防ぐ。
+
+- **判定**: `src/classify.ts` が、`oc:hold` の付いた open な issue を `hold` 行に置く。launch (picks) と再投入の意図 (`oc-pm-intent`) の対象から外れる (意図は `counters.intentRejected.hold` に数える)。`/status` の `hold` はこの行の件数。`needs_user` (`needs-user-input` のラベル数) には含まれない。hold の間に届いた再投入の意図は拒否として処理済みになるので、ラベルを外しても古い意図では投稿されない (ready の issue は通常の着手で拾われる)。
+- **付ける (推奨)**: 起票時に `labels` を指定する。ラベルは issue の作成と同時に付くので、Worker が最初に受け取る `issues` 配送から見えており、着手と競合しない (作成 API の仕様からの推論。実測は未検証)。
+  `gh api repos/signature-studio/signature-studio-dev/issues -f title='[AREA-n] ...' -f body='...' -f 'labels[]=oc:hold'`
+  起票後に `gh issue edit <N> --add-label oc:hold` で付けると、付与の前に次の tick が着手する窓が残るため、避ける。
+- **外す**: `gh issue edit <N> --remove-label oc:hold`。`issues` 配送で labels が更新され、次の tick (webhook の 2 秒後) から通常の分類に戻る。ready なら着手対象になる。
+- **ラベルが無いとき (初回のみ)**: `gh api repos/signature-studio/signature-studio-dev/labels -f name=oc:hold -f color=ededed -f description='Worker の自動着手を見送る (#2651)'`。作成の前に、存在しないラベル名を起票時に指定した場合の挙動は**未検証** (実測していない)。起票の前に作成しておく。
+- 対象は launch だけ。`oc-pm` の検出 (`no_pr` など) は `oc:hold` を見ない (`oc:hold` と `oc:no-pr` が両方付くと PM agent を起こし得る)。
+- VM 版の `tools/pm/launch_issues.py` は `oc:hold` を見ない。VM の timer は停止したままにする (再開すると、この印を素通しで着手する)。
 
 ## oc-pm: PM agent を起こす終端状態の検出と送信 (#2333)
 
@@ -138,7 +152,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 投稿した `/oc` (launch) に対して、題名が issue 題名と一致する `issue_comment` 由来の run (`in_progress`・`queued`・`pending`・`completed`) が現れたかを DO (`launchObs`) に記録する。
 投稿の応答時刻から 5 分以内に観測できなければ `failed` (着手失敗) とし、`/status.launch_unobserved` に issue 番号を出す。`failed` の issue は**自動では再投稿しない** (`stopped` に `launch-unobserved` として置く)。
 後から同じ題名の run が作成時刻 (投稿の 1 分前以降) で現れたら `observed` に直す。dry-run は投稿しないので記録しない。
-観測の判定は同期が新しいときだけ `failed` にする。観測済み・記録の無い古い launch は従来どおり 3 時間の `recent` 判定を残す (完了済みで報告の無い run を即時に再投稿しないため)。
+観測の判定は同期が新しいときだけ `failed` にする。観測済みの launch は、観測した run の完了時刻 (`launchObs.doneAt`・run の `updatedAt`) から 3 時間を `recent` の基準にする (run が進行中は `started` が先に効く)。完了時刻は観測の tick で記録する (`RunState` は完了 1 時間後に prune されるため)。完了時刻の無い観測済み・記録の無い古い launch は従来どおり投稿から 3 時間の `recent` 判定を残す (完了済みで報告の無い run を即時に再投稿しないため)。
 
 **secrets を出さない**: `/status` は集計だけで、issue のタイトル・本文・コメントは載せない。自由文は `last_error.what` とログの `note` だけ (どちらも `?detail=1` のみ)。
 これらと `console.log` は `src/redact.ts` を通し、PEM・`gh*_` / `github_pat_` の token・JWT・`Bearer …`・`sha256=…` と、実行時に分かっている secret (webhook secret・PEM・STORE_KEY・直近の installation token) を `[redacted]` にする。
@@ -195,7 +209,7 @@ cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd �
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 
-依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。既定設定の `pnpm install --frozen-lockfile` は 2026-10-15 05:55Z まで `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する (理由は『Workers Builds の接続状態と pnpm 経路』の節の release-age の項)。
+依存は pnpm (`pnpm-lock.yaml`)。`pnpm install --frozen-lockfile` を先に実行する (`test:unit` と `test:workers` は devDependencies の vitest を使う)。`npm test` は依存なしで動く。既定設定 (`minimumReleaseAge` を変えない) の `pnpm install --frozen-lockfile` が通る版の組を lock に入れてある (理由と版の選び方は『Workers Builds の接続状態と pnpm 経路』の節の release-age の項)。
 
 `npm run build` は bun、デプロイは wrangler を使う。wrangler は `login --device` がある版 (公式 docs の例は 4.119.0 の出力。VM は 4.151.0 で `--device` の存在を `wrangler login --help` で確認済み)。VM では root 不要で `$HOME/.local/bin` に置く
 (`npm install --prefix $HOME/.local/wrangler wrangler@<版>`、bun は npm の `bun` パッケージ)。
@@ -378,9 +392,12 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
   - `pnpm-lock.yaml`: `package-lock.json` から `pnpm import` で作った。版は変えていない。`package-lock.json` は置かない。
   - `pnpm-workspace.yaml` の `allowBuilds` (esbuild・workerd): pnpm 12 は既定で依存の build script を止める。無いと `ERR_PNPM_IGNORED_BUILDS` で install が落ちる。新しい依存が install script を持つときは、ここに足す。
   - `infra/pm-worker/package.json` に npm の `packageManager` を書かない。pnpm 12 は npm 指定のプロジェクトで実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。
-- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。ただし既定設定の install は 2026-10-15 05:55Z まで失敗する。下の release-age の項)。
+- 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。install が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落ちたら、下の release-age の項)。
 - 2026-10-14 の時点で、Workers Builds の install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。merge 後の Workers Builds の結果は、この README では確認していない。
-- **pnpm 12 の release-age (既定設定では 2026-10-15 05:55Z まで install が失敗する)**: pnpm 12.10.1 は既定で `minimumReleaseAge` = 1440 分 (公開から 24 時間未満の版を拒否する)。`pnpm-lock.yaml` の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` は 2026-10-14 05:43Z〜05:55Z に公開された版なので、既定設定の `pnpm install --frozen-lockfile` は `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。3 件が 24 時間を過ぎる 2026-10-15 05:55Z 以降は既定設定で通る見込み (未確認)。それまでの診断は `--config.minimum-release-age=0` を付けた install で行える (診断用。README の手順にはしない)。`minimumReleaseAgeExclude` での除外や版の変更は入れていない (#2585 の範囲外。PM 判断)。Workers Builds が pnpm 12.10.1 の既定を使うなら、同じ失敗が出る (推定。未確認)。
+- **pnpm 12 の release-age (`minimumReleaseAge` = 1440 分)**: 公開から 24 時間未満の版は既定で install を拒否する。2026-10-14 05:43Z〜05:55Z 公開の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` は、既定設定の `pnpm install --frozen-lockfile` を `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落とした (#2691 で実測)。そこで範囲を `wrangler` `^4.150.0`・`@cloudflare/vitest-plugin` `^1.4.1` に下げ、公開から 24 時間以上たつ版の組 (`wrangler@4.150.0` が依存する `miniflare@5.20261006.2-beta`・`workerd@1.20261006.1`) で lock を作り直した。
+  - 除外しない理由: `minimumReleaseAgeExclude` や `--config.minimum-release-age=0` で通すと、公開直後の版が Workers Builds の token (権限が広い) で入る。このポリシーが防ぐ侵害の入口になるので、ポリシーは変えない。
+  - 版の選び方: `pnpm view <pkg> time --json` で公開時刻を見て、24 時間以上たつ最新版を範囲に書く。lock に古い版が残ると範囲を書き換えても残るので、`pnpm remove <pkg>` の後に `pnpm add -D <pkg>@^<版>` で解決し直す。推移的な依存 (miniflare・workerd) も同じ確認の対象。
+  - Workers Builds の install の結果 (merge 後) は、この README では確認していない (PM が確認する)。
 
 ## 確認できていない点 `[未確認]` のチェックリスト
 

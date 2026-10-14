@@ -110,6 +110,24 @@ test("launch: blocked・started・needs-user-input・oc:stuck・親 (open な子
   assert.deepEqual(rows.user.map(([n]) => n).sort(), [44, 45]);
 });
 
+test("launch (#2651): oc:hold の issue は投稿しない。ラベルを外すと次の plan で着手対象に戻り、/status の hold に数える", async () => {
+  const ctx = await configuredApp({ live: true, handlers: [(c) => (/\/issues\/\d+\/comments$/.test(c.url) && c.method === "POST" ? j({ html_url: "x" }, 201) : undefined)] });
+  await seed(ctx, 60, { labels: ["oc:hold"] });
+  await seed(ctx, 61);
+  await markFresh(ctx);
+  const gh = await (ctx.app.engine as any).d.gh();
+  await ctx.app.engine.launch(gh);
+  assert.deepEqual(comments(ctx.m.calls).map((c) => c.url.match(/issues\/(\d+)\//)?.[1]), ["61"], "hold の 60 には投稿しない (対照の 61 だけ投稿)");
+  assert.equal((ctx.app.engine.status() as any).hold, 1);
+  assert.deepEqual(ctx.app.engine.plan().rows.hold.map(([n]) => n), [60]);
+  // ネガコン: 似た名前のラベルは hold にしない
+  await seed(ctx, 62, { labels: ["oc:holdx"] });
+  assert.deepEqual(ctx.app.engine.plan().picks.map((p) => p.n), [62], "oc:holdx は hold ではない");
+  assert.equal((await send(ctx.app, "issues", issuePayload(60, { labels: [], at: "2026-10-14T11:30:00Z" }))).status, 202);
+  assert.deepEqual(ctx.app.engine.plan().picks.map((p) => p.n).sort(), [60, 62], "ラベルを外すと 60 が着手対象に戻る");
+  assert.equal((ctx.app.engine.status() as any).hold, 0);
+});
+
 test("launch: 親 (merge 済みの PR を持つが open な子が残る) は着手対象から外し、子だけを着手する", async () => {
   const ctx = await configuredApp();
   await seed(ctx, 90, { title: "[X-1] 親" });
