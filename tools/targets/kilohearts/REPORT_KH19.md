@@ -196,3 +196,17 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
 未解決の起票先: (a)/(b) の this 型伝播は #848 に残す (#848 は CLOSED。受入 2 は未達のまま)。rip_data は #849、lift 失敗点は #850 (§4)。
+
+## 8. #2098 (KH-19g) 対照 Gain の before 160 の機械照合 (人手検証は未実施)
+
+- 素材: `plugins-kilohearts` を `$RUNNER_TEMP` に `tar --zstd -xf` で展開し、`KH_SRC` で `extract_installer.sh` を実行 (Windows 側は成功。macOS スライスの `llvm-lipo` は runner に無く失敗したが本節の対象外)。
+- 再生成: `rtti_walk.py` → `callgraph.py` (120,856 関数) → `gain_before_list.py gain`。`before_funcs` = 160、roots = 27 で §2 と一致。load average 0.99 (開始時)。
+- 一覧の再生成結果は正本 `gain_before_160.tsv` と列 1〜5 が全行一致。
+- 機械照合 `scripts/gain_mech_check.py` (本 issue で追加): `{"rows":160,"roots":27,"root_slot_ok":27,"nonroot":133,"edge_ok":133,"bad":[]}`。
+  - root 27 件は rtti の gain ns vtable slot に実在。
+  - 非 root 133 件は親関数の `call_site_rva` 位置の命令が `func_rva` への direct call/jmp。
+- `vtable_closure.py gain nogui` の before_funcs = 160 (before_bytes 39,357) で一致。
+- **判定**: 機械照合は通ったが、これは人手検証ではない。`verified` 列は全 160 行 `auto` のまま。手検証された行は 0 件のため、手検証集合と before 集合の差分は計算できず、差分 0 は主張しない。
+- 受入 1 (人手で呼び出し元と call 位置を確認し `manual` にする): **未達**。
+- 受入 2 (手検証集合と before 集合の差分 0 を書く): **未達** (手検証集合が空)。
+- 受入 3 (自動生成分を手検証済みと書かない): **達成** (本節と `verified` 列で明示)。
