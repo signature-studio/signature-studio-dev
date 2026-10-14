@@ -171,7 +171,7 @@ k236 P=0xa027 値 0x40a027: なし
 
 ## 14. 通常 boot の trap 位置と lift 誤り候補 (#942 受入 1・2・run 10)
 
-測定 commit: `54bacdc0` (origin/main・本 PR の基点。e2e の実行経路はこの commit と同一)。素材 fl-win64 / work-m11 / work-liftdiff を展開 (toolchain-emsdk は `/opt/emsdk` が既存のため展開せず)。
+測定 commit: `54bacdc0` (origin/main・本 PR の基点。e2e の実行経路はこの commit と同一)。素材 fl-win64 / work-m11 / work-liftdiff を展開 (toolchain-emsdk は `[EMSDK]` が runner に既存のため展開せず)。
 `FL_WIN64_DIR=$RUNNER_TEMP TMPDIR=$RUNNER_TEMP bash tools/m11/ldfix/ldfix_e2e.sh` は 71.5 秒 (real)・rc 0・judge PASS・load 0.96 / 0.67 / 0.31 (終了後)。stage4 units 17/942・icall 24・threw `memory access out of bounds` (base = fix)。survey ok 136 / trap 9 (base = fix)。修復件数 F3a 2 / F3c 33 / F1 0 / F2 0 / F3b 0。
 
 ### 14-1 survey 経路の bin 表観測は通常 boot と別物
