@@ -242,3 +242,7 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 
 ## 15. 2026-10-14 run (#2066 / SR-37): XferOnOffButton の .text 対応付けと本体バイト数
 - 詳細・実測・測定スクリプト: 付録 `REPORT_EFFORT_APPENDIX_2066.md` (本節の全文)。
+
+## 16. 2026-10-14 run (#2065 / SR-36): canvas 描画の試行
+- 結論: **未達 (描画 0 画素)**。CTextLabel のみの harness は wasm でコンパイル (69/69)・リンク (未解決 0)・実行 (rc=0) まで通るが、描画の非ゼロ画素は 0。阻害要因は文字列 (`createString` が nullptr) と描画命令 15 件の no-op。XferOnOffButton は範囲外 (阻害要因のみ記録)。
+- 詳細・実測・子 issue 案: 付録 `REPORT_EFFORT_APPENDIX_2065.md` (本節の全文)。
