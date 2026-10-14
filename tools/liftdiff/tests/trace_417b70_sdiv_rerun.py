@@ -6,17 +6,21 @@ native との食い違い (status / rax / mem / calls) を入力ごとに出す�
 
   FL_WIN64_DIR=<fl-win64 展開先> python3 tools/liftdiff/tests/trace_417b70_sdiv_rerun.py > tools/liftdiff/results/m11_417b70_sdiv_rerun.md
 
-前提: work/m11 (udiv 版) と work/m11_sdiv (sdiv 版) をビルド済み。
-sdiv 版は tools/m11/work/boot_final3.ll の 125366 行だけ `udiv` → `sdiv` に変えた IR (boot_final3_sdiv.ll) で、
-target JSON (work/m11_sdiv/target.json) は targets/m11.json の name / ir だけ差し替えたもの。
+前提: 素材 work-m11 (tools/m11/work/boot_final3.ll) と work-liftdiff (work/m11 の udiv 版) を展開済み。
+sdiv 版の IR と target JSON は tools/m11/m11_sdiv_variant.py が作る (work/ 以外に手順を持たせるため、
+この harness が最初に呼ぶ)。sdiv 版 wasm は harness 内で build する。
 """
+import contextlib
 import json
 import os
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+REPO = os.path.abspath(os.path.join(ROOT, '..', '..'))
 sys.path.insert(0, ROOT)
+from ldlib import build_wasm  # noqa: E402
 from ldlib.session import Session  # noqa: E402
 from ldlib.runners import Runner  # noqa: E402
 from ldlib import compare  # noqa: E402
@@ -65,10 +69,16 @@ def summarize(r):
 
 
 def main():
+    # sdiv 版の IR と target.json を work/ 外の手順 (tools/m11) から作り、その target を build する。
+    # 進捗ログは stdout (結果表の正本) に出さず stderr へ送る。
+    subprocess.run([sys.executable, os.path.join(REPO, 'tools/m11/m11_sdiv_variant.py')], check=True, stdout=sys.stderr)
     s = Session(os.path.join(ROOT, 'targets/m11.json'), build=False, trace=True)
     nat = run_native(s)
     udiv = run_wasm(s)
-    s_sdiv = Session(os.path.join(ROOT, 'work/m11_sdiv/target.json'), build=False, trace=True)
+    sdiv_t = os.path.join(ROOT, 'work/m11_sdiv/target.json')
+    with contextlib.redirect_stdout(sys.stderr):
+        build_wasm.build(build_wasm.load_target(sdiv_t))
+    s_sdiv = Session(sdiv_t, build=False, trace=True)
     sdiv = run_wasm(s_sdiv)
     print('<!-- 自動生成: python3 tools/liftdiff/tests/trace_417b70_sdiv_rerun.py (LD-62, #1767) -->')
     print('| stride | count | native | udiv wasm | sdiv wasm | udiv 食い違い | sdiv 食い違い |')
