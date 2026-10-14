@@ -6,7 +6,7 @@
 #   出力: <out_dir>/<mode>_run1.txt・<mode>_run2.txt。終了時に boot.o を消して既定 build を作り直す。
 set -uo pipefail
 HERE="$(cd -- "$(dirname -- "$0")/.." && pwd)"; cd "$HERE"
-source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1
+command -v emcc > /dev/null || { echo "[dest_2203] emcc が無い: 先に [EMSDK] の emsdk_env.sh を source する (docs/REFERENCES.md §4)"; exit 1; }
 MODE=${1:?off|on}; OUT=${2:?out_dir}
 case "$MODE" in off) GATE=0;; on) GATE=1;; *) echo "mode off|on"; exit 2;; esac
 mkdir -p "$OUT" work/probe2203
