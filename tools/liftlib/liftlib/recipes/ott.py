@@ -213,6 +213,18 @@ def run(workdir, build=True, helpers="gen", auto=(), lb_base=None):
     return res, log
 
 
+def outhash_json(r):
+    """ott_outhash.mjs の結果を読む (#3145)。stdout の最後の JSON 行を取る。JSON が無ければ rc と出力の抜粋を例外に残す
+    (旧版は json.loads(stdout) で "Expecting value" だけが残り、module 側の失敗が見えなかった)。"""
+    for line in reversed(r.stdout.splitlines()):
+        if line.strip().startswith("{"):
+            try:
+                return json.loads(line)
+            except ValueError:
+                break
+    raise RuntimeError("ott_outhash の JSON 出力が無い (rc=%s) stdout=%r stderr=%r" % (r.returncode, r.stdout[:200], r.stderr[:400]))
+
+
 def e2e_checks(cjs, workdir, label="", env_extra=None, outhash=True):
     """m10_e2e.sh の E1..E7 を再現して判定する。env_extra: lowbase 時の {LB_BASE, LB_ARENA}。
 
@@ -263,7 +275,7 @@ def e2e_checks(cjs, workdir, label="", env_extra=None, outhash=True):
                     e2.update(ee)
                 # 42 combo × module 初期化 (864MiB) を 2 module 分: 実測 約 7 分/module (CAB-238) ゆえ 1800 秒
                 r = subprocess.run(["node", os.path.join(RECIPES, "ott_outhash.mjs")], capture_output=True, text=True, env=e2, timeout=1800)
-                hs.append(json.loads(r.stdout))
+                hs.append(outhash_json(r))
             f0 = [k for k in hs[0] if "_f0_" in k]
             out["outhash"] = dict(combos=len(hs[0]), equal=hs[0] == hs[1], distinct=len(set(hs[0].values())),
                                   f0_equal=sum(1 for k in f0 if hs[0][k] == hs[1][k]), f0_total=len(f0))
@@ -272,5 +284,5 @@ def e2e_checks(cjs, workdir, label="", env_extra=None, outhash=True):
             else:
                 out["pass"] = out["pass"] and out["outhash"]["equal"]
         except Exception as ex:                  # noqa
-            out["outhash"] = dict(error=str(ex)[:200])
+            out["outhash"] = dict(error=str(ex)[:600])
     return out
