@@ -121,3 +121,26 @@
 | pattern 次元 (pat 別の note 保持) | mock は単一パターン | #2808 (PY-90) 系の pattern 作業 |
 | `fl_table.c` 行 61 の np=6 (stub 由来) | handler の NARGS で吸収。表の再生成は `gen_provider.py` の作業 | 子 #2929 ([PY-111]) |
 | useGlobalIndex (group 配列 A/B) | group 無しでは未モデル | #2805 (PY-89) |
+
+## 9. main 取り込み後の再測定 (競合解消。測定 commit `9d49d429`)
+
+- 経緯: PR ブランチ (HEAD `1872d54f`) が main (`04f4dca9`) と競合したため、`git merge origin/main` で解消した (rebase なし)。競合は 3 ファイル。
+  - `tools/python/host/fl_mock.mjs`: 本 PR の `getStepParam`・`getCurrentStepParam` と main の `getChannelIndex`・`getChannelMidiInPort` (PY-89) の両方を残した。
+  - `tools/python/tests/channels_diff.mjs`: 呼出し列を両方残した (本 PR 側 + main 側 15 件。呼出し 145 → 160)。
+  - `tools/python/tests/provider_check.mjs`: 期待集合 `pe100` (本 PR) と `stub89` (main) を両方入れ、期待値を実装 79 → 81・未実装 356 → 354 に直した。
+  - `tools/python/provider/fl_engine.c` は自動マージ。両方の関数が残り、重複は無い。
+- 入力: fl-win64 の PE と DATA 4 本を `$RUNNER_TEMP/fl-win64` に展開し、`fetch_inputs.sh` で `work/` に配置した。CPython wasm は `build_cpython_wasm.sh` (`/opt/emsdk`、emcc 6.0.12)。
+
+| 検査 | コマンド (`tools/python` で実行) | 結果 | 所要 |
+|---|---|---|---|
+| provider build | `EMSDK_ENV=<toolchain-emsdk 展開先>/emsdk/emsdk_env.sh bash provider/build.sh` | rc 0 | 11.505 秒 (sysroot キャッシュ生成を含む) |
+| CPython wasm | `bash build_cpython_wasm.sh` | rc 0 | 3 分 18.656 秒 |
+| flpy link | `FLPY_SKIP_TABLE=1 FL_WIN64_DIR=<展開先> bash build_flpy.sh` | rc 0 | 4.747 秒 |
+| 件数・ABI | `node tests/provider_check.mjs` | PASS (functions 435・implemented 81・unimplemented 354) | 0.278 秒 |
+| C と mock の差分 | `node tests/channels_diff.mjs` | PASS (calls 160・diffs 0) | 0.040 秒 |
+| 48 tool (wasm) | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok (soft_error 0・raised 0・host_calls 37425) | 1.280 秒 |
+| 48 tool (mock) | `node tests/all_tools.mjs` | 48/48 ok (host_calls 37425) | 1.258 秒 |
+| MIDI device 照合 | `node tests/device_diff.mjs` | PASS (calls 7・diffs 0) | 0.038 秒 |
+
+- 計測直前 `uptime` の load average 1.19 / 1.44 / 0.79 (nproc 4)。検証範囲は §6 と同じ (実 FLEngine の値とは比較していない)。
+- 差分: `git diff 9d49d429 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` の出力は `0`。本 commit は `tools/python/REPORT_PY100.md` だけを変える。
