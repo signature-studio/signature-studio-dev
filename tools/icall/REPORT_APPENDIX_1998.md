@@ -45,10 +45,11 @@
 | 素材 | `fl-win64`・`plugins-freshair` (fetch.sh: win 17 files, factory .epf 8)・`toolchain-retdec`・`toolchain-emsdk`・`work-icall`・`work-liftlib` |
 | `tools/ott/native/build.sh` | OK |
 | `tools/icall/fa_route_build.sh` | OK、5.2 s |
-| `tools/icall/diff/fa_sweep.sh 8 60` | 131 関数、69.8 s、load 0.08 (開始時 `uptime`) |
-| 区分 | bit 一致 47 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 9 (合計 131) |
+| `tools/icall/diff/fa_sweep.sh 8 60` | 131 関数、74 s、load 0.82 → 1.02 (開始・終了時 `/proc/loadavg`) |
+| 区分 | bit 一致 46 / native crash・timeout 66 / wasm のみ err 9 / 値の不一致 10 (合計 131) |
 
-注: 付録 1899 の測定 (bit 一致 46 / 値の不一致 10) とは 1 件ずつ違う。`wasm のみ err` は 9 件で一致し、対象 2 件 (180c8b280・181057b38) は両方とも wasm のみ err のまま。
+注: 付録 1899 の測定 (bit 一致 46 / 値の不一致 10) と一致。`wasm のみ err` は 9 件で、対象 2 件 (180c8b280・181057b38) は両方とも wasm のみ err のまま。
+注: 本測定の前に `tools/ott/native/build.sh` を実行した (未実行だと `libottnative.so` 無しで全件 crash_or_timeout になる)。
 
 ## 5. 未解決 (起票先)
 
