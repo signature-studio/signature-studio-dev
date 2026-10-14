@@ -57,27 +57,29 @@
 - `provider/fl_engine.c`: 同じ。`NARGS(0,0)` / `NARGS(1,2)` と `A_INT`。
 - 効果 (0x12df090・0x124c020) は API から観測できないため状態を持たない。P と gate は真の定数とし、-2 の経路は到達させない (仮置き)。
 - `tests/general_diff.mjs`: 呼出し 3 件と引数違い・型違い 4 件を追加 (計 16 件。既存 9 件)。
-- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349。
+- `tests/provider_check.mjs`: `pe125` (2 関数) を追加。実装 84→86、未実装 351→349 (PY-125 の PR 作成時の base 上)。main 取り込み後 (merge commit `6976c595`) は main の `pe100` (2 関数) を含むため、期待値は 実装 86→88、未実装 349→347。
 
 ## 検証
 
-測定 commit: `b6154b0e` (コードを変えた最後の commit。`feat(python): general.clearLog・dumpScoreLog を mock と C provider に実装 (#3001)`)。
-環境: runner 4 core、測定開始時の load average 1.98 (`uptime` 21:08:21)。素材: `fl-win64` の `block00031_PE.bin`・`block25159/24429/24430/24618_DATA.bin` を wildcard 展開。`toolchain-emsdk` は展開先の `emsdk/emsdk_env.sh` を `EMSDK_ENV` で指定。
+測定 commit: `6976c595` (コードを変えた最後の commit。main を取り込んだ merge。`tests/provider_check.mjs` の期待値を 88 / 347 に直した)。
+環境: runner 4 core、測定開始時の load average 1.97 (`uptime` 21:35:30)。素材: `fl-win64` ([WIN64]) を展開し、`block00031_PE.bin`・`block25159/24429/24430/24618_DATA.bin` を使う。emsdk は [EMSDK] の 6.0.12。
 
-前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 17 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒)・`EMSDK_ENV=<emsdk_env.sh> bash provider/build.sh` (rc 0、11.9 秒)。
+前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 27 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.1 秒)・`bash provider/build.sh` (rc 0、1.6 秒。`gen_provider.py --check-handlers` でハンドラ 88)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS | 0.06 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 86 / 未実装 349 / MCP 静的 60) | 0.60 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.52 秒 |
+| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.047 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 88 / 未実装 347 / MCP 静的 60) (rc 0) | 0.366 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 2.065 秒 |
+
+既定 (JS mock) の `node tests/all_tools.mjs` も 48/48 ok、host_calls 37,425、callback 往復 true (rc 0)。
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `clearLog` の戻り値を `undefined` から `0` にすると、`node tests/general_diff.mjs` は `AssertionError: general 差分 1 件` で rc 1。元に戻すと calls 16・diffs 0・PASS (rc 0)。
 
 コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff b6154b0e HEAD -- tools/python ':!*.md'
+$ git diff 6976c595 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
