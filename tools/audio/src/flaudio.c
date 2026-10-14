@@ -106,6 +106,10 @@ int fla_open(uint32_t sr, uint32_t out_ch, uint32_t in_ch, uint32_t buffer_frame
      * T >= burst + buffer_frames でないと 1 回の burst で枯渇する (PROTOCOL.md §4) */
     uint64_t need = ((uint64_t)burst + burst / 4 + buffer_frames + buffer_frames - 1) / buffer_frames;
     if (need > depth) depth = (uint32_t)need;
+    if (flags & FLA_F_T_FLOOR) {
+        uint32_t d_floor = (FLA_T_FLOOR_FRAMES + buffer_frames - 1) / buffer_frames;
+        if (depth < d_floor) depth = d_floor;
+    }
     /* depth の固定上限は置かない。制約は ring 容量のみ: 動的 T 拡張 (flasio, 上限 ring-2B) の余地を含め
      * (depth+2)*B <= FLA_MAX_RING が必要。超過はホストを落とさずエラー返却 (呼び側が CreateBuffers エラーに写像) */
     uint64_t t_min = ((uint64_t)depth + 2) * buffer_frames;
