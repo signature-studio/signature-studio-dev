@@ -9,7 +9,7 @@
 #   build   : retdec を取得 → 6edcaaea → 一時ログのパッチ適用 → cmake → make (所要を time で出す)
 #   install : 代用 share を置き make install (install-share.py は version.txt 一致で download を省く)
 #   ranges  : 範囲ごとに retdec-decompiler.py を実行し、一時ログ (stderr の TAG_*) の件数を数える
-#   stages  : 41a670 関数の 41a6a0 について、bin2llvmir の段ごとの IR を取り、値が変わる最初の段を出す
+#   stages  : 41a670 関数の 41a6a0 と 666a60 関数の 666b10 について、bin2llvmir の段ごとの IR を取り、値が変わる最初の段を出す
 #             (retdec_stage_1091.py を 2019 版に向ける。v5.0 の REPORT_911 §6c と同じ出力形式)
 #   variantb: share の types・static-code を 2019-03-08 の archive の物 (sha256 検証) に差し替えた変種で
 #             41a6a0・41a6d3・666b10 と対照 41a6b3 を再実行する (代用 share の影響の確認)
@@ -140,8 +140,11 @@ EOF
   chmod +x "$c/bin/retdec-bin2llvmir" "$WORK/retdec2019_cli.sh"
   mkdir -p "$WORK/run/stages"
   cp "$PE_BIN" "$WORK/run/stages/in.bin"
+  echo "--- 41a6a0 (関数 41a670、範囲 41a670-41a6f4)"
   RETDEC="$WORK/retdec2019_cli.sh" PE="$WORK/run/stages/in.bin" python3 "$HERE/retdec_stage_1091.py" 41a670 41a670 41a6f4 41a6a0 --out "$WORK/run/stages/o"
-  rm -f "$WORK/run/stages/in.bin" "$WORK/run/stages/o/f.dsm"
+  echo "--- 666b10 (関数 666a60、範囲 666a60-666b20)"
+  RETDEC="$WORK/retdec2019_cli.sh" PE="$WORK/run/stages/in.bin" python3 "$HERE/retdec_stage_1091.py" 666a60 666a60 666b20 666b10 --out "$WORK/run/stages/o2"
+  rm -f "$WORK/run/stages/in.bin" "$WORK/run/stages/o/f.dsm" "$WORK/run/stages/o2/f.dsm"
 }
 
 case "${1:-all}" in
