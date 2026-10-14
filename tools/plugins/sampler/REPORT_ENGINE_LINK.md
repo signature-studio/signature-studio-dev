@@ -172,8 +172,12 @@
   全文の patch は 250 行上限 (`docs/DOC_MAP.md` §1) を超えるため載せない。 上の stat と同じ範囲で `git diff 5880a9f6 HEAD -- tools/plugins/sampler ':!*.md'` を実行すれば再現できる。
 
 - **訂正 (測定経路に `lift/lift_ranges.sh` の差分が入る)**: `sampler_engines.sh` (受入条件 1) は `engine_lift.sh` → `lift_from_ll.sh` (`lift_ranges.sh` の RetDec 行を切り出して実行) 経由、`sampler_e2e.sh` (受入条件 2) は `lift/batch_lift.sh` → `lift_ranges.sh` 経由で RetDec を呼ぶ。 この `lift_ranges.sh` は `5880a9f6`..HEAD で変わっている (`git diff 5880a9f6 HEAD -- tools/plugins/lift/lift_ranges.sh`: 31 行追加・2 行削除)。
-- 変更の要点: RetDec 呼出 `--select-decode-only` の後ろが `${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection}` (5880a9f6、env 未設定なら付かない) から、既定 1 で付く形 (HEAD、`PLUG_NO_STATIC_DETECT=0` で付かない) に変わった。 env を立てない測定経路 (`sampler_engines.sh`・`sampler_e2e.sh`) は HEAD の既定で RetDec の argv が変わる。
-- 表の実測 (上の行) は `5880a9f6` の RetDec argv (静的検出あり) に対応する。 HEAD の既定 (静的検出なし) での `sampler_engines.sh` / `sampler_e2e.sh` の結果は未測定。 HEAD で `PLUG_NO_STATIC_DETECT=0` を立てると RetDec の argv は 5880a9f6 と同じになる (`NOSD_ARGS` が空になるコード読解。実測は未実施)。
+- 変更の要点: `5880a9f6` の RetDec 呼出は `--select-decode-only --timeout` のみで、静的検出の無効化を渡さない。 `8ea7a78b` で opt-in の `${PLUG_NO_STATIC_DETECT:+--disable-static-code-detection}` が入り、HEAD (`8a7f32ba`) で既定 1 になった。
+- argv の実測 (`lift_ranges.sh` を実行し、`/opt/retdec/bin/retdec-decompiler` を記録用の偽実行ファイルに差し替えて、渡った引数を比べた。 RetDec 本体は走らせていない):
+  - `5880a9f6` (env 未設定): `--select-decode-only --timeout 60` (静的検出の無効化なし)
+  - HEAD `8a7f32ba` (env 未設定): `--select-decode-only --disable-static-code-detection --timeout 60`
+  - HEAD `8a7f32ba` (`PLUG_NO_STATIC_DETECT=0`): `--select-decode-only --timeout 60` (`5880a9f6` と同一)
+- よって表の実測 (`5880a9f6`) は、HEAD で `PLUG_NO_STATIC_DETECT=0` を立てた経路と RetDec argv が一致する。 HEAD の既定 (静的検出なし) での `sampler_engines.sh` / `sampler_e2e.sh` の結果は未測定。 RetDec の出力差 (define 数・emcc 判定) は RetDec 本体が無いため測れていない。
 - 上の 6 ファイル (`closure_unreached.py`・`f80_split.py`・`lea_lift.sh`・`nc2_imm_synth.py`・`unr_nega.sh`・`x87_check.py`) を呼ぶのは `lea_e2e.sh` / `unr_e2e.sh` / `unr_nega.sh` / `unr_lift.sh` (別経路) だけ。 この点はレビュー側の `git grep` 確認と一致する。
 - **再測定は未実施・未解決**: RetDec v5.0 (`toolchain-retdec`) と emsdk (`toolchain-emsdk`) がこの run に無い (`$ARTIFACTS_DIR` は `fl-win64` のみ)。 次の run で `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` を指定し、HEAD で `sampler_engines.sh` と `sampler_e2e.sh` を env 未設定 (既定) で流して表を更新する。 起票先: #540 (本 PR の親 issue)。 それまで §7 の表は「5880a9f6 の実測」として読むこと。
 - 上の 6 ファイルの変更 (f80 計数・U6・NC2a/b) は別経路の検証の範囲で、本 REPORT の測定対象外。
