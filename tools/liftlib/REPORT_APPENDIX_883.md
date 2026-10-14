@@ -100,3 +100,28 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 OTT_DLL=<OTT_vst2_win64.dll の実パス> bash tools/liftlib/gen_ott_getparam_F.sh
 cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 200   # FAIL (match 0)
 ```
+
+## #883 run (測定 commit 9f336206, コード変更なし): shift 併用の実測
+
+素材: `analysis-ott-binaries` / `work-liftlib` / `work-m6-ott` を展開 (`$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
+
+| 設定 (leafspec `--n 200`) | rc | 時間 | match / mismatch / wasm_trap |
+|---|---|---|---|
+| ベース (`targets/ott_getparam.json`, blk_global=false, shift なし) | 1 | 4.1 s | 0 / 200 / 200 |
+| `shift` 0x180000000→0x30000000 のみ | 1 | 1.9 s | 0 / 200 / 200 |
+| `blk_global=true` + `shift` 0x180000000→0x30000000 | 1 | 1.9 s | 0 / 200 / 200 |
+| `blk_global=true` + `shift` 0x180000000→0x100000 | 1 | 1.9 s | 0 / 200 / 200 |
+
+判定: 3 設定すべて `memory access out of bounds` (`LL_VERBOSE=1`)。一時設定ファイルは削除済み (リポジトリ差分なし)。
+
+### 分かったこと
+
+1. `passes.shift` は `remap.shift_va` で `i64 <定数>` の 193 箇所を平行移動する (`shift_numeric: 193`)。適用はされている。
+2. しかし shift 後の `*_fixed.ll` に、加算形の画像 VA 参照が残る: `%17 = add nuw nsw i64 %x, 6442450944` (= 0x180000000) の後に `inttoptr`。`shift_va` は `i64 <定数>` の即値しか対象にしないため、この形は動かない。
+3. `blk_global` は BLK を `@__icall_blk` の GEP へ置く (`inttoptr` 定数は 0 件、`@__icall_blk` 136 箇所)。BLK 自体は trap の原因ではなくなった。
+4. よって trap の残り原因は、(a) 加算形の image VA (`0x180000000` 基準) が shift されていないこと、(b) 入力 this/idx が BLK から読まれ harness が書かないこと (#1270)、の 2 点。
+
+### 次の作業
+
+- (a) `shift_va` で加算定数 `6442450944` (0x180000000 の加算) を image base 移動の対象に含める (`remap.py` 側の拡張)。その上で shift 後の wasm 線形メモリ上限 (`newbase` の選択と INITIAL_MEMORY) を確認する。
+- (b) は #1270 (this/idx 受渡し) で扱う。
