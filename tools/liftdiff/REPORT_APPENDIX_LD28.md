@@ -87,3 +87,16 @@
 - **`trace_diverge_418be0.py` (rc 0)**: 本 commit の `tests/` には当該スクリプトが無いため、main の版 (`500acb3d` / `c00790d1` 反映済み) を入力 jsonl に与えた。除外 1 件 (解析不能要素)・対象 0 件 (`0x418be0` の共通 entry 直後の食い違いが無い)。記録 jsonl で得た 20 件 (16 + 4) は、この rebuild では再現しない。
 - **結論**: `1c4b7c7e` は記録 (2,273 / 2,892 / 2,256) の生成 commit ではない。`0x41c820` mismatch も再現しない。残りの候補 `9e9c1315` / `38d53ac8` / `930c6dbc` は子 issue に切り出す (1 run に収まらないため): #2276 (`9e9c1315`) / #2277 (`38d53ac8`) / #2278 (`930c6dbc`)。
 - **コード差分 (測定 commit → HEAD・候補の判定に影響する範囲)**: `git diff 1c4b7c7e origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (LD-74 の「候補範囲で差分 0」は、この範囲には当てはまらない)。
+
+#### 候補 `930c6dbc` の全件 closure rebuild (LD-102 / #2278)
+- **測定 commit = `930c6dbc`** (コードを変えた最後の commit。detached worktree で測定)。素材は `fl-win64` + `work-m11` + `work-liftdiff` (`tools/liftdiff/work/m11/batch_closure.jsonl` は記録と同一素材)。`930c6dbc` の code 差分 (`ldlib` / `liftdiff.py` / `targets` / `rt`) は `1c4b7c7e` と 0 行 (`git diff 1c4b7c7e 930c6dbc -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt | wc -l` = 0)。`930c6dbc` は docs のみ (icall REPORT 数値修正)。
+- **ビルド**: `liftdiff.py build` を `930c6dbc` のソースから実行 (rc 0・`sig_mismatch 0`・`undefined 1`・wasm 4,439,240 B)。`targets/m11.json` の `pe` は `/home/ubuntu/...` 固定のため、`work/` 配下の複製 target (`pe` だけ `fl-win64` 展開先へ向けた。repo の target は変更していない)。
+- **batch**: `batch --set closure --shards 14 --nobuild`。rc 0・**9 分 34 秒** (wall)・開始時 load 1.30。
+- **集計**: 一致 3,091 / 不一致 1,525 / 実行不能 2,805 (記録 2,273 / 2,892 / 2,256 と不一致。`1c4b7c7e` の全件再生成 (LD-91) と同一の集計)。
+- **記録との verdict 一致**: 7,421 関数中 5,704 (`1c4b7c7e` の全件再生成と同数)。
+- **対象 2 関数**: `0x418be0` = 記録 match / rebuild match。`0x41c820` = 記録 mismatch / rebuild match (記録の mismatch は再現せず)。
+- **`trace_diverge_418be0.py` (rc 0)**: `930c6dbc` の `tests/` には当該スクリプトが無いため、main の版を入力 jsonl に与えた。
+  - 本 rebuild の jsonl: 対象 0 件・除外 1 件 (解析不能要素)。
+  - 記録 jsonl (`work-liftdiff` 同梱): 16 + 4 = 20 件。`#2242` の結果と同じで、スクリプトが P2 を拾えることの対照になる。
+- **結論**: `930c6dbc` も記録 (2,273 / 2,892 / 2,256) の生成 commit ではない。`0x41c820` mismatch も再現しない。候補 4 件はいずれも記録を再現しなかった。残る `9e9c1315` (#2276) / `38d53ac8` (#2277) は既存の子 issue で扱う。#1035 の受入条件 1 は [~] のまま。
+- **コード差分 (測定 commit → HEAD・候補の判定に影響する範囲)**: `git diff 930c6dbc HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` は 25 ファイル・+1,528 / -91 行 (`--stat`。`930c6dbc` は `origin/main` の祖先)。この範囲の変更が判定に効くかは未測定。本測定は `930c6dbc` の値として読む。
