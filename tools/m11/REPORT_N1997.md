@@ -54,5 +54,6 @@
 
 ## 7. 差分
 
-- 測定 commit: `origin/main` = `c171b9dc`。本 REPORT の commit 以外にコード差分は無い。
-- 確認コマンド: `git diff c171b9dc HEAD -- tools/m11` (本 REPORT の追加のみ)。
+- 測定 commit: `c171b9dc` (本 run は測定していない。コード変更なし)。
+- PR の差分 (main 取り込み後): `git diff origin/main HEAD` = `tools/m11/REPORT_N1997.md` の追加 58 行のみ。
+- 注: 同じ HEAD で `git diff c171b9dc HEAD -- tools/m11` には、取り込んだ main 側の他 PR の変更 (9 file) が含まれる。本 PR の変更ではない。
