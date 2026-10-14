@@ -15,7 +15,9 @@
   実測 5.5 秒 (user 3.5 s / sys 7.1 s)。load 測定なし。
 - 対象: `extracted/block00031_PE.bin` (`flstudio_win64_26.1.7.5653.exe` と同梱)。
 - 解析補助: `analysis/flapi/pe_disasm.py` (capstone + pefile)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
-- 測定 commit: 本 PR の commit (`git log -1 --oneline` 参照)。解析に使ったのは `00083cdb` (main) 時点の表。
+- 測定 commit: `00083cdb` (main)。解析に使った `analysis/flapi` の表・逆アセンブラはこの時点のもの。
+  本 PR の commit `3f8255ae` は本 REPORT と `docs/DOC_MAP.md` の索引行のみを変えるため、解析コードの基準は `00083cdb` のまま。
+  証跡: `git diff 00083cdb HEAD -- tools/python/analysis/flapi` の出力は 0 行 (`3f8255ae` 時点で差分 0)。
 
 ## 確定 1: `selectTool` (0xd58670)
 
@@ -52,7 +54,7 @@ REPORT_PY44 の表の残り 36 件 (`selectTool`・`scrollTo` を除く) は、�
 
 - 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_disasm.py 0xd58670 60` / `0xd58490 40`。
   foreground・数秒。書式文字列は `pefile` で `.rdata` から直接読んだ (コマンドは PR 本文に記載)。
-- コード差分: 本 PR は `tools/python/REPORT_PY56.md` と `tools/python/REPORT_PY44.md`・`docs/DOC_MAP.md` の REPORT 索引行のみ。
+- コード差分: 本 PR は `tools/python/REPORT_PY56.md` と `docs/DOC_MAP.md` の REPORT 索引行のみ (`gh pr diff 1972 --name-only` で確認)。
   C provider・mock・テストは無変更のため、`all_tools.mjs` 48/48 は再測定しない (`docs/WORKFLOW.md` §6)。
 
 ## 未解決 (起票先付き)
