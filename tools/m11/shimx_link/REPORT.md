@@ -197,3 +197,25 @@ GetCurrentThreadId 3, GetModuleHandleW, GetProcAddress, InitializeCriticalSectio
   「lift 実機で `winstubs_loadlib_miss` を取得し retval_table を実測校正」は、unit 18 の先へ進むまで**実施不可** (probe の 1 件は校正根拠にならない)。
 - #103 引継ぎ 3 点のうち未着手: (1) `m11_genstubs.py` の除外リストへの pump API 追加は、`shimx_link` 系が genstubs の `m11_winstubs.c` を使わず pump TU も未リンクのため**現構成では不要** (pump を closure に入れる #102 で必要)。(2) `pump_ring_addr()` → `new PumpRing(...)` 結線も #102。(3) 時計較正は ctrl 単体を使わない — 本結線は時計に触れない。
 - `--trace` と `--ws` の併用は未検証 (trace_wrap の改名 IR は ws の定義済み名と未突合)。リンクのみ確認 (`--trace --soft --fix --ws`: mismatch 0 / undefined 0 / duplicate 0)、実行は未確認。trace の obj / `BOOT` パスは `$WSUF` 付きで WS 有無のキャッシュを分離済み (`boot_trace_fix.o` 4,282,726 B と `boot_trace_fix_ws.o` 4,282,642 B は別内容)。
+
+### 10.3 再測定 (2026-10-14, 測定 commit `e7491b4f`): 閉包リンクの復旧と現 IR での boot 到達点
+
+§10.1 の値は旧 IR (`work-m11` の `boot_final3.ll`, 2026-10-10 生成) での測定。以下は現 main のコードで IR を作り直した結果。
+
+| 項目 | 実測 |
+|---|---|
+| 修正前 (origin/main `580dd294`) | `build.sh --soft --fix --ws` が exit 1。`emcc: error: undefined exported symbol: "_sxt_count" [-Wundefined] [-Werror]`。`--trace` 専用の `sxt_*` (`trace_rt.c`) を plain の EXPORTS に入れていたため (emsdk 6.0.12 は未定義 export を -Werror 扱い) |
+| 修正 (`e7491b4f`) | `sxt_*` の EXPORTS を `[ $TRACE = 1 ]` のときだけ追加 (`build.sh` 2 行) |
+| リンク `--soft --fix --ws` | exit 0 / signature mismatch 1 / undefined 0 / duplicate 0 (3.8 s, obj キャッシュ有) |
+| リンク `--soft --fix` (ws 無し) | exit 0 / mismatch 1 / undefined 0 |
+| リンク `--trace --soft --fix` | exit 0 / mismatch 1 / undefined 0 |
+| mismatch 1 の出所 | `midiOutShortMsg`: boot IR は (i64,i32)→i32、`tools/shimx/src/midi_conv.c:163` は (HANDLE,DWORD)→UINT。ws 無しでも同じ。shimx 側の型不一致で、本修正の範囲外 (未解決) |
+| IR 再生成 | `M11_PE=<fl-win64 の extracted/block00031_PE.bin> bash tools/m11/m11_gen_ir2.sh` → OK (490,735 行, 45 s)。続けて `bash tools/m11/m11_build.sh` → OK (wasm-ld signature mismatch 0 / undefined 0, 22 s)。`m11_e2e.sh --full` は `m11_bounds.py` が `tools/m2/work/ghidra_dll/functions_dll.csv` (素材に無い) を要求して止まるため使えなかった |
+| `ws_e2e.mjs` | PASS 19 / FAIL 0 (0.35 s) |
+| boot 到達点 (ws 込み, 現 IR) | `boot_stage 1 / init_count 18 / units_run 17/942 / threw null / rc "1"`。§10.1 の OOB (`memory access out of bounds`) は消えた |
+| boot 到達点 (ws 無し, 同 IR) | 同じ (`units_run 17 / threw null / rc "1"`)。ws の有無で到達点は変わらない |
+| `BOOT_WS_STATS` (ws 込み) | `cpuid 8` (lift の自然経路) / `loadlib_calls 0` / `loadlib_miss 0` / `createprocess 0` / `pump_calls 0` |
+
+**結論**: 閉包リンクは現 main で再びリンクできる (修正前は exit 1)。ただし現 IR の boot は unit 17 で `rc=1` により停止し、FL の自然経路で LoadLibrary が 1 回も呼ばれない。`winstubs_loadlib_miss` の lift 実機取得 (受入) は未達。`LOADLIB_MISS ["WebView2Loader.dll"]` は引き続き probe 由来。
+
+**差分確認 (測定 commit から HEAD まで・コード範囲)**: `git diff e7491b4f HEAD -- tools/m11/shimx_link/build.sh tools/m11/shimx_link/*.c tools/m11/shimx_link/*.py` の出力は 0 行 (本節は REPORT のみ変更)。
