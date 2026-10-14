@@ -69,7 +69,7 @@
 
 - main (`81799351`) を merge した `116cd354` で、`docs/DOC_MAP.md`・`tools/python/REPORT_PY39.md` の 2 件を解消した (どちらも文書の分割移動の両立。コード側は無競合)。
 - 上の表と同じ 5 検証を `116cd354` で再実行し、全件 PASS (`channels_diff` 69 呼出し diffs 0、`provider_check` implemented 71、`all_tools` 48/48 の mock・wasm 両方)。
-- 差分 0 の証跡: `git diff 96de54b9 116cd354 -- tools/python/provider tools/python/host tools/python/tests` は 0 行。main 取り込みで `tools/python` 内に入った変更は `REPORT_PY39.md`・`REPORT_PY39_2548.md` (文書) のみ。
+- 差分 0 の証跡: `git diff 96de54b9 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (HEAD は main `ad4c27b3` の取り込み後。`116cd354` 時点でも 0 行)。main 取り込みで `tools/python` 内に入った変更は文書 (`REPORT_PY39.md`・`REPORT_PY39_2548.md`・`REPORT_PY72.md`) と解析スクリプト `analysis/flapi/pe_rip_consts.py` のみ。
 - 所要 (実測, `116cd354`): `provider/build.sh` 1.4 秒、`build_cpython_wasm.sh` 4 分 2 秒 (この run の初回ビルド)、`build_flpy.sh` 6.1 秒、`channels_diff` 0.12 秒、`provider_check` 0.35 秒、`all_tools` 2.1 秒 (mock) / 2.0 秒 (wasm)。
 - 入力の準備: `work/` は `fetch_inputs.sh` (`FL_WIN64_DIR` = fl-win64 素材の展開先。4 ブロックだけを `tar --wildcards` で展開)。`dist/flpy` は `FLPY_SKIP_TABLE=1 build_flpy.sh` で作り、追跡済みの `flapi_table.json` をそのまま使った (表は再生成していない)。
 - load average: `uptime` 15:52:51 時点で `1.72 / 1.80 / 0.89` (直前の CPython・flpy ビルドの影響を含む。テスト単体の値は採取していない)。
