@@ -7,6 +7,8 @@ import { rateMarkRun } from "./ratealert.ts";
 import { closeRefs, mentionRefs, refsOnlyNumbers } from "./refs.ts";
 
 export const DEFAULT_REVIEWER_LOGIN = "oc-reviewer-for-signature-studio[bot]";
+// 停止印 (oc-fix-limit) の作者。fix-progress.sh が job の GITHUB_TOKEN で投稿する (#2622・#2639)。実装 App 名義の印は agent が偽造できる。
+export const DEFAULT_MARK_LOGIN = "github-actions[bot]";
 export const NEEDS_USER_LABEL = "needs-user-input";
 
 export const WEBHOOK_EVENTS = [
@@ -62,7 +64,7 @@ export interface PrState {
 }
 // issue / PR ごとの終端状態の手がかり (oc-pm の検出に使う)。値は時刻・列挙値・真偽だけで、本文は持たない。
 export interface Signal {
-  // 最新の停止コメント (<!-- oc-fix-limit -->、bot 投稿)。intent は同じコメントの oc-pm-intent: stuck の reason (無ければ null)
+  // 最新の停止コメント (<!-- oc-fix-limit -->。作者は型 Bot かつ markLogin だけ)。intent は同じコメントの oc-pm-intent: stuck の reason (無ければ null)
   stop?: { at: string; intent: string | null };
   // 最後の <!-- oc-run-outcome: no-pr ... --> (bot 投稿)
   outcome?: { at: string; reason: string };
@@ -150,6 +152,8 @@ export interface WebhookInput {
   signature: string | null | undefined;
   body: string;
   botLogin: string;
+  // 停止印 (oc-fix-limit) の作者。型 Bot でこの login の投稿だけを信じる。省略時は DEFAULT_MARK_LOGIN。
+  markLogin?: string;
   // PM のログイン名 (人間の PAT と PM App の bot)。`oc_artifacts:` 行の取得に使う。省略時は取得しない。
   pmLogins?: string[];
   // reviewer の bot ログイン。review の verdict とマーカー付きコメントの信頼に使う。省略時は既定。
@@ -312,8 +316,8 @@ export function parseRelaunchIntent(body: string): { issue: string; arts: string
   };
 }
 
-// コメントから終端状態の手がかりを取る。マーカーは bot (実装 App・reviewer App) の投稿だけを信じる (誰でもコメントできるため)。
-function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: string[], reviewer: string): PmState {
+// コメントから終端状態の手がかりを取る。マーカーは bot の投稿だけを信じる (誰でもコメントできるため)。停止印は markLogin の投稿だけ (#2639)。
+function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: string[], reviewer: string, mark: string): PmState {
   const c = p.comment;
   const i = p.issue;
   if (!c || !i || p.action !== "created" || !Number.isInteger(i.number)) return s;
@@ -326,7 +330,9 @@ function applySignalComment(s: PmState, p: Json, botLogin: string, pmLogins: str
   const later = (prev: string | undefined): boolean => !prev || Date.parse(at) >= Date.parse(prev);
   const trusted = isBotUser(c.user) && (login === botLogin || login === reviewer);
   const patch: Partial<Signal> = {};
-  if (trusted && body.includes(STOP_MARK) && later(cur?.stop?.at)) patch.stop = { at, intent: parseStuckIntent(body, i.number) };
+  // 停止印は窓の印と同じ作者 (型 Bot・markLogin) の投稿だけ。実装 App・reviewer 名義の印は信じない (#2639)。
+  const stopper = c.user?.type === "Bot" && login === mark;
+  if (stopper && body.includes(STOP_MARK) && later(cur?.stop?.at)) patch.stop = { at, intent: parseStuckIntent(body, i.number) };
   if (trusted && later(cur?.outcome?.at)) {
     const reason = parseOutcomeReason(body);
     if (reason) patch.outcome = { at, reason };
@@ -361,8 +367,8 @@ function applyRateMarker(s: PmState, p: Json, botLogin: string, reviewer: string
   return { ...s, rateRuns: { ...s.rateRuns, [String(run)]: { at: c.created_at, issue: i.number } } };
 }
 
-function applyIssueComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = [], reviewer: string = DEFAULT_REVIEWER_LOGIN): PmState {
-  return applyRateMarker(applySignalComment(applyBotComment(s, p, botLogin, pmLogins), p, botLogin, pmLogins, reviewer), p, botLogin, reviewer);
+function applyIssueComment(s: PmState, p: Json, botLogin: string, pmLogins: string[] = [], reviewer: string = DEFAULT_REVIEWER_LOGIN, mark: string = DEFAULT_MARK_LOGIN): PmState {
+  return applyRateMarker(applySignalComment(applyBotComment(s, p, botLogin, pmLogins), p, botLogin, pmLogins, reviewer, mark), p, botLogin, reviewer);
 }
 
 // reviewer の verdict (APPROVED / CHANGES_REQUESTED) を PR の手がかりに反映する。COMMENTED は verdict ではない。
@@ -534,12 +540,13 @@ export function applyEvent(
   botLogin: string,
   pmLogins?: string[],
   reviewerLogin: string = DEFAULT_REVIEWER_LOGIN,
+  markLogin: string = DEFAULT_MARK_LOGIN,
 ): PmState {
   switch (event) {
     case "issues":
       return applyIssue(s, payload);
     case "issue_comment":
-      return applyIssueComment(s, payload, botLogin, pmLogins, reviewerLogin);
+      return applyIssueComment(s, payload, botLogin, pmLogins, reviewerLogin, markLogin);
     case "issue_dependencies":
       return applyDependencies(s, payload);
     case "pull_request":
@@ -565,5 +572,5 @@ export function handleWebhook(s: PmState, input: WebhookInput): WebhookResult {
     return { status: 202, state: s, reason: "ignored" };
   }
   if (input.repo && payload?.repository?.full_name !== input.repo) return { status: 202, state: s, reason: "ignored" };
-  return { status: 202, state: applyEvent(s, input.event, payload, input.botLogin, input.pmLogins, input.reviewerLogin), reason: "applied" };
+  return { status: 202, state: applyEvent(s, input.event, payload, input.botLogin, input.pmLogins, input.reviewerLogin, input.markLogin), reason: "applied" };
 }

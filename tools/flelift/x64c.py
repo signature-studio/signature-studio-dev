@@ -29,7 +29,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
 usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME]
-               [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000]
+               [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000] [--cfg-rax]
 """
 import sys, json, struct, argparse, bisect, collections, os, shutil, contextlib
 import pefile
@@ -92,6 +92,12 @@ class PEInfo:
             for imp in ent.imports:
                 nm = imp.name.decode() if imp.name else 'ord%d' % imp.ordinal
                 self.iat[imp.address] = nm
+        # MSVC CFG: call/jmp [GuardCFDispatchFunctionPointer] の先は jmp rax の thunk で、宛先は rax に入っている
+        self.cfg_slots = set()
+        lc = getattr(pe, 'DIRECTORY_ENTRY_LOAD_CONFIG', None)
+        if lc is not None and getattr(lc.struct, 'GuardCFDispatchFunctionPointer', 0):
+            self.cfg_slots.add(lc.struct.GuardCFDispatchFunctionPointer)
+        self.cfg_rax = False
         self.pdata = []
         for s in pe.sections:
             if s.Name.startswith(b'.pdata'):
@@ -793,6 +799,8 @@ class FnLift:
             slot = ins.address + ins.size + op.mem.disp
             if slot in self.pe.iat:
                 return self.L('imp_%s(); return;' % self.pe.iat[slot])
+            if self.pe.cfg_rax and slot in self.pe.cfg_slots:
+                return self.L('ott_dispatch(R[RAX]); return;')
         # 間接 tail jmp (CFG dispatch / longjmp 形 / IAT 経由等): target を値として dispatch
         return self.L('{ uint64_t t_ = %s; ott_dispatch(t_); return; }' % self.rd(ins, op, 8))
 
@@ -819,6 +827,8 @@ class FnLift:
             slot = ins.address + ins.size + op.mem.disp
             if slot in self.pe.iat:
                 return self.L(self.call_stmt(ins, 'imp_%s();' % self.pe.iat[slot]))
+            if self.pe.cfg_rax and slot in self.pe.cfg_slots:
+                return self.L(self.call_stmt(ins, 'ott_dispatch(R[RAX]);'))
         self.L('{ uint64_t t_ = %s; ' % self.rd(ins, op, 8) + self.call_stmt(ins, 'ott_dispatch(t_);') + ' }')
 
     def i_ret(self, ins, ops):
@@ -1703,11 +1713,13 @@ def main():
     ap.add_argument('--shift', type=lambda x: int(x, 0), default=0)
     ap.add_argument('--img-size', type=lambda x: int(x, 0), default=0x18c0000)
     ap.add_argument('--impbase', type=lambda x: int(x, 0), default=0x1D80000, help='IAT slot に敷設する pseudo-VA 基準 (dispatch が imp 呼出に解決)')
+    ap.add_argument('--cfg-rax', action='store_true', help='MSVC CFG の call/jmp [GuardCFDispatch] の宛先を rax から取る (既定 OFF = 従来どおり LD64(slot) を dispatch)')
     ap.add_argument('--shards', type=int, default=1, help='N>1 で fle_lifted.c を fle_lifted_s<k>.c (k<N) の N 本に分ける (関数は i%%N、ott_dispatch・weak imp・imp_tab は shard 0 のみ。1 は従来の単一ファイル)')
     a = ap.parse_args()
     IMG = a.img; SHIFT = a.shift; IMG_SIZE = a.img_size
     overrides = {int(x.split('=')[0], 16): x.split('=')[1] for x in a.override}
     pe = PEInfo(a.pe)
+    pe.cfg_rax = a.cfg_rax
     cfg = json.load(open(a.entries))
     entries = set(IMG + r for r in cfg.get('calltgt', [])) | set(cfg.get('roots', []))
     md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True
