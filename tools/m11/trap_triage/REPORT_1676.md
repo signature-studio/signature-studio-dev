@@ -34,7 +34,7 @@
 ## 3. 生成経路 (IR と機械語の突合)
 
 - `function_867510` は `8674a0` (list を走査) の後 `EnumDisplayMonitors(… [G2+188])` を呼ぶ。`8674a0` は `50aa70` と `40faa0` を呼ぶ。
-- list の生成元は `function_8651a0` (object 構築)。`[obj+188]` は `40f9e0(0xC9A40, 1)` の戻り値。
+- list の生成元は `function_8651a0` (object 構築)。`[obj+188]` は `40f9e0(obj, 1)` の戻り値 (§7.1 で訂正: 引数 `0xC9A40` は誤りで、正しくは obj=`0xc9bc0`)。
 - `40f9e0` → `410320` (alloc 相当) / `410360` (固定サイズ helper)。IR はどちらも `ret arg1`。
 - 機械語 (`disasm_img.py`):
   - `410320`: `test dl,dl; ...; call qword ptr [rax-0x30]` (**vtable 間接 call**)。
@@ -78,3 +78,30 @@
 | `[rax-0x30]`・`[rbx-0x50]` の実 target と base 設定関数の確定 | list B の base=0 の原因特定 | 既存 #1783 [LD-63] (410320 スロットの書き込み元の実行時 watch) |
 | DEFECTS 行 (D15 同類型か) | 分類 | 上記確定後 (#1931 の残件) |
 | `SV_RAW=1 survey_units.mjs` の n≥2 は未実施 (本 run は e2e 内の survey n=1) | survey 側の再現性が未確認 | 既存 #1783 の再測定に含める |
+
+## 7. #1965 の追補: 間接 call の実 target (probe 1 回・実行時メモリ)
+
+- 測定 commit: `f9c89955` (origin/main)。素材・e2e の結果は §6 参照 (本節では e2e を再実行していない)。
+- probe `probe1676_listB_writes.mjs` は 1 回のみ実行 (n=1 相当)。n≥2 は未実施。結果: unit 114 で `L=0x10bd4c20`・`base=0`・`cnt=1` の生成、unit 275 で trap。
+
+### 7.1 §6 の訂正 (引数の値)
+
+§6 は `40f9e0(0xC9A40, 1)` と書いたが誤り。`8651a0` の call 元 (VA `0x86522d` 等) は `mov rcx, [rip+disp]` で、`disp` 先のグローバルは VA `0x4c9af8` (wasm `0xc9af8`)。その値 (実行後メモリ) は **`0xc9bc0`** (実 object)。`0xC9A40` は object ではない。
+
+### 7.2 間接 call の実 target (実行後メモリで評価)
+
+- `40f9e0(obj=0xc9bc0, dl=1)` → `410320(rcx=obj)` の `call qword ptr [rax-0x30]`: `[obj-0x30]` = `0xf960` → **VA `0x40f960`**。
+- `410360` の `call qword ptr [rbx-0x50]` (`rbx = [rax]`、`rax` は `410360` の引数) の実 target は **未確定**。前回の `[obj-0x50]` の読みは `rbx=[obj]` を評価していないため誤りで、取り消す。
+- `40f960` の中身 (逆アセンブル): `rbx=rcx`、`rcx=[rbx-0x80]` (dword) を `409410` に渡し、結果を `40fb40(rcx=rbx, rdx=rax)` に渡す。
+- `40fb40` は list を走査し (`[rcx-0xc0]` の配列から `[rsi+r9]` へ 8 byte 書き込み)、`[rsi]=rdi` を書く。`40fac0` は再帰で同系統。**base (+8) を 0 から設定する命令はこの走査には見えない**。
+- `409410` の間接 call は `call qword ptr [rip+0xf9c86c]` (IAT slot VA `0x13a5c90` = `0x407a50`)。
+
+### 7.3 IR との突合
+
+- `function_40f960` / `function_40fb40` / `function_40fac0` は IR に定義が無い (`grep 'define.*@function_<VA>'` 0 件)。
+- `function_409410` / `40f9e0` / `410320` / `410360` は IR に定義あり。
+
+### 7.4 未確定
+
+- list B の base (+8) を 0 のまま生成する原因の**設定元**は未確定。`40fb40` の走査が base を書かないため、base は `40f9e0` 以外の経路 (list 生成直後の `[L+8]` 未初期化) の可能性が高いが、本 run では未確認。
+- DEFECTS 行案 (D15 同類型か) は設定元の確定後。
