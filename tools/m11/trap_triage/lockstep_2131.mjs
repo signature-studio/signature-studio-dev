@@ -87,6 +87,7 @@ for (let i = 0; i <= LS_MAX; i++) {
     new DataView(va.buffer, va.byteOffset, va.length).setUint32(o, v, true);
     console.log(`fix A(ON) 0x${o.toString(16)} <- OFF value 0x${v.toString(16)} (at checkpoint ${CKPT})`);
   }
+  if (i === CKPT && process.env.LS_FIX) console.log(`fix: diffPages now=${diffPages(A.mod, B.mod).length}`);
   if (i === CKPT && process.env.LS_REVERSE) {
     for (const p of dp) A.mod.HEAPU8.set(B.mod.HEAPU8.subarray(p * PG, (p + 1) * PG), p * PG);
     console.log(`reverse: copied ${dp.length} OFF pages into A(ON) at checkpoint; diffPages now=${diffPages(A.mod, B.mod).length}`);
