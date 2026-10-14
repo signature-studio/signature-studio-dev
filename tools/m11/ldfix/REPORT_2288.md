@@ -96,51 +96,67 @@
 2. V の実行時値の出所を追う: `0x418190` と `c21d80` の呼び出し元で、V の参照フィールドに入る値 (object 参照) を確認する。
 3. 1 と 2 が立った site から、`candidate_verdicts_1161.jsonl` と同じ形式で根拠行付きで入れる。
 
-## 8. 3 回目 run: c589b0 の 12 site を到達不能と確定 (NO_CONSUMER)・128f9e0 は次 run (LD-104 継続)
+## 8. 3 回目 run: c589b0 の 12 site を到達不能と確定 (NO_CONSUMER)・128f9e0 は子 issue #2679 へ (LD-104 継続)
 
-- 測定の基点: origin/main `927cd651`。コード変更は `ld104_reach.py` と results (`ld104_reach.tsv`・`candidate_verdicts_1161.jsonl` の 12 行・`spill178_1161.tsv` の 12 行) の追加だけ。`git diff 927cd651 HEAD -- tools/m11/ldfix` でも同じ。
-- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff`。`work-m11.tar.zst` / `work-liftdiff.tar.zst` を worktree のルートで展開 (内部パスが `tools/<area>/work/` のため 1 段移動は不要)。`boot_final3.ll` の sha256 は `010451add…` で前 run と一致。fl-win64 は未使用。
-- 注意: §2〜§7 の集計 (未判定 120 / 確定 51 / 判定不能 7) は 463d8176 時点。main の現状 (927cd651) の `results/spill178_1161.tsv` は 未判定 65 / 確定 97 / 判定不能 16 だった (他 issue の判定が入っている)。以下の増減はこの基点からの差。
+- 測定の基点: origin/main `927cd651`。測定 commit (コードを変えた最後の commit): `c00fa9f3` (`ld104_reach.py` の枝刈りを読み値 v から算出し、支配・外部分岐の測定を追加)。`git diff c00fa9f3 HEAD -- tools/m11/ldfix` は本 REPORT と `results/candidate_verdicts_1161.jsonl` の c589b0 の 12 行の evidence 文だけ (verdict・status は不変)。
+- 素材: `work-m11` を `M11_WORK=<主 checkout>/tools/m11/work` で読み取り専用に参照 (worktree には展開していない)。fl-win64 は未使用。
 
-### 8-1 IR に 24 site が無い理由 (機械語の CFG で確認)
+### 8-1 IR 側の欠落 (事実)
 
-- c589b0 の IR は `dec_label_pc_c59201` (IR 391009 行) で、c59230 の store (`0x1104dd8`・機械語 `mov byte ptr [rip+..], al` と一致) の直後に `br label %dec_label_pc_c5d220`。機械語は c59236 〜 c5928e (内部分岐 c5924a・c59253・c5925c、store 2 本、c5928e `jne c5d220`) を経由するが、IR に c59236 〜 c5928e の命令は無い。
-- 機械語の rip 相対参照のうち IR 関数本体に現れない LVA は c592b8 以降に集中する (`ld104_reach` 作業中の確認。K = `0x11e0ab0` の 27 件を含む)。
-- 欠落した到達可能な store のうち、2 本は VA `0x1504dd9` (LVA `0x1104dd9`・`mov byte ptr [rip+0x8abb6f], al` c59264) と VA `0x1504dda` (LVA `0x1104dda`・`mov byte ptr [rip+0x8abb69], 1` c5926a)。**これは未検証の候補**: この 2 cell が後続で読まれるか、IR のどこかで別に表現されているかは未確認。読まれるなら silent miscompile の候補 (新規類型の候補・DEFECTS.md 未登録。PM 判断)。
-- 24 site のうち c589b0 の 12 site は、枝刈り (§8-2) を入れると入口から到達できなくなる site。c592c2 は c592ae 系 (c59299 の配下) にある。
+- c589b0 の IR は `dec_label_pc_c59201` (IR 391009 行) で、c59230 の store の直後に `br label %dec_label_pc_c5d220`。機械語は c59236〜c5928e (内部分岐 c5924a・c59253・c5925c、store 2 本、c5928e `jne c5d220`) を経由するが、IR に c59236〜c5928e の block は無い (`dec_label_pc_c59236`・`c5928e`・`c59299`・`c5a7e8` の label が無く、`c5d220` の preds に `c591cd` と `c59201` が直接入る)。
+- この IR 欠落は 12 site の判定根拠ではない。12 site が届かないのは機械語の定数分岐による (§8-2・§8-3)。IR に無いことを根拠にしない。
+- 欠落した到達可能な store 2 本: c59264 (VA 0x1504dd9 = LVA 0x1104dd9, `mov byte ptr [rip+..], al`) と c5926a (VA 0x1504dda = LVA 0x1104dda, `mov byte ptr [rip+..], 1`)。どちらも入口から c59271 より前に到達する (枝刈りに依らない)。config 関数内の rip 参照は、0x1504dd9 が c59264 の書込み 1 件のみ、0x1504dda が c5926a の書込み 1 件と c59255 の読み 1 件 (同じ欠落 block 内) (`results/ld104_checks.txt`)。
 
-### 8-2 到達性 (`ld104_reach.py` → `results/ld104_reach.tsv`)
+### 8-2 到達性 (枝刈りは c59271 の読み値 v から算出)
 
-- 方法: 関数入口から jcc / jmp / call の後続を BFS (命令単位)。定数分岐の枝刈りは c589b0 だけ (`PRUNE_C589B0`): c5927c `je c59299`・c59283 `je c5a7b8` は取られず、c5928e `jne c5d220` は必ず取られる。
-- 根拠 (枝刈りの前提): VA `0x1504dd4` (dword) を rip 相対で指す命令を config 関数区間の全 8227 関数から走査した結果、書込み **1 件** (c59182 `mov dword ptr [rip+..], 8`)、読み 4 件 (c591a9・c591d4・c59208・c59271)。絶対アドレス参照は 0 件。c59271 の読みは値 8 (image 初期値 0x7fffffff も同じ枝)。`sub eax,6/4/1` の後に 0 になるのは v=6・10・11 だけで、v=8 も 0x7fffffff も該当しない。
-- 入口の predecessor: c59299 ← c5927c `je` のみ (fallthrough 無し)。c592a0 ← c59299 のみ。c5a7b8 ← c59283 `je` のみ。c59201 ← c591a0 `jne` のみ。
+- c59271 `mov eax,[FLAG]` の後、eax は v-6 (c5927c `je c59299`)・v-10 (c59283 `je c5a7b8`)・v-11 (c5928e `jne c5d220`) で判定される。枝刈り (`prune_for_v`) は v から機械的に決める。v=8 は §8-3 (a) で確定する。
+- 結果 (`results/ld104_checks.txt` から転記。12 site = c589b0 の site 数):
 
-| fn | 機械語の命令数 (到達) | 枝刈り無し: site 到達 | 枝刈り後: site 到達 | 判定 |
-|---|---|---|---|---|
-| c589b0 | 3477 → 468 | 12 / 12 | 0 / 12 | 12 site とも到達不能 → NO_CONSUMER |
-| 128f9e0 | 3681 → 3681 | 12 / 12 | 12 / 12 (枝刈り無し) | 到達可能。判定は未 (§8-3) |
+| 読み値 v / 枝刈り | 到達 site |
+|---|---|
+| 枝刈り無し | 12/12 |
+| NC: c5927c の不成立枝 (fall) のみ枝刈り | 4/12 (c592c2 c5a6b4 c5a705 c5a750) |
+| v=6 (c5927c 成立) | 4/12 (同上) |
+| **v=8 (c59182 の書込み値)** | **0/12** |
+| v=10 (c59283 成立) | 0/12 |
+| v=11 (c5928e 不成立 → c59294) | 8/12 (c5a811 c5bc03 c5bc54 c5bc9f c5bd1d c5d121 c5d172 c5d1bd) |
+| v=0x7fffffff (image 初期値) | 0/12 |
 
-### 8-3 判定
+- 行ごとの経路: c592c2・c5a6b4・c5a705・c5a750 は c5927c `je c59299` の成立枝 (v=6) 配下。残り 8 site は c5928e `jne c5d220` の不成立枝 (fall; v=11) → c59294 `jmp c5a7e8` 配下。両群とも v=8 では届かない。
+- 到達 (`results/ld104_reach.tsv`): c589b0 は枝刈り無し 12/12 → 枝刈り後 0/12。128f9e0 は 12/12 → 12/12 (枝刈りなし)。
 
-- c589b0 の 12 site (`c592c2` `c5a6b4` `c5a705` `c5a750` `c5a811` `c5bc03` `c5bc54` `c5bc9f` `c5bd1d` `c5d121` `c5d172` `c5d1bd`): **NO_CONSUMER**。根拠行は `candidate_verdicts_1161.jsonl` の 12 行 (`ld104_reach.tsv` と対応)。意味は「実行経路に消費者なし」(到達不能の死んだ store)。IR に無いのは到達不能の正しい省略であり、drop ではない。→ TRUE_DROP 0 件 (drops_510 の和集合 69 は不変)。
-- 128f9e0 の 12 site: **未判定**。枝刈り無しでも到達する。IR に K (0x11e0ab0) の読みが無いことは §3 のとおりだが、site の到達経路で IR の block 欠落が起きているかは未確認。次 run の入口は §8-4。
+### 8-3 v=8 の確定 (支配・書込み・外部分岐の測定)
 
-### 8-4 次の一手 (後続に渡す)
+- (a) 支配: 入口から c59271 は到達する (Y)。c59182 を除くと c59271 は到達しない (N)。c5918c も同様 (Y → N)。
+- (b) c5918c〜c59271 の call: 0 件 (線形逆アセンブル)。
+- (c) config 関数 8227 本 (`boot*.drc.config.json`・開始番地で統合) の全命令で、c5918c〜c59277 の外から内への直接分岐・call は 0 件 (直接分岐・call 61325 件を走査)。
+- FLAG (VA 0x1504dd4) を rip 相対で指す命令 (config 全関数): 書込み 1 件 (c59182 `mov dword ptr [rip+..], 8`)、読み 4 件 (c591a9・c591d4・c59208・c59271)、アドレス取得 (lea) 0 件。
+- 結論: c59271 が読む値は、そこへ至るどの経路でも c59182 の書込み値 8 である (c59182 が必ず先行し、その間に書込みも call も無い)。
 
-1. 128f9e0 の 12 site: 到達経路 (BFS の親を記録) を取り、経路上の IR block の欠落 (§8-1 と同型の c5d220 型 `br` の有無) を site ごとに見る。判定は根拠行付きで入れる。
-2. §8-1 の欠落 store 2 本 (LVA `0x1104dd9`・`0x1104dda`) の後続読みを確認する。読みが無ければ「死んだ store」、読みが有れば欠落の類型を DEFECTS.md 形式で起票 (PM 判断)。
-3. §8-2 の枝刈りの前提 (間接書込み無し) は config 関数区間の走査で確認した範囲。区間外のコードは未走査。
+範囲外 (未走査。判定はこの範囲に限る): config 外の image (`boot*.drc.config.json` の関数区間外)、間接分岐・間接 call (config 内 4250 件) による入口、FLAG のアドレスを値として持つ data 表経由の書込み。
 
-### 8-4 未解決 (本 run 時点)
+### 8-4 判定
 
-| 未解決 | 影響 | 起票先 |
-|---|---|---|
-| 128f9e0 の 12 site の判定 (到達可能・IR 側の経路未確定) | spill 宛の脱落関数の和集合 69 の残り | #2288 (次 run) |
-| §8-1 の欠落 store 2 本 (LVA `0x1104dd9`・`0x1104dda`) の後続読み | 新規類型の候補の確定 | #2288 (次 run) |
-| 枝刈りの前提 (config 区間外・間接書込み) | c589b0 の NO_CONSUMER の完全性 | #2288 (次 run) |
+- c589b0 の 12 site: **NO_CONSUMER** (機械語で到達不能)。根拠 12 行は `results/candidate_verdicts_1161.jsonl` (経路を行ごとに記載)。TRUE_DROP 0 件 (drops_510 の和集合 69 は不変)。
+- 128f9e0 の 12 site: 未判定のまま。子 issue #2679 (LD-120) に移した。
 
 ### 8-5 検証
 
-- `python3 tools/m11/ldfix/ld104_reach.py` → rc=0・1.2 s (CPU 1 core・load average 0.94)。
-- `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (`RUNNER_TEMP=<作業用一時ディレクトリ>`): 2m44s・load average 0.94 で 1〜6/7 は完走。7/7 の `cmp` は 12 行差分 (c589b0 の 12 site: 未判定 → 確定) で rc=1 になった。差分は想定どおり (`diff` で 12 行のみ)。`results/spill178_1161.tsv` を新出力で置換し、`cmp` は OK。`drops_510.tsv` は cmp OK (脱落関数の和集合 69 不変)。
-- 集計 (7/7 の出力): 確定 109 / 判定不能 16 / 未判定 53 (基点 927cd651 は 確定 97 / 判定不能 16 / 未判定 65)。
+- `M11_WORK=<主 checkout>/tools/m11/work python3 tools/m11/ldfix/ld104_reach.py`: rc=0・1.2 s。出力は `results/ld104_reach.tsv` (前版と cmp 一致) と `results/ld104_checks.txt`。
+- 負の対照: v=6 の枝刈りで 4/12 が届き、v=8 で 0/12 になる (分岐の判定 1 件で到達が変わる)。
+- e2e (`audit_lsf_ssa_e2e.sh`): 本 fix では再実行していない。`ld104_reach.py` は e2e から呼ばれず、e2e の入力 (`results/spill178_1161.tsv`・`drops_510.tsv`) は変更していない。直前 run の値 (2m44s・load average 0.94・確定 109 / 判定不能 16 / 未判定 53) は §8 の前版と同じ。
+
+### 8-6 新類型候補 (DEFECTS.md 形式の行案・PM 判断)
+
+| 候補 | 層 | 新旧 | 症状 | 根本原因 | 観測 | 検出信号 | 修復 |
+|---|---|---|---|---|---|---|---|
+| D?? (PM 採番) | fe | 新規候補 | 到達可能な条件分岐の block (store 2 本を含む) が IR から欠落し、直前の分岐が後続へ直接 `br` で飛ぶ (silent) | 未特定 (機械語 c59236〜c5928e の lift 出力が欠落) | c589b0: IR に `dec_label_pc_c59236`・`c5928e` が無い。落ちる store は 0x1104dd9・0x1104dda (§8-1) | 機械語の到達 block に対応する `dec_label_pc_<VA>` が IR に無い (c589b0 で 4 label) | 未定 |
+
+PM agent の判断待ち: この欠落類型を `docs/DEFECTS.md` に登録し、原因特定 (c59236〜c5928e の lift 出力) を起票するか。既定案: 登録し、原因特定を子 issue として起票する (本 PR では起票しない)。
+
+### 8-7 未解決 (本 run 時点)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 128f9e0 の 12 site の判定 (到達可能・IR 側の経路未確定) | spill 宛の脱落関数の和集合 69 の残り | #2679 (子・LD-120) |
+| 欠落 store 2 本の類型 (§8-6) の登録と原因特定 | 新類型候補の確定 | PM agent の判断待ち (既定案: 登録し原因特定を子 issue) |
