@@ -107,7 +107,7 @@ index 39480f0a..5a9c1929 100644
 
 ## 5c. 407a50 入口の参照先の実測 (次 run の受入条件 1 の途中結果)
 
-- 測定 commit: 本 PR の probe 変更を入れた commit (base は origin/main `984ff34f`)。素材は fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (35.8 s、ldfix=applied、F1=902、errors=0)、build ON rc=0 (18.3 s)。
+- 測定 commit: `8cd50a1d` (本 PR の HEAD。base は origin/main `984ff34f`)。HEAD で ON・OFF を再測定し、§5c の表と一致することを確認した。素材は fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (35.8 s、ldfix=applied、F1=902、errors=0)、build ON rc=0 (18.3 s)。
 - probe: `probe_entry.py` の `407a50` 入口に読み取り専用の 2 行を追加 (`[raw407]`: `[arg-8]` の値、`[chain407]`: `arg1 < 2601` の表引き (`18770492 + (arg+7)/8`) から `rbx` (`16404744 + 16*b`) → `[rbx+8]` → `[[rbx+8]+24]` の chain)。読み取りは `rd64`/`rd8` が image 範囲 (`0x10000`〜`0x20000000`) のみ読み、範囲外は `0xdead` を返す。
 - ON・OFF とも全 942 unit の probe 版 survey (`SV_ERR_LOG` で unit 番号付きの全 stderr を採取)。unit 190 の `407a50` 入口を順に並べた:
 
