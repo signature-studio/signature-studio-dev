@@ -63,7 +63,24 @@
 - `ldfix.py` (392d8ba5) の rc 0・`errors=0` (§3)。
 - 素材 md5: `boot_final.ll` = `31f82201…` (REPORT_N1702 と一致)。
 
-## 8. 差分
+## 8. 差分 (0ed6c6ff 追従の検証, §9)
 
 - 測定 commit: `392d8ba5` (新) と `7e149974` (旧)。両者の `tools/m11` を `git archive` で別 dir に展開して実行 (作業ツリーの `tools/m11` は変更していない)。
 - 本 REPORT の commit 以外に、`tools/m11` のコード差分は無い。
+- 現 head `0ed6c6ff` との間のコード差分: `git diff 392d8ba5 0ed6c6ff -- tools/m11 ':!**/REPORT*'` は 34 ファイル (+2021 / -18)。このうち §9 の既定経路の判定に関わるのは `m11_post.py` と `ldfix/ldfix.py` の 2 件。
+
+## 9. 0ed6c6ff への追従 (実測・既定経路の同一性)
+
+`work-m11` は素材に無く実 IR での再測定はできない (`fl-win64` は FL Studio 本体と抽出 block のみ)。代わりに、既定経路 (env 未設定) の出力が `392d8ba5` と `0ed6c6ff` で変わらないことを合成入力で実行して示す。
+
+| 検証 | 入力 | 結果 (`392d8ba5` vs `0ed6c6ff`) |
+|---|---|---|
+| `m11_post.py` 出力 IR | 合成 IR (`function_401000`〜`function_441000` の 6 定義。署名不一致 call site 3 件・0 詰め 1 件・probe 対象 `413060`/`40ff70` を含む) | `cmp` 一致 (IDENTICAL)。md5 `fa2baafa…` 同一 |
+| `m11_post.py` pad 一覧 (`--pads`) | 同上 | `cmp` 一致。0 詰め 1 site / 1 引数 |
+| `m11_post.py` report JSON (`--report`) | 同上 | `cmp` 一致 |
+| `ldfix.py` `f3c_track` (機械語記号実行) | 合成機械語 (`mov rax,[rcx]`・`mov [rcx],rax`・`mov [rdx],rcx`・`mov eax,[rdx]`) | `lsf`・`ptr`・`raw`・`blk0` が一致。`deref` タプルは `0ed6c6ff` で出所タグ (`'arg'`) が増えたのみ。`fix_f3c_use` は `'arg'` の deref だけを数えるため、適用判定は変わらない |
+
+- `m11_post.py` の変更は `M11_INSTR_40FF70` / `M11_PROBE_VARIANT` の env 分岐のみで、既定 (env 未設定) の分岐は旧と同じ経路を通る。
+- `ldfix.py` の変更は `_f3c_bump_slots` の新設 (`f3c_track` 内で `bumps` を `'argv'` として記録) と `deref` タプルへの出所追加。`bumps` は `argN + 可変` の slot にだけ効き、合成機械語では空 (`{}`)。
+- **未実施**: 実 IR (`work-m11`) に対する `0ed6c6ff` の `ldfix.py` の rc・`errors`・F4 の再測定。REPORT §3 の `ldfix.py` 行 (`F1=0 … F4=10 (errors=0)`) は `392d8ba5` の値のまま。`work-m11` を素材に含めた再実行が必要。PR 本文に `oc_artifacts: fl-win64 work-m11` を追記した。取得できた run で再測定し、結果を本 REPORT に追記する (未解決・PR 本文の表に記載)。
+- `boot_final.ll` の md5 `31f82201…` は素材が無いため今回は再確認できない (§2 の値は `392d8ba5` 時点の記録)。
