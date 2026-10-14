@@ -1,6 +1,6 @@
 # REPORT — [SR-5 #73] Serum 2 参照音源との dB 誤差ハーネス (参照は wine64 で生成)
 
-- 日付: 2026-10-14 / 測定 commit: `9ba13e5c` (SR-47 #2414 で既定を installer 全展開に切替えた最後の commit。実測は §4)。§1・§2 の既存測定は `8680cf44` (SR-5 当時)
+- 日付: 2026-10-14 / 測定 commit: `4993995f` (SR-47 #2414 のコード変更を含む最後の commit。実測は §4)。§1・§2 の既存測定は `8680cf44` (SR-5 当時)
 - 再現: `bash tools/targets/serum2/host/ref_harness.sh` (参照生成 → 決定性 → self-test → ネガコン)。wasm 候補は第 1 引数。
 - 入力: 実 `Serum2_win64.vst3` sha256 `501e7bb3…5283` (無改変 unpatched)。取り出し: `tar --zstd -xf <plugins-serum2.tar.zst> -C work/dl Install_Xfer_Serum2_2.1.5.exe` → `7z x -y -owork/exe_extract <exe> '$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3'` → `work/Serum2_win64.vst3` へ cp。
 - 前提 (runner): `sudo apt-get install -y --no-install-recommends wine64 libwine g++-mingw-w64-x86-64-posix` (素材 `apt-mingw` は `gcc-mingw-w64-x86-64` のみで、`build.sh` の `x86_64-w64-mingw32-g++` は入らない)。`ref_render.sh` は PATH に `wine64` が無いときだけ wine 同梱 dir を足す。
@@ -81,13 +81,13 @@ git diff 8680cf44 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
 - `ref_harness.sh`: pin 選択を `tables=yes → main`、それ以外 → `content_empty` に。
 - `ref_stub_check.sh`: 既定が全展開になったことに合わせて更新 (偽 wine64 で制御経路のみ確認)。
 
-### 4.3 実測 (測定 commit `9ba13e5c`・実 DLL・wine64 9.0・Actions runner)
+### 4.3 実測 (測定 commit `4993995f`・実 DLL・wine64 9.0・Actions runner)
 
 検証手順 (コミット済み HEAD): `bash tools/targets/serum2/host/ref_content.sh` → `bash tools/targets/serum2/host/ref_harness.sh`。
 
 | 項目 | 結果 |
 |---|---|
-| `ref_harness.sh` (既定 = 全展開) | **NG=0**・19.2 s・load 0.21 (実行後の 1 分値) |
+| `ref_harness.sh` (既定 = 全展開) | **NG=0**・14.0 s・load 0.16 (実行後の 1 分値) |
 | ref 3 回の file SHA-256 | 一致 `b4fd6d642b2d0a8f8e4b075b91b029ca4c6fc95ed3688c3e9397cf03ea416420` (data 部 `87fb7149…058ef`) |
 | `ref_manifest.json` 主 pin (`main`) | 一致 |
 | self-test (ref_1 vs ref_2, A-exact) | PASS (bit-exact) |
@@ -98,7 +98,7 @@ git diff 8680cf44 HEAD -- tools/targets/serum2/host ':(exclude)*.md'
 
 - §1 の全展開列と同じ値 (`b4fd6d64…`・peak/rms・ネガコン値) が再現した。SR-5 当時の pin と一致するため、DLL・MIDI・state は変わっていない。
 - host/e2e.sh (SR-1 の 62 本 e2e) は未実行。`vst3host.cpp` と `e2e.sh` は無変更で、`ref_render.sh` / `ref_harness.sh` を呼ばない。
-- 差分確認 (測定 commit 以降の md 以外のコード差分): `git diff 9ba13e5c HEAD -- tools/targets/serum2/host ':(exclude)*.md'` → 出力 0 行。
+- 差分確認 (測定 commit 以降の md 以外のコード差分): `git diff 4993995f HEAD -- tools/targets/serum2/host ':(exclude)*.md'` → 出力 0 行。
 
 ### 4.4 未解決
 
