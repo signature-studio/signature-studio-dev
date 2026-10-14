@@ -125,5 +125,6 @@ objdump -d --start-address=0x1803dfc10 --stop-address=0x1803dfc50 "$FA"
 ## 5. 検証
 
 - 測定 commit: `d36f86d9` (`tools/icall/diff/slot_trace.c` の最後のコード変更)。§2.1 の再現はこの commit の tree で実行した。
-- 検証 HEAD: 本付録を含む commit (§5 の差分確認は PR 作成時に行う)。
-- `git diff d36f86d9 HEAD -- tools/icall/diff tools/ott` の出力: 差分 0 (本付録は `tools/icall/REPORT_APPENDIX_2247.md` と `docs/DOC_MAP.md`・`tools/icall/REPORT.md` の索引のみ)。
+- 検証 HEAD: `a8731bec` (本付録を含む commit)。
+- `git diff --stat 573a4697 HEAD -- tools/icall/diff tools/ott` (#2247 の着手元 main からの計測対象の差分): `1 file changed, 51 insertions(+), 1 deletion(-)` (`slot_trace.c` のみ)。
+- `git diff d36f86d9 a8731bec -- tools/icall/diff tools/ott` の出力: 空 (差分 0)。`git diff --stat d36f86d9 a8731bec` は `docs/DOC_MAP.md`・`tools/icall/REPORT.md`・`tools/icall/REPORT_APPENDIX_2247.md` の 3 件 (本付録と索引のみ)。
