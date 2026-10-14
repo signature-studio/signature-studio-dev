@@ -1,35 +1,38 @@
 # PY-98 (#2858) MEMORY64 静的版の headless Chrome 読込と subinterp heap 測定
 
-**測定 commit: `38344a16`** (コードを変えた最後の commit)。以降の commit は本 REPORT だけを追加する。
+**測定 commit: `38344a16`** (コードを変えた最後の commit)。以降の commit は本 REPORT と PR 本文の記録だけ。
+測定の検証 HEAD は `10156444` (fix 対応の前の PR 枝 HEAD)。作業ツリーは clean で、ビルドと probe はこの HEAD で行った。
 親 issue #2633 (PY-80) の成果物 (`REPORT_PY80.md`・`static_subinterp_probe.mjs`) は main に無いため、
 既存スクリプトを土台に手順を作り直した。
 
 ## 1. 結論
 
-- **受入 1 (縮小後の範囲で達成。12 check 版は #2919)**: `flpy_static64` (`-sMEMORY64=1`) は headless Chrome 155 で読めた。
-  validate true、`_flpy_init` 0、`print(1 + 1)` が `2`、`_flpy_subinterp_run` は 1 回と 160 回の全てで ok。
-  判定は **PROBE OK (PASS)**。同じ probe の wasm32 版 `flpy_static` も PASS。
-  node v22.23.3 では `flpy_static64.wasm` の `WebAssembly.validate` が false (table64 非対応) のため、
-  MEMORY64 版の検査は headless Chrome でのみ行える。
-- **受入 2 (未達・子 #2918 へ分割)**: 160 回の subinterp 作成/破棄の前後で heap は増えなかった。
+- **受入 1 (縮小後の範囲で達成。12 check 版は #2919)**: `flpy_static64` (`-sMEMORY64=1`) は headless Chrome 154 で読めた。
+  n=3 の全回で validate true、`_flpy_init` 0、`print(1 + 1)` が `2`、`_flpy_subinterp_run` は 1 回と 160 回の全てで ok。
+  判定は **PROBE OK (3/3)**。同じ probe の wasm32 版 `flpy_static` も 3/3 PASS。
+- **所要 (n=3 の min–max)**: `flpy_static64` は load 134–205 ms・init 114–128 ms・run 19–28 ms・subinterp 1 回 94–115 ms・160 回 3,360–3,681 ms。
+  load average (probe 直前の 1 分値) は 1.97–2.25。詳細は §6-1。
+- **負のコントロール**: `flpy_static64.wasm` を 1 byte 切り詰めると validate が false になり、`STATIC64 PROBE FAIL`・exit 1 (§6-2)。
+- **受入 2 (縮小前の受入。未達・子 #2918 へ分割)**: 160 回の subinterp 作成/破棄の前後で heap は増えなかった。
   MEMORY64=1 は 33,554,432 B → 33,554,432 B、wasm32 も同じ。
   issue にある MEMORY64=2 の増加 (33,554,432 → 48,365,568 B) は、MEMORY64=2 版を作っていないため再現も比較もしていない。
   増加の原因は未切り分け (子 issue は §8)。
-- **検証**: 測定 commit `38344a16` の HEAD でビルドを作り直し、probe を再実行した。wasm の sha256 は再生成の前後で同一で、
-  結果は PASS のまま。`git diff 38344a16 HEAD -- tools/python` の出力は 0 行 (差分 0。本 REPORT を追加する前の HEAD で確認)。
+- node v22.23.3 では `flpy_static64.wasm` の `WebAssembly.validate` が false (table64 非対応) のため、
+  MEMORY64 版の検査は headless Chrome でのみ行える。
 
 ## 2. 環境
 
 | 項目 | 値 |
 |---|---|
-| ブラウザ | google-chrome 155.0.0.0 (HeadlessChrome)。`--headless=new --no-sandbox --disable-gpu` |
+| ブラウザ | google-chrome 154.0.8037.97 (HeadlessChrome/154.0.0.0)。probe の起動引数 `--headless=new --no-sandbox --disable-gpu` |
 | node (比較用のみ) | v22.23.3 |
-| emcc | 6.0.12 ([EMSDK] の `emsdk_env.sh`)。`-sMEMORY64=1` で "MEMORY64 is deprecated (prefer -m64 or --target=wasm64)" の警告が出る (ビルドは成功) |
+| emcc | 6.0.12 ([EMSDK] の pin)。この run で上流から取得し `activate 6.0.12`。`-sMEMORY64=1` で "MEMORY64 is deprecated (prefer the standard -m64 or --target=wasm64 flags)" の警告が出る (ビルドは成功) |
 | CPython | 3.12.1 (python.org の Python-3.12.1.tgz、record の source sha256 は d01ec6a33bc1…) |
-| 機械 | 4 vCPU / 15 GiB |
+| 機械 | nproc = 4。ビルドは `make -j4` (`nproc`) |
 
-素材: wasm32 の stdlib zip (`work/build-wasm/usr/local/lib/python312.zip`) を wasm64 版でも流用した。
-`$ARTIFACTS_DIR` の toolchain-emsdk は使わず、[EMSDK] をそのまま使った。
+素材: `$ARTIFACTS_DIR` には `fl-win64` だけがあり、`toolchain-emsdk` は無かった。
+この run では [EMSDK] の pin (6.0.12) を上流から取得して使った (素材は使っていない)。
+wasm32 の stdlib zip (`work/build-wasm/usr/local/lib/python312.zip`) を wasm64 版でも流用した。
 
 ## 3. 再現手順
 
@@ -38,20 +41,11 @@ bash tools/python/build_cpython_wasm.sh                     # native build-pytho
 CPY_MEMORY64=1 bash tools/python/build_cpython_wasm.sh      # wasm64 libpython + 補助 lib (work/build-wasm64)
 FLPY_MEMORY64=1 bash tools/python/build_flpy_static.sh      # dist/flpy_static64.{js,wasm,data}
 bash tools/python/build_flpy_static.sh                      # dist/flpy_static.{js,wasm,data} (wasm32 既定)
-node tools/python/tests/static64_browser_probe.mjs flpy_static64
-node tools/python/tests/static64_browser_probe.mjs flpy_static
+for i in 1 2 3; do cut -d' ' -f1-3 /proc/loadavg; node tests/static64_browser_probe.mjs flpy_static64; done
+for i in 1 2 3; do cut -d' ' -f1-3 /proc/loadavg; node tests/static64_browser_probe.mjs flpy_static; done
 ```
 
-ビルド時間 (`date -u`):
-
-| 段階 | 開始 → 終了 | 所要 |
-|---|---|---|
-| native + wasm32 (python.js まで) | 19:52:23 → 19:56:32 | 4 分 09 秒 |
-| wasm64 1 回目 (失敗・§5-1) | 19:56:39 → 19:58:14 | 1 分 35 秒 |
-| wasm64 再試行 (configure + libpython3.12.a) | 19:59:01 → 20:01:10 | 2 分 09 秒 |
-| wasm64 補助 lib (libmpdec / Hacl / expat) | 20:01:21 → 20:01:22 | 1 秒 (前段で作成済み) |
-| flpy link (MEMORY64=1) | 20:01:52 → 20:01:59 | 7 秒 |
-| flpy link (wasm32 既定) | 20:04:12 → 20:04:19 | 7 秒 |
+負のコントロール (§6-2): `cp -p dist/flpy_static64.wasm <退避先>` → `truncate -s -1 dist/flpy_static64.wasm` → probe → 退避先から戻す。
 
 ## 4. 変更点 (commit `38344a16`)
 
@@ -61,7 +55,7 @@ node tools/python/tests/static64_browser_probe.mjs flpy_static
     `work/build-wasm64/config.site-wasm64` を使う (§5-1)。
   - make は `libpython3.12.a` と、`build_flpy_static.sh` が使う補助 lib 3 本 (libmpdec・Hacl SHA2・expat) だけ。`OPT` に `-sMEMORY64=1`。
   - LGL の記録 (`tools/legal/notices/records`) は wasm64 では書かない (wasm32 の記録を変えないため)。
-  - 既定 (wasm32) は configure 引数・make 対象・記録とも変えていない。最終版の wasm32 経路を §6-3 で再実行して確認した。
+  - 既定 (wasm32) は configure 引数・make 対象・記録とも変えていない。
 - `tools/python/build_flpy_static.sh`
   - `FLPY_MEMORY64=1` で libpython の dir を `work/build-wasm64` にし、全 emcc の compile / link に `-sMEMORY64=1` を付ける。既定の出力名は `flpy_static64`。
   - `EXPORTED_FUNCTIONS` に `_flpy_subinterp_run` を追加 (wasm32 版も export が 1 つ増える。他は変えていない)。
@@ -84,48 +78,65 @@ node tools/python/tests/static64_browser_probe.mjs flpy_static
 
 ## 6. 測定結果
 
-### 6-1. flpy_static64 (MEMORY64=1) と flpy_static (wasm32) の比較
+### 6-1. n=3 の所要 (HEAD `10156444`・コード差分なし)
 
-- A 列: 測定 commit 前の作業ツリー (内容は `38344a16` と同一)。`flpy_static64` は 20:03:47、`flpy_static` は 20:04:23 に実行。
-- B 列: `38344a16` の HEAD で `build_flpy_static.sh` を再実行 (20:04:53) したあとの probe (20:05:15 頃)。
+- 測定方法: 同じ HEAD で作ったビルド物に対し、probe を各 3 回ずつ実行。probe は 1 本ずつ直列 (Chrome は 1 インスタンス)。
+  load は各 probe の直前の `/proc/loadavg` の 1 分値 (先頭 1 列)。機械は nproc = 4。
+- 所要の単位は ms (`load_ms`・`init_ms`・`run_ms`・`sub_once_ms` は page 内の計測、`sub_loop_ms` は 160 回の合計、`wall_ms` は driver の navigate → RESULT)。
 
-| 項目 | flpy_static64 A | flpy_static64 B | flpy_static A | flpy_static B |
+| 項目 | flpy_static64 (MEMORY64=1) 1 回目 / 2 回目 / 3 回目 | min–max | flpy_static (wasm32) 1 回目 / 2 回目 / 3 回目 | min–max |
 |---|---|---|---|---|
-| probe 判定 | **PASS** | **PASS** | PASS | PASS |
-| validate (Chrome) | true | true | true | true |
-| validate (node v22.23.3) | (未測定) | false | (未測定) | true |
-| wasm bytes | 6,375,192 | 6,375,192 | 5,969,243 | 5,969,243 |
-| load_ms (wasm 取得・validate・import・instantiate・preload) | 190 | 203 | 191 | 203 |
-| init_ms (`_flpy_init`) / rc | 108 / 0 | 111 / 0 | 101 / 0 | 85 / 0 |
-| run_ms (`print(1 + 1)`) / rc / stdout | 19 / 0 / `2` | 31 / 0 / `2` | 11 / 0 / `2` | 18 / 0 / `2` |
-| subinterp 1 回 | ok `2` / 100 ms | ok `2` / 117 ms | ok `2` / 83 ms | ok `2` / 80 ms |
-| subinterp 160 回 (ok) | 160 / 3,777 ms | 160 / 3,522 ms | 160 / 2,946 ms | 160 / 3,167 ms |
-| heap before (init 直後) | 33,554,432 | 33,554,432 | 33,554,432 | 33,554,432 |
-| heap after 160 回 | 33,554,432 | 33,554,432 | 33,554,432 | 33,554,432 |
-| heap 増加 | **なし** | **なし** | なし | なし |
-| heap の途中値 (n = 1, 20, 40, …, 160) | 全て 33,554,432 | 全て 33,554,432 | 全て 33,554,432 | 全て 33,554,432 |
-| driver wall_ms (navigate → RESULT) | 4,279 | 4,073 | 3,423 | 3,631 |
+| probe 判定 | PASS / PASS / PASS | 3/3 | PASS / PASS / PASS | 3/3 |
+| validate (Chrome) | true ×3 | | true ×3 | |
+| wasm bytes | 6,375,192 | | 5,969,243 | |
+| load_ms | 205 / 197 / 134 | 134–205 | 159 / 188 / 185 | 159–188 |
+| init_ms (rc 0) | 128 / 128 / 114 | 114–128 | 85 / 95 / 106 | 85–106 |
+| run_ms (`print(1 + 1)`, rc 0, stdout `2`) | 19 / 25 / 28 | 19–28 | 19 / 18 / 18 | 18–19 |
+| subinterp 1 回 (ok `2`) ms | 94 / 115 / 115 | 94–115 | 89 / 114 / 96 | 89–114 |
+| subinterp 160 回 (ok) ms | 3,360 / 3,449 / 3,681 (ok 160 ×3) | 3,360–3,681 | 2,728 / 3,104 / 3,212 (ok 160 ×3) | 2,728–3,212 |
+| heap before / after 160 回 | 33,554,432 / 33,554,432 (×3) | | 33,554,432 / 33,554,432 (×3) | |
+| heap 増加 | なし (×3) | | なし (×3) | |
+| heap の途中値 (n = 0, 1, 20, …, 160) | 全て 33,554,432 (×3) | | 全て 33,554,432 (×3) | |
+| driver wall_ms | 4,023 / 4,010 / 4,158 | 4,010–4,158 | 3,179 / 3,608 / 3,725 | 3,179–3,725 |
+| probe 直前の load (1 分値) | 2.25 / 2.05 / 1.97 | 1.97–2.25 | 1.81 / 1.99 / 2.71 | 1.81–2.71 |
 
-注記: `load_ms` は各 page 内の計測。`init` と `run` は 10〜20 ms 程度の揺れが A と B の間にあった。heap の値は全て 32 MiB (`INITIAL_MEMORY`) のまま。
+注記: 直前の load は、同じ作業の直前に行ったビルド (wasm64 link・flpy link) の影響を受けている。
+load の 5 分値・15 分値は測っていない。
 
-### 6-2. 再現性 (HEAD 再実行)
+### 6-2. 負のコントロール (validate を false にして FAIL することを確認)
 
-- `FLPY_MEMORY64=1 bash tools/python/build_flpy_static.sh` と `bash tools/python/build_flpy_static.sh` を HEAD (`38344a16`) で再実行した。
-- wasm の sha256 は再生成の前後で同一:
-  - `flpy_static64.wasm` = `6f8ec11fd1c9f19649c46e37890e7513ac1ce06568b0314ff0a3e67345762af7`
-  - `flpy_static.wasm` = `2771d1a7d6044e000a7c104461ae140fd9ffbed6c2bcf23ccd44727eabe4e59d`
-- 差分: `git diff 38344a16 HEAD -- tools/python` は **0 行 (差分 0)**。本 REPORT を追加する前の HEAD で確認した。
+| 項目 | 値 |
+|---|---|
+| 操作 | `dist/flpy_static64.wasm` を `truncate -s -1` (6,375,192 → 6,375,191 B)。probe 後に退避先から戻し、sha256 が測定時と一致することを確認 |
+| validate | **false** |
+| 判定 | **`STATIC64 PROBE FAIL`・exit 1** |
+| error | `CompileError: WebAssembly.instantiate(): section (code 11, "Data") extends past end of the module (length 3123900, remaining bytes 3123899) @+3251287` |
+| 所要 | driver wall_ms 462 / `node` 実行の real 0.992 s |
 
-### 6-3. wasm32 の配線確認
+### 6-3. 再現性 (同一環境での再リンク)
 
-- 最終版の `build_cpython_wasm.sh` で wasm32 経路を再実行 (20:06:22 UTC、incremental、rc 0)。`python.js` / `libpython3.12.a` は既存のものを使い、`records/cpython-3.12.1.json` は内容が変わらなかった (`git status` が空)。
+| wasm | 測定時の sha256 | 再リンク後の sha256 | 一致 |
+|---|---|---|---|
+| `flpy_static64.wasm` | `086e82e88cb10e3add46f4f415dd8bf09ea9da4a610badf031d7e06aeca48a16` | 同じ値 (`FLPY_MEMORY64=1 bash tools/python/build_flpy_static.sh` を再実行) | 一致 |
+| `flpy_static.wasm` | `98612d4d102374ce7d2cb7b8431076a53c6de9c591c9fa1b914727215d23be4c` | 同じ値 (`bash tools/python/build_flpy_static.sh` を再実行) | 一致 |
+
+- 前回 (PY-98 初版の環境) の sha256 は `flpy_static64.wasm` = `6f8ec11f…`・`flpy_static.wasm` = `2771d1a7…` で、今回と一致しない。wasm のバイト数は一致 (6,375,192 / 5,969,243)。
+  差の原因は未切り分け (emsdk の取得元・環境差の可能性)。どちらも同一環境では再現した。
+- 差分 0 の確認: `git diff 38344a16 10156444 -- tools/python ':!tools/python/REPORT_APPENDIX_2858.md'` は 0 行。
+  本 REPORT を含む commit の後も同じ pathspec で 0 行。
+
+### 6-4. wasm32 の配線確認
+
+- `bash tools/python/build_cpython_wasm.sh` (native build-python と wasm32 の全段) を HEAD で再実行し rc 0。
+  `records/cpython-3.12.1.json` は再記録されたが、`git status` は変化なし (内容は変わらなかった)。
+- wasm32 の `flpy_static` は 6-1 のとおり 3/3 PASS。
 
 ## 7. 受入条件の判定
 
 | 条件 | 判定 | 根拠 |
 |---|---|---|
-| 1 (縮小後). MEMORY64=1 を table64 対応エンジン (headless Chrome) で読み、smoke probe の結果 (PASS/FAIL・所要・load) を記録 | **達成** | §6-1 (PASS、load 190/203 ms、driver wall 4.1〜4.3 s)。元の 12 check 版は未実施 → #2919 |
-| 2. MEMORY64=2 の heap 増加 (160 回後) の原因を切り分ける | **未達 → #2918** | MEMORY64=1 と wasm32 では増加が出ない (§6-1)。MEMORY64=2 版は本 run で作っていない (範囲外) |
+| 1 (縮小後). MEMORY64=1 を table64 対応エンジン (headless Chrome) で読み、smoke probe の結果 (PASS/FAIL・所要・load) を記録 | **達成** | §6-1 (PROBE OK 3/3、load 134–205 ms・load average 1.97–2.25)。負のコントロールは §6-2。元の 12 check 版は未実施 → #2919 |
+| 2 (縮小前の受入。縮小後の範囲から外し #2918 へ). MEMORY64=2 の heap 増加 (160 回後) の原因を切り分ける | **未達 → #2918** | MEMORY64=1 と wasm32 では増加が出ない (§6-1)。MEMORY64=2 版は本 run で作っていない (範囲外) |
 
 ## 8. 未達・子 issue
 
@@ -141,7 +152,11 @@ node tools/python/tests/static64_browser_probe.mjs flpy_static
 - wasm32 版 (`flpy_static`) の 48 tool 比較 (`static_browser_check.mjs`) は未実行 (SAB 版 `dist/flpy.js` / `flprov.js` が無い)。
 - MEMORY64=2 は未ビルド (§8-1)。
 - probe は main thread で実行 (Worker ではない)。
+- load の 5 分値・15 分値は記録していない (§6-1 の注記を参照)。
 
 ## 10. 所要
 
-- 開始 19:50:59 UTC (作業開始の確認)、probe の最終実行 20:05:15 UTC、REPORT 作成 20:07 頃。
+- ビルド (fix 対応の run、UTC): wasm32 (native 含む) `20:20:40 → 20:25:09` = 4 分 29 秒 (make -j4、開始時の 1 分 load 0.40)。
+  wasm64 libpython `20:25:17 → 20:27:22` = 2 分 05 秒 (rc 0、native は流用)。
+  flpy link 2 本 (`20:27:22 → 20:27:48`)。flpy64 単独の `time` real は 20.0 秒。
+- probe: 6 回 (flpy_static64 3 回・flpy_static 3 回)。負のコントロール 1 回。再リンク 2 回 (sha 確認)。
