@@ -8,16 +8,17 @@
 
 - **0x180da6e60 の SIGSEGV は harness 側の初期化欠落で、件数 0 の経路に限って解消した** (native が落ちず、native/wasm とも 8/8 一致)。ただし一致は xmm0 の素通し (出力 = 入力) の一致で、構造体への副作用 (`A+0x19a4` の inc・cookie 検査) は比較していない。件数 >0 の loop 本体は harness で実行できていない。
 - **6 件の「誤り疑い」は判定できなかった**。件数 0 の経路では 6 件の store のうち No 1 (cookie store) だけが実行され、残り 5 件 (No 2・6・7・9・10) は件数 >0 の loop 内にあり、件数 1 では native が 10 秒以内に戻らない (ゼロ初期化の要素で hang)。miscompile とも無害とも確定しない。
-- **0x1803dee20 の揺れは、本 run の環境では再現しなかった**。native も wasm も入力素通しで 8/8 一致し、heap 埋め値 (0x00 → 0xcc) を変えても native の結果は変わらない。初版 (`63a82b32`) の測定と review 環境 (`175ae662` での再現報告) では native が 0000… を返したが、本 run では出ない。環境差の原因は未特定 (§5)。初版の「heap 由来の native 値」という説明は、本 run の観測では支持されない。
-- **受入の達成状況**: 受入 1 = 部分 / 受入 2 = 未達 (判定 0 件) / 受入 3 = 未達 (初版の揺れを本 run で再現できず、harness 状態による説明は未確認)。受入 2・3 が未達のため PR は `Refs #2695`、issue は open のまま。
+- **0x1803dee20 の native 既定出力は測定環境で異なり、未解決**。EPYC 9V45 の fix run (`a2c2c126`) では native が入力素通しで 3 条件とも 8/8 一致した。初版 (`63a82b32`・runner 未記録) と EPYC 7763 の review 再現、EPYC 9V74 の再確認 (`599f793c`) では native が `0000…` を返し、3 条件とも 0/8 だった。0/8 の環境では native の出力が heap 埋め値と一致する (0x00 → `0000…`、0xcc → `cccc…`)。測定経路 (`fa_cmp.py`・route 生成・libottnative 系) の差分は `a2c2c126..599f793c` で 0 行なので、測定経路の変更では説明できない。環境差の原因は未検証 (§5)。
+- **受入の達成状況**: 受入 1 = 部分 / 受入 2 = 未達 (判定 0 件) / 受入 3 = 未達 (native の既定出力が環境で異なり、harness 状態による説明は未確定)。受入 2・3 が未達のため PR は `Refs #2695`、issue は open のまま。
 
 ## 2. 測定条件
 
 | 項目 | 値 |
 |---|---|
-| 測定環境 | 本 fix run の runner (AMD EPYC 9V45、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。並列 1 (単一プロセス)。load は `uptime` の 1 分平均で、sweep 前 0.26・sweep 後 0.84 |
-| 素材 | `work-icall` のみ (`tools/icall/work/` へ `tar --zstd -xf` で展開、実測 18.5 s)。`FA_CORE` は `tools/icall/work/rt_freshair-core/rw.dll` |
-| emsdk | 本 run の素材に `toolchain-emsdk` は無かった。`[EMSDK]` (`docs/REFERENCES.md` §4) に上流 emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12` (19 s)。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。PR 本文の `oc_artifacts` に `toolchain-emsdk` を追加した |
+| 測定環境 (§3・§5・§6 の 9V45 の値) | fix run `a2c2c126` の runner (AMD EPYC 9V45、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。並列 1 (単一プロセス)。load は `uptime` の 1 分平均で、sweep 前 0.26・sweep 後 0.84 |
+| 測定環境 (§5・§6 の 9V74 の再確認) | `599f793c` で再測定した runner (AMD EPYC 9V74 80-Core、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。単一プロセス。sweep は 74.0 s (単独) |
+| 素材 | `work-icall` のみ (`tools/icall/work/` へ `tar --zstd -xf` で展開、実測 18.5 s)。`FA_CORE` は `tools/icall/work/rt_freshair-core/rw.dll` (未指定だと既定で `SlateCore.core_64` を探し、素材 plugins-freshair が要る) |
+| emsdk | 9V45 (`a2c2c126`) の run の素材に `toolchain-emsdk` は無かった。`[EMSDK]` (`docs/REFERENCES.md` §4) に上流 emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12` (19 s)。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。9V74 (`599f793c`) の run は `toolchain-emsdk` を使った (`/opt/emsdk`・emcc 6.0.12)。PR 本文の `oc_artifacts` に `toolchain-emsdk` を追加した |
 | libottnative | `bash tools/ott/native/build.sh` で本 run に作り直した (`tools/ott/work/libottnative.so`。tarball には無い) |
 | fixed route 生成 | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh`: 5.6 s (単独実行) |
 | 単発 fa_cmp | n=8 で 0.2 s 前後 |
@@ -64,7 +65,7 @@ SIGSEGV はプロセス全体を落とす (`fa_sweep.sh` では 1 関数ずつ�
 | wasm | err 0 (route は `[EMSDK]` の emcc 6.0.12 で再生成) |
 | 比較 | match 8 / mismatch 0 (値は入力 xmm0 の素通し) |
 
-負の対照: 修正前は native が SIGSEGV で落ち (出力なし)、修正後は戻って値を返す。native の出力が変わったことを確認した。
+負の対照: 修正前は native が SIGSEGV で落ち (出力なし)、修正後は戻って値を返す。native の出力が変わったことを確認した。EPYC 9V74 (`599f793c` の再確認) でも native 戻り・match 8 / mismatch 0 (`python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8`)。
 
 ### 3.5 経路の実行確認 (int3 トレース、件数 0、`a2c2c126`)
 
@@ -106,33 +107,44 @@ SIGSEGV はプロセス全体を落とす (`fa_sweep.sh` では 1 関数ずつ�
 
 集計: 判定 0 件 (miscompile 0 / 無害 0 / 判定保留 1 / 判定できない 5)。
 
-## 5. 受入 3: 0x1803dee20 の native 0 / wasm 入力の揺れ
+## 5. 受入 3: 0x1803dee20 の native 既定出力 (測定環境で異なる)
 
-`a2c2c126` の `fa_cmp.py` (n=8、先頭 2 点。wasm は全 8 点で入力値と一致):
+harness 状態別の結果 (n=8、先頭 1 点。wasm は全環境・全 8 点で入力値と一致した):
 
-| harness 状態 | native xmm0 (先頭 2 点) | wasm xmm0 (先頭 2 点) | 一致 (n=8) |
-|---|---|---|---|
-| 既定 (heap 埋め 0) | `c000c5300342457c`・`3fd6a5368858d8d0` (入力と同じ) | 同左 | 8/8 |
-| `FA_HEAP_FILL=0xcc` | 同左 (heap を 0xcc で埋めても変わらない) | 同左 | 8/8 |
-| `FA_ENC_INIT=1` | 同左 | 同左 | 8/8 |
+| 測定 | commit | 環境 | 既定 | `FA_HEAP_FILL=0xcc` | `FA_ENC_INIT=1` | 一致 (n=8) |
+|---|---|---|---|---|---|---|
+| fix run | `a2c2c126` | AMD EPYC 9V45 | 入力素通し (`c000c5300342457c`) | 入力素通し | 入力素通し | 8/8 (3 条件) |
+| 初版 | `63a82b32` (`175ae662` の REPORT §5) | runner 未記録 | `0000000000000000` | `cccccccccccccccc` | `0000000000000000` | 0/8 (3 条件) |
+| review 再現 | `599f793c` (reviewer 報告) | AMD EPYC 7763 | `0000…` | `cccc…` | `0000…` | 0/8 (3 条件) |
+| 再確認 | `599f793c` (本 fix) | AMD EPYC 9V74 | `0000000000000000` | `cccccccccccccccc` | `0000000000000000` | 0/8 (3 条件) |
 
-結論:
-
-- **初版との差**: 初版 (`63a82b32`) の測定では native が既定で `0000…`、heap 0xcc で `cccc…` (`FA_ENC_INIT=1` は `0000…`) を返し、wasm は入力素通しだった (0/8)。本 run ではどの条件でも native が入力素通しを返し、初版の観測を再現できなかった。review 環境 (`175ae662`) では `0000…` の再現が報告されている。環境差の原因は未特定 (CPU・glibc・`libottnative.so` のビルド条件のいずれかの疑い。未検証)。
-- **m2 への回答 (issue #2695 の観測との対応)**: 「#2674 の run では native・wasm が入力素通しで一致」は本 run の挙動と一致する。ただし、heap 内容が入力値だった状態で説明できるかは本 run では確認できない。heap 埋め値を変えても native の出力は変わらず、入力素通しのまま。heap 由来の値ではないことは確かだが、入力値が heap にあったかは未確認。初版と本 run で native の結果が異なる理由と合わせて未解決表に残す。
+- 9V74 の再確認では、既定・`FA_HEAP_FILL=0xcc`・`FA_HEAP_FILL=0`・`FA_ENC_INIT=1` の各条件とも上表の 0/8 の値になった (既定は 2 回実行して一致)。
+- 0/8 の 3 環境 (初版・7763・9V74) では、native の出力が heap 埋め値と一致する (0x00 → `0000…`、0xcc → `cccc…`)。値が heap から読まれたかどうかは未確認。
+- 8/8 の 9V45 では、heap 埋め値を変えても native は入力素通しのままだった (`a2c2c126` の測定)。9V45 だけが入力素通しを返す理由は未確認。
+- `a2c2c126..599f793c` の測定経路の差分は 0 行。したがって、差の原因が測定経路の変更である可能性は低い。測定環境に由来するかは未検証。
+- **原因の候補 (未検証)**: CPU 機種、glibc・ASLR によるメモリ配置、`libottnative.so` のビルド条件。`tools/ott/native/build.sh` は `gcc -O1 -g -fPIC -shared` で、`-march` 等は指定していない。どの候補も確かめていない。
+- wasm 側は全環境で入力素通しで、この点は環境によらず一致する。
+- **issue #2695 の観測との対応 (m2)**: 「#2674 の run では native・wasm が入力素通しで一致」は 9V45 の結果と一致し、0/8 の環境とは一致しない。#2674 の run の環境は記録が無い。heap 内容が入力値だった状態で説明できるかは確認できていない。未解決表に残す。
 
 ## 6. fa_sweep (8 60) の集計
 
-`bash tools/icall/diff/fa_sweep.sh 8 60` (fixed route・`FA_FRAME_SLOT=1`、単独実行 70.4 s、測定 commit `a2c2c126`):
+`bash tools/icall/diff/fa_sweep.sh 8 60` (fixed route・`FA_FRAME_SLOT=1`):
 
-| 集計 | 2508 (測定 `05194cdc`/`50112f92`) | 初版 (`63a82b32`) | 本 run (`a2c2c126`) |
-|---|---|---|---|
-| bit 一致 | 54 | 55 | **56** |
-| native crash/timeout | 66 | 65 | **65** |
-| wasm のみ err | 8 | 8 | 8 |
-| 値の不一致 | 3 | 3 | **2** |
+| 集計 | 2508 (測定 `05194cdc`/`50112f92`) | 初版 (`63a82b32`) | fix run (`a2c2c126`・9V45) | review 再現 (`599f793c`・7763) | 再確認 (`599f793c`・9V74) |
+|---|---|---|---|---|---|
+| bit 一致 | 54 | 55 | 56 | 55 | 55 |
+| native crash/timeout | 66 | 65 | 65 | 65 | 65 |
+| wasm のみ err | 8 | 8 | 8 | 8 | 8 |
+| 値の不一致 | 3 | 3 | 2 | 3 | 3 |
 
-差 (2508 → 本 run): 0x180da6e60 が crash から bit 一致へ変わった (初版と同じ)。0x1803dee20 が不一致から bit 一致へ変わった (本 run の native が入力素通しを返したため。§5)。本 run の値の不一致 2 件 (0x180da4030・0x18105d9fc、いずれも native 正常・wasm 値が 8/8 で異なる) は本 issue の範囲外で、個別の調査は行っていない。
+9V74 の再確認の実行時間は 74.0 s (単独)。9V45 の fix run は 70.4 s (単独)。
+
+- 0x180da6e60 が crash から bit 一致へ変わったのは、全環境で同じ。
+- 0x1803dee20 は、9V45 では bit 一致 (入力素通し)、7763 と 9V74 では不一致 (native `0000…`)。
+- 値の不一致の内訳 (9V74 の再確認): 0x1803dee20 (native `0000…`)、0x180da4030 (native `0000…`・wasm は入力素通し)、0x18105d9fc (native `0000000050400010`・wasm `00000000104af418`、先頭 1 点)。7763 の review 再現でも同じ 3 件が不一致だった。
+- 0x180da4030 は 9V45 では native 正常・wasm 値が異なる (native の値は未記録)。0/8 の環境 (7763・9V74) では native `0000…`。環境差として併記する。
+- 0x18105d9fc は 9V45 で不一致 (値は未記録)。9V74 では上記の値。環境差かどうかは未確認。
+- 2 件とも本 issue の範囲外で、個別の調査は行っていない。
 
 ## 7. 再現
 
@@ -144,9 +156,10 @@ export FA_CORE="$PWD/tools/icall/work/rt_freshair-core/rw.dll"
 FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh                 # fixed route (単独 5.6 s)
 python3 tools/icall/diff/fa_cmp.py 180da6e60 --n 8                 # 期待: match 8 / mismatch 0 (件数 0)
 FA_LOOP_N=0 python3 tools/icall/diff/hit_180da6e60.py 180da6e60   # 候補の実行 (件数 0): No 1・SIGSEGV 点・出口のみ 1
-python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8                 # 本 run: 8/8 (native は入力素通し)
-FA_HEAP_FILL=0xcc python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 本 run: 8/8
-bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 本 run: bit一致 56 / 65 / 8 / 2
+python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8                 # 9V45: 8/8 (native 入力素通し) / 7763・9V74: 0/8 (native 0000…)
+FA_HEAP_FILL=0xcc python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45: 8/8 / 7763・9V74: 0/8 (native cccc…)
+FA_ENC_INIT=1 python3 tools/icall/diff/fa_cmp.py 1803dee20 --n 8   # 9V45: 8/8 / 7763・9V74: 0/8 (native 0000…)
+bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 9V45: bit一致 56 / 65 / 8 / 2 / 7763・9V74: 55 / 65 / 8 / 3
 ```
 
 `xmm0_probe.py` は作っていない (`fa_cmp.py` の結果で足りたため)。issue #2695 の検証方法はこれを名指ししており、これは issue の検証方法からの逸脱である。
@@ -161,6 +174,6 @@ bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                   # 本 run: bi
 |---|---|---|
 | 0x180da6e60 の件数 >0 経路 (type 2・8 の要素の状態機械と仮想 callee の object) の harness | 6 件の判定が 0 件。件数 1 は hang (`0x180da41a0` の探索の原因未確認) | #2695 (本 issue に残す。analysis と harness の残件のため子 issue は起票していない) |
 | No 1 (cookie store の IR 欠落) の検査が wasm で通る理由 (検査が読む値の出所) | 無害とも誤りとも未確定 | #2695 |
-| 0x1803dee20: 初版の native 0000…/cccc… が本 run で再現せず。環境要因 (CPU・glibc・libottnative のビルド条件の疑い。未検証) | 初版の「heap 由来の native 値」説明の根拠が無くなった。初版の値の不一致 1 件の説明は未確定 | #2695 |
-| 本 run の sweep の値の不一致 2 件 (0x180da4030・0x18105d9fc) | 本 issue の範囲外の既存残件 | #2508 (既存の残件として引き継ぎ) |
+| 0x1803dee20: native の既定出力が測定環境で異なる (9V45 は入力素通し、7763・9V74 は `0000…`)。原因は未検証 (CPU・glibc・ASLR・libottnative のビルド条件の候補)。#2674 の観測 (入力素通し) との対応も未確定 | 受入 3 が未達。0/8 の環境で、heap 埋め値から native 出力が来る経路 (どこから読まれるか) も未確認 | #2695 |
+| sweep の値の不一致 (0x180da4030・0x18105d9fc。0x1803dee20 は上の行と同じ) | 本 issue の範囲外の既存残件。0x180da4030 は native の値が環境で異なる (§6)。0x18105d9fc が環境差か否かは未確認 | #2508 (既存の残件として引き継ぎ) |
 | 受入 2 の「miscompile か無害か」を判定するための callee 読み先の確定 | 分類結果が 0 件 | #2695 |
