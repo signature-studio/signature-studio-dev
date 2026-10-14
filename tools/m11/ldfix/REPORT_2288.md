@@ -11,13 +11,12 @@
 - 素材: `work-m11` は `tools/m11/work/`、`work-liftdiff` は `tools/liftdiff/work/` に展開 (tarball 内が `tools/m11/work/...` の相対パスのため、展開後に 1 段移動した)。
 - 再現用の素材名: `oc_artifacts: fl-win64 work-m11` (`work-liftdiff` は `audit_lsf_ssa_e2e.sh` の 4/7・5/7 で使うため併せて指定する場合は `work-liftdiff` を足す)。
 
-## 2. 機械語側の主張 (未再現・未確認)
+## 2. 機械語側の主張 (前 run の記述。§7-1 で再検証)
 
 - 対象 24 site は `spill178_1161.tsv` の status=未判定 (`c589b0` 12 / `128f9e0` 12) と一致 (§1 の集計で確認)。
-- 以下は**未再現・未確認の主張**として扱う。当時の逆アセンブル出力・走査スクリプトは残っておらず、本 run でも fl-win64 の逆アセンブルは行っていない。
-  - 全 24 site で、store 元 (`mov qword ptr [rbp+X], rax`) の直前に `mov rax,[rip+X]` → `mov rax,[rax]` (二段参照) があり、一段目の参照先が LVA `0x11e0ab0` (10 進 18746032) である。
-  - 同 slot は両関数の機械語から計 27 回参照される。
-- 再検証は §3-a の手順 3 (fl-win64 の逆アセンブル走査・生成元を `results/` に残す) で行う。
+- 前 run の主張は次のとおりで、2 回目 run の §7-1 で `work-m11` の image から再検証した (fl-win64 の PE は使っていない)。
+  - 全 24 site で、store 元 (`mov qword ptr [rbp+X], rax`) の直前に `mov rax,[rip+X]` → `mov rax,[rax]` (二段参照) があり、一段目の参照先が LVA `0x11e0ab0` (10 進 18746032) である。 → 再現。
+  - 同 slot は両関数の機械語からそれぞれ 27 回参照される (両関数で計 54 回)。 → 再現 (前 run の「計 27 回」は各関数の数)。
 
 ## 3. IR 側の確認 (不一致)
 
@@ -35,7 +34,7 @@
   - `sed -n '390809,391214p' boot_final3.ll | grep -c 18746032` → 0 件 (`function_c589b0`)
   - `sed -n '76541,77198p' boot_final3.ll | grep -c 18746032` → 0 件 (`function_128f9e0`)
   - `grep -ci '11e0ab0' boot_final3.ll` → 0 件 (16 進表記)
-- **§2 (機械語側) は未再現**。当時の逆アセンブル出力・生成元スクリプトは記録が無く、本 run では検証していない。「二段参照 24 site」「計 27 回」は未確認の主張。
+- **§2 (機械語側) は 2 回目 run で再現した** (§7-1)。
 - `boot_final3.ll` は実行ごとに sha256 が変わり得る (`docs/WORKFLOW.md` §11・#680)。再現には上記 sha256 の IR が要るため、次の手順でも sha256 を必ず記録する。
 - 再現手順 (次 run・未実行。素材 `oc_artifacts: fl-win64 work-m11` が前提):
   1. `tools/m11/work/boot_final3.ll` の sha256 を記録する (`sha256sum`)。
@@ -50,7 +49,7 @@
 
 ## 5. 次の一手 (後続に渡す)
 
-1. slot `0x11e0ab0` の値の出自を機械語側で確定する: 2 関数の外 (呼び出し元・初期化箇所) で書かれるか、グローバル初期値 (image 実データ) かを `m11_image.bin` の 0x11e0ab0 の内容から確認する。
+1. slot `0x11e0ab0` の値の出自: 機械語側は §7-1 で確定した (セル → V の参照。V は実行時に値が入る参照フィールド)。残りは V の実行時値の出所 (§7-4 の 2)。
 2. その結果で IR 側の扱いを決める: IR が slot を一切読まない場合、24 site の store 元は IR の別経路 (`function_X__lifted` や inline 展開) を経ている可能性があり、関数の IR 本体の取り違えを先に確認する。
 3. 判定は 1 と 2 の後に、site 単位で `candidate_verdicts_1161.jsonl` と同じ形式で入れる。
 
@@ -61,4 +60,38 @@
 | `c589b0` の未判定 12 site の IR 突合 (判定 0 件) | spill 宛の脱落関数の和集合 69 が未確定 | #2288 (本 PR は部分達成・Refs) |
 | `128f9e0` の未判定 12 site の IR 突合 (判定 0 件) | 同上 | #2288 |
 | slot `0x11e0ab0` の値の出自 (§5-1) | 上記 24 site の判定根拠が立たない | #2288 (次 run) |
-| §2 (機械語側: 二段参照 24 site・計 27 回) が未再現 | 機械語側の入口が未確定。§3-a 手順 3 で再検証する | #2288 (次 run) |
+| 24 site の IR 側 store 値の対応付け (§7-4 の 1) | 判定 0 件 (脱落関数の和集合 69 は未確定) | #2288 (次 run) |
+| V の実行時値の出所 (§7-4 の 2) | 24 site の判定根拠 | #2288 (次 run) |
+| 機械語走査は RetDec 関数区間 (config) のみ (§7-1) | 区間外からの書き込みは未走査 | #2288 (次 run) |
+
+## 7. 2 回目 run: 機械語側の再検証と V の出所 (LD-104 継続)
+
+- 測定 commit: 463d8176 (`ld104_cell_origin.py` と `results/ld104_*.tsv` を追加した commit)。以後 `git diff 463d8176 HEAD -- tools/m11/ldfix` のコード差分は 0 (本 REPORT のみ)。
+- 実行: `python3 tools/m11/ldfix/ld104_cell_origin.py` (約 3 秒) と `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (rc=0・所要 2m44s・7/7 完了・load average 0.99・`drops_510.tsv` / `spill178_1161.tsv` は results/ と cmp 一致)。
+  - 1 回目の e2e は worktree に `work-liftdiff` を展開していなかったため step 5/7 が落ちた。展開後に 7 step を再実行し、上の値は再実行のもの。
+- 素材: `oc_artifacts: work-m11 work-liftdiff`。`boot_final3.ll` の sha256 は `010451add5147d37cd06d8d0043255fcb2e65a536c4eadeff17e7ce43de7cb9e` (前 run と一致)。
+
+### 7-1 機械語側 (§2 の再検証)
+
+- 24 site (`results/ld104_sites.tsv`) は全て `mov rA,[rip+X]` → `mov rax,[rax]` → 後続命令の型。cell の VA は 0x15e0ab0 (LVA **0x11e0ab0**) で 24 site 共通。
+- cell K (0x11e0ab0) を指す rip 相対参照は RetDec 関数区間内で 72 件 (`results/ld104_cell_refs.tsv`)。書き込み (W)・RMW は 0 件。内訳は c589b0 27・128f9e0 27・10c7cd0 18。絶対アドレス表現 (immediate) は 0 件。
+- c589b0・128f9e0 の各 27 件は、`mov rax,[rax]` で連鎖する 24 件と `mov rcx,[K]` の 3 件。連鎖 24 件のうち、直後が spill 宛 store (`[rbp+D]`) になるのは 12 件 (site)。残り 12 件は直後に spill 宛 store が無い (直後は `[rbp+D]` の読み出し、別 slot の読み出し、または `mov rdx,[rip+X]`)。
+- cell の内容 V = 0x12b81b0 (LVA; VA 0x16b81b0)。`m11_image_gen.py` は .reloc が指す値だけを VA→LVA に直すため、K の内容は PE の DIR64 で初期化された値と推定される (.reloc 表そのものは image に無く未確認)。
+- V の 8 byte は image 上で 0。しかし V は実行時に値が入る参照フィールドと読める。`0x418190` は `[rcx]` (rcx = V) の値を読み、非 nil なら V を 0 に戻して参照を減らす (解放の型)。V の address を渡すのは `c21d80` の `lea rcx,[rip+X]` の 1 件だけで、`c21d80` はカウンタと 0 判定で初回だけ `0x415c30`・`0x418190` を呼ぶ。V を指す rip 参照もこの `lea` 1 件のみ。image の 0 は実行時の値ではない。
+
+### 7-2 IR 側 (前 run の確認の追認)
+
+- `c589b0`・`128f9e0` の IR 本体には K (18746032) を読む load が 1 件もない。boot_final.ll・boot_final2.ll・boot_final3.ll・bf_c.ll・bf_x.ll・shimx_link の各版でも同じ。`10c7cd0` には 8 件 (`load ptr`) ある。
+- V (19628464) の定数を含む IR 行は c589b0・128f9e0 の範囲外に 1 件 (`boot_final3.ll` 383162 行)。
+- したがって 24 site の store 値は、IR で K → V → *V の連鎖を通らない。ただし、この事実だけでは TRUE_DROP の根拠にならない。store 先 `[rbp+D]` と IR の stack_var / reg2mem の対応を site 単位で立てていないため。
+
+### 7-3 判定
+
+- 本 run の判定: **0 site** (`candidate_verdicts_1161.jsonl` は変更なし)。
+- 理由: 機械語側の出自は確定したが、IR 側の store 先との対応を 1 site も立てていない。根拠無しの判定は入れない。
+
+### 7-4 次の一手
+
+1. 24 site の `[rbp+D]` と IR の stack_var / reg2mem の対応を site 単位で立てる。入口は `results/ld92_machine_evidence.tsv` (後続の読み) と `results/ld104_sites.tsv`。
+2. V の実行時値の出所を追う: `0x418190` と `c21d80` の呼び出し元で、V の参照フィールドに入る値 (object 参照) を確認する。
+3. 1 と 2 が立った site から、`candidate_verdicts_1161.jsonl` と同じ形式で根拠行付きで入れる。

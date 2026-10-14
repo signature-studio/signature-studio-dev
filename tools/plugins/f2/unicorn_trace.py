@@ -58,7 +58,7 @@ def main():
     ap.add_argument('-p', action='append', default=[], type=lambda s: int(s, 0),
                     help='本体の前に同じメモリ上で順に実行する関数 (arena 初期化等。rcx/rdx は -H の host)')
     ap.add_argument('-V', action='store_true',
-                    help='kernel32!VirtualAlloc が 64KB 境界で POOL (0x50000000〜) の領域を返す (dwSize=rdx)')
+                    help='kernel32!VirtualAlloc が 64KB 境界で POOL (0x50000000〜) の領域を返す (dwSize=rdx。pool 超過は error を出して 0)')
     ap.add_argument('-H', action='store_true',
                     help='合成 host: rcx を SCRATCH+0x10000 の host に向け、[host]=vtable (0x40 スロット、全て ret stub)')
     a = ap.parse_args()
@@ -141,10 +141,16 @@ def main():
             print(info)
         if addr in names:
             hits[names[addr]] = hits.get(names[addr], 0) + 1
-            if a.V and names[addr] == 'kernel32.dll!VirtualAlloc':
+            if a.V and names[addr].lower() == 'kernel32.dll!virtualalloc':
                 size = uc_.reg_read(UC_X86_REG_RDX)
-                uc_.reg_write(UC_X86_REG_RAX, pool[0])
-                pool[0] += (size + 0xffff) & ~0xffff
+                need = (size + 0xffff) & ~0xffff
+                if pool[0] + need > POOL + POOL_SIZE:
+                    print('error: VirtualAlloc dwSize=%#x は pool の残り %#x を超える (戻り 0)' % (
+                        size, POOL + POOL_SIZE - pool[0]))
+                    uc_.reg_write(UC_X86_REG_RAX, 0)
+                else:
+                    uc_.reg_write(UC_X86_REG_RAX, pool[0])
+                    pool[0] += need
             else:
                 uc_.reg_write(UC_X86_REG_RAX, rets.get(addr, 0))
 

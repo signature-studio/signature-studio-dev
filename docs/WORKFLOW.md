@@ -38,7 +38,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    │                                ├ push -u origin <N>-<slug>        │
    │                                ├ gh pr create --base main         │
    │                                ├ gh issue comment N (進捗・実測)   │
-   │                                └ Status → In review を依頼 ────────┤
+   │                                └ ready PR を出して依頼 ───────────┤
    │                                                                   ├ 自分の worktree で
    │                                                                   │  PR branch を checkout
    │                                                                   ├ e2e 独立再実行 + 別算法検算
@@ -49,7 +49,7 @@ PM (main)                      subagent (実装)                  subagent (検�
    └ gh pr merge --merge ──→ branch/worktree 削除
 ```
 
-- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度・Status は PM が確定する)。
+- 流れ図の「issue 起票」は PM が行う。ただし実装 subagent も、1 run に収まらない実装・修復の作業の残りを子 issue として起票してよい (§3 の規定 (#835・#1758)。PR は自分の issue を `Closes #N` で閉じる。milestone・優先度は PM が確定する。Project の Status は参考で、§3)。
 - **worktree の場所**: リポジトリの**親ディレクトリの `ws-<N>`**
   (`git worktree add ../ws-<N> -b <N>-<slug> origin/main`)。
   既存 worktree は `git worktree list` で確認。**他人の worktree には触れない** (消さない・checkout しない)。
@@ -62,9 +62,9 @@ PM (main)                      subagent (実装)                  subagent (検�
 
 | 役割 | 着手時 | 完了時 | 禁止 |
 |---|---|---|---|
-| 実装 subagent | In progress | **In review** (自分を Done にしない) | Done への変更・他チケットの Status 変更 |
-| 検収 subagent | 対象が In review 確認 | 合格 → Done + コメント / 条件付き → **In review 維持** + 所見 | In review でないものを Done にしない |
-| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定 | merge・方針変更・是正 | — |
+| 実装 subagent | `/oc` で着手 (open PR が無い間は『着手済み』(`started`)) | **ready の PR を出す** (open PR は『レビュー中』か『修正中』。自分で完了にしない) | issue の手動 close・他チケットの分類やラベルの変更 |
+| 検収 subagent | 対象が open な ready PR であることを確認 | 合格 → approve + コメント / 条件付き → **request-changes** + 所見 | approve していない PR の merge |
+| PM (main) | 起票 (実装 subagent も下記の条件で可)・milestone 確定・ラベルの付け外し | merge・方針変更・是正 | — |
 
 - **PR は自分の issue を `Closes #N` で閉じる** (2026-10-14 PM 是正。#1758): 「`Refs #N` のみで merge」を原則にしない
   (Refs のみの merge は、親が open のまま残り、open 数の水増しと自動着手の分類の乱れを生んだ)。残りの作業は子 issue (`親: #N`) に分離する。
@@ -82,20 +82,36 @@ PM (main)                      subagent (実装)                  subagent (検�
   `gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -oE '^\[<AREA>-[0-9]+[a-z]?\]' | grep -oE '[0-9]+' | sort -n | tail -1`
   起票の直前にもう一度、`gh issue list --repo <R> --state all --limit 5000 --json title --jq '.[].title' | grep -cF '[<AREA>-<n>]'`
   が 0 になることを確認する (番号の重複を作らない)。② 本文に `親: #N`・受入条件・
-  必要な `oc_artifacts:` 行を書く。③ milestone・優先度・Project の Status は PM が確定する (subagent は触らない)。
+  必要な `oc_artifacts:` 行を書く。③ milestone・優先度は PM が確定する (subagent は触らない。Project の Status は参考のため触らない)。
   ④ 起票した番号を、最終回答と issue コメントに書く。
-- **チケット状態の唯一の正は Project V2 の Status フィールド + issue の open/closed**
-  (技術進捗の正本は `docs/STATUS.md`)。不変条件: `CLOSED ⇔ Done`、`OPEN ⇔ Backlog|Ready|In progress|In review`。
+- **チケット状態の正は issue の open/closed + ラベル + PR の状態** (技術進捗の正本は `docs/STATUS.md`)。
+  open な issue は次の表のどれかに分類する。語は `/status` (PM Worker) と `tools/pm/launch_issues.py plan` が出すもので、新しい語は作らない。
+  上から順に判定し、最初に当たったものが分類になる。
+
+| 分類 | 判定 (GitHub の事実) | 意味・次の一手 |
+|---|---|---|
+| `user` | `needs-user-input` ラベル、または `pm-apply` ラベル (workflow 変更の適用待ち) が付いている | 依頼者の回答・適用待ち。自動着手しない |
+| `blocked` | open な blocked_by (issue dependencies) がある、本文の依存行 (`依存:`・`blockedBy:` など) が open な issue を指す、`tools/pm/manual_deps.json` の依存 (停止報告に根拠のあるもの) が open、または子 issue を持つ親で PR が無い | blocker が close されるまで着手しない |
+| `started` (着手済み) | open PR が `N-<slug>` ブランチか `Closes/Refs/Fixes #N` で紐づく、または実装 run が稼働中 | 実装・レビュー・修正の途中。二重に着手しない |
+| `stopped` | 直近 24 時間以内の bot の最後のコメントが停止報告で、再投入の素材が無い、または再投入の上限 (2 回) に達した | PM の判断待ち |
+| `ready` | 上のどれにも当たらない (未着手・非ブロック) | 次の `launch` の対象 |
+
+- 停止報告の窓は **24 時間**。24 時間を過ぎた停止報告は `stopped` にならず、`ready` 扱いで次の `launch` の対象になる (`classify` の窓は `launch_issues.py` と Worker で同じ)。
+- `pm-apply` の issue は、Worker の `plan()` が着手も再投入もせず `user` 行に置く (`oc:no-pr` の有無に依らない)。
+- `recent` (`/oc` の投稿から 3 時間以内で報告がまだ無い、または bot のコメントから 1.5 時間以内) は着手直後の待ちとして `started` と同様に扱う。
+  `relaunch` (停止報告の素材名で再投入する候補) は `plan` の一時分類。`oc:stuck` の PR は着手数の律速に数えない。
+- **Project V2 の Status は参考**。VM の `tools/pm/sync_status.py` が動いている間だけ同期し、VM 退役後は更新されない。
+  判断の根拠にしない (根拠: #2353 の PM 判断)。
 - **label `state:*` は使わない** (2026-10-12 実測で全削除済み・0 件)。新規作成・付与しない。
 - **1 状態遷移 = 1 コメント**。コメントなしの状態変更は禁止。
-- **Status を変えるのは PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
-- **中断・ブロックで終了する場合**: Status は In progress のまま、中断コメント (到達点・WIP 所在・再開手順) を残し、
-  最終回答の冒頭に「未完・In Progress のまま」と明記。
+- **分類を変えるラベル (`needs-user-input`・`pm-apply`・`oc:stuck`・`oc:no-pr`) と milestone の変更は PM の責務**。subagent は依頼コメントを書く (PM が委任プロンプトで明示許可した場合を除く)。
+- **中断・ブロックで終了する場合**: issue は open のまま (分類は `started` か `stopped`)。中断コメント (到達点・WIP 所在・再開手順) を残し、
+  最終回答の冒頭に「未完・open のまま」と明記。
 
 ## 4. 着手前の確認 (毎回・省略不可)
 
 1. `gh issue view <N>` でスコープ・受入条件・親 issue・検証方法を確認。
-2. 同一チケット / 同一 dir に In progress または In review があれば**着手せず報告**。
+2. 同一チケット / 同一 dir に open PR (`started`) か稼働中の実装 run があれば**着手せず報告**。
 3. lift / 逆アセ / IR pass / ハーネス系は `docs/DEFECTS.md` を先に読み、REPORT 冒頭に
    「既知類型との関係: 該当 ID / 該当なし」を 1 行書く。
    **番号体系の注意**: `docs/DEFECTS.md` の D1a〜D23 と `tools/icall/REPORT.md` §4 の D1〜D13 は
@@ -228,8 +244,16 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   - `work-fw-stage1` → `tools/plugins/work/fw/` に framework stage-1 成果物 (fw_icall.dll / fw_map.json /
     fw[0-7].restored.ll / r2.restored.ll / r3.restored.ll の 12 ファイル。#610)。`fw_269_verify.sh` の既定 SRC がそのまま使える。
     作成・検証は `bash tools/plugins/framework/fw_pack_stage1.sh pack` → `artifacts/work-fw-stage1.tar.zst` (`verify` で単独検査も可)。
-    R2 への投入は PM が行う (S3 multipart、R2 から再ダウンロードした sha256 と梱包元の一致を確認する)。
+    R2 への投入の手順は下の「R2 への投入 (VM 非依存の手順)」。現状は PM が VM 上で行い、VM 退役後の担い手は依頼者とする。
   - 追加の `work-*` は R2 に置いて、`prepare-event-context.sh` の allowlist に足す (#293)。
+- **R2 への投入 (VM 非依存の手順・#2434)**: 担い手は依頼者 (現状の PM は VM 上で行う。VM 退役後は依頼者が行う)。
+  素材の原本の所在は `docs/REFERENCES.md` の「素材の原本と R2 bundle の対応」、投入の頻度は `tools/pm/REPORT.md` §13 が正本。
+  1. **権限を昇格**: Cloudflare で R2 の API token の権限を、バケット `signature-studio-artifacts` に限り「Workers R2 Storage Bucket Item Read」から「Read + Write」へ変える。画面上の操作名は `[未確認]`。昇格中は、この token を使う全ての経路が書ける (Actions の `CF_R2_*` が同じ token かは `[未確認]`)。投入は短時間で終える。
+  2. **投入**: 梱包した `<name>.tar.zst` を S3 互換 API で置く。大きい object は aws cli が multipart で送る (`tools/plugins/framework/fw_pack_stage1.sh` の注記と同じ形): `aws s3 cp <name>.tar.zst s3://signature-studio-artifacts/artifacts/<name>.tar.zst --endpoint-url "https://$CF_ACCOUNT_ID.r2.cloudflarestorage.com"`。S3 のキーは環境変数で渡し、値を repo・ログ・issue に書かない。
+  3. **照合**: R2 から同じ object を取り直し、梱包元と sha256 が一致することを確認する。不一致なら 2 からやり直す。
+  4. **権限を戻す**: 手順 1 の逆 (Read のみ)。戻したことを確認する方法は `[未確認]`。
+  5. **許可名を足す場合**: 同じ PR で `.github/scripts/prepare-event-context.sh` と `.github/scripts/watchdog.sh` の `ARTIFACT_RE` と、本節の許可名一覧を更新する。`pr-lint.sh` は watchdog.sh の値を読むため、`grep -n '^ARTIFACT_RE=' .github/scripts/*.sh` で両者の一致を確認する。
+  - **Actions から投入しない理由**: (1) Actions の R2 認証 (`CF_ACCOUNT_ID`・`CF_R2_ACCESS_KEY_ID`・`CF_R2_SECRET_ACCESS_KEY`) は素材の取得に使う。`tools/pm/README.md` の運用の約束は、投入を「R2 への投入は既存 token の一時昇格だけで行い、終わったら必ず Read のみへ戻す」と定める。Write 可能な token を repo secret に置くと、`/oc` を書ける人の run (実装 agent を含む) がバケットに書ける。(2) 原本の一部は VM のディスクにしか無い (`docs/REFERENCES.md` の原本表)。run からは `~/ダウンロード/` や mac pkg の展開物を再作成できない。
 - **fl-win64 の展開と `FL_WIN64_DIR`**: tarball は最上位に `extracted/` と installer exe を持つ
   (`extracted/block00031_PE.bin` 等)。展開先ディレクトリがそのまま `FL_WIN64_DIR` になる。
   tools/ のスクリプトは `tools/shared/env.sh` (bash)・`paths.py`・`paths.mjs` 経由でこの変数を読む
