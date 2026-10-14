@@ -235,3 +235,8 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 - ROOT 行の命令数: 27 行中 20 行が 3 命令。残り 7 行は `size` が 1〜8 B の短い関数 (`ret` 等) で、関数内に 3 命令が存在しない (例: #7 `size=1`、`ret` のみ)。`size` を超えて読まないため、この 7 行は関数内の全命令を出す。
 - 判定: ダンプは人手検証の**材料**であり、検証結果ではない。`verified` 列は 160 行すべて `auto` のまま。手検証集合は空のため、受入 1・2 は未達。
 - 未達の追跡: 160 行の人手確認 (受入 1) と、手検証集合と before 集合の差分 (受入 2) は #2176 (KH-35) に残す。再測定は本節で完了済み (#2176 には含めない)。
+
+## 10. KH-38 (#3065) 対照 Gain closure の unsup 被覆 (結論のみ)
+
+- 対照 Gain の before 160 closure で残っていた unsup (VEX/FMA 系ほか) を flelift x64c で被覆した。before / after の数値・内訳・未解決は [REPORT_APPENDIX_3065.md](REPORT_APPENDIX_3065.md)。
+- 再測定スクリプト: `scripts/lift_closure_x64c.sh`。差分テスト: `tools/flelift/tests/x64c_vex_diff.py`。
