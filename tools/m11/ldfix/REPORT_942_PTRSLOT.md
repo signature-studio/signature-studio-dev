@@ -52,15 +52,15 @@ E3 では stage4 の boot が `threw: null`・`dllmain_done: true` になり、�
 
 - **初版の測定 (commit `5fe8dbe0`) は無効**。base は qstore 前の IR で、所要秒 (n=1) は比較の根拠にしない。
 - **再測定は未実施**。必要なこと: (a) 素材 `work-m11` (`tools/m11/work/boot_final3.ll`・`m11_image.bin`)・work-liftdiff・emsdk `[EMSDK]`・RetDec `[RETDEC]` を揃える、(b) `python3 tools/m11/m11_cond.py --get qstore` が `applied` の IR で base (`m11_ov.c` = main) を測る、(c) pe の指紋 (`sha256sum block00031_PE.bin`) と qstore 状態を REPORT に書く。この run では `$ARTIFACTS_DIR` に `fl-win64.tar.zst` だけがあり、`tools/m11/work`・`[EMSDK]`・`[RETDEC]` が無いため、(a)〜(c) は実行できなかった。
-- コード差分 (WORKFLOW §6): e2e の経路 (`m11_ov.c`・`ldfix_e2e.sh`・`stage4.sh`・`survey_stage4.mjs`・`ldfix.py`・`fix_450560.py`) は main (`bbb07d80`) に対して差分 0。
+- コード差分 (WORKFLOW §6): e2e の経路 (`m11_ov.c`・`ldfix_e2e.sh`・`stage4.sh`・`survey_stage4.mjs`・`ldfix.py`・`fix_450560.py`) は §1 の測定 commit (`26f90ada`) から HEAD まで差分 0。
 
 ```sh
-git diff bbb07d80 HEAD -- tools/m11/m11_ov.c tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_450560.py | wc -l   # → 0
+git diff 26f90ada HEAD -- tools/m11/m11_ov.c tools/m11/ldfix/ldfix_e2e.sh tools/m11/ldfix/stage4.sh tools/m11/ldfix/survey_stage4.mjs tools/m11/ldfix/ldfix.py tools/m11/ldfix/fix_450560.py | wc -l   # → 0
 ```
 
 ## 6. 受入への反映・未解決
 
-- 受入 1 (trap 9 件の原因): **部分**。unit 53 の上流は D17 の 4B 初期化 slot と確定 (静的照合・§0)。修復は既存の qstore。適用 IR での消失は未実測。unit 87・138・17・56・144・149・158 は未確定。
+- 受入 1 (trap 9 件の原因): **部分**。unit 53 の上流は D17 の 4B 初期化 slot と確定 (静的照合・§0)。修復は既存の qstore。適用 IR での消失は未実測。unit 87 は D17 の同類型 (`REPORT_942_TRAPSITE.md` §0)。138・17・56・144・149・158 は未確定。
 - 受入 2 (boot threw): **部分**。boot threw は不変 (修復を入れていない)。次の入口は 887MB 要求の size の計算元。
 - 受入 3 (件数反映): 変更なし。
 
@@ -68,7 +68,7 @@ git diff bbb07d80 HEAD -- tools/m11/m11_ov.c tools/m11/ldfix/ldfix_e2e.sh tools/
 |---|---|---|
 | qstore 適用 IR での base 再測定 (unit 53 の消失の実測・qstore=applied・pe 指紋) | 受入 1 | #942 (次 run・素材が必要) |
 | E3 の 887MB VirtualAlloc 要求 (2 回・OOM) の size の計算元 | 受入 2 | #942 (次 run) |
-| unit 87・138 の上流 (`function_59f9a0`・`function_418210`)。qstore の確定 site かどうか | 受入 1 | #942 (次 run) |
+| unit 138 の上流 (`function_418210`・`function_646130`)。87 は D17 の候補 (dest の一致は未実測) | 受入 1 | #942 (次 run) |
 | unit 17・56・144・149・158 の trap 位置の確定 | 受入 1 | #942 (次 run) |
 | `alloca ptr` のうち C 側が 8 byte で読む slot の洗い出し (qstore の未検出分を含む) | 同種の残骸が他の unit にもある可能性 | #942 (次 run) |
 
@@ -79,5 +79,5 @@ grep -n "8cbb00" tools/m11/qstore/results/qstore_sites.tsv        # qstore の�
 python3 tools/m11/ldfix/probe_942_obj.py tools/m11/work/boot_final3.ll tools/m11/ldfix/work/probe_942_obj.ll
 (cd tools/m11/ldfix && bash stage4.sh work/probe_942_obj.ll probe_obj)
 S4_NAME=probe_obj S4_IMAGE=tools/m11/work/m11_image.bin node tools/m11/ldfix/trap_obj_942.mjs
-git diff bbb07d80 HEAD -- tools/m11/m11_ov.c                    # 空 (初版の 1 行は撤回)
+git diff 26f90ada HEAD -- tools/m11/m11_ov.c                    # 空 (初版の 1 行は撤回)
 ```
