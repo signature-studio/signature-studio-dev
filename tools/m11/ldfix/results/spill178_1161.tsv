@@ -79,9 +79,9 @@ cf3790	cf3baf	-		未判定	-	mov qword ptr [rbp + 0xf8], rax
 cf3790	cf3bbd	-		未判定	-	mov qword ptr [rbp + 0xf0], rax
 cf3790	cf3c0e	-		未判定	-	mov qword ptr [rbp + 0xe8], rax
 cf3790	cf3c1c	-		未判定	-	mov qword ptr [rbp + 0xe0], rax
-cf3790	cf3c7a	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0x140], rax
-cf3790	cf3cbb	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xd8], rax
-cf3790	cf3d20	-		未判定	CELL_DEEP	mov qword ptr [rbp + 0xd0], rax
+cf3790	cf3c7a	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0x140], rax
+cf3790	cf3cbb	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xd8], rax
+cf3790	cf3d20	cand	TRUE_DROP	確定	CELL_DEEP	mov qword ptr [rbp + 0xd0], rax
 cf3790	cf3dfa	-		未判定	-	mov qword ptr [rbp + 0xc8], rax
 cf3790	cf3e08	-		未判定	-	mov qword ptr [rbp + 0xc0], rax
 cf3790	cf3e7a	-		未判定	-	mov qword ptr [rbp + 0xb8], rax

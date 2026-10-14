@@ -11,7 +11,11 @@
   - 132: 全チケットは『ブロックされている』か『着手済み』のどちらか。ブロック要因 (blocked_by に open issue) が無く
          未着手の issue は /oc コメントで即座に着手する。
 
+  - Opened PR の数は oc:stuck の付いた PR を除く (stuck は人の処理待ちで、着手の律速にしない)。
+    stuck の open PR が STUCK_HIGH を超えたら launch を止める。
+
 env: TARGET=50 BATCH=25 DRY=1(launch でも実コメントしない) ONLY=番号,番号 FORCE_PHASE=1 (フェーズを無視)
+     STUCK_HIGH=40 (stuck の open PR の上限)
 """
 import json, os, re, subprocess, sys, time, collections
 from datetime import datetime, timezone
@@ -27,6 +31,7 @@ BATCH = int(os.environ.get("BATCH", "25"))
 DRY = os.environ.get("DRY") == "1"
 ONLY = {int(x) for x in os.environ.get("ONLY", "").split(",") if x}
 LOW, HIGH = 10, 80
+STUCK_HIGH = int(os.environ.get("STUCK_HIGH", "40"))
 
 
 def gh(args, input_=None):
@@ -178,11 +183,24 @@ def phase_update(open_prs):
     return st
 
 
+def count_open_prs(pulls):
+    """open PR の (oc:stuck を除いた数, oc:stuck の数)。"""
+    stuck = sum(1 for p in pulls if any(l.get("name") == "oc:stuck" for l in p.get("labels", [])))
+    return len(pulls) - stuck, stuck
+
+
 def open_pr_count():
     rc, o, e = gh(["api", "--paginate", "--slurp", f"repos/{R}/pulls?state=open&per_page=100"])
     if rc:
         raise SystemExit(f"open PR count failed: {e[:150]}")
-    return sum(len(p) for p in json.loads(o))
+    return count_open_prs([p for page in json.loads(o) for p in page])
+
+
+def launch_stop_reason(stuck):
+    """launch を止める理由。止めないなら None。"""
+    if stuck > STUCK_HIGH:
+        return f"oc:stuck の open PR {stuck} 件が上限 {STUCK_HIGH} を超えている (人の処理待ち)"
+    return None
 
 
 def active_runs(d):
@@ -205,7 +223,9 @@ _full_cache = {}
 def full_bot_body(n):
     if n not in _full_cache:
         rc, o, e = gh(["api", f"repos/{R}/issues/{n}/comments", "--paginate", "--jq",
-                       '[.[]|select(.user.login=="opencode-for-signature-studio[bot]")]|last|.body // ""'])
+                       '[.[]|select(.user.login=="opencode-for-signature-studio[bot]")'
+                       '|select((.body|contains("<!-- oc-run-outcome:")|not) and (.body|contains("<!-- oc-pm-")|not))]'
+                       '|last|.body // ""'])
         _full_cache[n] = o if rc == 0 else ""
     return _full_cache[n]
 
@@ -273,9 +293,9 @@ def classify(d):
 def cmd_plan():
     d = snapshot()
     iss, children, blockers, rows = classify(d)
-    op = open_pr_count()
+    op, stuck = open_pr_count()
     ph = phase_update(op)
-    print(f"open issues={len(iss)} open PRs={op} phase={'REVIEW-ONLY' if ph['review_only'] else 'LAUNCH'} active runs={active_runs(d)} target={TARGET}")
+    print(f"open issues={len(iss)} open PRs={op} (stuck={stuck}) phase={'REVIEW-ONLY' if ph['review_only'] else 'LAUNCH'} active runs={active_runs(d)} target={TARGET}")
     for k in ("blocked", "started", "user", "stopped", "recent"):
         print(f"{k}: {len(rows[k])}")
     print(f"relaunch (停止報告の素材名で再投入): {len(rows['relaunch'])}")
@@ -345,10 +365,14 @@ PM が着手を依頼します (1 issue = 1 run)。この issue は、ブロッ�
 def cmd_launch():
     d = snapshot()
     iss, children, blockers, rows = classify(d)
-    op = open_pr_count()
+    op, stuck = open_pr_count()
     ph = phase_update(op)
     act = active_runs(d)
-    print(f"open PRs={op} phase={'REVIEW-ONLY' if ph['review_only'] else 'LAUNCH'} active={act} target={TARGET} ready={len(rows['ready'])}")
+    print(f"open PRs={op} (stuck={stuck}) phase={'REVIEW-ONLY' if ph['review_only'] else 'LAUNCH'} active={act} target={TARGET} ready={len(rows['ready'])}")
+    why = launch_stop_reason(stuck)
+    if why:
+        print(f"停止: {why}")
+        return
     if ph["review_only"] and os.environ.get("FORCE_PHASE") != "1":
         print("Review-Only Phase: 新規着手しない (Opened PR が 10 件未満になったら解除)")
         return

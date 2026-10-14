@@ -29,10 +29,25 @@ def make_blob(seed, size=BLOB_SIZE, pfrac=0.30):
 BLOBS = {'r1': (101, 0.30), 'r2': (202, 0.30), 'r3': (303, 0.30), 'r4': (404, 0.85)}
 
 
+VMT_SLOTS = 8
+LD_VMT_IDX0 = 256  # rt/ld_core.h LD_VMT_IDX0 (GetProcAddress の index 0..255 と別域)
+LD_FAKEPROC_BASE = 0x50010000
+LD_FAKEPROC_SZ = 32
+
+
 def make_blob_vm(size=BLOB_SIZE):
-    """this 疑似オブジェクト: arena+0x1000 に VMT (arena+0x2000) への fixup ptr。VMT 本体は 0 埋め (未解決 slot は native で fault し比較外)。"""
+    """this 疑似オブジェクト: arena+0x1000 に VMT (arena+0x2000) への fixup ptr。VMT 本体は 0 埋め (未解決 slot は native で fault し比較外)。既存 pattern vm0 が使うため内容を変えない。"""
     buf = bytearray(size)
     buf[0x1000:0x1008] = (0x2000).to_bytes(8, 'little')
+    return bytes(buf), [0x1000]
+
+
+def make_blob_vmt(size=BLOB_SIZE):
+    """fvm 専用 this 疑似オブジェクト: make_blob_vm と同じ配置で、VMT slot k (arena+0x2000+8k) に仮 proc 番地 LD_FAKEPROC_BASE+(LD_VMT_IDX0+k)*SZ を置く (rt/ld_core.h の静的 index 域。native/wasm 同一解決)。"""
+    buf = bytearray(size)
+    buf[0x1000:0x1008] = (0x2000).to_bytes(8, 'little')
+    for k in range(VMT_SLOTS):
+        buf[0x2000 + 8 * k:0x2000 + 8 * k + 8] = (LD_FAKEPROC_BASE + (LD_VMT_IDX0 + k) * LD_FAKEPROC_SZ).to_bytes(8, 'little')
     return bytes(buf), [0x1000]
 
 
@@ -46,7 +61,7 @@ def make_blob_u16(size=BLOB_SIZE):
     return bytes(buf), []
 
 
-SPECIAL_BLOBS = {'vm': make_blob_vm, 'u16': make_blob_u16}
+SPECIAL_BLOBS = {'vm': make_blob_vm, 'vmt': make_blob_vmt, 'u16': make_blob_u16}
 
 # (name, ptr 位置集合, blob, ptr オフセット加算)
 PATTERNS = [
@@ -101,7 +116,7 @@ def fvm_candidates(fault, kinds):
 
 
 def fvm_line(va, name_prefix, arg, sig, trace=True, xfill=True):
-    """引数 arg だけを this 疑似オブジェクト (vm blob・arena+0x1000) へのポインタにした case。他の引数は small。"""
+    """引数 arg だけを this 疑似オブジェクト (vmt blob・arena+0x1000) へのポインタにした case。他の引数は small。"""
     kinds = kinds_of(sig['params'])
     toks = []
     for i, k in enumerate(kinds):
@@ -113,7 +128,7 @@ def fvm_line(va, name_prefix, arg, sig, trace=True, xfill=True):
             toks.append('i:a:0x%x' % PTR_SLOTS[0])
         else:
             toks.append('i:0x%x' % SMALL[i])
-    return 'id=%x:fvm%d fn=%x blob=vm args=%s trace=%d xfill=%d sig=%s rt=%s' % (
+    return 'id=%x:fvm%d fn=%x blob=vmt args=%s trace=%d xfill=%d sig=%s rt=%s' % (
         va, arg, va, ','.join(toks), 1 if trace else 0, 1 if xfill else 0, ','.join(sig['params']), sig['ret'])
 
 
