@@ -29,7 +29,7 @@ a = ap.parse_args()
 dirn = os.path.dirname(os.path.abspath(a.fixes))
 d = json.load(open(a.fixes))
 imm_rows = json.load(open(a.imm_class or os.path.join(dirn, 'imm_class_rows.json')))
-PTYPE = {(x['caller'], x['callee'], x['k'], x['pos']): x['ptype'] for x in imm_rows}
+PTYPE = {(x['caller'], x['callee'], x['k'], x['pos']): x['ptype'] for x in imm_rows if x['class'] != 'full_const'}
 mach = ldmach.Machine(a.pe)
 
 M64 = (1 << 64) - 1
