@@ -1,0 +1,77 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>flpy static (Worker) browser check</title>
+<pre id="result">PENDING</pre>
+<script type="module">
+// PY-81 (#2634): headless Chrome 上で、静的版 (Worker 内の flpy_static) と SAB 版 (flpy + flprov の provider) の 48 tool を比較する。
+//   比較は tool 別の status・result・host_calls・api_calls (差 0/48 が合格)。
+import { FlPython } from "/host/flpython.mjs";
+import { createWasmEngine } from "/host/fl_provider.mjs";
+import { A } from "/tests/tool_args.mjs";
+const J = JSON.stringify;
+const out = { crossOriginIsolated, sab: typeof SharedArrayBuffer !== "undefined" };
+const classify = (r) => { const text = r.err ? r.err : String(r.ok); return { status: r.err ? "raised" : /^(error|failed)/i.test(text) || /error/i.test(text.slice(0, 40)) ? "soft-error" : "ok", text }; };
+try {
+  const get = async (p) => new Uint8Array(await (await fetch(p)).arrayBuffer());
+  const ids = await (await fetch("/analysis/flapi/flapi_ids.json")).json();
+  const files = { "/fl/Lib/midi.py": await get("/work/midi.py"), "/fl/Lib/utils.py": await get("/work/utils.py"), "/fl/Tools/MCPTools.pyc": await get("/work/MCPTools.pyc") };
+
+  // (a) SAB 版: main thread の provider (flprov.wasm) + module Worker の flpy.wasm + SAB 同期 RPC
+  const engine = await createWasmEngine({ flprovUrl: new URL("/dist/flprov.js", location.href), ids });
+  const t0 = performance.now();
+  const py = await FlPython.create({ flpyUrl: new URL("/dist/flpy.js", location.href), engine, ids, files, onStdout: () => {}, onStderr: () => {} });
+  out.sab_init_ms = Math.round(performance.now() - t0);
+  await py.run(`import fl_rt; fl_rt.install_flapi(); fl_rt.load_pyc("/fl/Tools/MCPTools.pyc", "__main__")`);
+  const tools = JSON.parse((await py.call("__main__:get_mcp_tools_json", {})).ok);
+  const sab = [];
+  const t1 = performance.now();
+  for (const t of tools) {
+    const args = A[t.name];
+    if (args === undefined) { sab.push({ name: t.name, status: "no-args-defined" }); continue; }
+    const before = engine.record.length;
+    const r = await py.call(`__main__:${t.name}`, args);
+    const calls = engine.record.slice(before).map(([n, a]) => `${n}/${a.length}`);
+    const c = classify(r);
+    sab.push({ name: t.name, status: c.status, result: c.text.slice(0, 160), api_calls: [...new Set(calls)].sort(), host_calls: calls.length });
+  }
+  out.sab_tools_ms = Math.round(performance.now() - t1);
+  const hlId = engine.highlightCb();
+  let sabCb = false;
+  if (hlId) { const r = await py.call("fl_rt:invoke_cb", { id: hlId, args: [] }); sabCb = !r.err; }
+  out.sab_host_calls = engine.record.length;
+  await py.terminate();
+
+  // (b) 静的版: module Worker 内で flpy_static.wasm (CPython + provider を 1 wasm に静的リンク) を動かす
+  const w = new Worker(new URL("./static_worker.mjs", location.href), { type: "module" });
+  const stat = await new Promise((res, rej) => {
+    w.onmessage = (e) => (e.data.err !== undefined ? rej(new Error(e.data.err)) : res(e.data.ok));
+    w.onerror = (e) => rej(new Error(String(e.message || e)));
+    w.postMessage({ id: 1, wasm: new URL(location.href).searchParams.get("static") || "flpy_static" });
+  });
+  w.terminate();
+  out.static_init_ms = stat.summary.init_ms;
+  out.static_tools_ms = stat.summary.tools_ms;
+  out.static_in_worker = stat.summary.in_worker;
+  out.static_host_calls = stat.summary.host_calls;
+  out.static_wasm = new URL(location.href).searchParams.get("static") || "flpy_static";
+
+  // (c) 比較: tool 別 4 キー完全一致
+  const KEYS = ["status", "result", "host_calls", "api_calls"];
+  const diffs = [];
+  for (const s of sab) {
+    const c = stat.tools.find((x) => x.name === s.name);
+    if (!c) { diffs.push(`${s.name}: 静的版に無い`); continue; }
+    for (const k of KEYS) if (J(s[k]) !== J(c[k])) { diffs.push(`${s.name}.${k}`); break; }
+  }
+  const by = (arr, s) => arr.filter((c) => c.status === s).length;
+  out.tools = sab.length;
+  out.sab_ok = by(sab, "ok");
+  out.static_ok = by(stat.tools, "ok");
+  out.diff_tools = diffs.length;
+  out.diffs = diffs.slice(0, 10);
+  out.callback_sab = sabCb;
+  out.callback_static = stat.summary.callback_roundtrip;
+  out.ok = out.tools === 48 && out.sab_ok === 48 && out.static_ok === 48 && diffs.length === 0 && out.static_host_calls === out.sab_host_calls && sabCb && out.callback_static && out.static_in_worker === true;
+} catch (e) { out.error = String(e && e.stack || e); out.ok = false; }
+document.getElementById("result").textContent = "RESULT " + J(out);
+</script>

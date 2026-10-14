@@ -6,7 +6,7 @@
 
 - 7 関数 (selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn / incEventValue / processRECEvent) の**ハンドラ位置と引数書式は PE から確定**した。
 - **意味論 (戻り値・範囲外 code・副作用) は未確定**。各ハンドラは下位関数へ薄く委譲しており、実処理の所在まで追えていない。推測では実装しない。
-- 1〜6 回目は解析のみ (コード変更 0 件)。**7 回目 run で `selectAll` の経路を RetDec 逆コンパイルで確定した (経路は確定・選択値とゲートは未確定)**。選択値 (`ffac20`) の判定に依存するため、C provider と mock への実装は見送った (`c6485d55` の実装は `481bcd62` で戻した。下の「7 回目 run」節)。残り 6 関数は未実装のまま子 issue に分離した。受入条件は未達 (`Refs #1527`)。
+- 1〜6 回目は解析のみ (コード変更 0 件)。**7 回目 run で `selectAll` の経路を RetDec 逆コンパイルで確定した (経路は確定・選択値とゲートは未確定)**。選択値 (`ffac20`) の判定に依存するため、C provider と mock への実装は見送った (`c6485d55` の実装は `481bcd62` で戻した。下の「7 回目 run」節)。残り 6 関数は未実装のまま子 issue に分離した。受入条件は、縮小後の範囲 (PR #2677 本文の 4 条件) を完了し、残りを子 issue (#2668・#2642・#2563・#2576・#2581・#2544・#2547) に移して `Closes #1527` で閉じる (7 回目 run 時点の未達の内訳は「受入条件 (#1527) の状態 (7 回目 run 時点)」節)。
 - PY-69 (#2499): `selectOneChannel` の意味論を PE で確定し、C provider と mock に実装した (末尾の PY-69 節)。`setChannelPitch` は PE 意味論を PY-72 (`REPORT_PY72.md`・#2542 の子) で確定し、残りは #2576・#2563 に分けた。
 
 ## 測定
@@ -218,3 +218,26 @@
 ## 追加解析 (#2548 の run): setStepParameterByIndex の呼出し経路・status・副作用
 
 本文は `REPORT_PY39_2548.md` に分割移動した (250 行上限のため)。結論: 呼出し経路・status 表・範囲外 `-4`・param 3〜8 の副作用を PE で確定。param 0〜2・item 列挙・述語の型は未確定で、子 issue #2581 (`[PY-78]`) に移した。
+
+## 8 回目 run: selectAll の `*p` (0x154528c) の書込み候補を列挙
+
+- 測定: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_rip_refs.py 0x154528c 0x15e3a60` (本 run で追加)。展開: `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst --wildcards '*block00031_PE.bin'` (2.3 秒)。
+- 測定 commit `09df3f91` (コード変更の最後の commit。`pe_rip_refs.py` の docstring 例を `0x15e3a60` に直した。解析ロジックは変更していない)。実測: 終了 0・hits 50・25.763 秒・load average (1 分値) 0.23 → 0.49 (4 core)・並列数 1 (単一プロセスの線形走査)。
+- 参考 (PR 時点の commit `63304ec6`): hits 50・25.8 秒・load average 2.21 (4 core)・並列数 1。
+- docstring の旧例 `0x154528c` 単独: hits 0 (終了 0・25.961 秒)。
+- `0x154528c` を直接参照する RIP 相対命令は 0 件。`0x15e3a60` (`*p` を格納するスロット) を参照する 50 件はすべて読込み (`mov rax|rcx, qword ptr [rip+…]`) で、スロットへの書込みは無い。よって `*p` の書込みは、このスロットを読んだ後の間接書込みになる。
+- 読込み直後の `mov dword ptr [reg], …` (`*p` への書込み候補。読込み後 14 命令内・call 前までの走査):
+
+| 書込み VA | 命令 | 読み取れた内容 |
+|---|---|---|
+| 0x103b781 | `mov [rcx], eax` | 所属関数の先頭・引数は未読 |
+| 0x103b9ec / 0x103ba02 | `mov [rax], esi` / `mov [rax], ebx` | 関数 0x103b950 (引数 ecx=ebx・edx=esi)。`*p == ebx` なら `*p = esi`、それ以外で `*p == esi` なら `*p = ebx` (入替え)。呼出元は E8 走査で 0x103bb1a・0x103bc1b (別関数の内部) |
+| 0x103be3a | `mov [rax], ecx` | 所属関数は未読 |
+| 0x103c01c | `mov [rax], esi` | 所属関数は未読 |
+
+- 別フィールドへの書込み: 0x1003e32 の `mov dword ptr [rax+0x798], 0` は、直前の 0x1003e2e `mov rax, qword ptr [rbp+0x30]` で `rax` が再読込みされた値へのストアである。base は `[rbp+0x30]` の所属で未確定 (`*p` 由来の `p` (0x154528c) とは限らない)。`ffac20` の `item+0x798` との対応も未確認。
+- 結論: `*p` の書込み候補 4 行 (VA 5 件) を列挙したが、selectAll の経路 (0xd5b150 → 0xd843d0 → 0xd5b100 → 0x11e8670) がこれらを通るかは未確認。実行時の値も未確定。`selectAll` の実装は見送る。
+- 次に読む対象: 0x103b950 の呼出元 (0x103bb1a・0x103bc1b) の関数先頭、0x103b781・0x103be3a・0x103c01c の所属関数と引数、それらが selectAll の経路から呼ばれるかの call 連鎖。
+- 受入条件 (#1527) の扱い: selectAll の未解決は本節の候補列挙までとし、残りは子 issue #2668 (`[PY-85]`) に移した。
+- 検証 (測定 commit `12e711cc`・コミット済み HEAD): `fetch_inputs.sh` 0.98 秒 / `build_cpython_wasm.sh` 220 秒 / `FLPY_SKIP_TABLE=1 build_flpy.sh` 4.8 秒 / `provider/build.sh` 1.0 秒。`channels_diff` 69 呼出し diffs 0 PASS (0.15 秒)。`provider_check` 実装 71・未実装 364 PASS。`FL_ENGINE=wasm all_tools` 48/48 ok (1.34 秒)。`git diff 12e711cc HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行。
+- 8 回目節の測定 commit `09df3f91` からの差分: `git diff 09df3f91 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (本 REPORT の commit 時点で確認)。

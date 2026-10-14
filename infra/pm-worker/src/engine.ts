@@ -7,7 +7,7 @@ import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
 import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, planLaunch, RELAUNCH_WINDOW_MS, validateArtLine } from "./launch.ts";
-import { advanceLaunch, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
+import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
 import {
@@ -28,6 +28,7 @@ import {
 } from "./pm.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
+import type { VmState } from "./vmstate.ts";
 import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type Sample } from "./saturation.ts";
 import {
   applyEvent,
@@ -61,6 +62,8 @@ export const REDELIVER_EVERY_MS = 5 * 60_000;
 export const REDELIVER_MAX_PER_SCAN = 10;
 export const REDELIVER_MAX_PER_GUID = 3;
 const HOUR_MS = 3_600_000;
+// VM の状態を取り込む前の launch 停止 (#2343)。/status.launch_blocked と plan.blocked に出す。
+export const NO_IMPORT = "no-import";
 // open issue 数の履歴は 1 時間ごとに 1 点、最大 48 点 (48 時間分)。open_issues_delta_24h の基準に使う。
 export const OPEN_SAMPLE_MS = 3_600_000;
 export const OPEN_SAMPLE_MAX = 48;
@@ -112,6 +115,8 @@ export interface Plan {
   stuck_prs: number;
   // launch を止める理由 (stuck-ceiling / rate-guard)。止めないなら undefined。
   stop?: string;
+  // 新規・再投入の picks を空にしている理由 (no-import)。止めないなら undefined。
+  blocked?: typeof NO_IMPORT;
 }
 
 interface Meta {
@@ -129,6 +134,8 @@ interface Meta {
   // 直近の reconcile で DO と REST が食い違った件数と、その累計
   reconcileDiff?: { last: number; total: number };
   rateGuardOn?: boolean;
+  // VM の状態 (launched・relaunch・phase・pm_art) を取り込んだ時刻。無いあいだは launch しない (IMPORT_REQUIRED=0 を除く)。
+  importedAt?: string;
   // 同時実行の上限の推定 (saturation.ts)。観測の履歴は meta/obs に別に持つ。
   cap?: Cap;
   installationId?: number | null;
@@ -185,7 +192,8 @@ export interface Log {
     | "observed"
     | "resync"
     | "would-redeliver"
-    | "redeliver";
+    | "redeliver"
+    | "import";
   n?: number;
   art?: string;
   note?: string;
@@ -426,6 +434,48 @@ export class Engine {
     return { status: "ok" };
   }
 
+  // ---------------------------------------------------------------- VM の状態の取り込み・書き出し (#2343)
+  // apply のときだけ書く (既定は検証のみ。呼び出し側で検証を済ませた値が来る)。同じ issue が両方にあるときは、
+  // 新しい時刻 (launched・pm_art) と多い回数 (relaunch) を残す。phase は取り込んだ値 (VM の現在値) にする。
+  importVm(v: VmState, apply: boolean): void {
+    if (!apply) return;
+    for (const [k, at] of Object.entries(v.launched)) {
+      const cur = this.s.launchedAt[k];
+      if (cur && Date.parse(cur) >= Date.parse(at)) continue;
+      this.d.store.put("launchedAt", k, at);
+      this.s = { ...this.s, launchedAt: { ...this.s.launchedAt, [k]: at } };
+    }
+    for (const [k, r] of Object.entries(v.relaunch)) {
+      const cur = this.d.store.get<{ count: number; art: string | null }>("relaunch", k);
+      if (!cur || cur.count < r.count) this.d.store.put("relaunch", k, { count: r.count, art: r.art });
+    }
+    for (const [k, p] of Object.entries(v.pm_art)) {
+      const cur = this.s.pmArt[k];
+      if (cur && Date.parse(cur.at) >= Date.parse(p.at)) continue;
+      const next = { at: p.at, line: p.line };
+      this.d.store.put("pmArt", k, next);
+      this.s = { ...this.s, pmArt: { ...this.s.pmArt, [k]: next } };
+    }
+    this.d.store.put("meta", "phase", v.phase);
+    this.meta.importedAt = iso(this.d.now());
+    this.saveMeta();
+    this.pushLog({ kind: "import", note: `launched ${Object.keys(v.launched).length} relaunch ${Object.keys(v.relaunch).length} pm_art ${Object.keys(v.pm_art).length}` });
+  }
+
+  // VM の形式 (launched.json・relaunch.json・phase.json と pm_art) で書き出す。relaunch は issue 番号のキーだけ (np:<n> は VM に無いので出さない)。
+  // phase は一度も保存していなければ null (最初の tick の前)。
+  exportVm(): Omit<VmState, "phase"> & { phase: VmState["phase"] | null } {
+    const launched = { ...this.s.launchedAt };
+    const relaunch: VmState["relaunch"] = {};
+    for (const [k, r] of this.d.store.all<{ count: number; art: string | null }>("relaunch")) {
+      if (/^[1-9]\d*$/.test(k)) relaunch[k] = { count: r.count, art: r.art };
+    }
+    const pm_art: VmState["pm_art"] = {};
+    for (const [k, p] of Object.entries(this.s.pmArt)) pm_art[k] = { at: p.at, line: p.line };
+    const phase = this.d.store.get<VmState["phase"]>("meta", "phase") ?? null;
+    return { launched, relaunch, phase, pm_art };
+  }
+
   private async syncRuns(gh: Gh): Promise<number> {
     const R = this.d.cfg.repo;
     let diff = 0;
@@ -631,10 +681,14 @@ export class Engine {
     const relaunch: ClassifyInput["relaunch"] = {};
     for (const [k, v] of this.d.store.all<{ count: number; art: string | null }>("relaunch")) relaunch[k] = v;
     const launchState: Record<string, LaunchState> = {};
-    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) launchState[k] = v.state;
+    const launchDoneAt: Record<string, string> = {};
+    for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) {
+      launchState[k] = v.state;
+      if (v.state === "observed" && v.doneAt !== undefined) launchDoneAt[k] = v.doneAt;
+    }
     return {
       snap: { issues, prs, runs, bot_last, bot_report, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, launchDoneAt, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
       unknown,
     };
   }
@@ -796,7 +850,9 @@ export class Engine {
     phase.since = phase.review_only !== prev.review_only || !prev.since ? iso(nowMs) : prev.since;
     // launch を止める理由。stuck-ceiling (既存) を先に見る。rate-guard は REST の残量が 1,500 未満の間 (reconcile の読み取りは続く)。
     const stop = pr.stuck > this.d.cfg.stuckHigh ? "stuck-ceiling" : restGuardOn(this.meta.rest?.remaining) ? RATE_GUARD : undefined;
-    const gated = phase.review_only || !!stop;
+    // VM の状態を取り込むまでは launch しない (#2343)。取り込んだ launched の時刻は classify が recent に入れる。
+    const blocked = this.d.cfg.importRequired && !this.meta.importedAt ? NO_IMPORT : undefined;
+    const gated = phase.review_only || !!stop || !!blocked;
     for (const n of gated ? [] : sel.picks) {
       const i = issueOf.get(n);
       if (!i) continue;
@@ -821,6 +877,7 @@ export class Engine {
       open_prs_excl_stuck: pr.openExclStuck,
       stuck_prs: pr.stuck,
       stop,
+      blocked,
     };
     return { rows, plan, picks, unknown, children };
   }
@@ -846,7 +903,7 @@ export class Engine {
     return this.d.store.get<PhaseState>("meta", "phase") ?? { review_only: true };
   }
 
-  // 投稿した /oc の観測を進める (launchObs)。書くのは状態が変わったときだけ。失敗の判定は同期が新しいときだけ。
+  // 投稿した /oc の観測を進める (launchObs)。書くのは状態が変わったとき・観測した run の完了時刻が進んだときだけ。失敗の判定は同期が新しいときだけ。
   // dry-run は投稿しないので launchObs を作らず、ここでは何もしない。
   private observeLaunches(): void {
     const fresh = this.fresh();
@@ -855,10 +912,11 @@ export class Engine {
     for (const [k, obs] of this.d.store.all<LaunchObs>("launchObs")) {
       const title = this.s.issues[k]?.title;
       if (title === undefined) continue;
-      const next = advanceLaunch(obs, now, observedBy(runs, title, Date.parse(obs.at)), fresh);
+      const launchedMs = Date.parse(obs.at);
+      const next = advanceLaunch(obs, now, observedBy(runs, title, launchedMs), fresh, doneAtOf(runs, title, launchedMs));
       if (!next) continue;
       this.d.store.put("launchObs", k, next);
-      this.pushLog({ kind: next.state === "failed" ? "unobserved" : "observed", n: Number(k), note: next.state === "failed" ? "launch not observed in 5 min" : undefined });
+      if (next.state !== obs.state) this.pushLog({ kind: next.state === "failed" ? "unobserved" : "observed", n: Number(k), note: next.state === "failed" ? "launch not observed in 5 min" : undefined });
     }
   }
 
@@ -882,8 +940,8 @@ export class Engine {
     const live = this.d.cfg.liveLaunch && gh;
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     // 再投入の意図は picks より先に処理する。picks が先に投稿すると、同じ issue の意図は『投稿の後に出た意図』として focus なしで処理済みになるため。
-    // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard) は picks も空なので、意図も処理しない。
-    const intent = plan.phase.review_only || plan.stop ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children });
+    // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard・取り込み前の no-import) は picks も空なので、意図も処理しない (処理済みにせず次の tick に回す)。
+    const intent = plan.phase.review_only || plan.stop || plan.blocked ? { halted: false, handled: new Set<number>() } : await this.relaunchIntents(gh, !!live, planned, { rows, unknown, children });
     for (const p of intent.halted ? [] : picks) {
       if (intent.handled.has(p.n)) continue;
       let body: string;
@@ -943,7 +1001,7 @@ export class Engine {
   }
 
   // 再投入の意図 (oc-pm-intent: relaunch)。checkRelaunchIntent の検査を全て通し、かつ分類 (plan の rows) で投稿してよい行だけ /oc を投稿する。
-  // 投稿してよいのは ready・relaunch・stopped (PM の判断待ち)。user・blocked・started は理由を counters.intentRejected に数えて処理済みにする。
+  // 投稿してよいのは ready・relaunch・stopped (PM の判断待ち)。user・hold・blocked・started は理由を counters.intentRejected に数えて処理済みにする。
   // recent (着手直後の待ち) は処理済みにせず、次の tick に回す。検査・分類で落ちた意図も、毎 tick 数え直さないように処理済みにする。
   // 戻り値: 403/429 や残量で止まったか (halted)、この tick で投稿 (dry-run は記録) の対象にした issue (handled。picks から外す)。
   // dry-run では投稿せず記録だけする。処理済みにはしないので、live に切り替えると投稿される (README の『PM agent の判断待ち』を参照)。
@@ -1034,7 +1092,7 @@ export class Engine {
   }
 
   // 意図の投稿先の判定。wait は次の tick に回す (処理済みにしない)。reject は処理済みにして理由を数える。
-  // 行は plan の rows (picks と同じ分類)。oc:stuck・pm-apply・needs-user-input と、oc:no-pr の cooldown・上限は picks の再着手と同じに見る。
+  // 行は plan の rows (picks と同じ分類)。oc:stuck・pm-apply・needs-user-input・oc:hold と、oc:no-pr の cooldown・上限は picks の再着手と同じに見る。
   // 子 issue (open) を持つ親は、停止報告の内容に依らず投稿しない (plan は ready・relaunch の親を blocked・stopped に移すが、停止報告だけの親は stopped のまま残るため)。
   private intentGate(
     n: number,
@@ -1045,7 +1103,7 @@ export class Engine {
     if (!at) return { kind: "wait" };
     // blocked_by が未同期 (unknown) の間は、ready でも blocked の行に移っているので、先に待つ (確定してから拒否・投稿を決める)。
     if (at.row === "recent" || ctx.unknown.has(n)) return { kind: "wait" };
-    if (at.row === "user" || at.row === "blocked") return { kind: "reject", reason: at.row };
+    if (at.row === "user" || at.row === "hold" || at.row === "blocked") return { kind: "reject", reason: at.row };
     // 実行中の run だけで started のときは、run の完了後に分類し直すまで待つ (run の途中で意図を受け取っても捨てない)。open な PR があれば拒否する。
     if (at.row === "started") return at.openPr ? { kind: "reject", reason: "started" } : { kind: "wait" };
     const labels = this.s.issues[String(n)]?.labels ?? [];
@@ -1434,11 +1492,15 @@ export class Engine {
       open_prs_excl_stuck: plan.open_prs_excl_stuck,
       stuck_prs: plan.stuck_prs,
       launch_stop: plan.stop ?? null,
+      // VM の状態を取り込む前は "no-import" (launch しない)。取り込んだ時刻は imported_at (#2343)。
+      launch_blocked: plan.blocked ?? null,
+      imported_at: this.meta.importedAt ?? null,
       blocked: c("blocked"),
       started: c("started"),
       ready: c("ready"),
       relaunch: c("relaunch"),
       user: c("user"),
+      hold: c("hold"),
       stopped: c("stopped"),
       // 最後の run-outcome が artifact で止まり、新しい素材が無く再投入しないもの (PM の判断待ち)。
       no_pr_needs_pm: rows.stopped.filter(([n]) => (this.s.issues[String(n)]?.labels ?? []).includes("oc:no-pr") && this.s.sig[String(n)]?.outcome?.reason === "artifact").length,
