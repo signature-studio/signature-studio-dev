@@ -55,7 +55,8 @@ export interface Env {
   STUCK_HIGH?: string;
   // reviewer App の bot ログイン。review の verdict とマーカー付きコメントの信頼に使う。
   REVIEWER_LOGIN?: string;
-  // "0" のときだけ、VM の状態 (launched・relaunch・phase・pm_art) を取り込む前でも launch する (#2343)。既定は取り込むまで launch しない。
+  // "1" のときだけ、VM の状態 (launched・relaunch・phase・pm_art) を取り込むまで launch しない (#2343)。既定は取り込みを求めない (#2795)。
+  // wrangler.toml の [vars] には置かない (本番で既定のまま止まる事故の再発防止)。
   IMPORT_REQUIRED?: string;
   // デプロイした commit hash (`wrangler deploy --var BUILD_COMMIT:<hash>`)。wrangler.toml の [vars] には置かない (渡さなければ未設定)。/status の build に出す。
   BUILD_COMMIT?: string;
@@ -86,7 +87,7 @@ export interface Config {
   commentMaxPages: number;
   stuckHigh: number;
   reviewerLogin: string;
-  // VM の状態を取り込むまで launch しない (#2343)。IMPORT_REQUIRED=0 のときだけ false。
+  // VM の状態を取り込むまで launch しない (#2343)。IMPORT_REQUIRED=1 のときだけ true (#2795 で既定を false に反転)。
   importRequired: boolean;
   // oc-pm の対象にしてよい bot の起票者。人は author_association (OWNER / MEMBER / COLLABORATOR) で絞る。
   pmTargetBots: string[];
@@ -130,7 +131,7 @@ export function loadConfig(env: Partial<Env>, manualDeps: Record<string, number[
     commentMaxPages: Math.max(1, Math.floor(num(env.COMMENT_MAX_PAGES, DEFAULT_COMMENT_MAX_PAGES))),
     stuckHigh: num(env.STUCK_HIGH, 40),
     reviewerLogin: env.REVIEWER_LOGIN ?? DEFAULT_REVIEWER_LOGIN,
-    importRequired: env.IMPORT_REQUIRED !== "0",
+    importRequired: env.IMPORT_REQUIRED === "1",
     pmTargetBots: ["opencode-for-signature-studio[bot]", "oc-reviewer-for-signature-studio[bot]"],
     build: buildCommit(env.BUILD_COMMIT),
     manualDeps,

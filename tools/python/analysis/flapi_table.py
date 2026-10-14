@@ -76,13 +76,6 @@ def stub_sigs(mod):
     return sigs
 
 
-# 公開 stub に無い引数の補正 (PY-102 #2883)。binary の書式 (kwsig) が正。キーは "<module>.<name>"。
-# playlist.muteTrackLock: stub は index のみ。binary は index:int, value:int=-1 (書式 'i|i'、REPORT_PY61 §3・0xd56510)
-EXTRA_PARAMS = {
-    "playlist.muteTrackLock": [{"name": "value", "type": "int", "default": "-1"}],
-}
-
-
 mcp_used = {}
 for t in mcp["tools"]:
     for api in t["api_calls_transitive"]:
@@ -104,12 +97,9 @@ for m, blocks in raw["modules"].items():
     ent = {}
     for n, d in sorted(funcs.items()):
         win = bool(d) and (b"\x00" + n.encode() + b"\x00" + d.encode() + b"\x00") in pe
-        sig = sigs.get(n)
-        if sig and f"{m}.{n}" in EXTRA_PARAMS:
-            sig = {"params": sig["params"] + EXTRA_PARAMS[f"{m}.{n}"], "returns": sig["returns"]}
         ent[n] = {
             "doc": d,
-            "sig": sig,
+            "sig": sigs.get(n),
             "new_vs_stubs": n not in stubs_json.get(m, {}),
             "win_pair_verified": win if d else None,
             "arm64_same": n in arm,
@@ -184,6 +174,23 @@ n_win = sum(1 for v in modules.values() for e in v.values() if e["win_pair_verif
 if n_win == 0:
     die(f"win PE と (名前,doc) ペアが 1 件も一致しない: {WIN_PE} ({len(pe)} B)。FL 26.1.7 の block00031_PE.bin ではない可能性")
 
+
+def pe_arity(sig, kw):
+    """stub 署名の個数が FLEngine の書式 (kwsig の required/max) と違うとき、PE の個数で params を作り直す (PY-102 / #2927)。
+    PyArg_ParseTupleAndKeywords が受け付ける個数が正で、C 側の検査 (np/nmin) もこれに従う。
+    名前は kwlist (バイナリ由来) を優先し、無ければ stub の同位置。型と既定値は同名の stub 引数のものだけ引き継ぐ。
+    PE が省略可能とする位置で既定値が不明なら `PE_OPTIONAL` (リテラルでない記号。bind は C 側の既定値に任せる)。"""
+    ps, req, mx, kl = sig["params"], kw["required"], kw["max"], kw.get("kwlist")
+    by = {p["name"]: p for p in ps}
+    params = []
+    for i in range(mx):
+        n = kl[i] if kl else (ps[i]["name"] if i < len(ps) else f"arg{i}")
+        st = by.get(n)
+        d = None if i < req else (st["default"] if st and st["default"] is not None else "PE_OPTIONAL")
+        params.append({"name": n, "type": st["type"] if st else None, "default": d})
+    return {"params": params, "returns": sig["returns"], "arity_from": "kwsig"}
+
+
 # 実バイナリ由来の引数仕様 (flapi_kwargs.py の出力。無ければ付けない)
 _kwp = os.path.join(OUT, "flapi_kwargs.json")
 if os.path.exists(_kwp):
@@ -192,7 +199,11 @@ if os.path.exists(_kwp):
     for _m, _fs in json.load(open(_kwp))["modules"].items():
         for _n, _e in _fs.items():
             if _n in modules.get(_m, {}):
-                modules[_m][_n]["kwsig"] = kwsig_of(_e)
+                _ent = modules[_m][_n]
+                _ent["kwsig"] = kwsig_of(_e)
+                _kw = _ent["kwsig"]
+                if _ent["sig"] and _kw.get("max") is not None and len(_ent["sig"]["params"]) != _kw["max"]:
+                    _ent["sig"] = pe_arity(_ent["sig"], _kw)
 
 tot = sum(len(v) for v in modules.values())
 res = {"fl_version": "26.1.7", "python": "3.12.1", "function_total": tot,
