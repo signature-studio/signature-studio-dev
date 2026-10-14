@@ -148,6 +148,7 @@ PM (main)                      subagent (実装)                  subagent (検�
 4. **担当 dir 以外の未コミット変更は他担当の WIP**: 触らない・commit に含めない・stash/checkout/clean しない。
 5. ユーザへ追加アーティファクトを依頼する前に必ず検証する (`docs/REFERENCES.md` `[DOWNLOADS]` と
    既存抽出物で足りないことを確認し、確認コマンドと結果を併記)。
+6. **路線 (D5)**: 新規の lift・起動の作業は x64c / flelift / liftlib を使う。RetDec 路線 (`tools/m6`〜`tools/m11`) は、issue が明示した場合と、起動指標を動かす PM 承認済みの場合を除き、新規の作業を始めない (D5: `docs/DECISIONS.md`)。
 
 ## 5. 成果物の書き方 (報告の質)
 
@@ -192,6 +193,8 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
 - 例: `docs(liftlib): ...`・`fix(plugins): report corrections (CAB-269)`・
   `feat(kh): add DecompAt2 ghidra postScript`。
 - PR は `--base main` を基本 (repo の既定ブランチ = `main`)。body に `Closes #N`・受入条件・検証結果を書く。
+- **起動・GUI・ウィンドウに関わる PR は、本文に製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)、最初のウィンドウの有無) を書く。動かせなかったときは『動かしていない』と書く。** 起動・GUI に関わらない PR は KPI を書かなくてよい。
+- **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。定期 STATUS 同期の自動 PR (`docs(status): sync merged PRs`、`tools/pm/status_sync.py`) も例外 (`docs/STATUS.md` の status-auto 節の内側だけを変える PR に限る)。
 - **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
   10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
 
