@@ -145,21 +145,21 @@ $ git diff 3be69c80 HEAD -- tools/python/analysis tools/python/src
 | 3 | `0xec60ae` の対象型 (chan 以外なら除外) | **未達** (`[rbp+0x120]` の出所を追えず) |
 | 4 | `0x8ed012` の `[rbp+0x70]` が chan か | **未達** (判定材料を得られず) |
 
-- 測定 commit: `d7919454` (`analysis/py71_callers.py`・`py71_slot.py`・`py67_vtable.py` を追加)。基点 `47bbd8d3` (origin/main)。
+- 測定 commit: `8360e1da` (`analysis/py71_callers.py`・`py71_slot.py`・`py67_vtable.py`)。`d7919454` の PR 初版から、main 取り込みと 2 本の改名 (main 側の同名 `py67_callers.py`・`py67_slot.py` を残すため) を行った merge commit。基点 `origin/main` (`5d33ba04`)。
 - 素材: `fl-win64` の `extracted/block00031_PE.bin` を `$RUNNER_TEMP/fl-win64` に展開 (22,227,016 バイト)。`tools/**/work/` は使わない。
-- 実測 (コミット済み `d7919454`・wall は `/usr/bin/time`・n=1):
-  - `py71_callers.py $P 0x86a470,0x11c8950 8`: 120.8 秒 (直接 call 25 件)
-  - `py71_slot.py $P 0x1306300,0x13a5c90,0x15e3d38 16 16`: 112.3 秒
-  - `py71_callers.py $P 0xfe2c80+8k (k=0..68) 0`: 86.9 秒 (RIP・即値の参照 0 件)
-  - `py67_vtable.py` (vptr `0xfe2cf8`・`0x13063c8`): 各 0.2 秒
-  - load average (1 分): 計測開始前 0.13、最初の sweep 直後 2.02 (sweep は 1 プロセス)
+- 実測 (コミット済み `8360e1da`・wall は `date +%s` の差・n=1):
+  - `py71_callers.py $P 0x86a470,0x11c8950 8`: 87 秒 (直接 call 25 件 = `0x11c8950` 23 件 + `0x86a470` 2 件)
+  - `py71_slot.py $P 0x1306300,0x13a5c90,0x15e3d38 16 16`: 77 秒 (出力 178 行)
+  - `py71_callers.py $P 0xfe2c80+8k (k=0..68) 0`: 90 秒 (RIP・即値の参照 0 件。絶対値 `0xfe2cf8` の格納 2 件)
+  - `py67_vtable.py` (vptr `0x13063c8`・`0xfe2cf8`): 各 0.2 秒 (0.17 秒・0.19 秒)
+  - load average (1 分): 各 run 開始前 0.07〜0.88、終了後 0.91〜0.98 (sweep は 1 プロセス)
 - 正の対照: `0x11c8950` の直接 call 23 件 (前回の逆アセと一致)、`0x11be450` の `0x15e3d38` 読込みが `0x11c8950` の第 2 引数に入る (`py71_slot.py` の出力)。
 - ネガティブコントロール: スクリプトとしては未実施。`0xffe370` が vptr `0x13063c8` のスロットに無いことは静的に確認 (110 スロット・`[]`)。`0xfe2c80+8k` の RIP・即値参照 0 件は実測。
 
 ### 差分 0 の証跡
 
 ```
-$ git diff d7919454 HEAD -- tools/python/analysis tools/python/src
+$ git diff 8360e1da HEAD -- tools/python/analysis tools/python/src
 (出力 0 行)
 ```
 
