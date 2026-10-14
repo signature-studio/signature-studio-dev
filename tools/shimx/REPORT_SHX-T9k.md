@@ -63,8 +63,8 @@ IR は build 入力の `tools/m11/work/shimx_link/gen_fix/boot_trace.ll` (`--fix
   2. IR 再生成: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/m11/m11_gen_ir2.sh` → `FL_WIN64_DIR=… bash tools/m11/m11_build.sh`。
   3. shimx clean rebuild: `rm -rf tools/m11/work/shimx_link/obj tools/m11/work/shimx_link/gen_fix && bash tools/m11/shimx_link/build.sh --trace --soft --fix` → `[sxlink] OK trace_soft_fix` (`evidence_2593/build_trace_soft_fix_head.log`・15 秒)。
   4. probe: `node tools/m11/shimx_link/probe_sxlasterr_2593.mjs $PWD/tools/m11/work/shimx_link/m11_sx_trace_soft_fix.cjs 21` (unit 22 を trace。0.5 秒)。
-- 測定時の値: `m11_sx_trace_soft_fix.cjs` sha256 `c8b0c4d3…`・`.wasm` sha256 `63bfc70c…` (先頭 20 桁)。emcc は 6.0.12 (`/opt/emsdk`)。`uptime` load 0.29〜0.34 (4 CPU)。
-- 結果は HEAD (`a50c3ea7`) の clean rebuild で再現した (§2.1 は HEAD の出力・`evidence_2593/probe_u22_shimx_head.txt`)。
+- 測定時の値: `m11_sx_trace_soft_fix.cjs` sha256 `c8b0c4d3…`・`.wasm` sha256 `63bfc70c…` (先頭 20 桁)。emcc は 6.0.12 (`[EMSDK]`)。`uptime` load 0.29〜0.34 (4 CPU)。
+- 結果は HEAD (`a50c3ea7`) の clean rebuild で再現した (§2.1 は HEAD の出力・`evidence_2593/probe_u22_shimx_head.txt`)。証跡内のワークツリー絶対パスは `<repo>/` に置換した (それ以外は出力のまま)。
 - `git diff a50c3ea7 HEAD -- tools/m11 tools/shimx/src` の出力: 0 行 (本節の PR は REPORT と evidence と DOC_MAP と T9j の追記のみ)。
 
 ## 4. 未解決
