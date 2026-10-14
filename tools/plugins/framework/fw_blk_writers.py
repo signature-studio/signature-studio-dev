@@ -5,6 +5,9 @@
 定数 store を関数ごとに数える。`--fn NAME` を付けると、その関数の BLK store を
 値の定義行つきで列挙する。
 
+ポインタは 2 形を解決する: named (`%p = inttoptr i64 N to ptr` の後の `store ..., ptr %p`) と
+inline 定数式 (`store ..., ptr inttoptr (i64 N to ptr)`)。
+
 使い方 (stage-1 後の fw_flat4_canon3.ll に対して):
   python3 fw_blk_writers.py tools/plugins/work/fw/fw_flat4_canon3.ll
   python3 fw_blk_writers.py tools/plugins/work/fw/fw_flat4_canon3.ll --fn function_405670
@@ -14,15 +17,17 @@ import collections
 import re
 
 BLK8, BLK10, ERRCODE = 9048072, 9048080, 7155720
+TARGETS = (BLK8, BLK10, ERRCODE)
 
 fn_re = re.compile(r'^define .*?@([\w.]+)\(')
 ptr_re = re.compile(r'^\s*(%[\w.]+) = inttoptr i64 (\d+) to ptr')
 def_re = re.compile(r'^\s*(%[\w.]+) = (.*)')
 st_re = re.compile(r'^\s*store (i\d+) (\S+), ptr (%[\w.]+)')
+st_const_re = re.compile(r'^\s*store (i\d+) (\S+), ptr inttoptr \((?:i\d+ )?(\d+)(?: to ptr)?\)')
 
 
 def scan(path, want_fn=None):
-    """関数ごとに (行, 関数, 型, 値, 番地) を返す。want_fn があればその関数の定義も集める。"""
+    """関数ごとに (行, 関数, 型, 値, 番地, 値の定義) を返す。値の定義は (行, 式) か None。want_fn があればその関数の定義も集める。"""
     hits, defs, fn, ptrs = [], {}, None, {}
     with open(path) as f:
         for ln, line in enumerate(f, 1):
@@ -41,8 +46,12 @@ def scan(path, want_fn=None):
                 if d:
                     defs[d.group(1)] = (ln, d.group(2).strip()[:150])
             m = st_re.match(line)
-            if m and m.group(3) in ptrs and ptrs[m.group(3)] in (BLK8, BLK10, ERRCODE):
+            if m and m.group(3) in ptrs and ptrs[m.group(3)] in TARGETS:
                 hits.append((ln, fn, m.group(1), m.group(2), ptrs[m.group(3)], defs.get(m.group(2))))
+                continue
+            m = st_const_re.match(line)
+            if m and int(m.group(3)) in TARGETS:
+                hits.append((ln, fn, m.group(1), m.group(2), int(m.group(3)), defs.get(m.group(2))))
     return hits
 
 
