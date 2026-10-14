@@ -11,7 +11,7 @@
 
 ## 測定
 
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (実測 4.1 秒)。対象は `extracted/block00031_PE.bin`。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (実測 4.1 秒)。対象は `extracted/block00031_PE.bin`。
 - 逆アセンブル: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_disasm.py <VA> <命令数>` (PY-39 の補助をそのまま使用)。
 - 文言の読み出し (本 PR で追加): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_errmsg_probe.py` → 終了 0・4 件すべて OK・実測 0.032 秒 (load average 0.10、並列 1)。
 - ネガティブコントロール: 分岐先 VA を 1 バイトずらす (`0xd82d18`→`0xd82d19`) と `lea ではない` で終了 (FAIL を確認)。

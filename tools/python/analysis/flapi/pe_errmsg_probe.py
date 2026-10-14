@@ -5,7 +5,7 @@
 
 0xd82c20 は負の内部 code ごとに `lea rdx,[rip+disp]` で文言の char* を渡す。各 code の分岐先 VA を
 固定し、RIP 相対で文言を読む。期待値 (期待文言) と一致しなければ終了 1。
-展開: tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
+展開: tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C <展開先> --wildcards '*block00031_PE.bin'
 """
 import os
 import sys
