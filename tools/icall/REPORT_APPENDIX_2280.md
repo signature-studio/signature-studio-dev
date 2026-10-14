@@ -79,12 +79,13 @@ FA_FIX_COOKIE=1 FA_ENC_INIT=1 bash tools/icall/fa_route_build.sh    # 修復 ON 
 測定 commit は `52bd5e41` (測定対象のコードを含む最後の commit)。以後の commit のうち `fa_route_build.sh` の既定値変更 (`f871b2ae`) は**実行されるコードの変更**であり、測定値 (§2 の表) は既定 OFF の build には当たらない。REPORT・PR 本文の追記 commit (`25716308`・`e7e4e39b`) は測定対象のコードを変えていない。
 
 ```
-$ git diff 52bd5e41 HEAD -- tools/icall/fa_route_build.sh tools/icall/ir_fix_cookie.py
+$ git diff 52bd5e41 HEAD --stat -- tools/icall/fa_route_build.sh tools/icall/ir_fix_cookie.py
  tools/icall/fa_route_build.sh | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ tools/icall/ir_fix_cookie.py  | 3 +--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 ```
 
-差分の中身 (`git diff 52bd5e41 HEAD -- tools/icall/fa_route_build.sh`): `FA_FIX_COOKIE` の既定 `1→0` と注記の追加のみ。`ir_fix_cookie.py` は差分 0。
+差分の中身: `fa_route_build.sh` は `FA_FIX_COOKIE` の既定 `1→0` と注記の追加のみ。`ir_fix_cookie.py` は docstring の仮値注記と未使用 `fn_start` の削除 (実行経路は変わらない)。
 §2 の数値は `FA_FIX_COOKIE=1` を明示した build (=測定時の既定) の記録値であり、現在の既定 (OFF) の build は未測定。既定 (`FA_FIX_COOKIE` 未指定) は `fa_route_build.sh` の分岐上 `FA_FIX_COOKIE=0` と同一経路 (`SRC_FIX=SRC`) なので、§2 の OFF 列 (`FA_FIX_COOKIE=0`・測定 commit `52bd5e41`) はその経路の記録値として扱える。ただし既定指定での再測定は未実施。
 
 基点 main からのコード差分 (本 run のコード変更の全量):
