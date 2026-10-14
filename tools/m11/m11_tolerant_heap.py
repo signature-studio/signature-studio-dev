@@ -25,7 +25,7 @@ for u in d['units']:
     hr = sorted((r for r in u['ranges'] if r[2] in ('heap', 'c_static')), key=lambda r: -(r[1] - r[0]))
     rows.append((by, n, u, hr))
 rows.sort(key=lambda x: -(x[0]['heap'] + x[0]['c_static'] + x[0]['gap']))
-print('| 順位 | i | VA | 種類 | c_static B | heap B | gap B | 区間数 (heap+c_static) | 最大の区間 (領域・先頭 VA 相当の offset・長さ B) |')
+print('| 順位 | i | VA | 種類 | c_static B | heap B | gap B | 区間数 (heap+c_static) | 最大の 2 区間 (領域・先頭の絶対アドレス・長さ B) |')
 print('|---:|---:|---|---|---:|---:|---:|---:|---|')
 for k, (by, n, u, hr) in enumerate(rows, 1):
     big = ', '.join('%s 0x%x +%d' % (r[2], r[0], r[1] - r[0]) for r in hr[:2]) or '-'
