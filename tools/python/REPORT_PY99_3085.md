@@ -4,7 +4,7 @@
 
 親: #2874 (PY-99)。前段: `REPORT_PY41_APPENDIX.md` の PY-88 (#2788) 節。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
 前提: 同名 path `analysis/py99_slot_paths.py` は #2874 の script (PR #3092・main 取り込み済み) が使う。本節の script は同名を避けて `analysis/py99_merge_sets.py` に改名した (main 取り込み時の add/add 競合の解消。両方の内容を残す)。2 本の統合は未決 (未解決表)。
-測定 commit: `13ad4d36` (main 取り込みと競合解消の merge commit。script の改名を含む最後のコード commit)。main 取り込み前の `cbe89029` (negctl の S_p 表示と `--md` を入れたコード commit) の script を同じ入力で走らせた stdout と、`13ad4d36` の stdout は diff 0 行で一致した。`git diff 13ad4d36 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行 (本 commit は REPORT のみ)。py99 の入力 `py88_writes.py`・`py53_dispatch.py` は `git diff cbe89029 13ad4d36` で 0 行。
+測定 commit: `974467c2` (overlap 判定を X ごとの幅に直し、残骸の `analysis/py99_slot_paths.md` を削除した最後のコード commit)。main は `f81c46bb` を `fef54773` で取り込み済み。`git diff 974467c2 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 0 行 (本 commit は REPORT と DOC_MAP のみ)。py99 の入力 `py88_writes.py`・`py53_dispatch.py` は `git diff fef54773 974467c2` で 0 行。
 
 ### 結論 (受入 2 達成・受入 1 の閉包は子 #3104 に移管・`Closes #3085` (範囲縮小))
 
@@ -13,12 +13,12 @@
 
 ### 測定条件
 
-- 素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'`・2.8 秒)。`analysis/py53_dispatch.py` → fn=4664 命令 → `work/py53/fn.txt`。
+- 素材: `fl-win64` の `block00031_PE.bin` (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py64 --wildcards '*block00031_PE.bin'`・1.7 秒)。`analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` → fn=4664 命令 → `work/py53/fn.txt`。
 - 対象: py88 の既定 65 件のうち直接式で SLOT? のもの 49 件。読み = py88 の式の `SLOT[rbp+X]?@j` 葉 (読む命令 r と X の組) の異なり 77 件。
 - 算法 B (後ろ向き): r から CFG の逆辺を BFS で遡り、`[rbp+X]` への dword/qword store で止める。線形に遡って最初の合流 J と、J の先行辺 p ごとの S_p を出す。CFG は fall-through・jmp・jcc から作る (間接分岐 0 件)。
 - 算法 A (前向き): 同じ X の reaching-definitions 固定点 (gen・kill = 同 X の store)。読み r の IN(r) と B を 1 件ずつ比べる。
 - store の式: py88 の `Slicer.def_value` (線形)。式に `⚠合流`・`SLOT[` 等が残るものは未閉。
-- 実行 (`13ad4d36`・コミット済み HEAD): 既定 0.556 秒 (exit 0)・`--negctl drop-pred` 0.564 秒 (exit 1)。load average (1 分値) 0.07。素材の展開 (`tar --zstd -xf` で `block00031_PE.bin`) 2.8 秒。
+- 実行 (`974467c2`・コミット済み HEAD): 既定 0.331 秒 (exit 0)・`--negctl drop-pred` 0.330 秒 (exit 1)。load average (1 分値) 0.11。素材の展開 (`tar --zstd -xf` で `block00031_PE.bin`) 1.7 秒。
 
 ### 件数 (実測・`python3 analysis/py99_merge_sets.py work/py53/fn.txt` の出力)
 
@@ -48,7 +48,7 @@
 | 同 `--negctl drop-pred` | 77 件 | 15 | 1 |
 
 - negctl の辺: `0x104754a → 0x104755d` (合流 J = 0x104755d)。読み `0x1047b93 [rbp+0x520]` の S_p = {0x1047543} は、この辺以外に寄与しない store (`mov qword ptr [rbp+0x520], rax`) を選んだ。B の結果は {0x1047556} のみになり、A の {0x1047543, 0x1047556} と 15 件 (すべて X = 0x520) で食い違う。
-- `--negctl` の出力は、外した辺の S_p を cut 後の値で出し、その行に「B の到達集合からは除外」と付ける。
+- `--negctl` の出力では、外した辺 `p → J` の行に「B の到達集合からは除外」と付ける。その行の S_p は cut の前後で変わらない (既定出力と negctl 出力の `p=0x104754a` 行は、どちらも `{0x1047543}`)。cut は B の後ろ向き到達 (J からの遡り) だけに効き、p から後ろ向きに求める S_p は cut を受けない。
 - 選び方: 読みを VA 順に見て、S_p が他の先行辺の S_q に無い store を含む最初の p。
 
 ### 限界
@@ -56,7 +56,9 @@
 - 閉じた式は、store の式に `⚠合流`・`SLOT[`・`ACC`・`IN[`・`_in`・`clob@`・`VCALL`・`CALL[`・`<`・`…`・`⚠addr-taken` のいずれも含まないもの。式の同値性は見ていない (文字列の規則)。
 - 算法 A と B は同じ CFG を使う。検算が見るのは到達計算だけで、CFG 構築の誤りは両方に効く。
 - py88 が線形で IN とした読み (線形に先行 store が無い読み) は CFG 上の到達を見ていない (ループの戻り辺で届く store を取りこぼし得る)。
-- 解析した X は 21 種。`lea` で取られたもの 0・X と重なる別オフセットの frame store 0 件・frame の非定数オフセット store 0 件 (実測)。ポインタ経由の書込み (callee 内) は見ていない。
+- 解析した X は 21 種。X 自身が `lea` で取られたもの 0 (`[rbp + X]` の完全一致のみを数える)。X と重なる別オフセットの frame store は、X ごとの幅 (その X へ書く store の最大幅・store が無ければ 4) で数えて 0 件。frame の非定数オフセット store 0 件 (実測)。
+- 取りこぼしの例: `0x1047ad1: lea rcx, [rbp + 0x510]` の次の `0x1047ae6: call 0x414c70` に引数として渡る (`work/py53/fn.txt` の 774・777 行)。構造体の範囲 (X=0x520 を含むか) は未確認。callee 経由の書込みは見ていない。
+- ポインタ経由の書込み (callee 内) は見ていない。
 - 算法 B の S_p の式は py88 の線形の式なので、store の値に含まれる他の SLOT? 葉は、その葉の読みの経路を別途解いていない。
 
 ### 未解決
@@ -67,7 +69,7 @@
 | ACC?⚠合流 (`[rbp+0x5b8]` の合流読み・30 件) を同じ算法で解く | 元の受入 1 の一部 (ACC 側) | #3104 (PY-162) |
 | py88 が線形で IN とした読みの CFG 到達 (ループの戻り辺) | 取りこぼしの有無 | #3104 (PY-162・2 項目をコメントで追記) |
 | CFG 構築 (A・B 共通) の検証。mismatch 0 は到達計算の一致のみ | 検算の範囲 | #3104 (PY-162・同上) |
-| 2 本の PY-99 script (`analysis/py99_slot_paths.py` = #2874 の経路列挙・`analysis/py99_merge_sets.py` = 本節の先行辺 S_p と A/B 検算) の統合 | 同じ PY-99 を別算法で扱う重複。統合するまで両方の出力を正として扱う | PM agent の判断待ち: 統合するか。本 PR は同名を避けて改名し、両方残した (既定の「後の PR が統合」は未実施) |
+| 2 本の PY-99 script (`analysis/py99_slot_paths.py` = #2874 の経路列挙・`analysis/py99_merge_sets.py` = 本節の先行辺 S_p と A/B 検算) の統合 | 同じ PY-99 を別算法で扱う重複。統合するまで両方の出力を正として扱う | PM agent の判断待ち: 2 本の script を統合するか・既定案: 両 script を残す (既存の出力と #2874 の script は変えない。本 PR は同名を避けて改名した) |
 
 ### 再現コマンド
 
