@@ -77,7 +77,7 @@ emulator の経路は末端の間接 call で止まる (受け手の vtable が 
 
 ### 3.4 callee 戻り値 0 への依存
 
-emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90 = 1 の影響 (経路が変わる 11 ID・応答 0 の 202 件の構成変化・rax が変わる 4 ID) の数値の正本は main の `REPORT_DISPATCHER_APPENDIX.md` §B-2 (測定 commit `48f2ced9`)。本 PR の HEAD で同じ run を再測定し、一致した (§6)。本節は格納の観点の分類だけを書く。
+emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90 = 1 の影響 (経路が変わる 11 ID・応答 0 の 202 件の構成変化・rax が変わる 4 ID) の数値の正本は main の `REPORT_DISPATCHER_APPENDIX.md` §B-2 (測定 commit `48f2ced9`)。測定 commit `470a8f15` で同じ run を再測定し、一致した (PR 本文の検証表)。本節は格納の観点の分類だけを書く。
 
 - 応答 0 の 202 件は callee 戻り値 0 の仮定の上でのみ成り立つ。未収載 25・54・64・88・128 は、基準と `0x40fe90`=1 の両 run で応答 0 の集合に残る。0x40fe90 以外の 81 callee は個別には未測定 (main B-2 の全 82 VA = 1 の run は集合の結果だけを持つ)。
 - 基準の未実行格納 39 件 (静的 69 − 基準の実行被覆 30) の、変更 run での扱い:
@@ -96,9 +96,9 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
   - 0 固定: 0x01・0x13・0x18・0x26・0x41・0x45・0x46・0x54・0x64・0x65 (整数・bool・グローバル値。実値は未確定 = [PLG-P0b-28] の範囲)。
   - 注意: 非 NULL 応答は `0x41d110` の戻り値 (TLS 要素) ではなく obj を返す。非 NULL 性のみ一致させた。
 - Phase A (`hs_e2e.sh` の framework smoke): `[fw] Phase A (framework smoke): Halt0/RestoreContext dispatch=38 ff=0` → **PASS** (測定 commit `7ec1bdb8`・§6)。
-  `hs_e2e.sh` の Phase A は `$WFW/fw_route.cjs` を使う。その `fw_route.cjs` は `fw_stage2.sh` の 17 番 (emcc・205 行) が `hostshim/hostshim.c` をリンクして作るため、**hostshim.c の変更は Phase A の入力に入る**。応答表の変更 (0x07・0x1c・0x4e) を含む HEAD の `hostshim.c` で `fw_route.cjs` を作り直し、Phase A PASS を確認した。
+  `hs_e2e.sh` の Phase A は `$WFW/fw_route.cjs` を使う。その `fw_route.cjs` は `fw_stage2.sh` の 17 番 (emcc・205 行) が `hostshim/hostshim.c` をリンクして作るため、**hostshim.c の変更は Phase A の入力に入る**。応答表の変更 (0x07・0x1c・0x4e) を含む測定 commit `7ec1bdb8` の `hostshim.c` で `fw_route.cjs` を作り直し、Phase A PASS を確認した。
 - stage-2 (`fw_stage2.sh`・stage-1 再利用): `SMOKE PASS (Halt0/RestoreContext 到達): dispatch=38 units_done=0 va=1 heap=1 ff=0` (測定 commit `7ec1bdb8`)。`fw_smoke_check` は **FAIL** (`runerr=1`・`init_reach=16` MISMATCH)。これは `REPORT_2425.md` §4・`REPORT_2510.md` §1 に記録済みの既存状態 (#2510 の idx 16 RunError)。
-- Phase B (`hs_e2e.sh`): `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7 pluglog=0 slotsCalled=0x0` → **FAIL** (測定 commit `7ec1bdb8`。既存 #2911 の範囲)。`fw_hostfix.py` と `fw_rt.c` は `2dca40dd` と `e1515204` の間で main 取り込みにより変わった (2 ファイル 43 行追加・6 行削除)。その差分を含む HEAD で再測定した結果は前回と同じ FAIL。
+- Phase B (`hs_e2e.sh`): `memory access out of bounds`・`status=0xffffffff plug=0x0 rec=7 pluglog=0 slotsCalled=0x0` → **FAIL** (測定 commit `7ec1bdb8`。既存 #2911 の範囲)。`fw_hostfix.py` と `fw_rt.c` は `2dca40dd` と `e1515204` の間で main 取り込みにより変わった (2 ファイル 43 行追加・6 行削除)。その差分を含む `7ec1bdb8` で再測定した結果は前回と同じ FAIL。
 
 ## 5. 未解決 (起票先)
 
@@ -114,9 +114,9 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 
 ## 6. 再測定 (測定 commit `7ec1bdb8`)
 
-- 測定 commit: `7ec1bdb8` (本 PR の HEAD で測定)。コードを変えた最後の commit は `e1515204` (main 取り込み)。`git diff e1515204 7ec1bdb8 -- '*.py' '*.c' '*.sh'` は 0 行 (以降の commit は docs のみ)。
-- 方法: `git archive 7ec1bdb8` を `$RUNNER_TEMP/m2942` に展開 (リポジトリの作業ツリーには書いていない)。`work-fw-stage1` を `tools/plugins/work/fw/` に展開し、`fw_stage2.sh` (stage-1 再利用・step 17 で HEAD の `hostshim.c` をリンク) → `hs_e2e.sh` → `hs_resp_src.py` (全 46 ID) の順に実行。
-- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)、`work-fw-stage1` (12 ファイル)。emsdk は既存の `/opt/emsdk` (emcc 6.0.12・`tools/m1/flags.sh` の pin と一致) を使い、展開し直していない。Python は venv に `unicorn 2.1.4`・`pefile`・`capstone` を導入。実測は n=1。
+- 測定 commit: `7ec1bdb8`。コードを変えた最後の commit は `e1515204` (main 取り込み)。`git diff e1515204 7ec1bdb8 -- '*.py' '*.c' '*.sh'` は 0 行。`git diff 7ec1bdb8 HEAD -- '*.py' '*.c' '*.sh'` も 0 行 (出力なし。以降の commit は docs のみ)。
+- 方法: `git archive 7ec1bdb8` を `$RUNNER_TEMP/m2942` に展開 (リポジトリの作業ツリーには書いていない)。`work-fw-stage1` を `tools/plugins/work/fw/` に展開し、`fw_stage2.sh` (stage-1 再利用・step 17 で `7ec1bdb8` の `hostshim.c` をリンク) → `hs_e2e.sh` → `hs_resp_src.py` (全 46 ID) の順に実行。
+- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B)、`work-fw-stage1` (12 ファイル)。emsdk は既存の `[EMSDK]` (emcc 6.0.12・`tools/m1/flags.sh` の pin と一致) を使い、展開し直していない。Python は venv に `unicorn 2.1.4`・`pefile`・`capstone` を導入。実測は n=1。
 
 | 項目 | 結果 (測定 commit `7ec1bdb8`) |
 |---|---|
@@ -126,5 +126,5 @@ emulator は未実行の callee を戻り値 0 で代替する。callee 0x40fe90
 | `hs_resp_src.py` (全 46 ID) | exit 0・58.0 秒。格納 VA 20 件 (格納 19 件 + 初期化 `0x131873f`) がすべて §2 に存在 |
 
 - wasm サイズ: 15,063,373 B。`fw_stage2.sh` の注記にある HEAD 実測 15,061,227 B と 2,146 B 異なる。既定はサイズを照合しない (`FW_SIZE` 未指定) ため FAIL にはならない。差の原因は未確認 (測定ツリーの絶対パスの影響の可能性)。
-- 全 256 ID・`0x40fe90`=1・`hs_store_cov.py` は本節では再実行していない。コードは `470a8f15` と HEAD で同一 (`git diff 470a8f15 7ec1bdb8 -- '*.py' '*.c' '*.sh'` は 0 行) のため、§1・§3.4 の測定値 (`470a8f15` で再測定した値) をそのまま引き継ぐ。
-- `hs_resp_src.py` は `hs_disp_emu.py` を import する。本節で測定した HEAD の `hs_disp_emu.py` は main 取り込み後のもの (e1515204)。
+- 全 256 ID・`0x40fe90`=1・`hs_store_cov.py` は本節では再実行していない。コードは `470a8f15`・`7ec1bdb8` で同一 (`git diff 470a8f15 7ec1bdb8 -- '*.py' '*.c' '*.sh'` は 0 行。`7ec1bdb8` から HEAD までも 0 行) のため、§1・§3.4 の測定値 (`470a8f15` で再測定した値) をそのまま引き継ぐ。
+- `hs_resp_src.py` は `hs_disp_emu.py` を import する。本節で測定した `7ec1bdb8` の `hs_disp_emu.py` は main 取り込み後のもの (e1515204)。
