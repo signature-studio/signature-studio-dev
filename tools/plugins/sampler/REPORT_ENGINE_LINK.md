@@ -195,8 +195,8 @@
 | `sampler_engines.sh` 既定経路 (`PLUG_NO_STATIC_DETECT` 未設定) | **rc 0・4:56.02 (296 s)**・Maximum RSS 3.52 GB・開始時 load 0.70 / 終了直後 load 1.15 (1 分平均)。 `judge engines: PASS 2/2`。 23664: pdata 5,160 / lift_rc 0 / define 5,993 / `emcc_c_rc_after_f80` 0 / missing_ref 0 / missing_define 3。 23677: pdata 2,355 / lift_rc 0 / define 2,525 / `emcc_c_rc_after_f80` 0 / missing_ref 0 / missing_define 1。 (上の `PLUG_NO_STATIC_DETECT=0` 相当の表と比べ、pdata・lift_rc・define・`emcc_c_rc_after_f80`・missing_ref は両 block で一致。 `--disable-static-code-detection` の有無による差は、この 2 block の上の列では観測されなかった) |
 | `sampler_e2e.sh` (受入条件 2、既存 T0/T1 の emcc 退行確認) | **exit 0・14:13.43 (853 s)**・load average 4.80 (5 分平均、run 中盤)。 `judge shells: PASS 7/7` (lift_rc / emcc_c_rc / f80 全 0)。 batch 7 本すべて `rc=0 emcc_c=0 f80=0`。 `ids_crosscheck: 7/7` |
 
-- 注記: 上の数値は本 run の 1 回の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
-- 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と本 run の値は同じ判定結果 (PASS 2/2)。 本 run の測定 commit は上の記録のとおり (`cb3a89a6` または `5880a9f6`、未確定)。 前 run との比較は判定結果の一致のみで、同一 commit での再現とは書かない。
+- 注記: 上の表の数値は `cb3a89a6` 記録の実測 (n=1)。 `/usr/bin/time` と `uptime` で取った値で、run 内の他プロセスの負荷は記録していない。
+- 前 run #643 の記録 (main f0d65f32、exit 0・321 s) と上の表の値は同じ判定結果 (PASS 2/2)。 表の測定 commit は上の記録のとおり (`cb3a89a6` または `5880a9f6`、未確定)。 前 run との比較は判定結果の一致のみで、同一 commit での再現とは書かない。
 - **測定 commit の記録の不整合 (未解決)**: 本書は測定 commit を §7 冒頭・表の見出しでは `5880a9f6`、上の表の行と §1 では `cb3a89a6` と記す。 どちらが表の実測を行った commit かは、本書の記録からは確定できない。 両 commit とも既定 (`PLUG_NO_STATIC_DETECT` 未設定) の RetDec argv に `--disable-static-code-detection` を含まない (`cb3a89a6` は `${PLUG_NO_STATIC_DETECT:+...}` で未設定時は空、`5880a9f6` は該当行なし) ため、表の argv 条件は両方に当てはまる。 確定には実測 commit の記録を正す再実行が要る (起票先: #540)。
 
 ## 8. selector ごとの引数の意味 (受入条件 4 の続き)
