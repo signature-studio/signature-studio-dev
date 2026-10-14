@@ -137,28 +137,41 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 - 次の一手 (未着手): `function_412770` と `function_411d20` の IR で、Halt を呼ぶ条件の比較に使われる定数・ポインタを取り、
   LB=0 と LB=0x10000 の `boot_final.ll` の該当箇所を diff する。`m11_remap_count.py` の未 remap 即値 (§3) と突合する。
 
-## 6. 本 runner の実測 (#2779・LB=0 / 0x10000 の後段)
+## 6. 本 runner の参考値 (#2779・LB=0 / 0x10000 の後段・指紋検査を迂回)
 
 測定日 2026-10-14。素材 fl-win64 (`block00031_PE.bin` 22,227,016 B)・work-m11 (#516 以前の snapshot)。toolchain は runner 同梱の [EMSDK]・[RETDEC] (`docs/REFERENCES.md`)。
-測定 commit: LB=0 は `6566443d` (HEAD。修正前の `94dea77f` でも測定済み)、LB=0x10000 は `51b20449` (fix。測定時の作業ツリーと同一。以降はコード差分 0)。
+**以下の数値は受入の根拠ではなく参考値である。** `m11_e2e.sh` の lift 成果物の PE 指紋検査 (`work/lift_pe.sha256`・WORKFLOW §11) を `M11_SKIP_LIFT_FP=1` で迂回して後段だけを回した。素材 work-m11 には生成時の PE 指紋 (`lift_pe.sha256`・`ir_conditions.json`) が無く、lift 成果物が現 PE に対応することは確認できていない。全再生成は `functions_dll.csv` (Ghidra の中間物) を要し、本 run の時間内に収まらないため行っていない。
+測定 commit: `d890c724` (コードを変えた最後の commit。以降の差分は本 REPORT のみ。§6.5)。
 製品 KPI (`tools/flelift/boot/REPORT.md`) は本節で測っていない。
 
-### 6.1 `m11_e2e.sh` 1 コマンドは通らない (受入 1 未達)
+### 6.1 測定 (HEAD `d890c724`・参考値)
 
-`M11_LB_BASE=0 bash tools/m11/m11_e2e.sh` は全再生成に入り、`m11_bounds.py` で fail-closed (0.6 s)。`ir_conditions` を作る `functions_dll.csv` (Ghidra 中間物。`tools/m2/work/ghidra_dll/`) が素材に無い。`work/lift_pe.sha256` も無い。
-そこで後段だけを実行: `m11_e2e.sh` の複製 (`$RUNNER_TEMP`・未コミット。変えたのは `cd` と `lift_pe.sha256` の判定行だけ。lift 成果物が現 PE に対応するかは**未確認**)。gen_ir2 → boot5 RetDec lift → gen_ir2 → data/image → lb_check → build → 実行 A・B・C → judge → tolerant gate。
+再現 (リポジトリ root。`FL_WIN64_DIR` に `extracted/block00031_PE.bin`、`tools/m11/work/` に work-m11 を展開してから実行):
 
-| 条件 | 結果 | rc | wall |
-|---|---|---|---|
-| LB=0 (`94dea77f`・修正前) | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・tolerant gate と negctl は OK | 0 | 1 m 58 s |
-| LB=0 (`6566443d`・HEAD で再測定) | 上と同一 (ir_sha256 `39e97946…` は修正前と同じ)。gen_ir2 から build まで全再構築 | 0 | 1 m 21 s |
-| LB=0x10000 (`94dea77f`) | gen_ir2 が `fix_ld108` の assert で停止 (即値不一致) | 1 | 0 m 31 s |
-| LB=0x10000 (ld108 のみ修正) | build が `fix912` で停止 (`対象行が無い`) | 1 | 0 m 52 s |
-| LB=0x10000 (`51b20449`) | gen_ir2・build OK (build は obj 全再構築で 9 分)。units_run 37 (Halt0 早期終了)・survey ok 869 / noproc 1 / miss 46 / trap 26。寛容起動は 600 s の `timeout` で打ち切られ出力空 → tolerant gate FAIL | 1 | 11 m 10 s |
+```
+M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash tools/m11/m11_e2e.sh
+M11_SKIP_LIFT_FP=1 M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh
+```
 
-load は未採取 (実行後に測っていない)。LB=0x10000 の rc=1 の内訳: 寛容起動の出力欠落 (子 #3160) と、strict・survey の期待値 (LB=0 の 56・872) との不一致。
+`M11_SKIP_LIFT_FP` は `tools/m11/m11_e2e.sh` の指紋検査だけを外すオプションで、未設定なら従来どおり検査する。実行時は `WARNING ... 参考値` の行が出る。
 
-### 6.2 #403 の数値との比較
+| 条件 | 結果 | rc | wall | load (開始前 → 終了直後、1/5/15 分) |
+|---|---|---|---|---|
+| LB=0 | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67・gate と negctl OK・ir_sha256 `39e97946…` (修正前と同一) | 0 | 2 m 53 s | 0.19 0.30 0.15 → 1.00 0.63 0.31 |
+| LB=0x10000 | gen_ir2・lb_check・build OK。units_run 37 (Halt0 早期)・survey ok 869 / noproc 1 / miss 46 / trap 26。寛容起動は 600 s の `timeout` で打ち切られ出力空 (M11_TOLERANT 行無し → gate FAIL)・ir_sha256 `d8738edd…` | 1 | 11 m 38 s | 0.73 0.60 0.31 → 1.00 0.98 0.70 |
+
+nproc は 4。load は各 run の前後の `/proc/loadavg`。LB=0 と LB=0x10000 は同じ `work/` を共有するため逐次に測った。
+
+ptrcheck (`ptrcheck.gate`。`image_va_words_new` / 上限):
+
+| 条件 | run (通常起動) | survey (unit 実行後) |
+|---|---|---|
+| LB=0 | 69,359 / 69,359 (pass) | 71,001 / 71,001 (pass) |
+| LB=0x10000 | 69,099 / 69,359 (pass) | 70,945 / 71,001 (pass) |
+
+ptrcheck JSON の `ok` (生フラグ) は両条件で false。判定は `gate.pass`。LB=0x10000 側の ptrcheck はこの参考値で確認した (ただし上限は fresh 再生成の基準値で、迂回した素材との比較は参考)。
+
+### 6.2 #403 との比較 (参考値どうしの比較)
 
 | 項目 | #403 (引用) LB=0 | 本節 LB=0 | #403 (引用) LB=0x10000 | 本節 LB=0x10000 |
 |---|---|---|---|---|
@@ -166,72 +179,31 @@ load は未採取 (実行後に測っていない)。LB=0x10000 の rc=1 の内�
 | survey ok / noproc / miss / trap | 870 / 1 / 46 / 25 | 872 / 1 / 46 / 23 | 868 / 1 / 46 / 27 | 869 / 1 / 46 / 26 |
 | 通常起動の終了 | OOB | trap unreachable (function_8c5eb0) | Halt0 早期 | Halt0 早期 |
 
-units_run と LB=0x10000 の Halt0 早期終了は #403 と一致。survey は ±2 のずれ。**受入 2 (「変わらない」) は未達**。
-原因は未確定。候補は (a) boot5 の IR 組込み (`REPORT_N2778.md` §8.1 は boot5 無しで ok 870 を得ている。LB=0 のみの記録)、(b) ld108 (#2316。#403 より後)。切り分けは子 #3161。
+units_run と LB=0x10000 の Halt0 早期は #403 と一致、survey は ±2 のずれ。受入 2 (「変わらない」) は未達。原因は未確定。候補は (a) boot5 (素材に `boot5.lift.ll` が無く、本節は RetDec で lift し直した)、(b) ld108 (#2316。#403 より後)。切り分けは子 #3161。
 
-### 6.3 不具合の修正 (本 PR)
+### 6.3 前 round の測定 (参考。旧 commit・同じ迂回)
 
-`ldfix/fix_ld108.py` の head 即値 `16404608` (LB=0 の LVA 0xfa5080) と `fix912/m11_fix912.py` の VMT 即値 `994072` (0xf2b18) は LB=0 専用の固定文字列だった。LB=0x10000 の IR では +0x10000 された即値になる (実測 `16470144`・`1059608`)。そのため既定経路の `M11_LB_BASE=0x10000 m11_e2e.sh` は gen_ir2 か build で必ず止まっていた。両者とも `M11_LB_BASE` を足して照合するよう直した。
-LB=0 の文字列は旧版と完全一致 (`HEAD_ST`・`RAX_ST`・`OLD`・`NEW` を python で比較して True)。
+| 条件 | 結果 | rc | wall |
+|---|---|---|---|
+| LB=0 (`94dea77f`) | units_run 53・survey ok 872 / noproc 1 / miss 46 / trap 23・寛容 ok 874 / skipped 67 | 0 | 1 m 58 s |
+| LB=0 (`6566443d`) | 上と同一 (ir_sha256 `39e97946…`) | 0 | 1 m 21 s |
+| LB=0x10000 (`94dea77f`) | gen_ir2 が `fix_ld108` の assert で停止 (即値不一致) | 1 | 0 m 31 s |
+| LB=0x10000 (ld108 のみ修正・**未コミットの診断**) | build が `fix912` で停止 (`対象行が無い`) | 1 | 0 m 52 s |
+| LB=0x10000 (`51b20449`) | gen_ir2・build OK。units_run 37・survey ok 869 / trap 26。寛容起動が 600 s で打ち切り | 1 | 11 m 10 s |
 
-### 6.4 測定 commit から HEAD までの差分
+### 6.4 修正 (本 PR)
 
-LB=0 の測定 commit `94dea77f` から本 PR の fix commit `51b20449` までの `tools/m11` の差分 (本節の REPORT commit は含まない):
+`ldfix/fix_ld108.py` の head 即値 `16404608` (LB=0 の LVA 0xfa5080) と `fix912/m11_fix912.py` の VMT 即値 `994072` (0xf2b18) は LB=0 専用の固定文字列だった。LB=0x10000 の IR では +0x10000 の即値になるため、既定経路の `M11_LB_BASE=0x10000 m11_e2e.sh` は gen_ir2 で止まっていた。両者とも `tools/m11/lb_base.py` (`LB`・64KiB 境界 assert の単一定義) を `ldfix.py` と同じ形で import して使うよう直した (`51b20449`・`d890c724`)。LB=0 の e2e の IR 指紋 (`39e97946…`) は修正前と同一。
 
-```diff
-diff --git a/tools/m11/fix912/m11_fix912.py b/tools/m11/fix912/m11_fix912.py
-index 3399bb6f..09e52370 100644
---- a/tools/m11/fix912/m11_fix912.py
-+++ b/tools/m11/fix912/m11_fix912.py
-@@ -12,10 +12,14 @@ RetDec の IR (function_4fb090) はこの dl を定数 1 ではなく、スタ
- """
- import argparse
- import json
-+import os
- import sys
- 
--OLD = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 994072 to ptr), i64 %37, ptr %38)'
--NEW = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 994072 to ptr), i64 1, ptr %38)'
-+# VMT 即値は LVA (= RVA + M11_LB_BASE)。LB=0 は 994072 (0xf2b18)。LB=0x10000 で固定値だと対象行が無くなる (#2779)
-+LB = int(os.environ.get('M11_LB_BASE', '0'), 0)
-+VMT = str(994072 + LB)
-+OLD = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 ' + VMT + ' to ptr), i64 %37, ptr %38)'
-+NEW = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 ' + VMT + ' to ptr), i64 1, ptr %38)'
- 
- 
- def main():
-diff --git a/tools/m11/ldfix/fix_ld108.py b/tools/m11/ldfix/fix_ld108.py
-index 238016e9..4d099709 100755
---- a/tools/m11/ldfix/fix_ld108.py
-+++ b/tools/m11/ldfix/fix_ld108.py
-@@ -9,6 +9,7 @@ IR (lift 段から) は store 値を `%2 = load [arg1+8]` (変位 8) で代用
- 
- 使い方: python3 fix_ld108.py IN.ll OUT.ll
- """
-+import os
- import re
- import sys
- 
-@@ -16,7 +17,9 @@ FN = re.compile(r'^define [^\n]*@function_41a670\(.*?\n}\n', re.M | re.S)
- DEF = re.compile(r'^define [^\n]*@function_41a670\(([^)]*)\)', re.M)
- ARG1 = re.compile(r'i64(?: [a-z_]+)* %arg1')
- BLK = re.compile(r'^dec_label_pc_41a69c:[^\n]*\n(.*?)(?=^dec_label_pc_|\Z)', re.M | re.S)
--HEAD_ST = 'store i64 %2, ptr inttoptr (i64 16404608 to ptr), align 8'
-+# head 即値は LVA (= RVA + M11_LB_BASE)。LB=0 は 0xfa5080、LB=0x10000 は 0xfb5080 (#2779: 固定値だと LB=0x10000 で assert する)
-+LB = int(os.environ.get('M11_LB_BASE', '0'), 0)
-+HEAD_ST = 'store i64 %2, ptr inttoptr (i64 ' + str(16404608 + LB) + ' to ptr), align 8'
- RAX_ST = 'store i64 %2, ptr %rax.0.reg2mem'
- 
- 
-```
+### 6.5 測定 commit から HEAD までの差分
 
-LB=0 は HEAD (`6566443d`) で再測定した (上の表の 2 行目)。`51b20449` 以降のコード差分は無く (`git diff 51b20449 HEAD -- tools/m11 ':!tools/m11/REPORT_N403.md'` は 0 バイト)、IR の `ir_sha256` は修正前と同じ `39e97946…`。
+コードの差分は無い (測定 commit `d890c724` → HEAD は本 REPORT のみ)。確認: `git diff d890c724 HEAD -- tools/m11 ':!tools/m11/REPORT_N403.md'` (出力 0 バイト)。
+修正の差分: `git diff 94dea77f d890c724 -- tools/m11/fix912 tools/m11/ldfix tools/m11/m11_e2e.sh`。
 
-### 6.5 未解決 (起票先)
+### 6.6 未解決 (起票先)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 全再生成経路 (`functions_dll.csv`・`lift_pe.sha256`) で `m11_e2e.sh` 1 コマンドが通らない。後段の複製は未コミット | 受入 1 未達 | #3113 (既存) |
+| 全再生成経路 (`functions_dll.csv`・`lift_pe.sha256` 無し) で `m11_e2e.sh` 1 コマンドが通らない。§6 の値は指紋検査の迂回に依存 | 受入 1 (実測の根拠) 未達。lift 成果物と PE の対応は未確認 | PM 起票待ち (`work-m11` の更新・#728 以降の再生成) |
 | LB=0x10000 の寛容起動が 600 s で打ち切られ出力が空 | LB=0x10000 の e2e rc=1 | #3160 |
-| #403 との数値差 (survey ±2)・LB=0 の停止理由 (OOB → unreachable) | 受入 2 未達 | #3161 |
-| ptrcheck ゲートの LB=0x10000 側の結果 (基準は LB=0 の値) | 本 run の出力に数値行が無く未確認 | #3160 に含める |
+| #403 との数値差 (survey ±2)・LB=0 の停止理由 (OOB → unreachable)・LB=0x10000 の Halt0 早期 | 受入 2 (変わらない) 未達 | #3161 |
