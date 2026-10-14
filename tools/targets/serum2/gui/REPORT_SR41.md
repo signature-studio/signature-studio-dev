@@ -79,6 +79,6 @@ venv/bin/python $P/splice_demo_bit.py Serum2_win64.vst3 0x1800c2b50 0x1800c6090 
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| (a) 候補 1052 件の受信レジスタの base を this まで遡り、受信が SerumController (this) のものを確定する。特に `load[rcx]` 528 件・`load[rbx]` 244 件 | 受入 1 | 子 issue (SR-43) |
-| (b) slot 7 `0x1800c6090` から slot 17 `0x1800c9680` (Splice 生成直接呼出元) への呼出連鎖の有無を確定し、経路があれば demo bit (`0x1800c6874`) の分岐条件を追う。経路が無ければ非到達を静的に示す | 受入 2・3 | 子 issue (SR-44) |
+| (a) 候補 1052 件の受信レジスタの base を this まで遡り、受信が SerumController (this) のものを確定する。特に `load[rcx]` 528 件・`load[rbx]` 244 件 | 受入 1 | #2174 (SR-43) |
+| (b) slot 7 `0x1800c6090` から slot 17 `0x1800c9680` (Splice 生成直接呼出元) への呼出連鎖の有無を確定し、経路があれば demo bit (`0x1800c6874`) の分岐条件を追う。経路が無ければ非到達を静的に示す | 受入 2 (後段)・3 | #2175 (SR-44) |
 | (c) 実 VSTGUI 上の動的確認 | SR-30 受入 4 相当 | `#68` 残作業 (GUI lift 時) |
