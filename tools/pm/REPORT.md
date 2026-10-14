@@ -235,7 +235,7 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 結論: `test:unit` (vitest) **19 件 PASS** (うち観測 9 件)・2.1 s。`test:workers` **3 件 PASS**・1.5 s。`npm test` (node:test) **204 件 PASS / 0 FAIL**・17.7 s。load 0.33 (Node 22.23.3)。
 - ネガコン: `src/launchobs.ts` を 1 行ずつ壊して FAIL を確認。(b) の題名一致を外す → (b) と純関数の 2 件 FAIL。5 分の境界 `>` を `>=` → (a) と純関数の 2 件 FAIL。元に戻した後 `git diff -- src` は 0 行。
 - 差分の証跡: `git diff dd9931bf HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
-- 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。
+- 未解決: 受入 2 の残り (観測済み launch の 3 時間判定の置き換え。既定案は完了時刻から 3 時間) は子 issue #2645 ([CI-123]) へ移した。PR #2655 で実装 (結論と測定の全文は [`REPORT_APPENDIX_2645.md`](REPORT_APPENDIX_2645.md))。
 
 ## 18. heartbeat.sh の注釈と空白だけの文面の検査 (#2629・指示 145)
 - 測定 commit `17eb4e16` (main `13329492` を取り込んだ merge。測定は取り込み後の HEAD で実施)、測定時刻 2026-10-14T16:29Z。偽の opencode (`OPENCODE_BIN`)・`timeout` で打ち切り (リポジトリ外の検証スクリプト)。
@@ -245,6 +245,5 @@ review #2485 の変更: 観測は `fresh` な tick だけ記録する (`src/engi
 - 取り込みと再測定 (round 4): main `e1e816c2` を merge commit `384e2cbe` で取り込んだ (競合なし。`heartbeat.sh` は PR 側の版のまま)。README の VM 記述 (commit `517bbb13`) を直した後の HEAD で同じ測定を再実行した。送信回数・終了コード・初回送信の遅延 (1.01 秒・2.01 秒) は上の結果と同じ。
 - 差分 (round 4): `git diff 17eb4e16 HEAD -- tools/pm/heartbeat.sh tools/pm/heartbeat_msg_audit.txt tools/pm/systemd` の出力は 0 行。
 
-## 19. 観測済み launch の 3 時間 recent を、観測した run の完了から数える (#2645)
-- 結論: 観測済み launch の `recent` の基準を、投稿時刻から、観測した run の完了時刻 (`launchObs.doneAt`) に置き換えた。完了時刻が無い観測済み launch と観測記録の無い古い launch は、従来どおり投稿から 3 時間。
-- 全文 (測定・ネガコン・取り込み後の再測定): [`REPORT_APPENDIX_2645.md`](REPORT_APPENDIX_2645.md) (§19 の分割移動)。
+## 19. main の Ruleset `main-require-review` の実測 (#2648・ADR D27)
+- 測定値の正本: [`REPORT_2648.md`](REPORT_2648.md) (§18 は main の heartbeat 節 (#2629) が使うため、本節の全文は付録へ分割移動)。

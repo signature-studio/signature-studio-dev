@@ -1,8 +1,8 @@
-# tools/pm REPORT 付録 (#2645・§19)
+# tools/pm REPORT 付録 (#2645): 観測済み launch の 3 時間 recent の完了時刻化
 
-本体 [`REPORT.md`](REPORT.md) §19 の全文 (250 行上限のため分割移動。内容は削除していない)。
+本体 [`REPORT.md`](REPORT.md) §17 の未解決 (#2645) の実装記録。本体は 250 行上限のため、測定・ネガコンの全文はこの付録に置く。
 
-## 19. 観測済み launch の 3 時間 recent を、観測した run の完了から数える (#2645)
+## 観測済み launch の 3 時間 recent を、観測した run の完了から数える (#2645)
 
 測定した commit: `252bc259` (コードを変えた最後の commit。main `e1e816c2` の取り込み merge で競合 3 件を解消)。測定時刻は UTC 2026-10-14 16:43〜16:44。
 - 結論: 観測済み launch の `recent` の基準を、投稿時刻から、観測した run の完了時刻 (`launchObs.doneAt` = `RunState.updatedAt`) に置き換えた。完了時刻が無い観測済み launch と観測記録の無い古い launch は、従来どおり投稿から 3 時間。
@@ -14,7 +14,7 @@
 
 ### 取り込み後の再測定 (main `a8c02d48` を merge commit `8d27342e` で取り込み)
 
-- 競合 1 件: `tools/pm/REPORT.md` の §18 の節番号が、main の heartbeat の節 (#2629) と衝突した。両方の本文を残し、main 側の §18 を先に、本節を §19 に振り直した。コードの競合は無し (`src/` は自動マージ。PR の変更は main に対する差分として残っている)。
+- 競合 1 件 (`tools/pm/REPORT.md` の末尾): 本 PR の節番号が main の heartbeat の節 (#2629・§18) と衝突し、一旦 §19 に振った。その後 main の #2648 が §19 を使ったため、本節は REPORT.md の節から外し、本付録に置いた (REPORT.md §17 の未解決の行から参照)。コードの競合は無し (`src/` は自動マージ。PR の変更は main に対する差分として残っている)。
 - 測定 commit: `8d27342e` (コードを変えた最後の commit。取り込み merge)。測定は commit 済みの HEAD で実施。前節の `252bc259` の差分証跡 (`git diff 252bc259 HEAD -- infra/pm-worker`) は、main の変更が入ったため 0 行ではない。
 - `pnpm run test` (node:test): **293 pass / 0 fail**、18.6 s、load 0.89 → 1.35 (Node 22.23.3)。前節の 277 件から増えたのは main 側のテストを含むため。
 - `pnpm run test:unit` (vitest): **29 pass / 0 fail**、1.06 s。
