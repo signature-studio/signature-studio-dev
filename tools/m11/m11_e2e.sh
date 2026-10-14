@@ -10,6 +10,7 @@
 #   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→bounds→lift 4chunk→tail 固定点→IR→build; 約 10 分)
 #   bash tools/m11/m11_e2e.sh --trace   # icall / unit init のトレースを stderr に出す
 #   M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh   # LVA = RVA + 0x10000 (#222; 既定 0 = 従来 LVA=RVA). 変更時は --full 推奨 (IR の VA→LVA remap が変わる)
+#   M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash tools/m11/m11_e2e.sh  # 参考値専用: work/lift_pe.sha256 の PE 指紋検査を迂回して後段だけ回す (#2779・受入の根拠にしない)
 # 前提: /opt/emsdk, /opt/retdec, node(v26: ~/.local/share/pnpm/bin), analysis/win64/extracted/block00031_PE.bin
 set -u
 cd "$(dirname "$0")"
@@ -47,7 +48,11 @@ for i in 0 1 2 3; do [ -f work/boot$i.lift.ll ] || need_lift=1; done
 [ -f work/boot_final.ll ] || need_lift=1
 PE_PREV="$(python3 m11_cond.py --get pe)"   # IR を生成した PE (#680 review: PE が変わったら IR・data/image を作り直す)
 PE_SHA="$(sha256sum "$PE" | cut -d' ' -f1)"   # #728: lift 成果物を生成した PE の指紋 (work/lift_pe.sha256)
-[ "$(cat work/lift_pe.sha256 2>/dev/null)" = "$PE_SHA" ] || need_lift=1
+if [ "${M11_SKIP_LIFT_FP:-0}" = 1 ]; then  # #2779: 参考値専用の迂回 (WORKFLOW §11 の指紋検査を通さない)。受入の根拠にしない
+  step "WARNING: M11_SKIP_LIFT_FP=1 — lift 成果物の PE 指紋検査 (work/lift_pe.sha256) を迂回する。結果は参考値"
+else
+  [ "$(cat work/lift_pe.sha256 2>/dev/null)" = "$PE_SHA" ] || need_lift=1
+fi
 if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
   step "全再生成モード (scan → bounds → lift → tail 固定点 → IR)"
   [ -f work/scan_index.json ] && [ $FULL = 0 ] || must "m11_scan" python3 m11_scan.py

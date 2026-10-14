@@ -15,8 +15,10 @@ import json
 import os
 import sys
 
-# VMT 即値は LVA (= RVA + M11_LB_BASE)。LB=0 は 994072 (0xf2b18)。LB=0x10000 で固定値だと対象行が無くなる (#2779)
-LB = int(os.environ.get('M11_LB_BASE', '0'), 0)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lb_base import LB  # noqa: E402
+
+# VMT 即値は LVA (= RVA + LB)。LB=0 は 994072 (0xf2b18)。LB=0x10000 で固定値だと対象行が無くなる (#2779)
 VMT = str(994072 + LB)
 OLD = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 ' + VMT + ' to ptr), i64 %37, ptr %38)'
 NEW = '%39 = call i64 @function_4fa070(ptr nonnull inttoptr (i64 ' + VMT + ' to ptr), i64 1, ptr %38)'
