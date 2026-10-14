@@ -4,10 +4,12 @@
 用法: python3 tools/icall/diff/ott_apiset_cmp.py <OTT_vst2_win64.dll>
 出典: tools/icall/REPORT_APPENDIX_2225.md §2.3・§3 (#2225)。
 
-各 VA の値は次のどちらかで出力する:
-  raw       : PE ファイル上の生バイト (SizeOfRawData の範囲内)
-  zero-fill : セクションの仮想領域のうち raw 範囲の外 (ファイル外・0 固定。実値ではない)
-表が zero-fill 域にある場合、その entry は実値ではなく 0 として扱われる。
+各 VA (8 B) は次のどれかに分類し、セクション名・raw 範囲・virt 範囲と併せて表示する:
+  raw           : 全 8 B が SizeOfRawData の範囲内 (ファイルの実バイト)
+  一部 zero-fill : 先頭だけ raw 範囲内 (残りはファイル外・0 固定)
+  zero-fill     : 全 8 B が raw 範囲外・virt 範囲内 (ファイル外・0 固定。読取りではない)
+  セクション外   : virt 範囲のどのセクションにも入らない (0 固定。読取りではない)
+zero-fill / セクション外 の entry は decode しない (実値が無いため)。
 """
 import struct
 import sys
@@ -24,27 +26,28 @@ def locate(pe, base, va):
     rva = va - base
     for s in pe.sections:
         if s.VirtualAddress <= rva < s.VirtualAddress + s.Misc_VirtualSize:
-            return s, rva - s.VirtualAddress
-    return None, None
+            return s
+    return None
 
 
-def read_va(pe, base, va, size):
-    s, off = locate(pe, base, va)
+def read_qword(pe, base, va):
+    s = locate(pe, base, va)
     if s is None:
-        return bytes(size), "outside (セクション外・0 固定)", None
+        return None, "セクション外 (0 固定。読取りではない)", "セクション: なし"
+    sec_va = base + s.VirtualAddress
     name = s.Name.rstrip(b"\0").decode(errors="replace")
-    n = max(0, min(size, s.SizeOfRawData - off))
-    out = bytearray(size)
-    if n:
-        start = s.PointerToRawData + off
-        out[:n] = pe.__data__[start:start + n]
-    if n == size:
-        kind = "raw"
-    elif n == 0:
-        kind = "zero-fill (ファイル外・0 固定)"
-    else:
-        kind = "一部 zero-fill"
-    return bytes(out), kind, (name, s)
+    info = (f"セクション {name}: raw 0x{sec_va:x}-0x{sec_va + s.SizeOfRawData:x}, "
+            f"virt 0x{sec_va:x}-0x{sec_va + s.Misc_VirtualSize:x}")
+    off = va - sec_va
+    raw_len = s.SizeOfRawData
+    if off + 8 <= raw_len:
+        value = struct.unpack_from("<Q", pe.__data__, s.PointerToRawData + off)[0]
+        return value, "raw", info
+    if off >= raw_len:
+        return None, "zero-fill (ファイル外・0 固定。読取りではない)", info
+    part = pe.__data__[s.PointerToRawData + off:s.PointerToRawData + raw_len]
+    value = struct.unpack("<Q", part.ljust(8, b"\0"))[0]
+    return value, "一部 zero-fill (後半はファイル外・0 固定)", info
 
 
 def ror64(x, r):
@@ -57,28 +60,19 @@ def main():
         sys.exit(__doc__)
     pe = pefile.PE(sys.argv[1], fast_load=True)
     base = pe.OPTIONAL_HEADER.ImageBase
-    cookie_b, cookie_kind, _ = read_va(pe, base, COOKIE_VA, 8)
-    cookie = struct.unpack("<Q", cookie_b)[0]
+    cookie, ck_kind, ck_info = read_qword(pe, base, COOKIE_VA)
+    if cookie is None or ck_kind != "raw":
+        sys.exit(f"cookie VA 0x{COOKIE_VA:x} が raw 範囲にない ({ck_kind}): decode 不能")
     rot = cookie & 0x3F
-    print(f"cookie VA 0x{COOKIE_VA:x} = 0x{cookie:x} (rot {rot}) [{cookie_kind}]")
-    table, kind, info = read_va(pe, base, APISET_VA, 8 * N_ENTRY)
-    if info is not None:
-        name, s = info
-        raw_end = base + s.VirtualAddress + s.SizeOfRawData
-        virt_end = base + s.VirtualAddress + s.Misc_VirtualSize
-        print(f"section {name}: raw end 0x{raw_end:x}, virt end 0x{virt_end:x}")
-    print(f"api-set 表 0x{APISET_VA:x}: 表全体 [{kind}]")
-    raw_nonzero = 0
+    print(f"cookie VA 0x{COOKIE_VA:x} = 0x{cookie:x} (rot {rot}) [{ck_kind}] {ck_info}")
     for i in range(N_ENTRY):
-        raw = struct.unpack_from("<Q", table, 8 * i)[0]
-        if kind == "raw":
-            raw_nonzero += raw != 0
-        dec = ror64(raw ^ cookie, rot)
-        print(f"entry[{i:2d}] raw=0x{raw:016x} decoded=0x{dec:016x}")
-    if kind == "raw":
-        print(f"api-set 表 0x{APISET_VA:x}: entry {N_ENTRY}, raw 由来の非ゼロ {raw_nonzero}/{N_ENTRY}")
-    else:
-        print(f"api-set 表 0x{APISET_VA:x}: entry {N_ENTRY}, 実値 (raw) なし。全 entry は {kind} で 0 扱い")
+        va = APISET_VA + 8 * i
+        raw, kind, info = read_qword(pe, base, va)
+        head = f"entry[{i:2d}] VA 0x{va:x} [{kind}] {info}"
+        if raw is None or kind.startswith("一部"):
+            print(head + " → decode 対象外")
+            continue
+        print(head + f" raw=0x{raw:016x} decoded=0x{ror64(raw ^ cookie, rot):016x}")
 
 
 if __name__ == "__main__":
