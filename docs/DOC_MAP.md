@@ -126,6 +126,7 @@
 | `tools/liftdiff/REPORT_APPENDIX_LD83.md` | ~104 | liftdiff LD-83 (#2192): wasm 側の site trace (block 内の conditional br・import call の直前の記録)。既定 build と 12 case 差 0。native `1c0b6f`・`1c0b82` は site 単位で対応 (vm0 は native の je 成立と一致)。命令単位の完全 trace は #2801 (LD-131)。shim の block_ok の範囲外 trap は #2802 (LD-132) で main 解消済み |
 | `tools/liftdiff/REPORT_APPENDIX_LD133.md` | ~100 | liftdiff LD-133 (#2821): HeapFree 応答の統一 (#3049) 後の LD-84 再測定。wasm 入口列は 8 case で native と全件一致。残る outcome 差 (BOOL 戻り値の `i1` + `sext`・import 記録) の原因と D25 行案 |
 | `tools/liftdiff/REPORT_APPENDIX_LD84.md` | ~110 | liftdiff LD-84 (#2193): 残り 5 関数 (1801ab1d0・1ab258・1c621c・1c682c・1c69cc) の native 実行トレースと wasm 計装 block 列の対応表 (入口単位の一致と最初の分岐)。分岐の原因は HeapFree import 応答の契約差 (ld_core.h と shim heap.c)。LD-57 の vm0 早期 return 記述の訂正を含む。対応表の TSV は `results/ld84/` |
+| `tools/liftdiff/REPORT_APPENDIX_LD147.md` | ~121 | liftdiff LD-147 (#3180): BOOL 戻り値の import を `i1` で受けて `sext` する型決定 (D25) の実測 (`ott.ll` の複製 3 variant で rax 差 6 case が HeapFree の 1 行で消えることの確認)、`call i1 @` 18 件の列挙、修復経路 (RetDec は D5 で不可・x64c 側に同じ型決定なし)。再現 `tools/liftdiff/results/ld147/bool_sext_probe.py` |
 | `tools/liftdiff/REPORT_APPENDIX_LD67.md` | ~70 | liftdiff LD-67 (#1906): ld_blk 計装が OTT 旧 chain の vm0 戻り値を変える件の切り分けと修正。12 case の既定 build との比較 (LD-64 の baseline) |
 | `tools/liftdiff/REPORT_APPENDIX_LD41.md` | ~20 | liftdiff LD-41 (#1238) の新規追記: 0x417b70 の機械語 (idiv 符号付き) と IR (udiv 符号なし) の静的対応。LD-28 付録の 0x417b70 節の補足 (件数は results 参照)。動的確認は #1576 |
 | `tools/liftdiff/REPORT_LD24.md` | ~70 | liftdiff LD-24 (#976) 節: m11 closure `unsupported_sig` 50 件の内訳と #1193 / #1194 への分割 (署名内訳は IR 未照合)。REPORT.md §12 から参照 |
@@ -653,7 +654,7 @@
 | `docs/LEGAL.md` | ライセンス/規約上の運用制約と事実整理 | 技術実装・数値実測 |
 | `docs/LEGAL_TERMS_LEDGER.{json,md}` | 各社規約の取得台帳 (取得日・版表記・正規化テキストの SHA-256)。`.json` が正本、`.md` は自動生成 | 規約本文・手編集 (`pnpm terms-watch` が更新) |
 | `docs/DOC_MAP.md` | 本書。REPORT.md 索引・行数上限ルール・自動生成一覧・本章 | 技術内容・測定値 |
-| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D23 (横断正本) | 個別ケースの詳細 (report 側) |
+| `docs/DEFECTS.md` | lift silent miscompile 類型 D1a〜D25 (横断正本。D24 は無い) | 個別ケースの詳細 (report 側) |
 | `docs/HANDOFF/<日付>.md` | 引継ぎ要約 (方針・ブロッカー・次の一手)。最新のみ保持 | 状態の正本 (STATUS.md へ)・数値の羅列 |
 | `tools/<area>/REPORT.md` | **測定値・実測数値・検証結果の単一の正本** (日本語/英文を問わず) | なし (ここが正本) |
 | `tools/<area>/README.md` | **ナビゲーションのみ** (何をする dir か・E2E コマンド・関連ファイル) | 測定値・状態表 |
