@@ -214,3 +214,13 @@
 ## 12. L-3 (#104): 上位 5 plugin の state (event 213) デコーダ + DSP クラス静的所見
 
 - 詳細・実測・未解決 (起票先付き) は **`REPORT_APPENDIX.md` §12**。Fruity Parametric EQ 2 / Limiter / Reeverb 2 / Maximus / Delay 3 の state(213) デコーダ (`src/plugstate.ts`) を実装し、コーパス 2,090 件の往復が byte-exact。**受入条件 (クラス A/B 判定表) は未達** (X/L/W 3 者比較は未実施。静的走査による推定のみ)。
+
+## 13. #113 S1 (wine64 での FL 26.1.7 起動): 試行結果
+
+素材: `fl-win64` は block 分割 (25,165 block)。`tools/startup/loadpaths/mk_manifest.py` → `tools/assets/inventory/mk_inputs.py` → `tools/assets/win_paths/recover_paths.py` で `$INSTDIR` パスを復元し、インストール木 (25,131 件 / 2.3 GB) を組み立てた。`FL64.exe` = block00038 (597,064 B, STARTUP §0 と一致)、`FLEngine_x64.dll` = block00031 (ImageBase 0x400000、export `CreateFruityInstance`)。再現: `bash tools/flp/s1_wine_probe.sh`。
+
+- wine: apt の `wine64` 9.0 (Ubuntu 9.0~repack-4build3) + `xvfb`。`wineboot -i` でプレフィックス作成まで成功。
+- 起動 (`xvfb-run -a wine64 FL64.exe`、90 s 上限): **timeout (rc 124) で終了しない**。`Mfplat.dll` の読込 (G01) は成功、`WinVerifyTrust` が `FLEngine_x64.dll` に対して呼ばれ (G03)、その後 `MSGBOX` を出して停止。**`FLEngine_x64.dll` のロードには到達せず**。
+- MessageBox の本文はトレースに出ず未確定。画面キャプチャ道具 (xwd/PIL) が runner に無く、文言の目視はしていない。
+- 判定: S1 は **未達**。止まった箇所は G03 (Authenticode 検査、ホスト側 `0x1400062a0`) と推定。wine の `WinVerifyTrust` を shim する (DLL override) か、oracle 用ローカルパッチが要る。S2 (WAV 書き出し) には未到達。
+- 未解決: MessageBox 文言の確定 / G03 回避手段 (oracle 用ローカルパッチ or wine DLL override) / S2・S3 全部 → #113 に残す (Refs #113)。
