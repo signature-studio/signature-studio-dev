@@ -102,6 +102,10 @@ def main():
     vas = list(dict.fromkeys(cfg['exports'] + cfg.get('also', [])))
     src = {va: open(os.path.join(ddir, '%x.c' % va)).read() for va in vas}
     alltxt = '\n'.join(src.values())
+    # rcpps は代入形 `X = rcpps(D, S);` だけを許す (戻り値を捨てる形は数値が silent に誤るため停止)
+    rc_bad = [l for l in alltxt.split('\n') if 'rcpps(' in l and not re.match(r'^\s*\w+ = rcpps\(\w+,\s*\w+\);\s*$', l)]
+    if rc_bad:
+        raise SystemExit('rcpps の非代入形を検出 (停止): ' + ' | '.join(rc_bad[:3]))
     # --- グローバル
     gl = {}
     for m in re.finditer(r'\b(_DAT|_UNK)_([0-9a-f]{8,9})\b', alltxt):
