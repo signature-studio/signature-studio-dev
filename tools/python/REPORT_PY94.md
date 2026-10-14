@@ -67,7 +67,7 @@ RIP 相対の参照先は「次命令の VA + disp」で求めた。`**[G]` は 
 
 ## 検証
 
-測定 commit: `3213e57d` (main `80fb2fd0` の取り込みの merge。`tools/python` のコードを変えた最後の commit)。以降の commit は `.md` だけを変える。
+測定 commit: `3213e57d` (main `80fb2fd0` の取り込みの merge。`tools/python` のコードを変えた最後の commit)。以降の commit (`003b265d`・merge `7b5ad7e8`。main `bea685f7` の取り込みを含む) で `tools/python` のコードは変わっていない (下の diff は 0 行)。
 
 環境: テスト開始直前の load average 0.16 / 1.05 / 0.75 (`uptime`・23:47)。素材は `$ARTIFACTS_DIR` の `fl-win64.tar.zst` の実在を `ls` で確認し、`tar --zstd -xf` で必要な DATA block と PE (`block00031_PE.bin`・`block24429`・`block24430`・`block25159`・`block24618`) だけを `$RUNNER_TEMP/fl-win64/extracted` に展開した (2.9 秒)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。emsdk は runner の `[EMSDK]` (`docs/REFERENCES.md` §4)。`toolchain-emsdk` は使っていない。
 
