@@ -1,6 +1,6 @@
 // #1620 診断 (読取り + stack 埋め。IR 不変): 各 unit の前に、現在 SP より下の stack 領域を FILL で埋める。
 // 0x10a9f910 の遷移と unit ごとの戻り値が、埋め値に依存するかを見る。usage: node fill_probe.mjs <fillByte> <from> <to>
-// 注: W は埋め範囲 [sp-64KiB, sp) に入りうる (#1620 の実測では sp - W = 0x1950)。埋めで W を上書きすると遷移が埋め値に見えるため、埋めの前後で W の 8B を保存・復元する。
+// 注: W は埋め範囲 [sp-64KiB, sp) に入りうる。埋めで W を上書きすると遷移が埋め値に見えるため、埋めの前後で W の 8B を保存・復元する。
 import fs from 'fs';
 const M11 = new URL('../', import.meta.url).pathname.replace(/\/$/, '');
 const W = 0x10a9f910;
