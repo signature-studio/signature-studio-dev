@@ -184,7 +184,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 
 ## 14. oc-pm の refs_orphan 検出 (#2337・PR #2478)
 
-- 測定 commit: `20fcb6e1` (コードを変えた最後の commit。`src/pm.ts` の説明文と REST 経路のテストを足した。その前に main `c965bb19` を取り込んだ merge `15c4b4be`)。取得時刻は UTC (2026-10-14)。環境: runner (4 コア)・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
+- 測定 commit: `20fcb6e1` (コードを変えた最後の commit。`src/pm.ts` の説明文と REST 経路のテストを足した)。以後の `infra/pm-worker/src`・`test` の変更は 0 (main `ee85d000` までの取り込み merge `1fed9773` と文書の commit だけ)。取得時刻は UTC (2026-10-14)。環境: runner (4 コア)・Node v22.23.3。load は各測定の直前の `/proc/loadavg` の 1 分値。
 - 差分の証跡: `git diff 20fcb6e1 HEAD -- infra/pm-worker/src infra/pm-worker/test` の出力は 0 行 (本節を commit した後の HEAD で確認)。
 
 ### 14-1. 測定
@@ -194,6 +194,7 @@ oc-pm の検出 (`pm_detected`) は 4 種とも 0 件、`would_dispatch_pm` は�
 | `cd infra/pm-worker && npm test` (n=3) | 172 件 PASS / 0 FAIL。14.61〜14.75 s。load 1.74〜2.12 |
 | 内訳 | `test/refsorphan.test.ts` 12 件 (検出・ネガコン (a)〜(h)・送信・解析・REST 経路) + 既存 160 件 |
 | `npm run test:workers` (vitest + workerd) | 3 件 PASS / 0 FAIL。2.69 s。load 2.09 |
+| HEAD `1fed9773` で再実行 (n=1) | `npm test` 172 件 PASS / 0 FAIL・14.62 s・load 0.04。`npm run test:workers` 3 件 PASS。bun build 81.37 KB (件数・サイズは測定 commit と同じ) |
 | `bun build src/index.ts --target=browser --format=esm --external 'node:*'` | 81.37 KB (81,373 bytes)。`--minify` を付けると 53.96 KB (53,956 bytes) |
 
 ### 14-2. ネガコン (1 件を壊して FAIL を確認)
