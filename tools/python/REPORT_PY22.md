@@ -11,7 +11,7 @@
 | emsdk 展開 | `tar --zstd -xf toolchain-emsdk.tar.zst` | 成功 |
 | CPython wasm | `build_cpython_wasm.sh` | exit 0 |
 | pyc 抽出 | `analysis/extract_pyc_blocks.py` | pyc 40 本 (MCPTools 含む) |
-| pyscript 2 本 | block24772 → `cpt.pyscript`、block24775 → `stack.pyscript` | 手動配置 (抽出器は pyscript を書かない) |
+| pyscript 2 本 | block24772 → `cpt.pyscript`、block24775 → `stack.pyscript` | 当時は手動配置 (抽出器は pyscript を書かなかった)。現在の抽出器は `pyscript/{cpt,stack}.pyscript` を書く (REPORT_PY84.md §4.2) |
 | API stubs | `git clone IL-Group/FL-Studio-API-Stubs` | `flcpt` / `flrack` を含まない |
 | flpy 再リンク | `build_flpy.sh` | exit 0 |
 
