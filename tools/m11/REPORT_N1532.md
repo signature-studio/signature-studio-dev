@@ -85,7 +85,7 @@ REPORT §9 の表示では `set_other 410 / inherit 1,172`・`xmm 48` と書か�
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 新規 12 site (引数 20) の原因 commit の特定 (lift/tail/IR のどの段か) | 旧 1,963 と新 1,983 の差の説明が無い。受入条件「原因 commit を特定する」が未達 | 子 issue #1702 [M11-N117] (本 run で起票) |
-| `m11_argrecover_verify.py` が stack 引数位置 (pos≥4) を扱えない (`ALIAS[4]` で KeyError) | 0 詰め 33 fixes のうち pos≥4 の 15 件 (pos4: 11 + pos5: 4) は独立検算できない | 上と同じ子 issue に併記 |
+| `m11_argrecover_verify.py` が stack 引数位置 (pos≥4) を扱えない (`ALIAS[4]` で KeyError) | 0 詰め 33 fixes のうち pos≥4 の 15 件 (pos4: 11 + pos5: 4) は独立検算できない (→ PR #1868 で解消: `REPORT_N1835.md`) | 上と同じ子 issue に併記 |
 | `m11_sigfix_stats.sh` が verify 失敗で TSV を再生成しない | `results/sigfix_zeropad_remaining.tsv` が旧値のまま。再現手順が途中で止まる | 上と同じ子 issue |
 | `m11_e2e.sh --full` の survey 結果が旧 REPORT §14 と異なる (ok 866 → 872) | 当 run の数値比較の前提が変わる | #132 にコメント (本 run では未調査) |
 
