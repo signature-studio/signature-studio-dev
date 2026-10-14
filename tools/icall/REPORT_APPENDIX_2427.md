@@ -1,7 +1,7 @@
 # 付録: icall #2427 (ICALL-77) — 脱落 frame slot store を IR に戻す pass と route への組込み
 
 > 親: #2394 (ICALL-75)。残件: ICALL-78 (#2508)。
-> **既知類型との関係**: DEFECTS.md の D22 に近縁。REPORT_APPENDIX_2394 §6 の D23 候補 (脱落 store) の**修復側**を実装した。DEFECTS.md 本体への行追加は PM 判断 (`docs/WORKFLOW.md` §5)。
+> **既知類型との関係**: DEFECTS.md の D22 に近縁。REPORT_APPENDIX_2394 §6 の D24 候補 (脱落 store) の**修復側**を実装した。DEFECTS.md 本体への行追加は PM 判断 (`docs/WORKFLOW.md` §5)。
 
 ## 1. 結論
 
@@ -85,7 +85,7 @@ bash tools/icall/diff/fa_sweep.sh 8 60                                       # 1
 | `0x180da6e60` 候補 10 件の miscompile か無害かの分類 | closure 全体の判定は native crash/timeout のため比較不能 | ICALL-78 (#2508) |
 | 元 `SlateCore.core_64` の bytes と `rw.dll` の同 VA の sha256 照合 | (a) の根拠は PE decode 結果の比較のみ | ICALL-78 (#2508) (`plugins-freshair` 必要) |
 | `FA_FRAME_SLOT` の既定 ON 化 | 既定 OFF のため closure の route は従来どおり | PM 判断 (本 PR では既定 OFF) |
-| `docs/DEFECTS.md` への D23 行の追加 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
+| `docs/DEFECTS.md` への D24 行の追加 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
 | `fa_sweep.sh` の ±1 の揺れ (base 46/66/9/10 と 47/66/9/9) | 数値の正本の取り方 | #2302 (既存) |
 
 ## 8. 測定 commit と差分
