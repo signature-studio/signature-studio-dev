@@ -42,11 +42,10 @@
 | baseline | rc=0: 69, rc=124: 1, rc=95: 53, rc=98: 8 | 10 | 3/12 |
 | stub 有効 | rc=0: 73, rc=124: 1, rc=95: 47, rc=97: 2, rc=98: 8 | 11 | 4/12 |
 
-- baseline は sweep 3 回すべて同じ内訳。stub は sweep 6 回すべて同じ内訳 (rc=0: 73 / rc=97: 2)。
-- stub の `rc=97` は `18105bb90`・`18105bea0` の 2 件。
+- baseline は sweep 3 回すべて同じ内訳。
+- stub の rc 内訳は 2 通りを観測: rc=0: 73 / rc=97: 2 (`18105bb90`・`18105bea0`) と、rc=0: 72 / rc=97: 3 (`18105bb90`・`18105bea0`・`18105d8ac`)。
+  `18105d8ac` は run ごとに rc=0 と rc=97 の両方を観測した。揺れの原因は未特定 (§4)。
 - `0x1813068d0` が stub 有効で新規 hit (2198 と同じ)。
-- 未切り分けの不一致: `18105d8ac` は sweep 内では rc=0 (確認した 1 回の sweep で `F 18105d8ac rc=0`)、1 関数だけを単体で起動すると stub 条件で rc=97 (20/20 回)。レビュー側の実測 (rc=0: 72 / rc=97: 3・`18105d8ac` が rc=97) は、この単体条件と同じ結果。
-  sweep と単体の差 (実行方法・環境変数・stdout の扱い) は調べた範囲では原因を特定できず、§4 に残す。
 - fatal 行の保存: `slot_trace_fatal.txt` に `fatal` / `regs` / `heap_args` の 3 種が入る (base: 53 件ずつ・stub: 47 件ずつ)。
 
 ### 2.3 群ごとの確定結果 (baseline / stub)
@@ -106,7 +105,7 @@ cp tools/icall/work/slot_trace_fatal.txt tools/icall/work/fatal_stub.txt
 | 群 D (入口 `0x18105c1cc` 行の `ecx=0x50001b80`)・群 G (入口 `0x180ca2450` 行の `rcx=0x50000370`) の heap 域値の起源 | 受入条件 1 (群 D・G の残り) | #2247 (ICALL-68) |
 | 群 I の thunk 呼出し元 (harness の entry か guest 内の call 元か) | 群 I の機構の上流 | #2247 (ICALL-68) |
 | 群 C の `SLOT_ENC_INIT` 依存が guest の意図か harness の artefact か | 受入条件 2 の解釈 | #2247 (ICALL-68) |
-| `18105d8ac` の stub 条件 rc が sweep (rc=0) と単体 (rc=97) で食い違う原因 | 付録 §2.2 の stub の rc 内訳 (rc=0 と rc=97 の 1 件ずつ) | 本 PR の未解決表のみ (追跡。子は起票しない) |
+| `18105d8ac` の stub 条件の rc が run 間で揺れる (rc=0 と rc=97 の両方を観測)。原因は未特定 | 付録 §2.2 の stub の rc 内訳 (73/2 と 72/3 の 2 通り) | 本 PR の未解決表のみ (追跡。子は起票しない) |
 
 ## 5. 検証
 
