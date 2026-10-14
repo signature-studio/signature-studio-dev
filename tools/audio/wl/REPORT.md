@@ -8,7 +8,7 @@
 1. **実 FL ミキサでの比較は未達 (#34 待ち)**。本実験の「ミキサ」は FL ではなく、`tools/audio/test/fla_test.c` と同じ**テスト音ミキサ代役** (ramp / 正弦 / 入力素通し)。よって下記は **「ring + producer スレッド」構成と「worklet 内で直接 render」構成の構造的な遅延差** であり、FL 実機の遅延ではない。→ #194 は **Refs** (Closes しない)。
 2. **構造的な差**: 入力→出力の往復遅延 (相互相関, 同一 worklet クロック上) は worklet 直走行が **B フレームちょうど** (128/256/512 → 2.67/5.33/10.67 ms)、ring 方式は **T フレーム** (1408/1536/2048 f = 29.33/32.00/42.67 ms)。差は 26.67/26.67/32.00 ms (各 n=3 全 run 同値)。T は `T ≥ burst×1.25 + B` (`tools/audio/docs/PROTOCOL.md` §4) で決まり、worklet 直走行にはこの項が無い。
 3. **過負荷時の挙動 (実測・持続過負荷)**: render が worklet のオーディオスレッド上で走る。B=256@48k (予算 5333 µs) で模擬負荷 4000 µs は両方式とも健全 (underrun 0 / ramp 不一致 0)。**8000 µs (予算の 1.5 倍) では worklet 直走行の実時間比が 0.605〜0.636 (n=3 の full run の min–max。音声が実時間の 60.5〜63.6% しか進まない)、ring は underrun 443 (T が 15872 f まで拡張, 3 run とも同値)**。持続過負荷では両方式とも破綻するため、**直走行固有の代償はこの測定では示せていない**。一過性の単発超過を ring の T が吸収する側との比較は未測定 (§3 項目 4)。直走行は `Atomics.wait` 系のブロッキングが使えない (§3 項目 1)。
-4. **FL スレッド構造の再設計見積り (静的・FLEngine 全体の数であってミキサ専用ではない)**: §4。結論は「FL 本体は 1 DLL 内で CreateThread 3 箇所 / 待機系 760 箇所 (うち CS Enter 699) / 非ブロッキング同期 971 箇所 (CS Leave・Init・Delete と Event 系) を使い、worklet 直走行にはミキサ呼出グラフの切り出しが前提」。切り出し範囲 (どの関数がミキサ render から到達するか) は未解析。
+4. **FL スレッド構造の再設計見積り (静的・FLEngine 全体の数であってミキサ専用ではない)**: §4。結論は「FL 本体は 1 DLL 内で CreateThread 3 箇所 / 待機系 760 箇所 (うち CS Enter 699) / 非ブロッキング同期 971 箇所 (CS Leave・Init・Delete と Event 系) を使い、worklet 直走行にはミキサ呼出グラフの切り出しが前提」。切り出し範囲 (どの関数がミキサ render から到達するか) は、直接 call の下限だけを §4-2 で測定した (間接 call が大半の辺で未解決のため、ミキサ本体は未切り出し)。
 
 ## 2. 比較実験 (`run.mjs`, 実測)
 
@@ -51,10 +51,32 @@
 - プラグインのロード/GUI/ディスク読込は worklet から直接は呼べない (DOM・fetch が無いことは仕様上の事実。メモリ増加の可否は未確認) ため、**ミキサ経路から非同期要求 (ring/メール箱) を main/worker へ出す境界**が別途必要。これは本 PoC で未検証。
 - したがって工数見積りは「ミキサ到達関数集合の抽出 (lift 後の call graph) → その集合内の同期プリミティブ個数の再集計」が前提 (起票先 §6)。
 
+### 4-2 bufferSwitchTimeInfo (0xc56ae0) からの到達集合 (静的・下限)
+
+`python3 tools/audio/wl/mixer_reach.py` (測定 commit `b97553f`)。入口は FL の bufferSwitchTimeInfo 本体 (ASIO 表の 0xc56ae0)。直接 call と関数範囲外への直接 jmp (tail call) だけを辺にして BFS した。`thread_api.py` の分類で API を数える。
+
+| 項目 | 値 |
+|---|---|
+| 到達関数 (.pdata 57,816 中) | 4,433 (7.7%) |
+| 到達命令 / 範囲外の目標 | 295,499 / 10 |
+| 未追跡の間接 call/jmp (到達集合内の箇所数) | 3,801 (`call [mem]` 3,593 / `call [rip-data]` 157 / `call reg` 49 / `jmp [mem]` 2) |
+| thread_create (CreateThread 1 / SetTimer 3) | 4 箇所 / 4 関数 |
+| blocking_wait (EnterCriticalSection 170 を含む) | 188 箇所 / 121 関数 |
+| nonblocking_sync (LeaveCriticalSection 178 を含む) | 201 箇所 / 131 関数 |
+| atomic (Interlocked* の import) | 0 |
+
+読み方:
+- **直接 call だけでは到達集合が決まらない**。未追跡の間接 call が 3,801 箇所あり、到達集合の大半の辺 (vtable 形 `call [mem]` 3,593 箇所) が見えていない。ミキサ render から到達する集合はこの値より大きい下限。
+- 到達集合は UI (PostMessageW 25・ShowWindow・RedrawWindow) や設定読込 (RegQueryValueExW) を含む。入口の 1 関数が広く呼ぶため、ミキサ本体だけは切り出せていない。
+- 同期箇所 (blocking_wait + nonblocking_sync = 389 箇所) のうち CS の Enter/Leave が 348 箇所 (約 89%)。ミキサ内で CS を外す書換えの規模は、間接 call を解決した後の集合で再集計が要る。
+- bufferSwitchTimeInfo から `CreateThread` が 1 箇所到達する。初回呼出しでの遅延生成か、毎回の経路かは未確認。
+- 既知の辺 (systemTime 経路の `winmm!timeGetTime` 12 箇所) は到達しており gate PASS。入口を関数内部 (先頭+1) に差し替えた `--negctl` は gate FAIL (期待どおり)。
+
 ## 5. 検証
 
 | 項目 | 結果 |
 |---|---|
+| 到達集合 (`python3 tools/audio/wl/mixer_reach.py`, 測定 commit `b97553f`, 静的のみ) | gate 2/2 PASS (入口が pdata 先頭・既知辺 timeGetTime 12 箇所)。`--negctl` (入口を関数内部に差替え) は gate FAIL = 期待どおり。実行 約 8 s。結果は §4-2 |
 | 比較 e2e (`node tools/audio/wl/run.mjs --reps 3 --secs 6`, 作業ツリー) | **32/32 合格 (negctl 5 件を含む), exit 0, 所要 230.9 s, load average 開始 0.04 / 終了 0.16**, 並列 1 |
 | 静的スレッド面 (`fl_thread_surface.py`) | gate 4/4 PASS (CreateThread≥1, WaitForSingleObject≥1, SetEvent≥1, Sleep≥1), 6.6 s |
 | 静的 negctl (`--negctl`: gate の API 名を実在しない名に差替え) | gate 4/4 FAIL → exit 0 (検出能力あり) |
@@ -71,7 +93,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実 FL ミキサでの ring vs 直走行の比較 (本 PoC はテスト音代役) | #194 の「FL ミキサ」比較は未達 → #194 は Refs のまま | #34 (AU-13) にコメント。#34 完了後に本 `wl/run.mjs` の producer を FL に差替えて再実行 |
-| ミキサ render から到達する関数集合と、その中の CS / 待機 / スレッド生成の個数 | §4 の再設計見積りが FLEngine 全体の数に留まる | #227 (ICALL-1) は CLOSED のため追跡先にならない → **PM 判断: ICALL-1 の子として新規起票を依頼** (lift 後 call graph が前提) |
+| 間接 call (vtable / 関数ポインタ) を解決した後の、ミキサ render から到達する関数集合と、その中の CS / 待機 / スレッド生成の個数 | §4-2 は直接 call の下限のみ (間接 call が大半の辺で未解決)。§4 の見積りは FLEngine 全体の数 | #227 (ICALL-1) は CLOSED のため追跡先にならない → **PM 判断: ICALL-1 の子として新規起票を依頼** (lift 後 call graph が前提) |
 | 実機の burst (2048〜4096 f) での直走行の挙動と ring の T 伸長との比較 | 実機での差が未測定 (headless の burst 512 f のみ) | #187 (AU-2) にコメント |
 | 直走行の予算超過検知 (`rt_ratio` は本ハーネス独自。shim の `clock_jumps` に出ない) | 本番化する場合の監視設計が無い | #190 (AU-6) にコメント |
 | 一過性の単発超過 (ring の hiccup 試験と同条件) を直走行に入れた比較 | 直走行の一過性超過耐性が不明 (§3 項目 4)。持続過負荷しか測っていない | #190 (AU-6) にコメント (ring と同条件で実施) |
