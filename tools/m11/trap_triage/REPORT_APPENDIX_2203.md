@@ -58,7 +58,8 @@
 
 ## 5. コード差分 (受入 4・規約 6)
 
-- 測定 commit `da002968` から HEAD までのコード範囲の差分は 0 行 (`git diff da002968 HEAD -- tools/m11/m11_ov.c tools/m11/trap_triage/dest_2203.py tools/m11/trap_triage/dest_2203.sh tools/m11/trap_triage/run_dest_2203.mjs` は空。以後の commit は docs のみ)。
+- 測定 commit `da002968` から HEAD (`main` 取り込みの merge commit を含む) までの計測経路の差分は 0 行。範囲は `tools/m11/m11_build.sh tools/m11/m11_post.py tools/m11/m11_ov.c tools/m11/m11_rt.c tools/m11/m11_gen_ir2.sh tools/m11/m11_cond.py tools/shared/env.sh tools/m11/trap_triage/dest_2203.py tools/m11/trap_triage/dest_2203.sh tools/m11/trap_triage/run_dest_2203.mjs` (`git diff da002968 HEAD -- <範囲>` は空)。
+- 同じ merge で main の `tools/m11` の変更 (`m11_e2e.sh`・`m11_survey.mjs`・`m11_run.mjs`・`ldfix/`・`shimx_link/` ほか) を取り込んだが、測定経路はこれらを読まない (grep で確認)。再測定は行っていない。
 - 再測定は不要 (測定 commit で実行した)。
 
 ## 6. 未解決 (起票先)
