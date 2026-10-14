@@ -37,7 +37,7 @@
 
 1. **processRECEvent の引数不一致**: flapi は引数 0 だが、ハンドラは書式 `Iii` で 3 つの値を受け取り、その 3 値を下位関数へ渡している。flapi 側の署名が誤っている可能性がある。実機の呼出し例 (MCP 側の使用) で確かめるまでは確定しない。同名の `general.processRECEvent` (fn `0xd69f00`) は flapi 3 引数・書式 `Iii` で一致する。channels 側 (`0xd58e00`) だけ不一致。
 2. **incEventValue**: ハンドラは `Ii|d` で受け、`res` 既定値 `0x3fa5555555555555` (= 1/24) を置いている (`movabs` で確認)。下位関数 0x1051330 の戻り規約は未解析。
-3. **selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn**: ハンドラは `0xd5e620` 等の小関数を経由し、関数ポインタ表 (`call qword ptr [rax]`) で呼ぶ。0xd5e620・0xd58d80 は先頭 5 命令のみ確認 (薄い委譲)。0xd843d0・0xd84740・0xd82c20 は未読。実処理の関数 (channel 配列の参照・選択状態の更新) の特定が必要。
+3. **selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn**: ハンドラは `0xd5e620` 等の小関数を経由して呼ぶ (probe の呼び出し箇所で確認)。`0xd84740` 等の後段関数は未読。実処理の関数 (channel 配列の参照・選択状態の更新) の特定が必要。
 4. 範囲外 code: 上記のどれも、範囲外時に返す code (`FL_E_RANGE` = 4 か、別の code か) は未確定。
 
 ## 次 run への提案 (同 issue で継続)
@@ -56,15 +56,10 @@
 ## 追加解析 (2 回目 run): selectAll の委譲チェーン
 
 - 測定: `FL_WIN64_DIR=tools/python/work/fl python3 analysis/flapi/pe_handler_probe.py selectAll` (`work/` は gitignore)。展開は `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst --wildcards '*block00031_PE.bin'`。
-- 測定 (probe 出力): `0xd5b150` は先頭で `call 0xd5e620` を呼んだ後、`call 0xd843d0`・`call 0xd82c20`・`call 0x415c30` を続ける。関数全体は薄い委譲ではなく、`0xd5e620` 経由の間接呼び出し (関数ポインタ) の後段に `0xd843d0`・`0xd82c20` の処理がある。
-- 測定 (本体の逆アセンブル、下記の方法): 以下の 4 関数は probe の出力に現れないため、probe と同じ section 対応 (VA→file offset) で `block00031_PE.bin` から capstone により `ret` まで逆アセンブルした (作業用の一時スクリプトでリポジトリ外・未コミット)。
-  - `0xd5e620`: `sub rsp,0x28` / `mov rax,[rip+0x881f8d]` / `call qword ptr [rax]` / `add rsp,0x28` / `ret`。間接呼び出し 1 回のみの薄い委譲。
-  - `0xd5e640`: `0xc38a10` を呼び、`0x40feb0` を呼び、`0xd5e620` を呼んで `[rax]` に格納する。呼び元の 1 つ。channel 配列の参照の有無は未確定。
-  - `0xd82c20`: `index == 0` で関数ポインタ経路 (`call [rax]`) を取り、`index < 0` で `call [rax+0x88]` の後 `-4` 等の switch、`index >= 0` で `call 0xc38bc0` を呼ぶ。
-  - `0xc38bc0`: `mov rax,[rip+0xa7f719]` / `ret` のみ。引数 `index` を使わず、グローバル 1 個を返す。`index → 要素の解決` の候補ではない。
-- `selectAll` 本体 (`0xd56d00`・`0xd5b150`) の後段は `0xd843d0` (引数 6 個 + フラグ 1 個を構造体に格納する投入処理に見える) を呼ぶ。channel 固有の処理かは未確定。
+- 測定 (probe 出力): `0xd5b150` は先頭で `call 0xd5e620` を呼んだ後、`call 0xd843d0`・`call 0xd82c20`・`call 0x415c30` を続ける。関数全体は薄い委譲ではなく、`0xd5e620` の呼び出しの後段に `0xd843d0`・`0xd82c20`・`0x415c30` の呼び出しがある。
+- 本体の記述 (`0xd5e620`・`0xd5e640`・`0xd82c20`・`0xc38bc0`・`0xd843d0` の中身) は本測定の出力に現れないため、ここには書かない。probe の出力で確認できたのは、`0xd5b150` が `call 0xd5e620` の後に `call 0xd843d0`・`call 0xd82c20`・`call 0x415c30` を呼ぶ、という呼び出し順だけである。
 - 結論: selectAll の戻り値・範囲外 code は引き続き未確定。実処理の関数 (channel 要素の選択状態を書き換える箇所) は未特定。
 
 ## 受入条件 (#1527) の状態 (2 回目 run 時点)
 
-- 未達のまま。次に読む対象: `0xc38bc0` (index → channel 要素の解決)、`0xd841e0`・`0x4133f0` (投入処理が channel 操作か汎用か)。
+- 未達のまま。次に読むべき対象は、`0xd5b150` の後段で呼ばれる `0xd843d0`・`0xd82c20`・`0x415c30` の本体 (測定方法を記録したうえで読む)。
