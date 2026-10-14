@@ -194,7 +194,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 - **結論**: lift は runner 内で完走する (ピーク RSS **609MB**・**63〜64 s**)。単一 TU の `emcc -c fle_lifted.c` は **cap 11000MB 超で打ち切られる** (11261〜11436MB・97〜98 s)。cap の下で runner は生存し、本節まで到達した。**boot 未到達** (clang 段で停止、残作業は #2700)。#918 で runner を落としたのは lift ではなく clang の単一 TU (旧 lift は 13.8GB 超で kill、付録 §C)。
 - 測定 commit: `a3639395` (コードを変えた最後の commit。取込元 `c4895395` = `fa0ecaad`)。検証起点: `origin/main` `aaa3763e`。
 - 差分 0 の証跡: `git diff --stat a3639395 HEAD -- tools/flelift/x64c.py tools/flelift/boot/rss_cap.py tools/flelift/boot/build.sh tools/flelift/boot/boot_e2e.sh` は空 (本節の commit は REPORT のみ)。
-- 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/flelift/boot/fle6_measure.sh` (gen-A → lift → build plain。clang 段の cap 超過で rc=1)。素材 `oc_artifacts: fl-win64 toolchain-emsdk` (emsdk は `/opt/emsdk`)。
+- 再現: `FL_WIN64_DIR=<fl-win64 展開先> bash tools/flelift/boot/fle6_measure.sh` (gen-A → lift → build plain。clang 段の cap 超過で rc=1)。素材 `oc_artifacts: fl-win64 toolchain-emsdk` (emsdk は `[EMSDK]`)。
 
 ### 9-1. 工程の実測 (コミット済み HEAD で 2 回)
 
@@ -216,7 +216,7 @@ PE = block00031_PE.bin。生成物は work/boot/ (gitignore)。20MB 超 blob は
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 単一 TU の lifted C が clang -O0 で 11GB 超 (cap で打ち切り) | boot・link の実測が無い (#918 の boot 到達は未達) | 既存 #2700 [FLE-9] (TU 分割) |
+| 単一 TU の lifted C が clang -O0 で 11GB 超 (cap で打ち切り) | boot・link の実測が無い (#918 の boot 到達は残る) | 既存 #2700 [FLE-9] (TU 分割) |
 | cap 11000MB は打ち切り 2 回のみから決めた値 | cap が低すぎて通る TU を落とす可能性 | #2700 の分割後に再測定 |
 
 ## 10. FLE-6: dsp_ippv2 shim と 0x6a7b70 root (#672, PR #681)
