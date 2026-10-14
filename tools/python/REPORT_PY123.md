@@ -1,23 +1,25 @@
 # PY-123 (#3028): boot 停止時点の undo 管理オブジェクトと安全判定の実行時値を実測する
 
 親: #2998 (PY-123)。前段: #2978 (PY-120)・PE 解析は #2998 の issue コメント (2026-10-14 21:08Z)。
-既知類型との関係: 未判定。boot 中に `.data` の undo 系スロットが 0 に戻る原因は未特定で、`docs/DEFECTS.md` の既知類型に当たるかは確認していない (lift 由来の silent miscompile の疑いを含む)。
+前 run: #3055 (merge 済み・測定 commit `3064340a`・boot 停止時点の 0 を確認)。
+既知類型との関係: 未判定。0 化の書込みは直接の RIP 相対書込みではなく、`docs/DEFECTS.md` の既知類型に当たるかは未確認。
 
 ## 結論
 
-- **受入条件 1〜3 は未達。** boot 停止時点 (unit 209/942、`exit`) で、undo 管理 global `0x15e1c78`・安全判定 global `0x15e4790`・成功時戻り値 singleton `0x16b82e0` の 3 つとも **0**。読むべき undo オブジェクトが存在しないため、起動直後の `+0x20` (pos)・`+0x24` (count)、安全判定述語の関数 VA、singleton の中身は測れなかった。
-- **値は boot の途中で消えている。** image 敷設直後 (`_fle_data_install`) は `0x15e1c78 = 0x16bb068`・`0x15e4790 = 0x141d6b8` (PE の `.data` の値と一致)。`_fle_init` では消えない (実測)。boot 本体の途中で 0 に戻る。戻す箇所は未特定。
-- **このため、boot 停止点の値は実 FL の起動直後の状態として使えない。** #2998 の実装 (`restoreUndoLevel`・`getUndoLevelHint` の C 実装) は、この 0 の原因が分かるまで再開しない。
-- 測定 harness に boot 後の probe を足した (`tools/flelift/boot/fle_boot.mjs`)。boot の挙動は変わらない (units_run 209/942 は FLE-9 と同じ)。
+- **受入条件 1〜3 は未達。** boot は unit 209 (1-based) で `QuickFontCache DLL not found!` の MessageBox を出し、直後に GetMem(0x74) が NULL を返して `Error` → `exit(0)` で止まる。停止時点の undo 系 global は boot 中のこの経路で 0 になっており、起動直後の pos/count・安全判定 VA・singleton の値として使えない。
+- **0 化の位置 (今回の新結果)。** 監視 slot `0x15e1c78`・`0x15e4790` は `fle_run` 直前には PE の値 (`0x16bb068`・`0x141d6b8`) を持つ。0 になるのは **unit 209 の中**。unit 208 までの unit 境界・memset・FastMM の GetMem/FreeMem では変化しない。最初に検出したのは **GetMem 呼出し直前 (site 8)**。よって 0 化は FastMM の中ではなく、unit 209 の生成コードのうち MessageBoxW の後から GetMem 呼出しまでの区間で起きる。
+- 書込みは直接の `mov [rip+slot], reg` ではない (`pe_xref` の書込み 0 件と整合)。書込み命令そのものは未特定。
+- singleton `0x16b82e0` は boot 中ずっと 0 (PE 上も 0 で、変化なし)。
+- したがって boot 停止点の値は実 FL の起動直後の状態ではない。受入条件 1〜3 を測るには、unit 209 の `QuickFontCache DLL not found!` 経路を抜けた boot が要る (§5)。
 
 ## 受入条件の判定
 
 | # | 受入条件 (issue #3028) | 判定 | 根拠 |
 |---|---|---|---|
-| 1 | undo 管理オブジェクトの起動直後の `+0x20` (pos)・`+0x24` (count) を実測 | **未達** | slot `0x15e1c78` = 0 のためオブジェクトが無い (§2)。 |
-| 2 | 安全判定述語 (`[obj+0x98]`・`[obj+0x88]`、`obj = [[0x15e4790]+8]`) の関数 VA | **未達** | `0x15e4790` = 0 のため `obj` を辿れない (§2)。 |
-| 3 | 成功時戻り値 singleton `[0x16b82e0]` が `None` か | **未達** | 値は 0 (未設定)。`None` か否かは判定できない。 |
-| 4 | 上 3 件を本ファイルに書き、#2998 の実装を再開する | **部分** | 本ファイルに書いた。実装は未再開 (1〜3 が未達のため)。 |
+| 1 | undo 管理オブジェクトの起動直後の `+0x20` (pos)・`+0x24` (count) を実測 | **未達** | slot `0x15e1c78` は unit 209 で 0 に変わるため、起動直後のオブジェクトが測れない (§2-2)。 |
+| 2 | 安全判定述語 (`[obj+0x98]`・`[obj+0x88]`、`obj = [[0x15e4790]+8]`) の関数 VA | **未達** | `0x15e4790` も unit 209 で 0 (§2-2)。`obj` を辿れない。 |
+| 3 | 成功時戻り値 singleton `[0x16b82e0]` が `None` か | **未達** | 値は boot 全体で 0 (未設定)。`None` か否かは判定できない。 |
+| 4 | 上 3 件を本ファイルに書き、#2998 の実装を再開する | **部分** | 本ファイルに書いた。1〜3 が未達のため #2998 の実装は未再開。 |
 
 ## 1. 静的な値 (PE 直読み・実測)
 
@@ -30,93 +32,78 @@
 | `0x141d6b8` | `.data` | `0x0` | `obj` の候補先は file 上 0 |
 | `0x16b82e0` (戻り値 singleton) | `.bss` | (file 実体無し) | 静的には決まらない |
 
-- `analysis/flapi/pe_xref.py 15e1c78` (`.text` 全域・5,022,467 命令・35.0 秒): 読出し 768 件・**書込み 0 件** (`stores=0`)。`mov [rip+slot], reg` の直接書込みは PE に無い。
-- `analysis/flapi/pe_slot_writers.py 15e1c78` (36.0 秒): `[reg+8]` への書込み候補 1 件 (`0xf698af`)。`0xf698af` の周辺は `call 0xf82530` で得た確保先に `[rax+8]`・`[rax+0x10]` を書く別レコードの初期化と読め、undo 管理オブジェクトへの書込みとは断定しない (逆アセンブル確認: `tools/python/analysis/flapi/pe_disasm.py 0xf69840 70`)。
+- `analysis/flapi/pe_xref.py 15e1c78` (`.text` 全域): 読出し 768 件・**書込み 0 件**。
+- `analysis/flapi/pe_slot_writers.py 15e1c78`: `[reg+8]` への書込み候補 1 件 (`0xf698af`)。undo への書込みとは断定しない (前 run の判断どおり)。
 
-## 2. boot 停止時点の実行時値 (測定)
+## 2. boot 停止時点の実行時値 (前 run の測定、commit `3064340a`)
 
-測定 commit: **`3064340a`** (`feat(flelift): probe undo slots after boot (PY-123, #3028)`)。コードを変えた最後の commit。
-`git diff 3064340a HEAD -- tools/flelift/boot` の出力は空 (差分 0)。
+| 実行 | units_run / total | slot `0x15e1c78` | pos / count | slot `0x15e4790` | `[0x16b82e0]` | IPP 判定 |
+|---|---|---|---|---|---|---|
+| shim 有 (`FLE_IPP=1`) | 209 / 942 | `0x0` | null / null | `0x0` | `0x0` | `ok:false` (既知 NG #2702) |
+| ネガコン (`FLE_IPP=0`) | 209 / 942 | `0x0` | null / null | `0x0` | `0x0` | `ok:true` |
 
-測定コマンド (コミット済み HEAD で実行):
+正の対照 (`tools/flelift/boot/undo_probe_check.mjs`): 敷設前 `0x0` → `_fle_data_install` 直後 `0x16bb068`・`0x141d6b8` → `_fle_init` 直後も同じ。boot 本体の途中で 0 に戻る。
 
-```sh
-export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64
-time timeout 900 bash tools/flelift/boot/fle6_measure.sh
-```
+## 2-2. unit 単位の変化点 (今回の測定、測定 commit `b1b95f97`)
 
-- 所要: 実測 real 2 分 13.8 秒 (user 3 分 12.6 秒・sys 19.7 秒)。工程: gen-A 5 s・lift 51 s (x64c・closure 2・8 shard)・clang-plain 48 s (8 shard・peak RSS 2.2〜2.7 GB/本)・boot 15 s・negctl 14 s。
-- load average: 開始時 `0.22 0.59 0.37`、clang 中 `1.61 0.94 0.52`、boot 中 `1.54 0.96 0.53`。並列 1 本 (1 回のみ)。
-- n=2。コミット済み HEAD での測定 (上) と、同じコードを未コミットの作業ツリーで回した 1 回目 (2 分 20.8 秒) の値が一致した。
+`tools/flelift/boot/fle_boot.c` の `py_watch` (計測のみ・挙動は変えない) で、監視 slot の値が変わった時点を記録した。site の意味: 0 = `fle_run` 直前 / 1・2 = unit dispatch の直前・直後 / 3 = memset 直後 / 4 = ExitProcess / 5 = MessageBoxW / 6 = GetMem 直後 / 7 = FreeMem 直後 / 8 = GetMem 呼出し直前。
 
-| 実行 | units_run / total | boot_threw | slot `0x15e1c78` | pos `+0x20` / count `+0x24` | slot `0x15e4790` | `[0x16b82e0]` | IPP 判定 |
-|---|---|---|---|---|---|---|---|
-| shim 有 (`FLE_IPP=1`) | 209 / 942 | `exit` | `0x0` | null / null | `0x0` | `0x0` | `ok:false` (既知 NG) |
-| ネガコン (`FLE_IPP=0`) | 209 / 942 | `exit` | `0x0` | null / null | `0x0` | `0x0` | `ok:true` |
-
-- 判定: **boot 停止時点で 3 つの global とも 0。** shim の有無で変わらない。
-- `FLEBOOT_IPP_CHECK ok:false` (shim 有) は既知の NG。FLE-9 (`tools/flelift/boot/REPORT.md` §9) の「shim 有の IPP 判定は NG (#2702 が追う)」と同じ結果。本変更は IPP 判定の式に触れていない (差分は `fle_boot.mjs` の undo probe と出力行の追加のみ)。
-- 停止点は unit 209 の `MessageBoxA` → `exit(0)`。`FLE-9` の記録と同じ。
-
-### 2-1. 正の対照 (probe が非 0 を読めることの確認)
-
-`tools/flelift/boot/undo_probe_check.mjs` (コミット済み) を `tools/flelift/work/boot/fleboot_plain.cjs` に対して実行。
-
-```sh
-FLE_BOOT_VARIANT=plain node tools/flelift/boot/undo_probe_check.mjs "$PWD/tools/flelift/work/boot/fleboot_plain.cjs"
-```
-
-| 時点 | slot `0x15e1c78` | slot `0x15e4790` |
+| 実行 | 変化点 (unit 1-based, site, slot, old → new) | 件数 |
 |---|---|---|
-| 敷設前 | `0x0` | `0x0` |
-| `_fle_data_install` 直後 | `0x16bb068` | `0x141d6b8` |
-| `_fle_init` 直後 | `0x16bb068` | `0x141d6b8` |
+| shim 有 | unit 209, site 8, `0x15e1c78` `0x16bb068`→`0x0`・`0x15e4790` `0x141d6b8`→`0x0` | 5 (うち site 0 の snap 3) |
+| ネガコン | 同上 | 5 |
 
-- 判定: 敷設直後には PE の値が読める (probe は非 0 を検出できる)。`_fle_init` では消えない。
-- つまり、boot 停止時点の 0 は「probe が読めない」ではなく「boot の途中で 0 に戻った」結果。
+- 開始時 (site 0): `0x15e1c78` = `0x16bb068`・`0x15e4790` = `0x141d6b8`・`0x16b82e0` = `0x0`。
+- unit 1〜208 の dispatch 前後、memset (site 3)、FastMM の GetMem・FreeMem (site 6・7) では変化なし。
+- unit 209 の MessageBoxW (site 5) では変化なし (site 5 の検査時点ではまだ非 0)。
+- unit 209 の GetMem 呼出し直前 (site 8) で 0。GetMem の戻り値は 0 (失敗)。
+- 終了 (site 4, `ExitProcess`, call site `0x412a12`) では既に 0。
+- 戻り番地の連鎖 (`exit-stack`): `0x412a12` → `0x409433` (`fle_ov_getmem` の失敗経路 → `Error`) → `0x412a4f` (GetMem 呼出し元) … → `0x410380`。
 
-## 3. 0 に戻る箇所の絞り込み (未特定)
+### 2-3. 0 化の位置の逆アセンブル (unit 209 の GetMem 呼出し元)
 
-- `fle_boot_enter` の順序は `fle_data_install` → `fle_textwin_install` → `fle_init` → (boot 本体: DllMain → `_InitLib` → InitUnits)。`fle_data_install` と `fle_init` は値を消さない (§2-1)。
-- 残る候補: `fle_textwin_install` (`.text` 内データ窓の敷設。`.data` 外のはずだが未確認)・boot 本体の unit 1〜209 のいずれか (`_InitLib`・InitUnits の中で `.data` の一部を 0 にする処理)。
-- 絞り込みには unit 単位の測定 (`_fle_run` で 1 unit ずつ実行し、各後に slot を読む) が要る。本 run では未実施 (時間不足)。
+`pe_disasm.py 0x412960 120` (GetMem 呼出し元 `0x412a4f` の直前まで)。直接の 0 書込み `mov qword ptr [rip+0x11d82bf], 0` (VA `0x4129be`) はあるが、書込み先は `0x15eac88` で対象外。対象 slot (`0x15e1c78`) を指す RIP 相対の書込みは、この区間には見つからなかった。書込みは間接 (ポインタ・計算アドレス経由) と見られる。
+
+## 3. 解釈 (今回の範囲)
+
+- boot 停止点の 0 は、unit 209 の error 経路 (`QuickFontCache DLL not found!` → GetMem 失敗 → `Error` → `exit`) の途中で起きる。正常な起動の途中ではない。
+- `QuickFontCache` 系の既存の追跡: #154 (lift)・#2220 (FT 解決経路の到達性)。本 run では DLL 読込みの経路は確認していない。
 
 ## 4. 変更内容 (本 PR)
 
 | ファイル | 変更 |
 |---|---|
-| `tools/flelift/boot/fle_boot.mjs` | boot 後に undo 系の probe を読み、`FLEBOOT_UNDO {...}` を出す。`boot.undo_probe` として summary JSON にも入る。既存の出力・判定 (`FLEBOOT_RESULT`・`FLEBOOT_IPP_CHECK`) は変えない |
-| `tools/flelift/boot/undo_probe_check.mjs` | 正の対照 (§2-1) の再現スクリプト |
-| `tools/flelift/boot/results/boot_summary_fle6.json`・`boot_summary_fle6_negctl.json` | 上の測定 (3064340a) の summary。`undo_probe` を含む |
+| `tools/flelift/boot/fle_boot.c` | `py_watch` (監視 slot の変化点の記録・site 0〜8) と、`fle_py_ev_*` の export。`imp_ExitProcess`・`imp_MessageBoxW`・`fle_ov_getmem`・`fle_ov_freemem`・`fle_ov_initunits`・`imp_memset` に検査点を追加。`imp_ExitProcess` は stderr に戻り番地の連鎖を出す |
+| `tools/flelift/boot/fle_boot.mjs` | 変化点を `FLEBOOT_PY123` 行と summary の `boot.py_events` に出す |
+| `tools/flelift/boot/build.sh` | `_fle_py_ev_ptr`・`_fle_py_ev_n`・`_fle_py_ev_over` を export に追加 |
+| `tools/flelift/boot/results/boot_summary_py123.json`・`boot_summary_py123_negctl.json` | 測定 (`b1b95f97`) の summary |
 | `tools/python/REPORT_PY123.md` | 本ファイル |
-| `docs/DOC_MAP.md` | 本ファイルの索引行 |
 
-- KPI (起動・GUI に関わる変更のため。`docs/WORKFLOW.md` §7): FLEngine 起動の dispatch 数 (units_run) は **前 209 / 後 209** (`tools/flelift/boot/REPORT.md` §2・§9 の値と一致)。最初のウィンドウ: **無し** (boot は `MessageBoxA` → `exit(0)` で停止し、ウィンドウに届かない)。boot の挙動は probe の追加で変わらない。
+- KPI (起動に関わる変更のため。`docs/WORKFLOW.md` §7): FLEngine 起動の dispatch 数 (units_run) は **前 209 / 後 209** (`tools/flelift/boot/REPORT.md` §2・§9 と一致)。最初のウィンドウ: **無し** (unit 209 の MessageBox → `exit(0)`)。boot の挙動は計測の追加で変わらない (GetMem/FreeMem は shim 有 2314 / 1199・ネガコン 1891 / 776 で、前 run の `results/boot_summary_fle6*.json` と一致)。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| boot 中に `0x15e1c78`・`0x15e4790` が 0 に戻る箇所 (§3) | 起動直後の undo 値・安全判定の実体が測れない。lift 由来の silent miscompile か、実機でも 0 かが不明 | #3028 に残す (次の run で unit 単位の測定から絞り込む。子 issue は起票しない) |
-| 安全判定述語の関数 VA (`[obj+0x98]`・`[obj+0x88]`) | `restoreUndoLevel` の成功・-2 の分岐が決まらない | #3028 (上と同じ原因が解消されれば測れる) |
-| `[0x16b82e0]` の中身 (`None` か) | 成功時戻り値の判定ができない | #3028 (boot が Python 初期化まで届いていない可能性が高い。未確認) |
-| boot が unit 209 の `MessageBoxA` → `exit(0)` で止まる | 起動直後の状態に届かない | 既存の追跡: `tools/flelift/boot/REPORT.md` §9 (#2700 系) |
-| shim 有の IPP 判定 NG (`ok:false`) | 本測定の shim 有の判定が通らない (変更前から) | #2702 (`tools/flelift/boot/REPORT.md` §9 の記録どおり) |
+| unit 209 の GetMem 呼出し直前までの区間で、slot `0x15e1c78`・`0x15e4790` を 0 にする命令 (間接書込み) の特定 | 0 化の原因が lift 由来の silent miscompile か、unit 209 の経路で実機でも起きるかが不明 | #3028 に残す (次 run。`fle_chk` (FLE_CHK 変種) の住所検査か、unit 209 の逆アセンブルで書込み命令を探す) |
+| unit 209 の `QuickFontCache DLL not found!` 経路 (DLL 読込みの失敗) | この経路を抜けない限り、起動直後の状態 (受入条件 1〜3) を測れない | #3028 に残す。関連: #154・#2220 (QuickFontCache 系)。DLL 読込みの経路は未確認 |
+| 安全判定述語の VA・singleton の中身 | `restoreUndoLevel` の分岐・戻り値の判定ができない | #3028 (上の 2 件が解消した後に測る) |
+| boot が unit 209 で止まる | 起動直後の状態に届かない | 既存の追跡: `tools/flelift/boot/REPORT.md` §9 (#2700 系) |
+| shim 有の IPP 判定 NG (`ok:false`) | 本測定の shim 有の判定が通らない (変更前から) | #2702 |
 
 ## 6. 検証範囲
 
-- 範囲内: boot 停止時点 (unit 209) の undo 系 3 slot の値 (shim 有・無 の 2 条件、各 1 回)。敷設直後・init 直後の値 (正の対照)。PE の静的値と xref・writer 候補。
-- 範囲外: 起動直後 (boot 完了後・ウィンドウ表示後) の値。安全判定の実体。singleton の中身。boot 中のどの処理が 0 にするか。主張は boot 停止点に限る。
+- 範囲内: boot の unit 単位の変化点 (shim 有・ネガコンの 2 条件、各 1 回・測定 commit `b1b95f97`)。開始時の値 (site 0)・unit 209 の GetMem 呼出し直前の値 (site 8)・停止点 (site 4)。
+- 範囲外: 起動直後 (QuickFontCache 経路を抜けた後)。安全判定の実体。singleton の中身。0 化を行う命令の特定。
 - 未実施: `provider/build.sh` (emcc)・`node tests/general_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (実装が無いため走らせていない)。
 
 ## 7. 再現
 
 ```sh
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64
-bash tools/flelift/boot/fle6_measure.sh              # 約 2 分 14 秒 (§2)
-FLE_BOOT_VARIANT=plain node tools/flelift/boot/undo_probe_check.mjs "$PWD/tools/flelift/work/boot/fleboot_plain.cjs"   # §2-1
-python3 tools/python/analysis/flapi/pe_xref.py 15e1c78            # §1 (FL_WIN64_DIR 必須)
-python3 tools/python/analysis/flapi/pe_slot_writers.py 15e1c78   # §1
+FLE_BOOT_TAG=py123 FLE_BOOT_RUNS="shim negctl" bash tools/flelift/boot/fle6_measure.sh   # 約 2 分 12 秒 (§2-2)
+python3 tools/python/analysis/flapi/pe_disasm.py 0x412960 120                            # §2-3
 ```
 
 - 生成物は `tools/flelift/work/boot/` (gitignore)。結果 JSON は `tools/flelift/boot/results/` にコミット済み。
+- 測定 (`b1b95f97`): real 2 分 12.2 秒 (lift 49 s・clang 49 s・boot shim 14 s・negctl 14 s)。load average (開始) `1.07 1.02 0.61`。並列 1 本。
