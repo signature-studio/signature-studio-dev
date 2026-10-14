@@ -20,7 +20,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 OTT = os.path.dirname(HERE)
 WORK = os.path.join(OTT, 'work')
-NODE = os.environ.get('NODE', '/opt/emsdk/node/24.19.0_64bit/bin/node')
+NODE = os.environ.get('NODE', 'node')
 MOD = os.path.join(WORK, 'crtlift', 'ottl_crt.cjs')
 SCEN_FILES = [os.path.join(WORK, 'crtlift', 'scen_crt.json'),
               os.path.join(WORK, 'entrylift', 'scen.json')]
