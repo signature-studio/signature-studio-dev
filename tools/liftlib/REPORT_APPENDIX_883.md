@@ -68,7 +68,7 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 
 ## #1269 (HB-H28) BLK 配置の実測 (HEAD b1d2fe82 / 測定 commit 604e900f, コード変更なし)
 
-素材 (展開実測): `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/` (OTT_vst2_win64.dll)、`work-liftlib`・`work-m6-ott`・`work-icall` → 各 `tools/*/work/`。`fl-win64`・`toolchain-*` は本 run では不使用。
+素材 (展開実測): `analysis-ott-binaries` → `$ANALYSIS_DIR/plugins/ott/binaries/` (OTT_vst2_win64.dll)、`work-liftlib`・`work-m6-ott`・`work-icall` → 各 `tools/*/work/`。`fl-win64`・`toolchain-*` は本 run では不使用。
 
 | 項目 | 結果 |
 |---|---|
@@ -91,7 +91,7 @@ IR 上の読み (下記) は `work/ott_getparam/` の生成物を参照したも
 ### 残作業 (#1269 の受入条件のうち未達)
 
 1. (a) の実装と `leafspec` の wasm_trap 0 の確認 (match の判定は #1270 の受入条件)。
-2. `icall_e2e.sh` の前後測定。`ANALYSIS_DIR` は既定値が環境依存のため、環境変数で指定する (本 run では `$HOME/analysis` を指定)。また `tools/ott/work/` (`ott_e2e.sh` の成果物) が前提で、本 run では未展開。
+2. `icall_e2e.sh` の前後測定。`ANALYSIS_DIR` は既定値が環境依存のため、環境変数で指定する (本 run では `$ANALYSIS_DIR` を指定)。また `tools/ott/work/` (`ott_e2e.sh` の成果物) が前提で、本 run では未展開。
 3. ネガコン (修正を外すと wasm_trap 200 に戻る) の実測。
 
 ## 再現
@@ -103,7 +103,7 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 
 ## #883 run (測定 commit 9f336206, コード変更なし): shift 併用の実測
 
-素材: `analysis-ott-binaries` / `work-liftlib` / `work-m6-ott` を展開 (`$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
+素材: `analysis-ott-binaries` / `work-liftlib` / `work-m6-ott` を展開 (`$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
 
 | 設定 (leafspec `--n 200`) | rc | 時間 | match / mismatch / wasm_trap |
 |---|---|---|---|
@@ -128,7 +128,7 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 
 ## #1583 (HB-H33) run: blk_global 単独の実測 (測定 commit 5f0a8ce9, origin/main 起点 worktree)
 
-素材: `fl-win64` 以外の要求素材を展開 (`analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/`、`work-liftlib`・`work-icall`・`work-m6-ott` → 各 `tools/*/work/`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
+素材: `fl-win64` 以外の要求素材を展開 (`analysis-ott-binaries` → `$ANALYSIS_DIR/plugins/ott/binaries/`、`work-liftlib`・`work-icall`・`work-m6-ott` → 各 `tools/*/work/`)。`gen_ott_getparam_F.sh` → F.txt `0x18011e5a0-0x18011e76c` (460 bytes)。
 
 | 設定 (leafspec `--n 200`) | rc | 時間 | match / mismatch / wasm_trap |
 |---|---|---|---|
@@ -154,7 +154,7 @@ cd tools/liftlib && python3 -m liftlib leafspec targets/ott_getparam.json --n 20
 | 項目 | 値 |
 |---|---|
 | 測定 commit | `26f90ada` (origin/main・測定時の HEAD)。配線の最後のコード変更は `f8bd2ea0` (PR #2162) |
-| 素材 | `analysis-ott-binaries` → `$HOME/analysis/plugins/ott/binaries/`、`work-m6-ott`・`work-liftlib`・`work-icall` → 各 `tools/*/work/`。`OTT_DLL=$HOME/analysis/plugins/ott/binaries/OTT_vst2_win64.dll bash tools/liftlib/gen_ott_getparam_F.sh` で F.txt (`0x18011e5a0-0x18011e76c`、460 bytes) |
+| 素材 | `analysis-ott-binaries` → `$ANALYSIS_DIR/plugins/ott/binaries/`、`work-m6-ott`・`work-liftlib`・`work-icall` → 各 `tools/*/work/`。`OTT_DLL=$ANALYSIS_DIR/plugins/ott/binaries/OTT_vst2_win64.dll bash tools/liftlib/gen_ott_getparam_F.sh` で F.txt (`0x18011e5a0-0x18011e76c`、460 bytes) |
 | toolchain | [EMSDK] (`emsdk_env.sh` を source)・[RETDEC] (runner 既存)。`toolchain-*` の tar は展開していない |
 | 負荷 | 測定時の load average 0.2〜0.8 (4 コア) |
 
@@ -179,7 +179,7 @@ route 側の `ir_icall_restore.py` が出す `blk+0xb0` の load は、この le
 
 ネガコンで差し替えた 5 ファイルは `f8bd2ea0` 以降に変更が無いことを `git log f8bd2ea0..HEAD -- <5 files>` (0 件) で確認してから行った。`base.py`・`simd/gen.py` の後続差分は配線と無関係で、両方の測定で同じに残した。
 
-### icall_e2e (`ANALYSIS_DIR=$HOME/analysis PLUGINS_DIR=$HOME/analysis/plugins bash tools/icall/icall_e2e.sh`)
+### icall_e2e (`ANALYSIS_DIR=$ANALYSIS_DIR PLUGINS_DIR=$ANALYSIS_DIR/plugins bash tools/icall/icall_e2e.sh`)
 
 | 段 | 結果 |
 |---|---|
