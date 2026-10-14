@@ -268,3 +268,12 @@
   - 緊急 merge の Admin bypass の設定の有無は変わりうるため、本書には書かない (確認の手順は `docs/WORKFLOW.md` §2)。PM が設定を確かめるまで bypass は使えないものとして書く。
   - ロールバックは `enforcement` を `disabled` にする (`docs/WORKFLOW.md` §2)。
   - 測定値は `tools/pm/REPORT_2648.md` が正本。
+
+## D28 — ia32 の x87 は f80 を持たず、スタック要素を double で lower する (f80→f64)
+
+- **状態**: 採用 (2026-10-14, issue #1099 [PLG-G2-9]。親 #1098 の x87 unsup の扱い)
+- **決定**: x64c の ia32 経路の x87 subset は、ST(i) とメモリ経由の値を `double` で持つ (runtime は `tools/ott/rt/ott_x87.h`)。 f80 は `fld`/`fstp` の m80 変換 (10 B ↔ double) でだけ扱う。 subset 外の x87 命令は従来どおり `ott_unsup`。 x64 の生成 C は変えない。
+- **比較した方式**: (a) soft-float80 を実装して f80 を持つ、(b) RetDec 路線 (`tools/plugins/p0c/REPORT.md`) で f80 を扱う。 (c) 採用: f80→f64 (f80 を持たない)。
+- **理由**: `tools/plugins/p0c/REPORT.md` §3 の実測で、f32 入出力系は差分が無く、f64 出力の差分は 1 ulp 級に限られ、整数の x87 (fild/fistp) は i64 保持で正確だった。 soft-float80 は不要と判断。 subset の差分試験 (native と lowered の比較) の結果は `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1099.md` §1・§3 が正本。
+- **制限**: (1) 精度制御 PC は模型化しない (f64 固定)。 (2) `fst m32` の丸めは C の cast (nearest) 固定。 (3) `fild m64` で |v|>2^53 は丸まる。 (4) スタック over/underflow と x87 例外は模型化しない (`fwait` は no-op、FSW の例外フラグ・C1 は持たない)。 (5) RC (FCW bits 10-11) は `fist`/`fistp` の丸めにだけ適用する (算術と `fst m32` には効かない)。
+- **影響**: ia32 の x87 unsup は減った (残りは超越関数・`frndint`・`fscale`・`fprem` 等。付録 §8・§9)。 f80→f64 の精度差は `docs/DEFECTS.md` の新規類型の候補 (行案は付録 §6)。 `docs/DEFECTS.md` は編集しない (PM 判断 R8。精度差は本 ADR の帰結として付録 §6 に記録)。
