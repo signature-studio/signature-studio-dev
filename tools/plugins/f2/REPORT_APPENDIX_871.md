@@ -203,8 +203,8 @@ leaf_diff は IR leaf かつ機械語に間接 call 無しの 23 関数のみを
 
 ## 10.14 (#871 run) HEAD `ec58d54b` (origin/main) での再測定と新規不一致 2 件の切り分け
 
-- 測定 commit: `ec58d54b` (origin/main)。前節 `ae802a4c` からのコード差分は `tools/liftdiff/ldlib/session.py` の LD-23 fvm 追加 (`_fvm_cases`) と refine 条件 1 行のみ。`git diff ae802a4c ec58d54b -- tools/liftdiff/ldlib tools/plugins/f2/mk_targets.py tools/plugins/f2/leaf_diff.sh` の範囲で `callee_divergence` 判定 (`classify.py`) と `compare.py` は未変更。
-- 素材: `fl-win64` (`extracted/*_PE.bin` 313 本を `$RUNNER_TEMP/fl-win64` に展開)。`toolchain-retdec`・`toolchain-emsdk` は `/opt/retdec`・`/opt/emsdk` で実在を確認。
+- 測定 commit: `ec58d54b` (origin/main)。鮮度: `3b38f81d`→`ae802a4c` で LD-23 fvm (`0596772f`) と refine 1 行 (`ae802a4c`) が入った。`ae802a4c`→`ec58d54b` の liftdiff コード差分は 0 (`git diff ae802a4c ec58d54b -- tools/liftdiff/ldlib` が空、鮮度 OK)。`callee_divergence` 判定 (`classify.py`) と `compare.py` も未変更。
+- 素材: `fl-win64` (`extracted/*_PE.bin` 313 本を `$RUNNER_TEMP/fl-win64` に展開)。`toolchain-retdec`・`toolchain-emsdk` は `[RETDEC]`・`[EMSDK]` で実在を確認。
 - `f2_step1.sh`: rc 0、`DIFF count = 0`、IR leaf 55 / うち機械語でも間接 call 無し 23。
 - `leaf_diff.sh`: rc 0、144 s、load 1.07。**最終判定 一致 15 / 不一致 8 / 実行不能 0**。集合一致 EQ。
 
