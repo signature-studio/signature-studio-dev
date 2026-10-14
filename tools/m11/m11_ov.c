@@ -463,11 +463,12 @@ u64 function_40fb40(u64 self, u64 inst) {
     memset((void*)(uintptr_t)inst, 0, (size_t)(long long)(int)D(self - 0x80));
     Q(inst) = self;
 #if M11_INSTR_40F960
+    int chain_n = 0;
     fprintf(stderr, "[m11][40fb40] self=0x%llx inst=0x%llx size=%d\n", (unsigned long long)self, (unsigned long long)inst, (int)D(self - 0x80));
 #endif
     do {
 #if M11_INSTR_40F960
-        { static int chain_n = 0; if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 cls=0x%llx\n", (unsigned long long)cls); abort(); } }
+        if (++chain_n > 100000) { fprintf(stderr, "[m11][40fb40] chain>100000 self=0x%llx cls=0x%llx\n", (unsigned long long)self, (unsigned long long)cls); abort(); }
 #endif
         u64 it = Q(cls - 0xc0);
         if (it) {
@@ -484,6 +485,9 @@ u64 function_40fb40(u64 self, u64 inst) {
         if (cls) cls = Q(cls);
     } while (cls);
     if (flag) ov_initinst_nested(self, inst);
+#if M11_INSTR_40F960
+    fprintf(stderr, "[m11][40fb40] chain_len=%d self=0x%llx\n", chain_n, (unsigned long long)self);
+#endif
     return inst;
 }
 
