@@ -1,4 +1,4 @@
-# tools/python REPORT: PY-120 ui 操作・キー・ジョグ・編集 27 関数の PE 意味論 (#2981, 親 #941)
+# tools/python REPORT: PY-120 ui の操作・キー・ジョグ・編集 27 関数の PE 意味論 (#2981, 親 #2831)
 
 > 正本: `tools/python/REPORT_PY87.md` (PE 確定の書式・ネガティブコントロール)、`tools/python/REPORT_PY27.md` (保留 150 件の出自)。本付録は PY-120 の実測のみ。
 > 前段 `REPORT_PY95.md` は main に存在しない (issue 本文の記述は誤り)。PE から直接確認した。
@@ -9,13 +9,13 @@
 - PE から確定した事実は **呼出し契約の一部** (引数書式・既定値・ディスパッチの op code・経路)。全 27 関数の表は本文 §確定 (保留) の表。
 - issue 本文の仮説は 2 点とも誤り (PE で訂正):
   - `0xd81740` は関数ではない。27 関数のどれも `call 0xd81740` を含まない。`0xd81740` は `PyCallSynchronizedResult` の名前を持つ静的な型記述子 (先頭 qword はその自己参照 0xd81748) で、各 handler が `mov rdx, [rip+X]` (X は 0xd81740 を指す) で読んで `0x415610` (フィールドの既定値設定と見られる) と `0x415c30` (後始末と見られる) に渡す。
-  - `0x15e1e58` は状態ではない。VARARGS の 14 関数が `call [0x15e1e58]` で呼ぶ **PyArg_ParseTuple 相当の CPython API スロット** (戻り値 ≤ 0 で失敗: `movsxd rax,eax; test rax,rax; jle`)。`0x15e4280` は int 変換スロット (26 関数の戻り)。
+  - `0x15e1e58` は状態ではない。VARARGS の 14 関数は `mov rax, qword ptr [rip+X]` (X の解決先は 0x15e1e58。例: 0xd6a99d) で値を読み、`call qword ptr [rax]` で呼ぶ。0x15e1e58 は **PyArg_ParseTuple 相当の CPython API スロット** (戻り値 ≤ 0 で失敗: `movsxd rax,eax; test rax,rax; jle`)。`0x15e4280` も同じ形 (26 関数、`mov rax, qword ptr [rip+X]` → `call qword ptr [rax]`) で、int 変換スロット。
 - 共通の作用経路は `0xd84680(engine, &out, op, arg, mode, 0xf)` → `0xfdd2c0(op, arg, mode, 0xf, 0)` (約 5 KB の UI 側ディスパッチャ)。`scrollWindow` だけは `0xd843d0` を直接呼ぶ。作用の中身 (`0xfdd2c0` の op 別の分岐先) は未追跡で、これが保留の本体。
 
 ## 手段
 
 - ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>` (entry VA・fn VA・flags・先頭 40 命令)。`left`・`right` は同名の文字列が別テーブルにもあり、先頭に別 entry (0x1516038・0x1516048) が出るが無関係。ui の entry は本文表の値。
-- 呼出し契約の抽出: 新規 `analysis/flapi/pe_ui_ops_probe.py` (本 PR)。`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_ops_probe.py jog:d6a960 ...` で、関数先頭から ret までの PyArg 書式 (`lea rdx` の参照先文字列)・既定値 (`mov dword [rbp+0x6c], 1`)・型記述子参照・`call 0xd84680` 直前の r8/r9 を出す。
+- 呼出し契約の抽出: 新規 `analysis/flapi/pe_ui_ops_probe.py` (本 PR)。関数の範囲は `.pdata` の終端で決め、最初の ret では止めない (`.pdata` に無い fn はエラー)。`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_ui_ops_probe.py jog:d6a960 ...` で、関数先頭から終端までの PyArg 書式 (`lea rdx` の参照先文字列)・既定値 (`mov dword [rbp+0x6c], 1`)・型記述子参照・`call 0xd84680` 直前の r8/r9 を出す。
 - 素材: `[WIN64]` の素材 tar (fl-win64) から `block24429/24430/25159/24618_DATA.bin` を追加展開 (`fetch_inputs.sh` 用)。`toolchain-emsdk` は `[EMSDK]` (6.0.12 pin) を使用。
 - 公開 stub の戻り型: `analysis/flapi/flapi_table.json` の `modules.ui` (`sig.returns`)。PE の結論とは別に併記する。
 
@@ -61,7 +61,7 @@
 
 PE から確定した契約 (保留の中身。実装には使わない):
 
-- 全 27 関数で `0xd6fd10(self)` (CPython API スロット経由) → `*(rax)` を engine handle とする。
+- 全 27 関数が `call 0xd6fd10` を 1 回ずつ直接呼ぶ (例: 0xd6a986。`.pdata` 範囲の検算で 27 件)。`0xd6fd10` は `sub rsp,0x28; mov rax,[rip+X]; call qword ptr [rax]; add rsp,0x28; ret` だけの薄いラッパで、X の解決先は 0x15e05b8。戻り rax の `*(rax)` (例: 0xd6a98b `mov rbx, qword ptr [rax]`) を engine handle とする。
 - 失敗経路: `0xd84680` の `out.status` が 0 以外 → `0xd82c20(status)` (例外経路)。`0x11d1430` は `[vtbl+0x88]` の前提判定 (偽で status = -2)。`0xfdd2c0` は `mode` の bit 1 (`test al,2`) が 0 なら即 -1。`mode` は `0xfdd270` の戻り (vtbl+0x80 の結果を表で引く)。
 - 既定値: `up`・`down`・`left`・`right` は `mov dword [rbp+0x6c], 1` の後に `|i` で解析 (省略時 1)。`scrollWindow` の第 3 引数は `mov dword [rbp+0xa4], 0` (省略時 0)。stub の `directionFlag default 0` と一致。
 
@@ -70,30 +70,34 @@ PE から確定した契約 (保留の中身。実装には使わない):
 - 27 関数の作用先: `0xfdd2c0` の op 別の分岐。
 - 戻り値: `0x415610` の既定値規則 (out+8)、`0x15e4280` の型 (int と bool の区別)、`0xc38bc0` の同定。
 - `scrollWindow` の `0xd843d0` と callback 候補 `0xd6d290`。
-- `0xd6fd10` が呼ぶ CPython API スロットの同定 (engine handle の取り方)。
+- `0xd6fd10` の先 (スロット 0x15e05b8 の実体) の同定 (engine handle の取り方)。
 
 ## 検証
 
-測定 commit: `2310cdcb` (`analysis/flapi/pe_ui_ops_probe.py` 追加)。検証は HEAD `13b6ae46` (REPORT・DOC_MAP のみ追加) の作業ツリー clean 状態で再実行した。mock / C は本 PR で一切変えていないため、件数・差分は PY-27 基準の値と同じ。
+- 測定 commit (解析補助を変えた最後の commit): `97c60b6c` (`pe_ui_ops_probe.py` の関数範囲を `.pdata` 終端にし、r8/r9 の判定を書き直した)。`97c60b6c` の作業ツリー clean 状態で 27 関数を再実行した。
+  - 改修前の出力との比較: 関数ごとの本体行は同一。header に `ret=1` が加わった (27 関数すべて ret 1 個)。`py_compile` rc 0。
+  - 独立検算 (`.pdata` 範囲の逆アセンブル、リポジトリ外の一時スクリプト): 27 関数すべて ret 1 個、`call 0xd6fd10` 1 個、`call 0xd84680` 26 個、`call 0xd843d0` 1 個 (scrollWindow のみ)。`mov rax,[rip+X]` の解決先は 0x15e1e58 (14 関数) と 0x15e4280 (26 関数)。
+- provider・host・tests: 測定 commit `13b6ae46` の値 (下表)。以降 `git diff 13b6ae46 HEAD -- provider host tests` は空。`provider/build.sh` は 97c60b6c で再実行していない (emcc と `[EMSDK]` の展開先が本 fix run に無く、`toolchain-emsdk` は `$ARTIFACTS_DIR` に無いため)。provider・host・tests は 97c60b6c の時点で変わっていない。
 
-環境: runner 4 core、load average は開始時 0.29 (`uptime`、20:52)、検証時 0.10 (21:04)。`FL_WIN64_DIR` は `[WIN64]` の展開先 (`block00031_PE.bin` と DATA 4 本を展開)。emsdk は `[EMSDK]` (6.0.12)。
+環境 (`13b6ae46` の測定): runner 4 core、load average は開始時 0.29 (`uptime`、20:52)、検証時 0.10 (21:04)。`FL_WIN64_DIR` は `[WIN64]` の展開先 (`block00031_PE.bin` と DATA 4 本を展開)。emsdk は `[EMSDK]` (6.0.12)。
+環境 (`97c60b6c` の probe 再実行): `FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`extracted/block00031_PE.bin` と DATA 4 本を `tar --zstd -xf` の `--wildcards` で展開)。
 
 前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 31 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒)・`bash provider/build.sh` (rc 0、1.0 秒、ハンドラ 83)。
 
-| コマンド | 結果 | wall |
+| コマンド (測定 commit 13b6ae46) | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` (HEAD で再実行) | rc 0・ハンドラ 83 | 0.72 秒 |
+| `bash provider/build.sh` | rc 0・ハンドラ 83 | 0.72 秒 |
 | `node tests/provider_check.mjs` | PASS (435 / 実装 83 / 未実装 352 / MCP 静的 60)。PY-120 の増減は 0 のため期待値は据え置き | 0.28 秒 |
 | `node tests/ui_diff.mjs` | calls 17、diffs 0、範囲外既知差分 3、PASS | 0.04 秒 |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.25 秒 |
-| `py_compile analysis/flapi/pe_ui_ops_probe.py` | rc 0 | — |
+| `py_compile analysis/flapi/pe_ui_ops_probe.py` (97c60b6c) | rc 0 | — |
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `windows` 既定値 (29 行) の `0: true` を `0: false` に変えると、`node tests/ui_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 17・diffs 0・PASS (rc 0)。
 
-コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
+コード差分 (測定 commit `97c60b6c` から HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 2310cdcb HEAD -- tools/python ':!*.md'
+$ git diff 97c60b6c HEAD -- tools/python ':!*.md'
 (空)
 ```
 
@@ -101,10 +105,10 @@ $ git diff 2310cdcb HEAD -- tools/python ':!*.md'
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0xfdd2c0` の op 別作用 (UI のどの状態を変えるか) | 27 関数すべて保留 (実装不可) | 親 #2981 が決める (子 issue 案 A) |
-| `0x415610` の out+8 既定値規則・`0xc38bc0` の同定・`0x15e4280` の int/bool 判定 | 戻り値の値と型 | 親 #2981 が決める (子 issue 案 B) |
-| `selectWindow` の引数型 (stub bool / PE `i`) | 引数契約の正 | 親 #2981 が決める (子 issue 案 B) |
-| `scrollWindow` の `0xd843d0` 経路と callback `0xd6d290` | scrollWindow の作用 | 親 #2981 が決める (子 issue 案 A) |
-| `mode` (`0xfdd270` の戻り) の実機値 | 作用の成否 (bit 1) | 親 #2981 が決める (子 issue 案 A) |
+| `0xfdd2c0` の op 別作用 (UI のどの状態を変えるか) | 27 関数すべて保留 (実装不可) | #3035 (`[PY-140]`) |
+| `mode` (`0xfdd270` の戻り) の実機値 | 作用の成否 (bit 1) | #3035 (`[PY-140]`) |
+| `scrollWindow` の `0xd843d0` 経路と callback `0xd6d290` | scrollWindow の作用 | #3035 (`[PY-140]`) |
+| `0x415610` の out+8 既定値規則・`0xc38bc0` の同定・`0x15e4280` の int/bool 判定 | 戻り値の値と型 | #3034 (`[PY-141]`) |
+| `selectWindow` の引数型 (stub bool / PE `i`) | 引数契約の正 | #3034 (`[PY-141]`) |
 
-子 issue は本 PR では起票していない (親が起票先と本数を決める)。案 A = 「ui 操作の作用先 (0xfdd2c0 の op 表)」、案 B = 「ui 操作の戻り値と型 (0x415610・0x15e4280・0xc38bc0)」。
+子 issue は起票済み: #3035 `[PY-140]` (案 A: 作用先の確定と確定関数の mock/C 実装)、#3034 `[PY-141]` (案 B: 戻り値の値と型の確定)。親 #2981 の本文は受入 1・3・4 に縮めた。
