@@ -138,6 +138,9 @@ static long long hs_dispatcher(uint64_t host, uint64_t tag, uint32_t id, uint64_
     case 0x1d: case 0x32: case 0x2e: case 0x0e: case 0x0a:
     case 0x3d: case 0x25: case 0x12:
         return (long long)(uintptr_t)g_hs_obj;          /* 29,50,46,14,10,61,37,18 */
+    /* 格納元が 0x41d110 の戻り値 + 0x2a8 (非 NULL ポインタ) と機械語で確定した ID (#2886 REPORT_DISPATCHER_APPENDIX §2) */
+    case 0x07: case 0x1c: case 0x4e:                    /* 7,28,78 */
+        return (long long)(uintptr_t)g_hs_obj;
     /* ignore/test クラス + 未知 ID: 0 (fail-soft, 記録済み)
      * 2,33(0x3b),3,36(0x24),91(0x5b),23(0x17),48(0x30),30(0x1e),40(0x28),38(0x26),
      * 97(0x61),59(0x67),103(0x67?)、17(0x11),27(0x1b),8,13(0x0d),20(0x14),34(0x22),
