@@ -190,7 +190,7 @@ index 39480f0a..5a9c1929 100644
 
 | build | ok / oob / abort / halt0 | unit 190 |
 |---|---|---|
-| OFF (`M11_OV_CLASSCREATE=0`) | 870 / 16 / 0 / 7 | ok 以外 (oob) |
+| OFF (`M11_OV_CLASSCREATE=0`) | 870 / 16 / 0 / 7 | ok |
 | ON (`M11_OV_CLASSCREATE=1`) | 869 / 15 / 2 / 7 | oob |
 | ON + `M11_NOVCALL=1` (410360 の vcall 経路を外す) | 869 / 15 / 2 / 6 | oob |
 
