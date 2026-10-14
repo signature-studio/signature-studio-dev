@@ -85,7 +85,7 @@
 
 測定 commit: `bc6b8a32` (コードを変えた最後の commit。基点 `26f90ada`)。素材 `work-m11` を展開 (snapshot IR)。`bash tools/m11/shimx_link/build.sh --trace --soft` は `signature mismatch=1` (#1628 残件) で rc=0。
 
-**適用範囲 (差し戻し対応 2026-10-14、B2 (b))**: 本節の数値は `work-m11` (snapshot IR) 上の**相対比較**に限る。`docs/WORKFLOW.md` §11 は `work-m11` を「survey の基準には使わない」と定めるため、IR の正 (`bash tools/m11/m11_e2e.sh --full` の出力) での基点と head の survey は本 PR では取り直していない。取り直しは #2877 へ移した。よって 7-1 の「init unit の呼出 0 件」は受入条件 1 の根拠にしない。
+**適用範囲 (差し戻し対応 2026-10-14、B2 (b))**: 本節の数値は `work-m11` (snapshot IR) 上の**相対比較**に限る。`docs/WORKFLOW.md` §11 は `work-m11` を「survey の基準には使わない」と定めるため、IR の正 (`bash tools/m11/m11_e2e.sh --full` の出力) での基点と head の survey は本 PR では取り直していない。取り直しは #942 へ移した (§7-3)。よって 7-1 の「init unit の呼出 0 件」は受入条件 1 の根拠にしない。
 - 基点 `26f90ada` 以降、main (`665a704d`。差し戻し時の main は `b2b052ce`) では `tools/m11/ldfix`・`tools/m11/trap_triage` 等が変わっている (対象 dir で 13 files)。merge 後の挙動が本節の数値と一致する保証は無い。
 
 所要の注 (m3): 基点・測定の所要 (2 分 43 秒) は測定時の load average・並列数を採取していないため、比較の根拠にならない。差し戻し後のレビュー run (head `38f66a44`) で同じ survey は 5 分 23 秒 (load average 未記録) で、差の原因は未確定。WORKFLOW §5 の形 (所要 + load average + 並列数) の記録は次回の測定から行う。
@@ -139,5 +139,5 @@
 | IR 宣言 0 件の原因 (§5-2・§6) | IR 上の宣言だけでは呼出を判定できない | 既存 #942 へのコメントに併記 (trace 判定の前提) |
 | IFileDialog (`CoCreateInstance`) の明示 fail-fast (受入 2 の残り) | IFileDialog 経路は黙って失敗する | 新規子 #2916 (SHX-T33、`親: #1179`) |
 | gui の node + mock 検査 (受入 3) | 検査が無い | 新規子 #2917 (SHX-T34、`親: #1179`) |
-| IR の正 (`m11_e2e.sh --full`) での基点・head の survey 取り直し (適用範囲の節) | 本節の数値は snapshot 上の相対比較に限る | 既存 #2877 へのコメント (HEAD で 942 survey を再測定する受入に、基点の IR 正での取り直しを加える) |
-| 文字列長で survey の結果が変わる原因 (7-2 の行案) | shimx 変更ごとに survey の再測定が要る | 既存 #2877 へのコメント (再測定の受入に 7-2 の 5 変種のうち長いメッセージの版を加える。原因の特定は未着手) |
+| IR の正 (`m11_e2e.sh --full`) での基点・head の survey 取り直し (適用範囲の節) | 本節の数値は snapshot 上の相対比較に限る | 既存 #942 へのコメント (#2877 は 2026-10-14 に CLOSED のため付け替え。#942 は本文に survey base/fix の再測定を含むが、IR 正 (`m11_e2e.sh --full`) の指定は無いためコメントで依頼) |
+| 文字列長で survey の結果が変わる原因 (7-2 の行案) | shimx 変更ごとに survey の再測定が要る | 既存 #942 へのコメント (survey の検出力に関わるため同じ issue へ。#2877 は CLOSED。再測定の受入に 7-2 の 5 変種のうち長いメッセージの版を加える。原因の特定は未着手) |
