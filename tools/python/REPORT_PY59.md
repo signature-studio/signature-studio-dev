@@ -5,6 +5,7 @@
 
 ## 結論
 
+- **5 回目 run (§9・#2471): 受入条件 1〜3 を達成。** §8 の「登録 ID」は VMT のインスタンスサイズ (`[H-0x80]`) で、型はクラス名 (VMT の `[H-0x88]`) で同定した。`+0x79c` の書込幅の不一致は、別構造体 (TPRBaseToolForm と TPlugListForm) の同オフセットと確定した。詳細は §9。以下は 1〜4 回目の記録。
 - 受入条件 1 (3 箇所の対象構造体の同定) は**部分達成**。`0xec7bb8`・`0xec6098` は、書込み先 `this` を持つ関数 (`0xec7840`・`0xec53b0`) まで特定した。`0xdd2002` は `0xdd1fa0` 関数内で `this` (`[rbp+0x60]`) を引数 `rcx` で初期化するが、`0xdd1fde` で `0x410320` の戻り値に再代入される (呼び出し元 14 件はすべて `dl!=0` で、この経路に入る)。型は未同定。
 - 受入条件 2 (幅不一致の扱い) は**未達**。同一構造体の同一フィールドか、別構造体の同オフセットかは、型名が決まらないと確定できない。
 
@@ -132,3 +133,92 @@
 | 登録 ID 2064・2080・2088・2136・2208・2224・2240・2248・2272・2296・2328・2344・4568 が指す実体の型 (`0x409410` の登録表と、ID を登録する箇所) | 受入条件 1 (型名・vtable) | #2471 (PY-68) |
 | `0xec7bb8` の `this` (`[rbp+0x48]`) の生成元 | 受入条件 1 | #2471 (PY-68) |
 | 幅不一致の確定と `REPORT_PY50.md` 未確定表の更新 | 受入条件 2 | #2471 (PY-68) |
+
+§9 (5 回目 run) で 3 件とも解決した。§8-4 はその時点の記録として残す。
+
+## 9. 5 回目 run: VMT による型同定と幅不一致の確定 (#2471・PY-68)
+
+### 9-1. 結論
+
+- 受入条件 1 は**達成**。`0xdd2002` の `this` は TPRBaseToolForm 派生の TPR*Form 14 種のいずれか (呼出し元 14 箇所が各 H の NewInstance で生成)。`+0x79c` は TPRBaseToolForm の所有域。`0xec6098`・`0xec7bb8` の `this` は TPlugListForm の実体 (`0xec7bb8` は公開ハンドラ `FormMouseDown`・`FormKeyDown` の Self から来る)。
+- 受入条件 2 は**達成**。§8 の「登録 ID」13 種 (H は 15 件) の指す型は §9-4 の表。
+- 受入条件 3 は**達成**。`+0x79c` の書込幅 (qword と dword) の不一致は**別構造体の同オフセット**。`REPORT_PY50.md` の `+0x79c` 行と未確定表を更新した (§9-6)。
+- 前提の訂正: §8 の「登録 ID」`[H-0x80]` は VMT の**インスタンスサイズ** (`vmtInstanceSize`) である (値は 0x8a0 = 2208 など)。ID と型は 1 対 1 ではない (2088 は TPRKeyLimitForm と TPRLevelScaleForm、2240 は TPRStrumForm と TPRScoreCreatorForm)。型の同一性は H (VMT) で決まる。
+- `0x409410` は ID (サイズ) を受ける確保側と見られる (推定)。中身は未解析で、型の同定には不要だった。
+
+### 9-2. 測定条件
+
+- 素材: `fl-win64.tar.zst` → `tools/python/work/py59/extracted/block00031_PE.bin` (22,227,016 B。`tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で展開。`$ARTIFACTS_DIR` の実在を確認してから展開)。
+- 測定 commit: `13e3de11` (`analysis/py68_vmt.py` を追加した commit)。`git diff 13e3de11 HEAD -- tools/python/analysis/py68_vmt.py` の出力は 0 行 (測定後にスクリプトは変えていない)。
+- 解析スクリプト: `tools/python/analysis/py68_vmt.py` (新規)。
+  - `py68_vmt.py vmt <PE> <H>...` — クラス名・インスタンスサイズ・親チェーン
+  - `py68_vmt.py methods <PE> <H>...` — 親チェーン各段の公開メソッド (名前・コード VA)
+- 既存の `py59_func.py`・`py59_callers.py`・`py59_refs.py`・`py59_handle.py` は再実行のみ (変更なし)。
+
+### 9-3. VMT の構造 (実測)
+
+Delphi 64-bit の VMT 負オフセット。15 件すべてで `[H-0xc8]==H` (自己ポインタ) が成立した。
+
+| オフセット | 内容 (実測) |
+|---|---|
+| `-0xc8` | 自己ポインタ (= H) |
+| `-0x98` | 公開メソッド表 (件数 word・各エントリ `[size word][code qword][ShortString 名]`) |
+| `-0x88` | クラス名 (ShortString へのポインタ) |
+| `-0x80` | インスタンスサイズ (dword)。§8 の「登録 ID」 |
+| `-0x78` | 親 VMT の**格納位置** (`[[H-0x78]]` が親 VMT。ポインタのポインタ) |
+| `-0x30` | NewInstance 相当の F (§8-3。`[H-0x30]` = `0x40f960`) |
+
+### 9-4. H → 型 (受入条件 1・2)
+
+`vmt` モードの出力 (HEAD = `13e3de11`)。親チェーンは、TPR 系 14 種が `TPRBaseToolForm <- TFLBaseVectorForm <- TVectorForm <- ... <- TObject`、TPlugListForm が `TBaseGlassForm <- TChildVectorForm <- TVectorForm <- ... <- TObject`。
+
+| 呼出し元 (`0xe39d50..0xe3a086` 内) | H | `[H-0x80]` (旧「登録 ID」) | 型 |
+|---|---|---|---|
+| `0xe39e2f` | `0xdd2768` | 2208 (0x8a0) | TPRLegatoForm |
+| `0xe39e5d` | `0xbd2ed8` | 2224 (0x8b0) | TPRQuantizeForm |
+| `0xe39e8b` | `0xde9518` | 2248 (0x8c8) | TPRSliceForm |
+| `0xe39eb9` | `0xdf1388` | 2328 (0x918) | TPRArpForm |
+| `0xe39ee7` | `0xdf3b88` | 2240 (0x8c0) | TPRStrumForm |
+| `0xe39f15` | `0xdeb338` | 2136 (0x858) | TPRFlamForm |
+| `0xe39f43` | `0xdec498` | 2088 (0x828) | TPRKeyLimitForm |
+| `0xe39f71` | `0xdedf78` | 2064 (0x810) | TPRFlipForm |
+| `0xe39f9f` | `0xdf58b8` | 2344 (0x928) | TPRRandomForm |
+| `0xe39fcd` | `0xdefe88` | 2088 (0x828) | TPRLevelScaleForm |
+| `0xe39ffb` | `0xde78c8` | 2272 (0x8e0) | TPRLFOForm |
+| `0xe3a026` | `0xdd00c8` | 2240 (0x8c0) | TPRScoreCreatorForm |
+| `0xe3a051` | `0xdeed78` | 2080 (0x820) | TPRTripletForm |
+| `0xe3a07c` | `0xe0f468` | 4568 (0x11d8) | TPRChordToolForm |
+| `0xebf538` (`0xec6098` 系) | `0xebef58` | 2296 (0x8f8) | TPlugListForm |
+
+登録 ID 13 種 (受入条件 2) の型: 2064 TPRFlipForm・2080 TPRTripletForm・2088 TPRKeyLimitForm **と** TPRLevelScaleForm・2136 TPRFlamForm・2208 TPRLegatoForm・2224 TPRQuantizeForm・2240 TPRStrumForm **と** TPRScoreCreatorForm・2248 TPRSliceForm・2272 TPRLFOForm・2296 TPlugListForm・2328 TPRArpForm・2344 TPRRandomForm・4568 TPRChordToolForm。2088 と 2240 は別クラスで、同じサイズを持つ。
+
+### 9-5. 3 書込み箇所の対象構造体 (受入条件 1)
+
+| 書込み | 幅 | 関数 | `this` の由来 | 所有域 (親の instsize から) | 同じ関数で扱う他フィールド |
+|---|---|---|---|---|---|
+| `0xdd2002` `[this+0x79c]` | qword | `0xdd1fa0..0xdd2124` | 呼出し元 14 箇所 (§9-4 の H ごとに NewInstance した実体) を rcx で受ける。型は 14 種のいずれか | TPRBaseToolForm `[0x798,0x7c8)` (親 TFLBaseVectorForm = 0x798) | `+0x798`・`+0x7ad`・`+0x7b0` は同域。`+0x790` は TFLBaseVectorForm `[0x768,0x798)` |
+| `0xec6098` `[this+0x79c]` | dword | `0xec53b0..0xec61dc` | wrapper `0xebf510` が global slot `0x16baaf0` を渡す (rcx は未使用)。slot は `F(0xebef58)` = TPlugListForm の実体 (§8-3) | TPlugListForm `[0x770,0x8f8)` (親 TBaseGlassForm = 0x770) | `+0x794`・`+0x798`・`+0x7ae`・`+0x7b0` は同域 |
+| `0xec7bb8` `[this+0x79c]` | dword | `0xec7840..0xec7d68` | 呼出し元 (下記) が渡す Self。TPlugListForm の実体 | TPlugListForm `[0x770,0x8f8)` | `+0x7e0`・`+0x7e8`・`+0x7f4`・`+0x7fc` (読出し) は同域 |
+
+`0xec7bb8` の `this` の生成元 (§8 で未確認だった点):
+
+- `0xec7ed0` は `TPlugListForm.FormMouseDown` (公開メソッド表の `FormMouseDown=0xec7ed0`)。`rbx = rcx` (Self) を保存し、`0xec7f79`・`0xec8002`・`0xec8063` で `rcx = rbx` として `0xec7840` を呼ぶ。
+- `0xec7060` は `TPlugListForm.FormKeyDown` (公開メソッド表)。`0xec7114`〜`0xec7121` で `[rbp+0x30] = 0xec7710`・`[rbp+0x38] = Self` の対 (`TMethod` 形) を組み、`lea rdx,[rbp+0x30]` で渡す。ラッパー `0xec7710` は `rcx` を通し、`0xec7716` で `call 0xec7840` (`edx=0`)。Data (Self) が rcx に入る経路は Delphi のメソッドポインタ呼出し規約による (推定。受け側の関数は未解析)。
+- よって 2 経路とも `this` は TPlugListForm の Self。
+
+`0xdd1fa0` は公開メソッド表にも VMT の仮想スロットにも無い (静的メソッド)。所有域の判定は、書込みフィールドが親の instsize より後ろにあることによる。名前は推定でコンストラクタ本体。
+
+### 9-6. 幅不一致の確定 (受入条件 3)
+
+- `+0x79c` への書込み: qword (`0xdd2002`・TPRBaseToolForm 系) と dword (`0xec6098`・`0xec7bb8`・TPlugListForm)。
+- 2 型の共通の先祖は TVectorForm (instsize 0x768)。TPRBaseToolForm の所有域は 0x798 以上、TPlugListForm の所有域は 0x770 以上で、`0x79c` を含む共有フィールドは無い。
+- **結論: 別構造体の同オフセット**。同一フィールドの書込幅の不一致ではない。`REPORT_PY50.md` の `+0x79c` 行と未確定表を本 run で更新した。
+- 残り: `0xffa6d0` の `byte [+0x79c]` 読出しと、`0xdc1540`・`0xdc107f`・`0xdbe405` の byte 書込みは chan の `+0x79c` で、chan の型は未同定 (§9-7)。
+
+### 9-7. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| chan (`0xffa6d0` の `byte [+0x79c]` 読出し、`0xdc1540` 等の byte 書込み) の型 | `REPORT_PY50.md` の `+0x79c` の名前と chan 系の幅 | #1871 ([PY-51]) |
+| `+0x79c`・`+0x794` のフィールド名 | 名前のみ (幅と所有域は確定) | #1871 ([PY-51]) |
+| `0xdd1fa0` の名前 (推定: TPRBaseToolForm 系のコンストラクタ本体) と `0x409410` の中身 | 名前のみ。型同定には不要 | #1974 (PY-59・残り) |
