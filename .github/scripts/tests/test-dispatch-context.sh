@@ -223,6 +223,12 @@ expect "pm.md: the oc-pm-decision marker format" $?
 pm_has '<!-- oc-pm-intent: relaunch issue=N arts="..." focus=K -->'
 expect "pm.md: the oc-pm-intent marker format" $?
 
+# 10c. needs_decision は PR 起点 (Worker の条件・判断の印は PR に残す)・rule=skip・投稿前の確認 (#2591)。
+for s in 'sig.review.state === "CHANGES_REQUESTED" && sig.review.needs' 'NEEDS_KEY' '起点は **PR**' '判断の印は **PR (ref) に残す**' 'rule=skip' '<!-- oc-pm-decision: rule=skip reversible=yes -->' 'R9 の代わりに使う' 'R9 の流用はしない' '投稿・質問の前の確認' "grep -c '/oc'" '「launch 行なし」' 'issue が closed なら質問は書かない' 'merge 済みなら判断しない' 'ラベルは issue にしか効かない' 'U1〜U8・skip'; do
+  pm_has "$s"
+  expect "pm.md #2591: has '$s'" $?
+done
+
 # 10b. 不在中ダイジェスト (CI-70 #2349): digest 節は 24 時間ごと・件数だけ・1 日 1 件までの緊急コメント。user_answered は回答を反映して確定する。
 pm_has '### `digest`'
 expect "pm.md has the kind section 'digest'" $?

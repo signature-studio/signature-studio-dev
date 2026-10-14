@@ -425,5 +425,6 @@ PR を出し、ラベル `pm-apply` で管理していた。VM 退役後は次�
   依存する側の issue に「仮定で進む」旨をコメントし、既定案のまま実装・PR を進める。
 - **依頼者の回答の検出 (`user_answered`)**: `needs-user-input` の issue に依頼者 (人間) が返したコメントを、
   PM agent が読んで反映する。回答は既定案より優先する。値域外 (allowlist 外の素材名など) の部分だけ無視する。
-- **不在中の自動判断**: PM agent が行った判断は `<!-- oc-pm-decision: rule=Rn reversible=yes/no -->` マーカーで残る。
+- **不在中の自動判断**: PM agent が行った判断は `<!-- oc-pm-decision: rule=Rn reversible=yes/no -->` マーカーで残る (対象が無いときは `rule=skip`)。
+  判断の印は判断の対象 (ref) に残す。PR 起点の判断 (`needs_decision`) は PR に残す。書式・値域・投稿前の確認は `.github/prompts/pm.md` が正本。
   事後の確認はダイジェスト ([CI-70]) で行う。

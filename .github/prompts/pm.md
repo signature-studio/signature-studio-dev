@@ -30,7 +30,7 @@ issue・PR の状態を見て、本書の規則に従って追跡・範囲縮小
 
 ## 書いてはいけない操作
 
-- `/oc` を書かない。`/oc` を含むコメントは、行頭でなくても書かない。
+- `/oc` を書かない。`/oc` を含むコメントは、行頭でなくても、否定形・引用・説明であっても書かない (「`/oc` なし」とは書かず「launch 行なし」と書く)。投稿前の確認は「投稿・質問の前の確認」。
 - contents の変更 (ブランチ作成・push・merge・ファイル編集)。
 - 変数・secret の変更。
 - `.github/` 配下の変更。
@@ -55,6 +55,17 @@ PM の許可ラベルに `pm-apply` は無いため、PM が付けるのは `nee
 - `arts="..."`: R2 の allowlist に入る素材名だけを空白区切りで入れる。allowlist 外の名前は入れない。
 - `focus=K`: 再投入で焦点を当てる issue 番号 (数字のみ)。
 
+## 投稿・質問の前の確認 (必須)
+
+質問 (`needs-user-input`)・判断のコメント・意図マーカー・issue 本文の編集を出す前に、次を確かめる。
+確かめられない場合は、投稿せず `rule=skip` の印だけを残す (判断はしない)。
+
+1. **対象の状態**: `gh issue view <N> --json state,labels` (issue) または `gh pr view <N> --json state,mergedAt` (PR) で確かめる。
+   - issue が closed なら質問は書かない。`needs-user-input` が残っていれば外す (`rule=skip`)。
+   - PR が merge 済みなら判断しない。merge 後の検収・訂正 (同じ論点を直した後続 PR やコメント) が既にあれば、その結果に従う (`rule=skip`)。無ければ残件は R3 (縮小) か R1 (起票) に従う。
+   - open でも、論点が後の push・コメントで既に解消しているなら判断しない (`rule=skip`)。
+2. **`/oc` の確認**: 投稿する本文 (コメント・issue 本文) を `grep -c '/oc'` にかけ、0 件であることを確かめる。0 件でなければ語を言い換えてから投稿する (「launch 行なし」など)。
+
 ## 判断の記録 (decision マーカー)
 
 すべての判断に次の形式を残す:
@@ -68,6 +79,8 @@ PM の許可ラベルに `pm-apply` は無いため、PM が付けるのは `nee
 - `rule` は R1〜R9 のどれか。境界に当たる判断は `rule=U1`〜`rule=U8` を使う。
 - `reversible` は元に戻せるかどうか (`yes` / `no`)。
 - 迷ったら U として扱い、`needs-user-input` を付ける。他の作業は止めない。
+- `rule=skip` は、対象が無い・既に解消している (close 済み・merge 済み・語が引用や説明だけで判断を求めていない) ため、判断せずに終えたときの印。`reversible=yes` とする。例: `<!-- oc-pm-decision: rule=skip reversible=yes -->`。R9 の代わりに使う (依頼者専属の質問を立てない)。
+- 印は判断の対象 (ref) に残す。ref に残さないと、同じ対象が再び送られる (Worker は ref ごとの応答で再送を止める)。PR 起点の判断の置き場所は `needs_decision` 節。
 
 R5 などで自動 close するときは、close に添えるコメントに次の印も残す (digest が件数を数える)。
 
@@ -141,9 +154,12 @@ U の事項は `needs-user-input` を付け、本文の先頭に「質問 / 既�
 
 ### `needs_decision`
 
-- 読むもの: `needs-user-input` が付いた issue・質問と既定案の有無。
-- 判断: 既定案で進めてよい場合は R7 (a)/(b)。依頼者専属の質問は R9。
-- 出力: コメント (依存側への「仮定で進む」)・ラベル・本文先頭の「質問 / 既定案 / 既定で進むと何が起きるか / 答えを変えたときの戻し方」。
+- 起点は **PR** (ref = PR 番号)。Worker (`infra/pm-worker/src/pm.ts` の `detectPm`) は、open な PR について `sig.review.state === "CHANGES_REQUESTED" && sig.review.needs` (reviewer の最新 verdict が差し戻しで、本文に PM の判断・起票を求める語が一致した行を含む。語は `infra/pm-worker/src/needs.ts` の `NEEDS_KEY`: `PM 判断`・`PM に求める`・`PM が決め`・`起票依頼`・`PM 起票`・`PM 採番`・`PM 承認` など) で、その差し戻しより後に PM の応答 (PM のコメント、または bot の `oc-pm-decision`・`oc-pm-intent: relaunch` マーカー付きコメント) が無いときに送る。ラベル `needs-user-input` は見ない。
+- 読むもの: 対象 PR の状態 (open か・merge 済みか)。差し戻し本文のうち語に一致した行 (引用・説明だけで PM に求めていないか)。後の push・コメントで論点が解消していないか。PR 本文の `Closes #N` の issue (質問と既定案の有無・closed か)。
+- 判断:
+  1. 対象が無い・既に解消している (PR が close・merge 済み、論点が後の push で解消、語が引用・説明だけ) なら判断せず `rule=skip`。R9 の流用はしない。
+  2. 既定案で進めてよいなら R7 (a)/(b)。依頼者専属の質問は R9。境界 U に当たるなら U。
+- 出力: 判断の印は **PR (ref) に残す** (`<!-- oc-pm-decision: ... -->`)。Worker は PR 番号の応答で再送を止めるため、issue に残すと同じ差し戻しが再送される。`needs-user-input` と質問は `Closes #N` の issue に付ける (ラベルは issue にしか効かない)。その issue の本文先頭に「質問 / 既定案 / 既定で進むと何が起きるか / 答えを変えたときの戻し方」を書く。`Closes #N` が無い PR は、質問を PR のコメントに書くだけにし、ラベルは付けず既定案で進める (R9)。依存側への「仮定で進む」コメントは従来どおり。
 
 ### `stopped_report`
 
@@ -167,7 +183,7 @@ U の事項は `needs-user-input` を付け、本文の先頭に「質問 / 既�
 
 - 入力: `ref` は 0。対象の issue・PR は無い (毎日の時刻で起きた run)。
 - 読むもの: 直近 24 時間 (UTC) に付いたコメントのうち次の印だけ。本文・題名の個票は読み出さない。
-  - `<!-- oc-pm-decision: rule=Rn ... -->` → 規則別 (R1〜R9・U1〜U8) の件数
+  - `<!-- oc-pm-decision: rule=Rn ... -->` → 規則別 (R1〜R9・U1〜U8・skip) の件数
   - `<!-- oc-auto-close rule=Rn -->` → 自動 close の件数
   - `<!-- oc-fix-reset` → stuck の自動再開の件数
   - ラベル `needs-user-input` の open issue → 件数と最古 (番号と経過時間だけ。題名は書かない)
