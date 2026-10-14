@@ -50,7 +50,7 @@ FA-28 (#2097) まで未解決だった「probe 下 `out[0]=0` / probe 無し `ou
 ### 6.1 測定 commit と実測値 (PR 本文からの転記・未再検証)
 
 - 測定 commit: `962de2fb` (コード変更の最後の commit)。以下の数値は PR 本文 (実装側が `962de2fb` で報告した値) からの転記。本 fix のレビュー run では素材 (plugins-freshair) が無く再実行しておらず、これらの値は本セッションでは未検証。
-- 差分の証跡: `git diff 962de2fb HEAD -- tools/targets/freshair/lift2` (HEAD = `1c55dce7`) の出力は次のとおり。コード変更は `native_ctrl.c` のコメント 1 行だけで、実行ロジックは変わっていない。
+- 差分の証跡: `git diff 962de2fb HEAD -- tools/targets/freshair/lift2` (`1c55dce7` 時点で採取。以降この REPORT の commit は lift2 配下に触れないため差分は同じ) の出力は次のとおり。コード変更は `native_ctrl.c` のコメント 1 行だけで、実行ロジックは変わっていない。
 
   ```
   diff --git a/tools/targets/freshair/lift2/native/native_ctrl.c b/tools/targets/freshair/lift2/native/native_ctrl.c
