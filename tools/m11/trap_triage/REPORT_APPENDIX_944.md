@@ -46,7 +46,49 @@ j=13 (k=149) 以降は OFF/ON とも同じ値 (`len 59`) だが、ON はこの u
 2. **§9.3 追記・§4 (a) 更新**: 本付録へのリンクを §9.3 に追記。結論は「未確定」のまま。
 3. **決定的な測定と実測値**: **達成**。§1 の OFF 2 回一致・所要・load を記録。
 
-## 5. 未解決 (起票先付き)
+## 5. #2003 追記: 読出しなし ON の実測・unit 158 の trap frame・単独実行 (受入条件 2・4)
+
+測定 commit: **`c171b9dc`** (origin/main。本節の作業でコードは変えていない。`git diff c171b9dc HEAD -- tools/m11` は本節の文書追記のみ)。
+素材: `fl-win64` (`$RUNNER_TEMP/fl-win64`)・`work-m11` (`m11_gen_ir2.sh` で `ir_conditions.json` 再生成: F1=902 F3c=36 errors=0)・`toolchain-emsdk`。全体 load 開始 0.96〜1.23・直列・単発。
+
+### 6.1 `M11_DEST_READ=0` の ON を実測 (§1 で未実施だった分)
+
+コマンド: `M11_INSTR_413060=1 M11_OV_413060=1 M11_NEG_413060=0 M11_DEST_READ=0 bash m11_build.sh` → `M11_INSTR_413060=1 M11_SURVEY_COST=<out> node m11_survey.mjs`。build 34.7 s (`time` の real を含む一括)・load 0.96。
+
+- 結果: `{"units":942,"ok":870,"noproc":1,"miss":47,"trap":24,"clobber":0}` (unit 158 は ok)。`f413060_calls` は unit 158 で 28 回・getmem 140・freemem 94 (OFF と同じ呼出し数、getmem は OFF 139 から +1)。
+- 所見: 呼出し数と計数は §9.2 の推論と一致する。ただし後述 6.3 のとおり、unit 158 の ok/trap は全体 survey 内の状態に依存する。
+
+### 6.2 unit 158 の trap 最上位 frame (受入条件 2)
+
+`SV_ONLY=158 SV_RAW=1 node trap_triage/survey_units.mjs <out>` (単独実行・計測 ON・読出しあり) で frame を取得。
+
+- kind `oob` (memory access out of bounds)。最上位 wasm frame: **`function_407a50__lifted`** ← `function_407a50` ← `function_409410__lifted` ← `function_409410` ← `function_412c20` ← `function_414ad0` ← `function_414bb0` ← `function_652500` ← … (`function_665bd0`・`function_66d050`・`function_66d1a0` ・ `m11_icall` 経由)。
+- 生 frame (wasm offset 付き) は `work/repro_1389/frames_on158.json`。gitignore 対象のため repo には入れない。
+- 注意: frame は単独実行での値。全体 survey 中の trap 位置とは一致する保証がない (6.3)。
+
+### 6.3 単独実行で unit 158 はすべての構成で trap (重要・§9.2 の推論を覆す)
+
+`SV_ONLY=158` で同じ unit 158 を単独実行した結果 (全て `oob`・同じ最上位 frame `function_407a50__lifted`):
+
+| build | 単独結果 |
+|---|---|
+| 計測 ON (`M11_OV_413060=1`・`M11_DEST_READ=1`) | trap |
+| 計測 ON (`M11_OV_413060=1`・`M11_DEST_READ=0`) | trap |
+| 計測 OFF (`M11_OV_413060=0`・`M11_INSTR_413060=1`) | trap |
+| 既定 ON (`M11_OV_413060=1`・`M11_INSTR_413060=0`) | trap |
+| 既定 OFF (`M11_OV_413060=0`・`M11_INSTR_413060=0`) | trap |
+
+- したがって **unit 158 の ok/trap は計測 (記録の書込み・読出し) にも dest 値差にも依らない**。全体 survey では ok (OFF・読出しなし ON) / trap (読出しあり ON) になるが、単独では全構成 trap である。
+- 全体 survey の ok/trap は**先行 unit の実行による状態** (heap・shadow stack・先行 unit が残す値) に依存すると読むのが自然。§9.2 の「記録の副作用が trap を作る」推論は、単独実行の結果と整合しない。
+- 本節の単独実行は 1 回ずつ (決定性の再確認は未実施)。単独の trap が決定的かは未検証。
+
+### 6.4 この節で言えること・言えないこと
+
+- 言える: 読出しなし ON で全体 survey の unit 158 は ok (6.1)。unit 158 の最上位 trap frame は `function_407a50__lifted` (6.2)。unit 158 は単独では全構成で trap (6.3)。
+- 言えない: j=12 の値差 (`len 0→1`) が後続の結果を変えるか。全体 survey と単独実行で結果が違うため、「記録が trap を作る」「値差が trap を作る」のどちらも確定しない。
+- 未解決: 全体 survey で先行 unit のどの状態が unit 158 の ok/trap を分けるか (受入条件 1 の IR 突き合わせに含める)。
+
+## 6. 未解決 (起票先付き)
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
