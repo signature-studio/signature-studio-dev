@@ -190,20 +190,22 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 
 ## 12. 追補 (2026-10-14・#1317 8 回目 run): function_40f960 / 40fb40 の計測 (既定 OFF)
 
-- 測定 commit: `b36d3b5f` (計測 probe のコードはこの commit で最後に変わった。`M11_INSTR_40F960` 既定 0)。検証 HEAD `93e5fcb9`。
-  - `git diff b36d3b5f 93e5fcb9 -- tools/m11/m11_ov.c tools/m11/m11_build.sh` は出力なし (差分 0)。
-  - main 取り込み (merge `b09ad4eb`) で `m11_rt.c` と `m11_build.sh` に #1952 の knob (`M11_RT_PADPRE`・`M11_RT_PADPOST`・`M11_RT_EMPTY`、既定 0) が入った。既定 0 では `S_NEG` の文字列も build 出力も変わらない。今回の計測 (既定 0) には影響しない。
+- 測定 commit: `b36d3b5f` (計測 probe のコードはこの commit で最後に変わった。`M11_INSTR_40F960` 既定 0)。
+  - `git diff b36d3b5f HEAD -- tools/m11/m11_ov.c` は出力なし (差分 0)。
+  - `git diff b36d3b5f HEAD -- tools/m11/m11_build.sh tools/m11/m11_rt.c` の出力は 4 行・20 行。main 取り込み (merge `b09ad4eb`) で入った #1952 の knob (`M11_RT_PADPRE`・`M11_RT_PADPOST`・`M11_RT_EMPTY`、既定 0)。`m11_rt.c` の追加は全て `#if M11_RT_*` 内、`m11_build.sh` の `S_NEG` は既定 0 のとき従来と同一の文字列になるため、既定 0 では build 出力は変わらない。
   - `b36d3b5f` で `40fb40` の連鎖カウンタを `static` から呼び出しごとのローカル変数 `chain_n` に変更し、連鎖終了時に `chain_len=` を出す。既定 0 では build 出力は変わらない。
   - 前の commit `731a232a` の計測値は無効 (旧 `static` カウンタはプロセス全体の累計)。全 diff は `REPORT_1317_APPENDIX.md` §12。
 - 旧記録 (§4a・§6〜§8) の rc=124 (`0..830`+880) は、素材 IR 依存の可能性がある。公開 RetDec 由来の IR では再現しなかった (下記)。
 - 旧計測 (`731a232a`) の「`40fb40` の連鎖長 10 万未満」は**無効**。`40f960` の確保サイズ (呼び出しごとに出力) は有効な値。
 - 再測定 (`b36d3b5f`・`M11_INSTR_40F960=1`・`M11_M2P=1`・`survey_units.mjs` 60 s 上限): 素材 `work-m11` / `work-liftdiff` / `fl-win64` を展開して実施。
-  - IR は素材に `ir_conditions.json` が無く build を通せなかったため、公開 RetDec v5.0 (`avast/retdec` release) で `m11_gen_ir2.sh` を再生成 (rc=0・`ldfix errors=0`・49.9 s) してから build (rc=0・22.1 s)。emsdk は `6.0.12` を `[EMSDK]` に導入 (`llvm-nm` が PATH に無く build が rc=127 になったため `[EMSDK]/upstream/emscripten/llvm-nm` へリンク)。素材の `ir_conditions.json` / 素材 IR との同一性は未確認。
+  - 素材: `toolchain-retdec` を `$RUNNER_TEMP/tc/retdec` に、`toolchain-emsdk` を `$RUNNER_TEMP/tc/emsdk` に展開 (`tar --zstd -xf`)。RetDec は `retdec-decompiler --version` で v5.0 (commit `53e55b4`・build date 2022-12-08)。`/opt/retdec/bin/retdec-decompiler` と md5 が一致し、runner 既存版と同一。emsdk は `6.0.12` (`upstream/.emsdk_version` の `releases-6e9f6885...`)。`llvm-nm` は `emsdk/upstream/bin/llvm-nm` にあるため PATH に emsdk の bin を前置して build した (`RETDEC_ROOT=$RUNNER_TEMP/tc/retdec`・`EMSDK=$RUNNER_TEMP/tc/emsdk`)。
+  - IR: 素材 `work-m11` に `ir_conditions.json` が無いため、素材の RetDec で `m11_gen_ir2.sh` を再生成 (rc=0・51.3 s・`ldfix errors=0`・`ir_conditions.json` は `ldfix=applied`)。`m11_gen_ir2.sh` 直後の `ir_sha256` は `08c7b6…`、build の前処理 (alloca/guard/fix912 の正規化) 後は `b47a4d…` で `--check` が通る。素材 `work-m11` の旧 `boot_final.ll` (490,653 行) とは一致しない (今回 490,749 行・alloca 型の差が出る)。素材の旧 IR は `m11_cond.py --check` で拒否される (指紋記録なし)。
   - `0..829`+880: rc=0、6.5 s、`{"ok":763,"oob":14,"miss":46,"other":1,"halt0":7}`。`40f960` 521 回・`40fb40` 521 回 (`chain_len` 1〜7)。
   - `0..830`+880: rc=0、12.3 s、`{"ok":763,"oob":15,"miss":46,"other":1,"halt0":7}`。`40f960` 523 回・`40fb40` 523 回 (`chain_len` 1〜7)。
   - 対照 (`M11_INSTR_40F960=0`・同 IR): `0..829`+880 rc=0 6.9 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":14}`、`0..830`+880 rc=0 13.0 s `{"ok":764,"miss":46,"other":1,"halt0":6,"oob":15}`。計測 probe の ON/OFF で結果は 1 件ずれる (`ok`・`halt0`)。
   - 扱い: probe ON の結果は挙動を 1 件変えるため、停止判定には使わない。ずれの原因は未切り分け。各条件は 1 回の測定で、再現性 (2 回目の値) は未確認。
-  - **REPORT §4a・§6〜§8 の「`0..830`+880 は rc=124」とは再現が一致しない**。今回の IR (公開 RetDec 由来) と素材 IR の差が原因かは未切り分け。
+  - **REPORT §4a・§6〜§8 の「`0..830`+880 は rc=124」とは再現が一致しない**。今回の IR (素材の RetDec v5.0 で再生成) と旧 IR の差が原因かは未切り分け (旧 IR は `ir_conditions.json` が無く、同一条件で作り直せない)。
+  - 再測定の追加 (同じ `b36d3b5f` の build・素材 RetDec 再生成 IR): OFF 0..829 を 3 回 (`ok 764 / halt0 6` 3 回とも一致)。ON 0..829 は 2 回 (`ok 763 / halt0 7` 2 回とも一致)。ON と OFF のずれは再現する。
 
 | 条件 | `40f960` の呼び出し (self, size) | `40fb40` の chain_len 最大 | 最後の出力 |
 |---|---|---|---|
@@ -224,6 +226,6 @@ bash tools/m11/trap_triage/repro_1076.sh   # prefix_0_830_880 が rc=124 (上限
 | 1. 830 が残す状態 | 未達 (未特定。今回 830 を含めても停止せず、停止条件の再現が取れていない) |
 | 2. 停止命令・wasm frame | 未達 (今回の IR では停止しないため特定対象が無い) |
 | 3. 修正案 | 未達 |
-| 4. 修正後の完走 | 未達 (今回の IR では `0..830`+880 が完走。§4a・§6〜§8 の rc=124 との差は未切り分け) |
+| 4. 修正後の完走 | 未達 (今回の IR では `0..830`+880 が完走 (OFF rc=0 13.0 s・ON rc=0 12.3 s)。§4a・§6〜§8 の rc=124 との差は未切り分け) |
 
-- 次の一手: 素材 IR と今回の IR の差を切り分ける。素材 `work-m11` に `ir_conditions.json` が無いため、IR 生成条件 (RetDec の版・`m11_gen_ir2.sh` の入力) を揃えないと同一条件での再現にならない。
+- 次の一手: 旧 IR (§4a・§6〜§8) と今回の IR の差 (alloca 型の差を含む) の切り分け。素材の旧 IR は指紋記録が無く、同一条件で作り直せないため、`m11_gen_ir2.sh` の入力 (旧 RetDec 版の有無・`m11_cond.py` 導入前の生成条件) を揃えないと再現にならない。
