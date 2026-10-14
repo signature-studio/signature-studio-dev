@@ -22,47 +22,58 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ldmach import Machine  # noqa: E402
 
 ARG = ('rcx', 'rdx', 'r8', 'r9')
+NOWRITE = ('cmp', 'test')
 S_RE = re.compile(r'^qword ptr \[rsp \+ (0x[0-9a-f]+)\], (\w+)$')
-L_RE = re.compile(r'^(\w+), qword ptr \[rsp \+ (0x[0-9a-f]+)\]$')
-D_RE = re.compile(r'^(\w+), qword ptr \[(\w+)\]$')
-
-
 REG2_RE = re.compile(r'^(\w+), (\w+)$')
 SLOT_RE = re.compile(r'^(\w+), qword ptr \[rsp \+ (0x[0-9a-f]+)\]$')
 DEREF_RE = re.compile(r'^(\w+), qword ptr \[(\w+)\]$')
+DST_RE = re.compile(r'^(\w+), ')
+SUB32 = {'eax': 'rax', 'ebx': 'rbx', 'ecx': 'rcx', 'edx': 'rdx', 'esi': 'rsi', 'edi': 'rdi', 'ebp': 'rbp', 'esp': 'rsp'}
+
+
+def full(r):
+    """32bit / r8d 形の部分レジスタを 64bit 名へ寄せる (書込みで alias を正しく消すため)"""
+    if r in SUB32:
+        return SUB32[r]
+    m = re.match(r'^(r\d+)d$', r)
+    return m.group(1) if m else r
 
 
 def scan(ins, copy_alias=False):
     """alias: 引数の値 (ポインタ) を保持するレジスタ → 引数レジスタ / spill: 退避スロット → 引数レジスタ.
+    レジスタを書く命令 (mov 以外も含む) は、その宛先の alias を消す (cmp/test は書かない)。
     copy_alias=True は `mov R, argreg` の複写も alias に入れる (正常な間接参照も拾うため既定では無効)"""
     spill, alias, hits = {}, {}, []
     for i, x in enumerate(ins):
-        if x.mnemonic != 'mov':
-            continue
         op = x.op_str
+        dst = DST_RE.match(op)
+        if x.mnemonic != 'mov':
+            if dst and x.mnemonic not in NOWRITE:
+                alias.pop(full(dst.group(1)), None)
+            continue
         m = S_RE.match(op)
         if m and m.group(2) in ARG:
             spill[m.group(1)] = m.group(2)
             continue
         m = REG2_RE.match(op)
         if copy_alias and m and m.group(2) in ARG and m.group(1) not in ARG:
-            alias[m.group(1)] = m.group(2)
+            alias[full(m.group(1))] = m.group(2)
             continue
         m = SLOT_RE.match(op)
         if m and m.group(2) in spill:
-            alias[m.group(1)] = spill[m.group(2)]
+            alias[full(m.group(1))] = spill[m.group(2)]
             continue
         m = DEREF_RE.match(op)
-        if m and m.group(2) in alias and m.group(1) in ARG:
+        if m and full(m.group(2)) in alias and m.group(1) in ARG:
             for z in ins[i + 1:i + 7]:
                 if z.mnemonic == 'call':
-                    hits.append({'va': '0x%x' % x.address, 'base': m.group(2), 'arg': alias[m.group(2)],
+                    hits.append({'va': '0x%x' % x.address, 'base': full(m.group(2)), 'arg': alias[full(m.group(2))],
                                  'deref_reg': m.group(1), 'call_va': '0x%x' % z.address})
                     break
+            alias.pop(m.group(1), None)
             continue
-        m = re.match(r'^(\w+), ', op)
-        if m and m.group(1) in alias:
-            del alias[m.group(1)]
+        if dst:
+            alias.pop(full(dst.group(1)), None)
     return hits
 
 
