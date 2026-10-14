@@ -139,7 +139,7 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 
 ## 6. #3188: LB=0 と LB=0x10000 の寛容起動の unit 差 8 件の切り分け (本 runner で実測)
 
-測定 commit: `1d9e2037` (コード差分の最終 commit)。測定 runner: Actions (4 vCPU・RAM 15 GiB)。load average は未採取。
+測定 commit: `6a20f8b1` (コード差分の最終 commit。1d9e2037 から PATH 行の削除だけ・再測定済み)。測定 runner: Actions (4 vCPU・RAM 15 GiB)。load average は未採取。
 既知類型との関係: 該当なし (`docs/DEFECTS.md` の ID は未付与。NULL 源の memcpy は下 §6-3 の候補で、既存類型との対応は未確認)。
 素材: `fl-win64` (`block00031_PE.bin` 22,227,016 B、展開 2.2 s)・`work-m11` (展開 2 s。`lift_pe.sha256` 無し)。
 `m11_e2e.sh` の全再生成 (指紋検査) は使わず、後段だけ `m11_lb_tolerant_repro.sh` で回した (gen_ir2 → data/image → lb_check → build → `m11_tolerant.mjs`)。
