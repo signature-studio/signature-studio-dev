@@ -141,3 +141,36 @@
 | gui の node + mock 検査 (受入 3) | 検査が無い | 新規子 #2917 (SHX-T34、`親: #1179`) |
 | IR の正 (`m11_e2e.sh --full`) での基点・head の survey 取り直し (適用範囲の節) | 本節の数値は snapshot 上の相対比較に限る | 既存 #942 へのコメント (#2877 は 2026-10-14 に CLOSED のため付け替え。#942 は本文に survey base/fix の再測定を含むが、IR 正 (`m11_e2e.sh --full`) の指定は無いためコメントで依頼) |
 | 文字列長で survey の結果が変わる原因 (7-2 の行案) | shimx 変更ごとに survey の再測定が要る | 既存 #942 へのコメント (survey の検出力に関わるため同じ issue へ。#2877 は CLOSED。再測定の受入に 7-2 の 5 変種のうち長いメッセージの版を加える。原因の特定は未着手) |
+
+## 8. IFileDialog (CoCreateInstance) の明示 fail-fast (SHX-T33 #2916)
+
+親 #1179 の §7-3 の子。測定 commit: `c9eb2d8e` (コードを変えた最後の commit。基点 `9286a6bb` = origin/main)。
+
+| 項目 | 結果 |
+|---|---|
+| 素材 | `fl-win64` と `toolchain-emsdk` は `$ARTIFACTS_DIR` に実在を確認。`work-m11` は本 issue の oc_artifacts に無く、未取得 |
+| CLSID の照合 | 追加した GUID 2 件は、FL の tar をストリームで走査 (展開なし) して FL 本体の PE 内のバイト列と一致を確認。FileOpenDialog `DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7` 82 件・FileSaveDialog `C0B4E2F3-BA21-4773-8DBA-335EC946EB8B` 81 件 (§1 と同じ件数) |
+| 実装 | `tools/shimx/src/ole.c` の `CoCreateInstance`: 2 CLSID の一致時のみ `shim_unimplemented("CoCreateInstance(FileOpenDialog)")` / `shim_unimplemented("CoCreateInstance(FileSaveDialog)")`。clsid が NULL なら従来どおり |
+| shimx 単体 (`bash tools/shimx/test.sh`、HEAD `c9eb2d8e`) | 所要 14 s。load average 0.25 → 0.42 (nproc 4)。step 1 (ビルド・生成物) PASS、2 MT PASS (8 グループ)、3 ST PASS |
+| step 4 fail-fast | `ifiledialog` exit=1 ✓ (`CoCreateInstance(FileOpenDialog)`)、`ifilesave` exit=1 ✓ (`CoCreateInstance(FileSaveDialog)`)。既存の fail-fast 11 件も全て ✓ |
+| 他の CLSID (受入 2) | MT/ST 単体 (test_ole_shell.c): ShellLink `{00021401-...}`・乱数 GUID・clsid=0 は、従来どおり `REGDB_E_CLASSNOTREG` かつ `obj == NULL` (abort しない) |
+| step 5 (M4 互換) | **FAIL**: `tools/shim/test/test_main.c:204` (`HeapFree` に範囲外ポインタ → `GetLastError()==ERROR_INVALID_FUNCTION`)。`origin/main` `9286a6bb` を detached worktree で `test.sh` 実行した結果も同じ行で同じ FAIL。本変更は heap に触れない。step 5 以降は未実行 |
+| step 6 署名 | `test/sig/sig_test.sh` ALL PASS (rc=0)。カバレッジ (`scripts/gen_inventory.py` 単独実行): 未実装 0・M4 53/53・担当範囲 100% |
+| 生成物 | `gen_inventory.py` は `tools/m11/work` が無いと M11 列を変えて `inventory.csv`・`BACKLOG.md` を誤って書き換える (この worktree で P0 194 → 0 等)。コミットせず `git restore` で戻した。生成は work-m11 がある環境でのみ行う |
+
+挙動変化 (m2): IFileDialog の CoCreateInstance は従来 `REGDB_E_CLASSNOTREG` で呼出元へ戻った。今後は、この 2 CLSID の呼出で名前を出して abort する (`DWriteCreateFactory` と同じ方針)。呼出元が失敗戻りを前提に fallback していた場合、その経路は abort になる。また clsid の指す GUID を読むため、不正なポインタは従来の戻り値ではなく wasm の境界外アクセスになり得る (他の clsid 参照 API と同じ扱い)。
+
+### 8-1. 判定
+
+- 受入 1 (fail-fast): **満たす** (`test.sh` step 4 の 2 件、名前出力を確認)。
+- 受入 2 (他 CLSID の呼出元を壊さない): **部分**。単体で他 CLSID の戻り値は確認。実 boot の呼出元 (IR の呼出元 2 件 `function_c53c60`・`m11_tr_function_4690c0` が渡す CLSID) は work-m11 が無いため未確認。
+- 受入 3 (test.sh の検査): **満たす** (`expect_fail ifiledialog` / `ifilesave`)。ただし test.sh 全体は step 5 の既存 FAIL で rc=1 のまま。
+
+### 8-2. 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| IR の CoCreateInstance 呼出元 2 件が渡す CLSID の確定と、他 CLSID 呼出元の挙動の確認 (受入 2 の残り)。work-m11 が要る | 実 boot での IFileDialog 呼出の有無と、abort の影響が未確定 | 既存 #942 へのコメント (`m11_e2e.sh --full` の IR で確認を依頼) |
+| 本変更後の m11 survey の再測定 (§7-2 の文字列長による結果変化の再確認を含む) | shimx の変更で survey 結果が変わる実績がある | 既存 #942 へのコメント (§7-3 と同じ issue へ) |
+| step 5 (M4 互換 MT) の heap 範囲外ポインタ検査の既存 FAIL (`origin/main` で再現) | test.sh の step 5 以降 (M4・カバレッジ・署名・OTT) が通らない | 既存 issue なし。PM 判断 (起票を依頼) |
+| FLEngine 起動 KPI (dispatch 数・通過 unit 数) の前後 | 動かしていない。逐次 boot は #942 の停止 (unit 17) で止まる | 既存 #942 へのコメント (§7-3 と同じ) |
