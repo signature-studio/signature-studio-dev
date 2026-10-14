@@ -12,7 +12,7 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `*block00031_PE.bin` だけ展開 (実測 2.9 秒)。
 - 逆アセンブル `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_disasm.py <VA> <命令数>`: `1046a30 900`・`1047424 60`・`10476f0 22`・ハンドラ先頭 `104c2a6`・`104c4af`・`104c64f`・`104c919`・`104aa87`・`104caae`・`104cc72` (各 6)。いずれも終了 0・0.1 秒未満。
-- RetDec 5.0: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 RETDEC_BIN=/opt/retdec/bin/retdec-decompiler bash tools/python/analysis/flapi/pe_retdec.sh <out.c> 0x1046a30-0x1047424` (終了 0・9.3 秒)。
+- RetDec 5.0: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 RETDEC_BIN=[RETDEC] 配下の retdec-decompiler (`docs/REFERENCES.md` §4) bash tools/python/analysis/flapi/pe_retdec.sh <out.c> 0x1046a30-0x1047424` (終了 0・9.3 秒)。
 - 測定 commit: `e87eb52a` (本 run の基点 = origin/main)。本 run でコードは変えていない (追加は本付録・`REPORT_PY73.md` の 1 行・DOC_MAP の 1 行)。
 - 差分 0 の証跡: `git diff e87eb52a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行。
 
