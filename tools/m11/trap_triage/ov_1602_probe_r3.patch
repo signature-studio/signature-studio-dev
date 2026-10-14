@@ -1,0 +1,45 @@
+diff --git a/tools/m11/m11_ov.c b/tools/m11/m11_ov.c
+index b821303b..bc48f818 100644
+--- a/tools/m11/m11_ov.c
++++ b/tools/m11/m11_ov.c
+@@ -550,8 +550,24 @@ u64 function_535c11(u64 self) {
+         if (*(volatile u32*)(uintptr_t)(items + Q(self + 0x10) * 24) != 0xffffffffu) return (items & ~0xffULL) | 1;
+     }
+ }
++#ifdef M11_PROBE_1602
++static unsigned long long m11_p1602_rd(unsigned long long a, unsigned long long heap) {
++    return (a >= 8 && a + 8 <= heap) ? *(volatile unsigned long long*)(uintptr_t)a : 0;
++}
++#endif
+ u64 function_535bf2(u64 self) {
+     u64 items;
++#ifdef M11_PROBE_1602
++    {
++        unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
++        unsigned long long p8 = m11_p1602_rd(self + 8, heap);
++        unsigned long long it = m11_p1602_rd(p8 + 8, heap);
++        unsigned long long cnt = m11_p1602_rd(self + 0x10, heap);
++        unsigned long long e = it + (cnt + 1) * 24;
++        M11_TRACE("[m11][1602] 535bf2 self=0x%llx p8=0x%llx tbl=0x%llx cnt=%llu e=0x%llx e_in=%d heap=0x%llx\n",
++                  self, p8, it, cnt, e, (int)(e + 4 <= heap), heap);
++    }
++#endif
+     Q(self + 0x10) += 1;
+     items = Q(Q(self + 8) + 8);
+     if (*(volatile u32*)(uintptr_t)(items + Q(self + 0x10) * 24) != 0xffffffffu) return (items & ~0xffULL) | 1;
+@@ -1134,6 +1150,15 @@ static u64 ov_getter_478c70(u64 info, u64 size) {
+ extern unsigned long long function_410650(void);
+ extern unsigned long long function_407e20(unsigned long long);
+ unsigned long long function_410b10(unsigned long long obj) {
++#ifdef M11_PROBE_1602
++    {
++        unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
++        unsigned long long vmt = m11_p1602_rd(obj, heap);
++        unsigned long long isz = (vmt >= 0x80 && vmt - 0x80 + 4 <= heap) ? *(volatile unsigned int*)(uintptr_t)(vmt - 0x80) : 0;
++        M11_TRACE("[m11][1602] 410b10 obj=0x%llx vmt=0x%llx isz=0x%llx slot=0x%llx heap=0x%llx\n",
++                  obj, vmt, isz, obj + isz - 8, heap);
++    }
++#endif
+     u64 slot = obj + (u64)(long long)(int)D(Q(obj) - 0x80) - 8;
+     u64 cur = Q(slot);
+     u64 mon = cur & ~1ull;

@@ -988,6 +988,23 @@ void m11_p144_obs(unsigned long long p) {
 }
 #endif
 
+/* #882 計測専用 (M11_INSTR_40FFE0=1 のときだけ有効): function_40ffe0 の入口で arg1 と、40ff70 へ渡る値 v = [arg1]、
+ * v-0x90 (p-144) の値を stderr に出す。線形メモリ外は読まない (address 0 は線形メモリ内なので読む)。既定 0 では何も入らない。 */
+#ifndef M11_INSTR_40FFE0
+#define M11_INSTR_40FFE0 0
+#endif
+#if M11_INSTR_40FFE0
+static int g_ffe0_n;
+void m11_ffe0_obs(unsigned long long a) {
+    unsigned long long heap = (unsigned long long)__builtin_wasm_memory_size(0) * 65536ULL;
+    unsigned long long v = 0, p144 = 0;
+    if (a + 8 <= heap) v = *(volatile unsigned long long*)(uintptr_t)a;
+    if (v >= 0x90 && v - 0x90 + 8 <= heap) p144 = *(volatile unsigned long long*)(uintptr_t)(v - 0x90);
+    if (g_ffe0_n++ < 16)
+        fprintf(stderr, "[m11][ffe0] #%d arg1=0x%llx v=[arg1]=0x%llx p-144=0x%llx\n", g_ffe0_n, a, v, p144);
+}
+#endif
+
 /* ---- #483: TDictionary<K,V> (Generics.Collections) の Add/GetItem が全て「重複キー」と誤判定される原因 3 点の C 転記 ----
  * 8cc190 (Add) は FComparer = TEqualityComparer<K>.Default (53df80 → 479b40 _LookupVtableInfo) の GetHashCode/Equals を使う.
  *   479b40  `movzx rcx,byte [rbx]` (TypeInfo.Kind) の deref 脱落 (D4) で Kind=0 固定, `test cl,2; call rax` (getter 呼出し) 脱落 (D15)
