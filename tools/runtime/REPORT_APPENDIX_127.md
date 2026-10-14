@@ -34,7 +34,7 @@
 
 手順:
 - `playwright-core@1.56.1` を repo 外の作業ディレクトリに入れる (repo の `package.json` は変更しない)。
-- `npx playwright@1.56.1 install --with-deps webkit` で WebKit 26.0 を取得し、依存を `sudo apt` で導入 (2026-10-14 の runner で成功)。PR #433 の「導入不可」は依存を入れていなかったための結果。
+- `npx playwright@1.56.1 install --with-deps webkit` で WebKit 26.0 を取得し、依存を `sudo apt` で導入 (2026-10-14 の runner で成功)。PR #433 では依存不足で導入できなかったが、今回は `--with-deps` で導入できた (前回と同じ手順かは未確認)。
 - `PLAYWRIGHT_CORE=<作業dir>/node_modules/playwright-core/index.mjs node tools/runtime/probe/run_features_webkit.mjs` → `tools/runtime/work/features_result_webkit.json`。
 
 実測 (`d010b5d7`、3 回、全て exit 0、wall 2.35〜2.36 s、開始時 load 0.13〜0.15)。3 回で同値。
