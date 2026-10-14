@@ -32,7 +32,10 @@ static void* alloc_blk(size_t bytes, int zero) {
     return user;
 }
 static int blk_ok(void* user) {
-    if (!user || ((uintptr_t)user & 15u)) return 0;
+    /* ヘッダ 16B が wasm linear memory の内に収まるかを先に確かめる (範囲外は読まない / LD-132 #2802) */
+    uint64_t u = (uintptr_t)user;
+    uint64_t mem = (uint64_t)__builtin_wasm_memory_size(0) * 65536u;
+    if (!user || ((uintptr_t)user & 15u) || u < HEAP_HDR || u > mem) return 0;
     return ((Hdr16*)raw_of(user))->magic == HEAP_MAGIC;
 }
 
@@ -76,7 +79,7 @@ LPVOID HeapReAlloc(HEAP_HANDLE heap, DWORD flags, LPVOID p, SIZE_T bytes) {
 BOOL HeapFree(HEAP_HANDLE heap, DWORD flags, LPVOID p) {
     (void)heap; (void)flags;
     if (!p) return TRUE;
-    if (!blk_ok(p)) { SetLastError(ERROR_INVALID_PARAMETER); return FALSE; }
+    if (!blk_ok(p)) { SetLastError(ERROR_INVALID_FUNCTION); return FALSE; }
     Hdr16* h = (Hdr16*)raw_of(p);
     h->magic = HEAP_FREED;
     free(h);
