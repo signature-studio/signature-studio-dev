@@ -109,7 +109,7 @@ index 451305be..60d388f3 100755
 ```
 
 - wasm のビルド入力 (`fw_rt.c`・`fw_boot.c` が含まれる) がこの差分に入るため、既定 wasm は `a67af27b` の 15,062,173 B から変わりうる。ext 値も `a67af27b` (15,075,739 B) と本 PR の `e14a1a5d` (15,075,735 B) で 4 B 違う。この差は同一 HEAD でない比較の誤差の目安として扱う。
-- 同一 HEAD の既定測定は未実施 (素材 `toolchain-emsdk`・`work-fw-stage1` が本 run の `$HOME/artifacts` に無い)。→ #2767。
+- 同一 HEAD の既定測定は未実施 (素材 `toolchain-emsdk`・`work-fw-stage1` が本 run の `$ARTIFACTS_DIR` に無い)。→ #2767。
 
 ## 5. 未解決 (起票先)
 
