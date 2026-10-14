@@ -1,15 +1,23 @@
 // PM agent (oc-pm) を起こすべき終端状態の検出と、送信の抑止。どちらも純関数 (時刻・保管先は呼び出し側が渡す)。
 // 検出に LLM も本文の解析も使わない: ラベル・マーカー・正規表現 (needs.ts) だけ。issue / PR の自由文は payload に入れない。
-import { NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
+import { ASSOC_OK, NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 
 // repository_dispatch の event_type "oc-pm" の kind (列挙 9 値)。prepare-event-context.sh の許可リストと同じ。
 export const PM_KINDS = ["stuck", "no_pr", "refs_orphan", "needs_decision", "stopped_report", "user_answered", "supply", "digest", "retro"] as const;
 export type PmKind = (typeof PM_KINDS)[number];
 
-// この Worker が検出する kind。着手の優先順 (人の回答待ち・PM 判断待ちを先に送る)。
-// refs_orphan は [CI-58]、supply / digest は [CI-71] / [CI-70] が担当する。
+// この Worker が状態から検出する kind。着手の優先順 (人の回答待ち・PM 判断待ちを先に送る)。
+// refs_orphan は [CI-58]、supply は [CI-71] が担当する。
 export const DETECTED_KINDS = ["user_answered", "needs_decision", "stuck", "no_pr"] as const;
 export type DetectedKind = (typeof DETECTED_KINDS)[number];
+
+// 日次のダイジェスト (CI-70)。状態ではなく時刻で送る。ref は常に 0。内容は PM agent が pm.md の digest 節で集計する。
+export const DIGEST_KIND = "digest";
+export const DIGEST_REF = 0;
+export const DIGEST_EVERY_MS = 24 * 3_600_000;
+// rolling issue (題名 `[CI-n] 自律運転ダイジェスト (rolling)`) は本文だけを更新する issue。launch・再投入の対象から外す (classify)。
+// tools/pm/launch_issues.py の DIGEST_ROLLING_RE と同じ形にする (test-dispatch-context.sh が題名の一致を検査する)。
+export const DIGEST_ROLLING_RE = /^\[[A-Za-z]+-\d+\] 自律運転ダイジェスト \(rolling\)$/;
 
 export const STUCK_LABEL = "oc:stuck";
 export const NO_PR_LABEL = "oc:no-pr";
@@ -35,8 +43,6 @@ export interface HistoryEntry {
 
 // 抑止の上限 (同じ (kind, ref) は 60 分に 1 回、全体で 1 時間に 12 起動、同じ ref に 24 時間で 3 回)。
 export const PM_LIMITS = { dupMs: 60 * 60_000, hourMs: 3_600_000, hourMax: 12, dayMs: 24 * 3_600_000, refDayMax: 3 };
-
-const ASSOC_OK = ["MEMBER", "OWNER", "COLLABORATOR"];
 
 // 対象の起票者が MEMBER / OWNER / COLLABORATOR か許可 bot か。未設定 (古い保存値) は許可しない。
 export function authorAllowed(x: { author?: string; authorType?: string; assoc?: string }, bots: string[]): boolean {

@@ -6,7 +6,7 @@
 
 - 7 関数 (selectAll / selectOneChannel / setChannelPitch / setStepParameterByIndex / midiNoteOn / incEventValue / processRECEvent) の**ハンドラ位置と引数書式は PE から確定**した。
 - **意味論 (戻り値・範囲外 code・副作用) は未確定**。各ハンドラは下位関数へ薄く委譲しており、実処理の所在まで追えていない。推測では実装しない。
-- コード変更は `provider/` `host/` `tests/` で 0 件。本 PR は解析補助スクリプトと本 REPORT のみ。受入条件は未達 (`Refs #1527`)。
+- 1〜6 回目は解析のみ (コード変更 0 件)。**7 回目 run で `selectAll` の経路を RetDec 逆コンパイルで確定した (経路は確定・選択値とゲートは未確定)**。選択値 (`ffac20`) の判定に依存するため、C provider と mock への実装は見送った (`c6485d55` の実装は `481bcd62` で戻した。下の「7 回目 run」節)。残り 6 関数は未実装のまま子 issue に分離した。受入条件は未達 (`Refs #1527`)。
 
 ## 測定
 
@@ -110,3 +110,105 @@
 - `0x40fe90` / `0x40feb0`: `0x40feb0` は引数が非 0 かつ `0x40fe90` の検査に通らないとき、code `0xa` で `0x4096d0` を呼ぶ。`0x4096d0` は code の下位 7bit を受けて通知する。**0xa が範囲外 code かは未確定**。
 - 結論: 選択フラグの setter (`0xff8a90`)・全解除 (`0x11e8720`)・検索 (`0x11e8280`) の所在は確定。**selectAll / selectOneChannel がこれらを呼ぶかは未確認**のため、7 関数の戻り値・範囲外 code は引き続き未確定。`fl_engine.c` 実装は行わない。
 - 未読 (次に読む対象): `0x11e8670` の `0xfe8bb0` 以降 (呼び出し後の戻り規約)、`0xff8a90` の `0xfdee80`、`0xffac20`、`0x410010`、`0x4096b0`。selectAll・selectOneChannel 本体 (`0xd5b150` → `0xd843d0` 以降) が `0x11e8720`・`0x11e8280` を呼ぶかの確認。
+
+## 7 回目 run: selectAll の経路を RetDec で確定 (選択値・ゲートは未確定・実装は見送り)
+
+- 測定 commit: `481bcd62` (コード変更の最後の commit)。`c6485d55` で入れた selectAll の実装 (provider・mock・テスト) は `481bcd62` で `c6485d55^` (`54bacdc0`) の状態へ戻した。
+- 既知類型との関係: 該当なし (意味論の読解。lift 出力は実行に使っていない)。
+
+### 素材・ツール・測定
+
+- 素材: `$ARTIFACTS_DIR` の `fl-win64.tar.zst` から `block00031_PE.bin` (PE のみ 2.8 秒) と `block24429/24430/25159/24618_DATA.bin` (2.8 秒) を展開。逆コンパイルは `toolchain-retdec` の `retdec-decompiler` (RetDec v5.0、[RETDEC])。emsdk は `toolchain-emsdk` ([EMSDK])。
+- 経路の再現 (1 コマンド・6 範囲で 9.0 秒・関数 9 件検出):
+  `FL_WIN64_DIR=<展開先> RETDEC_BIN=<[RETDEC] の retdec-decompiler> bash analysis/flapi/pe_retdec.sh <out.c> 0xd5b150-0xd5b230,0xd843d0-0xd84530,0xd5b100-0xd5b150,0x11e8670-0x11e8715,0xff8a90-0xff8b60,0xffac20-0xffacb0`
+- 段ごとの再現範囲 (表の段番号に対応):
+
+| 段 | 再現範囲 (`pe_retdec.sh` の範囲指定) |
+|---|---|
+| 1 | `0xd5b150-0xd5b230` (`0xd5b1a0` で途中切れするため `0xd5b230` まで必要) |
+| 2 | `0xd843d0-0xd84530` |
+| 3 | `0xd5b100-0xd5b150` |
+| 4 | `0x11e8670-0x11e8715` |
+| 5 | `0xff8a90-0xff8b60`・`0xffac20-0xffacb0` |
+| 6 | 本 run の範囲に含めず未再現 (前 run の記録のみ) |
+
+- 注意: RetDec は stack 引数を落とすことがある (`d5afc0` の `d843d0` 呼出し)。引数は `pe_disasm.py` の逆アセンブルで照合する。
+- 注意: RetDec は `0x15e3a60` を定数 `g2 = 0x154528c` として読み、`ffac20` の比較先を誤る (下の 5' を参照)。RetDec の出力をそのまま採らず、逆アセンブルで照合した。
+
+### selectAll の経路 (PE 実測。RetDec 出力と逆アセンブルの照合)
+
+| 段 | VA | 働き | 再現 |
+|---|---|---|---|
+| 1. handler | 0xd5b150 | `obj = *d5e620()` → `d843d0(obj, &status, cb=0xd5b100, …)` → `d82c20(status)` を返す | 範囲 1 |
+| 2. 要求ラッパ | 0xd843d0 | `*result = -2`。`obj+80` (`[rbx+0x50]`) が非 0 かつ `d84f30(obj+80)` が偽なら `0xd84500` で return (-2 のまま)。通ると要求レコード `rec` を作り、引数を `rec+24..+64`、callback を `rec+88` に格納。`425210(…,1378)` と `526190(0,&v)` を呼ぶ (中身は未読)。`*result = rec+96` | 範囲 2 (asm `0xd843f0`〜`0xd84403` で gate を確認) |
+| 3. callback | 0xd5b100 | `rec+96 = -2`。`v = *(*(*0x15e4790)+8)` の先頭 byte が 0 なら return (-2 のまま)。非 0 なら `rec+96 = 0` で `0x11e8670(v)` | 範囲 3 |
+| 4. 全 channel | 0x11e8670 | 先頭で選択中 channel の UI 処理 (`0x11e8280`・`0xff8b60`) を行い、`fe8bb0(g1, i)` で index 0..count-1 の全 channel に `0xff8a90(item, 1)` | 範囲 4 |
+| 5. 選択フラグ | 0xff8a90 | `item+812` (byte) = `a2 != 0 ? ffac20(item) : 0` (asm `0xff8a90`〜`0xff8abe`) | 範囲 5 |
+| 5'. 選択フィルタ | 0xffac20 | `p = *(qword*)0x15e3a60`。`return (*(int32*)p < 0) \|\| (*(int32*)(item+0x798) == *(int32*)p)` (asm `0xffac20`〜`0xffac43`)。**0 を返すのは `*p >= 0` かつ `item+0x798 != *p` の channel** | 範囲 5 |
+| 6. 戻り値 | 0xd82c20 | status 0 → 正常 (None 扱い。`c38bc0()` は未読)。-1 Unspecified error / -2 Operation unsafe at current time / -3 Range error / -4 Index out of range。**本 run では未再現** | 前 run の記録 |
+
+### 5' の判定 (B1: 全 channel 選択の前提)
+
+- `0xffac20` の比較先は `*p` (ポインタ先の int32) である。RetDec の `g2` (ポインタの値 `0x154528c` を定数として読んだもの) は誤読。
+- `0x15e3a60` (`.data` 内) の 8 byte はファイル内で `0x154528c` (`.data` 内の VA)。その先の int32 のファイル内初期値は **-1**。よって**ロード直後は `*p < 0` となり `ffac20` は全 channel で 1 を返す**。
+- ただし、`*p` の**実行時**の書込み元と通常状態の値は未追跡 (`0x154528c` への直接参照と、`0x15e3a60` 経由の間接書込みの両方を含む)。`obj+80` の通常時の値と `d84f30`、callback の状態 byte (段 3) の通常時の値も未確定。
+- したがって「全 channel sel=1」は初期値でのみ成立する前提であり、通常状態での成立は未確定。推測で FL と食い違う値を返さないため、実装は見送る。
+
+### 実装の扱い (commit 481bcd62)
+
+- `c6485d55` の selectAll 差分 (`provider/fl_engine.c`・`host/fl_mock.mjs`・`tests/channels_diff.mjs`・`tests/provider_check.mjs`) を `481bcd62` で戻した。`git diff c6485d55^ 481bcd62 -- tools/python/provider tools/python/host tools/python/tests` は 0 行。
+- 未モデル化 (実行時値に依存し静的解析では確定できない): (a) 段 2 の `obj+80` と `d84f30` の判定、段 3 の状態 byte。(b) 段 5' の `*p` の実行時値と `item+0x798` の意味 (初期値 -1 は確認済み)。(c) UI 側の副作用: `0xff8b60` 本体 (先頭の `ret` まで 102 命令) に `item+812` (`+0x32c`) への書込みは無い。呼出先 `0x1311d90`・`0x4232e0`・`0x1060420`・`0x423980`・`0xfdee80` は未読。
+
+### 検証 (commit 481bcd62)
+
+| 検査 | 結果 | 所要 |
+|---|---|---|
+| `bash provider/build.sh` | 成功 (ハンドラ 70) | 1.401 秒 |
+| `node tests/channels_diff.mjs` | 53 呼出し・diffs 0・PASS | 0.062 秒 |
+| `node tests/provider_check.mjs` | `{"functions":435,"implemented":70,"unimplemented":365,"mcp_static":60,"PASS":true}` | 0.373 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` | 2.052 秒 |
+| `node tests/all_tools.mjs` (mock) | 48/48 ok・host_calls 37425 | 2.033 秒 |
+| 前提: `fetch_inputs.sh` (`FL_WIN64_DIR=work/fl`) / `build_cpython_wasm.sh` / `FLPY_SKIP_TABLE=1 EMSDK_DIR=<[EMSDK]> build_flpy.sh` | 成功 | 0.612 秒 / 240.835 秒 / 6.042 秒 |
+
+- 測定時 load average (1 分値): 0.53 (4 core)。
+- 差分 0 の証跡: `git diff c6485d55^ 481bcd62 -- tools/python/provider tools/python/host tools/python/tests` は 0 行 (測定 commit のコードは親 `54bacdc0` と同一)。本 REPORT を含む後続 commit でも `git diff 481bcd62 HEAD -- tools/python/provider tools/python/host tools/python/tests` は 0 行。
+
+### 受入条件 (#1527) の状態 (7 回目 run 時点)
+
+- [x] 7 関数の引数書式・ハンドラ位置 (1〜4 回目)
+- [部分] 戻り値・範囲外 code: selectAll は経路のみ確定 (段 6 の写像は未再現)。selectOneChannel は範囲外 -4 のみ確定 (下記)。他 5 関数は未確定
+- [未達] `fl_engine.c` 実装: 0 件 (selectAll は選択値とゲートが未確定のため見送り)
+- [部分] mock と C の diffs 0: 既存の 53 呼出しで diffs 0。selectAll は対象外
+- [x] `all_tools` 48/48 (wasm)
+
+### selectOneChannel (未確定・未実装)
+
+- `0xd5afc0` (handler): `d843d0(*d5e620(), &status, cb=0xd5af30, …)`。index と useGlobal は stack 渡しで、RetDec では出所が落ちている。前段の `*0x15e45a8` による分岐 (`v3 >= 1`) の意味も未確定。
+- callback `0xd5af30`: `rec+96 = -2`。状態 byte 判定は selectAll と同じ。`index = rec+24`、`useGlobal = rec+32`。`0x1005730(index, useGlobal, &item)`: useGlobal=0 は表 `*0x15e0128` (channel rack)、≠0 は表 `*0x15e2218`。範囲外は 0 を返し `rec+96 = -4`。成功時は `rec+96 = 0`、`0x11e84a0(item+1940)` (表アクセサ。副作用なし)、`0xffaf80(item)`。
+- `0xffaf80` は `0x609710` (item+144..+156 から矩形 4 値) と `0x40c660` (double→int) を呼ぶ UI 座標計算で、選択フラグ `+812` は書かない。排他選択の副作用はこの経路では見えない。次に読む対象: `0xff8a90` の PE 内呼出元。子 [PY-69] (#2499) で扱う。
+
+### 残り 6 関数 (本 run では未解析)
+
+- `setChannelPitch` (0xd5aa30)・`setStepParameterByIndex` (0xd5cec0)・`midiNoteOn` (0xd5c800)・`incEventValue` (0xd58ef0)・`processRECEvent` (0xd58e00) は逆コンパイル未実施。`processRECEvent` は flapi 署名の修正が先。`setChannelPitch` は [PY-69] (#2499)、残り 4 関数は [PY-70] (#2500)。
+
+### 次 run への提案
+
+- selectAll: `0x154528c` (`*p` の指す int32) への書込みを追う。直接の rip 相対参照と、`0x15e3a60` を読んでから書く間接参照の両方が対象。全ての書込みが負の値に限られるなら、段 2 の `obj+80`・`d84f30` を確認してから実装を再検討する。
+- 間接参照の追跡はこの run では未実施 (`pe_disasm.py` の線形走査は未知命令で止まるため、再同期が必要)。
+
+### 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| selectAll の選択値: `*p` (`0x154528c` の int32) の実行時の値と書込み元 (ロード時の初期値は -1) | 通常状態の値が 0 以上なら `item+0x798 == *p` の channel だけが選ばれる。実装は見送り | 未解決表のみ (親 #1527 に残す。子は起票しない) |
+| selectAll のゲート: `obj+80` の通常時の値と `d84f30`、callback の状態 byte | 通常時にゲートが通るかが未確認 (通らないと -2 で何もしない) | 未解決表のみ (親 #1527 に残す) |
+| `ff8b60` の呼出先 `0x1311d90`・`0x4232e0`・`0x1060420`・`0x423980`・`0xfdee80` | 選択フラグ `+812` への間接的な影響は未読 | 未解決表のみ (親 #1527 に残す) |
+| `selectOneChannel` の排他選択の副作用と stack 引数の出所 | `selectOneChannel` は未実装 | [PY-69] #2499 |
+| `setChannelPitch` の意味論 | 未実装 | [PY-69] #2499 |
+| `setStepParameterByIndex`・`midiNoteOn`・`incEventValue` の意味論と `processRECEvent` の flapi 署名修正 | 未実装 4 件 | [PY-70] #2500 |
+| `d843d0` の `425210`・`526190` (同期待ち) の中身 | 同期実行の前提 (callback 完了後に `*result` を読む) が未確認 | 未解決表のみ (親 #1527 に残す) |
+| `c38bc0()`・`0xd82c20` の戻り値の写像 | None 扱いと範囲外 code の根拠が未確認 | 未解決表のみ (親 #1527 に残す) |
+
+## 追加解析 (#2548 の run): setStepParameterByIndex の呼出し経路・status・副作用
+
+本文は `REPORT_PY39_2548.md` に分割移動した (250 行上限のため)。結論: 呼出し経路・status 表・範囲外 `-4`・param 3〜8 の副作用を PE で確定。param 0〜2・item 列挙・述語の型は未確定で、子 issue #2581 (`[PY-78]`) に移した。

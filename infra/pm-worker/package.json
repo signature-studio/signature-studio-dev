@@ -8,7 +8,8 @@
     "test": "node --experimental-strip-types --no-warnings --test 'test/*.test.ts'",
     "test:workers": "vitest run --config vitest.config.ts",
     "build": "bun build src/index.ts --target=browser --format=esm --external 'node:*' --minify --outfile=dist/index.js",
-    "metadata": "node scripts/metadata.mjs"
+    "metadata": "node scripts/metadata.mjs",
+    "test:unit": "vitest run --config vitest.unit.config.ts"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.2",
