@@ -122,16 +122,31 @@ S_P134="${M11_PROBE_134:-0}"   # #134: 1 = 計測用 IR probe (8c5eb0 の arg2�
 if [ "$(cat work/instr_134.stamp 2>/dev/null || echo 0)" != "$S_P134" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_P134" > work/instr_134.stamp
 echo "${M11_SIGFIX_RECOVER:-0}" > work/sigfix_recover.stamp
-if [ ! -f work/boot_final3.ll ] || [ work/boot_final.ll -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
+# #954 (M11-N54): M11_XMM_ARGS=1 = 機械語が xmm0..3 を入力に読む callee の IR 署名へ float/double 引数を復元する (fix_xmm_args.py, #547)。
+#   既定 0 (従来どおり復元しない)。1 のときだけ post (m11_post) の入力を boot_final.xa.ll に差し替える。切替えは stamp で post 結果を無効化する。
+#   M11_XMM_SKIP=f1,f2 は復元から外す関数 (fix_xmm_args.py の --skip-funcs。退行の二分探索用)。
+XMM_S="${M11_XMM_ARGS:-0}:${M11_XMM_SKIP:-}"
+if [ "$(cat work/xmm_args.stamp 2>/dev/null || echo 0)" != "$XMM_S" ]; then rm -f work/boot_final3.ll work/boot_final.xa.ll; fi
+echo "$XMM_S" > work/xmm_args.stamp
+POST_IN=work/boot_final.ll
+if [ "${M11_XMM_ARGS:-0}" = 1 ]; then
+  if [ ! -f work/boot_final.xa.ll ] || [ work/boot_final.ll -nt work/boot_final.xa.ll ] || [ ../plugins/lift/passes/fix_xmm_args.py -nt work/boot_final.xa.ll ]; then
+    SKIP_ARG=""; [ -n "${M11_XMM_SKIP:-}" ] && SKIP_ARG="--skip-funcs $M11_XMM_SKIP"
+    python3 ../plugins/lift/passes/fix_xmm_args.py work/boot_final.ll work/boot_final.xa.tmp.ll --pe "$PE_QS" --report work/xmm_args_report.json $SKIP_ARG
+    mv work/boot_final.xa.tmp.ll work/boot_final.xa.ll
+  fi
+  POST_IN=work/boot_final.xa.ll
+fi
+if [ ! -f work/boot_final3.ll ] || [ "$POST_IN" -nt work/boot_final3.ll ] || [ m11_post.py -nt work/boot_final3.ll ] || [ m11_argrecover.py -nt work/boot_final3.ll ]; then
   # M11_SIGFIX_RECOVER=1 (#131): sigfix の 0 詰め site を機械語突合し、定数代入が確定する引数だけ復元 (m11_argrecover.py)
   if [ "${M11_SIGFIX_RECOVER:-0}" = 1 ]; then
     PE="${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
-    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --pads work/sigfix_pads.json
     FIXES="${M11_SIGFIX_FIXES:-work/sigfix_fixes.json}"
     [ -n "${M11_SIGFIX_FIXES:-}" ] || python3 m11_argrecover.py work/sigfix_pads.json --pe "$PE" --lb "$M11_LB_BASE" --out "$FIXES"
-    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json --fixes "$FIXES"
   else
-    python3 m11_post.py work/boot_final.ll work/boot_final3.ll --report work/post_report.json
+    python3 m11_post.py "$POST_IN" work/boot_final3.ll --report work/post_report.json
   fi
 fi
 if [ "$S_P134" = 1 ]; then python3 trap_triage/probe134_ir.py work/boot_final3.ll || exit 1; fi   # #134 計測専用 (既定 0 では何もしない)
