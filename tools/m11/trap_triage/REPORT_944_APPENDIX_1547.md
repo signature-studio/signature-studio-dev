@@ -4,7 +4,8 @@
 
 ## 9. #1547 追記: unit 158 の観測副作用の切り分け (受入条件 1〜3)
 
-測定 commit: **`49f5dd63`** (コードを変えた最後の commit。`m11_rt.c` に `M11_DEST_GUARD` (既定 0) を追加し、`m11_build.sh` の `CF` に 1 語足した)。`git diff 49f5dd63 HEAD -- tools/m11` は本節の文書追記のみ。
+測定 commit: **`49f5dd63`** (`m11_rt.c` に `M11_DEST_GUARD` (既定 0) を追加し、`m11_build.sh` の `CF` に 1 語足した)。後続の `1f6c107b` は `m11_build.sh` の `rt.o` 作り直し stamp (`S_NEG`) に `M11_DEST_GUARD` を足しただけで、測定値の計算には影響しない。
+再検証 (HEAD `1f6c107b`・直列・単発): `repro_1389.sh` PASS (OFF/OFF 再実行 227 件一致、ON は 0x26d1a0 j=12 の 1 件差)。ガード 1 の build + survey は ok 870 / trap 24 / clobber 0、dest 記録 227 件、st=3 は 0 件 (`work/g1chk`)。既定 survey は 870/24/0 (12.447 s、load 0.88)。
 
 ### 9.1 測定 (実測・直列・単発)
 
