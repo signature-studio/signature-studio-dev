@@ -140,6 +140,7 @@
 | `tools/icall/REPORT_APPENDIX_1592.md` | ~67 | icall #1592 (ICALL-33): 警告 10 件の出所 (段の帰属は #1456 の BIR 段記述と未突合) と 366 site 落ちの独立性 (A〜D 再現・`roundtrip.sh` 書換え後 C/D 集合とも 366 落ち)。DEFECTS 行案は保留。未了は子 #1776 |
 | `tools/icall/REPORT_APPENDIX_1776.md` | ~82 | icall #1776 (ICALL-39): 警告 10 件の段の帰属 (LLVM→HLL の CFG 構築 2 件・copy-propagation 系の再構築 8 件) と `addEdgeFromVector()` の発生箇所 (upstream v5.0 で確認)。statement 単位の出所と最終出力への影響は未了 (子 #1861 `[ICALL-46]`)。DEFECTS 行案は保留 |
 | `tools/icall/REPORT_APPENDIX_1763.md` | ~59 | icall #1763 (ICALL-38): OTT F の jt 比較列 8 site の jt_present→jt_dropped 遷移の切り分け。rewrite 側の展開は 8 site とも生成済み。after IR で比較列区間の `insn.addr` が 0 件 (RetDec の switch 畳み込みが有力だが未確定)。before 段階で落ちていた 1 件 (0x1801a31fb) は未切り分け。未解決は子 #1839 (ICALL-42) |
+| `tools/icall/REPORT_APPENDIX_1589.md` | ~80 | icall #1589 (ICALL-32): jmp [mem] 走査 (現 HEAD: 250 関数 / 267 site。前 run の 265 / 288 は再現できず) と block24412 の before/after 分類変化 (lost 2→0、現 HEAD で再測定)。jt_dropped>0 の件数は現 audit 未確認 (旧 audit 記録のみ)。RetDec 復元か rewrite 計数かは未切り分け。受入条件 1 は未達 (次 run で実施。素材: plugins-ott / plugins-freshair) |
 | `tools/icall/REPORT_APPENDIX_1402.md` | ~21 | icall #1402 (ICALL-26) の jmp [mem] 形 jump table の cmp/je 展開 (jtm) の実装と、FLEngine 0x40d210--0x40d31b の before/after 実測 (dropped 0→0・未解決 → #1589)。REPORT_APPENDIX.md は 250 行上限のため増やさず別置き |
 | `tools/icall/disp_size/REPORT.md` | ~160 | capstone `disp_size` 誤り (D9) の水平展開監査 |
 | `tools/icall/landing/REPORT.md` | ~165 | Delphi unwind landing pad の抽出と lift |
