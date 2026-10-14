@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Blend2D.dll (block24339) と dsp_ippv2 (block24356) の AggCreateInstance の vtable を slot 単位で突き合わせる (T-SH-02, #146)。
 # 使い方: FL_WIN64_DIR=<fl-win64 展開先> python3 agg2d_vtable_cmp.py [出力 JSON]
-# 依存: pefile, capstone。agg2d_vtable.py の find_ctor_and_vtable / classify を流用する。
+# 依存: pefile, capstone。agg2d_vtable.py の find_ctor_and_vtable を流用する。
 # 出力の既定は tools/shared/work/ (gitignore)。
 import collections
 import json

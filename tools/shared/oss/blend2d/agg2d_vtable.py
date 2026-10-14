@@ -19,6 +19,8 @@ DEFAULT_OUT = os.path.join(REPO, "tools", "shared", "work", "agg2d_vtable.json")
 DLL_BLOCK = os.environ.get("AGG2D_BLOCK", "block24339_PE.bin")
 # AggCreateInstance の逆アセンブルで確認した値 (REPORT_AGG2D.md §5)。block24339 の検証用。
 KNOWN = {"block24339_PE.bin": (0x1800568A0, 0x1801DBEC0)}
+# agg2d_callees.py・agg2d_lift_probe.py が import する値。既定以外の DLL では None になり、import 側が落ちる。
+CTOR_VA, VTABLE_VA = KNOWN.get(DLL_BLOCK, (None, None))
 
 
 def classify(md, data, base, rva, text_lo, text_hi):
