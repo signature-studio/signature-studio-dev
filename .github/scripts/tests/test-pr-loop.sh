@@ -501,6 +501,31 @@ setup bbb '[]' 0
 FAKE_FAIL_PATH=repos/o/r/pulls/7 run_snap false > "$TMP/snap.out" 2>&1; rc=$?
 { [ "$rc" -ne 0 ] && ! grep -q 'OC_RECORD_OK' "$TMP/env" && grep -qx 'stop=true' "$TMP/out"; }; expect "snapshot: head を読めなければ OC_RECORD_OK を残さず stop=true" $?
 
+# gate が通った後 (agent の順番待ちの間) に停止条件が付いた場合: snapshot が止め、OC_RECORD_OK を残さない (#2873)
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"
+fx repos/o/r/issues/7 '{"labels":[{"name":"oc:stuck"}]}'
+: > "$TMP/out"; : > "$LOG"
+run_snap "$g" > /dev/null 2>&1; rc=$?
+{ [ "$g" = false ] && [ "$rc" -eq 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=stuck-label' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! grep -q OC_HEAD_BEFORE "$TMP/env" && ! logged 'issues/7/labels' && ! logged 'pr comment'; }; expect "snapshot: gate の後に oc:stuck が付いた -> stop=true・reason=stuck-label・rc=0・OC_RECORD_OK を残さず、何も投稿しない" $?
+
+setup aaa '[]' 0
+fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
+run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"
+fx repos/o/r/pulls/7 '{"state":"closed","merged":true,"head":{"sha":"aaa"}}'
+: > "$TMP/out"; : > "$LOG"
+run_snap "$g" > /dev/null 2>&1; rc=$?
+{ [ "$g" = false ] && [ "$rc" -eq 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=not-open' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "snapshot: gate の後に merge・close された -> stop=true・reason=not-open・OC_RECORD_OK を残さない" $?
+
+setup aaa '[]' 1
+review_event aaa
+GITHUB_EVENT_PATH="$TMP/event.json" run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"
+fx repos/o/r/pulls/7 '{"state":"open","head":{"sha":"bbb"}}'
+: > "$TMP/out"; : > "$LOG"
+GITHUB_EVENT_PATH="$TMP/event.json" run_snap "$g" > /dev/null 2>&1; rc=$?
+{ [ "$g" = false ] && [ "$rc" -eq 0 ] && grep -qx 'stop=true' "$TMP/out" && grep -qx 'reason=stale-head' "$TMP/out" && ! grep -q OC_RECORD_OK "$TMP/env" && ! logged 'pr comment' && ! logged 'issues/7/labels'; }; expect "snapshot: gate の後に head が進み、差し戻しが古い head になった -> stop=true・reason=stale-head・OC_RECORD_OK を残さない" $?
+
 setup aaa '[]' 0
 fx repos/o/r/pulls/7/reviews "$(seq_rv doc 3 1)"
 run_gate > /dev/null 2>&1; g="$(sed -n 's/^stop=//p' "$TMP/out")"

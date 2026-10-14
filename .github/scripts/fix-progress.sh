@@ -8,6 +8,7 @@
 #                 途中で失敗したら stop=true と reason=record-failed を出して非 0 で終わる (下の record と同じ)。
 #   snapshot      agent の起動直前の PR head と時刻を $GITHUB_ENV に記録する (#2873)。implement job で走る。
 #                 OC_GATE_STOP (gate の stop) が false のときだけ OC_RECORD_OK=1 を残す。それ以外は失敗する (fail-closed)。
+#                 gate の後に付いた停止条件 (pre_stop) も起動直前に見る。止めるなら stop=true と reason を出して 0 で終わる (OC_RECORD_OK は残さない)。
 #   record        gate と snapshot を続けて行う旧経路 (移行中の互換。#2323・#2622・#2869)。
 #                 窓 = 直近の oc-fix-limit / oc-fix-reset コメント以降の差し戻し (印は MARK_LOGIN の投稿だけを数える。#2622)。窓が MAX 件に達したら、
 #                 直近 3 件が機械的な類型のみ・繰り返し無し・合計が天井未満なら次の窓へ進める (oc-fix-reset)。
@@ -115,31 +116,41 @@ DECIDE='
 | {decision: $d, n: $n, total: $total, k: ($rs + 1)}
 '
 
-# gate_run <pr_json>: 窓の判定と印の投稿 (record と gate が呼ぶ)。結果は stop (true/false) と reason に入れる。
-# $GITHUB_ENV と $GITHUB_OUTPUT は書かない (呼び出し側が書く)。
-gate_run() {
-  local pr_json="$1" head_now pr_state review_commit labels cm rv dec decision n total k hour_ago recent
+# pre_stop <pr_json>: 起動を止める条件を見る (gate と snapshot が呼ぶ。#2873)。
+# oc:stuck の付いた PR・open でない PR・古い head への差し戻し (review の commit が現在の head と違う) は止める。
+# 止める理由を $pre_reason に入れる (止めないなら空)。PR へのコメントとラベルは付けない (呼び出し側が決める)。
+pre_stop() {
+  local pr_json="$1" head_now pr_state review_commit labels
   head_now="$(jq -r .head.sha <<< "$pr_json")"
   pr_state="$(jq -r .state <<< "$pr_json")"
   # 差し戻しの元になった review の commit (pull_request_review の event payload にだけある。repository_dispatch では空)
   review_commit="$(jq -r '.review.commit_id // empty' "${GITHUB_EVENT_PATH:-/dev/null}" 2> /dev/null || true)"
-  # 上限ガード: ラベルが付いている PR は fix を起動しない。
-  # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
-  stop=false
+  pre_reason=""
   # 取得の失敗で止まる (set -e)。pipefail 付きの if では API の失敗が『ラベル無し』と判定されてしまうため分ける (#2638 m2)。
   labels="$(gh api "repos/$OC_REPO/issues/$OC_PR_NUMBER" --jq '.labels[].name')"
   if grep -qx "$STUCK_LABEL" <<< "$labels"; then
-    stop=true
-    reason=stuck-label
+    pre_reason=stuck-label
     echo "PR #$OC_PR_NUMBER already has $STUCK_LABEL: the fix run is skipped"
   elif [ "$pr_state" != open ]; then
-    stop=true
-    reason=not-open
+    pre_reason=not-open
     echo "::notice::PR #$OC_PR_NUMBER is $pr_state (not open): the fix run is skipped"
   elif [ -n "$review_commit" ] && [ "$review_commit" != "$head_now" ]; then
-    stop=true
-    reason=stale-head
+    pre_reason=stale-head
     echo "::notice::the CHANGES_REQUESTED review is for ${review_commit:0:7}, but the PR head is now ${head_now:0:7}: the fix run is skipped"
+  fi
+}
+
+# gate_run <pr_json>: 窓の判定と印の投稿 (record と gate が呼ぶ)。結果は stop (true/false) と reason に入れる。
+# $GITHUB_ENV と $GITHUB_OUTPUT は書かない (呼び出し側が書く)。
+gate_run() {
+  local pr_json="$1" cm rv dec decision n total k hour_ago recent
+  # 上限ガード: ラベルが付いている PR は fix を起動しない (pre_stop)。
+  # 止めたことは PR に 1 回だけコメントし、ラベルで PM に引き渡す (watchdog もこのラベルで止まる)。
+  stop=false
+  pre_stop "$pr_json"
+  if [ -n "$pre_reason" ]; then
+    stop=true
+    reason="$pre_reason"
   else
     cm="$(gh api --paginate "repos/$OC_REPO/issues/$OC_PR_NUMBER/comments" | jq -s '[.[][]]')"
     rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
@@ -210,8 +221,17 @@ case "${1:-}" in
       echo "::error::fix-progress snapshot: the window gate did not pass (OC_GATE_STOP=${OC_GATE_STOP:-unset})" >&2
       exit 1
     fi
-    head_now="$(pr_head)"
+    pr_json="$(gh api "repos/$OC_REPO/pulls/$OC_PR_NUMBER")"
+    head_now="$(jq -r .head.sha <<< "$pr_json")"
     [ -n "$head_now" ] || exit 1
+    # gate の後に付いた停止条件 (oc:stuck・close・古い head への差し戻し) を起動直前に見る (#2873)。
+    # gate と同じく stop=true と reason を出して緑で終える。OC_RECORD_OK を残さないので agent は起動しない。
+    pre_stop "$pr_json"
+    if [ -n "$pre_reason" ]; then
+      printf 'stop=true\nreason=%s\n' "$pre_reason" >> "$GITHUB_OUTPUT"
+      OC_RECORD_DONE=1
+      exit 0
+    fi
     {
       printf 'OC_HEAD_BEFORE=%s\n' "$head_now"
       printf 'OC_START_TS=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
