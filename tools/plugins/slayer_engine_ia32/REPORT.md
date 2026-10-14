@@ -244,5 +244,5 @@ ia32 で要注意の mnemonic (件数): cdq 21 / movzx 51 / movsx 54 / lea 590 /
 
 ## 13. native vs wasm の差分試験 (#1223、測定は付録)
 
-- 結論: leaf 関数 4 本 (`0x10001b40`・`0x10009300`・`0x1000d77e`・`0x10008630`) を native 機械語と wasm (ia32 lift) で実行し、eax と OBJ 領域 128 B を bit 単位で突合した。 256 / 256 件一致。 ネガコン 1 bit で FAIL を確認。 export `main` と x87 関数は未達。
+- 結論: leaf 関数 4 本 (`0x10001b40`・`0x10009300`・`0x1000d77e`・`0x10008630`) を native 機械語と wasm (ia32 lift) で実行し、eax と OBJ 領域 128 B を bit 単位で突合した。 全件一致。 ネガコン 1 bit で FAIL を確認。 export `main` (子 #3127)・x87 関数 (#2989) は未達。 実行時の間接 call・sahf の AF・fs: の TEB は未検証 (子 #3128)。
 - 測定値・方式・制約・再現は [REPORT_APPENDIX_1223.md](REPORT_APPENDIX_1223.md) (正本)。
