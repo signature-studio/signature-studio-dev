@@ -175,7 +175,7 @@ $ git diff 53835669 HEAD -- tools/python/host tools/python/provider tools/python
 
 main (`65ea0ce3`) との競合は 3 件 (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/provider_check.mjs`)。main 側の PY-121 (#2985・screen 5 関数) の追加と本件の追加が同じ位置に並んだもので、両側を残した (削除なし)。`provider_check.mjs` の期待値は、本件 `pe120` (1 件) と main の `pe121` (5 件) を合算して、実装 98・未実装 337 にした (main 単独は 97・338、本件単独は 93・342)。
 
-測定 commit: `a18f0927` (コードを変えた最後の commit。merge)。環境: runner (4 core)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` は fl-win64 から DATA block 4 件 (block24429・block24430・block25159・block24618) と PE 本体 `block00031_PE.bin` だけを展開した先。emsdk は `/opt/emsdk` (6.0.12・`EMSDK_ENV` の既定)。
+測定 commit: `a18f0927` (コードを変えた最後の commit。merge)。環境: runner (4 core)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` は fl-win64 から DATA block 4 件 (block24429・block24430・block25159・block24618) と PE 本体 `block00031_PE.bin` だけを展開した先。emsdk は [EMSDK] (6.0.12・`EMSDK_ENV` の既定)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
