@@ -58,6 +58,7 @@
 - ユニット (`python3 tests/test_unit.py` 相当): T1〜T5・T7〜T26 は PASS (T17b は `LL_XRET_*` 未設定で skip。`work/cab2863/run_each.py` で個別実行)。**T6 は FAIL**: `tools/targets/freshair/work/...` (FA の `SlateCore.core_64`) が無いため `FileNotFoundError`。本 run の素材に無く、修復とは無関係。
 - `bash tools/liftlib/liftlib_e2e.sh --quick`: **rc=2** (前提検査で停止)。`前提が無い: .../targets/freshair/work/win/Fresh Air/.../SlateCore.core_64 (bash tools/targets/freshair/fetch.sh)`。FA と KH の展開物は本 run に無い。必要な `oc_artifacts` 名は `work-liftlib-targets` `plugins-freshair` `plugins-kilohearts` (本 issue の `oc_artifacts:` 行には含まれているが、直近の依頼コメントの行には含まれていなかった)。
 - 修正 run (2026-10-14・fix モード・コード差分 0・文書のみ修正): `$ARTIFACTS_DIR` の一覧を確認し、3 名は無かった (§4 末尾の素材一覧と同じ)。`bash tools/liftlib/liftlib_e2e.sh --quick` を HEAD で実行 → rc=2 (前提検査で停止: `targets/freshair/work/win/Fresh Air/...` が無い。前提検査は最初の不足で止まるため kilohearts は未検査。`$ARTIFACTS_DIR` に `work-liftlib-targets` は無い)。FA/KH 部分と T6 は未実行。素材の付いた run でこの節を実測値に置き換える。
+- 修正 run の HEAD で再現 (コード差分 0): `python3 -m liftlib ott --auto none` → **PASS** (IR 一致 7 項目 true・e2e checks 8/0・出力 SHA 42/42 equal・11.67 s。単独 run・load は未採取)。`tests/test_unit.py` の `t26()` を単独実行 → ok。作業用の `work/` は main の展開済みを `cp -a` で `tools/{m6,ott,m8,m9,m10,liftlib}/work` へ複写した (m8・m9・m10 を省くと O4 と outhash が「参照が無い」で NG になる)。
 - 素材の確認: `$ARTIFACTS_DIR` (R2 から展開された素材の置き場) には `fl-win64`・`toolchain-retdec`・`toolchain-emsdk`・`plugins-ott`・`analysis-ott-binaries`・`work-m6-ott`・`work-liftlib`・`work-icall`・`work-fw-stage1` のみ。展開先の `tools/targets/{freshair,kilohearts}/work` は存在しない。
 
 ## 5. 分岐書換えの実測と未解決
