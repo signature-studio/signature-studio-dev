@@ -81,7 +81,7 @@ PE から確定した契約 (保留の中身。実装には使わない):
 
 環境 (`13b6ae46` の測定): runner 4 core、load average は開始時 0.29 (`uptime`、20:52)、検証時 0.10 (21:04)。`FL_WIN64_DIR` は `[WIN64]` の展開先 (`block00031_PE.bin` と DATA 4 本を展開)。emsdk は `[EMSDK]` (6.0.12)。
 環境 (`97c60b6c` の probe 再実行): `FL_WIN64_DIR` は `$RUNNER_TEMP/fl-win64` (`extracted/block00031_PE.bin` と DATA 4 本を `tar --zstd -xf` の `--wildcards` で展開)。
-環境 (`13087005` の再実行): 素材は `$HOME/artifacts` の `fl-win64` と `toolchain-emsdk` (`/opt/emsdk`、emcc 6.0.12)。`fl-win64` から `extracted/block00031_PE.bin` と DATA 4 本 (block24429・24430・25159・24618) を `--wildcards` で展開 (2.96 秒)。runner 4 core、load average は開始時 0.43 (21:34:46)。
+環境 (`13087005` の再実行): 素材は `$HOME/artifacts` の `fl-win64` と `toolchain-emsdk` (`[EMSDK]`、emcc 6.0.12)。`fl-win64` から `extracted/block00031_PE.bin` と DATA 4 本 (block24429・24430・25159・24618) を `--wildcards` で展開 (2.96 秒)。runner 4 core、load average は開始時 0.43 (21:34:46)。
 
 前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 2.7 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、5.96 秒)・`bash provider/build.sh` (rc 0、1.28 秒、ハンドラ 86)。旧測定の生成物は `13b6ae46` の環境 (3 分 31 秒・4.6 秒) で、下表は `13087005` の再実行。
 
