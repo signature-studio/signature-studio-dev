@@ -89,6 +89,10 @@ static void __attribute__((ms_abi)) da6c00_probe(void* T, int id, int idx, int r
     ((da6c00_t)(g_p_da))(T, id, idx, r9);
     patch12(g_p_da, (const void*)&da6c00_probe, g_sv_da);
 }
+/* FA-32 (#2306) FA_NODE1_ZOBJ 用の偽オブジェクトの slot (host 関数。guest の call [vtbl+0x50] / [vtbl+0x18] から呼ばれる) */
+static unsigned char* g_fz_out; static unsigned char* g_fz_ctl;   /* out = shared_ptr {obj, ctrl} (16B) */
+static void __attribute__((ms_abi)) fz_set(void* self, void** out, int id) { (void)self; (void)id; out[0] = g_fz_out; out[1] = g_fz_ctl; }
+static void __attribute__((ms_abi)) fz_ret(void* self, void** out) { (void)self; out[0] = NULL; out[1] = NULL; }
 #define W64(b, o, v) do { uint64_t _t = (uint64_t)(uintptr_t)(v); memcpy((b) + (o), &_t, 8); } while (0)
 #define W32(b, o, v) do { uint32_t _t = (uint32_t)(v); memcpy((b) + (o), &_t, 4); } while (0)
 static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsigned char** Ck, unsigned char** Wk,
@@ -129,7 +133,12 @@ static void build_tree(uint8_t* im, unsigned char** Fp, unsigned char** Mp, unsi
         /* FA-16: 1 ノードを木に入れる (FA_NODE1=1 のときのみ。既定 OFF = 既存 baseline found=0 を維持)。
          * map 経路の探索 key は keycnt (0x180ca1499 の edx) なので node key = 1。
          * node: +0 left, +8 parent, +0x10 right, +0x19 isnil, +0x20 key(u16), +0x28 value, +0x30 blk */
-        if (getenv("FA_NODE1")) { unsigned char* N = gr_alloc(0x40); unsigned char* Z = gr_alloc(0x40); unsigned char* NB = gr_alloc(0x30);
+        /* FA-32 (#2306): FA_NODE1_ZBIG=1 は node 値 Z を 0x2400 (zero 埋め) にする診断、FA_NODE1_ZOBJ=1 はさらに Z+0x2c0 に
+         * vtable 付きの偽オブジェクト (slot +0x50/+0x18 = host の no-op) を置く診断。既定 OFF (REPORT_APPENDIX_FA32.md §2) */
+        if (getenv("FA_NODE1")) { unsigned char* N = gr_alloc(0x40); unsigned char* Z = gr_alloc(getenv("FA_NODE1_ZBIG") || getenv("FA_NODE1_ZOBJ") ? 0x2400 : 0x40); unsigned char* NB = gr_alloc(0x30);
+          if (getenv("FA_NODE1_ZOBJ") && k == 0) { static uint64_t vtf[32]; vtf[0x50 / 8] = (uint64_t)(uintptr_t)&fz_set; vtf[0x18 / 8] = (uint64_t)(uintptr_t)&fz_ret;
+            unsigned char* FO = calloc(1, 0x40); W64(FO, 0, vtf); W64(Z, 0x2c0, FO); g_fz_out = calloc(1, 0x40); W64(g_fz_out, 0, vtf);
+            static uint64_t vtcb[4]; vtcb[1] = vtcb[2] = 0x1803b4070ULL; g_fz_ctl = calloc(1, 0x30); W64(g_fz_ctl, 0, vtcb); W32(g_fz_ctl, 8, 0x40); W32(g_fz_ctl, 0xc, 0x40); }
           memset(N, 0, 0x40); memset(Z, 0, 0x40); memset(NB, 0, 0x30);
           unsigned short k1 = 1; memcpy(N + 0x20, &k1, 2);
           W64(N, 0x00, C + 0x21b8); W64(N, 0x08, C + 0x21b8); W64(N, 0x10, C + 0x21b8);

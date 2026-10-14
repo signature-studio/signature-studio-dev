@@ -28,7 +28,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
 usage: x64c.py --pe DLL --entries entries.json --out out_dir [--closure N] [--override VA=CNAME]
                [--img 0x400000] [--shift 0] [--img-size 0x18c0000] [--impbase 0x1D80000]
 """
-import sys, json, struct, argparse, bisect, collections, os, shutil
+import sys, json, struct, argparse, bisect, collections, os, shutil, contextlib
 import pefile
 import capstone
 from capstone import *
@@ -1544,6 +1544,7 @@ def main():
     ap.add_argument('--shift', type=lambda x: int(x, 0), default=0)
     ap.add_argument('--img-size', type=lambda x: int(x, 0), default=0x18c0000)
     ap.add_argument('--impbase', type=lambda x: int(x, 0), default=0x1D80000, help='IAT slot に敷設する pseudo-VA 基準 (dispatch が imp 呼出に解決)')
+    ap.add_argument('--shards', type=int, default=1, help='N>1 で fle_lifted.c を fle_lifted_s<k>.c (k<N) の N 本に分ける (関数は i%%N、ott_dispatch・weak imp・imp_tab は shard 0 のみ。1 は従来の単一ファイル)')
     a = ap.parse_args()
     IMG = a.img; SHIFT = a.shift; IMG_SIZE = a.img_size
     overrides = {int(x.split('=')[0], 16): x.split('=')[1] for x in a.override}
@@ -1594,7 +1595,8 @@ def main():
         queue = sorted(newc)
     out = a.out
     os.makedirs(out, exist_ok=True)
-    body_path = os.path.join(out, 'fle_lifted.body.tmp')
+    nsh = max(1, a.shards)
+    body_paths = [os.path.join(out, 'fle_lifted.body%d.tmp' % k) for k in range(nsh)]
     unsup = collections.Counter()
     unl = collections.Counter()
     unsup_sites = []
@@ -1602,8 +1604,10 @@ def main():
     ninsn = 0
     textrefs = set()
     jt_ranges = set()
-    with open(body_path, 'w') as bf:
-        for e in sorted(done):
+    with contextlib.ExitStack() as stack:
+        bfs = [stack.enter_context(open(p, 'w')) for p in body_paths]
+        for i, e in enumerate(sorted(done)):
+            bf = bfs[i % nsh]
             f = FnLift(pe, e, known, md, thunks)
             bf.write(('void f_%x(void) { %s(); }' % (e, overrides[e])) if e in overrides else f.lift())
             bf.write('\n')
@@ -1624,36 +1628,39 @@ def main():
     used_imps = sorted(used_imps)
     slots = sorted(pe.iat)                       # IAT slot VA (DLL 宣言順でなく VA 順で固定)
     imp_names = [pe.iat[s] for s in slots]
-    with open(os.path.join(out, 'fle_lifted.c'), 'w') as fh:
-        fh.write('#include "fle_cpu.h"\n')
-        for nm in used_imps:
-            fh.write('void imp_%s(void);\n' % nm)
-        for c in sorted(set(overrides.values())):
-            fh.write('void %s(void);\n' % c)
-        for e in sorted(done):
-            fh.write('void f_%x(void);\n' % e)
-        with open(body_path) as bf:
-            shutil.copyfileobj(bf, fh)
-        os.remove(body_path)
-        # 間接 dispatch: lifted 関数表 + IAT pseudo-VA 経路
-        # (FLE-2: 冒頭に optional probe hook — boot 側で計数/トレースする。未設定なら何もしない)
-        fh.write('void ott_dispatch(uint64_t t) {\n')
-        fh.write('  if (fle_dispatch_probe) fle_dispatch_probe(t);\n  switch (t) {\n')
-        for e in sorted(done):
-            fh.write('  case %s: f_%x(); return;\n' % (hx(sh(e)), e))
-        for tv2 in sorted(thunks):
-            fh.write('  case %s: imp_%s(); return;\n' % (hx(sh(tv2)), thunks[tv2]))
-        fh.write('  default: break;\n  }\n')
-        if slots:
-            fh.write('  if (t >= IMP_VA_BASE && t < IMP_VA_BASE + %du) { imp_by_index((int)(t - IMP_VA_BASE)); return; }\n' % len(slots))
-        fh.write('  ott_unlifted(t);\n}\n')
-        for nm in used_imps:
-            fh.write('__attribute__((weak)) void imp_%s(void) { extern void ott_missing_import(const char*); ott_missing_import("%s"); }\n' % (nm, nm))
-        # imp_by_index: IAT slot 順 (slot VA 昇順) の関数表
-        fh.write('static void imp_unimpl(void) { ott_missing_import("(unresolved import)"); }\n')
-        fh.write('static void (*const imp_tab[])(void) = {\n')
-        fh.write(',\n'.join('  imp_%s' % nm if nm in used_imps else '  imp_unimpl' for nm in imp_names))
-        fh.write('\n};\nvoid imp_by_index(int k) { if (k < 0 || k >= %d) { ott_missing_import("(oob import)"); return; } imp_tab[k](); }\n' % len(slots))
+    names = ['fle_lifted.c'] if nsh == 1 else ['fle_lifted_s%d.c' % k for k in range(nsh)]
+    for k, name in enumerate(names):
+        with open(os.path.join(out, name), 'w') as fh:
+            fh.write('#include "fle_cpu.h"\n')
+            for nm in used_imps:
+                fh.write('void imp_%s(void);\n' % nm)
+            for c in sorted(set(overrides.values())):
+                fh.write('void %s(void);\n' % c)
+            for e in sorted(done):
+                fh.write('void f_%x(void);\n' % e)
+            with open(body_paths[k]) as bf:
+                shutil.copyfileobj(bf, fh)
+            os.remove(body_paths[k])
+            if k: continue
+            # 間接 dispatch: lifted 関数表 + IAT pseudo-VA 経路
+            # (FLE-2: 冒頭に optional probe hook — boot 側で計数/トレースする。未設定なら何もしない)
+            fh.write('void ott_dispatch(uint64_t t) {\n')
+            fh.write('  if (fle_dispatch_probe) fle_dispatch_probe(t);\n  switch (t) {\n')
+            for e in sorted(done):
+                fh.write('  case %s: f_%x(); return;\n' % (hx(sh(e)), e))
+            for tv2 in sorted(thunks):
+                fh.write('  case %s: imp_%s(); return;\n' % (hx(sh(tv2)), thunks[tv2]))
+            fh.write('  default: break;\n  }\n')
+            if slots:
+                fh.write('  if (t >= IMP_VA_BASE && t < IMP_VA_BASE + %du) { imp_by_index((int)(t - IMP_VA_BASE)); return; }\n' % len(slots))
+            fh.write('  ott_unlifted(t);\n}\n')
+            for nm in used_imps:
+                fh.write('__attribute__((weak)) void imp_%s(void) { extern void ott_missing_import(const char*); ott_missing_import("%s"); }\n' % (nm, nm))
+            # imp_by_index: IAT slot 順 (slot VA 昇順) の関数表
+            fh.write('static void imp_unimpl(void) { ott_missing_import("(unresolved import)"); }\n')
+            fh.write('static void (*const imp_tab[])(void) = {\n')
+            fh.write(',\n'.join('  imp_%s' % nm if nm in used_imps else '  imp_unimpl' for nm in imp_names))
+            fh.write('\n};\nvoid imp_by_index(int k) { if (k < 0 || k >= %d) { ott_missing_import("(oob import)"); return; } imp_tab[k](); }\n' % len(slots))
     # IAT slot → pseudo-VA index map (data 側の敷設に使う)
     iat_names = {}
     for idx, s in enumerate(slots):

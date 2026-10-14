@@ -237,6 +237,67 @@ body="$(grep 'issues/42/comments' "$LOG" | head -1)"
 ! printf '%s' "$body" | grep -qE '(^|[[:space:]])/(oc|opencode)([[:space:]]|$)'
 expect "the outcome comment never contains a /oc command" $?
 
+# ------------------------------------------------------------------ detect-rate-limit.sh (#2344)
+# フィクスチャは opencode 2.0.26 に偽上流 (429 / 503 cooling down) を当てて得た実出力の error 行
+echo "== detect-rate-limit.sh"
+FX_429="$HERE/fixtures/opencode-2.0.26-rate-limit-429.jsonl"
+FX_503="$HERE/fixtures/opencode-2.0.26-rate-limit-503-cooldown.jsonl"
+det_reset() { reset; rm -f "$TMP/oc.jsonl"; }
+detect() { OC_OUTPUT_FILE="$TMP/oc.jsonl" bash "$SCRIPTS/detect-rate-limit.sh" "$@" > "$TMP/det" 2>&1; RC=$?; }
+
+# a. error 行の率制限 (429) -> annotation + cause=rate_limit。番号を渡すと対象にマーカー 1 件 (本文に /oc 無し)
+det_reset; cp "$FX_429" "$TMP/oc.jsonl"; fx repos/o/r/issues/42/comments '[]'
+detect 42
+{ [ $RC = 0 ] && grep -q '^::error title=oc-rate-limit::' "$TMP/det" && grep -qx 'cause=rate_limit' "$TMP/det" \
+  && [ "$(grep -c 'api -X POST repos/o/r/issues/42/comments' "$LOG")" = 1 ] && logged 'cause=rate_limit run=555 -->' \
+  && ! grep 'issues/42/comments' "$LOG" | grep -qE '(^|[[:space:]])/(oc|opencode)([[:space:]]|$)'; }
+expect "error line rate_limit (429, opencode 2.0.26 output) -> annotation + one marker comment on #42" $?
+
+# a2. 503 + 「credentials are cooling down」(本番の文言に近い形) も error 行で検知する
+det_reset; cp "$FX_503" "$TMP/oc.jsonl"
+detect
+{ [ $RC = 0 ] && grep -qx 'cause=rate_limit' "$TMP/det" && not_logged 'api -X POST'; }
+expect "error line 503 'credentials cooling down' rate_limit_error (opencode 2.0.26 output) -> detected (no target: no comment)" $?
+
+# b. ネガコン: error 行でも率制限でない原因 (Argument list too long) -> 検知しない
+det_reset; printf '%s\n' '{"type":"error","timestamp":1,"sessionID":"ses_x","error":{"type":"unknown","message":"Argument list too long"}}' > "$TMP/oc.jsonl"
+detect 42
+{ [ $RC = 0 ] && [ ! -s "$TMP/det" ] && not_logged 'api -X POST'; }
+expect "error line for another cause (Argument list too long) -> not detected (negative control)" $?
+
+# c. ネガコン: text 行に rate_limit_error という語が出るだけ -> 検知しない (error 行だけを見る)
+det_reset; answer '率制限 rate_limit_error を確認しました。着手します。'
+detect 42
+{ [ $RC = 0 ] && [ ! -s "$TMP/det" ] && not_logged 'api -X POST'; }
+expect "text block mentions rate_limit_error only -> not detected (negative control)" $?
+
+# d. 同じ run で 2 回呼んでもマーカーは 1 件 (2 回目は既存のマーカーを見て付けない)
+det_reset; cp "$FX_429" "$TMP/oc.jsonl"; fx repos/o/r/issues/42/comments '[]'
+detect 42
+fx repos/o/r/issues/42/comments '[{"user":{"type":"Bot"},"body":"[rate-limit] x\n<!-- oc-run-outcome: cause=rate_limit run=555 -->"}]'
+detect 42
+{ [ $RC = 0 ] && [ "$(grep -c 'api -X POST repos/o/r/issues/42/comments' "$LOG")" = 1 ] && grep -q 'already has' "$TMP/det"; }
+expect "same run called twice -> still one marker (idempotent)" $?
+
+# e. 出力ファイルが無い (setup 失敗・cancel) -> 何もせず 0 (gh も呼ばない)
+det_reset; rm -f "$TMP/oc.jsonl"
+detect 42
+{ [ $RC = 0 ] && [ ! -s "$TMP/det" ] && [ ! -s "$LOG" ]; }
+expect "no output file -> nothing, exit 0, no gh call" $?
+
+# f. record-run-outcome.sh (implement の経路): PR 無し + 率制限 -> no-pr マーカーに cause=rate_limit、annotation は 1 件、コメントは no-pr の 1 件だけ
+reset; ev_issue; issue open '[]'; prs '[]'; answer '着手報告のみ'; cat "$FX_429" >> "$TMP/oc.jsonl"
+outcome
+{ [ $RC = 0 ] && logged 'labels\[\]=oc:no-pr' && logged 'no-pr reason=unknown cause=rate_limit run=555 -->' \
+  && grep -q '^::error title=oc-rate-limit::' "$TMP/out" && [ "$(grep -c 'api -X POST repos/o/r/issues/42/comments' "$LOG")" = 1 ]; }
+expect "implement no-PR run with a rate-limit error line -> no-pr marker has cause=rate_limit (one comment)" $?
+
+# f2. ネガコン (record): text だけの率制限の語 -> cause は付かない
+reset; ev_issue; issue open '[]'; prs '[]'; answer '率制限 rate_limit_error を確認中。着手しました。'
+outcome
+{ [ $RC = 0 ] && reason_is unknown && not_logged 'cause=rate_limit' && ! grep -q 'oc-rate-limit' "$TMP/out"; }
+expect "implement no-PR run, text mentions rate_limit_error only -> no cause in the marker" $?
+
 # ------------------------------------------------------------------ review-recover.sh
 echo "== review-recover.sh"
 rreset() { reset; printf '{"pull_request":{"number":7}}' > "$TMP/ev.json"; fx repos/o/r/actions/runs/555/jobs '{"jobs":[{"id":9001,"name":"review"},{"id":9002,"name":"other"}]}'; }
