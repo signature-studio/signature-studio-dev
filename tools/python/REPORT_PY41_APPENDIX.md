@@ -73,9 +73,9 @@
 ## 分岐先ごとの式 (入口 `[rbp+0x5b8]` = edx、0x1046d6b)
 
 - 共通: r8d は `[rbp+0x5c0]`。F = `P.0x3b8 + rint(K · [rbp+0x5b8] · (P.0x3bc − P.0x3b8))`。`rint` は `call 0x40c660` (`cvtsd2si`・最近接偶数)、K = 2^-30 (VA 0x104ccd8)。F は r8d&0x20 のときだけ適用する。
-- 0x104c2a6 (ecx=0x40000000): P = `*(*(0x15e2eb8)+0x9e0)`。(a) F (0x104c311)。(b) r8d&1=0 かつ r8d&2≠0 で `[rbp+0x5b8] = dword[*(0x15e36d8)]` (0x104c3f0)。r8d&1 では `dword[*(0x15e36d8)] = [rbp+0x5b8]` (0x104c335) と `dword[*(0x15e2110)] = [rbp+0x2cc]` (0x104c3ca) を書く。
-- 0x104c64f (ecx=0x40000002): P = `*(*(0x15e2eb8)+0xb28)`。(a) F (0x104c6ba)。(b) r8d&1=0 かつ r8d&2≠0 で `[rbp+0x5b8] = dword[*(0x15e2c50)]` (0x104c769)。r8d&1 では `dword[*(0x15e2c50)] = [rbp+0x5b8]` (0x104c6ea) と `[*(0x15e2218)]` の各要素の `vtbl[0x128]` 呼出し。
-- 0x104c919 (ecx=0x40000005): P = `*(*(0x15e2eb8)+0x778)`。(a) F (0x104c984)。(b) r8d&1=0 または `byte[0x15e3500]≠0` で r8d&2≠0 なら `[rbp+0x5b8] = dword[*(0x15e28c8)]` (0x104c9e6)。r8d&1 かつ `byte[0x15e3500]=0` かつ `byte[*(0x15e2900)+0x3c]=0` なら `dword[*(0x15e28c8)] = [rbp+0x5b8]` (0x104c9c0)。
+- 0x104c2a6 (ecx=0x40000000): P = `*(*(*(0x15e2eb8))+0x9e0)` (3 段。0x104c2a6 `mov rax,[rip+..]`・0x104c2ad `mov rax,[rax]`・0x104c2b0 `mov rax,[rax+0x9e0]`。初版は 2 段と誤記し、PY-88 節の照合で修正)。(a) F (0x104c311)。(b) r8d&1=0 かつ r8d&2≠0 で `[rbp+0x5b8] = dword[*(0x15e36d8)]` (0x104c3f0)。r8d&1 では `dword[*(0x15e36d8)] = [rbp+0x5b8]` (0x104c335) と `dword[*(0x15e2110)] = [rbp+0x2cc]` (0x104c3ca) を書く。
+- 0x104c64f (ecx=0x40000002): P = `*(*(*(0x15e2eb8))+0xb28)` (3 段。0x104c64f・0x104c656・0x104c659 の同じ形)。(a) F (0x104c6ba)。(b) r8d&1=0 かつ r8d&2≠0 で `[rbp+0x5b8] = dword[*(0x15e2c50)]` (0x104c769)。r8d&1 では `dword[*(0x15e2c50)] = [rbp+0x5b8]` (0x104c6ea) と `[*(0x15e2218)]` の各要素の `vtbl[0x128]` 呼出し。
+- 0x104c919 (ecx=0x40000005): P = `*(*(*(0x15e2eb8))+0x778)` (3 段。0x104c919・0x104c92d・0x104c930 の同じ形)。(a) F (0x104c984)。(b) r8d&1=0 または `byte[0x15e3500]≠0` で r8d&2≠0 なら `[rbp+0x5b8] = dword[*(0x15e28c8)]` (0x104c9e6)。r8d&1 かつ `byte[0x15e3500]=0` かつ `byte[*(0x15e2900)+0x3c]=0` なら `dword[*(0x15e28c8)] = [rbp+0x5b8]` (0x104c9c0)。
 - 0x104caae (ecx の既定値): `[rbp+0x5b8]` は書かない。共通後半で `[rbp+0x5b8]` を読んで `call 0x12df2a0` の引数 (r9d) にする (条件: `[rbp+0x52f]≠0` かつ r8d&0x40)。
 - 共通の出口: `[rbp+0x584] = [rbp+0x5b8]` (0x104cc6b)。早期 exit は `[rbp+0x584] = -1` のまま 0x104cc72 へ飛ぶ。
 
@@ -101,56 +101,63 @@
 ## PY-88 (#2788): 0x1047497・0x104aa87 の `[rbp+0x5b8]` 書込み 65 件の式 (機械スライス・部分達成)
 
 親: #2033 (PY-64)。前段: 上節の PY-64。既知類型との関係: 該当なし (逆アセンブルの読解のみ・lift 作業ではない)。
-測定 commit: `7ad3c22b` (`analysis/py88_writes.py` を追加したコード commit)。`git diff 7ad3c22b HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本節は文書のみ)。
+測定 commit: `7e6c748a` (`analysis/py88_writes.py` の ACC 合流表示・store 検出の修正と `analysis/py64_check_expr.py` を入れたコード commit)。`git diff 7e6c748a HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (後続 commit は REPORT のみ)。
 
 ### 結論 (部分達成・`Refs #2788`)
 
-- 受入 1 (65 件の式・読む値・書く値の確定): **未達**。後ろ向きスライスで 65 件すべての式を機械的に出した (`analysis/py88_writes.py`)。ただし式が一意に決まるのは分岐の合流を越えない場合だけで、49 件はフレーム変数 `[rbp+X]` の store が合流を越えるため経路が一意に決まらない (SLOT?)。7 件は `call 0x10469f0` の戻り値、3 件は vtbl 呼出し。残りは子 #2874 (PY-99) に移管。
-- 受入 2 (PY-64 の式の別算法照合・mismatch 0): **部分達成**。PY-64 の 4 分岐先の書込み 6 件 (下表) について、手計算の表 (上節 PY-64) と機械スライスの式を照合し、6 件すべて一致 (mismatch 0)。K = 2^-30 は PE の 0x104ccd8 の double 実値 (9.313225746154785e-10) と一致。0x104caae の r9d 引数 (`call 0x12df2a0` の引数) は未照合 (未解決表)。
+- 受入 1 (65 件の式・読む値・書く値の確定): **未達**。機械スライスで 65 件すべての式を出したが、式が一意に決まるものは 0 件。フレーム変数 `[rbp+X]` の store が分岐合流を越える SLOT? が 49 件、`call 0x10469f0` の戻り値が 7 件、`call 0x40c660` (rint) が 6 件、vtbl 呼出しが 3 件 (マークなし・呼出し先未確定)。ACC (= `[rbp+0x5b8]` の書込み前の値) が合流を越える場合は ACC に黙って置換せず `ACC?⚠合流` と明示した (30 件)。
+- 受入 2 (PY-64 の式の別算法照合・mismatch 0): **部分達成**。PY-64 の 6 書込みを、式を式木に正規化して突合する `analysis/py64_check_expr.py` で照合した。初版の手計算の P (2 段) は 3 件の不一致として検出され、3 段に直して 6 件一致になった (修正前 不一致 3 件 → 修正後 一致 6 件)。0x104caae の r9d 引数 (`call 0x12df2a0`) は未照合。
 
 ### 測定条件
 
-- 素材: `oc_artifacts: fl-win64`。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/py64 --wildcards '*block00031_PE.bin'` で展開 (`work/` は gitignore)。
+- 素材: `oc_artifacts: fl-win64`。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/py64 --wildcards '*block00031_PE.bin'` (2.7 秒)。`work/` は gitignore。
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` → `fn=4664 dispatch=13 r8d_tests=174`。
 - 対象 65 件: `analysis/py64_branch_regions.py` と同じ到達範囲 (0x1047497 の 55 件・0x104aa87 の 15 件・重なり 5 件 → 一意 65 件) の `mov dword ptr [rbp + 0x5b8], reg`。
-- 式の列挙: `python3 analysis/py88_writes.py work/py53/fn.txt > work/py88/writes_65_expr.txt` (stderr に分類件数)。
-- 分類の件数 (実測・n=65):
+- 式の列挙: `python3 analysis/py88_writes.py work/py53/fn.txt` (stderr に分類件数)。
+- 分類 (実測・n=65。先頭の形と、未確定マーク):
 
-| 分類 | 件数 | 説明 | 例 (VA) |
-|---|---|---|---|
-| SLOT? | 49 | フレーム変数の store が分岐合流を越え、経路が一意に決まらない | 0x1047779 (`[rbp+0x4e0]` 経由) |
-| CALL[0x10469f0] の戻り値 | 7 | 引数 ecx=ACC (`[rbp+0x5b8]` の前の値)・edx・r8d。0x1047719 は r8d=0x3200 | 0x1047719・0x1047969・0x1047d98・0x1049b31・0x104a494・0x104b305・0x104b843 |
-| rint(xmm0) で始まる式 | 6 | `call 0x40c660` (cvtsd2si) の戻り値 | — |
-| VCALL (vtbl 呼出し) | 3 | `call qword ptr [rax + 0x30]` の戻り値 | 0x104a8a3・0x104a95f・0x104a9c7 |
+| 先頭の形 | 件数 | 未確定マーク (件数) |
+|---|---|---|
+| 直接式 | 49 | SLOT? 49 (うち ACC?⚠合流 20) |
+| `CALL[0x10469f0]` の戻り値 | 7 | ACC?⚠合流 7 (うち SLOT? 3・call で clob 1) |
+| rint(xmm0) (`call 0x40c660`) | 6 | SLOT? 3・ACC?⚠合流 3 |
+| VCALL (vtbl 呼出しの戻り値) | 3 | なし (呼出し先が未確定) |
 
-- 分類は `analysis/py88_writes.py` の `category()` (先頭一致の順)。式の全文は work/ (gitignore) の出力。
+- ACC?⚠合流 は計 30 件 (初版で ACC と黙って置いた件数と同じ。直前の線形順 store が分岐先を越える)。
+- 旧版 (`7ad3c22b`) との差: 出力 65 行中 32 行が変わった。内訳は ACC の印 30 行 (B4) と、SLOT 参照の @addr が変わった 2 行 (0x1049cf3・0x104a1fb)。SLOT 参照は旧版 133 件中 12 件が `cmp` 命令を store と誤認していた (m1)。新版は 136 件中 0 件 (残る `and` 7 件は実 store で、値は解かず SLOT? のまま)。
 
-### PY-64 の 6 書込み: 手計算の表 と 機械スライスの照合
+### PY-64 の 6 書込み: 手計算の表 と 機械スライスの突合 (negative control 込み)
 
-| 分岐先 (ecx) | 書込み | 手計算の表 (上節 PY-64) | 機械スライス | 判定 |
+| 分岐先 (ecx) | 書込み | 手計算の式 (上節 PY-64・P は 3 段) | 機械スライス | 判定 |
 |---|---|---|---|---|
-| 0x104c2a6 (0x40000000) | 0x104c311 | F: P.0x3b8 + rint(K·ACC·(P.0x3bc − P.0x3b8))、P = `*(*(0x15e2eb8)+0x9e0)` | `M32[M64[M64[M64[G[0x15e2eb8]]] +0x9e0] +0x3b8] + rint(f64(ACC)·M64[G[0x104ccd8]]·…)` | 一致 |
+| 0x104c2a6 (0x40000000) | 0x104c311 | F: `*(P+0x3b8) + rint(K·ACC·(*(P+0x3bc) − *(P+0x3b8)))`、P = `*(*(*(0x15e2eb8))+0x9e0)`、K = `*(0x104ccd8)` | `M32[M64[M64[M64[G[0x15e2eb8]]] +0x9e0] +0x3b8] + rint(...)` | 一致 |
 | 〃 | 0x104c3f0 | `dword[*(0x15e36d8)]` | `M32[M64[G[0x15e36d8]]]` | 一致 |
-| 0x104c64f (0x40000002) | 0x104c6ba | F、P = `*(*(0x15e2eb8)+0xb28)` | `…+0xb28…` | 一致 |
+| 0x104c64f (0x40000002) | 0x104c6ba | F、P = `*(*(*(0x15e2eb8))+0xb28)` | `…+0xb28…` | 一致 |
 | 〃 | 0x104c769 | `dword[*(0x15e2c50)]` | `M32[M64[G[0x15e2c50]]]` | 一致 |
-| 0x104c919 (0x40000005) | 0x104c984 | F、P = `*(*(0x15e2eb8)+0x778)` | `…+0x778…` | 一致 |
+| 0x104c919 (0x40000005) | 0x104c984 | F、P = `*(*(*(0x15e2eb8))+0x778)` | `…+0x778…` | 一致 |
 | 〃 | 0x104c9e6 | `dword[*(0x15e28c8)]` | `M32[M64[G[0x15e28c8]]]` | 一致 |
 
-- 照合は 6 件で mismatch 0。K の実値: `pefile` で `block00031_PE.bin` の VA 0x104ccd8 を double として読むと 9.313225746154785e-10 = 2^-30。
-- 機械スライスの式は、フレーム変数 `[rbp+0x5b8]` の前の値を `ACC` と置く (合流を越える store は解かない)。`lea r8,[rbp+0x5b8]` (0x104a924) の間接書込み (0xc61250 経由) は ACC に反映していない。
+- 突合の方法: `analysis/py64_check_expr.py` が、手計算の式 (スクリプト内の HAND。照合表と同じ文字列) と `py88_writes.Slicer` の出力を、同じ文法で式木にして並べ替え (+ と · は可換) してから比較する。機械側の `ACC?⚠合流@...` は ACC と同一視する (値は照合していない。3 件の F 式の ACC は分岐先入口の `[rbp+0x5b8]`)。
+- 実測 (コミット `7e6c748a` の code で実行):
+  - 正しい式 (P 3 段): `python3 analysis/py64_check_expr.py work/py53/fn.txt` → `n=6 mismatch=0`・exit 0。
+  - negative control (1) 初版の P (2 段) を 3 件の F 式に入れる: `--negctl p2` → `mismatch=3`・exit 1。0x104c311・0x104c6ba・0x104c984 が不一致、ほかの 3 件は一致 (初版の PR 本文の「mismatch 0」は、この手計算の誤りのため成立しなかった)。
+  - negative control (2) 0x104c311 の P だけ 2 段: `--negctl one` → `mismatch=1`・exit 1。
+- K の実値: `pefile` で `block00031_PE.bin` の VA 0x104ccd8 を double として読むと 9.313225746154785e-10 = 2^-30 (変更なし)。
 
 ### 限界
 
-- 合流を越える store は解かず SLOT? として残す。経路ごとの式は出していない (子 #2874 の範囲)。
-- ACC は 0x104a924 の間接書込みを含まない。
-- 機械スライスの検証は上表の 6 件の一致のみ。残りの 59 件は式の形の出力であり、照合は未実施。
+- 合流を越える store は解かず SLOT? / ACC?⚠合流 として残す。経路ごとの式は出していない (子 #2874 の範囲)。
+- 照合は PY-64 の 6 件のみ。残りの 59 件は式の形の出力であり、照合は未実施。
+- ACC?⚠合流 の 30 件は、分岐先入口の `[rbp+0x5b8]` の値に依存する。照合は記号の同一視までで、値は確定していない。
+- 0x104a924 の間接書込み (0xc61250 経由) は ACC に反映していない。
+- 0x104caae の r9d 引数 (`call 0x12df2a0`) は照合していない。
 
 ### 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 65 件のうち SLOT? 49 件の経路別の式 (合流の各先行経路ごと) | 受入 1 | #2874 (PY-99) |
+| 65 件のうち SLOT? 49 件・ACC?⚠合流 30 件の経路別の式 (合流の各先行経路ごと) | 受入 1 | #2874 (PY-99) |
 | `call 0x10469f0` (7 件) の本体と戻り値・引数の意味 | 受入 1 | #2874 (PY-99) |
 | vtbl 呼出し (3 件・`[rax+0x30]`) の呼出し先 | 受入 1 | #2874 (PY-99) |
-| 0x104caae の r9d 引数 (`call 0x12df2a0`) の式の照合 | 受入 2 の一部 | #2874 (PY-99) に追記 |
+| 0x104caae の r9d 引数 (`call 0x12df2a0`) の式の照合 | 受入 2 の一部 | #2874 (PY-99)。未追記 (#2874 本文に項目なし) |
 | 0x104a924 の間接書込み (0xc61250 経由) を ACC に反映 | ACC の定義 | #2874 (PY-99) |
