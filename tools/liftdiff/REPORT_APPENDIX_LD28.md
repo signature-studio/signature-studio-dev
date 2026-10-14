@@ -78,16 +78,46 @@
 - **結論**: 生成 commit は未特定。候補 4 件のいずれも、対象 2 関数の再生成では記録の `0x41c820 mismatch` を再現しなかった。全件の候補別 rebuild と、`trace_diverge_418be0.py` の解析の堅牢化が残る。#1035 の受入条件 1 は [~] のまま。
 
 #### 生成 commit 候補 `9e9c1315` の全件 rebuild (LD-100 / #2276)
-- **測定 commit = `9e9c1315`** (候補 commit を detached worktree で checkout・`git worktree add --detach ../ws-2276-9e9c1315 9e9c1315`)。`9e9c1315` は `38d53ac8` の子で、変更は docs (`FORMAT.md` §3) のみ。`git diff 9e9c1315 origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の stat は 25 files・+1528 / -91 (2329 行。main 取り込み後の差分)。本節の判定は候補 commit のソースに対するもので、main の HEAD の判定ではない。
+- **測定 commit = `9e9c1315`** (候補 commit を detached worktree で checkout・`git worktree add --detach ../ws-2276-9e9c1315 9e9c1315`)。`9e9c1315` は `38d53ac8` の子で、変更は docs (`FORMAT.md` §3) のみ。`git diff 9e9c1315 origin/main -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の stat は 25 files・+1528 / -91 (1,528 + 91 = **1,619 行**。main 取り込み後の差分)。比較基準の origin/main は `d1bbec7c` (本修正時点)。PR head `7b90bae9` から見た同じ範囲も 25 files・+1528 / -91 で一致する。本節の判定は候補 commit のソースに対するもので、main の HEAD の判定ではない。
 - **ビルド**: `liftdiff.py build` (`targets/m11.json` の `pe` を fl-win64 展開先へ向けた複製 target) → rc 0・`sig_mismatch` 0・`undefined` 1 (WindowFromPoint の stub skip 1 件)・wasm 4,439,240 bytes。
 - **全件 closure** (`batch --set closure --shards 14 --nobuild`・候補ビルド物): wall 11 m 22 s (開始時 load average 約 1.0・終了時 7.2)・rc 0。出力 `work/m11/batch_closure_9e9c1315.jsonl` (sha256 先頭 16 桁 `2b6a31200bd38f32`・7,421 行)。
   - 集計: **一致 3,092 / 不一致 1,524 / 実行不能 2,805** (記録 2,273 / 2,892 / 2,256 と不一致。前節の `1c4b7c7e` の全件再生成 (`--nobuild`・ビルド物は work-m11 同梱) 3,091 / 1,525 / 2,805 とほぼ同じ。ただし本節は候補ソースからビルドし直した値)。
   - 記録の `batch_closure.jsonl` (sha256 先頭 16 桁 `810b4d3a03df1cf0`) との verdict 一致は 5,705 / 7,421 (`1c4b7c7e` の 5,704 / 7,421 より 1 件多い)。
   - 実行不能の内訳: native_fault_all_patterns 1,342 / native_null_deref_all_patterns 1,102 / hang 311 / unsupported_sig 50。
 - **対象 2 関数** (全件 jsonl から): 0x418be0 = **match** (記録 match・一致)。0x41c820 = **match** (記録 mismatch・**不一致**。記録の mismatch は候補 `9e9c1315` の rebuild で再現しなかった)。
-- **`tests/trace_diverge_418be0.py` (main の HEAD 時点の版) の全件 jsonl**: rc 0 で終了。出力 = 対象 0 件・thunk 除去後の食い違い 0 件・trace 上限で判定不能 0 件・**解析不能で丸ごと除外 1 件**。前節の `1c4b7c7e` の全件 jsonl では rc 1 (`ValueError`) だった。本節で rc 0 になった理由は未切り分け (script の差分は確認していない)。出力は `results/m11_418be0_thunk.md` を上書きせず、`$RUNNER_TEMP` に置いた (commit しない)。全件 jsonl の 0x418be0 系は 0 件のため、記録の 20 / 16 / 4 の表は再現していない。
+- **`tests/trace_diverge_418be0.py` (main の HEAD 時点の版) の全件 jsonl**: rc 0 で終了。出力 = 対象 0 件・thunk 除去後の食い違い 0 件・trace 上限で判定不能 0 件・**解析不能で丸ごと除外 1 件**。前節の `1c4b7c7e` の全件 jsonl では rc 1 (`ValueError`) だった。本節で rc 0 になった理由は未切り分け。版: 測定に使った script は main 版で、その blob は `b679a99a` (PR head `7b90bae9` の `tests/trace_diverge_418be0.py` と同一)。ただし当時この blob を実際に使ったことは、本修正 run では再検証できない (入力 jsonl が runner に残っていない)。`9e9c1315` には当該 script が存在しない (main で後から追加)。**除外 1 件のレコード ID (関数 addr・record 番号) と例外メッセージは未記録・未確認**。`1c4b7c7e` の rc 1 (`ValueError`・上記) と同じ例外かも未確認。したがって本節の受入は「rc 0 で終わり、除外数 (1 件) を出力に含む」まで。「除外 0 件」とは主張しない。出力は `results/m11_418be0_thunk.md` を上書きせず、`$RUNNER_TEMP` に置いた (commit しない)。全件 jsonl の 0x418be0 系は 0 件のため、記録の 20 / 16 / 4 の表は再現していない。
 - **結論**: `9e9c1315` をソースからビルドし直した全件 closure は記録 (2,273 / 2,892 / 2,256) と一致しない (3,092 / 1,524 / 2,805)。0x41c820 の記録 mismatch は、この候補の rebuild では再現しない (qall は `match`)。記録と候補の差の原因は未特定 (ビルド条件・work-m11 の由来の切り分けは未実施)。#1035 の受入条件 1 は [~] のまま。
-- **HEAD との関係**: 測定は候補 `9e9c1315` 自体の判定。その後の main (`016cc403`) とは liftdiff のコードが 2,329 行異なるため、HEAD での再測定ではない。本 PR は REPORT のみ変更し、コードは変えない。
+- **HEAD との関係 (§6・鮮度)**: 本判定は候補 `9e9c1315` 自体のもので、**現 HEAD の挙動は主張しない**。HEAD (`7b90bae9`) との liftdiff コード差分は以下 (`git diff --stat 9e9c1315 HEAD -- tools/liftdiff/ldlib tools/liftdiff/liftdiff.py tools/liftdiff/targets tools/liftdiff/rt` の出力・1,528 + 91 = 1,619 行)。
+  ```
+   tools/liftdiff/ldlib/boot.py                | 160 +++++++++---
+   tools/liftdiff/ldlib/build_wasm.py          |  17 +-
+   tools/liftdiff/ldlib/cases.py               |  51 ++++
+   tools/liftdiff/ldlib/classify.py            |  39 ++-
+   tools/liftdiff/ldlib/clift.py               | 217 ++++++++++++++++
+   tools/liftdiff/ldlib/compare.py             |  58 ++++-
+   tools/liftdiff/ldlib/irtool.py              |  33 ++-
+   tools/liftdiff/ldlib/pe.py                  |   9 +-
+   tools/liftdiff/ldlib/runners.py             |  24 +-
+   tools/liftdiff/ldlib/session.py             |  64 ++++-
+   tools/liftdiff/liftdiff.py                  |  23 +-
+   tools/liftdiff/rt/fle_ldbridge.c            | 183 ++++++++++++++
+   tools/liftdiff/rt/fle_runner.mjs            | 125 ++++++++++
+   tools/liftdiff/rt/ld_core.h                 | 368 +++++++++++++++++++++++++++-
+   tools/liftdiff/rt/ld_ms_call.S              |   1 +
+   tools/liftdiff/rt/ld_native.c               | 115 ++++++++-
+   tools/liftdiff/rt/ld_runner.mjs             |   4 +-
+   tools/liftdiff/rt/ld_wasm.c                 |  19 +-
+   tools/liftdiff/targets/flelift.json         |  20 ++
+   tools/liftdiff/targets/m11.json             |   4 +-
+   tools/liftdiff/targets/m11_f4_post.json     |  18 ++
+   tools/liftdiff/targets/m11_f4_pre.json      |  18 ++
+   tools/liftdiff/targets/ott_old.json         |   2 +-
+   tools/liftdiff/targets/ott_old_blk.json     |  18 ++
+   tools/liftdiff/targets/ott_old_blk_off.json |  29 +++
+   25 files changed, 1528 insertions(+), 91 deletions(-)
+  ```
+  `tools/liftdiff` 全体では 157 files・+21407 / -226 (docs・results 等を含む)。本 PR は REPORT のみ変更し、コードは変えない。
+- **素材の実在確認 (本修正 run・`ls` 結果)**: `ls $HOME/artifacts` = `fl-win64.tar.zst` (2,324,302,252 bytes) のみ。`tools/liftdiff/work/` は不在。`work-m11` / `work-liftdiff` / `toolchain-emsdk` / `toolchain-retdec` は本 run に無く、全件 closure の再実行・`trace_diverge_418be0.py` 入力の再照合は未実施。上記の PR 本文の「展開」記述は前 run の記録であり、本 run では再確認できない。
 
 #### 候補 `1c4b7c7e` の全件 closure rebuild (LD-91 / #2242)
 - **測定 commit = `1c4b7c7e`** (コードを変えた最後の commit。detached worktree で測定)。素材は `fl-win64` + `work-m11` + `work-liftdiff` (`tools/liftdiff/work/m11/batch_closure.jsonl` は記録と同一素材)。
