@@ -60,9 +60,9 @@
 | 41a670 の head (期待 0x2222) | 0x3333 FAIL | **0x2222 PASS** |
 | `audit_lsf_disp.py` の SUSPECT (既定 = 変位形 + movs・lea 列挙) | 1 (41a670) | 0 (なし) |
 | `audit_lsf_disp.py --no-strmov` (#2316 時点の列挙) | 4 (41a670 6677a0 d237e0 de1da0) | 3 (6677a0 d237e0 de1da0) |
+| survey 942 unit | ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1 | 同じ |
 
 既定の検出器で、修復後 IR の `audit_lsf.py` の `SUSPECT_DISP_VAS` は空になる (#2402 スレッドの提案の確認)。`--no-strmov` の残る 3 件は `movs`・`lea` 経由の誤検出で、REPORT_2396 §3 で突合済み (未解決ではない)。既定の 41a670 の 1 件は修復で消える。測定は §9。
-| survey 942 unit | ok 870 / oob 16 / halt0 7 / miss 47 / other 1 / noproc 1 | 同じ |
 
 `survey_diff.py` の突合: ok 退行 unit 0、kind 以外を含む差分 unit 0、icall sites・targets の総数差 0。survey の差が 0 であることは、41a670 の修復が survey の結果を変えないことを示すだけで、survey が head 解除の分岐を通るかは未確認 (§8)。分岐の効果を示す証拠は直接呼びだけである。
 
@@ -103,7 +103,7 @@ FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/ldfix/ld108_e2e.sh
 
 main 取り込み前の run も同じ値だった (ir_sha256 3 種・survey 870 / 870・直接呼び): commit `16447b9b` で real 211.7 秒・`fail=0` (load 1.64 → 1.02)、commit `9cc0b4e4` (検査 2 件の追加前) で 208.7 秒・`fail=0`。取り込みで入った main 側のコード差分は `M11_INSTR_60A270` (既定 0 の計測 knob)・`m11_ov.c`・`m11_post.py` で、既定値の経路は変わらない。
 
-`git diff 28d10d58 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力: 0 行 (REPORT 以外のコード差分なし)。
+記録時点の値 (`28d10d58` の時点で、当時の HEAD から測った): `git diff 28d10d58 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行 (REPORT 以外のコード差分なし)。その後の main 取り込み (`d2fe925a`・`7f5524b6`) で `tools/m11` に差分が入ったため、REPORT 更新前の head `f87d27a7` で同じ式の出力は 2795 行で、0 行ではない。現在の検証範囲は §9 の列挙で示す。
 
 ## 8. 未解決
 
@@ -127,3 +127,28 @@ main 取り込み前の run も同じ値だった (ir_sha256 3 種・survey 870 
 - **reach の rc (指摘の付随)**: `9b74f4c2` の `ldfix_509_e2e.sh` は `EMSDK_ENV` が無いと 6/7 の reach だけが失敗し、rc 0 のままだった。`3de663ee` で `EMSDK_ENV` を必須にし、`reach_509.sh` の失敗を `FAIL=1` に反映した。上の rc 0 は reach 成功後の値。
 - 参考 (取り込み前 `3de663ee`): 同じ 2 本が rc 0。509 real 5 分 20.894 秒、ld108 real 3 分 23.637 秒。
 - 測定後のコード差分 (`git diff 7f5524b6 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'`) は 0 行 (測定 commit 以降は REPORT_2402 のみ変更)。
+- **e2e が実行するファイル (指摘 round 4 の (a))**。`ld108_e2e.sh`・`ldfix_509_e2e.sh` の推移閉包 67 件。静的解析で、スクリプト内の呼び出し・python の import・シェルのファイル名参照を辿り、文字列中のファイル名 (エラーメッセージ等) も含めた過大評価。`m11_lift.sh`・`m11_e2e.sh` が入るのは `m11_build.sh` の `echo` 内のメッセージ文字列からだけで、e2e はどちらも実行しない。
+
+```
+tools/m11/alloca/m11_alloca.py  tools/m11/fix912/m11_fix912.py  tools/m11/guard699/m11_guard699.py  tools/m11/lb_base.py
+tools/m11/lb_check.py  tools/m11/ldfix/audit_lsf.py  tools/m11/ldfix/audit_lsf_disp.py  tools/m11/ldfix/audit_lsf_ssa.py
+tools/m11/ldfix/audit_lsf_ssa_e2e.sh  tools/m11/ldfix/audit_undefload.py  tools/m11/ldfix/dyn_509.mjs  tools/m11/ldfix/dyn_ld108.mjs
+tools/m11/ldfix/dyn_xcheck.py  tools/m11/ldfix/fix_ld108.py  tools/m11/ldfix/ld108_e2e.sh  tools/m11/ldfix/ld108_irdiff.py
+tools/m11/ldfix/ldfix.py  tools/m11/ldfix/ldfix_509_e2e.sh  tools/m11/ldfix/ldfix_img.py  tools/m11/ldfix/ldframe.py
+tools/m11/ldfix/ldmach.py  tools/m11/ldfix/ldmach_img.py  tools/m11/ldfix/negctl_510.sh  tools/m11/ldfix/reach_509.sh
+tools/m11/ldfix/reach_survey.mjs  tools/m11/ldfix/spill_classify_1161.py  tools/m11/ldfix/tally_510.py  tools/m11/ldfix/window_recount.py
+tools/m11/m11_argrecover.py  tools/m11/m11_asmfix.py  tools/m11/m11_bounds.py  tools/m11/m11_build.sh
+tools/m11/m11_cond.py  tools/m11/m11_data_gen.py  tools/m11/m11_e2e.sh  tools/m11/m11_gen_ir2.sh
+tools/m11/m11_genstubs.py  tools/m11/m11_icall_audit.py  tools/m11/m11_image_gen.py  tools/m11/m11_judge.py
+tools/m11/m11_lift.sh  tools/m11/m11_lift_all.sh  tools/m11/m11_merge.py  tools/m11/m11_ov.c
+tools/m11/m11_passes.py  tools/m11/m11_post.py  tools/m11/m11_postjs.py  tools/m11/m11_ptrcheck.mjs
+tools/m11/m11_rt.c  tools/m11/m11_run.mjs  tools/m11/m11_scan.py  tools/m11/m11_simd2.py
+tools/m11/m11_survey.mjs  tools/m11/m11_tail.py  tools/m11/m11_wasmnames.py  tools/m11/m11_win.c
+tools/m11/msimd11_core.h  tools/m11/qstore/m11_qstore.py  tools/m11/trap_triage/survey_diff.py  tools/m11/trap_triage/survey_units.mjs
+tools/shared/env.sh  tools/shared/lift/libkio/ir_normalize.py  tools/shim/src/failfast.c  tools/shim/src/file.c
+tools/shim/src/heap.c  tools/shim/src/sync.c  tools/shim/src/timer.c
+```
+
+- 列挙に対する差分 (指摘 round 4 の (b)): `git diff d2fe925a HEAD -- <上の 67 件>` は 0 行。`git diff 7f5524b6 HEAD -- <67 件>` も 0 行。したがって `d2fe925a` で測った値 (§4 の `--no-strmov` 行など) は HEAD に当てはまる。
+- 列挙の外 (指摘 round 4 の (c)): `git diff d2fe925a 7f5524b6 -- tools ':(exclude)*.md'` で変わった 17 ファイルは全て列挙の外。内訳は `tools/liftlib/liftlib/passes/base.py`・`tools/m5/ir5_patch.py` の `normalize()` (uselistorder 除去、#1664)、`tools/m11/ldfix/retdec2019_gv_2405.sh` と patch、`tools/m11/shimx_link/*`、`tools/m11/trap_triage/*_2408.*`・`watch_store_682.py`、`tools/m11/test_a7_uselistorder.py`、`tools/pm/worker_url`。e2e の経路には入らない: (i) e2e の経路に `ir5_patch.py` を呼ぶ箇所は無い (tools/m11 で呼ぶのは `m11_lift.sh` だけ。e2e は work-m11 の `boot*.lift.ll` を入力にし lift を再実行しない)。(ii) `liftlib` を読むのは `test_a7_uselistorder.py` だけ。(iii) `ldfix.py`・`m11_passes.py` の `ir5_patch` の語は説明文・コメントで、import は `lb_base`・`ldmach`・`ldframe` のみ。
+- 測定は `7f5524b6` で行い、`7f5524b6` 以降の md 以外の `tools` 差分は 0 行 (`git diff 7f5524b6 HEAD -- tools ':(exclude)*.md'`)。よって再測定は不要 (WORKFLOW §6)。
