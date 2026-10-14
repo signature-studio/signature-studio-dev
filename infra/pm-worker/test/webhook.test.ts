@@ -77,6 +77,18 @@ test("issue_comment: bot の最後のコメントだけを botLast に反映す�
   assert.equal(s.botLast["7"]?.body, "停止します");
 });
 
+test("botReport: run-outcome と PM のマーカーを含む bot コメントは報告にせず、botLast だけが更新される", () => {
+  const c = (at: string, body: string) => ({ action: "created", issue: { number: 7 }, comment: { user: { login: BOT }, created_at: at, body } });
+  let s = send(EMPTY_STATE, "issue_comment", c("2026-10-14T10:00:00Z", "停止します。素材不足: toolchain-emsdk が無い")).state;
+  s = send(s, "issue_comment", c("2026-10-14T11:00:00Z", "<!-- oc-run-outcome: no-pr reason=artifact run=1 -->\n素材不足")).state;
+  assert.match(s.botLast["7"]?.body ?? "", /oc-run-outcome/);
+  assert.equal(s.botReport["7"]?.body, "停止します。素材不足: toolchain-emsdk が無い");
+  s = send(s, "issue_comment", c("2026-10-14T12:00:00Z", "<!-- oc-pm-decision: rule=R1 reversible=yes -->")).state;
+  assert.equal(s.botReport["7"]?.body, "停止します。素材不足: toolchain-emsdk が無い");
+  s = send(s, "issue_comment", c("2026-10-14T13:00:00Z", "報告 2")).state;
+  assert.equal(s.botReport["7"]?.body, "報告 2");
+});
+
 test("pull_request / pull_request_review: PR を増分に反映する", () => {
   const pr = (number: number, updatedAt: string, state: string, merged: boolean) => ({
     action: "synchronize",
