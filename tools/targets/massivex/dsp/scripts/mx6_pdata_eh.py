@@ -62,6 +62,29 @@ def walk_imports(rd, rva):
     return out
 
 
+def funclets_fh3(rd, fi):
+    """__CxxFrameHandler3 の FuncInfo (x64: RVA 形) から funclet (catch 本体・cleanup action) の RVA 集合を取る。
+    magic 0x19930520〜0x19930522 (VC7〜VC8+ の FuncInfo 形) のみ扱う。それ以外 (FH4 の符号化形 0x19930523 等) は None。"""
+    b = rd(fi, 36)
+    if b is None or int.from_bytes(b[:4], 'little') not in (0x19930520, 0x19930521, 0x19930522):
+        return None
+    max_state, disp_unwind, n_try, disp_try = (int.from_bytes(b[4 + 4 * i:8 + 4 * i], 'little') for i in range(4))
+    out = set()
+    for i in range(max_state):
+        e = rd(disp_unwind + 8 * i, 8) or b'\0' * 8
+        act = int.from_bytes(e[4:8], 'little')
+        if act:
+            out.add(act)
+    for t in range(n_try):
+        tb = rd(disp_try + 20 * t, 20) or b'\0' * 20
+        n_catch = int.from_bytes(tb[12:16], 'little')
+        disp_ha = int.from_bytes(tb[16:20], 'little')
+        for h in range(n_catch):
+            hb = rd(disp_ha + 16 * h, 16) or b'\0' * 16
+            out.add(int.from_bytes(hb[12:16], 'little'))
+    return out
+
+
 def main(pe_path, seeds_p, one_p, out_p):
     pe = pefile.PE(pe_path, fast_load=False)
     base = pe.OPTIONAL_HEADER.ImageBase
@@ -133,6 +156,63 @@ def main(pe_path, seeds_p, one_p, out_p):
             stats['eh_handler_entries'] += 1
             stats['handler:' + r['handler']] += 1
     res = {'pe_total': dict(stats)}
+    begins_all = sorted(entries)
+    import bisect
+
+    def in_pdata(x):
+        j = bisect.bisect_right(begins_all, x) - 1
+        return j >= 0 and begins_all[j] <= x < entries[begins_all[j]][0]
+
+    one_set = set(int(x, 16) - base for x in json.load(open(one_p))['roots'])
+    seed_set = set(int(x, 16) - base for x in json.load(open(seeds_p))['roots'])
+    fl_stats = {}
+    for label, roots in (('seeds', seed_set), ('one_round', one_set)):
+        fls = set()
+        n_fh3 = n_other = 0
+        for va in roots:
+            r = allrows.get(va)
+            if not r or not (r['flags'] & (EHANDLER | UHANDLER)) or r['handler'] != 'VCRUNTIME140.dll!__CxxFrameHandler3':
+                continue
+            hb = get(entries[va][1] + uinfo(entries[va][1])[1], 8)
+            if hb is None:
+                continue
+            got = funclets_fh3(rd, int.from_bytes(hb[4:8], 'little'))
+            if got is None:
+                n_other += 1
+                continue
+            n_fh3 += 1
+            fls |= got
+        fl_stats[label] = {
+            'fh3_functions_parsed': n_fh3, 'fh3_unparsed': n_other, 'funclets': len(fls),
+            'funclet_is_pdata_begin': sum(1 for x in fls if x in entries),
+            'funclet_inside_pdata_range': sum(1 for x in fls if in_pdata(x)),
+            'funclet_in_one_round_closure': sum(1 for x in fls if x in one_set),
+            'funclet_in_seeds': sum(1 for x in fls if x in seed_set),
+        }
+    res['funclets_fh3'] = fl_stats
+    # 独立再計算: .text 全体の線形走査で E8/E9 rel32 の宛先に funclet が現れるか (CFG 非依存)
+    tx = [s_ for s_ in pe.sections if s_.Characteristics & 0x20000000][0]
+    tb = data[tx.PointerToRawData:tx.PointerToRawData + tx.SizeOfRawData]
+    allfl = set()
+    for va in seed_set | one_set:
+        r = allrows.get(va)
+        if not r or not (r['flags'] & (EHANDLER | UHANDLER)) or r['handler'] != 'VCRUNTIME140.dll!__CxxFrameHandler3':
+            continue
+        hb = get(entries[va][1] + uinfo(entries[va][1])[1], 8)
+        if hb is not None:
+            got = funclets_fh3(rd, int.from_bytes(hb[4:8], 'little'))
+            if got:
+                allfl |= got
+    direct = 0
+    for op in (b'\xe8', b'\xe9'):
+        i = tb.find(op)
+        while i >= 0 and i + 5 <= len(tb):
+            tgt = tx.VirtualAddress + i + 5 + int.from_bytes(tb[i + 1:i + 5], 'little', signed=True)
+            if tgt in allfl:
+                direct += 1
+            i = tb.find(op, i + 1)
+    res['funclets_fh3']['union_seeds_one_round'] = len(allfl)
+    res['funclets_fh3']['linear_direct_call_jmp_refs_to_funclets'] = direct
     for label, path in (('seeds', seeds_p), ('one_round', one_p)):
         roots = sorted(set(int(x, 16) - base for x in json.load(open(path))['roots']))
         c = collections.Counter()
