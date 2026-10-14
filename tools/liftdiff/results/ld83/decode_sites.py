@@ -9,7 +9,8 @@
 符号化 (tools/liftdiff/ldlib/irtool.py の instrument・sites=True と一致させること):
   block 入口 = VA そのもの (bit 62 無し)
   site      = 1<<62 | kind<<56 | ord<<40 | cond<<39 (br のみ) | VA & 0xffffffff   (kind 1 = br・2 = import call)
-ord は同じ block 内の site の通し番号 (block 入口で 0 に戻る)。ord が 0,1,2… と連番でなければ NG (記録の欠落を示す)。
+ord は同じ block 内の site の通し番号 (block 入口で 0 に戻る)。呼び出し先の block 記録を挟んでも、site の VA で戻り先を解決して検査する
+(ord_ok の docstring)。解決できない site・連番から外れた ord は NG (記録の欠落・VA の帰属誤りを示す)。
 """
 import json, sys
 
@@ -34,14 +35,27 @@ def decode(v):
 
 
 def ord_ok(items):
-    expect = 0
-    for tag, _, o, _ in items:
+    """site の ord が block ごとに 0,1,2… と連番かを検査する。
+    呼び出し先の block 記録は呼び出し元の site の間に挟まり、戻りの印が無い。そこで site の VA (下位 32 bit) で
+    戻り先を解決する: 積まれた block のうち同じ VA の最も新しいものに属し、それより上の block は呼び出し先として閉じる。
+    VA が積まれていない site は NG (記録の欠落・ring の切れ目)。同じ VA の再帰呼出しは解決を誤りうる (REPORT §1)。"""
+    frames = []
+    by_va = {}
+    for tag, va, o, _ in items:
         if tag == 'B':
-            expect = 0
+            key = va & 0xffffffff
+            frames.append([key, 0])
+            by_va.setdefault(key, []).append(len(frames) - 1)
         elif tag in 'JC':
-            if o != expect:
+            lst = by_va.get(va)
+            if not lst:
                 return False
-            expect += 1
+            idx = lst[-1]
+            while len(frames) - 1 > idx:
+                by_va[frames.pop()[0]].pop()
+            if o != frames[idx][1]:
+                return False
+            frames[idx][1] += 1
     return True
 
 

@@ -45,6 +45,23 @@ define void @function_1c0d00() {
 }
 '''
 
+IR_LABELS = '''declare void @HeapFree(i32, i32, ptr)
+
+define void @function_1c2109(i1 %arg1) {
+dec_label_pc_1c2109:
+  call void @HeapFree(i32 0, i32 0, ptr null)
+  br i1 %arg1, label %25, label %dec_label_pc_1c2173
+; <label>:25:
+  call void @HeapFree(i32 0, i32 0, ptr null)
+  br label %dec_label_pc_1c2173
+dec_label_pc_1c2173.thread4:
+  call void @HeapFree(i32 0, i32 0, ptr null)
+  ret void
+dec_label_pc_1c2173:
+  ret void
+}
+'''
+
 SITE_STORE_RE = re.compile(r'store volatile i64 %lds\d+\.n1, ptr @ld_blk_n')
 
 
@@ -101,6 +118,19 @@ class UnlabeledFunction(unittest.TestCase):
         self.assertIn('sites skipped (block without dec_label_pc_ VA): 1', err)
 
 
+class OtherLabelBoundary(unittest.TestCase):
+    # (2') dec_label_pc_ 以外の境界 (`; <label>:25:`・`dec_label_pc_<VA>.thread4:`) は B 記録が無いので、
+    # そこから次の dec_label_pc_ までの site は記録せず skipped に数える (直前の block の VA を付けない)
+    def test_sites_after_other_labels_are_skipped(self):
+        txt, err = run_instrument(IR_LABELS, sites=True)
+        b = body(txt, 'function_1c2109')
+        # 記録は先頭の HeapFree (ord 0) と br (ord 1) の 2 件だけ。`; <label>:25` と `.thread4` の call は記録しない
+        self.assertEqual(len(SITE_STORE_RE.findall(b)), 2)
+        self.assertIn('store volatile i64 %s, ptr' % enc(2, 0x1c2109), b)
+        self.assertNotIn('store volatile i64 %s, ptr' % (enc(2, 0x1c2109) | (2 << 40)), b)
+        self.assertIn('sites skipped (block without dec_label_pc_ VA): 2', err)
+
+
 class SitesOff(unittest.TestCase):
     def test_no_site_store_when_sites_false(self):
         txt, err = run_instrument(IR, sites=False)
@@ -138,6 +168,20 @@ class DecodeSites(unittest.TestCase):
         # 先頭の call の記録を 1 件抜くと site 数が 3 → 2、J の ord が 1 から始まるため NG になる
         items = [decode_sites.decode(v) for v in decode_sites.vals(blk_list(drop=1))]
         self.assertEqual(sum(1 for t in items if t[0] in 'JC'), 2)
+        self.assertFalse(decode_sites.ord_ok(items))
+
+    def test_callee_blocks_between_sites_are_positive(self):
+        # 呼び出し元 block (B 1801c0b6c) の C.0 の後に呼び出し先 block (B 1801c0b71・C.0) が挟まり、戻った後に C.1 が続く
+        # (実データと同じ形: B は 33 bit、site は下位 32 bit)
+        seq = [0x1801c0b6c, (1 << 62) | (2 << 56) | 0x801c0b6c,
+               0x1801c0b71, (1 << 62) | (2 << 56) | 0x801c0b71,
+               (1 << 62) | (2 << 56) | (1 << 40) | 0x801c0b6c]
+        items = [decode_sites.decode(v) for v in decode_sites.vals([hex(v) for v in seq])]
+        self.assertTrue(decode_sites.ord_ok(items))
+
+    def test_site_without_block_is_ng(self):
+        # 先頭の B を抜くと、site の VA が積まれていない (記録の欠落・ring の切れ目)
+        items = [decode_sites.decode(v) for v in decode_sites.vals(blk_list(drop=0))]
         self.assertFalse(decode_sites.ord_ok(items))
 
     def test_cli_runs(self):

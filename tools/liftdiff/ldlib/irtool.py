@@ -75,6 +75,7 @@ INT_RE = re.compile(r'^i(\d+)$')
 
 
 BLK_RE = re.compile(r'^dec_label_pc_([0-9a-fA-F]+):(\s*;.*)?$')
+OTHER_LABEL_RE = re.compile(r'^(?:[A-Za-z0-9_.$-]+:|; <label>:\d+)')
 
 
 SITE_BR_RE = re.compile(r'^\s*br i1 (%[^,\s]+), label ')
@@ -98,8 +99,8 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
     sites=True (blocks=True 必須) のとき、block 内の conditional br と import 関数の call の直前に
     site 記録 (1<<62 | kind<<56 | ord<<40 | va&0xffffffff。br は cond を bit 39 に載せる) を store する (LD-83 / #2192)。
     kind 1 = br・2 = call、ord = block 内の site 通し番号 (0 始まり)。
-    block VA は直前の dec_label_pc_ で決まるため、関数の先頭が dec_label_pc_ で始まらない block の site は記録せず、
-    件数を stderr に出す。
+    block VA は直前の dec_label_pc_ で決まるため、dec_label_pc_ 以外の block 境界 (`; <label>:N`・`dec_label_pc_<VA>.<suffix>:`)
+    から次の dec_label_pc_ までの site は記録せず、件数を stderr に出す (B 記録が無く VA が決まらないため)。
     戻り値: 計装した関数数"""
     n = 0
     declared = set()
@@ -130,6 +131,11 @@ def instrument(ll_in, ll_out, prefix='function_', blocks=False, sites=False):
                              '  %%%s.n1 = add i64 %%%s.n, 1\n'
                              '  store volatile i64 %%%s.n1, ptr @ld_blk_n\n' % (t, t, t, t, t, va, t, t, t, t))
                     continue
+                if OTHER_LABEL_RE.match(line):
+                    # BLK_RE に一致しない境界 (`; <label>:N`・`dec_label_pc_<VA>.threadK:`) は B 記録が無い。
+                    # ここから次の dec_label_pc_ までの site は VA が決まらないので記録しない (件数だけ数える)
+                    cur_va = None
+                    site_ord = 0
             if pending is not None:
                 # 直前が define 行。entry ラベル行ならその後ろ、そうでなければこの行の前に挿入。
                 # 後者の場合は、この行も下の site 判定を通す (関数先頭の br・call を落とさない)
