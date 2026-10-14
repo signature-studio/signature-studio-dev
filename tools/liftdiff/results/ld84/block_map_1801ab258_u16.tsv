@@ -1,0 +1,5 @@
+k	wasm_block	native_block	match	native_insn_n	native_first_rva	native_last_rva	last_insn	last_rax	last_rcx
+0	1801ab258	1801ab258	=	10	1ab258	1ab27b	jmp 0x1801ab28a	200	1720f2058
+1	1801ab28a	1801ab28a	=	8	1ab28a	1ab2a0	je 0x1801ab2d3	0	1720f2058
+2	1801ab2a2	1801ab2a2	=	13	1ab2a2	1ab2d1	jmp 0x1801ab295	1720f2257	1720f2058
+3	1801ab2d3	1801ab2d3	=	5	1ab2d3	1ab2e4	ret	ffffffff	1720f2058

@@ -7,6 +7,7 @@ import {
   buildLaunchBody,
   defaultArtLine,
   inferArtifacts,
+  lowAllowance,
   noPrCooldownMs,
   planLaunch,
   prioOf,
@@ -112,6 +113,48 @@ test("選定 (区分): relaunch は従来どおり枠の先頭に全件入り、
   const p = planLaunch({ ready, relaunch: [7, 8], active: 47, target: 50, batch: 25 });
   assert.equal(p.room, 3);
   assert.deepEqual(p.picks, [7, 8, 101]);
+});
+
+test("LOW_CAP: critical が有るとき、prio:low の新しい launch は cap - running までに抑える (並びの末尾から落とす)", () => {
+  const ready = [
+    { n: 100, title: "t", blocksCount: 0 },
+    { n: 101, title: "t", blocksCount: 0, labels: ["prio:low"] },
+    { n: 102, title: "t", blocksCount: 0, labels: ["prio:low"] },
+    { n: 103, title: "t", blocksCount: 0, labels: ["prio:critical"] },
+  ];
+  const isLow = (n: number) => n === 101 || n === 102;
+  const p = planLaunch({ ready, relaunch: [], active: 0, target: 50, batch: 25, low: { cap: 2, running: 1, applied: true, isLow } });
+  assert.deepEqual(p.picks, [103, 100, 101], "cap 2 - running 1 = 1 件。low は 101 だけ入り、102 は落ちる (critical と normal は遊ばせない)");
+  const none = planLaunch({ ready, relaunch: [], active: 0, target: 50, batch: 25, low: { cap: 2, running: 2, applied: true, isLow } });
+  assert.deepEqual(none.picks, [103, 100], "実行中の low が cap に達していれば、low は 1 件も出ない");
+});
+
+test("LOW_CAP: relaunch の prio:low も同じ枠に数える。残りの枠は normal が使う", () => {
+  const ready = [
+    { n: 100, title: "t", blocksCount: 0 },
+    { n: 101, title: "t", blocksCount: 0, labels: ["prio:low"] },
+  ];
+  const isLow = (n: number) => n === 7 || n === 8 || n === 101;
+  const p = planLaunch({ ready, relaunch: [7, 8], active: 0, target: 50, batch: 25, low: { cap: 1, running: 0, applied: true, isLow } });
+  assert.deepEqual(p.picks, [7, 100], "relaunch の 7 が枠 1 を使い、8 と 101 は落ちる");
+});
+
+test("LOW_CAP: 上限が効かないとき (applied が偽) は、running が cap を超えていても low を従来どおり出す", () => {
+  const ready = [
+    { n: 100, title: "t", blocksCount: 0 },
+    { n: 101, title: "t", blocksCount: 0, labels: ["prio:low"] },
+    { n: 102, title: "t", blocksCount: 0 },
+  ];
+  const isLow = (n: number) => n === 101;
+  const p = planLaunch({ ready, relaunch: [], active: 0, target: 50, batch: 25, low: { cap: 0, running: 5, applied: false, isLow } });
+  assert.deepEqual(p.picks, [100, 102, 101], "low は末尾のまま、枠の残りに入る");
+});
+
+test("LOW_CAP: 残りの枠は lowAllowance が決める (適用中は cap - running を 0 で下限、適用外は無限)", () => {
+  assert.equal(lowAllowance({ cap: 10, running: 3, applied: true }), 7);
+  assert.equal(lowAllowance({ cap: 2, running: 2, applied: true }), 0);
+  assert.equal(lowAllowance({ cap: 2, running: 5, applied: true }), 0);
+  assert.equal(lowAllowance({ cap: 0, running: 0, applied: false }), Infinity);
 });
 
 test("cooldown (区分): prio:critical の oc:no-pr は半分 (3 時間)、他は設定どおり (6 時間)", () => {
