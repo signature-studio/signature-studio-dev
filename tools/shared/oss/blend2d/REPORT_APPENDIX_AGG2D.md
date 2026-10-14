@@ -5,7 +5,7 @@
 ## 12. vtable の slot 単位比較: Blend2D.dll と dsp_ippv2
 
 > 測定 commit: `cc8baecb` (`agg2d_vtable.py` を DLL 指定と ctor/vtable の自動検出に一般化し、`agg2d_vtable_cmp.py` を追加)。
-> `git diff cc8baecb HEAD -- tools/shared/oss/blend2d` の出力は 0 行 (この範囲で以後に変えたのは本 REPORT と `docs/DOC_MAP.md` のみ)。
+> `git diff cc8baecb HEAD -- tools/shared/oss/blend2d/agg2d_vtable.py tools/shared/oss/blend2d/agg2d_vtable_cmp.py` の出力は 0 行 (以後に変えたのは `agg2d_callers.py` の追加と REPORT・`docs/DOC_MAP.md` のみ)。
 > 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_vtable_cmp.py` (依存: `pefile`・`capstone`、数秒)。出力は `tools/shared/work/agg2d_vtable_cmp.json` (gitignore)。
 > 比較対象は `AggCreateInstance` を export する 2 DLL: **block24339 (Blend2D.dll)** と **block24356 (dsp_ippv2、IPP + AGG + GPC を同梱)**。block24355 は export 数 446・先頭が別形のため対象外。
 
@@ -53,7 +53,7 @@ slot の対応 (block24339 の種別 × block24356 の種別, 件数):
 
 ## 13. AggCreateInstance の呼び出し元の手がかり
 
-> 測定 commit: `dfddf729` (`agg2d_callers.py` を追加)。`git diff dfddf729 HEAD -- tools/shared/oss/blend2d` の出力は 0 行。
+> 測定 commit: `dfddf729` (`agg2d_callers.py` を追加)。`git diff dfddf729 HEAD -- tools/shared/oss/blend2d/agg2d_callers.py` の出力は 0 行。
 > 再現: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/shared/oss/blend2d/agg2d_callers.py` (依存: `pefile`・`capstone`、数秒、stdout に出力)。
 
 | 項目 | 値 | 根拠 |
