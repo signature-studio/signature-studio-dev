@@ -62,7 +62,7 @@ def independent(d, closed):
         if k in open_nums:
             for b in v:
                 waiting.setdefault(b, []).append(k)
-    unknown = [i["number"] for i in issues if (i.get("issue_dependencies_summary") or {}).get("total_blocked_by", 0) > 0 and i["number"] not in blocked]
+    unknown = [i["number"] for i in issues if (i.get("issue_dependencies_summary") or {}).get("total_blocked_by", 0) > len(blocked.get(i["number"], []))]
     out, why = [], {}
     for i in issues:
         n = i["number"]
@@ -86,11 +86,14 @@ def independent(d, closed):
 
 def main():
     d, worker_path = sys.argv[1], sys.argv[2]
+    issues = [i for i in flat(load(d, "issues_open.json")) if "pull_request" not in i]
+    prs_open = flat(load(d, "pulls_open.json"))
     closed_all = flat(load(d, "pulls_closed.json"))
     cut = datetime.now(timezone.utc).timestamp() - 24 * 3600
     closed_win = [p for p in closed_all if datetime.fromisoformat(p["updated_at"].replace("Z", "+00:00")).timestamp() >= cut]
     worker = json.load(open(worker_path, encoding="utf-8"))
-    res = {}
+    res = {"input": {"issues_open (PR を除く)": len(issues), "pulls_open": len(prs_open), "pulls_closed (全履歴)": len(closed_all), "pulls_closed (24 時間窓)": len(closed_win)}}
+    n_parents = 0
     for label, closed in (("full_history", closed_all), ("window_24h", closed_win)):
         ind, why, n_parents = independent(d, closed)
         w = sorted(worker[label])
@@ -103,7 +106,12 @@ def main():
             "excluded_by": why,
         }
     print(json.dumps(res, ensure_ascii=False, indent=1))
-    ok = all(not r["only_worker"] and not r["only_independent"] for r in res.values())
+    # 照合の対象が空なら、差分 0 でも検証にはならない (token が issue を読めず 0 = 0 になる場合など)。
+    empty = [k for k, v in (("open issue (PR を除く)", len(issues)), ("closed PR", len(closed_all)), ("子を持つ open 親", n_parents)) if v < 1]
+    if empty:
+        print(f"照合の対象が空: {', '.join(empty)} (取得の失敗・token の権限を確かめる)", file=sys.stderr)
+        sys.exit(2)
+    ok = all(not r["only_worker"] and not r["only_independent"] for k, r in res.items() if k != "input")
     sys.exit(0 if ok else 1)
 
 

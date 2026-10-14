@@ -5,7 +5,7 @@
 //   3. N に needs-user-input が付いていない
 //   4. N を参照する open PR がない (題名・本文の #N の言及で判定)
 //   5. N を blocker にしている open issue が、N の子以外にない
-// 保存状態の抜けは『閉じない』に倒す: open PR に mentions が無い (移行前の保存値)、blocked_by の一覧が不明な open issue があるときは閉じない。
+// 保存状態の抜けは『閉じない』に倒す: open PR に mentions が無い (移行前の保存値)、blocked_by の一覧が件数に足りない open issue があるときは閉じない。
 import { parentOf } from "./refs.ts";
 import { NEEDS_USER_LABEL, type PmState } from "./webhook.ts";
 
@@ -55,8 +55,8 @@ export function detectRuleA(s: PmState): CloseTarget[] {
     if (!open.has(blocked)) continue;
     for (const b of list) waiting.set(b, [...(waiting.get(b) ?? []), blocked]);
   }
-  // blocked_by の一覧が不明な open issue。どの親を待たせているか分からないので、子でない限り全体で閉じない。
-  const unknown = openIssues.filter((i) => i.blockedByCount > 0 && !(String(i.number) in s.blockedBy)).map((i) => i.number);
+  // blocked_by の一覧が不明な open issue (件数 total_blocked_by が一覧の件数より多い。件数だけ更新されて blocked_by_added の配送が欠けた形)。どの親を待たせているか分からないので、子でない限り全体で閉じない。
+  const unknown = openIssues.filter((i) => i.blockedByCount > (s.blockedBy[String(i.number)]?.length ?? 0)).map((i) => i.number);
 
   const mergedBy = new Map<number, number[]>();
   for (const p of Object.values(s.prs)) {

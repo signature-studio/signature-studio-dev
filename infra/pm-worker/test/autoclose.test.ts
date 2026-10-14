@@ -86,6 +86,14 @@ test("規則 A のネガコン (d'): blocked_by の一覧が不明な open issue
   assert.deepEqual(detectRuleA(child), [{ n: 100, mergedPr: 200, child: 101 }]);
 });
 
+test("規則 A のネガコン (d''): 件数だけ残って一覧が空 (blocked_by_added の取りこぼし) の非子 issue があれば、親は閉じない", () => {
+  const stale = state([I(100), I(101, { body: "親: #100" }), I(102, { blocked: 1 })], [P(200, { closes: [100] })], { "102": [] });
+  assert.deepEqual(detectRuleA(stale), []);
+  // 同じ形でも、不明な issue が子なら閉じてよい
+  const child = state([I(100), I(101, { body: "親: #100", blocked: 1 })], [P(200, { closes: [100] })], { "101": [] });
+  assert.deepEqual(detectRuleA(child), [{ n: 100, mergedPr: 200, child: 101 }]);
+});
+
 test("規則 A のネガコン (e): merged PR が無い (closed のまま merge されていない・参照なし) なら閉じない", () => {
   assert.deepEqual(detectRuleA(state([I(100), I(101, { body: "親: #100" })], [P(200, { closes: [100], merged: false })])), []);
   assert.deepEqual(detectRuleA(state([I(100), I(101, { body: "親: #100" })], [P(200, { closes: [] })])), []);
@@ -155,6 +163,13 @@ test("保存: PR の参照は body を切る前の全文から取る (3000 字�
   assert.equal(r.prs["300"].body.length, 3000);
   assert.deepEqual(r.prs["300"].mentions, [100]);
   assert.deepEqual(r.prs["300"].closes, []);
+});
+
+test("保存: 言及は件数で切らない (200 件を超える #番号も open PR の言及として残る)", () => {
+  const body = Array.from({ length: 250 }, (_, k) => `#${k + 1}`).join(" ");
+  const r = applyEvent(EMPTY_STATE, "pull_request", { action: "opened", pull_request: { ...prEv(300, { body }).pull_request } }, IMPL, [], REVIEWER);
+  assert.equal(r.prs["300"].mentions?.length, 250);
+  assert.ok(r.prs["300"].mentions?.includes(1) && r.prs["300"].mentions?.includes(250));
 });
 
 test("保存: closes は Closes / Fixes / Resolves / Refs のキーワードの参照だけ (本文の言及は closes に入れない)", () => {
@@ -316,4 +331,16 @@ test("LIVE_CLOSE=1 のネガコン: 子が無い親・merged PR の無い親は�
 test("起票者で絞らない: 人が起票した親でも、規則 A の条件を満たせば対象になる", () => {
   const s = state([{ ...I(100), author: HUMAN.login, authorType: "User", assoc: "OWNER" } as IssueState, I(101, { body: "親: #100" })], [P(200, { closes: [100] })]);
   assert.deepEqual(detectRuleA(s), [{ n: 100, mergedPr: 200, child: 101 }]);
+});
+
+test("同期: 件数が一覧より多い issue は、同期で REST から一覧を取り直す (件数だけ残って一覧が空のまま止まらない)", async () => {
+  const blockers = (c: Call) => (c.method === "GET" && c.url.includes("/issues/102/dependencies/blocked_by") ? j([{ number: 100 }]) : undefined);
+  const ctx = await configuredApp({ handlers: [blockers] });
+  const ev = issueEv(102, {});
+  ev.issue.issue_dependencies_summary = { total_blocked_by: 1 };
+  assert.equal((await send(ctx.app, "issues", ev)).status, 202);
+  assert.equal((ctx.app.engine as any).s.issues["102"].blockedByCount, 1);
+  assert.equal((ctx.app.engine as any).s.blockedBy["102"], undefined);
+  await (ctx.app.engine as any).syncBlockers(await engineGh(ctx), 80);
+  assert.deepEqual((ctx.app.engine as any).s.blockedBy["102"], [100]);
 });

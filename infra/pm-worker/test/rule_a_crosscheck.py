@@ -45,7 +45,7 @@ def main(path):
         if k in open_nums:
             for b in v:
                 waiting.setdefault(b, []).append(k)
-    unknown = [n for n in open_nums if issues[n]["blockedByCount"] > 0 and str(n) not in fx["blockedBy"]]
+    unknown = [n for n in open_nums if issues[n]["blockedByCount"] > len(blocked.get(n, []))]
     out = []
     for n in sorted(open_nums):
         if "needs-user-input" in issues[n]["labels"] or n not in kids or n not in merged or n in open_mentions:

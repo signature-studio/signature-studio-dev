@@ -442,7 +442,7 @@ export class Engine {
     return diff;
   }
 
-  // blocked_by の一覧が不明な issue (件数 > 0 だが一覧が無い) を REST で取る。1 回の上限 max 件。
+  // blocked_by の一覧が不明な issue (件数が一覧の件数より多い: 無いか、件数だけ更新されて古い) を REST で取る。1 回の上限 max 件。
   private async syncBlockers(gh: Gh, max: number): Promise<void> {
     const R = this.d.cfg.repo;
     let left = max;
@@ -451,7 +451,7 @@ export class Engine {
     let pages = 0;
     for (const [k, v] of Object.entries(this.s.issues)) {
       if (left <= 0) break;
-      if (v.state !== "open" || v.blockedByCount <= 0 || k in this.s.blockedBy) continue;
+      if (v.state !== "open" || v.blockedByCount <= (this.s.blockedBy[k]?.length ?? 0)) continue;
       left--;
       read++;
       const j = await gh.list<any>(`/repos/${R}/issues/${k}/dependencies/blocked_by`, 3);

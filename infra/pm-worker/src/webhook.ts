@@ -301,7 +301,6 @@ function applyDependencies(s: PmState, p: Json): PmState {
   const adding = p.action === "blocked_by_added" || p.action === "blocking_added";
   const has = cur.includes(blocker);
   if (adding === has) return s;
-  const known = k in s.blockedBy || !adding;
   const nextList = adding ? [...cur, blocker].sort((a: number, b: number) => a - b) : cur.filter((x) => x !== blocker);
   const summary = p.blocked_issue?.issue_dependencies_summary?.total_blocked_by;
   const blockedBy = { ...s.blockedBy, [k]: nextList };
