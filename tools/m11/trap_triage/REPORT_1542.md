@@ -12,7 +12,7 @@
 ## 1. 測定 (測定 commit `d015e210`・直列・単発の繰返し n=3・foreground)
 
 **実行環境** (2026-10-14 の GitHub Actions run。runner 4 vCPU、ディスク空き 76G):
-- 素材: `fl-win64` → `$RUNNER_TEMP/extracted/` (`FL_WIN64_DIR=$RUNNER_TEMP`)、`work-m11` → `tools/m11/work/` (展開後 `m11_gen_ir2.sh` で作り直し)、`toolchain-emsdk` → [EMSDK]、`toolchain-retdec` → [RETDEC] (いずれも `/opt` 配下に展開)。
+- 素材: `fl-win64` → `$RUNNER_TEMP/extracted/` (`FL_WIN64_DIR=$RUNNER_TEMP`)、`work-m11` → `tools/m11/work/` (展開後 `m11_gen_ir2.sh` で作り直し)、`toolchain-emsdk` → [EMSDK]、`toolchain-retdec` → [RETDEC] (展開先は `docs/REFERENCES.md` §4 の [EMSDK]・[RETDEC])。
 - IR 生成: `bash m11_gen_ir2.sh` (48 秒)。`ir_conditions.json`: `ldfix=applied`・`qstore=not-applied`・`ir_sha256=08c7b646…` (REPORT_1352・§1 旧記録と一致)。ldfix 件数: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 F4=10 errors=0 (旧記録と一致)。
 - 負荷: `uptime` で load 0.76〜1.03 (測定前後)。
 
@@ -97,7 +97,7 @@
 
 ## 4. 再現
 
-- A〜D の表 (n 回): `bash tools/m11/trap_triage/repro_1542_split.sh [N]` (N = 反復回数・既定 1)。`work/split_1542/table.tsv` に出力。前提は `m11_gen_ir2.sh` 実行済み・`FL_WIN64_DIR` 設定済み・`/opt/emsdk`・`/opt/retdec` 配置済み。
+- A〜D の表 (n 回): `bash tools/m11/trap_triage/repro_1542_split.sh [N]` (N = 反復回数・既定 1)。`work/split_1542/table.tsv` に出力。前提は `m11_gen_ir2.sh` 実行済み・`FL_WIN64_DIR` 設定済み・[EMSDK]・[RETDEC] 配置済み。
 - 既定と計測 OFF の基準: `bash tools/m11/trap_triage/repro_1352.sh` (判定 `PASS`)。
 - 変種: `M11_PROBE_VARIANT` (`noprobe` / `noren` / `nodecl`) は `M11_INSTR_413060=1` のときだけ有効 (それ以外は `m11_post.py` が exit)。
 - 作業ディレクトリは `tools/m11/`。`work/` は `m11_gen_ir2.sh` で生成する (`work-m11` 展開後に実行)。
