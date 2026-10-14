@@ -13,12 +13,12 @@ LD-27 (#1034) の分析と再現手順の正本。件数・per-case の出力は
 
 ## 類型
 
-class は `results/m11_typeb_cause.md` §3 の `class` 列。件数は集計行を参照する。
+class は `results/m11_typeb_cause.md` の各 case 行の `class=` 欄。件数は集計行を参照する。
 
 - **X (xmm_arg_drop)**: 呼出元 (または L) の entry で「xmm0 を書かれる前に読む」関数があり、その entry の x0 が native ≠ wasm。IR では該当関数の xmm0 入力が `call i64 @__asm_movsd(i128 0)` (`xor i128 0, 0`) に置き換わる (例: `function_40c1d0`)。既存類型 `xmm_arg_drop` (`tools/liftdiff/docs/FORMAT.md` の類型表 107 行)。修復は #547 (PLG-F2-4) の接続で行う。
   - `function_40c1d0` は sig の `params` が `[]` だが、機械語は `movsd [rbp+0x28], xmm0` で xmm0 の double を読む。戻り後は `mov ecx,eax; cmp cx,0x8000; jb 0x40c24c` で、native は正の double の経路 (0x40c24c) へ進み、wasm は `mov ecx,4; mov dl,1; call 0x40a1c0` の経路で FP 例外 (0x409730) により trap する。
 - **M (MXCSR 経路)**: L = 0x40a380 (`stmxcsr`/`ldmxcsr` で MXCSR を書く leaf) または 0x40a3b0 (`stmxcsr [rsp]; pop rax; ret` で MXCSR を返す leaf)。wasm の `function_40a3b0` は IR で `call void @__asm_stmxcsr(i32 0)` + `ret i64 0` (`work/m11/ir_instr.ll` の `define weak i64 @function_40a3b0`) のため戻り値は常に 0。native の戻り値は実際の MXCSR (既定値 0x1f80 のため 0 ではないと想定するが、直接計測していない)。0 は FP 例外の全アンマスク扱いとなり、0x40a1c0 の FP 例外判定 (`test eax, 0x20/0x10/8/4` → `call 0x409730`) が wasm 側で例外を送出する。`tools/m11/m11_ov.c` は同じ欠陥 (#417) に `function_40a3b0 → 0x1f80` の上書きを持つが、この IR (liftdiff の build) では `ret i64 0` のままで、上書きは反映されていない。上書きの効果は未実測。
-- **R (未特定)**: X にも M にも入らない。戻り後の分岐は §3 の `post`・`jcc` の列。§3 の `class=R` 行は次のとおり。
+- **R (未特定)**: X にも M にも入らない。戻り後の分岐は各 case 行の `post`・`jcc` 欄。`class=R` の行は次のとおり。
   - xfill=1: fn=0xcd1c20 (L=0xcd1a70、完全 trace で notB)、fn=0xf3c7b0・0xe24ee0・0xe26510 (L=0x12f9ed0、大域ポインタの長さを返す leaf と読むが未確認)。
   - xfill=0: fn=0xf3c7b0・0xe24ee0・0xe26510 (L=0x12f9ed0)、fn=0x4769f0 (L=0x4769f0、完全 trace で notB)、fn=0xff0600 (L=0xfea6a0、引数オブジェクトのフィールドを読んで al を返す leaf と読むが未確認。0xff0600 の `je` が al で決まる)。
   - 注: L=0x40ae30 (fn=0x12e5d80) は両 xfill とも X であり R ではない。個別原因は未特定。
@@ -27,7 +27,7 @@ class は `results/m11_typeb_cause.md` §3 の `class` 列。件数は集計行�
 
 0x40a3d0 は `movzx rax, word [rcx+rdx*2]; ret` の leaf。呼出元 0x40c1d0 は `movsd [rbp+0x28], xmm0` の後に `rcx = &[rbp+0x28]`、`edx = 3` で呼ぶ。よって rax = x0 の上位 16 bit (x0 は呼出元 entry の x0)。wasm 側の x0 は X 類の行で 0 となる。
 
-値の分布 (L が 0x40a3d0 の行の native 側の上位 16 bit。`results/m11_typeb_cause.md` §3 から再計算した件数。wasm の rax は全件 0x0000):
+値の分布 (L が 0x40a3d0 の行の native 側の上位 16 bit。`results/m11_typeb_cause.md` の各 case 行から再計算した件数。wasm の rax は全件 0x0000):
 
 | rax (native) | xfill=0 | xfill=1 |
 |---:|---:|---:|
