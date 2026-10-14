@@ -14,8 +14,7 @@
 - **分類 (暫定)**: 書込み命令 (store) は **lift 側** (lift が生成した IR の store)。ただし値は **null ページを指すポインタ chain** を経由する。ポインタ値 `0x400000004` の由来 (どの store が誤ったポインタを作ったか) は未特定。route 側 (data 敷設) は否定 (§3)。
 - **受入条件の充足状況**:
   - [x] BLK+0 への store 命令を IR 行まで特定 (行 19132)。
-  - [ ] wasm オフセットまでの対応は未取得 (IR 行 → wasm オフセットの変換は未実施)。
-  - [ ] route 側 / lift 側の最終分類 (値 `0x400000004` の生成元が未特定のため暫定)。
+  - 未達は子 issue へ移した (PM 判断で #1998 の範囲を縮小): wasm オフセット・route/lift の最終分類 → #2310 (ICALL-72)、値 `0x400000004` の生成元 → #2311 (ICALL-73)。
   - [x] `fa_sweep.sh 8 60` の集計を実測 (§4)。
 
 ## 2. 追跡 (実測)
@@ -32,7 +31,7 @@
 
 `fa_wc.py instr` の出力: `store total=5526 instrumented=5526 unhandled=0`。`fa_wc_build.sh` の出力の `__wchk` 挿入は 5527 行 (宣言 1 行を含む)。
 
-**WC 行 (HEAD `1fff0e4f` で 2026-10-14 に再実行・`fa_wc_drv.cjs` の stderr。コード差分 0)**: 168 行 (21 IR 行 × 8 入力)。BLK 窓 (`0x36319000`–`0x36319020`) への書込みは 21 IR 行 (`0x36319008` 56 件・`0x36319010` 56 件・`0x36319018` 56 件)。入力 `work/fa_route/oi.flat.ll` は 25805 行・store 5526・`function_181057d20` 参照 88 で、`fa_wc.py instr` は `store total=5526 instrumented=5526 unhandled=0`。"emsc" (`63736d65`) を含む WC 行:
+**WC 行 (測定に使った HEAD `1fff0e4f` で 2026-10-14 に再実行・`fa_wc_drv.cjs` の stderr。コード差分 0)**: 168 行 (21 IR 行 × 8 入力)。BLK 窓 (`0x36319000`–`0x36319020`) への書込みは 21 IR 行 (`0x36319008` 56 件・`0x36319010` 56 件・`0x36319018` 56 件)。入力 `work/fa_route/oi.flat.ll` は 25805 行・store 5526・`function_181057d20` 参照 88 で、`fa_wc.py instr` は `store total=5526 instrumented=5526 unhandled=0`。"emsc" (`63736d65`) を含む WC 行:
 
 | IR 行 | 関数 (`fn.json`) | 書込み先 | 値 | 件数 |
 |---|---|---|---|---|
@@ -62,8 +61,8 @@
 
 | 項目 | 値 |
 |---|---|
-| 測定 commit | `7273b6ac` (コードを変えた最後の commit)。`git diff 7273b6ac 1fff0e4f -- tools/icall` は本付録 `REPORT_APPENDIX_1998.md` のみ (+40 / −12)。コード差分 0 |
-| 検証 HEAD | `1fff0e4f` (`7273b6ac` 以降は REPORT 文言のみ。`git diff 7273b6ac 1fff0e4f -- tools` の出力は `REPORT_APPENDIX_1998.md` の 1 ファイルのみ) |
+| コードを変えた最後の commit | `7273b6ac` |
+| 測定に使った HEAD | `1fff0e4f` (REPORT 文言のみの差。`git diff 7273b6ac 1fff0e4f -- tools/icall` は本付録 `REPORT_APPENDIX_1998.md` のみ (+40 / −12)。コード差分 0) |
 | 素材 | `fl-win64`・`plugins-freshair` (fetch.sh: win 17 files, factory .epf 8)・`work-icall`・`toolchain-emsdk` (`/opt/emsdk`)。`toolchain-retdec` は `fa_route_build.sh`・`fa_sweep.sh` では未使用 |
 | `tools/ott/native/build.sh` | OK (`work/libottnative.so`) |
 | `tools/icall/fa_route_build.sh` | OK、12.3 s |
@@ -87,8 +86,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 値 `0x400000004` を作る store (null ページを指すポインタの生成元) の特定 (行 19124 の `%1` が "emsc" を運ぶ。`%1` の起点は未特定) | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #1998 (本 PR は Refs。残りは同 issue で継続) |
-| IR 行 19132 → wasm 命令オフセットの対応 | 受入条件「wasm オフセットか IR 命令まで」の wasm 側 | 同上 |
+| 値 `0x400000004` を作る store (null ページを指すポインタの生成元) の特定 (行 19124 の `%1` が "emsc" を運ぶ。`%1` の起点は未特定) | BLK+0 が "emsc" に化ける原因。wasm のみ err 2 件 (本付録 §1) | #2311 (ICALL-73) |
+| IR 行 19132 → wasm 命令オフセットの対応・route/lift の最終分類 | 受入条件「wasm オフセットか IR 命令まで」の wasm 側 | #2310 (ICALL-72) |
 | 引数付き lifted 関数の dispatch table 登録規則 | abort 6 件 (1852 付録 §2) | #1897 (ICALL-49) 既存 |
 | 監視の対象外: `llvm.memcpy` / `llvm.memset` 等の intrinsic、`cmpxchg` / `atomicrmw`、C 側 (`oi.*.c`・`rt/*.c`)、emscripten libc の書込み。集成体型 (`[N x T]`・`{...}`) の store は `fa_wc.py` が挿入せず件数を出す (`unhandled`) | 上記の書込みは BLK 窓への書込みを見逃しうる。`fa_wc.py` は `work/fa_route/oi.flat.ll` の 5526 store 中 5526 件を挿入 (未対応 0) で、この集合には該当しない | 本付録 (監視の限界として明記) |
 
