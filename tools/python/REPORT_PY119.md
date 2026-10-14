@@ -54,6 +54,8 @@
 
 ## 検証
 
+### PR 作成時 (`3a0f9b9a`)
+
 測定 commit: `3a0f9b9a` (コードを変えた最後の commit。`feat(python): arrangement の PE 確定 6 件を mock と C provider に実装`)。測定は同 commit の作業ツリー (`git status` 空) で、`provider/build.sh` を再実行してから行った。runner の load average は測定開始時 0.20 (`uptime`)。
 
 前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 4 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0)。
@@ -68,12 +70,31 @@
 
 ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `arrTime` 既定値 (0) を 1 にすると、`node tests/arrangement_diff.mjs` は `AssertionError: arrangement 差分 3 件` で rc 1 (FAIL)。元に戻すと calls 25・diffs 0・PASS。
 
-コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外): 下の出力を参照。
+### main 取り込み後の再測定 (`4f1ca1a3`)
+
+`origin/main` (`940c0d6a`) の取り込みで `tools/python` のコードが変わったため、上の `3a0f9b9a` の値はこの節の値で置き換える。測定 commit は `4f1ca1a3` (コードを変えた最後の commit。merge と、`provider_check.mjs`・`DOC_MAP.md` の競合解消)。測定は同 commit の作業ツリー (`git status` 空) で行った。runner の load average は測定開始時 0.74 (`uptime`)。
+
+前提の生成物 (gitignore): `fetch_inputs.sh` (`FL_WIN64_DIR` = fl-win64 の展開先、rc 0)・`build_cpython_wasm.sh` (rc 0、4 分 26 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。追跡済みの表を使い、表は再生成しない)。
+
+| コマンド | 結果 | wall |
+|---|---|---|
+| `bash provider/build.sh` | rc 0・ハンドラ 92 | 1.5 秒 |
+| `node tests/arrangement_diff.mjs` | calls 25、diffs 0、PASS | 1 秒未満 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 92 / 未実装 343 / MCP 静的 60) | 0.7 秒 |
+| `node tests/general_diff.mjs` | calls 9、diffs 0、PASS | 1 秒未満 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425 (実装前と同値)、callback 往復 true | 2.4 秒 |
+| `node tests/*_diff.mjs` (9 本) | 全て rc 0・diffs 0 (channels 161・device 8・ilmcp 32・midi_path 30・mixer 57・transport 7・ui 17 呼出し。arrangement 25・general 9 は上表と同じ) | 各 1 秒未満 |
+
+ネガティブコントロール (`docs/WORKFLOW.md` §5) の再測定: `host/fl_mock.mjs` の 24 行目 `arrTime: 0,` を 1 に変えると、`node tests/arrangement_diff.mjs` は `AssertionError: arrangement 差分 3 件` で rc 1 (FAIL)。元に戻すと `git diff` は空で、calls 25・diffs 0・PASS。
+
+取り込みで増えたコード差分 (`3a0f9b9a` から `4f1ca1a3` まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 3a0f9b9a HEAD -- tools/python ':!*.md'
-(空)
+$ git diff --stat 3a0f9b9a 4f1ca1a3 -- tools/python ':!*.md'
+ 17 files changed, 1900 insertions(+), 466 deletions(-)
 ```
+
+測定 commit から HEAD までのコード差分 (`git diff 4f1ca1a3 HEAD -- tools/python ':!*.md'`) は空。この節の後の commit は REPORT の追記だけ。
 
 ## 未解決
 
