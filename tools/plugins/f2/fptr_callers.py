@@ -3,6 +3,8 @@
 
 使い方: python3 fptr_callers.py <block_PE.bin> <VA> [<VA> ...]
 各 VA について:
+  0. VA 自身への参照: その値を格納する qword・rip 相対/絶対 disp・IMM (rel32 と即値。call/jmp/jcc を含む)・
+     .text 内の 4 バイト即値一致の件数。0 件も出す (VA が格納・参照されないことの確認)。
   1. 囲む pdata 関数 F (間接 call で呼ばれる値は F の先頭)。
   2. F の値を格納する qword (全セクション・8 バイト境界の一致を含む全一致)。
   3. 格納先 S を含む表: S の前後で .text を指す qword が続く範囲 [a, b)。
@@ -45,16 +47,22 @@ def main(argv):
     lo = base + text.VirtualAddress
     hi = lo + text.Misc_VirtualSize
     code = img[text.VirtualAddress:text.VirtualAddress + text.Misc_VirtualSize]
+    vas = [int(s, 16) for s in argv[2:]]
+    fs = [enclosing(va) or va for va in vas]
+    want = set(vas) | set(fs)
     md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
     md.detail = True
     refs = {}
     calls = {}
+    imms = {}
     off = 0
     while off < len(code):
         got = False
         for ins in md.disasm(code[off:off + 16], lo + off, 1):
             got = True
             for op in ins.operands:
+                if op.type == X86_OP_IMM and op.imm in want:
+                    imms.setdefault(op.imm, []).append((ins.address, ins.mnemonic))
                 if op.type != X86_OP_MEM:
                     continue
                 if op.mem.base == X86_REG_RIP:
@@ -70,11 +78,13 @@ def main(argv):
         if not got:
             off += 1
 
-    for va_s in argv[2:]:
-        va = int(va_s, 16)
-        f = enclosing(va)
-        F = f if f else va
+    for va_s, va, F in zip(argv[2:], vas, fs):
         print(f"== {va_s}: enclosing pdata fn = {hex(F)}")
+        print(f"  VA 自身 ({va_s}) への参照:")
+        print(f"    qword 格納: {fmt([base + j for j in find_all(img, struct.pack('<Q', va))])}")
+        print(f"    rip 相対・絶対 disp: {fmt([a for a, _, _ in refs.get(va, [])])}")
+        print(f"    IMM (rel32・即値。call/jmp/jcc 含む): {fmt([a for a, _ in imms.get(va, [])])}")
+        print(f"    .text 内の 4 バイト即値一致: {fmt([lo + i for i in find_all(code, struct.pack('<I', va))])}")
         print(f"  直接 call/jmp 元 ({hex(F)}): {fmt(calls.get(F, []))}")
         print(f"  .text 内の 4 バイト即値一致 ({hex(F)}): {[hex(lo + i) for i in find_all(code, struct.pack('<I', F))]}")
         slots = []
