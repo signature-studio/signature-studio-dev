@@ -50,7 +50,8 @@
 |---|---|---|
 | 引数付き lifted 関数を dispatch table に載せる規則 (BLK 経由の引数受け渡しを表で扱う wrapper) | abort 6 件 (本付録 §2) | #1897 (ICALL-49) |
 | out of bounds 2 件 (180c8b280・181057b38) の trap 位置と原因の確定 | wasm のみ err 2 件 | #1899 (ICALL-50) |
-| `GetCurrentThreadId` import 未実装 | wasm のみ err 1 件 | #1853 (ICALL-45) |
+
+注: `GetCurrentThreadId` (180f9e540) は main で解消済み (#1853 / #1898、shim は `tools/icall/rt/icall_rt.c`)。本測定 commit `8ea5d402` は shim 導入前のため、§2 の wasm のみ err 9 件に含まれる。
 
 ## 5. 再現
 
