@@ -110,6 +110,28 @@ python3 gui/effort_measure.py work/uidesc.json work/vstgui4/vstgui > work/effort
 - ネガティブコントロール: C 接頭辞 ヒューリスティックが誤る 5 種 (`CBitmapTextEdit` 等) を宣言照合で検出。宣言照合の偽陰性は、前方宣言のみのクラス (`CKickButton` `COnOffButton` 等) で一度生じたため、宣言の正規表現は `class|struct <名>\b` の単語一致に限定して再照合済み (`gui/effort_measure.py` の `upstream_has`)。
 - 範囲外: 実 VSTGUI 実行、wasm/canvas 上の表示、工数 (人日)、mac 版。
 
-## 6. 測定 commit
+## 6. PoC 境界の対象量 (2026-10-14 run, #1351 残件)
 
-- 測定時の HEAD: 本 PR のコミット (`git log -1`)。コード変更は `gui/effort_measure.py` (新規) と本 REPORT のみ。
+PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入条件 2)。起点は upstream の宣言ファイルで、`#include "..."` を再帰的に辿る (`gui/effort_poc.py`)。
+
+| 区分 | ファイル | 行数 | バイト |
+|---|---|---|---|
+| include 閉包 (`platform/` 除く) | 55 | 13,373 | 408,005 |
+| `platform/` (閉包内) | 13 | 897 | 29,435 |
+| 合計 | 68 | 14,270 | 437,440 |
+
+- 起点 (seed): `CTextLabel` `CViewContainer` `CView` `CControl` `CBitmap` `CDrawContext` の宣言ファイル。
+- canvas 側で実装が要る純粋仮想インタフェース (`lib/platform/iplatform*.h` と `platformfactory.h`): 全 16 ファイル・**133 関数**。内訳は frame 22 / graphicsdevice 22 / textedit 17 / platformfactory 14 / graphicspath 9 / framecallback 9 / openglview 10 / bitmap 7 / font 5 / ほか 18。
+- PoC で最低限要るのは描画に直結する bitmap / font / graphicspath / graphicsdevice / frame / factory の 6 種 (計 79 関数)。**これは本 run の判断であり、実際に閉包が要求するかは未検証** (リンク・実行で確定する)。
+- Xfer 固有 2 種 (`XferOnOffButton` 43 参照・`CTextLabel` 26 参照 は uidesc 上の参照数) の**関数数・バイトは未実測**。Xfer の .text 上での対応付けが要る (`gui/REPORT.md` §5-1 の注記どおり)。
+
+## 7. 工数 (人日) について (本 run の判断)
+
+- 工数は**本 run では推定値を出さない**。入力として §2・§6 の対象量は揃った。
+- 換算係数 (行/人日・関数/人日) を本リポジトリは持たない。係数を置くと、実測でない精度が数字に混入する。
+- 受入条件 1 の「工数の根拠」は、対象量 (本 REPORT §2 / §6) で根拠の材料は示した。人日そのものは未達として残し、判断はユーザに委ねる。
+
+## 8. 測定 commit
+
+- 測定 commit: `gui/effort_poc.py` を追加した commit (本 PR の最後のコード変更)。`git log -1 -- tools/targets/serum2/gui/effort_poc.py` で確認する。
+- 既存の `effort_measure.py` / `strategy_count.py` は本 run で再実行し、§2 の値と一致した (`effort_measure.py` は `work/effort_measure.txt` に保存)。
