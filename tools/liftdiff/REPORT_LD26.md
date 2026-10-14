@@ -29,4 +29,4 @@
 ## 4. 未達・残件
 
 - 前回 run で報告された `session.py:179` の `patterns.index` ValueError は、commit `ae802a4c` (`fix(liftdiff): skip refine for fvm pattern`) で修正済みのため、本 run では発生せず。
-- `liftdiff_e2e.sh` の既定フラグ (`--m11-only` 無し) は `tools/ott/work/ott.ll` (work-m6-ott) を要求し、本 run の素材に無い。受入条件の e2e 既定形は未実行。起票先: 本 issue #978 (素材追加の上で再実行)。
+- `liftdiff_e2e.sh` の既定フラグ (`--m11-only` 無し) は [2/4] で `targets/ott_old.json` の PE `${PLUGINS_DIR}/ott/binaries/OTT_vst2_win64.dll` を読む。この PE は `analysis-ott-binaries` (`$HOME/analysis/plugins/ott/binaries/`) にあり、本 run では `$ARTIFACTS_DIR` にも `$HOME/analysis` にも無く、ファイル検索 (`find /`) でも見つからなかった (`work-m6-ott` は展開済みで `tools/ott/work/ott.ll` は存在)。既定 e2e の不足は `analysis-ott-binaries`。受入条件の既定フラグ PASS は未実測。起票先: 本 issue #978 (`oc_artifacts` に `analysis-ott-binaries` を追加した run で再実行)。
