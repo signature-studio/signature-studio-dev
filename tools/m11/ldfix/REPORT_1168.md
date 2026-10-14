@@ -171,3 +171,49 @@ e2e の実測 (store 宛 CELL_COLLAPSED):
 `ir_loads_in_multi_groups=151 linked=11`。ネガコン成立 (link を外すと store 宛 CC_site 47 → 53)。上の値は `543e7320` の §6 の値と一致する。
 
 結べない load 数 (関数・K 単位) は §6 の表が正。`ff63f0` / `128f9e0` / `d0cee0` のように 1 ブロックに IR load が多い例は、ブロック内の順序を機械語の値の流れで追う必要があり、子 #1980 の範囲。受入条件のうち「値の流れで順序を決める」「store 宛 CELL_COLLAPSED の減少」は未達。
+
+## 8. #1980 (LD-73) 窓の拡張による 1:1 対応の再調査 (部分達成・規則は未採用)
+
+測定 commit: `543e7320` (`link_d17.py` / `link_d17_e2e.sh` / `fix_d17.py` / `fix_d17_e2e.sh` / `audit_lsf_ssa.py` を最後に変えた commit)。
+差分の証跡: `git diff 543e7320 HEAD -- tools/m11/ldfix/link_d17.py tools/m11/ldfix/link_d17_e2e.sh tools/m11/ldfix/fix_d17.py tools/m11/ldfix/fix_d17_e2e.sh tools/m11/ldfix/audit_lsf_ssa.py` の出力は空 (0 行)。
+素材: `work-m11` (`tools/m11/work/`) と `toolchain-emsdk` ([EMSDK]) が必要。
+
+再測定: `bash tools/m11/ldfix/link_d17_e2e.sh` (foreground、前回 run で 46.3 秒、emcc rc=0)。値は §6 と一致 (上記の差分 0 のため)。
+
+| 段 | store_CC_site | store_CC_fn | store_CELL_DEEP |
+|---|--:|--:|--:|
+| ssa_base (修復前) | 86 | 49 | 19 |
+| ssa_neg (fix_d17 のみ) | 53 | 28 | 52 |
+| ssa_link (fix_d17 + link_d17) | 47 | 26 | 58 |
+
+窓の拡張の診断 (`mach_chains` の rD 使用の走査窓 8 / 16 / 32 / 64 命令)。表の数値はコミット版 `window_survey_1980.py` の実測 (下の JSON 出力) と一致する。
+実行: `python3 tools/m11/ldfix/window_survey_1980.py "$RUNNER_TEMP/link_d17_e2e/boot_d17.ll" "$RUNNER_TEMP/link_d17_e2e/ssa_base.json" tools/m11/work/m11_image.bin 'tools/m11/work/boot*.drc.config.json' --windows 8,16,32,64`
+(`boot_d17.ll` と `ssa_base.json` は `link_d17_e2e.sh` の 2/6・1/6 の出力 `$RUNNER_TEMP/link_d17_e2e/`。上の再測定と同じ HEAD で実行。)
+
+```
+{"window": 8, "linked": 11, "reasons": {"base_clobbered": 11, "no_deref": 18, "dst_unused": 18}, "multi_blocks": 42, "multi_ir_eq_chain": 17}
+{"window": 16, "linked": 11, "reasons": {"base_clobbered": 11, "no_deref": 18, "dst_unused": 18}, "multi_blocks": 42, "multi_ir_eq_chain": 17}
+{"window": 32, "linked": 11, "reasons": {"base_clobbered": 11, "no_deref": 18, "dst_unused": 18}, "multi_blocks": 42, "multi_ir_eq_chain": 17}
+{"window": 64, "linked": 11, "reasons": {"base_clobbered": 11, "no_deref": 18, "dst_unused": 18}, "multi_blocks": 42, "multi_ir_eq_chain": 17}
+```
+
+| 窓 | 1:1 で結べた load | 結べない理由 (IR 1 本・chain 1 本のブロック) |
+|--:|--:|---|
+| 8 | 11 | no_deref 18 / dst_unused 18 / base_clobbered 11 |
+| 16 | 11 | 同上 |
+| 32 | 11 | 同上 |
+| 64 | 11 | 同上 |
+
+- 窓を広げても結べ数・理由の内訳とも変わらない。`dst_unused` は rD の使用先が 64 命令以内に無い (= 窓の問題ではない) ことを示す。
+- `multi_blocks` = (K, ブロック) 単位で IR 本数 > 1 または chain 本数 > 1 の組の数 (42)。`multi_ir_eq_chain` = そのうち IR 本数と chain 本数が一致した数 (17、`ff63f0` 11 本・`128f9e0` 系など)。
+- 本数が一致しても、どの IR load がどの chain に対応するかは順序・幅のどれでも一意に決まらないため、規則は採用しない (§7 と同じ判断)。
+- 本節の「結べない 47 件」(IR 1 本・chain 1 本のブロックの理由別内訳 18+18+11) と、上の「結べない load 140 件」(§6 の残作業) は別集合。前者は IR 1 本・chain 1 本のブロックに限った数、後者は K 組全体の未結合 load 数。
+
+結論 (#1980 の受入条件の現行番号に対応):
+- 1. 窓拡張の実測: 達成。コミット版スクリプトで窓 8/16/32/64 を実行し、結べ数 11 と理由の内訳が変わらないことを確認 (上の JSON・表)。
+- 2. 結べた load の修復: 達成。既存の 11 件のみ。store 宛 CELL_COLLAPSED は 86 → 47 site (§6)。
+- 3. ネガコン維持: 達成。ssa_neg 53/28 (修復を外すと 86/49 に戻る)。
+- 4. emcc 構文検証: 達成。`link_d17_e2e.sh` の emcc rc=0。
+- 5. REPORT 記録: 達成 (本節)。
+- 未達 (#2072 [LD-76] へ移管): 値の流れによる 1:1 規則 (同一ブロック複数 IR load の順序を機械語の rD の値の流れで決める方式)、結べない load 数の関数・K 単位の表更新。
+残作業の設計は #2072 で行う。
