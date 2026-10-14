@@ -166,15 +166,21 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | `p0c_e2e.sh` (lift 込み・k80 80 kernel) | 0 | 514 s | 0.70 → 7.86 |
 | `p0c2_e2e.sh` | 0 | 50 s | 7.86 → 3.98 |
 
-k80 lift 単体 (`PLUG_CANON_ALLOCA=1`): run1 4 s (load 4.08) / run2 4 s (load 3.83, ASLR 無効)。
-- **測定条件 (未確定)**: RetDec を再実行したか、`PLUG_REUSE_DRC=1` で既存 `k80.drc.ll` から再開したかは、測定時の記録が残っておらず確定できない。`lift_ranges.sh` は `PLUG_REUSE_DRC=1` かつ `drc.ll` 存在時にだけ RetDec を飛ばす。RetDec 実行を含む値としては 4 s は短すぎるため、再開だった可能性がある (推測。根拠なし)。
-- 再確認: 修正時点の runner には `[RETDEC]`・`k80.drc.ll`・k80 の `work/` が無く、再測定できなかった。この 4 s の値は一致判定 (受入条件 2・3) には使っていない。一致判定は sha256 と `p0c2_sweep.csv` の `cmp` で行った。
+k80 lift 単体 (`PLUG_CANON_ALLOCA=1`) の所要時間: **未測定 (条件不明)**。測定時に RetDec を再実行したか `PLUG_REUSE_DRC=1` で再開したかの記録が残っておらず、単独の時間値は採用しない。
+- 再測定不可: 修正時点の runner には `toolchain-retdec` ([RETDEC]・`/opt/retdec`) が `$ARTIFACTS_DIR` に無く、`k80.drc.ll` と k80 の `work/` も無いため、k80 lift を再実行できなかった。この欠落は PM 判断事項。
+- 一致判定 (受入条件 2・3) は lift の sha256 と `p0c2_sweep.csv` の `cmp` で行い、所要時間には依存しない。
 
 ### 検証の注記
 - 置換前後の lift 比較は同じ `block18983_PE.bin` / 同じ 80 ranges。`before` は `PLUG_CANON_ALLOCA` 未設定、`after` は設定。p0c2 の before/after は `work/k80.lift.ll` を差し替えて各 1 回ずつ実行 (50 s / 51 s)。
 - `argfix.ll` (中間 IR) のテキストは alloca 番号が変わるため before/after で byte 差が出る。最終判定の `p0c2_sweep.csv` は一致。
 
 ### 差分 (測定 commit 以降のコード差分)
-測定 commit = `d5959204`。p0c 配下のコード差分は 0。main 取り込み (`243f75d9`) で `tools/plugins/lift/lift_ranges.sh` に opt-in 変数 2 つ (`PLUG_NO_STATIC_DETECT`・`PLUG_I32PTR_FUNCS`) が入った。既定 (未設定) では出力は変わらず、p0c の k80 lift は両方とも未設定のまま呼ぶ (`p0c_e2e.sh` L56)。実測は `d5959204` の時点のまま (再測定は未実施。runner に RetDec が無いため)。
+測定 commit = `d5959204`。p0c 配下のコード差分は 0 (`git diff d5959204 HEAD -- tools/plugins/p0c` は `REPORT.md` の 32 行追加のみ)。
 
-`git diff d5959204 HEAD -- tools/plugins/p0c` の範囲は `REPORT.md` の 32 行追加のみ。
+ただし k80 lift が実行する `tools/plugins/lift/lift_ranges.sh` は main 取り込み (`243f75d9`) で変わっている (`git diff d5959204 HEAD -- tools/plugins/lift/lift_ranges.sh`):
+- `PLUG_NO_STATIC_DETECT` (RetDec に `--disable-static-code-detection`) を追加。展開は `${PLUG_NO_STATIC_DETECT:+...}` で、未設定時は空になる。
+- `PLUG_I32PTR_FUNCS` の有無で `fix_i32_ptr_arg.py` を通す `i3.ll` 段を追加。未設定時は `cp` で従来どおり。
+
+既定 (両変数未設定) の経路は、bash で展開を確認し引数・出力とも変わらないと判断した。`p0c_e2e.sh` は両変数を設定しない。`lift_ranges.sh` は `bash -n` を通る。
+
+これは「差分 0」ではない。`WORKFLOW.md` §6 に従えば再測定が必要だが、`toolchain-retdec` が無く実施できなかった。したがって §17 の実測 (lift 514 s / p0c2 50 s) は `d5959204` 時点の値であり、HEAD `e86c5ac8` 以降の再測定は未実施。PM 判断: `oc_artifacts: fl-win64 toolchain-retdec` で再実行するか、既定経路の等価性で受け入れるか。
