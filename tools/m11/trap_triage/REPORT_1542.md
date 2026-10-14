@@ -12,7 +12,7 @@
 ## 1. 測定 (測定 commit `d015e210`・直列・単発の繰返し n=3・foreground)
 
 **実行環境** (2026-10-14 の GitHub Actions run。runner 4 vCPU、ディスク空き 76G):
-- 素材: `fl-win64` → `$RUNNER_TEMP/extracted/` (`FL_WIN64_DIR=$RUNNER_TEMP`)、`work-m11` → `tools/m11/work/` (展開後 `m11_gen_ir2.sh` で作り直し)、`toolchain-emsdk` → [EMSDK]、`toolchain-retdec` → [RETDEC] (展開先は `docs/REFERENCES.md` §4 の [EMSDK]・[RETDEC])。
+- 素材: `fl-win64` → 作業用一時ディレクトリ (`FL_WIN64_DIR` で指定)、`work-m11` → `tools/m11/work/` (展開後 `m11_gen_ir2.sh` で作り直し)、`toolchain-emsdk` → [EMSDK]、`toolchain-retdec` → [RETDEC] (展開先は `docs/REFERENCES.md` §4 の [EMSDK]・[RETDEC])。
 - IR 生成: `bash m11_gen_ir2.sh` (48 秒)。`ir_conditions.json`: `ldfix=applied`・`qstore=not-applied`・`ir_sha256=08c7b646…` (REPORT_1352・§1 旧記録と一致)。ldfix 件数: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 F4=10 errors=0 (旧記録と一致)。
 - 負荷: `uptime` で load 0.76〜1.03 (測定前後)。
 
@@ -51,7 +51,9 @@
 - 所要: 1 回あたり 1 分 45 秒〜1 分 57 秒。
 - 旧記録 (`7fc1088f` の 1 回・1 分 54 秒・load 0.63〜0.97) は、現 head の 3 回と同じ判定 (PASS)。`22d4a2eb` での PASS 記録は測っていないため取り消し済み。
 
-**`tools/m11` の差分** (`git diff --stat 47e4a846 HEAD -- tools/m11`・測定 commit `47e4a846` から PR head まで。HEAD は `d015e210` 以降に REPORT のみを追加する):
+**`tools/m11` の差分**。測定 commit `d015e210` の直前の計測コード (`47e4a846`) から測定 commit までの差分 (IR 生成の鎖 `ldfix/` を含む) と、測定 commit から HEAD までの差分を分けて示す。
+
+`git diff --stat 47e4a846 d015e210 -- tools/m11` (測定 commit まで):
 
 ```
  tools/m11/REPORT_N15.md                   |  20 ++++
@@ -72,9 +74,16 @@
  15 files changed, 815 insertions(+), 14 deletions(-)
 ```
 
+`git diff --stat d015e210 HEAD -- tools/m11` (測定 commit から HEAD まで・本 REPORT の追記のみ):
+
+```
+ tools/m11/trap_triage/REPORT_1542.md | 119 +++++++++++++++++++++++------------
+ 1 file changed, 78 insertions(+), 41 deletions(-)
+```
+
 - `ldfix/ldfix.py` は +33/−5 (`git diff --numstat`)。IR は変わっていない (`ir_sha256=08c7b646…` が旧記録と一致、A〜D の IR md5 も旧記録と一致)。
 - 測定に使ったコード (`m11_post.py`・`m11_build.sh`・`m11_survey.mjs`・`m11_gen_ir2.sh`・`m11_cond.py`・`m11_ov.c`・`m11_rt.c`) は `47e4a846` から HEAD まで差分 0 (`git diff 47e4a846 HEAD -- <上記ファイル>` が空)。
-- 差分の大半は main 取り込み (`88a13a92`) 由来。`ldfix` の変更は IR 生成を変えていないことを上の md5 で確認した。
+- `47e4a846` → `d015e210` の差分の大半は main 取り込み (`88a13a92`) 由来。`ldfix` の変更は IR 生成を変えていないことを上の md5 で確認した。HEAD 側のコード差分 (`REPORT_1542.md` 以外) は 0。
 
 ## 2. 解釈
 
@@ -98,6 +107,6 @@
 ## 4. 再現
 
 - A〜D の表 (n 回): `bash tools/m11/trap_triage/repro_1542_split.sh [N]` (N = 反復回数・既定 1)。`work/split_1542/table.tsv` に出力。前提は `m11_gen_ir2.sh` 実行済み・`FL_WIN64_DIR` 設定済み・[EMSDK]・[RETDEC] 配置済み。
-- 既定と計測 OFF の基準: `bash tools/m11/trap_triage/repro_1352.sh` (判定 `PASS`)。
+- 既定と計測 OFF の基準: `bash tools/m11/trap_triage/repro_1352.sh` (判定 `PASS`)。§1 の 3 回は測定 commit `d015e210` で実施。
 - 変種: `M11_PROBE_VARIANT` (`noprobe` / `noren` / `nodecl`) は `M11_INSTR_413060=1` のときだけ有効 (それ以外は `m11_post.py` が exit)。
 - 作業ディレクトリは `tools/m11/`。`work/` は `m11_gen_ir2.sh` で生成する (`work-m11` 展開後に実行)。
