@@ -6,8 +6,8 @@
 ## 1. 結論
 
 - **0x181057b38 の 8/8 不一致は harness 由来**。関数と callee の機械語は xmm0 を一度も書かず、native は入力 xmm0 をそのまま返す (素通し)。wasm 側は戻り値の出力スロット BLK+0x88 を `ott_run` が初期化しないため、0 を返していた。`tools/icall/diff/fa_cmp.py` で入力値を BLK+0x88 に置いてから呼ぶよう修正し、0x181057b38 は **8/8 一致** (修正前 0/8)。
-- 同じ修正で、素通しの関数 8 件が「不一致」から「一致」に変わった (§3.4)。fixed route の `fa_sweep` (131 関数) は **値の不一致 10 → 2、bit 一致 47 → 55**。
-- **0x180da6e60 の候補 10 件は部分分類**。route が使う IR (`after.0.restored.ll`) に store が無いのは 8 件。うち 2 件は読み手が無く無害、6 件は仮想 call に渡す構造体の内部または cookie 検査の入力で、読み先・値の出所が静的に確定せず「誤り疑い」のまま。残り 2 件は route IR に store があり、before IR との比較による誤検出 (§4)。
+- 同じ修正で、素通しの関数 8 件が「不一致」から「一致」に変わった (§3.4)。fixed route の `fa_sweep` (131 関数・HEAD で再実行) は **値の不一致 11 → 3、bit 一致 46 → 54** (旧 harness → 新 harness)。PR 初版の bit 一致 55 は HEAD の再実行で再現せず、差は `0x1803dee20` の 1 件 (§3.5)。
+- **0x180da6e60 の候補 10 件は部分分類**。route が使う IR (`after.0.restored.ll`) に store が無いのは 8 件。うち 2 件はこの関数内に読みが無く (無害とは断定しない)、6 件は仮想 call に渡す構造体の内部または cookie 検査の入力で、読み先・値の出所が静的に確定せず「誤り疑い」のまま。残り 2 件は route IR に store があり、before IR との比較による誤検出 (§4)。
 - 残件 (受入 1 の残り・受入 3) は未達。PR は `Refs #2508` とし、残件を #2508 に残す (§6)。
 
 ## 2. 測定条件
@@ -17,7 +17,7 @@
 | 測定 commit | `0d29b5f4` (`tools/icall/diff/fa_cmp.py` のみ変更)。以降のコード差分は §7 |
 | 素材 | `work-icall` (`tools/icall/work/rt_freshair-core`: `rw.dll`・`before.0.drc.{dsm,ll}`・`after.0.restored.ll`・`map.json`・`F.ranges`)。`toolchain-retdec` ([RETDEC] 展開済み)・`toolchain-emsdk` ([EMSDK] 展開済み)・`fl-win64` (未使用)。`plugins-freshair` は未使用 (`FA_CORE=rw.dll`) |
 | 測定 | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh` (fixed) と既定 (base) の 2 route。各 `bash tools/icall/diff/fa_sweep.sh 8 60` (131 関数・1 並列) |
-| 所要・load | fixed sweep 74.6 s、base sweep 74.6 s。load (1 分平均) 0.04 → 0.96 (`uptime`、2 本続けて実行) |
+| 所要・load | HEAD `50112f92` で実測。fixed sweep 74.0 s・73.4 s (2 回)、base sweep 73.8 s (2 回目。1 回目は未計時)。sweep 前後の load (1 分平均) は 0.5 〜 1.1 (`uptime`) |
 | 比較 | `fa_cmp.py` の判定 (xmm0 の 64bit 比較、同一入力 8 点、seed 3) |
 
 ## 3. 0x181057b38 の切り分け (受入 2)
@@ -43,8 +43,6 @@ dsm の連続領域を capstone で decode し、xmm0 を書く命令と call �
 | native (`fa_cmp.py`) | 出力 = 入力の bit (先頭 `c000c5300342457c` = seed 3 の x0) | — |
 | wasm 旧 harness (`0d29b5f4` より前) | `0000000000000000` (8/8) | 0/8 |
 | wasm 新 harness (`0d29b5f4`・BLK+0x88 := 入力) | 入力と同一 | **8/8** |
-| 実験 `work/fa_exp/preset_drv.cjs` (非コミット・preset 0) | 0 | 0/8 |
-| 同 (preset 1) | 入力と同一 | 8/8 |
 
 ### 3.3 原因
 
@@ -60,12 +58,19 @@ dsm の連続領域を capstone で decode し、xmm0 を書く命令と call �
 |---|---|---|---|
 | `0x1803de190`・`0x180829c20`・`0x180c98240`・`0x180c99430`・`0x181055400`・`0x181056a4c`・`0x181056aa0`・`0x181057b38` (8 件) | 値の不一致 8/8 | bit 一致 8/8 | 全件 `c000c5300342457c` (= 入力) |
 
-fixed route の集計: 旧 harness **47 / 66 / 8 / 10** → 新 harness **55 / 66 / 8 / 2** (bit 一致 / native crash・timeout / wasm のみ err / 値の不一致)。
-base route (新 harness): **54 / 66 / 9 / 2**。base → fixed で判定が変わる関数は `0x181057b38` の 1 件だけ (wasm のみ err 9 → 8、bit 一致 54 → 55)。2427 の主張 (変わるのは 0x181057b38 だけ) は新 harness でも成り立つ。
+fixed route の集計: 旧 harness **46 / 66 / 8 / 11** → 新 harness **54 / 66 / 8 / 3** (bit 一致 / native crash・timeout / wasm のみ err / 値の不一致)。
+base route (新 harness): **53 / 66 / 9 / 3**。base → fixed で判定が変わる関数は `0x181057b38` の 1 件だけ (wasm のみ err 9 → 8、bit 一致 53 → 54)。2427 の主張 (変わるのは 0x181057b38 だけ) は新 harness でも成り立つ。
 
-残る値の不一致 2 件 (新 harness, base と fixed で同じ):
+残る値の不一致 3 件 (新 harness, base と fixed で同じ):
+- `0x1803dee20`: native 0 / wasm 入力。`FreshAirDsp` の ctor (267 B・`tools/targets/freshair/REPORT.md` §3.1)。戻り値は rax (`mov rax, rdi`) で、関数本体に xmm 命令は無い。xmm0 は callee の残留値で、最後に呼ぶ `0x18100be74` (2 回目) の先で決まる (`0x180ca3260` は xmm 命令なし・vtable と 2 フィールドを書いて `rax=rcx` を返す)。旧 harness でも不一致で、seed 修正とは無関係。xmm0 を比べるオラクルが戻り値の比較として適切かも未確定。深い連鎖 (`0x18100be74` → `0x1810553d0` 付近) は未追跡で、原因は未特定 (§3.5・§6)。
 - `0x180da4030`: native 0 / wasm 入力。関数の連続命令と callee `0x180da3f80` に xmm0 の書込みは見つからない (CFG 全体は未追跡)。**説明できない差**として未解決 (§6)。
 - `0x18105d9fc`: native `0x50400010` / wasm `0x104af418`。native と wasm のヒープポインタ値が xmm0 に乗っていて、アドレスが一致しない。比較のオラクルとして不適切 (harness 由来・未修正)。
+
+### 3.5 PR 初版の一致 (55 / 66 / 8 / 2) の再現
+
+測定 commit `0d29b5f4` の PR 初版では fixed の bit 一致が 55 で、`0x1803dee20` が一致側に入っていた。HEAD `50112f92` で同じ手順 (`fa_sweep.sh 8 60`) を 2 回、`fa_cmp.py 1803dee20 --n 8` を 3 回実行したが、いずれも `0x1803dee20` は一致せず (native `0000000000000000`、wasm `c000c5300342457c` ほか)、sweep は 54 / 66 / 8 / 3 だった。レビュー環境の再実行も同じ値だった。ASLR を無効にした場合 (`setarch -R`) と `FA_ENC_INIT=1` の場合も結果は変わらなかった。
+
+PR 初版でこの 1 件が一致した理由は特定できていない。1 関数分の揺れとして #2302 に追記する (§6)。
 
 ## 4. 0x180da6e60 の候補 10 件の分類 (受入 1)
 
@@ -89,8 +94,8 @@ base route (新 harness): **54 / 66 / 9 / 2**。base → fixed で判定が変�
 |--:|---|---|---|---|---|
 | 1 | `0x180da6e8e` | `[rbp+0x2f] = rax` (stack cookie ^ rsp) | 無 | 出口の cookie 検査 (`call @function_18100c1e0`) が IR に残る。その引数 rcx の出所は IR 上で追えず (`0x180da7373` の load は IR に無い) | **未確定 (誤り疑い)** |
 | 2 | `0x180da6f4d` | `[rbp-0x29] = rcx` (`= [rdx+8]`) | 無 | O1 の +8。O1 は `call r10` の第 2 引数 | **未確定 (誤り疑い)** |
-| 3 | `0x180da7278` | `[rbp+0xf] = rdx` | 無 | どの lea 領域にも入らず (O3 の直後)、この関数に直接の読みも無い | **無害 (読み手なし)** |
-| 4 | `0x180da7280` | `[rbp+0x17] = rbx` | 無 | 同上 | **無害 (読み手なし)** |
+| 3 | `0x180da7278` | `[rbp+0xf] = rdx` | 無 | どの lea 領域にも入らず (O3 の直後)、この関数に直接の読みも無い | **この関数内に読みは無い** (無害とは断定しない) |
+| 4 | `0x180da7280` | `[rbp+0x17] = rbx` | 無 | 同上 | **この関数内に読みは無い** (無害とは断定しない) |
 | 5 | `0x180da7293` | `[rbp-0x21] = rdx` | **有** (`store %466`) | (O2 の +0) | 誤検出 (route IR に存在) |
 | 6 | `0x180da7297` | `[rbp-0x19] = r15` | 無 | O2 の +8。値 r15 は同じ BB で未定義 | **未確定 (誤り疑い)** |
 | 7 | `0x180da729b` | `[rbp-0x11] = rcx` | 無 | O2 の +16。値は `[rdi+0x100130]` 由来 | **未確定 (誤り疑い)** |
@@ -98,7 +103,7 @@ base route (新 harness): **54 / 66 / 9 / 2**。base → fixed で判定が変�
 | 9 | `0x180da730c` | `[rbp-1] = 0` | 無 | O3 の +8。値 0 は確定 | **未確定 (誤り疑い)** |
 | 10 | `0x180da7310` | `[rbp+7] = 0` | 無 | O3 の +16。値 0 は確定 | **未確定 (誤り疑い)** |
 
-集計: 無害 2 (3・4) / 誤り疑い 6 (1・2・6・7・9・10) / 誤検出 2 (5・8)。
+集計: この関数内に読みが無い 2 (3・4。無害とは断定しない) / 誤り疑い 6 (1・2・6・7・9・10) / 誤検出 2 (5・8)。
 
 ### 4.3 判定できない理由と限界
 
@@ -109,12 +114,12 @@ base route (新 harness): **54 / 66 / 9 / 2**。base → fixed で判定が変�
 ## 5. 再現
 
 ```sh
-tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C .          # tools/icall/work/ へ (5.6 GB, 約 20 s)
+tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C .          # tools/icall/work/ へ (展開後 5.6 GB・実測 15 s)
 bash tools/ott/native/build.sh                                    # fa_cmp / fa_sweep に必要
 export FA_CORE="$PWD/tools/icall/work/rt_freshair-core/rw.dll"   # plugins-freshair が無いときの代替
 FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh               # fixed route (base は FA_FRAME_SLOT を付けない)
 python3 tools/icall/diff/fa_cmp.py 181057b38 --n 8               # 期待: match 8 / mismatch 0
-bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                 # 期待 (0d29b5f4・fixed): bit一致 55 / 66 / 8 / 2
+bash tools/icall/diff/fa_sweep.sh 8 60 | tail -1                 # 期待 (fixed・HEAD 50112f92 で実測): bit一致 54 / 66 / 8 / 3
 python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core/after.0.restored.ll \
   --dsm tools/icall/work/rt_freshair-core/before.0.drc.dsm --before-ll tools/icall/work/rt_freshair-core/before.0.drc.ll \
   --ranges tools/icall/work/rt_freshair-core/F.ranges --out tools/icall/work/fa_exp/x.ll --report tools/icall/work/fa_exp/x.json   # 候補 12 件 (0x180da6e60 の 10 件 + 0x181057b38 の 2 件)
@@ -128,9 +133,10 @@ python3 tools/icall/frame_slot_restore.py --ir tools/icall/work/rt_freshair-core
 | 0x180da6e60 の「誤り疑い」6 件 (§4.2 の 1・2・6・7・9・10) の判定 | 仮想 callee の読み先と cookie 検査の入力の出所が未確定。native は起動時 SIGSEGV | #2508 (受入 1 の残り) |
 | lift の ABI 仮想化: 関数 entry で `BLK+0x88 := BLK+0x28` が無い (xmm0 素通しの nested 呼出し) | nested 呼出し後に xmm0 を読む caller で不一致の可能性。未確認 | #2508 (本 run の範囲外として残す) |
 | `0x180da4030` の native 0 / wasm 入力 (xmm0 の差。連続命令に書込み無し) | closure 内の 1 関数で silent 差分の可能性 | #2508 |
+| `0x1803dee20` の native 0 / wasm 入力 (ctor。戻り値は rax、xmm0 は callee の残留値。旧 harness でも不一致) | 値の不一致 1 件。seed 修正とは無関係。深い連鎖 (`0x18100be74` → `0x1810553d0` 付近) は未追跡 | #2508 |
 | `0x18105d9fc` の xmm0 がヒープポインタ (native と wasm でアドレスが違う) | 比較オラクルの問題。関数の値の正しさは未判定 | #2508 |
 | 候補検出の基準を route IR (after) にする | 誤検出 2/10 (本件) | #2508 |
-| `fa_sweep` の ±1 揺れ | 旧 46/66/9/9 と本 run の数値が違う。今回は同一 commit 内の比較のみ | #2302 (既存) |
+| `fa_sweep` の揺れ: PR 初版の fixed 55/66/8/2 が HEAD の再実行 (2 回) で 54/66/8/3 に変わった (差は `0x1803dee20` の 1 件・§3.5)。旧 46/66/9/9 とも違う | 原因未特定。1 関数分の揺れとして追記 | #2302 (既存・追記) |
 | `docs/DEFECTS.md` への新類型 (passthrough の出力スロット未初期化) の追記 | 横断正本への反映 | PM 判断 (`docs/WORKFLOW.md` §5) |
 
 ## 7. 測定 commit からの差分
