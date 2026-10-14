@@ -1,0 +1,12 @@
+# va	pattern	solo12
+0x959a40	p0	native_fault(segv/ok)
+0x959a40	p01	native_fault(segv/ok)
+0x959a40	p1	equal(ok/ok)
+0x959a40	pall	equal(ok/ok)
+0x959a40	pall2	native_fault(segv/ok)
+0x959a40	q0	native_fault(segv/ok)
+0x959a40	qall	equal(ok/ok)
+0x959a40	s	native_fault(segv/ok)
+0x959a40	u16	native_fault(segv/ok)
+0x959a40	vm0	native_fault(segv/ok)
+0x959a40	z	native_fault(segv/ok)
