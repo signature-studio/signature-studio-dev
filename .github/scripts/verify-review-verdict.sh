@@ -47,8 +47,39 @@ rv="$(gh api --paginate "repos/$OC_REPO/pulls/$OC_PR_NUMBER/reviews" \
   | jq -s --arg h "$head" --arg l "$REVIEWER_LOGIN" '[.[][] | select(.user.login == $l and .commit_id == $h and (.state == "APPROVED" or .state == "CHANGES_REQUESTED"))] | last // {}')"
 st="$(jq -r '.state // "NONE"' <<< "$rv")"
 
+# 差し戻し本文の構造化マーカー (reviewer.md 参照) を検査する。警告のみで、verdict と終了コードは変えない (#2320)。
+check_review_marker() {
+  local body marker known="doc remeasure artifact closes path conflict code pm-decision user-decision" v c k
+  body="$(jq -r '.body // ""' <<< "$rv")"
+  marker="$(printf '%s\n' "$body" | grep -E '<!-- oc-review:' | tail -n 1 || true)"
+  if [ -z "$marker" ]; then
+    echo "::warning::CHANGES_REQUESTED on ${head:0:7} has no <!-- oc-review: v=1 ... --> marker"
+    return 0
+  fi
+  if [ "$(printf '%s\n' "$body" | grep -v '^[[:space:]]*$' | tail -n 1)" != "$marker" ]; then
+    echo "::warning::oc-review marker on ${head:0:7} is not the last line of the body"
+  fi
+  v="$(grep -oE 'v=[^ ]*' <<< "$marker" | head -n 1 || true)"
+  if [ "$v" != v=1 ]; then
+    echo "::warning::oc-review marker on ${head:0:7} has unsupported version: ${v:-none}"
+  fi
+  c="$(grep -oE 'classes=[^ ]*' <<< "$marker" | head -n 1 | cut -d= -f2- || true)"
+  for k in ${c//,/ }; do
+    case " $known " in
+      *" $k "*) ;;
+      *) echo "::warning::oc-review marker on ${head:0:7} has unknown class: ${k:-<empty>}" ;;
+    esac
+  done
+  return 0
+}
+
 case "$st" in
-  APPROVED | CHANGES_REQUESTED)
+  APPROVED)
+    echo "verdict on ${head:0:7}: $st"
+    exit 0
+    ;;
+  CHANGES_REQUESTED)
+    check_review_marker
     echo "verdict on ${head:0:7}: $st"
     exit 0
     ;;
