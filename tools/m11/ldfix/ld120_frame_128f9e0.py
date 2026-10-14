@@ -42,21 +42,26 @@ def main():
     k_loads = sum(1 for l in body if K_VALUE in l)
     cfg = json.load(open(os.path.join(w, 'boot3.drc.config.json')))
     locals_ = {v['name'] for f in cfg['functions'] if f.get('name') == FN_NAME for v in f.get('locals', [])}
+    drc = open(os.path.join(w, 'boot3.drc.ll')).read().splitlines()
+    ds = next(i for i, l in enumerate(drc) if re.match(r'define .*@%s\(' % FN_NAME, l))
+    de = next(i for i in range(ds, len(drc)) if drc[i] == '}')
+    drc_body = drc[ds:de]
     print('[ld120] frame F=%d (0x%x) / IR allocas %d 本 (範囲 %d〜%d) / IR 本体 %d 行 / K=%s の load %d 件'
           % (F, F, len(alloca), max(alloca), min(alloca), len(body), K_VALUE, k_loads))
 
-    rows = ['site\tdisp\tstack_var\tmachine_chain\tmachine_consumers\tir_alloca\tir_mentions\tconfig_local\tir_K_loads']
+    rows = ['site\tdisp\tstack_var\tmachine_chain\tmachine_consumers\tir_alloca\tir_mentions\tconfig_local\tir_K_loads\tdrc_mentions']
     facts = {}
     for s in SITES:
         ms = L.machine_side(mach, ins, idx, s, lambda x: int(L.MEM_RBP.search(x.op_str).group(1), 16))
         name = name_of(ms['disp'])
         off = -(F - ms['disp'])
         mentions = sum(1 for l in body if re.search(re.escape(name) + r'(?![\d])', l))
+        drc_m = sum(1 for l in drc_body if re.search(re.escape(name) + r'(?![\d])', l))
         facts[s] = dict(d=ms['disp'], name=name, chain=ms['chain'], refs=ms['refs'], alloca=off in alloca,
-                        mentions=mentions, cfg=name in locals_, k=ms['k'], v=ms['v'])
+                        mentions=mentions, cfg=name in locals_, k=ms['k'], v=ms['v'], drc=drc_m)
         rows.append('\t'.join([s, hex(ms['disp']), name, ms['chain'], ' | '.join(ms['refs']),
                                'yes' if off in alloca else 'no', str(mentions),
-                               'yes' if name in locals_ else 'no', str(k_loads)]))
+                               'yes' if name in locals_ else 'no', str(k_loads), str(drc_m)]))
         print('[ld120] %s [rbp+%s] -> %s: alloca %s / IR 言及 %d 件 / config locals %s'
               % (s, hex(ms['disp']), name, 'yes' if off in alloca else 'no', mentions,
                  'yes' if name in locals_ else 'no'))
@@ -75,12 +80,13 @@ def main():
             f = facts[s]
             ev = ('機械語 %s (2 段 deref・K=0x%x・V=0x%x)。消費者 %s。'
                   'IR: %s 本体 (76541〜77198 行) に %s の alloca・store・load は %d 件 (alloca %s)。'
-                  'K の load は IR 本体に %d 件。config の locals には %s が宣言済み (%s)。'
+                  'K の load は IR 本体に %d 件。RetDec 出力 boot3.drc.ll の同関数 (%d〜%d 行) にも %s の言及は %d 件 '
+                  '(m11 後処理より前の段で欠落)。config の locals には %s が宣言済み (%s)。'
                   'IR に store も読みも無く、TRUE_DROP / OK_LOAD / NO_CONSUMER の結線 (IR の store→load) が立たないため判定不能。'
-                  '欠落の原因は未確定 (子 issue)。'
+                  '欠落の原因は RetDec 段の未確定 (子 issue)。'
                   % (f['chain'], f['k'], f['v'], f['refs'][0], FN_NAME, f['name'],
-                     f['mentions'], 'yes' if f['alloca'] else 'no', k_loads, f['name'],
-                     'yes' if f['cfg'] else 'no'))
+                     f['mentions'], 'yes' if f['alloca'] else 'no', k_loads, ds + 1, de,
+                     f['name'], f['drc'], f['name'], 'yes' if f['cfg'] else 'no'))
             add.append(json.dumps({'fn': '128f9e0', 'site': s, 'verdict': 'UNDETERMINED', 'evidence': ev},
                                   ensure_ascii=False))
         with open(vpath, 'a') as fh:
