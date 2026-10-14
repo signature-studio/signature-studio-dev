@@ -65,6 +65,7 @@
 - 素材の壊れた symlink: `work-liftlib`・`work-m6-ott` の同梱 symlink 201 件が、取得元 VM の m6 作業 dir (repo 外の絶対パス) を指していた。`recipes/ott.py` の `full_t1.drc.{ll,dsm}` 張り直し (`dce097af`) で、e2e が使う作業 dir 2 組 (`tools/liftlib/work/ott/work/`・`tools/liftlib/work/ott_auto_f2_f7_p1/work/`・計 4 件) が正しい向きになった。残り 197 件は過去の作業 dir (`cab238`・`hang`・`wt_cab238`・`ott_auto_f7` など) で、`--quick` の経路では参照されず PASS (gitignore 対象・本 PR の範囲外)。
 - `--quick` が省くもの (`liftlib_e2e.sh` の仕様): (d) SIMD helper・(e) 注入・(f) leaf spec。受入条件 (`--quick`) の範囲外で、本 run では未実行。
 - §1 の `054ee527` の計測 (3 回) は、`dce097af` と比べると IR・SHA の経路が違わない (差分は `recipes/ott.py` の symlink 張り直し 2 行と表記のみ・`git diff 054ee527 dce097af --stat` で確認)。`dce097af` の `ott_auto_none` は上記の run で再確認した (所要の再計測は未実施)。
+- 測定 commit は `dce097af` (コードを変えた最後の commit)。その後のコード差分は `7c5dcd36` の docstring 1 行だけ (`git diff dce097af 7c5dcd36 -- tools/liftlib/liftlib tools/liftlib/tests tools/liftlib/liftlib_e2e.sh` の出力: `recipes/ott.py` 行 222 の `auto f7,p1` → `auto f2,f7,p1`)。`ast` の比較で、差分は docstring の文字列 1 箇所だけ。実行コードは同一のため `--quick` は再測定していない (`dce097af` の記録を示す)。
 - 作業ツリーは `dce097af` の時点で main より 363 commit 遅れている。`git merge-tree` で main との衝突は無し (rc=0)。main は取り込んでいない (取り込むと測定済みコードと差が生じ、再測定が要るため)。
 
 ## 5. 分岐書換えの実測と未解決
@@ -86,4 +87,4 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `legacy_p1` の `repmap` が挿入前の行番号 `j` で登録し挿入後の `out[j]` に適用するため、分岐の書換えが 1 件も適用されない (実測 0 / 19・上表)。挿入フラグ (cf・zf・pf 各 18 本) は使用 0 件 | 参照 chain の P1 (`DEFECTS.md` D1a 同型の対策) が OTT で効いていない。e2e (maxdev 0・SHA 42/42) は通るが、参照 `ir7e_p1.ll` も同じ状態のため。直すと参照 IR・m10 出力・SHA の再測定が要る (本 PR では直さない・挙動変更のため PM 判断) | #2094 (親) へ PM 判断を依頼 (子 issue は未起票) |
+| `legacy_p1` の `repmap` が挿入前の行番号 `j` で登録し挿入後の `out[j]` に適用するため、分岐の書換えが 1 件も適用されない (実測 0 / 19・上表)。挿入フラグ (cf・zf・pf 各 18 本) は使用 0 件 | 参照 chain の P1 (`DEFECTS.md` D1a 同型の対策) が OTT で効いていない。e2e (maxdev 0・SHA 42/42) は通るが、参照 `ir7e_p1.ll` も同じ状態のため。直すと参照 IR・m10 出力・SHA の再測定が要る (本 PR では直さない・挙動変更のため PM 判断) | #3067 (`[LIFTLIB-21]`・親 #2863。修正の是非と再測定の範囲は PM 判断) |
