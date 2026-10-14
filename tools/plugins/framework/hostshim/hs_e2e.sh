@@ -4,8 +4,8 @@
 #   bash hs_e2e.sh --fresh    # IR patch / table / emcc を作り直し
 #   bash hs_e2e.sh --observe  # 判定なし観測モード (GOLDEN 固定前の ID 序列観測)
 #   HS_WFW=<dir> bash hs_e2e.sh --fresh  # 入力 dir を差し替え (FW_EXT_FUNCS の ext 版 canon3 で検証)。
-#                                        # 相対パスも可 (cd の前に絶対化する)。増分判定は WFW の fw_flat4_canon3.ll と
-#                                        # fw_rt.c の mtime だけを見るため、差し替えるときは必ず --fresh
+#                                        # 絶対パスで指定する (相対パスは cd 後に解決されて前提不足になる)。
+#                                        # 増分判定は WFW の fw_flat4_canon3.ll と fw_rt.c の mtime だけを見るため、差し替えるときは必ず --fresh
 #
 # 前提: CAB-194 の framework lift 済み (tools/plugins/framework/fw_stage2.sh 完走)。
 #   本 script は framework 成果物を **読み取りのみ** で利用する:
@@ -21,7 +21,7 @@ HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 source "$HERE/../../../shared/env.sh"
 T="$REPO_ROOT"
 FW="$T/tools/plugins/framework"
-WFW="$(realpath -m -- "${HS_WFW:-$T/tools/plugins/work/fw}")"
+WFW="${HS_WFW:-$T/tools/plugins/work/fw}"
 W="$T/tools/plugins/work/hs"
 H="$HERE"
 FRESH=0
