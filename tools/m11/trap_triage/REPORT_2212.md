@@ -2,10 +2,10 @@
 
 ## 0. 結論
 
-- 測定 commit: **`16f4f199`** (測定に使ったコードを変えた最後の commit)。現 HEAD は `a8201fea` (main 取り込み merge) で、`tools/m11` に §7 の差分がある。**現 HEAD での再測定は未実施** (`work-m11` と [EMSDK] が本 run に無かった)。下の表は `16f4f199` の値で、現 HEAD の値ではない。
+- 測定 commit: **`7d3e5cad`** (測定に使ったコードを変えた最後の commit。§7 のとおり、測定 build の入力は `16f4f199` からの差分を含む現 HEAD と同じ)。下の表 (§2) は `7d3e5cad` で測った n=3 (計 30 セル) の値で、生値は `table_2212.tsv`・`addr_2212.txt` に tracked。
 - **受入条件 1 (リンク後の実アドレス)**: 測定済み (§3)。`g_dest_h` は **全構成で `10250f20`** で、PRE64・PRE4096 でも動かない。pad は `.bss` 上で `g_rec_h` の後ろに置かれ、`g_dest_h` より前には入らない。
 - **受入条件 2 (関数のみ・データ無しの対照)**: **部分達成**。NODATA は getmem **2012** (R0_rtOFF と同じ)・survey 870/24/0 で、C_noren の 2008 から動く。ただし NODATA は関数本体の書き込み (`g_dest_h`・`g_rec_*`) も消しているため、「関数のみ (本体そのまま)」の対照にはなっていない (§4)。
-- **受入条件 3 (n=3 の決定性)**: `16f4f199` で全 10 構成 × 3 回を測ったとされ、ok/trap/clobber・getmem・fastmm_getmem_impl・IR md5 が一致したと記録されている。ただし 30 セルの生値は repo に無く (§2)、現 HEAD では未検証。
+- **受入条件 3 (n=3 の決定性)**: 達成。`7d3e5cad` で全 10 構成 × 3 回 (30 セル) を測り、IR md5・undefined・ok/trap/clobber・getmem・fastmm_getmem_impl・実アドレスが全セルで一致した (§2・`table_2212.tsv`・`addr_2212.txt`)。
 - **受入条件 4**: 既定 (A_default) は全 3 回 870/24/0・getmem 2012 で、変えていない。
 - **機序は未確定**: PRE64 と PRE4096 は両方 `g_dest_h` が同じ位置で、結果だけ違う (2006 と 2008)。「`g_dest_h` のアドレスが変わるから」では説明できない (§4)。
 
@@ -17,11 +17,12 @@
 
 ## 2. 測定
 
-測定 commit `16f4f199`・直列・foreground・`FL_WIN64_DIR` (`[WIN64]` の素材展開先) 設定・`work-m11` (`[WORK-M11]`) を展開して `m11_gen_ir2.sh` で IR を再生成 (ldfix: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0。REPORT_1952 と一致)。
+測定 commit `7d3e5cad`・直列・foreground・`FL_WIN64_DIR` (`[WIN64]`・`fl-win64` を展開) 設定・`work-m11` (`[WORK-M11]`) を repo 直下で展開 (`tar --zstd -xf` は `tools/m11/work/` を含むため repo ルートで行う) し、`m11_gen_ir2.sh` で IR を再生成 (ldfix: F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=36 errors=0。REPORT_1952 と一致)。`[EMSDK]` は `toolchain-emsdk` 素材と `/opt/emsdk` 配置を確認して使用。
 
-- n=3 (HEAD `16f4f199`): 所要 15 分 34 秒 (`time` 実測)・開始時 load 0.85・4 vCPU。
-- n=1 (HEAD `16f4f199`): 所要 5 分 11 秒 (`time` 実測)・開始時 load 0.35。
-- n=3 の前 (変更を commit する前の同内容): 所要 15 分 26 秒。表は下の n=3 と一致。
+- IR 再生成 `m11_gen_ir2.sh`: 所要 30.8 秒 (`time` 実測)。
+- n=1 (`repro_1952_rt_mech.sh 1`): 所要 3 分 58.8 秒 (`time` 実測)。
+- n=3 (`repro_1952_rt_mech.sh 3`): 所要 11 分 57.3 秒 (`time` 実測)・終了時 uptime load 1.00 (4 vCPU)。
+- 同一 HEAD で n=1 の 10 構成と既存の `16f4f199` 表 (§2 旧版) は全行一致した (IR md5・ok/trap/clobber・getmem・fastmm)。
 
 | 構成 | IR md5 | undefined | ok/trap/clobber | getmem | fastmm_getmem_impl | g_dest_h 実アドレス |
 |---|---|--:|--:|--:|--:|---|
@@ -36,11 +37,7 @@
 | EMPTY | baa100ff | 0 | 870/24/0 | 2008 | 2091 | 10250f20 |
 | NODATA | baa100ff | 0 | 870/24/0 | **2012** | 2096 | (データ無し) |
 
-上の 10 構成は各 3 回とも同じ値だったと記録されている (n=3・`16f4f199`)。ただし次の理由で、この記述は repo からは検証できない。
-
-- 30 セル (構成 × 回) の生値は repo に無い。`work/split_1952/table.tsv`・`addr.txt`・`map_<tag>.txt` は gitignore の `work/` にしか出ず、`a8201fea` の作業ツリーにも `tools/m11/work/` は無い。
-- 上の表は 3 回分の要約 1 行である。各回の値は本ファイルに載せていない。
-- 値を載せ直すには、`work-m11` を展開して `repro_1952_rt_mech.sh 3` を実行し、`work/split_1952/table.tsv` を tracked なファイル (例: `tools/m11/trap_triage/`) へコピーする必要がある。これは #2212 の残作業。
+上表は 3 回とも同じ値 (30 セル中、全セル一致)。生値は `trap_triage/table_2212.tsv` (30 行: 構成・回・IR md5・undefined・g_dest_h offset・ok・trap・clobber・getmem・fastmm_getmem_impl) に tracked。実アドレスは `trap_triage/addr_2212.txt` (30 行・各セルの symbol VA)。map の全行は載せない (必要行は §3)。`map_<tag>.txt` は gitignore の `work/split_1952/` に残る。
 
 ## 3. リンク後の実アドレス (wasm 上の VA・map から)
 
@@ -70,29 +67,30 @@
 |---|---|---|
 | 関数本体 (書き込み) を残し static data だけ外す対照。NODATA の 2012 がデータ由来か本体由来かの確定 (受入条件 2 の残り) | 機序の確定 | #2275 ([M11-N147]) |
 | heap 開始位置・後続 static (`g_slots` 等) のアドレスと getmem の関係 | PRE64・PRE4096 の差 (2006 と 2008) の機序 | #2275 ([M11-N147]) |
-| 現 HEAD `a8201fea` での再測定 (10 構成 × n=3) と 30 セルの生値の tracked 化 | §0・§2 の値が `16f4f199` のものである | #2212 (`oc_artifacts: fl-win64 work-m11 toolchain-emsdk` で再実行) |
+| (解消済み) 現 HEAD での再測定 (10 構成 × n=3) と 30 セルの生値の tracked 化 | — | — |
 
 ## 6. 再現
 
-- `bash tools/m11/trap_triage/repro_1952_rt_mech.sh [N] [CONFIG...]` (N = 反復回数・既定 1。`NODATA` を含む 10 構成)。表は `work/split_1952/table.tsv`、実アドレスは `work/split_1952/addr.txt`、map は `work/split_1952/map_<tag>.txt` (すべて gitignore)。
+- `bash tools/m11/trap_triage/repro_1952_rt_mech.sh [N] [CONFIG...]` (N = 反復回数・既定 1。`NODATA` を含む 10 構成)。表は `work/split_1952/table.tsv`、実アドレスは `work/split_1952/addr.txt`、map は `work/split_1952/map_<tag>.txt` (すべて gitignore)。tracked 版は `table_2212.tsv`・`addr_2212.txt`。
 - 前提: `work/` が `m11_gen_ir2.sh` 生成済み・`FL_WIN64_DIR` 設定済み・[EMSDK] 配置済み (エントリ ID は `docs/REFERENCES.md`)。
 - 素材: `oc_artifacts: fl-win64 work-m11 toolchain-emsdk` (`docs/WORKFLOW.md` §11)。
 
 ## 7. 測定 commit からの差分
 
-測定 commit は `16f4f199` (§0)。現 HEAD `a8201fea` との差分は**空ではない**。以前の記述「`git diff 16f4f199 HEAD -- tools/m11` は空」は誤りだった。
+測定 commit は `7d3e5cad` (§0)。この commit の `tools/m11` で §2 の表を測った。
 
-`git diff 16f4f199 HEAD --shortstat -- tools/m11 ':!tools/m11/trap_triage/REPORT_2212.md'` の出力:
+`16f4f199` から `7d3e5cad` までの差分 (旧測定 commit からの変更。測定対象に含まれる):
 
 ```
- 29 files changed, 2384 insertions(+), 108 deletions(-)
+git diff 16f4f199 7d3e5cad --shortstat -- tools/m11
+ 29 files changed, 2384 insertions(+), 108 deletions(-)   (REPORT_2212 を除く)
 ```
 
-測定 build の経路に入るのは次の 3 ファイル (既定 knob `M11_INSTR_40FFE0=0` では出力が変わらない見込みだが、**未測定**):
+測定 build の経路に入るのは次の 3 ファイル。既定 knob `M11_INSTR_40FFE0=0` の経路の出力は、今回の n=1 (旧表と全行一致) で従来と同じと確認した:
 
 - `tools/m11/m11_build.sh`: `CF` に `-DM11_INSTR_40FFE0=${M11_INSTR_40FFE0:-0}` を追加。stamp の値が `"0"` から `"0:0"` に変わる。
 - `tools/m11/m11_ov.c`: `#if M11_INSTR_40FFE0` の計測関数 (+17 行。既定 0 では無効)。
 - `tools/m11/m11_post.py`: `M11_INSTR_40FFE0` の分岐と `tail` 行 (既定 0 では無効)。
 
 残り 26 ファイルは main 由来の解析スクリプト・REPORT (`ldfix/`・`trap_triage/` 配下) で、測定 build には入らない。
-現 HEAD での再測定が済むまで、§0〜§4 の測定値は `16f4f199` の値として読むこと。
+この REPORT の後続 commit は `trap_triage/` 配下の文書と tracked 生値のみを変えるため、`git diff 7d3e5cad HEAD -- tools/m11 ':!tools/m11/trap_triage'` は空になる (測定 build の入力は変わらない)。
