@@ -11,7 +11,7 @@
   - 訂正 (LD-47 review, §4 参照): 上記の「`tools/m11` のコードを最後に変えた commit」と「以降は docs のみ」は誤り。`tools/m11` の非 md 変更は `916d9932..12586095` に 18 件ある。`tools/m11` のコードを最後に変えた commit は `02e2c5a2` (`12586095` の祖先)。本 §1 の実測の基準は §4 の測定 commit `12586095` とする。
 - 素材: `[WORK-M11]` (`docs/REFERENCES.md` §1。取得指定 `oc_artifacts: work-m11`、展開先 `tools/m11/work/`)
 - 鮮度の証跡 (`git diff 916d9932 HEAD -- tools/m11`、`*.md` を除く): 空 = コード差分 0 (`git diff 916d9932 HEAD --name-only -- tools/m11` の結果は `*.md` のみ)
-  - 訂正 (LD-47 review): 上記の証跡は誤り。`git diff --name-only 916d9932 HEAD -- tools/m11` の非 md は 18 件 (`git diff --numstat` で +698 / -27)。空ではない。正しい鮮度の証跡は `git diff 12586095 HEAD -- tools/m11` の非 md = 0 件 (§4 参照)。
+  - 訂正 (LD-47 review): 上記の証跡は誤り。`916d9932` 以降の `tools/m11` 非 md 差分は 0 件ではない。鮮度の正本判定は §4 の e2e 経路 (3 ファイル) の差分 0 を参照。
 
 - cfg は glob をクォートして渡す (`'../work/boot*.drc.config.json'`)。クォートしないと `boot0` 1 本だけになり、
   集計が `lsf_sites_arg 29` になる (誤り)。クォートすると `90 / 370 / 169` となり、REPORT_968 の修復前と一致する。
@@ -65,7 +65,7 @@ e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`、foreground、31 秒、emcc rc=0。�
 
 ## 5. LD-47 (#1375) 対応付けの調査: 1:1 規則は未実装 (部分達成)
 
-測定 commit: `7fc1088f` (origin/main)。以降のコード差分は `tools/m11/ldfix/survey_d17_multiload.py` の追加 (`git diff --stat 7fc1088f 8186adf3 -- tools/m11`: 1 file, +128)。
+測定 commit: `7fc1088f` (origin/main)。以降の `tools/m11` のコード差分は、`tools/m11/ldfix/survey_d17_multiload.py` の追加と、main 取り込み由来の `tools/m11/trap_triage/probe1507_listB.mjs` の 2 件。
 
 - 素材: `[WORK-M11]` を `tools/m11/work/` に展開。ツールチェーンは `[EMSDK]` (`docs/REFERENCES.md`)。
 - e2e: `bash tools/m11/ldfix/fix_d17_e2e.sh` (foreground、emcc rc=0)。測定値は §4 を参照。
