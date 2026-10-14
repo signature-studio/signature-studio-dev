@@ -11,26 +11,27 @@
 
 ## 測定
 
-- 測定 commit: `7d52a228` (main (`3e8c8d25`) の取り込みの merge commit。コードを変えた最後の commit)。
-- コード範囲 `tools/python/{host,provider,tests}` の `git diff 7d52a228 HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。前回測定 (`c96ea0b8`) からの差分は main の取り込み分 (`git diff --stat c96ea0b8 7d52a228 -- tools/python/host tools/python/provider tools/python/tests` で 5 files・98 insertions・6 deletions) で、このため再測定した。
-- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に全展開 (5.6 秒、`extracted/` を含む)。`toolchain-emsdk` は `[EMSDK]` (`emsdk_env.sh` の実在を確認) が既に実在し、tarball は展開していない。`fetch_inputs.sh` rc 0 (0.29 秒)。`build_cpython_wasm.sh` rc 0 (246 秒、測定 `7d52a228`)。CPython の入力・ビルド手順は `c5602929` から変わっていない (`git diff --stat c5602929 HEAD -- tools/python/build_cpython_wasm.sh tools/python/build_flpy.sh tools/python/fetch_inputs.sh tools/python/src` は 0 行)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (6.15 秒、`7d52a228`)。追跡ファイルの変更は 0 件。
-- 環境: runner 4 core、node v22.23.3。測定終了時 (21:56) の load average 1.44 / 1.67 / 0.85。
-- 旧測定 (`09f6668b`・`c5602929`・`dcbb50a2`・`c96ea0b8` の表) は根拠にしない。Git 履歴に残る。main の取り込みは `c5602929` (`94b6c6bd`)・`dcbb50a2` (`718e90fb`)・`7d52a228` (`3e8c8d25`) の 3 回。`7d52a228` の競合は `tests/provider_check.mjs` の 1 箇所だけ (main の PY-121 (#2985) の `pe121` 集合を追加し、判定条件に入れ、件数を 99/336 に直した。main 側の 97/338 は `pe101` (本 PR) を含まない)。
+- 測定 commit: `fa5bf9fb` (main (`eeca4ded`) の取り込みの merge commit。コードを変えた最後の commit)。
+- コード範囲 `tools/python/{host,provider,tests}` の `git diff fa5bf9fb HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。前回測定 (`7d52a228`) からの差分は main の取り込み分 (`git diff --stat 7d52a228 fa5bf9fb -- tools/python/host tools/python/provider tools/python/tests` で 7 files・323 insertions・3 deletions) で、このため再測定した。
+- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に全展開 (5.5 秒、`extracted/` を含む)。`toolchain-emsdk` は `[EMSDK]` (`emsdk_env.sh` の実在を確認) が既に実在し、tarball は展開していない。`fetch_inputs.sh` rc 0 (0.247 秒)。`build_cpython_wasm.sh` rc 0 (245.8 秒、測定 `fa5bf9fb`)。CPython の入力・ビルド手順は `c5602929` から変わっていない (`git diff --stat c5602929 HEAD -- tools/python/build_cpython_wasm.sh tools/python/build_flpy.sh tools/python/fetch_inputs.sh tools/python/src` は 0 行)。`FLPY_SKIP_TABLE=1 build_flpy.sh` rc 0 (6.081 秒、`fa5bf9fb`)。追跡ファイルの変更は 0 件。
+- 環境: runner 4 core、node v22.23.3。測定終了時 (22:26) の load average 2.42 / 1.82 / 0.85。
+- 旧測定 (`09f6668b`・`c5602929`・`dcbb50a2`・`c96ea0b8`・`7d52a228` の表) は根拠にしない。Git 履歴に残る。main の取り込みは `c5602929` (`94b6c6bd`)・`dcbb50a2` (`718e90fb`)・`7d52a228` (`3e8c8d25`)・`fa5bf9fb` (`eeca4ded`) の 4 回。`fa5bf9fb` の競合は `tests/provider_check.mjs` の 1 箇所だけ (main の PY-119 setter (#2977・`pe119set` 6 関数)・PY-152 arrangement (#2983・`pe152` 6 関数) の集合を追加し、判定条件に入れ、件数を 111/324 にした。両側の集合を全て残した)。`docs/DOC_MAP.md` は自動解決。
 
-| 検査 (7d52a228) | コマンド | 結果 | 所要 |
+| 検査 (fa5bf9fb) | コマンド | 結果 | 所要 |
 |---|---|---|---|
-| provider ビルド | `bash tools/python/provider/build.sh` | rc 0・関数 435・ハンドラ 99 | 1.489 秒 |
-| channels 差分 | `node tests/channels_diff.mjs` | calls 170・diffs 0・PASS | 0.110 秒 |
-| general 差分 | `node tests/general_diff.mjs` | calls 9・diffs 0・PASS | 0.048 秒 |
-| device 差分 | `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS | 0.049 秒 |
-| ui 差分 (main 取り込みの PY-119) | `node tests/ui_state_diff.mjs` | calls 12・diffs 0・PASS | 0.053 秒 |
+| provider ビルド | `bash tools/python/provider/build.sh` | rc 0・関数 435・ハンドラ 111 | 1.448 秒 |
+| channels 差分 | `node tests/channels_diff.mjs` | calls 170・diffs 0・PASS | 0.097 秒 |
+| general 差分 (main 取り込みの PY-119 setter を含む) | `node tests/general_diff.mjs` | calls 25・diffs 0・PASS | 0.052 秒 |
+| device 差分 | `node tests/device_diff.mjs` | calls 8・rejects 4・midi_out 5・diffs 0・PASS | 0.053 秒 |
+| ui 差分 (main 取り込みの PY-119) | `node tests/ui_state_diff.mjs` | calls 12・diffs 0・PASS | 0.051 秒 |
 | screen 差分 (main 取り込みの PY-121) | `node tests/screen_diff.mjs` | calls 32・diffs 0・PASS | 0.054 秒 |
 | mixer 差分 (main 取り込みの PY-118) | `node tests/mixer_diff.mjs` | calls 59・diffs 0・PASS | 0.051 秒 |
-| 実装数 | `node tests/provider_check.mjs` (第 3 節の flpy を含む全体) | functions 435・implemented 99・unimplemented 336・mcp_static 60・PASS | 0.371 秒 |
-| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37425・callback_roundtrip true・PASS | 2.220 秒 |
-| PE 書込み元の列挙 | `python3 analysis/flapi/pe_grid_writers.py` | +0x7ac 書込み 21 件 (mnemonic `mov` のみ走査)・`0xff63f0` の直接 call 元 `0xff5b42`・`0xff5aa0` の直接 call 元 `0x1003c05` | 29.410 秒 |
+| arrangement 差分 (main 取り込みの PY-152) | `node tests/arrangement_diff.mjs` | calls 25・diffs 0・PASS | 0.054 秒 |
+| 実装数 | `node tests/provider_check.mjs` (第 3 節の flpy を含む全体) | functions 435・implemented 111・unimplemented 324・mcp_static 60・PASS | 0.369 秒 |
+| 全 tool | `FL_ENGINE=wasm node tests/all_tools.mjs` | total 48・ok 48・soft_error 0・raised 0・host_calls 37425・callback_roundtrip true・PASS | 2.106 秒 |
+| PE 書込み元の列挙 | `python3 analysis/flapi/pe_grid_writers.py` | +0x7ac 書込み 21 件 (mnemonic `mov` のみ走査)・`0xff63f0` の直接 call 元 `0xff5b42`・`0xff5aa0` の直接 call 元 `0x1003c05` | 29.366 秒 |
 
-- ネガティブコントロール (7d52a228 で再実施): mock の `channels.isGridBitAssigned` (`host/fl_mock.mjs` の `return true;`) を `return false;` に変えると `channels_diff` は `channels/playlist 差分 2 件` の AssertionError で rc 1 (FAIL)。元に戻すと PASS (calls 170・diffs 0)。作業ツリーは測定後に元へ戻して clean を確認。
+- ネガティブコントロール (fa5bf9fb で再実施): mock の `channels.isGridBitAssigned` (`host/fl_mock.mjs` の `return true;`) を `return false;` に変えると `channels_diff` は `channels/playlist 差分 2 件` の AssertionError で rc 1 (FAIL)。元に戻すと PASS (calls 170・diffs 0)。作業ツリーは測定後に元へ戻して clean を確認。
 - KPI: 起動・GUI に関わらない PR のため対象外。
 
 ## PE 解析 (FL_WIN64_DIR の `extracted/block00031_PE.bin`)
