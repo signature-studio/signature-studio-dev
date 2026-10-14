@@ -129,6 +129,24 @@ index 39480f0a..5a9c1929 100644
 - 未確定: ON で 1 ノードずれる書込元、既存 DEFECTS 類型への分類 (受入条件 2)、ON の ok 退行 0 (受入条件 3・4)。いずれも次 run の作業 (起票先 #1642)。
 - 注意: probe を入れた build は通常 build と結果が一致しない (§5b の 866/20 対 869/15 と同じ理由)。§5c の値は probe 版の結果。
 
+## 5d. ON-only 差分の切り分け (測定 commit `60932d35` = origin/main `Merge #1766`)
+
+- 素材: fl-win64・toolchain-retdec・toolchain-emsdk・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (50.7 s、ldfix=applied、F1=902、errors=0)。build ON・OFF rc=0。
+- 基準 (`SV_RAW=1`、全 942 unit、probe 無し): OFF `ok 870 / oob 16` (13.2 s)、ON `ok 869 / oob 15 / abort 2` (12.2 s)。§5 と一致。unit 190 は ON で `oob` (全体 survey の `frames` 先頭は `function_412e40`)。
+- 切り分け (ON build を変えて全 unit survey。いずれも unit 190 は ON と同じ `oob`):
+
+| 変更 | 結果 (ok / oob) | 読み |
+|---|---|---|
+| `9b4b00` の書込みを 1 文ずつ外す (8 通り) | 869 / 15 (全 8 通り同一) | 単独では効かない |
+| `9b4b00` の書込みを全部外す (mask=255) | 869 / 15 | 本体の書込みは原因ではない |
+| `41c130`・`9b4b00` の table 差し替えを外す (`M11_NO_TBL`) | 869 / 15 | table 差し替えは原因ではない |
+| `M11_OV_413060=1`・`M11_OV_CLASSCREATE=0` | 870 / 16 (OFF と同一) | `413060` の override 単独では ok 退行は出ない |
+| `410360` の `m11_vcall` 経路を外す | 未測定 (build 失敗) | マクロ `M11_NO_TBL` を使う行 (863 行目) が定義 (889 行目) より前にあり、コンパイル不可 |
+
+- 結論 (部分): ON の ok 退行は `9b4b00` の書込み・41c130/9b4b00 の table 差し替え・`413060` の単独 override では説明できない。残る候補は `410360` の vcall 経路 (`m11_vcall` → `ICALL_AT`) で、次 run で定義順を直して測る。
+- 測定に使った一時変更 (`M11_9B_SKIP`・`M11_NO_TBL` の define) は本 PR に含めない (`m11_ov.c` は commit 前に `git restore` で戻した)。
+- 注記: 本 run は REPORT の追記のみのコード差分 0 のため、再測定の commit 指定は §5 のまま。
+
 ## 5e. 修正 probe の ON/OFF 再測定 (#1642・測定 commit `7e665077` = origin/main)
 
 - 素材: fl-win64 (`[WIN64]`)・toolchain-retdec (`[RETDEC]`)・toolchain-emsdk (`[EMSDK]`)・work-m11 を展開。IR `m11_gen_ir2.sh` rc=0 (F1=902、errors=0)。build `M11_OV_CLASSCREATE=1`・`=0` とも rc=0 (signature mismatch 0・undefined 0)。
