@@ -50,7 +50,7 @@
 
 測定は `20a5bc6b` の内容で行った。環境: runner 4 core。測定開始直前の load average 0.30 (`uptime`、22:33:25)。
 
-再ビルド (`0555b22d` の内容から、provider は `20a5bc6b` まで変更なし): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.9 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 118、1.4 秒)・`build_cpython_wasm.sh` (rc 0、4 分 6 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒)。emsdk は `/opt/emsdk` (6.0.12) を使った。
+再ビルド (`0555b22d` の内容から、provider は `20a5bc6b` まで変更なし): 素材 `fl-win64.tar.zst` から上記 5 件を `tar --zstd -xf --wildcards` で展開 (rc 0、2.9 秒)・`fetch_inputs.sh` (rc 0)・`provider/build.sh` (rc 0、handlers 118、1.4 秒)・`build_cpython_wasm.sh` (rc 0、4 分 6 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5.9 秒)。emsdk は `[EMSDK]` (6.0.12) を使った。
 
 | コマンド | 結果 | wall |
 |---|---|---|
