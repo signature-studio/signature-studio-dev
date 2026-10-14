@@ -124,4 +124,4 @@
   - 残件 4 件 = 未宣言 callee のみ: `FUN_180fd4f30` 2・`FUN_180fd51cc` 1・`FUN_180fd2d38` 1。閉包は [KH-31] #1989 の範囲 (§10-7j の試行で callee 追加は 13→26 件に悪化するため、本 run では扱わない)。
 - 回帰 (HEAD `81090e96`, 1000 trial / seed 7, fix `bitcast,intload,stackpair,assoc,concat`, `build_cmp.sh`): Gain **1000/1000** (calls 4999/4999, wasm 15,161 B)・Haas **1000/1000** (calls 5500/5500, 16,878 B)・Gate **1000/1000** (calls 4999/4999, 17,367 B)。wasm サイズは §10-7m と一致。
 - 注意: `snapins/work/<name>/` が無いと `native_ref` が segfault する (§10-7l と同じ。`mkdir -p` で解消)。
-- 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI は呼出元 2 件の機械語からの推定で、Resonator 突合で検証する必要がある。
+- 未実施: Resonator の native 突合・ablation・ネガコン (emcc 未通過のため)。`FUN_180fcf904` の ABI (float 引数・short 戻り値) は呼出元 2 件と callee 本体の機械語で確認済み (上記「呼出元・callee の確定」)。native 突合での実行検証は未実施。
