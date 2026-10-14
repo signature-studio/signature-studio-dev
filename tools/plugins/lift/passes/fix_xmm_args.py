@@ -84,11 +84,6 @@ def close_paren(s, i):
     return -1
 
 
-def count_args(s):
-    """call の引数列 (括弧の外で区切る) の個数。"""
-    return len(split_args(s))
-
-
 def split_args(s):
     """call の引数列を括弧の外で区切って返す (空なら [])。"""
     if not s.strip():
@@ -108,7 +103,7 @@ def split_args(s):
     return out
 
 
-# #2762: 呼出し側の xmm 値を変換して渡すと survey が退行する callee (unit 149・158)。原因未特定のため変換を外し、arity 不一致のまま skip する
+# #2762: 呼出し側の xmm 値を変換して渡すと survey が退行する callee (unit 149・158)。原因未特定のため変換を外し、arity 不一致のまま skip する (原因の特定は #2902)
 NO_CONV = {'function_40c650'}
 
 
@@ -240,10 +235,10 @@ def main():
         zs = ', '.join('%s %s' % (p.split()[0], '0.0' if p.split()[0] in ('float', 'double') else '0') for p in extra)
         n = nparams[fn]
         lines = res.split('\n')
-        out = []
+        rebuilt = []
         for ln in lines:
             if ln.startswith('define '):
-                out.append(ln)
+                rebuilt.append(ln)
                 continue
             new, pos, hit, pre = [], 0, 0, []
             for m in re.finditer(r'call [^@\n]*@%s\(' % re.escape(fn), ln):
@@ -272,11 +267,11 @@ def main():
                     zero += 1
                 pos, hit = e, hit + 1
             if hit:
-                out.extend(pre)
-                out.append(''.join(new) + ln[pos:])
+                rebuilt.extend(pre)
+                rebuilt.append(''.join(new) + ln[pos:])
             else:
-                out.append(ln)
-        res = '\n'.join(out)
+                rebuilt.append(ln)
+        res = '\n'.join(rebuilt)
     rep['callsite_zero_args'] = zero
     rep['callsite_xmm_converted'] = cv_sites
     open(a.dst, 'w').write(res)
