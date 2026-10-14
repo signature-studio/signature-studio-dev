@@ -155,43 +155,63 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 
 ## 8. #2769: 計装版の停止原因と全 942 unit の `[aw]` 採取
 
-**判定**: 受入 1 (停止の切り分け) は達成。受入 2 (全 942 unit の `0x1ac308` の `[aw]` 採取) は、計装の範囲を「スタック slot への直接 store を除く全 store」にして達成 (**0 件**)。ただし計装版の挙動は計装なし版と 2 unit (158・283) で一致しないため、0 件は「この計装版の実行で」の結論に限る。
+**判定**: 受入 1 (停止の切り分け) は達成。受入 2 (全 942 unit の `0x1ac308` の `[aw]`) は、計装の範囲を「スタック slot への直接 store を除く全 store」にして **0 件** (run4)。0 件は次の範囲に限る。(i) 計装した `store` 命令による書込みだけを見ている。rep 系 helper 経由の書込みは計装外 (§8.4)。(ii) 計装版の挙動は計装なし版と 2 unit (158・283) で一致しない。(iii) スタック slot を外した run4 の 0 件は、スタック配置が `0x1ac308` と重ならないという未確認の前提に依る (§8.3)。全 store を計装した run5 も 0 件だが、3 unit は site 上限で打ち切られている (§8.3.1)。
 
 ### 8.1 測定条件
 
-- 測定 commit: `796507e9` (コードを変えた最後の commit。run4 はこの commit の `store_watch_1783.sh` で実施)。
-- 素材: `fl-win64` を [WIN64] (`FL_WIN64_DIR`) に展開、`work-m11`・`work-liftdiff` は worktree の `tools/m11/work/`・`tools/liftdiff/work/` に展開。`toolchain-emsdk` は展開したが、`m11_build.sh` が [EMSDK] を固定で読むため runner の [EMSDK] (emcc 6.0.12 pin) を使った。
-- `m11_gen_ir2.sh` rc 0 (40.1 s、`boot_final.ll` 490,735 行)、`m11_build.sh` rc 0 (21.3 s、`signature mismatch: 0, undefined symbol: 0`)。
+- 測定 commit: `32377077` (コードを変えた最後の commit。`store_watch_1783.sh` に `M11_WATCH_SRC`・`M11_SW_LIMIT` を足し、`SURVEY_UNITS` の grep を直し、`watch_store_682.py` の前提コメントを未確認と書き直した)。base・run4・run5 はいずれもこの commit で実施した。
+- `git diff --stat 5940f848 32377077` は `trap_triage/store_watch_1783.sh` と `trap_triage/watch_store_682.py` の 2 件のみ。gen・build の入力 (`m11_gen_ir2.sh`・`m11_build.sh` 等) は変わっていない。gen・build は `5940f848` で実施した。
+- 素材: `fl-win64` を [WIN64] (`FL_WIN64_DIR`) に展開。`work-m11`・`work-liftdiff` は tar の中身が `tools/...` 相対なので、リポジトリ直下に展開した (`tools/m11/work/`・`tools/liftdiff/work/`、gitignore)。`toolchain-emsdk` は展開していない (下の emcc の理由)。
+- emcc: 基準の `m11_build.sh` は [EMSDK] の `emsdk_env.sh` を自分で source し、`store_watch_1783.sh` は `EMSDK_ENV` (同じ [EMSDK]) を source する。両方とも emcc **6.0.12** (`emcc --version`)。素材 `toolchain-emsdk` の `emscripten-version.txt` も 6.0.12 で、版は一致する。
+- `m11_gen_ir2.sh` rc 0 (41.7 s、`boot_final.ll` 490,735 行)、`m11_build.sh` rc 0 (24.0 s、`wasm-ld signature mismatch: 0, undefined symbol: 0`)。
 
 ### 8.2 計装なし (基準)
 
-- `SV_SLOT=0x1ac308 node trap_triage/survey_units.mjs` の stdout: `SLOT_BOOT 0x1ac308 0xf960`、`SURVEY_UNITS {"ok":872,"miss":47,"other":1,"halt0":7,"oob":14,"noproc":1}` (合計 942)。rc 0、10.1 s。値が変わった unit は 0 件 (`slot` 付き unit なし)。
+- `SV_SLOT=0x1ac308 node trap_triage/survey_units.mjs` (32377077): stdout は `SLOT_BOOT 0x1ac308 0xf960`、`SURVEY_UNITS {"ok":872,"miss":47,"other":1,"halt0":7,"oob":14,"noproc":1}` (合計 942)。rc 0、10.4 s。
 
 ### 8.3 停止の切り分け (計装版)
 
-| 条件 | 結果 (実測) |
-|---|---|
-| 旧 script (全 store 計装、`ov.o` の `M11_FIX_682=0`) | unit 145 の開始行の直後で止まる。timeout 240 s で rc 124 |
-| `SV_TRACE_AT=145` (20 s) | unit 145 の icall 行は入口 `0x25c9f0` の 1 件のみ。以後の icall なし |
-| 全 store 計装、`ov.o` を base と同じ既定 (`M11_FIX_682=1`) | unit 106 で止まる。timeout 240 s で rc 124 |
-| 上と同じ + 同一 site の呼出し回数上限 5,000,000 で該当 unit を trap (`watch_addr_2769.c`) | 942 unit 完走 (1 s、rc 0)。打ち切りは 3 unit: 106 (site 11832)・145 (site 11833)・830 (site 42115) |
-| 全 store 計装、hook の本体を空にする (`m11_sw` は何もしない) | timeout 200 s で rc 124 (**挿入そのものが停止の原因**) |
-| 空 hook + スタック slot への直接 store を計装から外す (`ALLOCA_SKIP=1`) | 942 unit 完走 (rc 0)。kind は `{"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` |
+| 条件 | 結果 (実測) | 再測 |
+|---|---|---|
+| 旧 script (全 store 計装、`ov.o` の `M11_FIX_682=0`) | unit 145 の開始行の直後で止まる。timeout 240 s で rc 124 | 前 run の実測 (`796507e9` 以前) |
+| `SV_TRACE_AT=145` (20 s) | unit 145 の icall 行は入口 `0x25c9f0` の 1 件のみ。以後の icall なし | 前 run の実測 |
+| 全 store 計装、`M11_FIX_682=1` (base と同じ ov) | unit 106 で止まる。timeout 240 s で rc 124 | 前 run の実測 |
+| 上と同じ + 同一 site の呼出し回数上限 5,000,000 で該当 unit を trap (`watch_addr_2769.c`) | 942 unit 完走 (rc 0)。打ち切りは 3 unit: 106 (site 11832)・145 (site 11833)・830 (site 42115) | **run5 で再現** (§8.3.1) |
+| 全 store 計装、hook の本体を空にする (`m11_sw` は何もしない) | timeout 200 s で rc 124 (**挿入そのものが停止の原因**) | 前 run の実測 |
+| 空 hook + スタック slot への直接 store を計装から外す (`ALLOCA_SKIP=1`) | 942 unit 完走 (rc 0)。kind は `{"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` | 本 hook の run4 が同じ kind (§8.4) |
 
-- 停止点の正体: 打ち切りで得た site 11832・11833 は `function_407800` の IR 106693・106694 (`sites.json`)。この関数は decommit の loop で、歩幅が `%1 = xor i64 0, 0` (定数 0) のため、`VirtualFree` が成功を返す間は終わらない形になっている。計装なしでは抜けるのに、計装版では抜けない。site 42115 は `function_bf86f0` の IR 381155。
-- 計装版の unit 145 は「遅い」のではなく「回り続ける」: 旧 script の進捗行は unit 0〜145 の開始が 0.15 s 以内に並ぶ (`unit 145` で止まる)。REPORT §7.5 の「20 分」は timeout までの時間であり、計装 store の遅さではない。
+- 停止点の正体: 打ち切りで得た 3 site は、いずれも同じ関数内で alloca された名前への store。site 11832・11833 は `function_407800` の IR 106693・106694 (store 先 `%r14.05.reg2mem`・`%r13.04.reg2mem`、alloca は IR 106645・106644)。site 42115 は `function_bf86f0` の IR 381155 (store 先 `%stack_var_-324.0.reg2mem`、alloca は IR 380952)。`function_407800` は decommit の loop で、歩幅が `%1 = xor i64 0, 0` (定数 0) のため、`VirtualFree` が成功を返す間は終わらない形になっている。計装なしでは抜けるのに、計装版では抜けない。
+- 計装版の unit 145 は「遅い」のではなく「回り続ける」: 旧 script の進捗行は unit 0〜145 の開始が 0.15 s 以内に並ぶ (`unit 145` で止まる)。§7.5 の「20 分」は timeout までの時間であり、計装 store の遅さではない。
 - 機構: スタック slot (`alloca`) の番地を `ptrtoint` で外に出すことが効くと見ている。`function_407800` の `VirtualFree` の結果がなぜ変わるかは**未確定**。
-- 計装 site は 54,041 → 15,028 (39,013 は alloca を直接指す store。`watch_store_682.py` の `ALLOCA_SKIP=1`)。スタック slot への書込みは shadow stack 上で、0x1ac308 (イメージ内、SizeOfImage 0x18c0000 未満) には届かないと判断した。shadow stack の実配置は**未確認**。
+- 計装 site は 54,041 → 15,028 (39,013 は alloca の名前への store。`watch_store_682.py` の `ALLOCA_SKIP=1` で外す)。**スタック配置は未確認**: `0x1ac308` はイメージ内の番地 (SizeOfImage 0x18c0000 未満) なので shadow stack には届かないと見込んでいるが、これは前提であり実測していない (実行時の stack 範囲は未測定)。配置が重なれば、ALLOCA_SKIP=1 の 0 件は取りこぼしを含む。
 
-### 8.4 全 942 unit の `[aw]` 採取 (run4)
+### 8.3.1 再現 (`watch_addr_2769.c` の site 上限)
 
-- `bash trap_triage/store_watch_1783.sh run4` (commit `796507e9`、`timeout 300`、foreground): rc 0、52.0 s。
-  - `SURVEY_UNITS {"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` (942 unit 完走)。
-  - `[aw] hits: 0` (`run4.aw` の `[aw] ` 行 0 件・`sw-limit` 0 件)。`SV_SLOT` 付きの unit 0 件。
-  - 計装なし基準との kind 差分 2 unit: 158 (`ok`→`oob`)・283 (`ok`→`halt0`)。原因は未確認。
-  - script 終了後、`m11_boot.cjs.wasm` は計装なしに戻った (`site=%u addr=%x` 文字列 0 件)。
-- 判定の範囲: 0 件は「計装 15,028 site (alloca 直接 store を除く) の実行で `[W, W+8)` (W = 0x1ac308) に重なる書込みが無い」まで。計装版の挙動が基準と 2 unit 違うので、基準実行への直接の結論ではない。
-- 判定関数の確認 (native・`cc` で `watch_addr_1046.c` を直接コンパイル、`sw_selftest`): 0x1ac308・0x1ac30a・0x1ac30c (幅 4) は hit、0x1ac304 (幅 4)・0x1ac300 (幅 8) は非 hit。判定範囲は `[W, W+8)` で、コメントの「4B」より広い (上位集合なので取りこぼしは無い)。
+```sh
+export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス>   # [WIN64]・[EMSDK] (docs/REFERENCES.md §4)
+cd tools/m11
+bash m11_gen_ir2.sh && bash m11_build.sh
+M11_WATCH_SRC=trap_triage/watch_addr_2769.c ALLOCA_SKIP=0 timeout 300 bash trap_triage/store_watch_1783.sh run5
+grep -a "sw-limit" work/probe1783/run5.aw
+```
+
+- `ALLOCA_SKIP=0` で全 store (54,041 site) を計装する。site 番号はこの設定の番号で、`ALLOCA_SKIP=1` では番号がずれる。
+- `M11_SW_LIMIT` (既定 5,000,000) で site ごとの呼出し上限を変える。上限を超えた unit だけ trap し、survey は次の unit へ進む。
+- 期待される出力 (run5 の実測): `unit 106 [sw-limit] site=11832 n=5000001`・`unit 145 [sw-limit] site=11833 n=5000001`・`unit 830 [sw-limit] site=42115 n=5000001` の 3 行。
+- site → IR は `work/probe1783/sites.json` で引く (`"11832": {"fn": "function_407800", "line": 106693, ...}`)。
+
+run5 の実測 (32377077): rc 0、42.0 s (build と restore を含む)。`instrumented stores: 54041`、`SURVEY_UNITS {"ok":865,"miss":47,"other":4,"halt0":7,"oob":15,"abort":3,"noproc":1}` (合計 942)、`[aw] hits: 0`、上の 3 行を確認。
+
+### 8.4 全 942 unit の `[aw]` 採取 (run4・run5)
+
+- run4 (32377077・既定の `ALLOCA_SKIP=1`・`watch_addr_1046.c`・`timeout 300`): rc 0、52.8 s。
+  - `instrumented stores: 15028`。`SURVEY_UNITS {"ok":870,"miss":47,"other":1,"halt0":8,"oob":15,"noproc":1}` (942 unit 完走)。
+  - `[aw] hits: 0` (`run4.aw` の `[aw] ` 行 0 件)。
+- run5 (32377077・`ALLOCA_SKIP=0`・`watch_addr_2769.c`): `[aw]` 0 件。3 unit は site 上限で打ち切られ、その後の store は見ていない (§8.3.1)。
+- 計装なし基準との kind 差分 (run4): 158 (`ok`→`oob`)・283 (`ok`→`halt0`)。原因は未確認。
+- 判定の範囲: 0 件は「計装した store 命令 (run4 は 15,028 site・run5 は 54,041 site) の実行で、`[W, W+8)` (W = 0x1ac308) に重なる書込みが無い」まで。計装版の挙動が基準と 2 unit 違うので、基準実行への直接の結論ではない。
+- **計装外の書込み経路 (rep 系 helper)**: `[aw]` は IR の `store` 命令だけを計装する。`work/boot_final3.ll` は `__asm_rep_movsq_memcpy` (28 件)・`__asm_rep_movsb_memcpy` (1 件)・`__asm_rep_stosq_memset` (6 件) を外部宣言で呼ぶ。その実装 (`work/m11_simd.c` の rep 系 helper。`m11_simd2.py` で生成し `emcc -c` で wasm にリンク) は `m11_sw` を呼ばない (`grep -c m11_sw work/m11_simd.c` = 0)。したがって `0x1ac308` が rep movs/stos 経由で書かれても 0 件のままになる。**rep 系 helper 経由の書込みは計装外** (helper への監視の追加は未実施)。
+- 判定関数の確認 (前 run・native・`watch_addr_1046.c` を `cc` で直接コンパイルした `sw_selftest`): 0x1ac308・0x1ac30a・0x1ac30c (幅 4) は hit、0x1ac304 (幅 4)・0x1ac300 (幅 8) は非 hit。判定範囲は `[W, W+8)`。
 - wasm 実機での陽性対照 (既知の書込み番地で hit が出ること) は**未実施**。
 
 ### 8.5 未解決
@@ -199,6 +219,8 @@ export FL_WIN64_DIR=<fl-win64 の展開先> EMSDK_ENV=<emsdk_env.sh のパス> &
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 計装で `function_407800` の `VirtualFree` 結果が変わる機構 (スタック slot の `ptrtoint` が効く理由) | スタック slot を計装から外す前提が検証のみ | 本 PR 本文の未解決表 (追跡のみ・子は起票しない) |
+| スタック配置 (shadow stack の範囲) の実測。alloca 直接 store (`ALLOCA_SKIP=1` で外した 39,013 site) が `0x1ac308` に届かないことは未確認 | run4 の 0 件に取りこぼしがあるかが未確定。run5 の 0 件は 3 unit 打ち切りの範囲に限る | 本 PR 本文の未解決表 (追跡のみ) |
+| rep 系 helper (`__asm_rep_movsq_memcpy` 等) 経由の書込みは計装外 | `[aw]` 0 件は store 命令の範囲に限る | 本 PR 本文の未解決表 (追跡のみ) |
 | 計装版と基準の kind 差分 (158・283) | 0 件の結論は計装版の実行に限る | 本 PR 本文の未解決表 (追跡のみ) |
 | wasm 実機での陽性対照 (既知の書込み番地で `[aw]` が出る確認) | 0 件が「書込みなし」か「検出漏れ」か未確定 | 本 PR 本文の未解決表 (追跡のみ) |
 | 0x1ac308 の値 `0xf960` と静的 `0x40f960` の由来 (§7.6) | スロットの初期値の出所が未確定 | #2769 のクローズ後も §7.8 と同じく未解決 |
