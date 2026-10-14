@@ -155,3 +155,21 @@
 
 - 測定 base `8d632b57` は現 `origin/main` `b7df55e6` より古い。main では `src/runtime/audio-layout.ts` (+1 行) と `src/runtime/audio-shim.ts` (2 行変更) が変わっており、本測定には入っていない (未測定)。PR head の鮮度は保たれている (`git diff c604805c HEAD -- src/runtime` は 0 行)。
 - 通算 (§19〜§27 の同一 e2e): FAIL 3 件 / 計 289 run。§26 の未解決 (a)(b)(c)(d) は残る。捕獲の仕組みは NC で検証済みだが、失敗の再現は未達 (追跡 **#863**)。
+
+## 28 AU-15 (#863) producer 起床統計 (wake_hist) を判定行へ追加 (測定 commit `f370c4ed`)
+
+- 目的: 失敗時に producer 側の遅延の有無を見る材料を、wasm を再ビルドせずに取る。`fla_out_wait_fill_le` (`tools/audio/src/flasio.c`・`flaudio.c`) は ctl の `wake_hist[6]` (worklet の `notify_ms` から producer の起床までの遅延 ms。区間は <1 / <2 / <4 / <8 / <16 / ≥16) と `wake_count`・`wait_timeouts` を既に書いていたが、判定行に出していなかった。
+- 変更 (`f370c4ed`): `src/runtime/audio-shim.ts` の `producerStats()`、`src/runtime/audio_app.ts` の `FlAudioSession.producer()`、`src/index.ts` の `window.__audio.verify` に `producer` を追加、`tools/audio/integration/e2e.mjs` の判定行 (tone / underruns) に `prod_wake_hist=a/b/c/d/e/f prod_wake_count=N prod_wait_timeouts=N` を出力。`tools/audio/integration/index.ts.diff` も同じ変更 (現 tree では `startFlAudio` が既に入っているため適用はスキップされる)。
+- 注意: `wake_hist` は run 全体の累積で、起床の時刻は残らない。失敗位置との突き合わせは §25 の `fill_trace` と併用する。
+
+| 区分 | run 数 | 結果 | dev の prod_wake_hist (<1/<2/<4/<8/<16/≥16) | prod_wait_timeouts |
+|---|---|---|---|---|
+| 初回 (`f370c4ed`) | 1 | 13/13 PASS | 301/13/0/0/0/0 (count 314) | 0 |
+| 無負荷 | 4 | 4/4 PASS exit 0 | 303/12/0/0/0/0・313/8/0/0/0/0・299/9/0/0/0/0・301/7/0/0/0/0 (count 308〜321) | 0 (全 4 run) |
+| busy loop `yes` ×12 (`timeout 60`・開始時 load 7.9 / 13.4) | 2 | 2/2 PASS exit 0 | 293/12/21/0/0/0 (count 326)・315/7/9/0/0/0 (count 331) | 0 (全 2 run) |
+| `hunt.sh 400 1080` (foreground・時間上限 1080 s) | 91 | **91/91 PASS exit 0・FAIL 0** | hunt は run ごとの統計を残さない (最終 run のみログに残る) | — |
+
+- 計 98 run (初回 1・無負荷 4・負荷 2・hunt 91) 全 PASS。dev:tone `max_err=1.49e-8`・`zero_runs=0`・`underruns=0`・`first_err_frame=-1` (全 run 同値)。preview も全 PASS。
+- 読み: 無負荷では全 wake が 2 ms 未満 (<1 ms と <2 ms の 2 区間のみ)。`yes` ×12 の負荷では 2〜4 ms の区間に 21 / 9 回入り、負荷の強さに応じて producer の起床遅延が増えることは観測できた。≥8 ms の起床は 0 回で、underrun も 0 だった。判定指標としての感度は確認できた (負例の失敗は作れていない)。
+- 失敗の記録 (通算): §19・§23・§25 の FAIL 3 件はいずれも、その節で最初に走らせた e2e run (§19 は初回 1 run・§23 は無負荷の 1 回目・§25 は旧 HEAD の初回)。同じく節内の初回 run でも §21・§22 (改修前)・§24・本節は PASS。母数が少ないため「初回 run で起きやすい」は**仮説**に留める。FAIL の位置は 3 件とも `first_err_frame = first_underrun_frame = 56576` (quantum 442)。
+- 未解決 (追跡 **#863**): (a) 失敗時刻と照合できる producer 側の時系列 (quantum ごとの起床時刻) は wasm (`flasio.c`) の変更が必要で、本節の範囲外。(b) 再現条件の特定。(c) 初回 run の仮説の検証 (再起動直後・キャッシュ状態を分けた実測)。
