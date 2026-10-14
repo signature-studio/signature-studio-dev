@@ -89,7 +89,11 @@ typedef struct fla_ctl {
     uint32_t tick_target;      /* 152 device クロック待ち: dev_frames(低32bit) がこれを超えたら worklet が quanta を notify */
     uint32_t notify_ms;        /* 156 worklet が producer を notify した時刻 (Date.now() 下位32bit, ms) — wake 遅延計測用 */
     uint32_t burst_obs;        /* 160 worklet が観測した最長バースト (連続 process() の総フレーム数)。baseLatency より実態に近い */
-    uint32_t pad2[7];          /* 164 */
+    uint32_t clock_skip_frames;/* 164 clock_jump_frames の正の成分 (process() 間に描画されなかったフレーム = 実スキップ) */
+    uint32_t clock_dup_frames; /* 168 clock_jump_frames の負の成分の絶対値 (重複・後退) */
+    uint32_t clock_jump_max;   /* 172 1 回の jump の最大 abs (frames), gen 開始で 0 */
+    uint32_t clock_jump_max_q; /* 176 その最大 jump が起きた quantum 番号 (process() の通し番号) */
+    uint32_t pad2[3];          /* 180 */
     /* ---- line3 @192: main thread が書く 時刻対応 (getOutputTimestamp) ---- */
     uint64_t ref_ctx_time_bits;/* 192 contextTime(f64) */
     uint64_t ref_epoch_ms_bits;/* 200 performance.timeOrigin+performanceTime(f64) */
