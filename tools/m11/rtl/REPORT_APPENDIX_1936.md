@@ -31,6 +31,29 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 生成済み `fle_data.c` の敷設窓に `0x42f670` が無いことの直接確認と、窓を広げた再ビルド | vtable 0 の根本原因の確定。修復の前提 | 子 issue (下記) |
+| `0x44a590` の `unlifted_callee` (閉包外 indirect call 22 件) の原因 | 窓の修正後も `mismatch` のまま。vtable 以外の要因が残る | #410 継続 |
 | `0x4090e0` / `0x41cd70` / `0x42d830` の原因 | 退行 5 件のうち 3 件 | #410 継続 |
 | `0x412020` の native_fault | 退行 5 件のうち 1 件 | #410 継続 |
+
+### 9-6. 敷設窓の直接確認と vtable 窓の追加 (#2005)
+
+測定 commit: `cbe7967b` (`fix(flelift): add vtable 0x42f670 to fle_data install window`。コード変更はこの commit のみ)。
+素材: `fl-win64` / `toolchain-emsdk` / `work-liftdiff` / `work-m11` を展開 (`work-m11` は `tools/m11/work/`)。`fle_lift.sh` で `lift_meta.json` と `fle_data.c` を再生成 (`tools/flelift/work/lift/`・gitignore)。
+
+1. **敷設窓の直接確認 (受入 1)**: 修正前の生成済み `lift_meta.json` で、`jt_ranges` は 1 件 (`0x42f670` を含まない)、`textrefs` 由来の窓は `0x42f5c0..0x42f620` と `0x42f6f0..0x42f750` のみ。`0x42f670..0x42f6a0` は敷設窓の外。
+2. **窓の追加 (受入 2 の前提)**: `tools/flelift/fle_data_gen.py` に `(0x42f670, 0x30)` の窓を追加 (3 行)。
+3. **wasm fresh の PEEK (受入 2)**: `fle_data_install` 直後・`fle_init` 後の wasm 線形メモリ。
+
+| 測定 | `0x42f670` | `0x42f680` | `0x42f690` | `0x42f698` |
+|---|---|---|---|---|
+| wasm fresh 修正後 (`cbe7967b`) | `0x449380` | `0x40f9b0` | `0x40f9d0` | `0x4493a0` |
+
+native 値と修正前 (`0x0`) は §9-5 の表を参照。
+
+4. **`0x44a590` の再採点 (受入 3)**: `liftdiff.py run targets/flelift.json --fn 0x44a590 --state auto` の判定は、修正前後とも `verdict=mismatch`、tag `callee_divergence` (medium, entry_va #2)・`unlifted_callee` (high, 閉包外 indirect call 22 件、最後の VA `0x0`)。窓の追加だけでは `unlifted_callee` は消えなかった。(#1936 時点の記録は 18 件。今回は 22 件で、同一ではない。)
+5. **e2e**: `bash tools/flelift/fle_e2e.sh` (`cbe7967b` HEAD): **PASS**、136 秒、load avg 約 1.0。同じ修正を入れた作業ツリー (commit 前) での実行も PASS (141 秒)。
+
+#### 残り (未達)
+
+* 受入 3 の「`unlifted_callee` が消えるか」は、今回の窓追加では消えないと判明。原因は vtable 以外にあると見られるが未特定。
+* `0x44a590` の閉包外 indirect call 22 件の呼出先特定は未実施。
