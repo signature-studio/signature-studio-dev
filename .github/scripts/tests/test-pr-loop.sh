@@ -236,6 +236,46 @@ vsetup NONE
 env -u OC_REPO -u OC_PR_NUMBER GH_TOKEN=x GITHUB_EVENT_PATH=/dev/null RUNNER_TEMP="$TMP" bash "$SCRIPTS/verify-review-verdict.sh" > "$TMP/v.out" 2>&1; rc=$?
 { [ $rc = 0 ] && ! logged 'pr close' && ! logged 'pr reopen' && ! logged 'pr comment'; }; expect "Prepare PR context 失敗で OC_REPO/OC_PR_NUMBER が無い -> 何もせず 0 で終わる (二次失敗しない)" $?
 
+echo "== verify-review-verdict.sh (差し戻し本文の oc-review マーカーは警告のみ #2320 / CI-42)"
+# vrev <body>: head hhh への CHANGES_REQUESTED review (本文 = <body>) を 1 件仕込んで検証する
+vrev() {
+  vsetup NONE
+  fx repos/o/r/pulls/7/reviews "$(jq -nc --arg b "$1" '[{user:{login:"oc-reviewer-for-signature-studio[bot]"},state:"CHANGES_REQUESTED",commit_id:"hhh",body:$b}]')"
+  verify; rc=$?
+}
+warn() { grep -q '::warning::' "$TMP/v.out"; }
+
+vrev "- 指摘 1
+<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=doc,remeasure -->"
+{ [ $rc = 0 ] && ! warn && ! logged 'pr reopen'; }; expect "正しいマーカー -> 警告なし・verdict をそのまま採用 (rc 0)" $?
+
+vrev "- 指摘 1"
+{ [ $rc = 0 ] && warn && grep -q 'no <!-- oc-review' "$TMP/v.out" && ! logged 'pr reopen'; }; expect "マーカー欠落 -> 警告が出て終了コード 0・再起動しない" $?
+
+vrev "- 指摘 1
+<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=doc,bogus -->"
+{ [ $rc = 0 ] && grep -q 'unknown class: bogus' "$TMP/v.out"; }; expect "classes に未知語 -> 警告 (終了コード 0)" $?
+
+vrev "- 指摘 1
+<!-- oc-review: v=1 round=1 blocking=1 minor=0 classes=doc -->
+追記"
+{ [ $rc = 0 ] && grep -q 'not the last line' "$TMP/v.out"; }; expect "マーカーが末尾行でない -> 警告" $?
+
+vrev "- 指摘 1
+<!-- oc-review: v=2 round=1 blocking=1 minor=0 classes=doc -->"
+{ [ $rc = 0 ] && grep -q 'unsupported version: v=2' "$TMP/v.out"; }; expect "v=1 以外 -> 警告" $?
+
+echo "== reviewer.md の文言 (収束規則・マーカー・PM 判断表。旧文言の再混入を検出 #2320 / CI-42)"
+# stale_phrase <file>: 旧文言 (PM に起票を求める) が残っていれば 0 を返す
+stale_phrase() { grep -qE '起票を PM に求める|PM に(依頼|求める)する' "$1"; }
+REVIEWER_MD="$SCRIPTS/../prompts/reviewer.md"
+grep -q '収束規則' "$REVIEWER_MD" && grep -q '<!-- oc-review: v=1 round=<n>' "$REVIEWER_MD" && grep -q 'PM 判断が絡む指摘の扱い' "$REVIEWER_MD"
+expect "reviewer.md に収束規則・マーカー書式・PM 判断表がある" $?
+! stale_phrase "$REVIEWER_MD"; expect "reviewer.md に旧文言『起票を PM に求める』が無い" $?
+# ネガコン: 旧文言を戻した一時コピーでは同じ検査が fail する
+printf '%s\n' '(issue が無ければ起票を PM に求める)' > "$TMP/reviewer-neg.md"
+stale_phrase "$TMP/reviewer-neg.md"; expect "ネガコン: 旧文言を戻すと検査が検出する" $?
+
 echo "== review-recover.sh (review job が打ち切られたら watchdog を待たず同じ head で再起動 #1950 / CI-38)"
 # rrun <annotation> [review-retry マーカー数]: 初期化 -> review job の annotation を仕込んで review-recover.sh を走らせる
 rrun() {
