@@ -24,6 +24,8 @@ CT = {'i1': 'int', 'i8': 'int', 'i16': 'int', 'i32': 'int', 'i64': 'long long', 
 AUDIO_DLLS = {'dsound.dll'}
 SOFT_COMPAT = {'LoadStringW', 'MessageBoxA', 'MessageBoxW'}   # gui_compat.c が --soft で定義する (soft スタブからは除外)
 RET_LOG = {'GetModuleHandleW', 'GetProcAddress'}   # 戻り値も sxt_ret で記録する (SHX-T9f #1985)
+DEF_RE = re.compile(r'^define\b[^@\n]*@([\w.$-]+)\(')
+RET_CALL_RE = re.compile(r'@(%s)\(' % '|'.join(sorted(RET_LOG)))
 
 
 def nm_defined(path):
@@ -33,6 +35,39 @@ def nm_defined(path):
         if len(p) >= 3 and p[-2] in 'TtWwDdBbRr':
             out[p[-1]] = p[-2]
     return out
+
+
+def insert_arg(line, pos, extra):
+    """pos は開き括弧の直後。対応する閉じ括弧の直前に extra を足す (引数内の括弧を数える)。"""
+    depth, i = 1, pos
+    while depth:
+        depth += {'(': 1, ')': -1}.get(line[i], 0)
+        i += 1
+    inner = line[pos:i - 1]
+    return line[:i - 1] + (', ' if inner.strip() else '') + extra + line[i - 1:]
+
+
+def site_rewrite(src):
+    """RET_LOG の呼出し元を site ID (i32) として wrapper に渡す。
+    site = lifted IR の enclosing 関数名 + IR 行番号 (wasm の機械語 PC は C 側から取れないため)。"""
+    fn, sites, out = '?', [], []
+    for ln, line in enumerate(src.split('\n'), 1):
+        m = DEF_RE.match(line)
+        if m:
+            fn = m.group(1)
+        hits = RET_CALL_RE.findall(line)
+        if len(hits) > 1:
+            raise SystemExit('gen_link: 1 行に RET_LOG 呼出しが 2 つ以上 (line %d)' % ln)
+        m = RET_CALL_RE.search(line)
+        if m and line.lstrip().startswith('declare '):
+            line = insert_arg(line, m.end(), 'i32')
+        elif m:
+            if ' call ' not in line:
+                raise SystemExit('gen_link: RET_LOG 対象が call 以外で参照 (line %d)' % ln)
+            sites.append('%s@L%d' % (fn, ln))
+            line = insert_arg(line, m.end(), 'i32 %d' % (len(sites) - 1))
+        out.append(line)
+    return '\n'.join(out), sites
 
 
 def parse_decls(src):
@@ -132,7 +167,8 @@ def main():
     wrap = [n for n in names['shimx'] + stub_names if sig(n) is not None]
     skipped = [n for n in names['shimx'] + stub_names if sig(n) is None]
     wc = ['/* 自動生成 gen_link.py: shimx/GUI 呼出の計数ラッパ。IR 内の @NAME を @__sxt_NAME に改名して挟む */',
-          '#include <stdint.h>', 'extern void sxt_enter(int idx);', 'extern void sxt_ret(int idx, unsigned long long a, unsigned long long b, unsigned long long r);']
+          '#include <stdint.h>', 'extern void sxt_enter(int idx);', 'extern void sxt_ret(int idx, unsigned long long a, unsigned long long b, unsigned long long r, int site);']
+    tsrc, sites = site_rewrite(src)
     for i, n in enumerate(wrap):
         rt, ps = sig(n)
         pl = ', '.join('%s a%d' % (t, k) for k, t in enumerate(ps)) or 'void'
@@ -140,18 +176,21 @@ def main():
         wc.append('extern %s %s(%s);' % (rt, n, ', '.join(ps) or 'void'))
         if n in RET_LOG:
             a1 = 'a1' if len(ps) > 1 else '0'
-            wc.append('%s __sxt_%s(%s) { sxt_enter(%d); %s r = %s(%s); sxt_ret(%d, (unsigned long long)(uintptr_t)a0, (unsigned long long)(uintptr_t)%s, (unsigned long long)(uintptr_t)r); return r; }' % (rt, n, pl, i, rt, n, al, i, a1))
+            wc.append('%s __sxt_%s(%s, int site) { sxt_enter(%d); %s r = %s(%s); sxt_ret(%d, (unsigned long long)(uintptr_t)a0, (unsigned long long)(uintptr_t)%s, (unsigned long long)(uintptr_t)r, site); return r; }' % (rt, n, pl, i, rt, n, al, i, a1))
             continue
         wc.append('%s __sxt_%s(%s) { sxt_enter(%d); %s%s(%s); }' % (rt, n, pl, i, '' if rt == 'void' else 'return ', n, al))
     wc.append('const int sxt_n_names = %d;' % len(wrap))
     wc.append('const char* const sxt_names[] = {%s};' % ','.join('"%s"' % n for n in wrap))
     wc.append('const unsigned char sxt_is_gui[] = {%s};' % ','.join('1' if n in set(stub_names) else '0' for n in wrap))
+    wc.append('const int sxt_nsite = %d;' % len(sites))
+    wc.append('const char* const sxt_site_str[] = {%s};' % ','.join('"%s"' % s for s in sites or ['-']))
     open(os.path.join(a.out, 'trace_wrap.c'), 'w').write('\n'.join(wc) + '\n')
     pat = re.compile(r'@(%s)(?![\w.$-])' % '|'.join(re.escape(n) for n in sorted(wrap, key=len, reverse=True)))
-    new = pat.sub(lambda m: '@__sxt_' + m.group(1), src)
+    new = pat.sub(lambda m: '@__sxt_' + m.group(1), tsrc)
     open(os.path.join(a.out, 'boot_trace.ll'), 'w').write(new)
     print('[gen_link] 外部参照 %d: %s' % (len(cls), ' '.join('%s=%d' % (k, len(v)) for k, v in names.items())))
     print('[gen_link] ラッパ %d 本 (varargs で除外 %d: %s) / スタブ %d 本' % (len(wrap), len(skipped), ' '.join(skipped), len(stub_names)))
+    print('[gen_link] RET_LOG 呼出し元 site %d 件 (%s)' % (len(sites), ' '.join(sorted(RET_LOG))))
 
 
 if __name__ == '__main__':

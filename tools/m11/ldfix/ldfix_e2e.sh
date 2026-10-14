@@ -27,6 +27,9 @@ mkdir -p "$HERE/work/stage4"
 step "1/5 修復 pass 適用: boot_final3.ll -> work/ldfix_fixed.ll"
 python3 "$HERE/ldfix.py" tools/m11/work/boot_final3.ll "$HERE/work/ldfix_fixed.ll" \
   --pe "$PE" --report "$HERE/work/ldfix_report.json" || fail "ldfix.py"
+step "1b/5 function_450560 の 2 段 deref 復元 (#2502・機械語検証付き): work/ldfix_fixed.ll を上書き"
+python3 "$HERE/fix_450560.py" "$HERE/work/ldfix_fixed.ll" "$HERE/work/ldfix_fixed_450560.ll" --pe "$PE" || fail "fix_450560.py"
+mv "$HERE/work/ldfix_fixed_450560.ll" "$HERE/work/ldfix_fixed.ll"
 python3 - <<'PYEOF'
 import json
 r = json.load(open('tools/m11/ldfix/work/ldfix_report.json'))
@@ -41,7 +44,7 @@ emcc -c "$HERE/work/ldfix_fixed.ll" -o "$HERE/work/ldfix_fixed.o" -w -Wno-error=
 
 step "3/5 stage4 回帰 (m11_e2e.sh 相当: base = 修復前 / fix = 修復後)"
 bash "$HERE/stage4.sh" tools/m11/work/boot_final3.ll base | tee "$HERE/work/stage4_base.log" | grep STAGE4_RESULT
-bash "$HERE/stage4.sh" "$HERE/work/ldfix_fixed.ll" fix | tee "$HERE/work/stage4_fix.log" | grep STAGE4_RESULT
+S4_EXTRA_CF=-DM11_OV_NO_450560 bash "$HERE/stage4.sh" "$HERE/work/ldfix_fixed.ll" fix | tee "$HERE/work/stage4_fix.log" | grep STAGE4_RESULT
 
 step "4/5 unit survey (942 unit 隔離: base/fix)"
 for N in base fix; do
