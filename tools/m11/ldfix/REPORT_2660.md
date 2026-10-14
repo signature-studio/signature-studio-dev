@@ -4,6 +4,7 @@
 
 - 9 site を機械語・IR の両面で再検証した。**9 site すべて UNDETERMINED (判定不能) のまま**で、判定は変えない。
 - 4 site (45d570・45d581・45b1bf・45f938) は、機械語の消費者 (store 直後の load・間に call 無し) を確認できた。一方、IR の保存ブロックが entry から到達不能なのは、上流の `xor i64 0,0` (機械語 45b18b・45d0b5・45f56c の型タグ読みの置換) が作る死んだ辺による。上流が直ると辺は生き、store は IR で実行される。独立した脱落ではないため、TRUE_DROP への確定は取り下げた (§2)。上流修復の追跡は LD-127 (#2745) (§2.2)。
+- LD-127 (#2745): 上流 xor 0 の 3 関数の入口タグ読みを load に戻す pass F3d を追加した (既定無効・`--passes f3d`)。4 site の判定と `results/` は未更新 (§2.3)。
 - 残る 5 site (41ba8a・41bfd1・41e513・45c6dd・45d754) も UNDETERMINED。所見は §3 に残し、子 issue LD-123 (#2688) に移した。
 - 脱落関数の和集合は **72 関数** (main と同じ・`REPORT_2265.md` §3 の公表値)。9 site が未確定のため最終化は未了。最終化は子 issue LD-124 (#2689)。
 - 測定: 測定 commit `8a323067` (コードは `abca9e53` から変えていない・§7)。全 7 step の `audit_lsf_ssa_e2e.sh` を素材 `work-m11`・`work-liftdiff` で前景実行し、rc=0・7/7 完走 (2 回・154.7〜154.8 s)。主要値は §5。
@@ -41,6 +42,29 @@
 - 3 関数の同じ xor 行は `boot0.lift.ll` (RetDec lift 段の出力) に既にあり、置換は lift 段で入る。`%4 = trunc i64 %3 to i16` が型タグ分岐の条件になる。
 - 修復 (型タグ読みを定数にせず load として残す) と 4 site の判定確定は LD-127 (#2745) で行う。本 PR の範囲は追跡の紐付けまで。
 - DEFECTS.md の既存類型 (D1a〜D23) には当たらない。`REPORT_2438.md` §3 の新類型候補 (入口の memory 読みの `xor i64 0, 0`) に当たる。登録は PM 判断。
+
+### 2.3 上流 xor 0 の修復 (LD-127 #2745・F3d)
+
+- 機械語 (実 PE `block00031_PE.bin`・capstone 降下): 45b170 は 45b184 `mov rbx, rdx` → 45b18b `movzx rsi, word ptr [rbx]` (arg2)。45d0a0 は 45d0ac `mov [rbp+0x50], rcx` → 45d0b1 `mov rax, [rbp+0x50]` → 45d0b5 `movzx rax, word ptr [rax]` (arg1)。45f560 は 45f569 `mov rbx, rcx` → 45f56c `movzx rax, word ptr [rbx]` (arg1)。3 関数とも入口ブロックの 16 bit 型タグ読み。
+- lift 段の行: `boot0.lift.ll` の 58554 (45b170 の `%1`)・61313 (45d0a0 の `%3`)・64937 (45f560 の `%3`) に既に `xor i64 0, 0` がある。`boot_final3.ll` の行 (161459・164220・167844) は、ここから merge・asmfix・passes を経た後の位置である。m11 の生成コードに `xor i64 0, 0` を出力する箇所は無い (grep)。RetDec 内部のどの pass が定数化したかは未特定。
+- 既存 F3b が取りこぼした理由: F3b は zero-disp の `mov` load だけを数え (`movzx` を除外)、入口の `xor` が 1 本であることも求める (45d0a0・45f560 は入口に 3 本)。`ldfix.py --passes f3b --only 45b170,45d0a0,45f560` は 3 関数とも件数 0。
+- 修復 `fix_f3d` (`ldfix.py`・`--passes f3d` で有効・既定無効): 入口ブロックの機械語に movzx word の zero-disp load が 1 本 (rsp/rbp 基底を除く)・基底が argN に解決・入口の `xor i64 0,0` のうち結果が `trunc i64 %x to i16` か `and i64 %x, <imm>` で使われるものがちょうど 1 本、の全てを満たすときだけ、`xor` 行を `load i16` + `zext` に置き換える。
+- 修復の結果 (`--passes f3d --only 45b170,45d0a0,45f560`・3 関数): 161459 は arg2 の `load i16`、164220・167844 は arg1 の `load i16` になった (3 関数の xor 行を、load と zext を含む 2〜3 行に置き換えた差分のみ)。
+- 修復後 IR での到達性 (`ir_reach_2660.py`・死んだ辺の除外は 0 本):
+
+| 関数 | TARGET (site) | 結果 |
+|---|---|---|
+| 45d0a0 | dec_label_pc_45d565 (45d570) | reachable (dead edges 0) |
+| 45d0a0 | dec_label_pc_45d576 (45d581) | reachable (dead edges 0) |
+| 45b170 | dec_label_pc_45b1b8 (45b1bf) | reachable (dead edges 0) |
+| 45f560 | dec_label_pc_45f931 (45f938) | reachable (dead edges 0) |
+
+  §2 の辺 (例: 45b1a1→45b1b1) は、上流の `xor` が 0 のとき条件が定数に畳まれて死んでいた。修復後は条件が load 由来の値になるため、死んだ辺の仮定を外しても TARGET に到達する。ただし、この検査は CFG だけを見るため、辺が実際に生きることの証明ではない。
+- 影響範囲 (F3d 単独・`boot_final3.ll` の全 7421 関数): 60 関数に当たる (3 関数は本節の対象、残り 57 関数は同じ類型か未検証)。base 未解決 3・入口 xor が曖昧 21 は不適用。F3d は既定無効のまま。既定化には 60 関数の IR 変更の build・e2e 検証が要る (子 issue)。
+- 既定経路の回帰: HEAD の `ldfix.py` と修復後 `ldfix.py` の既定出力 (`boot_final3.ll` 入力) は `cmp` で一致 (F3d 既定無効のため)。
+- 4 site の判定 (`candidate_verdicts_1161.jsonl`・`spill178_1161.tsv`) は更新していない。`results/` は本番 IR (F3d 未適用) から生成されるため、F3d を既定化して IR を再生成するまで判定の根拠が無い。これは子 issue に移した。
+- 測定 commit: **`57d6612b`** (F3d を入れたコード commit)。`audit_lsf_ssa_e2e.sh` を前景で実行: rc=0・7/7 完走・120.9 s (loadavg 0.32 → 0.92)。`drops_510.tsv` と `spill178_1161.tsv` は `results/` と一致 (ログ 77 行・123 行)。spill 宛の現行分布は 確定 109・判定不能 28・未判定 41 (§5 の 97/16/65 は PR base `858ceef0` の値で、main の現行値ではない)。
+- コード差分: `git diff 57d6612b HEAD -- tools/m11/ldfix/results tools/m11/ldfix/*.py` (本節の REPORT 更新を含む commit 後) は 0 行。
 
 ## 3. UNDETERMINED 9 site の所見 (LD-123 へ)
 
