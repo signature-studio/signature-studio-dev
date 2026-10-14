@@ -1,0 +1,30 @@
+diff --git a/src/bin2llvmir/optimizations/constants/constants.cpp b/src/bin2llvmir/optimizations/constants/constants.cpp
+index 87273130..b4c44971 100644
+--- a/src/bin2llvmir/optimizations/constants/constants.cpp
++++ b/src/bin2llvmir/optimizations/constants/constants.cpp
+@@ -146,12 +146,14 @@ void ConstantsAnalysis::checkForGlobalInInstruction(
+ 		{
+ 			if (max == &root)
+ 			{
++				std::cerr << "TAG_SITE1_MAXROOT inst=" << llvmObjToString(inst) << std::endl;
+ 				auto* conv = IrModifier::convertConstantToType(ngv, val->getType());
+ 				inst->replaceUsesOfWith(val, conv);
+ 				return;
+ 			}
+ 			else if (userI)
+ 			{
++				std::cerr << "TAG_SITE2_USERI inst=" << llvmObjToString(inst) << std::endl;
+ 				auto* conv = IrModifier::convertConstantToType(ngv, maxC->getType());
+ 				userI->replaceUsesOfWith(maxC, conv);
+ 				return;
+@@ -160,8 +162,10 @@ void ConstantsAnalysis::checkForGlobalInInstruction(
+ 	}
+ 
+ 	auto* gv = dyn_cast<GlobalVariable>(root.value);
++	std::cerr << "TAG_PRE_GV inst=" << llvmObjToString(inst) << " rootval=" << (root.value ? llvmObjToString(root.value) : std::string("null")) << " ops=" << root.ops.size() << " isLoad=" << isa<LoadInst>(inst) << " gv=" << (gv != nullptr) << std::endl;
+ 	if (isa<LoadInst>(inst) && gv && root.ops.size() <= 1)
+ 	{
++		std::cerr << "TAG_SITE3_GV inst=" << llvmObjToString(inst) << " gv=" << gv->getName().str() << std::endl;
+ 		auto* conv = IrModifier::convertConstantToType(gv, val->getType());
+ 		inst->replaceUsesOfWith(val, conv);
+ 		return;

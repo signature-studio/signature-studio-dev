@@ -132,3 +132,7 @@ time make -j4                                                                   
 
 残件 (#2405): 2019 版の share 入手経路の確定 (2019-03-03 の share を別経路で得る、または 2019 版 `retdec-decompiler` 相当の起動方法を確立) → 41a6a0 での `checkForGlobalInInstruction` の L163〜168 発火確認 (`TAG` 一時ログ付きビルドも含む)。
 素材の入力: `block00031_PE.bin` は `fl-win64` 内 `extracted/`、sha256 先頭 `b2c64da4` (付録 §6f と一致)。
+
+### 追記 (#2405 / LD-113): 2019 版での gv 分岐の発火確認 (表・コマンド・全範囲の結果は `REPORT_2405.md`)
+
+測定 commit: `c810b847`。結論 (代用 share 条件): 2019 版の gv 分岐 (L163〜168) は 41a6a0 で発火する。実測値・所要時間・範囲別の結果は [REPORT_2405.md](REPORT_2405.md) (§3・§4・§5)。
