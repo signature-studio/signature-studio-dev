@@ -2,7 +2,7 @@
 
 親: #2316 (LD-108、PR #2397)。既知類型との関係: DEFECTS D20 (`docs/DEFECTS.md`)。
 
-**判定: 達成 (issue の範囲を縮めた)**。配線・ir_conditions / IR diff・通常 build の wasm での実測・survey 突合・`%arg1` assert・DEFECTS 更新は達成。受入条件 4 は survey の ok 退行 0 の突合に限った。869 と 870 の差は IR の出所 (同梱 IR と再生成 IR の差) まで特定した (§5) が、**5872 行のどの変更が差を生むかは未特定で、136 は本 run で再現せず原因は未特定**。この 2 点は受入条件から外し、§8 の未解決表に残した。
+**判定: 達成 (issue の範囲を縮めた)**。配線・ir_conditions / IR diff・通常 build の wasm での実測・survey の ok 退行 0 の突合・`%arg1` assert・DEFECTS 更新は達成。未解決は次の 2 点で、§8 の未解決表に残した: **5872 行のうちどの変更が ok 869 / 870 の差を生むかは未特定**、**136 型は本 run で再現せず原因は未特定**。
 
 測定 commit: `7f5524b6` (main 取り込み後の HEAD。コードを変えた最後の commit)。`ldfix_509_e2e.sh`・`ld108_e2e.sh` を同 commit で実測した (§9)。`git diff 7f5524b6 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行。取り込み前の `3de663ee` と `28d10d58` の値は §7・§9 に残す。
 
@@ -13,7 +13,7 @@
 | `fix_ld108.py` を `m11_gen_ir2.sh` の ldfix 直後 (`--bind` の前) に常設。想定と違う IR は fail-closed | **達成** (§2) |
 | `ir_conditions.json` の記録 (ldfix・qstore・PE) と `ir_sha256` が `m11_cond.py --check` で一致。組込み前後で変わるのは 41a670 の 1 関数だけ (`diff`) | **達成** (§3) |
 | 通常の `m11_build.sh` で作った wasm を `dyn_ld108.mjs` で直接呼び、head が修復後の期待値と一致 | **達成** (§4)。修復前 0x3333 FAIL → 修復後 0x2222 PASS |
-| 組込み後の survey 942 unit を組込み前と突合し、ok 退行 0 を示す | **達成** (§4)。869 / 870 の差は IR の出所 (同梱 IR と再生成 IR の差) まで特定 (§5)。どの変更が差を生むかと 136 型の原因は未特定のため受入条件から外し、§8 の未解決表に残した |
+| 組込み後の survey 942 unit を組込み前と突合し、ok 退行 0 を示す | **達成** (§4。870 / 870、kind 以外の差分 0) |
 | `%arg1` が `function_41a670` の第 1 仮引数 (型 `i64`) と一致することの assert | **達成** (§2・NC1) |
 | `docs/DEFECTS.md` D20 の「修復」欄を本番配線済みの記述へ | **達成** (結論 1 行 + リンク。測定値は書かない) |
 
