@@ -5,10 +5,12 @@
 # 2019-03-03 の share (retdec-support) は入手できない (REPORT_2405.md §1)。このため [RETDEC] (v5.0) の share を
 # 土台にし、2019 版が読む旧レイアウト (x86/ords・arm/ords) と version.txt (2019-03-03) だけ合わせた代用 share を使う。
 #
-# 使い方: bash tools/m11/ldfix/retdec2019_gv_2405.sh {build|install|ranges|variantb|all}
+# 使い方: bash tools/m11/ldfix/retdec2019_gv_2405.sh {build|install|ranges|variantb|stages|all}
 #   build   : retdec を取得 → 6edcaaea → 一時ログのパッチ適用 → cmake → make (所要を time で出す)
 #   install : 代用 share を置き make install (install-share.py は version.txt 一致で download を省く)
 #   ranges  : 範囲ごとに retdec-decompiler.py を実行し、一時ログ (stderr の TAG_*) の件数を数える
+#   stages  : 41a670 関数の 41a6a0 について、bin2llvmir の段ごとの IR を取り、値が変わる最初の段を出す
+#             (retdec_stage_1091.py を 2019 版に向ける。v5.0 の REPORT_911 §6c と同じ出力形式)
 #   variantb: share の types・static-code を 2019-03-08 の archive の物 (sha256 検証) に差し替えた変種で
 #             41a6a0・41a6d3・666b10 と対照 41a6b3 を再実行する (代用 share の影響の確認)
 # env:
@@ -116,11 +118,38 @@ do_variantb() {
   uptime
 }
 
+do_stages() {
+  : "${PE_BIN:?PE_BIN (block00031_PE.bin) を指定}"
+  local c="$WORK/install_c"
+  rm -rf "$c"; cp -a "$WORK/install" "$c"
+  mv "$c/bin/retdec-bin2llvmir" "$c/bin/retdec-bin2llvmir.real"
+  printf '#!/bin/sh\nexec "%s/bin/retdec-bin2llvmir.real" "$@" -print-after-all\n' "$c" > "$c/bin/retdec-bin2llvmir"
+  # retdec_stage_1091.py が使う v5.0 の CLI を 2019 版ラッパーの CLI に変換する。
+  # 2019 版の -print-after-all は module pass の見出しの直後に改行なしで本文が続くため、見出しの後ろで改行を足す
+  cat > "$WORK/retdec2019_cli.sh" <<'EOF'
+#!/bin/bash
+set -o pipefail
+pe=$1; shift; out=; r=
+while [ $# -gt 0 ]; do
+  case "$1" in -o) out=$2; shift 2 ;; --select-ranges) r=$2; shift 2 ;; --timeout) shift 2 ;; *) shift ;; esac
+done
+python3 "@C@/bin/retdec-decompiler.py" "$pe" -o "$out" --select-ranges "$r" --select-decode-only --stop-after bin2llvmir 2>&1 >/dev/null \
+  | sed -E 's/^(\*\*\* IR Dump After .* \*\*\*)source_filename/\1\nsource_filename/' >&2
+EOF
+  sed -i "s#@C@#$c#" "$WORK/retdec2019_cli.sh"
+  chmod +x "$c/bin/retdec-bin2llvmir" "$WORK/retdec2019_cli.sh"
+  mkdir -p "$WORK/run/stages"
+  cp "$PE_BIN" "$WORK/run/stages/in.bin"
+  RETDEC="$WORK/retdec2019_cli.sh" PE="$WORK/run/stages/in.bin" python3 "$HERE/retdec_stage_1091.py" 41a670 41a670 41a6f4 41a6a0 --out "$WORK/run/stages/o"
+  rm -f "$WORK/run/stages/in.bin" "$WORK/run/stages/o/f.dsm"
+}
+
 case "${1:-all}" in
   build) do_build ;;
   install) do_install ;;
   ranges) do_ranges ;;
   variantb) do_variantb ;;
-  all) do_build; do_install; do_ranges; do_variantb ;;
-  *) echo "usage: $0 {build|install|ranges|variantb|all}" >&2; exit 2 ;;
+  stages) do_stages ;;
+  all) do_build; do_install; do_ranges; do_variantb; do_stages ;;
+  *) echo "usage: $0 {build|install|ranges|variantb|stages|all}" >&2; exit 2 ;;
 esac
