@@ -15,7 +15,7 @@
 #   それ以外の新規 word は分類 C (整数・計算結果。値だけでは判定しない)。
 # 使い方: FL_WIN64_DIR=... python3 m11_ptrclass.py [IR] [--pe PE] [--image IMG] [--lb LB] [--out OUT]
 #         FL_WIN64_DIR=... python3 m11_ptrclass.py --hits <M11_PTRCHECK_DUMP の出力>   (分類 B・D の内訳と IR の使用関数を表示)
-import re, json, hashlib, argparse, os
+import re, json, hashlib, argparse, os, collections
 import pefile
 
 IMG_LO = 0x400000
@@ -73,13 +73,16 @@ pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY['IMAGE_DIRECTORY_E
 top = max(s.VirtualAddress + max(s.Misc_VirtualSize, s.SizeOfRawData)
           for s in pe.sections if s.Name.rstrip(b'\0').decode(errors='replace') in ('.text', '.data', '.rdata', '.didata'))
 image_ptr = set()
+site_of = {}
 for blk in getattr(pe, 'DIRECTORY_ENTRY_BASERELOC', []):
     for e in blk.entries:
         if e.struct.Data >> 12 != 10:
             continue
         r = blk.struct.VirtualAddress + (e.struct.Data & 0xfff)
         if r + 8 <= top:
-            image_ptr.add(int.from_bytes(img[a.lb + r:a.lb + r + 8], 'little'))
+            val = int.from_bytes(img[a.lb + r:a.lb + r + 8], 'little')
+            image_ptr.add(val)
+            site_of.setdefault(val, []).append(a.lb + r)
 data_image_lva = sorted(data & image_ptr)
 
 if a.hits:
@@ -104,6 +107,11 @@ if a.hits:
             if v in byv and v not in use_fn:
                 use_fn[v] = cur
     dset = set(data_image_lva)
+    # D の検証: 新規 word (ヒープ) と image の DIR64 地点の対応。同じ差分 (word − 地点) に揃えば、ヒープは image の連続領域のコピー。
+    deltas = collections.Counter(o - site_of[v][0] for o, v in hit_d if v in site_of)
+    if deltas:
+        dl, dn = deltas.most_common(1)[0]
+        print('D: %d words, most common (heap offset - image DIR64 site) = 0x%x for %d words (block copy if equal to count)' % (len(hit_d), dl, dn))
     print('distinct B+D values %d' % len(byv))
     for v in sorted(byv, key=lambda x: -len(byv[x])):
         s = section_of(v)
