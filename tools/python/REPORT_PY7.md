@@ -52,7 +52,8 @@ FAIL 7 (neg) の内訳: `Chords/data.pyc` 自身と、それを import する `c
 ## 6. 再現
 
 ```
-FL_WIN64_DIR=<fl-win64 展開先>/extracted python3 analysis/extract_pyc_blocks.py work/fl_extract
+PY312=work/build-native/install/bin/python3.12   # build_cpython_wasm.sh で作る (run_all.sh step 15 と同じ)
+FL_WIN64_DIR=<fl-win64 展開先>/extracted "$PY312" analysis/extract_pyc_blocks.py work/fl_extract
 # pyscript 2 本: block24772 → work/fl_extract/pyscript/cpt.pyscript、block24775 → stack.pyscript
 bash build_flpy.sh && node tests/chord_progression_e2e.mjs      # 41/41
 node tests/chord_progression_e2e.mjs --neg                       # exit 1 (ネガコン)

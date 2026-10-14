@@ -152,5 +152,3 @@ cmp work/fl_extract/drum_patterns.json "$FL_WIN64_DIR/extracted/block24797_DATA.
 | run_all 全体の mac 前提チェック (`FL_MAC_DIR` の `pkg_extract` 不在で rc=2) | run_all 全体が通らない。step 1 以降は未検証 | #2649 (PY-83) |
 | mock 値 (`loop_starter_config` の genres 流用・PPQ 96・`pattern_presets.cpt` 空) の実 FL 照合 | e2e の PASS は import・exec 可否の確認まで | #81 (PY-9) |
 | `flcpt` / `flrack` の関数実装 | e2e は属性のダミーで動かしている | #1327 |
-| `REPORT_PY7.md` の抽出手順と `tests/chord_progression_e2e.mjs` 冒頭コメントの旧コマンド (`python3 analysis/extract_pyc_blocks.py work/fl_extract`) | 現行の CLI (`FL_WIN64_DIR`・`PY312`) と食い違う | 未起票 (PM 判断) |
-| `REPORT_PY22.md` の「pyscript 2 本は手動配置」 | 本 run の抽出器で自動取得できるようになった | 未起票 (PM 判断) |
