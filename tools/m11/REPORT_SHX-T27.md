@@ -34,6 +34,25 @@
 - 末尾 12 件 (seq 85〜96) は全て unit 18 の `GetLocaleInfoW`。
 - file API (CreateFileW / CreateFileA / GetFileAttributesW / FindFirstFileW / FindFirstFileExW / FindNextFileW / ReadFile) は 0 件。
 
+### 2-2. 再測定 (main `e051402a`・worktree `work/ws-1630`・branch `1630-shx-t27-locale-loop`)
+
+| 段階 | 結果 |
+|---|---|
+| `build.sh --trace --soft` | rc=0 / 13.5 s / `signature mismatch=1 undefined symbol=0 duplicate=0` |
+| 実 boot (`SHIMX_TRACE_FILE=/ftrace.jsonl`) | rc=0 / 0.41 s / `units_run=17` / `dllmain_done=false` / `threw="memory access out of bounds"` / `total_calls=97` / `distinct_called=28` / `dropped=0` |
+| ftrace 行数 | 0 行 (0 バイト)。`ftrace_error` 無し |
+| unit 18 の末尾 40 件 (`tail`) | 全て `GetLocaleInfoW` |
+
+- ftrace の仕組み: `shimx_set_trace_file` は MEMFS に `fopen("w")` で空ファイルを作り、イベントは file API 呼出時にだけ `shx_ftrace_emit` で書く (`tools/shimx/src/trace.c`)。0 バイトは「file API が 1 件も呼ばれていない」ことを意味し、書き込み失敗ではない (`FS.readFile` は成功)。
+- `trace_file` の空振りは計装の問題ではなく、停止までに file API が到達していないことの直接の証拠。
+
+### 2-3. 駆動関数の静的確認 (`boot0.drc.c`)
+
+- `function_446400` (locale 情報収集) は 1 回の呼出で `function_4133f0` を含む多数の呼出を行う。ループ本体ではない。
+- `function_44bb70` は `function_446400` を **1 回だけ** 呼ぶ (`bp-416` の初期化 → `function_44bae0` → `function_446400` → `function_416750` → `function_415c30`)。反復の駆動元ではない。
+- `function_455790` は `g365` カウンタで初回だけ本処理に入り、2 回目以降は即 return する。ここも反復の駆動元とは考えにくい。
+- よって「`GetLocaleInfoW` 66 回反復」の駆動元は、上記 3 関数の外 (呼出元の連鎖の上流、または `function_446370` 系の呼出元) にある。未特定。
+
 ## 3. trap stack の解決 (export 名)
 
 `run_trace.mjs` の stack 注釈は `wasm-objdump` が無いため無効だった。代わりに `.cjs.wasm` の export section を直接読んで番号を解決した。
