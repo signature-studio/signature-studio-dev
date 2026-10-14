@@ -206,6 +206,11 @@ static void test_heap_out_of_range(void) {
         CHECK(HeapReAlloc(heap, 0, p, 64) == NULL);
         CHECK(GlobalFree((HGLOBAL)p) == (HGLOBAL)p);
     }
+    /* 範囲内だが割当てのない p (magic 不一致): 解放せず TRUE (#2821) */
+    static unsigned char nonheap[64];
+    SetLastError(ERROR_SUCCESS);
+    CHECK(HeapFree(heap, 0, nonheap + 32) == TRUE);
+    CHECK(GetLastError() == ERROR_SUCCESS);
 }
 
 /* ---------------------------------------------------------------
