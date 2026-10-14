@@ -14,8 +14,9 @@
 
 - `tools/icall/fa_route_build.sh`: `FA_ENC_INIT=1` のとき、data install の末尾で encoded slot 12 件に cookie (`0x3125eaa8` 相当) を書く。既定 (未設定) は従来と同一。
 - `tools/icall/diff/fa_cmp.py`: wasm 実行前に `_ott_data_install()` を呼ぶ。従来は data 未敷設のまま比較していた。
+  この呼び出しは `FA_ENC_INIT` と無関係に**常に実行される**。したがって §3 の OFF/ON はどちらも data 敷設ありの条件で測られている。`FA_ENC_INIT=1` で変わるのは encoded slot 初期化だけ。
 
-測定 commit: `009c77bd` (コードを変えた最後の commit)。HEAD までの差分は 0。
+測定 commit: `009c77bd` (コードを変えた最後の commit)。HEAD までのコード差分は 0 (`git diff 009c77bd HEAD` は本ファイルのみ)。
 
 ## 3. fa_sweep 実測 (`bash tools/icall/diff/fa_sweep.sh 8 60`)
 
@@ -24,10 +25,11 @@
 | OFF (既定) | 82 s (real) | 46 | 66 | 9 | 10 | 131 |
 | ON (`FA_ENC_INIT=1`) | 82 s (real) | 46 | 64 | 11 | 10 | 131 |
 
-- 前 run (#1921) の ON 47/64/9/11 は、`_ott_data_install()` を呼ばない比較で出た値。今回の修正後の ON は 46/64/11/10 で、一致件数は増えていない。
-- OFF→ON で状態が変わった関数:
-  - `0x181065928`: crash → wasm abort (`FAIL-FAST`)。前 run の「bit一致」が data 未敷設に依存していたかは未検証 (推定)。
-  - `0x1810553d0`: crash → wasm abort。
+- 前 run (#1921) の ON 47/64/9/11 は、data 未敷設の比較 (`fa_cmp.py` に `_ott_data_install()` が無い) で出た値。今回の ON は 46/64/11/10 で、bit一致が 47→46 に減っている。
+- OFF→ON で状態が変わった関数 (本 run の REPORT 件数から判明しているもの):
+  - `0x1810553d0`: 値の不一致 → wasm abort (`FAIL-FAST`)。前 run の ON では「値の不一致」だった。
+  - `0x181065928`: native crash → wasm abort (`FAIL-FAST`)。
+- **47→46 の関数 (推定・未検証)**: 件数の整合から `0x181065928` が bit一致から外れた可能性が高い。前 run の ON では `0x181065928` が bit一致で、本 run の ON では wasm abort になっている。ただし件数だけでは確定できない。関数別の `sweep.jsonl` は本 run の work/ に残っておらず、`work-icall`・`plugins-freshair` の素材が手元に無いため再測定できなかった。確定には `fa_sweep.sh` を素材ありで再実行し、`0x181065928` の判定を見る必要がある (子 issue へ移管せず、本 PR の未解決表に残す)。
 - 原因: `0x1810553d0` → indirect call → `0x1810806a0` が `fa_route` の `icall` テーブルに無い (`map.json` の `func_map` 外)。closure 外の関数で、data 敷設の有無とは別件。
 - 所要・load は同一マシン・同条件 (load 0.5〜0.8) で測定。
 
@@ -39,9 +41,10 @@ ON/OFF とも `fa_cmp.py` 単体で crash_or_timeout。原因は未切り分け�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `0x1810806a0` (closure 外 indirect target) の解決。`map.json` の範囲を広げるか、該当 import/関数の扱いを決める | `0x1810553d0`・`0x181065928` の wasm abort | ICALL-55 (子) |
-| encoded 表 (api-set 相当) の連続範囲と数の特定 | 受入条件 2 | ICALL-55 (子) |
-| crash 残り 3 件の原因切り分け | 受入条件 3 | ICALL-55 (子) |
+| `0x1810806a0` (closure 外 indirect target) の解決。`map.json` の範囲を広げるか、該当 import/関数の扱いを決める | `0x1810553d0`・`0x181065928` の wasm abort | #2079 (ICALL-56) |
+| encoded 表 (api-set 相当) の連続範囲と数の特定 | 受入条件 2 | #2081 (ICALL-57) |
+| crash 残り 3 件の原因切り分け | 受入条件 3 | #2083 (ICALL-58) |
+| `0x181065928` の bit一致離脱 (§3 の 47→46) の関数別確定 (素材ありで `fa_sweep.sh` 再実行) | §3 の推定の確認 | 本 PR (#2009) の未解決。素材 (`work-icall`・`plugins-freshair`) 付きの run で確定 |
 | 実経路で必要な未実装 import の実装 | 同上 | #1922 (ICALL-52) |
 
 ## 6. 再現
