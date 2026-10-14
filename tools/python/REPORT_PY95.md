@@ -12,7 +12,7 @@
 
 ## 1. 手段
 
-- 素材: `fl-win64.tar.zst` から `extracted/block00031_PE.bin` (関数探索) と DATA block 4 件 (`block25159`・`block24429`・`block24430`・`block24618`、`fetch_inputs.sh` 用) を `$RUNNER_TEMP/fl-win64/extracted/` に展開。`toolchain-emsdk` は展開せず、runner 既存の `/opt/emsdk` (emcc 6.0.12、`tools/m1/flags.sh` の pin) を使った。
+- 素材: `fl-win64.tar.zst` から `extracted/block00031_PE.bin` (関数探索) と DATA block 4 件 (`block25159`・`block24429`・`block24430`・`block24618`、`fetch_inputs.sh` 用) を `$RUNNER_TEMP/fl-win64/extracted/` に展開。`toolchain-emsdk` は展開せず、runner 既存の `[EMSDK]` (`docs/REFERENCES.md`。emcc 6.0.12、`tools/m1/flags.sh` の pin) を使った。
 - ハンドラ探索: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_handler_probe.py <名前...>`。PyMethodDef の entry VA と関数先頭 VA (`fn`) を得て、先頭 40 命令を出す。
 - 参照の同定: 各命令の `[rip + disp]` は「次命令の VA + disp」で絶対 VA にした。変換 slot は `call qword ptr [rax]` の直前の `mov rax, [rip+...]` の絶対 VA。
 - 戻り型: 公開 stub (`analysis/flapi/flapi_table.json` の `sig.returns`)。
