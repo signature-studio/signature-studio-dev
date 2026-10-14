@@ -159,8 +159,47 @@ static void step_end(void) {
   if (g_step_fp) { fclose(g_step_fp); g_step_fp = NULL; }
 }
 
+/* LD-129 (#2770): VA への書込み監視。env LD_WATCH_ADDR=<VA hex>・LD_WATCH_OUT=<path> で有効 (既定は無効)。
+ * 監視 page を PROT_READ|PROT_EXEC にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。
+ * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行われ、結果は変わらない)。
+ * 記録は書込み先が監視 8 バイトに重なるもの (書込み幅 16 以下を想定) だけ。LD_STEP_N・trace と同時には使わない。 */
+static u64 g_wp_va, g_wp_page, g_wp_rip, g_wp_addr, g_wp_old, g_wp_rsp, g_wp_rax, g_wp_rcx;
+static u8 g_wp_ins[16]; static int g_wp_call, g_wp_hit; static volatile int g_wp_pend; static FILE* g_wp_fp;
+static void wp_prot(int rw) { mprotect((void*)(uintptr_t)g_wp_page, 4096, rw ? PROT_READ | PROT_WRITE | PROT_EXEC : PROT_READ | PROT_EXEC); }
+static void wp_arm(void) {
+  const char* a = getenv("LD_WATCH_ADDR"); const char* o = getenv("LD_WATCH_OUT");
+  if (!a || !o || !*a || !*o) return;
+  u64 va = strtoull(a, NULL, 16);
+  if (va < g_imgbase || va + 8 > g_imgbase + g_imgsize) { fprintf(stderr, "[ld_native] LD_WATCH_ADDR %#llx outside image\n", (unsigned long long)va); return; }
+  g_wp_fp = fopen(o, "a"); if (!g_wp_fp) return;
+  g_wp_va = va; g_wp_page = va & ~0xfffull; wp_prot(0);
+}
+static void wp_fault(greg_t* g, u64 addr) {
+  g_wp_addr = addr; g_wp_rip = (u64)g[REG_RIP]; g_wp_rsp = (u64)g[REG_RSP]; g_wp_rax = (u64)g[REG_RAX]; g_wp_rcx = (u64)g[REG_RCX];
+  g_wp_call = g_in_call; g_wp_hit = addr + 16 > g_wp_va && addr < g_wp_va + 8;
+  memcpy(&g_wp_old, (void*)(uintptr_t)g_wp_va, 8); memcpy(g_wp_ins, (void*)(uintptr_t)g_wp_rip, 16);
+  wp_prot(1); g[REG_EFL] |= 0x100; g_wp_pend = 1;
+}
+static void wp_finish(greg_t* g) {
+  u64 nw; memcpy(&nw, (void*)(uintptr_t)g_wp_va, 8);
+  wp_prot(0); g[REG_EFL] &= ~0x100; g_wp_pend = 0;
+  if (g_wp_hit) {
+    fprintf(g_wp_fp, "wp case=%s call=%d rip_rva=%#llx rip=%#llx addr=%#llx old=%016llx new=%016llx chg=%d rsp=%#llx rax=%#llx rcx=%#llx ins=",
+            ld_case.id, g_wp_call, (unsigned long long)(g_wp_rip - g_imgbase), (unsigned long long)g_wp_rip, (unsigned long long)g_wp_addr,
+            (unsigned long long)g_wp_old, (unsigned long long)nw, g_wp_old != nw, (unsigned long long)g_wp_rsp,
+            (unsigned long long)g_wp_rax, (unsigned long long)g_wp_rcx);
+    for (int i = 0; i < 15; i++) fprintf(g_wp_fp, "%02x", g_wp_ins[i]);
+    fprintf(g_wp_fp, "\n"); fflush(g_wp_fp);
+  }
+}
+
 static void on_sig(int sig, siginfo_t* si, void* ucv) {
   ucontext_t* uc = (ucontext_t*)ucv; greg_t* g = uc->uc_mcontext.gregs;
+  if (g_wp_va && sig == SIGTRAP && g_wp_pend) { wp_finish(g); return; }
+  if (g_wp_va && (sig == SIGSEGV || sig == SIGBUS)) {
+    u64 fa = (u64)(uintptr_t)si->si_addr;
+    if (fa >= g_wp_page && fa < g_wp_page + 4096) { wp_fault(g, fa); return; }
+  }
   if (sig == SIGTRAP && g_step_on) { step_rec(g); return; }
   if (sig == SIGTRAP && g_in_call && g_step_armed && (u64)g[REG_RIP] - 1 == g_step_entry) {
     *(u8*)(uintptr_t)g_step_entry = g_step_orig; g_step_armed = 0; g[REG_RIP] = (greg_t)g_step_entry; g_step_on = 1;
@@ -288,6 +327,7 @@ int main(int argc, char** argv) {
   setvbuf(stdout, NULL, _IOFBF, 1 << 20);
   if (load_pe(argv[1])) return 3;
   install_signals();
+  wp_arm();
   while (getline(&g_line, &g_linecap, stdin) > 0) {
     char* l = g_line; size_t n = strlen(l); while (n && (l[n-1] == '\n' || l[n-1] == '\r')) l[--n] = 0;
     if (!strncmp(l, "LAYOUT ", 7)) {
