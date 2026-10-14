@@ -16,7 +16,7 @@
 
 ## 1. 変更点 (main との差分)
 
-- `tools/python/build_cpython_wasm.sh`・`tools/python/build_flpy_static.sh`: main と同一 (変更なし)。
+- `tools/python/build_cpython_wasm.sh`・`tools/python/build_flpy_static.sh`: 基準 commit `3d37a190` (main) と同一 (本 PR で変更なし)。`origin/main` (`940c0d6a`) では両スクリプトが変わっており、merge 後の main 上の build は本 REPORT の測定対象ではない。`build_cpython_wasm64.sh` は基準と `origin/main` で同一。
 - `tools/python/tests/static64_browser_probe.mjs` (driver): `browser/serve.mjs` で配信し、headless Chrome で `tests/browser/static64.html` を開く。`RESULT` 行を読んで `STATIC64 PROBE OK|FAIL {json}` を出す。
 - `tools/python/tests/browser/static64.html` と `static64_probe.mjs`: main thread で読込 → validate → init → `print(1 + 1)` → subinterp 1 回 → 160 回 (heap を記録)。
 - `docs/DOC_MAP.md`: 本 REPORT の索引行。
@@ -106,6 +106,8 @@ for i in 1 2 3; do cut -d' ' -f1-3 /proc/loadavg; node tests/static64_browser_pr
 2. **#2919 `[PY-109]` 12 check の subinterp probe を静的版 (headless Chrome) で実行する**
    受入: `tests/subinterp_probe.mjs` と同じ 12 check を `flpy_static64` と `flpy_static` に対して実行し、PASS/FAIL・load・所要を記録する。
 3. **起票せず (PM 判断)**: `flpy_static64` の 48 tool 比較 (Worker 版)・wasm64 の LGL 記録・`-sMEMORY64=1` の deprecation 警告の解消。受入条件の外にあるため子 issue は作らない。
+
+子 #2918・#2919 の本文は main の経路 (`build_cpython_wasm64.sh`・`FLPY_MEMORY64`・`CPY_BUILD`) へ直した。撤回した `CPY_MEMORY64` の手順と §6-1 の参照は外し、上流の実測は §5-1・§5-3 に向けた (本文のみの編集。測定は変えていない)。
 
 ## 9. 本 PR で行っていないこと
 
