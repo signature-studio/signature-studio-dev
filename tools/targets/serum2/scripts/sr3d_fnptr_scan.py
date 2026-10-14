@@ -30,10 +30,10 @@ def sec_of_rva(pe, rva):
 
 def sweep(md, code, va):
     """線形走査。capstone は無効バイトに当たると出力を止めるため、止まった次の 1 バイトから再開する。
-    返り値: (命令列, デコード済みバイト数, 再開回数)。"""
+    返り値: (命令列, デコード済みバイト数, 未デコードのバイトの VA 列)。"""
     insns = []
     off = 0
-    resumes = 0
+    skipped = []
     while off < len(code):
         pos = off
         for ins in md.disasm(memoryview(code)[off:], va + off):
@@ -41,9 +41,9 @@ def sweep(md, code, va):
             pos = ins.address - va + ins.size
         if pos >= len(code):
             break
+        skipped.append(va + pos)
         off = pos + 1
-        resumes += 1
-    return insns, sum(i.size for i in insns), resumes
+    return insns, sum(i.size for i in insns), skipped
 
 
 def main(path):
@@ -80,9 +80,9 @@ def main(path):
             continue
         code = s.get_data()
         va = base + s.VirtualAddress
-        insns, dec, resumes = sweep(md, code, va)
+        insns, dec, skipped = sweep(md, code, va)
         if code:
-            cov.append((s.Name.rstrip(b"\0").decode(errors="replace"), len(code), dec, resumes))
+            cov.append((s.Name.rstrip(b"\0").decode(errors="replace"), len(code), dec, skipped))
         for ins in insns:
             for op in ins.operands:
                 if op.type == capstone.x86.X86_OP_MEM and op.mem.base == capstone.x86.X86_REG_RIP:
@@ -92,12 +92,13 @@ def main(path):
                         rip_hits[tgt].append((ins.address, ins.mnemonic))
                 if op.type == capstone.x86.X86_OP_IMM and op.imm in tset:
                     rip_hits[op.imm].append((ins.address, "imm:" + ins.mnemonic))
-    print("\n(c0) 線形走査の被覆率 (実行可能セクション。デコード済みバイト / セクション長、再開 = 無効バイトからの再開回数)")
-    for name, n, dec, resumes in cov:
-        print(f"  {name:<8} {dec}/{n} B = {100 * dec / n:.2f}% 再開 {resumes} 回")
+    print("\n(c0) 線形走査の被覆率 (実行可能セクション。デコード済みバイト / セクション長、再開 = 無効バイトからの再開回数、未デコード位置 = 無効バイトの VA)")
+    for name, n, dec, skipped in cov:
+        pos_txt = (" 位置 " + " ".join(f"0x{a:x}" for a in skipped[:20])) if skipped else ""
+        print(f"  {name:<8} {dec}/{n} B = {100 * dec / n:.2f}% 未デコード {n - dec} B 再開 {len(skipped)} 回{pos_txt}")
     tot_n = sum(n for _, n, _, _ in cov)
     tot_dec = sum(dec for _, _, dec, _ in cov)
-    print(f"  合計 {tot_dec}/{tot_n} B = {100 * tot_dec / tot_n:.2f}%")
+    print(f"  合計 {tot_dec}/{tot_n} B = {100 * tot_dec / tot_n:.2f}% 未デコード {tot_n - tot_dec} B")
     print(f"\n(c) .text RIP-relative operands scanned: {n_rip}")
     for t in TARGETS + NAMES:
         h = rip_hits[t]
