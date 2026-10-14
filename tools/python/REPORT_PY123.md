@@ -169,6 +169,6 @@ python3 tools/python/analysis/flapi/pe_disasm.py 0x412960 120    # §2-3
 ```
 
 - 生成物は `tools/flelift/work/boot/` (gitignore)。結果 JSON は `tools/flelift/boot/results/` にコミット済み。
-- `build.sh` は `/opt/emsdk/emsdk_env.sh` を直接 source する (`SS_EMSDK_ENV` は `fle6_measure.sh` 側のみ)。emsdk 6.0.12 を `$RUNNER_TEMP/emsdk` に入れ、`/opt/emsdk` へ symlink して測った。
+- `build.sh` は `[EMSDK]` (`docs/REFERENCES.md` §4) の `emsdk_env.sh` を直接 source する (`SS_EMSDK_ENV` は `fle6_measure.sh` 側のみ)。emsdk 6.0.12 を `$RUNNER_TEMP/emsdk` に入れ、`[EMSDK]` の位置へ symlink して測った。
 - 測定 (`f57b7dff`・run `38653934214`): real 2 分 41.8 秒 (gen-A 5 s・lift 56 s・clang-plain 65 s・boot shim 17 s・negctl 19 s)。load average (開始) `0.24 0.69 0.41`。並列 1 本。
 - 前測定 (`b1b95f97`): real 2 分 12.2 秒 (lift 49 s・clang 49 s・boot shim 14 s・negctl 14 s)。load average (開始) `1.07 1.02 0.61`。
