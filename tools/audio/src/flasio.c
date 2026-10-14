@@ -222,7 +222,7 @@ static void *thread_fn(void *arg) {
     double quiet_t0 = emscripten_get_now();
     while (!A.stop) {
         uint32_t burst = LD(c->burst_obs);
-        uint32_t need = (burst * FLA_BURST_PCT / 100 + A.B + A.B - 1) / A.B * A.B;
+        uint32_t need = (uint32_t)(((uint64_t)burst * FLA_BURST_PCT / 100 + A.B + A.B - 1) / A.B * A.B);
         uint32_t u = LD(c->underruns);
         double now = emscripten_get_now();
         if (u != last_u) { esc += A.B; last_u = u; quiet_t0 = now; }
