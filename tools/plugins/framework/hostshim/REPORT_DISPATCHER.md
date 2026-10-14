@@ -209,3 +209,17 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 ### 8.5 次の作業
 
 - case 別の具体的な応答値 (`0x41d110` の TLS 要素が何を指すか、`0x86c900` の callback 登録先) は、実機 (または stage-2 の lift) でしか確定できない。起票先: #1222 (本 issue に残す)。
+
+## 9. #1222 4 回目 run: Phase A 回帰の実測 (受入 3)
+
+測定 commit: `04a7ff1a` (main 起点・コード無変更)。素材: `fl-win64`・`work-fw-stage1` を展開 (`work-fw-stage1` は repo ルート相対で `tar -C .`)。
+
+| 手順 | exit | wall (real) | load (開始 → 終了) | 結果 |
+|---|---|---|---|---|
+| `fw_stage2.sh` (stage-1 再利用・`FL_WIN64_DIR` 指定) | 0 | 6 分 35.98 秒 | 未計測 | smoke `dispatch=38 units_done=0 va=1 heap=1 ff=0` PASS・`fw_smoke_check PASS` |
+| `hs_e2e.sh` | 1 | 2 分 29.85 秒 | 開始 load 3.00 | **Phase A PASS** (`[fw] Phase A: Halt0/RestoreContext dispatch=38 ff=0`)。Phase B は `memory access out of bounds` で FAIL (下記) |
+
+- 受入 3 の対象 (Phase A 回帰 dispatch=38 ff=0): **満たす**。
+- Phase B の `memory access out of bounds` (`status=0xffffffff plug=0x0 rec=7`) は REPORT_1229 §1 の既知ベースライン (2b2faf52 で同症状) と同一。本 run はコード無変更のため、今回の変更による回帰ではない。起票先は既存の #1229 (`[PLG-P0b-4]`)。
+- 受入 3 の残り: `hostshim.c` の応答表を実測に合わせる作業は未実施 (受入 2 の未収載 ID 応答が未確定のため)。
+- 作業ツリー: `ws-1222` (branch `1222-plg-p0b-3-phaseA`)。生成物 (`tools/plugins/work/fw/`・`work/`) は gitignore 対象。
