@@ -182,7 +182,9 @@
 - **再測定は未実施・未解決**: RetDec v5.0 (`toolchain-retdec`) と emsdk (`toolchain-emsdk`) がこの run に無い (`$ARTIFACTS_DIR` は `fl-win64` のみ)。 次の run で `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk` を指定し、HEAD で `sampler_engines.sh` と `sampler_e2e.sh` を env 未設定 (既定) で流して表を更新する。 起票先: #540 (本 PR の親 issue)。 それまで §7 の表は「5880a9f6 の実測」として読むこと。
 - 上の 6 ファイルの変更 (f80 計数・U6・NC2a/b) は別経路の検証の範囲で、本 REPORT の測定対象外。
 
-| 項目 | 結果 (実測) |
+以下の表は **`PLUG_NO_STATIC_DETECT=0` 相当 (RetDec argv が `5880a9f6` と同じ経路) の実測** である。 HEAD の既定経路 (`PLUG_NO_STATIC_DETECT` 未設定 = 1、`--disable-static-code-detection` あり) の結果は **未測定**。
+
+| 項目 | 結果 (実測・`PLUG_NO_STATIC_DETECT=0` 相当) |
 |---|---|
 | 素材展開 `fl-win64.tar.zst` → `$RUNNER_TEMP/fl-win64` | 8.0 s、`block23663_PE.bin` / `block23664_PE.bin` 存在を確認 |
 | 殻の `ff /2` disp32=0x1c0 候補 (block23663) | 24 件 (§2a)。 9 件の selector (2,3,4,5,10,11,12,13,14) は §4 のとおり |
