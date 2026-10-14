@@ -73,7 +73,7 @@
 ## 7. 追加の測定 (3 回目 run)
 
 - 測定 commit: `ab13d73d` (作業 base = origin/main。解析スクリプトは変更していない)。`git diff ec02f804 HEAD -- tools/python/analysis/py59_func.py tools/python/analysis/py59_callers.py tools/python/analysis/py59_refs.py` の出力は 0 行。
-- 素材: `fl-win64.tar.zst` → `tools/python/work/py59/extracted/extracted/block00031_PE.bin` (`$ARTIFACTS_DIR` で実在確認後に展開)。
+- 素材: `fl-win64.tar.zst` → `tools/python/work/py59/extracted/block00031_PE.bin` (`$ARTIFACTS_DIR` で実在確認後に展開)。
 - `0xe39e2f`・`0xe39e5d`・`0xe39e8b`・`0xe39eb9` の 4 箇所 (`0xdd1fa0` の呼び出し元。`0xe39d50..0xe3a086` の関数内) は、第 1 引数 `rcx` を `[rip+disp]` の slot から読む。読出し先 VA は `0xdd26a0`・`0xbd2e10`・`0xde9450`・`0xdf12c0` (逆アセンブルの rip 計算値)。
   - この VA はいずれも `.text` (raw `0x9d1aa0`・`0x7d2210`・`0x9e8850`・`0x9f06c0`) で、データ slot ではない。値は code 相当のバイト列で、型を示す vtable として読めない。rip 計算が誤っている可能性を含め未確定。
 - 呼び出し元の引数割当 (`0xe39e0b` 付近): 第 1 引数 `rcx` (`this`) = `[rip+disp]` の値、第 3 引数 `r8` = `[[rip+disp]]` (参照元 slot `0x15e30f8`・`.data`)、第 4 引数 `r9` = 呼び出し元の rcx。`0x15e30f8` は `this` の供給元ではない。
