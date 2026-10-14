@@ -12,7 +12,8 @@
 
 ## 2. 測定条件
 
-- 測定 commit: `1b37410c` (origin/main)。コードを変えたのは本 PR の `tools/icall/diff/chain_chunk_check.py` (route の入力ではない)。
+- 測定 commit: route・fa_cmp・sweep は `1b37410c` (測定時点の origin/main。fix 時点の origin/main は `a4c5ea16`)。
+- `chain_chunk_check.py` は本 PR の `fdf6576c` で追加され、以後変更していない。ネガティブコントロール `chain_chunk_negctl.py` の測定 commit は `f8b1ca46` (route の入力ではない)。
 - 素材: `work-icall` (`tools/icall/work/rt_freshair-core/`)・`toolchain-retdec`・`toolchain-emsdk` (展開先は `[EMSDK]`・`[RETDEC]`。`docs/REFERENCES.md` §4)。`FA_CORE=rw.dll` の代替 (`plugins-freshair` は不使用)。
 - 出力の基準 (本 run の実測):
 
@@ -22,6 +23,16 @@
 | `python3 tools/icall/diff/fa_cmp.py 180da4030 --n 8` | match 0 / mismatch 8 (native `0000000000000000`・wasm `c000c5300342457c` ほか) | 0.16 s | REPORT 前版と一致 |
 | `bash tools/icall/diff/fa_sweep.sh 8 60` | **bit 一致 55 / crash・timeout 65 / wasm のみ err 9 / 値の不一致 2** (計 131) | 73.7 s | 前版 REPORT の基準 54/66/9/2 と 1 件違う (§6) |
 | `python3 tools/icall/diff/chain_chunk_check.py` | closure 131 中、pdata 終端 E に chained 断片がある関数 12 件 | — | §4 の表 |
+| `python3 tools/icall/diff/chain_chunk_negctl.py` | none 12 / empty 0 / drop1 11 (`0x180da4030` が消える) | — | 検査の入力 `pdata_chained` を壊すと件数が変わる (ネガティブコントロール・§2.1) |
+
+### 2.1 測定の鮮度 (`docs/WORKFLOW.md` §6)
+
+```sh
+git diff 1b37410c HEAD --stat -- tools/icall/fa_route_build.sh tools/icall/icall_rewrite.py tools/icall/audit_icall.py tools/icall/diff/fa_cmp.py tools/icall/diff/fa_sweep.sh tools/icall/ir_icall_restore.py tools/icall/frame_slot_restore.py tools/m2 tools/m5 tools/m11 tools/ott
+git diff fdf6576c HEAD --stat -- tools/icall/diff/chain_chunk_check.py
+```
+
+- 上の出力は 0 行 (route 入力・`chain_chunk_check.py` は測定 commit から変わっていない)。PR の差分は 4 ファイル (`docs/DOC_MAP.md`・`REPORT_APPENDIX_2708.md`・`chain_chunk_check.py`・`chain_chunk_negctl.py`)。
 
 ## 3. 原因の機構 (受入 4)
 
@@ -40,6 +51,14 @@
 
 E 直前の命令の内訳 (before dsm): 11 件中 9 件は不成立の `je`/`jle` (not-taken 経路で E へ落ちる)、1 件は `sub rsp, 0x20`、1 件 (`0x180da4030`) は `xor eax, eax`。いずれも直進 (fall-through) で E へ入る。E へのジャンプは 12 件すべて 0 件。
 
+### 3.1 DEFECTS.md の行案 (`docs/WORKFLOW.md` §5。直接編集はしない・番号は PM 採番)
+
+既存の D1a〜D23 と突き合わせ、既存行に同じ類型は無いことを確認した (新規)。列は `docs/DEFECTS.md` の表に合わせた。
+
+| ID | 層 | 新旧 | 症状 (silent) | 根本原因 | 観測 (証拠) | 検出信号 (機械的) | 修復 |
+|---|---|---|---|---|---|---|---|
+| D24 (案) | 前処理 (icall_rewrite) → fe | **新規** (D3・D1b とは別) | 親関数の末尾が hot/cold 断片 (UNW_FLAG_CHAININFO) へ fall-through するとき、断片が RetDec の入力範囲に入らず data 区分になる。`0x180da4030` は wasm が別の値を返す (fa_cmp 0/8)。他 3 件は wasm が例外 (`missing function`) | `icall_rewrite.py` 552〜568 行は chained 断片を `j*` の即値参照でしか複製せず、親末尾の fall-through で入る断片は複製されない。574〜575 行で複製されなかった断片を捨てる | `0x180da4030` (断片 `0x180da4081`–`0x180da419e`・fa_cmp 0/8)。修復対象の候補 4 件 (§4.1)。同形の `0x180ca1480` は A 定義から偽陰性 (§4.2)。詳細は本 §3 | `chain_chunk_check.py` の `chained_at_E` が 1 件以上の E について、before dsm 全体で E を即値に持つ `j*`・`call` が 0 件 (E は直進で入る) | 非断片関数の末尾 fall-through 先が断片の先頭なら、その断片も複製する (§5。子 #3198 で検証・未実装) |
+
 ## 4. A 型候補 11 件の判定 (受入 3)
 
 ### 4.1 判定の根拠 (fa_cmp は 1 関数ずつ別プロセス・`--n 8`)
@@ -54,18 +73,18 @@ E 直前の命令の内訳 (before dsm): 11 件中 9 件は不成立の `je`/`jl
 | `0x180829c20` | `0x180829c37` | `–0x180829caa` | `je` | match 8 / mismatch 0 | 症状なし。同上 |
 | `0x180c98240` | `0x180c98256` | `–0x180c982ca` | `je` | match 8 / mismatch 0 | 症状なし。同上 |
 | `0x180c99430` | `0x180c9946a` | `–0x180c99598` | `je` | match 8 / mismatch 0 | 症状なし。同上 |
-| `0x180829930` | `0x18082993a` | `–0x1808299a6` | `sub rsp,0x20` | native SIGSEGV (rip `0x180829958` = 断片内) | **判定保留** (断片が実行される入力で native が落ちる。ヒープ 0x400 B の初期化では前提を満たさない) |
+| `0x180829930` | `0x18082993a` | `–0x1808299a6` | `sub rsp,0x20` | native SIGSEGV (rip `0x180829958` = 断片内) | **判定保留** (断片が実行される入力で native が落ちる。ヒープ 0x400 B の初期化では前提を満たさないと推定) |
 | `0x180c97f20` | `0x180c97f3c` | `–0x180c98030` | `je` | native SIGSEGV (rip `0x180c97fba` = 断片内) | **判定保留** (同上) |
 | `0x180da6720` | `0x180da67cc` | `–0x180da6850` | `jle` | native SIGSEGV (rip `0x180da672d` = 親本体) | **判定保留** (断片に入る前に落ちる) |
 
 - 「修復対象の疑い」は、fa_cmp の失敗が wasm 側の例外として出る形 (8/8) で、欠落した実コードに到達している兆候と整合する。断片を補った後の再測定 (子 #3198) で確定する。
 - 8 点一致の 4 件は、この入力では断片の挙動が出ないだけ。偽陽性とは言えない (断片は pdata 登録の実コード)。
-- 3 件の判定保留は、native が断片内 (2 件) か親本体 (1 件) で SIGSEGV するため、fa_cmp の入力 (ヒープの 0x400 B) が関数の前提を満たしていない。入力を変える測定は本 PR の範囲外。
+- 3 件の判定保留は、native が断片内 (2 件) か親本体 (1 件) で SIGSEGV するため、fa_cmp の入力 (ヒープの 0x400 B) が関数の前提を満たしていないと**推定**する (根拠は SIGSEGV の rip の位置だけで、前提の中身は未検証)。入力を変える測定は本 PR の範囲外。
 
 ### 4.2 偽陽性の確認と、定義 A の除外 1 件
 
 - 断片判定 (`chain_chunk_check.py`) は byte の条件を使わず、pdata の登録だけで決まる。よって、非コードが候補に入るという data_code_count の欠点 (REPORT_APPENDIX_2696 §3.3) は受けない。12 件すべてが実コードである。
-- `0x180ca1480` (E = `0x180ca152d`、E 直前は `add rcx, 0xa8` の直進) は、断片が同じ形だが A 定義から外れていた。先頭 16 B が `48 89 5c 24 50 48 8d 54 24 20 e8 74 68 00 00 48` で、`00 00` の条件 (`call rel32` の上位 2 B) に当たった。`00 00` の条件は実コードを落とす (偽陰性)。この 1 件は同じ原因の候補として子 #3198 の検証に入れる (判定はしない)。
+- `0x180ca1480` (E = `0x180ca152d`、E 直前は `add rcx, 0xa8` の直進) は、断片が同じ形だが A 定義から外れていた。ここでいう A 定義の『先頭 16 B』は、断片の先頭 E から読んだ 16 B を指す。`0x180ca152d` から読んだ 16 B は `48 89 5c 24 50 48 8d 54 24 20 e8 74 68 00 00 48` で、`00 00` の条件 (`call rel32` の上位 2 B) に当たった。関数先頭 `0x180ca1480` から読んだ 16 B (`48 89 74 24 10 57 48 83 ec 40 49 8b f0 48 8b fa`) とは別物 (`audit_icall.Image.read` で確認)。`00 00` の条件は実コードを落とす (偽陰性)。この 1 件は同じ原因の候補として子 #3198 の検証に入れる (判定はしない)。
 
 ## 5. 修復の方針 (子 #3198 へ)
 
@@ -84,6 +103,7 @@ E 直前の命令の内訳 (before dsm): 11 件中 9 件は不成立の `je`/`jl
 tar --zstd -xf "$ARTIFACTS_DIR/work-icall.tar.zst" -C . tools/icall/work/rt_freshair-core/
 export FA_CORE="$PWD/tools/icall/work/rt_freshair-core/rw.dll"
 python3 tools/icall/diff/chain_chunk_check.py                     # 期待: closure 131 / chained_at_E 12 (A 11 + 0x180ca1480)
+python3 tools/icall/diff/chain_chunk_negctl.py                    # 期待: none 12 / empty 0 / drop1 11 (0x180da4030 が消える)
 bash tools/ott/native/build.sh                                    # fa_cmp に必要
 bash tools/icall/fa_route_build.sh                                 # base route (約 11 s)
 python3 tools/icall/diff/fa_cmp.py 180da4030 --n 8                # 期待: match 0 / mismatch 8
