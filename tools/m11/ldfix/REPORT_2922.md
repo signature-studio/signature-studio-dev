@@ -6,15 +6,15 @@
 
 ## 1. 測定
 
-- 測定 commit: `e272ee3c` (`origin/main` の `bf725b96` を取り込んだ merge。コードを変えた最後の commit)。直前の測定 commit は `be5f4697` (`e87eb52a` の取り込み)・`55ed65a2` (`3d37a190` の取り込み)。取り込み前の PR 測定は `ff010340` (基点 `71bf0957`)
-- main 取り込み: (1) `55ed65a2`: `origin/main` (`3d37a190`) を merge。競合は `docs/DOC_MAP.md` と `spill_classify_1161.py` の 2 箇所。(2) `be5f4697`: `origin/main` (`e87eb52a`) を merge。競合なし。(3) `e272ee3c`: `origin/main` (`bf725b96`・#2837 を含む) を merge。競合は `spill_classify_1161.py` の docstring 1 箇所で、2837 と 2922 の候補判定の両方を残した。`spill178_1161.tsv` は統合後の script で再生成し、merge の結果と一致。rebase はしていない
-- 素材: `work-m11` / `work-liftdiff` は repo 外に展開し、`M11_WORK` / `LD_WORK` で指定した (repo の `tools/**/work/` には置かない)。実行は `git archive` で repo 外に書き出した HEAD で行った
-- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground)。`e272ee3c` で rc=0・real 123s・load average 0.04 → 0.91・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)。`be5f4697` では rc=0・real 122s・load average 0.89 → 1.13・7/7 完了 (cmp OK)。`55ed65a2` では rc=0・real 159s・load average 0.10 → 1.10・7/7 完了
+- 測定 commit: `53a739d2` (`origin/main` の `940c0d6a` を取り込んだ merge。コードを変えた最後の commit。ldfix のコードは `e272ee3c` と同一)。直前の測定 commit は `e272ee3c` (`bf725b96` の取り込み)・`be5f4697` (`e87eb52a` の取り込み)・`55ed65a2` (`3d37a190` の取り込み)。取り込み前の PR 測定は `ff010340` (基点 `71bf0957`)
+- main 取り込み: (1) `55ed65a2`: `origin/main` (`3d37a190`) を merge。競合は `docs/DOC_MAP.md` と `spill_classify_1161.py` の 2 箇所。(2) `be5f4697`: `origin/main` (`e87eb52a`) を merge。競合なし。(3) `e272ee3c`: `origin/main` (`bf725b96`・#2837 を含む) を merge。競合は `spill_classify_1161.py` の docstring 1 箇所で、2837 と 2922 の候補判定の両方を残した。`spill178_1161.tsv` は統合後の script で再生成し、merge の結果と一致。(4) `53a739d2`: `origin/main` (`940c0d6a`) を merge。競合なし (auto-merge)。`spill178_1161.tsv` は統合後の script の出力と一致 (cmp OK)。rebase はしていない
+- 素材: `work-m11` / `work-liftdiff` は repo 外 (`$RUNNER_TEMP/ws2957_art`) に `tar -C` で展開し、`M11_WORK` / `LD_WORK` で指定した。tar の内部パスは `tools/m11/work/`・`tools/liftdiff/work/` (WORKFLOW §11 の既定) だが、AGENTS 禁止 4 により repo 内の `tools/**/work/` には置かない。実行は clean な worktree (`ws-2957`・HEAD `53a739d2`) で行った
+- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground)。`53a739d2` で rc=0・real 165s・load average 0.65 → 1.01・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)。`e272ee3c` で rc=0・real 123s・load average 0.04 → 0.91・7/7 完了 (cmp OK)。`be5f4697` では rc=0・real 122s・load average 0.89 → 1.13・7/7 完了 (cmp OK)。`55ed65a2` では rc=0・real 159s・load average 0.10 → 1.10・7/7 完了
 - 取り込み前の測定 (`ff010340`): rc=0・real 154s・load average 0.93・7/7 完了・cmp OK
-- 集計 (7/7、`e272ee3c`): spill 宛 unk site 178 / 71 関数。status 確定 139 (前 136) / 判定不能 29 (前 30) / 未判定 10 (前 12)。「前」は `origin/main` (`bf725b96`) の `spill_classify_1161.py` を同じ `ssa.json` に当てた実測 (main の `results/spill178_1161.tsv` と一致)
+- 集計 (7/7、`53a739d2`): spill 宛 unk site 178 / 71 関数。status 確定 139 (前 136) / 判定不能 29 (前 30) / 未判定 10 (前 12)。「前」は `origin/main` (`940c0d6a`) の `spill_classify_1161.py` を同じ `ssa.json` に当てた実測 (main の `results/spill178_1161.tsv` と一致)。`e272ee3c` 時点の集計と同じ値で、main 取り込みは集計を変えなかった
 - 脱落関数の和集合: spill 宛の確定 TRUE_DROP 関数 26 (前 25)。増分は `12cb680`。A ∪ B ∪ C = 69 + 8 = **77** (前 76 = 69 + 7)
-- 測定後の差分: `git diff e272ee3c HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)。HEAD の増分は REPORT の文言のみ
-- 差し戻し後の修正 (文書のみ): REPORT の文言と PR 本文だけを変えた。コードと results は変えていない
+- 測定後の差分: `git diff 53a739d2 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results tools/m11/lb_base.py` は出力なし (差分 0)。`53a739d2` の ldfix 差分は `e272ee3c` から 0 (同じ範囲)。HEAD の増分は REPORT の文言のみ
+- 差し戻し後の修正 (round 4・文書のみ): `origin/main` (`940c0d6a`) の merge と、REPORT の数値・文言 (§1・§3 表の列見出し・§4・§5) の修正。ldfix のコードと results は merge の前後で変えていない
 - 差し戻し後の e2e 再実行 (取り込み前の `bd643abf`): rc=0・real 157s・load average 0.48 → 0.96・7/7 完了・cmp 一致。集計は確定 123 / 判定不能 29 / 未判定 26 (取り込み前の値)
 
 ## 2. 判定結果 (12cb680 の 3 site)
@@ -36,7 +36,7 @@
   - `0x12ca330`: `0x12ca408` で `mov eax,[rbx+4]`。直前の `0x12ca406` の `je` を通らない条件付きの経路で読む
 - 呼び出し元と先の対応 (`m11_image.bin` を capstone で逆アセンブルし、`lea rcx,[rip+disp]` の解決先を確認。IMG_BASE `0x400000`):
 
-  | 呼び出し元 | `lea rcx` | `call 0x12cb680` | 先 (rcx) |
+  | 呼び出し元 | lea 命令の番地 (`lea rcx`) | call 命令の番地 (`call 0x12cb680`) | 先 (`lea rcx` の解決先) |
   |---|---|---|---|
   | `0x1003730` | `0x1003850` | `0x1003859` | `0x10036b0` |
   | `0x12a3ff0` | `0x12a4290` | `0x12a429a` | `0x12a3ec0` |
@@ -58,9 +58,10 @@
 ## 5. 再現
 
 ```
-tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst      # repo 直下で展開
-tar --zstd -xf $ARTIFACTS_DIR/work-liftdiff.tar.zst
-bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh
+mkdir -p "$RUNNER_TEMP/ws2957_art"                  # repo 外に展開 (tar の内部パスは tools/m11/work/・tools/liftdiff/work/)
+tar --zstd -xf $ARTIFACTS_DIR/work-m11.tar.zst -C "$RUNNER_TEMP/ws2957_art"
+tar --zstd -xf $ARTIFACTS_DIR/work-liftdiff.tar.zst -C "$RUNNER_TEMP/ws2957_art"
+M11_WORK="$RUNNER_TEMP/ws2957_art/tools/m11/work" LD_WORK="$RUNNER_TEMP/ws2957_art/tools/liftdiff/work" bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh
 ```
 
-素材不要の確認: `python3 tools/m11/ldfix/spill_classify_1161.py <ssa.json> tools/m11/ldfix/results/spill178_1161.tsv` の後、`cmp` で `results/` と一致を確認する。
+既存の `ssa.json` がある場合 (`ssa.json` は work-m11 から `audit_lsf_ssa.py` が作る): `python3 tools/m11/ldfix/spill_classify_1161.py <ssa.json> <出力 TSV>` の後、`cmp` で `results/spill178_1161.tsv` と一致を確認する。

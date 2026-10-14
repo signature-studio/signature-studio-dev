@@ -278,7 +278,7 @@
 | `tools/m11/ldfix/REPORT_2396.md` | ~120 | LD-111 (#2396): `audit_lsf_disp.py` の変位形を `audit_lsf.py` に統合 (既存 3 判定は byte 不変、SUSPECT_DISP_VAS を並べて出力)。残 SUSPECT 3 件 (6677a0・d237e0・de1da0) を機械語 `movs` の列挙漏れ (誤検出) と確定し、列挙を拡張して 4 → 1 件 (41a670 のみ、修復後 0)。独立算法 `triage_ld111.py` の突合と NC 5 本 |
 | `tools/m11/ldfix/REPORT_2438.md` | ~106 | LD-114 (#2438): #2264 §8.3 から移管された spill 宛 未判定 12 site の消費者分類 (OK_LOAD 5・UNDETERMINED 7)。入口の memory 読みの `xor i64 0, 0` (新類型候補・3009 関数) を記録 |
 | `tools/m11/ldfix/REPORT_2921.md` | ~77 | LD-138 (#2921): `ddf630` の spill 宛 未判定 4 site (ddf6b5・ddf6c6・ddff5a・de0bfe) を機械語と IR の段数で TRUE_DROP と分類。判定根拠は `results/candidate_verdicts_2921.jsonl`、再現は `ld138_ddf630_dis.py` |
-| `tools/m11/ldfix/REPORT_2922.md` | ~65 | LD-139 (#2922): #2838 の残り 12cb680 の 3 site (12cb8e1 判定不能 → 再分類・12cba4d・12cbab4 未判定) を TRUE_DROP に分類 (消費者 = 間接 call 先のコールバックの読み、IR 脱落)。脱落関数の和集合 75。動的 callback 経路と書き戻しは未解決 (PM) |
+| `tools/m11/ldfix/REPORT_2922.md` | ~65 | LD-139 (#2922): #2838 の残り 12cb680 の 3 site (12cb8e1 判定不能 → 再分類・12cba4d・12cbab4 未判定) を TRUE_DROP に分類 (消費者 = 間接 call 先のコールバックの読み、IR 脱落)。脱落関数の和集合は REPORT §1 の実測値。動的 callback 経路と書き戻しは未解決 (PM) |
 | `tools/m11/ldfix/REPORT_2838.md` | ~50 | LD-135 (#2838): #2245 の群 B 残りのうち 466af0 の 3 site (2 段参照の 1 段脱落) を TRUE_DROP に分類。残り 9 site は #2921・#2922・#2923 (LD-138〜140) に起票 (範囲縮小) |
 | `tools/m11/ldfix/REPORT_2245.md` | ~70 | LD-93 (#2245): #2227 の群 B (32 site) の部分達成。10 site を分類 (6bb3f0 4・1046a30 4 を TRUE_DROP、1046a30 1047556・12cb680 12cb8e1 を UNDETERMINED)。残りは #2837・#2838 へ移管。脱落関数の和集合 73 |
 | `tools/m11/ldfix/REPORT_2837.md` | ~72 | LD-134 (#2837): 10c7cd0 の未判定 12 site を分類。8 site を TRUE_DROP (2 段参照の V 側 deref 脱落。count を K-8 から読む)、4 site を OK_LOAD。脱落関数の和集合 76。e2e 7/7 は測定 commit 9b7ddcc7 で実測 (§1) |
