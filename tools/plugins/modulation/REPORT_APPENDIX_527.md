@@ -60,7 +60,7 @@
 
 ## K. 殻の engine 名参照と呼出経路 (受入 5 の続き、`engine_shell_entry.py`)
 
-測定 commit: `c5627440` (コード差分の最終 commit)。`git diff c5627440 HEAD -- tools/plugins/modulation/` の出力: 空 (差分 0)。
+測定 commit: `c5627440` (コード差分の最終 commit)。`git diff c5627440 HEAD -- tools/plugins/modulation/ ':(exclude)*.md'` の出力: 空 (コード・データの差分 0)。`*.md` を含めた差分は本付録の文書修正 (76a434aa 以降) のみ。
 用語: 「thunk」= KERNEL32 の import thunk (`jmp [rip+…]`)、「ラッパー」= thunk を呼ぶ関数 (§J と統一)。
 
 測定: `python3 modulation/engine_shell_entry.py <block_PE.bin>` (fl-win64 extracted の殻 4 本、静的のみ)。
