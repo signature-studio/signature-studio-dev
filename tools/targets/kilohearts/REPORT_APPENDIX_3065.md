@@ -5,36 +5,41 @@
 ## 0. 結論
 
 - 対照 Gain の before 160 関数 closure (`gain_before_160.tsv`・root 27) を flelift `x64c` で lift すると、**unsup 48 種 / 285 箇所** が残っていた (origin/main `718e90fb`)。
-- 測定 commit `ac58a874` で **0 種 / 0 箇所** に減った。関数数 158・命令数 9,513 は before / after で同じ。
-- 差し戻し後の修正で `i_rcr` を実機の rcr に合わせた (§4)。実機 rcr との照合 4000/4000 一致、差分テスト 35/35 PASS (HEAD `236a63c9`)。
-- **修正後の HEAD で closure を再測定していない** (`plugins-kilohearts` 素材が本 run に無い)。after の 0 は `ac58a874` の値。§4 の理由で rcr の unsup 件数は変わらない見込みだが、実測は未実施 (§4 未解決)。
+- 測定 commit `33cb62fe` で **0 種 / 0 箇所** に減った。関数数 158・命令数 9,513 は before / after で同じ。修正後の HEAD で再測定した値である (§2)。
+- 差し戻し後の修正で `i_rcr` を実機の rcr に合わせた (§4)。実機 rcr との照合は 4004/4004 一致 (64bit レジスタ全体を比較)、差分テストは 35/35 PASS。
 
 ## 1. 測定条件
 
-- 測定 commit: `ac58a874` (コードを変えた最後の測定)。before は origin/main `718e90fb` の `tools/flelift/x64c.py` を `X64C=` で指定して同じスクリプトを実行。
-- 素材: `plugins-kilohearts` の `Kilohearts Offline Installer.zip` を repo 外に展開 → `payload.dat` → `windows.zip/*` → `HeartCore.core_64` (76,642,304 B)。REPORT_KH19 §9 と同じ手順 (mac 側は不要)。
+- 測定 commit: `33cb62fe` (コードを変えた最後の commit。rcr の docstring と実機照合の修正)。以降の commit は本 REPORT と PR 本文だけ。
+- 環境: AMD EPYC 7763 (4 vCPU)、gcc 13.3.0、各 1 回。
+- 素材: `plugins-kilohearts.tar.zst` の先頭メンバー `Kilohearts Offline Installer.zip` を `tar --zstd --occurrence=1 -xf` で取り出し → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` (76,642,304 B)。作業は repo 外の一時 dir (`$RUNNER_TEMP`)。REPORT_KH19 §9 と同じ手順で、mac 側は不要。
 - 入力: `gain_before_160.tsv` の 160 行 (roots 27)。`func_rva` を calltgt、`root_class` が空でない行を roots とする。lift 対象は thunk (`jmp [IAT]`) の 2 行を除く 158 関数。
-- 実行: `X64C=<lifter> bash scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>`。4 vCPU、各 1 回、各 13.8 s。`--closure 0` (直接 call の閉包は 0 件)。
-- 測定 commit から HEAD (`236a63c9`) までの差分 (測定入力のパス): `git diff ac58a874 HEAD --stat -- tools/flelift tools/targets/kilohearts/scripts/lift_closure_x64c.sh tools/targets/kilohearts/gain_before_160.tsv`
+- 実行: `X64C=<lifter> bash scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>`。`--closure 0` (直接 call の閉包は 0 件)。after は 14.1 s、before は 14.0 s。
+- before: origin/main の `tools/flelift/x64c.py` を `X64C=` で指定して同じスクリプトを実行。origin/main の x64c.py は `718e90fb` から変わっていない (`git diff --stat 718e90fb origin/main -- tools/flelift/x64c.py tools/flelift/rt` は 0 行)。
+- 測定 commit から本 REPORT を含む HEAD までの差分 (測定入力のパス):
 
 ```
- tools/flelift/tests/rcr_native_check.py | 86 +++++++++++++++++++++++++++++++++
- tools/flelift/tests/x64c_vex_diff.py    | 85 +++++++++++++++++++++++++-------
+$ git diff --stat ac58a874 33cb62fe -- tools/flelift tools/targets/kilohearts/scripts/lift_closure_x64c.sh tools/targets/kilohearts/gain_before_160.tsv
+ tools/flelift/tests/rcr_native_check.py | 92 +++++++++++++++++++++++++++++++++
+ tools/flelift/tests/x64c_vex_diff.py    | 85 ++++++++++++++++++++++++------
  tools/flelift/x64c.py                   | 15 ++++--
- 3 files changed, 164 insertions(+), 22 deletions(-)
+ 3 files changed, 170 insertions(+), 22 deletions(-)
+
+$ git diff --stat 33cb62fe HEAD -- tools/flelift tools/targets/kilohearts/scripts/lift_closure_x64c.sh tools/targets/kilohearts/gain_before_160.tsv
+(出力 0 行)
 ```
 
-差分の中身は `x64c.py` の `i_rcr` (§4) と差分テスト・実機照合。lift の入力 (`gain_before_160.tsv`・`lift_closure_x64c.sh`) は不変。
+`ac58a874` (修正前の `i_rcr` で測った旧 after) は、測定入力の差分 (上段) が示すとおり `i_rcr` の修正を含まない。旧 after も 0 / 0 だった。
 
 ## 2. before / after 実測
 
 | 版 | unsup 種 | unsup 箇所 | 関数 | 命令 |
 |---|--:|--:|--:|--:|
-| before (origin/main `718e90fb`) | 48 | 285 | 158 | 9,513 |
-| after (`ac58a874`・修正前の `i_rcr`) | 0 | 0 | 158 | 9,513 |
+| before (origin/main `718e90fb`・同一の x64c.py は `213a310f` にも) | 48 | 285 | 158 | 9,513 |
+| after (`33cb62fe`・修正後の x64c.py) | 0 | 0 | 158 | 9,513 |
 
-- `int 0x29` の 3 箇所 (fail-fast) は件数の外 (§3)。after の表の 0 はこの 3 箇所を含まない。
-- 修正後 HEAD (`236a63c9`) の再測定は未実施 (§4)。
+- `int 0x29` の 3 箇所 (fail-fast) は件数の外 (§3)。after の表の 0 はこの 3 箇所を含まない。生成 C には `int 0x29 (fail-fast)` が 3 件出ている。
+- after の生成 C `fle_lifted.c` (1,107,081 B) は `gcc -std=gnu11 -c -I tools/flelift/rt` で rc 0 (`33cb62fe`)。
 
 before の内訳 (箇所数の多い順・種名 件数):
 
@@ -54,24 +59,23 @@ vmovsd 32 · vmovntdq 30 · vmovd 29 · vmulsd 25 · vaddsd 23 · vmovq 17 · vf
 
 ## 4. 検証 (実施・未実施)
 
-### 実施
+### 実施 (測定 commit `33cb62fe`)
 
-1. `python3 -m py_compile` ✓。生成 C (`fle_lifted.c`・約 1.1 MB) を `gcc -std=gnu11 -c` (`-I tools/flelift/rt`) で ✓ (`ac58a874` 時点、rc 0)。HEAD (`236a63c9`) では差分テストの生成 C (35 ケース) を `-Wshift-count-overflow` 付きでコンパイルし、shift 系の警告は 0 件 (残りは生成器の既存の `unused-label` 等)。
-2. 差分テスト `tools/flelift/tests/x64c_vex_diff.py` **35/35 PASS** (HEAD `236a63c9`)。GNU as で機械語にし、x64c の FnLift で C に落として runtime と共に実行し、参照値と全 X/YL/R/フラグを比較。初期フラグは乱数 (従来は全 0 で「保存」と「0 に設定」を区別できなかった)。
-   - 直接検証した mnemonic は 48 種のうち 16 種: vaddsd・vmulpd・vfmadd213sd・vfnmadd231sd・vfmsub213sd・vpsrlq・vpshufd・vmovq・vmovd・vinsertf128 (k=1 のみ)・rcr・movsldup・cmpleps・vucomisd・vmovsd・vsubsd。
+1. 生成 C (`fle_lifted.c`) を `gcc -std=gnu11 -c` で rc 0 (§2)。
+2. 差分テスト `tools/flelift/tests/x64c_vex_diff.py` **35/35 PASS**。GNU as で機械語にし、x64c の FnLift で C に落として runtime と共に実行し、参照値と全 X/YL/R/フラグを比較。初期フラグは乱数 (従来は全 0 で「保存」と「0 に設定」を区別できなかった)。
+   - 直接検証した mnemonic は 48 種のうち 16 種: vaddsd・vmulpd・vfmadd213sd・vfnmadd231sd・vfmsub213sd・vpsrlq・vpshufd・vmovq・vmovd・vinsertf128 (k=1 のみ)・rcr・movsldup・cmpleps・vucomisd・vmovsd・vsubsd。rcr は 19 ケース (count 1/32/33/0/cl/5 と 8・16bit の MOD 9・17 と 64bit の 63/64/65 を含む)。
    - 残り 32 種 (`int 0x29` を含む) は生成 C の目視のみ (#850)。`vinsertf128` は k=1 のみ検証、k=0 と `vmovntdq` は未検証。
-3. **rcr の規則は実機で確定** (`tools/flelift/tests/rcr_native_check.py`、x86-64 + gcc):
-   - 手順: インライン asm で `pushfq`/`popfq` により入力フラグを与え、`rcr` の結果と出力フラグ (CF/OF/ZF/SF/PF) を取る。乱数 4000 件 (w = 8/16/32/64、count 0〜255、フラグ乱数) を参照式 `rcr_ref` と照合。
-   - 結果: **4000/4000 一致**。
-   - 実機で確かめた規則: (a) count & マスク (8/16/32bit は 0x1F、64bit は 0x3F) が 0 なら flags 不変。(b) 8bit は回転量を MOD 9、16bit は MOD 17 で決める。マスク後が 9・17 の倍数 (回転 0) でも OF は更新され、CF は不変。(c) OF = MSB(結果) ^ MSB-1(結果)。count>1 でも同式 (scratch 検証で各 6000 件 × 2 回、count 0〜255、4 幅で全件一致)。(d) 32bit の書き込みは count 0 でも上位をゼロ拡張 (`rcr edx, cl` で cl=0 のとき rdx = 1)。(e) ZF/SF/PF は変えない。
+3. **rcr の規則は実機で確定** (`tools/flelift/tests/rcr_native_check.py`、x86-64 (AMD EPYC 7763)・gcc 13.3.0):
+   - 手順: インライン asm で `pushfq`/`popfq` により入力フラグを与え、`rcr` の結果と出力フラグ (CF/OF/ZF/SF/PF) を取る。レジスタは 64bit 乱数 (上位も入れる)、乱数 4000 件 (w = 8/16/32/64、count 0〜255、フラグ乱数) と、32bit の count 0/32/64/96 の 4 件を `rcr_ref` と照合。結果は **64bit レジスタ全体** で比較する (上位 32bit のゼロ拡張を含む)。
+   - 結果: **4004/4004 一致**。
+   - 実機で確かめた規則: (a) count & マスク (8/16/32bit は 0x1F、64bit は 0x3F) が 0 なら flags も結果も不変。32bit の書き込みは上位をゼロ拡張する。(b) 8bit は回転量を MOD 9、16bit は MOD 17 で決める。マスク後が 9・17 の倍数 (回転 0) でも OF は更新され、CF は不変。(c) OF = MSB(結果) ^ MSB-1(結果)。count>1 でも同式で、4004 件 (count 0〜255、OF を含む) が全件一致した。SDM は多ビット回転の OF を未定義としているため、これはこの CPU での観測値である。(d) 32bit の書き込みは count 0 でも上位 32bit をゼロ拡張する (`rcr edx, cl` で cl=0 のとき rdx の上位は 0)。差分テストの `rcr edx, 0` はこの規則を参照値に入れている。(e) ZF/SF/PF は変えない。
    - SDM 原文は本 run から取得できなかった (felixcloutier.com が 404)。上の規則は実機測定を根拠とする。
-4. 旧 `i_rcr` の検出力: 旧式で差分テストを流すと rcr 19 件がすべて FAIL (非 rcr 16 件は PASS)。旧式は 64bit の `(uint64_t)fCF << 64` を含み、`rcr rax, 1` の CF が誤った (gcc `-Wshift-count-overflow`)。修正後はこの警告が出ない。
+4. 旧 `i_rcr` の検出力 (前 round で確認): 旧式で差分テストを流すと rcr 19 件がすべて FAIL (非 rcr 16 件は PASS)。旧式は 64bit の `(uint64_t)fCF << 64` を含み、`rcr rax, 1` の CF が誤った (gcc `-Wshift-count-overflow`)。修正後はこの警告が出ない。
 
-### 未実施 / 未解決
+### 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 修正後 HEAD (`236a63c9`) での closure 再測定 (unsup 285 → 0 の再実行・`fle_lifted.c` の再生成と `gcc -c`) は未実施。`plugins-kilohearts` 素材が本 run の `$ARTIFACTS_DIR` に無く (fl-win64 のみ)、`HeartCore.core_64` を得られなかった。rcr の Unsup 経路 (`rd`/`wr` の型判定) は変えていないので件数の変化は見込まないが、実測はしていない | after 0 は `ac58a874` の値 | 次 run で `oc_artifacts: fl-win64 plugins-kilohearts` を付けて再測定 (#850) |
 | Gain closure の native 実行との bit 一致 (e2e) は未実施。差分テストの 16 種以外 (32 種) は生成 C の目視のみ。`vinsertf128` は k=1 のみ、k=0 と `vmovntdq` は未検証 | 被覆した handler の意味は 16 種でのみ確定 | #850 (親) |
 | FLEngine 起動の e2e (`tools/flelift/fle_e2e.sh`・boot) 未実施。製品 KPI (dispatch 数・通過 unit 数・最初のウィンドウ) は **動かしていない** | 製品 KPI の前後値が無い | #850 (親) |
 | vtable 規則の closure (nogui 555 関数 / all 1,995 関数) の unsup 未測定。`vtable_closure.py` は関数一覧を出さず件数のみ | 対照 closure の残りの unsup は不明 | #850 (親) |
@@ -80,9 +84,9 @@ vmovsd 32 · vmovntdq 30 · vmovd 29 · vmulsd 25 · vaddsd 23 · vmovq 17 · vf
 ## 5. 再現
 
 ```sh
-# 素材を展開し HeartCore.core_64 を得る (REPORT_KH19.md §9)
+# 素材を展開し HeartCore.core_64 を得る (REPORT_KH19.md §9。tar --zstd --occurrence=1 で先頭の zip だけ取り出す)
 X64C=<origin/main の x64c.py> bash tools/targets/kilohearts/scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>   # before: 285 site
-bash tools/targets/kilohearts/scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>                               # after: 0 site (修正後 HEAD は未測定)
+bash tools/targets/kilohearts/scripts/lift_closure_x64c.sh <HeartCore.core_64> <out>                               # after: 0 site (33cb62fe)
 python3 tools/flelift/tests/x64c_vex_diff.py                                                                       # 35/35
-python3 tools/flelift/tests/rcr_native_check.py                                                                    # rcr vs 実機 4000/4000 (x86-64)
+python3 tools/flelift/tests/rcr_native_check.py                                                                    # rcr vs 実機 4004/4004 (x86-64)
 ```
