@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # SR-47 (#2414): 参照の content dir = installer 全展開 (Tables・Presets 等あり) を作る。素材 plugins-serum2 から展開する。
 # usage: bash ref_content.sh [installer.exe]
-#   installer 既定: work/dl/Install_Xfer_Serum2_2.1.5.exe。無ければ $ARTIFACTS_DIR (既定 $HOME/artifacts) の
-#   plugins-serum2.tar.zst から取り出す。
+#   installer 既定: work/dl/Install_Xfer_Serum2_2.1.5.exe。無ければ $ARTIFACTS_DIR の plugins-serum2.tar.zst から取り出す。
 # 出力 (work/ は gitignore): content_full/ (7z x の全展開。Tables あり) と Serum2_win64.vst3 (DLL・無改変 sha256 501e7bb3…5283)。
 # 既に展開済みなら作り直さない。
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SERUM_DIR="$(cd "$HERE/.." && pwd)"
 W="$SERUM_DIR/work"
-ART="${ARTIFACTS_DIR:-$HOME/artifacts}"
+ART="${ARTIFACTS_DIR:-}"
 EXE="${1:-$W/dl/Install_Xfer_Serum2_2.1.5.exe}"
 mkdir -p "$W/dl"
 if [ ! -f "$EXE" ]; then
