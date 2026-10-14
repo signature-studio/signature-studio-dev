@@ -47,6 +47,21 @@
 | IR の宣言 (`boot_final3.ll`) | `SHBrowseForFolderA/W` の宣言 **0**。`SHGetPathFromIDList` / `SHGetSpecialFolderPath` / `SHILCreateFromPath` / `SHCreateItemFromParsingName` / `GetOpenFileNameW` も **0**。`CoCreateInstance` は宣言 1 件・呼出 2 件 (`function_4690c0` 経由。呼出元は `function_c53c60` と `m11_tr_function_4690c0`)。 |
 | trace で実際に呼ばれた API (run.json) | 26 種。GetCommandLineW・GetLocaleInfoW・GetProcAddress・LoadStringW・GetModuleFileNameW 等。file API と SHBrowseForFolder / IFileDialog 系は 0。 |
 
+## 6. 静的 call 箇所の再確認 (run 2026-10-14、コード差分 0)
+
+検証起点: `origin/main` `3d21715b` (worktree `ws-1179`)。素材 `fl-win64` を `$RUNNER_TEMP/fl1179` に展開 (25,166 ファイル)。PE の IAT と `.text` の `call` / `jmp` を Python で直接走査した (IR を使わない独立確認)。
+
+| 対象 PE | import 解決 | 静的 call 箇所 |
+|---|---|---|
+| `block00005_PE.bin` (FL 本体 EXE, PE32) | `SHBrowseForFolderA` = IAT `0x407154`、`CoCreateInstance` = IAT `0x407284` | `call [0x407154]` が `0x40432a` (SHBrowseForFolderA)、`call [0x407284]` が `0x402073` (CoCreateInstance)。いずれも 32bit 絶対 `FF 15 disp32` |
+| `block00031_PE.bin` (FLEngine_x64.dll, PE32+) | `SHBrowseForFolder*` は**無し**。`GetOpenFileNameW` / `GetSaveFileNameW` / `CoCreateInstance` / `ShellExecute*` / `SHGetPathFromIDListW` 等は有り | RIP 相対 `FF 25` (jmp thunk) が 9 箇所 (`0x4690c0` CoCreateInstance、`0x5937e0` GetOpenFileNameW、`0x5937f0` GetSaveFileNameW ほか) |
+
+判定:
+- **フォルダ選択 (`SHBrowseForFolder*`) の静的 call は FL 本体 EXE の `0x40432a` 1 箇所**。その関数は IR の定義範囲 (`function_` は `0x406e60` 以降のみ) より前にあり、**lift closure の外**。IR に宣言が無いのはこのため。
+- FLEngine 側の IR に `GetOpenFileNameW` 等の宣言が無いのは、`jmp` thunk 経由の呼出が lift で解決されていないことを示す (`REPORT_N1050.md` / `REPORT.md` §1 の間接 call 脱落と同根)。
+- 呼出の**実行時の有無**は依然として未確定。closure 外の関数で、unit 17 の trap (#1050) より後に到達するため、実 boot の trace では判定できない。
+- 受入条件 1 は**未達のまま**。方針決定 (受入条件 2) と gui mock 検査 (受入条件 3) も未着手。
+
 ### 5-1. 判定
 
 - **実 boot ではフォルダ選択は呼ばれていない**。ただし、呼ばれていないと言えるのは unit 17 で `memory access out of bounds` により止まるまでの範囲に限る。
