@@ -23,7 +23,7 @@
 ## 2. 呼出し経路 (PE 実測)
 
 **getStepParam (0xd5ba00)**
-1. 引数解析に失敗したら 0 を返す経路 (例外)。
+1. 引数解析に失敗すると `0xd5baf4` から `0xd82c20` へ進み、PyArg の例外に従って戻る (`0xd82c20` の status 0 の分岐は未読)。
 2. `padsStride == 0` → status -3 (`Range error`、FL code 4)。(0xd5ba66〜0xd5ba71)
 3. `q = step / padsStride` (idiv・切り捨て)、`idx = q + offset`。`idx` が `[0, 件数-1]` の外なら status -4 (`Index out of range`)。件数は `[[0x15e0128]+0x10]`。(0xd5ba7b〜0xd5baae)
 4. `chanId = [list[idx] + 0x794]`。
