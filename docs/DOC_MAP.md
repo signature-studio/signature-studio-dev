@@ -407,6 +407,7 @@
 | `tools/python/REPORT_PY113.md` | ~100 | PY-113 (#2943): playlist.setTrackColor の格納式を VA 付きで確定 (R/B 入替え + `0xffffff` で `+0x2c` へ)。getTrackColor との食い違いの原因 (C 側の素通し格納) と修正。テスト期待値は子 #2949 (PY-114)、mixer 側は子 #2951 (PY-115) |
 | `tools/python/REPORT_PY91.md` | 181 | PY-91 (#2809): playlist 操作系 inc 4 件の更新式・getLive 系の状態 helper・書式 5 件を VA 付きで確定。trigger・zone のコア本体、時間変換、solo/select の副作用、例外型は子 #2906・#2908・#2909 |
 | `tools/python/REPORT_PY124.md` | 88 | PY-124 (#2999): general.saveUndo の書式 `si\|i`・kwlist・既定値 updateHistory=1・戻り値 None・準備不可 -2 (文言付き例外か None かは未確定の報告判定に依存)・核の job 配置を VA 付きで確定。履歴 record の本体 (`0x101b780`・`0x1016ca0`) は子 `[PY-137]` (#3026) へ |
+| `tools/python/REPORT_PY30.md` | 132 | PY-30 (#1327): flcpt.cpt の CPT 4 メンバ (addChordMarker・getChordMarker・clearChordMarkers・chordMarkerCount) の引数書式・int 戻り値・要素返却を FLEngine PE の表とハンドラから確定し `src/flcpt.py` に実装。None 戻り値は推定 (#3034)。probe の呼べた数は 3/9 のまま (残りは子 #3174〜#3176) |
 | `tools/python/REPORT_PY115.md` | ~100 | PY-115 (#2951): mixer.setTrackColor の格納先 (track 要素 +0 フラグ・+4 値、`swap_rb(v)|0xff000000`) と mixer.getTrackColor の取得式を VA 付きで確定し、C/mock を合わせる。フラグ無し track の既定色は実行時値で未確定 (子 #2975 PY-118) |
 | `tools/python/REPORT_PY109.md` | ~100 | PY-109 (#2919): 静的版 subinterp の 12 check を headless Chrome で実行 (wasm32 は 12/12 PASS・node 版と一致、MEMORY64=1 は 11/12)。失敗 1 件 (反復で線形メモリが増える) は #2918 へ |
 | `tools/python/REPORT_PY58.md` | ~57 | PY-58 (#1973, 部分・未達): `+0x794` 書込み候補 16 件の分類 (chan ではないと判断 11・保留・未確定 4)。chan 上の書込み元は未特定 |
