@@ -80,6 +80,7 @@ echo "[ir_conditions post・build 後] $(tr -d '\n ' < "$OUT/post.cond_built.jso
 step "4/6 41a670 の動的確認 (dyn_ld108.mjs。通常 build の wasm)"
 node "$HERE/dyn_ld108.mjs" "$OUT/pre/m11_boot.cjs" "$OUT/post/m11_boot.cjs" "$W/m11_image.bin" | tee "$OUT/dyn.txt"
 grep -q 'DYN_SUMMARY after_fail=0/1' "$OUT/dyn.txt"; chk "修復後 wasm の head が期待値と一致" $?
+grep -q 'before=0x3333 (FAIL)' "$OUT/dyn.txt"; chk "修復前 wasm の head は 0x3333 で FAIL (修復の効果が検出できる)" $?
 
 step "5/6 survey 942 unit (修復前 / 修復後)"
 cp "$OUT/pre/m11_boot.cjs" "$W/m11_boot.cjs"; cp "$OUT/pre/m11_boot.cjs.wasm" "$W/m11_boot.cjs.wasm"

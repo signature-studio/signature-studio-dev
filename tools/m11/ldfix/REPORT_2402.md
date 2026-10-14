@@ -2,7 +2,7 @@
 
 親: #2316 (LD-108、PR #2397)。既知類型との関係: DEFECTS D20 (`docs/DEFECTS.md`)。
 
-**判定: 達成 (issue の範囲を縮めた)**。配線・ir_conditions / IR diff・通常 build の wasm での実測・survey 突合・`%arg1` assert・DEFECTS 更新は達成。受入条件 4 の ok 絶対値は 869 と 870 の差の原因を特定した。**136 は本 run で再現せず、原因は未特定**のため、「136 の原因特定」は issue の受入条件から外した (§5・§8)。
+**判定: 達成 (issue の範囲を縮めた)**。配線・ir_conditions / IR diff・通常 build の wasm での実測・survey 突合・`%arg1` assert・DEFECTS 更新は達成。受入条件 4 の ok 絶対値は、869 と 870 の差を IR の出所 (同梱 IR と再生成 IR の差) まで特定した。**ただし 5872 行のどの変更が差を生むかは未特定で、136 は本 run で再現せず原因は未特定**。「136 の原因特定」と「869/870 差の変更の特定」は issue の受入条件から外した (§5・§8)。
 
 測定 commit: `28d10d58` (origin/main `5c7bc303` を取り込んだ merge commit。コードを変えた最後の commit)。以後の commit は本 REPORT だけで、`git diff 28d10d58 HEAD -- tools/m11 ':(exclude)tools/m11/ldfix/REPORT_2402.md'` の出力は 0 行 (§7)。取り込み前の `16447b9b` でも同じ値だった (§7)。
 
@@ -13,13 +13,13 @@
 | `fix_ld108.py` を `m11_gen_ir2.sh` の ldfix 直後 (`--bind` の前) に常設。想定と違う IR は fail-closed | **達成** (§2) |
 | `ir_conditions.json` の記録 (ldfix・qstore・PE) と `ir_sha256` が `m11_cond.py --check` で一致。組込み前後で変わるのは 41a670 の 1 関数だけ (`diff`) | **達成** (§3) |
 | 通常の `m11_build.sh` で作った wasm を `dyn_ld108.mjs` で直接呼び、head が修復後の期待値と一致 | **達成** (§4)。修復前 0x3333 FAIL → 修復後 0x2222 PASS |
-| survey 942 unit の組込み前後の突合で ok 退行 0。ok 絶対値の差 (869 / 870) の原因を特定 | **達成**。退行 0 (§4)。869 と 870 の差は IR の出所 (§5)。136 型の原因特定は再現せず未特定のため範囲から外した (§8) |
+| survey 942 unit の組込み前後の突合で ok 退行 0。ok 絶対値の差 (869 / 870) の原因を特定 | **一部達成**。退行 0 (§4)。869 と 870 の差は IR の出所 (同梱 IR と再生成 IR の差) まで特定 (§5)。どの変更が差を生むかは未特定 (§8)。136 型は再現せず原因未特定のため範囲から外した (§8) |
 | `%arg1` が `function_41a670` の第 1 仮引数 (型 `i64`) と一致することの assert | **達成** (§2・NC1) |
 | `docs/DEFECTS.md` D20 の「修復」欄を本番配線済みの記述へ | **達成** (結論 1 行 + リンク。測定値は書かない) |
 
 ## 2. 配線
 
-- `m11_gen_ir2.sh`: ldfix の直後 (`ldfix=applied` の枝の中、`m11_cond.py --bind` の前) で `ldfix/fix_ld108.py` を適用し、`ld108=applied` を記録する。`set -e` の下なので、assert で止まれば IR は作られない。`--reset` に `ld108=not-applied` を足した。`M11_LDFIX=0` の枝は fix_ld108 を適用しない (ldfix 前の IR を取る A/B 用で、build は `ldfix=disabled` の明示 opt-in を要する枝のため)。
+- `m11_gen_ir2.sh`: ldfix の直後 (`ldfix=applied` の枝の中、`m11_cond.py --bind` の前) で `ldfix/fix_ld108.py` を適用し、`ld108=applied` を記録する。`set -e` の下で、assert で止まると `ld108=applied` は記録されず `--bind` にも到達しない。`fix_ld108.py` は `work/boot_final.ld108.ll` に書いてから `mv` するため、`work/boot_final.ll` は ldfix 後・fix_ld108 前の IR のまま残る。`--reset` で消えた `ir_sha256` は戻らないので、`m11_build.sh` は `ld108=not-applied` を見て rc 2 で拒否する (`--reset` に `ld108=not-applied` を足した)。`M11_LDFIX=0` の枝は fix_ld108 を適用しない (ldfix 前の IR を取る A/B 用で、build は `ldfix=disabled` の明示 opt-in を要する枝のため)。
 - `M11_FIX_LD108=0`: 修復前の IR を明示的に取る A/B 用。`ld108=disabled` を記録する。
 - `m11_build.sh`: `ldfix=applied` の IR は `ld108=applied` の記録を要求する。`ld108=disabled` は `M11_ALLOW_LD108_DISABLED=1` のときだけ build する (`M11_ALLOW_LDFIX_DISABLED` と同じ作り)。記録が無い IR (配線前に作った IR) は rc 2 で拒否する。
 - `fix_ld108.py`: `define` 行から第 1 仮引数を読み、`i64 %arg1` でなければ assert で止める。既存の assert (store 行が 1 件ずつ・ブロックの存在・関数が 1 件) は維持した。
@@ -110,4 +110,4 @@ main 取り込み前の run も同じ値だった (ir_sha256 3 種・survey 870 
 | 同梱 `boot_final.ll` と再生成 IR の 5872 行差のうち、ok 869 と 870 の差 (oob 15→16、abort 2→0) を生む変更の特定 | 旧 IR の値を基準にした過去 REPORT の絶対値は 870 と一致しない | 同上 (測定の基準は再生成 IR に統一済み) |
 | survey の差が 0 (survey が 41a670 の head 解除の分岐を通るかは未確認)。効果の証拠は wasm 直接呼びだけ | 実機経路での効果は未確認 | 本表のみ (survey の経路確認は再測定にあたる) |
 | `audit_lsf_disp.py` の `audit_lsf.py` 統合、残 SUSPECT 3 件の突合 | REPORT_2316 §5 のとおり | #2396 (LD-111) |
-| `666a60` のループ内 store の修復 | 同型の誤りが残る | #1091 の残件 (LD-33) |
+| `666a60` のループ内 store (`store i64 %29`) の修復 | 同型の誤りが残る (REPORT_735 §1.2・REPORT_509 §1) | #2447 (LD-115。親: #2402)。#1091 は CLOSED のため付け替えた。#2316 は 41a670 の修復が受入条件で範囲外 |

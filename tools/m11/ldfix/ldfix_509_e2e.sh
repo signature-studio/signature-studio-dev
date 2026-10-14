@@ -9,7 +9,7 @@
 #   5/7 ネガティブコントロール (旧版 = 修復を外す / 新版の store 1 本・消費者 1 関数を戻す)
 #   6/7 修復前後の wasm を作り survey 942 unit を unit ごとに突合 + 修復した関数の動的到達 (reach_509.sh)
 #        修復前 wasm: step 1 の ldfix=disabled 記録 + M11_ALLOW_LDFIX_DISABLED=1 (明示 opt-in)。
-#        修復後 wasm: 修復前 IR を ldfix.py --pe で正規適用 → ldfix=applied → --bind → 既定 gate で build (#1290)。
+#        修復後 wasm: 修復前 IR を ldfix.py --pe で正規適用 → ldfix=applied → ld108=disabled (#2402: fix_ld108 は適用しない。REPORT_1290 の測定条件を保つ) → --bind → M11_ALLOW_LD108_DISABLED=1 で build (#1290)。
 #   7/7 修復前後の wasm で 5 関数を直接呼んで期待値と突き合わせ (dyn_509.mjs)
 # 使い方: EMSDK_ENV=<[EMSDK] の emsdk_env.sh> bash tools/m11/ldfix/ldfix_509_e2e.sh      環境変数: EMSDK_ENV (必須、[EMSDK] の emsdk_env.sh) / M11_WORK (既定 tools/m11/work) / PY (capstone+pefile 入り python) / PREV_REF (既定 009e823)
 set -uo pipefail
@@ -108,8 +108,8 @@ FAIL=0
   && M11_ALLOW_LDFIX_DISABLED=1 bash m11_build.sh > "$OUT/build_base.log" 2>&1 \
   && cp work/m11_boot.cjs work/m11_boot.cjs.wasm "$OUT/basewasm/" && node trap_triage/survey_units.mjs "$OUT/sv_base.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復前 wasm の build/survey 失敗: $OUT/build_base.log"; FAIL=1; }
 ( cd "$B/tools/m11" && cp "$PRE" work/boot_final.ll && "$PY" ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE_QS" --report work/ldfix_report.json > "$OUT/ldfix_new.log" 2>&1 \
-  && mv work/boot_final.ldfix.ll work/boot_final.ll && python3 m11_cond.py ldfix=applied && python3 m11_cond.py --bind work/boot_final.ll \
-  && rm -f work/boot_final3.ll && bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
+  && mv work/boot_final.ldfix.ll work/boot_final.ll && python3 m11_cond.py ldfix=applied && python3 m11_cond.py ld108=disabled && python3 m11_cond.py --bind work/boot_final.ll \
+  && rm -f work/boot_final3.ll && M11_ALLOW_LD108_DISABLED=1 bash m11_build.sh > "$OUT/build_new.log" 2>&1 \
   && node trap_triage/survey_units.mjs "$OUT/sv_new.json" | tail -1 ) || { echo "[ldfix_509_e2e] 修復後 wasm の build/survey 失敗: $OUT/build_new.log"; FAIL=1; }
 ( cd "$B/tools/m11" && python3 trap_triage/survey_diff.py "$OUT/sv_base.json" "$OUT/sv_new.json" )
 "$PY" - "$OUT/sv_base.json" "$OUT/sv_new.json" <<'PYEOF'
