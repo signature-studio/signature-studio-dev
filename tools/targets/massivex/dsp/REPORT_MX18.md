@@ -45,14 +45,16 @@
 - **測定 commit `68534484`** (e2e・negctl の対象コード)。`be1df2ce` は同じコードで、dsp 配下の差分は本ファイルと `scripts/mx_tail_check.py` の追加のみ (`git diff 68534484 be1df2ce -- tools/targets/massivex/dsp/` で確認、既存コードの変更 0)。
 - **main 取り込み後の差分** (`git diff 68534484 e810021a -- tools/targets/massivex/dsp/`): `REPORT_MX13.md` 108 行・`scripts/mx_closure.py` 66 行 (MODE 引数の追加)・`scripts/mx_flow_recheck.py` 41 行。差分は 0 ではないため、再測定の対象になる。
 - **既定 `linear` の挙動は旧版と同じ**: `linear` の計算 (入口から次の入口までの線形 disasm・`begins` と `fsz` による末尾計算) は変更なし。変わるのは引数の追加・stderr の行形式・JSON への `mode` / `rounds_log` キーの追加のみ。
-- **素材不足のため、今回の HEAD では e2e・negctl を再測定していない**。`$ARTIFACTS_DIR` に `plugins-massivex` が無く (`fl-win64.tar.zst` のみ)、`plugins-massivex` 展開後に再実行が必要。
-- **e2e (`dsp/e2e.sh`): 未測定**。`$ARTIFACTS_DIR` (`/home/runner/artifacts`) に `plugins-massivex` が無く (`fl-win64.tar.zst` のみ)、PE が展開できないため実行していない。出所不明の旧 e2e 値 (`elapsed` / load) は削除した (git 履歴 `9d661e3d` 以前に残る)。
-- **negctl (`bash dsp/negctl.sh`): 未測定**。同じく PE が無いため未実行。
-- **closure (§2) の測定 commit は `68534484`**。検証 HEAD (`9d661e3d` の後続 commit) では再測定していない。差分の証跡 (`git diff 68534484 HEAD -- tools/targets/massivex/dsp/scripts/`):
+- **実測 HEAD: `4ff41093`** (main `293c1337` 取り込み済み)。素材 `plugins-massivex` を `$RUNNER_TEMP/mx` に展開し、`parse_setup_headers.py` → `extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B / md5 `622993e7…` = §11.1 と一致) を作ってから以下を実行した。
+- **e2e (`dsp/e2e.sh`)**: rc 0 / `OK elapsed=37s` / load start `0.64 0.58 0.27` → end `0.97 0.68 0.32` (実測 1 回)。
+- **negctl (`bash dsp/negctl.sh`)**: rc 0。NC1 `insns=3118 unsup=67` / NC2 `insns=4575 unsup=746` / NC3 `insns=31 unsup=0` で 3 件とも `FAIL<期待>` (実測 1 回)。
+- **closure (§2 の旧版)**: HEAD `4ff41093` で再測定 (`mx_closure.py <pe> dsp/work/rtti_vtables.json <out> linear`)。472,313 / 5,950 / 1,592,431 / InitDll 430,763 / GetPluginFactory 430,927 / factoriesListGetter 431,799 / ExitDll 2 で §2 の旧値と一致。
+- 旧 e2e 値 (`elapsed` / load の旧記録) は出所が追えないため削除した (git 履歴 `9d661e3d` 以前に残る)。上の値は本 run の実測のみ。
+- **closure (§2) の測定 commit は `68534484`** (試行の closure 数値)。HEAD `4ff41093` でも同じ値を再現した。差分の証跡 (`git diff 68534484 HEAD -- tools/targets/massivex/dsp/scripts/`):
   - `git diff --stat`: `scripts/mx_closure.py` 66 行 (+/-)・`scripts/mx_flow_recheck.py` 41 行・`scripts/mx_tail_check.py` 82 行 (追加のみ)。`REPORT_MX13.md` 108 行 (追加のみ)。
   - 全 diff は 259 行で、`git diff 68534484 HEAD -- tools/targets/massivex/dsp/scripts/ | sha256sum` = `8128fd61c79e8d880cbc3328cbcefcea09437116ef04a863c9cc667488904cc9`。
-  - `mx_closure.py` の差分は (a) `MODE` 第 4 引数の追加 (既定 `linear`・assert で `linear|flow` のみ)、(b) `flow()` の追加 (`MODE == 'flow'` の時だけ呼ぶ)、(c) 重複していた `begins = sorted(fsz)` の 1 行削除、(d) `rlog` / `mode` の JSON キー追加。既定 `linear` の経路は、入口から次の入口までの線形 disasm と `begins`/`fsz` の末尾計算が旧版と同じ (コード読みと `py_compile` のみ確認。実行は未実施)。
-- **closure の HEAD 再測定は未実施** (PE 不在)。受入 2 の §2 の値は測定 commit `68534484` のものとして読むこと。
+  - `mx_closure.py` の差分は (a) `MODE` 第 4 引数の追加 (既定 `linear`・assert で `linear|flow` のみ)、(b) `flow()` の追加 (`MODE == 'flow'` の時だけ呼ぶ)、(c) 重複していた `begins = sorted(fsz)` の 1 行削除、(d) `rlog` / `mode` の JSON キー追加。既定 `linear` の経路は、入口から次の入口までの線形 disasm と `begins`/`fsz` の末尾計算が旧版と同じ (コード読みに加え、HEAD `4ff41093` の実行で §2 の旧版の値を再現)。
+- **closure の HEAD 再測定は実施済み** (上の §4 冒頭の値)。§2 の値は測定 commit `68534484` と HEAD `4ff41093` の双方で一致。
 
 ## 5. 結論と残件
 
