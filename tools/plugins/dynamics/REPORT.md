@@ -131,7 +131,6 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 - `.pdata` で define 無し = `function_<開始VA>` の define が final.ll に無い range 数 (`engine_defs.py`。 分母は `.pdata` 関数数、括弧は欠けた range の合計長)。 19048 は 210 件のうち 67 件が call 先として `declare` だけ残り、link 時に未解決になる。
   19252 の 2 件は参照なし。 逆に range 内部に別 define が増えた件数は 19252 で 29、19048 で 54。
-- 本節の数値は到達性の実測で、engine の正しさは示さない。
 - **脱落の原因 (#1412)**: 19048 の欠落 210 件のうち 208 件は RetDec の静的検出 (`statically linked function`) による除去。 残り 2 件 (19252・19048 とも `CreateEngine` / `entry_point`) は名前付き define で存在する偽陽性。 集計を直した HEAD (db4fe1f0) で `missing_define` は両 engine とも 0。 詳細は付録 `REPORT_APPENDIX.md` §A。
 - 失敗の連鎖と修正 (clang は最初の型エラーで止まるため 1 件ずつ露見。 修正は engine 局所の `dynamics/engine_fixcmp.py`、共有鎖には未組込):
   1. 両 engine: `icmp eq ptr %x, %arg3` (`%arg3` は i64 仮引数) → 修正済み (19252 は該当 0 件、19048 は 1 件)。
@@ -151,7 +150,7 @@ P0c (`p0c/REPORT.md`) で見た各 kernel の現状 (本 PR では再測定し�
 
 - 測定 commit: **cb3a89a6** (origin/main)。 この後の差分は文書のみ (REPORT.md の分割移動・REPORT_APPENDIX.md 新設・DOC_MAP 索引 1 行)。
   `git diff cb3a89a6 HEAD -- tools/plugins/dynamics ':!*.md'` の出力は空 (コード差分 0 の証跡)。 文書差分の概要は `git diff cb3a89a6 HEAD -- tools/plugins/dynamics --stat` で REPORT.md のみ。 `docs/WORKFLOW.md` §6 に従い現 HEAD での e2e 再測定は不要 (下の `engine_lift.sh` 再測定は HEAD で実施)。
-- §4 の数値は db4fe1f0 で再測定 (本文 §4 の表と付録 §A)。 静的検出の切替前後の内訳は付録 §A。
+- §4 の数値は db4fe1f0 で再測定 (到達性の実測のみで、engine の正しさは示さない)。 静的検出の切替前後の内訳は付録 §A。
 
 | 項目 | 実測 |
 |---|---|
