@@ -248,6 +248,10 @@ jsonl の該当レコードを読んだ結果 (`batch_closure_hybrid.jsonl`、ba
 * 残る仮説: wasm 側で `0x44a4d8` の `mov rbx, [rax]` の読み値が 0 になり、`0x44a4db` の `ott_dispatch` が `ott_unlifted` (ret 0) に落ちる (evidence「last 0x0」と整合)。ただし読み値の実測は未取得 (wasm 再ビルドと probe が要る)。次の着手点はここ。
 * 含意: 「`0x40faa0` 入口の間接 call 解決の取り違え」は、`0x44a505` については否定された。`0x4511d0` (同じ `0x40faa0` 収束) も同種として扱えるかは未検証。
 
+### 9-5. vtable `0x42f670` の native/wasm 実測 (#1936・分割移動先 `REPORT_APPENDIX_1936.md`)
+
+* 結論: native は hybrid boot 後も vtable が PE 初期値 (`0x449380` 等)。wasm は fresh・boot_state 適用後とも 0。`fle_data_install` は呼ばれている (`--init=`)。敷設窓の直接確認 (生成済み `fle_data.c`) は未了。詳細は付録。
+
 ### 9-4. `0x44a4d8` の wasm 実測 (#1721; 仮説の一部を棄却)
 
 wasm 側で `0x44a4d8` 周辺の値を probe で実測した (`0x44a4b0` 入口 → `0x44a4db` dispatch 直前)。検証 commit: `main` (576c4976) 上の `tools/liftdiff/work/flelift/` (work-liftdiff 同梱) から派生。
