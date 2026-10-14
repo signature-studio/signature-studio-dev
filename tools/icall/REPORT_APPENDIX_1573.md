@@ -37,7 +37,11 @@ foreground、rc 0、所要 32.7 s (`time` 実測)、開始時 load 0.87。関数
 
 ## 鮮度の証跡 (`docs/WORKFLOW.md` §6)
 
-- 測定 commit: `d16d7f5d`。レビュー head: `2809b86b` (本付録の追加前)。
-- `git diff d16d7f5d 2809b86b -- tools/icall ':(exclude)*.md'` の出力: 空 (コード差分 0)。
-- 除外なしの `git diff d16d7f5d 2809b86b -- tools/icall --stat` は docs のみ: `REPORT_APPENDIX_1206.md` 1 行・`REPORT_APPENDIX_1573.md` 新規。
+- 測定 commit: `d16d7f5d`。レビュー head: `eceb86df`。
+- `git diff d16d7f5d eceb86df -- tools/icall ':(exclude)*.md'` の出力: 空 (コード差分 0)。
+- 除外なしの `git diff d16d7f5d eceb86df -- tools/icall --stat` の出力 (すべて docs):
+  - `REPORT_APPENDIX.md` | 2 +-
+  - `REPORT_APPENDIX_1206.md` | 2 +-
+  - `REPORT_APPENDIX_1573.md` | 43 +++ (新規)
+  - 合計 3 files changed, 45 insertions(+), 2 deletions(-)
 - よって測定値は現 head でも有効。再測定は不要。
