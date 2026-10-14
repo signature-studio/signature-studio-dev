@@ -33,33 +33,33 @@
 
 ## 検証
 
-測定 commit: `8fa9b315` (コードを変えた最後の commit。`tests/arrangement_diff.mjs` のコメント 1 行の追加)。その前のコード差分の最終 commit は `bb06a6f5` (`origin/main` (`0064cfbc`) を取り込んだ merge)。`bb06a6f5` より前の実装本体は `caad77f6` (mock・C・試験・件数)、検査スクリプトは `7e16e54a`。main の取り込みは 2 回あり (`8787ed04`・`0064cfbc`)、衝突はどちらも `tests/provider_check.mjs` の期待値だけだった。main 側で増えた集合は `pe115` (`mixer.getTrackColor`・PY-115) と `pe100` (`channels.getStepParam`・`channels.getCurrentStepParam`・PY-100)。両側の集合を併せ、期待値を 実装 90 / 未実装 345 にした。
+測定 commit: `179de1a5` (コードを変えた最後の commit。`origin/main` (`875eba29`) の取り込み merge。衝突は `docs/DOC_MAP.md` (両側の行を残す) と `tests/provider_check.mjs` (両側の集合を併せ、main の `pe119` 6 件を加えて期待値を 実装 96 / 未実装 339 にした))。その前のコード差分の最終 commit は `8fa9b315` (`tests/arrangement_diff.mjs` のコメント 1 行の追加)、さらに前は `bb06a6f5` (`origin/main` (`0064cfbc`) の取り込み merge)。`bb06a6f5` より前の実装本体は `caad77f6` (mock・C・試験・件数)、検査スクリプトは `7e16e54a`。main の取り込みは 2 回あり (`8787ed04`・`0064cfbc`)、衝突はどちらも `tests/provider_check.mjs` の期待値だけだった。main 側で増えた集合は `pe115` (`mixer.getTrackColor`・PY-115) と `pe100` (`channels.getStepParam`・`channels.getCurrentStepParam`・PY-100)。両側の集合を併せ、期待値を 実装 90 / 未実装 345 にした。
 
 環境: runner 4 core。ビルドの前提の生成物は gitignore 対象 (`tools/python/work/`・`tools/python/dist/`)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。素材 `fl-win64` の `extracted/` から `block00031_PE.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` を展開 (tar の member 名は `extracted/...`)。emsdk は `[EMSDK]` (`provider/build.sh` が `emsdk_env.sh` を source)。
 
-前提の生成物 (`8fa9b315` の worktree で新規に作成): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0・CPython 3.12.1・3 分 24.3 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0・4.9 秒)・`bash provider/build.sh` (rc 0)。
+前提の生成物 (`179de1a5` で再実行): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0・増分 0.69 秒。`8fa9b315` の新規 worktree では初回 3 分 24.3 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0)・`bash provider/build.sh` (rc 0・ハンドラ 90)。
 
-測定は `8fa9b315` の作業ツリー (未コミットの変更なし) で、開始時の load average 1.59 (1 分値)。
+測定は `179de1a5` の作業ツリー (未コミットの変更なし) で、開始時の load average 0.16 (1 分値)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・ハンドラ 90 | 1.02 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 90 / 未実装 345 / MCP 静的 60) | 0.43 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 96 / 未実装 339 / MCP 静的 60) | 0.28 秒 |
 | `node tests/arrangement_diff.mjs` | calls 8、diffs 0、PASS | 0.04 秒 |
 | `node tests/general_diff.mjs` | calls 9、diffs 0、PASS (PY-87 の回帰) | 0.04 秒 |
-| `node tests/mixer_diff.mjs` | calls 57、diffs 0、PASS (main 取り込みの回帰) | 0.04 秒 |
+| `node tests/mixer_diff.mjs` | calls 59、diffs 0、PASS (main 取り込みの回帰) | 0.04 秒 |
 | `node tests/channels_diff.mjs` | calls 161、diffs 0、PASS (main 取り込みの回帰) | 0.04 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback_roundtrip true | 1.29 秒 |
-| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_selection_check.py` | PASS (4 関数 ok、0xe43e80 の比較 2 件) | 4.89 秒 (pefile の読込み込み) |
+| `node tests/ui_state_diff.mjs` | calls 12、diffs 0、PASS (main の PY-119 の回帰) | 0.04 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback_roundtrip true | 1.25 秒 |
+| `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_selection_check.py` | PASS (4 関数 ok、0xe43e80 の比較 2 件) | 4.79 秒 (pefile の読込み込み) |
 
-件数の変化: main (`0064cfbc`) 単独は 実装 86 / 未実装 349 (`pe100`・`pe115` を含む)。本 PR は `pe96` 4 件を加え 実装 90 / 未実装 345 (total 435)。内訳: MCP 60 + device 5 + mig 5 + pe39 1 + stub41 6 + pe100 2 + stub89 2 + pe87 4 + pe96 4 + pe115 1 = 90。
+件数の変化: main (`875eba29`) の期待値は 実装 92 / 未実装 343 (`pe100`・`pe115`・`pe119` を含む)。本 PR は `pe96` 4 件を加え 実装 96 / 未実装 339 (total 435)。内訳: MCP 60 + device 5 + mig 5 + pe39 1 + stub41 6 + pe100 2 + stub89 2 + pe87 4 + pe96 4 + pe115 1 + pe119 6 = 96。
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `selEnd` 初期値を `-1` から `0` にすると、`node tests/arrangement_diff.mjs` は `AssertionError: arrangement 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 8・diffs 0・PASS (rc 0)。比較は測定 commit `8fa9b315` で行った (`selEnd` を一時変更して検査し、元に戻した。`git status` は clean)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `selEnd` 初期値を `-1` から `0` にすると、`node tests/arrangement_diff.mjs` は `AssertionError: arrangement 差分 1 件` で rc 1 (FAIL)。元に戻すと calls 8・diffs 0・PASS (rc 0)。比較は測定 commit `179de1a5` で行った (`selEnd` を一時変更して検査し、元に戻した。`git status` は clean)。
 
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 8fa9b315 HEAD -- tools/python ':!*.md'
+$ git diff 179de1a5 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
