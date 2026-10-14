@@ -109,3 +109,12 @@
 - 受入条件 1 (CDP timeout 原因の特定) は **未達**。今回の 10 run では再現しなかったため原因は未切り分け。CLI (agent-browser linux-x64) の既定 action timeout は `AGENT_BROWSER_DEFAULT_TIMEOUT` = 25000 ms。stress.mjs の watchdog は 20 分で、失敗メッセージ (`CDP command timed out: Runtime.evaluate`) が CLI の既定値由来かは未検証 (推定)。
 - 受入条件 3 (#740 の修正前 ASan 再現ログ) は **未達** (未取得)。
 - 未解決の起票先: AC1 (CDP timeout 原因の特定) は #1665 (GUI-23)、AC3 (#740 の ASan 修正前ログ) は #1666 (GUI-24)。
+
+## GUI-24 追補 (#740 残件: 修正前コードの ASan 再現ログ)
+
+- 修正前の親 commit `e64ef6f0` (= `6e6c9b74^`、`surf_free` が即時 free のまま) を detached worktree で用意し、`bash tools/gui/test/selftest.sh` (ASan) を直列に回した。
+- 結果: 1〜3 回目 rc 0、**4 回目で rc 1: heap-use-after-free** (`READ of size 4 at ... thread T1`, `blit_surf` `gui_headless.c:33` ← `recompose_all` `:45` ← `on_cmd` `:63` ← `gui_hl_drain` `:84` ← `render_thread` `:92`)。解放は `surf_free` `gui_core.c:177` (thread T0)、確保は `surf_alloc` `gui_core.c:156` ← `create_window_impl` `:454`。#489 の既知スタックと一致。
+- 同じ手順の別試行 (先の試行) では 6 回目で同一の UAF。計 2 回の再現 (2 試行合計 10 回の selftest 中)。
+- 再現時の所要: 4 回で 27 s、開始時 load 0.72 (1 分値)。
+- ログ: `$RUNNER_TEMP/gui740/pre_uaf.log` (Git 管理外。run 終了で消える)。
+- 判断: 受入条件 3 点目 (修正前 ASan 再現ログ) は **達成**。修正後は 94 回 (§18 の 30+64) で発火せず、修正前は 2/2 試行で発火しており、修正の有効性を示す対照として #740 の残件を閉じる根拠になる。#1666 (GUI-24) は本追補で完了扱い。
