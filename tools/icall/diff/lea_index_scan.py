@@ -4,8 +4,10 @@
 #   基底 B の値 X は lea-rip の定数。n = (slot − X − disp) / sc が整数のものだけを候補にする。
 #   X の求め方: (a) 線形走査 (分岐先・ret/jmp/int3/ud2 の直後で状態を破棄) と
 #               (b) 関数内の全定義が lea-rip の場合 (流れ非依存・全定義が X の集合)。
+#               (b) は入口由来の値を排除できないため、判定は必ず「届き得る」(届かないとは言わない)。
 #   添字 I の値域: 線形区間での最後の定義 (区間は分岐先で切れるので到達定義と一致する) から分類する。
 #     const (xor/mov の即値)・movzx byte/word・movsx byte/word・and imm (0..imm)・shr (上限)。それ以外は未確定。
+#     分岐先は objdump の先頭トークンを読む (0x 有りの形式・無しの形式 `4020 <sym+0x..>` の両方)。間接分岐の先は未解析。
 #   用法: python3 tools/icall/diff/lea_index_scan.py <objdump -d -M intel の出力> <SlateCore.core_64 | ->
 #   exe に '-' を渡すと pdata を使わない (負の対照用の合成入力)。結果は標準出力へ。
 import bisect
@@ -23,6 +25,7 @@ CALLER_SAVED = ["rax", "rcx", "rdx", "r8", "r9", "r10", "r11"]
 NO_WRITE = {"cmp", "test", "bt", "ucomiss", "ucomisd", "comiss", "comisd", "nop", "push", "ret", "int3",
             "ud2", "hlt", "prefetcht0", "prefetchnta", "clflush"}
 BOUNDARY_PREV = {"ret", "jmp", "int3", "ud2", "hlt"}
+JT_OP = re.compile(r"(?:0x)?[0-9a-f]+(?: |$)")
 
 REG64 = {}
 for _b, _names in [("rax", "eax ax al ah"), ("rbx", "ebx bx bl bh"), ("rcx", "ecx cx cl ch"),
@@ -174,8 +177,8 @@ def scan(dis_path, exe):
     pstart = set(starts)
     jt = set()
     for mnem, ops in parsed:
-        if (mnem.startswith("j") or mnem in ("call", "loop")) and ops and re.fullmatch(r"0x[0-9a-f]+", ops[0]):
-            jt.add(int(ops[0], 16))
+        if (mnem.startswith("j") or mnem in ("call", "loop")) and ops and JT_OP.match(ops[0]):
+            jt.add(int(ops[0].split()[0], 16))
     # 線形区間の境界: pdata 開始・分岐先・直前が ret/jmp/int3/ud2/hlt
     bound, key_of = [], []
     chunk, prev_int3 = None, True
@@ -290,9 +293,19 @@ def access(mnem, ops, op):
     return "R"
 
 
+def index_desc(kind, val):
+    if kind == "const":
+        return "定数 %d" % val
+    if kind == "range":
+        return "%s の値域 [%d,%d]" % (val[2], val[0], val[1])
+    return "値域未確定: %s" % val
+
+
 def verdict(c):
     kind, val = classify_index(c["def"])
     ns = [n for n in c["nS"].values() if n is not None]
+    if c["method"] == "流れ非依存":
+        return "届き得る", "基底が流れ非依存 (入口由来を排除できず)", index_desc(kind, val)
     if kind == "const":
         if any(n == val for n in ns):
             return "届く", "定数一致", "定数 %d" % val
@@ -313,9 +326,11 @@ def main():
     print("# lea_index_scan: 命令 %d 件・添字付きメモリ式 %d 件・評価した基底・添字の組 %d 件・うち基底が lea-rip の X を持つ組 %d 件・候補 %d 件 (n が整数になる組。同一 (VA,式,X) は 1 件)"
           % (len(lines), stats["idx_ops"], stats["base_pairs"], stats["x_pairs"], len(cands)))
     tally = defaultdict(int)
+    mtally = defaultdict(int)
     for c in cands:
         v, cat, why = verdict(c)
         tally[(v, cat, c["acc"])] += 1
+        mtally[(c["method"], v)] += 1
         nstr = " ".join("%x:%d" % (s, c["nS"][s]) for s in SLOTS if c["nS"][s] is not None)
         idef = c["def"][3] if c["def"] else "-"
         print("%x\t%s\t%s\tX=%x\tdisp=0x%x\tsc=%d\tbase=%s\tidx=%s\t%s\t%s\t%s\t%s\tn[%s]\tidxdef=%s\tacc=%s" % (
@@ -324,6 +339,9 @@ def main():
     print("# 集計 (判定・理由の種別・アクセス)")
     for k, v in sorted(tally.items()):
         print("# %s\t%s\t%s\t%d" % (k[0], k[1], k[2], v))
+    print("# 方式別 (基底 X の求め方・判定)")
+    for k, v in sorted(mtally.items()):
+        print("# %s\t%s\t%d" % (k[0], k[1], v))
 
 
 if __name__ == "__main__":
