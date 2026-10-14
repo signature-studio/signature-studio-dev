@@ -142,19 +142,19 @@ unit 40 の trap (上表) はこの Halt0 と同じ経路。**LB 依存で Halt 
 既知類型との関係: 該当なし (新しい候補: LB 直書きの定数を持つ IR 修復 pass が LB≠0 で不適用になる。類型 ID は未付与)。
 測定主体: 本 PR の作業 runner (2026-10-14)。素材は work-m11 (#516 以前の snapshot)・fl-win64・toolchain-emsdk (`[EMSDK]`)。
 `m11_e2e.sh` の全再生成は使わず、lift 成果物 (boot0〜4.lift.ll) から後段 (gen_ir2 → 画像 → lb_check → build → 寛容起動) を実行する (`tools/m11/m11_lb_tolerant_repro.sh`)。
-測定 commit: `9a00a57c` (コードを変えた最後の commit)。`git diff 9a00a57c HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空 (差分 0)。
+測定 commit: `17b078a1` (コードを変えた最後の commit。直前の `9a00a57c` で測った値も同じ)。`git diff 17b078a1 HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空 (差分 0)。
 
 ### 6-1 LB 別の結果 (`bash tools/m11/m11_lb_tolerant_repro.sh 0 work/repro_lb0` / `... 0x10000 work/repro_lb10000`)
 
 | 項目 | LB=0 | LB=0x10000 |
 |---|---|---|
-| 寛容起動 wall (timeout 600) | 16.8–16.9 s (n=2) | 20.2–20.5 s (n=3) |
+| 寛容起動 wall (timeout 600) | 16.8–17.0 s (n=3) | 20.2–20.5 s (n=4) |
 | attempted / ok / noproc / miss / skipped | 942 / 867 / 1 / 47 / 74 | 942 / 867 / 1 / 47 / 74 |
 | skipped の内訳 | oob 19・halt0 7・unreachable 1 | oob 16・halt0 8・abort 2・unreachable 1 |
 | hook_ran (InitUnits 本体の呼出し) | true (1 回) | true (1 回) |
 | lb_check (静的検査) | PASS | PASS |
 
-n=2 (LB=0): repro と `var_C` (同じ手順の別実行)。n=3 (LB=0x10000): repro・`var_A` (同じ手順の再実行)・`fixed` (同じ手順の初回)。
+LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (16.8 s)。LB=0x10000: `17b078a1` の repro (20.25 s)・`9a00a57c` の repro (20.2 s)・`var_A` (20.5 s)・`fixed` (20.5 s)。
 再実行は unit 別の記録 (942 件) が一致した (`m11_lb_unit_diff.py` の差 0)。
 
 ### 6-2 LB=0 と LB=0x10000 の unit 結果差 (`python3 tools/m11/m11_lb_unit_diff.py tools/m11/work/repro_lb0/tolerant_units.json tools/m11/work/repro_lb10000/tolerant_units.json`・kind 差 8)
