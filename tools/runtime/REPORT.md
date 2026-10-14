@@ -155,9 +155,9 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 | 追い出し時の `dispose` で呼ぶプラグイン終了処理 (FL 側 state 保存) の仕様 | pool は dispose フックだけ提供 | #125 へコメント |
 
 ## RT-6 実 loader 接続 (#125 2 回目): PluginPool → hostbridge 実 loader → lowbase 版 OTT
-既知類型との関係 (DEFECTS.md): 該当なし (ランタイム資源管理)。測定 commit `80b69fa2` (測定時のコード)。以後のコード差分は末尾の `git diff 80b69fa2 HEAD -- tools/runtime/memload/real src/runtime package.json` の出力に示す。
+既知類型との関係 (DEFECTS.md): 該当なし (ランタイム資源管理)。測定 commit は 2 つ: `80b69fa2` (初回測定) と `c531cf69` (コード HEAD。`114ee54e` と同じコードで、後続の `079dca82`・`c531cf69` は文書のみ)。`80b69fa2` 以後のコード差分は末尾の `git diff 80b69fa2 HEAD -- tools/runtime/memload/real src/runtime package.json` の出力に示す。`c531cf69` 以後のコード差分は同じ範囲で 0 行。
 - 実装: `tools/runtime/memload/real/real_worker.mjs` (Worker) と `run_real.mjs` (Chrome ドライバ、`pnpm runtime:memload:real`)。`PluginPool` (`src/runtime/memory_budget.ts` を transpile) の loader を派生 loader `PoolBridge` (hb_bridge.mjs の `LoadLibraryW` を継承し、handle 採番だけを単調増加に置換。`prewarm` した EmscriptenGuest を sync 取得) に、dispose を `bridge.FreeLibrary` に接続。共有 `hb_bridge.mjs` は未修正。OTT は `tools/hostbridge/lowbase/retdec/build_m10_lb.sh` の lowbase 版 (LB_BASE 0x10000, initial 24 MiB / max 64 MiB, `ott_hb.wasm` 848,256 B)。host は `retdec/build_host_lb.sh` (`host_vst2.wasm` 3,734 B)。
-- 入力素材 (展開確認済み): `work-m6-ott` (`tools/m10/work/ott_m10.ll` 955,899 B を lowbase 再ビルドに使用)。`plugins-ott` は NSIS インストーラ。`7z x` で取り出した `OTT_x64.dll` (PE32+, ImageBase 0x180000000, SizeOfImage 0x308000, 3,146,752 B) を `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` (環境変数。対応は `docs/REFERENCES.md` §4) として配置。`toolchain-emsdk` は runner 既存の [EMSDK] (emcc 6.0.12) を使用 (artifact は展開していない)。`toolchain-retdec` は ott_m10.ll があるため不使用。
+- 入力素材 (展開確認済み): `work-m6-ott` (`tools/m10/work/ott_m10.ll` 957,145 B を入力に使う。lowbase 再ビルドは `lb_reloc` で再配置した copy `tools/hostbridge/lowbase/work/m10_0x10000/ott_m10.ll` 955,899 B を読む)。`plugins-ott` は NSIS インストーラ。`7z x` で取り出した `OTT_x64.dll` (PE32+, ImageBase 0x180000000, SizeOfImage 0x308000, 3,146,752 B) を `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` (環境変数。対応は `docs/REFERENCES.md` §4) として配置。`toolchain-emsdk` は runner 既存の [EMSDK] (emcc 6.0.12) を使用 (artifact は展開していない)。`toolchain-retdec` は ott_m10.ll があるため不使用。
 - 試験内容: 150 種の alias (同一 OTT ファイル、各々独立の Memory) を sweep で 1 回ずつ pin、続けて 170 回の偏った pin (70% が先頭 40 種、同時 pin 最大 3)。cap は `DEFAULT_PLUGIN_CAPACITY` 96。cold ロード直後の初回 block (128 frame) の出力 sha256 を基準 (同ページ内の最初の cold ロード) と照合。warm pin は出力を照合せず、param 0 の読み戻し (0.5) で生存だけを見る。全 instance が同じ値を持つため、取り違えは検出しない (取り違え検出は未試験)。最後に全 unpin → 全 unload。
 - 実測 (コミット済み `80b69fa2` を clean worktree で 3 回, Chrome 154.0.8037.97, 4 vCPU, 1 分 loadavg 0.58→1.70 (各回開始時)):
   | 項目 | run1 | run2 | run3 |
@@ -170,9 +170,17 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
   | ネガコン neg_nofree (dispose で FreeLibrary しない) | OOM at load 124 | OOM at load 124 | OOM at load 124 |
   | ALL PASS / exit / wall | ALL PASS / 0 / 7.05 s | ALL PASS / 0 / 6.92 s | ALL PASS / 0 / 7.09 s |
 - 判定: 累計ロード 165 (> 124)、追い出し 69 で生存は 96 以下。実 OTT lowbase で、Memory 個数上限 (124) を超えるロードを pool 経由で通した。
+- コード HEAD `c531cf69` の実測 (`git archive` の一時展開で 3 回。Chrome 154.0.8037.97、1 分 loadavg 0.39 (1 回目開始時のみ記録)。ref sha256 先頭 `9c77523d15157285` は `80b69fa2` と同じで、計数も一致):
+  | 項目 | run1 | run2 | run3 |
+  |---|---|---|---|
+  | pool 試験 PASS (pins 320 / loads 165 / evictions 69 / 生存 96 / peakSize 96 / peakInUse 96。cold 照合・param・全解放の判定を含む) | PASS | PASS | PASS |
+  | 試験本体 run (Chrome 内) | 1.61 s | 1.49 s | 1.48 s |
+  | ネガコン neg_cap130 (OOM at load) | 125 | 124 | 125 |
+  | ネガコン neg_nofree (OOM at load) | 124 | 124 | 125 |
+  | ALL PASS / exit / wall | ALL PASS / 0 / 6.51 s | ALL PASS / 0 / 5.79 s | ALL PASS / 0 / 5.55 s |
 - 実測で確定した事項: (a) 本試験で観測した Memory 参照の解放経路は `FreeLibrary` (dispose で呼ばないと bridge が握り続け、pool の追い出しに関係なく 124 で OOM)。他の経路は観測していない。(b) `host_close` は単一の `g_info.hmodule` (最後に load した plugin) を解放するため、任意の plugin の解放には使えない。pool は `bridge.FreeLibrary(handle)` を直接呼ぶ。(c) 採番の衝突 (コードから導出、再現試験は未実施): `hb_bridge.mjs` の `LoadLibraryW` は `handle = HMODULE_BASE + (loaded.size + 1) * 0x10000` で採番するため、解放後の再ロードが既存 handle と一致し得る。本試験は `PoolBridge` (LoadLibraryW を単調採番に置換した派生クラス) で回避し、共有 poc 側は未修正。
 - 範囲外 / 検証範囲: Chrome 154 のみ (Firefox/Safari 未測定)。Worker 1 本のみ (per-thread カウンタ、SAB 共有カウンタは未配線)。異なる DLL の同時ロードは未実施 (plugins-ott は OTT のみ)。cold 照合の基準は node 参照ではなく同ページの最初の cold ロード (node との bit 突合は lowbase e2e 側で 500 block 実施済み)。warm pin は OTT が block 間で DSP 状態を持つため出力を照合しない。
-- 再現: `bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh` (前提: `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll`、`tools/m10/work/ott_m10.ll`) → `bash tools/hostbridge/lowbase/retdec/build_host_lb.sh` → `pnpm runtime:memload:real` (`--pos-only` / `--neg-only` 可)。
+- 再現: `bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh` (前提: `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll`、`tools/m10/work/ott_m10.ll`) → `bash tools/hostbridge/lowbase/retdec/build_host_lb.sh` → `pnpm runtime:memload:real` (`--pos-only` / `--neg-only` 可)。`c531cf69` の実測は `git archive` で一時展開した先に `work-m6-ott` を展開し、その中で上の 3 コマンドを実行した (共有 checkout の `work/` は使わない)。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
@@ -181,7 +189,7 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 | dispose 時の FL 側 state 保存仕様 (保存の要否・形式) | 設計判断。pool は dispose フックだけ提供 | #125 へコメント (未決として記載済み) |
 | 1 wasm に常駐 Memory が 124 超を載せる場合 (Kilohearts 47 stub 等の同居) | 追い出し対象外の常駐は回避できず OOM になる。回避策は未実装 | #96 (HB-H7) |
 | Chrome 以外の Memory 上限 (Firefox / Safari) | 予算値 96 は Chrome 154 の実測のみに基づく | #127 (RT-9) |
-| OTT 以外の DLL (freshair / serum2 / massivex) の同時ロード | 異なる lift 系統の DLL の同居は未試験 (素材 plugins-freshair 等が未取得) | #125 へコメント (素材取得後に再試験) |
+| OTT 以外の DLL (freshair / serum2 / massivex) の同時ロード | 異なる lift 系統の DLL の同居は未試験 (素材 plugins-freshair 等が未取得。本 PR の範囲外) | #125 (未確認・既定は実施しない) |
 
 - 測定後のコード差分 (`git diff 80b69fa2 HEAD -- tools/runtime/memload/real src/runtime package.json`、commit `39fb363f` と `114ee54e`)。コメント・失敗メッセージ・no-op 式の削除のみで、判定ロジックと実行経路は変えていない。出力:
 ```diff
@@ -237,4 +245,4 @@ index ee164c21..49382281 100644
      if (!r.refHash) f.push("出力 sha256 の基準が無い");
      if (r.bridgeLoaded !== r.finalSize || r.bridgeHandles !== r.bridgeLoaded) f.push(`bridge の登録数 ${r.bridgeLoaded} / 一意 handle ${r.bridgeHandles} が生存 entry ${r.finalSize} と一致しない`);
 ```
-- **コード HEAD (`114ee54e`。後続の `079dca82` は本節の文書のみ) の e2e は再測定していない**。本 run の素材は `fl-win64` のみで、OTT の e2e を再現できなかった。PR 本文の `oc_artifacts: work-m6-ott analysis-ott-binaries toolchain-emsdk` が揃う run で再測定する。上の表の実測値は測定 commit `80b69fa2` のもの。
+- **コード HEAD (`c531cf69`) の e2e は上の表のとおり実測済み** (3/3 PASS、計数と ref sha256 は `80b69fa2` と一致)。上の差分出力は `80b69fa2` 基準で、`c531cf69` 以後のコード差分は 0 行。
