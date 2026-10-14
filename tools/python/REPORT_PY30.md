@@ -73,7 +73,7 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.py add
 
 - 変更前の列: `1f31671^` = `e9881327` (PR の base。コードを変える直前の commit)。この列は PR 作成時の測定値で、本 REPORT の追記時には再測定していない (この runner に emsdk が無く wasm を作れないため)。
 - 変更後の列: `1f31671` (コードを変えた最後の commit)。この commit で再現した。
-- `git diff 1f31671 HEAD -- tools/python/src tools/python/tests tools/python/build_flpy.sh` の出力は空 (以後の追記は本 REPORT と DOC_MAP のみ)。
+- `git diff 1f31671 HEAD -- tools/python/src tools/python/tests tools/python/build_flpy.sh` の出力は `src/flcpt.py` の module docstring の 4 行 (`-` 4 行・`+` 4 行。戻り値の記述を推定に直した行) だけ。実行されるコードは変わらない: `compile()` した `co_code` は 1f31671 と HEAD で一致し、AST は module docstring を除いて一致する。`tests`・`build_flpy.sh` の差分は 0。
 
 ### 4.1 呼び出し表 (probe)
 
