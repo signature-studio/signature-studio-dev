@@ -24,12 +24,12 @@
 |---|---|
 | ブラウザ | google-chrome 155.0.0.0 (HeadlessChrome)。`--headless=new --no-sandbox --disable-gpu` |
 | node (比較用のみ) | v22.23.3 |
-| emcc | 6.0.12 (`/opt/emsdk/emsdk_env.sh`)。`-sMEMORY64=1` で "MEMORY64 is deprecated (prefer -m64 or --target=wasm64)" の警告が出る (ビルドは成功) |
+| emcc | 6.0.12 ([EMSDK] の `emsdk_env.sh`)。`-sMEMORY64=1` で "MEMORY64 is deprecated (prefer -m64 or --target=wasm64)" の警告が出る (ビルドは成功) |
 | CPython | 3.12.1 (python.org の Python-3.12.1.tgz、record の source sha256 は d01ec6a33bc1…) |
 | 機械 | 4 vCPU / 15 GiB |
 
 素材: wasm32 の stdlib zip (`work/build-wasm/usr/local/lib/python312.zip`) を wasm64 版でも流用した。
-`$ARTIFACTS_DIR` の toolchain は使わず、`/opt/emsdk` をそのまま使った。
+`$ARTIFACTS_DIR` の toolchain-emsdk は使わず、[EMSDK] をそのまま使った。
 
 ## 3. 再現手順
 
