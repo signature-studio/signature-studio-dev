@@ -21,7 +21,7 @@
 
 ### 10.3 実測 (fix round 3・2026-10-14・各 n=1)
 
-- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に展開 (12 ファイル)。`/opt/emsdk`・`/opt/retdec` は runner に存在。fl-win64 は展開していない (`fw_stage2.sh`・`hs_e2e.sh` は `$FL_WIN64_DIR` を読まない)。
+- 素材: `work-fw-stage1` を `tools/plugins/work/fw/` に展開 (12 ファイル)。[EMSDK]・[RETDEC] (`docs/REFERENCES.md` の ID) は runner に存在。fl-win64 は展開していない (`fw_stage2.sh`・`hs_e2e.sh` は `$FL_WIN64_DIR` を読まない)。
 - 実行: 逐次 (並列数 1・nproc 4)。`fw_stage2.sh` は増分 (`--fresh` なし。stage-1 の RetDec は再実行しない)。`hs_e2e.sh` は両回 `--fresh`。
 - 対照 = 注釈 `return 0` 版 (コミット 3b581236 の `fw_hostfix.py`)。置換版 = 91308efd の `fw_hostfix.py` (ca85489e の同ファイルと同一)。
 
