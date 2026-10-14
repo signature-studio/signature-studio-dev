@@ -105,7 +105,7 @@ console.log('M11_SURVEY ' + JSON.stringify({
   failfast_functions: ff, halted_units: halted.slice(0, 20), first_trap_units: first,
   getmem: Number(mod._m11_probe_count(0)), freemem: Number(mod._m11_probe_count(1)),
   ...(process.env.M11_INSTR_413060 === '1' ? {
-    dest_obs_n: Number(mod._m11_dest_obs_n()), dest_obs_hash: Number(mod._m11_dest_obs_hhi()).toString(16).padStart(8, '0') + Number(mod._m11_dest_obs_hlo()).toString(16).padStart(8, '0'),
+    ...(mod._m11_dest_obs_n ? { dest_obs_n: Number(mod._m11_dest_obs_n()), dest_obs_hash: Number(mod._m11_dest_obs_hhi()).toString(16).padStart(8, '0') + Number(mod._m11_dest_obs_hlo()).toString(16).padStart(8, '0') } : {}),
     f413060_calls: Number(mod._m11_probe_count(8)), f413060_units: perUnitCost.filter((c) => c.f413060 > 0).map((c) => c.i + ':' + c.va + ':' + c.f413060),
   } : {}),
   fastmm_getmem_impl: Number(mod._m11_probe_count(2)), fastmm_freemem_impl: Number(mod._m11_probe_count(3)),

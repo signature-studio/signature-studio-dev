@@ -229,6 +229,10 @@ RETDEC=<retdec-decompiler> PE=<block00031_PE.bin> python3 tools/m11/ldfix/retdec
 
 判定: 666b10 の変化は **段 17 の Constants optimization** で起き、41a6a0 (段 16) と同じ「ポインタ経由の load が gv の直接 load に畳まれる」形である。段 1 は RetDec の decoder 段で、ldfix 段ではない。**同一機構とまでは未確定**。分岐 (v5.0 L165〜170) への到達は発火確認 (子 #1967) に依存する。
 
+## 6f. #1967 (LD-71): 分岐の実行確認 (結論のみ)
+
+既存 v5.0 バイナリへの uprobe で、関数内の 3 呼び出し点 (siteA/B/C) の発火を測定。41a6a0・41a6d3・666b10 で siteA が各 1 回発火。siteA が L163〜166 (`gv` 分岐) に当たるかは DWARF 無しのため未確定。詳細・表は `tools/m11/ldfix/REPORT_911_APPENDIX_1967.md`。
+
 ## 7. 検証 (`docs/WORKFLOW.md` §6)
 
 - 検証 HEAD: PR head の hash は PR 本文と `gh pr view` が正本 (REPORT 内には書かない。自己参照になるため)。
