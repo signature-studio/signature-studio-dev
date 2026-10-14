@@ -18,9 +18,18 @@ echo "== 0x409090 -w 0x867100:0x867200 (run 1)"
 grep '^status' "$OUT/w_409090_1.txt"
 python3 "$WO" "$PE" "$OUT/w_409090_1.txt"
 
+echo "== 0x409090 -w 0x867100:0x867300 (8 ブロック・56 件の再現)"
+python3 "$UT" "$PE" 0x409090 -H -q 0x867100 -w 0x867100:0x867300 -m 2000000 > "$OUT/w_409090_300.txt"
+grep '^status' "$OUT/w_409090_300.txt"
+python3 "$WO" "$PE" "$OUT/w_409090_300.txt"
+
 echo "== negative: 0x409090 -w 0x867d00:0x867e00 (アリーナ末尾より上)"
 python3 "$UT" "$PE" 0x409090 -H -q 0x867100 -w 0x867d00:0x867e00 -m 2000000 > "$OUT/neg_409090.txt"
 python3 "$WO" "$PE" "$OUT/neg_409090.txt"
+
+echo "== negative: 集計の対照 (合成の書込み 1 行、rip=0x1000 は pdata 外 → unmapped 1・関数 0 件になること)"
+printf '  write 0x867100 size=8 val=0x0 rip=0x1000\n' > "$OUT/neg_synth.txt"
+python3 "$WO" "$PE" "$OUT/neg_synth.txt"
 
 echo "== negative: full path 0x83efb0 -H -w 0x867100:0x867200 (アリーナを構築しない経路)"
 python3 "$UT" "$PE" 0x83efb0 -H -w 0x867100:0x867200 -m 2000000 > "$OUT/full_83efb0.txt"
