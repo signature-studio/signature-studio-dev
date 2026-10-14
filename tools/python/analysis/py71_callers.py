@@ -8,7 +8,7 @@
 2. target を指す RIP 相対の lea / load / store を出す (py67_indirect.py と同じ判定)。
    target を即値 (imm32/imm64) として持つ命令 (mov reg, imm 等) も [imm] として出す (表への絶対アドレス参照の検出)。
 3. ファイル全体で target の 8 バイト絶対値の格納箇所を出し、その前後 4 要素 (表の広がり) を出す。
-PE 上の絶対 VA は ImageBase を足さない値 (capstone の出力と同じ)。
+出力の VA は ImageBase を足した値 (capstone の出力と同じ。例 0x86a470)。
 """
 import collections
 import struct

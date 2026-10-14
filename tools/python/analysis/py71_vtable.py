@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PY-71 (#2501): vtable の各スロットの関数本体で、指定フィールド (disp) を触るメモリ命令を数える (実機不要)。
 
-  python3 analysis/py67_vtable.py <PE.bin> <vtable VA hex> <field disp hex>[,...] [max_slots]
+  python3 analysis/py71_vtable.py <PE.bin> <vtable VA hex> <field disp hex>[,...] [max_slots]
 
 - vtable: 先頭から .text を指す 8 バイトを連続して読む (値が .text 外になるまで。最大 max_slots 件)。
 - 各スロットの関数本体は、先頭から int3 パディングまで (最大 0x2000 バイト) を線形に逆アセンブルする。
