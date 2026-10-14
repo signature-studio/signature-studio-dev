@@ -18,7 +18,16 @@ python3 - "$OUT" <<'PY'
 import json, sys
 rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
 rows = [r[0] if isinstance(r, list) else r for r in rows]
-ok = [r for r in rows if r.get('status') is None and r.get('n') and r['mismatch'] == 0 and r['native_err'] == 0 and r['wasm_err'] == 0]
-bad = [r for r in rows if r not in ok]
-print('funcs', len(rows), 'bit-match', len(ok), 'other', len(bad))
+cls = {'bit一致': 0, 'native crash/timeout': 0, 'wasm のみ err': 0, '値の不一致': 0}
+for r in rows:
+    if r.get('status') or r.get('native_err', 0) > 0:
+        k = 'native crash/timeout'
+    elif r.get('wasm_err', 0) > 0:
+        k = 'wasm のみ err'
+    elif r.get('mismatch', 0) > 0 or not r.get('n'):
+        k = '値の不一致'
+    else:
+        k = 'bit一致'
+    cls[k] += 1
+print('funcs', len(rows), ' | '.join(f'{k} {v}' for k, v in cls.items()))
 PY
