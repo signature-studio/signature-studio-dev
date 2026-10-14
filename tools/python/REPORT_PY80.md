@@ -50,7 +50,8 @@
 ## 2. `_PyInterpreterState_GetRefTotal` — FL PE は呼んでいない
 
 - 対応表 `analysis/pybind/pybind_map.json`: 束縛関数 `0xc395a0` の `lea` (0xc39e09) → resolver `0x4235f0` → slot `0x16b84e0`。release build の CPython には定義が無い (許容 1 件)。
-- 参照走査 `python3 analysis/pybind/slot_refs.py --pe <block00031_PE.bin> --slot 0x16b84e0` (新規): rip 相対の参照は **1 件** (0xc39e18 の `mov [rip],rax`。束縛時の store)。呼出し・読出しは **0 件**。絶対 64bit / 32bit の参照も 0 件。
+- 入力の展開 (`tools/python` で実行、gitignore の `work/` に置く): `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C work/py80 --wildcards '*block00031_PE.bin'` → `work/py80/extracted/block00031_PE.bin` (22,227,016 B、展開 2.9 秒)。
+- 参照走査 `python3 analysis/pybind/slot_refs.py --pe work/py80/extracted/block00031_PE.bin --slot 0x16b84e0` (新規): rip 相対の参照は **1 件** (0xc39e18 の `mov [rip],rax`。束縛時の store)。呼出し・読出しは **0 件**。絶対 64bit / 32bit の参照も 0 件。出力は `0x16b84e0 disp_va=0xc39e18 opcode=mov [rip],reg` の 1 行 (6.5 秒。fix の commit で再実行して一致を確認)。
 - 走査の対照 (呼出しを拾えることの確認): `Py_NewInterpreterFromConfig` の slot `0x16b8250` は store (0xc395f8) と `call [rip]` (0xc3b46b)。
 - 束縛関数の逆アセ (`llvm-objdump -d`、0xc395a0〜0xc3a120): resolver `0x4235f0` の呼出し 110 件は全て、直後が `movq %rax, slot(%rip)` (格納)。戻り値の検査 (test / cmp / 分岐) は無い。よって束縛が NULL を返しても、読み込み時には止まらず、slot に無言で格納される。
 - 結論: FLEngine PE は GetRefTotal を呼ばない。「FL が使う場合の束縛失敗時の挙動」は、この PE では発生しない。
@@ -61,6 +62,7 @@
 - `build_cpython_wasm64.sh`: wasm64 の configure は config.site に sizeof の固定値を持たないため、ポインタ幅は CFLAGS の `-sMEMORY64=1` に従う。
 - `-sMEMORY64=1` (wasm64 libpython + 静的版): リンク 6,375,065 B。
   - node 22.23.3 で `WebAssembly.validate` は **false** (`--experimental-wasm-memory64` を付けても false)。instantiate は `invalid table elements limits flags` で失敗する (table64 の形式)。
+  - 再現 (`tools/python` で実行。`dist/flpy_static64.wasm` は `FLPY_MEMORY64=1 CPY_BUILD=$PWD/work/build-wasm64 STATIC_OUT=flpy_static64 bash build_flpy_static.sh` で作る): `node -e 'const b=require("fs").readFileSync("dist/flpy_static64.wasm");console.log(WebAssembly.validate(b))'` → `false`。上の数値は測定 commit `2a85bd96` の dist による。fix の run では emsdk が無く dist を再ビルドしていない。この 1 行の書式は、空の wasm (`\0asm` + version) で `true`、壊れたファイルで `false` を確認した。instantiate の失敗メッセージは、この 1 行では再現しない (測定時の値)。
   - headless Chrome 154 (`google-chrome --headless=new --allow-file-access-from-files --dump-dom tests/memory64_validate_chrome.html`) では `validate=true` (wasm32 の `flpy_static.wasm` も true)。table64 はブラウザでは受理される。instantiate と probe の実行は未実施 (子 #2858)。
 - `-sMEMORY64=2` (binaryen の memory64/table64 lowering): リンク 6,548,115 B。`validate` は **true**。
   - `STATIC_WASM=flpy_static64l STATIC_MEM64=2 node tests/static_subinterp_probe.mjs` は `STATIC SUBINTERP FAIL` (rc 2)。**11/12 PASS**。失敗は wasm メモリ不変の 1 件だけ。3 系列とも 33,554,432 → 48,365,568 B (+14,811,136 B)。wall 23.53 秒 (load 0.98)。
