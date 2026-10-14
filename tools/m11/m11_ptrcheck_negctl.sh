@@ -11,8 +11,11 @@
 # 検出器の欠落・実行失敗・上の期待と違う結果は非 0 で終わる。
 # 既定 offset は REPORT_N1004.md の実測で使った 22519877 (検出側が >>>2 で word 化する)。
 # 分類の定数集合 work/ptrclass/classes.json は m11_ptrclass.py で作る (無ければ (c)(d) は FAIL)。
+# --survey: 同じ検査を survey (m11_survey.mjs, 基準 M11_PTRCHECK_SURVEY_MAX_NEW・分類 B は M11_PTRCHECK_SURVEY_UNREMAP_MAX) に対して行う (1 回約 16 s)。
 set -u
 cd "$(dirname "$0")"
+SCRIPT=m11_run.mjs; TAG=M11_RESULT; MAXVAR=M11_PTRCHECK_MAX_NEW; UMAXVAR=M11_PTRCHECK_UNREMAP_MAX
+if [ "${1:-}" = --survey ]; then SCRIPT=m11_survey.mjs; TAG=M11_SURVEY; MAXVAR=M11_PTRCHECK_SURVEY_MAX_NEW; UMAXVAR=M11_PTRCHECK_SURVEY_UNREMAP_MAX; shift; fi
 OFF="${1:-22519877}"
 BV="${2:-0x153fb68}"
 command -v node >/dev/null || { echo "NEGCTL FAIL: node が無い"; exit 1; }
@@ -22,10 +25,10 @@ OUT=$(mktemp); ERR=$(mktemp)
 trap 'rm -f "$OUT" "$ERR"' EXIT
 fail() { echo "NEGCTL FAIL: $*"; exit 1; }
 
-# run <env 指定...>: m11_run.mjs を実行し, NEW (image_va_words_new)・BC (unremap_cand)・RC (終了コード) を設定する。stderr は $ERR
+# run <env 指定...>: $SCRIPT を実行し, NEW (image_va_words_new)・BC (unremap_cand)・RC (終了コード) を設定する。stderr は $ERR
 run() {
-  env "$@" timeout 120 node m11_run.mjs > "$OUT" 2> "$ERR"; RC=$?
-  read -r NEW BC <<< "$(sed -n 's/^M11_RESULT //p' "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s);process.stdout.write(String(r.ptrcheck.image_va_words_new)+" "+String(r.ptrcheck.unremap.unremap_cand))})' 2>/dev/null)"
+  env "$@" timeout 120 node "$SCRIPT" > "$OUT" 2> "$ERR"; RC=$?
+  read -r NEW BC <<< "$(sed -n "s/^$TAG //p" "$OUT" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s);process.stdout.write(String(r.ptrcheck.image_va_words_new)+" "+String(r.ptrcheck.unremap.unremap_cand))})' 2>/dev/null)"
   [ -n "$NEW" ] && [ -n "$BC" ]
 }
 
@@ -33,15 +36,15 @@ run M11_PTRCHECK_INJECT= || fail "クリーン実行が失敗"
 clean=$NEW
 cleanB=$BC
 [ "$cleanB" != "null" ] || fail "分類ファイルを読めない (unremap_cand=null)"
-run M11_PTRCHECK_INJECT= M11_PTRCHECK_MAX_NEW="$clean" || fail "クリーン実行 (基準付き) が失敗"
+run M11_PTRCHECK_INJECT= "$MAXVAR=$clean" || fail "クリーン実行 (基準付き) が失敗"
 [ "$RC" -eq 0 ] || fail "基準 = クリーン実測値 で不合格になった (rc=$RC)"
 run M11_PTRCHECK_INJECT="$OFF" || fail "注入実行が失敗"
 [ "$RC" -eq 0 ] || fail "ゲート未設定の注入で非 0 になった (情報出力のみのはず, rc=$RC)"
 inj=$NEW
-run M11_PTRCHECK_INJECT="$OFF" M11_PTRCHECK_MAX_NEW="$clean" || fail "注入実行 (基準付き) が失敗"
+run M11_PTRCHECK_INJECT="$OFF" "$MAXVAR=$clean" || fail "注入実行 (基準付き) が失敗"
 [ "$RC" -eq 1 ] || fail "注入 + 基準 で exit 1 にならない (rc=$RC)"
-grep -qF 'FAIL: ptrcheck image_va_words_new=' "$ERR" || fail "FAIL 行が stderr に無い"
-run M11_PTRCHECK_INJECT= M11_PTRCHECK_MAX_NEW=abc || fail "非整数基準の実行が失敗"
+grep -qE 'FAIL: (survey )?ptrcheck image_va_words_new=' "$ERR" || fail "FAIL 行が stderr に無い"
+run M11_PTRCHECK_INJECT= "$MAXVAR=abc" || fail "非整数基準の実行が失敗"
 [ "$RC" -eq 1 ] || fail "非整数の基準が不合格にならない (rc=$RC)"
 diff=$(( inj - clean ))
 echo "clean=$clean injected(offset=$OFF)=$inj diff=$diff"
@@ -54,14 +57,14 @@ bclean=$cleanB
 binj=$BC
 echo "unremap_cand clean=$bclean injected(value=$BV)=$binj"
 [ "$(( binj - bclean ))" -eq 1 ] || fail "分類 B が +1 にならない (注入値 $BV がデータ領域 VA 定数でない可能性)"
-run M11_PTRCHECK_INJECT= M11_PTRCHECK_UNREMAP_MAX="$bclean" || fail "クリーン実行 (分類 B 基準付き) が失敗"
+run M11_PTRCHECK_INJECT= "$UMAXVAR=$bclean" || fail "クリーン実行 (分類 B 基準付き) が失敗"
 [ "$RC" -eq 0 ] || fail "分類 B の基準 = クリーン実測値 で不合格になった (rc=$RC)"
-run M11_PTRCHECK_INJECT="$OFF" M11_PTRCHECK_INJECT_VALUE="$BV" M11_PTRCHECK_UNREMAP_MAX="$bclean" || fail "B 注入 + 基準の実行が失敗"
+run M11_PTRCHECK_INJECT="$OFF" M11_PTRCHECK_INJECT_VALUE="$BV" "$UMAXVAR=$bclean" || fail "B 注入 + 基準の実行が失敗"
 [ "$RC" -eq 1 ] || fail "分類 B 注入 + 基準で exit 1 にならない (rc=$RC)"
-grep -qF 'FAIL: ptrcheck unremap_cand=' "$ERR" || fail "分類 B の FAIL 行が stderr に無い"
+grep -qE 'FAIL: (survey )?ptrcheck unremap_cand=' "$ERR" || fail "分類 B の FAIL 行が stderr に無い"
 
 # (e) 分類ファイル欠落は基準付きなら不合格 (fail-closed)
-run M11_PTRCHECK_INJECT= M11_PTRCLASS=/nonexistent/classes.json M11_PTRCHECK_UNREMAP_MAX="$bclean" || fail "分類ファイル欠落の実行が失敗"
+run M11_PTRCHECK_INJECT= M11_PTRCLASS=/nonexistent/classes.json "$UMAXVAR=$bclean" || fail "分類ファイル欠落の実行が失敗"
 [ "$RC" -eq 1 ] || fail "分類ファイル欠落 + 基準で exit 1 にならない (rc=$RC)"
 grep -qF 'available=false' "$ERR" || fail "分類ファイル欠落の FAIL 行が無い"
 echo "NEGCTL OK: 注入で image_va_words_new が +1、基準 = クリーン実測で exit 0、注入で exit 1 + FAIL 行、未設定は exit 0、非整数は exit 1。分類 B: 注入で unremap_cand +1、基準 = クリーンで exit 0、注入で exit 1 + FAIL 行、分類ファイル欠落は exit 1"

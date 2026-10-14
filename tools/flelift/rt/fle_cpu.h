@@ -128,6 +128,17 @@ static inline int32_t cvtt_d2i32(double v) { if (v != v || v >= 2147483648.0 || 
 static inline int64_t cvtt_d2i64(double v) { if (v != v || v >= 9223372036854775808.0 || v < -9223372036854775808.0) return INT64_MIN; return (int64_t)v; }
 static inline int32_t cvt_d2i32(double v) { double r = nearbyint(v); if (r != r || r >= 2147483648.0 || r < -2147483648.0) return INT32_MIN; return (int32_t)r; }
 static inline int64_t cvt_d2i64(double v) { double r = nearbyint(v); if (r != r || r >= 9223372036854775808.0 || r < -9223372036854775808.0) return INT64_MIN; return (int64_t)r; }
+/* VEX FMA: 1 回丸め (fma)。x86 は NaN 結果の bit51 (単精度 bit22) を立てるため musl 側の NaN payload を合わせる */
+static inline double ott_fma_d(double a, double b, double c) {
+    double r = fma(a, b, c);
+    if (r != r) { uint64_t u; memcpy(&u, &r, 8); u |= 1ULL << 51; memcpy(&r, &u, 8); }
+    return r;
+}
+static inline float ott_fma_s(float a, float b, float c) {
+    float r = fmaf(a, b, c);
+    if (r != r) { uint32_t u; memcpy(&u, &r, 4); u |= 1u << 22; memcpy(&r, &u, 4); }
+    return r;
+}
 
 /* 実行制御 (FLE-2 boot: hook により「戻る」経路があるため noreturn は付けない) */
 void ott_unsup(uint64_t addr, const char* what);
