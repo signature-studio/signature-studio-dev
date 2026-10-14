@@ -230,13 +230,13 @@ python3 tools/plugins/f2/xcheck_icall.py 18953 18975 18979 18982 18984 19005 190
 受入条件 1 は**未達** (不一致 8 のまま。pass は opt-in `PLUG_XMMARG=1`・既定 OFF)。HEAD `2f77ace` での実測 (6 block lift・`leaf_diff.sh` n=3・`nc_leaf.py`) は一致 15 / 不一致 8 / 実行不能 0 で、接続前と同一。分類器 (`xmm_arg_drop`) の変更は liftdiff 全体に効くが、既存 results (`tools/liftdiff/results/*`・`tools/flelift/boot/results/mixed_summary.md`) は旧分類のまま・再分類は未実施。実測・未解決は [`REPORT_APPENDIX.md`](REPORT_APPENDIX.md) §9。
 
 ## 10. PLG-F2-5 (#613): #232 (LD-1) `ldfix` の接続 (opt-in `PLUG_LDFIX=1`) → 付録
-受入条件 1 は**未達** (不一致 6 のまま)。受入条件 3 は**未達に改める**: #613 の B arm (`PLUG_LDFIX=1`) で一致に変わったとした 0x6b0ef0・0x6ca5c0 は、現行の V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`、測定 commit 26f90ada) で再現せず、両方とも不一致 (最終判定 15/8)。LDFIX を入れても最終判定は変わらない。詳細は [`REPORT_APPENDIX_613.md`](REPORT_APPENDIX_613.md) 末尾の追補 (#2726)。
+受入条件 1 は**未達** (現行 26f90ada の V1 は不一致 8)。受入条件 3 は**未達に改める**: #613 の B arm (`PLUG_LDFIX=1`) で一致に変わったとした 0x6b0ef0・0x6ca5c0 は、現行の V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`、測定 commit 26f90ada) で再現せず、両方とも不一致 (最終判定 15/8/0)。LDFIX 単独の寄与は現行では未測定で、#613 の A/B 対照 (17/6) が現行で再現しない原因は未確定。詳細は [`REPORT_APPENDIX_613.md`](REPORT_APPENDIX_613.md) 末尾の追補 (#2726)。
 ## 10.1 (#871 部分) 0x6f1650 の切り分け → 付録
 0x6f1650 (19059) の不一致は image 配置 (RVA) と IR 絶対 VA 定数のずれが原因と確定。修正は未実施で #871 に残す。詳細は [`REPORT_APPENDIX_871.md`](REPORT_APPENDIX_871.md)。
 
 ## 11. PLG-F2-8 (#2726): 残不一致 6 関数の原因切り分けと #547 ablation の再定義 → 付録
 
-- 結論: arm V0 (`PLUG_XMMARG=0 PLUG_LDFIX=0`) と V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`) で一致 15 / 不一致 8 / 実行不能 0 が同一。V1 は XMMARG と LDFIX を同時に切り替えた arm で、両者の寄与は分離していない。判定が変わった関数は 0 件。一次採点が変わったのは 0x6b0ef0・0x6ca5c0 (0/8 → 7/8、不一致のまま)。測定 commit `26f90ada`。
+- 結論: arm V0 (`PLUG_XMMARG=0 PLUG_LDFIX=0`) と V1 (`PLUG_XMMARG=1 PLUG_LDFIX=1`) で一致 15 / 不一致 8 / 実行不能 0 が同一。V1 は XMMARG と LDFIX を同時に切り替えた arm で、両者の寄与は分離していない。V0 → V1 (合成) で最終判定が変わった関数は 0 件 (合成 arm の事実で、LDFIX 単独の効果はここからは言えない)。一次採点が変わったのは 0x6b0ef0・0x6ca5c0 (0/8 → 7/8、不一致のまま)。測定 commit `26f90ada`。
 - 残 6 関数の原因 (1 行ずつ):
 
 | VA (block) | 原因 | 根拠 |

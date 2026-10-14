@@ -22,7 +22,9 @@
 
 ## 追補 (#2726): #613 の一致 2 件の再確認
 
-- #613 B arm の一致 2 件 (0x6b0ef0・0x6ca5c0) は、現行の V1 (測定 commit 26f90ada、`PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0`、`leaf_diff.sh` 1 回) で再現しない。最終判定は 15/8 で、両方とも不一致。
-- #871 付録 `REPORT_APPENDIX_871.md` §10.11・§10.12 (2b84c6f5・3b38f81d、LDFIX 既定 OFF) でも両方とも不一致 (残 6 に含まれる)。
-- #613 B arm の測定 commit は未記録 (本付録の表に commit の欄が無く、再現コマンドは環境変数の指定のみ)。そのため、#613 の 17/6 を再現できない。
-- 現行の結論: LDFIX による最終判定の変化は 0 件 (V0 15/8 = V1 15/8)。受入条件 3 の「F2 の修復は適用可」は本測定では根拠が無く、未達とする。
+- #613 の記録: 完了報告 (https://github.com/signature-studio/signature-studio-dev/issues/613#issuecomment-6149755116、2026-10-13) に「検証は commit `1af46f06` で再実行 (batch 6/6 rc=0、leaf_diff rc=0、17/6/0 再現)」。対照は A (`PLUG_XMMARG=1`、LDFIX=0) 15/8/0 → B (+`PLUG_LDFIX=1`) 17/6/0 で、差は 0x6b0ef0・0x6ca5c0 の 2 関数 (同一コード)。
+- 現行 V1 (測定 commit 26f90ada、`PLUG_XMMARG=1 PLUG_LDFIX=1 PLUG_ICALL=0`、`leaf_diff.sh` 1 回): 両方とも不一致、最終判定 15/8/0。#871 付録 `REPORT_APPENDIX_871.md` §10.11・§10.12 (2b84c6f5・3b38f81d、LDFIX 既定 OFF) でも両方とも不一致。
+- 1af46f06 → 26f90ada の間に、判定経路の変更がある (`git log --no-merges`): `tools/m11/ldfix/ldfix.py` を変える commit 8 件 (LDFIX の arm。例: b5eeb322・7db8953b・c5e6944c・1af9cad2)、`tools/plugins/lift/lift_ranges.sh` を変える commit 7 件 (例: 0d51d876 が `PLUG_NO_STATIC_DETECT` の既定を 1 にした)、`tools/plugins/lift/passes/fix_xmm_args.py` を変える commit 1 件 (98c2183a、#954 の `call_arity_mismatch` skip 規則)。
+- 98c2183a の規則は、現行 V1 で両関数が xmm2 を復元 (fixed) しており、この規則で止められていない。判定差の原因として断定できる根拠は無い。
+- 差の原因は未確定。LDFIX 単独の寄与と、上記の ldfix・pass・既定値の変更のどれが効いたかは、同一 commit (26f90ada) で `PLUG_XMMARG=1` のまま LDFIX=0/1 を測って切り分ける (未解決表 → #2850)。
+- 現行の結論: LDFIX 単独の効果は現行では判定していない (V0 15/8 と V1 15/8 は XMMARG と LDFIX の合成の結果)。受入条件 3 の「F2 の修復は適用可」は本測定では根拠が無く、未達とする。
