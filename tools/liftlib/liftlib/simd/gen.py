@@ -30,7 +30,7 @@ class Decl:
 
     @property
     def canon(self):
-        return "__asm_%s__%s%s" % (self.base, self.ret, "".join(self.args))
+        return ("__asm_%s__%s%s" % (self.base, self.ret, "".join(self.args))).replace("?", "p")
 
     @property
     def sig(self):
