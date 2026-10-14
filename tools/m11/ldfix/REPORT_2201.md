@@ -15,7 +15,7 @@
   - `repro_2143.sh f4` (ldfix 2 本 + 集計): real 1m20.9s
   - `ldfix.py` F4 有: real 40.9s / F4 無: real 38.8s
   - `repro_2143.sh named` (F4 有・無の監査 2 本): real 8.1s + 8.2s
-- 検証 (差分の入力): `git diff b25edd16 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh` は本 REPORT の commit 後も 0 行 (§6)。
+- 検証 (差分の入力): `git diff b25edd16 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh` は main 取り込みで 2 ファイル変わった (§6)。§7 の再測定は `8ae16694` で実施。
 
 ## 2. 変更内容
 
@@ -61,19 +61,23 @@
 
 ## 6. 測定 commit 以降のコード差分
 
-測定 commit `b25edd16` から HEAD までのコード差分 (`tools/m11/ldfix/*.py` `*.sh`):
+測定 commit (§7 で再測定した commit) は `8ae16694` (main 取り込み後の merge commit)。§1 の b25edd16 からの差分 (`git diff b25edd16 8ae16694 -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh`) は次のとおり (main 取り込みで変わった分):
 
 ```
-(出力 0 行。本 REPORT のみが後続 commit)
+tools/m11/ldfix/audit_undefload_dest.py | 42 +++++++++++++--
+tools/m11/ldfix/verify_dest_2202.py     | 92 +++++++++++++++++++++++++++++++++
+2 files changed, 131 insertions(+), 3 deletions(-)
 ```
 
-## 7. 素材での再実行 (fix run・HEAD 013a14ff 相当のコード)
+§1 の数値は b25edd16 時点の値。`named` 監査 (`audit_undefload_dest.py --named`) の集計部分は 8ae16694 でも §7 と同一値を得た。`8ae16694` 以降の commit は REPORT のみ (`git diff 8ae16694 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh` は 0 行)。
 
+## 7. 素材での再実行 (測定 commit 8ae16694)
+
+- 測定 commit: `8ae16694` (main 取り込み後。コードを変えた最後の commit)。以下はこの commit で実行した値。
 - 素材: `fl-win64` `extracted/block00031_PE.bin` (22,227,016 B)、`work-m11` (`tools/m11/work/`: `boot_final.ll` 19,787,837 B、`boot0..4.norm0.ll`)。両 tarball を `$ARTIFACTS_DIR` で確認した。
-- コード: `tools/m11/ldfix/*.py` `*.sh` は測定 commit b25edd16 と同一 (§6 で 0 行)。
 - 実行: `PE=... NORM0=tools/m11/work BOOT_FINAL=tools/m11/work/boot_final.ll bash tools/m11/ldfix/repro_2143.sh f4` / `... named`。
-- 実行環境: 4 vCPU・load average 1.55 (開始時)。
-- 所要時間 (実測): `named` の 2 本: real 6.495 s + 6.283 s。`f4` は出力の tail のみ取得し時間は未計測 (§1 の b25edd16 測定では real 1m20.9s)。
+- 実行環境: 4 vCPU・load average 0.59〜0.88 (測定中)。
+- 所要時間 (実測): `f4` real 1m7.869s (ldfix 2 本 + 集計)。`named` の 2 本: real 6.323 s + 6.337 s。
 
 ### 7.1 `repro_2143.sh f4`
 
@@ -124,4 +128,4 @@ JSON の `functions` 比較 (`named_f4on.json` と `named_f4off.json` の `funct
 
 ### 7.4 数値の対応
 
-§1 の測定 (b25edd16) と §7 の再実行は、`ldf4` 51 / 81、`named` 3170 / 3160 / 差 10、関数集合で一致した。
+§1 の測定 (b25edd16) と §7 の再実行 (8ae16694) は、`ldf4` 51 / 81、`named` 3170 / 3160 / 差 10、関数集合で一致した。
