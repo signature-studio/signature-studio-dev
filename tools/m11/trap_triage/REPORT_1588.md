@@ -46,6 +46,17 @@
 | `410320` の `rax` (vtable) が native と wasm で異なる理由 (入口値 / `6525b0` の `&slot` 経路) | 0x6525b0 の非到達原因の確定 | 本 issue #1588 の残り (本 PR で未達) |
 | `REPORT_APPENDIX_865.md` の「0x66ea90 再走で trap 無し」の訂正 | 記録の正確性 | 本 PR で REPORT_APPENDIX_865 に訂正を入れる (§5) |
 
+## 4.5 追加調査 (受入条件 1 の続き、run 2)
+
+測定 commit: `60932d35` (origin/main 起点の worktree `ws-1588`、本 PR で追加するのは `scan_1588_slot.py` と本節のみ)。
+
+- 再現 (`repro_1588.sh`、実測): p01 = mismatch、`first divergence index=5`、wasm OOB (最上位 `function_4133f0`)。0x66ea90 は 2 回とも `native_null_deref_all_patterns`。
+- `410320` 入口 (index 4): `rcx` = `rax` = `0x5ac338` (native) / `0x1ac338` (wasm、wasm 空間) で一致。`rdx` も一致 (`0x1`)。よって入口引数は分岐の原因ではない。
+- 分岐は `[rax-0x30]` = `0x5ac308` の読み値。native は `0x409410` (GetMem)、wasm は `0x5af3d0`。
+- 静的 PE (`block00031_PE.bin`, file off `0x1ab708`) の `0x5ac308` の値は `0x40f960`。実行時の `0x409410` とも wasm の `0x5af3d0` とも一致しない。よって**このスロットは実行時に書き換えられる**。
+- `scan_1588_slot.py` で `.text` 全体を capstone 走査: `[rip+disp]` と即値で `0x5ac308` / `0x5ac338` / `0x409410` / `0x40f960` / `0x5af3d0` を指す命令は **0 件**。書き込みは `rax` 等を経由した間接参照と推定され、静的には見えない。
+- 未解決のまま残る: 書き込み元の特定 (実行時 watch が必要。`tools/m11/trap_triage/` の既存 `watch_store_682.c` 系の方式を流用候補)。
+
 ## 5. 記録の訂正
 
 - `tools/liftdiff/REPORT_APPENDIX_865.md` §冒頭: 「0x66ea90 は再走で trap せず both_fault」→ 「both_fault (native segv・wasm OOB trap)。再走 2 回とも wasm OOB を再現」。
