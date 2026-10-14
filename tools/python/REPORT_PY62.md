@@ -52,7 +52,7 @@ python3 tools/python/analysis/flapi/sig_arity_check.py tools/python/analysis/fla
 # after: 対象 273 件・一致 249・不一致 24
 ```
 
-- 比較しない件数 (np と max を両方比べられないので数えない): `sig` が無い 30 件 (kwsig.max は 1〜6)、`kwsig.max` が無い 132 件 (うち sig あり 121 件・sig なし 11 件)。`plugins.getPresetCount` だけは sig (np 1) があり kwsig.max が無い。
+- 比較しない件数 (np と max を両方比べられないので数えない): `sig` が無い 30 件 (kwsig.max は 1〜5)、`kwsig.max` が無い 132 件 (うち sig あり 121 件・sig なし 11 件)。`plugins.getPresetCount` だけは sig (np 1) があり kwsig.max が無い。
 
 ### 4-2. 差し戻し時の 55 件との関係
 
