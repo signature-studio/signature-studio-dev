@@ -180,6 +180,8 @@ def sigfix(text, report, pads=None, fixes=None):
                 newargs.append('%s %s' % (pt, nv))
             else:
                 cv = fixes.get((cur, nm, k, i)) if fixes else None
+                if cv is not None and cv.get('bits') is not None and pt != 'i%d' % cv['bits']:
+                    cv = None
                 if cv is None:
                     newargs.append('%s %s' % (pt, _zero(pt)))
                 else:
@@ -254,7 +256,7 @@ def weaken(m):
 pads = []
 fixes = None
 if '--fixes' in sys.argv:
-    fixes = {(f['caller'], f['callee'], f['k'], f['pos']): f['const'] for f in json.load(open(sys.argv[sys.argv.index('--fixes') + 1]))['fixes']}
+    fixes = {(f['caller'], f['callee'], f['k'], f['pos']): dict(f['const'], bits=f.get('bits')) for f in json.load(open(sys.argv[sys.argv.index('--fixes') + 1]))['fixes']}
 text = sigfix(text, rep, pads, fixes)
 rep['sigfix_zeropad_sites'] = len(pads)
 rep['sigfix_zeropad_args'] = sum(p['want'] - p['have'] for p in pads)
