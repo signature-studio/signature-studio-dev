@@ -2,7 +2,7 @@
 
 - 親: #1833 (MX-16) / 本件: #1879 (MX-18)。前段は `REPORT_MX16.md`・`REPORT_MX14.md`。
 - 素材: `plugins-massivex` → `scripts/parse_setup_headers.py` → `scripts/extract_massivex.py <exe> work key` → `work/extracted/VST3/Massive X.vst3` (95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca`、MX-14・MX-16 と一致)。
-- 測定 commit: `68534484` (main。コード変更は本 commit で追加しない・検証スクリプトのみ追加)。
+- 測定 commit: `68534484` (§4 参照)。本 commit で追加するのは検証スクリプトと本ファイルのみ。
 
 ## 1. 試行 (code 側の末尾)
 
@@ -40,10 +40,14 @@
 - 試行 closure が旧版より小さいのは、SHORT による過小評価 (`InitDll` 430,763 → 368,099) であり、closure の縮小ではない。MX-16 §2 で棄却した「次の .pdata begin」と同じ原因。
 - 結論: 到達末尾は .pdata 無し入口の末尾の上界にも下界にもならず、採用不可。
 
-## 4. 検証 (測定 commit `68534484`・コード変更なし)
+## 4. 検証
 
-- **e2e (`bash dsp/e2e.sh`・n=1)**: rc 0 / `OK elapsed=43s` / load 0.28 0.30 0.15 → 0.63 0.39 0.19。
-- **negctl (`bash dsp/negctl.sh`)**: NC1 insns 3118 unsup 67 / NC2 insns 4575 unsup 746 / NC3 insns 31 unsup 0 → 3 件とも FAIL<期待>。
+- **測定 commit `68534484`** (e2e・negctl の対象コード)。`be1df2ce` は同じコードで、dsp 配下の差分は本ファイルと `scripts/mx_tail_check.py` の追加のみ (`git diff 68534484 be1df2ce -- tools/targets/massivex/dsp/` で確認、既存コードの変更 0)。
+- **main 取り込み後の差分** (`git diff 68534484 e810021a -- tools/targets/massivex/dsp/`): `REPORT_MX13.md` 108 行・`scripts/mx_closure.py` 66 行 (MODE 引数の追加)・`scripts/mx_flow_recheck.py` 41 行。差分は 0 ではないため、再測定の対象になる。
+- **既定 `linear` の挙動は旧版と同じ**: `linear` の計算 (入口から次の入口までの線形 disasm・`begins` と `fsz` による末尾計算) は変更なし。変わるのは引数の追加・stderr の行形式・JSON への `mode` / `rounds_log` キーの追加のみ。
+- **素材不足のため、今回の HEAD では e2e・negctl を再測定していない**。`$ARTIFACTS_DIR` に `plugins-massivex` が無く (`fl-win64.tar.zst` のみ)、`plugins-massivex` 展開後に再実行が必要。
+- **e2e の値は未確定**: 旧記録は `OK elapsed=43s` / load 0.28 0.30 0.15 → 0.63 0.39 0.19 だったが、この値を記録した実行ログが残っていない。PR 本文の load 0.44 0.53 0.36 → 0.74 0.59 0.39 も出所が確認できず、どちらが正しいかは確定できない。よって、この値は確定値として扱わない。
+- **negctl (`bash dsp/negctl.sh`)** の旧記録: NC1 insns 3118 unsup 67 / NC2 insns 4575 unsup 746 / NC3 insns 31 unsup 0 → 3 件とも FAIL<期待>。今回は未再測定。
 
 ## 5. 結論と残件
 
