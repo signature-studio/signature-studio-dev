@@ -77,7 +77,7 @@ arity 検査の内訳: 検査を外した版 (表 3 の「検査なし」) で p
 
 | 数値 | 再現コマンド |
 |---|---|
-| 表 1 survey・build | `cd tools/m11 && M11_XMM_ARGS=0 bash m11_build.sh && M11_SURVEY_UNITS=work/survey_xmm0.json node m11_survey.mjs` と、`M11_XMM_ARGS=1` の同じ 2 本 (出力は `work/survey_xmm1.json`)。`cmp work/survey_xmm0.json work/survey_xmm1.json` の差 0 が基準。emsdk (`/opt/emsdk`) と work-m11 の IR が要る。 |
+| 表 1 survey・build | `cd tools/m11 && M11_XMM_ARGS=0 bash m11_build.sh && M11_SURVEY_UNITS=work/survey_xmm0.json node m11_survey.mjs` と、`M11_XMM_ARGS=1` の同じ 2 本 (出力は `work/survey_xmm1.json`)。`cmp work/survey_xmm0.json work/survey_xmm1.json` の差 0 が基準。emsdk (`[EMSDK]`、docs/REFERENCES.md) と work-m11 の IR が要る。 |
 | 表 2・表 4・表 3「検査なし」 | `bash tools/m11/m11_xmm_stats.sh` (前提: `work/boot_final.ll` と `PE=$FL_WIN64_DIR/extracted/block00031_PE.bin`。出力 `work/xmm_stats/`。stdout の `[表2]` `[表3]` `[arity]` `[0詰め48]` が上記の数値。表 4 の fixed 0 も行として出る) |
 | 表 2 の 78 / 検査前の作業中の版 | 78 は `work/xmm_stats/xa_report.json` の `callsite_zero_args`。検査前の版は非再現 (表 3 の注) |
 | 40c1d0 の呼出し個数 | `grep -c 'call [^@]*@function_40c1d0(' work/boot_final.ll` (68)、`grep -c 'call i64 @function_40c1d0(i128 ' work/boot_final.ll` (65)、`grep -c 'call i64 @function_40c1d0()' work/boot_final.ll` (3) |
