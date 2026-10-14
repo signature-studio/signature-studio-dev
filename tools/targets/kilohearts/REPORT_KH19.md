@@ -149,9 +149,17 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 
 ## 8. #1816 (KH-19f) 機械照合と手検証の判定 (4 vCPU, 基点 main `f34e4f46`)
 
+- **測定 commit** (測定対象のコードを変えた最後の commit): `264893e2`。以下の実測はすべてこの commit の内容で実行した。
+- **検証 HEAD** (本節を含む PR の最終 commit): PR 本文に記載。測定 commit とは別の概念で、両者の差分は下の鮮度の証跡で示す。
+
 - 前提 #1823 (KH-19e) は merge 済み。TSV は main に存在する (`3a76c8cb`・`verified` 全 160 行 `auto`)。
 - 素材: `plugins-kilohearts` の `Kilohearts Offline Installer.zip` のみ展開 (tar で zip だけ取り出し)。Windows 側の `extract_installer.sh` 相当 (`payload.dat` → `windows.zip/*` → `HeartCore.core_64` 76,642,304 B)。mac 側は不要のため未展開。
-- 再生成 (4 vCPU・各 1 回): `rtti_walk.py` 1.9 s → `callgraph.py` 7.8 s → `vtable_closure.py gain all` 11.3 s。before 160 / after(all) 1,995 / vtable 1,847 / iat 251 / rip_data 54 / reg 62 — §2・§5 と一致。
+- 素材 `plugins-kilohearts` の `Kilohearts Offline Installer.zip` (3,833,108,300 B) を `tar --zstd -xf` で取り出し、Windows 側を手で展開した
+  (`payload.dat` → `windows.zip/*` → `HeartCore.core_64` 76,642,304 B)。`extract_installer.sh` は mac 側の dmg (`Kilohearts Offline Installer.dmg`) が無いと途中で停止するため、本 run では Windows 部分だけを手で展開した (スクリプト修正は本 PR の範囲外)。
+- 再生成 (測定 commit `264893e2`・4 vCPU・各 1 回・load average は 1 分値): `rtti_walk.py` 1.614 s (load 0.72) → `callgraph.py` 7.539 s → `vtable_closure.py gain all` 11.351 s (load 1.66 時点)。
+  before 160 / after(all) 1,995 / vtable 1,847 / iat 251 / rip_data 54 / reg 62 / indexed 8 / other 3 — §2・§5 と一致。
+- 再現コマンド (`tools/targets/kilohearts` で実行): `python3 scripts/rtti_walk.py work/winpkg/HeartCore.core_64 work/ms/rtti_vtables.json` → `callgraph.py <同> work/ms/rtti_vtables.json work/ms/callgraph.pkl 14` → `vtable_closure.py <同> work/ms/callgraph.pkl work/ms/rtti_vtables.json gain all work/ms/gain_all.json`。
+  以下の `verify_gain_tsv.py` / `gain_tsv_negctl.py` も同じ `work/ms/` を使う。
 - 機械照合 `scripts/verify_gain_tsv.py` (TSV の各行を .text のバイト列から独立に検査、160 行):
 
 | 検査 | 内容 | 結果 |
@@ -159,11 +167,30 @@ vtable call の候補をその class の同 slot に限る (narrow)。一意に�
 | A | root 行 27 件が gain の `*Dsp`/`*MasterDsp`/`*DspModel` の vtable slot に載る | 27 / 27 |
 | B | 非 root 行 133 件で、親関数の `call_site_rva` の命令が `call`/`jmp` rel で子 `func_rva` を指す | 133 / 133 |
 | D | 親鎖を辿ると全行が root に到達する | 160 / 160 |
+
+- 測定時間: `verify_gain_tsv.py` 8.432 s (測定 commit `264893e2`)。
+
+**ネガティブコントロール** (`scripts/gain_tsv_negctl.py` で TSV を 1 件だけ壊したコピーを作り、同じ `verify_gain_tsv.py` で照合。元 TSV は変更しない):
+
+| 壊し方 | 対象の検査 | 正常時 | 壊した後 | FAIL した行 |
+|---|---|--:|--:|---|
+| root 行 1 件 (`func_rva` 0x3370) の `root_class` を `BogusDsp` に置換 | A | 27 / 27 | 26 / 27 | 0x3370 |
+| 非 root 行 1 件 (`func_rva` 0x5c50) の `call_site_rva` を +1 (0x4d096 → 0x4d097) | B | 133 / 133 | 132 / 133 | 0x5c50 |
+
+- 検査は両方とも 1 件の破損で FAIL し、他の検査 (C・D) は変わらない。レビュワーが別環境で同じ 2 件を壊して得た値 (26 / 27・132 / 133) とも一致。
 | C (情報) | `func_rva` が .pdata の関数先頭と一致 | 113 / 160 (残り 47 は leaf sweep で拾った関数) |
 
 - 判定: **受入 1 (各関数を手で確認し `verified=manual`) は未達**。上記は機械照合であり、人手検証ではない。`verified` 列は 160 行すべて `auto` のまま残した。
 - 受入 2 (手検証 160 との差分 0): **未達・判定不能**。手検証の集合が無いため、差分は取れない。機械照合で「TSV の 160 行は gain の direct closure の再現として整合する」ことまでは言える。
 - 受入 3 (自動生成分を手検証済みと書かない): 本節で遵守。
+
+**鮮度の証跡** (`docs/WORKFLOW.md` §6・#1268):
+
+- 測定 commit: `264893e2`。`git diff --stat 3a76c8cb 264893e2 -- scripts/rtti_walk.py scripts/callgraph.py scripts/vtable_closure.py scripts/extract_installer.sh gain_before_160.tsv` は空 (測定パイプラインと TSV は `3a76c8cb` 以降不変)。
+  `3a76c8cb` からの追加は検査 2 本のみ: `scripts/verify_gain_tsv.py` (c38d37a4) と `scripts/gain_tsv_negctl.py` (264893e2)。
+- `git diff 264893e2 HEAD -- tools/targets/kilohearts/scripts` の出力は**空 (0 行)**。測定 commit から本節を書いた commit までの変更は `REPORT_KH19.md` のみ。
+  scripts 以下の実行コードは測定 commit から変えていないため、再測定は不要 (差分 0 の範囲)。
+- 検証起点 (測定を実行した HEAD) = 測定 commit `264893e2`。検証 HEAD (PR の最終 commit) とは区別する。
 
 #782 の受入 (lift / build の最初の失敗点) は未達で、§3 に記載。
 
