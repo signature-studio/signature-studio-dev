@@ -96,7 +96,7 @@
 ## 7. 2 回目 run: incEventValue の戻り値の型・範囲外 code・副作用の確定 (PE 実測)
 
 測定 (commit は `e1e816c2` = origin/main 基点。コード変更 0 のため、測定 commit は基点のまま):
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (実測 5.6 秒)。`toolchain-retdec` を `$RUNNER_TEMP/retdec-root` に展開 (実測 2.6 秒)。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (実測 5.6 秒)。`toolchain-retdec` を `$RUNNER_TEMP/retdec-root` に展開 (実測 2.6 秒)。
 - RetDec: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 RETDEC_BIN=$RUNNER_TEMP/retdec-root/retdec/bin/retdec-decompiler bash analysis/flapi/pe_retdec.sh <out.c> 0x1051330-0x1051720` → 実測 7.2 秒、関数 1 件 (`0x1051330`-`0x10516f6`)。
 - 逆アセンブル: `analysis/flapi/pe_disasm.py 1051330 260` (242 行、終端 `ret` は 0x10516f5)。RetDec の分岐と逆アセンブルを照合した。
 - 定数の読出し (ファイルのバイト列): `0x10516f8`=0.0 (f32)、`0x10516fc`=1.0 (f32)、`0x1051700`=1.0 (f64)、`0x1051708`=100.0 (f64)。
