@@ -140,16 +140,32 @@ GUI-9 (#186) は Windows 標準フォントを同梱せず Open Sans / Barlow �
 
 範囲外 (主張しない): 他のウェイト (Bold / Light 等) は fetch していないため未登録 (alias 表が要求した時点で追加)。実フォントを公開物へ載せる結線 (VFS #22 からの配布) はまだ無く、`bundled=true` は**載せる前提の保守的登録**。改変・subset 化した版は sha256 が変わるため成果物走査では検出されない (その版を載せるなら registry の追加が要る)。upstream (GitHub raw) の可用性に依存する。
 
-### 回帰の修正 (#935。検証起点: コミット `f673876e`・ws-935-ledger・fl-win64 展開済・node_modules は main checkout のものを symlink)
+### 回帰の修正 (#935。測定 commit: `d7050457`・ws-2747・fl-win64 は `$RUNNER_TEMP/fl-win64` へ展開・node_modules は main checkout のものを symlink)
 
 - 回帰: #615 (`4890d607`) で `fetch_fonts.sh` の sha256 を台帳 `tools/gui/test/fonts.tsv` へ移したのに、検査は `coveredBy` の先頭ファイル (`fetch_fonts.sh`) 本文だけを見ていたため、`8d632b57` では `notices.test.mjs` 4 件 FAIL (`#1`・`#36`・`#37`・`#53`) と `cli.mjs check` exit 1 (`open-sans`・`barlow` の sha256 が「取得スクリプトの検証値に無い」)。registry と台帳の値は一致しており、取得物の食い違いではない。
-- 修正: `validateFontAsset` は `coveredBy` の存在するファイルを全て連結して検証値を探す。font-asset の `coveredBy` に `tools/gui/test/fonts.tsv` を追加。
+- 修正 1 (`f673876e`): `validateFontAsset` は `coveredBy` の存在するファイルを全て連結して検証値を探す。font-asset の `coveredBy` に `tools/gui/test/fonts.tsv` を追加。
+- 修正 2 (`d7050457`・レビュー指摘): 修正 1 は sha256 が連結本文のどこかに有るかだけを見ており、名前と sha256 の対応を見ていなかった。修正 1 の `lib.mjs` (`f673876e`) で、`open-sans` の sha256 を `barlow` の値に取り替えると `cli.mjs check` が exit 0 (PASS) になることを実測した。修正 2 は台帳の同名行 (1 列目 = file 名、3 列目 = sha256) で照合する。単体テストと e2e に NEG を 4 件追加。
 
-| 項目 (`f673876e`・n=1) | 実測 |
+| 項目 (`d7050457`・n=3。min–max) | 実測 |
 |---|---|
-| `node --test tools/legal/notices/notices.test.mjs` | 51 pass / 0 fail / 3 skipped (修正前 `8d632b57` は 47 pass / 4 fail / 3 skipped) |
-| `node tools/legal/notices/cli.mjs check` | PASS components=22 (bundled 20) records=12 fonts=129 artifacts=0 (修正前 exit 1) |
-| `FL_WIN64_DIR=<fl-win64> TMPDIR=$RUNNER_TEMP bash tools/legal/notices/e2e.sh` | ALL PASS・PASS 27 / FAIL 0・31.9 s (load average 0.85) |
+| `node --test tools/legal/notices/notices.test.mjs` | 52 pass / 0 fail / 3 skipped・391–396 ms (修正前 `8d632b57` は 47 pass / 4 fail / 3 skipped) |
+| `node tools/legal/notices/cli.mjs check` | PASS components=22 (bundled 20) records=12 fonts=129 artifacts=0 (exit 0。修正前 `8d632b57` は exit 1) |
+| `FL_WIN64_DIR=<fl-win64> TMPDIR=$RUNNER_TEMP bash tools/legal/notices/e2e.sh` | ALL PASS・PASS 30 / FAIL 0・35.1 / 34.3 / 35.9 s (load average 0.61–0.92、並列 1) |
+
+ネガティブコントロール (検証起点 `d7050457`。e2e §5 と同じ壊し方。出力は `cli.mjs check` の実出力の抜粋。台帳を壊す 3 件は `$RUNNER_TEMP` の複製台帳を `coveredBy` で指す registry を `NOTICES_REGISTRY` で渡す。リポジトリの台帳は触らない):
+
+| NEG | 壊し方 | exit | 出力 (抜粋) |
+|---|---|---:|---|
+| 再ビルド記録の欠落 (freetype) | `records/freetype-2.7.json` を除く | 1 | `component freetype: 記録 records/freetype-2.7.json が無い (該当 build.sh を実行して記録する)` |
+| build.sh が registry に無い (oss/ffmpeg) | registry の ffmpeg の `coveredBy` を空にする | 1 | `tools/shared/oss/ffmpeg/build.sh: OSS 再ビルドスクリプトが registry の coveredBy に無い (記録なしの OSS)` |
+| NOTICES の無い成果物 | NOTICES を置かない dir を `--artifact` に渡す | 1 | `[artifact …/empty] THIRD_PARTY_NOTICES.txt が成果物に無い (vite build で出力される…)` |
+| 台帳の sha256 を壊す (open-sans) | `fonts.tsv` の OpenSans 行の sha256 を `0` で埋める | 1 | `component open-sans: OpenSans-Regular.ttf: sha256 が取得スクリプトの検証値に無い (台帳の同名行と食い違う。…)` |
+| 台帳から行を消す (barlow) | `fonts.tsv` から Barlow 行を削除 | 1 | `component barlow: Barlow-Regular.ttf: sha256 が取得スクリプトの検証値に無い (台帳の同名行と食い違う。…)` |
+| sha256 の取り違え (open-sans に barlow の sha256) | registry の open-sans の sha256 を barlow の値に替える | 1 | `component open-sans: OpenSans-Regular.ttf: sha256 が取得スクリプトの検証値に無い (台帳の同名行と食い違う。…)` |
+
+- 修正前の lib.mjs (`f673876e`) で「sha256 の取り違え」を実行すると exit 0 (PASS)。修正 2 で exit 1 になる。
+- 単体テスト: `validateFontAsset NEG: 別の部品の sha256 を当てる (名前と sha256 の対応が食い違う)` を追加 (52 pass)。
+- 鮮度 (`docs/WORKFLOW.md` §6): `git diff d7050457 HEAD -- tools/legal/notices ':!tools/legal/notices/REPORT.md'` の出力は空 (0 行)。検証 HEAD は本 REPORT 更新 commit。
 
 ## 範囲 / 範囲外
 
