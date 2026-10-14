@@ -105,6 +105,7 @@ static int in_image(uint64_t va) { return va >= 0x400000u && va < 0xd02000u; }
 EMSCRIPTEN_KEEPALIVE uint32_t hs_e2e_run(void) {
     hs_status = 0; hs_plug = 0; plug_log_n = 0; hs_slots_called = 0;
     fw_hs_install();
+    fw_call_cur(0x418120);   /* E3 診断: Phase B に無い TLS 初期化 (_InitLib hooks[1]) を 1 回だけ呼ぶ */
 
     /* ---- 1. CreatePlugInstance(Host, Tag) — HostTag は 64bit 幅で受領 (ABI.md §1.1) ---- */
     uint64_t host = 0;

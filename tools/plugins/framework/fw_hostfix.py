@@ -189,10 +189,16 @@ OVERRIDES = {
   store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
   ret i64 0
 }''',
-    # 0x4181e0: 0x4e5f50 が戻り値 ([BLK+0x80]) を +568 で deref する (hs_dbg 実測: 0x4181e0 →
-    # 0x4e5f50 直後に trap)。戻り値が fold 由来のため「該当なし」= 0 で fail-soft。
-    0x4181e0: '''define i64 @function_4181e0() local_unnamed_addr {
-  store i64 0, ptr inttoptr (i64 9048192 to ptr), align 8
+    # E3 (診断・未採用): 0x4180d0 を native の意味 (LocalAlloc(0x40, 0x288) → TlsSetValue(idx, blk)) に置換。
+    0x4180d0: '''define i64 @function_4180d0() local_unnamed_addr {
+  %idx = load i32, ptr inttoptr (i64 7171696 to ptr), align 4
+  %blk = call ptr @LocalAlloc(i32 64, i32 648)
+  %ok = icmp ne ptr %blk, null
+  br i1 %ok, label %set, label %done
+set:
+  %r = call i1 @TlsSetValue(i32 %idx, ptr %blk)
+  br label %done
+done:
   ret i64 0
 }''',
     # 0x40e720: `ClearWideString(var S)` (native 0x40e720 実測: S[0]!=0 なら refcount--
