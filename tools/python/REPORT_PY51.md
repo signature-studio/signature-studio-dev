@@ -75,7 +75,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| chan 上で `+0x794` を書く箇所 (書込み元) | `pairedChanIndex` の値の由来が決まらない。rerollLoopStarter* の chan 対応付けが確定しない | #1871 (本 issue を open のまま継続) |
-| `0xdd2002`・`0xec7bb8`・`0xec6098` の構造体同定 | 書込幅不一致が推定に留まる | #1871 |
-| `0xdbdd50` の配列 (`0x8244b5`) と `0xdbde10` の配列 (`0x8243c1`) が同一か | `pairedChanIndex` の添字の対象が確定しない | #1871 |
-| `ChannelFlags51` の bit2 の FLP 側の意味 | `chan.flag51Bit2` の名前が暫定 | #1871 |
+| chan 上で `+0x794` を書く箇所 (書込み元) | `pairedChanIndex` の値の由来が決まらない。rerollLoopStarter* の chan 対応付けが確定しない | #1916 ([PY-55]) |
+| `0xdd2002`・`0xec7bb8`・`0xec6098` の構造体同定 | 書込幅不一致が推定に留まる | #1916 ([PY-55]) |
+| `0xdbdd50` の配列 (`0x8244b5`) と `0xdbde10` の配列 (`0x8243c1`) が同一か | `pairedChanIndex` の添字の対象が確定しない | #1916 ([PY-55]) |
+| `ChannelFlags51` の bit2 の FLP 側の意味 | `chan.flag51Bit2` の名前が暫定 | #1916 ([PY-55]) |
