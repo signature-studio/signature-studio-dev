@@ -29,7 +29,7 @@
 - 測定 commit: `ed712942` (`fix(liftdiff): skip sites after non-dec_label block boundaries; resolve callee returns in site ord check (Refs #2192)`。コード差分の最終 commit)。後続の `21194fc0` はテストのみ。
 - 検証 HEAD の main 取り込み: `83e7bde5` (main `88b0f1c3` を merge。shim の `a4a620a9` (#2802) を含む)。main 取り込みの後で測定し直した (前版の `a14de29c` の値とは shim が違う)。
 - 測定 runner: `uptime` 20:10:22 (load average 0.05 / 0.20 / 0.13)。所要時間は run ごとに記録していない (ログ `work/ld83/run_*.log` に出力のみ)。
-- 素材: `work-m6-ott` (`tools/ott/work/ott.ll`・`tools/m6/work`・`tools/m8/work`・`tools/m9/work`・`tools/m10/work`)・`work-liftdiff` (`tools/liftdiff/work/`)・`analysis-ott-binaries` (`[ANALYSIS-PLUGINS]` の `ott/binaries/`。`PLUGINS_DIR=[ANALYSIS-PLUGINS]`)・emcc は既存の `/opt/emsdk`。`toolchain-emsdk` は展開していない。
+- 素材: `work-m6-ott` (`tools/ott/work/ott.ll`・`tools/m6/work`・`tools/m8/work`・`tools/m9/work`・`tools/m10/work`)・`work-liftdiff` (`tools/liftdiff/work/`)・`analysis-ott-binaries` (`[ANALYSIS-PLUGINS]` の `ott/binaries/`。`PLUGINS_DIR=[ANALYSIS-PLUGINS]`)・emcc は既存の emsdk (`[EMSDK]`)。`toolchain-emsdk` は展開していない。
 - build: `python3 ldlib/build_wasm.py targets/ott_old_site.json --force` (rc 0・`sig_mismatch` 0・`undefined` 0・stderr `[irtool] sites skipped (block without dec_label_pc_ VA): 21`)。既定版は `targets/ott_old.json --force` (rc 0・`sig_mismatch` 0・`undefined` 0)。
 - run: `python3 liftdiff.py run targets/ott_old_site.json --fn 0x1801ab1d0,0x1801ab258,0x1801c5e84,0x1801c621c,0x1801c682c,0x1801c69cc --pattern vm0,u16 --nobuild --notrace --json <out>` (既定版は `targets/ott_old.json` で同じ引数)。r1・r2 の 2 回。
 - 比較: `python3 results/ld67/compare_blk.py work/ld83/head_def_r<k>.json work/ld83/head_site_r<k>.json` (`k`=1,2)。両方 `cases=12 diff=0`。site JSON と既定 JSON は r1 と r2 でバイト一致 (`cmp`)。
