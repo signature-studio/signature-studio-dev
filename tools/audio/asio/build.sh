@@ -61,5 +61,5 @@ cp "$ROOT/public/worklets/fl-audio-worklet.js" "$OUT/web/worklets/"
   --lib es2022,dom,dom.iterable --outDir "$OUT/web/js" --rootDir "$ROOT/src/runtime" --noEmit false --isolatedModules \
   --strict --ignoreConfig "$ROOT/src/runtime/audio-layout.ts" "$ROOT/src/runtime/audio-shim.ts"
 sed -i 's|from "./audio-layout"|from "./audio-layout.js"|' "$OUT/web/js/audio-shim.js"
-cp "$HERE/harness/index_com.html" "$HERE/harness/com_page.mjs" "$OUT/web/"
+cp "$HERE/harness/index_com.html" "$HERE/harness/com_page.mjs" "$HERE/harness/chunk_verify.mjs" "$OUT/web/"
 echo "[iasio] build OK -> $OUT"

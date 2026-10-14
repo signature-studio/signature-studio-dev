@@ -175,3 +175,24 @@ wasm の外から、OOB 直前の値を読む計測が必要。
 3. 両者の `obj` を作る関数 (`function_4fad10` / `function_4fb910` の arg1・arg2) まで遡る。
 
 子 issue を起票する (`[M11-N91]`、`親: #714`)。既存 `[M11-N62]` (halt0 unit 492 の 4133f0 系 OOB) と対象 unit が別なので重複にはしない。
+
+### 11. 実値採取の試行と計測器の影響 (2026-10-13, 追補 run 5、n=1)
+
+測定 commit `3ed5a18c` (origin/main, 本 PR の作業ベース。コード変更なし)。素材は `$RUNNER_TEMP` と worktree の `tools/m11/work/` に展開。
+
+| 工程 | 結果 | 所要 |
+|---|---|---|
+| `m11_gen_ir2.sh` | rc=0 | 34.8 秒 |
+| `m11_build.sh` (probe 無し・`boot.o` 再生成) | rc=0 | 18.3 秒 |
+| `m11_survey.mjs` | rc=0 / ok 870 / trap 24 / noproc 1 / miss 47 | 13.3 秒 |
+| `check_682.py` | 2/5 (304=trap 555=trap 923=trap 291=ok 296=ok) rc=1 | - |
+
+**probe 入口 dump の試行は不採用**: `probe_entry.sh` (`m11_pe`) で 304・923 を入れた build は、`[pe]` が 1 件も出ず、304 が ok・923 が oob になった。probe の挿入が OOB の挙動を変える。`probe_entry.sh` の手順は `boot.o` を作り直すが、直後の `m11_build.sh` は `boot_final3.ll` が新しいと再コンパイルしないため、後片付けの順序にも注意が要る。probe 版で得た ok 判定は計測器の影響として扱い、本 REPORT の判定には使わない。
+
+**stale `boot.o` の注意**: probe 版の `boot.o` を消さずに通常 build を回すと、通常 build の判定 (ok 4/5) が probe 版のものになった。`boot.o` を消して再ビルドし、2/5 (trap 3 件) に戻ったことを確認した。
+
+**先頭フレーム (probe 無し・clean build、`M11_SURVEY_STACK=304,555,923`)**: 304・555 は wasm 3372 `function_535bf2` (`0x1a336f`)、呼出し鎖 3147 `function_535ab0` ← 3157 `function_4fad10` ← 1759 `function_4fb910` ← 5237 ← 12403 ← 14849 ← 14865。§9 と一致。
+
+**未解決 (変更なし、起票先 #714 / 子 `[M11-N91]` #1426)**: OOB 時の `tbl`・`cnt`・`obj` の実値は未採取。wasm の関数引数 (local) を読む手段が現行ツールに無い (`oob_insn.py` は命令の逆引きのみ)。実値採取には、probe を使わず wasm local を読む計測の追加が要る。これは `[M11-N91]` の範囲。
+
+判定: 受入 1・2 は未達のまま (本 run は再現と計測器の影響の確認まで)。

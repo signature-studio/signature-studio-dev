@@ -49,7 +49,7 @@
 |---|---|---|
 | **実オーディオデバイスでの underrun 評価** | runner は null sink。Firefox は出力デバイス無しで AudioContext が suspended | ユーザ実機が必要 (`xvfb-run` 無しの headful で `p7.mjs` をそのまま実行し `--require-worklet` を付ける)。**起票依頼: `[PERF-P7b]` 実機 (Windows/macOS) 採取** |
 | **Safari (WebKit)** | Linux runner に無い | 起票依頼: `[PERF-P7c]` macOS 実機。`p7.mjs` は Chrome/Firefox 以外の起動を未実装 (URL を開くだけで動くので `?cfg=safari` 手動オープンで可) |
-| **Android / モバイル CPU (3〜10× 低速想定)** | 実機無し | `[PERF-P7d]` Android Chrome 実機 (`chrome://inspect` かページ手動オープン) |
+| **Android / モバイル CPU (3〜10× 低速想定)** | 実機無し | `[PERF-P7d]` Android Chrome 実機 (`chrome://inspect` かページ手動オープン)。手順は §6 |
 | headful (実ウィンドウ・GPU 有) の wasm code cache | Xvfb 上では観測できず (§0)。実機の headful で違うかは不明 | 上の実機採取に含める |
 | Firefox の worklet 内 `postMessage(Module)` 挙動 | ハーネスが worklet 側の受信を確認していない | 実機採取時に worklet 側 `messageerror` を記録するよう拡張 |
 | Firefox 上限: Memory 400 本超 | CAP を 400 にしたため上限未到達 | 実機でも必要なら CAP を上げる (RSS 0 の仮想予約のみ) |
@@ -71,3 +71,17 @@ runner (Linux) では Safari を起動できないため、macOS 実機で以下
 4. 検証: Safari 上で `done` が届かない場合は、Safari の開発メニュー → コンソールのエラーを記録する。
 
 確認済み (runner, 26ce4469): `work/` を削除した状態から `mkdir -p work` → one-liner 起動 → `POST /result?cfg=safari&key=done` 200 → 3.5 秒待機後に `work/p7_safari.json` を読み、`{"safari":{"done":{"ok":true}}}` が含まれることを確認 (rc=0)。`p7.html` 200・`/wasm?c=mid` 200 (941,572 B) も確認済み。Safari 本体の挙動は未確認 (runner では Safari を起動できない)。
+
+## 6. Android Chrome 実機の手動採取手順 ([PERF-P7d] #950)
+
+runner では Android 実機を使えないため、実機担当者が以下を行う。結果は未取得 (本ファイルに実測値は無い)。`p7.mjs` の自動起動は使わない (Safari 節 §5 と同じ方式)。
+
+1. PC (Linux / macOS。adb が使えること) で repo を checkout し、リポジトリ直下で次を実行する (Node 必要。サーバは 127.0.0.1 のみで待つ)。
+   ```sh
+   mkdir -p work && node --input-type=module -e "import fs from 'node:fs'; import {startServer} from './tools/perf/p7/server.mjs'; const s = await startServer(); console.log(s.url + '/p7.html?cfg=android&rounds=3'); setInterval(() => fs.writeFileSync('work/p7_android.json', JSON.stringify(s.results, null, 1)), 3000);"
+   ```
+   表示された URL のポート番号 (`<port>`) を控える。
+2. USB 接続の Android 端末に対して `adb reverse tcp:<port> tcp:<port>` を実行し、端末の 127.0.0.1 から PC のサーバへ届くようにする。端末の Chrome で `http://127.0.0.1:<port>/p7.html?cfg=android&rounds=3` を開く。ページは round 0 の全実験を行い、同一 URL を 2 回再ロードする (wasm code cache の観測)。
+3. PC 側で `work/p7_android.json` の `done` キーが出るまで待つ。`done` が出てから 3 秒以上待ってから同ファイルを確認する (書き出しは 3 秒おきの interval)。
+4. `work/p7_android.json` を `tools/perf/p7/results/` に移し、compile 時間・定常実行・AudioWorklet の `process()` 間隔 (underrun 判定) を §0 と同じ表形式で本ファイルに追記する。端末名・Chrome バージョン・CPU・メモリを併記する。
+5. 検証: `done` が届かない場合は、Android Chrome の `chrome://inspect` からコンソールのエラーを記録する。
