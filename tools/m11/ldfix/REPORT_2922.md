@@ -6,14 +6,15 @@
 
 ## 1. 測定
 
-- 測定 commit: `ff010340` (コードを変えた最後の commit。`candidate_verdicts_2922.jsonl`・`spill_classify_1161.py`・再生成した `spill178_1161.tsv`)。基点は `origin/main` の `71bf0957`
-- 素材: `work-m11` / `work-liftdiff` を `tar --zstd -xf` で repo 直下に展開 (gitignore 対象の `tools/m11/work/`・`tools/liftdiff/work/`)
-- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground、`TMPDIR=$RUNNER_TEMP`)。`ff010340` で rc=0・real 154s・実行後 load average 0.93 (1 分平均)。7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)
-- 集計 (7/7): spill 宛 unk site 178 / 71 関数。status 確定 123 (前 120) / 判定不能 29 (前 30) / 未判定 26 (前 28)
-- 脱落関数の和集合: spill 宛の確定 TRUE_DROP 関数 24 (前 23)。増分は `12cb680`。A ∪ B ∪ C = 69 + 6 = **75** (前 74)
-- 測定後の差分: `git diff ff010340 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)
-- 差し戻し後の修正 (文書のみ): REPORT の文言と PR 本文だけを変えた。コードと results は変えていない (`git diff ff010340 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし)
-- 差し戻し後の e2e 再実行: `bd643abf` を `git archive` で repo 外に書き出し、素材 (`work-m11` / `work-liftdiff`) も repo 外に展開して `M11_WORK` / `LD_WORK` で指定した。`audit_lsf_ssa_e2e.sh` を foreground で実行: rc=0・real 157s・load average 0.48 → 0.96・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` は results/ と cmp 一致。集計も下の値と一致
+- 測定 commit: `55ed65a2` (`origin/main` の `3d37a190` を取り込んだ merge。コードを変えた最後の commit)。取り込み前の PR 測定は `ff010340` (基点 `71bf0957`)
+- 素材: `work-m11` / `work-liftdiff` は repo 外に展開し、`M11_WORK` / `LD_WORK` で指定した (repo の `tools/**/work/` には置かない)。実行は `git archive` で repo 外に書き出した HEAD で行った
+- 実行: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` (foreground)。`55ed65a2` で rc=0・real 159s・load average 0.10 → 1.10・7/7 完了。`drops_510.tsv`・`spill178_1161.tsv` が results/ と一致 (cmp OK)
+- 取り込み前の測定 (`ff010340`): rc=0・real 154s・load average 0.93・7/7 完了・cmp OK
+- 集計 (7/7、`55ed65a2`): spill 宛 unk site 178 / 71 関数。status 確定 127 (前 124) / 判定不能 29 (前 30) / 未判定 22 (前 24)。「前」は `origin/main` (`3d37a190`) の `spill_classify_1161.py` を同じ `ssa.json` に当てた実測 (`results/spill178_1161.tsv` と一致)
+- 脱落関数の和集合: spill 宛の確定 TRUE_DROP 関数 25 (前 24)。増分は `12cb680`。A ∪ B ∪ C = 69 + 7 = **76** (前 75)
+- 測定後の差分: `git diff 55ed65a2 HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results` は出力なし (差分 0)
+- 差し戻し後の修正 (文書のみ): REPORT の文言と PR 本文だけを変えた。コードと results は変えていない
+- 差し戻し後の e2e 再実行 (取り込み前の `bd643abf`): rc=0・real 157s・load average 0.48 → 0.96・7/7 完了・cmp 一致。集計は確定 123 / 判定不能 29 / 未判定 26 (取り込み前の値)
 
 ## 2. 判定結果 (12cb680 の 3 site)
 
