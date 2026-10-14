@@ -18,7 +18,7 @@
 | 測定環境 (§3・§5・§6 の 9V45 の値) | fix run `a2c2c126` の runner (AMD EPYC 9V45、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。並列 1 (単一プロセス)。load は `uptime` の 1 分平均で、sweep 前 0.26・sweep 後 0.84 |
 | 測定環境 (§5・§6 の 9V74 の再確認) | `599f793c` で再測定した runner (AMD EPYC 9V74 80-Core、Ubuntu 24.04、gcc 13.3.0、glibc 2.39)。単一プロセス。sweep は 74.0 s (単独) |
 | 素材 | `work-icall` のみ (`tools/icall/work/` へ `tar --zstd -xf` で展開、実測 18.5 s)。`FA_CORE` は `tools/icall/work/rt_freshair-core/rw.dll` (未指定だと既定で `SlateCore.core_64` を探し、素材 plugins-freshair が要る) |
-| emsdk | 9V45 (`a2c2c126`) の run の素材に `toolchain-emsdk` は無かった。`[EMSDK]` (`docs/REFERENCES.md` §4) に上流 emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12` (19 s)。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。9V74 (`599f793c`) の run は `toolchain-emsdk` を使った (`/opt/emsdk`・emcc 6.0.12)。PR 本文の `oc_artifacts` に `toolchain-emsdk` を追加した |
+| emsdk | 9V45 (`a2c2c126`) の run の素材に `toolchain-emsdk` は無かった。`[EMSDK]` (`docs/REFERENCES.md` §4) に上流 emsdk を pin 版で入れた: `git clone` の後 `./emsdk install 6.0.12 && ./emsdk activate 6.0.12` (19 s)。`emcc 6.0.12` (`tools/m1/flags.sh` の `EMCC_VERSION_PIN` と一致)。9V74 (`599f793c`) の run は `toolchain-emsdk` 素材を使った (`[EMSDK]` の emcc 6.0.12)。PR 本文の `oc_artifacts` に `toolchain-emsdk` を追加した |
 | libottnative | `bash tools/ott/native/build.sh` で本 run に作り直した (`tools/ott/work/libottnative.so`。tarball には無い) |
 | fixed route 生成 | `FA_FRAME_SLOT=1 bash tools/icall/fa_route_build.sh`: 5.6 s (単独実行) |
 | 単発 fa_cmp | n=8 で 0.2 s 前後 |
