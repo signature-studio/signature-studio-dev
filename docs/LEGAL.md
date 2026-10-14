@@ -266,7 +266,7 @@ zplane (Auftakt / élastique Pro / Metering / Restore)、Chicken Systems (Sample
 ## 7. 見つからなかった/確認できなかった文書、出所に関する事実
 
 見つからない/読めなかった:
-- **Native Instruments (Massive X)**: 同梱 EULA は**未確認** (`tools/legal/REPORT.md` §1)。Web 版 EULA は検収時に全文確認済み (§4.4)。Web 版と同梱版の同一性は**未確認**のまま。
+- **Native Instruments (Massive X)**: 同梱 EULA は**未確認** (`tools/legal/REPORT.md` §1。展開手段の解明は #2498)。Web 版 EULA は検収時に全文確認済み (§4.4)。Web 版と同梱版の同一性は**未確認**のまま。
 - **Slate Digital (Fresh Air)**: 同梱 EULA はファイル名判定では**なし** (`tools/legal/REPORT.md` §2)。公式 ToS はオンライン版のみで、適用される版は未確認。
 - **Xfer OTT (mac)**: pkg に `<license>` なし。OTT 専用の規約文書は未確認 (共通 Xfer EULA が win ライセンス画面に出る)。Xfer の公式規約ページは**公式ページなし** (確認日 2026-10-14、`tools/legal/REPORT.md` §3)。
 - **Image-Line FAQ (公開)**: 未確認。LGL-6 の範囲だが本文書では扱っていない。
