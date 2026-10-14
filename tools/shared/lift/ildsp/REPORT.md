@@ -148,3 +148,72 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 | 旧 REPORT 値 (362,277 / 129,188 / 10,305) の出典 | 現 script では再現しない (決定的な出力は 362,280 / 129,192 / 10,307)。旧値は別の版・別の script 状態の産物と推定するが未確認 | #161 継続 (旧値の出典確認) |
 | closure の間接 call 先の解決 | 表の命令数は下限 | 起票案 (PSOLA lift) で扱う |
 | ildsp の lift 本体 | #161 後半未達 | #161 継続 |
+
+## 5. WaveformColouring_CreateInstance の vcall `0x1a9e2b` の dispatch 先 (#2484 / T-SH-37)
+
+既知類型との関係: 該当なし (逆アセと PE 読みのみ。lift・IR を作らないため D1a〜D23 の検出対象外)。
+検証起点 commit: `80fb2fd0` (origin/main)。測定 commit (コードを変えた最後の commit): `8b1e34ac` (`tools/shared/scripts/ildsp_wc_dispatch.py`・`ildsp_wc_dispatch_check.py` の追加)。
+
+### 結論 (1 行)
+`0x1a9e2b` の `call [rax+0x18]` は sub-object への dispatch ではない。instance 自身 (0x228 B・vptr は +0) の WC vtable slot 3 を呼び、その値は `0x1a9de0` (DIR64 reloc あり) で、**静的に `0x1a9de0` へ確定**する。前提は §5-5 の 2 件。
+
+Issue 本文の「sub-object の vtable」という前提は誤り。CreateInstance は wrapper を作らず、単一の object を返す (§5-1)。
+
+### 5-1. instance の生成と vptr (静的事実)
+- `0x1ac470`: `mov ecx,0x228` → alloc (`0x1ac9c0`) → rbx。`memset` (`0x1aef60`、r8=0x228) の後 `mov rcx,rbx` → `jmp 0x1ac4a0`。
+- `0x1ac4a0`: `lea rax,[rip+0x233cfc]` (0x1ac4ad、RVA `0x3e01b0`) → `mov [rcx],rax` (0x1ac4b4)。vptr は instance の +0 に書く。
+- closure 内で WC vtable (`0x3e01b0`) を書くのは 0x1ac4b4 の 1 件のみ (`ildsp_wc_dispatch.py` の `vptr 格納` 節)。
+
+### 5-2. vcall の解決
+| 項目 | 値 | 根拠 |
+|---|---|---|
+| vcall の場所 | `0x1a9e2b`: `call qword ptr [rax+0x18]` (fn `0x1a9e10`) | objdump (検算) |
+| `0x1a9e10` の位置付け | WC vtable slot 2 (RVA `0x3e01c0` の値) | vtable の生値 |
+| 呼び出し元 | `.text` 内に `0x1a9e10` への直接 call/jmp は無い (vtable からのみ) | capstone 全走査 |
+| `this` の vptr 読み | `0x1a9e16`: `mov rax,[rcx]` (rcx = instance) | objdump |
+| vptr の値 | `0x3e01b0` (§5-1) | |
+| slot 番号 | 3 (`0x18` ÷ 8) | |
+| slot RVA / 値 | `0x3e01c8` / `0x1a9de0` (VA `0x1801a9de0`、DIR64 reloc あり) | 生バイト検算 |
+| 解決先の性質 | thunk でない・closure 内・21 命令 | ildsp_wc_dispatch.py |
+| 解決先の中身 (逆アセ読み) | 2 回ループで instance の +0x20・+0x24 (dword) と +0x40・+0x48 (qword) をゼロにする | objdump |
+
+- vcall の後 (`0x1a9e2e` 以降) は、戻り値を使わずに instance の +0x8〜+0x18 等へ書く (逆アセ読み)。
+
+### 5-3. closure の間接 call 19 件の内訳 (WC)
+| 種別 | 件数 | 本 REPORT での扱い |
+|---|---:|---|
+| vcall `call [reg+disp]` | 1 (`0x1a9e2b`) | §5-2 で解決 |
+| IAT | 16 | 子 [T-SH-52] #3216 で扱う |
+| 画像内関数ポインタ | 2 (`0x1aedf6`→`0x268260`・`0x1b6f6c`→`0x268268`。helper `0x1aedc0`・`0x1b6f4c` 内) | §5-4 |
+
+件数は `ildsp_closure.py` の WaveformColouring 行 (間接 19) と一致する (`ildsp_wc_dispatch.py` の vcall 節は 1 件)。
+
+### 5-4. 共通の例外送出 helper `0x1aedc0` / `0x1b6f4c` (T-SH-36 #2483 の結果を参照)
+- 結論: 宛先 (`0x268260`・`0x268268`) は静的に確定しない。T-SH-36 の結論 (`REPORT.md` §4-6) をそのまま引く。本 issue では再調査しない。
+- `0x1aedc0` は IAT の `RtlPcToFileHeader`・`RaiseException` を呼ぶ。`0x1aedf6` の間接 call は `0x268260` → `0x1cb5e0` (`jmp rax`)。
+- `0x1b6f4c` の `0x1b6f6c` は `0x268268` → `0x1cb600` (`jmp [0x268260]`) で、同じ `jmp rax` に至る。`rax` の値は静的に不明。
+- 扱いの案 (未確認・推定): 例外送出の path とみなし、lift では trap を第一候補にする。正常系に到達しないことは子 [T-SH-52] の native 実行で確かめる。
+
+### 5-5. 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| closure 内の WC vtable 以外の vptr 格納 3 件 (`0x16475a` (fn `0x164740`・vtable `0x3d27a0`)、`0x1acfff` (fn `0x1acfe0`・`0x1acfe8`・vtable `0x3d2778`)) の書き込み先が、WC instance の +0 でないこと | §5-2 の解決 (`0x1a9de0`) の前提。3 関数は `.text` 内に直接の呼び出し元が無く、間接経由 | 子 [T-SH-52] #3216 (差分テストで検出) |
+| 前提の 2 件目: instance の vptr が `0x3e01b0` のまま変わらないこと (動的な書き換えは静的には見ていない) | 同上 | 子 [T-SH-52] #3216 |
+| helper `0x1aedc0`・`0x1b6f4c` の正常系到達 (§5-4) | 画像内関数ポインタ 2 件の扱い (trap か stub か) | 子 [T-SH-52] #3216 |
+| IAT 16 件の扱い (GetLastError・HeapAlloc 等) | lift 規模 | 子 [T-SH-52] #3216 |
+| 70 関数の lift・native 全バイト差分・ネガティブコントロール・gate (#2484 の受入条件 2・3) | 本 PR では未実施 | 子 [T-SH-52] #3216 |
+
+### 5-6. 検証
+- 再現 (3 コマンド): `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` → `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_wc_dispatch.py` → `python3 tools/shared/scripts/ildsp_wc_dispatch_check.py tools/shared/work/raw/ildsp_wc_dispatch.json <PE>`。
+- 入力: `block24360_PE.bin` (sha256 f4b23b0f…)。`ildsp_closure.py` の WaveformColouring 行 (70 関数・2,757 命令・SIMD 23.8%・間接 19) を再現した。
+- 結果: `ildsp_wc_dispatch_check.py` は `ALL OK` (rc 0)。
+- 実測 (測定 commit `8b1e34ac`、4 core、load average は実行前後とも 0.03): `ildsp_wc_dispatch.py` 0.190 / 0.190 / 0.198 s、`ildsp_wc_dispatch_check.py` 0.038 / 0.038 / 0.039 s (rc 0 ×3)。`ildsp_wc_dispatch.py` の 3 回の stdout は `cmp` で完全一致。
+- ネガティブコントロール (JSON を壊して検算を通すか):
+
+| 名前 | 壊し方 | 結果 |
+|---|---|---|
+| neg_target | vcall の target_rva を `0x1a9de1` | `MISMATCH: slot`・rc=1 |
+| neg_store | 格納 vtable を `0x3e01b8` | `MISMATCH: store`・rc=1 |
+
+- 検算の範囲: 命令は objdump、slot 値と DIR64 reloc は PE の生バイトで照合。closure の完全性と、vptr 格納の網羅 (§5-5 の 3 件の書き込み先) は検算していない。
+- `git diff 8b1e34ac HEAD -- tools/shared/scripts` は本 REPORT の commit 以降も空 (差分 0)。
