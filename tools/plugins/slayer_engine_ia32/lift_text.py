@@ -5,7 +5,7 @@
 
 関数境界の決め方 (根拠は REPORT_APPENDIX_1098.md §1):
   R1 export (main = 0x10007ca0)。
-  R2 .rdata / .data の .reloc 絶対 dword (vtable・関数ポインタ表) のうち、値が .text を指すもの (243 本)。
+  R2 .text 以外の .reloc 絶対 dword (vtable・関数ポインタ表) のうち、値が .text を指すもの (505 箇所: .rdata 371・.data 134。 distinct 243 本)。
   R3 .text 内の命令の即値 (mov/push/lea) のうち、値が .text を指すもの (10 本)。
   R4 直接 call 先は x64c の closure (再帰降下) で追加。 jump table は jmp の表から読む。
   .text 内の reloc 箇所のうち jump table 以外の値 (86 本) は roots に入れない (入れると data を命令として読む: REPORT_APPENDIX_1098.md §3)。
