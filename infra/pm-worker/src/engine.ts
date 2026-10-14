@@ -6,7 +6,7 @@ import { countOpencodeRuns, countRunsByPrio, type ActiveCount } from "./active.t
 import { classify, isStopReport, neededArts, type ClassifyInput, type Rows, type Snapshot } from "./classify.ts";
 import type { Config } from "./config.ts";
 import { Gh, GhError, type ListResult } from "./github.ts";
-import { buildLaunchBody, checkRelaunchIntent, inferArtifacts, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
+import { addArts, buildLaunchBody, checkRelaunchIntent, defaultArtLine, lowAllowance, noPrCooldownMs, planLaunch, prioOf, RELAUNCH_WINDOW_MS, validateArtLine, type LowCap, type Prio } from "./launch.ts";
 import { advanceLaunch, doneAtOf, observedBy, type LaunchObs, type LaunchState } from "./launchobs.ts";
 import type { Store } from "./kvstore.ts";
 import { countOpenPrs, nextReviewOnly, type PhaseState } from "./phase.ts";
@@ -26,6 +26,7 @@ import {
   type HistoryEntry,
   type PmTarget,
 } from "./pm.ts";
+import { RATE_EVAL_GAP_MS, RATE_EVAL_MAX_GAP_MS, RATE_STREAK, RATE_WINDOW_MS, rateHit } from "./ratealert.ts";
 import { RATE_GUARD, restGuardOn, type RateInfo } from "./ratelimit.ts";
 import { redact } from "./redact.ts";
 import type { VmState } from "./vmstate.ts";
@@ -33,6 +34,7 @@ import { appendSample, capValue, nextCap, peakRunning, targetEff, type Cap, type
 import {
   applyEvent,
   EMPTY_STATE,
+  isOpencodeRun,
   KILLED_STOP_AT,
   NEEDS_USER_LABEL,
   reviewSignal,
@@ -60,6 +62,26 @@ const INTENT_HARD_STOP = ["launch-unobserved"];
 // oc-watchdog の最短送信間隔は WATCHDOG_INTERVAL_S (既定 300 秒 = VM の pm_watchdog_ping.sh と同じ 5 分) から、この分だけ短い。
 // tick は毎分 (cron と alarm) で、わずかに早い tick を弾くと次の送信が 1 分遅れ、周期が 6 分になるため。
 export const WATCHDOG_JITTER_MS = 30_000;
+// 降格 (#2340): 同じ issue に、この時間内に Worker (PM App) と個人の /oc の組が付いたら DO を dry-run に戻す。
+export const OC_DOUBLE_MS = 30 * 60_000;
+// shadow (#2340): would_launch と VM の /oc を、この窓 (15 分) で突き合わせる。
+export const SHADOW_WINDOW_MS = 15 * 60_000;
+const OC_KEEP_MS = 2 * 3_600_000;
+const OC_RE = /^\/oc\b/m;
+
+// PM のログイン (個人と PM App) が付けた /oc の記録。vm は PM の個人アカウント (VM の投稿の正)。
+export interface OcPost {
+  n: number;
+  id: number;
+  at: number;
+  vm: boolean;
+}
+// dry-run 中の各 tick の would_launch (計画に載った issue 番号)。
+export interface WouldRec {
+  at: number;
+  ns: number[];
+}
+
 // 管理用の全体同期 (POST /admin/resync) は 1 時間に RESYNC_PER_HOUR 回まで (試行は失敗しても数える)。
 export const RESYNC_PER_HOUR = 2;
 // 失敗した配送の走査は REDELIVER_EVERY_MS ごと。1 走査の再配送は REDELIVER_MAX_PER_SCAN 件まで、同じ guid は REDELIVER_MAX_PER_GUID 回まで。
@@ -153,6 +175,10 @@ interface Meta {
   installationId?: number | null;
   lastPlan?: Plan;
   lastError?: { at: string; what: string };
+  // 降格 (#2340)。値があると launch と dispatch は dry-run になる。解除は手動 (POST /demote/reset)。
+  demoted?: { at: string; reason: string };
+  // 降格の判定を始めた時刻 (コードが最初に動いた時刻・解除した時刻)。これより前の /oc は判定の対象にしない (過去の二重投稿で止めない・解除前の組を再降格させない)。
+  ocWatchFrom?: number;
   // 一覧を上限ページで打ち切った対象 (名前ごとに、同じ一覧を次に読んだ結果で上書きする)。1 件でもあれば fresh=false。
   syncTruncated?: Record<string, { pages: number; at: string }>;
   // 直近の全体同期の REST 回数 (全体 / うちコメント一覧)。
@@ -166,6 +192,8 @@ interface Meta {
   redeliverAt?: number;
   // 直近の走査で見た status != OK の配送の件数
   redeliverFailed?: number;
+  // 率制限の判定 (#2345) の直近の評価。count / total は窓 (30 分) の件数、streak は条件を満たした評価の連続回数、alert は streak が RATE_STREAK 以上。
+  rateAlert?: { at: number; count: number; total: number; streak: number; alert: boolean };
   counters?: {
     launched: number;
     dispatched: number;
@@ -182,6 +210,8 @@ interface Meta {
     intentRejected?: Record<string, number>;
     redelivered?: number;
     wouldRedeliver?: number;
+    demoted?: number;
+    restored?: number;
   };
 }
 
@@ -205,13 +235,16 @@ export interface Log {
     | "resync"
     | "would-redeliver"
     | "redeliver"
-    | "import";
+    | "rate-alert"
+    | "import"
+    | "demote"
+    | "restore";
   n?: number;
   art?: string;
   note?: string;
 }
 
-const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig"] as const;
+const BUCKETS = ["issues", "prs", "runs", "botLast", "botReport", "pmArt", "blockedBy", "launchedAt", "sig", "rateRuns"] as const;
 
 export function loadState(store: Store): PmState {
   const s: PmState = structuredClone(EMPTY_STATE);
@@ -285,6 +318,8 @@ export class Engine {
   obs: Sample[];
   dirty = false;
   private busy = false;
+  private ocPosts: OcPost[];
+  private wouldRecs: WouldRec[];
 
   private readonly d: EngineDeps;
 
@@ -294,6 +329,12 @@ export class Engine {
     this.meta = d.store.get<Meta>("meta", "main") ?? {};
     this.log = d.store.get<Log[]>("meta", "log") ?? [];
     this.obs = d.store.get<Sample[]>("meta", "obs") ?? [];
+    this.ocPosts = d.store.get<OcPost[]>("meta", "ocPosts") ?? [];
+    this.wouldRecs = d.store.get<WouldRec[]>("meta", "wouldRecs") ?? [];
+    if (this.meta.ocWatchFrom === undefined) {
+      this.meta.ocWatchFrom = d.now();
+      this.saveMeta();
+    }
   }
 
   private saveMeta(): void {
@@ -341,12 +382,90 @@ export class Engine {
       this.s = r.state;
     }
     if (r.status === 202 && r.reason === "applied") this.dirty = true;
+    if (r.status === 202 && r.reason === "applied" && event === "issue_comment") this.noteOc(JSON.parse(body));
     return r;
+  }
+
+  // ---------------------------------------------------------------- 降格と shadow (#2340)
+  // PM のログイン (個人と PM App) の /oc 投稿を記録する。id で重複を除く (webhook と reconcile の両方から来るため)。
+  // 降格の組は、Worker (PM App) と Worker 以外の PM ログイン (個人) の /oc だけ (先後は問わない)。Worker 同士・個人同士の組は数えない。
+  // 組は OC_DOUBLE_MS 以内で同じ issue に付き、判定は ocWatchFrom 以降に届いたものだけ。
+  private noteOc(p: any): void {
+    const c = p?.comment;
+    const n = Number(p?.issue?.number);
+    const id = Number(c?.id);
+    const at = Date.parse(c?.created_at);
+    const login: string | undefined = c?.user?.login;
+    if (p?.action !== "created" || !Number.isInteger(n) || !Number.isInteger(id) || !Number.isFinite(at)) return;
+    if (!login || typeof c.body !== "string" || !this.pmLogins().includes(login) || !OC_RE.test(c.body)) return;
+    if (this.ocPosts.some((x) => x.id === id)) return;
+    const vm = this.d.cfg.pmLogins.includes(login);
+    const from = this.meta.ocWatchFrom ?? 0;
+    if (at >= from && this.ocPosts.some((x) => x.at >= from && x.n === n && x.vm !== vm && Math.abs(x.at - at) <= OC_DOUBLE_MS)) this.demote(`double-oc #${n}`);
+    const now = this.d.now();
+    this.ocPosts = [...this.ocPosts.filter((x) => x.at >= now - OC_KEEP_MS), { n, id, at, vm }];
+    this.d.store.put("meta", "ocPosts", this.ocPosts);
+  }
+
+  private demote(reason: string): void {
+    if (this.meta.demoted) return;
+    this.meta.demoted = { at: iso(this.d.now()), reason: this.clean(reason) };
+    this.meta.counters = this.meta.counters ?? this.zero();
+    this.meta.counters.demoted = (this.meta.counters.demoted ?? 0) + 1;
+    this.pushLog({ kind: "demote", note: reason });
+    this.saveMeta();
+  }
+
+  // 降格の解除。自動では戻さない (呼び出し側が repo の push 権限を確認してから呼ぶ)。
+  // 判定の起点を解除の時刻に移す。解除前の /oc の組は、full sync が読み直しても再判定しない。
+  resetDemote(): boolean {
+    if (!this.meta.demoted) return false;
+    this.meta.demoted = undefined;
+    this.meta.ocWatchFrom = this.d.now();
+    this.meta.counters = this.meta.counters ?? this.zero();
+    this.meta.counters.restored = (this.meta.counters.restored ?? 0) + 1;
+    this.pushLog({ kind: "restore", note: "manual" });
+    this.saveMeta();
+    return true;
+  }
+
+  // 投稿・dispatch の実効モード。設定が live でも、降格中は dry-run。
+  private launchLive(): boolean {
+    return this.d.cfg.liveLaunch && !this.meta.demoted;
+  }
+  private dispatchLive(): boolean {
+    return this.d.cfg.liveDispatch && !this.meta.demoted;
+  }
+
+  // 直近 SHADOW_WINDOW_MS の would_launch (計画) と、VM (PM の個人アカウント) の /oc を突き合わせる。個票は出さず、issue 番号だけ。
+  // recall = VM が投稿した各 issue が、投稿の直前 15 分以内の would_launch に含まれていた割合。
+  // precision = would_launch の (tick, issue) のうち、15 分以内に VM が同じ issue を投稿した割合。投稿 0 件の窓では null。
+  shadow(): Record<string, unknown> {
+    const now = this.d.now();
+    const ws = now - SHADOW_WINDOW_MS;
+    const W = SHADOW_WINDOW_MS;
+    const vm = this.ocPosts.filter((x) => x.vm && x.at >= ws && x.at <= now);
+    const recs = this.wouldRecs.filter((w) => w.at >= ws - W && w.at <= now);
+    const hit = (p: OcPost) => recs.some((w) => w.at >= p.at - W && w.at <= p.at && w.ns.includes(p.n));
+    const pairs = recs.filter((w) => w.at >= ws).flatMap((w) => w.ns.map((n) => ({ n, at: w.at })));
+    const posted = (q: { n: number; at: number }) => vm.some((p) => p.n === q.n && p.at >= q.at && p.at <= q.at + W);
+    const recallHit = vm.filter(hit).length;
+    const precHit = pairs.filter(posted).length;
+    const uniq = (xs: number[]) => [...new Set(xs)].sort((a, b) => a - b);
+    return {
+      window_start: iso(ws),
+      posts: vm.length,
+      recall: vm.length ? recallHit / vm.length : null,
+      precision: pairs.length ? precHit / pairs.length : null,
+      vm_only: uniq(vm.filter((p) => !hit(p)).map((p) => p.n)),
+      worker_only: uniq(pairs.filter((q) => !posted(q)).map((q) => q.n)),
+    };
   }
 
   // ---------------------------------------------------------------- 同期
   // 戻り値は、DO の内容が実際に変わった entity の数 (reconcile の食い違いの計数に使う)。
   private applyAll(event: (typeof WEBHOOK_EVENTS)[number], payload: unknown): number {
+    if (event === "issue_comment") this.noteOc(payload);
     const next = applyEvent(this.s, event, payload as any, this.d.cfg.botLogin, this.pmLogins(), this.d.cfg.reviewerLogin);
     if (next === this.s) return 0;
     const changed = countChanged(this.s, next);
@@ -634,7 +753,7 @@ export class Engine {
   }
 
   private zero(): NonNullable<Meta["counters"]> {
-    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0 };
+    return { launched: 0, dispatched: 0, wouldLaunch: 0, wouldDispatch: 0, reconciles: 0, pmDispatched: 0, wouldDispatchPm: 0, closed: 0, wouldClose: 0, redelivered: 0, wouldRedeliver: 0, demoted: 0, restored: 0 };
   }
 
   // 完了して 1 時間たった run は捨てる (順不同配送の判定に使う期間だけ持つ)。
@@ -645,6 +764,14 @@ export class Engine {
         this.d.store.del("runs", k);
         const { [k]: _, ...rest } = this.s.runs;
         this.s = { ...this.s, runs: rest };
+      }
+    }
+    // 率制限のマーカーは run と同じ 1 時間で捨てる (判定の窓は 30 分)。
+    for (const [k, v] of Object.entries(this.s.rateRuns)) {
+      if (Date.parse(v.at) < cut) {
+        this.d.store.del("rateRuns", k);
+        const { [k]: _, ...rest } = this.s.rateRuns;
+        this.s = { ...this.s, rateRuns: rest };
       }
     }
     // 閉じた issue / PR の手がかりは使わない。数えた run の id (killRun) だけは残す (reopen の後に古い run の配送が届いても数え直さない)。
@@ -667,7 +794,7 @@ export class Engine {
     const s = this.s;
     const issues = Object.values(s.issues)
       .filter((i) => i.state === "open")
-      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount } }));
+      .map((i) => ({ number: i.number, title: i.title, labels: i.labels, body: i.body, deps: { total_blocked_by: i.blockedByCount }, ...(i.artLine ? { artLine: i.artLine } : {}) }));
     const prs = (Object.values(s.prs) as PrState[]).map((p) => ({ number: p.number, state: p.state, ref: p.ref, body: p.body }));
     const runs = (Object.values(s.runs) as RunState[])
       .filter((r) => r.status !== "completed")
@@ -775,11 +902,9 @@ export class Engine {
     // pm-apply・needs-user-input は着手も再投入もしない (下の HOLD_LABELS の処理で user に置く)。
     const held = (n: number) => (labels.get(n) ?? []).some((l) => HOLD_LABELS.includes(l));
     const failed = (n: number): boolean => input.launchState?.[String(n)] === "failed";
-    // 既定の素材行 (PM の oc_artifacts 行。無ければ題名とラベルからの推定)。picks の既定と同じ。
-    const baseArt = (n: number): string => {
-      const b = this.s.pmArt[String(n)]?.line;
-      return b && validateArtLine(b) ? b : inferArtifacts(title.get(n) ?? "", labels.get(n) ?? []);
-    };
+    // 既定の素材行 (PM の行 → 本文の行 → 推定)。picks の既定と同じ。
+    const artOf = new Map(snap.issues.map((i) => [i.number, i.artLine] as const));
+    const baseArt = (n: number): string => defaultArtLine(this.s.pmArt[String(n)]?.line, artOf.get(n), title.get(n) ?? "", labels.get(n) ?? []);
 
     const moveTo = (n: number, from: keyof Rows, to: () => void) => {
       (rows as any)[from] = (rows as any)[from].filter((x: any) => (Array.isArray(x) ? x[0] : x) !== n);
@@ -796,7 +921,6 @@ export class Engine {
       const outcome = this.s.sig[String(n)]?.outcome;
       const reason = outcome?.reason ?? "unknown";
       const c = this.noPrState(n);
-      const prevNames = (c.art ?? baseArt(n)).replace("oc_artifacts:", "").trim().split(/\s+/).filter(Boolean);
       let pick: { art: string; np: NoPrReason; reportAt?: string } | null = null;
       let recent = false;
       let note = reason;
@@ -816,8 +940,8 @@ export class Engine {
         // 素材を足すのは、直前の報告が停止報告のときだけ (報告の素材名を読む)。報告が無い (古い保存値) は新しい素材なし。
         const rep = snap.bot_report[String(n)];
         const stop = isStopReport(rep?.head ?? "");
-        const extra = stop ? neededArts(n, input).filter((a) => !prevNames.includes(a)) : [];
-        if (extra.length) pick = { art: "oc_artifacts: " + [...prevNames, ...extra].join(" "), np: "artifact" };
+        const line = stop ? addArts(c.art ?? baseArt(n), neededArts(n, input)) : null;
+        if (line) pick = { art: line, np: "artifact" };
         else note = !rep || stop ? "artifact: 新しい素材なし" : "artifact: 停止報告でない";
       } else {
         note = `oc:no-pr ${reason} 再投入済み`;
@@ -899,9 +1023,10 @@ export class Engine {
       if (!i) continue;
       const base = this.s.pmArt[String(n)]?.line;
       const np = npPick.get(n);
-      const cand = relMap.get(n) ?? np?.art ?? (base && validateArtLine(base) ? base : inferArtifacts(i.title, i.labels));
-      // 本文由来 (PM コメント・bot 報告) の行は、allowlist を通ったものだけを使う。通らなければ推定値に落とす。
-      const art = validateArtLine(cand) ? cand : inferArtifacts(i.title, i.labels);
+      const dflt = defaultArtLine(base, i.artLine, i.title, i.labels);
+      const cand = relMap.get(n) ?? np?.art ?? dflt;
+      // 素材行は allowlist を通ったものだけを使う。通らなければ既定 (PM の行 → 本文の行 → 推定) に落とす。
+      const art = validateArtLine(cand) ? cand : dflt;
       picks.push({ n, art, relaunch: relMap.has(n), np: np?.np, reportAt: np?.reportAt });
     }
     const plan: Plan = {
@@ -974,13 +1099,17 @@ export class Engine {
       return plan;
     }
     this.d.store.put("meta", "phase", plan.phase);
+    // shadow 用の記録 (dry-run でも live でも、計画に載った issue を残す)。15 分の窓で突き合わせるので、2 窓分だけ保つ。
+    const now = this.d.now();
+    this.wouldRecs = [...this.wouldRecs.filter((w) => w.at >= now - 2 * SHADOW_WINDOW_MS), ...(picks.length ? [{ at: now, ns: picks.map((p) => p.n) }] : [])];
+    this.d.store.put("meta", "wouldRecs", this.wouldRecs);
     // 遷移したときだけ記録する (毎 tick 書かない)。
     const guarded = restGuardOn(this.meta.rest?.remaining);
     if (guarded !== !!this.meta.rateGuardOn) {
       this.meta.rateGuardOn = guarded;
       this.pushLog({ kind: "skip", note: `${RATE_GUARD} ${guarded ? "on" : "off"} remaining=${this.meta.rest?.remaining ?? "?"}` });
     }
-    const live = this.d.cfg.liveLaunch && gh;
+    const live = this.launchLive() && gh;
     const planned = this.d.store.get<Record<string, number>>("meta", "planned") ?? {};
     // 再投入の意図は picks より先に処理する。picks が先に投稿すると、同じ issue の意図は『投稿の後に出た意図』として focus なしで処理済みになるため。
     // 意図で扱った issue (投稿・dry-run の記録) は picks から外す。停止中 (review-only・stuck・rate-guard・取り込み前の no-import) は picks も空なので、意図も処理しない (処理済みにせず次の tick に回す)。
@@ -1189,7 +1318,7 @@ export class Engine {
     if (this.d.now() - last < minGap) return "skipped";
     if (!this.fresh()) return "skipped";
     this.meta.counters = this.meta.counters ?? this.zero();
-    if (!this.d.cfg.liveDispatch || !gh) {
+    if (!this.dispatchLive() || !gh) {
       this.meta.watchdogAt = this.d.now();
       this.meta.counters.wouldDispatch++;
       this.saveMeta();
@@ -1220,7 +1349,7 @@ export class Engine {
 
   // 履歴は live と dry-run で分ける (dry-run の記録が、live に切り替えた直後の送信を抑止しないように)。
   private pmHistoryKey(): string {
-    return this.d.cfg.liveDispatch ? "pmDispatch" : "pmWould";
+    return this.dispatchLive() ? "pmDispatch" : "pmWould";
   }
   private pmHistory(): HistoryEntry[] {
     return pruneHistory(this.d.now(), this.d.store.get<HistoryEntry[]>("meta", this.pmHistoryKey()) ?? []);
@@ -1231,7 +1360,7 @@ export class Engine {
   async pmDispatch(gh: Gh | null): Promise<{ sent: PmTarget[]; would: PmTarget[] }> {
     const out = { sent: [] as PmTarget[], would: [] as PmTarget[] };
     if (!this.fresh()) return out;
-    const live = !!(this.d.cfg.liveDispatch && gh);
+    const live = !!(this.dispatchLive() && gh);
     const now = this.d.now();
     const hist = this.pmHistory();
     const { send } = selectDispatch(now, this.detectPmTargets(), hist);
@@ -1330,7 +1459,7 @@ export class Engine {
     this.meta.digestAt = now;
     this.meta.counters = this.meta.counters ?? this.zero();
     const hist = [...this.pmHistory(), { kind: DIGEST_KIND, ref: DIGEST_REF, at: now }];
-    if (!this.d.cfg.liveDispatch || !gh) {
+    if (!this.dispatchLive() || !gh) {
       this.meta.counters.wouldDispatchPm = (this.meta.counters.wouldDispatchPm ?? 0) + 1;
       this.d.store.put("meta", this.pmHistoryKey(), hist);
       this.pushLog({ kind: "would-pm-dispatch", n: DIGEST_REF, note: DIGEST_KIND });
@@ -1449,7 +1578,10 @@ export class Engine {
       if (!this.meta.fullSyncAt || now - this.meta.fullSyncAt > FULL_SYNC_EVERY_MS || stale) await this.fullSync(gh);
       else if (now - (this.meta.reconcileAt ?? 0) >= this.d.cfg.reconcileIntervalS * 1000) await this.reconcile(gh);
       // 同期が古い・打ち切り中は run 一覧が不完全なので観測しない (launch と同じ条件)。偽の飽和を作らないため。
-      if (this.fresh()) this.observe(now);
+      if (this.fresh()) {
+        this.observe(now);
+        this.rateAlert();
+      }
       await this.watchdog(gh);
       await this.launch(gh);
       await this.pmDispatch(gh);
@@ -1474,6 +1606,28 @@ export class Engine {
   // 次の alarm までの待ち (ms)。dirty (webhook 直後) は 2 秒、それ以外は 60 秒。
   nextDelayMs(): number {
     return this.dirty ? 2000 : 60_000;
+  }
+
+  // 率制限の判定 (#2345・CI-66)。直近 30 分に完了した opencode.yaml の run のうち、cause=rate_limit のマーカーがあるものを数える。
+  // 件数と割合の条件を RATE_STREAK 回連続で満たしたら alert。alert は通知しない (起票は CI-67)。REST は呼ばない。
+  // 評価は tick ごとだが、alarm と cron が重なった分は数えない (RATE_EVAL_GAP_MS 以内は評価しない)。
+  rateAlert(): void {
+    const now = this.d.now();
+    const prev = this.meta.rateAlert;
+    if (prev && now - prev.at < RATE_EVAL_GAP_MS) return;
+    let count = 0;
+    let total = 0;
+    for (const r of Object.values(this.s.runs)) {
+      if (r.status !== "completed" || !isOpencodeRun(r)) continue;
+      const t = Date.parse(r.updatedAt);
+      if (!(t > now - RATE_WINDOW_MS && t <= now)) continue;
+      total++;
+      if (this.s.rateRuns[String(r.id)]) count++;
+    }
+    const streak = rateHit(count, total) ? (prev && now - prev.at <= RATE_EVAL_MAX_GAP_MS ? prev.streak : 0) + 1 : 0;
+    const alert = streak >= RATE_STREAK;
+    if (alert !== (prev?.alert ?? false)) this.pushLog({ kind: "rate-alert", note: alert ? "on" : "off" });
+    this.meta.rateAlert = { at: now, count, total, streak, alert };
   }
 
   // ---------------------------------------------------------------- 観測
@@ -1535,12 +1689,15 @@ export class Engine {
       build: this.d.cfg.build,
       // mode は両方の経路が live のときだけ "live" (pm_gate.sh は mode=live を『VM の command を止めてよい』と読む)。
       // 片方だけ live のときは "partial"。個別の状態は mode_launch / mode_dispatch。
-      mode: this.d.cfg.liveLaunch && this.d.cfg.liveDispatch ? "live" : this.d.cfg.liveLaunch || this.d.cfg.liveDispatch ? "partial" : "dry-run",
-      mode_launch: this.d.cfg.liveLaunch ? "live" : "dry-run",
-      mode_dispatch: this.d.cfg.liveDispatch ? "live" : "dry-run",
+      mode: this.launchLive() && this.dispatchLive() ? "live" : this.launchLive() || this.dispatchLive() ? "partial" : "dry-run",
+      mode_launch: this.launchLive() ? "live" : "dry-run",
+      mode_dispatch: this.dispatchLive() ? "live" : "dry-run",
       mode_close: this.d.cfg.liveClose ? "live" : "dry-run",
       // 規則 A の候補数 (issue 番号は出さない。記録は counters.wouldClose と log の would-close)。
       auto_close_detected: detectRuleA(this.s).length,
+      // 降格 (#2340) の理由。issue 番号だけを含む。降格していなければ null。解除は POST /demote/reset (手動)。
+      demoted_reason: this.meta.demoted?.reason ?? null,
+      shadow: this.shadow(),
       // TARGET に数える run の総数 (opencode.yaml の in_progress + queued など。実装・review・fix・oc-pm・watchdog の全て)。active_all と同じ値。
       active_runs: plan.active,
       active_all: plan.active,
@@ -1590,7 +1747,7 @@ export class Engine {
       open_issues_delta_24h: base ? open - base.open : null,
       pm_dispatch_1h: this.pmHistory().filter((h) => now - h.at < 3_600_000).length,
       // dry-run で『送るはずだった』oc-pm (直近 24 時間。kind と ref だけ)。LIVE_DISPATCH では空。
-      would_dispatch_pm: this.d.cfg.liveDispatch ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
+      would_dispatch_pm: this.dispatchLive() ? [] : this.pmHistory().map((h) => ({ kind: h.kind, ref: h.ref, at: iso(h.at) })),
       last_full_sync: this.meta.fullSyncAt ? iso(this.meta.fullSyncAt) : null,
       last_reconcile: this.meta.reconcileAt ? iso(this.meta.reconcileAt) : null,
       last_watchdog: this.meta.watchdogAt ? iso(this.meta.watchdogAt) : null,
@@ -1614,6 +1771,17 @@ export class Engine {
       // dry-run のために投稿しなかった GitHub への書き込み (/oc 投稿 + repository_dispatch) の累計。
       dry_run_skipped_posts: counters.wouldLaunch + counters.wouldDispatch,
       reconcile_diff: this.meta.reconcileDiff ?? { last: 0, total: 0 },
+      // 率制限の判定 (#2345)。alert は 2 回連続で条件を満たしたとき true。rate_limit_30m は直近の評価の窓 (30 分) の件数と割合 (評価が無ければ null)。通知はしない。
+      rate_limit_alert: this.meta.rateAlert?.alert === true,
+      rate_limit_30m: this.meta.rateAlert
+        ? {
+            count: this.meta.rateAlert.count,
+            total: this.meta.rateAlert.total,
+            rate: this.meta.rateAlert.total ? this.meta.rateAlert.count / this.meta.rateAlert.total : null,
+            streak: this.meta.rateAlert.streak,
+            at: iso(this.meta.rateAlert.at),
+          }
+        : null,
       rest_remaining: rest?.remaining ?? null,
       rest_used: rest?.used ?? null,
       rest_reset_at: rest?.reset !== undefined ? iso(rest.reset * 1000) : null,
