@@ -4,7 +4,7 @@
 フィールド + issue の open/closed。`docs/WORKFLOW.md` §3)。
 旧 `tools/docs/MILESTONES.md`・`tools/ipp/STATUS.md`・`tools/m11/STATUS.md` は本ファイルに統合し削除した。
 
-- 更新責任: merge の事実を反映する更新は agent も PR で行ってよい (自動更新は [DOCS-21])。方針の変更・MS の定義の改訂は PM。
+- 更新責任: merge の事実を反映する更新は agent も PR で行ってよい (自動更新は #2361)。方針の変更・MS の定義の改訂は PM。
 - 測定値・実測数値は書かない。各リンク先 (`tools/<area>/REPORT.md`) が単一の正本。
 - 引き継ぎ情報は `docs/HANDOFF/2026-10-12.md`。
 
@@ -93,7 +93,7 @@
 | `python` | CPython wasm+ブリッジ。flapi provider の静的リンクと per-module state が main 入り。FLEngine 実機上の動作は未達 | `tools/python/REPORT.md` |
 | `flp` | FLP/FST パーサ設計 | `tools/flp/REPORT.md` |
 | `plugins` | 141 種マップ (カウントの正本: `tools/plugins/REPORT.md`) | `tools/plugins/REPORT.md` |
-| `plugins/framework` | TFruityHost shim。fw stage-2 は runner で再構築可能 (PLG-P0a)。e2e chain は work-fw-stage1 素材で通る | `tools/plugins/framework/REPORT.md` |
+| `plugins/framework` | TFruityHost shim。fw stage-2 は runner で再構築可能 (PLG-P0a)。framework smoke PASS・hs_e2e Phase B は未達 (memory access out of bounds。#985) | `tools/plugins/framework/REPORT.md` |
 | `plugins/p0c` | kernel 表検証+f80 | `tools/plugins/p0c/REPORT.md` |
 | `shared` | 分類+OSS 再ビルド+プロプラ lift PoC | `tools/shared/REPORT.md` |
 | `ipp` | 評価・PoC・優先 stub 充填まで完了 | `tools/ipp/REPORT.md` |
