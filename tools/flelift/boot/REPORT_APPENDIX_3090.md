@@ -18,7 +18,7 @@
 - **0x15F34A0 の書込み元 (受入 3)**: 未了。lift C の `0x15f34a0` の参照は `s2:94092` (`0x6542eb` の `lea rdx,[0x15f34a0]`、
   `f_653f40` の登録ループで `f_653dd0` に渡す引数) の 1 箇所。直接の store は無く、終了前に 0 へ戻す箇所は特定していない。
 
-## 1. 計測 (`bash tools/flelift/boot/fle6_measure.sh`、素材 `fl-win64`・emsdk は runner 既設の `/opt/emsdk`)
+## 1. 計測 (`bash tools/flelift/boot/fle6_measure.sh`、素材 `fl-win64`・emsdk は `SS_EMSDK_ENV` で runner 既設のものを指定)
 
 ### 1-0. 同一セッションの対照 (HEAD `b5ac0f2f`・修正前 `8d8d0e6a`)
 
