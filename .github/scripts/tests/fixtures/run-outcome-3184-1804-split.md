@@ -2,7 +2,7 @@
 
 **確認したこと**
 - 前提 #1815 (`[PY-42]`) は 2026-10-14T07:01Z に merge 済み。`tools/python/REPORT_PY42.md` は `main` にある (commit `1b6fe7b5`・`573bb86a`)。前回停止の理由は解消。
-- 素材は揃っている: `$HOME/artifacts/` に `fl-win64.tar.zst`・`toolchain-retdec.tar.zst`・`toolchain-emsdk.tar.zst` が実在。`oc_artifacts` の追加指定は不要。
+- 素材は揃っている: `$ARTIFACTS_DIR/` に `fl-win64.tar.zst`・`toolchain-retdec.tar.zst`・`toolchain-emsdk.tar.zst` が実在。`oc_artifacts` の追加指定は不要。
 - 未達の受入条件は 5 件 (意味論の確定・C 実装・mock と C の diffs 0・`all_tools.mjs` 48/48 ok)。いずれも未着手。
 - REPORT_PY42 の時点で、11 関数の戻り値・引数の意味は未確定 (ハンドラ書式は読めたが意味は未決)。推測実装は禁止。
 

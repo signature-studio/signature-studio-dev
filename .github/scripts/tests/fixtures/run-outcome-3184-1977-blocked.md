@@ -5,7 +5,7 @@
 - 本文の前提は「[MX-27] の結果」であり、範囲の注記にも「呼び出し元が未確定のうちは RULES を変更しない (根拠なしの br_force / store は silent miscompile になる)」とある。
 - 前提の #1976 [MX-27] (DLL 側の N5/N6 読み手と呼び出し元の確定) は **OPEN** で、結果が REPORT_APPENDIX.md にまだ無い。
 - 親 #1900 の受入 2・3 は、子 #1976 の完了待ちになっている。
-- 素材 (fl-win64 / plugins-massivex / toolchain-retdec / toolchain-emsdk) は $HOME/artifacts に実在を確認済み。素材不足は無い。
+- 素材 (fl-win64 / plugins-massivex / toolchain-retdec / toolchain-emsdk) は $ARTIFACTS_DIR に実在を確認済み。素材不足は無い。
 
 ### 結論
 - 呼び出し元が未確定の状態で RULES を変えると silent miscompile になるため、差し替えの実装は行わない。

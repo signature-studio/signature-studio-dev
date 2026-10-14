@@ -7,7 +7,7 @@
 - #3077 は OPEN です。その受入 6「`node tools/gui/flengine/cfi_probe.mjs` が `EnterCriticalSection` を越え、次の停止点 (または S22 到達) を記録すること」が未達です。最新の実測 (commit `ae963e28`) では `CreateFruityInstance` が 1 ms で Aborted しています (`[shim] CS-MISS key=0x12bd390`)。
 - この状態で trace しても open 系の呼出しは 0 件のままです (#2905 の実測と同じ)。受入 1〜3 は測れません。
 - branch `2965-*` の既存 PR はありません。
-- 素材: `$HOME/artifacts` に `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` / `work-m11` が実在します。素材作業は、依存が解けてから行います。
+- 素材: `$ARTIFACTS_DIR` に `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` / `work-m11` が実在します。素材作業は、依存が解けてから行います。
 
 **PM への依頼**
 - 依存の表示が実態とずれています。#2880 は閉じているため「ブロックする open な issue が無い」と判定されましたが、実際のブロッカーは #3077 です。`blocked_by: #3077` の設定をお願いします。
