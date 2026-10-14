@@ -19,7 +19,10 @@ const resolve = (f) => { const m = /wasm-function\[(\d+)\]/.exec(f); return m &&
 const errs = [];
 // trace 行 (m11_ov.c の M11_TRACE) は診断用の別チャンネル: rec.err には入れない (SV_TRACE_AT の有無で survey JSON を変えないため, #495)
 const TRACE_RE = /^\[m11\]\[(icall|icall-miss|InitUnits|unit \d+\/\d+|InitLib|UStrAsg|longjmp)\]/;
-const mod = await m2.default({ printErr: (s) => { s = String(s); const tr = TRACE_RE.test(s); if (!tr) errs.push(s); if (tr || process.env.SV_TRACE_AT) fs.writeSync(2, s + '\n'); } });
+// SV_ERR_LOG=<file>: 非 trace の stderr を unit 番号付きで全行 <file> に追記する (rec.err は unit あたり 3 行で切られるため). 既定 OFF
+let curUnit = -1;
+const errLog = process.env.SV_ERR_LOG ? fs.openSync(process.env.SV_ERR_LOG, 'w') : null;
+const mod = await m2.default({ printErr: (s) => { s = String(s); const tr = TRACE_RE.test(s); if (!tr) { errs.push(s); if (errLog !== null) fs.writeSync(errLog, `unit ${curUnit} ${s}\n`); } if (tr || process.env.SV_TRACE_AT) fs.writeSync(2, s + '\n'); } });
 if (process.env.SV_TRACE_PROBE) mod.m11_trace_probe = 1;   // trace が汚した shadow stack の最深距離を測る (M11_TRACE_SPAN の裏取り)
 mod.HEAPU8.set(fs.readFileSync(M11 + '/work/m11_image.bin'), 0);
 mod._m11_set_survey(1); if (process.env.SV_TRACE) mod._m11_set_trace(1);
@@ -60,6 +63,7 @@ for (let i = 0; i < 942; i++) {
   const miss0 = mod._m11_icall_miss(), uniq0 = mod._m11_icall_miss_uniq();
   const ic0 = icallCounts();
   const e0 = errs.length;
+  curUnit = i;
   if (process.env.SV_PROG) fs.writeSync(2, 'unit ' + i + '\n');
   const rec = { unit: i, va: '0x' + mod._m11_unit_va(i).toString(16) };
   try {
