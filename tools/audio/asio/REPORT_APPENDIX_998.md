@@ -44,22 +44,23 @@
 | A の ring 枯渇の直接原因 (producer 側の遅延か consumer 側の遅延か) が未特定。`cb_late` との対応は 1 件のみで未確定 | 原因と対処 (受入条件 2) が未達 | #998 |
 | underrun 時の ring 深さ・worklet 側ログの採取は本節では未実施 (snapshot の min_fill のみ) | 枯渇の時刻と経路が分からない | #998 → §12-4 で一部採取 |
 
-### 12-4. underrun 直前の ring 充填 trace (2026-10-14・検証 HEAD `e1418105` + harness 出力追加)
+### 12-4. underrun 直前の ring 充填 trace (2026-10-14・測定 commit `b09073d9` + harness 出力追加)
 
 harness (`harness/chunk_verify.mjs`) の結果 JSON に `underrun_trace` (初回 underrun 直前 64 quantum の `cap.fill` 推移) と `callback_gap` (worklet 呼出間隔ヒストグラム, `hdr[8..14]`) を追加した。worklet 本体・判定基準・ゲートは無変更。負荷は `yes` 4 本 (4 コア runner)、実行は worktree の絶対パスで foreground。
 
 | 実行 | exit | 所要 | `com_ramp_b256_d2` underruns / silence | min_fill | worklet 呼出間隔 最大 (ms) | producer cb_max (µs) | cb_late / wait_timeouts |
 |---|---|---|---|---|---|---|---|
-| T1 | **1** | 215 s | **1 / 256** | 256 | 14 | 23,839 | 0 / 0 |
+| T1 | **1** | 215 s | **1 / 256** | 0 (※・trace 上) | 14 | 23,839 | 0 / 0 |
 | T2 | 0 | 207 s | 0 / 0 | 未記録 | 16 | 未記録 | 未記録 |
 | T3 | 0 | 211 s | 0 / 0 | 未記録 | 16 | 未記録 | 未記録 |
 
-- **T1 の trace**: `fill_before_first` は underrun 直前の 64 quantum。直近の値は `…1024, 896, 768, 640, 512, 640, 512, 384, 256, 128, 0` で、途中に小さな戻り (512 → 640) を含むものの、全体として 1024 から 0 へ段階的に減っている。一段の瞬断ではなく、producer が ring を補充し切れなくなった形。
-- T1 の `cb_max` 23.8 ms は 1 回だけの producer 側の長い bufferSwitch。原因との対応は未確定。
+- **T1 の trace**: `fill_before_first` は underrun 直前の 64 quantum。直近 11 点は `…1024, 896, 768, 640, 512, 640, 512, 384, 256, 128, 0`。隣接差分は −128 が 9 回、+128 が 1 回 (512 → 640) で、残りの quantum は消費 (128 frames/quantum ≒ 2.67 ms) のみ分減っている。つまり約 9〜10 quantum (≒ 24〜27 ms) の間 producer がほぼ書き込まず、その後 1 回だけ部分的に復帰して underrun に至った形。「段階的な追従不足」ではなく「producer の書き込み停止」が実測に近い。
+- T1 の `cb_max` 23.8 ms (単発の producer 側 bufferSwitch) は、上記の停止時間 (≒ 24〜27 ms) と時間的に整合する。ただし因果は推定で、停止の原因 (どの wake / JS 往復か) は未特定。
+- (※) `min_fill` は旧版の表で 256 としていたが、trace と矛盾していた (256 は同行の silence 値の取り違えの可能性が高い)。harness の `device_fill` は `k = 8 .. qEnd` の全 quantum を走査し、underrun 最初の quantum の充填は trace 末尾の `0` と同じ `cap.fill` 配列の値なので、`device_fill.min` は 0 になるはず。T1 の結果 JSON は `work/` ごと未保存のため、`device_fill.min` の直接確認は未了。
 - T1 の `cb_late` 0・`wait_timeouts` 0 で、worklet 側の呼出間隔も最大 14 ms。worklet が止まったのではなく、producer が充填を追えなくなった可能性が高い。ただしこれは trace からの推定で、producer 側の時系列 (どの wake で遅れたか) は未採取。
 - T2・T3 は underrun 0 で、`callback_gap` は T1 と同程度 (最大 16 ms)。
 
-**判定**: 負荷下の underrun は、充填が徐々に枯渇する形 (producer 追従不足) で再現する。`cb_late` や worklet 停止では説明できない。直接原因 (producer のどの待ちで遅れたか) は未特定のため、受入条件 2 は**部分達成のまま**。
+**判定**: 負荷下の underrun は、producer が約 24〜27 ms 書き込みを止めたあと 1 回だけ部分復帰して ring が枯渇する形で再現する (1 回の bufferSwitch 停止と時間的に整合)。`cb_late` や worklet 停止では説明できない。直接原因 (producer のどの待ちで遅れたか) は未特定のため、受入条件 2 は**部分達成のまま**。
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
