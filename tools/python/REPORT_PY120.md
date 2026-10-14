@@ -91,7 +91,7 @@ $ git diff 937343d7 HEAD -- tools/python ':!*.md'
 
 環境 (本 run):
 
-- 素材: `$ARTIFACTS_DIR` に `fl-win64.tar.zst` と `toolchain-emsdk.tar.zst` が実在することを `ls` で確認した。`fl-win64` は `tar --zstd -xf ... --wildcards` で `extracted/block00031_PE.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` を `$RUNNER_TEMP/fl-win64` に展開 (2.996 秒)。`FL_WIN64_DIR` はその展開先。emsdk は `/opt/emsdk` (emcc 6.0.12)。
+- 素材: `$ARTIFACTS_DIR` に `fl-win64.tar.zst` と `toolchain-emsdk.tar.zst` が実在することを `ls` で確認した。`fl-win64` は `tar --zstd -xf ... --wildcards` で `extracted/block00031_PE.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block25159_DATA.bin`・`block24618_DATA.bin` を `$RUNNER_TEMP/fl-win64` に展開 (2.996 秒)。`FL_WIN64_DIR` はその展開先。emsdk は `[EMSDK]` (emcc 6.0.12)。
 - 前提の生成物 (gitignore の `work/`・`dist/`。commit しない): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 13.3 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、6.18 秒)。`provider_check.mjs` は `dist/flpy.js` を読むため、この生成物が無いと動かない。
 - runner: 4 core。load average は計測中 2.5〜2.6 (`uptime`、21:57)。
 
