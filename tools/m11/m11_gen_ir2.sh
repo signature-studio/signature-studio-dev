@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 source ../shared/env.sh   # FL_WIN64_DIR (環境変数で指定)
 PE="${M11_PE:-${PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}}"
-python3 m11_cond.py --reset ldfix=pending qstore=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
+python3 m11_cond.py --reset ldfix=pending qstore=not-applied ld108=not-applied pe="$PE"   # #680: IR 生成条件を記録 (work/ir_conditions.json)
 CH="work/boot0.lift.ll work/boot1.lift.ll work/boot2.lift.ll work/boot3.lift.ll"
 [ -f work/boot4.lift.ll ] && CH="$CH work/boot4.lift.ll"
 # boot5 = 間接 call 先の fallback 実装 (m11_extra_ranges5.txt; #132 unit #23)
@@ -48,6 +48,17 @@ elif [ -f "$PE" ] && python3 -c 'import capstone, pefile' 2>/dev/null; then
   python3 ldfix/ldfix.py work/boot_final.ll work/boot_final.ldfix.ll --pe "$PE" --report work/ldfix_report.json ${LDFIX_ARGS:-}
   mv work/boot_final.ldfix.ll work/boot_final.ll
   python3 m11_cond.py ldfix=applied
+  # ld108 (#2316/#2402, D20): 41a670 の head 解除 store (機械語 `mov rax,[rax]` = [arg1+0]) を lift 段の [arg1+8] の load から直す。
+  #   1 関数だけを書き換え、想定と違う IR (仮引数の型・store 行・二重適用) は assert で止める (set -e で fail-closed)。
+  #   M11_FIX_LD108=0 は適用前の IR を明示的に取る A/B 検証用 (ldfix/ld108_e2e.sh)。ir_conditions.json に ld108=disabled を残し、build は M11_ALLOW_LD108_DISABLED=1 でしか通さない。
+  if [ "${M11_FIX_LD108:-1}" = 0 ]; then
+    python3 m11_cond.py ld108=disabled
+    echo "[gen_ir2] M11_FIX_LD108=0: fix_ld108 を適用しない (ir_conditions.json ld108=disabled; build は M11_ALLOW_LD108_DISABLED=1 が要る)" >&2
+  else
+    python3 ldfix/fix_ld108.py work/boot_final.ll work/boot_final.ld108.ll
+    mv work/boot_final.ld108.ll work/boot_final.ll
+    python3 m11_cond.py ld108=applied
+  fi
 else
   python3 m11_cond.py ldfix=skipped
   echo "[gen_ir2] ERROR: ldfix skip (PE 無し: $PE / capstone・pefile 無し) — fail-closed で失敗" >&2
