@@ -2,7 +2,7 @@
 
 # #2585: pm-worker の Workers Builds install と Workers Logs の測定
 
-測定 commit: `e11ab9a9` (`infra/pm-worker/` のコードを変えた最後の commit。`origin/main` (`f3102162`) を取り込んだ merge。main 側の `src/`・`test/` の変更を含むため、取り込み前の `fc4e5915` から再測定した)。PR #2586。検証は測定 commit を `git archive` で別 dir に展開し、既定設定のまま行った。環境: pnpm 12.10.1 (root `devEngines` と同じ)・Node v22.23.3 (runner)・wrangler 4.151.0。
+測定 commit: `6868e0a1` (`infra/pm-worker/` のコードを変えた最後の commit。`minimumReleaseAgeExclude` を外した commit。`origin/main` (`064af0d8`) を取り込んだ merge `be1ee59d` の後)。PR #2586。環境: pnpm 12.10.1 (root `devEngines` と同じ)・Node v22.23.3 (runner)・wrangler 4.151.0。
 
 ## 0. 取得方法
 
@@ -43,52 +43,42 @@
 - 差分が無い merge 37 件のうち 11 件にも、ビルドが作成された (2026-10-14 の観測)。
 - 公式は『push event の変更ファイルが 0 件ならパス判定を飛ばして build する』と書く。原因は未確認。
 
-## 4. 検証 (測定 commit `e11ab9a9`、既定設定・CLI 上書きなし)
+## 4. 検証 (測定 commit `6868e0a1`、既定設定・CLI 上書きなし)
 
-### 4-1. `pnpm install --frozen-lockfile`
+### 4-1. `pnpm install --frozen-lockfile` (exclude 無し)
 
-修正前 (merge 後の `01c27a6a`。`minimumReleaseAgeExclude` 無し): rc=1
-
-```
-✗ Lockfile failed supply-chain policy check (159 entries in 1s)
-Error: ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION
-3 lockfile entries failed verification: @cloudflare/vitest-plugin@1.4.2, miniflare@5.20261012.0-beta, wrangler@4.151.0
-```
-
-修正後 (`fc4e5915` の展開で未キャッシュの検証: rc=0。`e11ab9a9` は lockfile が同一で、`git diff fc4e5915 e11ab9a9 -- infra/pm-worker/pnpm-lock.yaml` は差分 0。`e11ab9a9` の展開では検証結果がキャッシュ表示): rc=0
+`CI=true`・`node_modules` を削除してから実行。rc=1。
 
 ```
-✓ Lockfile passes supply-chain policies (159 entries in 415ms)
+✗ Lockfile failed supply-chain policy check (159 entries in 995ms)
 Lockfile is up to date, resolution step is skipped
-Packages: +79
-.../node_modules/workerd postinstall$ node install.js
-.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
-.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
-.../node_modules/workerd postinstall: Done
-devDependencies:
-+ @cloudflare/vitest-plugin 1.4.2
-+ vitest 4.1.11
-+ wrangler 4.151.0
-Done in 1.8s using pnpm v12.10.1
-rc=0
+Error: ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION
+3 lockfile entries failed verification:
+  @cloudflare/vitest-plugin@1.4.2 was published at 2026-10-14T05:53:30.000Z
+  miniflare@5.20261012.0-beta was published at 2026-10-14T05:43:25.000Z
+  wrangler@4.151.0 was published at 2026-10-14T05:48:57.000Z
+  (minimumReleaseAge cutoff: 2026-10-13T16:27:02.904Z)
+rc=1
 ```
 
-`e11ab9a9` の展開 (`git archive HEAD package.json infra/pm-worker tools/pm`) の install: `✓ Lockfile passes supply-chain policies (verified 4m ago)` → `Packages: +79` → `Done in 60ms using pnpm v12.10.1` → rc=0。
+- 3 版が 24 時間を過ぎるのは、pnpm の表示で 2026-10-15T05:53:30Z 以降 (vitest-plugin)、npm の `time` で 2026-10-15T05:54:48Z 以降 (§4-5)。05:55Z 以降なら両方を満たす。その時刻以降は既定設定のまま通る見込み (未確認)。
+- PM 判断 (2026-10-14) で `minimumReleaseAgeExclude` は採らない。exclude を入れた試行 (`fc4e5915`・`e11ab9a9`・`12aca053`) は rc=0 だったが、採用しない (§4-6)。
 
-### 4-2. テスト (`e11ab9a9` の展開)
+### 4-2. テスト
 
-| コマンド | 結果 | rc |
+| コマンド | 結果 (測定 commit `6868e0a1`) | rc |
 |---|---|---|
-| `pnpm test` | tests 201 / pass 201 / fail 0 (10 s) | 0 |
-| `pnpm run test:unit` | 10/10 (2 s) | 0 |
-| `pnpm run test:workers` | 3/3 (4 s) | 0 |
+| `pnpm test` (依存なし。Node の test runner と Python 3) | tests 251 / pass 251 / fail 0 (12.5 s) | 0 |
+| `pnpm run test:unit` | 未実施。`vitest` が入らない (§4-1) | — |
+| `pnpm run test:workers` | 未実施。`@cloudflare/vitest-plugin` が入らない (§4-1) | — |
 
-`tools/pm` を含めて展開する必要がある (突き合わせテストが `tools/pm/*.py` を読む)。
+未実施の 2 件は 2026-10-15 05:55Z 以降の既定設定の install で再測定する (PR #2586 の未解決表)。exclude 入りの旧測定の値は §4-6。今の HEAD の値ではない。
 
-### 4-3. dry-run と observability の読み取り
+### 4-3. dry-run と observability
 
-- `pnpm exec wrangler deploy --dry-run --outdir <一時 dir>`: rc=0。Total Upload 107.48 KiB / gzip 33.40 KiB。bindings は `PM` (PmDO) と `[vars]` 10 個 (`REPO` `ORG` `TARGET=50` `BATCH=25` `BOT_LOGIN` `PM_LOGINS` `LIVE_LAUNCH=1` `LIVE_DISPATCH=1` `NO_PR_COOLDOWN_H=24` `COMMENT_MAX_PAGES=150`)。
-- `unstable_readConfig({ config: 'wrangler.toml' })` の `observability`: `{"enabled":true,"head_sampling_rate":1}`。
+- `pnpm exec wrangler deploy --dry-run`: 未実施 (wrangler が入らない。§4-1)。exclude 入りの旧測定の値は §4-6。
+- `wrangler.toml` の observability を TOML として直接読む (測定 commit `6868e0a1`・依存なし): `{'enabled': True, 'head_sampling_rate': 1}`。`[observability]` の table は main と同一で、本 PR では触っていない。
+- `wrangler.toml` の `[vars]` と `[[durable_objects]]` も同じ読み取りで確認: DO binding は `PM` (`PmDO`) の 1 件。`[vars]` は 10 個 (`REPO` `ORG` `TARGET` `BATCH` `BOT_LOGIN` `PM_LOGINS` `LIVE_LAUNCH` `LIVE_DISPATCH` `NO_PR_COOLDOWN_H` `COMMENT_MAX_PAGES`)。
 
 ### 4-4. fsevents の darwin 模擬 (Copilot の指摘の確認)
 
@@ -99,28 +89,21 @@ rc=0
 
 ### 4-5. npm registry の公開時刻 (`npm view <pkg>@<ver> time`)
 
-| 版 | 公開時刻 (UTC) |
-|---|---|
-| `miniflare@5.20261012.0-beta` | 2026-10-14T05:43:27.769Z |
-| `wrangler@4.151.0` | 2026-10-14T05:50:43.466Z |
-| `@cloudflare/vitest-plugin@1.4.2` | 2026-10-14T05:54:48.543Z |
-
-3 版の最後の公開 (05:54:48.543Z) から 24 時間を過ぎるのは 2026-10-15T05:54:48Z 以降。`minimumReleaseAgeExclude` を外すと、それまで frozen lockfile の install が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落ちる (4-1)。
-
-### 4-6. main 取り込み後の再測定 (測定 commit `12aca053`)
-
-§4-1〜4-5 は測定 commit `e11ab9a9` の値。`12aca053` は `origin/main` (`58d1183b`) を取り込んだ merge commit で、`infra/pm-worker` の lockfile・package.json・pnpm-workspace.yaml は `e11ab9a9` と同一。`wrangler.toml` は main と同一。テストは main 側の `refs_orphan` のテストが増えて 201 → 213 件。既定設定・CLI 上書きなし、作業 tree は `12aca053` のまま (`infra/pm-worker` の `node_modules` を削除して再作成)。
-
-| 検証 | 結果 | rc |
+| 版 | npm の `time` (UTC) | pnpm の表示 (§4-1) |
 |---|---|---|
-| `CI=true pnpm install --frozen-lockfile` | `✓ Lockfile passes supply-chain policies (verified 1m ago)` → `Packages: +79` → `Done in 66ms using pnpm v12.10.1` (store のキャッシュ済み検証。未キャッシュの検証は §4-1) | 0 |
-| `pnpm test` | tests 213 / pass 213 / fail 0 (15.5 s) | 0 |
-| `pnpm run test:unit` | 10/10 (vitest 783 ms) | 0 |
-| `pnpm run test:workers` | 3/3 (vitest 1.39 s) | 0 |
-| `pnpm exec wrangler deploy --dry-run --outdir <一時 dir>` | Total Upload 109.30 KiB / gzip 33.88 KiB。bindings は `PM` (PmDO) と `[vars]` 10 個 | 0 |
-| `unstable_readConfig` の observability | `{"enabled":true,"head_sampling_rate":1}`・DO binding 1 件 | — |
+| `miniflare@5.20261012.0-beta` | 2026-10-14T05:43:27.769Z | 05:43:25.000Z |
+| `wrangler@4.151.0` | 2026-10-14T05:50:43.466Z | 05:48:57.000Z |
+| `@cloudflare/vitest-plugin@1.4.2` | 2026-10-14T05:54:48.543Z | 05:53:30.000Z |
 
-`git diff 12aca053 HEAD -- infra/pm-worker` の出力は空 (測定後の commit は `tools/pm/` だけを変える)。
+最後の版が 24 時間を過ぎるのは、npm の `time` で 2026-10-15T05:54:48Z 以降、pnpm の表示で 05:53:30Z 以降。README と PR 本文は両方を満たす 05:55Z を目安にする。
+
+### 4-6. 旧測定 (exclude 入り・不採用。今の HEAD の値ではない)
+
+exclude を入れていた時点の測定。PM 判断 (2026-10-14) で採らないため、参考として残す。
+
+- `fc4e5915`: 未キャッシュの policy 検証で `✓ Lockfile passes supply-chain policies (159 entries in 415ms)` → `Packages: +79` → `Done in 1.8s using pnpm v12.10.1`。rc=0。
+- `e11ab9a9`: `pnpm test` 201/201 (10 s)・`test:unit` 10/10 (2 s)・`test:workers` 3/3 (4 s)。rc は各 0。`tools/pm` を含めて展開する必要がある (突き合わせテストが `tools/pm/*.py` を読む)。
+- `12aca053` (main `58d1183b` 取り込み後): `CI=true pnpm install --frozen-lockfile` は `verified 1m ago` (store のキャッシュ済み検証) → `Done in 66ms` rc=0。`pnpm test` 213/213 (15.5 s)・`test:unit` 10/10 (783 ms)・`test:workers` 3/3 (1.39 s)・`wrangler deploy --dry-run` rc=0 (Total Upload 109.30 KiB / gzip 33.88 KiB・bindings は `PM` と `[vars]` 10 個)・`unstable_readConfig` の observability `{"enabled":true,"head_sampling_rate":1}`。
 
 ## 5. 未解決
 
