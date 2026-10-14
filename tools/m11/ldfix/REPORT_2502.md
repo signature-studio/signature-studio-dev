@@ -110,4 +110,4 @@ python3 tools/m11/ldfix/scan_spill_deref_2502.py tools/m11/work/boot_final3.ll -
 ```
 
 - 測定 commit: `8ec1def3` (コード差分の最終 commit)。本 REPORT を含む後続 commit はドキュメントのみ。
-- `git diff 8ec1def3 HEAD -- tools/m11/ldfix tools/m11/m11_ov.c` の出力 (差分 0 の証跡) は下記。
+- `git diff 8ec1def3 HEAD -- tools/m11/ldfix/fix_450560.py tools/m11/ldfix/scan_spill_deref_2502.py tools/m11/ldfix/stage4.sh tools/m11/ldfix/ldfix_e2e.sh tools/m11/m11_ov.c | wc -l` → `0` (コード差分 0 行)。後続の差分は `REPORT_2502.md` と `docs/DOC_MAP.md` のみ (`git diff --stat 8ec1def3 HEAD`)。
