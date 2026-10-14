@@ -61,35 +61,36 @@
 
 ## 検証
 
-測定 commit: `6a9fe2df` (コードを変えた最後の commit。main `8fd940bb` を取り込んだ merge)。main は `875eba29` の取り込み後にも進んだため、再 merge した。競合は `host/fl_mock.mjs` と `tests/provider_check.mjs` の 2 件で、両側の追加 (PY-121 の screen 5 関数と PY-125 の 2 関数) を残した。以後の commit は REPORT_PY125.md のみ。
-環境: runner 4 core。測定中の load average は 0.11〜0.18 (`uptime` 21:55:18〜21:55:46。直前のビルドの後)。素材: `fl-win64` ([WIN64]) を展開し、`extracted/block00031_PE.bin`・`block25159/24429/24430/24618_DATA.bin` を使う (`FL_WIN64_DIR` = [WIN64] の展開先)。emsdk は [EMSDK] の 6.0.12。この run は launch 時に `toolchain-emsdk` が展開されていなかったため、上流から導入した (`git clone` emsdk → `./emsdk install 6.0.12` → `./emsdk activate 6.0.12`、約 2 分)。PR 本文に `oc_artifacts: fl-win64 toolchain-emsdk` を書いた。
+測定 commit: `bd7db129` (コードを変えた最後の commit。main `65ea0ce3` を取り込んだ merge。競合は無く、自動 merge)。直前の測定は `6a9fe2df` (main `8fd940bb` 取り込み後)。以後の commit は本 REPORT_PY125.md のみ。
+main 取り込みの `tools/python` 側の変更 (`git diff --stat 8fd940bb 65ea0ce3 -- tools/python`) は `REPORT_PY109.md`・`tests/browser/static_subinterp.html`・`tests/static_subinterp_browser.mjs` の追加 (313 行) だけで、`host/`・`provider/`・検証 tests (`general_diff`・`provider_check`・`all_tools`・`mixer_diff`・`screen_diff`) は変わっていない。
+環境: runner 4 core。`uptime` 22:05:28 (テスト直後) の load average 1.13 (1 分値)。素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf` 7.9 秒)、`FL_WIN64_DIR` はその展開先。`toolchain-emsdk` を `$RUNNER_TEMP/toolchain-emsdk` に展開 (6.5 秒)。ビルドは `/opt/emsdk` (6.0.12。artifact と同版。`build_cpython_wasm.sh` が `/opt/emsdk` を直接 source する) を使った。
 
-前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、3 分 50.6 秒。`e3154671` の tree で作成。以後 `tools/python/src`・`analysis`・CPython ビルドスクリプトは変わっていない (`git diff --stat e3154671 6a9fe2df -- tools/python/src tools/python/analysis tools/python/build_*.sh` は空))・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒。`6a9fe2df` で再ビルド)・`bash provider/build.sh` (rc 0、0.7 秒。`gen_provider.py --check-handlers` でハンドラ 99)。
+前提の生成物 (gitignore): `bash fetch_inputs.sh` (rc 0、0.9 秒)・`bash build_cpython_wasm.sh` (rc 0、3 分 7.6 秒。`bd7db129` の tree で作成)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、4.6 秒)・`bash provider/build.sh` (rc 0、1.0 秒)。ハンドラ数は `python3 provider/gen_provider.py --check-handlers provider/fl_engine.c` で 99 (期待値 99 と一致)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.037 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 99 / 未実装 336 / MCP 静的 60) (rc 0) | 0.278 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.269 秒 |
-| `node tests/all_tools.mjs` (既定 JS mock) | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.286 秒 |
-| `node tests/mixer_diff.mjs` (main 側の追加分。既定色 0xff636c71 を mock と wasm で検査) | calls 59、diffs 0、PASS (rc 0) | 0.039 秒 |
-| `node tests/screen_diff.mjs` (main 側 #2985 の追加分) | calls 32、diffs 0、PASS (rc 0) | 0.044 秒 |
+| `node tests/general_diff.mjs` | calls 16、diffs 0、PASS (rc 0) | 0.047 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 99 / 未実装 336 / MCP 静的 60) (rc 0) | 0.271 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.317 秒 |
+| `node tests/all_tools.mjs` (既定 JS mock) | 48/48 ok、host_calls 37,425、callback 往復 true (rc 0) | 1.236 秒 |
+| `node tests/mixer_diff.mjs` (main 側の追加分。既定色 0xff636c71 を mock と wasm で検査) | calls 59、diffs 0、PASS (rc 0) | 0.038 秒 |
+| `node tests/screen_diff.mjs` (main 側 #2985 の追加分) | calls 32、diffs 0、PASS (rc 0) | 0.041 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `clearLog` の戻り値を `undefined` から `0` にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1。元に戻すと calls 16・diffs 0・PASS (rc 0)。
+wall は `date +%s.%N` の差 (node 起動を含む)。
 
-コード差分 (前回の測定 commit `e8604912` から `6a9fe2df` まで。`tools/python` の .md 以外。main 側の PY-118 既定色・PY-121 screen 状態・両者の merge 解消と、本 PR のコメント修正):
+ネガティブコントロール (`docs/WORKFLOW.md` §5。前回測定 `6a9fe2df` で実施。その後 PR の対象コード (`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/general_diff.mjs`) は変わっていない): `host/fl_mock.mjs` の `clearLog` の戻り値を `undefined` から `0` にすると、`node tests/general_diff.mjs` は `AssertionError [ERR_ASSERTION]: general 差分 1 件` で rc 1。元に戻すと calls 16・diffs 0・PASS (rc 0)。
+
+コード差分 (前回の測定 commit `6a9fe2df` から `bd7db129` まで。`tools/python` の .md 以外。main 側の追加のみ):
 
 ```
-$ git diff --stat e8604912 6a9fe2df -- tools/python ':!*.md'
- tools/python/host/fl_mock.mjs         | 13 +++++--
- tools/python/provider/fl_engine.c     | 14 ++++++--
- tools/python/tests/mixer_diff.mjs     |  6 ++++
- tools/python/tests/provider_check.mjs |  8 +++--
- tools/python/tests/screen_diff.mjs    | 67 +++++++++++++++++++++++++++++++++++
- 5 files changed, 100 insertions(+), 8 deletions(-)
+$ git diff --stat 6a9fe2df bd7db129 -- tools/python ':!*.md'
+ tools/python/tests/browser/static_subinterp.html | 162 +++++++++++++++++++++++
+ tools/python/tests/static_subinterp_browser.mjs  |  56 ++++++++
+ 2 files changed, 218 insertions(+)
 ```
 
-測定 commit から本 REPORT の commit までの差分 (`git diff 6a9fe2df HEAD -- tools/python ':!*.md'`) は空 (本 commit は REPORT_PY125.md だけを変える)。
+`static_subinterp_browser.mjs` は main 側 PY-109 の headless Chrome probe で、本 PR の検証対象ではない (本測定では実行していない)。測定 commit から本 REPORT の commit までの差分 (`git diff bd7db129 HEAD -- tools/python ':!*.md'`) は空 (本 commit は REPORT_PY125.md だけを変える)。
+
 
 ## 未解決
 
