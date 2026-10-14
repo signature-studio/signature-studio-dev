@@ -5,7 +5,7 @@
 ## 1. 結論
 - (c) の段の切り分け: **部分達成**。snapshot IR (`69c774de…`) と ldfix0 再生成 IR (`25e931f2…`) の差は、`m11_gen_ir2.sh` の **ldfix 段** (`ldfxr`・`ldfxc`) と、`alloca [N x i64]` の出所 (§4) の 2 段で生じる。`boot_all.ll`・`boot_allfx.ll` (merge・numfix・asmfix) までは snapshot と sha256 が完全一致する。両者は同じ `boot{0..4}.lift.ll` を入力にしているため、lift 段の差は本測定の範囲に無い。RetDec を再実行した lift 段の再現 (`--full`) は未実施。snapshot の `ldfxc` 差 (54 件) は **`b5eeb322` (#736・F3c-block の値 store 門) で生じる**。その直前の `7db8953b` の ldfix で snapshot の `ldfxc` 66 行と完全一致し、`b5eeb322` 以降は 12 行 (§3-2)。
 - `alloca [N x i64]` の 54 件 (snapshot) と 0 件 (ldfix0 再生成) の差: **`159d9fc0` (alloca pass R8 の追加) で生じる**。R8 導入前の `m11_alloca.py` (`159d9fc0~1`) を ldfix1 再生成 IR に当てると `alloca [N x i64]` は **54 件** で snapshot と一致する (§4)。現 HEAD の `m11_alloca.py` は 2,408 件を生む。
-- (b) ok 861 → 868 (+7) の二分探索: **部分達成**。862→866 は `f39a9e3b` 付近、866→868 は単調でなく `3bdae05d` 付近まで絞った候補区間 (§8)。単一の原因 commit は未確定。残りは子 issue に切り出す (§6)。
+- (b) ok 861 → 868 (+7) の二分探索: **部分達成**。862→866 は `f39a9e3b` 付近、866→868 は単調でなく `3bdae05d` 付近まで絞った候補区間 (§8)。単一の原因 commit は未確定。残りは子 issue に切り出す (§6)。 その後 #2163 で変化点を commit 単位に特定 (§8-4)。
 - (d) `m11_e2e.sh` 既定経路の再通し: **未達**。`functions_dll.csv` は素材に無く、Ghidra 12.1.4 (`[GHIDRA]` 無し) の取得と headless 実行 (約 10 分) を本 run で行う時間が無かった。子 issue に切り出す (§6)。
 
 受入条件の充足: (a)(c) は達成、(b)(d) は未達。issue は `Refs #1415`。
@@ -86,6 +86,7 @@ python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408
 ```
 
 ## 8. #1597 (M11-N103) の二分結果: ok 862→866・866→868 の変化点 (#2163)
+- 訂正 (§8-4): PE が固定パスの commit (`c2936605` を祖先に持たない) の値は ldfix skip 条件の可能性がある。§8-1〜§8-3 と §9 のうち該当する値は、ldfix 有りで再測した §8-4 を正本とする。
 - 測定の条件: 各 commit で `git archive <commit> tools/m11 tools/shim tools/shared tools/m6` を展開し、work-m11 の lift 中間物 (`boot0..6.lift.ll`) と `m11_image.bin` だけ外から置く。`M11_LDFIX=1 bash m11_gen_ir2.sh` → `m11_data_gen.py` → `m11_image_gen.py` → `M11_QSTORE=0 bash m11_build.sh` → `node m11_survey.mjs`。`FL_WIN64_DIR` は fl-win64 の PE 1 member。`m11_data.c` と `m11_image.bin` は commit ごとに作り直す (`m11_e2e.sh` と同じ順)。
 - 環境: 4 vCPU。Node v22.23.3。1 commit の測定は gen 18〜83 秒・build 13〜51 秒・survey 8〜31 秒 (2〜4 並列で実行したため、時間は並列数で変わる)。load average は直列測定時 0.66 (`uptime`)、並列時は未記録。
 - 測定 commit (本 PR の起点): `6444b186` (main)。現 head `72bf1144` は未再測定。`6444b186`〜`72bf1144` の間で測定範囲にコード差分があるため、`6444b186` の測定値は `72bf1144` の値として扱わない。
@@ -143,14 +144,14 @@ python3 alloca/m11_alloca.py work/boot_final.ll out.ll --report r.json   # 2,408
 | `f39a9e3b^1` | main 側 (枝の直前) | 862 | 32 | 47 |
 | `ef34c29f` (merge-base) | — | 862 | 32 | 47 |
 
-- **862→866 を起こす commit は `03692a0c`**。その直前 `03692a0c^` は 861 で、枝の上では 861→866 (+5)。`03692a0c` の差分は `tools/m11/m11_ov.c` の +23 行 (`function_47b260` の C 転記) のみ。
+- **862→866 を起こす commit は `03692a0c`**。その直前 `03692a0c^` は 861 で、枝の上では 861→866 (+5)。(この 861/866 は PE 固定パスの commit の値。ldfix 有りでは 856→861。§8-4)`03692a0c` の差分は `tools/m11/m11_ov.c` の +23 行 (`function_47b260` の C 転記) のみ。
   ```
   $ git diff --stat 03692a0c^ 03692a0c -- tools/m11
    tools/m11/m11_ov.c | 23 +++++++++++++++++++++++
    1 file changed, 23 insertions(+)
   ```
   差分本文 (`git diff 03692a0c^ 03692a0c -- tools/m11`) は `function_47b260` の C 転記 (`#if M11_FIX_682` で囲まれた 23 行、`m11_ov.c` の 480 行付近)。
-- 注: main 側の 862 (`f39a9e3b^1`) と枝の起点の 861 は一致しない。code 変更を含む first-parent 列で見ると、`035274be` (861) の次の code 変更 commit `04fafae6` (Merge PR #701 `134-m11-stage6`) で 862 になる。この merge の内部 commit 単位の切り分けは未実施。
+- 注: main 側の 862 (`f39a9e3b^1`) と枝の起点の 861 は一致しない。code 変更を含む first-parent 列で見ると、`035274be` (861) の次の code 変更 commit `04fafae6` (Merge PR #701 `134-m11-stage6`) で 862 になる。この merge の内部 commit 単位の切り分けは未実施 (ldfix 有りでは `5ee72b93` 単独の 856→862 と切り分け済み。§8-4)。
 - 再現確認: `03692a0c` 866 / `03692a0c^` 861 を再実行して同値 (n=2)。
 
 ### 8-2. ok 866→867→868 の変化点 (`e07cc83f`〜`3bdae05d`)
@@ -175,7 +176,7 @@ first-parent で `e07cc83f`〜`3bdae05d` を測った (merge 単位、各 n=1)�
 
 ### 8-3. 検証範囲 / 未解決
 - 範囲: 本 runner・1 ホスト・PE 1 member・各 commit n=1 (`03692a0c`・`03692a0c^` のみ再実行して n=2、同値)。
-- 未解決 (起票先: 親 #1597): (i) `04fafae6` (Merge PR #701) の内部 commit 単位の切り分け (861→862 の起点)、(ii) `2c77e8b0`〜`35c3425b` の間の code 変更 commit 14 件 (未測定。`902f1132`・`b6e4eb42` は 867 と測定済み)。受入条件の範囲外。
+- 未解決 (起票先: 親 #1597): (i) `04fafae6` (Merge PR #701) の内部 commit 単位の切り分け (861→862 の起点。ldfix 有りでは `5ee72b93` 単独の 856→862 で解消、§8-4)、(ii) `2c77e8b0`〜`35c3425b` の間の code 変更 commit 14 件 (未測定。`902f1132`・`b6e4eb42` は 867 と測定済み)。受入条件の範囲外。
 ## 9. (b) 二分探索の結果 (#1597・部分達成・候補区間)
 - 測定 commit: 各行の commit ごとに `git archive <commit> tools/m11 tools/shim tools/shared` を展開し、work-m11 の lift 成果物から IR を再生成 (`m11_gen_ir2.sh`, `M11_LDFIX=1`, `M11_QSTORE=0`) → `m11_build.sh` → `m11_survey.mjs`。PE は fl-win64 の `block00031_PE.bin` (sha256 `b2c64da4…`)。n=1。4 vCPU。load 0.8〜1.3。
 - 対象列: `git rev-list --first-parent d6a17b64..4c3f7458 -- tools/m11 tools/shim tools/shared` の 221 件 (終端は測定 commit `4c3f7458` に固定。`origin/main` は後から進むため使わない)。下表の `c2936605`・`8afdc9e1`・`5ee72b93` はこの列の外 (側枝 commit。`d6a17b64..4c3f7458` の祖先ではあるが first-parent の path 絞りに出ない) で、測定の参考として載せる。表の行順は時系列ではない (`035274be` は列内、`c2936605` は側枝で、PE 修正の説明の順に並べた)。
@@ -183,8 +184,8 @@ first-parent で `e07cc83f`〜`3bdae05d` を測った (merge 単位、各 n=1)�
 
 | commit | ok | miss | trap | 備考 |
 |---|---|---|---|---|
-| `d6a17b64` | 861 | 46 | 34 | 旧 base。ldfix 適用済みで再生成 |
-| `035274be` | 861 | 46 | 34 | PR #700 直前 |
+| `d6a17b64` | 861 | 46 | 34 | 旧 base。ldfix 適用済みで再生成 (§8-4: PE 固定パスで skip の可能性。未再測) |
+| `035274be` | 861 | 46 | 34 | PR #700 直前 (§8-4: ldfix 有りでは 856) |
 | `c2936605` | 856 | 46 | 38 | PE パス修正 (#134)。`035274be` では ldfix が skip されていた (PE の固定パスが旧 ubuntu 環境のもの) |
 | `8afdc9e1` | 856 | 46 | 39 | boot5 (#132) |
 | `5ee72b93` | 862 | 47 | 32 | 414ad0・43a3f0 の転記 (#134) |
@@ -203,12 +204,15 @@ first-parent で `e07cc83f`〜`3bdae05d` を測った (merge 単位、各 n=1)�
 | `4c3f7458` | 868 | 47 | 26 | issue の HEAD 値と一致 |
 
 - 件数: 個別測定 18 commit。加えて `be764c40` `2b99366a` `c6f70c98` `490f4313` `ec7ee3f2` `0a626c64` の 6 commit は **未測定** (両端 `3bdae05d`・`4c3f7458` が 868 のため、この範囲にあることだけは列順から言える。値は推定で、実測値ではない)。
-- 注意 1: issue 本文の 818 と前回コメントの 856 は、本 run の測定と一致しない。本 run の `d6a17b64` は 861 (ldfix 有り)。基準は 861 とする。
+- 注意 1: issue 本文の 818 と前回コメントの 856 は、本 run の測定と一致しない。本 run の `d6a17b64` は 861 (ldfix 有り)。基準は 861 とする。**訂正 (§8-4)**: `d6a17b64`・`035274be` は PE 固定パスで ldfix skip の可能性がある。`035274be` は ldfix 有りで 856 (861 ではない)。`d6a17b64` は未再測。
 - 注意 2: 列は path 絞りの rev-list で線形ではなく、ok は単調に変化しない (例: `d34a89e3` 866 → `b6e4eb42` 867 → `8bc34ed9` 866 → `902f1132` 867)。各値は n=1 で、この往復を再現性のある差と区別できていない。したがって以下は **候補区間** であり、単一の原因 commit ではない。
-- 注意 3: `035274be` (861) と `c2936605` (856) の差は ldfix の有無 (PE パス) と数えた。測定条件が途中で変わるため、ここを 1 段と数えない。
+- 注意 3: `035274be` (861) と `c2936605` (856) の差は ldfix の有無 (PE パス) と数えた。測定条件が途中で変わるため、ここを 1 段と数えない。(§8-4 の ldfix 有りでは `035274be` も 856 で、この差は消える)
 - 注意 4: 未測定の 6 commit は個別の測定記録が無い。実測列には入れない。
 - 結論 (候補区間, n=1 の実測の範囲):
   - 861 → 862 → 866 の上昇は `f39a9e3b` (#682 の `47b260` 転記) を含む区間で最初に現れる (候補)。
   - 866 → 867 の揺れは `e07cc83f`〜`2c77e8b0` の区間にあり、ノイズとの区別は未達 (n≥2 の再測定が必要)。
   - 867 → 868 は `3bdae05d` (PR #1316 merge) を含む区間で現れる (候補)。
-  - 原因 commit の特定と差分添付は未完了 (子 issue #2163)。
+  - 原因 commit の特定と差分添付は未完了 (子 issue #2163)。→ その後 §8-1・§8-2・§8-4 で特定: 862→866 は `03692a0c`、866→867 は `9af7827f`、867→868 は `3bdae05d`。
+
+### 8-4. ldfix 有りの再測定 (#2163)
+- 要点: `c2936605` より前の commit は PE 固定パスで ldfix が skip され、§8-1 の 861 (`035274be`) は skip 条件の値。ldfix 有りでは `035274be` = 856。main 側の 856→862 は `5ee72b93` 単独、枝の `03692a0c` で 856→861。merge `9952e605` では、枝側の親 `9952e605^1` (861) と origin/main 側の親 `9952e605^2` (862) から 866 になり、**862→866 は `03692a0c` が起こす** (`9952e605^2` → `9952e605` の `m11_ov.c` +23 行が `03692a0c` の差分と一致)。`03692a0c` の効果は 856 起点で +5、862 起点で +4 と 1 差が出る (重なる unit は未特定)。866→867 は `9af7827f` 単独、867→868 は `3bdae05d` 単独。全表・測定手順・`git diff --stat`・未解決は `REPORT_APPENDIX_2163.md` (§8-4)。
