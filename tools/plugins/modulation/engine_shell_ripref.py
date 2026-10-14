@@ -82,7 +82,7 @@ def main(path, args):
                 if hit is not None:
                     tgt = sva + end + disp
                     print("  ref", hex(hit.address), hit.mnemonic, hit.op_str, "-> ", hex(tgt))
-                break
+                    break
 
 
 if __name__ == "__main__":
