@@ -1,4 +1,4 @@
-import { configuredApp, send, T0 } from "./helpers.ts";
+import { configuredApp, MARK, send, T0 } from "./helpers.ts";
 import { REPO } from "./helpers.ts";
 
 export const REVIEWER = "oc-reviewer-for-signature-studio[bot]";
@@ -90,4 +90,4 @@ export const outcomeBody = (reason: string, run = 100) => `[run-outcome] ...\n<!
 export const T_BASE = Date.parse("2026-10-14T10:00:00Z");
 export const at = (min: number): string => iso(T_BASE + min * 60_000);
 
-export { send, T0 };
+export { MARK, send, T0 };
