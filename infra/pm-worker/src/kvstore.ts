@@ -4,6 +4,7 @@ export type Bucket =
   | "prs"
   | "runs"
   | "botLast"
+  | "botReport"
   | "pmArt"
   | "blockedBy"
   | "launchedAt"

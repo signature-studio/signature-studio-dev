@@ -36,8 +36,15 @@ inputs:
 runs:
   using: "composite"
   steps:
+    # uv / bun は PATH に載るため版を固定する (未指定だと実行ごとに最新が入る)。
+    # 版を上げるときは下の `--version` の出力も確認する。
     - name: Setup uv
       uses: astral-sh/setup-uv@v10.3.0
+      with:
+        version: '0.13.1'
+    - name: Show uv version
+      shell: bash
+      run: uv --version
     - name: Setup Python using uv
       shell: bash
       run: uv python install --default 3.14
@@ -48,6 +55,11 @@ runs:
       run: pnpm runtime set node 26.10.0
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: '1.4.3'
+    - name: Show Bun version
+      shell: bash
+      run: bun --version
     - name: Setup OpenCode
       shell: bash
       env:
@@ -234,14 +246,25 @@ runs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
         fi
     # p0c e2e 等の Python 依存 (#893)。runner の python3 は EXTERNALLY-MANAGED のため
-    # システムへ pip install できない。専用 venv を作り、GITHUB_PATH で後続 step の
-    # python3 / pip をその venv に向ける。
+    # システムへ pip install できない。専用 venv を作る。版と hash は requirements-py.txt で
+    # 固定し、wheel だけを --require-hashes で入れる (#2621)。
+    # venv の bin/ は GITHUB_PATH に載せない。wheel は console script を bin/ に置けるため、
+    # PATH に載せると後続 step の gh・git・python3 より先に見つかりうる。代わりに python /
+    # python3 / python3.14 だけを venv の python へ exec する薄いラッパーを置き、その dir を PATH に載せる。
     - name: Install Python deps for tools (pefile / capstone / numpy)
       shell: bash
       run: |
         set -euo pipefail
         venv="$HOME/.local/agent-py"
+        shim="${venv}-shim"
         uv venv --clear --python 3.14 "$venv"
-        uv pip install --python "$venv/bin/python" pefile capstone numpy
+        uv pip install --python "$venv/bin/python" --require-hashes --only-binary :all: -r "${{ github.action_path }}/requirements-py.txt"
         "$venv/bin/python" -c "import pefile, capstone, numpy; print('pefile', pefile.__version__, 'capstone', capstone.__version__, 'numpy', numpy.__version__)"
-        echo "$venv/bin" >> "$GITHUB_PATH"
+        rm -rf "$shim"
+        mkdir -p "$shim"
+        for name in python python3 python3.14; do
+          printf '#!/bin/sh\nexec "%s" "$@"\n' "$venv/bin/python" > "$shim/$name"
+          chmod 755 "$shim/$name"
+        done
+        "$shim/python3" -c "import pefile, capstone, numpy"
+        echo "$shim" >> "$GITHUB_PATH"

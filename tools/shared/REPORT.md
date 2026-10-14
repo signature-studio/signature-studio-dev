@@ -35,7 +35,7 @@
 | elastique | 第三者プロプラ | zplane élastique **2.2.15** (`TElastiquePro`); win は静的 IPP 979KB 含む | 1.2M / 5.0M | 12/15 | lift (EULA 要確認) |
 | REX Shared Library | 第三者プロプラ | REX2 (`CREX2DecompressCallback`/`XREX2BadFormat`), 著作権表示 "Propellerhead Software AB 2000-2010" (Reason Studios 前身; win DLL の UTF-16 リソース) | – / 0.3M | – / 14 | 低優先 |
 | libkio | 第三者(NI) 派生 | GCC C++ + boost, 名前空間 **NI::GP / K4PO / K4PatchLib** (Kontakt4 patch lib); win は DirectWaveCtEngine.dll に内蔵 | 5.5M / 4.8M | 126/2 | T-SH-13; **lift PoC 済(部分)** |
-| ILTools / SGv2 / QuickFontCache | IL プロプラ (**FPC 3.2.3** mac / Delphi win, 同一 Pascal ソース) | `FPC 3.2.3 [2023/12/20] for x86_64 - Darwin` を 4 lib で確認。SGv2 ↔ win `FruityPlug_x64.dll` (export `CreatePlugInstance` 一致; 推定) | 4.6/8.1/4.7M / 3.7/5.9/2.1M | 5/2/8 | FLEngine と同 Delphi パイプライン (T-SH-12) |
+| ILTools / SGv2 / QuickFontCache | IL プロプラ (**FPC 3.2.3** mac / Delphi win, 同一 Pascal ソース) | `FPC 3.2.3 [2023/12/20] for x86_64 - Darwin` を 4 lib で確認。SGv2 ↔ win `FruityPlug_x64.dll` (export `CreatePlugInstance` 一致; 推定 → **訂正: 固定値の block24353 は VERSIONINFO で Maximus と判明し、この対応は採らない**。未特定 = `tools/fruityplug/REPORT.md`) | 4.6/8.1/4.7M / 3.7/5.9/2.1M | 5/2/8 | FLEngine と同 Delphi パイプライン (T-SH-12) |
 | libwinbridge | IL プロプラ **mac 専用** | FPC; Win32 型 (HKEY/IDropTarget) を mac に橋渡しする層 | 1.4M / – | 34 | **移植不要** (tools/shim + M2 SHIM_INVENTORY) |
 | DirectWaveCtEngine | IL プロプラ | C++ (libc++) `SampleImport/*` (Kontakt/EXS/Akai/SF2/SFZ/REX importer)。mac は 3717 export (visibility 漏れ), win は 2 | 9.3M / 4.8M | 3717/2 | T-SH-13 (低優先) |
 | beat_tracker | IL プロプラ + Eigen | C++ + Eigen, librosa/madmom 風 (`estimate_bpm`, `forward_backward_decode`, `bar_position_hmm`) | 2.6M / 1.0M | 305/14 | T-SH-14 |
