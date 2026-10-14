@@ -1,6 +1,6 @@
 # MX-3b U1 (process slot 同定) — 反証と RTTI 突合 (#266)
 
-- 担当: #266 (MX-3b 残件 U1)。前 run の候補 (PR #1422 / REPORT §12) の検証。
+- 担当: #266 (MX-3b 残件 U1)。前 run の候補 (`tools/targets/massivex/dsp/REPORT.md` §12「U1 進捗」・PR #1422 由来) の検証。
 - 測定素材: `plugins-massivex` の `Native Instruments Massive X v1.7.1.exe` を `work/` に展開し、
   `parse_setup_headers.py` → `extract_massivex.py` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B) を生成。
   md5-ok 0/125 (既知・#798 REPORT §11.1)。`work/` は gitignore。
@@ -16,8 +16,8 @@
 - したがって partial slot 9 を IAudioProcessor の process とみなす根拠は無い。
 - slot 9 本体 (0x1800119c0) は ProcessData (rdx) を読まず (`xor edx, edx` で上書き)、process の形ではない。
 
-**U1 (process slot 同定) は未達のまま。** 正しい入口は「`IAudioProcessor` を基底に持つ具体クラスの vtable」を
-RTTI の COL 走査で探すこと (§4)。
+**U1 (process slot 同定) は部分確定。** `MassiveXPlugIn` の IAudioProcessor サブオブジェクト vtable `0x183973108` の
+slot 9 = `0x180082400` が process と特定した (根拠は §9)。Ghidra による独立確認は未了。
 
 ## 2. 測定 (測定 commit 43661d6d)
 
@@ -42,7 +42,9 @@ RTTI の COL 走査で探すこと (§4)。
 - 前 run の xref 記述「0x18000e580 (`mov [rcx],rax`)」は誤り。実際は `lea rax,[rip+...]` の位置で、
   直後の `mov [rcx],rax` が書き込み。前 run の「2 件ずつ」は本 run の件数と一致した。
 
-## 4. 次の作業 (U1 の正しい入口)
+## 4. 次の作業 (U1 の入口と実施状況)
+
+1〜3 の相当作業は §9 で実施済み (手段は §9.1)。残るのは Ghidra 等による独立確認 (§9.2)。
 
 1. RTTI 全走査: 型名 `.?AVIAudioProcessor@Vst@Steinberg@@` の TypeDescriptor を指す COL を探し、その COL の
    `pClassDescriptor` の base 配列から、IAudioProcessor を基底に持つ具体クラスを列挙する (`mx_vtable_rtti.py` の拡張)。
@@ -77,15 +79,16 @@ RTTI の COL 走査で探すこと (§4)。
 
 ## 8. 未解決 (起票先)
 
-- U1 本体 (IAudioProcessor を基底に持つクラスの主 vtable 同定と process slot の本体解析): **#266** (本 issue・残件)。
+- U1 (IAudioProcessor の process slot): 部分確定 (§9)。Ghidra による独立確認は未了で、**#266** (本 issue・残件)。
 - U2/U5 (closure 厳密化): #1122 (CLOSED・成果は `REPORT_MX5.md`)。
 - U3/U4 (vectorcall / C++ EH): #1123 (OPEN)。
 - MX2-3 (N5/N6): #830 (OPEN)。
 
 ## 9. U1 結論 (IAudioProcessor の process slot 同定・#266)
 
-**結論: `MassiveXPlugIn` の IAudioProcessor サブオブジェクト vtable `0x183973108` の slot 9 = `0x180082400` が process。**
-§1 の「0x1839761b8 slot 9」候補 (§12) は誤り (同 vtable は `MassiveXAudioClass` の副 vtable で、IAudioProcessor を含まない)。
+**結論 (部分確定・Ghidra 独立確認は未了): `MassiveXPlugIn` の IAudioProcessor サブオブジェクト vtable `0x183973108` の slot 9 = `0x180082400` が process。**
+§1 の「0x1839761b8 slot 9」候補は誤り (同 vtable は `MassiveXAudioClass` の副 vtable で、IAudioProcessor を含まない)。
+「§12」は同ディレクトリの `REPORT.md` §12 (「U1 進捗」・PR #1422 由来) を指す (本ファイルには §12 は無い)。
 
 ### 9.1 方法 (Ghidra は未導入のため pefile + capstone で代替)
 
