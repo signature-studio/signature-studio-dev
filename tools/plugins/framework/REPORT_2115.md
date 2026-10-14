@@ -204,3 +204,45 @@ for m in re.finditer(b"\xe8", d):
 | REPORT_2069 §3.1 の解析対象の誤り (`block00031` を使用) | 前提の誤伝播 | 本 PR で §1 に訂正を記載 |
 | r3 系の引数付き呼出 (8 件) と 0 引数定義の不一致 | 引数規約の不整合 | #2115 (同上) |
 | fold deref (`0x40d6e0` / `[0x710040]`) と `plug != 0` | Phase B OOB | #1890 / #2008 (既存) |
+
+## 10. TLS index 未設定の確認と注釈の置換 (測定 commit 91308efd)
+
+前提: §8 の `return 0` 版も注釈削除版も Phase B は同じ OOB。TLS 経路 (`gs:[0x58][[0x6d6e70]]`) の未設定を確認した。
+
+### 10.1 確認事実
+
+- `block18983_PE.bin` に TLS directory は無く、TLS index 変数 `0x6d6e70` の初期値は `0xFFFFFFFF` (`.data`)。
+- `[0x7162d8]` は `.bss` で 0 のため、`function_4181e0` は TLS 経路を通る。`idx = -1` は `zext` 後に線形メモリ外のアドレスになる (canon3 `dec_label_pc_7d8a61`)。
+- `[0x6d6e70]` を設定するのは `function_418120` (`TlsAlloc` → store) のみ。canon3 と hs_flat3 に直接 call は 0 件、hs_e2e の dispatch ログにも `0x418120` は 0 件 (注釈版・置換版とも)。
+- 呼出元は戻り値を `[BLK+0x80]` から読み `+568` を deref する (§8 の注釈記述・hs_dbg 実測)。
+
+### 10.2 注釈の置換 (`fw_hostfix.py` 0x4181e0)
+
+- `idx == -1` なら `TlsAlloc()` で確保し `[0x6d6e70]` に store する。
+- TLS スロットが 0 なら 4096 byte の 0 埋めブロック `@fw_tls_block` を割り当てて書く。戻り値は SSA と `[BLK+0x80]` の両方に store する。
+- フラグ `[0x7162d8]` != 0 の経路 (418030・4180d0・`[0x7162d0]`) は未モデル (初期値 0 の前提)。
+
+### 10.3 実測
+
+対照 = 注釈 `return 0` 版 (3b581236・plain 実行)、置換版 = 91308efd (`--fresh`)。n=1。
+
+| 手順 | 結果 | 所要 (real) | load (開始 → 終了) |
+|---|---|---|---|
+| `fw_stage2.sh` (canon3 新規生成) | rc 0・`SMOKE PASS` (dispatch=38 units_done=0 ff=0) | 7 分 23.5 秒 | 0.14 / 0.27 / 0.14 (12:49:06) → 2.39 / 2.32 / 1.11 (12:56:30) |
+| `hs_e2e.sh` (対照) | Phase A `dispatch=38 ff=0` / Phase B OOB / `rec=7` / `E2E FAIL: 1 項目` | 2 分 37.9 秒 | 未記録 |
+| `hs_e2e.sh --fresh` (置換版) | Phase A `dispatch=38 ff=0` / Phase B OOB / `rec=7` / `E2E FAIL: 1 項目` | 2 分 38.6 秒 | 0.64 / 0.88 / 0.89 (13:08:11) → 1.05 / 0.97 / 0.93 (13:10:50) |
+
+- Phase B の OOB は両版で残る。失敗位置は変わった: 対照は `0x4e5fa6` の間接呼出先 0 → `0x40d807` (target 0) → OOB。置換版は `0x4e5fa6` の target が `0x1712` になり、その後 `0x40d807` (target 0) → OOB。
+- 中間版 (TLS 割当のみ・`[BLK+0x80]` store なし・1 回実測) では `0x4e5fa6` の target が文字列由来の値 `0x6572432000000000` になった。戻り値の受け渡し先を `[BLK+0x80]` に揃えるため store を追加した。
+- 差分確認: `git diff 91308efd HEAD -- tools/plugins/framework` の出力は空 (本節の追記は md のみ)。
+
+### 10.4 結論と未解決
+
+- 受入 2 は未達。0 埋めブロックは stand-in で、正しい戻り値 (TLS ブロックの中身・`+568` の意味) は未確定。OOB は解消していない。
+- 受入 3 は §10.3 の実測と対照で部分達成。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| Phase B の OOB 位置 (`0x40d807` の soft-miss 後) と `0x4e5fa6` の target 0x1712 | 受入 2 | #2115 (継続) |
+| TLS ブロックの中身 (`+568`) の native 意味。0 埋めは stand-in | 戻り値の確定 | #2115 (継続) |
+| `0x418120` (TlsAlloc) を chain で呼ぶ間接呼出元の特定 | 注釈で補うか RTL 側で設定するかの判断 | #2115 (継続) |
