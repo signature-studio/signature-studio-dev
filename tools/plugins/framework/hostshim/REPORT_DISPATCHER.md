@@ -241,7 +241,7 @@ distinct (rax, path) = 109 / IDs = 256。WATCH 番地の到達 (`hit`) は次の
 
 ## 11. #2886 (PLG-P0b-25): 格納元の機械語確定
 
-部分達成。詳細と VA は `REPORT_DISPATCHER_APPENDIX_2886.md` (新規ファイル・分割移動ではない)。測定 commit は `2d523491` (解析) と `2dca40dd` (応答表)。callee 依存の再測定は `470a8f15` (付録 §6)。
+部分達成。詳細と VA は `REPORT_DISPATCHER_APPENDIX_2886.md` (新規ファイル・分割移動ではない)。測定 commit は `2d523491` (解析)・`2dca40dd` (応答表)・`470a8f15` (callee 依存の再測定)・`7ec1bdb8` (stage-2・Phase A/B・格納 VA の再測定。付録 §6)。
 
 - 受入 1 (格納元 19 ID): 出所を VA 付きで確定。TLS 要素ポインタ + `0x2a8` 6 ID / call 戻り値 6 ID / callee 出力引数 1 / グローバル・フィールド 5 / ローカル 1。値の実体は未確定。
 - 受入 2 (仮想呼出し出口 27 ID): A (戻り値を格納) 3 / B (戻り値を捨てて `0x13281af` へ) 13 / C (後続未読) 11。B は応答が状態格納 0〜4 で決まる。
