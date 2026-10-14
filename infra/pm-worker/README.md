@@ -204,28 +204,35 @@ Worker の状態 (Durable Object) に、VM が持っていた `launched`・`rela
   - `relaunch.json` → `relaunch` (`{"<n>": {"count": 0〜3, "art": "oc_artifacts: …" または null}}`)
   - `phase.json` → `phase` (`{"review_only": bool, "open_prs": 整数, "since": "<ISO 8601>"}`)。**VM の `phase.json` は使わない。** 切替 (『切替の記録』) の後は、fresh な tick ごとに `launch()` が DO の `meta/phase` を保存するので、DO の値が live の現在値になる。VM の `phase.json` は切替の時点で凍結されていて、取り込むと live の Review-Only の状態が古い値に戻る (open PR が 10〜80 の間は直前の値を保つ規則のため、ずれが残る)。取り込みの `phase` は `GET /admin/export` の DO の現在値を使う (下の手順)
   - `issues_state.json` の `pm_art` → `pm_art` (`{"<n>": {"at": "<ISO 8601>", "line": "oc_artifacts: <ALLOW_ARTS の部分集合>" または "oc_artifacts: none"}}`)。`issues_state.json` は `issue_snapshot.py` が書き、`launch_issues.py` が読む
-- **値域** (外れると 400 で何も保存しない。`problems` に理由が返る): issue 番号は 1 以上の数字 (7 桁まで)。時刻はタイムゾーン付きの ISO 8601。`launched` と `pm_art.at` は、取り込み時の現在時刻 + 5 分より後なら 400 (`phase.since` は未来の値も通る)。`count` は 0〜3 の整数。素材行は `oc_artifacts: none` (追加素材なし) か、`src/launch.ts` の `ALLOW_ARTS` の部分集合 (`none` と素材名の混在は 400)。キーは 4 つだけ (未知のキー・欠落は 400)。200 KB を超えると 413。
+- **値域** (外れると 400 で何も保存しない。`problems` に理由が返る): issue 番号は 1 以上の数字 (7 桁まで)。時刻はタイムゾーン付きの ISO 8601。`launched` と `pm_art.at` は、取り込み時の現在時刻 + 5 分より後なら 400 (`phase.since` は未来の値も通る)。`count` は 0〜3 の整数。素材行は `oc_artifacts: none` (追加素材なし) か、`src/launch.ts` の `ALLOW_ARTS` の部分集合 (`none` と素材名の混在・説明文・括弧書きは 400。補助スクリプトが直す)。キーは 4 つだけ (未知のキー・欠落は 400)。本文が 200 KiB (204,800 バイト。`src/vmstate.ts` の `MAX_IMPORT_BYTES`) を超えると 413。数値の出どころは `tools/pm/REPORT_2799.md`。
 - **手順** (`$PM_WORKER_URL` は Worker の URL、`$TOKEN` は repo の push 権限を持つ GitHub token。新しい API token は作らない):
 
   ```sh
   curl -fsS -H "authorization: Bearer $TOKEN" "$PM_WORKER_URL/admin/export" > export.json   # DO の現在値 (phase はここから取る)
-  jq -n --slurpfile l launched.json --slurpfile r relaunch.json --slurpfile e export.json --slurpfile s issues_state.json \
-    '{launched: $l[0], relaunch: $r[0], phase: $e[0].phase, pm_art: $s[0].pm_art}' > import.json
+  node infra/pm-worker/scripts/build_import.mjs --launched launched.json --relaunch relaunch.json \
+    --state issues_state.json --export export.json > import.json   # リポジトリの root で。整形しない JSON を作り、素材行を正規化する。200 KiB を超えると何も書かずに失敗する
   curl -sS -H "authorization: Bearer $TOKEN" --data-binary @import.json "$PM_WORKER_URL/admin/import"          # 検証のみ (保存しない)
   curl -sS -H "authorization: Bearer $TOKEN" --data-binary @import.json "$PM_WORKER_URL/admin/import?apply=1"  # 保存
   curl -sS -H "authorization: Bearer $TOKEN" "$PM_WORKER_URL/admin/export"                                     # 確認 (VM の形式で返る)
   ```
 
+  補助スクリプトが使えないとき (Node が無いとき) は、次の `jq -cn` で作る (`-c` で整形しない。素材行は正規化されないので、下の確認を行う):
+
+  ```sh
+  jq -cn --slurpfile l launched.json --slurpfile r relaunch.json --slurpfile e export.json --slurpfile s issues_state.json \
+    '{launched: $l[0], relaunch: $r[0], phase: $e[0].phase, pm_art: $s[0].pm_art}' > import.json
+  ```
+
   検証で 400 が返ったら、`problems` の issue 番号を直してから送り直す (許可外の素材名は VM の `pm_art` に残っていることがある)。
-  送る前に、`relaunch.json` の `art` に `none` と素材名が並ぶ行がないか確かめる。VM の `launch_issues.py` は、既存の行が `none` のとき不足の素材を足すので (`cand = base + extra`)、`oc_artifacts: none fl-win64` の形を書き得る。この形の行が 1 件でもあると、取り込みは全件 400 になる。見つけたら `none` を外して (`oc_artifacts: fl-win64` の形に) 直してから送る。見つける方法: `jq -r 'to_entries[] | select(.value.art != null and (.value.art | contains(" none "))) | "\(.key) \(.value.art)"' relaunch.json`
-- **取り込み前は launch しない**: `?apply=1` の取り込みが一度も成功していない間は、新規・再投入の picks を空にし、`/status` に `launch_blocked: "no-import"` を出す (取り込み時刻は `imported_at`)。再投入の意図 (`oc-pm-intent`) による /oc の投稿も同じく止める (意図は処理済みにせず、取り込み後の tick で投稿する)。VM の状態が無い新規の構成のための安全装置。`IMPORT_REQUIRED=0` で外せる (`wrangler.toml` の `[vars]` に置く。dashboard で入れた値は deploy で消える)。
+  スクリプトは素材行を正規化する (説明文・括弧書きを落とし、`none` と素材名が並ぶときは素材名だけを残す。許可外の語は落として標準エラーに issue 番号と一緒に出す。素材が 1 つも残らない `relaunch` の `art` は `null`・`pm_art` の行は除く)。`jq` で作るときは、`relaunch.json` の `art` に `none` と素材名が並ぶ行がないか確かめる。VM の `launch_issues.py` は、既存の行が `none` のとき不足の素材を足すので (`cand = base + extra`)、`oc_artifacts: none fl-win64` の形を書き得る。この形の行が 1 件でもあると、取り込みは全件 400 になる。見つけたら `none` を外して (`oc_artifacts: fl-win64` の形に) 直してから送る。見つける方法: `jq -r 'to_entries[] | select(.value.art != null and (.value.art | contains(" none "))) | "\(.key) \(.value.art)"' relaunch.json`
+- **取り込み前は launch しない**: `?apply=1` の取り込みが一度も成功していない間は、新規・再投入の picks を空にし、`/status` に `launch_blocked: "no-import"` を出す (取り込み時刻は `imported_at`)。再投入の意図 (`oc-pm-intent`) による /oc の投稿も同じく止める (意図は処理済みにせず、取り込み後の tick で投稿する)。VM の状態が無い新規の構成のための安全装置。取り込みを必須にするかは `IMPORT_REQUIRED` で決まる。現在のコードの既定は 1 (`IMPORT_REQUIRED !== "0"`) で、`wrangler.toml` の `[vars]` に `IMPORT_REQUIRED = "0"` を置くと外せる (dashboard で入れた値は deploy で消える)。#2795 の後は既定が 0 になり、`IMPORT_REQUIRED=1` を明示したときだけ必須になる (#2795 は未 merge。merge 後はこの段落を『既定 0』に直す)。
 - **反映の順序** (依頼者の操作。この変更は `wrangler.toml` を変えていない):
   1. この変更を反映する (「デプロイ」節の手順 4)。`/admin/import` はこの変更で初めて存在するので、反映の前には取り込めない。
   2. 反映の直後から、取り込みが済むまで launch は止まる (`/status` の `launch_blocked` が `"no-import"`)。
   3. 上の手順で取り込む (`?apply=1`)。
   4. `curl -fsS "$PM_WORKER_URL/status"` の `launch_blocked` が `null`、`imported_at` が時刻になったことを確認する。
-  - 手順 2 の期間は、『切替の記録』の『#2343 は前提から外した』とは異なる (反映の時点で launch が止まる)。どのくらい止めてよいかは依頼者の判断。既定案は、反映の直後に取り込みを行い、止まる期間を取り込みまでの数分にすること (`IMPORT_REQUIRED` は既定の 1 のまま)。
-  - 反映から取り込みまでを止めたくないときは、`wrangler.toml` の `[vars]` に `IMPORT_REQUIRED = "0"` を入れる変更を先に main へ merge してから反映する。取り込んだ後は、その行を外す変更を merge して反映する (残すと、取り込みの確認なしで launch する状態が続く)。
+  - 手順 2 の期間は、『切替の記録』の『#2343 は前提から外した』とは異なる (反映の時点で launch が止まる)。どのくらい止めてよいかは依頼者の判断。既定案は、反映の直後に取り込みを行い、止まる期間を取り込みまでの数分にすること (#2795 の後は既定が 0 なので launch は止まらない。#2795 が未 merge の間は既定の 1 のまま)。
+  - 反映から取り込みまでを止めたくないときは、#2795 が未 merge の間だけ、`wrangler.toml` の `[vars]` に `IMPORT_REQUIRED = "0"` を入れる変更を先に main へ merge してから反映する。取り込んだ後は、その行を外す変更を merge して反映する (残すと、取り込みの確認なしで launch する状態が続く)。#2795 の後は既定が 0 なので、この行の追加・削除は要らない (取り込みを必須にしたいときだけ `IMPORT_REQUIRED = "1"` を置く)。
 - **取り込みの扱い**: 同じ issue が既に DO にあるときは、`launched`・`pm_art` は時刻が新しい方、`relaunch` は回数の多い方を残す。VM の凍結値が DO の新しい値を消すことはない (切替の後に DO が launch した issue の時刻は、VM の凍結値より新しい)。`relaunch` は VM だけが持つ履歴で、切替の前の `relaunch.json` (件数は `tools/pm/REPORT.md` §12-6) を Worker に入れる。これが無いと、履歴の無い issue を最大 2 回余分に再投入し得る。`phase` は取り込んだ値 (上の手順では DO の現在値) にする。取り込んだ `launched` が 3 時間以内の issue は `recent` に入り、着手したばかりの issue に二重に着手しない。取り込んだ値は全体同期 (`/admin/resync`) でも消えない。
 - **書き出し**: `GET /admin/export` は VM の形式で返す (`launched`・`relaunch` (issue 番号のキーだけ。`np:<n>` は VM に無いので出さない)・`phase` (一度も保存していなければ null)・`pm_art`)。VM へ戻すときの順序は『切替』の節と `tools/pm/README.md` に従う (両方が live だと二重投稿になる)。
 - **往復の例外**: 書き出した JSON を取り込み直して通るのは、許可内の値だけ。Worker の webhook は PM の `oc_artifacts:` 行を検証せずに保存するので、許可外の素材名の行 (例: `oc_artifacts: fetchsh`) が `pm_art` に入ると、その行の書き出しは取り込み直しで 400 になる。取り込みではその行は消えず、新しい PM 投稿で上書きされるまで残る。`phase` が一度も保存されていないとき (最初の tick の前) は `phase` が null で、取り込み直しは 400 になる。取り込み直しの前に、書き出しの `pm_art` の行と `phase` を確認する。
@@ -255,7 +262,7 @@ Worker の状態 (Durable Object) に、VM が持っていた `launched`・`rela
 
 ```
 cd infra/pm-worker && npm test      # Node >= 22.6 (--experimental-strip-types)。依存パッケージなし。Python 3 が要る (突き合わせ)
-cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン・/oc 投稿の観測 (#2342) のネガコン・VM の状態の取り込み (#2343 test/unit/vm_import.test.ts)
+cd infra/pm-worker && npm run test:unit   # vitest (fetch モック・workerd なし)。test/unit/。/admin/resync と失敗配送の回収 (#2339) のネガコン・/oc 投稿の観測 (#2342) のネガコン・VM の状態の取り込み (#2343 test/unit/vm_import.test.ts)・取り込みの本文を作る補助スクリプト (#2799 test/unit/build_import.test.ts)
 cd infra/pm-worker && npm run test:workers # vitest + workerd (実 Durable Object)。test/runtime/
 ```
 
