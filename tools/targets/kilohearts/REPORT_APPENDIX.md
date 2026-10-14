@@ -104,7 +104,7 @@
 
 #### 10-7n. #2087 (KH-33) run: Resonator emcc の param_1 引数 ABI 復元 (部分・Resonator はビルド未通過)
 - 素材: `plugins-kilohearts` の Installer zip → payload.dat → windows.zip → HeartCore.core_64 (手展開)。Ghidra 12.1.4 = GitHub release `ghidra_12.1.4_PUBLIC_20260921.zip` (sha256 先頭 16 桁 `ddac49f9…` 一致)、JDK 21 (Temurin)、emsdk 6.0.12 ([EMSDK])。測定 commit = `81090e96` (コード変更は `ghidra_route/ghidra_to_c.py`・`ghidra_route/patches.py` のみ)。
-- 呼出元の確定 (Ghidra の C 出力は引数・戻り値を落とすため、呼出元の機械語を capstone で逆アセンブルして確認):
+- 呼出元の記録 (前 run の capstone 逆アセンブルによる。出力は repo に未保存で本 run では再現不能のため、**未検証の記録**として扱う。以下の ABI は規則の根拠にはなるが、宣言型・読みレジスタは下記「未確認」が解消されるまで確定しない):
   - `FUN_180fcf904` = 引数 `float` (xmm0)・戻り値 `short` (ax)。呼出元 2 件: `FUN_180fbc1f4` (xmm0 = `afStackX_8[0]`、入力 float)・`FUN_180fbbfb8` (xmm0 = `param_2`)。`void` 宣言は誤り。
   - `FUN_180fbdfcc` = 引数 `short*` (rcx)・戻り値 `short`。呼出元 1 件: `FUN_180fbbfb8` (rcx = 入力 `param_1`)。
   - `FUN_180fbdef4` = 引数 2 個 (rcx, dx)。呼出元 1 件: `FUN_180fbc1f4` (rcx = `&afStackX_10`・dx = 0)。Ghidra の呼出しの 3 個目 (r8) は callee が読まないため落とす。
