@@ -121,7 +121,7 @@ PoC = 「CTextLabel 系 + XferOnOffButton 等 1 view を canvas 描画」(受入
 | 合計 | 68 | 14,270 | 437,440 |
 
 - 起点 (seed): `CTextLabel` `CViewContainer` `CView` `CControl` `CBitmap` `CDrawContext` の宣言ファイル。
-- canvas 側で実装が要る純粋仮想インタフェース (`lib/platform/iplatform*.h` と `platformfactory.h`、計 16 ファイル): **159 関数**。`effort_poc.py` が出力する (コメント除去後に `virtual ... = 0;` を数える。`grep -c 'virtual.*= 0;'` と突き合わせ済み)。
+- canvas 側で実装が要る純粋仮想インタフェース (`lib/platform/iplatform*.h` と `platformfactory.h`、計 16 ファイル): **159 関数**。`effort_poc.py` が出力する (コメント除去後に `virtual ... = 0;` を数える。`grep -cE '=\s*0\s*;'` の行数 (frame 25 / graphicsdevice 31 / platformfactory 20 / graphicspath 13 / font 7 / framecallback 10) と一致を確認済み)。
   - 内訳 (ファイル別): graphicsdevice 31 / frame 25 / platformfactory 20 / graphicspath 13 / textedit 17 / framecallback 10 / openglview 10 / bitmap 7 / font 7 / viewlayer 6 / gradient 3 / resourceinputstream 3 / timer 3 / fileselector 2 / optionmenu 1 / string 1。
   - 前版の「133 関数・内訳 frame 22 / graphicsdevice 22 …」は、コードから再現できなかったため撤回する。
 - PoC で最低限要る関数の部分集合 (bitmap / font / graphicspath / graphicsdevice / frame / factory の 6 ファイル) の関数数は、上記の内訳から合計 **103 関数** (bitmap 7 + font 7 + graphicspath 13 + graphicsdevice 31 + frame 25 + factory 20)。ただし「PoC で最低限要る 6 種」の選定は**本 run の判断で、閉包が実際に要求するかは未検証** (リンク・実行で確定する)。選定根拠: 「CTextLabel 系 + XferOnOffButton を canvas に描く」に直接使う描画・文字・ビットマップ・フレーム・ファクトリ。
