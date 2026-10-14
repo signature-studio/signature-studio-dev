@@ -2,7 +2,7 @@
 
 親: #2038 (LD-75)。前段: #1091 (LD-33、CLOSED)。
 
-**判定: 部分達成**。修復・wasm 直接呼び実測・DEFECTS 追記は達成。検出信号は既存の `audit_lsf_disp.py` で実装済みだが、`audit_lsf.py` への統合は未達。
+**判定: 部分達成**。修復 (**検証用の手作業パッチ。本番の IR 生成経路には未配線**)・wasm 直接呼び実測・DEFECTS 追記は達成。検出信号は既存の `audit_lsf_disp.py` で実装済みだが、`audit_lsf.py` への統合は未達。本番 build の wasm は 41a670 が未修復のまま (§3・§5)。
 
 測定 commit: `f0c721e4` (コードを変えた最後の commit)。
 
@@ -11,8 +11,8 @@
 | 受入条件 | 結果 |
 |---|---|
 | 検出信号を定義して `audit_lsf.py` に追加 | **未達 (部分)**。検出信号は `audit_lsf_disp.py` (#911 で定義済み) として実装され、41a670 を検出する。`audit_lsf.py` 本体は未変更 (§2) |
-| 修復を実装し、wasm 直接呼びで head=0x2222 を実測 | **達成**。修復前 head=0x3333 (FAIL) → 修復後 head=0x2222 (PASS) (§3) |
-| DEFECTS.md に新規類型を追記 | **達成** (新規行は作らず、既存 D20 の検出信号・修復・実測欄を更新。`docs/DEFECTS.md` の D20 行) |
+| 修復を実装し、wasm 直接呼びで head=0x2222 を実測 | **部分達成**。`fix_ld108.py` (検証用パッチ) で修復前 head=0x3333 (FAIL) → 修復後 head=0x2222 (PASS) を実測 (§3)。パッチは `ld108_e2e.sh` だけが適用し、`m11_gen_ir2.sh` / `m11_build.sh` には未配線。通常の build の wasm は未修復 (→ #2402) |
+| DEFECTS.md に新規類型を追記 | **達成** (新規行は作らず、既存 D20 行の検出信号・修復・観測欄を更新。DEFECTS 側は結論 1 行とリンクだけで、測定値は本 REPORT だけに置く。修復欄は「検証用の手作業パッチ (非本番)」と明記) |
 
 ## 2. 検出信号
 
@@ -32,6 +32,8 @@
 ## 3. 修復と動的確認
 
 修復: `tools/m11/ldfix/fix_ld108.py`。機械語 41a69c〜41a6a3 (`mov rax,[rbp+0x50]; mov rax,[rax]; mov [head],rax`、rax = arg1、変位 0) に対し、IR の head 解除ブロック `dec_label_pc_41a69c` の store 値 `%2` (= `load [arg1+8]`) を、新たに挿入した `load i64 [arg1+0]` に置換する。変更は 41a670 の 1 関数・4 行。
+
+**適用範囲 (本番非配線)**: `fix_ld108.py` を呼ぶのは `ld108_e2e.sh` だけである。`tools/m11/m11_gen_ir2.sh` は ldfix 段で `ldfix/ldfix.py` だけを適用し、`m11_build.sh` も `fix_ld108` を呼ばない。したがって本節の修復後 wasm は `ld108_e2e.sh` が作る検証用の build で、通常の build (`m11_gen_ir2.sh` → `m11_build.sh`) の wasm ではない。配線 (`m11_cond.py` の記録と IR の sha256 が組込み後の IR と一致することの確認を含む) は未実施で、#2402 に移した。
 
 動的確認 (`dyn_ld108.mjs`。修復前 / 修復後の wasm を直接呼ぶ):
 
@@ -53,11 +55,13 @@ ok の絶対値 (136) は REPORT_509 (ok 852) や、同 image を別 build 条�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `audit_lsf_disp.py` を `audit_lsf.py` に統合 (受入条件 1 の残り) | 検出信号が既存の SUSPECT 集計に入らない | 子 issue (本 run で起票) |
-| 残る SUSPECT 3 件 (6677a0 / d237e0 / de1da0) の機械語突合 | 誤検出か、機械語の列挙漏れか未判定 | 同上 (子 issue に含める) |
+| `audit_lsf_disp.py` を `audit_lsf.py` に統合 (受入条件 1 の残り) | 検出信号が既存の SUSPECT 集計に入らない | #2396 (LD-111) |
+| 残る SUSPECT 3 件 (6677a0 / d237e0 / de1da0) の機械語突合 | 誤検出か、機械語の列挙漏れか未判定 | #2396 (LD-111) |
 | `666a60` のループ内 store (`store i64 %29`) の修復 | 同型の誤りが残る (REPORT_911 §2) | #1091 の残件 (LD-33) に含む。本 PR は未着手 |
 | RetDec 段 16 の変換規則の発火確認 (分岐の実行) | 根本原因の機構が未確定 | #1967 / #2038 の既存経路 |
-| survey の ok 絶対値 (136 / 869) の build 条件差 | 測定の再現に build 条件の固定が要る | 本 PR の範囲外。`ld108_e2e.sh` の前提 (ir_conditions) を次の run で揃える |
+| `fix_ld108.py` の本番配線 (`m11_gen_ir2.sh` の ldfix 直後への組込み、`m11_cond` 記録と IR sha256 の一致確認、通常 build の wasm での実測) | 通常の build の wasm は 41a670 が未修復 | #2402 (LD-112) |
+| survey の ok 絶対値 (136 / 869) の build 条件差 | 測定の再現に build 条件の固定が要る | #2402 (LD-112。`ld108_e2e.sh` の前提 (ir_conditions) を揃える) |
+| `fix_ld108.py` が挿入する `%arg1` と関数の仮引数の一致 assert (レビュー minor) | 想定と違う IR で気付けない | #2402 (LD-112。コード変更になるため、測定済みの本 PR では触らない) |
 
 ## 6. 再現
 
@@ -65,5 +69,5 @@ ok の絶対値 (136) は REPORT_509 (ok 852) や、同 image を別 build 条�
 FL_WIN64_DIR=<fl-win64 の展開先> bash tools/m11/ldfix/ld108_e2e.sh
 ```
 
-前提: `tools/m11/work` に work-m11 の展開 (boot_final.ll ほか)、`/opt/emsdk`。所要 62.4 秒 (commit `f0c721e4`、load 0.38 → 0.78)。
+前提: `tools/m11/work` に work-m11 の展開 (boot_final.ll ほか)、`[EMSDK]` (`docs/REFERENCES.md`)。所要 62.4 秒 (commit `f0c721e4`、load 0.38 → 0.78)。
 スクリプトは終了時に `work/boot_final*.ll` と `ir_conditions.json` を元に戻す。
