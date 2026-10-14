@@ -243,3 +243,7 @@ FA の P1' (comisd×2+jbe/jae+xorps/movaps+jmp, 合流先は reg2mem alloca) が
 ## 23. LIFTLIB-5 (#342) — tan / tanf bit-exact・SVF 20/40 (未達)
 
 - **結論**: tan 40/40・tanf 40/40 で gate 化。SVF 20/40 (未達・gate 無し)、cvt 26/40。本文は [`REPORT_APPENDIX_E.md`](REPORT_APPENDIX_E.md) (§23.1〜§23.7・DEFECTS 行案)。
+
+## 24. CI-8 (#448): work-* 絶対 symlink の張り直しと lowbase_e2e [3] の素材 .so 不整合
+
+- **結論**: 受入 1・2 は達成済み (絶対 symlink 201 本を張り直し、旧パス 0)。受入 3 は素材の古い `libottnative.so` で [3] が FAIL したため、[3] で `tools/ott/native/build.sh` から再ビルドする修正 (2f1b76fc) で ALL PASS (rc 0 / 103 s / 150,708 cell)。詳細は [`REPORT_APPENDIX_448.md`](REPORT_APPENDIX_448.md)。
