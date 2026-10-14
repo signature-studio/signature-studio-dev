@@ -74,6 +74,8 @@ const ADDED_KEYS = [
   // 自律運転の指標 (#2335)
   "stuck", "stuck_age_max_min", "needs_pm", "needs_user", "no_pr_by_reason", "refs_only_merge_rate_24h", "open_issues_delta_24h", "pm_dispatch_1h",
   "launch_unobserved",
+  // Worker の自動着手を見送る oc:hold の issue の数 (#2651)
+  "hold",
 ];
 // detail のみ (公開 /status は出さない。oc-pm の dry-run 記録)
 const DETAIL_ONLY_KEYS = ["would_dispatch_pm"];
