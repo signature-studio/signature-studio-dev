@@ -4,9 +4,9 @@
 
 ## 1. 測定の前提
 
-- 基点 commit: `25d2cdc0` (origin/main 取得時点)。`tools/m11/ldfix` の差分は本 run で追加した REPORT のみ。
+- 測定 commit: `25d2cdc0` (origin/main 取得時点)。e2e はこの commit の tree で実行した。以降の HEAD との差分は本 run で追加した REPORT のみ (§7)。
 - 素材: work-m11 / work-liftdiff を `tools/m11/work/`・`tools/liftdiff/work/` に展開 (`tar --zstd -xf`, 8 秒)。fl-win64 は `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` を機械語の PE 正本として使用。
-- 既知類型との関係: 該当 ID なし (LD-35・LD-94 の spill 宛 unk 分類の延長)。本 run は `docs/DEFECTS.md` を未確認 (新類型の有無は判定していない)。
+- 既知類型との関係: 該当 ID なし (`docs/DEFECTS.md` D1a〜D22 を全件確認。本 run は新類型を観測していない。LD-35・LD-94 の spill 宛 unk 分類の延長)。
 - e2e 実測: `bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh` を 1 回実行 → rc=0・所要 1m58s (user 1m57s)・load average 0.91 (実行後の uptime)・7/7 完了。`[1]`〜`[6]` の集計は results/ と一致 (`spill178_1161.tsv` cmp OK)。#2246 の実測 (2m29s) との差は機械の差と推定 (未検証)。
 
 ## 2. 対象の確認
@@ -18,7 +18,7 @@
 ## 3. 機械語の後続読み出し (PE 経路・実測)
 
 `audit_lsf.py --pe block00031_PE.bin --only <19 関数>` で 19 関数すべて機械語を辿れた (`mach_fns=19`・所要 0.45 秒)。
-config 経路 (`boot1.drc.config.json`) では 17 関数が `NO DESCEND` (関数区間表に無い) で、後続読み出しを取れなかった (残り 2 関数 `415610`・`415c30` は取れた)。
+config 経路 (`boot1.drc.config.json`) では 17 関数が `NO DESCEND` (関数区間表に無い) で、後続読み出しを取れなかった (残り 2 関数 `415610`・`415c30` は取れた)。本 fix (差し戻し対応) では `tools/m11/work` を展開していないため、この件数は再実測していない (前回 run の実測値。本 fix では未再測定)。
 
 対象 23 site について、同じ `[rbp/rsp + disp]` を後続で参照する命令の件数 (descend 経路・線形でなく CFG を辿る):
 
@@ -69,4 +69,12 @@ python3 tools/m11/ldfix/audit_lsf.py tools/m11/work/boot_final3.ll tools/m11/wor
 | 後半 23 site の分類 | 同上 | #2265 (LD-98) |
 | UNDETERMINED 7 site の IR 側再検証 | 同上 | #2253 (LD-95・既存) |
 | 群 A / 群 B の分類 | 同上 | #2244 / #2245 (既存) |
-| config 経路で 14 関数が `NO DESCEND` (関数区間表の欠落) | 機械語の後続読み出しを config 経路で取れない。PE 経路 (`--pe`) が必要 | #2264 (本文の注意に追記) |
+| config 経路で 17 関数が `NO DESCEND` (関数区間表の欠落。§3 と同じ件数) | 機械語の後続読み出しを config 経路で取れない。PE 経路 (`--pe`) が必要 | #2264 (本文の注意に追記) |
+
+## 7. 鮮度の証跡
+
+- 測定 commit: `25d2cdc0` (e2e・§3 の audit はこの tree で実行)。
+- 測定 commit から HEAD までの差分 (`git diff 25d2cdc0 HEAD -- tools/m11/ldfix`) は本 REPORT の追加のみ。判定ファイル (`candidate_verdicts_1161.jsonl`・`results/spill178_1161.tsv`) の差分は 0。
+- 差分の出力 (`git diff 25d2cdc0 HEAD -- tools/m11/ldfix`) は下記。
+
+
