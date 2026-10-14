@@ -182,3 +182,59 @@ python3 tools/runtime/bench/make_big_wasm.py <in.wasm> <out.wasm> <K> && node to
 | 1 wasm に常駐 Memory が 124 超を載せる場合 (Kilohearts 47 stub 等の同居) | 追い出し対象外の常駐は回避できず OOM になる。回避策は未実装 | #96 (HB-H7) |
 | Chrome 以外の Memory 上限 (Firefox / Safari) | 予算値 96 は Chrome 154 の実測のみに基づく | #127 (RT-9) |
 | OTT 以外の DLL (freshair / serum2 / massivex) の同時ロード | 異なる lift 系統の DLL の同居は未試験 (素材 plugins-freshair 等が未取得) | #125 へコメント (素材取得後に再試験) |
+
+- 測定後のコード差分 (`git diff 80b69fa2 HEAD -- tools/runtime/memload/real src/runtime package.json`、commit `39fb363f` と `114ee54e`)。コメント・失敗メッセージ・no-op 式の削除のみで、判定ロジックと実行経路は変えていない。出力:
+```diff
+diff --git a/tools/runtime/memload/real/real_worker.mjs b/tools/runtime/memload/real/real_worker.mjs
+index 78ccd06f..12705ead 100644
+--- a/tools/runtime/memload/real/real_worker.mjs
++++ b/tools/runtime/memload/real/real_worker.mjs
+@@ -1,5 +1,5 @@
+-// RT-6 実 loader 試験 (#125): PluginPool (src/runtime/memory_budget.ts) を hostbridge の実 loader に接続する Worker。
+-// 実 loader = host_vst2.wasm の LoadLibraryW / FreeLibrary (hb_bridge.mjs) で、lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
++// RT-6 実 loader 試験 (#125): PluginPool (src/runtime/memory_budget.ts) を hostbridge の loader に接続する Worker。
++// loader = host_vst2.wasm + hb_bridge.mjs の LoadLibraryW / FreeLibrary (LoadLibraryW の採番だけ PoolBridge で置換)。lowbase 版 OTT (DLL 1 本 = 1 Memory, initial 24 MiB) を
+ // PluginPool 経由で pin / unpin / LRU 追い出しする。判定は run_real.mjs 側。
+ import { ModuleTable, HostBridge, EmscriptenGuest, HMODULE_BASE } from "./hb_bridge.mjs";
+ import { PluginPool, MemoryBudget, DEFAULT_PLUGIN_CAPACITY } from "./memory_budget.js";
+@@ -72,7 +72,7 @@ async function runCase(mode) {
+   });
+ 
+   // OTT は block 間で DSP 状態を持つ。bit 一致を見られるのは cold ロード直後の初回 block だけ (基準 = 最初の cold ロード)。
+-  // warm pin (追い出されず残っていた instance) は、出力ではなくパラメータの読み戻しで instance の取り違えを見る。
++  // warm pin (追い出されず残っていた instance) は出力を照合せず、param 0 の読み戻しで生存だけを見る (全 instance が同じ値を持つため取り違えは検出しない)。
+   const use = async (k, held) => {
+     const before = R.loads;
+     const h = await pool.pin(`p${k}`);
+diff --git a/tools/runtime/memload/real/run_real.mjs b/tools/runtime/memload/real/run_real.mjs
+index ee164c21..49382281 100644
+--- a/tools/runtime/memload/real/run_real.mjs
++++ b/tools/runtime/memload/real/run_real.mjs
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env node
+ // RT-6 実 loader 試験 (#125) 1 コマンド: `node tools/runtime/memload/real/run_real.mjs [--neg-only|--pos-only]`
+-// PluginPool を hostbridge の実 loader (host_vst2.wasm の LoadLibraryW/FreeLibrary) に接続し、lowbase 版 OTT を
++// PluginPool を hostbridge の loader (host_vst2.wasm + hb_bridge.mjs。LoadLibraryW の採番だけ PoolBridge で置換) に接続し、lowbase 版 OTT を
+ // 150 種 + 320 pin で回す。各ケースは新しい headless Chrome (= 新しいレンダラ)。判定が崩れたら exit 1。
+ // ネガティブコントロール (NEG) は「壊すと OOM / 判定 FAIL になる」ことを確認し、検出しなければ exit 1。
+ // 前提: bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh (lowbase 版 OTT) と retdec/build_host_lb.sh (host_vst2.wasm)。
+@@ -48,7 +48,7 @@ const isOom = (e) => !!e && /could not allocate memory|Out of memory/i.test(e.me
+ const checks = {
+   pos: (r) => {
+     const f = [];
+-    if (r.fatal || r.err) f.push(`例外 ${JSON.stringify(r.err)} (ロード ${r.loads} 回目${r.atLoad != null ? "" : ""})`);
++    if (r.fatal || r.err) f.push(`例外 ${JSON.stringify(r.err)} (ロード ${r.loads} 回目)`);
+     if (r.pins !== PINS) f.push(`pins=${r.pins} != ${PINS}`);
+     if (r.loads <= NATIVE_LIMIT) f.push(`累計ロード ${r.loads} がネイティブ上限 ${NATIVE_LIMIT} を超えていない (追い出しが効いていない)`);
+     if (r.loads !== r.evictions + r.finalSize) f.push(`loads(${r.loads}) != evictions(${r.evictions}) + 生存(${r.finalSize}) (追い出し以外で entry が消えた/残った)`);
+@@ -56,7 +56,7 @@ const checks = {
+     if (r.finalInUse !== r.finalSize) f.push(`枠と entry の不一致 inUse=${r.finalInUse} size=${r.finalSize}`);
+     if (r.coldLoads !== r.loads) f.push(`cold 照合 ${r.coldLoads} 件 != ロード ${r.loads} 件 (照合されていないロードがある)`);
+     if (r.hashMismatch !== 0) f.push(`cold ロード直後の出力 sha256 が基準と不一致 ${r.hashMismatch} 件 (基準 ${r.refHash?.slice(0, 16)})`);
+-    if (r.paramMismatch) f.push(`warm pin でパラメータ読み戻しが不一致 ${r.paramMismatch} 件 (instance の取り違え疑い)`);
++    if (r.paramMismatch) f.push(`warm pin で param 読み戻しが不一致 ${r.paramMismatch} 件 (instance の状態喪失疑い)`);
+     if (r.handleMismatch !== 0) f.push(`hostbridge の handle と pool の対応が崩れた ${r.handleMismatch} 件`);
+     if (!r.refHash) f.push("出力 sha256 の基準が無い");
+     if (r.bridgeLoaded !== r.finalSize || r.bridgeHandles !== r.bridgeLoaded) f.push(`bridge の登録数 ${r.bridgeLoaded} / 一意 handle ${r.bridgeHandles} が生存 entry ${r.finalSize} と一致しない`);
+```
+- **HEAD (`114ee54e`) の e2e は再測定していない**。本 run の素材は `fl-win64` のみで、OTT の e2e を再現できなかった。PR 本文の `oc_artifacts: work-m6-ott analysis-ott-binaries toolchain-emsdk` が揃う run で再測定する。上の表の実測値は測定 commit `80b69fa2` のもの。
