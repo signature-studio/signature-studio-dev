@@ -48,7 +48,7 @@
 #### 現 head での全件再生成と記録の比較 (LD-60 / #1736)
 - **再生成の基準 = `576c4976`** (測定時の `origin/main`)。ただし再生成の値は `576c4976` のコードの結果とは言えない。fix run で `git diff 576c4976 8a75e60a -- tools/liftdiff` を確認すると 17 ファイル・444 行追加の差分があり、空ではない (同一コードという前版の主張は誤りだった)。
   - 鮮度の正本は上の `200cc2b4` 側 (測定に使う 3 ファイルの差分 0 行) で、`576c4976` 基準の差分は参考値。
-  - 比較 (検証 HEAD `c66ddd7b`): `git diff 576c4976 c66ddd7b -- tools/liftdiff` = 20 files・592 insertions・10 deletions (本 REPORT の追記 7 insertions・6 deletions を含む)。`origin/main` と HEAD `85e75eec` の `git diff -- tools/liftdiff` は `REPORT_APPENDIX_LD28.md` のみ (19 insertions・6 deletions)。merge 前後で `tools/liftdiff` のコードは変わっていない (`git diff 848d83fd 85e75eec -- tools/liftdiff` = 0 行)。
+  - 比較 (検証 HEAD `c66ddd7b`): `git diff 576c4976 c66ddd7b -- tools/liftdiff` = 20 files・592 insertions・10 deletions (本 REPORT の追記 7 insertions・6 deletions を含む)。`origin/main` と HEAD の `git diff -- tools/liftdiff` は `REPORT_APPENDIX_LD28.md` のみ (merge 後の HEAD で確認)。merge 前後で `tools/liftdiff` のコードは変わっていない (`git diff 848d83fd 85e75eec -- tools/liftdiff` = 0 行)。
 - **コマンド**: `FL_WIN64_DIR=<fl-win64 展開先> python3 tools/liftdiff/liftdiff.py batch tools/liftdiff/targets/m11.json --set closure --shards 14 --nobuild --out tools/liftdiff/work/m11/batch_closure_head.jsonl` (build は同じ target で事前に実施)。
 - **入力・出力 sha256**: 素材 `block00031_PE.bin` = `b2c64da4…9496d` (22,227,016 bytes)。比較対象の記録 `batch_closure.jsonl` = `810b4d3a…bf6` (49,316,750 bytes)。再生成出力 `batch_closure_head.jsonl` = `b7990688…ae462` (51,854,845 bytes)。
 - **所要**: 858 s (shards 14・4 コア・開始時 load average 0.41・RC 0)。
@@ -67,7 +67,7 @@
 - **検算 (実測・検証 HEAD `c66ddd7b`)**: `$ARTIFACTS_DIR` の `work-liftdiff` / `work-m11` を展開して測定。`sha256sum tools/liftdiff/work/m11/batch_closure.jsonl` = `810b4d3a03df1cf0b3cc1e004983e8c575bcaeeaa54c4780f7f0bcf2becfb6bf` (記録と一致)、49,316,750 bytes、mtime 2026-10-10 08:54:42 UTC。集計 (実測): match 2,273 / mismatch 2,892 / unexec 2,256 (計 7,421、`liftdiff_version` 全件 1)。pattern 集合は 9 種 (z, s, p0, p1, p01, pall, pall2, q0, qall) が 7,371 件、空が 50 件。
 - **ログ末尾の集計との不一致**: `batch_closure.log` の `関数数 7421: 一致 2275 / 不一致 2885 / 実行不能 2261` は jsonl の集計と一致しない (match +2・mismatch −7・unexec +5)。ログと jsonl が同一 run の出力かは確認できていない。
 - **生成 commit**: 特定できず。`git log -S` で `batch_closure` / `[batch] done` / `wasm_trap` を探しても、記録に対応する commit は残っていない。`ldlib/cases.py` で `vm0`・`u16` が追加されたのは `79584ef7` (2026-10-13) で、jsonl の 9 pattern はそれより前の集合と整合する。ただし commit は一意に決まらない。
-- **再生成との対応**: `python3 tools/liftdiff/tests/trace_diverge_418be0.py` の出力は `results/m11_418be0_thunk.md` と diff 0 行で一致 (検証 HEAD `c66ddd7b` で実測: rc 0・0.90 s・出力 18 行・`results/m11_418be0_thunk.md` と diff 0 行)。
+- **再生成との対応**: `python3 tools/liftdiff/tests/trace_diverge_418be0.py` の出力は `results/m11_418be0_thunk.md` と diff 0 行で一致 (検証 commit `ac8eb649` (再生成) で実測: rc 0・0.73 s・出力 19 行。出力の 19 行目は「trace_head に解析不能要素があり丸ごと除外したケース」の行で、`#2089` (`500acb3d` / `c00790d1`) で追加された)。
 - **未解決**: (a) 生成 commit の特定と、その commit での 0x418be0 系 20 / 16 / 4 の再走、(b) 現 head と記録の差 (pattern 別 outcome) の説明、(c) shards 1 と 14 の差の原因 (0x418be0 / 0x41c820 の単体 run で非決定性か shard 間の状態共有かを切り分ける)。
 
 #### 生成 commit の候補再生成と shards 反復 (LD-74 / #2012)
