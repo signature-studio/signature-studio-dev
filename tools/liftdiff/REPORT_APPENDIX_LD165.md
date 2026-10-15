@@ -8,7 +8,7 @@
 - **case 単位では揺れた**: units 10 case / 6 関数、hybrid 6 case / 4 関数。全件が **wasm 側の status の変化** (trap ↔ timeout、crash ↔ hang) で、native 側は全件 `segv` のまま。timing 付き native の差は無い。
 - **起点**: shard ごと (chunk 内 `vas[i::12]`) に最初に違った関数は、units 4 shard・hybrid 3 shard の全てで wasm 側の 1 case だった。起点より前に同じ shard で違った関数は無い。
 - **原因の候補 (未確定)**:
-  - (A) **wasm 1.0 s 上限の内外**。同じ case の trap は単独で 0.20 s (§4)。batch r2 で同じ経路が 1.296 s の timeout になった。負荷 (12 shard・4 vCPU) で 6 倍超に延びたと見られる。
+  - (A) **wasm 1.0 s 上限の内外**。同じ case の trap は、同じ関数の先の case の後で 0.20 s (§4)。batch r2 では同じ経路が 1.296 s の timeout になった。負荷 (12 shard・4 vCPU) で 6 倍超に延びたと見られる。
   - (B) **wasm runner の履歴依存**。同じ case の経路が、同じ runner で先に走った case で変わる (`0x1060950 s` は前段なしで timeout 1.05 s、同じ関数の z の後で trap 0.20 s)。(B) は batch の r1/r2 の差 (前段が同じ) は説明しない。r1/r2 の差は (A) による。
   - (C) V8 の wasm 階層化 (Liftoff → TurboFan) の完了時刻が負荷で変わる。**未検証** (次の子 issue で確かめる)。
 - **受入 1・2 (同一入力の再現性) は本付録では未達** (4 回の一致は偶然の一致かもしれず、LD-154 の揺れは再現していない)。受入 3 (揺れた case の候補と証拠) は case 単位について満たした。判定が変わった関数は本 run では 0 件のため、LD-154 の判定変化の原因は未確定のまま。残りは子 issue へ (§7)。
