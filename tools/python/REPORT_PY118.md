@@ -79,7 +79,7 @@
 | 0x788150 の呼出し元と起動時のゲート値 `0x15f69e0`〜`0x15f69ec` (§1b) | `0x783810` の変換が恒等かは未確定 | #3059 (PY-157) |
 | 初期化 0x770830 の起動経路 (呼出し元 0x111d87a・0x11be297) | 初期値が起動時に有効かは未確定 | #3059 (PY-157) |
 | wrapper の範囲判定 `[0x8834fa]-1` と範囲外 error code | C/mock は既存の `MX` (0..126) を流用している | #3059 (PY-157) |
-| `provider_check.mjs` の flpy 部と `all_tools.mjs` (既定・wasm) が未実行 | `dist/flpy.js` と `work/midi.py` が本 run に無い。本 PR の変更は mixer 経路だけだが、flpy 経路の回帰は未検証 | #3059 (PY-157) |
+| ~~`provider_check.mjs` の flpy 部と `all_tools.mjs` (既定・wasm) が未実行~~ | §10 で実行済み (#3804 / PY-255)。PASS | #3804 (PY-255) で解消 |
 
 ## 7. 差分と検証の鮮度
 
@@ -142,5 +142,22 @@
 |---|---|---|
 | 0x111d7e0 の上位呼出し元 (起動時か遅延か) | 未設定時の既定色 `0xff636c71` が実行時に有効かは未確定 | #3805 (PY-256) |
 | 0x11be297 経路 (`CreateFruityInstance`) の起動時性 | 0x770830 の初期化タイミング | #3805 (PY-256) |
-| provider_check の flpy 部・all_tools (既定・wasm) の実行 | flpy 経路の回帰は未検証 (`dist/flpy.js` と `work/midi.py` が本 run に無い) | #3804 (PY-255) |
+| ~~provider_check の flpy 部・all_tools (既定・wasm) の実行~~ | §10 で実行済み (#3804 / PY-255)。PASS | #3804 (PY-255) で解消 |
 | N = 502 の実行時値 (上限 N−1)、PE の 127〜501 の区間、範囲外の PyErr 有無 (`0xd84510` の間接先) | C/mock は 127 以上を RANGE、PE は 127〜501 を範囲内とみる。実行時 N が 502 なら食い違いが残る | #3553 (PY-212) |
+
+## 10. #3804 (PY-255): flpy 部 (provider_check.mjs) と all_tools.mjs (既定・wasm) の実行 (実測)
+
+§5・§6 で未実行だった 2 本を実行した。コードは変えていない (測定 commit `425347571` = `origin/main`)。
+
+- 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` (`FL_WIN64_DIR`)、`toolchain-emsdk` を `$RUNNER_TEMP/emsdk-art` に `tar --zstd -xf` で展開。入力は `bash tools/python/fetch_inputs.sh` で配置 (win64 の DATA block から `midi.py`・`utils.py`・`MCPTools.pyc`・device script・fl-stubs)。
+- 手順 (順に実行、いずれも foreground、rc は実測):
+  1. `bash tools/python/build_cpython_wasm.sh`: rc 0。real 4 分 9.9 秒 (user 7 分 51 秒)。`libpython3.12.a`・`python.js`・`python.wasm`・`python.data` を生成。
+  2. `EMSDK_ENV=<emsdk>/emsdk_env.sh FL_WIN_PE=<fl-win64>/extracted/block00031_PE.bin bash tools/python/build_flpy.sh`: rc 0。real 24.6 秒 (user 53.3 秒)。`dist/flpy.{js,wasm,data}` を生成。
+  3. `node tests/all_tools.mjs` (既定・wasm): **PASS**。出力 `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`。real 2.081 秒 (user 2.720 秒)、load `2.78 1.85 0.88` (17:43:25)。
+  4. `EMSDK_ENV=<emsdk>/emsdk_env.sh bash tools/python/provider/build.sh` (`dist/flprov.{js,wasm}` を作る): rc 0。real 1.537 秒。`fl_table.c`: 435 関数、ハンドラ 228。
+  5. `node tests/provider_check.mjs`: **PASS**。出力 `{"functions":435,"implemented":228,"unimplemented":207,"mcp_static":60,"PASS":true}`。real 0.373 秒 (user 0.755 秒)、load `2.43 1.80 0.88` (17:43:35)。flpy 部 (`work/midi.py` を使う CPython 側の検査) まで通過。
+- 件数について: §4・§8.3 の `impl 84 / unimpl 351` は過去の木の値。現行の `provider_check.mjs` は件数を期待集合 (`provider_expect/*.json`) から導出するため、現行値 `228 / 207` が正。件数の assert はスクリプト内で PASS。
+- 失敗: 0 件。手順 4 の前に `provider_check.mjs` を実行した際は `dist/flprov.js` が無く ERR_MODULE_NOT_FOUND で止まった (前提の不足。手順 4 の後で PASS)。C/mock の差分ではない。
+- 素材: `toolchain-emsdk` は本 run の `$ARTIFACTS_DIR` にあった (§4 の記述は過去 run のもの)。
+
+結論: §5 の未実行は解消。flpy 経路 (`dist/flpy.js`) の回帰は、本測定の範囲では無し。
