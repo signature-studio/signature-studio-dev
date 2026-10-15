@@ -14,7 +14,7 @@ def env():
 
 class Runner:
     def __init__(self, name, cmd, init_lines, timeout=10.0, wrap=None):
-        self.name, self.cmd, self.init_lines, self.timeout = name, cmd, init_lines, timeout
+        self.name, self.cmd, self.init_lines, self.timeout = name, cmd, init_lines, float(os.environ.get("LD_RUNNER_TMO") or timeout)   # WIN-33 (#3556): env で上書き可
         self.p = None
         self.buf = b''
         self.restarts = 0

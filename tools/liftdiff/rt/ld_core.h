@@ -72,6 +72,9 @@ static int ld_nfakemod;
 static struct { u64 mod; char name[96]; } ld_fakeprocs[256];
 static int ld_nfakeproc;
 static u64 ld_fake_atom;            /* RegisterClipboardFormatW / atom / handle 系の連番 */
+/* WIN-33 (#3556): 実カタログ供給。native 専用。ld_native.c が env LD_CATALOG_MO 指定時だけ設定する (既定 NULL = 従来応答)。 */
+static u8* ld_cat_blob; static u64 ld_cat_len, ld_cat_pos;
+#define LD_CAT_H 0x65000001ull
 
 /* CAB-233: 出力ポインタ (第1〜4引数に来る dst) の妥当性検査。
  * guest の不正 state 由来の garbage ポインタへの書込みが native ランナ自体を壊すため、
@@ -424,7 +427,37 @@ static u64 ld_model_call(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, u64 a4, 
      *     CreateFileW→仮 handle + ReadFile で読ませる): magic check (0x4e1a3c) は通るが、catalog iteration loop
      *     (0x513da9 の VMT 仮想 call Get(i)) から rbp ごと破壊されて戻る (rbp=0x7fff00000000, rdx=.mo の host バッファ)
      *     → unit 830/895/898 は embodiment 深层の stub ギャップが残る。0 応答で 928/942 が最良。
-     * 真正ファイル I/O 接続 (System/Languages/LC_MESSAGES/default.moe = block25158) は下流タスクへ。 */
+     * 真正ファイル I/O 接続 (System/Languages/LC_MESSAGES/default.moe = block25158) は下流タスクへ。
+     * WIN-33 (#3556): 上の実験を env LD_CATALOG_MO 指定時だけ再現する。default.moe は仮ハンドル LD_CAT_H で開き、
+     * ReadFile/SetFilePointer/GetFileSize を実バイトで応答する。他のファイルは従来どおり 0。 */
+    if (ld_cat_blob) {
+      if (ld_streq(n, "CreateFileW") || ld_streq(n, "CreateFileA")) {
+        char fn[512];
+        if (n[strlen(n) - 1] == 'W') ld_read_strW(a0, fn, sizeof fn); else ld_read_strA(a0, fn, sizeof fn);
+        if (!strstr(fn, "default.moe")) return 0;
+        ld_cat_pos = 0; return LD_CAT_H;
+      }
+      if (ld_streq(n, "ReadFile") && a0 == LD_CAT_H) {
+        u64 k = ld_cat_len > ld_cat_pos ? ld_cat_len - ld_cat_pos : 0;
+        if (k > (a2 & 0xffffffffull)) k = a2 & 0xffffffffull;
+        if (k && !ld_dst_ok(a1, k)) return 0;
+        if (k) memcpy((void*)(uintptr_t)a1, ld_cat_blob + ld_cat_pos, k);
+        ld_cat_pos += k;
+        if (a3 && ld_dst_ok(a3, 4)) *(u32*)(uintptr_t)a3 = (u32)k;
+        return 1;
+      }
+      if (ld_streq(n, "SetFilePointer") && a0 == LD_CAT_H) {
+        int64_t d = (int64_t)(int32_t)(u32)a1;
+        if (a2 && ld_dst_ok(a2, 4)) d += (int64_t)*(int32_t*)(uintptr_t)a2 << 32;
+        int64_t base = a3 == 0 ? 0 : a3 == 1 ? (int64_t)ld_cat_pos : (int64_t)ld_cat_len;
+        int64_t np = base + d;
+        if (np < 0) { ld_lasterr = 131; return 0xffffffffull; }
+        ld_cat_pos = (u64)np;
+        if (a2 && ld_dst_ok(a2, 4)) *(int32_t*)(uintptr_t)a2 = (int32_t)(np >> 32);
+        return (u64)np & 0xffffffffull;
+      }
+      if (ld_streq(n, "GetFileSize") && a0 == LD_CAT_H) { if (a1 && ld_dst_ok(a1, 4)) *(u32*)(uintptr_t)a1 = 0; return ld_cat_len; }
+    }
   }
   if (ld_streq(n, "VirtualAlloc")) { if (a0) return a0; return ld_heap_alloc((u32)a1 ? (a1 & 0xffffffffull) : 0x1000, 0x10000, 1); }
   if (ld_streq(n, "VirtualFree") || ld_streq(n, "HeapFree") || ld_streq(n, "CloseHandle") || ld_streq(n, "TlsFree")) return 1;

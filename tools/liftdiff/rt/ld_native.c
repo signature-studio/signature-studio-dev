@@ -132,10 +132,20 @@ static void tr_disarm(void) { for (int i = 0; i < g_ntr_set; i++) *(u8*)g_tr_va[
  * case の関数 entry に int3 を置き、そこから TF (single-step) で image 内の命令を 1 つずつ記録する。
  * 出力: <接頭辞>.<case id> に 1 行 1 命令 (rva と主要レジスタ, 16 進)。既定 (env 未設定) は無効。 */
 static u64 g_step_entry, g_step_max, g_step_cnt; static u8 g_step_orig; static int g_step_armed, g_step_on; static FILE* g_step_fp;
+static u64 g_mem_va, g_mem_last, g_mem_rva; static int g_mem_on;   /* WIN-33 (#3556): LD_STEP_MEM=<VA hex> で 8B の変化を記録 */
 static void step_rec(greg_t* g) {
   if (!g_in_call || g_step_cnt >= g_step_max) { g[REG_EFL] &= ~0x100; g_step_on = 0; return; }
   u64 rip = (u64)g[REG_RIP];
+  if (g_mem_on) {
+    u64 cur = *(u64*)(uintptr_t)g_mem_va;
+    if (cur != g_mem_last) {
+      fprintf(g_step_fp, "MEM writer_last_img_rva=%llx old=%llx new=%llx step=%llu rip_now=%llx\n", (unsigned long long)g_mem_rva,
+              (unsigned long long)g_mem_last, (unsigned long long)cur, (unsigned long long)g_step_cnt, (unsigned long long)(rip - g_imgbase));
+      g_mem_last = cur;
+    }
+  }
   if (rip >= g_imgbase && rip < g_imgbase + g_imgsize) {
+    g_mem_rva = rip - g_imgbase;
     fprintf(g_step_fp, "%llx %llx %llx %llx %llx %llx %llx %llx %llx %llx %llx\n", (unsigned long long)(rip - g_imgbase),
             (unsigned long long)g[REG_RAX], (unsigned long long)g[REG_RCX], (unsigned long long)g[REG_RDX], (unsigned long long)g[REG_RBX],
             (unsigned long long)g[REG_RSP], (unsigned long long)g[REG_RBP], (unsigned long long)g[REG_RSI], (unsigned long long)g[REG_RDI],
@@ -148,9 +158,11 @@ static void step_begin(void) {
   g_step_max = 0; g_step_cnt = 0; g_step_on = 0; g_step_armed = 0; g_step_fp = NULL;
   const char* n = getenv("LD_STEP_N"); const char* o = getenv("LD_STEP_OUT");
   if (!n || !o || !atoll(n)) return;
+  { const char* sid = getenv("LD_STEP_ID"); if (sid && strcmp(sid, ld_case.id)) return; }   /* WIN-33 (#3556): 指定 case id だけ trace */
   char path[512]; snprintf(path, sizeof path, "%s.%s", o, ld_case.id);
   g_step_fp = fopen(path, "w"); if (!g_step_fp) return;
   g_step_max = (u64)atoll(n); g_step_entry = ld_case.fn; g_step_orig = *(u8*)(uintptr_t)ld_case.fn; g_step_armed = 1;
+  { const char* mv = getenv("LD_STEP_MEM"); g_mem_on = 0; if (mv && *mv) { g_mem_va = strtoull(mv, NULL, 16); g_mem_last = *(u64*)(uintptr_t)g_mem_va; g_mem_on = 1; g_mem_rva = 0; } }
   *(u8*)(uintptr_t)ld_case.fn = 0xCC;
 }
 static void step_end(void) {
@@ -287,7 +299,8 @@ static void run_case(char* line) {
   scrub_stack(ld_case.stkfill);
   step_begin();
   if (ld_case.trace && !g_step_max) tr_arm();
-  struct itimerval it = { {0, 0}, {1, 500000} };
+  long tmo_us = 1500000; { const char* tm = getenv("LD_CASE_TMO_US"); if (tm && atol(tm) > 0) tmo_us = atol(tm); }   /* WIN-33 (#3556): 既定 1.5 s */
+  struct itimerval it = { {0, 0}, {tmo_us / 1000000, tmo_us % 1000000} };
   struct timespec t0, t1;
   ld_native_ms = -1.0;
   if (sigsetjmp(g_jb, 1) == 0) {
@@ -339,6 +352,15 @@ int main(int argc, char** argv) {
   if (load_pe(argv[1])) return 3;
   install_signals();
   wp_arm();
+  { const char* cat = getenv("LD_CATALOG_MO");   /* WIN-33 (#3556): 実カタログ供給 (未設定なら従来応答) */
+    if (cat && *cat) {
+      FILE* cf = fopen(cat, "rb");
+      if (!cf) { fprintf(stderr, "[ld_native] LD_CATALOG_MO unreadable: %s\n", cat); return 6; }
+      fseek(cf, 0, SEEK_END); ld_cat_len = (u64)ftell(cf); fseek(cf, 0, SEEK_SET);
+      ld_cat_blob = malloc(ld_cat_len ? ld_cat_len : 1);
+      if (!ld_cat_blob || fread(ld_cat_blob, 1, ld_cat_len, cf) != ld_cat_len) { fprintf(stderr, "[ld_native] LD_CATALOG_MO read failed\n"); return 6; }
+      fclose(cf);
+    } }
   while (getline(&g_line, &g_linecap, stdin) > 0) {
     char* l = g_line; size_t n = strlen(l); while (n && (l[n-1] == '\n' || l[n-1] == '\r')) l[--n] = 0;
     if (!strncmp(l, "LAYOUT ", 7)) {
