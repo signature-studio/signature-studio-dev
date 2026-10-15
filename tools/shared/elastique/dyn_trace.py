@@ -30,7 +30,7 @@ from unicorn.x86_const import (UC_X86_REG_RAX, UC_X86_REG_RCX, UC_X86_REG_RDX, U
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, '..', 'work', 'elastique', 'dyn')
 DLL = os.environ.get('ELASTIQUE_DLL', os.path.join(HERE, '..', 'work', 'win', 'elastique_x64.dll'))
-ENTRIES = os.path.join(HERE, 'data', 'entries.csv')
+ENTRIES = os.environ.get('DYN_ENTRIES', os.path.join(HERE, 'data', 'entries.csv'))
 OUT_CSV = os.path.join(HERE, 'data', 'runtime_indirect.csv')
 PAGE = 0x1000
 STUB = 0x10000000
@@ -43,6 +43,7 @@ SCRATCH_SIZE = 0x100000
 POOL = 0x50000000
 POOL_SIZE = 0x4000000
 COUNT = int(os.environ.get('DYN_COUNT', '3000000'))
+COUNT_EXTRA = int(os.environ.get('DYN_COUNT_EXTRA', '1000000'))
 ENTRY_INIT = 0x1803E71B0
 
 
@@ -165,6 +166,8 @@ def main():
     last = [None]
     run_label = ['-']
     ins_total = [0]
+    cur_src = set()
+    group_src = {}
 
     def decode(addr):
         code = bytes(uc.mem_read(addr, 16))
@@ -182,6 +185,8 @@ def main():
         p = last[0]
         if p is not None:
             last[0] = None
+            if kcache[p][1]:
+                cur_src.add(p)
             e = edges.get((p, addr))
             if e is None:
                 e = edges[(p, addr)] = [0, kcache[p][1], kcache[p][2], run_label[0]]
@@ -211,7 +216,7 @@ def main():
 
     runs = []
 
-    def run(label, entry, args):
+    def run(label, entry, args, group='base', count=COUNT):
         run_label[0] = label
         rsp = STACK_TOP - 0x208
         uc.mem_write(rsp, struct.pack('<Q', SENT))
@@ -219,11 +224,12 @@ def main():
         for r, v in zip((UC_X86_REG_RCX, UC_X86_REG_RDX, UC_X86_REG_R8, UC_X86_REG_R9), args):
             uc.reg_write(r, v)
         last[0] = None
+        cur_src.clear()
         t0 = time.time()
         before = ins_total[0]
         status = 'returned'
         try:
-            uc.emu_start(entry, SENT, count=COUNT)
+            uc.emu_start(entry, SENT, count=count)
         except UcError as e:
             rip = uc.reg_read(UC_X86_REG_RIP)
             status = 'uc_error:%s' % e
@@ -234,15 +240,20 @@ def main():
                 e2 = edges.setdefault(ek, [0, kcache[p][1], kcache[p][2], label])
                 e2[0] += 1
                 status += ' fault_target=%#x class=%s' % (rip, 'unmapped')
+                if kcache[p][1]:
+                    cur_src.add(p)
         if status == 'returned' and uc.reg_read(UC_X86_REG_RIP) != SENT:
             status = 'count_limit'
         rv = uc.reg_read(UC_X86_REG_RAX)
-        runs.append({'run': label, 'entry': '%#x' % entry, 'args': ' '.join('%#x' % a for a in args),
+        group_src.setdefault(group, set()).update(cur_src)
+        runs.append({'run': label, 'group': group, 'entry': '%#x' % entry,
+                     'args': ' '.join('%#x' % a for a in args),
                      'status': status, 'rax': '%#x' % rv, 'insns': ins_total[0] - before,
                      'sec': round(time.time() - t0, 2)})
         print('run %-28s %-14s insns=%-9d rax=%#x sec=%.1f %s' % (
             label, status[:14], ins_total[0] - before, rv, time.time() - t0, status if len(status) > 14 else ''),
             flush=True)
+        return rv
 
     exports = [(e.name.decode(), ib + e.address) for e in pe.DIRECTORY_ENTRY_EXPORT.symbols]
     export_va = dict(exports)
@@ -250,11 +261,14 @@ def main():
     run('ElAllocator_SetFunctions', export_va['ElAllocator_SetFunctions'],
         (host['host.malloc'], host['host.free'], 0, 0))
     obj = SCRATCH + 0x1000
+    objs = []
     for nm, va in exports:
         if nm == 'ElAllocator_SetFunctions':
             continue
         run(nm + ':zero', va, (0, 0, 0, 0))
-        run(nm + ':scratch', va, (obj, obj + 0x1000, 44100, 2))
+        rv = run(nm + ':scratch', va, (obj, obj + 0x1000, 44100, 2))
+        if 'CreateInstance' in nm and POOL <= rv < POOL + POOL_SIZE:
+            objs.append((nm, rv))
 
     thunks = []
     slots = {}
@@ -273,18 +287,26 @@ def main():
     slot_readers = {}
 
     def on_slot_read(u, access, addr, size, value, ud):
-        if addr not in slots:
-            return
         rip = u.reg_read(UC_X86_REG_RIP)
-        key = (rip, addr, run_label[0])
-        slot_readers[key] = slot_readers.get(key, 0) + 1
+        for s in slots:
+            if addr < s + 8 and s < addr + size:
+                key = (rip, s, run_label[0])
+                slot_readers[key] = slot_readers.get(key, 0) + 1
 
     if slots:
-        uc.hook_add(UC_HOOK_MEM_READ, on_slot_read, begin=min(slots), end=max(slots) + 7)
+        uc.hook_add(UC_HOOK_MEM_READ, on_slot_read, begin=min(slots) - 16, end=max(slots) + 23)
     print('thunk heads (.data/.rdata の 8 byte 値 → call %#x で始まる): %d' % (ENTRY_INIT, len(thunks)), flush=True)
     for v in thunks:
         run('thunk:%#x' % v, v, (0, 0, 0, 0))
         run('thunk:%#x:scratch' % v, v, (obj, obj + 0x1000, 44100, 2))
+
+    targets = [(nm, va) for nm, va in exports if nm != 'ElAllocator_SetFunctions']
+    targets += [('thunk:%#x' % v, v) for v in thunks]
+    for nm, va in targets:
+        run(nm + ':rate48k', va, (obj, obj + 0x1000, 48000, 1), 'rate48k', COUNT_EXTRA)
+    for i, (cnm, o) in enumerate(objs[:3]):
+        for nm, va in targets:
+            run('%s:obj%d(%s)' % (nm, i, cnm), va, (o, obj, 44100, 2), 'obj', COUNT_EXTRA)
 
     os.makedirs(WORK, exist_ok=True)
     with open(os.path.join(WORK, 'slot_readers.csv'), 'w', newline='') as f:
@@ -323,6 +345,8 @@ def main():
         'thunk_heads': len(thunks),
         'thunk_slot_readers_distinct_rip': len({r for r, _, _ in slot_readers}),
         'indirect_edges_to_thunk_heads': sum(v[0] for (s_, d, v) in ind_edges if d in set(thunks)),
+        'indirect_sites_by_group': {g: len(s) for g, s in sorted(group_src.items())},
+        'create_instances_chained': len(objs),
     }
     with open(os.path.join(WORK, 'summary.json'), 'w') as f:
         json.dump(summary, f, indent=1)
