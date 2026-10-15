@@ -72,7 +72,7 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | `undefined1 auVar7..33 [64]` (ZMM 系 12 ローカル)・`_8_56_`・`_16_48_` などの部分レーン代入 (配列どうしの代入) | member reference 106 件 | [KH-67] (#3808) |
-| `aauStack_f8[11][16]` の混在型 (`_0_4_` を float 読み・int 書き、`_4_12_` と `undefined1[12]` の代入) | member reference 11 件 | [KH-68] (#3809) |
+| `aauStack_f8[11][16]` の混在型 | member reference 11 件 | 解消済み (§10-7v・#3809) |
 | `SUB84`・`SUB168`・`ZEXT416` 等の疑似関数 | census SIMD 46 件 | #3095 [KH-43] (既存) |
 | Delay の native 突合 (1000 trial) | Delay は emcc 通過のみで、native 突合は未検証 | #3073 [KH-41] (既存) |
 | `origin/main` (`58ed035cf`) の `ghidra_route` 変更の取り込みと再測定 | 取り込み後の件数は未確定 | 本 PR (main を取り込むときに同じ手順で再測定) |
@@ -83,4 +83,53 @@
   python3 tools/targets/kilohearts/ghidra_route/ghidra_to_c.py delay <gr>/cdelay <gr>/delay <C> --fix bitcast,intload,stackpair,assoc,concat,lanes
   emcc -c -ferror-limit=0 -I tools/targets/kilohearts/ghidra_route <gr>/cdelay/delay.c -o <gr>/cdelay/delay.o 2> <gr>/cdelay/emcc.log
   python3 tools/targets/kilohearts/ghidra_route/emcc_census.py <gr>/cdelay/emcc.log
+  ```
+
+#### 10-7v. #3809 (KH-68) run: aauStack_f8[11][16] の混在型レーンを型付けする (完了)
+- 結論: Delay の `aauStack_f8[11][16]` (128bit 一時領域の 2 次元配列) の参照 11 件 (`member reference base type 'undefined1[16]'`) を、`ghidra_to_c.py --fix lanes` の規則で解消した。emcc `member reference base type 'undefined1[16]'` は **11 → 0**。Gain/Haas/Gate は生成 C・`.o`・1000 trial の突合が旧版と一致した。
+- 測定 commit (コードを変えた最後の commit): `287469238`。`git diff 287469238 HEAD -- tools/targets/kilohearts/ghidra_route` の出力は本節の commit 時点で 0 行。
+- 環境 (n=1・GitHub runner 4 vCPU・RAM 15GB): 素材 `plugins-kilohearts` (`Kilohearts Offline Installer.zip` 3,833,108,300 B → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)。[GHIDRA] 12.1.4 は公式 zip を取得し sha256 `ddac49f9…d2db` を一致確認。JDK 21 (temurin-21.0.12)。[EMSDK] 6.0.12。作業先はすべて repo 外 (`$RUNNER_TEMP`)。
+- decompile: Delay 閉包 139 関数 → **139/139 OK**。gain・haas・gate (それぞれの閉包) → **9/9 OK** (gain 1・haas 5・gate 3。`work/ghidra/out` へ集約)。
+
+##### aauStack_f8 の参照 (全 11 箇所・すべて `aauStack_f8[0]`)
+| 行 (変換後 C) | 元の参照 | 型の決め方 | 変換規則 |
+|---|---|---|---|
+| 1175 | `aauStack_f8[0]._4_12_ = auStack_144` | `auStack_144` は `undefined1[12]` の 12 バイト。B12 と型が合わない | `memcpy(aauStack_f8[0]._4_12_, auStack_144, 12)` (バイト列の代入。値は変わらない) |
+| 1176 | `aauStack_f8[0]._0_4_ = iStack_148` | int 値を書く | レーンを `uint32_t` にする (int → uint32 は同じビット幅の整数変換) |
+| 1185 | `aauStack_f8[0]._4_4_ = *(undefined4 *)(...)` | int 値を書く | `uint32_t` レーン |
+| 1186 | `aauStack_f8[0]._0_4_ = *(undefined4 *)(...)` | int 値を書く | `uint32_t` レーン |
+| 1187 | `aauStack_f8[0]._8_8_ = 0` | 0 を書く | `uint64_t` レーン |
+| 1190 | `fVar26 = aauStack_f8[0]._0_4_` | float として読む | `u2f(...)` (ビット再解釈) |
+| 1191 | `fVar31 = aauStack_f8[0]._4_4_` | float として読む | `u2f(...)` (ビット再解釈) |
+| 1269 | `uVar36 = aauStack_f8[0]._8_4_ ^ _UNK_...` | 整数として読む | そのまま (`uint32_t` レーン) |
+| 1270 | `uVar37 = aauStack_f8[0]._12_4_ ^ _UNK_...` | 整数として読む | そのまま (`uint32_t` レーン) |
+| 1274 | `auVar6._8_4_ = uVar36 & aauStack_f8[0]._8_4_` | 整数の AND を float レーンへ代入 | `u2f(...)` (ビット再解釈。数値変換にしない) |
+| 1275 | `auVar6._12_4_ = uVar37 & aauStack_f8[0]._12_4_` | 同上 | `u2f(...)` |
+
+- 型: `V128A` (新規。`lanes` 指定時だけ出力。`_0_4_`・`_4_4_`・`_8_4_`・`_12_4_` = `uint32_t`、`_4_12_` = `uint8_t[12]`、`_8_8_` = `uint64_t`)。
+- 規則 (`lanes`): 対象は `undefined1 aauStack_f8 [11] [16];` の宣言 (Delay の 1 関数)。`V128A aauStack_f8 [11];` に書換え、上の 4 種 (memcpy・u2f・u2f・u2f) を正規表現で当てる。`lanes` を付けない限り出力は変わらない。
+- 残る数値変換: なし。`uint ^ float` (1258・1267 行相当) と `FUN_180289ea0` の引数型 (1174 行) は `aauStack_f8` と無関係の既存の型不一致で、旧版にも同じ行が残る (エラー種別の差分は `undefined1[16]` の 11 件だけ)。
+- 影響範囲: `aauStack_f8` の宣言を持つ関数は Delay の `FUN_1802ed7f0` だけ (`grep` で確認)。`lanes` を付けた Gain/Haas/Gate の生成 C は旧版と本体が一致 (下表)。
+
+##### 測定 (測定 commit `287469238`・HEAD 時点で再実行・実測)
+| 項目 | origin/main `68c6cbb75` (lanes なし相当) | 測定 commit `287469238` (lanes) |
+|---|---|---|
+| decompile (delay 閉包) | 139/139 OK | 139/139 OK |
+| C 行数 (delay.c) | 7,281 | 7,290 (+9: V128A 定義と変換行) |
+| emcc error 行 (`-c -ferror-limit=0`) | 420 | **409 (-11)** |
+| `member reference base type 'undefined1[16]'` | 11 | **0** |
+| `member reference base type 'undefined1[64]'` | 106 | 106 (不変・#3808 の範囲) |
+| エラー種別の差分 | — | `undefined1[16]` の 11 件だけ消える (他は同じ) |
+| emcc wall (Delay `-c`・1 回実測) | 15.5 s | 15.7 s |
+
+- Gain/Haas/Gate (`lanes` 付き・新旧とも `--fix bitcast,intload,stackpair,assoc,concat,lanes`):
+  - 生成 C: 新旧で本体一致 (ヘッダ 1 行目の fix 一覧を除く)。gain 122 行・haas 301 行・gate 429 行。
+  - `.o`: `emcc -c -w -O1` で **byte 一致** (gain 1,435 B・haas 3,217 B・gate 3,756 B)。
+  - 突合 (`build_cmp.sh <name> 1000 7`・HEAD): gain **1000/1000** (calls 4999/4999・wasm 15,161 B)、haas **1000/1000** (calls 5500/5500・wasm 16,878 B)、gate **1000/1000** (calls 4999/4999・wasm 17,367 B)。wasm サイズは §10-7u と一致。
+
+- 再現 (`<gr>` = repo 外の作業先・`<C>` = `HeartCore.core_64`):
+  ```
+  analyzeHeadless <proj> kh -import <C> -noanalysis -scriptPath tools/targets/kilohearts/scripts/ghidra -postScript DecompEach.java <gr>/delay <delay 閉包 139 件の VA> -deleteProject
+  python3 tools/targets/kilohearts/ghidra_route/ghidra_to_c.py delay <gr>/cdelay <gr>/delay <C> --fix bitcast,intload,stackpair,assoc,concat,lanes
+  emcc -c -ferror-limit=0 -I tools/targets/kilohearts/ghidra_route <gr>/cdelay/delay.c -o <gr>/cdelay/delay.o 2> <gr>/cdelay/emcc.log
   ```
