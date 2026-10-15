@@ -121,7 +121,7 @@
 
 ## GUI-23 (#1665): 6h CDP タイムアウトの切り分け (原因未特定)
 
-測定 commit `f0cb6407d` (コード変更の最後の commit。診断として `stress.mjs` に eval 所要時間の採取と `[slow-eval]` 出力、`stress.sh` の grep に eval 行を追加)。`git diff f0cb6407d HEAD -- tools/gui` は本節 (REPORT) のみの差分。`TMPDIR=$RUNNER_TEMP`、worktree `ws-1665`、`pnpm install --frozen-lockfile`、`tools/e2e` の `npm ci --ignore-scripts`、`gcc-mingw-w64-x86-64` 導入済み。素材 fl-win64 / toolchain-emsdk / toolchain-retdec は `$HOME/artifacts` に実在を確認。
+測定 commit `f0cb6407d` (コード変更の最後の commit。診断として `stress.mjs` に eval 所要時間の採取と `[slow-eval]` 出力、`stress.sh` の grep に eval 行を追加)。`git diff f0cb6407d HEAD -- tools/gui` は本節 (REPORT) のみの差分。`TMPDIR=$RUNNER_TEMP`、worktree `ws-1665`、`pnpm install --frozen-lockfile`、`tools/e2e` の `npm ci --ignore-scripts`、`gcc-mingw-w64-x86-64` 導入済み。素材 fl-win64 / toolchain-emsdk / toolchain-retdec は `$ARTIFACTS_DIR` に実在を確認。
 
 - **e2e 全体 (コミット済み HEAD で foreground、3 回)**: `76e7e74eb` 1 回目 rc=0 ALL PASS (2 m 41 s)、`76e7e74eb` 2 回目 rc=0 ALL PASS (2 m 28 s)、`f0cb6407d` rc=0 ALL PASS (2 m 26 s)。いずれも 6h の CDP timeout は 0。
 - **6h の eval 所要 (`f0cb6407d` の診断ログ、負荷なし)**: stress.mjs 1 プロセスあたり max 613 ms / 595 ms、3 s 超 0 件。
