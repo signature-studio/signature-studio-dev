@@ -4,8 +4,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { countRunsByPrio } from "../src/active.ts";
 import { effectivePrioMap, noPrCooldownMs, planLaunch, sortReady, type PrioIssue, type ReadyIssue } from "../src/launch.ts";
-import type { RunState } from "../src/webhook.ts";
-import { configuredApp, issuePayload, markFresh, send } from "./helpers.ts";
+import { EMPTY_STATE, handleWebhook, prioIssues, type PmState, type RunState } from "../src/webhook.ts";
+import { signBody } from "../src/hmac.ts";
+import { BOT, WH_SECRET, configuredApp, issuePayload, markFresh, send } from "./helpers.ts";
 
 const I = (number: number, labels: string[] = [], body = "", state: "open" | "closed" = "open"): PrioIssue => ({ number, state, labels, body });
 const child = (number: number, parent: number, labels: string[] = []): PrioIssue => I(number, labels, `親: #${parent}`);
@@ -74,4 +75,58 @@ test("engine (#3973): 親 #3478 (critical) の子 #3748 はラベル無しでも
   await markFresh(ctx);
   assert.deepEqual(ctx.app.engine.plan().picks.map((p) => p.n), [3748, 3500, 3501, 3502]);
   assert.deepEqual((ctx.app.engine.status() as any).ready_by_prio, { critical: 1, normal: 3, low: 0 });
+});
+
+// sub_issues の取り込み (#3989): GitHub の sub-issue の親は、本文に『親: #N』が無いときだけ区分の継承に使う。
+const sub = (action: string, parent: number, child: number, at = "2026-10-14T11:00:00Z") => ({
+  action,
+  repository: { full_name: "signature-studio/signature-studio-dev" },
+  parent_issue: { number: parent },
+  sub_issue: { number: child, updated_at: at },
+});
+const apply = (s: PmState, payload: unknown) =>
+  handleWebhook(s, { secret: WH_SECRET, event: "sub_issues", signature: signBody(WH_SECRET, JSON.stringify(payload)), body: JSON.stringify(payload), botLogin: BOT, repo: "signature-studio/signature-studio-dev" }).state;
+const withIssues = (...xs: { number: number; labels: string[]; body?: string }[]): PmState => {
+  const s = structuredClone(EMPTY_STATE);
+  for (const x of xs) s.issues[String(x.number)] = { number: x.number, title: "t", labels: x.labels, body: x.body ?? "", state: "open", updatedAt: "2026-10-14T10:00:00Z", blockedByCount: 0 };
+  return s;
+};
+const prioOfChild = (s: PmState, n: number) => effectivePrioMap(prioIssues(s)).get(n);
+
+test("sub_issues (#3989): sub-issue の親 (open・critical) から子は critical。取り込む前は継承しない (normal)", () => {
+  let s = withIssues({ number: 10, labels: ["prio:critical"] }, { number: 11, labels: [] });
+  assert.equal(prioOfChild(s, 11), "normal", "取り込み前は継承しない");
+  s = apply(s, sub("sub_issue_added", 10, 11));
+  assert.equal(prioOfChild(s, 11), "critical", "sub-issue の親から継承");
+});
+
+test("sub_issues: 本文の『親: #N』が優先される (両方あれば本文の親。sub-issue の親が critical でも本文の親が low なら low)", () => {
+  let s = withIssues({ number: 10, labels: ["prio:critical"] }, { number: 20, labels: ["prio:low"] }, { number: 11, labels: [], body: "親: #20" });
+  s = apply(s, sub("sub_issue_added", 10, 11));
+  assert.equal(prioOfChild(s, 11), "normal", "本文の親 20 (low) は継承しない。sub-issue の親 10 (critical) は使わない");
+});
+
+test("sub_issues: 取り外し (tombstone) で継承が消える。古い追加の配送では戻らない", () => {
+  let s = withIssues({ number: 10, labels: ["prio:critical"] }, { number: 11, labels: [] });
+  s = apply(s, sub("sub_issue_added", 10, 11, "2026-10-14T11:00:00Z"));
+  s = apply(s, sub("sub_issue_removed", 10, 11, "2026-10-14T12:00:00Z"));
+  assert.equal(prioOfChild(s, 11), "normal", "取り外し後は継承しない");
+  s = apply(s, sub("sub_issue_added", 10, 11, "2026-10-14T11:00:00Z"));
+  assert.equal(prioOfChild(s, 11), "normal", "古い追加の再送は取り外しを戻さない");
+});
+
+test("sub_issues: 親が closed・無い・循環なら継承しない (sub-issue でも body と同じ規則)", () => {
+  let s = withIssues({ number: 10, labels: ["prio:critical"] }, { number: 11, labels: [] });
+  s = apply(s, sub("sub_issue_added", 10, 11));
+  s.issues["10"] = { ...s.issues["10"], state: "closed", labels: [], body: "" };
+  assert.equal(prioOfChild(s, 11), "normal", "親が closed");
+  let t = withIssues({ number: 11, labels: [] });
+  t = apply(t, sub("sub_issue_added", 99, 11));
+  assert.equal(prioOfChild(t, 11), "normal", "親が無い (snapshot に無い番号)");
+});
+
+test("sub_issues: 規則を壊すと落ちる (取り込んだ親は継承に効き、無視すれば normal のまま)", () => {
+  const s = apply(withIssues({ number: 10, labels: ["prio:critical"] }, { number: 11, labels: [] }), sub("sub_issue_added", 10, 11));
+  assert.equal(s.sig["11"]?.subParent?.n, 10, "親を sig に保存する");
+  assert.equal(prioOfChild(s, 11), "critical");
 });

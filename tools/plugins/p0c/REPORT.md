@@ -148,6 +148,8 @@ bash tools/plugins/p0c/p0c_e2e.sh      # 初回実測 355 秒 (work/ 無し・HE
 | §21 | #3439: 0x5e12b0 の ucomiss 被演算子・flags を接続し census に入れる (測定 commit `14731ce2c`・戻り値 2001/2001) | `REPORT_APPENDIX_I.md` |
 | §22 | #3513: 戻り値の機械語 slot (`ret_slot`) を分類し、xmm0 の kernel を戻り値試験 [5b] の gate に入れる (測定 commit `9c38a83e4`・xmm0 1 件・負論対照 2 本 FAIL) | `REPORT_APPENDIX_I.md` |
 | §23 | #3280: 0x5dffc0 の 10000 case 残差 (x87 fsincos の 66-bit π 縮約) の解消 (測定 commit `9e49eb950`・buf_diff 3 → 0) | `REPORT_APPENDIX_J.md` |
+| §24 | #3281: GLOBAL_INITS を PE の .data から読む pass に置換 (測定 commit `74ae2bbf2`) | `REPORT_APPENDIX_K.md` |
+| §25 | #3951: 0x5e1280 の buf_diff=3996 の原因は k80_diff の 64bit xmm 引数の渡し方 (driver)。修復 `73409179c` で buf_diff=0 (2000/10000) | `REPORT_APPENDIX_L.md` |
 
 ## 17. #1366 (CI-26): lift 段の alloca 並び正規化と before/after 一致
 

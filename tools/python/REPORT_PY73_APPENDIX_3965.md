@@ -1,74 +1,78 @@
-# PY-322 付録 (#3965 の子・#4371): 関数ポインタ表 `0xfe2c80`・`0xd1af20` の経路・vtable `0x125b1c0` の +0x60 (親 #3965)
+# PY-278 付録 (#3965): 0xfff070・0xd1af20・0x1262970 の間接呼出し元 (親 #3649)
 
-親: #3965 (PY-278)。前段: `REPORT_PY73_APPENDIX_3649.md` §1・§3 (書込み 18 件の所属関数と直接呼出し元)。本体: `REPORT_PY73.md` §2・§8-3。
-既知類型との関係: 該当なし (lift 作業ではない。逆アセンブルと参照の列挙)。
+親: #3649 (PY-283)。前段: `tools/python/REPORT_PY73_APPENDIX_3649.md` §1-1・§1-2・§3-3。本体: `tools/python/REPORT_PY73.md` §8-3。
+既知類型との関係: 該当なし (lift 作業ではない。逆アセンブルと格納先の逆引き)。
 実装: 0 件 (`provider/`・`host/`・`tests/` は未変更)。製品 KPI: 対象外 (起動・GUI に関わらない解析)。
 
 ## 結論
 
-- **3649 付録の取り漏らしを訂正する**: 3649 §1-2 は「`0xd1af20` は直接呼出し・末尾 jmp・関数ポインタ格納の全てが 0 件」と書いたが、取り漏らしがあった。`0xd16123` と `0xd16163` の 2 箇所が `lea rax, [rip+disp]` で `0xd1af20` のアドレスを取り、ローカル構造体 `[rbp+0x30]` に格納している (§1)。この構造体のアドレスは `0x526190` に渡される。`0xd1af20` の呼出しは、この構造体経由の間接呼出しになる可能性がある。
-- **`0xd1af20` を含む関数 `0xd160e0`・`0xd16080` は直接呼出しで 0 件**。`0xd160e0` のアドレスは、データ領域 `0xd14800` (`0xd14800`・`0xd147d0`) に格納されている (§1-2)。`0xd14800` を RIP 相対・絶対参照で読む命令は 0 件。したがって `0xd14800` の読出し元は未特定。
-- **関数ポインタ表 `0xfe2c80`〜`0xfe2ea0`**: `0xfff070` の格納箇所は `0xfe2e48` のみ (3649 と一致)。表の VA を RIP 相対・絶対 disp・即値で参照する命令は 0 件 (即値の 12 件は条件分岐の飛び先で、表への参照ではない)。表を指す格納値は `0xfe2c30`・`0xfe2ed8` の 2 件 (§2)。その読出し元は未追跡。
-- **vtable `V = 0x125b1c0`**: 格納箇所は `0x125b0f8`・`0x125b2d0` の 2 件。`0x1262970` (+0x60) の格納は `0x125b220` の 1 件 (3649 と一致)。`[reg+0x60]` の間接 call 517 箇所のうち、どのクラスの vtable かは未特定 (§3)。
-- **書込み 18 件のゲート前後**: 本付録では判定していない。3649 §3 の結論 (書込み関数 0/12 が直接 call で `0xd5c800` に届かない) は、今回の結果でも変わらない。ただし `0xd16123` 経路のような間接経路 (構造体経由) は直接 call の閉包に入らない。間接経路の扱いは未確定。
+- **3649 付録 §1-2 の「`0xd1af20` の関数ポインタ格納 0 件」は誤りだった。** `0xd1af20` は `lea rax, [rip+disp]` で 2 箇所 (`0xd16123`・`0xd16163`) から参照され、コールバック用の構造体 (`[rbp+0x30]`・`[rdx+0x30]`) に格納されて `0x526190` に渡される。直接 call 0 件・末尾 jmp 0 件は正しいが、この経路で関数に届く。
+- **`0xfff070` は関数ポインタ表 `0xfe2c80`〜`0xfe2ea0` の 57 番目 (`0xfe2e48`) にだけ格納される。** 表を指す RIP 相対参照・絶対参照は 0 件。PE 全体の 8 byte LE 走査でも `.text+0xbe2e48` の 1 箇所だけ。表を読む呼出し元は未特定。
+- **`0x1262970` は `V = 0x125b1c0` の vtable の +0x60 (`0x125b220`) にだけ格納される。** PE 全体の走査で `.text+0xe5b220` の 1 箇所。`[reg+0x60]` の間接 call 517 件のうち、どのオブジェクトの vtable かは未特定。
+- **`0xd1af20` の呼出し元の確定は子へ。** 格納先の構造体を受け取る `0x526190` の呼出し元は 17 箇所 (14 関数) で、うち `0xd160b7`・`0xd16136`・`0xd16176` は `0xd16080`・`0xd160e0` の内側。その上流は未追跡。
 
 ## 測定
 
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` (2.3 GB) を `tar --zstd -xf` で `$RUNNER_TEMP/fl-win64` に展開 (`extracted/block00031_PE.bin`。実測 2.9 秒)。
-- 測定 commit: `cdbd28e1c` (origin/main の取り込み時点。以後のコード変更は本 PR の `pe_py322_probe.py` の追加のみ)。
-- 再現: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/flapi/pe_py322_probe.py`。実測 64.0 秒・load 0.89 (並列 1)。出力は §1〜§3 の転記元。
-- 既存ツールの確認: `pe_flag_scope_check.py` は 37.3 秒で 3649 の値 (0/12・書込み 18 件) を再現。`pe_callgraph.py callers 0xfff070,0xd1af20` は直接呼出し 0 件。`pe_xref.py 0x125b1c0,0x40fb40,0x1262970` は RIP 参照 0 件。
-- 差分 0 の証跡: `git diff cdbd28e1c HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は本 PR の `analysis/flapi/pe_py322_probe.py` 追加の 1 件だけ (既存コードは未変更)。
-- 検証範囲: 逆アセンブル・参照列挙・格納値の読取り。wasm・mock の実行は未実施。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf --wildcards '*block00031_PE.bin'` で `work/extracted/` に展開 (22,227,016 B・1.66 秒)。
+- 新規スクリプト: `tools/python/analysis/flapi/pe_py278_indirect_probe.py` (rip・abs・raw の 3 検査)。
+- 再現: `FL_WIN64_DIR=<展開先>/extracted python3 tools/python/analysis/flapi/pe_py278_indirect_probe.py` (`<展開先>` は `tar --zstd -xf ... -C <展開先>` の先。PE は `<展開先>/extracted/block00031_PE.bin`)。
+  - 測定 (HEAD `0d6dc03fc`・クリーン展開): 2 分 38 秒 (real)・user 2 分 38 秒・並列 1・load 0.9。出力 19 行。
+  - 出力: rip 2 件・abs 10 件 (`jo`・`jne`・`loopne`・`jae`・`jrcxz` の分岐命令のみ・分岐先を除くと 0 件)・raw `0xd1af20` 0 件・`0xfff070` 1 件 (`.text+0xbe2e48`)・`0x125b1c0` 2 件・`0x1262970` 1 件 (`.text+0xe5b220`)。§1 と一致。
+- 注: abs 検査は即値・disp に対象 VA が現れる命令を全て出す。分岐命令 (`jo`・`jne`・`loopne` など) の分岐先も含むため、abs の出力のうち分岐命令の行は手で除外して数える (本付録の「絶対アドレスでの参照 0 件」は分岐先を除いた数)。
+- 既存の検査 `pe_flag_scope_check.py` の再現も実施 (HEAD `0d6dc03fc`): 32.4 秒 (real)・user 31.9 秒・load 0.9。出力は 3649 付録 §1・§3 と一致 (writes 18 (A 4 / B 12 / C 2)・0/12 到達・vt+0x60 `0x1262970`・間接 call 517・333・格納先 `0xfe2e48`・`0x125b220`)。
+- 測定 commit: `519ca703c` (`pe_py278_indirect_probe.py` を入れた commit。コードを変えた最後の commit)。
 
-## 1. `0xd1af20` の経路
+## 1. 格納による間接参照 (PE 全体の逆引き)
 
-`pe_callgraph.py around 0xd16100 0xd16190` の出力 (要約):
+| 対象 VA | 参照の種類 | 格納・参照箇所 (RVA) | 件数 |
+|---|---|---|---|
+| `0xd1af20` | `lea` (RIP 相対) → 構造体へ格納 | `0xd16123` (`[rbp+0x30]`)・`0xd16163` (`[rdx+0x30]`) | 2 |
+| `0xd1af20` | PE 全体の 8 byte 格納 | なし | 0 |
+| `0xfff070` | 8 byte 格納 (関数ポインタ表) | `.text+0xbe2e48` (表 `0xfe2c80` の 57 番目) | 1 |
+| `0x1262970` | 8 byte 格納 (vtable) | `.text+0xe5b220` (`V+0x60`) | 1 |
+
+- `0xfff070` の表 `0xfe2c80`〜`0xfe2ea0` は `.text` 内・RVA 0xfe2c80。表への RIP 相対参照・絶対参照は 0 件 (`pe_py278_indirect_probe.py` の rip・abs 検査)。表を使う呼出しは静的に追えない。
+- `0x1262970` の vtable `V = 0x125b1c0` の格納箇所は 2 件 (`.text+0xe5b0f8`・`.text+0xe5b2d0`) で、`V+0x60` は `0x125b220` (`.text+0xe5b220`) のみ。
+
+## 2. `0xd1af20` の格納文脈 (確定)
 
 ```
-0xd16118 mov rax, qword ptr [rip + 0x9a2cf9]
-0xd1611f mov qword ptr [rbp + 0x38], rax
-0xd16123 lea rax, [rip + 0x4df6]           ; -> 0xd1af20
-0xd1612a mov qword ptr [rbp + 0x30], rax
-0xd1612e mov rcx, qword ptr [rbp + 0x50]
-0xd16132 lea rdx, [rbp + 0x30]
-0xd16136 call 0x526190
+0xd16118  mov rax, [rip+0x9a2cf9]   ; 値 (前段で得た値)
+0xd1611f  mov [rbp+0x38], rax
+0xd16123  lea rax, [rip+0x4df6]     ; = 0xd1af20
+0xd1612a  mov [rbp+0x30], rax       ; 構造体 +0x30 に関数ポインタ
+0xd1612e  mov rcx, [rbp+0x50]
+0xd16132  lea rdx, [rbp+0x30]       ; 構造体の先頭を第 2 引数に
+0xd16136  call 0x526190
 ```
 
-- `0xd16163` (`0xd16150` の関数内) も同じ形: `lea rax, [rip+0x4db6]` → `0xd1af20`、`[rdx+0x30]` に格納し、`0x526190` を呼ぶ。
-- `0x526190` は `[rbp+0x60]` に 16 byte (`movsq`×2) をコピーし、`0x525380` (引数 `r8` = そのコピー) と `0x525ec0` を呼ぶ。`0x525ec0` は `call qword ptr [rbx+0x18]` (間接 call、`rbx = [[rip+0x10cc721]]`) を含む。
-- `0xd16080`・`0xd160e0` (`0xd16123`・`0xd16163` を含む関数) の直接呼出し元は 0 件。`0xd160e0` は `0xd14800` に格納 (qword `0xd160e0`)、`0xd16080` は `0xd147d0` に格納。
-- `0xd14800` の格納内容: `[0xd160e0, 0x525740, 0x100000000000e]` (`0xd1af20` を指すのではなく `0xd160e0` を指す)。`0xd14800` を読む RIP 相対・絶対参照は `.text` 全体で 0 件。
+```
+0xd16158  mov rax, [rip+0x9a2cb9]
+0xd1615f  mov [rdx+0x38], rax
+0xd16163  lea rax, [rip+0x4db6]     ; = 0xd1af20
+0xd1616a  mov [rdx+0x30], rax
+0xd16172  lea rdx, [rdx+0x30]
+0xd16176  call 0x526190
+```
 
-**未確定**: `0xd14800`・`0xd147d0` の読出し元 (間接経路)。`0xd1af20` が `0x525ec0` の間接 call の標的になるかどうか。
+- `0x526190` は `[rbp+0x30]` 側の構造体を `0x415610`・`0x525380`・`0x525ec0`・`0x415c30` に渡す (逆アセンブル `0x526190`〜`0x5261f9`)。その中で `0xd1af20` が呼ばれるかどうかは未確定 (`0x525380`・`0x525ec0` の中を未読)。
+- `0xd16123` の属する関数 (`func` 推定 `0xd160e0`) の直接呼出し元は 0 件。`0xd16150` (2 つ目の入口) の直接呼出し元も 0 件。
 
-## 2. 関数ポインタ表 `0xfe2c80`〜`0xfe2ea0`
+## 3. 未確定 (子 #4371 へ)
 
-- `0xfff070` の格納: `0xfe2e48` の 1 件 (表の 57 番目。3649 §1-2 と一致)。
-- 表 VA を指す RIP 相対・絶対 disp の参照: 0 件。
-- 即値に表の範囲が現れる命令は 12 件 (`jo`・`jne`・`loopne`・`jae`・`jrcxz` 等の条件分岐の飛び先)。表への参照ではないため除外。
-- 表の範囲 (`0xfe2c80`〜`0xfe2ea0`) に入る値を格納する qword: `0xfe2c30`・`0xfe2ed8` の 2 箇所 (格納場所の VA)。格納されている値そのものは表の範囲内の関数 VA。表の先頭を指す格納ではない。読出し元は未追跡。
+- `0xfff070` の表 `0xfe2c80` を読む呼出し元 (表のインデックス計算を含む)。
+- `0x1262970` (vt+0x60) を呼ぶオブジェクトのクラス。`[reg+0x60]` 517 件の中で、`V` (= `0x125b1c0`) を指すオブジェクトに限った絞り込み。
+- `0xd1af20` を呼ぶ `0x526190` 配下の経路 (`0x525380`・`0x525ec0` の中身)。
+- 書込み 18 件のゲート (`0xd5c858`) との前後判定。
 
-**未確定**: 表の添字計算の読出し元。`[reg+idx*8+disp]` の形の参照は、RIP・絶対の検索では拾えない。
+## 差分 0 の証跡
 
-## 3. vtable `V = 0x125b1c0`
+- 測定 commit: `519ca703c` (上の「測定」節と同じ)。
+- 差分 (測定の鎖): `git diff 519ca703c HEAD -- tools/python/analysis/flapi/pe_py278_indirect_probe.py tools/python/analysis/flapi/pe_callgraph.py tools/python/analysis/flapi/pe_flag_scope_check.py` の出力は 0 行。測定に使った 3 スクリプトは測定 commit から無変更。
+- 差分 (範囲全体): `git diff 519ca703c HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` は 12 ファイル・673 行追加・10 行削除 (main 取り込み merge `0d6dc03fc` で入った他担当の変更: `analysis/flapi/pe_py272_probe.py`・`pe_py273_*.py`・`pe_py274_dispatch.py`・`py265_g1_writers.py`・`py65_ret584_reach.py`・`py99_closure.py`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/device_diff.mjs`・`tests/patterns_group_diff.mjs`・`tests/provider_expect/pe180.json`)。いずれも本付録の測定の鎖から import されない。
+- 訂正 commit (`b5daba019`・`0d6dc03fc`) は本 REPORT のみを変えた (`git diff 519ca703c HEAD -- tools/python/analysis/flapi/pe_py278_indirect_probe.py tools/python/analysis/flapi/pe_callgraph.py tools/python/analysis/flapi/pe_flag_scope_check.py` = 0 行)。
 
-| 項目 | 格納箇所 | 値 |
-|---|---|---|
-| V+0x48 | `0x125b208` | `0x1262950` |
-| V+0x60 | `0x125b220` | `0x1262970` (flagC の set) |
-| V+0x88 | `0x125b248` | `0x1262a90` (ゲート) |
+## 4. 受入条件の判定
 
-V 自体 (`0x125b1c0`) を格納する qword は `0x125b0f8`・`0x125b2d0` の 2 件。
-
-- `call qword ptr [reg+0x60]` の 517 箇所のうち、どのクラス (vtable) から呼ばれるかは未特定。`reg` の由来 (オブジェクトの生成元) を追う必要がある。
-
-## 4. 受入条件 (#4371) の判定
-
-親 issue #4371 の受入条件のうち、本付録で確定したもの:
-
-- [ ] 3 つの呼出し元 (間接経路を含む) を PE 解析箇所つきで残す → **部分**: `0xd1af20` の構造体経由 (§1) と表の格納 (§2) は残した。表の読出し元・`0xd14800` の読出し元・`[reg+0x60]` のクラスは未確定。
-- [ ] 書込み 18 件のゲート前後判定 → **未着手**。
-- [x] 推測の状態モデルでは実装しない (`provider/`・`host/`・`tests/` は未変更)。
-
-未解決は PR 本文の表に、起票先つきで書く。
+- [x] 3 件の格納箇所を PE 解析箇所つきで REPORT に残す (`0xd1af20` は `0xd16123`・`0xd16163` の callback 構造体 (§2)。`0xfff070` は表 `0xfe2c80` の 57 番目 `0xfe2e48` (§1)。`0x1262970` は `V+0x60` `0x125b220` (§1))。呼出し元 (間接経路を含む) の確定は子 #4371 に移した (§3)。
+- [x] 推測の状態モデルでは実装しない (provider・mock は未変更)。
