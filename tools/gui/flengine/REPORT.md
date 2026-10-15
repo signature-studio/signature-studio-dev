@@ -196,9 +196,9 @@ P は `IMPORTS.md` の優先度。起動 = DllMain attach で到達、他は sur
 
 - 原因と対応: `e2e.sh` が boot5 (`m11_extra_ranges5.txt`) を複製側で lift していなかったため callback が IR に無かった。`e2e.sh` で lift を追加 (元の `tools/m11` は読取のみ)。`judge.py` は無変更。
 - 実測 (boot, 測定 commit `f0235912`): `units_run 110` (旧 109)、`icall_miss 4` (旧 7)、miss 先は `0xfa9390` のみ。`f0235912` の時点では B1 PASS。
-- 現 head `ad9c633ac` の実測 (foreground 1 回・8 分 44 秒・素材 `work-m11`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64`・apt-mingw): `e2e.sh` rc **1**・`JUDGE FAIL (14/15)`。FAIL は B1 のみ: `GetMem 774 (base 772)`、他は一致 (`units_run 110`・`icall_miss 4`・`threw None`)。ネガコン N1〜N10 は期待どおり FAIL。`icall` の `0x85df70` は miss から消えた。
+- 最終 head `b2be21337` の実測 (foreground 1 回・6 分 17 秒・load 1.55 → 2.24・素材 `work-m11`・`toolchain-emsdk`・`toolchain-retdec`・`fl-win64`・apt-mingw): `e2e.sh` rc **1**・`JUDGE FAIL (14/15)`。FAIL は B1 のみ: `GetMem 774 (base 772)`、他は一致 (`units_run 110`・`icall_miss 4`・`threw None`)。ネガコン N1〜N10 は期待どおり FAIL。`icall` の `0x85df70` は miss から消えた。
 - B1 の GetMem 差 (現 head で再現・決定的): 比較元を `run.mjs --wasm` (`-pthread` の shim 無し base) に変えたため base が 772 になり、GUI (774) と一致しない。同じ `-pthread` base を 3 回測って 772 (決定的)、GUI 側は 2 回とも 774。旧比較元 `m11_run.mjs` (非 pthread) は 774 (2 回) で GUI と一致する。GUI の `--plain` (到達ログ無し) も 774 で、shim の到達ログの有無では変わらない。差の原因 (`-pthread` の base の確保量) は未特定。
-- 判定の変更 (`judge.py` の `threw` 比較先の変更) は判定式の緩和ではなく比較キーの修正だが、現 head の結果では B1 は PASS しない。比較元の決め方は本 PR では確定できず、再測定と原因切り分けは子 #4751 の範囲。
+- `judge.py` は `origin/main` と差分 0 (本 PR は変更していない)。B1 の比較元 (`-pthread` の shim 無し base) と `boot_threw` 比較は main `f7f1921fa` (#4420) が入れたもので、本 PR の変更ではない。main の決定は維持し、比較元の決め方は子 #4751 で扱う。
 - survey は本変更で動いていない: `results/survey_soft.json` (隔離版) は `764/1/46/131` で、`f0235912`〜HEAD 不変。`survey_soft_chain.json` は `875/1/46/20` で、`f0235912`〜HEAD 不変。main 側の値 (`872/1/47/22`) との差は main の測定由来。詳細と測定鮮度は [REPORT_APPENDIX_4645.md](REPORT_APPENDIX_4645.md) §3・§4。
 
 ## 7. 未解決

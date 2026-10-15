@@ -10,7 +10,7 @@ REPORT §6j の全文。要約と未解決は [REPORT.md](REPORT.md) §6j・§7 
 ## 2. 実測 (boot)
 
 - baseline / GUI とも `units_run 110` (旧 109)、`icall_miss 4` (旧 7)。miss 先は `0xfa9390` のみ (`0x85df70`・`0x457860` が解消)。
-- 現 head `ad9c633ac` の e2e: rc 1・`JUDGE FAIL (14/15)`。FAIL は B1 の `GetMem 774 (base 772)` のみ (詳細は [REPORT.md](REPORT.md) GUI-27 節)。B1 は現 head で PASS しない。
+- 最終 head `b2be21337` の e2e: rc 1・`JUDGE FAIL (14/15)`。FAIL は B1 の `GetMem 774 (base 772)` のみ (詳細は [REPORT.md](REPORT.md) §6j)。B1 は最終 head で PASS しない。
 - `results/` の現 head の出力 (`boot.json`・`baseline_boot.json`・`survey_*.json`・`ir_sha256.txt`) は、この e2e の実行結果で書き換えた。`survey_soft_chain.json` の `ok/trap/miss/icall_miss` は `875/20/46/46` で、本文の値と一致する。`mem_*`・`Halt0`・`MessageBoxA` の calls も変わっている (`git diff -- tools/gui/flengine/results/survey_soft_chain.json` で確認)。
 - 解消は boot 経路で確認。残件 `0xfa9390` は子 #4730 (GUI-27)。
 
@@ -31,4 +31,4 @@ survey には 2 つの結果ファイルがあり、値が違う。REPORT の旧
 ## 4. 測定の鮮度
 
 - 測定 commit `f0235912` 以降の `tools/m11` には差分がある (`git diff f0235912 HEAD -- tools/m11`: 19 files、+460/-21)。`m11_gen_ir2.sh` (`M11_FIX_LD236`)・`ldfix/ldfix.py` (`fix_f3c_use` の門。#4439) などが含まれる。
-- この差分を反映した再測定は本 PR の差し戻し run では未実施 (素材 `work-m11`・`toolchain-retdec`・`apt-mingw` が runner に無い。`ARTIFACTS_DIR` にあるのは `fl-win64` のみ)。現 HEAD の e2e 実測は未取得。
+- 最終 head `b2be21337` は `tools/m11` の差分を含む状態で e2e を再測定済み (REPORT §6j)。素材は `oc_artifacts` 行の 5 点 (fl-win64・work-m11・toolchain-emsdk・toolchain-retdec・apt-mingw) を展開して使った。
