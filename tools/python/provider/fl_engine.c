@@ -224,13 +224,14 @@ FL_H(channels, focusEditor) {
     if (idx < 0 || idx >= nch) RANGE();
     return fl_ret_none(c);
 }
-/* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす (生成条件は未確定)。
- * 既定値は stub の並び (param 0..7 = pitch 60・velocity 100・release 64・fine pitch 120・pan 64・mod X 64・mod Y 64・ticks 0)。
- * 構造体が無い・param が 0..7 の外は -1 (PE: 構造体 NULL で -1)。param 8 (PE: byte +0x11) は既定値未確定のため未モデル (-1) */
-static const int64_t step_def[8] = {60, 100, 64, 120, 64, 64, 64, 0};
+/* PY-100 (#2879): PE 0xd5b930 の readout。構造体は grid bit が立つ step にあるとみなす。
+ * PY-111 (#2929): 生成経路を PE で確認 (REPORT_PY111.md)。setGridBit の note は 0x12d4100 の creation path で作られ、
+ * param 0 = 60 (0x1062200)・1 = 100 (setGridBit が 100 を渡す)・2/3/4 = 64/120/64 (init 0x1062210)・5/6 = 128 (同 G の byte 2/3)・
+ * 7 = 開始 tick = step × V (V 静的 24)・8 = 0 (0x12d42ac)。構造体が無い・param が 0..8 の外は -1 (PE: 構造体 NULL で -1) */
+static const int64_t step_def[9] = {60, 100, 64, 120, 64, 128, 128, 0, 0};
 static int64_t step_param(const Chan *k, int64_t pos, int64_t prm) {
-    if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 7) return -1;
-    return step_def[prm];
+    if (pos < 0 || pos >= NSTEP || !k->steps[pos] || prm < 0 || prm > 8) return -1;
+    return prm == 7 ? pos * 24 : step_def[prm];
 }
 /* PE 0xd5bb30: 引数を読んでから index を検査 (範囲外は Index out of range)。useGlobalIndex は未モデル (グループ無し) */
 FL_H(channels, getCurrentStepParam) {
@@ -507,6 +508,11 @@ FL_H(ui, getFocusedFormCaption) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getFocusedPluginName) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, getHintMsg) { NARGS(0, 0); return fl_ret_s(c, ""); }
 FL_H(ui, isInPopupMenu) { NARGS(0, 0); return fl_ret_b(c, 0); }
+/* PY-130 (#3007): PE 0xd6ee00 (setBrowserAutoHide) は O+0x8c4 に (v==1) を書く。0xd6f170 (setStepEditMode) は S=[O+0xab8] の +0x49e を (v==1) にする (末端は vtbl[0x200] 経由で未確定)。値は未実測の仮置き (REPORT_PY130_3007) */
+FL_H(ui, setBrowserAutoHide) { NARGS(1, 1); ui_browser_auto_hide = A_INT(0, 0) == 1; return fl_ret_none(c); }
+FL_H(ui, setStepEditMode) { NARGS(1, 1); ui_step_edit = A_INT(0, 0) == 1; return fl_ret_none(c); }
+/* PY-130: ui 版 getVersion (PE 0xd6c2f0 '|i'・既定 4) は mode 0..3 で int、4..6 で str、他は int 0 (分岐表は REPORT_PY130_3007) */
+FL_H(ui, getVersion) { NARGS(0, 1); int64_t m = A_INT(0, 4); return (m >= 4 && m <= 6) ? fl_ret_s(c, "") : fl_ret_i(c, 0); }
 
 /* ---- general (1) ---- mock と同じ MIDI scripting API バージョン (実機値は未実測) */
 FL_H(general, getVersion) { NARGS(0, 0); return fl_ret_i(c, 1); }

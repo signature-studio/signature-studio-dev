@@ -157,7 +157,7 @@ export function checkRelaunchIntent(
 }
 
 export type Prio = "critical" | "normal" | "low";
-const PRIO_RANK: Record<Prio, number> = { critical: 0, normal: 1, low: 2 };
+export const PRIO_RANK: Record<Prio, number> = { critical: 0, normal: 1, low: 2 };
 
 // 優先の区分。prio:critical が付いていれば critical、prio:low なら low、どちらも無ければ normal (両方付いたら高い方)。
 export function prioOf(labels: string[]): Prio {

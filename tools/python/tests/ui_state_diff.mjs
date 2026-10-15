@@ -23,14 +23,28 @@ const run = (eng, name, args) => {
 const NOARG = ["ui.isClosing", "ui.getTimeDispMin", "ui.isMetronomeEnabled", "ui.isPrecountEnabled", "ui.isStartOnInputEnabled",
   "ui.isLoopRecEnabled", "ui.getStepEditMode", "ui.isBrowserAutoHide", "ui.getSnapMode",
   "ui.getFocusedFormID", "ui.getFocusedFormCaption", "ui.getFocusedPluginName", "ui.getHintMsg", "ui.isInPopupMenu"];
+// PY-130 (#3007): setter 2 件は書いた値をすぐ後の getter で読めること (同じ状態を両 engine が共有する)。getVersion は mode の型分岐
+const setters = [
+  ["ui.setBrowserAutoHide", [1]], ["ui.isBrowserAutoHide", []],
+  ["ui.setBrowserAutoHide", [2]], ["ui.isBrowserAutoHide", []],
+  ["ui.setBrowserAutoHide", [true]], ["ui.isBrowserAutoHide", []],
+  ["ui.setStepEditMode", [1]], ["ui.getStepEditMode", []],
+  ["ui.setStepEditMode", [0]], ["ui.getStepEditMode", []],
+  ["ui.getVersion", []], ["ui.getVersion", [0]], ["ui.getVersion", [3]], ["ui.getVersion", [4]],
+  ["ui.getVersion", [6]], ["ui.getVersion", [7]], ["ui.getVersion", [-1]], ["ui.getVersion", [true]],
+  ["ui.getVersion", ["x"]],
+];
 const calls = [
   ...NOARG.map((name) => [name, []]),
   ["ui.getFocused", [0]], ["ui.getFocused", [true]], ["ui.getFocused", ["x"]],
+  ...setters,
 ];
 // 引数個数違い (NOARGS の関数に引数を渡す・getFocused の 0 個と 2 個): mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
   ...NOARG.map((name) => [name, [1]]),
   ["ui.getFocused", []], ["ui.getFocused", [0, 1]],
+  ["ui.setBrowserAutoHide", []], ["ui.setBrowserAutoHide", [1, 2]], ["ui.setStepEditMode", []], ["ui.setStepEditMode", [1, 2]],
+  ["ui.getVersion", [0, 1]], ["ui.getVersion", [1, 2]],
 ];
 
 const diffs = [];
