@@ -154,3 +154,59 @@ git diff 51a6881f7 74942e399 -- tools/gui/lift tools/gui/test tools/gui/golden t
 差分の証跡: `git diff 6db8b1fe8 HEAD -- tools/gui/lift tools/gui/test tools/gui/golden tools/gui/src` は 0 行 (本節を入れた commit は文書のみ)。
 
 限界 (round 1 m1): `fix_wstr` は、コメント内の閉じていない `"` (例: `/* say "hi */ x = L"y"; */`) を文字列の開始と見なし、同じ行の後続の `L"..."` を変換しない。測定した 5 本の `retdec.c` (W 1 本・4 PE) のコメント行に `"` は 0 件 (`grep -cE '(//|/\*).*"'`)。現行の入力では発火しない。
+
+## #3509 [WIN-31]: W 版ゲストの wasm 読み戻しと native surface の sha256 一致 (測定 commit `38c113c21`)
+
+### 結論
+- 受入 1: **達成**。同じ PE (`test/gui_app_w.c`) を `lift/gui_lift.sh` → `lift/gui_wasm.sh` で wasm 化し、既存の `e2e/index.html`・`e2e_main.js`・ドライバ (agent-browser) で実行。OffscreenCanvas 読み戻しは期待画像 (独立オラクル `golden/gen_golden_w.py`) と差 0 / 64,000 px。
+- 受入 2: **達成**。読み戻し (RGBA) の alpha を統計側で落とした RGB 3 バイト列の sha256 は `6f809bdf4f348903…`。native の surface sha256 (`native_w_run`) と一致。期待画像の P6 payload の sha256 も同値 (gui_hl_stats の定義どおり)。
+- 受入 3: **達成 (実測範囲)**。`gui_lift_post.py` の変更後も、gui_app.c の wasm 経路 (`e2e.sh` の 4・4b・6・6a〜6h 相当) が全て PASS。lifted.c の sha256 は前回記録と一致。
+- 既存 e2e への組込み (`e2e.sh` の step 化) は #3510 [WIN-32] (本 issue の範囲外)。
+
+### 変更
+- `tools/gui/e2e/e2e.mjs`: `E2E_MODE=w` を追加。入力なし。`w: roundtrip ok` を待って読み戻し・sha256・スクリーンショットを取り、ESC → `w: destroy` → exit 0 を確認する。gui_app のシナリオは変えない。
+- `tools/gui/golden/gen_golden_w.py`: `emit <out.ppm> [--tamper]` を追加 (期待画像の書き出し。比較ロジックは不変)。
+- `tools/gui/test/wasm_w_e2e.sh` (新規): W 版の 1 コマンド検証 (native_w_e2e → lift → gui_wasm → E2E_MODE=w → ネガコン)。
+
+### 検証 (測定 commit `38c113c21`・コミット済み HEAD・4 vCPU・load 0.18 (開始時))
+| 項目 | 結果 | 数え方・条件 |
+|---|---|---|
+| `bash tools/gui/test/wasm_w_e2e.sh` | rc 0・PASS・11.2 s | native_w_e2e → lift → `GUI_NO_FT=1 gui_wasm.sh` → `E2E_MODE=w e2e.mjs` → ネガコン |
+| 読み戻し vs 期待画像 | EXACT MATCH (0/64,000 px) | `build/e2e/w_canvas_readback.ppm` と `gen_golden_w.py emit` の期待画像 |
+| 読み戻し sha256 vs native | `6f809bdf4f348903edba334442193a0290cc537721191aaf71088c2eea596bc6` = native · MATCH | RGBA から alpha を除いた RGB 3 B の sha256。native は `native_w_run` の surface 行 |
+| 期待画像の sha256 | `6f809bdf…` | P6 の payload 192,000 B。native の定義 (行優先の RGB 3 B) と同値 |
+| スクリーンショット vs 期待画像 | EXACT MATCH (0/64,000 px) | 480x360 から左上 320x200 |
+| 終了 | `w: destroy` の後 ExitProcess code=0 | `window.__e2e.host.exited` |
+| ネガコン (期待画像 1 px 改竄) | MISMATCH (1/64,000 px)・rc 1 | `E2E_TAMPER=1`。`wasm_w_e2e.sh` は MISMATCH 行と rc 1 の両方を要求 |
+| FreeType 組込み wasm (`gui_wasm.sh` 既定) で同じ検証 | EXACT MATCH・sha 一致・PASS | `GUI_NO_FT=1` を外したビルド。`GUI_NO_FT=1` の代替が結果を変えないことの実測 |
+| lifted.c (W) sha256 | `3233c6f7e79b04a2039d462f48253d753b428fcea8a5867ee047d31a90bf74f5` | 上の「6db8b1fe8」節の値と同一 |
+
+版: RetDec v5.0 (commit `53e55b4b`。[RETDEC] と同じ)・emcc 6.0.12・mingw GCC 13-win32・Chrome 155.0.8059.39・agent-browser 0.39.0・node v22.23.3。素材は `toolchain-retdec`・`toolchain-emsdk` (`$ARTIFACTS_DIR` の実在を確認)、mingw は apt-mingw。`fl-win64` は使わない。
+
+### 受入 3: gui_app.c の wasm 経路 (`gui_lift_post.py` の変更後・測定 commit `38c113c21`)
+`e2e.sh` の step 3・4・4b・6 以降を、step ごとのコマンドで実行した (`e2e.sh` 一括の通しは行っていない。理由は未解決表)。
+
+| step | 内容 | 結果 |
+|---|---|---|
+| 3 | `gui_lift.sh test/gui_app.c` の lifted.c sha256 | `2bf479fe686fc05e95ef64af1414df7ec7577f2c6f8adb77fb00515e14bbef62` (上の 6db8b1fe8 節の値と一致) |
+| 4 | `gui_wasm.sh` (`GUI_NO_FT=1`) | rc 0 |
+| 4b | `test/text_wasm_e2e.sh` (FreeType 2.7 を `shared/oss/freetype/build.sh` で作成。native と wasm32・wasm64 の出力が一致) | PASS。FT 組込みの 8x8 経路は無組込み build と 0 px 差。ネガコン 5 本 (N1〜N5) はすべて期待どおりに判定 (N1〜N4 は rejected、N5 は FreeType 出力と 8x8 を区別できる) |
+| 6 | `e2e.mjs` (gui_app golden) | 読み戻し EXACT (0/64,000 px)・スクリーンショット EXACT・PASS |
+| 6a | ネガコン (`E2E_TAMPER=1`) | MISMATCH (1/64,000 px)・rc 1 |
+| 6b | ALLOW_MEMORY_GROWTH (grow) | 読み戻し EXACT・PASS (wasm memory 3801088 B) |
+| 6c | fail-fast (`gui_app_ff.c`) | EXIT 0xfa11・`FAIL-FAST: unimplemented Win32 API: Ellipse`・PASS |
+| 6d | reach-log | 読み戻し EXACT・36 API (IMPL 36・STUB 0)・PASS |
+| 6e | `integ/sigprobe.sh` | declares=177・mismatch=0・unresolved=0 (陰性対照 mismatch=177) |
+| 6f | `present/e2e.sh` の 2 段 (`dirty.test.mjs` と `present_e2e.mjs`) | ALL PASS (30 s) |
+| 6g | `input/e2e.mjs` | ALL PASS (入力リング drop 0・41 push / 41 consume) |
+| 6h | `e2e/stress.sh` (50,000 frames × 2) | PASS ×2 (各 14.5 s・drop 0・終端の golden EXACT)。ネガコン burst (drop 198960) と leak (3801088 → 3932160 B) はともに exit 1 |
+
+### 差分 (測定 commit から HEAD まで)
+`git diff 38c113c21 HEAD -- tools/gui/lift tools/gui/test tools/gui/golden tools/gui/src tools/gui/e2e` の出力は 0 行 (本節を入れた commit は `tools/gui/REPORT_APPENDIX_W.md` だけ)。
+
+### 未解決
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `e2e.sh` への W 版の組込みと、GUI-REACH の順序検査 | W 版が `e2e.sh` の 1 本通しに入らない | #3510 [WIN-32] |
+| `e2e.sh` 全体の 1 本通し (native 段 1〜2b・1c (SIMD) を含む) | 個別 step の PASS は実測済み。通しとしては未実測 | #3510 [WIN-32] (`e2e.sh` 組込みの run で実施) |
+| 不可視 TApplication 窓 (cx=0・cy=0) の `w: nccreate NG` / `w: cs NG` 行 (ゲスト側の判定。native と同じ。PASS には影響しない) | ログに NG 行が残る | PM 判断 (ゲストの判定の見直し) |

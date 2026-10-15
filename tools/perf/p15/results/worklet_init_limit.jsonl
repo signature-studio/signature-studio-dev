@@ -1,0 +1,27 @@
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":1,"runtime":"chrome Chrome/155.0.8059.39","cpus":4,"cpu":"AMD EPYC 9V45 96-Core Processor","loadavg":[0.68,0.79,0.43],"blk":1000,"reps":7,"neg":-1,"run":0,"runtime_ua":"AudioWorkletGlobalScope","m":1,"instances":1,"init_only":true,"setup_ms":17,"memory_mib":864,"renderer_rss_mib":660.7,"renderer_rss_delta_mib":51.3}
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":130,"runtime":"chrome Chrome/155.0.8059.39","cpus":4,"cpu":"AMD EPYC 9V45 96-Core Processor","loadavg":[0.68,0.79,0.43],"blk":1000,"reps":7,"neg":-1,"run":0,"runtime_ua":"AudioWorkletGlobalScope","m":130,"instances":1,"init_only":true,"setup_ms":465,"memory_mib":864,"renderer_rss_mib":1194.7,"renderer_rss_delta_mib":579.8}
+{"mode":"init_limit_worklet","M":192,"run":0,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":256,"run":0,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":288,"run":0,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":320,"run":0,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":352,"run":0,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":1,"runtime":"chrome Chrome/155.0.8059.39","cpus":4,"cpu":"AMD EPYC 9V45 96-Core Processor","loadavg":[1.2,0.97,0.56],"blk":1000,"reps":7,"neg":-1,"run":1,"runtime_ua":"AudioWorkletGlobalScope","m":1,"instances":1,"init_only":true,"setup_ms":21,"memory_mib":864,"renderer_rss_mib":664.5,"renderer_rss_delta_mib":-41.6}
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":130,"runtime":"chrome Chrome/155.0.8059.39","cpus":4,"cpu":"AMD EPYC 9V45 96-Core Processor","loadavg":[1.5,1.04,0.58],"blk":1000,"reps":7,"neg":-1,"run":1,"runtime_ua":"AudioWorkletGlobalScope","m":130,"instances":1,"init_only":true,"setup_ms":455,"memory_mib":864,"renderer_rss_mib":1186.5,"renderer_rss_delta_mib":600.1}
+{"mode":"init_limit_worklet","M":192,"run":1,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":256,"run":1,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":288,"run":1,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":320,"run":1,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":352,"run":1,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":1,"runtime":"chrome Chrome/155.0.8059.39","cpus":4,"cpu":"AMD EPYC 9V45 96-Core Processor","loadavg":[1.12,1.06,0.67],"blk":1000,"reps":7,"neg":-1,"run":2,"runtime_ua":"AudioWorkletGlobalScope","m":1,"instances":1,"init_only":true,"setup_ms":22,"memory_mib":864,"renderer_rss_mib":658.6,"renderer_rss_delta_mib":76.1}
+{"mode":"init_limit_worklet","cfg":"ott_shared_instance_worklet","M":130,"runtime":"chrome Chrome/155.0.8059.39","cpus":4,"cpu":"AMD EPYC 9V45 96-Core Processor","loadavg":[1.12,1.06,0.67],"blk":1000,"reps":7,"neg":-1,"run":2,"runtime_ua":"AudioWorkletGlobalScope","m":130,"instances":1,"init_only":true,"setup_ms":446,"memory_mib":864,"renderer_rss_mib":1179.5,"renderer_rss_delta_mib":471.7}
+{"mode":"init_limit_worklet","M":192,"run":2,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":256,"run":2,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":288,"run":2,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":320,"run":2,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":352,"run":2,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":160,"run":0,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":176,"run":0,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":160,"run":1,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":176,"run":1,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":160,"run":2,"neg":-1,"error":"Error: eval timeout"}
+{"mode":"init_limit_worklet","M":176,"run":2,"neg":-1,"error":"Error: eval timeout"}
