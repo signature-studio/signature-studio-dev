@@ -65,7 +65,7 @@ REPORT.md §7.7 の未解決「longjmp の発生条件」の解析。検証 HEAD
 
 - `qfc_boot.sh` (strict / soft) の結果: strict は `MISSING IMPORT LocalAlloc` で DllMain の trap (FAIL)。soft は `DllMain(PROCESS_ATTACH)` が `ok rax=0x1`、続く `FontCache_GetStats` で `call to UNLIFTED function 0 ret=0x57fb09` (FAIL)。
 - 既存の lift 設定 (override `0x40f9c0=qfc_ov_longjmp`・root `0x59c210`) で、経路 B の戻り先は既に入っている。このため新しい override・root の追加は不要。
-- 経路 B の発火条件は §5 で確定した。停止点 (`FontCache_GetStats`) は経路 B の後の段であり、経路 B 自体の不具合ではない。次の停止点は FT 解決 (`0x563000`) の未解決ポインタ (#4296 / #4510 §2)。
+- 経路 B の静的な発火条件は §5 で確定した。実行時の発火は未測定 (§5 の未トレース)。停止点 (`FontCache_GetStats`) が経路 B の後の段であるかは推定で、実測からは確定していない。次の停止点は FT 解決 (`0x563000`) の未解決ポインタと推定する (#4296 / #4510 §2)。
 
 ## 6. 未解決
 
