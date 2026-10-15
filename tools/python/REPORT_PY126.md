@@ -38,11 +38,11 @@
 
 ## 検証
 
-- 測定 commit: 本 REPORT と `analysis/py126_process_rec_chain.py` を追加した commit (コード変更は analysis スクリプトのみ。`tools/python` の `provider/`・`host/`・`tests/` は変更なし)。
+- 測定 commit: `5ac75460c` (`analysis/py126_process_rec_chain.py` を追加した commit)。以後スクリプトは無変更。main 取り込み後の merge commit `d170d964c` でも同じ結果 (26 件 ok・rc 0)。
 - `python3 analysis/py126_process_rec_chain.py`: 26 件 ok・rc 0。
 - ネガティブコントロール: スクリプトの期待 VA `0xD846E0` を `0xD846E1` に変えた複製で実行 → `FAIL 0xd84740: callback = 0xd846e0 (次命令 + disp)` で rc 1。元のスクリプトは無変更。
 - e2e (`general_diff.mjs`・`provider_check.mjs`・`all_tools.mjs`): 実装を変えていないため対象外。件数は変化なし。
-- コード差分: `git diff 77f804e70 HEAD -- tools/python ':!*.md'` は `analysis/py126_process_rec_chain.py` の追加のみ (mock・C・tests は 0 行)。
+- コード差分: `git diff 5ac75460c HEAD -- tools/python/analysis/py126_process_rec_chain.py` は 0 行 (スクリプト無変更)。`git diff --stat 5ac75460c HEAD -- tools/python ':!*.md'` は main 取り込み分のみ (`host/fl_mock.mjs` 11 行・`provider/fl_engine.c` 15 行・`tests/`・`analysis/flapi/` の追加 3 件)。本 PR の検証対象 (スクリプトと PE) には影響しない。
 
 ## 未解決
 
