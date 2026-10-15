@@ -74,5 +74,5 @@ boot の数字は修正前後で変わらない: hybrid `units_run=928/942`・`f
   - [3b/4] `CHECK_INITUNITS PASS` (units: EMPTY 11・native_not_ok 0 / hybrid: EMPTY 0・native_not_ok 0・diff 11)。
   - [4/4] sample:800: 一致 361 / 不一致 233 / 実行不能 206。
 - ネガコン: 旧 rt (`git show cf296603:tools/liftdiff/rt/ld_core.h` でビルド) で `tests/check_initunits.py` → `native_not_ok=11`・`CHECK_INITUNITS FAIL`・exit 1。
-- 素材: `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` (`$HOME/artifacts`)。emsdk は `/opt/emsdk`。
+- 素材: `fl-win64 toolchain-retdec toolchain-emsdk work-m11 work-liftdiff` (`$HOME/artifacts`)。emsdk は `[EMSDK]` (`docs/REFERENCES.md`)。
 - 測定 commit 以降のコード差分: `git diff bb94bce77 HEAD -- tools/liftdiff/rt tools/liftdiff/tests tools/liftdiff/ldlib tools/liftdiff/liftdiff_e2e.sh` の出力は 0 行 (測定 commit の後の commit は REPORT 付録と `docs/DOC_MAP.md` の登録だけ)。
