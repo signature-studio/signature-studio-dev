@@ -1,7 +1,5 @@
 # REPORT_3230 — 7e48d6 (部分定義 site, DEF と ENTRY の混在) の機械語・IR 確認 (#3230 / 親 #2211)
 
-自動生成: なし (手で作成。測定 commit と値はこの REPORT に書く)
-
 ## 1. 測定条件
 
 - 測定 commit: `32925d7f` (判定器 `audit_frame_store_alias_2211.py` と結果 JSON を含む commit)。この commit から `origin/main` (`de2aa64f7`) までで判定器に差分は無い。判定器・入力 JSON は本 issue で変更していない。
@@ -51,8 +49,8 @@ IR (`work/boot_final.ll`・`@function_7e45e0`) の 7e48d6 相当:
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `frame_derived` が `lea` の派生を拾わず、漏出と call 副作用を見ない (判定器の欠陥) | 判定器の 43 関数で、call 副作用を見ないまま判定が出ている。個別の正否は未確認 | 子 issue (本 PR で起票) |
-| IR の alloca が call 引数の書き込み範囲 (4 バイト超) を覆わない (lift の stack 変数推定の欠陥) | `7e45e0` の `[rbp+0x6c]` が定数 0 になる。他の call 引数の関数も同型の可能性 (未確認) | 子 issue (本 PR で起票) |
+| `frame_derived` が `lea` の派生を拾わず、漏出と call 副作用を見ない (判定器の欠陥) | 判定器の 43 関数で、call 副作用を見ないまま判定が出ている。個別の正否は未確認 | #4090 [LD-192] |
+| IR の alloca が call 引数の書き込み範囲 (4 バイト超) を覆わない (lift の stack 変数推定の欠陥) | `7e45e0` の `[rbp+0x6c]` が定数 0 になる。他の call 引数の関数も同型の可能性 (未確認) | #3932 [M11-N201]・#3933 [M11-N202] の範囲 (既存の子。新規起票なし) |
 
 ## 7. 結論
 
