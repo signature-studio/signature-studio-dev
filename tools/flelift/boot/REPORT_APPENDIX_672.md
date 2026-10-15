@@ -236,3 +236,11 @@ REPORT §7 (旧 165〜167 行):
 - 所要 (実測): lift 81 s・clang plain (8 shard) 99〜102 s・boot default 9 s・boot negctl 10〜25 s。load 1.0〜1.95 (4 vCPU)。
 - 未解決: 既定 root 化の survey 破裂 (`survey_drive.sh` 未実施)・unit 895 の `exit` が正常終了か (MessageBoxW 不在の影響か) は未特定。
 - **測定 commit `dec8fa928`** (コードを変えた最後の commit)。HEAD で再測定 (`FLE_BOOT_RUNS="default negctl"`・`FLE_EXTRA_ROOTS` 未指定): 既定 units **895** (GetMem 3,680 / FreeMem 1,499・`exit`)、ネガコン units **209** (1,891 / 776・`exit`)。C-1 と同値。lift 80 s・clang 96 s・boot 9 s / 25 s。`git diff dec8fa928 HEAD -- tools/flelift/boot` は空。
+
+### E. #4782 (FLE-24): 既定経路の unit 895 と B-7 `oob` の切り分け (2026-10-15)
+
+- **E-1 既定経路 (`FLE_BOOT_RUNS=default`・`FLE_EXTRA_ROOTS` 未指定・lift を新規に再生成)**: units **895**・GetMem 3,680 / FreeMem 1,499・`exit` (code 0・call site `0x412a12`)。`oob` は出ない。ログに `out of bounds` は 0 件で、trap 箇所は無い (停止は unit 895 の後の正常な exit 経路)。`MessageBoxW` `QuickFontCache DLL not found!` は 1 件 (自動 IDOK・#3410 系)。
+- **E-2 同一 binary の再実行**: 同じ `fleboot_plain.cjs` を 2 回再実行 (`FLE_IPP` 未指定・`FLE_BOOT_LOG_CAP=0`) は、どちらも 895・`exit`。`FLE_BOOT_LOG_CAP=268435456` (B-7 の run の値) でも 895・`exit`。実行は決定的で、ログ上限は効いていない。
+- **E-3 B-7 構成を B-7 の commit で再現**: `e64581479` (B-7 の文書化 commit) を別 worktree で lift・build し、`FLE_EXTRA_ROOTS=0x6a7b70,0x976da0 FLE_BOOT_RUNS=ilt` を実行。結果は 895・`exit` (oob なし)。結果 JSON: `results/boot_summary_b7re_ilt.json`。B-7 の `oob` run の build は残っていない (成果物未 commit) ため、当時の build を再現できない。
+- **E-4 切り分けの結果**: `oob` は現在の lift・build・同一構成のどれでも再現しない。B-7 と既定の `exit` の差の原因は**未切り分け**。候補は、当時の lift・clang の差 (成果物が無い) と、当時の emsdk の版の差 (今回は `toolchain-emsdk` 6.0.12 を使い、当時の版は未確認)。
+- 所要 (実測): lift 80 s・clang plain 8 shard 114 s・boot default 10 s・全体 3m30s。load 0.99〜2.28 (4 vCPU)。素材: `fl-win64`・`toolchain-emsdk` (6.0.12)。
