@@ -207,3 +207,44 @@ node trap_triage/probe1676_watch.mjs                                      # base
 | `function_535c2e` (IR 未定義。RetDec が `535bf2` の末尾 ret を落とした) の既定化 | ON 時の unit 304・555 の abort (併用で解消) | #2521 |
 | 既定 ON 化と回帰ゲートの更新 | — | #2521 |
 | DEFECTS.md への D23 追記 | 横断正本の更新 | PM 判断 (`docs/WORKFLOW.md` §5) |
+
+## 8. #2521: `function_535c2e` の既定化 (`M11_FIX_535BF2` 既定 ON)・unit 144 の trap 経路
+
+既知類型との関係: 該当なし (unit 144 の回帰は原因未特定。§8.2 は trap 位置まで)。
+
+### 8.0 結論
+
+1. **受入 3 (`function_535c2e`・unit 304/555 の abort)**: `M11_FIX_535BF2` の既定を 0 → 1 にした (commit `d80e9909f`)。ON (`M11_FIX_50A830=1`) では unit 304・555 が abort から oob に戻り、OFF の分類と一致する。OFF 経路は unit 単位で不変 (§8.1)。
+2. **受入 1 (unit 144 の回帰の原因)**: 未特定。trap の関数チェーン (§8.2) まで。
+3. **受入 2 (ON で unit 144 の回帰を解消)**: 未達。ON の survey ok は 872 (OFF 873 − 1) で「872 以上」は数値上満たすが、unit 144 は ok → oob のまま。
+4. **受入 4 (既定 ON 化)**: 未達。`M11_FIX_50A830` は既定 OFF のまま (受入 1・2 が前提)。
+5. e2e の rc は既定・ON とも **1**。origin/main `44a7f4465` (変更前) でも同じ値で、ゲートの期待値と実測が合わない (§8.1 の 3 件)。本 PR では期待値を変えていない。
+
+### 8.1 実測 (測定 commit `d80e9909f`。素材・環境は §1 と同じ。直列 1 本、load average は uptime の 1 分値 1.04 (基準 OFF の直後))
+
+| 条件 | e2e rc | wall | survey ok / trap / miss | 基準 (origin/main OFF) との unit 差 |
+|---|---|---|---|---|
+| 既定 (`d80e9909f`) | 1 | 1m11.5s | 873 / 22 / 46 | 0 |
+| `M11_FIX_50A830=1` (`d80e9909f`) | 1 | 1m10.3s | 872 / 23 / 46 | 1 (144 ok → oob。304・555 は OFF と同じ oob) |
+| 基準 OFF (`44a7f4465`、変更前) | 1 | 3m13s (初回の build を含む) | 873 / 22 / 46 | — |
+| ON + `M11_FIX_535BF2=0` (変更前の既定、`44a7f4465`) | 1 | 1m11s | 872 / 23 / 46 | 3 (144 ok → oob、304・555 oob → Aborted) = 変更前の abort を再現 (ネガコン) |
+| OFF + `M11_FIX_535BF2=1` (`44a7f4465` + フラグ) | 1 | 1m12s | 873 / 22 / 46 | 0 (535BF2 は OFF 経路の分類を変えない) |
+
+- e2e rc=1 の内訳 (既定・ON 共通): (a) tolerant gate `通常起動の完了数 101 != 期待 56` (units_run_full 98 + skipped)、(b) `survey ok=873 != 期待 872` (OFF)、(c) ptrcheck survey `image_va_words_new 71005 > M11_EXPECT_PTR_SURVEY_NEW_MAX 71001`。期待値は変更していない (e2e_expect.env・m11_tolerant_gate.py)。
+- IR sha256 は `17a98d6e…` (`ir_conditions.json`)。§1 の `6909f85d…` と異なる。環境差か drift かは未切り分け。
+
+### 8.2 unit 144 の trap 経路 (ON・`M11_SURVEY_STACK=144 node m11_survey.mjs`)
+
+wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function_407e20` (wasm 1877) ← `function_409440` ← `function_412d60` ← `function_4136a0` ← `function_413760` ← `function_414bb0` ← `function_414c70` ← `function_43c4c0` ← `function_653660` ← `function_6539e0` ← `function_653f40` ← `function_65c540` (unit 144 の本体)
+
+- `407e20` は IR 先頭で `arg1 - 8` のヘッダを読み、trap はこの読み出しで起きる。`409440` は `arg1 ≠ 0` を確かめてから `407e20` を呼ぶ。つまり解放される値は nil ではなく、範囲外の非 0 値である (推定。値は未採取)。
+- `412d60` は参照解放 (管理フィールドの減算と 0 判定) の形。`43c4c0` の呼出し先の一部 (`413760`) は `412d60` に至る。推定: Grow 後の list 関連の状態のうち、後の解放経路で参照される値が不正になっている。**未検証**。
+- 照合済み (引数の取り違えは否定): `50ade0` の C 転記 (`m11_ov.c`) は機械語 (`50ade0` 78 B) と一致する。`417fc0` の IR シグネチャは `(ptr, ptr, i64, i64)` で、C 側の `(&FItems, ti, 1, newcap)` と一致する。
+
+### 8.3 未解決 (次の一手: `407e20` に渡る arg1 を ON/OFF で採取し、FItems・Count・Capacity のどれかを判定する)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| unit 144 の回帰の原因と修正 (受入 1・2・4) | 既定 ON (`M11_FIX_50A830`) 不可 | 子 issue (#2521 の残り。本 PR で issue の範囲を縮めた) |
+| e2e の期待値と実測の不一致 (8.1 の (a)〜(c)) | e2e が既定でも rc=1 | PM 判断 (issue コメント) |
+| IR sha256 の差 (`17a98d6e…` と §1 の `6909f85d…`) | 基準の再現性 | PM 判断 |
