@@ -57,7 +57,7 @@
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok・soft_error 0・raised 0・host_calls 37,425・callback_roundtrip true (rc 0) | 2.079 秒 | 0.96 |
 
 - `ui_state_diff.mjs` の calls 52 は、通常呼出し (ui ゲッター 14 + getFocused 3 + setter 13 = 30) と引数個数違い (22) の合計。setter 追加分は 19 呼出し (通常 13 + 個数違い 6)。
-- 参考: PY-119 報告の `ui_state_diff` calls 12 は、現在のスクリプトの出力 (PR 前も 33) と一致しない。PY-119 の件数は古いまま残っている (本 PR では訂正しない)。
+- 参考: PY-119 報告の `ui_state_diff` calls 12 は、現在のスクリプトの呼出し列と一致しない (PR 前の列は、ゲッター 17 + 個数違い 16 = 33 件と列から数えた値で、実行して測ったものではない)。PY-119 の件数は古いまま残っている (本 PR では訂正しない)。
 
 ネガティブコントロール: `host/fl_mock.mjs` の `ui.setSnapMode` の引数個数検査を `arity(a, 1, 1)` から `arity(a, 1, 2)` に変えると、`node tests/ui_state_diff.mjs` は `AssertionError [ERR_ASSERTION]: ui 状態ゲッター差分 1 件` (差分の name は `ui.setSnapMode`) で rc 1 (FAIL)。元に戻すと calls 52・diffs 0・PASS (rc 0)。`provider/*.wasm` は変えていない (mock のみの変更)。
 
