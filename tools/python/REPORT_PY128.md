@@ -21,7 +21,7 @@
 - `0x40c660` = `cvtsd2si rax,xmm0` (既定の最近接偶数丸め。範囲外と NaN は INT64_MIN)。
 - `0x43a820` → `0x43a500` が 10 進 (符号 flag 付き)。`0x414c70` は連結 (長さ `r13+r14` を確保して複写。確認済み)。接尾辞は `0x11f1b14` の `%` (長さ 1)。
 
-## 保留 2 件 (子 issue #234 へ)
+## 保留 2 件 (子 issue #3694 へ)
 
 | 関数 | entry | fn (VA) | 確定した事実 | 未確定の点 |
 |---|---|---|---|---|
@@ -60,4 +60,4 @@ $ git diff 3bdba9d55 HEAD -- tools/python ':!*.md'
 |---|---|---|
 | `getFocusedNodeCaption` / `getFocusedNodeFileType` の focused node 実体 | 未実装 (2 件) | #3694 (PY-234) |
 | `getHintValue` の PyArg 失敗経路 (`0xd82c20`) の例外型。int32 外の値 (PyArg の OverflowError) | 例外型は provider 規約 (code 5) に合わせた仮定。実機は未確認 | #3694 (PY-234) |
-| `getProgTitle` の定数の値が実機で同じか (テスト実行の実測なし) | 定数の読出しは PE 根拠のみ | 親 #2831 の残件として追跡 |
+| `getProgTitle` の定数の値が実機で同じか (テスト実行の実測なし) | 定数の読出しは PE 根拠のみ | #3694 (PY-234) |
