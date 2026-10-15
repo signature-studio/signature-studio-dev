@@ -88,7 +88,7 @@ const seq = [
   ["mixer.trackCount", []],
   ["mixer.getTrackCount", []],
   ["mixer.getEqBandCount", []],
-  // 範囲外 index は両者とも code 4 (RANGE)
+  // idx ≥ 127 (NMIX) は両者とも code 4 (RANGE)。idx < 0 の getTrackColor は int 0 (行 26〜28 で pin 済み)
   ["mixer.getTrackName", [127]],
   ["mixer.getTrackColor", [127]],
   ["mixer.getTrackColor", [-1]],
