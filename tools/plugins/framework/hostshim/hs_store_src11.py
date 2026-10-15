@@ -7,7 +7,7 @@
   * 読み元が [rbp+disp] / [global] なら、関数 [FN_LO, FN_HI) 内で同じ式へ書く命令の VA 一覧
   * 読み元が [rax+...] / call / 比較なら『未確定 (理由)』
 
-結論の判定は REPORT_DISPATCHER_APPENDIX_4849.md §8 が行う。本スクリプトは出力を作るだけ。
+結論の判定は REPORT_DISPATCHER_APPENDIX_4849.md §5.1 が行う。本スクリプトは出力を作るだけ。
 
 使い方: FL_WIN64_DIR=<展開先> PYTHONPATH=<unicorn,pefile,capstone> python3 hs_store_src11.py [VA...]
 """
