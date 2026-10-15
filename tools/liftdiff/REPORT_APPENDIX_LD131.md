@@ -72,7 +72,7 @@ closure 6 の未 lift は `1801c6a04` の 1 件 (呼出し元 `1801c6a2c`)。clo
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | x64c 出力の計装 (opt-in 既定 off の `OTT_INSN_HIT`) と計装 wasm での vm0・u16 の命令 VA 列 | 実装済み (§9)。計装 wasm の `ret` と native の rax の照合は未実施 | #3988 (LD-185・本 PR で完了) |
-| 既定 build との 12 case 差 0 (liftdiff harness の x64c 対応)・未 lift callee `1801c6a04` | 受入 3。harness が x64c の wasm を入力に取れるかは未確認 | #3990 (LD-186・依存 #3988) |
+| 既定 build との 12 case 差 0 (liftdiff harness の x64c 対応) | 受入 3。harness が x64c の wasm を入力に取れるかは未確認。未 lift callee `1801c6a04` は §10 で解消済み | #3990 (LD-186・依存 #3988) |
 
 ## 6. 測定 commit と差分
 
@@ -150,3 +150,19 @@ closure 6 の未 lift は `1801c6a04` の 1 件 (呼出し元 `1801c6a2c`)。clo
  tools/ott/rt/ott_cpu.h                          |  8 ++++
  6 files changed, 154 insertions(+)
 ```
+
+## 10. LD-245 (#4953) closure 6 の未 lift callee `1801c6a04` の解消
+
+- 原因: `x64c.py --closure N` は深さ N までしか callee を閉包に入れない。`1801c6a04` (呼出し元 `1801c6a2c`) は深さ 7 で入るため、深さ 6 では未 lift で残っていた。`1801c6a04` は小さい関数 (`test rcx,rcx`・`xadd [rcx+0x15c]`・`dec`) で、x64c の未対応命令は無い。
+- 決定: 残さず解消する。閉包の深さを 6 → 7 に上げる (`ld131_lift.sh`・`ld185_verify.sh` の両方。ld185 は ld131 と出力一致を検証するため揃える)。
+- 測定 commit: `f726f55ef` (コードを変えた最後の commit。worktree `4953-ld-closure7`、base `origin/main` = `0f5bcaa89`)。
+- 測定 (HEAD = `f726f55ef`、load average 0.32):
+  - `bash tools/liftdiff/results/ld131/ld131_lift.sh` → `[x64c] functions 29, insns 952, unsup {}, unlifted callees 0, imports 11`。wall 0.56 s (`real`)。
+  - `ott_lifted.c` sha256 = `1862e98ba665698a2f2ed03f54180763aeab44476442dc4f48df84744d9d443c` (2 回の生成で一致、`cmp` 一致)。
+  - TSV `insn_map_6fn.tsv` は 952 行 (ヘッダ除く)・29 関数。`kind=call-unlifted` は 0 行。
+  - `python3 tools/liftdiff/tests/test_insn_va_map.py` → 8 件 OK。
+  - `bash tools/liftdiff/results/ld185/ld185_verify.sh` → 既定 off の sha256 `1862e98b...` (ld131 と一致)・計装 `insn_hit_calls=952`・emcc ビルド成功 (`ottl_insn.wasm` 617759 B)。trace の件数は vm0 56・u16 76 (§9.3 と同じ)。ret は両方 1。所要 4.17 s (`real`)。
+- 入力: `OTT_vst2_win64.dll` の sha256 は §1 と同じ `ecd51e05…`。
+- 変化 (閉包 6 → 7): 関数 28 → 29・命令 941 → 952・未 lift 1 → 0。追加の関数は `1801c6a04` のみ。`1801c6a2c` の `call 0x1801c6a04` は `call-unlifted` から `call` に変わる。
+- 既存の §1〜§9 の数値 (941 命令・28 関数) は、閉包 6 の時点の記録として残す。現在の lift は閉包 7 (952 命令・29 関数)。
+- 製品 KPI: lift の静的解析のみで起動・GUI に関わらないため書かない。

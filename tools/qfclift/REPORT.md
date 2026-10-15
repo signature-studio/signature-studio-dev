@@ -139,6 +139,8 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | strict | DllMain | `[fle] MISSING IMPORT LocalAlloc` (rt に実装なし) | 0 | FAIL |
 | soft | DllMain | `[fle] call to UNLIFTED function 0x59c210 ret=0` | 0 | FAIL |
 
+- HEAD `ea44afd71` の boot (PR #4943 作成者の測定。fix run では未再現): strict FAIL (`MISSING IMPORT LocalAlloc`)、soft FAIL (`FontCache_GetStats` で `call to UNLIFTED function 0`)。real 37 s。上の HEAD `1fd48d2ce` の値と同じ停止点。
+
 - 3 run (`QFC_BOOT_REBUILD=1 bash tools/qfclift/qfc_boot.sh`・逐次・foreground・nproc 4)。3 run とも判定 JSON は表と同一:
 
 | run | real (script 計測) | load 開始 | load 終了 |
@@ -176,7 +178,7 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 |---|---|---|
 | 戻り先 `0x59c210` (setjmp/longjmp 継続) の lift 対応 (FLEngine 同型の override と断片 entry) と、DllMain 側の longjmp 起動元の特定 | DllMain が完走しない | #3410 (T-SH-77) |
 | `ExitProcess(0)` の偽の停止 (判定済み #4262。修正は #4510 で landed。`ExitProcess` は出なくなった) | DllMain の完走 (boot PASS) の判定 | #4262 (T-SH-106)・修正 #4510 (T-SH-126) |
-| longjmp の発生条件 (呼出元は `0x40fb80` 内の `0x40fbcf`・`0x40fcb8`。`[0x5aa000]` の書込みは setter `0x40fd10` のみ。経路 B の flag `[0x5d0cb0]` は `0x40f4eb` で reason+1 を書かれ、reason 1 では静的に発火 (実行時は未トレース)。付録 `REPORT_APPENDIX_4263.md` §5) | 偽の停止かどうかの切り分け | #4263 (T-SH-107・経路 A の reason ≥2 は未測定) |
+| longjmp の発生条件 (呼出元は `0x40fb80` 内の `0x40fbcf`・`0x40fcb8`。`[0x5aa000]` の書込みは setter `0x40fd10` のみ。経路 B の flag `[0x5d0cb0]` は `0x40f4eb` で reason+1 を書かれ、reason 1 では flag 2 で `f_40fa40` に入る (経路 A/B の対応は静的推定。`[0x5d0db0]` は未測定。付録 `REPORT_APPENDIX_4263.md` §5.2)。経路 A は reason 1 で arm されない) | 偽の停止かどうかの切り分け | #4263 (T-SH-107・経路 A と reason ≥2 は未測定) |
 | rt 未実装の import 162 件のうち、DllMain 経路で実際に呼ばれるものの実装 | 同上。soft stub の 0 返しは実物ではない。直接呼出しの計数は §10 | #3411 (T-SH-78) |
 | GetProcAddress → FT_* 14 本 (`qfc_import.c`) の結線と FontCache_GetStats / CleanUp の実行 (PASS 判定) | FT 結合と boot 全体の検証 | #3434 (T-SH-83。#3412 は closed) |
 
@@ -208,9 +210,12 @@ soft stub の戻り値は実物ではないため、PASS の根拠にしない�
 | H1 | `1fd48d2ce` | PASS (exit 0) | 66.43 s | 0.65 0.45 0.20 | 0.89 0.56 0.26 |
 | H2 | `1fd48d2ce` | PASS (exit 0) | 67.37 s | 0.83 0.56 0.26 | 0.94 0.65 0.31 |
 | H3 | `1fd48d2ce` | PASS (exit 0) | 67.82 s | 0.94 0.65 0.31 | 0.98 0.72 0.37 |
+| X1 | `ea44afd71` | PASS (exit 0)。**PR #4943 作成者の測定 (fix run では未再現)** | 96.5 s | 0.39 (1 分値のみ) | 1.20 (1 分値のみ) |
 | E1 | `f1dc143e5` | PASS (exit 0) | 116.87 s | 0.10 0.23 0.17 | 0.87 0.48 0.28 |
 | E2 | `f1dc143e5` | PASS (exit 0) | 116.97 s | 0.74 0.47 0.27 | 1.14 0.72 0.39 |
 | E3 | `f1dc143e5` | PASS (exit 0) | 116.70 s | 1.14 0.72 0.39 | 1.02 0.82 0.47 |
+
+- X1 の内容 (作成者の測定値を #4263 の結果コメントから転記。再実行なし): functions 6,347 / unsup 0 / spot diff PASS / ネガコン 3 本 FAIL 検出。insns・unlifted callees・spot の件数 (12/12) と、ネガコン各 case の件数は作成者の記録に無いため空欄。
 
 - **min–max (HEAD `1fd48d2ce`、n=3、全 PASS): real 66.43–67.82 s**。load 開始 0.65–0.94。
 - min–max (HEAD `f1dc143e5`、n=3、全 PASS): real 116.70–116.97 s。前回測定 (`5c7a48a`、§6 の P1〜P3: 196.08–196.70 s) との差は未切り分け。
