@@ -8,7 +8,7 @@
 - 受入 4 (py88 の movabs 対応と 65 件の式表の変化件数): **完了**。`movabs` を定数の定義として扱うよう `analysis/py88_writes.py` を直した。65 件のうち変化は **1 件** (0x104b843 の call 0x10469f0 の引数 edx・r8d)。他 64 件は文字列が一致し、分類の件数も変わらない。
 - 受入 6 (0x104a945 以降の r8d の使い道と値の式): **使い道を確定、値は 3 値の集合として確定**。`mov r8d` の値は VCALL B (0x104a95c) の第 3 引数で、到達集合は {入口 d, VCALL A の戻り値, IND@0x104a92b}。`OUT(0xc61250)` の中身は未確定 (§5)。
 - 検算: 0x104b843 の表引き (movabs 2 件を含む 6 命令) を、py88 の式とは独立に整数演算 (mod 2^64) で実行し、4 つの入力 k で期待値 (`0x1539eb4 + 8k`・`0x1539eb8 + 8k`) と一致 (mismatch 0)。py88 の式にも同じ 3 つの要素が現れる。
-- 未着手 (#3101 に残す): 受入 1 (G11 55 件・G2〜G6・G8 の照合)・受入 2 (0x7a0c20 の vtbl 解決)・受入 3 (0x104a48f の T ポインタ)・受入 5 (0x104cc65 の戻り値式)。
+- 未着手 (#3101 に残す): 受入 1 (G11 55 件・G2〜G6・G8 の照合)・受入 2 (0x7a0c20 の vtbl 解決)・受入 3 (0x104a48f の T ポインタ)・受入 5 (0x104cc65 の戻り値式)。旧受入 1 の移送分のうち未閉の部分 (0x104bffa・VCALL 3 件の呼出し先・CALL 7 件の引数) は #3101 の受入 7〜9。rint 6 件は #3913 (PY-271)。内訳と担当は §7。
 
 ## 2. 測定条件
 
@@ -16,6 +16,8 @@
 - 素材: `oc_artifacts: fl-win64`。`ls $ARTIFACTS_DIR` で `fl-win64.tar.zst` の実在を確認。`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C tools/python/work/py64 --wildcards '*block00031_PE.bin'` (2.1 秒)。`work/` は gitignore。
 - 逆アセンブル: `python3 analysis/py53_dispatch.py work/py64/extracted/block00031_PE.bin work/py53` → `fn=4664 dispatch=13 r8d_tests=174` (0.08 秒)。
 - 測定時の load average: 0.08〜0.23 (測定開始時)。
+- 再測定 (main 取り込み後): 測定した HEAD は `8e3f34c94` (main 取り込み merge・コードは `91f9b90f3` と同じ)。展開 2.8 秒・`py53_dispatch` 0.10 秒・`py88_writes` 65 行・`py161_movabs_check` `mismatch=0`・`--negctl` `mismatch=4` (exit 1)・`py160_reach` の値は §5 と一致。
+- 測定の鎖の差分: `git diff 91f9b90f3 8e3f34c94 -- tools/python/analysis/py53_dispatch.py tools/python/analysis/py88_writes.py tools/python/analysis/py160_reach.py tools/python/analysis/py161_movabs_check.py` の出力は 0 行。範囲 `tools/python/analysis tools/python/provider tools/python/host tools/python/tests` には main 側の変更 10 ファイル (`analysis/flapi/*`・`analysis/py65_r8d_bits.py`・`analysis/py99_closure.{py,md}`・`host/fl_mock.mjs`・`provider/fl_engine.c`・`tests/mixer_diff.mjs`) が入るが、測定の鎖の外 (import されない)。
 
 ## 3. 65 件の式表: 修正前後の差分
 
@@ -53,6 +55,7 @@
 ## 5. 0x104a945 の r8d (受入 6)
 
 - 命令列 (fn.txt): `0x104a938 mov rcx,[rbp+0x410]`・`0x104a93f mov edx,[rbp+0x570]`・`0x104a945 mov r8d,[rbp+0x5b8]`・`0x104a94c mov r9d,2`・`0x104a959 mov rax,[rax]`・`0x104a95c call [rax+0x30]`。ecx = O2 (this)、edx = E (j)、r8d = 読み値、r9d = 2 の VCALL B の引数。
+- 引数の番号: `this` (rcx) を第 1 引数と数えた値。よって r8d は第 3 引数、edx は第 2 引数 (`this` を除いて数えると、r8d は第 2 引数になる)。
 - 到達集合 (`python3 analysis/py160_reach.py work/py53/fn.txt reach 0x5b8 0x104a945`): `{0x1046d6b, 0x104a8a3, IND@0x104a92b(0xc61250 経由)}`。
   - 0x1046d6b: 入口の store (edx 受け = d)。
   - 0x104a8a3: VCALL A (0x104a8a0) の戻り値の store。
@@ -64,7 +67,7 @@
 
 | 受入 | 判定 |
 |---|---|
-| 1 G11 (55 件) の値式・G2〜G6・G8 の py88 式の照合 | 未着手。G2〜G6・G8 の式は SLOT? の葉を含み、閉包は PR #3858 (#3104・open) の対象。依存が未 merge のため着手しない |
+| 1 G11 (55 件) の値式・G2〜G6・G8 の py88 式の照合 | 未着手 (#3101 に残す)。G2〜G6・G8 の式の SLOT? 葉の閉包の算法は #3104 (`analysis/py99_closure.py`・`REPORT_PY99_3104.md`) に既にある。依存の PR #3858 (#3104) は merge 済み・#3104 は CLOSED。依存は解消しており、着手可 (本 PR の範囲外) |
 | 2 0x7a0c20 の vtbl[+0x28]・vtbl[+0x18]・0x729d20・[this+0x548] の解決 | 未着手 (実行時データ。PE 静的解析の範囲外の可能性が高い) |
 | 3 0x104a48f の T ポインタ (`*(0x15e44c8)`)・[rbp+0x564] | 未着手 (`0x15e44c8` の値は実行時に決まる) |
 | 4 py88 の movabs 対応と 65 件の変化件数 | **完了** (§3・1 件) |
@@ -78,7 +81,21 @@
 | 受入 1・2・3・5 (上表) | 65 件の式確定・r9d・r8d・戻り値式 | #3101 (open・既存) |
 | `OUT(0xc61250)` の値 (0xc62db0 の書く qword) | 0x104a945 の r8d・VCALL B の引数・0x104cc65 の戻り値 | #3101 (受入 5 と同じ) |
 | `SLOT[rbp+0x570]?@0x104aa97` (j の入力依存) | 0x104b843 の edx・r8d の添字 | #3101 (受入 1 の残り) |
-| `rint` (call 0x40c660) 6 件の担当 | #2788 受入 1 の 6 件。どの子の本文にも明示がない。SLOT?・ACC? の葉を含むなら PR #3858 (#3104) の閉包の対象の可能性があるが未確認 | PM 判断 (担当未定) |
+| 旧受入 1 の内訳のうち未閉: 直接式 1 件 `0x104bffa`・VCALL 3 件の呼出し先 VA・CALL 7 件の引数の葉 | §7.1 の内訳 | #3101 (受入 7〜9・本 PR で追記) |
+| `rint` (call 0x40c660) 6 件 | §7.1 の内訳 | #3913 (PY-271・本 PR で起票) |
+
+### 7.1 65 件の内訳と担当 (#2788 旧受入 1 の移送先)
+
+py88 の分類 (stderr の件数表・`REPORT_PY159.md` §1 の内訳と同じ)。
+
+| 内訳 | 件数 | 担当 (番号・状態) | 状態 |
+|---|---|---|---|
+| 直接式 (SLOT? 49 件・うち ACC?⚠合流 20 件を含む) | 49 | #3104 (PY-162・CLOSED・PR #3858 merged 2026-10-15T04:56:18Z) | 閉じた書込み **48/49** (入口のレジスタ葉を除く)・厳格判定 0/49 (`REPORT_PY99_3104.md`)。未閉 1 件 `0x104bffa` (`⚠合流@0x104bd49`・`⚠合流@0x104be63`) は #3101 (受入 7)。py88 の合流判定の範囲の修正は #3877 (PY-263・OPEN) |
+| CALL 7 件 (`call 0x10469f0`) | 7 | #2874 (PY-99・CLOSED・PR #3092) | 受入 (a) の戻り値式 `edx + rint(2^-30·ecx·(r8d−edx))` を確定 (`REPORT_PY99_APPENDIX.md`)。引数の葉 (例: 0x104b843 の edx・r8d の `SLOT[rbp+0x570]?@0x104aa97`) は #2874 の受入外のため未閉 → #3101 (受入 9) |
+| VCALL 3 件 (0x104a8a3・0x104a95f・0x104a9c7) | 3 | #3135 (PY-163・CLOSED・PR #3153) | 引数と戻り値式は確定 (`REPORT_PY163.md` §3)。呼出し先 `vtbl[+0x30]` の関数 VA は未確定 (受入 1 未達) → #3101 (受入 8) |
+| rint (call 0x40c660) 6 件 (0x10483d3・0x1048ed3・0x104906e・0x10491ed・0x104a876・0x104a999) | 6 | #3913 (PY-271・OPEN・本 PR で起票) | 未着手 |
+
+件数の検算: 49 + 7 + 3 + 6 = 65。
 
 ## 8. 再現
 
