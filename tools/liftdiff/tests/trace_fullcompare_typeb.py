@@ -102,6 +102,19 @@ for line in open(batch):
 print('# 型 B 候補 %d case (trace_head 基準の L が leaf)' % len(items))
 nat, was = sess.make_runners()
 rows = []
+RP = os.environ.get('LD_RETPROBE_OUT')   # LD-220 (#4466): 戻り値の直接計測 (ld_native の LD_RETPROBE_VA=40a3d0 と併用)
+rp_stat = collections.Counter()
+
+
+def rp_lines(pos):
+    """native 1 run の間に追記された rp 行 (rp run=... rax=...) を dict のリストで返す。"""
+    if not RP or not os.path.exists(RP):
+        return []
+    with open(RP) as f:
+        f.seek(pos)
+        return [dict(t.split('=', 1) for t in l.split()[1:]) for l in f if l.startswith('rp ')]
+
+
 try:
     for fva, pat, L in items:
         name = sess.fn_name(fva)
@@ -111,7 +124,9 @@ try:
             continue
         for xf in (True, False):
             line = cases.case_line(fva, name, pat, sig, trace=True, xfill=xf)
+            pos = os.path.getsize(RP) if RP and os.path.exists(RP) else 0
             rn = nat.run_cases([line], ['n'])[0]
+            RL = rp_lines(pos)
             rw = was.run_cases([line], ['w'])[0]
             TN = rn.get('trace', [])
             TW = rw.get('trace', [])
@@ -136,6 +151,19 @@ try:
             else:
                 cls = 'R'
             rows.append((xf, cls, Lf, caller))
+            if Lf == 0x40a3d0 and RP:
+                k = N[:i + 1].count(0x40a3d0) - 1   # L の entry が、trace 上で何回目の 0x40a3d0 呼出しか
+                if k >= len(RL):
+                    rp_stat['count_mismatch'] += 1
+                    print('   RAX fn=0x%x xfill=%d k=%d probe_calls=%d (不一致・比較しない)' % (
+                        fva, 1 if xf else 0, k, len(RL)))
+                else:
+                    measured = int(RL[k]['rax'], 16)
+                    derived = int(lx[0], 16) >> 48
+                    rp_stat['match' if measured == derived else 'differ'] += 1
+                    print('   RAX fn=0x%x xfill=%d k=%d measured_rax=0x%x derived_rax=0x%x rsp_delta=%s ret_rva=%s %s' % (
+                        fva, 1 if xf else 0, k, measured, derived, RL[k]['rsp_delta'], RL[k]['ret_rva'],
+                        'MATCH' if measured == derived else 'DIFF'))
             print('fn=0x%x pat=%s xfill=%d class=%s L_full=%s typeB_full=%s next(native,wasm)=%s native=%s wasm=%s' % (
                 fva, pat, 1 if xf else 0, cls,
                 ('0x%x' % Lf) if Lf is not None else '-',
@@ -150,6 +178,8 @@ try:
                 post or '-',
                 ('%s %s' % jcc) if jcc else '-'))
     print('## 集計 (xfill, class): %s' % sorted(collections.Counter((int(x), c) for x, c, _, _ in rows).items()))
+    if RP:
+        print('## rax 直接計測 (LD-220): %s' % sorted(rp_stat.items()))
 finally:
     nat.close()
     was.close()

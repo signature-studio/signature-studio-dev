@@ -37,9 +37,28 @@
   probe の値が REPORT_MX10 §2 と一致するという記述は REPORT_MX10 側の記録との比較であり、本件での再測定ではない。
 - 測定スクリプトの鮮度: `dsp/scripts/mx_unres_residual_4198.py` は測定 commit `c2b976d75` の `dsp/scripts/mx_unres_residual.py` と blob が一致 (`cmp` 一致)。測定 commit から HEAD までに変更されていない。
 
-## 5. 未解決 (起票先)
+## 5. 再計測 (本 run・素材 `plugins-massivex` 展開)
 
-| 残件 | 影響 | 起票先 |
+- 素材: `plugins-massivex` → `Native Instruments Massive X v1.7.1.exe` → `parse_setup_headers.py` → `extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` (95,356,824 B、md5 `622993e76565f49c094063a2b717d6ca`、REPORT_MX10 §4 と一致)。
+- 測定 commit: `scripts/mx_parent18_4198.py` を追加した commit (本 PR の最後のコード変更。`git log -1 -- tools/targets/massivex/dsp/scripts/mx_parent18_4198.py`)。
+- `mx_parent18_4198.py` (母集団は先頭 `.pdata`、所在判定は両 `.pdata`): 母集団 18 件。`not_in_pdata/end==child_begin` 4・`end_in_valid_begins` 5・`end_in_text_other` 2・`end_not_in_text` 7 (合計 18)。
+- 2 本の `.pdata` (0x5f50000・0x6176000) の全 entry で照合すると、親 (begin,end) 13 種はどちらにも一致しない (`pdata_in` 0 件)。
+- 親 begin は 16 件が `.text` 内・2 件が外。`mx_unres_residual.py` (MX-15) の `begin_in_pdata` 7 件は「親 begin が全 `.pdata` の begin に在る」の判定で、(begin,end) の完全一致判定とは別。REPORT_MX5 §2 の「pdata 内 7 / 外 11」は、この begin 単独判定の数字と一致する。
+- 親の end が `.text` の外を指す 9 件 (`end_in_text_other` 2・`end_not_in_text` 7) は、親 RUNTIME_FUNCTION の読み方 (UNWIND_INFO の CountOfCodes の偶数詰め後の 12 B) では説明できない値を含む。
+  - 同一 UNWIND_INFO の親 end が、子 entry の begin 集合 (valid) に在る件 5・子 begin と一致する件 4。
+  - 一方、9 件は end が `.text` 外で、子 begin とも一致しない。
+- 結論: 親 18 件は「`.pdata` 外の親」という 1 種では説明できず、(a) 親 end が子境界と一致する 9 件 (`end==child_begin` 4・`end_in_valid_begins` 5)、(b) end が `.text` 外を指す 9 件 (`end_in_text_other` 2・`end_not_in_text` 7) の 2 群に分かれる。(b) は UNWIND_INFO の読み方の誤りか、親が別形式である可能性がある。**未確定**。
+
+## 6. 検証 (本 run・コミット済み HEAD)
+
+- 実行 HEAD: `74375c75a` (本節の e2e・negctl を実行した commit。以降のコード差分は 0)。
+- `bash dsp/e2e.sh` (n=1・素材 `work/extracted` の PE・rc 0): `OK elapsed=27s load start=[0.43 0.32 0.14] end=[0.66 0.39 0.17]`。
+- `bash dsp/negctl.sh` (n=1): NC1 `unsup=5` / NC2 `unsup=285` / NC3 `insns=31 unsup=0` → 3 件とも `FAIL<期待>`。
+- 親 18 件の内訳は §5 を参照 (同じ 1 回の実測。ここには書かない)。
+- 前版 (§2・§4) の e2e・negctl の数値 (NC2 unsup 292 等) は本 run の値 (285) と異なるため、前版の値は取り下げる。
+
+## 7. 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 親 18 件の所在の再現 (REPORT_MX5 の 7/11 と今回の 0/18 の差。UNWIND_INFO 読み方の疑い・未確定) | 受入 1・2 が書けない | 本 issue #4198 (Refs・未達) |
-| 解決規則の確定と受入 3 の e2e・negctl 再実行 (要 `plugins-massivex`) | 受入 1〜3 | #4198 (Refs・未達) |
+| 親 18 件の解決規則の確定 (特に親 end が `.text` 外を指す b 群 9 件。UNWIND_INFO 読み方の誤りか、別形式の親かは未確定) | 受入 1・2 が書けない | #4198 (Refs・未達) |

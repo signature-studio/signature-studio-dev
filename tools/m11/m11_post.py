@@ -340,6 +340,7 @@ for (nm, ret, args) in fns:
             L.append('  %%c%d = bitcast i32 %%t%d to float' % (i, i))
             cargs.append('float %%c%d' % i)
         elif t == '%tagPOINT':
+            # #4184 (LD-200): POINT は 8 バイト値渡し (x64 rcx = x | y<<32)。下位 32bit が x、上位が y
             L.append('  %%px%d = trunc i64 %s to i32' % (i, v))
             L.append('  %%ps%d = lshr i64 %s, 32' % (i, v))
             L.append('  %%py%d = trunc i64 %%ps%d to i32' % (i, i))
