@@ -3,7 +3,7 @@
 - 日付: 2026-10-15 / 親: #4484 (SR-76) / 前段: `REPORT_SR76.md` §5 (a)・§4 / 対象: `0x1803573f0` (`+0x20408` の書込元)
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。FLEngine 起動・GUI は**動かしていない** (製品 KPI は測っていない)。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3` (x86_64-win)。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` (REPORT_SR76 §1 と一致)。作業用 dir はリポジトリ外。
-- 測定 commit (解析に使ったコード): `d7d352b84` (`reg_call_resolve.py` の追加 commit)。
+- 測定 commit (解析に使ったコード): `d7d352b84` (`reg_call_resolve.py` の追加 commit)。本 PR の後続 commit はコードを変えず、docstring と本 REPORT の限界記述だけを変えた (§1.1)。
 
 ## 0. 結論
 
@@ -33,6 +33,12 @@ venv/bin/python $P/reg_call_resolve.py Serum2_win64.vst3 0x1803573f0 0x1800c6090
 | `reg_call_resolve.py` root `0x1800c6090` (HEAD `d7d352b84`) | 10.17 秒 (user 9.96 秒) | rc 0。出力 md5 `2f0232a61d4c13c904f2c1a1bb8a15a3` |
 
 実行前後の load average: 0.30 → 0.50 (1 分平均)。同 run 内で逐次実行。同一入力での再実行 (コミット前の版) でも出力 md5 は一致した。
+
+### 1.1 解決ロジックの限界 (コードは未変更・再測定なし)
+
+- `resolve()` は分岐命令 (j*) とラベルを無視し、直前の 1 経路だけを後ろ向きに辿る。分岐の合流点で別経路の定義は見ていない。例: `mov rax, A; jne L; mov rax, B; L: call rax` は B だけを返す。したがって「解決 120」には合流を跨いで決めた宛先が含まれ、合流の他経路は未検証。
+- `,` を含まない 1 オペランド命令 (inc/dec/neg/not/cdqe など) は読み飛ばす。これらは対象レジスタを変えるため、定義元の探索が 1 つ前の定義に届く場合がある (未検証)。
+- 再測定は `plugins-serum2` の素材が要るため、本 PR では行っていない。上記の限界は、コードを直して再測定するまで『解決 120』の正確さを保証しない。
 
 ## 2. 解決の結果 (両 root 共通)
 
