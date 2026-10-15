@@ -105,10 +105,10 @@
 | 項目 (#3733 の一覧) | 結果 | VA と事実 | 残り (理由) |
 |---|---|---|---|
 | カテゴリ c の索引 | 部分 | `0x102bb20(registry, c, &out)` は `0x102b6c0` (ハッシュ。`vtbl+0x20` の戻りを `&0x7fffffff`・`+1`・`&0x7fffffff`。c に依らない) と `0x102b610` (16 バイト要素の線形探索。dword key がハッシュと一致し、`vtbl+0x18(registry+0x18 の object, entry の byte, c)` が真になった位置の索引を返す。空の key (-1) に当たると負の値を返す) で索引を取り、`0x102bb20` は索引が負なら NULL、そうでなければ要素の `+8` を返す | `vtbl+0x18` の実体と、c の値から名前への対応は未読 |
-| registry 要素の型 | 未確定 | 要素は `0x102bb20` が返す object。`0x102ca60` が各カテゴリを `0x102b8b0` で登録し、`0x448ee0` で作る (`[0x15e4c18]` の global 経由) | 要素の型記述子・vtbl は未特定 (`0x448ee0` 未読) |
+| registry 要素の型 | 部分 | 要素は `0x102bb20` が返す object。`0x102ca60` が `0x102b8b0` で登録し、その前に `0x448ee0` (factory。`0x410320` で生成し `0x41c820` で名前を設定する) を呼ぶ。`0x102ca60` の 2 経路 (bit0・bit1) は、第 1 引数 `0x430df0` と名前 `[0x15e4c18]` が同じで、呼出し前の guard だけが違う (`0x100c1b0`・`0x100d098`。先頭バイトが 7 なら呼ばない)。`0x102b8b0` は `0x41a7b0`・`0x102b3e0` を呼ぶ (`0x102b3e0` は配列の伸長) | 要素の型記述子・vtbl は未特定。guard 先の global の型は未読 |
 | `vtbl+0x10` (`0x101b780` 内、`(elem, r9b)`) の書込み内容 | 未確定 | 呼出し位置 `0x101b8f6`・`0x101bc18` 付近。r9b は `0x1017ad0` が渡す `updateHistory == 1` の真偽 (§2) | 呼ぶ vtbl の実体を未読 |
 | `vtbl+0x40` (`record+0x0c`・`+0x14` の object、`0x101b98e`・`0x101b9d4`) | 部分 | 引数は `record+0x28` (系列番号・`0x15e4018` の dword) を 192 バイト (24 qword) 間隔で索引した global `0x15e2aa0` の要素 | 呼ぶ vtbl の実体と、`+0x0c`・`+0x14` の object の型は未読 |
-| 大配列 `0x12f9ed0`・`0x416750` の意味 | 未確定 | `0x12f9ed0` は `[0x196eb60]` (.bss。実行時に埋まる配列) の要素数 (`[arr-8]`)。`0x12f9ec0` は同配列の要素。`0x416750` は `+0x80` の配列へ書く関数 | 配列の中身は .bss のため PE だけでは決まらない。`0x416750` 本体未読 |
+| 大配列 `0x12f9ed0`・`0x416750` の意味 | 部分 | `0x12f9ed0` は `[0x196eb60]` (.bss。実行時に埋まる配列) の要素数 (`[arr-8]`)。`0x12f9ec0` は同配列の要素。`0x416750` は冒頭で `[r8]` の型 tag (0x16) を見て、22 の要素なら `[rbx+0x19]` の関数ポインタを呼ぶ (分岐の先頭のみ読了) | 配列の中身は .bss のため PE だけでは決まらない。`0x416750` の本体の後半は未読 |
 | mask ゲート `(mask & A) == B` の A・B | **確定** | `0x101b9e2`・`0x101b9e9` が `.text` 内の定数 (RIP 相対 `0x101bd54`・`0x101bd5c`。`.text` は読取専用) を読む。A = `0x10000000004` (bit 2 と bit 40)、B = `0`。`je 0x101bb0c` は `(mask & A) == B` のときの飛び先を確認した (飛び先の確認のみ。「`+0x80` への書込みを飛ばす」という意味付けは検査していない) | — |
 | `0x1019e30` (record ctor) | 部分 | `+0x48`・`+0x64`・`+0x7c`〜`+0x7f`・`+0x68` を 0、`+0x35` を 1、`+0x34` を 0、`+0x0c`・`+0x14`・`+0x40` に object を入れる (`0x105f460`・`0x10601e0`・`0x102c9b0`) | `0x105f460`・`0x10601e0` 未読 |
 | `0x102c9b0` (registry 生成) | 部分 | `0x102ca60` を呼び、bit 0 (`test al,1`) と bit 1 (`test al,2`) の 2 経路で `0x448ee0` を呼ぶ | `0x102b8b0` 未読 |
@@ -143,9 +143,12 @@
 - 逆アセンブル補助 (PY-137): `python3 analysis/py41_disasm.py <block00031_PE.bin> 1016ca0 1017ad0 101b780 101d180 418210 418190 418000 418030 418260 1019da0 1019dd0 1016e00 fdef70` (`py41_disasm.py` は各 VA から最初の `ret` で止まる。`0x1016ca0` の後処理 loop は最初の `ret` (`0x1016dd1`) より前にある)。
 - #4770 (PY-378) の検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/py4770_saveundo_open.py` → `PASS: py4770 saveUndo open facts` (実測 0.071 秒。`uptime` の load average 0.17 / 0.26 / 0.14)。測定 commit `2efd1b12d` (main 取り込み後の HEAD。その時点の `tools/python/analysis` の差分は main 由来の 240 行を含むが、検査は取り込み後の HEAD で実行)。確定した A・B の定数 (`0x10000000004`・`0`) と、registry flags (`byte[0x1019f70] = 2`)、`0x40faa0`・`0x418190`・`0x418210`・`0x102bb20` の本体の形を assert する。`capstone` は `lock xadd` を mnemonic `'lock xadd'` として出すので、検査はその文字列で照合している。
 - #4770 の未実施: `[H+8]`・`0x101d180` の実行時の挙動、大配列 `0x196eb60` の中身は PE だけでは決まらないので、実機で観測しないと確定しない。
+- PY-385 (#4796): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 analysis/py4796_saveundo_pe.py` → `PASS: py4796 saveUndo PE facts (PY-385)`。確定した 6 本 (`0x41c360`・`0x414850`・`0x414ad0`・`0x448ee0`・`0x102ca60`・`0x102b8b0`) の形と、`0x102ca60` の global (`0x430df0`・`[0x15e4c18]`・guard `0x100c1b0`・`0x100d098`) を assert する。ネガティブコントロール: `0x102ca60` の第 1 引数の期待値 `0x430DF0` を `0x430DF1` に変えたコピー → `AssertionError: ['0x430df0', '0x430df0']` で停止 (実測)。
+- PY-385 の未実施: vtbl の実体 (`+0x10`・`+0x18`・`+0x40`)、`0x416750` の後半、`0x12f9ed0`・`0x12f9ec0` の配列内容、`0x101a6e0`・`0x101d180` は未読。`0x101d180` の reset と `+0x34` の意味は PE だけでは決まらない。
 - PY-137 の未実施: `tests/general_diff.mjs`・`provider_check.mjs`・`all_tools.mjs` は本 PR で `host/`・`provider/`・`tests/` を変えていないので未実行。`saveUndo` の実機での挙動は未実測。
 
 ## 7. 子 issue
 
 - #3026 (PY-137, 親 #2999): 本 PR で、履歴スロットの式と record 書込みの VA 構造を §4-2 に確定した。issue の範囲は §4-2 の確定 1 件に縮め、`Closes #3026` とする。
+- #4796 (PY-385, 親 #4770): §4-2b の未確定のうち、`0x41c360`・`0x414850`・`0x414ad0`・`0x448ee0`・`0x102ca60`・`0x102b8b0` の 6 本を PE から確定し `analysis/py4796_saveundo_pe.py` で assert した。vtbl の実体 (`+0x10`・`+0x18`・`+0x40`)・`0x416750` の後半・大配列の内容は未確定のまま (理由は §4-2b の表)。
 - 残り → `[PY-242]` #3733 (親 #3026): record 内容の PE 確定、mock と C provider への `general.saveUndo` 実装、general_diff 差分 0・provider_check 期待値・all_tools 48/48 (#3026 の受入条件のうち #2〜#4 と、§4-2 の残りの PE 未確定。ring 後処理の `+0x34`・refcount・flag、子 object の本体を含む)。
