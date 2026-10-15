@@ -8,10 +8,10 @@
 - ASIO の `fla_open` 呼出に、初期 T の下限 **1536 frames (B=256 で depth 6)** を `FLA_F_T_FLOOR` で適用した。burst 探査の結果には依らない。
 - 測定 commit `35938a59`: `com_ramp_b256_d2` を同一 HEAD で連続 **20 回, 20/20 PASS** (underrun 0・silence 0・ramp mismatch 0)。
 - 変更前 (main `853f1940`) の 5 回: depth 4 の 1 回で underrun 1 (silence 3328)、depth 6 の 4 回は underrun 0。
-- `lat_out` (FL へ報告する遅延): 前 3073 (depth 4) / 3585 (depth 6) → 後 **3585 (常時)**。B=256 の増分 +512 frames (48 kHz で 10.7 ms) は depth 4 だった実行の分のみ。**採否は依頼者判断 U1** (§4)。
+- `lat_out` (FL へ報告する遅延): 前 3073 (depth 4) / 3585 (depth 6) → 後 **3585 (常時)**。B=256 の増分 +512 frames (48 kHz で 10.7 ms) は depth 4 だった実行の分のみ。**採否: 2026-10-15 採用** (PM 判断。§4)。
 - main `3d37a190` 取り込み後の merge commit `69280d57` でも同一 HEAD で 20 回連続 **20/20 PASS** (§6)。
 - 増分の式 (式からの計算。depth 引数 2 の場合): `max(0, D − max(2, need)) × B` frames、D = ceil(1536 / B)。到達可能な最大は B=128 で +1152 frames (24.0 ms)、B=256 で +1024 frames (21.3 ms)、B=512 で +512 frames、B=1024 で 0 (§2)。
-- B=128 の親 e2e 系シナリオ `asio_ramp_b128_d2` は、PR HEAD と同じコードで 7 回中 2 回 FAIL。基点 `3d37a190` は 5 回 0 FAIL。**本 PR 由来かは切り分けられていない** (§5・§6-5)。
+- B=128 の親 e2e 系シナリオ `asio_ramp_b128_d2` は、PR 由来のコードで 8 回中 3 回 FAIL (§6-6 で現 HEAD `853874e67` の親 e2e も 1 回 FAIL)。基点 `3d37a190` は 5 回 0 FAIL。**本 PR 由来かは切り分けられていない** (§5・§6-5)。
 
 ## 2. 実装
 
@@ -58,11 +58,12 @@ floor は動的調整の下限にもなる。`flasio.c` の thread_fn は `Tn = 
 - `FL_WIN64_DIR` に `fl-win64` を展開して `bash tools/audio/e2e.sh --quick` を実行 → **rc 0・所要 5 分 43 秒**。
 - 内訳: harness 44/44 PASS (`tools/audio/results/results.json`)・asio node check 126/126 PASS・asio COM 3/3 PASS (`com_ramp_b256_d2` は underrun 0・lat_out 3585)。
 
-## 4. 増える遅延の採否 (依頼者判断 U1・needs-user-input)
+## 4. 増える遅延の採否 (U1)
 
-- 判断者は依頼者。reviewer・PM は代行しない。`needs-user-input` は #2934 に付いている (質問文は #2934 の本文先頭)。
-- 採用 = 本 PR を merge。不採用 = 本 PR を閉じる (または `flasio.c` の `FLA_F_T_FLOOR` 指定 1 行を戻す)。
-- 既定案 (PM): 変えない (不採用で保留)。merge せず・閉じず open のまま残す。
+- **採否: 採用** (2026-10-15・#2934 の PM 判断コメント)。判断者は依頼者 (repo admin 権限を確認済み)。PR #2995 を merge (merge commit `fbc7ac973`)。`needs-user-input` は外した。
+- 採用文は『初期目標充填 T の下限 1536 frames (ASIO のみ)』で、B で限定していない。よって採用は B=128 にも及ぶ (B=128 の増分は実測 +128、式の最大 +1152)。
+- 戻し方: merge 後は `flasio.c` の `fla_open` 呼出から `FLA_F_T_FLOOR` を外す 1 行。
+- 採否の検討時の判断材料 (depth 引数 2 の場合。増分は式からの計算。§2):
 - 判断材料 (depth 引数 2 の場合。増分は式からの計算。§2):
   - 典型値 (burst 512 と 1024 の 2 条件。REPORT_AU2_CI.md では 48 kHz の burst は 512f が大半):
     - B=128: burst 512 (need 6) で +768 frames (16.0 ms)、burst 1024 (need 11) で +128 frames (2.7 ms)。
@@ -70,14 +71,14 @@ floor は動的調整の下限にもなる。`flasio.c` の thread_fn は `Tn = 
   - 最大: B=128 +1152 frames (24.0 ms、need 3)、B=256 +1024 frames (21.3 ms、need 2)。どちらも burst 128 の条件で、記録上の典型ではない。B=512 は burst 128〜384 の条件でのみ +512 (need 2)、それ以上は 0。B=1024: 常に 0。
   - 測定した増分: B=256 は +512 (depth 4 → 6、§3-1)。B=128 は +128 (基点 T 1408 → PR T 1536、§6-5)。
 - **open 時 depth は run ごとに変わる (未確定の点あり)**: 基点 B=128 の T 1408 は stats から直接読める (`latency_changes` 0 のため T は run 中に変わらず、T = open 時の depth × B = 11 × 128)。ただし open 時の burst 値 (`fla_cmd` OPEN の `res[0]`) は未記録のため、「depth 11 = burst 1024」は式からの解釈で未確認。run 中の `burst_obs` (512) は open 時の値ではない。同じ B=128 でも、同日の main 実行 (`tools/audio/results/results.json`・2026-10-13) では `asio_ramp_b128_d2` が depth 6 (T 768)、`asio_loop_noise_b128` が depth 11 (T 1408) で、どちらも `burst_obs` 512・`latency_changes` 0。したがって B=128 の増分は +128 (depth 11 の run) 〜 +768 (depth 6 の run) の幅で、run ごとに決まる。open 時 burst を 1 回ログに出せば確定できる (未実施)。
-- B=128 の FAIL 切り分け (§5) が出るまで、B=128 を含めた影響の判断は保留になる。
+- B=128 の FAIL の切り分け (§5) は未了。
 
 ## 5. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 増える遅延 (lat_out) の採否 (U1)。§4 | merge の可否。既定案は不採用で保留 | 依頼者判断 U1 (#2934 needs-user-input) |
-| B=128 の `asio_ramp_b128_d2` FAIL の、本 PR 由来か否か。PR HEAD と同じコードで 7 回中 2 回 FAIL (underrun 1)、基点 `3d37a190` は 5 回 0 FAIL (§6-5)。母数が少なく有意差は言えず、本 PR 由来を否定できない。main 側にも同シナリオの「1 回目 FAIL・再実行 PASS」の記録が複数ある: `tools/audio/REPORT_DS.md` (1 回目 FAIL・再実行 PASS・一過性の負荷揺れ扱い)、`tools/audio/REPORT_AU5.md` (`b66c676` 回 2 FAIL・回 2' 単独 PASS)、`tools/audio/REPORT_AU2_CI.md` (quick FAIL・負荷起因の疑い、未確認)。原因は main 側でも未切り分け | 親 e2e の受入条件 3 (rc 0) は未達のまま。PR は B=128 の初期 T を 1408 → 1536 に変える | #187 |
+| (解決) 増える遅延 (lat_out) の採否 (U1)。§4 | 2026-10-15 採用・PR #2995 merge 済み | #2934 の PM 判断 |
+| B=128 の `asio_ramp_b128_d2` FAIL の、本 PR 由来か否か。PR 由来のコード (`69280d57`〜`853874e67`) で 8 回中 3 回 FAIL (underrun 1。§6-1・§6-5・§6-6)、基点 `3d37a190` は 5 回 0 FAIL (§6-5)。母数が少なく有意差は言えず、本 PR 由来を否定できない。main 側にも同シナリオの「1 回目 FAIL・再実行 PASS」の記録が複数ある: `tools/audio/REPORT_DS.md` (1 回目 FAIL・再実行 PASS・一過性の負荷揺れ扱い)、`tools/audio/REPORT_AU5.md` (`b66c676` 回 2 FAIL・回 2' 単独 PASS)、`tools/audio/REPORT_AU2_CI.md` (quick FAIL・負荷起因の疑い、未確認)。原因は main 側でも未切り分け | 親 e2e の受入条件 3 (rc 0) は未達のまま。PR は B=128 の初期 T を 1408 → 1536 に変える | #2777 (負荷依存 underrun の原因特定。B=128 の FAIL 切り分けを追記) |
 | B=128 に下限を適用するか (範囲の選択。B≥256 に限れば B=128 の経路は基点と同じ)。本付録では変更していない | B=128 の FAIL 切り分けと、§4 の増分 (最大 +1152) に効く | PM (範囲の判断) |
 | producer が約 19 ms 書き込みを止める直接経路は未特定 (#2777 §3-1 と同じ) | 本対処は初期 T の固定で症状を抑えるもので、原因の特定ではない | #2777 |
 | B=512・1024 の実測と実オーディオデバイスでの測定 | §2 の増分は式からの計算のみ | #2777 |
@@ -124,3 +125,31 @@ main `3d37a190` を取り込んだ。競合は `docs/DOC_MAP.md` と `tools/audi
 - 基点 T 1408 は depth 11。stats の T と `latency_changes` 0 から、open 時の depth × B = 1408 と読める (run 中に T は変わっていない)。open 時の burst 値 (`res[0]`) は未記録のため、depth 11 ↔ burst 1024 (式からの逆算) は未確認。ログの `burst=512` は run 中の `burst_obs` で、open 時の値ではない (§4 の run ごとの幅を参照)。
 - 判定: 基点 0/5 と PR 2/7 は母数が少なく有意差は言えない。FAIL run の機構 (ring の残量が 0 まで枯渇・lat_changes が 2) は未特定。
 - **結論: 本 PR 由来かは切り分けられていない**。PR の変更で B=128 の初期 T が 1408 → 1536 になり、FAIL は変更後の経路で起きている。本 PR 由来を否定できない。親 e2e の受入条件 (rc 0) は未達のまま (§5)。
+
+## 6-6. 現 HEAD `853874e67` での再測定 (main 取り込み後・#863 と #2541 を含む)
+
+main は `69280d57` 以降に `a2ca18f45`・`90d144e94` (#2541: 安全係数を `FLA_BURST_PCT` に集約。既定 125 は挙動不変)、`287655cf2`・`89b105380` (#863: producer の write 記録。`FLA_CTL_SIZE` 384 → 16776) を取り込んだ。`tools/audio/src` が変わるため、§6-2 の 20/20 は現 HEAD の根拠にならない。同一 HEAD で測り直した。
+
+- 測定 HEAD: `853874e67` (origin/main)。検証用 worktree (branch `2934-record-floor-decision`) で実行。`node_modules` は main checkout から symlink。素材は本 run の `$ARTIFACTS_DIR` から展開 (`fl-win64`・`toolchain-emsdk`)。
+
+### 6-6-1. 親 e2e `bash tools/audio/e2e.sh --quick` (HEAD `853874e67`)
+
+- **rc 1**・wall 262.0 s・load 1.30 (開始) → 0.33 (終了)・nproc 4。harness **43/44 PASS**。FAIL は `asio_ramp_b128_d2` (underrun 1・silence 3072・ramp 不一致 171392/192384)。harness が非 0 で終わったため、ASIO 検収 (`asio/e2e.sh`) には進まなかった。
+- 受入条件 3 (親 e2e rc 0) は、現 HEAD では未達。`asio_ramp_b128_d2` の FAIL は §5 の #2777 で追跡する。
+
+### 6-6-2. `com_ramp_b256_d2` の同一 HEAD 連続 20 回
+
+- 実行: `node harness/run_com.mjs --quick --only com_ramp_b256_d2` を 20 回連続。**20/20 PASS**。
+- 全回 underrun 0・silence 0・lat_out 3585・ramp 0 mismatch (144768 frames。r10 のみ 144896)。
+- 所要: r1〜r10 が 566 s (1 回平均 56.6 s)、r11〜r20 が 566 s。
+
+### 6-6-3. 測定 commit と差分
+
+- 測定 commit: `853874e67` (main。本 PR は docs のみで、`tools/audio/src` と `tools/audio/asio` のコードは変えない)。
+- `git diff 853874e67 HEAD -- tools/audio/src tools/audio/asio ':!*.md'` の出力: 空。
+
+### 6-6-4. 判定
+
+- 受入 1 (同一 HEAD 連続 20 回): 現 HEAD `853874e67` で達成 (20/20)。
+- 受入 2 (前後値と採否の記録): 達成 (§4 に採用を記録)。
+- 受入 3 (親 e2e rc 0): **未達** (現 HEAD で 1 回 FAIL)。reviewer は `15942e59` と merge 後の木で rc 0 を確認している。B=128 の FAIL が PR 由来かは切り分けられていない (§5)。

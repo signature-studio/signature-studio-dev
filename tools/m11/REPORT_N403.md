@@ -211,3 +211,7 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 
 - 全文: `tools/m11/REPORT_APPENDIX_3188.md` (測定 commit は main 取り込み後の `e2b5f1e5a`・値の正本は付録 §7-3)。
 - 結論: LB 直書きの修正は main (#3160) と同一の機能。main 取り込み後の寛容起動でも LB 間の kind 差は 8 件 (§6-2 と一致)。8 unit の原因は未特定で、子 #3296 に残す。
+
+## 9. 本 runner の参考値 (#2779・LB=0 / 0x10000 の後段・指紋検査を迂回)
+
+参考値のみ (受入の根拠ではない)。`m11_e2e.sh` の指紋検査 (`work/lift_pe.sha256`) を `M11_SKIP_LIFT_FP=1` で迂回した後段の測定。測定値・再現・未解決は付録 `tools/m11/REPORT_APPENDIX_2779.md` が正本 (250 行上限のため分割移動)。

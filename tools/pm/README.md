@@ -54,6 +54,7 @@ PR / Issue / Actions run の運用ツール。2026-10-14 に VM の timer を停
 | `rest_heal.py` | open PR を CONFLICT / FIX / NOREVIEW / DRAFT / APPROVED / COVERED / STUCK_LABELLED に分類し、足りない次の一手を `/oc` コメントか close→reopen で補う。watchdog (`.github/scripts/watchdog.sh`) の補助 |
 | `sync_status.py` | Project V2 の Status を PR / Issue の実態に同期する (冪等)。Status は参考で、チケット状態の正は issue の open/closed + ラベル + PR (`docs/WORKFLOW.md` §3)。実行しないと Status が陳腐化する。**退役後は同期をやめる (根拠: #2356。下表)** |
 | `pm_needs.py` | 最新の差し戻しが PM 判断を求めていて、PM の応答が無い PR を列挙する。未回答の検出は Worker の `needs.ts` が担い、heartbeat からは実行しない (指示 145)。手で確かめるときだけ使う |
+| `oc_pm_duration.py` | oc-pm run の所要時間 (run_started_at → updated_at・pm job) と同時実行数 (平均・瞬間の最大・起動数) を REST で実測する (#3463)。測定値は [`REPORT_3463.md`](REPORT_3463.md)。`python3 tools/pm/oc_pm_duration.py --now <UTC>`。テスト: `python3 -m unittest discover -s tools/pm -p 'test_oc_pm_duration.py'` |
 | `idle_report.sh` | watchdog の run 履歴から『idle>0 が 15 分以上続いた回数』を数える (VM の `pm-watchdog.timer` を止めてよいかの soak 判定用)。REST のみ。`idle_report.sh --since <ISO> --until <ISO>`。使い方は下の節。テスト: `bash tools/pm/test_idle_report.sh` |
 | `pr_gaps.py` | open PR を「レビュー中 / 修正中 / 担当なし」に分類する |
 | `dismiss_spam.py` | watchdog が水増しした `(watchdog)` の request-changes を取り下げる (`DRY=1` で確認) |
@@ -83,6 +84,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `issue_snapshot.py` | 廃止 | open issue の集計は Worker の同期 (`fullSync`・`reconcile`) が担う。`launch_issues.py` だけが読んでいた | `launch_issues.py` と同時に削除。状態の扱いは下の『状態ファイル』の節 | #2355 |
 | `launch_issues.py` | Worker | `plan`・`launch` は Worker が live (`/oc` の投稿と着手の判断)。`blocked` (GitHub の依存欄への同期) は Worker が書かないため、退役後は依存欄が新規分で更新されない。判定は本文の `blockedBy:` を Worker の `classify.ts` が読むので、影響は表示のみ | 『状態ファイル』の節の扱いを反映してから削除。`classify_crosscheck.py`・`phase_crosscheck.py` (`infra/pm-worker/test/`) が `launch_issues.py` を importlib で読み、`classify.test.ts`・`phase.test.ts` がそれを `python3` で呼ぶため、先に crosscheck の Python 依存を fixture 固定に置き換える。依存欄の同期が要るなら別 issue | #2355 |
 | `manual_deps.json` | 残す (Worker が import) | 停止報告に根拠のある依存。Worker のビルドが `infra/pm-worker/src/config.ts` の 1 行目で読むため、移すとビルドが壊れる | パスを変えない | - |
+| `oc_pm_duration.py` | 残す | oc-pm run の所要と同時実行数の実測 (REST のみ・VM に依存しない)。#3463 の測定の再現用 | なし | #3463 |
 | `pm_gate.sh` | 廃止 | Worker が live の間に VM の launch・ping を止める standby ゲート。VM の timer を再開しないので不要 (#2341 は closed) | 削除のみ | #2355 |
 | `pm_wake.sh` | 残す | PM セッションを必要なときだけ起こす VM 側の経路 (`heartbeat.sh` の置換。#2347)。timer の有効化は PM が判断する | なし (有効化の判断は PM) | #2347 |
 | `pm_needs.py` | Worker | 差し戻しが PM 判断を求めて未回答の PR の検出は、Worker の `needs.ts` (同じ語彙 `NEEDS_KEY`) が担う。ただし `infra/pm-worker/test/needs_crosscheck.py` が `pm_needs.py` の `KEY` を importlib で読み、`needs.test.ts` がそれを `python3` で呼ぶため、ファイルを消すとこのテストが落ちる | crosscheck の Python 依存を fixture 固定に置き換えてから削除 (`needs_crosscheck.py` が `pm_needs.py` を読まない形にする) | - |
@@ -102,6 +104,7 @@ systemd の停止・変更は PM が行い、この README には含まれない
 | `systemd/pm-watchdog.timer` | Worker | 同上 | 停止済み | #2355 |
 | `test_idle_report.sh` | 残す | `idle_report.sh` と同じ | なし | #2354 |
 | `test_launch_issues.py` | 廃止 | `launch_issues.py` と同時。Worker の規則は `infra/pm-worker/test/` (vitest と `*_crosscheck.py`) で確かめる。ただし `*_crosscheck.py` は `launch_issues.py` を importlib で読むので、この依存を fixture 固定に置き換えてから削除する | `launch_issues.py` と同時に削除 (crosscheck の依存の置き換えが先) | #2355 |
+| `test_oc_pm_duration.py` | 残す | `oc_pm_duration.py` の計算部分の単体テスト (gh は呼ばない。CI の unittest discover が拾う) | なし | #3463 |
 | `test_pm_gate.sh` | 廃止 | `pm_gate.sh` と同時 | 同上 | #2355 |
 | `test_pm_wake.sh` | 残す | `pm_wake.sh` の判定テスト (fake curl・fake opencode。CI の scripts-test が拾う) | なし | #2347 |
 | `test_status_sync.py` | 未実装 (#2362) | `status_sync.py` の検証。後継の workflow が入るまで残す | `status_sync.py` と同時に削除 (後継 #2362 が main に入るまで残す) | #2362 |
