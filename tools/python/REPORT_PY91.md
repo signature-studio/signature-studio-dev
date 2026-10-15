@@ -18,7 +18,7 @@
 | 関数 | コア VA | 作用 (確定した範囲) | 根拠 VA | 未確定 |
 |---|---|---|---|---|
 | lockDisplayZone | 0xd56fc0 | 準備真なら status=0 (0xd56fee)。zone = `[[rbx+8]+0x50]` (0xd56ffa)。NULL なら -7 (0xd5701d)。非 NULL なら `zone->vtbl[+0x148](rdx=index=[rbx+0x18], r8=([rbx+0x20]≠0))` (0xd57012〜0xd57015) | 0xd56fe4・0xd56fee・0xd56ffa・0xd5701d・0xd57015 | `[+0x148]` の実体 (zone の型が未確定) → #2906 |
-| liveDisplayZone | 0xd57150 | 準備真で status=0 (0xd57183)。zone = `[[rbx+8]+0x50]` (0xd5718f)、NULL は -7 (0xd571c5)。`0x420980(&rect, [rbx+0x18], [rbx+0x20], [rbx+0x28], [rbx+0x30])` で rect を作り (0xd571ae)、`0xd84f70(zone, &rect, [rbx+0x38]=duration)` (0xd571be) | 0xd571ae・0xd571be。0x420980 は out[0],out[4],out[8],out[0xc] に 4 引数を書く。0xd84f70 は 0xfdc630 へ転送 (0xd84f70〜0xd84f7d) | 0xfdc630 内の `zone->vtbl[+0x80]` 準備判定 (0xfdc66b)・`e5abd0(g, zone, rect)` (0xfdc685)・`0x420b00(rect)` の意味、`zone+0x58 ← duration ÷ *[g]` (0xfdc696〜0xfdc6a6) の単位、遅延実行 0x737020 → #2906 |
+| liveDisplayZone | 0xd57150 | 準備真で status=0 (0xd57183)。zone = `[[rbx+8]+0x50]` (0xd5718f)、NULL は -7 (0xd571c5)。`0x420980(&rect, [rbx+0x18], [rbx+0x20], [rbx+0x28], [rbx+0x30])` で rect を作り (0xd571ae)、`0xd84f70(zone, &rect, [rbx+0x38]=duration)` (0xd571be) | 0xd571ae・0xd571be。0x420980 は out[0],out[4],out[8],out[0xc] に 4 引数を書く。0xd84f70 は 0xfdc630 へ転送 (0xd84f70〜0xd84f7d) | 0xfdc630 内の `O.vtbl[+0x80]` 準備判定 (0xfdc66b、O = `[[*(0x608132)]+8]`。zone ではない)・`e5abd0(g, zone, rect)` (0xfdc685)・`0x420b00(rect)` の意味、`zone+0x58 ← duration ÷ *[g]` (0xfdc696〜0xfdc6a6) の単位、遅延実行 0x737020 → #2906 |
 | triggerLiveClip | 0xd577e0 | 準備真で `0x1221bc0(ecx=[rbx+0x18] index, edx=[rbx+0x20] subNum, r8d=[rbx+0x28] flags, xmm3=(f32)*[rbx+0x30] velocity)` (0xd57821)、status=0 (0xd57826)。velocity は wrapper が double で受け (書式 'd')、既定値 -1.0 | 0xd57821・0xd57826。コア本体は §1-1 | 0x1221bc0 の後半 (§1-1) → #2906 |
 | refreshLiveClips | 0xd579d0 | 準備真で `0x1222b90()` (0xd579fe)、status=0 (0xd57a03) | 0x1222b90 = `0x1221bc0(-1, 0, 0x30000, -1.0f)` (0x1222b94〜0x1222ba7) | K=3 経路の意味 (推定: 全 track のリセット) → #2906 |
 | incLivePosSnap | 0xd57af0 | 準備真で `S = 0x12e1a20()[index*0x114 + 0x24]` (0xd57b1e〜0xd57b2b)、`0x100bad0(S, value=[rbx+0x20])` (0xd57b33)、status=0 | 0xd57b33 | — (§2 で確定) |
@@ -43,7 +43,7 @@
   - K=0: `S+0xa0 ← (subNum<0 ? -1 : subNum<<16)`、`S+0xa8 ← M3` (0x1221d77〜0x1221ddd)。
   - K=1〜3: `S+0xa0`・`S+0xa4 ← -1`、`S+0xa8 ← M3`。K=2 のみ index 自身を除外 (0x1221e2e〜0x1221e95)。
   - K≥4: `S+0xa8` のみ (0x1221dea〜0x1222028)。
-- velocity 適用: `byte [0x1222265]` の bit K が立ち、かつ `S+0xa0 ≥ 0` のとき (0x1222254〜0x122227e)。velocity ≥ 0 は `count` (該当 block の要素数 = `qword[ptr-8]`) を掛けて `0x63a690` で整数化し [0, count-1] に丸めて `S+0xa0` へ加算 (推定)。velocity < 0 は `S+0xd4` が同じ block なら `(sub+1)%count` を `S+0xa0` へ加算 (推定) (0x12222a0〜0x12223b9)。
+- velocity 適用: `movzx` (0x1222265) が読む `byte [0x1222b80]` (値 0x05) の bit K が立ち、かつ `S+0xa0 ≥ 0` のとき (0x1222254〜0x122227e)。velocity ≥ 0 は `count` (該当 block の要素数 = `qword[ptr-8]`) を掛けて `0x63a690` で整数化し [0, count-1] に丸めて `S+0xa0` へ加算 (推定)。velocity < 0 は `S+0xd4` が同じ block なら `(sub+1)%count` を `S+0xa0` へ加算 (推定) (0x12222a0〜0x12223b9)。
 - **未読**: 0x1222805〜0x1222b5c の全 track ループの大部分。`S+0xa0`・`S+0xa8` の意味、bit 0/1/2/3-4/5/7 の名前 (推定に留まる) → #2906。
 
 ## 2. inc 系 helper の更新式 (4 件・確定)
@@ -170,7 +170,7 @@ REPORT_PY61 §4-2 のまま変更なし (文言対応・数値非対応)。今�
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| lockDisplayZone の `zone->vtbl[+0x148]`、liveDisplayZone の `zone->vtbl[+0x80]`・`e5abd0`・`0x420b00`・`0x737020`、`zone+0x58` の単位 | zone 系の C 実装の中身 | #2906 (PY-104) |
+| lockDisplayZone の `zone->vtbl[+0x148]`、liveDisplayZone の `[[*(0x608132)]+8]` の `vtbl[+0x80]`・`e5abd0`・`0x420b00`・`0x737020`、`zone+0x58` の単位 | zone 系の C 実装の中身 | #2906 (PY-104) |
 | triggerLiveClip のコア `0x1221bc0` の後半 (0x1222805〜0x1222b5c)、flags の bit 0/1/2/3-4/5/7 の意味、refreshLiveClips の K=3 の作用 | triggerLiveClip・refreshLiveClips の C 実装 | #2906 (PY-104) |
 | `0x1221b30`・`0x1221aa0` の定数 (分母・乗数 `*[g]`)、`0x442c00`、`0x12e1a20()+0x21c48` の表 | 時間 ↔ block 番号の変換式 | #2908 (PY-105) |
 | `0x12e7f80` の cfg (+0x49e)・`+0xd4`・`+0xd6`、`0x12e3a60`、`0xbd68e0` の `0x666780` | solo 設定・select mode 1 の副作用 | #2908 (PY-105) |
