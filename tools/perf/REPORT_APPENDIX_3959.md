@@ -28,17 +28,21 @@ node tools/perf/p15/node_init_sweep.mjs --m $(seq -s, 2 160) --timeout 15000 --o
 | 同 | 145 (署名) | 3 | 署名 145/145 一致 (`sig_ok=true`) | 806〜868 | `worklet_range_sig.jsonl` |
 | Chrome 155.0.8059.39・EPYC 9V45 | 1・130 | 3 | 成功 (M=130 の setup 446〜465) | 17〜22・446〜465 | `worklet_init_limit.jsonl` (commit `e4d2d1799`) |
 | 同 | 160・176・192・256・288・320・352 | 各 3 | 無応答 (`eval timeout`。timeout 値は未記録) | — | 同 |
-| **Chrome 155.0.8059.39・EPYC 9V45・HEAD `1dad02299`** | 145 | 3 | 成功 3/3 | 472〜500 | `head_1dad02299_worklet_m145_146_init.jsonl` |
+| Chrome 155.0.8059.39・EPYC 9V45・素材 wasm (sha `e8fb…`)・`1dad02299` で測定 | 145 | 3 | 成功 3/3 | 472〜500 | `head_1dad02299_worklet_m145_146_init.jsonl` |
+| 同 | 146 | 3 | 無応答 3/3 (`eval timeout` 30 s) | — | 同 |
+| Chrome 154.0.8037.97・EPYC 7763・素材 wasm (sha `e8fb…`)・`9e0bbf7e7` の機械で再測定 | 145 | 3 | 成功 3/3 | 811〜834 | `rerun_20261015_e8fb_worklet_m145_146_init.jsonl` |
 | 同 | 146 | 3 | 無応答 3/3 (`eval timeout` 30 s) | — | 同 |
 
-- Chrome 155 の行は M=146 を含まない。M=146 の結果は Chrome 154 (測定 commit `277307238`) と Chrome 155 (HEAD `1dad02299`) の両方で、どちらも無応答。
+- M=146 の結果は Chrome 154 (測定 commit `277307238`) と Chrome 155 (測定 commit `1dad02299`・素材 wasm) と本 run の Chrome 154 (`9e0bbf7e7`) の 3 つで、どれも無応答。
 - 測定 commit: 154 の行は `277307238`、155 の行 (1・130) は `e4d2d1799`。155 の HEAD 再現 (`rerun_20261015_worklet_*.jsonl`) は `ab6466296`。
-- HEAD 再測定 (`1dad02299`): 素材 `work-m6-ott` を展開し、`tools/ott/work/lift/ottl.wasm` (sha256 `e8fb06203811ff1f42ea563f9647ef290ca93abfe4cc0b7e68660b680eac664e`) を使った。この wasm は `tools/ott/.gitignore` の `work/` 配下で commit に入らず、本 run では再生成していない。HEAD の lift コード (`x64c.py` ほか) で wasm を作り直した結果ではない。154 の run (`277307238`) で使った wasm の sha は未記録のため、154 と HEAD の wasm が同一かは確認できない。
-  - 再現コマンド (HEAD。素材展開後):
-  - 再現コマンド (HEAD。素材展開後):
+- HEAD 測定 (`1dad02299`・Chrome 155 の行): **素材 wasm での測定**。素材 `work-m6-ott` の `tools/ott/work/lift/ottl.wasm` (sha256 `e8fb06203811ff1f42ea563f9647ef290ca93abfe4cc0b7e68660b680eac664e`) を使った。この wasm は `tools/ott/.gitignore` の `work/` 配下で commit に入らない。**HEAD の lift/rt から wasm を再生成していない** (emcc と Windows DLL `OTT_vst2_win64.dll` が本 run の環境に無い)。よって HEAD の lift・rt の差分 (下記) が測定値を変えないことは示せていない。HEAD で作った wasm の測定は子 #4392 に残す。
+- 154 の run (`277307238`) で使った wasm の sha は未記録のため、154 と HEAD の wasm が同一かは確認できない。
+- 本 run の再測定 (`9e0bbf7e7`・Chrome 154.0.8037.97・EPYC 7763・素材 wasm の sha `e8fb…` 一致): M=145 は 3/3 成功 (setup 811〜834 ms)、M=146 は 3/3 無応答 (`eval timeout` 30 s)。生データ: `tools/perf/p15/results/rerun_20261015_e8fb_worklet_m145_146_init.jsonl`。Chrome 155 の HEAD 測定とは版・CPU が違う。
+  - 再現コマンド (素材展開後):
 
 ```sh
 node tools/perf/p15/chrome_worklet.mjs --init-only --m 145,146 --runs 3 --timeout 30000 --out tools/perf/p15/results/head_1dad02299_worklet_m145_146_init.jsonl
+node tools/perf/p15/chrome_worklet.mjs --init-only --m 145,146 --runs 3 --timeout 30000 --out tools/perf/p15/results/rerun_20261015_e8fb_worklet_m145_146_init.jsonl
 ```
 - 再現コマンド (154 の行。素材 `work-m6-ott` 展開後):
 
