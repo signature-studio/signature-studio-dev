@@ -79,7 +79,7 @@
 - したがって親の IR は `[rbp+0x4c]` の初期値を持たない。callee の `[+76]` の読み・加算は親の値を経由しない。原因 (RetDec の stack var 検出か後段 pass のどれか) は未確認。
 - 親の `[rbp+0x48]` (`-32`) は loop 変数として `stack_var_-32.*.reg2mem` の SSA 分解で扱われ、callee の `[+72]` の rmw (+1) が IR の値に反映されない。D23 の機構 (callee が親の値を別の場所から読む) と整合する。
 
-## 7. baseline (修復前・新 IR・測定 commit は `e0ff2fa0` (検出器のコミット)。HEAD で再現済み)
+## 7. baseline (修復前・新 IR・測定 commit は `e0ff2fa0` (検出器のコミット)。c14f55eb で再現済み。main 取り込み後の HEAD は §8)
 
 | 段階 | 結果 |
 |---|---|
@@ -95,7 +95,7 @@
 
 - 測定 commit: `e0ff2fa0` (検出器 `tools/m11/frame_share/detect.py` を追加したコミット。§4・§7 の数値はこの commit の検出器で採取した)。
 - `e0ff2fa0` で再実行 (HEAD と同じ IR・同じ手順): 検出 `closure 7421`・`mov 渡し 307`・`D23 信号 301`・親 63・callee 94 (§4 と一致)。shimx `build.sh --trace --soft` は `mismatch=0`、実 boot は `units_run=17`・`dllmain_done=true`・`total_calls=106`・ftrace 0 行 (§7 と一致)。
-- `e0ff2fa0` から HEAD までのコード差分: `git diff e0ff2fa0 HEAD -- tools/m11/frame_share tools/m11/shimx_link tools/m11/*.py tools/m11/*.sh tools/m11/ldfix` の出力は 0 行 (本 REPORT の文言修正のみ)。差分 0 のため、この REPORT の数値は再測定していない。
+- `e0ff2fa0` から HEAD までのコード差分: `git diff e0ff2fa0 HEAD -- tools/m11/frame_share tools/m11/shimx_link tools/m11/*.py tools/m11/*.sh tools/m11/ldfix` の出力は、c14f55eb 時点では 0 行 (本 REPORT の文言修正のみ)。main 取り込み merge `871e59d3` 後は 7 files・+313/-7 で、main 側の変更 (`m11_lb_unit_diff.py`・`m11_lb_tolerant_repro.sh`・`ldfix/fix_ld108.py`・`ldfix/fix_ld116.py`・`ldfix/dyn_ld115.mjs`・`ldfix/ld116_e2e.sh`・`ldfix/REPORT_2513.md`) を含む。IR の既定経路 (`m11_gen_ir2.sh` → `ldfix/fix_ld108.py`) は、環境変数 `M11_LB_BASE` 未設定時の出力文字列が従来と同一 (コード読解)。`fix912/` (既定 OFF) も既定では変化しない。ただし `work-m11` 素材 (lift 済み `boot0〜5`) が本 run に無く、HEAD `871e59d3` での再現・再測定は**未実施**。この REPORT の数値は `e0ff2fa0` の測定値のまま。
 
 ## 9. 未解決 (起票先)
 
