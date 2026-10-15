@@ -328,7 +328,11 @@ if (SURVEY) {
     // survey は boot 実機連鎖と同じインスタンスで行う (InitContext 0x15eac90 は boot の _InitLib が設定済み)。
     // unit は 1 本ずつ fle_run (新 RSP) で隔離実行し、trap/raise/halt0 を JS 側で分類する。
     const tbl = 0x15eac90;
-    const tblPtr = BigInt(m.HEAPU32[tbl/4+1]) << 32n | BigInt(m.HEAPU32[tbl/4]);
+    let tblPtr = BigInt(m.HEAPU32[tbl/4+1]) << 32n | BigInt(m.HEAPU32[tbl/4]);
+    // #4854: 既定 (mode 3) の boot は unit 895 の後の exit (ExitProcess 経路) で InitContext.InitTable が 0 になる。
+    // InitUnits の開始時の値は PackageInfo (PKG = 0x13768b0・_StartLib の rdx) なので、survey の前にそれへ戻す。
+    const tblRestored = process.env.FLE_SURVEY_NOREPAIR !== '1' && tblPtr === 0n && m.HEAPU32[PKG / 4] > 0;
+    if (tblRestored) { m.HEAPU32[tbl / 4] = PKG; m.HEAPU32[tbl / 4 + 1] = 0; tblPtr = BigInt(PKG); }
     if (tblPtr === 0n) {
         survey = { error: 'InitContext.InitTable == 0 (boot が _InitLib に届かず)' };
     } else {
@@ -340,11 +344,13 @@ if (SURVEY) {
         for (let i = FROM; i < TO; i++) {
             console.error('[survey] unit ' + i + '/' + total);
             const proc = Number(m._fle_unit_proc(i) >>> 0);
-            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); continue; }
+            // noproc / empty も jsonl に 1 行ずつ残す (merge_survey.py が 942 件を数えられるように・#4854)
+            const emit = (cls, info) => { try { appendFileSync(outPath.replace(/\.json$/, '.jsonl'), JSON.stringify([i, cls, info]) + '\n'); } catch { } };
+            if (!proc) { byCls['noproc'] = (byCls['noproc'] || 0) + 1; details.push([i, 'noproc', 0]); emit('noproc', 0); continue; }
             // InitUnits と同じ [proc]!=0 check (実機 semantics: 先頭 8B が 0 なら skip)
             let zero8 = true;
             for (let k = 0; k < 8; k++) if (U8[proc + k]) { zero8 = false; break; }
-            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); continue; }
+            if (zero8) { byCls['empty'] = (byCls['empty'] || 0) + 1; details.push([i, 'empty', proc]); emit('empty', proc); continue; }
             const lj = Number(m._fle_n_longjmp());
             let cls = 'ok', info = 0;
             try {
