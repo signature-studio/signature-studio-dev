@@ -58,6 +58,7 @@ for i, grp in enumerate(ARG_GPR):
         GPR_ALIAS[r] = i
 XMM_ARG = {X.X86_REG_XMM0: 0, X.X86_REG_XMM1: 1, X.X86_REG_XMM2: 2, X.X86_REG_XMM3: 3}
 FPCMP = {X.X86_INS_COMISD, X.X86_INS_COMISS, X.X86_INS_UCOMISD, X.X86_INS_UCOMISS, X.X86_INS_VCOMISD, X.X86_INS_VCOMISS, X.X86_INS_VUCOMISD, X.X86_INS_VUCOMISS}
+ZERO_IDIOM = {'xorps', 'xorpd', 'pxor', 'xor', 'subsd', 'subss', 'subps'}
 
 
 class Analyzer:
@@ -79,8 +80,9 @@ class Analyzer:
             return ins
         return None
 
-    def analyze(self, va, max_ins=3000):
-        """VA の関数を制御フロー追跡し特徴を返す"""
+    def analyze(self, va, max_ins=3000, zero_idiom=False):
+        """VA の関数を制御フロー追跡し特徴を返す。zero_idiom=True なら xmm の同一レジスタ読みを
+        ゼロ化イディオム (xorps r,r 等) とみなし xmm_slots から除く (#2850。既定 False は従来どおり)"""
         base = self.pe.base
         rva0 = va - base
         seen = set()
@@ -144,12 +146,14 @@ class Analyzer:
                 rr, wr = ins.regs_access()
             except Exception:
                 rr, wr = [], []
+            zero = zero_idiom and mn in ZERO_IDIOM and len(ins.operands) == 2 and ins.operands[0].type == 1 \
+                and ins.operands[1].type == 1 and ins.operands[0].reg == ins.operands[1].reg
             for r in rr:
                 if r in GPR_ALIAS and GPR_ALIAS[r] not in defs:
                     # xor ecx,ecx のような自己 xor は読みでない
                     if not (mn in ('xor', 'sub') and len(ins.operands) == 2 and ins.operands[0].type == 1 and ins.operands[1].type == 1 and ins.operands[0].reg == ins.operands[1].reg):
                         used_args.add(GPR_ALIAS[r])
-                if r in XMM_ARG and ('x', XMM_ARG[r]) not in defs:
+                if r in XMM_ARG and ('x', XMM_ARG[r]) not in defs and not zero:
                     used_x.add(XMM_ARG[r])
             nd = set(defs)
             for r in wr:
