@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(HERE, '..'))
 from ldlib import cases  # noqa: E402
 
 SIG = {'ret': 'i64', 'params': ['i64', 'i64', 'i128'], 'defined': True}
-SLOT_PATCH = 'i:0x11f3480:q=0x50012000'
+SLOT_PATCH = 'i:0x11f3480:q=0x50018000'  # VMT slot 0 = LD_FAKEPROC_BASE + LD_VMT_IDX0(1024) * 32
 
 
 def main():

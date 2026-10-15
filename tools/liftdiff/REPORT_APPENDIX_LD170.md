@@ -115,7 +115,7 @@ boot の変化 (928 → 892) の原因を、修正の内訳を 1 つずつ変え
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| e2e sample:800 で base との case 差 42 件 (verdict 1 件 `0x7850d0` mismatch→match) の波及経路。vmt blob の番地変更が他 pattern に効く理由は未切り分け | liftdiff の判定の一部が変わる。PR 内では「回帰なし」と断定しない | 本 PR の本文で明示 (未切り分け) |
+| e2e sample:800 で base との case 差 42 件 (verdict 1 件 `0x7850d0` mismatch→match) の原因。有力候補は `PATCH_BY_VA` の仮 proc 番地 (`0x50012000`) が `LD_VMT_IDX0=1024` で GetProcAddress 域 (index 256) に移ったこと (レビュー B1・コードの読みによる)。番地を `LD_FAKEPROC_BASE + LD_VMT_IDX0 * LD_FAKEPROC_SZ` (`0x50018000`) から導くよう修正済み (単体テスト `test_ld203_slot_fill` は PASS)。**修正後の再測定は未実施** (素材 `work-m11`・`work-liftdiff`・`toolchain-emsdk` が run に無く、boot と e2e を実行できない)。§8-1・§8-2 の数値は修正前のもの | 修正後の判定が base と一致するかは未確認。PR 内では「回帰なし」と断定しない | 再測定 (素材投入後・本 PR の `oc_artifacts:` に `work-m11 work-liftdiff toolchain-emsdk` を指定して再実行) |
 | 有効化 route の boot 残りの 3 件 (unit 830 segv・他 2 件) | 928/942 (受入の下限は満たす。全数 942 には届かない) | #3946 系の既存追跡 |
 
 ## 7. 再現
