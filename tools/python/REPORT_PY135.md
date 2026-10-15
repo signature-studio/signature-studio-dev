@@ -6,11 +6,11 @@
 ## 結論
 
 - 7 件すべての entry・fn VA・PyArg 書式 (個数・型の並び) を PE から確定した。書式は `analysis/flapi/flapi_kwargs.json` の `fmt` と一致した。
-- **`blank` (0xd7c600) は効果を確定した**: 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。
+- **`blank` (0xd7c600) は isBlanked と activeCounter の効果を確定した**: 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。偽の経路の `0xd7e330` 呼出し (`[scr+0x1c4]` 側。観測対象を変えるかは未確定) は mock/C に含めていない (未解決 (d))。
 - **`addMeter` (0xd7ada0) は観測できる状態を変える (PE で確定。round 1 で追加)**: 書式解析が成功 (rc>0) し `scr≠0` のとき `0xd7d9e0` が呼ばれ、その分岐なしの経路で `isUnBlank` (`scr+0x1d1`) を真に、`activeCounter` (`scr+0x1cc`) を `scr+0x1dc` (仮置き 0) にする。mock と C はこの遷移を持ち、`tests/screen_diff.mjs` の期待値で検査する。
 - **残り 5 件** (`displayBar`・`fillRect`・`drawRect`・`drawText`・`eraseRect`) は、**API から観測できる状態を変えないと推定**する。根拠は本体と dispatch callback の先頭 1200 命令に `scr+0x1c?`・`+0x1d?` への直接の書込みが無かったことだけで、本体の全経路と下位呼出しは未確認 (未解決 (a)〜(d))。mock と C は引数検査と None だけを模す (`arrangement.selectionSet` 等と同じ扱い)。描画の引数の意味 (矩形の書式 x/y/w/h か l/t/r/b か) は保留。
-- 実装・未実装の件数は main (`40d3a788d`) の 171/264 (main の `tests/provider_check.mjs` の期待値) → **178/257** (`fl_table.c` 435 関数。本 PR の 7 件を加えた。`gen_provider.py --check-handlers` のハンドラ 178 と一致)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
-- 測定 commit: `b3e9046d7` (コードを変えた最後の commit。main `40d3a788d` を取り込んだ merge)。e2e はすべて PASS (下の検証表)。
+- 実装・未実装の件数は main (`d39241f69`) の 173/262 (main の `tests/provider_check.mjs` の期待値) → **180/255** (`fl_table.c` 435 関数。本 PR の 7 件を加えた。`provider/build.sh` のハンドラ 180 と一致)。`tests/screen_diff.mjs` は 87 呼出しで mock と C の差分 0、期待値の不一致 0。
+- 測定 commit: `5edad7cc6` (コードを変えた最後の commit。main `d39241f69` を取り込んだ merge)。e2e はすべて PASS (下の検証表)。
 
 ## PE 根拠 (VA)
 
@@ -41,11 +41,12 @@
 0xd7d130  test sil,sil ; je 0xd7d13c
 0xd7d135  call 0xd52790(scr)            ; 真: 描画 (効果は観測できない)
 0xd7d13c  mov eax,[rbx+0x1dc]; mov [rbx+0x1cc],eax   ; 偽 (解除): activeCounter ← scr+0x1dc
-0xd7d185  call 0xd7e330(...)            ; 偽: 配列 [scr+0x1c4] の再描画 (効果は観測できない)
+0xd7d185  call 0xd7e330(...)            ; 偽: `[scr+0x1c4]` の要素ごとに呼ぶループの一部と読める (0xd7d182 mov r8d,edi で a1 を渡す。未追試・効果は未確定)
 0xd7d198  mov byte [rbx+0x1d0], sil     ; isBlanked を書く
 ```
 
 - 真→偽の解除時だけ activeCounter が変わる。`isUnBlank` (`+0x1d1`) は触らない。
+- `0xd7e330` の呼出し (`0xd7d185`) が観測対象 (activeCounter・isBlanked・isUnBlank 以外の状態) を変えるかは未確定。mock/C は変えない (未解決 (d))。
 - `+0x1dc` の初期値は未実測。mock と C は仮置き 0 (`screenDefaultCounter` / `scr_dflt`) を使い、コメントで仮置きと明記した。
 
 ### `addMeter` の効果 (`0xd7d9e0`)
@@ -58,11 +59,11 @@
 0xd7dbfb  mov eax, [rcx+0x1dc]          ; rcx = scr
 0xd7dc01  mov [rcx+0x1cc], eax          ; activeCounter ← scr+0x1dc
 0xd7dc07  mov byte [rcx+0x1d1], 1       ; isUnBlank ← 1
-0xd7dc19  call 0xd7e330(...)            ; 再描画 (効果は観測できない)
+0xd7dc19  call 0xd7e330(...)            ; 配列 [scr+0x1c4] の要素ごとの呼出し (blank と同じ呼出し。効果は未確定)
 ```
 
 - API から観測できる効果は `isUnBlank` と `activeCounter` の 2 つ。mock と C は `isUnBlank = true`・`activeCounter = scr+0x1dc (仮置き 0)` を模す。
-- 配列 `[scr+0x1c4]` への追加が API から観測できるかは未確定 (未解決 (e))。
+- 配列 `[scr+0x1c4]` への追加と、`0xd7dc19` の `0xd7e330` 呼出しが API から観測できるかは未確定 (未解決 (d)・(e))。
 - round 0 (`59dac085f`) では addMeter を no-op としていた。PE の逆アセンブルで上の遷移を確認したため、round 1 で修正した。
 
 ## 実装 (mock と C)
@@ -73,19 +74,19 @@
 
 ## 検証
 
-測定 commit: `b3e9046d7` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。main `40d3a788d` を取り込んだ merge。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。前回の測定 (`ec3da771b`、main `d5681415e` 取り込み。175/260)・`d40d9af26` (main `e13f1efd2` 取り込み。172/263)・`524693988` (merge 前。169/266)・round 0 の測定 (`a60dccce8`、addMeter の遷移を含まない) は無効であり、本節が新しい測定。
+測定 commit: `5edad7cc6` (`Merge remote-tracking branch 'origin/main' into 3022-py135-screen-draw-pe`。main `d39241f69` を取り込んだ merge。コードを変えた最後の commit)。以下は同じ commit のクリーンな作業ツリーで実行した。これより前の測定 (main 取り込み前の各 head) は無効であり、本節が新しい測定。
 
-環境: runner 4 core。emsdk は `[EMSDK]` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`) は展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (7.3 秒)、`FL_WIN64_DIR` はその展開先。`fetch_inputs.sh` は `FL_WIN64_DIR` を指定して rc 0 (`work/midi.py`・`utils.py`・`MCPTools.pyc` を配置)。前提生成物: `build_cpython_wasm.sh` (rc 0、wall 2 分 42 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0。wall は未計測)。main の取り込みで衝突したのは 2 回 (`d5681415e`・`40d3a788d`) で、いずれも `provider/fl_engine.c` (`fl_engine_reset` の初期化行。PR 側 `scr_dflt`・main 側 `browser_op`。`static` 宣言は PR 側 `scr_dflt`・main 側 PY-224 の `lp_*`) と `tests/provider_check.mjs` (条件行と件数) だけで、両方の変更を残した (件数は 178/257)。測定時の load average (1 分値): 0.13 → 0.20。
+環境: runner 4 core。load average (1 分値) 2.21 (測定開始時)。emsdk は `[EMSDK]` の 6.0.12 (`tools/m1/flags.sh` の pin と一致。runner に既存)。`toolchain-emsdk` の素材 (`$ARTIFACTS_DIR/toolchain-emsdk.tar.zst`) は展開していない。fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (5 秒)、`FL_WIN64_DIR` はその展開先。前提生成物: `fetch_inputs.sh` (`FL_WIN64_DIR` 指定、rc 0)・`build_cpython_wasm.sh` (rc 0、wall 4 分 05 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、wall 6.1 秒)。main `d39241f69` の取り込みで衝突したのは `tests/provider_check.mjs` の 1 箇所 (条件行と件数) だけで、PR 側 `pe135` と main 側 `pe143` の両方を残し、件数は実測の 180 / 255 にした。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 178`・警告 0 | 0.705 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 178 / 未実装 257 / MCP 静的 60) | 0.225 秒 |
-| `node tests/screen_diff.mjs` | calls 87、diffs 0、PASS | 0.034 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.136 秒 |
-| `node tests/*_diff.mjs` (21 本。main 由来の差分テストを含む) | 21/21 rc 0 | 未計測 |
+| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 180`・警告 0 | 1.471 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 180 / 未実装 255 / MCP 静的 60) | 0.382 秒 |
+| `node tests/screen_diff.mjs` | calls 87、diffs 0、PASS | 0.052 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.092 秒 |
+| `node tests/*_diff.mjs` (21 本。main 由来の差分テストを含む。21 本の合計) | 21/21 rc 0 | 1.992 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。addMeter の状態遷移は次の 2 件で確かめ、どちらも `b3e9046d7` で再実行した (改変 → FAIL → 元の内容に戻して PASS。戻した内容は `cmp` で元と一致を確認)。
+ネガティブコントロール (`docs/WORKFLOW.md` §5)。`59dac085f` では `blank` の解除時の復元 (1) と `drawText` の文字列検査 (2) を外して FAIL を確かめた。addMeter の状態遷移は次の 2 件で確かめ、どちらも `5edad7cc6` で再実行した (改変 → FAIL → 元の内容に戻して PASS。戻した内容は `cmp` で元と一致を確認)。
 
 - (3) mock の `addMeter` から `isUnBlank`・`activeCounter` の書込みを外す → `AssertionError: screen 型違い 期待値と不一致 5 件`、rc 1 (FAIL)。戻すと PASS (calls 87)。
 - (4) C の `addMeter` から同じ書込みを外す → 同じ 5 件、rc 1 (FAIL)。戻すと PASS (calls 87)。
@@ -94,7 +95,7 @@
 コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff b3e9046d7 HEAD -- tools/python ':!*.md'
+$ git diff 5edad7cc6 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
@@ -102,15 +103,15 @@ $ git diff b3e9046d7 HEAD -- tools/python ':!*.md'
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 描画 6 件の引数の意味 (矩形の書式、本体 `0xd52d10`・`0xd52cc0`・`0xd7e330`・`0xd7bc10`・`0xd7b420`、`vtbl(scr)[+0x100]`) | 引数の意味論は検査できない。状態への影響は下の (a)〜(e) で扱う | #2985 (親。PY-121 の未確定と併せて追跡) |
-| (a) drawRect (`0xd52cc0`) の戻り経路 (fillRect と同型と見たが未確認) | drawRect の戻り値と、戻りまでに scr の状態が変わるかが未確定。mock/C は None だけを返す | #2985 (親) |
-| (b) 成功時の戻り None (推定。`0xc38bc0` の指す先は未同定) | 6 件すべての成功時の戻り値。mock/C は None を返す | #2985 (親) |
-| (c) eraseRect の `vtbl(scr)[+0x100]` (callback `0xd7be40` の `0xd7bea4` 呼出し先) が未同定 | eraseRect が scr の状態を変えるかは未確定。mock/C は変えない (推定) | #2985 (親) |
-| (d) callback `0xd7b420`・`0xd7bc10`・`0xd7be40` と本体 `0xd52d10`・`0xd52cc0` の下位呼出し | 先頭 1200 命令には `scr+0x1c?`・`+0x1d?` への直接書込みが無かった。だが addMeter は下位 `0xd7d9e0` で書いていた。displayBar・fillRect・drawRect・drawText・eraseRect が isUnBlank・activeCounter を変えるかは未確定。mock/C は変えない (推定) | #2985 (親) |
-| (e) addMeter の `0xd7d9e0` 内の配列 `[scr+0x1c4]` への追加 (`0x417fc0`・`0x416750`) | 配列の追加が API から観測できるかは未確定。mock/C は配列を持たない | #2985 (親) |
-| 述語 `0x11d1430` (= `vtbl(this)[+0x88]`) の実体。偽の経路 (`task+0x60=-2`) の Python 側の戻り値・例外 | `blank`・`displayBar`・`drawText`・`eraseRect` の偽経路は mock/C が成功経路 (None) だけを模す | #3045 (PY-125 の報告ゲート) |
-| `scr = 0` (screen 未初期化) の経路 | mock/C は初期化済みの経路だけを模す (REPORT_PY121_2985 未確定 1 と同じ) | #2985 |
-| `blank` 解除時の `scr+0x1dc` の初期値 | 解除後の `getScreenActiveCounter` は仮置き 0 (未実測)。mock と C は同じ仮置き。addMeter の成功時も同じ値 | #2985 |
-| flapi 表の書式表記: `displayBar` が `iisaa` (PE は `iisdi`)、`drawText` が `aaaaaa` (PE は `isiiii`) | `fl_table.c` の dispatch は通すので実害はない。表記の不一致のみ | #2952 (PY-116・書式表記) |
+| 描画 6 件の引数の意味 (矩形の書式、本体 `0xd52d10`・`0xd52cc0`・`0xd7e330`・`0xd7bc10`・`0xd7b420`、`vtbl(scr)[+0x100]`) | 引数の意味論は検査できない。状態への影響は下の (a)〜(e) で扱う | 親への提案 (#2985 は closed。PY-121 の未確定と併せた追跡先は PM が割り当てる) |
+| (a) drawRect (`0xd52cc0`) の戻り経路 (fillRect と同型と見たが未確認) | drawRect の戻り値と、戻りまでに scr の状態が変わるかが未確定。mock/C は None だけを返す | 親への提案 (#2985 は closed) |
+| (b) 成功時の戻り None (推定。`0xc38bc0` の指す先は未同定) | 6 件すべての成功時の戻り値。mock/C は None を返す | 親への提案 (#2985 は closed) |
+| (c) eraseRect の `vtbl(scr)[+0x100]` (callback `0xd7be40` の `0xd7bea4` 呼出し先) が未同定 | eraseRect が scr の状態を変えるかは未確定。mock/C は変えない (推定) | 親への提案 (#2985 は closed) |
+| (d) callback `0xd7b420`・`0xd7bc10`・`0xd7be40` と本体 `0xd52d10`・`0xd52cc0` の下位呼出し | 先頭 1200 命令には `scr+0x1c?`・`+0x1d?` への直接書込みが無かった。だが addMeter は下位 `0xd7d9e0` で書いていた。displayBar・fillRect・drawRect・drawText・eraseRect が isUnBlank・activeCounter を変えるかは未確定。mock/C は変えない (推定) | 親への提案 (#2985 は closed) |
+| (e) addMeter の `0xd7d9e0` 内の配列 `[scr+0x1c4]` への追加 (`0x417fc0`・`0x416750`) | 配列の追加が API から観測できるかは未確定。mock/C は配列を持たない | 親への提案 (#2985 は closed) |
+| 述語 `0x11d1430` (= `vtbl(this)[+0x88]`) の実体。偽の経路 (`task+0x60=-2`) の Python 側の戻り値・例外 | `blank`・`displayBar`・`drawText`・`eraseRect` の偽経路は mock/C が成功経路 (None) だけを模す | #3045 (PY-145 の報告ゲート) |
+| `scr = 0` (screen 未初期化) の経路 | mock/C は初期化済みの経路だけを模す (REPORT_PY121_2985 未確定 1 と同じ) | 親への提案 (#2985 は closed) |
+| `blank` 解除時の `scr+0x1dc` の初期値 | 解除後の `getScreenActiveCounter` は仮置き 0 (未実測)。mock と C は同じ仮置き。addMeter の成功時も同じ値 | 親への提案 (#2985 は closed) |
+| flapi 表の書式表記: `displayBar` が `iisaa` (PE は `iisdi`)、`drawText` が `aaaaaa` (PE は `isiiii`) | `fl_table.c` の dispatch は通すので実害はない。表記の不一致のみ | 親への提案 (#2952 [PY-116] は closed。追跡先は PM が割り当てる) |
 
-起票した子 issue: なし (残りは既存 issue に紐づけた。子は不要と判断)。
+起票した子 issue: なし。未解決 (a)〜(e) と描画 6 件の引数の意味は、実装の作業ではなく PE の追跡 (調査) である。`docs/WORKFLOW.md` §3 は「未解決の追跡」だけの子の起票を禁じるため、起票せず表に残した。追跡先の割当ては PM に依頼した (PR コメント)。
