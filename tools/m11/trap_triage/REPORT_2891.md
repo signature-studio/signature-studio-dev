@@ -116,6 +116,6 @@ python3 tools/m11/trap_triage/watch_summary_2891.py tools/m11/work/trap_2891/wat
 
 ## 8. 測定 commit からの差分 (差分 0 の証跡)
 
-- 測定 commit: `ed70adf5a` (origin/main)。計測に使った build 入力 (IR・C・build スクリプト・`survey_units.mjs`・`probe_2780_units.mjs`・計装スクリプト) は、この commit と同一。
+- 測定 commit: `ed70adf5a` (origin/main)。計測に使った build 入力 (IR・C・build スクリプト・`survey_units.mjs`・`probe_2780_units.mjs`) は、この commit と同一。
 - fix round 1 の再測定は `6d978d485` で行った。その後 (本 commit まで) の差分は、本 REPORT・`watch_summary_2891.py` (集計のみ、計測に使っていない) の追加。
-- 検証: `git diff ed70adf5a HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs tools/m11/trap_triage/probe2780_ir.py tools/m11/trap_triage/probe_2780_units.mjs tools/m11/trap_triage/watch_store_2891.mjs tools/m11/trap_triage/store_sites_2891.py` の出力は **0 bytes** (`| wc -c` = 0)。
+- 検証: `git diff ed70adf5a HEAD -- tools/m11/m11_gen_ir2.sh tools/m11/m11_build.sh tools/m11/m11_rt.c tools/m11/m11_ov.c tools/m11/trap_triage/survey_units.mjs tools/m11/trap_triage/probe2780_ir.py tools/m11/trap_triage/probe_2780_units.mjs` の出力は **0 bytes** (`| wc -c` = 0)。本 PR で新規追加した計測スクリプト (`watch_store_2891.mjs`・`store_sites_2891.py`・`watch_summary_2891.py`) は測定 commit に無いため、この一覧に入れない (`git diff ed70adf5a HEAD -- <3 本>` は新規ファイル分の 7,011 bytes)。計測に使った 2 本は `git diff 6d978d485 HEAD -- tools/m11/trap_triage/watch_store_2891.mjs tools/m11/trap_triage/store_sites_2891.py` の出力が **0 bytes** (測定後に変わっていない)。
