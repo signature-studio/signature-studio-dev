@@ -797,6 +797,7 @@
 | `tools/python/REPORT_PY120_2984.md` | ~186 | PY-120 (#2984): launchMapPages 12 件のうち `length` 1 件を PE (0xd791b0) で確定・mock/C 差分 0 (件数は仮置き 0)。残り 11 件は子 #3027・#3029・#3030 |
 | `tools/python/REPORT_PY379.md` | ~80 | PY-379 (#4765・親 #3746): launchMapPages の例外化の述語 `vt[+0x88]` (VMT 0x125b1c0 → 0x1262a90) と gate `vt[+0x98]` (→ 0x1262b80) を PE で同定。フラグ 2 つの書込み元は未確定 (#3746) |
 | `tools/python/REPORT_PY139_3030.md` | ~133 | PY-139 (#3030): launchMapPages のイベント処理 3 件 (processMapItem・releaseMapItem・checkMapForHiddenItem) の PE 呼出し契約 (書式・戻り・失敗 code・共通ディスパッチャ 0xd843d0 の要求格納)。作用先 (mgr の vtable) は未確定で mock/C は未実装。残りは子 issue |
+| `tools/python/REPORT_PY4870_5129.md` | ~120 | PY-4870 (#5129): patterns 書込み系 5 関数の PE 意味論。setPatternName・setPatternColor・setPatternLength・incrementPatternLength は入口〜書込み先まで確定 (範囲・戻り・副作用)。duplicatePatternData は本体未確定 (#5129 残件) |
 | `tools/python/REPORT_APPENDIX_2984.md` | ~184 | PY-120 (#2984) の付録: REPORT §検証 から分割移動した過去の測定節 (初回〜merge `a2a56bf8`)。内容は削除していない。正本は `REPORT_PY120_2984.md` |
 | `tools/python/REPORT_PY138.md` | ~150 | PY-138 (#3029): launchMapPages の init・updateMap・createOverlayMap の書式・個数・成功時の戻りを PE で確定し mock/C に実装 (副作用は未確定)。setMapItemTarget の戻り型 None は PY-243 (#3745) で確定 (`REPORT_PY243.md`)。項目書込み・範囲検査は子 #4581、例外化の述語・持ち越し 1〜3 は子 #3746 |
 | `tools/python/REPORT_PY243.md` | ~80 | PY-243 (#3745): launchMapPages.setMapItemTarget の戻り型 None を PE (0xd7a3a0 → 0xd82c20 → 0xc38bc0 → `[0x16b82e0]`) で確定し mock/C に arity 3 の引数検査付きで実装 (差分 0)。項目書込み (0xd7a280)・0x416750・範囲検査は子 #4581 (PY-344)。flapi 表の戻り型 `int` の修正も #4581 |
