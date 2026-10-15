@@ -48,7 +48,7 @@ PE ファイル上の `0x898100`〜 は `.data` の値で、`+8` (next) は 0。
 
 - **どの経路が `f_41bcf0` を起こすべきか**は未特定。PE の entry (`0x87cdf0`) を先に走らせる試行 (`PRE_ENTRY`) は `Aborted(native code called abort())` で止まり、初期化経路まで届かなかった (`GetCurrentThreadId`・`TlsAlloc`・`LocalAlloc` の import stub 経由)。entry 経由の起動は本付録の対象外。
 - `f_41bcf0` を起こす間接呼出しの登録元の特定は次の作業 (#4582 の範囲)。推定で起動経路を決めない。
-- 測定は n=1。所要 57 秒 (`cpi_pool_probe.sh`・emcc 含む全体)、load は 0.31 (測定後の `uptime`)。
+- 測定は n=2 (冒頭と同じ)。所要 57.6 秒 (`cpi_pool_probe.sh`・emcc 含む全体)、load 0.34 (開始) → 0.87 (終了)。
 
 ## 5. 未解決 (起票先)
 
