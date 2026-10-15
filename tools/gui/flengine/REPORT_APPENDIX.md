@@ -24,6 +24,8 @@
 
 未解決 (起票先付き): 受入条件 1 は #1426 (304/555/923 の OOB 実値採取)。S1 の 3 unit は #1635 `[GUI-22]`。現 HEAD の S1 FAIL (`870/1/47/24/0` vs `867/1/47/27/0`) は本 PR で解消しない (`Refs #1442`)。
 
+WIN-21 (#3352) の現 HEAD の実測と S1 の unit 再測定は [REPORT_APPENDIX_3352.md](REPORT_APPENDIX_3352.md) §6k (測定 commit `c3ee6daa7`) を正とする。
+
 ## 6j. GetMonitorInfoW / EnumDisplayMonitors の重複定義 (#1559 / M11-N102)
 
 **測定 commit `60932d35` (main)。実行コードの差分 0** (`git diff 60932d35 HEAD -- tools/gui tools/m11 tools/shim tools/shared ':!*/results/*' ':!*.md'` が 0 行)。

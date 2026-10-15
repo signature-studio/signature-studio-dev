@@ -139,8 +139,8 @@ python3 tools/shared/scripts/ildsp_vtable_check.py tools/shared/work/raw/ildsp_v
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| vtable slot 1–3・5 の役割 (どの method か) の native 実行による確定 | 受入条件 (1) の残り | 子 [T-SH-38] |
-| 間接 call 4 件 (0x1aedc0 / 0x1b6f4c) の正常系での到達実測・扱いの決定 (4-6) | 受入条件 (3) | 子 [T-SH-38] |
+| vtable slot 1–3・5 の役割 (どの method か) の native 実行による確定 | 受入条件 (1) の残り | 子 [T-SH-53] #3249 |
+| 間接 call 4 件 (0x1aedc0 / 0x1b6f4c) の正常系での到達実測・扱いの決定 (4-6) | 受入条件 (3) | 子 [T-SH-54] #3250 |
 | 15 関数 (closure は 4-5 の定義で 36 / 87 関数) の lift・native 差分・ネガコン・gate | 受入条件 (2)(4) | 子 [T-SH-39] |
 | 旧 issue 本文の「15 関数・473 命令・SIMD 11.4%」の出典 | 本 REPORT で再現できない | #2483 本文から削除 (本 PR) |
 | §2 survey 表が chained `.pdata` 未処理で下限 | §2 の数値は下限 | #161 継続 |
@@ -198,15 +198,17 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
   - よって 2 件の格納先 `[rcx]` は、どちらの経路でも呼び出し元が直前に作ったスタック上のアドレスで、WC instance (ヒープ上の 0x228 B) ではない。
   - 範囲: `ildsp_wc_dispatch.py` の `direct_callers` (exec セクション全走査の直接 call/jmp) と `## 対象 VA への参照` 節 (全画像走査の RIP 相対の命令参照と 8 バイト絶対値)。対象 `0x1acfe8`・`0x164740`・`0x1ad008`・`0x1ad028`・`0x1ac9c0` は、RIP 相対 0 件・8 バイト値 0 件。レジスタに計算した値からの参照と、4 バイト相対値のテーブルは網羅していない。
 - `0x1b6f4c` の `0x1b6f6c` は `0x268268` → `0x1cb600` (`jmp [0x268260]`) で、同じ `jmp rax` に至る。`rax` の値は静的に不明。
-- 扱いの案 (未確認・推定): 例外送出の path とみなし、lift では trap を第一候補にする。正常系に到達しないことは子 [T-SH-52] の native 実行で確かめる。
+- 扱いの案 (未確認・推定): 例外送出の path とみなし、lift では trap を第一候補にする。正常系の到達は `REPORT_APPENDIX_3276.md` で確定 (HeapAlloc 成功時は 0 回)。
 
 ### 5-5. 未解決
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | instance の vptr が `0x3e01b0` のまま変わらないこと (動的な書き換えは静的には見ていない)。他 vtable 格納 2 件の書き込み先は §5-4 でスタック上と確認済み | §5-2 の解決 (`0x1a9de0`) の前提 | 子 [T-SH-52] #3216 |
-| helper `0x1aedc0`・`0x1b6f4c` の正常系到達 (§5-4) | 画像内関数ポインタ 2 件の扱い (trap か stub か) | 子 [T-SH-52] #3216 |
+| 例外 path の catch 先 (`RaiseException` の先) が trap か stub か (`REPORT_APPENDIX_3276.md` の未解決) | 画像内関数ポインタ 2 件 (§5-4) の扱い | 子 [T-SH-52] #3216 |
 | IAT 16 件の扱い (GetLastError・HeapAlloc 等) | lift 規模 | 子 [T-SH-52] #3216 |
 | 70 関数の lift・native 全バイト差分・ネガティブコントロール・gate (#2484 の受入条件 2・3) | 本 PR では未実施 | 子 [T-SH-52] #3216 |
+
+- native 確定 (T-SH-59 #3276): 正常系で helper `0x1aedc0`・`0x1b6f4c` は 0 回。例外 path の vptr 格納先はスタック。詳細と実測は `REPORT_APPENDIX_3276.md`。
 
 ### 5-6. 検証
 - 再現 (3 コマンド): `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_closure.py` → `FL_WIN64_DIR=<展開先> python3 tools/shared/scripts/ildsp_wc_dispatch.py` → `python3 tools/shared/scripts/ildsp_wc_dispatch_check.py tools/shared/work/raw/ildsp_wc_dispatch.json <PE>`。
@@ -224,8 +226,14 @@ Issue 本文の「sub-object の vtable」という前提は誤り。CreateInsta
 - 検算の範囲: 命令は objdump、slot 値と DIR64 reloc は PE の生バイトで照合。closure の完全性は検算していない。対象 VA の参照は、RIP 相対の命令参照と 8 バイト絶対値だけを見る (レジスタ計算値・4 バイト相対値は対象外。他 vtable 格納 2 件の書き込み先は §5-4 の走査で確認)。
 - `git diff da2ba516 HEAD -- tools/shared/scripts` の出力は空 (差分 0)。
 
-## 6. vtable slot 4 (0x1aa3a0) の lift と native 差分 (#2529)
+## 6. vtable slot 4 (0x1aa3a0) と slot 5 (0x1aa470) の lift と native 差分 (#2529・#3404)
 
 ### 結論 (1 行)
-GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間接 call 0) を RetDec で lift し、元の機械語との差分は 240/240 で一致。ネガティブコントロール 2 件は期待どおり FAIL。
-全文 (手順・選定根拠・実測・未解決) は `REPORT_APPENDIX_2529.md` §6 が正本 (250 行上限のため分割移動)。
+GeneralPitchShifter vtable slot 4 (RVA 0x1aa3a0・42 命令・直接 call / 間接 call 0) を RetDec で lift し、元の機械語との差分は 240/240 で一致。ネガティブコントロール 2 件は期待どおり FAIL。slot 5 (RVA 0x1aa470・`xor eax,eax; ret`) も同じ手順で lift し、戻り値を含む差分は 240/240 で一致 (#3404)。
+全文 (手順・選定根拠・実測・未解決) は slot 4 が `REPORT_APPENDIX_2529.md` §6、slot 5 が `REPORT_APPENDIX_3404.md` が正本 (250 行上限のため分割移動)。
+
+## 7. WaveformColouring_CreateInstance の x64c lift と native 差分 — T-SH-52 (#3216・部分達成)
+
+### 結論 (1 行)
+WaveformColouring closure の入口 70 関数を x64c で C に lift し wasm にした。CreateInstance → slot 0 の native 対 wasm は 64 case で全バイト一致 (ネガティブコントロール FAIL 64/64)。slot 1–5 の host 前提と VEX 3 命令の未対応は子 T-SH-57・58・59 に残す。
+全文 (手順・実測・未解決の表) は `REPORT_APPENDIX_3216.md` §7 が正本 (250 行上限のため分割移動)。

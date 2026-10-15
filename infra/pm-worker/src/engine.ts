@@ -1514,7 +1514,7 @@ export class Engine {
   }
 
   // launch の停止が 30 分続いたら、PM agent に 1 回だけ知らせる (#2795)。新しい kind は作らず、digest (ref 0) を送る。
-  // 同じ停止区間では 1 回だけ (失敗した試行も数える)。上限は pmHistory (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 12 件) に従う。
+  // 同じ停止区間では 1 回だけ (失敗した試行も数える)。上限は pmHistory (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 24 件) に従う。
   // 同期が古いときも送る (止まったまま古くなる場合こそ知らせる必要があるため)。LIVE_DISPATCH のときだけ送り、dry-run は would に記録する。
   // 降格中 (dispatch を止めている間) は送らず、区間の 1 回も使わずに保留する。解除の後に送る。
   async haltNotify(gh: Gh | null): Promise<"sent" | "would" | "skipped"> {

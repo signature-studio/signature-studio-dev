@@ -31,7 +31,7 @@ if [ ! -f "$W/obj/.sx_done" ]; then
   touch "$W/obj/.sx_done"
 fi
 
-CCF="$OPT -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1"
+CCF="$OPT -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1 ${FLE_EXTRA_CCF:-}"   # FLE_EXTRA_CCF=-DFLE_WWATCH: 書込み監視 (#3028)
 SHARDS="${FLE_SHARDS:-1}"
 CAP_MB="${FLE_CC_RSS_CAP_MB:-$([ "$SHARDS" -gt 1 ] && echo 5000 || echo 11000)}"
 cc() { local src="$1" obj="$2"; shift 2
