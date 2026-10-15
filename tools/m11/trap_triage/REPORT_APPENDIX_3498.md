@@ -11,6 +11,7 @@
 - 入力: `boot_final.ll` (19,787,837 B・sha256 `69c774de…`。`tools/m11/work/` の既存の展開物で、本 run で sha256 を再計算して一致を確認) と `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B。`$RUNNER_TEMP` に展開)。
 - 再生成した証拠表: strict 288 件 (`scan_guard.py --report`・`strict_evidence.py`)。`judge_entry_check.py <IR> strict_evidence.tsv 4 35` は 32 行を出した。`judge_ctx.py 4 35` で行 4〜35 の文脈 (機械語・B・L・T・preds) を出し、L の icmp は `judge_dump.py 4 35` の出力で全件を確認した。
 - 実測 (本 fix run・foreground・1 回ずつ): `scan_guard.py --report` 3.4 s・rc 0。`strict_evidence.py` 7.5 s・rc 0・TSV 288 行。`judge_entry_check.py 4 35` rc 0・32 行。`judge_ctx.py 4 35` rc 0・2,190 行 (96,627 B)。`judge_dump.py 4 35` rc 0・160 行。load average (1 分値) は終了時 0.06 (`/proc/loadavg`)。
+- 競合解消後の再実行 (`origin/main` `0c6550546` の取り込み後の merge commit `5e68c526c`・同じ入力・foreground・1 回): `scan_guard.py --report` rc 0・strict 288。`strict_evidence.py` rc 0・TSV 288 行。`judge_entry_check.py 4 35` rc 0・32 行。`judge_ctx.py 4 35` rc 0・2,190 行 (96,627 B)。`judge_dump.py 4 35` rc 0・160 行。上の `git diff 1d04852b0 HEAD` は merge 後も 0 行。
 
 ### 判定規則 (件ごと。0978196e8 版の文言をそのまま使う。(a)〜(c) を真陽性の必要条件として明記する)
 
