@@ -4,11 +4,13 @@
  * import スタブ (HeapAlloc / EnterCriticalSection 等) は wc_glue.c と同じ規約 (同じ bump heap・同じ戻り値)。
  * build: gcc -O1 -w -I <workdir> -o native_ref wc_native_ref.c
  * usage: native_ref image_native.bin cases.bin res_native.bin   (wc_layout.h は -I の dir から読む) */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <ucontext.h>
 #include <signal.h>
 #include <unistd.h>
 #include <sys/time.h>
@@ -46,6 +48,29 @@ static void on_fault(int sig, siginfo_t *si, void *uc) { (void)uc; if (in_case) 
 
 static void rd_exact(FILE *f, void *p, size_t n) { if (fread(p, 1, n, f) != n) { fprintf(stderr, "short read\n"); exit(2); } }
 
+/* 到達計測 (T-SH-115 / #4303): 基本ブロック先頭に int3 を置き、SIGTRAP で到達を記録して元の 1 byte に戻す。
+ * 1 case で各ブロックは高々 1 回の記録で足りるため、TF による 1 命令単位の復帰は不要。 */
+#define COV_MAX 512
+static int cov_on, cov_n;
+static uint32_t cov_rva[COV_MAX];
+static uint8_t cov_orig[COV_MAX];
+static uint8_t cov_hit[COV_MAX];
+static uint8_t *cov_img;
+static void on_trap(int sig, siginfo_t *si, void *uc) {
+    (void)sig; (void)si;
+    ucontext_t *u = uc;
+    uint64_t rip = (uint64_t)u->uc_mcontext.gregs[REG_RIP];
+    for (int i = 0; i < cov_n; i++) {
+        if ((uint64_t)(uintptr_t)(cov_img + cov_rva[i]) == rip - 1) {
+            cov_hit[i] = 1;
+            cov_img[cov_rva[i]] = cov_orig[i];
+            u->uc_mcontext.gregs[REG_RIP] = (greg_t)(rip - 1);
+            return;
+        }
+    }
+    _exit(5);
+}
+
 static void set_iat(uint8_t *img, uint32_t rva, void *fn) { if (rva) *(uint64_t *)(img + rva) = (uint64_t)(uintptr_t)fn; }
 
 int main(int argc, char **argv) {
@@ -71,11 +96,30 @@ int main(int argc, char **argv) {
     sigaction(SIGALRM, &sa, NULL);
     FILE *fc = fopen(argv[2], "rb"), *fo = fopen(argv[3], "wb");
     if (!fc || !fo) DIE("open cases/out\n");
+    FILE *fv = NULL;
+    const char *covpath = getenv("WC_COV_OUT");
+    const char *blkpath = getenv("WC_COV_BLOCKS");
+    if (covpath && blkpath) {
+        FILE *fb = fopen(blkpath, "r");
+        if (!fb) DIE("open blocks\n");
+        while (cov_n < COV_MAX && fscanf(fb, "%x", &cov_rva[cov_n]) == 1) cov_n++;
+        fclose(fb);
+        fv = fopen(covpath, "wb");
+        if (!fv) DIE("open cov out\n");
+        cov_on = 1; cov_img = img;
+        struct sigaction st;
+        memset(&st, 0, sizeof st);
+        st.sa_sigaction = on_trap;
+        st.sa_flags = SA_SIGINFO;
+        sigaction(SIGTRAP, &st, NULL);
+    }
     uint32_t ncase; rd_exact(fc, &ncase, 4);
     uint8_t *data = malloc(WC_DATA_SZ);
     for (uint32_t c = 0; c < ncase; c++) {
         rd_exact(fc, data, WC_DATA_SZ);
         memcpy(img, imgbuf, WC_IMG_SIZE);
+        memset(cov_hit, 0, sizeof cov_hit);
+        if (cov_on) for (int i = 0; i < cov_n; i++) { cov_orig[i] = img[cov_rva[i]]; img[cov_rva[i]] = 0xCC; }
         set_iat(img, WC_IAT_HeapAlloc_RVA, st_heapalloc);
         set_iat(img, WC_IAT_HeapFree_RVA, st_heapfree);
         set_iat(img, WC_IAT_GetLastError_RVA, st_gle);
@@ -124,8 +168,10 @@ int main(int argc, char **argv) {
         fwrite(&hits, 8, 1, fo);
         fwrite(arena, 1, WC_ARENA_SZ, fo);
         fwrite(img + WC_DATA_RVA, 1, WC_DATA_SZ, fo);
+        if (fv) fwrite(cov_hit, 1, COV_MAX, fv);
     }
     fclose(fo);
+    if (fv) fclose(fv);
     fprintf(stderr, "[native] cases=%u SIGSEGV/SIGBUS=%d SIGALRM=%d\n", ncase, (int)n_segv, (int)n_alrm);
     return 0;
 }
