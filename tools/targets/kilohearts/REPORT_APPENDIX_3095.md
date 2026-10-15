@@ -130,3 +130,28 @@ bash ghidra_route/build_cmp.sh gain 1000 7 bitcast,intload,stackpair,assoc,conca
 - 再現の注意: `build_cmp.sh` は `snapins/work/<n>/` が無いと `native_ref` が segfault する (`run_all.sh` [1] は `mkdir -p` している)。本測定では事前に作成した。
 - 未実施: Delay の native 突合 (emcc が 463 件で通らないため)。#3073 の範囲。
 - 測定 commit から HEAD までのコード差分: 測定 commit = `abee0a1ff` (コードを変えた最後の commit = main 取り込みの merge)。`git diff abee0a1ff HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (この節を含む REPORT・DOC_MAP の commit は範囲外)。
+
+## 9. 競合解消後の再測定 (測定 commit `ab01412df`)
+
+- 経緯: PR #3812 が main と競合した (watchdog 依頼)。`origin/main` (`a9afb18ec`) を merge した (`ab01412df`、rebase・force push なし)。競合は `docs/DOC_MAP.md` の 1 箇所 (両側とも別行の追加。PR 側の `REPORT_APPENDIX_3095.md` 行と main 側の `REPORT_APPENDIX_3802.md`・`_3802_DIFF.md` 行を残した)。`ghidra_shim.h` は競合しない (`SUB168` は 1 定義のまま)。`ghidra_to_c.py` は自動マージ (origin/main との差分は `maxps` 行の 1 行のみ)。main 側の #3802 (`6323671e7`〜`b201ce387`) が `ghidra_route` を変えたため §8 の測定は HEAD と一致しなくなり、取り直した。
+- 前提: §1 と同じ素材・道具 (Ghidra 12.1.4 公式 zip の sha256 `ddac49f9…` 一致・JDK 21・emcc 6.0.12)。`HeartCore.core_64` 76,642,304 B。
+- decompile (挿入順の lift 集合 141 件・重複 1 件を除く): **141/141 OK**。Gain/Haas/Gate の 10 関数は **10/10 OK** (Ghidra wall 32 s)。
+- emcc (`--fix bitcast,intload,stackpair,assoc,concat`・`emcc -c -ferror-limit=0`): wall 11.2 s、rc 1 (残件あり)。census は **441 件**。
+
+| 分類 | 463 (`abee0a1ff`, §8) | 441 (`ab01412df`) |
+|---|---|---|
+| 未関数化 callee | 6 | 1 |
+| レーン型 | 166 | 166 |
+| 引数数不一致 | 86 | 86 |
+| SIMD・AVX・swi 疑似関数 | 0 | 0 |
+| code 型の間接呼出し | 0 | 0 |
+| 未定義 identifier | 17 | 2 |
+| 演算・代入の型不一致 | 186 | 186 |
+| その他 | 2 | 0 |
+| **合計** | **463** | **441** |
+
+- 減った 22 件は、#3802 の commit `6323671e7` のメッセージ「未定義 identifier 15・未関数化 callee 5・スタブ衝突 2 を解消」と件数が合う (各分類の対応は commit 本文で確認していない)。
+- 残件の名前 (emcc log): 未定義 identifier 2 = `PTR__guard_dispatch_icall_1813a1d38`・`LAB_180fd2aab`、未関数化 callee 1 = `func_0x0001802ecfc0`。§7 の「未定義 identifier 17・未関数化 callee 6・その他 2 (計 25 件)」は §8 (`abee0a1ff`) の値で、現 HEAD では 3 件。
+- 単体突合 (`simd_shim_check.c`・`gcc -O1 -mavx2`): 実装 13 種 × 200,000 試行 **mismatches: 0** (rc 0)。ネガティブコントロール (`-DKH_NEG=1`) は **mismatches: 200000** (rc 1)。
+- 回帰 (`build_cmp.sh <n> 1000 7 bitcast,intload,stackpair,assoc,concat`): Gain **1000/1000** (calls 4999/4999・wasm 15,161 B)、Haas **1000/1000** (calls 5500/5500・16,878 B)、Gate **1000/1000** (calls 4999/4999・17,367 B)。wasm サイズは §4・§8 と一致。
+- 測定 commit から HEAD までのコード差分: 測定 commit = `ab01412df` (コードを変えた最後の commit = main 取り込みの merge)。`git diff ab01412df HEAD -- tools/targets/kilohearts/ghidra_route tools/targets/kilohearts/snapins/scripts` の出力は 0 行 (この節を含む REPORT の commit は範囲外)。
