@@ -82,9 +82,10 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 
 - 基準: 静的 69 格納のうち実行 30・未実行 39。11 行のうち基準で実行されたのは 0x1321225 の 1 行 (1 ID) だけ。
 - 実測の結論: 11 行のうち、供給元の値を与えて実行されたのは 0/11。実行できなかった理由は次のとおり。0x132206e・0x13220b2・0x13221be は供給元が `call 0x40ae70` の戻り値で、その呼出しブロックに基準の経路が届かない (下記)。残り 8 行は供給元がフィールド・グローバル・仮想呼出しで、`HS_DISP_RET_SPEC` (callee 戻り値のみ) では値を与えられない。
-- 0x40ae70 の変更で格納が動かない理由: 呼出し位置 0x1322031・0x1322181 を含むブロック (0x1322010〜・0x1322170〜) が、基準を含むどの ID の経路にも現れない (`path` 集計で 0 件)。戻り値より手前の分岐で止まっている。その分岐は未特定。
+- 0x40ae70 の変更で格納が動かない理由: 呼出し位置 0x1322031・0x1322181 と、0x1322010〜0x1322040 の範囲は、基準を含むどの ID の経路にも現れない (`path` 集計で 0 件・§7)。0x1322170〜 の後半は ID 77 が通るが、呼出し位置 0x1322181 は通らない。戻り値より手前の分岐で止まっている。その分岐は未特定。
 - 0x40fe90 の変更で 0x1321225 が失われるのは、`0x1321e12 call 0x40fe90` の戻り値が 0x1321e17 の分岐を変え、0x1321225 の経路に影響するため (供給元ではなく経路の影響)。
-- 測定時間・load: 基準 `hs_disp_emu.py` 既定 (`HS_DISP_PATH=1`・全 256 ID) real 1m12s、終了時 load 0.91 (`uptime`)。変更 run 3 回の合計は 20:36:56〜20:40:33 (壁時計 3m37s、load 0.98)。`hs_store_src11.py` real 0.174 秒、`hs_store_cov.py` (基準のみ) real 5.9 秒。
+- 測定時間・load (HEAD `74f22dcaa`・2026-10-15 21:10〜21:13 に 1 回ずつ実測。本節の timing は全てこの run の値): 基準 `hs_disp_emu.py` 既定 (`HS_DISP_PATH=1`・全 256 ID) real 72.44 秒、終了時 load 0.87 (`uptime` の 1 分平均)。変更 run `HS_DISP_RET_SPEC=0x40fe90:one` real 72.53 秒、終了時 load 0.96。`hs_store_src11.py` real 0.17 秒。
+- 上の表のうち `0x40fe90:one` の行は、この再測定 (HEAD `74f22dcaa`・`hs_store_cov.py`) でも一致した (新規 4・失われる 3・11 行 0)。`0x40ae70:one` / `0x40ae70:host` の行は今回は再測定していない (測定 commit `8436217c4` の結果)。
 - 残作業 (未解決): 0x1322010 ブロックへ至る上流の分岐の特定 (これが決まれば 0x132206e・0x13220b2・0x13221be の実測が可能)。未確定 7 行の読み元 (グローバル基底・リスト起点・vtable 先・cmp 左辺) の追跡。
 
 ### 5.2 #5421 (PLG-P0b-58) — call 戻り値経路の 5 行
@@ -114,8 +115,8 @@ rax 格納の直前書込み (VA 付き、`hs_store_src27.py` の出力):
 ## 6. コード差分
 
 - `git diff 31208b4c8 HEAD -- tools/plugins/framework/hostshim/` は `hs_store_src27.py` の新規追加と、本 REPORT の新規追加だけ。`hs_disp_emu.py`・`hostshim.c`・`hs_store_cov.py` は変更なし。
-- #5422 の追加: `hs_store_src11.py` の新規追加 (測定 commit `8436217c4`)。`git diff 8436217c4 HEAD -- tools/plugins/framework/hostshim/` は本 REPORT の追記と `hs_store5_src.py` (main 取り込み分) だけ。
-- main 取り込み後の再測定 (HEAD `582ca621e`・全 256 ID・`hs_disp_emu.py` 既定 `HS_DISP_PATH=1`): 基準 real 57.5 秒・終了時 load 1.12。`hs_store_cov.py` の基準は実行 30・未実行 39・no-case 202 (数値は §4 と一致)。変更 run `0x40fe90:one` は real 58.2 秒、基準比の新規実行 4・失われる実行 3・11 行の新規実行 0 (§5.1 と一致)。`hs_store_src11.py` real 0.156 秒。
+- #5422 の追加: `hs_store_src11.py` の新規追加 (測定 commit `8436217c4`)。`git diff 8436217c4 HEAD -- tools/plugins/framework/hostshim/` の差分は、本 REPORT の追記・`hs_store5_src.py` (main 取り込み分)・`hs_store_src11.py` の docstring 1 行だけ。実行コードの差分は無い。
+- 測定値は §5.1 だけに書く (本節に timing は置かない)。
 
 ## 7. 再現コマンド
 
@@ -124,4 +125,11 @@ FL_WIN64_DIR=<展開先> PYTHONPATH=<unicorn,pefile,capstone> python3 hs_store_s
 FL_WIN64_DIR=<展開先> PYTHONPATH=<unicorn,pefile,capstone> python3 hs_store_branch.py
 FL_WIN64_DIR=<展開先> HS_DISP_PATH=1 HS_DISP_OUT=base.json python3 hs_disp_emu.py
 FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_cov.py base.json
+FL_WIN64_DIR=<展開先> PYTHONPATH=<...> python3 hs_store_src11.py
+```
+
+§5.1 の path 集計 (`base.json` は `HS_DISP_PATH=1` の出力。`path` は VA の list):
+
+```
+python3 -c "import json; r=json.load(open('base.json')); [print(hex(a), sum(1 for v in r.values() if v.get('path') and a in v['path'])) for a in (0x1322031, 0x1322181)]"
 ```
