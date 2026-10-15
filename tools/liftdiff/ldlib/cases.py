@@ -152,7 +152,7 @@ def machine_sig(va, sig):
     ps = MACHINE_ENTRY.get(va)
     if ps is None:
         return sig
-    return dict(sig, params=ps, wsig=['i64'] * len(ps), tr=True)
+    return dict(sig, params=ps, wsig=['i64'] * len(ps), tr=True, ir_params=sig['params'])
 
 
 CUSTOM = {}
