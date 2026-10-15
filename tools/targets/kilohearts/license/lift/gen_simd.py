@@ -225,6 +225,8 @@ def gen(name, ret, params):
         body = '%s L128 r; r.w[0] = r.w[1] = %s.w[1]; r.w[2] = r.w[3] = %s.w[3]; return r.q;' % (pre, A(0), A(0))
     if b == 'movsldup' and n == 1 and ptys[0] == 'i128' and R == 'i128':
         body = '%s L128 r; r.w[0] = r.w[1] = %s.w[0]; r.w[2] = r.w[3] = %s.w[2]; return r.q;' % (pre, A(0), A(0))
+    if b in ('movmskps', 'movmskpd', 'pmovmskb'):
+        pass
     if b == 'pcmpeqd' and ptys == ['i128', 'i128'] and R == 'i128':
         body = '%s L128 r; for (int i = 0; i < 4; i++) r.w[i] = (%s.w[i] == %s.w[i]) ? 0xffffffffu : 0; return r.q;' % (pre, A(0), A(1))
     if b == 'pcmpeqw' and ptys == ['i128', 'i128'] and R == 'i128':
