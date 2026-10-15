@@ -281,7 +281,7 @@
 | `tools/m11/trap_triage/REPORT.md` | ~228 | M11 survey trap の個別原因切り分け (#130)・halt0 20 の原因 (#417)・OOB 分類 (#419、§8.2 = 旧 tree の実測。現 main の ON/OFF 比較は REPORT_595) |
 | `tools/m11/trap_triage/REPORT_2212.md` | ~115 | #2212: rt.o の静的データ配置 (`g_dest_h`・`g_rec_*`・pad) と関数有無の対照 (NODATA 2012・PRE/POST の 2006・既定 2008)・リンク後の実アドレス・n=3 の決定性 (生値 `table_2212.tsv`・`addr_2212.txt`)・再現 `repro_1952_rt_mech.sh` |
 | `tools/m11/trap_triage/REPORT_714.md` | ~246 | #714: OOB 呼出し鎖・計測器の影響・実値採取の再試行 (§12〜§13)。#1602 r4 の要約は末尾。全文は `REPORT_APPENDIX_1602.md` |
-| `tools/m11/trap_triage/REPORT_APPENDIX_3928.md` | ~95 | #3928 (M11-28): unit 144 の trap と `function_4136a0` (UniqueString) の `*s` deref 脱落 (D4 同型) の C 転記 (`M11_FIX_4136A0`・既定 OFF)。144 は trap→ok、158 は ok→oom の回帰。測定値・受入の達成状況・未解決の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_3928.md` | ~115 | #3928 (M11-28): unit 144 の trap と `function_4136a0` (UniqueString) の `*s` deref 脱落 (D4 (DEFECTS.md) 同型) の C 転記 (`M11_FIX_4136A0`・既定 OFF)。144 は trap→ok、158 は ok→oom の回帰。測定値・受入の達成状況・未解決の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3499.md` | ~60 | #3499: REPORT_718 §4j (証拠表の行 36〜66 の件ごとの判定・根拠・注・未解決) の全文。250 行上限のため分割移動。判定ツールは `judge_ctx_3499.py` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3564.md` | ~70 | #3564: strict 候補の残り (証拠表の行 36〜66 の保留 6・単独 15) の件ごと判定 (真陽性 12・偽陽性 1・保留 8)。REPORT_718 §4i の全文・判定補助 `judge_src.py`・機械語側のネガティブコントロール `negctl_3564.py` (付録 §7) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3502.md` | ~85 | #3502: 証拠表の行 67〜98 の保留 30 件の件ごと再判定 (真陽性 9・偽陽性 4・保留 19・判定基準・照合範囲・未解決)。REPORT_718 §4k の正本 |
