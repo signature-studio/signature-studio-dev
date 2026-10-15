@@ -24,7 +24,7 @@
 
 ## 2. 測定の条件
 
-- 素材: `fl-win64` を `[WIN64]` の展開先 (`FL_WIN64_DIR`) に展開 (5.7 秒)。`work-m11` を worktree の `tools/m11/work` に展開 (2.4 秒)。`[EMSDK]` は `/opt/emsdk` (展開済み)。
+- 素材: `fl-win64` を `[WIN64]` の展開先 (`FL_WIN64_DIR`) に展開 (5.7 秒)。`work-m11` を worktree の `tools/m11/work` に展開 (2.4 秒)。`[EMSDK]` は `[EMSDK]` (展開済み)。
 - IR 再生成 `m11_gen_ir2.sh`: rc=0・所要 50.2 秒。ldfix 行: `F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 errors=0` (REPORT_2212 は F3c=36)。
 - n=3 は直列・foreground・単発。所要 (`time` real): C_noren の n=3 と NODATA_BODY の n=3 を含む 6 セル 3 分 30.8 秒。ただし NODATA_BODY の行は pad の並びが未修正の版で、§3 では採らない。修正後の NODATA_BODY n=3 (3 セル) は 1 分 45.0 秒。残りの 5 セル (A_default・R0_rtOFF・NODATA・PRE64・PRE4096、各 n=1) は 3 分 2.9 秒。
 - uptime (01:28 UTC): load average 1 分平均 0.36・5 分 0.79・15 分 0.64 (4 vCPU)。
@@ -85,7 +85,7 @@
 ## 8. 再現
 
 - `bash tools/m11/trap_triage/repro_1952_rt_mech.sh [N] [CONFIG...]` (CONFIG に `NODATA_BODY` を追加)。表は `work/split_1952/table.tsv`、実アドレスは `work/split_1952/addr.txt` (gitignore)。tracked 版は `table_2275.tsv`・`addr_2275.txt`。
-- 前提: `FL_WIN64_DIR` = `[WIN64]` (`fl-win64` を展開し、`m11_build.sh` と `m11_gen_ir2.sh` で同じ値を使う。IR は PE のパスを記録する)・`work/` が `m11_gen_ir2.sh` 生成済み・`/opt/emsdk` 配置済み。
+- 前提: `FL_WIN64_DIR` = `[WIN64]` (`fl-win64` を展開し、`m11_build.sh` と `m11_gen_ir2.sh` で同じ値を使う。IR は PE のパスを記録する)・`work/` が `m11_gen_ir2.sh` 生成済み・`[EMSDK]` 配置済み。
 - 素材: `oc_artifacts: fl-win64 work-m11 toolchain-emsdk` (`docs/WORKFLOW.md` §11)。
 
 ## 9. 測定 commit からの差分
