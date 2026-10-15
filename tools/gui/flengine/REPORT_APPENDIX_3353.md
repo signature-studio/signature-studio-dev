@@ -16,6 +16,7 @@
 |---|---|---|
 | 1 boot の 1675 到達を計装で実測。届かなければ trap 位置を REPORT に書く | 未達 (届かない。計装で実測)。trap 位置は無し (boot は完走) | §3-2。起票先 [WIN-26] |
 | 2 boot7 閉包を取り込み、`cfi_probe` が `EnterCriticalSection` を越えるか記録。越えなければ次の停止点を記録 | 達成 (越えない。次の停止点は `EnterCriticalSection(0x12bd390)` の CS-MISS) | §3-3 |
+| 3 `cfi_probe.mjs` の `boot.err` 整形 (22 行目の `String(e)`) を直す | 未達 (未修正。判断には影響しない。直すと測定 commit の鮮度が崩れ、boot 例外の再現も無いため検証できない) | #3353 (§8) |
 
 ## 3. 実測 (測定版: 1 組の commit・1 run の記録)
 
@@ -85,7 +86,7 @@ boot7 の有無による差: boot の経路は boot7 を含まない既定の IR
 ## 6. 製品 KPI (起動・ウィンドウ)
 
 - FLEngine 起動の通過 unit 数 / init: 前 (boot7 無し・3245 head) 109 / 111 → 後 (boot7 有り・本 run) 109 / 111。
-- 最初のウィンドウ: 前 (3245 head の e2e・`REPORT_APPENDIX_3245.md` §3) は窓 P4/P5 PASS。後 (本 run) は boot 中に `CreateWindowExW` が IMPL で 1 回呼ばれる。CFI 経由の経路は CS-MISS で止まり、CFI 経由のウィンドウ作成には届かない。
+- 最初のウィンドウ: 前 (boot7 無し) も後 (boot7 有り) も、boot 中に `CreateWindowExW` が IMPL で 1 回呼ばれる (同じ tree の比較・§9-1)。CFI 経由の経路は CS-MISS で止まり、CFI 経由のウィンドウ作成には届かない。3245 の e2e の窓 P4/P5 PASS (`REPORT_APPENDIX_3245.md` §3) は 3245 head の別測定で、本 PR では再測定していない。
 - 動かしていないもの: 実 FL の製品起動。e2e.sh (窓 P4/P5 の判定)。
 
 ## 7. 検証範囲・範囲外
@@ -100,7 +101,8 @@ boot7 の有無による差: boot の経路は boot7 を含まない既定の IR
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | init 1675 (`InitializeCriticalSection(0x12bd390)`) に boot が届かない原因 (受入 1) | CS 0x12bd390 が未登録 → CFI が `EnterCriticalSection` で abort | [WIN-26] (本 PR は `Refs #3353`) |
-| boot7 込みの e2e (JUDGE・S1) は未測定 | 既定の CI は boot7 を含まない | #3354 の merge 後に再測定 (子 issue は起票しない) |
+| boot7 込みの e2e (JUDGE・S1) は未測定 | 既定の CI は boot7 を含まない | #3353 (本 PR の Refs 先・OPEN。再測定のみで子 issue は起票しない) |
+| `cfi_probe.mjs` の `boot.err` が `[object Object]` (受入 3・22 行目の `String(e)`) | boot の例外内容が読めない。判断には影響しない (`REPORT_APPENDIX_3245.md` §5) | #3353 (本 PR は未修正) |
 | main 上の boot・CFI は未測定 (解消) | §9 で main 取り込み後の HEAD (`037431a02`) で測定済み。結論は同じ | — |
 
 ## 9. main 取り込み後の再測定 (測定 commit `037431a02`)
