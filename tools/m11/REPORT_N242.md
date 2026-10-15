@@ -1,0 +1,69 @@
+# M11 REPORT (#5392 / [M11-N242] / 親 #4890): set_other 非 imm のポインタ経由読込 (ptr_mem) の接続判定
+
+結論: ポインタ経由の読込 122 件 (load_ptr・chain>load_ptr。台帳 mem_ptr 89 + reg 由来 33) を、同じ関数内の同じ `[base+d]` への直線区間の格納で接続判定する分類器 `m11_setother_ptr_class.py` を追加した。実測は **実値化 0 / 復元不能 0 / 未決 122 / 未分類 0**。全件が未決で、接続先は理由別に残る。値を決められた件数は 0 のため、`m11_argrecover_verify.py` での照合対象も 0 件 (該当なし)。IR は変えていない (分類のみ)。
+
+## 1. 接続方式 (決めたこと)
+
+分類器 `m11_setother_ptr_class.py` が、各行の読込 `mov r, <幅> ptr [base+d]` について、同じ関数内で**同じ `[base+d]` へ最後に格納した命令**を直線区間で後ろ向きに探す。
+
+| 判定 (理由) | 条件 | 区分 |
+|---|---|---|
+| `ptr_imm` | 同じ基底・同じ幅・同じ disp の即値格納 | 実値化 |
+| `ptr_reg_store` | 同じ `[base+d]` への reg 格納 | 未決 |
+| `ptr_width_mismatch` | 同じ `[base+d]` への格納が読込と幅が違う | 未決 |
+| `ptr_base_def` | 基底 reg の族を書き換える命令 (以後の `[base+d]` は別番地) | 未決 |
+| `ptr_alias_write` | 基底が違う書込み (別名の可能性) | 未決 |
+| `ptr_call` | 呼出し (別名の書込みが起きうる) | 未決 |
+| `ptr_unknown_write` | メモリ書込みの可能性がある未知の命令・メモリ付き set* | 未決 |
+| `ptr_overlap` / `ptr_index_write` / `ptr_abs_write` | 読込範囲と重なる別幅・index 付き・絶対番地の書込み | 未決 |
+| `slot_merge` | 読込命令が分岐先 (合流点) | 未決 |
+| `ptr_entry` | 区間が関数先頭まで届いた | 未決 |
+| `frame_base` / `no_mem_operand` | 基底が rbp/rsp (別分類器の対象) / 定義命令にメモリ操作数が無い | 未決 |
+
+- 基底の比較は 64bit 族で行う (`eax` と `rax` を同一視)。
+- 判定の単体テストは `test_setother_ptr_class.py` (7 件・PASS)。負例 (別基底・reg 格納・幅違い・呼出し・基底再定義・先頭到達) と正例 (同基底の即値格納)。
+
+## 2. 測定 (実測)
+
+- 入力: `work-m11` の `boot_final.ll` (sha256 先頭 `69c774ded8aaf717`) と `fl-win64` の `extracted/block00031_PE.bin` (先頭 `b2c64da40921cf26`。REPORT_N174 と同一) から、`m11_post.py` → `m11_argrecover.py` → `m11_setother_nonimm_class.py` で `nonimm_class_rows.json` (349 件) を再生成。台帳の数は REPORT_N174 / N172 と一致 (非 imm 349)。
+- 測定: `python3 m11_setother_ptr_class.py work/sigfix_stats/nonimm_class_rows.json --pe <PE>` (real 0.29 秒・load 1 プロセス単独)。
+
+```
+[ptr-class] 対象 122 件 (load_ptr・chain>load_ptr)
+  実値化      0
+  復元不能     0
+  未決       122
+  未分類   0
+[ptr-class] 理由別
+  未決       no_mem_operand         3
+  未決       ptr_alias_write        2
+  未決       ptr_base_def           82
+  未決       ptr_call               17
+  未決       ptr_unknown_write      2
+  未決       slot_merge             16
+```
+
+- 対象 122 件の基底 reg は rax 71・rbx 33・rcx 11・rsi 6 (1 件はメモリ操作数なし)。50 関数に分布する。
+- `ptr_base_def` 82 件の多くは、読込の直前で基底を別の値に書き換えている形 (`mov rcx, [rax+0xc0]` の連鎖)。同じ基底への格納が区間内に無いので未決。
+- 実値化 0 件のため、`m11_argrecover_verify.py` の照合は対象 0 件 (該当なし)。
+
+## 3. 差分
+
+- 新規: `tools/m11/m11_setother_ptr_class.py`・`tools/m11/test_setother_ptr_class.py`・本 REPORT。既存の分類器・`ldmach.py` は変更していない。
+- 測定 commit: 本 PR の HEAD (分類器を最後に変えた commit)。
+
+## 4. 受入条件の判定
+
+| 受入 | 判定 | 根拠 |
+|---|---|---|
+| 接続方式 (どの store・別名を対象とするか) を REPORT に書く | **達成** | §1 |
+| 実値化した値を照合する (0 件なら該当なし) | **該当なし** (実値化 0 件) | §2 |
+
+## 5. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| ptr_mem 122 件の値 (実値化 0) | 呼出し引数の値が未保証。現方式 (同一基底の直線区間格納) では接続できない | #4890 (親) の残作業 |
+| 基底 reg の再定義を跨ぐ接続 (`ptr_base_def` 82 件) | 基底の値を辿る別名解析 (reg の到達定義) が要る | #4890 (親) の残作業 |
+| 呼出しを跨ぐ接続 (`ptr_call` 17 件) | 呼出し先の書込み範囲の解析が要る | #4890 (親) の残作業 |
+| IR への注入 (実値化した値を `m11_post.py` に入れる経路) | 実値化 0 件のため未実施 | #4890 (親) の残作業 |
