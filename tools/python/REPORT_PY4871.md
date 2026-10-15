@@ -11,11 +11,12 @@
 
 ## 測定
 
-- 測定 commit (コードを最後に変えた commit): `317a10e46` (`tools/python/analysis/flapi/pattern_write_cores.py` の追加)。この PR で他に変えたのは本 REPORT と `docs/DOC_MAP.md` の索引行だけ。
-- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 1.577 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
-- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_cores.py work/py5130/extracted/block00031_PE.bin` (実測 real 0.060 s・user 0.044 s・sys 0.016 s、n=1。実行直前の load average は `0.00 0.16 0.14`)。
+- 測定 commit (コードを最後に変えた commit): `dc31ff4c8` (`tools/python/analysis/flapi/pattern_write_semantics.py` の追加と本 REPORT の訂正)。
+- 素材: `fl-win64` (`$ARTIFACTS_DIR/fl-win64.tar.zst` を確認)。展開: `tools/python` で `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C work/py5130 --wildcards '*block00031_PE.bin'` (実測 real 2.910 s)。展開先は `work/py5130/extracted/` (gitignore・commit しない)。
+- 再現 (1 コマンド): `cd tools/python && python3 analysis/flapi/pattern_write_semantics.py work/py5130/extracted/block00031_PE.bin` (HEAD `dc31ff4c8` で実測 real 0.086 s・user 0.069 s・sys 0.018 s、n=1。実行直前の load average は `0.09 0.19 0.08`。結果 `RESULT OK fail=0 total=11`)。
+- 前段の再現: `cd tools/python && python3 analysis/flapi/pattern_write_cores.py work/py5130/extracted/block00031_PE.bin` (実測 real 0.060 s・user 0.044 s・sys 0.016 s、n=1。`pattern_write_cores.py` は `317a10e46` で追加・変更なし)。
 - 逆アセンブル: `python3 analysis/py41_disasm.py work/py5130/extracted/block00031_PE.bin <VA...>` (`pe_disasm.py` と同じ capstone + pefile の方式)。
-- コード差分 (測定 commit から HEAD まで): `git diff 317a10e46 HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
+- コード差分 (測定 commit から HEAD まで): `git diff dc31ff4c8 HEAD -- tools/python/analysis tools/python/provider tools/python/host` の出力は 0 行 (C provider・mock・テストは変えない。`all_tools.mjs` は再測定しない: `docs/WORKFLOW.md` §6)。
 
 ## 1. 共通の呼び出し形
 
