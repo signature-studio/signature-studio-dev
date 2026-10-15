@@ -3,7 +3,7 @@
 実行: python3 tools/flelift/tests/x64c_vex_diff.py (GNU as / objcopy / gcc / python3.13+ の math.fma が必要)。
 各命令を GNU as で機械語にし、x64c の FnLift で C に落として fle_cpu runtime と共に実行し、
 Intel SDM の意味から計算した参照値 (Python, math.fma 使用) と全 state を比較する。"""
-import sys, os, subprocess, math, struct, random
+import sys, os, subprocess, math, struct, random, base64
 
 import tempfile
 WS = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
@@ -541,6 +541,41 @@ def cases():
     add('addsubpd xmm1, xmm2', e_addsub)
 
     add('vpmovsxdq xmm1, xmm2', xz(1, lambda st: s32(st['X'][2][0]) & MASK, lambda st: s32(st['X'][2][0] >> 32) & MASK))
+
+    # rcpps: 実機近似表 (approx_tables.b64 の rcp 表) と指数則 253-e から期待値を作る (x64c の C 実装とは独立)。
+    RCP_TAB = struct.unpack('<4096I', base64.b64decode(''.join(
+        l for l in open(L.APPROX_TABLES_B64) if not l.startswith('#')).replace('\n', '').replace(' ', ''))[:4096 * 4])
+
+    def rcp_ref(x):
+        s = x & 0x80000000; e = (x >> 23) & 0xff; man = x & 0x7fffff
+        if e == 0: return s | 0x7f800000
+        if e == 0xff: return (s | 0x7f800000 | (man | 0x400000)) if man else s
+        t = 253 - e
+        return s if t <= 0 else (s | (t << 23) | RCP_TAB[(x >> 11) & 0xfff])
+
+    def rcp_words(st, s):
+        # 128bit の 4 lane (f32) を (lo64, hi64) の rcp 結果に変換する
+        src = [st['X'][s][0], st['X'][s][1]]
+        w = [rcp_ref((src[k // 2] >> (32 * (k % 2))) & 0xffffffff) for k in range(4)]
+        return [w[0] | (w[1] << 32), w[2] | (w[3] << 32)]
+
+    def e_rcpps(d, s):
+        def e(st):
+            s2 = clone(st)
+            s2['X'][d] = rcp_words(st, s)
+            return s2
+        return e
+
+    def p_rcp(st):
+        # 0 / 非正規 / 1.0 / pi / Inf / -Inf / NaN / -0 / 大きな正規値 を混ぜる
+        lanes = [0x3f800000, 0x40490fdb, 0x00000001, 0x7f800000, 0xff800000, 0x7fc00001, 0x80000000, 0x42c80000]
+        st['X'][2] = [lanes[0] | (lanes[1] << 32), lanes[2] | (lanes[3] << 32)]
+        st['YL'][2] = [lanes[4] | (lanes[5] << 32), lanes[6] | (lanes[7] << 32)]
+        return st
+
+    add('rcpps xmm1, xmm2', e_rcpps(1, 2), p_rcp)
+    add('rcpps xmm3, xmm3', e_rcpps(3, 3))
+    add('vrcpps xmm1, xmm2', xz(1, lambda st: rcp_words(st, 2)[0], lambda st: rcp_words(st, 2)[1]), p_rcp)
     add('vshufps xmm1, xmm1, xmm2, 8', xz(1,
         lambda st: (st['X'][1][0] & 0xffffffff) | ((st['X'][1][1] & 0xffffffff) << 32),  # r.d[0]=a.d[0], r.d[1]=a.d[2]
         lambda st: (st['X'][2][0] & 0xffffffff) * ((1 << 32) | 1)))
@@ -617,6 +652,7 @@ def main():
     cs = cases()
     code = bytearray(0x10000)
     texts = []
+    approx_flags = []
     vas = []
     for k, (asm, _, _) in enumerate(cs):
         va = BASE + 0x100 * k
@@ -642,11 +678,18 @@ def main():
     for va in vas:
         f = L.FnLift(pe, va, {va}, md, {})
         texts.append(f.lift())
+        approx_flags.append(f.approx_used)
         if f.unsup:
             print('UNSUP', va, dict(f.unsup))
 
     rng_states = [fresh_state() for _ in cs]
     lines = ['#include "fle_cpu.h"', '#include <stdio.h>', 'static uint64_t MBUF[4] __attribute__((aligned(32)));']
+    if any(approx_flags):
+        neg = [int(a.split('=', 1)[1]) for a in sys.argv[1:] if a.startswith('--neg-rcp=')]
+        tab = L.approx_rcp_table()
+        if neg:
+            tab[neg[0]] ^= 1                        # ネガコン: 表の 1 entry を改変した C を作り、rcpps 検査が FAIL することを確かめる
+        lines.append(L.approx_rcp_decl(tab))
     lines += texts
     lines.append('int main(void) {')
     for k, (asm, prep, expect) in enumerate(cs):
