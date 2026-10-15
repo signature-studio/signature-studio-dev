@@ -19,6 +19,11 @@ for fn in ('f_40f430', 'f_40fb80', 'f_40fa40'):
     i = src.index(f'void {fn}(void) {{\nL_')
     j = src.index('\n', src.index(';', i)) + 1
     src = src[:j] + dbg.replace('ENTER %s', f'ENTER {fn}') + src[j:]
+# 経路 A (0x40fbcf) と経路 B (0x40fcb8) の呼出し直前で、発火の有無と flag を出す (CALL_A / CALL_B)。
+for va, tag in (('40fbcf', 'CALL_A'), ('40fcb8', 'CALL_B')):
+    tgt = f'/* {va}: call 0x40fa40 */\n'
+    assert src.count(tgt) == 1, tgt
+    src = src.replace(tgt, tgt + f' {{ fprintf(stderr,"[trace4263] {tag} flagA=%u flagB=%u\\n",(unsigned)LD8(0x5d0db0),(unsigned)LD8(0x5d0cb0)); }}\n')
 open(sys.argv[2], 'w').write('#include <stdio.h>\n' + src)
 PY
 emcc -O0 -ffp-contract=off -fno-fast-math -I../flelift/rt -I../shared/oss/freetype -I"$FT_SRC_INC" "$T/lift2/fle_lifted.c" "$L/fle_data.c" "$L/soft_imp.c" qfc_imp.c "$QFC/qfc_ov_trace_4263.c" ../shared/oss/freetype/qfc_import.c "$FT_WASM32_LIB" ../flelift/rt/fle_cpu.c ../flelift/rt/fle_glue.c \
@@ -28,3 +33,4 @@ emcc -O0 -ffp-contract=off -fno-fast-math -I../flelift/rt -I../shared/oss/freety
   -o "$T/qfcl_trace.cjs"
 QFC_CJS="$T/qfcl_trace.cjs" timeout 300 node "$QFC/qfc_trace_4263.mjs" > "$T/trace.log" 2>&1 || true
 grep -E '\[trace4263\]|\[ret\]|\[trap\]' "$T/trace.log"
+echo "[qfc_trace_4263] ENTER=$(grep -c 'ENTER' "$T/trace.log") CALL_A=$(grep -c 'CALL_A' "$T/trace.log") CALL_B=$(grep -c 'CALL_B' "$T/trace.log")"
