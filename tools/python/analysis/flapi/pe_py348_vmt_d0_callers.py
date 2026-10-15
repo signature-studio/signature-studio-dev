@@ -61,6 +61,10 @@ def main():
     print(f"call [reg+0xd0] 件数: {len(sites)} / レジスタ別: {dict(regs)} / 所属関数 (推定): {len(fns)}")
     for fn in sorted(fns, key=lambda x: (x is None, x or 0)):
         print(f"  fn={hex(fn) if fn else None} sites={[hex(x) for x in fns[fn]]}")
+    imm_call = [a for a, m, o in insns if m == "call" and "0xd0" in o and not o.startswith("qword ptr [")]
+    jmp_d0 = [a for a, m, o in insns if m == "jmp" and "0xd0" in o]
+    print(f"call 即値形 (mnemonic=call・オペランドに 0xd0 を含み qword ptr [ で始まらない): {len(imm_call)}")
+    print(f"jmp (mnemonic=jmp・オペランドに 0xd0 を含む): {len(jmp_d0)}")
     raw = open(RAW_PATH, "rb").read()
     refs = vmt_refs(raw)
     for k, v in refs.items():
@@ -71,6 +75,10 @@ def main():
                 f.write(f"{a:#x}\t{o}\n")
     check("0xd0 の間接 call (qword ptr [reg+0xd0]) 件数 243 (PY-320 §3 の 244 とは 1 件ずれ・差は未解明)",
           len(sites) == 243, f"n={len(sites)}")
+    check("call 即値形 (0xd0 を含み qword ptr [ で始まらない) 件数 285 (probe の数え方で実測)",
+          len(imm_call) == 285, f"n={len(imm_call)}")
+    check("jmp (0xd0 を含む) 件数 283",
+          len(jmp_d0) == 283, f"n={len(jmp_d0)}")
     check("TQuickMenuItem VMT を指す rip 相対変位は 2 件 (型を VMT 参照で絞れないことの確認)",
           len(refs["TQuickMenuItem"]) == 2,
           f"hits={[hex(x) for x in refs['TQuickMenuItem']]}")

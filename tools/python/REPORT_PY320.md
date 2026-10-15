@@ -32,7 +32,7 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 - よって rdx (第 2 引数) = **Self** (`0x840b50` の rcx = 呼出し元の rbx)。Self は `0x72db20` で `rbx = rcx` の `TQuickMenuItem` インスタンスとみられる。
 - 対照: `0x840be8` と `0x840c2e` の 0x12acb70 への到達は、`[rbx+0x100]` が 0x12acb70 の値を持つことを要する。その値の書込み先は未確認。
 
-## 3. 未確定 → #4405 [PY-325] (起票先)
+## 3. 未確定 → #4656 [PY-351] (起票先。PY-325 #4405 は closed)
 
 - `0x72db20` の呼出し元: `call [reg + 0xd0]` は 244 箇所あり、そのうち MoveLeftMenu の OnClick を発火する箇所は未同定。
 - `[Self+0x100]` に 0x12acb70 が書き込まれる箇所 (DFM 読込みの TMethod 生成) は未確認。REPORT_PY268 §3 の推定 (`TMethod(Code = 0x12acb70, Data = TFXForm)`) の裏付けは未取得。
@@ -54,19 +54,20 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 
 ## 6. PY-348 (#4603): 0x72db20 の間接呼出し元と MoveLeftMenu の発火箇所
 
-結論: **未達** (受入 1・2 は未達)。0x72db20 の呼出し元の総数と、VMT からの型による絞り込みの不可を確定した。発火箇所の同定は #4405 (PY-325) に残す。
+結論: **未達** (受入 1・2 は未達)。0x72db20 の呼出し元の総数と、VMT からの型による絞り込みの不可を確定した。発火箇所の同定は #4656 (PY-351) に残す。
 
 | 受入 | 結果 | 根拠 |
 |---|---|---|
 | 1. 0x72db20 を間接に呼ぶ箇所 (関数と VA) を特定する | **未達**。`call qword ptr [reg+0xd0]` の全走査は 243 件 (§6.1)。0x72db20 を指す VMT 位置は code に無いため、どの呼出しが 0x72db20 に当たるかは静的に絞れない (§6.2) | §6.1・§6.2 |
 | 2. MoveLeftMenu の OnClick を発火する箇所を絞る | **未達** | §6.3 |
-| 3. probe を追加し、`pe_py325_refs.py` 6/6 PASS のままであることを確認する | `pe_py325_refs.py` は main に存在しない (issue の前提と不一致)。代わりに `pe_py348_vmt_d0_callers.py` (2 件 PASS) を追加し、既存 `pe_py320_fire_site.py` 11/11 PASS を再確認 | §6.4 |
+| 3. probe を追加し、`pe_py325_refs.py` 6/6 PASS のままであることを確認する | `pe_py325_refs.py` は PR の base (`cdcd804`) 時点では不在だった。現 main には `171ef59ad` で追加済みで、同じ素材で 6/6 PASS (実測・§6.4)。新 probe `pe_py348_vmt_d0_callers.py` は 4/4 PASS。`pe_py320_fire_site.py` 11/11 PASS | §6.4 |
 
 ### 6.1 `call [reg+0xd0]` の全走査
 
 - 件数 243 (レジスタ別: rbx 140・rax 49・rsi 38・rdi 10・r13 5・r14 1)。所属関数 (推定) 136 件。
-- PY-320 §3 の記載は 244 件。本走査は 243 件で、1 件ずれる。差の原因は未解明 (`call` の表記 `qword ptr [reg + 0xd0]` 以外の形を数えていない可能性)。
-- `call` の即値形 (283 件) と `jmp` (283 件) は、0xd0 を含むが VMT スロットの間接呼出しではない (即値・アドレス)。
+- PY-320 §3 の記載は 244 件。本走査は 243 件で、1 件ずれる。差の原因は未解明 (PY-351 で確認する)。
+- 数え方 (probe に assert): `mnemonic=call` かつオペランドが `qword ptr [` で始まり `+ 0xd0]` で終わるもの = 243。
+- 数え方 (probe に assert): `mnemonic=call` かつオペランドに `0xd0` を含み `qword ptr [` で始まらないもの = 即値形 **285**。`mnemonic=jmp` かつオペランドに `0xd0` を含むもの = **283**。いずれも `0xd0ece0` のような即値アドレス・変位の部分一致で、VMT スロットの間接呼出しではない。
 
 ### 6.2 型による絞り込みの不可
 
@@ -79,11 +80,12 @@ KPI: 起動・GUI に関わらないため記載不要 (解析のみ)。
 
 - 0x72db20 の内側で `call 0x840b50` する (§1)。0x840b50 の 0x840be8・0x840c2e から 0x12acb70 を呼ぶ経路 (§2) の前段は、0x72db20 を呼ぶ 243 件のどれから到達するかが未確定。
 - 0x72db20 を呼ぶ候補の絞り込みは、次のどちらかを要する: (a) 動的 (実行中の vtable 呼出し) の確認、(b) `mov [reg], imm64` 形式を含む VMT 書込みの走査による TQuickMenuItem インスタンス生成箇所の特定 (本走査では未実施)。
-- 残課題は #4405 (PY-325) に起票先として残す。
+- 残課題は #4656 (PY-351) に起票先として残す。
 
 ### 6.4 検証
 
-- 新規 probe: `tools/python/analysis/flapi/pe_py348_vmt_d0_callers.py` (2 件 PASS・終了 0)。`FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_py348_vmt_d0_callers.py`。
+- 新規 probe: `tools/python/analysis/flapi/pe_py348_vmt_d0_callers.py` (4 件 PASS・終了 0)。`FL_WIN64_DIR=<展開先> python3 tools/python/analysis/flapi/pe_py348_vmt_d0_callers.py`。
 - 既存 probe: `pe_py320_fire_site.py` 11 件 PASS (終了 0)。
-- 素材: `fl-win64.tar.zst` の `block00031_PE.bin` (`$ARTIFACTS_DIR`)。展開 2.8 秒。
-- 測定 commit: 本 PR の最後のコード commit。実行時間: `pe_py348_vmt_d0_callers.py` 41.1 秒、`pe_py320_fire_site.py` 42.0 秒 (同一 worktree・同一素材で実測)。
+- 既存 probe: `pe_py325_refs.py` (現 main 版・`171ef59ad`) 6 件 PASS (終了 0)。同じ素材で実行。
+- 素材: `fl-win64.tar.zst` の `block00031_PE.bin` (`$ARTIFACTS_DIR`)。展開 2.9 秒。
+- 測定 commit と実行時間は PR 本文の「検証結果」に記載 (本ファイルには書かない。自己参照を避けるため)。
