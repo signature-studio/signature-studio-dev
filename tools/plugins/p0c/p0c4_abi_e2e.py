@@ -36,10 +36,12 @@ NINE = ['0x5de820', '0x5dedf0', '0x5dfb60', '0x5df210', '0x5df240', '0x5e0760',
         '0x5e0b70', '0x5e0bb0', '0x5e1590', '0x5e1780', '0x5e0330']
 CRASH4 = ['0x5de710', '0x5df610', '0x5e05b0', '0x5e0d80']
 B6 = ['0x5dee90', '0x5df040', '0x5e09f0', '0x5e0a70', '0x5e0b10', '0x5e1210']
-# #2182 (P0c-17): census の buf_diff≠0 だった 18 kernel。修復後は全て buf_diff=0 (REPORT_APPENDIX_H §19)
+# #2182 (P0c-17): census の buf_diff≠0 だった 18 kernel。修復後は 2000 case で全て buf_diff=0
+# (10000 case では 0x5dffc0 のみ buf_diff=3: REPORT_APPENDIX_H §19.1・#3280)
 FIX18 = ['0x5de620', '0x5dea40', '0x5dec40', '0x5dedb0', '0x5dee20', '0x5dee50', '0x5df340',
          '0x5dfae0', '0x5dfbe0', '0x5dfc90', '0x5dfdb0', '0x5dffc0', '0x5dfff0', '0x5e0300',
          '0x5e0350', '0x5e03f0', '0x5e12c0', '0x5e1490']
+HB_N = 15  # k80_hand_bodies.py の BODIES 14 + GLOBAL_INITS 1 (#2182)
 EXT_FUNCS = 'function_5dfc90,function_5dfbe0,function_5dfd30,function_5dfdb0'
 EXT_CHOPF = 'function_5dfbe0,function_5dfc90,function_5dfdb0'
 EXT_CHOPR = '5dfbe0:5dfc0a-5dfc7c,5dfc90:5dfcb5-5dfd1e,5dfdb0:5dfded-5dfe40'
@@ -139,11 +141,17 @@ def main():
     run(['python3', os.path.join(HERE, 'f80_lower.py'), dfx, ext,
          '--ext', '--ext-funcs', EXT_FUNCS, '--chop-funcs', EXT_CHOPF, '--chop-ranges', EXT_CHOPR])
     hb = os.path.join(d3, 'k80.hb.ll')
-    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), ext, hb])
+    hbj = os.path.join(d3, 'k80.hb.json')
+    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), ext, hb, '--report', hbj])
     hb2 = os.path.join(d3, 'k80.hb2.ll')
-    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), hb, hb2])
+    hb2j = os.path.join(d3, 'k80.hb2.json')
+    run(['python3', os.path.join(HERE, 'k80_hand_bodies.py'), hb, hb2, '--report', hb2j])
     if open(hb, 'rb').read() != open(hb2, 'rb').read():
         raise SystemExit('[FAIL] k80_hand_bodies not idempotent')
+    for j in (hbj, hb2j):
+        n = len(json.load(open(j))['replaced'])
+        if n != HB_N:
+            raise SystemExit('[FAIL] k80_hand_bodies 置換件数 %d (期待 %d = BODIES 14 + GLOBAL_INITS 1)' % (n, HB_N))
     run(['llvm-as', hb, '-o', os.path.join(d3, 'k80.hb.bc')])
 
     print('== [5] 差分試験 (native vs 修復後 IR, %d case/kernel, fork 隔離) ==' % cases)

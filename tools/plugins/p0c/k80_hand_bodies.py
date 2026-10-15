@@ -602,11 +602,15 @@ def replace_bodies(text, bodies):
         text = text[:start] + new + text[end:]
         done.append(name)
     for gname, (old, new) in GLOBAL_INITS.items():
-        if ('@%s = ' % gname) in text:
-            line = [x for x in text.split('\n') if x.startswith('@%s = ' % gname)][0]
-            if line.endswith(old):
-                text = text.replace(line, line[:-len(old)] + new, 1)
-                done.append('@' + gname)
+        lines = [x for x in text.split('\n') if x.startswith('@%s = ' % gname)]
+        if len(lines) != 1:
+            raise SystemExit('[hand_bodies] @%s の定義行が %d 本 (期待 1)' % (gname, len(lines)))
+        line = lines[0]
+        if line.endswith(old):
+            text = text.replace(line, line[:-len(old)] + new, 1)
+        elif not line.endswith(new):
+            raise SystemExit('[hand_bodies] @%s の初期値が想定外: %s' % (gname, line))
+        done.append('@' + gname)  # 適用済み (再実行) も数える: 件数検査を冪等に保つ
     decls = sorted(set(re.findall(r'@(llvm\.\w+\.f80)\(', ''.join(BODIES.values()))))
     for name in decls:
         line = 'declare x86_fp80 @%s(x86_fp80)' % name

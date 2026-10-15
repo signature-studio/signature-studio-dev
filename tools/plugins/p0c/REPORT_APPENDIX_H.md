@@ -96,6 +96,7 @@
 - 10000 case の追加検証 (同じ修復済み IR を `k80_diff.py --cases 10000`、20.8 秒):
   17 kernel は buf_diff=0。**0x5dffc0 だけ buf_diff=3** (20000 cell 中)。2000 case では 0 だった。
   このため 0x5dffc0 は bit-exact と確定できない (19.3 の未解決)。
+- 測定 commit は `d2e4283a` のまま。その後の差分 (`k80_hand_bodies.py` の GLOBAL_INITS の不一致停止、`p0c4_abi_e2e.py` の置換件数検査と FIX18 コメント) は、素材 `toolchain-retdec` が無い run では再測定できず、**未測定** (19.5)。
 
 ### 19.2 kernel 別の原因と修復
 
@@ -132,3 +133,30 @@
 |---|---|---|
 | 0x5dffc0 の残差 (10000 case で buf_diff=3)。原因は大きい |t| の x87 fsincos 引数縮約と推定 (未確認) | 80 本の bit-exact の 1 本が未達。2000 case の標準では 0 | #3280 [P0c-19] |
 | 手書き本体 (k80_hand_bodies.py) を lift 側の一般修正に置き換えていない。RetDec raw lift の x87 スタック参照・xmm2/xmm3 入替の根本原因は未特定 | 同型の誤りを他 kernel で自動検出できない。本体は関数単位で保守が必要 | #3281 [P0c-20] |
+
+### 19.4 silent miscompile 類型の行案 (docs/DEFECTS.md 形式・PM 判断で採否を決める)
+
+`docs/WORKFLOW.md` §5 に従い、DEFECTS.md は直接編集せず行案だけを書く。ID は仮置きで、採番は PM が行う。
+類型の根拠は機械語との突き合わせ (19.2) で、RetDec のどの pass が原因かは未特定。
+
+| 仮 ID | 層 | 新旧 | 症状 (silent) | 根本原因 | 観測 (証拠) | 検出信号 (機械的) | 修復 |
+|---|---|---|---|---|---|---|---|
+| (案) xmm 引数の入替え | fe | 新規 | 同じ xmm 型の 2 引数 (a=xmm2, b=xmm3) の役割が入れ替わり、(1±a)·b が反転する | RetDec raw lift が xmm2/xmm3 の参照を入れ替える | 0x5dfff0: 修復前 buf_diff 4,000 (2000 case)、修復後 0 | 関数入口の xmm2/xmm3 の live-in と、後続の読み先 (機械語の movss 先) の対応が IR と一致しない | 関数単位の本体 (k80_hand_bodies)。D5 (xmm 引数の取り違え: 整数 reg と混同) とは別。D5 は xmm と整数 reg の取り違え、本件は xmm 引数どうしの入替え |
+| (案) x87 スタック参照のずれ | fe | 新規 | fstp の格納値が別の入力に依存する (f32 出力が全域で不一致) | RetDec raw lift の st(i) 参照の番号がずれる (fxch 列・fstp 後の再参照) | 0x5dee20 (5,168,510)・0x5dee50・0x5e0300・0x5e0350・0x5dedb0・0x5dea40・0x5dec40 の 7 kernel、修復後 0 | 機械語の x87 push/pop 列と IR の fstp 参照先の対応が一致しない | 機械語の push/pop 列どおりの本体 (k80_hand_bodies) |
+| (案) PE 定数の 0 初期化 | fe (未切り分け) | 新規 | グローバル定数が 0 として読まれ、その定数を使う出力が全域で不一致 | IR の `global i128 0` が PE の .data (VA 0x6fffb0 = (0.5, 0.5)) を取り込まない | 0x5e03f0: buf_diff 5,168,510 → 0 | PE の .data 値と IR の global 初期値の照合が無い | GLOBAL_INITS で初期値を設定。D16 (rdata 窓が縮む) とは別機構 (D16 は窓サイズ、本件は窓内の初期値)。D16 の gen_globals 経路で起きたかは未確認 |
+| (案) fistp 範囲外の処理欠落 | fe | 新規 | \|v\|>32767 や NaN で 0x8000 を返すべき所が別の値になる | fistp word の範囲判定 (0x8000 を返す分岐) が IR に無い | 0x5de620: buf_diff 301,144 → 0 | 機械語の fistp 直後の範囲判定 (cmp/cmov) の有無 | rint と範囲判定 (k80_hand_bodies)。#982 (fistp qword の上位 dword store 欠落) と同じ fistp 系だが、store の欠落ではなく範囲外値の変換規則の欠落 |
+
+### 19.5 負論対照 (新しい gate の FAIL 確認): 未実施
+
+- 状態: **数値なし**。この run の素材は `fl-win64` のみで、`work/k80.lift.ll` が無いため `p0c4_abi_e2e.py` は [5] の差分試験 (`k80_diff.py`) まで進めない。FIX18 の検査と CSV 全 kernel の buf_diff 検査が 1 kernel の本体除去で FAIL することは、**まだ観測していない**。
+- この run で確認したこと (合成 IR。kernel の数値ではない): `k80_hand_bodies.py` は BODIES 14 + GLOBAL_INITS 1 = 15 件を返す (1 回目・2 回目とも 15)。2 回目の出力は 1 回目と byte 一致。`@global_var_6fffb0` の初期値が想定外 (`global i128 5`) の場合と定義行が無い場合は rc 1 で停止する。
+- 次の素材付き run で行う手順 (未実行):
+  1. `p0c4_abi_e2e.py 2000` を実行し、`work/diff3/k80.ext.ll` を得る。
+  2. 0x5dfff0 の本体だけを外した IR を作る: `replace_bodies` を BODIES から `function_5dfff0` を除いた dict で呼ぶ (`k80_hand_bodies` を import して出力を `nega.ll` に書く)。
+  3. `k80_diff.py --ir nega.ll --only 0x5dfff0 --cases 2000` の buf_diff を記録する (期待: 0 以外)。FIX18 の検査はこの kernel を `buf_diff≠0` として FAIL にするはず。
+- 起票先: 本 PR #3284 の次の review (素材付き run) で実施する。
+
+### 19.6 検証範囲
+
+- 検証した: `k80_hand_bodies.py` の件数・冪等・不一致停止 (合成 IR)、`p0c4_abi_e2e.py` の構文 (`py_compile`)。
+- 検証していない (素材不足): `p0c_e2e.sh`、`p0c4_abi_e2e.py 2000` (件数検査を通ったかを含む)、19.5 の負論対照。範囲外の主張は弱める。
