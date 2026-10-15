@@ -13,6 +13,8 @@ namespace VSTGUI {
 class CanvasPlatformFactory : public IPlatformFactory
 {
 public:
+	explicit CanvasPlatformFactory (PlatformInstanceHandle) noexcept {}
+
 	uint64_t getTicks () const noexcept override;
 
 	PlatformFramePtr createFrame (IPlatformFrameCallback* frame, const CRect& size, void* parent,

@@ -42,7 +42,7 @@ git diff 887ae3df 2e84269d -- infra/pm-worker/src infra/pm-worker/test | wc -l #
 
 ### 0-4 依存の入れ方 (release-age の診断用の設定)
 
-- 既定設定の `pnpm install --frozen-lockfile` は、lockfile の `miniflare@5.20261012.0-beta`・`wrangler@4.151.0`・`@cloudflare/vitest-plugin@1.4.2` が公開から 24 時間未満のため `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。測定時 (2026-10-14) も `pnpm install --frozen-lockfile --dry-run` で同じエラーを確認した。README『Workers Builds の接続状態と pnpm 経路』の release-age の項と同じ。
+- 既定設定の `pnpm install --frozen-lockfile` は、lockfile に公開から 24 時間未満の版 (一覧は `REPORT_APPENDIX_2653.md` §2) があるため `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で失敗する。測定時 (2026-10-14) も `pnpm install --frozen-lockfile --dry-run` で同じエラーを確認した。README『Workers Builds の接続状態と pnpm 経路』の release-age の項と同じ。
 - 測定は `--config.minimum-release-age=0` を付けて行った。診断用の設定で、lockfile・`pnpm-workspace.yaml` は変えていない (`--frozen-lockfile`)。解除の判断は PM (#2585 の範囲外)。
 - wrangler は `pnpm exec` を使うと、同じ release-age の事前チェックで WARN が出る。このため dry-run は `./node_modules/.bin/wrangler` を直接呼んだ (バージョンは同じ 4.151.0)。
 
