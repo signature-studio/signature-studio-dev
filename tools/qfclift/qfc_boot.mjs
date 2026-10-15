@@ -51,7 +51,7 @@ const stop = steps.find((s) => s.status !== 'ok');
 const out = {
   verdict, soft_calls: softN, steps,
   soft_names: [...new Set(steps.flatMap((s) => s.soft))],
-  stopped_at: stop ? stop.name : null, stopped_by: stop ? (stop.stderr[0] || stop.trap) : null,
+  stopped_at: stop ? stop.name : null, stopped_by: stop ? (stop.stderr.at(-1) || stop.trap) : null,
 };
 writeFileSync(process.env.QFC_OUT, JSON.stringify(out, null, 2));
 console.log('[qfc_boot] verdict', verdict, '| soft calls', softN, '| steps', steps.map((s) => `${s.name}=${s.status}${s.rax ? ' rax=' + s.rax : ''}`).join(' ; '));
