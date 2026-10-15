@@ -176,11 +176,16 @@ export interface PrioIssue {
   state: "open" | "closed";
   labels: string[];
   body: string;
+  // GitHub の sub-issue の親 (sub_issues の webhook で取り込んだ番号。取り込めていなければ未設定 = 継承しない)。本文の『親: #N』が優先 (#3989)。
+  subParent?: number | null;
 }
 
-// 本文の『親: #N』の親が open の issue として引けるときだけその issue を返す。無い・closed・自己参照なら null。
+// 親の番号: 本文の『親: #N』を優先し、無ければ sub-issue の親。どちらも無ければ null。
+const parentNoOf = (i: PrioIssue): number | null => parentOf(i.body) ?? i.subParent ?? null;
+
+// 親 (番号 p) が open の issue として引けるときだけその issue を返す。無い・closed・自己参照なら null。
 function openParentOf(i: PrioIssue, byNo: Map<number, PrioIssue>): PrioIssue | null {
-  const p = parentOf(i.body);
+  const p = parentNoOf(i);
   if (p === null || p === i.number) return null;
   const parent = byNo.get(p);
   return parent?.state === "open" ? parent : null;
