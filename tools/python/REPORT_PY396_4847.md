@@ -42,7 +42,7 @@
 
 - READ の 18 件は `mov r8, rax` で戻り値を次の関数の引数に渡すもの (例 `0x49658b`・`0x497064`・`0x497140`)。戻り値の利用は実在する。ただし `rcx` に Q が載るのは `0x40fc2c` だけ (測定 1) なので、Q の問いには関係しない。
 - RET の 801 件は `rcx` が何であっても戻り値が上位へ伝わる、という意味で、Q が伝わるとは限らない。Q の流れは測定 1 で確定する。
-- 前 run (run 38735524097) の「rax を読む 50 件は全部 stosq の誤検出」は誤りだった。`stosq` は rax の値を格納するので読みとして数える必要がある。本 probe ではそう数える。
+- 前 run (run 38735524097) は rax を読む候補 50 件を `xor eax,eax` 後の `stosq` (ゼロ埋め) と判定した。本 probe は `xor eax,eax` を先に CLOBBER と数えるので、同じ箇所はこの分類に入る (rax の値は 0 で、戻り値ではない)。
 
 ## 測定 3: `0x40fc2c` 周辺 (逆アセ)
 
@@ -57,6 +57,7 @@
 
 ## 測定
 
-- 測定 commit: 本 PR の最後のコード commit (`git log -1 --format=%h -- tools/python/analysis/flapi/pe_ret_propagation.py`)。
+- 測定 commit: `814f2ebba` (probe `pe_ret_propagation.py` を追加した最後のコード commit)。HEAD で再現した。
 - 素材: `$HOME/artifacts/fl-win64.tar.zst` の `extracted/block00031_PE.bin` (22,227,016 B)。展開 2.2 秒。
-- 再現: 上記 2 コマンド。
+- 再現: 上記 2 コマンド。測定 2 は HEAD で 0.6 秒 (1725 件)。測定 1 は 46.6 秒 (load は未計測)。
+- 差分: `git diff 814f2ebba HEAD -- tools/python/analysis` は REPORT 追記のみで、解析コードは変わらない。
