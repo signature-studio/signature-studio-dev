@@ -101,7 +101,7 @@ for (const id of ids) {
   notImpl ? unimpl++ : impl++;
 }
 // 実装 = MCP 静的 60 + device 5 (MIDI scripting 用、tests/device_diff.mjs が mock と照合) + MIDI 経路 5 (mig) + PE 確定 1 (pe39) + PE 引数書式・範囲 5 (pe40・#1529) + PE 確定 1 (pe102・#2883) + stub 確定 6 (stub41) + PE 確定 2 (pe101) + PE 確定 2 (pe100) + stub 確定 2 (stub89) + PE 確定 4 (pe87) + PE 確定 7 (pe94・#2830) + PE 確定 9 (pe95・#2831) + PE 確定 4 (pe96・#2832) + PE 確定 1 (pe115) + PE 確定 5 (pe121) + ui PE 確定 6 (pe119・#2980) + ui setter・getVersion 3 件 (pe130・#3007) + general PE 確定 6 (pe119set・#2977) + arrangement PE 呼出し 6 (pe152・#2983) + arrangement PE 戻り str 2 (pe143・#3041) + ui 表示・メニュー 6 (pe121_2982・#2982) + general PE 確定 2 (pe125・#3001) + general PE 確定 1 (pe235・#3701) + launchMapPages PE 確定 1 (pe120・#2984) + launchMapPages 書式・戻り 3 件 (pe138・#3029) + channels PE 判定順 1 (pe76・#2563) + patterns グループ 2 (pe172・#3219) + PY61 確定 7 (pl61・#2027) + device PE 確定 7 (pe206・#3494) + device 連動 1 (pe215・#3568) + patterns 数え・選択 4 (pe179・#3271) + mixer PE 確定 2 (pe205・#3493) + ui ブラウザ 3 件 (pe132・#3013) + ui PE 確定 2 (pe133・#3014) + ui PE 確定 2 (pe128・#3005) + screen 初期化・メニュー 10 (pe136・#3025) + screen 描画・メーター 7 (pe135・#3022)
-assert.equal(impl, 204); assert.equal(unimpl, 231);
+assert.equal(impl, 206); assert.equal(unimpl, 229);
 
 // 2. エラー code (C 側): range / wrong param / 型 / unspecified
 const E = (name, ...a) => direct(name, ...a);
