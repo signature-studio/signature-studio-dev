@@ -202,3 +202,39 @@ LB=0: `17b078a1` の repro (17.0 s)・`9a00a57c` の repro (16.9 s)・`var_C` (1
 | LB=0 と LB=0x10000 の unit 結果差 8 件 (特に unit 40 の Halt0・unit 745 の oob) の原因 | LB 依存の寛容起動の結果が変わる。silent 誤りの可能性 | 子 issue (本 PR の Closes #3160 の後に起票) |
 | 元の 600 s 打ち切りの原因 (本 snapshot では再現せず) | 報告の根拠が再現しない | 本 issue の §6-3 に記録。再現には lift_pe.sha256 付きの完全な成果物が要る |
 | LB=0 寛容起動の pin (874/67) と snapshot の値 (867/74) の差 | gate 数値の基準が snapshot と不一致 | PM 確認 (`--full` 再生成での再測定が要る) |
+
+## 7. #3296: function_412770 の rep movsq 源 `ptr null` の修正 (受入 1 達成・受入 2 未達)
+
+測定主体: 本 PR の作業 runner (2026-10-15)。素材: fl-win64 (`block00031_PE.bin`)・work-m11 (`tools/m11/work`)・emsdk (`/opt/emsdk`)。
+測定 commit: `3b6651de` (コードを変えた最後の commit)。`git diff 3b6651de HEAD -- tools/m11 ':(exclude)tools/m11/REPORT*'` の出力は空 (差分 0)。
+
+### 7-1 機械語と lift IR
+
+- 機械語 (VA 0x412790〜0x41279b): `mov rsi,[rax]` (rax = arg1) → `mov rdi,rax; mov ecx,0x25; rep movsq` (37 qword)。源は `[arg1+0]` の**値** (1 段 deref)。
+- lift 段 (`tools/m11/work/boot0.lift.ll`) から既に `call @__asm_rep_movsq_memcpy(ptr %4, ptr null, i64 37)`。`ptr null` の源は boot_final.ll でも lift でもこの 1 箇所だけ。
+- 修正: `tools/m11/ldfix/fix_src412770.py` (gen_ir2 で ldfix の後に適用。対象行が 1 件でない・二重適用・第 1 仮引数が `ptr %arg1` でない場合は assert で停止)。`load i64 [arg1+0]` → `inttoptr` → 源に置換。
+
+### 7-2 LB 別の再現 (`bash tools/m11/m11_lb_tolerant_repro.sh <LB> <出力>`)
+
+| 条件 | wall | ok / miss / oob / halt0 / abort / noproc |
+|---|---|---|
+| LB=0 修正前 (`repro_lb0`) | 16.7 s | 868 / 47 / 19 / 7 / 0 / 1 |
+| LB=0 修正後 (`fix_lb0`) | 16.6 s | 868 / 47 / 19 / 7 / 0 / 1 |
+| LB=0x10000 修正前 (`repro_lb10000`) | 20.1 s | 868 / 47 / 16 / 8 / 2 / 1 |
+| LB=0x10000 修正後 (`fix_lb10000`) | 19.7 s | 868 / 47 / 16 / 8 / 2 / 1 |
+
+- `m11_lb_unit_diff.py` の kind 差は、修正前 (`repro_lb0` vs `repro_lb10000`) も修正後 (`fix_lb0` vs `fix_lb10000`) も **8 件** (unit 40・153・158・291・296・304・555・745。§6-2 と同じ)。
+- 修正前後の unit 結果差は **0** (`fix_lb0` vs `repro_lb0`、`fix_lb10000` vs `repro_lb10000`)。修正は unit 結果を 1 件も変えなかった。
+- 解釈 (推定・未確認): 源が `[arg1+0]` の値で、その値が 0 なら修正後も address 0 を読むので LB 依存は残る。寛容起動の harness で arg1 先の値が 0 である可能性が高い。機械語どおりの読みは正しいが、LB 依存の直接原因ではない。
+- 受入 1 (機械語どおりの load に戻す lift 修正) は達成。受入 2 (kind 差 0) は未達。
+
+### 7-3 新類型の行案 (`docs/DEFECTS.md` 用・ID 未付与・PM が登録)
+
+`NULL 源の rep movsq`: lift 段が機械語 `mov rsi,[rax]` (1 段 deref の load) を脱落させ、rep movsq の源を `ptr null` にする。NULL 源は wasm の address 0 を読むため、address 0 の中身 (LB=0 は PE ヘッダ・LB=0x10000 は 0 埋め) で結果が LB 依存になる。検出: boot_final.ll に `__asm_rep_movsq_memcpy(ptr ..., ptr null, ...)` (本件 1 件)。修正: `ldfix/fix_src412770.py` (本件のみ・一般化は未実施)。
+
+### 7-4 未解決 (起票先)
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| LB 依存 unit 差 8 件 (40・153・158・291・296・304・555・745) の原因。修正後も不変。arg1 先の値・unit 40 の Halt 経路・unit 153/158 の OOB の発生箇所は未特定 | 寛容起動の LB 別の結果が違う (silent 誤り)。受入 2 未達 | 子 issue [M11-N181] |
+| issue 本文の `tools/m11/m11_lb_ir_fn_diff.py` は repo に存在しない | 関数単位の IR diff (`function_412770`) の再現コマンドが使えない | 本 PR では未対応。issue 本文の修正は PM |
