@@ -7,7 +7,7 @@
 ## 測定条件
 
 - 測定 commit: `2267e738e` (コード変更の最後の commit。`git diff 2267e738e HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行)。基点 `549edb5ea` (origin/main)。
-- 素材: `work-m11` (展開先 `tools/m11/work`)・`fl-win64` の `extracted/block00031_PE.bin` (`$RUNNER_TEMP/win64`)・`/opt/emsdk`。
+- 素材: `work-m11` (展開先 `tools/m11/work`)・`fl-win64` の `extracted/block00031_PE.bin` (`$RUNNER_TEMP/win64`)・emsdk (`[EMSDK]`)。
 - IR: `bash m11_gen_ir2.sh` (41 s)。`ir_sha256` 生成直後 `597757f4…` (#3643 と同じ)。build 後 `362e47a9…`。
 - survey は直列 1 本、各条件 n=1。`node m11_survey.mjs` は約 12 s。build は `rm -f work/obj/ov.o` の後に実行 (約 22 s)。uptime load 0.8〜1.2 (1 分値)。
 
