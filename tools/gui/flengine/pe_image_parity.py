@@ -93,9 +93,10 @@ def main():
                 bad_sh = [(n, lo, bytearray(sd), fx) for (n, lo, sd, fx) in shared]
                 for (n, lo, sd, fx) in bad_sh:
                     if n == ".data":
+                        base = lo - lb
                         for r in pe.dir64_relocs():
-                            if lo - lb <= r < lo - lb + len(sd) - 8:
-                                off = r - (lo - lb)
+                            if base <= r <= base + len(sd) - 8:
+                                off = r - base
                                 v = struct.unpack_from("<Q", sd, off)[0]
                                 if pe.base < v < pe.base + pe_image.IMG_SPAN_M11:
                                     sd[off] ^= 1      # 補正済み 1 スロットの最下位ビットを反転
@@ -116,7 +117,7 @@ def main():
         # 状態の突合: runtime 方式 (RetDec 経路) の補正数が lva 方式と整合する
         img, offs, st = pe_image.runtime_image(pe, skip=(".text",))
         ds = [s for s in pe.sections if s[0] in (".data", ".rdata")]
-        n_in = sum(1 for r in pe.dir64_relocs() if any(lo <= r < lo + vs - 8 for (_n, lo, vs, _d) in ds))
+        n_in = sum(1 for r in pe.dir64_relocs() if any(lo <= r <= lo + vs - 8 for (_n, lo, vs, _d) in ds))
         lva_fixed = sum(fx for (_n, _lo, _sd, fx) in pe_image.rebase_sections(pe, (".rdata", ".data"), 0))
         print("[parity] INFO runtime 方式 (.text 除外・image 内宛のみ): %s / data 系 DIR64 スロット %d / lva 方式の補正 %d" % (st, n_in, lva_fixed))
     print("[parity] done → exit %d" % rc)
