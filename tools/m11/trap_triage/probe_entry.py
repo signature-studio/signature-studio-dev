@@ -46,6 +46,7 @@ void m11_pe(u64 fn, u64 a1, u64 a2, u64 a3, u64 a4) {
     fprintf(stderr, "[pe] %llx a=%llx %llx %llx %llx | [a1]=%llx [a1+8]=%llx [[a1+8]+8]=%llx [[a1+8]+0x10]=%llx\n", fn, a1, a2, a3, a4, q(a1), l, q(l + 8), q(l + 0x10));
     if (fn == 0x407a50ULL) { u64 p = a1 - 8; fprintf(stderr, "[raw407] a1=%llx p=%llx v=%llx\n", a1, p, rd64(p));
         if (a1 < 2601) { u64 b = rd8(18770492ULL + (a1 + 7) / 8); u64 rb = 16404744ULL + 16 * b; u64 n = rd64(rb + 8); u64 m = rd64(n + 24); fprintf(stderr, "[chain407] b=%llx rbx=%llx n=%llx m=%llx m-8=%llx\n", b, rb, n, m, m - 8); } }
+    if (fn == 0x412e40ULL && a2 <= 16) { for (u64 i = 0; i < a2; i++) { u64 s = a1 + 8 * i; fprintf(stderr, "[arr412] n=%llx i=%llx slot=%llx\n", a2, i, in_img(s) ? *(volatile u64*)(uintptr_t)s : 0xdeadULL); } }
 }
 ''')
 if WATCH:   # 各 fn 入口で chain を読み, 前回から値が変わっていたら「直前の fn の入口〜この fn の入口の間」に書込みがあったと出す
