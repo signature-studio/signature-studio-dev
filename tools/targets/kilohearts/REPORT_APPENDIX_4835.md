@@ -5,25 +5,25 @@ PR #4866 のレビュー指摘 (round 1・round 2) への対応。
 
 ## 現状 (現 HEAD の規則 = `delay` 29 件・`stereo` 38 件)
 
-- 測定 commit (コードを変えた最後の commit): `7e697bb67` (main `a823ed40b` を取り込んだ merge)。基点: `a823ed40b` (PR 前の main の取り込み先)。
-- `git diff a823ed40b 7e697bb67 -- tools/targets/kilohearts/ghidra_route`: `patches.py` の `delay 2666` 追加 1 件のみ (+4 行)。
-- 規則の内訳: `delay` 29 件 = main 側 28 件 + 本 PR の `delay 2666`。`stereo` 38 件 = main と同じ。`delay 2666` は stereo に入らない。`delay 4329` は撤回済み (下の節)。
-- 測定条件: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)。`[GHIDRA]` 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21 (temurin-21)。`gtype_census.sh` を `7e697bb67` と `a823ed40b` (`git archive`) に適用。FX = `bitcast,intload,stackpair,assoc,concat,gtype`・n=1。
-- 実測 (`7e697bb67` = 現 head / `a823ed40b` = 基点):
+- 測定 commit (コードを変えた最後の commit): `fda9d1c52` (main `0f5bcaa89` の取り込み merge)。基点: `0f5bcaa89` (`origin/main`)。
+- `git diff 0f5bcaa89 fda9d1c52 -- tools/targets/kilohearts/ghidra_route`: `patches.py` の `delay 2666` 追加 1 件のみ (+4 行)。
+- 規則の内訳: `delay` 29 件 = 基点 28 件 + `delay 2666`。`stereo` 38 件 = 基点と同じ。`delay 2666` は stereo に入らない。`delay 4329` は撤回済み (下の節)。
+- 測定条件: 素材 `plugins-kilohearts` (Installer zip → `payload.dat` → `windows.zip/1ccb1df8c8f10745` → `HeartCore.core_64` 76,642,304 B)・`toolchain-emsdk` (emcc 6.0.12)。`[GHIDRA]` 12.1.4 (zip sha256 先頭 16 桁 `ddac49f903da9d5b` 一致)・JDK 21 (temurin-21)。`gtype_census.sh` を `fda9d1c52` と `0f5bcaa89` (`git archive`) に適用。FX = `bitcast,intload,stackpair,assoc,concat,gtype`・n=1。
+- 実測 (`fda9d1c52` = 現 head / `0f5bcaa89` = 基点):
 
-| 項目 | `a823ed40b` (基点) | `7e697bb67` (現 HEAD) |
+| 項目 | `0f5bcaa89` (基点 = origin/main) | `fda9d1c52` (現 HEAD) |
 |---|---|---|
-| delay emcc error 行 (合計) | 339 | 338 |
+| delay emcc error 行 (合計) | 338 | 337 |
 | 引数数不一致 | 80 | 79 |
 | レーン型 (128bit) | 167 | 167 |
-| 演算・代入・ポインタの型不一致 | 92 | 92 |
+| 演算・代入・ポインタの型不一致 | 91 | 91 |
 | delay 閉包 decompile | 151/151 OK | 151/151 OK |
 | `ghidra_to_c.py delay` の `ABI rule hit` | — | assert 通過 (rc=0)・全件 1 |
 | Gain / Haas / Gate の `.o` | 1435 / 3217 / 3756 B | 1435 / 3217 / 3756 B |
 | Gain / Haas / Gate の生成 C (`cmp`) | 一致 (4643 / 11255 / 15282 B) | 同左 |
 | Stereo の生成 C (`cmp`) | 一致 (3867341 B) | 同左 |
 
-- 差分 1 件 (引数数不一致 80→79・合計 339→338) は `delay 2666` (`FUN_180fbbfb8` → `FUN_180fbdfcc`) の効果。
+- 差分 1 件 (引数数不一致 80→79・合計 338→337) は `delay 2666` (`FUN_180fbbfb8` → `FUN_180fbdfcc`) の効果。
 - `delay` 規則は `name == 'delay'` のときだけ適用される。ただし `ABI['stereo']` へは `FUN_180fd4f30(` を呼ぶ `delay` 規則 22 件が合流する (`patches.py` 136 行)。`delay 2666` の置換先は `FUN_180fbdfcc(...)` のため stereo には入らず、Stereo の生成 C は基点と一致 (`cmp`)。
 - census の合計は FX (`--fix` の組み合わせ) に依存する。上の値は上記 FX 条件でのみ有効。
 
