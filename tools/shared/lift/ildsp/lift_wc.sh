@@ -21,15 +21,15 @@ if [ "$MODE" = all ]; then
 fi
 DLL="${ILDSP_DLL:-$FL_WIN64_DIR/extracted/block24360_PE.bin}"
 [ -f "$DLL" ] || { echo "[ildsp-wc] DLL not found: $DLL (FL_WIN64_DIR=${FL_WIN64_DIR:-})"; exit 2; }
-W="$ROOT/work/lift/ildsp-wc"; mkdir -p "$W"
+W="$ROOT/work/lift/${WC_WORK:-ildsp-wc}"; mkdir -p "$W"
 source "${EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" >/dev/null 2>&1
 
-# 閉包の root: CreateInstance と vtable 0x3e01b0 の slot 先 (ildsp_closure.py の出力と一致する値)
+# 閉包の root: CreateInstance と vtable 0x3e01b0 の slot 先 (ildsp_closure.py の出力と一致する値)。WC_ROOTS で差し替え可 (lift_psola.sh)
 SIZE=$(python3 -c "import pefile,sys; pe=pefile.PE(sys.argv[1], fast_load=True); print(hex(pe.OPTIONAL_HEADER.SizeOfImage))" "$DLL")
-python3 - "$W/entries.json" <<'PY'
+python3 - "$W/entries.json" "${WC_ROOTS:-0x1ac470 0x1a9cf0 0x1a9f10 0x1a9e10 0x1a9de0 0x1aa0b0 0x1ac460}" <<'PY'
 import json, sys
 IMG = 0x180000000
-rvas = [0x1ac470, 0x1a9cf0, 0x1a9f10, 0x1a9e10, 0x1a9de0, 0x1aa0b0, 0x1ac460]
+rvas = [int(x, 0) for x in sys.argv[2].split()]
 json.dump({'roots': [IMG + r for r in rvas], 'calltgt': []}, open(sys.argv[1], 'w'))
 PY
 rm -rf "$W/lift"

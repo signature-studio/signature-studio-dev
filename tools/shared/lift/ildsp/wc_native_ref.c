@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
             uint64_t acc = inst;
             for (int k = 0; k < WC_CALL_SLOTS; k++) {
                 uint64_t r = ((FN4)(img + WC_SLOT_RVA[k]))(inst, WC_ARENA + 0x8000, 0, 0);
-                acc = acc * 31 + r;
+                if ((WC_RET_MASK >> k) & 1) acc = acc * 31 + r;
             }
             rax = acc;
             ualarm(0, 0);
