@@ -128,7 +128,7 @@ git diff a65a71ed1 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md
 
 **kh249_check の前提**: `product_index.json` は `KH_SRC=<素材の展開先>` で `scripts/kh249_product_index.py` を走らせて生成する (素材の所在は既定 `~/ダウンロード`)。
 
-測定 commit から HEAD までのコード差分 (`git diff 56254af13 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md'`) は 0 行ではない (#3307 の `lift/gen_simd.py` 等。§8.3 で 313 の sha を動かすことを確認)。§8 の値は HEAD (`091c68915`) 基準で読む。
+測定 commit から HEAD までのコード差分 (`git diff 56254af13 HEAD -- tools/targets/kilohearts/license ':!*KH656_REPORT*.md'`) は 0 行ではない (#3307 の `lift/gen_simd.py` 等。§8.3 で 313 の sha を動かすことを確認)。§8 の値は測定 commit `091c68915` 時点の値。HEAD `e71682521` (main 取り込み後の `lic_build.py`・`kh_lower.py`・`lic_config.json` の差分込み) では未測定。
 
 ### 8.1 #4272: lift-8 の sha 差分の内訳 (実測)
 
@@ -179,7 +179,7 @@ section 単位の内訳: **未測定**。
 - 受入 1: lift-8 の off 側 globals (9 件) を記録 (§8.1)。
 - 受入 2: 未達。sha 差分の section 単位の内訳・global の寄与・code の差の位置は未測定 (§8.1)。残りは #4547 へ移す。
 - 受入 3: 313 で `raw_va` の値 store の比較 (§8.2)。文字列 VA の 84 行だけが変わる。
-- 受入 4: 未測定の箇所は本文に未測定と明記した。未測定の範囲: lift-8 の `56254af13` での値 (`gen_simd.py` の lift-8 への影響の有無)・sha 差の section 内訳。HEAD 基準の値だけを結論に使う。
+- 受入 4: 未測定の箇所は本文に未測定と明記した。未測定の範囲: lift-8 の `56254af13` での値 (`gen_simd.py` の lift-8 への影響の有無)・sha 差の section 内訳。結論に使うのは測定 commit `091c68915` 時点の値だけ (HEAD `e71682521` での再測定は未実施)。
 - `kh656_closure.py --rounds 4` は収束せず `FAIL` になる (`lic_config.json` の F ブロックを書き換えた状態で終わるため、測定後は HEAD に戻した)。収束の再確認は本 issue の範囲外。
 - 閉包の 4 ラウンド不収束は #1817 (KH-28) の範囲。
 
