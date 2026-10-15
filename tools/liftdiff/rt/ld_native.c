@@ -5,6 +5,7 @@
 #define _GNU_SOURCE
 #include "ld_core.h"
 #include <signal.h>
+#include <sched.h>
 #include <setjmp.h>
 #include <ucontext.h>
 #include <sys/mman.h>
@@ -161,7 +162,7 @@ static void step_end(void) {
 
 /* LD-129 (#2770): VA への書込み監視。env LD_WATCH_ADDR=<VA hex>・LD_WATCH_OUT=<path> で有効 (既定は無効)。
  * 監視 page を PROT_READ|PROT_EXEC にし、書込みの SIGSEGV で書込み命令の RIP・書込み先を採る。
- * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行う。結果が変わらないことは未確認。REPORT_APPENDIX_2770.md §8.4)。
+ * TF で書込み 1 命令だけ実行させてから page を戻す (書込みはそのまま行う。CPU 固定下の boot 状態は不変: REPORT_APPENDIX_2770.md §8.9。page 保護を変えるため読取りのみではない: #3648)。
  * 記録は書込み先の開始アドレスが va-15..va+7 にあるもの (書込み幅 16 以下を想定)。重ならない書込みも含む superset で、取りこぼしは無い。
  * TF の待ち (g_wp_pend) の間は SIGALRM を block する (timeout で page が RWX のまま残るのを防ぐ)。
  * LD_STEP_N・trace と同時には使わない。 */
@@ -336,6 +337,8 @@ static char* g_line; static size_t g_linecap;
 int main(int argc, char** argv) {
   if (argc < 2) { fprintf(stderr, "usage: ld_native <pe>\n"); return 2; }
   setvbuf(stdout, NULL, _IOFBF, 1 << 20);
+  const char* pin = getenv("LD_PIN_CPU");   /* #2770: boot 状態は実行 CPU 番号に依存する (§8.9)。比較時は env で CPU を固定する */
+  if (pin && *pin) { cpu_set_t cs; CPU_ZERO(&cs); CPU_SET(atoi(pin), &cs); if (sched_setaffinity(0, sizeof cs, &cs)) { perror("LD_PIN_CPU"); return 6; } }
   if (load_pe(argv[1])) return 3;
   install_signals();
   wp_arm();
