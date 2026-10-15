@@ -840,6 +840,8 @@ export class Engine {
     }
     const relaunch: ClassifyInput["relaunch"] = {};
     for (const [k, v] of this.d.store.all<{ count: number; art: string | null }>("relaunch")) relaunch[k] = v;
+    const pmAt: Record<string, string> = {};
+    for (const [k, g] of Object.entries(s.sig)) if (g.pmAt) pmAt[k] = g.pmAt;
     const launchState: Record<string, LaunchState> = {};
     const launchDoneAt: Record<string, string> = {};
     for (const [k, v] of this.d.store.all<LaunchObs>("launchObs")) {
@@ -848,7 +850,7 @@ export class Engine {
     }
     return {
       snap: { issues, prs, runs, bot_last, bot_report, pm_art: s.pmArt },
-      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, launchDoneAt, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason },
+      input: { nowMs: this.d.now(), launched: s.launchedAt, launchState, launchDoneAt, relaunch, manualDeps: this.d.cfg.manualDeps, liveBlockers, fullBotBody, reportBody, outcomeReason, pmAt },
       unknown,
     };
   }

@@ -119,6 +119,36 @@ test("分類: STOP_RE の判定から run-outcome と PM マーカーの本文�
   assert.deepEqual(marked.recent.map(([n]) => n), [70]);
 });
 
+test("分類 (#5226): PM の判断 (bot の最後のコメント以降の PM 応答) で bot コメントの窓 1.5h を解く", () => {
+  const now = Date.parse("2026-10-16T12:00:00Z");
+  const botAt = new Date(now - 10 * 60_000).toISOString();
+  const snap: Snapshot = {
+    issues: [{ number: 71, title: "[X-2] t", labels: [], body: "", deps: null }],
+    prs: [],
+    runs: [],
+    bot_last: { "71": { at: botAt, head: "<!-- oc-pm-decision: rule=R4 reversible=yes -->", art: null } },
+    bot_report: {},
+    pm_art: {},
+  };
+  const input = (pmAt?: Record<string, string>): ClassifyInput => ({
+    nowMs: now,
+    launched: {},
+    relaunch: {},
+    manualDeps: {},
+    liveBlockers: {},
+    fullBotBody: { "71": "<!-- oc-pm-decision: rule=R4 reversible=yes -->" },
+    reportBody: {},
+    outcomeReason: {},
+    ...(pmAt ? { pmAt } : {}),
+  });
+  assert.deepEqual(classify(snap, input()).rows.recent.map(([n]) => n), [71], "対照: PM 応答が無ければ窓の中は recent (旧挙動)");
+  const before = new Date(now - 20 * 60_000).toISOString();
+  assert.deepEqual(classify(snap, input({ "71": before })).rows.recent.map(([n]) => n), [71], "PM 応答が bot コメントより古ければ窓は解けない");
+  assert.deepEqual(classify(snap, input({ "71": botAt })).rows.recent, [], "PM 応答が bot コメントと同時刻以降なら窓を解く");
+  assert.deepEqual(classify(snap, input({ "71": new Date(now - 5 * 60_000).toISOString() })).rows.recent, [], "PM 応答が後なら窓を解く");
+  assert.deepEqual(classify(snap, input({ "71": new Date(now - 5 * 60_000).toISOString() })).rows.ready, [71], "窓が解けたら ready に戻る");
+});
+
 test("分類 (#2651): oc:hold の issue は hold 行に置き、launch の行 (ready・relaunch・stopped・recent) に入れない。ラベルを外すと ready に戻る", () => {
   const now = Date.parse("2026-10-14T12:00:00Z");
   const issue = (n: number, labels: string[], body = "") => ({ number: n, title: `[X-${n}] t`, labels, body, deps: null });

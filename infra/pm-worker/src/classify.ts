@@ -68,6 +68,8 @@ export interface ClassifyInput {
   reportBody: Record<string, string>;
   // 最後の run-outcome の reason (stop / split / blocked / artifact / unknown)。素材による再投入は artifact のときだけ。
   outcomeReason: Record<string, string>;
+  // PM の応答の最新時刻 (sig.pmAt)。bot の最後のコメント以降に PM の応答があれば、その bot コメントの窓 (BOT_COMMENT_WINDOW_H) は解けている (#5226)。
+  pmAt?: Record<string, string>;
 }
 export interface Rows {
   blocked: Array<[number, number[]]>;
@@ -90,6 +92,9 @@ const WORD = "\\p{L}\\p{N}_\\-";
 function wordBounded(a: string): RegExp {
   return new RegExp(`(?<![${WORD}])${a}(?![${WORD}])`, "u");
 }
+
+// PM の応答 (pmAt) が bot の最後のコメント (botAt) 以降なら、PM はその後に判断済み。窓を解く (#5226)。
+const pmAnswered = (pmAt: string | undefined, botAt: string): boolean => !!pmAt && Date.parse(pmAt) >= Date.parse(botAt);
 
 const lines = (s: string): string[] => s.split(/\r\n|\r|\n/);
 const allNums = (s: string): number[] => [...s.matchAll(/#(\d+)/g)].map((m) => Number(m[1]));
@@ -271,7 +276,7 @@ export function classify(d: Snapshot, input: ClassifyInput): Classified {
         if (!cand && material && newArts(rep?.art, base).length) cand = rep?.art ?? null;
         if (cand && rl.count < 2 && cand !== rl.art) rows.relaunch.push([n, cand]);
         else rows.stopped.push([n, head90(bl.head)]);
-      } else if (bl && ageH(bl.at) < BOT_COMMENT_WINDOW_H) {
+      } else if (bl && ageH(bl.at) < BOT_COMMENT_WINDOW_H && !pmAnswered(input.pmAt?.[k], bl.at)) {
         rows.recent.push([n, `bot comment ${fmt1(ageH(bl.at))}h ago`]);
       } else if (bl && ageH(bl.at) < 24 && stopHit) {
         const rl = rlOf(n);
