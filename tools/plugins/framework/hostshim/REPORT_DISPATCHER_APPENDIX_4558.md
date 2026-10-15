@@ -5,7 +5,7 @@
 ## 1. 測定条件
 
 - 基準 commit: `origin/main` (`7033a7bad`)。測定 commit: 本 PR の最後の commit (`hs_p56_callers.py` 追加。コードを変えた最後の commit)。
-- 素材: `fl-win64` の `extracted/block00031_PE.bin` (22,227,016 B) を `$RUNNER_TEMP/fl-win64` に展開。`work-fw-stage1` を展開し、`fw_stage2.sh` を走らせて stage-2 の 8 件 (`fw_flat4_canon3.ll` 等) を再生成した。`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12。`tools/m1/flags.sh` の pin と一致) として使用。
+- 素材: `fl-win64` (`[WIN64]`) の `extracted/block00031_PE.bin` (22,227,016 B) を展開して使用。`work-fw-stage1` を展開し、`fw_stage2.sh` を走らせて stage-2 の 8 件 (`fw_flat4_canon3.ll` 等) を再生成した。`toolchain-emsdk` は `/opt/emsdk` (emcc 6.0.12。`tools/m1/flags.sh` の pin と一致) として使用。
 - Python: `uv` で venv を作り `unicorn 2.1.4`・`pefile`・`capstone 5.0.7` を入れた。
 - load: 測定中 1.3 前後 (`uptime` 10:02 時点で 1.34)。実行は n=1。
 
