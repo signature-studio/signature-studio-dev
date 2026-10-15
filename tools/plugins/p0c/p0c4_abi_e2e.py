@@ -196,7 +196,7 @@ def main():
         if r is None or r[7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, r[7] if r else 'not-run'))
     # #277: native crash (sig) の kernel が 0 / 対象 B の 6 kernel が ok モデルで CSV に出る
-    # (0x5e12b0 は #3439 で ucomiss の被演算子・flags を接続して ok になった: REPORT_APPENDIX_H §20)
+    # (0x5e12b0 は #3439 で ucomiss の被演算子・flags を接続して ok になった: REPORT_APPENDIX_I §21)
     for k in sorted(rows):
         if rows[k][7].startswith('sig'):
             fails.append('%s %s (期待: sig なし)' % (k, rows[k][7]))
