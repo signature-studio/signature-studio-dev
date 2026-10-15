@@ -105,9 +105,19 @@ unit 40 の前後 (u32 の下位 4B) を LB 別に読んだ値 (`M11_TOLERANT_PE
 - peek: `M11_TOLERANT_PEEK=<addr,..> M11_TOLERANT_PEEK_UNITS=40 node tools/m11/m11_tolerant.mjs` (build 済みの `work/m11_boot.cjs` を使う。アドレスは LB 分ずらす)
 - 既定 (計測 OFF): `bash tools/m11/m11_lb_tolerant_repro.sh 0 work/head_lb0` と `... 0x10000 work/head_lb10000` → `m11_lb_unit_diff.py` で kind_diff 8 (§3)
 
-## 8. function_4128b0 入口の分岐値の観測 (#4457・受入 1 達成・受入 2/3 は未達)
+## 8. function_4128b0 入口の分岐値の観測 (#4457・受入 1 達成・受入 3 達成・受入 2 未達)
 
 測定 commit: `bcdf045f7` (`M11_INSTR_4128B0` 配線。計測 env の既定は 0)。素材は `fl-win64`・`work-m11`・`toolchain-emsdk` (`[EMSDK]` 6.0.12)。
+
+- **測定 commit 以降の測定対象コード差分** (`git diff bcdf045f7 424a6373b -- tools/m11/m11_ov.c tools/m11/m11_post.py tools/m11/m11_build.sh`。`m11_build.sh` は差分 0):
+  ```diff
+  -    unsigned long long a1 = R(0xfa5008), a2 = R(0x11dadb0), a3 = R(0x11daddc);
+  +    unsigned long long a1 = R(0xfa5008), a2 = R(0x11eadb0), a3 = R(0x11eaddc);
+  +            // #4184 (LD-200): POINT は 8 バイト値渡し (x64 rcx = x | y<<32)。下位 32bit が x、上位が y
+  ```
+  (`m11_ov.c` の番地 2 行と `m11_post.py` の注釈 1 行。`m11_ov.c` の番地修正は既定 OFF の経路を変えない。ON 観測の読み先だけ変わる)
+- 本 PR の `tools/m11` 全体の差分 (23 ファイル・+6379/-27) は main 取り込みを含むため、測定対象の差分ではない。
+- **未再測定**: 上の番地修正後の再測定 (§8-1・§8-2 の全値) は、本 run に `work-m11`・`toolchain-emsdk` が無く未実施 (§8-3)。以下の §8-1・§8-2 の ON 値は修正前の誤番地の読みで、結論に使わない。
 
 - 観測点: `function_4128b0` の入口 (`m11_post.py` の wrapper + `m11_ov.c` の `m11_4128b0_obs`)。`M11_INSTR_4128B0=1` のときだけ入る。`function_412770` の強定義 (`m11_ov.c`) は観測点にしない (§2)。
 - 番地 (LB=0 の番地): `[0xFA5008]` (16404488 = 0xFA5008)・`[0x11EADB0]` (18787760)・`[0x11EADDC]` (18787804, GetCurrentThreadId 比較の相手)。LB=0x10000 は +0x10000 (16470024 / 18853296 / 18853340)。
