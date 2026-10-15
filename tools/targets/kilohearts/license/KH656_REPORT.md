@@ -148,7 +148,7 @@ kh_180ef7fc0 → kh_18012e420 → kh_1801d3b60 → kh_180138750 → kh_180138a30
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `rcx` (`[rsp+32]`) の設定元と、`[rcx]` に入る値 (絶対 VA か stack 由来か) | 原因 (lift 誤り / 配置) と DEFECTS 類型 ID の判定 | #1821 継続 |
+| (解決・付録) `[rcx]` の値 = `.rdata` 文字列 `"invalid hash bucket count"` の生 VA `0x1813d2203`。配置の問題で DEFECTS **D11** (loud)。詳細は `KH656_REPORT_APPENDIX_1821.md` §1〜§3 | 受入 2 は達成。解消は子 issue (付録 §6) | #1821 |
 
 ## 8. 閉包展開の再試行 (#1761 / KH-27、実測)
 
