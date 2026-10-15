@@ -35,7 +35,7 @@ echo "[fix_d17_e2e] ネガコン: 修復を外した audit では突合が FAIL 
 nogate="$("$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill_nogate.ll" \
   --tsv "$HERE/results/spill37_1169.tsv" --gate none)" || exit 1
 echo "$nogate" | head -1
-echo "$nogate" | head -1 | grep -q '^spill fixed=30 skipped=0 ' || { echo "[fix_d17_e2e] FAIL: ネガコン 2 (--gate none) が TRUE_DROP 30 件を書き換えない" >&2; exit 1; }
+echo "$nogate" | head -1 | grep -q '^spill fixed=30 skipped=0 ' || { echo "[fix_d17_e2e] FAIL: ネガコン 2 (--gate none) が 30 件を書き換えない" >&2; exit 1; }
 gate1="$("$PY" "$HERE/fix_spill_2794.py" "$OUT/boot_d17.ll" "$OUT/ssa_base.json" "$IMG" "$CFG" "$OUT/boot_spill_1to1.ll" \
   --tsv "$HERE/results/spill37_1169.tsv" --gate 1to1)" || exit 1
 echo "$gate1" | head -1
