@@ -1,20 +1,24 @@
-/* ks_semantic_vf_kh.c — KH VocalFilter (formant process 0x18085a730) を実機機械語で同一シナリオ実行 (ks_semantic_filter_kh.c の複製・VA と説明だけ差替え)。
- *   ks_semantic_filter_kh <core_64> <ncases> <seed>
- * 呼び出し形は ks_semantic_gain.c の KH 側と同じ: process(this=rcx, ctx=rdx, aud=r8)。
- * 読み (objdump の逆アセンブル、tools/targets/freshair/REPORT_APPENDIX_FA39.md §2):
- *   aud : L/R の float ポインタ @0/@8、n @0x28 (int)
- *   ctx : P = *(ctx+0x3188)。P+0 type (int, 0..7)、P+4 freq (float, xmm3)、P+8 Q (float)、P+0xc gain (float)、
- *         P+0x10 order (int, 2 倍して渡す)。SC の同じ呼び出し位置 (0x180b6f0f2・0x180b6f1a3) は
- *         P+0x9dc4 type / P+0x9e0c freq / P+0x9e54 Q / P+0x9e9c gain / P+0x9ee4 order を渡す (tools/targets/freshair/REPORT_APPENDIX_FA39.md §2)
- *   this: this+0x60 (float, n/this+0x60 を時間加算に使う → 基準値 48000 とする)、this+0x12d8 (合算バッファ。
- *         0x1802ff250 が ptr+0x28 から書くので、0x28 + 4*n 以上の確保が要る)
- * 出力: case ごとに 1 行。"C<i> n=.. mode=.. ..." 形式の入力、続けて L・R・this[0x60..0x12e0) を hex で出す。
+/* ks_semantic_vf_kh.c — KH VocalFilter (formant process 0x18085a730) を実機機械語で同一シナリオ実行 (#4071)。
+ *   ks_semantic_vf_kh <core_64> scen <scen.txt>
+ * 呼び出し形: process(this=rcx, ctx=rdx, aud=r8)。
+ * 読み (objdump -d -M intel HeartCore.core_64, REPORT_APPENDIX_FA51.md §2):
+ *   ctx : P = *(ctx+0x3188)。
+ *         P+0 (float) @18085a76e movss xmm0,[rax] と P+4 (float) @18085a772 movss xmm7,[rax+4] は
+ *         @18085a780・@18085a785 で minss/maxss の組 (周波数の下端・上端)。
+ *         P+8 (float, Q) @18085a777 movss xmm6,[rax+8] → log10f 側へ。
+ *         P+0xc (u8) @18085a789 movzx + and 1 → 0/1 から 2/5 を作る (@18085a790)。
+ *         P+0x10 (u8) @18085a796 movzx + and 1 → 0/5 を作る (@18085a79d)。
+ *   aud : L/R の float ポインタ @0/@8、n @0x28 (int)。
+ *   this: this+0x60 (float, sr)。this+0x12d8 (合算バッファ。0x1802ff250 が ptr+0x28 から書く)。
+ * SC (SlateCore 0x1808e1fa0) の同じ値の読み位置: 0x9dc4 (float, @1808e1fd4) と 0x9e0c (float, @1808e1fec) が周波数の組、
+ *   0x9e54 (float, Q, @1808e1fcc)、0x9e9c (u8, cmp @1808e2013)・0x9ee4 (u8, neg/sbb @1808e1ff5) が flag、S+0x98 (float, sr, @1808e201a)。
+ * 写像: 0x9dc4→P+0、0x9e0c→P+4、0x9e54→P+8、0x9e9c→P+0xc、0x9ee4→P+0x10、S+0x98→this+0x60。
+ * 出力: case ごとに 1 行。" |" + this+0x60 (8) + this+0x70 (0x200) + this+0x470 (0x200) + this+0xc70 (0x670) + " " L " " R。
  */
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -23,9 +27,6 @@ typedef long long (__attribute__((ms_abi)) *fn_t)(void*, void*, void*);
 
 #define VA_FILTER 0x18085a730ULL
 #define SUM_VA 0x200000000ULL
-#define ST_SIZE 0x1400
-#define ST_DUMP_LO 0x60
-#define ST_DUMP_HI 0x12e0
 #define MAXN 128
 
 static uint8_t* map_pe(const char* path) {
@@ -49,76 +50,9 @@ static uint8_t* map_pe(const char* path) {
     return m;
 }
 
-static uint32_t rng;
-static uint32_t R32(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }
-static float bitsf(uint32_t b) { float f; memcpy(&f, &b, 4); return f; }
-static float RF(float lo, float hi) { return lo + (hi - lo) * ((R32() >> 8) / 16777216.0f); }
-static float RFS(float lo, float hi) {
-    switch (R32() % 24) {
-    case 0: return 0.0f;
-    case 1: return lo;
-    case 2: return hi;
-    case 3: return bitsf(0x00000400u);
-    case 4: return bitsf(0x80000400u);
-    case 5: return 1e-20f;
-    default: return RF(lo, hi);
-    }
-}
+static void hexdump_out(const void* p, size_t n) { const uint8_t* b = p; for (size_t i = 0; i < n; i++) printf("%02x", b[i]); }
 
-typedef struct {
-    int n, mode, pn;
-    float a, b, c;
-    float L[MAXN], R[MAXN];
-} Case;
-
-static float LG(float lo, float hi) { return powf(10.0f, RF(lo, hi)); }
-
-static void gen(Case* c) {
-    static const int ord[6] = {0, 1, 1, 2, 3, 4};
-    c->n = 1 + (int)(R32() % MAXN);
-    c->mode = (int)(R32() % 8);
-    c->pn = ord[R32() % 6];
-    c->a = LG(1.3f, 4.3f);
-    c->b = LG(-1, 1);
-    c->c = LG(-1, 1);
-    for (int i = 0; i < c->n; i++) { c->L[i] = RFS(-1, 1); c->R[i] = RFS(-1, 1); }
-}
-
-static void hexdump(FILE* f, const void* p, size_t n) { const uint8_t* b = p; for (size_t i = 0; i < n; i++) fprintf(f, "%02x", b[i]); }
-
-static int run(uint64_t va, Case* c, int idx) {
-    uint8_t* self = calloc(1, ST_SIZE);
-    uint8_t* aud = calloc(1, 0x40);
-    uint8_t* ctx = calloc(1, 0x3200);
-    uint8_t* P = calloc(1, 0x20);
-    float *L = calloc(MAXN + 1, 4), *R = calloc(MAXN + 1, 4);
-    memcpy(L, c->L, sizeof c->L); memcpy(R, c->R, sizeof c->R);
-    memset((void*)SUM_VA, 0, 0x1000);
-    *(float**)(aud + 0) = L; *(float**)(aud + 8) = R; *(int*)(aud + 0x28) = c->n;
-    *(float*)(self + 0x60) = 48000.0f;
-    *(void**)(self + 0x12d8) = (uint8_t*)SUM_VA - 0x28;
-    *(int*)(P + 0) = c->mode;
-    *(float*)(P + 4) = c->a;
-    *(float*)(P + 8) = c->b;
-    *(float*)(P + 0xc) = c->c;
-    *(int*)(P + 0x10) = c->pn;
-    *(void**)(ctx + 0x3188) = P;
-    printf("C%d n=%d mode=%d pn=%d a=%08x b=%08x c=%08x ", idx, c->n, c->mode, c->pn,
-           *(uint32_t*)&c->a, *(uint32_t*)&c->b, *(uint32_t*)&c->c);
-    if (getenv("IN_DUMP") && getenv("IN_DUMP")[0] == '1') {
-        fprintf(stderr, "I%d ", idx); hexdump(stderr, c->L, c->n * 4); fprintf(stderr, " "); hexdump(stderr, c->R, c->n * 4); fprintf(stderr, "\n");
-    }
-    ((fn_t)va)(self, ctx, aud);
-    hexdump(stdout, L, c->n * 4); printf(" "); hexdump(stdout, R, c->n * 4); printf(" ");
-    hexdump(stdout, self + ST_DUMP_LO, ST_DUMP_HI - ST_DUMP_LO); printf("\n");
-    free(self); free(aud); free(ctx); free(P); free(L); free(R);
-    return 0;
-}
-
-/* シナリオ入力 (lift2/gen_filter_scen.py が作る SC 用ファイル) を同じ値で実行する。書込み (region 0=S, 1=P) は KH の
- * 写像に変換: S+0x98 → this+0x60、P の 0x9dc4/0x9e0c/0x9e54/0x9e9c/0x9ee4 → P+0/4/8/0xc/0x10。
- * 出力は native_filter.c と同じ並び (call ごとに " |" + S+0x98(8) + S+0xa0(0x200) + S+0x4a0(0x200) + S+0xca0(0x670) + " " L " " R)。
- * KH の対応位置は this+0x60 / +0x70 / +0x470 / +0xc70 (SC 側 = KH + 0x38 / +0x30 / +0x30 / +0x30)。 */
+/* シナリオ入力 (lift2/gen_vf_scen.py が作る SC 用ファイル) を同じ値で実行する。書込み (region 0=S, 1=P) は上の写像で KH に変換する。 */
 static int run_scen(const char* core, const char* path) {
     static char line[1 << 22]; static unsigned long tok[1 << 20];
     map_pe(core);
@@ -127,7 +61,7 @@ static int run_scen(const char* core, const char* path) {
     while (fgets(line, sizeof line, fp)) {
         int k = 0; char* p = strtok(line, " \n"); while (p) { tok[k++] = strtoul(p, NULL, 16); p = strtok(NULL, " \n"); }
         int ti = 0; int sidx = (int)tok[ti++]; int ncalls = (int)tok[ti++];
-        uint8_t* self = calloc(1, ST_SIZE); uint8_t* P = calloc(1, 0x20); uint8_t* ctx = calloc(1, 0x3200);
+        uint8_t* self = calloc(1, 0x1400); uint8_t* P = calloc(1, 0x20); uint8_t* ctx = calloc(1, 0x3200);
         *(void**)(ctx + 0x3188) = P;
         *(void**)(self + 0x12d8) = (uint8_t*)SUM_VA - 0x28;
         printf("S%d", sidx);
@@ -151,9 +85,9 @@ static int run_scen(const char* core, const char* path) {
             *(float**)(aud + 0) = L; *(float**)(aud + 8) = R; *(int*)(aud + 0x28) = n;
             memset((void*)SUM_VA, 0, 0x1000);
             ((fn_t)VA_FILTER)(self, ctx, aud);
-            printf(" |"); hexdump(stdout, self + 0x60, 8); hexdump(stdout, self + 0x70, 0x200); hexdump(stdout, self + 0x470, 0x200);
-            hexdump(stdout, self + 0xc70, 0x670);
-            printf(" "); hexdump(stdout, L, n * 4); printf(" "); hexdump(stdout, R, n * 4);
+            printf(" |"); hexdump_out(self + 0x60, 8); hexdump_out(self + 0x70, 0x200); hexdump_out(self + 0x470, 0x200);
+            hexdump_out(self + 0xc70, 0x670);
+            printf(" "); hexdump_out(L, n * 4); printf(" "); hexdump_out(R, n * 4);
             free(aud); free(L); free(R);
         }
         printf("\n");
@@ -164,15 +98,6 @@ static int run_scen(const char* core, const char* path) {
 
 int main(int argc, char** argv) {
     if (argc == 4 && !strcmp(argv[2], "scen")) return run_scen(argv[1], argv[3]);
-    if (argc < 4) { fprintf(stderr, "usage: ks_semantic_filter_kh <core_64> <ncases> <seed> | <core_64> scen <scen.txt>\n"); return 2; }
-    int nc = atoi(argv[2]);
-    rng = (uint32_t)strtoul(argv[3], 0, 0) * 2654435761u + 12345u; if (!rng) rng = 1;
-    map_pe(argv[1]);
-    if (mmap((void*)SUM_VA, 0x1000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0) != (void*)SUM_VA) { fprintf(stderr, "sum map fail\n"); return 3; }
-    for (int i = 0; i < nc; i++) {
-        Case c; memset(&c, 0, sizeof c);
-        gen(&c);
-        run(VA_FILTER, &c, i);
-    }
-    return 0;
+    fprintf(stderr, "usage: ks_semantic_vf_kh <core_64> scen <scen.txt>\n");
+    return 2;
 }

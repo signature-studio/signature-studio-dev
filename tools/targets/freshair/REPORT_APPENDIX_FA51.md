@@ -15,13 +15,34 @@
 
 ## §2. param 写像の根拠 (機械語の読み)
 
-- SC `0x1808e1fa0`: `this+0x90` から P を取り、`P+0x9dc4` (f32, freq A 相当)・`P+0x9e0c` (f32)・`P+0x9e54` (f32, Q)・`P+0x9e9c` (u8 ≠ 0 で分岐)・`P+0x9ee4` (u8, `neg`/`sbb` で 0/1 化)・`S+0x98` (f32, sr) を読む。
-- KH `0x18085a730`: `ctx+0x3188` から P を取り、`P+0` (int, type の `&1`)・`P+4` (f32)・`P+8` (f32, Q, `log10f` へ)・`P+0xc` (u8, `&1`)・`P+0x10` (u8, `&1`)・`this+0x60` (sr) を読む。
-- 写像: SC `0x9dc4→KH P+0`・`0x9e0c→P+4`・`0x9e54→P+8`・`0x9e9c→P+0xc`・`0x9ee4→P+0x10`。`this+0x60` ↔ `S+0x98`。
-- 判定ルール: flag は 0/1 のみ書く (SC は非 0 判定、KH は `&1` で読むので、2 以上は両側で一致しない)。
-- **未確定 (レビュー指摘 1・#4422 round 1)**: 上の写像は、同じ KH 側 harness の FA-39 (`REPORT_APPENDIX_FA39.md` §2) と食い違う。FA-39 は SC `0x9dc4` を type (int) に、`0x9e0c` を freq に写している (Filter 側の process。VocalFilter 側の型配置は FA-39 とは別と仮定できるが、本付録は根拠を示していない)。本付録の `gen_vf_scen.py` は `0x9dc4` に周波数の float bits を書き、KH の `P+0` (int type) に渡す。この組み合わせでは、type と freq の入れ替わりを否定できない。
-- 本 run では逆アセンブルし直せない: `$ARTIFACTS_DIR` (`fl-win64.tar.zst`) に `SlateCore.core_64`・`HeartCore.core_64` が無い (展開後の全文を検索しても無い)。素材 `work-liftlib-targets` が要る (PR 本文の `oc_artifacts:` 行で依頼)。そのため写像の正誤は未判定のまま残す。
-- 参考 (前回の読み): `objdump -d` の逆アセンブルによる読み (SC: `SlateCore.core_64`・KH: `HeartCore.core_64`)。素材が揃った run で、§2 の表を両側の命令列で再確認する必要がある。
+素材 `work-liftlib-targets` (`SlateCore.core_64`・`HeartCore.core_64`) を `objdump -d -M intel` で逆アセンブルして読んだ (round 2 の指摘 1 への対応)。
+
+**KH `0x18085a730` (HeartCore.core_64)**: `ctx+0x3188` から P を取る (`@18085a767 mov rax,[rdx+0x3188]`)。
+
+| KH | 命令 (アドレス) | 読み |
+|---|---|---|
+| `P+0` | `movss xmm0,[rax]` (@18085a76e)・`minss xmm8,xmm0` (@18085a780) | float。`P+4` と組で min/max を取る → 周波数の下端 |
+| `P+4` | `movss xmm7,[rax+4]` (@18085a772)・`maxss xmm7,xmm0` (@18085a785) | float。周波数の上端 (`P+0` と min/max の組) |
+| `P+8` | `movss xmm6,[rax+8]` (@18085a777)・`call 0x180fbbae0` (@18085a7a3) | float。Q (log10 系の関数へ) |
+| `P+0xc` | `movzx ecx,[rax+0xc]`・`and ecx,1` (@18085a789〜a78d) | u8 flag。`&1` で 0/1 → 2 か 5 |
+| `P+0x10` | `movzx eax,[rax+0x10]`・`and eax,1` (@18085a796〜a79a) | u8 flag。`&1` で 0/1 → 0 か 5 |
+| `this+0x60` | `movss xmm0,[rdi+0x60]` (@18085a7c2) | float。sr |
+
+**SC `0x1808e1fa0` (SlateCore.core_64)**: `this+0x90` から P を取る (`@1808e1fb2 mov rbx,[rcx+0x90]`)。
+
+| SC | 命令 (アドレス) | 読み |
+|---|---|---|
+| `0x9dc4` | `movss xmm8,[rbx+0x9dc4]` (@1808e1fd4)・`minss xmm0,xmm8` (@1808e2035) | float。`0x9e0c` と組で min/max → 周波数の下端 |
+| `0x9e0c` | `movss xmm9,[rbx+0x9e0c]` (@1808e1fec)・`maxss xmm9,xmm8` (@1808e205c) | float。周波数の上端 |
+| `0x9e54` | `movss xmm6,[rbx+0x9e54]` (@1808e1fcc) | float。Q |
+| `0x9e9c` | `cmp byte [rbx+0x9e9c],0` (@1808e2013)・`cmovne edx,eax` (@1808e202a) | u8 flag。非 0 で 5、0 で 2 (KH の `P+0xc` と対応) |
+| `0x9ee4` | `movzx eax,[rbx+0x9ee4]`・`neg al`・`sbb edi,edi`・`and edi,5` (@1808e1fe5〜1ff9) | u8 flag。非 0 で 5、0 で 0 (KH の `P+0x10` と対応) |
+| `S+0x98` | `movss xmm2,[rsi+0x98]` (@1808e201a) | float。sr (rsi = this) |
+
+**写像 (両側の命令で確認)**: `0x9dc4→P+0`・`0x9e0c→P+4`・`0x9e54→P+8`・`0x9e9c→P+0xc`・`0x9ee4→P+0x10`・`S+0x98→this+0x60`。周波数の組は両側とも min/max の組なので、どちらが下端・上端かは写像の方向に影響しない。FA-39 の写像 (`0x9dc4`→type int) は VocalFilter には当てはまらない (VocalFilter の `0x9dc4` は float)。FA-39 は Filter 側の process の読みで、本付録の対象とは別。
+
+- flag の判定ルール: SC は非 0 判定、KH は `&1` で読む。よって flag に 2 以上を書くと両側で一致しない。`gen_vf_scen.py` は 0/1 のみ書く。
+- 残る差 (state 窓の不一致) は写像の問題ではない (§3)。
 
 ## §3. 測定 (コミット済み HEAD で再現)
 

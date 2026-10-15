@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """gen_vf_scen.py <out> [N] [seed] — VocalFilter の SC/KH 同一入力シナリオ (#4071)。形式は gen_filter_scen.py と同じ。
-P の書込み先 (SC 側 offset): 0x9dc4 = 周波数 A, 0x9e0c = 周波数 B, 0x9e54 = Q, 0x9e9c = flag1 (0/1), 0x9ee4 = flag2 (0/1)。
+P の書込み先 (SC 側 offset・型は機械語の読み、REPORT_APPENDIX_FA51.md §2): 0x9dc4 = float (周波数の下端), 0x9e0c = float (周波数の上端), 0x9e54 = float (Q), 0x9e9c = u8 flag1 (0/1), 0x9ee4 = u8 flag2 (0/1)。
 S+0x98 = サンプルレート。flag は 0/1 のみ (SC は非 0 判定、KH は &1 で読むため、2 以上は両側で一致しない)。
 """
 import random, struct, sys
