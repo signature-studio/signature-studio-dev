@@ -31,9 +31,10 @@
 
 - 素材: `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` (`fl-win64.tar.zst` から `tar --zstd -xf ... '*block00031_PE.bin'` で取り出し。fl-win64 26.1.7.5653)。IR は `tools/m11/work/boot_final3.ll` (読込のみ・gitignore)。
 - IR の出所: `work-m11.tar.zst` の `boot_final3.ll` (`tools/m11/work/` に展開。PR 本文の `oc_artifacts: fl-win64 work-m11`)。生成は `tools/plugins/lift/passes/m11_post.py` (boot_final.ll → boot_final3.ll の後処理)。`work-m11` は #516 以前の生成で、現 main の生成手順とは一致しない (`docs/WORKFLOW.md` §11)。
-- IR の sha256: **未記録**。測定 (commit `f602f9354`) の時点で指紋を取っていなかった。本 PR の run では `work-m11` が取得されていないため、指紋を再計算できない。検収 run が `sha256sum tools/m11/work/boot_final3.ll` を取り、下の件数を再現できたら、その指紋をここに追記する。件数が一致しなければ、IR の違いとして扱う。
+- IR の sha256: `010451add5147d37cd06d8d0043255fcb2e65a536c4eadeff17e7ce43de7cb9e` (21,769,117 bytes・`work-m11.tar.zst` の `tools/m11/work/boot_final3.ll`)。測定 (commit `f602f9354`) の時点では指紋を取っていなかった。fix run (HEAD `250df8f61`) で `work-m11` を展開して取り、下の件数が一致したので、測定に使った IR と同じ入力とみなす。
+- PE の sha256: `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d` (22,227,016 bytes・`fl-win64.tar.zst` の `block00031_PE.bin`)。
 - 走査: `python3 tools/m11/ldfix/scan_spill_deref_3328.py tools/m11/work/boot_final3.ll --pe $RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin --out <json>`
-- 出力 (実測・IR 入力): `IR 関数 7421 / .pdata 有り 6969 / CALL 11 関数 13 箇所 / CMP 13 関数 20 箇所 / COPY 49 関数 103 箇所 / EXCL 3 関数 3 箇所` (実行 3.6 s・load average 0.15 / 0.25 / 0.18)。
+- 出力 (実測・IR 入力): `IR 関数 7421 / .pdata 有り 6969 / CALL 11 関数 13 箇所 / CMP 13 関数 20 箇所 / COPY 49 関数 103 箇所 / EXCL 3 関数 3 箇所` (実行 3.6 s・load average 0.15 / 0.25 / 0.18)。fix run で HEAD `250df8f61` を再実行し、同じ件数になった (実行 5.0 s)。
 - 2502 の走査 (`scan_spill_deref_2502.py`・無変更) は同じ PE・IR で 14 関数 / 16 箇所 (再実行で一致)。
 - 測定 commit: `f602f9354` (§7)。
 
@@ -53,9 +54,9 @@
 
 ## 4. 取りこぼし (COPY) の定義と偽陽性の抑え方
 
-- 2502 の `--copy-alias` は 64 関数 / 123 箇所だった。spill 由来 16 (= CALL 13 + EXCL 3) を引いた copy 由来 107 のうち、直接呼出しが 103 箇所。残りの間接呼出し 4 箇所は差分 (123 − 16 − 103) で、命令形 (`call [reg...]` など) は測定時に記録しておらず**推定**。
+- 2502 の `--copy-alias` は 64 関数 / 123 箇所だった。spill 由来 16 (= CALL 13 + EXCL 3) を引いた copy 由来 107 のうち、直接呼出しが 103 箇所。残りの間接呼出し 4 箇所は差分 (123 − 16 − 103) で、fix run で実測した。deref VA 0x1280414・0x409484・0x40949e・0xc627ab の call (VA 0x1280422・0x409487・0x4094a1・0xc627c0) は、順に `call qword ptr [rbx + 0x268]`・`call qword ptr [rip + 0xf9c813]`・`call qword ptr [rip + 0xf9c7f1]`・`call qword ptr [rdi + 0x18]` (`pe_disasm_va.py` で逆アセンブル)。2502 の `--copy-alias` の集合から 3328 の CALL + EXCL + COPY の集合を引くと、この 4 件だけが残る (VA 一致)。
 - 今回の COPY の抑え方と効果 (実測):
-  - 直接呼出しのみ: 推定で間接呼出し 4 箇所を除外 (命令形は未確認。検収 run で IR 入力から確かめる)。
+  - 直接呼出しのみ: 間接呼出し 4 箇所を除外する (3328 の COPY 103 箇所は全て直接呼出し)。
   - 複写先は callee-saved (rbx/rsi/rdi/rbp/r12〜r15) に限る: 今回の 103 箇所は全て callee-saved のため効果 0 (条件は残す)。
   - 再ロード除外 (EXCL): copy 由来は 0 件 (効果 0)。
 - つまり機械的な条件で減ったのは 4 箇所だけ。残り 103 箇所 (49 関数) は正常な間接参照を含みうるが、機械語だけでは区別できない。IR 側の判定が要る (子 #3382 [CI-153])。
@@ -98,7 +99,7 @@
   ```
   (2502 の script は 0 行)
 - 同じ差分の後で、判定の出力が変わらないことを確かめた。仮 IR (`ldmach.Machine(PE).fns` の全 57,816 関数を `define void @function_<VA>(i64 %arg1)` にした `$RUNNER_TEMP/m11_3328/synth.ll`) を、修正前と修正後の script で走査し、出力 JSON を `cmp` で比べた → 一致。件数は CALL 39 関数 67 箇所・EXCL 3 関数 3 箇所・CMP 31 関数 47 箇所・COPY 202 関数 336 箇所 (実行 36 s)。仮 IR の CALL + EXCL は 42 関数 / 70 箇所 (母集団が全 .pdata なので、IR 入力の 14 関数 / 16 箇所とは比較しない)。
-- 仮 IR は IR 入力の代わりにならない。IR 入力 (`work-m11`) での再測定は、本 PR の run では未実施 (素材が無い)。検収 run が §2 の件数を IR 入力で再現するのが正の確認になる。
+- 仮 IR は IR 入力の代わりにならない。IR 入力 (`work-m11` の `boot_final3.ll`) での再測定は fix run (HEAD `250df8f61`) で実施し、§2 の件数と一致した。
 
 ## 8. 未解決
 
