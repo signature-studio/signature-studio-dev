@@ -218,7 +218,7 @@
 | `tools/m11/REPORT_N27.md` | ~238 | #680: survey 測定基準の固定化 (ldfix/qstore の fail-closed・PE パス env 化・IR 生成条件と指紋の記録・同一 runner の n=3 再現・NC 試験・`--full` は入力 CSV 欠落で未成功 (§10)・レビュー指摘の扱い・§13 73532f8 (c) 数値の切り分け) (環境間一致は未実測)。§14 (#960 `--full` 2 回実行の段の切り分け) は要約のみで全文は `REPORT_APPENDIX_960.md` |
 | `tools/m11/REPORT_SHX-T26.md` | ~49 | #1629 (SHX-T26): trap stack の `wasm-function[1352]` = `function_4133f0` (ガード版のみ)。`function_8c5eb0` は stack に出ず D19 とは別原因と判定 |
 | `tools/m11/REPORT_N1598.md` | ~60 | #1598 (M11-N104): `m11_e2e.sh` 既定経路を HEAD `4c3f7458` で rc 0 まで再通し (623 秒・judge PASS)。Ghidra 12.1.4 (sha256 一致・JDK 21) で `functions_dll.csv` 59,010 行を作成。trap (stage 4) は残存 |
-| `tools/m11/REPORT_N3172.md` | ~85 | #3172 (M11-N177): `m11_e2e.sh --full` の `functions_dll.csv` 作成経路 (`m11_ghidra_dll.sh`・PE 指紋 sidecar) の実測と差し戻し対応。測定と未解決は本体を参照 |
+| `tools/m11/REPORT_N3172.md` | ~86 | #3172 (M11-N177): `m11_e2e.sh --full` の `functions_dll.csv` 作成経路 (`m11_ghidra_dll.sh`・PE 指紋 sidecar) の実測と差し戻し対応。測定と未解決は本体を参照 |
 | `tools/m11/REPORT_N1415.md` | 218 | #1415: snapshot IR (`69c774de…`) と再生成 IR の段ごとの sha256 切り分け (merge・asmfix までは一致)。`alloca [N x i64]` 54 件は R8 導入前 pass (`159d9fc0~1`) で再現。ldfix の `ldfxc` 差 54 件と (b)(d) は未解決 (子 issue)。§8 (#1597・#2163 の二分結果) と §8-4 (ldfix 有りの再測定) |
 | `tools/m11/REPORT_APPENDIX_2163.md` | ~68 | m11 #2163 (REPORT_N1415.md §8-4) の全文: ldfix 有りの再測定表 (`035274be`・`5ee72b93`・`03692a0c`・`9952e605`・`9af7827f`・`3bdae05d` 等)・merge `9952e605` の親の向きと 862→866 (`03692a0c`) の `git diff --stat`・§8-1〜§9 の値の扱い・測定手順・未解決 |
 | `tools/m11/REPORT_N1165.md` | ~110 | #1165: 旧 IR (818/21/56/77) の再現 (`d6a17b64` 手順で ok 818・oob 21・halt0 56)・ldfix の有無による差 (818 ↔ 828)・ldfix 無し build の opt-in 経路 (`M11_ALLOW_LDFIX_DISABLED=1`)・HEAD の 2×2 測定。lift 段の起点と e2e 全体は未解決 (#1165) |

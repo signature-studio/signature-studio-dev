@@ -3,7 +3,7 @@
 # m11_bounds.py / m11_tail.py の入力で、素材 (R2) には含まれない。PE の sha256 が sidecar (functions_dll.csv.pe_sha256) と一致する時だけ再利用する (#3231)。
 # 不一致・sidecar 無しは旧 CSV を functions_dll.csv.stale に退避して作り直す (PE が変わると関数表だけ古くなるため)。
 # Ghidra は GHIDRA_HOME (docs/REFERENCES.md の [GHIDRA] の install 先) で指定できる。未指定なら公式 release を取得して sha256 を検査する (fail-closed)。
-# JDK は JAVA_HOME_21 (既定は docs/REFERENCES.md の [JDK21])。PE は M11_PE / FL_WIN64_DIR で指定する。
+# JDK は JAVA_HOME_21 で指定する (未指定時は docs/REFERENCES.md の [JDK21] と同じ install 先を既定値に直書き)。PE は M11_PE / FL_WIN64_DIR で指定する。
 # 使い方: bash tools/m11/m11_ghidra_dll.sh
 set -euo pipefail
 HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
