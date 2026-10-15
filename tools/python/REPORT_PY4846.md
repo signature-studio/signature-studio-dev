@@ -51,7 +51,7 @@ index ≥ 0 の先 (未確定):
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString の index ≥ 0 経路 (0x1051170・0x1050f90・0x104f580・0x1046a30/0x104d2b0) | 4 関数の index ≥ 0 が未実装 | #4846 の残り (子 #4845 の結果を待つ。親 #3839) |
+| getLinkedValue・getLinkedInfo・getLinkedParamName・getLinkedValueString の index ≥ 0 経路 (0x1051170・0x1050f90・0x104f580・0x1046a30/0x104d2b0) | 4 関数の index ≥ 0 が未実装 (code 2) | 子 #4865 (親: #4846) |
 
 ## 5. 検証
 
