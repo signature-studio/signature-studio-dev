@@ -89,6 +89,7 @@
 | `tools/liftlib/REPORT_APPENDIX.md` | ~266 | liftlib §17 全文 (HB-H3 #93 iargs pass)・§18 全文 (LIFTLIB #241 ymm(i256) helper ABI / pcmpistri / F2 xmm 戻り搬送) |
 | `tools/liftlib/REPORT_APPENDIX_448.md` | ~60 | liftlib CI-8 (#448) の付録: work-* 絶対 symlink の張り直し実測、素材 `libottnative.so` が HEAD と不整合で `lowbase_e2e.sh` [3] が FAIL した件と、[3] で `build.sh` から再生成する修正 (2f1b76fc) の実測。測定値の正本。本文は REPORT §24 |
 | `tools/liftlib/REPORT_APPENDIX_898.md` | ~35 | liftlib #898 (HB-H22) iargs 未対応 3 site の bind の付録 (REPORT_APPENDIX §17 の #898 節を分割移動)。`movzx` 合成 (1801a3117 解決)、残り 2 site は main の HB-H25 #1158 で bind 済み。高バイト unbound (T16b)。測定値は REPORT_APPENDIX_898.md が正本 |
+| `tools/liftlib/REPORT_APPENDIX_294.md` | ~57 | liftlib #294 (親 CI-4) の付録: `dir64_boundary_gate.sh` の `FL_WIN64_DIR` を `tools/shared/env.sh` 経由へ置換した実測 (測定 commit `1aa0500ba`・変更前後の出力一致・既定値同一)。gate `[1]` の既存 FAIL は `pe_image_parity.py` の旧境界 (#3832) |
 | `tools/liftlib/REPORT_APPENDIX_2128.md` | ~60 | liftlib #2128 (部分達成): ott_getparam leaf への icall runtime 配線の実測 (測定 commit `f8bd2ea0`・変更前 `df2eebde` との比較・unit T1〜T5・未解決の起票先)。測定値の正本 |
 | `tools/liftlib/REPORT_APPENDIX_3067.md` | ~95 | liftlib #3067 (LIFTLIB-21): `legacy_p1` の repmap が挿入前の行番号で登録され、挿入後の行へ当たらず 0/19 件しか書換えなかった欠陥 (D1a 同型) の修正と、修正前後の件数・単体テスト T1〜T26 の結果・e2e (`--quick`)・OTT 出力 census の実測 (測定 commit `c8316dc7`)。残留分岐は #3137 (LIFTLIB-22)。測定値の正本 |
 | `tools/liftlib/REPORT_APPENDIX_2181.md` | ~89 | liftlib #2181 (HB-H45, 部分達成): ott_getparam F=281 の SSA dominance 欠陥 (iargs の支配しない bind) の修復と emcc 成功の実測 (測定 commit `b1c2d148`・変更前後の比較・ネガティブコントロールの未達・子 #2859/#2861)。測定値の正本 |
@@ -401,6 +402,7 @@
 | `tools/shimx/REPORT_SHX-T39.md` | 99 | SHX-T39 (#3149): unit 23 の baseline が 0xf960 の後に入る分岐条件 (`function_467c40` の slot ゲート) の IR 行つき特定。証跡と IR 行の再抽出は `tools/shimx/evidence_3149/` (`repro.sh`)。 |
 | `tools/shimx/REPORT_SHX-T9k.md` | ~76 | SHX-T9k (#2593): unit 22 の GetLastError=126 の発生元 (GetProcAddress の 1 回目) と、IR 行番号 ↔ wasm バイトオフセットの対応 (REPORT_SHX-T9j.md §2.4 の後続) |
 | `tools/shimx/REPORT_SHX-T35.md` | ~118 | SHX-T35 (#3023): HeapFree の範囲外ポインタを M4 契約に揃えた判断と測定 (REPORT.md は 250 行上限のため付録) |
+| `tools/shimx/REPORT_SHX-T36.md` | ~95 | SHX-T36 (#3069): test.sh の emcc 無出力を FAIL にし、step 6 の入力欠落で生成物 4 件を上書きしない。ガードは `test/guard/guard_test.sh` (7b)。mutant A/B/C の結果と測定 (入力あり・入力欠落) の正本 |
 | `tools/shimx/REPORT_SHX-T37.md` | 103 | SHX-T37 (#3070): HeapReAlloc・GlobalLock/GlobalUnlock/GlobalFree の不正入力の戻り値・GetLastError を M4 契約・native 参照・MSDN と突き合わせた表と「直さない」判断。実測は `tools/shimx/evidence_3070/run.sh`。範囲外 trap は #3056 (merge 済み) で解消 |
 | `tools/shimx/BACKLOG.md` | ~540 | shimx の未解決一覧 |
 | `tools/shimx/pathreg/REPORT.md` | ~200 | パス写影/レジストリ永続化の shimx 側インタフェース接続 |
@@ -588,6 +590,7 @@
 | `tools/python/REPORT_PY173.md` | 81 | PY-173 (#3220): patterns 数え・選択系 4 関数の索引基準 (patternCount・isPatternDefault は 1..999、isPatternSelected は i-1)・型・述語 `0x12d8d30` の論理式。戻り値の値と C/mock 実装は子 #3271 (PY-179)。probe は `analysis/flapi/pe_pattern_probe.py` |
 | `tools/python/REPORT_PY179.md` | 65 | PY-179 (#3271): patterns 数え・選択系 4 関数の C/mock 実装 (値は PE 静的状態からの仮置き)。isPatternDefault の範囲外 code 4 と patternNumber 初期値 1 を PE で確定。述語 E・選択リストの意味は子 #3536・#3537 |
 | `tools/python/REPORT_PY152.md` | ~203 | PY-152 (#2983): arrangement 8 件のうち 6 件 (currentTime / addAutoTimeMarker / jumpToMarker / liveSelection / selectionClear / selectionSet) の PE 根拠・mock/C 差分 0・値と副作用は未確定。jumpToMarker の必須個数は PE (1) と表 (2) が不一致で PM 判断待ち。変換スロット 0x15e4280 = PyLong_FromLong を同定。残りは子 #3041 (PY-143)・#3043 (PY-144) |
+| `tools/python/REPORT_PY143.md` | ~60 | PY-143 (#3041): arrangement 2 件 (currentTimeHint・getMarkerName) の呼出し先 (0xe4b8b0・0xe53c90) を同定し、戻り str の書式 (bar:beat:tick・範囲外は空文字) を PE で確定。mock/C 差分 0。BBT 分解 0x1312080 と 0 埋め幅は未同定、all_tools は未実行 |
 | `tools/python/REPORT_PY144.md` | ~137 | PY-144 (#3043): arrangement の書込み系 5 件の呼出し経路 (共通経路 0xd843d0・ゲート vtbl+0x98・コールバック VA) を PE で確定。選択 2 件 (selectionSet・selectionClear) は 0xe43d30 の規則で mock/C に反映し差分 0。マーカー・liveSelection・jumpToMarker の効果本体は未同定 (子 #3796 PY-254)。jumpToMarker・liveSelectionStart の個数は PE と表が不一致のまま (PM 判断) |
 | `tools/python/REPORT_PY205.md` | 92 | PY-205 (#3493): mixer.getTrackCount (`*(*0x15e2198)` の dword − 2) と getEqBandCount (3) の PE 確定。大域は qword ポインタ・変換スロット 0x15e4280 (REPORT_PY152 §42 流用)。ネイティブ C と mock の照合 0 件差・ネガティブコントロール (−3 で 124)。絶対値 125 は実行時値未確定。wasm 版は未実行 (#3553) |
 | `tools/python/REPORT_PY172.md` | 89 | PY-172 (#3219): patterns グループ系 4 関数の PE 確定 (件数・群名・群の索引は 0 始まり・索引 -1 の意味は未確定)。getPatternGroupCount / getPatternGroupName を件数 0 の仮置きで C・mock に実装 (差分 0)。残り 2 件は子 #3278 (PY-180) |

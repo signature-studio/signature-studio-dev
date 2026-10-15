@@ -26,6 +26,10 @@ const calls = [
   ["arrangement.selectionSet", [1, 2]], ["arrangement.selectionSet", [1, 2, true, false, 0]],
   ["arrangement.liveSelection", [1, true]], ["arrangement.addAutoTimeMarker", [1, "Marker"]],
   ["arrangement.jumpToMarker", [1]], ["arrangement.jumpToMarker", [-1, true]],
+  ["arrangement.getMarkerName", [0]], ["arrangement.getMarkerName", [-1]], ["arrangement.getMarkerName", [5]],
+  ["arrangement.currentTimeHint", [0, 0]], ["arrangement.currentTimeHint", [0, 97]],
+  ["arrangement.currentTimeHint", [1, 97, 96, 1]], ["arrangement.currentTimeHint", [0, 1537, 96, true]],
+  ["arrangement.currentTimeHint", [0, -97]],
 ];
 // 引数個数違い: mock と C は共に code 5 (Wrong number of parameters)
 const arity = [
@@ -34,12 +38,15 @@ const arity = [
   ["arrangement.selectionSet", [1]], ["arrangement.selectionSet", [1, 2, 3, 4, 5, 6]],
   ["arrangement.liveSelection", [1]], ["arrangement.addAutoTimeMarker", [1]],
   ["arrangement.jumpToMarker", []], ["arrangement.jumpToMarker", [1, 2, 3]],
+  ["arrangement.getMarkerName", []], ["arrangement.getMarkerName", [1, 2]],
+  ["arrangement.currentTimeHint", [0]], ["arrangement.currentTimeHint", [0, 1, 2, 3, 4]],
 ];
 // 型違い: 整数・bool 以外 (文字列・小数) と、str 引数の None は code 5
 const types = [
   ["arrangement.currentTime", ["x"]], ["arrangement.selectionSet", [1, "x"]],
   ["arrangement.liveSelection", [1, 1.5]], ["arrangement.addAutoTimeMarker", [1, 2]],
   ["arrangement.addAutoTimeMarker", [1, null]], ["arrangement.jumpToMarker", ["x"]],
+  ["arrangement.getMarkerName", ["x"]], ["arrangement.currentTimeHint", [0, "x"]],
 ];
 
 const diffs = [];
