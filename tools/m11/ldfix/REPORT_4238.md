@@ -66,7 +66,7 @@
 
 ## 5. 子 issue
 
-子 issue (本 run で起票し、番号は最終回答と issue コメントに記す): 407a50 の戻り値の全経路と NONFRAME の call 戻り値への拡張 (親 #4238)。子の本文に、旧 JSON `frame_store_callee_3228.json` の書き換えの扱いを含める。
+子 issue #4288 (LD-208): 407a50 の戻り値の全経路と NONFRAME の call 戻り値への拡張 (親 #4238)。旧 JSON `frame_store_callee_3228.json` の扱いも #4288 に含める。
 
 ## 6. 差分 (WORKFLOW §6)
 
