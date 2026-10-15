@@ -26,7 +26,7 @@
 
 ## 3. e2e (`bash tools/m11/ldfix/fix_d17_e2e.sh`)
 
-- 素材展開: `work-m11` (`tar --zstd -xf`、2 秒)。emsdk は `/opt/emsdk/emsdk_env.sh` 既存。
+- 素材展開: `work-m11` (`tar --zstd -xf`、2 秒)。emsdk は `[EMSDK]` (`docs/REFERENCES.md` §4) 既存。
 - 結果: rc=0 / `RESULT: PASS` (突合) / `emcc rc=0`。
 - TRUE_DROP 30 site: REPAIRED 13 / SKIPPED 17 (旧 24 site 相当から、#3752・#3753 で判定が増えた)。
 - 修復前 CELL_COLLAPSED 37 → 修復後 28 (消えた 9)。
