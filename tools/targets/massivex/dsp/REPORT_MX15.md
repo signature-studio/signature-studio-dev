@@ -2,7 +2,8 @@
 
 - 親: #1624 (MX-12, CLOSED・PR #1830 merge 済) / 起票: #1810 (MX-15)。本ファイルは #1810 の実測。
 - 素材: `plugins-massivex` → `work/extracted/VST3/Massive X.vst3` (95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca`。REPORT_MX12 と一致)。
-- 計測スクリプト: `dsp/scripts/mx_unres_residual.py` (新規・本 run)。残件の定義は `mx_unres_orig7498.py` と同一。
+  - **PE の入手手順**: `plugins-massivex.tar.zst` の中身は Inno Setup の exe (`Native Instruments Massive X v1.7.1.exe`, 1,870,391,792 B) と dmg の 2 本。exe は 7z で開けず、`Massive X.vst3` は exe の中に平文では無い。`tar --zstd -xf` で展開後、`tools/targets/massivex/scripts/parse_setup_headers.py <exe> work` → `scripts/extract_massivex.py <exe> work key` で `work/extracted/VST3/Massive X.vst3` を生成する (REPORT.md §11.1)。`work/` は gitignore。2026-10-15 に本手順を再実行し、md5 `622993e7…` (95,356,824 B) を再現した。
+- 計測スクリプト: `dsp/scripts/mx_unres_residual.py`。残件の定義は `mx_unres_orig7498.py` と同一。`parent18` の所在別内訳 (`parent18_location`) を本 run で追加した。
 
 ## 1. 今 run で達成した範囲
 
@@ -27,15 +28,16 @@
 
 - 定義: section hit が 1 件 (一意) かつ CHAININFO の entry のうち、親 RUNTIME_FUNCTION が valid `.pdata` に完全一致で無いもの (`mx_unres_residual.py` の `parent18`)。
 - 一意 CHAININFO 62,516 件のうち、親が valid `.pdata` 外の 18 件。
-- 内訳 (`parent18b` の補助計測): 親の begin が全 `.pdata` 内に在る 7 件・在らない 11 件。親の RVA が `.text` 内 16 件・外 2 件。親の end が `.text` 内 11 件・外 7 件。
+- 内訳 (`mx_unres_residual.py` の `parent18_location`・出力 JSON を転記): 親の begin が全 `.pdata` 内に在る 7 件 (`begin_in_pdata`)・在らない 11 件 (`begin_not_in_pdata`)。親の RVA (begin) が `.text` 内 16 件 (`begin_in_text`)・外 2 件 (`begin_not_in_text`)。親の end が `.text` 内 11 件 (`end_in_text`)・外 7 件 (`end_not_in_text`)。
 
 この 18 件は残件 490 件とは別の母集団。読み方の規則が決まるまで、親を確定できない。
 
 ## 4. 検証
 
-- **測定 commit (コードを変えた最後の commit)**: `2c889acc7` (`feat(massivex): count MX-12 residual 490 candidates and MX-10 parent-absent 18 (Refs #1810)`)。
-- **e2e (`bash dsp/e2e.sh`・測定 commit・n=1)**: rc 0 / `OK elapsed=17s` / load 0.10 0.42 0.27 → 0.30 0.45 0.28。
-- **negctl (`bash dsp/negctl.sh`・測定 commit・n=1)**: NC1 insns 3118 / unsup 5 (base 24002) → FAIL<期待>。NC2 insns 4575 / unsup 292 → FAIL<期待>。NC3 insns 31 / unsup 0 → FAIL<期待>。3 件とも FAIL<期待>。
-  - **注 (未解決)**: REPORT_MX12 §4 の negctl は NC1 unsup 67 / NC2 unsup 746 と記録されている。本 run の値 (5 / 292) と一致しない。同じ PE (md5 一致) での差の理由は未確認。判定 (3 件とも FAIL<期待>) は両方で一致する。
+- **測定 commit (コードを変えた最後の commit)**: `791d4f4a9` (`feat(massivex): output MX-10 parent18 location breakdown in residual script (Refs #1810)`)。
+- **e2e (`bash dsp/e2e.sh`・測定 commit・n=1)**: rc 0 / `OK elapsed=17s` / load 0.22 0.45 0.26 → 0.40 0.47 0.27。
+- **negctl (`bash dsp/negctl.sh`・測定 commit・n=1)**: rc 0 / 6s。NC1 insns 3118 / unsup 5 (base 24002) → FAIL<期待>。NC2 insns 4575 / unsup 292 → FAIL<期待>。NC3 insns 31 / unsup 0 → FAIL<期待>。3 件とも FAIL<期待>。
+  - **未解決 (追跡先 #4197)**: REPORT_MX12 §4 の negctl は NC1 unsup 67 / NC2 unsup 746 と記録されている。本 run の値 (5 / 292) と一致しない。同じ PE (md5 一致) での差の理由は未確認。判定 (3 件とも FAIL<期待>) は両方で一致する。#4197 (MX-49) の再測定で、同じ PE・同じ commit の 2 回の実行値を並べて原因を確定する。
 - **残件の再計測 (`mx_unres_residual.py`・測定 commit)**: `{parent18: 18, population: 7498, redo_0: 458, redo_1: 7008, redo_2: 32}`。REPORT_MX12 §2 と一致。
-- **測定 commit から HEAD までのコード差分 (差分 0 の証跡)**: `git diff 2c889acc7 HEAD -- tools/targets/massivex/dsp/scripts` の出力は空。本 REPORT の commit は docs のみ。
+- **§3 の所在別内訳 (同・測定 commit・出力 JSON `dsp/work/mx_unres_residual.json` の `parent18_location`)**: `{begin_in_pdata: 7, begin_not_in_pdata: 11, begin_in_text: 16, begin_not_in_text: 2, end_in_text: 11, end_not_in_text: 7}`。§3 の値はこの出力から転記した。
+- **測定 commit から HEAD までのコード差分 (差分 0 の証跡)**: `git diff 791d4f4a9 HEAD -- tools/targets/massivex/dsp/scripts` の出力は 0 バイト。本 REPORT の commit は docs のみ。
