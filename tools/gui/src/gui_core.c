@@ -1461,7 +1461,7 @@ API LoadIconA(I64 hi, I64 name) { (void)hi; return name < 0x10000 ? (0x7E000000 
 API LoadIconW(I64 hi, I64 name) { return LoadIconA(hi, name); }
 int64_t LoadBitmapW(int64_t, int64_t);   /* gui_gdi.c */
 int64_t GetObjectW(int64_t, int64_t, int64_t);
-/* LoadImageW: IMAGE_BITMAP (0) は LoadBitmapW へ委譲 (拡縮なし)、IMAGE_ICON (1) / IMAGE_CURSOR (2) は標準 OIC_/IDC_ (hinst=0) の擬似ハンドルのみ。
+/* LoadImageW: IMAGE_BITMAP (0) は LoadBitmapW へ委譲 (拡縮なし)、IMAGE_ICON (1) / IMAGE_CURSOR (2) は hinst=0 の擬似ハンドルのみ (name の ID 制限なしは LoadIconW / LoadCursorW と同じ)。
    LR_SHARED / LR_DEFAULTSIZE は擬似ハンドルが共有で既定寸 (32x32) のため無視してよい。それ以外は未実装として fail-fast。 */
 static GUI_NORETURN void liw_fail(const char *why, I64 hinst, I64 name, I64 type, I64 cx, I64 cy, I64 load) {
   char m[192];
