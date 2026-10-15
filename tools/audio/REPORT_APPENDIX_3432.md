@@ -5,9 +5,9 @@
 ## 1. 測定 commit と差分 0 の証跡
 
 - 測定 commit: `4d97f703e` (`feat(audio): AU-2 行列の PASS 判定に burst_runs > 0 を加える (#3432)`)
-- 検証 HEAD: `68971573d` (main 取り込みの merge commit)。`tools/audio` のコード差分は main 取り込み前後で 0 (`git diff 4d97f703e 68971573d -- tools/audio ':!*.md'` = 0 バイト)。
+- 検証 HEAD = 本 PR の head (本付録を含む commit)。測定時からの差分は md のみ。
 - `git diff 4d97f703e HEAD -- tools/audio ':!*.md'` (コード・テスト・スクリプト) の出力: **0 バイト**。
-- `git diff 4d97f703e HEAD -- tools/audio` の全体は md のみの差分 (本付録の新規追加 39 行と、`REPORT_AU2_CI.md` §12 のリンク 1 行)。
+- `git diff 4d97f703e HEAD -- tools/audio` の全体は md のみの差分 (本付録の新規追加と、`REPORT_AU2_CI.md` §12 のリンク 1 行)。
   測定対象のコードは測定時と同一で、差分は文書だけ。
 
 ## 2. node テスト (HEAD で再実行)
@@ -29,9 +29,8 @@
 - 環境: headless Chrome・ubuntu runner・nproc 4・load avg 0.32→0.27
 - 結果: **44/44 PASS**・wall **252.7 s**
 - ASIO 全 scenario の `burst_runs`: **398〜1596** (`want > 0` を満たす)
-- 出典: 測定 commit `4d97f703e` の run (PR #4249 の作成時)。生 JSON は本 fix run では残っていない
-  (`/tmp/opencode/au38_quick.json` 不在)。差分 0 のため、同じ測定値が HEAD の結果を表す。
-  reviewer の判断により再測定はしていない。
+- 出典: 測定 commit `4d97f703e` の run (PR #4249 の作成時)。生 JSON は本付録に残していない (測定値は上記の要約のみ)。
+  コード差分 0 のため、同じ測定値が HEAD の結果を表す。reviewer の判断により再測定はしていない。
 
 ## 4. 未解決
 
