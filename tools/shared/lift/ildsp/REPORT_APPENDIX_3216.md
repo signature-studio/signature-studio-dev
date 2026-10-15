@@ -121,5 +121,12 @@ python3 tools/shared/lift/ildsp/count_unlifted.py "$FL_WIN64_DIR/extracted/block
 未確定 (残り): 閉包外の呼出元 `0x1c35ff`・`0x1c36be` (owner `0x1c35c4`) は閉包の外。「どの export からも到達しない」は seh_reach.py では計算していない (未確認)。閉包の定義を変えた場合は、この 2 呼出元の到達を確認し直す (子 [T-SH-57] の範囲)。
 
 ### 7-8 測定後のコード差分 (差分 0 の証跡)
-測定 commit は `ce4f51453` (origin/main。閉包の数値を出した `ildsp_closure.py` と `seh_reach.py` の入力を含む)。`git diff ce4f51453 HEAD -- tools/shared/lift/ildsp tools/shared/scripts tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh ':!*.md'` の出力は `seh_reach.py` の 1 件のみ (125 行追加。本 PR の差し替え)。閉包の計算 (`ildsp_closure.py`) に使うファイルは差分 0。
+測定 commit は `ce4f51453` (origin/main。閉包の数値 70 関数・2757 命令を出した入力の commit)。閉包の計算 (`ildsp_closure.py`・`ildsp_survey.py`・`paths.py`) と閉包の数値を変える `.py` は `ce4f51453` 以降で差分 0 (`git diff --stat ce4f51453 HEAD -- tools/shared/scripts/ildsp_closure.py tools/shared/scripts/ildsp_survey.py tools/shared/scripts/paths.py` の出力は空)。
+`git diff --stat ce4f51453 HEAD -- tools/shared/lift/ildsp tools/shared/scripts tools/flelift/x64c.py tools/flelift/rt tools/shared/env.sh ':!*.md'` の実出力:
+```
+ tools/shared/lift/ildsp/seh_reach.py      | 184 ++++++++++++++++++++++++++++++
+ tools/shared/lift/ildsp/unlifted_reach.py | 144 +++++++++++++++++++++++
+ 2 files changed, 328 insertions(+)
+```
+差分は本 PR の `seh_reach.py` (解析スクリプト・閉包を変えない) と、main から取り込んだ `unlifted_reach.py` (閉包の入力ではない)。
 なお `2cff3f50d` 以降の差分は main の取り込み (51 files) を含むため、本節の根拠には使わない。
