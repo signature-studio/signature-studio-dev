@@ -856,6 +856,22 @@ def main():
     cfile = os.path.join(D, 'harness.c')
     open(cfile, 'w').write('\n'.join(lines) + '\n')
     rt = os.path.join(WS, 'tools/flelift/rt')
+    neg_rsq = [int(a.split('=', 1)[1]) for a in sys.argv[1:] if a.startswith('--neg-rsq=')]
+    if neg_rsq:
+        # ネガコン (rsqrtps): rsq の odd/even 両表の entry N を 1 bit 改変した fle_approx.inc で harness を作る。
+        # N はテスト入力が引く添字 (例: 448 は even 表が引かれる)。引かれない添字では FAIL しない。
+        rt_neg = os.path.join(D, 'rt_neg')
+        os.makedirs(rt_neg)
+        for n in ('fle_cpu.c', 'fle_cpu.h'):
+            open(os.path.join(rt_neg, n), 'w').write(open(os.path.join(rt, n)).read())
+        _, odd, even = approx_table()
+        odd = list(odd); even = list(even)
+        odd[neg_rsq[0]] ^= 1; even[neg_rsq[0]] ^= 1
+        tbl = lambda nm, t: 'static const uint32_t %s[4096] = {\n%s\n};\n' % (nm, ',\n'.join(
+            '  ' + ', '.join('0x%06xu' % v for v in t[i:i + 8]) for i in range(0, 4096, 8)))
+        open(os.path.join(rt_neg, 'fle_approx.inc'), 'w').write(
+            '/* ネガコン: kh_at_rsq_odd/even[%d] を 1 bit 改変 */\n' % neg_rsq[0] + tbl('kh_at_rsq_odd', odd) + tbl('kh_at_rsq_even', even))
+        rt = rt_neg
     exe = os.path.join(D, 'harness')
     cc = subprocess.run(['gcc', '-std=gnu11', '-O0', '-w', '-I', rt, cfile, os.path.join(rt, 'fle_cpu.c'),
                          '-o', exe, '-lm'], capture_output=True, text=True)

@@ -6,7 +6,8 @@ import base64, os, struct
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, '..', '..', 'targets', 'kilohearts', 'snapins', 'scripts', 'approx_tables.b64')
 OUT = os.path.join(HERE, 'fle_approx.inc')
-NAMES = ('kh_at_rcp', 'kh_at_rsq_odd', 'kh_at_rsq_even')
+# blob 内の表の番号 (0 = rcp 表。rcpps の表は x64c.py が生成 C 内に埋め込むため、ここでは出さない)
+NAMES = ((1, 'kh_at_rsq_odd'), (2, 'kh_at_rsq_even'))
 
 
 def main():
@@ -15,8 +16,8 @@ def main():
     assert len(blob) == 3 * 4096 * 4, len(blob)
     vals = struct.unpack('<12288I', blob)
     with open(OUT, 'w') as f:
-        f.write('/* 自動生成 (gen_approx_inc.py): 実機 (AMD Ryzen 9 9950X) の rcpps / rsqrtps 近似表。手編集禁止。 */\n')
-        for k, nm in enumerate(NAMES):
+        f.write('/* 自動生成 (gen_approx_inc.py): 実機 (AMD Ryzen 9 9950X) の rsqrtps 近似表。手編集禁止。 */\n')
+        for k, nm in NAMES:
             t = vals[k * 4096:(k + 1) * 4096]
             f.write('static const uint32_t %s[4096] = {\n' % nm)
             for i in range(0, 4096, 8):

@@ -284,15 +284,8 @@ void imp_CoTaskMemAlloc(void) { void* p = fle_alloc(R[RCX], 1); R[RAX] = (uint64
 void imp_CoTaskMemFree(void) { IMP_RET(); }
 void imp_PropVariantClear(void) { R[RAX] = 0; IMP_RET(); }
 
-/* rcpps / rsqrtps の実機近似 (gen_simd.py の kh_rcp_exact / kh_rsqrt_exact と同一式・同一表。
- * 指数則 (実測): rcpps 253-e (<=0 で ±0) / rsqrtps 190-((e+1)>>1)。奇偶で別表 (√2 因子)。 */
-uint32_t fle_rcp_exact(uint32_t x) {
-    uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
-    if (e == 0) return s | 0x7f800000u;
-    if (e == 0xff) return man ? (s | 0x7f800000u | (man | 0x400000u)) : s;
-    int t = 253 - (int)e;
-    return t <= 0 ? s : (s | ((uint32_t)t << 23) | kh_at_rcp[(x >> 11) & 0xfffu]);
-}
+/* rsqrtps の実機近似 (gen_simd.py の kh_rsqrt_exact と同一式・同一表)。
+ * 指数則 (実測): rsqrtps 190-((e+1)>>1)。奇偶で別表 (√2 因子)。rcpps は x64c.py が生成 C 内の kh_rcp_exact を使う。 */
 uint32_t fle_rsqrt_exact(uint32_t x) {
     uint32_t s = x & 0x80000000u, e = (x >> 23) & 0xff, man = x & 0x7fffffu;
     if (e == 0) return s | 0x7f800000u;
