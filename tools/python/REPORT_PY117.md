@@ -49,20 +49,19 @@
 - `general.safeToEdit` と同じ変数 (C: `safe_edit`・mock: `st.safeEdit`) を読むので、両者の値は常に一致する。
 - 試験用の setter は本番の FL API ではない (`setSafeEdit`)。既定値 (真) は `fl_engine_reset` と mock の初期値のまま。
 
-## 4. 検証 (測定 commit `be6d784f9`・コミット済み HEAD)
+## 4. 検証 (測定 commit `134a0e8d7`・コミット済み HEAD)
 
-- 測定 commit は main (`abb5fbf9d`) を取り込んだ merge commit `be6d784f9`。前回の測定 (`395f5496a`・main `5ec4aef07`) の後に main が進んだため、取り込みを 3 回目にした。
-- 競合は `provider/build.sh` の `EXPORTED_FUNCTIONS` だけ。本 PR の `_fl_engine_set_safe_edit` と main の `_fl_engine_midi_word_count`・`_fl_engine_midi_word`・`_fl_engine_set_device_link` を両方残した (順序は main 側に合わせ、`_fl_engine_set_safe_edit` は `_fl_engine_reset` の直後)。`fl_engine.c` は自動 merge。`muteTrackLock` の C の判定 (`if (!safe_edit) return fl_err(...)`) と mock の判定 (`if (!st.safeEdit) throw UNSAFE();`) が残ることを grep で確認し、`EXPORTED_FUNCTIONS` の全関数は link が通ったことで定義を確認した。
-- 素材: `fl-win64` を `tar --zstd -xf` で `$RUNNER_TEMP` 直下に展開 (実測 real 5.656 秒)。`FL_WIN64_DIR=$RUNNER_TEMP` で `fetch_inputs.sh` を回し `work/` に入力を置いた (real 0.549 秒)。
-- emsdk 6.0.12 は upstream から `[EMSDK]` の位置に `install` / `activate` で入れた (本 run の時点では未配置だった)。
-- ビルド (実測 real): `provider/build.sh` 1.569 秒・`build_cpython_wasm.sh` 4 分 36 秒・`FLPY_SKIP_TABLE=1 build_flpy.sh` 6.076 秒。
-- `node tests/provider_check.mjs`: `{"functions":435,"implemented":165,"unimplemented":270,"mcp_static":60,"PASS":true}` (前回は implemented 162。main の新規実装分で 165)。
-- `node tests/playlist_diff.mjs`: `{"calls":72,"diffs":0,"mock_state_steps":8,"PASS":true}`。
-- `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}`。real 2.022 秒。
-- main 側で変わった diff テスト (同じ mock・C を通る): `channels_diff` `{"calls":231,"diffs":0,"PASS":true}`・`device_diff` `{"calls":11,"diffs":0,"PASS":true}`・`mixer_diff` `{"calls":69,"diffs":0,"PASS":true}`・`ui_state_diff` `{"calls":58,"diffs":0,"PASS":true}`。
-- ミューテーション (HEAD で再測): mock の guard を外す → `unsafe 差分 3 件` で FAIL (exit 1)。C の guard を外して `build.sh` で作り直す → 同じく FAIL (exit 1)。元に戻して作り直すと `playlist_diff` は PASS。
-- 測定後の load average は `1.09 1.58 0.85` (`/proc/loadavg`)。並列 1。
-- 差分確認: `git diff be6d784f9 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (本 REPORT の commit のみ。測定後のコード変更は無い)。
+- 測定 commit は main (`ffb17f14d`) を取り込んだ merge commit `134a0e8d7` (取り込みは 4 回目。競合解消は watchdog の依頼)。
+- 競合は 2 件。`provider/build.sh` の `EXPORTED_FUNCTIONS` は、本 PR の `_fl_engine_set_safe_edit` と main の `_fl_engine_browser_op` を両方残した (`_fl_engine_set_safe_edit` は `_fl_engine_reset` の直後・`_fl_engine_browser_op` は `_fl_engine_display_time` の直後)。`docs/DOC_MAP.md` の REPORT 表は、本 PR の `REPORT_PY117.md` 行と main の `REPORT_PY141.md`・`REPORT_PY140.md` 行を両方残した。`fl_engine.c`・`fl_mock.mjs` は自動 merge。`muteTrackLock` の C の判定 (`if (!safe_edit) return fl_err(...)`) と mock の判定 (`if (!st.safeEdit) throw UNSAFE();`) が残ることを grep で確認した。
+- 素材: `fl-win64` の `extracted/` だけを `$ARTIFACTS_DIR` から `$RUNNER_TEMP` に展開 (real 4.764 秒)。`toolchain-emsdk` は本 run の素材に無かったため、[EMSDK] 6.0.12 を upstream から `install` / `activate` で入れ、`build_cpython_wasm.sh` が直接 source する [EMSDK] の位置へ symlink した。`FL_WIN64_DIR=$RUNNER_TEMP` で `fetch_inputs.sh` を回し `work/` に入力を置いた (real 0.424 秒)。
+- ビルド (実測 real・exit 0): `provider/build.sh` 1.475 秒・`build_cpython_wasm.sh` 4 分 29.660 秒・`build_flpy.sh` 7.102 秒。
+- `node tests/provider_check.mjs`: `{"functions":435,"implemented":171,"unimplemented":264,"mcp_static":60,"PASS":true}` (real 0.365 秒。前回は 165。main の新規実装分で 171)。
+- `node tests/playlist_diff.mjs`: `{"calls":72,"diffs":0,"mock_state_steps":8,"PASS":true}` (real 0.053 秒)。
+- `FL_ENGINE=wasm node tests/all_tools.mjs`: `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (real 2.097 秒)。
+- main 側で変わった diff テスト (同じ mock・C を通る): `channels_diff` `{"calls":238,"diffs":0,"grid_calls":1200,"grid_true":30,"grid_diffs":0,"PASS":true}`・`device_diff` `{"calls":11,"link_calls":6,"rejects":4,"midi_out":10,"diffs":0,"PASS":true}`・`mixer_diff` `{"calls":69,"diffs":0,"PASS":true}`・`ui_state_diff` `{"calls":58,"diffs":0,"PASS":true}`。
+- ミューテーション (`134a0e8d7` で再測): mock の guard を外す (`if (false) throw UNSAFE();`) → `unsafe 差分 3 件` の AssertionError で FAIL (exit 1)。C の guard を外して `provider/build.sh` で作り直す → 同じく `unsafe 差分 3 件` で FAIL (exit 1)。元に戻して作り直すと `playlist_diff` は PASS。
+- 直列 1 本。テスト開始時の load average は `2.35 1.58 0.77` (`/proc/loadavg`)。
+- 差分確認: `git diff 134a0e8d7 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` の出力は 0 行 (本 REPORT の commit のみ。測定後のコード変更は無い)。
 
 ## 5. 未解決
 
