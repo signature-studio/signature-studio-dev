@@ -88,7 +88,7 @@ python3 tools/plugins/lift/passes/test_comis_flags.py   # 単体 6 件 (IR 変�
 
 `sampler_engines.sh` は `lift_from_ll.sh` 経由で `engine_lift.sh` を呼ぶため、既定の `PLUG_COMIS_FLAGS=1` が 23664・23677 にも効く。 既定 on は維持する (issue #3242 の「sampler engine の経路で既定 on」どおり。 judge 判定は反映・baseline とも不変)。
 
-- 測定: `bash tools/plugins/sampler/sampler_engines.sh` (反映・既定) と `PLUG_COMIS_FLAGS=0 bash tools/plugins/sampler/sampler_engines.sh` (baseline) を各 1 回、逐次。 検証 HEAD `a92d70769` (コード差分 `git diff c45bf383a HEAD -- tools/plugins/lift tools/plugins/sampler/*.sh tools/plugins/sampler/*.py` は 0 行。 測定のコードは c45bf383a と同じ)。 PE は `fl-win64` から `block23664_PE.bin`・`block23677_PE.bin` の 2 本だけ展開。 emcc は `/opt/emsdk`、RetDec は `/opt/retdec` (runner の既存 toolchain。 `toolchain-*.tar.zst` は展開していない)。 `TMPDIR=$RUNNER_TEMP`。 4 vCPU・load 0.6〜1.3。
+- 測定: `bash tools/plugins/sampler/sampler_engines.sh` (反映・既定) と `PLUG_COMIS_FLAGS=0 bash tools/plugins/sampler/sampler_engines.sh` (baseline) を各 1 回、逐次。 検証 HEAD `a92d70769` (コード差分 `git diff c45bf383a HEAD -- tools/plugins/lift tools/plugins/sampler/*.sh tools/plugins/sampler/*.py` は 0 行。 測定のコードは c45bf383a と同じ)。 PE は `fl-win64` から `block23664_PE.bin`・`block23677_PE.bin` の 2 本だけ展開。 emcc は `[EMSDK]`、RetDec は `[RETDEC]` (runner の既存 toolchain。 `toolchain-*.tar.zst` は展開していない)。 `TMPDIR=$RUNNER_TEMP`。 4 vCPU・load 0.6〜1.3。
 
 | engine | 測定 | 反映 (呼出し削除) | unimpl (`simd2`) | emcc -c (f80 後) | defines / function_defines | missing_ref | lift_s |
 |---|---|---|---|---|---|---|---|
