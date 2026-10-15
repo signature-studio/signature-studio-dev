@@ -8,8 +8,8 @@
 - 7 件すべての entry・fn VA・PyArg 書式 (個数・型の並び) を PE から確定した。書式は `analysis/flapi/flapi_kwargs.json` の `fmt` と一致した。
 - **`blank` (0xd7c600) は効果を確定した**: 第 1 引数が 1 なら `isBlanked` (`scr+0x1d0`) を真に書く。真→偽の解除では `scr+0x1cc ← scr+0x1dc` (activeCounter の復元) を行う。`scr+0x1dc` の初期値は未実測のため仮置き 0。
 - **残り 6 件** (`addMeter`・`displayBar`・`fillRect`・`drawRect`・`drawText`・`eraseRect`) は描画だけを行い、API から観測できる状態を変えない。mock と C は引数検査と None の返却だけを模す (`arrangement.selectionSet` 等と同じ扱い)。描画の引数の意味 (矩形の書式 x/y/w/h か l/t/r/b か) は保留。
-- 実装・未実装の件数は 155/280 → **162/273** (`fl_table.c` 435 関数)。`tests/screen_diff.mjs` は 32 → 72 呼出しで mock と C の差分 0。
-- 測定 commit: `59dac085f`。e2e はすべて PASS (下の検証表)。
+- 実装・未実装の件数は main (`a8fc92eb5`) の 162/273 → **169/266** (`fl_table.c` 435 関数)。`tests/screen_diff.mjs` は 32 → 72 呼出しで mock と C の差分 0。
+- 測定 commit: `a60dccce8` (コードを変えた最後の commit。`59dac085f` の実装を main に取り込んだ merge)。e2e はすべて PASS (下の検証表)。
 
 ## PE 根拠 (VA)
 
@@ -55,28 +55,28 @@
 
 ## 検証
 
-測定 commit: `59dac085f` (コードを変えた最後の commit。`feat(python): screen 描画・メーター系 7 件の PE 確定と mock/C 実装 (#3022)`)。以下は同じ commit のクリーンな作業ツリーで実行した。
+測定 commit: `a60dccce8` (コードを変えた最後の commit。`59dac085f` (`feat(python): screen 描画・メーター系 7 件の PE 確定と mock/C 実装 (#3022)`) を main `a8fc92eb5` に取り込んだ merge。取り込みで `tools/python` の他の変更も入ったため、この commit で再測定した)。以下は同じ commit のクリーンな作業ツリーで実行した。
 
-環境: runner 4 core、emsdk は `[EMSDK]` (runner 同梱の既存版。`toolchain-emsdk` 素材は取得したが展開していない)、fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (5.5 秒)。前提生成物: `fetch_inputs.sh` (rc 0、0.5 秒)・`build_cpython_wasm.sh` (rc 0、4 分 3 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.1 秒)。測定時の load average: 0.92 (1 分値、`uptime` 03:36:29)。
+環境: runner 4 core、emsdk は `[EMSDK]` (runner 同梱の既存版。`toolchain-emsdk` 素材は取得したが展開していない)、fl-win64 を `$RUNNER_TEMP/fl-win64` に全展開 (5.5 秒)。前提生成物: `fetch_inputs.sh` (rc 0、0.5 秒)・`build_cpython_wasm.sh` (rc 0、4 分 3 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、6.1 秒)。測定時の load average: 0.16 (1 分値、`uptime` 03:39:56)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
-| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 162` | 1.0 秒 |
-| `node tests/provider_check.mjs` | PASS (435 / 実装 162 / 未実装 273 / MCP 静的 60) | 0.35 秒 |
+| `bash provider/build.sh` | rc 0・`fl_table.c: 435 関数, ハンドラ 169` | 1.0 秒 |
+| `node tests/provider_check.mjs` | PASS (435 / 実装 169 / 未実装 266 / MCP 静的 60) | 0.35 秒 |
 | `node tests/screen_diff.mjs` | calls 72、diffs 0、PASS | 0.05 秒 |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.16 秒 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 2.07 秒 |
 
-ネガティブコントロール (`docs/WORKFLOW.md` §5)。`host/fl_mock.mjs` を 1 箇所ずつ壊して `node tests/screen_diff.mjs` が FAIL することを確かめ、戻した後に PASS を再確認した。
+ネガティブコントロール (`docs/WORKFLOW.md` §5)。`host/fl_mock.mjs` を 1 箇所ずつ壊して `node tests/screen_diff.mjs` が FAIL することを確かめ、戻した後に PASS を再確認した。実施は `59dac085f` (screen の行は `a60dccce8` と同一。`git diff 59dac085f a60dccce8` の screen 関連行は 0)。
 
 - (1) `blank` の解除時の activeCounter 復元を外す → `AssertionError: screen 差分 1 件`、rc 1 (FAIL)。`setScreenActiveCounter(7)` → `blank(0,0)` の順で検出。
 - (2) `drawText` の文字列検査を外す (`str(a[1])` → `argI(a,1,0)`) → `AssertionError: screen 差分 2 件`、rc 1 (FAIL)。型違いの `drawText(0,1,…)` と `drawText(0,"t",…,4.5)` で検出。
 
-戻した後: `screen_diff` calls 72・diffs 0・PASS、`provider_check` 162/273・PASS、`all_tools` 48/48。
+戻した後: `screen_diff` calls 72・diffs 0・PASS、`provider_check` 169/266・PASS、`all_tools` 48/48。
 
-コード差分 (測定 commit から HEAD まで、`tools/python` の .md 以外):
+コード差分 (測定 commit から PR HEAD まで、`tools/python` の .md 以外):
 
 ```
-$ git diff 59dac085f HEAD -- tools/python ':!*.md'
+$ git diff a60dccce8 HEAD -- tools/python ':!*.md'
 (空)
 ```
 
@@ -85,7 +85,7 @@ $ git diff 59dac085f HEAD -- tools/python ':!*.md'
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 描画 6 件の引数の意味 (矩形の書式、`0xd52d10`・`0xd52cc0`・`0xd7d9e0`・`0xd7e330`・`0xd7bc10`・`0xd7b420` の本体、`vtbl(scr)[+0x100]`) | 描画先は API から観測できないため、mock/C の状態に影響しない。意味論の検査はできない | #2985 (親。PY-121 の未確定と併せて追跡) |
-| 述語 `0x11d1430` (= `vtbl(this)[+0x88]`) の実体。偽の経路 (`task+0x60=-2`) の Python 側の戻り値・例外 | `blank`・`displayBar`・`drawText`・`eraseRect` の偽経路 (述語偽) は mock/C が成功経路 (None) だけを模す | #3045 (PY-125 の報告ゲート) |
+| 述語 `0x11d1430` (= `vtbl(this)[+0x88]`) の実体。偽の経路 (`task+0x60=-2`) の Python 側の戻り値・例外 | `blank`・`displayBar`・`drawText`・`eraseRect` の偽経路は mock/C が成功経路 (None) だけを模す | #3045 (PY-125 の報告ゲート) |
 | `scr = 0` (screen 未初期化) の経路 | mock/C は初期化済みの経路だけを模す (REPORT_PY121_2985 未確定 1 と同じ) | #2985 |
 | `blank` 解除時の `scr+0x1dc` の初期値 | 解除後の `getScreenActiveCounter` は仮置き 0 (未実測)。mock と C は同じ仮置き | #2985 |
 | flapi 表の書式表記: `displayBar` が `iisaa` (PE は `iisdi`)、`drawText` が `aaaaaa` (PE は `isiiii`) | `fl_table.c` の dispatch は通すので実害はない。表記の不一致のみ | #2952 (PY-116・書式表記) |
