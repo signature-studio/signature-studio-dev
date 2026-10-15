@@ -50,7 +50,7 @@
 | `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
 
 - 測定環境: GitHub Actions runner (親 dir の worktree `ws-3494`、commit `0641856`)。load average は測定中 2.2〜2.9 (`uptime`、n=1)。`device_diff` / `provider_check` / `all_tools` の所要は main 作業ツリーでの先行測定 (provider_check 0.33 秒、all_tools wasm 1.39 秒、load 2.2〜2.4)。
-- **ネガティブコントロール** (1 件を壊して FAIL すること。作業ツリーの写し・base `e5c96411e` 上で実施): (a) mock の `getMasterSync` を `return true` → `device 差分 1 件`・exit 1 (`device.getMasterSync` の値の不一致)。(b) mock の `setMasterSync` を `st.masterSync = false` → `device 差分 1 件`・exit 1。本体 (壊していない版) は diffs 0・exit 0。
+- **ネガティブコントロール** (1 件を壊して FAIL すること。作業ツリーの写し・base `e5c96411e` 上で実施): (a) mock の `getMasterSync` を `return true` → `device 差分 2 件`・exit 1 (訂正: 当初の記録「1 件」は誤り。HEAD `868d0fbbb` で再実行すると 2 件。下の「再測定」節)。(b) mock の `setMasterSync` を `st.masterSync = false` → `device 差分 1 件`・exit 1。本体 (壊していない版) は diffs 0・exit 0。
 - 追加の確認: `git status` で作業ツリーに残る変更は本 PR の 4 ファイル (+ `REPORT_PY206.md` と `docs/DOC_MAP.md`) のみ。`package.json`・`pnpm-lock.yaml` は runner 側の既存差分で commit に含めない。
 
 ## 競合解消後の再測定 (測定 commit `dc65d9857`)
@@ -68,7 +68,7 @@ main (`5fae94c61`) を merge して競合 (`tests/provider_check.mjs` の実装�
 | `node tests/all_tools.mjs` (JS mock) | 48/48 ok・host_calls 37,425 | 0 |
 
 - 所要 (`date` 差分・整数秒): device_diff 0・provider_check 1・patterns_diff 0・all_tools wasm 1・all_tools mock 1。load average は測定中 2.75〜3.05 (`uptime`、n=1)。
-- 測定 commit `dc65d9857` から HEAD までのコード差分: `git diff dc65d9857 HEAD -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (本節の追記は REPORT のみ)。
+- 測定 commit `dc65d9857` から `5056e0760` (本節の時点の HEAD) までのコード差分: `git diff dc65d9857 5056e0760 -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行。後続の main 取り込み (`342d8ce92`) で差分は 137 行になったため、現 HEAD の差分は「342d8ce92 節」と「再測定」節を参照。
 - 前回測定 (`0641856`) から `dc65d9857` までのコード差分 (main 取り込み分、4 ファイル・+81/-3): `host/fl_mock.mjs` +7・`provider/fl_engine.c` +9・`tests/patterns_diff.mjs` +60・`tests/provider_check.mjs` (実装集合と期待件数)。
 
 ## main 再取り込み後の再測定 (測定 commit `342d8ce92`)
@@ -90,7 +90,23 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf`・8 秒・rc 0)。emsdk は既定の `EMSDK_DIR` (emcc 6.0.12・[EMSDK])。
 - 所要 (整数秒・`date` 差分。provider build は `time` 実測 0.87 秒): cpython 163・flpy 4・provider_check 0・device_diff 0・mixer_diff 0・patterns_diff 0・all_tools wasm 1・all_tools mock 1。load average は測定中 1.27〜1.99 (`uptime`、n=3)。
-- 前回測定 (`dc65d9857`) から `342d8ce92` までのコード差分 (main 取り込み分): `git diff --stat dc65d9857 342d8ce92 -- tools/python/host tools/python/provider tools/python/tests` は 4 ファイル (+28/-16)。`fl_mock.mjs`・`fl_engine.c` の差分は channels grid bit と mixer 2 関数で、device 関数の実装行は差分 0。device のネガティブコントロール (冒頭の検証節) は本節では未再実施。
+- 前回測定 (`dc65d9857`) から `342d8ce92` までのコード差分 (main 取り込み分): `git diff --stat dc65d9857 342d8ce92 -- tools/python/host tools/python/provider tools/python/tests` は 4 ファイル (+28/-16)。`fl_mock.mjs`・`fl_engine.c` の差分は channels grid bit と mixer 2 関数で、device 関数の実装行は差分 0。device のネガティブコントロール (冒頭の検証節) は本節では未再実施 (「再測定」節で再実施)。
+- コード差分 (測定 commit から HEAD まで): `git diff 342d8ce92 868d0fbbb -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行 (`868d0fbbb` 時点)。`868d0fbbb` より後の commit (本節を書いた commit を含む) は `tools/python/REPORT_PY206.md` と `docs/DOC_MAP.md` のみ。
+
+## 再測定 (fix 差し戻し・HEAD `868d0fbbb`・ネガティブコントロール再実施)
+
+- 方法: `git archive HEAD tools/python` を `$RUNNER_TEMP` 直下の別ディレクトリに展開し、そこで `bash provider/build.sh` を実行 (作業ツリーは未変更)。変異は展開先の `host/fl_mock.mjs` の写しだけに入れた。元の行は `device.getMasterSync` (394 行: `return st.masterSync;`) と `device.setMasterSync` (396 行: `st.masterSync = argI(a, 0, 0) === 1;`)。
+
+| 検査 | 結果 | rc |
+|---|---|---|
+| `bash provider/build.sh` (展開先) | `fl_table.c: 435 関数, ハンドラ 162` | 0 |
+| `node tests/device_diff.mjs` (変異なし) | calls 18・rejects 10・midi_out 5・**diffs 0**・PASS | 0 |
+| (a) `getMasterSync` を `return true` に変異 | **`device 差分 2 件`**・exit 1。2 件とも `device.getMasterSync`: ① 初期値 (mock true / C false)、② `setMasterSync(false)` の後 (mock true / C false)。`setMasterSync(true)` の後は両方 true で一致 | 1 |
+| (b) `setMasterSync` を `st.masterSync = false` に変異 | `device 差分 1 件`・exit 1。`setMasterSync(true)` の後の `device.getMasterSync` (mock false / C true) | 1 |
+| `node tests/provider_check.mjs` (変異なし・展開先) | `implemented 162・unimplemented 273` の assert と §2・§2b (エラー code・ilmcp) を通過。§3 (flpy 段) は `work/midi.py` と `dist/flpy.js` を要し、`work/midi.py` 不在の ENOENT で停止 (rc 1)。§3 の PASS は `342d8ce92` 節の full 測定 (同じコード) で確認済み | 1 |
+
+- (a) の件数は `0641856` 節の「1 件」が誤りで、HEAD `868d0fbbb` の再実行で 2 件。`0641856` 節の該当行には訂正を付けて残した。
+- 差分 0 の根拠: 上の方法の `git diff 342d8ce92 868d0fbbb -- tools/python/host tools/python/provider tools/python/tests` は出力 0 行。
 
 ## 検証範囲 / 範囲外
 
@@ -102,6 +118,6 @@ main (`cc5c28b8f`) を再度 merge した (merge commit `342d8ce92`)。前回の
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 残り 25 関数 (MIDI 送信・dispatch 系 13 / linked control 系 8 / その他 4) | device 系の未実装 25 件 (C provider は Unspecified error) | 子 issue C1〜C3 (本 PR 作成時に起票。番号は PR 本文・issue コメントに記載) |
-| 状態値の実機初期値 (idle / midi-out / master sync) | 実 FLEngine の値と mock の値が異なりうる | 本 issue の子 C1〜C3 の受入に含めない。`general` 系と同じく仮置きのまま、実機測定の子を別途起票する (PM 判断) |
+| 残り 25 関数 (MIDI 送信・dispatch 系 13 / linked control 系 8 / その他 4) | device 系の未実装 25 件 (C provider は Unspecified error) | #3566 (PY-214・13 関数)・#3568 (PY-215・8 関数)・#3569 (PY-216・4 関数) |
+| 状態値の実機初期値 (idle / midi-out / master sync) | 実 FLEngine の値と mock の値が異なりうる | 子 #3566・#3568・#3569 の受入に含めない。`general` 系と同じく仮置きのまま、実機測定の子を別途起票する (PM 判断) |
 | P 偽 (-2) と vtbl 先の効果 | `setMasterSync` / 通知 3 件の副作用が C/mock で模擬されない | 同上 (PY-125 の `REPORT_PY125` §4 と同じ未解決として扱う) |
