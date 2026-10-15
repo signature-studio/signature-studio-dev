@@ -13,7 +13,7 @@
 ## 測定
 
 - 測定 commit: `674ac4248` (`tools/python/analysis/py223_indirect_callers.py` を最後に変えた commit)。この後のコード差分は 0 行 (`git diff 674ac4248 HEAD -- tools/python/analysis tools/python/provider tools/python/host tools/python/tests` の出力 0 行。REPORT のみ変更)。
-- 素材: `$HOME/artifacts/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C tools/python/work/py223 --wildcards '*block00031_PE.bin'` (1.5 秒)。展開先 `tools/python/work/py223/extracted/` は gitignore。
+- 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (`oc_artifacts: fl-win64`)。展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C tools/python/work/py223 --wildcards '*block00031_PE.bin'` (1.5 秒)。展開先 `tools/python/work/py223/extracted/` は gitignore。
 - 検査 (PASS): `FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py` → `table.check PASS`・rc 0。所要 47.46 秒 (n=1)、user 47.43 秒、load average (1/5/15 分) は実行前 `0.43 0.55 0.35`・実行後 `0.77 0.63 0.39`、並列数 1。
 - ネガティブコントロール: `--mutate` (表の添字 51 の値を 1 ビット反転したメモリ上の複製で検査) → `table.check FAIL`・rc 1。所要 48.05 秒 (n=1)。検査は効いている。
 - 独立算法の検算: 命令の逆アセンブルを使わず、`.text` のバイト列を正規表現 `\xff[\x90-\x97]<disp32>` で数えた (`call r/m64` の ModRM mod=10 reg=010 の形)。結果は `[reg+0x120]` 114 件・`[reg+0x198]` 24 件で、逆アセンブル側と一致。
@@ -56,7 +56,7 @@
 
 ```
 cd tools/python
-tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C work/py223 --wildcards '*block00031_PE.bin'
+tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C work/py223 --wildcards '*block00031_PE.bin'
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py          # table.check PASS・rc 0
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_indirect_callers.py --mutate # table.check FAIL・rc 1
 FL_WIN64_DIR=$PWD/work/py223 python3 analysis/flapi/pe_callgraph.py callers 0xed4b70,0x12da6d0
