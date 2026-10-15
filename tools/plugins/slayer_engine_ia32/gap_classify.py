@@ -2,7 +2,7 @@
 """gap_classify.py: lift 後の未被覆区間 (.text で被覆 0 の連続域) を 3 類に分類する (#2814 / 親 #1098)。
 
   (a) data-in-code : jt 表と半分以上重なる、または .text 内の reloc 値 (ポインタ) を 2 本以上含む
-  (b) 関数          : 直接 call/jmp の先頭になる、または関数 prologue (55 8b ec / 8b ff 55 8b ec / 83 ec / 81 ec) で始まる
+  (b) 関数          : 区間の先頭を指す直接 call/jmp/jcc がある、または関数 prologue (55 8b ec / 8b ff 55 8b ec / 83 ec / 81 ec) で始まる
   (c) 参照の無い区間 : 上記のどれでもない。 nop/int3/00 のみの区間 (padding) を含む
 
   python3 gap_classify.py <PE> <lift 出力 dir> [--md]   分類表を出す (--md で REPORT_APPENDIX_2814 用の Markdown)
@@ -64,12 +64,16 @@ def classify(env):
         for k in range(a, b):
             where[k] = n
     calls = collections.defaultdict(list)
+    heads = collections.defaultdict(list)
     code = img[text.VirtualAddress:text.VirtualAddress + TS]
     for ins in md.disasm(code, T0):
         if (ins.mnemonic == 'call' or ins.mnemonic.startswith('j')) and ins.operands and ins.operands[0].type == X86_OP_IMM:
             t = ins.operands[0].imm
             if T0 <= t < T0 + TS and (t - T0) in where:
-                calls[where[t - T0]].append(ins.address)
+                n = where[t - T0]
+                calls[n].append(ins.address)
+                if t - T0 == gaps[n][0]:
+                    heads[n].append(ins.address)
     relo = collections.defaultdict(list)
     for b in pe.DIRECTORY_ENTRY_BASERELOC:
         for e in b.entries:
@@ -90,17 +94,23 @@ def classify(env):
             cls, why = 'a', 'jt 表と重なる (%d/%d B)' % (jt, b - a)
         elif len(relo[n]) >= 2:
             cls, why = 'a', '.text 内の reloc 値 %d 本 (ポインタ表とみなす)' % len(relo[n])
-        elif (calls[n] and bs[0] not in PAD) or bs[:3] == b'\x55\x8b\xec' or bs[:5] == b'\x8b\xff\x55\x8b\xec' or bs[:2] in (b'\x83\xec', b'\x81\xec'):
+        elif (heads[n] and bs[0] not in PAD) or bs[:3] == b'\x55\x8b\xec' or bs[:5] == b'\x8b\xff\x55\x8b\xec' or bs[:2] in (b'\x83\xec', b'\x81\xec'):
             cls = 'b'
-            if calls[n]:
-                why = '直接 call/jmp の先 (参照元 %s)' % ','.join('0x%x' % x for x in calls[n][:3])
+            if heads[n]:
+                why = '区間先頭への直接 call/jmp (参照元 %s)' % ','.join('0x%x' % x for x in heads[n][:3])
             else:
                 why = 'prologue %s' % bs[:6].hex(' ')
         else:
             cls = 'c'
-            why = '参照なし・prologue なし' + (' (reloc %d 本)' % len(relo[n]) if relo[n] else '')
+            if heads[n]:
+                why = '先頭が pad (先頭への参照あり)'
+            elif calls[n]:
+                why = '区間内の分岐のみ (先頭への参照なし)'
+            else:
+                why = '参照なし・prologue なし'
+            why += (' (reloc %d 本)' % len(relo[n]) if relo[n] else '')
         rows.append(dict(va=T0 + a, size=b - a, cls=cls, why=why, jt=jt,
-                         ncall=len(calls[n]), nreloc=len(relo[n]),
+                         ncall=len(calls[n]), nhead=len(heads[n]), nreloc=len(relo[n]),
                          calls=['0x%x' % x for x in calls[n][:3]], relocs=['0x%x' % x for x in relo[n][:3]],
                          head=bs[:8].hex(' ')))
     return rows

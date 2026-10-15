@@ -183,7 +183,7 @@
 | 178 | 0x10009cba | 6 | c | padding (90/cc/00 のみ) | - | - | `cc cc cc cc cc cc` |
 | 179 | 0x10009cd9 | 9 | c | 参照なし・prologue なし | - | - | `8d 54 24 0c e8 23 1d 00` |
 | 180 | 0x10009edd | 13 | c | 参照なし・prologue なし | - | - | `cc cc cc ba c0 4b 02 10` |
-| 181 | 0x10009f72 | 38 | c | 参照なし・prologue なし | 0x10009f8f 0x10009f96 | - | `cc cc cc cc cc cc cc cc` |
+| 181 | 0x10009f72 | 38 | c | 区間内の分岐のみ (先頭への参照なし) | 0x10009f8f 0x10009f96 | - | `cc cc cc cc cc cc cc cc` |
 | 182 | 0x10009fa2 | 14 | c | 参照なし・prologue なし | - | - | `ba 7a 4f 02 10 eb f4 ba` |
 | 183 | 0x1000a00b | 1 | c | padding (90/cc/00 のみ) | - | - | `90` |
 | 184 | 0x1000a013 | 153 | a | .text 内の reloc 値 4 本 (ポインタ表とみなす) | - | 0x1000a00f 0x1000a014 0x1000a018 | `90 20 a0 00 10 4c a0 00` |
@@ -214,8 +214,8 @@
 | 209 | 0x1000ba48 | 22 | c | 参照なし・prologue なし | - | - | `8b 44 24 08 25 00 00 f0` |
 | 210 | 0x1000ba6b | 62 | c | 参照なし・prologue なし | - | - | `66 8b 04 24 66 3d 7f 02` |
 | 211 | 0x1000bce1 | 15 | c | padding (90/cc/00 のみ) | - | - | `cc cc cc cc cc cc cc cc` |
-| 212 | 0x1000bd6b | 79 | b | 直接 call/jmp の先 (参照元 0x10009ee5) | 0x10009ee5 | - | `55 8b ec 81 c4 30 fd ff` |
-| 213 | 0x1000beeb | 117 | b | 直接 call/jmp の先 (参照元 0x10009f85) | 0x10009f85 | - | `55 8b ec 81 c4 30 fd ff` |
+| 212 | 0x1000bd6b | 79 | b | 区間先頭への直接 call/jmp (参照元 0x10009ee5) | 0x10009ee5 | - | `55 8b ec 81 c4 30 fd ff` |
+| 213 | 0x1000beeb | 117 | b | 区間先頭への直接 call/jmp (参照元 0x10009f85) | 0x10009f85 | - | `55 8b ec 81 c4 30 fd ff` |
 | 214 | 0x1000c077 | 13 | b | prologue 83 ec 2c 83 e0 3f | - | - | `83 ec 2c 83 e0 3f ff 24` |
 | 215 | 0x1000c516 | 571 | b | prologue 83 ec 2c db 3c 24 | - | - | `83 ec 2c db 3c 24 db 7c` |
 | 216 | 0x1000ca1e | 717 | c | 参照なし・prologue なし | - | - | `50 53 51 8b 44 24 16 35` |
