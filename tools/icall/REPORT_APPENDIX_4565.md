@@ -11,7 +11,7 @@
 
 ## 2. 環境
 
-- HEAD `248816185` (origin/main、branch `4565-icall-cxx-eh-unwind`)。素材: `fl-win64`・`plugins-freshair`・`toolchain-emsdk` (`/opt/emsdk`)・`work-icall`・`work-liftlib` を展開。`RetDec` (`/opt/retdec`) は本作業の経路に無い。
+- HEAD `248816185` (origin/main、branch `4565-icall-cxx-eh-unwind`)。素材: `fl-win64`・`plugins-freshair`・`toolchain-emsdk` ([EMSDK])・`work-icall`・`work-liftlib` を展開。`RetDec` ([RETDEC]) は本作業の経路に無い。
 - `bash tools/targets/freshair/fetch.sh` (`FA_DL=$RUNNER_TEMP/plugins-freshair`): `win: 17 files, factory .epf: 8, mac: 0 files` (mac は `xar`・pkg 無しで skip)。
 - `bash tools/icall/fa_route_build.sh`: 10.1 s、`fa_route.cjs` 生成 (`missing` 4 関数は既存の出力)。
 
@@ -53,15 +53,16 @@
 
 | 条件 | 所要 | 件数 (funcs 131) |
 |---|---|---|
-| 変更前 (`origin/main` の `ott_native.c`) | 測定時刻 10:0x (wall 未計測) | bit一致 55 / native crash/timeout 65 / wasm のみ err 9 / 値の不一致 2 |
+| 変更前 (`origin/main` の `ott_native.c`) | wall 未計測 (変更後の測定と同じ条件・load は未記録) | bit一致 55 / native crash/timeout 65 / wasm のみ err 9 / 値の不一致 2 |
 | 変更後 | real 1m14.120s・user 1m10.060s・sys 4.652s。load average 1.03 → 1.26 | bit一致 55 / native crash/timeout 65 / wasm のみ err 9 / 値の不一致 2 |
 
 行単位の比較 (`sweep_base.jsonl` vs `sweep_new.jsonl`): 131 行中 差分 0。6 関数はいずれも `{"status": "crash_or_timeout"}`。
 
 ### 4.3 差分 (測定 commit `248816185` → 作業 commit)
 
-測定 commit (コードを変えた最後の commit): 作業 commit を参照 (本節末尾)。
-`git diff 248816185 HEAD -- tools/ott/native` の行数は、commit 後に記録する。
+測定 commit (コードを変えた最後の commit): `28329dd08`。
+`git diff 248816185 28329dd08 -- tools/ott/native` の出力 (ベース `248816185` = origin/main 取り込み時点):
+`tools/ott/native/build.sh` (1 行変更: `-fno-omit-frame-pointer`) と `tools/ott/native/ott_native.c` (+118 行) のみ。`git diff --stat` は `2 files changed, 119 insertions(+), 1 deletion(-)`。
 
 ## 5. 未解決
 
