@@ -58,7 +58,7 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 
 ## 16. #523 segfault の切り分け (2026-10-13 · 実測 · 診断のみ · コード変更なし)
 
-- **HEAD**: `13bdc5fe` (origin/main)。 測定入力は §15 と同じ `80c32a06` 系の engine lift 出力 (lift 側の差分 0。 `git diff 512c53ab origin/main -- tools/plugins/reverb_delay tools/lift tools/p0c` は空)。
+- **HEAD**: `13bdc5fe` (origin/main)。 測定入力は §15 と同じ `80c32a06` 系の engine lift 出力 (lift 側の差分 0。 `git diff 512c53ab 13bdc5fe -- tools/plugins/reverb_delay tools/plugins/lift tools/plugins/p0c` は空)。
 - **再現 (19165, IPPCODE 除外 + AVX 系 78 除外)**: summary `19165,2000,0,2608,6,148,139,0,139,601,...`。 lift rc 0 / define 2,608 / f80 6 / `emcc -c` **rc 139**。 §15 と define・f80・rc が一致。 unimpl helper は 148 (§15 の 241 とは不一致。 未切り分け)。 601 は lift 段の秒数 (`engine_lift.sh` の `t1-t0`)。
 - **スタック上限は原因でない**: `ulimit -s unlimited` でも rc 139。 クラッシュは `WebAssembly Instruction Selection` 中の `DAGCombiner::visitSTORE` (LLVM の DAG combine)。
 - **落ちる関数は 2 つ**: 関数単位でスタブ化 (`unreachable` 置換・診断専用・コミットせず) して `emcc -c` を再実行したところ、`function_1800ceec0` (f80 参照 859 箇所) を外すと次は `function_1801439a0` (f80 参照 879 箇所) で落ち、両方を外すと segfault は消えた (rc 1)。 いずれも x87 を大量に含む。
@@ -70,7 +70,7 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 
 ## 17. #523 f80 関数の関数単位除外による部分集合の `emcc -c` (2026-10-15 · 実測 · 到達性のみ)
 
-- **測定 commit**: `81aafb874` (main `5b1f9dffc` を取り込んだ merge commit。 コードを変えた最後の commit。 `engine_f80_stub.py` は関数名を解釈できないとき exit≠0 で止まり、`engine_f80_subset.sh` は stub 失敗時に古い TSV を読まずに止まる)。 旧測定 commit `6a9893ac0` からの code 差分は `tools/plugins/reverb_delay/ipp_callers.py` と `shell_bind.py` の新規追加 (main 側の静的解析道具。 f80 段の経路には入らない) のみで、`git diff 6a9893ac0 81aafb874 -- tools/plugins/reverb_delay/engine_f80_stub.py tools/plugins/reverb_delay/engine_f80_subset.sh tools/plugins/reverb_delay/engine_f80_gate.sh tools/plugins/reverb_delay/engine_f80_nc.sh tools/plugins/reverb_delay/engine_lift.sh tools/plugins/reverb_delay/env.sh tools/lift tools/p0c` は空。 そのため両 engine を 81aafb874 で再測定した (下表・下の実測値)。 `git diff 81aafb874 HEAD -- tools/plugins/reverb_delay/*.py tools/plugins/reverb_delay/*.sh tools/lift tools/p0c` は空 (以降の commit は `.md` のみ)。 lift 鎖は `git diff 42357b73e 81aafb874 -- tools/lift tools/p0c tools/plugins/reverb_delay/engine_lift.sh` が空。
+- **測定 commit**: `81aafb874` (main `5b1f9dffc` を取り込んだ merge commit。 コードを変えた最後の commit。 `engine_f80_stub.py` は関数名を解釈できないとき exit≠0 で止まり、`engine_f80_subset.sh` は stub 失敗時に古い TSV を読まずに止まる)。 旧測定 commit `6a9893ac0` からの code 差分は 17 files (`git diff --stat 6a9893ac0 81aafb874 -- tools/plugins/lift tools/plugins/p0c tools/plugins/reverb_delay`。 内訳と既定経路での扱いは下の注)。 f80 段の 6 files は差分 0 (`git diff 6a9893ac0 81aafb874 -- tools/plugins/reverb_delay/engine_f80_stub.py tools/plugins/reverb_delay/engine_f80_subset.sh tools/plugins/reverb_delay/engine_f80_gate.sh tools/plugins/reverb_delay/engine_f80_nc.sh tools/plugins/reverb_delay/engine_lift.sh tools/plugins/reverb_delay/env.sh` は空)。 lift 鎖は `git diff 42357b73e 6a9893ac0 -- tools/plugins/lift tools/plugins/p0c tools/plugins/reverb_delay/engine_lift.sh` が空で、差分は main 取り込み (81aafb874) で入った。 そのため両 engine を 81aafb874 で再測定した (下表・下の実測値)。 `git diff 81aafb874 HEAD -- tools/plugins/reverb_delay/*.py tools/plugins/reverb_delay/*.sh tools/plugins/lift tools/plugins/p0c` は空 (以降の commit は `.md` のみ)。
 - **方法**: `engine_f80_stub.py` が `e.fixcmp.ll` の `x86_fp80` を含む関数の定義を `declare` に置換する (判定は `define` から対応する `}` までの本体に限る)。 除外は関数単位で、名前・VA・理由を `f80_excluded.tsv` に記録する。 `engine_f80_subset.sh` が部分集合を `emcc -c` し、`engine_f80_gate.sh` が gate を判定する。 gate: rc 0 かつ define 数が除外数だけ減る かつ 除外集合 = 本体に f80 を含む define 集合 (stub と別算法の awk で求める) かつ 部分集合の本体 f80 = 0。 NC は実 IR で `engine_f80_nc.sh <e.fixcmp.ll の絶対パス> <OUT>` を回す。 base (無改変) は PASS、nc1 (件数を保って非 f80 関数を除外名に入れる) と nc2 (除外を 1 件減らす) は FAIL を要求する。
 - **素材**: `$ARTIFACTS_DIR` に `fl-win64` / `toolchain-retdec` / `toolchain-emsdk` が実在することを確認した (2026-10-15 の run)。 `env.sh` が `fl-win64` の PE を展開。 RetDec は [RETDEC] の `retdec-decompiler` (v5.0)、emcc は [EMSDK] (6.0.12。 `docs/REFERENCES.md` の pin と一致) を使った。 toolchain の tarball は展開していない (runner に既存の `/opt` 配置を使用)。
 
@@ -95,6 +95,15 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 
 - **実測時間と負荷** (81aafb874 の run。 19000 は 02:29:52–02:32:46 UTC、19165 は 02:33:12–02:44:03 UTC): 19000 は lift 167 s (summary 第 10 列)・wall 2 分 50 秒・部分集合 (stub・emcc・gate) sec=2。 19165 は lift 634 s・wall 10 分 49 秒・部分集合 sec=10。 負荷は uptime の 1 分平均で、19000 の lift 終了時 0.98、19165 の lift 終了時 1.07 (nproc 4)。 測定 commit `6a9893ac0` の run は lift 126 s・457 s で、今回は両方とも長い (原因は未確認)。 rc・define・f80・unimpl helper (17・136)・gate の値は前回と一致。
 - **summary の列の注記**: `engine_lift.sh` の summary 第 5 列 (f80) は旧判定 (`re.split` のチャンク全体で `x86_fp80` を見る) で、19165 で 6 を出す (本体基準は 5)。 §7・§12・§15・§16 の「f80 6」は同じ判定の値。 第 6 列 (unimpl helper) は `e.simd.log` の最初の `unimplemented N`。 本 commit の run では 19000 = 17、19165 = 136。 #523 本文の 93 は REPORT §7 の表から転記された値で、測定 commit と構成の記録が無い。 §16 の 148 と §15 の 241 も別の測定で、切り分けは未了 (#3447 受入 5)。
+
+- **6a9893ac0 → 81aafb874 の 17 files と既定経路での扱い** (静的確認。 呼出元は `grep -rn` で確認):
+  - `lift/lift_ranges.sh` (+5)・`lift/passes/m11_simd2.py` (+5/−1)・`lift/passes/SOURCES.txt` (+1): `PLUG_COMIS_FLAGS=1` (既定 0) のときだけ動く opt-in。 未設定では旧出力と同じ。
+  - `lift/passes/comis_flags.py`・`lift/passes/test_comis_flags.py` (新規): 上記 opt-in からだけ呼ばれる (test は既定経路外)。
+  - `p0c/k80_argfix.py`: `lift/passes/fix_xmm_args.py` 経由でだけ呼ばれ、同 pass は `PLUG_XMMARG=1` (既定 0) のときだけ `lift_ranges.sh` から実行される。
+  - `p0c/p0c4_abi_e2e.py`・`p0c/ucomi_ret_check.py` (新規)・`p0c/k80_unmeasured.py` (新規): p0c の e2e と単独の計測。 lift 経路から呼ばれない。
+  - `p0c/REPORT.md`・`p0c/REPORT_APPENDIX_H.md`・`p0c/REPORT_APPENDIX_I.md`・`reverb_delay/REPORT.md`・`reverb_delay/REPORT_APPENDIX.md`・`reverb_delay/REPORT_APPENDIX_3445.md`: 文書。
+  - `reverb_delay/ipp_callers.py`・`reverb_delay/shell_bind.py` (新規): 単独の静的解析道具。 engine 段の script から呼ばれない。
+  - 既定経路の出力は変わらないと静的に判断した。 ただし lift 鎖の変更を含むため、測定は 81aafb874 で取り直した。
 
 ### 受入条件への対応 (#523・本節)
 
@@ -180,7 +189,7 @@ bash tools/plugins/reverb_delay/engine_f80_nc.sh "$PWD/tools/plugins/work/reverb
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `LoadLibraryW` の引数 (`obj+0x2a6`) の書込元が未特定。 読み込まれる実パスが `engine_x64.dll` / `Engine_x64.dll` であることは静的に未確認 | 結合の前提 (読み込む DLL の同一性) | 本 PR の未解決表 → #3446 へのコメント。 子 issue 化は PM 判断 |
+| `LoadLibraryW` の引数 (`obj+0x2a6`) の書込元が未特定。 読み込まれる実パスが `engine_x64.dll` / `Engine_x64.dll` であることは静的に未確認 | 結合の前提 (読み込む DLL の同一性) | #3625 ([PLG-F4-6])。 確定までは「未確認」とし、`engine_x64.dll` を読む前提で進める |
 | 殻 ↔ engine の実行時検証 (dispatcher 呼出の戻り値、コールバックの実際の引数) なし | ABI は静的推定 | #201 の差分試験 (出口条件 3) |
 | 19164 の名前走査の仮想メソッド経由の呼出元 (18999 の 0x6dff80 相当) 未確認 | 19164 の解決経路の一部 | 同上 (本 PR の範囲外) |
 | engine → 殻の呼出 (engine が殻のコールバックを呼ぶ箇所) の ABI 未測定 | 双方向の境界の一部 | #523 系 (PLG-F4-2、engine の lift 側) |
