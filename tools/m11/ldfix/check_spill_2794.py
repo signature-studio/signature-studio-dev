@@ -3,7 +3,8 @@
 
 検査 (1 つでも外れたら exit 1):
   C1 修復後の spill 宛 CELL_COLLAPSED 集合 ⊆ 修復前の集合 (修復で新たに CELL_COLLAPSED が増えてはならない)
-  C2 修復前 − 修復後 = 報告の修復集合 (消えた site と修復した site が一致する)
+  C2 修復前 − 修復後 = 1 対 1 の修復集合 (消えた site と 1 対 1 で修復した site が一致する)
+  C2b callarg 根拠の修復 (#2910) は修復後も audit に残る (関数 × K 判定) ことを確かめる
   C3 修復した site はすべて TRUE_DROP (判定 TSV)
 出力: 判定 TRUE_DROP の 24 site 全件の表 (fn・site・status・理由) を OUT.tsv に書く。
 使い方: python3 check_spill_2794.py BEFORE.json AFTER.json REPORT.json SPILL37.tsv OUT.tsv
@@ -33,13 +34,19 @@ def main():
     verdict = {(r[0], r[1]): r[3] for r in rows if len(r) > 3}
     removed = before - after
     fixed_set = set(fixed)
+    # callarg 根拠 (#2910) の修復は、audit が関数 × K 単位で判定するため、同じ K の別の i32 読み出しが残る限り CELL_COLLAPSED のまま残る
+    callarg = {k for k in fixed_set if fixed[k].get('ev', '1to1') != '1to1'}
     ok = True
     if not after <= before:
         print('FAIL C1: 修復後に新たな spill 宛 CELL_COLLAPSED が出た: %s' % sorted(after - before)[:5])
         ok = False
-    if removed != fixed_set:
-        print('FAIL C2: 消えた site %d 件 != 修復した site %d 件 (差 %s)' % (len(removed), len(fixed_set), sorted(removed ^ fixed_set)[:5]))
+    if removed != fixed_set - callarg:
+        print('FAIL C2: 消えた site %d 件 != 1 対 1 で修復した site %d 件 (差 %s)' % (len(removed), len(fixed_set - callarg), sorted(removed ^ (fixed_set - callarg))[:5]))
         ok = False
+    if callarg - after:
+        print('FAIL C2b: callarg 根拠の修復 site が audit から消えた (判定の粒度の前提が崩れた): %s' % sorted(callarg - after)[:5])
+        ok = False
+    print('callarg 根拠の修復 %d site は audit 上 CELL_COLLAPSED のまま (同一 K の別読み出しが残る)' % len(callarg & after))
     bad = [k for k in fixed_set if verdict.get(k) != 'TRUE_DROP']
     if bad:
         print('FAIL C3: TRUE_DROP 以外を修復した: %s' % bad)
@@ -51,7 +58,7 @@ def main():
             continue
         k = (r[0], r[1])
         if k in fixed:
-            x, st, why = fixed[k], 'REPAIRED', 'ok'
+            x, st, why = fixed[k], 'REPAIRED', fixed[k].get('ev', '1to1')
         else:
             x = skipped.get(k, dict(K='-', m='-', i='-', why='not_candidate'))
             st, why = 'SKIPPED', x['why']

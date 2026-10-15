@@ -23,6 +23,9 @@ const swapRb = (v) => ((v & 0xff) << 16) | (v & 0xff00) | ((v >>> 16) & 0xff);
 const MIX_DEFAULT_COLOR = 0xff636c71;
 // PY-172 (#3219): パターングループ数の仮置き (未実測・REPORT_PY172)。件数 0 では getPatternGroupName の全索引が範囲外
 const PGRP_N = 0;
+// PY-179 (#3271): 述語 pred の静的状態 (未投入で偽) から導く仮置き・patternNumber の PE 初期値 1 (provider/fl_engine.c の PAT_N・PAT_NUMBER と同じ・REPORT_PY179)
+const PAT_N = 999;
+const PAT_NUMBER = 1;
 // PY-78 (#2581): PE 0x130f3d0 の項目書換え規則 (C provider の step_item_write / step_items_set と同一・REPORT_PY39_2548.md)。項目 = 字段の object
 const clampHi = (v, hi) => (v <= 0 ? 0 : v > hi ? hi : v);
 const newItem = () => ({ d0: 0, w0c: 0, b10: 0, b11: 0, b12: 0, b14: 0, b15: 0, b16: 0, b17: 0 });
@@ -148,13 +151,12 @@ export function createMockEngine() {
     "channels.isChannelMuted": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).mute; },
     "channels.isChannelSolo": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).solo; },
     "channels.getChannelColor": (...a) => { arity(a, 1, 2); argI(a, 1, 0); return ch(a[0]).color; },
-    // PY-101 (#2878): PE 0xd5b420 は position<0 を 0 として返す (エラーにしない)。範囲外は index の -4 のみ (C と同一)
+    // PY-101 (#2878) / PY-112 (#2932): PE 0xd5b420 は position の範囲検査を持たない。position<0 は 0、件数以上は event 経路の値 (mock は event 未モデルのため false) (C と同一)
     "channels.getGridBit": (...a) => {
       arity(a, 2, 3);
       ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
       const k = ch(a[0]);
-      if (p >= 64) throw RANGE();
-      return p >= 0 && !!k.steps[p];
+      return p >= 0 && p < 64 && !!k.steps[p];
     },
     // PY-101 (#2878): PE 0xd5b360 は grid (+0x7ac) 非 null で True。mock の channel は生成時に grid を持つものとして扱い、null 経路は持たない (C と同一)
     "channels.isGridBitAssigned": (...a) => {
@@ -163,13 +165,12 @@ export function createMockEngine() {
       ch(a[0]);
       return true;
     },
-    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (G1・G2・行テーブルの意味が未確定・#2932)。base 0x12d3e20 と同じ読出し
+    // PY-101 (#2878): PE 0xd5bc10 → 0x12d3ff0。loop 分岐は未モデル (行テーブル T の生成元が未確定・REPORT_PY112)。base 0x12d3e20 と同じ読出し。件数以上は getGridBit と同じく false
     "channels.getGridBitWithLoop": (...a) => {
       arity(a, 2, 3);
       ix(a[0]); const p = ix(a[1]); argI(a, 2, 0);
       const k = ch(a[0]);
-      if (p >= 64) throw RANGE();
-      return p >= 0 && !!k.steps[p];
+      return p >= 0 && p < 64 && !!k.steps[p];
     },
     // 選択の並びで offset 番目 (負は先頭扱い・仮置き)、超えたら最後の選択。無選択は canBeNone で -1 / 0
     "channels.channelNumber": (...a) => {
@@ -253,6 +254,10 @@ export function createMockEngine() {
       if (idx < 0 || idx >= st.channels.length) throw RANGE();
     },
     "mixer.trackCount": () => st.mixer.length,
+    // PE 0xd641d0: ポインタ大域 0x15e2198 の指す先の dword を読んで −2 (trackCount 0xd5e8b0 と同じ読み方・REPORT_PY205)
+    "mixer.getTrackCount": () => st.mixer.length - 2,
+    // PE 0xd63870: ecx=3 を変換スロット 0x15e4280 に渡すのみ (REPORT_PY205)
+    "mixer.getEqBandCount": () => 3,
     "mixer.getTrackName": (i) => tr(i).name,
     "mixer.setTrackName": (i, n) => { tr(i).name = n; },
     "mixer.getTrackVolume": (i, mode) => F(mode ? 20 * Math.log10(Math.max(tr(i).vol, 1e-6) / 0.8) : tr(i).vol),
@@ -355,6 +360,10 @@ export function createMockEngine() {
     // PY-172 (#3219): PE 0xd67000 は件数 (配列 null で 0)、0xd67030 は索引 [0, 件数-1] の外を status -4。件数 0 は仮置き (provider/fl_engine.c の PGRP_N と同じ)
     "patterns.getPatternGroupCount": (...a) => { arity(a, 0, 0); return PGRP_N; },
     "patterns.getPatternGroupName": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 0 || i >= PGRP_N) throw RANGE(); return ""; },
+    "patterns.patternCount": (...a) => { arity(a, 0, 0); return PAT_N; },
+    "patterns.patternNumber": (...a) => { arity(a, 0, 0); return PAT_NUMBER; },
+    "patterns.isPatternDefault": (...a) => { arity(a, 1, 1); const i = argI(a, 0, 0); if (i < 1 || i > PAT_N) throw RANGE(); return false; },
+    "patterns.isPatternSelected": (...a) => { arity(a, 1, 1); argI(a, 0, 0); return false; },
     // PY-119 (#2977): PE の setRecPPQ 0xd69350・setNumerator 0xd694e0・setDenominator 0xd69670 の範囲判定 (範囲外は status -3 Range error)。ゲート (safeToEdit 相当) は未確定のため真と仮定 (REPORT_PY119_2977)
     "general.setRecPPQ": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 24 || v > 960) throw RANGE("Range error"); st.recPPQ = v; },
     "general.setNumerator": (...a) => { arity(a, 1, 1); const v = ix(a[0]); if (v < 1 || v > 16) throw RANGE("Range error"); st.numerator = v; },
