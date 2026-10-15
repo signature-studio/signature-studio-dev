@@ -48,6 +48,7 @@
 | 対照 (規則変更なし) | 3 / 1 / 44 | 3 / 1 / 46 / 1 | `results/frame_store_alias_4204.json` |
 | `--negctl-glk` (全関数の漏出を True) | 3 / 1 / 44 | 3 / 1 / 46 / 1 | `results/negctl_alias_4204_glk.json` |
 | `--negctl-nosync` (区間 sync 無効) | 3 / 1 / 44 | 3 / 1 / 46 / 1 | `results/negctl_alias_4204_nosync.json` |
+| `--negctl-noglk` (#4330 で追加。全関数の glk を False) | 4 / 34 / 10 | 4 / 36 / 10 / 1 | `results/negctl_alias_4330_noglk.json` (`REPORT_4330.md` §3) |
 
 **ネガコンは対照と区別できない。** 3 条件は関数・site の判定が全件一致する (関数 verdict の差 0、site の差 0)。理由:
 
