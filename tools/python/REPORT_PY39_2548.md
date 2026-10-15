@@ -158,7 +158,7 @@ PY-78 節の項目と同一。列挙に使う字段:
 | +8 | dword (符号付き) | 長さ。終端 = start + max(長さ, 1) | `0x105f2e0` |
 | +0xc・+0x10〜+0x17 | word・byte | param 0〜6・8 の書換え先 (PY-78 節の表) | `0x130f4f6`〜`0x130f699` |
 
-stride は反復子が `[container+0x10]` から読む実行時の値で、PE からは定まらない。mock / C は StepItem の大きさ 24 B で固定する (実機の stride は未実測)。
+stride は反復子が `[container+0x10]` から読む実行時の値。mock / C は StepItem の大きさ 24 B で固定する。24 B 以上は PY-78 の最大字段 `+0x17` (byte) から言える。実機の stride は未実測・作成元は未調査。
 
 ### 列挙の判定式 (`0x130f200`・確定)
 
@@ -178,7 +178,10 @@ note を pattern の container から 0x12df320 で反復 (閾値 thr = step' + 
 
 - `provider/fl_engine.c`: StepItem の `p1[8]` を `p4[2]`・`ch` (+6)・`len` (+8) に分割 (大きさ 24 B・既存字段の位置は不変)。`note_next`・`note_end`・`note_enum` (判定式)・`fl_engine_note_enum_probe(seed, n, chan, step, V)` (seed の LCG で n 件 (<= 256) を作り start 昇順に並べて列挙)・`fl_engine_note_enum_out`。
 - `host/fl_mock.mjs`: `noteGen`・`noteEnum` (C と同一の式)・`noteEnumProbe`・`noteEnumNotes` (spot 用)。`host/fl_provider.mjs`: `noteEnumProbe`。`provider/build.sh`: export 2 件を追加。
-- `tests/note_enum_diff.mjs` (新規): spot 3 件 (手計算の期待値を mock で固定) と 33264 呼出し (seed 8 × n 7 × chan 6 × step 9 × V 11) の mock / wasm 照合。
+- `tests/note_enum_diff.mjs` (新規): spot 3 件 (手計算の期待値を mock で固定) と 33264 呼出し (seed 8 × n 7 × chan 6 × step 9 × V 11) の mock / wasm 照合。spot の入力は start 昇順 (反復子は start >= 閾値で止まるため、非昇順の入力は後続が読まれない)。
+  - spot 1: `[[0,0,1],[5,1,1],[6,10,2],[7,1,1],[9,1,1],[10,1,1]]`・chan 1・step 6・V 4 → `[1,3]`。note 0 は終端 3 で外れ、note 1 は start_q 4・終端 7 で入り、note 2 は ch 違い、note 3 (start 7) は start_q 4・終端 8 で入り、note 4 は start_q 8 で外れ、note 5 (start 10) で反復が止まる。
+  - spot 2: `[[-5,2,1],[-2,1,1]]`・chan 1・step -5・V 4 → `[]` (0 方向への切捨て)。
+  - spot 3: `[[7,0,3],[7,-3,3],[7,1,3]]`・chan 3・step 7・V 1 → `[0,1,2]` (len <= 0 は長さ 1 とみなす)。
 
 ### 実測 (commit `dd124029`・wasm)
 
@@ -188,8 +191,21 @@ note を pattern の container から 0x12df320 で反復 (閾値 thr = step' + 
 - 既存: `node tests/step_item_diff.mjs` → `{"calls":5929,"spot":5,"diffs":0,"PASS":true}`。`node tests/channels_diff.mjs` → `{"calls":170,"diffs":0,"PASS":true}`。
 - 受入 3: `FL_ENGINE=wasm node tests/all_tools.mjs` → `{"total":48,"ok":48,"soft_error":0,"raised":0,"no_args":0,"host_calls":37425,"callback_roundtrip":true}` (1.98 秒)。入力は `fetch_inputs.sh` (FL_WIN64_DIR の DATA block 4 件)、`build_cpython_wasm.sh` (CPython 3.12.1 wasm・約 4.5 分)、`build_flpy.sh` (flpy.js)。
 
+### 実測 (測定 commit `1de44df73`・spot 1 の入力を昇順に修正後)
+
+- 修正: spot 1 の入力を start 昇順 `[0,5,6,7,9,10]` に直し、期待値 `[1]` を `[1,3]` に直した。非昇順の入力では反復子が start=10 で止まり、note 3 (start 7) を読まないため `[1]` になっていた。
+- 環境: emsdk 6.0.12 (上流から `./emsdk install 6.0.12`・`tools/shim/REPORT.md` の手順)。`EMSDK_ENV=<emsdk>/emsdk_env.sh bash provider/build.sh` が exit 0。provider の C は本 commit で無変更。load average 0.15 (測定時 01:05)。
+- `node tests/note_enum_diff.mjs` → `{"calls":33264,"nonempty":5869,"spot":3,"diffs":0,"PASS":true}` (0.867 秒)。
+- `node tests/step_item_diff.mjs` → `{"calls":5929,"spot":5,"diffs":0,"PASS":true}`。`node tests/channels_diff.mjs` → `{"calls":170,"diffs":0,"PASS":true}`。
+- C 側の spot 照合 (リポジトリ外の一時ハーネス・`fl_engine.c` を include・`gcc -Wall -Wextra -fsanitize=undefined,address`・報告 0): spot 1 → `[1,3]`、spot 2 → `[]`、spot 3 → `[0,1,2]` (mock と一致)。旧の非昇順 spot 1 → `[1]`。
+- `FL_ENGINE=wasm node tests/all_tools.mjs` は再測定していない。dd124029 以降の変更は `tests/note_enum_diff.mjs` のみで、provider・host・`tests/all_tools.mjs` は無変更のため、dd124029 の 48/48 を維持する。
+- 差分の証跡: `git diff dd124029 1de44df73 --stat -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis` は `tests/note_enum_diff.mjs` の 1 件のみ (2 行)。`git diff 1de44df73 HEAD -- tools/python/provider tools/python/host tools/python/tests tools/python/analysis | wc -l` = 0 (本 commit 時点)。
+
 ### 未解決
 
 - V (PE `[0x15e25f8]`) の値と意味・書込み元: PY-185 (#3310) の範囲。
 - `channels.setStepParameterByIndex` の handler への接続: #3311 (未接続のまま)。
-- 参照数 (COW)・`0x418190` の後半・件数 0 の channel 探索の実機確認: 本 PR では未モデル (PE 読みの推定)。新規の子 issue は起票しない (PR 本文の未解決表に記載)。
+- 件数 0 の channel 探索 (NULL 参照の可能性・PE 推定): 本 PR では未モデル (件数 1 以上を仮定)。起票先: #3311 へのコメント (a) https://github.com/signature-studio/signature-studio-dev/issues/3311#issuecomment-6181995465
+- 参照数 (COW): 本 PR では未モデル (単一参照を仮定)。起票先: #3311 へのコメント (b) (同上 URL)
+- `0x418190` の後半 (参照数 0 になった後の解放処理): 未読。起票先: #3311 へのコメント (c) (同上 URL)
+- 実機の note stride: mock / C は 24 B 固定 (24 B 以上は確定・実機は未実測)。起票先: #3311 へのコメント (d) (同上 URL)
