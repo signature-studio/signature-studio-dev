@@ -324,13 +324,14 @@ def main():
         tag = ("QS", 0) if t == g_va else ("QO", 0)
         ins = w.decode(a)
         w.work.append((a + ins.size, {canon(r): tag}))
-    for entry, reg in EXTRA_ENTRIES:
-        w.work.append((entry, {reg: ("QO", 0)}))
-    for off in range(-0x48, 0, 8):
-        b = read_va(Q_VPTR + off, 8)
-        ent = struct.unpack("<Q", b)[0] if b else 0
-        if any(st <= ent < st + sz for st, sz, _, _, _ in text):
-            w.work.append((ent, {"rcx": ("QO", 0)}))
+    if seeds:
+        for entry, reg in EXTRA_ENTRIES:
+            w.work.append((entry, {reg: ("QO", 0)}))
+        for off in range(-0x48, 0, 8):
+            b = read_va(Q_VPTR + off, 8)
+            ent = struct.unpack("<Q", b)[0] if b else 0
+            if any(st <= ent < st + sz for st, sz, _, _, _ in text):
+                w.work.append((ent, {"rcx": ("QO", 0)}))
     w.run()
     rounds = 1
     while w.copies and rounds < 3:
