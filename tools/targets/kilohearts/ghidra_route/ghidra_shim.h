@@ -98,10 +98,9 @@ static inline V128 vpsrldq_avx(V128 s, int n) {
     for (int i = 0; i + n < 16; i++) r.b[i] = s.b[i + n];
     return r;
 }
-/* SUB84(x, off) / SUB168(x, off): x の byte 位置 off から 4 / 8 byte の切り出し (little-endian)。SUB84 は lvalue を取る。 */
+/* SUB84(x, off): x の byte 位置 off から 4 byte の切り出し (little-endian)。lvalue を取る。 */
 static inline uint kh_sub84(const void *p, int off) { uint r; memcpy(&r, (const unsigned char *)p + off, 4); return r; }
 #define SUB84(x, off) kh_sub84(&(x), (off))
-static inline ulonglong SUB168(V128 x, int off) { ulonglong r; memcpy(&r, x.b + off, 8); return r; }
 /* ZEXT816(v): 64bit を下位に置き上位 64bit は 0 (movq xmm,r64) */
 static inline V128 ZEXT816(ulonglong v) { V128 r; memset(&r, 0, sizeof r); memcpy(r.b, &v, 8); return r; }
 /* MINPS dst,src: lane 毎に dst < src ? dst : src (NaN は src)。maxps と対称 */
@@ -182,4 +181,21 @@ static inline V128 vpmovsxdq_avx(V128 s) {
 /* swi(n) = x86 の int n (int 3 = breakpoint, int 0x29 = __fastfail)。どちらも戻らない trap。到達時は abort (fail-fast) */
 static inline void *kh_swi_fail(void) { abort(); return 0; }
 #define swi(n) kh_swi_fail()
+/* x86 `mul r64` (rdx:rax = rax × r64) を 128bit ベクタの `*` と印字した形 (stereo 180fdc470・180fdfdb0)。
+ * 呼出し直前に両オペランドの上位 qword は 0 (`_8_8_ = 0`) なので、積は 64×64→128 の符号なし積。 */
+static inline V128 v128_mul64(V128 a, V128 b) {
+    unsigned __int128 p = (unsigned __int128)a._0_8_ * b._0_8_;
+    V128 r; memcpy(r.b, &p, 16);
+    return r;
+}
+/* 128bit 整数加算 (機械語の add/adc の繰上がりを含む)。 */
+static inline V128 v128_add(V128 a, V128 b) {
+    unsigned __int128 x, y;
+    memcpy(&x, a.b, 16); memcpy(&y, b.b, 16);
+    x += y;
+    V128 r; memcpy(r.b, &x, 16);
+    return r;
+}
+/* Ghidra SUBPIECE: SUB168(x, 0) = 下位 8 バイト, SUB168(x, 8) = 上位 8 バイト。 */
+static inline ulonglong SUB168(V128 v, int off) { ulonglong r; memcpy(&r, v.b + off, 8); return r; }
 #endif

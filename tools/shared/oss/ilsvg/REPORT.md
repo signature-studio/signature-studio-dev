@@ -100,7 +100,7 @@ mac dylib (`Shared/ILSvg_x64.dylib`) は素材に無いため、受入条件 4 �
 
 ## 版の組の再検討 (#151): svgdom 0.3.61 + svgren 0.6.3 (probe)
 
-結論 1 行: svgdom 0.3.61 と svgren 0.6.3 は symbol 解析の判定範囲内 (svgdom 0.3.59〜0.4.9 / svgren 0.5.9〜0.6.3) で、この組は連結 wasm・native で通り smoke 64x64 の画素が IDENTICAL。cssom は判定 (0.2.x) の範囲外の 0.1.19 を使っており、0.2.x と組んだ probe は未実施。採用の確定は PM 判断 (#151)。
+結論 1 行: svgdom 0.3.61 と svgren 0.6.3 は symbol 解析の判定範囲内 (svgdom 0.3.59〜0.4.9 / svgren 0.5.9〜0.6.3) で、この組は連結 wasm・native で通り smoke 64x64 の画素が IDENTICAL。cssom は判定 (0.2.x) の範囲外の 0.1.19 を使っている (0.2.x 版での組は §2)。採用の確定は PM 判断 (#151)。
 
 根拠 (上流 tag の実測):
 - svgdom は 2f138bb (2021-04-04) で cssdom → cssom に切り替え。0.3.59 は cssdom を使うため除外、0.3.60 以降が FL の cssom 使用と整合。
@@ -127,8 +127,49 @@ mac dylib (`Shared/ILSvg_x64.dylib`) は素材に無いため、受入条件 4 �
 - ネガティブコントロール: wasm 側の入力だけ円の色を `#00fe00` (1 LSB) にした SVG (`sed 's/#00ff00/#00fe00/' wrap/smoke.svg > neg_smoke.svg`) を `wasm_smoke.cjs` で描くと、native と `cmp` で DIFFER (812 バイト不一致、最初の差は byte 4210)。
 
 未解決 (起票先):
-- utki は svgren 0.6.3 が要求する `release()` のため 1.1.162 (2021-10-12) 以降が必要。1.1.162 では mikroxml 0.1.36 / cssom 0.1.19 の `utki::span::const_iterator` 欠落と、utki 自身の `unicode.cpp` (libc++ の `char_traits<unsigned char>`) で連結不可。この組は未探索 → #151 (PM 判断)。
+- utki は svgren 0.6.3 が要求する `release()` のため 1.1.162 (2021-10-12) 以降が必要。1.1.162 では mikroxml 0.1.36 / cssom 0.1.19 の `utki::span::const_iterator` 欠落と、utki 自身の `unicode.cpp` (libc++ の `char_traits<unsigned char>`) で連結不可。→ §2 で cssom 0.2.0 + utki 1.1.162 も試したが、mikroxml 0.1.36 の `const_iterator` 欠落で不成立 (未解決は残る → #151)。
 - 採用版の確定 (svgren 0.6.3 + svgdom 0.3.61 案 と 0.6.4 + 0.4.7 案のどちらを正本にするか) → #151 (PM 判断)。
 - mac dylib との比較 → #1148 / #1348 (変更なし)。
-- cssom 0.2.x (判定の範囲内) と組んだ probe は未実施 → #151 (PM 判断)。
+- cssom 0.2.x の組は §2 で試行済み (0.2.0 は通る。0.2.4 は utki API 欠落、0.2.5 以降は svgdom 0.3.61 と衝突)。
 - vendored pixman (version 未特定) は ILSvg の構成 stack に含まれるが、本 probe の組には入っていない → #151 (PM 判断)。
+
+## 版の組の再検討 2 (#151): cssom 0.2.0 で組んだ probe
+
+結論 1 行: svgdom 0.3.61 + svgren 0.6.3 + cssom 0.2.0 + papki 1.0.101 + agg 2.8.9 の組は、symbol 解析の判定 (`tools/shared/data/ilsvg_version.json`) の全項目を満たし、連結 wasm と native の smoke 画素が IDENTICAL になった。utki・r4・mikroxml は判定が無く、utki 1.1.124 (probe 限定の 1 行置換付き) を使った。採用の確定は PM 判断 (#151)。
+
+組 (`bash tools/shared/oss/ilsvg/probe_pair_0361_cssom020.sh`、既定 `UTKI_TAG=1.1.124`):
+
+| 部品 | 版 | symbol 判定 | probe 限定の処置 |
+|---|---|---|---|
+| svgdom | 0.3.61 | 0.3.59〜0.4.9 (cssom 化後の 0.3.60 以降) | なし |
+| svgren | 0.6.3 | 0.5.9〜0.6.3 | `scope_exit.release()` → `reset()` (utki 1.1.124 の名前。動作同一) |
+| cssom | 0.2.0 | 0.2.x | なし |
+| papki | 3ed8151 (= 1.0.101) | 1.0.102 未満 (`dir(std::string)`) | `fs_file.cpp` を除外 |
+| agg | 2.8.9 | 2.7.4〜2.8.42 の範囲内 (単一点は不可) | なし |
+| utki | 1.1.124 | 判定なし | svgren の置換が必要 |
+| r4 / mikroxml | 1.0.53 / 0.1.36 | 判定なし | なし |
+
+cssom の試行 (svgdom 0.3.61 の `parser.cpp`・`style_stack.cpp`・`stream_writer.cpp` と cssom の組):
+
+| cssom | 結果 |
+|---|---|
+| 0.2.0 | 構文 OK。連結・実行 OK (上の組) |
+| 0.2.4 (2023-06-20) | 構文 OK。連結不可: `utki::kilobyte` / `utki::to_int` / `utki::integer_base` が、調べた utki 7 版 (1.1.124・1.1.140・1.1.150・1.1.162・1.1.170・1.1.180・1.1.190) のいずれにも無い |
+| 0.2.5 / 0.2.10 / 0.2.20 / 0.2.23 | 構文不可: svgdom 0.3.61 の `get_id()` / `get_tag()` の戻り型が衝突 (0.2.5 で確認、他も同じエラー) |
+| 0.2.24 | `papki` でなく `fsif` を要求 (構文は未検証) |
+
+utki 1.1.162 (svgren の `release()` を置換せずに組む): `UTKI_TAG=1.1.162 bash tools/shared/oss/ilsvg/probe_pair_0361_cssom020.sh` は em++ で失敗 (20 errors・10.5 s)。mikroxml 0.1.36 が `utki::span<char>::const_iterator` を要求し、utki 1.1.162 に無いため。mikroxml の別版との組は本節では試していない。
+
+### 測定 (commit 650d82d42 = コードを変えた最後の commit)
+
+- `bash tools/shared/oss/ilsvg/probe_pair_0361_cssom020.sh` exit 0・real 1 m 37.7 s・開始時 load average 0.31 0.47 0.30 (emcc 6.0.12、clean な作業ディレクトリ)。
+- wasm 383454 B / native・wasm とも dims 64 64 nonzero_px 4096 / ARGB32 16384 B `cmp` IDENTICAL。
+- ネガティブコントロール: 同じ組で wasm 側の入力だけ円の色を `#00fe00` にすると `cmp` DIFFER (812 バイト不一致、最初の差は byte 4210)。
+- 差分: `git diff 650d82d42 HEAD -- tools/shared/oss/ilsvg ':(exclude)tools/shared/oss/ilsvg/REPORT.md'` の出力は空 (REPORT.md のみ変更)。
+
+未解決 (起票先):
+- 採用版の確定 (本組 と 既存の svgdom 0.4.7 + svgren 0.6.4 (#927) のどちらを正本にするか) → #151 (PM 判断)。本組は symbol 判定と整合する。0.6.4 は `path_type` / `spread_templ` を含む版で、FL バイナリに無い symbol と矛盾する。`build_pair.sh` の版変更は PM 判断後の別 PR。
+- utki / r4 / mikroxml の版 (判定なし。本組は utki 1.1.124 + 1 行置換) → #151
+- AGG の単一点 (2.7.4〜2.8.42 の範囲内の 2.8.9) → #151
+- vendored pixman (version 未特定) → #151
+- mac dylib との出力比較 → #1348 (親 #1148)
