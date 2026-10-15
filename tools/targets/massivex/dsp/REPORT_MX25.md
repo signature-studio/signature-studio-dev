@@ -199,3 +199,50 @@
 | 1 | `rex2` (0x2693a0c)。capstone は APX の lea 形として受理 | 番地ずれの疑い |
 
 - 受入 2 (mismatch 0・取りこぼし 0) は未達。閉包 169,752 は規則の判断待ち (`pdata_call` は既定ではない・既定 `any` は不変)。
+
+## 5.8 MX-59 (#5400): 番地ずれ疑い 3 件の判定 (head `9645894e3` を実測。`0b91334ed` の値は main 取り込み前の参考値)
+
+- **head 実測 (`9645894e3`・`git diff --numstat 0b91334ed 9645894e3 -- tools/targets/massivex/dsp/scripts` = `7 1`)**: 素材 `plugins-massivex` → `parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` → `Massive X.vst3` md5 `622993e76565f49c094063a2b717d6ca` (95,356,824 B・一致)。`mx_rtti.py` → `mx_closure.py flow pdata_call` (22 round・入口 169,752・2 m 0 s) → `mx_flow_recheck.py` (2 m 11 s・終了時 load `4.47 2.04 0.82`・RESULT=FAIL・rc 1)。展開 125 件の md5-ok 0/125 は §8.1 の既知事象。
+- head の結果 (`0b91334ed` の値と並べる):
+
+| 項目 | `0b91334ed` (参考) | head `9645894e3` |
+|---|--:|--:|
+| 入口 | 169,752 | 169,752 |
+| (ii) 先頭ブロック不正 | 21,168 | 21,168 |
+| (iii) 先頭ブロック正常 | 160,259 | 160,259 |
+| 取りこぼし | 23 | 23 |
+| 過剰 | 1 | 1 |
+| mismatch | 115 | **24** |
+| `mismatch_cap_bad_obj_ok` | (未記載) | 23 |
+| `mismatch_cap_ok_obj_bad_(bad)/%?/rex2` | (未記載) | 1 |
+
+- head の 3 件の判定: `0x12e3768` (`(bad)`) と `0x2693a0c` (rex2) は head の mismatch に**無い** (`0b91334ed` の値でも無い。`ljmp` を TERM に加えた効果が head でも維持される)。`0x2470627` (`(bad)`・先頭は表データ `02 f9 fb 46 …`) は head でも**残る** (capstone 受理・objdump `(bad)`)。よって head では「2 件は mismatch に無い・1 件 (`0x2470627`) は未解決」。
+- `0b91334ed` → head の番地ごとの差 (`mismatch_0b91334ed.tsv` と `mismatch_head.tsv` の比較。ともに `work/mx29/`・gitignore): 旧 115 = 共通 6 + LOCK 規則で消えた 109 (旧 `lock` 109 件の全て) ; 新 24 = 共通 6 + 新規 18 (capstone 不正・objdump 受理 18 件)。共通 6 件に `0x2470627` を含む。`insn_sdm_ok` (SDM の LOCK 規則) が capstone 側の LOCK 109 件を一致扱いにし、代わりに capstone 不正・objdump 受理の 18 件が新たに mismatch に出た。取りこぼし・過剰は両方で 23・1 (同一)。
+- head の mismatch 24 の内訳 (`mismatch_cap_bad_obj_ok` 23・`mismatch_cap_ok_obj_bad_(bad)/%?/rex2` 1 = `0x2470627`)。23 件は全て capstone 不正・objdump 受理 (`capstone=False objdump=True`)。
+- `0b91334ed` → head の番地ごとの差 (`work/mx29/mismatch_0b91334ed.tsv` と `mismatch_head.tsv`・gitignore。同じ `flow_pdata_call_sets.pkl` に旧版・新版の script を当てて再生成): 旧 115 = 共通 6 + 旧だけの 109 (旧 `lock` 109 件の全て・capstone 側の LOCK 判定が一致扱いに変わって消えた)。新 24 = 共通 6 + 新だけの 18 (capstone 不正・objdump 受理)。共通 6 件は `0x2470627` を含む 6 件。取りこぼし 23・過剰 1 は両方で同一。
+- 以下の旧記述は `0b91334ed` の値 (取り込み前の参考値)。
+- 入力: `mx_rtti.py` → `mx_closure.py flow pdata_call` (22 round・169,752 入口)。`mx_flow_recheck.py` は `0b91334ed` で実行。
+- 変更 (`0b91334ed`): 先頭ブロックの終端 `TERM` に `ljmp` (`ff /5`・遠方ジャンプ) を加えた。`ljmp` は制御を移すため、その後ろは先頭ブロックではない。
+- 結果 (`0b91334ed`・`RESULT=FAIL`):
+
+| 項目 | 値 |
+|---|--:|
+| (ii) 先頭ブロック不正 | 21,168 |
+| (iii) 先頭ブロック正常 | 160,259 |
+| 取りこぼし | 23 |
+| 過剰 | 1 |
+| mismatch | 115 |
+| `(bad)/%?/rex2` | 1 |
+| `lock` (LOCK 規則) | 109 |
+| capstone 不正・objdump 受理 | 5 |
+
+- 変更前との比較はしない。変更前 (`0b91334ed` の親) の同一 run の値は本 run では再測定できていない。§5.3 の値 (対象 181,532・入口 169,974) とは入口集合が違い (対象総数の差 105)、同じ入口集合ではないため「117 → 115」は比較として成立しない。この比較は撤回する。
+- 3 件の判定 (`0b91334ed` の script での値。`ljmp` の効果だけを見ている。`insn_sdm_ok` 取り込み前):
+  - `0x12e3768` (`(bad)`): 先頭ブロックの `ljmp *(%rax,%rax,1)` (`12e37b9`) の後ろ (`12e37be`) の `(bad)` を読んでいた。番地ずれではない。終端に `ljmp` を加えると `0b91334ed` の run では解消。head の判定は上の head 実測節を参照。
+  - `0x2693a0c` (`rex2`): 先頭 `e1 8b` は `loope` で正常。`rex2` と判定されたのは後続の `ljmp *(%rbx)` (`2693a17`) より後ろ。終端に `ljmp` を加えると `0b91334ed` の run では解消。head の判定は上の head 実測節を参照。
+  - `0x2470627` (`(bad)`): 未解決。先頭が命令列ではなく表 (`02 f9 fb 46 02 18 …` の 8 バイト周期)。`.text` 内のデータ領域を入口として読んでいる疑い。`ljmp` 終端では判定できない。
+- 残る mismatch 115 件: LOCK 規則 109 件 (capstone 側の判定。#4068)・capstone 不正 / objdump 受理 5 件・`0x2470627` 1 件。
+- 受入 1 (mismatch 0・取りこぼし 0・過剰 0) は未達。取りこぼし 23 と過剰 1 は残る。取りこぼし 23・過剰 1 と #4068 の関係は推定で、未切り分け。
+- 実行時間: `mx_flow_recheck.py` 1 m 56 s (wall)・終了後 load `5.21 4.04 2.46` (`0b91334ed` の run)。
+- main 取り込み後の script: `mx_flow_recheck.py` は main の `insn_sdm_ok` を取り込んで `0b91334ed` から変わった (`git diff --numstat 0b91334ed 9645894e3 -- tools/targets/massivex/dsp/scripts` = `7 1`)。上の表は取り込み前の値。`7abf69f9d` の `mx_flow_recheck.py` は `9645894e3` と同一 (`git diff 9645894e3 7abf69f9d -- tools/targets/massivex/dsp/scripts` = 空) のため、この節の head 実測が HEAD の値。
+- 既定の `any` 経路・`pdata` 経路は変えていない (`TERM` は `pdata_call` の `flow` 検算でのみ使う)。
