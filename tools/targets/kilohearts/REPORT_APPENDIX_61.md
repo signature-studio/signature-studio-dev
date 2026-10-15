@@ -82,16 +82,19 @@ unsup の内訳 (両ホスト同一):
 
 - 測定 commit: `b91c8c212` (コードを変えた最後の commit)。入力 `HeartCore.core_64` は §2 と同一 (sha256 先頭 16 桁 `d55ce8b4c0ad7ebe`、76,642,304 B)。
 - 閉包 (`bash tools/targets/kilohearts/scripts/host_x64c_closure.sh`・両ホスト・同一入力): 改変前 (`origin/main` 6441decbb) は unsup **65 site** / 改変後 (`b91c8c212`) は **0**。
+- **注記 (鮮度)**: 下表・上の値はすべて測定 commit `b91c8c212` の値。その後 main 取り込みで `x64c.py` 等が変わったが、閉包は再測定していない (入力 `HeartCore.core_64` は素材 `fl-win64` に無く、`work-liftlib-targets` が必要)。現 HEAD で閉包 unsup 0 は**未確認**。再測定は未解決表の項目。
 
-| ホスト | 閉包 改変前 → 後 (functions / insns / unsup) | ネガコン 改変前 → 後 (functions / insns / unsup) |
+| ホスト (列値は `b91c8c212` の測定値) | 閉包 改変前 → 後 (functions / insns / unsup) | ネガコン 改変前 → 後 (functions / insns / unsup) |
 |---|---|---|
 | micropass | 242 / 18,402 / 65 → 242 / 18,402 / **0** | 148 / 11,102 / 65 → 148 / 11,102 / **0** |
 | multipass | 251 / 20,764 / 65 → 251 / 20,764 / **0** | 160 / 13,856 / 65 → 160 / 13,856 / **0** |
 
 - 改変前の内訳 (両ホスト同一): rcpps 29・rsqrtps 25・vcomiss 4・vcvtdq2ps 2・vpsrld 2・vpslld 1・haddps 1・vandps 1。
 - 実装: `rt/fle_approx.inc` (`gen_approx_inc.py` が `approx_tables.b64` から生成)・`rt/fle_cpu.c` の `fle_rcp_exact` / `fle_rsqrt_exact` (`gen_simd.py` と同一式・同一指数則)・`x64c.py` の `i_rcpps` / `i_rsqrtps` / `i_haddps` と VEX 形。
-- 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py` (測定 commit): pass 102 / fail 0 (rc 0)。近似の参照値は表を直接読む Python 別実装 (`approx_ref`)。
+- 差分テスト `python3 tools/flelift/tests/x64c_vex_diff.py` (測定 commit `b91c8c212` の値): pass 102 / fail 0 (rc 0)。現 HEAD `3ba1fdc75` での再実行は pass 108 / fail 0 (下の再確認行を参照)。近似の参照値は表を直接読む Python 別実装 (`approx_ref`)。
 - FLEngine e2e `bash tools/flelift/fle_e2e.sh` (測定 commit・素材 `fl-win64`): PASS。lift 7,018 関数 / 340,761 insns / unsup 0 / unlifted 0。smoke OK。spot diff equal 16/16・mismatch 0。D9 mismatch 0。所要 2m30s (`time` 実測 real 149.8 s)。
 - FLEngine lift 出力の同一性: `origin/main` (6441decbb) と測定 commit で `fle_lifted.c` / `fle_data.c` が `cmp` 一致。新 handler は FLEngine 側で元から unsup 0 の経路だけに効く。
 - main 取り込み後の再確認 (HEAD `837d9d232`・#4479 競合解消): FLEngine e2e `fle_e2e.sh` PASS (real 1m37.4s)。lift 7,018 関数 / 340,761 insns / unsup 0。spot diff equal 16/16・D9 mismatch 0。閉包 (`host_x64c_closure.sh`) は入力 `HeartCore.core_64` が素材 `fl-win64` に無いため再測定していない (上の表は `b91c8c212` の値)。差分テストは main 側の追加分を含めて 108/0。
+- 測定 commit `b91c8c212` から現 HEAD までの差分 (閉包の入力 `tools/targets/kilohearts/scripts` と `tools/flelift` の範囲。`git diff --stat b91c8c212 HEAD -- tools/targets/kilohearts/scripts tools/flelift`): 14 files changed, 977 insertions(+), 64 deletions(-)。内訳は `tools/flelift/x64c.py` (15 行・VEX 表の main 取り込み分と `haddps` 重複解消)・`tools/flelift/tests/x64c_vex_diff.py` (+69)・`tools/targets/kilohearts/scripts/phaseplant_x64c_closure.sh` (新規 47 行・main 由来)・`tools/flelift/boot/` 配下 (main 由来の boot 測定の変更)・`results/` 配下の JSON。閉包の依存 (`host_x64c_closure.sh` 本体) は差分 0。実差分は `git diff b91c8c212 HEAD -- tools/targets/kilohearts/scripts tools/flelift` で得られる。
+- 再測定の要否: 上の差分は閉包の結果を変え得るため、`docs/WORKFLOW.md` §6 に従い閉包の再測定が必要 (未実施・未解決表)。
 - 表の出所の注意: 表は AMD Ryzen 9 9950X で抽出した値。今回の実行ホストは AMD EPYC 7763 (Zen 3) で、近似表の同一性は本測定では未検証 (REPORT §13 の既存の注記と同じ)。
