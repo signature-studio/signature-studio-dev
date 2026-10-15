@@ -1,6 +1,6 @@
 # tools/shared/lift/rex 付録 — movnti (閉包内 24 箇所) の到達と x64c 対応の要否 — T-SH-90 (#3589)
 
-測定 commit: 本 PR の最後のコード commit (`tools/shared/lift/rex/` の `.c`・`.mjs`・`.py`・`.sh` を変えた commit)。以降の差分は本付録と REPORT の更新だけ。
+測定 commit: `24903929f` (`tools/shared/lift/rex/` の `.c`・`.mjs`・`.py`・`.sh` を変えた最後の commit。同 HEAD で `all` を再実行して rc 0)。以降の差分は本付録と REPORT の文書だけ (`git diff 24903929f HEAD -- tools/shared/lift/rex tools/flelift tools/shared/env.sh ':(exclude)*.md'` の出力は 0 行)。
 既知類型との関係: 該当なし (不一致 0)。
 
 ## 結論 (1 行)
