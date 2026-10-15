@@ -388,6 +388,11 @@ FL_H(arrangement, selectionSet) { NARGS(2, 5); for (int i = 0; i < 5; i++) (void
 FL_H(arrangement, liveSelection) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
 FL_H(arrangement, addAutoTimeMarker) { (void)A_INT(0, 0); (void)A_STR(1); return fl_ret_none(c); }
 FL_H(arrangement, jumpToMarker) { (void)A_INT(0, 0); (void)A_INT(1, 0); return fl_ret_none(c); }
+/* ---- patterns (2 of 4, PY-172 #3219): PE 0xd67000 は配列 null で 0・非 null で ptr-8 の件数を返す。0xd67030 は索引 [0, 件数-1] の外を status -4。
+ * グループ配列の実状態は未実測のため、件数 0 (null の経路) を仮置きする。件数 0 では全索引が範囲外 (REPORT_PY172) */
+#define PGRP_N 0
+FL_H(patterns, getPatternGroupCount) { NARGS(0, 0); return fl_ret_i(c, PGRP_N); }
+FL_H(patterns, getPatternGroupName) { NARGS(1, 1); int64_t i = A_INT(0, 0); if (i < 0 || i >= PGRP_N) RANGE(); return fl_ret_s(c, ""); }
 /* ---- screen (5) ---- PY-121 (#2985): PE 0xd7c7e0・0xd7c830・0xd7c880・0xd7c8c0・0xd7c740 (REPORT_PY121_2985)。値は未実測の仮置き */
 FL_H(screen, isBlanked) { NARGS(0, 0); return fl_ret_b(c, scr_blanked); }
 FL_H(screen, isUnBlank) { NARGS(0, 0); return fl_ret_b(c, scr_unblank); }
