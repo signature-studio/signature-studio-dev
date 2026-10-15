@@ -22,6 +22,8 @@
 | 修復 ON・`+0x4c` の初期 store を外す (`+0x70` のみ・120 B) | rc 0 | rc 0・mismatch 0・undefined 0 | rc 0・`units_run=17`・`init_count_var=18`・`dllmain_done=false`・`threw="memory access out of bounds"`・`total_calls=103` |
 | 既定 (修復 OFF・opt-in フラグ後) | rc 0 | rc 0・mismatch 0・undefined 0 | baseline と一致 (`units_run=17`・`total_calls=106`) |
 
+注: 上表 (§3) の ON 行は初回測定で、上限は 120 s。§7.1 は同じ ON 条件を上限 150 s で再測定した (commit `e9f8317f8`)。どちらも rc 124 (hang) で、timeout 秒数だけが異なる。一致したのは rc・`units_run`・`total_calls` で、timeout 秒数は一致しない。§7.1 の 150 s が後の測定の上限。
+
 - 修復 pass の入力 (生成段階の IR) は `%stack_var_-104 = alloca i64` (8 B)。最初の測定で見た `[6 x i64]` は、`m11_build.sh` 内の `alloca/m11_alloca.py` (R8 escape gap) が拡幅した後の形だった。pass は両方の形を受けるようにした。
 - 修復 pass の対象は `function_448490` の 1 関数 (`ALLOCA_RE` と entry の anchor が 1 件であることを assert する)。
 
