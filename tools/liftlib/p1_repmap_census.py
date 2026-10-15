@@ -18,7 +18,7 @@
 
   --residual  窓で書換えられなかった comis 直後の分岐を分類する (#3137)。JSON 1 行。
     br_other     窓内の最初の分岐が cf/zf/pf の名前参照でない
-      stale      条件の依存連鎖の葉 (整数比較) が 1 つでも comis より前に定義されている = comis のフラグを読まず前の cmp を読む (D1a 同型)。葉が前後に混在する場合も stale
+      stale      条件の依存連鎖の葉 (整数比較) が 1 つでも comis より前に定義されている = comis のフラグを読まず前の cmp を読む (D1a 同型)。葉が前後に混在する場合も stale (その件数を mixed に数える)
         clean    間に関数呼出し・フラグ更新 asm が無い
         call     間に関数呼出し・フラグ更新 asm がある (callee がフラグを変えるため IR だけでは決まらない)。フラグ更新 asm の名前は flag_call_re (整数 ALU・bt 系・sahf/popf/clc/stc/cmc/xadd/ptest。SSE の xorpd・subsd 等は含まない)
       fresh      葉が全て comis より後 (分岐のフラグは comis 後の整数比較由来。同型でない)
@@ -76,6 +76,8 @@ def residual_census(text, parse_call):
             return 'unknown'
         if not any(x < idx for x in ls):
             return 'fresh'
+        if any(x > idx for x in ls):
+            cnt['mixed'] += 1
         between = [k for k in range(idx + 1, jj) if flag_call_re.search(lines[k])]
         return 'stale_call' if between else 'stale_clean'
     def first_event(idx):
@@ -88,7 +90,7 @@ def residual_census(text, parse_call):
             if comis_re.search(l):
                 return 'next_comis', k
         return 'fn_end', None
-    cnt = Counter()
+    cnt = Counter({"mixed": 0})
     sites = [i for i, l in enumerate(lines) if re.match(r"^\s*call void @__asm_", l) and 'comis' in l]
     sites = [i for i in sites if parse_call(lines[i]) is not None]
     for idx in sites:
