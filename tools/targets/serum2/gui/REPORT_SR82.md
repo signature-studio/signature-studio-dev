@@ -28,11 +28,13 @@
 `arg_vt_indirect.py` (測定 commit `6c2b01972`):
 
 - ARG 系の所属関数 = 145 個 / 表の slot に現れる = 129 個 (`arg_vtable_callers.py` の値と一致)。
-- 間接 call の候補 (slot × 先頭ごと) = 113,548 件。
-- うち呼出元が SerumController の関数 = 12 件 (`arg_vt_indirect.py` の SC 行の合計)。
+- 間接 call の候補 (slot × 先頭ごと) = 113,548 件 **(旧値・取りこぼしを含む)**。
+- うち呼出元が SerumController の関数 = 12 件 **(旧値・取りこぼしを含む)**。
 - 参考: `.text` 全体で SC の関数内の `call qword ptr [reg+disp]` = 26 件 (`disp` を問わない)。
 
-読み方: 113,548 件の大半は別クラスの同じ disp の呼出であり、ARG の型の確定には使えない。SC 関数内の 12 件も、受けた object が F の所属 class かは未確定。
+**注 (レビュー指摘への対応):** 測定 commit `6c2b01972` の `arg_vt_indirect.py` は `qword ptr [reg + 0x..]` だけを受けており、capstone 5.0.7 が `[reg]` (disp 0) と `[reg + 8]` (disp 8、10 進出力) を出す呼出を落としていた。上の 113,548 件と 12 件は、この取りこぼしを含む旧値である。修正 commit では正規表現を `[reg]` と `[reg + 10進|0x16進]` の両方を受けるように直した。修正後の件数は未測定 (下記)。
+
+読み方: 候補の大半は別クラスの同じ disp の呼出であり、ARG の型の確定には使えない。SC 関数内の件数も、受けた object が F の所属 class かは未確定。
 
 ## 3. THIS・THIS-CHILD の件数 (受入 2 の現状)
 
@@ -65,9 +67,10 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 | ツール | 実行 | real (s) | load (1 分値) | 出力 md5 |
 |---|---|---|---|---|
 | `receiver_this_trace.py` | 1 | 27.07 | 0.74 | (TSV 1053 行) |
-| `arg_vt_indirect.py` | 1 | 31.61 | 0.73 | `9b4cb2ff` |
-| `arg_vt_indirect.py` | 2 | 31.74 | 0.91 | `9b4cb2ff` |
+| `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 1 | 31.61 | 0.73 | `9b4cb2ff` |
+| `arg_vt_indirect.py` (旧 commit・取りこぼしあり) | 2 | 31.74 | 0.91 | `9b4cb2ff` |
 
+- 修正後の再測定は未実施。理由: 再測定には `plugins-serum2` 素材が必要だが、`$ARTIFACTS_DIR` (`fl-win64.tar.zst` のみ) に無く、`Serum2_win64.vst3` の実体もこの run のどこにも無い。再測定は素材を用意した run で行う (未解決 (e))。
 - `receiver_this_trace.py` の TSV md5 は未記録 (§3 の不一致の検証は本 run では行っていない)。
 
 ### 鮮度の証跡 (`docs/WORKFLOW.md` §6)
@@ -82,3 +85,4 @@ venv/bin/python $P/arg_vt_indirect.py Serum2_win64.vst3 trace.tsv --tsv vt_ind.t
 | (b) THIS 69・THIS-CHILD 197 の SC 伝播と、THIS-CHILD の SC 証拠 (6 件 / 5 関数) の定義を揃えた再集計 | 受入 2 | #4930 (本 issue 残) |
 | (c) 表の境界 (連続する関数ポインタの run の先頭) の決め方と、run 数への換算 | 受入 3 | #4930 (本 issue 残) |
 | (d) `receiver_this_trace.py` の TSV md5 の不一致 (REPORT_SR60 §3) | 再現性 | #4930 (本 issue 残) |
+| (e) `arg_vt_indirect.py` の修正後の再測定 (件数・md5 を 2 回一致で確認)。素材 `plugins-serum2` を要する | 受入 1 の件数 | #4930 (本 issue 残) |

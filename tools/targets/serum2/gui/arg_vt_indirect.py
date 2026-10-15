@@ -85,14 +85,16 @@ for name in (b".rdata", b".data"):
         if v in targets:
             slot_hits[v].append(IMG + s.VirtualAddress + o)
 
-ind_re = re.compile(r"qword ptr \[(\w+) \+ (0x[0-9a-f]+)\]")
+ind_re = re.compile(r"qword ptr \[(\w+)(?: \+ (0x[0-9a-f]+|\d+))?\]")
 sites_by_disp = defaultdict(list)
 for ins in R.ins_all:
     if ins.mnemonic != "call":
         continue
     m = ind_re.search(ins.op_str)
     if m:
-        sites_by_disp[int(m.group(2), 16)].append(ins.address)
+        d = m.group(2) or "0"
+        disp = int(d, 16) if d.startswith("0x") else int(d, 10)
+        sites_by_disp[disp].append(ins.address)
 
 rows = []
 for F in sorted(targets):
