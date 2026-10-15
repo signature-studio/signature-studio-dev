@@ -629,10 +629,12 @@ FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); r
  * obj.+0x50 == 0 の経路 (0xd82c20 に code -7 = "Device not assigned") は未モデル (例外化の述語が実行時値のため) */
 FL_H(launchMapPages, length) { NARGS(0, 0); return fl_ret_i(c, lm_pages); }
 /* ---- launchMapPages (3 of 12, PY-138 #3029) ---- PE init 0xd79020 (sii)・updateMap 0xd79290 (i)・createOverlayMap 0xd7a130 (iiii) は書式と成功時の戻り (定数 = None) を確定。
- * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。setMapItemTarget は戻り型の食い違いが未解決のため未実装 */
+ * page 配列への副作用は未確定のため状態を変えない (REPORT_PY138)。 */
 FL_H(launchMapPages, init) { NARGS(3, 3); (void)A_STR(0); (void)A_INT(1, 0); (void)A_INT(2, 0); return fl_ret_none(c); }
 FL_H(launchMapPages, updateMap) { NARGS(1, 1); (void)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(launchMapPages, createOverlayMap) { NARGS(4, 4); for (int i = 0; i < 4; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
+/* ---- launchMapPages (PY-243 #3745) ---- PE 0xd7a3a0 は書式 iii・成功時の戻り None (REPORT_PY243)。項目書込みは項目の状態を持たないため状態を変えない */
+FL_H(launchMapPages, setMapItemTarget) { NARGS(3, 3); for (int i = 0; i < 3; i++) (void)A_INT(i, 0); return fl_ret_none(c); }
 
 /* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
 FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }
