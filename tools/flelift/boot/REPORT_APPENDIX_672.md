@@ -8,7 +8,7 @@
 - **既定経路は不変**: 診断なし・root 有の shim / ネガコンは units 209・GetMem / FreeMem 2,314 / 1,199 と 1,891 / 776 (§9-2・§10 の基準と一致)。既定 (root 無し) は 1,890 / 776・停止 `unlifted 0x6a7b70` (§10 と一致)。
 - **診断あり (`FLE_DIAG_NULLFILL=1`)**: fill コールバック `0x6a7b70` の呼出し 1,048,576 件 (= 面の高さ 2^20 行) を戻す。undo slot `0x15e1c78` / `0x15e4790` は 0 化されず、GetMem(0x74) の icall-miss も起きず、`0x15F34A0` は shim 有で非 0 (`0x7f10001c`)。
 - **停止点の移動**: 診断ありは unit 209 の中で `MessageBoxW` (`QuickFontCache DLL not found!`) の後、`unlifted 0x6bbc20` (call site ret `0x6c9380` = `f_6c9280`) で停止。units_run は **209 のまま** (診断による前進は修復ではない)。子 issue **#3491 [FLE-14]** に起票。
-- 製品 KPI (既定経路): units 209 → 209 (変化なし)。最初のウィンドウ: 未達 (停止は診断なし・診断ありとも unit 209 内)。
+- 製品 KPI (既定経路): §C 参照 (訂正済み: 既定経路は boot_roots 追加後 209 → 895)。最初のウィンドウ: 未達 (停止は診断なし・診断ありとも unit 209 内)。
 
 ## 1. 結果表 (本 run・各 route n=1)
 
@@ -115,7 +115,7 @@ REPORT §7 (旧 165〜167 行):
   lift の stub は LoadLibraryW・GetProcAddress とも 0 を返すため、**lift だけが 2^20 面の経路に入る** (推定: native は ILTools_x64.dll を読めて非 0 になる。`tools/iltools/REPORT.md` の対象 DLL。読込成功の native 実測は未実施)。
 - **実測**: ILTools の擬似モジュール (`FLE_IPP=3`・本 PR で追加) で分岐入力を非 0 にすると、**units_run 209 → 851 (942 中)**。fill (`0x6a7b70`) 6 回 → 0 回、空の `MessageBoxA` → `exit(0)` は出ない。ネガコン (`FLE_IPP=0`) と shim (`FLE_IPP=1`) は 209 のまま (同じ lift・同じバイナリで mode だけ変えた差)。
 - **仮説 A は支持されない**。`f_6b8fa0` のサイズは 32bit `imul` で 0 (mod 2^32) になり GetMem(0) → nil。native の `System._GetMem` も size ≤ 0 で nil (`0x409410`・`0x40941a`) で、ホストの `fle_ov_getmem` と一致する (GetMem の差ではない)。この経路に入れば native も buf = 0 のまま fill する。したがって例外回復の捕捉先を探す必要は、分岐を回避できた今は無い。
-- **既定経路は不変** (FLE_IPP 未指定・0 = 209 / 1,891・776)。opt-in の `FLE_IPP=3` だけが変わる。よって PR は `Refs #672` (`Closes` の条件『診断なしの既定経路で units_run > 209』は未達)。
+- ~~**既定経路は不変** (FLE_IPP 未指定・0 = 209 / 1,891・776)。opt-in の `FLE_IPP=3` だけが変わる。よって PR は `Refs #672` (`Closes` の条件『診断なしの既定経路で units_run > 209』は未達)。~~ → 訂正 (§C-2): 既定経路は boot_roots の `0x976da0` 追加後 895 (受入 2 達成)。PR の `Refs` / `Closes` は PM 判断どおり `Refs #672` のまま。
 
 ### B-2 静的判定 (`fle672_static.py` の出力の要点)
 
@@ -142,7 +142,7 @@ REPORT §7 (旧 165〜167 行):
 | **ILTools 分岐入力 (本 PR)** | **3** | **851** | 3,139 / 1,490 | **0** | **0** | `unlifted 0x976da0` (呼出元 `0x92d24e`・`f_92d150` 内) | **64** (0x815e9c・fail-soft 0) | 0x7f10001c (OK) |
 
 - ILT route のログには `MessageBoxW text='QuickFontCache DLL not found!'` が出る (既知の T-SH 系の別件・B-4)。
-- 製品 KPI (既定経路): units 209 → **209 (変化なし)**。最初のウィンドウ: 未達 (ILT route の停止は unit 851 の unlifted 0x976da0)。
+- 製品 KPI (既定経路): §C 参照 (訂正済み: 209 → 895)。最初のウィンドウ: 未達 (ILT route は訂正前の測定で unit 851 の unlifted 0x976da0 で停止)。
 - 検証範囲: 1 本の lift (`closure 2`・root `0x6a7b70`)。n = 1。範囲外: native 実行による ILTools の読込・CreateCursorFromFont の戻り値の突合。
 
 ### B-4 未解決 (起票先付き)
@@ -212,7 +212,7 @@ REPORT §7 (旧 165〜167 行):
 
 - 停止点: 既定 (と B-7 構成) とも unit 895 の後に `exit` (code 0・call site `0x412a12`)。`oob memory access out of bounds` は **どの構成でも再現しなかった**。B-7 の旧 `oob` run は再現できず、原因は未切り分け (旧 run の build・lift の差の可能性)。
 - 所要 (実測): lift 81 s・clang plain (8 shard) 100 s (既定) / 83 s (B-7)・boot default 10 s・boot negctl 26 s。load 1.1〜2.2 (4 vCPU)。
-- 結論: 既定経路 209 → 895 は新規 lift で再現した。受入 2 (既定経路 > 209) は満たす。`oob` は再現しないため、本 PR は `Closes #672` のままとする。`exit` (code 0) が正常終了か (最初のウィンドウ未達) は未解決。
+- 結論: 既定経路 209 → 895 は新規 lift で再現した。受入 2 (既定経路 > 209) は満たす。`oob` は再現しないため、PM 判断 (2026-10-15) どおり本 PR は `Refs #672` のまま (`oob` の切り分けが #4782 で未了のため `Closes` にしない)。`exit` (code 0) が正常終了か (最初のウィンドウ未達) は未解決。
 
 ## §C. 既定経路の更新 (2026-10-15・PM 判断 1・2 の実装)
 

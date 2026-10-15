@@ -139,7 +139,7 @@ FLE-5 末の残 3 件は `unlifted 280 / 659` (`0x6a7b70`, blocklist 対象) と
 1. **unit#209 の次の blocker は `unlifted 0x6a7b70`** (fill、`f_6c7610` ← `f_815050`)。root 化すると fill が image を 0 埋めし survey が成立しないため `FLE_ROOT_BLOCKLIST` で除外。診断 (§11) では fill 後の停止点は `unlifted 0x6bbc20` (f_6c9280)。
 2. **unit 進行 209 で横ばい**。次の一手は `0x6bbc20` の解消 (子 issue #3491 `[FLE-14]`)。fill の上流 (面 2^20) は #3112。
 3. **残 survey 非 ok 3** = unit 280 / 659 (`0x6a7b70`, blocklist 対象) + unit 895
-   (`0x976da0` は `PostMessageW` を呼ぶ thunk と特定済み・付録 672 §B-7。root 化で unit 895 → 次は oob)。
+   (`0x976da0` は `PostMessageW` を呼ぶ thunk と特定済み・付録 672 §B-7。root 化で unit 895 (旧 B-7 の『次は oob』は再測定で再現せず・付録 §C-2)。
 3. **VMT slot の自動 root 化 (RTTI/COL walk) は非適用**: 対象 0x6a7b70 は `.pdata` 整齊の
    実関数だが **image 内のあらゆるセクションに qword 参照を持たない** (実行時構築)。
    `.text` 内の連続 .text 参照 (VMT メソッド配列) の scan も実装したが拾えず、
