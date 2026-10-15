@@ -473,9 +473,14 @@ def cases():
     add('vmulpd ymm2, ymm3, [rbx]', e_y(pdop(MUL), 2, 3, 'M'), yprep(regs=(3,), mem=mem_nice))
     add('vaddps ymm1, ymm2, ymm3', e_y(psop(ADD), 1, 2, 3), yprep(regs=(2, 3), ps=True))
     add('vmulps ymm5, ymm5, [rbx]', e_y(psop(MUL), 5, 5, 'M'), yprep(regs=(5,), ps=True, mem=mem_ps))
+    add('vsubps ymm1, ymm2, ymm3', e_y(psop(SUB), 1, 2, 3), yprep(regs=(2, 3), ps=True))
+    add('vdivps ymm0, ymm1, ymm2', e_y(psop(DIV), 0, 1, 2), yprep(regs=(1, 2), ps=True))
     add('vxorpd ymm0, ymm1, ymm2', e_y(lambda x, y: x ^ y, 0, 1, 2))
+    add('vxorps ymm3, ymm4, ymm5', e_y(lambda x, y: x ^ y, 3, 4, 5))
     add('vandpd ymm3, ymm4, ymm5', e_y(lambda x, y: x & y, 3, 4, 5))
+    add('vandps ymm6, ymm7, ymm6', e_y(lambda x, y: x & y, 6, 7, 6))
     add('vorps ymm7, ymm6, [rbx]', e_y(lambda x, y: x | y, 7, 6, 'M'), yprep(mem=mem_rand))
+    add('vorpd ymm2, ymm2, [rbx]', e_y(lambda x, y: x | y, 2, 2, 'M'), yprep(mem=mem_rand))
     add('vunpcklpd ymm1, ymm2, ymm3', e_unpack(False, 1, 2, 3))
     add('vunpckhpd ymm1, ymm2, ymm3', e_unpack(True, 1, 2, 3))
     add('vshufpd ymm1, ymm2, ymm3, 6', e_shuf(6, 1, 2, 3))
@@ -583,12 +588,17 @@ def cases():
         return s2
     add('div byte ptr [rbx]', e_div8m, p_div8m)
 
-    def e_pushfq(st):   # RSP -= 8; [RSP] = RFLAGS (AF・DF は 0 に固定してある)
+    def e_pushfq(st):   # RSP -= 8; [RSP] = RFLAGS (AF・DF は 0 に固定・IF は 1: ユーザモードの native 実測 0x202/0x206)
         s2 = clone(st)
         f = st['F']
-        s2['MEMQ'] = [0, 0, 0, 2 | f['CF'] | (f['PF'] << 2) | (f['ZF'] << 6) | (f['SF'] << 7) | (f['OF'] << 11)]
+        s2['MEMQ'] = [0, 0, 0, 2 | (1 << 9) | f['CF'] | (f['PF'] << 2) | (f['ZF'] << 6) | (f['SF'] << 7) | (f['OF'] << 11)]
         return s2
-    add('pushfq', e_pushfq, yprep(mem=mem_zero, reg=4, off=32))
+
+    def p_pushfq(st):   # CF=1 に固定する (CF 項の負例を決定的にするため)
+        st = yprep(mem=mem_zero, reg=4, off=32)(st)
+        st['F']['CF'] = 1
+        return st
+    add('pushfq', e_pushfq, p_pushfq)
     return C
 
 

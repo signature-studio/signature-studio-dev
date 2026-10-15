@@ -27,7 +27,7 @@ ott 原版からの差分 (FLEngine 実測 1,105 未対応 site = 0.32% の解�
     movsldup/movshdup/cmpXXps (KH-38 #3065。before 160 closure の unsup 285 site → 0。差分テスト tests/x64c_vex_diff.py)
   - VEX.256 (ymm) の packed 算術 (vaddpd/vsubpd/vmulpd/vdivpd・ps 版)・bitwise・vunpckl/hpd・vshufpd・vextractf128・vcvtdq2pd を
     上位 128bit (YL) 込みで lane 計算 (KH-38 #3428。PSOLA_CreateInstance 閉包 unsup 2,472 → 0)。
-    加えて vcvtss2sd/vcvtsi2sd/vsqrtsd/vpunpcklqdq/vmovhpd (VEX.128)・movddup/lddqu/movntpd/palignr/shlx/pushfq・div r/m8
+    加えて vcvtss2sd/vcvtsi2sd/vsqrtsd/vmovhpd (VEX.128)・vpunpcklqdq (専用分岐)・movddup/lddqu/movntpd/palignr/shlx/pushfq・div r/m8
   - dispatch に IAT pseudo-VA 経路を追加: data 側で IAT slot に IMP_VA_BASE+idx を敷設し,
     `mov rax,[iat]; call rax` 形の間接呼出を imp 呼出に解決
 
@@ -556,7 +556,7 @@ class FnLift:
         self.L('{ uint64_t v_ = %s; R[RSP] -= 8; ST64(R[RSP], v_); }' % self.rd(ins, ops[0], 8))
 
     def i_pushfq(self, ins, ops):
-        self.L('{ uint64_t v_ = 2 | fCF | ((uint64_t)fPF << 2) | ((uint64_t)fAF << 4) | ((uint64_t)fZF << 6) | ((uint64_t)fSF << 7) | ((uint64_t)fDF << 10) | ((uint64_t)fOF << 11); R[RSP] -= 8; ST64(R[RSP], v_); }')
+        self.L('{ uint64_t v_ = 2 | (1ULL << 9) | fCF | ((uint64_t)fPF << 2) | ((uint64_t)fAF << 4) | ((uint64_t)fZF << 6) | ((uint64_t)fSF << 7) | ((uint64_t)fDF << 10) | ((uint64_t)fOF << 11); R[RSP] -= 8; ST64(R[RSP], v_); }')
 
     def i_pop(self, ins, ops):
         self.L('{ uint64_t v_ = LD64(R[RSP]); R[RSP] += 8; %s }' % self.wr(ins, ops[0], 'v_', 8))
@@ -1001,7 +1001,7 @@ class FnLift:
             'vmovsd': ('movsd', False), 'vmovss': ('movss', False),
             'vcvtsd2ss': ('cvtsd2ss', False), 'vcvtsi2ss': ('cvtsi2ss', False),
             'vcvtss2sd': ('cvtss2sd', False), 'vcvtsi2sd': ('cvtsi2sd', False), 'vsqrtsd': ('sqrtsd', False),
-            'vpunpcklqdq': ('punpcklqdq', False), 'vmovhpd': ('movhpd', False)}
+            'vmovhpd': ('movhpd', False)}
     VEX2 = {'vmovd': 'movd', 'vmovq': 'movq', 'vcvtdq2pd': 'cvtdq2pd', 'vcvtps2pd': 'cvtps2pd',
             'vcvtpd2dq': 'cvtpd2dq', 'vcvttpd2dq': 'cvttpd2dq', 'vcvtss2si': 'cvtss2si', 'vpshufd': 'pshufd'}
     VEXF = {'vucomisd': 'ucomisd', 'vucomiss': 'ucomiss', 'vcomisd': 'comisd', 'vstmxcsr': 'stmxcsr', 'vldmxcsr': 'ldmxcsr'}
