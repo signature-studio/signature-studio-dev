@@ -3,7 +3,7 @@
 - 日付: 2026-10-15 / 親: #2174 (SR-43) / 前段: `REPORT_SR43.md` (受信 base の this 遡り・候補 1052 件)
 - 範囲: 静的解析のみ。実 VSTGUI 上の動的確認は範囲外。
 - 入力: `plugins-serum2` の `Install_Xfer_Serum2_2.1.5.exe` → `Serum2.vst3` (x86_64-win)。sha256 `501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283` / 19,236,864 B (SR-43 と一致)。作業用 dir はリポジトリ外。
-- 測定 commit: `1c21885fb` (`sr48_arg_this.py` を追加した commit)。以降のコード変更は無い。
+- 測定 commit: `43bb2fd96` (`sr48_arg_this.py` の nocaller 判定を集合比較に直した commit。初版は `1c21885fb`)。以降のコード変更は無い (§6)。
 
 ## 0. 結論
 
@@ -29,7 +29,7 @@ SR-43 の分類 (strict) は同一 (`vptr:ARG` 240・`vptr:THIS` 67・`vptr:THIS
 | 対象 | 件数 | 判定 | 内訳 (呼出元の値) |
 |---|---|---|---|
 | ARG (直接の引数) | 240 | 確定 0 | `nocaller` 232・`unk` 5・`unk-child` 6 (呼出元が 1 件以上の候補は 8 件) |
-| 　うち直接呼出元なし | 231 (関数 117 個) | — | うち 230 件は関数アドレスとしてデータ表 (`.rdata`/`.data`) に現れる |
+| 　うち直接呼出元なし | 232 (関数 118 個) | — | うち 230 件は関数アドレスとしてデータ表 (`.rdata`/`.data`) に現れる |
 | ARG-CHILD (親の引数) | 68 | 確定 0 | `nocaller` 57・`unk` 55・`unk-child` 1 |
 | THIS | 67 (関数 63) | SC 証拠 0 | 呼出元 `nocaller` 22・`this-nonSC` 16・`unk` 22・`unk-child` 28 |
 | THIS-CHILD | 191 | 型未確定 | 所属関数の SC 0 件 |
@@ -58,16 +58,25 @@ venv/bin/python $P/sr48_arg_this.py Serum2_win64.vst3 --tsv sr48.tsv
 ```
 
 - 依存: `pefile` `capstone` `zstandard`。
-- 実測 (n=3・逐次・測定 commit `1c21885fb`。load は `/proc/loadavg` の 1 分値):
+- 実測 (n=3・逐次・測定 commit `43bb2fd96`。load は `/proc/loadavg` の 1 分値。入力 sha256 `501e7bb3…` を確認):
 
 | 実行 | real (s) | load 開始 → 終了 | stdout md5 | TSV md5 |
 |---|---|---|---|---|
-| 1 | 25.53 | 0.36 → 0.58 | `83917015…` | `f347f0af…` |
-| 2 | 25.58 | 0.58 → 0.73 | `83917015…` | `f347f0af…` |
-| 3 | 25.58 | 0.73 → 0.82 | `83917015…` | `f347f0af…` |
+| 1 | 25.84 | 0.22 → 0.49 | `12896f67…` | `f347f0af…` |
+| 2 | 25.34 | 0.49 → 0.73 | `12896f67…` | `f347f0af…` |
+| 3 | 25.49 | 0.73 → 0.82 | `12896f67…` | `f347f0af…` |
 
 - 決定性: 3 回の stdout md5 と TSV md5 が全て一致 (表示の集合は整列済み)。
+- 初版 (`1c21885fb`) の stdout md5 は `83917015…` だった。判定の変更は ARG 行の nocaller 件数 (231 → 232) だけで、TSV は変わらない (`f347f0af…`)。
 - 報告前コマンド (`docs/WORKFLOW.md` §6) の結果は §6 に記載する。
+
+## 6. 報告前コマンド (`docs/WORKFLOW.md` §6)
+
+- 検証起点 (測定 commit): `43bb2fd96`
+- `git diff 43bb2fd96 HEAD -- tools/targets/serum2/gui/sr48_arg_this.py` の出力: 空 (スクリプトのコード差分 0)
+- `git status --porcelain=v1 -- tools/targets/serum2/gui/`: 0 行
+- `find tools/targets/serum2/gui -type f -size +20M -not -path '*/work/*'`: 0 件
+- 本 REPORT の行数: 上記 79 行から §4 の修正と §6 の追加で増えた行を含む (PR 本文の値は最終 commit 時点の `wc -l` に合わせる)
 
 ## 5. 未解決 (起票先)
 
