@@ -37,7 +37,8 @@ GUI-REACH 21 BitBlt 1 IMPL P0
 `git diff 383e9462a HEAD -- tools/gui/lift tools/gui/test tools/gui/golden tools/gui/src tools/gui/e2e` の出力は 0 行 (本付録と REPORT の索引を入れた commit は文書だけ)。
 
 ## wasm 側の順序検査 (#4803)
-`test/wasm_w_e2e.sh` の W 版ゲストを `gui_wasm.sh … reach` で作り (画素・読み戻しの検査は不変)、`E2E_MODE=w` が `GUI-REACH`・`GUI-MSG` 行を `build/e2e/w_reach.log` に保存して `reach_order_check.py` に通す。
+`test/wasm_w_e2e.sh` の W 版ゲストを `gui_wasm.sh … reach` で作る。画素・読み戻し・スクリーンショットの検査ロジックは不変だが、**検査対象の wasm バイナリは従来と別のビルド** (`gui_core.c` に `-DGUI_REACH_LOG`、関数の改名と wrapper 経由)。`wasm_w_e2e.sh` は step 1 で `native_w_e2e.sh` を呼び、さらに `gui_lift.sh` の RetDec 段を通るため、素材は `toolchain-emsdk toolchain-retdec apt-mingw` が要る (#4811 の差し戻しで素材行を修正)。
+`E2E_MODE=w` が `GUI-REACH`・`GUI-MSG` 行を `build/e2e/w_reach.log` に保存して `reach_order_check.py` に通す。
 - 測定 commit `2d81f2810` (コミット済み HEAD)・load 0.82〜0.89: `bash tools/gui/test/wasm_w_e2e.sh` rc 0・28.8 s。EXACT MATCH (0/64,000 px)・読み戻し sha256 `6f809bdf…` が native と MATCH・スクリーンショット EXACT MATCH・順序検査 PASS (32 件の到達行)・ネガコン (1 px 改竄) MISMATCH・rc 1。
 - 差分 (測定 commit から HEAD まで): 0 行 (測定 commit が HEAD)。
 
