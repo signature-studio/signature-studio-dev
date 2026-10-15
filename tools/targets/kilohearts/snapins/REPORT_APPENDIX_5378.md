@@ -10,7 +10,7 @@
   再現: `python3 snapins/scripts/carve_process_split.py work/callgraph.pkl work/closures_sets.pkl snapins/snapins.json`。
 - unique 25 の IAT 呼出は **0 件**。infra 120 の IAT 呼出は **60 件** (`callgraph.pkl` の `iat`。名前付き 51 + CFG 間接 9。REPORT_APPENDIX_781 §5 と同じ)。
 - unique 25 を `carveproc` (snapins.json) として既存 lift 経路 (`build.py carveproc --path s0 --no-compare`) で lift した。結果: **20 関数**を wasm 化、`undefined_imports = []`。
-- 残り 5 callgraph ノード (`0x18037e63f`・`0x180c23e02`・`0x180c23f28`・`0x180c2419a`・`0x180c243df`) は、RetDec の `--select-ranges` が関数入口として扱えず (`stage0 に関数が無い`) 入力から外した。5 件とも、lift した 20 関数のいずれかの範囲の内側にある (`0x18037e63f`→`0x18037e5e0`、`0x180c23e02`→`0x180c23d90`、`0x180c23f28`→`0x180c23ec0`、`0x180c2419a`→`0x180c240c0`、`0x180c243df`→`0x180c242c0`)。
+- 残り 5 callgraph ノード (`0x18037e63f`・`0x180c23e02`・`0x180c23f28`・`0x180c2419a`・`0x180c243df`) は、RetDec の `--select-ranges` が関数入口として扱えず (`stage0 に関数が無い`) 入力から外した。関数入口として扱えなかった (未確認)。5 件とも、lift した 20 関数のいずれかの RVA 範囲の内側にある (`0x18037e63f`→`0x18037e5e0`、`0x180c23e02`→`0x180c23d90`、`0x180c23f28`→`0x180c23ec0`、`0x180c2419a`→`0x180c240c0`、`0x180c243df`→`0x180c242c0`)。範囲の包含は確認したが、それ以上の扱い (内部アドレスか否か) は未確認。
 - bit-exact 比較は行っていない (`--no-compare`)。受入 1 の bit-exact は親 #4863 の受入 1。
 
 ## 1. lift 結果 (実測)
@@ -47,11 +47,10 @@ unique 側 25 から呼ばれる infra 関数 (= 11 件)。`carve_process_split.
 | `0x181384040` (memmove) | 外 | `0x37d210`・`0x389700` | stub (`abort`)。`khbase` の shim は別 snap-in の設定 |
 
 - 11 件は `carveproc` の `stubs.c` で全て `abort()` の stub (`stubs 11`)。「khbase 対象」は、khbase で lift する予定の関数だが、本 lift の wasm には入っていない。
-
-- infra 120 の内訳 (`snapins.json` の `khbase.lift` の集合との照合・実測): **khbase の lift 対象 98 関数 (10,044 B)** と **khbase 外 22 関数 (10,671 B)**。IAT 60 件は全て khbase 側の 98 関数に含まれ、khbase 外の 22 関数の IAT は 0。
-- 判定: infra 120 は **共有 (khbase に寄せる) 98 件 / 個別 22 件**。ただし「khbase の lift 対象である」は登録上の事実で、khbase の lift が成功して bit-exact であることは示していない。
-- unique 25 が直接呼ぶ callee は 11 件 (khbase 対象 6・khbase 外 5)。khbase 外の 5 件は本 lift で stub (`abort`)。
+- memmove (`0x181384040`) は `abort` の stub。unique 側の `0x37d210`・`0x389700` が memmove を呼ぶため、wasm 実行時はこの経路で必ず trap する。wasm 動作は未検証で、memmove の shim 方針は後続 #4863 で決める。
+- unique 25 が直接呼ぶ callee は 11 件 (khbase 対象 6・khbase 外 5 = `carve_process_split.py` の出力)。khbase 外の 5 件は本 lift で stub (`abort`)。
 - stub 11 件を呼ぶ unique 関数は `0x37d210`・`0x389700`・`0x38a510`・`0x38a680`・`0xbacaa0`・`0xfd4d48`。これらの経路は wasm 実行時に `abort()` で止まる。bit-exact の対象にできるのは stub を解消した後。
+- infra 120 のうち khbase lift に含まれる数 / 含まれない数と各 B 数は **本 run では未再現**。`carve_process_split.py` はこの集計を出力せず、入力の `work/callgraph.pkl`・`work/closures_sets.pkl` は本 run に無い (生成元の `plugins-kilohearts` 素材が未取得)。前版の 98 / 22・10,044 B / 10,671 B は再現できないため本書から外した。判定は未確定。
 
 ## 3. 未解決 (起票先)
 
@@ -59,5 +58,6 @@ unique 側 25 から呼ばれる infra 関数 (= 11 件)。`carve_process_split.
 |---|---|---|
 | 20 関数の bit-exact (native vs wasm) | 受入 1 の検証 | #4863 (親) の受入 1 |
 | 未 lift の infra callee 5 件 (stub) の lift | wasm 実行時に `abort` | 親 #4863 の残作業 (infra 側の判定) |
-| 内部 5 アドレスの扱い (関数入口でない) | 範囲内の処理の検証範囲 | 本付録 §0 の通り。関数入口の定義は親 #4863 |
+| 5 アドレスを関数入口として扱えたか (未確認。RVA 範囲の包含のみ確認) | 範囲内の処理の検証範囲 | 本付録 §0 の通り。関数入口の定義は親 #4863 |
+| infra 120 の khbase 帰属の件数・B 数 (未再現) | infra 側の判定 | 親 #4863 の残作業 (入力 pkl の再生成には `plugins-kilohearts` 素材が要る) |
 | slot 7・13 が native scenario で呼ばれるか | process 以外の呼出経路 | #5377 (KH-155) と KH-130 |
