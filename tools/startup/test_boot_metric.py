@@ -84,7 +84,7 @@ GUI_SURVEY = {"units_total": 942,
                         {"name": "CreateWindowExW", "calls": 2}]}
 X64_BOOT = {"boot": {"units_total": 942, "units_run": 209, "threw": {"cls": "oob"},
                      "stopped_at_1based": 209, "getmem": 1886, "freemem": 776}}
-X64_SURVEY = {"units_covered": 895, "byCls": {"ok": 892, "unlifted": 3}}
+X64_SURVEY = {"units_covered": 942, "byCls": {"ok": 892, "empty": 46, "unlifted": 3, "noproc": 1}}
 X64_REPORT = """# boot
 
 ### 4-1. variant 対照
@@ -360,6 +360,11 @@ class BootMetricTest(unittest.TestCase):
         broken = APPENDIX.replace("ok 872 / trap 23", "ok 900 / trap 23")
         with self.assertRaises(bm.MetricError):
             self.build({"tools/m11/REPORT_APPENDIX_1430.md": broken})
+
+    def test_negative_x64c_survey_sum_mismatch_fails(self):
+        broken = json.dumps({"units_covered": 942, "byCls": {"ok": 892, "empty": 46, "unlifted": 3, "noproc": 0}})
+        with self.assertRaises(bm.MetricError):
+            self.build({"tools/flelift/boot/results/survey.json": broken})
 
     def test_negative_gui_survey_report_mismatch_fails(self):
         broken = GUI_REPORT.replace("S1 `870/1/47/24/0`", "S1 `871/1/47/24/0`")

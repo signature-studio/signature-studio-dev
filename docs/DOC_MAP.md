@@ -351,6 +351,7 @@
 | `tools/m11/trap_triage/REPORT_APPENDIX_3499.md` | ~60 | #3499: REPORT_718 §4j (証拠表の行 36〜66 の件ごとの判定・根拠・注・未解決) の全文。250 行上限のため分割移動。判定ツールは `judge_ctx_3499.py` |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3564.md` | ~150 | #3564: strict 候補の残り (証拠表の行 36〜66 の保留 6・単独 15) の件ごと判定 (真陽性 12・偽陽性 1・保留 8)。REPORT_718 §4i の全文・判定補助 `judge_src.py`・機械語側のネガティブコントロール `negctl_3564.py` (付録 §7)・行 37 の偽陽性と保留 8 件の機構 (§8。列挙ツール `frame_ops_3564.py`) |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3502.md` | ~85 | #3502: 証拠表の行 67〜98 の保留 30 件の件ごと再判定 (真陽性 9・偽陽性 4・保留 19・判定基準・照合範囲・未解決)。REPORT_718 §4k の正本 |
+| `tools/m11/trap_triage/REPORT_APPENDIX_4885.md` | ~60 | #4885: 証拠表の行 67・68・71〜74 の件ごとの判定 (母数 6・真陽性 4・偽陽性 0・保留 2)。REPORT_718 §4l の正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3498.md` | ~79 | #3498 (PR #3567): strict 候補の証拠表 行 4〜35 (32 件) の件ごとの表・判定規則・未解決 (REPORT_718 §4h の全文。REPORT_718.md の 250 行上限のため分割移動)。判定の内訳は付録 §4h が正本 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_2785.md` | ~73 | #2785: 304/555/923 の obj 生成元。詳細は付録 |
 | `tools/m11/trap_triage/REPORT_APPENDIX_3823.md` | ~67 | #3823: 923 の obj 0x10bd3960 への書込み (全 store 計装・unit 830/880 の 0 書込み)。呼出し鎖は未確定 |
@@ -625,6 +626,7 @@
 | `tools/python/REPORT_PY227.md` | 89 | PY-227 (#3655): device.midiOutMsg の arg4 (word の bit 24–31)・channel ≤ -1 の message 送出・-7 (device 無し)・-6 (送出先無し) の判定順を PE 0xd747f0 の逆アセンブルで確定し、C・mock・`tests/device_diff.mjs` (word 列と経路の差分 0) に入れる。forwardMIDICC の -7・-6 は #3671 |
 | `tools/python/REPORT_PY231.md` | 112 | PY-231 (#3671): device.forwardMIDICC の -7 (device 無し)・-6 (送出先無し) の判定と送出の記録。書式 `"L|i"`・第 2 引数の既定 1 を PE 0xd75120 で確定 (第 1 引数は word、第 2 引数は送出先テーブルの添字)。-7・-6 の判定は 0xd75120 では未検証の仮置き (判定表の 0xd748e0 は midiOutNewMsg)。C・mock・`tests/device_diff.mjs` (差分 0・ネガティブコントロール 2 件)。値の変化検出のテーブル初期値は #4884 (PY-401)、-7・-6 の PE 裏付けと送出失敗経路は #4909 (PY-402)、送出先 HMIDIOUT の由来は #3981 |
 | `tools/python/REPORT_PY211.md` | 133 | PY-211 (#3539): patterns の jumpToPattern・movePattern・findFirstNextEmptyPat の委譲先本体 (VA 付き)・範囲外の暫定決定 (1..999 の外は no-op)・index 基準 (1 始まり・movePattern は相対量)。前段 REPORT_PY208 の番地・要素幅・flags の訂正。副作用本体は #3558 |
+| `tools/python/REPORT_PY394.md` | 74 | PY-394 (#4842・親 #3889): G1 (`0x15d51a0`) の書込み元 13 箇所 (RIP 相対 1 件 `0x12d9629` + ポインタ格納セル `0x15e4018` の読出し 444 件からの追跡で 12 件)。セル自体への書込みは 0 件。解析スクリプト `analysis/py394_g1_cell_reads.py`。書込みの実行時の条件は未解決 (#3889) |
 | `tools/python/REPORT_PY223.md` | 113 | PY-223 (#3627): 0xed4b70 (0x12da6d0 の唯一の呼出し元) の所在 (関数ポインタ表 0xed0bb0 の添字 51)・vtable 候補 (スロット 0x198 / 0x120) と仮想 call の件数・flag 参照関数。全 313 PE block の絶対値参照で、他 block から G1・T・flag・表への参照は 0 件 (受入 4)。G1 の RIP 相対書込みは 1 件 (0x12d9629)。receiver の vptr の書込み元・obj・flag の条件は子 #3888・#3889・#3890。解析スクリプト `analysis/py223_indirect_callers.py`・`analysis/py223_block_scan.py` |
 | `tools/python/REPORT_PY56.md` | ~70 | PY-56 (#1934): playlist 38 関数のうち `selectTool` (書式 `i`)・`scrollTo` (書式 `iiii`) の引数確定。残り 36 関数は子 #1971 (PY-57) |
 | `tools/python/REPORT_PY57.md` | ~75 | PY-57 (#1971): playlist 残り 36 関数のうち 8 件の逆アセンブル骨格 (戻り値・範囲 code は未確定)。未読 26 件は #2026 (PY-61) |
@@ -867,6 +869,7 @@
 | `tools/plugins/sampler/REPORT_APPENDIX_GATE.md` | ~25 | sampler REPORT §6 の gate 設計 (judge の判定条件) と ネガティブコントロール NC1〜NC7 の表の全文 (250 行上限のため分割移動) |
 | `tools/plugins/sampler/REPORT_APPENDIX_1774.md` | 81 | sampler REPORT §7c: VEX comis/ucomis の flag 反映 (#1774 [PLG-F3-14]) の実測。 同一ブロック内の flag 反映 pass の結果 (19252 1 箇所・19048 0 箇所)、機械語の消費命令と IR の参照の対応、icall 別案 (`PLUG_ICALL=1`) の不採用理由、fail-open 修正の確認と限界 (§7c.4)、未解決 (子 [PLG-F3-33]・[PLG-F3-34])。 方式の決定は DECISIONS D15 |
 | `tools/plugins/sampler/REPORT_APPENDIX_1582.md` | ~12 | sampler REPORT §7b の分割移動節の全文 ([PLG-F3-12] #1582: engine_lift の実測 19252/19048・19048 の `emcc -c` 回帰の疑い・VEX comis/ucomis の flag 方式の検討 2 案)。 方式の決定は DECISIONS D15 |
+| `tools/plugins/sampler/REPORT_APPENDIX_4155.md` | ~80 | sampler [PLG-F3-40] #4155: VEX comis の機械語の消費命令と IR の 1:1 対応 (19252: 11/14・19048: 8/12)。 欠落 7 件 (19252: 3・19048: 4) は RetDec の CFG 構造化 (`e.drc.c`) の段で fall-through 基本ブロックが落ちたもの。 照合の道具 `vex_comis_match.py`。 測定 commit は `bf1ca2291` (`bf1ca2291`→HEAD の実行コード差分 0 行) |
 | `tools/plugins/sampler/REPORT_APPENDIX_3242.md` | ~75 | sampler [PLG-F3-34] #3242: 非 VEX comis/ucomis の flag を slot を持つ関数で IR に反映 (19252: 反映 9・未反映 47 / 19048: 反映 6・未反映 74)、反映できない呼出しを unimpl に出す経路、述語の native 検算 (484 件・ネガティブコントロール 3 種)。 既知類型 D1a。 測定 commit `c45bf383a` |
 | `tools/plugins/sampler/REPORT_ENGINE_LINK.md` | ~55 | sampler REPORT §5 の付録: Fruity Slicer 2 殻 (23663) と engine (23664) の結線。 `engine_x64.dll` のロード経路・`DispatchToEngine` の case 表 (#540 受入条件 4 の部分達成) |
 | `tools/plugins/sampler/REPORT_ENGINE_LINK_APPENDIX_3009.md` | ~148 | REPORT_ENGINE_LINK §10 の (a)(b)(c) の再解析 (#3009): sel 2・4 の戻り値 (sel 2 は常に 0、sel 4 は int32・bool・`const char*`)、wrapper の呼出し元 (sel 2 11 件・sel 4 12 件・0x843930 6 件。 付録 540 の件数の訂正)、0x84bd8f の内側 id {3,7}、0x84bc30 の参照 (8 byte 絶対 VA で `.text` 内の表 1 件・参照元は未確定)。 検証は `dispatch_selectors.py` (NC 付き) |
@@ -975,6 +978,7 @@
 | `tools/targets/serum2/gui/REPORT_SR30.md` | ~100 | SR-30 (#2000): REPORT_SR28 の vtable 0x180a86b88 前提の訂正 (RTTI は SerumEditor の sub-object)。Splice 生成の直接呼出元と demo bit 読書 (0x1800c2b50 / 0x1800c6090) を列挙。選択 state 条件と間接経路は未達 (子 #2053〜#2055) |
 | `tools/targets/serum2/gui/REPORT_SR58.md` | ~70 | SR-58 (#4097): NODOM 242 件の理由別分類 (間接 jmp 89・back-edge 79・merge 74)・`receiver_this_trace.py --nodom-tsv`。支配判定の変更と偽陰性・偽陽性は未達 (子 issue)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR59.md` | ~95 | SR-59 (#4122, SR-48 残): 所属関数の入口がデータ表 (vtable) に載る RTTI の分類 (`arg_vtable_callers.py`)。ARG の型は未確定 (SC 0 件)。THIS-CHILD の SC 証拠 6 件 (5 関数)。測定値の正本 |
+| `tools/targets/serum2/gui/REPORT_SR60.md` | ~110 | SR-60 (#4164, SR-59 残): 表の先頭の探索窓の修正 (64→4096)、直接 call の呼出元の引数の出所 (`arg_caller_types.py`)。ARG の型は未確定 (SC 0 件)。vtable 経由の呼出元と表の境界は子 [SR-82] (#4930)。測定値の正本 |
 | `tools/targets/serum2/gui/REPORT_SR57.md` | ~73 | SR-57 (#3626, SR-28 受入 3): patch 後の demo 表示経路の静的確認。demo 表示 `0x18004fc9c` は patch 後に関数内で到達不能 (証明)、`0x1800501c0` は汎用ヘルパで非 demo の呼出元が残るため受入文の前提は不成立、overlay_demo_version は呼出元 0 件。解析は `demo_dialog_reach.py` / `demo_dialog_strings.py` |
 | `tools/targets/serum2/gui/REPORT_M7_CANVAS.md` | ~120 | SR-7 (#68) の M7 接続照合 (静的): CanvasFrame を tools/gui の surface・out ring の記号と照合 (`gui/m7_canvas_connect.py`)。設計上は接続可・実装は一部のみ・画素形式が不一致。数値の正本は本体 §0・§2 |
 | `tools/targets/serum2/gui/REPORT_APPENDIX_1350.md` | ~197 | #1350 付録: VSTGUI 14.3 除外 (setMouseCursor の jump table 範囲検査 `cmp eax,0xa`)・14.0 確定と 14.1〜14.3 除外 (`call_once` 構造・`callonce_probe.py`)・再現手順と実測 |
@@ -1031,6 +1035,7 @@
 | `tools/targets/kilohearts/REPORT_APPENDIX_3835.md` | ~70 | #3835 (KH-70): Delay の残件 `LAB_180fd2aab` (戻り番地の書込み)・`PTR__guard_dispatch_icall_1813a1d38` (CFG 間接呼出し) を機械語で確定し `DELAY_RULES` で書換える。census 341 → 339・Gain/Haas/Gate の cmp・1000/1000 が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3836.md` | ~70 | #3836 (KH-71): Ghidra の double ビット再解釈 `(ulonglong)dVarN` を `dbitcast` (d2u/u2d) で書換える fix の測定と未解決。Delay の 98 行の所在・emcc 件数・Gain/Haas/Gate の同一性が正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3802_DIFF.md` | ~165 | #3802 付録 §⑧ の差分の全文: 測定 commit `6323671e7` → HEAD の `ghidra_route` の `git diff` 出力 (main 取り込み分を含む)。差分の記録であり測定値の正本ではない |
+| `tools/targets/kilohearts/REPORT_APPENDIX_4883.md` | ~60 | KH-127 (#4883): Delay の引数過不足 10 件のうち 4 件 (`FUN_180fb5c6c`・`FUN_180fb5f8c`) を機械語で確定し規則化 (86 → 82)・残件 6 件は子 #4917 [KH-135]。§10-7v の正本 |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3800.md` | ~66 | KH-64 (#3800): Delay の引数過不足のうち呼出先 FUN_180fd4f30 分の ABI 規則 (部分)。根拠・census・未解決は §10-7u が正本 (残りは子 #3844・#3847) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_4871.md` | ~60 | KH-124 (#4871): Stereo 閉包の FUN_180fd4f30 引数なし呼出 22 件を delay の ABI 規則で書換え (emcc 42 → 20)。根拠・内訳・未解決は §10-7v が正本 (残りは子 #4910・#4911) |
 | `tools/targets/kilohearts/REPORT_APPENDIX_3096.md` | ~70 | KH-44 (#3096): `code` 関数ポインタ化で Delay の間接呼出し 21 件を解消 (emcc 577 → 556)・gain/haas/gate の .o 新旧 byte 一致・残件の子 issue 分割。§10-7t の正本 |
