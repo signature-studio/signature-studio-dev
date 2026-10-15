@@ -1,6 +1,8 @@
 # M11 REPORT (#3906 / [M11-N196] / 親 #3142): set_other 非 imm のスタック slot 読込・frame lea 110 件の接続
 
-結論: 非 imm 台帳のうち、スタック slot 読込 (load_stack 50・chain>load_stack 1) と frame 内 lea (lea_stack 59) の 110 件を、呼出し元の機械語と frame 定数 C から IR の stack_var (alloca) に接続して分類した。測定 commit `fe41cc75` の実測は **実値化 25 / 復元不能 0 / 未決 85 / 未分類 0** (§2)。実値化は全て lea の接続 (alloca の番地)。スロット読込 51 件は同じ slot への格納を直線区間で見つけられず、実値化 0 件だった。接続の IR への注入と未決 85 件は子 issue #3932 (N201)・#3933 (N202) に移した。
+結論: 非 imm 台帳のうち、スタック slot 読込 (load_stack 50・chain>load_stack 1) と frame 内 lea (lea_stack 59) の 110 件を、呼出し元の機械語と frame 定数 C から IR の stack_var (alloca) に接続して分類した。旧コード (測定 commit `fe41cc75`) の実測は **実値化 25 / 復元不能 0 / 未決 85 / 未分類 0** (§2)。実値化は全て lea の接続 (alloca の番地)。スロット読込 51 件は同じ slot への格納を直線区間で見つけられず、実値化 0 件だった。
+
+レビュー指摘で、旧 `load_def` がメモリ書込みを見落として誤って実値化していたことが分かったので修正した (修正 commit `df4801b10`・負例は §3)。修正後の 110 件の再測定は、素材 (work-m11 の IR・機械語の入力) が runner に無いため**未実施** (§4)。件数の不変は実測ではなく論拠で示す (§4)。接続の IR への注入と未決 85 件は子 issue #3932 (N201)・#3933 (N202) に移した。
 
 ## 1. 接続方式 (決めたこと)
 
@@ -14,11 +16,12 @@
   - call を越える: `slot_call` (slot のアドレスが漏れているかを判定せず、保守的に止める)
   - ret・jmp: `slot_branch`
   - rsp・rbp の変更: `slot_base`、別の基底レジスタの書込み: `slot_alias_base`、ポインタ経由の書込み: `slot_ptr_write`、slot に重なる別幅の書込み: `slot_overlap`
+  - メモリ書込みの可能性がある未知の命令 (`movq`・`pop`・`rep stosq` など、ldmach の kind=other): `slot_unknown_write`。index 付きの書込み: `slot_index_write` (直接の slot 格納と見なさない)
   - 格納が見つかった場合: `mov qword ptr [rbp+d], imm` なら実値化 (`slot_imm`)、reg 格納は未決 (`slot_reg`・未追跡)
   - 区間の先頭まで格納が無ければ `slot_entry`
   - frame 定数が求まらない (rsp で先に動かす prologue 等): `no_frame`
 
-## 2. 測定 (測定 commit `fe41cc75`)
+## 2. 測定 (旧コード・測定 commit `fe41cc75`。修正後は未再測定 (§4))
 
 - 入力: `work-m11` の `tools/m11/work/boot_final.ll` (`m11_post.py` の既定出力 sha `ecab191b…`・REPORT_N86 と一致)、PE は `fl-win64` の `extracted/block00031_PE.bin` (sha `b2c64da4…`)。
 - 手順: `m11_post.py` → `m11_argrecover.py` (台帳 410 件・非 imm 349 件。REPORT_N171 と一致) → `m11_setother_nonimm_class.py` (349 件・未決 349。REPORT_N171 と一致) → `m11_setother_mem_class.py nonimm_class_rows.json --pe PE --ir boot_final.ll`。
@@ -38,27 +41,41 @@
 | **合計** | | **110** | **実値化 25 / 復元不能 0 / 未決 85 / 未分類 0** |
 
 - 実値化した 25 件の値は alloca の番地 (ポインタ)。例: `function_1014ff0` → `function_443f90` の pos 0 は `&%stack_var_-16` (`lea rcx, [rbp+0x48]`)。
-- load_stack の実値化は 0 件。同じ slot への格納が直線区間にある件が無かった。最多は分岐先越え (23)・call 越え (18)。
+- load_stack の実値化は 0 件。旧コードで qword の即値格納が直線区間に見つかった件は無かった (imm 格納 0 件)。reg 格納は 1 件 (`slot_reg`) 見つかっている。最多は分岐先越え (23)・call 越え (18)。
 
 ## 3. 検証と限界 (受入 3 の判定を含む)
 
-- **C の検証**: 呼出し元 IR に `stack_var_(d−C)` の定義があるのは 110 件中 36 件 (`C 検証: 在 36 / 無 69`)。ここから「C 規則がずれている」か「alloca が無い (配列の内部など)」かは切り分けていない。lea の 25 件は、定義の存在を確認した件だけ。名前の存在だけでは誤った C でも偶然当たりうるため、IR の既存の参照との突合は未実施 (#3933 で行う)。
-- **受入 3 (照合)**: 実値化 25 件の値は alloca の番地で、定数 (`fixes.json` の `const`) ではない。`m11_argrecover_verify.py` の照合対象外のため、**該当なし** (定数の実値化は 0 件)。
+- **C の検証**: C が求まった 105 件 (no_frame 5 件を除く) のうち、呼出し元 IR に `stack_var_(d−C)` の定義があるのは 36 件 (在 36 / 無 69)。ここから「C 規則がずれている」か「alloca が無い (配列の内部など)」かは切り分けていない。lea の 25 件は、定義の存在を確認した件だけ。名前の存在だけでは誤った C でも偶然当たりうるため、IR の既存の参照との突合は未実施 (#3933 で行う)。
+- **受入 3 (照合)**: `m11_argrecover_verify.py` の入力は `fixes.json` の const 行だけ。定数の実値化は 0 件のため照合対象 0 件で、**該当なし**。alloca の番地 25 件 (lea の実値化) は値が定数ではないので入力の範囲外。
 - IR への注入は行っていない。接続の値は `tools/m11/work/sigfix_stats/mem_class_rows.json` にだけ書いた (gitignore 対象)。注入と survey の前後比較は #3932 (N201)。
+- **負例 (修正の実測)**: `load_def` の誤判定を、旧関数 (`ba8ccff2`) と修正後 (`df4801b10`) に同じ機械語列で流した。旧関数はいずれの負例も実値化を返していた。
+
+| 機械語列 (直前の格納 → 読込) | 旧 `load_def` (`ba8ccff2`) | 修正後 (`df4801b10`) |
+|---|---|---|
+| `mov qword ptr [rbp+0x48], 1` → `movq qword ptr [rbp+0x48], xmm0` → `mov rcx, qword ptr [rbp+0x48]` | 実値化 `slot_imm` 1 (誤り) | 未決 `slot_unknown_write` |
+| `mov qword ptr [rbp+0x48], 1` → `pop qword ptr [rbp+0x48]` → 読込 | 実値化 `slot_imm` 1 (誤り) | 未決 `slot_unknown_write` |
+| `mov qword ptr [rbp+0x48], 1` → `rep stosq qword ptr [rdi], rax` → 読込 | 実値化 `slot_imm` 1 (誤り) | 未決 `slot_unknown_write` |
+| `mov qword ptr [rbp+rax*8+0x48], 1` → 読込 | 実値化 `slot_imm` 1 (誤り) | 未決 `slot_index_write` |
+| `mov qword ptr [rbp+0x48], 1` → 読込 (正例) | 実値化 `slot_imm` 1 | 実値化 `slot_imm` 1 |
+
+- 修正の中身: (a) `ldmach.memops_of` の kind=other (`movq`・`pop`・`rep stosq` などのメモリ書込みの可能性がある命令。`rip` 相対を除く) は `slot_unknown_write` で打ち切る。読むだけの `lea`・`cmp`・`test`・`bt` は元から対象外。(b) index 付きのメモリ書込みは直接の slot 格納と見なさず `slot_index_write` で打ち切る。
+- 単体テスト: `python3 tools/m11/test_setother_mem_class.py` (`df4801b10`) は 5 件 OK (正例 1・負例 4)。
 
 ## 4. 測定 commit と差分
 
-- 測定 commit: `fe41cc75` (`m11_setother_mem_class.py` の追加。コードを変えた最後の commit)。以後の commit は REPORT (md) のみ。
-- 測定 commit から HEAD までのコード差分 (`git diff fe41cc75 HEAD -- tools/m11 ':(exclude)*.md'`) は、この REPORT の commit 時点で 0 行。
-- 再測定: コミット済みの `fe41cc75` の script で同じ入力を流し、件数が一致 (実値化 25・未決 85。出力 `mem_class_rows_head.json` の sha `b73f8515…`)。
+- 旧コードの 110 件の実測 (§2): 測定 commit `fe41cc75`。その後の、対象の分類を変えた commit は `load_def` の修正 `df4801b10` (コードを変えた最後の commit)。
+- **修正後の 110 件の再測定は未実施**。`boot_final.ll`・`nonimm_class_rows.json`・PE (`block00031_PE.bin`) が runner に無いことを `find` で確認した (artifacts 側は `fl-win64.tar.zst` のみ)。素材が揃う run で `m11_setother_mem_class.py` を流し、§2 の表 (理由列) と本節を更新する。
+- 修正 commit から HEAD までのコード差分 (`git diff df4801b10 HEAD -- tools/m11 ':(exclude)*.md'`) は 0 行。
+- 件数が変わらないことの論拠 (実測ではない): 修正後の `load_def` は、旧コードと同じ命令を同じ順に見る。違うのは、旧コードが通過していた kind=other の書込みと index 付きの書込みで打ち切る点だけで、通過した命令の判定は同じ。よって修正後に実値化を返す行は、旧コードも同じ格納で実値化を返す行の部分集合になる。旧コードの load_stack の実値化は 0 件なので、修正後も 0 件。lea 行は `load_def` を通らないので不変。よって 実値化 25・未決 85 は変わらない見込み。ただし理由ラベルは変わりうる (§2 の理由列は旧コードの値)。
+- 旧コードの再測定 (記録): コミット済みの `fe41cc75` の script で同じ入力を流し、件数が一致 (実値化 25・未決 85。出力 `mem_class_rows_head.json` の sha `b73f8515…`)。
 
 ## 5. 受入条件の判定
 
 | 受入 | 判定 | 根拠 |
 |---|---|---|
-| 1. 110 件を 実値化 / 復元不能 / 未決 で件数実測・未分類 0 | **達成** | §2 (25 / 0 / 85 / 0) |
+| 1. 110 件を 実値化 / 復元不能 / 未決 で件数実測・未分類 0 | **達成** (旧コード。修正後の再測定は未実施) | §2 (25 / 0 / 85 / 0)・§4 |
 | 2. 接続方式 (どの store・alloca を対象とするか) を REPORT に書く | **達成** | §1 |
-| 3. 実値化した値を `m11_argrecover_verify.py` で照合 | **該当なし** | 実値化の値は alloca の番地で定数ではない (§3) |
+| 3. 実値化した値を `m11_argrecover_verify.py` で照合 | **該当なし** | 定数の実値化 0 件のため照合対象 0 件 (§3。alloca 番地 25 件は入力の範囲外) |
 
 ## 6. 未解決
 
@@ -66,4 +83,5 @@
 |---|---|---|
 | 接続 25 件 (lea_alloca) を IR の 0 詰め call 引数に入れていない・survey 未測定 | IR の値が未決のまま | #3932 ([M11-N201]) |
 | 未決 85 件 (slot_merge 23・slot_call 18+1・lea_alloca_absent 34・no_frame 5・その他 4) | 接続先が無い | #3933 ([M11-N202]) |
-| C 規則の IR 突合 (定義あり 36/110) | 接続 25 件の正しさが名前の存在だけで確認されている | #3933 ([M11-N202]) |
+| C 規則の IR 突合 (定義あり 36/105) | 接続 25 件の正しさが名前の存在だけで確認されている | #3933 ([M11-N202]) |
+| 修正後の 110 件の再測定 (理由列の更新) | 素材が runner に無く未実施。件数は論拠のみ (§4) | #3142 (親) |
