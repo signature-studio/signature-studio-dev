@@ -123,7 +123,7 @@ new only: ['vaddps', 'vblendps', 'vblendvps', 'vpermilps']
 - **入力**: 各 op 20,000 call・seed 1。値は 1/4 特殊値 (±0・±Inf・NaN・非正規・1.0 等)、1/4 任意 bit、1/2 指数を 1 付近に寄せた通常域 (単精度・倍精度の丸め差が出やすい)。
 
 ### 検証 A: `python3 snapins/scripts/ymm_vocab_check.py 20000 1`
-- 生出力の省略: ネガコン区間の `mismatch=0` 行と NANPAYLOAD 行は省略 (全行は再実行で得られる)。
+- 生出力の全行 (ネガコン区間の `mismatch=0` 行と NANPAYLOAD 行を含む): [REPORT_APPENDIX_3256.md](REPORT_APPENDIX_3256.md) に分割移動した。
 - 実行: `timeout 300 python3 snapins/scripts/ymm_vocab_check.py 20000 1` → rc 0・`real 1.170 s` (user 0.852 s / sys 0.219 s)。実行前後の load は `0.47 0.38 0.28`。
 
 ```
