@@ -706,6 +706,7 @@
 | `tools/shared/lift/rex/REPORT_APPENDIX_2870.md` | ~50 | rex REPORT §9 全文 (T-SH-46 #2870: 成功経路 (戻り値 1 / 3) と arena 書込の一致・落ちる case の分類・未解決) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2896.md` | ~41 | rex REPORT §10 の旧版全文 (T-SH-47 #2896: REX_SIDE フラグと owner/rex_side.wasm の旧測定 (測定 commit `105733875`・133 件版)。最新は REPORT §10) |
 | `tools/shared/lift/rex/REPORT_APPENDIX_2969.md` | ~45 | rex REPORT の付録 (T-SH-48 #2969: 中核閉包 (REXCreate / REXGetInfoFromBuffer / REXRenderSlice) の owner tier 配置と REX_SIDE 除外の実測。測定 commit `9593fe1c1`) |
+| `tools/shared/lift/rex/REPORT_APPENDIX_3588.md` | ~75 | rex REPORT の付録 (T-SH-89 #3588: 元の機械語が落ちる 73 件の分類 (fault 命令・レジスタ・入力による切り分け)・ネガコン・未解決。測定 commit `54b2272b0`) |
 
 ### IPP
 
