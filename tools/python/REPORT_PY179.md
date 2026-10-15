@@ -6,7 +6,7 @@
 
 - **PE で確定: 達成。** isPatternDefault の範囲外は `-4` を `0xd82c20` へ渡す経路で、status -4 は文言 "Index out of range" = `FL_E_RANGE` (code 4)。patternNumber の slot の指す先の初期値は 1 (1 始まり)。
 - **C provider・mock に 4 関数を実装: 達成 (値は仮置き)。** patternCount = 999・patternNumber = 1・isPatternDefault = 範囲 [1, 999] の外 code 4・それ以外 偽・isPatternSelected = 偽 (範囲検査なし)。値は PE の静的状態からの導出で、実行時の値は未実測。
-- **未達 (子へ移す):** 述語の構造体 `E` の各フィールドの意味 → 子 #3536 (PY-210)。選択リスト `G+0x6ac` と `G` の初期化 → 子 #3537 (PY-211)。
+- **未達 (子へ移す):** 述語の構造体 `E` の各フィールドの意味 → 子 #3536 (PY-210)。選択リスト `G+0x6ac` と `G` の初期化 → 子 #3537 (PY-211)。戻り値の型 (int/bool) → patternCount・isPatternDefault は子 #3536、isPatternSelected は子 #3537 (§2・§5)。
 - **未実行:** `FL_ENGINE=wasm node tests/all_tools.mjs` の 48/48。wasm CPython (`dist/flpy.js`) と `work/midi.py` が要り、本 run では用意できなかった (§5)。
 
 ## 2. 関数ごとの事実と実装 (根拠: PE の VA・section 実測)
@@ -20,6 +20,7 @@
 
 - `G` の null 経路で返す `[0x16b82e0]` は変換スロットを通らず、C/mock では偽 (0) として扱う。REPORT_PY173 §2 の型の不揃いは、本実装では値 0 に揃う。
 - 索引基準 (1 始まり・0 始まり) は REPORT_PY173 §1 の通り。本 PR で変えない。
+- **型は仮置き**: patternCount・patternNumber は int (`fl_ret_i`)、isPatternDefault・isPatternSelected は bool (`fl_ret_b`)。変換スロット `0x15e4280` は int と bool で共通に呼ばれ (REPORT_PY173 §2)、PE からは呼出し側の型を区別できない。型の確定は子 #3536・#3537 (§5)。
 
 ### 訂正 (REPORT_PY100 §4b)
 
@@ -27,21 +28,23 @@ REPORT_PY100 の表「`patternNumber()` (0xd64d20 が読む slot) `0x15e4018` �
 
 ## 3. 差分検査と検証
 
-測定 commit: `5a41297b5` (`feat(python): add patterns count/select provisional impl (PY-179, #3271)`。コードを変えた最後の commit)。以後の commit は本 REPORT と `DOC_MAP.md` の文言だけを変える。
+測定 commit: `35b9b764b` (`Merge remote-tracking branch 'origin/main' into 3271-pattern-impl`。コードを変えた最後の commit)。`5a41297b5` で測った後に main を取り込み、`git diff c6fb962e2 35b9b764b -- tools/python/provider tools/python/host tools/python/tests` で main 側の変更 (4 files・76 行追加・3 行削除。#1529 の channels 5 関数の C・mock 実装と `channels_diff.mjs`・件数 assert) が入った。ハンドラ数が 148 から 153 に変わったため、merge 後の HEAD で全項目を再測定した。以後の commit は本 REPORT の文言だけを変える。
 
-| コマンド | 結果 | wall / load |
-|---|---|---|
-| `bash tools/python/provider/build.sh` (emcc は `[EMSDK]`) | rc 0。`fl_table.c: 435 関数, ハンドラ 148` (実装数 148 と一致) | 2.26 秒 (user 1.64 秒・sys 0.31 秒) |
-| `node tests/patterns_diff.mjs` (新規・25 呼出し: 戻り値・範囲・個数・型) | `{"calls":25,"diffs":0,"PASS":true}` rc 0 | 実測は同 run 内 (wasm 初期化含む) |
-| `node tests/patterns_group_diff.mjs` (PY-172 の回帰) | `{"calls":14,"diffs":0,"PASS":true}` rc 0 | 同上 |
-| ネガティブコントロール: `fl_engine.c` の `PAT_N` を 998 に壊して build → `patterns_diff.mjs` | rc 1・`patterns 数え・選択系 差分 2 件` (patternCount と isPatternDefault(999)) | 同上 |
-| 同 (`PAT_N` を 999 へ戻して build → 再実行) | rc 0・`diffs 0` | 同上 |
-| `node tests/provider_check.mjs` | 件数 assert (line 74: `impl 148`・`unimpl 287`) 通過。line 126 の既存 flpy 部 (`work/midi.py` 無し) で ENOENT 停止 | — |
-| `FL_ENGINE=wasm node tests/all_tools.mjs` | 未実行 (`dist/flpy.js` と `work/midi.py` が本 run に無い。`build_cpython_wasm.sh` が前提) | — |
+| コマンド | 結果 | wall (n=3 の min–max) | load (1 分値・各回の開始時) |
+|---|---|---|---|
+| `bash tools/python/provider/build.sh` (emcc は `[EMSDK]`) | rc 0。`fl_table.c: 435 関数, ハンドラ 153` (実装数 153 と一致) | 810–857 ms | 0.47 |
+| `node tests/patterns_diff.mjs` (25 呼出し: 戻り値・範囲・個数・型) | `{"calls":25,"diffs":0,"PASS":true}` rc 0 (n=3 とも同じ) | 41–43 ms | 0.47 |
+| `node tests/patterns_group_diff.mjs` (PY-172 の回帰) | `{"calls":14,"diffs":0,"PASS":true}` rc 0 (n=3 とも同じ) | 41–43 ms | 0.47 |
+| ネガティブコントロール: `fl_engine.c` の `PAT_N` を 998 に壊して build → `patterns_diff.mjs` | rc 1・`patterns 数え・選択系 差分 2 件` (patternCount と isPatternDefault(999)) | 単発 (未計測) | 未計測 |
+| 同 (`PAT_N` を 999 へ戻して build → 再実行) | rc 0・`diffs 0`。`fl_engine.c` は元に戻した (`git diff` 空) | 単発 (未計測) | 未計測 |
+| `node tests/provider_check.mjs` | 件数 assert (line 76: `impl 153`・`unimpl 282`) 通過。line 128 の既存 flpy 部 (`work/midi.py` 無し) で ENOENT 停止 | 単発 (未計測) | 0.48 |
+| `FL_ENGINE=wasm node tests/all_tools.mjs` | 未実行 (`dist/flpy.js` と `work/midi.py` が本 run に無い。`build_cpython_wasm.sh` が前提) | — | — |
 
-- 測定 commit から HEAD までの差分 (本 REPORT の commit 後に実行。差分 0 行): `git diff 5a41297b5 HEAD -- tools/python/provider tools/python/host tools/python/tests` (出力 0 行)。
+測定環境: `nproc` 4・並列数 1 (直列実行)。wall は `date +%s%N` の差 (ms)。load は `/proc/loadavg` の 1 分値。build の初回 (cold) は 1194 ms・load 0.62 で、表の n=3 には含めない。
+
+- 測定 commit から HEAD までの差分 (本 REPORT の commit 後に実行。差分 0 行): `git diff 35b9b764b HEAD -- tools/python/provider tools/python/host tools/python/tests` (出力 0 行)。
 - ネガティブコントロールは「期待値を壊すと FAIL する」ことの確認。C と mock を同時に壊すケースは検出できない (mock は独立に書いた値で照合する)。
-- 検証範囲: C provider の 4 関数の戻り値・code と mock の一致。範囲外: 実行時の値 (仮置き)・flpy 経由の Python 呼出し・`all_tools.mjs`。
+- 検証範囲: C provider の 4 関数の戻り値・code と mock の一致。範囲外: 実行時の値 (仮置き)・型 (§2)・flpy 経由の Python 呼出し・`all_tools.mjs`。
 
 ## 4. 再現
 
@@ -63,3 +66,4 @@ FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_pattern_probe.py   #
 | 選択リスト `G+0x6ac` の書込み元とレコードの内容・`G` の初期化・G が null のときの `[0x16b82e0]` の意味 | isPatternSelected (偽) が仮置き | 子 #3537 (PY-211) |
 | `FL_ENGINE=wasm node tests/all_tools.mjs` 48/48 と `provider_check.mjs` の flpy 部 (`dist/flpy.js`・`work/midi.py` が要る) | 受入 7 は未実測。flpy 経路の回帰も未検証 (既存の未検証範囲・PY-157 と同じ) | 子 #3536・#3537 の PR で実測する (再測定だけの子は起票しない) |
 | probe (`pe_pattern_probe.py`) は分岐の飛び先を検査しない (REPORT_PY173 §5) | 同種の分岐の読み違いを probe が検出しない | 子 #3536 の PR で扱う (実装に直結する分)。残りは #3220 |
+| 4 関数の戻り値の型 (int/bool)。変換スロット `0x15e4280` は int と bool で共通で、PE から区別できない | 型は仮置き (patternCount・patternNumber = int、isPatternDefault・isPatternSelected = bool)。呼出し側の読みで変わり得る | patternCount・isPatternDefault → 子 #3536 (PY-210)、isPatternSelected → 子 #3537 (PY-211) の受入へ追記 (両 issue の本文に追記済み) |
