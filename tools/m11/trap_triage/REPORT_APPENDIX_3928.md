@@ -158,7 +158,7 @@ return np;
 
 ## #5093 (M11-32): [0x64] の書込み元の探索 (部分・未達)
 
-- 測定 commit: `2e3c6d554` (origin/main 取込み時点・本 PR は probe と本節のみ)。OFF (既定) の build。IR `ir_sha256=d66e24aa…` (gen 直後)・build 後 `64a0e5dc…`。#3643 の `597757f4…` とは IR が違う (再生成の差。未切り分け)。
+- 測定 commit: `59e21b78f` (probe `probe_5093.mjs` と本節を含む PR の tree。build 対象のコードは `2e3c6d554` と同一: `git diff 2e3c6d554 59e21b78f -- tools/m11` は `probe_5093.mjs` と本付録の追加 35 行だけ)。OFF (既定) の build。IR `ir_sha256=d66e24aa…` (gen 直後)・build 後 `64a0e5dc…`。#3643 の `597757f4…` とは IR が違う (再生成の差。未切り分け)。
 - survey (OFF・n=1): 873 / 21 / 47 / 1 (ok/trap/miss/noproc)・unit 144 は `memory access out of bounds`。#3643 の集計と一致。
 - 順序: unit 0〜143 を順に走らせると unit 114 も trap し、unit 144 の trap は 0〜143 の実行後の状態に依る。unit 144 を単独で走らせると trap しない (probe の順序依存)。
 - unit 144 の trace (順次実行後): `[m11][icall] 0x25c540` → `[m11][UStrAsg] dest=0x10aa13b8 src=0x6c old=0x0` → trap。trap の wasm 関数は `407e20`←`409440`←`412d60`←`4136a0`←`413760`←`414bb0`←`414c70`←`43c4c0`←`653660` (`m11_wasmnames.py`)。
