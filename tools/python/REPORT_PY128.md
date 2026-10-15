@@ -34,7 +34,7 @@
 
 測定 commit: `b9dc4a500` (コードを変えた最後の commit。`main` (`1bb93134e`) の取り込み merge。PR 自身の実装は `3bdba9d55`)。取り込みで `tests/provider_check.mjs` が衝突し、`main` 側の pl61 (7 件) と本 PR の pe128 (2 件) を両方残して 164 / 271 に直した。以降の変更は `REPORT_PY128.md` のみ (md)。
 
-環境: runner 4 core、load average 1.05 (03:42:24)。`FL_WIN64_DIR` は `$HOME/artifacts/fl-win64.tar.zst` を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (7 秒。`extracted/block00031_PE.bin` を含む)。`toolchain-emsdk` は展開せず [EMSDK] (既存。`docs/REFERENCES.md`) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、213 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5 秒)。
+環境: runner 4 core、load average 1.05 (03:42:24)。`FL_WIN64_DIR` は素材 `artifacts/fl-win64.tar.zst` (R2 由来) を `$RUNNER_TEMP/fl-win64` に `tar --zstd -xf` で展開 (7 秒。`extracted/block00031_PE.bin` を含む)。`toolchain-emsdk` は展開せず [EMSDK] (既存。`docs/REFERENCES.md`) を使用。生成物 (gitignore): `fetch_inputs.sh` (rc 0)・`build_cpython_wasm.sh` (rc 0、213 秒)・`FLPY_SKIP_TABLE=1 build_flpy.sh` (rc 0、5 秒)。
 
 | コマンド | 結果 | wall |
 |---|---|---|
