@@ -104,6 +104,6 @@ slot 3 の引数別の対照 (同一 init・同一 `R8=16`・`S5=出力`):
 
 ## 7. 検証
 
-- 測定 commit: 下記 (本 PR の code commit を、後続の commit で確定する)。素材 `fl-win64` を `work/fl` に展開して実行。
-- `psola_init_probe.sh` (12 実験・RDX=入力の対照 1 件を含む): 0.7 s・1 回。RDX=入力の対照行のみ落ち、他は完走 (rc=0 は対照行を除く)。
+- 測定 commit (コードを変えた最後の commit): `e366f3ef9` (`fix(ildsp): slot 3 needs RDX=0; probe adds sequential call row (#4302)`)。素材 `fl-win64` を `work/fl` に展開して実行。
+- `psola_init_probe.sh` (12 実験・RDX=入力の対照 1 件を含む): 3 回実行。各 0.68〜0.70 s・load 0.10・3 回の出力は `cmp` で完全一致。対照行 (`RDX=入力`) のみ落ち、他 11 行は完走 (rc=0)。
 - 差分テスト (`lift_psola.sh`) は未実施 (受入 3)。
