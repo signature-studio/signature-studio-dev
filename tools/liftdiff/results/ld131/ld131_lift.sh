@@ -13,5 +13,5 @@ DLL="$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll"
 mkdir -p "$OUT/lift"
 python3 -c "import json,sys; json.dump({'roots':[int(x,16) for x in sys.argv[1:]],'calltgt':[]}, open('$OUT/entries6.json','w'))" \
   1801ab1d0 1801ab258 1801c5e84 1801c621c 1801c682c 1801c69cc
-python3 "$REPO/tools/ott/lift/x64c.py" --pe "$DLL" --entries "$OUT/entries6.json" --out "$OUT/lift" --closure 6
+python3 "$REPO/tools/ott/lift/x64c.py" --pe "$DLL" --entries "$OUT/entries6.json" --out "$OUT/lift" --closure 7
 python3 "$HERE/insn_va_map.py" "$OUT/lift/ott_lifted.c" --out "$HERE/insn_map_6fn.tsv"

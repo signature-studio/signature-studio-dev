@@ -32,19 +32,6 @@ for sp in glob.glob(os.path.join(HERE, 'results', '*summary*.json')) + glob.glob
             continue
         if int(i) not in units:
             units[int(i)] = [int(i), cls, info]
-    total = sum((sv.get('byCls') or {}).values())
-    if total and len(units) < total:
-        have = {}
-        for v in units.values():
-            have[v[1]] = have.get(v[1], 0) + 1
-        for cls, n in (sv.get('byCls') or {}).items():
-            miss = n - have.get(cls, 0)
-            for i in range(total):
-                if miss <= 0:
-                    break
-                if i not in units:
-                    units[i] = [i, cls, 0]
-                    miss -= 1
 by, details = {}, []
 for i in sorted(units):
     _, cls, info = units[i]
@@ -54,4 +41,4 @@ for i in sorted(units):
 out = {'units_covered': len(units), 'byCls': by, 'details': details[:600]}
 json.dump(out, open(os.path.join(HERE, 'results', 'survey.json'), 'w'), indent=1, ensure_ascii=False)
 segs = len(glob.glob(os.path.join(HERE, 'results', 'survey_seg_*.jsonl')))
-print('[merge_survey] segments=%d covered=%d byCls=%s' % (segs, len(units), by))
+print('[merge_survey] segments=%d covered=%d missing=%d byCls=%s' % (segs, len(units), 942 - len(units), by))
