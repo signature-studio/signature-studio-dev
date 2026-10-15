@@ -99,7 +99,7 @@ python3 tools/python/analysis/flapi/sig_arity_check.py "$RUNNER_TEMP/flapi_befor
 - コード差分: `git diff f5cc310da HEAD -- tools/python/provider tools/python/host tools/python/tests` の出力は 0 行 (本 commit の後続は REPORT_PY62.md だけ)。
 - 再測定の理由: 前版の測定 commit `d6f17dde0` 以降に main が provider/host/tests を変えた (`git diff --stat 6c94bbdfb bd4463eaa -- tools/python/provider tools/python/host tools/python/tests` で 5 ファイル)。
 - 素材: `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開 (`tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst` real 7.941 s・`extracted/` 25,166 件)。`FL_WIN64_DIR=$RUNNER_TEMP/fl-win64` で `fetch_inputs.sh` を実行した (rc 0)。
-- emsdk: runner 同梱 `[EMSDK]` (`/opt/emsdk`・emcc 6.0.12) を使用。`toolchain-emsdk` は展開していない (`build_cpython_wasm.sh` が `[EMSDK]` を固定で読むため)。PR 本文の `oc_artifacts` 行は素材の取得指定 (review run の再現用)。
+- emsdk: runner 同梱 `[EMSDK]` (emcc 6.0.12) を使用。`toolchain-emsdk` は展開していない (`build_cpython_wasm.sh` が `[EMSDK]` を固定で読むため)。PR 本文の `oc_artifacts` 行は素材の取得指定 (review run の再現用)。
 - 前段: `fetch_inputs.sh` rc 0、`build_cpython_wasm.sh` real 3 m 54.466 s rc 0、`FLPY_SKIP_TABLE=1 build_flpy.sh` real 5.755 s rc 0。
 - load average (`/proc/loadavg` の 1 分値・並列 1): 検証開始時 0.41、全検証の完了後 0.57。
 
