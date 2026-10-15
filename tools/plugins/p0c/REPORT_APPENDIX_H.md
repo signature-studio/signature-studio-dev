@@ -85,3 +85,50 @@
 | 未測定 13 kernel (ABI 非 ok で CSV 対象外: 0x5de410 0x5de4b0 0x5de540 0x5de6a0 0x5de870 0x5deaa0 0x5df460 0x5df5a0 0x5dfa70 0x5e0380 0x5e11a0 0x5e12b0 0x5e1870) | 80 本の完全な判定ができない。0x5e12b0 は既存 #938 が担当。内訳 (Group B / abi-mismatch 等) は本測定では未分類 | 残りの分類は PM 判断 (#197 本文の更新時に付録 A/C の status と突き合わせる) |
 | Group B 12 本を出口条件に含めるか | 判定基準そのもの | PM 判断 (#197 本文の更新) |
 | harness の `maxulp` が 10^8 台を返す | 精度指標としては使えない (buf_diff のみで判定) | harness 修正は本 issue 外 |
+
+## 19. #2182: 18 kernel の buf_diff 0 化 (修復と検証)
+
+### 19.1 結果
+
+- 修復前の値は §18.3 (同一 census)。修復の commit は `d2e4283a` (測定 commit)。
+- `p0c4_abi_e2e.py 2000` (HEAD `d2e4283a`): rc 0・所要 15.3 秒・`run=67 ok=67 sig11=0`・CSV 67 kernel 全てで buf_diff=0 (修復前は 49/67)。冪等性 OK・llvm-as OK。
+- `p0c_e2e.sh` (クリーン checkout の HEAD `d2e4283a`、`tools/plugins/p0c/work` 無し): rc 0・`== e2e OK ==`・3 分 51 秒。測定時の load average は開始 0.31・終了 9.85 (1 分)。
+- 10000 case の追加検証 (同じ修復済み IR を `k80_diff.py --cases 10000`、20.8 秒):
+  17 kernel は buf_diff=0。**0x5dffc0 だけ buf_diff=3** (20000 cell 中)。2000 case では 0 だった。
+  このため 0x5dffc0 は bit-exact と確定できない (19.3 の未解決)。
+
+### 19.2 kernel 別の原因と修復
+
+修復前の buf_diff は §18.3。原因は「機械語と IR の突き合わせで確認した差分」であり、RetDec 側の根本原因の特定までは行っていない。
+
+| kernel | class | 修復後 (2000 / 10000) | 原因 (機械語との突き合わせ) | 修復 |
+|---|---|---|---|---|
+| 0x5dfff0 | f32chain | 0 / 0 | raw lift で xmm2 (a) と xmm3 (b) の参照が入れ替わる。(1±a)·b の中間精度が f64 では 80-bit と丸めがずれる | 本体を x86_fp80 で書き直し |
+| 0x5de620 | f32chain | 0 / 0 | `fistp word` の範囲外 (|v|>32767・NaN) を 0x8000 にする処理が無い | rint + 範囲判定 |
+| 0x5dee20 | f32chain | 0 / 0 | `fstp` が格納する値の x87 スタック参照がずれる (out += in) | 本体 (f32 add) |
+| 0x5dee50 | f32chain | 0 / 0 | 同上 (fxch 列の参照ずれ) | 本体 (f32 add) |
+| 0x5e0300 | f32chain | 0 / 0 | 同上。(in[2k]+in[2k+1])·c の 80-bit 中間値 | 本体 (x86_fp80) |
+| 0x5e0350 | f32chain | 0 / 0 | 同上。0x6fc200 (0.5) 参照の 2 出力 | 本体 (x86_fp80) |
+| 0x5dedb0 | f32chain | 0 / 0 | スケールが反復ごとに B+k·S と累積 (`fadd st(1)`) する部分を IR が落とす | 本体 (x86_fp80) |
+| 0x5dea40 | f32chain | 0 / 0 | 上と同じ累積スケール (2 要素版) | 本体 (x86_fp80) |
+| 0x5dec40 | f32chain | 0 / 0 | 2 本の累積スケール (C と F)。5 番目の引数の int bits を f32 として読む | 本体 (x86_fp80) |
+| 0x5dfae0 | transc | 0 / 0 | `f2xm1`/`fscale` の指数計算を IR が別式にしていた。`(1-2^y)·Q+P` を 80-bit で再現 (2^y は `llvm.exp2.f80`) | 本体 (exp2 近似) |
+| 0x5dfbe0 | rc_chop | 0 / 0 | fldcw (RC=chop) を含む 80-bit 中間値を f64 で近似していた | §18.4 と同じ ext pass (`f80_lower --ext`) を適用 |
+| 0x5dfc90 | rc_chop | 0 / 0 | 同上 | 同上 |
+| 0x5dfdb0 | rc_chop | 0 / 0 | 同上 | 同上 |
+| 0x5dffc0 | f64mem | 0 / **3** | a/b の入替え + `(1+a)·K` → `fsincos` → sin/cos。sin/cos を `llvm.sin/cos.f80` (glibc) で近似。残差は大きい |t| での x87 fsincos の π 近似誤差と推定 (未確認) | 本体 (未解決: 19.3) |
+| 0x5df340 | sse | 0 / 0 | 4 lane の乗数ランプ (vector ごとに +d)。端数は生の arg5 を加算。IR は乗数を定数化していた | 本体 (SIMD の加算順を再現) |
+| 0x5e03f0 | sse | 0 / 0 | `@global_var_6fffb0` が 0 初期化。PE の 0x6FFFB0 は (0.5, 0.5) | GLOBAL_INITS で初期値を設定 |
+| 0x5e12c0 | sse | 0 / 0 | in-place clip (|x| < C なら 0) の IR 誤り | 本体 |
+| 0x5e1490 | sse | 0 / 0 | `llrint` 後の table 参照。`@global_var_70f568` は 0x6FC200 へのポインタだが IR は整数として読んでいた | 本体 (0.5 を直接参照) |
+
+- 修復は `tools/plugins/p0c/k80_hand_bodies.py` (関数単位の本体差し替え・シグネチャ不変・冪等)。本体は機械語の読解に基づく手書きであり、一般の lift 修復ではない。
+- `p0c4_abi_e2e.py` の鎖: `k80_deref_fix` → ext pass (p0c4_e2e.py と同じ引数) → `k80_hand_bodies.py` → 差分試験。冪等性を検査する。
+- 受入の判定は buf_diff のみ (ret_diff は native が rax を放置する kernel で意味を持たない、既存定義どおり)。
+
+### 19.3 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 0x5dffc0 の残差 (10000 case で buf_diff=3)。原因は大きい |t| の x87 fsincos 引数縮約と推定 (未確認) | 80 本の bit-exact の 1 本が未達。2000 case の標準では 0 | #3280 [P0c-19] |
+| 手書き本体 (k80_hand_bodies.py) を lift 側の一般修正に置き換えていない。RetDec raw lift の x87 スタック参照・xmm2/xmm3 入替の根本原因は未特定 | 同型の誤りを他 kernel で自動検出できない。本体は関数単位で保守が必要 | #3281 [P0c-20] |
