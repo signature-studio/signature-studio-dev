@@ -18,9 +18,11 @@ EMSDK_DIR="${EMSDK_DIR:-/opt/emsdk}"
 [ "${FLPY_SKIP_TABLE:-0}" = 1 ] || python3 "$HERE/analysis/flapi_table.py" >/dev/null   # flapi_table.json / flapi_ids.json を再生成 (入力欠落なら exit 2 で停止)
 [ "${FLPY_TABLE_ONLY:-0}" = 1 ] && { echo "FLPY_TABLE_ONLY=1: table 再生成のみで終了 ($OUTF)"; exit 0; }
 WORK="$HERE/work"; SRC="$WORK/Python-3.12.1"; B="$WORK/build-wasm"; D="${FLPY_OUT:-$HERE/dist}"; ST="$WORK/staging"; C="${FLPY_C:-$HERE/src/flpy.c}"
+EMSDK_ROOT="$EMSDK_DIR"
 # shellcheck disable=SC1091
-source "$EMSDK_DIR/emsdk_env.sh" >/dev/null 2>&1
-EMSDK_DIR="$EMSDK_DIR" bash "$HERE/fetch_zlib_port.sh"   # -sUSE_ZLIB の port (GitHub tag 404 対策・PY-298)
+source "$EMSDK_ROOT/emsdk_env.sh" >/dev/null 2>&1
+export EMSDK_DIR="$EMSDK_ROOT"   # emsdk_env.sh は export 済みの EMSDK_* を unset するため復元する
+bash "$HERE/fetch_zlib_port.sh"   # -sUSE_ZLIB の port (GitHub tag 404 対策・PY-298)
 
 rm -rf "$ST"; mkdir -p "$ST/fl/Lib" "$ST/usr/local/lib/python3.12/lib-dynload" "$D"
 cp "$HERE/src/fl_rt.py" "$HERE/src/fl_api.py" "$HERE/src/flpianoroll.py" "$HERE/src/enveditor.py" "$HERE/src/flcpt.py" "$OUTF/flapi_table.json" "$ST/fl/Lib/"
