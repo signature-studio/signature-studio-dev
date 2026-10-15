@@ -12,3 +12,4 @@ REPORT.md の §RT-6 実 loader 接続 (#125) で使った派生 loader `PoolBri
 - `bash tools/hostbridge/lowbase/retdec/build_m10_lb.sh` は `lb_data_gen.py` で `$PLUGINS_DIR/ott/binaries/OTT_vst2_win64.dll` を読む。素材 `analysis-ott-binaries` が無く、`[ANALYSIS-PLUGINS]` 配下の `ott/binaries/OTT_vst2_win64.dll` が存在しないため `FileNotFoundError` で rc=1 停止。
 - `node tools/runtime/memload/real/run_real.mjs --neg-only` は lowbase の `ott_hb.cjs` が無いため「前提無し」で rc=2。
 - 再依頼の素材: `fl-win64 toolchain-emsdk toolchain-retdec work-m6-ott analysis-ott-binaries` (依頼 issue の `oc_artifacts` 行に `analysis-ott-binaries` を足す)。取得後は `build_m10_lb.sh` → `retdec/build_host_lb.sh` → `pnpm runtime:memload:real` の順で実行し、所要・PASS/FAIL・ロード数をこの付録に残す。
+- 追補 (#2519 RT-13): 上の「未実測」は解消。実測結果は `tools/runtime/REPORT.md` の RT-13 節が正本。
