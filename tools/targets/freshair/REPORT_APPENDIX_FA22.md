@@ -84,14 +84,13 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 |---|---|---|---|---|
 | probe 無し (`FA_OUT0=1 FA_NODE1=1`) | 2 回目 | 未測定 | 未測定 | (probe 無し) |
 | `fa32_node1.sh` C 行 (`f5160903f`, **`FA_PROBE9=1` 併用**) | 2 回目 | C==Z 8/8 | `out0==C+0x2b0` 8/8 | – |
-
-- 上の「probe 無し」行は未測定。前回実測 (`63d53758b`) は、その後 `tools/targets/freshair/lift2` 他 17 ファイルが変わったため採らない。HEAD で取り直すには素材 `plugins-freshair` が要る。`$ARTIFACTS_DIR` には `fl-win64` しか無く、本 run では展開できなかった。取り直しは素材追加後の別作業とする。
 | `FA_NODE1 FA_SET9 FA_PROBE9 FA_P9GUARD` (HEAD `f5160903f`, S900〜S906 同形) | 1 回目 (map 経路) | C=C0 | 0 | 0 |
 | 同 | 2 回目 (nokey 経路) | C=Z (S900: `0x555947237750`) | `Z+0x2b0` (S900: `out0-C=0x2b0`) | 1 |
 
+- 上の「probe 無し」行は未測定。前回実測 (`63d53758b`) は、その後 `tools/targets/freshair/lift2` 他 17 ファイルが変わったため採らない。HEAD で取り直すには素材 `plugins-freshair` が要る。`f5160903f` の測定 run では `$RUNNER_TEMP` に展開できたが、HEAD 作業の run では `$ARTIFACTS_DIR` に `fl-win64` しか無く展開できなかった。取り直しは素材追加後の別作業とし、親 #4223 の本文にチェックリストで残す。
 - probe 下の 2 回目 (C 行, HEAD) では `out[0]=C+0x2b0` (`0x180ca1651`) で、node Z 自身の値ではない。`[out0+0x10]=Z+0x2c0` が poison と一致し、ERR の直接原因になる。
 - probe 無しの `out[0]=Z+0x2b0` (旧測定 `63d53758b`) は HEAD では未測定。表の値は再測定できるまで根拠に使わない。
-- `found` は `out[0]!=0` で定義する (§8 の `out+0x10` 判定は誤り)。1 回目 0・2 回目 1。
+- `found` は `out[0]!=0` で定義する (§3 の 31〜32 行目の `out+0x10` 判定は誤り)。1 回目 0・2 回目 1。
 - 1 回目 (map) と 2 回目 (nokey) の両方で `out0` を観測できたのは probe 有り (`FA_P9GUARD`) の実測のみ。
 
 ### 9.3 測定 (受入 3)
@@ -99,7 +98,7 @@ setter `0x180c9d700` 内の間接 call で落ちる。本付録は**機械語の
 測定 commit: `f5160903f`。
 - `bash tools/targets/freshair/lift2/run_fa9.sh`: wall 39 s (`build_ctrl.sh` を内部で実行した時間を含む)、load 0.53→0.82、**GATE PASS**。(a) base ERR=0・ca1480=72・path=map・eq=1・found=0・da6c00=0 / (b) alt ERR=8/8 / (b-wasm) ERR=8/8 / (c) pert 差分 395 トークン・差分 0 呼出。
 - `bash tools/targets/freshair/lift2/run_ctrl.sh 2 5` (run_fa9 内で実行): wall 3 s、load 0.82 付近、**BIT-EXACT 15/15** (fma0・fma1)、rc=0。
-- 素材: `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し `FA_DL=... fetch.sh` (factory .epf 8 本)。`fl-win64` は未使用。`toolchain-emsdk` / `toolchain-retdec` は runner 既存の `[EMSDK]`・`[RETDEC]` を使用 (展開せず)。
+- 素材: 上の測定 (`f5160903f`) は、その測定 run で `plugins-freshair` を `$RUNNER_TEMP/plugins-freshair` に展開し `FA_DL=... fetch.sh` (factory .epf 8 本) して行った。`fl-win64` は未使用。`toolchain-emsdk` / `toolchain-retdec` は runner 既存の `[EMSDK]`・`[RETDEC]` を使用 (展開せず)。HEAD 作業 run (本 PR の fix round) では `plugins-freshair` が無く、HEAD での再測定はしていない。
 
 ### 9.4 残り
 
