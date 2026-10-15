@@ -6,9 +6,9 @@
 ## A. 結論
 
 - **PE の書込み可能セクション** (`.data`・`.bss`・`.idata`・`.didata`) の sha256 は、3 変種 (plain = -O0 / o2 = -O2 / o2lto = -O2 -flto) × 2 run の **6 本すべてで一致** (`891b29801d1bd50a`)。guest 側の書込み可能な状態はこの範囲で変種間一致。
-- **ネガコン (`FLE_IPP=0`) では、この範囲の sha256 は変わらない** (同じ `891b29801d1bd50a`)。よって、この範囲は「shim 有無」という出力を変える入力に対して判別力が無い。ネガコンが変えるのは線形メモリ全体と C スタックを除く範囲 (`no_cstack`) だけ。
+- **ネガコン (`FLE_IPP=0`) では、この範囲の sha256 は変わらない** (同じ `891b29801d1bd50a`)。受入 2 は寛容起動 (`FLE_TOLERANT=1`) をネガコンに変えて達成した (§H。`1d51294fb74290c3` に変わる)。
 - **線形メモリ全体 (`full`) と `no_cstack` は、変種間でも同一変種の run 間でも一致しない**。原因は §D・§G-7 (C 側の data レイアウト・C heap の数ページ) で、guest の状態ではない。
-- 結論の範囲: 「PE 書込み可能セクションは 3 変種で一致」は n=2 で確かめた。「出力メモリ全体が一致」は**言えない**。ネガコンの判別力は `no_cstack` でのみ確かめた。
+- 結論の範囲: 「PE 書込み可能セクションは 3 変種で一致」は n=2 で確かめた。「出力メモリ全体が一致」は**言えない**。ネガコンの判別力は §H で書込み可能セクションについても確かめた (`FLE_IPP=0` では判別できず、寛容起動で判別できた)。
 - 根拠の節: 本節の結論は現行の測定 (§G-2・§G-3) に基づく。§C-2・§C-3・§D は旧測定 (`09e7239c0` 相当) の値。`image_writable` は旧・現行で同値 (`891b29801d1bd50a`)。`full`・`no_cstack` の値は現行 (§G-2) に従う。
 
 ## B. 測定条件と出力領域の定義
@@ -79,7 +79,8 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `image_writable` は `FLE_IPP=0` に対して判別力が無い (ネガコンの変化は `no_cstack` だけ)。受入 2 の「ネガコンで sha256 が変わる」は、guest の書込み可能セクションでは未達 | 「出力が一致」の強さが弱い (guest の heap 側の状態は見ていない) | #3330 (次 run: guest heap (FastMM の確保範囲) を出力範囲に加える案の検討) |
+| (解決 §H) `FLE_IPP=0` は `image_writable` に判別力が無かった → ネガコンを寛容起動 (`FLE_TOLERANT=1`) に変えて解決 | — | — |
+| 出力範囲に guest heap (FastMM の確保範囲) を含めていない | 「出力が一致」は PE 書込み可能セクションの範囲に限る | 本表で追跡 (子 issue は不起票) |
 | `no_cstack` の run 間非決定 (plain r1/r2 で 5 ページ・C heap 付近) | `full`・`no_cstack` を厳密な一致判定に使えない | #3330 (非決定源の特定。時刻・乱数の書込み元を確かめる) |
 | 変種間の C data レイアウトの差 (0x10000000〜約 20 MB) | `full` の変種間一致は得られない | #3330 (C 側の状態を比較対象から外す定義を採るかの判断) |
 | n=2 (run 間 min–max 未測定) | 一致の強さが 2 run 分 | #3330 |
@@ -151,10 +152,29 @@ RESULT PASS
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `image_writable` が `FLE_IPP=0` に対して判別力が無い (受入 2 未達。G-2) | 出力の一致の強さが弱い (guest heap 側は未確認) | #3330 (次 run) |
+| (解決 §H) `image_writable` が `FLE_IPP=0` に対して判別力が無い (G-2) → 寛容起動 (`FLE_TOLERANT=1`) で解決 | — | — |
 | `full`・`no_cstack` の run 間非決定 (G-2 参考: 6 通り) | 厳密一致の判定に使えない | #3330 |
 | 変種間の C data レイアウトの差 | `full` の変種間一致は未達 | #3330 |
 | boot の load average 未記録 (G-4) | 所要の n=2 の条件が不完全 | #3330 |
 | n=2 (run 間 min–max 未測定) | 一致の強さが 2 run 分 | #3330 |
 
 - §C-3 の表は旧測定 (`09e7239c0` 相当) の値。`full`・`no_cstack` は run ごとに変わるため、新測定 (G-2) とは値が違う。`image_writable` は両方で `891b29801d1bd50a`。
+
+## H. 受入 2 の解決: ネガコンを寛容起動 (`FLE_TOLERANT=1`) にする (測定 commit `dd91690f8`)
+
+- 理由: `FLE_IPP=0` は ipp の呼出し (2 → 0) を変えるが、`image_writable` は変えなかった (§G-2)。summary の `ipp_ptr_15F34A0` は shim 有でも boot 終了時に 0。出力を変える入力として寛容起動 (`FLE_TOLERANT=1`: InitUnits を unit ごとに隔離して続行) を採った。`FLE_IPP=0` は参考行として残す。
+- 測定: 基点 `origin/main` の worktree `ws-3330` (branch `3330-outmem-negctl`)。`dd91690f8` で `outmem_variants.sh boot` (3 変種 n=2 + `plain_negctl` (FLE_IPP=0) + `plain_tolerant` (FLE_TOLERANT=1・n=2))。lift と plain は同一ソースの既存 build を再利用 (build 2 s)。o2 ∥ o2lto は build 608 s (rc 0・開始時 load 1.02)。
+
+| label | run | image_writable (先頭 16 桁) | 判定 |
+|---|---|---|---|
+| plain / o2 / o2lto | 1・2 (計 6) | `891b29801d1bd50a` (全 6 本一致) | 受入 1 (RESULT PASS) |
+| plain_negctl (`FLE_IPP=0`) | 1 | `891b29801d1bd50a` | 変わらない (参考) |
+| plain_tolerant (`FLE_TOLERANT=1`) | 1・2 | `1d51294fb74290c3` (両 run 一致) | **変わる = 受入 2 達成** |
+
+- 寛容起動の中身 (r1 の summary): `tolerant.kinds` = ok 208 / empty 37 / exit 1 / clobber 695 / noproc 1 (started 942)。通常経路 (unit 209 で exit) とは別の起動経路で、guest の状態を大きく変える。
+- 比較器の検出力 (`outmem_variants.sh mutant`・rc 1): plain r1 の dump の 1 byte (線形 `0x13a5000`) を反転 → dump sha256 `d29170bfb4a5d176 → b0dbae075d0242c7`、`image_writable` 不一致で `RESULT FAIL` (rc 1)。
+- 製品 KPI (boot・plain): units_run 209 / stopped 209 / exit (`MessageBoxA → ExitProcess`)。§C-2 と同じ。最初のウィンドウは未達のまま。既定の boot 経路は変えていない (寛容起動は `FLE_TOLERANT=1` のときだけ)。
+- 所要 (実測): build o2 ∥ o2lto 608 s。boot 全体 (node 9 実行 + compare) 103 s (04:23:52〜04:25:35 UTC)。variant の wall (summary.tsv): plain 15.2〜15.7 s / o2 4.1〜4.2 s / o2lto 4.7〜4.8 s。寛容起動の wall は driver が記録していない (未解決)。
+- 署名: summary.tsv の `signature` は 6 本すべて `21521c4c16cc1e11` (変種間・run 間で一致)。§G-1 の `953e12a0e9aec56e` とは別値。基点を `origin/main` にしたため、main 側で `fle_boot.mjs` に追加された boot JSON のキー (`py_snap`・`py_events`・`undo_probe` 等) が署名に入った。wasm サイズも §C-1 より大きい (plain 127,084,075 / o2 64,686,803 / o2lto 62,608,263 B・差 1.9〜2.2 KB・原因は未確認)。
+- コード差分: 測定 commit `dd91690f8` から HEAD までの `git diff dd91690f8 HEAD -- tools/flelift/boot ':(exclude)*.md'` は空 (本節のコミットは md のみ)。`1ca5989f6` からの差分は 21 files (基点が `origin/main` のため他の PR の boot 変更を含む)。
+- 未解決 (本表で追跡): 署名・wasm サイズの差の原因 / 寛容起動の wall 未記録 / 出力範囲に guest heap を含めない (§F)。

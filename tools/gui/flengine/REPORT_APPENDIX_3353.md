@@ -3,6 +3,8 @@
 親 #3245 の子。(1) boot の init 1675 (`function_1266a60` → `function_423940` = `InitializeCriticalSection(0x12bd390)`) への到達を計装で実測する。(2) CreateFruityInstance の閉包 (boot7) を IR に取り込み、`cfi_probe.mjs` が `EnterCriticalSection` を越えるかを記録する。
 既知類型との関係: 該当なし (新規の lift 欠陥類型は観測していない)。
 
+> **訂正 (#3478・`REPORT_APPENDIX_3478.md` §5)**: 下の「boot は完走する」「dllmain_done True」は誤り。`dllmain_done True` は InitUnits が unit 114 (VA `0x623840`) で Halt0 に入って longjmp 相当で抜けた結果である。init 1675 に届かない原因は Halt0 の脱出。CS 計装の結論 (`0x12bd390` の CS-INIT 0 件・CFI の CS-MISS) は変わらない。
+
 ## 1. 結論 (測定版: #3245 の head `8bc881c4d` + 本 PR の `6a17a3c47`。main 取り込み後の HEAD `037431a02` でも同じ結論 (§9))
 
 - boot は完走する (`dllmain_done` True・`boot_threw` / `boot_failfast` なし・`units_run` 109・`init_count` 111)。LoadImageW の実装 (#3245) を入れた boot は trap せず DllMain を抜ける。
