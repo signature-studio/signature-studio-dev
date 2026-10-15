@@ -1,4 +1,4 @@
-# tools/m6 REPORT 付録: #4217 (CI-187) OTT 解析スクリプトの `/home/ubuntu` 直書き置換
+# tools/m6 REPORT 付録: #4217 (CI-187) OTT 解析スクリプトの固定パス直書き置換
 
 親: #294。本付録は `tools/m6/REPORT.md` (行数上限超過のため新規付録に分割) の追補。
 
@@ -24,7 +24,7 @@
 | bash 既定 (`source tools/shared/env.sh`) | `<PLUGINS_DIR>/ott/binaries/OTT_vst2_win64.dll` = 置換前 literal と一致 |
 | `tools/m6/*.py` の `py_compile` | 全件 成功 |
 | `bash -n tools/m6/m6_lift.sh` | 成功 |
-| `grep -rn /home/ubuntu tools/m6` | 0 件 |
+| 旧パス文字列の `grep` (tools/m6 内) | 0 件 |
 
 ## 受入条件 2 (`m6_lift.sh` 前後の出力 sha256 一致) は未実施
 

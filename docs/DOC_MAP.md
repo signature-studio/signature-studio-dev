@@ -249,7 +249,7 @@
 | `tools/ott/ACCEPTANCE_CAB137_CAB138.md` | ~210 | OTT CRT/entry 検収記録 |
 | `tools/ott/ACCEPTANCE_CAB238_CAB135.md` | ~210 | OTT f7 既定化・AVX 検収記録 |
 | `tools/m6/REPORT.md`・`tools/m7/REPORT.md`・`tools/m8/REPORT.md`・`tools/m9/REPORT.md`・`tools/m10/REPORT.md` | ~280/210/160/115/105 | 旧 RetDec 路線 M6〜M10 の経緯 (歴史) |
-| `tools/m6/REPORT_APPENDIX_4217.md` | ~50 | #4217 (CI-187): `tools/m6` の `/home/ubuntu` 直書きを `PLUGINS_DIR` 経由に置換した件 (既定値の同一性実測)。`m6_lift.sh` 前後の sha256 は未実施 |
+| `tools/m6/REPORT_APPENDIX_4217.md` | ~50 | #4217 (CI-187): `tools/m6` の作業用 VM 固定パス直書きを `PLUGINS_DIR` 経由に置換した件 (既定値の同一性実測)。`m6_lift.sh` 前後の sha256 は未実施 |
 
 ### FLEngine 起動
 
