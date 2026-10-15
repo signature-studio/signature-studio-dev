@@ -32,6 +32,8 @@ def main():
         len(sa['img']), len(sb['img']), na, nb, len(ea - eb), len(eb - ea)))
     print('byte_diff=%d heap_eq=%s heap_used=%s/%s hw=%s/%s' % (
         len(diff), heap_eq, sa.get('heap_used'), sb.get('heap_used'), sa.get('hw'), sb.get('hw')))
+    ja, jb = json.load(open(a_path)), json.load(open(b_path))
+    print('state_eq=%s detail_eq=%s units_run=%s/%s' % (ja['state'] == jb['state'], ja.get('detail') == jb.get('detail'), ja.get('units_run'), jb.get('units_run')))
     for k in diff[:40]:
         print('  rva=%#x a=%s b=%s' % (k, '%02x' % ma[k] if k in ma else '--', '%02x' % mb[k] if k in mb else '--'))
 
