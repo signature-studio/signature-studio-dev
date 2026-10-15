@@ -18,6 +18,7 @@
 #define FLA_QUANTUM    128u        /* AudioWorklet render quantum (固定) */
 #define FLA_MAX_CH     8u          /* コンパイル時上限 (FL ILWASAPI 実測は 2in/2out) */
 #define FLA_MAX_RING   (1u << 15)  /* ring_frames 上限 (2 の冪) */
+#define FLA_PW_N       1024u       /* producer の write 記録リングの件数 (fla_ctl_t.pw_trace)。256 frame/write で 5.5 s 分 (3 s の e2e は約 566 件で全件保持) */
 /* 目標充填 T の安全係数 (%): T の下限 = burst × FLA_BURST_PCT/100 + 2B。OPEN 較正 (flaudio.c) と実行中の拡張 (flasio.c) で共用。
  * 既定 125 は AU-24 (#2541) の実測で維持 (130/150 は grows と遅延を増やし、grows 0 にならなかった)。 */
 #ifndef FLA_BURST_PCT
@@ -130,9 +131,13 @@ typedef struct fla_ctl {
     uint32_t fill_samples;     /* 356 */
     /* 360..383 */
     uint32_t wake_hist[6];     /* 360 wake 遅延ヒストグラム (ms): <1,<2,<4,<8,<16,>=16 (Date.now 分解能 ±1ms) */
+    /* ---- line6 @384: producer の write 単位の記録 (FLA_PW_N 件のリング)。件 k = [w (write 開始 frame), fill (起床時の充填),
+     * 起床時刻 µs, 完了時刻 µs] (performance.now の下 32bit)。pw_n は通算数 (添字 = pw_n % FLA_PW_N) ---- */
+    uint32_t pw_n;             /* 384 */
+    uint32_t pw_trace[FLA_PW_N * 4]; /* 388 */
 } fla_ctl_t;
 
-#define FLA_CTL_SIZE 384u
+#define FLA_CTL_SIZE 16776u
 
 /* ---- ABI 自己検証用: JS が同じ配列を持つ (audio-layout.ts) ---- */
 typedef struct { const char *name; uint32_t off; } fla_layout_entry_t;

@@ -4,6 +4,7 @@
 #include "canvas_bitmap.h"
 #include "canvas_font.h"
 #include "canvas_frame.h"
+#include "canvas_string.h"
 #include "vstgui/lib/platform/iplatformtimer.h"
 #include <chrono>
 
@@ -97,8 +98,7 @@ CanvasPlatformFactory::createResourceInputStream (const CResourceDescription& de
 //------------------------------------------------------------------------
 PlatformStringPtr CanvasPlatformFactory::createString (UTF8StringPtr utf8String) const noexcept
 {
-	(void)utf8String;
-	return nullptr;
+	return PlatformStringPtr (new CanvasString (utf8String));
 }
 
 //------------------------------------------------------------------------

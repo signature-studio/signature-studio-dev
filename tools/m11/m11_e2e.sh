@@ -7,7 +7,7 @@
 # 使い方:
 #   M11_EXPECT_STAGE=5 M11_EXPECT_SURVEY_OK=850 bash tools/m11/m11_e2e.sh  # 期待値の上書き (既定は e2e_expect.env)。下回れば exit 1 (#715)
 #   bash tools/m11/m11_e2e.sh           # work/ の成果物があれば再利用 (無ければ自動で全再生成), build は増分
-#   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→bounds→lift 4chunk→tail 固定点→IR→build; 約 10 分)
+#   bash tools/m11/m11_e2e.sh --full    # RetDec lift から全再生成 (scan→functions_dll.csv (無ければ Ghidra 12.1.4 で作成)→bounds→lift 4chunk→tail 固定点→IR→build; 実測 約 22 分 (Ghidra での CSV 作成 約 10 分を含む。REPORT_N3172 §3))
 #   bash tools/m11/m11_e2e.sh --trace   # icall / unit init のトレースを stderr に出す
 #   M11_LB_BASE=0x10000 bash tools/m11/m11_e2e.sh   # LVA = RVA + 0x10000 (#222; 既定 0 = 従来 LVA=RVA). 変更時は --full 推奨 (IR の VA→LVA remap が変わる)
 #   M11_SKIP_LIFT_FP=1 M11_LB_BASE=0 bash tools/m11/m11_e2e.sh  # 参考値専用: work/lift_pe.sha256 の PE 指紋検査を迂回して後段だけ回す (#2779・受入の根拠にしない)
@@ -56,6 +56,7 @@ fi
 if [ $FULL = 1 ] || [ $need_lift = 1 ]; then
   step "全再生成モード (scan → bounds → lift → tail 固定点 → IR)"
   [ -f work/scan_index.json ] && [ $FULL = 0 ] || must "m11_scan" python3 m11_scan.py
+  must "functions_dll.csv (Ghidra 12.1.4)" bash m11_ghidra_dll.sh   # #3172: 素材に無い中間物。無ければ作る (有れば即 0)
   must "m11_bounds" python3 m11_bounds.py
   must "lift 4 chunks (RetDec)" bash m11_lift_all.sh
   for it in 1 2 3; do

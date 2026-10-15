@@ -84,15 +84,16 @@ Account: Workers Scripts **Edit**、Access: Apps and Policies **Edit**、Access:
 
 ## CI / E2E の秘密情報 (`.github/workflows/e2e.yaml`)
 
-> workflow 本体は App に `workflows` 権限が無く push できなかったため `tools/e2e/ci/e2e.yaml.proposed` に置いてある。
-> 有効化: `git mv tools/e2e/ci/e2e.yaml.proposed .github/workflows/e2e.yaml` (`workflows` 権限のあるユーザが実施。詳細 `tools/e2e/REPORT.md` §CI 化)。
+> workflow 本体は `.github/workflows/e2e.yaml` (2026-10-15 に PR #3292 で配置済み)。当初は App に `workflows` 権限が無く push できなかったため
+> `tools/e2e/ci/e2e.yaml.proposed` に置いていたが、配置後に削除した (経緯は `tools/e2e/REPORT.md` §CI 化)。
 
 | ジョブ | トリガ | 内容 | 必要な設定 |
 |---|---|---|---|
 | `local` | PR / main push (対象 path のみ) / 手動 | `tools/e2e/run.sh --driver both --targets preview,edge-sim` | なし |
 | `remote` | 週次 (月曜 03:17 UTC) / 手動 (`remote=true`) | `tools/e2e/run.sh --url "$E2E_URL" --driver both` | repo variable `E2E_URL`、secrets `E2E_ACCESS_CLIENT_ID` / `E2E_ACCESS_CLIENT_SECRET` |
 
-- `E2E_URL` が空なら remote は skip (notice のみ・失敗にしない)。URL は手動実行の `url` 入力でも上書きできる。
+- `E2E_URL` (repo variable) が空なら、job の `if` (`vars.E2E_URL != ''`) で remote ジョブ自体が起動しない (notice も出ない)。
+  手動実行で `remote=true` と `url` を入れても、`E2E_URL` が空なら起動しない。`E2E_URL` が設定済みのときだけ、`url` 入力が値を上書きする (`inputs.url || vars.E2E_URL`)。
 - 成果物 (`results/*.json`・`shots/*.png`・ログ) は artifact `e2e-{local,remote}-<run_id>` に 14 日保存、表は job summary に出る。
 - **fork PR / 秘密情報**: `local` は secrets を使わない。`remote` は schedule / 手動のみで PR からは起動しない。
 

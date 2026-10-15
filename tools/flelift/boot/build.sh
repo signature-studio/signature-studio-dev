@@ -13,9 +13,12 @@ W="${FLE_BOOT_WORK:-$FLE/work/boot}"   # 別 route の並走用に上書き可 (
 PE="${FLE_PE:-$FL_WIN64_DIR/extracted/block00031_PE.bin}"
 V="${1:-plain}"
 case "$V" in plain|strict|nosx|chk) ;; *) echo "usage: build.sh [plain|strict|nosx|chk]"; exit 1;; esac
+# #970: 最適化変種 (既定 -O0)。FLE_LABEL は obj・出力名の接頭 (変種ごとに分けて -O0 の obj を上書きしない)。
+OPT="${FLE_CC_OPT:--O0}"
+LBL="${FLE_LABEL:-$V}"
 mkdir -p "$W/obj" "$W/tmp"
 export TMPDIR="$W/tmp"
-set +u; source /opt/emsdk/emsdk_env.sh > /dev/null 2>&1; set -u
+set +u; source "${SS_EMSDK_ENV:-/opt/emsdk/emsdk_env.sh}" > /dev/null 2>&1; set -u
 
 # ---- 生成物が無い場合のみ gen (entries/link_defs/imp bridge/textwin) ----
 [ -f "$W/fle_entries_boot.json" ] || python3 "$HERE/gen_boot.py" --pe "$PE" --out "$W"
@@ -28,7 +31,7 @@ if [ ! -f "$W/obj/.sx_done" ]; then
   touch "$W/obj/.sx_done"
 fi
 
-CCF="-O0 -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1"
+CCF="$OPT -w -Wno-error=int-conversion -Wno-implicit-function-declaration -g1 ${FLE_EXTRA_CCF:-}"   # FLE_EXTRA_CCF=-DFLE_WWATCH: 書込み監視 (#3028)
 SHARDS="${FLE_SHARDS:-1}"
 CAP_MB="${FLE_CC_RSS_CAP_MB:-$([ "$SHARDS" -gt 1 ] && echo 5000 || echo 11000)}"
 cc() { local src="$1" obj="$2"; shift 2
@@ -48,30 +51,30 @@ NOSX_DEF=$([ "$V" = nosx ] && echo 1 || echo 0)
 EXPORTS="_fle_boot_enter,_fle_boot_set_strict,_fle_units_run,_fle_units_total,_fle_units_empty,_fle_boot_stage,_fle_n_getmem,_fle_n_freemem,_fle_n_longjmp,_fle_n_exit,_fle_n_getproc,_fle_n_soft,_fle_n_soft_uniq,_fle_soft_name,_fle_soft_count,_fle_va_calls,_fle_va_bytes,_fle_n_cb,_fle_unit_proc,_fle_run,_fle_rget,_fle_data_install,_fle_init,_fle_reset,_fle_boot_set_nullpage,_fle_boot_set_blkdiag,_fle_blkdiag_stat,_fle_boot_set_ipp,_fle_ipp_total,_fle_ipp_names,_fle_ipp_name,_fle_ipp_count,_fle_ipp_site,_fle_ipp_stop_name,_fle_ipp_stop_site,_fle_boot_set_tolerant,_fle_call_unit_at,_fle_rsp_get,_fle_rsp_set,_fle_n_disp0,_fle_ring_at,_emscripten_stack_get_current,__emscripten_stack_restore,_fle_py_ev_ptr,_fle_py_ev_n,_fle_py_ev_over"
 [ "$NOSX_DEF" = 1 ] || EXPORTS="$EXPORTS,_shimx_set_trace,_shimx_init"
 # FLE_SHARDS>1: fle_lifted_s<k>.c を xargs -P3 で並列 clang (各 cap 付き)。既定 1 は単一 fle_lifted.c。
-LIFTED_OBJS="$W/obj/${V}_lifted.o"
+LIFTED_OBJS="$W/obj/${LBL}_lifted.o"
 if [ "$SHARDS" -gt 1 ]; then
-  cc_shard() { cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted_s$1.c" "$W/obj/${V}_lifted_s$1.o" $CCF $CHKF -I"$FLE/rt" -I"$HERE"; }
+  cc_shard() { cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted_s$1.c" "$W/obj/${LBL}_lifted_s$1.o" $CCF $CHKF -I"$FLE/rt" -I"$HERE"; }
   export -f cc cc_shard
-  export W V FLE HERE CAP_MB CCF CHKF FLE_LIFT_DIR
-  seq 0 $((SHARDS - 1)) | xargs -P 3 -I{} bash -c 'cc_shard {}'
+  export W V LBL FLE HERE CAP_MB CCF CHKF FLE_LIFT_DIR
+  seq 0 $((SHARDS - 1)) | xargs -P "${FLE_CC_JOBS:-3}" -I{} bash -c 'cc_shard {}'
   LIFTED_OBJS=""
-  for k in $(seq 0 $((SHARDS - 1))); do LIFTED_OBJS="$LIFTED_OBJS $W/obj/${V}_lifted_s$k.o"; done
+  for k in $(seq 0 $((SHARDS - 1))); do LIFTED_OBJS="$LIFTED_OBJS $W/obj/${LBL}_lifted_s$k.o"; done
 else
-  cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted.c"  "$W/obj/${V}_lifted.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+  cc "${FLE_LIFT_DIR:-$W/lift}/fle_lifted.c"  "$W/obj/${LBL}_lifted.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
 fi
-cc "${FLE_LIFT_DIR:-$W/lift}/fle_data.c"    "$W/obj/${V}_data.o"    $CCF $CHKF -I"$FLE/rt"
-cc "$FLE/rt/fle_cpu.c"     "$W/obj/${V}_cpu.o"     $CCF $CHKF -I"$FLE/rt" $CPUDEFS
-cc "$FLE/rt/fle_glue.c"    "$W/obj/${V}_glue.o"    $CCF $CHKF -I"$FLE/rt"
-cc "$BRIDGE"               "$W/obj/${V}_bridge.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
-cc "$W/fle_textwin.c"      "$W/obj/${V}_tw.o"      $CCF $CHKF -I"$FLE/rt" -I"$HERE"
-cc "$HERE/fle_boot.c"      "$W/obj/${V}_boot.o"    $CCF $CHKF -I"$FLE/rt" -I"$HERE" -I"$SX/src" \
+cc "${FLE_LIFT_DIR:-$W/lift}/fle_data.c"    "$W/obj/${LBL}_data.o"    $CCF $CHKF -I"$FLE/rt"
+cc "$FLE/rt/fle_cpu.c"     "$W/obj/${LBL}_cpu.o"     $CCF $CHKF -I"$FLE/rt" $CPUDEFS
+cc "$FLE/rt/fle_glue.c"    "$W/obj/${LBL}_glue.o"    $CCF $CHKF -I"$FLE/rt"
+cc "$BRIDGE"               "$W/obj/${LBL}_bridge.o"  $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+cc "$W/fle_textwin.c"      "$W/obj/${LBL}_tw.o"      $CCF $CHKF -I"$FLE/rt" -I"$HERE"
+cc "$HERE/fle_boot.c"      "$W/obj/${LBL}_boot.o"    $CCF $CHKF -I"$FLE/rt" -I"$HERE" -I"$SX/src" \
    -DFLEBOOT_STRICT=$([ "$V" = strict ] && echo 1 || echo 0) -DFLEBOOT_NOSX=$NOSX_DEF
-OBJS="$LIFTED_OBJS $W/obj/${V}_data.o $W/obj/${V}_cpu.o $W/obj/${V}_glue.o $W/obj/${V}_bridge.o $W/obj/${V}_tw.o $W/obj/${V}_boot.o"
+OBJS="$LIFTED_OBJS $W/obj/${LBL}_data.o $W/obj/${LBL}_cpu.o $W/obj/${LBL}_glue.o $W/obj/${LBL}_bridge.o $W/obj/${LBL}_tw.o $W/obj/${LBL}_boot.o"
 [ $NOSX = 1 ] || OBJS="$OBJS $W/obj/sx_*.o"
-emcc $OBJS -o "$W/fleboot_$V.cjs.tmp" \
-  -O0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \
+emcc $OBJS -o "$W/fleboot_$LBL.cjs.tmp" \
+  $OPT -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \
   -sENVIRONMENT=node -sMODULARIZE=1 -sEXPORT_NAME=flebootcreate -sEXIT_RUNTIME=1 \
   -sEXPORTED_FUNCTIONS=$EXPORTS -sEXPORTED_RUNTIME_METHODS=UTF8ToString,HEAPU8,HEAPU32 \
-  -Wl,--initial-memory=$((0x36000000)) -Wl,--max-memory=$((0x36000000)) 2> "$W/link_$V.log" || { tail -40 "$W/link_$V.log"; exit 1; }
-mv "$W/fleboot_$V.cjs.tmp" "$W/fleboot_$V.cjs"
-echo "[build] $V: mismatch=$(grep -c 'signature mismatch' "$W/link_$V.log" || true) undefined=$(grep -c 'undefined symbol' "$W/link_$V.log" || true) dup=$(grep -c 'duplicate symbol' "$W/link_$V.log" || true) -> $W/fleboot_$V.cjs ($(stat -c%s "$W/fleboot_$V.cjs.wasm") B)"
+  -Wl,--initial-memory=$((0x36000000)) -Wl,--max-memory=$((0x36000000)) 2> "$W/link_$LBL.log" || { tail -40 "$W/link_$LBL.log"; exit 1; }
+mv "$W/fleboot_$LBL.cjs.tmp" "$W/fleboot_$LBL.cjs"
+echo "[build] $V: mismatch=$(grep -c 'signature mismatch' "$W/link_$LBL.log" || true) undefined=$(grep -c 'undefined symbol' "$W/link_$LBL.log" || true) dup=$(grep -c 'duplicate symbol' "$W/link_$LBL.log" || true) -> $W/fleboot_$LBL.cjs ($(stat -c%s "$W/fleboot_$LBL.cjs.wasm") B)"

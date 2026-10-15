@@ -197,6 +197,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
   `feat(kh): add DecompAt2 ghidra postScript`。
 - PR は `--base main` を基本 (repo の既定ブランチ = `main`)。body に `Closes #N`・受入条件・検証結果を書く。
 - **起動・GUI・ウィンドウに関わる PR は、本文に製品 KPI の前後 (FLEngine 起動の dispatch 数・通過 unit 数 (`tools/flelift/boot/REPORT.md`)、最初のウィンドウの有無) を書く。動かせなかったときは『動かしていない』と書く。** 起動・GUI に関わらない PR は KPI を書かなくてよい。
+- **起動結果を変える PR** (`tools/m11/REPORT.md`・`tools/flelift/boot/REPORT.md`・`tools/gui/flengine/**`・`tools/startup/**` を変える PR) は、(1) `python3 tools/startup/boot_metric.py` で `tools/startup/boot_metric.json` を再生成し同じ PR に含める (手で編集しない)、(2) `docs/STATUS.md` 先頭の「FL のウィンドウ」行の最終到達ステップを更新した record の値に合わせる、(3) STATUS には測定値を書かず REPORT に書く、(4) pr-lint が `boot-metric:` を出したら再生成するか、起動結果を変えない変更なら本文に `boot_metric: unchanged (<理由>)` を書く (#3191)。
 - **docs だけの PR を作らない。** 調査・測定の結果は、それを必要とした実装 PR か issue コメントに入れる。REPORT の更新は、実装と同じ PR に含める。例外: 規約・ADR・PM の判断の記録。定期 STATUS 同期の自動 PR (`docs(status): sync merged PRs`、`tools/pm/status_sync.py`) も例外 (`docs/STATUS.md` の status-auto 節の内側だけを変える PR に限る)。
 - **1 チケット = 1 subagent。** チケット化されていない作業も subagent 委任する。
   10 回以上の tool call が必要になる作業は必ず subagent に委任すること。
@@ -271,7 +272,7 @@ find <dir> -type f -size +20M -not -path '*/work/*'   # 20MiB 超 blob が無い
     (gitignore 対象の検証スナップショット。commit しない)。`work-m11` は #516 qstore 以前の生成
     (`qstore_report.json`・`ir_conditions.json` 無し) で現 main の生成手順と一致しない (#680)。survey の基準には使わない。
     IR の正は `bash tools/m11/m11_e2e.sh --full` (RetDec から再生成) の出力とする。`--full` は head `2e128c5c` で rc 0 まで通る (633 秒・素材 + Ghidra 再生成が前提。`tools/m11/REPORT_N27.md` §12・#728)。ただし reached_stage は 4 で trap が残る。IR の sha256 は A7 の空行除去 (#1664) より前は実行ごとに変わった (原因と修正後の一致は `tools/m11/REPORT_APPENDIX_960.md` §19)。
-    `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
+    `functions_dll.csv` は素材に無い Ghidra headless の中間物で、Ghidra 12.1.4 (`support/analyzeHeadless`・JDK 21・`tools/m2/ghidra_scripts/DumpFunctions.java`) で作る (`bash tools/m11/m11_e2e.sh --full` は無ければ `tools/m11/m11_ghidra_dll.sh` が Ghidra を取得・検査して作る・#3172)。lift 成果物は `work/lift_pe.sha256` に生成時の PE 指紋を記録し、PE が変われば作り直す。PE とパスは `FL_WIN64_DIR` 経由・相対パス化済み。
     `work/ir_conditions.json` の `ldfix=applied` と `ir_sha256` (IR の指紋) が一致しない IR は build されない (`m11_build.sh`)。
     **使う側が最初に `bash tools/m11/m11_gen_ir2.sh` を実行して `ir_conditions.json` を作る** (`FL_WIN64_DIR` の PE が要るので `fl-win64` も指定する)。
     Python の `capstone`・`pefile` が要る。無いと ldfix が skipped になり fail-closed で `exit 1` する。agent-setup が `~/.local/agent-py` の venv に `pefile` `capstone` `numpy` を入れる (#893)。版と hash は `.github/actions/agent-setup/requirements-py.txt` で固定し、`--require-hashes` で入れる (#2621)。venv の bin は PATH に載せず、`python` / `python3` を venv の python へ委譲するラッパーの dir (`~/.local/agent-py-shim`) を PATH 先頭に置く。venv 無しで動かす場合は同じ venv を手で作る。
