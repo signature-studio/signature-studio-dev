@@ -205,6 +205,7 @@
 | `tools/liftdiff/REPORT_LD158.md` | ~190 | liftdiff LD-158 (#3470) 節: ret=i128 39 関数の実戻りレジスタの動的実測 (rax / rdx / xmm0 の書換え) と、xmm0 戻り 8 関数の署名 double 化 (`ret_override`・m11_tr_ 経由)。判定不能 11 と併存 20 は LD-162 (#3572) へ |
 | `tools/liftdiff/REPORT_LD234.md` | ~70 | liftdiff LD-234 (#4667) 節: `liftdiff_e2e.sh --m11-only` の所要時間 (real/user/sys)・load・`[4/4]` (sample:800) の件数の実測 (2 回、測定 commit `fbb19946c`)。LD-215 の未解決を埋める |
 | `tools/liftdiff/REPORT_LD212.md` | ~90 | liftdiff LD-212 (#4379) 節: 併存 20 関数の呼出し元 581 件を窓 24 命令で読んだ rax / rdx / xmm0 の read/dead/unknown 件数。戻りは確定せず `ret_override` 未変更。確定作業は子 issue |
+| `tools/liftdiff/REPORT_LD263.md` | ~50 | liftdiff LD-263 (#5277) 節: `6ed480` の戻り型を callee の ret 直前命令と呼出し元の ucomisd 直前マスクで判定 (`tests/ld263_ret_type.py`)。結論 double。`ret_override` 未変更 (親 #4666 で反映) |
 | `tools/liftdiff/REPORT_LD215.md` | ~90 | liftdiff LD-215 (#4429) 節: 分岐を越えた呼出し元・呼出し先の経路判定 (`tests/ld215_retprop.py`)。確定は 20 関数中 1 件 (型未確定)。`ret_override` 未変更。残件は子 issue |
 | `tools/liftdiff/tests/ld158_ret_probe.py` | ~110 | LD-158 (#3470) の動的プローブ: i128 戻り関数を 11 pattern × xfill {1,0} で native 実行し、戻り後 rax / rdx / xmm0 の書換えを記録 (`work/ld158_probe.json`)。`--names` で陰性対照の関数を指定できる |
 | `tools/liftdiff/tests/ld158_summarize.py` | ~70 | LD-158 (#3470) の集計: 動的分類・静的 dsm 判定 (窓 3 / 8) の件数と、`ret_override` と動的 xmm0 のみ集合の一致を出す (`work/ld158_table.tsv`) |
