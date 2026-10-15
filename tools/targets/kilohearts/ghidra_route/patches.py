@@ -10,6 +10,26 @@ ASSOC = {
     'gate': [('ramp (1 site)',) + RAMP,
              ('smoothstep (1 site)', r'\(fVar4 - \(fVar23 \+ fVar23\)\) \* fVar23 \* fVar23', '(fVar4 - (fVar23 + fVar23)) * (fVar23 * fVar23)')],
 }
+# グローバル型表 (gtype・Delay の型不一致): Ghidra は `_DAT_<va>` の型を印字しないため、ghidra_to_c.py の infer_type が
+# 使い方から float と推定する。実機の逆アセンブル (capstone・RIP 相対参照の命令の幅) で整数マスクと確認したものだけを入れる。
+# 1 行 = 1 グローバル。値 = C の型。根拠の命令は REPORT_APPENDIX_3801.md の表が正本。
+GTYPE = {
+    'delay': {
+        '182280be0': 'ulonglong',  # cmp/mov qword・Ghidra: (ulonglong)dVar12 との & 比較
+        '182280c10': 'ulonglong',  # mov qword・0x000fffffffffffff (double 仮数マスク)
+        '182280c30': 'ulonglong',  # and/or qword・0x800 (& の 64bit 項)
+        '182280c68': 'ulonglong',  # mov qword・>> の被演算子 (64bit シフト)
+        '182280c70': 'ulonglong',  # mov qword・>> の被演算子 (64bit シフト)
+        '182280ce0': 'ulonglong',  # cmp/mov qword・0x7ff0000000000000 との | (ulonglong)
+        '182281e70': 'ulonglong',  # mov qword・| (ulonglong) の被演算子
+        '182282780': 'ulonglong',  # andpd (下位 8 bytes)・0x7fffffffffffffff (abs マスク)
+        '18141d060': 'ulonglong',  # xorps (下位 8 bytes)・0x8000000000000000 (符号マスク)
+        '1813d1a80': 'uint',       # xorps/pxor/movaps (下位 4 bytes)・0x80000000 (符号マスク)
+        '181422a10': 'uint',       # minps/movaps・& -(uint)(...) の 4 byte マスク
+        '182280bc0': 'longlong',   # cmp r10,qword・(longlong) 比較
+        '182280bc8': 'longlong',   # cmp r10,qword・(longlong) 比較
+    },
+}
 # ABI 表 (resonator 残件 emcc 4 件 = param_1 不足 3・引数数不一致 1)。Ghidra が呼出元で引数・戻り値を落としたため、
 # 呼出元の機械語 (capstone 逆アセンブル, HeartCore 0x180fbc1f4・0x180fbbfb8) のレジスタ設定から復元する。
 #   FUN_180fcf904: 引数 float (xmm0)・戻り値 short (ax)。呼出元 180fbc1f4 は xmm0 = 入力 float (= afStackX_8[0])、
