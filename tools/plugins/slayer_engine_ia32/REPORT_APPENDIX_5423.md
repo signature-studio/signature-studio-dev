@@ -3,7 +3,7 @@
 既知類型との関係: 該当なし。 入力の設計で、lift の模型化 (DEFECTS.md) は変えない。
 
 - 親: #4922 (窓の中身をポインタとして辿る 2 本のうち `0x100085a0` の分)。 前段: `REPORT_APPENDIX_4147.md` §2・§4。
-- 測定 commit: 本付録を含む PR の commit (コードを変えた最後の commit。 下の §4)。 入力は fl-win64 の `block22434_PE.bin` と seed 5423。
+- 測定 commit: `782bd4dec` (コードを変えた最後の commit。 下の §4)。 入力は fl-win64 の `block22434_PE.bin` と seed 5423。
 - 起動・GUI に関わらない (製品 KPI は対象外)。
 - 既存の harness (`x87_fn_native.c`・`x87_fn_glue.c`・`x87_fn_entry_wasm.mjs`・`x87_fn_diff.py`) は変えていない。 プローブの複製を `work/85a0_5423/` に作って測った。
 
@@ -47,7 +47,7 @@ export EMSDK=$RUNNER_TEMP/emsdk-tc/emsdk; export PATH=$EMSDK/upstream/emscripten
 export FL_WIN64_DIR=$RUNNER_TEMP/fl-win64          # extracted/block22434_PE.bin を展開済み
 cd tools/plugins/slayer_engine_ia32
 python3 lift_text.py                 # 19 s
-python3 probe_85a0_5423.py           # 約 44 s (ベースライン rc -11・複製 rc 0)
+python3 probe_85a0_5423.py           # 33.0 s (実測。ベースライン rc -11・複製 rc 0)
 ```
 
 ## 5. 未解決
