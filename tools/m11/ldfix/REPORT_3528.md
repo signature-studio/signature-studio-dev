@@ -28,9 +28,18 @@
 - 3 対象は `REPORT_2660.md` §2.3 の結論と一致する (45b170 = arg2、45d0a0・45f560 = arg1)。
 - 入口に movzx word が複数ある関数: 442b00 (3 本)・651b00 (4 本)。突合の対象は disp 0・非 frame 基底の 1 本だけで、残りは disp 付きか frame 基底のため対象外 (TSV の `mach_movzx_word_entry` 列)。
 
-negative control (`f3d_crosscheck_3528.py` の判定が効くこと): F3d 版 IR の 45b170 の `ldfxt*_p = inttoptr i64 %arg2 to ptr` を `%arg1` に書き換えた IR を同じ式で与えた。結果は 45b170 のみ NG (`mach_argn` 2 ・ IR argK 1)、OK 57 / NG 1。手順は `f3d_negctl_3528.sh` (§6) に 1 本化した。
+negative control (`f3d_crosscheck_3528.py` の判定が効くこと): `f3d_negctl_3528.sh` が、F3d 版 IR の 45b170 の `ldfxt*_p = inttoptr i64 %arg2 to ptr` を `%arg1` に書き換えた IR を作り、突合に掛ける。結果は 45b170 のみ NG (`mach_argn` 2 ・ IR argK 1)、OK 57 / NG 1 (修正後の実測は下の段落)。
 
-修正 (レビュー指摘 4): 入口の store のうち、32bit・8bit・即値の書き込みや、slot と幅が重なる書き込み (`add` などの read-modify-write を含む) は slot の由来を消していなかった。そのため古い由来 (`arg1` など) が残り、誤った OK の余地があった。`ldmach.memops_of` で書き込みを判定し、重なる slot の由来を消すように直した。単体テスト `test_f3d_slots_3528.py` は修正後 6/6 PASS、修正前の版では 3 件 FAIL。上の表と NC の値は修正前の測定値。修正後の TSV 再生成 (OK 58 / NG 0 が変わらないこと) は IR (`work-m11`) が無いこの run では未実施で、§6 の手順で確かめる。
+修正 (レビュー指摘 4): 入口の store のうち、32bit・8bit・即値の書き込みや、slot と幅が重なる書き込み (`add` などの read-modify-write を含む) は slot の由来を消していなかった。そのため古い由来 (`arg1` など) が残り、誤った OK の余地があった。`ldmach.memops_of` で書き込みを判定し、重なる slot の由来を消すように直した。単体テスト `test_f3d_slots_3528.py` は修正後 6/6 PASS、修正前の版では 3 件 FAIL。
+
+修正後の再測定 (測定 commit `8affe0dba`。素材 `oc_artifacts: fl-win64 work-m11 work-liftdiff` を展開。`tools/m11/work/boot_final3.ll` の sha256 は `010451add5147d37…` で §3 と一致。4 vCPU):
+
+- F3d 版 IR: `ldfix.py --passes f3d` で `f3d_fns`=58 (`f3d_ambiguous` 21・`f3d_base_unresolved` 3・`f3d_arg_missing` 2)。生成 5.1 s。
+- 突合 TSV: `f3d_crosscheck_3528.py` の出力を `results/f3d_crosscheck_3528.tsv` と `cmp` で比べ、**byte 一致** (`# changed=58 OK=58 NG=0`)。修正で判定は変わらなかった。0.6 s。
+- negative control: `bash tools/m11/ldfix/f3d_negctl_3528.sh` → `# changed=58 OK=57 NG=1`、NG は 45b170 のみ、`NC PASS`。全体 6.1 s。
+- 単体テスト: `python3 tools/m11/ldfix/test_f3d_slots_3528.py` → `FAIL=0` (6 件)。
+- load: 上の実行の後に `/proc/loadavg` は `0.19 0.30 0.14` (nproc 4)。実行中の load は取っていない。
+- 鮮度: 測定対象のコード差分は `git diff 8affe0dba HEAD -- tools/m11/ldfix/*.py tools/m11/ldfix/*.sh tools/m11/ldfix/results/` が 0 行 (REPORT のみの commit では変わらない)。
 
 突合の範囲: 由来 argN と挿入 load の argK の一致までを見る。挿入 load の値と後段の比較 (`trunc i64 .. to i16` / `and`) の定数が機械語の比較定数と一致するかは見ていない。guard の IR 側条件 (`fix_f3d`) で確かめているのは「挿入先の xor が 1 本」まで。
 
@@ -40,6 +49,7 @@ negative control (`f3d_crosscheck_3528.py` の判定が効くこと): F3d 版 IR
 - F3d: 同じ IR に `ldfix.py --passes f3d` を掛けた版 (58 関数・`f3d_fns`=58・`f3d_ambiguous`=21・`f3d_base_unresolved`=3・`f3d_arg_missing`=2)。
 - 実行: `audit_lsf_ssa_e2e.sh` を前景で 2 回。HEAD 2 m 44.8 s (rc 0・7/7)・F3d 2 m 44.2 s (rc 0・7/7)。nproc 4。
 - 差: 出力ログは HEAD と F3d で `diff` 0 行 (7 step とネガティブコントロール NC0〜NC7 を含む)。step 2 の `ssa.json` は 225 関数すべて同一。
+- 修正後の audit は再実行しない。audit が実行するコード (`ldfix.py`・`audit_lsf_ssa_e2e.sh`・`results/drops_510.tsv`・`results/spill178_1161.tsv`) は測定 commit `b706fb666` から HEAD まで差分 0 行 (`git diff b706fb666 HEAD -- tools/m11/ldfix/ldfix.py tools/m11/ldfix/audit_lsf_ssa_e2e.sh tools/m11/ldfix/results/drops_510.tsv tools/m11/ldfix/results/spill178_1161.tsv` = 0 行)。測定対象の差分が 0 なので、`docs/WORKFLOW.md` §6 の鮮度基準により再測定は要らない。
 - 母集団: `ssa.json` の 225 関数のうち F3d 対象は 4 関数 (45b170・45d0a0・45e3c0・45f560)。この 4 関数の record も変わらなかった。残り 54 関数は audit の母集団に無く、audit では観測できない。
 
 HEAD の step 値 (本 run・`b706fb666` の素材):
@@ -74,13 +84,13 @@ HEAD の step 値 (本 run・`b706fb666` の素材):
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 既定化の判断: 効果の実測・既定化したコミット済み HEAD の e2e 再測定・guard の効く入力の negative control・挿入 load の値と後段の比較定数の一致 | #2834 (LD-135) の前提「F3d を既定化すると判断したこと」が未成立。4 site の判定と results 更新は未着手 | #2834 へのコメント (前提は PM が決める) |
-| 既定 e2e の pin (STRICT_DONE 56・SURVEY_OK_EXACT 872) と本 snapshot の不一致 (HEAD でも発生・`REPORT_2660.md` §9.1) | 既定 e2e が rc=1 で終わる (F3d の影響ではない) | #2834 へのコメント (本 issue の本文が「別途扱う」とした件の引継ぎ) |
+| 既定 e2e の pin と本 snapshot の不一致 (pin の値は `REPORT_2660.md` §9.4 参照。HEAD でも発生・`REPORT_2660.md` §9.1) | 既定 e2e が rc=1 で終わる (F3d の影響ではない) | #2834 へのコメント (本 issue の本文が「別途扱う」とした件の引継ぎ) |
 
 ## 6. 再現手順
 
 1. F3d 版 IR: `python3 tools/m11/ldfix/ldfix.py tools/m11/work/boot_final3.ll $T/boot_final3.f3d.ll --pe $PE --passes f3d --report $T/f3d.json` (`f3d_fns`=58)。
-2. 突合: `python3 tools/m11/ldfix/f3d_crosscheck_3528.py tools/m11/work/boot_final3.ll $T/boot_final3.f3d.ll --pe $PE --report $T/f3d.json > tools/m11/ldfix/results/f3d_crosscheck_3528.tsv` (OK 58 / NG 0)。
+2. 突合: `python3 tools/m11/ldfix/f3d_crosscheck_3528.py tools/m11/work/boot_final3.ll $T/boot_final3.f3d.ll --pe $PE --report $T/f3d.json > $T/crosscheck.tsv` を `cmp $T/crosscheck.tsv tools/m11/ldfix/results/f3d_crosscheck_3528.tsv` で比べる。期待値: byte 一致・`# changed=58 OK=58 NG=0` (§2 の修正後測定で確認済み)。コミット済みの TSV は上書きしない。
 3. negative control: `bash tools/m11/ldfix/f3d_negctl_3528.sh` (環境変数 `M11_WORK`・`FL_WIN64_DIR`・`OUT` は `f3d_negctl_2745.sh` と同じ)。45b170 の `ldfxt*_p = inttoptr i64 %arg2 to ptr` を `%arg1` に書き換えた IR を作り、突合に掛ける。期待値: 最終行 `# changed=58 OK=57 NG=1`、NG の行は 45b170 のみで、スクリプトは `NC PASS` を出す。
 4. 突合ツールの単体テスト: `python3 tools/m11/ldfix/test_f3d_slots_3528.py` (IR と PE は不要。期待値: `FAIL=0`)。
 5. audit: HEAD は `M11_WORK=tools/m11/work LD_WORK=tools/liftdiff/work bash tools/m11/ldfix/audit_lsf_ssa_e2e.sh`。F3d は `M11_WORK` に `tools/m11/work/*` の symlink を並べ、`boot_final3.ll` だけを手順 1 の出力に差し替えた dir を渡す。`RUNNER_TEMP` を変えて出力先を分ける。
-6. `PE` は `fl-win64` の `extracted/block00031_PE.bin`。`$T` は `$RUNNER_TEMP` 配下の作業用 dir。
+6. 素材は `oc_artifacts: fl-win64 work-m11 work-liftdiff` で取得する (`work-m11`・`work-liftdiff` は `tar --zstd -xf` で `tools/m11/work/`・`tools/liftdiff/work/` に展開)。`PE` は `fl-win64` の `extracted/block00031_PE.bin`。`$T` は `$RUNNER_TEMP` 配下の作業用 dir。
