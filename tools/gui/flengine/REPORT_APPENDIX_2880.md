@@ -56,7 +56,7 @@ REPORT_APPENDIX.md §9 の全文 (250 行上限のため分割移動)。外部�
 ### 9-5. IR の読取 (boot7 込み・`boot_final3.ll`)
 
 - `EnterCriticalSection` の呼出し: 定数 CS は `function_419560` の `0x11EAF00` のみ。残りは引数が動的な呼出し (`function_4232e0`、ラッパ `function_406f50` 経由)。失敗した `0x12bd390` は動的な引数なので、呼出元はこの候補のどれか。**呼出元 VA は未特定** (wasm に name section が無く、JS の stack は wasm 関数 index しか出ない)。
-- 初期化と解放の対: `function_41ce10` は init 列の 3 番目 (`inits_text.txt`)。フラグ `0x11e6a38` を `dec` し、結果が 0 のときに初期化本体に入る。本体は `function_418e10` (= `InitializeCriticalSection(0x11EAF00)`) を呼ぶ。`function_41cd70` は init 列の 4 番目で、`add 1` の結果が 0 のとき `function_418f20` → `DeleteCriticalSection(0x11EAF00)` を呼ぶ。解放側が init 列に入る理由は未確認 (`m11_bounds.py` の抽出規則)。
+- 初期化と解放の対: `function_41ce10` は init 列の 3 番目 (`inits_text.txt`)。フラグ `0x11e6a38` を `dec` し、結果が 0 のときに初期化本体に入る。本体は `function_418e10` (= `InitializeCriticalSection(0x11EAF00)`) を呼ぶ。`function_41cd70` は init 列の 4 番目で、`add 1` の結果が 0 のとき `function_418f20` → `DeleteCriticalSection(0x11EAF00)` を呼ぶ。解放側が init 列に入る理由は確定: `array1` entry 1 の final 列 (REPORT_699 §9-2)。
 - trap の候補: `unreachable` を持つのは `function_447860` のみ。`G` → `P` → `*P` が 0 のとき `function_409730` の後に `unreachable` へ落ちる。ただし実測では `G = 0` → `P = 0` → `*P` = `load [0]` = 0x4bdb50 ≠ 0 なので、この分岐は通る。**trap 地点は未特定**。
 
 ### 9-6. e2e (`bash tools/gui/flengine/e2e.sh`・commit `ae963e28`)
@@ -85,7 +85,7 @@ IR 指紋 (fix で追記。e2e は再実行していない): 素材展開直後�
 | boot の `unreachable` の地点と理由 | `CreateFruityInstance` の前に boot が止まる | 子 issue `[WIN-16]` (`親: #2880`) |
 | `0x12bd390` の登録経路 (どの unit が初期化するか) | 呼出しの完了 (受入 3) | 同上 |
 | 呼出元 VA (wasm name section 無し) | 受入 1 の呼出元 VA | 同上 |
-| 解放側 `function_41cd70` が init 列に入る理由 | boot が 41cd70 に届くと `0x11EAF00` を削除する (推定) | 同上 |
+| 解放側 `function_41cd70` が init 列に入る理由 | boot が 41cd70 に届くと `0x11EAF00` を削除する (掲載理由は確定: REPORT_699 §9-2。到達の実測は未計測) | 同上 |
 | S1 の差 (§9-6 の 13/14 と 14/14) | 判定の再現性 | PR 本文の未解決表のみ (再測定) |
 | (解消) 現 HEAD での `cfi_probe.mjs` の再測定 | `adad27ad` で再測定し、9-3 と同じ値 (§9-8) | — |
 
