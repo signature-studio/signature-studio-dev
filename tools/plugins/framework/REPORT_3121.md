@@ -5,26 +5,27 @@
 
 ## 0. 結論 (1 行)
 
-分類器の BLK 判定を修正した (`c7ef3b716`・合成入力 13 件で修正版は全件一致、旧版は 8 件誤判定)。旧版の判定値 (BLK 104 / UNK 11 / MISS 8) は無効で、修正版での実 IR の再分類は素材 (`work-fw-stage1`・`toolchain-retdec`) が本 run に無く未実施 (§7)。section の +285,040 B (0x45970) のうち #2584 は +752 B、icall 側は単一 merge の #617 (+255,616 B) が最大で、残りは個別未測定の区間 (§5)。受入 1〜4 は未達。
+分類器の BLK 判定を修正 (`c7ef3b716`) し、修正版で修正前 IR の 123 行を再分類した: BLK 106 / NOBLK 0 / UNK 9 / MISS 8 (旧版の 104 / 11 / 8 は誤判定を含み無効)。修正後 IR では `ptrtoint ([2 x i8]* @1 to i32)` が 0 行で、入口分岐は定数式でなく BLK の実読み (`%2`) に依る。section の +285,040 B (0x45970) のうち #2584 は +752 B、icall 側は単一 merge の #617 (+255,616 B) が最大で、残りは個別未測定の区間 (§5)。受入 1・5 は達成、2〜4 は未達。
 
 ## 1. 検証起点と測定 commit
 
-- 起点: `origin/main` `624fca112` (実 IR の基点)。worktree `../ws-3121`・branch `3121-plg-p0b-30-blk-classify`。
-- 分類器の測定 commit: 旧版 `ab210bc8b`、修正版 **`c7ef3b716`** (BLK 判定の修正)。修正版の `--selftest` は `c7ef3b716` で実行した (§3.1)。
-- 実 IR の素材 (旧版の実測時): `work-fw-stage1` (修正前 IR・10/10 生成) と `work-liftlib` を展開。修正前 IR は展開直後の `fw6.restored.ll` を退避して使う (`fw_lift.sh` が上書きするため)。`fl-win64` は member 2 本のみ展開。`[RETDEC]` は runner 既存 (`docs/REFERENCES.md` §1)。
+- 起点: `origin/main` の基点 `624fca112` (実 IR の基点)。`624fca112` から測定 commit までの `tools/icall`・`tools/liftlib`・`tools/plugins/framework` (`.md` を除く) の差分は、新規の `fw_blk_fold_map.py` だけ。fw_prep・icall・fw_lift の実行コードは `624fca112` と同一。
+- 分類器の測定 commit: **`ba58ff628`**。BLK 判定の修正は `c7ef3b716`、以降の `69dc53e9f`・`5d072f5fb` は REPORT のみ、`ba58ff628` は docstring の受入番号 (`#3121 受入 1`) だけ。判定ロジックは `c7ef3b716` と同じ。
+- 実 IR の素材 (本 run): `$ARTIFACTS_DIR` の `work-fw-stage1` (修正前 IR・旧版の `fw_icall.dll`/`fw_map.json`) と `fl-win64` (`extracted/block18983_PE.bin`・`extracted/block00031_PE.bin` の 2 本だけ)。`work-fw-stage1` を展開して修正前の `fw0`〜`fw7.restored.ll` を `$RUNNER_TEMP/old/` に退避してから `fw_lift.sh` を実行 (同名の chunk を上書きするため)。`work-liftlib`・`toolchain-emsdk` は本手順では未使用。
+- RetDec: `[RETDEC]` (`docs/REFERENCES.md` §1 の `toolchain-retdec` の行。展開先は `[RETDEC]`)。本 run の runner には `[RETDEC]` が既存で、その `bin/retdec-decompiler` の sha256 は `toolchain-retdec.tar.zst` 内の同名ファイルと一致 (本 run で確認)。
 - 補助物: `fw_hash_counts.json` は `{}` で代用 (REPORT_2566 §1 と同じ。framework 統計のみに影響)。
-- 実行環境 (旧版の実測時): nproc 4・RAM 15 GiB。
-- 本 run (修正 run) の素材: `$ARTIFACTS_DIR` には `fl-win64` のみ。`toolchain-retdec`・`work-fw-stage1`・`work-liftlib` は無く、`fw_lift.sh` は RetDec 未配置のため実行不能。
+- 実行環境: nproc 4・RAM 15 GiB。
 
-## 2. 実測 (n=1・基点 `624fca112`・旧版の実測時)
+## 2. 実測 (n=1・基点 `624fca112`・測定 commit `ba58ff628`)
 
 | 手順 | 結果 | 所要 (real) | load average (終了時 1/5/15 分) |
 |---|---|---|---|
-| `fw_prep.py` | F.ranges 11,736 件 | 36.6 s | — |
-| `icall_rewrite.py` (blk `8a1000`) | rewrote 11,736 funcs / 6,159 sites・`errors {}`・section +5,924,861 B | 23.4 s | — |
-| `fw_lift.sh` (RetDec 8 chunk・restore・merge) | rc 0・`fw_all.restored.ll` 11,939 defines | 10 分 16 秒 | 1.08 2.06 1.72 |
+| `fw_prep.py` | F.ranges 作成 | 20.1 s | — |
+| `icall_rewrite.py` (blk `8a1000`) | rewrote 11,736 funcs / 6,159 sites・`errors {}`・section +5,924,861 B | 21.2 s | — |
+| `fw_lift.sh` (RetDec 8 chunk・restore・merge) | rc 0・`fw_all.restored.ll` 1,542,337 行 / 11,939 defines | 5 分 42 秒 | 1.46 2.30 1.35 |
 
-- `fw_lift.sh` の所要は REPORT_2566 (5 分 42 秒)・REPORT_3120 (5 分 50 秒) より長い。原因は未切り分け (load 計測は終了時の値のみ)。
+- `fw_lift.sh` の所要は前回の測定 (10 分 16 秒) と違う。原因は未切り分け (実行環境の差を含む)。
+- 前回の測定の section 値 (+5,924,861 B) は本 run の `icall_rewrite.py` と一致する (§5 の 624fca112 の行)。
 
 ## 3. 受入 1 の前半: 修正前 IR の 123 行の分類
 
@@ -36,7 +37,7 @@
 
 ### 3.1 分類器の検証 (合成入力 13 件・素材不要)
 
-`python3 tools/plugins/framework/fw_blk_fold_map.py --selftest` で実行する (入力は `fw_blk_fold_map.py` の `SELFTEST_IR`)。旧版は同じ入力を `old.scan` / `old.classify` で読んだ。
+`python3 tools/plugins/framework/fw_blk_fold_map.py --selftest` で実行する (入力は `fw_blk_fold_map.py` の `SELFTEST_IR`)。測定 commit `ba58ff628` で `selftest 13 cases, 0 fail`。旧版は同じ入力を `old.scan` / `old.classify` で読んだ。
 
 | 関数 / insn.addr | 入力の型 | 期待 | 旧版 `ab210bc8b` | 修正版 `c7ef3b716` |
 |---|---|---|---|---|
@@ -54,30 +55,31 @@
 | a002 / 1015 | 非 BLK の load の値を BLK 番地へ store | NOBLK | BLK (誤) | NOBLK |
 | a003 / 1013 | br の label 参照 | NOBLK | UNK (誤: label を値に数えた) | NOBLK |
 
-- 旧版は 13 件中 8 件が誤り (1001・1002・1006・1007・1011・1012・1013・1015)。修正版は 13/13 一致 (`selftest 13 cases, 0 fail`)。
+- 旧版は 13 件中 8 件が誤り (1001・1002・1006・1007・1011・1012・1013・1015)。修正版は 13/13 一致。
 
-### 3.2 旧版の分類結果 (無効・結論に使わない)
+### 3.2 修正版の分類結果 (修正前 IR 123 行 → 修正後 IR `fw0`〜`fw7`)
 
-旧版 (`ab210bc8b`) で修正前 IR の 123 行を分類した結果。§3.1 の誤判定 (BLK 側の過大・取りこぼし) を含むため、件数は根拠にしない。修正版での再分類は §7 の素材待ち。
+`python3 tools/plugins/framework/fw_blk_fold_map.py $R/old/fw6.restored.ll tools/plugins/work/fw/fw[0-7].restored.ll --csv $R/fold.csv` (測定 commit `ba58ff628`)。旧版 (`ab210bc8b`) の 104 / 11 / 8 は §3.1 の誤判定を含むため無効で、本節の値に置き換える。
 
-| 分類 (旧版) | 件数 | 意味 |
-|---|---|---|
-| BLK | 104 | (旧判定器) 値の流れを遡ると BLK 読みに届く |
-| UNK | 11 | (旧判定器) 呼出し結果・判定不能 |
-| MISS | 8 | 修正後 IR に同じ (関数, insn.addr) の命令が無い |
-| 計 | 123 | `!insn.addr` の無い 16 行は直前の insn.addr を引き継ぎ (分類の `*`) |
+| 分類 | 件数 | うち NOADDR 行の引継ぎ (`*`) | 意味 |
+|---|---|---|---|
+| BLK | 106 | 7 | 値の流れを SSA で遡ると BLK 読みに届く |
+| NOBLK | 0 | 0 | 遡った全経路が BLK 読みに届かず、関数引数・呼出し結果にも当たらない |
+| UNK | 9 | 9 | 判定不能。直接の命令 (insn.addr あり) では 0 件で、全件が NOADDR 行の引継ぎ |
+| MISS | 8 | 0 | 修正後 IR に同じ (関数, insn.addr) の命令が無い (5 関数・8 行) |
+| 計 | 123 | 16 | `!insn.addr` の無い 16 行は直前の insn.addr を引き継ぐ (分類の `*`) |
 
-- 52 関数に散在 (上位 `function_63fde0`・`function_463820`・`function_550000`・`function_5928f0`)。
-- 旧版で数えた対照 (無作為 300 件の一般命令) と内訳 (遡り無しの件数・uselistorder・NOADDR の件数) は、committed script と §8 の手順からは再現できないため削除した (Git 履歴の `ab210bc8b` に残る)。
+- 52 関数に散在。上位は `function_63fde0` (BLK 10 行)・`function_463820` (BLK 6)・`function_550000` (BLK 5)。
+- MISS 8 行の内訳: `function_413d90` 2・`function_4414d0` 1・`function_5e07b0` 2・`function_5e0b10` 2・`function_5ef360` 1。修正後 IR で命令が消えたか移動したかは未確認 (§7)。
 
 ## 4. 受入 1 の後半: 修正後 IR で入口分岐が定数式でない
 
-| | 修正前 IR (`fw6.restored.ll` 5141 行) | 修正後 IR (`fw6.restored.ll` 5545〜5547 行) |
+| | 修正前 IR (`fw6.restored.ll` 5141 行。`br i1 or (i1 icmp` の行は fw6 に 32 行) | 修正後 IR (`fw6.restored.ll` 5541〜5547 行。同じ形の行は 0 行) |
 |---|---|---|
-| 入口分岐 | `br i1 or (icmp eq (and (p,p),0), icmp slt (and (p,p),0))` (`p` = `ptrtoint @1`・定数式) | `%14 = trunc i64 %2`・`%2 = load i64 inttoptr (9048088)` (BLK+0x18 の実読み)・`%15 = icmp slt i32 %14, 1`・`br i1 %15` |
-| 意味 | `x==0 ∨ x<0` (`x` = `p`) ⇔ `x<1` | 同じ `x<1`。ただし `x` は BLK の実読み |
+| 入口分岐 | `br i1 or (i1 icmp eq (i32 and (ptrtoint @1, ptrtoint @1), 0), i1 icmp slt (...))` (`@1` の定数式) | `%2 = load i64, i64* inttoptr (i64 9048088)` (BLK+0x18 の実読み)・`%14 = trunc i64 %2 to i32`・`%15 = icmp slt i32 %14, 1`・`br i1 %15` |
+| 意味 | 定数式の比較 (値は `@1` の番地で決まる) | `x<1` の比較。`x` は BLK の実読み |
 
-- 修正後 IR では `ptrtoint ([2 x i8]* @1 to i32)` が 0 行 (修正前 123 行)、`@global_var_8a10*` の constant global が 0 件 (修正前 4 件)。REPORT_2566 §4 の数値を再現した。
+- 修正後 IR の `ptrtoint ([2 x i8]* @1 to i32)` は `fw0`〜`fw7` で 0 行 (修正前は 81・314・139・0・67・146・123・98 行で合計 968 行)。
 - この節は IR の目視と grep による観測で、分類器の判定を使っていない。
 
 ## 5. 受入 5: section 伸び `+0x45970` B の切り分け
@@ -108,7 +110,7 @@
 
 | 受入 | 状態 | 根拠 |
 |---|---|---|
-| 1. 旧 IR 123 行の BLK / 他由来の分類と、修正後 IR の入口分岐 | 未達 (分類器は修正済み・実 IR の再分類は素材待ち) | §3.1 (分類器の検証)・§4 (入口分岐)。§3.2 の旧値は無効 |
+| 1. 旧 IR 123 行の BLK / 他由来の分類と、修正後 IR の入口分岐 | 達成 | §3.2 (BLK 106・NOBLK 0・UNK 9・MISS 8)・§4 (入口分岐は定数式でない)。§3.2 の旧値は無効 |
 | 2. `init_reach` の直接呼出の計測 | 未達 (blocked) | #3120 が OPEN で smoke 未 PASS。PASS 後に測る |
 | 3. n≥3 の実測 | 未達 (blocked) | 同上 |
 | 4. RetDec が BLK slot を constant にする機構 | 未達 | 観測のみ (§4: 修正後 IR で BLK の constant global が 0 件)。最小再現は未着手 |
@@ -118,33 +120,36 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 修正版の分類器で実 IR を再分類し、§3.2 を置き換える | 受入 1 の件数が未確定。素材 `work-fw-stage1`・`toolchain-retdec` が本 run に無い | #3121 (継続。PR 本文の `oc_artifacts:` 行で素材を指定して再実行) |
 | `init_reach` の直接呼出 (受入 2) と n≥3 (受入 3) | #3120 の smoke PASS が前提 | #3121 (継続。#3120 PASS 後に測る) |
 | RetDec が BLK slot を constant にする機構 (受入 4) | BLK を外すだけで fold が消えるかが未確定 | #3121 (継続) |
-| §5 の個別未測定の区間 (`809702b82`→`49eb6e68e` 7 件、`3dac0302c` 2 件、`fd3465111` 9 件、`bb7cb2677` 20 件、`5d33ba04a` 40 件、HEAD 21 件) | +96・+128 B の帰属の細部 | 再測定のみのため子 issue は起票しない (本表で記録) |
+| MISS 8 行 (5 関数) の不在の原因 | 修正後 IR で命令が消えたか移動したか未確認。BLK 106 の上下 8 件以内 | 再測定のみのため子 issue なし (本表で記録) |
+| §5 の個別未測定の区間 (`809702b82`→`49eb6e68e` 7 件、`3dac0302c` 2 件、`fd3465111` 9 件、`bb7cb2677` 20 件、`5d33ba04a` 40 件、HEAD 21 件) | +96・+128 B の帰属の細部 | 再測定のみのため子 issue なし (本表で記録) |
 
 ## 8. 再現手順
 
 ```sh
-python3 tools/plugins/framework/fw_blk_fold_map.py --selftest      # 合成入力 13 件・素材不要 (c7ef3b716 で 13/13)
-git worktree add ../ws-3121 -b 3121-plg-p0b-30-blk-classify origin/main
-cd ../ws-3121 && tar --zstd -xf $ARTIFACTS_DIR/work-fw-stage1.tar.zst && tar --zstd -xf $ARTIFACTS_DIR/work-liftlib.tar.zst
-cp tools/plugins/work/fw/fw6.restored.ll $RUNNER_TEMP/old_fw6.ll   # 修正前 IR (fw_lift.sh が上書きする)
-D=$RUNNER_TEMP/fl-win64; mkdir -p $D && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $D extracted/block18983_PE.bin extracted/block00031_PE.bin
+python3 tools/plugins/framework/fw_blk_fold_map.py --selftest      # 合成入力 13 件・素材不要
+# 作業ツリーは PR ブランチ 3121-plg-p0b-30-blk-classify の worktree (実測は ws-3909)
+W=tools/plugins/work/fw; R=$RUNNER_TEMP
+tar --zstd -xf $ARTIFACTS_DIR/work-fw-stage1.tar.zst -C .          # 修正前 fw0〜fw7・旧 fw_icall.dll (F.ranges は無い)
+mkdir -p $R/old && cp $W/fw[0-7].restored.ll $R/old/               # 修正前 IR (fw_lift.sh が上書きする)
+mkdir -p $R/fl-win64 && tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst -C $R/fl-win64 extracted/block18983_PE.bin extracted/block00031_PE.bin
 echo '{}' > tools/plugins/work/fw_hash_counts.json
-FL_WIN64_DIR=$D python3 tools/plugins/framework/fw_prep.py
-cd tools/plugins/work/fw && python3 ../../../icall/icall_rewrite.py --pe $D/extracted/block18983_PE.bin --funcs F.ranges --out fw_icall.dll --map fw_map.json && cd ../../../..
-FL_WIN64_DIR=$D bash tools/plugins/framework/fw_lift.sh                 # 10 分 16 秒 (旧測定)・RetDec は [RETDEC] 必要
-python3 tools/plugins/framework/fw_blk_fold_map.py $RUNNER_TEMP/old_fw6.ll tools/plugins/work/fw/fw[0-7].restored.ll --csv $RUNNER_TEMP/fold.csv
+export FL_WIN64_DIR=$R/fl-win64
+python3 tools/plugins/framework/fw_prep.py                         # 20.1 s (§2)
+(cd $W && python3 ../../../icall/icall_rewrite.py --pe $FL_WIN64_DIR/extracted/block18983_PE.bin --funcs F.ranges --out fw_icall.dll --map fw_map.json)   # 21.2 s
+bash tools/plugins/framework/fw_lift.sh                            # 5 分 42 秒 (§2)。fw_icall.dll があれば icall 段は飛ばす
+python3 tools/plugins/framework/fw_blk_fold_map.py $R/old/fw6.restored.ll $W/fw[0-7].restored.ll --csv $R/fold.csv
 ```
 
-- 素材 (PR 本文の `oc_artifacts:` 行): `fl-win64 toolchain-retdec toolchain-emsdk work-fw-stage1 work-liftlib`。`toolchain-retdec` は `[RETDEC]` に展開される (`docs/REFERENCES.md` §4)。
+- `[RETDEC]` が無い runner では `toolchain-retdec` を展開して `[RETDEC]` に置く (`docs/REFERENCES.md` §1)。
+- 素材 (PR 本文の `oc_artifacts:` 行): `fl-win64 toolchain-retdec toolchain-emsdk work-fw-stage1 work-liftlib`。本手順で使うのは `fl-win64`・`work-fw-stage1` (と `[RETDEC]` が無いときの `toolchain-retdec`)。
 - §5 は `git archive <commit> tools/icall | tar -x -C <dir>` で版を取り出し、`F.ranges` を複写して `icall_rewrite.py` を同じ引数で実行し、`section +N B` を読む。区間の commit 数は `git rev-list --first-parent --count A..B -- tools/icall`。
 
 ## 9. コード差分 (測定 commit 以降)
 
-分類器の測定 commit は `c7ef3b716`。以降の実行コードの差分は無し (本 PR の追記は REPORT と DOC_MAP のみ)。
+分類器の測定 commit は `ba58ff628`。以降の実行コードの差分は無し (本 PR の追記は REPORT と DOC_MAP のみ)。`c7ef3b716` → `ba58ff628` の差分は `fw_blk_fold_map.py` の docstring の 1 行 (受入番号)。
 
 ```sh
-git diff c7ef3b716 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'   # 空 = 実行コード差分 0
+git diff ba58ff628 HEAD -- tools/plugins/framework tools/icall tools/liftlib ':!*.md'   # 空 = 実行コード差分 0
 ```
