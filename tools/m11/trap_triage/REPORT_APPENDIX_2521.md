@@ -47,6 +47,8 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 
 ### 8.5 #3482: unit 144 の trap の直接原因 (計測)
 
+> 注 (fix round 1): 本節の数値は PR 時点の IR (ir_sha256 `116d9406…`) での計測。同じ手順を本 run の IR (`e608b0f3…`) で取り直すと (§8.6)、unit 144 は OFF でも trap し、ON 固有の差は出なかった。『ON で unit 144 が ok → oob』『OFF の `[0]` = 0x10bd4c01』は本 run では再現していない。trap 経路の記述は probe 下の経路として §8.6 で再確認した。
+
 測定 commit `aa04b5352` (`tools/m11/m11_ov.c` に `M11_PROBE_LIST` (既定 0) の計測 probe を追加。既定ビルドは変わらない)。基点 `bd4463eaa` (origin/main)。IR は `m11_gen_ir2.sh` で作り直し (ir_sha256 `116d9406…`・`r8b=applied`)。素材 fl-win64・work-m11・toolchain-retdec は `$RUNNER_TEMP` と worktree に展開。直列 1 本。
 
 | 条件 | 環境変数 | survey ok / trap / miss | 基準 (OFF) との unit 差 |
@@ -56,8 +58,8 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 | OFF + probe | `M11_PROBE_LIST=1` | 874 / 21 / 46 | probe が挙動を変える (unit 153 が変化。計測値として使わない) |
 | ON + probe | `M11_FIX_50A830=1 M11_PROBE_LIST=1` | 872 / 23 / 46 | 計測の trace 用 |
 
-- e2e (既定): rc=1 (既知: tolerant 通常起動 101 ≠ 期待 56、survey ok 873 ≠ 期待 872)。`m11_e2e.sh` の所要 約 73 s (IR 再生成 51 s を除く)。load average は 0.42〜0.48。
-- trap の経路: `function_407e20` は `[arg1-8]` (hdr) が 0 のとき `[0]` (wasm アドレス 0) を次の block として読む。`[0]` が範囲外なら trap する。
+- e2e (既定): rc=1 (既知: tolerant 通常起動 101 ≠ 期待 56、survey ok 873 ≠ 期待 872)。`m11_e2e.sh` の所要は 73 s (IR 再生成 51 s を除く)。load average は 0.42〜0.48 (いずれも単発・n=1)。
+- trap の経路 (probe 下・PR 時点の IR。§8.6 で再確認): `function_407e20` は `[arg1-8]` (hdr) が 0 のとき `[0]` (wasm アドレス 0) を次の block として読む。`[0]` が範囲外なら trap する。
 - unit 144 で `function_412d60` (参照解放: `[arg1]=0`、`[arg1-8]` を減算、0 なら `function_409440(arg1-16)`) に渡る `arg1` = `0x6c`。解放される値は `0x5c` (ポインタでない)。`[0x54]` (= hdr) は OFF/ON とも 0。
 - 差は `[0]` の内容だけ: OFF = `0x10bd4c01` / ON = `0x865901` (`409440(0x5c)` の `[hdr]` の値)。OFF の `[0]` は lift 版 `function_50a830` が nil の FItems (items=0) に `Q(0 + cnt*8) = item` で書いた残骸と推定 (unit 114 の Add が `[0]` へ書く)。ON では list が Grow されるため、この残骸は残らない。ON の `[0]` の書込み元は**未特定**。
 - unit 144 自身には list 操作が無い (`[probe_list]` 0 件)。範囲外の値が list Add で入る経路は無い (ON の Add 32 件はすべて範囲内の item)。
@@ -66,5 +68,51 @@ wasm スタック (内側→外側、`m11_wasmnames.py` で名前化): `function
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| ON の `[0]` (= 0x865901) の書込み元と、unit 144 が `412d60(0x6c)` に至る nil 読みの元 (どの list・配列が nil のまま読まれるか) | 既定 ON 不可 (survey ok −1) | 子 issue (本 PR の issue コメントに番号) |
+| ON の `[0]` (= 0x865901) の書込み元と、unit 144 が `412d60(0x6c)` に至る nil 読みの元 (どの list・配列が nil のまま読まれるか) | 既定 ON 不可 (survey ok −1) | #3592 ([M11-24]) |
 | 既定 ON 化と e2e 期待値 (tolerant 101 ≠ 56、survey 872/873) | e2e rc=1 | PM 判断 (§8.3 の既存未解決) |
+
+### 8.6 fix round 1: 再測定 (ON / OFF / probe の unit 別突合)
+
+測定は実測・単発 (n=1)。survey は直列 1 本、1 回 12 s。測定 commit `24a8965bd` (コード差分の最終 commit。基点 `bd4463eaa`)。`git diff 24a8965bd HEAD -- tools/m11 ':!tools/m11/trap_triage'` の出力は 0 行。IR は本 run で `m11_gen_ir2.sh` を作り直した (`ldfix`・`ld108`・`ld115`・`r8b` = applied)。`m11_build.sh` 後は `qstore=applied`、ir_sha256 `e608b0f3…`。PR 時点の `116d9406…`・REPORT §1 の `6909f85d…`・#3482 本文の `17a98d6e…` のいずれとも異なる。IR の sha が環境ごとに変わる理由は未切り分け。
+
+| 条件 | ok / trap / miss (noproc) | unit 144 (0x25c540) | OFF との unit 差 |
+|---|---|---|---|
+| OFF (既定) | 873 / 21 / 47 (1) | trap | — |
+| ON `M11_FIX_50A830=1` | 873 / 21 / 47 (1) | trap | 0 件 |
+| OFF + probe `M11_PROBE_LIST=1` | 873 / 21 / 47 (1) | trap | 0 件 |
+| ON + probe | 871 / 23 / 47 (1) | trap | 2 件 (下) |
+
+- ON + probe と ON の差は 2 件: unit 304 (VA `0x483140`)・unit 555 (`0x7f2500`) が ok → `memory access out of bounds`。OFF + probe と OFF の差は 0 件。
+- 再現性: ON を 2 回取って 0 件差。ON + probe を 2 回 (trace 付きを含む) 取って 0 件差 (942 unit)。
+- trap 経路 (probe 下): unit 144 の trace は ON + probe・OFF + probe とも `[probe_free] arg1=5c hdr=0 [hdr]=865901` (同じ値)。unit 745 は `arg1=10ba240c hdr=ffffffa0 [hdr]=0`。
+- trace 行の件数 (ON + probe): `[probe_list]` 30・`[probe_grow]` 9・`[probe_free]` 2。§8.5 の『list Add 32 件』は PR 時点 IR の値。
+- 判定: 『ON で unit 144 が ok → oob』は本 run では成立しない (OFF でも trap)。trap 経路 (`412d60(0x6c)` → `409440(0x5c)` → `407e20` で `[0]` が範囲外) は probe 下で ON/OFF とも再現した。ON 固有の回帰の有無は、PR 時点の IR と同じ sha を再現できてから判定する (#3592 の受入)。
+- ov.o の注意 (本 fix round で修正): `m11_build.sh` は `M11_FIX_50A830` の切替えで `work/obj/ov.o` を作り直さなかった (stamp 無し)。stamp `work/ov_fix_50a830.stamp` を追加した。上の数値は、対応する ov.o を作り直した後に取った (OFF は `rm work/obj/ov.o` の後、ON は stamp 追加後の再ビルドで `cc m11_ov.c` 1 件を確認)。
+
+GUI (m2): `tools/gui/flengine/build.sh` は `m11_ov.c` を独自の CF で直接コンパイルする。差し戻し時の reviewer 実測 (同じ CF の `cc -E -P`): 基点 `bd4463eaa` と PR head の既定出力は同一 (9132 行・差 0)。`-DM11_PROBE_LIST=1` のみ +6 行 (ネガティブコントロール)。本 run では GUI の e2e は実行していない。
+
+main との関係 (m3): `git merge-tree --write-tree origin/main HEAD` は競合なし (rc 0)。`git diff --stat bd4463eaa origin/main -- tools/m11` は 15 files。merge 後の既定 e2e は未測定。
+
+再現手順 (1 コマンドずつ。作業ディレクトリはリポジトリのルート):
+
+```sh
+mkdir -p "$RUNNER_TEMP/win64" && tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C "$RUNNER_TEMP/win64" extracted/block00031_PE.bin
+tar --zstd -xf "$ARTIFACTS_DIR/work-m11.tar.zst"
+cd tools/m11 && FL_WIN64_DIR="$RUNNER_TEMP/win64" bash m11_gen_ir2.sh
+cd tools/m11 && FL_WIN64_DIR="$RUNNER_TEMP/win64" M11_FIX_50A830=1 M11_PROBE_LIST=1 bash m11_build.sh
+cd tools/m11 && M11_SURVEY_DETAIL="$RUNNER_TEMP/detail_on_probe.json" node m11_survey.mjs
+cd tools/m11 && M11_SURVEY_DETAIL="$RUNNER_TEMP/detail_trace.json" bash trap_triage/probe_trace.sh 2> "$RUNNER_TEMP/trace.err" > "$RUNNER_TEMP/trace.out"
+awk '/^\[UNIT\] /{u=$2} /\[probe_(free|list|grow)\]/{print "unit=" u, $0}' "$RUNNER_TEMP/trace.err"
+```
+
+- OFF / ON の切替え: `cd tools/m11 && FL_WIN64_DIR="$RUNNER_TEMP/win64" bash m11_build.sh` (OFF) または `… M11_FIX_50A830=1 …` (ON) の後、`M11_SURVEY_DETAIL=<path>.json node m11_survey.mjs`。
+- unit 差分: `python3 -c "import json,sys; a=json.load(open(sys.argv[1])); b=json.load(open(sys.argv[2])); print([(x['i'],x['kind'],y['kind']) for x,y in zip(a,b) if x!=y])" A.json B.json`
+- 集計: survey の標準出力 `M11_SURVEY {...}` の `"ok"`・`"trap"`・`"miss"`・`"noproc"`。
+- unit 144 のスタック: `M11_SURVEY_STACK=144 node m11_survey.mjs`。
+- `trap_triage/probe_trace.sh` は `m11_survey.mjs` の複製 (printErr を stderr に流し、各 unit の前に `[UNIT] <i>` を出す。`work/m11_survey_trace.mjs` に作る) を実行する。unit 結果は `m11_survey.mjs` と一致 (ON + probe で 0 件差)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| 本 run の IR (`e608b0f3…`) で ON と OFF が一致し、unit 144 は両方 trap。PR 時点の IR (`116d9406…`) との差 (IR 生成の決定性か環境差か) | 既定 ON 化の判定 (ON 固有の回帰が再現しない) | #3592 ([M11-24]) |
+| `412d60(0x6c)` の元の nil 読みと、ON・OFF の `[0]` (0x865901) の書込み元 | trap の原因 (probe 下) | #3592 ([M11-24]) |
+| merge 後の既定 e2e は未測定 | merge 後の既定 e2e の結果が未確認 | PM 判断 (merge 後の確認) |
