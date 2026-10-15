@@ -20,7 +20,7 @@
 | 入力 | `targets/m11.json`・`--set sample:800`・`--nobuild` (build は `liftdiff.py build targets/m11.json` を先に実行: `[build] OK`・`wasm_size` 4463122・10 s) |
 | units state | `--state auto` (`bootstate targets/m11.json --nobuild`: `units_run=22/942`・precondition ok=False。LD-42 の既存状態) |
 | hybrid state | `--state work/m11/boot_state_hybrid.json` (`bootstate --mode hybrid --nobuild`: `units_run=928/942`・`first_fail=830`・precondition ok=True) |
-| 素材 | `fl-win64` を `$RUNNER_TEMP/fl-win64` へ展開 (`FL_WIN64_DIR`)。`work-m11` は `tools/m11/work/`、`work-liftdiff` は `tools/liftdiff/work/` へ展開。`[EMSDK]` は runner の `/opt/emsdk` |
+| 素材 | `fl-win64` を展開して `FL_WIN64_DIR` に指定 (`[WIN64]`・展開手順は `docs/WORKFLOW.md` §11)。`work-m11` は `tools/m11/work/`、`work-liftdiff` は `tools/liftdiff/work/` へ展開。`[EMSDK]` (`docs/REFERENCES.md` §4) |
 | 機 | 4 vCPU・15 GiB。run は直列 |
 | limits | native ITIMER 1.5 s (recv 10.0 s)・wasm vm 1.000 s (recv 10.0 s) (`[batch] limits` 行) |
 
