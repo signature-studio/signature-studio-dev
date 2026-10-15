@@ -20,7 +20,7 @@
 - **304 と 555 は base・soft の両方が `memory access out of bounds`** (base 側も ok ではない)。923 も両方 OOB。issue 本文の「base は ok」は現 main の測定と合わない。GUI 結合による新規 trap ではない。
 - **304/555 の真因 (受入条件 1)**: 未達。`[M11-N91]` (#1426・OPEN: OOB 直前の tbl/cnt/obj の実値採取と obj の生成元特定) と #714 (`function_535c2e` 系) の既存調査にある。本 run では wasm の local を読む計測を入れていない。
 - **#1275 系統の判定 (受入条件 2)**: 同系統ではない。#1275 (`tools/m11/trap_triage/REPORT_1275.md`) の 304/555 は **ClassCreate ON 時の abort** (`function_535c2e` の未定義 closure 外)。本 e2e は ClassCreate OFF (既定) で、304/555 は OFF でも OOB のまま。OFF の OOB は `function_535bf2` が先頭フレーム (REPORT_1275 §3 の OFF 行)。したがって OFF の OOB 原因は #1275 の abort とは別経路で、#1426 側。
-- **S1 の残り (101/291/296)**: base 側だけ trap する 3 unit。survey の順序依存 (REPORT §5-6 の既知) か GUI 実装の差かは未切り分け。子 issue #1635 `[GUI-22]` で扱う。
+- **S1 の残り (101/291/296)**: 現 IR では base/soft とも同じ結果 (差は無い)。差分は 304/555 (survey 順序依存) で、#1635 `[GUI-22]` の切り分けと隔離条件の統一は [REPORT_APPENDIX_1635.md](REPORT_APPENDIX_1635.md) を正とする。
 
 未解決 (起票先付き): 受入条件 1 は #1426 (304/555/923 の OOB 実値採取)。S1 の 3 unit は #1635 `[GUI-22]`。現 HEAD の S1 FAIL (`870/1/47/24/0` vs `867/1/47/27/0`) は本 PR で解消しない (`Refs #1442`)。
 
