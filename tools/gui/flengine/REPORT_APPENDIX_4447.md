@@ -9,41 +9,52 @@
 - **出力**: `tools/gui/flengine/run.mjs` の結果 JSON に `units_dispatched` を追加 (`units_run` と同値の別名。flelift の語彙に合わせる)。
 - **却下した候補**: `m11_disp_count()` は `m11_disp_n` (間接呼出テーブルの件数 = 8621) を返すだけで dispatch 件数ではない。`disp_entries` と同じ値のため使わない。
 
-## 2. 前後比較 (同一 HEAD・shim の heap.c だけ差し替え)
+## 2. 前後比較 (再測定は未実施)
+
+**状態: 未解決。下表は受入の根拠にしない。** 差し戻し (oc-review round 1) の指摘 1 を、この run では再測定できなかった。
 
 - 測定 commit: `9bfcc26a3` (`feat(gui): report units_dispatched`)。コード差分は `tools/gui/flengine/run.mjs` の 1 行だけ。
-- `a4a620a9^` 側: 同 HEAD の `tools/shim/src/heap.c` を `git show a4a620a9^:tools/shim/src/heap.c` に差し替え、`build.sh` → `run.mjs` (通常起動)。
-- `a4a620a9` 側: 差し替えなし (HEAD の heap.c)。e2e の boot 結果 `results/boot.json`。
+- 旧表の問題: 「`a4a620a9` (HEAD `9bfcc26a3`)」側は HEAD の `tools/shim/src/heap.c` (blob `01bfe4b01`) をそのまま使った。`a4a620a9` の blob は `45ba1484e` で、`01bfe4b01` には後続の `7278e8571` (fix(shim): report HeapFree like the native reference, #2821) が入る。つまり旧表の比較は `cde475fbc` と `01bfe4b01` の比較で、issue #4447 の受入 (`a4a620a9^` と `a4a620a9`) とは一致しない。
+- 必要な再測定: `a4a620a9^` 側は `cde475fbc`、`a4a620a9` 側は `45ba1484e` を `tools/shim/src/heap.c` に入れ、同一 HEAD で `build.sh` → `run.mjs` を実行する。
+- 再測定を止めた理由: `tools/m11/work` (work-m11) が無く、`emcc`・`retdec-decompiler`・`x86_64-w64-mingw32-gcc` が PATH に無い。`$HOME/artifacts` は `fl-win64.tar.zst` のみ。必要な素材は `work-m11 toolchain-emsdk toolchain-retdec apt-mingw` (PR 本文の `oc_artifacts:` 行で指定)。
 
-| 項目 | `a4a620a9^` | `a4a620a9` (HEAD `9bfcc26a3`) |
+旧表 (参考。受入根拠ではない):
+
+| 項目 | `cde475fbc` (`a4a620a9^` の heap.c) | `01bfe4b01` (HEAD の heap.c) |
 |---|---|---|
-| `units_dispatched` (dispatch 件数) | 109 | 109 |
+| `units_dispatched` | 109 | 109 |
 | `units_run` | 109 | 109 |
 | `init_count` | 111 | 111 |
-| `dllmain_done` | true | true |
 | `icall_miss` | 7 | 7 |
 | GetMem / FreeMem | 760 / 24 | 760 / 24 |
 
-- 差は 0 件。`a4a620a9` の heap.c 修正 (範囲外ポインタの拒否) は、通常起動の unit 進行 (dispatch 数) を変えない。
-- 前回 `65844e9ef` の実測 (`REPORT_APPENDIX_LD136.md` §7) でも units_run 109・GetMem 760 だった。今回と一致する。
+- 前回 `65844e9ef` の実測の出典は `tools/liftdiff/REPORT_APPENDIX_LD136.md` §7 (B1 boot parity 行: `52 (base 52) · 560 · 20 · 5`)。この行には units_run 109・GetMem 760 の値は無い。`65844e9ef:tools/gui/flengine/results/boot.json` は `units_run` 109・`GetMem` 761・`FastMM_GetMem(407a50)` 782 (同 commit の結果 JSON から直接確認)。
 
-## 3. e2e 実測 (測定 commit `9bfcc26a3`)
+## 3. boot.json の GetMem / FastMM の変化
 
-- 実行: `bash tools/gui/flengine/e2e.sh` を foreground で 1 回。素材 `fl-win64` `toolchain-emsdk` `toolchain-retdec` `work-m11` を展開。`apt-mingw` 相当の `x86_64-w64-mingw32-gcc` は runner に存在。
-- 所要 620 s。load 開始 0.23 / 終了 1.17。nproc 4。
-- judge 14/15 (exit 1)。FAIL は B1 のみ。`units_run 109 (base 109)` `dllmain True` `GetMem 760 (base 761)` `FreeMem 24` `icall_miss 7`。前回 head (`65844e9ef`) と同じ FAIL 形。
+- `results/boot.json` の差分 (`9bfcc26a3` → `HEAD`): `GetMem 761→760`・`FastMM_GetMem(407a50) 782→781`。`units_run` 109 と `FreeMem` 24 は変わらない。
+- 結果 JSON を生成した run の番号・素材・commit は確認できなかった (旧 run のログが無い)。したがって「この変化の原因」は実測では確定していない。
+- 候補 (未測定): `65844e9ef` → `9bfcc26a3` の間に入った `tools/m11/m11_ov.c` の変更 `22c914300` (`fix(m11): transcribe function_40d210 (FillChar memset) n>32 body`, #3921)。`function_40d210` は `m11_ov.c` 内の GetMem 周辺 (行 966・982・993) から呼ばれるため、GetMem 件数を 1 減らす経路として妥当な候補。ただし、この変更を外して測って確かめるまでは原因とは言えない。
+- `run.mjs` の変更 (`33585cb01`・`7f54678a7` 系の survey 隔離) は survey モードの処理で、通常起動の boot 経路には入らない (`git diff 65844e9ef 9bfcc26a3 -- tools/gui/flengine/run.mjs` で確認)。
+- 結論: `units_dispatched` の追加自体は GetMem を変えない。GetMem の 1 件減は上記の m11 側変更に由来する可能性が高い。確定には `22c914300` の前後を同一 HEAD で測り直す必要があり、この run では未実施。
+
+## 4. e2e 実測 (測定 commit `9bfcc26a3`)
+
+- 実行: `bash tools/gui/flengine/e2e.sh` を foreground で 1 回 (前回 run の記録)。所要 620 s。load 開始 0.23 / 終了 1.17。nproc 4。
+- judge 14/15 (exit 1)。FAIL は B1 のみ。`units_run 109 (base 109)` `dllmain True` `GetMem 760 (base 761)` `FreeMem 24` `icall_miss 7`。`65844e9ef` と同じ FAIL 形。
 - native selftest・pe_image parity・pe_image e2e・ネガコン N1〜N10 は期待どおり。
 - `units_dispatched` は JSON 上で 109。
 
-## 4. 製品 KPI (前後)
+## 5. 製品 KPI (前後)
 
-- 起動 dispatch 数: 前 109 / 後 109 (差 0)。
-- 通過 unit 数: 前 109 / 後 109。
+- 起動 dispatch 数: 前 109 / 後 109 (差 0)。ただし前側は上記 §2 の再測定未実施のため、比較としては未確定。
+- 通過 unit 数: 前 109 / 後 109 (同上)。
 - 最初のウィンドウ: P4 `hwnd=0x1100013`・P5 `hwnd=0x1100012` (ともに PASS)。
 - `tools/flelift/boot` の 209 dispatch とは別の経路 (GUI shim 経路の値)。混同しない。
 
-## 5. 未解決
+## 6. 未解決
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| B1 の GetMem 760 対 761 (1 件差) | e2e judge が 14/15 のまま | #4093 系の既存追跡 (本 PR の範囲外) |
+| `a4a620a9^` / `a4a620a9` の heap.c を正しく差し替えた再測定 (指摘 1) | 受入「前後を REPORT に書く」が未達。KPI の前後比較は確定していない | 本 PR で追跡 (素材 `work-m11 toolchain-emsdk toolchain-retdec apt-mingw` を指定して再実行) |
+| GetMem 760 対 761 の原因 (`22c914300` が候補) | judge B1 の 1 件差 (本 PR 前から同じ FAIL) | 起票なし (受入条件の外。原因の切り分けは未実施) |
