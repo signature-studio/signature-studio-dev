@@ -169,4 +169,10 @@ export function selectDispatch(
   return { send, skipped };
 }
 
-export const pruneHistory = (now: number, h: HistoryEntry[]): HistoryEntry[] => h.filter((x) => now - x.at < PM_LIMITS.dayMs);
+export const pruneHistory = <T extends { at: number }>(now: number, h: T[]): T[] => h.filter((x) => now - x.at < PM_LIMITS.dayMs);
+
+// 毎時上限 (hourMax) で見送った件数。tick ごとに 1 件 (時刻と件数)。pruneHistory と同じ 24 時間の窓で捨てる (#3462)。
+export interface SkipEntry {
+  at: number;
+  n: number;
+}

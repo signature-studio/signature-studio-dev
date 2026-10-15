@@ -235,6 +235,26 @@ export function createMockEngine() {
     },
     "channels.quickQuantize": (i) => { ch(i); },
     "channels.showEditor": (i) => { ch(i); },
+    // PY-40 (#1529): PE 0xd5ca50 / 0xd5c920 / 0xd5cbd0 / 0xd5c180 / 0xd5c5d0 (C provider と同一)。index は 0..件数-1 (範囲外 code 4)。述語・UI 副作用は未モデル
+    "channels.closeGraphEditor": (...a) => { arity(a, 1, 1); argI(a, 0, 0); },
+    "channels.updateGraphEditor": (...a) => { arity(a, 0, 0); },
+    "channels.showGraphEditor": (...a) => {
+      arity(a, 4, 5);
+      argI(a, 0, 0); argI(a, 1, 0); argI(a, 2, 0);
+      const idx = argI(a, 3, 0);
+      argI(a, 4, 1);
+      if (idx < 0 || idx >= st.channels.length) throw RANGE();
+    },
+    "channels.showCSForm": (...a) => {
+      arity(a, 1, 3);
+      const idx = argI(a, 0, 0); argI(a, 1, 1); argI(a, 2, 0);
+      if (idx < 0 || idx >= st.channels.length) throw RANGE();
+    },
+    "channels.focusEditor": (...a) => {
+      arity(a, 1, 2);
+      const idx = argI(a, 0, 0); argI(a, 1, 0);
+      if (idx < 0 || idx >= st.channels.length) throw RANGE();
+    },
     "mixer.trackCount": () => st.mixer.length,
     "mixer.getTrackName": (i) => tr(i).name,
     "mixer.setTrackName": (i, n) => { tr(i).name = n; },

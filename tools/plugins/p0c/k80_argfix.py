@@ -35,6 +35,10 @@ RetDec が落とす引数を機械語 ABI 走査 (k80abi.py: win64 slot の read
         slot (= 引数) なら `%in.xmmN.bits` を追加して zext で接続する。placeholder が
         複数 use を持つ場合は全 use が同一 slot を指すときだけ接続する。
 
+  [D] ucomiss/comiss の flags (0x5e12b0): `or i1 %CF, %ZF` の placeholder を、被演算子の比較
+      `fcmp ult` (CF) / `fcmp ueq` (ZF) に接続する (被演算子が接続済みの場合のみ)。
+      [C] は戻り値の無い `call void @__asm_ucomiss` も被演算子の接続先にする。
+
   引数は既存 RetDec 引数の **末尾に追記** (既存参照を壊さない; m7 ir7 と同じ規約)。
   適用後は llvm-as 通過を推奨 (idempotent: 追加済みの store/引数は再適用しない)。
 """
@@ -46,6 +50,8 @@ import re
 SLOT_GPR = ['rcx', 'rdx', 'r8', 'r9']
 SLOT_XMM = ['xmm0', 'xmm1', 'xmm2', 'xmm3']
 SKIP_SPILLFIX = os.environ.get('K80_NO_SPILLFIX') == '1'
+SKIP_VOIDHELPER = os.environ.get('K80_NO_VOIDHELPER') == '1'
+SKIP_UCOMI_FLAGS = os.environ.get('K80_NO_UCOMI_FLAGS') == '1'
 
 
 def func_name(header):
@@ -332,8 +338,9 @@ def fix_helper_operand_xmm(header, body, habi, rep, fname):
                 continue
             helper_uses = []
             for l in uses:
-                hm = re.search(r'=\s*call\s+\w+\s+@(__asm_\w+)\(', l)
-                if not hm:
+                # 戻り値の無い helper (`call void @__asm_ucomiss(...)`) も被演算子の接続先 (0x5e12b0)
+                hm = re.search(r'(?:=\s*)?call\s+\w+\s+@(__asm_\w+)\(', l)
+                if not hm or (SKIP_VOIDHELPER and '= call' not in l and 'call void' in l):
                     helper_uses = None
                     break
                 helper_uses.append((l, hm.group(1)))
@@ -435,6 +442,80 @@ def fix_helper_operand_xmm(header, body, habi, rep, fname):
         if not fixed_any:
             break
     return header, body, changed
+
+
+RE_UCOMI = re.compile(r'^(\s*)call void @__asm_(u?comis[sd])(?:__\d+)?\(i128 (%[\w.$-]+), i128 (%[\w.$-]+)\)\s*$')
+RE_FLAG_OR = re.compile(r'^(\s*)(%[\w.$-]+) = or i1 (%[\w.$-]+), (%[\w.$-]+)\s*$')
+RE_LABEL = re.compile(r'^[\w.$-]+:')
+
+
+def _ucomi_one(lines):
+    zdef = {}
+    for k, ln in enumerate(lines):
+        m = re.match(r'^\s*(%[\w.$-]+) = xor i(?:128|1) 0, 0\s*$', ln)
+        if m:
+            zdef[m.group(1)] = (k, 'xor i1' in ln)
+    for k, ln in enumerate(lines):
+        m = RE_UCOMI.match(ln)
+        if not m:
+            continue
+        ind, mn, A, B = m.group(1), m.group(2), m.group(3), m.group(4)
+        if A in zdef or B in zdef:
+            continue
+        j = None
+        for t in range(k + 1, len(lines)):
+            if RE_LABEL.match(lines[t]):
+                break
+            if RE_FLAG_OR.match(lines[t]):
+                j = t
+                break
+        if j is None:
+            continue
+        fm = RE_FLAG_OR.match(lines[j])
+        f1, f2 = fm.group(3), fm.group(4)
+        if f1 not in zdef or f2 not in zdef or not (zdef[f1][1] and zdef[f2][1]):
+            continue
+        ok = True
+        for f in (f1, f2):
+            uses = [l for l in lines if re.search(r'(?<![\w.%-])' + re.escape(f) + r'(?![\w.-])', l)
+                    and not re.match(r'^\s*' + re.escape(f) + r' = ', l)]
+            if uses != [lines[j]]:
+                ok = False
+        if not ok:
+            continue
+        ity, fty = ('i32', 'float') if mn.endswith('ss') else ('i64', 'double')
+        tag = 'ucf.%d' % k
+        new = ['%s%%%s.a = trunc i128 %s to %s' % (ind, tag, A, ity),
+               '%s%%%s.af = bitcast %s %%%s.a to %s' % (ind, tag, ity, tag, fty),
+               '%s%%%s.b = trunc i128 %s to %s' % (ind, tag, B, ity),
+               '%s%%%s.bf = bitcast %s %%%s.b to %s' % (ind, tag, ity, tag, fty),
+               '%s%%%s.cf = fcmp ult %s %%%s.af, %%%s.bf' % (ind, tag, fty, tag, tag),
+               '%s%%%s.zf = fcmp ueq %s %%%s.af, %%%s.bf' % (ind, tag, fty, tag, tag)]
+        lines[j] = '%s%s = or i1 %%%s.cf, %%%s.zf' % (fm.group(1), fm.group(2), tag, tag)
+        lines[k + 1:k + 1] = new
+        return lines, f1, f2
+    return None
+
+
+def fix_ucomi_flags(header, body, rep, fname):
+    """[D] ucomiss/comiss の flags 接続 (0x5e12b0)。RetDec は flags を `xor i1 0,0` に落とす。
+
+    jbe/ja の判定は CF|ZF。ucomiss a,b の flags は CF = (a<b または非順序)、ZF = (a==b または非順序)
+    なので、`or i1 %CF, %ZF` の 2 placeholder を `fcmp ult` / `fcmp ueq` に接続する。
+    被演算子が未接続 (xor i128 0,0) のときと、placeholder が or 以外で使われるときは触らない (fail-closed)。
+    """
+    if SKIP_UCOMI_FLAGS:
+        return header, body, False
+    lines = body.split('\n')
+    changed = False
+    for _ in range(16):
+        res = _ucomi_one(lines)
+        if res is None:
+            break
+        lines = res[0]
+        rep['ucomi_flags_fixed'] = rep.get('ucomi_flags_fixed', 0) + 1
+        changed = True
+    return header, '\n'.join(lines), changed
 
 
 RE_STRUCT_COPY = re.compile(
@@ -575,7 +656,7 @@ def main():
     a = ap.parse_args()
     abi = json.load(open(a.abi)) if a.abi else {}
     rep = {'movd_sites': {}, 'movd_fixed': 0, 'orphan_float_fixed': 0, 'orphan_gpr_fixed': 0,
-           'helper_xmm_fixed': 0, 'struct_copy_fixed': 0, 'funcs': {}}
+           'helper_xmm_fixed': 0, 'ucomi_flags_fixed': 0, 'struct_copy_fixed': 0, 'funcs': {}}
 
     text = open(a.src, errors='replace').read()
     starts = [m.start() for m in re.finditer(r'(?m)^define [^\n]*\{', text)]
@@ -597,10 +678,11 @@ def main():
         habi = abi.get(va, {}) if va else {}
         h2, b2, c1 = fix_movd_from_zero(header, body, habi, rep, fname or '')
         h3, b3, c2 = fix_helper_operand_xmm(h2, b2, habi, rep, fname or '')
+        h3, b3, c25 = fix_ucomi_flags(h3, b3, rep, fname or '')
         h4, b4, c3 = fix_struct_copy(h3, b3, habi, rep, fname or '')
         h5, b5, c4 = fix_orphan_alloca(h4, b4, habi, rep, fname or '')
-        if c1 or c2 or c3 or c4:
-            rep['funcs'][fname] = {'movd': c1, 'helper': c2, 'struct': c3, 'orphan': c4}
+        if c1 or c2 or c25 or c3 or c4:
+            rep['funcs'][fname] = {'movd': c1, 'helper': c2, 'ucomi': c25, 'struct': c3, 'orphan': c4}
         out.append(h5 + b5 + '\n}\n' + inter)
 
     result = ''.join(out)
