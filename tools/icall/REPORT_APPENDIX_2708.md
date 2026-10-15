@@ -112,3 +112,27 @@ bash tools/icall/diff/fa_sweep.sh 8 60                            # 期待 (base
 ```
 
 注: `fa_cmp.py` は複数 VA を 1 プロセスで回すと native の SIGSEGV で止まる。`fa_sweep.sh` が 1 関数ずつ別プロセスで回すのはこのため。
+
+## 8. 子 #3198 (ICALL-87) の実装結果 (オプトイン `FA_FALL_FRAG=1`・既定 OFF)
+
+- 修正: `icall_rewrite.py` に、非断片関数の末尾が断片先頭へ fall-through するとき、その断片を複製する経路を入れた。既定 OFF (`FA_FALL_FRAG=1` で有効)。断片内の分岐先は closure か断片 (`in_closure`) に無いものを含むときは複製しない。
+- 既定 (OFF) の rewriter 出力は `origin/main` と byte 一致 (`rw.dll`・`func_map` 一致)。
+- 測定 (同一パイプライン: rewrite → RetDec decode-only → ir_icall_restore → fa_route_build → fa_cmp / fa_sweep 8 60。native は `tools/ott/native/build.sh`)
+
+| 条件 | fa_cmp 180da4030 --n 8 | fa_sweep 8 60 (bit一致/crash/wasm_err/不一致) |
+|---|---|---|
+| 既定 (OFF) | match 0 / mismatch 8 | 55 / 65 / 10 / 1 |
+| `FA_FALL_FRAG=1` | **match 8 / mismatch 0** | 55 / 65 / 11 / 0 |
+
+- 既定 OFF と ON の per-function 差 (同一パイプライン): `0x180da4030` mismatch → match (受入 2 を達成)。`0x180c99430` match → wasm_err (`memory access out of bounds`)。**回帰 1 件が未解決。** 既定 OFF で `0x1803de190` が wasm_err になるのは旧 artifact (`work-icall` の RetDec decode) との差で、同一パイプラインでは出ない。
+- 旧 artifact 基準 (`work-icall` の sweep.jsonl・本 run 前の route) は 56/65/9/1 (REPORT の 55/65/9/2 と違う)。
+- 回帰の機構 (未確定): 断片を複製すると、断片内の `jcc` 先が closure 外の関数の先頭になる経路がある (`0x1803de190` は `function_1803de22d` 欠落で確認)。`in_closure` の判定で一部だけ防いだ。`0x180c99430` の out-of-bounds は未調査。
+- 受入 3 (A 型 11 件の判定の再実施) と受入 4 の `0x180ca1480` は未実施。
+
+## 9. 未解決
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `FA_FALL_FRAG=1` で `0x180c99430` が wasm_err (out-of-bounds) | 既定 OFF なので現行の出力は変わらない。ON にすると 1 関数回帰する | #3198 (本 PR は Refs) |
+| A 型 11 件の判定の再実施・`0x180ca1480` の判定 | 受入 3・4 の残り | #3198 |
+| 既定 ON 化の判断 | 回帰解消まで既定 OFF | #3198 |
