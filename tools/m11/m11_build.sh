@@ -142,6 +142,9 @@ echo "${M11_PROBE_2400:-0}" > work/instr_2400.stamp
 # #2407: function_e3ef60 観測 probe の ON/OFF で post 結果と ov.o を作り直す (stamp)
 if [ "$(cat work/instr_e3ef60.stamp 2>/dev/null || echo 0)" != "${M11_INSTR_E3EF60:-0}" ]; then rm -f work/boot_final3.ll work/obj/ov.o; fi
 echo "${M11_INSTR_E3EF60:-0}" > work/instr_e3ef60.stamp
+# #3520: M11_FIX_535BF2・M11_FIX_50A830 は m11_ov.c の転記を切り替える。stamp が無いと前回 build の ov.o を再利用し、切替え後の測定が前の設定の値になる
+if [ "$(cat work/fix_ov.stamp 2>/dev/null || echo none)" != "$M11_FIX_535BF2-$M11_FIX_50A830" ]; then rm -f work/obj/ov.o; fi
+echo "$M11_FIX_535BF2-$M11_FIX_50A830" > work/fix_ov.stamp
 S_P134="${M11_PROBE_134:-0}"   # #134: 1 = 計測用 IR probe (8c5eb0 の arg2・R・list; trap_triage/probe134_ir.py) を boot_final3.ll に入れる。既定 0 では入れない
 if [ "$(cat work/instr_134.stamp 2>/dev/null || echo 0)" != "$S_P134" ]; then rm -f work/boot_final3.ll; fi
 echo "$S_P134" > work/instr_134.stamp
