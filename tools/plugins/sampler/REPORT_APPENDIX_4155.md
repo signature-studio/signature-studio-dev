@@ -12,7 +12,7 @@
 
 ## 1. 測定
 
-- 測定 commit: 本 PR の HEAD (`engine_lift.sh` の経路は main `1ff7c6880` と同一。 本 PR はコード変更が `tools/plugins/sampler/` の新規ファイルのみ)。
+- 測定 commit: `bf1ca2291` (コードを変えた最後の commit)。 `bf1ca2291`→HEAD の実行コード差分 0 行 (`git diff bf1ca2291 HEAD -- tools/plugins/sampler/engine_lift.sh tools/plugins/lift tools/plugins/sampler/vex_comis_match.py`)。 `engine_lift.sh` の経路は main `1ff7c6880` と同一。
 - 素材: fl-win64 (`block19252_PE.bin`・`block19048_PE.bin`)。 RetDec は [RETDEC]、emsdk は [EMSDK] (いずれも runner の既存。 `docs/REFERENCES.md` §4)。
 - `engine_lift.sh` (前景・timeout 900 s)、summary.csv:
 
