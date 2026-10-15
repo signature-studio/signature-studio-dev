@@ -4,7 +4,7 @@
 
 ## 12. P2 の p99 (AU-30 #3151)
 
-- **測定 commit**: `e403fd7a` (コードを変えた最後の commit。worklet・ctl・ハーネス・集計)。`git diff --stat e403fd7a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は測定 commit 時点で 0 行。ただし main 取り込み後の HEAD では 0 行ではない: `d55d2c45` 時点で 5 files・70 insertions(+)・7 deletions(-) (main 側の AU-29・AU-32 の変更)、`8310689a` 時点で 9 files・229 insertions(+)・11 deletions(-)。`e403fd7a` の値は現 HEAD の値ではない。全行列の再測定は §12-3、部分の再測定は §12-2。
+- **測定 commit**: `e403fd7a` (コードを変えた最後の commit。worklet・ctl・ハーネス・集計)。`git diff --stat e403fd7a HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は測定 commit 時点で 0 行。ただし main 取り込み後の HEAD では 0 行ではない: `d55d2c45` 時点で 5 files・70 insertions(+)・7 deletions(-) (main 側の AU-29・AU-32 の変更)、`8310689a` 時点で 9 files・229 insertions(+)・11 deletions(-)。`e403fd7a` の値は現 HEAD の値ではない。全行列の再測定は §12-3 (旧 layout の参考値) と §12-4 (最終コード・受入 2 の根拠)、部分の再測定は §12-2。
 - **方式**: worklet は連続 `process()` の run (Date.now 差 ≤1 ms) が終わるたびに `burst_hist[floor(len/512)]` (測定時は ctl @384・`FLA_CTL_SIZE` 384→512。main 取り込み時に main の `pw_trace` (@388) と衝突したため、末尾の @16772 へ移し `FLA_CTL_SIZE` は 16904) を +1 する。末尾 bin は ≥15872 f。`run.mjs` は p99 を該当 bin の上端で出す (512 f 刻み。真の p99 はこの値以下) → 結果 JSON の `stats.burst_p99`・`stats.burst_runs`。末尾 bin (≥15872 f) に p99 が入ると 16384 と出るが、これは上限ではない (実際の長さはそれを超えうる)。run には待機中の 128 f 単独 run も入る (fake 48k の bin 0 は 1499 run 中 364。発生源は未切り分け)。
 - **再現**: `bash tools/audio/build.sh` → `AU2_OUT=tools/audio/results/au30_p99 bash tools/audio/au2_matrix.sh 3` → `node tools/audio/au2_summary.mjs tools/audio/results/au30_p99`。環境: ubuntu runner (4 vCPU), google-chrome 154.0.8037.97, PulseAudio 16.1 (apt 導入)。生結果: `results/au30_p99/`。
 
@@ -52,7 +52,7 @@
 
 - **wall と load**: 2 シナリオの run の wall は 89.2 s (PulseAudio 無し, load 0.41→0.20)・80.8 s (null-sink r1, load 0.31→0.10)。
 - **結論**: null 48k は 3/3 PASS (underrun 0・silence 0)。受入 3 の null 48k 条件は現 HEAD で満たす。null 96k は n=1 の PASS で p99 は §12-1 と同値の 3584。burst 最大値は rep ごとに揺れる (§12-1 の 3456 に対し今回 4480)。PulseAudio 無しの 48k は 1/1 PASS で、§12-1 の fake 48k rep 1 の FAIL (underrun 1) は今回再現していない。1 rep のため原因の切り分けは未実施 (#187)。
-- **未実施**: 行列の全行は §12-3 (測定 commit `8310689a`) で測り直した。この節 §12-2 は部分の再測定で、行列の n=3 の値は §12-3 を正とする。
+- **未実施**: 行列の全行は §12-3 (測定 commit `8310689a`) で測り直した。この節 §12-2 は部分の再測定で、行列の n=3 の値は §12-4 を正とする (§12-3 は旧 layout の参考値)。
 - **最終 HEAD での確認**: main の 2 回目の取り込み (`origin/main` `7c85004e`) で `run.mjs` が変わった (`--browser` の分岐・Linux の `pactl get-default-sink` の読取り・JSON の `browser`・`default_output`)。Chrome の経路は同一 (`withBrowser = withChrome`)。`git diff --stat d55d2c45 4ca74476 -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` = 5 files・159 insertions(+)・4 deletions(-) (Safari 用ファイルの追加と `run.mjs`)。同 HEAD で null-sink の `--only asio_sine_b256_d2,asio_sine_b256_96k` を再実行: **2/2 PASS** (48k: underrun 0・burst 1152・p99 1536・T 1792 / 96k: underrun 0・burst 4480・p99 3584・T 5888・sine maxErr 1.49e-8・`default_output` = `ci_null`)。
 - **Safari の mock テスト**: `SAFARIDRIVER=tools/audio/test/safaridriver_mock.mjs node tools/audio/test/safari_mock_test.mjs` → rc 0 (PASS 全行)。
 
@@ -83,26 +83,30 @@
 - **NC**: `nc_soak15_negctl` は FAIL (exit 1・underrun 7・silence 3712・ramp mismatch 669952/720896)。期待どおり。
 - **未実施**: Firefox の p99 (子 [AU-37] #3323)・30 分ソークの p99 (#187)。
 
-### 12-4 競合解消後の HEAD の再測定 (測定 commit `fb5a0d69`・HEAD `b512c1073` で n=3)
+### 12-4 最終コードの行列 (測定 commit `fb5a0d69`・n=3・生結果 `results/au30_p99_r3/`)
 
 - **理由**: main (`cf2966030`) と競合したため merge (`ba34d3521`)。競合解消で ctl の配置が変わった: `burst_hist` を `pw_trace` (@388) の後ろ **@16772** へ移し、`FLA_CTL_SIZE` は **16904**。main の既存 offset (`pw_n` @384・`pw_trace` @388) は変えていない。
 - **ABI 照合**: `flaudio.c` の `g_layout` (C の `offsetof`) と `audio-layout.ts` の `FLA_LAYOUT` を突き合わせ、69 フィールド全て一致 (不一致 0)。`sizeof(fla_ctl_t)` = 16904 = `FLA_CTL_SIZE`。
 - **不具合 (`ba34d3521` で発見・`fb5a0d69` で修正)**: worklet は ctl を `new Int32Array(buf, ctlPtr, 128)` (128 ints 固定) で見ていた。@16772 の `burst_hist` (index 4193〜) は範囲外で、`Atomics.add` は worklet の `run()` の `try/catch` に飲まれ、`burst_hist` は全 run で 0 のまま。`ba34d3521` の 1 rep では **p99 が 6 条件とも 0 で、6/6 PASS** (判定は p99 を見ないため通過)。修正: ビュー長を `processorOptions.ctlSize` (= `FLA_CTL_SIZE`) から取る。
-- **測定**: `AU2_OUT=<tmp> bash tools/audio/au2_matrix.sh 3` (HEAD `b512c1073`・`bash tools/audio/build.sh` 直後)。ubuntu runner (4 vCPU)、google-chrome、PulseAudio 16.1 (apt 導入。runner に未導入で、導入前の run は null 条件が `pactl` 不在の rc 127 で止まった)、emsdk 6.0.12 (上流から導入、`EMSDK_ENV` で指定)。行列全体 10 分 26 秒。
-  - fake シンク 9/9 PASS (3 rep × 3 条件)・null-sink 9/9 PASS (3 rep × 3 条件)。各 run の wall 89.2〜90.5 s、load avg (1 分) の開始 0.04〜0.21・終了 0.03〜0.15 (nproc 4)。null の sink は `ci_null` (sink-input を 1 秒ごとに採取)。
-  - NC (`--soak 15 --inject-hiccup`): FAIL (exit 1・underrun 7・silence 3712・ramp mismatch 669952/720896)。期待どおり。
-- **結果 (n=3・18 run 全 PASS・underrun 0・silence 0・sine maxErr 1.49e-8)**:
+- **測定 commit と差分**: 測定 commit は `fb5a0d69` (測定対象コードを最後に変えた commit)。`git diff --stat fb5a0d69 HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は **0 行** (測定時の HEAD は `3e1025b7e`・docs のみ)。
+- **環境**: ubuntu runner (nproc 4)・google-chrome 154.0.8037.97 (headless)・emsdk 6.0.12 (素材 `toolchain-emsdk` を `/opt/emsdk` に展開して使用)・PulseAudio 16.1 (apt 導入。fake は `pulseaudio -k` で停止、null は `module-null-sink sink_name=ci_null` を既定 sink)。
+- **再現**: `bash tools/audio/build.sh` (`[audio] build OK`) → `AU2_OUT=tools/audio/results/au30_p99_r3 bash tools/audio/au2_matrix.sh 3` (exit 0・wall 9 分 49 秒・01:38:53 → 01:48:42)。集計: `node tools/audio/au2_summary.mjs tools/audio/results/au30_p99_r3`。
+- **結果** (`au2_summary.mjs` の出力そのまま):
 
-| 条件 | シナリオ | PASS | burst max (f) | p99 (f, bin 上端) | 実 T (f) | T_req (f, セル最大) |
-|---|---|---|---|---|---|---|
-| Chrome fake シンク | 48k `asio_sine_b256_d2` | 3/3 | 512 | 1024 | 1024〜1536 | 1024 |
-| Chrome fake シンク | 96k `asio_sine_b256_96k` | 3/3 | 1024 | 1536 | 2816 | 1536 |
-| Chrome fake シンク | 96k `asio_sine_b512_96k` | 3/3 | 1024 | 1536 | 3072 | 2048 |
-| Chrome PulseAudio null-sink | 48k `asio_sine_b256_d2` | 3/3 | 1152 | 1536 | 1792 | 1792 |
-| Chrome PulseAudio null-sink | 96k `asio_sine_b256_96k` | 3/3 | 3456〜5632 | 3584 | 4608〜7424 | 7424 |
-| Chrome PulseAudio null-sink | 96k `asio_sine_b512_96k` | 3/3 | 4480 | 3584 | 6144 | 6144 |
+| 条件 | sr | シナリオ | n | PASS | underrun (合計) | burst max (f) | burst p99 (f, bin 上端) | 実 T (f) | T_req (f) | T≥T_req | baseLatency (ms) | outputLatency (ms) | clock (Hz, 平均) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Chrome fake シンク | 48000 | asio_sine_b256_d2 | 3 | 2/3 | 1 | 512 | 1024 | 1024〜1536 | 1024 | OK | 10.0 | 30.0 | 48000.0 |
+| Chrome fake シンク | 96000 | asio_sine_b256_96k | 3 | 3/3 | 0 | 1024 | 1536 | 2816 | 1536 | OK | 10.0 | 30.0 | 95999.9 |
+| Chrome fake シンク | 96000 | asio_sine_b512_96k | 3 | 3/3 | 0 | 1024 | 1536 | 3072 | 2048 | OK | 10.0 | 30.0 | 96000.0 |
+| Chrome PulseAudio null-sink | 48000 | asio_sine_b256_d2 | 3 | 3/3 | 0 | 1152 | 1536 | 1792 | 1792 | OK | 11.6 | 31.0〜37.0 | 48019.4 |
+| Chrome PulseAudio null-sink | 96000 | asio_sine_b256_96k | 3 | 3/3 | 0 | 3456〜4480 | 3584 | 4608〜5888 | 5888 | OK | 11.6 | 83.0〜84.0 | 96014.2 |
+| Chrome PulseAudio null-sink | 96000 | asio_sine_b512_96k | 3 | 3/3 | 0 | 4352〜5632 | 3584 | 6144〜7680 | 7680 | OK | 11.6 | 69.0〜70.0 | 95986.6 |
 
-- **T の判定**: 18 run の全てで実 T ≥ その run の T_req (`ceil((burst×1.25 + B)/B)×B`)。null 96k b256 は run ごとに (burst 4480・3456・5632) → (T 5888・4608・7424) で一致。
-- **p99 の再現**: 各条件の 3 rep で p99 は同値 (fake 48k 1024・fake 96k 1536・null 48k 1536・null 96k 3584)。
-- **未実施**: 30 分ソークの p99 (#187)、Firefox (子 [AU-37] #3323)。
-- **差分 (測定 commit → HEAD)**: 測定 commit は `fb5a0d69` (測定対象コードの最後の変更)。`git diff --stat fb5a0d69 HEAD -- tools/audio/src tools/audio/test tools/audio/harness tools/audio/build.sh tools/audio/au2_summary.mjs public/worklets src/runtime` の出力は 0 行 (`b512c1073` 以降は REPORT のみ)。
+- **PASS**: fake 8/9・null-sink 9/9。null-sink は全 rep で underrun 0・silence 0・sine maxErr 1.49e-8。受入 3 の null 48k は 3/3 PASS。
+- **FAIL 1 件 (未解決)**: fake_r1 の `asio_sine_b256_d2` で underrun 1・silence 640・sine maxErr 5.88e-1 (rep 2・3 は PASS)。同じ rep 1 の FAIL は `e403fd7a` (§12-1: silence 128・maxErr 6.85e-1)・`8310689a` (§12-3: silence 640・maxErr 5.88e-1) でも出ており、3 回の n=3 行列で rep 1 にだけ出ている。原因は未切り分け。本 PR の未解決表で追跡 (#187 は closed)。前版の「HEAD `b512c1073` の n=3 では再現せず」は、生データが commit されておらず検証できないため撤回する。
+- **T の判定**: 全 6 行で run ごとの T ≥ T_req が OK (`au2_summary.mjs` の T≥T_req 列)。
+- **p99 (bin 上端)**: 各条件の 3 rep で同値 (fake 48k 1024・fake 96k 1536・null 48k 1536・null 96k 3584)。
+- **NC** (`nc_soak15_negctl`): FAIL (exit 1・underrun 7・silence 3712・ramp mismatch 669952/720896)。期待どおり。
+- **wall と load**: null_r2 の wall は 37.9 s (他の rep は 88.9〜90.4 s)。3 条件とも PASS・underrun 0 で、差の原因は未切り分け。1 分 load avg は各 run の開始 0.03〜0.57・終了 0.03〜0.54 (nproc 4)。
+- **sink**: fake の `default_output` は `pactl` 接続失敗 (PulseAudio 停止の意図どおり)。null は全 3 rep で `ci_null` (sink-input を `null_r*_sinkinputs.txt` に採取)。
+- **未実施**: 30 分ソークの p99 (#187)、Firefox の p99 (子 [AU-37] #3323)。
