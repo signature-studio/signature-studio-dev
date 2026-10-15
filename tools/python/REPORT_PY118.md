@@ -116,7 +116,7 @@
 
 ### 8.3 実測 (コミット済み HEAD `32662af4d`・測定 commit)
 
-- 環境: runner。build 直前の `uptime` は `load average: 0.43, 0.49, 0.23` (04:40:25)。emsdk は `toolchain-emsdk` (`$HOME/artifacts`) を `tar --zstd -xf` で `$RUNNER_TEMP/emsdk-art` に展開。`fl-win64` は使わない (provider の build と mock・wasm の比較だけ)。
+- 環境: runner。build 直前の `uptime` は `load average: 0.43, 0.49, 0.23` (04:40:25)。emsdk は素材 `toolchain-emsdk` を `tar --zstd -xf` で `$RUNNER_TEMP/emsdk-art` に展開。`fl-win64` は使わない (provider の build と mock・wasm の比較だけ)。
 - 初回 build (`32662af4d`): real 10.089 s、警告 0。下表は同じ HEAD での再実行。
 
 | コマンド | 結果 | wall |
