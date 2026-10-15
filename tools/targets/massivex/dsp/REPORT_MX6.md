@@ -5,7 +5,8 @@
   (`tools/targets/massivex/scripts/parse_setup_headers.py` → `extract_massivex.py <exe> <work> key`) で展開。
   `Massive X.vst3` = 95,356,824 B / md5 `622993e76565f49c094063a2b717d6ca` (REPORT §0 の記録値と一致)。
 - 前回 run の「素材を展開できない」停止は誤り (innoextract のみで判断していた)。本 run は既存パーサで展開済み。
-- 測定 commit (コードを変えた最後の commit) = **fbc9971f**。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (`MX_PE` で PE を指定)。
+- 測定 commit (コードを変えた最後の commit) = **5de22167f** (MX-41 #3792 で 2 本目 `.pdata` の census と読取不能の分類を追加)。再現: `bash tools/targets/massivex/dsp/mx6_e2e.sh` (`MX_PE` で PE を指定)。
+- MX-41 (#3792・MX-38 の U4b) の追補: 素材は `plugins-massivex` を展開し直した (md5 `622993e7` 一致)。分類の全件表は `REPORT_APPENDIX_3792.md`。
 
 ## 0. 結論 (先出し)
 
@@ -13,8 +14,10 @@
    (seeds 566 件・1-round closure 604 件)。独自規約 (5 番目以降の vector/HVA 引数) を持つ入口関数は検出されず。
    ただし **xmm0〜3 だけの vectorcall は Win64 と区別できず判定不能** (pdata 始点で各 17 件を保留・§2 限界)。
 2. **chained .pdata (受入 2・U4)**: 1 本目の .pdata 全体 (entry 187,060 件・§3) のうち UNW_FLAG_CHAININFO は **62,526 件 (33.4%・分子と分母は同じ範囲)**。
-   2 本目 (158,952 B) は census の対象外 (U4b)。入口 seeds の pdata 始点 566 件には chained 子は **0 件**。EH handler を持つ入口関数は 248 件
+   2 本目 (VS 158,952 B・raw 6,144 B) は MX-41 で census に入れた (§3・509 件・chained 34・読取不能 0)。入口 seeds の pdata 始点 566 件には chained 子は **0 件**。EH handler を持つ入口関数は 248 件
    (`__CxxFrameHandler3` 247 / `__CxxFrameHandler4` 1)。
+6. **読取不能 160 件 (MX-41・受入 1・4)**: reader の欠陥ではない。160 件は全て UnwindInfoAddress の値が画像外 (≥ SizeOfImage `0x6616000`)、どの section にも入らず raw も無い。
+   pefile の独立解決でも同じ 160 件を読取不能と判定した (差 0)。値の由来 (配布 PE の改変か、展開の誤りか) は未確定 → [MX-33] (#3032)。全件表は `REPORT_APPENDIX_3792.md`。
 3. **funclet 一覧 (受入 2)**: FH3 の FuncInfo (x64 RVA 形) から catch 本体と cleanup action の funclet RVA を取ると、
    seeds 由来 **533 件** (pdata 始点 529)・1-round 由来を含む和集合 **537 件**。
 4. **#228 同型判定 (受入 3)**: **同型あり**。funclet 537 件のうち 1-round CFG closure に入るものは **0 件**、
@@ -33,11 +36,12 @@
 | NC selftest (合成バイト列) | 5/5 PASS |
 | RTTI + 入口面 | seeds 567 / 1-round 3,226 (`dsp/REPORT.md` §2 注の e2e 再現値。同注の mx_closure.py 実測 3,227 とは 1 件違う) / pdata 186,960 (`mx_entry_surface.py` が .text 範囲と `e <= t_hi` で絞った数。§3 の 187,060 は絞らない 1 本目の全 entry で、差 100) |
 | vectorcall 検出 | seeds: pdata 始点 livein45 = 0 / one-round: pdata 始点 livein45 = 0 |
-| unwind census | 1 本目の .pdata 全体: entry 187,060 / chained 62,526 / EH 23,293 / 読取不能 160 |
+| unwind census | 1 本目の .pdata 全体: entry 187,060 / chained 62,526 / EH 23,293 / 読取不能 160 ・ 2 本目: entry 509 / chained 34 / EH 49 / 読取不能 0 (MX-41) |
 | funclet | seeds 533 / 和集合 537 / 線形直接参照 4 |
 | 判定 | PASS (pdata 始点の vectorcall livein 0 かつ整合 OK) |
 
-- 所要 **28.0 s** (測定 commit fbc9971f・同一 PE)。load average: 0.31 0.37 0.36 → 0.54 0.42 0.37。
+- 所要 **40 s** (測定 commit 5de22167f・同一 PE・MX-41 の工程を含む。`OK elapsed=40s`)。load average: 0.39 0.29 0.18 → 0.69 0.38 0.22。
+- MX-41 の判定 (工程 5): 1 本目の件数 (187,060 / 62,526 / 23,293 / 160) の維持・読取不能 160 の全件が画像外・独立再計算 (pefile) の一致・ネガコン (+1 / -1) を同時に満たし PASS。
 - 実行: `MX_PE='$RUNNER_TEMP/.../Massive X.vst3' MX6_WORK='$RUNNER_TEMP/massivex-mx6' bash tools/targets/massivex/dsp/mx6_e2e.sh` → exit 0。
 
 ## 2. vectorcall 静的検出 (U3)
@@ -66,17 +70,42 @@
 
 ## 3. unwind census (U4)
 
-- 「1 本目の .pdata 全体」= `.pdata` section の先頭 (file 順) の全 entry (st≠0・e>st の 187,060 件)。2 本目 (158,952 B) は含まない (U4b)。以下の「全体」はこの範囲。
+- 「1 本目の .pdata 全体」= `.pdata` section の先頭 (file 順) の全 entry (st≠0・e>st の 187,060 件)。以下の「全体」はこの範囲。2 本目は下表の別行 (MX-41)。
 
 | 集合 | pdata 始点 | chained 子 (CHAININFO) | EH handler | 内訳 |
 |---|--:|--:|--:|---|
 | 1 本目 .pdata 全体 | 187,060 entry | 62,526 | 23,293 | FH3 14,381 / FH4 2,542 / `__C_specific_handler` 16 / IAT 外 (direct) 6,354 |
+| 2 本目 .pdata 全体 (MX-41) | 509 entry | 34 | 49 | 全件 IAT 外 (direct)。st は全件 `.text`・ui は全件画像内 |
 | seeds | 566 | **0** | 248 | FH3 247 / FH4 1 |
 | 1-round | 604 | 1 | 256 | FH3 248 / FH4 5 / direct 3 |
 
+- **2 本目 (MX-41・#3792)**: VS 158,952 B・raw 6,144 B (512 slot のうち非零 510・census の条件 `e > st` で 509)。VS は `.xdata` の VA 範囲と重なる。
+  読取は raw を持つ section を優先する (`make_rva_reader`) ので、2 本目の ui は全件 raw から読める (reader は変更なし)。
+  PE の例外ディレクトリ (DataDirectory[3]) は 1 本目 (VA `0x5F50000`・size `0x224190`) だけを指し、2 本目は指さない。
+  除外された 1 件 (2 本目の offset `0x12B4`・st `0x6700E4E9`・e < st・画像外) は 1 本目の破損 (下記) と同じ型 (先頭が E9)。
+
 - handler は `jmp [rip+X]` の thunk から IAT 名を引いた (`walk_imports`: pefile の import 表は 30 DLL で打ち切られるため手動で辿る)。
-- 読取不能 160 件 (1 本目 .pdata 全体): `.pdata` の 2 本目の VirtualSize が `.xdata` の VA 範囲と重なる。読取は raw データを持つセクションを優先
-  (`make_rva_reader`)。残り 160 件の原因は未確定 → [MX-33] (#3032)。
+- **読取不能 160 件の分類 (MX-41・#3792・測定 commit 5de22167f・`mx41_pdata2_census.py`)**:
+
+  | 分類 (UnwindInfoAddress の値) | 件数 |
+  |---|--:|
+  | 画像外 (≥ SizeOfImage `0x6616000`) | **160** |
+  | どの section にも入らない (画像内) | 0 |
+  | VirtualSize の zero 埋めだけ | 0 |
+  | raw を持つ section の内側 | 0 |
+
+  - 値の範囲は `0x17E6E86C`〜`0xEFC4E938`。欄の先頭バイトは **E8 (CALL rel32) が 148 件**、他は 12 件 (`38`×3・`e0`×2・`48`×2 ほか)。
+    関数先頭 (st) の 1 バイトは `48` (128 件) などの通常の prolog で、関数本体は正常に見える。
+  - E8 の rel32 の宛先は 148 件中 84 件が画像内の section に入る。一様な 32 bit 値なら画像内に入る確率は約 2.5% (107 MB / 2^32) なので、機械語の断片の可能性が高い (断定はしない)。
+  - **独立再計算 (受入 3)**: pefile の `get_section_by_rva` / `get_offset_from_rva` で同じ判定を再計算した。読取不能の集合は一致 (160 = 160・差 0)。
+    読める 186,900 件の flags (CHAIN / EH) も全件一致 (不一致 0)。pefile の `get_section_by_rva` は 2 本目の VS 範囲内の RVA (`0x6186300`) を `.xdata` として返し、reader と同じ raw に解決した。
+  - **ネガティブコントロール (受入 4)**: 読める 1 件 (st `0x000010D0`・ui `0x06186314`) の ui を画像外の値 `0x49500DE8` に壊す → 読取不能 160 → **161 (+1)**・その行は画像外。
+    逆に読取不能 1 件 (st `0x0002FAC0`) の ui を隣の読める値 `0x0618CCD0` に直す → **159 (-1)**。分類は件数の変化と一致する。
+  - **結論**: 読取不能の原因は reader ではなく、1 本目 `.pdata` の UnwindInfoAddress 欄に入っている画像外の値 (機械語の断片を含む)。reader には直す箇所が無いため変更していない。
+    値の由来 (配布 PE / repack 由来の改変か、展開 `extract_massivex.py` の誤りか) は未確定。展開の誤りは局所 160 件に限られ隣接データは一致するため可能性は低いが、
+    installer 内の MD5 は 125/125 件が一致しない既知事象 (`tools/targets/massivex/REPORT.md` §8.1) で、原本との照合はできていない → [MX-33] (#3032)。
+  - 全 160 件の表 (st / e / ui / 所属 section / raw / 先頭バイト) は `REPORT_APPENDIX_3792.md`。
+  - 1 本目の読取不能 160 件は zero 埋め (VirtualSize と raw の差) や section 境界の問題ではない (raw の外ではなく画像の外)。
 
 ## 4. funclet と #228 同型判定 (U4・受入 2・3)
 
@@ -113,14 +142,15 @@
 | U3b | 間接 jmp テーブルの残り (seeds 12 / 1-round 14 の pdata 始点が過大近似のまま。解決器は MSVC の lea 形のみ) | 陰性の保守性は保つが精度は未確定 | [MX-33] (#3032) |
 | U3c | 1-round の root 3,226 のうち解析できない 118 件 (先頭命令のデコード 0 件) の由来 | 118 件は vectorcall 判定の対象外 (陰性の結果は 3,108 関数の範囲に限る) | [MX-33] (#3032) |
 | U4a | FH4 (`__CxxFrameHandler4`・符号化 FuncInfo) の funclet 未解析 (1 本目 .pdata 全体 2,542 entry・入口 1 / 1-round 5) | FH4 の landing pad が一覧に入らない | [MX-33] (#3032) |
-| U4b | `.pdata` 2 本目 (158,952 B・`.xdata` と VA 重なり) が census の対象外・読取不能 160 件の原因未確定 | 1 本目 .pdata 全体の数値は下界 | [MX-33] (#3032) |
+| U4b | 1 本目の読取不能 160 件の由来 (UnwindInfoAddress が画像外・E8 始まり 148 件)。配布 PE の改変か展開の誤りかは未確定 (§3・`REPORT_APPENDIX_3792.md`)。2 本目の census は MX-41 で済 | 1 本目 .pdata 全体の chained / EH 数値は 160 件を除いた下界 | [MX-33] (#3032) |
 | U4c | IAT 外の handler (direct) 6,354 件 (1 本目 .pdata 全体) の同定 | 別 handler の EH 構造が未確認 | [MX-33] (#3032) |
 | U4d | funclet を指す E8/E9 一致候補 4 件の由来 (命令境界を確認して、どの関数から来るか) と、深い closure での到達 | #228 同型の判定を closure 拡張で確定できない | [MX-33] (#3032) |
 | U4e | funclet の x64c closure への取り込み (#228 の landing pad 方式を MSVC に当てる実装) | 同型の欠陥が lift 出力に現れる (未修復) | [MX-33] (#3032) |
 
 ## 7. 検証 commit と差分 (docs/WORKFLOW.md §6)
 
-- 測定 commit = **fbc9971f** (`dsp/scripts/mx6_*.py` と `dsp/mx6_e2e.sh` を最後に変えた commit)。
-- `git diff fbc9971f HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行**
-  (本 REPORT の commit は docs のみ。コードの変更は無い)。
-- 検証: e2e は測定 commit fbc9971f で実行し PASS (§1)。差し戻し後の修正 run では `plugins-massivex` が無く PE を展開できず、e2e は再実行していない。NC selftest は修正後の HEAD で再実行し 5/5 PASS。
+- 測定 commit = **5de22167f** (`dsp/scripts/mx41_pdata2_census.py` と `dsp/mx6_e2e.sh` を最後に変えた commit。MX-41)。
+- `git diff 5de22167f HEAD -- tools/targets/massivex/dsp/scripts tools/targets/massivex/dsp/mx6_e2e.sh` は **0 行**
+  (本 REPORT と付録の commit は docs のみ。コードの変更は無い)。
+- 検証: e2e は測定 commit 5de22167f を `git worktree` (`ws-3792`) で再現して PASS (§1・40 s)。素材は `plugins-massivex` を `$RUNNER_TEMP` に展開し、`parse_setup_headers.py` → `extract_massivex.py <exe> <work> key` で `Massive X.vst3` を再生成 (md5 `622993e7` 一致)。
+  MX-6 本体の数値は前回 fbc9971f の測定と同一 (seeds 567・pdata 186,960・入口 livein 0・anyref 183 / 1,296・1 本目 187,060 / 62,526 / 23,293 / 160)。
