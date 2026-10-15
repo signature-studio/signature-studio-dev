@@ -78,14 +78,15 @@ static void wt_rec(const char* n, u64 a0, u64 a1, u64 a2, u64 a3, const u64* stk
 /* LD-161 (#3563): abort helper (case の abortret=<VA>, 例 0x409730) の入口を trace hit で保存する。
  * helper は必ず abort 経路 (RaiseException は noncontinuable) に入り、その RaiseException で入口の return 状態へ戻す
  * (rsp+8・rip=戻り先・rax=0・callee-saved と xmm は入口の値)。native 専用 (wasm は trace の int3 を持たない)。 */
-static greg_t g_ab_gr[NGREG]; static struct _libc_fpstate g_ab_fp; static u64 g_ab_va; static int g_ab_valid;
+static greg_t g_ab_gr[NGREG]; static struct _libc_fpstate g_ab_fp; static sigset_t g_ab_mask; static u64 g_ab_va; static int g_ab_valid;
 static void ab_save(ucontext_t* uc, u64 addr) {
   memcpy(g_ab_gr, uc->uc_mcontext.gregs, sizeof g_ab_gr);
   g_ab_gr[REG_RIP] = (greg_t)addr; g_ab_gr[REG_EFL] &= ~0x100;
-  g_ab_fp = *uc->uc_mcontext.fpregs; g_ab_valid = 1;
+  g_ab_fp = *uc->uc_mcontext.fpregs; g_ab_mask = uc->uc_sigmask; g_ab_valid = 1;
 }
 static void __attribute__((noreturn)) ab_return(void) {
   ucontext_t uc; memset(&uc, 0, sizeof uc);
+  uc.uc_sigmask = g_ab_mask;
   memcpy(uc.uc_mcontext.gregs, g_ab_gr, sizeof g_ab_gr);
   greg_t sp = g_ab_gr[REG_RSP];
   uc.uc_mcontext.gregs[REG_RIP] = *(greg_t*)(uintptr_t)sp;
@@ -373,10 +374,12 @@ static void run_case(char* line) {
   struct itimerval it = { {0, 0}, {tmo_us / 1000000, tmo_us % 1000000} };
   struct timespec t0, t1;
   ld_native_ms = -1.0;
+  unsigned int host_mx = 0; __asm__ volatile("stmxcsr %0" : "=m"(host_mx));   /* ゲストの MXCSR (全例外 unmask) を host に持ち込まない (LD-161, #3563) */
   if (sigsetjmp(g_jb, 1) == 0) {
     g_in_call = 1; setitimer(ITIMER_REAL, &it, NULL);
     clock_gettime(CLOCK_MONOTONIC, &t0);
     ld_ms_call(fn, gpr, xmm, stk, nstk, out, ld_case.rax);
+    __asm__ volatile("ldmxcsr %0" : : "m"(host_mx));
     clock_gettime(CLOCK_MONOTONIC, &t1);
     ld_native_ms = (double)(t1.tv_sec - t0.tv_sec) * 1e3 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
@@ -385,6 +388,7 @@ static void run_case(char* line) {
     step_end();
     puts(ld_case_end("ok", NULL, 0, 0, out[0], out[1], out[2], out[3], 1));
   } else {
+    __asm__ volatile("ldmxcsr %0" : : "m"(host_mx));
     struct itimerval z = {{0,0},{0,0}}; setitimer(ITIMER_REAL, &z, NULL);
     g_in_call = 0;
     if (ld_case.trace) tr_disarm();
