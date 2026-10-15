@@ -58,12 +58,10 @@
 ### 2-2. 束縛関数の直接実行 (試行・未達)
 
 - 方法: `fle_boot.c` の `fle_py_bind_probe` が boot 停止後 (summary の書出しの後) に `fle_run(0xc395a0)` を 1 回実行する。プローブ中だけ (a) `LoadLibraryW("Python312")` の load hook が擬似 hmod `0x7f0e0000` を返し、(b) `GetProcAddress` は名前ごとに cell (データ変数の番地) を返す。cell の中身は型トークン `0x7f300000 + i`。束縛された名前は `fle_py_bind_name` で読む。`FLE_PY106_BIND=1` のときだけ動き、boot の経路は変えない。出力は `results/boot_summary_<tag>_<label>_py106bind.json` (`FLEBOOT_PY106B`・`FLEBOOT_PY106RING`)。
-- 結果 (測定 commit `f4d462ad5`): `FLEBOOT_PY106B` は `threw: exit (code 0)`、束縛された名前は 0 件。`GetProcAddress` に 1 度も届かず、slot `0x16b8488` は 0 のまま。`FLEBOOT_PY106RING` (直近 dispatch) の末尾は `0xc395a0` の 1 件だけで、以後の dispatch は無い。
+- 結果 (測定 commit `f4d462ad5`): `FLEBOOT_PY106B` は `threw: exit (code 0)`、束縛された名前は 0 件。`GetProcAddress` に 1 度も届かず、slot `0x16b8488` は 0 のまま。`FLEBOOT_PY106RING` は直近 dispatch のリングで、ring に入るのは非 0 の dispatch だけ。末尾は `0xc395a0`。`dispatch(0)` は `fle_probe_dispatch` が `t == 0` を ring に入れず `g_n_disp0` を数えて return するため、ring には現れない (`0xc395a0` の後の `dispatch(0)` は、下の読みの `[fleboot][ff] dispatch(0) -> ret 0` 行で見える)。
 - 読み (PE の逆アセンブルと実測): `0xc395a0` は先頭で `[0x16b85c8]` (hmod) を見て、0 なら `0x6539e0` (Python312 のローダ) を呼ぶ。ローダは内部の `0x653660` で、post-boot の状態では null の関数ポインタを踏む (`[fleboot][ff] dispatch(0) -> ret 0`)。そのあと `MessageBoxA` → `exit` (site `0x412a12`) に入る。load hook は 1 度も呼ばれない。
 - 別案 (不成立): ローダを飛ばして `0xc395d1` (hmod 判定の後) から始める試みは、`0xc395d1` が lift の関数入口でないため `unlifted` (target `0xc395d1`) で止まった。
 - 結論: 束縛を boot の外で走らせる経路は、ローダ内部の null 呼出しで塞がれている。型名の実行時の値は、この段階では得られない (受入 1 は未達のまま)。
-
-
 
 ## 3. RANGE (-4) と repo の写像 (受入 2)
 
@@ -88,8 +86,12 @@
 
 ## 5. 変更範囲
 
-- 追加: `tools/python/analysis/flapi/exc_type_chain.py` (5 項目の検算)、本 REPORT、`docs/DOC_MAP.md` の索引行。
-- 変更: `tools/flelift/boot/fle_boot.c` (`g_py_watch` を 3 → 6 件)、`tools/flelift/boot/fle_boot.mjs` (`FLEBOOT_PY106` 行の追加)、`tools/python/REPORT_PY91.md` §7 (式の訂正と結論への参照)。
+- 前回 PR (#3644・測定 commit `c8f80c7f5`) で追加: `tools/python/analysis/flapi/exc_type_chain.py` (5 項目の検算)、本 REPORT、`docs/DOC_MAP.md` の索引行。
+- 前回 PR で変更: `tools/flelift/boot/fle_boot.c` (`g_py_watch` を 3 → 6 件)、`tools/flelift/boot/fle_boot.mjs` (`FLEBOOT_PY106` 行の追加)、`tools/python/REPORT_PY91.md` §7 (式の訂正と結論への参照)。
+- 本 PR (測定 commit `f4d462ad5`) で変更。いずれも計測のみで、`FLE_PY106_BIND=1` のときだけ動く:
+  - `tools/flelift/boot/fle_boot.c`: 名前ごとの cell を返す `py_probe_cell`、束縛関数 `0xc395a0` を直接実行する `fle_py_bind_probe`、結果を読む `fle_py_bind_name` / `fle_py_bind_cell`。load hook の `Python312` 擬似 hmod の分岐と、`GetProcAddress` の cell の分岐 (どちらも `g_py_probe` が 1 のときだけ)。
+  - `tools/flelift/boot/fle_boot.mjs`: `FLE_PY106_BIND=1` の分岐。summary の書出しの後に probe を実行し、`FLEBOOT_PY106B`・`FLEBOOT_PY106RING` を出して `results/boot_summary_<tag>_<label>_py106bind.json` に書く。
+  - `tools/flelift/boot/build.sh`: `EXPORTS` に `_fle_py_bind_probe`・`_fle_py_bind_name`・`_fle_py_bind_cell` の 3 件を追加。
 - 変更なし: `provider/`・`host/`・`tests/`・`src/` (受入 3)。
 
 ## 6. 未解決 (起票先付き)
@@ -97,8 +99,8 @@
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
 | 実行時の型名 (`PyExc_*` の実体) の観測 (受入 1 の残り) | 静的には `PyExc_RuntimeError` と確定したが、実行時の確認は未達。直接実行 (§2-2) はローダ 0x653660 の null 呼出しで止まる | #2909 (open のまま残す。再開条件: (a) ローダ 0x6539e0 → 0x653660 の post-boot の null 呼出し元を特定して解消する、または (b) boot 中に束縛関数 0xc395a0 (呼出し元 `0xc3b3a2`) へ到達する) |
-| repo の RANGE → IndexError (`fl_api.h:35`・`fl_api.py:18`・`provider_check.mjs:171`) と FL の型 (RuntimeError) の不一致 | Python 側で RANGE の型が FL と食い違う。直すと tests も直す | 実行時の確認 (上の行) の後に、写像の修正を別 issue で扱う (PM 判断)。未確定の段階では直さない |
-| boot の unit 209 で `.data` の `0x15e1140` が 0 になる (PY-123 の undo global と同じ時点) | 停止点で chain を読めない | `tools/python/REPORT_PY123.md` §2-5 (fill 経路。#3090 が追う) |
+| repo の RANGE → IndexError (`fl_api.h:35`・`fl_api.py:18`・`provider_check.mjs:171`) と FL の型 (RuntimeError) の不一致 | Python 側で RANGE の型が FL と食い違う。直すと tests も直す | #2909 (PM agent の判断待ち: repo の RANGE → IndexError (`fl_api.h:35`) を FL の RuntimeError に直すか / 既定案: 受入 1 の実行時確認まで現状維持 (写像は変えない))。未確定の段階では直さない |
+| boot の unit 209 で `.data` の `0x15e1140` が 0 になる (PY-123 の undo global と同じ時点) | 停止点で chain を読めない | `tools/python/REPORT_PY123.md` §2-5 の fill 経路 (#3112 [FLE-13] が追う)・停止点は #3060 [FLE-11] |
 | FL の status (-1〜-9) と repo の code (1〜8) の数値対応 | 写像の根拠 | `tools/python/REPORT_PY61.md` §4-2 (#2026) の既存の未解決 |
 
 ## 7. 再現
