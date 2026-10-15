@@ -13,8 +13,8 @@
 
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` を `tar --zstd -xf ... --wildcards '*block00031_PE.bin'` で `$RUNNER_TEMP/fl-win64/extracted/block00031_PE.bin` に展開 (2.2 秒、22,227,016 バイト)。
 - 逆アセ: `pe_callgraph.py` の `load()`・`function_starts()`・`around`・`callers`。
-- 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0、所要 29.3 秒 (n=1)。前段 `pe_py269_probe.py` (C1〜C11) は ALL PASS、所要 30.2 秒 (n=1)。
-- 測定 commit: `a35ffb975` (本 PR の `pe_py275_probe.py`・`pe_py275_map_readers.py` を最後に変えた commit)。
+- 検証: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0、所要 29.4 秒 (n=1)。前段 `pe_py269_probe.py` (C1〜C11) は ALL PASS、所要 30.0 秒 (n=1)。
+- 測定 commit: `5cb0fb182` (main 取り込み後の HEAD。コードを変えた最後の commit。`pe_py275_probe.py`・`pe_py275_map_readers.py` の最後の変更は `a35ffb975`)。
 
 ## 1. 受入 1: 格納先
 
@@ -51,10 +51,10 @@
 
 ## 4. 検証
 
-- `pe_py275_map_readers.py` (§5 の候補列挙): M1・M2 ALL PASS、終了 0、所要 30.8 秒 (n=1)。候補 4 関数。
-- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0、所要 29.3 秒 (n=1)。
-- 前段: `pe_py269_probe.py` → C1〜C11 ALL PASS、終了 0、所要 30.2 秒 (n=1)。
-- コード差分: 測定 commit `a35ffb975` から HEAD までの `tools/python/analysis/flapi` の差分は空 (`git diff a35ffb975 HEAD -- tools/python/analysis/flapi`)。測定 commit が最後のコード変更で、以後の変更は docs のみ。
+- `pe_py275_map_readers.py` (§5 の候補列挙): M1・M2 ALL PASS、終了 0、所要 31.0 秒 (n=1)。候補 4 関数。
+- probe: `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 python3 tools/python/analysis/flapi/pe_py275_probe.py` → P1〜P9 ALL PASS、終了 0、所要 29.4 秒 (n=1)。
+- 前段: `pe_py269_probe.py` → C1〜C11 ALL PASS、終了 0、所要 30.0 秒 (n=1)。
+- コード差分: `git diff 5cb0fb182 HEAD -- tools/python/analysis/flapi` は空 (測定 commit 以降はこの範囲のコード変更なし)。`a35ffb975` から `5cb0fb182` までの差分は main 取り込みによる `pe_py366b_probe.py` (別 PR の probe。本 REPORT の測定対象外) の追加のみ。
 
 ## 5. 受入 2 後半の候補 (解析補助・上限ではない)
 
