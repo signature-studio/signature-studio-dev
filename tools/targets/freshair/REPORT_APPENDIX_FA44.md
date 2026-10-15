@@ -15,7 +15,7 @@
 
 ## §3. smoke の実測
 
-- 測定 commit: `75fce79a3` (ハーネス 4 本・smoke・シナリオ生成を追加した commit)。素材: `work-liftlib-targets` を `$HOME/artifacts` から展開 (SlateCore.core_64)。
+- 測定 commit: `75fce79a3` (ハーネス 4 本・smoke・シナリオ生成を追加した commit)。素材: `work-liftlib-targets` (SlateCore.core_64) を展開して使用。
 - 再現: `bash tools/targets/freshair/ks_fa44_native_smoke.sh 20 <outdir>`。
 - 実測: 2 回目の実行 9.62 s (real)・nproc=4・load 1 分値 0.18〜0.20。EXIT=0。stderr 0 B。GUARD 0 件。
 
@@ -51,7 +51,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| 4 組の param 写像 (C4) の確定 | 差分実行の入力が未確定 | #52 (残件) |
-| Delay の出力の比較 (ポインタ欄を除く) | Delay の bit 比較が未実施 | #52 (残件) |
-| Delay の未対応命令 `pextrd` (wasm 化) | wasm 化の範囲外 | #52 (残件) |
-| 4 組の出力値の正しさ (wasm・KH との一致) | smoke は実行できたまでの確認 | #52 (残件) |
+| 4 組の param 写像 (C4) の確定 | 差分実行の入力が未確定 | #4053 (子, 親 #3740) |
+| Delay の出力の比較 (ポインタ欄を除く) | Delay の bit 比較が未実施 | #4053 (子, 親 #3740) |
+| Delay の未対応命令 `pextrd` (wasm 化) | wasm 化の範囲外 | #4053 (子, 親 #3740) |
+| 4 組の出力値の正しさ (wasm・KH との一致) | smoke は実行できたまでの確認 | #4053 (子, 親 #3740) |
