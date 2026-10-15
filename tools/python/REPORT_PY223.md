@@ -201,6 +201,7 @@ FL_WIN64_DIR=$PWD/work/py223 python3 analysis/py223_block_scan.py --mutate      
 |---|---|---|
 | 関数をまたぐ値・分岐合流・メモリ経由の値で 0xed0bb0 を作る経路 | 受入 2 の残り | #3888 (親) |
 
+## PY-266 (#3890): flag `+0x49e` の書込み元 (部分達成)
 
 - 測定 commit: `251f0e1a5` (`analysis/py266_0x49e_writers.py` の追加 commit)。素材 `fl-win64`・block00031 のみ展開 (1.6 秒)。`.text` 5,022,299 命令・`.pdata` 57,816 関数。
 - 検査 (実測・commit `251f0e1a5`): `FL_WIN64_DIR=$PWD/work/py266 python3 analysis/py266_0x49e_writers.py --tsv work/py266/writers.tsv` → rc 0・70.7 秒 (n=1)・user 70.6 秒・load average 0.75→0.98 (並列数 1・4 コア)。
