@@ -142,7 +142,7 @@
 |---|---|---|
 | 0x111d7e0 の上位呼出し元 (起動時か遅延か) | 未設定時の既定色 `0xff636c71` が実行時に有効かは未確定 | #3805 (PY-256) |
 | 0x11be297 経路 (`CreateFruityInstance`) の起動時性 | 0x770830 の初期化タイミング | #3805 (PY-256) |
-| provider_check の flpy 部・all_tools (既定・wasm) の実行 | flpy 経路の回帰は未検証 (`dist/flpy.js` と `work/midi.py` が本 run に無い) | #3804 (PY-255) |
+| ~~provider_check の flpy 部・all_tools (既定・wasm) の実行~~ | §10 で実行済み (#3804 / PY-255)。PASS | #3804 (PY-255) で解消 |
 | N = 502 の実行時値 (上限 N−1)、PE の 127〜501 の区間、範囲外の PyErr 有無 (`0xd84510` の間接先) | C/mock は 127 以上を RANGE、PE は 127〜501 を範囲内とみる。実行時 N が 502 なら食い違いが残る | #3553 (PY-212) |
 
 ## 10. #3804 (PY-255): flpy 部 (provider_check.mjs) と all_tools.mjs (既定・wasm) の実行 (実測)
