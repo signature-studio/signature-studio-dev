@@ -69,7 +69,7 @@ def func_range(va):
 
 md = Cs(CS_ARCH_X86, CS_MODE_64)
 rip_re = re.compile(r"\[rip ([+-]) (0x[0-9a-f]+)\]")
-mem_re = re.compile(r"^qword ptr \[(r[a-z0-9]+)(?: \+ (0x[0-9a-f]+))?\]$")
+mem_re = re.compile(r"^qword ptr \[(r[a-z0-9]+)(?: \+ (0x[0-9a-f]+|[0-9]+))?\]$")
 REG_RE = re.compile(r"^(r[a-z0-9]+)$")
 WRITE = {"mov", "movabs", "lea", "movzx", "movsxd", "movsx", "xchg", "pop", "cmove", "cmovne",
          "add", "sub", "xor", "and", "or", "shl", "shr", "sar", "imul", "neg", "not", "inc", "dec"}
@@ -111,7 +111,7 @@ for lo, hi in funcs:
             continue
         mm = mem_re.match(op)
         if mm:
-            disp = int(mm.group(2), 16) if mm.group(2) else 0
+            disp = int(mm.group(2), 0) if mm.group(2) else 0
             ind[lo].append((ins.address, "mem", mm.group(1), disp, op, "-"))
             continue
         if REG_RE.match(op):
