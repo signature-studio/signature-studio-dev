@@ -75,7 +75,7 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 
 - 測定 commit: `19831e71f` (コードを変えた最後の commit。`origin/main` (`091e4a7b6`) を取り込んだ merge)。取り込みで tools/python の 25 file が main 側から入り、競合は `tests/provider_check.mjs` の 1 件。解消は main の判定行に `pe133` を足し、件数を 173/262 に更新した。前の測定 `2ac0de3f0` は取り込み前 (main `1d04852b0`) の値で、この merge で無効になった。
 - `git diff 19831e71f HEAD -- tools/python ':!*.md'` の出力は空 (測定後の変更は REPORT の md のみ)。
-- 環境: runner 4 core、測定時の `uptime` は `load average: 0.83, 1.27, 0.71` (04:35)。emsdk は上流から `git clone --depth 1 https://github.com/emscripten-core/emsdk.git /opt/emsdk` → `./emsdk install 6.0.12` (24 秒) → `./emsdk activate 6.0.12` で導入した (`[EMSDK]`、pin は `tools/m1/flags.sh`)。`fl-win64` 素材は `extracted/block00031_PE.bin`・`block25159_DATA.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin` を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst` で展開した (2.6 秒)。
+- 環境: runner 4 core、測定時の `uptime` は `load average: 0.83, 1.27, 0.71` (04:35)。emsdk は上流から `git clone --depth 1 https://github.com/emscripten-core/emsdk.git [EMSDK]` → `./emsdk install 6.0.12` (24 秒) → `./emsdk activate 6.0.12` で導入した (`[EMSDK]`、pin は `tools/m1/flags.sh`)。`fl-win64` 素材は `extracted/block00031_PE.bin`・`block25159_DATA.bin`・`block24429_DATA.bin`・`block24430_DATA.bin`・`block24618_DATA.bin` を `tar --zstd -xf $ARTIFACTS_DIR/fl-win64.tar.zst` で展開した (2.6 秒)。
 - 前提の生成物 (gitignore・`work/`・`dist/`): `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash fetch_inputs.sh` (rc 0)・`bash build_cpython_wasm.sh` (rc 0、4 分 05 秒)・`FLPY_SKIP_TABLE=1 bash build_flpy.sh` (rc 0、5.9 秒)。`bash provider/build.sh` は rc 0 (`fl_table.c`: 関数 435・ハンドラ 173)。
 
 | コマンド | 結果 | wall |
