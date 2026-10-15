@@ -410,6 +410,9 @@ def main():
     for k in list(range(4)) + list(range(6, 16)):
         if f'xmm{k}' not in used:
             regs.append(f'@xmm{k} = global i128 0')
+    for k in range(16):
+        if f'ymm{k}' in used:
+            regs.append(f'@ymm{k} = global i256 0')
     for f in FLAGS:
         regs.append(f'@{f} = global i1 false')
     regs.append('@rflags = global i64 0')

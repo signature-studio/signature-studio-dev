@@ -37,6 +37,7 @@ static const struct { const char *n; double v; } params[] = {{"Cutoff", 0.5}, {"
 static double pvals[3];
 #define NPARAM 3
 static int changed_flag, use_metronome, precount, rec_ppq;
+static int lm_pages;
 static int ui_closing, ui_time_disp_min, ui_start_on_input, ui_loop_rec, ui_step_edit, ui_browser_auto_hide, ui_snap_mode;
 static int undo_pos, undo_count, undo_last, safe_edit;
 static char proj_title[NAME], proj_author[NAME], proj_genre[NAME];
@@ -72,6 +73,7 @@ void fl_engine_reset(void) {
     for (int i = 0; i < NPARAM; i++) pvals[i] = params[i].v;
     tempo = 130; playing = 0; hl_cb = 0; n_pr = n_run = 0;
     changed_flag = 0; use_metronome = 0; precount = 0; rec_ppq = 96;
+    lm_pages = 0;
     ui_closing = 0; ui_time_disp_min = 0; ui_start_on_input = 0; ui_loop_rec = 0; ui_step_edit = 0; ui_browser_auto_hide = 0; ui_snap_mode = 0;
     undo_pos = 0; undo_count = 0; undo_last = 0; safe_edit = 1;
     set_name(proj_title, ""); set_name(proj_author, ""); set_name(proj_genre, "");
@@ -380,6 +382,10 @@ FL_H(general, setDenominator) { NARGS(1, 1); int64_t v = A_INT(0, 0); if (v < 2 
 FL_H(general, setUndoHistoryPos) { NARGS(1, 1); undo_pos = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryCount) { NARGS(1, 1); undo_count = (int)A_INT(0, 0); return fl_ret_none(c); }
 FL_H(general, setUndoHistoryLast) { NARGS(1, 1); undo_last = (int)A_INT(0, 0); return fl_ret_none(c); }
+
+/* ---- launchMapPages (1 of 12, PY-120 #2984) ---- PE 0xd791b0: obj.+0x50 の配列 (+0x3c0) の件数を返す。件数は仮置き 0 (REPORT_PY120_2984)。
+ * obj.+0x50 == 0 の経路 (0xd82c20 に code -7 = "Device not assigned") は未モデル (例外化の述語が実行時値のため) */
+FL_H(launchMapPages, length) { NARGS(0, 0); return fl_ret_i(c, lm_pages); }
 
 /* ---- arrangement (4, PY-96 #2832) ---- PE 0xd786e0/0xd78700/0xd78500 が obj+0xd74/+0xd78 を読み、0xd78720 は 0xe43e80 (両方 >= 0) を bool で返す。初期値 -1 は未実測の仮置き */
 FL_H(arrangement, selectionStart) { NARGS(0, 0); return fl_ret_i(c, sel_start); }

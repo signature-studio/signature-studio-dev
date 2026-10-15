@@ -42,7 +42,7 @@
 | エンジン export | win: `CreateFruityInstance`(VA 0x1375990)/`__dbk_fcall_wrapper`/`dbkFCallWrapperAddr` の **3 本のみ**。mac: 1 本のみ |
 | 署名ゲート | 3 箇所 (host→engine `0x1400062a0`、engine 自己検査 ×2 `0x1375990`)。署名者名 == "Image Line NV" → 不一致 -2 |
 | エンジン所在 | `<exeDir>\FLEngine_x64.dll` → 無ければ `HKCU/HKLM(WOW64_32)\Software\Image-Line\Shared\Paths\FL Studio engine` (値=ファイルパス)。`Builds\` があれば `ShowEngineChoice` |
-| 登録情報 | `…\Registrations\FL Studio 26.1\ILRegKey` (HKCU→HKLM)。マシン識別コード (`MachineGuid`+`GetComputerNameExW`+`SHGetFolderPathW`) が **24 関数にインライン展開** |
+| 登録情報 | `…\Registrations\FL Studio 26.1\ILRegKey` (HKCU→HKLM)。マシン識別コード (`MachineGuid`+`GetComputerNameExW`+Reg 系、および `SHFolder.dll` を `LoadLibraryW` で読み名前で解決した `SHGetFolderPathW` (CSIDL 0x1a)) が **24 関数にインライン展開** (`license_obs/REPORT.md` §9) |
 | フラグ | `byte[0x14f84a8]` は `0x10c7cd0` だけが書込。読み側: bit0=0→"Registered to: <name>"、1→"Please remember to register"。bit1→Fire edition |
 | ユーザデータ | `Shared data`(HKCU Paths) → 無ければ `SHGetFolderPath(CSIDL_PERSONAL)\Image-Line\`。書込テスト `testpermissions.tmp`。env `FLStudio<k>Data` 等を設定 |
 | 単一インスタンス | `FindWindowW("TFruityLoopsMainForm")` + WM_COPYDATA |

@@ -14,19 +14,21 @@ export PATH="$work/emsdk/upstream/emscripten:$PATH"
 export HERE="$here" OUT="$out"
 
 cd "$work/vstgui4" || exit 2
-if ! git diff --quiet -- vstgui/lib/vstguibase.h vstgui/lib/platform/platformfwd.h; then
-  echo "vstguibase.h / platformfwd.h は既に変更済み (patch 適用済み扱い)"
-else
-  git apply "$gui/patches/vstguibase_emscripten.patch" || exit 2
-  git apply "$gui/patches/platformfwd_emscripten.patch" || exit 2
-fi
+for p in vstguibase_emscripten platformfwd_emscripten platformfactory_emscripten; do
+  if git apply --reverse --check "$gui/patches/$p.patch" 2>/dev/null; then
+    echo "$p: 適用済み (patch 適用済み扱い)"
+  else
+    git apply "$gui/patches/$p.patch" || exit 2
+  fi
+done
 
 rm -rf "$out" && mkdir -p "$out/obj"
 
 # upstream は lib/*.cpp・lib/controls/*.cpp・lib/animation/*.cpp を対象にする (platform/ 以下は canvas で置換するため除外)。
 # lib/animation は CView::~CView → Animator::removeAnimations の未解決を止めるために加えた (初回リンクで 1 件)。
-# platform/platformfactory.cpp は WASM 分岐が無いため除外し、harness が getPlatformFactory を定義する。
-{ ls vstgui/lib/*.cpp; ls vstgui/lib/controls/*.cpp; ls vstgui/lib/animation/*.cpp; } > "$out/upstream_cpp.txt"
+# platform/platformfactory.cpp は patches/platformfactory_emscripten.patch の WASM 分岐 (canvas factory) を入れて対象に加える。
+# これで harness の init() が initPlatform → CFontDesc::init の upstream 経路を通る (SR-51 #3261)。
+{ ls vstgui/lib/*.cpp; ls vstgui/lib/controls/*.cpp; ls vstgui/lib/animation/*.cpp; echo vstgui/lib/platform/platformfactory.cpp; } > "$out/upstream_cpp.txt"
 { ls "$here"/canvas_*.cpp; echo "$here/render_poc_main.cpp"; } > "$out/canvas_cpp.txt"
 cat "$out/upstream_cpp.txt" "$out/canvas_cpp.txt" > "$out/all_cpp.txt"
 
