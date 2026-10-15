@@ -91,10 +91,11 @@ sample:800 (`liftdiff_e2e.sh --m11-only`、`--shards 12 --state auto`、2 回ず
 - **差分証跡** (WORKFLOW §6): `git diff --stat e1efecc2f HEAD -- tools/liftdiff` の実出力は以下 (`ldlib/`・`liftdiff.py`・`liftdiff_e2e.sh` の差分は 0 件)。
 
   ```
-   tools/liftdiff/REPORT_APPENDIX_LD177.md | 27 ++++++++++++++++-----------
-   tools/liftdiff/ld198_recount.py         | 15 +++++++++++++++
-   2 files changed, 31 insertions(+), 11 deletions(-)
+   tools/liftdiff/REPORT_APPENDIX_LD177.md | 42 +++++++++++++++++++++------------
+   tools/liftdiff/ld198_recount.py         | 15 ++++++++++++
+   2 files changed, 42 insertions(+), 15 deletions(-)
   ```
+  (この数字は `430e35ed3` 時点の REPORT の実測。以後に REPORT を編集すると `--stat` の行数は変わる。)
 
 - **fvm 12 → 41 (+29) の説明**: 新規 fvm 29 件 (`0x10263d0 0x10293b0 0x102b6c0 0x102b750 0x11e7940 0x126e4c0 0x472530 0x47d460 0x4fb160 0x534eb0 0x539e00 0x5c1030 0x64fa70 0x64fc70 0x675010 0x678460 0x681380 0x8cbe40 0x8e7080 0x905af0 0xa96550 0xa96620 0xc3efe0 0xd2b370 0xd2b5b0 0xd2b620 0xd2bb50 0xebbfb0 0xebc1a0`) は resolved 29 件と同一集合 (`resolved==newfvm`)。base で fvm 済みの 12 件は消えていない (lost 0)。
 - **測定**: base `1f12b1b6d` と HEAD `e1efecc2f` で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64 bash tools/liftdiff/liftdiff_e2e.sh --m11-only` を 1 回ずつ、同一 runner で連続実行 (各 worktree は `/tmp/opencode/ld198-{base,head}`)。素材 `fl-win64`・`work-m11`・`work-liftdiff` は `$ARTIFACTS_DIR` から展開。`work-m11` は `m11_gen_ir2.sh` で `ir_conditions.json` を作った後 (`ir_sha256` 597757f4…)。emsdk は pin 6.0.12 を上流から取得して `/opt/emsdk` に置いた (素材 `toolchain-emsdk` は本 run に無い)。
