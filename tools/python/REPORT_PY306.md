@@ -14,7 +14,7 @@
 
 ## 測定
 
-- 測定 commit: 本 PR の最後のコード変更 commit (下記の commit)。基点は `origin/main` = `c2f0e7ebf`。
+- 測定 commit: `681b9b3b9` (解析スクリプト `pe_py306_slot_writers.py` を追加した commit)。基点は `origin/main` = `c2f0e7ebf`。
 - 素材: `$ARTIFACTS_DIR/fl-win64.tar.zst` (2,324,302,252 バイト) から `extracted/block00031_PE.bin` (22,227,016 バイト) のみ展開。
 - 走査: `analysis/flapi/pe_py306_slot_writers.py`。`.text` の全命令 (5,183,833 件)、所要 約 65 秒、user 61.7 秒。
 - 逆アセ: `analysis/flapi/pe_disasm.py` と、解決用の一時 probe (`work/py306/`・gitignore 対象)。
@@ -50,6 +50,7 @@
 
 | 未解決 | 影響 | 起票先 |
 |---|---|---|
-| `[[rip+0x15e06a0]]` (`0x16bd564`・`.bss`) の実行時値 | `0x104ae3d`・`0x104b1fd` の obj・base の VA | 子 (本 PR では扱わない) |
-| `0x15d8930` への `0x1312c3e` の書込みの意味 | `0x104c919` 枝の宛先が n か | 子 |
-| `0x1311030` の呼出し元経路 (`0x104c4af`) | 固定 VA `0x196ec34` に書く n の意味 | 子 |
+| `[[rip+0x15e06a0]]` (`0x16bd564`・`.bss`) の実行時値 | `0x104ae3d`・`0x104b1fd` の obj・base の VA | 未起票 (PY-299 #4107 の残件として PM 判断) |
+| `0x15d8930` への `0x1312c3e` の書込みの意味 | `0x104c919` 枝の宛先が n か | 未起票 (同上) |
+| `0x1311030` の呼出し元経路 (`0x104c4af`) | 固定 VA `0x196ec34` に書く n の意味 | 未起票 (同上) |
+| 静的 slot の実行時書換え (PE 外の初期化) の有無 | `0x104c2a6`・`0x104c64f`・`0x104c919` の VA | 未起票 (同上) |
