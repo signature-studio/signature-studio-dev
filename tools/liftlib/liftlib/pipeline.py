@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
+from typing import Any
 
 from . import env
 from . import ir as IR
@@ -31,7 +32,7 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 SIMD_DIR = os.path.join(HERE, "simd")
 
 
-def rpath(p):
+def rpath(p: str | None) -> str | None:
     """repo 相対 / 絶対パス。`${PLUGINS_DIR}` 等 (env.PATH_VARS のキー) は環境変数優先で展開する"""
     if p is None:
         return None
@@ -39,7 +40,7 @@ def rpath(p):
     return p if os.path.isabs(p) else os.path.join(ROOT, p)
 
 
-def load_cfg(path):
+def load_cfg(path: str) -> dict[str, Any]:
     cfg = json.load(open(path))
     cfg["_path"] = os.path.abspath(path)
     return cfg
@@ -394,7 +395,7 @@ def _dump_report(workdir, stats, log):
     json.dump(dict(stats=stats, log=log), open(os.path.join(workdir, "pipeline_report.json"), "w"), indent=1, ensure_ascii=False, default=str)
 
 
-def run_all(cfg_path, workdir=None, detect_only=False):
+def run_all(cfg_path: str, workdir: str | None = None, detect_only: bool = False) -> tuple[dict[str, Any], str, str | None, dict[str, Any], list[str]]:
     cfg, workdir, mod, stats, log = lift_repair(cfg_path, workdir, detect_only)
     cjs = None
     if not detect_only:

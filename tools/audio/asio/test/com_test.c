@@ -475,7 +475,8 @@ static int run_com(char *j, size_t jn) {
       "\"stats\":{\"cb_count\":%u,\"cb_late\":%u,\"cb_max_us\":%u,\"cb_avg_us\":%u,\"underruns\":%u,\"silence_frames\":%u,"
       "\"in_overruns\":%u,\"in_underflows\":%u,\"min_fill\":%u,\"avg_fill\":%u,\"wake_count\":%u,\"wait_timeouts\":%u,"
       "\"ring_frames\":%u,\"quanta\":%u,\"reset_requests\":%u,\"wake_hist\":[%u,%u,%u,%u,%u,%u],"
-      "\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u},"
+      "\"latency_changes\":%u,\"T\":%u,\"burst_obs\":%u,\"timeinfo_cb\":%u,"
+      "\"seg_max_us\":{\"in_read\":%u,\"memset\":%u,\"bufferswitch\":%u,\"out_write\":%u}},"
       "\"timeinfo\":{\"calls\":%u,\"bad\":%u},\"clock\":{\"samples\":%d,\"monotonic\":%d},\"produced_frames\":%llu,"
       "\"com\":{\"hr_register\":%d,\"hr_enum\":%d,\"enum_n\":%u,\"driver\":\"%s\",\"hr_cocreate\":%d,"
       "\"refs_last\":%u,\"alive\":%u,\"qi_ok\":%u,\"created\":%u,\"host_bs\":%u,\"host_bsti\":%u,"
@@ -487,6 +488,7 @@ static int run_com(char *j, size_t jn) {
       st.wake_count, st.wait_timeouts, st.ring_frames, st.quanta, st.reset_requests,
       st.wake_hist[0], st.wake_hist[1], st.wake_hist[2], st.wake_hist[3], st.wake_hist[4], st.wake_hist[5],
       st.latency_changes, st.T, st.burst_obs, st.timeinfo_cb,
+      st.seg_max_us[0], st.seg_max_us[1], st.seg_max_us[2], st.seg_max_us[3],
       g_host.bsti, g_ti_bad, ns, mono, (unsigned long long)g_n,
       hr_reg, hr_enum, n, names[0], hr_cc,
       refs_last, cst.alive, cst.qi_ok, cst.created, g_host.bs, g_host.bsti,

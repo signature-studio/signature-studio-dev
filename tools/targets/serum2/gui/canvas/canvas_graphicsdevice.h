@@ -1,8 +1,9 @@
 // SR-39 #2107: canvas platform (wasm) の IPlatformGraphicsDevice* 実装。
 // SR-50 #3260: drawRect (塗り・線 1px)・clearRect・drawString (canvas_font.cpp) は bitmap へ画素を書く。
 // SR-55 #3422: drawLine・drawLines・drawPolygon・drawEllipse・drawBitmap (1:1 転写) も bitmap へ画素を書く。
+// SR-78 #4551: fillRectWithBitmap は srcRect を dstRect へ拡大縮小して描く (quality が kMedium・kHigh なら bilinear、それ以外は最近傍)。drawBitmapNinePartTiled はその 9 部分を fillRectWithBitmap で描く。
 // SR-61 #4231: drawArc (弧の塗り・線)・drawPoint (1 画素)・drawGraphicsPath (path の塗り・線) も bitmap へ画素を書く。
-// SR-62 #4233: fillLinearGradient・fillRadialGradient (path の内側を色停止点で塗る)・drawBitmapNinePartTiled (9 分割を各部分で 1:1 タイル)・fillRectWithBitmap (タイル塗り) も bitmap へ画素を書く。
+// SR-62 #4233: fillLinearGradient・fillRadialGradient (path の内側を色停止点で塗る) も bitmap へ画素を書く。
 // SR-69 #4428: transformMatrix は点・線・多角形・楕円・矩形・clearRect・bitmap の dest 位置・文字の基準点へ適用する (clipRect は CDrawContext が device 座標で渡すので変換しない)。回転・傾斜は矩形を外接矩形で近似し、拡大縮小は bitmap と文字に掛けない。
 // SR-68 #4427: 線は lineWidth の太さで描く (太さ 1 かつ aliasing は従来の Bresenham)。drawMode の kAntiAliasing は線の被覆率を alpha に掛けて描く。
 // 状態設定は lineWidth・drawMode・clipRect (bitmap 境界との交差)・fillColor・frameColor・globalAlpha・transformMatrix を保持し、他 (lineStyle・global state の save/restore) は何もしない。

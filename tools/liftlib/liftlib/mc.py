@@ -15,12 +15,12 @@ _GPR_FAMILIES = {
     "rdx": "rdx edx dx dl dh", "rsi": "rsi esi si sil", "rdi": "rdi edi di dil",
     "rbp": "rbp ebp bp bpl", "rsp": "rsp esp sp spl",
 }
-for _n in range(8, 16):
-    _GPR_FAMILIES["r%d" % _n] = "r%d r%dd r%dw r%db" % (_n, _n, _n, _n)
-CANON = {}
+for _nr in range(8, 16):
+    _GPR_FAMILIES["r%d" % _nr] = "r%d r%dd r%dw r%db" % (_nr, _nr, _nr, _nr)
+CANON: dict[str, str] = {}
 for _c, _names in _GPR_FAMILIES.items():
-    for _n in _names.split():
-        CANON[_n] = _c
+    for _nm in _names.split():
+        CANON[_nm] = _c
 for _i in range(32):
     for _p in ("xmm", "ymm", "zmm"):
         CANON["%s%d" % (_p, _i)] = "xmm%d" % _i
@@ -381,7 +381,7 @@ class MFunc:
                 if self.insns[va].mem and self.insns[va].mem["read"]]
 
 
-_CW_CACHE = {}
+_CW_CACHE: dict[tuple[int, int], "set[str] | None"] = {}
 
 
 def _callee_writes(img, target, visiting):

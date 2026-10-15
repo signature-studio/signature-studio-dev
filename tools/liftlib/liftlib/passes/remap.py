@@ -7,11 +7,18 @@
 - shift_va(text, base, newbase, maxv): IR 内の VA 直値 / @global_var_ 名を新ベースへ平行移動 (ir6_shift 互換)
 """
 import re
+from typing import TYPE_CHECKING, Any
+
+from liftlib.ir import Func
+
+if TYPE_CHECKING:
+    from liftlib.ir import Module
+    from liftlib.pe import Image
 
 TYPE_BYTES = {"i8": 1, "i16": 2, "i32": 4, "i64": 8, "i128": 16, "i256": 32, "float": 4, "double": 8, "ptr": 8}
 
 
-def _esc(b):
+def _esc(b: bytes) -> str:
     out = []
     for v in b:
         if 32 <= v < 127 and v not in (0x22, 0x5C):
@@ -21,7 +28,8 @@ def _esc(b):
     return "".join(out)
 
 
-def gdata(mod, img, mode="external", min_size=8, base=None, newbase=None, log=None, pad_gap=False):
+def gdata(mod: "Module", img: "Image", mode: str = "external", min_size: int = 8, base: int | None = None,
+          newbase: int | None = None, log: list[str] | None = None, pad_gap: bool = False) -> dict[str, int]:
     """module item の `@global_var_*` 定義行を書換える。返値: {"replaced": n, "added": n}
 
     pad_gap (CAB-239): 定義サイズを「次の global VA までの間隔」まで拡張する。
@@ -31,26 +39,26 @@ def gdata(mod, img, mode="external", min_size=8, base=None, newbase=None, log=No
     log = log if log is not None else []
     base = img.base if base is None else base
     n_rep = n_add = 0
-    have = {}
-    for idx, it in enumerate(mod.items):
+    have: dict[str, tuple[int | None, int, str]] = {}
+    for item_idx, it in enumerate(mod.items):
         if not isinstance(it, str):
             continue
         m = re.match(r"^(@global_var_([0-9a-f]+)) = (.*)$", it)
         if not m:
             continue
-        have[m.group(1)] = (idx, int(m.group(2), 16), m.group(3))
+        have[m.group(1)] = (item_idx, int(m.group(2), 16), m.group(3))
     # 補間: 参照のみで定義の無い global
-    refs = set()
+    refs: set[str] = set()
     for it in mod.items:
-        if hasattr(it, "render"):
+        if isinstance(it, Func):
             for ln in it.render():
                 for mm in re.finditer(r"@global_var_([0-9a-f]+)\b", ln):
                     refs.add("@global_var_" + mm.group(1))
     # ptrtoint (@global_var_X) 形 (表 base) のみ pad 対象にする (CAB-239: 索引読みが隣接データを踏むため)。
     # 書換可能性の確認も兼ねる
-    tp_bases = set()
+    tp_bases: set[str] = set()
     for it in mod.items:
-        if hasattr(it, "render"):
+        if isinstance(it, Func):
             for ln in it.render():
                 for mm in re.finditer(r"ptrtoint \((?:i\d+\*|ptr)\s*(@global_var_[0-9a-f]+)", ln):
                     tp_bases.add(mm.group(1))
@@ -61,10 +69,10 @@ def gdata(mod, img, mode="external", min_size=8, base=None, newbase=None, log=No
                 tp_bases.add(mm.group(1))
     order = sorted(have.items(), key=lambda kv: kv[1][1])
     for name in sorted(refs - set(have)):
-        va = int(name[len("@global_var_"):], 16)
-        b = img.read(va if newbase is None else va - newbase + base, min_size)
+        va_new = int(name[len("@global_var_"):], 16)
+        b = img.read(va_new if newbase is None else va_new - newbase + base, min_size)
         mod.add_global('%s = local_unnamed_addr constant [%d x i8] c"%s", align 16' % (name, min_size, _esc(b)))
-        have[name] = (None, va, "constant [%d x i8]" % min_size)
+        have[name] = (None, va_new, "constant [%d x i8]" % min_size)
         n_add += 1
         order = sorted(have.items(), key=lambda kv: kv[1][1])
     all_vas = [v[1] for _, v in order] + [img.base + img.size]
@@ -90,7 +98,7 @@ def gdata(mod, img, mode="external", min_size=8, base=None, newbase=None, log=No
     return {"replaced": n_rep, "added": n_add}
 
 
-def _decl_size(rest, min_size):
+def _decl_size(rest: str, min_size: int) -> int:
     m = re.search(r"\[(\d+) x (i8|i16|i32|i64|i128|float|double)\]", rest)
     if m:
         return max(int(m.group(1)) * TYPE_BYTES[m.group(2)], min_size)
@@ -100,13 +108,14 @@ def _decl_size(rest, min_size):
     return min_size
 
 
-def shift_va(text, base=0x180000000, newbase=0x30000000, maxv=0x1803FFFFF, add_forms=False):
+def shift_va(text: str, base: int = 0x180000000, newbase: int = 0x30000000, maxv: int = 0x1803FFFFF,
+             add_forms: bool = False) -> tuple[str, int]:
     """ir6_shift.py 互換: @global_var_ 名と i64 VA 直値を平行移動。返値 (text, n_numeric)
     add_forms: `add [nuw] [nsw] i64 %x, <VA>` の右オペランド (加算形の画像 VA) も平行移動する。
     既定 False は ott recipe の出力 (IR 完全一致) を保つため。"""
     shift = base - newbase
 
-    def rename_sym(m):
+    def rename_sym(m: "re.Match[str]") -> str:
         v = int(m.group(1), 16)
         if base <= v <= maxv:
             return "@global_var_%x" % (v - shift)
@@ -114,7 +123,7 @@ def shift_va(text, base=0x180000000, newbase=0x30000000, maxv=0x1803FFFFF, add_f
     text = re.sub(r"@global_var_(18[0-9a-fA-F]{6,10})\b", rename_sym, text)
     n = [0]
 
-    def rep_num(m):
+    def rep_num(m: "re.Match[str]") -> str:
         if m.group(1) == "0":
             return m.group(0)
         v = int(m.group(1), 0)
@@ -124,7 +133,7 @@ def shift_va(text, base=0x180000000, newbase=0x30000000, maxv=0x1803FFFFF, add_f
         return m.group(0)
     text = re.sub(r"i64 (0x1[0-9a-fA-F]{8,12}|[0-9]{9,11})", rep_num, text)
     if add_forms:
-        def rep_add(m):
+        def rep_add(m: "re.Match[str]") -> str:
             v = int(m.group(2), 0)
             if base <= v <= maxv:
                 n[0] += 1
@@ -134,22 +143,22 @@ def shift_va(text, base=0x180000000, newbase=0x30000000, maxv=0x1803FFFFF, add_f
     return text, n[0]
 
 
-def gdata_legacy(text, img, datab=0x30000000):
+def gdata_legacy(text: str, img: "Image", datab: int = 0x30000000) -> tuple[str, dict[str, int]]:
     """[vendored] tools/m6/ir6_gdata.py 互換: 全 @global_var_* 定義を PE 実データ (VA shift 済み) の
     `constant [N x i8] c"..."` に置換し, 参照のみのものを `global [8 x i8]` で追加。IR テキスト完全一致用。"""
-    def to_llvm(b):
+    def to_llvm(b: bytes) -> str:
         esc = ''
         for v in b:
             esc += chr(v) if 32 <= v < 127 and v not in (34, 92) else '\\%02x' % v
         return '"' + esc + '"'
 
-    def read_bytes(rva, sz):
+    def read_bytes(rva: int, sz: int) -> bytes:
         b = img.read(img.base + rva, sz)
         return b
 
     names = sorted(set(re.findall(r"@global_var_([0-9a-f]+)\b", text)))
     ln = text.split('\n')
-    out = []
+    out: list[str] = []
     replaced = 0
     for l in ln:
         m = re.match(r"^(@global_var_([0-9a-f]+)) = .*$", l)

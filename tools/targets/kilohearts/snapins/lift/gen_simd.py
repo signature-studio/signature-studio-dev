@@ -153,6 +153,10 @@ def gen(name, ret, params):
             e = '%s %s %s' % (x, sym, y) if sym else ('(%s < %s ? %s : %s)' % (x, y, x, y) if op == 'min' else '(%s > %s ? %s : %s)' % (x, y, x, y))
             loops.append('r.%s[%d] = %s;' % (fld, i, e))
         body = '%s L128 r; %s return r.q;' % (pre, ' '.join(loops))
+    # ----- addsubpd: 偶数 lane = a - b, 奇数 lane = a + b (x64c i_addsubpd と同一)
+    if b == 'addsubpd' and R == 'i128' and n == 2 and ptys == ['i128', 'i128']:
+        body = ('%s L128 r; r.g[0] = %s.g[0] - %s.g[0]; r.g[1] = %s.g[1] + %s.g[1]; return r.q;'
+                % (pre, A(0), A(1), A(0), A(1)))
     # ----- bitwise
     m = re.match(r'^(and|andn|or|xor)(ps|pd)$|^(pand|pandn|por|pxor)$', b)
     if m and R == 'i128' and n == 2 and ptys == ['i128', 'i128']:

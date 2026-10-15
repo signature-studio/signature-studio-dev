@@ -1,6 +1,6 @@
 # Kilohearts (HeartCore 2.4.6 / release 132102) インストーラ解析 + snap-in lift 可否 (target 事前解析)
 
-> **付録**: §10-7b・§10-7c の全文は `tools/targets/kilohearts/REPORT_APPENDIX.md`。
+> **付録**: §10-7b・§10-7c の全文は `tools/targets/kilohearts/REPORT_APPENDIX.md`。§10-7y (#4671 関数ポインタ global・FNPTR) は `REPORT_APPENDIX_4671.md`。
 
 - 解析日: 2026-10-10 / 担当 dir: `tools/targets/kilohearts/` (抽出物・大物は `work/`, gitignore)
 - 素材: `~/ダウンロード/Kilohearts Offline Installer.zip` (3,833,108,300 B) / `.dmg` (3,841,525,745 B)

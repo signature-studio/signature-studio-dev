@@ -102,6 +102,14 @@ const seq = [
   ["mixer.getTrackName", [1, 100]],
   ["mixer.getTrackName", [0, 1]],
   ["mixer.getTrackName", [1, "x"]],
+  // PY-226 (#4674): 非 ASCII は UTF-16 code unit で数える (PE 0x12be470)。"aé🎵B" は 5 unit (🎵 は 2 unit・mask 外)
+  ["mixer.setTrackName", [3, "aé🎵B"]],
+  ["mixer.getTrackName", [3, 3]],
+  ["mixer.getTrackName", [3, 2]],
+  ["mixer.getTrackName", [3, 1]],
+  ["mixer.setTrackName", [4, "🎵BCD"]],
+  ["mixer.getTrackName", [4, 1]],
+  ["mixer.getTrackName", [4, 3]],
 ];
 
 const diffs = [];

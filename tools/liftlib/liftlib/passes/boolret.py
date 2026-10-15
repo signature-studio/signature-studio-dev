@@ -13,9 +13,9 @@ CALL_I1 = re.compile(r'^\s*(%[\w.\-]+) = call i1 @')
 SEXT_I1 = re.compile(r'^(\s*%[\w.\-]+ = )sext i1 (%[\w.\-]+) to i64(.*)$')
 
 
-def apply(text):
+def apply(text: str) -> tuple[str, int]:
     lines = text.split('\n')
-    bool_vals = set()
+    bool_vals: set[str] = set()
     n = 0
     for i, line in enumerate(lines):
         if line.startswith('define '):
