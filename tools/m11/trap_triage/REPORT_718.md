@@ -181,6 +181,15 @@
 - 真陽性の構造判定 (IR に count の入口判定が無い) の到達可能性 (count が 0 や負になる経路の有無) は未測定。`docs/DEFECTS.md` の類型への対応は PM 判断。
 - 再現: `python3 tools/m11/guard699/scan_guard.py <boot_final.ll> --pe <block00031_PE.bin> --report strict.json` → `python3 tools/m11/trap_triage/strict_evidence.py <IR> --pe <PE> --report strict.json --out strict_evidence.tsv` → `python3 tools/m11/trap_triage/judge_ctx.py <IR> strict_evidence.tsv <PE> 67 98`。
 
+## 4h. 証拠表の行 36〜66 の残り (#3564・部分達成: 判定 21 件・真陽性 12・偽陽性 1・保留 8)
+
+- 全文・行ごとの根拠・判定方法は `REPORT_APPENDIX_3564.md`。本節は結論のみ。
+- 測定 commit: `4517825a2` (origin/main)。`git diff 03df83be4 4517825a2 -- tools/m11/guard699/ tools/m11/ldfix/ldmach.py tools/m11/trap_triage/strict_evidence.py tools/m11/trap_triage/judge_ctx.py` = 0 行。入力: `work-m11` の `boot_final.ll` (sha256 `69c774de…`)・`fl-win64` の `block00031_PE.bin` (22,227,016 B)。strict 288 (§3 と一致)。
+- 基準: 機械語の count 源と IR の count 源が同じ G・同じ段数・同じ幅で、IR に入口判定が無く末尾が後判定 (do-while) なら、count = 0 で IR が本体を回り機械語は T へ直行するので真陽性 (構造判定。count = 0 の到達性は未測定)。jcc が機械語だけで不成立なら偽陽性。
+- 結果: 真陽性 12 (51〜56・58・60・62〜64・66)、偽陽性 1 (43)、保留 8 (39・41・42・47・57・59・61・65)。母数 31 のうち残り 10 件 (36〜38・40・44〜46・48〜50) は #3499 の判定 (PR #3571・未 merge) で、本節の対象外。偽陽性率は母数 288 の判定が終わるまで書かない。
+- 保留の型: 段数が不一致 (41・47・65)、幅が不一致 (57・59・61)、偽側が T と別経路 (39)、戻り値の出所未確認 (42)。
+- #3571 の行 40・41 は本節の基準では確定できない (行 41 は保留)。#3571 の修正は本 PR では行わない。
+
 ## 5. 再現
 
 本 PR にコミットされた再現手段は `scan_guard.py` のみで、入力は `work-m11` の `boot_final.ll` を要する。
