@@ -56,6 +56,11 @@ def main():
                 n = name_of(int(tok, 16))
                 if n:
                     rows.append((a, n, "abs", m, o, tok))
+        elif not BRANCH.match(m):
+            for tok in HEX.findall(o):
+                n = name_of(int(tok, 16))
+                if n:
+                    rows.append((a, n, "imm", m, o, tok))
         if m in ("call", "jmp") and not o.startswith("0x"):
             ind.append((a, m, o))
 
