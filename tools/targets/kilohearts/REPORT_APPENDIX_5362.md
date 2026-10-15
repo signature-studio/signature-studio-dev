@@ -27,7 +27,7 @@
 - 規則は呼出し側の `(void *)` cast。値は変わらない (整数に入ったアドレスを pointer に戻すだけ)。
 
 #### 5362-4. 測定 (実測・n=1・load は各 run 前後で `uptime`)
-- **測定 commit**: 作業ブランチ上の本 PR の commit (下記 5362-6 の hash)。baseline は `origin/main` `fdd9cf1e1`。
+- **測定 commit: 未確定**。以前の記録 (`00f13a526`) はリポジトリに存在しない (`git cat-file -t` が fatal) ため撤回する。測定時の作業ツリーが本ブランチの HEAD (`3b3418d88`) と同一だった記録は無い。baseline は `origin/main` `fdd9cf1e1`。HEAD で再測定するまで、以下の数値は「本 PR の規則を入れた作業ツリーでの旧測定」として扱う。
 - emcc (`emcc -c -ferror-limit=0 -I ghidra_route delay.c`): baseline 15.7 s・error 415 行 → 本 PR 409 行。
 
 | 分類 (`emcc_census.py`) | baseline `fdd9cf1e1` | 本 PR |
