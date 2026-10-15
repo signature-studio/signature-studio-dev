@@ -12,7 +12,7 @@
 
 - 測定 commit: `404931a8a` (`fix(python): getGridBit・getGridBitWithLoop の件数以上を RANGE にしない`。コードを変えた最後の commit)。
 - 検証 HEAD: 本 REPORT の commit。コード範囲 `git diff 404931a8a HEAD -- tools/python/host tools/python/provider tools/python/tests` は 0 行 (本 REPORT の commit は範囲外)。
-- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開 (5.550 秒)。`toolchain-emsdk` は `/opt/emsdk/emsdk_env.sh` (既定の `EMSDK_ENV`) で使った。`fetch_inputs.sh` rc 0。
+- 素材: `fl-win64` (26.1.7) を `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C $RUNNER_TEMP/fl-win64` で全展開 (5.550 秒)。`toolchain-emsdk` は [EMSDK] の `emsdk_env.sh` (既定の `EMSDK_ENV`) で使った。`fetch_inputs.sh` rc 0。
 - 環境: runner 4 core、node v22.23.3。測定後の `uptime` は load average 3.24 / 1.99 / 0.98 (ビルド直後)。
 
 | 検査 (404931a8a) | コマンド | 結果 | 所要 |
@@ -82,7 +82,7 @@
 
 ## 再現
 
-- 素材展開: `tar --zstd -xf "$HOME/artifacts/fl-win64.tar.zst" -C <展開先>` (`FL_WIN64_DIR=<展開先>`)。PE は `extracted/block00031_PE.bin`。
+- 素材展開: `tar --zstd -xf "$ARTIFACTS_DIR/fl-win64.tar.zst" -C <展開先>` (`FL_WIN64_DIR=<展開先>`)。PE は `extracted/block00031_PE.bin`。
 - 逆アセンブル: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_disasm.py 12d3ff0 90` ほか、`12d3e20`・`d5b420`・`12cee00`。
 - 参照元: `FL_WIN64_DIR=<展開先> python3 analysis/flapi/pe_xref.py 0x15d51a0,0x193fd08`。
 - 検査: `bash provider/build.sh` の後に `node tests/channels_diff.mjs`・`node tests/provider_check.mjs`・`FL_ENGINE=wasm node tests/all_tools.mjs` (flpy は `build_cpython_wasm.sh` → `FLPY_SKIP_TABLE=1 build_flpy.sh`)。
