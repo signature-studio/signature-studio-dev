@@ -2,10 +2,11 @@
 # #699: 8c5eb0 の件数 0 ループ先頭ガードの IR 復元 (guard699/m11_guard699.py を m11_build.sh が適用) の実測 + ネガコン.
 # 比較元は現在の m11_ov.c (main 取り込み後の版。#700 の 8c7710 転記を含む) の 1 版に固定する。
 #   off = 同じ m11_ov.c, guard 無効 (M11_GUARD699=off)                       基準
-#   fix = 同じ m11_ov.c, guard 有効 (既定)                                   期待: unit 56 の trap 元が function_8c6530 の OOB から function_8c5eb0 の fail-fast (unreachable) に変わる (G2)
+#   fix = 同じ m11_ov.c, guard 有効 (既定)                                   期待: unit 56 の trap 元が function_8c6530 の OOB から function_8c5eb0 の辺 (returned = function_410360 の戻り値) に変わる (G2)
 #   ng  = 同じ m11_ov.c, 偽ガード (icmp eq i32 %9, 123456789 = 常に不成立)   期待: off と unit 差 0 (ネガコン), unit 56 trap
 # G2 は #699 の受入条件 2 改訂 (PM 判断, コメント 6147966392) に合わせた。unit 56 が ok になることは条件にしない。
 # 旧 G2 (unit 56 trap→ok) は main の変更で別原因の trap が残るため不成立 (旧期待値は REPORT_699 §3-6 に残す)。
+# #3077 (89bee32d) で fail-fast 辺は機械語どおり function_410360 の戻り値を返す形になった。よって fix の期待は unreachable ではなく returned。
 # 各 survey は rc=0 かつ units JSON 生成を確認してから判定する (前回 JSON の流用で PASS しない)。
 # 判定が 1 つでも外れる・build/survey が失敗したら exit 1。終了時に m11_ov.c と work/boot_final.ll を開始時の版へ戻す
 # (ng 構成の IR が残ると次の既定 build の前提が変わるため。boot_final.ll は m11_build.sh が pass を in-place 適用する)。
@@ -63,10 +64,10 @@ for n in names:
     print(f'counts {n}:', cnt(n), 'unit56=', L[n][56])
 def t56(n):
     s = open(f'{out}/stack56_{n}.txt', errors='replace').read()
-    return 'oob' if 'memory access out of bounds' in s else 'unreachable' if 'unreachable' in s else 'other'
+    return 'oob' if 'memory access out of bounds' in s else 'unreachable' if 'unreachable' in s else 'returned' if 'returned' in s else 'other'
 checks = [
     ('G1 off: unit 56 は trap (8c5eb0 の欠陥が残る)', L['off'][56] == 'trap'),
-    ('G2 (#699 受入 2 改訂): unit 56 の trap 元が off=OOB → fix=unreachable (8c5eb0 の fail-fast 辺)', t56('off') == 'oob' and t56('fix') == 'unreachable'),
+    ('G2 (#699 受入 2 改訂, #3077 後の現版): unit 56 の trap 元が off=OOB → fix=returned (8c5eb0 の辺。function_410360 の戻り値)', t56('off') == 'oob' and t56('fix') == 'returned'),
     ('G3 ng (ネガコン) vs off: unit 差 0 かつ unit 56 は trap', diff('off', 'ng') == [] and L['ng'][56] == 'trap'),
 ]
 bad = 0
