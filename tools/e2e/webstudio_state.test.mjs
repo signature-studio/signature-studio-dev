@@ -28,6 +28,16 @@ test("frames 0 のままでは running にならない", () => {
   assert.equal(c.contract.state, "booting");
 });
 
+test("guest は setGuest まで契約に現れず、設定後は種別を保持する (test は fl-boot の PASS 条件を満たさない)", () => {
+  const c = createWebstudioController();
+  assert.equal("guest" in c.contract, false);
+  c.setGuest("test");
+  assert.equal(c.contract.guest, "test");
+  c.setFrames(2);
+  assert.equal(c.contract.state, "running");
+  assert.equal(c.contract.guest, "test");
+});
+
 test("error は終端: 以後 running へ戻らず frames も動かない。最初の error を保持", () => {
   const c = createWebstudioController();
   c.fail(new Error("boom"));

@@ -192,7 +192,7 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 
 - `MX_OPT=-O0` の初回 exit 1 は、`858fbfcd` での 3 回連続でも再現せず (上表 3 行とも exit 0)。`d0eddb92` の 3 回と合わせ計 6 回連続 PASS。原因は引き続き未確定 (上記の記録と同じ)。
 
-- dsp の値は `dsp/REPORT.md` と §2/§3 に一致 (258,087 / 48,612)。別の値は残していない。
+- dsp の値 (258,087 / 48,612) は 858fbfcd 時点の測定で、その時点の `dsp/REPORT.md` と §2/§3 に一致 (別の値は残していない)。現 HEAD の値 (258,087 / 38,485) は §11.5 を正本とする。
 - clen 回帰 (クリーン HEAD) は §11.4 で実施。本表は測定 HEAD `858fbfcd` の値で、現 HEAD の値は §11.4。
 
 ### 11.2 未解決 (起票先付き)
@@ -233,6 +233,10 @@ work/ (gitignore): hdr_block1/2.bin, files.json, locations.json, header_parse.js
 - 未解決 (起票先 #3454 [MX-35]):
   - NC3 の判定閾値が固定値 `< 48612` のまま (base は 38,485)。dummy 入力では FAIL<期待> になるが、閾値が base と連動せず、他の入力で判定を誤りうる。
   - `dsp/REPORT.md` §0・§3 の 48,612 は旧値。現 HEAD の値は本節。
+
+### 11.5 dsp unsup 基準の更新と NC3 の相対判定 (#3454・2026-10-15 実測)
+
+- 結論: unsup 基準は 48,612 → **38,485 site / 264 種** (測定 commit `458405518`)。NC3 は base unsup 比較に変更し、NC1〜NC3 は期待どおり FAIL。実測表・群別内訳・未解決は [REPORT_APPENDIX_3454.md](REPORT_APPENDIX_3454.md) (250 行上限のため分割移動)。
 
 ## 12. MX2-3 (N5 / N6) 実測 — 2026-10-13 (#830)
 
