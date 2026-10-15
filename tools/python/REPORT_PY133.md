@@ -10,7 +10,7 @@
 - **showPicker・openEventEditor は実装した** (mock と C の差分 0)。戻り値は PE の経路で None (stub の `openEventEditor` 戻り `int` とは食い違う。下の未解決)。作用先 (picker・エディタの起動) は未モデルの no-op。
 - **launchAudioEditor は保留**。戻り値 int は callee `0x118a810` の戻り値で、その意味が未同定。値を mock/C に書くと silent miscompile になるため実装しない。子 issue #3734 (PY-242) に移した。
 - 件数 (main 取り込み後の基準・`pe130`・`pe132` を含む): 実装 168 → 170 (+2・`pe133`)、未実装 267 → 265。
-- 引数の意味: 検索キー・格納・分岐の用途を VA で確定した (「引数の意味」節)。意味を確定できない引数 (`showPicker` の arg1・arg2、`eventId` の上位 16 bit、`newWindow=2` の委譲先) は、理由を書いて未解決表に載せた (子 #3734)。
+- 引数の意味: 検索キー・格納・分岐の用途を VA で確定した (「引数の意味」節)。`launchAudioEditor` の 5 引数は callee `0x118a810` への渡し方を VA で確定した。意味を確定できない引数 (`launchAudioEditor` の 5 引数の意味、`showPicker` の arg1・arg2、`eventId` の上位 16 bit、`newWindow=2` の委譲先) は、理由を書いて未解決表に載せた (子 #3734)。
 
 ## PE 根拠 (3 件)
 
@@ -55,8 +55,14 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 | `showPicker` arg1 | PyArg 出力 `[rbp+0x9c]` (0xd6f329・必須) → dispatch 5 番目 → task+0x18 → callback `mov edx,[rbx+0x18]` (0xd6f2c0) | picker の `vtbl[+0x48]` の第 2 引数 (0xd6f2cd) | 未確定。受け側の picker オブジェクト `*(*(G)+0x54)` のクラスと slot +0x48 の実装 VA が未同定のため、何の index かを言えない | 未確定 |
 | `showPicker` arg2 | PyArg 出力 `[rbp+0x98]` (0xd6f330・既定 -1 は 0xd6f314) → task+0x20 → callback `mov r8d,[rbx+0x20]` (0xd6f2c3) | `vtbl[+0x48]` の第 3 引数 | 未確定 (arg1 と同じ理由) | 未確定 |
 | `showPicker` の第 4 引数 | callback `mov r9b,1` (0xd6f2c7) | 定数 | 値 1 は確定。意味は arg1・arg2 と同じく未確定 | 値は確定 |
+| `launchAudioEditor` reuse | PyArg 出力 `[rbp+0xbc]` (0xd6d57f)。dispatch の 5 番目の引数 → `movsxd` で task+0x18 (0xd6d5da)。callback が `cmp qword [task+0x18],1` → `sete cl` (0xd6d4cf〜0xd6d4d4) | callee `0x118a810` の第 1 引数 rcx (`reuse == 1` の bool・0xd6d4f0 の直前) | callee 未解析のため、1 のとき何を再利用するかは未確定 | 渡し方は確定。意味は未確定 |
+| `launchAudioEditor` filename | PyArg 出力 `[rbp+0xb0]` (0xd6d586)。task+0x20 (0xd6d5e6〜0xd6d5ed)。callback が `0x41c6e0(&[rbp+0x58], [task+0x20])` で局所へ複製 (0xd6d497〜0xd6d4a0) し、その値を rdx へ (0xd6d4d7) | callee 第 2 引数 rdx | 未確定。`0x41c6e0` は引数 2 つを受け `[src]` の先頭 byte を調べる helper で、中身は未解析 | 渡し方は確定。意味は未確定 |
+| `launchAudioEditor` index | PyArg 出力 `[rbp+0xb8]` (0xd6d58d)。task+0x28 (0xd6d5f2〜0xd6d5f9)。callback が `mov r8d,[task+0x28]` (0xd6d4df) | callee 第 3 引数 r8 (32 bit 読み) | 未確定 | 渡し方は確定。意味は未確定 |
+| `launchAudioEditor` preset | PyArg 出力 `[rbp+0xa8]` (0xd6d599)。task+0x30 (0xd6d5fe〜0xd6d605)。callback が `0x41c6e0(&[rbp+0x50], [task+0x30])` で複製 (0xd6d4a7〜0xd6d4b2) し、その値を r9 へ (0xd6d4e3) | callee 第 4 引数 r9 | 未確定 (filename と同じ理由) | 渡し方は確定。意味は未確定 |
+| `launchAudioEditor` presetGUID | PyArg 出力 `[rbp+0xa0]` (0xd6d5a5)。task+0x38 (dispatch の複製先。callback の読みは 0xd6d4bb)。callback が `0x41c6e0(&[rbp+0x48], [task+0x38])` で複製 (0xd6d4bb〜0xd6d4c6) し、その値をスタックの第 5 引数 `[rsp+0x20]` へ (0xd6d4e7〜0xd6d4eb) | callee 第 5 引数 (スタック) | 未確定 (filename と同じ理由) | 渡し方は確定。意味は未確定 |
 
 - 型: PyArg は `newWindow` を `i`、fl_table は `b`。`provider/fl_dispatch.c` の `'b'` は tag `'I'` (int) も受理する (61 行) ので、値 2 が型検査で弾かれることはない。
+- `launchAudioEditor` の 5 引数は、task から callee `0x118a810` への渡し方 (上の表) までを VA で確定した。意味が未確定な理由は、callee 本体が大きく未解析なため (`sub rsp,0x888`・0x118a810 の先頭 40 命令は各スロットのゼロ初期化)。確定に必要な情報は、callee 内で rcx・rdx・r8・r9・`[rsp+0x20]` がどの読み出し・分岐に使われるかの追跡。この追跡は本 PR の範囲外として子 #3734 に移した。
 - 未確定の引数は未解決表に載せた (起票先は子 #3734)。
 
 ## 実装 (作用は未モデル)
@@ -84,7 +90,12 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 | `FL_ENGINE=wasm node tests/all_tools.mjs` | 48/48 ok、host_calls 37,425、callback 往復 true | 1.24 秒 |
 
 - ネガティブコントロール (`docs/WORKFLOW.md` §5): `host/fl_mock.mjs` の `ui.openEventEditor` の個数上限を 3 から 2 にすると `node tests/ui_editor_diff.mjs` は rc 1 (`AssertionError [ERR_ASSERTION]: ui.openEventEditor`)。元に戻すと `arity(a, 2, 3)` に戻り、テストは PASS (本節の測定と同じ commit で確認)。
-- PE の VA (「引数の意味」節) は、前の run で `pe_handler_probe.py`・`pe_disasm.py`・`pe_va_read.py` により再確認済み。main 取り込みは PE 解析の入力に触れていない。
+- PE の VA の再確認 (差し戻し round 3 への対応で、この run で実行)。展開は `tar --zstd -xf $HOME/artifacts/fl-win64.tar.zst -C $RUNNER_TEMP/fl-win64 extracted/block00031_PE.bin` (1 ファイル・2.6 秒)。実行は `tools/python` で `FL_WIN64_DIR=$RUNNER_TEMP/fl-win64`。
+  - `python3 analysis/flapi/pe_handler_probe.py launchAudioEditor openEventEditor showPicker` → fn `0xd6d540`・`0xd6ef80`・`0xd6f2e0`、PyArg `isiss` (0xd6d6a4)・`Ii|i` (0xd6f0b4)・`i|i` (0xd6f404)、既定値の `mov dword ptr [rbp+0xa4],0` (0xd6efb4) が REPORT の表と一致。
+  - `python3 analysis/flapi/pe_disasm.py d6d440 75` → launchAudioEditor の callback の `sete cl` (0xd6d4d4)・`mov r8d,dword ptr [rax+0x28]` (0xd6d4df)・`call 0x118a810` (0xd6d4f0) が一致。
+  - `python3 analysis/flapi/pe_disasm.py e34614 12` → newWindow==2 の分岐 (`cmp eax,2` 0xe34617・`call 0xe3d440` 0xe34630) が一致。
+  - `python3 analysis/flapi/pe_va_read.py d6ef7c` → byte `0x01` (`openEventEditor` の 4 番目の引数の値)。
+  - `python3 analysis/flapi/pe_disasm.py 118a810 40` → callee の先頭は `sub rsp,0x888` と各スロットのゼロ初期化。本体の使われ方は未解析。
 
 ## 製品 KPI (起動・GUI に関わる PR の記載)
 
@@ -96,7 +107,8 @@ PE: `FL_WIN64_DIR=<fl-win64 展開先> python3 analysis/flapi/pe_handler_probe.p
 |---|---|---|
 | `ui.launchAudioEditor`: callee `0x118a810` の戻り値の意味と、述語偽 (status -2) の挙動 | 戻り int の値が決まらず、mock/C 未実装 | 子 issue #3734 (PY-242) |
 | `showPicker`・`openEventEditor`: 作用先 (`0xe34450`・picker の vtbl[+0x48]) と、述語偽 (-2) の戻り (None か例外か) | 作用は no-op。述語偽の経路は未実装 | 子 issue #3734 (PY-242) の範囲に含める |
-| `openEventEditor`: stub・fl_table の戻り `int` と PE の戻り None が不一致 (本 PR は PE に合わせた) | Python 側の戻り型。stub と実装が食い違う | PM (`analysis/flapi/` の生成元の確認) |
+| `openEventEditor`: stub・fl_table の戻り `int` と PE の戻り None が不一致 (本 PR は PE に合わせた) | Python 側の戻り型。stub と実装が食い違う。`fl_api_call` (`provider/fl_dispatch.c` 68〜88 行) は `fl_desc` の戻り kind を読まないため、動作は変わらない | PM agent の判断待ち: 生成元 (`tools/python/analysis/flapi/`) の戻り型を `int` のまま残すか None に直すか・既定案: PE に合わせて None (現実装) |
+| `launchAudioEditor` の 5 引数 (reuse・filename・index・preset・presetGUID) の意味: callee `0x118a810` (`sub rsp,0x888`) の本体が未解析 | 渡し方 (VA) は「引数の意味」節で確定。意味が未確定で、mock/C 未実装 | 子 issue #3734 (PY-242) |
 | `showPicker` の必須引数 (`i`) に None を渡したとき: PyArg は TypeError、本 PR は既定値扱い | None を渡しても code 5 にならない | プロジェクト共通の規約 (`fl_a_int`・mock の `argI`: None は既定値)。REPORT_PY121_2982 と同じ扱い |
 | `showPicker` の arg1・arg2 の意味: 受け側の picker オブジェクト `*(*(G)+0x54)` のクラスと、vtbl[+0x48] の実装 VA | 引数の意味が未確定。作用は no-op | 子 issue #3734 (PY-242) |
 | `openEventEditor` の eventId の上位 16 bit の意味 (`0xe3d690` の引数)、ID が何の対象か | ID の体系が未確定。C/mock は ID を検査しない | 子 issue #3734 (PY-242) |
