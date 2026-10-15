@@ -82,7 +82,7 @@ PM の判断が要る終端状態を **決定的に** (ラベル・マーカー�
 - 状態は `sig` (issue / PR 番号ごとの時刻・列挙値・真偽。本文は持たない)。webhook の増分で更新し、webhook で埋まらない reviewer の verdict と `needs-user-input` の付与時刻は reconcile で REST から一度だけ補う (best effort)。
 - 送信: payload は `{"event_type":"oc-pm","client_payload":{"kind":<列挙>,"ref":<数字>}}` だけ。値は検証済みの列挙・整数から組み立て、issue / PR の自由文は入らない。PM App の installation token で送る。スイッチは `LIVE_DISPATCH` (oc-watchdog と同じ。別スイッチは作らない)。
 - 絞り込み: 起票者が `MEMBER` / `OWNER` / `COLLABORATOR`、または許可 bot (`opencode-for-signature-studio[bot]` `oc-reviewer-for-signature-studio[bot]`) の対象だけ。起票者が未取得の対象は送らない。
-- 抑止 (DO の `meta/pmDispatch`): 同じ (kind, ref) は 60 分に 1 回・全体で 1 時間に 12 起動・同じ ref に 24 時間で 3 回まで。未送信の対象を先に、送信済みは古い順に選ぶ。失敗した試行も数える (403 / 429 はその tick を打ち切る)。同期が 15 分以上止まっている間は送らない。`refs_orphan` だけは種類ごとの上限 (`KIND_LIMITS`) が加わり、同じ N に 24 時間 1 回・1 日 10 件まで (全体の上限にも従う)。
+- 抑止 (DO の `meta/pmDispatch`): 同じ (kind, ref) は 60 分に 1 回・全体で 1 時間に 24 起動・同じ ref に 24 時間で 3 回まで。未送信の対象を先に、送信済みは古い順に選ぶ。失敗した試行も数える (403 / 429 はその tick を打ち切る)。同期が 15 分以上止まっている間は送らない。`refs_orphan` だけは種類ごとの上限 (`KIND_LIMITS`) が加わり、同じ N に 24 時間 1 回・1 日 10 件まで (全体の上限にも従う)。
 - **dry-run (既定。`LIVE_DISPATCH` が `"1"` でないとき)**: 送らず、`/status` の `would_dispatch_pm` (`?detail=1` のみ) と `counters.wouldDispatchPm`、`pm_detected` (kind ごとの検出数) に記録する。履歴は live と分ける (`meta/pmWould`)。`LIVE_LAUNCH` は関係しない。
 - ラベル `pm-apply` / `needs-user-input` の issue (着手しても PR を出さない/出せない) は、`no_pr` の検出から除く。`plan()` は、この 2 ラベルの issue を ready・再投入の対象であっても着手せず `user` 行に置く (`oc:no-pr` の有無に依らない)。`user_answered` は `needs-user-input` が対象。`tools/pm/launch_issues.py` との差は PR 本文の未解決表に書く。
 - 検出するのは上の 5 kind。`refs_orphan` は [CI-58]、`supply` は [CI-71] が担当する。
@@ -184,7 +184,7 @@ reconcile の読み取りと watchdog の dispatch は続く。launch の途中�
 
 - **区間**: 止まった時刻を `meta.halt.since` に保存する。止まり続けている間は起点を変えない。全ての条件が無くなると区間を消す (次の停止の起点に使い回さない)。
 - **/status**: `launch_halted` (`{reason, since}`。止まっていなければ `null`) と `launch_halted_overdue` (15 分以上止まり、かつ `ready` と `room` がある間は `true`)。
-- **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 12 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。降格中 (`demoted_reason` がある間) は送らず、区間の 1 回も使わずに保留する (解除の後に送る。降格中の would は 60 分に 1 回まで数える)。
+- **PM agent への通知** (30 分継続で 1 回): 新しい kind は作らず、`oc-pm` の `digest` (`ref` 0) を送る。同じ停止区間では 1 回だけ (失敗した試行も数える)。`pmHistory` の上限 (同じ digest#0 は 60 分に 1 回、全体は 1 時間に 24 件) に従う。`LIVE_DISPATCH` が `"1"` のときだけ送り、そうでなければ `counters.wouldDispatchPm` に数える。降格中 (`demoted_reason` がある間) は送らず、区間の 1 回も使わずに保留する (解除の後に送る。降格中の would は 60 分に 1 回まで数える)。
 - **限界**: `digest` の PM run が Worker から受け取るのは kind と ref だけで、`launch_halted` (停止の理由と時刻) は読まない。そのため通知を受けた PM agent は『launch が止まっている』とは分からず、通常の digest の集計をする。率制限は別で、digest の PM run は緊急の判定に `tools/pm/worker_url` の `/status` を `curl` で読む (`rate_limit_alert`・`rest_remaining`。#2539・`.github/prompts/pm.md` の digest 節)。停止の理由を通知に載せる経路 (`.github/scripts/watchdog.sh` が `/status` を読んで障害 issue を起票する経路への接続) は CI-135 (#2848) の範囲で、この README の範囲外。
 - **変異テスト**: `npm run test:mutation` が、既定値・閾値・区間の起点・解消・重複抑止・降格中の通知 (降格ゲートと保留) の 9 か所を 1 つずつ壊し、テストが落ちることを確かめる (`scripts/mutation_halt.mjs`)。
 
@@ -307,7 +307,7 @@ wrangler login --device --browser=false
 ```
 
 表示された URL (`https://dash.cloudflare.com/oauth2/device`) を手元のブラウザで開き、表示されたコードを入力して **Allow** を押す (コードの有効期限は 5 分。切れたら再実行)。
-ログインする Cloudflare のメンバーには、後述の **Workers の Admin** (Workers product スコープ) が要る。デプロイ後も `wrangler logout` はしない。保存された OAuth を VM に残し、以後の再デプロイに PM が使う (PM 判断 2026-10-14、#2357。手順は後述の「再デプロイ」)。新規 API token は作らない。
+ログインする Cloudflare のメンバーには、後述の **Workers の Admin** (Workers product スコープ) が要る。デプロイ後も `wrangler logout` はしない。保存された OAuth は VM に残す (PM 判断 2026-10-14、#2357)。使うのは手動の再デプロイ (後述の「再デプロイ」節) だけで、通常の deploy は Workers Builds が行う (『Workers Builds の接続と運用』の節)。新規 API token は作らない。
 
 ### 必要な Cloudflare の権限
 
@@ -346,7 +346,7 @@ App の id・private key・webhook secret は Worker が受け取って暗号化
 VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済み。Worker が着手と `oc-watchdog` の dispatch を担う状態にするため、`LIVE_LAUNCH` `LIVE_DISPATCH` を `"1"` にした。VM の timer は**再開しない**。
 
 - 前提 (merged): #2398 (Review-Only と `oc:stuck` の上限)、#2418 (LIVE の分離)、#2420 (#2380 コメントを新しい順に 24 時間分読む)、#2422 (#2338 `/status` の観測・redact・rate-guard。Worker の REST 残量が 1,500 未満の間は launch を止める)。未 merge の #2343 (VM 状態の取り込み)・#2334 (no-pr の理由別再着手)・#2340 (shadow の自己昇格) は前提から外した。VM が止まっているので二重着手の窓が無く、phase は『open PR < 10 で解除』の規則で足りる。
-- merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 12 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 3 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。oc-pm を含めて live にするのは既定案 (#2319 の設計どおり)。PM の判断は PR #2453 の未解決表と PM のコメントに記録した。突き合わせはこの版 (`e88e1890`) で測り直した。
+- merge 後に動く版は #2422 (rate-guard) と #2423 (#2333 oc-pm) を含む (この PR の差分には無い)。rate-guard は Worker の REST 残量 (`rest_remaining`) が 1,500 未満の間 launch を止める (`launch_stop: rate-guard`。未観測の間は止めない)。**`LIVE_DISPATCH="1"` は `oc-pm` (PM agent の起動) も送る**(別スイッチは無い。上限は全体で 1 時間に 24 起動・同じ (kind, ref) は 60 分に 1 回・同じ ref に 24 時間で 3 回。pm job の token は issues / pull-requests の write だけで contents を持たない)。止めるときは `LIVE_DISPATCH="0"` (`oc-watchdog` も止まる)。oc-pm を含めて live にするのは既定案 (#2319 の設計どおり)。PM の判断は PR #2453 の未解決表と PM のコメントに記録した。突き合わせはこの版 (`e88e1890`) で測り直した。
 - 暫定の安全装置: `TARGET="50"` (最初の 1 時間。80 に戻す作業は #2458)。`NO_PR_COOLDOWN_H` は 24 から 6 に短縮した (#2650。理由別の再着手の規則 (上の 3.) が入ったため。値は下の表)。`TARGET` は後で『opencode.yaml の全 run の総数の目標』に意味を改め、既定を 58 にした (上の 6。#2458 は置き換え)。Review-Only は `phase.ts` / `engine.ts` が既に持つ (open PR が 80 超で launch しない、`oc:stuck` が `STUCK_HIGH` 超で止める)。
 - 突き合わせ: dry-run の Worker と VM の `launch_issues.py` の差は、open な子を持つ親の除外・`pm-apply` の user 扱い・`oc:no-pr` の cooldown・VM の `relaunch.json` の有無で説明がつく (推定を含む。測定は #2422・#2423 を含む版。内訳と未解決は `tools/pm/REPORT.md` §12)。(この版の時点では `NO_PR_COOLDOWN_H` の既定 3 が `oc:no-pr` の issue を大量に候補へ戻すので 24 にしていた。#2650 で、理由別の規則に合わせて 6 にした。)
 - 初回のデプロイ (2026-10-14) では、保存状態を整える一時ビルド (全体同期の前倒しと、phase を VM の `phase.json` に合わせる) を使った。リポジトリの差分には無い。理由と結果は `tools/pm/REPORT.md` §12-5。その後も保存 outcome の欠落が観測されている。観測と計測は `tools/pm/REPORT_APPENDIX_2652.md` §4・§5、原因の追跡は子 #2757 (根因は未特定)。保存状態の補完は下の『保存値の版 (`SIGNAL_VER`) を上げる』の仕組みで行う想定だが、その効果は本番で未確認。
@@ -356,7 +356,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 
 ## 保存値の版 (`SIGNAL_VER`) を上げる (#2652)
 
-派生値 (issue の起票者 `author`・`assoc`、PR・issue の手がかり `sig.outcome` など) を作る規則を変えたら、`src/engine.ts` の `SIGNAL_VER` を 1 上げて deploy する (現行は 2)。版は全体同期が完了したときに `meta.signalVer` へ記録する。保存値の版が `SIGNAL_VER` と違う最初の tick は、周期 (6 時間) を待たずに全体同期を 1 回走らせて、古い保存値を補完する。その全体同期が失敗したときは `SIGNAL_RETRY_MS` (15 分) ごとに再試行し、それより頻繁には叩かない。上げると次のことが起きる: (1) 全体同期の REST 呼び出しが 1 回増える (周期の全体同期と同じ量)。(2) 補完で新たに `no_pr` の対象になった issue の oc-pm 起動が増え得る (全体で 1 時間 12 件まで。同じ (kind, ref) は 60 分に 1 回)。(3) `artifact` の再投入の候補も増え得る。deploy 前の `/status` の `pm_detected` は今の保存値から数えた値なので、版の補完で増える件数は deploy 前には見えない (REST で再計算した件数は `tools/pm/REPORT_APPENDIX_2652.md` §5)。deploy は `LIVE_LAUNCH` / `LIVE_DISPATCH` の状態を確認してから行う (merge とデプロイは別)。
+派生値 (issue の起票者 `author`・`assoc`、PR・issue の手がかり `sig.outcome` など) を作る規則を変えたら、`src/engine.ts` の `SIGNAL_VER` を 1 上げて deploy する (現行は 2)。版は全体同期が完了したときに `meta.signalVer` へ記録する。保存値の版が `SIGNAL_VER` と違う最初の tick は、周期 (6 時間) を待たずに全体同期を 1 回走らせて、古い保存値を補完する。その全体同期が失敗したときは `SIGNAL_RETRY_MS` (15 分) ごとに再試行し、それより頻繁には叩かない。上げると次のことが起きる: (1) 全体同期の REST 呼び出しが 1 回増える (周期の全体同期と同じ量)。(2) 補完で新たに `no_pr` の対象になった issue の oc-pm 起動が増え得る (全体で 1 時間 24 件まで。同じ (kind, ref) は 60 分に 1 回)。(3) `artifact` の再投入の候補も増え得る。deploy 前の `/status` の `pm_detected` は今の保存値から数えた値なので、版の補完で増える件数は deploy 前には見えない (REST で再計算した件数は `tools/pm/REPORT_APPENDIX_2652.md` §5)。deploy は `LIVE_LAUNCH` / `LIVE_DISPATCH` の状態を確認してから行う (merge とデプロイは別)。
 
 全体同期が一覧を打ち切った (`sync_truncated`) ままでも版は記録する。打ち切りは `Gh.list` のページ上限に一覧の件数が届いたときに起きる (上の『同期の窓と打ち切り』)。窓 (`COMMENT_WINDOW_H`) が読む量を決めるのはコメントの一覧だけで、open の issue・PR の一覧は窓に依らない。そのため 15 分後の再試行も同じ打ち切りになりやすい (推定。再試行は REST を増やすだけになる)。打ち切りが残る間は `fresh=false` で launch と watchdog の dispatch が止まり、周期の全体同期 (6 時間) が次の機会になる。
 
@@ -379,7 +379,7 @@ VM の `pm-launch.timer` `pm-watchdog.timer` は依頼者の指示で停止済�
 | `LOW_CAP` | `prio:low` の issue の未完了の run の上限。`prio:critical` が着手済みか launch 可能な間だけ効く (#2721)。空・非数・負は既定に戻す | `"10"` (`config.ts` の `DEFAULT_LOW_CAP` と同じ) |
 
 個別の設定があれば `LIVE` より優先する (`LIVE=1` かつ `LIVE_LAUNCH=0` なら launch だけ dry-run)。`LIVE=1` だけの旧デプロイは従来どおり両方 live。
-切替は `[vars]` を書き換えて**再デプロイ**する (`cd infra/pm-worker && npx wrangler deploy`。`STORE_KEY` の secret は変わらない)。リポジトリと稼働中の値を一致させるため、書き換えは PR で merge してから、その main でデプロイする。
+切替は `[vars]` を書き換えて**再デプロイ**する (`cd infra/pm-worker && npx wrangler deploy`。`STORE_KEY` の secret は変わらない)。リポジトリと稼働中の値を一致させるため、書き換えは PR で merge してから、その main でデプロイする。Workers Builds の接続後は、merge が deploy になる (『Workers Builds の接続と運用』)。手動の deploy は後述の『再デプロイ』節の手順による。
 
 ### A. repository_dispatch を先に live にする (oc-watchdog と oc-pm)
 
@@ -410,9 +410,9 @@ Worker が送る type は `oc-watchdog` と `oc-pm` の 2 つだけ。`oc-watchd
 3. VM の `pm-launch.timer` を止める (A を済ませていなければ `pm-watchdog.timer` も)。
 4. 戻す場合 (旧案。今は『切替の記録』の戻し方に従い、VM の timer は再開しない): `LIVE_LAUNCH` を `"0"` にして再デプロイし、VM の timer を再開する (VM 版は変更していない)。同期が壊れたら `/status` の `fresh` が false になり、Worker は投稿しない。
 
-## 再デプロイ (PM。VM に残した wrangler の OAuth)
+## 再デプロイ (通常は Workers Builds。手動の手順は PM が VM の OAuth で行う)
 
-Worker のコード (`src/`・`wrangler.toml`) を変更して main に merge したら、PM が VM から再デプロイする。認証は初回デプロイで保存された OAuth を使う (wrangler が refresh token で access token を自動更新する)。
+Worker のコード (`src/`・`wrangler.toml`) を変更して main に merge すると、Workers Builds (接続済み。『Workers Builds の接続と運用』の節) が main をビルド・デプロイする。この節の手順は、Workers Builds が使えないときや止めるときに PM が VM の OAuth で手動で行うものであり、VM に OAuth が残っているときだけ使える。認証は初回デプロイで保存された OAuth を使う (wrangler が refresh token で access token を自動更新する)。
 Workers Builds の接続状態は後述の『Workers Builds の接続状態と pnpm 経路』を見る。デプロイするのは **main に merge 済みの commit だけ**。以下のコマンドは wrangler 4.151.0 で、`--help` とソース、認証なしで実行できるものは実行して確認した。実 Worker への実行は未確認の項目として最後に列挙する。
 
 1. 認証の確認 (token の値は表示しない・書かない)。
@@ -435,7 +435,7 @@ Workers Builds の接続状態は後述の『Workers Builds の接続状態と p
 5. 反映の確認。
    - `wrangler deployments status` に、手順 4 の `--tag` と `--message` を持つ version が 100% で出る。出力の項目 (version id・Created・Tag・Message) はソースで確認した。実 Worker での表示は未確認 (末尾のチェックリスト)。
    - `curl -fsS "$PM_WORKER_URL/status"` が応答し、`fresh` が `true`、`last_tick` が deploy 後の時刻に進む。
-   - `curl -fsS "$PM_WORKER_URL/status"` の `build` が、手順 4 で `--var BUILD_COMMIT:` に渡した commit hash (全体) と一致すること。`null` のままなら、その deploy は `--var` を付けずに出ている (反映とは判断しない。手順 4 をやり直す)。`build` は公開の `/status` にも出る (集計の一部で、秘密ではない)。
+   - `curl -fsS "$PM_WORKER_URL/status"` の `build` が、手順 4 で `--var BUILD_COMMIT:` に渡した commit hash (全体) と一致すること。`null` のままなら、その deploy は `--var` を付けずに出ている (反映とは判断しない。手順 4 をやり直す)。Workers Builds の deploy は `--var` を付けないので、接続後は merge した版の `build` も `null` になりうる。その版の反映は commit の check run で見る (『Workers Builds の接続と運用』の『運用』)。`build` は公開の `/status` にも出る (集計の一部で、秘密ではない)。
    - 反映の判定は `/status` の `build` で行う (外から見られる。watchdog や他の agent も同じ確認ができる)。`wrangler deployments status` の Tag / Message は、wrangler にログインした VM で 100% の version を確かめる補助に使う。
 
 ## ロールバック
@@ -461,7 +461,7 @@ Workers Builds の接続状態は後述の『Workers Builds の接続状態と p
 - 擬似的な再現: 隔離した設定 dir に、期限切れの access token と無効な refresh token を入れて `CI=1 wrangler whoami` (`--json` の有無を問わず) を実行すると、終了コード 1 で上のメッセージが出た。これは実機の失効 (Cloudflare 側で refresh token が失効した場合) の再現ではない。
 - エラー文は、`CLOUDFLARE_API_TOKEN` を設定する方法も案内する。**この手順では従わない** (token を作らない・設定しない。指示 4・9)。
 
-**失効している間の状態。** 稼働中の Worker は、最後にデプロイしたコードのまま動き続ける (webhook・Cron・alarm・DO は Cloudflare 側で動く)。遅れるのは『コード変更の反映』と『ロールバック』だけ。main に merge した修正は、再認証までデプロイされない。
+**失効している間の状態。** 稼働中の Worker は、最後にデプロイしたコードのまま動き続ける (webhook・Cron・alarm・DO は Cloudflare 側で動く)。手動の再デプロイとロールバックは、再認証まで遅れる。Workers Builds が接続されている間は、main に merge した修正は OAuth と関係なくビルド・デプロイされる (『Workers Builds の接続と運用』の節)。
 
 **対処。** 再認証にはブラウザでの承認が要るので、依頼者の操作になる。
 
@@ -469,11 +469,29 @@ Workers Builds の接続状態は後述の『Workers Builds の接続状態と p
 2. 実行後に `wrangler whoami --json` が通ることを確認し、保留していた再デプロイをする。
 3. 依頼者が不在のときは待たない。`needs-user-input` の issue に積む (既定案: 『再認証まで反映を遅らせる』。他の作業は止めない。`docs/WORKFLOW.md` §12)。
 
-## Workers Builds を接続しない理由
+## Workers Builds の接続と運用
 
-> **注意 (#2585)**: 下の判断 (接続しない) は、2026-10-14 の実測で Workers Builds のビルド記録が見えた事実と食い違う。接続の有無と判断の見直しは PM (#2357) が決める。接続の状態と pnpm 経路の注意は次の節を見る。接続した場合、Workers Builds の deploy には `--var BUILD_COMMIT` が付かないので、その版の `/status` の `build` は `null` になる (推定。未確認)。
+> **注意 (#2585)**: Workers Builds の deploy には `--var BUILD_COMMIT` が付かないので、その版の `/status` の `build` は `null` になりうる (推定。未確認)。
 
-Workers Builds (Cloudflare 側に repo を接続し、main への merge で自動ビルド・デプロイする機能) は、既定ではビルド用の API token を Cloudflare がアカウントに**自動で発行**する (公式: <https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token>)。依頼者の指示 4・9 (無断で token を作らない・secrets を平文で保存しない) の趣旨に反しうるため、PM 判断 (2026-10-14、#2357 [CI-78]) で接続しないと決めた。代わりに、上の手順で PM が VM の OAuth を使って再デプロイする。引き換えに、merge から反映までは PM の操作を待ち、OAuth が失効している間は反映できない (稼働中の Worker は止まらない)。依頼者が判断を変えたら、#2357 を再開して判断する。
+Workers Builds (Cloudflare 側に repo を接続し、main への merge で自動ビルド・デプロイする機能) は、既定ではビルド用の API token を Cloudflare がアカウントに**自動で発行**する (公式: <https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token>)。
+
+- **接続の経緯**: 2026-10-14 の PM 判断 (#2357 [CI-78]) は接続しないだった。理由は上の token の自動発行で、依頼者の指示 4・9 の趣旨に反しうるため。2026-10-15 に `signature-studio-pm` への接続済みを確認して #2357 を close した。根拠は、main の merge commit の check run `Workers Builds: signature-studio-pm` が success だったこと。
+- **確認できたビルド設定** (出典: #2452・#2585): root directory は `infra/pm-worker`、deploy command は `npx wrangler deploy`、build command は空。packageManager は、リポジトリ直下の `package.json` の `packageManager` (`pnpm@12.10.1`) から pnpm を選び、`infra/pm-worker` で `pnpm install --frozen-lockfile` を実行する。
+- **未確認** (推測では書かない):
+  1. watch paths の実際のダッシュボード設定値 (未確認)。#2357 のコメントの提案は `infra/pm-worker/*`・`tools/pm/manual_deps.json` だが、ダッシュボードは読んでいない。
+  2. Cloudflare が自動発行した token に実際に付与された権限 (未確認)。#2357 のコメントは Workers Scripts・Workers KV・Workers R2・全 zone の Workers Routes (edit) などを含むと書いている。自分で token を選んだかどうかも未確認。
+  3. watch paths が効かず、差分のない merge でもビルドが作られたこと (#2585 のコメント)。原因は未確認。
+  4. build が失敗したときに新版が出ないこと (未確認)。
+
+### 運用
+
+- **token の権限が広い**: Worker が使わない Workers KV・R2・全 zone の Routes を含みうる (未確認)。このため、公開直後の版を入れない release-age の方針 (『[Workers Builds の接続状態と pnpm 経路](#workers-builds-の接続状態と-pnpm-経路-2585)』の節の『pnpm 12 の release-age』の項) を変えない理由になる。
+- **build failure の見方**: commit の check run `Workers Builds: signature-studio-pm` の summary にある Build ID とダッシュボードのリンクから、段 (install / build / deploy) とログを見る。失敗したビルドで新版が出ないことは未確認 (上の未確認 4)。
+- **deploy が merge ごとに走る場合の注意** (watch paths は未確認。上の未確認 1・3):
+  - (a) `[vars]` は deploy のたびに `wrangler.toml` の値で置き換わる。`LIVE_*` や `TARGET` を変える PR は、merge で本番に反映される。
+  - (b) `build` が `null` になりうる (冒頭の注意。推定。未確認)。
+  - (c) 無関係な merge でも再デプロイが走りうる。害は未確認。
+  - (d) VM の OAuth や `wrangler rollback` で戻しても、次のビルドが main の内容で上書きする恐れがある (推定。未確認)。
 
 ## Workers Builds の接続状態と pnpm 経路 (#2585)
 
@@ -483,12 +501,12 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
   - `pnpm-workspace.yaml` の `allowBuilds` (esbuild・workerd): pnpm 12 は既定で依存の build script を止める。無いと `ERR_PNPM_IGNORED_BUILDS` で install が落ちる。新しい依存が install script を持つときは、ここに足す。
   - `infra/pm-worker/package.json` に npm の `packageManager` を書かない。pnpm 12 は npm 指定のプロジェクトで実行を拒否する (`ERR_PNPM_OTHER_PM_EXPECTED`)。
 - 確認の手順: `cd infra/pm-worker && pnpm install --frozen-lockfile && pnpm exec wrangler deploy --dry-run --outdir work/dryrun` (認証なしで通る。install が `ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION` で落ちたら、下の release-age の項)。
-- 2026-10-14 の時点で、Workers Builds の install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。merge 後の Workers Builds の結果は、この README では確認していない。
+- install 段は上の 2 点 (npm 指定と lockfile の無さ) で失敗していた (#2585)。以後の結果は、commit の check run `Workers Builds: signature-studio-pm` で見る (見方は『Workers Builds の接続と運用』の『運用』)。
 - **pnpm 12 の release-age (`minimumReleaseAge` = 1440 分)**: 公開から 24 時間未満の版は既定で install を拒否する。その版 (一覧は付録 §2) を含む lock は、その版のうち最も新しいものの公開から 24 時間が過ぎるまで、既定設定の `pnpm install --frozen-lockfile` が失敗する。公開時刻・違反の内訳・範囲を下げた経緯と再現の結果は [`tools/pm/REPORT_APPENDIX_2653.md`](../../tools/pm/REPORT_APPENDIX_2653.md)。
   - 除外しない理由: `minimumReleaseAgeExclude` や `--config.minimum-release-age=0` で通すと、公開直後の版が Workers Builds の token (権限が広い) で入る。このポリシーが防ぐ侵害の入口になるので、ポリシーは変えない。
   - `pnpm add` は既定設定でも、違反版を `minimumReleaseAgeExclude` に自動で書き足す (付録 §3 c。追跡 #3342)。`pnpm add` の後は `pnpm-workspace.yaml` の差分を確かめる。
   - 版の選び方: `pnpm view <pkg> time --json` で公開時刻を見て、24 時間以上たつ最新版を範囲に書く。lock に古い版が残ると範囲を書き換えても残るので、`pnpm remove <pkg>` の後に `pnpm add -D <pkg>@^<版>` で解決し直す。推移的な依存 (miniflare・workerd) も同じ確認の対象。
-  - Workers Builds の install の結果 (merge 後) は、この README では確認していない (PM が確認する)。
+  - install の結果は、commit の check run で見る (『Workers Builds の接続と運用』の『運用』)。
 
 ## 確認できていない点 `[未確認]` のチェックリスト
 
@@ -500,3 +518,6 @@ Workers Builds (Cloudflare 側に repo を接続し、main への merge で自�
 - [ ] `[未確認]` rollback で `[vars]` (特に `LIVE_LAUNCH` / `LIVE_DISPATCH`) と Cron の schedule が戻し先の version の値に戻るか。公式は『binding の先は変わらない』とだけ書き、`[vars]` と schedule の扱いは書いていない。`LIVE_LAUNCH` または `LIVE_DISPATCH` が `"1"` の運用中に rollback すると、戻し先の値が `"0"` ならその経路が dry-run に戻る (投稿・dispatch が止まる) 恐れがある。`--var` で渡した `BUILD_COMMIT` (binding) も戻るかは未確認で、戻らないときに `build` が何になるか (戻す前の hash のままか、`null` か) も分からない。確認の方法: 上のテストの後に `GET /status` の `mode_launch` / `mode_dispatch` (と `mode`)・`build`、dashboard の Triggers の cron が残っていることを見る。
 - [ ] `[未確認]` `wrangler deployments status` と `wrangler versions list` の実際の出力 (Tag / Message の表示を含む)。項目名はソースで確認した。実 Worker での表示は未確認。
 - [ ] `[未確認]` `--var BUILD_COMMIT:<hash>` の値が、実 Worker の `/status` の `build` に出ること。`--var` を付けない deploy で `build` が `null` に戻ること (`--keep-vars` なしの既定。wrangler の help の説明どおりと読んだが、実機では未確認)。確認の方法: 次の再デプロイで手順 4 の hash を渡し、手順 5 の `build` が一致すること。`null` に戻る挙動は、`--var` を付けない deploy が次に行われたときに見る (テストのためだけの deploy はしない)。ローカルでは `wrangler deploy --dry-run` と vitest (node と workerd) で確認済み。
+- [ ] `[未確認]` watch paths の実際の値 (Cloudflare ダッシュボードの Builds の設定)。確認の方法: ダッシュボードの設定を見て、この README に値を書く (推測で書かない)。
+- [ ] `[未確認]` Workers Builds の token に付与された権限。確認の方法: Cloudflare のダッシュボードで token の権限を確認する (値は書かない・貼らない)。
+- [ ] `[未確認]` 差分のない merge でビルドが作られる原因 (#2585)。確認の方法: 該当 commit の check run と watch paths の設定を比べる。

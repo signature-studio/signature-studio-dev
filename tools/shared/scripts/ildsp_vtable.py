@@ -5,6 +5,7 @@ usage: ildsp_vtable.py [PE] [--out <json>]
   既定 PE: $FL_WIN64_DIR/extracted/block24360_PE.bin (tools/shared/paths.py)
   既定 out: tools/shared/work/raw/ildsp_vtable.json (gitignore)
   検算: ildsp_vtable_check.py <json> (生バイトだけで読み直す別実装)
+  --seed: 追加で、指定した RVA (16 進、カンマ区切り) だけから辿った closure を出す (例: 0x161fc0)
 
 出力 (事実のみ。各 slot の役割の判定は tools/shared/lift/ildsp/REPORT.md §4):
   1. CreateInstance (RVA 0x1aa290) の vptr 格納 lea の RIP 相対先 = vtable RVA
@@ -30,10 +31,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("pe", nargs="?", default=os.path.join(FL_WIN64_DIR, "extracted", "block24360_PE.bin"))
     ap.add_argument("--out", default=os.path.join(ROOT, "work", "raw", "ildsp_vtable.json"))
+    ap.add_argument("--seed", default="")
     a = ap.parse_args()
 
     raw = open(a.pe, "rb").read()
     pe = pefile.PE(a.pe, fast_load=True)
+    pe.parse_data_directories(directories=[pefile.DIRECTORY_ENTRY["IMAGE_DIRECTORY_ENTRY_IMPORT"]])
     img = pe.get_memory_mapped_image()
     base = pe.OPTIONAL_HEADER.ImageBase
     secs = {s.Name.rstrip(b"\0").decode(errors="replace"): s for s in pe.sections}
@@ -184,7 +187,7 @@ def main():
     def closure(entries):
         seen, order, stack = {}, [], list(entries)
         n_ins = simd = dcalls = 0
-        ind_calls, ind_jmps, dsites, franges = [], [], [], {}
+        ind_calls, ind_jmps, dsites, djsites, franges = [], [], [], [], {}
         while stack:
             ent = stack.pop()
             b, ranges, ins, mode = body(ent)
@@ -209,6 +212,7 @@ def main():
                     if direct(i):
                         t = int(i.op_str, 16)
                         if t not in own:
+                            djsites.append([hex(i.address), hex(t)])
                             stack.append(t)
                     else:
                         ind_jmps.append({"site": hex(i.address), "in_func": hex(b), "op": i.op_str, **ind_info(i)})
@@ -218,6 +222,7 @@ def main():
             "function_starts": [{"start": hex(x), "mode": seen[x],
                                  "ranges": [[hex(p), hex(q)] for p, q in franges[x]]} for x in sorted(order)],
             "direct_call_sites": sorted(dsites),
+            "direct_jmp_sites": sorted(djsites),
             "instructions": n_ins, "simd": simd, "direct_calls": dcalls,
             "indirect_calls": sorted(ind_calls, key=lambda d: int(d["site"], 16)),
             "indirect_jmps": sorted(ind_jmps, key=lambda d: int(d["site"], 16)),
@@ -225,6 +230,8 @@ def main():
 
     cl_ci = closure([CREATE_RVA])
     cl_all = closure([CREATE_RVA] + [int(s["target_rva"], 16) for s in slot_out])
+    seeds = [int(x, 16) for x in a.seed.split(",") if x]
+    cl_seed = closure(seeds) if seeds else None
 
     res = {
         "pe": a.pe,
@@ -236,6 +243,7 @@ def main():
                    "end_value_va": hex(end_v), "end_in_text": bool(t_lo <= end_v - base < t_hi)},
         "closure_create_only": cl_ci,
         "closure_with_slots": cl_all,
+        "closure_seed": cl_seed,
     }
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     json.dump(res, open(a.out, "w"), ensure_ascii=False, indent=1)
@@ -246,11 +254,16 @@ def main():
         extra = f" -> {s['thunk_target']}" if s["kind"] == "thunk_inner" else ""
         print(f"slot {s['index']}: {s['target_rva']} {s['kind']}{extra} mode={s['mode']} ranges={s['ranges']} "
               f"calls={[(c['target'], c['rdx']) for c in s['calls']]} stores_vptr={s['stores_vptr']}")
-    for name, cl in (("CreateInstance 単独", cl_ci), ("CreateInstance + 全 slot", cl_all)):
+    named = [("CreateInstance 単独", cl_ci), ("CreateInstance + 全 slot", cl_all)]
+    if cl_seed is not None:
+        named.append((f"seed {a.seed}", cl_seed))
+    for name, cl in named:
         print(f"closure[{name}]: functions={cl['functions']} instructions={cl['instructions']} simd={cl['simd']} "
               f"direct_calls={cl['direct_calls']} indirect_calls={len(cl['indirect_calls'])} indirect_jmps={len(cl['indirect_jmps'])}")
         for c in cl["indirect_calls"]:
             print(f"  indirect call {c['site']} in {c['in_func']}: {c['op']} slot={c.get('slot_rva')} import={c.get('import')}")
+        for c in cl["indirect_jmps"]:
+            print(f"  indirect jmp {c['site']} in {c['in_func']}: {c['op']} slot={c.get('slot_rva')} import={c.get('import')}")
 
 
 if __name__ == "__main__":

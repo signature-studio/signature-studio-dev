@@ -1,0 +1,158 @@
+# 01:43:46
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	IDLE
+# 01:43:47
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:48
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:49
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:50
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:51
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:52
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:53
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:54
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:55
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:56
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:57
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:58
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:43:59
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:00
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:01
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:02
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:03
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:04
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:05
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:06
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:07
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:08
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:09
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:10
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:11
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:12
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:13
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:14
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:15
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:16
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:17
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:18
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:19
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:20
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:21
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:22
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"
+# 01:44:23
+1	ci_null	module-null-sink.c	s16le 2ch 44100Hz	RUNNING
+	Sink: 1
+		application.name = "Google Chrome"

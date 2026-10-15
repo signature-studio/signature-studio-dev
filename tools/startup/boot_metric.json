@@ -70,7 +70,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "1333a9ec"
+          "file_last_commit": "4aa8d6de"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -149,7 +149,7 @@
           "file": "tools/m11",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "1333a9ec"
+          "file_last_commit": "4aa8d6de"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -224,9 +224,9 @@
       "commit": "703b4857",
       "units": {
         "total": 942,
-        "ok": 52,
+        "ok": 109,
         "skipped": null,
-        "failed": 1,
+        "failed": 0,
         "miss": null,
         "noproc": null,
         "dispatched": null,
@@ -238,8 +238,8 @@
         "last_step": "S09"
       },
       "gui_natural": {
-        "RegisterClassW": 0,
-        "CreateWindowExW": 0
+        "RegisterClassW": 1,
+        "CreateWindowExW": 1
       },
       "first_wm_paint": null,
       "pixels": null,
@@ -265,43 +265,43 @@
           "file": "tools/gui/flengine/REPORT.md",
           "locator": "md: /^### HEAD `([0-9a-f]{8})` の実測 \\(.*本節を正とする\\)/",
           "measured_commit": "703b4857",
-          "file_last_commit": "b37f613f"
+          "file_last_commit": "9a6f490b"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:units_run",
           "measured_commit": "703b4857",
-          "file_last_commit": "c1a81f39"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:boot_threw",
           "measured_commit": "703b4857",
-          "file_last_commit": "c1a81f39"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:units_total",
           "measured_commit": "703b4857",
-          "file_last_commit": "c1a81f39"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:reach[RegisterClassW].calls (配列に無ければ 0)",
           "measured_commit": "703b4857",
-          "file_last_commit": "c1a81f39"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/boot.json",
           "locator": "json:reach[CreateWindowExW].calls (配列に無ければ 0)",
           "measured_commit": "703b4857",
-          "file_last_commit": "c1a81f39"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "5431adc1"
+          "file_last_commit": "a460ef09"
         },
         {
           "file": "tools/startup/STARTUP.md",
@@ -361,61 +361,61 @@
           "file": "tools/gui/flengine/REPORT.md",
           "locator": "md: /測定 commit `([0-9a-f]{8})`・judge [0-9]+/[0-9]+・S1 `(\\d+)/(\\d+)/(\\d+)/(\\d+)/(\\d+)`/",
           "measured_commit": "719f1c43",
-          "file_last_commit": "b37f613f"
+          "file_last_commit": "9a6f490b"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:units_total",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.ok",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.noproc",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.miss",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.trap",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.clobber",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:survey.kinds",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:reach[RegisterClassW].calls (配列に無ければ 0)",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         },
         {
           "file": "tools/gui/flengine/results/survey_soft.json",
           "locator": "json:reach[CreateWindowExW].calls (配列に無ければ 0)",
           "measured_commit": "719f1c43",
-          "file_last_commit": "5f9d7cbd"
+          "file_last_commit": "d14566f5"
         }
       ]
     },
@@ -612,13 +612,13 @@
           "file": "tools/flelift/boot/REPORT.md",
           "locator": "md:### 4-1. /^\\| plain \\| [^|]*\\| \\*\\*209 dispatch\\*\\* / oob \\(`f_([0-9a-f]+)`\\)/",
           "measured_commit": null,
-          "file_last_commit": "25d323ca"
+          "file_last_commit": "62db1035"
         },
         {
           "file": "tools/flelift/boot",
           "locator": "grep 0 件 /CreateFruityInstance/ (呼出し構文・コメント/.md/allow を除く)",
           "measured_commit": null,
-          "file_last_commit": "25d323ca"
+          "file_last_commit": "15de1ecf"
         },
         {
           "file": "tools/startup/STARTUP.md",

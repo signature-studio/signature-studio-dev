@@ -65,3 +65,69 @@ PLUG_F80_LOWER=1 bash tools/plugins/reverb_delay/engine_lift.sh 19000 800
 - **両スタブ外し後の残り (ferror-limit=0)**: `emcc -c` rc 1 / error 296 件。 内訳は `no libcall available for fmul with type f80` 134、`fadd` 116、`do not know how to soften fp_extend` 22、`fp_round` 19、`sint_to_fp` 4、`frem` 1。 segfault 以外の未解決はすべて f80 の libcall 不足。
 - **判断**: 19165 の `emcc -c` rc 0 の前提は「f80 の扱い」の 1 点に集約される。 f80 を f64 に下げる (`PLUG_F80_LOWER=1`) と segfault は消えた (§13 で 19165 rc 1 = E7)。 一方で E7 の型誤り推定は §15 で単独では成立しなかった。 次の判断は PM 側で、(a) f80 を持つ関数の扱い (精度を落とす lowering か、関数単位の除外か)、(b) x87 を含む 2 関数の DAG combine 回避 (LLVM 側・wasm backend の回避策) のどちらを取るか。
 - **注意**: スタブ版の wasm は生成していない (関数を消すため miscompile)。 本節の数値は到達性の診断であり、engine の正しさは示さない。
+
+## 18. #3446 (PLG-F4-4) 殻 ↔ engine DLL の結合方式 (2026-10-15 · 静的解析 · 測定 commit 1a72e7dbf)
+
+- **既知類型との関係**: 該当なし (逆アセンブル・PE 解析のみ。 lift 鎖・IR は変更していない)。 測定は `tools/plugins/reverb_delay/shell_bind.py` (本節で追加。 gate 付き)。
+- **素材**: `fl-win64` のみ (`$RUNNER_TEMP/fl-win64/extracted/block{18999,19000,19164,19165}_PE.bin`)。 engine の正しさや実行時の挙動は見ていない (範囲外)。
+- **再現**: `FL_WIN64_DIR=<展開先> python3 tools/plugins/reverb_delay/shell_bind.py 18999 19000` (Delay 3) と `... 19164 19165` (Multiband Delay)。 両方とも rc 0・判定 `OK`。 NC: `--engine-name Nope_x64.dll` で rc 1・判定 `FAIL ['load', 'entry']` (経路と間接呼出が見つからないと落ちる)。
+
+### 18-1. 結論 (先出し)
+
+1. **結合方式は LoadLibrary + GetProcAddress (名前引き) で、殻が engine を読み込む。** engine 側から殻への関数ポインタ渡しは無い。 殻が自分の audioMaster コールバックの関数ポインタを engine の入口に渡し、engine が返す `AEffect*` を殻が保持する (VST2 の入口形)。
+2. **入口の名前は 26 通りの候補表を総当たりする。** 殻は `VstPluginMain` / `VSTPluginMain` / `main` / `maiN` … (大文字小文字の違いを含む 26 件、Delphi UnicodeString) を順に `GetProcAddress` し、最初に成功した名前を使う。 両 engine では大文字小文字を区別した最初の一致が `VSTPluginMain` (表の 2 番目)。
+3. **engine の入口は両 engine で別物**: Delay 3 engine (19000) の `VSTPluginMain` (RVA 0xe9a0) は `jmp ?CreateEngine` (RVA 0xe830) の trampoline。 Multiband Delay engine (19165) の `VSTPluginMain` (RVA 0x1d77f0) は本体 (`push rbx` で始まる)。 19165 の export は `VSTPluginMain` / `main` のみ。
+4. **呼出境界 (殻 → engine)**: 入口は引数 1 つ (rcx = 殻のコールバック)、戻り値 rax = `AEffect*`。 殻は `AEffect*` を自分の object の `+0x9b4` に保存し、以後 `call [rax+8]` (AEffect.dispatcher、64-bit VST2 の配置) で呼ぶ。 dispatcher の初回呼出は `edx=0` (effOpen)・`r8=0`・`r9=0`・`[rsp+0x20]=NULL`・`[rsp+0x28]=0.0f`。
+
+### 18-2. 殻の import と読込系 API の呼出位置 (shell_bind.py [1])
+
+| 殻 | thunk (`jmp [IAT]`) の呼出位置 | 件数 |
+|---|---|--:|
+| 18999 Delay 3 | LoadLibraryW 0x44077b ほか 8 箇所 / LoadLibraryA 0x418cf1 / LoadLibraryExW 0x4158ab / GetProcAddress 10 箇所 | W 9・A 1・ExW 1・Gpa 10 |
+| 19164 Multiband Delay | LoadLibraryW 0x4407db ほか 8 箇所 / LoadLibraryA 0x418cf1 / LoadLibraryExW 0x4158ab / GetProcAddress 10 箇所 | W 9・A 1・ExW 1・Gpa 10 |
+
+- 殻の IAT には `kernel32!LoadLibraryA` / `LoadLibraryW` / `LoadLibraryExW` / `GetProcAddress` / `FreeLibrary` / `GetModuleHandleW` が並ぶ。 engine 経路の `LoadLibraryW` 呼出は 1 箇所 (下の経路)。 他の呼出はそれぞれ別の DLL (FL 本体側の API 解決) で、本節の対象外。
+
+### 18-3. engine 名 → LoadLibraryW の経路 (shell_bind.py [2])
+
+| 殻 | engine 名の UnicodeString | 参照 (`lea`, 1 箇所) | 直接 call で LoadLibraryW へ届く経路 |
+|---|---|---|---|
+| 18999 | `engine_x64.dll` (VA 0x6e9b44、長さ 14) | 0x6e999f (関数 0x6e9940) | 0x6e9940 → 0x6dcb80 → 0x440750 → `call LoadLibraryW` @0x44077b |
+| 19164 | `Engine_x64.dll` (VA 0x6e6504、長さ 14) | 0x6e632f (関数 0x6e62d0) | 0x6e62d0 → 0x6d59b0 → 0x4407b0 → `call LoadLibraryW` @0x4407db |
+
+- 0x440750 (18999 側) は、引数 `edx=0x8000` を `SetErrorMode` 相当 (0x41d520) で設定し、その間に `LoadLibraryW` を呼ぶ wrapper (0x41d520 の同定と 0x8000 = SEM_NOOPENFILEERRORBOX は SDK の定数からの推定)。 19164 側の 0x4407b0 も同形と推定 (未確認)。
+- **未確定**: `LoadLibraryW` の引数は `obj+0x2a6` (18999 では 0x6dd0fe / 0x6dd0f0 で `UnicodeString` に複写) から来る。 この `+0x2a6` へ書く命令は殻の全 code に見当たらず (読み出しと比較 (0x6dfa30) のみ)、**読み込まれる実パスが `engine_x64.dll` であることは静的に確定できていない**。 参照元 0x6e9940 の `dir + engine_x64.dll` 連結結果は、0x6e9940 のローカル `[rbp+0x26a]` に複写されるだけで LoadLibrary へ届いていない (静的に追えた範囲)。
+
+### 18-4. 候補表と解決名 (shell_bind.py [3][4])
+
+- 候補表: 18999 は 26 件 (VA 0x73c468–0x73c530、8 バイト間隔、`.data` のポインタ配列)、19164 は 26 件 (VA 0x73b7f8–0x73b8c0)。 順序は両殻で同じ: `VstPluginMain, VSTPluginMain, main, maiN, maIn, maIN, mAin, mAiN, mAIn, mAIN, Main, MaiN, MaIn, MaIN, MAin, MAiN, MAIn, MAIN, vstpluginmain, VSTPluginMain, VSTPluginmain, VSTpluginmain, VSTpluginMain, vstPluginMain, vstPluginmain, vstpluginMain`。
+- 候補表を参照する関数: 18999 0x6dc2d0 (`lea rbx,[rip+…]` で表の先頭 0x73c468 を参照)、19164 0x6d5100 (表の先頭 0x73b7f8 付近)。 いずれも直接 call 2 段の先で `GetProcAddress` の thunk を呼ぶ (18999: 0x6dc2a0 → 0x41d1b0 の 0x41d1de、19164: 0x41d1d0 の 0x41d1fe)。 wrapper (0x41d1b0 / 0x41d1d0) は、第 2 引数の上位 16 bit が 0 なら序数として直接渡し、そうでなければ文字列を変換してから渡す (変換関数の同定は未了)。
+- 18999 では 0x6dc2d0 の呼出元は仮想メソッド (0x6dff80、vtable 上の位置 0x6db200 を `.text` 内で確認) で、0x6dff80 が明示名 (r8) を先に試し、失敗時に 0x6dc2d0 の総当たりへ回る。 19164 の仮想メソッド経由の呼出は未確認。
+- 解決名: 両 engine の export と大文字小文字を区別して照合すると、最初の一致は `VSTPluginMain` (表の 2 番目)。 `VstPluginMain` (表の 1 番目) は両 engine に無い。
+
+### 18-5. 呼出境界の実測 (shell_bind.py [5][6])
+
+| 項目 | 18999 (Delay 3) | 19164 (Multiband Delay) |
+|---|---|---|
+| 入口の呼出 (解決した FARPROC) | 0x6dd3d5 `call [rbp+0x338]` (関数 0x6dcb80) | 0x6d6205 `call [rbp+0x338]` (関数 0x6d59b0) |
+| 引数 (rcx) | `lea rcx,[rip-0x18d5]` → 0x6dbb00 (殻のコールバック) | `lea rcx,[rip-0x18d5]` → 0x6d4930 (殻のコールバック) |
+| 戻り値 | rax → 0x6dd3e2 `mov [rcx+0x9b4], rax` | rax → 0x6d6212 `mov [rcx+0x9b4], rax` |
+| コールバックの先頭 | `push` 6 個・`mov [rbp+0x30],rcx` … (rcx=effect、edx=opcode、r8d=index、r9=value、残りはスタック。 0x6dbb0f〜0x6dbb1a) | 同形 (0x6d4930 から push 6 個・`sub rsp,0x78`) |
+| dispatcher 呼出 | 0x6dd6e9 `call [rax+8]` (rcx=`[obj+0x9b4]`、edx=0、r8=0、r9=0、`[rsp+0x20]`=0、`[rsp+0x28]`=0.0f) | 0x6d6519 `call [rax+8]` (同じ設定) |
+| engine 側の入口 (shell_bind.py [6]) | `VSTPluginMain` = `jmp ?CreateEngine` (RVA 0xe9a0 → 0xe830)。 `CreateEngine` の引数型は `AEffect* (*)(audioMasterCallback)` (export 名のマングリングから) | `VSTPluginMain` = 本体 (RVA 0x1d77f0、`push rbx`)。 `CreateEngine` の export は無い |
+
+- 呼出規約は Win64 (rcx/rdx/r8/r9 + スタック)。 戻り値は rax。 engine → 殻の方向の呼出 (engine が殻のコールバックを呼ぶ箇所) は本節で測っていない (範囲外)。
+- `[rax+8]` が dispatcher であることは、VST2 SDK の 64-bit `AEffect` 配置 (magic: int32、dispatcher: offset 8) からの推定。 配置の実測はしていない。
+
+### 18-6. 検証・限界
+
+- 検証範囲: 殻と engine の PE 上の静的な呼出関係、export 名の照合、呼出の引数準備の静的読取り。 範囲外: 実行 (Wine 等での起動)、engine の正しさ、wasm へのリンク (#201 の出口条件側)。
+- NC (ネガティブコントロール): 存在しない engine 名 `Nope_x64.dll` で経路と間接呼出の判定が落ちる (`FAIL ['load', 'entry']`、rc 1)。
+- 鮮度: 測定 commit 1a72e7dbf。 以後の差分は本節の文書のみ (`git diff 1a72e7dbf HEAD -- tools/plugins/reverb_delay/shell_bind.py` の出力は 0 行)。
+
+| 未解決 | 影響 | 起票先 |
+|---|---|---|
+| `LoadLibraryW` の引数 (`obj+0x2a6`) の書込元が未特定。 読み込まれる実パスが `engine_x64.dll` / `Engine_x64.dll` であることは静的に未確認 | 結合の前提 (読み込む DLL の同一性) | 本 PR の未解決表 → #3446 へのコメント。 子 issue 化は PM 判断 |
+| 殻 ↔ engine の実行時検証 (dispatcher 呼出の戻り値、コールバックの実際の引数) なし | ABI は静的推定 | #201 の差分試験 (出口条件 3) |
+| 19164 の名前走査の仮想メソッド経由の呼出元 (18999 の 0x6dff80 相当) 未確認 | 19164 の解決経路の一部 | 同上 (本 PR の範囲外) |
+| engine → 殻の呼出 (engine が殻のコールバックを呼ぶ箇所) の ABI 未測定 | 双方向の境界の一部 | #523 系 (PLG-F4-2、engine の lift 側) |
