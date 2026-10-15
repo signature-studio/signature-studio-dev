@@ -6,7 +6,7 @@
 RetDec 由来の x87 鎖 (fld/fadd/fmul/fstp の stack 参照) が機械語とずれる kernel、または
 x87 の拡張精度 (80-bit 中間値) を f64 に落とすと丸めが変わる kernel は、関数単位で
 機械語どおりの本体を書く。関数のシグネチャ (引数順) は変えない。
-差し替え対象は BODIES の関数本体と GLOBAL_INITS の 1 行 (@global_var_6fffb0 の初期値) のみ。他の行は 1 byte も変えない。
+差し替え対象は BODIES の関数本体と GLOBAL_INITS の 1 行 (@global_var_6fffb0 の初期値) のみ。BODIES が呼ぶ declare の補完を除き、他の行は変えない。
 
 差し替えの根拠 (REPORT_APPENDIX_H §19):
   0x5dfff0  : 引数 a(xmm2)/b(xmm3) の参照が入れ替わる + (1±a)*b を 80-bit で丸める
