@@ -43,7 +43,7 @@ def main():
         for s in pe.sections:
             if s.VirtualAddress <= rva < s.VirtualAddress + max(s.Misc_VirtualSize, s.SizeOfRawData):
                 o = s.PointerToRawData + rva - s.VirtualAddress
-                avail = min(n, s.PointerToRawData + s.SizeOfRawData - o)
+                avail = max(0, min(n, s.PointerToRawData + s.SizeOfRawData - o))
                 return data[o:o + avail] + b'\0' * (n - avail)
         if rva < pe.OPTIONAL_HEADER.SizeOfHeaders:
             return data[rva:rva + n] + b'\0' * max(0, n - (len(data) - rva))

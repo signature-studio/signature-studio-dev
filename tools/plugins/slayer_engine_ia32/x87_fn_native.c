@@ -43,7 +43,7 @@ __asm__(
     " mov 8(%ebp),%edi\n mov 12(%ebp),%edx\n mov 16(%ebp),%esi\n"
     " movl %esp,g_sp\n"
     " pushl 20(%esi)\n pushl 16(%esi)\n pushl 12(%esi)\n pushl 8(%esi)\n pushl 4(%esi)\n pushl (%esi)\n"
-    " mov %edx,%ecx\n xor %eax,%eax\n xor %edx,%edx\n"
+    " mov %edx,%ecx\n xor %eax,%eax\n xor %edx,%edx\n mov $0x10F00000-0x1000,%ebp\n"
     " call *%edi\n"
     " movl g_sp,%esp\n"
     " pop %edi\n pop %esi\n pop %ebx\n pop %ebp\n ret\n");

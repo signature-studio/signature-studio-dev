@@ -44,6 +44,7 @@ POOL = 0x50000000
 POOL_SIZE = 0x4000000
 COUNT = int(os.environ.get('DYN_COUNT', '3000000'))
 COUNT_EXTRA = int(os.environ.get('DYN_COUNT_EXTRA', '1000000'))
+POSCTRL = os.environ.get('DYN_POSCTRL') == '1'
 ENTRY_INIT = 0x1803E71B0
 
 
@@ -295,6 +296,11 @@ def main():
 
     if slots:
         uc.hook_add(UC_HOOK_MEM_READ, on_slot_read, begin=min(slots) - 16, end=max(slots) + 23)
+    if slots and POSCTRL:
+        ctl = STUB + STUB_SIZE - 0x100
+        slot = min(slots)
+        uc.mem_write(ctl, b'\x48\xb8' + struct.pack('<Q', slot) + b'\x48\x8b\x00\xc3')
+        run('posctrl:slot_read', ctl, (0, 0, 0, 0))
     print('thunk heads (.data/.rdata の 8 byte 値 → call %#x で始まる): %d' % (ENTRY_INIT, len(thunks)), flush=True)
     for v in thunks:
         run('thunk:%#x' % v, v, (0, 0, 0, 0))
