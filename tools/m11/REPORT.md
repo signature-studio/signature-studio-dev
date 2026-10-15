@@ -227,7 +227,7 @@ unit 149 は OFF/ON とも oob のまま。ON で kind が変わるのは unit 8
 ## 19. #4011 [WIN-42]: vtable[0] 復元 `function_41a800` (gated `M11_M2V`) と QueryInterface `0x41c180` の C 転記 (部分達成)
 
 - 変更: `m11_passes.py` `pass_m2s_fn41a800_vtable0` (既定 OFF・`M11_M2V=1` で有効)・`m11_ov.c` に `tr_41c180` / `tr_4467ac` を `disp_find` 登録。`tr_41c180` の戻り値は `test al,al` で非 0 → 0・0 → `0x80004002` (機械語 `41c180`〜`41c191` と一致)。
-- 測定 commit: `71f6e449ac2218f3bff31a61e64da58c30dcee47` (PR head と同一)。以下は作者が同 commit で測定した値。**本 review 修正 run では再測定していない** (`work-m11` / `toolchain-retdec` が未取得で `tools/m11/work/` が無いため実行不可)。
+- 測定 commit: `71f6e449ac2218f3bff31a61e64da58c30dcee47`。以後の差分は REPORT.md のみ (`m11_ov.c` / `m11_passes.py` は差分 0)。以下は作者が同 commit で測定した値。**本 review 修正 run では再測定していない** (`work-m11` / `toolchain-retdec` が未取得で `tools/m11/work/` が無いため実行不可)。
 
 | コマンド | rc | 所要 | 備考 |
 |---|---|---|---|
