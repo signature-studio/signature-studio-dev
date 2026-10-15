@@ -186,7 +186,7 @@ string WAVRenderForm  ascii_hits=6 utf16_hits=0
 
 製品 KPI (flelift の起動 dispatch 数・通過 unit 数): 動かしていない (flelift は未変更。S1 は FL64.exe を 1 回だけ起動し、起動の dispatch 数は測っていない)。
 
-## 21. #3052 Autogun の 32-bit 書出しの書き手の切り分け (置換・int3)
+## 21. #3052 Autogun の 32-bit 書出しの経路の切り分け (置換・int3)
 
 測定 commit: **`af9a3a630`** (`tools/flp/s5_writer_matrix.sh` の追加と、`s2_render_probe.sh` に `S2_WINEDEBUG` を足した最後のコード変更)。`git diff af9a3a630 HEAD -- tools/flp/s2_render_probe.sh tools/flp/s5_writer_matrix.sh tools/flp/s1_wine_probe.sh tools/flp/s4_xref.py` の出力は 0 行 (本節は文書のみ)。
 
@@ -214,8 +214,8 @@ breakpoint 行 = `+seh` ログの `code=80000003` 行数。1 例外につき複�
 
 **21.2 読み取り**
 1. **§16.3・§20.4 の「書式は `0x670fd0` の第 6 引数 (`[rbp+0x178]`)」は、Autogun の 32-bit 経路では成り立たない。** `0x670fd0` は int3 で一度も実行されず (X8)、その直接呼出し元 3 件を nop にしても・第 6 引数を変えても出力は変わらない (X1〜X4)。`0x670fd0` の入口を ret にしても不変 (X5)。
-2. **実行されている書き手は `0x674800` (RIFF/WAVE) と `0x674620` (`fmt `)** (X9・X10)。`0x674800` は `fmt ` 側の `0x674620` を呼び、RIFF/WAVE/fmt のテンプレート (`.data` の `0x13e93ec`・`0x13e93f4` (JUNK)・`0x13e93fc`・`0x13e9404`) を参照する。32-bit 出力の WAV ヘッダ (`RIFF`・`WAVE`・`JUNK` (28 B、ゼロ)・`fmt `・`data`) と一致する。テンプレートを指す RIP 相対参照は `.text` 全体 (生バイト走査) で 19 箇所あり、`0x670fd0`・`0x674620`・`0x674800` の 3 関数のみ。
-3. **`0x674620` は書式を引数で受けない。** `this` 相当の `[rbp+0x60]` から `+0x50` → `+0x10` のテーブルを読み (`mov eax,[rax+rbx]`)、`cmp byte [rax+0x41],0` と `cmp byte [rax+0x42],0` で分岐する (objdump)。書式を決める値は、この書き出しオブジェクトのフィールドにあると推定する (未確認)。
+2. **int3 で到達する関数は `0x674800` (RIFF/WAVE 系) と `0x674620` (`fmt ` 系)** (X9・X10)。到達は「実行される」ことだけを示し、「WAV ヘッダを書く」「書式を決める」とは示さない (X6 との不整合は下記 4)。`0x674800` は `fmt ` 側の `0x674620` を呼び、RIFF/WAVE/fmt のテンプレート (`.data` の `0x13e93ec`・`0x13e93f4` (JUNK)・`0x13e93fc`・`0x13e9404`) を参照する。32-bit 出力の WAV ヘッダ (`RIFF`・`WAVE`・`JUNK` (28 B、ゼロ)・`fmt `・`data`) の構成とテンプレートの対応は観察した。テンプレートを指す RIP 相対参照は `.text` 全体で 19 箇所あり、`0x670fd0`・`0x674620`・`0x674800` の 3 関数のみ。(注: 19 箇所の走査と objdump による分岐の観察は手動確認。走査スクリプトは未コミット。`s5_writer_matrix.sh` は置換試験のみ。)
+3. **`0x674620` は書式を引数で受けない。** `this` 相当の `[rbp+0x60]` から `+0x50` → `+0x10` のテーブルを読み (`mov eax,[rax+rbx]`)、`cmp byte [rax+0x41],0` と `cmp byte [rax+0x42],0` で分岐する (objdump)。書式を決める値は、この書き出しオブジェクトのフィールドにあると推定する (未確認)。`0x674620` が WAV の fmt を実際に書くか (書式を決めるか) は、§21.3 の強制試験の結果待ち。
 4. **未解決の矛盾**: `0x674800` 入口を `ret` にしても (X6) WAV は同一に出る。一方、int3 では実行される (X10)。int3 の VEH による復帰の扱いと、`0x674800` 本体がヘッダの内容を決めるかは未確認。よって `0x674800` が形式を決めるかは、現時点では確定しない。
 5. 対照 C1 で置換は効く (16-bit に変わる)。よって X1〜X10 の不変は「置換が効かなかった」ではない。`speaker_x64.dll` (RIFF/fmt/WAVE を持つ別の DLL) は経路外 (S1)。
 
