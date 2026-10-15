@@ -4,7 +4,7 @@
 
 - 測定 commit: **`aa647a2ac`** (測定に使ったコードを変えた最後の commit。pad の並びを `g_dest_n`・`g_rec_*` と一致させた)。生値は `table_2275.tsv`・`addr_2275.txt` に tracked。HEAD の生値は `table_2275_head.tsv`・`addr_2275_head.txt` に tracked。
 - **測定 commit `aa647a2ac` では getmem −4 が再現しなかった**。測定した 7 構成 (A_default・R0_rtOFF・C_noren・NODATA・NODATA_BODY・PRE64・PRE4096) は全て getmem **2008**・fastmm_getmem_impl 2091・ok/trap/clobber 873/21/0。REPORT_2212 の R0・NODATA・既定の 2012 (と PRE64 の 2006) はこの測定 commit では出ない。
-- **HEAD の値は §10 で実測した** (測定した HEAD `5674b96ac`。tools/m11 のコードは `e3dc956f9` と同一): 7 構成 (13 セル) が全て 873/21/0・getmem 2008。R0_rtOFF も 2008 のため、HEAD でも −4 は再現しない。本書の §0・§3 の数値は、特に断らない限り測定 commit (`aa647a2ac`) の値である。
+- **HEAD の値は §10 で実測した** (測定した HEAD `bb8aaf1d5`。tools/m11 のコードは `e3dc956f9` と同じで、`m11_rt.c` の 290 行目のコメント 1 行だけが違う): 7 構成 (13 セル) が全て 873/21/0・getmem 2008。R0_rtOFF も 2008 のため、HEAD でも −4 は再現しない。本書の §0・§3 の数値は、特に断らない限り測定 commit (`aa647a2ac`) の値である。
 - 入力が変わっている (測定 commit で): IR md5 は REPORT_2212 の `baa100ff` から `423c347e` に変わった (全構成で同一)。ldfix の F3c は 36 から 46 に変わった。既定の基準も 870/24/0 から 873/21/0 に変わった。main 側の IR 生成の変更 (dade5b85 から e695e9f3f までの範囲) が入力を変えたと見ている。どの commit かは未特定 (§7)。本 PR は既定の出力を変えない (§5)。
 - 受入条件への対応 (§6):
   1. 関数本体の書込みを残し静的データだけ外す構成: NODATA_BODY を n=3 (直列・foreground) で測った。結果 2008 (= C_noren)。ただし −4 が測定 commit に無いため、データ由来か本体由来かは判定できない。
@@ -101,16 +101,16 @@
 
 - `bash tools/m11/trap_triage/repro_1952_rt_mech.sh [N] [CONFIG...]` (CONFIG に `NODATA_BODY` を追加)。表は `work/split_1952/table.tsv`、実アドレスは `work/split_1952/addr.txt` (gitignore)。tracked 版は測定 commit `table_2275.tsv`・`addr_2275.txt`、HEAD 版は `table_2275_head.tsv`・`addr_2275_head.txt`。
 - 前提: `FL_WIN64_DIR` = `[WIN64]` (`fl-win64` を展開し、`m11_build.sh` と `m11_gen_ir2.sh` で同じ値を使う。IR は PE のパスを記録する)・`work/` が `m11_gen_ir2.sh` 生成済み・`[EMSDK]` 配置済み。
-- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` (`docs/WORKFLOW.md` §11)。前回の run では `toolchain-retdec`・`toolchain-emsdk`・`work-m11` が無く実行できなかった。HEAD で実行した手順は §10。
+- 素材: `oc_artifacts: fl-win64 toolchain-retdec toolchain-emsdk work-m11` (`docs/WORKFLOW.md` §11)。HEAD で実行した手順は §10。
 
 ## 9. 測定 commit からの差分
 
 - 測定 commit: `aa647a2ac` (pad を `g_dest_n`・`g_rec_*` と同じ並びにした版)。この commit の `tools/m11` で §3 の表を測った。
 - 前回の版 `bf11784ec` (pad 修正前) の NODATA_BODY 行は、静的領域の並びが C_noren と 8 B・0x10 B ずれていたため採らない (§4 の結果で置き換えた)。
-- 差分 (`aa647a2ac` → 確認時の HEAD `5674b96ac`。`trap_triage` を除く。コマンド: `git diff --stat aa647a2ac HEAD -- tools/m11 ':(exclude)tools/m11/trap_triage'`)。以前の「出力は空」は merge 前の commit の結果で、HEAD には当てはまらない。
+- 差分 (`aa647a2ac` → 確認時の HEAD `bb8aaf1d5`。`trap_triage` を除く。コマンド: `git diff --stat aa647a2ac HEAD -- tools/m11 ':(exclude)tools/m11/trap_triage'`)。以前の「出力は空」は merge 前の commit の結果で、HEAD には当てはまらない。
 
 ```
- tools/m11/REPORT_APPENDIX_3188.md        |  75 +++++++++++++
+ tools/m11/REPORT_APPENDIX_3188.md        |  75 ++++++++++++
  tools/m11/REPORT_APPENDIX_3229.md        |  47 ++++++++
  tools/m11/REPORT_N3172.md                |  90 +++++++++++++++
  tools/m11/REPORT_N3325.md                | 106 +++++++++++++++++
@@ -138,18 +138,20 @@
  tools/m11/m11_ov.c                       |  50 +++++++-
  tools/m11/m11_post.py                    |  12 +-
  tools/m11/m11_ptrcheck.mjs               |   2 +-
+ tools/m11/m11_rt.c                       |   2 +-
  tools/m11/m11_tolerant.mjs               |  11 +-
- 29 files changed, 1757 insertions(+), 91 deletions(-)
+ 30 files changed, 1758 insertions(+), 92 deletions(-)
 ```
 
-差分は 0 ではない。main 取り込みで入った IR 生成・build の変更 (`m11_build.sh`・`m11_gen_ir2.sh`・`m11_post.py`・`m11_ov.c`・`ldfix/`) が測定経路に含まれる。HEAD での再測定は §10。
+差分は 0 ではない。main 取り込みで入った IR 生成・build の変更 (`m11_build.sh`・`m11_gen_ir2.sh`・`m11_post.py`・`m11_ov.c`・`ldfix/`) が測定経路に含まれる。`m11_rt.c` の差分は 290 行目のコメント 1 行 (#2275 round 5 の修正) で、測定経路には入らない。HEAD での再測定は §10。
 
 ## 10. HEAD の再測定 (実施)
 
-- 測定した HEAD: `5674b96ac` (PR の REPORT 修正を重ねた版)。tools/m11 のコードは `e3dc956f9` と同一 (下の差分 0 の証跡)。`e3dc956f9` は origin/main `517b95da3` を取り込んだ merge。競合は `tools/m11/m11_build.sh` の CF 行 1 箇所で、origin/main の `-DM11_PROBE_2400` と本ブランチの `-DM11_RT_NODATA_BODY` を両方残して解消した。
+- 測定した HEAD: `bb8aaf1d5` (`m11_rt.c` の 290 行目のコメントを直した commit)。その後の commit は REPORT_2275.md と DOC_MAP.md だけを変え、tools/m11 のコードは変えない。tools/m11 のコードは `e3dc956f9` と同じで、違うのは `m11_rt.c` の 290 行目のコメント 1 行だけ (下の差分証跡)。`e3dc956f9` は origin/main `517b95da3` を取り込んだ merge。競合は `tools/m11/m11_build.sh` の CF 行 1 箇所で、origin/main の `-DM11_PROBE_2400` と本ブランチの `-DM11_RT_NODATA_BODY` を両方残して解消した。
+- 前の HEAD `3daa45491` でも同じ手順を実行し、13 セルが同一だった (round 4 の run)。
 - 素材 (この再測定): `fl-win64` を `$RUNNER_TEMP/fl-win64` に展開し `FL_WIN64_DIR` に設定。`work-m11` を `tools/m11/work/` に展開。`toolchain-retdec`・`toolchain-emsdk` の tarball は展開せず、既存の `[RETDEC]`・`[EMSDK]` を使った (`m11_build.sh` は `[EMSDK]` を固定の場所から読む)。`emcc --version` = `6.0.12 (5488e0871d46)`。
-- IR 再生成 `m11_gen_ir2.sh`: rc=0・32.8 秒。ldfix 行: `F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 F3d=0 F4=10 errors=0`。`ir_conditions.json` の `ldfix`・`ld108`・`ld115` は applied。`ir_sha256` は `12dde126…`。
-- repro: `bash tools/m11/trap_triage/repro_1952_rt_mech.sh 3 A_default C_noren NODATA_BODY` (rc=0・3 分 46.2 秒) と `... 1 R0_rtOFF NODATA PRE64 PRE4096` (rc=0・1 分 35.6 秒)。直列・foreground。測定開始時の load average 1 分平均 0.72。
+- IR 再生成 `m11_gen_ir2.sh`: rc=0・51.7 秒。ldfix 行: `F1=902 F1v=4 F2=30 F3a=3 F3b=5 F3c=46 F3d=0 F4=10 errors=0`。`ir_conditions.json` の `ldfix`・`ld108`・`ld115` は applied。`ir_sha256` は `12dde126…`。
+- repro: `bash tools/m11/trap_triage/repro_1952_rt_mech.sh 3 A_default C_noren NODATA_BODY` (rc=0・6 分 7.7 秒) と `... 1 R0_rtOFF NODATA PRE64 PRE4096` (rc=0・2 分 20.7 秒)。直列・foreground。n=3 の開始時の load average 1 分平均 0.54。
 
 | 構成 | 回数 | boot_final3.ll md5 | undefined symbol | ok/trap/clobber | getmem | fastmm_getmem_impl |
 |---|--:|---|--:|--:|--:|--:|
@@ -161,9 +163,10 @@
 | PRE64 | 1 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
 | PRE4096 | 1 | 8b4461e0 | 0 | 873/21/0 | 2008 | 2091 |
 
-- 全 13 セル (n=3 の 3 構成 9 行・n=1 の 4 構成 4 行) が同一。生の表は `table_2275_head.tsv` (`work/split_1952/table.tsv` の写し・ヘッダ無し・13 行)、実アドレスは `addr_2275_head.txt` (13 行)。
+- 全 13 セル (n=3 の 3 構成 9 行・n=1 の 4 構成 4 行) が同一。生の表は `table_2275_head.tsv` (ヘッダ無し・13 行)、実アドレスは `addr_2275_head.txt` (13 行)。本 commit の実測 (`work/split_1952/table.tsv`・`addr.txt`) と全行一致 (`diff` の出力は空)。
 - 静的領域 (`.data`・`.bss` の VA と大きさ、pad の位置) は §4 と同一 (`addr_2275_head.txt` で確認)。
-- 差分 0 の証跡 (WORKFLOW §6): `git diff --stat e3dc956f9 HEAD -- tools/m11 ':(exclude)tools/m11/trap_triage/*_2275*'` の出力は空。除外しているのは本書と 2275 の生値 (`table_2275*.tsv`・`addr_2275*.txt`) で、コードではない。本書の commit も tools/m11 のコードを変えない。
+- 前処理: 既定フラグで `bb8aaf1d5` の `m11_rt.c` を `gcc -E -P` で前処理した md5 は `9e726bc5…` で、origin/main `4517825a2` の `m11_rt.c` と一致する。IR の md5 (`8b4461e0`) は前の HEAD と同じ。
+- 差分 0 の証跡 (WORKFLOW §6): `git diff --stat e3dc956f9 bb8aaf1d5 -- tools/m11 ':(exclude)tools/m11/trap_triage/*_2275*'` の出力は `tools/m11/m11_rt.c | 2 +-` の 1 行だけ (コメント 1 行の変更)。除外しているのは本書と 2275 の生値 (`table_2275*.tsv`・`addr_2275*.txt`)。コードは変わっていないため、上の再測定の値は HEAD の値である。
 - 結論:
   - **HEAD でも getmem −4 は再現しない**。R0_rtOFF (rt.o の計測 OFF) も 2008 で、REPORT_2212 の 2012 は出ない。「rt.o の計測 flag が −4 を生む」は HEAD でも成り立たない。
   - 受入 1・2・5 の機序は、−4 が無いため HEAD でも判定できない (§6 のまま)。
