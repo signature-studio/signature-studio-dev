@@ -7,7 +7,7 @@
  * - 現状の producer は tools/audio のテスト wasm (fla_test: 440/660Hz 正弦)。FL 本体 wasm の接続時は
  *   loadToneWasm を差し替えるだけでよい (FlAudioWasmApi の 5 関数が接点)。
  */
-import { FlAudioShim, type FlAudioWasmApi, type FlCaptureSpec, type ProducerStats } from "./audio-shim";
+import { FlAudioShim, type ConsumerUnderrun, type FlAudioWasmApi, type FlCaptureSpec, type ProducerStats } from "./audio-shim";
 
 /** vite の base が / 以外でも解決できるよう document.baseURI 基準にする (public/worklets/ を配置) */
 export const WORKLET_URL = new URL("worklets/fl-audio-worklet.js", document.baseURI).href;
@@ -66,6 +66,8 @@ export interface FlAudioSession {
   underruns(): number;
   /** producer の起床統計 (失敗時に producer 遅延の有無を見る) */
   producer(): ProducerStats;
+  /** worklet 側の underrun 通知 (失敗時に consumer 側の直前の履歴を見る) */
+  consumer(): ConsumerUnderrun[];
   dispose(): void;
 }
 
@@ -108,6 +110,7 @@ export async function startFlAudio(o: StartOptions = {}): Promise<FlAudioSession
     samplePosition: () => (shim.snapshot().quanta ?? 0) * 128,
     underruns: () => shim.snapshot().underruns ?? 0,
     producer: () => shim.producerStats(),
+    consumer: () => shim.consumerStats(),
     dispose: () => shim.dispose(),
   };
 }
