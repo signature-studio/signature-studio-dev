@@ -33,6 +33,15 @@ async function http(ctx, p, init = {}) {
   return r;
 }
 
+// 実機 (Workers Static Assets, 既定 html_handling: auto-trailing-slash) は /index.html を 307 -> / で返す。
+// Access ログインの 3xx と取り違えないよう、status と Location を厳密に検査する (deploy/EDGE-SIM.md §A-2・§B)。
+export function assertIndexHtmlRedirect(r, base) {
+  const loc = r.headers.get("location");
+  assertEq(r.status, 307, `/index.html status (Location=${loc ?? "なし"})`);
+  assert(loc !== null, "/index.html の Location が無い");
+  assertEq(new URL(loc, base).href, new URL("/", base).href, "/index.html Location");
+}
+
 const STATUS_JS = `document.getElementById('status')?.textContent ?? ''`;
 
 export const checks = [
@@ -61,6 +70,13 @@ export const checks = [
       const probes = ["/", "/index.html", jsPath, "/worklets/fl-audio-worklet.js", "/__e2e__/add.wasm"];
       const notes = [];
       for (const p of probes) {
+        if (p === "/index.html" && ctx.target.name === "url") {
+          const r = await fetch(new URL(p, ctx.url), { redirect: "manual", headers: ctx.headers });
+          assertIndexHtmlRedirect(r, ctx.url);
+          await r.arrayBuffer();
+          notes.push("/index.html=307->/");
+          continue;
+        }
         const r = await http(ctx, p, { headers: { "Accept-Encoding": "br, zstd, gzip" } });
         if (p === "/__e2e__/add.wasm" && r.status === 404) {
           notes.push("add.wasm 未配置(skip)");
