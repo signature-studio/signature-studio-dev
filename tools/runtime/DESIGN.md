@@ -163,9 +163,9 @@ e2e (`pnpm runtime:e2e`): stage → Vite dev (COOP/COEP) → headless Chrome →
 | 機能 | 検出 | 無い場合の退避 |
 |---|---|---|
 | 実行可否 (必須) | main: `crossOriginIsolated && typeof SharedArrayBuffer !== "undefined"`。Worker: shared Memory 生成と、`Atomics.wait` が `"timed-out"` を返すこと (TypeError でないこと) | ring 経路 (`Atomics.wait`) が成立しないため起動せず、非対応メッセージを表示 (退避なし) |
-| memory64 | `WebAssembly.validate` で memory64 モジュールを検証 | 既定は wasm32 のため不要。検出結果で wasm32↔wasm64 を切り替えない。wasm64 ビルドは §1.5 の退避トリガ時だけ使う |
+| memory64 | `WebAssembly.validate` で memory64 モジュールを検証 | 既定は wasm32 のため不要。検出結果で wasm32↔wasm64 を切り替えない。wasm64 ビルドは §1.5 の退避トリガ時だけ使い、その場合は shared かつ事前確保を優先する (非 shared の大域 grow が遅い。REPORT RT-9) |
 | JSPI | `typeof WebAssembly.promising === "function" && typeof WebAssembly.Suspending === "function"` | 副次手段のため無くても成立する。無ければ ring 経路のみ。async→sync の橋渡し (VFS 等) は補助 Worker の sync-RPC へ (§2.5、未実装) |
-| OffscreenCanvas | Worker 内で `transferControlToOffscreen()` と `getContext("2d")` が成功すること | メインスレッド canvas + 描画コマンド転送 (RT-3 で設計) |
+| OffscreenCanvas | main: `typeof HTMLCanvasElement.prototype.transferControlToOffscreen === "function"` のうえで、検出専用の使い捨て canvas に `transferControlToOffscreen()` が成功すること (本番 canvas は検出で転送しない)。Worker: `new OffscreenCanvas(w, h).getContext("2d")` が成功すること | メインスレッド canvas + 描画コマンド転送 (RT-3 で設計) |
 | Worker 内 WebGL2 | Worker 内で `getContext("webgl2")` (実行時に判定。headless では判定できない) | GUI の描画は 2D (RT-3)。GL 描画を使う段階で退避を設計する (未決) |
 | VFS (OPFS sync handle) | Worker 内で `navigator.storage.getDirectory()` と `createSyncAccessHandle` | **退避は未設計 (未解決)**。WebKit 参考値では `navigator.storage` が無い。Safari の有無は未確認 |
 | AudioWorklet | `ctx.audioWorklet.addModule` の成否と、`ctx.resume()` が時限内に解決すること | 無音で起動せず明示エラー (音声は sample clock マスター: RT-4)。時限の値は実装時に決める。Firefox は音声 backend が無いと `resume()` が解決しない |
