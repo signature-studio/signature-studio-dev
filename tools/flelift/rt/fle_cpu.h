@@ -55,7 +55,8 @@ void fle_chk(uint64_t a, int line);
 #define LDF64(a) (*(f64u*)A_(a))
 #ifdef FLE_WWATCH
 /* 書込み監視 (診断用・既定無効)。書込み先が監視 slot に重なるときだけ fle_wwatch が stderr に出す (fle_cpu.c)。
- * 書込み値は一時変数に取ってから監視して store する (値の式を 2 回評価しない)。 */
+ * 書込み値は一時変数に取ってから監視して store する (値の式を 2 回評価しない)。
+ * ST* の a は WW_ と A_ で 2 回評価されるので、副作用の無い式であること (x64c の生成アドレス式は純粋式)。 */
 void fle_wwatch(uint64_t a, uint32_t n, const void* src, const char* file, int line);
 #define WW_(a, n, p) fle_wwatch((uint64_t)(a), (n), (p), __FILE__, __LINE__)
 #define ST8(a, v) ({ uint8_t wv_ = (uint8_t)(v); WW_(a, 1, &wv_); (*(u8u*)A_(a) = wv_); })
