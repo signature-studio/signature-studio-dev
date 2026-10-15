@@ -219,6 +219,9 @@ class Session:
             rec['cases'].append(c)
         if not any(c['outcome'] in ('equal', 'diff', 'wasm_trap') for c in rec['cases']):
             fvm, fvm_skip = self._fvm_cases(nat, was, va, sig, rec['cases'], sigs)
+            for c in fvm:
+                if c['outcome'] == 'diff' and (c.get('diffs') or {}).get('calls', {}).get('kind') == 'native_extra_call':
+                    c['fvm_held'] = True   # LD-196 (PM 判断 R7): fvm の native_extra_call 系 diff は mismatch にせず unexec に据え置く
             rec['cases'] += fvm
             if fvm_skip:
                 rec['fvm_skip'] = fvm_skip
