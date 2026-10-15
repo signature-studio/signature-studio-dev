@@ -738,6 +738,7 @@
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_1223.md` | ~54 | Slayer_Engine.dll (block22434) の native vs wasm 差分試験 (#1223 PLG-G2-11): leaf 関数 4 本の eax と OBJ 領域の bit 突合・ネガコン。 測定値の正本 (REPORT §13 の付録) |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3127.md` | ~123 | Slayer_Engine.dll の export main (0x10007ca0) の native vs wasm 差分試験 (#3127 PLG-G2-26、callback 0 経路): KERNEL32 import 41 件の ia32 方針表 (実装・stub・fail-fast)・heap/TLS の突合・ネガコン。 非 0 経路は #3917。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_3128.md` | 104 | Slayer_Engine.dll の実行時の 3 点 (#3128 PLG-G2-27): 間接 call (`ott_dispatch`) の native vs wasm 突合 128/128・ネガコン (入口 2 本・呼先 9 本の範囲)、AF を読む命令 0 件の列挙 (sahf 32 件)、fs: (TEB) の列挙 (lift 済み 18 件・DLL 全体の下限 22 件)、native 突合の未達 (子 PLG-G2-37)、未 lift 区間の分類の誤り (#3546)。 測定値の正本 (REPORT §13 の付録) |
+| `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_4066.md` | ~45 | x87 断片 10 本の入口判定 (#4066 PLG-G2-42): 直接 call・間接ジャンプテーブルの参照から callee 4 本と switch-arm 断片 6 本に分類 (規則は `x87_fn_diff.py --classify`)。 親関数の入口は未確定。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/REPORT_APPENDIX_2989.md` | ~95 | x87 を含む leaf 関数 2 本の native vs wasm 差分試験 (#2989 PLG-G2-25): eax・x87 深さ・ST(0)・OBJ 窓の突合、ST(0) の f64 の丸め差の分布、ネガコン 2 種 (判定器・lowering の 1 演算の取り違え)。 測定値の正本 |
 | `tools/plugins/slayer_engine_ia32/MARSHAL.md` | ~80 | 殻 (x64) ↔ Slayer_Engine.dll (ia32) の VST2 構造体 marshal 表の仕様 (#674 受入 3)。測定値は REPORT.md §9 |
 | `tools/shared/REPORT.md` | ~212 | FL Shared ライブラリの分類・IPP 実測・OSS wasm 再ビルド・プロプラ lift PoC。win freetype.dll = 2.4.10 確定 (#145, §3.1) |
