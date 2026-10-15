@@ -4,8 +4,11 @@
 #   (B) 旧既定 (--auto none) の liftlib gate : checks/census/trap + outhash 42/42 一致
 # 出力: tools/ott/work/cab238/outhash_gate/{A,B}.log, A_fp1.json, A_ref.json
 set -uo pipefail
-SNAP=/home/ubuntu/work/webstudio/tools/liftlib/work/wt_cab238/tools/liftlib
-OUT=/home/ubuntu/work/webstudio/tools/ott/work/cab238/outhash_gate
+HERE_GATE="$(cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=/dev/null
+source "$HERE_GATE/../../shared/env.sh"   # REPO_ROOT
+SNAP="$REPO_ROOT/tools/liftlib/work/wt_cab238/tools/liftlib"
+OUT="$REPO_ROOT/tools/ott/work/cab238/outhash_gate"
 mkdir -p "$OUT"
 export PATH="$SNAP/../..:$PATH"
 NODE="$(command -v node || ls /opt/emsdk/node/*/bin/node | tail -1)"
@@ -18,10 +21,10 @@ echo "=== (A) auto f7,p1 = 既定ビルド vs m10 参照 (40 combo, p0.9_f1_a0 /
   cd "$SNAP"
   # 既定 (legacy) レイアウト: e2e_harness は既定 ARENA 0x30310000 を使う (LB_* env は渡さない)
   DROP=p0.9_f1_a0,p0.9_f1_a1 OTT_CJS="$SNAP/work/ott_auto_f7_p1/ott_gen.cjs" \
-      "$NODE" /home/ubuntu/work/webstudio/tools/ott/f7eval/cab238_outhash.mjs > "$OUT/A_fp1.json" 2>"$OUT/A_fp1.err"
+      "$NODE" "$REPO_ROOT/tools/ott/f7eval/cab238_outhash.mjs" > "$OUT/A_fp1.json" 2>"$OUT/A_fp1.err"
   echo "rc=$?" >> "$OUT/A.log"
   # m10 参照 (liftlib recipe 本体をそのまま使用 = gate (B) で 42/42 一致したものと同一条件)
-  env OTT_CJS=/home/ubuntu/work/webstudio/tools/m10/work/ott_m10.cjs \
+  env OTT_CJS="$REPO_ROOT/tools/m10/work/ott_m10.cjs" \
       "$NODE" liftlib/recipes/ott/ott_outhash.mjs > "$OUT/A_ref.json" 2>"$OUT/A_ref.err"
   echo "rc=$?" >> "$OUT/A.log"
 )

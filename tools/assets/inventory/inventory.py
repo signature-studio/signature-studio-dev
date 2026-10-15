@@ -15,13 +15,14 @@ from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 WORK = os.path.join(ROOT, 'work')
+sys.path.insert(0, os.path.join(HERE, '..', '..', 'shared'))
+from paths import FL_MAC_DIR, FL_WIN64_DIR as _WIN64
 # block_manifest.json / pe_metadata.json が無い環境は inventory/mk_inputs.py で再構成し WIN_INPUTS_DIR に置く
-_WIN64 = os.environ.get('FL_WIN64_DIR') or '/home/ubuntu/work/analysis/win64'
 _INPUTS = os.environ.get('WIN_INPUTS_DIR') or _WIN64
 WIN_EXTRACTED = os.path.join(_WIN64, 'extracted')
 WIN_MANIFEST = os.path.join(_INPUTS, 'block_manifest.json')
 WIN_PE_META = os.path.join(_INPUTS, 'pe_metadata.json')
-MAC_APP = '/home/ubuntu/work/analysis/mac/pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents'
+MAC_APP = os.path.join(FL_MAC_DIR, 'pkg_extract/payload_out/Applications/FL Studio 2026.app/Contents')
 
 # ---- 分類 ---------------------------------------------------------------
 # cls: 実行バイナリの扱い   lift    = wasm 化(lift)対象 (FL 独自/クローズド)

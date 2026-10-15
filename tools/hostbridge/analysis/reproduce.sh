@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # reproduce.sh — Fruity Wrapper 解析の根拠 (evidence/*) を素材から再生成する.
-#   素材: /home/ubuntu/work/analysis/win64/extracted/blockNNNNN_PE.bin (自作 NSIS パーサ産物)
-#         /home/ubuntu/work/analysis/plugins/ott/report_logs/ghidraProj (OTT Ghidra project; コピーして使用)
+#   素材: $FL_WIN64_DIR/extracted/blockNNNNN_PE.bin (自作 NSIS パーサ産物; tools/shared/env.sh)
+#         $PLUGINS_DIR/ott/report_logs/ghidraProj (OTT Ghidra project; コピーして使用)
 #         tools/m2/work/ghidra_dll (FLEngine_x64.dll の Ghidra project; コピーして使用)
 #   初回は fw_a.dll の Ghidra 自動解析 (~3 分) が走る. 以降は解析済 project に対するクエリのみ (数十秒).
 set -euo pipefail
 HB="$(cd -- "$(dirname -- "$0")/.." && pwd)"
-W="$HB/work"; G="$W/ghidra"; E="$HB/evidence"; X=/home/ubuntu/work/analysis/win64/extracted
+# shellcheck source=/dev/null
+source "$HB/../shared/env.sh"   # FL_WIN64_DIR / PLUGINS_DIR
+W="$HB/work"; G="$W/ghidra"; E="$HB/evidence"; X="$FL_WIN64_DIR/extracted"
 GH=/opt/ghidra/ghidra_12.1.4_PUBLIC/support/analyzeHeadless
 mkdir -p "$W" "$G" "$E"
 [ -f "$W/fw_a.dll" ]          || cp "$X/block19091_PE.bin" "$W/fw_a.dll"        # Fruity Wrapper 2.7.0.5653 (x64)
@@ -16,7 +18,7 @@ if [ ! -d "$G/fw.rep" ]; then
   (cd "$W" && "$GH" ghidra fw -import fw_a.dll -scriptPath "$HB/ghidra_scripts" -postScript DumpFunctions.java "$G/functions_fw.csv" -max-cpu 8 > "$G/analyze_fw.log" 2>&1)
 fi
 [ -d "$W/ghidra_fle" ]  || cp -r "$HB/../m2/work/ghidra_dll" "$W/ghidra_fle"
-[ -d "$W/ghidraProj.rep" ] || cp -r /home/ubuntu/work/analysis/plugins/ott/report_logs/ghidraProj.* "$W/"
+[ -d "$W/ghidraProj.rep" ] || cp -r "$PLUGINS_DIR"/ott/report_logs/ghidraProj.* "$W/"
 Q() { "$HB/ghidra_scripts/run.sh" "$@" > /dev/null; }
 FW() { local out="$1"; shift; Q "$G" fw fw_a.dll "$E/$out" "$@"; }
 FLE() { local out="$1"; shift; Q "$W/ghidra_fle" ghproj_dll block00031_PE.bin "$E/$out" "$@"; }
