@@ -128,18 +128,21 @@ n=3 の所要 **146 / 147 / 147 s** (並列数 1、4 コア)、終了時 load av
 ### 4.7 e2e 修正 (#4039・a7d3646be) の実測と IR 条件
 
 測定 commit: `a7d3646be` (`ldfix_509_e2e.sh` の prev 依存と修復後 wasm の build 条件を揃えた commit)。
-`git diff a7d3646be HEAD -- tools/m11` の本体差分は 0 行 (e2e の経路: `ldfix/`・`m11_build.sh`・`m11_cond.py`・`trap_triage/survey_*`・`tools/shim`・`tools/shared` の差分 0)。main 取り込みで `tools/m11` に増えたのは別 issue の REPORT・補助 script のみ。
+`git diff --stat a7d3646be HEAD -- tools/m11` は 20 files / +1216 −17。大半は main 取り込みで入った別 issue の REPORT・補助 script (`REPORT_1325.md`・`REPORT_3195.md`・`residual_3195.py`・`u3_check_4040.py` ほか)。
+e2e の本体 `tools/m11/ldfix/ldfix_509_e2e.sh` は `a7d3646be → HEAD` で 13 行追加・12 行削除 (`|| { ...; FAIL=1; }` の追加、`FAIL=0` の位置の移動、コメント追加)。値を生成する経路 (`ldfix.py`・`ldmach*.py`・`ldframe.py`・`ldfix_img.py`・`audit_lsf.py`・`reach_509.sh`・`dyn_509.mjs`・`m11_build.sh`・`m11_cond.py`・`trap_triage/survey_*`・`tools/shim`・`tools/shared`) は `a7d3646be → HEAD` で差分 0。
+ただし上の実測 (rc=0) は FAIL 伝播が無い `a7d3646be` の版のもの。`HEAD` の rc 挙動は未実測。
 
 | 項目 | 結果 |
 |---|---|
-| e2e `ldfix_509_e2e.sh` (`PREV_REF=HEAD`) | rc=0、4 分 5 秒、load (1 分値) 終了時 1.18 |
-| e2e (`PREV_REF=009e823`、既定) | rc=0、3 分 38 秒、load 終了時 1.18 |
+| e2e `ldfix_509_e2e.sh` (`PREV_REF=HEAD`、測定 commit `a7d3646be`) | rc=0、4 分 5 秒、load (1 分値) 終了時 1.18 (FAIL 伝播前の版) |
+| e2e (`PREV_REF=009e823`、既定、測定 commit `a7d3646be`) | rc=0、3 分 38 秒、load 終了時 1.18 (FAIL 伝播前の版) |
 | 直接呼び出し 5 関数 (c62780・7e5240・409c80・41a670・1063090) | 修復前 wasm FAIL 5/5、修復後 wasm PASS 5/5 (`DYN_SUMMARY after_fail=0/5`) |
 | 旧版 009e823 の ldfix 出力 (`NC:prev`) | store 形 SUSPECT 8 関数 / 11 site (§4.5 と一致) |
 | 修復後 wasm の survey | ok 871 → 873、ok 退行 0 |
 
 - 上の実測は測定 commit `a7d3646be` のもの。本 REPORT の文言修正 (次行の注) の後の HEAD では e2e を再実行していない。
-- ネガコン 2 件 (`nc_store`・`nc_use`) は `AssertionError` で止まり、SUSPECT 値を取れていなかった (a7d3646be の時点)。ネガコンの正規表現が現在の IR と合わない可能性が残る (未確認)。a7d3646be 以降、`ldfix_509_e2e.sh` は各 step の失敗を `FAIL=1` にして rc≠0 で終わる (失敗を rc=0 に隠さない)。
+- ネガコン 2 件 (`nc_store`・`nc_use`) は `AssertionError` で止まり、SUSPECT 値を取れていなかった (a7d3646be の実測)。ネガコンの正規表現が現在の IR と合わない (ネガコンの正規表現の修正は #3194 の残件)。
+- **HEAD の e2e は step 5 の assert で rc≠0 になる**: step 5 の IR 作成 heredoc は `|| { ...; FAIL=1; }` で包まれており、上の AssertionError がそのまま `FAIL=1` になり、step 7 の前で rc≠0 として終わる。これは HEAD のコードからの判定で、HEAD での実行は未実測。rc≠0 は FAIL を rc に反映するための意図どおりの結果。
 - 修復前 wasm の IR 条件: `M11_LDFIX=0` で生成 (`ldfix=disabled`)。`ld108`・`ld115`・`r8b`・`src412770` は適用していない (`m11_gen_ir2.sh` の ldfix 分岐の外側)。build は `M11_ALLOW_LDFIX_DISABLED=1` の opt-in のみ。
 - 修復後 wasm の IR 条件: 修復前 IR に `ldfix.py --pe` のみを適用 (`ldfix=applied`)。`ld108`・`ld115`・`r8b`・`src412770` は未適用 (`ld108=disabled`・`r8b=disabled`・`ld115=disabled` を記録し、build は `M11_ALLOW_LD108_DISABLED=1 M11_ALLOW_R8B_DISABLED=1 M11_ALLOW_LD115_DISABLED=1` で opt-in)。通常パイプラインの wasm (`m11_gen_ir2.sh` の全 fix 適用) とは別物で、この 2 つの wasm の比較は `ldfix` の寄与だけを測るものではない (ld108・ld115・r8b・src412770 の寄与を含まない)。
 - `FL_WIN64_DIR="$(dirname "$(dirname "$PE_QS")")"` は `PE_QS` が `extracted/` 配下の場合のみ正しい。
