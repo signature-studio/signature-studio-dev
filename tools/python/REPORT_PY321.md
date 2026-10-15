@@ -59,6 +59,7 @@ issue #4347 の受入 1 は満たしていない。`Refs #4347` の部分達成�
 - 0x410090 の絶対 qword 3532 件 (8 バイト整列 3531 件) のうち、RIP 相対で読まれるものは 0 件。disp32 / 即値で読まれるものも無い。`pe_py321b_rbx80.py` の走査で、絶対 qword 表は RIP から参照されない。
 - 含意: 0x410090 は静的な表から `[rbx+0x80]` へ写される経路では無い。書込みは実行時 (オブジェクト生成・プロパティ設定) と見られる。この経路の特定には動的 trace か、3531 件の所属 (VMT かどうか) を別 probe で確定する必要がある。未確定。
 - probe: `tools/python/analysis/flapi/pe_py321b_rbx80.py` (4/4 PASS・終了 0・所要 37.3 秒・load average 0.58)。
+- 再検証 (HEAD で再実行): `pe_py274_dispatch.py` 8/8 PASS・終了 0・所要 37.0 秒。`pe_py321_upstream.py` 8/8 PASS・終了 0・所要 2 分 01 秒 (前回の 1 分 35 秒より長い。load average 1.29)。
 
 ## 5. 未解決 (起票先)
 
